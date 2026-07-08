@@ -192,6 +192,7 @@
         ['🏹 Adventures', () => UI.show('adventures')],
         ['🏆 Tournaments', () => UI.show('tournaments')],
         ['🏛 Dya Guild', () => UI.show('guild')],
+        ['📖 Vakarborac', () => UI.show('compendium')],
         ['👥 Friends', () => UI.show('friends')],
         ['📜 Profile', () => UI.show('profile')],
         ['⚙ Settings', () => UI.show('settings')],

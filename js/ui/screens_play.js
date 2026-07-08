@@ -678,7 +678,7 @@
             win: iWon && !draw, draw, ranked: cfg.ranked,
             opponentName: M.teams[1].name, format: cfg.format || 'Casual',
             duration: res.duration,
-            stats: { eliminations: T0.stats.eliminations, relicCaptured: T0.stats.relicCaptured, tokensPlayed: T0.stats.tokensPlayed },
+            stats: { eliminations: T0.stats.eliminations, relicCaptured: T0.stats.relicCaptured, tokensPlayed: T0.stats.tokensPlayed, combos: T0.stats.combos },
             replay, tournament: cfg.tournament || null,
             usedNewToken: usedNew, fastRelic: iWon && res.duration < 300 && T0.stats.relicCaptured,
           });
@@ -696,10 +696,15 @@
           ov.appendChild(parts);
         } else if (!draw) DYA.audio.play('defeat');
         ov.appendChild(U.el('h1', { cls: draw ? 'draw' : iWon ? 'victory' : 'defeat', text: draw ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT' }));
-        ov.appendChild(U.el('p', { cls: 'muted', text: 'vs ' + M.teams[1].name + (cfg.ranked ? ' · Ranked' : '') }));
+        const oppAcc = cfg.opponent && cfg.opponent.accId ? G.world.accounts[cfg.opponent.accId] : null;
+        ov.appendChild(U.el('p', { cls: 'muted', text: 'vs ' + M.teams[1].name + (oppAcc ? ' · rank ' + oppAcc.rank : '') + (cfg.ranked ? ' · Ranked' : '') }));
         if (rewards) {
           const rw = U.el('div', { cls: 'panel mt', style: 'min-width:340px;text-align:center' });
           rw.appendChild(U.el('div', { html: '⭐ <b class="gold">+' + rewards.xp + ' XP</b> &nbsp; 🪙 <b class="gold">+' + rewards.gold + ' gold</b>' }));
+          /* NgAkara and Okid shown only if earned (Part XII) */
+          if (rewards.salvage && (rewards.salvage.okid || rewards.salvage.ngakara)) {
+            rw.appendChild(U.el('div', { cls: 'small gold', text: 'Field salvage: ' + (rewards.salvage.okid ? '⬡ +' + rewards.salvage.okid + ' Okid ' : '') + (rewards.salvage.ngakara ? '🧪 +' + rewards.salvage.ngakara + ' NgAkara' : '') }));
+          }
           rewards.bonuses.forEach(([label, amt]) => rw.appendChild(U.el('div', { cls: 'small muted', text: label + ' +' + amt + ' XP' })));
           ov.appendChild(rw);
           (rewards.lvlEvents || []).forEach(ev => setTimeout(() => showLevelUp(ev), 700));

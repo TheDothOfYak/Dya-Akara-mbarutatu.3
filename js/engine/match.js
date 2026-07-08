@@ -61,7 +61,7 @@
       resources: t.startResources || 0,
       pouch: (t.pouch || []).map(tok => ({ tok, state: 'pouch', readiedAtPulse: -1 })),
       readied: [],                          // pouch entries, max 5
-      stats: { tokensPlayed: [], eliminations: 0, relicCaptured: false, relicMethod: null, resourcesEarned: 0, stolen: 0 },
+      stats: { tokensPlayed: [], eliminations: 0, relicCaptured: false, relicMethod: null, resourcesEarned: 0, stolen: 0, combos: {} },
       aiMem: { nextThink: 2 + i },
       aiRng: new U.Rng((cfg.seed >>> 0) ^ ((i + 1) * 0x9E3779B9)),
     }));
@@ -160,6 +160,7 @@
       c.rooted = true;
     }
     if (sp.behavior === 'gynge') c.state = 'dormant';
+    if ((sp.features.rider || sp.tags.includes('mount')) && M.teams[teamIdx] && M.teams[teamIdx].stats) M.teams[teamIdx].stats.combos['Rider on the field'] = true;
     M.creatures.push(c);
     M.addEffect('deploy', x, y, { r: c.radius });
     return c;
@@ -305,6 +306,15 @@
     const M = this;
     M.pulseIndex++;
     const esc = EC.escalationMult(M.time);
+    /* escalation announcements at 10/15/20+ min */
+    if (esc !== M.lastEsc) {
+      M.lastEsc = esc;
+      if (esc > 1) M.uiEvent(-1, 'event', 'ESCALATION ×' + esc + ' — resources per pulse multiplied.');
+    }
+    /* the Sunear'Zikhron passes overhead every fifth minute */
+    const zik = Math.floor(M.time / 60) % 5 === 4;
+    if (zik && !M.zikNoted) { M.zikNoted = true; M.uiEvent(-1, 'event', 'The Sunear’Zikhron passes overhead — the RubberMcFlies begin to glow.'); }
+    if (!zik) M.zikNoted = false;
     let interval = M.settings.pulseInterval, amount = M.settings.pulseAmount;
     if (M.settings.chaos) { interval = M.rng.pick(EC.PULSE_INTERVALS); amount = M.rng.pick(EC.PULSE_AMOUNTS); }
     M.nextPulseAt = M.time + interval;
@@ -344,6 +354,7 @@
         const jus = M.creatures.filter(o => !o.dead && o.speciesId === 'ju_field' && U.dist(c.x, c.y, o.x, o.y) < c.vars.conversionRange);
         if (jus.length) {
           const convertN = Math.round(2 * M.settings.pulseAmount * c.vars.efficiency);
+          if (convertN > 0 && M.teams[c.team]) M.teams[c.team].stats.combos['Ju Field awakened'] = true;
           for (let i = 0; i < convertN; i++) {
             const host = M.rng.pick(jus);
             if ((host.mem.juLeft == null ? (host.mem.juLeft = Math.round(host.vars.fieldSize || 8)) : host.mem.juLeft) <= 0) continue;
@@ -1004,6 +1015,7 @@
         M.addEffect('buff', ally.x, ally.y, {});
       },
       collectMakari(c, remnant) {
+        if (M.teams[c.team]) M.teams[c.team].stats.combos['Crushed Makari harvest'] = true;
         const i = M.remnants.indexOf(remnant);
         if (i >= 0) {
           M.remnants.splice(i, 1);
@@ -1012,6 +1024,7 @@
         }
       },
       supplyAcid(c, vorn) {
+        if (M.teams[c.team]) M.teams[c.team].stats.combos['Chemist acid supply'] = true;
         vorn.mem.chemistAcid = true;
         c.state = 'special';
         M.addEffect('buff', vorn.x, vorn.y, {});
@@ -1048,7 +1061,10 @@
         c.state = 'attack';
         if (c.attackCd <= 0) { c.attackCd = 1; s.hp -= c.dmg * 1.5; if (s.hp <= 0) { M.structures = M.structures.filter(x => x !== s); } }
       },
-      mountTower(c, s) { s.occupant = c.id; c.onTower = s.id; c.x = s.x; c.y = s.y - 16; },
+      mountTower(c, s) {
+        s.occupant = c.id; c.onTower = s.id; c.x = s.x; c.y = s.y - 16;
+        if (M.teams[c.team]) M.teams[c.team].stats.combos['Builder’s tower manned'] = true;
+      },
 
       addEffect: (type, x, y, data) => M.addEffect(type, x, y, data),
     };

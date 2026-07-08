@@ -736,8 +736,18 @@
       if (me.lastWinDay !== day) { me.lastWinDay = day; xp += EC.XP_BONUS.firstWinOfDay; bonuses.push(['First win of the day', EC.XP_BONUS.firstWinOfDay]); }
       if (result.usedNewToken) { xp += EC.XP_BONUS.newTokenMatch; bonuses.push(['New token’s first match', EC.XP_BONUS.newTokenMatch]); }
       if (result.fastRelic) { xp += EC.XP_BONUS.fastRelic; bonuses.push(['Swift Relic capture', EC.XP_BONUS.fastRelic]); }
+      /* in-match combo achievements (Part IX bonus XP) */
+      const combos = result.stats && result.stats.combos ? Object.keys(result.stats.combos) : [];
+      combos.slice(0, 2).forEach(cn => { xp += EC.XP_BONUS.comboAchieved; bonuses.push(['Combo: ' + cn, EC.XP_BONUS.comboAchieved]); });
     } else {
       me.winStreak = 0;
+    }
+    /* field salvage — the win screen reserves space for earned Okid/NgAkara */
+    const salvage = { okid: 0, ngakara: 0 };
+    if (result.win && !result.draw) {
+      const srng = new U.Rng(U.newSeed());
+      if (srng.chance(0.12)) { salvage.okid = 1; me.okid[0] += 1; }
+      if (srng.chance(0.07)) { salvage.ngakara = 1; me.ngakara += 1; }
     }
     gold = Math.round(gold * (1 + G.titleBuff('gold')));
     me.gold += gold;
@@ -768,7 +778,7 @@
     }
     const lvlEvents = G.addXP(xp);
     G.save();
-    return { xp, gold, bonuses, lvlEvents };
+    return { xp, gold, bonuses, lvlEvents, salvage };
   };
 
   /* ================== TOURNAMENTS ================== */
