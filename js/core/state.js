@@ -102,6 +102,16 @@
       });
     });
 
+    /* ---- Elbergi always keeps a few honest cheap listings (tutorial depends on it) ---- */
+    for (let i = 0; i < 4; i++) {
+      const spid = rng.pick(['kipsu', 'wild_punk', 'uff', 'rodak', 'mikolo_moko', 'karnen', 'raf_krabbi']);
+      const t = TK.mint({ speciesId: spid, rng, owner: elbergi.id, rarity: Math.min(SP.get(spid).rarity[1], rng.int(0, 1)) });
+      elbergi.tokens[t.id] = t;
+      t.status = 'market';
+      const lst = { id: U.uid('lst'), tokenId: t.id, sellerId: elbergi.id, price: rng.int(80, 160), status: 'sale', at: Date.now(), featured: false };
+      w.market.listings[lst.id] = lst;
+    }
+
     /* ---- seed tournaments ---- */
     seedTournaments(w, rng);
     return w;
@@ -208,6 +218,10 @@
     if (!U.profanityOk(displayName)) return { err: 'That name is not permitted by the Dya Guild.' };
     if (Object.values(G.world.accounts).some(a => !a.ai && a.email === email)) return { err: 'An account with that email already exists.' };
     const acc = baseAccount({ email, passHash: hashPass(pass), displayName });
+    /* new player starting resources (design doc Part IX) */
+    acc.gold = EC.START.gold;
+    acc.okid[0] = EC.START.okid;
+    acc.ngakara = EC.START.ngakara;
     G.world.accounts[acc.id] = acc;
     G.me = acc;
     G.save();

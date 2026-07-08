@@ -358,6 +358,7 @@
   UI.register('match', {
     enter(root, params) {
       const M = params.match, cfg = params.cfg;
+      DYA.currentMatch = M;
       const me = G.me;
       const scr = U.el('div', { cls: 'screen', id: 'matchScreen' });
       const canvas = U.el('canvas', { id: 'matchCanvas' });

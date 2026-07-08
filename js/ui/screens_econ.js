@@ -935,6 +935,7 @@
             inf.appendChild(U.el('div', { cls: 'small', style: 'height:32px;overflow:hidden', text: SP.get(tok.speciesId).desc }));
             /* price breakdown; market avg never shown to buyers */
             inf.appendChild(U.el('div', { html: '<span class="lc-price">' + (l.status === 'display' ? '—' : U.fmt(l.price) + 'g') + '</span> <span class="status-badge ' + l.status + '">' + (l.status === 'sale' ? 'FOR SALE' : l.status === 'offer' ? 'MAKE OFFER' : 'DISPLAY') + '</span>' }));
+            item.appendChild(inf);
             item.onclick = () => {
               const scr2 = U.el('div', { cls: 'screen', style: 'z-index:10;background:var(--bg)' });
               const actions = [];

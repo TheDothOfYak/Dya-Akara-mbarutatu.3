@@ -97,7 +97,7 @@
       else if (k === 'text') e.textContent = attrs[k];
       else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
       else if (k === 'style') e.style.cssText = attrs[k];
-      else e.setAttribute(k, attrs[k]);
+      else if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
     }
     if (children) children.forEach(c => { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
     return e;

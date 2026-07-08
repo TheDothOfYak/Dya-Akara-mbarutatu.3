@@ -93,7 +93,7 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 .bell .dot { position: absolute; top: -2px; right: -4px; width: 9px; height: 9px; background: var(--red); border-radius: 50%; }
 
 /* ---------- toasts & notifications ---------- */
-#toasts { position: fixed; right: 16px; top: 60px; z-index: 300; display: flex; flex-direction: column; gap: 8px; width: 320px; }
+#toasts { position: fixed; right: 16px; top: 60px; z-index: 640; display: flex; flex-direction: column; gap: 8px; width: 320px; }
 .toast {
   background: linear-gradient(180deg, var(--panel2), var(--panel));
   border: 1px solid var(--gold-dim); border-radius: 8px; padding: 10px 14px;
@@ -111,7 +111,7 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 .notif-row .n-x:hover { color: var(--red); }
 
 /* ---------- modal ---------- */
-.modal-back { position: fixed; inset: 0; background: #000a; z-index: 200; display: flex; align-items: center; justify-content: center; animation: fadeIn .2s; }
+.modal-back { position: fixed; inset: 0; background: #000a; z-index: 500; display: flex; align-items: center; justify-content: center; animation: fadeIn .2s; }
 .modal { max-width: 620px; width: 92%; max-height: 86vh; overflow-y: auto; animation: slideUp .25s ease; }
 
 /* ---------- token cards ---------- */
@@ -234,7 +234,7 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 .piece-row:hover { border-color: var(--gold-dim); }
 .piece-row.selected { border-color: var(--gold); box-shadow: 0 0 12px #d9b87a33; }
 .ritual-orb { position: relative; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; }
-.ritual-overlay { position: fixed; inset: 0; background: #000d; z-index: 250; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn .4s; }
+.ritual-overlay { position: fixed; inset: 0; background: #000d; z-index: 520; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn .4s; }
 
 /* ---------- profile ---------- */
 .profile-wrap { flex: 1; display: flex; overflow: hidden; }
@@ -279,7 +279,7 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 .hud-events { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; }
 .hud-event { background: #000a; border-radius: 14px; padding: 4px 16px; font-size: 13px; color: var(--ink); margin-bottom: 4px; animation: slideUp .3s; }
 .hud-minimap { position: absolute; bottom: 118px; left: 14px; }
-.hud-readied { position: absolute; right: 14px; top: 90px; width: 120px; display: flex; flex-direction: column; gap: 8px; }
+.hud-readied { position: absolute; right: 14px; top: 158px; width: 120px; display: flex; flex-direction: column; gap: 8px; }
 .readied-slot { background: #0009; border: 1px solid var(--gold-dim); border-radius: 8px; padding: 6px; text-align: center; cursor: grab; backdrop-filter: blur(3px); position: relative; }
 .readied-slot .rs-key { position: absolute; top: 3px; left: 6px; font-size: 11px; color: var(--gold); background: #000a; border: 1px solid var(--gold-dim); border-radius: 4px; padding: 0 5px; }
 .readied-slot:hover { border-color: var(--gold); box-shadow: 0 0 12px #d9b87a44; }
@@ -322,7 +322,7 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 
 /* ---------- loading overlay ---------- */
 #loadingOverlay {
-  position: fixed; inset: 0; z-index: 400; display: flex; flex-direction: column;
+  position: fixed; inset: 0; z-index: 700; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   background: radial-gradient(ellipse at 50% 40%, #2d2114 0%, #171009 75%);
 }
