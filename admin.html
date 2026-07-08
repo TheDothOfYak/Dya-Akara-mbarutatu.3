@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dya'Akara — Admin Panel</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body { overflow: auto; }
+    .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .admin-grid { display: grid; grid-template-columns: 200px 1fr; gap: 18px; }
+    .admin-nav { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 20px; align-self: start; }
+    .admin-nav .btn { text-align: left; }
+    table.adm { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.adm th, table.adm td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+    table.adm th { color: var(--gold-dim); font-weight: normal; letter-spacing: .08em; font-size: 11px; text-transform: uppercase; }
+    table.adm tr:hover td { background: #2a221633; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="js/core/util.js"></script>
+  <script src="js/core/audio.js"></script>
+  <script src="js/data/species.js"></script>
+  <script src="js/data/economy.js"></script>
+  <script src="js/data/lore.js"></script>
+  <script src="js/core/token.js"></script>
+  <script src="js/core/state.js"></script>
+  <script src="js/engine/sprites.js"></script>
+  <script src="js/ui/admin.js"></script>
+</body>
+</html>
