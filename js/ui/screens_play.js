@@ -291,6 +291,21 @@
       mid.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
       mid.appendChild(voteRow('MODE — Chaos randomizes every pulse (majority required)', ['Standard', 'Chaos'], 'mode'));
       mid.appendChild(U.el('p', { cls: 'small muted', html: '◆ = opponent’s current vote' }));
+      /* terrain tokens: set by the organizer pre-match; random for casual (Part XV) */
+      const terrRow = U.el('div', { cls: 'vote-row' });
+      if (cfg.format === 'Private Match') {
+        terrRow.appendChild(U.el('div', { cls: 'muted small', text: 'TERRAIN SET — you are the organizer' }));
+        const tSel = U.el('select', { cls: 'txt mt', style: 'max-width:280px' });
+        DYA.lore.TERRAIN_SETS.filter(t => t.basic).forEach(t => tSel.appendChild(U.el('option', { value: t.id, text: t.name })));
+        tSel.onchange = () => { cfg.terrain = tSel.value; };
+        cfg.terrain = cfg.terrain || 'plains';
+        tSel.value = cfg.terrain;
+        terrRow.appendChild(tSel);
+      } else {
+        const tset = DYA.lore.TERRAIN_SETS.find(t => t.id === cfg.terrain);
+        terrRow.appendChild(U.el('div', { cls: 'muted small', html: 'TERRAIN SET — ' + (tset ? '<span class="gold">' + tset.name + '</span> (set by the organizer)' : '<span class="gold">assigned randomly</span> for casual matches') }));
+      }
+      mid.appendChild(terrRow);
       const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready — skip the wait' });
       mid.appendChild(readyBtn);
       wrap.appendChild(mid);
