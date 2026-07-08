@@ -12,12 +12,12 @@ Open `index.html` in Chrome/Edge/Firefox. That's it.
 
 **Option 2 — local server (recommended, avoids any file:// quirks):**
 ```bash
-cd Dya-Akara-mbarutatu.3
+npm run dev          # serves on http://localhost:8000
+# or, with no node at all:
 python3 -m http.server 8000
-# then visit http://localhost:8000
 ```
 
-**GitHub Codespaces:** open this repo in a Codespace, run the server command above, and open the forwarded port.
+**GitHub Codespaces:** open this repo in a Codespace, run `npm run dev`, and open the forwarded port 8000 when it pops up.
 
 Create an account (email/password — stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
 
