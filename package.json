@@ -4,8 +4,9 @@
   "description": "Dya'Akara — Token Game of the Mbaru Tatu. Pure HTML/CSS/JS, no build step.",
   "private": true,
   "scripts": {
-    "dev": "npx --yes http-server -p 8000 -c-1 .",
-    "start": "npx --yes http-server -p 8000 -c-1 .",
+    "dev": "python3 -m http.server 8000 || npx --yes http-server -p 8000 -c-1 .",
+    "start": "python3 -m http.server 8000 || npx --yes http-server -p 8000 -c-1 .",
+    "dev:node": "npx --yes http-server -p 8000 -c-1 .",
     "test": "node tests/test_engine.js"
   }
 }
