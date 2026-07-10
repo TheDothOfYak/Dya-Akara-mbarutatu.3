@@ -40,8 +40,8 @@
       scr.appendChild(box);
       root.appendChild(scr);
 
-      function doLogin() {
-        const r = G.login(email.value.trim().toLowerCase(), pass.value);
+      async function doLogin() {
+        const r = await G.login(email.value.trim().toLowerCase(), pass.value);
         if (r.err) { err.textContent = r.err; DYA.audio.play('deny'); return; }
         afterLogin();
       }
@@ -157,10 +157,10 @@
     const m = UI.modal(wrap, { sticky: true });
     const row = U.el('div', { cls: 'flex mt' });
     row.appendChild(U.el('button', {
-      cls: 'btn primary flex1', text: 'Begin', onclick: () => {
+      cls: 'btn primary flex1', text: 'Begin', onclick: async () => {
         if (!email.value.includes('@')) { err.textContent = 'A real-looking email, please.'; return; }
         if (pass.value.length < 4) { err.textContent = 'Password must be at least 4 characters.'; return; }
-        const r = G.createAccount(email.value.trim().toLowerCase(), pass.value, name.value.trim());
+        const r = await G.createAccount(email.value.trim().toLowerCase(), pass.value, name.value.trim());
         if (r.err) { err.textContent = r.err; return; }
         G.me.avatarIdx = chosenAv;
         G.me.region = regSel.value;

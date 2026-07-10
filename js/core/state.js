@@ -230,7 +230,23 @@
     G.save();
     return { acc };
   };
-  G.login = function (email, pass) {
+  G.login = async function (email, pass) {
+    const supa = window.DYA_SUPABASE && window.DYA_SUPABASE.enabled ? window.DYA_SUPABASE.client : null;
+    if (supa) {
+      const res = await supa.signIn({ email, password: pass });
+      if (res.error) return { err: res.error.message || 'Supabase sign-in failed.' };
+      const authUser = res.user || (res.access_token ? await supa.getUser(res.access_token) : null);
+      const acc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email) || baseAccount({ email, passHash: null, displayName: email.split('@')[0] });
+      acc.authProvider = 'supabase';
+      acc.authId = authUser && authUser.id;
+      acc.authToken = res.access_token || null;
+      acc.email = email;
+      acc.lastLogin = Date.now();
+      G.world.accounts[acc.id] = acc;
+      G.me = acc;
+      G.save();
+      return { acc, auth: res };
+    }
     const acc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
     if (!acc) return { err: 'No account found with that email.' };
     if (acc.passHash !== hashPass(pass)) return { err: 'Incorrect password.' };
