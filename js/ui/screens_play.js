@@ -121,9 +121,73 @@
       grid.appendChild(bigCard('👁', 'Spectate', 'Watch a public match in progress. React freely; the players never see it.', () => P.spectateFlow()));
       grid.appendChild(bigCard('🎞', 'Replays', 'Your last 50 casual matches and every tournament match, stored as seed + inputs.', () => P.replayList()));
       body.appendChild(grid);
+
+      /* ---- LIVE NOW: the Dya'kukull are playing right now ---- */
+      const livePanel = U.el('div', { cls: 'panel mt', style: 'max-width:1000px;margin:18px auto 0' });
+      body.appendChild(livePanel);
+      function renderLive() {
+        if (!livePanel.isConnected) return;
+        const ln = G.liveNow();
+        livePanel.innerHTML = '';
+        livePanel.appendChild(U.el('div', { cls: 'flex' }, [
+          U.el('h3', { cls: 'gold', text: 'Live Now' }),
+          U.el('span', { cls: 'pill', html: '<span class="online-dot online" style="display:inline-block"></span> ' + ln.online.length + ' Dya\u2019kukull online' }),
+        ]));
+        /* challenges to YOU first */
+        ln.challenges.forEach(ch => {
+          const ai = G.world.accounts[ch.aiId];
+          if (!ai) return;
+          const row = U.el('div', { cls: 'friend-row', style: 'border-left:3px solid var(--gold)' });
+          row.appendChild(U.el('div', { cls: 'flex1', html: '⚔ <b class="gold">' + U.esc(ai.displayName) + '</b> (Lv ' + ai.level + ') challenges you!<span class="small muted"> · expires in ' + Math.max(1, Math.ceil((ch.expiresAt - Date.now()) / 60000)) + 'm</span>' }));
+          row.appendChild(U.el('button', {
+            cls: 'btn small primary', text: 'Accept', onclick: () => {
+              const opp = G.acceptChallenge(ch.id);
+              if (!opp) { UI.toast({ title: 'Too late', body: 'The challenge expired.', icon: '⌛' }); renderLive(); return; }
+              P.pickPouch(pouch => {
+                P.startMatch({
+                  mode: 'standard', ranked: false, format: 'Challenge Match',
+                  opponent: { name: opp.displayName, accId: opp.id, aiSkill: opp.aiCfg.matchSkill, pouch: P.accountPouch(opp), simulatedHuman: true },
+                  pouch,
+                });
+              });
+            },
+          }));
+          livePanel.appendChild(row);
+        });
+        /* matches happening right now — watch any of them */
+        if (!ln.matches.length) livePanel.appendChild(U.el('p', { cls: 'muted small', text: 'No matches on right now. Someone will start one soon — the Dya\u2019kukull are always playing.' }));
+        ln.matches.forEach(mrec => {
+          const a = G.world.accounts[mrec.aId], b = G.world.accounts[mrec.bId];
+          if (!a || !b) return;
+          const row = U.el('div', { cls: 'friend-row' });
+          row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(a.displayName) + '</b> vs <b>' + U.esc(b.displayName) + '</b> <span class="small muted">· ' + mrec.format + ' · ends ~' + Math.max(1, Math.ceil((mrec.endsAt - Date.now()) / 60000)) + 'm</span>' }));
+          row.appendChild(U.el('button', {
+            cls: 'btn small', text: '👁 Watch', onclick: () => {
+              G.markLiveWatched(mrec.id);
+              const match = new DYA.match.Match({
+                seed: mrec.seed, mode: 'standard',
+                settings: { pulseInterval: 5, pulseAmount: 3, chaos: false },
+                terrain: ['plains', 'forest', 'mountain', 'desert'][mrec.seed % 4],
+                teams: [
+                  { name: a.displayName, controller: 'ai', aiSkill: a.aiCfg.matchSkill, pouch: P.accountPouch(a), seal: a.seal },
+                  { name: b.displayName, controller: 'ai', aiSkill: b.aiCfg.matchSkill, pouch: P.accountPouch(b), seal: b.seal },
+                ],
+              });
+              UI.showWithLoading('spectate', { match, title: 'LIVE — ' + a.displayName + ' vs ' + b.displayName, liveId: mrec.id }, 900);
+            },
+          }));
+          livePanel.appendChild(row);
+        });
+        /* recent results ticker */
+        if (ln.recent.length) {
+          livePanel.appendChild(U.el('div', { cls: 'small muted mt', html: 'Recent: ' + ln.recent.slice(0, 4).map(r => U.esc(r.winner) + ' beat ' + U.esc(r.winner === r.a ? r.b : r.a)).join(' · ') }));
+        }
+      }
       page.appendChild(body);
       scr.appendChild(page);
       root.appendChild(scr);
+      renderLive(); /* after attach — the isConnected guard needs a live DOM */
+      const liveIv = setInterval(() => { if (!livePanel.isConnected) { clearInterval(liveIv); return; } renderLive(); }, 6000);
     },
   });
 
@@ -176,7 +240,8 @@
       const m = UI.modal(w, { sticky: true });
       const cancel = U.el('button', { cls: 'btn ghost mt', text: 'Leave queue', onclick: () => { clearTimeout(t); m.close(); } });
       w.appendChild(cancel);
-      const ais = Object.values(G.world.accounts).filter(a => a.ai && Math.abs(a.level - G.me.level) < 12);
+      let ais = Object.values(G.world.accounts).filter(a => a.ai && Math.abs(a.level - G.me.level) < 12 && G.aiStatus(a.id) === 'online');
+      if (!ais.length) ais = Object.values(G.world.accounts).filter(a => a.ai && Math.abs(a.level - G.me.level) < 12);
       const opp = ais.length ? ais[Math.floor(Math.random() * ais.length)] : Object.values(G.world.accounts).find(a => a.ai);
       const t = setTimeout(() => {
         status.textContent = 'Opponent found: ' + opp.displayName + ' (Lv ' + opp.level + ')';
@@ -1091,6 +1156,8 @@
         renderer.draw(dt);
         renderer.drawMinimap(mmCv.getContext('2d'), 150);
         if (M.over) {
+          /* a watched live match is decided by what actually happened */
+          if (params.liveId && M.result.winner >= 0) G.resolveLiveMatch(params.liveId, M.result.winner);
           const ov = U.el('div', { cls: 'match-overlay' });
           ov.appendChild(U.el('h1', { style: 'color:var(--gold);font-size:34px', text: M.result.winner === -1 ? 'DRAW' : M.teams[M.result.winner].name + ' WINS' }));
           ov.appendChild(U.el('button', { cls: 'btn mt', text: 'Back', onclick: () => UI.show('play') }));
