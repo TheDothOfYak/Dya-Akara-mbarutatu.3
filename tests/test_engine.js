@@ -47,12 +47,12 @@ function runMatch(seed, maxSec) {
 }
 console.log('Running AI vs AI match (seed 777)...');
 const t0 = Date.now();
-const m1 = runMatch(777, 1200);
+const m1 = runMatch(777, 2000); /* tanky pouch draws can grind ~25 min before the relic lands */
 console.log('  finished in', Date.now() - t0, 'ms real;', m1.time.toFixed(1), 's sim; over=', m1.over, 'result=', JSON.stringify(m1.result && { winner: m1.result.winner, how: m1.result.how }));
 console.log('  creatures spawned:', m1.idCounter - 1, ' log inputs:', m1.log.length);
 console.log('  team stats:', m1.teams.map(T => ({ played: T.stats.tokensPlayed.length, elim: T.stats.eliminations, res: Math.round(T.resources.Fti + T.resources.Su + T.resources.Eldi + T.resources.Ular) })));
 
-const m2 = runMatch(777, 1200);
+const m2 = runMatch(777, 2000);
 const same = m1.tick === m2.tick && JSON.stringify(m1.result) === JSON.stringify(m2.result) && m1.log.length === m2.log.length;
 console.log('Determinism check (same seed):', same ? 'PASS' : 'FAIL', m1.tick, 'vs', m2.tick);
 
@@ -62,7 +62,7 @@ if (m1.over) {
   const mr = DYAG.match.Match.fromReplay(JSON.parse(JSON.stringify(rep)));
   mr.headless = true;
   let ticks = 0;
-  while (!mr.over && ticks < 1200 * 20) { mr.doTick(); ticks++; }
+  while (!mr.over && ticks < 2000 * 20) { mr.doTick(); ticks++; }
   const repOk = mr.over && mr.result.winner === m1.result.winner && Math.abs(mr.time - m1.time) < 1;
   console.log('Replay determinism:', repOk ? 'PASS' : 'FAIL', 'replay result:', JSON.stringify(mr.result && { winner: mr.result.winner, how: mr.result.how, t: mr.time.toFixed(1) }), 'vs original t=', m1.time.toFixed(1));
 }

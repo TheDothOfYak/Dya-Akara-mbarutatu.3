@@ -83,6 +83,8 @@
     levelup:    () => { [440, 554, 659, 880, 1108].forEach((f, i) => tone({ freq: f, dur: 0.3, vol: 0.22, type: 'triangle', delay: i * 0.12 })); },
     chest:      () => { tone({ freq: 300, freqEnd: 600, dur: 0.3, vol: 0.2, type: 'triangle' }); SFXdelay('coin', 0.3); },
     notify:     () => { tone({ freq: 740, dur: 0.1, vol: 0.14, type: 'sine' }); tone({ freq: 988, dur: 0.15, vol: 0.12, type: 'sine', delay: 0.09 }); },
+    horn:       () => { tone({ freq: 233, freqEnd: 311, dur: 0.5, vol: 0.18, type: 'sawtooth' }); tone({ freq: 311, dur: 0.4, vol: 0.14, type: 'sawtooth', delay: 0.32 }); tone({ freq: 466, dur: 0.55, vol: 0.1, type: 'triangle', delay: 0.32 }); },
+    zikhron:    () => { [392, 494, 587, 740].forEach((f, i) => tone({ freq: f, freqEnd: f * 1.02, dur: 1.2, vol: 0.08, type: 'sine', delay: i * 0.24 })); noise({ freq: 2200, dur: 1.8, vol: 0.035, filter: 'bandpass' }); },
     crowd:      () => { noise({ freq: 500, dur: 1.2, vol: 0.25, channel: 'crowd', filter: 'bandpass' }); },
     /* ShurgrEdan retribution strike — has its own settings toggle */
     shurgrEdan: () => {

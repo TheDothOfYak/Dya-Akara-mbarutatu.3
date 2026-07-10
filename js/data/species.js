@@ -575,6 +575,65 @@
     special: 'Each resource pulse, converts double the pulse resource count of Ju into Sprengju. Inert without a Ju Field in range.',
     vars: { conversionRange: [80, 160], efficiency: [0.6, 1] }, picks: {},
   });
+  /* ---- buff fruits: playable one-use boons. They belong to NOBODY once
+     placed — whichever creature reaches one first (either team) eats it. */
+  def('ember_root', {
+    name: 'Ember Root', family: 'Flora', element: 'Eldi',
+    rarity: [0, 2], size: [0, 0], rig: 'blob',
+    color: '#d4552a', color2: '#ffb03a',
+    features: { glow: true, fruit: 'strike' },
+    tags: ['passive', 'buff'],
+    behavior: 'sprengju',
+    statMul: { hp: 0.12, dmg: 0, speed: 0 },
+    attackRange: 0,
+    desc: 'A smoldering tuber that never quite goes out. Creatures that eat one fight like something is burning in them — because something is.',
+    temperament: 'Inert. Warm to the touch. First come, first served.',
+    special: 'Consumed by the first creature to reach it — ANY team. Grants a strike surge.',
+    vars: { potency: [0.3, 0.55] }, picks: {},
+  });
+  def('skith_grass', {
+    name: 'Skith Grass', family: 'Flora', element: 'Fti',
+    rarity: [0, 2], size: [0, 0], rig: 'blob',
+    color: '#cfd4b8', color2: '#f0f0f5',
+    features: { glow: true, fruit: 'pace' },
+    tags: ['passive', 'buff'],
+    behavior: 'sprengju',
+    statMul: { hp: 0.12, dmg: 0, speed: 0 },
+    attackRange: 0,
+    desc: 'A wind-bleached bundle of ridge grass. Eating it makes the legs forget how heavy the body is.',
+    temperament: 'Inert. Rustles when nothing is moving. First come, first served.',
+    special: 'Consumed by the first creature to reach it — ANY team. Grants a burst of pace.',
+    vars: { potency: [0.25, 0.45] }, picks: {},
+  });
+  def('mirrordew', {
+    name: 'Mirrordew', family: 'Flora', element: 'Su',
+    rarity: [0, 2], size: [0, 0], rig: 'blob',
+    color: '#5ab8d8', color2: '#bfe8ff',
+    features: { glow: true, fruit: 'mend' },
+    tags: ['passive', 'buff'],
+    behavior: 'sprengju',
+    statMul: { hp: 0.12, dmg: 0, speed: 0 },
+    attackRange: 0,
+    desc: 'A pod of still water that reflects a creature the way it was before its wounds.',
+    temperament: 'Inert. Perfectly calm. First come, first served.',
+    special: 'Consumed by the first creature to reach it — ANY team. Closes a third of its wounds.',
+    vars: { potency: [0.25, 0.4] }, picks: {},
+  });
+  def('stonefruit', {
+    name: 'Stonefruit', family: 'Flora', element: 'Ular',
+    rarity: [0, 2], size: [0, 0], rig: 'blob',
+    color: '#8d8578', color2: '#b8ae9c',
+    features: { glow: true, fruit: 'guard' },
+    tags: ['passive', 'buff'],
+    behavior: 'sprengju',
+    statMul: { hp: 0.12, dmg: 0, speed: 0 },
+    attackRange: 0,
+    desc: 'A mineral-hearted fruit of the deep hills. It sits in the stomach like a boulder and blows like one too.',
+    temperament: 'Inert. Heavier than it looks. First come, first served.',
+    special: 'Consumed by the first creature to reach it — ANY team. Hardens the hide for a time.',
+    vars: { potency: [0.2, 0.35] }, picks: {},
+  });
+
   def('sprengju', {
     name: 'Sprengju', family: 'Ju', element: 'Eldi',
     rarity: [1, 4], size: [0, 0], rig: 'blob',

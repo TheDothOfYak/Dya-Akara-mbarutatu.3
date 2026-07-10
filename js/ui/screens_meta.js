@@ -1136,6 +1136,7 @@
         const tok = TK.mint({ speciesId: 'sword_eikar', rng, owner: me.id, rarity: 1, name: me.displayName });
         tok.story = me.displayName + ' — you, sung true from a lock of your own acorn-cap at the Guild registry. Every player of Dya’Akara begins with their own truth on the field.';
         tok.isStarter = true;
+        tok.isSelf = true; /* the token of the player themself — it commands the field as they would */
         G.addToken(tok);
         spot({
           step: 3, title: 'Your First Token: You',
@@ -1263,7 +1264,7 @@
       case 9:
         spot({
           step: 10, title: 'Your First Match',
-          body: 'The Guild has prepared a <b>rental pouch</b> — a full 25 tokens, on loan. Rentals cost gold normally (25% of market price each); this one is the Guild’s treat. Win by carrying the <b>Relic</b> to your hoard. Ready tokens from the wheel at the bottom, trigger them with <b>SPACE</b> or by dragging onto the field.',
+          body: 'The Guild has prepared a <b>rental pouch</b> — a full 25 tokens, on loan. Rentals cost gold normally (25% of market price each); this one is the Guild’s treat. Win by carrying <b>their Relic</b> to your hoard. Turn the wheel with <b>A/D</b> or the scroll wheel, ready the centered token with <b>SHIFT</b> (or click it), and trigger readied tokens with <b>SPACE</b> or by dragging onto the field.',
           nextLabel: 'Into the arena',
           next: () => {
             TUT.clear();

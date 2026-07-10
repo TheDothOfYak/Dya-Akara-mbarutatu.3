@@ -76,9 +76,34 @@
       const x = grng.next() * M.world.w, y = grng.next() * M.world.h, r = 14 + grng.next() * 60;
       ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.5, 0, 0, TAU); ctx.fill();
     }
-    if (zik) { /* memory storm tint + drifting motes */
-      ctx.fillStyle = 'rgba(104,224,232,0.05)';
+    const zf = M.zikFrac ? M.zikFrac() : (zik ? 1 : 0);
+    if (zf > 0) { /* the Sunear'Zikhron: memory-wave ribbons, glyph motes, cyan wash */
+      ctx.fillStyle = 'rgba(104,224,232,' + (0.06 * zf) + ')';
       ctx.fillRect(0, 0, M.world.w, M.world.h);
+      /* three drifting wave ribbons sweeping the arena */
+      for (let w2 = 0; w2 < 3; w2++) {
+        ctx.strokeStyle = 'rgba(104,224,232,' + (0.16 * zf * (1 - w2 * 0.25)) + ')';
+        ctx.lineWidth = 10 - w2 * 3;
+        ctx.beginPath();
+        const baseY = ((R.t * (34 + w2 * 16) + w2 * 340) % (M.world.h + 260)) - 130;
+        for (let x = 0; x <= M.world.w; x += 26) {
+          const y = baseY + Math.sin(x * 0.008 + R.t * (1.1 + w2 * 0.4)) * 34;
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      /* memory glyph motes riding the storm wind */
+      const mrng = new DYA.util.Rng(0xF00D);
+      ctx.fillStyle = 'rgba(180,240,244,' + (0.5 * zf) + ')';
+      ctx.font = '11px Georgia';
+      for (let i = 0; i < 34; i++) {
+        const sx = mrng.next() * M.world.w, sy = mrng.next() * M.world.h, spd = 40 + mrng.next() * 70;
+        const mx = (sx + R.t * spd) % M.world.w;
+        const my = sy + Math.sin(R.t * 1.3 + i) * 14;
+        ctx.globalAlpha = 0.35 * zf * (0.4 + 0.6 * Math.abs(Math.sin(R.t * 0.9 + i)));
+        ctx.fillText(['ᛃ', 'ᛗ', 'ᛟ', '᛫', 'ᛝ'][i % 5], mx, my);
+      }
+      ctx.globalAlpha = 1;
     }
 
     /* ------- zones under everything ------- */
@@ -193,6 +218,26 @@
       ctx.closePath(); ctx.fill();
       ctx.strokeStyle = '#e8d9ff'; ctx.lineWidth = 1.2; ctx.stroke();
       ctx.restore();
+    }
+
+    /* ------- field morsels: Karnen food + chemist pieces ------- */
+    for (const pk of (M.pickups || [])) {
+      const bob = Math.sin(R.t * 2.4 + pk.id) * 2;
+      if (pk.kind === 'food') {
+        ctx.fillStyle = '#8a6b3a';
+        ctx.beginPath(); ctx.ellipse(pk.x, pk.y + bob, 7, 5, 0.3, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#a8c46a';
+        ctx.beginPath(); ctx.ellipse(pk.x + 3, pk.y - 3 + bob, 4, 3, -0.4, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#5d4a28'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pk.x - 4, pk.y - 2 + bob); ctx.lineTo(pk.x - 7, pk.y - 7 + bob); ctx.stroke();
+      } else { /* chemist piece: a glowing swirl */
+        const g2 = ctx.createRadialGradient(pk.x, pk.y + bob, 1, pk.x, pk.y + bob, 12);
+        g2.addColorStop(0, '#c48ae8cc'); g2.addColorStop(1, '#c48ae800');
+        ctx.fillStyle = g2;
+        ctx.beginPath(); ctx.arc(pk.x, pk.y + bob, 12, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#e8d4f8';
+        ctx.beginPath(); ctx.arc(pk.x, pk.y + bob, 3.4 + Math.sin(R.t * 4 + pk.id) * 0.8, 0, TAU); ctx.fill();
+      }
     }
 
     /* ------- creatures (sorted by y for depth) ------- */
@@ -425,6 +470,26 @@
         /* okid coin flip-in */
         if (f < 0.5) {
           SPR.drawCoin(ctx, e.x, e.y - 40 * (0.5 - f) * 2, 10, t * 3, null, {});
+        }
+        break;
+      }
+      case 'rock': {
+        /* a thrown stone arcing from source to target */
+        const rx = e.x + (e.tx - e.x) * f, ry = e.y + (e.ty - e.y) * f - Math.sin(f * Math.PI) * 46;
+        ctx.fillStyle = '#8d8578';
+        ctx.save();
+        ctx.translate(rx, ry); ctx.rotate(f * 9);
+        ctx.beginPath();
+        ctx.moveTo(-5, 2); ctx.lineTo(-2, -4); ctx.lineTo(4, -3); ctx.lineTo(5, 3); ctx.lineTo(0, 5);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#00000033'; ctx.fillRect(-3, -1, 4, 3);
+        ctx.restore();
+        if (f > 0.85) {
+          ctx.fillStyle = 'rgba(200,190,170,' + (1 - f) * 3 + ')';
+          for (let i = 0; i < 4; i++) {
+            const a = i / 4 * TAU;
+            ctx.beginPath(); ctx.arc(e.tx + Math.cos(a) * (f - 0.85) * 60, e.ty + Math.sin(a) * (f - 0.85) * 60, 2.4, 0, TAU); ctx.fill();
+          }
         }
         break;
       }

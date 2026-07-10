@@ -121,9 +121,73 @@
       grid.appendChild(bigCard('👁', 'Spectate', 'Watch a public match in progress. React freely; the players never see it.', () => P.spectateFlow()));
       grid.appendChild(bigCard('🎞', 'Replays', 'Your last 50 casual matches and every tournament match, stored as seed + inputs.', () => P.replayList()));
       body.appendChild(grid);
+
+      /* ---- LIVE NOW: the Dya'kukull are playing right now ---- */
+      const livePanel = U.el('div', { cls: 'panel mt', style: 'max-width:1000px;margin:18px auto 0' });
+      body.appendChild(livePanel);
+      function renderLive() {
+        if (!livePanel.isConnected) return;
+        const ln = G.liveNow();
+        livePanel.innerHTML = '';
+        livePanel.appendChild(U.el('div', { cls: 'flex' }, [
+          U.el('h3', { cls: 'gold', text: 'Live Now' }),
+          U.el('span', { cls: 'pill', html: '<span class="online-dot online" style="display:inline-block"></span> ' + ln.online.length + ' Dya\u2019kukull online' }),
+        ]));
+        /* challenges to YOU first */
+        ln.challenges.forEach(ch => {
+          const ai = G.world.accounts[ch.aiId];
+          if (!ai) return;
+          const row = U.el('div', { cls: 'friend-row', style: 'border-left:3px solid var(--gold)' });
+          row.appendChild(U.el('div', { cls: 'flex1', html: '⚔ <b class="gold">' + U.esc(ai.displayName) + '</b> (Lv ' + ai.level + ') challenges you!<span class="small muted"> · expires in ' + Math.max(1, Math.ceil((ch.expiresAt - Date.now()) / 60000)) + 'm</span>' }));
+          row.appendChild(U.el('button', {
+            cls: 'btn small primary', text: 'Accept', onclick: () => {
+              const opp = G.acceptChallenge(ch.id);
+              if (!opp) { UI.toast({ title: 'Too late', body: 'The challenge expired.', icon: '⌛' }); renderLive(); return; }
+              P.pickPouch(pouch => {
+                P.startMatch({
+                  mode: 'standard', ranked: false, format: 'Challenge Match',
+                  opponent: { name: opp.displayName, accId: opp.id, aiSkill: opp.aiCfg.matchSkill, pouch: P.accountPouch(opp), simulatedHuman: true },
+                  pouch,
+                });
+              });
+            },
+          }));
+          livePanel.appendChild(row);
+        });
+        /* matches happening right now — watch any of them */
+        if (!ln.matches.length) livePanel.appendChild(U.el('p', { cls: 'muted small', text: 'No matches on right now. Someone will start one soon — the Dya\u2019kukull are always playing.' }));
+        ln.matches.forEach(mrec => {
+          const a = G.world.accounts[mrec.aId], b = G.world.accounts[mrec.bId];
+          if (!a || !b) return;
+          const row = U.el('div', { cls: 'friend-row' });
+          row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(a.displayName) + '</b> vs <b>' + U.esc(b.displayName) + '</b> <span class="small muted">· ' + mrec.format + ' · ends ~' + Math.max(1, Math.ceil((mrec.endsAt - Date.now()) / 60000)) + 'm</span>' }));
+          row.appendChild(U.el('button', {
+            cls: 'btn small', text: '👁 Watch', onclick: () => {
+              G.markLiveWatched(mrec.id);
+              const match = new DYA.match.Match({
+                seed: mrec.seed, mode: 'standard',
+                settings: { pulseInterval: 5, pulseAmount: 3, chaos: false },
+                terrain: ['plains', 'forest', 'mountain', 'desert'][mrec.seed % 4],
+                teams: [
+                  { name: a.displayName, controller: 'ai', aiSkill: a.aiCfg.matchSkill, pouch: P.accountPouch(a), seal: a.seal },
+                  { name: b.displayName, controller: 'ai', aiSkill: b.aiCfg.matchSkill, pouch: P.accountPouch(b), seal: b.seal },
+                ],
+              });
+              UI.showWithLoading('spectate', { match, title: 'LIVE — ' + a.displayName + ' vs ' + b.displayName, liveId: mrec.id }, 900);
+            },
+          }));
+          livePanel.appendChild(row);
+        });
+        /* recent results ticker */
+        if (ln.recent.length) {
+          livePanel.appendChild(U.el('div', { cls: 'small muted mt', html: 'Recent: ' + ln.recent.slice(0, 4).map(r => U.esc(r.winner) + ' beat ' + U.esc(r.winner === r.a ? r.b : r.a)).join(' · ') }));
+        }
+      }
       page.appendChild(body);
       scr.appendChild(page);
       root.appendChild(scr);
+      renderLive(); /* after attach — the isConnected guard needs a live DOM */
+      const liveIv = setInterval(() => { if (!livePanel.isConnected) { clearInterval(liveIv); return; } renderLive(); }, 6000);
     },
   });
 
@@ -176,7 +240,8 @@
       const m = UI.modal(w, { sticky: true });
       const cancel = U.el('button', { cls: 'btn ghost mt', text: 'Leave queue', onclick: () => { clearTimeout(t); m.close(); } });
       w.appendChild(cancel);
-      const ais = Object.values(G.world.accounts).filter(a => a.ai && Math.abs(a.level - G.me.level) < 12);
+      let ais = Object.values(G.world.accounts).filter(a => a.ai && Math.abs(a.level - G.me.level) < 12 && G.aiStatus(a.id) === 'online');
+      if (!ais.length) ais = Object.values(G.world.accounts).filter(a => a.ai && Math.abs(a.level - G.me.level) < 12);
       const opp = ais.length ? ais[Math.floor(Math.random() * ais.length)] : Object.values(G.world.accounts).find(a => a.ai);
       const t = setTimeout(() => {
         status.textContent = 'Opponent found: ' + opp.displayName + ' (Lv ' + opp.level + ')';
@@ -509,14 +574,81 @@
         if (DYA.tutorial) DYA.tutorial.onEvent('deployed');
       }
 
-      /* wheel scroll cycles through pouch */
-      wheelEl.addEventListener('wheel', e => {
-        e.preventDefault();
+      /* wheel scroll cycles through pouch — A/D (or W/S) do the same */
+      function moveWheel(dir) {
         const avail = T0.pouch.filter(en => en.state === 'pouch');
         if (!avail.length) return;
-        wheelIndex = (wheelIndex + (e.deltaY > 0 ? 1 : -1) + avail.length) % avail.length;
+        wheelIndex = (wheelIndex + dir + avail.length) % avail.length;
         renderWheel();
+      }
+      wheelEl.addEventListener('wheel', e => {
+        e.preventDefault();
+        moveWheel(e.deltaY > 0 ? 1 : -1);
       }, { passive: false });
+
+      /* additional cost (§1): a fallen token costs +1 per prior defeat, paid
+         from any one resource — the player picks it here (click or keys 1–4) */
+      let costPicker = null;
+      function openCostPicker(en, costV, tax, doReady) {
+        const w2 = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Additional cost +' + tax }),
+          U.el('p', { cls: 'small muted mt', text: en.tok.name + ' has fallen ' + tax + ' time' + (tax > 1 ? 's' : '') + ' — replaying it costs ' + tax + ' extra. Choose the resource that pays it, or press 1–4.' })]);
+        const m2 = UI.modal(w2);
+        function cleanup() { document.removeEventListener('keydown', keyH, true); costPicker = null; }
+        function close() { cleanup(); m2.close(); }
+        const pick = (el) => {
+          if (T0.resources[el] < (costV[el] || 0) + tax) { DYA.audio.play('deny'); return; }
+          close(); doReady(el);
+        };
+        const row2 = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+        SP.ELEMENTS.forEach((el, n) => {
+          const can = T0.resources[el] >= (costV[el] || 0) + tax;
+          row2.appendChild(U.el('button', {
+            cls: 'btn small' + (can ? '' : ' ghost'),
+            html: '<span class="keybind" style="padding:0 6px;margin-right:6px;font-size:11px">' + (n + 1) + '</span><span class="el-' + el + '">' + el + '</span> (' + Math.floor(T0.resources[el]) + ')',
+            onclick: () => pick(el),
+          }));
+        });
+        w2.appendChild(row2);
+        /* while the picker is up it owns the keyboard: 1–4 pick, Esc cancels,
+           everything else is swallowed so trigger slots can't misfire */
+        const keyH = (e) => {
+          if (!m2.el.isConnected) { cleanup(); return; }
+          e.stopPropagation();
+          const n = parseInt(e.key, 10);
+          if (n >= 1 && n <= 4) { e.preventDefault(); pick(SP.ELEMENTS[n - 1]); }
+          else if (e.key === 'Escape') { e.preventDefault(); close(); }
+        };
+        document.addEventListener('keydown', keyH, true);
+        costPicker = { close };
+      }
+
+      /* shared ready flow: wheel-card click and the Shift hotkey both land here */
+      function tryReady(en, i, card) {
+        const costV = TK.costVec(en.tok);
+        const tax = en.deaths || 0;
+        const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
+          (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
+        if (!afford) { DYA.audio.play('deny'); renderWheel(); return; }
+        if (T0.readied.length >= 5) { UI.toast({ title: 'Ready panel full', body: 'Five readied tokens is the limit.', icon: '⚠' }); renderWheel(); return; }
+        const doReady = (taxRes) => {
+          M.queueInput(0, { type: 'ready', pouchIdx: i, taxRes });
+          DYA.audio.play('ready');
+          if (DYA.tutorial) DYA.tutorial.onEvent('readied');
+          if (card) animateReadyFly(card);
+          setTimeout(renderWheel, 80);
+        };
+        if (tax > 0) openCostPicker(en, costV, tax, doReady);
+        else doReady(null);
+      }
+
+      /* Shift (either side) readies whatever card sits centered on the wheel */
+      function readyCentered() {
+        const avail = T0.pouch.map((en, i) => ({ en, i })).filter(x => x.en.state === 'pouch');
+        if (!avail.length) return;
+        const pos = ((wheelIndex % avail.length) + avail.length) % avail.length;
+        const { en, i } = avail[pos];
+        tryReady(en, i, wheelEl.querySelector('.wheel-card.center'));
+      }
 
       function renderWheel() {
         wheelEl.innerHTML = '';
@@ -530,7 +662,7 @@
           if (avail.length <= Math.abs(k)) continue;
           const { en, i } = avail[idx];
           const costV = TK.costVec(en.tok);
-          const tax = en.deaths || 0; /* commander tax: +1 per prior defeat, any one resource */
+          const tax = en.deaths || 0; /* additional cost: +1 per prior defeat, any one resource */
           const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
             (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
           const card = U.el('div', { cls: 'wheel-card' + (k === 0 ? ' center' : Math.abs(k) >= 3 ? ' fade3' : Math.abs(k) === 2 ? ' fade2' : ' fade1') });
@@ -549,27 +681,7 @@
           card.onmouseleave = () => { if (tooltip) { tooltip.remove(); tooltip = null; } };
           card.onclick = () => {
             wheelIndex = idx; // click centers it…
-            if (!afford) { DYA.audio.play('deny'); renderWheel(); return; }
-            if (T0.readied.length >= 5) { UI.toast({ title: 'Ready panel full', body: 'Five readied tokens is the limit.', icon: '⚠' }); renderWheel(); return; }
-            const doReady = (taxRes) => {
-              M.queueInput(0, { type: 'ready', pouchIdx: i, taxRes });
-              DYA.audio.play('ready');
-              if (DYA.tutorial) DYA.tutorial.onEvent('readied');
-              animateReadyFly(card);
-              setTimeout(renderWheel, 80);
-            };
-            if (tax > 0) {
-              /* commander tax: the player chooses which resource pays it */
-              const w2 = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Commander tax +' + tax }),
-                U.el('p', { cls: 'small muted mt', text: en.tok.name + ' has fallen ' + tax + ' time' + (tax > 1 ? 's' : '') + '. Choose the resource that pays the tax.' })]);
-              const m2 = UI.modal(w2);
-              const row2 = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
-              SP.ELEMENTS.forEach(el => {
-                const can = T0.resources[el] >= (costV[el] || 0) + tax;
-                row2.appendChild(U.el('button', { cls: 'btn small' + (can ? '' : ' ghost'), html: '<span class="el-' + el + '">' + el + '</span> (' + Math.floor(T0.resources[el]) + ')', onclick: () => { if (!can) return; m2.close(); doReady(el); } }));
-              });
-              w2.appendChild(row2);
-            } else doReady(null);
+            tryReady(en, i, card);
           };
           wheelEl.appendChild(card);
         }
@@ -610,9 +722,11 @@
         });
       }
 
-      /* keyboard: space + 2–5 trigger readied at cursor, per rebindable controls */
+      /* keyboard: space + 2–5 trigger readied at cursor (rebindable);
+         Shift readies the centered wheel card; A/D or W/S turn the wheel */
       const keyHandler = (e) => {
         if (M.over) return;
+        if (costPicker) return; /* additional-cost picker owns the keyboard */
         const c = me.settings.controls;
         if (e.key === c.pause || e.key === 'Escape') { e.preventDefault(); togglePause(); return; }
         const slotKeys = [c.trigger1, c.trigger2, c.trigger3, c.trigger4, c.trigger5];
@@ -620,7 +734,13 @@
         if (slot >= 0) {
           e.preventDefault();
           triggerSlot(slot, mouseWorld.x, mouseWorld.y);
+          return;
         }
+        if (isDuel) return;
+        const k = e.key.toLowerCase();
+        if (k === 'a' || k === 'w' || e.key === 'ArrowLeft') { e.preventDefault(); moveWheel(-1); return; }
+        if (k === 'd' || k === 's' || e.key === 'ArrowRight') { e.preventDefault(); moveWheel(1); return; }
+        if (e.key === 'Shift' && !e.repeat) { e.preventDefault(); readyCentered(); }
       };
       document.addEventListener('keydown', keyHandler);
 
@@ -715,7 +835,8 @@
 
         /* HUD updates */
         const esc = EC.escalationMult(M.time);
-        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '');
+        const zf = M.zikFrac ? M.zikFrac() : 0;
+        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '') + (zf > 0 ? ' · <span style="color:var(--r6)">☄ SUNEAR’ZIKHRON</span>' : '');
         const frac = Math.max(0, 1 - (M.nextPulseAt - M.time) / (M.settings.pulseInterval || 8));
         pulseBar.firstChild.style.width = Math.min(100, frac * 100) + '%';
         relicRow.innerHTML = M.mode === 'hunt'
@@ -725,7 +846,10 @@
         resBox.innerHTML = resCollapsed
           ? '<div>' + resHtml + '</div>'
           : '<div style="font-size:19px">' + resHtml + '</div><div class="small muted">Fti · Su · Eldi · Ular</div>' +
-            '<div class="small mt">Pulse: +' + (M.settings.chaos ? '?' : M.settings.pulseAmount * esc) + ' every ' + (M.settings.chaos ? '?' : M.settings.pulseInterval) + 's</div>';
+            '<div class="small mt">Pulse: +' + (M.settings.chaos ? '?' : M.settings.pulseAmount * esc) + ' every ' + (M.settings.chaos ? '?' : M.settings.pulseInterval) + 's</div>' +
+            (zf > 0
+              ? '<div class="small" style="color:var(--r6)">☄ Storm overhead — McFlies glow, memories surge</div>'
+              : '<div class="small muted">☄ Sunear’Zikhron in ' + Math.max(0, Math.ceil(240 - M.time % 300)) + 's</div>');
 
         if (M.pulseIndex !== lastPulseIdx || T0.readied.length !== lastReadiedLen) {
           lastPulseIdx = M.pulseIndex; lastReadiedLen = T0.readied.length;
@@ -1032,6 +1156,8 @@
         renderer.draw(dt);
         renderer.drawMinimap(mmCv.getContext('2d'), 150);
         if (M.over) {
+          /* a watched live match is decided by what actually happened */
+          if (params.liveId && M.result.winner >= 0) G.resolveLiveMatch(params.liveId, M.result.winner);
           const ov = U.el('div', { cls: 'match-overlay' });
           ov.appendChild(U.el('h1', { style: 'color:var(--gold);font-size:34px', text: M.result.winner === -1 ? 'DRAW' : M.teams[M.result.winner].name + ' WINS' }));
           ov.appendChild(U.el('button', { cls: 'btn mt', text: 'Back', onclick: () => UI.show('play') }));

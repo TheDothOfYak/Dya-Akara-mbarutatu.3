@@ -372,6 +372,7 @@
         Controls() {
           body.innerHTML = '';
           body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Click a binding, then press the new key.' }));
+          body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Fixed match keys: SHIFT readies the centered wheel token · A/D (or W/S, or arrows) turn the wheel · 1–4 pick the resource when an additional cost pops up.' }));
           const binds = [
             ['Trigger readied slot 1 (at cursor)', 'trigger1'],
             ['Trigger readied slot 2', 'trigger2'],
@@ -602,7 +603,7 @@
 
       function friendRow(acc, actions) {
         const row = U.el('div', { cls: 'friend-row' });
-        const status = acc.ai ? (U.hashStr(acc.id) % 3 === 0 ? 'online' : U.hashStr(acc.id) % 3 === 1 ? 'away' : 'offline') : acc.onlineStatus;
+        const status = acc.ai ? G.aiStatus(acc.id) : acc.onlineStatus;
         row.appendChild(U.el('div', { cls: 'online-dot ' + status }));
         const avc = U.el('canvas', { width: 30, height: 30, style: 'border-radius:50%' });
         SPR.drawAvatar(avc.getContext('2d'), acc.avatarIdx || (U.hashStr(acc.id) % SPR.AVATAR_COUNT), 30);
@@ -634,7 +635,7 @@
           me.friends.forEach(id => {
             const acc = G.world.accounts[id];
             if (!acc) return;
-            const st = acc.ai ? (U.hashStr(acc.id) % 3 === 0 ? 'online' : U.hashStr(acc.id) % 3 === 1 ? 'away' : 'offline') : acc.onlineStatus;
+            const st = acc.ai ? G.aiStatus(acc.id) : acc.onlineStatus;
             groups[st].push(acc);
           });
           ['online', 'away', 'offline'].forEach(gname => {

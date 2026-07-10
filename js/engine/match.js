@@ -48,7 +48,8 @@
     M.effects = [];
     M.structures = [];
     M.zones = [];          // bogs, fire patches
-    M.remnants = [];       // crushed makari etc.
+    M.remnants = [];
+    M.pickups = []; /* field morsels: Karnen food, chemist pieces */       // crushed makari etc.
     M.orbs = [];           // resource orb visuals
     M.pendingSpawns = [];  // uff respawns etc.
     M.inputQueue = [];
@@ -158,7 +159,7 @@
       attackRange: sp.attackRange || 20,
       attackCd: 0,
       state: 'idle', stateTick: 0,
-      vars: tok.vars || {}, picks: tok.picks || {},
+      vars: Object.assign({}, tok.vars), picks: tok.picks || {},
       diamonds: tok.diamonds || {},
       tokAge: tok.age || 0.5,
       mem: {},
@@ -180,6 +181,26 @@
       intent: {},
       animPhase: (M.idCounter * 0.61803) % 1 * 6.28,
     };
+    /* the player's own Eikar — the token of THEM — reads the field and
+       sounds the horn on its own; it is exactly as smart as its keeper */
+    c.isCommander = !!(tok.isSelf || (tok.isStarter && sp.eikarLayer));
+
+    /* life-history quirks (Part V): each individual's lived experience,
+       applied as real field effects. Stat-shaping ones land here; the
+       situational ones are read during the sim. All deterministic. */
+    c.quirks = {};
+    (TK.quirks ? TK.quirks(tok) : []).forEach(qid => { c.quirks[qid] = true; });
+    if (c.quirks.heavy_boned) { c.maxHp = Math.round(c.maxHp * 1.18); c.hp = c.maxHp; c.speed = Math.round(c.speed * 0.9); }
+    if (c.quirks.swift_blood) { c.speed = Math.round(c.speed * 1.15); c.maxHp = Math.max(2, Math.round(c.maxHp * 0.92)); c.hp = c.maxHp; }
+    if (c.quirks.keen_eye) c.attackRange = Math.round(c.attackRange * 1.15);
+    if (c.quirks.long_wind) {
+      if (c.vars.breathRange) c.vars.breathRange *= 1.2;
+      else if (c.vars.vineLength) c.vars.vineLength *= 1.2;
+      else if (c.vars.reach) c.vars.reach *= 1.2;
+      else c.attackRange = Math.round(c.attackRange * 1.1);
+    }
+    if (c.quirks.hoard_sense && c.vars.stealRate) c.vars.stealRate *= 1.25;
+
     /* rooted species anchor where they land */
     if (sp.features.rootsOnDeploy || sp.features.stationary || sp.features.rooted || sp.rig === 'field' || sp.rig === 'tree' || sp.rig === 'relic') {
       c.rooted = true;
@@ -206,18 +227,18 @@
       if (!entry || entry.state !== 'pouch') return;
       if (T.readied.length >= 5) { M.uiEvent(team, 'deny', 'Ready panel is full (5 slots).'); return; }
       const cost = Object.assign({}, TK.costVec(entry.tok));
-      /* commander tax (July update §1): +1 per prior defeat, any resource */
+      /* additional cost (July update §1): +1 per prior defeat, any resource */
       const tax = entry.deaths || 0;
       if (tax > 0) {
         const taxRes = input.taxRes && ELS.includes(input.taxRes) ? input.taxRes : mostAbundant(T.resources);
         cost[taxRes] = (cost[taxRes] || 0) + tax;
       }
-      if (!canAfford(T.resources, cost)) { M.uiEvent(team, 'deny', 'Not enough resources' + (tax ? ' (commander tax +' + tax + ')' : '') + '.'); return; }
+      if (!canAfford(T.resources, cost)) { M.uiEvent(team, 'deny', 'Not enough resources' + (tax ? ' (additional cost +' + tax + ')' : '') + '.'); return; }
       payCost(T.resources, cost);
       entry.state = 'readied';
       entry.readiedAtPulse = M.pulseIndex;
       T.readied.push(entry);
-      M.uiEvent(team, 'ready', entry.tok.name + ' readied' + (tax ? ' (tax +' + tax + ')' : '') + '.');
+      M.uiEvent(team, 'ready', entry.tok.name + ' readied' + (tax ? ' (additional cost +' + tax + ')' : '') + '.');
     } else if (input.type === 'trigger') {
       const entry = T.readied[input.slot];
       if (!entry) return;
@@ -333,9 +354,28 @@
   };
 
   /* ================= PULSES & RESOURCES ================= */
+  /* The Sunear'Zikhron — the perpetual memory storm — passes overhead
+     during the last minute of every five. Pure functions of match time,
+     so the lockstep sim and every replay agree on the weather. */
+  Match.prototype.zikhron = function () { return Math.floor(this.time / 60) % 5 === 4; };
+  Match.prototype.zikFrac = function () {
+    const t = this.time % 300; /* storm occupies 240–300s of each cycle */
+    if (t < 240) return 0;
+    return Math.max(0, Math.min(1, (t - 240) / 6, (300 - t) / 6));
+  };
+
   Match.prototype.doPulse = function () {
     const M = this;
     M.pulseIndex++;
+    /* hoard-sense quirk: every 4th pulse a living hoarder sniffs out +1 extra */
+    for (const c of M.creatures) {
+      if (c.dead || !c.quirks || !c.quirks.hoard_sense) continue;
+      c.mem.hoardPulses = (c.mem.hoardPulses || 0) + 1;
+      if (c.mem.hoardPulses % 4 === 0 && M.teams[c.team] && M.teams[c.team].resources) {
+        M.teams[c.team].resources[ELS[M.rng.int(0, 3)]] += 1;
+        M.addEffect('steal', c.x, c.y - c.radius, {});
+      }
+    }
     const esc = EC.escalationMult(M.time);
     /* escalation announcements at 10/15/20+ min */
     if (esc !== M.lastEsc) {
@@ -343,9 +383,13 @@
       if (esc > 1) M.uiEvent(-1, 'event', 'ESCALATION ×' + esc + ' — resources per pulse multiplied.');
     }
     /* the Sunear'Zikhron passes overhead every fifth minute */
-    const zik = Math.floor(M.time / 60) % 5 === 4;
-    if (zik && !M.zikNoted) { M.zikNoted = true; M.uiEvent(-1, 'event', 'The Sunear’Zikhron passes overhead — the RubberMcFlies begin to glow.'); }
-    if (!zik) M.zikNoted = false;
+    const zik = M.zikhron();
+    if (zik && !M.zikNoted) {
+      M.zikNoted = true;
+      M.uiEvent(-1, 'event', 'The Sunear’Zikhron passes overhead — McFlies glow, memories surge, the storm feeds the pulse.');
+      if (!M.headless) DYA.audio.play('zikhron');
+    }
+    if (!zik && M.zikNoted) { M.zikNoted = false; M.uiEvent(-1, 'event', 'The Sunear’Zikhron moves on.'); }
     let interval = M.settings.pulseInterval, amount = M.settings.pulseAmount;
     if (M.settings.chaos) { interval = M.rng.pick(EC.PULSE_INTERVALS); amount = M.rng.pick(EC.PULSE_AMOUNTS); }
     M.nextPulseAt = M.time + interval;
@@ -358,9 +402,20 @@
       /* Karnen harvest (random types), RubberMcFly (its own truth's type), Stryx absorb */
       M.creatures.forEach(c => {
         if (c.dead || c.team !== T.idx) return;
-        if (c.speciesId === 'karnen') { const n = Math.round(c.vars.harvestOutput * c.vars.workEthic); for (let i = 0; i < n; i++) units.push(M.rng.pick(ELS)); }
+        if (c.speciesId === 'karnen') {
+          const n = Math.round(c.vars.harvestOutput * c.vars.workEthic);
+          for (let i = 0; i < n; i++) units.push(M.rng.pick(ELS));
+          /* farmers: every second pulse they also set out FOOD — a morsel
+             any creature may claim, and smart ones may carry to another */
+          c.mem.farmPulses = (c.mem.farmPulses || 0) + 1;
+          if (c.mem.farmPulses % 2 === 0 && M.pickups.filter(pk => !pk.carrier).length < 12) {
+            M.pickups.push({ id: M.idCounter++, kind: 'food', x: c.x + M.rng.range(-34, 34), y: c.y + M.rng.range(-30, 30), potency: 0.25, bornTick: M.tick, carrier: null });
+          }
+        }
         if (c.speciesId === 'rubbermcfly') {
-          const n = Math.round(c.vars.resourceCount);
+          /* vital to guiding and strengthening the storm — while the
+             Sunear'Zikhron passes, each glowing McFly yields one extra */
+          const n = Math.round(c.vars.resourceCount) + (zik ? 1 : 0);
           const multi = c.picks.resourceTypes === 'multi';
           if (!c.mem.mcflyEl) c.mem.mcflyEl = M.rng.pick(ELS);
           for (let i = 0; i < n; i++) units.push(multi ? M.rng.pick(ELS) : c.mem.mcflyEl);
@@ -452,15 +507,18 @@
     /* movement */
     if (it.move && !c.rooted && !(c.onTower)) {
       let sp = c.speed * (it.move.run ? 1.45 : 1) * buffMul('speedMul');
-      if (c.carryingRelic) sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;
+      if (c.carryingRelic) {
+        sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;
+        if (c.quirks && c.quirks.relic_runner) sp *= 1.2;
+      }
       if (c.speciesId === 'mikolo_moko' && !c.carryingRelic) sp *= c.vars.sprint || 1.3;
       if (c.speciesId === 'tyndael') sp *= 0.7 + c.heat * 0.6;
       if (c.speciesId === 'harkal') sp *= 1 + c.frenzy * 0.4;
       const inBog = M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r);
-      if (inBog && !c.sp.tags.includes('flyer')) sp *= 0.45;
+      if (inBog && !c.sp.tags.includes('flyer') && !(c.quirks && c.quirks.bog_raised)) sp *= 0.45;
       /* water pools: aquatic/flying pass freely, ground-only creatures slow (§15) */
       const inWater = M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r);
-      if (inWater && !c.sp.tags.includes('flyer') && !c.sp.tags.includes('su') && c.sp.element !== 'Su') sp *= 0.55;
+      if (inWater && !c.sp.tags.includes('flyer') && !c.sp.tags.includes('su') && c.sp.element !== 'Su' && !(c.quirks && c.quirks.water_raised)) sp *= 0.55;
       const dx = it.move.x - c.x, dy = it.move.y - c.y;
       const d = Math.hypot(dx, dy);
       if (d > 3) {
@@ -485,7 +543,7 @@
         c.facing = t.x >= c.x ? 1 : -1;
         if (c.attackCd <= 0) {
           c.attackCd = 1 / ((c.vars.tongueSpeed || 1) * (c.speciesId === 'harkal' ? 1 + c.frenzy : 1) * buffMul('atkSpeedMul'));
-          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1) * (1 + Math.min(0.2, Math.floor((c.matchXp || 0) / 100) * 0.02));
+          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1) * (1 + Math.min(0.2, Math.floor((c.matchXp || 0) / 100) * 0.02)) * M.quirkDmgMul(c);
           if (c.speciesId === 'tyndael') dmg *= 0.7 + c.heat * 0.7;
           if (it.useBreath && c.headsLeft > 1) dmg *= 1.25; // multi-head strike
           M.damage(t, dmg, c);
@@ -529,15 +587,113 @@
       }
     }
 
-    /* sprengju consumption: any non-passive creature stepping on one */
+    /* iron gut quirk: wounds close strangely fast */
+    if (c.quirks && c.quirks.iron_gut && c.hp > 0 && c.hp < c.maxHp && M.tick % 20 === 0) {
+      c.hp = Math.min(c.maxHp, c.hp + Math.max(0.3, c.maxHp * 0.0035));
+    }
+
+    /* rock thrower quirk: grabs loose stone and hurls it at the nearest enemy */
+    if (c.quirks && c.quirks.rock_thrower && c.stunnedUntil <= M.tick) {
+      if (c.mem.rockAt == null) c.mem.rockAt = M.time + 4;
+      if (M.time >= c.mem.rockAt) {
+        let best = null, bd = 260;
+        for (const o of M.creatures) {
+          if (o.dead || o.team === c.team || o.sp.rig === 'relic') continue;
+          const d2 = U.dist(c.x, c.y, o.x, o.y);
+          if (d2 < bd && d2 > c.attackRange + c.radius) { bd = d2; best = o; }
+        }
+        if (best) {
+          c.mem.rockAt = M.time + 7;
+          c.facing = best.x >= c.x ? 1 : -1;
+          M.addEffect('rock', c.x, c.y - c.radius * 0.6, { tx: best.x, ty: best.y - best.radius * 0.4 });
+          M.damage(best, 4 + c.dmg * 0.5, c, { noAnim: true });
+          if (!best.dead) best.stunnedUntil = Math.max(best.stunnedUntil, M.tick + Math.round(0.4 / TICK));
+        } else {
+          c.mem.rockAt = M.time + 2; /* nothing in range — check again soon */
+        }
+      }
+    }
+
+    /* chemist Eikar: every so often they lob a piece of SOMETHING onto the
+       field — a random buff for whatever token grabs it first, either team */
+    if (c.sp.behavior === 'chemist' && !c.dead) {
+      if (c.mem.chemAt == null) c.mem.chemAt = M.time + 10;
+      if (M.time >= c.mem.chemAt) {
+        c.mem.chemAt = M.time + 14;
+        if (M.pickups.filter(pk => !pk.carrier).length < 12) {
+          M.pickups.push({ id: M.idCounter++, kind: 'chem', x: c.x + M.rng.range(-110, 110), y: c.y + M.rng.range(-90, 90), potency: M.rng.range(0.25, 0.5), bornTick: M.tick, carrier: null });
+          M.addEffect('rock', c.x, c.y - c.radius * 0.6, { tx: M.pickups[M.pickups.length - 1].x, ty: M.pickups[M.pickups.length - 1].y });
+        }
+      }
+    }
+
+    /* sprengju & buff-fruit consumption: any non-passive creature stepping on
+       one eats it — the fruits belong to NOBODY, first come first served */
     if (!c.sp.tags.includes('passive') && !c.rooted && M.tick % 10 === 0) {
-      const spj = M.creatures.find(o => !o.dead && o.speciesId === 'sprengju' && U.dist(c.x, c.y, o.x, o.y) < c.radius + 12);
+      const spj = M.creatures.find(o => !o.dead && (o.speciesId === 'sprengju' || o.sp.features.fruit) && U.dist(c.x, c.y, o.x, o.y) < c.radius + 12);
       if (spj) {
         spj.dead = true; spj.deadTick = M.tick;
         const pot = spj.vars.potency || 0.3;
-        c.buffs.push({ dmgMul: 1 + pot, speedMul: 1 + pot * 0.5, until: M.tick + Math.round(10 / TICK) });
-        c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pot * 0.3);
+        const fruit = spj.sp.features.fruit;
+        if (!fruit) { /* classic sprengju: everything at once */
+          c.buffs.push({ dmgMul: 1 + pot, speedMul: 1 + pot * 0.5, until: M.tick + Math.round(10 / TICK) });
+          c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pot * 0.3);
+        } else if (fruit === 'strike') c.buffs.push({ dmgMul: 1 + pot * 1.4, until: M.tick + Math.round(12 / TICK) });
+        else if (fruit === 'pace') c.buffs.push({ speedMul: 1 + pot * 1.3, until: M.tick + Math.round(12 / TICK) });
+        else if (fruit === 'mend') c.hp = Math.min(c.maxHp, c.hp + c.maxHp * (0.2 + pot * 0.5));
+        else if (fruit === 'guard') c.buffs.push({ armorMul: Math.max(0.55, 1 - pot * 1.2), until: M.tick + Math.round(12 / TICK) });
         M.addEffect('buff', c.x, c.y, {});
+        if (fruit) M.uiEvent(-1, 'event', c.tokName + ' devours the ' + spj.sp.name + '.');
+      }
+    }
+
+    /* field morsels: eat when hungry; the smart carry food to others.
+       Smart creatures never abandon a fight to fetch — that lives in their
+       behavior trees as a lowest-priority errand. */
+    if (!c.sp.tags.includes('passive') && M.tick % 10 === 0 && M.pickups.length) {
+      const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
+      const carried = M.pickups.find(pk => pk.carrier === c.id);
+      if (carried) {
+        carried.x = c.x; carried.y = c.y - c.radius - 10;
+        /* feed a wounded ally — mounts first (an Eikar feeds its Byrd) */
+        let target = null;
+        for (const o of M.creatures) {
+          if (o.dead || o === c || o.team !== c.team || o.hp >= o.maxHp * 0.7) continue;
+          if (U.dist(c.x, c.y, o.x, o.y) > 70) continue;
+          if (!target || (o.sp.tags.includes('mount') && !target.sp.tags.includes('mount'))) target = o;
+        }
+        if (target) {
+          M.pickups = M.pickups.filter(pk => pk !== carried);
+          target.hp = Math.min(target.maxHp, target.hp + target.maxHp * carried.potency);
+          M.addEffect('heal', target.x, target.y, {});
+          M.uiEvent(-1, 'event', c.tokName + ' feeds ' + target.tokName + '.');
+        } else if (c.hp < c.maxHp * 0.6) { /* its own need outgrew its patience */
+          M.pickups = M.pickups.filter(pk => pk !== carried);
+          c.hp = Math.min(c.maxHp, c.hp + c.maxHp * carried.potency);
+          M.addEffect('heal', c.x, c.y, {});
+        }
+      } else {
+        const pk = M.pickups.find(pk2 => !pk2.carrier && U.dist(c.x, c.y, pk2.x, pk2.y) < c.radius + 14);
+        if (pk) {
+          if (pk.kind === 'chem') {
+            /* a piece of something — random boon for whoever grabbed it */
+            M.pickups = M.pickups.filter(pk2 => pk2 !== pk);
+            const roll = M.rng.pick(['strike', 'pace', 'guard', 'mend']);
+            if (roll === 'strike') c.buffs.push({ dmgMul: 1 + pk.potency * 1.4, until: M.tick + Math.round(12 / TICK) });
+            else if (roll === 'pace') c.buffs.push({ speedMul: 1 + pk.potency * 1.2, until: M.tick + Math.round(12 / TICK) });
+            else if (roll === 'guard') c.buffs.push({ armorMul: Math.max(0.55, 1 - pk.potency), until: M.tick + Math.round(12 / TICK) });
+            else c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pk.potency);
+            M.addEffect('buff', c.x, c.y, {});
+            M.uiEvent(-1, 'event', c.tokName + ' grabs the chemist\u2019s piece — ' + roll + '!');
+          } else if (c.hp < c.maxHp * 0.8) {
+            /* hungry enough to eat it on the spot */
+            M.pickups = M.pickups.filter(pk2 => pk2 !== pk);
+            c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pk.potency);
+            M.addEffect('heal', c.x, c.y, {});
+          } else if (smart) {
+            pk.carrier = c.id; /* carry it for someone who needs it */
+          }
+        }
       }
     }
 
@@ -554,6 +710,36 @@
     }
   };
 
+  /* situational damage multiplier from life-history quirks —
+     plus the seed races' memory surge while the storm passes */
+  Match.prototype.quirkDmgMul = function (c) {
+    const M = this, q = c.quirks;
+    let m = 1;
+    /* Eikar/Keilia are immortal through memory: while the Sunear'Zikhron
+       is overhead their zikhron strength becomes strike (up to +20%) */
+    if (c.tok && c.tok.layer && c.tok.layer.zikhron && M.zikhron()) {
+      m *= 1 + 0.2 * Math.min(1, c.tok.layer.zikhron);
+    }
+    if (!q) return m;
+    if (q.storm_born && M.zikhron()) m *= 1.25; /* Sunear'Zikhron overhead */
+    if (q.early_riser && M.time < 60) m *= 1.15;
+    if (q.slow_burner && M.time > 300) m *= 1.15;
+    if (q.cornered_fighter && c.hp < c.maxHp * 0.5) m *= 1.12;
+    if (q.vengeful && c.mem.vengeUntil && M.time < c.mem.vengeUntil) m *= 1.3;
+    if (q.pack_raised || q.loner) {
+      let allies = 0;
+      for (const o of M.creatures) {
+        if (o.dead || o === c || o.team !== c.team) continue;
+        if (U.dist(c.x, c.y, o.x, o.y) < (q.loner ? 200 : 160)) { allies++; if (allies >= 2) break; }
+      }
+      if (q.pack_raised) m *= 1 + 0.08 * allies;
+      if (q.loner && allies === 0) m *= 1.18;
+    }
+    if (q.forest_reared && M.zones.some(z => z.type === 'forest' && U.dist(c.x, c.y, z.x, z.y) < z.r)) m *= 1.12;
+    if (q.shore_reared && M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r)) m *= 1.12;
+    return m;
+  };
+
   /* ================= DAMAGE & DEATH ================= */
   Match.prototype.damage = function (t, amount, source, opts) {
     const M = this;
@@ -568,6 +754,13 @@
     if (t.vars.scarToughness) dmg *= 1 - t.vars.scarToughness * 0.5;
     if (t.vars.hairArmor && source && source.x < t.x === (t.facing > 0)) dmg *= 1 - t.vars.hairArmor; // back armor
     if (t.onTower) dmg *= 0.7;
+    /* guard buffs (Stonefruit, chemist pieces) */
+    for (const b of t.buffs) { if (b.armorMul && b.until > M.tick) dmg *= b.armorMul; }
+    /* defensive life-history quirks */
+    if (t.quirks) {
+      if (t.quirks.thick_hide) dmg = Math.max(0.2, dmg - 1);
+      if (t.quirks.scarred_survivor && t.hp < t.maxHp * 0.3) dmg *= 0.85;
+    }
     /* naga first head: near-invincible absorb */
     if ((t.speciesId === 'ular_naga' || t.speciesId === 'su_naga')) {
       const firstHeadPortion = t.maxHp * 0.55;
@@ -591,6 +784,12 @@
     }
     /* harkal frenzy on damage taken */
     if (t.speciesId === 'harkal') t.frenzy = Math.min(1, t.frenzy + 0.2);
+    /* skittish quirk: the first bad wound triggers a burst of speed */
+    if (t.quirks && t.quirks.skittish && !t.mem.skitDone && t.hp > 0 && t.hp < t.maxHp * 0.5) {
+      t.mem.skitDone = true;
+      t.buffs.push({ speedMul: 1.45, until: M.tick + Math.round(3 / TICK) });
+      M.addEffect('buff', t.x, t.y, {});
+    }
 
     /* naga head loss */
     if ((t.speciesId === 'ular_naga' || t.speciesId === 'su_naga') && t.headCount > 1) {
@@ -612,6 +811,27 @@
     if (source && source.team !== c.team && M.teams[source.team]) M.teams[source.team].stats.eliminations++;
     if (source && !source.dead) source.matchXp = (source.matchXp || 0) + 25; // kill XP (§2)
 
+    /* feeding: a predator eats what it kills — the meal closes wounds,
+       and a Naga's feeding hurries the growth of its next head */
+    if (source && !source.dead && cause === 'combat' && source.team !== c.team &&
+        (source.sp.tags.includes('carnivore') || source.sp.tags.includes('omnivore')) &&
+        !c.sp.tags.includes('inert') && !c.sp.features.fruit && c.speciesId !== 'sprengju') {
+      source.hp = Math.min(source.maxHp, source.hp + Math.min(source.maxHp * 0.25, c.maxHp * 0.12));
+      M.addEffect('heal', source.x, source.y, {});
+      if (source.speciesId === 'ular_naga' || source.speciesId === 'su_naga') {
+        source.growthPulses = (source.growthPulses || 0) + 2; /* a good meal feeds the next head */
+      }
+    }
+
+    /* vengeful quirk: nearby allies of the fallen enter a brief fury */
+    for (const o of M.creatures) {
+      if (o.dead || o === c || o.team !== c.team) continue;
+      if (o.quirks && o.quirks.vengeful && U.dist(o.x, o.y, c.x, c.y) < 180) {
+        o.mem.vengeUntil = M.time + 6;
+        M.addEffect('buff', o.x, o.y, {});
+      }
+    }
+
     /* relic drop */
     if (c.carryingRelic) {
       c.carryingRelic = false;
@@ -624,7 +844,7 @@
       if (!M.headless) DYA.audio.play('relicDrop');
     }
 
-    /* commander tax (§1): a defeated token returns to the pouch; replaying it
+    /* additional cost (§1): a defeated token returns to the pouch; replaying it
        costs +1 resource per prior defeat. Uff excepted while self-respawning. */
     if (M.mode === 'standard' && M.teams[c.team] && M.teams[c.team].controller !== 'wild' &&
         !c.isKofiSpawn && c.speciesId !== 'kofi' && c.speciesId !== 'sprengju' &&
@@ -755,6 +975,48 @@
         M.pendingSpawns.splice(i, 1);
       }
     }
+    /* the living horn: each fielded commander (the player's self-Eikar)
+       evaluates the field every few seconds and rallies the side (§ fun pass).
+       Reads sim state only — deterministic in lockstep and replays. */
+    if (M.mode === 'standard' && M.tick % 120 === 0) {
+      for (const cm of M.creatures) {
+        if (cm.dead || !cm.isCommander) continue;
+        const myRelic = M.relics.find(r => r.ownerTeam === cm.team);
+        const foeRelic = M.relics.find(r => r.ownerTeam !== cm.team);
+        let call = null;
+        if (myRelic && myRelic.carrier != null && myRelic.carrierTeam !== cm.team) {
+          call = 'INTERCEPT THE THIEF';
+          for (const o of M.creatures) {
+            if (o.dead || o.team !== cm.team || o === cm || o.rooted) continue;
+            if (U.dist(cm.x, cm.y, o.x, o.y) < 340) o.buffs.push({ speedMul: 1.28, until: M.tick + Math.round(4.5 / TICK) });
+          }
+        } else if (foeRelic && !foeRelic.carrier && !foeRelic.captured && !foeRelic.disabled &&
+                   M.creatures.some(o => !o.dead && o.team === cm.team && U.dist(o.x, o.y, foeRelic.x, foeRelic.y) < 380)) {
+          call = 'PRESS FOR THE RELIC';
+          for (const o of M.creatures) {
+            if (o.dead || o.team !== cm.team || o.rooted) continue;
+            if (U.dist(o.x, o.y, foeRelic.x, foeRelic.y) < 380) o.buffs.push({ speedMul: 1.15, dmgMul: 1.05, until: M.tick + Math.round(4.5 / TICK) });
+          }
+        } else {
+          const hoard = M.teams[cm.team] && M.teams[cm.team].hoard;
+          if (hoard && M.creatures.some(o => !o.dead && o.team !== cm.team && !o.sp.tags.includes('passive') && U.dist(o.x, o.y, hoard.x, hoard.y) < 240)) {
+            call = 'HOLD THE HOARD';
+            for (const o of M.creatures) {
+              if (o.dead || o.team !== cm.team) continue;
+              if (U.dist(o.x, o.y, hoard.x, hoard.y) < 300) o.buffs.push({ dmgMul: 1.2, until: M.tick + Math.round(4.5 / TICK) });
+            }
+          }
+        }
+        if (call && cm.mem.lastCall !== call && M.tick - (cm.mem.lastCallTick || -9999) > 240) {
+          cm.mem.lastCall = call; cm.mem.lastCallTick = M.tick;
+          M.uiEvent(-1, 'event', '📯 ' + cm.tokName + ' sounds the horn — ' + call + '!');
+          M.addEffect('buff', cm.x, cm.y, {});
+          if (!M.headless && cm.team === 0) DYA.audio.play('horn');
+        }
+        if (!call) cm.mem.lastCall = null;
+      }
+    }
+
     /* relic capture + defensive recovery */
     if (M.mode === 'standard' && M.tick % 5 === 0) {
       for (const rl of M.relics) {
@@ -792,6 +1054,8 @@
       M.creatures.forEach(c => { if (c.dead && M.tick - c.deadTick >= 60) M.recordTokenXp(c); });
       M.creatures = M.creatures.filter(c => !c.dead || M.tick - c.deadTick < 60);
       M.remnants = M.remnants.filter(r => M.tick - r.at < 1200);
+      /* unclaimed morsels spoil after 90s; carried ones keep */
+      M.pickups = M.pickups.filter(pk => pk.carrier != null ? M.creatures.some(o => !o.dead && o.id === pk.carrier) : M.tick - pk.bornTick < 1800);
     }
   };
 
@@ -813,7 +1077,9 @@
       const bossAlive = M.creatures.some(c => !c.dead && c.team === 1);
       if (!bossAlive) { M.finish(0, 'hunt'); return; }
       const T = M.teams[0];
-      const anyAlive = M.creatures.some(c => !c.dead && c.team === 0);
+      /* flora and other passives don't keep a hunt alive — a lone stonefruit
+         is not a hunter */
+      const anyAlive = M.creatures.some(c => !c.dead && c.team === 0 && !c.sp.tags.includes('passive'));
       const anyLeft = T.pouch.some(e => e.state === 'pouch') || T.readied.length > 0;
       if (!anyAlive && !anyLeft && M.time > 20) { M.finish(1, 'hunt'); return; }
       return;
@@ -915,6 +1181,15 @@
       makariRemnants: () => M.remnants,
       inBog: (c) => M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r),
       inWater: (c) => M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r),
+      nearestPickup: (c, range) => {
+        let best = null, bd = range || 200;
+        for (const pk of M.pickups) {
+          if (pk.carrier != null) continue;
+          const d = U.dist(c.x, c.y, pk.x, pk.y);
+          if (d < bd) { bd = d; best = pk; }
+        }
+        return best;
+      },
       offCooldown: (c, key) => !c.mem['cd_' + key] || c.mem['cd_' + key] <= M.tick,
 
       enemiesNear(c, range) {
@@ -954,7 +1229,18 @@
       hold(c) { c.intent.state = 'idle'; },
       lazyHold(c) { c.intent.state = 'idle'; },
       guard(c) { c.intent.state = 'idle'; },
-      guardPost(c) { c.intent.state = 'idle'; },
+      guardPost(c) {
+        /* the smart don't stand around: with nothing better to do — and ONLY
+           then — they stroll to a nearby morsel. They never abandon a fight
+           for food; this is the lowest branch of every tree that reaches it. */
+        const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
+        if (smart && !c.rooted && !M._api.nearestEnemy(c, 220) &&
+            !M.pickups.some(pk => pk.carrier === c.id)) {
+          const pk = M._api.nearestPickup(c, 200);
+          if (pk) { c.intent.move = { x: pk.x, y: pk.y, run: false }; return; }
+        }
+        c.intent.state = 'idle';
+      },
       sleep(c) { c.intent.state = 'dormant'; },
       wake(c) { if (c.state === 'dormant') c.state = 'idle'; },
       shellUp(c) { c.intent.state = 'dormant'; },
@@ -1277,7 +1563,7 @@
       return;
     }
 
-    /* 2. ready affordable tokens (vector costs + commander tax) */
+    /* 2. ready affordable tokens (vector costs + additional cost) */
     if (T.readied.length < (skill > 0.7 ? 2 : 1) + 1) {
       const affordable = T.pouch.map((e, i) => ({ e, i }))
         .filter(x => {

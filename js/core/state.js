@@ -937,7 +937,281 @@
         if (seller && seller.ai) { const t = seller.tokens[l.tokenId]; if (t) t.status = 'collection'; delete G.world.market.listings[l.id]; }
       });
     }
+    /* the Dya'kukull live their own lives — with catch-up if the game was closed */
+    const live = liveState();
+    const elapsed = Date.now() - (live.lastBeat || Date.now());
+    const beats = Math.min(40, Math.max(1, Math.floor(elapsed / 45000)));
+    for (let b = 0; b < beats; b++) liveBeat(rng, b < beats - 1);
+    live.lastBeat = Date.now();
     G.save();
+  };
+
+  /* ================= THE DYA'KUKULL LIVE =================
+     The 100 AI players actually play the game: they log on, play
+     casual matches among themselves, enter and run tournaments,
+     hunt, craft, post notices, challenge the player — and log off
+     again. Never everyone at once; never nobody. */
+  function liveState() {
+    const w = G.world;
+    if (!w.live) w.live = { sessions: {}, matches: [], challenges: [], recent: [], lastBeat: 0 };
+    if (!w.live.recent) w.live.recent = [];
+    return w.live;
+  }
+  G.aiStatus = function (accId) {
+    const live = liveState();
+    const sess = live.sessions[accId];
+    return sess ? sess.status : 'offline';
+  };
+  G.liveNow = function () {
+    const live = liveState();
+    const online = Object.values(G.world.accounts).filter(a => a.ai && G.aiStatus(a.id) === 'online');
+    return { online, matches: live.matches.filter(m => !m.resolved), challenges: live.challenges.filter(ch => ch.expiresAt > Date.now()), recent: live.recent };
+  };
+
+  /* statistical outcome for an unwatched AI-vs-AI match */
+  function aiVsAiOutcome(a, b, rng) {
+    const sa = (a.aiCfg.matchSkill || 0.5) * 2 + a.rank / 1200;
+    const sb = (b.aiCfg.matchSkill || 0.5) * 2 + b.rank / 1200;
+    return rng.chance(sa / (sa + sb)); /* true = a wins */
+  }
+  function recordAiMatch(a, b, aWins, format, duration, tournament) {
+    const at = Date.now();
+    const mid = U.uid('mtc');
+    [[a, aWins, b], [b, !aWins, a]].forEach(([p, won, opp]) => {
+      p.stats[won ? 'wins' : 'losses']++;
+      p.matchHistory.unshift({ id: mid, at, opponent: opp.displayName, format: format || 'Casual — Dya\u2019kukull', ranked: false, win: won, draw: false, duration: duration || 300, tournament: tournament || null });
+      if (p.matchHistory.length > 30) p.matchHistory.pop();
+      p.xp += won ? 40 : 15;
+      while (p.xp >= EC.xpForLevel(p.level + 1)) p.level++;
+      p.gold += won ? 25 : 10;
+      p.rank = Math.max(800, p.rank + (won ? 3 : -3));
+    });
+  }
+  G.resolveLiveMatch = function (matchId, winnerIdx) {
+    const live = liveState();
+    const rec = live.matches.find(m2 => m2.id === matchId);
+    if (!rec || rec.resolved) return;
+    rec.resolved = true;
+    const a = G.world.accounts[rec.aId], b = G.world.accounts[rec.bId];
+    if (a && b) {
+      recordAiMatch(a, b, winnerIdx === 0, rec.format, Math.round((Date.now() - rec.startedAt) / 1000));
+      live.recent.unshift({ at: Date.now(), a: a.displayName, b: b.displayName, winner: winnerIdx === 0 ? a.displayName : b.displayName });
+      if (live.recent.length > 8) live.recent.pop();
+    }
+    G.save();
+  };
+
+  function liveBeat(rng, catchUp) {
+    const live = liveState();
+    const now = Date.now();
+    const ais = Object.values(G.world.accounts).filter(a => a.ai && a.aiCfg.active);
+
+    /* ---- presence: sessions with real breaks ---- */
+    ais.forEach(a => {
+      const sess = live.sessions[a.id];
+      if (sess && sess.until > now) return;
+      const r = rng.next();
+      /* roughly 12-18 online at a time; sociable AIs stay on longer */
+      if (!sess || sess.status === 'offline') {
+        if (r < 0.12) live.sessions[a.id] = { status: 'online', until: now + (15 + rng.next() * 55) * 60000 };
+        else live.sessions[a.id] = { status: 'offline', until: now + (30 + rng.next() * 240) * 60000 };
+      } else if (sess.status === 'online') {
+        if (r < 0.3) live.sessions[a.id] = { status: 'away', until: now + (4 + rng.next() * 12) * 60000 };
+        else live.sessions[a.id] = { status: 'offline', until: now + (60 + rng.next() * 300) * 60000 };
+      } else { /* away */
+        if (r < 0.6) live.sessions[a.id] = { status: 'online', until: now + (10 + rng.next() * 40) * 60000 };
+        else live.sessions[a.id] = { status: 'offline', until: now + (60 + rng.next() * 240) * 60000 };
+      }
+    });
+    /* there should always be a few active */
+    let online = ais.filter(a => G.aiStatus(a.id) === 'online');
+    while (online.length < 6 && ais.length) {
+      const wake = rng.pick(ais.filter(a => G.aiStatus(a.id) !== 'online'));
+      if (!wake) break;
+      live.sessions[wake.id] = { status: 'online', until: now + (20 + rng.next() * 50) * 60000 };
+      online = ais.filter(a => G.aiStatus(a.id) === 'online');
+    }
+
+    /* ---- casual matches among themselves ---- */
+    live.matches.forEach(m2 => {
+      if (!m2.resolved && m2.endsAt <= now && !m2.watched) {
+        const a = G.world.accounts[m2.aId], b = G.world.accounts[m2.bId];
+        m2.resolved = true;
+        if (a && b) {
+          const aWins = aiVsAiOutcome(a, b, rng);
+          recordAiMatch(a, b, aWins, m2.format, Math.round((m2.endsAt - m2.startedAt) / 1000));
+          live.recent.unshift({ at: now, a: a.displayName, b: b.displayName, winner: aWins ? a.displayName : b.displayName });
+          if (live.recent.length > 8) live.recent.pop();
+        }
+      }
+    });
+    live.matches = live.matches.filter(m2 => !m2.resolved || now - m2.endsAt < 300000);
+    const busy = {};
+    live.matches.forEach(m2 => { if (!m2.resolved) { busy[m2.aId] = 1; busy[m2.bId] = 1; } });
+    const free = online.filter(a => !busy[a.id]);
+    if (live.matches.filter(m2 => !m2.resolved).length < 3 && free.length >= 2 && rng.chance(0.45)) {
+      const a = rng.pick(free);
+      let b = rng.pick(free);
+      if (b === a) b = free[(free.indexOf(a) + 1) % free.length];
+      if (a !== b) {
+        live.matches.push({
+          id: U.uid('lvm'), aId: a.id, bId: b.id, seed: U.newSeed(),
+          format: rng.chance(0.25) ? 'Private Match' : 'Casual Queue',
+          startedAt: now, endsAt: now + (3 + rng.next() * 5) * 60000,
+          resolved: false, watched: false,
+        });
+      }
+    }
+
+    /* ---- tournaments run themselves ---- */
+    const trns = Object.values(G.world.tournaments);
+    const humanIn = (t) => t.players.some(pid => { const acc = G.world.accounts[pid]; return acc && !acc.ai; });
+    /* keep the browser stocked */
+    if (trns.filter(t => t.state === 'open').length < 4 && rng.chance(0.5)) seedOneTournament(rng);
+    trns.forEach(t => {
+      if (humanIn(t)) return; /* never touch an event the player is in */
+      if (t.state === 'open') {
+        /* entrants trickle in */
+        if (rng.chance(0.55)) {
+          const cands = online.filter(a => a.aiCfg.tournaments && !t.players.includes(a.id) && a.level >= (EC.CIRCUIT_MIN_LEVEL[t.circuit] || 0));
+          const joiner = cands.length ? rng.pick(cands) : null;
+          if (joiner) { t.players.push(joiner.id); joiner.gold = Math.max(0, joiner.gold - t.entryFee); }
+        }
+        if (t.players.length >= t.size) {
+          t.pot = t.entryFee * t.players.length;
+          const order = rng.shuffle(t.players.slice());
+          if (t.structure === 'rr') {
+            const round = [];
+            for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) round.push({ a: order[i], b: order[j], winner: null });
+            t.bracket = [round];
+          } else {
+            t.bracket = [order.map((pid, i) => i % 2 === 0 ? { a: order[i], b: order[i + 1], winner: null } : null).filter(Boolean)];
+          }
+          t.state = 'running'; t.aiOnly = true;
+        }
+      } else if (t.state === 'running' && t.aiOnly && t.bracket && rng.chance(0.5)) {
+        /* resolve the current round, one beat at a time */
+        const round = t.bracket[t.bracket.length - 1];
+        const open2 = round.filter(mm => !mm.winner);
+        if (open2.length) {
+          const mm = rng.pick(open2);
+          const a = G.world.accounts[mm.a], b = G.world.accounts[mm.b];
+          if (!a) mm.winner = mm.b; else if (!b) mm.winner = mm.a;
+          else { const aw = aiVsAiOutcome(a, b, rng); mm.winner = aw ? mm.a : mm.b; recordAiMatch(a, b, aw, t.circuit + ' Tournament', 240 + Math.floor(rng.next() * 300), t.name); }
+        } else if (t.structure === 'rr' || round.length === 1) {
+          /* champion */
+          let champ;
+          if (t.structure === 'rr') {
+            const wins = {};
+            t.bracket[0].forEach(mm => { if (mm.winner) wins[mm.winner] = (wins[mm.winner] || 0) + 1; });
+            champ = t.players.slice().sort((x, y) => (wins[y] || 0) - (wins[x] || 0))[0];
+          } else champ = round[0].winner;
+          t.state = 'done'; t.champion = champ; t.doneAt = now;
+          const cAcc = G.world.accounts[champ];
+          if (cAcc) {
+            cAcc.gold += Math.round((t.pot || 0) * 0.6) + (EC.CIRCUIT_GOLD[t.circuit] || 0);
+            cAcc.stats.tourneysWon++;
+            G.world.season.winners.push({ name: cAcc.displayName, circuit: t.circuit, tournament: t.name, at: now });
+          }
+          const org = t.organizerId && G.world.accounts[t.organizerId];
+          if (org) org.gold += Math.round((t.pot || 0) * 0.05) + (t.sealed ? 200 : 0);
+        } else {
+          /* build next round */
+          const next = [];
+          for (let i = 0; i < round.length; i += 2) next.push({ a: round[i].winner, b: round[i + 1] ? round[i + 1].winner : null, winner: round[i + 1] ? null : round[i].winner });
+          t.bracket.push(next);
+        }
+      }
+      /* prune finished AI events after an hour so the ledger stays lean */
+      if (t.state === 'done' && t.aiOnly && t.doneAt && now - t.doneAt > 3600000) delete G.world.tournaments[t.id];
+    });
+
+    if (catchUp) return; /* during catch-up: world moves, but nobody pesters the player */
+
+    /* ---- they reach out to the player ---- */
+    const me = G.me;
+    if (me && !me.ai) {
+      live.challenges = live.challenges.filter(ch => ch.expiresAt > now);
+      if (live.challenges.length < 2 && rng.chance(0.07)) {
+        const near = online.filter(a => Math.abs(a.level - me.level) < 15 && !live.challenges.some(ch => ch.aiId === a.id));
+        const ch = near.length ? rng.pick(near) : null;
+        if (ch) {
+          live.challenges.push({ id: U.uid('chl'), aiId: ch.id, at: now, expiresAt: now + 12 * 60000 });
+          G.notify({ type: 'social', title: 'Challenge!', body: ch.displayName + ' (Lv ' + ch.level + ') challenges you to a match. Play → Live Now to accept.', icon: '⚔' });
+        }
+      }
+      if (rng.chance(0.015)) {
+        const cand = online.find(a => !me.friends.includes(a.id) && !me.pendingIn.includes(a.id) && !me.pendingOut.includes(a.id) && !me.blocked.includes(a.id));
+        if (cand) {
+          me.pendingIn.push(cand.id);
+          if (!cand.pendingOut) cand.pendingOut = [];
+          cand.pendingOut.push(me.id);
+          G.notify({ type: 'social', title: 'Friend request', body: cand.displayName + ' wants to be friends.', icon: '🤝' });
+        }
+      }
+    }
+
+    /* ---- and the rest of a player's life: hunts, crafting, notices ---- */
+    if (rng.chance(0.2) && online.length) {
+      const a = rng.pick(online);
+      const r2 = rng.next();
+      if (r2 < 0.4) { /* hunting trip */
+        a.stats.huntsDone++;
+        a.pieces = a.pieces || [];
+        a.pieces.push({ speciesId: rng.pick(SP.huntable), material: rng.pick(L.MATERIALS), from: 'Hunt', temperBias: 0, at: now });
+      } else if (r2 < 0.75) { /* craft something (keeps stalls stocked) */
+        const piece = (a.pieces || []).pop();
+        const spid = piece ? piece.speciesId : rng.pick(SP.craftable);
+        const tok = TK.mint({ speciesId: spid, rng: new U.Rng(U.newSeed()), owner: a.id, aiOwner: true });
+        a.tokens[tok.id] = tok;
+        a.stats.crafted++;
+      } else if (r2 < 0.85) { /* post a notice */
+        G.world.trinvak.unshift({
+          id: U.uid('tv'), at: now, author: a.displayName, paid: 5 + Math.floor(rng.next() * 40),
+          title: rng.pick(['Looking for sparring partners', 'WTB water tokens', 'Selling — see my stall', 'Local bracket forming', 'Lost a wager, selling cheap', 'Karnen co-op forming']),
+          body: rng.pick(['Find me on the ladder.', 'Fair prices, honest songs.', 'No time-wasters, please.', 'The Guild has been notified. Cordially.', 'First come, first served.']),
+        });
+        if (G.world.trinvak.length > 30) G.world.trinvak.pop();
+      }
+    }
+  }
+
+  function seedOneTournament(rng) {
+    const circuit = rng.chance(0.65) ? 'Local' : 'Regional';
+    const sealed = rng.chance(0.4);
+    const ais = Object.values(G.world.accounts).filter(a => a.ai && a.aiCfg.tournaments);
+    const org = rng.pick(ais);
+    const t = {
+      id: U.uid('trn'),
+      name: sealed
+        ? rng.pick(['Guild Evening Bracket', 'Guild Open Qualifier', 'Sealed Circuit Night']) + ' — ' + rng.pick(L.PLACES)
+        : rng.pick(['The Bent Vine Cup', 'Backlot Brawl', 'Riverstone Invitational', 'The Cracked Okid Open', 'Torchlight Tourney']) + ' (' + org.displayName + ')',
+      circuit, sealed,
+      organizer: sealed ? 'Dya Guild' : org.displayName, organizerId: sealed ? null : org.id,
+      entryFee: circuit === 'Local' ? 25 + Math.floor(rng.next() * 50) : 75, pouchFormat: rng.pick(['single', 'three-draft', 'random']),
+      size: rng.pick([4, 8]), structure: rng.chance(0.25) ? 'rr' : 'single',
+      aftd: rng.chance(0.25),
+      state: 'open', players: [], bracket: null,
+      titlePool: EC.TITLES.filter(tt => tt.tier === circuit).map(tt => tt.id),
+      rules: [], arena: rng.pick(L.ARENAS[circuit]),
+      terrain: rng.pick(['plains', 'forest', 'mountain', 'desert']), createdAt: Date.now(), schedule: 'Rolling',
+    };
+    if (t.aftd) t.rules.push('Aftð — Active Tokens: XP, growth, and behavior persist across the tournament.');
+    G.world.tournaments[t.id] = t;
+    return t;
+  }
+  G.acceptChallenge = function (chId) {
+    const live = liveState();
+    const ch = live.challenges.find(c2 => c2.id === chId);
+    if (!ch || ch.expiresAt < Date.now()) return null;
+    live.challenges = live.challenges.filter(c2 => c2 !== ch);
+    G.save();
+    return G.world.accounts[ch.aiId] || null;
+  };
+  G.markLiveWatched = function (matchId) {
+    const live = liveState();
+    const rec = live.matches.find(m2 => m2.id === matchId);
+    if (rec) rec.watched = true;
   };
   function aiCreateListing(w, ai, tok, rng) {
     if (tok.status !== 'collection') return;
