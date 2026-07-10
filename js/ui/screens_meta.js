@@ -578,6 +578,15 @@
       });
       views.Main();
 
+      /* the field plays around you: refresh when other matches resolve */
+      const sig = () => t.state + '|' + JSON.stringify(t.bracket ? t.bracket.map(r2 => r2.map(mm => mm.winner)) : null);
+      let lastSig = sig();
+      const liveIv = setInterval(() => {
+        if (!scr.isConnected) { clearInterval(liveIv); return; }
+        if (sig() !== lastSig) { lastSig = sig(); UI.show('bracket', { trn: t }); }
+      }, 5000);
+      this.leave = () => clearInterval(liveIv);
+
       function roundName(t, ri) {
         const rounds = Math.log2(t.size);
         const left = rounds - ri;
@@ -632,8 +641,7 @@
             onFinish: (res, iWon) => {
               mt.winner = iWon ? me.id : oppId;
               if (t.aftd) DYA.aftd.afterMatch(t, res);
-              simulateOtherMatches(ri);
-              advanceBracket();
+              advanceBracket(); /* advances only when the whole round is played */
               if (t.state === 'done') {
                 if (t.champion === me.id) tournamentWon();
                 else {
@@ -641,10 +649,11 @@
                   UI.toast({ title: 'Tournament over', body: G.world.accounts[t.champion].displayName + ' takes the championship. Your share of the pool, if any, is paid.', icon: '🏆' });
                 }
               } else if (!iWon && t.structure !== 'rr') {
-                /* eliminated — the bracket plays itself out so payouts land */
-                simulateToCompletion();
-                finishTournament(t);
-                UI.toast({ title: 'Eliminated', body: 'The bracket moves on without you. There is always next season.', icon: '🏆' });
+                /* eliminated — the rest of the field plays on WITHOUT you,
+                   match by match, over the next while. Results land here. */
+                UI.toast({ title: 'Eliminated', body: 'The bracket plays on without you — watch it fill in from the bracket page. There is always next season.', icon: '🏆' });
+              } else if (!t.bracket[t.bracket.length - 1].every(m2 => m2.winner)) {
+                UI.toast({ title: 'Match recorded', body: 'The other Dya\u2019kukull play their matches on their own time. You\u2019ll be told when your next round is ready.', icon: '🏆' });
               }
               G.save();
               UI.show('bracket', { trn: t });
@@ -681,17 +690,6 @@
         }
       }
 
-      function simulateOtherMatches(ri) {
-        const rng = new U.Rng(U.newSeed());
-        t.bracket[ri].forEach(m2 => {
-          if (m2.winner) return;
-          if (m2.a === me.id || m2.b === me.id) return;
-          const a = G.world.accounts[m2.a], b = G.world.accounts[m2.b];
-          if (!a) { m2.winner = m2.b; return; }
-          if (!b) { m2.winner = m2.a; return; }
-          m2.winner = rng.chance(a.rank / (a.rank + b.rank)) ? m2.a : m2.b;
-        });
-      }
       function rrWins() {
         const wins = {};
         t.bracket[0].forEach(m2 => { if (m2.winner) wins[m2.winner] = (wins[m2.winner] || 0) + 1; });
@@ -718,14 +716,6 @@
           t.bracket.push(next);
         }
       }
-      function simulateToCompletion() {
-        let guard = 0;
-        while (t.state !== 'done' && guard++ < 24) {
-          simulateOtherMatches(t.bracket.length - 1);
-          advanceBracket();
-        }
-      }
-
       /* §9 — completion payouts: trickle-down pool, organizer 5%, sealed extras. Runs once. */
       function finishTournament(t2) {
         if (t2.paidOut) return t2.payout || {};
