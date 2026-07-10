@@ -1063,14 +1063,18 @@
       }
     }
 
-    /* ---- tournaments run themselves ---- */
+    /* ---- tournaments run themselves — around the player, never FOR them ----
+       AI-vs-AI pairings resolve on their own schedule, including inside events
+       the player entered. The player's own matches are never played for them:
+       a round only advances once THEY have played theirs. */
     const trns = Object.values(G.world.tournaments);
-    const humanIn = (t) => t.players.some(pid => { const acc = G.world.accounts[pid]; return acc && !acc.ai; });
+    const isHuman = (pid) => { const acc = G.world.accounts[pid]; return acc && !acc.ai; };
+    const humanIn = (t) => t.players.some(isHuman);
     /* keep the browser stocked */
     if (trns.filter(t => t.state === 'open').length < 4 && rng.chance(0.5)) seedOneTournament(rng);
     trns.forEach(t => {
-      if (humanIn(t)) return; /* never touch an event the player is in */
-      if (t.state === 'open') {
+      const human = humanIn(t);
+      if (t.state === 'open' && !human) {
         /* entrants trickle in */
         if (rng.chance(0.55)) {
           const cands = online.filter(a => a.aiCfg.tournaments && !t.players.includes(a.id) && a.level >= (EC.CIRCUIT_MIN_LEVEL[t.circuit] || 0));
@@ -1089,40 +1093,39 @@
           }
           t.state = 'running'; t.aiOnly = true;
         }
-      } else if (t.state === 'running' && t.aiOnly && t.bracket && rng.chance(0.5)) {
-        /* resolve the current round, one beat at a time */
+      } else if (t.state === 'running' && t.bracket && rng.chance(0.5)) {
         const round = t.bracket[t.bracket.length - 1];
-        const open2 = round.filter(mm => !mm.winner);
+        const humanMatch = (mm) => isHuman(mm.a) || isHuman(mm.b);
+        /* resolve ONE AI-vs-AI pairing this beat; the player's matches wait */
+        const open2 = round.filter(mm => !mm.winner && !humanMatch(mm));
         if (open2.length) {
           const mm = rng.pick(open2);
           const a = G.world.accounts[mm.a], b = G.world.accounts[mm.b];
           if (!a) mm.winner = mm.b; else if (!b) mm.winner = mm.a;
           else { const aw = aiVsAiOutcome(a, b, rng); mm.winner = aw ? mm.a : mm.b; recordAiMatch(a, b, aw, t.circuit + ' Tournament', 240 + Math.floor(rng.next() * 300), t.name); }
-        } else if (t.structure === 'rr' || round.length === 1) {
-          /* champion */
-          let champ;
-          if (t.structure === 'rr') {
-            const wins = {};
-            t.bracket[0].forEach(mm => { if (mm.winner) wins[mm.winner] = (wins[mm.winner] || 0) + 1; });
-            champ = t.players.slice().sort((x, y) => (wins[y] || 0) - (wins[x] || 0))[0];
-          } else champ = round[0].winner;
-          t.state = 'done'; t.champion = champ; t.doneAt = now;
-          const cAcc = G.world.accounts[champ];
-          if (cAcc) {
-            cAcc.gold += Math.round((t.pot || 0) * 0.6) + (EC.CIRCUIT_GOLD[t.circuit] || 0);
-            cAcc.stats.tourneysWon++;
-            G.world.season.winners.push({ name: cAcc.displayName, circuit: t.circuit, tournament: t.name, at: now });
+        } else if (round.every(mm => mm.winner)) {
+          /* round complete (the player played theirs, or is out): crown or advance */
+          if (t.structure === 'rr' || round.length === 1) {
+            let champ;
+            if (t.structure === 'rr') {
+              const wins = {};
+              t.bracket[0].forEach(mm => { if (mm.winner) wins[mm.winner] = (wins[mm.winner] || 0) + 1; });
+              champ = t.players.slice().sort((x, y) => (wins[y] || 0) - (wins[x] || 0))[0];
+            } else champ = round[0].winner;
+            completeTournamentAmbient(t, champ, now);
+          } else {
+            const next = [];
+            for (let i = 0; i < round.length; i += 2) next.push({ a: round[i].winner, b: round[i + 1] ? round[i + 1].winner : null, winner: round[i + 1] ? null : round[i].winner });
+            t.bracket.push(next);
+            /* tell the player when their next match is ready */
+            if (G.me && next.some(mm => mm.a === G.me.id || mm.b === G.me.id)) {
+              G.notify({ type: 'tournament', title: 'Your match is ready', body: t.name + ' — the round has advanced. To the bracket!', icon: '🏆' });
+            }
           }
-          const org = t.organizerId && G.world.accounts[t.organizerId];
-          if (org) org.gold += Math.round((t.pot || 0) * 0.05) + (t.sealed ? 200 : 0);
-        } else {
-          /* build next round */
-          const next = [];
-          for (let i = 0; i < round.length; i += 2) next.push({ a: round[i].winner, b: round[i + 1] ? round[i + 1].winner : null, winner: round[i + 1] ? null : round[i].winner });
-          t.bracket.push(next);
         }
+        /* otherwise: the only open matches are the player's — the bracket waits for them */
       }
-      /* prune finished AI events after an hour so the ledger stays lean */
+      /* prune finished AI-only events after an hour so the ledger stays lean */
       if (t.state === 'done' && t.aiOnly && t.doneAt && now - t.doneAt > 3600000) delete G.world.tournaments[t.id];
     });
 
@@ -1174,6 +1177,37 @@
         if (G.world.trinvak.length > 30) G.world.trinvak.pop();
       }
     }
+  }
+
+  /* ambient completion: pays the field, honors the organizer, releases Aftð.
+     Only reached when the champion is an AI (the player's own final can only
+     complete through their own play). */
+  function completeTournamentAmbient(t, champ, now) {
+    if (t.paidOut) { t.state = 'done'; t.champion = t.champion || champ; return; }
+    t.paidOut = true;
+    t.state = 'done'; t.champion = champ; t.doneAt = now;
+    const pool = t.pot != null ? t.pot : Math.round((t.entryFee || 0) * (t.size || 0));
+    const cAcc = G.world.accounts[champ];
+    if (cAcc) {
+      if (G.me && cAcc === G.me) G.addGold(Math.round(pool * 0.6) + (EC.CIRCUIT_GOLD[t.circuit] || 0), true);
+      else cAcc.gold += Math.round(pool * 0.6) + (EC.CIRCUIT_GOLD[t.circuit] || 0);
+      cAcc.stats.tourneysWon++;
+      G.world.season.winners.push({ name: cAcc.displayName, circuit: t.circuit, tournament: t.name, at: now });
+    }
+    const org = t.organizerId && G.world.accounts[t.organizerId];
+    if (org) {
+      const cut = Math.round(pool * 0.05) + (t.sealed ? 200 : 0);
+      if (G.me && org === G.me) {
+        G.addGold(cut, true);
+        if (t.sealed) { G.me.okid[0]++; G.me.ngakara++; }
+        G.notify({ type: 'tournament', title: 'Your event concluded', body: t.name + ' — champion: ' + (cAcc ? cAcc.displayName : '?') + '. Your organizer cut' + (t.sealed ? ' and creator reward have' : ' has') + ' been paid.', icon: '🏛' });
+      } else { org.gold += cut; if (t.sealed) { org.okid[0]++; org.ngakara++; } }
+    }
+    /* the player entered but didn't win: tell them how it ended, release Aftð */
+    if (G.me && t.players.includes(G.me.id) && champ !== G.me.id) {
+      G.notify({ type: 'tournament', title: 'Tournament concluded', body: t.name + ' — ' + (cAcc ? cAcc.displayName : 'someone') + ' takes the championship.', icon: '🏆' });
+    }
+    if (t.aftd && window.DYA && DYA.aftd) DYA.aftd.deactivate(t);
   }
 
   function seedOneTournament(rng) {
