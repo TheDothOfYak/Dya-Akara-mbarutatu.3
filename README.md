@@ -19,6 +19,8 @@ python3 -m http.server 8000
 
 **GitHub Codespaces:** open this repo in a Codespace, run `npm run dev`, and open the forwarded port 8000 when it pops up.
 
+**Free permanent hosting:** this project is set up for GitHub Pages. After the workflow runs from the main branch, the game will be available at `https://<your-username>.github.io/Dya-Akara-mbarutatu.3/`.
+
 Create an account (email/password — stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
 
 **The Admin Panel** lives at `admin.html` — outside the game UI, as specified. First visit sets the admin password. You are the admin.

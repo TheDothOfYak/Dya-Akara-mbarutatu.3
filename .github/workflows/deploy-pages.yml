@@ -2,7 +2,7 @@ name: Deploy Dya'Akara to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/fable-5-game-build-mvph2l]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
