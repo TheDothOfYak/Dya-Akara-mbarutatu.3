@@ -811,5 +811,11 @@
     huntable: ['su_naga', 'sru_vorn', 'lutut', 'hvaleia', 'ular_naga', 'tonguatjis', 'kuni_byrd_wild'],
     /* craftable = everything except spawned/promo */
     craftable: Object.keys(S).filter(k => !S[k].notCraftable),
+    /* duel-legal check: a duel needs a token that actually fights.
+       Fruit, relic shavings, Ju Fields, Kofi, Mikolo Moko, Karnen,
+       the RubberMcFly — anything with no attack — may still be picked
+       DELIBERATELY in Pick/Blind mode, but Random assignment and the
+       Dya'kukull never field one. */
+    canDuel: (id) => { const sp = S[id]; return !!(sp && sp.attackRange > 0 && sp.statMul && sp.statMul.dmg > 0); },
   };
 })();

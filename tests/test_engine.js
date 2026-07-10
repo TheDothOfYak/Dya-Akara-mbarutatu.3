@@ -80,6 +80,57 @@ let dt2 = 0;
 while (!d.over && dt2 < 600 * 20) { d.doTick(); dt2++; }
 console.log('Duel:', d.over ? 'finished' : 'TIMEOUT', JSON.stringify(d.result && { winner: d.result.winner, how: d.result.how, t: d.time.toFixed(1) }));
 
+/* --- duel rules (July fixes) --- */
+/* 1. canDuel: non-fighters are never duel-legal for random/AI selection */
+const nonFighters = ['albali_fruit', 'sprengju_shaving', 'ju_field', 'rubbermcfly', 'mikolo_moko', 'kofi', 'karnen', 'stonefruit', 'ember_root'];
+const fighters = ['harkal', 'raf_krabbi', 'tyndael', 'sword_eikar', 'gynge', 'su_naga'];
+const cdBad = nonFighters.filter(id => DYAG.species.canDuel(id));
+const cdGood = fighters.filter(id => !DYAG.species.canDuel(id));
+console.log('canDuel filter:', (!cdBad.length && !cdGood.length) ? 'PASS' : 'FAIL', cdBad.length ? 'non-fighters passed: ' + cdBad : '', cdGood.length ? 'fighters rejected: ' + cdGood : '');
+
+/* 2. a fighter-vs-fighter duel never draws (winner is 0 or 1) */
+let duelDraws = 0, duelRuns = 0;
+for (let s = 1; s <= 8; s++) {
+  const dd = new DYAG.match.Match({
+    seed: s * 1013, mode: 'duel',
+    teams: [
+      { name: 'A', controller: 'ai', pouch: [DYAG.token.mint({ speciesId: fighters[s % fighters.length], rng })] },
+      { name: 'B', controller: 'ai', pouch: [DYAG.token.mint({ speciesId: fighters[(s + 3) % fighters.length], rng })] },
+    ],
+  });
+  dd.headless = true;
+  let n = 0;
+  while (!dd.over && n < 600 * 20) { dd.doTick(); n++; }
+  if (dd.over) { duelRuns++; if (dd.result.winner === -1) duelDraws++; }
+}
+console.log('No-McFly duels never draw:', (duelRuns === 8 && duelDraws === 0) ? 'PASS' : 'FAIL', '(' + duelRuns + '/8 finished, ' + duelDraws + ' draws)');
+
+/* 3. RubberMcFly duel: the fighter kills the McFly, the ShurgrEdan answers → the one legal draw */
+const md = new DYAG.match.Match({
+  seed: 4242, mode: 'duel',
+  teams: [
+    { name: 'A', controller: 'ai', pouch: [DYAG.token.mint({ speciesId: 'rubbermcfly', rng })] },
+    { name: 'B', controller: 'ai', pouch: [DYAG.token.mint({ speciesId: 'harkal', rng })] },
+  ],
+});
+md.headless = true;
+let mn = 0;
+while (!md.over && mn < 600 * 20) { md.doTick(); mn++; }
+console.log('McFly duel → draw:', (md.over && md.result.winner === -1 && md.result.how === 'draw') ? 'PASS' : 'FAIL', JSON.stringify(md.result && { winner: md.result.winner, how: md.result.how, t: md.time.toFixed(1) }));
+
+/* 4. non-fighter standoff (Pick-mode fruit vs fruit): the Guild calls it — a winner, not a draw */
+const sd = new DYAG.match.Match({
+  seed: 777, mode: 'duel',
+  teams: [
+    { name: 'A', controller: 'ai', pouch: [DYAG.token.mint({ speciesId: 'stonefruit', rng })] },
+    { name: 'B', controller: 'ai', pouch: [DYAG.token.mint({ speciesId: 'ember_root', rng })] },
+  ],
+});
+sd.headless = true;
+let sn = 0;
+while (!sd.over && sn < 600 * 20) { sd.doTick(); sn++; }
+console.log('Fruit standoff resolves:', (sd.over && sd.result.winner !== -1) ? 'PASS' : 'FAIL', JSON.stringify(sd.result && { winner: sd.result.winner, how: sd.result.how, t: sd.time.toFixed(1) }));
+
 /* --- hunt test --- */
 const huntPouch = mkPouch(rng, 10);
 const h = new DYAG.match.Match({

@@ -6,7 +6,9 @@
      seed → identical outcomes on every client & in replays.
    - Replays = seed + input log (design doc Part XIV).
    - Standard match: pulses, Relic capture, tether, escalation.
-   - Duel mode: 1v1 tokens, no resources/pulse/Relic, no draws.
+   - Duel mode: 1v1 tokens, no resources/pulse/Relic. The only
+     possible draw is a RubberMcFly in play (ShurgrEdan retribution
+     taking both sides down, or a McFly standoff).
    - Hunt mode: encounter objectives against wild creatures.
    ============================================================ */
 (function () {
@@ -216,8 +218,11 @@
   /* ================= INPUTS ================= */
   /* input: {type:'ready', pouchIdx} | {type:'trigger', slot, x, y} |
             {type:'feed', creatureId} | {type:'chat', msg} | {type:'concede'} */
-  Match.prototype.queueInput = function (team, input) {
-    this.inputQueue.push({ tick: this.tick + 1, team, input });
+  /* atTick/seq are used by networked lockstep play: inputs are scheduled
+     a fixed delay ahead and applied in (tick, team, seq) order so both
+     clients simulate identically regardless of message arrival order. */
+  Match.prototype.queueInput = function (team, input, atTick, seq) {
+    this.inputQueue.push({ tick: atTick != null ? atTick : this.tick + 1, team, input, seq: seq || 0 });
   };
 
   Match.prototype.applyInput = function (team, input) {
@@ -280,13 +285,19 @@
     M.tick++;
     M.time = M.tick * TICK;
 
-    /* inputs scheduled for this tick */
-    for (let i = 0; i < M.inputQueue.length; i++) {
-      const q = M.inputQueue[i];
-      if (q.tick <= M.tick) {
-        M.log.push({ t: M.tick, team: q.team, i: q.input });
-        M.applyInput(q.team, q.input);
-        M.inputQueue.splice(i, 1); i--;
+    /* inputs scheduled for this tick — applied in deterministic
+       (tick, team, seq) order so lockstep clients always agree */
+    if (M.inputQueue.length) {
+      const due = [];
+      for (let i = 0; i < M.inputQueue.length; i++) {
+        if (M.inputQueue[i].tick <= M.tick) { due.push(M.inputQueue[i]); M.inputQueue.splice(i, 1); i--; }
+      }
+      if (due.length) {
+        due.sort((a, b) => (a.tick - b.tick) || (a.team - b.team) || ((a.seq || 0) - (b.seq || 0)));
+        for (const q of due) {
+          M.log.push({ t: M.tick, team: q.team, i: q.input });
+          M.applyInput(q.team, q.input);
+        }
       }
     }
 
@@ -1065,11 +1076,33 @@
     if (M.over) return;
 
     if (M.mode === 'duel') {
+      /* a pending ShurgrEdan strike (RubberMcFly retribution) must land
+         before the duel can be called — it can turn a win into the tie */
+      if (M._timeouts && M._timeouts.length) return;
       const alive0 = M.creatures.some(c => !c.dead && c.team === 0);
       const alive1 = M.creatures.some(c => !c.dead && c.team === 1);
-      if (!alive0 && !alive1) { M.finish(M.rng.chance(0.5) ? 0 : 1, 'duel'); return; } // no draws possible
+      /* the ONLY tie a duel allows: a RubberMcFly was in play */
+      const mcflyInPlay = M.teams.some(T => T.pouch.some(e => e.tok && e.tok.speciesId === 'rubbermcfly'));
+      if (!alive0 && !alive1) {
+        if (mcflyInPlay) { M.finish(-1, 'draw'); return; }
+        M.finish(M.rng.chance(0.5) ? 0 : 1, 'duel'); // photo finish — the seed decides, never a draw
+        return;
+      }
       if (!alive0) { M.finish(1, 'duel'); return; }
       if (!alive1) { M.finish(0, 'duel'); return; }
+      /* stalemate guard: two tokens that cannot reach or hurt each other
+         (deliberate Pick-mode fruit, rooted standoffs) would otherwise
+         stand forever. After 90s without combat the Guild calls it on
+         condition — unless a RubberMcFly is in play, which is the one
+         legal draw. */
+      if (M.time > 90 && (M.tick - M.lastCombatTick) > Math.round(90 / TICK)) {
+        if (mcflyInPlay) { M.finish(-1, 'draw'); return; }
+        const frac = (team) => M.creatures.filter(c => !c.dead && c.team === team)
+          .reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0);
+        const f0 = frac(0), f1 = frac(1);
+        M.finish(f0 === f1 ? (M.rng.chance(0.5) ? 0 : 1) : (f0 > f1 ? 0 : 1), 'condition');
+        return;
+      }
       return;
     }
 

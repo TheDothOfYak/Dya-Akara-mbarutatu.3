@@ -228,10 +228,15 @@
     G.world.accounts[acc.id] = acc;
     G.me = acc;
     G.save();
+    if (DYA.online) DYA.online.onAuthChange();
     return { acc };
   };
   G.login = async function (email, pass) {
-    const supa = window.DYA_SUPABASE && window.DYA_SUPABASE.enabled ? window.DYA_SUPABASE.client : null;
+    /* Supabase email/password auth is OPT-IN (config.supabase.useAuth).
+       By default accounts stay local to the device; the online layer
+       (friends, matches) rides on top of local accounts. */
+    const useAuth = window.DYA_CONFIG && window.DYA_CONFIG.supabase && window.DYA_CONFIG.supabase.useAuth;
+    const supa = useAuth && window.DYA_SUPABASE && window.DYA_SUPABASE.enabled ? window.DYA_SUPABASE.client : null;
     if (supa) {
       const res = await supa.signIn({ email, password: pass });
       if (res.error) return { err: res.error.message || 'Supabase sign-in failed.' };
@@ -245,6 +250,7 @@
       G.world.accounts[acc.id] = acc;
       G.me = acc;
       G.save();
+      if (DYA.online) DYA.online.onAuthChange();
       return { acc, auth: res };
     }
     const acc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
@@ -254,9 +260,10 @@
     acc.lastLogin = Date.now();
     G.me = acc;
     G.save();
+    if (DYA.online) DYA.online.onAuthChange();
     return { acc };
   };
-  G.logout = function () { G.me = null; };
+  G.logout = function () { G.me = null; if (DYA.online) DYA.online.onAuthChange(); };
   G.banInfo = function (accId) { return G.world.bans[accId || (G.me && G.me.id)] || null; };
   G.isBanned = function (accId) {
     const b = G.world.bans[accId];
@@ -793,7 +800,8 @@
     }
     /* rewards */
     let xp = 0, gold = 0;
-    if (result.draw) { xp = Math.round((result.ranked ? EC.XP.rankedLoss : EC.XP.casualLoss) * 0.8); gold = 10; }
+    /* a draw is nobody's win — the victor's reward is split evenly between both sides */
+    if (result.draw) { xp = Math.round((result.ranked ? EC.XP.rankedWin : EC.XP.casualWin) / 2); gold = Math.round((result.ranked ? EC.GOLD.rankedWin : EC.GOLD.casualWin) / 2); }
     else if (result.win) { xp = result.ranked ? EC.XP.rankedWin : EC.XP.casualWin; gold = result.ranked ? EC.GOLD.rankedWin : EC.GOLD.casualWin; }
     else { xp = result.ranked ? EC.XP.rankedLoss : EC.XP.casualLoss; gold = result.ranked ? EC.GOLD.rankedLoss : EC.GOLD.casualLoss; }
     /* bonus XP */

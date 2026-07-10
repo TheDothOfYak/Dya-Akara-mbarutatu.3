@@ -584,9 +584,42 @@
   });
 
   /* ================= FRIENDS ================= */
+  /* Online setup panel — paste a Supabase project URL + anon key to switch
+     this browser online. Shared with the Play screens via UI.onlineSetup. */
+  UI.onlineSetup = function (onDone) {
+    const O = DYA.online;
+    const c = (window.DYA_CONFIG && window.DYA_CONFIG.supabase) || {};
+    const w = U.el('div', {});
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Set up online play' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', html: 'Online friends and cross-device matches run on a free <b>Supabase</b> project. One of you creates the project once, runs the game’s SQL setup, and then <b>everyone</b> pastes the same two values here (or they’re baked into <code>js/config.js</code> on the deployed site).<br><br>Full walkthrough: <b>ONLINE_SETUP.md</b> in the game folder.' }));
+    const urlInp = U.el('input', { cls: 'txt mt', placeholder: 'Project URL — https://yourproject.supabase.co', value: c.url || '' });
+    const keyInp = U.el('input', { cls: 'txt mt', placeholder: 'anon public key — eyJ…', value: c.anonKey || '' });
+    w.appendChild(urlInp); w.appendChild(keyInp);
+    const status = U.el('p', { cls: 'small mt muted' });
+    w.appendChild(status);
+    const m = UI.modal(w);
+    const row = U.el('div', { cls: 'flex mt' });
+    row.appendChild(U.el('button', {
+      cls: 'btn primary', text: 'Connect', onclick: async () => {
+        const r = O.saveConfig(urlInp.value, keyInp.value);
+        if (r.err) { status.textContent = r.err; status.style.color = 'var(--red)'; return; }
+        status.style.color = ''; status.textContent = 'Testing connection…';
+        const t = await O.testConnection();
+        if (t.err) { status.textContent = t.err; status.style.color = 'var(--red)'; return; }
+        status.style.color = 'var(--green)'; status.textContent = '✓ Connected. You are online.';
+        O.onAuthChange();
+        setTimeout(() => { m.close(); if (onDone) onDone(); }, 700);
+      },
+    }));
+    if (O.configured()) row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Go offline', onclick: () => { O.clearConfig(); location.reload(); } }));
+    row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => m.close() }));
+    w.appendChild(row);
+  };
+
   UI.register('friends', {
     enter(root) {
       const me = G.me;
+      const O = DYA.online;
       const scr = U.el('div', { cls: 'screen' });
       scr.appendChild(UI.topbar({ title: 'Friends' }));
       const page = U.el('div', { cls: 'page' });
@@ -601,36 +634,127 @@
       page.appendChild(body);
       scr.appendChild(page); root.appendChild(scr);
 
+      let activeView = 'Friends';
+      /* live refresh when the online poller learns something new */
+      UI.onOnlineUpdate = () => { if (body.isConnected && views[activeView]) views[activeView](); };
+
       function friendRow(acc, actions) {
         const row = U.el('div', { cls: 'friend-row' });
-        const status = acc.ai ? G.aiStatus(acc.id) : acc.onlineStatus;
+        const status = acc.net ? acc.onlineStatus : acc.ai ? G.aiStatus(acc.id) : acc.onlineStatus;
         row.appendChild(U.el('div', { cls: 'online-dot ' + status }));
         const avc = U.el('canvas', { width: 30, height: 30, style: 'border-radius:50%' });
         SPR.drawAvatar(avc.getContext('2d'), acc.avatarIdx || (U.hashStr(acc.id) % SPR.AVATAR_COUNT), 30);
         row.appendChild(avc);
-        row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(acc.displayName) + '</b> <span class="small muted">Lv ' + acc.level + ' · ' + status + '</span>' }));
+        row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(acc.displayName) + '</b> <span class="small muted">Lv ' + acc.level + ' · ' + status + (acc.net ? ' · 🌐 ' + U.esc(acc.code || '') : '') + '</span>' }));
         actions.forEach(a => row.appendChild(a));
         return row;
       }
 
+      /* the online banner: your friend code, or the setup prompt */
+      function onlineBanner() {
+        const bar = U.el('div', { cls: 'panel mb', style: 'padding:12px 16px' });
+        if (!O.configured()) {
+          bar.appendChild(U.el('div', { cls: 'flex' }, [
+            U.el('div', { cls: 'flex1', html: '<b>Offline mode.</b> <span class="small muted">Friends on other computers need the online service — a 5-minute one-time setup.</span>' }),
+            U.el('button', { cls: 'btn small primary', text: '🌐 Set up online play', onclick: () => UI.onlineSetup(() => views[activeView]()) }),
+          ]));
+          return bar;
+        }
+        if (O.state.error) {
+          bar.appendChild(U.el('div', { cls: 'flex' }, [
+            U.el('div', { cls: 'flex1', html: '<b style="color:var(--red)">Online service unreachable.</b> <span class="small muted">' + U.esc(O.state.error) + '</span>' }),
+            U.el('button', { cls: 'btn small', text: 'Settings', onclick: () => UI.onlineSetup(() => views[activeView]()) }),
+          ]));
+          return bar;
+        }
+        const code = O.myCode();
+        bar.appendChild(U.el('div', { cls: 'flex' }, [
+          U.el('div', {
+            cls: 'flex1',
+            html: '🌐 <b class="gold">Online</b> — your friend code: <b class="gold" style="font-size:20px;letter-spacing:.25em">' + U.esc(code || '……') + '</b><br><span class="small muted">Tell it to a friend on any computer — they add you with it below.</span>',
+          }),
+          U.el('button', {
+            cls: 'btn small', text: '⧉ Copy', onclick: (e) => {
+              if (code && navigator.clipboard) navigator.clipboard.writeText(code);
+              e.target.textContent = '✓ Copied';
+              setTimeout(() => { e.target.textContent = '⧉ Copy'; }, 1200);
+            },
+          }),
+          U.el('button', { cls: 'btn small ghost', text: '↻', title: 'Refresh now', onclick: () => { O.refresh().then(() => views[activeView]()); } }),
+          U.el('button', { cls: 'btn small ghost', text: '⚙', title: 'Online settings', onclick: () => UI.onlineSetup(() => views[activeView]()) }),
+        ]));
+        return bar;
+      }
+
+      async function addByInput(value) {
+        value = String(value || '').trim();
+        if (!value) return;
+        /* a 6-character code goes to the online service first */
+        if (O.configured() && O.looksLikeCode(value)) {
+          if (O.myCode() && value.toUpperCase() === O.myCode()) { UI.alert('Hm', 'That is your own friend code. You are already your own friend. Hopefully.'); return; }
+          try {
+            const profile = await O.lookupCode(value);
+            if (profile) {
+              const r = await O.sendRequest(profile);
+              if (r.err) UI.alert('Cannot add', r.err);
+              else if (r.accepted) UI.toast({ title: 'Friends!', body: profile.name + ' had already sent you a request — you are now friends.', icon: '🤝' });
+              else UI.toast({ title: 'Request sent', body: 'Friend request sent to ' + profile.name + ' across the wire.', icon: '🌐' });
+              views[activeView]();
+              return;
+            }
+          } catch (e) {
+            UI.alert('Online service unreachable', e.message);
+            return;
+          }
+        }
+        /* otherwise: local world (Dya'kukull and same-device players) */
+        const found = G.findAccount(value);
+        if (!found) {
+          UI.alert('Not found', O.configured()
+            ? 'No player by that name, ID, or friend code. Friend codes are 6 characters — ask your friend to read theirs from their own Friends screen.'
+            : 'No player by that name or ID here. To add a friend on ANOTHER computer, set up online play first (button above).');
+          return;
+        }
+        if (found.id === me.id) { UI.alert('Hm', 'You are already your own friend. Hopefully.'); return; }
+        const r = G.sendFriendRequest(found.id);
+        if (r.err) UI.alert('Cannot add', r.err);
+        else UI.toast({ title: 'Request sent', body: 'Friend request sent to ' + found.displayName + '.', icon: '🤝' });
+      }
+
       const views = {
         Friends() {
+          activeView = 'Friends';
           body.innerHTML = '';
+          body.appendChild(onlineBanner());
           const add = U.el('div', { cls: 'flex mb' });
-          const inp = U.el('input', { cls: 'txt', placeholder: 'Add by name or player ID…' });
-          const btn = U.el('button', {
-            cls: 'btn', text: 'Add friend', onclick: () => {
-              const found = G.findAccount(inp.value);
-              if (!found) { UI.alert('Not found', 'No player by that name or ID.'); return; }
-              if (found.id === me.id) { UI.alert('Hm', 'You are already your own friend. Hopefully.'); return; }
-              const r = G.sendFriendRequest(found.id);
-              if (r.err) UI.alert('Cannot add', r.err);
-              else UI.toast({ title: 'Request sent', body: 'Friend request sent to ' + found.displayName + '.', icon: '🤝' });
-              inp.value = '';
-            },
-          });
+          const inp = U.el('input', { cls: 'txt', placeholder: O.configured() ? 'Add by friend code (6 letters) — or local name/ID…' : 'Add by name or player ID…' });
+          inp.addEventListener('keydown', e => { if (e.key === 'Enter') { addByInput(inp.value); inp.value = ''; } });
+          const btn = U.el('button', { cls: 'btn', text: 'Add friend', onclick: () => { addByInput(inp.value); inp.value = ''; } });
           add.appendChild(inp); add.appendChild(btn);
           body.appendChild(add);
+
+          /* --- real people first: online friends across devices --- */
+          if (O.configured() && O.state.friends.length) {
+            body.appendChild(U.el('h3', { cls: 'gold mb mt', text: '🌐 ONLINE FRIENDS — ' + O.state.friends.length }));
+            O.state.friends.forEach(f => {
+              const shim = { id: f.id, displayName: f.name, level: f.level, avatarIdx: f.avatarIdx, onlineStatus: f.status, net: true, code: f.code };
+              body.appendChild(friendRow(shim, [
+                U.el('button', {
+                  cls: 'btn small', text: '⚔ Invite', title: 'Open a private room and share the code with ' + f.name,
+                  onclick: () => DYA.play.privateOnlineFlow({ hostFor: f.name }),
+                }),
+                U.el('button', {
+                  cls: 'btn small danger', text: 'Remove', onclick: async () => {
+                    const r = await O.removeFriend(f.id);
+                    if (r.err) UI.alert('Hm', r.err);
+                    views.Friends();
+                  },
+                }),
+              ]));
+            });
+          }
+
+          /* --- local friends (this device's world + Dya'kukull) --- */
           const groups = { online: [], away: [], offline: [] };
           me.friends.forEach(id => {
             const acc = G.world.accounts[id];
@@ -650,12 +774,24 @@
               ]));
             });
           });
-          if (!me.friends.length) body.appendChild(U.el('p', { cls: 'muted center mt', text: 'No friends yet. The Mbaru Tatu is friendlier than it looks — add someone.' }));
+          if (!me.friends.length && !(O.configured() && O.state.friends.length)) {
+            body.appendChild(U.el('p', { cls: 'muted center mt', text: 'No friends yet. The Mbaru Tatu is friendlier than it looks — add someone.' }));
+          }
         },
         Pending() {
+          activeView = 'Pending';
           body.innerHTML = '';
+          body.appendChild(onlineBanner());
           body.appendChild(U.el('h3', { cls: 'gold mb', text: 'Incoming' }));
-          if (!me.pendingIn.length) body.appendChild(U.el('p', { cls: 'muted small', text: 'None.' }));
+          const inTotal = me.pendingIn.length + (O.configured() ? O.state.incoming.length : 0);
+          if (!inTotal) body.appendChild(U.el('p', { cls: 'muted small', text: 'None.' }));
+          if (O.configured()) O.state.incoming.forEach(r => {
+            const shim = { id: r.fromId, displayName: r.fromName, level: 0, avatarIdx: U.hashStr(r.fromId) % SPR.AVATAR_COUNT, onlineStatus: 'online', net: true, code: r.fromCode };
+            body.appendChild(friendRow(shim, [
+              U.el('button', { cls: 'btn small', text: 'Accept', onclick: async () => { const res = await O.respondRequest(r, true); if (res.err) UI.alert('Hm', res.err); views.Pending(); } }),
+              U.el('button', { cls: 'btn small ghost', text: 'Decline', onclick: async () => { const res = await O.respondRequest(r, false); if (res.err) UI.alert('Hm', res.err); views.Pending(); } }),
+            ]));
+          });
           me.pendingIn.forEach(id => {
             const acc = G.world.accounts[id]; if (!acc) return;
             body.appendChild(friendRow(acc, [
@@ -664,7 +800,14 @@
             ]));
           });
           body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Sent' }));
-          if (!me.pendingOut.length) body.appendChild(U.el('p', { cls: 'muted small', text: 'None.' }));
+          const outTotal = me.pendingOut.length + (O.configured() ? O.state.outgoing.length : 0);
+          if (!outTotal) body.appendChild(U.el('p', { cls: 'muted small', text: 'None.' }));
+          if (O.configured()) O.state.outgoing.forEach(r => {
+            const shim = { id: r.toId, displayName: r.toName, level: 0, avatarIdx: U.hashStr(r.toId) % SPR.AVATAR_COUNT, onlineStatus: 'offline', net: true, code: r.toCode };
+            body.appendChild(friendRow(shim, [
+              U.el('button', { cls: 'btn small ghost', text: 'Cancel', onclick: async () => { await O.cancelRequest(r); views.Pending(); } }),
+            ]));
+          });
           me.pendingOut.forEach(id => {
             const acc = G.world.accounts[id]; if (!acc) return;
             body.appendChild(friendRow(acc, [
@@ -673,6 +816,7 @@
           });
         },
         Blocked() {
+          activeView = 'Blocked';
           body.innerHTML = '';
           if (!me.blocked.length) body.appendChild(U.el('p', { cls: 'muted', text: 'Nobody is blocked. Admirable restraint.' }));
           me.blocked.forEach(id => {
@@ -689,6 +833,8 @@
         tabs.appendChild(tab);
       });
       views.Friends();
+      /* pull fresh online data the moment the screen opens */
+      if (O.configured()) O.refresh().then(() => { if (body.isConnected) views[activeView](); });
     },
   });
 
