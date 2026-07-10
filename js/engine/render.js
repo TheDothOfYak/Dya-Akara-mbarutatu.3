@@ -76,9 +76,34 @@
       const x = grng.next() * M.world.w, y = grng.next() * M.world.h, r = 14 + grng.next() * 60;
       ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.5, 0, 0, TAU); ctx.fill();
     }
-    if (zik) { /* memory storm tint + drifting motes */
-      ctx.fillStyle = 'rgba(104,224,232,0.05)';
+    const zf = M.zikFrac ? M.zikFrac() : (zik ? 1 : 0);
+    if (zf > 0) { /* the Sunear'Zikhron: memory-wave ribbons, glyph motes, cyan wash */
+      ctx.fillStyle = 'rgba(104,224,232,' + (0.06 * zf) + ')';
       ctx.fillRect(0, 0, M.world.w, M.world.h);
+      /* three drifting wave ribbons sweeping the arena */
+      for (let w2 = 0; w2 < 3; w2++) {
+        ctx.strokeStyle = 'rgba(104,224,232,' + (0.16 * zf * (1 - w2 * 0.25)) + ')';
+        ctx.lineWidth = 10 - w2 * 3;
+        ctx.beginPath();
+        const baseY = ((R.t * (34 + w2 * 16) + w2 * 340) % (M.world.h + 260)) - 130;
+        for (let x = 0; x <= M.world.w; x += 26) {
+          const y = baseY + Math.sin(x * 0.008 + R.t * (1.1 + w2 * 0.4)) * 34;
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      /* memory glyph motes riding the storm wind */
+      const mrng = new DYA.util.Rng(0xF00D);
+      ctx.fillStyle = 'rgba(180,240,244,' + (0.5 * zf) + ')';
+      ctx.font = '11px Georgia';
+      for (let i = 0; i < 34; i++) {
+        const sx = mrng.next() * M.world.w, sy = mrng.next() * M.world.h, spd = 40 + mrng.next() * 70;
+        const mx = (sx + R.t * spd) % M.world.w;
+        const my = sy + Math.sin(R.t * 1.3 + i) * 14;
+        ctx.globalAlpha = 0.35 * zf * (0.4 + 0.6 * Math.abs(Math.sin(R.t * 0.9 + i)));
+        ctx.fillText(['ᛃ', 'ᛗ', 'ᛟ', '᛫', 'ᛝ'][i % 5], mx, my);
+      }
+      ctx.globalAlpha = 1;
     }
 
     /* ------- zones under everything ------- */

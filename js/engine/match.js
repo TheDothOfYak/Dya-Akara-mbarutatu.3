@@ -349,6 +349,16 @@
   };
 
   /* ================= PULSES & RESOURCES ================= */
+  /* The Sunear'Zikhron — the perpetual memory storm — passes overhead
+     during the last minute of every five. Pure functions of match time,
+     so the lockstep sim and every replay agree on the weather. */
+  Match.prototype.zikhron = function () { return Math.floor(this.time / 60) % 5 === 4; };
+  Match.prototype.zikFrac = function () {
+    const t = this.time % 300; /* storm occupies 240–300s of each cycle */
+    if (t < 240) return 0;
+    return Math.max(0, Math.min(1, (t - 240) / 6, (300 - t) / 6));
+  };
+
   Match.prototype.doPulse = function () {
     const M = this;
     M.pulseIndex++;
@@ -368,9 +378,13 @@
       if (esc > 1) M.uiEvent(-1, 'event', 'ESCALATION ×' + esc + ' — resources per pulse multiplied.');
     }
     /* the Sunear'Zikhron passes overhead every fifth minute */
-    const zik = Math.floor(M.time / 60) % 5 === 4;
-    if (zik && !M.zikNoted) { M.zikNoted = true; M.uiEvent(-1, 'event', 'The Sunear’Zikhron passes overhead — the RubberMcFlies begin to glow.'); }
-    if (!zik) M.zikNoted = false;
+    const zik = M.zikhron();
+    if (zik && !M.zikNoted) {
+      M.zikNoted = true;
+      M.uiEvent(-1, 'event', 'The Sunear’Zikhron passes overhead — McFlies glow, memories surge, the storm feeds the pulse.');
+      if (!M.headless) DYA.audio.play('zikhron');
+    }
+    if (!zik && M.zikNoted) { M.zikNoted = false; M.uiEvent(-1, 'event', 'The Sunear’Zikhron moves on.'); }
     let interval = M.settings.pulseInterval, amount = M.settings.pulseAmount;
     if (M.settings.chaos) { interval = M.rng.pick(EC.PULSE_INTERVALS); amount = M.rng.pick(EC.PULSE_AMOUNTS); }
     M.nextPulseAt = M.time + interval;
@@ -385,7 +399,9 @@
         if (c.dead || c.team !== T.idx) return;
         if (c.speciesId === 'karnen') { const n = Math.round(c.vars.harvestOutput * c.vars.workEthic); for (let i = 0; i < n; i++) units.push(M.rng.pick(ELS)); }
         if (c.speciesId === 'rubbermcfly') {
-          const n = Math.round(c.vars.resourceCount);
+          /* vital to guiding and strengthening the storm — while the
+             Sunear'Zikhron passes, each glowing McFly yields one extra */
+          const n = Math.round(c.vars.resourceCount) + (zik ? 1 : 0);
           const multi = c.picks.resourceTypes === 'multi';
           if (!c.mem.mcflyEl) c.mem.mcflyEl = M.rng.pick(ELS);
           for (let i = 0; i < n; i++) units.push(multi ? M.rng.pick(ELS) : c.mem.mcflyEl);
@@ -609,12 +625,18 @@
     }
   };
 
-  /* situational damage multiplier from life-history quirks */
+  /* situational damage multiplier from life-history quirks —
+     plus the seed races' memory surge while the storm passes */
   Match.prototype.quirkDmgMul = function (c) {
     const M = this, q = c.quirks;
-    if (!q) return 1;
     let m = 1;
-    if (q.storm_born && Math.floor(M.time / 60) % 5 === 4) m *= 1.25; /* Sunear'Zikhron overhead */
+    /* Eikar/Keilia are immortal through memory: while the Sunear'Zikhron
+       is overhead their zikhron strength becomes strike (up to +20%) */
+    if (c.tok && c.tok.layer && c.tok.layer.zikhron && M.zikhron()) {
+      m *= 1 + 0.2 * Math.min(1, c.tok.layer.zikhron);
+    }
+    if (!q) return m;
+    if (q.storm_born && M.zikhron()) m *= 1.25; /* Sunear'Zikhron overhead */
     if (q.early_riser && M.time < 60) m *= 1.15;
     if (q.slow_burner && M.time > 300) m *= 1.15;
     if (q.cornered_fighter && c.hp < c.maxHp * 0.5) m *= 1.12;

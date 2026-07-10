@@ -770,7 +770,8 @@
 
         /* HUD updates */
         const esc = EC.escalationMult(M.time);
-        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '');
+        const zf = M.zikFrac ? M.zikFrac() : 0;
+        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '') + (zf > 0 ? ' · <span style="color:var(--r6)">☄ SUNEAR’ZIKHRON</span>' : '');
         const frac = Math.max(0, 1 - (M.nextPulseAt - M.time) / (M.settings.pulseInterval || 8));
         pulseBar.firstChild.style.width = Math.min(100, frac * 100) + '%';
         relicRow.innerHTML = M.mode === 'hunt'
@@ -780,7 +781,10 @@
         resBox.innerHTML = resCollapsed
           ? '<div>' + resHtml + '</div>'
           : '<div style="font-size:19px">' + resHtml + '</div><div class="small muted">Fti · Su · Eldi · Ular</div>' +
-            '<div class="small mt">Pulse: +' + (M.settings.chaos ? '?' : M.settings.pulseAmount * esc) + ' every ' + (M.settings.chaos ? '?' : M.settings.pulseInterval) + 's</div>';
+            '<div class="small mt">Pulse: +' + (M.settings.chaos ? '?' : M.settings.pulseAmount * esc) + ' every ' + (M.settings.chaos ? '?' : M.settings.pulseInterval) + 's</div>' +
+            (zf > 0
+              ? '<div class="small" style="color:var(--r6)">☄ Storm overhead — McFlies glow, memories surge</div>'
+              : '<div class="small muted">☄ Sunear’Zikhron in ' + Math.max(0, Math.ceil(240 - M.time % 300)) + 's</div>');
 
         if (M.pulseIndex !== lastPulseIdx || T0.readied.length !== lastReadiedLen) {
           lastPulseIdx = M.pulseIndex; lastReadiedLen = T0.readied.length;
