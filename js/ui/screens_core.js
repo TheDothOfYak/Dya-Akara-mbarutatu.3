@@ -372,6 +372,7 @@
         Controls() {
           body.innerHTML = '';
           body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Click a binding, then press the new key.' }));
+          body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Fixed match keys: SHIFT readies the centered wheel token · A/D (or W/S, or arrows) turn the wheel · 1–4 pick the resource when an additional cost pops up.' }));
           const binds = [
             ['Trigger readied slot 1 (at cursor)', 'trigger1'],
             ['Trigger readied slot 2', 'trigger2'],

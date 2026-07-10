@@ -509,14 +509,81 @@
         if (DYA.tutorial) DYA.tutorial.onEvent('deployed');
       }
 
-      /* wheel scroll cycles through pouch */
-      wheelEl.addEventListener('wheel', e => {
-        e.preventDefault();
+      /* wheel scroll cycles through pouch — A/D (or W/S) do the same */
+      function moveWheel(dir) {
         const avail = T0.pouch.filter(en => en.state === 'pouch');
         if (!avail.length) return;
-        wheelIndex = (wheelIndex + (e.deltaY > 0 ? 1 : -1) + avail.length) % avail.length;
+        wheelIndex = (wheelIndex + dir + avail.length) % avail.length;
         renderWheel();
+      }
+      wheelEl.addEventListener('wheel', e => {
+        e.preventDefault();
+        moveWheel(e.deltaY > 0 ? 1 : -1);
       }, { passive: false });
+
+      /* additional cost (§1): a fallen token costs +1 per prior defeat, paid
+         from any one resource — the player picks it here (click or keys 1–4) */
+      let costPicker = null;
+      function openCostPicker(en, costV, tax, doReady) {
+        const w2 = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Additional cost +' + tax }),
+          U.el('p', { cls: 'small muted mt', text: en.tok.name + ' has fallen ' + tax + ' time' + (tax > 1 ? 's' : '') + ' — replaying it costs ' + tax + ' extra. Choose the resource that pays it, or press 1–4.' })]);
+        const m2 = UI.modal(w2);
+        function cleanup() { document.removeEventListener('keydown', keyH, true); costPicker = null; }
+        function close() { cleanup(); m2.close(); }
+        const pick = (el) => {
+          if (T0.resources[el] < (costV[el] || 0) + tax) { DYA.audio.play('deny'); return; }
+          close(); doReady(el);
+        };
+        const row2 = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+        SP.ELEMENTS.forEach((el, n) => {
+          const can = T0.resources[el] >= (costV[el] || 0) + tax;
+          row2.appendChild(U.el('button', {
+            cls: 'btn small' + (can ? '' : ' ghost'),
+            html: '<span class="keybind" style="padding:0 6px;margin-right:6px;font-size:11px">' + (n + 1) + '</span><span class="el-' + el + '">' + el + '</span> (' + Math.floor(T0.resources[el]) + ')',
+            onclick: () => pick(el),
+          }));
+        });
+        w2.appendChild(row2);
+        /* while the picker is up it owns the keyboard: 1–4 pick, Esc cancels,
+           everything else is swallowed so trigger slots can't misfire */
+        const keyH = (e) => {
+          if (!m2.el.isConnected) { cleanup(); return; }
+          e.stopPropagation();
+          const n = parseInt(e.key, 10);
+          if (n >= 1 && n <= 4) { e.preventDefault(); pick(SP.ELEMENTS[n - 1]); }
+          else if (e.key === 'Escape') { e.preventDefault(); close(); }
+        };
+        document.addEventListener('keydown', keyH, true);
+        costPicker = { close };
+      }
+
+      /* shared ready flow: wheel-card click and the Shift hotkey both land here */
+      function tryReady(en, i, card) {
+        const costV = TK.costVec(en.tok);
+        const tax = en.deaths || 0;
+        const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
+          (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
+        if (!afford) { DYA.audio.play('deny'); renderWheel(); return; }
+        if (T0.readied.length >= 5) { UI.toast({ title: 'Ready panel full', body: 'Five readied tokens is the limit.', icon: '⚠' }); renderWheel(); return; }
+        const doReady = (taxRes) => {
+          M.queueInput(0, { type: 'ready', pouchIdx: i, taxRes });
+          DYA.audio.play('ready');
+          if (DYA.tutorial) DYA.tutorial.onEvent('readied');
+          if (card) animateReadyFly(card);
+          setTimeout(renderWheel, 80);
+        };
+        if (tax > 0) openCostPicker(en, costV, tax, doReady);
+        else doReady(null);
+      }
+
+      /* Shift (either side) readies whatever card sits centered on the wheel */
+      function readyCentered() {
+        const avail = T0.pouch.map((en, i) => ({ en, i })).filter(x => x.en.state === 'pouch');
+        if (!avail.length) return;
+        const pos = ((wheelIndex % avail.length) + avail.length) % avail.length;
+        const { en, i } = avail[pos];
+        tryReady(en, i, wheelEl.querySelector('.wheel-card.center'));
+      }
 
       function renderWheel() {
         wheelEl.innerHTML = '';
@@ -530,7 +597,7 @@
           if (avail.length <= Math.abs(k)) continue;
           const { en, i } = avail[idx];
           const costV = TK.costVec(en.tok);
-          const tax = en.deaths || 0; /* commander tax: +1 per prior defeat, any one resource */
+          const tax = en.deaths || 0; /* additional cost: +1 per prior defeat, any one resource */
           const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
             (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
           const card = U.el('div', { cls: 'wheel-card' + (k === 0 ? ' center' : Math.abs(k) >= 3 ? ' fade3' : Math.abs(k) === 2 ? ' fade2' : ' fade1') });
@@ -549,27 +616,7 @@
           card.onmouseleave = () => { if (tooltip) { tooltip.remove(); tooltip = null; } };
           card.onclick = () => {
             wheelIndex = idx; // click centers it…
-            if (!afford) { DYA.audio.play('deny'); renderWheel(); return; }
-            if (T0.readied.length >= 5) { UI.toast({ title: 'Ready panel full', body: 'Five readied tokens is the limit.', icon: '⚠' }); renderWheel(); return; }
-            const doReady = (taxRes) => {
-              M.queueInput(0, { type: 'ready', pouchIdx: i, taxRes });
-              DYA.audio.play('ready');
-              if (DYA.tutorial) DYA.tutorial.onEvent('readied');
-              animateReadyFly(card);
-              setTimeout(renderWheel, 80);
-            };
-            if (tax > 0) {
-              /* commander tax: the player chooses which resource pays it */
-              const w2 = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Commander tax +' + tax }),
-                U.el('p', { cls: 'small muted mt', text: en.tok.name + ' has fallen ' + tax + ' time' + (tax > 1 ? 's' : '') + '. Choose the resource that pays the tax.' })]);
-              const m2 = UI.modal(w2);
-              const row2 = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
-              SP.ELEMENTS.forEach(el => {
-                const can = T0.resources[el] >= (costV[el] || 0) + tax;
-                row2.appendChild(U.el('button', { cls: 'btn small' + (can ? '' : ' ghost'), html: '<span class="el-' + el + '">' + el + '</span> (' + Math.floor(T0.resources[el]) + ')', onclick: () => { if (!can) return; m2.close(); doReady(el); } }));
-              });
-              w2.appendChild(row2);
-            } else doReady(null);
+            tryReady(en, i, card);
           };
           wheelEl.appendChild(card);
         }
@@ -610,9 +657,11 @@
         });
       }
 
-      /* keyboard: space + 2–5 trigger readied at cursor, per rebindable controls */
+      /* keyboard: space + 2–5 trigger readied at cursor (rebindable);
+         Shift readies the centered wheel card; A/D or W/S turn the wheel */
       const keyHandler = (e) => {
         if (M.over) return;
+        if (costPicker) return; /* additional-cost picker owns the keyboard */
         const c = me.settings.controls;
         if (e.key === c.pause || e.key === 'Escape') { e.preventDefault(); togglePause(); return; }
         const slotKeys = [c.trigger1, c.trigger2, c.trigger3, c.trigger4, c.trigger5];
@@ -620,7 +669,13 @@
         if (slot >= 0) {
           e.preventDefault();
           triggerSlot(slot, mouseWorld.x, mouseWorld.y);
+          return;
         }
+        if (isDuel) return;
+        const k = e.key.toLowerCase();
+        if (k === 'a' || k === 'w' || e.key === 'ArrowLeft') { e.preventDefault(); moveWheel(-1); return; }
+        if (k === 'd' || k === 's' || e.key === 'ArrowRight') { e.preventDefault(); moveWheel(1); return; }
+        if (e.key === 'Shift' && !e.repeat) { e.preventDefault(); readyCentered(); }
       };
       document.addEventListener('keydown', keyHandler);
 

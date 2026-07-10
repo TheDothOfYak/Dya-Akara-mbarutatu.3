@@ -222,18 +222,18 @@
       if (!entry || entry.state !== 'pouch') return;
       if (T.readied.length >= 5) { M.uiEvent(team, 'deny', 'Ready panel is full (5 slots).'); return; }
       const cost = Object.assign({}, TK.costVec(entry.tok));
-      /* commander tax (July update §1): +1 per prior defeat, any resource */
+      /* additional cost (July update §1): +1 per prior defeat, any resource */
       const tax = entry.deaths || 0;
       if (tax > 0) {
         const taxRes = input.taxRes && ELS.includes(input.taxRes) ? input.taxRes : mostAbundant(T.resources);
         cost[taxRes] = (cost[taxRes] || 0) + tax;
       }
-      if (!canAfford(T.resources, cost)) { M.uiEvent(team, 'deny', 'Not enough resources' + (tax ? ' (commander tax +' + tax + ')' : '') + '.'); return; }
+      if (!canAfford(T.resources, cost)) { M.uiEvent(team, 'deny', 'Not enough resources' + (tax ? ' (additional cost +' + tax + ')' : '') + '.'); return; }
       payCost(T.resources, cost);
       entry.state = 'readied';
       entry.readiedAtPulse = M.pulseIndex;
       T.readied.push(entry);
-      M.uiEvent(team, 'ready', entry.tok.name + ' readied' + (tax ? ' (tax +' + tax + ')' : '') + '.');
+      M.uiEvent(team, 'ready', entry.tok.name + ' readied' + (tax ? ' (additional cost +' + tax + ')' : '') + '.');
     } else if (input.type === 'trigger') {
       const entry = T.readied[input.slot];
       if (!entry) return;
@@ -723,7 +723,7 @@
       if (!M.headless) DYA.audio.play('relicDrop');
     }
 
-    /* commander tax (§1): a defeated token returns to the pouch; replaying it
+    /* additional cost (§1): a defeated token returns to the pouch; replaying it
        costs +1 resource per prior defeat. Uff excepted while self-respawning. */
     if (M.mode === 'standard' && M.teams[c.team] && M.teams[c.team].controller !== 'wild' &&
         !c.isKofiSpawn && c.speciesId !== 'kofi' && c.speciesId !== 'sprengju' &&
@@ -1376,7 +1376,7 @@
       return;
     }
 
-    /* 2. ready affordable tokens (vector costs + commander tax) */
+    /* 2. ready affordable tokens (vector costs + additional cost) */
     if (T.readied.length < (skill > 0.7 ? 2 : 1) + 1) {
       const affordable = T.pouch.map((e, i) => ({ e, i }))
         .filter(x => {
