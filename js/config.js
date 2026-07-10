@@ -9,8 +9,8 @@
          anonKey: 'eyJ…'   (the "anon public" key — never the service key)
        Alternatively, each player can paste them in-game:
        Friends → "Set up online play" (stored in that browser only). */
-    url: '',
-    anonKey: '',
+    url: 'https://pfqokjuztareqjdxaaiw.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmcW9ranV6dGFyZXFqZHhhYWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MTI0NDAsImV4cCI6MjA5OTI4ODQ0MH0.yn30h1YFtzETZoQ7Miqh7zZ9lio4NiRt3qYna6YP180',
     /* useAuth: when true, login goes through Supabase email/password
        accounts instead of this device's local accounts. Leave false —
        online friends & matches work fine with local accounts. */
