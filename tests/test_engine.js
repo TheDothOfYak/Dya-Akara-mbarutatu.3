@@ -50,7 +50,7 @@ const t0 = Date.now();
 const m1 = runMatch(777, 1200);
 console.log('  finished in', Date.now() - t0, 'ms real;', m1.time.toFixed(1), 's sim; over=', m1.over, 'result=', JSON.stringify(m1.result && { winner: m1.result.winner, how: m1.result.how }));
 console.log('  creatures spawned:', m1.idCounter - 1, ' log inputs:', m1.log.length);
-console.log('  team stats:', m1.teams.map(T => ({ played: T.stats.tokensPlayed.length, elim: T.stats.eliminations, res: Math.round(T.resources) })));
+console.log('  team stats:', m1.teams.map(T => ({ played: T.stats.tokensPlayed.length, elim: T.stats.eliminations, res: Math.round(T.resources.Fti + T.resources.Su + T.resources.Eldi + T.resources.Ular) })));
 
 const m2 = runMatch(777, 1200);
 const same = m1.tick === m2.tick && JSON.stringify(m1.result) === JSON.stringify(m2.result) && m1.log.length === m2.log.length;

@@ -301,6 +301,22 @@
         cfg.terrain = cfg.terrain || 'plains';
         tSel.value = cfg.terrain;
         terrRow.appendChild(tSel);
+        /* §15 terrain tokens — the launch pair, placed by the organizer during setup ONLY */
+        terrRow.appendChild(U.el('div', { cls: 'muted small mt', text: 'TERRAIN TOKENS — organizer places them before the match; none can be added later' }));
+        cfg.terrainTokens = cfg.terrainTokens || [];
+        const ttRow = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap' });
+        [['forest', '🌲 Forest patch', 'Ular creatures fight happier inside; the canopy blocks some ranged targeting.'],
+         ['water', '💧 Water pool', 'Su creatures fight happier inside; water creatures pass freely, walkers wade slow or walk around.']].forEach(([id, label, tip]) => {
+          const b = U.el('button', { cls: 'btn small' + (cfg.terrainTokens.includes(id) ? '' : ' ghost'), text: label, title: tip });
+          b.onclick = () => {
+            if (cfg.terrainTokens.includes(id)) cfg.terrainTokens = cfg.terrainTokens.filter(x => x !== id);
+            else cfg.terrainTokens.push(id);
+            b.classList.toggle('ghost', !cfg.terrainTokens.includes(id));
+            DYA.audio.play('click');
+          };
+          ttRow.appendChild(b);
+        });
+        terrRow.appendChild(ttRow);
       } else {
         const tset = DYA.lore.TERRAIN_SETS.find(t => t.id === cfg.terrain);
         terrRow.appendChild(U.el('div', { cls: 'muted small', html: 'TERRAIN SET — ' + (tset ? '<span class="gold">' + tset.name + '</span> (set by the organizer)' : '<span class="gold">assigned randomly</span> for casual matches') }));
@@ -310,10 +326,15 @@
       mid.appendChild(readyBtn);
       wrap.appendChild(mid);
 
-      /* right: opponent */
+      /* right: opponent — with their pouch preview (§10) */
       const right = U.el('div', { cls: 'setup-col panel' });
       right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Opponent — ' + cfg.opponent.name }));
       right.appendChild(U.el('p', { cls: 'muted small', text: cfg.ranked ? 'RANKED MATCH — Guild sealed.' : 'Casual match.' }));
+      if (cfg.opponent.pouch && cfg.opponent.pouch.length) {
+        const og = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(78px,1fr))' });
+        cfg.opponent.pouch.forEach(t => og.appendChild(UI.tokenCard(t, { size: 56, mode: 'minimal' })));
+        right.appendChild(og);
+      }
       const oppStatus = U.el('p', { cls: 'mt', text: 'Voting…' });
       right.appendChild(oppStatus);
       const chat = U.el('div', { cls: 'mt' });
@@ -360,11 +381,12 @@
       seed, mode: cfg.mode || 'standard', terrain,
       settings,
       teams: [
-        { name: G.me.displayName, accId: G.me.id, controller: 'human', pouch: cfg.pouch.map(t => U.deepCopy(t)), startResources: startRes },
+        { name: G.me.displayName, accId: G.me.id, controller: 'human', pouch: cfg.pouch.map(t => U.deepCopy(t)), startResources: startRes, seal: G.me.seal || { avatarIdx: G.me.avatarIdx, patterns: [] } },
         cfg.mode === 'hunt'
           ? { name: 'The Wild', controller: 'wild', pouch: [] }
-          : { name: cfg.opponent.name, accId: cfg.opponent.accId, controller: 'ai', aiSkill: cfg.opponent.aiSkill, pouch: (cfg.opponent.pouch || []).map(t => U.deepCopy(t)) },
+          : { name: cfg.opponent.name, accId: cfg.opponent.accId, controller: 'ai', aiSkill: cfg.opponent.aiSkill, pouch: (cfg.opponent.pouch || []).map(t => U.deepCopy(t)), seal: (cfg.opponent.accId && G.world.accounts[cfg.opponent.accId] && G.world.accounts[cfg.opponent.accId].seal) || { avatarIdx: 3, patterns: ['runes'] } },
       ],
+      terrainTokens: cfg.terrainTokens,
       hunt: cfg.hunt,
     });
     UI.showWithLoading('match', { match, cfg }, 1300);
@@ -443,9 +465,25 @@
       /* ---------- input state ---------- */
       let mouseWorld = { x: 800, y: 500 };
       let draggingSlot = null;
+      let fieldTip = null;
       canvas.addEventListener('mousemove', e => {
         const r = canvas.getBoundingClientRect();
         mouseWorld = renderer.toWorld(e.clientX - r.left, e.clientY - r.top);
+        /* §11: hover any creature → tooltip with name, species, temperament, status */
+        const hov = M.creatures.find(c => !c.dead && U.dist(mouseWorld.x, mouseWorld.y, c.x, c.y) < Math.max(24, c.radius * 1.6));
+        if (hov) {
+          if (!fieldTip) { fieldTip = U.el('div', { cls: 'wheel-tip', style: 'pointer-events:none;bottom:auto;transform:none' }); scr.appendChild(fieldTip); }
+          const card = TK.descriptionCard(hov.tok);
+          fieldTip.innerHTML = '<div class="gold">' + U.esc(hov.tokName) + ' — ' + U.esc(hov.sp.name) + '</div>' +
+            '<div class="small muted">' + U.esc(card.temperament) + '</div>' +
+            '<div class="small mt">HP ' + Math.max(0, Math.round(hov.hp)) + '/' + Math.round(hov.maxHp) +
+            ' · ' + hov.state + (hov.carryingRelic ? ' · <span class="gold">CARRYING RELIC</span>' : '') +
+            (hov.stunnedUntil > M.tick ? ' · stunned' : '') +
+            (hov.headCount > 1 ? ' · heads ' + hov.headsLeft + '/' + hov.headCount : '') +
+            (M.teams[hov.team] ? ' · ' + U.esc(M.teams[hov.team].name) : '') + '</div>';
+          fieldTip.style.left = Math.min(window.innerWidth - 360, e.clientX + 18) + 'px';
+          fieldTip.style.top = Math.max(8, e.clientY - 30) + 'px';
+        } else if (fieldTip) { fieldTip.remove(); fieldTip = null; }
       });
       canvas.addEventListener('click', e => {
         if (selectedSlot != null) { triggerSlot(selectedSlot, mouseWorld.x, mouseWorld.y); selectedSlot = null; }
@@ -491,12 +529,14 @@
           const idx = ((wheelIndex + k) % avail.length + avail.length) % avail.length;
           if (avail.length <= Math.abs(k)) continue;
           const { en, i } = avail[idx];
-          const cost = SP.RARITY_COST[en.tok.rarity];
-          const afford = T0.resources >= cost;
+          const costV = TK.costVec(en.tok);
+          const tax = en.deaths || 0; /* commander tax: +1 per prior defeat, any one resource */
+          const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
+            (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
           const card = U.el('div', { cls: 'wheel-card' + (k === 0 ? ' center' : Math.abs(k) >= 3 ? ' fade3' : Math.abs(k) === 2 ? ' fade2' : ' fade1') });
           card.appendChild(UI.tokenArt(en.tok.speciesId, k === 0 ? 62 : 46));
           card.appendChild(U.el('div', { cls: 'wc-name', text: en.tok.name }));
-          card.appendChild(U.el('div', { cls: 'wc-meta', html: SP.RARITIES[en.tok.rarity] + ' · ◈' + cost }));
+          card.appendChild(U.el('div', { cls: 'wc-meta', html: SP.ELEMENTS.filter(el => costV[el] > 0).map(el => '<span class="el-' + el + '">' + costV[el] + '</span>').join('·') + (tax ? ' <span style="color:var(--red)">+' + tax + '</span>' : '') }));
           card.appendChild(U.el('div', { cls: 'wc-dot ' + (afford ? 'ok' : 'no') }));
           card.onmouseenter = () => {
             const sp = SP.get(en.tok.speciesId);
@@ -511,13 +551,46 @@
             wheelIndex = idx; // click centers it…
             if (!afford) { DYA.audio.play('deny'); renderWheel(); return; }
             if (T0.readied.length >= 5) { UI.toast({ title: 'Ready panel full', body: 'Five readied tokens is the limit.', icon: '⚠' }); renderWheel(); return; }
-            M.queueInput(0, { type: 'ready', pouchIdx: i }); // …and readies it
-            DYA.audio.play('ready');
-            if (DYA.tutorial) DYA.tutorial.onEvent('readied');
-            setTimeout(renderWheel, 80);
+            const doReady = (taxRes) => {
+              M.queueInput(0, { type: 'ready', pouchIdx: i, taxRes });
+              DYA.audio.play('ready');
+              if (DYA.tutorial) DYA.tutorial.onEvent('readied');
+              animateReadyFly(card);
+              setTimeout(renderWheel, 80);
+            };
+            if (tax > 0) {
+              /* commander tax: the player chooses which resource pays it */
+              const w2 = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Commander tax +' + tax }),
+                U.el('p', { cls: 'small muted mt', text: en.tok.name + ' has fallen ' + tax + ' time' + (tax > 1 ? 's' : '') + '. Choose the resource that pays the tax.' })]);
+              const m2 = UI.modal(w2);
+              const row2 = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+              SP.ELEMENTS.forEach(el => {
+                const can = T0.resources[el] >= (costV[el] || 0) + tax;
+                row2.appendChild(U.el('button', { cls: 'btn small' + (can ? '' : ' ghost'), html: '<span class="el-' + el + '">' + el + '</span> (' + Math.floor(T0.resources[el]) + ')', onclick: () => { if (!can) return; m2.close(); doReady(el); } }));
+              });
+              w2.appendChild(row2);
+            } else doReady(null);
           };
           wheelEl.appendChild(card);
         }
+      }
+
+      /* §12: animate the card sliding from the wheel to the readied board */
+      function animateReadyFly(card) {
+        try {
+          const r0 = card.getBoundingClientRect();
+          const target = readiedEl.getBoundingClientRect();
+          const ghost = card.cloneNode(true);
+          ghost.style.cssText = 'position:fixed;left:' + r0.left + 'px;top:' + r0.top + 'px;width:' + r0.width + 'px;z-index:120;transition:all .55s cubic-bezier(.4,.1,.3,1);pointer-events:none;opacity:.95';
+          document.body.appendChild(ghost);
+          requestAnimationFrame(() => {
+            ghost.style.left = (target.right - r0.width * 0.7) + 'px';
+            ghost.style.top = (target.top + 40) + 'px';
+            ghost.style.transform = 'scale(.55)';
+            ghost.style.opacity = '0.2';
+          });
+          setTimeout(() => ghost.remove(), 600);
+        } catch (e) { }
       }
 
       function renderReadied() {
@@ -593,10 +666,12 @@
       pauseBtn.onclick = togglePause;
 
       function relicText() {
-        if (M.relic.disabled) return '—';
-        if (M.relic.carrierTeam === 0) return '<span style="color:var(--green)">YOURS</span>';
-        if (M.relic.carrierTeam === 1) return '<span style="color:var(--red)">THEIRS</span>';
-        return 'Free';
+        const mine = M.relics && M.relics.find(r => r.ownerTeam === 0);
+        const theirs = M.relics && M.relics.find(r => r.ownerTeam === 1);
+        if (!mine || mine.disabled) return '—';
+        const mineTxt = mine.carrier != null ? '<span style="color:var(--red)">STOLEN!</span>' : (Math.abs(mine.x - mine.homeX) > 6 ? '<span style="color:var(--eldi)">DROPPED</span>' : '<span style="color:var(--green)">SAFE</span>');
+        const theirsTxt = theirs.captured ? '<span style="color:var(--green)">CAPTURED</span>' : theirs.carrier != null ? '<span style="color:var(--green)">TAKEN</span>' : 'home';
+        return 'Yours: ' + mineTxt + ' · Theirs: ' + theirsTxt;
       }
 
       /* ---------- simulated disconnect (rare, casual queue only) ---------- */
@@ -646,11 +721,11 @@
         relicRow.innerHTML = M.mode === 'hunt'
           ? '☠ Quarry: ' + (M.creatures.some(c => !c.dead && c.isBoss) ? '<b style="color:var(--red)">ALIVE</b>' : 'DOWN')
           : 'Relic: ' + relicText();
+        const resHtml = SP.ELEMENTS.map(el => '<span class="el-' + el + '" style="margin-left:8px">◈' + Math.floor(T0.resources[el]) + '</span>').join('');
         resBox.innerHTML = resCollapsed
-          ? '<div class="rb-big">◈' + Math.floor(T0.resources) + '</div>'
-          : '<div class="rb-big">◈ ' + Math.floor(T0.resources) + '</div><div class="small muted">resources</div>' +
-            '<div class="small mt">Pulse: +' + (M.settings.chaos ? '?' : M.settings.pulseAmount * esc) + ' every ' + (M.settings.chaos ? '?' : M.settings.pulseInterval) + 's</div>' +
-            '<div class="small muted">' + M.pulseElement + ' pulse</div>';
+          ? '<div>' + resHtml + '</div>'
+          : '<div style="font-size:19px">' + resHtml + '</div><div class="small muted">Fti · Su · Eldi · Ular</div>' +
+            '<div class="small mt">Pulse: +' + (M.settings.chaos ? '?' : M.settings.pulseAmount * esc) + ' every ' + (M.settings.chaos ? '?' : M.settings.pulseInterval) + 's</div>';
 
         if (M.pulseIndex !== lastPulseIdx || T0.readied.length !== lastReadiedLen) {
           lastPulseIdx = M.pulseIndex; lastReadiedLen = T0.readied.length;
@@ -768,11 +843,16 @@
     [['pick', 'Pick — choose your token'], ['random', 'Random — assigned from your collection'], ['blind', 'Blind Pick — both choose secretly']].forEach(([v, l]) => modeSel.appendChild(U.el('option', { value: v, text: l })));
     w.appendChild(modeSel);
     const wagerSel = U.el('select', { cls: 'txt mt' });
-    [['none', 'No wager — honor duel'], ['gold', 'Wager gold'], ['token', 'Wager the dueling tokens themselves']].forEach(([v, l]) => wagerSel.appendChild(U.el('option', { value: v, text: l })));
+    [['none', 'No wager — honor duel'], ['gold', 'Wager gold'], ['ngakara', 'Wager NgAkara'], ['okid', 'Wager Okid'], ['token', 'Wager the dueling tokens themselves']].forEach(([v, l]) => wagerSel.appendChild(U.el('option', { value: v, text: l })));
     w.appendChild(wagerSel);
-    const goldInp = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Gold wager', style: 'display:none' });
-    wagerSel.onchange = () => goldInp.style.display = wagerSel.value === 'gold' ? '' : 'none';
-    w.appendChild(goldInp);
+    const goldInp = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Amount', style: 'display:none' });
+    const okidRar = U.el('select', { cls: 'txt mt', style: 'display:none' });
+    SP.RARITIES.forEach((r, i) => okidRar.appendChild(U.el('option', { value: i, text: r + ' Okid' })));
+    wagerSel.onchange = () => {
+      goldInp.style.display = (wagerSel.value === 'gold' || wagerSel.value === 'ngakara' || wagerSel.value === 'okid') ? '' : 'none';
+      okidRar.style.display = wagerSel.value === 'okid' ? '' : 'none';
+    };
+    w.appendChild(goldInp); w.appendChild(okidRar);
     const m = UI.modal(w);
     w.appendChild(U.el('button', {
       cls: 'btn primary mt', text: 'Find opponent', onclick: () => {
@@ -780,14 +860,17 @@
         if (!toks.length) { UI.alert('No tokens', 'You need at least one token to duel.'); return; }
         const wager = wagerSel.value;
         const goldAmt = parseInt(goldInp.value) || 0;
+        const okidR = parseInt(okidRar.value) || 0;
         if (wager === 'gold' && (goldAmt <= 0 || goldAmt > me.gold)) { UI.alert('Bad wager', 'Wager gold you actually hold.'); return; }
+        if (wager === 'ngakara' && (goldAmt <= 0 || goldAmt > me.ngakara)) { UI.alert('Bad wager', 'Wager NgAkara you actually hold.'); return; }
+        if (wager === 'okid' && (goldAmt <= 0 || goldAmt > me.okid[okidR])) { UI.alert('Bad wager', 'Wager Okid you actually hold.'); return; }
         m.close();
         const mode = modeSel.value;
         if (mode === 'pick' || mode === 'blind') {
-          pickTokenModal(toks, tok => beginDuel(tok, { mode, wager, goldAmt }));
+          pickTokenModal(toks, tok => beginDuel(tok, { mode, wager, goldAmt, okidR }));
         } else {
           const tok = toks[Math.floor(Math.random() * toks.length)];
-          beginDuel(tok, { mode, wager, goldAmt });
+          beginDuel(tok, { mode, wager, goldAmt, okidR });
         }
       },
     }));
@@ -836,6 +919,12 @@
           if (opts.wager === 'gold') {
             G.addGold(iWon ? opts.goldAmt : -opts.goldAmt);
             UI.toast({ title: iWon ? 'Wager won!' : 'Wager lost', body: (iWon ? '+' : '−') + U.fmt(opts.goldAmt) + 'g', icon: '🪙' });
+          } else if (opts.wager === 'ngakara') {
+            me.ngakara = Math.max(0, me.ngakara + (iWon ? opts.goldAmt : -opts.goldAmt));
+            UI.toast({ title: iWon ? 'Wager won!' : 'Wager lost', body: (iWon ? '+' : '−') + opts.goldAmt + ' NgAkara', icon: '🧪' });
+          } else if (opts.wager === 'okid') {
+            me.okid[opts.okidR] = Math.max(0, me.okid[opts.okidR] + (iWon ? opts.goldAmt : -opts.goldAmt));
+            UI.toast({ title: iWon ? 'Wager won!' : 'Wager lost', body: (iWon ? '+' : '−') + opts.goldAmt + ' ' + SP.RARITIES[opts.okidR] + ' Okid', icon: '⬡' });
           } else if (opts.wager === 'token') {
             if (iWon) {
               const won = U.deepCopy(oppTok); won.id = U.uid('tok');

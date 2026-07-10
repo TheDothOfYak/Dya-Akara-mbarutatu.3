@@ -52,13 +52,25 @@
       ctx.beginPath(); ctx.arc(0, 0, o.r * 2.2, 0, TAU); ctx.fill();
     }
 
-    /* team ring (subtle, under the creature) */
+    /* team ring (subtle, under the creature) — player's seal engraved inside (§3) */
     if (o.teamColor) {
+      if (o.seal) {
+        ctx.save();
+        ctx.globalAlpha *= 0.4;
+        ctx.translate(0, o.r * 0.85);
+        ctx.scale(1, 0.45);
+        SPR.drawSeal(ctx, 0, 0, o.r * 1.02, o.seal);
+        ctx.restore();
+      }
       ctx.strokeStyle = o.teamColor;
       ctx.globalAlpha *= 0.55;
       ctx.lineWidth = Math.max(1.5, o.r * 0.12);
       ctx.beginPath(); ctx.ellipse(0, o.r * 0.85, o.r * 1.1, o.r * 0.45, 0, 0, TAU); ctx.stroke();
       ctx.globalAlpha = o.alpha != null ? o.alpha : 1;
+    }
+    /* optional floating seal token above the creature (§3, match-settings toggle) */
+    if (o.seal && o.sealBadge && state !== 'death') {
+      SPR.drawSeal(ctx, 0, -o.r * 2.1 + Math.sin(t * 2) * 2, o.r * 0.32, o.seal);
     }
 
     ctx.scale(o.facing < 0 ? -1 : 1, squash);
@@ -73,6 +85,8 @@
     else if (rig === 'field') drawField(ctx, o, t, state);
     else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
     else if (rig === 'crab') drawCrab(ctx, o, t, state);
+    else if (rig === 'mcfly') drawMcFly(ctx, o, t, state);
+    else if (rig === 'bird') drawBird(ctx, o, t, state);
     else drawQuad(ctx, o, t, state);
 
     ctx.scale(o.facing < 0 ? -1 : 1, 1); // unflip for shimmer
@@ -131,8 +145,24 @@
       }
     }
 
-    /* --- 4 legs --- */
-    if (!dormant && !F.stationary) {
+    /* --- aquatic body plan: fins and tail, never legs (§6) --- */
+    if (F.aquatic) {
+      const swim = Math.sin(t * (moving ? 9 : 4));
+      ctx.fillStyle = shade(sp.color, -18);
+      /* tail fin */
+      ctx.beginPath();
+      ctx.moveTo(-bodyW * 0.9, y0);
+      ctx.lineTo(-bodyW * 1.35, y0 - r * 0.34 + swim * r * 0.16);
+      ctx.lineTo(-bodyW * 1.35, y0 + r * 0.34 + swim * r * 0.16);
+      ctx.closePath(); ctx.fill();
+      /* side fins */
+      ctx.beginPath();
+      ctx.moveTo(bodyW * 0.05, y0 + bodyH * 0.5);
+      ctx.quadraticCurveTo(bodyW * 0.0 + swim * r * 0.1, y0 + bodyH * 1.15, -bodyW * 0.35, y0 + bodyH * 0.55);
+      ctx.closePath(); ctx.fill();
+    }
+    /* --- 4 legs (never for aquatic or legless species) --- */
+    if (!dormant && !F.stationary && !F.aquatic && !F.legless) {
       ctx.strokeStyle = shade(sp.color, -40);
       ctx.lineWidth = Math.max(2, r * 0.16);
       ctx.lineCap = 'round';
@@ -180,7 +210,8 @@
     grd.addColorStop(0, shade(sp.color, 22));
     grd.addColorStop(1, shade(sp.color, -18));
     ctx.fillStyle = grd;
-    ctx.beginPath(); ctx.ellipse(attackLunge * 0.3, y0, bodyW, bodyH * (dormant ? 0.75 : 1), 0, 0, TAU); ctx.fill();
+    const undul = F.aquatic ? Math.sin(t * 6) * 0.05 : 0;
+    ctx.beginPath(); ctx.ellipse(attackLunge * 0.3, y0, bodyW, bodyH * (dormant ? 0.75 : 1), undul, 0, TAU); ctx.fill();
 
     /* rocky / carved / scars / plates texture */
     if (F.rocky || F.carved) {
@@ -736,6 +767,250 @@
         ctx.stroke();
       }
     }
+  }
+
+  /* ============ RUBBERMCFLY — ball, beak, butterfly wings, two legs (§6) ============ */
+  function drawMcFly(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const hover = Math.sin(t * 3.2) * r * 0.1;
+    const flap = Math.sin(t * 10);
+    /* butterfly wings — two pairs, colorful */
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(side * r * 0.18, hover - r * 0.1);
+      ctx.rotate(side * flap * 0.45);
+      const wg = ctx.createRadialGradient(side * r * 0.5, -r * 0.2, 2, side * r * 0.5, -r * 0.2, r * 0.75);
+      wg.addColorStop(0, '#e8a4d8dd'); wg.addColorStop(0.6, sp.color2 + 'cc'); wg.addColorStop(1, '#68e0e866');
+      ctx.fillStyle = wg;
+      ctx.beginPath(); ctx.ellipse(side * r * 0.55, -r * 0.3, r * 0.52, r * 0.34, side * 0.5, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(side * r * 0.45, r * 0.18, r * 0.36, r * 0.24, side * -0.4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#ffffff44'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.1); ctx.lineTo(side * r * 0.8, -r * 0.4); ctx.stroke();
+      ctx.restore();
+    }
+    /* two little legs */
+    ctx.strokeStyle = shade(sp.color, -45); ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+    for (const side of [-0.3, 0.3]) {
+      ctx.beginPath(); ctx.moveTo(side * r, hover + r * 0.45);
+      ctx.lineTo(side * r + Math.sin(t * 5 + side * 9) * r * 0.06, hover + r * 0.85); ctx.stroke();
+    }
+    /* ball body */
+    const bg = ctx.createRadialGradient(-r * 0.15, hover - r * 0.15, 2, 0, hover, r * 0.55);
+    bg.addColorStop(0, shade(sp.color, 30)); bg.addColorStop(1, shade(sp.color, -12));
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(0, hover, r * 0.52, 0, TAU); ctx.fill();
+    /* beak */
+    ctx.fillStyle = '#d9a441';
+    ctx.beginPath();
+    ctx.moveTo(r * 0.42, hover - r * 0.05);
+    ctx.lineTo(r * 0.78, hover + r * 0.03 + (state === 'special' ? Math.sin(t * 12) * r * 0.05 : 0));
+    ctx.lineTo(r * 0.42, hover + r * 0.14);
+    ctx.closePath(); ctx.fill();
+    /* eyes */
+    ctx.fillStyle = '#241a10';
+    ctx.beginPath(); ctx.arc(r * 0.2, hover - r * 0.12, Math.max(1, r * 0.08), 0, TAU); ctx.fill();
+  }
+
+  /* ============ BIRD RIG — Kuni & Albali Byrds read as real birds (§6) ============ */
+  function drawBird(ctx, o, t, state) {
+    const sp = o.sp, r = o.r, F = sp.features || {};
+    const moving = state === 'walk' || state === 'run';
+    const idleBob = state === 'idle' ? Math.sin(t * 2.4) * r * 0.05 : 0;
+    const attackLunge = state === 'attack' || state === 'special' ? Math.max(0, Math.sin(t * 12)) * r * 0.3 : 0;
+    const y0 = -r * 0.15 + idleBob;
+    const flap = Math.sin(t * (moving || state === 'special' ? 13 : 4.5));
+    /* far wing */
+    ctx.fillStyle = shade(sp.color, -28);
+    ctx.save();
+    ctx.translate(-r * 0.1, y0 - r * 0.25);
+    ctx.rotate(-0.35 - flap * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-r * 0.9, -r * 0.75, -r * 1.45, -r * 0.28);
+    ctx.quadraticCurveTo(-r * 0.85, 0.06 * r, 0, 0);
+    ctx.fill();
+    ctx.restore();
+    /* tail feathers */
+    ctx.fillStyle = shade(sp.color, -16);
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5, y0 + r * 0.1);
+      ctx.lineTo(-r * (1.15 + Math.abs(i) * 0.05), y0 + r * 0.28 + i * r * 0.14 + flap * r * 0.03);
+      ctx.lineTo(-r * 0.55, y0 + r * 0.3);
+      ctx.closePath(); ctx.fill();
+    }
+    /* legs + talons */
+    ctx.strokeStyle = '#d9a441'; ctx.lineWidth = Math.max(1.5, r * 0.09); ctx.lineCap = 'round';
+    for (const side of [-0.18, 0.22]) {
+      const sw = moving ? Math.sin(t * 12 + side * 20) * r * 0.12 : 0;
+      ctx.beginPath(); ctx.moveTo(side * r, y0 + r * 0.55);
+      ctx.lineTo(side * r + sw, r * 0.85); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(side * r + sw - r * 0.09, r * 0.88); ctx.lineTo(side * r + sw + r * 0.12, r * 0.88); ctx.stroke();
+    }
+    /* body — upright bird oval */
+    const grd = ctx.createLinearGradient(0, y0 - r * 0.6, 0, y0 + r * 0.6);
+    grd.addColorStop(0, shade(sp.color, 22)); grd.addColorStop(1, shade(sp.color, -16));
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(attackLunge * 0.3, y0, r * 0.52, r * 0.66, -0.18, 0, TAU); ctx.fill();
+    /* breast feather texture */
+    ctx.strokeStyle = shade(sp.color, -30) + '66'; ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.arc(r * 0.12, y0 + r * 0.1 + i * r * 0.14, r * 0.2, 0.6, 2.4); ctx.stroke();
+    }
+    /* head + beak */
+    const hx = r * 0.42 + attackLunge, hy = y0 - r * 0.62;
+    ctx.fillStyle = shade(sp.color, 14);
+    ctx.beginPath(); ctx.arc(hx, hy, r * 0.3, 0, TAU); ctx.fill();
+    ctx.fillStyle = F.feral ? '#8a2a2a' : '#d9a441';
+    ctx.beginPath();
+    ctx.moveTo(hx + r * 0.22, hy - r * 0.06);
+    ctx.lineTo(hx + r * (0.62 + (state === 'attack' ? 0.1 : 0)), hy + r * 0.05);
+    ctx.lineTo(hx + r * 0.22, hy + r * 0.14);
+    ctx.closePath(); ctx.fill();
+    /* hooked tip for raptors */
+    ctx.beginPath(); ctx.moveTo(hx + r * 0.6, hy + r * 0.02); ctx.lineTo(hx + r * 0.56, hy + r * 0.16); ctx.lineTo(hx + r * 0.46, hy + r * 0.08); ctx.fill();
+    /* eye */
+    ctx.fillStyle = '#241a10';
+    ctx.beginPath(); ctx.arc(hx + r * 0.06, hy - r * 0.06, Math.max(1, r * 0.07), 0, TAU); ctx.fill();
+    /* Albali: five horns with healing film */
+    if (F.horns) {
+      ctx.strokeStyle = sp.color2 || '#b03030'; ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        const a = -2.1 + i * 0.3;
+        ctx.beginPath(); ctx.moveTo(hx, hy - r * 0.2);
+        ctx.lineTo(hx + Math.cos(a) * r * 0.55, hy - r * 0.2 + Math.sin(a) * r * 0.55); ctx.stroke();
+      }
+    }
+    /* near wing */
+    ctx.fillStyle = shade(sp.color, -8);
+    ctx.save();
+    ctx.translate(r * 0.05, y0 - r * 0.2);
+    ctx.rotate(-0.25 + flap * 0.55);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(-r * 1.0, -r * 0.85, -r * 1.55, -r * 0.3);
+    ctx.quadraticCurveTo(-r * 0.9, r * 0.1, 0, 0);
+    ctx.fill();
+    /* wing feather lines */
+    ctx.strokeStyle = shade(sp.color, -35) + '88'; ctx.lineWidth = 1;
+    for (let i = 1; i <= 3; i++) {
+      ctx.beginPath(); ctx.moveTo(-r * 0.2 * i, -r * 0.05 * i);
+      ctx.lineTo(-r * (1.3 - 0.1 * i), -r * (0.4 - 0.06 * i)); ctx.stroke();
+    }
+    ctx.restore();
+    /* rider */
+    if (F.rider || o.hasRider) drawMiniAcorn(ctx, -r * 0.12, y0 - r * 0.75, r * 0.34, t, '#c8a05c', '#6d4a2e');
+  }
+
+  /* ============ PLAYER SEAL — engraved coin crest (§3) ============ */
+  const sealCache = {};
+  SPR.PATTERNS = ['runes', 'laurel', 'dots', 'waves', 'chevrons', 'stars', 'vines', 'knots'];
+  SPR.drawSeal = function (ctx, x, y, R, seal, opts) {
+    seal = seal || { avatarIdx: 0, patterns: [] };
+    opts = opts || {};
+    const key = (seal.avatarIdx || 0) + ':' + (seal.patterns || []).join(',') + ':' + Math.round(R);
+    let cv = sealCache[key];
+    if (!cv) {
+      cv = document.createElement('canvas');
+      const S = Math.max(24, Math.ceil(R * 2));
+      cv.width = S; cv.height = S;
+      renderSeal(cv.getContext('2d'), S / 2, seal);
+      sealCache[key] = cv;
+    }
+    ctx.save();
+    if (opts.alpha != null) ctx.globalAlpha *= opts.alpha;
+    ctx.drawImage(cv, x - R, y - R, R * 2, R * 2);
+    ctx.restore();
+  };
+
+  function renderSeal(ctx, R, seal) {
+    const gold = '#d9b87a';
+    /* coin disc */
+    ctx.fillStyle = '#241d14';
+    ctx.beginPath(); ctx.arc(R, R, R * 0.98, 0, TAU); ctx.fill();
+    ctx.strokeStyle = gold; ctx.lineWidth = Math.max(1, R * 0.05);
+    ctx.beginPath(); ctx.arc(R, R, R * 0.94, 0, TAU); ctx.stroke();
+    ctx.lineWidth = Math.max(0.7, R * 0.025);
+    ctx.beginPath(); ctx.arc(R, R, R * 0.58, 0, TAU); ctx.stroke();
+    /* outer ring: up to two engraved patterns */
+    const pats = (seal.patterns || []).slice(0, 2);
+    pats.forEach((p, pi) => {
+      const rr = R * (pats.length === 1 ? 0.76 : pi === 0 ? 0.82 : 0.68);
+      drawPatternRing(ctx, R, rr, p, gold);
+    });
+    /* center: engraving-style acorn portrait (line work, no fill color) */
+    ctx.save();
+    ctx.translate(R, R * 1.08);
+    ctx.strokeStyle = gold; ctx.lineWidth = Math.max(1, R * 0.045); ctx.lineJoin = 'round';
+    const r = R * 0.34;
+    const idx = seal.avatarIdx || 0;
+    ctx.beginPath(); /* acorn body */
+    ctx.moveTo(-r, -r * 0.1);
+    ctx.quadraticCurveTo(-r * 1.05, r * 1.05, 0, r * 1.05);
+    ctx.quadraticCurveTo(r * 1.05, r * 1.05, r, -r * 0.1);
+    ctx.stroke();
+    if (idx % 5 === 4) { /* pointed cap */
+      ctx.beginPath(); ctx.moveTo(-r * 1.05, -r * 0.05); ctx.lineTo(0, -r * 1.4); ctx.lineTo(r * 1.05, -r * 0.05); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.ellipse(0, -r * 0.14, r * 1.08, r * 0.48, 0, Math.PI, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.6); ctx.lineTo(r * 0.16, -r * 0.95); ctx.stroke();
+    }
+    /* eyes */
+    ctx.fillStyle = gold;
+    ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.22, r * 0.09, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.35, r * 0.22, r * 0.09, 0, TAU); ctx.fill();
+    if (idx >= 7 && idx % 2 === 1) { /* eyepatch line */
+      ctx.beginPath(); ctx.arc(r * 0.35, r * 0.22, r * 0.17, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawPatternRing(ctx, R, rr, pattern, gold) {
+    ctx.save();
+    ctx.strokeStyle = gold; ctx.fillStyle = gold;
+    ctx.lineWidth = Math.max(0.7, R * 0.03); ctx.lineCap = 'round';
+    const n = 16;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * TAU;
+      ctx.save();
+      ctx.translate(R + Math.cos(a) * rr, R + Math.sin(a) * rr);
+      ctx.rotate(a + Math.PI / 2);
+      const u = R * 0.07;
+      switch (pattern) {
+        case 'runes':
+          ctx.strokeRect(-u * 0.5, -u, u, u * 2);
+          ctx.beginPath(); ctx.moveTo(-u * 0.5, 0); ctx.lineTo(u * 0.5, i % 2 ? -u * 0.6 : u * 0.6); ctx.stroke();
+          break;
+        case 'laurel':
+          ctx.beginPath(); ctx.ellipse(0, 0, u * 0.5, u * 1.1, 0.5, 0, TAU); ctx.stroke();
+          break;
+        case 'dots':
+          ctx.beginPath(); ctx.arc(0, 0, u * 0.45, 0, TAU); ctx.fill();
+          break;
+        case 'waves':
+          ctx.beginPath(); ctx.moveTo(-u, 0); ctx.quadraticCurveTo(-u * 0.3, -u, 0, 0); ctx.quadraticCurveTo(u * 0.3, u, u, 0); ctx.stroke();
+          break;
+        case 'chevrons':
+          ctx.beginPath(); ctx.moveTo(-u * 0.7, u * 0.5); ctx.lineTo(0, -u * 0.6); ctx.lineTo(u * 0.7, u * 0.5); ctx.stroke();
+          break;
+        case 'stars':
+          for (let k = 0; k < 4; k++) {
+            const sa = k / 4 * TAU;
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(sa) * u * 0.8, Math.sin(sa) * u * 0.8); ctx.stroke();
+          }
+          break;
+        case 'vines':
+          ctx.beginPath(); ctx.moveTo(-u, u * 0.4); ctx.quadraticCurveTo(0, -u * 1.1, u, u * 0.4); ctx.stroke();
+          ctx.beginPath(); ctx.arc(0, -u * 0.4, u * 0.2, 0, TAU); ctx.fill();
+          break;
+        case 'knots':
+          ctx.beginPath(); ctx.arc(-u * 0.3, 0, u * 0.45, 0, TAU); ctx.stroke();
+          ctx.beginPath(); ctx.arc(u * 0.3, 0, u * 0.45, 0, TAU); ctx.stroke();
+          break;
+      }
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   /* ============ token coin (loading screen, market, okid) ============ */

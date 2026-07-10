@@ -60,6 +60,7 @@
           row.appendChild(UI.tokenArt(tok.speciesId, 30));
           row.appendChild(U.el('div', { cls: 'flex1', html: U.esc(tok.name) + '<br><span class="small muted r' + tok.rarity + '">' + SP.RARITIES[tok.rarity] + '</span>' }));
           row.appendChild(U.el('div', { cls: 'mt-x', text: '✕', onclick: () => { collState.pouch.tokenIds = collState.pouch.tokenIds.filter(x => x !== id); renderPouch(); } }));
+          UI.attachHoverInfo(row, tok);
           psList.appendChild(row);
         });
         count.textContent = collState.pouch.tokenIds.length + '/' + EC.POUCH_SIZE;
@@ -166,6 +167,26 @@
         const actions = [];
         actions.push(U.el('button', { cls: 'btn primary', text: '⚔ Duel vs AI', onclick: () => DYA.play.startDuelVsAI(tok) }));
         actions.push(U.el('button', { cls: 'btn', text: '👝 Add to pouch', onclick: () => { addToPouch(tok.id); } }));
+        /* §4 — name your token like a pet; famous tokens may arrive name-locked */
+        if (!tok.nameLocked && !tok.isRental) {
+          actions.push(U.el('button', {
+            cls: 'btn', text: '✎ Rename', onclick: () => {
+              const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Name your token' })]);
+              w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Default is the species name. Give it something of its own — it is yours, after all.' }));
+              const inp = U.el('input', { cls: 'txt mt', maxlength: 24, value: tok.name });
+              w.appendChild(inp);
+              const m = UI.modal(w);
+              w.appendChild(U.el('button', {
+                cls: 'btn primary mt', text: 'Name it', onclick: () => {
+                  const nm = inp.value.trim();
+                  if (nm.length < 2) return;
+                  tok.name = nm; G.save(); m.close(); scr2.remove(); UI.show('collection');
+                  UI.toast({ title: 'Renamed', body: '"' + nm + '" it is.', icon: '✎' });
+                },
+              }));
+            },
+          }));
+        }
         if (!tok.isRental) {
           actions.push(U.el('button', {
             cls: 'btn', text: '🎁 Gift to friend', onclick: () => {
@@ -555,7 +576,7 @@
         /* market price NOT shown to buyers — design rule */
         if (l.status !== 'display') {
           actions.push(U.el('button', {
-            cls: 'btn primary', text: 'Buy now — ' + U.fmt(l.price) + 'g', onclick: () => {
+            cls: 'btn primary', text: 'Buy now — ' + U.fmt(l.price) + 'g' + extrasText(l.want), onclick: () => {
               if (me.gold < l.price) { UI.alert('Not enough gold', 'You hold ' + U.fmt(me.gold) + 'g.'); return; }
               const r = G.buyListing(l.id);
               if (r.err) { UI.alert('Cannot buy', r.err); return; }
@@ -567,23 +588,7 @@
             },
           }));
         }
-        actions.push(U.el('button', {
-          cls: 'btn', text: '📩 Make offer', onclick: () => {
-            const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Offer on ' + tok.name })]);
-            const amt = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Gold amount', value: Math.round(l.price * 0.8) || 100 });
-            const note = U.el('input', { cls: 'txt mt', placeholder: 'Say something (optional)' });
-            w.appendChild(amt); w.appendChild(note);
-            const m = UI.modal(w);
-            w.appendChild(U.el('button', {
-              cls: 'btn primary mt', text: 'Send offer', onclick: () => {
-                const r = G.makeOffer(l.id, parseInt(amt.value) || 0, note.value);
-                if (r.err) { UI.alert('Cannot offer', r.err); return; }
-                m.close();
-                UI.toast({ title: 'Offer sent', body: 'Watch My Offers for the reply.', icon: '📩' });
-              },
-            }));
-          },
-        }));
+        actions.push(U.el('button', { cls: 'btn', text: '📩 Make offer', onclick: () => offerComposer(l, tok) }));
         actions.push(U.el('button', { cls: 'btn ghost', text: '🏪 Visit stall', onclick: () => { scr2.remove(); UI.show('playerStall', { seller }); } }));
         scr2.appendChild(UI.tokenDetail(tok, { onBack: () => scr2.remove(), actions }));
         root.appendChild(scr2);
@@ -651,6 +656,79 @@
     },
   });
 
+  /* §7 multi-currency offer composer: gold + NgAkara + Okid + tokens from my collection */
+  function offerComposer(l, tok, onSent) {
+    const me = G.me;
+    const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Offer on ' + tok.name })]);
+    const amt = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Gold amount', value: Math.round((l.price || 200) * 0.8) });
+    w.appendChild(amt);
+    w.appendChild(U.el('div', { cls: 'small muted mt', text: 'Sweeten the pot (optional):' }));
+    const exRow = U.el('div', { cls: 'flex' });
+    const exNg = U.el('input', { cls: 'txt', type: 'number', min: 0, style: 'max-width:110px', placeholder: 'NgAkara (' + me.ngakara + ')' });
+    const exOk = U.el('input', { cls: 'txt', type: 'number', min: 0, style: 'max-width:90px', placeholder: 'Okid' });
+    const exOkR = U.el('select', { cls: 'txt', style: 'max-width:150px' });
+    SP.RARITIES.forEach((r2, i) => exOkR.appendChild(U.el('option', { value: i, text: r2 + ' (' + me.okid[i] + ')' })));
+    exRow.appendChild(exNg); exRow.appendChild(exOk); exRow.appendChild(exOkR);
+    w.appendChild(exRow);
+    /* trade tokens into the bundle */
+    const picked = [];
+    const tokBtn = U.el('button', { cls: 'btn small ghost mt', text: '＋ Add tokens to the trade' });
+    const pickedRow = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap;gap:4px' });
+    tokBtn.onclick = () => {
+      const w2 = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Trade tokens' })]);
+      const g2 = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(100px,1fr));max-height:340px;overflow-y:auto' });
+      const m2 = UI.modal(w2);
+      Object.values(me.tokens).filter(t => t.status === 'collection' && !t.frozen && !t.isRental).forEach(t => {
+        const card = UI.tokenCard(t, { size: 60, mode: 'minimal' });
+        if (picked.includes(t.id)) card.style.borderColor = 'var(--gold)';
+        card.onclick = () => {
+          const i = picked.indexOf(t.id);
+          if (i >= 0) { picked.splice(i, 1); card.style.borderColor = ''; }
+          else { picked.push(t.id); card.style.borderColor = 'var(--gold)'; }
+          syncPicked();
+        };
+        g2.appendChild(card);
+      });
+      w2.appendChild(g2);
+      w2.appendChild(U.el('button', { cls: 'btn primary mt', text: 'Done', onclick: () => m2.close() }));
+    };
+    function syncPicked() {
+      pickedRow.innerHTML = '';
+      picked.forEach(id => { const t = me.tokens[id]; if (t) pickedRow.appendChild(U.el('span', { cls: 'pill', text: t.name })); });
+    }
+    w.appendChild(tokBtn); w.appendChild(pickedRow);
+    const note = U.el('input', { cls: 'txt mt', placeholder: 'Say something (optional)' });
+    w.appendChild(note);
+    const m = UI.modal(w);
+    w.appendChild(U.el('button', {
+      cls: 'btn primary mt', text: 'Send offer', onclick: () => {
+        const ng = parseInt(exNg.value) || 0, okq = parseInt(exOk.value) || 0;
+        const extras = (ng > 0 || okq > 0 || picked.length)
+          ? { ngakara: ng, okidQty: okq, okidRarity: parseInt(exOkR.value) || 0, tokenIds: picked.slice() }
+          : null;
+        const r = G.makeOffer(l.id, parseInt(amt.value) || 0, note.value, extras);
+        if (r.err) { UI.alert('Cannot offer', r.err); return; }
+        m.close();
+        UI.toast({ title: 'Offer sent', body: 'Watch My Offers for the reply.', icon: '📩' });
+        if (onSent) onSent();
+      },
+    }));
+  }
+
+  /* pretty-print an offer's extras bundle */
+  function extrasText(ex) {
+    if (!ex) return '';
+    const bits = [];
+    if (ex.ngakara) bits.push(ex.ngakara + ' NgAkara');
+    if (ex.okidQty) bits.push(ex.okidQty + ' ' + SP.RARITIES[ex.okidRarity || 0] + ' Okid');
+    (ex.tokenIds || []).forEach(tid => {
+      let t = null;
+      for (const acc of Object.values(G.world.accounts)) { if (acc.tokens[tid]) { t = acc.tokens[tid]; break; } }
+      bits.push(t ? '🎴 ' + t.name : '🎴 a token');
+    });
+    return bits.length ? ' + ' + bits.join(' + ') : '';
+  }
+
   /* offer negotiation thread — gold border selling, blue buying */
   function offerThread(o) {
     const me = G.me;
@@ -667,7 +745,7 @@
     o.history.forEach(h => {
       const mine = (h.by === 'buyer') === (o.buyerId === me.id);
       msgs.appendChild(U.el('div', { cls: 'offer-msg' + (mine ? ' mine' : '') }, [
-        U.el('div', { cls: 'om-bubble', html: '<b class="gold">' + U.fmt(h.amount) + 'g</b>' + (h.note ? ' — ' + U.esc(h.note) : '') }),
+        U.el('div', { cls: 'om-bubble', html: '<b class="gold">' + U.fmt(h.amount) + 'g</b>' + U.esc(extrasText(h.extras)) + (h.note ? ' — ' + U.esc(h.note) : '') }),
       ]));
     });
     th.appendChild(msgs);
@@ -734,7 +812,8 @@
       function newListing() {
         const avail = Object.values(me.tokens).filter(t => t.status === 'collection' && !t.frozen && !t.isRental);
         if (!avail.length) { UI.alert('Nothing to list', 'All your tokens are in use, frozen, or rentals.'); return; }
-        const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'New listing — 50g flat fee' })]);
+        const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'New listing' })]);
+        w.appendChild(U.el('div', { cls: 'small muted', text: 'No listing fee — the Guild takes its cut as sale tax when the token sells.' }));
         const sel = U.el('select', { cls: 'txt mt' });
         avail.forEach(t => sel.appendChild(U.el('option', { value: t.id, text: t.name + ' (' + SP.get(t.speciesId).name + ', ' + SP.RARITIES[t.rarity] + ')' })));
         const avgLine = U.el('div', { cls: 'small gold mt' });
@@ -744,12 +823,23 @@
         const status = U.el('select', { cls: 'txt mt' });
         [['sale', 'For sale — instant buy'], ['offer', 'Make offer — negotiate only'], ['display', 'Display only (offers still open)']].forEach(([v, l]) => status.appendChild(U.el('option', { value: v, text: l })));
         w.appendChild(sel); w.appendChild(avgLine); w.appendChild(price); w.appendChild(status);
+        /* §7 multi-currency asks: gold plus NgAkara and/or Okid */
+        w.appendChild(U.el('div', { cls: 'small muted mt', text: 'Also ask for (optional — buyer pays these on top of the gold):' }));
+        const wantRow = U.el('div', { cls: 'flex' });
+        const wantNg = U.el('input', { cls: 'txt', type: 'number', min: 0, style: 'max-width:120px', placeholder: 'NgAkara' });
+        const wantOk = U.el('input', { cls: 'txt', type: 'number', min: 0, style: 'max-width:100px', placeholder: 'Okid' });
+        const wantOkR = U.el('select', { cls: 'txt', style: 'max-width:150px' });
+        SP.RARITIES.forEach((r2, i) => wantOkR.appendChild(U.el('option', { value: i, text: r2 + ' Okid' })));
+        wantRow.appendChild(wantNg); wantRow.appendChild(wantOk); wantRow.appendChild(wantOkR);
+        w.appendChild(wantRow);
         const m = UI.modal(w);
         w.appendChild(U.el('button', {
-          cls: 'btn primary mt', text: 'List it (−50g)', onclick: () => {
+          cls: 'btn primary mt', text: 'List it', onclick: () => {
             const tok = me.tokens[sel.value];
             const p = parseInt(price.value) || G.marketAverage(tok.speciesId, tok.rarity);
-            const r = G.createListing(tok, p, status.value);
+            const ng = parseInt(wantNg.value) || 0, okq = parseInt(wantOk.value) || 0;
+            const want = (ng > 0 || okq > 0) ? { ngakara: ng, okidQty: okq, okidRarity: parseInt(wantOkR.value) || 0 } : null;
+            const r = G.createListing(tok, p, status.value, want);
             if (r.err) { UI.alert('Cannot list', r.err); return; }
             m.close(); DYA.audio.play('coin'); UI.show('myStall');
           },
@@ -760,7 +850,7 @@
         Listings() {
           body.innerHTML = '';
           const myLsts = Object.values(G.world.market.listings).filter(l => l.sellerId === me.id);
-          if (!myLsts.length) { body.appendChild(U.el('p', { cls: 'muted', text: 'Your shelves are empty. List something — the fee is 50g flat.' })); return; }
+          if (!myLsts.length) body.appendChild(U.el('p', { cls: 'muted', text: 'Your shelves are empty. List something — no listing fee, the sale tax is the Guild’s cut.' }));
           myLsts.forEach(l => {
             const tok = me.tokens[l.tokenId];
             if (!tok) return;
@@ -779,6 +869,21 @@
             }));
             row.appendChild(U.el('button', { cls: 'btn small ghost', text: '★ Feature', onclick: () => { me.stall.featuredTokenId = tok.id; G.save(); UI.show('myStall'); } }));
             row.appendChild(U.el('button', { cls: 'btn small danger', text: 'Remove', onclick: () => { G.removeListing(l.id); UI.show('myStall'); } }));
+            body.appendChild(row);
+          });
+          /* §7 rolling recent-transactions view */
+          body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Recent Transactions — across the market' }));
+          const recent = (G.world.market.recent || []).slice(0, 20);
+          if (!recent.length) body.appendChild(U.el('p', { cls: 'muted small', text: 'No sales recorded yet. The ledger is patient.' }));
+          recent.forEach(tr => {
+            const mine = tr.buyerId === me.id || tr.sellerId === me.id;
+            const row = U.el('div', { cls: 'friend-row' + (mine ? ' gold' : '') });
+            row.appendChild(UI.tokenArt(tr.species, 34));
+            row.appendChild(U.el('div', {
+              cls: 'flex1', html: '<b' + (mine ? ' class="gold"' : '') + '>' + U.esc(tr.tokName) + '</b> — ' +
+                U.esc(tr.seller) + ' → ' + U.esc(tr.buyer) + ' for <b class="gold">' + U.fmt(tr.price) + 'g</b>' +
+                '<span class="small muted"> · ' + U.timeAgo(tr.at) + '</span>',
+            }));
             body.appendChild(row);
           });
         },
@@ -939,7 +1044,7 @@
             item.onclick = () => {
               const scr2 = U.el('div', { cls: 'screen', style: 'z-index:10;background:var(--bg)' });
               const actions = [];
-              if (seller.id !== me.id && l.status !== 'display') actions.push(U.el('button', { cls: 'btn primary', text: 'Buy now — ' + U.fmt(l.price) + 'g', onclick: () => { buyFlow(l, tok); scr2.remove(); } }));
+              if (seller.id !== me.id && l.status !== 'display') actions.push(U.el('button', { cls: 'btn primary', text: 'Buy now — ' + U.fmt(l.price) + 'g' + extrasText(l.want), onclick: () => { buyFlow(l, tok); scr2.remove(); } }));
               if (seller.id !== me.id) actions.push(U.el('button', { cls: 'btn', text: 'Make offer', onclick: () => offerFlow(l, tok) }));
               scr2.appendChild(UI.tokenDetail(tok, { onBack: () => scr2.remove(), actions }));
               root.appendChild(scr2);
@@ -961,20 +1066,7 @@
         if (DYA.tutorial) DYA.tutorial.onEvent('marketBuy');
         UI.show('playerStall', params);
       }
-      function offerFlow(l, tok) {
-        const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Offer on ' + tok.name })]);
-        const amt = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Gold amount', value: Math.round((l.price || 200) * 0.8) });
-        const note = U.el('input', { cls: 'txt mt', placeholder: 'Say something (optional)' });
-        w.appendChild(amt); w.appendChild(note);
-        const m = UI.modal(w);
-        w.appendChild(U.el('button', {
-          cls: 'btn primary mt', text: 'Send offer', onclick: () => {
-            const r = G.makeOffer(l.id, parseInt(amt.value) || 0, note.value);
-            if (r.err) { UI.alert('Cannot offer', r.err); return; }
-            m.close(); UI.toast({ title: 'Offer sent', icon: '📩' });
-          },
-        }));
-      }
+      function offerFlow(l, tok) { offerComposer(l, tok); }
 
       page.appendChild(body);
       scr.appendChild(page);

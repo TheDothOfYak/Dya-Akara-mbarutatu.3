@@ -148,7 +148,7 @@
     name: 'Stryx', family: 'Creature', element: 'Ular',
     rarity: [1, 5], size: [1, 3], rig: 'quad',
     color: '#7d766a', color2: '#4d7a44', // stone armor, vine limbs
-    features: { rocky: true, vines: true, rootsOnDeploy: true },
+    features: { rocky: true, vines: true, rootsOnDeploy: true, legless: true },
     tags: ['stationary', 'forest'],
     behavior: 'stryx',
     statMul: { hp: 1.9, dmg: 1.1, speed: 0 },
@@ -221,7 +221,7 @@
   });
   def('albali_byrd', {
     name: 'Albali Byrd', family: 'Albali Byrd', element: 'Fti',
-    rarity: [2, 5], size: [2, 3], rig: 'quad',
+    rarity: [2, 5], size: [2, 3], rig: 'bird',
     color: '#e8e3d4', color2: '#b03030', // pale bird, five red horns
     features: { wings: true, horns: 5 },
     tags: ['flyer', 'guardian', 'forest'],
@@ -236,7 +236,7 @@
   });
   def('albali_villtur', {
     name: 'Albali Byrd Villtur', family: 'Albali Byrd', element: 'Fti',
-    rarity: [3, 5], size: [2, 3], rig: 'quad',
+    rarity: [3, 5], size: [2, 3], rig: 'bird',
     color: '#8f8574', color2: '#701818',
     features: { wings: true, horns: 5, feral: true },
     tags: ['flyer', 'carnivore'],
@@ -299,9 +299,9 @@
 
   def('rubbermcfly', {
     name: 'RubberMcFly', family: 'Vakarborac', element: 'Fti',
-    rarity: [3, 6], size: [0, 0], rig: 'quad',
+    rarity: [3, 6], size: [0, 0], rig: 'mcfly',
     color: '#c8b8e8', color2: '#9d7fe0',
-    features: { wings: true, round: true, biolum: true },
+    features: { butterfly: true, beak: true, biolum: true },
     tags: ['passive', 'biolum', 'sacred', 'generator'],
     behavior: 'rubbermcfly',
     statMul: { hp: 0.5, dmg: 0, speed: 0.9 },
@@ -333,7 +333,7 @@
     name: 'Hvaleia', family: 'Creature', element: 'Su',
     rarity: [4, 6], size: [3, 4], rig: 'quad',
     color: '#33658a', color2: '#1e3f57',
-    features: { blowholes: true, clubTail: true, manyEyes: true, low: true },
+    features: { blowholes: true, clubTail: true, manyEyes: true, low: true, aquatic: true },
     tags: ['su', 'carnivore', 'apex', 'tank'],
     behavior: 'hvaleia',
     statMul: { hp: 2.1, dmg: 1.3, speed: 0.8 },
@@ -351,7 +351,7 @@
       name, family: 'Grothyn', element,
       rarity: rarity, size: [1, 3], rig: 'quad',
       color, color2,
-      features: { shell: true, rootsOnDeploy: true, stalk: true },
+      features: { shell: true, rootsOnDeploy: true, stalk: true, aquatic: true },
       tags: ['stationary', 'shell'],
       behavior: 'grothyn',
       statMul: { hp: 1.7, dmg: 1.1, speed: 0 },
@@ -454,7 +454,7 @@
     name: 'Su Naga', family: 'Naga', element: 'Su',
     rarity: [4, 6], size: [3, 4], rig: 'quad',
     color: '#2a6f8f', color2: '#68e0e8', // deep sea, electric-blue biolum
-    features: { heads: [2, 5], serpent: true, ridge: true, biolum: true },
+    features: { heads: [2, 5], serpent: true, ridge: true, biolum: true, aquatic: true },
     tags: ['su', 'carnivore', 'apex', 'naga', 'biolum'],
     behavior: 'su_naga',
     statMul: { hp: 1.9, dmg: 1.5, speed: 0.85 },
@@ -470,7 +470,7 @@
     name: 'Harkal', family: 'Creature', element: 'Su',
     rarity: [1, 4], size: [1, 2], rig: 'quad',
     color: '#5d7e8f', color2: '#38505c',
-    features: { finned: true, scars: true, bigJaw: true, hover: true },
+    features: { finned: true, scars: true, bigJaw: true, hover: true, aquatic: true },
     tags: ['su', 'carnivore', 'flyer'],
     behavior: 'harkal',
     statMul: { hp: 1.0, dmg: 1.3, speed: 1.3 },
@@ -501,7 +501,7 @@
   /* -------- Kuni Byrd -------- */
   def('kuni_byrd_wild', {
     name: 'Kuni Byrd (Wild)', family: 'Kuni Byrd', element: 'Fti',
-    rarity: [3, 5], size: [2, 3], rig: 'quad',
+    rarity: [3, 5], size: [2, 3], rig: 'bird',
     color: '#8a6d3b', color2: '#d9c27a',
     features: { wings: true, talons: true },
     tags: ['flyer', 'carnivore', 'ambush'],
@@ -516,7 +516,7 @@
   });
   def('kuni_byrd_ridden', {
     name: 'Kuni Byrd (Ridden)', family: 'Kuni Byrd', element: 'Fti',
-    rarity: [4, 6], size: [2, 3], rig: 'quad',
+    rarity: [4, 6], size: [2, 3], rig: 'bird',
     color: '#8a6d3b', color2: '#b03a2e', // saddle red
     features: { wings: true, talons: true, rider: true },
     tags: ['flyer', 'carnivore', 'mount'],

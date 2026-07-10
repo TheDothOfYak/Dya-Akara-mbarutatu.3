@@ -351,14 +351,46 @@
       function createTournament() {
         const w = U.el('div', {});
         w.appendChild(U.el('h3', { cls: 'gold', text: 'Create a player-run tournament' }));
-        w.appendChild(U.el('p', { cls: 'small muted', text: 'Requires a Guild tournament license (200g, from the Guild market). Set your own rules; baseline tournament rules still apply.' }));
+        w.appendChild(U.el('p', { cls: 'small muted', text: 'Requires a Guild tournament license (200g, from the Guild market). Set your own structure and rewards; baseline tournament rules still apply.' }));
         const nm = U.el('input', { cls: 'txt mt', placeholder: 'Tournament name' });
-        const fee = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Entry fee (goes to prize pool)', value: 50 });
+        const fee = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Entry fee (goes to the reward pool)', value: 50 });
+        /* §9 bracket structure is the organizer's call */
+        const struct = U.el('select', { cls: 'txt mt' });
+        [['single', 'Single elimination'], ['rr', 'Round robin — everyone plays everyone']].forEach(([v, l]) => struct.appendChild(U.el('option', { value: v, text: l })));
         const fmt = U.el('select', { cls: 'txt mt' });
         [['single', 'Single pouch — locked all tournament'], ['three-draft', 'Three pouch draft'], ['random', 'Random pouch each match']].forEach(([v, l]) => fmt.appendChild(U.el('option', { value: v, text: l })));
         const size = U.el('select', { cls: 'txt mt' });
         [4, 8, 16].forEach(s => size.appendChild(U.el('option', { value: s, text: s + ' players' })));
-        w.appendChild(nm); w.appendChild(fee); w.appendChild(fmt); w.appendChild(size);
+        w.appendChild(nm); w.appendChild(fee); w.appendChild(struct); w.appendChild(fmt); w.appendChild(size);
+        /* §9 custom rewards, pledged from the organizer's own pocket */
+        w.appendChild(U.el('div', { cls: 'small muted mt', text: 'Custom rewards (optional — pledged from your own pocket):' }));
+        const bonus = U.el('input', { cls: 'txt', type: 'number', min: 0, placeholder: 'Bonus gold for the champion' });
+        w.appendChild(bonus);
+        const prizeSel = U.el('select', { cls: 'txt mt' });
+        prizeSel.appendChild(U.el('option', { value: '', text: 'No token prize' }));
+        Object.values(me.tokens).filter(x => x.status === 'collection' && !x.frozen && !x.isRental).forEach(x => prizeSel.appendChild(U.el('option', { value: x.id, text: '🎴 ' + x.name + ' (' + SP.RARITIES[x.rarity] + ')' })));
+        w.appendChild(prizeSel);
+        /* §15 terrain tokens for every match of the event — organizer's call at creation */
+        const terrToks = [];
+        const ttRow = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+        [['forest', '🌲 Forest patch'], ['water', '💧 Water pool']].forEach(([id, label]) => {
+          const b = U.el('button', { cls: 'btn small ghost', text: label });
+          b.onclick = () => {
+            const i = terrToks.indexOf(id);
+            if (i >= 0) terrToks.splice(i, 1); else terrToks.push(id);
+            b.classList.toggle('ghost', !terrToks.includes(id));
+          };
+          ttRow.appendChild(b);
+        });
+        w.appendChild(U.el('div', { cls: 'small muted mt', text: 'Terrain tokens (placed on every arena of this event):' }));
+        w.appendChild(ttRow);
+        let aftd = false, wantSeal = false;
+        const aftdBtn = U.el('button', { cls: 'btn small ghost mt', text: '✦ Aftð — Active Tokens: OFF', title: 'Tokens keep XP, growth, and behavior across the whole tournament — and same-species pairs may breed.' });
+        aftdBtn.onclick = () => { aftd = !aftd; aftdBtn.textContent = '✦ Aftð — Active Tokens: ' + (aftd ? 'ON' : 'OFF'); aftdBtn.classList.toggle('ghost', !aftd); };
+        w.appendChild(aftdBtn);
+        const sealBtn = U.el('button', { cls: 'btn small ghost mt', style: 'margin-left:6px', text: '🏛 Request Guild seal: OFF', title: 'Sealed events pay the organizer a creator reward (200g + 1 Okid + 1 NgAkara) at completion and the champion a Guild chest. You may enter — and win — your own event.' });
+        sealBtn.onclick = () => { wantSeal = !wantSeal; sealBtn.textContent = '🏛 Request Guild seal: ' + (wantSeal ? 'ON' : 'OFF'); sealBtn.classList.toggle('ghost', !wantSeal); };
+        w.appendChild(sealBtn);
         const m = UI.modal(w);
         w.appendChild(U.el('button', {
           cls: 'btn primary mt', text: me.flags.tournamentLicense ? 'Create' : 'Buy license (200g) & create', onclick: () => {
@@ -367,14 +399,21 @@
               G.addGold(-200); me.flags.tournamentLicense = true;
             }
             if (nm.value.trim().length < 3) return;
+            const bonusGold = parseInt(bonus.value) || 0;
+            if (bonusGold > 0 && me.gold < bonusGold) { UI.alert('Too poor', 'You cannot pledge ' + U.fmt(bonusGold) + 'g you do not hold.'); return; }
+            if (bonusGold > 0) G.addGold(-bonusGold);
             const t = {
-              id: U.uid('trn'), name: nm.value.trim(), circuit: 'Local', sealed: false,
-              organizer: me.displayName, entryFee: parseInt(fee.value) || 0,
-              pouchFormat: fmt.value, size: parseInt(size.value),
+              id: U.uid('trn'), name: nm.value.trim(), circuit: 'Local', sealed: wantSeal,
+              organizer: me.displayName, organizerId: me.id, entryFee: parseInt(fee.value) || 0,
+              pouchFormat: fmt.value, size: parseInt(size.value), structure: struct.value,
+              aftd, customReward: { gold: bonusGold, tokenId: prizeSel.value || null },
+              terrainTokens: terrToks.slice(),
               state: 'open', players: [], bracket: null,
               titlePool: [], rules: [], arena: L.ARENAS.Local[0],
               terrain: 'plains', createdAt: Date.now(), schedule: 'Rolling',
             };
+            if (aftd) t.rules.push('Aftð — Active Tokens: XP, growth, and behavior persist across the tournament.');
+            if (t.structure === 'rr') t.rules.push('Round robin: most match wins takes the championship.');
             G.world.tournaments[t.id] = t;
             G.save(); m.close(); UI.show('tournaments');
           },
@@ -392,11 +431,20 @@
             const pick = rng.pick(ais);
             if (!t.players.includes(pick.id)) t.players.push(pick.id);
           }
-          /* build single-elim bracket */
+          /* §9 every entry fee lands in the reward pool */
+          t.pot = t.entryFee * t.players.length;
           const order = rng.shuffle(t.players);
-          t.bracket = [order.map((p, i) => i % 2 === 0 ? { a: order[i], b: order[i + 1], winner: null } : null).filter(Boolean)];
+          if (t.structure === 'rr') {
+            /* round robin: one big round of every pairing */
+            const round = [];
+            for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) round.push({ a: order[i], b: order[j], winner: null });
+            t.bracket = [round];
+          } else {
+            t.bracket = [order.map((p, i) => i % 2 === 0 ? { a: order[i], b: order[i + 1], winner: null } : null).filter(Boolean)];
+          }
           t.state = 'running';
           t.myPouch = pouch.map(x => x.id);
+          if (t.aftd) DYA.aftd.activate(t, pouch);
           G.save();
           UI.show('bracket', { trn: t });
         }, { title: t.pouchFormat === 'random' ? 'Random pouch — pick a fallback' : 'Choose your tournament pouch' });
@@ -469,7 +517,14 @@
             t.rules.forEach(r => left.appendChild(U.el('div', { cls: 'small', text: '• ' + r })));
           } else left.appendChild(U.el('div', { cls: 'small muted', text: 'Standard Guild ruleset. No exceptions pinned.' }));
           left.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Rewards' }));
-          left.appendChild(U.el('div', { cls: 'small', html: '🥇 ' + U.fmt(prizePool(t)) + 'g · title' + (t.titlePool.length ? '' : ' (none)') + ' · ' + EC.CIRCUIT_XP[t.circuit] + ' XP<br>🥈 ' + U.fmt(Math.round(prizePool(t) * 0.35)) + 'g<br>🥉 entry back' }));
+          const pool = t.pot != null ? t.pot : t.entryFee * t.size;
+          left.appendChild(U.el('div', {
+            cls: 'small', html:
+              '🥇 ' + U.fmt(Math.round(pool * 0.6) + EC.CIRCUIT_GOLD[t.circuit] + ((t.customReward && t.customReward.gold) || 0)) + 'g · title' + (t.titlePool.length ? '' : ' (none)') + ' · ' + EC.CIRCUIT_XP[t.circuit] + ' XP' +
+              (t.sealed ? ' · 🎁 Guild chest' : '') +
+              ((t.customReward && t.customReward.tokenId) ? ' · 🎴 token prize' : '') +
+              '<br>🥈 ' + U.fmt(Math.round(pool * 0.25)) + 'g<br>🥉 ' + U.fmt(Math.round(pool * 0.1)) + 'g shared (trickle-down)<br>🏛 organizer keeps ' + U.fmt(Math.round(pool * 0.05)) + 'g (5%) at the end' + (t.sealed ? ' + creator reward' : ''),
+          }));
           const toggle = U.el('button', { cls: 'btn small ghost mt', text: bracketView === 'full' ? 'View: Full Bracket' : 'View: My Path' });
           toggle.onclick = () => { bracketView = bracketView === 'full' ? 'my' : 'full'; views.Main(); };
           left.appendChild(toggle);
@@ -523,7 +578,6 @@
       });
       views.Main();
 
-      function prizePool(t) { return Math.round(t.entryFee * t.size * 0.8) + EC.CIRCUIT_GOLD[t.circuit]; }
       function roundName(t, ri) {
         const rounds = Math.log2(t.size);
         const left = rounds - ri;
@@ -572,16 +626,24 @@
         function launch(pouch) {
           DYA.play.startMatch({
             mode: 'standard', ranked, format: t.circuit + ' Tournament', tournament: t.name,
-            terrain: t.terrain,
+            terrain: t.terrain, terrainTokens: t.terrainTokens,
             opponent: { name: opp.displayName, accId: opp.id, aiSkill: opp.aiCfg ? opp.aiCfg.matchSkill : 0.7, pouch: DYA.play.accountPouch(opp), simulatedHuman: true },
             pouch,
             onFinish: (res, iWon) => {
               mt.winner = iWon ? me.id : oppId;
+              if (t.aftd) DYA.aftd.afterMatch(t, res);
               simulateOtherMatches(ri);
               advanceBracket();
-              if (iWon && isLastWinner()) {
-                tournamentWon();
-              } else if (!iWon) {
+              if (t.state === 'done') {
+                if (t.champion === me.id) tournamentWon();
+                else {
+                  finishTournament(t);
+                  UI.toast({ title: 'Tournament over', body: G.world.accounts[t.champion].displayName + ' takes the championship. Your share of the pool, if any, is paid.', icon: '🏆' });
+                }
+              } else if (!iWon && t.structure !== 'rr') {
+                /* eliminated — the bracket plays itself out so payouts land */
+                simulateToCompletion();
+                finishTournament(t);
                 UI.toast({ title: 'Eliminated', body: 'The bracket moves on without you. There is always next season.', icon: '🏆' });
               }
               G.save();
@@ -630,7 +692,22 @@
           m2.winner = rng.chance(a.rank / (a.rank + b.rank)) ? m2.a : m2.b;
         });
       }
+      function rrWins() {
+        const wins = {};
+        t.bracket[0].forEach(m2 => { if (m2.winner) wins[m2.winner] = (wins[m2.winner] || 0) + 1; });
+        return wins;
+      }
       function advanceBracket() {
+        if (t.structure === 'rr') {
+          if (t.bracket[0].every(m2 => m2.winner)) {
+            const wins = rrWins();
+            t.state = 'done';
+            t.champion = t.players.slice().sort((a, b) =>
+              (wins[b] || 0) - (wins[a] || 0) ||
+              ((G.world.accounts[b] ? G.world.accounts[b].rank : 0) - (G.world.accounts[a] ? G.world.accounts[a].rank : 0)))[0];
+          }
+          return;
+        }
         const last = t.bracket[t.bracket.length - 1];
         if (last.length === 1 && last[0].winner) { t.state = 'done'; t.champion = last[0].winner; return; }
         if (last.every(m => m.winner) && last.length > 1) {
@@ -641,12 +718,86 @@
           t.bracket.push(next);
         }
       }
-      function isLastWinner() { return t.state === 'done' && t.champion === me.id; }
+      function simulateToCompletion() {
+        let guard = 0;
+        while (t.state !== 'done' && guard++ < 24) {
+          simulateOtherMatches(t.bracket.length - 1);
+          advanceBracket();
+        }
+      }
+
+      /* §9 — completion payouts: trickle-down pool, organizer 5%, sealed extras. Runs once. */
+      function finishTournament(t2) {
+        if (t2.paidOut) return t2.payout || {};
+        t2.paidOut = true;
+        const pool = t2.pot != null ? t2.pot : Math.round(t2.entryFee * t2.size);
+        const pay = { championGold: 0, chest: null, prizeTok: null };
+        const grant = (pid, amount) => {
+          if (!pid || amount <= 0) return;
+          const acc = G.world.accounts[pid];
+          if (!acc) return;
+          if (acc === me) G.addGold(amount, true); else acc.gold += amount;
+        };
+        const champion = t2.champion;
+        let runnerUp = null, third = [];
+        if (t2.structure === 'rr') {
+          const wins = rrWins();
+          const order = t2.players.slice().sort((a, b) => (wins[b] || 0) - (wins[a] || 0));
+          runnerUp = order[1] || null; third = order[2] ? [order[2]] : [];
+        } else if (t2.bracket && t2.bracket.length) {
+          const finalM = t2.bracket[t2.bracket.length - 1][0];
+          if (finalM) runnerUp = finalM.a === champion ? finalM.b : finalM.a;
+          const semis = t2.bracket.length > 1 ? t2.bracket[t2.bracket.length - 2] : null;
+          if (semis) third = semis.map(m2 => m2.winner === m2.a ? m2.b : m2.a).filter(pp => pp && pp !== champion && pp !== runnerUp);
+        }
+        pay.championGold = Math.round(pool * 0.6) + EC.CIRCUIT_GOLD[t2.circuit] + ((t2.customReward && t2.customReward.gold) || 0);
+        grant(champion, pay.championGold);
+        grant(runnerUp, Math.round(pool * 0.25));
+        third.forEach(pp => grant(pp, Math.round(pool * 0.1 / third.length)));
+        const orgId = t2.organizerId || (G.findAccount(t2.organizer) || {}).id;
+        grant(orgId, Math.round(pool * 0.05));
+        if (t2.sealed) {
+          /* creator reward — even when the organizer entered (and won) their own event */
+          const org = orgId && G.world.accounts[orgId];
+          if (org) {
+            if (org === me) { G.addGold(200, true); me.okid[0]++; me.ngakara++; G.notify({ type: 'tournament', title: 'Creator reward', body: 'The Guild honors your sealed event: 200g + 1 Okid + 1 NgAkara.', icon: '🏛' }); }
+            else { org.gold += 200; org.okid[0]++; org.ngakara++; }
+          }
+          /* champion's Guild chest: gold, Okid, NgAkara — rarely a crafting piece */
+          const rng = new U.Rng(U.newSeed());
+          const chest = { gold: rng.int(150, 600), okR: rng.int(0, 3), okQ: rng.int(1, 2), ng: rng.int(0, 3), piece: rng.chance(0.08) ? rng.pick(SP.huntable) : null };
+          pay.chest = chest;
+          const champAcc = champion && G.world.accounts[champion];
+          if (champAcc) {
+            if (champAcc === me) {
+              G.addGold(chest.gold, true); me.okid[chest.okR] += chest.okQ; me.ngakara += chest.ng;
+              if (chest.piece) me.pieces.push({ speciesId: chest.piece, material: 'chest trophy piece', from: t2.name, temperBias: 0, at: Date.now() });
+            } else { champAcc.gold += chest.gold; champAcc.okid[chest.okR] += chest.okQ; champAcc.ngakara += chest.ng; }
+          }
+        }
+        /* organizer's pledged token prize changes hands */
+        if (t2.customReward && t2.customReward.tokenId && champion) {
+          const org = orgId && G.world.accounts[orgId];
+          const champAcc = G.world.accounts[champion];
+          const ptok = org && org.tokens[t2.customReward.tokenId];
+          if (ptok && champAcc && champAcc.id !== org.id) {
+            delete org.tokens[ptok.id];
+            ptok.ownerId = champAcc.id; ptok.status = 'collection';
+            ptok.tradeHistory.push({ at: Date.now(), from: org.displayName, to: champAcc.displayName, price: 0, gift: true });
+            champAcc.tokens[ptok.id] = ptok;
+            if (champAcc === me) pay.prizeTok = ptok;
+          }
+        }
+        if (t2.aftd) DYA.aftd.deactivate(t2);
+        t2.payout = pay;
+        G.save();
+        return pay;
+      }
 
       function tournamentWon() {
-        const gold = prizePool(t);
+        const pay = finishTournament(t); /* pays the whole field, including me */
+        const gold = pay.championGold;
         const xp = EC.CIRCUIT_XP[t.circuit];
-        G.addGold(gold, true);
         me.stats.tourneysWon++;
         G.grantAchievement('tourney_win');
         G.world.season.winners.push({ name: me.displayName, circuit: t.circuit, tournament: t.name, at: Date.now() });
@@ -659,6 +810,14 @@
         const w = U.el('div', { cls: 'center' });
         w.appendChild(U.el('h2', { cls: 'gold', text: '🏆 CHAMPION 🏆' }));
         w.appendChild(U.el('p', { cls: 'mt', html: 'Winner of <b>' + U.esc(t.name) + '</b><br>🪙 +' + U.fmt(gold) + 'g · ⭐ +' + xp + ' XP' }));
+        if (pay.chest) {
+          const ch = pay.chest;
+          w.appendChild(U.el('div', {
+            cls: 'panel mt', html: '🎁 <b class="gold">Guild-sealed champion\u2019s chest</b><br>🪙 +' + U.fmt(ch.gold) + 'g · ⬡ +' + ch.okQ + ' ' + SP.RARITIES[ch.okR] + ' Okid · 🧪 +' + ch.ng + ' NgAkara' +
+              (ch.piece ? '<br>🦴 <b>A crafting piece of a ' + SP.get(ch.piece).name + '</b> — the rare roll came in.' : ''),
+          }));
+        }
+        if (pay.prizeTok) w.appendChild(U.el('div', { cls: 'panel mt', html: '🎴 The organizer\u2019s pledged prize is yours: <b class="gold">' + U.esc(pay.prizeTok.name) + '</b>' }));
         const m = UI.modal(w, { sticky: true });
         function done() { m.close(); const evs = G.addXP(xp); evs.forEach(ev => DYA.play.showLevelUp(ev)); UI.refreshTopbar(); UI.show('bracket', { trn: t }); }
         if (!pool.length) { w.appendChild(U.el('button', { cls: 'btn primary mt', text: 'Glory enough', onclick: done })); DYA.audio.play('victory'); return; }
@@ -687,6 +846,80 @@
       }
     },
   });
+
+  /* ================= AFTÐ — ACTIVE TOKENS (§2) =================
+     In an Aftð tournament, tokens keep their earned XP, growth, and
+     behavior drift for the WHOLE tournament, then reset when it ends
+     (match-reset stays the default everywhere else). Same-species
+     pairs that stay active through a long event may leave offspring. */
+  const AFTD = {};
+  DYA.aftd = AFTD;
+
+  AFTD.activate = function (t, pouch) {
+    const me = G.me;
+    t.aftdTokens = [];
+    pouch.forEach(tok => {
+      const real = me.tokens[tok.id];
+      if (!real || real.aftdBase) return;
+      real.aftdBase = { stats: U.deepCopy(real.stats), behaviorValue: real.behaviorValue, headCount: real.picks ? real.picks.headCount : undefined };
+      real.aftdXp = 0;
+      t.aftdTokens.push(real.id);
+    });
+    UI.toast({ title: 'Aftð — Active Tokens', body: 'Your tokens keep what they earn until the tournament ends.', icon: '✦' });
+  };
+
+  AFTD.afterMatch = function (t, res) {
+    const me = G.me;
+    if (!res || !res.tokenXp) return;
+    const rng = new U.Rng(U.newSeed());
+    Object.entries(res.tokenXp).forEach(([tid, e]) => {
+      const tok = me.tokens[tid];
+      if (!tok || !tok.aftdBase) return;
+      tok.aftdXp = (tok.aftdXp || 0) + e.xp;
+      /* +2% strike & health per 100 carried XP, capped at +30% over base */
+      const mul = Math.min(1.3, 1 + Math.floor(tok.aftdXp / 100) * 0.02);
+      tok.stats.dmg = Math.round(tok.aftdBase.stats.dmg * mul);
+      tok.stats.hp = Math.round(tok.aftdBase.stats.hp * mul);
+      /* Naga heads grown on the field stay grown */
+      if (e.heads > 1 && tok.picks && (tok.picks.headCount || 1) < e.heads) tok.picks.headCount = Math.min(5, e.heads);
+      /* behavior drifts a little with lived experience */
+      if (rng.chance(0.35)) tok.behaviorValue = U.clamp(tok.behaviorValue + rng.pick([-1, 1]), 1, 99);
+    });
+    G.save();
+  };
+
+  AFTD.deactivate = function (t) {
+    const me = G.me;
+    /* breeding check happens BEFORE the reset, while the pair is still "active" */
+    const rounds = t.structure === 'rr' ? Math.max(1, t.players.length - 1) : (t.bracket ? t.bracket.length : 0);
+    if (rounds >= 3 && t.aftdTokens && t.aftdTokens.length) {
+      const bySpecies = {};
+      t.aftdTokens.forEach(tid => { const tok = me.tokens[tid]; if (tok) (bySpecies[tok.speciesId] = bySpecies[tok.speciesId] || []).push(tok); });
+      const rng = new U.Rng(U.newSeed());
+      Object.values(bySpecies).forEach(list => {
+        if (list.length < 2 || !rng.chance(0.6)) return;
+        const parent = rng.pick(list);
+        const child = TK.mint({ speciesId: parent.speciesId, rng, owner: me.id, rarity: Math.max(0, parent.rarity - rng.int(0, 1)) });
+        /* offspring are weaker than either parent, stats freshly rolled then scaled down */
+        child.stats.hp = Math.max(1, Math.round(child.stats.hp * rng.range(0.6, 0.8)));
+        child.stats.dmg = Math.max(1, Math.round(child.stats.dmg * rng.range(0.6, 0.8)));
+        child.name = parent.name + '\u2019s offspring';
+        child.story = 'Born under Aftð rules at ' + t.name + '. Weaker than its line — for now.';
+        G.addToken(child);
+        UI.toast({ title: 'Aftð offspring', body: parent.name + ' leaves you ' + child.name + '.', icon: '🥚' });
+      });
+    }
+    (t.aftdTokens || []).forEach(tid => {
+      const tok = me.tokens[tid];
+      if (!tok || !tok.aftdBase) return;
+      tok.stats = tok.aftdBase.stats;
+      tok.behaviorValue = tok.aftdBase.behaviorValue;
+      if (tok.picks) tok.picks.headCount = tok.aftdBase.headCount;
+      delete tok.aftdBase; delete tok.aftdXp;
+    });
+    delete t.aftdTokens;
+    G.save();
+  };
 
   /* ================= DYA GUILD PAGE ================= */
   const guildState = { tab: 'Market' };
@@ -871,6 +1104,7 @@
     UI.confirm('Skip the tutorial?', 'You keep everything already granted, but forfeit the remaining tutorial tokens.', () => {
       G.me.tutorial.done = true;
       G.me.gold = Math.max(G.me.gold, 1000);
+      if (!G.me.seal) G.me.seal = { avatarIdx: G.me.avatarIdx, patterns: ['runes'], locked: false };
       TUT.clear(); G.save();
     }, 'Skip');
   };
@@ -880,7 +1114,7 @@
   function spot(opts) {
     TUT.clear();
     const s = U.el('div', { cls: 'tut-spot', style: opts.pos || 'left:50%;top:52%;transform:translate(-50%,-50%)' });
-    s.appendChild(U.el('div', { cls: 'ts-step', text: 'TUTORIAL — STEP ' + opts.step + ' OF 14' }));
+    s.appendChild(U.el('div', { cls: 'ts-step', text: 'TUTORIAL — STEP ' + opts.step + ' OF 15' }));
     s.appendChild(U.el('div', { cls: 'ts-title', text: opts.title }));
     s.appendChild(U.el('div', { cls: 'ts-body', html: opts.body }));
     const row = U.el('div', { cls: 'flex mt' });
@@ -914,12 +1148,29 @@
         spot({
           step: 4, title: 'The Tournament Road',
           body: 'Dya’Akara is played in circuits: <b>Local → Regional → Half Planet → Whole Planet → Interplanetary</b>. The Dya Guild seals official events — ranked play lives there. Your home region sets your Regional circuit. Everything else is practice, pride, and profit.',
-          next: () => { me.tutorial.step = 5; save(); TUT.run(); },
+          next: () => { me.tutorial.step = 4.5; save(); TUT.run(); },
+        });
+        break;
+      case 4.5: /* §3/§14 — the player's seal is struck during the tutorial */
+        spot({
+          step: 5, title: 'Strike Your Seal',
+          body: 'Every keeper carries a <b>seal</b> — an engraved coin, struck once: your face at the center, up to two patterns around the rim. It marks your screens, rings your creatures on the field, and stamps your victories.',
+          nextLabel: 'Design my seal',
+          next: () => {
+            TUT.clear();
+            UI.sealDesigner(() => {
+              spot({
+                step: 5, title: 'The Seal Is Struck',
+                body: 'Done — and done forever. You will find it behind every page and beneath every creature you field.',
+                next: () => { me.tutorial.step = 5; save(); TUT.run(); },
+              });
+            });
+          },
         });
         break;
       case 5: { /* Guild selection — pick 4 tokens, one per element */
         spot({
-          step: 5, title: 'Guild Selection — choose 4 tokens',
+          step: 6, title: 'Guild Selection — choose 4 tokens',
           body: 'The Guild grants every new player four tokens: one of each element — <span class="el-Su">Su</span>, <span class="el-Eldi">Eldi</span>, <span class="el-Fti">Fti</span>, <span class="el-Ular">Ular</span>. Choose one from each shelf.',
           next: () => {
             TUT.clear();
@@ -962,7 +1213,7 @@
       }
       case 6:
         spot({
-          step: 6, title: 'Your First Hunt',
+          step: 7, title: 'Your First Hunt',
           body: 'Tokens are crafted from pieces of real creatures — and pieces come from <b>Hunts</b>. The Guild has arranged a beginner’s Hunt: a young Tonguatjis, patient and shelled. Bring your five tokens.',
           nextLabel: 'Begin the Hunt',
           next: () => {
@@ -982,7 +1233,7 @@
                 } else {
                   UI.show('menu');
                   setTimeout(() => spot({
-                    step: 6, title: 'The Wild Won This Round',
+                    step: 7, title: 'The Wild Won This Round',
                     body: 'It happens. The Guild has re-baited the trail — try the Hunt again.',
                     nextLabel: 'Retry the Hunt',
                     next: () => { TUT.run(); },
@@ -995,15 +1246,15 @@
         break;
       case 7:
         spot({
-          step: 7, title: 'Crafting — Sing It True',
+          step: 8, title: 'Crafting — Sing It True',
           body: 'You carry a <b>Tonguatjis shell splinter</b>. At the workbench: sing the creature’s song, pour NgAkara into the veins of the piece, set the trigger, and the Okid’Relic captures its TRUTH. You have 5 Okid and 5 NgAkara — plenty.',
           nextLabel: 'To the workbench',
-          next: () => { TUT.clear(); UI.show('crafting'); setTimeout(() => spot({ step: 7, title: 'Craft it', body: 'Select the shell splinter on the left, then press <b>⚗ Craft Token</b>. Token 6 of 13.', pos: 'right:30px;top:120px' }), 500); },
+          next: () => { TUT.clear(); UI.show('crafting'); setTimeout(() => spot({ step: 8, title: 'Craft it', body: 'Select the shell splinter on the left, then press <b>⚗ Craft Token</b>. Token 6 of 13.', pos: 'right:30px;top:120px' }), 500); },
         });
         break;
       case 8:
         spot({
-          step: 8, title: 'The Market',
+          step: 9, title: 'The Market',
           body: 'Everything in Dya’Akara can be bought, sold, and haggled over. The Guild asks you to make two purchases to learn the ropes:<br>1. A <b>Guild stall token</b> (Guild page → Market, 100g)<br>2. Any token from <b>Elbergi Plass</b>’s famous stall (Market → Stalls)<br><br><i>Tokens 7 and 8 of 13.</i>',
           nextLabel: 'To the Guild market',
           next: () => { TUT.clear(); me.tutorial.market = { guild: false, elbergi: false }; save(); UI.show('guild'); },
@@ -1011,7 +1262,7 @@
         break;
       case 9:
         spot({
-          step: 9, title: 'Your First Match',
+          step: 10, title: 'Your First Match',
           body: 'The Guild has prepared a <b>rental pouch</b> — a full 25 tokens, on loan. Rentals cost gold normally (25% of market price each); this one is the Guild’s treat. Win by carrying the <b>Relic</b> to your hoard. Ready tokens from the wheel at the bottom, trigger them with <b>SPACE</b> or by dragging onto the field.',
           nextLabel: 'Into the arena',
           next: () => {
@@ -1038,7 +1289,7 @@
         const rng = new U.Rng(U.newSeed());
         [0, 1].forEach(() => G.addToken(TK.mint({ speciesId: rng.pick(SP.craftable), rng, owner: me.id, rarity: rng.int(0, 1) })));
         spot({
-          step: 10, title: 'Post-Match Reward',
+          step: 11, title: 'Post-Match Reward',
           body: 'Your first match pays out: <b>2 tokens</b>, courtesy of the Guild. Win or lose, the arena always teaches something.<br><br><i>Tokens 9–10 of 13.</i>',
           next: () => { me.tutorial.step = 11; save(); TUT.run(); },
         });
@@ -1050,7 +1301,7 @@
         [0, 1].forEach(() => G.addToken(TK.mint({ speciesId: rng.pick(SP.craftable), rng, owner: me.id, rarity: rng.int(0, 1) })));
         DYA.audio.play('levelup');
         spot({
-          step: 11, title: 'Level 1 — Milestone Chest',
+          step: 12, title: 'Level 1 — Milestone Chest',
           body: 'The XP from your first match carries you to <b>Level 1</b>. Milestone chests at levels 3, 5, 10, 15, 20, and beyond bring gold, Okid, NgAkara — and bonus tokens, like these <b>two</b>.<br><br><i>Tokens 11–12 of 13.</i>',
           next: () => { me.tutorial.step = 12; save(); TUT.run(); },
         });
@@ -1061,7 +1312,7 @@
         const rng = new U.Rng(U.newSeed());
         G.addToken(TK.mint({ speciesId: rng.pick(SP.craftable), rng, owner: me.id, rarity: 1 }));
         spot({
-          step: 12, title: 'Achievement: First Steps on the Field',
+          step: 13, title: 'Achievement: First Steps on the Field',
           body: 'Achievements mark one-time feats and tiered grinds (win 10… 100… 1,000 matches). This one pays a token.<br><br><i>Token 13 of 13. Your starting collection is complete.</i>',
           next: () => { me.tutorial.step = 13; save(); TUT.run(); },
         });
@@ -1069,7 +1320,7 @@
       }
       case 13:
         spot({
-          step: 13, title: 'Build Your Own Pouch',
+          step: 14, title: 'Build Your Own Pouch',
           body: 'A pouch holds up to <b>25 tokens</b>. Open your Collection, name a pouch in the left sidebar, and add tokens with the <b>+</b> button or by dragging. Save it when you like it. Rentals can fill the gaps — up to 13 per pouch.',
           nextLabel: 'To the Collection',
           next: () => { TUT.clear(); me.tutorial.step = 13.5; save(); UI.show('collection'); },
@@ -1077,7 +1328,7 @@
         break;
       case 14:
         spot({
-          step: 14, title: 'One More Match — Your Pouch This Time',
+          step: 15, title: 'One More Match — Your Pouch This Time',
           body: 'Play a full match with the pouch you built (rentals welcome). Win it, lose it — after this, the Mbaru Tatu is yours.',
           nextLabel: 'Final tutorial match',
           next: () => {
@@ -1095,7 +1346,7 @@
                   UI.show('menu');
                   setTimeout(() => {
                     spot({
-                      step: 14, title: 'Tutorial Complete',
+                      step: 15, title: 'Tutorial Complete',
                       body: 'Thirteen tokens. A thousand gold. Five Hunt roads and every market stall open to you.<br><br><b>Welcome to Dya’Akara, ' + U.esc(me.displayName) + '.</b>',
                       nextLabel: 'Begin',
                       next: () => { TUT.clear(); UI.refreshTopbar(); },
@@ -1110,7 +1361,8 @@
     }
   };
 
-  /* tutorial event hooks */
+  /* tutorial event hooks — every completion shows a Continue-gated beat (§14):
+     the tutorial never yanks the player anywhere on a timer. */
   TUT.onEvent = function (ev, data) {
     const me = G.me;
     if (!me || me.tutorial.done) return;
@@ -1121,10 +1373,13 @@
         if (ev === 'marketBuy') me.tutorial.market.elbergi = true;
         G.save();
         if (me.tutorial.market.guild && me.tutorial.market.elbergi) {
-          me.tutorial.step = 9; G.save();
-          setTimeout(() => { UI.show('menu'); setTimeout(TUT.run, 500); }, 900);
+          spot({
+            step: 9, title: 'The Market Knows You Now',
+            body: 'Both purchases made — a Guild token and one of Elbergi’s. Haggling, offers, and your own stall come later; the ropes are learned.',
+            next: () => { me.tutorial.step = 9; G.save(); TUT.clear(); UI.show('menu'); setTimeout(TUT.run, 400); },
+          });
         } else if (me.tutorial.market.guild) {
-          setTimeout(() => spot({ step: 8, title: 'One more purchase', body: 'Now visit <b>Market → Stalls</b> and buy any token from <b>Elbergi Plass</b>’s stall — Elbergi’s Fine Truths.', nextLabel: 'To the Market', next: () => { TUT.clear(); UI.show('market'); } }), 700);
+          spot({ step: 9, title: 'One more purchase', body: 'Now visit <b>Market → Stalls</b> and buy any token from <b>Elbergi Plass</b>’s stall — Elbergi’s Fine Truths.', nextLabel: 'To the Market', next: () => { TUT.clear(); UI.show('market'); } });
         }
       }
     }
@@ -1133,13 +1388,16 @@
     const me = G.me;
     if (!me || me.tutorial.done || !TUT.active) return;
     if (name === 'crafting' && me.tutorial.step === 7) {
-      /* watch for craft completion */
+      /* watch for craft completion, then wait for the player's Continue */
       const check = setInterval(() => {
         if (!G.me || G.me.tutorial.done) { clearInterval(check); return; }
         if (G.me.tokens && Object.values(G.me.tokens).some(t => t.speciesId === 'tonguatjis')) {
           clearInterval(check);
-          G.me.tutorial.step = 8; G.save();
-          setTimeout(() => { UI.show('menu'); setTimeout(TUT.run, 500); }, 1200);
+          spot({
+            step: 8, title: 'Sung True',
+            body: 'The Tonguatjis stands in your collection — shell, tongue, truth and all. <i>Token 6 of 13.</i>',
+            next: () => { G.me.tutorial.step = 8; G.save(); TUT.clear(); UI.show('menu'); setTimeout(TUT.run, 400); },
+          });
         }
       }, 1500);
     }
@@ -1148,8 +1406,11 @@
         if (!G.me || G.me.tutorial.done) { clearInterval(check); return; }
         if (G.me.pouches.length > 0) {
           clearInterval(check);
-          G.me.tutorial.step = 14; G.save();
-          setTimeout(TUT.run, 900);
+          spot({
+            step: 14, title: 'Pouch Saved',
+            body: 'A pouch of your own. You can build as many as you like and pick one before every match.',
+            next: () => { G.me.tutorial.step = 14; G.save(); TUT.run(); },
+          });
         }
       }, 1500);
     }

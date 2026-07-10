@@ -231,14 +231,22 @@
       SP.list.forEach(s => spc.appendChild(U.el('option', { value: s.id, text: s.name })));
       const rar = U.el('select', { cls: 'txt' });
       SP.RARITIES.forEach((r, i) => rar.appendChild(U.el('option', { value: i, text: r })));
-      body.appendChild(U.el('div', { cls: 'grid', style: 'grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end' }, [
+      /* §4 famous tokens: given name + whether the recipient may rename it */
+      const fname = U.el('input', { cls: 'txt', maxlength: 24, placeholder: '(species name)' });
+      const editSel = U.el('select', { cls: 'txt' });
+      [['no', 'Name locked (famous)'], ['yes', 'Owner may rename']].forEach(([v, l]) => editSel.appendChild(U.el('option', { value: v, text: l })));
+      body.appendChild(U.el('div', { cls: 'grid', style: 'grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end' }, [
         U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Account' }), acc]),
         U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Species' }), spc]),
         U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Rarity' }), rar]),
+      ]));
+      body.appendChild(U.el('div', { cls: 'grid', style: 'grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:8px' }, [
+        U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Famous name (optional)' }), fname]),
+        U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Name editable?' }), editSel]),
         U.el('button', {
           cls: 'btn primary', text: 'Spawn', onclick: () => {
-            const r = G.admin.spawnToken(acc.value, spc.value, parseInt(rar.value));
-            if (r.tok) alert('Spawned "' + r.tok.name + '" into ' + G.world.accounts[acc.value].displayName + '\'s collection.');
+            const r = G.admin.spawnToken(acc.value, spc.value, parseInt(rar.value), { name: fname.value.trim() || null, nameEditable: editSel.value === 'yes' });
+            if (r.tok) alert('Spawned "' + r.tok.name + '" into ' + G.world.accounts[acc.value].displayName + '\'s collection.' + (r.tok.nameLocked ? ' (name locked)' : ''));
           },
         }),
       ]));

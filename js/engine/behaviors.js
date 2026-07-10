@@ -360,7 +360,7 @@
   };
 
   B.mikolo_moko = function (c, api) {
-    const relic = api.relic();
+    const relic = api.relic(c.team);
     const own = api.ownHoard(c.team);
     if (c.carryingRelic) {
       // most direct route home; decoy misdirection while chased
@@ -377,6 +377,12 @@
     if (relic.carrier && relic.carrierTeam !== c.team) {
       // relic grabbed by enemy → follow and wait for drop
       api.moveToward(c, relic.x + 50, relic.y + 30, false);
+      return;
+    }
+    // our own relic stolen → run it down (defense duty)
+    const ours = api.ownRelic(c.team);
+    if (ours && ours.carrier != null) {
+      api.moveToward(c, ours.x, ours.y, true);
       return;
     }
     if (!relic.carrier && !relic.captured) {
@@ -484,17 +490,39 @@
   /* ================= SENTIENT UNITS ================= */
 
   function sentientCommon(c, api) {
-    // relic-carrying: sentients with objective awareness will run the relic home
-    const relic = api.relic();
+    // relic-carrying: run the stolen enemy relic home
+    const relic = api.relic(c.team);
     if (c.carryingRelic) {
       const own = api.ownHoard(c.team);
       api.moveToward(c, own.x, own.y, false);
       return true;
     }
-    // relic free and no immediate fight → go take it (from any distance)
-    if (!relic.carrier && !relic.captured && !api.enemiesNear(c, 140).length) {
-      api.moveToward(c, relic.x, relic.y, api.dist(c, relic) < 200);
-      if (api.dist(c, relic) < 24 + c.radius) api.pickRelic(c);
+    // our own relic was stolen → highest duty is getting it back
+    const ours = api.ownRelic(c.team);
+    if (ours && (ours.carrier != null || (Math.abs(ours.x - ours.homeX) > 6 && !ours.captured))) {
+      api.moveToward(c, ours.x, ours.y, true);
+      return true;
+    }
+    // raid the enemy relic — but weigh field state first (§8): commit only
+    // when healthy, not embattled, and the target isn't a deathtrap
+    if (relic && !relic.carrier && !relic.captured && !relic.disabled) {
+      const d = api.dist(c, relic);
+      // within arm's reach: grab it no matter what — hesitation kills
+      if (d < 80) {
+        api.moveToward(c, relic.x, relic.y, true);
+        if (d < 24 + c.radius) api.pickRelic(c);
+        return true;
+      }
+      const lateGame = api.time > 480; // escalation era: caution stops paying
+      if (!lateGame) {
+        if (api.enemiesNear(c, 140).length) return false;         // in a fight — deal with it
+        if (c.hp < c.maxHp * 0.45) return false;                   // too hurt to run the gauntlet
+        const guards = api.enemiesNear({ x: relic.x, y: relic.y, team: c.team }, 130).length;
+        const backup = api.alliesNear(c, 220).filter(a => a.dmg > 4).length;
+        if (guards >= 2 && backup === 0) { api.guardPost(c); return false; } // suicide run — wait for support
+      }
+      api.moveToward(c, relic.x, relic.y, d < 260);
+      if (d < 24 + c.radius) api.pickRelic(c);
       return true;
     }
     return false;
@@ -552,14 +580,24 @@
       api.moveAway(c, closeThreat.x, closeThreat.y, true); return;
     }
     // prioritize flyers and Su creatures
-    let target = api.nearestEnemy(c, c.attackRange, o => o.sp.tags.includes('flyer') || o.element === 'Su');
-    if (!target) target = api.nearestEnemy(c, c.attackRange);
+    let target = api.nearestEnemy(c, c.attackRange, o => (o.sp.tags.includes('flyer') || o.element === 'Su') && !api.losBlocked(c.x, c.y, o.x, o.y));
+    if (!target) target = api.nearestEnemy(c, c.attackRange, o => !api.losBlocked(c.x, c.y, o.x, o.y));
     if (target) {
       if (c.quiver <= 0) { api.hold(c); return; } // out of arrows (Karnen refills)
       api.shoot(c, target);
       return;
     }
-    // seek vantage: drift toward a good position (mid-own-half elevated spot)
+    // tactical positioning (§8): stand behind the nearest allied frontliner
+    const tank = api.alliesNear(c, 400).filter(a => a.dmg > 6 && !a.rooted && !a.sp.tags.includes('passive'))
+      .sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
+    if (tank) {
+      const own = api.ownHoard(c.team);
+      const a = Math.atan2(tank.y - own.y, tank.x - own.x);
+      const px = tank.x - Math.cos(a) * 90, py = tank.y - Math.sin(a) * 90;
+      if (api.dist(c, { x: px, y: py }) > 30) { api.moveToward(c, px, py, false); return; }
+      api.guard(c); return;
+    }
+    // no frontline yet: hold a vantage in our half
     if (!c.mem.vantage) {
       const own = api.ownHoard(c.team);
       c.mem.vantage = { x: own.x + (api.enemyHoard(c.team).x - own.x) * 0.3 + api.rng.range(-60, 60), y: c.y + api.rng.range(-80, 80) };
@@ -613,10 +651,11 @@
     const cornered = api.enemiesNear(c, 40);
     if (cornered.length) { api.attack(c, cornered[0]); return; }
     if (fleeThreats(c, api, 60)) return;
-    // archer on team → tower first priority
-    const archer = api.alliesNear(c, 900).find(a => a.sp.behavior === 'archer_unit' && !a.onTower);
+    // tower first priority: build whenever the team fields ranged allies (or
+    // any Eikar at all) and has no tower yet — Eikar garrison and shoot from it
+    const rangedAlly = api.alliesNear(c, 1200).find(a => a.sp.behavior === 'archer_unit' || a.sp.tags.includes('eikar'));
     const haveTower = api.structuresOf(c.team, 'tower').length;
-    if (archer && !haveTower) { api.startBuild(c, 'tower'); return; }
+    if (!haveTower && (rangedAlly || true)) { api.startBuild(c, 'tower'); return; }
     // enemy pressure at key position → wall
     const own = api.ownHoard(c.team);
     const pressure = api.enemiesNear({ x: own.x, y: own.y, team: c.team }, 260).length;

@@ -105,7 +105,7 @@
     /* ---- Elbergi always keeps a few honest cheap listings (tutorial depends on it) ---- */
     for (let i = 0; i < 4; i++) {
       const spid = rng.pick(['kipsu', 'wild_punk', 'uff', 'rodak', 'mikolo_moko', 'karnen', 'raf_krabbi']);
-      const t = TK.mint({ speciesId: spid, rng, owner: elbergi.id, rarity: Math.min(SP.get(spid).rarity[1], rng.int(0, 1)) });
+      const t = TK.mint({ speciesId: spid, rng, owner: elbergi.id, rarity: Math.min(SP.get(spid).rarity[1], rng.int(0, 1)), aiOwner: true });
       elbergi.tokens[t.id] = t;
       t.status = 'market';
       const lst = { id: U.uid('lst'), tokenId: t.id, sellerId: elbergi.id, price: rng.int(80, 160), status: 'sale', at: Date.now(), featured: false };
@@ -155,9 +155,12 @@
     const craftables = SP.craftable;
     for (let i = 0; i < count; i++) {
       const spid = rng.pick(craftables);
-      const t = TK.mint({ speciesId: spid, rng, owner: acc.id });
+      const t = TK.mint({ speciesId: spid, rng, owner: acc.id, aiOwner: true });
       acc.tokens[t.id] = t;
     }
+    /* every player has a seal — AI seals derive from their identity */
+    acc.avatarIdx = rng.int(0, 16);
+    acc.seal = { avatarIdx: acc.avatarIdx, patterns: rng.shuffle(['runes', 'laurel', 'dots', 'waves', 'chevrons', 'stars', 'vines', 'knots']).slice(0, rng.int(1, 2)), locked: true };
     /* one pouch */
     const pouchToks = rng.shuffle(Object.keys(acc.tokens)).slice(0, Math.min(25, count));
     acc.pouches = [{ id: U.uid('pch'), name: name + '’s Pouch', tokenIds: pouchToks }];
@@ -412,13 +415,12 @@
     return Math.round(base * wobble);
   };
 
-  G.createListing = function (tok, price, status) {
-    if (G.me.gold < EC.LISTING_FEE) return { err: 'Listing fee is 50 gold.' };
+  G.createListing = function (tok, price, status, want) {
     if (tok.frozen) return { err: 'This token is frozen pending Guild review.' };
-    G.me.gold -= EC.LISTING_FEE;
     tok.status = 'market';
     const lst = {
       id: U.uid('lst'), tokenId: tok.id, sellerId: G.me.id, price: Math.round(price),
+      want: want || null,      // §7 multi-currency listing: {ngakara, okidQty, okidRarity}
       status: status || 'sale', // sale | offer | display
       at: Date.now(), featured: false,
     };
@@ -462,6 +464,13 @@
     const tok = seller.tokens[lst.tokenId];
     if (!tok) return { err: 'Token unavailable.' };
     if (G.me.gold < lst.price) return { err: 'Not enough gold.' };
+    const w2 = lst.want;
+    if (w2) {
+      if ((w2.ngakara || 0) > G.me.ngakara) return { err: 'Seller also wants ' + w2.ngakara + ' NgAkara.' };
+      if ((w2.okidQty || 0) > G.me.okid[w2.okidRarity || 0]) return { err: 'Seller also wants ' + w2.okidQty + ' ' + SP.RARITIES[w2.okidRarity || 0] + ' Okid.' };
+      G.me.ngakara -= (w2.ngakara || 0); seller.ngakara += (w2.ngakara || 0);
+      if (w2.okidQty) { G.me.okid[w2.okidRarity || 0] -= w2.okidQty; seller.okid[w2.okidRarity || 0] += w2.okidQty; }
+    }
     return completeSale(lst, seller, tok, G.me, lst.price);
   };
   function completeSale(lst, seller, tok, buyer, price) {
@@ -479,6 +488,10 @@
     seller.stats.sales++; buyer.stats.purchases++;
     if (seller.stats.sales >= EC.TRUSTED_SELLER_SALES) seller.trustedSeller = true;
     delete G.world.market.listings[lst.id];
+    /* rolling recent-transactions feed (§7) */
+    G.world.market.recent = G.world.market.recent || [];
+    G.world.market.recent.unshift({ at: Date.now(), tokName: tok.name, species: tok.speciesId, price, buyer: buyer.displayName, buyerId: buyer.id, seller: seller.displayName, sellerId: seller.id });
+    if (G.world.market.recent.length > 30) G.world.market.recent.pop();
     if (seller === G.me) { checkAchievement('first_sale', 1); }
     if (!seller.ai) seller.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'market', title: 'Token sold', body: tok.name + ' sold for ' + U.fmt(price) + 'g (tax ' + U.fmt(tax) + 'g).', icon: '💰' });
     if (buyer === G.me) { checkAchievement('collect_25', Object.keys(G.me.tokens).length); }
@@ -486,20 +499,40 @@
     return { ok: true, tax };
   }
   /* ---------- offers: chat-style negotiation ---------- */
-  G.makeOffer = function (lstId, amount, note) {
+  /* value a mixed bundle in gold-equivalents (for AI judgment) */
+  G.bundleValue = function (b) {
+    let v = b.amount || 0;
+    v += (b.extras && b.extras.ngakara || 0) * 120;
+    if (b.extras && b.extras.okidQty) v += b.extras.okidQty * [60, 140, 320, 700, 1500, 3200, 7000][b.extras.okidRarity || 0];
+    (b.extras && b.extras.tokenIds || []).forEach(tid => {
+      const t = G.me && G.me.tokens[tid];
+      if (t) v += Math.round(G.marketAverage(t.speciesId, t.rarity) * 0.8);
+    });
+    return v;
+  };
+  /* AI response delay (§7): skewed short, occasionally up to the 15-minute cap, never instant */
+  function aiDelayMs(rng2) {
+    const d = Math.min(900, 20 + -Math.log(Math.max(1e-6, rng2.next())) * 90);
+    return Math.round(d * 1000);
+  }
+  G.makeOffer = function (lstId, amount, note, extras) {
     const lst = G.world.market.listings[lstId];
     if (!lst) return { err: 'Listing gone.' };
     if (G.me.gold < amount) return { err: 'You cannot offer more gold than you hold.' };
+    if (extras) {
+      if ((extras.ngakara || 0) > G.me.ngakara) return { err: 'You cannot offer NgAkara you do not hold.' };
+      if ((extras.okidQty || 0) > G.me.okid[extras.okidRarity || 0]) return { err: 'You cannot offer Okid you do not hold.' };
+    }
     const off = {
       id: U.uid('off'), listingId: lstId, buyerId: G.me.id, sellerId: lst.sellerId,
       state: 'pending', // pending | countered | accepted | ended | expired
-      history: [{ by: 'buyer', amount: Math.round(amount), note: note || '', at: Date.now() }],
+      history: [{ by: 'buyer', amount: Math.round(amount), extras: extras || null, note: note || '', at: Date.now() }],
       at: Date.now(),
     };
     G.world.market.offers[off.id] = off;
-    /* AI sellers respond immediately */
+    /* AI sellers respond on a humane delay, processed by the world tick */
     const seller = G.world.accounts[lst.sellerId];
-    if (seller.ai) aiRespondToOffer(off, lst, seller);
+    if (seller.ai) off.respondAt = Date.now() + aiDelayMs(new U.Rng(U.hashStr(off.id)));
     G.save();
     return { off };
   };
@@ -509,10 +542,7 @@
     off.history.push({ by: bySeller ? 'seller' : 'buyer', amount: Math.round(amount), note: note || '', at: Date.now() });
     off.state = 'countered';
     const other = G.world.accounts[bySeller ? off.buyerId : off.sellerId];
-    if (other.ai) {
-      const lst = G.world.market.listings[off.listingId];
-      if (lst) aiRespondToOffer(off, lst, other);
-    }
+    if (other.ai) off.respondAt = Date.now() + aiDelayMs(new U.Rng(U.hashStr(off.id) ^ off.history.length));
     G.save();
     return { off };
   };
@@ -527,6 +557,17 @@
     const last = off.history[off.history.length - 1];
     if (buyer.gold < last.amount) { off.state = 'expired'; G.save(); return { err: 'Buyer funds insufficient — offer auto-deleted.' }; }
     off.state = 'accepted';
+    /* transfer any extras in the accepted bundle (§7) */
+    const firstOffer = off.history.find(h => h.by === 'buyer' && h.extras);
+    if (firstOffer && firstOffer.extras) {
+      const ex = firstOffer.extras;
+      if (ex.ngakara) { buyer.ngakara = Math.max(0, buyer.ngakara - ex.ngakara); seller.ngakara += ex.ngakara; }
+      if (ex.okidQty) { buyer.okid[ex.okidRarity || 0] = Math.max(0, buyer.okid[ex.okidRarity || 0] - ex.okidQty); seller.okid[ex.okidRarity || 0] += ex.okidQty; }
+      (ex.tokenIds || []).forEach(tid => {
+        const t2 = buyer.tokens[tid];
+        if (t2) { delete buyer.tokens[tid]; t2.ownerId = seller.id; seller.tokens[t2.id] = t2; t2.tradeHistory.push({ at: Date.now(), from: buyer.displayName, to: seller.displayName, price: 0, trade: true }); }
+      });
+    }
     const res = completeSale(lst, seller, tok, buyer, last.amount);
     delete G.world.market.offers[off.id];
     return res;
@@ -535,23 +576,36 @@
     const off = G.world.market.offers[offId];
     if (off) { delete G.world.market.offers[offId]; G.save(); }
   };
-  function aiRespondToOffer(off, lst, aiAcc) {
+  function aiRespondToOffer(off, lst) {
     const rngA = new U.Rng(U.hashStr(off.id) ^ off.history.length);
     const last = off.history[off.history.length - 1];
+    if (last.by !== 'buyer') return;
     const reserve = Math.round(lst.price * rngA.range(0.72, 0.9));
-    if (last.by === 'buyer') {
-      if (last.amount >= reserve) {
-        setTimeout(() => { G.acceptOffer(off.id, true); if (DYA.ui && DYA.ui.onMarketUpdate) DYA.ui.onMarketUpdate(); }, 800 + rngA.next() * 1500);
-      } else if (last.amount < reserve * 0.55 || off.history.length > 7) {
-        off.state = 'ended';
-        setTimeout(() => { if (DYA.ui && DYA.ui.onMarketUpdate) DYA.ui.onMarketUpdate(); }, 600);
-      } else {
-        const counter = Math.round(Math.max(reserve, last.amount * rngA.range(1.1, 1.3)));
-        off.history.push({ by: 'seller', amount: counter, note: rngA.pick(['Closer.', 'I can’t go that low.', 'The song alone cost more than that.', 'Meet me here.']), at: Date.now() });
+    const lastAi = off.history.filter(h => h.by === 'seller').pop();
+    const bundleVal = last.amount + G.bundleValue({ amount: 0, extras: last.extras });
+    /* §7 bartering rule: the AI only pushes the price UP when the player's
+       counter is under HALF of the AI's LAST offer. At or above that, it
+       negotiates normally — counters down or accepts. */
+    const lowball = lastAi ? bundleVal < lastAi.amount * 0.5 : bundleVal < reserve * 0.5;
+    if (bundleVal >= reserve) {
+      G.acceptOffer(off.id, true);
+      if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Offer accepted!', body: 'Your offer was accepted. The token is yours.', icon: '🤝' });
+    } else if (lowball) {
+      if (off.history.length > 7) { off.state = 'ended'; }
+      else {
+        const up = Math.round((lastAi ? lastAi.amount : lst.price) * rngA.range(1.02, 1.12));
+        off.history.push({ by: 'seller', amount: up, note: rngA.pick(['You insult the token.', 'That number went the wrong way for you.', 'The Guild frowns on jokes.']), at: Date.now() });
         off.state = 'countered';
-        setTimeout(() => { if (DYA.ui && DYA.ui.onMarketUpdate) DYA.ui.onMarketUpdate(); }, 600);
+        if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Counter-offer', body: 'The seller countered at ' + U.fmt(up) + 'g.', icon: '📩' });
       }
+    } else {
+      const prev = lastAi ? lastAi.amount : lst.price;
+      const counter = Math.round(Math.max(reserve, Math.min(prev - 1, (bundleVal + prev) / 2 * rngA.range(0.98, 1.05))));
+      off.history.push({ by: 'seller', amount: counter, note: rngA.pick(['Closer.', 'I can’t go that low.', 'The song alone cost more than that.', 'Meet me here.']), at: Date.now() });
+      off.state = 'countered';
+      if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Counter-offer', body: 'The seller countered at ' + U.fmt(counter) + 'g.', icon: '📩' });
     }
+    if (DYA.ui && DYA.ui.onMarketUpdate) DYA.ui.onMarketUpdate();
   }
   /* ---------- guild buyback (75% of market average, no tax) ---------- */
   G.buyback = function (tok) {
@@ -799,7 +853,10 @@
         terrain: circuit === 'Local' ? rng.pick(['plains', 'forest', 'mountain', 'desert']) : rng.pick(L.TERRAIN_SETS.filter(ts => true)).id,
         createdAt: Date.now(),
         schedule: 'Rolling — matches play when bracket fills',
+        structure: 'single',
+        aftd: rng.chance(0.25), /* some seeded events run Aftð Active-Token rules (§2) */
       };
+      if (t.aftd) t.rules.push('Aftð — Active Tokens: XP, growth, and behavior persist across the tournament.');
       w.tournaments[t.id] = t;
       return t;
     };
@@ -817,6 +874,15 @@
   /* ================== AI WORLD SIMULATION TICK ================== */
   let lastSim = 0;
   G.simTick = function () {
+    /* due AI offer responses fire regardless of the main tick throttle */
+    Object.values(G.world.market.offers).forEach(off => {
+      if (off.respondAt && off.respondAt <= Date.now() && (off.state === 'pending' || off.state === 'countered')) {
+        off.respondAt = null;
+        const lst = G.world.market.listings[off.listingId];
+        const responder = G.world.accounts[off.sellerId];
+        if (lst && responder && responder.ai) aiRespondToOffer(off, lst);
+      }
+    });
     // Called periodically from the UI loop. Keeps market/world alive.
     if (Date.now() - lastSim < 45000) return;
     lastSim = Date.now();
@@ -832,10 +898,10 @@
         const toks = Object.values(ai.tokens).filter(t => t.status === 'collection');
         if (toks.length > 6) aiCreateListing(G.world, ai, rng.pick(toks), rng);
       } else if (roll < ai.aiCfg.marketActivity * 0.75) {
-        // buy a player listing sometimes
+        // §7 AI reach: buy from ANY market or stall, not only player listings
         const lsts = Object.values(G.world.market.listings).filter(l => {
           const seller = G.world.accounts[l.sellerId];
-          return seller && !seller.ai && l.status === 'sale';
+          return seller && seller.id !== ai.id && l.status === 'sale' && !l.want;
         });
         if (lsts.length && rng.chance(0.35)) {
           const lst = rng.pick(lsts);
@@ -903,10 +969,14 @@
       Object.values(G.world.accounts).forEach(a => { if (!a.ai) a.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'announcement', title, body, icon: '📣' }); });
       G.saveNow();
     },
-    spawnToken(accId, speciesId, rarity) {
+    spawnToken(accId, speciesId, rarity, opts) {
+      opts = opts || {};
       const acc = G.world.accounts[accId];
       if (!acc) return { err: 'Account not found' };
-      const tok = TK.mint({ speciesId, rng: new U.Rng(U.newSeed()), owner: accId, rarity });
+      const tok = TK.mint({ speciesId, rng: new U.Rng(U.newSeed()), owner: accId, rarity, name: opts.name });
+      /* §4 famous tokens: the editable-name flag is set at creation, here */
+      if (opts.name && !opts.nameEditable) tok.nameLocked = true;
+      if (opts.name) tok.famous = true;
       acc.tokens[tok.id] = tok;
       if (!acc.ai) acc.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'system', title: 'Token granted', body: 'The Dya Guild has granted you ' + tok.name + ' (' + SP.get(speciesId).name + ').', icon: '🎁' });
       G.saveNow();

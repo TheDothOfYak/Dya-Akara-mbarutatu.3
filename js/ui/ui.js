@@ -45,10 +45,33 @@
     if (!next) { console.error('no screen', name); return; }
     if (UI.current && UI.current.leave) UI.current.leave();
     UI.root.innerHTML = '';
+    if (hoverTip) hoverTip.style.display = 'none';
     UI.current = next; UI.currentName = name;
     next.enter(UI.root, params || {});
+    addSealWatermark(name);
     if (DYA.tutorial) DYA.tutorial.onScreen(name, params);
   };
+
+  /* player seal as a faint background on every non-battle screen (§3).
+     Battle surfaces (arena + HUD) stay clean. */
+  const NO_SEAL_SCREENS = { match: 1, spectate: 1, login: 1 };
+  let sealWmCache = null, sealWmKey = '';
+  function addSealWatermark(name) {
+    if (NO_SEAL_SCREENS[name]) return;
+    const me = G.me;
+    if (!me || !me.seal || !SPR.drawSeal) return;
+    const key = (me.seal.avatarIdx || 0) + '|' + (me.seal.patterns || []).join(',');
+    if (!sealWmCache || sealWmKey !== key) {
+      sealWmCache = U.el('canvas', { width: 560, height: 560 });
+      SPR.drawSeal(sealWmCache.getContext('2d'), 280, 280, 268, me.seal);
+      sealWmKey = key;
+    }
+    const wm = U.el('div', { cls: 'seal-watermark' });
+    const cv = U.el('canvas', { width: 560, height: 560 });
+    cv.getContext('2d').drawImage(sealWmCache, 0, 0);
+    wm.appendChild(cv);
+    UI.root.appendChild(wm);
+  }
 
   /* loading transition with the spinning-coin screen */
   UI.showWithLoading = function (name, params, minMs) {
@@ -252,7 +275,35 @@
     card.appendChild(U.el('div', { cls: 'tc-cost', text: '◈' + SP.RARITY_COST[tok.rarity] }));
     if (opts.onclick) card.onclick = () => opts.onclick(tok);
     if (tok.frozen) card.appendChild(U.el('div', { style: 'position:absolute;inset:0;background:#2a4a6a44;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#9ac4df;font-size:12px', text: '❄ FROZEN — under review' }));
+    if (opts.hover !== false) UI.attachHoverInfo(card, tok);
     return card;
+  };
+
+  /* §11 — hover info card: name, species/type, temperament summary, status.
+     Same treatment as the battle hover; used in the pouch builder & grids. */
+  let hoverTip = null;
+  UI.attachHoverInfo = function (el, tok) {
+    el.addEventListener('mouseenter', () => {
+      const sp = SP.get(tok.speciesId);
+      if (!hoverTip) { hoverTip = U.el('div', { cls: 'hover-info' }); document.body.appendChild(hoverTip); }
+      const card = TK.descriptionCard ? TK.descriptionCard(tok) : null;
+      const costVec = TK.costVec ? TK.costVec(tok) : null;
+      hoverTip.innerHTML =
+        '<div class="hi-name">' + U.esc(tok.name) + '</div>' +
+        '<div class="hi-line">' + U.esc(sp.name) + ' · <span class="el-' + sp.element + '">' + sp.element + '</span> · ' + SP.RARITIES[tok.rarity] + '</div>' +
+        (card ? '<div class="hi-temper">' + U.esc(card.temperament) + '</div>' : '') +
+        '<div class="hi-line">Health ' + tok.stats.hp + ' · Strike ' + tok.stats.dmg + ' · Pace ' + tok.stats.speed + '</div>' +
+        (costVec && TK.fmtCost ? '<div class="hi-line gold">Cost: ' + U.esc(TK.fmtCost(costVec)) + '</div>' : '') +
+        (tok.status && tok.status !== 'collection' ? '<div class="hi-line muted">Status: ' + U.esc(tok.status) + '</div>' : '');
+      hoverTip.style.display = 'block';
+    });
+    el.addEventListener('mousemove', (e) => {
+      if (!hoverTip) return;
+      const x = Math.min(window.innerWidth - 260, e.clientX + 16);
+      const y = Math.min(window.innerHeight - 150, e.clientY + 14);
+      hoverTip.style.left = x + 'px'; hoverTip.style.top = y + 'px';
+    });
+    el.addEventListener('mouseleave', () => { if (hoverTip) hoverTip.style.display = 'none'; });
   };
 
   /* full detail view content (3D-ish rotating render + all info) */
@@ -303,10 +354,11 @@
     badges.appendChild(U.el('span', { cls: 'type-badge', style: 'border-color:var(--line);color:var(--ink-dim)', text: SP.SIZES[tok.sizeIdx] }));
     right.appendChild(badges);
     const costRow = U.el('div', { cls: 'flex mt' }, [U.el('span', { cls: 'muted small', text: 'COST TO READY' })]);
-    const pips = U.el('span', { cls: 'cost-pips' });
-    for (let i = 0; i < SP.RARITY_COST[tok.rarity]; i++) pips.appendChild(U.el('span', { cls: 'cost-pip' }));
-    costRow.appendChild(pips);
-    costRow.appendChild(U.el('span', { cls: 'gold', text: SP.RARITY_COST[tok.rarity] + ' resources' }));
+    const costVec = TK.costVec(tok);
+    const vecSpan = U.el('span', {});
+    SP.ELEMENTS.forEach(e => { if (costVec[e] > 0) vecSpan.appendChild(U.el('span', { cls: 'el-' + e, style: 'margin-right:8px', text: costVec[e] + ' ' + e })); });
+    costRow.appendChild(vecSpan);
+    costRow.appendChild(U.el('span', { cls: 'gold', text: '(' + SP.RARITY_COST[tok.rarity] + ' total)' }));
     right.appendChild(costRow);
     right.appendChild(U.el('div', { cls: 'divider' }));
     right.appendChild(U.el('div', { html: '<span class="muted small">DESCRIPTION</span><br>' + U.esc(sp.desc) }));

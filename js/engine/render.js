@@ -93,6 +93,17 @@
           const rr = z.r * (0.4 + 0.2 * i) + Math.sin(R.t * 1.5 + i) * 5;
           ctx.beginPath(); ctx.ellipse(z.x, z.y, rr, rr * 0.7, 0, 0, TAU); ctx.stroke();
         }
+      } else if (z.type === 'forest') {
+        ctx.fillStyle = '#3c5530cc';
+        ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.8, 0, 0, TAU); ctx.fill();
+        for (let i = 0; i < 7; i++) {
+          const a = i / 7 * TAU;
+          const tx = z.x + Math.cos(a) * z.r * 0.55, ty = z.y + Math.sin(a) * z.r * 0.45;
+          ctx.fillStyle = '#4a3520';
+          ctx.fillRect(tx - 2.5, ty - 4, 5, 14);
+          ctx.fillStyle = SPR.shade('#3c5530', 18 + (i % 3) * 10);
+          ctx.beginPath(); ctx.arc(tx, ty - 14, 13 + (i % 3) * 3, 0, TAU); ctx.fill();
+        }
       } else if (z.type === 'bog') {
         ctx.fillStyle = '#8fbf3f55';
         ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.72, 0, 0, TAU); ctx.fill();
@@ -162,9 +173,9 @@
       for (let i = 0; i < 5; i++) ctx.fillRect(r.x + Math.sin(i * 2.1) * 8, r.y + Math.cos(i * 1.3) * 6, 3, 3);
     }
 
-    /* ------- relic ------- */
-    if (!M.relic.disabled && !M.relic.captured) {
-      const rl = M.relic;
+    /* ------- relics (one per side) ------- */
+    for (const rl of (M.relics || [])) {
+      if (rl.disabled || rl.captured) continue;
       const bob = rl.carrier ? 0 : Math.sin(R.t * 2) * 4;
       const rg = ctx.createRadialGradient(rl.x, rl.y - 14 + bob, 2, rl.x, rl.y - 14 + bob, 30);
       rg.addColorStop(0, '#e8d9ffcc'); rg.addColorStop(1, '#7a4ae800');
@@ -173,8 +184,9 @@
       ctx.save();
       ctx.translate(rl.x, rl.y - 14 + bob);
       ctx.rotate(Math.sin(R.t * 1.3) * 0.2);
+      const ownCol = M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].color : '#cbb8f0';
       const relg = ctx.createLinearGradient(-8, -12, 8, 12);
-      relg.addColorStop(0, '#cbb8f0'); relg.addColorStop(0.5, '#8a6fd0'); relg.addColorStop(1, '#5a3a95');
+      relg.addColorStop(0, '#cbb8f0'); relg.addColorStop(0.5, ownCol); relg.addColorStop(1, '#5a3a95');
       ctx.fillStyle = relg;
       ctx.beginPath();
       ctx.moveTo(0, -14); ctx.lineTo(9, -4); ctx.lineTo(6, 12); ctx.lineTo(-6, 12); ctx.lineTo(-9, -4);
@@ -205,6 +217,8 @@
         sp: c.sp, r: c.radius * 1.35, state: c.dead ? 'death' : c.state,
         t: R.t, phase: c.animPhase, facing: c.facing,
         teamColor: M.mode === 'hunt' && c.team === 1 ? '#9c3a3a' : M.teams[c.team] ? M.teams[c.team].color : null,
+        seal: M.teams[c.team] ? M.teams[c.team].seal : null,
+        sealBadge: dset.sealBadges,
         alpha,
         shimmer: dset.holographic && !c.dead,
         biolum: biolumOn,
@@ -588,7 +602,7 @@
     const ox = (size - M.world.w * s) / 2, oy = (size - M.world.h * s) / 2;
     /* zones */
     M.zones.forEach(z => {
-      ctx2.fillStyle = z.type === 'water' ? '#3b9ae188' : z.type === 'bog' ? '#8fbf3f66' : '#e8842c66';
+      ctx2.fillStyle = z.type === 'water' ? '#3b9ae188' : z.type === 'bog' ? '#8fbf3f66' : z.type === 'forest' ? '#3c553088' : '#e8842c66';
       ctx2.beginPath(); ctx2.arc(ox + z.x * s, oy + z.y * s, z.r * s, 0, TAU); ctx2.fill();
     });
     /* hoards */
@@ -597,15 +611,16 @@
       ctx2.fillStyle = T.color;
       ctx2.beginPath(); ctx2.arc(ox + T.hoard.x * s, oy + T.hoard.y * s, 5, 0, TAU); ctx2.fill();
     });
-    /* relic */
-    if (!M.relic.disabled && !M.relic.captured) {
-      ctx2.fillStyle = '#cbb8f0';
+    /* relics */
+    (M.relics || []).forEach(rl => {
+      if (rl.disabled || rl.captured) return;
+      ctx2.fillStyle = M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].color : '#cbb8f0';
       ctx2.save();
-      ctx2.translate(ox + M.relic.x * s, oy + M.relic.y * s);
+      ctx2.translate(ox + rl.x * s, oy + rl.y * s);
       ctx2.rotate(Math.PI / 4);
       ctx2.fillRect(-3, -3, 6, 6);
       ctx2.restore();
-    }
+    });
     /* creatures */
     M.creatures.forEach(c => {
       if (c.dead) return;

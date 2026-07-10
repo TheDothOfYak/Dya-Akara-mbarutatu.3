@@ -113,8 +113,9 @@
     const dmg = Math.round(SP.SIZE_DMG[sizeIdx] * mul.dmg * (0.8 + combatExp * 0.5) * (1 + rarity * 0.05) * 10) / 10;
     const speed = Math.round(SP.SIZE_SPEED[sizeIdx] * mul.speed * rng.range(0.9, 1.12));
 
-    /* Individual creature name + backstory (written at crafting time) */
-    const name = opts.name || L.genCreatureName(rng, sp.name);
+    /* Naming: tokens default to their species name until the owner names
+       them (July update §4). AI players auto-name theirs in Dearcineon. */
+    const name = opts.name || (opts.aiOwner ? L.genCreatureName(rng, sp.name) : sp.name);
     const place = rng.pick(L.PLACES);
     const mat = rng.pick(L.MATERIALS);
     const story =
@@ -123,11 +124,18 @@
       (energy > 800 ? L.STORY_TEMPER[1 + (rng.int(0, 1) * 2)] : energy < 150 ? L.STORY_TEMPER[0] : rng.pick(L.STORY_TEMPER)) + ' ' +
       rng.pick(L.STORY_MATERIAL).replace('{mat}', mat).replace('{place}', place);
 
+    /* Per-token resource cost vector (July update §1): total scales with
+       rarity, split across the four resources by element affinity. A token
+       may cost any combination, including zero of a type. Locked at mint. */
+    const costVec = T.deriveCostVec(sp, rarity, rng);
+
     const now = Date.now();
     return {
       id: U.uid('tok'),
       speciesId: sp.id,
       name,
+      nameLocked: !!opts.nameLocked,
+      cost: costVec,
       ownerId: opts.owner || null,
       crafterId: opts.crafter || opts.owner || null,
       rarity, sizeIdx,
@@ -152,8 +160,41 @@
     };
   };
 
-  /* Cost (in match resources) to ready this token */
-  T.cost = (tok) => SP.RARITY_COST[tok.rarity];
+  /* Total cost (sum across the four resources) to ready this token */
+  T.cost = (tok) => {
+    const v = T.costVec(tok);
+    return v.Fti + v.Su + v.Eldi + v.Ular;
+  };
+
+  /* Resource cost vector; derives one for tokens minted before the update */
+  T.costVec = function (tok) {
+    if (tok.cost && typeof tok.cost === 'object') return tok.cost;
+    const sp = SP.get(tok.speciesId);
+    return T.deriveCostVec(sp, tok.rarity, new U.Rng(U.hashStr(tok.id || sp.id)));
+  };
+
+  T.deriveCostVec = function (sp, rarity, rng) {
+    const total = SP.RARITY_COST[rarity];
+    const v = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+    const others = SP.ELEMENTS.filter(e => e !== sp.element && e !== sp.element2);
+    let left = total;
+    /* primary element carries most of the cost */
+    v[sp.element] = Math.max(1, Math.ceil(total * 0.55));
+    left -= v[sp.element];
+    if (sp.element2 && left > 0) {
+      const s = Math.min(left, Math.max(1, Math.round(total * 0.25)));
+      v[sp.element2] += s; left -= s;
+    }
+    /* remainder spills into other resources — deterministic per token */
+    while (left > 0) {
+      v[rng.pick(others)] += 1; left--;
+    }
+    return v;
+  };
+
+  T.fmtCost = function (vec) {
+    return SP.ELEMENTS.filter(e => vec[e] > 0).map(e => vec[e] + ' ' + e).join(' · ') || 'free';
+  };
 
   /* Baseline market value in gold */
   T.baseValue = function (tok) {
