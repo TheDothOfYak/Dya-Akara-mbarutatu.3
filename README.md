@@ -44,7 +44,7 @@ Everything in the design document that can exist without a live backend or final
 
 - **Match engine (Part III, VI, VII, VIII)** — deterministic fixed-timestep simulation; every launch creature's decision tree in priority order; per-individual trait variation; pulse system with voting + chaos mode; escalation at 10/15/20 min; tether fade at 80%/elimination at 100%; the exact draw rule; all key interaction rules (Kofi prey instinct, Tyndael tunnel vision, Naga dominance and first-head near-invincibility, Hvaleia jet size limits, Malsti Duat edge cases, ShurgrEdan retribution) and combo behaviors (riders, towers, Chemist supply lines, Ju + Sprengju Shaving).
 - **Full token roster (Part IV, V)** — all launch tokens, each minted as a specific *individual* with a locked behavior value (weighted lifetime energy average), personality diamonds, Eikar/Keilia trait layers, and an auto-written backstory.
-- **Duel mode** — pick/random/blind, anything wagered, no Guild cut, wagered tokens permanently lost.
+- **Duel mode** — pick/random/blind, anything wagered, no Guild cut, wagered tokens permanently lost. Random assignment and Dya'kukull opponents only ever field tokens that actually fight (no fruit, relic shavings, or Ju Fields). The only draw a duel allows is a RubberMcFly in play; on a draw nobody wins, all wagers return to their owners, and the match reward is split evenly.
 - **Replays (Part XIV)** — stored as seed + input log, byte-identical playback, last 50 casual kept, tournament replays permanent.
 - **Progression & economy (Part IX)** — exact XP bands, the full level-reward chest table with milestones, crafting costs, market tax by rarity, 75% Guild buyback, 50g listing fee, rentals at 25%→3%, titles with buffs (equipped-only), achievements, the complete 14-step tutorial.
 - **Hunts (Part X)** — slots every 10 levels (expiring at the next band), the Track with narrator per creature (Noka for the ancients), 2 questions with the hidden ~5% temperament influence, encounter series, guaranteed piece + hidden performance-scored payouts, 1-Nurtui cooldowns.
@@ -60,20 +60,26 @@ Per the creator's direction, all creatures use **animated placeholder rigs**: a 
 
 **No music**, by design — the composer is handling that. The music channel exists in Settings and stays politely silent. Synthesized SFX are in (including the ShurgrEdan strike, with its own toggle).
 
-## Firebase / Multiplayer
+## Online Play (real cross-device multiplayer)
 
-This build runs fully local: accounts, world, market, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). "Online" opponents are the AI players — matchmaking, private rooms, and tournaments all work against them, and the engine is already deterministic lockstep (shared seed + input log, per Part XIV) so real networked play slots in without touching game logic.
+The game now has a real online layer — see **[ONLINE_SETUP.md](ONLINE_SETUP.md)** for the 10-minute setup. It runs on a free Supabase project (Firebase, if you use it, only *hosts the files* — it does not make the game online by itself):
 
-**To go live later:** implement the three functions of `DYA.store` (`load`/`save`/`reset`) against Firestore, put Firebase Auth behind `G.createAccount`/`G.login`, and relay match inputs through a Realtime Database channel. The seams are marked in `state.js`.
+- **Cross-device friends** — every player gets a permanent 6-character **friend code** (shown at the top of the Friends screen once online). Exchange codes, send/accept requests, and see each other's live online status from any two computers. (`js/core/online.js`, plain REST, polled every 15s.)
+- **Cross-device private matches** — Play → Private Match: one player opens a room and shares a 5-letter code, the other joins with it. Both computers run the identical deterministic simulation and exchange only inputs (lockstep over a Supabase Realtime channel, ~500ms input delay, desync detector included). (`js/core/netplay.js`.)
+- Configure once in `js/config.js` (bakes it into the deployment), or per-browser in-game via **Friends → Set up online play**.
+
+Everything else still runs fully local: accounts, world, market, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). Matchmaking, duels, and tournaments are played against the AI populace.
 
 ## Deferred (matches Part XVII)
 
-Sniller, Vyrenalur, Aerolhorn, Kalo'Eik variants, Api Buta, Expedition/Challenge modes, Pia'don-tier titles, replay share links, variable pouch sizes, the Gynge flip mechanic (no current token can trigger it), WebXR/mobile, and real cross-device multiplayer per above.
+Sniller, Vyrenalur, Aerolhorn, Kalo'Eik variants, Api Buta, Expedition/Challenge modes, Pia'don-tier titles, replay share links, variable pouch sizes, the Gynge flip mechanic (no current token can trigger it), WebXR/mobile, online matchmaking/tournaments (online play currently covers friends + private matches), and shared cross-device market/world state.
 
 ## Tests
 
 ```bash
-node tests/test_engine.js   # headless: determinism, replay exactness, duel/hunt/standard resolution
+npm test                     # runs both suites below
+node tests/test_engine.js    # headless: determinism, replay exactness, duel/hunt/standard resolution, duel tie rules
+node tests/test_netplay.js   # lockstep netplay: two simulated machines must stay tick-identical
 ```
 
 ---

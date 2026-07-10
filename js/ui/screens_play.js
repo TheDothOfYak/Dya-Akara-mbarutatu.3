@@ -266,34 +266,194 @@
   };
 
   P.privateFlow = function () {
+    /* with the online service configured, private matches are REAL
+       cross-device rooms; otherwise the offline stand-in flow runs */
+    if (DYA.online && DYA.online.enabled) { P.privateOnlineFlow(); return; }
     const w = U.el('div', {});
-    w.appendChild(U.el('h3', { cls: 'gold', text: 'Private Match' }));
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Private Match — offline' }));
     const m = UI.modal(w);
     const code = Math.random().toString(36).slice(2, 7).toUpperCase();
-    w.appendChild(U.el('p', { cls: 'mt', html: 'Room code: <b class="gold" style="font-size:22px;letter-spacing:.2em">' + code + '</b><br><span class="small muted">Share it — or invite from your friends list. (Real cross-device rooms arrive with the Firebase backend; here a friend joins in moments.)</span>' }));
-    const joinInp = U.el('input', { cls: 'txt mt', placeholder: 'Or enter a friend’s code…' });
-    w.appendChild(joinInp);
+    w.appendChild(U.el('p', { cls: 'mt', html: 'You are in <b>offline mode</b> — rooms here are practice rooms against a Dya’kukull stand-in.<br><span class="small muted">To play a friend on another computer, set up online play first (it takes ~5 minutes, once).</span>' }));
     const row = U.el('div', { cls: 'flex mt' });
+    row.appendChild(U.el('button', { cls: 'btn primary', text: '🌐 Set up online play', onclick: () => { m.close(); UI.onlineSetup(() => P.privateFlow()); } }));
     row.appendChild(U.el('button', {
-      cls: 'btn primary', text: 'Open room', onclick: () => {
+      cls: 'btn', text: 'Practice room (vs AI)', onclick: () => {
         m.close();
         const friends = G.me.friends.map(id => G.world.accounts[id]).filter(Boolean);
         const opp = friends.length ? friends[Math.floor(Math.random() * friends.length)] : Object.values(G.world.accounts).find(a => a.ai);
-        UI.toast({ title: 'Room ' + code, body: opp.displayName + ' joined your room!', icon: '🤝' });
+        UI.toast({ title: 'Room ' + code, body: opp.displayName + ' joined your practice room.', icon: '🤝' });
         setTimeout(() => P.inviteFriendMatch(opp), 900);
-      },
-    }));
-    row.appendChild(U.el('button', {
-      cls: 'btn', text: 'Join room', onclick: () => {
-        if (joinInp.value.trim().length < 3) return;
-        m.close();
-        const opp = Object.values(G.world.accounts).find(a => a.ai);
-        P.inviteFriendMatch(opp);
       },
     }));
     row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => m.close() }));
     w.appendChild(row);
   };
+
+  /* ---------- REAL cross-device private matches ---------- */
+  P.privateOnlineFlow = function (opts) {
+    opts = opts || {};
+    const me = G.me;
+    const w = U.el('div', {});
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Private Match — Online' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', html: (opts.hostFor ? 'Open a room and tell <b>' + U.esc(opts.hostFor) + '</b> the code. ' : '') + 'One player opens a room and shares the 5-letter code; the other joins with it. Both computers play the same live match.' }));
+    const m = UI.modal(w);
+    const joinInp = U.el('input', { cls: 'txt mt', placeholder: 'Friend’s room code…', maxlength: 5, style: 'text-transform:uppercase;letter-spacing:.2em' });
+    const row = U.el('div', { cls: 'flex mt' });
+    row.appendChild(U.el('button', { cls: 'btn primary', text: 'Open a room', onclick: () => { m.close(); P.pickPouch(pouch => hostRoom(pouch)); } }));
+    row.appendChild(U.el('button', {
+      cls: 'btn', text: 'Join room', onclick: () => {
+        const code = joinInp.value.trim().toUpperCase();
+        if (code.length !== 5) { UI.alert('Room code', 'Room codes are 5 letters — ask the host to read theirs off their screen.'); return; }
+        m.close();
+        P.pickPouch(pouch => joinRoom(code, pouch));
+      },
+    }));
+    row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => m.close() }));
+    w.appendChild(joinInp);
+    w.appendChild(row);
+
+    function myProfile(pouch) {
+      return {
+        id: me.netId || me.id, name: me.displayName, level: me.level,
+        avatarIdx: me.avatarIdx || 0, seal: me.seal || { avatarIdx: me.avatarIdx, patterns: [] },
+        startRes: G.titleBuff('startRes') || 0,
+        pouch: pouch.map(t => U.deepCopy(t)),
+      };
+    }
+
+    /* ----- host side ----- */
+    async function hostRoom(pouch) {
+      const code = DYA.netplay.genRoomCode();
+      const wait = U.el('div', { cls: 'center' });
+      wait.appendChild(U.el('h3', { cls: 'gold', text: 'Opening room…' }));
+      const codeEl = U.el('div', { cls: 'gold mt', style: 'font-size:34px;letter-spacing:.35em', text: code });
+      const statusEl = U.el('p', { cls: 'muted mt', text: 'Connecting to the room service…' });
+      wait.appendChild(codeEl); wait.appendChild(statusEl);
+      const wm = UI.modal(wait, { sticky: true });
+      let room = null, started = false, startPayload = null, closed = false;
+      wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Close room', onclick: () => { closed = true; if (room) room.leave(); wm.close(); } }));
+      try {
+        room = await DYA.netplay.joinRoom(code, myProfile(pouch).id, {
+          onMessage(msg) {
+            if (!msg) return;
+            if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) { P._netSession.route(msg); return; }
+            if (msg.t === 'hello') {
+              if (started) {
+                /* same guest asking again (lost our start): resend */
+                if (startPayload && msg.id === startPayload.guest.id) room.send(startPayload.wire);
+                else room.send({ t: 'full' });
+                return;
+              }
+              started = true;
+              statusEl.textContent = msg.name + ' joined! Starting…';
+              DYA.audio.play('notify');
+              const host = myProfile(pouch);
+              const info = {
+                seed: U.newSeed(),
+                terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)],
+                settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
+                host,
+                guest: { id: msg.id, name: msg.name, level: msg.level, avatarIdx: msg.avatarIdx, seal: msg.seal, startRes: msg.startRes || 0, pouch: msg.pouch },
+              };
+              startPayload = { guest: info.guest, wire: { t: 'start', info: { seed: info.seed, terrain: info.terrain, settings: info.settings, host } } };
+              room.send(startPayload.wire);
+              setTimeout(() => { if (!closed) { wm.close(); launchNetMatch(room, 0, info, pouch); } }, 700);
+            }
+          },
+          onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
+        });
+        statusEl.innerHTML = 'Room is open. Tell your friend the code — they join under<br><b>Play → Private Match → Join room</b>.';
+      } catch (e) {
+        wm.close();
+        UI.alert('Could not open the room', e.message);
+      }
+    }
+
+    /* ----- guest side ----- */
+    async function joinRoom(code, pouch) {
+      const wait = U.el('div', { cls: 'center' });
+      wait.appendChild(U.el('h3', { cls: 'gold', text: 'Joining room ' + code + '…' }));
+      const statusEl = U.el('p', { cls: 'muted mt', text: 'Connecting…' });
+      wait.appendChild(statusEl);
+      const wm = UI.modal(wait, { sticky: true });
+      let room = null, launched = false, closed = false, helloTimer = null;
+      wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { closed = true; clearInterval(helloTimer); if (room) room.leave(); wm.close(); } }));
+      const prof = myProfile(pouch);
+      try {
+        room = await DYA.netplay.joinRoom(code, prof.id, {
+          onMessage(msg) {
+            if (!msg) return;
+            if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) { P._netSession.route(msg); return; }
+            if (launched || closed) return;
+            if (msg.t === 'start') {
+              launched = true;
+              clearInterval(helloTimer);
+              const info = {
+                seed: msg.info.seed, terrain: msg.info.terrain, settings: msg.info.settings,
+                host: msg.info.host, guest: prof,
+              };
+              wm.close();
+              launchNetMatch(room, 1, info, pouch);
+            } else if (msg.t === 'full') {
+              launched = true; clearInterval(helloTimer);
+              wm.close(); room.leave();
+              UI.alert('Room full', 'That room already has two players.');
+            }
+          },
+          onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
+        });
+        statusEl.textContent = 'Connected — waiting for the host to answer…';
+        const hello = { t: 'hello', id: prof.id, name: prof.name, level: prof.level, avatarIdx: prof.avatarIdx, seal: prof.seal, startRes: prof.startRes, pouch: prof.pouch };
+        room.send(hello);
+        let tries = 0;
+        helloTimer = setInterval(() => {
+          if (launched || closed) { clearInterval(helloTimer); return; }
+          if (++tries > 6) {
+            clearInterval(helloTimer);
+            wm.close(); room.leave();
+            UI.alert('Nobody home', 'No host answered on that code. Check the code and make sure their room is still open, then try again.');
+            return;
+          }
+          room.send(hello);
+        }, 2500);
+      } catch (e) {
+        wm.close();
+        UI.alert('Could not join the room', e.message);
+      }
+    }
+  };
+
+  /* both clients build the SAME match (host = team 0, guest = team 1)
+     and keep it in lockstep over the room channel */
+  function launchNetMatch(room, myTeam, info, myPouch) {
+    const match = new DYA.match.Match({
+      seed: info.seed, mode: 'standard', terrain: info.terrain,
+      settings: info.settings,
+      teams: [
+        { name: info.host.name, controller: 'human', pouch: (info.host.pouch || []).map(t => U.deepCopy(t)), startResources: info.host.startRes || 0, seal: info.host.seal },
+        { name: info.guest.name, controller: 'human', pouch: (info.guest.pouch || []).map(t => U.deepCopy(t)), startResources: info.guest.startRes || 0, seal: info.guest.seal },
+      ],
+    });
+    const net = new DYA.netplay.Lockstep(match, myTeam, payload => room.send(payload));
+    net.room = room;
+    P._netSession = net;
+    /* the room handlers created at join time forward net traffic here */
+    net.route = (msg) => {
+      if (!msg) return;
+      if (msg.t === 'frame' || msg.t === 'need') net.onRemote(msg);
+      else if (msg.t === 'bye') net.peerLeft = Date.now();
+    };
+    const opp = myTeam === 0 ? info.guest : info.host;
+    UI.showWithLoading('match', {
+      match,
+      cfg: {
+        mode: 'standard', ranked: false, format: 'Private Match (Online)',
+        myTeam, net,
+        opponent: { name: opp.name, remoteHuman: true },
+        pouch: myPouch,
+      },
+    }, 1300);
+  }
 
   P.inviteFriendMatch = function (acc) {
     P.pickPouch(pouch => {
@@ -513,9 +673,20 @@
       let wheelIndex = 0;
       let tooltip = null;
 
-      const T0 = M.teams[0];
+      /* networked matches: the local player may be team 1 (the guest) */
+      const MY = (cfg && cfg.myTeam) || 0;
+      const NET = cfg && cfg.net;
+      const T0 = M.teams[MY];
+      const OPP = M.teams[1 - MY];
       const isDuel = M.mode === 'duel';
       if (isDuel) wheelEl.style.display = 'none';
+
+      /* every local action goes through here: direct for local play,
+         lockstep-scheduled + broadcast for networked play */
+      function sendInput(input) {
+        if (NET) NET.queueLocal(input);
+        else M.queueInput(MY, input);
+      }
 
       /* quick chat */
       const chatBtn = U.el('button', { cls: 'btn small ghost', text: '💬', style: 'position:absolute;bottom:130px;right:14px' });
@@ -523,7 +694,7 @@
         const w = U.el('div', {});
         w.appendChild(U.el('h3', { cls: 'gold', text: 'Quick chat' }));
         const m = UI.modal(w);
-        L.QUICK_CHAT.forEach(q => w.appendChild(U.el('button', { cls: 'btn small ghost q-opt', text: q, onclick: () => { M.queueInput(0, { type: 'chat', msg: q }); m.close(); } })));
+        L.QUICK_CHAT.forEach(q => w.appendChild(U.el('button', { cls: 'btn small ghost q-opt', text: q, onclick: () => { sendInput({ type: 'chat', msg: q }); m.close(); } })));
       };
       scr.appendChild(chatBtn);
 
@@ -569,7 +740,7 @@
         const entry = T0.readied[slot];
         if (!entry) return;
         if (entry.readiedAtPulse === M.pulseIndex) { UI.toast({ title: 'Not yet', body: 'A token cannot trigger in the pulse it was readied. Next pulse.', icon: '⏳' }); DYA.audio.play('deny'); return; }
-        M.queueInput(0, { type: 'trigger', slot, x, y });
+        sendInput({ type: 'trigger', slot, x, y });
         DYA.audio.play('deploy');
         if (DYA.tutorial) DYA.tutorial.onEvent('deployed');
       }
@@ -631,7 +802,7 @@
         if (!afford) { DYA.audio.play('deny'); renderWheel(); return; }
         if (T0.readied.length >= 5) { UI.toast({ title: 'Ready panel full', body: 'Five readied tokens is the limit.', icon: '⚠' }); renderWheel(); return; }
         const doReady = (taxRes) => {
-          M.queueInput(0, { type: 'ready', pouchIdx: i, taxRes });
+          sendInput({ type: 'ready', pouchIdx: i, taxRes });
           DYA.audio.play('ready');
           if (DYA.tutorial) DYA.tutorial.onEvent('readied');
           if (card) animateReadyFly(card);
@@ -746,26 +917,26 @@
 
       /* ---------- pause ---------- */
       let pauseOverlay = null;
-      const vsRealPlayer = cfg.opponent && cfg.opponent.simulatedHuman;
+      const vsRealPlayer = cfg.opponent && (cfg.opponent.simulatedHuman || cfg.opponent.remoteHuman);
       function togglePause() {
         if (pauseOverlay) { closePause(); return; }
         if (!vsRealPlayer) M.paused = true; // vs AI: simulation actually pauses
         pauseOverlay = U.el('div', { cls: 'match-overlay' });
         pauseOverlay.appendChild(U.el('h1', { style: 'color:var(--ink)', text: 'PAUSED' }));
         if (vsRealPlayer) pauseOverlay.appendChild(U.el('p', { cls: 'muted small', text: 'Multiplayer pause is cosmetic — the match continues.' }));
-        const info = U.el('p', { cls: 'muted mt center', html: 'vs <b>' + U.esc(M.teams[1].name) + '</b> · ' + M.creatures.filter(cr => !cr.dead).length + ' creatures on field<br>Relic: ' + relicText() + ' · Pulse in ' + Math.max(0, M.nextPulseAt - M.time).toFixed(0) + 's' });
+        const info = U.el('p', { cls: 'muted mt center', html: 'vs <b>' + U.esc(OPP.name) + '</b> · ' + M.creatures.filter(cr => !cr.dead).length + ' creatures on field<br>Relic: ' + relicText() + ' · Pulse in ' + Math.max(0, M.nextPulseAt - M.time).toFixed(0) + 's' });
         pauseOverlay.appendChild(info);
         const col = U.el('div', { cls: 'menu-nav mt' });
         col.appendChild(U.el('button', { cls: 'btn', text: 'Resume', onclick: closePause }));
         col.appendChild(U.el('button', { cls: 'btn', text: 'Settings', onclick: () => { closePause(); const prev = { match: M, cfg }; UI.show('settings'); const back = U.qs('.back-arrow'); if (back) back.onclick = () => UI.show('match', prev); } }));
         col.appendChild(U.el('button', {
           cls: 'btn danger', text: 'Concede', onclick: () => {
-            UI.confirm('Concede the match?', 'A concession is a loss. The Guild records everything.', () => { closePause(); M.queueInput(0, { type: 'concede' }); }, 'Concede');
+            UI.confirm('Concede the match?', 'A concession is a loss. The Guild records everything.', () => { closePause(); sendInput({ type: 'concede' }); }, 'Concede');
           },
         }));
         col.appendChild(U.el('button', {
           cls: 'btn', text: 'Report player', onclick: () => {
-            const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Report ' + M.teams[1].name })]);
+            const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Report ' + OPP.name })]);
             const sel = U.el('select', { cls: 'txt mt' });
             ['Unsporting behavior', 'Offensive name', 'Suspected cheating', 'Token rule violation', 'Other'].forEach(r => sel.appendChild(U.el('option', { text: r })));
             const note = U.el('textarea', { cls: 'txt mt', rows: 3, placeholder: 'Details (optional)' });
@@ -776,28 +947,29 @@
         }));
         col.appendChild(U.el('button', {
           cls: 'btn ghost', text: 'Back to menu', onclick: () => {
-            UI.confirm('Leave the match?', 'Leaving counts as a concession.', () => { closePause(); M.queueInput(0, { type: 'concede' }); }, 'Leave & concede');
+            UI.confirm('Leave the match?', 'Leaving counts as a concession.', () => { closePause(); sendInput({ type: 'concede' }); }, 'Leave & concede');
           },
         }));
         pauseOverlay.appendChild(col);
         scr.appendChild(pauseOverlay);
       }
-      function closePause() { if (pauseOverlay) { pauseOverlay.remove(); pauseOverlay = null; } M.paused = false; }
+      function closePause() { if (pauseOverlay) { pauseOverlay.remove(); pauseOverlay = null; } if (!NET) M.paused = false; }
       pauseBtn.onclick = togglePause;
 
       function relicText() {
-        const mine = M.relics && M.relics.find(r => r.ownerTeam === 0);
-        const theirs = M.relics && M.relics.find(r => r.ownerTeam === 1);
+        const mine = M.relics && M.relics.find(r => r.ownerTeam === MY);
+        const theirs = M.relics && M.relics.find(r => r.ownerTeam === 1 - MY);
         if (!mine || mine.disabled) return '—';
         const mineTxt = mine.carrier != null ? '<span style="color:var(--red)">STOLEN!</span>' : (Math.abs(mine.x - mine.homeX) > 6 ? '<span style="color:var(--eldi)">DROPPED</span>' : '<span style="color:var(--green)">SAFE</span>');
         const theirsTxt = theirs.captured ? '<span style="color:var(--green)">CAPTURED</span>' : theirs.carrier != null ? '<span style="color:var(--green)">TAKEN</span>' : 'home';
         return 'Yours: ' + mineTxt + ' · Theirs: ' + theirsTxt;
       }
 
-      /* ---------- simulated disconnect (rare, casual queue only) ---------- */
+      /* ---------- simulated disconnect (rare, casual queue only — never
+         for real networked opponents) ---------- */
       let disconnectFired = false;
       function maybeDisconnect() {
-        if (disconnectFired || !cfg.opponent || !cfg.opponent.simulatedHuman || M.mode !== 'standard') return;
+        if (disconnectFired || !cfg.opponent || !cfg.opponent.simulatedHuman || cfg.opponent.remoteHuman || M.mode !== 'standard') return;
         if (M.time > 120 && M.time < 121 && Math.random() < 0.04) {
           disconnectFired = true;
           M.paused = true;
@@ -822,16 +994,45 @@
         }
       }
 
+      /* ---------- networked-play status (stall pill, drop, desync) ---------- */
+      let netPill = null, netLeftOverlay = null, desyncWarned = false;
+      function netStatus() {
+        if (!NET) return;
+        /* waiting on the opponent's inputs */
+        const stalled = NET.stalled();
+        if (stalled && !netPill) {
+          netPill = U.el('div', { cls: 'pill', style: 'position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:40', text: '⌛ waiting for ' + OPP.name + '…' });
+          scr.appendChild(netPill);
+        } else if (!stalled && netPill) { netPill.remove(); netPill = null; }
+        /* opponent left the room, or went silent for 20s */
+        const gone = NET.peerLeft || (NET.stallSince && Date.now() - NET.stallSince > 20000);
+        if (gone && !netLeftOverlay && !M.over) {
+          netLeftOverlay = U.el('div', { cls: 'match-overlay' });
+          netLeftOverlay.appendChild(U.el('h1', { style: 'color:var(--ink);font-size:34px', text: 'OPPONENT DISCONNECTED' }));
+          netLeftOverlay.appendChild(U.el('p', { cls: 'muted mt', text: OPP.name + ' stopped responding. You may claim the victory or keep waiting.' }));
+          const row = U.el('div', { cls: 'flex mt' });
+          row.appendChild(U.el('button', { cls: 'btn primary', text: 'Take the victory', onclick: () => { netLeftOverlay.remove(); netLeftOverlay = null; M.finish(MY, 'disconnect'); } }));
+          row.appendChild(U.el('button', { cls: 'btn', text: 'Keep waiting', onclick: () => { netLeftOverlay.remove(); netLeftOverlay = null; NET.peerLeft = null; NET.stallSince = Date.now(); } }));
+          netLeftOverlay.appendChild(row);
+          scr.appendChild(netLeftOverlay);
+        }
+        if (NET.desynced && !desyncWarned) {
+          desyncWarned = true;
+          UI.toast({ title: 'Desync detected', body: 'The two machines disagree on the simulation. Results may differ — using the same browser on both computers keeps them identical.', icon: '⚠' });
+        }
+      }
+
       /* ---------- main loop ---------- */
       let last = performance.now(), raf, finished = false;
       let lastPulseIdx = 0, lastReadiedLen = -1, lastPouchLeft = -1;
       function frame(now) {
-        if (!canvas.isConnected) { cancelAnimationFrame(raf); document.removeEventListener('keydown', keyHandler); return; }
+        if (!canvas.isConnected) { cancelAnimationFrame(raf); document.removeEventListener('keydown', keyHandler); if (NET && NET.room) NET.room.leave(); return; }
         const dt = Math.min(0.1, (now - last) / 1000); last = now;
-        M.step(dt);
+        if (NET) NET.step(dt); else M.step(dt);
         renderer.draw(dt);
         renderer.drawMinimap(mmCv.getContext('2d'), 150);
         maybeDisconnect();
+        netStatus();
 
         /* HUD updates */
         const esc = EC.escalationMult(M.time);
@@ -861,7 +1062,7 @@
         /* event feed */
         while (lastEventIdx < M.events.length) {
           const ev = M.events[lastEventIdx++];
-          if (ev.kind === 'deny' && ev.team !== 0) continue;
+          if (ev.kind === 'deny' && ev.team !== MY) continue;
           const el = U.el('div', { cls: 'hud-event', text: (ev.kind === 'chat' ? '💬 ' : '') + ev.msg });
           eventsEl.appendChild(el);
           setTimeout(() => el.remove(), 4200);
@@ -877,12 +1078,13 @@
       /* ---------- end of match ---------- */
       function onMatchEnd() {
         document.removeEventListener('keydown', keyHandler);
+        if (NET && NET.room) { try { NET.room.leave(); } catch (e) { } P._netSession = null; }
         setTimeout(() => showWinLoss(), 900);
       }
 
       function showWinLoss() {
         const res = M.result;
-        const iWon = res.winner === 0 || M.disconnectWin && res.winner === 0;
+        const iWon = res.winner === MY;
         const draw = res.winner === -1;
         const replay = M.serializeReplay();
         let rewards = null;
@@ -890,7 +1092,7 @@
           const usedNew = T0.stats.tokensPlayed.some(spid => Object.values(me.tokens).some(t => t.speciesId === spid && t.newlyCrafted));
           rewards = G.recordMatch({
             win: iWon && !draw, draw, ranked: cfg.ranked,
-            opponentName: M.teams[1].name, format: cfg.format || 'Casual',
+            opponentName: OPP.name, format: cfg.format || 'Casual',
             duration: res.duration,
             stats: { eliminations: T0.stats.eliminations, relicCaptured: T0.stats.relicCaptured, tokensPlayed: T0.stats.tokensPlayed, combos: T0.stats.combos },
             replay, tournament: cfg.tournament || null,
@@ -911,7 +1113,7 @@
         } else if (!draw) DYA.audio.play('defeat');
         ov.appendChild(U.el('h1', { cls: draw ? 'draw' : iWon ? 'victory' : 'defeat', text: draw ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT' }));
         const oppAcc = cfg.opponent && cfg.opponent.accId ? G.world.accounts[cfg.opponent.accId] : null;
-        ov.appendChild(U.el('p', { cls: 'muted', text: 'vs ' + M.teams[1].name + (oppAcc ? ' · rank ' + oppAcc.rank : '') + (cfg.ranked ? ' · Ranked' : '') }));
+        ov.appendChild(U.el('p', { cls: 'muted', text: 'vs ' + OPP.name + (oppAcc ? ' · rank ' + oppAcc.rank : '') + (cfg.ranked ? ' · Ranked' : '') }));
         if (rewards) {
           const rw = U.el('div', { cls: 'panel mt', style: 'min-width:340px;text-align:center' });
           rw.appendChild(U.el('div', { html: '⭐ <b class="gold">+' + rewards.xp + ' XP</b> &nbsp; 🪙 <b class="gold">+' + rewards.gold + ' gold</b>' }));
@@ -923,12 +1125,13 @@
           ov.appendChild(rw);
           (rewards.lvlEvents || []).forEach(ev => setTimeout(() => showLevelUp(ev), 700));
         }
-        const stats = U.el('div', { cls: 'mt muted small center', html: 'Tokens played: ' + T0.stats.tokensPlayed.length + ' · Eliminations: ' + T0.stats.eliminations + '<br>' + (M.mode === 'standard' ? 'Relic: ' + (T0.stats.relicMethod || M.teams[1].stats.relicMethod || (draw ? 'never captured' : '—')) + '<br>' : '') + 'Duration: ' + U.fmtDur(res.duration * 1000) });
+        const stats = U.el('div', { cls: 'mt muted small center', html: 'Tokens played: ' + T0.stats.tokensPlayed.length + ' · Eliminations: ' + T0.stats.eliminations + '<br>' + (M.mode === 'standard' ? 'Relic: ' + (T0.stats.relicMethod || OPP.stats.relicMethod || (draw ? 'never captured' : '—')) + '<br>' : '') + 'Duration: ' + U.fmtDur(res.duration * 1000) });
         ov.appendChild(stats);
         const row = U.el('div', { cls: 'flex mt' });
         row.appendChild(U.el('button', { cls: 'btn primary', text: 'Play again', onclick: () => { ov.remove(); if (cfg.onFinish) { cfg.onFinish(res, iWon, draw); } else UI.show('play'); } }));
         const rematch = U.el('button', { cls: 'btn', text: 'Rematch' });
-        if (cfg.opponent && !cfg.tournament) rematch.onclick = () => { ov.remove(); P.startMatch(Object.assign({}, cfg)); };
+        if (NET) { rematch.disabled = true; rematch.title = 'Open a fresh room for a rematch'; }
+        else if (cfg.opponent && !cfg.tournament) rematch.onclick = () => { ov.remove(); P.startMatch(Object.assign({}, cfg)); };
         else { rematch.disabled = true; rematch.title = 'Opponent left'; }
         row.appendChild(rematch);
         row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Menu', onclick: () => { ov.remove(); if (cfg.onFinish) cfg.onFinish(res, iWon, draw, true); else UI.show('menu'); } }));
@@ -962,7 +1165,7 @@
     const me = G.me;
     const w = U.el('div', {});
     w.appendChild(U.el('h3', { cls: 'gold', text: 'Duel — 1 token vs 1 token' }));
-    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'No resources, no pulse, no Relic. Fight to elimination — no draws. Anything can be wagered; the Guild takes no cut. A wagered token lost is lost forever.' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'No resources, no pulse, no Relic. Fight to elimination. The only draw a duel allows is a RubberMcFly in play — on a draw nobody wins, every wager returns to its owner, and the reward is split evenly. Anything can be wagered; the Guild takes no cut. A wagered token lost is lost forever.' }));
     const modeSel = U.el('select', { cls: 'txt mt' });
     [['pick', 'Pick — choose your token'], ['random', 'Random — assigned from your collection'], ['blind', 'Blind Pick — both choose secretly']].forEach(([v, l]) => modeSel.appendChild(U.el('option', { value: v, text: l })));
     w.appendChild(modeSel);
@@ -988,12 +1191,17 @@
         if (wager === 'gold' && (goldAmt <= 0 || goldAmt > me.gold)) { UI.alert('Bad wager', 'Wager gold you actually hold.'); return; }
         if (wager === 'ngakara' && (goldAmt <= 0 || goldAmt > me.ngakara)) { UI.alert('Bad wager', 'Wager NgAkara you actually hold.'); return; }
         if (wager === 'okid' && (goldAmt <= 0 || goldAmt > me.okid[okidR])) { UI.alert('Bad wager', 'Wager Okid you actually hold.'); return; }
-        m.close();
         const mode = modeSel.value;
         if (mode === 'pick' || mode === 'blind') {
+          m.close();
           pickTokenModal(toks, tok => beginDuel(tok, { mode, wager, goldAmt, okidR }));
         } else {
-          const tok = toks[Math.floor(Math.random() * toks.length)];
+          /* Random assignment only ever draws from tokens that FIGHT —
+             no fruit, no relic shavings, no Ju Fields. */
+          const fighters = toks.filter(t => SP.canDuel(t.speciesId));
+          if (!fighters.length) { UI.alert('No duel-fit tokens', 'Random assignment needs a token that actually fights — fruit, relics, and Ju Fields don’t duel. Use Pick mode if you insist on fielding one.'); return; }
+          m.close();
+          const tok = fighters[Math.floor(Math.random() * fighters.length)];
           beginDuel(tok, { mode, wager, goldAmt, okidR });
         }
       },
@@ -1019,7 +1227,8 @@
     const me = G.me;
     const ais = Object.values(G.world.accounts).filter(a => a.ai);
     const opp = ais[Math.floor(Math.random() * ais.length)];
-    const oppToks = Object.values(opp.tokens);
+    /* the Dya'kukull never field a non-fighter in a duel */
+    const oppToks = Object.values(opp.tokens).filter(t => SP.canDuel(t.speciesId));
     const oppTok = oppToks.length ? oppToks[Math.floor(Math.random() * oppToks.length)] : TK.mint({ speciesId: 'harkal', rng: new U.Rng(U.newSeed()) });
     if (opts.mode === 'blind') {
       UI.toast({ title: 'Blind pick', body: 'Tokens revealed: ' + myTok.name + ' vs ' + oppTok.name + '!', icon: '🎭' });
@@ -1037,6 +1246,14 @@
       cfg: {
         mode: 'duel', format: 'Duel (' + opts.mode + ')', opponent: { name: opp.displayName, accId: opp.id },
         onFinish: (res, iWon, draw, toMenu) => {
+          /* a draw is nobody's win: every wager returns to its owner,
+             both tokens go home, and neither duel stat moves */
+          if (draw) {
+            if (opts.wager !== 'none') UI.toast({ title: 'Draw — wagers returned', body: 'Nobody wins. Both sides take back exactly what they staked.', icon: '🤝' });
+            G.save();
+            UI.show(toMenu ? 'menu' : 'play');
+            return;
+          }
           /* duel stats + wagers */
           if (iWon) me.stats.duelsWon++; else me.stats.duelsLost++;
           if (iWon) G.grantAchievement('first_duel');
