@@ -173,6 +173,52 @@
     wrap.appendChild(row);
   }
 
+  /* ================= SEAL DESIGNER (§3) =================
+     One unique engraved coin per player: avatar at the center,
+     up to two pattern rings around it. Built once, then locked. */
+  UI.sealDesigner = function (onDone) {
+    const me = G.me;
+    if (me.seal && me.seal.locked) { UI.alert('Seal already struck', 'A seal is struck once and carried for life. Yours is on your avatar page.'); if (onDone) onDone(); return; }
+    const w = U.el('div', { cls: 'center' });
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Strike Your Seal' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Your engraving at the center. Choose up to TWO patterns for the outer rings. This coin marks your screens, your creatures on the field, and your victories — and it is struck exactly once.' }));
+    const cv = U.el('canvas', { width: 200, height: 200, cls: 'mt' });
+    w.appendChild(U.el('div', {}, [cv]));
+    const patterns = [];
+    function redraw() {
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, 200, 200);
+      SPR.drawSeal(ctx, 100, 100, 94, { avatarIdx: me.avatarIdx, patterns: patterns.slice() });
+    }
+    redraw();
+    const row = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;justify-content:center' });
+    SPR.PATTERNS.forEach(p => {
+      const b = U.el('button', { cls: 'btn small ghost', text: p });
+      b.onclick = () => {
+        const i = patterns.indexOf(p);
+        if (i >= 0) { patterns.splice(i, 1); b.classList.add('ghost'); }
+        else {
+          if (patterns.length >= 2) { UI.toast({ title: 'Two rings at most', body: 'A seal carries one or two patterns — remove one first.', icon: '⭕' }); return; }
+          patterns.push(p); b.classList.remove('ghost');
+        }
+        redraw(); DYA.audio.play('click');
+      };
+      row.appendChild(b);
+    });
+    w.appendChild(row);
+    const m = UI.modal(w, { sticky: true });
+    w.appendChild(U.el('button', {
+      cls: 'btn primary mt', text: '⚒ Strike it — forever', onclick: () => {
+        if (!patterns.length) { UI.toast({ title: 'Choose a pattern', body: 'At least one ring pattern, keeper.', icon: '⭕' }); return; }
+        me.seal = { avatarIdx: me.avatarIdx, patterns: patterns.slice(), locked: true };
+        G.save(); m.close();
+        DYA.audio.play('levelup');
+        UI.toast({ title: 'Seal struck', body: 'Your mark is now on everything that is yours.', icon: '🪙' });
+        if (onDone) onDone();
+      },
+    }));
+  };
+
   /* ================= MAIN MENU ================= */
   UI.register('menu', {
     enter(root) {
@@ -321,6 +367,7 @@
           body.appendChild(toggle('Bioluminescence', () => s.display.bioluminescence, v => s.display.bioluminescence = v));
           body.appendChild(toggle('Holographic shimmer', () => s.display.holographic, v => s.display.holographic = v));
           body.appendChild(toggle('Colorblind mode', () => s.display.colorblind, v => s.display.colorblind = v));
+          body.appendChild(toggle('Seal badges floating above creatures (in matches)', () => !!s.display.sealBadges, v => s.display.sealBadges = v));
         },
         Controls() {
           body.innerHTML = '';
@@ -674,6 +721,19 @@
       }
       refreshPrev();
       cols.appendChild(prev);
+
+      /* §3 — your seal, under the preview */
+      prev.appendChild(U.el('div', { cls: 'divider' }));
+      prev.appendChild(U.el('div', { cls: 'muted small mb', text: 'YOUR SEAL' }));
+      if (me.seal && me.seal.locked) {
+        const sc = U.el('canvas', { width: 120, height: 120 });
+        SPR.drawSeal(sc.getContext('2d'), 60, 60, 56, me.seal);
+        prev.appendChild(sc);
+        prev.appendChild(U.el('div', { cls: 'small muted mt', text: 'Struck once. Carried for life.' }));
+      } else {
+        prev.appendChild(U.el('p', { cls: 'small muted', text: 'You have not struck your seal yet.' }));
+        prev.appendChild(U.el('button', { cls: 'btn small mt', text: '🪙 Strike your seal', onclick: () => UI.sealDesigner(() => UI.show('avatar')) }));
+      }
 
       const rightCol = U.el('div', { cls: 'flex1' });
       rightCol.appendChild(U.el('h3', { cls: 'gold mb', text: 'Portraits' }));

@@ -17,6 +17,17 @@
   const WORLD = { w: 1600, h: 1000 };
   const HOARD_R = 70;
   const RELIC_PICK_R = 26;
+  const ELS = ['Fti', 'Su', 'Eldi', 'Ular'];
+
+  function startVec(n) {
+    const v = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+    for (let i = 0; i < n; i++) v[ELS[i % 4]]++;
+    return v;
+  }
+  function resTotal(v) { return v.Fti + v.Su + v.Eldi + v.Ular; }
+  function canAfford(v, cost) { return ELS.every(e => v[e] >= (cost[e] || 0)); }
+  function payCost(v, cost) { ELS.forEach(e => { v[e] -= (cost[e] || 0); }); }
+  function mostAbundant(v) { return ELS.slice().sort((a, b) => v[b] - v[a])[0]; }
 
   function Match(cfg) {
     const M = this;
@@ -55,18 +66,25 @@
       name: t.name,
       accId: t.accId || null,
       controller: t.controller,             // 'human' | 'ai' | 'replay' | 'wild'
+      seal: t.seal || null,
       aiSkill: t.aiSkill || 0.6,
       color: i === 0 ? '#d9b87a' : '#b05a5a',
-      hoard: i === 0 ? { x: 150, y: WORLD.h / 2 } : { x: WORLD.w - 150, y: WORLD.h / 2 },
-      resources: t.startResources || 0,
-      pouch: (t.pouch || []).map(tok => ({ tok, state: 'pouch', readiedAtPulse: -1 })),
+      hoard: i === 0 ? { x: 240, y: WORLD.h / 2 } : { x: WORLD.w - 240, y: WORLD.h / 2 },
+      resources: startVec(t.startResources || 0),
+      pouch: (t.pouch || []).map(tok => ({ tok, state: 'pouch', readiedAtPulse: -1, deaths: 0 })),
       readied: [],                          // pouch entries, max 5
       stats: { tokensPlayed: [], eliminations: 0, relicCaptured: false, relicMethod: null, resourcesEarned: 0, stolen: 0, combos: {} },
       aiMem: { nextThink: 2 + i },
       aiRng: new U.Rng((cfg.seed >>> 0) ^ ((i + 1) * 0x9E3779B9)),
     }));
 
-    M.relic = { x: WORLD.w / 2, y: WORLD.h / 2, carrier: null, carrierTeam: null, captured: false, homeX: WORLD.w / 2, homeY: WORLD.h / 2 };
+    /* Dual relics (July update §1): each side keeps its own relic in its
+       hoard; you win by carrying the OPPONENT'S relic home. */
+    M.relics = M.teams.map((T2, i) => ({
+      ownerTeam: i, x: T2.hoard.x, y: T2.hoard.y - 26,
+      homeX: T2.hoard.x, homeY: T2.hoard.y - 26,
+      carrier: null, carrierTeam: null, captured: false, disabled: false,
+    }));
 
     /* terrain features → obstacles & water zones (visual + light gameplay: bogs/water flags) */
     M.props = [];
@@ -84,6 +102,13 @@
         M.zones.push({ type: 'water', x: WORLD.w / 2, y: WORLD.h - 140, r: 260, team: -1 });
         M.zones.push({ type: 'water', x: WORLD.w / 2 - 380, y: 160, r: 180, team: -1 });
       }
+      /* organizer-placed terrain tokens (July update §15) */
+      (cfg.terrainTokens || []).forEach((tt, i) => {
+        const tx = WORLD.w / 2 + (i === 0 ? -1 : 1) * trng.range(80, 260);
+        const ty = trng.range(WORLD.h * 0.3, WORLD.h * 0.7);
+        if (tt === 'forest') M.zones.push({ type: 'forest', x: tx, y: ty, r: 120, team: -1 });
+        else if (tt === 'water') M.zones.push({ type: 'water', x: tx, y: ty, r: 130, team: -1 });
+      });
     })();
 
     /* duel mode: spawn both tokens immediately, no economy */
@@ -94,8 +119,8 @@
       });
     }
 
-    /* hunt mode: no Relic on the field — the quarry is the objective */
-    if (M.mode === 'hunt' || M.mode === 'duel') { M.relic.captured = true; M.relic.disabled = true; }
+    /* hunt/duel: no relics on the field */
+    if (M.mode === 'hunt' || M.mode === 'duel') { M.relics.forEach(r => { r.captured = true; r.disabled = true; }); }
 
     /* hunt mode: spawn wild side */
     if (M.mode === 'hunt' && cfg.hunt) {
@@ -103,7 +128,7 @@
         const tok = e.tok || TK.mint({ speciesId: e.speciesId, rng: M.rng, rarity: e.rarity });
         const cx = WORLD.w * 0.72 + M.rng.range(-90, 90), cy = WORLD.h / 2 + M.rng.range(-190, 190);
         const c = M.spawnFromToken(tok, 1, cx, cy);
-        if (e.boss) { c.isBoss = true; c.maxHp *= 1.6; c.hp = c.maxHp; c.tetherRange = 9999; }
+        if (e.boss) { c.isBoss = true; c.maxHp *= 1.6; c.hp = c.maxHp; }
       });
       M.teams[1].controller = 'wild';
     }
@@ -138,8 +163,8 @@
       tokAge: tok.age || 0.5,
       mem: {},
       buffs: [],
-      tetherRange: computeTether(sp, sizeIdx),
       tetherFrac: 0,
+      matchXp: 0, growthPulses: 0,
       dead: false, deadTick: 0,
       spawnTick: M.tick, spawnTime: M.time,
       lastHitTick: null, lastAttacker: null,
@@ -166,12 +191,6 @@
     return c;
   };
 
-  function computeTether(sp, sizeIdx) {
-    if (sp.tags.includes('relic') || sp.tags.includes('sentient')) return 900; // relic runners roam far
-    if (sp.tags.includes('thief')) return 850;
-    if (sp.tags.includes('apex')) return 600;
-    return 420 + sizeIdx * 60;
-  }
 
   /* ================= INPUTS ================= */
   /* input: {type:'ready', pouchIdx} | {type:'trigger', slot, x, y} |
@@ -186,13 +205,19 @@
       const entry = T.pouch[input.pouchIdx];
       if (!entry || entry.state !== 'pouch') return;
       if (T.readied.length >= 5) { M.uiEvent(team, 'deny', 'Ready panel is full (5 slots).'); return; }
-      const cost = SP.RARITY_COST[entry.tok.rarity];
-      if (T.resources < cost) { M.uiEvent(team, 'deny', 'Not enough resources.'); return; }
-      T.resources -= cost;
+      const cost = Object.assign({}, TK.costVec(entry.tok));
+      /* commander tax (July update §1): +1 per prior defeat, any resource */
+      const tax = entry.deaths || 0;
+      if (tax > 0) {
+        const taxRes = input.taxRes && ELS.includes(input.taxRes) ? input.taxRes : mostAbundant(T.resources);
+        cost[taxRes] = (cost[taxRes] || 0) + tax;
+      }
+      if (!canAfford(T.resources, cost)) { M.uiEvent(team, 'deny', 'Not enough resources' + (tax ? ' (commander tax +' + tax + ')' : '') + '.'); return; }
+      payCost(T.resources, cost);
       entry.state = 'readied';
       entry.readiedAtPulse = M.pulseIndex;
       T.readied.push(entry);
-      M.uiEvent(team, 'ready', entry.tok.name + ' readied.');
+      M.uiEvent(team, 'ready', entry.tok.name + ' readied' + (tax ? ' (tax +' + tax + ')' : '') + '.');
     } else if (input.type === 'trigger') {
       const entry = T.readied[input.slot];
       if (!entry) return;
@@ -267,8 +292,14 @@
       if (c.stunnedUntil > M.tick) { c.state = 'hit'; continue; }
       if ((M.tick + c.id) % 6 === 0) {
         c.intent = {};
-        const b = BV[c.sp.behavior];
-        if (b) { api._c = c; b(c, api); }
+        /* Duel: creatures ALWAYS fight — pursue to elimination, no idling (§1) */
+        if (M.mode === 'duel') {
+          const foe = api.nearestEnemy(c, 99999);
+          if (foe) api.attack(c, foe, false, true, (c.vars.breathRange || c.sp.behavior === 'grothyn' || c.headCount > 1));
+        } else {
+          const b = BV[c.sp.behavior];
+          if (b) { api._c = c; b(c, api); }
+        }
         /* hunt drive: hunter-side creatures press toward the quarry when idle */
         if (M.mode === 'hunt' && c.team === 0 && !c.rooted && !c.intent.attackTarget &&
             !c.sp.tags.includes('passive') && c.sp.behavior !== 'kofi' && c.sp.behavior !== 'chemist' && c.sp.behavior !== 'karnen') {
@@ -321,19 +352,48 @@
     M.pulseElement = M.rng.pick(SP.ELEMENTS);
     M.teams.forEach(T => {
       if (T.controller === 'wild') return;
-      let gain = amount * esc;
-      /* Karnen harvest */
+      /* four resources: each pulse distributes randomly among Fti/Su/Eldi/Ular */
+      const units = [];
+      for (let i = 0; i < amount * esc; i++) units.push(M.rng.pick(ELS));
+      /* Karnen harvest (random types), RubberMcFly (its own truth's type), Stryx absorb */
       M.creatures.forEach(c => {
         if (c.dead || c.team !== T.idx) return;
-        if (c.speciesId === 'karnen') gain += Math.round(c.vars.harvestOutput * c.vars.workEthic);
-        if (c.speciesId === 'rubbermcfly') gain += Math.round(c.vars.resourceCount);
-        if (c.speciesId === 'stryx' && c.vars.absorbRate > 0.2) gain += 1;
+        if (c.speciesId === 'karnen') { const n = Math.round(c.vars.harvestOutput * c.vars.workEthic); for (let i = 0; i < n; i++) units.push(M.rng.pick(ELS)); }
+        if (c.speciesId === 'rubbermcfly') {
+          const n = Math.round(c.vars.resourceCount);
+          const multi = c.picks.resourceTypes === 'multi';
+          if (!c.mem.mcflyEl) c.mem.mcflyEl = M.rng.pick(ELS);
+          for (let i = 0; i < n; i++) units.push(multi ? M.rng.pick(ELS) : c.mem.mcflyEl);
+        }
+        if (c.speciesId === 'stryx' && c.vars.absorbRate > 0.2) units.push('Ular');
       });
-      T.resources += gain;
-      T.stats.resourcesEarned += gain;
-      /* orb visuals near hoard */
-      for (let i = 0; i < Math.min(6, gain); i++) {
-        M.orbs.push({ x: T.hoard.x + M.rng.range(-50, 50), y: T.hoard.y + M.rng.range(-50, 50), el: M.pulseElement, t0: M.time, team: T.idx });
+      units.forEach(el => { T.resources[el]++; });
+      T.stats.resourcesEarned += units.length;
+      /* orb visuals near hoard, colored by resource type */
+      units.slice(0, 6).forEach(el => {
+        M.orbs.push({ x: T.hoard.x + M.rng.range(-50, 50), y: T.hoard.y + M.rng.range(-50, 50), el, t0: M.time, team: T.idx });
+      });
+    });
+
+    /* growth milestones (July update §2): Naga regrowth/new heads on
+       pulse-count thresholds set by the pulse interval */
+    const growEvery = interval >= 4 ? 3 : interval === 3 ? 4 : interval === 2 ? 5 : 6;
+    M.creatures.forEach(c => {
+      if (c.dead || (c.speciesId !== 'ular_naga' && c.speciesId !== 'su_naga')) return;
+      c.growthPulses = (c.growthPulses || 0) + 1;
+      if (c.growthPulses >= growEvery) {
+        c.growthPulses = 0;
+        if (c.headsLeft < c.headCount) {
+          c.headsLeft++;
+          c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.12);
+          M.addEffect('headLost', c.x, c.y - c.radius, {});
+          M.uiEvent(-1, 'event', c.tokName + ' regrows a head.');
+        } else if (c.headCount < 5) {
+          c.headCount++; c.headsLeft++;
+          c.maxHp = Math.round(c.maxHp * 1.08); c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.1);
+          M.addEffect('headLost', c.x, c.y - c.radius, {});
+          M.uiEvent(-1, 'event', c.tokName + ' grows a NEW head!');
+        }
       }
     });
     if (M.orbs.length > 40) M.orbs.splice(0, M.orbs.length - 40);
@@ -347,7 +407,6 @@
         kofiTok.vars.vigor = c.vars.kofiQuality;
         const k = M.spawnFromToken(kofiTok, c.team, c.x + M.rng.range(-30, 30), c.y + M.rng.range(-30, 30));
         k.isKofiSpawn = true;
-        k.tetherRange = 500;
       }
       /* Sprengju Relic Shaving conversion */
       if (c.speciesId === 'sprengju_shaving') {
@@ -399,6 +458,9 @@
       if (c.speciesId === 'harkal') sp *= 1 + c.frenzy * 0.4;
       const inBog = M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r);
       if (inBog && !c.sp.tags.includes('flyer')) sp *= 0.45;
+      /* water pools: aquatic/flying pass freely, ground-only creatures slow (§15) */
+      const inWater = M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r);
+      if (inWater && !c.sp.tags.includes('flyer') && !c.sp.tags.includes('su') && c.sp.element !== 'Su') sp *= 0.55;
       const dx = it.move.x - c.x, dy = it.move.y - c.y;
       const d = Math.hypot(dx, dy);
       if (d > 3) {
@@ -423,7 +485,7 @@
         c.facing = t.x >= c.x ? 1 : -1;
         if (c.attackCd <= 0) {
           c.attackCd = 1 / ((c.vars.tongueSpeed || 1) * (c.speciesId === 'harkal' ? 1 + c.frenzy : 1) * buffMul('atkSpeedMul'));
-          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1);
+          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1) * (1 + Math.min(0.2, Math.floor((c.matchXp || 0) / 100) * 0.02));
           if (c.speciesId === 'tyndael') dmg *= 0.7 + c.heat * 0.7;
           if (it.useBreath && c.headsLeft > 1) dmg *= 1.25; // multi-head strike
           M.damage(t, dmg, c);
@@ -461,7 +523,8 @@
       if (M.time >= c.mem.breathAt) {
         c.mem.breathAt = M.time + (c.vars.breathCooldown || 12);
         const tier = c.picks.breathTier || 1;
-        M.teams[c.team].resources += tier * 0.5;
+        c.mem.breathAcc = (c.mem.breathAcc || 0) + tier * 0.5;
+        if (c.mem.breathAcc >= 1) { c.mem.breathAcc -= 1; M.teams[c.team].resources.Su++; }
         M.addEffect('breathSu', c.x, c.y - c.radius, {});
       }
     }
@@ -484,8 +547,11 @@
       c.dmg = c.tok.stats.dmg * Math.max(0.15, c.swarmFrac);
     }
 
-    /* relic position follows carrier */
-    if (c.carryingRelic) { M.relic.x = c.x; M.relic.y = c.y - c.radius - 6; }
+    /* carried relic follows its carrier */
+    if (c.carryingRelic) {
+      const rl = M.relics.find(r => r.carrier === c.id);
+      if (rl) { rl.x = c.x; rl.y = c.y - c.radius - 6; }
+    }
   };
 
   /* ================= DAMAGE & DEATH ================= */
@@ -509,6 +575,9 @@
     }
     dmg = Math.max(0.2, dmg);
     t.hp -= dmg;
+    /* in-match XP (§2): damage dealt + damage absorbed */
+    if (source && !source.dead) source.matchXp = (source.matchXp || 0) + dmg * 0.5;
+    t.matchXp = (t.matchXp || 0) + dmg * 0.25;
     t.lastHitTick = M.tick;
     t.lastAttacker = source || null;
     if (t.state !== 'attack') t.state = 'hit';
@@ -541,14 +610,31 @@
     c.dead = true; c.deadTick = M.tick; c.state = 'death';
     if (!M.headless) DYA.audio.play('death');
     if (source && source.team !== c.team && M.teams[source.team]) M.teams[source.team].stats.eliminations++;
+    if (source && !source.dead) source.matchXp = (source.matchXp || 0) + 25; // kill XP (§2)
 
     /* relic drop */
     if (c.carryingRelic) {
       c.carryingRelic = false;
-      M.relic.carrier = null; M.relic.carrierTeam = null;
-      M.relic.x = c.x; M.relic.y = c.y;
-      M.uiEvent(-1, 'relic', 'The Relic is dropped!');
+      const rl = M.relics.find(r => r.carrier === c.id);
+      if (rl) {
+        rl.carrier = null; rl.carrierTeam = null;
+        rl.x = c.x; rl.y = c.y;
+        M.uiEvent(-1, 'relic', (rl.ownerTeam === 0 ? 'Your' : 'Their') + ' Relic is dropped!');
+      }
       if (!M.headless) DYA.audio.play('relicDrop');
+    }
+
+    /* commander tax (§1): a defeated token returns to the pouch; replaying it
+       costs +1 resource per prior defeat. Uff excepted while self-respawning. */
+    if (M.mode === 'standard' && M.teams[c.team] && M.teams[c.team].controller !== 'wild' &&
+        !c.isKofiSpawn && c.speciesId !== 'kofi' && c.speciesId !== 'sprengju' &&
+        !(c.speciesId === 'uff' && cause !== 'retribution')) {
+      const entry = M.teams[c.team].pouch.find(e => e.tok.id === c.tokId);
+      if (entry && entry.state === 'played') {
+        entry.state = 'pouch';
+        entry.deaths = (entry.deaths || 0) + 1;
+        entry.readiedAtPulse = -1;
+      }
     }
 
     /* ShurgrEdan retribution — direct kill of a RubberMcFly */
@@ -635,15 +721,15 @@
 
   Match.prototype.stepMisc = function () {
     const M = this;
-    /* tether check + creature separation + regen */
+    /* border tether (§1): the arena border IS the tether. Creatures fade in
+       the outer band (80% of the way from arena center) and are eliminated
+       at the border itself. */
     for (const c of M.creatures) {
       if (c.dead) continue;
-      /* tether */
-      if (!c.carryingRelic || true) {
-        const d = U.dist(c.x, c.y, c.homeX, c.homeY);
-        c.tetherFrac = d / c.tetherRange;
-        if (c.tetherFrac >= 1) { M.kill(c, null, 'tether'); M.uiEvent(-1, 'event', c.tokName + ' faded beyond its tether.'); continue; }
-      }
+      const nx = Math.abs(c.x - WORLD.w / 2) / (WORLD.w / 2 - 14);
+      const ny = Math.abs(c.y - WORLD.h / 2) / (WORLD.h / 2 - 14);
+      c.tetherFrac = Math.max(nx, ny);
+      if (c.tetherFrac >= 0.995 && !c.rooted) { M.kill(c, null, 'tether'); M.uiEvent(-1, 'event', c.tokName + ' faded at the arena border.'); continue; }
       /* rodak-style regen intent */
       if (c.mem.regen && c.hp < c.maxHp) { c.hp = Math.min(c.maxHp, c.hp + c.mem.regen * 2 * TICK); }
       /* separation (cheap, every 4 ticks) */
@@ -669,8 +755,41 @@
         M.pendingSpawns.splice(i, 1);
       }
     }
+    /* relic capture + defensive recovery */
+    if (M.mode === 'standard' && M.tick % 5 === 0) {
+      for (const rl of M.relics) {
+        if (rl.disabled || rl.captured) continue;
+        if (rl.carrier != null) {
+          const car = M.creatures.find(cr => cr.id === rl.carrier);
+          if (car && !car.dead) {
+            const own = M.teams[car.team].hoard;
+            if (U.dist(car.x, car.y, own.x, own.y) < HOARD_R) {
+              rl.captured = true; rl.x = own.x; rl.y = own.y - 26;
+              car.carryingRelic = false; rl.carrier = null;
+              car.matchXp = (car.matchXp || 0) + 40;
+              M.teams[car.team].stats.relicCaptured = true;
+              M.teams[car.team].stats.relicMethod = 'Carried home by ' + car.tokName;
+              M.uiEvent(-1, 'relic', car.tokName + ' delivers the enemy Relic!');
+            }
+          }
+        } else {
+          /* a dropped relic touched by its owners returns home */
+          const atHome = Math.abs(rl.x - rl.homeX) < 4 && Math.abs(rl.y - rl.homeY) < 4;
+          if (!atHome) {
+            const defender = M.creatures.find(cr => !cr.dead && cr.team === rl.ownerTeam && !cr.sp.tags.includes('inert') && U.dist(cr.x, cr.y, rl.x, rl.y) < RELIC_PICK_R + cr.radius);
+            if (defender) {
+              rl.x = rl.homeX; rl.y = rl.homeY;
+              defender.matchXp = (defender.matchXp || 0) + 20;
+              M.uiEvent(-1, 'relic', defender.tokName + ' returns the Relic home!');
+            }
+          }
+        }
+      }
+    }
+
     /* dead cleanup after fade */
     if (M.tick % 40 === 0) {
+      M.creatures.forEach(c => { if (c.dead && M.tick - c.deadTick >= 60) M.recordTokenXp(c); });
       M.creatures = M.creatures.filter(c => !c.dead || M.tick - c.deadTick < 60);
       M.remnants = M.remnants.filter(r => M.tick - r.at < 1200);
     }
@@ -700,18 +819,13 @@
       return;
     }
 
-    /* standard: relic captured */
-    if (M.relic.carrier != null) {
-      const c = M.creatures.find(cr => cr.id === M.relic.carrier);
-      if (c && !c.dead) {
-        const own = M.teams[c.team].hoard;
-        if (U.dist(c.x, c.y, own.x, own.y) < HOARD_R) {
-          M.teams[c.team].stats.relicCaptured = true;
-          M.teams[c.team].stats.relicMethod = 'Carried home by ' + c.tokName;
-          M.relic.captured = true;
-          M.finish(c.team, 'relic');
-          return;
-        }
+    /* standard: win = the opponent's relic sits in your hoard (all of them
+       in multiplayer; in 1v1 that is the single enemy relic) */
+    for (const rl of M.relics) {
+      if (rl.captured && !rl.disabled) {
+        const winner = 1 - rl.ownerTeam;
+        M.finish(winner, 'relic');
+        return;
       }
     }
     /* draw: both pouches empty AND all field creatures semi-idle 5 straight minutes */
@@ -721,18 +835,51 @@
     }
   };
 
+  /* accumulate a creature's in-match XP/growth against its source token
+     (plain bookkeeping — no RNG, no effect on the sim) */
+  Match.prototype.recordTokenXp = function (c) {
+    const M = this;
+    if (!c.tokId) return;
+    /* only pouch tokens persist — engine-minted spawns (kofi, sprengju,
+       uff respawn copies, wild enemies) carry wall-clock ids and stay ephemeral */
+    const T = M.teams[c.team];
+    if (!T || !T.pouch.some(e => e.tok.id === c.tokId)) return;
+    M.tokenXp = M.tokenXp || {};
+    const e = M.tokenXp[c.tokId] = M.tokenXp[c.tokId] || { xp: 0, heads: 0, team: c.team };
+    e.xp += Math.round(c.matchXp || 0);
+    e.heads = Math.max(e.heads, c.headCount || 1);
+    c.matchXp = 0;
+  };
+
   Match.prototype.finish = function (winnerIdx, how) {
     const M = this;
     M.over = true;
+    M.creatures.forEach(c => M.recordTokenXp(c));
     M.result = {
       winner: winnerIdx, how,
       duration: M.time,
       stats: M.teams.map(T => T.stats),
+      tokenXp: M.tokenXp || {},
     };
     if (M.onFinish) M.onFinish(M.result);
   };
 
   /* ================= UI EVENTS ================= */
+  /* segment vs forest-zone circles: forest patches block ranged targeting */
+  Match.prototype.losBlocked = function (x1, y1, x2, y2) {
+    for (const z of this.zones) {
+      if (z.type !== 'forest') continue;
+      const dx = x2 - x1, dy = y2 - y1;
+      const len2 = dx * dx + dy * dy;
+      if (len2 < 1) continue;
+      let t = ((z.x - x1) * dx + (z.y - y1) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const px = x1 + t * dx, py = y1 + t * dy;
+      if (U.dist(px, py, z.x, z.y) < z.r * 0.85) return true;
+    }
+    return false;
+  };
+
   Match.prototype.uiEvent = function (team, kind, msg) {
     this.events.push({ tick: this.tick, team, kind, msg });
     if (this.events.length > 30) this.events.shift();
@@ -753,7 +900,14 @@
       dist: (a, b) => U.dist(a.x, a.y, b.x, b.y),
       byId: (id) => M.creatures.find(c => c.id === id),
       creaturesOf: (spid) => M.creatures.filter(c => c.speciesId === spid && !c.dead),
-      relic: () => M.relic,
+      /* dual relics: 'the relic' from a creature's point of view is the
+         ENEMY's relic (the thing it can steal). */
+      relic: (team) => {
+        const t = team != null ? team : (api._c ? api._c.team : 0);
+        return M.relics.find(r => r.ownerTeam !== t && !r.disabled) || { x: WORLD.w / 2, y: WORLD.h / 2, captured: true, disabled: true, carrier: null };
+      },
+      ownRelic: (team) => M.relics.find(r => r.ownerTeam === team && !r.disabled) || null,
+      losBlocked: (x1, y1, x2, y2) => M.losBlocked(x1, y1, x2, y2),
       ownHoard: (team) => M.teams[team] ? M.teams[team].hoard : M.teams[0].hoard,
       enemyHoard: (team) => M.teams[1 - team] ? M.teams[1 - team].hoard : M.teams[0].hoard,
       teamRes: (team) => M.teams[team].resources,
@@ -791,7 +945,11 @@
       moveToward(c, x, y, run) { c.intent.move = { x, y, run: !!run }; },
       moveAway(c, x, y, run) {
         const a = Math.atan2(c.y - y, c.x - x);
-        c.intent.move = { x: c.x + Math.cos(a) * 120, y: c.y + Math.sin(a) * 120, run: !!run };
+        c.intent.move = {
+          x: U.clamp(c.x + Math.cos(a) * 120, 90, WORLD.w - 90),
+          y: U.clamp(c.y + Math.sin(a) * 120, 90, WORLD.h - 90),
+          run: !!run,
+        };
       },
       hold(c) { c.intent.state = 'idle'; },
       lazyHold(c) { c.intent.state = 'idle'; },
@@ -809,7 +967,7 @@
       },
       forage(c) {
         if (!c.mem.forageTarget || U.dist(c.x, c.y, c.mem.forageTarget.x, c.mem.forageTarget.y) < 14) {
-          c.mem.forageTarget = { x: U.clamp(c.x + M.rng.range(-160, 160), 30, WORLD.w - 30), y: U.clamp(c.y + M.rng.range(-160, 160), 30, WORLD.h - 30) };
+          c.mem.forageTarget = { x: U.clamp(c.x + M.rng.range(-160, 160), 90, WORLD.w - 90), y: U.clamp(c.y + M.rng.range(-160, 160), 90, WORLD.h - 90) };
         }
         c.intent.move = { x: c.mem.forageTarget.x, y: c.mem.forageTarget.y, run: false };
       },
@@ -882,6 +1040,7 @@
       },
       shoot(c, target) {
         if (c.attackCd > 0) return;
+        if (M.losBlocked(c.x, c.y, target.x, target.y)) return; // forest blocks the shot (§15)
         c.state = 'attack';
         c.facing = target.x >= c.x ? 1 : -1;
         c.attackCd = 1.6 / (c.vars.drawSpeed || 1);
@@ -946,19 +1105,22 @@
         }
       },
 
-      /* relic */
+      /* relic (steals the ENEMY relic only) */
       pickRelic(c) {
-        if (M.relic.carrier != null || M.relic.captured) return;
-        if (U.dist(c.x, c.y, M.relic.x, M.relic.y) > RELIC_PICK_R + c.radius) return;
-        M.relic.carrier = c.id; M.relic.carrierTeam = c.team;
+        const rl = M.relics.find(r => r.ownerTeam !== c.team && !r.disabled && !r.captured && r.carrier == null);
+        if (!rl) return;
+        if (U.dist(c.x, c.y, rl.x, rl.y) > RELIC_PICK_R + c.radius) return;
+        rl.carrier = c.id; rl.carrierTeam = c.team;
         c.carryingRelic = true;
-        M.uiEvent(-1, 'relic', c.tokName + ' has the Relic!');
+        c.matchXp = (c.matchXp || 0) + 15;
+        M.uiEvent(-1, 'relic', c.tokName + ' grabs ' + (rl.ownerTeam === 0 ? 'YOUR' : 'the enemy') + ' Relic!');
         if (!M.headless) DYA.audio.play('relicPick');
       },
       dropRelic(c) {
         if (!c.carryingRelic) return;
-        c.carryingRelic = false; M.relic.carrier = null; M.relic.carrierTeam = null;
-        M.relic.x = c.x; M.relic.y = c.y;
+        const rl = M.relics.find(r => r.carrier === c.id);
+        c.carryingRelic = false;
+        if (rl) { rl.carrier = null; rl.carrierTeam = null; rl.x = c.x; rl.y = c.y; }
       },
 
       /* malsti duat */
@@ -985,8 +1147,11 @@
       },
       stealResource(c) {
         const T = M.teams[1 - c.team];
-        if (T && T.resources >= 1 && (M.tick % 20 === 0)) {
-          T.resources -= 1;
+        if (T && resTotal(T.resources) >= 1 && (M.tick % 20 === 0)) {
+          const el = mostAbundant(T.resources);
+          T.resources[el] -= 1;
+          c.mem.stolenVec = c.mem.stolenVec || { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+          c.mem.stolenVec[el]++;
           c.mem.stolen = (c.mem.stolen || 0) + 1;
           M.teams[c.team].stats.stolen++;
           M.addEffect('steal', c.x, c.y, {});
@@ -994,8 +1159,8 @@
         c.intent.state = 'special';
       },
       depositStolen(c) {
-        M.teams[c.team].resources += c.mem.stolen || 0;
-        c.mem.stolen = 0;
+        if (c.mem.stolenVec) ELS.forEach(e => { M.teams[c.team].resources[e] += c.mem.stolenVec[e]; });
+        c.mem.stolenVec = null; c.mem.stolen = 0;
       },
 
       /* support */
@@ -1089,15 +1254,17 @@
       const pick = triggerable[0];
       let x, y;
       const sp = SP.get(pick.e.tok.speciesId);
-      const relicFree = M.relic.carrier == null && !M.relic.captured;
-      const enemyHasRelic = M.relic.carrierTeam === 1 - T.idx;
+      const myRelic = M.relics.find(r => r.ownerTeam === T.idx);
+      const enemyRelic = M.relics.find(r => r.ownerTeam !== T.idx);
+      const enemyHasMine = myRelic && myRelic.carrier != null;
+      const enemyRelicFree = enemyRelic && enemyRelic.carrier == null && !enemyRelic.captured;
       if (M.mode === 'hunt' && enemyCreatures.length) {
         const q = enemyCreatures.find(e => e.isBoss) || enemyCreatures[0];
         x = q.x + T.aiRng.range(-160, 160); y = q.y + T.aiRng.range(-160, 160);
-      } else if (enemyHasRelic && T.aiRng.chance(0.4 + skill * 0.4)) {
-        x = M.relic.x + T.aiRng.range(-40, 40); y = M.relic.y + T.aiRng.range(-40, 40); // intercept carrier
-      } else if (sp.tags.includes('thief') || (sp.tags.includes('sentient') && relicFree && T.aiRng.chance(skill * 0.7))) {
-        x = M.relic.homeX + T.aiRng.range(-120, 120); y = M.relic.homeY + T.aiRng.range(-120, 120); // relic play
+      } else if (enemyHasMine && T.aiRng.chance(0.4 + skill * 0.4)) {
+        x = myRelic.x + T.aiRng.range(-40, 40); y = myRelic.y + T.aiRng.range(-40, 40); // intercept the thief
+      } else if (enemyRelicFree && (sp.tags.includes('thief') || (sp.tags.includes('sentient') && T.aiRng.chance(skill * 0.7)))) {
+        x = enemyRelic.homeX + T.aiRng.range(-140, 140); y = enemyRelic.homeY + T.aiRng.range(-140, 140); // raid their hoard
       } else if (sp.tags.includes('stationary') || sp.behavior === 'archer_unit' || sp.behavior === 'grothyn') {
         x = own.x + (enemy.x - own.x) * 0.28 + T.aiRng.range(-60, 60); y = own.y + T.aiRng.range(-200, 200); // defensive line
       } else if (enemyCreatures.length && T.aiRng.chance(0.5)) {
@@ -1110,10 +1277,16 @@
       return;
     }
 
-    /* 2. ready affordable tokens */
+    /* 2. ready affordable tokens (vector costs + commander tax) */
     if (T.readied.length < (skill > 0.7 ? 2 : 1) + 1) {
       const affordable = T.pouch.map((e, i) => ({ e, i }))
-        .filter(x => x.e.state === 'pouch' && SP.RARITY_COST[x.e.tok.rarity] <= T.resources);
+        .filter(x => {
+          if (x.e.state !== 'pouch') return false;
+          const cost = Object.assign({}, TK.costVec(x.e.tok));
+          const tax = x.e.deaths || 0;
+          if (tax > 0) { const el = mostAbundant(T.resources); cost[el] = (cost[el] || 0) + tax; }
+          return canAfford(T.resources, cost);
+        });
       if (affordable.length) {
         let choice;
         if (T.aiRng.chance(skill)) {
@@ -1127,7 +1300,7 @@
         } else {
           choice = T.aiRng.pick(affordable);
         }
-        M.queueInput(T.idx, { type: 'ready', pouchIdx: choice.i });
+        M.queueInput(T.idx, { type: 'ready', pouchIdx: choice.i, taxRes: mostAbundant(T.resources) });
       }
     }
   };
