@@ -158,7 +158,7 @@
       attackRange: sp.attackRange || 20,
       attackCd: 0,
       state: 'idle', stateTick: 0,
-      vars: tok.vars || {}, picks: tok.picks || {},
+      vars: Object.assign({}, tok.vars), picks: tok.picks || {},
       diamonds: tok.diamonds || {},
       tokAge: tok.age || 0.5,
       mem: {},
@@ -180,6 +180,22 @@
       intent: {},
       animPhase: (M.idCounter * 0.61803) % 1 * 6.28,
     };
+    /* life-history quirks (Part V): each individual's lived experience,
+       applied as real field effects. Stat-shaping ones land here; the
+       situational ones are read during the sim. All deterministic. */
+    c.quirks = {};
+    (TK.quirks ? TK.quirks(tok) : []).forEach(qid => { c.quirks[qid] = true; });
+    if (c.quirks.heavy_boned) { c.maxHp = Math.round(c.maxHp * 1.18); c.hp = c.maxHp; c.speed = Math.round(c.speed * 0.9); }
+    if (c.quirks.swift_blood) { c.speed = Math.round(c.speed * 1.15); c.maxHp = Math.max(2, Math.round(c.maxHp * 0.92)); c.hp = c.maxHp; }
+    if (c.quirks.keen_eye) c.attackRange = Math.round(c.attackRange * 1.15);
+    if (c.quirks.long_wind) {
+      if (c.vars.breathRange) c.vars.breathRange *= 1.2;
+      else if (c.vars.vineLength) c.vars.vineLength *= 1.2;
+      else if (c.vars.reach) c.vars.reach *= 1.2;
+      else c.attackRange = Math.round(c.attackRange * 1.1);
+    }
+    if (c.quirks.hoard_sense && c.vars.stealRate) c.vars.stealRate *= 1.25;
+
     /* rooted species anchor where they land */
     if (sp.features.rootsOnDeploy || sp.features.stationary || sp.features.rooted || sp.rig === 'field' || sp.rig === 'tree' || sp.rig === 'relic') {
       c.rooted = true;
@@ -336,6 +352,15 @@
   Match.prototype.doPulse = function () {
     const M = this;
     M.pulseIndex++;
+    /* hoard-sense quirk: every 4th pulse a living hoarder sniffs out +1 extra */
+    for (const c of M.creatures) {
+      if (c.dead || !c.quirks || !c.quirks.hoard_sense) continue;
+      c.mem.hoardPulses = (c.mem.hoardPulses || 0) + 1;
+      if (c.mem.hoardPulses % 4 === 0 && M.teams[c.team] && M.teams[c.team].resources) {
+        M.teams[c.team].resources[ELS[M.rng.int(0, 3)]] += 1;
+        M.addEffect('steal', c.x, c.y - c.radius, {});
+      }
+    }
     const esc = EC.escalationMult(M.time);
     /* escalation announcements at 10/15/20+ min */
     if (esc !== M.lastEsc) {
@@ -452,15 +477,18 @@
     /* movement */
     if (it.move && !c.rooted && !(c.onTower)) {
       let sp = c.speed * (it.move.run ? 1.45 : 1) * buffMul('speedMul');
-      if (c.carryingRelic) sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;
+      if (c.carryingRelic) {
+        sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;
+        if (c.quirks && c.quirks.relic_runner) sp *= 1.2;
+      }
       if (c.speciesId === 'mikolo_moko' && !c.carryingRelic) sp *= c.vars.sprint || 1.3;
       if (c.speciesId === 'tyndael') sp *= 0.7 + c.heat * 0.6;
       if (c.speciesId === 'harkal') sp *= 1 + c.frenzy * 0.4;
       const inBog = M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r);
-      if (inBog && !c.sp.tags.includes('flyer')) sp *= 0.45;
+      if (inBog && !c.sp.tags.includes('flyer') && !(c.quirks && c.quirks.bog_raised)) sp *= 0.45;
       /* water pools: aquatic/flying pass freely, ground-only creatures slow (§15) */
       const inWater = M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r);
-      if (inWater && !c.sp.tags.includes('flyer') && !c.sp.tags.includes('su') && c.sp.element !== 'Su') sp *= 0.55;
+      if (inWater && !c.sp.tags.includes('flyer') && !c.sp.tags.includes('su') && c.sp.element !== 'Su' && !(c.quirks && c.quirks.water_raised)) sp *= 0.55;
       const dx = it.move.x - c.x, dy = it.move.y - c.y;
       const d = Math.hypot(dx, dy);
       if (d > 3) {
@@ -485,7 +513,7 @@
         c.facing = t.x >= c.x ? 1 : -1;
         if (c.attackCd <= 0) {
           c.attackCd = 1 / ((c.vars.tongueSpeed || 1) * (c.speciesId === 'harkal' ? 1 + c.frenzy : 1) * buffMul('atkSpeedMul'));
-          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1) * (1 + Math.min(0.2, Math.floor((c.matchXp || 0) / 100) * 0.02));
+          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1) * (1 + Math.min(0.2, Math.floor((c.matchXp || 0) / 100) * 0.02)) * M.quirkDmgMul(c);
           if (c.speciesId === 'tyndael') dmg *= 0.7 + c.heat * 0.7;
           if (it.useBreath && c.headsLeft > 1) dmg *= 1.25; // multi-head strike
           M.damage(t, dmg, c);
@@ -529,6 +557,33 @@
       }
     }
 
+    /* iron gut quirk: wounds close strangely fast */
+    if (c.quirks && c.quirks.iron_gut && c.hp > 0 && c.hp < c.maxHp && M.tick % 20 === 0) {
+      c.hp = Math.min(c.maxHp, c.hp + Math.max(0.3, c.maxHp * 0.0035));
+    }
+
+    /* rock thrower quirk: grabs loose stone and hurls it at the nearest enemy */
+    if (c.quirks && c.quirks.rock_thrower && c.stunnedUntil <= M.tick) {
+      if (c.mem.rockAt == null) c.mem.rockAt = M.time + 4;
+      if (M.time >= c.mem.rockAt) {
+        let best = null, bd = 260;
+        for (const o of M.creatures) {
+          if (o.dead || o.team === c.team || o.sp.rig === 'relic') continue;
+          const d2 = U.dist(c.x, c.y, o.x, o.y);
+          if (d2 < bd && d2 > c.attackRange + c.radius) { bd = d2; best = o; }
+        }
+        if (best) {
+          c.mem.rockAt = M.time + 7;
+          c.facing = best.x >= c.x ? 1 : -1;
+          M.addEffect('rock', c.x, c.y - c.radius * 0.6, { tx: best.x, ty: best.y - best.radius * 0.4 });
+          M.damage(best, 4 + c.dmg * 0.5, c, { noAnim: true });
+          if (!best.dead) best.stunnedUntil = Math.max(best.stunnedUntil, M.tick + Math.round(0.4 / TICK));
+        } else {
+          c.mem.rockAt = M.time + 2; /* nothing in range — check again soon */
+        }
+      }
+    }
+
     /* sprengju consumption: any non-passive creature stepping on one */
     if (!c.sp.tags.includes('passive') && !c.rooted && M.tick % 10 === 0) {
       const spj = M.creatures.find(o => !o.dead && o.speciesId === 'sprengju' && U.dist(c.x, c.y, o.x, o.y) < c.radius + 12);
@@ -554,6 +609,30 @@
     }
   };
 
+  /* situational damage multiplier from life-history quirks */
+  Match.prototype.quirkDmgMul = function (c) {
+    const M = this, q = c.quirks;
+    if (!q) return 1;
+    let m = 1;
+    if (q.storm_born && Math.floor(M.time / 60) % 5 === 4) m *= 1.25; /* Sunear'Zikhron overhead */
+    if (q.early_riser && M.time < 60) m *= 1.15;
+    if (q.slow_burner && M.time > 300) m *= 1.15;
+    if (q.cornered_fighter && c.hp < c.maxHp * 0.5) m *= 1.12;
+    if (q.vengeful && c.mem.vengeUntil && M.time < c.mem.vengeUntil) m *= 1.3;
+    if (q.pack_raised || q.loner) {
+      let allies = 0;
+      for (const o of M.creatures) {
+        if (o.dead || o === c || o.team !== c.team) continue;
+        if (U.dist(c.x, c.y, o.x, o.y) < (q.loner ? 200 : 160)) { allies++; if (allies >= 2) break; }
+      }
+      if (q.pack_raised) m *= 1 + 0.08 * allies;
+      if (q.loner && allies === 0) m *= 1.18;
+    }
+    if (q.forest_reared && M.zones.some(z => z.type === 'forest' && U.dist(c.x, c.y, z.x, z.y) < z.r)) m *= 1.12;
+    if (q.shore_reared && M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r)) m *= 1.12;
+    return m;
+  };
+
   /* ================= DAMAGE & DEATH ================= */
   Match.prototype.damage = function (t, amount, source, opts) {
     const M = this;
@@ -568,6 +647,11 @@
     if (t.vars.scarToughness) dmg *= 1 - t.vars.scarToughness * 0.5;
     if (t.vars.hairArmor && source && source.x < t.x === (t.facing > 0)) dmg *= 1 - t.vars.hairArmor; // back armor
     if (t.onTower) dmg *= 0.7;
+    /* defensive life-history quirks */
+    if (t.quirks) {
+      if (t.quirks.thick_hide) dmg = Math.max(0.2, dmg - 1);
+      if (t.quirks.scarred_survivor && t.hp < t.maxHp * 0.3) dmg *= 0.85;
+    }
     /* naga first head: near-invincible absorb */
     if ((t.speciesId === 'ular_naga' || t.speciesId === 'su_naga')) {
       const firstHeadPortion = t.maxHp * 0.55;
@@ -591,6 +675,12 @@
     }
     /* harkal frenzy on damage taken */
     if (t.speciesId === 'harkal') t.frenzy = Math.min(1, t.frenzy + 0.2);
+    /* skittish quirk: the first bad wound triggers a burst of speed */
+    if (t.quirks && t.quirks.skittish && !t.mem.skitDone && t.hp > 0 && t.hp < t.maxHp * 0.5) {
+      t.mem.skitDone = true;
+      t.buffs.push({ speedMul: 1.45, until: M.tick + Math.round(3 / TICK) });
+      M.addEffect('buff', t.x, t.y, {});
+    }
 
     /* naga head loss */
     if ((t.speciesId === 'ular_naga' || t.speciesId === 'su_naga') && t.headCount > 1) {
@@ -611,6 +701,15 @@
     if (!M.headless) DYA.audio.play('death');
     if (source && source.team !== c.team && M.teams[source.team]) M.teams[source.team].stats.eliminations++;
     if (source && !source.dead) source.matchXp = (source.matchXp || 0) + 25; // kill XP (§2)
+
+    /* vengeful quirk: nearby allies of the fallen enter a brief fury */
+    for (const o of M.creatures) {
+      if (o.dead || o === c || o.team !== c.team) continue;
+      if (o.quirks && o.quirks.vengeful && U.dist(o.x, o.y, c.x, c.y) < 180) {
+        o.mem.vengeUntil = M.time + 6;
+        M.addEffect('buff', o.x, o.y, {});
+      }
+    }
 
     /* relic drop */
     if (c.carryingRelic) {

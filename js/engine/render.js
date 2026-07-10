@@ -428,6 +428,26 @@
         }
         break;
       }
+      case 'rock': {
+        /* a thrown stone arcing from source to target */
+        const rx = e.x + (e.tx - e.x) * f, ry = e.y + (e.ty - e.y) * f - Math.sin(f * Math.PI) * 46;
+        ctx.fillStyle = '#8d8578';
+        ctx.save();
+        ctx.translate(rx, ry); ctx.rotate(f * 9);
+        ctx.beginPath();
+        ctx.moveTo(-5, 2); ctx.lineTo(-2, -4); ctx.lineTo(4, -3); ctx.lineTo(5, 3); ctx.lineTo(0, 5);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#00000033'; ctx.fillRect(-3, -1, 4, 3);
+        ctx.restore();
+        if (f > 0.85) {
+          ctx.fillStyle = 'rgba(200,190,170,' + (1 - f) * 3 + ')';
+          for (let i = 0; i < 4; i++) {
+            const a = i / 4 * TAU;
+            ctx.beginPath(); ctx.arc(e.tx + Math.cos(a) * (f - 0.85) * 60, e.ty + Math.sin(a) * (f - 0.85) * 60, 2.4, 0, TAU); ctx.fill();
+          }
+        }
+        break;
+      }
       case 'hit': {
         ctx.fillStyle = 'rgba(255,235,200,' + (1 - f) * 0.8 + ')';
         const n = e.big ? 7 : 4;
