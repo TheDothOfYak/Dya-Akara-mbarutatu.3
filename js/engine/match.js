@@ -48,7 +48,8 @@
     M.effects = [];
     M.structures = [];
     M.zones = [];          // bogs, fire patches
-    M.remnants = [];       // crushed makari etc.
+    M.remnants = [];
+    M.pickups = []; /* field morsels: Karnen food, chemist pieces */       // crushed makari etc.
     M.orbs = [];           // resource orb visuals
     M.pendingSpawns = [];  // uff respawns etc.
     M.inputQueue = [];
@@ -180,6 +181,10 @@
       intent: {},
       animPhase: (M.idCounter * 0.61803) % 1 * 6.28,
     };
+    /* the player's own Eikar — the token of THEM — reads the field and
+       sounds the horn on its own; it is exactly as smart as its keeper */
+    c.isCommander = !!(tok.isSelf || (tok.isStarter && sp.eikarLayer));
+
     /* life-history quirks (Part V): each individual's lived experience,
        applied as real field effects. Stat-shaping ones land here; the
        situational ones are read during the sim. All deterministic. */
@@ -397,7 +402,16 @@
       /* Karnen harvest (random types), RubberMcFly (its own truth's type), Stryx absorb */
       M.creatures.forEach(c => {
         if (c.dead || c.team !== T.idx) return;
-        if (c.speciesId === 'karnen') { const n = Math.round(c.vars.harvestOutput * c.vars.workEthic); for (let i = 0; i < n; i++) units.push(M.rng.pick(ELS)); }
+        if (c.speciesId === 'karnen') {
+          const n = Math.round(c.vars.harvestOutput * c.vars.workEthic);
+          for (let i = 0; i < n; i++) units.push(M.rng.pick(ELS));
+          /* farmers: every second pulse they also set out FOOD — a morsel
+             any creature may claim, and smart ones may carry to another */
+          c.mem.farmPulses = (c.mem.farmPulses || 0) + 1;
+          if (c.mem.farmPulses % 2 === 0 && M.pickups.filter(pk => !pk.carrier).length < 12) {
+            M.pickups.push({ id: M.idCounter++, kind: 'food', x: c.x + M.rng.range(-34, 34), y: c.y + M.rng.range(-30, 30), potency: 0.25, bornTick: M.tick, carrier: null });
+          }
+        }
         if (c.speciesId === 'rubbermcfly') {
           /* vital to guiding and strengthening the storm — while the
              Sunear'Zikhron passes, each glowing McFly yields one extra */
@@ -600,15 +614,86 @@
       }
     }
 
-    /* sprengju consumption: any non-passive creature stepping on one */
+    /* chemist Eikar: every so often they lob a piece of SOMETHING onto the
+       field — a random buff for whatever token grabs it first, either team */
+    if (c.sp.behavior === 'chemist' && !c.dead) {
+      if (c.mem.chemAt == null) c.mem.chemAt = M.time + 10;
+      if (M.time >= c.mem.chemAt) {
+        c.mem.chemAt = M.time + 14;
+        if (M.pickups.filter(pk => !pk.carrier).length < 12) {
+          M.pickups.push({ id: M.idCounter++, kind: 'chem', x: c.x + M.rng.range(-110, 110), y: c.y + M.rng.range(-90, 90), potency: M.rng.range(0.25, 0.5), bornTick: M.tick, carrier: null });
+          M.addEffect('rock', c.x, c.y - c.radius * 0.6, { tx: M.pickups[M.pickups.length - 1].x, ty: M.pickups[M.pickups.length - 1].y });
+        }
+      }
+    }
+
+    /* sprengju & buff-fruit consumption: any non-passive creature stepping on
+       one eats it — the fruits belong to NOBODY, first come first served */
     if (!c.sp.tags.includes('passive') && !c.rooted && M.tick % 10 === 0) {
-      const spj = M.creatures.find(o => !o.dead && o.speciesId === 'sprengju' && U.dist(c.x, c.y, o.x, o.y) < c.radius + 12);
+      const spj = M.creatures.find(o => !o.dead && (o.speciesId === 'sprengju' || o.sp.features.fruit) && U.dist(c.x, c.y, o.x, o.y) < c.radius + 12);
       if (spj) {
         spj.dead = true; spj.deadTick = M.tick;
         const pot = spj.vars.potency || 0.3;
-        c.buffs.push({ dmgMul: 1 + pot, speedMul: 1 + pot * 0.5, until: M.tick + Math.round(10 / TICK) });
-        c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pot * 0.3);
+        const fruit = spj.sp.features.fruit;
+        if (!fruit) { /* classic sprengju: everything at once */
+          c.buffs.push({ dmgMul: 1 + pot, speedMul: 1 + pot * 0.5, until: M.tick + Math.round(10 / TICK) });
+          c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pot * 0.3);
+        } else if (fruit === 'strike') c.buffs.push({ dmgMul: 1 + pot * 1.4, until: M.tick + Math.round(12 / TICK) });
+        else if (fruit === 'pace') c.buffs.push({ speedMul: 1 + pot * 1.3, until: M.tick + Math.round(12 / TICK) });
+        else if (fruit === 'mend') c.hp = Math.min(c.maxHp, c.hp + c.maxHp * (0.2 + pot * 0.5));
+        else if (fruit === 'guard') c.buffs.push({ armorMul: Math.max(0.55, 1 - pot * 1.2), until: M.tick + Math.round(12 / TICK) });
         M.addEffect('buff', c.x, c.y, {});
+        if (fruit) M.uiEvent(-1, 'event', c.tokName + ' devours the ' + spj.sp.name + '.');
+      }
+    }
+
+    /* field morsels: eat when hungry; the smart carry food to others.
+       Smart creatures never abandon a fight to fetch — that lives in their
+       behavior trees as a lowest-priority errand. */
+    if (!c.sp.tags.includes('passive') && M.tick % 10 === 0 && M.pickups.length) {
+      const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
+      const carried = M.pickups.find(pk => pk.carrier === c.id);
+      if (carried) {
+        carried.x = c.x; carried.y = c.y - c.radius - 10;
+        /* feed a wounded ally — mounts first (an Eikar feeds its Byrd) */
+        let target = null;
+        for (const o of M.creatures) {
+          if (o.dead || o === c || o.team !== c.team || o.hp >= o.maxHp * 0.7) continue;
+          if (U.dist(c.x, c.y, o.x, o.y) > 70) continue;
+          if (!target || (o.sp.tags.includes('mount') && !target.sp.tags.includes('mount'))) target = o;
+        }
+        if (target) {
+          M.pickups = M.pickups.filter(pk => pk !== carried);
+          target.hp = Math.min(target.maxHp, target.hp + target.maxHp * carried.potency);
+          M.addEffect('heal', target.x, target.y, {});
+          M.uiEvent(-1, 'event', c.tokName + ' feeds ' + target.tokName + '.');
+        } else if (c.hp < c.maxHp * 0.6) { /* its own need outgrew its patience */
+          M.pickups = M.pickups.filter(pk => pk !== carried);
+          c.hp = Math.min(c.maxHp, c.hp + c.maxHp * carried.potency);
+          M.addEffect('heal', c.x, c.y, {});
+        }
+      } else {
+        const pk = M.pickups.find(pk2 => !pk2.carrier && U.dist(c.x, c.y, pk2.x, pk2.y) < c.radius + 14);
+        if (pk) {
+          if (pk.kind === 'chem') {
+            /* a piece of something — random boon for whoever grabbed it */
+            M.pickups = M.pickups.filter(pk2 => pk2 !== pk);
+            const roll = M.rng.pick(['strike', 'pace', 'guard', 'mend']);
+            if (roll === 'strike') c.buffs.push({ dmgMul: 1 + pk.potency * 1.4, until: M.tick + Math.round(12 / TICK) });
+            else if (roll === 'pace') c.buffs.push({ speedMul: 1 + pk.potency * 1.2, until: M.tick + Math.round(12 / TICK) });
+            else if (roll === 'guard') c.buffs.push({ armorMul: Math.max(0.55, 1 - pk.potency), until: M.tick + Math.round(12 / TICK) });
+            else c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pk.potency);
+            M.addEffect('buff', c.x, c.y, {});
+            M.uiEvent(-1, 'event', c.tokName + ' grabs the chemist\u2019s piece — ' + roll + '!');
+          } else if (c.hp < c.maxHp * 0.8) {
+            /* hungry enough to eat it on the spot */
+            M.pickups = M.pickups.filter(pk2 => pk2 !== pk);
+            c.hp = Math.min(c.maxHp, c.hp + c.maxHp * pk.potency);
+            M.addEffect('heal', c.x, c.y, {});
+          } else if (smart) {
+            pk.carrier = c.id; /* carry it for someone who needs it */
+          }
+        }
       }
     }
 
@@ -669,6 +754,8 @@
     if (t.vars.scarToughness) dmg *= 1 - t.vars.scarToughness * 0.5;
     if (t.vars.hairArmor && source && source.x < t.x === (t.facing > 0)) dmg *= 1 - t.vars.hairArmor; // back armor
     if (t.onTower) dmg *= 0.7;
+    /* guard buffs (Stonefruit, chemist pieces) */
+    for (const b of t.buffs) { if (b.armorMul && b.until > M.tick) dmg *= b.armorMul; }
     /* defensive life-history quirks */
     if (t.quirks) {
       if (t.quirks.thick_hide) dmg = Math.max(0.2, dmg - 1);
@@ -723,6 +810,18 @@
     if (!M.headless) DYA.audio.play('death');
     if (source && source.team !== c.team && M.teams[source.team]) M.teams[source.team].stats.eliminations++;
     if (source && !source.dead) source.matchXp = (source.matchXp || 0) + 25; // kill XP (§2)
+
+    /* feeding: a predator eats what it kills — the meal closes wounds,
+       and a Naga's feeding hurries the growth of its next head */
+    if (source && !source.dead && cause === 'combat' && source.team !== c.team &&
+        (source.sp.tags.includes('carnivore') || source.sp.tags.includes('omnivore')) &&
+        !c.sp.tags.includes('inert') && !c.sp.features.fruit && c.speciesId !== 'sprengju') {
+      source.hp = Math.min(source.maxHp, source.hp + Math.min(source.maxHp * 0.25, c.maxHp * 0.12));
+      M.addEffect('heal', source.x, source.y, {});
+      if (source.speciesId === 'ular_naga' || source.speciesId === 'su_naga') {
+        source.growthPulses = (source.growthPulses || 0) + 2; /* a good meal feeds the next head */
+      }
+    }
 
     /* vengeful quirk: nearby allies of the fallen enter a brief fury */
     for (const o of M.creatures) {
@@ -876,6 +975,48 @@
         M.pendingSpawns.splice(i, 1);
       }
     }
+    /* the living horn: each fielded commander (the player's self-Eikar)
+       evaluates the field every few seconds and rallies the side (§ fun pass).
+       Reads sim state only — deterministic in lockstep and replays. */
+    if (M.mode === 'standard' && M.tick % 120 === 0) {
+      for (const cm of M.creatures) {
+        if (cm.dead || !cm.isCommander) continue;
+        const myRelic = M.relics.find(r => r.ownerTeam === cm.team);
+        const foeRelic = M.relics.find(r => r.ownerTeam !== cm.team);
+        let call = null;
+        if (myRelic && myRelic.carrier != null && myRelic.carrierTeam !== cm.team) {
+          call = 'INTERCEPT THE THIEF';
+          for (const o of M.creatures) {
+            if (o.dead || o.team !== cm.team || o === cm || o.rooted) continue;
+            if (U.dist(cm.x, cm.y, o.x, o.y) < 340) o.buffs.push({ speedMul: 1.28, until: M.tick + Math.round(4.5 / TICK) });
+          }
+        } else if (foeRelic && !foeRelic.carrier && !foeRelic.captured && !foeRelic.disabled &&
+                   M.creatures.some(o => !o.dead && o.team === cm.team && U.dist(o.x, o.y, foeRelic.x, foeRelic.y) < 380)) {
+          call = 'PRESS FOR THE RELIC';
+          for (const o of M.creatures) {
+            if (o.dead || o.team !== cm.team || o.rooted) continue;
+            if (U.dist(o.x, o.y, foeRelic.x, foeRelic.y) < 380) o.buffs.push({ speedMul: 1.15, dmgMul: 1.05, until: M.tick + Math.round(4.5 / TICK) });
+          }
+        } else {
+          const hoard = M.teams[cm.team] && M.teams[cm.team].hoard;
+          if (hoard && M.creatures.some(o => !o.dead && o.team !== cm.team && !o.sp.tags.includes('passive') && U.dist(o.x, o.y, hoard.x, hoard.y) < 240)) {
+            call = 'HOLD THE HOARD';
+            for (const o of M.creatures) {
+              if (o.dead || o.team !== cm.team) continue;
+              if (U.dist(o.x, o.y, hoard.x, hoard.y) < 300) o.buffs.push({ dmgMul: 1.2, until: M.tick + Math.round(4.5 / TICK) });
+            }
+          }
+        }
+        if (call && cm.mem.lastCall !== call && M.tick - (cm.mem.lastCallTick || -9999) > 240) {
+          cm.mem.lastCall = call; cm.mem.lastCallTick = M.tick;
+          M.uiEvent(-1, 'event', '📯 ' + cm.tokName + ' sounds the horn — ' + call + '!');
+          M.addEffect('buff', cm.x, cm.y, {});
+          if (!M.headless && cm.team === 0) DYA.audio.play('horn');
+        }
+        if (!call) cm.mem.lastCall = null;
+      }
+    }
+
     /* relic capture + defensive recovery */
     if (M.mode === 'standard' && M.tick % 5 === 0) {
       for (const rl of M.relics) {
@@ -913,6 +1054,8 @@
       M.creatures.forEach(c => { if (c.dead && M.tick - c.deadTick >= 60) M.recordTokenXp(c); });
       M.creatures = M.creatures.filter(c => !c.dead || M.tick - c.deadTick < 60);
       M.remnants = M.remnants.filter(r => M.tick - r.at < 1200);
+      /* unclaimed morsels spoil after 90s; carried ones keep */
+      M.pickups = M.pickups.filter(pk => pk.carrier != null ? M.creatures.some(o => !o.dead && o.id === pk.carrier) : M.tick - pk.bornTick < 1800);
     }
   };
 
@@ -934,7 +1077,9 @@
       const bossAlive = M.creatures.some(c => !c.dead && c.team === 1);
       if (!bossAlive) { M.finish(0, 'hunt'); return; }
       const T = M.teams[0];
-      const anyAlive = M.creatures.some(c => !c.dead && c.team === 0);
+      /* flora and other passives don't keep a hunt alive — a lone stonefruit
+         is not a hunter */
+      const anyAlive = M.creatures.some(c => !c.dead && c.team === 0 && !c.sp.tags.includes('passive'));
       const anyLeft = T.pouch.some(e => e.state === 'pouch') || T.readied.length > 0;
       if (!anyAlive && !anyLeft && M.time > 20) { M.finish(1, 'hunt'); return; }
       return;
@@ -1036,6 +1181,15 @@
       makariRemnants: () => M.remnants,
       inBog: (c) => M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r),
       inWater: (c) => M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r),
+      nearestPickup: (c, range) => {
+        let best = null, bd = range || 200;
+        for (const pk of M.pickups) {
+          if (pk.carrier != null) continue;
+          const d = U.dist(c.x, c.y, pk.x, pk.y);
+          if (d < bd) { bd = d; best = pk; }
+        }
+        return best;
+      },
       offCooldown: (c, key) => !c.mem['cd_' + key] || c.mem['cd_' + key] <= M.tick,
 
       enemiesNear(c, range) {
@@ -1075,7 +1229,18 @@
       hold(c) { c.intent.state = 'idle'; },
       lazyHold(c) { c.intent.state = 'idle'; },
       guard(c) { c.intent.state = 'idle'; },
-      guardPost(c) { c.intent.state = 'idle'; },
+      guardPost(c) {
+        /* the smart don't stand around: with nothing better to do — and ONLY
+           then — they stroll to a nearby morsel. They never abandon a fight
+           for food; this is the lowest branch of every tree that reaches it. */
+        const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
+        if (smart && !c.rooted && !M._api.nearestEnemy(c, 220) &&
+            !M.pickups.some(pk => pk.carrier === c.id)) {
+          const pk = M._api.nearestPickup(c, 200);
+          if (pk) { c.intent.move = { x: pk.x, y: pk.y, run: false }; return; }
+        }
+        c.intent.state = 'idle';
+      },
       sleep(c) { c.intent.state = 'dormant'; },
       wake(c) { if (c.state === 'dormant') c.state = 'idle'; },
       shellUp(c) { c.intent.state = 'dormant'; },

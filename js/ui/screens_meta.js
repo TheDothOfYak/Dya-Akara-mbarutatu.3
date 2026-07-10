@@ -1136,6 +1136,7 @@
         const tok = TK.mint({ speciesId: 'sword_eikar', rng, owner: me.id, rarity: 1, name: me.displayName });
         tok.story = me.displayName + ' — you, sung true from a lock of your own acorn-cap at the Guild registry. Every player of Dya’Akara begins with their own truth on the field.';
         tok.isStarter = true;
+        tok.isSelf = true; /* the token of the player themself — it commands the field as they would */
         G.addToken(tok);
         spot({
           step: 3, title: 'Your First Token: You',
