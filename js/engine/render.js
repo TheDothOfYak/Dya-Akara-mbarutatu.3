@@ -260,6 +260,7 @@
       ctx.translate(c.x, c.y);
       SPR.draw(ctx, {
         sp: c.sp, r: c.radius * 1.35, state: c.dead ? 'death' : c.state,
+        indiv: c.tok && DYA.token.physique ? DYA.token.physique(c.tok) : null,
         t: R.t, phase: c.animPhase, facing: c.facing,
         teamColor: M.mode === 'hunt' && c.team === 1 ? '#9c3a3a' : M.teams[c.team] ? M.teams[c.team].color : null,
         seal: M.teams[c.team] ? M.teams[c.team].seal : null,

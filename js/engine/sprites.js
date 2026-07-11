@@ -27,11 +27,101 @@
   }
   SPR.shade = shade;
 
+  /* hue-rotate + lighten a hex color (for per-individual coat drift) */
+  function hueShift(hex, deg, light) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let h = 0, s = 0, l = (mx + mn) / 2;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      h = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h /= 6;
+    }
+    h = (h + deg / 360 + 1) % 1;
+    l = Math.max(0.05, Math.min(0.92, l + light / 100));
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+    const f = (tc) => {
+      tc = (tc + 1) % 1;
+      if (tc < 1 / 6) return p + (q - p) * 6 * tc;
+      if (tc < 1 / 2) return q;
+      if (tc < 2 / 3) return p + (q - p) * (2 / 3 - tc) * 6;
+      return p;
+    };
+    const to = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255);
+    return '#' + ((to(f(h + 1 / 3)) << 16) | (to(f(h)) << 8) | to(f(h - 1 / 3))).toString(16).padStart(6, '0');
+  }
+  SPR.hueShift = hueShift;
+
+  /* per-individual species tint, cached — every token wears its own coat */
+  const tintCache = {};
+  function tintedSpecies(sp, indiv) {
+    if (!indiv || (!indiv.hue && !indiv.light)) return sp;
+    const key = sp.id + '|' + indiv.hue + '|' + indiv.light;
+    let t = tintCache[key];
+    if (!t) {
+      t = tintCache[key] = Object.assign({}, sp, {
+        color: sp.color ? hueShift(sp.color, indiv.hue, indiv.light) : sp.color,
+        color2: sp.color2 ? hueShift(sp.color2, indiv.hue * 0.7, indiv.light * 0.6) : sp.color2,
+      });
+    }
+    return t;
+  }
+
+  /* identifying markings — spots, a dorsal stripe, a facial blaze, pale
+     feet — drawn over the body rigs that can carry them */
+  const MARKABLE = { quad: 1, biped: 1, bird: 1, crab: 1, blob: 1 };
+  function drawMarking(ctx, o, indiv) {
+    if (!indiv || !indiv.marking || indiv.marking === 'none' || !MARKABLE[o.sp.rig || 'quad']) return;
+    const r = o.r;
+    ctx.save();
+    ctx.globalAlpha *= 0.32;
+    const dark = shade(o.sp.color || '#8a6f4a', -70), pale = shade(o.sp.color || '#8a6f4a', 80);
+    if (indiv.marking === 'spots') {
+      ctx.fillStyle = pale;
+      for (let i = 0; i < 5; i++) {
+        const a = (indiv.markSeed * 0.37 + i * 2.4) % 6.283;
+        const rr = ((indiv.markSeed >> (i + 2)) % 7) / 10 + 0.15;
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(a) * r * 0.55 * rr * 1.6, Math.sin(a) * r * 0.4 * rr - r * 0.1, r * 0.11, r * 0.09, 0, 0, TAU);
+        ctx.fill();
+      }
+    } else if (indiv.marking === 'stripe') {
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = r * 0.16;
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.18, r * 0.72, r * 0.5, 0, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.stroke();
+    } else if (indiv.marking === 'blaze') {
+      ctx.fillStyle = pale;
+      ctx.beginPath();
+      ctx.ellipse(r * 0.52, -r * 0.28, r * 0.2, r * 0.3, -0.4, 0, TAU);
+      ctx.fill();
+    } else if (indiv.marking === 'socks') {
+      ctx.fillStyle = pale;
+      [-0.45, -0.12, 0.2, 0.5].forEach(fx => {
+        ctx.beginPath();
+        ctx.ellipse(r * fx, r * 0.72, r * 0.1, r * 0.13, 0, 0, TAU);
+        ctx.fill();
+      });
+    }
+    ctx.restore();
+  }
+
   /* ============ master draw ============ */
   /* o: {sp (species def), r, state, t, phase, facing, teamColor, alpha,
          shimmer (bool), biolum (bool), heat (0..1 tyndael), swarmFrac,
          heads (actual head count), hasRider, quality} */
   SPR.draw = function (ctx, o) {
+    /* per-individual look: coat drift + build (display-only — the sim
+       never reads these) */
+    if (o.indiv) {
+      o = Object.assign({}, o, {
+        sp: tintedSpecies(o.sp, o.indiv),
+        r: o.r * (o.indiv.build || 1),
+      });
+    }
     const sp = o.sp;
     const state = o.state || 'idle';
     const t = (o.t || 0) + (o.phase || 0);
@@ -88,6 +178,9 @@
     else if (rig === 'mcfly') drawMcFly(ctx, o, t, state);
     else if (rig === 'bird') drawBird(ctx, o, t, state);
     else drawQuad(ctx, o, t, state);
+
+    /* this individual's identifying marks, over the coat */
+    if (o.indiv && state !== 'death') drawMarking(ctx, o, o.indiv);
 
     ctx.scale(o.facing < 0 ? -1 : 1, 1); // unflip for shimmer
 

@@ -161,15 +161,26 @@
     UI.toast(n);
     UI.refreshTopbar();
   };
+  /* run a notification's stored action: a plain-data screen jump
+     ({screen, params}) so it survives being saved with the world */
+  UI.runAction = function (action) {
+    if (!action || !action.screen) return;
+    UI.show(action.screen, action.params || {});
+  };
   UI.toast = function (n) {
-    const t = U.el('div', { cls: 'toast' }, [
+    const t = U.el('div', { cls: 'toast' + (n.action ? ' actionable' : '') }, [
       U.el('div', { cls: 't-title', text: (n.icon ? n.icon + ' ' : '') + n.title }),
       U.el('div', { cls: 't-body', text: n.body || '' }),
     ]);
-    t.onclick = () => t.remove();
+    if (n.action) {
+      t.appendChild(U.el('div', { cls: 't-go', text: (n.actionLabel || 'View') + ' ›' }));
+      t.onclick = () => { t.remove(); UI.runAction(n.action); };
+    } else {
+      t.onclick = () => t.remove();
+    }
     U.qs('#toasts').appendChild(t);
     DYA.audio.play('notify');
-    setTimeout(() => { t.style.transition = 'opacity .5s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, 5200);
+    setTimeout(() => { t.style.transition = 'opacity .5s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, n.action ? 9000 : 5200);
   };
   let notifPanel = null;
   UI.toggleNotifPanel = function () {
@@ -178,15 +189,19 @@
     notifPanel = U.el('div', { id: 'notifPanel' });
     if (!me.notifications.length) notifPanel.appendChild(U.el('div', { cls: 'muted center', style: 'padding:18px', text: 'Nothing new. The Guild sleeps.' }));
     me.notifications.slice().reverse().forEach(n => {
-      const row = U.el('div', { cls: 'notif-row' }, [
+      const row = U.el('div', { cls: 'notif-row' + (n.action ? ' actionable' : '') }, [
         U.el('div', { text: n.icon || '📜' }),
         U.el('div', {}, [
           U.el('div', { style: 'color:var(--gold);font-size:13px', text: n.title }),
           U.el('div', { cls: 'small muted', text: n.body || '' }),
-          U.el('div', { cls: 'small muted', text: U.timeAgo(n.at) }),
+          U.el('div', { cls: 'small muted', text: U.timeAgo(n.at) + (n.action ? ' · click to view' : '') }),
         ]),
         U.el('div', { cls: 'n-x', text: '✕', onclick: (e) => { e.stopPropagation(); G.dismissNotification(n.id); row.remove(); UI.refreshTopbar(); } }),
       ]);
+      if (n.action) {
+        row.style.cursor = 'pointer';
+        row.onclick = () => { notifPanel.remove(); notifPanel = null; UI.runAction(n.action); };
+      }
       notifPanel.appendChild(row);
     });
     document.body.appendChild(notifPanel);
@@ -241,18 +256,21 @@
     SPR.draw(ctx, {
       sp, r: w * 0.26, state: cv._state || 'idle', t: t, phase: cv._phase || 0,
       facing: 1, alpha: 1, shimmer: true, biolum: true,
-      heads: cv._heads, heat: 0.7,
+      heads: cv._heads, heat: 0.7, indiv: cv._indiv,
     });
     ctx.restore();
   }
 
   /* live animated art canvas for a species */
-  UI.tokenArt = function (speciesId, size, state, heads) {
+  UI.tokenArt = function (speciesId, size, state, heads, tok) {
     const cv = U.el('canvas', { width: size, height: size });
     cv._sp = SP.get(speciesId);
     cv._state = state || 'idle';
     cv._phase = Math.random() * 6.28;
     cv._heads = heads;
+    /* with the token in hand, draw THIS individual — its own coat,
+       build, and markings — not the species template */
+    cv._indiv = tok && TK.physique ? TK.physique(tok) : null;
     UI.animCards.add(cv);
     drawTokenArt(cv, UI._animT);
     return cv;
@@ -263,7 +281,7 @@
     opts = opts || {};
     const sp = SP.get(tok.speciesId);
     const card = U.el('div', { cls: 'tok-card' + (tok.isRental ? ' rental' : '') });
-    card.appendChild(UI.tokenArt(tok.speciesId, opts.size || 92, 'idle', tok.picks && tok.picks.headCount));
+    card.appendChild(UI.tokenArt(tok.speciesId, opts.size || 92, 'idle', tok.picks && tok.picks.headCount, tok));
     card.appendChild(U.el('div', { cls: 'tc-name', text: tok.name }));
     if (opts.mode !== 'minimal') {
       card.appendChild(U.el('div', { cls: 'tc-meta', html: '<span class="rarity-dot br' + tok.rarity + '"></span>' + SP.RARITIES[tok.rarity] + ' · <span class="el-' + sp.element + '">' + sp.element + '</span>' }));
@@ -337,7 +355,7 @@
       ctx.scale(squish, 1);
       SPR.draw(cv.getContext('2d'), {
         sp, r: 95, state: 'idle', t, facing,
-        alpha: 1, shimmer: true, biolum: true,
+        alpha: 1, shimmer: true, biolum: true, indiv: TK.physique ? TK.physique(tok) : null,
         heads: tok.picks && tok.picks.headCount, heat: 0.8,
       });
       ctx.restore();
@@ -364,6 +382,9 @@
     right.appendChild(U.el('div', { cls: 'divider' }));
     right.appendChild(U.el('div', { html: '<span class="muted small">DESCRIPTION</span><br>' + U.esc(sp.desc) }));
     right.appendChild(U.el('div', { cls: 'mt', html: '<span class="muted small">TEMPERAMENT (THIS INDIVIDUAL)</span><br>' + U.esc(card.temperament) }));
+    if (card.marks) {
+      right.appendChild(U.el('div', { cls: 'mt', html: '<span class="muted small">DISTINGUISHING MARKS</span><br>' + U.esc(card.marks) }));
+    }
     if (card.fieldNotes && card.fieldNotes.length) {
       right.appendChild(U.el('div', { cls: 'mt', html: '<span class="muted small">FIELD NOTES (LIFE HISTORY)</span><br>' + card.fieldNotes.map(n => '\u25B8 ' + U.esc(n)).join('<br>') }));
     }

@@ -436,10 +436,12 @@
   });
 
   /* ================= MARKET ================= */
-  const mktState = { tab: 'Browse', filter: 'All', search: '', view: 'grid', sort: 'newest' };
+  const mktState = { tab: 'Browse', filter: 'All', search: '', view: 'grid', sort: 'newest', panelOpen: true };
 
   UI.register('market', {
-    enter(root) {
+    enter(root, params) {
+      /* deep-linkable: offer-reply alerts jump straight to a tab */
+      if (params && params.tab) mktState.tab = params.tab;
       const me = G.me;
       const scr = U.el('div', { cls: 'screen' });
       scr.appendChild(UI.topbar({ title: 'Market' }));
@@ -496,14 +498,27 @@
         main.appendChild(gwrap);
         body.appendChild(main);
 
-        /* right stall panel: notify-me + featured sellers */
-        const panel = U.el('div', { cls: 'stall-panel' });
-        panel.appendChild(U.el('h3', { cls: 'gold mb', text: 'Notify Me' }));
-        panel.appendChild(U.el('p', { cls: 'small muted', text: 'Get an alert when a species you want is listed.' }));
+        /* right stall panel: notify-me + featured sellers — collapsible */
+        const panel = U.el('div', { cls: 'stall-panel' + (mktState.panelOpen ? '' : ' collapsed') });
+        const pToggle = U.el('div', {
+          cls: 'sp-toggle', title: mktState.panelOpen ? 'Collapse this panel' : 'Expand Notify Me & Busy Stalls',
+          text: mktState.panelOpen ? '»' : '«',
+        });
+        pToggle.onclick = () => { mktState.panelOpen = !mktState.panelOpen; UI.show('market'); };
+        panel.appendChild(pToggle);
+        if (!mktState.panelOpen) {
+          const rail = U.el('div', { cls: 'sp-rail', title: 'Expand Notify Me & Busy Stalls', text: '🔔' });
+          rail.onclick = pToggle.onclick;
+          panel.appendChild(rail);
+        }
+        const pBody = U.el('div', { cls: 'sp-body' });
+        panel.appendChild(pBody);
+        pBody.appendChild(U.el('h3', { cls: 'gold mb', text: 'Notify Me' }));
+        pBody.appendChild(U.el('p', { cls: 'small muted', text: 'Get an alert when a species you want is listed.' }));
         const nmSel = U.el('select', { cls: 'txt mt' });
         SP.craftable.forEach(id => nmSel.appendChild(U.el('option', { value: id, text: SP.get(id).name })));
-        panel.appendChild(nmSel);
-        panel.appendChild(U.el('button', {
+        pBody.appendChild(nmSel);
+        pBody.appendChild(U.el('button', {
           cls: 'btn small mt', text: '🔔 Toggle alert', onclick: () => {
             const on = G.toggleNotifyMe(nmSel.value);
             UI.toast({ title: on ? 'Alert set' : 'Alert removed', body: SP.get(nmSel.value).name, icon: '🔔' });
@@ -511,11 +526,11 @@
         }));
         const mine = Object.entries(G.world.market.notifyMe).filter(([k, v]) => v.includes(me.id));
         if (mine.length) {
-          panel.appendChild(U.el('div', { cls: 'small muted mt', text: 'Active alerts:' }));
-          mine.forEach(([k]) => panel.appendChild(U.el('div', { cls: 'pill', style: 'margin:3px', text: SP.get(k).name })));
+          pBody.appendChild(U.el('div', { cls: 'small muted mt', text: 'Active alerts:' }));
+          mine.forEach(([k]) => pBody.appendChild(U.el('div', { cls: 'pill', style: 'margin:3px', text: SP.get(k).name })));
         }
-        panel.appendChild(U.el('div', { cls: 'divider' }));
-        panel.appendChild(U.el('h3', { cls: 'gold mb', text: 'Busy Stalls' }));
+        pBody.appendChild(U.el('div', { cls: 'divider' }));
+        pBody.appendChild(U.el('h3', { cls: 'gold mb', text: 'Busy Stalls' }));
         const sellers = {};
         Object.values(G.world.market.listings).forEach(l => { sellers[l.sellerId] = (sellers[l.sellerId] || 0) + 1; });
         Object.entries(sellers).sort((a, b) => b[1] - a[1]).slice(0, 6).forEach(([sid, n]) => {
@@ -523,7 +538,7 @@
           const row = U.el('div', { cls: 'friend-row', style: 'cursor:pointer' });
           row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(acc.stall.name || acc.displayName) + '</b><br><span class="small muted">' + n + ' listings' + (acc.trustedSeller ? ' · ✓ trusted' : '') + '</span>' }));
           row.onclick = () => UI.show('playerStall', { seller: acc });
-          panel.appendChild(row);
+          pBody.appendChild(row);
         });
         body.appendChild(panel);
 
@@ -995,7 +1010,7 @@
         if (ftok) {
           const fbox = U.el('div', { cls: 'panel flex1', style: 'display:flex;gap:20px;align-items:center' });
           const artWrap = U.el('div', { style: 'animation:floaty 3.4s ease-in-out infinite' });
-          artWrap.appendChild(UI.tokenArt(ftok.speciesId, 150, 'idle', ftok.picks && ftok.picks.headCount));
+          artWrap.appendChild(UI.tokenArt(ftok.speciesId, 150, 'idle', ftok.picks && ftok.picks.headCount, ftok));
           fbox.appendChild(artWrap);
           const finfo = U.el('div', { cls: 'flex1' });
           finfo.appendChild(U.el('div', { cls: 'small gold', text: '★ FEATURED' }));
@@ -1033,7 +1048,7 @@
             if (!l) return;
             const tok = seller.tokens[l.tokenId];
             const item = U.el('div', { cls: 'flex flex1', style: 'gap:14px;cursor:pointer' });
-            item.appendChild(UI.tokenArt(tok.speciesId, 84, 'idle', tok.picks && tok.picks.headCount));
+            item.appendChild(UI.tokenArt(tok.speciesId, 84, 'idle', tok.picks && tok.picks.headCount, tok));
             const inf = U.el('div', { cls: 'flex1' });
             inf.appendChild(U.el('div', { cls: 'gold', text: tok.name }));
             inf.appendChild(U.el('div', { cls: 'small muted', text: SP.get(tok.speciesId).name + ' · ' + SP.RARITIES[tok.rarity] + ' · ' + SP.SIZES[tok.sizeIdx] }));

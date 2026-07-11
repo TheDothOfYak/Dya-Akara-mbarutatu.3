@@ -42,6 +42,9 @@
     { id: 'water_raised', note: 'Water never slows it.', story: 'It was raised beside a Grothyn pond at {place} and treats water as dry land', ok: (sp) => grounded(sp) && sp.element !== 'Su' && !sp.tags.includes('su') },
     { id: 'bog_raised', note: 'Bog never slows it.', story: 'It was whelped in the Awvadhi margins near {place}; bog is just ground to it', ok: grounded },
     { id: 'hoard_sense', note: 'Sniffs out extra resources while it lives.', story: 'It nested beside a trader\u2019s cache at {place} and came to understand treasure', ok: () => true },
+    { id: 'giant_slayer', note: 'Hits harder against creatures larger than itself.', story: 'It brought down a beast twice its size in the hills over {place}, and has never respected size since', ok: fighter },
+    { id: 'duelist', note: 'Sharper in single combat \u2014 a little sloppy in a brawl.', story: 'It fought its rivals one at a time, formally, in the clearing at {place}. Crowds offend it', ok: fighter },
+    { id: 'home_guard', note: 'Fights harder in sight of its own hoard.', story: 'It held one nest at {place} through four raiding seasons and never gave a step', ok: fighter },
   ];
   T.QUIRK_BY_ID = {};
   T.QUIRKS.forEach(q => T.QUIRK_BY_ID[q.id] = q);
@@ -50,7 +53,7 @@
     const pool = T.QUIRKS.filter(q => q.ok(sp));
     if (!pool.length) return [];
     const out = [rng.pick(pool).id];
-    if (rng.chance(0.12)) {
+    if (rng.chance(0.2)) {
       const q2 = rng.pick(pool).id;
       if (q2 !== out[0]) out.push(q2);
     }
@@ -64,6 +67,43 @@
     const sp = SP.get(tok.speciesId);
     tok.quirks = T.rollQuirks(sp, new U.Rng(U.hashStr((tok.id || sp.id) + '::quirk')));
     return tok.quirks;
+  };
+
+  /* ============ PHYSIQUE — how THIS individual looks ============
+     Purely visual (zero effect on the sim): coat drift off the species
+     colors, a lighter or heavier build, and an identifying marking.
+     Derived deterministically from the token id, so every token — old
+     or new, on any client — always looks like itself. */
+  const MARKINGS = ['none', 'none', 'none', 'spots', 'spots', 'stripe', 'blaze', 'socks'];
+  const MARK_TEXT = {
+    spots: 'dappled with pale spots',
+    stripe: 'a dark stripe down the back',
+    blaze: 'a pale blaze across the face',
+    socks: 'pale-marked feet',
+  };
+  T.physique = function (tok) {
+    if (tok.physique) return tok.physique;
+    const rng = new U.Rng(U.hashStr((tok.id || tok.speciesId) + '::phys'));
+    tok.physique = {
+      hue: Math.round(rng.range(-24, 24)),                    // coat drift, degrees
+      light: Math.round(rng.range(-13, 13)),                  // paler / duskier
+      build: Math.round(rng.range(0.9, 1.1) * 100) / 100,     // visual scale only
+      marking: rng.pick(MARKINGS),
+      markSeed: rng.int(0, 9999),
+    };
+    return tok.physique;
+  };
+  T.physiqueText = function (tok) {
+    const p = T.physique(tok);
+    const bits = [];
+    if (p.build <= 0.94) bits.push('small-built for its kind');
+    else if (p.build >= 1.06) bits.push('heavy-built for its kind');
+    if (p.light >= 8) bits.push('pale-coated');
+    else if (p.light <= -8) bits.push('dark-coated');
+    if (MARK_TEXT[p.marking]) bits.push(MARK_TEXT[p.marking]);
+    if (!bits.length) return '';
+    const s = bits.join(', ');
+    return s.charAt(0).toUpperCase() + s.slice(1) + '.';
   };
 
   /* Mint a new token.
@@ -200,7 +240,7 @@
     const costVec = T.deriveCostVec(sp, rarity, rng);
 
     const now = Date.now();
-    return {
+    const tok = {
       id: U.uid('tok'),
       speciesId: sp.id,
       name,
@@ -229,6 +269,8 @@
       isStarter: !!opts.isStarter,
       isRental: false,
     };
+    T.physique(tok); /* bake in this individual's look */
+    return tok;
   };
 
   /* Total cost (sum across the four resources) to ready this token */
@@ -299,6 +341,7 @@
       special: sp.special,
       desc: sp.desc,
       story: tok.story,
+      marks: T.physiqueText(tok),
       fieldNotes: T.quirks(tok).map(qid => (T.QUIRK_BY_ID[qid] || { note: qid }).note),
     };
   };
