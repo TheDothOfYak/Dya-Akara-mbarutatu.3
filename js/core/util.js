@@ -94,7 +94,9 @@
     if (attrs) for (const k in attrs) {
       if (k === 'cls') e.className = attrs[k];
       else if (k === 'html') e.innerHTML = attrs[k];
-      else if (k === 'text') e.textContent = attrs[k];
+      /* every UI string flows through here — the admin panel's text
+         overrides (DYA.mods.tr) apply globally at this choke point */
+      else if (k === 'text') e.textContent = (DYA.mods && DYA.mods.trEnabled) ? DYA.mods.tr(attrs[k]) : attrs[k];
       else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
       else if (k === 'style') e.style.cssText = attrs[k];
       else if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
