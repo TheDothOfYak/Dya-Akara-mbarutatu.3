@@ -35,11 +35,24 @@
     saveTimer: null,
   };
 
+  /* the logged-in human's account travels to the cloud (if configured)
+     on every save, so it's there the next time they log in — from
+     any device (see js/core/account_cloud.js) */
+  function pushMeToCloud() {
+    if (G.me && !G.me.ai && DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.push(G.me);
+  }
+  /* the Admin Panel edits accounts other than G.me (or none at all —
+     admin.html never logs in as a player), so its mutations push the
+     specific account they touched explicitly. */
+  function pushAccountToCloud(acc) {
+    if (acc && !acc.ai && DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.push(acc);
+  }
+  G.pushAccountToCloud = pushAccountToCloud;
   G.save = function () {
     clearTimeout(G.saveTimer);
-    G.saveTimer = setTimeout(() => store.save(G.world), 400);
+    G.saveTimer = setTimeout(() => { store.save(G.world); pushMeToCloud(); }, 400);
   };
-  G.saveNow = () => store.save(G.world);
+  G.saveNow = () => { store.save(G.world); pushMeToCloud(); };
 
   /* ---------- global AI tuning (admin-editable via DYA.mods) ---------- */
   function aiTune() {
@@ -230,15 +243,50 @@
   }
 
   /* ================== ACCOUNTS ================== */
-  G.createAccount = function (email, pass, displayName) {
+  /* Cross-device accounts (see js/core/account_cloud.js): when online
+     is configured, an account's email is the key to the SAME save on
+     any device — the cloud copy is fetched at login and installed
+     into G.world.accounts so every other system keeps working exactly
+     as it did against a local-only world. Without online configured,
+     accounts stay local to this device/browser only, as before. */
+  function installAccount(acc, email) {
+    /* drop any stale local-only duplicate of this email under a
+       different id (e.g. this device's own pre-cloud copy) */
+    Object.keys(G.world.accounts).forEach(id => {
+      const a = G.world.accounts[id];
+      if (id !== acc.id && !a.ai && a.email === email) delete G.world.accounts[id];
+    });
+    G.world.accounts[acc.id] = acc;
+  }
+  async function pullBanFromCloud(accId) {
+    if (!(DYA.accountCloud && DYA.accountCloud.configured())) return;
+    try {
+      const b = await DYA.accountCloud.fetchBan(accId);
+      if (b) G.world.bans[accId] = { at: Date.now(), reason: b.reason, permanent: b.permanent, until: b.until ? Date.parse(b.until) : null, public: true };
+      else delete G.world.bans[accId];
+    } catch (e) { /* keep whatever local ban state we already had */ }
+  }
+  G.createAccount = async function (email, pass, displayName) {
     if (!displayName || displayName.length < 2 || displayName.length > 20) return { err: 'Display name must be 2–20 characters.' };
     if (!U.profanityOk(displayName)) return { err: 'That name is not permitted by the Dya Guild.' };
+    email = String(email || '').trim().toLowerCase();
     if (Object.values(G.world.accounts).some(a => !a.ai && a.email === email)) return { err: 'An account with that email already exists.' };
+    const AC = DYA.accountCloud;
+    if (AC && AC.configured()) {
+      let remote;
+      try { remote = await AC.fetchByEmail(email); }
+      catch (e) { return { err: 'Could not reach the account service: ' + e.message }; }
+      if (remote) return { err: 'An account with that email already exists.' };
+    }
     const acc = baseAccount({ email, passHash: hashPass(pass), displayName });
     /* new player starting resources (design doc Part IX) */
     acc.gold = EC.START.gold;
     acc.okid[0] = EC.START.okid;
     acc.ngakara = EC.START.ngakara;
+    if (AC && AC.configured()) {
+      const r = await AC.insert(acc);
+      if (r.err) return { err: r.err }; // e.g. someone else claimed the email a moment ago
+    }
     G.world.accounts[acc.id] = acc;
     G.me = acc;
     G.save();
@@ -246,9 +294,9 @@
     return { acc };
   };
   G.login = async function (email, pass) {
-    /* Supabase email/password auth is OPT-IN (config.supabase.useAuth).
-       By default accounts stay local to the device; the online layer
-       (friends, matches) rides on top of local accounts. */
+    /* Supabase email/password auth is OPT-IN (config.supabase.useAuth)
+       and unrelated to cross-device accounts below — it's a separate,
+       stronger (but unfinished) path some deployments may adopt later. */
     const useAuth = window.DYA_CONFIG && window.DYA_CONFIG.supabase && window.DYA_CONFIG.supabase.useAuth;
     const supa = useAuth && window.DYA_SUPABASE && window.DYA_SUPABASE.enabled ? window.DYA_SUPABASE.client : null;
     if (supa) {
@@ -267,10 +315,44 @@
       if (DYA.online) DYA.online.onAuthChange();
       return { acc, auth: res };
     }
+
+    email = String(email || '').trim().toLowerCase();
+    const AC = DYA.accountCloud;
+    if (AC && AC.configured()) {
+      let remote;
+      try { remote = await AC.fetchByEmail(email); }
+      catch (e) { return { err: 'Could not reach the account service: ' + e.message }; }
+      if (remote) {
+        if (remote.pass_hash !== hashPass(pass)) return { err: 'Incorrect password.' };
+        const acc = remote.data;
+        acc.id = remote.id; acc.email = email; acc.passHash = remote.pass_hash;
+        installAccount(acc, email);
+        await pullBanFromCloud(acc.id);
+        acc.lastLogin = Date.now();
+        G.me = acc;
+        G.save();
+        if (DYA.online) DYA.online.onAuthChange();
+        return { acc };
+      }
+      /* not in the cloud yet: a local-only account from before this
+         device ever synced online. Log in locally, then this device's
+         copy becomes the canonical cloud record from now on. */
+      const localAcc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
+      if (!localAcc) return { err: 'No account found with that email.' };
+      if (localAcc.passHash !== hashPass(pass)) return { err: 'Incorrect password.' };
+      const r = await AC.insert(localAcc);
+      if (r.err && !/already exists/i.test(r.err)) return { err: r.err };
+      localAcc.lastLogin = Date.now();
+      G.me = localAcc;
+      G.save();
+      if (DYA.online) DYA.online.onAuthChange();
+      return { acc: localAcc };
+    }
+
+    /* offline fallback: fully local, exactly as before */
     const acc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
     if (!acc) return { err: 'No account found with that email.' };
     if (acc.passHash !== hashPass(pass)) return { err: 'Incorrect password.' };
-    if (G.world.bans[acc.id] && G.world.bans[acc.id].permanent) { /* can still log in to view collection */ }
     acc.lastLogin = Date.now();
     G.me = acc;
     G.save();
@@ -1321,14 +1403,24 @@
     checkPass(p) { return G.world.adminPass === hashPass(p); },
     hasPass() { return !!G.world.adminPass; },
     ban(accId, reason, days) {
-      G.world.bans[accId] = { at: Date.now(), reason, permanent: !days, until: days ? Date.now() + days * 86400000 : null, public: true };
+      const until = days ? Date.now() + days * 86400000 : null;
+      G.world.bans[accId] = { at: Date.now(), reason, permanent: !days, until, public: true };
       G.world.rulings.unshift({ at: Date.now(), text: 'BAN — ' + (G.world.accounts[accId] ? G.world.accounts[accId].displayName : accId) + ': ' + reason + (days ? ' (' + days + ' days)' : ' (permanent)') });
       G.saveNow();
+      const acc = G.world.accounts[accId];
+      if ((!acc || !acc.ai) && DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.pushBan(accId, reason, !days, until);
     },
-    unban(accId) { delete G.world.bans[accId]; G.world.rulings.unshift({ at: Date.now(), text: 'Ban lifted for ' + (G.world.accounts[accId] ? G.world.accounts[accId].displayName : accId) + '.' }); G.saveNow(); },
+    unban(accId) {
+      delete G.world.bans[accId];
+      G.world.rulings.unshift({ at: Date.now(), text: 'Ban lifted for ' + (G.world.accounts[accId] ? G.world.accounts[accId].displayName : accId) + '.' });
+      G.saveNow();
+      if (DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.clearBan(accId);
+    },
     announce(title, body, type) {
       G.world.announcements.unshift({ id: U.uid('ann'), at: Date.now(), title, body, type: type || 'mass' });
-      Object.values(G.world.accounts).forEach(a => { if (!a.ai) a.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'announcement', title, body, icon: '📣' }); });
+      Object.values(G.world.accounts).forEach(a => {
+        if (!a.ai) { a.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'announcement', title, body, icon: '📣' }); pushAccountToCloud(a); }
+      });
       G.saveNow();
     },
     spawnToken(accId, speciesId, rarity, opts) {
@@ -1342,9 +1434,10 @@
       acc.tokens[tok.id] = tok;
       if (!acc.ai) acc.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'system', title: 'Token granted', body: 'The Dya Guild has granted you ' + tok.name + ' (' + SP.get(speciesId).name + ').', icon: '🎁' });
       G.saveNow();
+      pushAccountToCloud(acc);
       return { tok };
     },
-    grantTrusted(accId) { const a = G.world.accounts[accId]; if (a) { a.trustedSeller = true; G.saveNow(); } },
+    grantTrusted(accId) { const a = G.world.accounts[accId]; if (a) { a.trustedSeller = true; G.saveNow(); pushAccountToCloud(a); } },
     activateInterplanetary() {
       const rng = new U.Rng(U.newSeed());
       const t = {
@@ -1395,6 +1488,7 @@
           else if (outcome === 'cleared' || outcome === 'corrected') { tok.flagged = false; }
         }
         if (owner && !owner.ai) owner.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'announcement', title: 'Guild ruling', body: 'Review of your token concluded: ' + outcome + '.', icon: '⚖️' });
+        pushAccountToCloud(owner);
       }
       G.saveNow();
     },

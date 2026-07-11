@@ -21,7 +21,7 @@ python3 -m http.server 8000
 
 **Free permanent hosting:** this project is set up for GitHub Pages. After the workflow runs from the main branch, the game will be available at `https://<your-username>.github.io/Dya-Akara-mbarutatu.3/`.
 
-Create an account (email/password — stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
+Create an account (email/password — cross-device when online is configured, otherwise stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
 
 **The Admin Panel** lives at `admin.html` — outside the game UI, as specified. First visit sets the admin password. You are the admin.
 
@@ -65,13 +65,15 @@ Per the creator's direction, all creatures use **animated placeholder rigs**: a 
 
 The game now has a real online layer — see **[ONLINE_SETUP.md](ONLINE_SETUP.md)** for the 10-minute setup. It runs on a free Supabase project (Firebase, if you use it, only *hosts the files* — it does not make the game online by itself):
 
+- **Cross-device accounts — log in anywhere** — a player's whole save (collection, gold, level, friends, settings, achievements) is keyed to their email and lives in a `dya_accounts` table, not just one browser's `localStorage`. Log in with the same email+password on any computer — home, work, a phone browser — and pick up exactly where you left off. Bans travel the same way, enforced the moment you log in anywhere. (`js/core/account_cloud.js`.)
 - **Cross-device friends** — every player gets a permanent 6-character **friend code** (shown at the top of the Friends screen once online). Exchange codes, send/accept requests, and see each other's live online status from any two computers. (`js/core/online.js`, plain REST, polled every 15s.)
 - **Cross-device private matches** — Play → Private Match: one player opens a room and shares a 5-letter code, the other joins with it. Both computers run the identical deterministic simulation and exchange only inputs (lockstep over a Supabase Realtime channel, ~500ms input delay, desync detector included). (`js/core/netplay.js`.)
 - **The shared player market — real buy & sell, no duplicates** — list a token to the online market and every player sees it; the full token travels with the listing. Buying is an **atomic conditional update**: exactly one buyer can ever win a token, and the moment they do it leaves the market for everyone else. The seller's device collects the proceeds (minus the Guild tax) on its next sync. Cancelling and admin pulls return the token home. (`js/core/market_online.js`.)
-- **Admin edits broadcast to all players** — the admin panel's creature/text/balance/AI edits push to a `dya_config` row that every game polls (`js/core/mods.js`).
+- **Admin edits broadcast to all players** — the admin panel's creature/text/balance/AI edits push to a `dya_config` row that every game polls (`js/core/mods.js`). The Admin Panel can also look up and manage any player's cloud account, even one it's never locally seen.
 - Configure once in `js/config.js` (bakes it into the deployment), or per-browser in-game via **Friends → Set up online play**. If you set up Supabase before this update, re-run `supabase/schema.sql` once — it's idempotent and just adds the new tables.
+- ⚠ Same open-policy security model as the rest of this online layer (see [ONLINE_SETUP.md](ONLINE_SETUP.md#a-note-on-security)): fine for a game shared among people you trust, not equivalent to real per-account authentication.
 
-Everything else still runs fully local: accounts, world, the local Dya'kukull stalls, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). Matchmaking, duels, and tournaments are played against the AI populace.
+Without online configured, everything still runs fully local exactly as before: accounts, world, the local Dya'kukull stalls, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). Matchmaking, duels, and tournaments are always played against the AI populace, which stays a per-browser simulation even with online configured — it's world flavor, not portable player data.
 
 ## Deferred (matches Part XVII)
 
@@ -80,10 +82,11 @@ Sniller, Vyrenalur, Aerolhorn, Kalo'Eik variants, Api Buta, Expedition/Challenge
 ## Tests
 
 ```bash
-npm test                        # runs all three suites below
-node tests/test_engine.js       # headless: determinism, replay exactness, duel/hunt/standard resolution, duel tie rules
-node tests/test_netplay.js      # lockstep netplay: two simulated machines must stay tick-identical
-node tests/test_mods_market.js  # admin live-edit overrides + shared market: atomic buys, no token duplicates
+npm test                          # runs all four suites below
+node tests/test_engine.js         # headless: determinism, replay exactness, duel/hunt/standard resolution, duel tie rules
+node tests/test_netplay.js        # lockstep netplay: two simulated machines must stay tick-identical
+node tests/test_mods_market.js    # admin live-edit overrides + shared market: atomic buys, no token duplicates
+node tests/test_cloud_accounts.js # cross-device accounts: same login from a fresh "device", bans travel, offline fallback intact
 ```
 
 ---

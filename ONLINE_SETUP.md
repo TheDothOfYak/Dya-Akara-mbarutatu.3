@@ -5,14 +5,15 @@ make the game online. Firebase here only *hosts the files* (like GitHub Pages do
 computer that opens the game still keeps its own private world in its own browser storage —
 which is why you and your friend could type codes at each other all day and never connect.
 
-The game's real online features (cross-device **friends**, cross-device **private
-matches**, the **shared player market**, and the **admin panel's live game edits**) run on
-a free **Supabase** project. One of you sets it up once; then it works for everyone who
-plays your deployment.
+The game's real online features (cross-device **accounts**, cross-device **friends**,
+cross-device **private matches**, the **shared player market**, and the **admin panel's
+live game edits**) run on a free **Supabase** project. One of you sets it up once; then it
+works for everyone who plays your deployment.
 
 > **Already set up from an earlier version?** Just re-run `supabase/schema.sql` (Step 2) —
-> every statement is idempotent, so it only adds the two new tables (`dya_listings` for the
-> shared market, `dya_config` for admin edits) and leaves your existing data alone.
+> every statement is idempotent, so it only adds the new tables (`dya_listings` for the
+> shared market, `dya_config` for admin edits, `dya_accounts`/`dya_bans` for cross-device
+> accounts) and leaves your existing data alone.
 
 ---
 
@@ -56,6 +57,27 @@ Two ways — pick either:
    ```
 2. Commit and redeploy (GitHub Pages / Firebase Hosting). Everyone who loads the site is
    online automatically.
+
+## Cross-device accounts — log in anywhere
+
+Once online is configured (Steps 1–4), **your email+password account is no longer trapped
+on one device.** Log in with the same email and password on your laptop, your phone's
+browser, a computer at work, a computer at a family member's house — anywhere — and you get
+the same collection, gold, level, friends, and settings.
+
+How it works: your whole save is stored in the `dya_accounts` table, keyed to your email.
+When you log in anywhere, the game fetches that row and picks up exactly where you left
+off; every save pushes the latest copy back (usually within ~1–2 seconds). Bans travel the
+same way — if the Guild bans you on one device, that ban is enforced the moment you log in
+on any other.
+
+If you already had a local-only account from before this existed, just log in as normal on
+whichever device you use most — that device's copy becomes the cloud original from then on,
+and every other device you log into afterward will get it.
+
+**The Admin Panel can also manage accounts it's never locally seen** — Overview has a
+"🔎 Look up & load" box: type a player's email and their whole account loads in for editing,
+banning, or granting resources, exactly like any account created on that browser.
 
 ## Step 5 — Add each other
 
@@ -124,10 +146,17 @@ Prefer pushing balance changes when no one is mid-match.
 
 ## A note on security
 
-The included SQL policies are **open**: anyone who has your site's anon key can read/write
-the friends tables. For a game shared among friends this is fine — but don't store secrets
-in it, and don't publish the URL/key anywhere you wouldn't publish the game itself.
+The included SQL policies are **open**: anyone who has your site's anon key can read or
+write any of the game's tables directly via Supabase's API, bypassing the game entirely.
+For a game shared among friends this has always been the tradeoff — but it's worth being
+explicit now that **accounts** use the same policy: a determined visitor who inspects your
+deployed site's source (where the anon key lives, in `js/config.js`) could read or edit
+another player's gold, collection, or password hash directly, not just friend codes or
+listings. That's the accepted tradeoff for this repo's whole online layer — don't deploy it
+somewhere you wouldn't trust everyone with a link to the site.
 
-Accounts also stay **local to each device** (the online identity rides on top of them).
-Optional Supabase email/password login exists behind `useAuth: true` in `js/config.js` for
-later, but you don't need it.
+If that ever matters more for your deployment, the real fix is switching `dya_accounts` to
+Supabase Auth (real login sessions) with a row-level policy scoped to `auth.uid()` instead
+of the open policy — a bigger change than anything here. The scaffolding for Supabase
+email/password login already exists behind `useAuth: true` in `js/config.js`, unused by
+default.
