@@ -1377,7 +1377,12 @@
   };
   TUT.onScreen = function (name) {
     const me = G.me;
-    if (!me || me.tutorial.done || !TUT.active) return;
+    /* defense in depth: whatever the exit path (logout, ban, a stray
+       reload of 'login'/'menu' while G.me is unset), a leftover .tut-spot
+       must never survive onto a screen it doesn't belong to — it can
+       block clicks on real controls underneath it */
+    if (!me || me.tutorial.done) { TUT.active = false; TUT.clear(); return; }
+    if (!TUT.active) return;
     if (name === 'crafting' && me.tutorial.step === 7) {
       /* watch for craft completion, then wait for the player's Continue */
       const check = setInterval(() => {

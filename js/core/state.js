@@ -263,7 +263,15 @@
     if (DYA.online) DYA.online.onAuthChange();
     return { acc };
   };
-  G.logout = function () { G.me = null; if (DYA.online) DYA.online.onAuthChange(); };
+  G.logout = function () {
+    G.me = null;
+    /* a tutorial spotlight is a fixed element parented to <body>, outside
+       the normal screen container — it survives UI.show() transitions and
+       must be torn down explicitly, or it sits on top of (and swallows
+       clicks on) whatever renders next, including the login form */
+    if (DYA.tutorial) { DYA.tutorial.active = false; DYA.tutorial.clear(); }
+    if (DYA.online) DYA.online.onAuthChange();
+  };
   G.banInfo = function (accId) { return G.world.bans[accId || (G.me && G.me.id)] || null; };
   G.isBanned = function (accId) {
     const b = G.world.bans[accId];
