@@ -51,7 +51,8 @@ Everything in the design document that can exist without a live backend or final
 - **Tournaments (Part XI)** — circuit browser, Guild-sealed vs player-run, brackets with all six tabs, ranked at Regional+, title selection per tier (Local auto → Planet pick-3-keep-1), leaderboards, seasons ended by admin-activated Interplanetary.
 - **All UI screens (Part XII)** — built to the locked wireframes: Pia'don login shot, the 9-card token wheel (not radial), collection with collapsible pouch builder, torchlit stalls with the seller-only market average, the crafting ritual (skippable), circular minimap, spinning-coin loading screen with lore tips, the lot.
 - **Social (Part XIII)** — friends/pending/blocked, follows (cap 100), notifications (dismissed = gone), quick-chat only in match, reports to the Guild, public bans with collection-only access, spectator mode with cosmetic reactions.
-- **Admin panel (Part XVI)** — tournaments, bans/appeals, frozen-token review (cleared/corrected/deleted/penalized), market monitor, token spawning, announcements, trusted-seller grants, and the full **Dya'kukull tab** managing the 100 AI players who populate the market, stalls, queues, and brackets.
+- **Admin panel (Part XVI)** — tournaments, bans/appeals, frozen-token review (cleared/corrected/deleted/penalized), market monitor (local AND the shared online market), token spawning, announcements, trusted-seller grants, and the full **Dya'kukull tab** managing the 100 AI players who populate the market, stalls, queues, and brackets — now with global AI tuning dials, bulk operations, and per-AI collection management.
+- **Live game editing from the admin panel** — every species is fully editable (stats, rarity/size bands, elements, behavior tree, per-individual trait ranges, dictionary text, and the sprite itself: rig, colors, feature layers, or an uploaded image with live animated preview; clone species into new ones), all game text (lore tips, story fragments, quick chat, plus game-wide exact-match UI string replacement), every balance/economy table, and the AI tuning dials. Edits are stored as overrides (`js/core/mods.js`), apply instantly, survive world resets, and — when online is configured — push to Supabase so **every player's game adopts them within a minute**.
 - **The Vakarborac** — the creature dictionary as an in-game field guide (main menu → 📖 Vakarborac): every species with living art, temperament, and field notes, organized in the dictionary's five volumes.
 
 ## Placeholder Art
@@ -66,20 +67,23 @@ The game now has a real online layer — see **[ONLINE_SETUP.md](ONLINE_SETUP.md
 
 - **Cross-device friends** — every player gets a permanent 6-character **friend code** (shown at the top of the Friends screen once online). Exchange codes, send/accept requests, and see each other's live online status from any two computers. (`js/core/online.js`, plain REST, polled every 15s.)
 - **Cross-device private matches** — Play → Private Match: one player opens a room and shares a 5-letter code, the other joins with it. Both computers run the identical deterministic simulation and exchange only inputs (lockstep over a Supabase Realtime channel, ~500ms input delay, desync detector included). (`js/core/netplay.js`.)
-- Configure once in `js/config.js` (bakes it into the deployment), or per-browser in-game via **Friends → Set up online play**.
+- **The shared player market — real buy & sell, no duplicates** — list a token to the online market and every player sees it; the full token travels with the listing. Buying is an **atomic conditional update**: exactly one buyer can ever win a token, and the moment they do it leaves the market for everyone else. The seller's device collects the proceeds (minus the Guild tax) on its next sync. Cancelling and admin pulls return the token home. (`js/core/market_online.js`.)
+- **Admin edits broadcast to all players** — the admin panel's creature/text/balance/AI edits push to a `dya_config` row that every game polls (`js/core/mods.js`).
+- Configure once in `js/config.js` (bakes it into the deployment), or per-browser in-game via **Friends → Set up online play**. If you set up Supabase before this update, re-run `supabase/schema.sql` once — it's idempotent and just adds the new tables.
 
-Everything else still runs fully local: accounts, world, market, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). Matchmaking, duels, and tournaments are played against the AI populace.
+Everything else still runs fully local: accounts, world, the local Dya'kukull stalls, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). Matchmaking, duels, and tournaments are played against the AI populace.
 
 ## Deferred (matches Part XVII)
 
-Sniller, Vyrenalur, Aerolhorn, Kalo'Eik variants, Api Buta, Expedition/Challenge modes, Pia'don-tier titles, replay share links, variable pouch sizes, the Gynge flip mechanic (no current token can trigger it), WebXR/mobile, online matchmaking/tournaments (online play currently covers friends + private matches), and shared cross-device market/world state.
+Sniller, Vyrenalur, Aerolhorn, Kalo'Eik variants, Api Buta, Expedition/Challenge modes, Pia'don-tier titles, replay share links, variable pouch sizes, the Gynge flip mechanic (no current token can trigger it), WebXR/mobile, online matchmaking/tournaments (online play currently covers friends, private matches + the shared market), and cross-device negotiation/offers on online listings (online listings are instant-buy; haggling stays on the local stalls).
 
 ## Tests
 
 ```bash
-npm test                     # runs both suites below
-node tests/test_engine.js    # headless: determinism, replay exactness, duel/hunt/standard resolution, duel tie rules
-node tests/test_netplay.js   # lockstep netplay: two simulated machines must stay tick-identical
+npm test                        # runs all three suites below
+node tests/test_engine.js       # headless: determinism, replay exactness, duel/hunt/standard resolution, duel tie rules
+node tests/test_netplay.js      # lockstep netplay: two simulated machines must stay tick-identical
+node tests/test_mods_market.js  # admin live-edit overrides + shared market: atomic buys, no token duplicates
 ```
 
 ---

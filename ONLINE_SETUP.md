@@ -5,9 +5,14 @@ make the game online. Firebase here only *hosts the files* (like GitHub Pages do
 computer that opens the game still keeps its own private world in its own browser storage —
 which is why you and your friend could type codes at each other all day and never connect.
 
-The game's real online features (cross-device **friends** and cross-device **private
-matches**) run on a free **Supabase** project. One of you sets it up once; then it works for
-everyone who plays your deployment.
+The game's real online features (cross-device **friends**, cross-device **private
+matches**, the **shared player market**, and the **admin panel's live game edits**) run on
+a free **Supabase** project. One of you sets it up once; then it works for everyone who
+plays your deployment.
+
+> **Already set up from an earlier version?** Just re-run `supabase/schema.sql` (Step 2) —
+> every statement is idempotent, so it only adds the two new tables (`dya_listings` for the
+> shared market, `dya_config` for admin edits) and leaves your existing data alone.
 
 ---
 
@@ -81,7 +86,31 @@ Two ways — pick either:
   ever happens.
 - If your friend disconnects, you can claim the victory or wait for them.
 - Duels, tournaments and the matchmaking queue still run against the Dya'kukull (the 100
-  AI players) — online play currently covers **friends** and **private matches**.
+  AI players) — online play covers **friends**, **private matches**, and the **shared
+  market**.
+
+## The shared market (real buy & sell)
+
+Once online is configured, **Market → My Stall → ＋ New listing** offers a destination:
+
+- **🌐 Online market** — the listing goes into the shared `dya_listings` table and appears
+  in every player's Market → Browse (marked `🌐 PLAYER`). The full token travels with the
+  listing. **Every token is one of a kind**: buying is an atomic database update that only
+  succeeds while the listing is still active, so exactly one buyer ever wins it. Everyone
+  else is told the token has left the market. While listed, the token is escrowed out of
+  your collection; the sale proceeds (minus the Guild's rarity tax) arrive on your next
+  sync, within ~20 seconds.
+- **🏪 Local stalls** — the old behavior: your own world's Dya'kukull market, offers and
+  negotiation included.
+
+## Admin edits reach every player
+
+The Admin Panel (`admin.html`) can edit creatures (stats, behaviors, sprites), all game
+text, balance tables, and AI tuning. With online configured, every save is pushed to the
+`dya_config` table and **every player's game adopts the newest revision within a minute** —
+no redeploy needed. Note: if two players are mid-**online match** when an edit lands, their
+games could momentarily disagree about creature stats; the desync detector will catch it.
+Prefer pushing balance changes when no one is mid-match.
 
 ## Troubleshooting
 

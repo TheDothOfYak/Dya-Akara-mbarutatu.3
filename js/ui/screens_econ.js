@@ -542,44 +542,95 @@
         });
         body.appendChild(panel);
 
+        function matchesFilters(tok) {
+          if (mktState.filter !== 'All' && tok.element !== mktState.filter) return false;
+          if (mktState.search) {
+            const q = mktState.search.toLowerCase();
+            const sp = SP.get(tok.speciesId);
+            if (!tok.name.toLowerCase().includes(q) && !(sp && sp.name.toLowerCase().includes(q))) return false;
+          }
+          return true;
+        }
         function grid() {
           gwrap.innerHTML = '';
-          let lsts = Object.values(G.world.market.listings).filter(l => {
+          const MO = DYA.marketOnline;
+          /* unified entries: real player listings from the shared online
+             market + the local Dya'kukull stalls */
+          const entries = [];
+          if (MO && MO.enabled()) {
+            MO.others().forEach(row => {
+              if (!row.token || !matchesFilters(row.token)) return;
+              entries.push({ online: true, row, tok: row.token, price: row.price, at: Date.parse(row.created_at) || 0 });
+            });
+          }
+          Object.values(G.world.market.listings).forEach(l => {
             const seller = G.world.accounts[l.sellerId];
-            if (!seller || seller.id === me.id) return false;
-            if (me.blocked.includes(seller.id) || seller.blocked.includes(me.id)) return false;
+            if (!seller || seller.id === me.id) return;
+            if (me.blocked.includes(seller.id) || seller.blocked.includes(me.id)) return;
             const tok = seller.tokens[l.tokenId];
-            if (!tok) return false;
-            if (mktState.filter !== 'All' && tok.element !== mktState.filter) return false;
-            if (mktState.search) {
-              const q = mktState.search.toLowerCase();
-              if (!tok.name.toLowerCase().includes(q) && !SP.get(tok.speciesId).name.toLowerCase().includes(q)) return false;
-            }
-            return true;
+            if (!tok || !matchesFilters(tok)) return;
+            entries.push({ online: false, l, seller, tok, price: l.price, at: l.at });
           });
-          lsts.sort((a, b) => {
-            const ta = G.world.accounts[a.sellerId].tokens[a.tokenId], tb = G.world.accounts[b.sellerId].tokens[b.tokenId];
+          entries.sort((a, b) => {
             if (mktState.sort === 'cheap') return a.price - b.price;
             if (mktState.sort === 'pricey') return b.price - a.price;
-            if (mktState.sort === 'rare') return tb.rarity - ta.rarity;
+            if (mktState.sort === 'rare') return b.tok.rarity - a.tok.rarity;
             return b.at - a.at;
           });
-          if (!lsts.length) { gwrap.appendChild(U.el('p', { cls: 'muted center', text: 'The stalls are bare. Check back — the Dya\'kukull are always trading.' })); return; }
+          if (!entries.length) { gwrap.appendChild(U.el('p', { cls: 'muted center', text: 'The stalls are bare. Check back — the Dya\'kukull are always trading.' })); return; }
           const grd = U.el('div', { cls: mktState.view === 'grid' ? 'grid cols-auto' : 'grid cols-list' });
           if (mktState.view === 'grid') grd.style.gridTemplateColumns = 'repeat(auto-fill,minmax(150px,1fr))';
-          lsts.slice(0, 60).forEach(l => {
-            const seller = G.world.accounts[l.sellerId];
-            const tok = seller.tokens[l.tokenId];
-            const card = UI.tokenCard(tok, { size: mktState.view === 'grid' ? 92 : 60, onclick: () => openListing(l) });
-            card.classList.add('listing-card');
-            card.appendChild(U.el('div', { cls: 'lc-price', text: l.status === 'display' ? '—' : U.fmt(l.price) + 'g' }));
-            card.appendChild(U.el('div', {}, [U.el('span', { cls: 'status-badge ' + l.status, text: l.status === 'sale' ? 'FOR SALE' : l.status === 'offer' ? 'MAKE OFFER' : 'DISPLAY' })]));
-            card.appendChild(U.el('div', { cls: 'small muted', style: 'cursor:pointer;text-decoration:underline dotted', text: seller.stall.name || seller.displayName, onclick: (e) => { e.stopPropagation(); UI.show('playerStall', { seller }); } }));
-            grd.appendChild(card);
+          entries.slice(0, 80).forEach(en => {
+            if (en.online) {
+              const card = UI.tokenCard(en.tok, { size: mktState.view === 'grid' ? 92 : 60, onclick: () => openOnlineListing(en.row) });
+              card.classList.add('listing-card');
+              card.appendChild(U.el('div', { cls: 'lc-price', text: U.fmt(en.price) + 'g' }));
+              card.appendChild(U.el('div', {}, [U.el('span', { cls: 'status-badge sale', text: '🌐 PLAYER' })]));
+              card.appendChild(U.el('div', { cls: 'small muted', text: en.row.seller_name || 'A player' }));
+              grd.appendChild(card);
+            } else {
+              const seller = en.seller, l = en.l, tok = en.tok;
+              const card = UI.tokenCard(tok, { size: mktState.view === 'grid' ? 92 : 60, onclick: () => openListing(l) });
+              card.classList.add('listing-card');
+              card.appendChild(U.el('div', { cls: 'lc-price', text: l.status === 'display' ? '—' : U.fmt(l.price) + 'g' }));
+              card.appendChild(U.el('div', {}, [U.el('span', { cls: 'status-badge ' + l.status, text: l.status === 'sale' ? 'FOR SALE' : l.status === 'offer' ? 'MAKE OFFER' : 'DISPLAY' })]));
+              card.appendChild(U.el('div', { cls: 'small muted', style: 'cursor:pointer;text-decoration:underline dotted', text: seller.stall.name || seller.displayName, onclick: (e) => { e.stopPropagation(); UI.show('playerStall', { seller }); } }));
+              grd.appendChild(card);
+            }
           });
           gwrap.appendChild(grd);
         }
         grid();
+        /* pull the freshest shared-market state when the stalls open */
+        if (DYA.marketOnline && DYA.marketOnline.enabled() && Date.now() - DYA.marketOnline.state.lastFetch > 5000) DYA.marketOnline.refresh();
+      }
+
+      /* a real player's listing from the shared online market.
+         Buying is atomic server-side — exactly one buyer can ever win
+         a token; everyone else finds it gone. */
+      function openOnlineListing(row) {
+        const MO = DYA.marketOnline;
+        const tok = row.token;
+        const scr2 = U.el('div', { cls: 'screen', style: 'z-index:10;background:var(--bg)' });
+        const actions = [];
+        const buyBtn = U.el('button', {
+          cls: 'btn primary', text: 'Buy now — ' + U.fmt(row.price) + 'g', onclick: async () => {
+            if (me.gold < row.price) { UI.alert('Not enough gold', 'You hold ' + U.fmt(me.gold) + 'g.'); return; }
+            buyBtn.disabled = true; buyBtn.textContent = 'Claiming…';
+            const r = await MO.buy(row);
+            if (r.err) { buyBtn.disabled = false; buyBtn.textContent = 'Buy now — ' + U.fmt(row.price) + 'g'; UI.alert('Cannot buy', r.err); scr2.remove(); UI.show('market'); return; }
+            DYA.audio.play('coin');
+            scr2.remove();
+            UI.toast({ title: 'Purchase complete', body: r.tok.name + ' is yours — and off the market for everyone else.', icon: '🛒' });
+            UI.refreshTopbar();
+            if (DYA.tutorial) DYA.tutorial.onEvent('marketBuy');
+            UI.show('market');
+          },
+        });
+        actions.push(buyBtn);
+        scr2.appendChild(UI.tokenDetail(tok, { onBack: () => scr2.remove(), actions }));
+        scr2.appendChild(U.el('div', { cls: 'small muted center', text: 'Sold by ' + (row.seller_name || 'a player') + ' · a real player on the shared market. One of a kind — first buyer takes it.' }));
+        root.appendChild(scr2);
       }
 
       function openListing(l) {
@@ -825,10 +876,20 @@
       root.appendChild(scr);
 
       function newListing() {
+        const MO = DYA.marketOnline;
+        const onlineOk = MO && MO.enabled();
         const avail = Object.values(me.tokens).filter(t => t.status === 'collection' && !t.frozen && !t.isRental);
         if (!avail.length) { UI.alert('Nothing to list', 'All your tokens are in use, frozen, or rentals.'); return; }
         const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'New listing' })]);
         w.appendChild(U.el('div', { cls: 'small muted', text: 'No listing fee — the Guild takes its cut as sale tax when the token sells.' }));
+        /* where does it go? the shared online market (real players, one
+           unique token, first buyer wins) or the local torchlit stalls */
+        let dest = null;
+        if (onlineOk) {
+          dest = U.el('select', { cls: 'txt mt' });
+          [['online', '🌐 Online market — real players, everywhere'], ['local', '🏪 Local stalls — this world only']].forEach(([v, l]) => dest.appendChild(U.el('option', { value: v, text: l })));
+          w.appendChild(dest);
+        }
         const sel = U.el('select', { cls: 'txt mt' });
         avail.forEach(t => sel.appendChild(U.el('option', { value: t.id, text: t.name + ' (' + SP.get(t.speciesId).name + ', ' + SP.RARITIES[t.rarity] + ')' })));
         const avgLine = U.el('div', { cls: 'small gold mt' });
@@ -839,33 +900,73 @@
         [['sale', 'For sale — instant buy'], ['offer', 'Make offer — negotiate only'], ['display', 'Display only (offers still open)']].forEach(([v, l]) => status.appendChild(U.el('option', { value: v, text: l })));
         w.appendChild(sel); w.appendChild(avgLine); w.appendChild(price); w.appendChild(status);
         /* §7 multi-currency asks: gold plus NgAkara and/or Okid */
-        w.appendChild(U.el('div', { cls: 'small muted mt', text: 'Also ask for (optional — buyer pays these on top of the gold):' }));
+        const localOnly = U.el('div', {});
+        localOnly.appendChild(U.el('div', { cls: 'small muted mt', text: 'Also ask for (optional — buyer pays these on top of the gold):' }));
         const wantRow = U.el('div', { cls: 'flex' });
         const wantNg = U.el('input', { cls: 'txt', type: 'number', min: 0, style: 'max-width:120px', placeholder: 'NgAkara' });
         const wantOk = U.el('input', { cls: 'txt', type: 'number', min: 0, style: 'max-width:100px', placeholder: 'Okid' });
         const wantOkR = U.el('select', { cls: 'txt', style: 'max-width:150px' });
         SP.RARITIES.forEach((r2, i) => wantOkR.appendChild(U.el('option', { value: i, text: r2 + ' Okid' })));
         wantRow.appendChild(wantNg); wantRow.appendChild(wantOk); wantRow.appendChild(wantOkR);
-        w.appendChild(wantRow);
+        localOnly.appendChild(wantRow);
+        w.appendChild(localOnly);
+        const onlineNote = U.el('div', { cls: 'small muted mt', text: '🌐 Online listings are instant-buy, gold only. The moment one player buys it, it leaves the market for everyone — the token is theirs alone.' });
+        w.appendChild(onlineNote);
+        function syncDest() {
+          const online = onlineOk && dest.value === 'online';
+          status.style.display = online ? 'none' : '';
+          localOnly.style.display = online ? 'none' : '';
+          onlineNote.style.display = online ? '' : 'none';
+        }
+        if (onlineOk) { dest.onchange = syncDest; }
+        syncDest();
         const m = UI.modal(w);
-        w.appendChild(U.el('button', {
-          cls: 'btn primary mt', text: 'List it', onclick: () => {
+        const listBtn = U.el('button', {
+          cls: 'btn primary mt', text: 'List it', onclick: async () => {
             const tok = me.tokens[sel.value];
             const p = parseInt(price.value) || G.marketAverage(tok.speciesId, tok.rarity);
-            const ng = parseInt(wantNg.value) || 0, okq = parseInt(wantOk.value) || 0;
-            const want = (ng > 0 || okq > 0) ? { ngakara: ng, okidQty: okq, okidRarity: parseInt(wantOkR.value) || 0 } : null;
-            const r = G.createListing(tok, p, status.value, want);
-            if (r.err) { UI.alert('Cannot list', r.err); return; }
+            if (onlineOk && dest.value === 'online') {
+              listBtn.disabled = true; listBtn.textContent = 'Listing…';
+              const r = await MO.list(tok, p);
+              if (r.err) { listBtn.disabled = false; listBtn.textContent = 'List it'; UI.alert('Cannot list', r.err); return; }
+            } else {
+              const ng = parseInt(wantNg.value) || 0, okq = parseInt(wantOk.value) || 0;
+              const want = (ng > 0 || okq > 0) ? { ngakara: ng, okidQty: okq, okidRarity: parseInt(wantOkR.value) || 0 } : null;
+              const r = G.createListing(tok, p, status.value, want);
+              if (r.err) { UI.alert('Cannot list', r.err); return; }
+            }
             m.close(); DYA.audio.play('coin'); UI.show('myStall');
           },
-        }));
+        });
+        w.appendChild(listBtn);
       }
 
       const views = {
         Listings() {
           body.innerHTML = '';
+          /* my ONLINE listings — the shared market real players buy from */
+          const MO = DYA.marketOnline;
+          const myOnline = (MO && MO.enabled()) ? MO.mine() : [];
+          if (myOnline.length) {
+            body.appendChild(U.el('h3', { cls: 'gold mb', text: '🌐 Online listings — visible to every player' }));
+            myOnline.forEach(row => {
+              const tok = row.token;
+              const r2 = U.el('div', { cls: 'friend-row' });
+              r2.appendChild(UI.tokenArt(tok.speciesId, 50));
+              r2.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(tok.name) + '</b> <span class="pill gold">🌐 ONLINE</span><br><span class="small">Listed: <b class="gold">' + U.fmt(row.price) + 'g</b> · Market avg: <b>' + U.fmt(G.marketAverage(tok.speciesId, tok.rarity)) + 'g</b> · first buyer takes it</span>' }));
+              r2.appendChild(U.el('button', {
+                cls: 'btn small danger', text: 'Cancel', onclick: async () => {
+                  const res = await MO.cancel(row);
+                  if (res.err) UI.alert('Listing', res.err);
+                  UI.show('myStall');
+                },
+              }));
+              body.appendChild(r2);
+            });
+            body.appendChild(U.el('div', { cls: 'divider' }));
+          }
           const myLsts = Object.values(G.world.market.listings).filter(l => l.sellerId === me.id);
-          if (!myLsts.length) body.appendChild(U.el('p', { cls: 'muted', text: 'Your shelves are empty. List something — no listing fee, the sale tax is the Guild’s cut.' }));
+          if (!myLsts.length && !myOnline.length) body.appendChild(U.el('p', { cls: 'muted', text: 'Your shelves are empty. List something — no listing fee, the sale tax is the Guild’s cut.' }));
           myLsts.forEach(l => {
             const tok = me.tokens[l.tokenId];
             if (!tok) return;

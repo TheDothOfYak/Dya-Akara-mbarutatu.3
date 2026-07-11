@@ -41,6 +41,20 @@
   };
   G.saveNow = () => store.save(G.world);
 
+  /* ---------- global AI tuning (admin-editable via DYA.mods) ---------- */
+  function aiTune() {
+    return (DYA.mods && DYA.mods.aiTuning) ? DYA.mods.aiTuning() : {};
+  }
+  /* effective match skill for any AI account — per-AI dial × global dial */
+  G.aiSkill = function (acc) {
+    const mul = aiTune().matchSkillMul != null ? aiTune().matchSkillMul : 1;
+    return U.clamp(((acc && acc.aiCfg && acc.aiCfg.matchSkill) || 0.6) * mul, 0.05, 1.5);
+  };
+  function aiMarketActivity(acc) {
+    const mul = aiTune().marketActivityMul != null ? aiTune().marketActivityMul : 1;
+    return U.clamp(((acc.aiCfg && acc.aiCfg.marketActivity) || 0) * mul, 0, 1);
+  }
+
   /* ---------- password "hashing" (local build; real auth = Firebase later) ---------- */
   function hashPass(p) { return String(U.hashStr('dya!' + p + '!akara')); }
 
@@ -921,17 +935,20 @@
     if (Date.now() - lastSim < 45000) return;
     lastSim = Date.now();
     const rng = new U.Rng(U.newSeed());
+    const T = aiTune();
     const ais = Object.values(G.world.accounts).filter(a => a.ai && a.aiCfg.active);
     if (!ais.length) return;
     /* a few AIs act */
-    for (let i = 0; i < 3; i++) {
+    const acts = Math.max(0, Math.round(T.actionsPerBeat != null ? T.actionsPerBeat : 3));
+    for (let i = 0; i < acts; i++) {
       const ai = rng.pick(ais);
       const roll = rng.next();
-      if (roll < ai.aiCfg.marketActivity * 0.5) {
+      const activity = aiMarketActivity(ai);
+      if (roll < activity * 0.5) {
         // list something
         const toks = Object.values(ai.tokens).filter(t => t.status === 'collection');
         if (toks.length > 6) aiCreateListing(G.world, ai, rng.pick(toks), rng);
-      } else if (roll < ai.aiCfg.marketActivity * 0.75) {
+      } else if (roll < activity * 0.75) {
         // §7 AI reach: buy from ANY market or stall, not only player listings
         const lsts = Object.values(G.world.market.listings).filter(l => {
           const seller = G.world.accounts[l.sellerId];
@@ -948,7 +965,7 @@
             }
           }
         }
-      } else if (roll < ai.aiCfg.marketActivity * 0.8 && G.me) {
+      } else if (roll < activity * 0.8 && G.me) {
         // occasionally make an offer on a player's offer-enabled listing
         const lsts = Object.values(G.world.market.listings).filter(l => l.sellerId === G.me.id && l.status !== 'display');
         if (lsts.length && rng.chance(0.3)) {
@@ -1004,8 +1021,8 @@
 
   /* statistical outcome for an unwatched AI-vs-AI match */
   function aiVsAiOutcome(a, b, rng) {
-    const sa = (a.aiCfg.matchSkill || 0.5) * 2 + a.rank / 1200;
-    const sb = (b.aiCfg.matchSkill || 0.5) * 2 + b.rank / 1200;
+    const sa = G.aiSkill(a) * 2 + a.rank / 1200;
+    const sb = G.aiSkill(b) * 2 + b.rank / 1200;
     return rng.chance(sa / (sa + sb)); /* true = a wins */
   }
   function recordAiMatch(a, b, aWins, format, duration, tournament) {
@@ -1058,8 +1075,10 @@
       }
     });
     /* there should always be a few active */
+    const T = aiTune();
+    const minOnline = T.minOnline != null ? T.minOnline : 6;
     let online = ais.filter(a => G.aiStatus(a.id) === 'online');
-    while (online.length < 6 && ais.length) {
+    while (online.length < minOnline && ais.length) {
       const wake = rng.pick(ais.filter(a => G.aiStatus(a.id) !== 'online'));
       if (!wake) break;
       live.sessions[wake.id] = { status: 'online', until: now + (20 + rng.next() * 50) * 60000 };
@@ -1110,7 +1129,7 @@
       const human = humanIn(t);
       if (t.state === 'open' && !human) {
         /* entrants trickle in */
-        if (rng.chance(0.55)) {
+        if (rng.chance(T.tournamentJoinChance != null ? T.tournamentJoinChance : 0.55)) {
           const cands = online.filter(a => a.aiCfg.tournaments && !t.players.includes(a.id) && a.level >= (EC.CIRCUIT_MIN_LEVEL[t.circuit] || 0));
           const joiner = cands.length ? rng.pick(cands) : null;
           if (joiner) { t.players.push(joiner.id); joiner.gold = Math.max(0, joiner.gold - t.entryFee); }
@@ -1169,7 +1188,7 @@
     const me = G.me;
     if (me && !me.ai) {
       live.challenges = live.challenges.filter(ch => ch.expiresAt > now);
-      if (live.challenges.length < 2 && rng.chance(0.07)) {
+      if (live.challenges.length < 2 && rng.chance(T.challengeChance != null ? T.challengeChance : 0.07)) {
         const near = online.filter(a => Math.abs(a.level - me.level) < 15 && !live.challenges.some(ch => ch.aiId === a.id));
         const ch = near.length ? rng.pick(near) : null;
         if (ch) {
@@ -1177,7 +1196,7 @@
           G.notify({ type: 'social', title: 'Challenge!', body: ch.displayName + ' (Lv ' + ch.level + ') challenges you to a match. Play → Live Now to accept.', icon: '⚔' });
         }
       }
-      if (rng.chance(0.015)) {
+      if (rng.chance(T.friendRequestChance != null ? T.friendRequestChance : 0.015)) {
         const cand = online.find(a => !me.friends.includes(a.id) && !me.pendingIn.includes(a.id) && !me.pendingOut.includes(a.id) && !me.blocked.includes(a.id));
         if (cand) {
           me.pendingIn.push(cand.id);
@@ -1284,10 +1303,11 @@
   function aiCreateListing(w, ai, tok, rng) {
     if (tok.status !== 'collection') return;
     tok.status = 'market';
+    const T = aiTune();
     const avg = SP.RARITY_VALUE[tok.rarity];
     const lst = {
       id: U.uid('lst'), tokenId: tok.id, sellerId: ai.id,
-      price: Math.round(avg * rng.range(0.8, 1.5)),
+      price: Math.round(avg * rng.range(T.listPriceLo != null ? T.listPriceLo : 0.8, T.listPriceHi != null ? T.listPriceHi : 1.5)),
       status: rng.chance(0.12) ? 'display' : rng.chance(0.3) ? 'offer' : 'sale',
       at: Date.now() - Math.floor(rng.next() * 86400000),
       featured: false,

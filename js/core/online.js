@@ -276,6 +276,8 @@
     clearInterval(timer); timer = null;
     O.state.ready = false;
     O.state.friends = []; O.state.incoming = []; O.state.outgoing = [];
+    /* the shared online market rides the same auth lifecycle */
+    if (DYA.marketOnline) DYA.marketOnline.onAuthChange();
     const me = O.me();
     if (!me || !O.configured()) return;
     ensureRegistered().then(ok => { if (ok) O.refresh(); });

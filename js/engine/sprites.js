@@ -165,19 +165,23 @@
 
     ctx.scale(o.facing < 0 ? -1 : 1, squash);
 
-    const rig = sp.rig || 'quad';
-    if (rig === 'quad') drawQuad(ctx, o, t, state);
-    else if (rig === 'biped') drawBiped(ctx, o, t, state);
-    else if (rig === 'flame') drawFlame(ctx, o, t, state);
-    else if (rig === 'swarm') drawSwarm(ctx, o, t, state);
-    else if (rig === 'tree') drawTree(ctx, o, t, state);
-    else if (rig === 'blob') drawBlob(ctx, o, t, state);
-    else if (rig === 'field') drawField(ctx, o, t, state);
-    else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
-    else if (rig === 'crab') drawCrab(ctx, o, t, state);
-    else if (rig === 'mcfly') drawMcFly(ctx, o, t, state);
-    else if (rig === 'bird') drawBird(ctx, o, t, state);
-    else drawQuad(ctx, o, t, state);
+    /* admin-uploaded sprite image replaces the procedural rig entirely
+       (falls back to the rig until the image has decoded) */
+    if (!(sp.spriteImg && drawImageSprite(ctx, o, t, state))) {
+      const rig = sp.rig || 'quad';
+      if (rig === 'quad') drawQuad(ctx, o, t, state);
+      else if (rig === 'biped') drawBiped(ctx, o, t, state);
+      else if (rig === 'flame') drawFlame(ctx, o, t, state);
+      else if (rig === 'swarm') drawSwarm(ctx, o, t, state);
+      else if (rig === 'tree') drawTree(ctx, o, t, state);
+      else if (rig === 'blob') drawBlob(ctx, o, t, state);
+      else if (rig === 'field') drawField(ctx, o, t, state);
+      else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
+      else if (rig === 'crab') drawCrab(ctx, o, t, state);
+      else if (rig === 'mcfly') drawMcFly(ctx, o, t, state);
+      else if (rig === 'bird') drawBird(ctx, o, t, state);
+      else drawQuad(ctx, o, t, state);
+    }
 
     /* this individual's identifying marks, over the coat */
     if (o.indiv && state !== 'death') drawMarking(ctx, o, o.indiv);
@@ -207,6 +211,35 @@
     }
     ctx.restore();
   };
+
+  /* ============ ADMIN IMAGE SPRITE ============
+     A per-species image (data URI) uploaded through the Admin Panel.
+     Simple state animation is applied so it still reads on the field:
+     idle bob, walk/run gait bounce, attack lunge, dormant slump. */
+  const imgCache = {};
+  function spriteImage(sp) {
+    const key = sp.id + ':' + (sp.spriteImg ? sp.spriteImg.length : 0);
+    let entry = imgCache[key];
+    if (!entry) {
+      entry = imgCache[key] = { img: new Image(), ready: false };
+      entry.img.onload = () => { entry.ready = true; };
+      entry.img.src = sp.spriteImg;
+    }
+    return entry.ready ? entry.img : null;
+  }
+  function drawImageSprite(ctx, o, t, state) {
+    const img = spriteImage(o.sp);
+    if (!img) return false; /* not decoded yet — caller falls back to the rig */
+    const r = o.r;
+    const moving = state === 'walk' || state === 'run';
+    const bob = state === 'idle' ? Math.sin(t * 2.2) * r * 0.05
+      : moving ? Math.abs(Math.sin(t * (state === 'run' ? 14 : 8))) * -r * 0.12 : 0;
+    const lunge = state === 'attack' ? Math.max(0, Math.sin(t * 12)) * r * 0.3 : 0;
+    const slump = state === 'dormant' ? r * 0.25 : 0;
+    const w = r * 2.3, h = r * 2.3 * (img.height / Math.max(1, img.width));
+    ctx.drawImage(img, -w / 2 + lunge, -h * 0.72 + bob + slump, w, h);
+    return true;
+  }
 
   /* ============ QUADRUPED — "small four-legged animal" ============ */
   function drawQuad(ctx, o, t, state) {

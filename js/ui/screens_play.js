@@ -146,7 +146,7 @@
               P.pickPouch(pouch => {
                 P.startMatch({
                   mode: 'standard', ranked: false, format: 'Challenge Match',
-                  opponent: { name: opp.displayName, accId: opp.id, aiSkill: opp.aiCfg.matchSkill, pouch: P.accountPouch(opp), simulatedHuman: true },
+                  opponent: { name: opp.displayName, accId: opp.id, aiSkill: G.aiSkill(opp), pouch: P.accountPouch(opp), simulatedHuman: true },
                   pouch,
                 });
               });
@@ -169,8 +169,8 @@
                 settings: { pulseInterval: 5, pulseAmount: 3, chaos: false },
                 terrain: ['plains', 'forest', 'mountain', 'desert'][mrec.seed % 4],
                 teams: [
-                  { name: a.displayName, controller: 'ai', aiSkill: a.aiCfg.matchSkill, pouch: P.accountPouch(a), seal: a.seal },
-                  { name: b.displayName, controller: 'ai', aiSkill: b.aiCfg.matchSkill, pouch: P.accountPouch(b), seal: b.seal },
+                  { name: a.displayName, controller: 'ai', aiSkill: G.aiSkill(a), pouch: P.accountPouch(a), seal: a.seal },
+                  { name: b.displayName, controller: 'ai', aiSkill: G.aiSkill(b), pouch: P.accountPouch(b), seal: b.seal },
                 ],
               });
               UI.showWithLoading('spectate', { match, title: 'LIVE — ' + a.displayName + ' vs ' + b.displayName, liveId: mrec.id }, 900);
@@ -207,7 +207,7 @@
           P.pickPouch(pouch => {
             P.startMatch({
               mode: 'standard', ranked: false, format: 'Quick Play vs AI (' + d + ')',
-              opponent: { name: 'Dya’kukull ' + d, aiSkill: AI_SKILL[d], pouch: P.aiPouch(AI_SKILL[d]) },
+              opponent: { name: 'Dya’kukull ' + d, aiSkill: G.aiSkill({ aiCfg: { matchSkill: AI_SKILL[d] } }), pouch: P.aiPouch(AI_SKILL[d]) },
               pouch, skipSetup: true, vsAI: true,
             });
           });
@@ -250,7 +250,7 @@
           m.close();
           P.startMatch({
             mode: 'standard', ranked: false, format: 'Casual Queue',
-            opponent: { name: opp.displayName, accId: opp.id, aiSkill: opp.aiCfg.matchSkill, pouch: P.accountPouch(opp), simulatedHuman: true },
+            opponent: { name: opp.displayName, accId: opp.id, aiSkill: G.aiSkill(opp), pouch: P.accountPouch(opp), simulatedHuman: true },
             pouch,
           });
         }, 1200);
@@ -459,7 +459,7 @@
     P.pickPouch(pouch => {
       P.startMatch({
         mode: 'standard', ranked: false, format: 'Private Match',
-        opponent: { name: acc.displayName, accId: acc.id, aiSkill: (acc.aiCfg && acc.aiCfg.matchSkill) || 0.6, pouch: P.accountPouch(acc), simulatedHuman: true },
+        opponent: { name: acc.displayName, accId: acc.id, aiSkill: G.aiSkill(acc), pouch: P.accountPouch(acc), simulatedHuman: true },
         pouch,
       });
     });
@@ -1238,7 +1238,7 @@
       seed, mode: 'duel',
       teams: [
         { name: me.displayName, controller: 'human', pouch: [U.deepCopy(myTok)] },
-        { name: opp.displayName, controller: 'ai', aiSkill: opp.aiCfg.matchSkill, pouch: [U.deepCopy(oppTok)] },
+        { name: opp.displayName, controller: 'ai', aiSkill: G.aiSkill(opp), pouch: [U.deepCopy(oppTok)] },
       ],
     });
     UI.showWithLoading('match', {
@@ -1324,8 +1324,8 @@
       settings: { pulseInterval: 5, pulseAmount: 3, chaos: false },
       terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)],
       teams: [
-        { name: a.displayName, controller: 'ai', aiSkill: a.aiCfg.matchSkill, pouch: P.accountPouch(a) },
-        { name: b.displayName, controller: 'ai', aiSkill: b.aiCfg.matchSkill, pouch: P.accountPouch(b) },
+        { name: a.displayName, controller: 'ai', aiSkill: G.aiSkill(a), pouch: P.accountPouch(a) },
+        { name: b.displayName, controller: 'ai', aiSkill: G.aiSkill(b), pouch: P.accountPouch(b) },
       ],
     });
     UI.showWithLoading('spectate', { match, title: 'LIVE — ' + a.displayName + ' vs ' + b.displayName }, 900);
