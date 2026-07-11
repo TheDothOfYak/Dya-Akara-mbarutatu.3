@@ -837,7 +837,7 @@
           const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
             (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
           const card = U.el('div', { cls: 'wheel-card' + (k === 0 ? ' center' : Math.abs(k) >= 3 ? ' fade3' : Math.abs(k) === 2 ? ' fade2' : ' fade1') });
-          card.appendChild(UI.tokenArt(en.tok.speciesId, k === 0 ? 62 : 46));
+          card.appendChild(UI.tokenArt(en.tok.speciesId, k === 0 ? 62 : 46, 'idle', en.tok.picks && en.tok.picks.headCount, en.tok));
           card.appendChild(U.el('div', { cls: 'wc-name', text: en.tok.name }));
           card.appendChild(U.el('div', { cls: 'wc-meta', html: SP.ELEMENTS.filter(el => costV[el] > 0).map(el => '<span class="el-' + el + '">' + costV[el] + '</span>').join('·') + (tax ? ' <span style="color:var(--red)">+' + tax + '</span>' : '') }));
           card.appendChild(U.el('div', { cls: 'wc-dot ' + (afford ? 'ok' : 'no') }));
@@ -884,7 +884,7 @@
           const cool = en.readiedAtPulse === M.pulseIndex;
           const el = U.el('div', { cls: 'readied-slot' + (cool ? ' cooldown' : ''), draggable: 'true' });
           el.appendChild(U.el('div', { cls: 'rs-key', text: keys[slot] }));
-          el.appendChild(UI.tokenArt(en.tok.speciesId, 54));
+          el.appendChild(UI.tokenArt(en.tok.speciesId, 54, 'idle', en.tok.picks && en.tok.picks.headCount, en.tok));
           el.appendChild(U.el('div', { cls: 'small', style: 'font-size:10px', text: en.tok.name }));
           if (cool) el.appendChild(U.el('div', { cls: 'small muted', style: 'font-size:9px', text: 'next pulse' }));
           el.addEventListener('dragstart', e => { e.dataTransfer.setData('slot', slot); });

@@ -101,6 +101,10 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 }
 .toast .t-title { color: var(--gold); font-size: 14px; }
 .toast .t-body { font-size: 13px; color: var(--ink-dim); margin-top: 2px; }
+/* toasts that jump somewhere on click (offer replies etc.) */
+.toast.actionable { border-color: var(--gold); box-shadow: 0 6px 20px #000a, 0 0 14px #d9b87a33; }
+.toast.actionable:hover { background: linear-gradient(180deg, #352b1c, var(--panel2)); }
+.toast .t-go { font-size: 12px; color: var(--gold); margin-top: 5px; letter-spacing: .08em; }
 #notifPanel {
   position: fixed; right: 10px; top: 54px; width: 360px; max-height: 70vh; overflow-y: auto; z-index: 290;
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 40px #000c; padding: 8px;
@@ -203,10 +207,19 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 .status-badge.sale { background: #2e4a2e; color: #9adf9a; }
 .status-badge.offer { background: #2e3d4a; color: #9ac4df; }
 .status-badge.display { background: #4a3e2e; color: #dfc99a; }
-.stall-panel { width: 300px; flex-shrink: 0; border-left: 1px solid var(--line); padding: 16px; overflow-y: auto; background: #1b1510; }
+.stall-panel { width: 300px; flex-shrink: 0; border-left: 1px solid var(--line); padding: 16px; overflow-y: auto; background: #1b1510; transition: width .18s ease; }
+.stall-panel.collapsed { width: 36px; padding: 10px 6px; overflow: hidden; }
+.stall-panel.collapsed .sp-body { display: none; }
+.sp-toggle { cursor: pointer; color: var(--ink-dim); font-size: 17px; line-height: 1; padding-bottom: 8px; }
+.sp-toggle:hover { color: var(--gold); }
+.sp-rail { cursor: pointer; text-align: center; font-size: 16px; padding-top: 6px; }
 
-/* stall page (torchlit) */
-.stall-bg { background: linear-gradient(180deg, #241a10 0%, #191008 100%); position: relative; }
+/* stall page (torchlit). NOTE: must not override .screen's
+   position:absolute — doing so un-anchors the screen from the viewport,
+   its height grows with content, #app clips the overflow, and stall
+   pages become unscrollable. .screen's absolute positioning already
+   contains the absolutely-positioned torches and banners. */
+.stall-bg { background: linear-gradient(180deg, #241a10 0%, #191008 100%); }
 .torch { position: absolute; width: 60px; height: 90px; pointer-events: none; animation: torch 2.4s infinite; }
 .stall-sign { background: linear-gradient(180deg, #4a3520, #3a2a18); border: 2px solid var(--gold-dim); border-radius: 8px; padding: 14px 18px; box-shadow: 0 6px 20px #000a; }
 .shelf { background: linear-gradient(180deg, #3a2c1a, #2d2114); border-radius: 4px; border-bottom: 6px solid #1f160c; padding: 14px; display: flex; gap: 14px; margin-bottom: 18px; }

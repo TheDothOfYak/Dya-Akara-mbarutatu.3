@@ -131,6 +131,64 @@ let sn = 0;
 while (!sd.over && sn < 600 * 20) { sd.doTick(); sn++; }
 console.log('Fruit standoff resolves:', (sd.over && sd.result.winner !== -1) ? 'PASS' : 'FAIL', JSON.stringify(sd.result && { winner: sd.result.winner, how: sd.result.how, t: sd.time.toFixed(1) }));
 
+/* --- AI brain: situational deployment (July fixes) --- */
+{
+  /* 1. relic stolen → the AI's next deployment cuts the thief off on its road home */
+  const am = new DYAG.match.Match({
+    seed: 31337, mode: 'standard', terrain: 'plains',
+    settings: { pulseInterval: 5, pulseAmount: 3, chaos: false },
+    teams: [
+      { name: 'AI', controller: 'ai', aiSkill: 1.1, pouch: [DYAG.token.mint({ speciesId: 'harkal', rng })] },
+      { name: 'Foe', controller: 'ai', aiSkill: 0.2, pouch: [] },
+    ],
+  });
+  am.headless = true;
+  const T0 = am.teams[0];
+  /* hand the AI a readied fighter and plant a thief carrying its relic */
+  const entry = T0.pouch[0];
+  entry.state = 'readied'; entry.readiedAtPulse = -1;
+  T0.readied.push(entry);
+  const thiefTok = DYAG.token.mint({ speciesId: 'mikolo_moko', rng });
+  const thiefC = am.spawnFromToken(thiefTok, 1, 800, 500);
+  am.relics[0].carrier = thiefC.id; am.relics[0].carrierTeam = 1;
+  am.pulseIndex = 1;
+  T0.aiMem.nextThink = 0;
+  am.aiThink(T0);
+  const trig = am.inputQueue.find(q => q.team === 0 && q.input.type === 'trigger');
+  const enemyHoard = am.teams[1].hoard;
+  let ok = false, why = 'no trigger queued';
+  if (trig) {
+    const dThief = Math.hypot(trig.input.x - thiefC.x, trig.input.y - thiefC.y);
+    const towardHome = Math.abs(trig.input.x - thiefC.x) < Math.abs(enemyHoard.x - thiefC.x) + 60;
+    ok = dThief < 420 && trig.input.x >= thiefC.x - 120 && towardHome;
+    why = 'landed at ' + Math.round(trig.input.x) + ',' + Math.round(trig.input.y) + ' (thief at 800,500)';
+  }
+  console.log('AI intercepts relic thief:', ok ? 'PASS' : 'FAIL', why);
+
+  /* 2. a buff fruit lands beside the AI's own champion, not in a field somewhere */
+  const bm = new DYAG.match.Match({
+    seed: 4141, mode: 'standard', terrain: 'plains',
+    settings: { pulseInterval: 5, pulseAmount: 3, chaos: false },
+    teams: [
+      { name: 'AI', controller: 'ai', aiSkill: 1.1, pouch: [DYAG.token.mint({ speciesId: 'stonefruit', rng })] },
+      { name: 'Foe', controller: 'ai', aiSkill: 0.2, pouch: [] },
+    ],
+  });
+  bm.headless = true;
+  const BT = bm.teams[0];
+  const fe = BT.pouch[0];
+  fe.state = 'readied'; fe.readiedAtPulse = -1;
+  BT.readied.push(fe);
+  const champTok = DYAG.token.mint({ speciesId: 'harkal', rng });
+  const champ = bm.spawnFromToken(champTok, 0, 500, 640);
+  bm.pulseIndex = 1;
+  BT.aiMem.nextThink = 0;
+  bm.aiThink(BT);
+  const ftrig = bm.inputQueue.find(q => q.team === 0 && q.input.type === 'trigger');
+  const fok = ftrig && Math.hypot(ftrig.input.x - champ.x, ftrig.input.y - champ.y) < 80;
+  console.log('AI places fruit beside its champion:', fok ? 'PASS' : 'FAIL', ftrig ? 'landed ' + Math.round(Math.hypot(ftrig.input.x - champ.x, ftrig.input.y - champ.y)) + 'px away' : 'no trigger');
+}
+
 /* --- hunt test --- */
 const huntPouch = mkPouch(rng, 10);
 const h = new DYAG.match.Match({
@@ -146,6 +204,25 @@ h.headless = true;
 let ht = 0;
 while (!h.over && ht < 900 * 20) { h.doTick(); ht++; }
 console.log('Hunt:', h.over ? 'finished' : 'TIMEOUT', JSON.stringify(h.result && { winner: h.result.winner, how: h.result.how, t: h.time.toFixed(1) }));
+
+/* --- per-token individuality: physique --- */
+{
+  const a = DYAG.token.mint({ speciesId: 'harkal', rng });
+  const b = DYAG.token.mint({ speciesId: 'harkal', rng });
+  const pa = DYAG.token.physique(a), pa2 = DYAG.token.physique(a), pb = DYAG.token.physique(b);
+  const stable = JSON.stringify(pa) === JSON.stringify(pa2);
+  const shaped = ['hue', 'light', 'build', 'marking', 'markSeed'].every(k => pa[k] !== undefined);
+  /* across a batch, same-species individuals must not all look alike */
+  const batch = [];
+  for (let i = 0; i < 12; i++) batch.push(JSON.stringify(DYAG.token.physique(DYAG.token.mint({ speciesId: 'harkal', rng }))));
+  const distinct = new Set(batch).size;
+  console.log('Token physique:', (stable && shaped && distinct >= 10) ? 'PASS' : 'FAIL',
+    'stable=' + stable + ' distinct=' + distinct + '/12', 'sample=' + JSON.stringify(pb));
+  /* physique never touches the sim: derived stats fields unchanged */
+  const legacy = { id: 'tok_legacy_1', speciesId: 'harkal', rarity: 1, stats: { hp: 50, dmg: 8, speed: 60 } };
+  const pl = DYAG.token.physique(legacy);
+  console.log('Legacy tokens get a physique too:', pl && pl.marking !== undefined ? 'PASS' : 'FAIL');
+}
 
 /* --- token/economy sanity --- */
 const tok = DYAG.token.mint({ speciesId: 'su_naga', rng });

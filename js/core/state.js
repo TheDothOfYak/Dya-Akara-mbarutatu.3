@@ -618,23 +618,25 @@
        counter is under HALF of the AI's LAST offer. At or above that, it
        negotiates normally — counters down or accepts. */
     const lowball = lastAi ? bundleVal < lastAi.amount * 0.5 : bundleVal < reserve * 0.5;
+    /* offer replies carry a click-through straight to the Offers tab */
+    const offersAction = { screen: 'market', params: { tab: 'My Offers' } };
     if (bundleVal >= reserve) {
       G.acceptOffer(off.id, true);
-      if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Offer accepted!', body: 'Your offer was accepted. The token is yours.', icon: '🤝' });
+      if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Offer accepted!', body: 'Your offer was accepted. The token is yours.', icon: '🤝', action: offersAction, actionLabel: 'View offers' });
     } else if (lowball) {
       if (off.history.length > 7) { off.state = 'ended'; }
       else {
         const up = Math.round((lastAi ? lastAi.amount : lst.price) * rngA.range(1.02, 1.12));
         off.history.push({ by: 'seller', amount: up, note: rngA.pick(['You insult the token.', 'That number went the wrong way for you.', 'The Guild frowns on jokes.']), at: Date.now() });
         off.state = 'countered';
-        if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Counter-offer', body: 'The seller countered at ' + U.fmt(up) + 'g.', icon: '📩' });
+        if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Counter-offer', body: 'The seller countered at ' + U.fmt(up) + 'g.', icon: '📩', action: offersAction, actionLabel: 'Reply in Offers' });
       }
     } else {
       const prev = lastAi ? lastAi.amount : lst.price;
       const counter = Math.round(Math.max(reserve, Math.min(prev - 1, (bundleVal + prev) / 2 * rngA.range(0.98, 1.05))));
       off.history.push({ by: 'seller', amount: counter, note: rngA.pick(['Closer.', 'I can’t go that low.', 'The song alone cost more than that.', 'Meet me here.']), at: Date.now() });
       off.state = 'countered';
-      if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Counter-offer', body: 'The seller countered at ' + U.fmt(counter) + 'g.', icon: '📩' });
+      if (G.me && off.buyerId === G.me.id) G.notify({ type: 'market', title: 'Counter-offer', body: 'The seller countered at ' + U.fmt(counter) + 'g.', icon: '📩', action: offersAction, actionLabel: 'Reply in Offers' });
     }
     if (DYA.ui && DYA.ui.onMarketUpdate) DYA.ui.onMarketUpdate();
   }
@@ -957,7 +959,7 @@
             at: Date.now(),
           };
           G.world.market.offers[off.id] = off;
-          G.notify({ type: 'market', title: 'Offer received', body: ai.displayName + ' made an offer on ' + (G.me.tokens[lst.tokenId] ? G.me.tokens[lst.tokenId].name : 'your listing') + '.', icon: '📩' });
+          G.notify({ type: 'market', title: 'Offer received', body: ai.displayName + ' made an offer on ' + (G.me.tokens[lst.tokenId] ? G.me.tokens[lst.tokenId].name : 'your listing') + '.', icon: '📩', action: { screen: 'market', params: { tab: 'My Offers' } }, actionLabel: 'Reply in Offers' });
         }
       }
     }

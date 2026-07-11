@@ -554,7 +554,7 @@
         c.facing = t.x >= c.x ? 1 : -1;
         if (c.attackCd <= 0) {
           c.attackCd = 1 / ((c.vars.tongueSpeed || 1) * (c.speciesId === 'harkal' ? 1 + c.frenzy : 1) * buffMul('atkSpeedMul'));
-          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1) * (1 + Math.min(0.2, Math.floor((c.matchXp || 0) / 100) * 0.02)) * M.quirkDmgMul(c);
+          let dmg = c.dmg * buffMul('dmgMul') * (it.dmgMul || 1) * (1 + Math.min(0.2, Math.floor((c.matchXp || 0) / 100) * 0.02)) * M.quirkDmgMul(c, t);
           if (c.speciesId === 'tyndael') dmg *= 0.7 + c.heat * 0.7;
           if (it.useBreath && c.headsLeft > 1) dmg *= 1.25; // multi-head strike
           M.damage(t, dmg, c);
@@ -723,7 +723,7 @@
 
   /* situational damage multiplier from life-history quirks —
      plus the seed races' memory surge while the storm passes */
-  Match.prototype.quirkDmgMul = function (c) {
+  Match.prototype.quirkDmgMul = function (c, target) {
     const M = this, q = c.quirks;
     let m = 1;
     /* Eikar/Keilia are immortal through memory: while the Sunear'Zikhron
@@ -748,6 +748,16 @@
     }
     if (q.forest_reared && M.zones.some(z => z.type === 'forest' && U.dist(c.x, c.y, z.x, z.y) < z.r)) m *= 1.12;
     if (q.shore_reared && M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r)) m *= 1.12;
+    if (q.giant_slayer && target && target.sizeIdx > c.sizeIdx) m *= 1.18;
+    if (q.home_guard && U.dist(c.x, c.y, M.teams[c.team].hoard.x, M.teams[c.team].hoard.y) < 320) m *= 1.15;
+    if (q.duelist) {
+      let foes = 0;
+      for (const o of M.creatures) {
+        if (o.dead || o.team === c.team || o.sp.tags.includes('passive')) continue;
+        if (U.dist(c.x, c.y, o.x, o.y) < 220) { foes++; if (foes >= 2) break; }
+      }
+      m *= foes === 1 ? 1.15 : foes >= 2 ? 0.95 : 1; /* sharp alone, sloppy in a brawl */
+    }
     return m;
   };
 
@@ -1561,42 +1571,127 @@
     const M = this;
     if (M.time < T.aiMem.nextThink) return;
     const skill = T.aiSkill;
-    T.aiMem.nextThink = M.time + U.lerp(6, 1.6, Math.min(1, skill)) + T.aiRng.range(0, 2);
 
+    /* ---------- read the field ---------- */
     const myCreatures = M.creatures.filter(c => !c.dead && c.team === T.idx);
     const enemyCreatures = M.creatures.filter(c => !c.dead && c.team === 1 - T.idx);
     const own = T.hoard, enemy = M.teams[1 - T.idx].hoard;
+    const myRelic = M.relics.find(r => r.ownerTeam === T.idx);
+    const enemyRelic = M.relics.find(r => r.ownerTeam !== T.idx);
+    /* the thief: an enemy creature carrying MY relic home */
+    const thief = myRelic && myRelic.carrier != null ? M.creatures.find(c => c.id === myRelic.carrier && !c.dead) : null;
+    /* my carrier: my creature hauling THEIR relic toward my hoard */
+    const myCarrier = enemyRelic && enemyRelic.carrier != null ? M.creatures.find(c => c.id === enemyRelic.carrier && !c.dead && c.team === T.idx) : null;
+    const enemyRelicFree = enemyRelic && enemyRelic.carrier == null && !enemyRelic.captured && !enemyRelic.disabled;
+    const relicDropped = myRelic && !myRelic.disabled && myRelic.carrier == null && U.dist(myRelic.x, myRelic.y, myRelic.homeX, myRelic.homeY) > 40;
+    const hoardThreats = enemyCreatures.filter(c => U.dist(c.x, c.y, own.x, own.y) < 360);
+    const homeGuards = myCreatures.filter(c => U.dist(c.x, c.y, own.x, own.y) < 360);
+    const fielded = (c) => !c.sp.tags.includes('passive') && c.sp.attackRange > 0;
+    const fighters = myCreatures.filter(fielded);
+    const isRunnerSp = (sp) => sp.tags.includes('thief') || sp.tags.includes('sentient');
+    const haveRunner = myCreatures.some(c => isRunnerSp(c.sp));
+    /* how thick is the guard around their relic? Runners are wasted
+       against a wall — count before committing one */
+    const relicGuards = enemyRelic ? enemyCreatures.filter(c => fielded(c) && U.dist(c.x, c.y, enemyRelic.homeX, enemyRelic.homeY) < 260).length : 9;
+    const runnerInHand = T.readied.some(e => isRunnerSp(SP.get(e.tok.speciesId)));
+    const urgent = !!thief || hoardThreats.length > homeGuards.length;
 
-    /* 1. trigger readied tokens (readied in a previous pulse) */
+    /* skilled keepers read the field faster — and snap to attention the
+       moment their relic starts moving */
+    const base = U.lerp(6, 1.6, Math.min(1, skill)) + T.aiRng.range(0, 2);
+    T.aiMem.nextThink = M.time + (urgent ? base * 0.45 : base);
+    /* placement discipline: sloppy hands scatter, good hands are exact */
+    const jit = U.lerp(150, 45, Math.min(1, skill));
+    const passiveSp = (sp) => sp.tags.includes('passive') || !sp.attackRange;
+
+    /* ---------- 1. trigger a readied token where it matters ---------- */
     const triggerable = T.readied.map((e, i) => ({ e, i })).filter(x => x.e.readiedAtPulse < M.pulseIndex);
     if (triggerable.length) {
-      const pick = triggerable[0];
-      let x, y;
+      /* choose the token best suited to the moment, not just the oldest */
+      const suit = (x) => {
+        const sp = SP.get(x.e.tok.speciesId);
+        let s = T.aiRng.range(0, 1);
+        if (thief && !passiveSp(sp)) s += (x.e.tok.stats.speed || 40) / 30;       // interceptors want legs
+        /* a runner shines against a thin guard; against a wall, send
+           fighters first and keep the runner in hand */
+        if (enemyRelicFree && isRunnerSp(sp)) s += relicGuards <= 1 ? 3 : 0.5;
+        if (enemyRelicFree && runnerInHand && relicGuards >= 2 && !passiveSp(sp) && !isRunnerSp(sp)) s += 1.4;
+        if (hoardThreats.length && (sp.tags.includes('apex') || sp.statMul.dmg >= 1.3)) s += 1.6;
+        if (sp.behavior === 'sprengju' && fighters.length) s += 1.2;              // a fruit is only worth placing beside a fighter
+        if (passiveSp(sp) && (thief || hoardThreats.length)) s -= 2;              // no fruit in a crisis
+        return s;
+      };
+      const pick = triggerable.sort((a, b) => suit(b) - suit(a))[0];
       const sp = SP.get(pick.e.tok.speciesId);
-      const myRelic = M.relics.find(r => r.ownerTeam === T.idx);
-      const enemyRelic = M.relics.find(r => r.ownerTeam !== T.idx);
-      const enemyHasMine = myRelic && myRelic.carrier != null;
-      const enemyRelicFree = enemyRelic && enemyRelic.carrier == null && !enemyRelic.captured;
+      let x, y;
       if (M.mode === 'hunt' && enemyCreatures.length) {
         const q = enemyCreatures.find(e => e.isBoss) || enemyCreatures[0];
         x = q.x + T.aiRng.range(-160, 160); y = q.y + T.aiRng.range(-160, 160);
-      } else if (enemyHasMine && T.aiRng.chance(0.4 + skill * 0.4)) {
-        x = myRelic.x + T.aiRng.range(-40, 40); y = myRelic.y + T.aiRng.range(-40, 40); // intercept the thief
-      } else if (enemyRelicFree && (sp.tags.includes('thief') || (sp.tags.includes('sentient') && T.aiRng.chance(skill * 0.7)))) {
-        x = enemyRelic.homeX + T.aiRng.range(-140, 140); y = enemyRelic.homeY + T.aiRng.range(-140, 140); // raid their hoard
+      } else if (thief && !passiveSp(sp) && T.aiRng.chance(0.45 + skill * 0.45)) {
+        /* cut the thief off AHEAD, on its road home — not where it was */
+        const lead = U.lerp(0.15, 0.45, Math.min(1, skill));
+        x = thief.x + (enemy.x - thief.x) * lead + T.aiRng.range(-jit * 0.5, jit * 0.5);
+        y = thief.y + (enemy.y - thief.y) * lead + T.aiRng.range(-jit * 0.5, jit * 0.5);
+      } else if (relicDropped && !passiveSp(sp) && T.aiRng.chance(0.35 + skill * 0.4)) {
+        x = myRelic.x + T.aiRng.range(-50, 50); y = myRelic.y + T.aiRng.range(-50, 50); // stand over the dropped relic
+      } else if (hoardThreats.length > homeGuards.length && !passiveSp(sp)) {
+        const t2 = T.aiRng.pick(hoardThreats);
+        x = own.x + (t2.x - own.x) * 0.5 + T.aiRng.range(-jit * 0.6, jit * 0.6);   // meet raiders halfway
+        y = own.y + (t2.y - own.y) * 0.5 + T.aiRng.range(-jit * 0.6, jit * 0.6);
+      } else if (myCarrier && !passiveSp(sp) && T.aiRng.chance(skill * 0.75)) {
+        x = myCarrier.x + (own.x - myCarrier.x) * 0.3 + T.aiRng.range(-70, 70);    // screen the carrier's road home
+        y = myCarrier.y + (own.y - myCarrier.y) * 0.3 + T.aiRng.range(-70, 70);
+      } else if (enemyRelicFree && isRunnerSp(sp) && (relicGuards <= 1 || T.aiRng.chance(0.3))) {
+        x = enemyRelic.homeX + T.aiRng.range(-jit, jit); y = enemyRelic.homeY + T.aiRng.range(-jit, jit); // the guard is thin — raid NOW
+      } else if (enemyRelicFree && !passiveSp(sp) && homeGuards.length > 0 && T.aiRng.chance(skill * 0.5) &&
+                 (runnerInHand && relicGuards >= 2 ||
+                  myCreatures.some(c => isRunnerSp(c.sp) && U.dist(c.x, c.y, enemyRelic.homeX, enemyRelic.homeY) < 430))) {
+        /* muscle for the raid: a runner is poised (in hand or at their
+           gates) but the guard is thick — send fighters to crack it.
+           Never strips the last guard off the home hoard. */
+        x = enemyRelic.homeX + T.aiRng.range(-170, 170); y = enemyRelic.homeY + T.aiRng.range(-170, 170);
+      } else if (!passiveSp(sp) && homeGuards.length === 0 && myCreatures.length >= 2 && T.aiRng.chance(skill * 0.5)) {
+        /* an empty hoard is a free steal — keep a garrison */
+        x = own.x + T.aiRng.range(60, 150) * (enemy.x > own.x ? 1 : -1); y = own.y + T.aiRng.range(-120, 120);
+      } else if (sp.behavior === 'sprengju' && fighters.length) {
+        /* buffs land beside the biggest friendly bruiser */
+        const champ = fighters.sort((a, b) => (b.hp * b.dmg) - (a.hp * a.dmg))[0];
+        x = champ.x + T.aiRng.range(-36, 36); y = champ.y + T.aiRng.range(-36, 36);
+      } else if (sp.id === 'sprengju_shaving' && myCreatures.some(c => c.speciesId === 'ju_field')) {
+        const ju = myCreatures.find(c => c.speciesId === 'ju_field');
+        x = ju.x + T.aiRng.range(-40, 40); y = ju.y + T.aiRng.range(-40, 40);      // wake the Ju Field
+      } else if (sp.id === 'ju_field' && myCreatures.some(c => c.speciesId === 'sprengju_shaving')) {
+        const sh = myCreatures.find(c => c.speciesId === 'sprengju_shaving');
+        x = sh.x + T.aiRng.range(-40, 40); y = sh.y + T.aiRng.range(-40, 40);
       } else if (sp.tags.includes('stationary') || sp.behavior === 'archer_unit' || sp.behavior === 'grothyn') {
         x = own.x + (enemy.x - own.x) * 0.28 + T.aiRng.range(-60, 60); y = own.y + T.aiRng.range(-200, 200); // defensive line
       } else if (enemyCreatures.length && T.aiRng.chance(0.5)) {
         const target = T.aiRng.pick(enemyCreatures);
         x = target.x + T.aiRng.range(-70, 70); y = target.y + T.aiRng.range(-70, 70); // contest
       } else {
-        x = own.x + (enemy.x - own.x) * T.aiRng.range(0.3, 0.65); y = T.aiRng.range(200, WORLD.h - 200);
+        /* advance — good keepers push the relic lane, not the wings */
+        x = own.x + (enemy.x - own.x) * T.aiRng.range(0.3, 0.65);
+        y = U.lerp(T.aiRng.range(200, WORLD.h - 200), WORLD.h / 2 + T.aiRng.range(-160, 160), Math.min(1, skill));
       }
       M.queueInput(T.idx, { type: 'trigger', slot: pick.i, x: U.clamp(x, 40, WORLD.w - 40), y: U.clamp(y, 40, WORLD.h - 40) });
-      return;
+      /* a crisis gets both hands: skilled keepers slam a second token
+         down in the same breath when the relic or hoard is in danger */
+      if (urgent && skill > 0.75 && triggerable.length > 1) {
+        const second = triggerable.filter(x => x !== pick && !passiveSp(SP.get(x.e.tok.speciesId)))
+          .sort((a, b) => suit(b) - suit(a))[0];
+        if (second) {
+          const tx = thief ? thief.x : (hoardThreats[0] ? own.x + (hoardThreats[0].x - own.x) * 0.5 : own.x + 120);
+          const ty = thief ? thief.y : (hoardThreats[0] ? own.y + (hoardThreats[0].y - own.y) * 0.5 : own.y);
+          /* slots shift after the first trigger applies — queued same tick,
+             applied in seq order, so adjust the index for the removal */
+          const slot2 = second.i > pick.i ? second.i - 1 : second.i;
+          M.queueInput(T.idx, { type: 'trigger', slot: slot2, x: U.clamp(tx + T.aiRng.range(-60, 60), 40, WORLD.w - 40), y: U.clamp(ty + T.aiRng.range(-60, 60), 40, WORLD.h - 40) });
+        }
+      }
+      /* no early return — a sharp keeper readies the next token the same breath */
     }
 
-    /* 2. ready affordable tokens (vector costs + additional cost) */
+    /* ---------- 2. ready the token the situation asks for ---------- */
     if (T.readied.length < (skill > 0.7 ? 2 : 1) + 1) {
       const affordable = T.pouch.map((e, i) => ({ e, i }))
         .filter(x => {
@@ -1607,18 +1702,40 @@
           return canAfford(T.resources, cost);
         });
       if (affordable.length) {
-        let choice;
-        if (T.aiRng.chance(skill)) {
-          /* smart-ish: prefer counter picks & relic runners */
-          const needRunner = !myCreatures.some(c => c.sp.tags.includes('thief') || c.sp.tags.includes('sentient'));
-          const runners = affordable.filter(x => SP.get(x.e.tok.speciesId).tags.includes('thief') || SP.get(x.e.tok.speciesId).tags.includes('sentient'));
-          const heavies = affordable.filter(x => SP.get(x.e.tok.speciesId).tags.includes('apex'));
-          if (needRunner && runners.length) choice = T.aiRng.pick(runners);
-          else if (enemyCreatures.length > myCreatures.length && heavies.length) choice = T.aiRng.pick(heavies);
-          else choice = affordable.sort((a, b) => b.e.tok.rarity - a.e.tok.rarity)[0];
-        } else {
-          choice = T.aiRng.pick(affordable);
+        const pouchHas = (id) => T.pouch.some(e => e.state === 'pouch' && e.tok.speciesId === id);
+        const fieldHas = (id) => myCreatures.some(c => c.speciesId === id);
+        const need = (x) => {
+          const sp = SP.get(x.e.tok.speciesId);
+          let s = 2 + x.e.tok.rarity * 0.5 + T.aiRng.range(0, 1.5);
+          if (passiveSp(sp)) {
+            s -= 3; /* a non-fighter is dead weight… */
+            if (sp.behavior === 'sprengju' && fighters.length) s += 3.4;                     // …unless it feeds a fighter
+            if (sp.id === 'sprengju_shaving' && (fieldHas('ju_field') || pouchHas('ju_field'))) s += 4.2; // …or wakes a Ju Field
+            if (sp.id === 'ju_field' && (fieldHas('sprengju_shaving') || pouchHas('sprengju_shaving'))) s += 4.2;
+            if (sp.id === 'karnen') s += 2.6;                                                // …or works the economy
+            if (sp.id === 'rubbermcfly') s += 1.6;                                           // …or hums out resources
+          }
+          if ((sp.tags.includes('thief') || sp.tags.includes('sentient')) && enemyRelicFree) s += haveRunner ? 1.4 : 3.5; /* sentients raid in numbers */
+          if ((sp.tags.includes('apex') || sp.statMul.dmg >= 1.4) && (hoardThreats.length || enemyCreatures.length > myCreatures.length)) s += 2.6;
+          if (sp.tags.includes('stationary') && hoardThreats.length) s += 1.4;
+          if (thief && !passiveSp(sp) && (x.e.tok.stats.speed || 0) > 50) s += 1.8;          // legs for the chase
+          if ((x.e.deaths || 0) > 1) s -= x.e.deaths * 0.6;                                  // stop feeding a dying horse
+          return s;
+        };
+        const ranked = affordable.map(x => ({ x, s: need(x) })).sort((a, b) => b.s - a.s);
+        /* patience: a good keeper saves toward a heavy hitter instead of
+           spending every pulse on chaff — never while under attack */
+        if (skill > 0.6 && !urgent && ranked[0].s < 4.2 && T.aiRng.chance((skill - 0.6) * 1.1)) {
+          const total = resTotal(T.resources);
+          const heavy = T.pouch.some(e => {
+            if (e.state !== 'pouch' || e.tok.rarity < 3) return false;
+            const c = TK.costVec(e.tok);
+            const missing = ELS.reduce((s2, el) => s2 + Math.max(0, (c[el] || 0) - T.resources[el]), 0);
+            return missing > 0 && missing <= Math.max(2, (M.settings.pulseAmount || 2));
+          });
+          if (heavy && total < 14) return; /* hold the purse one pulse */
         }
+        const choice = T.aiRng.chance(Math.min(0.92, 0.25 + skill * 0.6)) ? ranked[0].x : T.aiRng.pick(affordable);
         M.queueInput(T.idx, { type: 'ready', pouchIdx: choice.i, taxRes: mostAbundant(T.resources) });
       }
     }
