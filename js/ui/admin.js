@@ -28,7 +28,7 @@
 (function () {
   'use strict';
   const U = DYA.util, G = DYA.state, SP = DYA.species, EC = DYA.economy, L = DYA.lore, TK = DYA.token, M = DYA.mods;
-  let root, view = 'Overview';
+  let root, view = 'Overview', huntTab = 'Available';
 
   window.addEventListener('DOMContentLoaded', () => {
     G.init();
@@ -173,7 +173,7 @@
   }
 
   /* ---------- main panel ---------- */
-  const NAV = ['Overview', 'Creatures', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
+  const NAV = ['Overview', 'Creatures', 'Hunts', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
   function panel() {
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap' });
@@ -206,7 +206,7 @@
       const ms = M.summary();
       const tiles = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(160px,1fr))' });
       [['Real players', humans.length], ['AI players', ais.length], ['Local listings', listings], ['Open reports/appeals', openReports], ['Tournaments', Object.values(G.world.tournaments).length], ['Season', G.world.season.number],
-      ['Species edited', ms.species + ms.customSpecies], ['Text overrides', ms.text + ms.lore], ['Balance overrides', ms.balance], ['Edit revision', ms.rev]].forEach(([l, v]) => {
+      ['Species edited', ms.species + ms.customSpecies], ['Hunts available', ms.huntsAvailable + '/' + ms.hunts], ['Text overrides', ms.text + ms.lore], ['Balance overrides', ms.balance], ['Edit revision', ms.rev]].forEach(([l, v]) => {
         tiles.appendChild(U.el('div', { cls: 'stat-tile' }, [U.el('div', { cls: 'st-num', text: v }), U.el('div', { cls: 'st-lbl', text: l })]));
       });
       body.appendChild(tiles);
@@ -263,6 +263,73 @@
       }
       search.oninput = paint;
       paint();
+    },
+
+    /* ================= HUNTS ================= */
+    Hunts(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Every Hunt is ONE specific creature you author by hand — not a random member of a species. A creature can be hunted once; the first player to finish it claims it for the whole world and it moves to the Hunted list' + (M.configured() ? ', reaching every player online within a minute.' : ' (this browser only until Supabase is configured).') }));
+      body.appendChild(syncLine());
+
+      /* sub-tabs */
+      const tabs = U.el('div', { cls: 'flex mb' });
+      ['Available', 'Hunted'].forEach(t => {
+        const b = U.el('button', { cls: 'btn small' + (huntTab === t ? ' primary' : ''), text: t + ' (' + (t === 'Available' ? M.availableHunts().length : M.huntedHunts().length) + ')' });
+        b.onclick = () => { huntTab = t; rerender(); };
+        tabs.appendChild(b);
+      });
+      body.appendChild(tabs);
+
+      if (huntTab === 'Available') {
+        body.appendChild(U.el('button', { cls: 'btn primary mb', text: '＋ Create a Hunt', onclick: () => editHunt(null) }));
+        const hunts = M.availableHunts().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        if (!hunts.length) { body.appendChild(U.el('p', { cls: 'muted', text: 'No Hunts posted. Create one — players see it in Adventures once it is live.' })); return; }
+        const grd = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px' });
+        hunts.forEach(h => {
+          const sp = SP.get(h.speciesId);
+          const card = U.el('div', { cls: 'panel', style: 'padding:10px' });
+          const row = U.el('div', { cls: 'flex' });
+          if (sp) row.appendChild(spriteThumb(sp, 54));
+          const info = U.el('div', { cls: 'flex1', style: 'margin-left:8px' });
+          info.appendChild(U.el('div', { cls: 'gold', text: h.name || '(unnamed)' }));
+          info.appendChild(U.el('div', { cls: 'small muted', text: (sp ? sp.name : h.speciesId) + ' · ' + (SP.RARITIES[h.rarity] || '?') }));
+          info.appendChild(U.el('div', { cls: 'small muted', text: (h.encounters ? h.encounters.length : 0) + ' encounter(s) · 🪙' + U.fmt((h.rewards && h.rewards.gold) || 0) }));
+          row.appendChild(info);
+          card.appendChild(row);
+          const acts = U.el('div', { cls: 'flex mt' });
+          acts.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editHunt(h) }));
+          acts.appendChild(U.el('button', {
+            cls: 'btn small', text: 'Mark hunted', onclick: () => {
+              if (!confirm('Manually retire "' + (h.name || h.speciesId) + '"? It leaves every player\'s roster.')) return;
+              M.markHunted(h.id, 'Admin').then(rerender);
+            },
+          }));
+          acts.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: () => { if (confirm('Delete this Hunt permanently?')) { M.deleteHunt(h.id); rerender(); } } }));
+          card.appendChild(acts);
+          grd.appendChild(card);
+        });
+        body.appendChild(grd);
+      } else {
+        const hunts = M.huntedHunts().sort((a, b) => (b.huntedAt || 0) - (a.huntedAt || 0));
+        if (!hunts.length) { body.appendChild(U.el('p', { cls: 'muted', text: 'No creature has been hunted yet.' })); return; }
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['Creature', 'Species', 'Rarity', 'Hunted by', 'When', ''].map(h => U.el('th', { text: h }))));
+        hunts.forEach(h => {
+          const sp = SP.get(h.speciesId);
+          const tr = U.el('tr', {}, [
+            U.el('td', { text: h.name || '(unnamed)' }),
+            U.el('td', { text: sp ? sp.name : h.speciesId }),
+            U.el('td', { text: SP.RARITIES[h.rarity] || '?' }),
+            U.el('td', { text: h.huntedBy || '—' }),
+            U.el('td', { text: h.huntedAt ? U.timeAgo(h.huntedAt) : '—' }),
+          ]);
+          const td = U.el('td', {});
+          td.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Reopen', onclick: () => { M.reopenHunt(h.id); rerender(); } }));
+          td.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: () => { if (confirm('Delete this Hunt permanently?')) { M.deleteHunt(h.id); rerender(); } } }));
+          tr.appendChild(td);
+          tbl.appendChild(tr);
+        });
+        body.appendChild(tbl);
+      }
     },
 
     /* ================= TEXT & LORE ================= */
@@ -919,6 +986,191 @@
     });
     holder.appendChild(states);
     return holder;
+  }
+
+  /* ================= HUNT EDITOR =================
+     Authors one individual Hunt end to end: identity, narrative framing,
+     the encounter chain, and the exact rewards. */
+  function selectEl(options, value) {
+    const s = U.el('select', { cls: 'txt' });
+    options.forEach(([v, label]) => s.appendChild(U.el('option', { value: v, text: label })));
+    if (value != null) s.value = value;
+    return s;
+  }
+  function parseEnemies(text) {
+    return (text || '').split('\n').map(line => {
+      const parts = line.trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return null;
+      const e = { speciesId: parts[0] };
+      parts.slice(1).forEach(p => {
+        if (/^\d+$/.test(p)) e.rarity = parseInt(p, 10);
+        else if (/^boss$/i.test(p)) e.boss = true;
+      });
+      return e;
+    }).filter(Boolean);
+  }
+  function enemiesToText(arr) {
+    return (arr || []).map(e => [e.speciesId, (e.rarity != null ? e.rarity : null), (e.boss ? 'boss' : null)].filter(x => x != null && x !== '').join(' ')).join('\n');
+  }
+  function editHunt(existing) {
+    const isNew = !existing;
+    const firstSpid = (SP.list[0] && SP.list[0].id) || '';
+    const work = existing ? U.deepCopy(existing) : {
+      id: U.uid('hunt'), name: '', speciesId: firstSpid, rarity: 3, narrator: 'guide', intro: '',
+      encounters: [{ name: 'The Quarry', desc: '', terrain: 'plains', enemies: [{ speciesId: firstSpid, boss: true }] }],
+      rewards: { gold: 600, okid: 3, ngakara: 3, pieces: 1, pieceMaterial: '', secondPieceChance: (EC.HUNT && EC.HUNT.secondPieceChance) || 0.06 },
+      hunted: false, huntedBy: null, huntedAt: 0, createdAt: Date.now(),
+    };
+    work.rewards = work.rewards || {};
+    work.encounters = work.encounters || [];
+
+    const { w, close } = modal('3% 6%');
+    const closeAll = () => { stopPreviews(); close(); rerender(); };
+    w.appendChild(U.el('h2', { cls: 'gold', text: isNew ? 'Create a Hunt' : 'Edit Hunt — ' + (work.name || work.speciesId) }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'This is one specific creature. Give it a name, choose which species it is, frame the pursuit, build the encounters it takes to bring it down, and set exactly what the hunter earns.' }));
+
+    const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:320px 1fr;gap:18px;align-items:start' });
+    w.appendChild(cols);
+
+    /* ---------- LEFT: identity + sprite ---------- */
+    const left = U.el('div', {});
+    cols.appendChild(left);
+    left.appendChild(U.el('h3', { cls: 'gold mb', text: 'The creature' }));
+    left.appendChild(livePreview(() => SP.get(work.speciesId) || SP.list[0]));
+
+    const nameIn = U.el('input', { cls: 'txt', maxlength: 32, value: work.name, placeholder: 'e.g. Old Scarback' });
+    lblIn(left, 'Individual name', nameIn);
+
+    const spSel = selectEl(SP.list.map(s => [s.id, s.name]), work.speciesId);
+    spSel.onchange = () => { work.speciesId = spSel.value; };
+    lblIn(left, 'Species (what it is)', spSel);
+
+    const rarSel = selectEl(SP.RARITIES.map((r, i) => [String(i), r]), String(work.rarity));
+    lblIn(left, 'Rarity', rarSel);
+
+    const narSel = selectEl(Object.keys(L.NARRATORS).map(k => [k, L.NARRATORS[k].name]), work.narrator);
+    lblIn(left, 'Narrator (voice of the Track)', narSel);
+
+    /* ---------- RIGHT: narrative + rewards ---------- */
+    const right = U.el('div', {});
+    cols.appendChild(right);
+
+    const introTa = U.el('textarea', { cls: 'txt', rows: 5, style: 'width:100%', placeholder: 'The Track intro this narrator speaks before the two questions. Leave blank to use the narrator’s default opener.' });
+    introTa.value = work.intro || '';
+    right.appendChild(U.el('h3', { cls: 'gold mb', text: 'The Track — opening words' }));
+    right.appendChild(introTa);
+    right.appendChild(U.el('p', { cls: 'small muted mt', text: 'The two Track questions are drawn from the pools under Text & Lore (species-specific first, then general).' }));
+
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Rewards on success' }));
+    const rewGrid = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px' });
+    const rewIns = {};
+    [['gold', 'Gold (max)'], ['okid', 'Buri Okid (max)'], ['ngakara', 'NgAkara (max)'], ['pieces', 'Guaranteed pieces']].forEach(([k, lb]) => {
+      const cell = U.el('div', {});
+      cell.appendChild(U.el('label', { cls: 'lbl', text: lb }));
+      rewIns[k] = numIn(work.rewards[k] != null ? work.rewards[k] : 0, { step: 1 });
+      cell.appendChild(rewIns[k]);
+      rewGrid.appendChild(cell);
+    });
+    right.appendChild(rewGrid);
+    const rewGrid2 = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:1fr 160px;gap:8px' });
+    const matCell = U.el('div', {});
+    matCell.appendChild(U.el('label', { cls: 'lbl', text: 'Crafting-piece material (blank = random)' }));
+    rewIns.pieceMaterial = U.el('input', { cls: 'txt', value: work.rewards.pieceMaterial || '', placeholder: 'e.g. ridge-scale' });
+    matCell.appendChild(rewIns.pieceMaterial);
+    rewGrid2.appendChild(matCell);
+    const chCell = U.el('div', {});
+    chCell.appendChild(U.el('label', { cls: 'lbl', text: 'Bonus-piece chance (perfect run)' }));
+    rewIns.secondPieceChance = numIn(work.rewards.secondPieceChance != null ? work.rewards.secondPieceChance : 0.06, { step: 0.01 });
+    chCell.appendChild(rewIns.secondPieceChance);
+    rewGrid2.appendChild(chCell);
+    right.appendChild(rewGrid2);
+    right.appendChild(U.el('p', { cls: 'small muted mt', text: 'Gold/Okid/NgAkara are ceilings — a hunter’s hidden performance score scales the actual payout down from these.' }));
+
+    /* ---------- ENCOUNTERS (full width) ---------- */
+    w.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Encounter chain' }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Each encounter is one match on the way to the kill. Enemies: one per line as "speciesId [rarity] [boss]" — e.g. "harkal" or "su_naga 4 boss". The last enemy of the final encounter is the creature itself.' }));
+    const terrainOpts = L.TERRAIN_SETS.map(t => [t.id, t.name]);
+    const encWrap = U.el('div', {});
+    w.appendChild(encWrap);
+    function paintEncounters() {
+      encWrap.innerHTML = '';
+      work.encounters.forEach((enc, i) => {
+        const box = U.el('div', { cls: 'panel mb', style: 'padding:10px' });
+        const head = U.el('div', { cls: 'flex', style: 'align-items:center' });
+        head.appendChild(U.el('b', { cls: 'gold flex1', text: 'Encounter ' + (i + 1) }));
+        if (i > 0) head.appendChild(U.el('button', { cls: 'btn small ghost', text: '↑', onclick: () => { const t = work.encounters[i - 1]; work.encounters[i - 1] = enc; work.encounters[i] = t; paintEncounters(); } }));
+        if (i < work.encounters.length - 1) head.appendChild(U.el('button', { cls: 'btn small ghost', text: '↓', onclick: () => { const t = work.encounters[i + 1]; work.encounters[i + 1] = enc; work.encounters[i] = t; paintEncounters(); } }));
+        head.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { work.encounters.splice(i, 1); paintEncounters(); } }));
+        box.appendChild(head);
+        const grid = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:1fr 200px;gap:8px' });
+        const nCell = U.el('div', {});
+        nCell.appendChild(U.el('label', { cls: 'lbl', text: 'Encounter name' }));
+        const nIn = U.el('input', { cls: 'txt', value: enc.name || '' });
+        nIn.oninput = () => enc.name = nIn.value;
+        nCell.appendChild(nIn);
+        grid.appendChild(nCell);
+        const tCell = U.el('div', {});
+        tCell.appendChild(U.el('label', { cls: 'lbl', text: 'Terrain' }));
+        const tSel = selectEl(terrainOpts, enc.terrain || 'plains');
+        tSel.onchange = () => enc.terrain = tSel.value;
+        tCell.appendChild(tSel);
+        grid.appendChild(tCell);
+        box.appendChild(grid);
+        const dTa = U.el('textarea', { cls: 'txt mt', rows: 2, style: 'width:100%', placeholder: 'What the hunter sees here.' });
+        dTa.value = enc.desc || '';
+        dTa.oninput = () => enc.desc = dTa.value;
+        box.appendChild(U.el('label', { cls: 'lbl', text: 'Description' }));
+        box.appendChild(dTa);
+        const eTa = U.el('textarea', { cls: 'txt mt', rows: 3, style: 'width:100%;font-family:monospace;font-size:12px', placeholder: 'harkal\nharkal\nsu_naga 4 boss' });
+        eTa.value = enemiesToText(enc.enemies);
+        eTa.oninput = () => enc.enemies = parseEnemies(eTa.value);
+        box.appendChild(U.el('label', { cls: 'lbl', text: 'Enemies (one per line)' }));
+        box.appendChild(eTa);
+        encWrap.appendChild(box);
+      });
+      encWrap.appendChild(U.el('button', {
+        cls: 'btn small', text: '＋ Add encounter', onclick: () => {
+          work.encounters.push({ name: 'Encounter ' + (work.encounters.length + 1), desc: '', terrain: 'plains', enemies: [{ speciesId: work.speciesId, boss: true }] });
+          paintEncounters();
+        },
+      }));
+    }
+    paintEncounters();
+
+    /* ---------- ACTIONS ---------- */
+    const acts = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+    acts.appendChild(U.el('button', {
+      cls: 'btn primary', text: isNew ? 'Create Hunt' : 'Save Hunt', onclick: () => {
+        const name = nameIn.value.trim();
+        if (!name) { alert('Give the creature a name.'); return; }
+        if (!SP.get(spSel.value)) { alert('Pick a valid species.'); return; }
+        work.name = name;
+        work.speciesId = spSel.value;
+        work.rarity = parseInt(rarSel.value, 10) || 0;
+        work.narrator = narSel.value;
+        work.intro = introTa.value.trim();
+        work.rewards = {
+          gold: parseInt(rewIns.gold.value, 10) || 0,
+          okid: parseInt(rewIns.okid.value, 10) || 0,
+          ngakara: parseInt(rewIns.ngakara.value, 10) || 0,
+          pieces: Math.max(1, parseInt(rewIns.pieces.value, 10) || 1),
+          pieceMaterial: rewIns.pieceMaterial.value.trim(),
+          secondPieceChance: U.clamp(parseFloat(rewIns.secondPieceChance.value) || 0, 0, 1),
+        };
+        work.encounters = (work.encounters || []).map(e => ({
+          name: (e.name || '').trim() || 'Encounter',
+          desc: (e.desc || '').trim(),
+          terrain: e.terrain || 'plains',
+          enemies: (e.enemies && e.enemies.length) ? e.enemies : [{ speciesId: work.speciesId, boss: true }],
+        }));
+        if (!work.encounters.length) work.encounters = [{ name: 'The Quarry', desc: '', terrain: 'plains', enemies: [{ speciesId: work.speciesId, boss: true }] }];
+        M.setHunt(work);
+        closeAll();
+      },
+    }));
+    acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: closeAll }));
+    if (!isNew) acts.appendChild(U.el('button', { cls: 'btn danger', text: 'Delete Hunt', onclick: () => { if (confirm('Delete this Hunt permanently?')) { M.deleteHunt(work.id); closeAll(); } } }));
+    w.appendChild(acts);
   }
 
   /* ================= SPECIES EDITOR ================= */

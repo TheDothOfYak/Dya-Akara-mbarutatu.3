@@ -218,9 +218,9 @@
       notifications: [],
       onlineStatus: 'online',
       settings: defaultSettings(),
-      huntSlots: [],                       // {id, speciesId, fromLevelBand, source}
+      huntSlots: [],                       // {id, huntId, source, expiresAtBand} — huntId picks an admin-authored Hunt
       huntSlotsEarned: 0,
-      huntCooldowns: {},                   // speciesId -> readyAt(ms)
+      huntCooldowns: {},                   // legacy per-species cooldowns (individual Hunts are one-and-done)
       stall: { name: '', bio: '', banner: '#6d4a2e', frame: 'wood', featuredTokenId: null, trophies: [] },
       stats: { wins: 0, losses: 0, draws: 0, duelsWon: 0, duelsLost: 0, crafted: 0, sales: 0, purchases: 0, huntsDone: 0, tourneysWon: 0, relicCaptures: 0, eliminations: 0, favSpecies: {}, rankHistory: [] },
       rank: 1000,                          // ranked rating
@@ -418,7 +418,7 @@
       /* Hunt slots: one per 10 levels; unused slots expire at the next level-10 interval */
       if (G.me.level % EC.HUNT.slotEveryLevels === 0) {
         G.me.huntSlots = G.me.huntSlots.filter(s => !s.expiresAtBand || s.expiresAtBand > G.me.level);
-        G.me.huntSlots.push({ id: U.uid('hs'), speciesId: null, source: 'level', expiresAtBand: G.me.level + EC.HUNT.slotEveryLevels });
+        G.me.huntSlots.push({ id: U.uid('hs'), huntId: null, source: 'level', expiresAtBand: G.me.level + EC.HUNT.slotEveryLevels });
         gained.huntSlot = true;
       }
       /* avatar unlocks by level */
@@ -1356,7 +1356,11 @@
       if (r2 < 0.4) { /* hunting trip */
         a.stats.huntsDone++;
         a.pieces = a.pieces || [];
-        a.pieces.push({ speciesId: rng.pick(SP.huntable), material: rng.pick(L.MATERIALS), from: 'Hunt', temperBias: 0, at: now });
+        /* Hunts are now individual admin-authored quarry; draw the piece
+           from an available Hunt's species if any, else any craftable one. */
+        const huntSpecies = (DYA.mods && DYA.mods.availableHunts().map(h => h.speciesId)) || [];
+        const pieceSpid = huntSpecies.length ? rng.pick(huntSpecies) : rng.pick(SP.craftable);
+        a.pieces.push({ speciesId: pieceSpid, material: rng.pick(L.MATERIALS), from: 'Hunt', temperBias: 0, at: now });
       } else if (r2 < 0.75) { /* craft something (keeps stalls stocked) */
         const piece = (a.pieces || []).pop();
         const spid = piece ? piece.speciesId : rng.pick(SP.craftable);

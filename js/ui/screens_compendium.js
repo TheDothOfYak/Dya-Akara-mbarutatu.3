@@ -62,7 +62,7 @@
             nameRow.appendChild(U.el('b', { cls: 'gold', style: 'font-size:17px', text: sp.name }));
             nameRow.appendChild(U.el('span', { cls: 'type-badge el-' + sp.element, style: 'border-color:currentColor', text: sp.element + (sp.element2 ? '/' + sp.element2 : '') }));
             nameRow.appendChild(U.el('span', { cls: 'type-badge r' + sp.rarity[0], style: 'border-color:currentColor', text: SP.RARITIES[sp.rarity[0]] + (sp.rarity[1] > sp.rarity[0] ? '–' + SP.RARITIES[sp.rarity[1]] : '') }));
-            if (SP.huntable.includes(id)) nameRow.appendChild(U.el('span', { cls: 'pill', text: '🏹 Huntable' }));
+            if (DYA.mods && DYA.mods.availableHunts().some(h => h.speciesId === id)) nameRow.appendChild(U.el('span', { cls: 'pill', text: '🏹 Huntable' }));
             if (owned) nameRow.appendChild(U.el('span', { cls: 'pill gold', text: '✓ ' + owned + ' in collection' }));
             info.appendChild(nameRow);
             info.appendChild(U.el('div', { cls: 'small mt', html: '<span class="muted">Description —</span> ' + U.esc(sp.desc) }));

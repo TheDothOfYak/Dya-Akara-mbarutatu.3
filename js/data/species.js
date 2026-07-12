@@ -807,8 +807,10 @@
       Fti: ['albali_byrd', 'kuni_byrd_wild', 'rubbermcfly'],
       Ular: ['domestic_punk', 'wild_punk', 'kipsu', 'gynge'],
     },
-    /* Hunt roster at launch (Part X) */
-    huntable: ['su_naga', 'sru_vorn', 'lutut', 'hvaleia', 'ular_naga', 'tonguatjis', 'kuni_byrd_wild'],
+    /* Hunt roster: no default quarry — every Hunt is an individual
+       creature the admin authors by hand in the Admin Panel's Hunts
+       tab (DYA.mods.hunts). See ui/screens_meta.js / ui/admin.js. */
+    huntable: [],
     /* craftable = everything except spawned/promo */
     craftable: Object.keys(S).filter(k => !S[k].notCraftable),
     /* duel-legal check: a duel needs a token that actually fights.
