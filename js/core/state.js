@@ -1027,9 +1027,11 @@
   function seedTournaments(w, rng) {
     const ais = Object.values(w.accounts).filter(a => a.ai && a.aiCfg.tournaments);
     const mk = (circuit, sealed, name, format) => {
+      const org = sealed ? null : rng.pick(ais);
       const t = {
         id: U.uid('trn'), name, circuit, sealed,
-        organizer: sealed ? 'Dya Guild' : rng.pick(ais).displayName,
+        organizer: sealed ? 'Dya Guild' : org.displayName,
+        organizerId: sealed ? null : org.id,
         entryFee: { 'Local': 25, 'Regional': 75, 'Half Planet': 200, 'Whole Planet': 500, 'Interplanetary': 1000 }[circuit],
         pouchFormat: format || rng.pick(['single', 'three-draft', 'random']),
         size: rng.pick([4, 8, 8, 16]),
