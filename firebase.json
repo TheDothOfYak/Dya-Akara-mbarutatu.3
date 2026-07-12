@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "dya-akara-mbarutatu0-1",
+    "site": "dyaakara-yak",
     "public": ".",
     "ignore": [
       "firebase.json",
