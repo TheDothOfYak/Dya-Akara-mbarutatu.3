@@ -1337,51 +1337,89 @@
   P.showLevelUp = showLevelUp;
 
   /* ================= DUELS ================= */
+  /* A duel is fought between players. The exception is a no-stakes bout
+     against the machine — the AI is NOT a player, and the Dya'kukull
+     (the "AI players") ARE players you can wager and haggle against. */
+
+  /* ---------- wager bet model ---------- */
+  const OKID_VALUE = SP.RARITY_VALUE.map(v => Math.round(v * 0.3));
+  const NGAKARA_VALUE = 150;
+  function emptyBet() { return { gold: 0, ngakara: 0, okid: [0, 0, 0, 0, 0, 0, 0], tokens: [] }; }
+  function betValue(bet) {
+    let v = (bet.gold || 0) + (bet.ngakara || 0) * NGAKARA_VALUE;
+    (bet.okid || []).forEach((n, i) => { v += (n || 0) * OKID_VALUE[i]; });
+    (bet.tokens || []).forEach(t => { v += G.marketAverage(t.speciesId, t.rarity); });
+    return v;
+  }
+  function betEmpty(bet) { return betValue(bet) === 0; }
+  function betSummary(bet) {
+    const parts = [];
+    if (bet.gold) parts.push(U.fmt(bet.gold) + 'g');
+    if (bet.ngakara) parts.push(bet.ngakara + ' NgAkara');
+    (bet.okid || []).forEach((n, i) => { if (n) parts.push(n + ' ' + SP.RARITIES[i] + ' Okid'); });
+    (bet.tokens || []).forEach(t => parts.push(t.name));
+    return parts.length ? parts.join(' · ') : 'Nothing — honor duel';
+  }
+
   P.duelFlow = function () {
-    const me = G.me;
     const w = U.el('div', {});
     w.appendChild(U.el('h3', { cls: 'gold', text: 'Duel — 1 token vs 1 token' }));
-    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'No resources, no pulse, no Relic. Fight to elimination. The only draw a duel allows is a RubberMcFly in play — on a draw nobody wins, every wager returns to its owner, and the reward is split evenly. Anything can be wagered; the Guild takes no cut. A wagered token lost is lost forever.' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'No resources, no pulse, no Relic. Fight to elimination. A duel is fought between players — haggle over stakes, then pick your tokens. Or take a no-stakes practice bout against the machine.' }));
+    const m = UI.modal(w);
+    const row = U.el('div', { cls: 'mt', style: 'display:flex;gap:10px;flex-wrap:wrap' });
+    row.appendChild(U.el('button', { cls: 'btn primary', text: '⚔ vs Player', onclick: () => { m.close(); P.duelVsPlayerFlow(); } }));
+    row.appendChild(U.el('button', { cls: 'btn', text: '🤖 vs AI', onclick: () => { m.close(); P.duelVsAIFlow(); } }));
+    w.appendChild(row);
+    w.appendChild(U.el('p', { cls: 'small muted mt', html: '<b>vs Player</b> — a Dya’kukull, a real player. Wager anything; both must agree. <br><b>vs AI</b> — the machine. Practice only, nothing at stake.' }));
+    w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
+  };
+
+  /* ---------- vs AI (practice — the machine is not a player) ---------- */
+  P.duelVsAIFlow = function () {
+    const me = G.me;
+    const w = U.el('div', {});
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Duel the AI — practice' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'A no-stakes bout against the machine. Nothing is wagered — the AI is not a player.' }));
+    const diffSel = U.el('select', { cls: 'txt mt' });
+    [['0.3', 'Litk — gentle'], ['0.6', 'Vel — even'], ['0.95', 'Skor — hard'], ['1.2', 'Skaar — brutal']].forEach(([v, l]) => diffSel.appendChild(U.el('option', { value: v, text: l })));
+    w.appendChild(diffSel);
     const modeSel = U.el('select', { cls: 'txt mt' });
-    [['pick', 'Pick — choose your token'], ['random', 'Random — assigned from your collection'], ['blind', 'Blind Pick — both choose secretly']].forEach(([v, l]) => modeSel.appendChild(U.el('option', { value: v, text: l })));
+    [['pick', 'Pick — choose your token'], ['random', 'Random — assigned from your collection'], ['blind', 'Blind Pick — chosen secretly']].forEach(([v, l]) => modeSel.appendChild(U.el('option', { value: v, text: l })));
     w.appendChild(modeSel);
-    const wagerSel = U.el('select', { cls: 'txt mt' });
-    [['none', 'No wager — honor duel'], ['gold', 'Wager gold'], ['ngakara', 'Wager NgAkara'], ['okid', 'Wager Okid'], ['token', 'Wager the dueling tokens themselves']].forEach(([v, l]) => wagerSel.appendChild(U.el('option', { value: v, text: l })));
-    w.appendChild(wagerSel);
-    const goldInp = U.el('input', { cls: 'txt mt', type: 'number', placeholder: 'Amount', style: 'display:none' });
-    const okidRar = U.el('select', { cls: 'txt mt', style: 'display:none' });
-    SP.RARITIES.forEach((r, i) => okidRar.appendChild(U.el('option', { value: i, text: r + ' Okid' })));
-    wagerSel.onchange = () => {
-      goldInp.style.display = (wagerSel.value === 'gold' || wagerSel.value === 'ngakara' || wagerSel.value === 'okid') ? '' : 'none';
-      okidRar.style.display = wagerSel.value === 'okid' ? '' : 'none';
-    };
-    w.appendChild(goldInp); w.appendChild(okidRar);
     const m = UI.modal(w);
     w.appendChild(U.el('button', {
-      cls: 'btn primary mt', text: 'Find opponent', onclick: () => {
+      cls: 'btn primary mt', text: 'Fight', onclick: () => {
         const toks = Object.values(me.tokens).filter(t => !t.frozen);
         if (!toks.length) { UI.alert('No tokens', 'You need at least one token to duel.'); return; }
-        const wager = wagerSel.value;
-        const goldAmt = parseInt(goldInp.value) || 0;
-        const okidR = parseInt(okidRar.value) || 0;
-        if (wager === 'gold' && (goldAmt <= 0 || goldAmt > me.gold)) { UI.alert('Bad wager', 'Wager gold you actually hold.'); return; }
-        if (wager === 'ngakara' && (goldAmt <= 0 || goldAmt > me.ngakara)) { UI.alert('Bad wager', 'Wager NgAkara you actually hold.'); return; }
-        if (wager === 'okid' && (goldAmt <= 0 || goldAmt > me.okid[okidR])) { UI.alert('Bad wager', 'Wager Okid you actually hold.'); return; }
-        const mode = modeSel.value;
-        if (mode === 'pick' || mode === 'blind') {
-          m.close();
-          pickTokenModal(toks, tok => beginDuel(tok, { mode, wager, goldAmt, okidR }));
-        } else {
-          /* Random assignment only ever draws from tokens that FIGHT —
-             no fruit, no relic shavings, no Ju Fields. */
-          const fighters = toks.filter(t => SP.canDuel(t.speciesId));
-          if (!fighters.length) { UI.alert('No duel-fit tokens', 'Random assignment needs a token that actually fights — fruit, relics, and Ju Fields don’t duel. Use Pick mode if you insist on fielding one.'); return; }
-          m.close();
-          const tok = fighters[Math.floor(Math.random() * fighters.length)];
-          beginDuel(tok, { mode, wager, goldAmt, okidR });
-        }
+        const mode = modeSel.value, skill = parseFloat(diffSel.value);
+        chooseMyDuelist(toks, mode, myTok => { m.close(); beginDuel(myTok, { vsAI: true, aiSkill: skill, mode }); });
       },
     }));
+    w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
+  };
+
+  /* pick/blind → choose a token by hand; random → a random duel-fit token */
+  function chooseMyDuelist(toks, mode, cb) {
+    if (mode === 'random') {
+      const fighters = toks.filter(t => SP.canDuel(t.speciesId));
+      if (!fighters.length) { UI.alert('No duel-fit tokens', 'Random assignment needs a token that actually fights — fruit, relics, and Ju Fields don’t duel. Use Pick mode if you insist on fielding one.'); return; }
+      cb(fighters[Math.floor(Math.random() * fighters.length)]);
+    } else {
+      pickTokenModal(toks, cb);
+    }
+  }
+
+  /* ---------- vs Player (a Dya'kukull — wager negotiation) ---------- */
+  P.duelVsPlayerFlow = function () {
+    const me = G.me;
+    const toks = Object.values(me.tokens).filter(t => !t.frozen);
+    if (!toks.length) { UI.alert('No tokens', 'You need at least one token to duel.'); return; }
+    const ais = Object.values(G.world.accounts).filter(a => a.ai);
+    if (!ais.length) { UI.alert('No opponents', 'No players are available to duel right now.'); return; }
+    let pool = ais.filter(a => G.aiStatus(a.id) === 'online');
+    if (!pool.length) pool = ais;
+    const opp = pool[Math.floor(Math.random() * pool.length)];
+    UI.show('duelSetup', { opp });
   };
 
   function pickTokenModal(toks, cb) {
@@ -1397,15 +1435,313 @@
     w.appendChild(grid);
   }
 
-  P.startDuelVsAI = function (tok) { beginDuel(tok, { mode: 'pick', wager: 'none', goldAmt: 0 }); };
+  P.startDuelVsAI = function (tok) { beginDuel(tok, { vsAI: true, aiSkill: 0.7, mode: 'pick' }); };
+
+  /* ============ DUEL SETUP — wager negotiation + token select ============
+     Laid out like the pre-match voting screen: your side on the left, the
+     totals + a chat in the middle, the opponent on the right. No timer —
+     you can haggle as long as you like, and withdraw with no consequences.
+     Phase 1 negotiates the stakes (both must agree); phase 2 picks the
+     token-selection mode (both must choose the same — Random needs both). */
+  UI.register('duelSetup', {
+    enter(root, cfg) {
+      const me = G.me;
+      const opp = cfg.opp;
+      const oppWealth = 400 + (U.hashStr(opp.id) % 4200);
+      let phase = 'bet';                 // 'bet' | 'select'
+      let myBet = emptyBet(), oppBet = emptyBet();
+      let myAgreed = false, oppAgreed = false;
+      let myMode = null, oppMode = null; // token-select method
+      let myReady = false, oppReady = false;
+      let launched = false;
+      const oppFighters = Object.values(opp.tokens).filter(t => SP.canDuel(t.speciesId));
+
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Duel Setup — vs ' + opp.displayName }));
+      const wrap = U.el('div', { cls: 'setup-wrap' });
+
+      /* ---- left: your side ---- */
+      const left = U.el('div', { cls: 'setup-col panel' });
+      wrap.appendChild(left);
+      /* ---- middle: totals + chat ---- */
+      const mid = U.el('div', { cls: 'setup-col panel', style: 'max-width:440px' });
+      wrap.appendChild(mid);
+      /* ---- right: opponent ---- */
+      const right = U.el('div', { cls: 'setup-col panel' });
+      right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Opponent — ' + opp.displayName }));
+      right.appendChild(U.el('p', { cls: 'muted small', html: 'A live player — one of the Dya’kukull. <span class="' + (G.aiStatus(opp.id) === 'online' ? 'gold' : 'muted') + '">' + (G.aiStatus(opp.id) === 'online' ? 'Online now.' : 'Just stepped in.') + '</span>' }));
+      right.appendChild(U.el('p', { cls: 'muted small mt', text: 'Their side of the stakes shows in the middle. They pick their own duelist when the wager is set.' }));
+      const rightBody = U.el('div', { cls: 'mt' });
+      right.appendChild(rightBody);
+      wrap.appendChild(right);
+
+      scr.appendChild(wrap);
+      root.appendChild(scr);
+
+      /* ---------- shared chat (persists across both phases) ---------- */
+      const chatLog = U.el('div', { cls: 'duel-chat-log' });
+      const chatBox = U.el('div', { cls: 'duel-chat' });
+      const chatIn = U.el('div', { cls: 'duel-chat-in' });
+      L.QUICK_CHAT.forEach(q => chatIn.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:1px', text: q, onclick: () => sayMine(q) })));
+      chatBox.appendChild(chatLog); chatBox.appendChild(chatIn);
+      function addChat(cls, who, text) {
+        const msg = U.el('div', { cls: 'duel-msg ' + cls });
+        if (who) msg.appendChild(U.el('span', { cls: 'who', text: who }));
+        msg.appendChild(U.el('span', { text: text }));
+        chatLog.appendChild(msg);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      function sysChat(text) { addChat('sys', '', text); }
+      function sayMine(text) { addChat('me', me.displayName, text); DYA.audio.play('click'); oppReplyTo(text); }
+      function sayOpp(text) { if (launched) return; addChat('them', opp.displayName, text); }
+
+      const OPP_MATCH_LINES = ['Fair enough. I’m in.', 'That I can match. Done.', 'Agreed. Let’s see your token.', 'Reasonable. I’ll cover it.', 'Deal. The sway favors the bold.'];
+      const OPP_HIGH_LINES = ['That’s steep. Ease off and I’ll match you.', 'Too rich for my hoard — trim it down.', 'I can’t cover all that. Lower the stakes.', 'Bring it under what I can carry and we talk.'];
+      const OPP_EMPTY_LINES = ['An honor duel? Suits me. Or lay something down.', 'Nothing on the line? Name a stake if you dare.', 'Pride only, then. Or wager something real.'];
+      const OPP_REPLY = { 'Good luck!': 'Luck is for those without a plan. But — good luck.', 'Nice token!': 'It’s served me well. Yours had better be ready.', 'The Relic!': 'No Relic here — just the two of us and steel.', 'One more after this?': 'Win first. Then we’ll talk about a rematch.' };
+      function pickLine(a) { return a[Math.floor(Math.random() * a.length)]; }
+      function oppReplyTo(text) {
+        const canned = OPP_REPLY[text];
+        setTimeout(() => sayOpp(canned || pickLine(['Hah.', 'We’ll see.', 'Talk is cheap — set your stake.', 'Mm.'])), 500 + Math.random() * 700);
+      }
+
+      /* ---------- opponent bet AI: match your value from its own hoard ---------- */
+      function matchBet(value) {
+        const b = emptyBet();
+        let remaining = value;
+        if (myBet.tokens.length && oppFighters.length) {
+          myBet.tokens.forEach(mt => {
+            const tv = G.marketAverage(mt.speciesId, mt.rarity);
+            let best = null, bestD = Infinity;
+            oppFighters.forEach(ot => {
+              if (b.tokens.includes(ot)) return;
+              const d = Math.abs(G.marketAverage(ot.speciesId, ot.rarity) - tv);
+              if (d < bestD) { bestD = d; best = ot; }
+            });
+            if (best) { b.tokens.push(best); remaining -= G.marketAverage(best.speciesId, best.rarity); }
+          });
+        }
+        b.gold = Math.max(0, Math.round(remaining));
+        return b;
+      }
+      let oppTimer = null;
+      function oppReconsider() {
+        oppAgreed = false;
+        if (oppTimer) clearTimeout(oppTimer);
+        const target = betValue(myBet);
+        oppTimer = setTimeout(() => {
+          if (launched || phase !== 'bet') return;
+          if (betEmpty(myBet)) { oppBet = emptyBet(); oppAgreed = true; sayOpp(pickLine(OPP_EMPTY_LINES)); }
+          else if (target > oppWealth) { oppBet = matchBet(oppWealth); oppAgreed = false; sayOpp(pickLine(OPP_HIGH_LINES)); }
+          else { oppBet = matchBet(target); oppAgreed = true; sayOpp(pickLine(OPP_MATCH_LINES)); }
+          renderMid();
+        }, 700 + Math.random() * 900);
+      }
+
+      /* ---------- LEFT: your bet controls ---------- */
+      function renderLeft() {
+        left.innerHTML = '';
+        if (phase === 'select') {
+          left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your duelist' }));
+          left.appendChild(U.el('p', { cls: 'muted small', text: 'Choose how your token is decided. For a Random duel, both of you must choose Random — talk it over in the middle.' }));
+          left.appendChild(U.el('p', { cls: 'muted small mt', html: 'Locked stake: <span class="gold">' + U.esc(betSummary(myBet)) + '</span>' }));
+          return;
+        }
+        left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your stake' }));
+        left.appendChild(U.el('p', { cls: 'muted small', text: 'Lay down what you’re willing to wager. Nothing is lost until the duel is fought — and a draw returns everything.' }));
+
+        /* gold */
+        left.appendChild(betNumberField('GOLD', me.gold, myBet.gold, v => { myBet.gold = v; }));
+        /* ngakara */
+        left.appendChild(betNumberField('NGAKARA', me.ngakara, myBet.ngakara, v => { myBet.ngakara = v; }));
+        /* okid — per rarity tier */
+        const okidField = U.el('div', { cls: 'bet-field' });
+        okidField.appendChild(U.el('label', { html: 'OKID <span class="hold">— by tier</span>' }));
+        const okidRow = U.el('div', { cls: 'flex', style: 'gap:6px' });
+        const okidRar = U.el('select', { cls: 'txt', style: 'max-width:150px' });
+        SP.RARITIES.forEach((r, i) => okidRar.appendChild(U.el('option', { value: i, text: r + ' (' + me.okid[i] + ')' })));
+        const okidNum = U.el('input', { cls: 'txt', type: 'number', min: '0', style: 'max-width:100px', value: String(myBet.okid[0] || 0) });
+        okidRar.onchange = () => { okidNum.value = String(myBet.okid[+okidRar.value] || 0); };
+        okidNum.oninput = () => {
+          const i = +okidRar.value;
+          let v = Math.max(0, Math.min(me.okid[i], parseInt(okidNum.value) || 0));
+          okidNum.value = String(v); myBet.okid[i] = v; onBetChange();
+        };
+        okidRow.appendChild(okidRar); okidRow.appendChild(okidNum);
+        okidField.appendChild(okidRow);
+        left.appendChild(okidField);
+
+        /* staked tokens */
+        const tokField = U.el('div', { cls: 'bet-field' });
+        tokField.appendChild(U.el('label', { text: 'TOKENS' }));
+        const chips = U.el('div', {});
+        myBet.tokens.forEach(t => {
+          const chip = U.el('span', { cls: 'bet-chip' }, [U.el('span', { text: t.name })]);
+          chip.appendChild(U.el('span', { cls: 'x', text: '✕', onclick: () => { myBet.tokens = myBet.tokens.filter(x => x !== t); onBetChange(); renderLeft(); } }));
+          chips.appendChild(chip);
+        });
+        tokField.appendChild(chips);
+        tokField.appendChild(U.el('button', {
+          cls: 'btn small ghost mt', text: '＋ Stake a token', onclick: () => {
+            const avail = Object.values(me.tokens).filter(t => !t.frozen && !myBet.tokens.includes(t));
+            if (!avail.length) { UI.alert('No tokens', 'Nothing left to stake.'); return; }
+            pickTokenModal(avail, t => { myBet.tokens.push(t); onBetChange(); renderLeft(); });
+          },
+        }));
+        tokField.appendChild(U.el('p', { cls: 'muted small mt', text: 'A staked token lost is lost forever — the Guild does not retrieve it.' }));
+        left.appendChild(tokField);
+      }
+      function betNumberField(label, held, cur, set) {
+        const f = U.el('div', { cls: 'bet-field' });
+        f.appendChild(U.el('label', { html: label + ' <span class="hold">— you hold ' + U.fmt(held) + '</span>' }));
+        const inp = U.el('input', { cls: 'txt', type: 'number', min: '0', value: String(cur || 0), style: 'max-width:160px' });
+        inp.oninput = () => { let v = Math.max(0, Math.min(held, parseInt(inp.value) || 0)); inp.value = String(v); set(v); onBetChange(); };
+        f.appendChild(inp);
+        return f;
+      }
+      function onBetChange() { myAgreed = false; oppReconsider(); renderMid(); }
+
+      /* ---------- MIDDLE: totals + chat + action ---------- */
+      function renderMid() {
+        mid.innerHTML = '';
+        if (phase === 'bet') {
+          mid.appendChild(U.el('h3', { cls: 'gold center', text: 'The Wager' }));
+          mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Both sides must agree. No timer — haggle in the chat, and withdraw any time with no consequences.' }));
+
+          const mine = U.el('div', { cls: 'duel-total' + (myAgreed ? ' agreed' : '') }, [
+            U.el('div', {}, [U.el('div', { cls: 'small muted', text: 'YOU STAKE' }), U.el('div', { text: betSummary(myBet) })]),
+            U.el('div', { cls: 'dt-val', text: '~' + U.fmt(betValue(myBet)) + 'g' }),
+          ]);
+          const theirs = U.el('div', { cls: 'duel-total' + (oppAgreed ? ' agreed' : '') }, [
+            U.el('div', {}, [U.el('div', { cls: 'small muted', text: opp.displayName.toUpperCase() + ' STAKES' }), U.el('div', { text: betSummary(oppBet) })]),
+            U.el('div', { cls: 'dt-val', text: '~' + U.fmt(betValue(oppBet)) + 'g' }),
+          ]);
+          mid.appendChild(mine); mid.appendChild(theirs);
+          mid.appendChild(U.el('p', { cls: 'small mb' }, [
+            U.el('span', { cls: 'duel-agree ' + (myAgreed ? 'yes' : 'no'), text: (myAgreed ? '✓' : '○') + ' You ' }),
+            U.el('span', { text: '   ' }),
+            U.el('span', { cls: 'duel-agree ' + (oppAgreed ? 'yes' : 'no'), text: (oppAgreed ? '✓' : '○') + ' ' + opp.displayName }),
+          ]));
+
+          mid.appendChild(chatBox);
+
+          const bothAgree = myAgreed && oppAgreed;
+          const agreeBtn = U.el('button', { cls: 'btn ' + (myAgreed ? 'ghost' : 'primary'), style: 'width:100%;margin-top:10px', text: myAgreed ? '✓ Agreed — click to change' : '✓ Agree to these stakes' });
+          agreeBtn.onclick = () => { myAgreed = !myAgreed; DYA.audio.play('click'); renderMid(); };
+          mid.appendChild(agreeBtn);
+          const goBtn = U.el('button', { cls: 'btn primary', style: 'width:100%;margin-top:8px', text: bothAgree ? 'Stakes set — choose tokens →' : 'Both must agree first' });
+          goBtn.disabled = !bothAgree ? 'true' : null;
+          goBtn.onclick = () => { if (bothAgree) toSelectPhase(); };
+          mid.appendChild(goBtn);
+          mid.appendChild(U.el('button', { cls: 'btn ghost', style: 'width:100%;margin-top:8px', text: 'Withdraw — no consequences', onclick: () => { launched = true; UI.show('play'); } }));
+        } else {
+          mid.appendChild(U.el('h3', { cls: 'gold center', text: 'Choose Tokens' }));
+          mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Both pick the same method. Random needs both of you to choose Random — settle it in the chat.' }));
+          const modes = [['pick', 'Pick', 'Choose your token'], ['random', 'Random', 'Assigned from your collection'], ['blind', 'Blind', 'Chosen secretly, revealed at the clash']];
+          const row = U.el('div', { cls: 'vote-opts', style: 'justify-content:center' });
+          modes.forEach(([v, label]) => {
+            const b = U.el('div', { cls: 'vote-opt' + (myMode === v ? ' mine' : '') + (oppMode === v ? ' theirs' : ''), text: label });
+            b.onclick = () => { setMyMode(v); };
+            row.appendChild(b);
+          });
+          mid.appendChild(row);
+          const chosen = modes.find(m => m[0] === myMode);
+          mid.appendChild(U.el('p', { cls: 'center small muted mt', text: chosen ? chosen[2] : 'Pick a method.' }));
+          mid.appendChild(U.el('p', { cls: 'small muted center', html: '◆ = ' + opp.displayName + '’s choice' }));
+
+          mid.appendChild(chatBox);
+
+          const matched = myMode && myMode === oppMode;
+          const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%;margin-top:10px', text: myReady ? (matched && oppReady ? 'Starting…' : '✓ Ready — waiting for ' + opp.displayName + '…') : '✓ Ready' });
+          readyBtn.disabled = !myMode ? 'true' : null;
+          readyBtn.onclick = () => { myReady = true; DYA.audio.play('click'); renderMid(); tryStart(); };
+          mid.appendChild(readyBtn);
+          mid.appendChild(U.el('button', { cls: 'btn ghost', style: 'width:100%;margin-top:8px', text: 'Withdraw — no consequences', onclick: () => { launched = true; UI.show('play'); } }));
+        }
+      }
+
+      /* ---------- RIGHT: opponent live view ---------- */
+      function renderRight() {
+        rightBody.innerHTML = '';
+        if (oppFighters.length) {
+          rightBody.appendChild(U.el('p', { cls: 'muted small mb', text: 'Their pouch:' }));
+          const og = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(64px,1fr))' });
+          oppFighters.slice(0, 12).forEach(t => og.appendChild(UI.tokenCard(t, { size: 50, mode: 'minimal' })));
+          rightBody.appendChild(og);
+        }
+        rightBody.appendChild(U.el('p', { cls: 'mt ' + (oppAgreed || oppReady ? 'gold' : 'muted') + ' small', text: phase === 'bet' ? (oppAgreed ? '✓ Agreed to the stakes.' : 'Weighing the stakes…') : (oppReady ? '✓ Ready.' : (oppMode ? 'Chose ' + oppMode + '.' : 'Choosing a method…')) }));
+      }
+
+      /* ---------- token-select phase ---------- */
+      function setMyMode(v) {
+        myMode = v; myReady = false; oppReady = false; DYA.audio.play('click');
+        /* the opponent mirrors your method (Random needs both — it obliges) */
+        setTimeout(() => {
+          if (launched || phase !== 'select') return;
+          oppMode = v;
+          if (v === 'random') sayOpp(pickLine(['Random it is — I trust the sway.', 'Both blind to the draw. Agreed.', 'Let the collection decide. Random.']));
+          else if (v === 'blind') sayOpp('Blind, then. Neither sees till the clash.');
+          else sayOpp('You pick yours, I’ll pick mine.');
+          renderMid(); renderRight();
+        }, 600 + Math.random() * 700);
+        renderMid();
+      }
+      function tryStart() {
+        if (!(myReady && myMode)) return;
+        if (oppMode !== myMode) { sysChat('Waiting — ' + opp.displayName + ' must choose ' + myMode + ' too.'); return; }
+        /* opponent readies up shortly after, then we launch */
+        setTimeout(() => {
+          if (launched || phase !== 'select') return;
+          oppReady = true; renderRight(); renderMid();
+          setTimeout(startDuel, 500);
+        }, 500 + Math.random() * 600);
+      }
+      function startDuel() {
+        if (launched) return;
+        const mode = myMode;
+        const toks = Object.values(me.tokens).filter(t => !t.frozen);
+        const oppTok = oppFighters.length ? oppFighters[Math.floor(Math.random() * oppFighters.length)] : TK.mint({ speciesId: 'harkal', rng: new U.Rng(U.newSeed()) });
+        const launch = (myTok) => { launched = true; beginDuel(myTok, { opp, oppTok, mode, myBet, oppBet }); };
+        if (mode === 'random') {
+          const fighters = toks.filter(t => SP.canDuel(t.speciesId));
+          if (!fighters.length) { UI.alert('No duel-fit tokens', 'Random assignment needs a token that actually fights. Withdraw and pick by hand.'); return; }
+          launch(fighters[Math.floor(Math.random() * fighters.length)]);
+        } else {
+          pickTokenModal(toks, launch);
+        }
+      }
+
+      function toSelectPhase() {
+        phase = 'select';
+        sysChat('Stakes locked. Now choose how you field your token.');
+        renderLeft(); renderMid(); renderRight();
+      }
+
+      /* ---------- boot ---------- */
+      renderLeft(); renderMid(); renderRight();
+      sysChat('You’ve challenged ' + opp.displayName + ' to a duel. Lay down a stake — or none.');
+      setTimeout(() => sayOpp('So you want to duel. What are we playing for?'), 700);
+
+      this.leave = () => { if (oppTimer) clearTimeout(oppTimer); };
+    },
+  });
 
   function beginDuel(myTok, opts) {
     const me = G.me;
-    const ais = Object.values(G.world.accounts).filter(a => a.ai);
-    const opp = ais[Math.floor(Math.random() * ais.length)];
-    /* the Dya'kukull never field a non-fighter in a duel */
-    const oppToks = Object.values(opp.tokens).filter(t => SP.canDuel(t.speciesId));
-    const oppTok = oppToks.length ? oppToks[Math.floor(Math.random() * oppToks.length)] : TK.mint({ speciesId: 'harkal', rng: new U.Rng(U.newSeed()) });
+    let opp, oppTok, myBet, oppBet, aiSkill;
+    if (opts.vsAI) {
+      /* a pure practice bout — the machine is NOT a player, so no stakes
+         and no Dya'kukull account is involved */
+      opp = { displayName: 'AI', id: null };
+      const fighterIds = SP.list.filter(sp => SP.canDuel(sp.id)).map(sp => sp.id);
+      oppTok = TK.mint({ speciesId: fighterIds[Math.floor(Math.random() * fighterIds.length)], rng: new U.Rng(U.newSeed()) });
+      myBet = emptyBet(); oppBet = emptyBet();
+      aiSkill = opts.aiSkill || 0.7;
+    } else {
+      opp = opts.opp; oppTok = opts.oppTok;
+      myBet = opts.myBet || emptyBet(); oppBet = opts.oppBet || emptyBet();
+      aiSkill = G.aiSkill(opp);
+    }
     if (opts.mode === 'blind') {
       UI.toast({ title: 'Blind pick', body: 'Tokens revealed: ' + myTok.name + ' vs ' + oppTok.name + '!', icon: '🎭' });
     }
@@ -1414,56 +1750,65 @@
       seed, mode: 'duel',
       teams: [
         { name: me.displayName, controller: 'human', pouch: [U.deepCopy(myTok)] },
-        { name: opp.displayName, controller: 'ai', aiSkill: G.aiSkill(opp), pouch: [U.deepCopy(oppTok)] },
+        { name: opp.displayName, controller: 'ai', aiSkill, pouch: [U.deepCopy(oppTok)] },
       ],
     });
+    const staked = !opts.vsAI && (!betEmpty(myBet) || !betEmpty(oppBet));
     UI.showWithLoading('match', {
       match,
       cfg: {
         mode: 'duel', format: 'Duel (' + opts.mode + ')', opponent: { name: opp.displayName, accId: opp.id },
         onFinish: (res, iWon, draw, toMenu) => {
-          /* a draw is nobody's win: every wager returns to its owner,
+          /* a draw is nobody's win: every stake returns to its owner,
              both tokens go home, and neither duel stat moves */
           if (draw) {
-            if (opts.wager !== 'none') UI.toast({ title: 'Draw — wagers returned', body: 'Nobody wins. Both sides take back exactly what they staked.', icon: '🤝' });
+            if (staked) UI.toast({ title: 'Draw — stakes returned', body: 'Nobody wins. Both sides take back exactly what they staked.', icon: '🤝' });
             G.save();
             UI.show(toMenu ? 'menu' : 'play');
             return;
           }
-          /* duel stats + wagers */
-          if (iWon) me.stats.duelsWon++; else me.stats.duelsLost++;
-          if (iWon) G.grantAchievement('first_duel');
-          if (opts.wager === 'gold') {
-            G.addGold(iWon ? opts.goldAmt : -opts.goldAmt);
-            UI.toast({ title: iWon ? 'Wager won!' : 'Wager lost', body: (iWon ? '+' : '−') + U.fmt(opts.goldAmt) + 'g', icon: '🪙' });
-          } else if (opts.wager === 'ngakara') {
-            me.ngakara = Math.max(0, me.ngakara + (iWon ? opts.goldAmt : -opts.goldAmt));
-            UI.toast({ title: iWon ? 'Wager won!' : 'Wager lost', body: (iWon ? '+' : '−') + opts.goldAmt + ' NgAkara', icon: '🧪' });
-          } else if (opts.wager === 'okid') {
-            me.okid[opts.okidR] = Math.max(0, me.okid[opts.okidR] + (iWon ? opts.goldAmt : -opts.goldAmt));
-            UI.toast({ title: iWon ? 'Wager won!' : 'Wager lost', body: (iWon ? '+' : '−') + opts.goldAmt + ' ' + SP.RARITIES[opts.okidR] + ' Okid', icon: '⬡' });
-          } else if (opts.wager === 'token') {
-            if (iWon) {
-              const won = U.deepCopy(oppTok); won.id = U.uid('tok');
-              won.tradeHistory.push({ at: Date.now(), from: opp.displayName, to: me.displayName, price: 0, wager: true });
-              G.addToken(won);
-              G.grantAchievement('duel_wager');
-              UI.toast({ title: 'Token claimed!', body: oppTok.name + ' is yours by right of duel.', icon: '⚔' });
-            } else {
-              /* permanent loss — design rule */
-              G.removeToken(myTok.id);
-              delete opp.tokens[oppTok.id]; // symbolic transfer
-              const lost = U.deepCopy(myTok); lost.id = U.uid('tok'); lost.ownerId = opp.id;
-              opp.tokens[lost.id] = lost;
-              UI.alert('Token forfeited', myTok.name + ' now belongs to ' + opp.displayName + '. The Guild does not retrieve wagered tokens.');
-            }
-          }
+          if (!opts.vsAI) { if (iWon) me.stats.duelsWon++; else me.stats.duelsLost++; }
+          if (iWon && !opts.vsAI) G.grantAchievement('first_duel');
+          if (staked) resolveWager(me, opp, iWon, myBet, oppBet);
           G.save();
           UI.show(toMenu ? 'menu' : 'play');
         },
         noRecord: false,
       },
     }, 1000);
+  }
+
+  /* settle a player-vs-player wager: winner takes the pot, loser forfeits
+     their own stake. Resource stakes move against the opponent account;
+     staked tokens transfer, permanently. */
+  function resolveWager(me, opp, iWon, myBet, oppBet) {
+    let stakedToken = false;
+    if (iWon) {
+      if (oppBet.gold) G.addGold(oppBet.gold);
+      if (oppBet.ngakara) me.ngakara += oppBet.ngakara;
+      (oppBet.okid || []).forEach((n, i) => { if (n) me.okid[i] += n; });
+      (oppBet.tokens || []).forEach(ot => {
+        stakedToken = true;
+        const won = U.deepCopy(ot); won.id = U.uid('tok'); won.ownerId = me.id;
+        won.tradeHistory = won.tradeHistory || [];
+        won.tradeHistory.push({ at: Date.now(), from: opp.displayName, to: me.displayName, price: 0, wager: true });
+        G.addToken(won);
+        if (opp.tokens) delete opp.tokens[ot.id];
+      });
+      if (stakedToken) G.grantAchievement('duel_wager');
+      UI.toast({ title: 'Wager won!', body: 'You claim ' + betSummary(oppBet) + ' from ' + opp.displayName + '.', icon: '⚔' });
+    } else {
+      if (myBet.gold) G.addGold(-myBet.gold);
+      if (myBet.ngakara) me.ngakara = Math.max(0, me.ngakara - myBet.ngakara);
+      (myBet.okid || []).forEach((n, i) => { if (n) me.okid[i] = Math.max(0, me.okid[i] - n); });
+      (myBet.tokens || []).forEach(mt => {
+        stakedToken = true;
+        G.removeToken(mt.id);
+        if (opp.tokens) { const lost = U.deepCopy(mt); lost.id = U.uid('tok'); lost.ownerId = opp.id; opp.tokens[lost.id] = lost; }
+      });
+      if (stakedToken) UI.alert('Stake forfeited', 'You lost ' + betSummary(myBet) + ' to ' + opp.displayName + '. The Guild does not retrieve wagered tokens.');
+      else UI.toast({ title: 'Wager lost', body: 'You forfeit ' + betSummary(myBet) + ' to ' + opp.displayName + '.', icon: '🪙' });
+    }
   }
 
   /* ================= REPLAYS ================= */
