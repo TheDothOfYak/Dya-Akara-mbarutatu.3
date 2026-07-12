@@ -33,7 +33,7 @@ Uses a service account key rather than `firebase login:ci` — the CI-token logi
 1. [Firebase Console](https://console.firebase.google.com) → your project → gear icon → **Project settings** → **Service accounts** tab → **Generate new private key**. This downloads a `.json` file — keep it safe, it's a real credential.
 2. Open that file in a text editor and copy its *entire* contents.
 3. GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → name it `FIREBASE_SERVICE_ACCOUNT` → paste the whole JSON as the value.
-4. Push anything to `main` (or re-run the "Deploy Dya'Akara to Firebase Hosting" workflow from the Actions tab) — it deploys to the Firebase project named in `.firebaserc` (`dya-akara` by default).
+4. Push anything to `main` (or re-run the "Deploy Dya'Akara to Firebase Hosting" workflow from the Actions tab) — it deploys to the Firebase project ID named in `.firebaserc`. Note: a Firebase project's actual ID (what goes in `.firebaserc`, `firebase.json`'s `site`, and the workflow's `projectId`) is not always the same as the friendly name shown in the console — Firebase appends a random suffix if your preferred name was already taken globally. Check the exact `project_id` field in your service account JSON key if the deploy fails with a 403 permission error.
 </details>
 
 Create an account (email/password — cross-device when online is configured, otherwise stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
