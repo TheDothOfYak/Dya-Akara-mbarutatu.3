@@ -235,6 +235,8 @@ label.lbl { display: block; font-size: 12px; color: var(--ink-dim); letter-spaci
 .offer-msg .om-bubble { background: var(--panel2); border-radius: 10px; padding: 6px 12px; font-size: 13px; max-width: 75%; }
 .offer-msg.mine { justify-content: flex-end; }
 .offer-msg.mine .om-bubble { background: #3a2f1e; }
+.offer-msg .om-bubble.chat { background: transparent; border: 1px solid var(--line); font-style: italic; opacity: .92; }
+.offer-msg.mine .om-bubble.chat { background: transparent; border-color: var(--gold-dim); }
 .offer-actions { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
 
 /* ---------- crafting ---------- */

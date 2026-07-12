@@ -216,6 +216,8 @@
       replays: [],                         // {id, at, seed, settings, log, meta, permanent}
       friends: [], pendingIn: [], pendingOut: [], blocked: [], follows: [],
       notifications: [],
+      dms: {},                             // otherId -> [{ by:'me'|'them', text, at }]
+      dmReplies: {},                       // otherId -> timestamp of a pending Dya'kukull reply
       onlineStatus: 'online',
       settings: defaultSettings(),
       huntSlots: [],                       // {id, huntId, source, expiresAtBand} — huntId picks an admin-authored Hunt
@@ -761,6 +763,89 @@
     const off = G.world.market.offers[offId];
     if (off) { delete G.world.market.offers[offId]; G.save(); }
   };
+  /* free-text chat inside a negotiation — kept separate from the numeric
+     offer history so it never disturbs the accept/counter state machine */
+  const MARKET_BANTER = [
+    'Talk is free. The token is not.', 'Flattery won’t move the price — gold will.',
+    'Ha. Make it a real number.', 'The Guild taught me patience. Test it.',
+    'A fine token deserves a fine offer.', 'Say less, offer more.',
+    'We’re close. Don’t spoil it with words.', 'I have all Nurtui to wait. Do you?',
+    'Charming. Now show me your hoard.', 'Mm. Keep talking, or keep bidding.',
+  ];
+  G.sayOnOffer = function (offId, note, bySeller) {
+    const off = G.world.market.offers[offId];
+    if (!off) return { err: 'Offer closed.' };
+    note = String(note || '').trim();
+    if (!note) return { err: 'Nothing to say.' };
+    off.chat = off.chat || [];
+    off.chat.push({ by: bySeller ? 'seller' : 'buyer', note: note.slice(0, 160), at: Date.now() });
+    const other = G.world.accounts[bySeller ? off.buyerId : off.sellerId];
+    let replyIn;
+    if (other && other.ai) { replyIn = 1200 + Math.random() * 2600; off.chatRespondAt = Date.now() + replyIn; }
+    G.save();
+    return { off, replyIn };
+  };
+  function aiChatReply(off) {
+    const responder = G.world.accounts[off.sellerId] && G.world.accounts[off.sellerId].ai ? 'seller'
+      : (G.world.accounts[off.buyerId] && G.world.accounts[off.buyerId].ai ? 'buyer' : null);
+    if (!responder) return;
+    const rng = new U.Rng(U.hashStr(off.id) ^ ((off.chat && off.chat.length) || 0) ^ 0x9e37);
+    off.chat = off.chat || [];
+    off.chat.push({ by: responder, note: rng.pick(MARKET_BANTER), at: Date.now() });
+    G.save();
+    if (DYA.ui && DYA.ui.onMarketUpdate) DYA.ui.onMarketUpdate();
+  }
+  /* ---------- direct messages (friends) ---------- */
+  const DM_LINES = [
+    'Ha! Good to hear from you.', 'The circuits are brutal this season — you holding up?',
+    'Saw your last match. Bold play.', 'Trade me something shiny sometime.',
+    'One of these Nurtui, you and I duel. For honor.', 'The Guild is watching, as always. Stay sharp.',
+    'Well met, friend.', 'I keep meaning to try that Relic run with you.',
+    'Your name’s been coming up on the boards. Good things.', 'Careful out there. The Xikia highlands bite.',
+  ];
+  const DM_HOOKS = [
+    { re: /\b(hi|hey|hello|yo|greet)/i, lines: ['Hey yourself!', 'Well met.', 'Ha — hello, friend.'] },
+    { re: /\b(duel|fight|match|battle)/i, lines: ['A duel? Name the Nurtui and I’m there.', 'You’d lose, but I admire the spirit.', 'Bring your best token. I’ll bring mine.'] },
+    { re: /\b(trade|sell|buy|token|market)/i, lines: ['Always. What are you hunting for?', 'Check my stall — I’ll cut you a friend’s price.', 'I might part with one. Might.'] },
+    { re: /\b(gg|good game|well played|nice)/i, lines: ['Likewise! Rematch soon.', 'The sway favored you. Next time, me.', 'Ha, you earned it.'] },
+    { re: /\?/, lines: ['Good question. Ask me over a duel.', 'Hm. The Guild would say “play honestly.”', 'Depends who’s asking, friend.'] },
+  ];
+  function pickDMReply(text) {
+    const rng = new U.Rng(U.hashStr((text || '') + '|' + Date.now()));
+    const hook = DM_HOOKS.find(h => h.re.test(text || ''));
+    return hook ? rng.pick(hook.lines) : rng.pick(DM_LINES);
+  }
+  G.sendDM = function (otherId, text) {
+    text = String(text || '').trim();
+    if (!text) return { err: 'Nothing to send.' };
+    const other = G.world.accounts[otherId];
+    if (!other) return { err: 'That player is gone.' };
+    G.me.dms = G.me.dms || {};
+    const thread = G.me.dms[otherId] = G.me.dms[otherId] || [];
+    thread.push({ by: 'me', text: text.slice(0, 200), at: Date.now() });
+    if (thread.length > 100) thread.splice(0, thread.length - 100);
+    let replyIn;
+    if (other.ai) {
+      G.me.dmReplies = G.me.dmReplies || {};
+      replyIn = 1500 + Math.random() * 4000;
+      G.me.dmReplies[otherId] = Date.now() + replyIn;
+    }
+    G.save();
+    return { ok: true, replyIn };
+  };
+  function aiDMReply(otherId) {
+    const other = G.world.accounts[otherId];
+    if (!other || !G.me.dms || !G.me.dms[otherId]) return;
+    const thread = G.me.dms[otherId];
+    const lastMine = thread.slice().reverse().find(m => m.by === 'me');
+    const reply = pickDMReply(lastMine ? lastMine.text : '');
+    thread.push({ by: 'them', text: reply, at: Date.now() });
+    if (thread.length > 100) thread.splice(0, thread.length - 100);
+    G.notify({ type: 'social', title: other.displayName, body: reply, icon: '💬', action: { screen: 'friends' }, actionLabel: 'Open Friends' });
+    G.save();
+    if (DYA.ui && DYA.ui.onDM) DYA.ui.onDM(otherId);
+    if (DYA.ui && DYA.ui.onOnlineUpdate) DYA.ui.onOnlineUpdate();
+  }
   function aiRespondToOffer(off, lst) {
     const rngA = new U.Rng(U.hashStr(off.id) ^ off.history.length);
     const last = off.history[off.history.length - 1];
@@ -1072,7 +1157,17 @@
         const responder = G.world.accounts[off.sellerId];
         if (lst && responder && responder.ai) aiRespondToOffer(off, lst);
       }
+      if (off.chatRespondAt && off.chatRespondAt <= Date.now()) {
+        off.chatRespondAt = null;
+        aiChatReply(off);
+      }
     });
+    /* due friend-message replies from the Dya'kukull */
+    if (G.me && G.me.dmReplies) {
+      Object.keys(G.me.dmReplies).forEach(otherId => {
+        if (G.me.dmReplies[otherId] <= Date.now()) { delete G.me.dmReplies[otherId]; aiDMReply(otherId); }
+      });
+    }
     // Called periodically from the UI loop. Keeps market/world alive.
     if (Date.now() - lastSim < 45000) return;
     lastSim = Date.now();

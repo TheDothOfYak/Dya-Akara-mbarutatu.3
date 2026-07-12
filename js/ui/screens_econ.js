@@ -846,14 +846,36 @@
     head.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + (tok ? U.esc(tok.name) : 'Token gone') + '</b> — ' + (selling ? 'selling to' : 'buying from') + ' ' + U.esc(other ? other.displayName : '?') + '<br><span class="small muted">Listed at ' + (lst ? U.fmt(lst.price) + 'g' : '—') + ' · ' + o.state + '</span>' }));
     th.appendChild(head);
     const msgs = U.el('div', { cls: 'offer-msgs' });
-    o.history.forEach(h => {
-      const mine = (h.by === 'buyer') === (o.buyerId === me.id);
+    /* interleave numeric offers and free-text chat by time */
+    const items = o.history.map(h => ({ kind: 'offer', by: h.by, at: h.at || 0, h }))
+      .concat((o.chat || []).map(c => ({ kind: 'chat', by: c.by, at: c.at || 0, note: c.note })))
+      .sort((a, b) => a.at - b.at);
+    items.forEach(it => {
+      const mine = (it.by === 'buyer') === (o.buyerId === me.id);
+      const inner = it.kind === 'offer'
+        ? '<b class="gold">' + U.fmt(it.h.amount) + 'g</b>' + U.esc(extrasText(it.h.extras)) + (it.h.note ? ' — ' + U.esc(it.h.note) : '')
+        : '💬 ' + U.esc(it.note);
       msgs.appendChild(U.el('div', { cls: 'offer-msg' + (mine ? ' mine' : '') }, [
-        U.el('div', { cls: 'om-bubble', html: '<b class="gold">' + U.fmt(h.amount) + 'g</b>' + U.esc(extrasText(h.extras)) + (h.note ? ' — ' + U.esc(h.note) : '') }),
+        U.el('div', { cls: 'om-bubble' + (it.kind === 'chat' ? ' chat' : ''), html: inner }),
       ]));
     });
     th.appendChild(msgs);
     if (o.state === 'pending' || o.state === 'countered') {
+      /* free-text chat — available any time the negotiation is open */
+      const chatRow = U.el('div', { cls: 'offer-actions' });
+      const say = U.el('input', { cls: 'txt', placeholder: 'Message…', maxlength: 160, style: 'flex:1' });
+      const sendSay = () => {
+        const t = say.value.trim(); if (!t) return;
+        const r = G.sayOnOffer(o.id, t, selling);
+        if (r && r.err) { UI.alert('Cannot send', r.err); return; }
+        if (r && r.replyIn) setTimeout(() => G.simTick(), r.replyIn + 200);
+        say.value = ''; UI.show(UI.currentName || 'market');
+      };
+      say.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendSay(); } });
+      chatRow.appendChild(say);
+      chatRow.appendChild(U.el('button', { cls: 'btn small', text: 'Send', onclick: sendSay }));
+      th.appendChild(chatRow);
+
       const acts = U.el('div', { cls: 'offer-actions' });
       const last = o.history[o.history.length - 1];
       const myTurn = (last.by === 'buyer') === selling;
