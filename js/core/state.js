@@ -534,6 +534,64 @@
     return { tok };
   };
 
+  /* ---------- token upgrading (raise a specific individual's rarity) ----------
+     Every rarity tier the mint formula grants +6% HP and +5% damage (token.js);
+     an upgrade re-scales the exact same way so an upgraded token matches a
+     freshly-minted one of that rarity, plus a small pace bump. Costs the same
+     Okid + NgAkara as crafting a token of the target rarity would. */
+  G.upgradeCost = function (tok) {
+    if (!tok || tok.rarity >= 6) return null;
+    return EC.CRAFT_COST[tok.rarity + 1];
+  };
+  G.upgradePreview = function (tok) {
+    if (!tok || tok.rarity >= 6) return null;
+    const old = tok.rarity, target = old + 1;
+    const hpF = (1 + target * 0.06) / (1 + old * 0.06);
+    const dmgF = (1 + target * 0.05) / (1 + old * 0.05);
+    return {
+      target,
+      hp: Math.max(2, Math.round(tok.stats.hp * hpF)),
+      dmg: Math.max(0.5, Math.round(tok.stats.dmg * dmgF * 10) / 10),
+      speed: Math.round(tok.stats.speed * 1.02),
+    };
+  };
+  G.canUpgrade = function (tok) {
+    if (!tok || tok.rarity >= 6 || tok.isRental || tok.frozen) return false;
+    const cost = EC.CRAFT_COST[tok.rarity + 1];
+    let okidAvail = 0;
+    for (let i = tok.rarity + 1; i < 7; i++) okidAvail += G.me.okid[i];
+    const okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
+    return okidAvail >= okidNeed && G.me.ngakara >= cost.ngakara;
+  };
+  G.upgradeToken = function (tok) {
+    if (!tok) return { err: 'Token not found.' };
+    if (tok.rarity >= 6) return { err: 'Already ' + SP.RARITIES[6] + ' — the highest rarity.' };
+    if (tok.isRental) return { err: 'Rented tokens belong to the Guild — they cannot be upgraded.' };
+    if (tok.frozen) return { err: 'This token is frozen pending Guild review.' };
+    if (tok.status === 'market') return { err: 'Take the token off the market before upgrading it.' };
+    const target = tok.rarity + 1;
+    const cost = EC.CRAFT_COST[target];
+    if (!G.canUpgrade(tok)) return { err: 'Not enough materials — needs ' + Math.max(1, cost.okid - G.titleBuff('craftDiscount')) + ' ' + SP.RARITIES[target] + '+ Okid and ' + cost.ngakara + ' NgAkara.' };
+    /* spend Okid (target tier and up) + NgAkara */
+    let okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
+    for (let i = target; i < 7 && okidNeed > 0; i++) {
+      const use = Math.min(G.me.okid[i], okidNeed);
+      G.me.okid[i] -= use; okidNeed -= use;
+    }
+    G.me.ngakara -= cost.ngakara;
+    /* raise every stat */
+    const pre = G.upgradePreview(tok);
+    tok.stats.hp = pre.hp;
+    tok.stats.dmg = pre.dmg;
+    tok.stats.speed = pre.speed;
+    tok.rarity = target;
+    tok.cost = TK.deriveCostVec(SP.get(tok.speciesId), target, new U.Rng(U.hashStr((tok.id || tok.speciesId) + ':up' + target)));
+    tok.upgraded = (tok.upgraded || 0) + 1;
+    if (target === 6) checkAchievement('torcain_own', 1);
+    G.save();
+    return { ok: true, tok };
+  };
+
   /* ================== MARKET ================== */
   G.marketAverage = function (speciesId, rarity) {
     // sellers-only market average: base value with a stable pseudo-market wobble

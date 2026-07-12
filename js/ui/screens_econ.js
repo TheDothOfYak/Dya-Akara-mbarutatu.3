@@ -167,6 +167,10 @@
         const actions = [];
         actions.push(U.el('button', { cls: 'btn primary', text: '⚔ Duel vs AI', onclick: () => DYA.play.startDuelVsAI(tok) }));
         actions.push(U.el('button', { cls: 'btn', text: '👝 Add to pouch', onclick: () => { addToPouch(tok.id); } }));
+        /* upgrade a specific individual to the next rarity — raises all its stats */
+        if (!tok.isRental && tok.rarity < 6) {
+          actions.push(U.el('button', { cls: 'btn', text: '⬆ Upgrade rarity', onclick: () => openUpgrade(tok, scr2) }));
+        }
         /* §4 — name your token like a pet; famous tokens may arrive name-locked */
         if (!tok.nameLocked && !tok.isRental) {
           actions.push(U.el('button', {
@@ -215,6 +219,40 @@
         }
         scr2.appendChild(UI.tokenDetail(tok, { onBack: () => scr2.remove(), actions }));
         root.appendChild(scr2);
+      }
+
+      function openUpgrade(tok, scr2) {
+        const pre = G.upgradePreview(tok);
+        if (!pre) { UI.alert('Cannot upgrade', 'This token is already at the highest rarity.'); return; }
+        const cost = G.upgradeCost(tok);
+        const okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
+        const w = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Upgrade ' + tok.name })]);
+        w.appendChild(U.el('p', { cls: 'small muted mt', html: 'Raise this individual from <b>' + SP.RARITIES[tok.rarity] + '</b> to <b class="gold">' + SP.RARITIES[pre.target] + '</b>. Its stats climb to match a freshly-sung token of that rarity.' }));
+        const statRow = (l, a, b) => U.el('div', { cls: 'flex', style: 'justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0' }, [
+          U.el('span', { cls: 'small muted', text: l }),
+          U.el('span', { cls: 'small', html: a + ' <span class="gold">→ ' + b + '</span>' }),
+        ]);
+        const box = U.el('div', { cls: 'mt' });
+        box.appendChild(statRow('HP', tok.stats.hp, pre.hp));
+        box.appendChild(statRow('Damage', tok.stats.dmg, pre.dmg));
+        box.appendChild(statRow('Speed', tok.stats.speed, pre.speed));
+        w.appendChild(box);
+        w.appendChild(U.el('p', { cls: 'small mt', html: 'Cost: <b>' + okidNeed + '</b> ' + SP.RARITIES[pre.target] + '+ Okid · <b>' + cost.ngakara + '</b> NgAkara' }));
+        const err = U.el('div', { cls: 'small mt', style: 'color:var(--red);min-height:16px' });
+        if (!G.canUpgrade(tok)) err.textContent = 'Not enough ' + SP.RARITIES[pre.target] + '+ Okid or NgAkara.';
+        w.appendChild(err);
+        const m = UI.modal(w);
+        w.appendChild(U.el('button', {
+          cls: 'btn primary mt', text: '⬆ Upgrade to ' + SP.RARITIES[pre.target], disabled: G.canUpgrade(tok) ? undefined : 'true', onclick: () => {
+            const r = G.upgradeToken(tok);
+            if (r.err) { err.textContent = r.err; return; }
+            DYA.audio.play('levelup');
+            m.close(); scr2.remove();
+            UI.refreshTopbar();
+            UI.show('collection');
+            UI.toast({ title: 'Upgraded!', body: tok.name + ' is now ' + SP.RARITIES[tok.rarity] + '.', icon: '⬆' });
+          },
+        }));
       }
 
       renderPouch();
