@@ -22,10 +22,12 @@
   window.DYA_CONFIG.storage = window.DYA_CONFIG.storage || 'local';
 
   /* per-browser override, set from the in-game "Set up online play" panel —
-     lets players go online without editing files or redeploying */
+     lets players go online (or point at their own project) without editing
+     files or redeploying. An explicitly-saved override wins over the baked-in
+     default so the player's choice actually persists across reloads. */
   try {
     const saved = JSON.parse(localStorage.getItem('dyaakara_online_cfg') || 'null');
-    if (saved && saved.url && saved.anonKey && !window.DYA_CONFIG.supabase.url) {
+    if (saved && saved.url && saved.anonKey) {
       window.DYA_CONFIG.supabase.url = saved.url;
       window.DYA_CONFIG.supabase.anonKey = saved.anonKey;
     }
