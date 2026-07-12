@@ -109,13 +109,18 @@
     };
 
     /* ---- Elbergi Plass, the preset AI merchant ---- */
-    const elbergi = makeAIAccount(rng, { name: L.ELBERGI.name, stallName: L.ELBERGI.stallName, bio: L.ELBERGI.bio, level: 42, region: 'fyrsti', merchant: true });
+    const elbergi = makeAIAccount(rng, { id: 'ai_elbergi', name: L.ELBERGI.name, stallName: L.ELBERGI.stallName, bio: L.ELBERGI.bio, level: 42, region: 'fyrsti', merchant: true });
     w.accounts[elbergi.id] = elbergi;
     w.elbergiId = elbergi.id;
 
-    /* ---- 100 Dya'kukull AI players ---- */
+    /* ---- 100 Dya'kukull AI players ----
+       ids are deterministic (ai_0..ai_99) — every browser's local
+       simulation seeds from the same fixed RNG in the same draw order,
+       so these are the SAME 100 AI everywhere. That lets their listings
+       and offers live in the shared online market as recognizably the
+       same seller across every player's independently-simulated world. */
     for (let i = 0; i < 100; i++) {
-      const ai = makeAIAccount(rng, {});
+      const ai = makeAIAccount(rng, { id: 'ai_' + i });
       w.accounts[ai.id] = ai;
     }
 
@@ -132,7 +137,7 @@
     /* ---- Elbergi always keeps a few honest cheap listings (tutorial depends on it) ---- */
     for (let i = 0; i < 4; i++) {
       const spid = rng.pick(['kipsu', 'wild_punk', 'uff', 'rodak', 'mikolo_moko', 'karnen', 'raf_krabbi']);
-      const t = TK.mint({ speciesId: spid, rng, owner: elbergi.id, rarity: Math.min(SP.get(spid).rarity[1], rng.int(0, 1)), aiOwner: true });
+      const t = TK.mint({ id: elbergi.id + '_boot' + i, speciesId: spid, rng, owner: elbergi.id, rarity: Math.min(SP.get(spid).rarity[1], rng.int(0, 1)), aiOwner: true });
       elbergi.tokens[t.id] = t;
       t.status = 'market';
       const lst = { id: U.uid('lst'), tokenId: t.id, sellerId: elbergi.id, price: rng.int(80, 160), status: 'sale', at: Date.now(), featured: false };
@@ -150,12 +155,16 @@
     const level = opt.level || Math.max(1, Math.round(rng.gauss(14, 10)));
     const region = opt.region || rng.pick(EC.REGIONS).id;
     const acc = baseAccount({
-      id: U.uid('ai'),
+      id: opt.id || U.uid('ai'),
       displayName: name,
       email: name.toLowerCase().replace(/[^a-z]/g, '') + '@dya.kukull',
       region,
     });
     acc.ai = true;
+    /* stable net identity for the shared online market — same id
+       everywhere, unlike human accounts whose netId is a random uuid
+       assigned on first online use (see market_online.js) */
+    acc.netId = acc.id;
     acc.aiCfg = {
       active: true,
       marketActivity: opt.merchant ? 1 : rng.range(0.1, 0.9),   // how often they list/buy
@@ -182,7 +191,7 @@
     const craftables = SP.craftable;
     for (let i = 0; i < count; i++) {
       const spid = rng.pick(craftables);
-      const t = TK.mint({ speciesId: spid, rng, owner: acc.id, aiOwner: true });
+      const t = TK.mint({ id: acc.id + '_t' + i, speciesId: spid, rng, owner: acc.id, aiOwner: true });
       acc.tokens[t.id] = t;
     }
     /* every player has a seal — AI seals derive from their identity */
@@ -1062,7 +1071,12 @@
   /* ================== AI WORLD SIMULATION TICK ================== */
   let lastSim = 0;
   G.simTick = function () {
-    /* due AI offer responses fire regardless of the main tick throttle */
+    const MO = DYA.marketOnline;
+    const cloudOn = !!(MO && MO.configured());
+    /* due AI offer responses fire regardless of the main tick throttle.
+       Cloud offers are answered by market_online.js's own poll instead
+       (any browser can answer a due AI-seller reply there, not just
+       this one) — this block only ever concerns LOCAL offers. */
     Object.values(G.world.market.offers).forEach(off => {
       if (off.respondAt && off.respondAt <= Date.now() && (off.state === 'pending' || off.state === 'countered')) {
         off.respondAt = null;
@@ -1085,28 +1099,53 @@
       const roll = rng.next();
       const activity = aiMarketActivity(ai);
       if (roll < activity * 0.5) {
-        // list something
+        // list something — on the real shared market when configured
+        // (the SAME atomic, no-duplicates path a human uses), the
+        // local stalls otherwise
         const toks = Object.values(ai.tokens).filter(t => t.status === 'collection');
-        if (toks.length > 6) aiCreateListing(G.world, ai, rng.pick(toks), rng);
+        if (toks.length > 6) {
+          const tok = rng.pick(toks);
+          if (cloudOn) {
+            const avg = SP.RARITY_VALUE[tok.rarity];
+            const price = Math.round(avg * rng.range(T.listPriceLo != null ? T.listPriceLo : 0.8, T.listPriceHi != null ? T.listPriceHi : 1.5));
+            const mode = rng.chance(0.12) ? 'display' : rng.chance(0.3) ? 'offer' : 'sale';
+            MO.listAs(ai, tok, price, { mode });
+          } else {
+            aiCreateListing(G.world, ai, tok, rng);
+          }
+        }
       } else if (roll < activity * 0.75) {
         // §7 AI reach: buy from ANY market or stall, not only player listings
-        const lsts = Object.values(G.world.market.listings).filter(l => {
-          const seller = G.world.accounts[l.sellerId];
-          return seller && seller.id !== ai.id && l.status === 'sale' && !l.want;
-        });
-        if (lsts.length && rng.chance(0.35)) {
-          const lst = rng.pick(lsts);
-          const seller = G.world.accounts[lst.sellerId];
-          const tok = seller.tokens[lst.tokenId];
-          if (tok && ai.gold >= lst.price && lst.price < G.marketAverage(tok.speciesId, tok.rarity) * 1.4) {
-            completeSale(lst, seller, tok, ai, lst.price);
-            if (G.me && seller.id === G.me.id) {
-              G.notify({ type: 'market', title: 'Token sold!', body: tok.name + ' sold to ' + ai.displayName + ' for ' + U.fmt(lst.price) + 'g.', icon: '💰' });
+        if (cloudOn) {
+          const rows = MO.state.listings.filter(r => r.seller_net_id !== ai.netId && r.mode !== 'display' && !r.want);
+          if (rows.length && rng.chance(0.35)) {
+            const row = rng.pick(rows);
+            if (ai.gold >= row.price && row.price < G.marketAverage(row.token.speciesId, row.token.rarity) * 1.4) {
+              MO.buyAs(ai, row);
+            }
+          }
+        } else {
+          const lsts = Object.values(G.world.market.listings).filter(l => {
+            const seller = G.world.accounts[l.sellerId];
+            return seller && seller.id !== ai.id && l.status === 'sale' && !l.want;
+          });
+          if (lsts.length && rng.chance(0.35)) {
+            const lst = rng.pick(lsts);
+            const seller = G.world.accounts[lst.sellerId];
+            const tok = seller.tokens[lst.tokenId];
+            if (tok && ai.gold >= lst.price && lst.price < G.marketAverage(tok.speciesId, tok.rarity) * 1.4) {
+              completeSale(lst, seller, tok, ai, lst.price);
+              if (G.me && seller.id === G.me.id) {
+                G.notify({ type: 'market', title: 'Token sold!', body: tok.name + ' sold to ' + ai.displayName + ' for ' + U.fmt(lst.price) + 'g.', icon: '💰' });
+              }
             }
           }
         }
-      } else if (roll < activity * 0.8 && G.me) {
+      } else if (roll < activity * 0.8 && G.me && !cloudOn) {
         // occasionally make an offer on a player's offer-enabled listing
+        // (local-market flavor only — the shared market's AI sellers
+        // respond to offers too, see market_online.js, but AI never
+        // proactively offers there since bundle trade-ins don't apply)
         const lsts = Object.values(G.world.market.listings).filter(l => l.sellerId === G.me.id && l.status !== 'display');
         if (lsts.length && rng.chance(0.3)) {
           const lst = rng.pick(lsts);
@@ -1120,13 +1159,17 @@
         }
       }
     }
-    /* prune old AI listings so market stays fresh */
-    const all = Object.values(G.world.market.listings);
-    if (all.length > 140) {
-      all.sort((a, b) => a.at - b.at).slice(0, all.length - 140).forEach(l => {
-        const seller = G.world.accounts[l.sellerId];
-        if (seller && seller.ai) { const t = seller.tokens[l.tokenId]; if (t) t.status = 'collection'; delete G.world.market.listings[l.id]; }
-      });
+    if (!cloudOn) {
+      /* prune old AI listings so the local market stays fresh (the
+         shared cloud market has no local prune — it's a real shared
+         table, not a per-browser cache) */
+      const all = Object.values(G.world.market.listings);
+      if (all.length > 140) {
+        all.sort((a, b) => a.at - b.at).slice(0, all.length - 140).forEach(l => {
+          const seller = G.world.accounts[l.sellerId];
+          if (seller && seller.ai) { const t = seller.tokens[l.tokenId]; if (t) t.status = 'collection'; delete G.world.market.listings[l.id]; }
+        });
+      }
     }
     /* the Dya'kukull live their own lives — with catch-up if the game was closed */
     const live = liveState();

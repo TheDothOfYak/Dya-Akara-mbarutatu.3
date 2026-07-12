@@ -241,7 +241,7 @@
 
     const now = Date.now();
     const tok = {
-      id: U.uid('tok'),
+      id: opts.id || U.uid('tok'),
       speciesId: sp.id,
       name,
       nameLocked: !!opts.nameLocked,
