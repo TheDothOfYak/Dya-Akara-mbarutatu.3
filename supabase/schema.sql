@@ -7,7 +7,12 @@
 --
 -- It creates the tables the game's online layer uses:
 --   • friends       (dya_players / dya_friend_requests / dya_friends)
+--   • messages      (dya_messages) — friend-to-friend direct chat
 --   • shared market (dya_listings) — unique tokens, atomic buys
+--   • tournaments   (dya_tournaments / dya_tournament_players) — real,
+--                                    shared cross-device tournaments
+--   • season ladder (dya_season_queue, dya_players.rank) — the official
+--                                    ranked season's live matchmaking
 --   • admin config  (dya_config)   — the Admin Panel's live game
 --                                    edits, pushed to every player
 --   • accounts      (dya_accounts / dya_bans) — a player's whole
@@ -90,6 +95,19 @@ create table if not exists public.dya_listings (
 -- a token can only be on the market once at a time
 create unique index if not exists dya_listings_unique_active
   on public.dya_listings (token_id) where status = 'active';
+
+-- ---------- direct messages (friend-to-friend chat) ----------
+-- One row per message between two player identities. Threads are
+-- reconstructed client-side by the pair (from_id, to_id). Kept simple
+-- and append-only; clients poll for anything newer than they've seen.
+create table if not exists public.dya_messages (
+  id         uuid primary key default gen_random_uuid(),
+  from_id    uuid not null references public.dya_players(id) on delete cascade,
+  from_name  text not null default '',
+  to_id      uuid not null references public.dya_players(id) on delete cascade,
+  body       text not null,
+  created_at timestamptz not null default now()
+);
 
 -- ---------- accounts (a player's whole save, portable to any device) ----------
 -- `data` holds the ENTIRE local account object (tokens, gold, level,
@@ -201,6 +219,7 @@ alter table public.dya_bans            enable row level security;
 alter table public.dya_tournaments        enable row level security;
 alter table public.dya_tournament_players enable row level security;
 alter table public.dya_season_queue       enable row level security;
+alter table public.dya_messages           enable row level security;
 
 drop policy if exists "dya players open"  on public.dya_players;
 drop policy if exists "dya requests open" on public.dya_friend_requests;
@@ -212,6 +231,7 @@ drop policy if exists "dya bans open"     on public.dya_bans;
 drop policy if exists "dya tournaments open"    on public.dya_tournaments;
 drop policy if exists "dya trn players open"    on public.dya_tournament_players;
 drop policy if exists "dya season queue open"   on public.dya_season_queue;
+drop policy if exists "dya messages open"       on public.dya_messages;
 
 create policy "dya players open"  on public.dya_players         for all using (true) with check (true);
 create policy "dya requests open" on public.dya_friend_requests for all using (true) with check (true);
@@ -223,6 +243,7 @@ create policy "dya bans open"     on public.dya_bans            for all using (t
 create policy "dya tournaments open" on public.dya_tournaments        for all using (true) with check (true);
 create policy "dya trn players open" on public.dya_tournament_players for all using (true) with check (true);
 create policy "dya season queue open" on public.dya_season_queue       for all using (true) with check (true);
+create policy "dya messages open"    on public.dya_messages           for all using (true) with check (true);
 
 -- helpful indexes for the polling queries
 create index if not exists dya_requests_to   on public.dya_friend_requests (to_id, status);
@@ -236,3 +257,5 @@ create index if not exists dya_tournaments_state on public.dya_tournaments (stat
 create index if not exists dya_trn_players_trn   on public.dya_tournament_players (tournament_id);
 create index if not exists dya_players_rank       on public.dya_players (rank desc);
 create index if not exists dya_season_queue_find  on public.dya_season_queue (circuit, status, updated_at desc);
+create index if not exists dya_messages_to     on public.dya_messages (to_id, created_at);
+create index if not exists dya_messages_from   on public.dya_messages (from_id, created_at);
