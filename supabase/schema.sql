@@ -10,12 +10,25 @@
 --   • shared market (dya_listings) — unique tokens, atomic buys
 --   • admin config  (dya_config)   — the Admin Panel's live game
 --                                    edits, pushed to every player
+--   • accounts      (dya_accounts / dya_bans) — a player's whole
+--                                    save (collection, gold, level,
+--                                    friends, settings…) travels with
+--                                    their email+password to ANY
+--                                    device; bans enforce everywhere
 -- with open row-level-security policies suitable for a friendly
 -- private deployment.
 --
--- NOTE: the policies below let anyone holding your anon key
--- read and write these tables. That is fine for a game shared
--- among friends; do not store anything sensitive here.
+-- ⚠ NOTE ON SECURITY: the policies below let ANYONE holding your
+-- site's anon key (which is public — it ships in the deployed
+-- site's source) read or write these tables directly via Supabase's
+-- REST API, bypassing the game entirely. That includes dya_accounts:
+-- a determined visitor could read or edit another player's gold,
+-- token collection, or password hash by calling the API directly.
+-- This matches the trust model of every other table in this file
+-- (fine for a game played among friends) — it is NOT the same as
+-- real per-account security. If that matters for your deployment,
+-- the fix is switching to real Supabase Auth with a row-level policy
+-- scoped to `auth.uid()`, which is a bigger change than this file.
 -- ============================================================
 
 create extension if not exists pgcrypto;
@@ -75,6 +88,30 @@ create table if not exists public.dya_listings (
 create unique index if not exists dya_listings_unique_active
   on public.dya_listings (token_id) where status = 'active';
 
+-- ---------- accounts (a player's whole save, portable to any device) ----------
+-- `data` holds the ENTIRE local account object (tokens, gold, level,
+-- pouches, friends, notifications, settings, achievements, stats…) —
+-- everything G.me carries locally. Login fetches this by email and
+-- installs it into the local world, so every existing synchronous
+-- game system keeps working unchanged.
+create table if not exists public.dya_accounts (
+  id         text primary key,
+  email      text not null unique,
+  pass_hash  text not null,
+  data       jsonb not null,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+-- ---------- bans (public record, enforced on every device) ----------
+create table if not exists public.dya_bans (
+  account_id text primary key,
+  reason     text not null,
+  permanent  boolean not null default false,
+  until      timestamptz,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- admin config (Admin Panel live game edits) ----------
 -- One row (key='mods') holds the creator's overrides: creature stats,
 -- behaviors, sprites, text, balance, AI tuning. Every game client
@@ -91,18 +128,24 @@ alter table public.dya_friend_requests enable row level security;
 alter table public.dya_friends         enable row level security;
 alter table public.dya_listings        enable row level security;
 alter table public.dya_config          enable row level security;
+alter table public.dya_accounts        enable row level security;
+alter table public.dya_bans            enable row level security;
 
 drop policy if exists "dya players open"  on public.dya_players;
 drop policy if exists "dya requests open" on public.dya_friend_requests;
 drop policy if exists "dya friends open"  on public.dya_friends;
 drop policy if exists "dya listings open" on public.dya_listings;
 drop policy if exists "dya config open"   on public.dya_config;
+drop policy if exists "dya accounts open" on public.dya_accounts;
+drop policy if exists "dya bans open"     on public.dya_bans;
 
 create policy "dya players open"  on public.dya_players         for all using (true) with check (true);
 create policy "dya requests open" on public.dya_friend_requests for all using (true) with check (true);
 create policy "dya friends open"  on public.dya_friends         for all using (true) with check (true);
 create policy "dya listings open" on public.dya_listings        for all using (true) with check (true);
 create policy "dya config open"   on public.dya_config          for all using (true) with check (true);
+create policy "dya accounts open" on public.dya_accounts        for all using (true) with check (true);
+create policy "dya bans open"     on public.dya_bans            for all using (true) with check (true);
 
 -- helpful indexes for the polling queries
 create index if not exists dya_requests_to   on public.dya_friend_requests (to_id, status);
@@ -111,3 +154,4 @@ create index if not exists dya_friends_a     on public.dya_friends (a_id);
 create index if not exists dya_friends_b     on public.dya_friends (b_id);
 create index if not exists dya_listings_active on public.dya_listings (status, created_at desc);
 create index if not exists dya_listings_seller on public.dya_listings (seller_net_id, status, claimed);
+create index if not exists dya_accounts_email  on public.dya_accounts (email);

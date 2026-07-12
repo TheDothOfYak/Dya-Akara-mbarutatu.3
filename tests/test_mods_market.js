@@ -175,7 +175,7 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   await new Promise(r => setTimeout(r, 10)); /* let boot fetches settle */
 
   /* two players on "different devices" — we swap G.me to simulate */
-  const seller = G.createAccount('seller@x', 'passpass', 'SellerSam').acc;
+  const seller = (await G.createAccount('seller@x', 'passpass', 'SellerSam')).acc;
   const tok = DYAG.token.mint({ speciesId: 'kipsu', rng: new U.Rng(11), rarity: 1, owner: seller.id });
   seller.tokens[tok.id] = tok;
   G.me = seller;
@@ -190,7 +190,7 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   const row = MO.state.listings[0];
 
   /* buyer wins the atomic claim */
-  const buyer = G.createAccount('buyer@x', 'passpass', 'BuyerBea').acc;
+  const buyer = (await G.createAccount('buyer@x', 'passpass', 'BuyerBea')).acc;
   buyer.gold = 1000;
   G.me = buyer;
   const br = await MO.buy(row);
@@ -198,7 +198,7 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   check('buyer pays and owns the unique token', buyer.gold === 500 && !!buyer.tokens[tok.id] && buyer.tokens[tok.id].status === 'collection');
 
   /* a second buyer racing on the SAME row must lose */
-  const buyer2 = G.createAccount('buyer2@x', 'passpass', 'LateLarry').acc;
+  const buyer2 = (await G.createAccount('buyer2@x', 'passpass', 'LateLarry')).acc;
   buyer2.gold = 1000;
   G.me = buyer2;
   const br2 = await MO.buy(Object.assign({}, row, { status: 'active' })); /* stale client view */

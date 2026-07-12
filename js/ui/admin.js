@@ -16,6 +16,10 @@
        per-AI control down to their collections.
      • MARKET — local stalls AND the shared online market
        (pull any player listing; the token returns home).
+     • ACCOUNTS — Overview can look up and load any player's
+       cloud account by email, even one this browser has never
+       locally seen, so bans/edits/grants work on every real
+       player, not just ones created on this device.
 
    Edits are stored as overrides (DYA.mods), applied instantly,
    and — when online is configured — pushed to Supabase so every
@@ -32,6 +36,28 @@
     gate();
   });
 
+  /* ---------- cloud accounts: pull every real player's save into this
+     admin session, even ones who signed up on a device this browser
+     has never seen — so every tab below (bans, spawn, edit) can act
+     on them like any other account. ---------- */
+  const cloudAcc = { loaded: false, loading: false, error: null };
+  async function loadCloudAccounts() {
+    const AC = DYA.accountCloud;
+    if (!AC || !AC.configured()) return;
+    cloudAcc.loading = true;
+    try {
+      const rows = await AC.fetchAll();
+      rows.forEach(row => {
+        const acc = row.data;
+        acc.id = row.id; acc.email = row.email; acc.passHash = row.pass_hash;
+        acc.cloudAccount = true;
+        G.world.accounts[acc.id] = acc;
+      });
+      cloudAcc.loaded = true; cloudAcc.error = null;
+    } catch (e) { cloudAcc.error = e.message; }
+    cloudAcc.loading = false;
+  }
+
   /* ---------- access gate: you are the admin ---------- */
   function gate() {
     root.innerHTML = '';
@@ -43,10 +69,10 @@
     const err = U.el('div', { cls: 'small center mt', style: 'color:var(--red);min-height:16px' });
     wrap.appendChild(err);
     const btn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: G.world.adminPass ? 'Enter' : 'Set password & enter' });
-    btn.onclick = () => {
+    btn.onclick = async () => {
       if (pass.value.length < 4) { err.textContent = 'At least 4 characters.'; return; }
-      if (!G.world.adminPass) { G.admin.setPass(pass.value); panel(); return; }
-      if (G.admin.checkPass(pass.value)) panel();
+      if (!G.world.adminPass) { G.admin.setPass(pass.value); await loadCloudAccounts(); panel(); return; }
+      if (G.admin.checkPass(pass.value)) { await loadCloudAccounts(); panel(); }
       else err.textContent = 'Wrong password. The Guild is watching. Cordially.';
     };
     pass.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
@@ -104,6 +130,48 @@
     return U.el('p', { cls: 'small ' + (s.error ? '' : 'muted'), style: s.error ? 'color:var(--red)' : '', text: txt });
   }
 
+  /* ---------- cloud accounts status + look-up-by-email ---------- */
+  function cloudAccountsLine() {
+    const AC = DYA.accountCloud;
+    const wrap = U.el('div', { cls: 'mb' });
+    if (!AC || !AC.configured()) {
+      wrap.appendChild(U.el('p', { cls: 'small muted', text: 'Player accounts are local to each device (online not configured) — this admin session only sees accounts that were created or edited in THIS browser.' }));
+      return wrap;
+    }
+    const cloudCount = Object.values(G.world.accounts).filter(a => a.cloudAccount).length;
+    wrap.appendChild(U.el('p', {
+      cls: 'small ' + (cloudAcc.error ? '' : 'muted'), style: cloudAcc.error ? 'color:var(--red)' : '',
+      text: cloudAcc.error ? '⚠ Could not load cloud accounts: ' + cloudAcc.error + (/(relation|table)/i.test(cloudAcc.error) ? ' — re-run supabase/schema.sql to add the dya_accounts table.' : '')
+        : '🌐 ' + cloudCount + ' player account(s) loaded from the cloud — every real player, on every device, not just this browser.',
+    }));
+    const row = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+    row.appendChild(U.el('button', {
+      cls: 'btn small ghost', text: '🔄 Refresh from cloud', onclick: async () => {
+        await loadCloudAccounts(); rerender();
+      },
+    }));
+    const emailIn = U.el('input', { cls: 'txt', placeholder: 'player@email.com', style: 'max-width:220px' });
+    row.appendChild(emailIn);
+    row.appendChild(U.el('button', {
+      cls: 'btn small', text: '🔎 Look up & load', onclick: async () => {
+        const email = emailIn.value.trim().toLowerCase();
+        if (!email) return;
+        try {
+          const remote = await AC.fetchByEmail(email);
+          if (!remote) { alert('No cloud account with that email.'); return; }
+          const acc = remote.data;
+          acc.id = remote.id; acc.email = remote.email; acc.passHash = remote.pass_hash; acc.cloudAccount = true;
+          G.world.accounts[acc.id] = acc;
+          G.saveNow();
+          alert('Loaded ' + acc.displayName + ' — edit them from the table below.');
+          rerender();
+        } catch (e) { alert('Lookup failed: ' + e.message); }
+      },
+    }));
+    wrap.appendChild(row);
+    return wrap;
+  }
+
   /* ---------- main panel ---------- */
   const NAV = ['Overview', 'Creatures', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
   function panel() {
@@ -143,12 +211,13 @@
       });
       body.appendChild(tiles);
       body.appendChild(syncLine());
+      body.appendChild(cloudAccountsLine());
       body.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Real player accounts' }));
       const tbl = U.el('table', { cls: 'adm' });
       tbl.appendChild(U.el('tr', {}, [U.el('th', { text: 'Name' }), U.el('th', { text: 'Level' }), U.el('th', { text: 'Gold' }), U.el('th', { text: 'Tokens' }), U.el('th', { text: 'Rank' }), U.el('th', { text: '' })]));
       humans.forEach(a => {
         const tr = U.el('tr', {}, [
-          U.el('td', { text: a.displayName }), U.el('td', { text: a.level }),
+          U.el('td', { html: U.esc(a.displayName) + (a.cloudAccount ? ' <span class="pill">🌐 cloud</span>' : '') }), U.el('td', { text: a.level }),
           U.el('td', { text: U.fmt(a.gold) }), U.el('td', { text: Object.keys(a.tokens).length }),
           U.el('td', { text: a.rank }),
         ]);
@@ -597,7 +666,7 @@
           const a = G.world.accounts[acc.value];
           a.gold += parseInt(gold.value) || 0;
           a.ngakara += parseInt(ngak.value) || 0;
-          G.saveNow(); alert('Granted.');
+          G.saveNow(); G.pushAccountToCloud(a); alert('Granted.');
         },
       })]));
     },
@@ -1126,7 +1195,7 @@
       U.el('button', {
         cls: 'btn primary', text: 'Save', onclick: () => {
           fields.forEach(([k, , t]) => { a[k] = t === 'number' ? (parseInt(inputs[k].value) || 0) : inputs[k].value; });
-          G.saveNow(); close(); rerender();
+          G.saveNow(); G.pushAccountToCloud(a); close(); rerender();
         },
       }),
       U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => close() }),
