@@ -19,11 +19,23 @@ python3 -m http.server 8000
 
 **GitHub Codespaces:** open this repo in a Codespace, run `npm run dev`, and open the forwarded port 8000 when it pops up.
 
-**Free permanent hosting:** this project is set up for GitHub Pages. After the workflow runs from the main branch, the game will be available at `https://<your-username>.github.io/Dya-Akara-mbarutatu.3/`.
+**Free permanent hosting:** every push to `main` auto-deploys to two places:
+- **GitHub Pages** — `https://<your-username>.github.io/Dya-Akara-mbarutatu.3/` (`.github/workflows/deploy-pages.yml`). Requires Settings → Pages → Source → **GitHub Actions**, once.
+- **Firebase Hosting** — `https://<your-firebase-project>.web.app` (`.github/workflows/deploy-firebase.yml`). Requires a one-time `FIREBASE_TOKEN` repository secret — see below.
+
+Both serve the exact same static files, so both stay in sync automatically from now on.
+
+<details>
+<summary>One-time Firebase Hosting setup (only needed once, by whoever owns the Firebase project)</summary>
+
+1. `npm install -g firebase-tools` (if you don't have it), then `firebase login:ci` — this opens a browser once and prints a long token in your terminal.
+2. GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → name it `FIREBASE_TOKEN`, paste the token as the value.
+3. Push anything to `main` (or re-run the "Deploy Dya'Akara to Firebase Hosting" workflow from the Actions tab) — it deploys to the Firebase project named in `.firebaserc` (`dya-akara` by default).
+</details>
 
 Create an account (email/password — cross-device when online is configured, otherwise stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
 
-**The Admin Panel** lives at `admin.html` — outside the game UI, as specified. First visit sets the admin password. You are the admin.
+**The Admin Panel** lives at `admin.html` on either hosting domain — outside the game UI, as specified. First visit on a given domain sets that domain's admin password (the password, the local Dya'kukull AI population, and local market/tournament flavor are stored per-browser-origin, so github.io and web.app each get their own — but real player accounts, the shared market, and admin's game-content edits are cloud-based via Supabase and identical on both). You are the admin.
 
 ## Match Controls
 
