@@ -1144,10 +1144,16 @@
       /* ---------- simulated disconnect (rare, casual queue only — never
          for real networked opponents) ---------- */
       let disconnectFired = false;
+      let disconnectRolled = false;
       function maybeDisconnect() {
         if (disconnectFired || !cfg.opponent || !cfg.opponent.simulatedHuman || cfg.opponent.remoteHuman || M.mode !== 'standard') return;
-        if (M.time > 120 && M.time < 121 && Math.random() < 0.04) {
-          disconnectFired = true;
+        /* Roll exactly once when crossing the 120s mark — otherwise this fires
+           every frame across the whole window and the odds compound to a near
+           certainty. A single slim roll keeps disconnects genuinely rare. */
+        if (!disconnectRolled && M.time > 120) {
+          disconnectRolled = true;
+          if (Math.random() < 0.001) {
+            disconnectFired = true;
           M.paused = true;
           const ov = U.el('div', { cls: 'match-overlay' });
           ov.appendChild(U.el('h1', { style: 'color:var(--ink);font-size:34px', text: 'OPPONENT DISCONNECTED' }));
@@ -1167,6 +1173,7 @@
               ov.appendChild(row);
             }
           }, 1000);
+          }
         }
       }
 
