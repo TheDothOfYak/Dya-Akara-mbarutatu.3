@@ -97,6 +97,7 @@
       balance: {},        // key -> replacement array (RARITY_COST, SIZE_HP, …)
       economy: {},        // key -> replacement value
       ai: {},             // AI tuning knobs (see AI_DEFAULTS)
+      hunts: {},          // id -> admin-authored individual Hunt (see Hunts tab)
     };
   }
 
@@ -190,6 +191,46 @@
     return Object.assign({}, AI_DEFAULTS, M.data.ai || {});
   };
 
+  /* ================= HUNTS =================
+     Individual, admin-authored quarry. Unlike species (a template),
+     each Hunt is ONE specific creature: it is hunted once and then
+     consumed. Authored in the Admin Panel's Hunts tab, stored here so
+     the roster — and each "hunted" flag — reaches every player online. */
+  M.hunts = function () { return Object.values(M.data.hunts || {}); };
+  M.getHunt = function (id) { return (M.data.hunts || {})[id] || null; };
+  M.availableHunts = function () { return M.hunts().filter(h => !h.hunted); };
+  M.huntedHunts = function () { return M.hunts().filter(h => h.hunted); };
+  M.setHunt = function (h) {
+    if (!h || !h.id) return;
+    M.data.hunts = M.data.hunts || {};
+    M.data.hunts[h.id] = U.deepCopy(h);
+    M.save();
+  };
+  M.deleteHunt = function (id) {
+    if (M.data.hunts && M.data.hunts[id]) { delete M.data.hunts[id]; M.save(); }
+  };
+  /* Reopen a consumed Hunt (admin action). */
+  M.reopenHunt = function (id) {
+    const h = M.data.hunts && M.data.hunts[id];
+    if (!h) return;
+    h.hunted = false; h.huntedBy = null; h.huntedAt = 0;
+    M.save();
+  };
+  /* Global consumption: the first player to finish a Hunt claims it for
+     the whole world. We adopt any newer admin state first so our push
+     doesn't clobber a concurrent edit, then flag it and push straight
+     away (the same optimistic, first-writer-wins model as the market). */
+  M.markHunted = async function (id, by) {
+    if (M.configured()) { try { await M.fetchRemote(); } catch (e) { /* offline is fine */ } }
+    const h = M.data.hunts && M.data.hunts[id];
+    if (!h) return { missing: true };
+    if (h.hunted) return { already: true, by: h.huntedBy };
+    h.hunted = true; h.huntedBy = by || null; h.huntedAt = Date.now();
+    M.save();
+    if (M.configured()) { try { await M.pushRemote(); } catch (e) { /* debounced push will retry */ } }
+    return { ok: true };
+  };
+
   /* ================= EDIT HELPERS (used by the Admin Panel) ================= */
   /* Compute the minimal per-key diff of an edited species vs its base. */
   M.setSpecies = function (id, edited) {
@@ -252,6 +293,8 @@
       lore: Object.keys(d.lore || {}).length,
       balance: Object.keys(d.balance || {}).length + Object.keys(d.economy || {}).length,
       ai: Object.keys(d.ai || {}).length,
+      hunts: Object.keys(d.hunts || {}).length,
+      huntsAvailable: Object.values(d.hunts || {}).filter(h => !h.hunted).length,
       rev: d.rev,
       updatedAt: d.updatedAt,
     };

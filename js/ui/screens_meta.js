@@ -7,7 +7,7 @@
    ============================================================ */
 (function () {
   'use strict';
-  const U = DYA.util, G = DYA.state, UI = DYA.ui, SP = DYA.species, EC = DYA.economy, TK = DYA.token, L = DYA.lore;
+  const U = DYA.util, G = DYA.state, UI = DYA.ui, SP = DYA.species, EC = DYA.economy, TK = DYA.token, L = DYA.lore, M = DYA.mods;
 
   /* ================= ADVENTURES / HUNT ================= */
   UI.register('adventures', {
@@ -25,68 +25,82 @@
 
       if (me.activeHunt) { renderActiveHunt(body); page.appendChild(body); scr.appendChild(page); root.appendChild(scr); return; }
 
-      body.appendChild(U.el('p', { cls: 'muted', text: 'A Hunt is a narrative pursuit of one great creature. Success earns a crafting piece of that creature — the token itself must still be sung true at the workbench. You earn one Hunt slot every 10 levels; unused slots expire at the next 10-level mark.' }));
+      body.appendChild(U.el('p', { cls: 'muted', text: 'A Hunt is a narrative pursuit of one specific creature. Each is a single individual — once someone brings it down, it is gone for good. Success earns a crafting piece of that creature — the token itself must still be sung true at the workbench. You earn one Hunt slot every 10 levels; unused slots expire at the next 10-level mark.' }));
+
+      /* prune expired slots and any choice whose Hunt has vanished */
+      me.huntSlots = me.huntSlots.filter(s => !s.expiresAtBand || s.expiresAtBand > me.level);
+      me.huntSlots.forEach(s => { if (s.huntId && !(M && M.getHunt(s.huntId))) s.huntId = null; });
 
       /* slots */
       body.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Your Hunt Slots' }));
-      me.huntSlots = me.huntSlots.filter(s => !s.expiresAtBand || s.expiresAtBand > me.level);
       if (!me.huntSlots.length) {
         body.appendChild(U.el('p', { cls: 'muted', text: 'No open Hunt slots. The next arrives at level ' + (Math.floor(me.level / 10) * 10 + 10) + '. Tournaments sometimes award them too.' }));
       }
       me.huntSlots.forEach(slot => {
         const row = U.el('div', { cls: 'panel mb', style: 'display:flex;gap:14px;align-items:center' });
-        if (!slot.speciesId) {
+        const hunt = slot.huntId && M ? M.getHunt(slot.huntId) : null;
+        if (!hunt) {
           row.appendChild(U.el('div', { style: 'font-size:30px', text: '🏹' }));
           row.appendChild(U.el('div', { cls: 'flex1', html: '<b>Open slot</b> <span class="small muted">(' + slot.source + (slot.expiresAtBand ? ' · expires at level ' + slot.expiresAtBand : '') + ')</span><br><span class="small muted">Choose your quarry. The choice locks until the Hunt is done.</span>' }));
-          row.appendChild(U.el('button', { cls: 'btn', text: 'Choose creature', onclick: () => chooseCreature(slot) }));
+          row.appendChild(U.el('button', { cls: 'btn', text: 'Choose a Hunt', onclick: () => chooseHunt(slot) }));
+        } else if (hunt.hunted) {
+          row.appendChild(U.el('div', { style: 'font-size:30px', text: '🕳' }));
+          row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(hunt.name) + '</b> <span class="pill">claimed</span><br><span class="small muted">Another hunter brought it down first. Choose a different quarry.</span>' }));
+          row.appendChild(U.el('button', { cls: 'btn', text: 'Choose a Hunt', onclick: () => chooseHunt(slot) }));
         } else {
-          const sp = SP.get(slot.speciesId);
-          row.appendChild(UI.tokenArt(slot.speciesId, 66));
-          row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + sp.name + '</b><br><span class="small muted">' + sp.temperament + '</span>' }));
-          const cd = me.huntCooldowns[slot.speciesId];
-          if (cd && cd > Date.now()) {
-            row.appendChild(U.el('div', { cls: 'small muted', text: 'Cooldown: ' + U.fmtDur(cd - Date.now()) }));
-            row.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Re-choose', onclick: () => { slot.speciesId = null; G.save(); UI.show('adventures'); } }));
-          } else {
-            row.appendChild(U.el('button', { cls: 'btn primary', text: 'Begin the Track', onclick: () => startTrack(slot) }));
-            row.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Re-choose', onclick: () => { slot.speciesId = null; G.save(); UI.show('adventures'); } }));
-          }
+          const sp = SP.get(hunt.speciesId);
+          row.appendChild(UI.tokenArt(hunt.speciesId, 66));
+          row.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(hunt.name) + '</b> <span class="small muted">(' + (sp ? sp.name : hunt.speciesId) + ')</span><br><span class="small muted">' + (sp ? sp.temperament : '') + '</span>' }));
+          row.appendChild(U.el('button', { cls: 'btn primary', text: 'Begin the Track', onclick: () => startTrack(slot) }));
+          row.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Re-choose', onclick: () => { slot.huntId = null; G.save(); UI.show('adventures'); } }));
         }
         body.appendChild(row);
       });
 
-      body.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'The Launch Hunt Roster' }));
-      const grid = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(200px,1fr))' });
-      SP.huntable.forEach(id => {
-        const sp = SP.get(id);
-        const card = U.el('div', { cls: 'tok-card', style: 'text-align:left;padding:12px' });
-        card.appendChild(UI.tokenArt(id, 84, 'idle'));
-        card.appendChild(U.el('div', { cls: 'gold', text: sp.name }));
-        card.appendChild(U.el('div', { cls: 'small muted', text: 'Narrator: ' + L.NARRATORS[L.HUNT_NARRATOR[id]].name }));
-        const cd = me.huntCooldowns[id];
-        if (cd && cd > Date.now()) card.appendChild(U.el('div', { cls: 'small', style: 'color:var(--red)', text: 'Hunted recently — ' + U.fmtDur(cd - Date.now()) }));
-        grid.appendChild(card);
-      });
-      grid.appendChild(U.el('div', { cls: 'tok-card', style: 'text-align:left;padding:12px;opacity:.5' }, [
-        U.el('div', { style: 'font-size:40px;text-align:center', text: '❔' }),
-        U.el('div', { cls: 'gold', text: 'Vyrenalur · Aerolhorn' }),
-        U.el('div', { cls: 'small muted', text: 'Future release. Noka is not ready to speak of them.' }),
-      ]));
-      body.appendChild(grid);
+      /* available hunts the admin has posted (not already taken by one of my slots) */
+      body.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Available Hunts' }));
+      const takenIds = me.huntSlots.map(s => s.huntId).filter(Boolean);
+      const avail = (M ? M.availableHunts() : []).filter(h => takenIds.indexOf(h.id) < 0);
+      if (!avail.length) {
+        body.appendChild(U.el('p', { cls: 'muted', text: 'No Hunts are posted right now. The Guild sends word when a great creature is sighted — check back.' }));
+      } else {
+        const grid = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(200px,1fr))' });
+        avail.forEach(h => {
+          const sp = SP.get(h.speciesId);
+          const card = U.el('div', { cls: 'tok-card', style: 'text-align:left;padding:12px' });
+          card.appendChild(UI.tokenArt(h.speciesId, 84, 'idle'));
+          card.appendChild(U.el('div', { cls: 'gold', text: h.name }));
+          card.appendChild(U.el('div', { cls: 'small muted', text: (sp ? sp.name : h.speciesId) + ' · ' + (SP.RARITIES[h.rarity] || '') }));
+          const narr = L.NARRATORS[h.narrator];
+          if (narr) card.appendChild(U.el('div', { cls: 'small muted', text: 'Narrator: ' + narr.name }));
+          const openSlot = me.huntSlots.find(s => !s.huntId || !(M && M.getHunt(s.huntId)) || M.getHunt(s.huntId).hunted);
+          card.appendChild(U.el('button', {
+            cls: 'btn small mt' + (openSlot ? ' primary' : ' ghost'), text: openSlot ? 'Take this Hunt' : 'Needs a Hunt slot',
+            onclick: () => {
+              if (!openSlot) { UI.toast ? UI.toast('You have no open Hunt slot.') : alert('You have no open Hunt slot.'); return; }
+              openSlot.huntId = h.id; G.save(); UI.show('adventures');
+            },
+          }));
+          grid.appendChild(card);
+        });
+        body.appendChild(grid);
+      }
       page.appendChild(body);
       scr.appendChild(page);
       root.appendChild(scr);
 
-      function chooseCreature(slot) {
+      function chooseHunt(slot) {
+        const list = (M ? M.availableHunts() : []).filter(h => me.huntSlots.every(s => s === slot || s.huntId !== h.id));
         const w = U.el('div', {});
         w.appendChild(U.el('h3', { cls: 'gold', text: 'Choose your quarry' }));
-        const g2 = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(120px,1fr))' });
         const m = UI.modal(w);
-        SP.huntable.forEach(id => {
+        if (!list.length) { w.appendChild(U.el('p', { cls: 'muted mt', text: 'No Hunts are available right now.' })); return; }
+        const g2 = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(120px,1fr))' });
+        list.forEach(h => {
           const card = U.el('div', { cls: 'tok-card' });
-          card.appendChild(UI.tokenArt(id, 70));
-          card.appendChild(U.el('div', { cls: 'tc-name', text: SP.get(id).name }));
-          card.onclick = () => { slot.speciesId = id; G.save(); m.close(); UI.show('adventures'); };
+          card.appendChild(UI.tokenArt(h.speciesId, 70));
+          card.appendChild(U.el('div', { cls: 'tc-name', text: h.name }));
+          card.onclick = () => { slot.huntId = h.id; G.save(); m.close(); UI.show('adventures'); };
           g2.appendChild(card);
         });
         w.appendChild(g2);
@@ -94,10 +108,12 @@
 
       /* ---- the Track: narrative + 2 questions (hidden 5% influence) ---- */
       function startTrack(slot) {
-        const spid = slot.speciesId;
-        const narrKey = L.HUNT_NARRATOR[spid] || 'guide';
-        const narr = L.NARRATORS[narrKey];
-        const intro = (L.HUNT_INTROS[spid] && L.HUNT_INTROS[spid][narrKey]) || 'The trail is fresh. Answer, and we begin.';
+        const hunt = M && M.getHunt(slot.huntId);
+        if (!hunt || hunt.hunted) { slot.huntId = null; G.save(); UI.show('adventures'); return; }
+        const spid = hunt.speciesId;
+        const narrKey = hunt.narrator || L.HUNT_NARRATOR[spid] || 'guide';
+        const narr = L.NARRATORS[narrKey] || L.NARRATORS.guide;
+        const intro = hunt.intro || (L.HUNT_INTROS[spid] && L.HUNT_INTROS[spid][narrKey]) || 'The trail is fresh. Answer, and we begin.';
         /* questions: at least 1 creature-specific if pool exists */
         const rng = new U.Rng(U.newSeed());
         const specific = (L.HUNT_QUESTIONS_SPECIFIC[spid] || []);
@@ -118,8 +134,11 @@
           track.insertBefore(U.el('div', { cls: 'narrator-box mt', text: midTrackLine(spid, narrKey) }), qWrap);
           askQuestion(q2, () => {
             const bias = answers.filter(a => a === 'fierce').length - answers.filter(a => a === 'calm').length; // -2..2
+            /* snapshot the authored Hunt so an in-progress pursuit survives
+               even if the admin edits or deletes it mid-hunt */
             me.activeHunt = {
-              slotId: slot.id, speciesId: spid,
+              slotId: slot.id, huntId: hunt.id, huntName: hunt.name, speciesId: spid,
+              encounters: U.deepCopy(hunt.encounters || []), rewards: U.deepCopy(hunt.rewards || {}),
               encounterIdx: 0, answers, temperBias: bias / 2, /* hidden ~5% acquisition influence */
               losses: 0, startedAt: Date.now(), attemptStart: Date.now(),
             };
@@ -149,8 +168,9 @@
       function renderActiveHunt(body) {
         const hunt = me.activeHunt;
         const sp = SP.get(hunt.speciesId);
-        const encounters = huntEncounters(hunt.speciesId);
-        body.appendChild(U.el('h3', { cls: 'gold center', text: 'HUNT — ' + sp.name.toUpperCase() }));
+        const encounters = (hunt.encounters && hunt.encounters.length) ? hunt.encounters
+          : [{ name: (sp && sp.name) || 'The Quarry', desc: 'The quarry stands before you.', terrain: 'plains', enemies: [{ speciesId: hunt.speciesId, boss: true }] }];
+        body.appendChild(U.el('h3', { cls: 'gold center', text: 'HUNT — ' + (hunt.huntName || (sp && sp.name) || '').toUpperCase() }));
         /* encounter progress dots */
         const dots = U.el('div', { cls: 'encounter-dots' });
         encounters.forEach((e, i) => {
@@ -167,7 +187,7 @@
           cls: 'btn primary', text: '⚔ Fight encounter', onclick: () => {
             DYA.play.pickPouch(pouch => {
               DYA.play.startMatch({
-                mode: 'hunt', format: 'Hunt — ' + sp.name, skipSetup: true, noRecord: true,
+                mode: 'hunt', format: 'Hunt — ' + (hunt.huntName || (sp && sp.name) || 'Quarry'), skipSetup: true, noRecord: true,
                 hunt: { enemies: cur.enemies },
                 terrain: cur.terrain, pouch,
                 opponent: { name: 'The Wild' },
@@ -207,30 +227,38 @@
           if (hunt.failedOnce) score -= 0.2;
           score = U.clamp(score + G.titleBuff('huntScore'), 0.05, 1);
           const perfect = !hunt.failedOnce && hunt.losses === 0;
-          const ceil = EC.HUNT.ceilings[spid] || { gold: 500, okid: 3, ngakara: 3 };
-          const goldFloor = Math.round(ceil.gold * EC.HUNT.goldFloorRate);
-          const gold = Math.round(goldFloor + (ceil.gold - goldFloor) * score);
-          const okid = Math.round(ceil.okid * score);
-          const ngak = Math.round(ceil.ngakara * score);
+          /* rewards come from THIS individual creature's authored payout */
+          const rw = hunt.rewards || {};
+          const ceilGold = rw.gold != null ? rw.gold : 500;
+          const goldFloor = Math.round(ceilGold * EC.HUNT.goldFloorRate);
+          const gold = Math.round(goldFloor + (ceilGold - goldFloor) * score);
+          const okid = Math.round((rw.okid != null ? rw.okid : 3) * score);
+          const ngak = Math.round((rw.ngakara != null ? rw.ngakara : 3) * score);
           const rng = new U.Rng(U.newSeed());
-          /* rewards: 1 piece guaranteed; perfect runs have a hidden shot at a 2nd */
-          const pieces = [{ speciesId: spid, material: rng.pick(L.MATERIALS), from: 'Hunt', temperBias: hunt.temperBias, at: Date.now() }];
-          if (perfect && rng.chance(EC.HUNT.secondPieceChance)) pieces.push({ speciesId: spid, material: rng.pick(L.MATERIALS), from: 'Hunt (perfect)', temperBias: hunt.temperBias, at: Date.now() });
+          const mat = () => (rw.pieceMaterial && rw.pieceMaterial.trim()) || rng.pick(L.MATERIALS);
+          /* guaranteed pieces (author-set); perfect runs have a hidden shot at one more */
+          const pieceCount = Math.max(1, rw.pieces || 1);
+          const pieces = [];
+          for (let i = 0; i < pieceCount; i++) pieces.push({ speciesId: spid, material: mat(), from: 'Hunt', temperBias: hunt.temperBias, at: Date.now() });
+          const secondChance = rw.secondPieceChance != null ? rw.secondPieceChance : (EC.HUNT.secondPieceChance || 0);
+          if (perfect && rng.chance(secondChance)) pieces.push({ speciesId: spid, material: mat(), from: 'Hunt (perfect)', temperBias: hunt.temperBias, at: Date.now() });
           pieces.forEach(p => me.pieces.push(p));
           G.addGold(gold, true);
-          me.okid[Math.min(6, SP.get(spid).rarity[0])] += okid;
+          const spDef = SP.get(spid);
+          if (spDef) me.okid[Math.min(6, spDef.rarity[0])] += okid;
           me.ngakara += ngak;
           me.stats.huntsDone++;
-          me.huntCooldowns[spid] = Date.now() + EC.HUNT.cooldownMs; // 1 Nurtui per-creature cooldown
           me.huntSlots = me.huntSlots.filter(s => s.id !== hunt.slotId); // slot consumed on completion
           me.activeHunt = null;
           G.grantAchievement('first_hunt');
           if (perfect) G.grantAchievement('no_losses_hunt');
           G.save();
+          /* claim this individual creature for the whole world — it is now hunted */
+          if (hunt.huntId && M) M.markHunted(hunt.huntId, me.displayName);
           /* reward screen */
           const w = U.el('div', { cls: 'center' });
           w.appendChild(U.el('h2', { cls: 'gold', text: '✦ THE HUNT IS DONE ✦' }));
-          w.appendChild(U.el('p', { cls: 'muted mt', text: 'The ' + SP.get(spid).name + ' yields a piece of its truth.' }));
+          w.appendChild(U.el('p', { cls: 'muted mt', text: 'The ' + (hunt.huntName || (SP.get(spid) && SP.get(spid).name) || 'creature') + ' yields a piece of its truth.' }));
           w.appendChild(U.el('div', { cls: 'panel mt', html: '🦴 <b>' + pieces.length + '× crafting piece</b> (' + pieces.map(p => p.material).join(', ') + ')<br>🪙 +' + U.fmt(gold) + ' gold · ⬡ +' + okid + ' Okid · 🧪 +' + ngak + ' NgAkara' }));
           w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Take the piece to the Crafting bench to sing the token true.' }));
           const m = UI.modal(w, { sticky: true });
@@ -242,49 +270,6 @@
       }
     },
   });
-
-  /* encounter series per hunted creature: two lead-ins + the boss */
-  function huntEncounters(spid) {
-    const sets = {
-      su_naga: [
-        { name: 'The Shallows', desc: 'Raf Krabbi scuttle over the tide-rocks where the Naga was last seen. Clear them, quietly if you can.', enemies: [{ speciesId: 'raf_krabbi' }, { speciesId: 'raf_krabbi' }, { speciesId: 'harkal' }], terrain: 'ocean' },
-        { name: 'Blue Light Below', desc: 'Harkal frenzy where the water glows. Something below is feeding them scraps. It knows you are here.', enemies: [{ speciesId: 'harkal' }, { speciesId: 'harkal' }, { speciesId: 'hvaleia', rarity: 4 }], terrain: 'ocean' },
-        { name: 'THE SU NAGA', desc: 'The water goes calm. That is the most dangerous version of it.', enemies: [{ speciesId: 'su_naga', boss: true }, { speciesId: 'harkal' }], terrain: 'ocean' },
-      ],
-      ular_naga: [
-        { name: 'Broken Ground', desc: 'Gynge stir where the serpent passed. The ground itself is nervous.', enemies: [{ speciesId: 'gynge' }, { speciesId: 'gynge' }, { speciesId: 'rodak' }], terrain: 'mountain' },
-        { name: 'The Shed Skin', desc: 'A shed ridge-scale the size of a door. Kipsu scatter as you approach the molt-ground.', enemies: [{ speciesId: 'kipsu' }, { speciesId: 'kipsu' }, { speciesId: 'sru_vorn', rarity: 4 }], terrain: 'mountain' },
-        { name: 'THE ULAR NAGA', desc: 'Every head is watching you. The first one cannot be put down — the Guild certified that in blood.', enemies: [{ speciesId: 'ular_naga', boss: true }], terrain: 'mountain' },
-      ],
-      sru_vorn: [
-        { name: 'Edge of the Bog', desc: 'The Awvadhi pits bubble. Rodak scavenge the stockpiled kills — do not become one.', enemies: [{ speciesId: 'rodak' }, { speciesId: 'rodak' }], terrain: 'forest' },
-        { name: 'The Trap Line', desc: 'Acid pits, arranged. Farmed. It has been expecting visitors.', enemies: [{ speciesId: 'tonguatjis' }, { speciesId: 'raf_krabbi' }], terrain: 'forest' },
-        { name: 'THE SRU VORN', desc: 'It is lazy right up until it is not.', enemies: [{ speciesId: 'sru_vorn', boss: true }], terrain: 'forest' },
-      ],
-      lutut: [
-        { name: 'Under the Flight Line', desc: 'Harkal wheel beneath the cliffs, cleaning up what the Lutut drops.', enemies: [{ speciesId: 'harkal' }, { speciesId: 'harkal' }], terrain: 'mountain' },
-        { name: 'The Screech', desc: 'You hear it before you see it. Guild physicians describe the sensation as "unrecommended."', enemies: [{ speciesId: 'kuni_byrd_wild' }, { speciesId: 'albali_villtur' }], terrain: 'mountain' },
-        { name: 'THE LUTUT', desc: 'The apex predator of apex predators. It eats Ular Naga. Consider what that makes you.', enemies: [{ speciesId: 'lutut', boss: true }], terrain: 'mountain' },
-      ],
-      hvaleia: [
-        { name: 'The Pod’s Wake', desc: 'Smashed wreckage floats where the pod hunted. Krabbi pick the ruins.', enemies: [{ speciesId: 'raf_krabbi' }, { speciesId: 'raf_krabbi' }, { speciesId: 'harkal' }], terrain: 'ocean' },
-        { name: 'Eyes Everywhere', desc: 'It has already seen you. It saw you yesterday. Come loud, come honest.', enemies: [{ speciesId: 'harkal' }, { speciesId: 'hvaleia', rarity: 4 }], terrain: 'ocean' },
-        { name: 'THE HVALEIA', desc: 'Count its eyes and you will run out of numbers. Its underside is the only mercy it offers.', enemies: [{ speciesId: 'hvaleia', boss: true }], terrain: 'ocean' },
-      ],
-      tonguatjis: [
-        { name: 'Deep Forest Quiet', desc: 'Six days under one tree. The forest has gone quiet around it — even the Kipsu detour.', enemies: [{ speciesId: 'kipsu' }, { speciesId: 'wild_punk' }], terrain: 'forest' },
-        { name: 'The Flight Lines', desc: 'Stay off the paths flying things use. That is where the tongue works.', enemies: [{ speciesId: 'albali_villtur' }], terrain: 'forest' },
-        { name: 'THE TONGUATJIS', desc: 'A tongue many times longer than the creature. You will not see it coming. That is the point of it.', enemies: [{ speciesId: 'tonguatjis', boss: true }], terrain: 'forest' },
-      ],
-      kuni_byrd_wild: [
-        { name: 'The Cliff Shelf', desc: 'Bones below the nest shelf. Small ones. Medium ones. A few large ones.', enemies: [{ speciesId: 'rodak' }, { speciesId: 'kipsu' }], terrain: 'mountain' },
-        { name: 'The Shadow', desc: 'You won’t see the dive. You’ll see the shadow, and then you won’t see anything for a bit.', enemies: [{ speciesId: 'albali_villtur' }, { speciesId: 'kuni_byrd_wild', rarity: 3 }], terrain: 'mountain' },
-        { name: 'THE KUNI BYRD', desc: 'Bring something it can’t lift.', enemies: [{ speciesId: 'kuni_byrd_wild', boss: true }], terrain: 'mountain' },
-      ],
-    };
-    return sets[spid] || sets.sru_vorn;
-  }
-  DYA.huntEncounters = huntEncounters;
 
   /* ================= TOURNAMENTS ================= */
   const trnState = { filter: 'All' };
@@ -755,7 +740,9 @@
           }
           /* champion's Guild chest: gold, Okid, NgAkara — rarely a crafting piece */
           const rng = new U.Rng(U.newSeed());
-          const chest = { gold: rng.int(150, 600), okR: rng.int(0, 3), okQ: rng.int(1, 2), ng: rng.int(0, 3), piece: rng.chance(0.08) ? rng.pick(SP.huntable) : null };
+          const huntSpecies = (DYA.mods && DYA.mods.availableHunts().map(h => h.speciesId)) || [];
+          const chestPieceSpid = huntSpecies.length ? rng.pick(huntSpecies) : rng.pick(SP.craftable);
+          const chest = { gold: rng.int(150, 600), okR: rng.int(0, 3), okQ: rng.int(1, 2), ng: rng.int(0, 3), piece: rng.chance(0.08) ? chestPieceSpid : null };
           pay.chest = chest;
           const champAcc = champion && G.world.accounts[champion];
           if (champAcc) {
@@ -793,7 +780,7 @@
         G.world.season.winners.push({ name: me.displayName, circuit: t.circuit, tournament: t.name, at: Date.now() });
         /* hunt slot reward from bigger tournaments */
         if (EC.CIRCUITS.indexOf(t.circuit) >= 1) {
-          me.huntSlots.push({ id: U.uid('hs'), speciesId: null, source: 'tournament', expiresAtBand: Math.floor(me.level / 10) * 10 + 10 });
+          me.huntSlots.push({ id: U.uid('hs'), huntId: null, source: 'tournament', expiresAtBand: Math.floor(me.level / 10) * 10 + 10 });
         }
         /* title flow per circuit tier */
         const pool = t.titlePool.map(id => EC.TITLES.find(x => x.id === id)).filter(Boolean);
