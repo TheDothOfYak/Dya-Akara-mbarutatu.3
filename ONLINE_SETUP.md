@@ -12,7 +12,8 @@ works for everyone who plays your deployment.
 
 > **Already set up from an earlier version?** Just re-run `supabase/schema.sql` (Step 2) —
 > every statement is idempotent, so it only adds the new tables (`dya_listings` for the
-> shared market, `dya_config` for admin edits, `dya_accounts`/`dya_bans` for cross-device
+> shared market, `dya_tournaments`/`dya_tournament_players` for shared tournaments,
+> `dya_config` for admin edits, `dya_accounts`/`dya_bans` for cross-device
 > accounts) and leaves your existing data alone.
 
 ---
@@ -107,9 +108,9 @@ banning, or granting resources, exactly like any account created on that browser
   can disagree on floating-point trigonometry; the game detects this and warns you if it
   ever happens.
 - If your friend disconnects, you can claim the victory or wait for them.
-- Duels, tournaments and the matchmaking queue still run against the Dya'kukull (the 100
-  AI players) — online play covers **friends**, **private matches**, and the **shared
-  market**.
+- Duels and the matchmaking queue still run against the Dya'kukull (the 100 AI players);
+  online play covers **friends**, **private matches**, the **shared market**, and
+  **shared tournaments** (below).
 
 ## The shared market (real buy & sell)
 
@@ -124,6 +125,37 @@ Once online is configured, **Market → My Stall → ＋ New listing** offers a 
   sync, within ~20 seconds.
 - **🏪 Local stalls** — the old behavior: your own world's Dya'kukull market, offers and
   negotiation included.
+
+## Shared tournaments (real players, across devices)
+
+Once online is configured, tournaments are **real and shared** — every device sees the same
+open events in **Tournaments → Tournament Browser**.
+
+- **Create one for your friends.** ＋ Create tournament → leave **🌐 Online — friends can
+  join** ON. Set an optional **password** to keep it private. Your friends see it in their
+  own browser and **Join** from their own devices (a password prompt appears if you set one).
+- **Real players first.** Tournaments are for real players. The Dya'kukull only pad the
+  **empty** seats, and only when you **▶ Go live** — they never form a field by themselves,
+  and joining always seats a real player ahead of any filler.
+- **The bracket is shared.** Each player plays their own matches; the bracket fills in for
+  everyone as results come in (a human-vs-human pairing is decided by whoever plays first).
+- **Titles are official-only.** A friend's tournament plays for gold and glory. **Titles**
+  come only from **official season tournaments**, which you create and run from the Admin
+  Panel (below). The season-ending **Interplanetary** is one of these.
+
+Tables: `dya_tournaments` (one row per shared event, bracket and all) and
+`dya_tournament_players` (one row per **real** registrant — the AI are never stored here).
+
+### Official season tournaments (Admin Panel)
+
+In **`admin.html` → Tournaments** you can, with online configured:
+
+- **Create an official season tournament** — name, circuit, size, format, optional entry fee
+  and password. It's marked official (the only kind that awards titles) and hosted by the
+  Guild, so you don't need to take a seat yourself.
+- **▶ Make live** once your players have joined — real players are seated first, the
+  Dya'kukull pad any empty seats, and the bracket begins.
+- **Monitor** a running event's live bracket and standings.
 
 ## Admin edits reach every player
 

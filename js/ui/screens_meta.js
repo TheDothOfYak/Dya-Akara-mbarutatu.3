@@ -292,6 +292,18 @@
       page.appendChild(head);
       const body = U.el('div', { cls: 'page-body' });
 
+      const TO = DYA.tournamentsOnline;
+      const onlineOn = TO && TO.enabled && TO.enabled();
+      /* keep the shared list fresh while this screen is open */
+      if (onlineOn && Date.now() - (TO.state.lastFetch || 0) > 5000) TO.refresh();
+      if (onlineOn) {
+        const s = TO.state;
+        body.appendChild(U.el('p', { cls: 'small ' + (s.error ? '' : 'muted'), style: s.error ? 'color:var(--red)' : '',
+          text: s.tablesMissing ? '⚠ Online tournaments need the new tables — re-run supabase/schema.sql.'
+            : s.error ? '⚠ Online tournaments: ' + s.error
+            : '🌐 Online tournaments are ON — real players across every device share this browser. The Dya’kukull only fill empty seats.' }));
+      }
+
       /* season banner */
       body.appendChild(U.el('div', { cls: 'panel mb', style: 'display:flex;gap:14px;align-items:center' }, [
         U.el('div', { style: 'font-size:26px', text: '🏆' }),
@@ -303,17 +315,43 @@
       if (trnState.filter !== 'All') trns = trns.filter(t => t.circuit === trnState.filter);
       trns.sort((a, b) => EC.CIRCUITS.indexOf(a.circuit) - EC.CIRCUITS.indexOf(b.circuit));
       if (!trns.length) body.appendChild(U.el('p', { cls: 'muted', text: 'No open tournaments at this circuit. The Guild activates the Interplanetary when the season ripens.' }));
+      /* online events first — they're the real, shared ones */
+      trns.sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
       trns.forEach(t => {
         const card = U.el('div', { cls: 'panel mb tour-card', style: 'display:flex;gap:14px;align-items:center' });
+        const badge = t.online
+          ? (t.official ? U.el('span', { cls: 'pill gold', text: '🏛 OFFICIAL' }) : U.el('span', { cls: 'pill', text: '🌐 online' }))
+          : (t.sealed ? UI.guildSeal(18) : U.el('span', { cls: 'small muted', text: 'player-run' }));
+        const seatInfo = t.online
+          ? (t.state === 'open'
+              ? (t.registered ? t.registered.length : (t.players || []).length) + '/' + t.size + ' real players joined'
+              : t.size + ' players (Dya’kukull filled empty seats)')
+          : t.size + ' players';
         card.appendChild(U.el('div', { cls: 'flex1' }, [
           U.el('div', { cls: 'flex' }, [
             U.el('b', { cls: 'gold', text: t.name }),
-            t.sealed ? UI.guildSeal(18) : U.el('span', { cls: 'small muted', text: 'player-run' }),
+            badge,
+            t.online && t.hasPassword ? U.el('span', { cls: 'small muted', text: '🔒' }) : null,
           ]),
           U.el('div', { cls: 'small muted', text: t.circuit + ' circuit · ' + t.arena + ' · organizer: ' + t.organizer }),
-          U.el('div', { cls: 'small', html: 'Entry <b class="gold">' + U.fmt(t.entryFee) + 'g</b> · ' + t.size + ' players · pouch: ' + t.pouchFormat + (t.rules.length ? ' · <span style="color:var(--eldi)">special rules</span>' : '') + (t.sealed && EC.CIRCUITS.indexOf(t.circuit) >= 1 ? ' · <b>RANKED</b>' : '') }),
+          U.el('div', { cls: 'small', html: 'Entry <b class="gold">' + U.fmt(t.entryFee) + 'g</b> · ' + seatInfo + ' · pouch: ' + t.pouchFormat + (t.rules && t.rules.length ? ' · <span style="color:var(--eldi)">special rules</span>' : '') + (t.official ? ' · <b>TITLES</b>' : (t.sealed && EC.CIRCUITS.indexOf(t.circuit) >= 1 ? ' · <b>RANKED</b>' : '')) }),
         ]));
-        if (t.state === 'running' && t.players.includes(me.id)) {
+        if (t.online) {
+          const iAmIn = TO.iAmIn(t);
+          const iOrganize = t.organizerNetId && me.netId && t.organizerNetId === me.netId;
+          if (t.state === 'running') {
+            card.appendChild(U.el('button', { cls: 'btn ' + (iAmIn ? 'primary' : 'small ghost'), text: iAmIn ? 'Continue bracket' : 'Watch', onclick: () => UI.show('bracket', { trn: t }) }));
+          } else if (t.state === 'open') {
+            if (iAmIn) {
+              if (iOrganize) card.appendChild(U.el('button', { cls: 'btn primary', text: '▶ Go live', onclick: () => startOnline(t) }));
+              card.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Withdraw', onclick: () => { TO.leave(t).then(r => { if (r.err) UI.alert('Hm', r.err); UI.show('tournaments'); }); } }));
+            } else {
+              const minLv = EC.CIRCUIT_MIN_LEVEL[t.circuit];
+              if (me.level < minLv) card.appendChild(U.el('div', { cls: 'small muted', text: 'Requires level ' + minLv }));
+              else card.appendChild(U.el('button', { cls: 'btn', text: t.entryFee ? 'Join — ' + U.fmt(t.entryFee) + 'g' : 'Join', onclick: () => joinOnline(t) }));
+            }
+          }
+        } else if (t.state === 'running' && t.players.includes(me.id)) {
           card.appendChild(U.el('button', { cls: 'btn primary', text: 'Continue bracket', onclick: () => UI.show('bracket', { trn: t }) }));
         } else if (t.state === 'open') {
           const minLv = EC.CIRCUIT_MIN_LEVEL[t.circuit];
@@ -332,6 +370,42 @@
       page.appendChild(body);
       scr.appendChild(page);
       root.appendChild(scr);
+
+      /* live-refresh the browser when the shared list changes under us */
+      UI.onTournamentsUpdate = () => { if (scr.isConnected && UI.currentName === 'tournaments') UI.show('tournaments'); };
+
+      /* ---- online: join a shared tournament (password + pouch) ---- */
+      function joinOnline(t) {
+        function proceed(password) {
+          DYA.play.pickPouch(pouch => {
+            TO.join(t, pouch, password).then(r => {
+              if (r.err) { UI.alert('Could not join', r.err); return; }
+              UI.toast({ title: 'Joined', body: 'You have a seat in ' + t.name + '. It begins when the organizer goes live.', icon: '🏆' });
+              UI.show('tournaments');
+            });
+          }, { title: t.pouchFormat === 'random' ? 'Random pouch — pick a fallback' : 'Choose your tournament pouch' });
+        }
+        if (t.hasPassword) {
+          const w = U.el('div', {});
+          w.appendChild(U.el('h3', { cls: 'gold', text: 'Password required' }));
+          w.appendChild(U.el('p', { cls: 'small muted', text: 'This tournament is locked. Ask the organizer for the password.' }));
+          const pw = U.el('input', { cls: 'txt mt', type: 'password', placeholder: 'Tournament password' });
+          w.appendChild(pw);
+          const m = UI.modal(w);
+          w.appendChild(U.el('button', { cls: 'btn primary mt', text: 'Join', onclick: () => { const v = pw.value; m.close(); proceed(v); } }));
+        } else proceed(null);
+      }
+
+      /* ---- online: organizer goes live ---- */
+      function startOnline(t) {
+        UI.confirm('Go live?', 'Seats fill with your registered players first; the Dya’kukull only pad the empty seats (never a whole field). Start ' + t.name + '?', () => {
+          TO.start(t).then(r => {
+            if (r.err) { UI.alert('Not yet', r.err); return; }
+            UI.toast({ title: 'Tournament is live', body: r.reals + ' real player(s) seated' + (r.fillers ? ', ' + r.fillers + ' Dya’kukull filling in' : '') + '. To the bracket!', icon: '🏆' });
+            UI.show('bracket', { trn: G.world.tournaments[t.onlineId || t.id] || t });
+          });
+        });
+      }
 
       function createTournament() {
         const w = U.el('div', {});
@@ -376,17 +450,57 @@
         const sealBtn = U.el('button', { cls: 'btn small ghost mt', style: 'margin-left:6px', text: '🏛 Request Guild seal: OFF', title: 'Sealed events pay the organizer a creator reward (200g + 1 Okid + 1 NgAkara) at completion and the champion a Guild chest. You may enter — and win — your own event.' });
         sealBtn.onclick = () => { wantSeal = !wantSeal; sealBtn.textContent = '🏛 Request Guild seal: ' + (wantSeal ? 'ON' : 'OFF'); sealBtn.classList.toggle('ghost', !wantSeal); };
         w.appendChild(sealBtn);
+
+        /* ---- online: friends can join from their own devices ---- */
+        let online = onlineOn;
+        let pwInput = null;
+        if (onlineOn) {
+          const onlineBtn = U.el('button', { cls: 'btn small mt', style: 'display:block', text: '🌐 Online — friends can join: ON', title: 'An online tournament is shared across every device. Real players fill the seats; the Dya’kukull only pad what’s left. Titles come from official season events only.' });
+          onlineBtn.onclick = () => { online = !online; onlineBtn.textContent = '🌐 Online — friends can join: ' + (online ? 'ON' : 'OFF'); onlineBtn.classList.toggle('ghost', !online); pwWrap.style.display = online ? '' : 'none'; };
+          w.appendChild(onlineBtn);
+          const pwWrap = U.el('div', { cls: 'mt' });
+          pwWrap.appendChild(U.el('div', { cls: 'small muted', text: 'Password (optional — leave blank for an open tournament):' }));
+          pwInput = U.el('input', { cls: 'txt', type: 'text', placeholder: 'Tournament password', autocomplete: 'off' });
+          pwWrap.appendChild(pwInput);
+          w.appendChild(pwWrap);
+        } else {
+          w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Set up online play (Friends → Set up online play) to make a shared tournament your friends can join from their own devices.' }));
+        }
+
         const m = UI.modal(w);
         w.appendChild(U.el('button', {
           cls: 'btn primary mt', text: me.flags.tournamentLicense ? 'Create' : 'Buy license (200g) & create', onclick: () => {
+            if (nm.value.trim().length < 3) { UI.alert('Name it', 'Give the tournament a name (3+ characters).'); return; }
             if (!me.flags.tournamentLicense) {
               if (me.gold < 200) { UI.alert('Too poor', 'The license costs 200g.'); return; }
               G.addGold(-200); me.flags.tournamentLicense = true;
             }
-            if (nm.value.trim().length < 3) return;
             const bonusGold = parseInt(bonus.value) || 0;
             if (bonusGold > 0 && me.gold < bonusGold) { UI.alert('Too poor', 'You cannot pledge ' + U.fmt(bonusGold) + 'g you do not hold.'); return; }
             if (bonusGold > 0) G.addGold(-bonusGold);
+
+            if (online && onlineOn) {
+              /* shared, cross-device tournament — pick my seat pouch, then create */
+              m.close();
+              DYA.play.pickPouch(pouch => {
+                TO.create({
+                  name: nm.value.trim(), circuit: 'Local', sealed: wantSeal, official: false,
+                  entryFee: parseInt(fee.value) || 0, pouchFormat: fmt.value,
+                  size: parseInt(size.value), structure: struct.value, aftd,
+                  customReward: { gold: bonusGold, tokenId: null }, // token prizes aren't portable across devices
+                  terrainTokens: terrToks.slice(), terrain: 'plains',
+                  password: pwInput && pwInput.value.trim() ? pwInput.value.trim() : null,
+                  myPouch: pouch,
+                }).then(r => {
+                  if (r.err) { UI.alert('Could not create', r.err); return; }
+                  UI.toast({ title: 'Tournament created', body: 'Share it with your friends — they’ll see it in their Tournament Browser. Go live when everyone’s in.', icon: '🌐' });
+                  UI.show('tournaments');
+                });
+              }, { title: 'Choose your tournament pouch' });
+              return;
+            }
+
+            /* offline / local-only tournament (original behavior) */
             const t = {
               id: U.uid('trn'), name: nm.value.trim(), circuit: 'Local', sealed: wantSeal,
               organizer: me.displayName, organizerId: me.id, entryFee: parseInt(fee.value) || 0,
@@ -468,7 +582,8 @@
   /* ---------- bracket display (Part XII spec) ---------- */
   UI.register('bracket', {
     enter(root, params) {
-      const t = params.trn;
+      /* for online events, always render the freshest shared mirror */
+      const t = (params.trn && params.trn.online && G.world.tournaments[params.trn.id]) || params.trn;
       const me = G.me;
       const scr = U.el('div', { cls: 'screen' });
       scr.appendChild(UI.topbar({ title: 'Tournament' }));
@@ -563,12 +678,16 @@
       });
       views.Main();
 
-      /* the field plays around you: refresh when other matches resolve */
-      const sig = () => t.state + '|' + JSON.stringify(t.bracket ? t.bracket.map(r2 => r2.map(mm => mm.winner)) : null);
+      /* the field plays around you: refresh when other matches resolve. For
+         online events the shared mirror is swapped out under us on each poll,
+         so read the freshest copy from G.world.tournaments each tick. */
+      const cur = () => (t.online && G.world.tournaments[t.id]) || t;
+      const sig = () => { const c = cur(); return c.state + '|' + JSON.stringify(c.bracket ? c.bracket.map(r2 => r2.map(mm => mm.winner)) : null); };
       let lastSig = sig();
       const liveIv = setInterval(() => {
         if (!scr.isConnected) { clearInterval(liveIv); return; }
-        if (sig() !== lastSig) { lastSig = sig(); UI.show('bracket', { trn: t }); }
+        if (t.online && DYA.tournamentsOnline && Date.now() - (DYA.tournamentsOnline.state.lastFetch || 0) > 5000) DYA.tournamentsOnline.refresh();
+        if (sig() !== lastSig) { lastSig = sig(); UI.show('bracket', { trn: cur() }); }
       }, 5000);
       this.leave = () => clearInterval(liveIv);
 
@@ -624,6 +743,9 @@
             opponent: { name: opp.displayName, accId: opp.id, aiSkill: opp.aiCfg ? opp.aiCfg.matchSkill : 0.7, pouch: DYA.play.accountPouch(opp), simulatedHuman: true },
             pouch,
             onFinish: (res, iWon) => {
+              /* online: the shared bracket is authoritative — report the result
+                 and let the poll fill in the rest of the field */
+              if (t.online) { onlineMatchDone(iWon); return; }
               mt.winner = iWon ? me.id : oppId;
               if (t.aftd) DYA.aftd.afterMatch(t, res);
               advanceBracket(); /* advances only when the whole round is played */
@@ -646,8 +768,51 @@
           });
         }
 
-        /* Planet+ : pick 3 titles before the final */
-        if (isFinal && (t.circuit === 'Whole Planet' || t.circuit === 'Interplanetary') && t.titlePool.length && !t.myTitlePicks) {
+        /* online: write my result to the shared bracket, then settle/notify */
+        function onlineMatchDone(iWon) {
+          const winnerLocalId = iWon ? me.id : oppId;
+          DYA.tournamentsOnline.reportMatch(t, ri, mi, winnerLocalId).then(r => {
+            if (r.err) { UI.alert('Sync problem', r.err); UI.show('bracket', { trn: t }); return; }
+            const t2 = r.mir || G.world.tournaments[t.onlineId || t.id] || t;
+            if (r.already) UI.toast({ title: 'Already decided', body: 'Your opponent reported this pairing first. The bracket stands.', icon: '🏆' });
+            if (t2.state === 'done') {
+              const sum = DYA.tournamentsOnline.settleLocal(t2);
+              onlineComplete(t2, sum, iWon);
+            } else {
+              if (!iWon && t2.structure !== 'rr') UI.toast({ title: 'Eliminated', body: 'The bracket plays on without you — watch it fill in from here.', icon: '🏆' });
+              else UI.toast({ title: 'Match recorded', body: 'Waiting on the rest of the field — the bracket advances as players finish.', icon: '🏆' });
+              UI.show('bracket', { trn: t2 });
+            }
+          });
+        }
+
+        /* online completion modal — champion picks a title only for OFFICIAL events */
+        function onlineComplete(t2, sum, iWon) {
+          if (!sum) { UI.show('bracket', { trn: t2 }); return; }
+          const w = U.el('div', { cls: 'center' });
+          if (sum.champion) {
+            w.appendChild(U.el('h2', { cls: 'gold', text: '🏆 CHAMPION 🏆' }));
+            w.appendChild(U.el('p', { cls: 'mt', html: 'Winner of <b>' + U.esc(t2.name) + '</b><br>🪙 +' + U.fmt(sum.gold) + 'g' + (sum.xp ? ' · ⭐ +' + sum.xp + ' XP' : '') }));
+          } else {
+            w.appendChild(U.el('h2', { cls: 'gold', text: 'Tournament over' }));
+            w.appendChild(U.el('p', { cls: 'mt', html: U.esc(sum.championName) + ' takes the championship.' + (sum.gold ? '<br>Your placement share: 🪙 +' + U.fmt(sum.gold) + 'g' + (sum.xp ? ' · ⭐ +' + sum.xp + ' XP' : '') : '') }));
+          }
+          const m = UI.modal(w, { sticky: true });
+          function finish() { m.close(); if (sum.xp) { const evs = G.addXP(sum.xp); evs.forEach(ev => DYA.play.showLevelUp(ev)); } UI.refreshTopbar(); UI.show('tournaments'); }
+          if (sum.champion && sum.official && sum.titlePool.length) {
+            w.appendChild(U.el('p', { cls: 'muted mt', text: 'Official season title — choose one to keep:' }));
+            sum.titlePool.slice(0, 6).forEach(tt => {
+              w.appendChild(U.el('button', { cls: 'btn ghost q-opt', text: tt.name + ' — ' + tt.desc, onclick: () => { if (!me.titles.includes(tt.id)) me.titles.push(tt.id); G.save(); finish(); } }));
+            });
+          } else {
+            if (sum.champion && !sum.official) w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Titles are awarded only by official season tournaments. This one was for gold and glory.' }));
+            w.appendChild(U.el('button', { cls: 'btn primary mt', text: 'Claim', onclick: finish }));
+          }
+          if (sum.champion) DYA.audio.play('victory');
+        }
+
+        /* Planet+ : pick 3 titles before the final (official events only) */
+        if (isFinal && !t.online && t.official && (t.circuit === 'Whole Planet' || t.circuit === 'Interplanetary') && t.titlePool.length && !t.myTitlePicks) {
           const pool = t.titlePool.map(id => EC.TITLES.find(x => x.id === id)).filter(Boolean);
           const picks = [];
           const w = U.el('div', {});
@@ -782,8 +947,9 @@
         if (EC.CIRCUITS.indexOf(t.circuit) >= 1) {
           me.huntSlots.push({ id: U.uid('hs'), huntId: null, source: 'tournament', expiresAtBand: Math.floor(me.level / 10) * 10 + 10 });
         }
-        /* title flow per circuit tier */
-        const pool = t.titlePool.map(id => EC.TITLES.find(x => x.id === id)).filter(Boolean);
+        /* title flow per circuit tier — titles come from OFFICIAL season
+           tournaments only (Interplanetary + Admin-run official events) */
+        const pool = (t.official ? t.titlePool : []).map(id => EC.TITLES.find(x => x.id === id)).filter(Boolean);
         const w = U.el('div', { cls: 'center' });
         w.appendChild(U.el('h2', { cls: 'gold', text: '🏆 CHAMPION 🏆' }));
         w.appendChild(U.el('p', { cls: 'mt', html: 'Winner of <b>' + U.esc(t.name) + '</b><br>🪙 +' + U.fmt(gold) + 'g · ⭐ +' + xp + ' XP' }));

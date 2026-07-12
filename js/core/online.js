@@ -278,6 +278,8 @@
     O.state.friends = []; O.state.incoming = []; O.state.outgoing = [];
     /* the shared online market rides the same auth lifecycle */
     if (DYA.marketOnline) DYA.marketOnline.onAuthChange();
+    /* so do the shared online tournaments */
+    if (DYA.tournamentsOnline) DYA.tournamentsOnline.onAuthChange();
     const me = O.me();
     if (!me || !O.configured()) return;
     ensureRegistered().then(ok => { if (ok) O.refresh(); });
