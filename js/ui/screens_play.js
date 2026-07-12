@@ -1040,9 +1040,14 @@
       const oppStatus = U.el('p', { cls: 'mt', text: 'Voting…' });
       right.appendChild(oppStatus);
       const chat = U.el('div', { cls: 'mt' });
+      const say = (msg) => UI.toast({ title: G.me.displayName, body: msg, icon: '💬' });
       L.QUICK_CHAT.slice(0, 4).forEach(q => {
-        chat.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:2px', text: q, onclick: () => UI.toast({ title: G.me.displayName, body: q, icon: '💬' }) }));
+        chat.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:2px', text: q, onclick: () => say(q) }));
       });
+      /* free-text typing */
+      const chatType = U.el('input', { cls: 'txt mt', maxlength: 120, placeholder: 'Type a message…' });
+      chatType.addEventListener('keydown', e => { if (e.key === 'Enter') { const t = chatType.value.trim(); if (t) { say(t); chatType.value = ''; } } });
+      chat.appendChild(chatType);
       right.appendChild(chat);
       wrap.appendChild(right);
       scr.appendChild(wrap);
@@ -1172,6 +1177,13 @@
         w.appendChild(U.el('h3', { cls: 'gold', text: 'Quick chat' }));
         const m = UI.modal(w);
         L.QUICK_CHAT.forEach(q => w.appendChild(U.el('button', { cls: 'btn small ghost q-opt', text: q, onclick: () => { sendInput({ type: 'chat', msg: q }); m.close(); } })));
+        /* free-text typing */
+        const inp = U.el('input', { cls: 'txt', maxlength: 120, placeholder: 'Type a message…', style: 'flex:1' });
+        const sendTyped = () => { const t = inp.value.trim(); if (!t) return; sendInput({ type: 'chat', msg: t }); m.close(); };
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendTyped(); } });
+        const typeRow = U.el('div', { style: 'display:flex;gap:4px;margin-top:8px' }, [inp, U.el('button', { cls: 'btn small primary', text: 'Send', onclick: sendTyped })]);
+        w.appendChild(typeRow);
+        setTimeout(() => inp.focus(), 0);
       };
       scr.appendChild(chatBtn);
 
@@ -1373,6 +1385,9 @@
       /* keyboard: space + 2–5 trigger readied at cursor (rebindable);
          Shift readies the centered wheel card; A/D or W/S turn the wheel */
       const keyHandler = (e) => {
+        /* don't hijack keystrokes while the player is typing in a chat/text field */
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
         if (M.over) return;
         if (costPicker) return; /* additional-cost picker owns the keyboard */
         const c = me.settings.controls;
@@ -1791,7 +1806,13 @@
       const chatBox = U.el('div', { cls: 'duel-chat' });
       const chatIn = U.el('div', { cls: 'duel-chat-in' });
       L.QUICK_CHAT.forEach(q => chatIn.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:1px', text: q, onclick: () => sayMine(q) })));
-      chatBox.appendChild(chatLog); chatBox.appendChild(chatIn);
+      /* free-text typing alongside the quick-chat phrases */
+      const chatType = U.el('input', { cls: 'txt', maxlength: 120, placeholder: 'Type a message…', style: 'flex:1;min-width:120px' });
+      const sendTyped = () => { const t = chatType.value.trim(); if (!t || launched) return; sayMine(t); chatType.value = ''; };
+      chatType.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendTyped(); } });
+      const chatSend = U.el('button', { cls: 'btn small primary', style: 'margin:1px', text: 'Send', onclick: sendTyped });
+      const chatTypeRow = U.el('div', { style: 'display:flex;gap:4px;margin-top:4px' }, [chatType, chatSend]);
+      chatBox.appendChild(chatLog); chatBox.appendChild(chatIn); chatBox.appendChild(chatTypeRow);
       function addChat(cls, who, text) {
         const msg = U.el('div', { cls: 'duel-msg ' + cls });
         if (who) msg.appendChild(U.el('span', { cls: 'who', text: who }));
