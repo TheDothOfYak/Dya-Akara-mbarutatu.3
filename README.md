@@ -21,16 +21,19 @@ python3 -m http.server 8000
 
 **Free permanent hosting:** every push to `main` auto-deploys to two places:
 - **GitHub Pages** — `https://<your-username>.github.io/Dya-Akara-mbarutatu.3/` (`.github/workflows/deploy-pages.yml`). Requires Settings → Pages → Source → **GitHub Actions**, once.
-- **Firebase Hosting** — `https://<your-firebase-project>.web.app` (`.github/workflows/deploy-firebase.yml`). Requires a one-time `FIREBASE_TOKEN` repository secret — see below.
+- **Firebase Hosting** — `https://<your-firebase-project>.web.app` (`.github/workflows/deploy-firebase.yml`). Requires a one-time `FIREBASE_SERVICE_ACCOUNT` repository secret — see below.
 
 Both serve the exact same static files, so both stay in sync automatically from now on.
 
 <details>
 <summary>One-time Firebase Hosting setup (only needed once, by whoever owns the Firebase project)</summary>
 
-1. `npm install -g firebase-tools` (if you don't have it), then `firebase login:ci` — this opens a browser once and prints a long token in your terminal.
-2. GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → name it `FIREBASE_TOKEN`, paste the token as the value.
-3. Push anything to `main` (or re-run the "Deploy Dya'Akara to Firebase Hosting" workflow from the Actions tab) — it deploys to the Firebase project named in `.firebaserc` (`dya-akara` by default).
+Uses a service account key rather than `firebase login:ci` — the CI-token login is deprecated and increasingly gets rejected (401) by Firebase's newer Hosting API.
+
+1. [Firebase Console](https://console.firebase.google.com) → your project → gear icon → **Project settings** → **Service accounts** tab → **Generate new private key**. This downloads a `.json` file — keep it safe, it's a real credential.
+2. Open that file in a text editor and copy its *entire* contents.
+3. GitHub repo → **Settings → Secrets and variables → Actions → New repository secret** → name it `FIREBASE_SERVICE_ACCOUNT` → paste the whole JSON as the value.
+4. Push anything to `main` (or re-run the "Deploy Dya'Akara to Firebase Hosting" workflow from the Actions tab) — it deploys to the Firebase project named in `.firebaserc` (`dya-akara` by default).
 </details>
 
 Create an account (email/password — cross-device when online is configured, otherwise stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
