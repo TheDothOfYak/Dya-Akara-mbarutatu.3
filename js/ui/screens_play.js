@@ -1177,13 +1177,6 @@
         w.appendChild(U.el('h3', { cls: 'gold', text: 'Quick chat' }));
         const m = UI.modal(w);
         L.QUICK_CHAT.forEach(q => w.appendChild(U.el('button', { cls: 'btn small ghost q-opt', text: q, onclick: () => { sendInput({ type: 'chat', msg: q }); m.close(); } })));
-        /* free-text typing */
-        const inp = U.el('input', { cls: 'txt', maxlength: 120, placeholder: 'Type a message…', style: 'flex:1' });
-        const sendTyped = () => { const t = inp.value.trim(); if (!t) return; sendInput({ type: 'chat', msg: t }); m.close(); };
-        inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendTyped(); } });
-        const typeRow = U.el('div', { style: 'display:flex;gap:4px;margin-top:8px' }, [inp, U.el('button', { cls: 'btn small primary', text: 'Send', onclick: sendTyped })]);
-        w.appendChild(typeRow);
-        setTimeout(() => inp.focus(), 0);
       };
       scr.appendChild(chatBtn);
 
@@ -1385,9 +1378,6 @@
       /* keyboard: space + 2–5 trigger readied at cursor (rebindable);
          Shift readies the centered wheel card; A/D or W/S turn the wheel */
       const keyHandler = (e) => {
-        /* don't hijack keystrokes while the player is typing in a chat/text field */
-        const ae = document.activeElement;
-        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
         if (M.over) return;
         if (costPicker) return; /* additional-cost picker owns the keyboard */
         const c = me.settings.controls;
