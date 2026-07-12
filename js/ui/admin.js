@@ -1089,6 +1089,11 @@
     /* ---------- ENCOUNTERS (full width) ---------- */
     w.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Encounter chain' }));
     w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Each encounter is one match on the way to the kill. Enemies: one per line as "speciesId [rarity] [boss]" — e.g. "harkal" or "su_naga 4 boss". The last enemy of the final encounter is the creature itself.' }));
+    /* copyable reference of valid species ids — the enemy lines need ids, not names */
+    const idRef = U.el('details', { cls: 'mb' });
+    idRef.appendChild(U.el('summary', { cls: 'small gold', style: 'cursor:pointer', text: 'Species ids you can use as enemies (' + SP.list.length + ')' }));
+    idRef.appendChild(U.el('div', { cls: 'small muted', style: 'max-height:120px;overflow:auto;font-family:monospace;font-size:11px;line-height:1.6;margin-top:4px', text: SP.list.map(s => s.id).sort().join('  ·  ') }));
+    w.appendChild(idRef);
     const terrainOpts = L.TERRAIN_SETS.map(t => [t.id, t.name]);
     const encWrap = U.el('div', {});
     w.appendChild(encWrap);
@@ -1164,6 +1169,13 @@
           enemies: (e.enemies && e.enemies.length) ? e.enemies : [{ speciesId: work.speciesId, boss: true }],
         }));
         if (!work.encounters.length) work.encounters = [{ name: 'The Quarry', desc: '', terrain: 'plains', enemies: [{ speciesId: work.speciesId, boss: true }] }];
+        /* block unknown enemy species — a mistyped id would otherwise crash the hunt */
+        const badIds = [];
+        work.encounters.forEach(e => e.enemies.forEach(en => { if (!SP.get(en.speciesId)) badIds.push(en.speciesId); }));
+        if (badIds.length) {
+          alert('Unknown enemy species: ' + [...new Set(badIds)].join(', ') + '\n\nUse a real species id (see the Creatures tab). Fix or remove these lines before saving.');
+          return;
+        }
         M.setHunt(work);
         closeAll();
       },

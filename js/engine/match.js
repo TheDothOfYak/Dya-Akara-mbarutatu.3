@@ -128,6 +128,8 @@
     /* hunt mode: spawn wild side */
     if (M.mode === 'hunt' && cfg.hunt) {
       cfg.hunt.enemies.forEach((e, i) => {
+        /* never crash a hunt on a mistyped enemy species — just skip it */
+        if (!e.tok && !SP.get(e.speciesId)) { console.warn('hunt: skipping unknown enemy species', e.speciesId); return; }
         const tok = e.tok || TK.mint({ speciesId: e.speciesId, rng: M.rng, rarity: e.rarity });
         const cx = WORLD.w * 0.72 + M.rng.range(-90, 90), cy = WORLD.h / 2 + M.rng.range(-190, 190);
         const c = M.spawnFromToken(tok, 1, cx, cy);
