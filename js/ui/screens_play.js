@@ -208,7 +208,7 @@
             P.startMatch({
               mode: 'standard', ranked: false, format: 'Quick Play vs AI (' + d + ')',
               opponent: { name: 'Dya’kukull ' + d, aiSkill: G.aiSkill({ aiCfg: { matchSkill: AI_SKILL[d] } }), pouch: P.aiPouch(AI_SKILL[d]) },
-              pouch, skipSetup: true, vsAI: true,
+              pouch, vsAI: true,
             });
           });
         },
@@ -330,34 +330,30 @@
       const statusEl = U.el('p', { cls: 'muted mt', text: 'Connecting to the room service…' });
       wait.appendChild(codeEl); wait.appendChild(statusEl);
       const wm = UI.modal(wait, { sticky: true });
-      let room = null, started = false, startPayload = null, closed = false;
+      let room = null, started = false, closed = false;
       wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Close room', onclick: () => { closed = true; if (room) room.leave(); wm.close(); } }));
       try {
         room = await DYA.netplay.joinRoom(code, myProfile(pouch).id, {
           onMessage(msg) {
             if (!msg) return;
             if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) { P._netSession.route(msg); return; }
+            /* pre-match voting messages route to the setup screen */
+            if (P._netSetup && (msg.t === 'vote' || msg.t === 'ready' || msg.t === 'start')) { P._netSetup.route(msg); return; }
             if (msg.t === 'hello') {
+              if (closed) return;
               if (started) {
-                /* same guest asking again (lost our start): resend */
-                if (startPayload && msg.id === startPayload.guest.id) room.send(startPayload.wire);
+                /* guest re-sent hello (lost our setup): rebroadcast, or reject a third player */
+                if (P._netSetup && P._netSetup.isHost && P._netSetup.guestId === msg.id) P._netSetup.onHello(msg);
                 else room.send({ t: 'full' });
                 return;
               }
               started = true;
-              statusEl.textContent = msg.name + ' joined! Starting…';
               DYA.audio.play('notify');
+              wm.close();
               const host = myProfile(pouch);
-              const info = {
-                seed: U.newSeed(),
-                terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)],
-                settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
-                host,
-                guest: { id: msg.id, name: msg.name, level: msg.level, avatarIdx: msg.avatarIdx, seal: msg.seal, startRes: msg.startRes || 0, pouch: msg.pouch },
-              };
-              startPayload = { guest: info.guest, wire: { t: 'start', info: { seed: info.seed, terrain: info.terrain, settings: info.settings, host } } };
-              room.send(startPayload.wire);
-              setTimeout(() => { if (!closed) { wm.close(); launchNetMatch(room, 0, info, pouch); } }, 700);
+              const guest = { id: msg.id, name: msg.name, level: msg.level, avatarIdx: msg.avatarIdx, seal: msg.seal, startRes: msg.startRes || 0, pouch: msg.pouch };
+              /* the host and guest now VOTE on pulse settings together before the match */
+              UI.show('netMatchSetup', { role: 'host', room, host, guest, pouch, oppVote: msg.vote });
             }
           },
           onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
@@ -384,8 +380,17 @@
           onMessage(msg) {
             if (!msg) return;
             if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) { P._netSession.route(msg); return; }
+            /* pre-match voting messages route to the setup screen once it's open */
+            if (P._netSetup && (msg.t === 'vote' || msg.t === 'ready' || msg.t === 'start')) { P._netSetup.route(msg); return; }
             if (launched || closed) return;
-            if (msg.t === 'start') {
+            if (msg.t === 'setup') {
+              /* host answered — both players now VOTE on settings before the match */
+              launched = true; // stop the hello retries; the setup screen owns the flow now
+              clearInterval(helloTimer);
+              wm.close();
+              UI.show('netMatchSetup', { role: 'guest', room, host: msg.host, guest: prof, pouch, oppVote: msg.hostVote });
+            } else if (msg.t === 'start') {
+              /* fallback: a host on the old (no-vote) build */
               launched = true;
               clearInterval(helloTimer);
               const info = {
@@ -403,7 +408,7 @@
           onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
         });
         statusEl.textContent = 'Connected — waiting for the host to answer…';
-        const hello = { t: 'hello', id: prof.id, name: prof.name, level: prof.level, avatarIdx: prof.avatarIdx, seal: prof.seal, startRes: prof.startRes, pouch: prof.pouch };
+        const hello = { t: 'hello', id: prof.id, name: prof.name, level: prof.level, avatarIdx: prof.avatarIdx, seal: prof.seal, startRes: prof.startRes, pouch: prof.pouch, vote: { interval: 8, amount: 2, mode: 'Standard' } };
         room.send(hello);
         let tries = 0;
         helloTimer = setInterval(() => {
@@ -464,6 +469,177 @@
       });
     });
   };
+
+  /* ============ ONLINE PRE-MATCH VOTING (two-device private match) ============
+     Both players vote on pulse settings over the room channel; the HOST is
+     authoritative on the final match parameters (seed, terrain, settings) and
+     ships them in the 'start' message, so the two lockstep sims stay identical
+     exactly as before — the vote only decides what the host computes. */
+  function normalizeVote(v) {
+    v = v || {};
+    return {
+      interval: EC.PULSE_INTERVALS.indexOf(v.interval) >= 0 ? v.interval : 8,
+      amount: EC.PULSE_AMOUNTS.indexOf(v.amount) >= 0 ? v.amount : 2,
+      mode: v.mode === 'Chaos' ? 'Chaos' : 'Standard',
+    };
+  }
+  function middleGround(a, b) {
+    return {
+      pulseInterval: Math.round((a.interval + b.interval) / 2),
+      pulseAmount: Math.round((a.amount + b.amount) / 2),
+      chaos: a.mode === 'Chaos' && b.mode === 'Chaos',
+    };
+  }
+
+  UI.register('netMatchSetup', {
+    enter(root, cfg) {
+      const isHost = cfg.role === 'host';
+      const room = cfg.room;
+      const myVote = { interval: 8, amount: 2, mode: 'Standard' };
+      let oppVote = normalizeVote(cfg.oppVote);
+      let meReady = false, oppReady = false, done = false;
+      let terrain = 'plains';
+
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Match Setup — Online' }));
+      const wrap = U.el('div', { cls: 'setup-wrap' });
+
+      /* left: my pouch */
+      const left = U.el('div', { cls: 'setup-col panel' });
+      left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your pouch — ' + G.me.displayName }));
+      const pl = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(78px,1fr))' });
+      cfg.pouch.forEach(t => pl.appendChild(UI.tokenCard(t, { size: 56, mode: 'minimal' })));
+      left.appendChild(pl);
+      wrap.appendChild(left);
+
+      /* center: voting */
+      const mid = U.el('div', { cls: 'setup-col panel', style: 'max-width:420px' });
+      let timeLeft = 30;
+      const timer = U.el('div', { cls: 'setup-timer', text: timeLeft });
+      mid.appendChild(timer);
+      mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Both players vote — the middle ground wins. The host locks it in.' }));
+      const oppRefreshers = [];
+      function voteRow(label, opts, key, fmt) {
+        const row = U.el('div', { cls: 'vote-row' });
+        row.appendChild(U.el('div', { cls: 'muted small', text: label }));
+        const wrap2 = U.el('div', { cls: 'vote-opts' });
+        const cells = opts.map(o => {
+          const b = U.el('div', { cls: 'vote-opt' + (myVote[key] === o ? ' mine' : '') + (oppVote[key] === o ? ' theirs' : ''), text: fmt ? fmt(o) : o });
+          b.onclick = () => {
+            myVote[key] = o;
+            U.qsa('.vote-opt', wrap2).forEach((x, i) => x.classList.toggle('mine', opts[i] === o));
+            DYA.audio.play('click');
+            sendVote();
+          };
+          wrap2.appendChild(b);
+          return b;
+        });
+        oppRefreshers.push(() => cells.forEach((b, i) => b.classList.toggle('theirs', oppVote[key] === opts[i])));
+        row.appendChild(wrap2);
+        return row;
+      }
+      mid.appendChild(voteRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, 'interval', v => v + 's'));
+      mid.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
+      mid.appendChild(voteRow('MODE — Chaos randomizes every pulse (both must agree)', ['Standard', 'Chaos'], 'mode'));
+      mid.appendChild(U.el('p', { cls: 'small muted', html: '◆ = opponent’s current vote' }));
+      function refreshOpp() { oppRefreshers.forEach(fn => fn()); }
+      /* terrain — the host is the organizer (design Part XV) */
+      if (isHost) {
+        const terrRow = U.el('div', { cls: 'vote-row' });
+        terrRow.appendChild(U.el('div', { cls: 'muted small', text: 'TERRAIN SET — you are the organizer' }));
+        const tSel = U.el('select', { cls: 'txt mt', style: 'max-width:280px' });
+        DYA.lore.TERRAIN_SETS.filter(t => t.basic).forEach(t => tSel.appendChild(U.el('option', { value: t.id, text: t.name })));
+        tSel.value = terrain;
+        tSel.onchange = () => { terrain = tSel.value; };
+        terrRow.appendChild(tSel);
+        mid.appendChild(terrRow);
+      } else {
+        mid.appendChild(U.el('p', { cls: 'muted small mt', html: 'TERRAIN — <span class="gold">set by the host</span> (the organizer).' }));
+      }
+      const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready' });
+      mid.appendChild(readyBtn);
+      wrap.appendChild(mid);
+
+      /* right: opponent */
+      const right = U.el('div', { cls: 'setup-col panel' });
+      const oppProfile = isHost ? cfg.guest : cfg.host;
+      right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Opponent — ' + (oppProfile ? oppProfile.name : '…') }));
+      right.appendChild(U.el('p', { cls: 'muted small', text: 'Private online match — live opponent.' }));
+      if (oppProfile && oppProfile.pouch && oppProfile.pouch.length) {
+        const og = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(78px,1fr))' });
+        oppProfile.pouch.forEach(t => og.appendChild(UI.tokenCard(t, { size: 56, mode: 'minimal' })));
+        right.appendChild(og);
+      }
+      const oppStatus = U.el('p', { cls: 'mt', text: 'Voting…' });
+      right.appendChild(oppStatus);
+      wrap.appendChild(right);
+      scr.appendChild(wrap);
+      root.appendChild(scr);
+
+      /* ---- networking ---- */
+      function sendVote() { try { room.send({ t: 'vote', vote: myVote }); } catch (e) { } }
+      function sendSetup() { try { room.send({ t: 'setup', host: cfg.host, hostVote: myVote }); } catch (e) { } }
+      if (isHost) sendSetup();
+      sendVote();
+
+      const session = {
+        isHost,
+        guestId: cfg.guest ? cfg.guest.id : null,
+        onHello(msg) { if (msg.vote) { oppVote = normalizeVote(msg.vote); refreshOpp(); } sendSetup(); sendVote(); },
+        route(msg) {
+          if (msg.t === 'vote') { oppVote = normalizeVote(msg.vote); refreshOpp(); }
+          else if (msg.t === 'ready') { oppReady = true; oppStatus.textContent = '✓ Ready.'; if (isHost && meReady) hostFinish(); }
+          else if (msg.t === 'start' && !isHost) { guestLaunch(msg.info); }
+        },
+      };
+      P._netSetup = session;
+
+      const iv = setInterval(() => {
+        if (done) return;
+        timeLeft--;
+        timer.textContent = timeLeft;
+        if (timeLeft <= 5) timer.classList.add('urgent');
+        if (timeLeft <= 0) {
+          if (isHost) hostFinish();
+          else { timer.textContent = '…'; readyBtn.disabled = 'true'; readyBtn.textContent = 'Waiting for the host to lock the match…'; }
+        }
+      }, 1000);
+
+      readyBtn.onclick = () => {
+        meReady = true;
+        readyBtn.textContent = isHost ? '✓ Locking when the opponent readies…' : '✓ Waiting for the host…';
+        try { room.send({ t: 'ready' }); } catch (e) { }
+        if (isHost && oppReady) hostFinish();
+      };
+
+      function cleanup() { done = true; clearInterval(iv); if (P._netSetup === session) P._netSetup = null; }
+
+      function hostFinish() {
+        if (done) return;
+        cleanup();
+        const settings = middleGround(myVote, oppVote);
+        const info = { seed: U.newSeed(), terrain, settings, host: cfg.host, guest: cfg.guest };
+        try { room.send({ t: 'start', info: { seed: info.seed, terrain: info.terrain, settings: info.settings, host: cfg.host } }); } catch (e) { }
+        launchNetMatch(room, 0, info, cfg.pouch);
+      }
+      function guestLaunch(hostInfo) {
+        if (done) return;
+        cleanup();
+        const info = { seed: hostInfo.seed, terrain: hostInfo.terrain, settings: hostInfo.settings, host: hostInfo.host, guest: cfg.guest };
+        launchNetMatch(room, 1, info, cfg.pouch);
+      }
+
+      this.leave = () => {
+        clearInterval(iv);
+        if (!done) {
+          /* left the setup without starting — abandon the room */
+          done = true;
+          if (P._netSetup === session) P._netSetup = null;
+          try { room.leave(); } catch (e) { }
+        }
+      };
+    },
+  });
 
   /* ================= MATCH SETUP (vote system) ================= */
   /* cfg: {mode, ranked, format, opponent:{name, aiSkill, pouch, simulatedHuman}, pouch, skipSetup, terrain, tournament, onFinish} */
