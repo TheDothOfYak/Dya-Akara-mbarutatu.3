@@ -173,7 +173,7 @@
   }
 
   /* ---------- main panel ---------- */
-  const NAV = ['Overview', 'Creatures', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
+  const NAV = ['Overview', 'Creatures', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'All Tokens', 'Token Limits', 'Tournaments', 'Bans & Appeals', 'New Users', 'Flagged Tokens', 'Announcements', 'God Mode'];
   function panel() {
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap' });
@@ -652,9 +652,10 @@
         U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Famous name (optional)' }), fname]),
         U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Name editable?' }), editSel]),
         U.el('button', {
-          cls: 'btn primary', text: 'Spawn', onclick: () => {
-            const r = G.admin.spawnToken(acc.value, spc.value, parseInt(rar.value), { name: fname.value.trim() || null, nameEditable: editSel.value === 'yes' });
+          cls: 'btn primary', text: 'Spawn', onclick: async () => {
+            const r = await G.admin.spawnToken(acc.value, spc.value, parseInt(rar.value), { name: fname.value.trim() || null, nameEditable: editSel.value === 'yes' });
             if (r.tok) alert('Spawned "' + r.tok.name + '" into ' + G.world.accounts[acc.value].displayName + '\'s collection.' + (r.tok.nameLocked ? ' (name locked)' : ''));
+            else if (r.err) alert(r.err);
           },
         }),
       ]));
@@ -669,6 +670,150 @@
           G.saveNow(); G.pushAccountToCloud(a); alert('Granted.');
         },
       })]));
+    },
+
+    /* ================= ALL TOKENS (every token in existence) ================= */
+    'All Tokens'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Every token that exists — every real player’s collection (loaded from the cloud) plus all 100 Dya’kukull and Elbergi. Search to narrow it down; edit anything, reassign an owner, or delete it outright.' }));
+      const refreshBtn = U.el('button', { cls: 'btn small ghost mb', text: '⟳ Refresh from the cloud' });
+      refreshBtn.onclick = async () => { refreshBtn.disabled = true; refreshBtn.textContent = 'Refreshing…'; await loadCloudAccounts(); rerender(); };
+      body.appendChild(refreshBtn);
+      if (cloudAcc.error) body.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ ' + cloudAcc.error }));
+
+      const bar = U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap;gap:8px' });
+      const q = U.el('input', { cls: 'txt', style: 'max-width:220px', placeholder: '🔎 Name, species, or owner…' });
+      const spFilter = U.el('select', { cls: 'txt', style: 'max-width:180px' });
+      spFilter.appendChild(U.el('option', { value: '', text: 'All species' }));
+      SP.list.forEach(s => spFilter.appendChild(U.el('option', { value: s.id, text: s.name })));
+      const rarFilter = U.el('select', { cls: 'txt', style: 'max-width:150px' });
+      rarFilter.appendChild(U.el('option', { value: '', text: 'All rarities' }));
+      SP.RARITIES.forEach((r, i) => rarFilter.appendChild(U.el('option', { value: i, text: r })));
+      const ownerFilter = U.el('select', { cls: 'txt', style: 'max-width:160px' });
+      [['', 'Any owner'], ['human', 'Real players only'], ['ai', 'Dya’kukull only']].forEach(([v, l]) => ownerFilter.appendChild(U.el('option', { value: v, text: l })));
+      bar.appendChild(q); bar.appendChild(spFilter); bar.appendChild(rarFilter); bar.appendChild(ownerFilter);
+      body.appendChild(bar);
+
+      const countLine = U.el('div', { cls: 'small muted mb' });
+      body.appendChild(countLine);
+      const tblWrap = U.el('div', {});
+      body.appendChild(tblWrap);
+
+      const everything = [];
+      Object.values(G.world.accounts).forEach(acc => {
+        Object.values(acc.tokens).forEach(t => everything.push({ acc, tok: t }));
+      });
+
+      function paint() {
+        const query = q.value.trim().toLowerCase();
+        let list = everything;
+        if (query) {
+          list = list.filter(({ acc, tok }) => {
+            const sp = SP.get(tok.speciesId);
+            return tok.name.toLowerCase().includes(query) || (sp && sp.name.toLowerCase().includes(query)) || acc.displayName.toLowerCase().includes(query);
+          });
+        }
+        if (spFilter.value) list = list.filter(({ tok }) => tok.speciesId === spFilter.value);
+        if (rarFilter.value !== '') list = list.filter(({ tok }) => tok.rarity === parseInt(rarFilter.value));
+        if (ownerFilter.value === 'human') list = list.filter(({ acc }) => !acc.ai);
+        if (ownerFilter.value === 'ai') list = list.filter(({ acc }) => acc.ai);
+        countLine.textContent = list.length + ' of ' + everything.length + ' tokens in existence' + (list.length > 150 ? ' — showing the first 150, narrow your search for more' : '');
+        tblWrap.innerHTML = '';
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['Name', 'Species', 'Rarity', 'Owner', 'Status', ''].map(h => U.el('th', { text: h }))));
+        list.slice(0, 150).forEach(({ acc, tok }) => {
+          const sp = SP.get(tok.speciesId);
+          const tr = U.el('tr', {});
+          tr.appendChild(U.el('td', { text: tok.name }));
+          tr.appendChild(U.el('td', { text: sp ? sp.name : tok.speciesId }));
+          tr.appendChild(U.el('td', { text: SP.RARITIES[tok.rarity] }));
+          tr.appendChild(U.el('td', { html: U.esc(acc.displayName) + (acc.ai ? ' <span class="pill">AI</span>' : acc.cloudAccount ? ' <span class="pill">🌐</span>' : '') }));
+          tr.appendChild(U.el('td', { text: tok.status + (tok.frozen ? ' · ❄ frozen' : '') + (tok.flagged ? ' · 🚩' : '') }));
+          const td = U.el('td', {});
+          td.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editToken(acc, tok) }));
+          tr.appendChild(td);
+          tbl.appendChild(tr);
+        });
+        tblWrap.appendChild(tbl);
+      }
+      [q, spFilter, rarFilter, ownerFilter].forEach(el => el.addEventListener('input', paint));
+      paint();
+    },
+
+    /* ================= TOKEN LIMITS (hard, real-time supply caps) ================= */
+    'Token Limits'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Hard, real-time supply caps — enforced in the database itself, not just here. Hunting/crafting/upgrading/spawning all reserve a slot before minting; once a capped species+rarity hits its cap, nobody (player or Dya’kukull) can produce another until you raise the cap or one frees up (buyback, deletion, or an upgrade moving out of that tier).' }));
+      const MO = DYA.marketOnline;
+      if (!MO || !MO.configured()) {
+        body.appendChild(U.el('p', { cls: 'muted small', text: 'Online is not configured (js/config.js) — supply caps need Supabase.' }));
+        return;
+      }
+      const setBox = U.el('div', { cls: 'panel mb' });
+      setBox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Set a cap' }));
+      const spSel = U.el('select', { cls: 'txt' });
+      SP.list.forEach(s => spSel.appendChild(U.el('option', { value: s.id, text: s.name })));
+      const rarSel = U.el('select', { cls: 'txt' });
+      SP.RARITIES.forEach((r, i) => rarSel.appendChild(U.el('option', { value: i, text: r })));
+      const capIn = U.el('input', { cls: 'txt', type: 'number', min: 0, placeholder: 'Max supply' });
+      setBox.appendChild(U.el('div', { cls: 'grid', style: 'grid-template-columns:1fr 1fr 1fr;gap:10px' }, [
+        U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Species' }), spSel]),
+        U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Rarity' }), rarSel]),
+        U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Cap' }), capIn]),
+      ]));
+      const allRaritiesChk = U.el('input', { type: 'checkbox' });
+      setBox.appendChild(U.el('label', { cls: 'flex mt', style: 'gap:6px;align-items:center' }, [allRaritiesChk, U.el('span', { cls: 'small', text: 'Apply to all 7 rarity tiers of this species' })]));
+      const msg = U.el('div', { cls: 'small mt', style: 'min-height:16px' });
+      setBox.appendChild(msg);
+      setBox.appendChild(U.el('div', { cls: 'flex mt' }, [
+        U.el('button', {
+          cls: 'btn primary', text: 'Set cap', onclick: async () => {
+            const capVal = capIn.value.trim();
+            if (capVal === '') { msg.style.color = 'var(--red)'; msg.textContent = 'Enter a number, or use Clear cap to remove one.'; return; }
+            const cap = Math.max(0, parseInt(capVal) || 0);
+            const rarities = allRaritiesChk.checked ? [0, 1, 2, 3, 4, 5, 6] : [parseInt(rarSel.value)];
+            for (const r of rarities) await MO.setSupplyCap(spSel.value, r, cap);
+            msg.style.color = 'var(--gold)'; msg.textContent = 'Saved.';
+            rerender();
+          },
+        }),
+        U.el('button', {
+          cls: 'btn ghost', text: 'Clear cap', onclick: async () => {
+            const rarities = allRaritiesChk.checked ? [0, 1, 2, 3, 4, 5, 6] : [parseInt(rarSel.value)];
+            for (const r of rarities) await MO.clearSupplyCap(spSel.value, r);
+            msg.style.color = 'var(--gold)'; msg.textContent = 'Cleared — uncapped again.';
+            rerender();
+          },
+        }),
+      ]));
+      body.appendChild(setBox);
+
+      body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Current supply' }));
+      const holder = U.el('div', {});
+      body.appendChild(holder);
+      holder.appendChild(U.el('p', { cls: 'small muted', text: 'Loading…' }));
+      MO.fetchSupply().then(rows => {
+        holder.innerHTML = '';
+        const relevant = rows.filter(r => r.cap != null || r.count > 0);
+        if (!relevant.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'Nothing minted or capped yet.' })); return; }
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['Species', 'Rarity', 'In existence', 'Cap', ''].map(h => U.el('th', { text: h }))));
+        relevant
+          .sort((a, b) => (b.cap != null ? 1 : 0) - (a.cap != null ? 1 : 0) || a.species_id.localeCompare(b.species_id))
+          .forEach(row => {
+            const sp = SP.get(row.species_id);
+            const full = row.cap != null && row.count >= row.cap;
+            const tr = U.el('tr', {});
+            tr.appendChild(U.el('td', { text: sp ? sp.name : row.species_id }));
+            tr.appendChild(U.el('td', { text: SP.RARITIES[row.rarity] }));
+            tr.appendChild(U.el('td', { html: full ? '<b style="color:var(--red)">' + row.count + '</b>' : String(row.count) }));
+            tr.appendChild(U.el('td', { text: row.cap == null ? '— uncapped' : String(row.cap) }));
+            tr.appendChild(U.el('td', { text: full ? '🔒 FULL' : '' }));
+            tbl.appendChild(tr);
+          });
+        holder.appendChild(tbl);
+      }).catch(e => {
+        holder.innerHTML = '';
+        holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Could not load supply data: ' + e.message }));
+      });
     },
 
     /* ================= TOURNAMENTS ================= */
@@ -745,6 +890,50 @@
         if (against) acts.appendChild(U.el('button', { cls: 'btn small danger', text: 'Ban them', onclick: () => { G.admin.ban(against.id, rep.reason || 'Guild ruling', 7); rep.open = false; G.saveNow(); rerender(); } }));
         row.appendChild(acts);
         body.appendChild(row);
+      });
+    },
+
+    /* ================= NEW USERS (audit queue, non-blocking) ================= */
+    'New Users'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Every new account, oldest first — see what they’ve got and check it off. This is a log, not a gate: an account plays completely normally whether or not, or however long before, you get to it here.' }));
+      const AC = DYA.accountCloud;
+      if (!AC || !AC.configured()) {
+        body.appendChild(U.el('p', { cls: 'muted small', text: 'Online is not configured (js/config.js) — this queue needs Supabase.' }));
+        return;
+      }
+      const holder = U.el('div', {});
+      body.appendChild(holder);
+      holder.appendChild(U.el('p', { cls: 'small muted', text: 'Loading…' }));
+      AC.fetchUnreviewed().then(rows => {
+        holder.innerHTML = '';
+        if (!rows.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'Nothing pending — every account has been checked.' })); return; }
+        rows.forEach(row => {
+          const acc = row.data || {};
+          const toks = Object.values(acc.tokens || {});
+          const card = U.el('div', { cls: 'panel mb' });
+          card.appendChild(U.el('div', { html: '<b>' + U.esc(acc.displayName || '?') + '</b> <span class="small muted">' + U.esc(row.email) + ' · joined ' + U.timeAgo(Date.parse(row.created_at) || Date.now()) + '</span>' }));
+          card.appendChild(U.el('div', { cls: 'small mt', text: toks.length + ' token(s) currently held:' }));
+          if (!toks.length) card.appendChild(U.el('div', { cls: 'small muted', text: '(none yet)' }));
+          const grid = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:6px' });
+          toks.forEach(t => {
+            const sp = SP.get(t.speciesId);
+            grid.appendChild(U.el('span', { cls: 'pill', text: t.name + ' (' + (sp ? sp.name : t.speciesId) + ', ' + SP.RARITIES[t.rarity] + ')' }));
+          });
+          card.appendChild(grid);
+          const btn = U.el('button', {
+            cls: 'btn small primary mt', text: '✓ Mark checked', onclick: async () => {
+              btn.disabled = true; btn.textContent = 'Saving…';
+              const r = await AC.markReviewed(row.id);
+              if (r.err) { alert(r.err); btn.disabled = false; btn.textContent = '✓ Mark checked'; return; }
+              card.remove();
+            },
+          });
+          card.appendChild(btn);
+          holder.appendChild(card);
+        });
+      }).catch(e => {
+        holder.innerHTML = '';
+        holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Could not load new users: ' + e.message }));
       });
     },
 
@@ -1202,6 +1391,99 @@
     ]));
   }
 
+  /* persist an edited account regardless of where it lives: this
+     device's own local save, plus a debounced push to the cloud row
+     for anything that isn't AI (works whether or not `acc` happens to
+     be the currently logged-in G.me — pushAccountToCloud only needs
+     the account object itself) */
+  function saveAccount(acc) {
+    G.saveNow();
+    if (!acc.ai) G.pushAccountToCloud(acc);
+  }
+
+  /* full token editor — reachable from All Tokens (every token, any
+     owner) and from a per-AI Collection manager. Reassigning the
+     owner moves the token between accounts; changing species/rarity
+     trues up the live supply counters (see dya_species_supply). */
+  function editToken(acc, tok) {
+    const { w, close } = modal('8% 18%');
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Edit token — ' + tok.name }));
+    w.appendChild(U.el('div', { cls: 'small muted mb', text: 'Currently owned by ' + acc.displayName + (acc.ai ? ' (AI)' : acc.cloudAccount ? ' (cloud player)' : ' (this device)') }));
+
+    const nameI = U.el('input', { cls: 'txt', value: tok.name });
+    const spSel = U.el('select', { cls: 'txt' });
+    SP.list.forEach(s => spSel.appendChild(U.el('option', { value: s.id, text: s.name, selected: s.id === tok.speciesId || undefined })));
+    const rarSel = U.el('select', { cls: 'txt' });
+    SP.RARITIES.forEach((r, i) => rarSel.appendChild(U.el('option', { value: i, text: r, selected: i === tok.rarity || undefined })));
+    const hpI = U.el('input', { cls: 'txt', type: 'number', value: tok.stats.hp });
+    const dmgI = U.el('input', { cls: 'txt', type: 'number', step: '0.1', value: tok.stats.dmg });
+    const spdI = U.el('input', { cls: 'txt', type: 'number', value: tok.stats.speed });
+    const statusSel = U.el('select', { cls: 'txt' });
+    ['collection', 'market', 'pouch', 'field'].forEach(s => statusSel.appendChild(U.el('option', { value: s, text: s, selected: s === tok.status || undefined })));
+    const ownerSel = U.el('select', { cls: 'txt' });
+    Object.values(G.world.accounts).forEach(a2 => ownerSel.appendChild(U.el('option', { value: a2.id, text: a2.displayName + (a2.ai ? ' (AI)' : ''), selected: a2.id === acc.id || undefined })));
+
+    [['Name', nameI], ['Species', spSel], ['Rarity', rarSel], ['HP', hpI], ['Damage', dmgI], ['Speed', spdI], ['Status', statusSel], ['Owner', ownerSel]].forEach(([l, el]) => {
+      w.appendChild(U.el('label', { cls: 'lbl mt', text: l })); w.appendChild(el);
+    });
+
+    const frozenChk = U.el('input', { type: 'checkbox' }); frozenChk.checked = !!tok.frozen;
+    const flaggedChk = U.el('input', { type: 'checkbox' }); flaggedChk.checked = !!tok.flagged;
+    const rentalChk = U.el('input', { type: 'checkbox' }); rentalChk.checked = !!tok.isRental;
+    const chkRow = U.el('div', { cls: 'flex mt', style: 'gap:16px' });
+    [['Frozen', frozenChk], ['Flagged', flaggedChk], ['Rental', rentalChk]].forEach(([l, chk]) => {
+      chkRow.appendChild(U.el('label', { cls: 'flex', style: 'gap:6px;align-items:center' }, [chk, U.el('span', { cls: 'small', text: l })]));
+    });
+    w.appendChild(chkRow);
+
+    w.appendChild(U.el('div', { cls: 'flex mt' }, [
+      U.el('button', {
+        cls: 'btn primary', text: 'Save', onclick: () => {
+          const oldSpecies = tok.speciesId, oldRarity = tok.rarity;
+          tok.name = nameI.value.trim() || tok.name;
+          tok.speciesId = spSel.value;
+          tok.rarity = parseInt(rarSel.value);
+          tok.element = SP.get(tok.speciesId).element;
+          tok.stats.hp = parseInt(hpI.value) || tok.stats.hp;
+          tok.stats.dmg = parseFloat(dmgI.value) || tok.stats.dmg;
+          tok.stats.speed = parseInt(spdI.value) || tok.stats.speed;
+          tok.status = statusSel.value;
+          tok.frozen = frozenChk.checked;
+          tok.flagged = flaggedChk.checked;
+          tok.isRental = rentalChk.checked;
+          const newOwnerId = ownerSel.value;
+          if (newOwnerId !== acc.id) {
+            const newOwner = G.world.accounts[newOwnerId];
+            delete acc.tokens[tok.id];
+            acc.pouches.forEach(p => { p.tokenIds = p.tokenIds.filter(id => id !== tok.id); });
+            Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === tok.id) delete G.world.market.listings[l.id]; });
+            tok.ownerId = newOwnerId;
+            newOwner.tokens[tok.id] = tok;
+            saveAccount(newOwner);
+          }
+          if ((oldSpecies !== tok.speciesId || oldRarity !== tok.rarity) && DYA.marketOnline) {
+            DYA.marketOnline.releaseSupplySlot(oldSpecies, oldRarity);
+            DYA.marketOnline.reserveSupplySlot(tok.speciesId, tok.rarity);
+          }
+          saveAccount(acc);
+          close(); rerender();
+        },
+      }),
+      U.el('button', {
+        cls: 'btn danger', text: 'Delete token', onclick: () => {
+          if (!confirm('Permanently delete "' + tok.name + '"? This cannot be undone.')) return;
+          delete acc.tokens[tok.id];
+          acc.pouches.forEach(p => { p.tokenIds = p.tokenIds.filter(id => id !== tok.id); });
+          Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === tok.id) delete G.world.market.listings[l.id]; });
+          if (DYA.marketOnline) DYA.marketOnline.releaseSupplySlot(tok.speciesId, tok.rarity);
+          saveAccount(acc);
+          close(); rerender();
+        },
+      }),
+      U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => close() }),
+    ]));
+  }
+
   function editAI(a) {
     const { w, close } = modal('4% 14%');
     w.appendChild(U.el('h3', { cls: 'gold', text: 'Dya’kukull — ' + a.displayName }));
@@ -1247,12 +1529,14 @@
         const sp = SP.get(t.speciesId);
         const r = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center;border-bottom:1px solid var(--line);padding:3px 0' });
         r.appendChild(U.el('div', { cls: 'flex1 small', html: '<b>' + U.esc(t.name) + '</b> <span class="muted">' + (sp ? sp.name : t.speciesId) + ' · ' + SP.RARITIES[t.rarity] + (t.status !== 'collection' ? ' · ' + t.status : '') + '</span>' }));
+        r.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editToken(a, t) }));
         r.appendChild(U.el('button', {
           cls: 'btn small danger', text: '✕', onclick: () => {
             delete a.tokens[t.id];
             a.pouches.forEach(p => p.tokenIds = p.tokenIds.filter(x => x !== t.id));
             Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === t.id) delete G.world.market.listings[l.id]; });
             G.saveNow(); paintToks();
+            if (DYA.marketOnline) DYA.marketOnline.releaseSupplySlot(t.speciesId, t.rarity);
           },
         }));
         tokBox.appendChild(r);

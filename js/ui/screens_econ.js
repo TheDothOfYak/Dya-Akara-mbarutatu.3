@@ -243,8 +243,8 @@
         w.appendChild(err);
         const m = UI.modal(w);
         w.appendChild(U.el('button', {
-          cls: 'btn primary mt', text: '⬆ Upgrade to ' + SP.RARITIES[pre.target], disabled: G.canUpgrade(tok) ? undefined : 'true', onclick: () => {
-            const r = G.upgradeToken(tok);
+          cls: 'btn primary mt', text: '⬆ Upgrade to ' + SP.RARITIES[pre.target], disabled: G.canUpgrade(tok) ? undefined : 'true', onclick: async () => {
+            const r = await G.upgradeToken(tok);
             if (r.err) { err.textContent = r.err; return; }
             DYA.audio.play('levelup');
             m.close(); scr2.remove();
@@ -405,10 +405,12 @@
         let done = false, raf;
         const t0 = performance.now();
         const phases = ['SINGING THE CREATURE’S SONG…', 'POURING THE NGAKARA INTO THE VEINS…', 'SETTING THE TRIGGER…', 'THE TRUTH TAKES HOLD.'];
-        function finish() {
+        async function finish() {
           if (done) return; done = true;
           cancelAnimationFrame(raf);
-          const r = G.craftToken(piece, piece.temperBias || 0);
+          skip.style.display = 'none';
+          status.textContent = 'CONSULTING THE GUILD’S LEDGER…';
+          const r = await G.craftToken(piece, piece.temperBias || 0);
           overlay.remove();
           if (r.err) { UI.alert('Craft failed', r.err); return; }
           /* result screen */

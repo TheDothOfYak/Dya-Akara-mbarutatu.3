@@ -25,8 +25,13 @@ global.location = { pathname: '/index.html' };
 global.Image = function () { return { onload: null, set src(v) {} }; };
 
 /* ---------- in-memory PostgREST fake ---------- */
-const db = { dya_listings: [], dya_config: [] };
+const db = { dya_listings: [], dya_config: [], dya_species_supply: [] };
 let idCounter = 1;
+function supplyRow(species, rarity) {
+  let row = db.dya_species_supply.find(r => r.species_id === species && r.rarity === rarity);
+  if (!row) { row = { species_id: species, rarity, cap: null, count: 0 }; db.dya_species_supply.push(row); }
+  return row;
+}
 function parseFilters(qs) {
   const filters = [];
   (qs || '').split('&').forEach(part => {
@@ -44,6 +49,22 @@ function parseFilters(qs) {
 }
 global.fetch = async function (url, opts) {
   opts = opts || {};
+  const rpcM = url.match(/\/rest\/v1\/rpc\/([a-z_]+)$/);
+  if (rpcM) {
+    const fn = rpcM[1];
+    const body = opts.body ? JSON.parse(opts.body) : {};
+    if (fn === 'reserve_token_slot') {
+      const row = supplyRow(body.p_species, body.p_rarity);
+      if (row.cap == null || row.count < row.cap) { row.count++; return { ok: true, status: 200, json: async () => [{ reserved: true, cur_count: row.count, cur_cap: row.cap }] }; }
+      return { ok: true, status: 200, json: async () => [{ reserved: false, cur_count: row.count, cur_cap: row.cap }] };
+    }
+    if (fn === 'release_token_slot') {
+      const row = supplyRow(body.p_species, body.p_rarity);
+      row.count = Math.max(0, row.count - 1);
+      return { ok: true, status: 200, json: async () => null };
+    }
+    return { ok: false, status: 404, json: async () => ({ message: 'unknown rpc ' + fn }) };
+  }
   const m = url.match(/\/rest\/v1\/([a-z_]+)(\?(.*))?$/);
   if (!m) return { ok: false, status: 404, json: async () => ({ message: 'bad path' }) };
   const table = m[1], qs = m[3] || '';
@@ -253,7 +274,7 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   const pre = G.upgradePreview(upTok);
   check('preview targets the next rarity', pre.target === before.rarity + 1);
   check('preview raises HP and damage', pre.hp > before.hp && pre.dmg >= before.dmg);
-  const ur = G.upgradeToken(upTok);
+  const ur = await G.upgradeToken(upTok);
   check('upgrade succeeds with materials', !!ur.ok, ur.err);
   check('rarity went up one tier', upTok.rarity === before.rarity + 1);
   check('HP actually increased', upTok.stats.hp > before.hp && upTok.stats.hp === pre.hp);
@@ -263,16 +284,17 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
 
   /* upgrade all the way to Torcain, then it must refuse */
   let guard = 0;
-  while (upTok.rarity < 6 && guard++ < 10) G.upgradeToken(upTok);
+  while (upTok.rarity < 6 && guard++ < 10) await G.upgradeToken(upTok);
   check('can climb to Torcain', upTok.rarity === 6);
-  const capped = G.upgradeToken(upTok);
+  const capped = await G.upgradeToken(upTok);
   check('Torcain cannot be upgraded further', !!capped.err && !G.canUpgrade(upTok));
 
   /* no materials → refused */
   const poorTok = DYAG.token.mint({ speciesId: 'kipsu', rng: new U.Rng(22), rarity: 0, owner: seller.id });
   seller.tokens[poorTok.id] = poorTok;
   seller.okid = [0, 0, 0, 0, 0, 0, 0]; seller.ngakara = 0;
-  check('upgrade refused without materials', G.canUpgrade(poorTok) === false && !!G.upgradeToken(poorTok).err);
+  const poorResult = await G.upgradeToken(poorTok);
+  check('upgrade refused without materials', G.canUpgrade(poorTok) === false && !!poorResult.err);
   check('refused upgrade left the token untouched', poorTok.rarity === 0);
 
   console.log(failures ? 'MODS+MARKET: ' + failures + ' FAILURE(S)' : 'MODS+MARKET: ALL PASS');

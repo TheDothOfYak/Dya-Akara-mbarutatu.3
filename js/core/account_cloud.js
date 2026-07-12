@@ -73,6 +73,29 @@
     return rows || [];
   };
 
+  /* the Admin Panel's New Users queue: accounts nobody has checked yet */
+  AC.fetchUnreviewed = async function () {
+    if (!AC.configured()) return [];
+    return (await rest('GET', 'dya_accounts?reviewed=eq.false&select=*&order=created_at.asc&limit=500')) || [];
+  };
+  AC.markReviewed = async function (accountId) {
+    if (!AC.configured()) return { err: 'Online is not configured.' };
+    try {
+      await rest('PATCH', 'dya_accounts?id=eq.' + encodeURIComponent(accountId), { reviewed: true, reviewed_at: new Date().toISOString() });
+      return { ok: true };
+    } catch (e) { return { err: e.message }; }
+  };
+  /* patch just the `data` blob of a specific cloud account — used to
+     save a token edit made from the admin token browser without
+     requiring that account to be logged in on this device */
+  AC.patchData = async function (accountId, data) {
+    if (!AC.configured()) return { err: 'Online is not configured.' };
+    try {
+      await rest('PATCH', 'dya_accounts?id=eq.' + encodeURIComponent(accountId), { data, updated_at: new Date().toISOString() });
+      return { ok: true };
+    } catch (e) { return { err: e.message }; }
+  };
+
   function row(account) {
     return {
       id: account.id,

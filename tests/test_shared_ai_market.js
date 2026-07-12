@@ -25,11 +25,16 @@ global.location = { pathname: '/index.html' };
 global.Image = function () { return { onload: null, set src(v) {} }; };
 
 /* ---------- in-memory PostgREST fake (extended: or=, not.is.null, lte.) ---------- */
-const db = { dya_listings: [], dya_config: [], dya_offers: [] };
+const db = { dya_listings: [], dya_config: [], dya_offers: [], dya_species_supply: [] };
 let idCounter = 1;
 function matchOp(row, col, op, val) {
   if (op === 'eq') return String(row[col]) === val;
   return false;
+}
+function supplyRow(species, rarity) {
+  let row = db.dya_species_supply.find(r => r.species_id === species && r.rarity === rarity);
+  if (!row) { row = { species_id: species, rarity, cap: null, count: 0 }; db.dya_species_supply.push(row); }
+  return row;
 }
 function parseFilters(qs) {
   const filters = [];
@@ -69,6 +74,22 @@ function parseFilters(qs) {
 }
 global.fetch = async function (url, opts) {
   opts = opts || {};
+  const rpcM = url.match(/\/rest\/v1\/rpc\/([a-z_]+)$/);
+  if (rpcM) {
+    const fn = rpcM[1];
+    const body = opts.body ? JSON.parse(opts.body) : {};
+    if (fn === 'reserve_token_slot') {
+      const row = supplyRow(body.p_species, body.p_rarity);
+      if (row.cap == null || row.count < row.cap) { row.count++; return { ok: true, status: 200, json: async () => [{ reserved: true, cur_count: row.count, cur_cap: row.cap }] }; }
+      return { ok: true, status: 200, json: async () => [{ reserved: false, cur_count: row.count, cur_cap: row.cap }] };
+    }
+    if (fn === 'release_token_slot') {
+      const row = supplyRow(body.p_species, body.p_rarity);
+      row.count = Math.max(0, row.count - 1);
+      return { ok: true, status: 200, json: async () => null };
+    }
+    return { ok: false, status: 404, json: async () => ({ message: 'unknown rpc ' + fn }) };
+  }
   const m = url.match(/\/rest\/v1\/([a-z_]+)(\?(.*))?$/);
   if (!m) return { ok: false, status: 404, json: async () => ({ message: 'bad path' }) };
   const table = m[1], qs = m[3] || '';

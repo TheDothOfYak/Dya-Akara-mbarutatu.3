@@ -578,6 +578,53 @@
     }
   };
 
+  /* ================= SUPPLY CAPS (hard, real-time) =================
+     Every genuinely new token — hunting/crafting rewards, admin
+     grants, the Dya'kukull's own ongoing hunting/crafting — reserves
+     a slot here FIRST. reserve_token_slot() does the cap check and
+     the increment together in one database transaction, so two
+     mints of the same capped species at the same instant can't both
+     slip in under the cap. Species/rarities nobody has capped are
+     unaffected in spirit (the call still happens — this project
+     doesn't keep anything about token production local — but it
+     always succeeds instantly since the row has no cap). */
+  MO.reserveSupplySlot = async function (speciesId, rarity) {
+    if (!MO.configured()) return { reserved: true }; // no cloud, no cap system — mint freely, exactly as before
+    try {
+      const rows = await rest('POST', 'rpc/reserve_token_slot', { p_species: speciesId, p_rarity: rarity });
+      const r = rows && rows[0];
+      return r ? { reserved: !!r.reserved, count: r.cur_count, cap: r.cur_cap } : { reserved: true };
+    } catch (e) { return { reserved: false, err: e.message }; }
+  };
+  /* releases a slot — call when a token is destroyed (buyback, admin
+     delete) or changes rarity (upgrade: release the old tier). Never
+     needs to block anything, so callers can fire this and move on. */
+  MO.releaseSupplySlot = async function (speciesId, rarity) {
+    if (!MO.configured()) return;
+    try { await rest('POST', 'rpc/release_token_slot', { p_species: speciesId, p_rarity: rarity }); }
+    catch (e) { /* best-effort — a missed release just means the count runs a little high */ }
+  };
+  /* every (species, rarity) row that has ever been minted or capped —
+     the Admin Panel's Token Limits tab reads this directly, since the
+     cap itself lives here (not in the client-synced mods layer) and
+     must stay the single source of truth the RPC above enforces */
+  MO.fetchSupply = async function () {
+    if (!MO.configured()) return [];
+    return (await rest('GET', 'dya_species_supply?select=*&order=species_id.asc,rarity.asc')) || [];
+  };
+  /* set (or raise/lower) a cap — upsert so a never-before-touched
+     species/rarity gets a row too; omits `count` from the payload so
+     an existing row's live count is never clobbered */
+  MO.setSupplyCap = async function (speciesId, rarity, cap) {
+    if (!MO.configured()) return { err: 'Online play is not configured.' };
+    try {
+      await rest('POST', 'dya_species_supply?on_conflict=species_id,rarity',
+        { species_id: speciesId, rarity, cap }, 'resolution=merge-duplicates');
+      return { ok: true };
+    } catch (e) { return { err: e.message }; }
+  };
+  MO.clearSupplyCap = function (speciesId, rarity) { return MO.setSupplyCap(speciesId, rarity, null); };
+
   /* ================= ADMIN ================= */
   MO.adminFetchAll = async function () {
     return rest('GET', 'dya_listings?select=*&order=created_at.desc&limit=200');

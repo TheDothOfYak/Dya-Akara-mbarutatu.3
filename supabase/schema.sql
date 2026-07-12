@@ -146,14 +146,99 @@ create table if not exists public.dya_offers (
 -- everything G.me carries locally. Login fetches this by email and
 -- installs it into the local world, so every existing synchronous
 -- game system keeps working unchanged.
+--
+-- reviewed / reviewed_at: the Admin Panel's "New Users" queue. Every
+-- brand-new account starts unreviewed; the admin can look over the
+-- tokens it currently holds and check it off. Purely an audit trail —
+-- nothing in the game reads or gates on this column, so an account
+-- plays completely normally whether or not (or however long before)
+-- an admin gets around to checking it.
 create table if not exists public.dya_accounts (
-  id         text primary key,
-  email      text not null unique,
-  pass_hash  text not null,
-  data       jsonb not null,
-  updated_at timestamptz not null default now(),
-  created_at timestamptz not null default now()
+  id          text primary key,
+  email       text not null unique,
+  pass_hash   text not null,
+  data        jsonb not null,
+  reviewed    boolean not null default false,
+  reviewed_at timestamptz,
+  updated_at  timestamptz not null default now(),
+  created_at  timestamptz not null default now()
 );
+alter table public.dya_accounts add column if not exists reviewed boolean not null default false;
+alter table public.dya_accounts add column if not exists reviewed_at timestamptz;
+
+-- ---------- token supply: live counts + hard, real-time caps ----------
+-- One row per (species_id, rarity). cap = null means uncapped. Every
+-- genuinely NEW token (hunting/crafting rewards, admin grants, the
+-- Dya'kukull's own ongoing hunting/crafting) reserves a slot here
+-- FIRST, via the reserve_token_slot() function below, before the
+-- token is minted client-side — the increment and the cap check
+-- happen together in one database transaction, so two players (or a
+-- player and an AI) minting the same capped species at the same
+-- instant can't both slip in under the cap. The Dya'kukull's original,
+-- deterministic starting collections (see state.js's freshWorld) are
+-- NOT reserved here — they're a fixed one-time genesis population
+-- that's identical on every device, not new production; counting it
+-- here would multiply it by however many devices have ever booted a
+-- fresh world.
+create table if not exists public.dya_species_supply (
+  species_id text not null,
+  rarity     int  not null,
+  cap        int,
+  count      int  not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (species_id, rarity)
+);
+alter table public.dya_species_supply enable row level security;
+drop policy if exists "dya supply open" on public.dya_species_supply;
+create policy "dya supply open" on public.dya_species_supply for all using (true) with check (true);
+
+-- atomically reserve one slot for (p_species, p_rarity): increments
+-- count and returns reserved=true only while cap is null or count is
+-- still under it. Auto-creates an uncapped row on first use so minting
+-- an never-before-capped species never has to wait on the admin
+-- having touched it.
+create or replace function public.reserve_token_slot(p_species text, p_rarity int)
+returns table(reserved boolean, cur_count int, cur_cap int) as $$
+declare
+  r record;
+begin
+  insert into public.dya_species_supply (species_id, rarity, cap, count)
+  values (p_species, p_rarity, null, 0)
+  on conflict (species_id, rarity) do nothing;
+
+  update public.dya_species_supply
+     set count = count + 1, updated_at = now()
+   where species_id = p_species and rarity = p_rarity
+     and (cap is null or count < cap)
+  returning count, cap into r;
+
+  if r.count is null then
+    select s.count, s.cap into r from public.dya_species_supply s where s.species_id = p_species and s.rarity = p_rarity;
+    return query select false, r.count, r.cap;
+  else
+    return query select true, r.count, r.cap;
+  end if;
+end;
+$$ language plpgsql;
+
+-- releases one slot — called when a token is destroyed (buyback,
+-- admin delete) or changes rarity (upgrade: release the old tier,
+-- reserve the new one). Never goes below zero.
+create or replace function public.release_token_slot(p_species text, p_rarity int)
+returns void as $$
+begin
+  insert into public.dya_species_supply (species_id, rarity, cap, count)
+  values (p_species, p_rarity, null, 0)
+  on conflict (species_id, rarity) do nothing;
+
+  update public.dya_species_supply
+     set count = greatest(0, count - 1), updated_at = now()
+   where species_id = p_species and rarity = p_rarity;
+end;
+$$ language plpgsql;
+
+grant execute on function public.reserve_token_slot(text, int) to anon, authenticated;
+grant execute on function public.release_token_slot(text, int) to anon, authenticated;
 
 -- ---------- bans (public record, enforced on every device) ----------
 create table if not exists public.dya_bans (

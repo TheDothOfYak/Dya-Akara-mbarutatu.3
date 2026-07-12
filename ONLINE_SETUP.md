@@ -12,8 +12,9 @@ works for everyone who plays your deployment.
 
 > **Already set up from an earlier version?** Just re-run `supabase/schema.sql` (Step 2) —
 > every statement is idempotent, so it only adds the new tables (`dya_listings` for the
-> shared market, `dya_config` for admin edits, `dya_accounts`/`dya_bans` for cross-device
-> accounts) and leaves your existing data alone.
+> shared market, `dya_offers` for haggling, `dya_config` for admin edits, `dya_accounts`/
+> `dya_bans` for cross-device accounts, `dya_species_supply` for the admin panel's token
+> supply caps) and leaves your existing data alone.
 
 ---
 

@@ -397,6 +397,49 @@
     return (t && t.buff && t.buff[key]) || 0;
   };
 
+  /* ---------- supply-cap reservation (dya_species_supply, hard/real-time) ----------
+     Two patterns, depending on how deeply the mint site is embedded in
+     a synchronous flow:
+       - BLOCKING sites (a deliberate button click: craft, upgrade,
+         admin grant) await reserveMintSlot() BEFORE spending materials
+         or minting, and refuse cleanly if the cap is full.
+       - OPTIMISTIC sites (the level-up milestone chest; the
+         Dya'kukull's own ongoing hunting/crafting) mint immediately —
+         blocking a match's level-up celebration, or turning the
+         ambient world-tick into a slow sequential network loop, isn't
+         worth it for a probabilistic bonus token — then reconcile
+         moments later: if the cap turns out to already be full,
+         reclaimTokenIfUnreserved() removes it and (for a human) says
+         why. A network hiccup fails OPEN here (the mint stands) since
+         punishing a player for a flaky connection on a bonus they
+         already saw isn't the point of any of this. */
+  function reserveMintSlot(speciesId, rarity) {
+    const MO = DYA.marketOnline;
+    return MO ? MO.reserveSupplySlot(speciesId, rarity) : Promise.resolve({ reserved: true });
+  }
+  function releaseMintSlot(speciesId, rarity) {
+    const MO = DYA.marketOnline;
+    if (MO) MO.releaseSupplySlot(speciesId, rarity);
+  }
+  function reclaimTokenIfUnreserved(acc, tok) {
+    const MO = DYA.marketOnline;
+    if (!MO || !MO.configured()) return;
+    MO.reserveSupplySlot(tok.speciesId, tok.rarity).then(res => {
+      if (res.reserved || res.err || !acc.tokens[tok.id]) return; // network hiccup fails open — only a CONFIRMED cap-full reclaims
+      delete acc.tokens[tok.id];
+      acc.pouches.forEach(p => { p.tokenIds = p.tokenIds.filter(id => id !== tok.id); });
+      if (acc.stall.featuredTokenId === tok.id) acc.stall.featuredTokenId = null;
+      if (!acc.ai) {
+        acc.notifications.push({
+          id: U.uid('ntf'), at: Date.now(), type: 'system', title: 'Token reclaimed',
+          body: tok.name + ' (' + SP.get(tok.speciesId).name + ') reached its collector’s cap the instant it was granted, and has been reclaimed by the Guild. Sorry about that.',
+          icon: '⚖️',
+        });
+      }
+      G.save();
+    }).catch(() => { /* couldn't reach the ledger — fail open, the mint stands */ });
+  }
+
   /* Add XP; returns array of level-up events with chest contents. */
   G.addXP = function (amount) {
     amount = Math.round(amount * (1 + G.titleBuff('xp')));
@@ -418,6 +461,7 @@
         const tok = TK.mint({ speciesId: spid, rng, owner: G.me.id, rarity: Math.min(m.tokenRarity, SP.get(spid).rarity[1]) });
         G.me.tokens[tok.id] = tok;
         gained.tokens.push(tok);
+        reclaimTokenIfUnreserved(G.me, tok);
         G.me.okid[m.okidRarity] += m.okidQty;
         gained.okid.push({ qty: m.okidQty, rarity: m.okidRarity });
         G.me.ngakara += m.ngakara; gained.ngakara += m.ngakara;
@@ -519,12 +563,16 @@
     const okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
     return okidAvail >= okidNeed && G.me.ngakara >= cost.ngakara;
   };
-  G.craftToken = function (piece, temperBias) {
+  G.craftToken = async function (piece, temperBias) {
     // piece: {speciesId, rarity?} from a Hunt (or market pieces)
     const sp = SP.get(piece.speciesId);
     const rng = new U.Rng(U.newSeed());
     const rarity = piece.rarity != null ? piece.rarity : rng.int(sp.rarity[0], sp.rarity[1]);
     if (!G.canCraft(rarity)) return { err: 'Not enough materials.' };
+    const reservation = await reserveMintSlot(piece.speciesId, rarity);
+    if (!reservation.reserved) {
+      return { err: reservation.err ? ('Could not reach the Guild’s ledger — try again.') : ('The Guild has capped ' + sp.name + ' (' + SP.RARITIES[rarity] + ') at ' + reservation.cap + ' — none are available to craft right now.') };
+    }
     const cost = EC.CRAFT_COST[rarity];
     let okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
     for (let i = rarity; i < 7 && okidNeed > 0; i++) {
@@ -572,7 +620,7 @@
     const okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
     return okidAvail >= okidNeed && G.me.ngakara >= cost.ngakara;
   };
-  G.upgradeToken = function (tok) {
+  G.upgradeToken = async function (tok) {
     if (!tok) return { err: 'Token not found.' };
     if (tok.rarity >= 6) return { err: 'Already ' + SP.RARITIES[6] + ' — the highest rarity.' };
     if (tok.isRental) return { err: 'Rented tokens belong to the Guild — they cannot be upgraded.' };
@@ -581,6 +629,13 @@
     const target = tok.rarity + 1;
     const cost = EC.CRAFT_COST[target];
     if (!G.canUpgrade(tok)) return { err: 'Not enough materials — needs ' + Math.max(1, cost.okid - G.titleBuff('craftDiscount')) + ' ' + SP.RARITIES[target] + '+ Okid and ' + cost.ngakara + ' NgAkara.' };
+    /* upgrading moves the token INTO the target rarity's supply bucket
+       — reserve there before spending anything */
+    const reservation = await reserveMintSlot(tok.speciesId, target);
+    if (!reservation.reserved) {
+      return { err: reservation.err ? ('Could not reach the Guild’s ledger — try again.') : ('The Guild has capped ' + SP.get(tok.speciesId).name + ' (' + SP.RARITIES[target] + ') at ' + reservation.cap + ' — upgrading into that tier isn’t available right now.') };
+    }
+    const oldRarity = tok.rarity;
     /* spend Okid (target tier and up) + NgAkara */
     let okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
     for (let i = target; i < 7 && okidNeed > 0; i++) {
@@ -598,6 +653,7 @@
     tok.upgraded = (tok.upgraded || 0) + 1;
     if (target === 6) checkAchievement('torcain_own', 1);
     G.save();
+    releaseMintSlot(tok.speciesId, oldRarity);
     return { ok: true, tok };
   };
 
@@ -808,9 +864,11 @@
     const avg = G.marketAverage(tok.speciesId, tok.rarity);
     const pay = Math.round(avg * EC.BUYBACK_RATE);
     if (tok.flagged) return { err: 'Flagged tokens require review before buyback.' };
+    const speciesId = tok.speciesId, rarity = tok.rarity;
     G.removeToken(tok.id);
     G.addGold(pay);
     G.save();
+    releaseMintSlot(speciesId, rarity); // the token is destroyed — free its supply slot
     return { pay };
   };
   /* ---------- gifting (no fee) ---------- */
@@ -1404,6 +1462,7 @@
         const tok = TK.mint({ speciesId: spid, rng: new U.Rng(U.newSeed()), owner: a.id, aiOwner: true });
         a.tokens[tok.id] = tok;
         a.stats.crafted++;
+        reclaimTokenIfUnreserved(a, tok);
       } else if (r2 < 0.85) { /* post a notice */
         G.world.trinvak.unshift({
           id: U.uid('tv'), at: now, author: a.displayName, paid: 5 + Math.floor(rng.next() * 40),
@@ -1524,10 +1583,14 @@
       });
       G.saveNow();
     },
-    spawnToken(accId, speciesId, rarity, opts) {
+    async spawnToken(accId, speciesId, rarity, opts) {
       opts = opts || {};
       const acc = G.world.accounts[accId];
       if (!acc) return { err: 'Account not found' };
+      const reservation = await reserveMintSlot(speciesId, rarity);
+      if (!reservation.reserved) {
+        return { err: reservation.err ? ('Could not reach the Guild’s ledger — try again.') : ('Capped at ' + reservation.cap + ' — none available to spawn. Raise or clear the cap in Token Limits first.') };
+      }
       const tok = TK.mint({ speciesId, rng: new U.Rng(U.newSeed()), owner: accId, rarity, name: opts.name });
       /* §4 famous tokens: the editable-name flag is set at creation, here */
       if (opts.name && !opts.nameEditable) tok.nameLocked = true;
