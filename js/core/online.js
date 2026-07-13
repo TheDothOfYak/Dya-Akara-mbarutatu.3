@@ -111,8 +111,13 @@
     friends: [],        // [{id, name, code, level, avatarIdx, status, lastSeen}]
     incoming: [],       // pending requests to me [{id, fromId, fromName, fromCode, at}]
     outgoing: [],       // my pending requests [{id, toId, toName, toCode, at}]
+    dms: {},            // otherNetId -> [{id, by:'me'|'them', text, at, fromName}]
   };
   const knownIncoming = {};
+  /* direct-message sync state */
+  let knownMsgIds = {};   // message id -> true (dedupe across polls + own sends)
+  let msgSince = null;    // ISO of the newest message ingested (incremental poll cursor)
+  let firstMsgLoad = true;// suppress notifications while loading the initial backlog
 
   function profileStatus(lastSeenIso) {
     const t = Date.parse(lastSeenIso || 0);
@@ -225,6 +230,68 @@
     return { ok: true };
   };
 
+  /* ---------- direct messages ---------- */
+  /* fold one server row into O.state.dms; returns true if it's a NEW
+     message from someone else (worth a notification) */
+  function ingestMessage(row) {
+    if (!row || knownMsgIds[row.id]) return false;
+    const me = O.me();
+    if (!me) return false;
+    knownMsgIds[row.id] = true;
+    const mine = row.from_id === me.netId;
+    const other = mine ? row.to_id : row.from_id;
+    const thread = O.state.dms[other] = O.state.dms[other] || [];
+    thread.push({ id: row.id, by: mine ? 'me' : 'them', text: row.body, at: Date.parse(row.created_at) || Date.now(), fromName: row.from_name || '' });
+    thread.sort((a, b) => a.at - b.at);
+    if (thread.length > 200) thread.splice(0, thread.length - 200);
+    if (row.created_at && (!msgSince || row.created_at > msgSince)) msgSince = row.created_at;
+    return !mine;
+  }
+
+  O.sendMessage = async function (toNetId, text) {
+    const me = O.me();
+    if (!me || !O.state.ready) return { err: 'Not connected to the online service yet.' };
+    text = String(text || '').trim();
+    if (!text) return { err: 'Nothing to send.' };
+    try {
+      const rows = await rest('POST', 'dya_messages', {
+        from_id: me.netId, from_name: me.displayName, to_id: toNetId, body: text.slice(0, 300),
+      }, 'return=representation');
+      if (rows && rows[0]) ingestMessage(rows[0]); // adopt the server row (with its id) so the poll won't duplicate it
+    } catch (e) { return { err: 'Could not send the message: ' + e.message }; }
+    return { ok: true };
+  };
+
+  /* incremental fetch of everything to/from me since the last poll */
+  O.pollMessages = async function () {
+    const me = O.me();
+    if (!me || !O.configured() || !O.state.ready) return;
+    try {
+      let path = 'dya_messages?or=(to_id.eq.' + me.netId + ',from_id.eq.' + me.netId + ')&select=*';
+      path += msgSince
+        ? '&created_at=gt.' + encodeURIComponent(msgSince) + '&order=created_at.asc'
+        : '&order=created_at.desc&limit=200';
+      let rows = await rest('GET', path) || [];
+      if (!msgSince) rows = rows.slice().reverse(); // backlog came newest-first
+      const fresh = [];
+      const affected = {};
+      rows.forEach(row => {
+        const wasNew = ingestMessage(row);
+        const other = row.from_id === me.netId ? row.to_id : row.from_id;
+        affected[other] = true;
+        if (wasNew && !firstMsgLoad) fresh.push(row);
+      });
+      firstMsgLoad = false;
+      fresh.forEach(row => {
+        DYA.state.notify({ type: 'social', title: row.from_name || 'Friend', body: row.body, icon: '💬', action: { screen: 'friends' }, actionLabel: 'Open Friends' });
+      });
+      if (rows.length && DYA.ui) {
+        Object.keys(affected).forEach(id => { if (DYA.ui.onDM) DYA.ui.onDM(id); });
+        if (DYA.ui.onOnlineUpdate) DYA.ui.onOnlineUpdate();
+      }
+    } catch (e) { /* transient — try again next tick */ }
+  };
+
   /* ---------- polling ---------- */
   O.refresh = async function () {
     const me = O.me();
@@ -278,6 +345,7 @@
     clearInterval(timer); timer = null;
     O.state.ready = false;
     O.state.friends = []; O.state.incoming = []; O.state.outgoing = [];
+    O.state.dms = {}; knownMsgIds = {}; msgSince = null; firstMsgLoad = true;
     /* the shared online market rides the same auth lifecycle */
     if (DYA.marketOnline) DYA.marketOnline.onAuthChange();
     /* so do the shared online tournaments */
@@ -286,7 +354,7 @@
     if (DYA.season) DYA.season.onAuthChange();
     const me = O.me();
     if (!me || !O.configured()) return;
-    ensureRegistered().then(ok => { if (ok) O.refresh(); });
-    timer = setInterval(() => { heartbeat(); O.refresh(); }, HEARTBEAT_MS);
+    ensureRegistered().then(ok => { if (ok) { O.refresh(); O.pollMessages(); } });
+    timer = setInterval(() => { heartbeat(); O.refresh(); O.pollMessages(); }, HEARTBEAT_MS);
   };
 })();

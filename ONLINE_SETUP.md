@@ -5,16 +5,18 @@ make the game online. Firebase here only *hosts the files* (like GitHub Pages do
 computer that opens the game still keeps its own private world in its own browser storage —
 which is why you and your friend could type codes at each other all day and never connect.
 
-The game's real online features (cross-device **accounts**, cross-device **friends**,
-cross-device **private matches**, the **shared player market**, and the **admin panel's
-live game edits**) run on a free **Supabase** project. One of you sets it up once; then it
-works for everyone who plays your deployment.
+The game's real online features (cross-device **accounts**, cross-device **friends** and
+**chat**, cross-device **private matches**, **shared tournaments** and the **ranked season
+ladder**, the **shared player market**, and the **admin panel's live game edits**) run on a
+free **Supabase** project. One of you sets it up once; then it works for everyone who plays
+your deployment.
 
 > **Already set up from an earlier version?** Just re-run `supabase/schema.sql` (Step 2) —
 > every statement is idempotent, so it only adds the new tables (`dya_listings` for the
 > shared market, `dya_tournaments`/`dya_tournament_players` for shared tournaments,
-> `dya_config` for admin edits, `dya_accounts`/`dya_bans` for cross-device
-> accounts) and leaves your existing data alone.
+> `dya_season_queue` for the ranked season ladder, `dya_config` for admin edits,
+> `dya_accounts`/`dya_bans` for cross-device accounts, `dya_messages` for friend chat)
+> and leaves your existing data alone.
 
 ---
 

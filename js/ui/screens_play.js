@@ -1040,9 +1040,14 @@
       const oppStatus = U.el('p', { cls: 'mt', text: 'Voting…' });
       right.appendChild(oppStatus);
       const chat = U.el('div', { cls: 'mt' });
+      const say = (msg) => UI.toast({ title: G.me.displayName, body: msg, icon: '💬' });
       L.QUICK_CHAT.slice(0, 4).forEach(q => {
-        chat.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:2px', text: q, onclick: () => UI.toast({ title: G.me.displayName, body: q, icon: '💬' }) }));
+        chat.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:2px', text: q, onclick: () => say(q) }));
       });
+      /* free-text typing */
+      const chatType = U.el('input', { cls: 'txt mt', maxlength: 120, placeholder: 'Type a message…' });
+      chatType.addEventListener('keydown', e => { if (e.key === 'Enter') { const t = chatType.value.trim(); if (t) { say(t); chatType.value = ''; } } });
+      chat.appendChild(chatType);
       right.appendChild(chat);
       wrap.appendChild(right);
       scr.appendChild(wrap);
@@ -1791,7 +1796,13 @@
       const chatBox = U.el('div', { cls: 'duel-chat' });
       const chatIn = U.el('div', { cls: 'duel-chat-in' });
       L.QUICK_CHAT.forEach(q => chatIn.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:1px', text: q, onclick: () => sayMine(q) })));
-      chatBox.appendChild(chatLog); chatBox.appendChild(chatIn);
+      /* free-text typing alongside the quick-chat phrases */
+      const chatType = U.el('input', { cls: 'txt', maxlength: 120, placeholder: 'Type a message…', style: 'flex:1;min-width:120px' });
+      const sendTyped = () => { const t = chatType.value.trim(); if (!t || launched) return; sayMine(t); chatType.value = ''; };
+      chatType.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendTyped(); } });
+      const chatSend = U.el('button', { cls: 'btn small primary', style: 'margin:1px', text: 'Send', onclick: sendTyped });
+      const chatTypeRow = U.el('div', { style: 'display:flex;gap:4px;margin-top:4px' }, [chatType, chatSend]);
+      chatBox.appendChild(chatLog); chatBox.appendChild(chatIn); chatBox.appendChild(chatTypeRow);
       function addChat(cls, who, text) {
         const msg = U.el('div', { cls: 'duel-msg ' + cls });
         if (who) msg.appendChild(U.el('span', { cls: 'who', text: who }));

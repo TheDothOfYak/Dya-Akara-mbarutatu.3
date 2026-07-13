@@ -650,6 +650,70 @@
         return row;
       }
 
+      /* ---------- direct-message thread with a friend ----------
+         Online (net) friends talk over Supabase (O.state.dms + O.sendMessage);
+         local Dya'kukull talk to the on-device simulation (G.me.dms). */
+      function openDM(acc) {
+        const online = !!acc.net;
+        const otherId = acc.id;
+        const wrap = U.el('div', { style: 'width:min(460px,88vw)' });
+        wrap.appendChild(U.el('h3', { cls: 'gold', text: '💬 ' + acc.displayName + (online ? ' 🌐' : '') }));
+        const log = U.el('div', { cls: 'offer-msgs', style: 'max-height:48vh;overflow-y:auto;margin:10px 0;min-height:80px' });
+        const thread = () => online ? (O.state.dms[otherId] || []) : ((G.me.dms && G.me.dms[otherId]) || []);
+        function renderLog() {
+          log.innerHTML = '';
+          const t = thread();
+          if (!t.length) log.appendChild(U.el('p', { cls: 'muted small center', text: 'Say hello to ' + acc.displayName + '.' }));
+          t.forEach(msg => {
+            log.appendChild(U.el('div', { cls: 'offer-msg' + (msg.by === 'me' ? ' mine' : '') }, [
+              U.el('div', { cls: 'om-bubble chat', text: msg.text }),
+            ]));
+          });
+          log.scrollTop = log.scrollHeight;
+        }
+        const inRow = U.el('div', { cls: 'flex mt' });
+        const inp = U.el('input', { cls: 'txt', placeholder: 'Message ' + acc.displayName + '…', maxlength: online ? 300 : 200, style: 'flex:1' });
+        const send = () => {
+          const t = inp.value.trim(); if (!t) return;
+          if (online) {
+            inp.value = '';
+            O.sendMessage(otherId, t).then(r => {
+              if (r && r.err) { UI.alert('Cannot send', r.err); inp.value = t; return; }
+              renderLog();
+            });
+          } else {
+            const r = G.sendDM(otherId, t);
+            if (r && r.err) { UI.alert('Cannot send', r.err); return; }
+            if (r && r.replyIn) setTimeout(() => G.simTick(), r.replyIn + 200);
+            inp.value = ''; renderLog();
+          }
+          inp.focus();
+        };
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
+        inRow.appendChild(inp);
+        inRow.appendChild(U.el('button', { cls: 'btn primary', text: 'Send', onclick: send }));
+        wrap.appendChild(log); wrap.appendChild(inRow);
+        UI.modal(wrap);
+        renderLog();
+        setTimeout(() => inp.focus(), 0);
+        /* live-refresh when a reply lands; self-cleans once the modal node
+           leaves the DOM (backdrop close removes it directly) */
+        UI._dmRefresh = { id: otherId, el: log, fn: renderLog };
+        if (online) {
+          O.pollMessages();
+          const iv = setInterval(() => {
+            if (!log.isConnected) { clearInterval(iv); return; } // modal closed → stop polling
+            O.pollMessages();
+          }, 3500);
+        }
+      }
+      UI.onDM = (id) => {
+        const r = UI._dmRefresh;
+        if (!r) return;
+        if (!r.el.isConnected) { UI._dmRefresh = null; return; }
+        if (r.id === id) r.fn();
+      };
+
       /* the online banner: your friend code, or the setup prompt */
       function onlineBanner() {
         const bar = U.el('div', { cls: 'panel mb', style: 'padding:12px 16px' });
@@ -739,6 +803,7 @@
             O.state.friends.forEach(f => {
               const shim = { id: f.id, displayName: f.name, level: f.level, avatarIdx: f.avatarIdx, onlineStatus: f.status, net: true, code: f.code };
               body.appendChild(friendRow(shim, [
+                U.el('button', { cls: 'btn small', text: '💬 Message', onclick: () => openDM(shim) }),
                 U.el('button', {
                   cls: 'btn small', text: '⚔ Invite', title: 'Open a private room and share the code with ' + f.name,
                   onclick: () => DYA.play.privateOnlineFlow({ hostFor: f.name }),
@@ -767,6 +832,7 @@
             body.appendChild(U.el('h3', { cls: 'gold mb mt', text: gname.toUpperCase() + ' — ' + groups[gname].length }));
             groups[gname].forEach(acc => {
               body.appendChild(friendRow(acc, [
+                U.el('button', { cls: 'btn small', text: '💬 Message', onclick: () => openDM(acc) }),
                 U.el('button', { cls: 'btn small', text: '⚔ Invite', onclick: () => DYA.play.inviteFriendMatch(acc) }),
                 U.el('button', { cls: 'btn small ghost', text: 'Profile', onclick: () => UI.show('profile', { account: acc }) }),
                 U.el('button', { cls: 'btn small ghost', text: 'Stall', onclick: () => UI.show('playerStall', { seller: acc }) }),
