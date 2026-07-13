@@ -579,6 +579,11 @@
     else if (placement === 2) { gold = Math.round(pool * 0.25); xp = Math.round((EC.CIRCUIT_XP[t.circuit] || 0) * 0.3); }
     else if (placement === 3) { gold = Math.round(pool * 0.05); xp = Math.round((EC.CIRCUIT_XP[t.circuit] || 0) * 0.15); }
     if (gold) G.addGold(gold, true);
+    /* admin-authored per-placement rewards (Okid, NgAkara, tokens, Hunt
+       privileges) ride in data.rewards; 1st = index 0, 2nd = 1, 3rd = 2 … */
+    if (Array.isArray(t.rewards) && placement >= 1 && placement <= t.rewards.length && t.rewards[placement - 1]) {
+      G.grantTournamentReward(m.id, t.rewards[placement - 1]);
+    }
     if (placement === 1) {
       m.stats.tourneysWon = (m.stats.tourneysWon || 0) + 1;
       if (G.grantAchievement) G.grantAchievement('tourney_win');
@@ -609,6 +614,7 @@
       entryFee: def.entryFee || 0, pouchFormat: def.pouchFormat || 'three-draft',
       size: def.size || 8, structure: def.structure || 'single',
       aftd: false, customReward: { gold: def.bonusGold || 0, tokenId: null },
+      rewards: Array.isArray(def.rewards) ? def.rewards : null,
       terrainTokens: [],
       titlePool: def.titlePool || EC.TITLES.filter(tt => tt.tier === circuit || (circuit === 'Whole Planet' && tt.tier === 'Planet')).map(tt => tt.id),
       rules: [], arena: (L.ARENAS[circuit] ? L.ARENAS[circuit][0] : 'Arena'),

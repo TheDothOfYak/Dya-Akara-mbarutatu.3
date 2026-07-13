@@ -512,10 +512,49 @@
     const okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
     return okidAvail >= okidNeed && G.me.ngakara >= cost.ngakara;
   };
-  G.craftToken = function (piece, temperBias) {
+  /* Craft-by-Okid (admin feature): when EC.CRAFT_BY_OKID is configured and the
+     player has chosen which Okid rarity to spend, the crafted token's power is
+     decided by that choice via the designer's table. Returns the target rarity
+     + stat multipliers, or null when the classic (piece-rarity) path applies. */
+  G.craftByOkidMap = function (okidRarity) {
+    const tbl = EC.CRAFT_BY_OKID;
+    if (!Array.isArray(tbl) || okidRarity == null) return null;
+    const m = tbl[okidRarity];
+    if (!m) return null;
+    const target = m.rarity != null ? U.clamp(m.rarity | 0, 0, 6) : okidRarity;
+    return { target, hpMul: m.hpMul != null ? m.hpMul : 1, dmgMul: m.dmgMul != null ? m.dmgMul : 1, speedMul: m.speedMul != null ? m.speedMul : 1 };
+  };
+  G.craftToken = function (piece, temperBias, okidRarity) {
     // piece: {speciesId, rarity?} from a Hunt (or market pieces)
     const sp = SP.get(piece.speciesId);
     const rng = new U.Rng(U.newSeed());
+    const map = G.craftByOkidMap(okidRarity);
+
+    /* ---- designer path: the chosen Okid rarity decides the token's power ---- */
+    if (map) {
+      const rarity = map.target;
+      const cost = EC.CRAFT_COST[rarity];
+      const okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
+      let avail = 0; for (let i = okidRarity; i < 7; i++) avail += G.me.okid[i];
+      if (avail < okidNeed || G.me.ngakara < cost.ngakara) return { err: 'Not enough materials — needs ' + okidNeed + ' ' + SP.RARITIES[okidRarity] + '+ Okid and ' + cost.ngakara + ' NgAkara.' };
+      let need = okidNeed;
+      for (let i = okidRarity; i < 7 && need > 0; i++) { const use = Math.min(G.me.okid[i], need); G.me.okid[i] -= use; need -= use; }
+      G.me.ngakara -= cost.ngakara;
+      const tok = TK.mint({ speciesId: piece.speciesId, rng, owner: G.me.id, crafter: G.me.id, rarity, temperBias: temperBias || piece.temperBias || 0 });
+      tok.stats.hp = Math.max(1, Math.round(tok.stats.hp * map.hpMul));
+      tok.stats.dmg = Math.max(0, Math.round(tok.stats.dmg * map.dmgMul * 10) / 10);
+      tok.stats.speed = Math.max(0, Math.round(tok.stats.speed * map.speedMul));
+      tok.newlyCrafted = true;
+      G.addToken(tok);
+      G.me.pieces = G.me.pieces.filter(p => p !== piece);
+      G.me.stats.crafted++;
+      checkAchievement('first_craft', 1);
+      checkAchievement('craft_10', G.me.stats.crafted);
+      G.save();
+      return { tok };
+    }
+
+    /* ---- classic path: the Hunt shard's own rarity ---- */
     const rarity = piece.rarity != null ? piece.rarity : rng.int(sp.rarity[0], sp.rarity[1]);
     if (!G.canCraft(rarity)) return { err: 'Not enough materials.' };
     const cost = EC.CRAFT_COST[rarity];
@@ -534,6 +573,25 @@
     checkAchievement('craft_10', G.me.stats.crafted);
     G.save();
     return { tok };
+  };
+
+  /* ---------- combine Okid: fuse N of one rarity into the next tier ---------- */
+  G.combineOkidRule = function () {
+    const c = EC.COMBINE_OKID || { need: 3, yield: 1 };
+    return { need: Math.max(2, c.need | 0 || 3), yield: Math.max(1, c.yield | 0 || 1) };
+  };
+  G.canCombineOkid = function (rarity) {
+    if (rarity == null || rarity < 0 || rarity >= 6) return false; // no tier above Torcain
+    return (G.me.okid[rarity] || 0) >= G.combineOkidRule().need;
+  };
+  G.combineOkid = function (rarity) {
+    if (rarity >= 6) return { err: 'Torcain is the highest rarity — there is nothing above it.' };
+    const rule = G.combineOkidRule();
+    if ((G.me.okid[rarity] || 0) < rule.need) return { err: 'Need ' + rule.need + ' ' + SP.RARITIES[rarity] + ' Okid to combine.' };
+    G.me.okid[rarity] -= rule.need;
+    G.me.okid[rarity + 1] += rule.yield;
+    G.save();
+    return { ok: true, from: rarity, to: rarity + 1, yield: rule.yield };
   };
 
   /* ---------- token upgrading (raise a specific individual's rarity) ----------
@@ -1146,6 +1204,48 @@
   }
   G.seedTournamentsForAdmin = function () { seedTournaments(G.world, new U.Rng(U.newSeed())); G.save(); };
 
+  /* ---------- rich tournament rewards (admin-authored, per placement) ----------
+     reward: { gold, ngakara, huntSlots, okid:[{rarity,qty}], tokens:[{speciesId,rarity,qty}] }
+     Grants everything to one account (real player or Dya'kukull). "Hunting
+     privileges" are Hunt slots. Returns a summary for the placement modal. */
+  G.grantTournamentReward = function (accId, reward) {
+    if (!reward) return null;
+    const acc = G.world.accounts[accId];
+    if (!acc) return null;
+    const isMe = !!(G.me && acc.id === G.me.id);
+    const summary = { gold: 0, ngakara: 0, huntSlots: 0, okid: [], tokens: [] };
+    if (reward.gold) { if (isMe) G.addGold(reward.gold, true); else acc.gold += reward.gold; summary.gold += reward.gold; }
+    if (reward.ngakara) { acc.ngakara = (acc.ngakara || 0) + reward.ngakara; summary.ngakara += reward.ngakara; }
+    (reward.okid || []).forEach(o => {
+      const r = U.clamp((o.rarity | 0), 0, 6), q = (o.qty | 0);
+      if (q > 0) { acc.okid[r] = (acc.okid[r] || 0) + q; summary.okid.push({ rarity: r, qty: q }); }
+    });
+    (reward.tokens || []).forEach(tk => {
+      if (!SP.get(tk.speciesId)) return;
+      const q = Math.max(1, (tk.qty | 0) || 1);
+      for (let i = 0; i < q; i++) {
+        const tok = TK.mint({ speciesId: tk.speciesId, rng: new U.Rng(U.newSeed()), owner: acc.id, rarity: (tk.rarity != null ? tk.rarity : undefined), aiOwner: !!acc.ai });
+        acc.tokens[tok.id] = tok;
+        summary.tokens.push(tok);
+      }
+    });
+    if (reward.huntSlots) {
+      const n = reward.huntSlots | 0;
+      for (let i = 0; i < n; i++) acc.huntSlots.push({ id: U.uid('hs'), huntId: null, source: 'tournament', expiresAtBand: Math.floor((acc.level || 1) / 10) * 10 + 10 });
+      summary.huntSlots += n;
+    }
+    if (isMe && (summary.okid.length || summary.tokens.length || summary.huntSlots || summary.ngakara)) {
+      const bits = [];
+      if (summary.ngakara) bits.push('+' + summary.ngakara + ' NgAkara');
+      summary.okid.forEach(o => bits.push('+' + o.qty + ' ' + SP.RARITIES[o.rarity] + ' Okid'));
+      if (summary.tokens.length) bits.push('+' + summary.tokens.length + ' token' + (summary.tokens.length > 1 ? 's' : ''));
+      if (summary.huntSlots) bits.push('+' + summary.huntSlots + ' Hunt privilege' + (summary.huntSlots > 1 ? 's' : ''));
+      if (bits.length) G.notify({ type: 'tournament', title: 'Tournament rewards', body: bits.join(' · '), icon: '🎁' });
+    }
+    if (!isMe) pushAccountToCloud(acc);
+    return summary;
+  };
+
   /* ================== AI WORLD SIMULATION TICK ================== */
   let lastSim = 0;
   G.simTick = function () {
@@ -1459,11 +1559,15 @@
         const pieceSpid = huntSpecies.length ? rng.pick(huntSpecies) : rng.pick(SP.craftable);
         a.pieces.push({ speciesId: pieceSpid, material: rng.pick(L.MATERIALS), from: 'Hunt', temperBias: 0, at: now });
       } else if (r2 < 0.75) { /* craft something (keeps stalls stocked) */
-        const piece = (a.pieces || []).pop();
-        const spid = piece ? piece.speciesId : rng.pick(SP.craftable);
-        const tok = TK.mint({ speciesId: spid, rng: new U.Rng(U.newSeed()), owner: a.id, aiOwner: true });
-        a.tokens[tok.id] = tok;
-        a.stats.crafted++;
+        /* skip minting new filler when the creator has turned auto-generation
+           off — they want to hand-design every active token */
+        if (!EC.NO_AUTOGEN) {
+          const piece = (a.pieces || []).pop();
+          const spid = piece ? piece.speciesId : rng.pick(SP.craftable);
+          const tok = TK.mint({ speciesId: spid, rng: new U.Rng(U.newSeed()), owner: a.id, aiOwner: true });
+          a.tokens[tok.id] = tok;
+          a.stats.crafted++;
+        }
       } else if (r2 < 0.85) { /* post a notice */
         G.world.trinvak.unshift({
           id: U.uid('tv'), at: now, author: a.displayName, paid: 5 + Math.floor(rng.next() * 40),
@@ -1559,10 +1663,25 @@
   }
 
   /* ================== ADMIN ================== */
+  /* The admin password is kept in its OWN localStorage key, written and read
+     synchronously — NOT inside the world save. The world save is debounced,
+     versioned (a version bump regenerates a fresh world), and can be reset or
+     re-imported; any of those would silently wipe an in-world password and
+     force "first access — set the password" on every reload. A standalone key
+     survives all of that. world.adminPass is still mirrored for older saves. */
+  const ADMIN_PASS_KEY = 'dyaakara_admin_pass_v1';
+  function readAdminPass() {
+    try { const v = localStorage.getItem(ADMIN_PASS_KEY); if (v) return v; } catch (e) { /* ignore */ }
+    return (G.world && G.world.adminPass) || null;
+  }
+  function writeAdminPass(hash) {
+    try { localStorage.setItem(ADMIN_PASS_KEY, hash); } catch (e) { /* ignore */ }
+    if (G.world) { G.world.adminPass = hash; G.saveNow(); }
+  }
   G.admin = {
-    setPass(p) { G.world.adminPass = hashPass(p); G.saveNow(); },
-    checkPass(p) { return G.world.adminPass === hashPass(p); },
-    hasPass() { return !!G.world.adminPass; },
+    setPass(p) { writeAdminPass(hashPass(p)); },
+    checkPass(p) { return readAdminPass() === hashPass(p); },
+    hasPass() { return !!readAdminPass(); },
     ban(accId, reason, days) {
       const until = days ? Date.now() + days * 86400000 : null;
       G.world.bans[accId] = { at: Date.now(), reason, permanent: !days, until, public: true };
@@ -1599,6 +1718,35 @@
       return { tok };
     },
     grantTrusted(accId) { const a = G.world.accounts[accId]; if (a) { a.trustedSeller = true; G.saveNow(); pushAccountToCloud(a); } },
+    /* count of procedurally-generated filler tokens still in the world */
+    countAutoGenTokens() {
+      let n = 0;
+      Object.values(G.world.accounts).forEach(acc => Object.values(acc.tokens || {}).forEach(t => { if (t.autoGen && !t.adminEdited && !t.isStarter) n++; }));
+      return n;
+    },
+    /* wipe every auto-generated token so only hand-designed / tutorial tokens
+       remain. Cleans pouches and any market listings that pointed at them. */
+    purgeAutoGenTokens() {
+      let removed = 0;
+      const touched = [];
+      Object.values(G.world.accounts).forEach(acc => {
+        let hit = false;
+        Object.values(acc.tokens || {}).forEach(t => {
+          if (t.autoGen && !t.adminEdited && !t.isStarter) {
+            delete acc.tokens[t.id]; removed++; hit = true;
+            (acc.pouches || []).forEach(p => { if (p.tokenIds) p.tokenIds = p.tokenIds.filter(x => x !== t.id); });
+          }
+        });
+        if (hit) touched.push(acc);
+      });
+      Object.values(G.world.market.listings).forEach(l => {
+        const seller = G.world.accounts[l.sellerId];
+        if (!seller || !seller.tokens[l.tokenId]) delete G.world.market.listings[l.id];
+      });
+      G.saveNow();
+      touched.forEach(acc => pushAccountToCloud(acc));
+      return { removed };
+    },
     activateInterplanetary() {
       const rng = new U.Rng(U.newSeed());
       const t = {

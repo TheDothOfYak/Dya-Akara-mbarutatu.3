@@ -63,15 +63,16 @@
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap', style: 'max-width:420px;margin-top:12vh' });
     wrap.appendChild(U.el('h1', { cls: 'gold center', text: "DYA'AKARA — ADMIN" }));
-    wrap.appendChild(U.el('p', { cls: 'muted center small mt', text: G.world.adminPass ? 'Enter the admin password.' : 'First access — set the admin password. You are the admin.' }));
+    const hasPass = G.admin.hasPass();
+    wrap.appendChild(U.el('p', { cls: 'muted center small mt', text: hasPass ? 'Enter the admin password.' : 'First access — set the admin password. You are the admin.' }));
     const pass = U.el('input', { cls: 'txt mt', type: 'password', placeholder: 'Admin password' });
     wrap.appendChild(pass);
     const err = U.el('div', { cls: 'small center mt', style: 'color:var(--red);min-height:16px' });
     wrap.appendChild(err);
-    const btn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: G.world.adminPass ? 'Enter' : 'Set password & enter' });
+    const btn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: hasPass ? 'Enter' : 'Set password & enter' });
     btn.onclick = async () => {
       if (pass.value.length < 4) { err.textContent = 'At least 4 characters.'; return; }
-      if (!G.world.adminPass) { G.admin.setPass(pass.value); await loadCloudAccounts(); panel(); return; }
+      if (!G.admin.hasPass()) { G.admin.setPass(pass.value); await loadCloudAccounts(); panel(); return; }
       if (G.admin.checkPass(pass.value)) { await loadCloudAccounts(); panel(); }
       else err.textContent = 'Wrong password. The Guild is watching. Cordially.';
     };
@@ -203,7 +204,17 @@
     lblIn(form, 'Bracket', struct); lblIn(form, 'Pouch', pfmt); lblIn(form, 'Entry fee', fee);
     lblIn(form, 'Champion bonus', bonus); lblIn(form, 'Password', pw);
     box.appendChild(form);
-    const cacts = U.el('div', { cls: 'flex mt' });
+    let pendingRewards = null;
+    const cacts = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:6px' });
+    const rewLbl = U.el('span', { cls: 'small muted', style: 'align-self:center' });
+    const setRewLbl = () => rewLbl.textContent = pendingRewards && pendingRewards.length ? '🎁 rewards set for top ' + pendingRewards.length : 'no placement rewards yet';
+    setRewLbl();
+    cacts.appendChild(U.el('button', {
+      cls: 'btn small', text: '🎁 Placement rewards…', onclick: () => {
+        editTournamentRewards(parseInt(size.value) || 8, pendingRewards, (rw) => { pendingRewards = rw; setRewLbl(); });
+      },
+    }));
+    cacts.appendChild(rewLbl);
     cacts.appendChild(U.el('button', {
       cls: 'btn small primary', text: '＋ Create official tournament', onclick: async () => {
         if (nm.value.trim().length < 3) { alert('Give it a name (3+ characters).'); return; }
@@ -211,9 +222,10 @@
           name: nm.value.trim(), circuit: circuit.value, size: parseInt(size.value),
           structure: struct.value, pouchFormat: pfmt.value, entryFee: parseInt(fee.value) || 0,
           bonusGold: parseInt(bonus.value) || 0, password: pw.value.trim() || null,
+          rewards: pendingRewards,
         });
         if (r.err) { alert('Could not create: ' + r.err); return; }
-        nm.value = ''; pw.value = '';
+        nm.value = ''; pw.value = ''; pendingRewards = null; setRewLbl();
         alert('Official tournament created. Share it — players will see it in their Tournament Browser. Come back here to MAKE IT LIVE once they’ve joined.');
         rerender();
       },
@@ -621,6 +633,77 @@
       cbox.appendChild(cacts);
       body.appendChild(cbox);
 
+      /* --- Combine Okid rule (3 same → 1 next tier) --- */
+      const cmb = EC.COMBINE_OKID || { need: 3, yield: 1 };
+      const mbox = U.el('div', { cls: 'panel mb' });
+      mbox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Combine Okid (fuse up a tier)' }));
+      mbox.appendChild(U.el('p', { cls: 'small muted', text: 'Players fuse several Okid of one rarity into the next rarity up. Default: 3 → 1.' }));
+      const mrow = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px' });
+      const needIn = numIn(cmb.need, { step: 1, min: 2 });
+      const yieldIn = numIn(cmb.yield, { step: 1, min: 1 });
+      mrow.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Okid consumed (same rarity)' }), needIn]));
+      mrow.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Okid produced (next rarity)' }), yieldIn]));
+      mbox.appendChild(mrow);
+      const macts = U.el('div', { cls: 'flex mt' });
+      macts.appendChild(U.el('button', {
+        cls: 'btn small primary', text: 'Save', onclick: () => {
+          M.set('economy', 'COMBINE_OKID', { need: Math.max(2, parseInt(needIn.value, 10) || 3), yield: Math.max(1, parseInt(yieldIn.value, 10) || 1) });
+          flashSaved(macts);
+        },
+      }));
+      macts.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Reset', onclick: () => { M.set('economy', 'COMBINE_OKID', null); needIn.value = EC.COMBINE_OKID.need; yieldIn.value = EC.COMBINE_OKID.yield; flashSaved(macts, 'Reset.'); } }));
+      mbox.appendChild(macts);
+      body.appendChild(mbox);
+
+      /* --- Crafted token power per Okid rarity (design the craft-from-shard outcome) --- */
+      const pbox = U.el('div', { cls: 'panel mb' });
+      pbox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Crafted token power per Okid rarity' }));
+      pbox.appendChild(U.el('p', { cls: 'small muted', text: 'When ON, crafting a Hunt shard lets the player pick which Okid rarity to spend, and that choice decides the crafted token — its rarity and flat HP/Damage/Speed multipliers. When OFF, crafting uses the shard’s own rarity (classic).' }));
+      const active = Array.isArray(EC.CRAFT_BY_OKID);
+      const enWrap = U.el('div', { cls: 'flex', style: 'align-items:center;gap:10px' });
+      const enTog = U.el('div', { cls: 'toggle' + (active ? ' on' : '') });
+      enWrap.appendChild(enTog);
+      enWrap.appendChild(U.el('span', { cls: 'small', text: active ? 'ON — players choose the Okid quality' : 'OFF — classic crafting' }));
+      pbox.appendChild(enWrap);
+      const tblHolder = U.el('div', { cls: 'mt' });
+      pbox.appendChild(tblHolder);
+      function paintOkidTable() {
+        tblHolder.innerHTML = '';
+        if (!Array.isArray(EC.CRAFT_BY_OKID)) return;
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['Okid used', '→ Token rarity', 'HP ×', 'Damage ×', 'Speed ×'].map(h => U.el('th', { text: h }))));
+        const ins = [];
+        SP.RARITIES.forEach((rn, i) => {
+          const m = EC.CRAFT_BY_OKID[i] || { rarity: i, hpMul: 1, dmgMul: 1, speedMul: 1 };
+          const rSel = selectEl(SP.RARITIES.map((r2, j) => [String(j), r2]), String(m.rarity != null ? m.rarity : i));
+          const hp = numIn(m.hpMul != null ? m.hpMul : 1, { step: 0.05, style: 'max-width:80px' });
+          const dm = numIn(m.dmgMul != null ? m.dmgMul : 1, { step: 0.05, style: 'max-width:80px' });
+          const sp2 = numIn(m.speedMul != null ? m.speedMul : 1, { step: 0.05, style: 'max-width:80px' });
+          ins.push({ rSel, hp, dm, sp2 });
+          tbl.appendChild(U.el('tr', {}, [
+            U.el('td', { html: '<span class="rarity-dot br' + i + '"></span>' + rn }),
+            U.el('td', {}, [rSel]), U.el('td', {}, [hp]), U.el('td', {}, [dm]), U.el('td', {}, [sp2]),
+          ]));
+        });
+        tblHolder.appendChild(tbl);
+        const pacts = U.el('div', { cls: 'flex mt' });
+        pacts.appendChild(U.el('button', {
+          cls: 'btn small primary', text: 'Save table', onclick: () => {
+            const val = ins.map(x => ({ rarity: parseInt(x.rSel.value, 10) || 0, hpMul: parseFloat(x.hp.value) || 1, dmgMul: parseFloat(x.dm.value) || 1, speedMul: parseFloat(x.sp2.value) || 1 }));
+            M.set('economy', 'CRAFT_BY_OKID', val);
+            flashSaved(pacts);
+          },
+        }));
+        tblHolder.appendChild(pacts);
+      }
+      enTog.onclick = () => {
+        if (Array.isArray(EC.CRAFT_BY_OKID)) { M.set('economy', 'CRAFT_BY_OKID', null); }
+        else { M.set('economy', 'CRAFT_BY_OKID', EC.defaultCraftByOkid()); }
+        rerender();
+      };
+      paintOkidTable();
+      body.appendChild(pbox);
+
       /* scalar knobs */
       const sbox = U.el('div', { cls: 'panel mb' });
       sbox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Other dials' }));
@@ -720,9 +803,13 @@
           naiAcc.level = Math.max(1, Math.round(rng.gauss(12, 8)));
           naiAcc.gold = Math.round(500 + rng.next() * 4000);
           naiAcc.tokens = {};
-          for (let i = 0; i < 12; i++) {
-            const t = TK.mint({ speciesId: rng.pick(SP.craftable), rng, owner: naiAcc.id, aiOwner: true });
-            naiAcc.tokens[t.id] = t;
+          /* respect the "no auto-generated tokens" setting — a fresh AI starts
+             empty so the creator can hand-design its collection */
+          if (!EC.NO_AUTOGEN) {
+            for (let i = 0; i < 12; i++) {
+              const t = TK.mint({ speciesId: rng.pick(SP.craftable), rng, owner: naiAcc.id, aiOwner: true });
+              naiAcc.tokens[t.id] = t;
+            }
           }
           naiAcc.pouches = [];
           naiAcc.stall.name = name + '’s Stall';
@@ -948,6 +1035,7 @@
           tr.appendChild(U.el('td', { text: tok.stats ? (tok.stats.hp + ' / ' + tok.stats.dmg + ' / ' + tok.stats.speed) : '—' }));
           tr.appendChild(U.el('td', { text: tok.matchesPlayed || 0 }));
           const actTd = U.el('td', {});
+          actTd.appendChild(U.el('button', { cls: 'btn small primary', text: 'Edit', onclick: () => editToken(tok, owner) }));
           actTd.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Owner', onclick: () => editAccount(owner) }));
           tr.appendChild(actTd);
           tbl.appendChild(tr);
@@ -1012,8 +1100,9 @@
       const tbl = U.el('table', { cls: 'adm' });
       tbl.appendChild(U.el('tr', {}, [U.el('th', { text: 'Name' }), U.el('th', { text: 'Circuit' }), U.el('th', { text: 'State' }), U.el('th', { text: 'Players' }), U.el('th', { text: '' })]));
       Object.values(G.world.tournaments).forEach(t => {
-        const tr = U.el('tr', {}, [U.el('td', { text: t.name + (t.sealed ? ' 🔴' : '') }), U.el('td', { text: t.circuit }), U.el('td', { text: t.state }), U.el('td', { text: t.players.length + '/' + t.size })]);
+        const tr = U.el('tr', {}, [U.el('td', { text: t.name + (t.sealed ? ' 🔴' : '') + (Array.isArray(t.placeRewards) && t.placeRewards.length ? ' 🎁' : '') }), U.el('td', { text: t.circuit }), U.el('td', { text: t.state }), U.el('td', { text: t.players.length + '/' + t.size })]);
         const td = U.el('td', {});
+        td.appendChild(U.el('button', { cls: 'btn small', text: '🎁 Rewards', onclick: () => editTournamentRewards(t.size, t.placeRewards, (rw) => { if (rw) t.placeRewards = rw; else delete t.placeRewards; G.saveNow(); rerender(); }) }));
         td.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: () => { delete G.world.tournaments[t.id]; G.saveNow(); rerender(); } }));
         tr.appendChild(td);
         tbl.appendChild(tr);
@@ -1143,6 +1232,30 @@
           },
         }),
       ]));
+      /* ---- hand-designed world: purge auto-generated tokens + stop new ones ---- */
+      body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Auto-generated tokens' }));
+      const autoCount = G.admin.countAutoGenTokens();
+      const noAuto = !!EC.NO_AUTOGEN;
+      body.appendChild(U.el('p', { cls: 'muted small', text: 'Design every active token by hand: turn off auto-generation so the world stops minting filler, then purge the procedurally-generated tokens that already exist. Tutorial/starter tokens and anything you have edited are kept.' }));
+      const agRow = U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap;align-items:center;gap:10px' });
+      const agTog = U.el('div', { cls: 'toggle' + (noAuto ? ' on' : '') });
+      agTog.onclick = () => { M.set('economy', 'NO_AUTOGEN', noAuto ? null : true); rerender(); };
+      agRow.appendChild(agTog);
+      agRow.appendChild(U.el('span', { cls: 'small', text: noAuto ? 'Auto-generation OFF — the world no longer mints filler tokens.' : 'Auto-generation ON — Dya’kukull still craft filler tokens.' }));
+      body.appendChild(agRow);
+      body.appendChild(U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap;align-items:center;gap:10px' }, [
+        U.el('button', {
+          cls: 'btn danger', text: '🧹 Purge auto-generated tokens (' + autoCount + ')', onclick: () => {
+            if (!autoCount) { alert('No auto-generated tokens to purge.'); return; }
+            if (!confirm('Delete all ' + autoCount + ' auto-generated tokens across every account? Hand-designed, edited, and tutorial tokens are kept. No undo.')) return;
+            const r = G.admin.purgeAutoGenTokens();
+            alert('Purged ' + r.removed + ' auto-generated token(s).');
+            rerender();
+          },
+        }),
+        U.el('span', { cls: 'small muted', text: autoCount + ' auto-generated token(s) currently in the world.' }),
+      ]));
+
       body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Game edits (overrides)' }));
       body.appendChild(syncLine());
       body.appendChild(U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap' }, [
@@ -1340,6 +1453,75 @@
     const terrainOpts = L.TERRAIN_SETS.map(t => [t.id, t.name]);
     const encWrap = U.el('div', {});
     w.appendChild(encWrap);
+
+    /* structured per-enemy editor: species/rarity/boss inline, plus an
+       optional "exact" panel that overrides the wild roll with precise
+       size, hp/dmg/speed, behavior value, and individual variables. */
+    function paintEnemies(enc, container) {
+      container.innerHTML = '';
+      enc.enemies.forEach((en, idx) => {
+        const row = U.el('div', { cls: 'panel', style: 'padding:8px;margin-bottom:6px;background:#20180e' });
+        const top = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center;flex-wrap:wrap' });
+        const spSel = selectEl(SP.list.map(s => [s.id, s.name]), en.speciesId || (SP.list[0] && SP.list[0].id));
+        spSel.style.flex = '2'; spSel.onchange = () => en.speciesId = spSel.value;
+        const rSel = selectEl([['', 'rarity: roll']].concat(SP.RARITIES.map((r, i) => [String(i), r])), en.rarity != null ? String(en.rarity) : '');
+        rSel.style.flex = '1'; rSel.onchange = () => { if (rSel.value === '') delete en.rarity; else en.rarity = parseInt(rSel.value, 10); };
+        const bossWrap = U.el('label', { cls: 'small', style: 'display:flex;align-items:center;gap:4px' });
+        const bossChk = U.el('input', { type: 'checkbox' }); bossChk.checked = !!en.boss;
+        bossChk.onchange = () => { if (bossChk.checked) en.boss = true; else delete en.boss; };
+        bossWrap.appendChild(bossChk); bossWrap.appendChild(U.el('span', { text: 'boss' }));
+        const exactBtn = U.el('button', { cls: 'btn small ghost', text: en._open ? '⚙ hide' : '⚙ exact' });
+        exactBtn.onclick = () => { en._open = !en._open; paintEnemies(enc, container); };
+        const delBtn = U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { enc.enemies.splice(idx, 1); paintEnemies(enc, container); } });
+        top.appendChild(spSel); top.appendChild(rSel); top.appendChild(bossWrap); top.appendChild(exactBtn); top.appendChild(delBtn);
+        row.appendChild(top);
+
+        if (en._open) {
+          en.stats = en.stats || {};
+          const grid = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px' });
+          function ex(label, val, onset, step) {
+            const c = U.el('div', {});
+            c.appendChild(U.el('label', { cls: 'lbl', text: label }));
+            const inp = numIn(val != null ? val : '', { step: step || 1, placeholder: 'auto' });
+            inp.oninput = () => { const v = inp.value.trim(); onset(v === '' ? null : parseFloat(v)); };
+            c.appendChild(inp); grid.appendChild(c);
+          }
+          const nameC = U.el('div', {});
+          nameC.appendChild(U.el('label', { cls: 'lbl', text: 'Name (blank = auto)' }));
+          const nameI = U.el('input', { cls: 'txt', value: en.name || '', placeholder: 'auto' });
+          nameI.oninput = () => { if (nameI.value.trim()) en.name = nameI.value.trim(); else delete en.name; };
+          nameC.appendChild(nameI); grid.appendChild(nameC);
+          const sizeC = U.el('div', {});
+          sizeC.appendChild(U.el('label', { cls: 'lbl', text: 'Size' }));
+          const sizeSel = selectEl([['', 'roll']].concat(SP.SIZES.map((s, i) => [String(i), s])), en.sizeIdx != null ? String(en.sizeIdx) : '');
+          sizeSel.onchange = () => { if (sizeSel.value === '') delete en.sizeIdx; else en.sizeIdx = parseInt(sizeSel.value, 10); };
+          sizeC.appendChild(sizeSel); grid.appendChild(sizeC);
+          ex('HP', en.stats.hp, v => { if (v == null) delete en.stats.hp; else en.stats.hp = v; });
+          ex('Damage', en.stats.dmg, v => { if (v == null) delete en.stats.dmg; else en.stats.dmg = v; }, 0.1);
+          ex('Speed', en.stats.speed, v => { if (v == null) delete en.stats.speed; else en.stats.speed = v; });
+          ex('Behavior value', en.behaviorValue, v => { if (v == null) delete en.behaviorValue; else en.behaviorValue = v; });
+          row.appendChild(grid);
+          const vlabel = U.el('label', { cls: 'lbl', text: 'Variable overrides (JSON — aggressionThreshold, teleportRange, breathCooldown…)' });
+          const vTa = U.el('textarea', { cls: 'txt', rows: 2, style: 'width:100%;font-family:monospace;font-size:11px' });
+          vTa.value = en.vars ? JSON.stringify(en.vars) : '';
+          const vErr = U.el('div', { cls: 'small', style: 'color:var(--red);min-height:12px' });
+          vTa.oninput = () => {
+            const s = vTa.value.trim();
+            if (!s) { delete en.vars; vErr.textContent = ''; return; }
+            try { en.vars = JSON.parse(s); vErr.textContent = ''; } catch (e) { vErr.textContent = 'Invalid JSON'; }
+          };
+          row.appendChild(vlabel); row.appendChild(vTa); row.appendChild(vErr);
+        }
+        container.appendChild(row);
+      });
+      container.appendChild(U.el('button', {
+        cls: 'btn small', text: '＋ Add enemy', onclick: () => {
+          enc.enemies.push({ speciesId: (SP.get(work.speciesId) ? work.speciesId : (SP.list[0] && SP.list[0].id)) });
+          paintEnemies(enc, container);
+        },
+      }));
+    }
+
     function paintEncounters() {
       encWrap.innerHTML = '';
       work.encounters.forEach((enc, i) => {
@@ -1369,11 +1551,11 @@
         dTa.oninput = () => enc.desc = dTa.value;
         box.appendChild(U.el('label', { cls: 'lbl', text: 'Description' }));
         box.appendChild(dTa);
-        const eTa = U.el('textarea', { cls: 'txt mt', rows: 3, style: 'width:100%;font-family:monospace;font-size:12px', placeholder: 'harkal\nharkal\nsu_naga 4 boss' });
-        eTa.value = enemiesToText(enc.enemies);
-        eTa.oninput = () => enc.enemies = parseEnemies(eTa.value);
-        box.appendChild(U.el('label', { cls: 'lbl', text: 'Enemies (one per line)' }));
-        box.appendChild(eTa);
+        box.appendChild(U.el('label', { cls: 'lbl', text: 'Enemies — the last enemy of the final encounter is the quarry itself' }));
+        enc.enemies = (enc.enemies || []).map(e => typeof e === 'string' ? { speciesId: e } : e);
+        const enemyWrap = U.el('div', {});
+        box.appendChild(enemyWrap);
+        paintEnemies(enc, enemyWrap);
         encWrap.appendChild(box);
       });
       encWrap.appendChild(U.el('button', {
@@ -1405,11 +1587,26 @@
           pieceMaterial: rewIns.pieceMaterial.value.trim(),
           secondPieceChance: U.clamp(parseFloat(rewIns.secondPieceChance.value) || 0, 0, 1),
         };
+        const cleanEnemy = (en) => {
+          if (typeof en === 'string') return { speciesId: en };
+          const out = { speciesId: en.speciesId };
+          if (en.rarity != null) out.rarity = en.rarity;
+          if (en.boss) out.boss = true;
+          if (en.name) out.name = en.name;
+          if (en.sizeIdx != null) out.sizeIdx = en.sizeIdx;
+          if (en.behaviorValue != null) out.behaviorValue = en.behaviorValue;
+          if (en.vars && Object.keys(en.vars).length) out.vars = en.vars;
+          if (en.stats && Object.keys(en.stats).some(k => en.stats[k] != null)) {
+            out.stats = {};
+            ['hp', 'dmg', 'speed'].forEach(k => { if (en.stats[k] != null) out.stats[k] = en.stats[k]; });
+          }
+          return out;
+        };
         work.encounters = (work.encounters || []).map(e => ({
           name: (e.name || '').trim() || 'Encounter',
           desc: (e.desc || '').trim(),
           terrain: e.terrain || 'plains',
-          enemies: (e.enemies && e.enemies.length) ? e.enemies : [{ speciesId: work.speciesId, boss: true }],
+          enemies: (e.enemies && e.enemies.length) ? e.enemies.map(cleanEnemy) : [{ speciesId: work.speciesId, boss: true }],
         }));
         if (!work.encounters.length) work.encounters = [{ name: 'The Quarry', desc: '', terrain: 'plains', enemies: [{ speciesId: work.speciesId, boss: true }] }];
         M.setHunt(work);
@@ -1544,6 +1741,18 @@
     spdIn.oninput = () => work.statMul.speed = parseFloat(spdIn.value) || 0;
     const rngIn = cell(g1, 'Attack range (px, 0 = never fights)', numIn(work.attackRange || 0, {}));
     rngIn.oninput = () => work.attackRange = parseFloat(rngIn.value) || 0;
+    /* per-species base ready-cost range — overrides the rarity cost table so
+       cost is not driven by rarity alone (each mint rolls between lo and hi) */
+    const hasCR = Array.isArray(work.costRange);
+    const crLo = cell(g1, 'Base cost min (blank = use rarity)', numIn(hasCR ? work.costRange[0] : '', { step: 1, min: 0, placeholder: 'rarity' }));
+    const crHi = cell(g1, 'Base cost max', numIn(hasCR ? work.costRange[1] : '', { step: 1, min: 0, placeholder: 'rarity' }));
+    const syncCR = () => {
+      const lo = crLo.value.trim(), hi = crHi.value.trim();
+      if (lo === '' && hi === '') { delete work.costRange; return; }
+      const a = parseInt(lo, 10); const b = parseInt(hi, 10);
+      work.costRange = [isNaN(a) ? (isNaN(b) ? 0 : b) : a, isNaN(b) ? (isNaN(a) ? 0 : a) : b];
+    };
+    crLo.oninput = syncCR; crHi.oninput = syncCR;
 
     const tagsIn = U.el('input', { cls: 'txt', value: (work.tags || []).join(', ') });
     tagsIn.oninput = () => work.tags = tagsIn.value.split(',').map(s => s.trim()).filter(Boolean);
@@ -1680,6 +1889,203 @@
     w.appendChild(acts);
   }
 
+  /* ================= INDIVIDUAL TOKEN EDITOR =================
+     Click any token anywhere in the panel and rewrite it end to end:
+     identity, exact stats, behavior, per-element cost (its "price" to
+     ready), the individual variables & trait picks that drive its
+     abilities on the field, and its lore. Edits are written straight
+     onto the live token in its owner's collection and pushed to the
+     cloud so they stick for that real player. */
+  function editToken(tok, owner) {
+    const { w, close } = modal('3% 8%');
+    const closeAll = () => { stopPreviews(); close(); rerender(); };
+    const sp0 = SP.get(tok.speciesId);
+    w.appendChild(U.el('h2', { cls: 'gold', text: 'Token — ' + tok.name } ));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Owned by ' + (owner ? owner.displayName : '?') + (owner && owner.ai ? ' (Dya’kukull)' : '') + ' · ' + (sp0 ? sp0.name : tok.speciesId) + ' · id ' + tok.id + '. Every field below is this ONE individual — nothing here touches the species.' }));
+
+    const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:300px 1fr;gap:18px;align-items:start' });
+    w.appendChild(cols);
+    const left = U.el('div', {}), right = U.el('div', {});
+    cols.appendChild(left); cols.appendChild(right);
+
+    /* ---- LEFT: live preview of whatever species it currently is ---- */
+    left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Preview' }));
+    let curSpId = tok.speciesId;
+    left.appendChild(livePreview(() => SP.get(curSpId) || sp0 || SP.list[0]));
+    const valLine = U.el('p', { cls: 'small muted mt center' });
+    left.appendChild(valLine);
+    const refreshVal = () => { try { valLine.textContent = 'Market value ≈ ' + U.fmt(TK.baseValue(tok)) + 'g · ready-cost ' + TK.cost(tok); } catch (e) { valLine.textContent = ''; } };
+
+    /* ---- RIGHT: identity & exact stats ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Identity' }));
+    const g1 = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px' });
+    right.appendChild(g1);
+    function cell(parent, label, el) {
+      const c = U.el('div', {});
+      c.appendChild(U.el('label', { cls: 'lbl', text: label }));
+      c.appendChild(el); parent.appendChild(c); return el;
+    }
+    const nameIn = cell(g1, 'Name', U.el('input', { cls: 'txt', value: tok.name, maxlength: 40 }));
+    const spSel = cell(g1, 'Species', selectEl(SP.list.map(s => [s.id, s.name]), tok.speciesId));
+    spSel.onchange = () => { curSpId = spSel.value; };
+    const rarSel = cell(g1, 'Rarity', selectEl(SP.RARITIES.map((r, i) => [String(i), r]), String(tok.rarity)));
+    const sizeSel = cell(g1, 'Size', selectEl(SP.SIZES.map((s, i) => [String(i), s]), String(tok.sizeIdx)));
+    const elSel = cell(g1, 'Element', selectEl(SP.ELEMENTS.map(e => [e, e + ' (' + SP.ELEMENT_NAMES[e] + ')']), tok.element || (sp0 ? sp0.element : 'Fti')));
+
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Exact stats' }));
+    const g2 = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px' });
+    right.appendChild(g2);
+    tok.stats = tok.stats || { hp: 10, dmg: 1, speed: 40 };
+    const hpIn = cell(g2, 'HP', numIn(tok.stats.hp, { step: 1 }));
+    const dmgIn = cell(g2, 'Damage', numIn(tok.stats.dmg, { step: 0.1 }));
+    const spdIn = cell(g2, 'Speed', numIn(tok.stats.speed, { step: 1 }));
+    const behIn = cell(g2, 'Behavior value (truth: calm 5 … 3000 volatile)', numIn(tok.behaviorValue != null ? tok.behaviorValue : 400, { step: 1 }));
+    const ageIn = cell(g2, 'Age (0–1 → health)', numIn(tok.age != null ? tok.age : 0.5, { step: 0.01 }));
+    const expIn = cell(g2, 'Combat exp (0–1 → skill)', numIn(tok.combatExp != null ? tok.combatExp : 0.5, { step: 0.01 }));
+
+    /* ---- per-element cost (the token's "price" to ready in a match) ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Price — resource cost to ready' }));
+    right.appendChild(U.el('p', { cls: 'small muted', text: 'The exact per-element cost paid to bring this token onto the field. Set any combination, including zero.' }));
+    const costVec = Object.assign({ Fti: 0, Su: 0, Eldi: 0, Ular: 0 }, TK.costVec(tok));
+    const g3 = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(4,1fr);gap:8px' });
+    right.appendChild(g3);
+    const costIns = {};
+    SP.ELEMENTS.forEach(e => { costIns[e] = cell(g3, e + ' (' + SP.ELEMENT_NAMES[e] + ')', numIn(costVec[e] || 0, { step: 1, min: 0 })); });
+
+    /* ---- abilities: per-individual variables & trait picks ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Abilities — individual variables' }));
+    right.appendChild(U.el('p', { cls: 'small muted', text: 'The rolled numbers this individual carries (vine length, teleport range, breath cooldown…). These drive its behavior tree on the field.' }));
+    const varsBox = U.el('div', {});
+    right.appendChild(varsBox);
+    tok.vars = tok.vars || {};
+    function paintVars() {
+      varsBox.innerHTML = '';
+      Object.keys(tok.vars).forEach(k => {
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
+        const kIn = U.el('input', { cls: 'txt', value: k, style: 'flex:2' });
+        const vIn = numIn(tok.vars[k], { step: 'any', style: 'flex:1' });
+        const commit = () => {
+          const nk = kIn.value.trim();
+          if (nk !== k) delete tok.vars[k];
+          if (nk) tok.vars[nk] = parseFloat(vIn.value) || 0;
+        };
+        kIn.onchange = commit; vIn.onchange = commit;
+        r.appendChild(kIn); r.appendChild(vIn);
+        r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { delete tok.vars[k]; paintVars(); } }));
+        varsBox.appendChild(r);
+      });
+      varsBox.appendChild(U.el('button', {
+        cls: 'btn small ghost', text: '＋ Add variable', onclick: () => {
+          tok.vars['newVar' + Object.keys(tok.vars).length] = 1; paintVars();
+        },
+      }));
+    }
+    paintVars();
+
+    right.appendChild(U.el('label', { cls: 'lbl mt', text: 'Trait picks (one chosen option each — vine behavior, breath tier, target preference…)' }));
+    const picksBox = U.el('div', {});
+    right.appendChild(picksBox);
+    tok.picks = tok.picks || {};
+    function paintPicks() {
+      picksBox.innerHTML = '';
+      Object.keys(tok.picks).forEach(k => {
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
+        const kIn = U.el('input', { cls: 'txt', value: k, style: 'flex:1' });
+        const vIn = U.el('input', { cls: 'txt', value: String(tok.picks[k]), style: 'flex:1' });
+        const commit = () => {
+          const nk = kIn.value.trim();
+          if (nk !== k) delete tok.picks[k];
+          if (nk) { const raw = vIn.value.trim(); tok.picks[nk] = (raw !== '' && !isNaN(Number(raw))) ? Number(raw) : raw; }
+        };
+        kIn.onchange = commit; vIn.onchange = commit;
+        r.appendChild(kIn); r.appendChild(vIn);
+        r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { delete tok.picks[k]; paintPicks(); } }));
+        picksBox.appendChild(r);
+      });
+      picksBox.appendChild(U.el('button', {
+        cls: 'btn small ghost', text: '＋ Add pick', onclick: () => {
+          tok.picks['newPick' + Object.keys(tok.picks).length] = 'option'; paintPicks();
+        },
+      }));
+    }
+    paintPicks();
+
+    /* ---- flags & lore ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Flags & lore' }));
+    const statusSel = U.el('select', { cls: 'txt' });
+    ['collection', 'market', 'pouch', 'field'].forEach(s => statusSel.appendChild(U.el('option', { value: s, text: s })));
+    statusSel.value = tok.status || 'collection';
+    lblIn(right, 'Status', statusSel);
+    const flagRow = U.el('div', { cls: 'flex mt', style: 'gap:16px;flex-wrap:wrap' });
+    function toggle(label, on, onToggle) {
+      const t = U.el('div', { cls: 'toggle' + (on ? ' on' : '') });
+      t.onclick = () => { t.classList.toggle('on'); onToggle(t.classList.contains('on')); };
+      const box = U.el('div', {}, [U.el('label', { cls: 'lbl', text: label }), t]);
+      flagRow.appendChild(box);
+    }
+    let nameLocked = !!tok.nameLocked, frozen = !!tok.frozen, famous = !!tok.famous;
+    toggle('Name locked', nameLocked, v => nameLocked = v);
+    toggle('Frozen (unplayable)', frozen, v => frozen = v);
+    toggle('Famous', famous, v => famous = v);
+    right.appendChild(flagRow);
+    const matIn = U.el('input', { cls: 'txt', value: tok.material || '' });
+    lblIn(right, 'Material', matIn);
+    const storyTa = U.el('textarea', { cls: 'txt', rows: 3, style: 'width:100%' });
+    storyTa.value = tok.story || '';
+    lblIn(right, 'Story / description card text', storyTa);
+
+    refreshVal();
+
+    /* ---- actions ---- */
+    const acts = U.el('div', { cls: 'flex mt', style: 'gap:8px;flex-wrap:wrap' });
+    acts.appendChild(U.el('button', {
+      cls: 'btn primary', text: '💾 Save token', onclick: () => {
+        tok.name = nameIn.value.trim() || tok.name;
+        tok.speciesId = spSel.value;
+        tok.rarity = parseInt(rarSel.value, 10) || 0;
+        tok.sizeIdx = parseInt(sizeSel.value, 10) || 0;
+        tok.element = elSel.value;
+        tok.stats = {
+          hp: Math.max(1, Math.round(parseFloat(hpIn.value) || 1)),
+          dmg: Math.max(0, Math.round((parseFloat(dmgIn.value) || 0) * 10) / 10),
+          speed: Math.max(0, Math.round(parseFloat(spdIn.value) || 0)),
+        };
+        tok.behaviorValue = U.clamp(Math.round(parseFloat(behIn.value) || 0), 5, 3000);
+        tok.age = U.clamp(parseFloat(ageIn.value) || 0, 0, 1);
+        tok.combatExp = U.clamp(parseFloat(expIn.value) || 0, 0, 1);
+        tok.cost = {
+          Fti: Math.max(0, parseInt(costIns.Fti.value, 10) || 0),
+          Su: Math.max(0, parseInt(costIns.Su.value, 10) || 0),
+          Eldi: Math.max(0, parseInt(costIns.Eldi.value, 10) || 0),
+          Ular: Math.max(0, parseInt(costIns.Ular.value, 10) || 0),
+        };
+        tok.status = statusSel.value;
+        tok.nameLocked = nameLocked; tok.frozen = frozen; tok.famous = famous;
+        tok.material = matIn.value.trim();
+        tok.story = storyTa.value;
+        tok.adminEdited = true;
+        delete tok.autoGen; /* a hand-edited token is no longer "auto-generated" */
+        G.saveNow();
+        if (owner) G.pushAccountToCloud(owner);
+        closeAll();
+      },
+    }));
+    acts.appendChild(U.el('button', {
+      cls: 'btn danger', text: '🗑 Delete token', onclick: () => {
+        if (!confirm('Delete "' + tok.name + '" from ' + (owner ? owner.displayName : 'this account') + '\'s collection permanently?')) return;
+        if (owner) {
+          delete owner.tokens[tok.id];
+          (owner.pouches || []).forEach(p => { if (p.tokenIds) p.tokenIds = p.tokenIds.filter(x => x !== tok.id); });
+          Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === tok.id) delete G.world.market.listings[l.id]; });
+          G.saveNow(); G.pushAccountToCloud(owner);
+        }
+        closeAll();
+      },
+    }));
+    acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: closeAll }));
+    w.appendChild(acts);
+  }
+
   /* ================= ACCOUNT / AI EDITORS ================= */
   function editAccount(a) {
     const { w, close } = modal('10% 22%');
@@ -1747,6 +2153,7 @@
         const sp = SP.get(t.speciesId);
         const r = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center;border-bottom:1px solid var(--line);padding:3px 0' });
         r.appendChild(U.el('div', { cls: 'flex1 small', html: '<b>' + U.esc(t.name) + '</b> <span class="muted">' + (sp ? sp.name : t.speciesId) + ' · ' + SP.RARITIES[t.rarity] + (t.status !== 'collection' ? ' · ' + t.status : '') + '</span>' }));
+        r.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editToken(t, a) }));
         r.appendChild(U.el('button', {
           cls: 'btn small danger', text: '✕', onclick: () => {
             delete a.tokens[t.id];
@@ -1786,6 +2193,92 @@
         },
       }),
       U.el('button', { cls: 'btn danger', text: 'Delete AI', onclick: () => { if (confirm('Delete ' + a.displayName + '?')) { delete G.world.accounts[a.id]; G.saveNow(); close(); rerender(); } } }),
+      U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => close() }),
+    ]));
+  }
+
+  /* ================= TOURNAMENT PLACEMENT REWARDS =================
+     Decide exactly what each finishing place earns: gold, NgAkara, Okid,
+     tokens, and Hunt privileges (Hunt slots). Used by both the online
+     official-tournament creator and the local tournaments list. */
+  function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+  function editTournamentRewards(sizeHint, initial, onSave) {
+    const { w, close } = modal('4% 12%');
+    w.appendChild(U.el('h2', { cls: 'gold', text: 'Placement rewards' }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Decide exactly what each finishing place earns — gold, NgAkara, Okid, tokens, and Hunt privileges (Hunt slots). Leave a place empty for nothing. These are granted in addition to the normal prize-pool split.' }));
+    const places = Math.max(3, Math.min(sizeHint || 8, 8));
+    const rewards = (Array.isArray(initial) ? U.deepCopy(initial) : []);
+    const holder = U.el('div', {});
+    w.appendChild(holder);
+
+    function paint() {
+      holder.innerHTML = '';
+      for (let p = 0; p < places; p++) {
+        rewards[p] = rewards[p] || { gold: 0, ngakara: 0, huntSlots: 0, okid: [], tokens: [] };
+        const rw = rewards[p];
+        rw.okid = rw.okid || []; rw.tokens = rw.tokens || [];
+        const box = U.el('div', { cls: 'panel mb', style: 'padding:10px' });
+        box.appendChild(U.el('b', { cls: 'gold', text: ordinal(p + 1) + ' place' }));
+        const g = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px' });
+        const mk = (label, key) => {
+          const c = U.el('div', {});
+          c.appendChild(U.el('label', { cls: 'lbl', text: label }));
+          const inp = numIn(rw[key] || 0, { step: 1, min: 0 });
+          inp.oninput = () => rw[key] = parseInt(inp.value, 10) || 0;
+          c.appendChild(inp); g.appendChild(c);
+        };
+        mk('Gold', 'gold'); mk('NgAkara', 'ngakara'); mk('Hunt privileges', 'huntSlots');
+        box.appendChild(g);
+
+        /* Okid rows */
+        box.appendChild(U.el('label', { cls: 'lbl mt', text: 'Okid' }));
+        rw.okid.forEach((o, oi) => {
+          const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
+          const rSel = selectEl(SP.RARITIES.map((rn, i) => [String(i), rn]), String(o.rarity || 0));
+          rSel.onchange = () => o.rarity = parseInt(rSel.value, 10) || 0;
+          const qIn = numIn(o.qty || 1, { step: 1, min: 1, style: 'max-width:90px' });
+          qIn.oninput = () => o.qty = parseInt(qIn.value, 10) || 1;
+          r.appendChild(rSel); r.appendChild(qIn);
+          r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { rw.okid.splice(oi, 1); paint(); } }));
+          box.appendChild(r);
+        });
+        box.appendChild(U.el('button', { cls: 'btn small ghost', text: '＋ Okid', onclick: () => { rw.okid.push({ rarity: 0, qty: 1 }); paint(); } }));
+
+        /* Token rows */
+        box.appendChild(U.el('label', { cls: 'lbl mt', text: 'Tokens (minted fresh for the winner)' }));
+        rw.tokens.forEach((tk, ti) => {
+          const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
+          const spSel = selectEl(SP.list.map(s => [s.id, s.name]), tk.speciesId || (SP.list[0] && SP.list[0].id));
+          spSel.style.flex = '2'; spSel.onchange = () => tk.speciesId = spSel.value;
+          const rSel = selectEl([['', 'rarity: roll']].concat(SP.RARITIES.map((rn, i) => [String(i), rn])), tk.rarity != null ? String(tk.rarity) : '');
+          rSel.onchange = () => { if (rSel.value === '') delete tk.rarity; else tk.rarity = parseInt(rSel.value, 10); };
+          const qIn = numIn(tk.qty || 1, { step: 1, min: 1, style: 'max-width:80px' });
+          qIn.oninput = () => tk.qty = parseInt(qIn.value, 10) || 1;
+          r.appendChild(spSel); r.appendChild(rSel); r.appendChild(qIn);
+          r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { rw.tokens.splice(ti, 1); paint(); } }));
+          box.appendChild(r);
+        });
+        box.appendChild(U.el('button', { cls: 'btn small ghost', text: '＋ Token', onclick: () => { rw.tokens.push({ speciesId: (SP.list[0] && SP.list[0].id), qty: 1 }); paint(); } }));
+
+        holder.appendChild(box);
+      }
+    }
+    paint();
+
+    /* strip empty placements down to a compact array before saving */
+    function clean() {
+      const isEmpty = rw => !rw || (!rw.gold && !rw.ngakara && !rw.huntSlots && !(rw.okid && rw.okid.length) && !(rw.tokens && rw.tokens.length));
+      let last = -1;
+      rewards.forEach((rw, i) => { if (!isEmpty(rw)) last = i; });
+      if (last < 0) return null;
+      return rewards.slice(0, last + 1).map(rw => ({
+        gold: rw.gold || 0, ngakara: rw.ngakara || 0, huntSlots: rw.huntSlots || 0,
+        okid: (rw.okid || []).filter(o => (o.qty | 0) > 0),
+        tokens: (rw.tokens || []).filter(t => t.speciesId && SP.get(t.speciesId)),
+      }));
+    }
+    w.appendChild(U.el('div', { cls: 'flex mt' }, [
+      U.el('button', { cls: 'btn primary', text: 'Save rewards', onclick: () => { onSave(clean()); close(); } }),
       U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => close() }),
     ]));
   }

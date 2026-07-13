@@ -6,8 +6,14 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%238a6f42'/><circle cx='50' cy='50' r='38' fill='%233a2f1d'/><circle cx='50' cy='50' r='14' fill='%23d4552a'/></svg>">
   <style>
-    html, body { height: 100%; }
+    /* The shared game stylesheet (css/style.css) pins html, body AND #app to
+       position:fixed / overflow:hidden so the game itself never scrolls. The
+       admin panel lives inside that same #app, so those rules clipped every
+       tab and killed scrolling. Re-open the page here: let the document flow
+       and scroll normally, and un-fix #app so its content can grow tall. */
+    html, body { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; }
     body { overflow: auto; }
+    #app { position: static; inset: auto; overflow: visible; height: auto; min-height: 100%; }
     .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
     /* align-items:start so the two columns can each manage their own scroll */
     .admin-grid { display: grid; grid-template-columns: 200px 1fr; gap: 18px; align-items: start; }
