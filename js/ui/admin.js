@@ -876,6 +876,26 @@
 
     /* ================= TOURNAMENTS ================= */
     Tournaments(body) {
+      /* ---- OFFICIAL SEASON: open/close the ranked ladder (you are the organizer) ---- */
+      const live = M.seasonLive && M.seasonLive();
+      const sbox = U.el('div', { cls: 'panel mb', style: 'border-left:3px solid ' + (live ? 'var(--gold)' : 'var(--line)') });
+      sbox.appendChild(U.el('div', { cls: 'flex', style: 'align-items:center;gap:12px' }, [
+        U.el('div', { style: 'font-size:26px', text: live ? '🟢' : '🔴' }),
+        U.el('div', { cls: 'flex1', html: '<b class="gold">Official season — ' + (live ? 'OPEN' : 'CLOSED') + '</b><br><span class="small muted">The ranked ladder doesn’t run until you open it. You are the organizer of the Guild season; players can only climb once it’s open.</span>' }),
+        U.el('button', {
+          cls: 'btn ' + (live ? 'danger' : 'primary'), text: live ? 'Close the season' : '▶ Open the official season',
+          onclick: () => {
+            if (!M.setSeasonLive) { alert('Update the game to the latest build to control the season.'); return; }
+            if (live && !confirm('Close the official season? Players won’t be able to play ranked ladder matches until you open it again.')) return;
+            M.setSeasonLive(!live);
+            flashSaved(sbox, live ? 'Season closed — pushing to all players…' : 'Season OPEN — pushing to all players…');
+            rerender();
+          },
+        }),
+      ]));
+      if (!M.configured()) sbox.appendChild(U.el('p', { cls: 'small muted mt', text: 'Online isn’t configured, so this only affects this browser. With Supabase set up, opening the season reaches every player within a minute.' }));
+      body.appendChild(sbox);
+
       body.appendChild(U.el('div', { cls: 'flex mb' }, [
         U.el('button', {
           cls: 'btn primary', text: '⚡ ACTIVATE INTERPLANETARY', onclick: () => {
