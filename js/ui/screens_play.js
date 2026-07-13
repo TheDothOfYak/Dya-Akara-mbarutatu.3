@@ -460,6 +460,120 @@
     }, 1300);
   }
 
+  /* ============ LIVE TOURNAMENT MATCHES (two humans in a bracket) ============
+     A bracket pairing between two real players is just a normal cross-device
+     match — but nothing is exchanged by hand: the room code and the whole match
+     (seed, terrain, BOTH pouches) are DERIVED from the shared bracket, which
+     both devices already hold. Both players sit down (a short presence
+     handshake), both build the identical lockstep match, and the winner is
+     reported to the shared bracket. Because both run the same deterministic
+     simulation they agree on the outcome. If the opponent isn't around, the
+     caller's fallback plays their submitted pouch so the bracket never stalls. */
+  function tournamentRoomCode(s) {
+    const A = DYA.netplay.ROOM_ALPHABET;
+    let code = '';
+    for (let i = 0; i < 5; i++) code += A[Math.abs(U.hashStr('trnroom:' + s + ':' + i)) % A.length];
+    return code;
+  }
+
+  /* o: { t, ri, mi, oppNetId, oppName, ranked, onFinish(res,iWon,draw,winnerLocalId), onFallback() } */
+  P.tournamentLiveMatch = function (o) {
+    const me = G.me;
+    const myNet = DYA.tournamentsOnline.netId();
+    const t = o.t, ri = o.ri, mi = o.mi;
+    const roster = t.roster || {};
+    if (!roster[o.oppNetId] || !roster[myNet]) { if (o.onFallback) o.onFallback(); return; } // no shared pouches — sim instead
+    const hostNet = myNet < o.oppNetId ? myNet : o.oppNetId;
+    const guestNet = myNet < o.oppNetId ? o.oppNetId : myNet;
+    const iAmHost = myNet === hostNet;
+    const seedStr = t.id + '|' + ri + '|' + mi;
+    const roomCode = tournamentRoomCode(seedStr);
+
+    const wait = U.el('div', { cls: 'center' });
+    wait.appendChild(U.el('h3', { cls: 'gold', text: 'Live match vs ' + o.oppName }));
+    const statusEl = U.el('p', { cls: 'muted mt', text: 'Connecting…' });
+    wait.appendChild(statusEl);
+    const wm = UI.modal(wait, { sticky: true });
+    let room = null, launched = false, closed = false, peerReady = false, readyTimer = null, giveUpAt = Date.now() + 30000;
+
+    function done() { clearInterval(readyTimer); if (room && !launched) { try { room.leave(); } catch (e) { } } }
+    function fallback() { if (closed) return; closed = true; done(); wm.close(); if (o.onFallback) o.onFallback(); }
+
+    function launch() {
+      if (launched || closed) return;
+      launched = true; clearInterval(readyTimer); wm.close();
+      const buildTeam = (netid) => {
+        const r = roster[netid] || {};
+        return { name: r.name || 'Player', controller: 'human', pouch: (r.pouch || []).map(x => U.deepCopy(x)), startResources: 0, seal: { avatarIdx: r.avatarIdx || 0, patterns: [] } };
+      };
+      const match = new DYA.match.Match({
+        seed: U.hashStr(seedStr), mode: 'standard', terrain: t.terrain || 'plains',
+        settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
+        teams: [buildTeam(hostNet), buildTeam(guestNet)],
+      });
+      const myTeam = iAmHost ? 0 : 1;
+      const net = new DYA.netplay.Lockstep(match, myTeam, payload => room.send(payload));
+      net.room = room; P._netSession = net;
+      net.route = (msg) => { if (!msg) return; if (msg.t === 'frame' || msg.t === 'need') net.onRemote(msg); else if (msg.t === 'bye') net.peerLeft = Date.now(); };
+      UI.showWithLoading('match', {
+        match,
+        cfg: {
+          mode: 'standard', ranked: !!o.ranked, format: (t.circuit || '') + ' Tournament', tournament: t.name,
+          myTeam, net,
+          opponent: { name: o.oppName, accId: o.oppNetId, remoteHuman: true },
+          pouch: (roster[myNet].pouch || []).map(x => U.deepCopy(x)),
+          onFinish: (res, iWon, draw) => {
+            /* both devices ran the same sim → same winner. Draws break on a
+               shared coin so both report the same seat. */
+            let winnerNet;
+            if (draw) winnerNet = (Math.abs(U.hashStr(seedStr + ':tie')) % 2 === 0) ? hostNet : guestNet;
+            else winnerNet = iWon ? myNet : o.oppNetId;
+            const winnerLocalId = winnerNet === myNet ? me.id : winnerNet;
+            if (o.onFinish) o.onFinish(res, iWon, draw, winnerLocalId);
+          },
+        },
+      }, 1200);
+    }
+
+    function offerFallback() {
+      statusEl.innerHTML = '<b>' + U.esc(o.oppName) + '</b> isn’t at the table yet.';
+      const rowb = U.el('div', { cls: 'flex mt' });
+      rowb.appendChild(U.el('button', { cls: 'btn primary', text: 'Play their pouch (counts)', onclick: fallback }));
+      rowb.appendChild(U.el('button', { cls: 'btn', text: 'Keep waiting', onclick: () => { giveUpAt = Date.now() + 30000; statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…'; rowb.remove(); armTimer(); } }));
+      rowb.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => { closed = true; done(); wm.close(); UI.show('bracket', { trn: t }); } }));
+      wait.appendChild(rowb);
+    }
+    function armTimer() {
+      readyTimer = setInterval(() => {
+        if (launched || closed) { clearInterval(readyTimer); return; }
+        try { room.send({ t: 'tready' }); } catch (e) { }
+        if (Date.now() > giveUpAt) { clearInterval(readyTimer); offerFallback(); }
+      }, 1500);
+    }
+
+    (async function connect() {
+      try {
+        room = await DYA.netplay.joinRoom(roomCode, myNet, {
+          onMessage(msg) {
+            if (!msg) return;
+            if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) { P._netSession.route(msg); return; }
+            if (msg.t === 'tready') { peerReady = true; if (!launched && !closed) { try { room.send({ t: 'tready' }); } catch (e) { } launch(); } }
+          },
+          onPeerJoin() { if (room && !launched && !closed) { try { room.send({ t: 'tready' }); } catch (e) { } } },
+          onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
+        });
+        statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…';
+        wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Play their pouch instead', onclick: fallback }));
+        room.send({ t: 'tready' });
+        armTimer();
+      } catch (e) {
+        wm.close();
+        UI.alert('Could not connect', e.message + ' — playing against their submitted pouch instead.');
+        if (o.onFallback) o.onFallback();
+      }
+    })();
+  };
+
   P.inviteFriendMatch = function (acc) {
     P.pickPouch(pouch => {
       P.startMatch({

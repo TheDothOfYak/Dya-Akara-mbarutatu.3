@@ -105,6 +105,19 @@
   /* is a given (mirrored) tournament an online one? */
   TO.isOnline = function (t) { return !!(t && t.online); };
 
+  /* my permanent cross-device identity (used to seat live-match roles) */
+  TO.netId = function () { return myNetId(); };
+
+  /* fetch just one event's current row (so a live match can check whether a
+     pairing was already decided before both players sit down to play it) */
+  TO.fetchRow = async function (id) {
+    if (!TO.configured()) return null;
+    try {
+      const rows = await rest('GET', 'dya_tournaments?id=eq.' + encodeURIComponent(id) + '&select=*');
+      return (rows && rows[0]) || null;
+    } catch (e) { return null; }
+  };
+
   /* ================= pseudo-accounts ================= */
   /* materialize a roster member (a remote real player, or an AI filler) as a
      light account so the bracket UI and match sim find it in G.world.accounts */
@@ -174,6 +187,7 @@
     } else {
       /* running/done: the roster + bracket in `data` are authoritative */
       const roster = d.roster || {};
+      t.roster = roster; // both devices read identical pouches from here to build live matches
       Object.keys(roster).forEach(id => { if (id !== mn) ensurePseudo(id, roster[id]); });
       if (mn && roster[mn] && (roster[mn].pouch || []).length) t.myPouch = roster[mn].pouch.map(x => x.id); // my locked pouch
       t.players = (d.players || []).map(localizeId);

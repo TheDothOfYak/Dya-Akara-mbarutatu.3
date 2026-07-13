@@ -106,6 +106,11 @@ DYAG.play.accountPouch = function (acc) {
   return ids.map(id => acc.tokens[id]).filter(Boolean).slice(0, 15);
 };
 
+const TK = DYAG.token, SP = DYAG.species;
+function giveTokens(n) {
+  const rng = new DYAG.util.Rng(DYAG.util.newSeed());
+  for (let i = 0; i < n; i++) { const t = TK.mint({ speciesId: rng.pick(SP.craftable), rng, owner: G.me.id }); G.me.tokens[t.id] = t; }
+}
 function myPouch() { return Object.values(G.me.tokens).slice(0, 5); }
 
 (async function main() {
@@ -115,7 +120,7 @@ function myPouch() { return Object.values(G.me.tokens).slice(0, 5); }
   G.init();
   const a = await G.createAccount('alice@dya.test', 'secret123', 'Alice');
   check('device A signed up', !!a.acc, a.err);
-  G.me.level = 8; G.saveNow(); // a real player who enters tournaments
+  G.me.level = 8; giveTokens(6); G.saveNow(); // a real player who enters tournaments
 
   const cr = await TO.create({ name: 'Friday Night Brawl', size: 4, structure: 'single', pouchFormat: 'single', entryFee: 0, myPouch: myPouch() });
   check('create returns an id', !!cr.id, cr.err);
@@ -137,7 +142,7 @@ function myPouch() { return Object.values(G.me.tokens).slice(0, 5); }
   G.init();
   const b = await G.createAccount('bob@dya.test', 'secret123', 'Bob');
   check('device B signed up', !!b.acc, b.err);
-  G.me.level = 8; G.saveNow();
+  G.me.level = 8; giveTokens(6); G.saveNow();
   await TO.refresh();
   const seen = G.world.tournaments[trnId];
   check('device B sees Alice’s shared tournament', !!seen && seen.online === true);
@@ -151,7 +156,7 @@ function myPouch() { return Object.values(G.me.tokens).slice(0, 5); }
   await DYAG.accountCloud.pushNow(G.me);
   newDevice(); G.init();
   const c = await G.createAccount('cara@dya.test', 'secret123', 'Cara');
-  G.me.level = 8; G.saveNow();
+  G.me.level = 8; giveTokens(6); G.saveNow();
   await TO.refresh();
   const locked = G.world.tournaments[pcr.id];
   check('password-locked tournament is flagged', !!locked && locked.hasPassword === true);
@@ -186,9 +191,17 @@ function myPouch() { return Object.values(G.me.tokens).slice(0, 5); }
   check('admin-created event is official', db.dya_tournaments.find(r => r.id === empty.id).official === true);
   check('official event carries a title pool', (db.dya_tournaments.find(r => r.id === empty.id).data.titlePool || []).length > 0);
 
+  /* ---------- the shared roster carries both players' pouches ----------
+     (both devices read identical pouches from here to build the SAME live
+     head-to-head match with no hand-exchanged setup) */
+  const rosterRow = db.dya_tournaments.find(r => r.id === trnId).data.roster;
+  const realSeats = Object.keys(rosterRow).filter(id => !rosterRow[id].ai);
+  check('both real seats carry a non-empty pouch', realSeats.length === 2 && realSeats.every(id => Array.isArray(rosterRow[id].pouch) && rosterRow[id].pouch.length > 0));
+
   /* ---------- the shared bracket advances on a reported result ---------- */
   await TO.refresh();
   const live = G.world.tournaments[trnId];
+  check('running mirror exposes the shared roster for live matches', !!live.roster && Object.keys(live.roster).length === 4);
   /* find Alice's first-round match and report her as the winner */
   let ri = -1, mi = -1;
   live.bracket[0].forEach((mt, i) => { if (mt.a === G.me.id || mt.b === G.me.id) { ri = 0; mi = i; } });

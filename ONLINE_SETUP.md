@@ -137,8 +137,13 @@ open events in **Tournaments → Tournament Browser**.
 - **Real players first.** Tournaments are for real players. The Dya'kukull only pad the
   **empty** seats, and only when you **▶ Go live** — they never form a field by themselves,
   and joining always seats a real player ahead of any filler.
-- **The bracket is shared.** Each player plays their own matches; the bracket fills in for
-  everyone as results come in (a human-vs-human pairing is decided by whoever plays first).
+- **Real matches in a structure.** A bracket is just normal matches played in order. A
+  pairing between **two real players is a live head-to-head match** — both sit down and play
+  it across their devices (same lockstep engine as Private Matches; no room code to
+  exchange — it's derived from the bracket). Against a Dya'kukull filler you play their
+  submitted pouch. If your live opponent isn't around, you can play their pouch instead so
+  the bracket never stalls. Every result is recorded to your match history, and the bracket
+  fills in for everyone as results come in.
 - **Titles are official-only.** A friend's tournament plays for gold and glory. **Titles**
   come only from **official season tournaments**, which you create and run from the Admin
   Panel (below). The season-ending **Interplanetary** is one of these.

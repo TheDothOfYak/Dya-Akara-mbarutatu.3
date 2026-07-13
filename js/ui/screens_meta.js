@@ -768,9 +768,11 @@
           });
         }
 
-        /* online: write my result to the shared bracket, then settle/notify */
-        function onlineMatchDone(iWon) {
-          const winnerLocalId = iWon ? me.id : oppId;
+        /* online: write my result to the shared bracket, then settle/notify.
+           `explicitWinner` is passed by a live head-to-head match (which also
+           resolves draws); the vs-pouch path just passes who won. */
+        function onlineMatchDone(iWon, explicitWinner) {
+          const winnerLocalId = explicitWinner != null ? explicitWinner : (iWon ? me.id : oppId);
           DYA.tournamentsOnline.reportMatch(t, ri, mi, winnerLocalId).then(r => {
             if (r.err) { UI.alert('Sync problem', r.err); UI.show('bracket', { trn: t }); return; }
             const t2 = r.mir || G.world.tournaments[t.onlineId || t.id] || t;
@@ -830,6 +832,12 @@
           });
           return;
         }
+        /* online: a pairing between two real players is a LIVE cross-device
+           match; against a Dya'kukull filler it's the normal vs-pouch match.
+           Either way the pouch is the one you locked in when you joined, so
+           both devices build the identical match. */
+        if (t.online) { onlinePlay(); return; }
+
         pickPouchAndLaunch();
         function pickPouchAndLaunch() {
           if (t.pouchFormat === 'single' && t.myPouch) {
@@ -837,6 +845,20 @@
           } else {
             DYA.play.pickPouch(launch, { title: t.pouchFormat === 'three-draft' ? 'Draft: choose which pouch for THIS match' : 'Choose your pouch' });
           }
+        }
+
+        function onlinePlay() {
+          const lockedPouch = (t.myPouch || []).map(id => me.tokens[id]).filter(Boolean);
+          const pouchForSim = lockedPouch.length ? lockedPouch : DYA.play.accountPouch(me);
+          const simLaunch = () => launch(pouchForSim); // launch()'s onFinish reports via onlineMatchDone
+          const oppIsHuman = opp && opp.remote && !opp.ai;
+          if (oppIsHuman && DYA.play.tournamentLiveMatch && DYA.netplay && DYA.tournamentsOnline) {
+            DYA.play.tournamentLiveMatch({
+              t, ri, mi, oppNetId: oppId, oppName: opp.displayName, ranked,
+              onFinish: (res, iWon, draw, winnerLocalId) => onlineMatchDone(iWon, winnerLocalId),
+              onFallback: simLaunch,
+            });
+          } else simLaunch();
         }
       }
 
