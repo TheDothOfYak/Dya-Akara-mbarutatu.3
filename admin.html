@@ -14,7 +14,9 @@
     html, body { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; }
     body { overflow: auto; }
     #app { position: static; inset: auto; overflow: visible; height: auto; min-height: 100%; }
-    .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    /* use the full screen width — cap only on ultra-wide displays so forms
+       don't stretch absurdly, but otherwise fill the viewport edge to edge */
+    .admin-wrap { max-width: 2400px; margin: 0 auto; padding: 20px 32px; }
     /* align-items:start so the two columns can each manage their own scroll */
     .admin-grid { display: grid; grid-template-columns: 200px 1fr; gap: 18px; align-items: start; }
     /* the nav sidebar sticks and scrolls on its own if it ever outgrows the viewport */
