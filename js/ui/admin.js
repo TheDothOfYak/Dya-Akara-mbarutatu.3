@@ -309,7 +309,7 @@
   }
 
   /* ---------- main panel ---------- */
-  const NAV = ['Overview', 'Creatures', 'Hunts', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
+  const NAV = ['Overview', 'Creatures', 'Hunts', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
   function panel() {
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap' });
@@ -317,7 +317,7 @@
     wrap.appendChild(U.el('p', { cls: 'muted small', text: 'Full god-mode access. Season ' + G.world.season.number + ' · ' + Object.keys(G.world.accounts).length + ' accounts · Handle with the usual recklessness.' }));
     const grid = U.el('div', { cls: 'admin-grid mt' });
     const nav = U.el('div', { cls: 'admin-nav' });
-    const body = U.el('div', {});
+    const body = U.el('div', { cls: 'admin-body' });
     NAV.forEach(v => {
       const b = U.el('button', { cls: 'btn' + (view === v ? ' primary' : ''), text: v });
       b.onclick = () => { view = v; panel(); };
@@ -872,6 +872,91 @@
           G.saveNow(); G.pushAccountToCloud(a); alert('Granted.');
         },
       })]));
+    },
+
+    /* ================= ALL TOKENS ================= */
+    'All Tokens'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Every token in the game — the entire collection of every account this admin session can see (real players, Dya’kukull, and any cloud accounts loaded). Escrowed / on-market / pouched tokens are included; each still lives in its owner’s collection. Search or filter to narrow.' }));
+      /* pulling in the cloud accounts makes this literally every real player's tokens, not just this browser's */
+      body.appendChild(cloudAccountsLine());
+
+      /* flatten every token across every account */
+      const all = [];
+      Object.values(G.world.accounts).forEach(acc => {
+        Object.values(acc.tokens || {}).forEach(tok => all.push({ tok, owner: acc }));
+      });
+
+      /* summary */
+      const byRarity = {};
+      all.forEach(({ tok }) => { byRarity[tok.rarity] = (byRarity[tok.rarity] || 0) + 1; });
+      const realCount = all.filter(x => !x.owner.ai).length;
+      const tiles = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px' });
+      [['Total tokens', U.fmt(all.length)], ['Held by real players', U.fmt(realCount)], ['Held by Dya’kukull', U.fmt(all.length - realCount)], ['Accounts', U.fmt(Object.keys(G.world.accounts).length)]].forEach(([l, v]) => {
+        tiles.appendChild(U.el('div', { cls: 'stat-tile' }, [U.el('div', { cls: 'st-num', text: v }), U.el('div', { cls: 'st-lbl', text: l })]));
+      });
+      body.appendChild(tiles);
+      body.appendChild(U.el('p', { cls: 'small muted mt mb', text: 'By rarity: ' + SP.RARITIES.map((rn, i) => (byRarity[i] || 0) + '× ' + rn).join('  ·  ') }));
+
+      /* controls */
+      const bar = U.el('div', { cls: 'flex mb', style: 'gap:8px;flex-wrap:wrap;align-items:center' });
+      const search = U.el('input', { cls: 'txt', style: 'max-width:240px', placeholder: '🔎 name / species / owner…' });
+      const ownerSel = selectEl([['all', 'All owners'], ['real', 'Real players only'], ['ai', 'Dya’kukull only']], 'all');
+      const rarSel = selectEl([['any', 'Any rarity']].concat(SP.RARITIES.map((r, i) => [String(i), r])), 'any');
+      const statusSel = selectEl([['any', 'Any status'], ['collection', 'Collection'], ['market', 'On market'], ['pouch', 'In pouch'], ['field', 'On field']], 'any');
+      bar.appendChild(search); bar.appendChild(ownerSel); bar.appendChild(rarSel); bar.appendChild(statusSel);
+      body.appendChild(bar);
+
+      const CAP = 300;
+      const note = U.el('p', { cls: 'small muted' });
+      body.appendChild(note);
+      const holder = U.el('div', {});
+      body.appendChild(holder);
+
+      function repaint() {
+        const q = search.value.trim().toLowerCase();
+        const ownerF = ownerSel.value, rarF = rarSel.value, statF = statusSel.value;
+        let rows = all.filter(({ tok, owner }) => {
+          if (ownerF === 'real' && owner.ai) return false;
+          if (ownerF === 'ai' && !owner.ai) return false;
+          if (rarF !== 'any' && String(tok.rarity) !== rarF) return false;
+          if (statF !== 'any' && (tok.status || 'collection') !== statF) return false;
+          if (q) {
+            const sp = SP.get(tok.speciesId);
+            const hay = (tok.name + ' ' + (sp ? sp.name : tok.speciesId) + ' ' + owner.displayName + ' ' + (SP.RARITIES[tok.rarity] || '')).toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
+        rows.sort((a, b) => (b.tok.rarity - a.tok.rarity) || ((SP.get(a.tok.speciesId) || {}).name || a.tok.speciesId).localeCompare((SP.get(b.tok.speciesId) || {}).name || b.tok.speciesId));
+        note.textContent = 'Showing ' + Math.min(rows.length, CAP) + ' of ' + rows.length + ' matching token(s)' + (rows.length > CAP ? ' — narrow with search to see the rest.' : '.');
+        holder.innerHTML = '';
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['', 'Name', 'Species', 'Rarity', 'Size', 'Element', 'Owner', 'Status', 'HP / DMG / SPD', 'Played', ''].map(h => U.el('th', { text: h }))));
+        rows.slice(0, CAP).forEach(({ tok, owner }) => {
+          const sp = SP.get(tok.speciesId);
+          const tr = U.el('tr', {});
+          const iconTd = U.el('td', {});
+          if (sp) iconTd.appendChild(spriteThumb(sp, 34));
+          tr.appendChild(iconTd);
+          tr.appendChild(U.el('td', { html: '<b>' + U.esc(tok.name) + '</b>' + (tok.nameLocked ? ' 🔒' : '') + (tok.frozen ? ' ❄' : '') + (tok.isRental ? ' <span class="pill">rental</span>' : '') }));
+          tr.appendChild(U.el('td', { text: sp ? sp.name : tok.speciesId }));
+          tr.appendChild(U.el('td', { text: SP.RARITIES[tok.rarity] != null ? SP.RARITIES[tok.rarity] : tok.rarity }));
+          tr.appendChild(U.el('td', { text: SP.SIZES[tok.sizeIdx] != null ? SP.SIZES[tok.sizeIdx] : tok.sizeIdx }));
+          tr.appendChild(U.el('td', { text: tok.element || (sp ? sp.element : '—') }));
+          tr.appendChild(U.el('td', { html: U.esc(owner.displayName) + (owner.ai ? ' <span class="pill">AI</span>' : (owner.cloudAccount ? ' <span class="pill">🌐</span>' : '')) }));
+          tr.appendChild(U.el('td', { text: tok.status || 'collection' }));
+          tr.appendChild(U.el('td', { text: tok.stats ? (tok.stats.hp + ' / ' + tok.stats.dmg + ' / ' + tok.stats.speed) : '—' }));
+          tr.appendChild(U.el('td', { text: tok.matchesPlayed || 0 }));
+          const actTd = U.el('td', {});
+          actTd.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Owner', onclick: () => editAccount(owner) }));
+          tr.appendChild(actTd);
+          tbl.appendChild(tr);
+        });
+        holder.appendChild(tbl);
+      }
+      search.oninput = repaint;
+      [ownerSel, rarSel, statusSel].forEach(el => el.onchange = repaint);
+      repaint();
     },
 
     /* ================= TOURNAMENTS ================= */
