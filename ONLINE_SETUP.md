@@ -157,6 +157,11 @@ Tables: `dya_tournaments` (one row per shared event, bracket and all) and
 The Guild's season isn't a bracket — it's one long **ranked ladder** everyone
 climbs together:
 
+- **It doesn't start until you open it.** You are the organizer of the Guild
+  season: it stays closed until you **Open the official season** from the Admin
+  Panel (Tournaments tab). Until then players see "the Guild hasn't opened this
+  season yet" and can't play ranked ladder matches; the moment you open it, every
+  player's game learns within a minute. You can close it again anytime.
 - **You start in your Local circuit** and play other players there. Winning
   raises your ranked rating; **enough rating promotes you** to the next circuit
   (Local → Regional → Half Planet → Whole Planet → Interplanetary).

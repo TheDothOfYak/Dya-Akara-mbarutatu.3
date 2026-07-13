@@ -225,12 +225,16 @@
       }
       body.appendChild(panel);
 
-      const findBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '⚔ Find a Season Match' });
-      findBtn.onclick = () => P.seasonMatchmake();
+      const seasonOpen = !S || !S.isOpen || S.isOpen();
+      const findBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: seasonOpen ? '⚔ Find a Season Match' : '🔒 Season not open yet' });
+      findBtn.disabled = !seasonOpen;
+      findBtn.onclick = () => { if (seasonOpen) P.seasonMatchmake(); };
       body.appendChild(findBtn);
-      body.appendChild(U.el('p', { cls: 'small muted mt', text: (S && S.enabled && S.enabled())
-        ? 'You’ll be matched with a real player in your circuit if one is searching — otherwise a Dya’kukull fills in so you never wait. Every match is ranked.'
-        : 'Online isn’t set up, so you’ll play the Dya’kukull of your circuit. Set up online play (Friends) to face real players.' }));
+      body.appendChild(U.el('p', { cls: 'small muted mt', text: !seasonOpen
+        ? 'The Guild hasn’t opened this season yet. The season begins when the organizer starts it from the Admin Panel — check back soon.'
+        : (S && S.enabled && S.enabled())
+          ? 'You’ll be matched with a real player in your circuit if one is searching — otherwise a Dya’kukull fills in so you never wait. Every match is ranked.'
+          : 'Online isn’t set up, so you’ll play the Dya’kukull of your circuit. Set up online play (Friends) to face real players.' }));
 
       const lad = U.el('div', { cls: 'panel mt' });
       lad.appendChild(U.el('h3', { cls: 'gold mb', text: 'The circuit climb' }));
@@ -283,6 +287,7 @@
   P.seasonMatchmake = function () {
     const me = G.me;
     const S = DYA.season;
+    if (S && S.isOpen && !S.isOpen()) { UI.alert('Season not open', 'The Guild hasn’t opened this season yet. It begins when the organizer starts it.'); return; }
     const circuit = EC.circuitForRank(me.rank);
     P.pickPouch(pouch => {
       const prevRank = me.rank;

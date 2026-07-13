@@ -98,6 +98,7 @@
       economy: {},        // key -> replacement value
       ai: {},             // AI tuning knobs (see AI_DEFAULTS)
       hunts: {},          // id -> admin-authored individual Hunt (see Hunts tab)
+      season: { live: false, openedAt: 0 }, // the Guild's official season: OFF until the organizer (admin) opens it
     };
   }
 
@@ -189,6 +190,19 @@
   /* ================= AI TUNING ================= */
   M.aiTuning = function () {
     return Object.assign({}, AI_DEFAULTS, M.data.ai || {});
+  };
+
+  /* ================= OFFICIAL SEASON =================
+     The Guild's official season (the ranked ladder) doesn't run until the
+     organizer — the admin — opens it. This flag rides the same dya_config
+     channel as every other admin edit, so every player's game learns the
+     season is live within a minute. */
+  M.seasonLive = function () { const s = M.data.season || {}; return !!s.live; };
+  M.setSeasonLive = function (live) {
+    M.data.season = Object.assign({ live: false, openedAt: 0 }, M.data.season || {});
+    M.data.season.live = !!live;
+    if (live) M.data.season.openedAt = Date.now();
+    M.save();
   };
 
   /* ================= HUNTS =================

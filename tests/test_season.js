@@ -132,6 +132,14 @@ function pouchOf(acc) { return Object.values(acc.tokens).slice(0, 5); }
   check('both sides agree who hosts', rA2.pairing && rB.pairing && rA2.pairing.hostNet === rB.pairing.hostNet && rA2.pairing.guestNet === rB.pairing.guestNet);
   check('exactly one pairing formed (no extra claims)', db.dya_season_queue.filter(r => r.status === 'matched').length === 2);
 
+  /* ---------- the season is closed until the organizer opens it ---------- */
+  const M = DYAG.mods;
+  check('online season starts CLOSED until opened', S.isOpen() === false);
+  M.setSeasonLive(true);
+  check('opening the season makes it live', S.isOpen() === true && M.seasonLive() === true);
+  M.setSeasonLive(false);
+  check('closing the season shuts the ladder', S.isOpen() === false);
+
   console.log(failures ? ('SEASON LADDER: ' + failures + ' FAILURE(S)') : 'SEASON LADDER: ALL PASS');
   process.exit(failures ? 1 : 0);
 })();

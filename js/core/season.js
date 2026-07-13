@@ -56,6 +56,14 @@
   S.enabled = function () { return S.configured() && !!me(); };
   S.netId = function () { return myNetId(); };
 
+  /* the season only runs once the organizer (admin) has opened it. Offline /
+     solo play keeps a local ladder open; online play waits for the shared
+     "season live" flag the admin broadcasts through dya_config. */
+  S.isOpen = function () {
+    if (!S.configured()) return true; // offline: your local circuit ladder is always available
+    return DYA.mods && DYA.mods.seasonLive ? DYA.mods.seasonLive() : false;
+  };
+
   /* ---------- circuit standing (derived from your ranked rating) ---------- */
   S.circuit = function (acc) { return DYA.economy.circuitForRank((acc || me() || {}).rank || 0); };
   S.circuitIndex = function (acc) { return DYA.economy.CIRCUITS.indexOf(S.circuit(acc)); };
