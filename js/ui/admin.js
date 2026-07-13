@@ -1029,17 +1029,22 @@
           return true;
         });
         rows.sort((a, b) => (b.tok.rarity - a.tok.rarity) || ((SP.get(a.tok.speciesId) || {}).name || a.tok.speciesId).localeCompare((SP.get(b.tok.speciesId) || {}).name || b.tok.speciesId));
-        note.textContent = 'Showing ' + Math.min(rows.length, CAP) + ' of ' + rows.length + ' matching token(s)' + (rows.length > CAP ? ' — narrow with search to see the rest.' : '.');
+        note.textContent = 'Showing ' + Math.min(rows.length, CAP) + ' of ' + rows.length + ' matching token(s)' + (rows.length > CAP ? ' — narrow with search to see the rest.' : '.') + ' Click any row to edit that token.';
         holder.innerHTML = '';
         const tbl = U.el('table', { cls: 'adm' });
         tbl.appendChild(U.el('tr', {}, ['', 'Name', 'Species', 'Rarity', 'Size', 'Element', 'Owner', 'Status', 'HP / DMG / SPD', 'Played', ''].map(h => U.el('th', { text: h }))));
         rows.slice(0, CAP).forEach(({ tok, owner }) => {
           const sp = SP.get(tok.speciesId);
-          const tr = U.el('tr', {});
+          /* the whole row opens the token editor — the table is wide and the
+             Edit button in the last column is easy to miss behind the sideways
+             scroll, so clicking anywhere on the row (except the Owner button)
+             works too */
+          const tr = U.el('tr', { style: 'cursor:pointer' });
+          tr.onclick = () => editToken(tok, owner);
           const iconTd = U.el('td', {});
           if (sp) iconTd.appendChild(spriteThumb(sp, 34));
           tr.appendChild(iconTd);
-          tr.appendChild(U.el('td', { html: '<b>' + U.esc(tok.name) + '</b>' + (tok.nameLocked ? ' 🔒' : '') + (tok.frozen ? ' ❄' : '') + (tok.isRental ? ' <span class="pill">rental</span>' : '') }));
+          tr.appendChild(U.el('td', { html: '<b class="gold">' + U.esc(tok.name) + '</b>' + (tok.nameLocked ? ' 🔒' : '') + (tok.frozen ? ' ❄' : '') + (tok.isRental ? ' <span class="pill">rental</span>' : '') }));
           tr.appendChild(U.el('td', { text: sp ? sp.name : tok.speciesId }));
           tr.appendChild(U.el('td', { text: SP.RARITIES[tok.rarity] != null ? SP.RARITIES[tok.rarity] : tok.rarity }));
           tr.appendChild(U.el('td', { text: SP.SIZES[tok.sizeIdx] != null ? SP.SIZES[tok.sizeIdx] : tok.sizeIdx }));
@@ -1049,8 +1054,8 @@
           tr.appendChild(U.el('td', { text: tok.stats ? (tok.stats.hp + ' / ' + tok.stats.dmg + ' / ' + tok.stats.speed) : '—' }));
           tr.appendChild(U.el('td', { text: tok.matchesPlayed || 0 }));
           const actTd = U.el('td', {});
-          actTd.appendChild(U.el('button', { cls: 'btn small primary', text: 'Edit', onclick: () => editToken(tok, owner) }));
-          actTd.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Owner', onclick: () => editAccount(owner) }));
+          actTd.appendChild(U.el('button', { cls: 'btn small primary', text: '✎ Edit', onclick: (e) => { e.stopPropagation(); editToken(tok, owner); } }));
+          actTd.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Owner', onclick: (e) => { e.stopPropagation(); editAccount(owner); } }));
           tr.appendChild(actTd);
           tbl.appendChild(tr);
         });
