@@ -1262,7 +1262,9 @@
        AI-vs-AI pairings resolve on their own schedule, including inside events
        the player entered. The player's own matches are never played for them:
        a round only advances once THEY have played theirs. */
-    const trns = Object.values(G.world.tournaments);
+    /* online tournaments are driven by core/tournaments_online.js, not the local
+       Dya'kukull sim — leave their shared brackets alone */
+    const trns = Object.values(G.world.tournaments).filter(t => !t.online);
     const isHuman = (pid) => { const acc = G.world.accounts[pid]; return acc && !acc.ai; };
     const humanIn = (t) => t.players.some(isHuman);
     /* keep the browser stocked */
@@ -1506,6 +1508,7 @@
       const rng = new U.Rng(U.newSeed());
       const t = {
         id: U.uid('trn'), name: 'THE INTERPLANETARY — Season ' + G.world.season.number, circuit: 'Interplanetary', sealed: true,
+        official: true, /* an official season tournament — the only kind that awards titles */
         organizer: 'Dya Guild', entryFee: 1000, pouchFormat: 'three-draft', size: 16,
         state: 'open', players: [], bracket: null,
         titlePool: EC.TITLES.filter(tt => tt.tier === 'Interplanetary').map(tt => tt.id),
@@ -1523,8 +1526,8 @@
       w.season.endedAt = Date.now();
       const winners = w.season.winners.slice();
       w.season = { number: w.season.number + 1, startedAt: Date.now(), endedAt: null, winners: [] };
-      Object.values(w.accounts).forEach(a => { if (!a.ai) { a.rank = Math.round((a.rank + 1000) / 2); } });
-      G.admin.announce('Season ' + (w.season.number - 1) + ' has ended', 'The season reset ceremony honors all circuit winners. A new season begins now. Ranks have been softened toward 1000.');
+      Object.values(w.accounts).forEach(a => { if (!a.ai) { a.rank = Math.round((a.rank + 1000) / 2); a.seasonReached = []; } });
+      G.admin.announce('Season ' + (w.season.number - 1) + ' has ended', 'The season reset ceremony honors all circuit winners. A new season begins now. Ranks have been softened toward 1000, and the circuit climb begins again.');
       G.saveNow();
       return winners;
     },

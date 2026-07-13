@@ -172,6 +172,142 @@
     return wrap;
   }
 
+  /* ---------- official online season tournaments (make live & monitor) ---------- */
+  function onlineTournaments(body) {
+    const TO = DYA.tournamentsOnline;
+    const box = U.el('div', { cls: 'panel mb' });
+    box.appendChild(U.el('h3', { cls: 'gold mb', text: '🏛 Official season tournaments (online, shared with every player)' }));
+    if (!TO || !TO.configured()) {
+      box.appendChild(U.el('p', { cls: 'muted small', text: 'Online is not configured (js/config.js) — official online season tournaments need Supabase. Only local circuit tournaments exist.' }));
+      body.appendChild(box);
+      return;
+    }
+    box.appendChild(U.el('p', { cls: 'muted small', text: 'Create an official event, share it, then MAKE IT LIVE when your players have joined. Real players fill the seats; the Dya’kukull only pad the empty ones — and only official events award titles.' }));
+
+    /* --- create form --- */
+    const form = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;align-items:end' });
+    const nm = U.el('input', { cls: 'txt', placeholder: 'Tournament name' });
+    const circuit = U.el('select', { cls: 'txt' });
+    EC.CIRCUITS.forEach(c => circuit.appendChild(U.el('option', { value: c, text: c })));
+    const size = U.el('select', { cls: 'txt' });
+    [4, 8, 16, 32].forEach(s => size.appendChild(U.el('option', { value: s, text: s + ' players' })));
+    size.value = 8;
+    const struct = U.el('select', { cls: 'txt' });
+    [['single', 'Single elimination'], ['rr', 'Round robin']].forEach(([v, l]) => struct.appendChild(U.el('option', { value: v, text: l })));
+    const pfmt = U.el('select', { cls: 'txt' });
+    [['single', 'Single pouch'], ['three-draft', 'Three-pouch draft'], ['random', 'Random pouch']].forEach(([v, l]) => pfmt.appendChild(U.el('option', { value: v, text: l })));
+    const fee = numIn(0, { placeholder: 'Entry fee' });
+    const bonus = numIn(0, { placeholder: 'Champion bonus gold' });
+    const pw = U.el('input', { cls: 'txt', placeholder: 'Password (optional)' });
+    lblIn(form, 'Name', nm); lblIn(form, 'Circuit', circuit); lblIn(form, 'Size', size);
+    lblIn(form, 'Bracket', struct); lblIn(form, 'Pouch', pfmt); lblIn(form, 'Entry fee', fee);
+    lblIn(form, 'Champion bonus', bonus); lblIn(form, 'Password', pw);
+    box.appendChild(form);
+    const cacts = U.el('div', { cls: 'flex mt' });
+    cacts.appendChild(U.el('button', {
+      cls: 'btn small primary', text: '＋ Create official tournament', onclick: async () => {
+        if (nm.value.trim().length < 3) { alert('Give it a name (3+ characters).'); return; }
+        const r = await TO.adminCreate({
+          name: nm.value.trim(), circuit: circuit.value, size: parseInt(size.value),
+          structure: struct.value, pouchFormat: pfmt.value, entryFee: parseInt(fee.value) || 0,
+          bonusGold: parseInt(bonus.value) || 0, password: pw.value.trim() || null,
+        });
+        if (r.err) { alert('Could not create: ' + r.err); return; }
+        nm.value = ''; pw.value = '';
+        alert('Official tournament created. Share it — players will see it in their Tournament Browser. Come back here to MAKE IT LIVE once they’ve joined.');
+        rerender();
+      },
+    }));
+    box.appendChild(cacts);
+
+    /* --- live list --- */
+    const holder = U.el('div', { cls: 'mt' });
+    holder.appendChild(U.el('p', { cls: 'small muted', text: 'Loading online tournaments…' }));
+    box.appendChild(holder);
+    body.appendChild(box);
+
+    TO.adminFetchAll().then(async rows => {
+      holder.innerHTML = '';
+      if (!rows || !rows.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'No online tournaments yet.' })); return; }
+      const tbl = U.el('table', { cls: 'adm' });
+      tbl.appendChild(U.el('tr', {}, ['Name', 'Circuit', 'Official', 'State', 'Real players', ''].map(h => U.el('th', { text: h }))));
+      for (const row of rows) {
+        const d = row.data || {};
+        let realCount = '—';
+        if (row.state === 'open') { try { realCount = (await TO.adminFetchPlayers(row.id)).length + '/' + row.size; } catch (e) { realCount = '?'; } }
+        else if (d.roster) realCount = Object.values(d.roster).filter(x => !x.ai).length + ' + ' + Object.values(d.roster).filter(x => x.ai).length + ' AI';
+        const tr = U.el('tr', {}, [
+          U.el('td', { text: row.name }),
+          U.el('td', { text: row.circuit }),
+          U.el('td', { html: row.official ? '<span class="gold">official</span>' : '—' }),
+          U.el('td', { text: row.state }),
+          U.el('td', { text: realCount }),
+        ]);
+        const td = U.el('td', {});
+        if (row.state === 'open') {
+          td.appendChild(U.el('button', {
+            cls: 'btn small primary', text: '▶ Make live', onclick: async () => {
+              const r = await TO.start({ onlineId: row.id, id: row.id, size: row.size, circuit: row.circuit, structure: d.structure || 'single', entryFee: d.entryFee || 0 });
+              alert(r.err ? 'Cannot start: ' + r.err : 'Live! ' + r.reals + ' real player(s) seated' + (r.fillers ? ', ' + r.fillers + ' Dya’kukull filling in.' : '.'));
+              rerender();
+            },
+          }));
+        } else if (row.state === 'running') {
+          td.appendChild(U.el('button', { cls: 'btn small', text: 'Monitor', onclick: () => monitorOnline(row) }));
+        }
+        td.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: async () => { if (!confirm('Delete this online tournament for everyone?')) return; await TO.adminDelete(row.id); rerender(); } }));
+        tr.appendChild(td);
+        tbl.appendChild(tr);
+      }
+      holder.appendChild(tbl);
+    }).catch(e => {
+      holder.innerHTML = '';
+      holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Could not load online tournaments: ' + e.message + (/(relation|table)/i.test(e.message) ? ' — re-run supabase/schema.sql to add the dya_tournaments tables.' : '') }));
+    });
+  }
+
+  /* official season ladder standings — real players by ranked rating, with the
+     circuit each currently sits in (Local → Interplanetary) */
+  function seasonLadderStandings(body) {
+    const box = U.el('div', { cls: 'panel mb mt' });
+    box.appendChild(U.el('h3', { cls: 'gold mb', text: '📈 Season ladder standings (the official ranked climb)' }));
+    box.appendChild(U.el('p', { cls: 'muted small', text: 'Everyone climbs one ladder: play your circuit, rank up, promote. Titles are awarded on reaching each circuit. This is the live standing of every real player this admin session can see.' }));
+    const players = Object.values(G.world.accounts).filter(a => !a.ai).sort((a, b) => (b.rank || 0) - (a.rank || 0));
+    if (!players.length) { box.appendChild(U.el('p', { cls: 'muted small', text: 'No real players yet.' })); body.appendChild(box); return; }
+    const tbl = U.el('table', { cls: 'adm' });
+    tbl.appendChild(U.el('tr', {}, ['#', 'Name', 'Level', 'Rating', 'Circuit'].map(h => U.el('th', { text: h }))));
+    players.slice(0, 50).forEach((a, i) => {
+      tbl.appendChild(U.el('tr', {}, [
+        U.el('td', { text: '#' + (i + 1) }),
+        U.el('td', { html: U.esc(a.displayName) + (a.cloudAccount ? ' <span class="pill">🌐</span>' : '') }),
+        U.el('td', { text: a.level }),
+        U.el('td', { text: a.rank || 1000 }),
+        U.el('td', { html: '<b class="gold">' + EC.circuitForRank(a.rank || 1000) + '</b>' }),
+      ]));
+    });
+    box.appendChild(tbl);
+    body.appendChild(box);
+  }
+
+  /* live monitor of a running online tournament's shared bracket */
+  function monitorOnline(row) {
+    const { w } = modal('8% 12%');
+    const d = row.data || {};
+    const roster = d.roster || {};
+    const nm = id => id == null ? 'bye' : (roster[id] ? roster[id].name + (roster[id].ai ? ' 🤖' : '') : id);
+    w.appendChild(U.el('h2', { cls: 'gold', text: row.name }));
+    w.appendChild(U.el('p', { cls: 'small muted', text: row.circuit + ' · ' + (d.structure === 'rr' ? 'round robin' : 'single elimination') + ' · ' + Object.values(roster).filter(x => !x.ai).length + ' real, ' + Object.values(roster).filter(x => x.ai).length + ' Dya’kukull' }));
+    if (!d.bracket) { w.appendChild(U.el('p', { cls: 'muted', text: 'No bracket yet.' })); return; }
+    d.bracket.forEach((round, ri) => {
+      w.appendChild(U.el('h3', { cls: 'gold mb mt', text: d.structure === 'rr' ? 'Round robin' : 'Round ' + (ri + 1) }));
+      round.forEach(mt => {
+        if (!mt) return;
+        w.appendChild(U.el('div', { cls: 'small', text: nm(mt.a) + ' vs ' + nm(mt.b) + ' — ' + (mt.winner ? 'won by ' + nm(mt.winner) : 'pending') }));
+      });
+    });
+    if (d.champion) w.appendChild(U.el('div', { cls: 'panel mt', html: '🏆 <b class="gold">Champion: ' + U.esc(nm(d.champion)) + '</b>' }));
+  }
+
   /* ---------- main panel ---------- */
   const NAV = ['Overview', 'Creatures', 'Hunts', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
   function panel() {
@@ -757,9 +893,16 @@
         }),
         U.el('button', { cls: 'btn ghost', text: 'Seed fresh circuit tournaments', onclick: () => { G.seedTournamentsForAdmin(); rerender(); } }),
       ]));
+
+      /* ---- OFFICIAL online season tournaments: make live & monitor ---- */
+      onlineTournaments(body);
+
       body.appendChild(U.el('h3', { cls: 'gold mb', text: 'Season ' + G.world.season.number + ' winners so far' }));
       if (!G.world.season.winners.length) body.appendChild(U.el('p', { cls: 'muted small', text: 'None yet.' }));
       G.world.season.winners.forEach(w => body.appendChild(U.el('div', { cls: 'small', text: '🏆 ' + w.name + ' — ' + w.tournament + ' (' + w.circuit + ')' })));
+
+      /* ---- official season LADDER standings (ranked circuit climb) ---- */
+      seasonLadderStandings(body);
       body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'All tournaments' }));
       const tbl = U.el('table', { cls: 'adm' });
       tbl.appendChild(U.el('tr', {}, [U.el('th', { text: 'Name' }), U.el('th', { text: 'Circuit' }), U.el('th', { text: 'State' }), U.el('th', { text: 'Players' }), U.el('th', { text: '' })]));

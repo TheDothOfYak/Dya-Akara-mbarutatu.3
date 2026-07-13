@@ -115,6 +115,7 @@
         return c;
       }
       grid.appendChild(bigCard('⚡', 'Quick Play — vs AI', 'Straight into a match against the machine. Pick a difficulty, pick a pouch, go.', () => P.quickPlayFlow()));
+      grid.appendChild(bigCard('🏆', 'Ranked Season', 'The Guild’s official ladder. Play your circuit, rank up, climb Local → Interplanetary. Titles are earned here.', () => UI.show('seasonLadder')));
       grid.appendChild(bigCard('🌐', 'Matchmaking Queue', 'Casual queue — matched with the next player near your level. No rank implications.', () => P.matchmakingFlow()));
       grid.appendChild(bigCard('🤝', 'Private Match', 'Invite a friend, or share a room code.', () => P.privateFlow()));
       grid.appendChild(bigCard('⚔', 'Duel', '1 token vs 1 token. No resources, no Relic. Anything can be wagered. No Guild cut.', () => P.duelFlow()));
@@ -190,6 +191,171 @@
       const liveIv = setInterval(() => { if (!livePanel.isConnected) { clearInterval(liveIv); return; } renderLive(); }, 6000);
     },
   });
+
+  /* ================= OFFICIAL SEASON LADDER ================= */
+  UI.register('seasonLadder', {
+    enter(root) {
+      const me = G.me;
+      const S = DYA.season;
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Ranked Season' }));
+      const page = U.el('div', { cls: 'page' });
+      const head = U.el('div', { cls: 'page-head' });
+      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('play') }));
+      head.appendChild(U.el('h2', { text: 'Ranked Season ' + G.world.season.number }));
+      page.appendChild(head);
+      const body = U.el('div', { cls: 'page-body', style: 'max-width:720px;margin:0 auto' });
+
+      const circuit = EC.circuitForRank(me.rank);
+      const ci = EC.CIRCUITS.indexOf(circuit);
+      const floor = EC.CIRCUIT_RANK_FLOOR[circuit];
+      const nextFloor = EC.nextCircuitFloor(me.rank);
+
+      const panel = U.el('div', { cls: 'panel mb' });
+      panel.appendChild(U.el('div', { cls: 'flex', style: 'align-items:center;gap:14px' }, [
+        U.el('div', { style: 'font-size:30px', text: '🏆' }),
+        U.el('div', { cls: 'flex1', html: '<b class="gold">' + circuit + ' circuit</b> · rating <b class="gold">' + me.rank + '</b><br><span class="small muted">' + (nextFloor ? 'Reach ' + nextFloor + ' to promote to ' + EC.CIRCUITS[ci + 1] : 'Top circuit — you stand among the finest of the Mbaru Tatu.') + '</span>' }),
+      ]));
+      if (nextFloor) {
+        const span = nextFloor - floor;
+        const pct = Math.max(2, Math.min(100, Math.round(((me.rank - floor) / span) * 100)));
+        const bar = U.el('div', { style: 'height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px' });
+        bar.appendChild(U.el('div', { style: 'height:100%;width:' + pct + '%;background:var(--gold)' }));
+        panel.appendChild(bar);
+      }
+      body.appendChild(panel);
+
+      const findBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '⚔ Find a Season Match' });
+      findBtn.onclick = () => P.seasonMatchmake();
+      body.appendChild(findBtn);
+      body.appendChild(U.el('p', { cls: 'small muted mt', text: (S && S.enabled && S.enabled())
+        ? 'You’ll be matched with a real player in your circuit if one is searching — otherwise a Dya’kukull fills in so you never wait. Every match is ranked.'
+        : 'Online isn’t set up, so you’ll play the Dya’kukull of your circuit. Set up online play (Friends) to face real players.' }));
+
+      const lad = U.el('div', { cls: 'panel mt' });
+      lad.appendChild(U.el('h3', { cls: 'gold mb', text: 'The circuit climb' }));
+      EC.CIRCUITS.forEach(c => {
+        const reached = me.rank >= EC.CIRCUIT_RANK_FLOOR[c];
+        const row = U.el('div', { cls: 'friend-row' });
+        row.appendChild(U.el('div', { cls: 'flex1', html: (reached ? '✅ ' : '🔒 ') + '<b' + (c === circuit ? ' class="gold"' : '') + '>' + c + '</b> <span class="small muted">rating ' + EC.CIRCUIT_RANK_FLOOR[c] + '+</span>' }));
+        lad.appendChild(row);
+      });
+      body.appendChild(lad);
+
+      const lb = U.el('div', { cls: 'panel mt' });
+      lb.appendChild(U.el('h3', { cls: 'gold mb', text: 'Season leaderboard' }));
+      const lbBody = U.el('div', {});
+      lbBody.appendChild(U.el('p', { cls: 'small muted', text: 'Loading standings…' }));
+      lb.appendChild(lbBody);
+      body.appendChild(lb);
+
+      page.appendChild(body);
+      scr.appendChild(page);
+      root.appendChild(scr);
+
+      /* leaderboard: real ratings when online, else this world's standings */
+      function paint(list) {
+        lbBody.innerHTML = '';
+        if (!list.length) { lbBody.appendChild(U.el('p', { cls: 'muted small', text: 'No standings yet — play a season match to appear here.' })); return; }
+        list.forEach((p, i) => {
+          const row = U.el('div', { cls: 'friend-row' + (p.me ? ' gold' : '') });
+          row.appendChild(U.el('div', { style: 'width:30px', text: '#' + (i + 1) }));
+          row.appendChild(U.el('div', { cls: 'flex1', html: '<b' + (p.me ? ' class="gold"' : '') + '>' + U.esc(p.name) + '</b> <span class="small muted">' + EC.circuitForRank(p.rank) + '</span>' }));
+          row.appendChild(U.el('div', { cls: 'gold', text: p.rank }));
+          lbBody.appendChild(row);
+        });
+      }
+      function localBoard() {
+        const players = Object.values(G.world.accounts).filter(a => a.level > 0 || a.id === me.id);
+        players.sort((a, b) => b.rank - a.rank);
+        paint(players.slice(0, 15).map(p => ({ name: p.displayName, rank: p.rank, level: p.level, me: p.id === me.id })));
+      }
+      if (S && S.enabled && S.enabled()) {
+        S.leaderboard(15).then(rows => {
+          if (!rows) { localBoard(); return; }
+          paint(rows.map(r => ({ name: r.name, rank: r.rank, level: r.level, me: r.id === me.netId })));
+        });
+      } else localBoard();
+    },
+  });
+
+  /* find (or fill) a ranked season match in your circuit, then run it */
+  P.seasonMatchmake = function () {
+    const me = G.me;
+    const S = DYA.season;
+    const circuit = EC.circuitForRank(me.rank);
+    P.pickPouch(pouch => {
+      const prevRank = me.rank;
+      const online = S && S.enabled && S.enabled();
+      if (!online) { aiMatch(pouch, prevRank, circuit); return; }
+
+      const w = U.el('div', { cls: 'center' });
+      w.appendChild(U.el('h3', { cls: 'gold', text: 'Searching — ' + circuit + ' circuit' }));
+      const status = U.el('p', { cls: 'muted mt', text: 'Looking for a player in your circuit…' });
+      w.appendChild(status);
+      const m = UI.modal(w, { sticky: true });
+      let cancelled = false, done = false, elapsed = 0;
+      w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { cancelled = done = true; S.dequeue(); m.close(); UI.show('seasonLadder'); } }));
+
+      const tick = async () => {
+        if (cancelled || done) return;
+        elapsed++;
+        let r; try { r = await S.poll(pouch); } catch (e) { r = { err: e.message }; }
+        if (cancelled || done) return;
+        if (r.pairing) { done = true; m.close(); seasonLive(r.pairing, pouch, prevRank, circuit); return; }
+        status.textContent = 'Looking for a player in your circuit… (' + elapsed + 's)';
+        if (elapsed >= 10) { done = true; m.close(); S.dequeue(); aiMatch(pouch, prevRank, circuit); return; }
+        setTimeout(tick, 2000);
+      };
+      setTimeout(tick, 600);
+    });
+
+    function aiMatch(pouch, prevRank, circuit) {
+      const opp = (DYA.season && DYA.season.aiOpponentFor(circuit)) || Object.values(G.world.accounts).find(a => a.ai);
+      if (!opp) { UI.alert('No opponent', 'The Dya’kukull are all busy right now. Try again in a moment.'); return; }
+      P.startMatch({
+        mode: 'standard', ranked: true, format: circuit + ' Season',
+        opponent: { name: opp.displayName, accId: opp.id, aiSkill: G.aiSkill(opp), pouch: P.accountPouch(opp), simulatedHuman: true },
+        pouch,
+        onFinish: () => seasonAfter(prevRank),
+      });
+    }
+    function seasonLive(pairing, pouch, prevRank, circuit) {
+      const myNet = DYA.season.netId();
+      P.liveMatch({
+        seedStr: 'season:' + pairing.roomCode,
+        myNet, oppNet: pairing.oppNet, oppName: pairing.oppName,
+        hostNet: pairing.hostNet, guestNet: pairing.guestNet,
+        pouchFor: (net) => net === myNet ? pouch : pairing.oppPouch,
+        nameFor: (net) => net === myNet ? me.displayName : pairing.oppName,
+        terrain: ['plains', 'forest', 'mountain', 'desert'][Math.abs(U.hashStr(pairing.roomCode)) % 4],
+        ranked: true, format: circuit + ' Season', waitTitle: 'Season match vs ' + pairing.oppName,
+        onFinish: () => { S.dequeue(); seasonAfter(prevRank); },
+        onFallback: () => { S.dequeue(); aiMatch(pouch, prevRank, circuit); },
+        onCancel: () => { S.dequeue(); UI.show('seasonLadder'); },
+      });
+    }
+    function seasonAfter(prevRank) {
+      const promo = DYA.season ? DYA.season.checkPromotion(prevRank) : null;
+      if (promo && promo.promoted) showPromotion(promo);
+      else UI.show('seasonLadder');
+    }
+    function showPromotion(promo) {
+      const w = U.el('div', { cls: 'center' });
+      w.appendChild(U.el('h2', { cls: 'gold', text: '⬆ PROMOTED' }));
+      w.appendChild(U.el('p', { cls: 'mt', html: 'You’ve climbed into the <b class="gold">' + U.esc(promo.toCircuit) + '</b> circuit of the season!' }));
+      const m = UI.modal(w, { sticky: true });
+      if (promo.titlePool && promo.titlePool.length) {
+        w.appendChild(U.el('p', { cls: 'muted mt', text: 'Official season title — choose one to keep:' }));
+        promo.titlePool.forEach(tt => {
+          w.appendChild(U.el('button', { cls: 'btn ghost q-opt', text: tt.name + ' — ' + tt.desc, onclick: () => { if (!G.me.titles.includes(tt.id)) G.me.titles.push(tt.id); G.save(); m.close(); UI.show('seasonLadder'); } }));
+        });
+      } else {
+        w.appendChild(U.el('button', { cls: 'btn primary mt', text: 'Onward', onclick: () => { m.close(); UI.show('seasonLadder'); } }));
+      }
+      DYA.audio.play('victory');
+    }
+  };
 
   /* ---------- flows ---------- */
   const AI_NAMES = ['Litk', 'Mael', 'Vel', 'Skor', 'Skaar']; // AI difficulty tiers, named for the size scale
@@ -459,6 +625,136 @@
       },
     }, 1300);
   }
+
+  /* ============ LIVE MATCHES DERIVED FROM SHARED DATA ============
+     A pairing between two real players (a bracket match, or a season-ladder
+     pairing) is just a normal cross-device match — but nothing is exchanged by
+     hand: the room code and the whole match (seed, terrain, BOTH pouches) are
+     DERIVED from data both devices already hold. Both players sit down (a short
+     presence handshake), both build the identical lockstep match, and because
+     they run the same deterministic simulation they agree on the outcome. If
+     the opponent never shows, the caller's fallback keeps things moving. */
+  function derivedRoomCode(s) {
+    const A = DYA.netplay.ROOM_ALPHABET;
+    let code = '';
+    for (let i = 0; i < 5; i++) code += A[Math.abs(U.hashStr('lmroom:' + s + ':' + i)) % A.length];
+    return code;
+  }
+
+  /* generic connector.
+     o: { seedStr, myNet, oppNet, oppName, hostNet, guestNet, pouchFor(net),
+          nameFor(net), terrain, ranked, format, tournament, waitTitle, fallbackLabel,
+          onFinish(res,iWon,draw,winnerLocalId), onFallback(), onCancel() } */
+  P.liveMatch = function (o) {
+    const me = G.me;
+    const roomCode = derivedRoomCode(o.seedStr);
+    const iAmHost = o.myNet === o.hostNet;
+
+    const wait = U.el('div', { cls: 'center' });
+    wait.appendChild(U.el('h3', { cls: 'gold', text: o.waitTitle || ('Live match vs ' + o.oppName) }));
+    const statusEl = U.el('p', { cls: 'muted mt', text: 'Connecting…' });
+    wait.appendChild(statusEl);
+    const wm = UI.modal(wait, { sticky: true });
+    let room = null, launched = false, closed = false, readyTimer = null, giveUpAt = Date.now() + (o.waitMs || 30000);
+
+    function stop() { clearInterval(readyTimer); if (room && !launched) { try { room.leave(); } catch (e) { } } }
+    function fallback() { if (closed) return; closed = true; stop(); wm.close(); if (o.onFallback) o.onFallback(); }
+    function cancel() { if (closed) return; closed = true; stop(); wm.close(); if (o.onCancel) o.onCancel(); }
+
+    function launch() {
+      if (launched || closed) return;
+      launched = true; clearInterval(readyTimer); wm.close();
+      const buildTeam = (net) => ({
+        name: (o.nameFor ? o.nameFor(net) : (net === o.myNet ? me.displayName : o.oppName)) || 'Player',
+        controller: 'human', pouch: (o.pouchFor(net) || []).map(x => U.deepCopy(x)),
+        startResources: 0, seal: { avatarIdx: 0, patterns: [] },
+      });
+      const match = new DYA.match.Match({
+        seed: U.hashStr(o.seedStr), mode: 'standard', terrain: o.terrain || 'plains',
+        settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
+        teams: [buildTeam(o.hostNet), buildTeam(o.guestNet)],
+      });
+      const myTeam = iAmHost ? 0 : 1;
+      const net = new DYA.netplay.Lockstep(match, myTeam, payload => room.send(payload));
+      net.room = room; P._netSession = net;
+      net.route = (msg) => { if (!msg) return; if (msg.t === 'frame' || msg.t === 'need') net.onRemote(msg); else if (msg.t === 'bye') net.peerLeft = Date.now(); };
+      UI.showWithLoading('match', {
+        match,
+        cfg: {
+          mode: 'standard', ranked: !!o.ranked, format: o.format || 'Match', tournament: o.tournament || null,
+          myTeam, net,
+          opponent: { name: o.oppName, accId: o.oppNet, remoteHuman: true },
+          pouch: (o.pouchFor(o.myNet) || []).map(x => U.deepCopy(x)),
+          onFinish: (res, iWon, draw) => {
+            /* both devices ran the same sim → same winner. Draws break on a
+               shared coin so both report the same seat. */
+            let winnerNet;
+            if (draw) winnerNet = (Math.abs(U.hashStr(o.seedStr + ':tie')) % 2 === 0) ? o.hostNet : o.guestNet;
+            else winnerNet = iWon ? o.myNet : o.oppNet;
+            const winnerLocalId = winnerNet === o.myNet ? me.id : winnerNet;
+            if (o.onFinish) o.onFinish(res, iWon, draw, winnerLocalId);
+          },
+        },
+      }, 1200);
+    }
+
+    function offerFallback() {
+      statusEl.innerHTML = '<b>' + U.esc(o.oppName) + '</b> isn’t at the table yet.';
+      const rowb = U.el('div', { cls: 'flex mt' });
+      rowb.appendChild(U.el('button', { cls: 'btn primary', text: o.fallbackLabel || 'Play a Dya’kukull instead', onclick: fallback }));
+      rowb.appendChild(U.el('button', { cls: 'btn', text: 'Keep waiting', onclick: () => { giveUpAt = Date.now() + 30000; statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…'; rowb.remove(); armTimer(); } }));
+      rowb.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: cancel }));
+      wait.appendChild(rowb);
+    }
+    function armTimer() {
+      readyTimer = setInterval(() => {
+        if (launched || closed) { clearInterval(readyTimer); return; }
+        try { room.send({ t: 'lmready' }); } catch (e) { }
+        if (Date.now() > giveUpAt) { clearInterval(readyTimer); offerFallback(); }
+      }, 1500);
+    }
+
+    (async function connect() {
+      try {
+        room = await DYA.netplay.joinRoom(roomCode, o.myNet, {
+          onMessage(msg) {
+            if (!msg) return;
+            if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) { P._netSession.route(msg); return; }
+            if (msg.t === 'lmready') { if (!launched && !closed) { try { room.send({ t: 'lmready' }); } catch (e) { } launch(); } }
+          },
+          onPeerJoin() { if (room && !launched && !closed) { try { room.send({ t: 'lmready' }); } catch (e) { } } },
+          onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
+        });
+        statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…';
+        wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: o.fallbackLabel || 'Play a Dya’kukull instead', onclick: fallback }));
+        room.send({ t: 'lmready' });
+        armTimer();
+      } catch (e) {
+        wm.close();
+        UI.alert('Could not connect', e.message + ' — ' + (o.fallbackLabel ? o.fallbackLabel.toLowerCase() : 'playing a Dya’kukull instead') + '.');
+        if (o.onFallback) o.onFallback();
+      }
+    })();
+  };
+
+  /* bracket pairing between two real players → a live match built from the roster */
+  P.tournamentLiveMatch = function (o) {
+    const myNet = DYA.tournamentsOnline.netId();
+    const roster = (o.t.roster) || {};
+    if (!roster[o.oppNetId] || !roster[myNet]) { if (o.onFallback) o.onFallback(); return; } // no shared pouches — sim instead
+    const seedStr = o.t.id + '|' + o.ri + '|' + o.mi;
+    P.liveMatch({
+      seedStr, myNet, oppNet: o.oppNetId, oppName: o.oppName,
+      hostNet: myNet < o.oppNetId ? myNet : o.oppNetId,
+      guestNet: myNet < o.oppNetId ? o.oppNetId : myNet,
+      pouchFor: (net) => (roster[net] && roster[net].pouch) || [],
+      nameFor: (net) => (roster[net] && roster[net].name) || (net === myNet ? G.me.displayName : o.oppName),
+      terrain: o.t.terrain, ranked: o.ranked, format: (o.t.circuit || '') + ' Tournament', tournament: o.t.name,
+      waitTitle: 'Live match vs ' + o.oppName, fallbackLabel: 'Play their pouch (counts)',
+      onFinish: o.onFinish, onFallback: o.onFallback,
+      onCancel: () => UI.show('bracket', { trn: o.t }),
+    });
+  };
 
   P.inviteFriendMatch = function (acc) {
     P.pickPouch(pouch => {

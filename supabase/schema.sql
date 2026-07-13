@@ -40,9 +40,12 @@ create table if not exists public.dya_players (
   name        text not null default 'Player',
   level       int  not null default 0,
   avatar_idx  int  not null default 0,
+  rank        int  not null default 1000,   -- ranked rating, powers the season leaderboard
   last_seen   timestamptz not null default now(),
   created_at  timestamptz not null default now()
 );
+-- existing deployments: add the column if the table predates it
+alter table public.dya_players add column if not exists rank int not null default 1000;
 
 -- ---------- friend requests ----------
 create table if not exists public.dya_friend_requests (
@@ -122,6 +125,71 @@ create table if not exists public.dya_config (
   updated_at timestamptz not null default now()
 );
 
+-- ---------- online tournaments (one row per shared tournament) ----------
+-- Tournaments are REAL and shared: every device sees the same open events.
+-- `data` carries the whole tournament object (bracket, rules, rewards…),
+-- exactly the shape the local game already uses, so the existing UI runs
+-- unchanged. The flat columns are there for cheap browsing/filtering.
+--   • official  — only Admin-Panel season tournaments award titles.
+--   • pass_hash — optional password gate (null = open to anyone).
+-- Tournaments are meant for real players; the Dya'kukull (AI) are only
+-- padded in at start time and are NEVER stored as registered players, so
+-- a real player always takes priority over any AI filler.
+create table if not exists public.dya_tournaments (
+  id               text primary key,
+  name             text not null default 'Tournament',
+  circuit          text not null default 'Local',
+  state            text not null default 'open' check (state in ('open','running','done')),
+  official         boolean not null default false,
+  sealed           boolean not null default false,
+  organizer_net_id text,
+  organizer_name   text not null default '',
+  size             int  not null default 8,
+  pass_hash        text,
+  data             jsonb not null,
+  updated_at       timestamptz not null default now(),
+  created_at       timestamptz not null default now()
+);
+
+-- ---------- tournament registrations (one row per REAL player seat) ----------
+-- Only real players get a row here; AI never do. Seating is an INSERT with a
+-- unique (tournament_id, net_id) guard, so a friend joining is atomic and a
+-- player can never double-register. The pouch travels in the row so any
+-- device can render the bracket and simulate that player's matches.
+create table if not exists public.dya_tournament_players (
+  id            uuid primary key default gen_random_uuid(),
+  tournament_id text not null references public.dya_tournaments(id) on delete cascade,
+  net_id        text not null,
+  name          text not null default 'Player',
+  level         int  not null default 1,
+  rank          int  not null default 1000,
+  avatar_idx    int  not null default 0,
+  pouch         jsonb not null default '[]'::jsonb,
+  joined_at     timestamptz not null default now(),
+  unique (tournament_id, net_id)
+);
+
+-- ---------- season matchmaking queue (live ranked ladder) ----------
+-- One row per player currently looking for an official-season match. Pairing
+-- is atomic: a searcher CLAIMS a waiting opponent with a conditional update
+-- (…where opponent_net_id is null), so exactly one pairing is ever formed and
+-- both sides then meet in the same derived room. Rows are short-lived; a stale
+-- one (nobody claimed it) is abandoned and the searcher plays a Dya'kukull.
+create table if not exists public.dya_season_queue (
+  net_id          text primary key,
+  name            text not null default 'Player',
+  level           int  not null default 1,
+  rank            int  not null default 1000,
+  avatar_idx      int  not null default 0,
+  circuit         text not null default 'Local',
+  season          int  not null default 1,
+  pouch           jsonb not null default '[]'::jsonb,
+  status          text not null default 'seeking' check (status in ('seeking','matched')),
+  opponent_net_id text,
+  room_code       text,
+  updated_at      timestamptz not null default now()
+);
+
 -- ---------- row level security (open policies) ----------
 alter table public.dya_players         enable row level security;
 alter table public.dya_friend_requests enable row level security;
@@ -130,6 +198,9 @@ alter table public.dya_listings        enable row level security;
 alter table public.dya_config          enable row level security;
 alter table public.dya_accounts        enable row level security;
 alter table public.dya_bans            enable row level security;
+alter table public.dya_tournaments        enable row level security;
+alter table public.dya_tournament_players enable row level security;
+alter table public.dya_season_queue       enable row level security;
 
 drop policy if exists "dya players open"  on public.dya_players;
 drop policy if exists "dya requests open" on public.dya_friend_requests;
@@ -138,6 +209,9 @@ drop policy if exists "dya listings open" on public.dya_listings;
 drop policy if exists "dya config open"   on public.dya_config;
 drop policy if exists "dya accounts open" on public.dya_accounts;
 drop policy if exists "dya bans open"     on public.dya_bans;
+drop policy if exists "dya tournaments open"    on public.dya_tournaments;
+drop policy if exists "dya trn players open"    on public.dya_tournament_players;
+drop policy if exists "dya season queue open"   on public.dya_season_queue;
 
 create policy "dya players open"  on public.dya_players         for all using (true) with check (true);
 create policy "dya requests open" on public.dya_friend_requests for all using (true) with check (true);
@@ -146,6 +220,9 @@ create policy "dya listings open" on public.dya_listings        for all using (t
 create policy "dya config open"   on public.dya_config          for all using (true) with check (true);
 create policy "dya accounts open" on public.dya_accounts        for all using (true) with check (true);
 create policy "dya bans open"     on public.dya_bans            for all using (true) with check (true);
+create policy "dya tournaments open" on public.dya_tournaments        for all using (true) with check (true);
+create policy "dya trn players open" on public.dya_tournament_players for all using (true) with check (true);
+create policy "dya season queue open" on public.dya_season_queue       for all using (true) with check (true);
 
 -- helpful indexes for the polling queries
 create index if not exists dya_requests_to   on public.dya_friend_requests (to_id, status);
@@ -155,3 +232,7 @@ create index if not exists dya_friends_b     on public.dya_friends (b_id);
 create index if not exists dya_listings_active on public.dya_listings (status, created_at desc);
 create index if not exists dya_listings_seller on public.dya_listings (seller_net_id, status, claimed);
 create index if not exists dya_accounts_email  on public.dya_accounts (email);
+create index if not exists dya_tournaments_state on public.dya_tournaments (state, created_at desc);
+create index if not exists dya_trn_players_trn   on public.dya_tournament_players (tournament_id);
+create index if not exists dya_players_rank       on public.dya_players (rank desc);
+create index if not exists dya_season_queue_find  on public.dya_season_queue (circuit, status, updated_at desc);

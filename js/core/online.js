@@ -136,6 +136,7 @@
           name: me.displayName,
           level: me.level,
           avatar_idx: me.avatarIdx || 0,
+          rank: me.rank || 1000,
           last_seen: new Date().toISOString(),
         }, 'resolution=merge-duplicates');
         O.state.ready = true;
@@ -158,6 +159,7 @@
     try {
       await rest('PATCH', 'dya_players?id=eq.' + me.netId, {
         name: me.displayName, level: me.level, avatar_idx: me.avatarIdx || 0,
+        rank: me.rank || 1000,
         last_seen: new Date().toISOString(),
       });
     } catch (e) { O.state.error = e.message; }
@@ -278,6 +280,10 @@
     O.state.friends = []; O.state.incoming = []; O.state.outgoing = [];
     /* the shared online market rides the same auth lifecycle */
     if (DYA.marketOnline) DYA.marketOnline.onAuthChange();
+    /* so do the shared online tournaments */
+    if (DYA.tournamentsOnline) DYA.tournamentsOnline.onAuthChange();
+    /* and the season ladder queue (clears any stale search) */
+    if (DYA.season) DYA.season.onAuthChange();
     const me = O.me();
     if (!me || !O.configured()) return;
     ensureRegistered().then(ok => { if (ok) O.refresh(); });
