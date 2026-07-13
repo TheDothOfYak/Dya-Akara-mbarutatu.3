@@ -317,7 +317,7 @@
     wrap.appendChild(U.el('p', { cls: 'muted small', text: 'Full god-mode access. Season ' + G.world.season.number + ' · ' + Object.keys(G.world.accounts).length + ' accounts · Handle with the usual recklessness.' }));
     const grid = U.el('div', { cls: 'admin-grid mt' });
     const nav = U.el('div', { cls: 'admin-nav' });
-    const body = U.el('div', {});
+    const body = U.el('div', { cls: 'admin-body' });
     NAV.forEach(v => {
       const b = U.el('button', { cls: 'btn' + (view === v ? ' primary' : ''), text: v });
       b.onclick = () => { view = v; panel(); };
