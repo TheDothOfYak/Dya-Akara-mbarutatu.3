@@ -1682,6 +1682,10 @@
     setPass(p) { writeAdminPass(hashPass(p)); },
     checkPass(p) { return readAdminPass() === hashPass(p); },
     hasPass() { return !!readAdminPass(); },
+    clearPass() {
+      try { localStorage.removeItem(ADMIN_PASS_KEY); } catch (e) { /* ignore */ }
+      if (G.world) { G.world.adminPass = null; G.saveNow(); }
+    },
     ban(accId, reason, days) {
       const until = days ? Date.now() + days * 86400000 : null;
       G.world.bans[accId] = { at: Date.now(), reason, permanent: !days, until, public: true };

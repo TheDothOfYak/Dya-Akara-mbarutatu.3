@@ -78,6 +78,20 @@
     };
     pass.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
     wrap.appendChild(btn);
+
+    /* Locked out? The admin gate is a local convenience lock, not real
+       security (the panel is client-side and edits already ride the public
+       key), so a self-serve reset is fine — and it rescues anyone whose
+       stored hash got into a bad state. Clears it and returns to first-access. */
+    if (hasPass) {
+      const reset = U.el('button', { cls: 'btn ghost small mt', style: 'width:100%', text: 'Forgot / reset admin password' });
+      reset.onclick = () => {
+        if (!confirm('Reset the admin password? You will set a new one on the next screen. (This does not touch any game data.)')) return;
+        G.admin.clearPass();
+        gate();
+      };
+      wrap.appendChild(reset);
+    }
     root.appendChild(wrap);
   }
 
