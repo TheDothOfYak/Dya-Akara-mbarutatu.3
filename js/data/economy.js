@@ -185,6 +185,29 @@
   E.CIRCUIT_GOLD = { 'Local': 120, 'Regional': 400, 'Half Planet': 1200, 'Whole Planet': 3500, 'Interplanetary': 12000 };
   E.CIRCUIT_MIN_LEVEL = { 'Local': 1, 'Regional': 5, 'Half Planet': 15, 'Whole Planet': 30, 'Interplanetary': 40 };
 
+  /* ---------- Official season ladder ----------
+     The Guild's season is one long ranked ladder, not a bracket. Everyone
+     starts in their Local circuit and plays other players there; winning
+     raises your rank, and enough rank PROMOTES you to the next circuit. A
+     match is always available — a real player at your circuit if one is
+     looking, otherwise a Dya'kukull who fills in. Titles are earned by
+     reaching each circuit (official-only). */
+  E.CIRCUIT_RANK_FLOOR = { 'Local': 0, 'Regional': 1150, 'Half Planet': 1350, 'Whole Planet': 1550, 'Interplanetary': 1750 };
+  E.SEASON_RANK = { win: 25, draw: 0, loss: -18 }; // rating move per official-season match
+  /* which circuit a given ranked rating sits in (highest floor it clears) */
+  E.circuitForRank = function (rank) {
+    let cur = E.CIRCUITS[0];
+    for (const c of E.CIRCUITS) { if ((rank || 0) >= E.CIRCUIT_RANK_FLOOR[c]) cur = c; }
+    return cur;
+  };
+  E.circuitIndexForRank = function (rank) { return E.CIRCUITS.indexOf(E.circuitForRank(rank)); };
+  /* rank needed for the next promotion, or null at the top */
+  E.nextCircuitFloor = function (rank) {
+    const i = E.circuitIndexForRank(rank);
+    const next = E.CIRCUITS[i + 1];
+    return next ? E.CIRCUIT_RANK_FLOOR[next] : null;
+  };
+
   /* ---------- Regions (home region choices; each planet's circuits) ---------- */
   E.REGIONS = [
     { id: 'velkinovek', name: 'Velkinovek', planet: 'Velki', blurb: 'The most populated continent on Velki. Busy circuits, busier taverns.' },

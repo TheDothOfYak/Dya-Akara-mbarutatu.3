@@ -145,13 +145,32 @@ open events in **Tournaments → Tournament Browser**.
   the bracket never stalls. Every result is recorded to your match history, and the bracket
   fills in for everyone as results come in.
 - **Titles are official-only.** A friend's tournament plays for gold and glory. **Titles**
-  come only from **official season tournaments**, which you create and run from the Admin
-  Panel (below). The season-ending **Interplanetary** is one of these.
+  come only from the **official season** — the ranked ladder (promotions) and the official
+  bracket events the Guild runs from the Admin Panel. The season-ending **Interplanetary**
+  is one of those.
 
 Tables: `dya_tournaments` (one row per shared event, bracket and all) and
 `dya_tournament_players` (one row per **real** registrant — the AI are never stored here).
 
-### Official season tournaments (Admin Panel)
+### The official season is a ranked ladder (Play → Ranked Season)
+
+The Guild's season isn't a bracket — it's one long **ranked ladder** everyone
+climbs together:
+
+- **You start in your Local circuit** and play other players there. Winning
+  raises your ranked rating; **enough rating promotes you** to the next circuit
+  (Local → Regional → Half Planet → Whole Planet → Interplanetary).
+- **A match is always available.** *Find a Season Match* pairs you with a real
+  player in your circuit who's also searching (an atomic claim over a shared
+  queue, then a live cross-device match). If nobody is searching this instant, a
+  **Dya'kukull of your circuit fills in**, so you never wait.
+- **Titles are earned by reaching each circuit** — official-season only.
+- The **leaderboard** reads real ratings shared by every player's game.
+
+Offline, the ladder still runs — you climb by beating the Dya'kukull of your
+circuit; set up online play to face real players and share the leaderboard.
+
+### Official bracket tournaments (Admin Panel)
 
 In **`admin.html` → Tournaments** you can, with online configured:
 

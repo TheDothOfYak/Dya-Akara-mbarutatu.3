@@ -266,6 +266,29 @@
     });
   }
 
+  /* official season ladder standings — real players by ranked rating, with the
+     circuit each currently sits in (Local → Interplanetary) */
+  function seasonLadderStandings(body) {
+    const box = U.el('div', { cls: 'panel mb mt' });
+    box.appendChild(U.el('h3', { cls: 'gold mb', text: '📈 Season ladder standings (the official ranked climb)' }));
+    box.appendChild(U.el('p', { cls: 'muted small', text: 'Everyone climbs one ladder: play your circuit, rank up, promote. Titles are awarded on reaching each circuit. This is the live standing of every real player this admin session can see.' }));
+    const players = Object.values(G.world.accounts).filter(a => !a.ai).sort((a, b) => (b.rank || 0) - (a.rank || 0));
+    if (!players.length) { box.appendChild(U.el('p', { cls: 'muted small', text: 'No real players yet.' })); body.appendChild(box); return; }
+    const tbl = U.el('table', { cls: 'adm' });
+    tbl.appendChild(U.el('tr', {}, ['#', 'Name', 'Level', 'Rating', 'Circuit'].map(h => U.el('th', { text: h }))));
+    players.slice(0, 50).forEach((a, i) => {
+      tbl.appendChild(U.el('tr', {}, [
+        U.el('td', { text: '#' + (i + 1) }),
+        U.el('td', { html: U.esc(a.displayName) + (a.cloudAccount ? ' <span class="pill">🌐</span>' : '') }),
+        U.el('td', { text: a.level }),
+        U.el('td', { text: a.rank || 1000 }),
+        U.el('td', { html: '<b class="gold">' + EC.circuitForRank(a.rank || 1000) + '</b>' }),
+      ]));
+    });
+    box.appendChild(tbl);
+    body.appendChild(box);
+  }
+
   /* live monitor of a running online tournament's shared bracket */
   function monitorOnline(row) {
     const { w } = modal('8% 12%');
@@ -877,6 +900,9 @@
       body.appendChild(U.el('h3', { cls: 'gold mb', text: 'Season ' + G.world.season.number + ' winners so far' }));
       if (!G.world.season.winners.length) body.appendChild(U.el('p', { cls: 'muted small', text: 'None yet.' }));
       G.world.season.winners.forEach(w => body.appendChild(U.el('div', { cls: 'small', text: '🏆 ' + w.name + ' — ' + w.tournament + ' (' + w.circuit + ')' })));
+
+      /* ---- official season LADDER standings (ranked circuit climb) ---- */
+      seasonLadderStandings(body);
       body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'All tournaments' }));
       const tbl = U.el('table', { cls: 'adm' });
       tbl.appendChild(U.el('tr', {}, [U.el('th', { text: 'Name' }), U.el('th', { text: 'Circuit' }), U.el('th', { text: 'State' }), U.el('th', { text: 'Players' }), U.el('th', { text: '' })]));

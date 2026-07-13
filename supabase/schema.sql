@@ -40,9 +40,12 @@ create table if not exists public.dya_players (
   name        text not null default 'Player',
   level       int  not null default 0,
   avatar_idx  int  not null default 0,
+  rank        int  not null default 1000,   -- ranked rating, powers the season leaderboard
   last_seen   timestamptz not null default now(),
   created_at  timestamptz not null default now()
 );
+-- existing deployments: add the column if the table predates it
+alter table public.dya_players add column if not exists rank int not null default 1000;
 
 -- ---------- friend requests ----------
 create table if not exists public.dya_friend_requests (
@@ -166,6 +169,27 @@ create table if not exists public.dya_tournament_players (
   unique (tournament_id, net_id)
 );
 
+-- ---------- season matchmaking queue (live ranked ladder) ----------
+-- One row per player currently looking for an official-season match. Pairing
+-- is atomic: a searcher CLAIMS a waiting opponent with a conditional update
+-- (…where opponent_net_id is null), so exactly one pairing is ever formed and
+-- both sides then meet in the same derived room. Rows are short-lived; a stale
+-- one (nobody claimed it) is abandoned and the searcher plays a Dya'kukull.
+create table if not exists public.dya_season_queue (
+  net_id          text primary key,
+  name            text not null default 'Player',
+  level           int  not null default 1,
+  rank            int  not null default 1000,
+  avatar_idx      int  not null default 0,
+  circuit         text not null default 'Local',
+  season          int  not null default 1,
+  pouch           jsonb not null default '[]'::jsonb,
+  status          text not null default 'seeking' check (status in ('seeking','matched')),
+  opponent_net_id text,
+  room_code       text,
+  updated_at      timestamptz not null default now()
+);
+
 -- ---------- row level security (open policies) ----------
 alter table public.dya_players         enable row level security;
 alter table public.dya_friend_requests enable row level security;
@@ -176,6 +200,7 @@ alter table public.dya_accounts        enable row level security;
 alter table public.dya_bans            enable row level security;
 alter table public.dya_tournaments        enable row level security;
 alter table public.dya_tournament_players enable row level security;
+alter table public.dya_season_queue       enable row level security;
 
 drop policy if exists "dya players open"  on public.dya_players;
 drop policy if exists "dya requests open" on public.dya_friend_requests;
@@ -186,6 +211,7 @@ drop policy if exists "dya accounts open" on public.dya_accounts;
 drop policy if exists "dya bans open"     on public.dya_bans;
 drop policy if exists "dya tournaments open"    on public.dya_tournaments;
 drop policy if exists "dya trn players open"    on public.dya_tournament_players;
+drop policy if exists "dya season queue open"   on public.dya_season_queue;
 
 create policy "dya players open"  on public.dya_players         for all using (true) with check (true);
 create policy "dya requests open" on public.dya_friend_requests for all using (true) with check (true);
@@ -196,6 +222,7 @@ create policy "dya accounts open" on public.dya_accounts        for all using (t
 create policy "dya bans open"     on public.dya_bans            for all using (true) with check (true);
 create policy "dya tournaments open" on public.dya_tournaments        for all using (true) with check (true);
 create policy "dya trn players open" on public.dya_tournament_players for all using (true) with check (true);
+create policy "dya season queue open" on public.dya_season_queue       for all using (true) with check (true);
 
 -- helpful indexes for the polling queries
 create index if not exists dya_requests_to   on public.dya_friend_requests (to_id, status);
@@ -207,3 +234,5 @@ create index if not exists dya_listings_seller on public.dya_listings (seller_ne
 create index if not exists dya_accounts_email  on public.dya_accounts (email);
 create index if not exists dya_tournaments_state on public.dya_tournaments (state, created_at desc);
 create index if not exists dya_trn_players_trn   on public.dya_tournament_players (tournament_id);
+create index if not exists dya_players_rank       on public.dya_players (rank desc);
+create index if not exists dya_season_queue_find  on public.dya_season_queue (circuit, status, updated_at desc);

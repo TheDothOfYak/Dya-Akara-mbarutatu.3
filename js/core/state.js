@@ -1526,8 +1526,8 @@
       w.season.endedAt = Date.now();
       const winners = w.season.winners.slice();
       w.season = { number: w.season.number + 1, startedAt: Date.now(), endedAt: null, winners: [] };
-      Object.values(w.accounts).forEach(a => { if (!a.ai) { a.rank = Math.round((a.rank + 1000) / 2); } });
-      G.admin.announce('Season ' + (w.season.number - 1) + ' has ended', 'The season reset ceremony honors all circuit winners. A new season begins now. Ranks have been softened toward 1000.');
+      Object.values(w.accounts).forEach(a => { if (!a.ai) { a.rank = Math.round((a.rank + 1000) / 2); a.seasonReached = []; } });
+      G.admin.announce('Season ' + (w.season.number - 1) + ' has ended', 'The season reset ceremony honors all circuit winners. A new season begins now. Ranks have been softened toward 1000, and the circuit climb begins again.');
       G.saveNow();
       return winners;
     },
