@@ -81,6 +81,30 @@
     { okid: 15, ngakara: 20 }, // Torcain
   ];
 
+  /* ---------- Craft-by-Okid (admin-designed) ----------
+     OFF by default (null). When the admin enables it (Admin → Balance &
+     Economy → "Crafted token power per Okid rarity"), crafting a Hunt shard
+     lets the player choose which Okid rarity to spend, and THAT choice decides
+     how strong the crafted token is: the target rarity plus flat stat
+     multipliers, all designer-controlled. Shape when set: an array of 7 (one
+     per Okid rarity index) of { rarity, hpMul, dmgMul, speedMul }. */
+  E.CRAFT_BY_OKID = null;
+  E.defaultCraftByOkid = function () {
+    return RARITIES_LEN().map((_, i) => ({ rarity: i, hpMul: 1, dmgMul: 1, speedMul: 1 }));
+  };
+  function RARITIES_LEN() { return new Array(7).fill(0); }
+
+  /* When ON, the world stops auto-generating filler tokens (ambient Dya'kukull
+     crafting, new-AI starter collections). Admin-designed and player tokens are
+     untouched. Lets the creator hand-author every active token. */
+  E.NO_AUTOGEN = false;
+
+  /* ---------- Combine Okid (fuse up a tier) ----------
+     "3 of the same rarity Okid combine into 1 of the next rarity above."
+     need = how many of tier N are consumed, yield = how many of tier N+1 are
+     produced. Admin-tunable in Balance & Economy. */
+  E.COMBINE_OKID = { need: 3, yield: 1 };
+
   /* ---------- Market ---------- */
   E.MARKET_TAX = [0.03, 0.05, 0.07, 0.10, 0.13, 0.17, 0.20]; // by rarity index
   E.BUYBACK_RATE = 0.75;       // Dya Guild buyback: 75% of market average, no tax

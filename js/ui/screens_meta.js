@@ -916,6 +916,13 @@
         grant(champion, pay.championGold);
         grant(runnerUp, Math.round(pool * 0.25));
         third.forEach(pp => grant(pp, Math.round(pool * 0.1 / third.length)));
+        /* admin-authored per-placement rewards (gold, NgAkara, Okid, tokens,
+           Hunt privileges) — 1st = index 0, 2nd = 1, 3rd = 2 */
+        if (Array.isArray(t2.placeRewards) && t2.placeRewards.length) {
+          if (champion && t2.placeRewards[0]) G.grantTournamentReward(champion, t2.placeRewards[0]);
+          if (runnerUp && t2.placeRewards[1]) G.grantTournamentReward(runnerUp, t2.placeRewards[1]);
+          if (t2.placeRewards[2]) third.forEach(pp => pp && G.grantTournamentReward(pp, t2.placeRewards[2]));
+        }
         const orgId = t2.organizerId || (G.findAccount(t2.organizer) || {}).id;
         grant(orgId, Math.round(pool * 0.05));
         if (t2.sealed) {

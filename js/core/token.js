@@ -268,6 +268,10 @@
       matchesPlayed: 0,
       isStarter: !!opts.isStarter,
       isRental: false,
+      /* procedurally minted filler (Dya'kukull collections, ambient world
+         churn) is tagged so the admin can purge it and hand-design each token.
+         Player crafts, starters, and admin grants are NOT auto-generated. */
+      autoGen: !!(opts.autoGen || opts.aiOwner),
     };
     T.physique(tok); /* bake in this individual's look */
     return tok;
@@ -287,8 +291,19 @@
   };
 
   T.deriveCostVec = function (sp, rarity, rng) {
-    const total = SP.RARITY_COST[rarity];
+    /* Base cost is normally read straight off the rarity table, but a species
+       may define its OWN base-cost range (Admin → Creatures → "Base ready
+       cost"). When present it overrides rarity as the driver: each individual
+       rolls a total between the low and high, so cost varies token to token
+       independently of rarity. (design: rarity is not the only factor). */
+    let total = SP.RARITY_COST[rarity];
+    if (sp && Array.isArray(sp.costRange) && sp.costRange.length === 2) {
+      const lo = Math.min(sp.costRange[0], sp.costRange[1]);
+      const hi = Math.max(sp.costRange[0], sp.costRange[1]);
+      total = Math.max(0, Math.round(rng.range(lo, hi)));
+    }
     const v = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+    if (total <= 0) return v; /* a deliberately free token */
     const others = SP.ELEMENTS.filter(e => e !== sp.element && e !== sp.element2);
     let left = total;
     /* primary element carries most of the cost */

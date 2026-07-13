@@ -129,9 +129,25 @@
     if (M.mode === 'hunt' && cfg.hunt) {
       cfg.hunt.enemies.forEach((e, i) => {
         const tok = e.tok || TK.mint({ speciesId: e.speciesId, rng: M.rng, rarity: e.rarity });
+        /* admin-authored exact overrides (Admin → Hunts → encounter enemies):
+           size, precise hp/dmg/speed, behavior value, name, and individual
+           variables all come straight off the Hunt definition so the quarry
+           fights exactly as designed rather than as a random roll. */
+        if (e.sizeIdx != null) tok.sizeIdx = U.clamp(e.sizeIdx | 0, 0, 4);
+        if (e.name) tok.name = e.name;
+        if (e.behaviorValue != null) tok.behaviorValue = e.behaviorValue;
+        if (e.vars && typeof e.vars === 'object') tok.vars = Object.assign({}, tok.vars, e.vars);
+        if (e.stats && typeof e.stats === 'object') {
+          tok.stats = Object.assign({}, tok.stats);
+          if (e.stats.hp != null) tok.stats.hp = Math.max(1, e.stats.hp);
+          if (e.stats.dmg != null) tok.stats.dmg = Math.max(0, e.stats.dmg);
+          if (e.stats.speed != null) tok.stats.speed = Math.max(0, e.stats.speed);
+        }
         const cx = WORLD.w * 0.72 + M.rng.range(-90, 90), cy = WORLD.h / 2 + M.rng.range(-190, 190);
         const c = M.spawnFromToken(tok, 1, cx, cy);
-        if (e.boss) { c.isBoss = true; c.maxHp *= 1.6; c.hp = c.maxHp; }
+        /* a boss gets the classic 1.6× health bump ONLY when the author left
+           the health at default — an explicit exact HP override is honored as-is */
+        if (e.boss) { c.isBoss = true; if (!(e.stats && e.stats.hp != null)) { c.maxHp *= 1.6; c.hp = c.maxHp; } }
       });
       M.teams[1].controller = 'wild';
     }

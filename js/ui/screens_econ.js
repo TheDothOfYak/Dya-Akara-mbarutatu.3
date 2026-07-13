@@ -266,6 +266,7 @@
     enter(root) {
       const me = G.me;
       let selected = me.pieces[0] || null;
+      let craftOkid = null; // chosen Okid rarity when craft-by-Okid is enabled
       const scr = U.el('div', { cls: 'screen' });
       scr.appendChild(UI.topbar({ title: 'Crafting' }));
       const wrap = U.el('div', { cls: 'craft-wrap' });
@@ -358,12 +359,35 @@
         const info = U.el('div', { cls: 'center', style: 'max-width:380px' });
         info.appendChild(U.el('h2', { cls: 'gold', text: sp.name }));
         info.appendChild(U.el('div', { cls: 'muted small', text: 'From a ' + (selected.material || 'piece') + (selected.from ? ' — ' + selected.from : '') }));
-        info.appendChild(U.el('div', { cls: 'mt', html: '<span class="type-badge r' + rarity + '" style="border-color:currentColor">' + SP.RARITIES[rarity] + '</span>' }));
-        info.appendChild(U.el('div', { cls: 'mt small', html: 'Cost: <b class="gold">' + cost.okid + '</b> Okid (' + SP.RARITIES[rarity] + '+) · <b class="gold">' + cost.ngakara + '</b> NgAkara' }));
-        const can = G.canCraft(rarity);
+
+        /* craft-by-Okid (admin feature): the player chooses which Okid rarity to
+           spend, and that decides the crafted token's power. */
+        const byOkidActive = Array.isArray(EC.CRAFT_BY_OKID);
+        let effRarity = rarity, effCost = cost, can;
+        if (byOkidActive) {
+          const owned = me.okid.map((n, i) => i).filter(i => me.okid[i] > 0);
+          if (craftOkid == null || me.okid[craftOkid] <= 0) craftOkid = owned.length ? owned[0] : 0;
+          const map = G.craftByOkidMap(craftOkid) || { target: rarity };
+          effRarity = map.target;
+          effCost = EC.CRAFT_COST[effRarity];
+          const sel = U.el('select', { cls: 'txt mt', style: 'max-width:260px' });
+          SP.RARITIES.forEach((rn, i) => sel.appendChild(U.el('option', { value: i, text: rn + ' Okid (' + me.okid[i] + ')' })));
+          sel.value = String(craftOkid);
+          sel.onchange = () => { craftOkid = parseInt(sel.value, 10); renderCenter(); };
+          info.appendChild(U.el('div', { cls: 'small mt', text: 'Okid quality decides the result:' }));
+          info.appendChild(sel);
+          info.appendChild(U.el('div', { cls: 'mt', html: '<span class="type-badge r' + effRarity + '" style="border-color:currentColor">' + SP.RARITIES[effRarity] + '</span> <span class="small muted">' + (map.hpMul !== 1 || map.dmgMul !== 1 || map.speedMul !== 1 ? '(HP×' + map.hpMul + ' DMG×' + map.dmgMul + ' SPD×' + map.speedMul + ')' : '') + '</span>' }));
+          info.appendChild(U.el('div', { cls: 'mt small', html: 'Cost: <b class="gold">' + effCost.okid + '</b> ' + SP.RARITIES[craftOkid] + '+ Okid · <b class="gold">' + effCost.ngakara + '</b> NgAkara' }));
+          let avail = 0; for (let i = craftOkid; i < 7; i++) avail += me.okid[i];
+          can = avail >= Math.max(1, effCost.okid - G.titleBuff('craftDiscount')) && me.ngakara >= effCost.ngakara;
+        } else {
+          info.appendChild(U.el('div', { cls: 'mt', html: '<span class="type-badge r' + rarity + '" style="border-color:currentColor">' + SP.RARITIES[rarity] + '</span>' }));
+          info.appendChild(U.el('div', { cls: 'mt small', html: 'Cost: <b class="gold">' + cost.okid + '</b> Okid (' + SP.RARITIES[rarity] + '+) · <b class="gold">' + cost.ngakara + '</b> NgAkara' }));
+          can = G.canCraft(rarity);
+        }
         const craftBtn = U.el('button', { cls: 'btn primary mt', text: '⚗ Craft Token', disabled: can ? undefined : 'true' });
         if (!can) info.appendChild(U.el('div', { cls: 'small mt', style: 'color:var(--red)', text: 'Not enough materials.' }));
-        craftBtn.onclick = () => runRitual(selected, rarity);
+        craftBtn.onclick = () => runRitual(selected, effRarity, byOkidActive ? craftOkid : null);
         info.appendChild(U.el('div', {}, [craftBtn]));
         center.appendChild(info);
       }
@@ -378,6 +402,30 @@
         if (!me.okid.some(n => n > 0)) okidRows.appendChild(U.el('div', { cls: 'small muted', text: 'No Okid. Level chests and the market carry them.' }));
         right.appendChild(okidRows);
         right.appendChild(U.el('div', { cls: 'small mt', html: '🧪 NgAkara: <b>' + me.ngakara + '</b>' }));
+
+        /* combine Okid: fuse several of one rarity into the next tier up */
+        const rule = G.combineOkidRule();
+        right.appendChild(U.el('div', { cls: 'divider' }));
+        right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Combine Okid' }));
+        right.appendChild(U.el('p', { cls: 'muted small', text: rule.need + ' of one rarity → ' + rule.yield + ' of the next rarity up.' }));
+        let anyCombine = false;
+        for (let i = 0; i < 6; i++) {
+          if (!G.canCombineOkid(i)) continue;
+          anyCombine = true;
+          const row = U.el('div', { cls: 'flex mt', style: 'align-items:center;gap:6px' });
+          row.appendChild(U.el('div', { cls: 'small flex1', html: '<span class="rarity-dot br' + i + '"></span>' + rule.need + '× ' + SP.RARITIES[i] + ' → ' + rule.yield + '× ' + SP.RARITIES[i + 1] }));
+          row.appendChild(U.el('button', {
+            cls: 'btn small', text: 'Combine', onclick: () => {
+              const r = G.combineOkid(i);
+              if (r.err) { UI.alert('Cannot combine', r.err); return; }
+              DYA.audio.play('craft');
+              renderRight(); renderCenter();
+            },
+          }));
+          right.appendChild(row);
+        }
+        if (!anyCombine) right.appendChild(U.el('div', { cls: 'small muted mt', text: 'Gather ' + rule.need + '+ of a single rarity to fuse them upward.' }));
+
         right.appendChild(U.el('div', { cls: 'divider' }));
         right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Recently Crafted' }));
         const recent = Object.values(me.tokens).filter(t => t.crafterId === me.id).sort((a, b) => b.craftedAt - a.craftedAt).slice(0, 6);
@@ -391,7 +439,7 @@
       }
 
       /* the ritual: song plays, fluid pours, runes animate — skippable */
-      function runRitual(piece, rarity) {
+      function runRitual(piece, rarity, okidRarity) {
         const sp = SP.get(piece.speciesId);
         const overlay = U.el('div', { cls: 'ritual-overlay' });
         const cv = U.el('canvas', { width: 460, height: 460 });
@@ -408,7 +456,7 @@
         function finish() {
           if (done) return; done = true;
           cancelAnimationFrame(raf);
-          const r = G.craftToken(piece, piece.temperBias || 0);
+          const r = G.craftToken(piece, piece.temperBias || 0, okidRarity);
           overlay.remove();
           if (r.err) { UI.alert('Craft failed', r.err); return; }
           /* result screen */
