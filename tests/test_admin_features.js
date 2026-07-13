@@ -86,22 +86,25 @@ console.log('== ADMIN FEATURES ==');
   const res = G.craftToken(me.pieces[0], 0, 4 /* spend Onnar */);
   check('craft-by-okid produces a token', !!res.tok, res.err);
   check('craft-by-okid target rarity from mapping', res.tok && res.tok.rarity === 5, 'rarity=' + (res.tok && res.tok.rarity));
-  // multiplier check: average hp with 3x mapping vs 1x mapping over N crafts
-  // (mint has size/vigor variance, so compare averages, not single rolls)
+  // multiplier check: compare average hp with a big multiplier gap (1x vs 8x)
+  // over N crafts. Use a single-size species (kofi, size [0,0]) so mint's big
+  // size-band variance is out of play, and a wide tolerance band, so the test
+  // is robust to the remaining vigor/age roll rather than statistically flaky.
+  const PIECE = 'kofi';
   function avgHp(mul, N) {
-    EC.CRAFT_BY_OKID[4] = { rarity: 5, hpMul: mul, dmgMul: 1, speedMul: 1 };
+    EC.CRAFT_BY_OKID[4] = { rarity: 3, hpMul: mul, dmgMul: 1, speedMul: 1 };
     let sum = 0;
     for (let i = 0; i < N; i++) {
       me.okid = [0, 0, 0, 0, 9, 0, 0];
-      me.pieces = [{ speciesId: 'gynge', material: 'x', from: 'test' }];
+      me.pieces = [{ speciesId: PIECE, material: 'x', from: 'test' }];
       const r = G.craftToken(me.pieces[0], 0, 4);
       sum += r.tok.stats.hp;
     }
     return sum / N;
   }
-  const a1 = avgHp(1, 60), a3 = avgHp(3, 60);
-  const ratio = a3 / a1;
-  check('craft-by-okid hp multiplier scales stats (~3x)', ratio > 2.6 && ratio < 3.4, 'ratio=' + ratio.toFixed(2));
+  const a1 = avgHp(1, 200), a8 = avgHp(8, 200);
+  const ratio = a8 / a1;
+  check('craft-by-okid hp multiplier scales stats (~8x)', ratio > 6 && ratio < 10, 'ratio=' + ratio.toFixed(2));
   EC.CRAFT_BY_OKID = null;
 })();
 

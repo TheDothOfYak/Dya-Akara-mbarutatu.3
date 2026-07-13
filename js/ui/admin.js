@@ -78,6 +78,20 @@
     };
     pass.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
     wrap.appendChild(btn);
+
+    /* Locked out? The admin gate is a local convenience lock, not real
+       security (the panel is client-side and edits already ride the public
+       key), so a self-serve reset is fine — and it rescues anyone whose
+       stored hash got into a bad state. Clears it and returns to first-access. */
+    if (hasPass) {
+      const reset = U.el('button', { cls: 'btn ghost small mt', style: 'width:100%', text: 'Forgot / reset admin password' });
+      reset.onclick = () => {
+        if (!confirm('Reset the admin password? You will set a new one on the next screen. (This does not touch any game data.)')) return;
+        G.admin.clearPass();
+        gate();
+      };
+      wrap.appendChild(reset);
+    }
     root.appendChild(wrap);
   }
 
@@ -1015,17 +1029,22 @@
           return true;
         });
         rows.sort((a, b) => (b.tok.rarity - a.tok.rarity) || ((SP.get(a.tok.speciesId) || {}).name || a.tok.speciesId).localeCompare((SP.get(b.tok.speciesId) || {}).name || b.tok.speciesId));
-        note.textContent = 'Showing ' + Math.min(rows.length, CAP) + ' of ' + rows.length + ' matching token(s)' + (rows.length > CAP ? ' — narrow with search to see the rest.' : '.');
+        note.textContent = 'Showing ' + Math.min(rows.length, CAP) + ' of ' + rows.length + ' matching token(s)' + (rows.length > CAP ? ' — narrow with search to see the rest.' : '.') + ' Click any row to edit that token.';
         holder.innerHTML = '';
         const tbl = U.el('table', { cls: 'adm' });
         tbl.appendChild(U.el('tr', {}, ['', 'Name', 'Species', 'Rarity', 'Size', 'Element', 'Owner', 'Status', 'HP / DMG / SPD', 'Played', ''].map(h => U.el('th', { text: h }))));
         rows.slice(0, CAP).forEach(({ tok, owner }) => {
           const sp = SP.get(tok.speciesId);
-          const tr = U.el('tr', {});
+          /* the whole row opens the token editor — the table is wide and the
+             Edit button in the last column is easy to miss behind the sideways
+             scroll, so clicking anywhere on the row (except the Owner button)
+             works too */
+          const tr = U.el('tr', { style: 'cursor:pointer' });
+          tr.onclick = () => editToken(tok, owner);
           const iconTd = U.el('td', {});
           if (sp) iconTd.appendChild(spriteThumb(sp, 34));
           tr.appendChild(iconTd);
-          tr.appendChild(U.el('td', { html: '<b>' + U.esc(tok.name) + '</b>' + (tok.nameLocked ? ' 🔒' : '') + (tok.frozen ? ' ❄' : '') + (tok.isRental ? ' <span class="pill">rental</span>' : '') }));
+          tr.appendChild(U.el('td', { html: '<b class="gold">' + U.esc(tok.name) + '</b>' + (tok.nameLocked ? ' 🔒' : '') + (tok.frozen ? ' ❄' : '') + (tok.isRental ? ' <span class="pill">rental</span>' : '') }));
           tr.appendChild(U.el('td', { text: sp ? sp.name : tok.speciesId }));
           tr.appendChild(U.el('td', { text: SP.RARITIES[tok.rarity] != null ? SP.RARITIES[tok.rarity] : tok.rarity }));
           tr.appendChild(U.el('td', { text: SP.SIZES[tok.sizeIdx] != null ? SP.SIZES[tok.sizeIdx] : tok.sizeIdx }));
@@ -1035,8 +1054,8 @@
           tr.appendChild(U.el('td', { text: tok.stats ? (tok.stats.hp + ' / ' + tok.stats.dmg + ' / ' + tok.stats.speed) : '—' }));
           tr.appendChild(U.el('td', { text: tok.matchesPlayed || 0 }));
           const actTd = U.el('td', {});
-          actTd.appendChild(U.el('button', { cls: 'btn small primary', text: 'Edit', onclick: () => editToken(tok, owner) }));
-          actTd.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Owner', onclick: () => editAccount(owner) }));
+          actTd.appendChild(U.el('button', { cls: 'btn small primary', text: '✎ Edit', onclick: (e) => { e.stopPropagation(); editToken(tok, owner); } }));
+          actTd.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Owner', onclick: (e) => { e.stopPropagation(); editAccount(owner); } }));
           tr.appendChild(actTd);
           tbl.appendChild(tr);
         });
@@ -1896,9 +1915,11 @@
      abilities on the field, and its lore. Edits are written straight
      onto the live token in its owner's collection and pushed to the
      cloud so they stick for that real player. */
-  function editToken(tok, owner) {
+  function editToken(tok, owner, onDone) {
     const { w, close } = modal('3% 8%');
-    const closeAll = () => { stopPreviews(); close(); rerender(); };
+    /* when opened on top of another modal (an account editor), repaint that
+       caller's list instead of the whole panel behind it */
+    const closeAll = () => { stopPreviews(); close(); if (onDone) onDone(); else rerender(); };
     const sp0 = SP.get(tok.speciesId);
     w.appendChild(U.el('h2', { cls: 'gold', text: 'Token — ' + tok.name } ));
     w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Owned by ' + (owner ? owner.displayName : '?') + (owner && owner.ai ? ' (Dya’kukull)' : '') + ' · ' + (sp0 ? sp0.name : tok.speciesId) + ' · id ' + tok.id + '. Every field below is this ONE individual — nothing here touches the species.' }));
@@ -2088,24 +2109,83 @@
 
   /* ================= ACCOUNT / AI EDITORS ================= */
   function editAccount(a) {
-    const { w, close } = modal('10% 22%');
-    w.appendChild(U.el('h3', { cls: 'gold', text: 'Edit — ' + a.displayName }));
+    const { w, close } = modal('4% 12%');
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Edit — ' + a.displayName + (a.cloudAccount ? ' 🌐' : '') }));
+    const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:1fr 1fr;gap:18px;align-items:start' });
+    w.appendChild(cols);
+    const leftC = U.el('div', {}), rightC = U.el('div', {});
+    cols.appendChild(leftC); cols.appendChild(rightC);
+
+    /* ---- account fields ---- */
     const fields = [['displayName', 'Name', 'text'], ['level', 'Level', 'number'], ['gold', 'Gold', 'number'], ['ngakara', 'NgAkara', 'number'], ['rank', 'Rank', 'number']];
     const inputs = {};
     fields.forEach(([k, l, t]) => {
-      w.appendChild(U.el('label', { cls: 'lbl', text: l }));
+      leftC.appendChild(U.el('label', { cls: 'lbl', text: l }));
       inputs[k] = U.el('input', { cls: 'txt', type: t, value: a[k] });
-      w.appendChild(inputs[k]);
+      leftC.appendChild(inputs[k]);
     });
-    w.appendChild(U.el('div', { cls: 'flex mt' }, [
+    leftC.appendChild(U.el('div', { cls: 'flex mt' }, [
       U.el('button', {
-        cls: 'btn primary', text: 'Save', onclick: () => {
+        cls: 'btn primary', text: 'Save account', onclick: () => {
           fields.forEach(([k, , t]) => { a[k] = t === 'number' ? (parseInt(inputs[k].value) || 0) : inputs[k].value; });
           G.saveNow(); G.pushAccountToCloud(a); close(); rerender();
         },
       }),
-      U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => close() }),
+      U.el('button', { cls: 'btn ghost', text: 'Close', onclick: () => { close(); rerender(); } }),
     ]));
+
+    /* ---- collection: edit each individual token ---- */
+    a.tokens = a.tokens || {};
+    rightC.appendChild(U.el('h3', { cls: 'gold mb', text: 'Collection (' + Object.keys(a.tokens).length + ' tokens)' }));
+    const search = U.el('input', { cls: 'txt mb', placeholder: '🔎 name / species / rarity…' });
+    rightC.appendChild(search);
+    const tokBox = U.el('div', { style: 'max-height:52vh;overflow:auto' });
+    rightC.appendChild(tokBox);
+    function paintToks() {
+      tokBox.innerHTML = '';
+      const q = search.value.trim().toLowerCase();
+      const list = Object.values(a.tokens).filter(t => {
+        if (!q) return true;
+        const sp = SP.get(t.speciesId);
+        return (t.name + ' ' + (sp ? sp.name : t.speciesId) + ' ' + (SP.RARITIES[t.rarity] || '')).toLowerCase().includes(q);
+      }).sort((x, y) => (y.rarity - x.rarity));
+      if (!list.length) { tokBox.appendChild(U.el('p', { cls: 'muted small', text: q ? 'No matching tokens.' : 'No tokens.' })); return; }
+      list.forEach(t => {
+        const sp = SP.get(t.speciesId);
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center;border-bottom:1px solid var(--line);padding:4px 0' });
+        if (sp) r.appendChild(spriteThumb(sp, 30));
+        r.appendChild(U.el('div', { cls: 'flex1 small', html: '<b>' + U.esc(t.name) + '</b>' + (t.nameLocked ? ' 🔒' : '') + (t.frozen ? ' ❄' : '') + '<br><span class="muted">' + (sp ? sp.name : t.speciesId) + ' · ' + (SP.RARITIES[t.rarity] != null ? SP.RARITIES[t.rarity] : t.rarity) + (t.status && t.status !== 'collection' ? ' · ' + t.status : '') + ' · ' + (t.stats ? t.stats.hp + '/' + t.stats.dmg + '/' + t.stats.speed : '—') + '</span>' }));
+        r.appendChild(U.el('button', { cls: 'btn small primary', text: 'Edit', onclick: () => editToken(t, a, paintToks) }));
+        r.appendChild(U.el('button', {
+          cls: 'btn small danger', text: '✕', onclick: () => {
+            if (!confirm('Delete "' + t.name + '"?')) return;
+            delete a.tokens[t.id];
+            (a.pouches || []).forEach(p => { if (p.tokenIds) p.tokenIds = p.tokenIds.filter(x => x !== t.id); });
+            Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === t.id) delete G.world.market.listings[l.id]; });
+            G.saveNow(); G.pushAccountToCloud(a); paintToks();
+          },
+        }));
+        tokBox.appendChild(r);
+      });
+    }
+    search.oninput = paintToks;
+    paintToks();
+
+    /* ---- mint a fresh token into this collection ---- */
+    const addRow = U.el('div', { cls: 'flex mt', style: 'gap:6px' });
+    const spSel = U.el('select', { cls: 'txt' });
+    SP.list.forEach(s => spSel.appendChild(U.el('option', { value: s.id, text: s.name })));
+    const rarSel = U.el('select', { cls: 'txt', style: 'max-width:130px' });
+    SP.RARITIES.forEach((rn, i) => rarSel.appendChild(U.el('option', { value: i, text: rn })));
+    addRow.appendChild(spSel); addRow.appendChild(rarSel);
+    addRow.appendChild(U.el('button', {
+      cls: 'btn small', text: '＋ Mint', onclick: () => {
+        const t = TK.mint({ speciesId: spSel.value, rng: new U.Rng(U.newSeed()), owner: a.id, rarity: parseInt(rarSel.value, 10) });
+        a.tokens[t.id] = t;
+        G.saveNow(); G.pushAccountToCloud(a); paintToks();
+      },
+    }));
+    rightC.appendChild(addRow);
   }
 
   function editAI(a) {
@@ -2153,7 +2233,7 @@
         const sp = SP.get(t.speciesId);
         const r = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center;border-bottom:1px solid var(--line);padding:3px 0' });
         r.appendChild(U.el('div', { cls: 'flex1 small', html: '<b>' + U.esc(t.name) + '</b> <span class="muted">' + (sp ? sp.name : t.speciesId) + ' · ' + SP.RARITIES[t.rarity] + (t.status !== 'collection' ? ' · ' + t.status : '') + '</span>' }));
-        r.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editToken(t, a) }));
+        r.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editToken(t, a, paintToks) }));
         r.appendChild(U.el('button', {
           cls: 'btn small danger', text: '✕', onclick: () => {
             delete a.tokens[t.id];
