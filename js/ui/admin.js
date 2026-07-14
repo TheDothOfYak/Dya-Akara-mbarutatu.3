@@ -1056,6 +1056,19 @@
           const actTd = U.el('td', {});
           actTd.appendChild(U.el('button', { cls: 'btn small primary', text: '✎ Edit', onclick: (e) => { e.stopPropagation(); editToken(tok, owner); } }));
           actTd.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Owner', onclick: (e) => { e.stopPropagation(); editAccount(owner); } }));
+          actTd.appendChild(U.el('button', {
+            cls: 'btn small danger', text: '🗑 Delete', onclick: (e) => {
+              e.stopPropagation();
+              if (!confirm('Delete "' + tok.name + '" from ' + owner.displayName + '\'s collection permanently?')) return;
+              delete owner.tokens[tok.id];
+              (owner.pouches || []).forEach(p => { if (p.tokenIds) p.tokenIds = p.tokenIds.filter(x => x !== tok.id); });
+              Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === tok.id) delete G.world.market.listings[l.id]; });
+              /* drop it from the flattened list backing this tab, then repaint */
+              for (let i = all.length - 1; i >= 0; i--) { if (all[i].tok === tok) all.splice(i, 1); }
+              G.saveNow(); G.pushAccountToCloud(owner);
+              repaint();
+            },
+          }));
           tr.appendChild(actTd);
           tbl.appendChild(tr);
         });
