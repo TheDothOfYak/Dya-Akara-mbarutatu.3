@@ -1670,7 +1670,14 @@
      force "first access — set the password" on every reload. A standalone key
      survives all of that. world.adminPass is still mirrored for older saves. */
   const ADMIN_PASS_KEY = 'dyaakara_admin_pass_v1';
-  function readAdminPass() {
+  /* Built-in default admin password. This is a CLIENT-SIDE convenience gate,
+     not real security — the whole admin panel and its Supabase anon key are
+     already public — so a fixed default is fine and it means the panel never
+     asks you to "set a password" again, even if this browser refuses to keep
+     localStorage between loads (private mode, cleared storage, a fresh device).
+     It always works; any password you additionally set with setPass() works too. */
+  const DEFAULT_ADMIN_PASS_HASH = hashPass('rEsaliGrEsta810!');
+  function readStoredAdminPass() {
     try { const v = localStorage.getItem(ADMIN_PASS_KEY); if (v) return v; } catch (e) { /* ignore */ }
     return (G.world && G.world.adminPass) || null;
   }
@@ -1680,8 +1687,10 @@
   }
   G.admin = {
     setPass(p) { writeAdminPass(hashPass(p)); },
-    checkPass(p) { return readAdminPass() === hashPass(p); },
-    hasPass() { return !!readAdminPass(); },
+    checkPass(p) { const h = hashPass(p); return h === DEFAULT_ADMIN_PASS_HASH || readStoredAdminPass() === h; },
+    /* always true — there is always at least the built-in default password, so
+       the gate shows "Enter" (never the first-time "set a password" screen) */
+    hasPass() { return true; },
     clearPass() {
       try { localStorage.removeItem(ADMIN_PASS_KEY); } catch (e) { /* ignore */ }
       if (G.world) { G.world.adminPass = null; G.saveNow(); }

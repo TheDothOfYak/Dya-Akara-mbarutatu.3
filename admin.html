@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dya'Akara — Admin Panel</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%238a6f42'/><circle cx='50' cy='50' r='38' fill='%233a2f1d'/><circle cx='50' cy='50' r='14' fill='%23d4552a'/></svg>">
@@ -37,6 +38,43 @@
     table.adm th, table.adm td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
     table.adm th { color: var(--gold-dim); font-weight: normal; letter-spacing: .08em; font-size: 11px; text-transform: uppercase; }
     table.adm tr:hover td { background: #2a221633; }
+
+    /* ============================================================
+       MOBILE / NARROW SCREENS
+       On a phone the 200px sidebar + content grid is unusable, so:
+       - stack to a single column
+       - turn the nav into a horizontal, swipeable tab bar pinned to the top
+       - tighten padding and let tables scroll sideways as before
+       - modals go (near) full-screen — the JS also switches their inset
+       - inputs are 16px so iOS doesn't zoom the page when you focus a field
+       ============================================================ */
+    @media (max-width: 760px) {
+      html { -webkit-text-size-adjust: 100%; }
+      .admin-wrap { padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+      .admin-wrap > h1 { font-size: 20px; }
+      .admin-grid { grid-template-columns: 1fr; gap: 12px; }
+      /* nav becomes a sticky, horizontally scrolling row of tabs */
+      .admin-nav {
+        position: sticky; top: 0; z-index: 20;
+        flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+        max-height: none; gap: 6px; padding: 8px 2px;
+        background: var(--bg, #14100a); border-bottom: 1px solid var(--line);
+        -webkit-overflow-scrolling: touch;
+      }
+      .admin-nav .btn { flex: 0 0 auto; white-space: nowrap; text-align: center; }
+      /* keep forms readable: single-column grids on tiny screens — both the
+         in-page panels AND the editor modals (which attach to <body>, and use
+         an inline 320px+1fr two-column layout that must stack on a phone) */
+      .admin-body .grid, .panel .grid { grid-template-columns: 1fr !important; }
+      /* 16px inputs prevent iOS focus-zoom */
+      .admin-wrap input, .admin-wrap select, .admin-wrap textarea { font-size: 16px; }
+      /* modals fill the screen and scroll internally */
+      .modal, .panel[style*="position:fixed"], .panel[style*="position: fixed"] {
+        inset: 0 !important; border-radius: 0 !important; max-height: 100vh;
+      }
+      table.adm { font-size: 12px; }
+      table.adm th, table.adm td { padding: 6px 6px; }
+    }
   </style>
 </head>
 <body>
