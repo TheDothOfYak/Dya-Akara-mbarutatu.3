@@ -84,9 +84,9 @@
        key), so a self-serve reset is fine — and it rescues anyone whose
        stored hash got into a bad state. Clears it and returns to first-access. */
     if (hasPass) {
-      const reset = U.el('button', { cls: 'btn ghost small mt', style: 'width:100%', text: 'Forgot / reset admin password' });
+      const reset = U.el('button', { cls: 'btn ghost small mt', style: 'width:100%', text: 'Reset to default password' });
       reset.onclick = () => {
-        if (!confirm('Reset the admin password? You will set a new one on the next screen. (This does not touch any game data.)')) return;
+        if (!confirm('Clear any custom admin password and go back to the built-in default? (This does not touch any game data.)')) return;
         G.admin.clearPass();
         gate();
       };
@@ -97,8 +97,12 @@
 
   /* ---------- shared helpers ---------- */
   function modal(inset) {
+    /* on a phone every modal goes (near) full-screen — the desktop insets
+       leave a tiny usable window that's unworkable on a small display */
+    const narrow = (window.innerWidth || 1000) < 760;
+    const useInset = narrow ? '0' : (inset || '5% 10%');
     const back = U.el('div', { style: 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99' });
-    const w = U.el('div', { cls: 'panel', style: 'position:fixed;inset:' + (inset || '5% 10%') + ';overflow:auto;z-index:100' });
+    const w = U.el('div', { cls: 'panel', style: 'position:fixed;inset:' + useInset + ';overflow:auto;z-index:100' + (narrow ? ';border-radius:0' : '') });
     back.onclick = () => close();
     function close() { back.remove(); w.remove(); }
     document.body.appendChild(back);
