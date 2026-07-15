@@ -50,9 +50,105 @@
   G.pushAccountToCloud = pushAccountToCloud;
   G.save = function () {
     clearTimeout(G.saveTimer);
-    G.saveTimer = setTimeout(() => { store.save(G.world); pushMeToCloud(); }, 400);
+    G.saveTimer = setTimeout(() => { store.save(G.world); pushMeToCloud(); adminAutoPublish(); }, 400);
   };
-  G.saveNow = () => { store.save(G.world); pushMeToCloud(); };
+  G.saveNow = () => { store.save(G.world); pushMeToCloud(); adminAutoPublish(); };
+  /* when an admin session mutates the world (deleting/editing/spawning AI
+     tokens, curating Dya'kukull), publish the shared AI world so it reaches
+     every device. No-op outside the admin panel and when offline. */
+  function adminAutoPublish() { if (G.isAdminSession && G.publishAdminWorldSoon) G.publishAdminWorldSoon(); }
+
+  /* ================== SHARED ADMIN WORLD (Dya'kukull + AI market) ==================
+     Real player accounts already sync via account_cloud (dya_accounts). The AI
+     world — the 100 Dya'kukull, their tokens, and the AI-owned market — is
+     generated locally on every device and never uploaded, so admin curation of
+     it (deleting tokens, editing prices/stats, spawning) used to vanish on any
+     other device. We publish the admin-curated AI world to the shared dya_config
+     table (key 'adminworld') and every device adopts it on boot, replacing ONLY
+     its locally-generated AI accounts and their market listings — real players'
+     accounts and listings are left completely untouched. */
+  const ADMIN_WORLD_KEY = 'adminworld';
+  function supaCfg() { return (window.DYA_CONFIG && window.DYA_CONFIG.supabase) || {}; }
+  function onlineConfigured() { const c = supaCfg(); return !!(c.url && c.anonKey); }
+  function supaRest(method, path, body, prefer) {
+    const c = supaCfg();
+    return fetch(c.url + '/rest/v1/' + path, {
+      method,
+      headers: Object.assign({ apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey, 'Content-Type': 'application/json' }, prefer ? { Prefer: prefer } : {}),
+      body: body != null ? JSON.stringify(body) : undefined,
+    }).then(async res => {
+      if (res.status === 204) return null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { const e = new Error((data && (data.message || data.hint || data.error)) || ('HTTP ' + res.status)); e.status = res.status; throw e; }
+      return data;
+    });
+  }
+  G.adminWorldSync = { lastPush: 0, lastFetch: 0, error: null, configured: onlineConfigured };
+
+  function buildAdminWorldSnapshot() {
+    const accounts = {}, aiIds = new Set();
+    Object.values(G.world.accounts).forEach(a => { if (a.ai) { accounts[a.id] = a; aiIds.add(a.id); } });
+    const listings = {};
+    Object.values(G.world.market.listings).forEach(l => { if (aiIds.has(l.sellerId)) listings[l.id] = l; });
+    return {
+      rev: (G.world.adminWorldRev || 0) + 1,
+      updatedAt: Date.now(),
+      elbergiId: G.world.elbergiId || null,
+      accounts,
+      market: { listings },
+    };
+  }
+
+  G.publishAdminWorld = async function () {
+    if (!onlineConfigured()) return { err: 'Online is not configured.' };
+    try {
+      const snap = buildAdminWorldSnapshot();
+      await supaRest('POST', 'dya_config?on_conflict=key', { key: ADMIN_WORLD_KEY, value: snap, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates');
+      G.world.adminWorldRev = snap.rev; G.world.adminWorldAt = snap.updatedAt;
+      store.save(G.world);
+      G.adminWorldSync.lastPush = Date.now(); G.adminWorldSync.error = null;
+      return { ok: true, accounts: Object.keys(snap.accounts).length };
+    } catch (e) { G.adminWorldSync.error = e.message; return { err: e.message }; }
+  };
+
+  let adminWorldPushTimer = null;
+  G.publishAdminWorldSoon = function () {
+    if (!onlineConfigured()) return;
+    clearTimeout(adminWorldPushTimer);
+    adminWorldPushTimer = setTimeout(() => { G.publishAdminWorld(); }, 2500);
+  };
+
+  function adoptAdminWorld(snap) {
+    /* remove every locally-generated AI account… */
+    Object.keys(G.world.accounts).forEach(id => { if (G.world.accounts[id] && G.world.accounts[id].ai) delete G.world.accounts[id]; });
+    /* …and any market listing now missing its seller (the AI ones); real
+       players' listings keep their (still-present) seller and stay. */
+    Object.values(G.world.market.listings).forEach(l => {
+      const seller = G.world.accounts[l.sellerId];
+      if (!seller || seller.ai) delete G.world.market.listings[l.id];
+    });
+    /* install the shared AI accounts + their listings */
+    Object.values(snap.accounts || {}).forEach(a => { a.ai = true; G.world.accounts[a.id] = a; });
+    Object.values((snap.market && snap.market.listings) || {}).forEach(l => { if (G.world.accounts[l.sellerId]) G.world.market.listings[l.id] = l; });
+    if (snap.elbergiId) G.world.elbergiId = snap.elbergiId;
+    G.world.adminWorldRev = snap.rev || 0;
+    G.world.adminWorldAt = snap.updatedAt || 0;
+    store.save(G.world);
+  }
+
+  G.fetchAdminWorld = async function () {
+    if (!onlineConfigured()) return { ok: false };
+    try {
+      const rows = await supaRest('GET', 'dya_config?key=eq.' + ADMIN_WORLD_KEY + '&select=value');
+      G.adminWorldSync.lastFetch = Date.now(); G.adminWorldSync.error = null;
+      const snap = rows && rows[0] && rows[0].value;
+      if (!snap) return { ok: true, adopted: false };
+      /* last-writer-wins by wall clock — never re-adopt our own latest push */
+      if ((snap.updatedAt || 0) <= (G.world.adminWorldAt || 0)) return { ok: true, adopted: false };
+      adoptAdminWorld(snap);
+      return { ok: true, adopted: true };
+    } catch (e) { G.adminWorldSync.error = e.message; return { err: e.message }; }
+  };
 
   /* ---------- global AI tuning (admin-editable via DYA.mods) ---------- */
   function aiTune() {
