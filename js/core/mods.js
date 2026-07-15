@@ -393,7 +393,15 @@
       const remote = rows && rows[0] && rows[0].value;
       if (remote) {
         M.syncState.remoteRev = remote.rev || 0;
-        if ((remote.rev || 0) > (M.data.rev || 0)) {
+        /* Adopt when the remote is NEWER BY WALL-CLOCK (updatedAt), not merely
+           when its rev is higher. The rev is a per-device counter, so a device
+           that has made its own edits can end up with a higher local rev than a
+           genuinely newer edit made elsewhere and would otherwise ignore it —
+           the exact reason admin edits "didn't stick" on a second device.
+           Timestamp comparison is last-writer-wins across every device. */
+        const remoteAt = remote.updatedAt || 0, localAt = M.data.updatedAt || 0;
+        const newer = remoteAt > localAt || (remoteAt === localAt && (remote.rev || 0) > (M.data.rev || 0));
+        if (newer) {
           M.data = Object.assign(emptyMods(), remote);
           cacheLocal();
           M.apply();

@@ -30,6 +30,10 @@
   const U = DYA.util, G = DYA.state, SP = DYA.species, EC = DYA.economy, L = DYA.lore, TK = DYA.token, M = DYA.mods;
   let root, view = 'Overview', huntTab = 'Available';
 
+  /* this IS the admin session — world mutations here publish the shared AI
+     world so every player's device picks up the curation (see G.saveNow) */
+  G.isAdminSession = true;
+
   window.addEventListener('DOMContentLoaded', () => {
     G.init();
     root = U.qs('#app');
@@ -58,6 +62,13 @@
     cloudAcc.loading = false;
   }
 
+  /* adopt the shared, admin-curated AI world before editing, so every admin
+     device edits the SAME Dya'kukull roster and curation compounds instead of
+     each device fighting its own locally-generated one */
+  async function pullSharedWorld() {
+    if (G.fetchAdminWorld) { try { await G.fetchAdminWorld(); } catch (e) { /* offline is fine */ } }
+  }
+
   /* ---------- access gate: you are the admin ---------- */
   function gate() {
     root.innerHTML = '';
@@ -72,8 +83,8 @@
     const btn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: hasPass ? 'Enter' : 'Set password & enter' });
     btn.onclick = async () => {
       if (pass.value.length < 4) { err.textContent = 'At least 4 characters.'; return; }
-      if (!G.admin.hasPass()) { G.admin.setPass(pass.value); await loadCloudAccounts(); panel(); return; }
-      if (G.admin.checkPass(pass.value)) { await loadCloudAccounts(); panel(); }
+      if (!G.admin.hasPass()) { G.admin.setPass(pass.value); await loadCloudAccounts(); await pullSharedWorld(); panel(); return; }
+      if (G.admin.checkPass(pass.value)) { await loadCloudAccounts(); await pullSharedWorld(); panel(); }
       else err.textContent = 'Wrong password. The Guild is watching. Cordially.';
     };
     pass.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
@@ -1236,6 +1247,38 @@
     /* ================= GOD MODE ================= */
     'God Mode'(body) {
       body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Anything. Everything. No confirmation beyond the ones below. You were warned by this sentence.' }));
+
+      /* ---- shared world: make this device's curated Dya'kukull world global ---- */
+      const swBox = U.el('div', { cls: 'panel mb' });
+      swBox.appendChild(U.el('h3', { cls: 'gold mb', text: '🌐 Shared world (Dya’kukull + AI market)' }));
+      const swConf = G.adminWorldSync && G.adminWorldSync.configured && G.adminWorldSync.configured();
+      swBox.appendChild(U.el('p', { cls: 'small muted', text: swConf
+        ? 'Deleting/editing/spawning Dya’kukull tokens now auto-publishes to every device on the next sync. Real players’ own accounts always sync separately and are never touched. Use this to force a publish right now, or pull the latest shared world.'
+        : 'Online isn’t configured (js/config.js), so the Dya’kukull world stays local to this device. Real-player accounts still sync when online is set up.' }));
+      if (swConf) {
+        const err = G.adminWorldSync.error;
+        swBox.appendChild(U.el('p', { cls: 'small ' + (err ? '' : 'muted'), style: err ? 'color:var(--red)' : '', text: err
+          ? '⚠ Shared-world sync problem: ' + err + (/(relation|table|column)/i.test(err) ? ' — the dya_config table must exist (run supabase/schema.sql).' : '')
+          : '✓ Online. Revision ' + (G.world.adminWorldRev || 0) + (G.adminWorldSync.lastPush ? ' · published ' + U.timeAgo(G.adminWorldSync.lastPush) : '') + '.' }));
+        const swActs = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap;gap:8px' });
+        swActs.appendChild(U.el('button', {
+          cls: 'btn primary', text: '🌐 Publish world to all devices now', onclick: async () => {
+            const r = await G.publishAdminWorld();
+            alert(r.ok ? 'Published ' + r.accounts + ' Dya’kukull account(s). Every device adopts this on its next load.' : 'Publish failed: ' + r.err);
+            rerender();
+          },
+        }));
+        swActs.appendChild(U.el('button', {
+          cls: 'btn', text: '⬇ Pull latest shared world', onclick: async () => {
+            const r = await G.fetchAdminWorld();
+            alert(r.adopted ? 'Adopted the latest shared world.' : (r.err ? 'Fetch failed: ' + r.err : 'Already up to date.'));
+            rerender();
+          },
+        }));
+        swBox.appendChild(swActs);
+      }
+      body.appendChild(swBox);
+
       body.appendChild(U.el('h3', { cls: 'gold mb', text: 'World save' }));
       body.appendChild(U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap' }, [
         U.el('button', {
