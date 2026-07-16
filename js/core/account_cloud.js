@@ -118,6 +118,16 @@
     }
   };
 
+  /* permanently remove a player account from the cloud (admin delete) */
+  AC.remove = async function (accountId) {
+    if (!AC.configured()) return { ok: false };
+    try {
+      await rest('DELETE', 'dya_accounts?id=eq.' + encodeURIComponent(accountId));
+      AC.state.error = null;
+      return { ok: true };
+    } catch (e) { AC.state.error = e.message; return { err: e.message }; }
+  };
+
   /* ================= BANS ================= */
   AC.fetchBan = async function (accountId) {
     if (!AC.configured()) return null;

@@ -439,13 +439,19 @@
             M.pickups.push({ id: M.idCounter++, kind: 'food', x: c.x + M.rng.range(-34, 34), y: c.y + M.rng.range(-30, 30), potency: 0.25, bornTick: M.tick, carrier: null });
           }
         }
-        if (c.speciesId === 'rubbermcfly') {
-          /* vital to guiding and strengthening the storm — while the
-             Sunear'Zikhron passes, each glowing McFly yields one extra */
-          const n = Math.round(c.vars.resourceCount) + (zik ? 1 : 0);
+        /* RubberMcFly — and now ANY creature a designer has given a
+           resourceCount (Admin → Creatures → "Resources generated per pulse")
+           — produces resources for its team each pulse. The McFly still gets
+           its Sunear'Zikhron bonus; other generators get the +1 only if tagged
+           "generator". A "multi" resourceTypes pick spreads across all four
+           elements, otherwise it yields its own element/truth. */
+        if (c.speciesId === 'rubbermcfly' || (c.vars.resourceCount > 0 && c.speciesId !== 'karnen')) {
+          const isMcfly = c.speciesId === 'rubbermcfly';
+          const bonus = (zik && (isMcfly || (c.sp.tags && c.sp.tags.includes('generator')))) ? 1 : 0;
+          const n = Math.round(c.vars.resourceCount || 0) + bonus;
           const multi = c.picks.resourceTypes === 'multi';
-          if (!c.mem.mcflyEl) c.mem.mcflyEl = M.rng.pick(ELS);
-          for (let i = 0; i < n; i++) units.push(multi ? M.rng.pick(ELS) : c.mem.mcflyEl);
+          if (!c.mem.genEl) c.mem.genEl = (c.sp.element && ELS.includes(c.sp.element)) ? c.sp.element : M.rng.pick(ELS);
+          for (let i = 0; i < n; i++) units.push(multi ? M.rng.pick(ELS) : c.mem.genEl);
         }
         if (c.speciesId === 'stryx' && c.vars.absorbRate > 0.2) units.push('Ular');
       });
