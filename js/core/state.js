@@ -1334,10 +1334,13 @@
       if (q > 0) { acc.okid[r] = (acc.okid[r] || 0) + q; summary.okid.push({ rarity: r, qty: q }); }
     });
     (reward.tokens || []).forEach(tk => {
-      if (!SP.get(tk.speciesId)) return;
+      /* a reward token may be a fully designed spec (Admin → token designer)
+         or the simple species/rarity form — mint the same way either way */
+      const spec = (tk.spec && tk.spec.speciesId) ? tk.spec : { speciesId: tk.speciesId, rarity: tk.rarity };
+      if (!SP.get(spec.speciesId)) return;
       const q = Math.max(1, (tk.qty | 0) || 1);
       for (let i = 0; i < q; i++) {
-        const tok = TK.mint({ speciesId: tk.speciesId, rng: new U.Rng(U.newSeed()), owner: acc.id, rarity: (tk.rarity != null ? tk.rarity : undefined), aiOwner: !!acc.ai });
+        const tok = TK.mintSpec(spec, { rng: new U.Rng(U.newSeed()), owner: acc.id, aiOwner: !!acc.ai });
         acc.tokens[tok.id] = tok;
         summary.tokens.push(tok);
       }

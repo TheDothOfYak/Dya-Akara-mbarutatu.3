@@ -511,76 +511,85 @@
 
     /* ================= GUILD MARKET ================= */
     'Guild Market'(body) {
-      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'The Dya Guild’s own stall. It shows underneath the standard goods on the Guild page — the potions, Okid and licences stay exactly as they are. Two things you control here: the POOL a random Guild stall token pulls from, and the individual creatures the Guild sells outright.' + (M.configured() ? ' Both reach every player online within a minute.' : ' (this browser only until Supabase is configured).') }));
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'The Dya Guild’s own stall. It shows underneath the standard goods on the Guild page — the potions, Okid and licences stay exactly as they are. Two things you control here: the LIMITED random pool a Guild stall token pulls from, and the individual creatures the Guild sells outright. Every creature here is designed by hand, down to the last stat, variable and decision tree.' + (M.configured() ? ' Both reach every player online within a minute.' : ' (this browser only until Supabase is configured).') }));
       body.appendChild(syncLine());
 
       const g = M.guildData();
 
-      /* ---------- RANDOM POOL ---------- */
+      /* ---------- RANDOM POOL (limited, designed entries) ---------- */
       const poolBox = U.el('div', { cls: 'panel mb' });
-      poolBox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Random “Guild stall token” pool' }));
-      poolBox.appendChild(U.el('p', { cls: 'small muted', text: 'When a player buys the random Guild stall token, its species is picked from the creatures you tick below. Leave every box unticked to fall back to the built-in seven. Price and the highest rarity a pull may roll are set here too.' }));
+      poolBox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Random “Guild stall token” pool (limited)' }));
+      poolBox.appendChild(U.el('p', { cls: 'small muted', text: 'Stock the pool with hand-designed creatures and a quantity for each. Every buy draws one at random (weighted by remaining stock) and takes it OUT — when the stock hits zero the random token sells out. Leave the pool empty to keep the classic unlimited common draw (so the tutorial always has one to buy).' }));
 
-      const poolCfg = U.el('div', { cls: 'grid mb', style: 'grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px' });
-      const priceIn = numIn(g.poolPrice, { step: 1, min: 0 });
-      const rarSel = selectEl(SP.RARITIES.map((r, i) => [String(i), r]), String(U.clamp(g.poolRarityMax, 0, SP.RARITIES.length - 1)));
-      poolCfg.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Price per random token (gold)' }), priceIn]));
-      poolCfg.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Highest rarity a pull can roll' }), rarSel]));
-      poolBox.appendChild(poolCfg);
+      /* working copy — edited in place, persisted on Save */
+      const poolWork = M.guildPoolEntries().map(e => U.deepCopy(e));
+      const priceIn = numIn(g.poolPrice, { step: 1, min: 0, style: 'max-width:160px' });
+      poolBox.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Price per random token (gold)' }), priceIn]));
 
-      const chosen = new Set(g.pool || []);
-      const poolSearch = U.el('input', { cls: 'txt mb', style: 'max-width:240px', placeholder: '🔎 Search species…' });
-      poolBox.appendChild(poolSearch);
-      const poolCount = U.el('span', { cls: 'small muted', style: 'margin-left:10px' });
-      const setPoolCount = () => poolCount.textContent = chosen.size ? chosen.size + ' species in the pool' : 'no species ticked — using the built-in seven';
-      poolBox.appendChild(poolCount);
-      const pickGrid = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px;max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:8px' });
-      poolBox.appendChild(pickGrid);
-      function paintPool() {
-        pickGrid.innerHTML = '';
-        const q = poolSearch.value.toLowerCase();
-        SP.list.filter(sp => !q || sp.name.toLowerCase().includes(q) || sp.id.includes(q)).forEach(sp => {
-          const lab = U.el('label', { cls: 'small', style: 'display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer' });
-          const chk = U.el('input', { type: 'checkbox' });
-          chk.checked = chosen.has(sp.id);
-          chk.onchange = () => { if (chk.checked) chosen.add(sp.id); else chosen.delete(sp.id); setPoolCount(); };
-          lab.appendChild(chk);
-          lab.appendChild(U.el('span', { html: U.esc(sp.name) + ' <span class="muted">' + sp.element + '</span>' }));
-          pickGrid.appendChild(lab);
+      const poolList = U.el('div', { cls: 'mt' });
+      poolBox.appendChild(poolList);
+      function paintPoolEntries() {
+        poolList.innerHTML = '';
+        const totalStock = poolWork.reduce((n, e) => n + Math.max(0, e.qty | 0), 0);
+        poolList.appendChild(U.el('p', { cls: 'small muted mb', text: poolWork.length ? (totalStock + ' token(s) in the pool across ' + poolWork.length + ' design(s)') : 'Pool empty — the stall runs the classic unlimited common draw.' }));
+        poolWork.forEach((e, i) => {
+          const sp = SP.get(e.spec.speciesId);
+          const row = U.el('div', { cls: 'panel', style: 'padding:8px;margin-bottom:6px;background:#20180e' });
+          const top = U.el('div', { cls: 'flex', style: 'gap:8px;align-items:center;flex-wrap:wrap' });
+          if (sp) top.appendChild(spriteThumb(sp, 42));
+          const info = U.el('div', { cls: 'flex1', style: 'min-width:120px' });
+          info.appendChild(U.el('div', { cls: 'gold small', text: (e.spec.name || (sp ? sp.name : e.spec.speciesId)) }));
+          info.appendChild(U.el('div', { cls: 'small muted', text: specSummary(e.spec) }));
+          top.appendChild(info);
+          const qWrap = U.el('div', {});
+          qWrap.appendChild(U.el('label', { cls: 'lbl', text: 'Stock' }));
+          const qIn = numIn(e.qty | 0, { step: 1, min: 0, style: 'max-width:80px' });
+          qIn.oninput = () => e.qty = Math.max(0, parseInt(qIn.value, 10) || 0);
+          qWrap.appendChild(qIn);
+          top.appendChild(qWrap);
+          top.appendChild(U.el('button', { cls: 'btn small', text: '✎ Design', onclick: () => editHuntEnemy(e.spec, paintPoolEntries, { hideBoss: true, title: 'Pool creature — design every detail', intro: 'This is one design in the random pool. Set anything you like — species, rarity, size, exact stats, behaviour tree, every variable and trait pick. Blank fields roll fresh on each draw.' }) }));
+          top.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { poolWork.splice(i, 1); paintPoolEntries(); } }));
+          row.appendChild(top);
+          poolList.appendChild(row);
         });
+        poolList.appendChild(U.el('button', {
+          cls: 'btn small', text: '＋ Add creature to pool', onclick: () => {
+            poolWork.push({ id: U.uid('gpe'), spec: { speciesId: (SP.list[0] && SP.list[0].id) }, qty: 1 });
+            paintPoolEntries();
+          },
+        }));
       }
-      poolSearch.oninput = paintPool;
-      paintPool();
-      setPoolCount();
+      paintPoolEntries();
       const poolActs = U.el('div', { cls: 'flex mt' });
       poolActs.appendChild(U.el('button', {
         cls: 'btn small primary', text: 'Save pool', onclick: () => {
-          M.setGuildPool(Array.from(chosen), parseInt(priceIn.value, 10) || 0, parseInt(rarSel.value, 10) || 0);
+          M.setGuildPool(poolWork.filter(e => SP.get(e.spec.speciesId)), parseInt(priceIn.value, 10) || 0);
           flashSaved(poolActs);
         },
       }));
-      poolActs.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Clear pool (use built-in)', onclick: () => { chosen.clear(); paintPool(); setPoolCount(); } }));
+      poolActs.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Empty the pool (use classic draw)', onclick: () => { if (confirm('Remove every pool design and go back to the unlimited built-in draw?')) { poolWork.length = 0; paintPoolEntries(); } } }));
       poolBox.appendChild(poolActs);
       body.appendChild(poolBox);
 
       /* ---------- INDIVIDUAL LISTINGS ---------- */
       body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Individual listings — creatures the Guild sells outright' }));
-      body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Each listing is one specific creature offered on the Guild stall at a fixed price. Every one is ONE OF A KIND — the first player to buy it claims it for the whole world and it leaves every other player’s stall, exactly like the rest of the market. Sold listings show below; relist one to put it back up.' }));
+      body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Each listing is one hand-designed creature offered on the Guild stall at a fixed price. Every one is ONE OF A KIND — the first player to buy it claims it for the whole world and it leaves every other player’s stall, exactly like the rest of the market. Sold listings show below; relist one to put it back up.' }));
       body.appendChild(U.el('button', { cls: 'btn primary mb', text: '＋ Create a listing', onclick: () => editGuildListing(null) }));
 
       const all = M.guildListings().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       if (!all.length) { body.appendChild(U.el('p', { cls: 'muted', text: 'No listings yet. Create one — it appears under “Creatures for sale” on the Guild page.' })); return; }
 
       function listingCard(l) {
-        const sp = SP.get(l.speciesId);
+        const spec = M.listingSpec(l);
+        const sp = SP.get(spec.speciesId);
         const card = U.el('div', { cls: 'panel', style: 'padding:10px' + (l.sold ? ';opacity:.6' : '') });
         const row = U.el('div', { cls: 'flex' });
         if (sp) row.appendChild(spriteThumb(sp, 54));
         const info = U.el('div', { cls: 'flex1', style: 'margin-left:8px' });
-        const nameLine = U.el('div', { cls: 'gold', text: l.name || (sp ? sp.name : l.speciesId) });
+        const nameLine = U.el('div', { cls: 'gold', text: spec.name || (sp ? sp.name : spec.speciesId) });
         if (l.sold) nameLine.appendChild(U.el('span', { cls: 'pill', style: 'margin-left:6px', text: 'SOLD' }));
         info.appendChild(nameLine);
-        info.appendChild(U.el('div', { cls: 'small muted', text: (sp ? sp.name : l.speciesId) + ' · ' + (SP.RARITIES[l.rarity] || '?') }));
+        info.appendChild(U.el('div', { cls: 'small muted', text: specSummary(spec) }));
         info.appendChild(U.el('div', { cls: 'small muted', text: '🪙 ' + U.fmt(l.price || 0) + 'g' + (l.sold && l.soldAt ? ' · sold ' + U.timeAgo(l.soldAt) : '') }));
         row.appendChild(info);
         card.appendChild(row);
@@ -1785,21 +1794,45 @@
     w.appendChild(acts);
   }
 
+  /* One-line summary of everything an admin has designed onto a token spec,
+     so pool entries and listings show what's been customized at a glance. */
+  function specSummary(spec) {
+    spec = spec || {};
+    const sp = SP.get(spec.speciesId);
+    const bits = [sp ? sp.name : (spec.speciesId || '?')];
+    bits.push(spec.rarity != null ? SP.RARITIES[spec.rarity] : 'rarity: roll');
+    if (spec.sizeIdx != null) bits.push(SP.SIZES[spec.sizeIdx]);
+    if (spec.element) bits.push(spec.element);
+    if (spec.stats && (spec.stats.hp != null || spec.stats.dmg != null || spec.stats.speed != null)) bits.push('exact stats');
+    if (spec.behaviorValue != null) bits.push('behaviour ' + spec.behaviorValue);
+    if (spec.behavior) bits.push('tree:' + spec.behavior);
+    if (spec.picks && spec.picks.headCount != null) bits.push(spec.picks.headCount + ' heads');
+    const nVars = spec.vars ? Object.keys(spec.vars).length : 0;
+    const nPicks = spec.picks ? Object.keys(spec.picks).filter(k => k !== 'headCount').length : 0;
+    if (nVars) bits.push(nVars + ' var' + (nVars > 1 ? 's' : ''));
+    if (nPicks) bits.push(nPicks + ' pick' + (nPicks > 1 ? 's' : ''));
+    return bits.join(' · ');
+  }
+
   /* ================= GUILD LISTING EDITOR =================
-     Authors one creature the Dya Guild sells outright: which species it is,
-     the individual name it carries, its rarity, the price, and a line of
-     stall copy. It's minted true to this every time a player buys it. */
+     Authors one creature the Dya Guild sells outright. The creature itself is
+     designed with the full token designer (every stat, variable, trait and
+     decision tree); this modal wraps that with the sale price and stall copy.
+     It's minted true to the design every time a player buys it. */
   function editGuildListing(existing) {
     const isNew = !existing;
     const firstSpid = (SP.list[0] && SP.list[0].id) || '';
     const work = existing ? U.deepCopy(existing) : {
-      id: U.uid('glst'), speciesId: firstSpid, name: '', rarity: 1, price: 200, desc: '', createdAt: Date.now(),
+      id: U.uid('glst'), spec: { speciesId: firstSpid, rarity: 1 }, price: 200, desc: '', createdAt: Date.now(),
     };
+    /* migrate a legacy flat listing into a spec */
+    if (!work.spec) work.spec = { speciesId: work.speciesId, name: work.name, rarity: work.rarity };
+    delete work.speciesId; delete work.name; delete work.rarity;
 
     const { w, close } = modal('4% 8%');
     const closeAll = () => { stopPreviews(); close(); rerender(); };
     w.appendChild(U.el('h2', { cls: 'gold', text: isNew ? 'Create a Guild listing' : 'Edit listing' }));
-    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'One specific creature on the Guild’s stall. Pick the species, name the individual, set the rarity and price, and add a line of description shown to players.' }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'One specific creature on the Guild’s stall. Design the creature down to the last detail, then set its price and a line of stall copy.' }));
 
     const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:320px 1fr;gap:18px;align-items:start' });
     w.appendChild(cols);
@@ -1808,21 +1841,20 @@
     const left = U.el('div', {});
     cols.appendChild(left);
     left.appendChild(U.el('h3', { cls: 'gold mb', text: 'The creature' }));
-    left.appendChild(livePreview(() => SP.get(work.speciesId) || SP.list[0]));
+    left.appendChild(livePreview(() => SP.get(work.spec.speciesId) || SP.list[0]));
 
-    /* ---------- RIGHT: identity + price ---------- */
+    /* ---------- RIGHT: design + price ---------- */
     const right = U.el('div', {});
     cols.appendChild(right);
 
-    const spSel = selectEl(SP.list.map(s => [s.id, s.name]), work.speciesId);
-    spSel.onchange = () => { work.speciesId = spSel.value; };
-    lblIn(right, 'Species (what it is)', spSel);
-
-    const nameIn = U.el('input', { cls: 'txt', maxlength: 32, value: work.name, placeholder: 'Leave blank to use the species name' });
-    lblIn(right, 'Individual name', nameIn);
-
-    const rarSel = selectEl(SP.RARITIES.map((r, i) => [String(i), r]), String(work.rarity));
-    lblIn(right, 'Rarity', rarSel);
+    const summaryLine = U.el('div', { cls: 'small muted mb', text: specSummary(work.spec) });
+    right.appendChild(U.el('label', { cls: 'lbl', text: 'The designed creature' }));
+    right.appendChild(summaryLine);
+    right.appendChild(U.el('button', {
+      cls: 'btn mb', text: '✎ Design the creature (every detail)', onclick: () => {
+        editHuntEnemy(work.spec, () => { summaryLine.textContent = specSummary(work.spec); }, { hideBoss: true, title: 'Listing creature — design every detail', intro: 'Design the exact creature this listing sells. Species, name, rarity, size, precise stats, behaviour tree, every variable and trait pick — anything you set is minted true; anything left blank rolls once when the listing is created.' });
+      },
+    }));
 
     const priceIn = numIn(work.price, { step: 1, min: 0 });
     lblIn(right, 'Price (gold)', priceIn);
@@ -1835,10 +1867,7 @@
     const acts = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
     acts.appendChild(U.el('button', {
       cls: 'btn primary', text: isNew ? 'Create listing' : 'Save listing', onclick: () => {
-        if (!SP.get(spSel.value)) { alert('Pick a valid species.'); return; }
-        work.speciesId = spSel.value;
-        work.name = nameIn.value.trim();
-        work.rarity = parseInt(rarSel.value, 10) || 0;
+        if (!SP.get(work.spec.speciesId)) { alert('Pick a valid species (Design the creature).'); return; }
         work.price = Math.max(0, parseInt(priceIn.value, 10) || 0);
         work.desc = descTa.value.trim();
         M.setGuildListing(work);
@@ -1855,7 +1884,13 @@
      at spawn; anything set is used exactly by the match engine. Uses the same
      ability catalog dropdowns as the species editor, but with single values
      (this is one specific creature, not a template). */
-  function editHuntEnemy(en, onDone) {
+  /* The universal token designer. Authors ONE creature down to the last
+     detail — used for Hunt enemies AND anywhere a token is designed/granted
+     (Guild listings, the Guild stall pool, tournament rewards). opts:
+       hideBoss — hide the "boss" toggle (only Hunt enemies are bosses)
+       title / intro — override the modal heading + blurb */
+  function editHuntEnemy(en, onDone, opts) {
+    opts = opts || {};
     en.stats = en.stats || {};
     en.vars = en.vars || {};
     en.picks = en.picks || {};
@@ -1864,8 +1899,8 @@
     const { w, close } = modal('3% 8%');
     const closeAll = () => { stopPreviews(); close(); if (onDone) onDone(); };
     const cat = abilityCatalog();
-    w.appendChild(U.el('h2', { cls: 'gold', text: 'Hunt creature — ' + (SP.get(curSp) ? SP.get(curSp).name : curSp) }));
-    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Author this ONE creature completely. Blank fields roll at spawn; anything you set is used exactly. Heads, every variable and trait pick, even the decision tree — all yours.' }));
+    w.appendChild(U.el('h2', { cls: 'gold', text: opts.title || ('Hunt creature — ' + (SP.get(curSp) ? SP.get(curSp).name : curSp)) }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: opts.intro || 'Author this ONE creature completely. Blank fields roll at spawn; anything you set is used exactly. Heads, every variable and trait pick, even the decision tree — all yours.' }));
 
     const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:280px 1fr;gap:18px;align-items:start' });
     w.appendChild(cols);
@@ -1886,9 +1921,11 @@
     function hcell(parent, label, el) { const c = U.el('div', {}); c.appendChild(U.el('label', { cls: 'lbl', text: label })); c.appendChild(el); parent.appendChild(c); return el; }
     const nameI = hcell(g1, 'Name (blank = auto)', U.el('input', { cls: 'txt', value: en.name || '', placeholder: 'auto' }));
     nameI.oninput = () => { if (nameI.value.trim()) en.name = nameI.value.trim(); else delete en.name; };
-    const bossWrap = U.el('div', { cls: 'toggle' + (en.boss ? ' on' : ''), style: 'margin-top:4px' });
-    bossWrap.onclick = () => { if (en.boss) delete en.boss; else en.boss = true; bossWrap.classList.toggle('on'); };
-    hcell(g1, 'Boss (the quarry itself)', bossWrap);
+    if (!opts.hideBoss) {
+      const bossWrap = U.el('div', { cls: 'toggle' + (en.boss ? ' on' : ''), style: 'margin-top:4px' });
+      bossWrap.onclick = () => { if (en.boss) delete en.boss; else en.boss = true; bossWrap.classList.toggle('on'); };
+      hcell(g1, 'Boss (the quarry itself)', bossWrap);
+    }
     const rSel = hcell(g1, 'Rarity', selectEl([['', 'roll']].concat(SP.RARITIES.map((r, i) => [String(i), r])), en.rarity != null ? String(en.rarity) : ''));
     rSel.onchange = () => { if (rSel.value === '') delete en.rarity; else en.rarity = parseInt(rSel.value, 10); };
     const sizeSel = hcell(g1, 'Size', selectEl([['', 'roll']].concat(SP.SIZES.map((s, i) => [String(i), s])), en.sizeIdx != null ? String(en.sizeIdx) : ''));
@@ -2896,21 +2933,29 @@
         });
         box.appendChild(U.el('button', { cls: 'btn small ghost', text: '＋ Okid', onclick: () => { rw.okid.push({ rarity: 0, qty: 1 }); paint(); } }));
 
-        /* Token rows */
-        box.appendChild(U.el('label', { cls: 'lbl mt', text: 'Tokens (minted fresh for the winner)' }));
+        /* Token rows — each is a hand-designed token (species, rarity, and any
+           exact stat/variable/trait/tree override) minted fresh for the winner */
+        box.appendChild(U.el('label', { cls: 'lbl mt', text: 'Tokens (designed, minted fresh for the winner)' }));
         rw.tokens.forEach((tk, ti) => {
-          const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
-          const spSel = selectEl(SP.list.map(s => [s.id, s.name]), tk.speciesId || (SP.list[0] && SP.list[0].id));
-          spSel.style.flex = '2'; spSel.onchange = () => tk.speciesId = spSel.value;
-          const rSel = selectEl([['', 'rarity: roll']].concat(SP.RARITIES.map((rn, i) => [String(i), rn])), tk.rarity != null ? String(tk.rarity) : '');
-          rSel.onchange = () => { if (rSel.value === '') delete tk.rarity; else tk.rarity = parseInt(rSel.value, 10); };
-          const qIn = numIn(tk.qty || 1, { step: 1, min: 1, style: 'max-width:80px' });
+          /* migrate a legacy flat token reward into a spec */
+          if (!tk.spec) { tk.spec = { speciesId: tk.speciesId || (SP.list[0] && SP.list[0].id) }; if (tk.rarity != null) tk.spec.rarity = tk.rarity; delete tk.speciesId; delete tk.rarity; }
+          const r = U.el('div', { style: 'margin-bottom:6px' });
+          const line = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center;flex-wrap:wrap' });
+          const spSel = selectEl(SP.list.map(s => [s.id, s.name]), tk.spec.speciesId || (SP.list[0] && SP.list[0].id));
+          spSel.style.flex = '2'; spSel.onchange = () => { tk.spec.speciesId = spSel.value; sumLine.textContent = specSummary(tk.spec); };
+          const rSel = selectEl([['', 'rarity: roll']].concat(SP.RARITIES.map((rn, i) => [String(i), rn])), tk.spec.rarity != null ? String(tk.spec.rarity) : '');
+          rSel.onchange = () => { if (rSel.value === '') delete tk.spec.rarity; else tk.spec.rarity = parseInt(rSel.value, 10); sumLine.textContent = specSummary(tk.spec); };
+          const qIn = numIn(tk.qty || 1, { step: 1, min: 1, style: 'max-width:70px' });
           qIn.oninput = () => tk.qty = parseInt(qIn.value, 10) || 1;
-          r.appendChild(spSel); r.appendChild(rSel); r.appendChild(qIn);
-          r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { rw.tokens.splice(ti, 1); paint(); } }));
+          const designBtn = U.el('button', { cls: 'btn small', text: '✎ Design', onclick: () => editHuntEnemy(tk.spec, () => { sumLine.textContent = specSummary(tk.spec); }, { hideBoss: true, title: 'Reward token — design every detail', intro: 'Design the exact token this placement awards. Anything you set is minted true for the winner; blank fields roll fresh when it’s granted.' }) });
+          line.appendChild(spSel); line.appendChild(rSel); line.appendChild(qIn); line.appendChild(designBtn);
+          line.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { rw.tokens.splice(ti, 1); paint(); } }));
+          r.appendChild(line);
+          const sumLine = U.el('div', { cls: 'small muted', style: 'margin:2px 0 0 2px', text: specSummary(tk.spec) });
+          r.appendChild(sumLine);
           box.appendChild(r);
         });
-        box.appendChild(U.el('button', { cls: 'btn small ghost', text: '＋ Token', onclick: () => { rw.tokens.push({ speciesId: (SP.list[0] && SP.list[0].id), qty: 1 }); paint(); } }));
+        box.appendChild(U.el('button', { cls: 'btn small ghost', text: '＋ Token', onclick: () => { rw.tokens.push({ spec: { speciesId: (SP.list[0] && SP.list[0].id) }, qty: 1 }); paint(); } }));
 
         holder.appendChild(box);
       }
@@ -2926,7 +2971,10 @@
       return rewards.slice(0, last + 1).map(rw => ({
         gold: rw.gold || 0, ngakara: rw.ngakara || 0, huntSlots: rw.huntSlots || 0,
         okid: (rw.okid || []).filter(o => (o.qty | 0) > 0),
-        tokens: (rw.tokens || []).filter(t => t.speciesId && SP.get(t.speciesId)),
+        tokens: (rw.tokens || []).filter(t => {
+          const sid = (t.spec && t.spec.speciesId) || t.speciesId;
+          return sid && SP.get(sid);
+        }),
       }));
     }
     w.appendChild(U.el('div', { cls: 'flex mt' }, [

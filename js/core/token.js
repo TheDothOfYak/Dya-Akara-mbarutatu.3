@@ -277,6 +277,48 @@
     return tok;
   };
 
+  /* ================= MINT FROM A DESIGNED SPEC =================
+     A "spec" is a token the admin designed by hand (Admin Panel token
+     designer): species plus any subset of exact overrides — name, rarity,
+     size, element, behavior value, per-token behavior tree, individual
+     variables and trait picks (heads, breath tier…), and exact HP/Damage/
+     Speed. Any field left unset rolls at mint; anything set is honored
+     exactly. This is the ONE path for granting a designed token anywhere —
+     Guild stall, Guild listings, tournament rewards — so a token comes out
+     the same wherever it's handed over. The same override fields are applied
+     by the match engine when a designed creature is fielded (engine/match).*/
+  T.mintSpec = function (spec, opts) {
+    spec = spec || {};
+    opts = opts || {};
+    const tok = T.mint({
+      speciesId: spec.speciesId,
+      rng: opts.rng || new U.Rng(U.newSeed()),
+      rarity: spec.rarity != null ? spec.rarity : undefined,
+      name: (spec.name || '').trim() || undefined,
+      owner: opts.owner,
+      crafter: opts.crafter,
+      aiOwner: opts.aiOwner,
+      nameLocked: opts.nameLocked,
+      isStarter: opts.isStarter,
+    });
+    if (spec.sizeIdx != null) tok.sizeIdx = U.clamp(spec.sizeIdx | 0, 0, 4);
+    if (spec.element) tok.element = spec.element;
+    if (spec.behaviorValue != null) tok.behaviorValue = U.clamp(Math.round(spec.behaviorValue), 5, 3000);
+    /* a per-token behavior tree the engine reads when this token is fielded */
+    if (spec.behavior) tok.behavior = spec.behavior;
+    if (spec.vars && typeof spec.vars === 'object') tok.vars = Object.assign({}, tok.vars, spec.vars);
+    if (spec.picks && typeof spec.picks === 'object') tok.picks = Object.assign({}, tok.picks, spec.picks);
+    if (spec.stats && typeof spec.stats === 'object') {
+      tok.stats = Object.assign({}, tok.stats);
+      if (spec.stats.hp != null) tok.stats.hp = Math.max(1, spec.stats.hp);
+      if (spec.stats.dmg != null) tok.stats.dmg = Math.max(0, spec.stats.dmg);
+      if (spec.stats.speed != null) tok.stats.speed = Math.max(0, spec.stats.speed);
+    }
+    /* the look depends on size/picks, so re-bake after applying overrides */
+    T.physique(tok);
+    return tok;
+  };
+
   /* Total cost (sum across the four resources) to ready this token */
   T.cost = (tok) => {
     const v = T.costVec(tok);

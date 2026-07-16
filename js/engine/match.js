@@ -244,6 +244,10 @@
       c.rooted = true;
     }
     if (sp.behavior === 'gynge') c.state = 'dormant';
+    /* a per-token behavior tree the admin designed onto this individual
+       (TK.mintSpec) — honored whenever the token is fielded, not just when
+       it's spawned as a hunt enemy */
+    if (tok.behavior && BV[tok.behavior]) c.behaviorOverride = tok.behavior;
     if ((sp.features.rider || sp.tags.includes('mount')) && M.teams[teamIdx] && M.teams[teamIdx].stats) M.teams[teamIdx].stats.combos['Rider on the field'] = true;
     M.creatures.push(c);
     M.addEffect('deploy', x, y, { r: c.radius });

@@ -1229,22 +1229,58 @@
           goods.appendChild(good('⬡', 'Tui Okid', 'Uncommon crafting Okid.', 140, () => { me.okid[1]++; G.save(); }));
           goods.appendChild(good('⬡', 'Stamijan Okid', 'Fine crafting Okid.', 320, () => { me.okid[2]++; G.save(); }));
           goods.appendChild(good('📜', 'Tournament license', 'Run your own tournaments. Baseline rules apply.', 200, () => { me.flags.tournamentLicense = true; G.save(); }));
-          /* the random Guild stall token — species drawn from the admin-curated
-             pool (Guild Market tab), falling back to the built-in seven */
-          const gd = (M && M.guildData) ? M.guildData() : { poolPrice: 100, poolRarityMax: 1 };
-          goods.appendChild(good('🎴', 'Guild stall token', 'A random token from the Guild’s own stall. Species is the Guild’s choice.', gd.poolPrice, () => {
-            const rng = new U.Rng(U.newSeed());
-            const pool = (M && M.guildPool) ? M.guildPool() : ['kipsu', 'wild_punk', 'uff', 'raf_krabbi', 'rodak', 'mikolo_moko', 'karnen'];
-            const valid = pool.filter(id => SP.get(id));
-            if (!valid.length) { G.addGold(gd.poolPrice, true); UI.alert('The stall is bare', 'The Guild has nothing to draw from right now.'); return; }
-            const spid = rng.pick(valid);
-            const maxR = gd.poolRarityMax != null ? gd.poolRarityMax : 1;
-            const tok = TK.mint({ speciesId: spid, rng, rarity: Math.min(maxR, SP.get(spid).rarity[1]) });
-            G.addToken(tok);
-            UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(spid).name + ')', icon: '🎴' });
-            if (DYA.tutorial) DYA.tutorial.onEvent('guildStallBuy');
-          }));
           body.appendChild(goods);
+
+          /* ---- the random Guild stall token. When the admin has stocked a
+             curated pool (Guild Market tab) it is LIMITED: every pull is one
+             of a kind, drawn and decremented globally, and it sells out when
+             the stock runs dry. Unstocked, it keeps the classic unlimited
+             common draw so the tutorial always has one to buy. ---- */
+          const gd = (M && M.guildData) ? M.guildData() : { poolPrice: 100 };
+          const poolLimited = !!(M && M.poolConfigured && M.poolConfigured());
+          const poolStock = (M && M.poolStock) ? M.poolStock() : 0;
+          if (!poolLimited || poolStock > 0) {
+            const stallCard = U.el('div', { cls: 'panel center' });
+            stallCard.appendChild(U.el('div', { style: 'font-size:30px', text: '🎴' }));
+            stallCard.appendChild(U.el('b', { cls: 'gold', text: 'Guild stall token' }));
+            stallCard.appendChild(U.el('p', { cls: 'small muted', text: poolLimited ? 'A random creature from the Guild’s stocked pool — one of a kind. ' + poolStock + ' left.' : 'A random token from the Guild’s own stall. Species is the Guild’s choice.' }));
+            const stallBtn = U.el('button', { cls: 'btn small mt', text: U.fmt(gd.poolPrice) + 'g' });
+            stallBtn.onclick = async () => {
+              if (me.gold < gd.poolPrice) { UI.alert('Too poor', 'That costs ' + U.fmt(gd.poolPrice) + 'g.'); return; }
+              stallBtn.disabled = true;
+              let tok = null;
+              if (poolLimited) {
+                stallBtn.textContent = 'Drawing…';
+                const r = await M.drawGuildPool();
+                if (r.empty) { UI.alert('Sold out', 'The Guild’s pool is empty — every token has been drawn.'); views.Market(); return; }
+                if (r.ok) tok = TK.mintSpec(r.spec, { rng: new U.Rng(U.newSeed()) });
+              }
+              if (!tok) {
+                /* legacy / unconfigured: classic unlimited built-in draw */
+                const rng = new U.Rng(U.newSeed());
+                const pool = (M && M.GUILD_DEFAULT_POOL) || ['kipsu', 'wild_punk', 'uff', 'raf_krabbi', 'rodak', 'mikolo_moko', 'karnen'];
+                const valid = pool.filter(id => SP.get(id));
+                if (!valid.length) { UI.alert('The stall is bare', 'The Guild has nothing to draw from right now.'); views.Market(); return; }
+                const spid = rng.pick(valid);
+                tok = TK.mint({ speciesId: spid, rng, rarity: Math.min(1, SP.get(spid).rarity[1]) });
+              }
+              G.addGold(-gd.poolPrice, true);
+              G.addToken(tok);
+              DYA.audio.play('coin');
+              UI.refreshTopbar();
+              UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(tok.speciesId).name + ')', icon: '🎴' });
+              if (DYA.tutorial) DYA.tutorial.onEvent('guildStallBuy');
+              views.Market();
+            };
+            stallCard.appendChild(stallBtn);
+            goods.appendChild(stallCard);
+          } else {
+            const soldOut = U.el('div', { cls: 'panel center', style: 'opacity:.6' });
+            soldOut.appendChild(U.el('div', { style: 'font-size:30px', text: '🎴' }));
+            soldOut.appendChild(U.el('b', { cls: 'gold', text: 'Guild stall token' }));
+            soldOut.appendChild(U.el('p', { cls: 'small muted', text: 'Sold out — the Guild’s pool is empty.' }));
+            goods.appendChild(soldOut);
+          }
 
           /* ---- the creatures the Guild is selling outright (admin-authored
              individual listings, shown beneath the standard goods). Each is
@@ -1258,12 +1294,9 @@
             /* mint deterministically from the listing id so the card shown is
                exactly the creature the buyer receives */
             const listingToken = (l) => {
-              const sp = SP.get(l.speciesId);
-              if (!sp) return null;
-              const rng = new U.Rng(U.hashStr(l.id));
-              const rarity = Math.min(l.rarity != null ? l.rarity : sp.rarity[0], sp.rarity[1]);
-              const tok = TK.mint({ speciesId: l.speciesId, rng, rarity, name: (l.name || '').trim() || undefined });
-              return tok;
+              const spec = M.listingSpec(l);
+              if (!spec || !SP.get(spec.speciesId)) return null;
+              return TK.mintSpec(spec, { rng: new U.Rng(U.hashStr(l.id)) });
             };
             listings.forEach(l => {
               const preview = listingToken(l);
@@ -1288,7 +1321,7 @@
                 G.addToken(tok);
                 DYA.audio.play('coin');
                 UI.refreshTopbar();
-                UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(l.speciesId).name + ') — one of a kind, now yours.', icon: '🎴' });
+                UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(tok.speciesId).name + ') — one of a kind, now yours.', icon: '🎴' });
                 if (DYA.tutorial) DYA.tutorial.onEvent('guildStallBuy');
                 views.Market();
               };
