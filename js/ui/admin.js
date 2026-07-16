@@ -980,12 +980,15 @@
       body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Resource grants' }));
       const gold = U.el('input', { cls: 'txt', type: 'number', placeholder: 'Gold' });
       const ngak = U.el('input', { cls: 'txt', type: 'number', placeholder: 'NgAkara' });
-      body.appendChild(U.el('div', { cls: 'flex' }, [gold, ngak, U.el('button', {
+      const hslots = U.el('input', { cls: 'txt', type: 'number', placeholder: 'Hunt slots' });
+      body.appendChild(U.el('div', { cls: 'flex' }, [gold, ngak, hslots, U.el('button', {
         cls: 'btn', text: 'Grant to selected account', onclick: () => {
           const a = G.world.accounts[acc.value];
           a.gold += parseInt(gold.value) || 0;
           a.ngakara += parseInt(ngak.value) || 0;
-          G.saveNow(); G.pushAccountToCloud(a); alert('Granted.');
+          const hs = parseInt(hslots.value) || 0;
+          if (hs > 0) G.admin.grantHuntSlots(a.id, hs);
+          G.saveNow(); G.pushAccountToCloud(a); alert('Granted' + (hs > 0 ? ' (incl. ' + hs + ' Hunt slot' + (hs > 1 ? 's' : '') + ')' : '') + '.');
         },
       })]));
     },
@@ -1459,10 +1462,12 @@
       id: U.uid('hunt'), name: '', speciesId: firstSpid, rarity: 3, narrator: 'guide', intro: '',
       encounters: [{ name: 'The Quarry', desc: '', terrain: 'plains', enemies: [{ speciesId: firstSpid, boss: true }] }],
       rewards: { gold: 600, okid: 3, ngakara: 3, pieces: 1, pieceMaterial: '', secondPieceChance: (EC.HUNT && EC.HUNT.secondPieceChance) || 0.06 },
+      partySize: 5,
       hunted: false, huntedBy: null, huntedAt: 0, createdAt: Date.now(),
     };
     work.rewards = work.rewards || {};
     work.encounters = work.encounters || [];
+    if (work.partySize == null) work.partySize = 5;
 
     const { w, close } = modal('3% 6%');
     const closeAll = () => { stopPreviews(); close(); rerender(); };
@@ -1487,6 +1492,13 @@
 
     const rarSel = selectEl(SP.RARITIES.map((r, i) => [String(i), r]), String(work.rarity));
     lblIn(left, 'Rarity', rarSel);
+
+    /* how many tokens the hunter fields for THIS hunt — their own Eikar plus
+       (partySize − 1) chosen. A token that falls is out for the rest of the
+       hunt, so a smaller party is a harder, higher-stakes pursuit. */
+    const partyIn = numIn(work.partySize != null ? work.partySize : 5, { step: 1, min: 1, max: 13 });
+    partyIn.oninput = () => work.partySize = U.clamp(parseInt(partyIn.value, 10) || 5, 1, 13);
+    lblIn(left, 'Hunting party size (incl. the player)', partyIn);
 
     const narSel = selectEl(Object.keys(L.NARRATORS).map(k => [k, L.NARRATORS[k].name]), work.narrator);
     lblIn(left, 'Narrator (voice of the Track)', narSel);
@@ -1628,6 +1640,7 @@
         work.name = name;
         work.speciesId = spSel.value;
         work.rarity = parseInt(rarSel.value, 10) || 0;
+        work.partySize = U.clamp(parseInt(partyIn.value, 10) || 5, 1, 13);
         work.narrator = narSel.value;
         work.intro = introTa.value.trim();
         work.rewards = {
@@ -2495,6 +2508,20 @@
       inputs[k] = U.el('input', { cls: 'txt', type: t, value: a[k] });
       leftC.appendChild(inputs[k]);
     });
+    /* grant Hunt slots directly to this player */
+    leftC.appendChild(U.el('label', { cls: 'lbl mt', text: 'Hunt slots (has ' + ((a.huntSlots || []).length) + ' open)' }));
+    const hsGrant = U.el('div', { cls: 'flex', style: 'gap:6px' });
+    const hsN = numIn(1, { step: 1, min: 1, style: 'max-width:90px' });
+    hsGrant.appendChild(hsN);
+    hsGrant.appendChild(U.el('button', {
+      cls: 'btn small', text: '🏹 Grant Hunt slots', onclick: () => {
+        const n = parseInt(hsN.value, 10) || 1;
+        G.admin.grantHuntSlots(a.id, n);
+        alert('Granted ' + n + ' Hunt slot' + (n > 1 ? 's' : '') + ' to ' + a.displayName + '.');
+        close(); rerender();
+      },
+    }));
+    leftC.appendChild(hsGrant);
     leftC.appendChild(U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:6px' }, [
       U.el('button', {
         cls: 'btn primary', text: 'Save account', onclick: () => {
@@ -2687,7 +2714,7 @@
           inp.oninput = () => rw[key] = parseInt(inp.value, 10) || 0;
           c.appendChild(inp); g.appendChild(c);
         };
-        mk('Gold', 'gold'); mk('NgAkara', 'ngakara'); mk('Hunt privileges', 'huntSlots');
+        mk('Gold', 'gold'); mk('NgAkara', 'ngakara'); mk('Hunt slots', 'huntSlots');
         box.appendChild(g);
 
         /* Okid rows */

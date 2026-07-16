@@ -143,6 +143,20 @@ console.log('== ADMIN FEATURES ==');
   check('purge removes auto-gen tokens', pr.removed >= 1 && G.admin.countAutoGenTokens() === 0, 'removed=' + pr.removed + ' left=' + G.admin.countAutoGenTokens());
 })();
 
+/* ---------- admin grants Hunt slots to a player ---------- */
+(function () {
+  const acc = Object.values(G.world.accounts).find(a => a.ai);
+  acc.huntSlots = []; acc.notifications = acc.notifications || [];
+  const before = acc.huntSlots.length;
+  const r = G.admin.grantHuntSlots(acc.id, 3);
+  check('grantHuntSlots adds the requested slots', r.ok && acc.huntSlots.length === before + 3, 'now ' + acc.huntSlots.length);
+  check('admin-granted slots never expire', acc.huntSlots.slice(-3).every(s => s.expiresAtBand == null && s.source === 'admin'));
+  // and via a tournament reward (Hunt privileges)
+  acc.huntSlots = [];
+  G.grantTournamentReward(acc.id, { huntSlots: 2 });
+  check('tournament reward grants Hunt slots', acc.huntSlots.length === 2, 'got ' + acc.huntSlots.length);
+})();
+
 /* ---------- admin password persists in its own key ---------- */
 (function () {
   G.admin.setPass('secret123');
