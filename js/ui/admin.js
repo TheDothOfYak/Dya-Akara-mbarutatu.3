@@ -1699,6 +1699,37 @@
 
   /* ================= SPECIES EDITOR ================= */
   const RIGS = ['quad', 'biped', 'flame', 'swarm', 'tree', 'blob', 'field', 'relic', 'crab', 'mcfly', 'bird'];
+
+  /* Ability catalog for the dropdown menus: merges the curated descriptions in
+     data/abilities.js with the real ranges/options learned from every existing
+     species, so the designer picks abilities from a list instead of guessing
+     internal key names. Cached for the session. */
+  let _abilityCatalog = null;
+  function abilityCatalog() {
+    if (_abilityCatalog) return _abilityCatalog;
+    const AB = DYA.abilities || { VARS: {}, PICKS: {}, TAGS: [], FEATURES: [], humanize: x => x };
+    const humanize = AB.humanize || (x => x);
+    const vars = {}, picks = {}, tags = {};
+    Object.keys(AB.VARS || {}).forEach(k => vars[k] = { desc: AB.VARS[k].desc || '', lo: null, hi: null });
+    Object.keys(AB.PICKS || {}).forEach(k => picks[k] = { desc: AB.PICKS[k].desc || '', options: new Set((AB.PICKS[k].options || []).map(String)) });
+    (AB.TAGS || []).forEach(t => tags[t.id] = t.desc || '');
+    SP.list.forEach(sp => {
+      Object.entries(sp.vars || {}).forEach(([k, r]) => {
+        const v = vars[k] = vars[k] || { desc: '', lo: null, hi: null };
+        if (Array.isArray(r)) { v.lo = v.lo == null ? r[0] : Math.min(v.lo, r[0]); v.hi = v.hi == null ? r[1] : Math.max(v.hi, r[1]); }
+      });
+      Object.entries(sp.picks || {}).forEach(([k, opts]) => {
+        const p = picks[k] = picks[k] || { desc: '', options: new Set() };
+        (opts || []).forEach(o => p.options.add(String(o)));
+      });
+      (sp.tags || []).forEach(t => { if (!(t in tags)) tags[t] = ''; });
+    });
+    Object.keys(vars).forEach(k => { vars[k].label = humanize(k); if (vars[k].lo == null) { vars[k].lo = 0; vars[k].hi = 1; } });
+    Object.keys(picks).forEach(k => { picks[k].label = humanize(k); picks[k].options = Array.from(picks[k].options); });
+    _abilityCatalog = { vars, picks, tags, features: (AB.FEATURES || []), humanize };
+    return _abilityCatalog;
+  }
+
   function editSpecies(id) {
     const sp = SP.get(id);
     /* working copy — nothing applies until Save */
@@ -1732,15 +1763,70 @@
     c2.oninput = () => work.color2 = c2.value;
     lblIn(left, 'Secondary color', c2);
 
-    const feats = U.el('textarea', { cls: 'txt', rows: 5, style: 'font-family:monospace;font-size:11px' });
+    /* ---- features: friendly toggles + a Heads control, no JSON needed ---- */
+    left.appendChild(U.el('label', { cls: 'lbl', text: 'Features — body parts & flags (hover for what each does)' }));
+    work.features = work.features || {};
+    const featBox = U.el('div', { style: 'max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:8px' });
+    left.appendChild(featBox);
+    function paintFeatures() {
+      featBox.innerHTML = '';
+      const cat = abilityCatalog();
+      /* Heads first, front and centre (the Naga control) */
+      const headsRow = U.el('div', { cls: 'mb', style: 'border-bottom:1px solid var(--line);padding-bottom:6px' });
+      headsRow.appendChild(U.el('label', { cls: 'lbl', style: 'margin:0', text: '🐍 Heads (min–max per individual; same value = fixed)' }));
+      const hasHeads = Array.isArray(work.features.heads);
+      const hrow = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center' });
+      const hLo = numIn(hasHeads ? work.features.heads[0] : '', { step: 1, min: 1, style: 'max-width:70px', placeholder: '—' });
+      const hHi = numIn(hasHeads ? (work.features.heads[1] != null ? work.features.heads[1] : work.features.heads[0]) : '', { step: 1, min: 1, style: 'max-width:70px', placeholder: '—' });
+      const syncHeads = () => {
+        const lo = parseInt(hLo.value, 10), hi = parseInt(hHi.value, 10);
+        if (isNaN(lo) && isNaN(hi)) { delete work.features.heads; delete work.picks.headCount; return; }
+        const a = isNaN(lo) ? hi : lo, b = isNaN(hi) ? lo : hi;
+        const mn = Math.max(1, Math.min(a, b)), mx = Math.max(1, Math.max(a, b));
+        work.features.heads = [mn, mx];
+        /* per-token head count rolls uniformly across the band */
+        work.picks = work.picks || {};
+        const list = []; for (let n = mn; n <= mx; n++) list.push(n);
+        work.picks.headCount = list;
+      };
+      hLo.oninput = syncHeads; hHi.oninput = syncHeads;
+      hrow.appendChild(hLo); hrow.appendChild(U.el('span', { text: '–' })); hrow.appendChild(hHi);
+      headsRow.appendChild(hrow);
+      featBox.appendChild(headsRow);
+      /* the rest as toggles */
+      cat.features.filter(f => f.id !== 'heads').forEach(f => {
+        const on = !!work.features[f.id];
+        const row = U.el('label', { cls: 'flex small', style: 'align-items:flex-start;gap:6px;margin-bottom:4px;cursor:pointer', title: f.desc });
+        const chk = U.el('input', { type: 'checkbox' }); chk.checked = on;
+        chk.onchange = () => { if (chk.checked) work.features[f.id] = true; else delete work.features[f.id]; };
+        row.appendChild(chk);
+        row.appendChild(U.el('span', {}, [U.el('b', { text: f.id }), U.el('span', { cls: 'muted', text: ' — ' + f.desc })]));
+        featBox.appendChild(row);
+      });
+      /* any custom feature keys already on this species that aren't in the catalog */
+      const known = new Set(cat.features.map(f => f.id));
+      Object.keys(work.features).forEach(k => {
+        if (known.has(k) || k === 'heads') return;
+        const row = U.el('div', { cls: 'flex small', style: 'align-items:center;gap:6px;margin-bottom:3px' });
+        row.appendChild(U.el('span', { cls: 'gold flex1', text: k + ' (custom): ' + JSON.stringify(work.features[k]) }));
+        row.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { delete work.features[k]; paintFeatures(); } }));
+        featBox.appendChild(row);
+      });
+    }
+    paintFeatures();
+    /* advanced JSON fallback for anything exotic */
+    const advDet = U.el('details', { style: 'margin-top:6px' });
+    advDet.appendChild(U.el('summary', { cls: 'small muted', style: 'cursor:pointer', text: 'Advanced: edit features as JSON' }));
+    const feats = U.el('textarea', { cls: 'txt mt', rows: 4, style: 'font-family:monospace;font-size:11px' });
     feats.value = JSON.stringify(work.features || {}, null, 1);
     const featErr = U.el('div', { cls: 'small', style: 'color:var(--red);min-height:14px' });
     feats.oninput = () => {
-      try { work.features = JSON.parse(feats.value); featErr.textContent = ''; }
+      try { work.features = JSON.parse(feats.value); featErr.textContent = ''; paintFeatures(); }
       catch (e) { featErr.textContent = 'Invalid JSON — preview keeps the last valid features.'; }
     };
-    lblIn(left, 'Feature layers (JSON — wings, horns, vines, heads, shell, flame…)', feats);
-    left.appendChild(featErr);
+    advDet.appendChild(feats);
+    advDet.appendChild(featErr);
+    left.appendChild(advDet);
 
     /* ---- custom image sprite ---- */
     left.appendChild(U.el('label', { cls: 'lbl', text: 'Custom image (replaces the rig everywhere; auto-shrunk to 96px)' }));
@@ -1833,9 +1919,33 @@
     };
     crLo.oninput = syncCR; crHi.oninput = syncCR;
 
-    const tagsIn = U.el('input', { cls: 'txt', value: (work.tags || []).join(', ') });
-    tagsIn.oninput = () => work.tags = tagsIn.value.split(',').map(s => s.trim()).filter(Boolean);
-    lblIn(right, 'Tags (comma-separated: carnivore, apex, flyer, prey, stationary, pack, su…)', tagsIn);
+    /* ---- tags: toggle chips from the catalog (hover for meaning) + custom ---- */
+    right.appendChild(U.el('label', { cls: 'lbl', text: 'Tags — click to toggle (some change how it fights; hover for meaning)' }));
+    work.tags = work.tags || [];
+    const tagsBox = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap;gap:6px' });
+    right.appendChild(tagsBox);
+    function paintTags() {
+      tagsBox.innerHTML = '';
+      const cat = abilityCatalog();
+      Object.keys(cat.tags).sort().forEach(id => {
+        const on = work.tags.includes(id);
+        const chip = U.el('button', { cls: 'btn small' + (on ? ' primary' : ' ghost'), title: cat.tags[id] || id, text: id });
+        chip.onclick = () => { if (on) work.tags = work.tags.filter(t => t !== id); else work.tags.push(id); paintTags(); };
+        tagsBox.appendChild(chip);
+      });
+      const known = new Set(Object.keys(cat.tags));
+      work.tags.filter(t => !known.has(t)).forEach(t => {
+        const chip = U.el('button', { cls: 'btn small primary', title: 'custom tag', text: t + ' ✕' });
+        chip.onclick = () => { work.tags = work.tags.filter(x => x !== t); paintTags(); };
+        tagsBox.appendChild(chip);
+      });
+      tagsBox.appendChild(U.el('button', {
+        cls: 'btn small ghost', text: '＋ custom', onclick: () => {
+          const t = prompt('Custom tag name:'); if (t && t.trim() && !work.tags.includes(t.trim())) { work.tags.push(t.trim()); paintTags(); }
+        },
+      }));
+    }
+    paintTags();
 
     /* behavior */
     right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Behavior' }));
@@ -1848,17 +1958,20 @@
     craftChk.onclick = () => { if (work.notCraftable) delete work.notCraftable; else work.notCraftable = true; craftChk.classList.toggle('on'); };
     lblIn(right, 'Craftable / obtainable by players', craftChk);
 
-    /* per-individual variable ranges */
-    right.appendChild(U.el('label', { cls: 'lbl', text: 'Per-individual variables — every minted token rolls between low and high' }));
+    /* per-individual variable ranges — with an "add known ability" dropdown */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Abilities — variables' }));
+    right.appendChild(U.el('p', { cls: 'small muted', text: 'Numbers this creature carries; every minted token rolls between low and high. Add one from the menu (with a plain-English description) or type your own.' }));
     const varsBox = U.el('div', {});
     right.appendChild(varsBox);
     function paintVars() {
       varsBox.innerHTML = '';
+      const cat = abilityCatalog();
       Object.entries(work.vars || {}).forEach(([k, range]) => {
-        const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
+        const wrap = U.el('div', { style: 'margin-bottom:6px' });
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px' });
         const kIn = U.el('input', { cls: 'txt', value: k, style: 'flex:2' });
-        const lo = numIn(range[0], { step: 'any', style: 'flex:1' });
-        const hi = numIn(range[1], { step: 'any', style: 'flex:1' });
+        const lo = numIn(Array.isArray(range) ? range[0] : range, { step: 'any', style: 'flex:1' });
+        const hi = numIn(Array.isArray(range) ? range[1] : range, { step: 'any', style: 'flex:1' });
         const upd = () => {
           const nk = kIn.value.trim();
           if (nk !== k) { delete work.vars[k]; paintVarsSoon(); }
@@ -1869,20 +1982,40 @@
         kIn.onchange = upd; lo.oninput = upd; hi.oninput = upd;
         r.appendChild(kIn); r.appendChild(lo); r.appendChild(hi);
         r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { delete work.vars[k]; paintVars(); } }));
-        varsBox.appendChild(r);
+        wrap.appendChild(r);
+        if (cat.vars[k] && cat.vars[k].desc) wrap.appendChild(U.el('div', { cls: 'small muted', style: 'margin:2px 0 0 2px', text: cat.vars[k].desc }));
+        varsBox.appendChild(wrap);
       });
-      varsBox.appendChild(U.el('button', {
-        cls: 'btn small ghost', text: '＋ Add variable', onclick: () => {
+      /* add-from-menu row */
+      const addRow = U.el('div', { cls: 'flex mt', style: 'gap:6px;flex-wrap:wrap' });
+      const sel = U.el('select', { cls: 'txt', style: 'flex:1;min-width:180px' });
+      sel.appendChild(U.el('option', { value: '', text: '＋ Add an ability…' }));
+      Object.keys(cat.vars).sort((a, b) => cat.vars[a].label.localeCompare(cat.vars[b].label)).forEach(k => {
+        if (work.vars && k in work.vars) return; // already present
+        sel.appendChild(U.el('option', { value: k, text: cat.vars[k].label + (cat.vars[k].desc ? ' — ' + cat.vars[k].desc.slice(0, 60) : '') }));
+      });
+      sel.onchange = () => {
+        const k = sel.value; if (!k) return;
+        work.vars = work.vars || {};
+        const info = cat.vars[k] || { lo: 0, hi: 1 };
+        work.vars[k] = [info.lo != null ? info.lo : 0, info.hi != null ? info.hi : 1];
+        paintVars();
+      };
+      addRow.appendChild(sel);
+      addRow.appendChild(U.el('button', {
+        cls: 'btn small ghost', text: 'custom', onclick: () => {
           work.vars = work.vars || {};
           work.vars['newVar' + Object.keys(work.vars).length] = [0, 1];
           paintVars();
         },
       }));
+      varsBox.appendChild(addRow);
     }
     paintVars();
 
-    /* picks */
-    right.appendChild(U.el('label', { cls: 'lbl', text: 'Trait picks — each token gets ONE option per row (repeat an option to weight it)' }));
+    /* trait picks — with an "add known pick" dropdown that pre-fills options */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Abilities — trait picks' }));
+    right.appendChild(U.el('p', { cls: 'small muted', text: 'Each token is randomly assigned ONE option from the list (repeat an option to make it more likely). Add one from the menu or type your own.' }));
     const picksBox = U.el('div', {});
     right.appendChild(picksBox);
     function parsePickList(s) {
@@ -1890,10 +2023,12 @@
     }
     function paintPicks() {
       picksBox.innerHTML = '';
+      const cat = abilityCatalog();
       Object.entries(work.picks || {}).forEach(([k, opts]) => {
-        const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
+        const wrap = U.el('div', { style: 'margin-bottom:6px' });
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px' });
         const kIn = U.el('input', { cls: 'txt', value: k, style: 'flex:1' });
-        const oIn = U.el('input', { cls: 'txt', value: opts.join(', '), style: 'flex:3' });
+        const oIn = U.el('input', { cls: 'txt', value: (opts || []).join(', '), style: 'flex:3' });
         const upd = () => {
           const nk = kIn.value.trim();
           if (nk !== k) delete work.picks[k];
@@ -1902,15 +2037,33 @@
         kIn.onchange = upd; oIn.onchange = upd;
         r.appendChild(kIn); r.appendChild(oIn);
         r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { delete work.picks[k]; paintPicks(); } }));
-        picksBox.appendChild(r);
+        wrap.appendChild(r);
+        if (cat.picks[k] && cat.picks[k].desc) wrap.appendChild(U.el('div', { cls: 'small muted', style: 'margin:2px 0 0 2px', text: cat.picks[k].desc + (cat.picks[k].options && cat.picks[k].options.length ? '  ·  options: ' + cat.picks[k].options.join(', ') : '') }));
+        picksBox.appendChild(wrap);
       });
-      picksBox.appendChild(U.el('button', {
-        cls: 'btn small ghost', text: '＋ Add pick', onclick: () => {
+      const addRow = U.el('div', { cls: 'flex mt', style: 'gap:6px;flex-wrap:wrap' });
+      const sel = U.el('select', { cls: 'txt', style: 'flex:1;min-width:180px' });
+      sel.appendChild(U.el('option', { value: '', text: '＋ Add a trait pick…' }));
+      Object.keys(cat.picks).sort((a, b) => cat.picks[a].label.localeCompare(cat.picks[b].label)).forEach(k => {
+        if (work.picks && k in work.picks) return;
+        sel.appendChild(U.el('option', { value: k, text: cat.picks[k].label + (cat.picks[k].desc ? ' — ' + cat.picks[k].desc.slice(0, 60) : '') }));
+      });
+      sel.onchange = () => {
+        const k = sel.value; if (!k) return;
+        work.picks = work.picks || {};
+        const info = cat.picks[k] || { options: [] };
+        work.picks[k] = (info.options && info.options.length) ? info.options.map(o => (o !== '' && !isNaN(Number(o))) ? Number(o) : o) : ['option A', 'option B'];
+        paintPicks();
+      };
+      addRow.appendChild(sel);
+      addRow.appendChild(U.el('button', {
+        cls: 'btn small ghost', text: 'custom', onclick: () => {
           work.picks = work.picks || {};
           work.picks['newPick' + Object.keys(work.picks).length] = ['option A', 'option B'];
           paintPicks();
         },
       }));
+      picksBox.appendChild(addRow);
     }
     paintPicks();
 
@@ -1930,7 +2083,8 @@
     const acts = U.el('div', { cls: 'flex mt', style: 'gap:8px;flex-wrap:wrap' });
     acts.appendChild(U.el('button', {
       cls: 'btn primary', text: '💾 Save' + (M.configured() ? ' & push to all players' : ''), onclick: () => {
-        try { work.features = JSON.parse(feats.value); } catch (e) { /* keep last valid */ }
+        /* work.features is kept live by the feature toggles + the advanced JSON
+           editor, so nothing to re-parse here. */
         M.setSpecies(id, work);
         closeAll();
       },
@@ -2167,6 +2321,30 @@
     w.appendChild(acts);
   }
 
+  /* permanently delete an account (real player or Dya'kukull): from the world,
+     its market listings, offers, any tournaments it sits in, bans, and — for a
+     real player — from the cloud so it's gone on every device. Returns a promise
+     for the cloud deletion (or undefined when offline / AI). */
+  function deleteAccount(a) {
+    if (!a) return;
+    const id = a.id;
+    delete G.world.accounts[id];
+    /* clean market: listings + offers + notify subscriptions referencing them */
+    Object.values(G.world.market.listings).forEach(l => { if (l.sellerId === id || l.buyerId === id) delete G.world.market.listings[l.id]; });
+    Object.values(G.world.market.offers || {}).forEach(o => { if (o.sellerId === id || o.buyerId === id) delete G.world.market.offers[o.id]; });
+    /* pull them out of any tournament rosters */
+    Object.values(G.world.tournaments || {}).forEach(t => { if (Array.isArray(t.players)) t.players = t.players.filter(p => p !== id); });
+    /* clear any ban record */
+    if (G.world.bans && G.world.bans[id]) delete G.world.bans[id];
+    G.saveNow();
+    /* real players also live in the cloud account table + ban table */
+    const AC = DYA.accountCloud;
+    if (!a.ai && AC && AC.configured()) {
+      if (AC.clearBan) { try { AC.clearBan(id); } catch (e) { /* best effort */ } }
+      if (AC.remove) return AC.remove(id);
+    }
+  }
+
   /* ================= ACCOUNT / AI EDITORS ================= */
   function editAccount(a) {
     const { w, close } = modal('4% 12%');
@@ -2184,11 +2362,20 @@
       inputs[k] = U.el('input', { cls: 'txt', type: t, value: a[k] });
       leftC.appendChild(inputs[k]);
     });
-    leftC.appendChild(U.el('div', { cls: 'flex mt' }, [
+    leftC.appendChild(U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:6px' }, [
       U.el('button', {
         cls: 'btn primary', text: 'Save account', onclick: () => {
           fields.forEach(([k, , t]) => { a[k] = t === 'number' ? (parseInt(inputs[k].value) || 0) : inputs[k].value; });
           G.saveNow(); G.pushAccountToCloud(a); close(); rerender();
+        },
+      }),
+      U.el('button', {
+        cls: 'btn danger', text: '🗑 Delete ' + (a.ai ? 'account' : 'player'), onclick: async () => {
+          if (!confirm('Delete ' + a.displayName + '? This removes the account, its ' + Object.keys(a.tokens || {}).length + ' token(s), and its market listings.')) return;
+          if (!confirm('Really delete ' + a.displayName + '? There is no undo' + (a.cloudAccount ? ' — this also removes them from the cloud, on every device.' : '.'))) return;
+          const del = deleteAccount(a);
+          if (del && del.then) { try { await del; } catch (e) { /* cloud delete best-effort */ } }
+          close(); rerender();
         },
       }),
       U.el('button', { cls: 'btn ghost', text: 'Close', onclick: () => { close(); rerender(); } }),
