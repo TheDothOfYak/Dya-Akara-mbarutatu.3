@@ -101,6 +101,12 @@
       economy: {},        // key -> replacement value
       ai: {},             // AI tuning knobs (see AI_DEFAULTS)
       hunts: {},          // id -> admin-authored individual Hunt (see Hunts tab)
+      guild: {            // the Dya Guild's own market stall (see Guild Market tab)
+        pool: [],         // species ids the RANDOM "Guild stall token" draws from
+        poolPrice: 100,   // price of one random Guild stall token
+        poolRarityMax: 1, // ceiling rarity a random pull can roll
+        listings: {},     // id -> individual creature the Guild sells outright
+      },
       season: { live: false, openedAt: 0 }, // the Guild's official season: OFF until the organizer (admin) opens it
     };
   }
@@ -248,6 +254,54 @@
     return { ok: true };
   };
 
+  /* ================= GUILD MARKET =================
+     The Dya Guild's own stall. Two admin-authored parts, both riding the
+     same dya_config channel as every other edit so every player's game
+     picks them up within a minute:
+       • pool  — the species the RANDOM "Guild stall token" draws from,
+                 plus its price and the highest rarity a pull may roll.
+       • listings — individual creatures the Guild sells outright: each is
+                 a specific species/rarity/name/price the player can buy
+                 directly, minted deterministically so what's shown is what
+                 you get. */
+  const GUILD_DEFAULT_POOL = ['kipsu', 'wild_punk', 'uff', 'raf_krabbi', 'rodak', 'mikolo_moko', 'karnen'];
+  M.guildData = function () {
+    const g = M.data.guild || {};
+    return {
+      pool: Array.isArray(g.pool) ? g.pool : [],
+      poolPrice: g.poolPrice != null ? g.poolPrice : 100,
+      poolRarityMax: g.poolRarityMax != null ? g.poolRarityMax : 1,
+      listings: g.listings || {},
+    };
+  };
+  /* The effective random pool: the admin's curated species if they've set
+     any, otherwise the original built-in seven. */
+  M.guildPool = function () {
+    const g = M.guildData();
+    return (g.pool && g.pool.length) ? g.pool.slice() : GUILD_DEFAULT_POOL.slice();
+  };
+  M.guildListings = function () { return Object.values((M.data.guild && M.data.guild.listings) || {}); };
+  M.setGuildPool = function (pool, price, rarityMax) {
+    M.data.guild = M.data.guild || {};
+    M.data.guild.pool = (pool || []).slice();
+    if (price != null) M.data.guild.poolPrice = Math.max(0, price);
+    if (rarityMax != null) M.data.guild.poolRarityMax = Math.max(0, rarityMax);
+    M.save();
+  };
+  M.setGuildListing = function (l) {
+    if (!l || !l.id) return;
+    M.data.guild = M.data.guild || {};
+    M.data.guild.listings = M.data.guild.listings || {};
+    M.data.guild.listings[l.id] = U.deepCopy(l);
+    M.save();
+  };
+  M.deleteGuildListing = function (id) {
+    if (M.data.guild && M.data.guild.listings && M.data.guild.listings[id]) {
+      delete M.data.guild.listings[id];
+      M.save();
+    }
+  };
+
   /* ================= EDIT HELPERS (used by the Admin Panel) ================= */
   /* Compute the minimal per-key diff of an edited species vs its base. */
   M.setSpecies = function (id, edited) {
@@ -312,6 +366,7 @@
       ai: Object.keys(d.ai || {}).length,
       hunts: Object.keys(d.hunts || {}).length,
       huntsAvailable: Object.values(d.hunts || {}).filter(h => !h.hunted).length,
+      guildListings: Object.keys((d.guild && d.guild.listings) || {}).length,
       rev: d.rev,
       updatedAt: d.updatedAt,
     };

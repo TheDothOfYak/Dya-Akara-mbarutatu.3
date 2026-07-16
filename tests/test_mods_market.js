@@ -162,6 +162,23 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   check('global AI skill dial multiplies per-AI skill', Math.abs(G.aiSkill(someAI) - Math.min(1.5, someAI.aiCfg.matchSkill * 2)) < 1e-9);
   M.set('ai', 'matchSkillMul', null);
 
+  /* guild market — the admin-authored Guild stall (random pool + listings) */
+  check('guild pool falls back to the built-in seven when unset', M.guildPool().length === 7 && M.guildPool().includes('kipsu'));
+  M.setGuildPool(['gynge', 'harkal'], 250, 3);
+  check('saved guild pool replaces the fallback', M.guildPool().length === 2 && M.guildPool().includes('gynge') && !M.guildPool().includes('kipsu'));
+  check('guild pool price and rarity ceiling persist', M.guildData().poolPrice === 250 && M.guildData().poolRarityMax === 3);
+  M.setGuildPool([], 100, 1);
+  check('clearing the pool restores the built-in fallback', M.guildPool().length === 7);
+  const listing = { id: 'glst_test', speciesId: 'kipsu', name: 'Old Sparks', rarity: 2, price: 480, desc: 'A steady hand.', createdAt: Date.now() };
+  M.setGuildListing(listing);
+  check('a guild listing is stored', M.guildListings().length === 1 && M.guildListings()[0].name === 'Old Sparks');
+  /* the game mints it deterministically from the listing id — WYSIWYG */
+  const previewA = DYAG.token.mint({ speciesId: listing.speciesId, rng: new U.Rng(U.hashStr(listing.id)), rarity: listing.rarity, name: listing.name });
+  const previewB = DYAG.token.mint({ speciesId: listing.speciesId, rng: new U.Rng(U.hashStr(listing.id)), rarity: listing.rarity, name: listing.name });
+  check('listing mints deterministically (shown == bought)', previewA.stats.hp === previewB.stats.hp && previewA.name === 'Old Sparks' && previewA.rarity === 2);
+  M.deleteGuildListing('glst_test');
+  check('a guild listing can be deleted', M.guildListings().length === 0);
+
   /* persistence across a reload */
   const e3 = U.deepCopy(SP.get('uff'));
   e3.desc = 'A very odd creature indeed.';

@@ -1229,15 +1229,65 @@
           goods.appendChild(good('⬡', 'Tui Okid', 'Uncommon crafting Okid.', 140, () => { me.okid[1]++; G.save(); }));
           goods.appendChild(good('⬡', 'Stamijan Okid', 'Fine crafting Okid.', 320, () => { me.okid[2]++; G.save(); }));
           goods.appendChild(good('📜', 'Tournament license', 'Run your own tournaments. Baseline rules apply.', 200, () => { me.flags.tournamentLicense = true; G.save(); }));
-          goods.appendChild(good('🎴', 'Guild stall token', 'A common token from the Guild’s own stall. Species is the Guild’s choice.', 100, () => {
+          /* the random Guild stall token — species drawn from the admin-curated
+             pool (Guild Market tab), falling back to the built-in seven */
+          const gd = (M && M.guildData) ? M.guildData() : { poolPrice: 100, poolRarityMax: 1 };
+          goods.appendChild(good('🎴', 'Guild stall token', 'A random token from the Guild’s own stall. Species is the Guild’s choice.', gd.poolPrice, () => {
             const rng = new U.Rng(U.newSeed());
-            const spid = rng.pick(['kipsu', 'wild_punk', 'uff', 'raf_krabbi', 'rodak', 'mikolo_moko', 'karnen']);
-            const tok = TK.mint({ speciesId: spid, rng, rarity: Math.min(1, SP.get(spid).rarity[1]) });
+            const pool = (M && M.guildPool) ? M.guildPool() : ['kipsu', 'wild_punk', 'uff', 'raf_krabbi', 'rodak', 'mikolo_moko', 'karnen'];
+            const valid = pool.filter(id => SP.get(id));
+            if (!valid.length) { G.addGold(gd.poolPrice, true); UI.alert('The stall is bare', 'The Guild has nothing to draw from right now.'); return; }
+            const spid = rng.pick(valid);
+            const maxR = gd.poolRarityMax != null ? gd.poolRarityMax : 1;
+            const tok = TK.mint({ speciesId: spid, rng, rarity: Math.min(maxR, SP.get(spid).rarity[1]) });
             G.addToken(tok);
             UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(spid).name + ')', icon: '🎴' });
             if (DYA.tutorial) DYA.tutorial.onEvent('guildStallBuy');
           }));
           body.appendChild(goods);
+
+          /* ---- the creatures the Guild is selling outright (admin-authored
+             individual listings, shown beneath the standard goods) ---- */
+          const listings = (M && M.guildListings) ? M.guildListings() : [];
+          if (listings.length) {
+            body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Creatures for sale' }));
+            body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Specific creatures from the Guild’s own stall. Each is minted true to what you see when you buy it.' }));
+            const stallGrid = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(210px,1fr))' });
+            /* mint deterministically from the listing id so the card shown is
+               exactly the creature the buyer receives */
+            const listingToken = (l) => {
+              const sp = SP.get(l.speciesId);
+              if (!sp) return null;
+              const rng = new U.Rng(U.hashStr(l.id));
+              const rarity = Math.min(l.rarity != null ? l.rarity : sp.rarity[0], sp.rarity[1]);
+              const tok = TK.mint({ speciesId: l.speciesId, rng, rarity, name: (l.name || '').trim() || undefined });
+              return tok;
+            };
+            listings.forEach(l => {
+              const preview = listingToken(l);
+              if (!preview) return;
+              const cell = U.el('div', { cls: 'panel center' });
+              cell.appendChild(UI.tokenCard(preview, { size: 92 }));
+              if (l.desc) cell.appendChild(U.el('p', { cls: 'small muted mt', text: l.desc }));
+              cell.appendChild(U.el('button', {
+                cls: 'btn small mt', text: U.fmt(l.price) + 'g', onclick: () => {
+                  if (me.gold < l.price) { UI.alert('Too poor', 'That costs ' + U.fmt(l.price) + 'g.'); return; }
+                  const tok = listingToken(l);
+                  if (!tok) { UI.alert('Unavailable', 'That listing can’t be minted right now.'); return; }
+                  G.addGold(-l.price, true);
+                  G.addToken(tok);
+                  DYA.audio.play('coin');
+                  UI.refreshTopbar();
+                  UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(l.speciesId).name + ')', icon: '🎴' });
+                  if (DYA.tutorial) DYA.tutorial.onEvent('guildStallBuy');
+                  views.Market();
+                },
+              }));
+              stallGrid.appendChild(cell);
+            });
+            body.appendChild(stallGrid);
+          }
+
           body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'New releases' }));
           body.appendChild(U.el('p', { cls: 'small muted', text: 'Terrain sets and token releases are announced in the Avizu’Vac. Basic terrain sets shipped at launch; named sets circulate at wealthier venues.' }));
         },

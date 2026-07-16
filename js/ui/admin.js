@@ -350,7 +350,7 @@
   }
 
   /* ---------- main panel ---------- */
-  const NAV = ['Overview', 'Creatures', 'Hunts', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
+  const NAV = ['Overview', 'Creatures', 'Hunts', 'Guild Market', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
   function panel() {
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap' });
@@ -507,6 +507,88 @@
         });
         body.appendChild(tbl);
       }
+    },
+
+    /* ================= GUILD MARKET ================= */
+    'Guild Market'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'The Dya Guild’s own stall. It shows underneath the standard goods on the Guild page — the potions, Okid and licences stay exactly as they are. Two things you control here: the POOL a random Guild stall token pulls from, and the individual creatures the Guild sells outright.' + (M.configured() ? ' Both reach every player online within a minute.' : ' (this browser only until Supabase is configured).') }));
+      body.appendChild(syncLine());
+
+      const g = M.guildData();
+
+      /* ---------- RANDOM POOL ---------- */
+      const poolBox = U.el('div', { cls: 'panel mb' });
+      poolBox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Random “Guild stall token” pool' }));
+      poolBox.appendChild(U.el('p', { cls: 'small muted', text: 'When a player buys the random Guild stall token, its species is picked from the creatures you tick below. Leave every box unticked to fall back to the built-in seven. Price and the highest rarity a pull may roll are set here too.' }));
+
+      const poolCfg = U.el('div', { cls: 'grid mb', style: 'grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px' });
+      const priceIn = numIn(g.poolPrice, { step: 1, min: 0 });
+      const rarSel = selectEl(SP.RARITIES.map((r, i) => [String(i), r]), String(U.clamp(g.poolRarityMax, 0, SP.RARITIES.length - 1)));
+      poolCfg.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Price per random token (gold)' }), priceIn]));
+      poolCfg.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Highest rarity a pull can roll' }), rarSel]));
+      poolBox.appendChild(poolCfg);
+
+      const chosen = new Set(g.pool || []);
+      const poolSearch = U.el('input', { cls: 'txt mb', style: 'max-width:240px', placeholder: '🔎 Search species…' });
+      poolBox.appendChild(poolSearch);
+      const poolCount = U.el('span', { cls: 'small muted', style: 'margin-left:10px' });
+      const setPoolCount = () => poolCount.textContent = chosen.size ? chosen.size + ' species in the pool' : 'no species ticked — using the built-in seven';
+      poolBox.appendChild(poolCount);
+      const pickGrid = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px;max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:8px' });
+      poolBox.appendChild(pickGrid);
+      function paintPool() {
+        pickGrid.innerHTML = '';
+        const q = poolSearch.value.toLowerCase();
+        SP.list.filter(sp => !q || sp.name.toLowerCase().includes(q) || sp.id.includes(q)).forEach(sp => {
+          const lab = U.el('label', { cls: 'small', style: 'display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer' });
+          const chk = U.el('input', { type: 'checkbox' });
+          chk.checked = chosen.has(sp.id);
+          chk.onchange = () => { if (chk.checked) chosen.add(sp.id); else chosen.delete(sp.id); setPoolCount(); };
+          lab.appendChild(chk);
+          lab.appendChild(U.el('span', { html: U.esc(sp.name) + ' <span class="muted">' + sp.element + '</span>' }));
+          pickGrid.appendChild(lab);
+        });
+      }
+      poolSearch.oninput = paintPool;
+      paintPool();
+      setPoolCount();
+      const poolActs = U.el('div', { cls: 'flex mt' });
+      poolActs.appendChild(U.el('button', {
+        cls: 'btn small primary', text: 'Save pool', onclick: () => {
+          M.setGuildPool(Array.from(chosen), parseInt(priceIn.value, 10) || 0, parseInt(rarSel.value, 10) || 0);
+          flashSaved(poolActs);
+        },
+      }));
+      poolActs.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Clear pool (use built-in)', onclick: () => { chosen.clear(); paintPool(); setPoolCount(); } }));
+      poolBox.appendChild(poolActs);
+      body.appendChild(poolBox);
+
+      /* ---------- INDIVIDUAL LISTINGS ---------- */
+      body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Individual listings — creatures the Guild sells outright' }));
+      body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Each listing is one specific creature offered on the Guild stall at a fixed price. Unlike a Hunt it never runs out — every buyer gets the same creature, minted true to what’s shown.' }));
+      body.appendChild(U.el('button', { cls: 'btn primary mb', text: '＋ Create a listing', onclick: () => editGuildListing(null) }));
+
+      const listings = M.guildListings().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      if (!listings.length) { body.appendChild(U.el('p', { cls: 'muted', text: 'No listings yet. Create one — it appears under “Creatures for sale” on the Guild page.' })); return; }
+      const grd = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px' });
+      listings.forEach(l => {
+        const sp = SP.get(l.speciesId);
+        const card = U.el('div', { cls: 'panel', style: 'padding:10px' });
+        const row = U.el('div', { cls: 'flex' });
+        if (sp) row.appendChild(spriteThumb(sp, 54));
+        const info = U.el('div', { cls: 'flex1', style: 'margin-left:8px' });
+        info.appendChild(U.el('div', { cls: 'gold', text: l.name || (sp ? sp.name : l.speciesId) }));
+        info.appendChild(U.el('div', { cls: 'small muted', text: (sp ? sp.name : l.speciesId) + ' · ' + (SP.RARITIES[l.rarity] || '?') }));
+        info.appendChild(U.el('div', { cls: 'small muted', text: '🪙 ' + U.fmt(l.price || 0) + 'g' }));
+        row.appendChild(info);
+        card.appendChild(row);
+        const acts = U.el('div', { cls: 'flex mt' });
+        acts.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editGuildListing(l) }));
+        acts.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: () => { if (confirm('Delete this listing? It leaves every player’s Guild stall.')) { M.deleteGuildListing(l.id); rerender(); } } }));
+        card.appendChild(acts);
+        grd.appendChild(card);
+      });
+      body.appendChild(grd);
     },
 
     /* ================= TEXT & LORE ================= */
@@ -1682,6 +1764,71 @@
     }));
     acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: closeAll }));
     if (!isNew) acts.appendChild(U.el('button', { cls: 'btn danger', text: 'Delete Hunt', onclick: () => { if (confirm('Delete this Hunt permanently?')) { M.deleteHunt(work.id); closeAll(); } } }));
+    w.appendChild(acts);
+  }
+
+  /* ================= GUILD LISTING EDITOR =================
+     Authors one creature the Dya Guild sells outright: which species it is,
+     the individual name it carries, its rarity, the price, and a line of
+     stall copy. It's minted true to this every time a player buys it. */
+  function editGuildListing(existing) {
+    const isNew = !existing;
+    const firstSpid = (SP.list[0] && SP.list[0].id) || '';
+    const work = existing ? U.deepCopy(existing) : {
+      id: U.uid('glst'), speciesId: firstSpid, name: '', rarity: 1, price: 200, desc: '', createdAt: Date.now(),
+    };
+
+    const { w, close } = modal('4% 8%');
+    const closeAll = () => { stopPreviews(); close(); rerender(); };
+    w.appendChild(U.el('h2', { cls: 'gold', text: isNew ? 'Create a Guild listing' : 'Edit listing' }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'One specific creature on the Guild’s stall. Pick the species, name the individual, set the rarity and price, and add a line of description shown to players.' }));
+
+    const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:320px 1fr;gap:18px;align-items:start' });
+    w.appendChild(cols);
+
+    /* ---------- LEFT: sprite preview ---------- */
+    const left = U.el('div', {});
+    cols.appendChild(left);
+    left.appendChild(U.el('h3', { cls: 'gold mb', text: 'The creature' }));
+    left.appendChild(livePreview(() => SP.get(work.speciesId) || SP.list[0]));
+
+    /* ---------- RIGHT: identity + price ---------- */
+    const right = U.el('div', {});
+    cols.appendChild(right);
+
+    const spSel = selectEl(SP.list.map(s => [s.id, s.name]), work.speciesId);
+    spSel.onchange = () => { work.speciesId = spSel.value; };
+    lblIn(right, 'Species (what it is)', spSel);
+
+    const nameIn = U.el('input', { cls: 'txt', maxlength: 32, value: work.name, placeholder: 'Leave blank to use the species name' });
+    lblIn(right, 'Individual name', nameIn);
+
+    const rarSel = selectEl(SP.RARITIES.map((r, i) => [String(i), r]), String(work.rarity));
+    lblIn(right, 'Rarity', rarSel);
+
+    const priceIn = numIn(work.price, { step: 1, min: 0 });
+    lblIn(right, 'Price (gold)', priceIn);
+
+    const descTa = U.el('textarea', { cls: 'txt', rows: 3, style: 'width:100%', placeholder: 'A line of stall copy shown under the card.' });
+    descTa.value = work.desc || '';
+    lblIn(right, 'Description', descTa);
+
+    /* ---------- ACTIONS ---------- */
+    const acts = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+    acts.appendChild(U.el('button', {
+      cls: 'btn primary', text: isNew ? 'Create listing' : 'Save listing', onclick: () => {
+        if (!SP.get(spSel.value)) { alert('Pick a valid species.'); return; }
+        work.speciesId = spSel.value;
+        work.name = nameIn.value.trim();
+        work.rarity = parseInt(rarSel.value, 10) || 0;
+        work.price = Math.max(0, parseInt(priceIn.value, 10) || 0);
+        work.desc = descTa.value.trim();
+        M.setGuildListing(work);
+        closeAll();
+      },
+    }));
+    acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: closeAll }));
+    if (!isNew) acts.appendChild(U.el('button', { cls: 'btn danger', text: 'Delete listing', onclick: () => { if (confirm('Delete this listing permanently?')) { M.deleteGuildListing(work.id); closeAll(); } } }));
     w.appendChild(acts);
   }
 
