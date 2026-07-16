@@ -171,11 +171,19 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   check('clearing the pool restores the built-in fallback', M.guildPool().length === 7);
   const listing = { id: 'glst_test', speciesId: 'kipsu', name: 'Old Sparks', rarity: 2, price: 480, desc: 'A steady hand.', createdAt: Date.now() };
   M.setGuildListing(listing);
-  check('a guild listing is stored', M.guildListings().length === 1 && M.guildListings()[0].name === 'Old Sparks');
+  check('a guild listing is stored and available', M.guildListings().length === 1 && M.availableGuildListings().length === 1 && M.guildListings()[0].name === 'Old Sparks');
   /* the game mints it deterministically from the listing id — WYSIWYG */
   const previewA = DYAG.token.mint({ speciesId: listing.speciesId, rng: new U.Rng(U.hashStr(listing.id)), rarity: listing.rarity, name: listing.name });
   const previewB = DYAG.token.mint({ speciesId: listing.speciesId, rng: new U.Rng(U.hashStr(listing.id)), rarity: listing.rarity, name: listing.name });
   check('listing mints deterministically (shown == bought)', previewA.stats.hp === previewB.stats.hp && previewA.name === 'Old Sparks' && previewA.rarity === 2);
+  /* one of a kind: first buyer claims it, a second is refused */
+  const claim1 = await M.buyGuildListing('glst_test', 'buyer-one');
+  check('first buyer claims the listing', claim1.ok === true);
+  check('a claimed listing leaves the available stall', M.availableGuildListings().length === 0 && M.soldGuildListings().length === 1);
+  const claim2 = await M.buyGuildListing('glst_test', 'buyer-two');
+  check('a second buyer is refused — one of a kind', !claim2.ok && claim2.already === true && claim2.by === 'buyer-one');
+  M.relistGuildListing('glst_test');
+  check('admin can relist a sold listing', M.availableGuildListings().length === 1);
   M.deleteGuildListing('glst_test');
   check('a guild listing can be deleted', M.guildListings().length === 0);
 

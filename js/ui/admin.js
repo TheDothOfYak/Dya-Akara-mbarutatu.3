@@ -565,30 +565,48 @@
 
       /* ---------- INDIVIDUAL LISTINGS ---------- */
       body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Individual listings — creatures the Guild sells outright' }));
-      body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Each listing is one specific creature offered on the Guild stall at a fixed price. Unlike a Hunt it never runs out — every buyer gets the same creature, minted true to what’s shown.' }));
+      body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Each listing is one specific creature offered on the Guild stall at a fixed price. Every one is ONE OF A KIND — the first player to buy it claims it for the whole world and it leaves every other player’s stall, exactly like the rest of the market. Sold listings show below; relist one to put it back up.' }));
       body.appendChild(U.el('button', { cls: 'btn primary mb', text: '＋ Create a listing', onclick: () => editGuildListing(null) }));
 
-      const listings = M.guildListings().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      if (!listings.length) { body.appendChild(U.el('p', { cls: 'muted', text: 'No listings yet. Create one — it appears under “Creatures for sale” on the Guild page.' })); return; }
-      const grd = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px' });
-      listings.forEach(l => {
+      const all = M.guildListings().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      if (!all.length) { body.appendChild(U.el('p', { cls: 'muted', text: 'No listings yet. Create one — it appears under “Creatures for sale” on the Guild page.' })); return; }
+
+      function listingCard(l) {
         const sp = SP.get(l.speciesId);
-        const card = U.el('div', { cls: 'panel', style: 'padding:10px' });
+        const card = U.el('div', { cls: 'panel', style: 'padding:10px' + (l.sold ? ';opacity:.6' : '') });
         const row = U.el('div', { cls: 'flex' });
         if (sp) row.appendChild(spriteThumb(sp, 54));
         const info = U.el('div', { cls: 'flex1', style: 'margin-left:8px' });
-        info.appendChild(U.el('div', { cls: 'gold', text: l.name || (sp ? sp.name : l.speciesId) }));
+        const nameLine = U.el('div', { cls: 'gold', text: l.name || (sp ? sp.name : l.speciesId) });
+        if (l.sold) nameLine.appendChild(U.el('span', { cls: 'pill', style: 'margin-left:6px', text: 'SOLD' }));
+        info.appendChild(nameLine);
         info.appendChild(U.el('div', { cls: 'small muted', text: (sp ? sp.name : l.speciesId) + ' · ' + (SP.RARITIES[l.rarity] || '?') }));
-        info.appendChild(U.el('div', { cls: 'small muted', text: '🪙 ' + U.fmt(l.price || 0) + 'g' }));
+        info.appendChild(U.el('div', { cls: 'small muted', text: '🪙 ' + U.fmt(l.price || 0) + 'g' + (l.sold && l.soldAt ? ' · sold ' + U.timeAgo(l.soldAt) : '') }));
         row.appendChild(info);
         card.appendChild(row);
         const acts = U.el('div', { cls: 'flex mt' });
-        acts.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editGuildListing(l) }));
+        if (l.sold) {
+          acts.appendChild(U.el('button', { cls: 'btn small primary', text: 'Relist', onclick: () => { M.relistGuildListing(l.id); rerender(); } }));
+        } else {
+          acts.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Edit', onclick: () => editGuildListing(l) }));
+        }
         acts.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: () => { if (confirm('Delete this listing? It leaves every player’s Guild stall.')) { M.deleteGuildListing(l.id); rerender(); } } }));
         card.appendChild(acts);
-        grd.appendChild(card);
-      });
+        return card;
+      }
+
+      const available = all.filter(l => !l.sold);
+      const sold = all.filter(l => l.sold);
+      const grd = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px' });
+      if (!available.length) grd.appendChild(U.el('p', { cls: 'muted', text: 'Every listing has sold. Create a new one, or relist a sold one below.' }));
+      available.forEach(l => grd.appendChild(listingCard(l)));
       body.appendChild(grd);
+      if (sold.length) {
+        body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Sold (' + sold.length + ')' }));
+        const sgrd = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px' });
+        sold.forEach(l => sgrd.appendChild(listingCard(l)));
+        body.appendChild(sgrd);
+      }
     },
 
     /* ================= TEXT & LORE ================= */

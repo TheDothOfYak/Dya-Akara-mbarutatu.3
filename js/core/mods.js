@@ -281,6 +281,10 @@
     return (g.pool && g.pool.length) ? g.pool.slice() : GUILD_DEFAULT_POOL.slice();
   };
   M.guildListings = function () { return Object.values((M.data.guild && M.data.guild.listings) || {}); };
+  /* Only the listings still for sale — a listing is one-of-a-kind, so once
+     any player buys it, it's gone from every player's stall. */
+  M.availableGuildListings = function () { return M.guildListings().filter(l => !l.sold); };
+  M.soldGuildListings = function () { return M.guildListings().filter(l => l.sold); };
   M.setGuildPool = function (pool, price, rarityMax) {
     M.data.guild = M.data.guild || {};
     M.data.guild.pool = (pool || []).slice();
@@ -300,6 +304,28 @@
       delete M.data.guild.listings[id];
       M.save();
     }
+  };
+  /* Put a sold listing back on the stall (admin action). */
+  M.relistGuildListing = function (id) {
+    const l = M.data.guild && M.data.guild.listings && M.data.guild.listings[id];
+    if (!l) return;
+    l.sold = false; l.soldBy = null; l.soldAt = 0;
+    M.save();
+  };
+  /* Atomically claim a one-of-a-kind listing for a buyer. Same optimistic,
+     first-writer-wins model as Hunts and the online market: adopt the newest
+     admin state first so we don't clobber a concurrent sale, refuse if it's
+     already gone, otherwise flag it sold and push straight away. The caller
+     only mints the token and charges gold when this returns { ok: true }. */
+  M.buyGuildListing = async function (id, by) {
+    if (M.configured()) { try { await M.fetchRemote(); } catch (e) { /* offline is fine */ } }
+    const l = M.data.guild && M.data.guild.listings && M.data.guild.listings[id];
+    if (!l) return { missing: true };
+    if (l.sold) return { already: true, by: l.soldBy };
+    l.sold = true; l.soldBy = by || null; l.soldAt = Date.now();
+    M.save();
+    if (M.configured()) { try { await M.pushRemote(); } catch (e) { /* debounced push will retry */ } }
+    return { ok: true };
   };
 
   /* ================= EDIT HELPERS (used by the Admin Panel) ================= */

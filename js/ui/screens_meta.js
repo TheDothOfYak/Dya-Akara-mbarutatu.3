@@ -1247,11 +1247,13 @@
           body.appendChild(goods);
 
           /* ---- the creatures the Guild is selling outright (admin-authored
-             individual listings, shown beneath the standard goods) ---- */
-          const listings = (M && M.guildListings) ? M.guildListings() : [];
+             individual listings, shown beneath the standard goods). Each is
+             ONE OF A KIND: the first player to buy it claims it for the whole
+             world and it disappears from every other player's stall. ---- */
+          const listings = (M && M.availableGuildListings) ? M.availableGuildListings() : [];
           if (listings.length) {
             body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Creatures for sale' }));
-            body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Specific creatures from the Guild’s own stall. Each is minted true to what you see when you buy it.' }));
+            body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Specific creatures from the Guild’s own stall. Each is one of a kind — first buyer takes it, and it’s minted true to what you see.' }));
             const stallGrid = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(210px,1fr))' });
             /* mint deterministically from the listing id so the card shown is
                exactly the creature the buyer receives */
@@ -1269,20 +1271,28 @@
               const cell = U.el('div', { cls: 'panel center' });
               cell.appendChild(UI.tokenCard(preview, { size: 92 }));
               if (l.desc) cell.appendChild(U.el('p', { cls: 'small muted mt', text: l.desc }));
-              cell.appendChild(U.el('button', {
-                cls: 'btn small mt', text: U.fmt(l.price) + 'g', onclick: () => {
-                  if (me.gold < l.price) { UI.alert('Too poor', 'That costs ' + U.fmt(l.price) + 'g.'); return; }
-                  const tok = listingToken(l);
-                  if (!tok) { UI.alert('Unavailable', 'That listing can’t be minted right now.'); return; }
-                  G.addGold(-l.price, true);
-                  G.addToken(tok);
-                  DYA.audio.play('coin');
-                  UI.refreshTopbar();
-                  UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(l.speciesId).name + ')', icon: '🎴' });
-                  if (DYA.tutorial) DYA.tutorial.onEvent('guildStallBuy');
+              const buyBtn = U.el('button', { cls: 'btn small mt', text: U.fmt(l.price) + 'g' });
+              buyBtn.onclick = async () => {
+                if (me.gold < l.price) { UI.alert('Too poor', 'That costs ' + U.fmt(l.price) + 'g.'); return; }
+                buyBtn.disabled = true; buyBtn.textContent = 'Claiming…';
+                /* claim it globally FIRST — only mint + charge if we won the claim */
+                const r = await M.buyGuildListing(l.id, me.id);
+                if (!r.ok) {
+                  UI.alert('Already gone', 'Another keeper bought this one first. One of a kind — it’s off the stall.');
                   views.Market();
-                },
-              }));
+                  return;
+                }
+                const tok = listingToken(l);
+                if (!tok) { UI.alert('Unavailable', 'That listing can’t be minted right now.'); views.Market(); return; }
+                G.addGold(-l.price, true);
+                G.addToken(tok);
+                DYA.audio.play('coin');
+                UI.refreshTopbar();
+                UI.toast({ title: 'The Guild provides', body: tok.name + ' (' + SP.get(l.speciesId).name + ') — one of a kind, now yours.', icon: '🎴' });
+                if (DYA.tutorial) DYA.tutorial.onEvent('guildStallBuy');
+                views.Market();
+              };
+              cell.appendChild(buyBtn);
               stallGrid.appendChild(cell);
             });
             body.appendChild(stallGrid);
