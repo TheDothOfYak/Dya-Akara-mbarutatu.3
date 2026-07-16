@@ -923,6 +923,14 @@
         entry.readiedAtPulse = -1;
       }
     }
+    /* HUNT permadeath: a token that falls on the hunt is gone — it does not
+       return to the pouch (no replay) and is reported so the hunt roster can
+       retire it for the rest of the pursuit. */
+    if (M.mode === 'hunt' && M.teams[c.team] && M.teams[c.team].controller !== 'wild' &&
+        !c.isKofiSpawn && c.speciesId !== 'kofi' && c.speciesId !== 'sprengju') {
+      const entry = M.teams[c.team].pouch.find(e => e.tok.id === c.tokId);
+      if (entry) entry.state = 'dead';
+    }
 
     /* ShurgrEdan retribution — direct kill of a RubberMcFly */
     if (c.speciesId === 'rubbermcfly' && cause === 'combat' && source && !source.dead) {
@@ -1216,6 +1224,13 @@
       stats: M.teams.map(T => T.stats),
       tokenXp: M.tokenXp || {},
     };
+    /* hunt roster bookkeeping: which of the player's (team 0) tokens fell and
+       which are still standing — by token id, for cross-encounter permadeath */
+    const t0 = M.teams[0];
+    if (t0 && t0.pouch) {
+      M.result.playerDeadTokIds = t0.pouch.filter(e => e.state === 'dead').map(e => e.tok.id);
+      M.result.playerAliveTokIds = t0.pouch.filter(e => e.state !== 'dead').map(e => e.tok.id);
+    }
     if (M.onFinish) M.onFinish(M.result);
   };
 

@@ -80,5 +80,43 @@ m2.headless = true;
 const lutut = m2.creatures.find(c => c.speciesId === 'lutut');
 check('a plain quarry still spawns and rolls', !!lutut && lutut.maxHp > 0 && !lutut.behaviorOverride);
 
+/* ---- permadeath: a fallen party token is retired and reported ---- */
+console.log('  -- hunt permadeath --');
+const party = TK.mint({ speciesId: 'harkal', rng, rarity: 1 });
+const pm = new DYAG.match.Match({
+  seed: 20, mode: 'hunt', terrain: 'plains',
+  settings: { pulseInterval: 5, pulseAmount: 2, chaos: false },
+  hunt: { enemies: [{ speciesId: 'lutut', boss: true }] },
+  teams: [
+    { name: 'Hunter', controller: 'ai', pouch: [party] },
+    { name: 'Wild', controller: 'wild', pouch: [] },
+  ],
+});
+pm.headless = true;
+const pc = pm.spawnFromToken(party, 0, 300, 300);
+const entry = pm.teams[0].pouch.find(e => e.tok.id === party.id);
+entry.state = 'played';
+pm.damage(pc, 99999, { dead: false, x: pc.x, y: pc.y, sp: pc.sp, vars: {}, quirks: {} }, { noAnim: true });
+check('a fallen hunt token does NOT return to the pouch (permadeath)', entry.state === 'dead', 'state=' + entry.state);
+pm.finish(1, 'test');
+check('result reports the fallen player token', (pm.result.playerDeadTokIds || []).indexOf(party.id) >= 0);
+check('result survivors exclude the fallen token', (pm.result.playerAliveTokIds || []).indexOf(party.id) < 0);
+
+/* a standard (non-hunt) match still lets a downed token return to the pouch */
+const sTok = TK.mint({ speciesId: 'harkal', rng, rarity: 1 });
+const sm = new DYAG.match.Match({
+  seed: 21, mode: 'standard', terrain: 'plains',
+  settings: { pulseInterval: 5, pulseAmount: 2, chaos: false },
+  teams: [
+    { name: 'A', controller: 'ai', pouch: [sTok] },
+    { name: 'B', controller: 'ai', pouch: [TK.mint({ speciesId: 'lutut', rng, rarity: 1 })] },
+  ],
+});
+sm.headless = true;
+const sc = sm.spawnFromToken(sTok, 0, 300, 300);
+const sEntry = sm.teams[0].pouch.find(e => e.tok.id === sTok.id); sEntry.state = 'played';
+sm.damage(sc, 99999, { dead: false, x: sc.x, y: sc.y, sp: sc.sp, vars: {}, quirks: {} }, { noAnim: true });
+check('a downed token in a STANDARD match returns to the pouch (not permadeath)', sEntry.state === 'pouch', 'state=' + sEntry.state);
+
 console.log(failures ? ('\nHUNT CREATURE: ' + failures + ' FAILURE(S)') : '\nHUNT CREATURE: ALL PASS');
 process.exit(failures ? 1 : 0);

@@ -164,58 +164,154 @@
         return lines[narrKey];
       }
 
-      /* ---- active hunt: encounter series ---- */
+      /* ---- active hunt: assemble a party, then the encounter series ----
+         A Hunt is fought by a PARTY: the token that represents you (your Eikar,
+         which always rides along) plus up to 4 others you choose — 5 in all.
+         A token that falls in ANY encounter is out of the whole Hunt; it cannot
+         be fielded again. Win by bringing the quarry down before your party is
+         wiped. That is the strategy: who you bring, and who you spend. */
       function renderActiveHunt(body) {
+        const HUNT_PARTY_MAX = 5; // self + 4
+        const huntSelfToken = () => Object.values(me.tokens).find(t => t.isSelf) || null;
         const hunt = me.activeHunt;
         const sp = SP.get(hunt.speciesId);
         const encounters = (hunt.encounters && hunt.encounters.length) ? hunt.encounters
           : [{ name: (sp && sp.name) || 'The Quarry', desc: 'The quarry stands before you.', terrain: 'plains', enemies: [{ speciesId: hunt.speciesId, boss: true }] }];
+        hunt.fallenIds = hunt.fallenIds || [];
         body.appendChild(U.el('h3', { cls: 'gold center', text: 'HUNT — ' + (hunt.huntName || (sp && sp.name) || '').toUpperCase() }));
+
+        /* first: assemble the party */
+        if (!hunt.partyIds) { assembleParty(body); return; }
+        /* drop any party token that has since left the collection */
+        hunt.partyIds = hunt.partyIds.filter(id => me.tokens[id]);
+        const standing = hunt.partyIds.filter(id => hunt.fallenIds.indexOf(id) < 0);
+
         /* encounter progress dots */
         const dots = U.el('div', { cls: 'encounter-dots' });
         encounters.forEach((e, i) => {
           dots.appendChild(U.el('div', { cls: 'enc-dot' + (i < hunt.encounterIdx ? ' done' : i === hunt.encounterIdx ? ' current' : ''), title: e.name }));
         });
         body.appendChild(dots);
+
+        /* the party roster — fallen ones greyed out */
+        body.appendChild(partyRoster(hunt, standing));
+
         const cur = encounters[hunt.encounterIdx];
         const box = U.el('div', { cls: 'panel center', style: 'max-width:560px;margin:0 auto' });
         box.appendChild(U.el('h3', { cls: 'gold', text: 'Encounter ' + (hunt.encounterIdx + 1) + ' of ' + encounters.length + ' — ' + cur.name }));
         box.appendChild(U.el('p', { cls: 'muted mt', text: cur.desc }));
         box.appendChild(U.el('div', { cls: 'mt' }, [UI.tokenArt(cur.enemies[cur.enemies.length - 1].speciesId, 110)]));
+        box.appendChild(U.el('p', { cls: 'small mt', html: '<b class="gold">' + standing.length + '</b> of ' + hunt.partyIds.length + ' still standing — your surviving party takes the field.' }));
         const row = U.el('div', { cls: 'flex mt', style: 'justify-content:center' });
         row.appendChild(U.el('button', {
           cls: 'btn primary', text: '⚔ Fight encounter', onclick: () => {
-            DYA.play.pickPouch(pouch => {
-              DYA.play.startMatch({
-                mode: 'hunt', format: 'Hunt — ' + (hunt.huntName || (sp && sp.name) || 'Quarry'), skipSetup: true, noRecord: true,
-                hunt: { enemies: cur.enemies },
-                terrain: cur.terrain, pouch,
-                opponent: { name: 'The Wild' },
-                onFinish: (res, iWon) => {
-                  hunt.losses += res.stats && res.stats[0] ? Math.max(0, res.stats[0].tokensPlayed.length - 1) : 0;
-                  if (iWon) {
-                    hunt.encounterIdx++;
-                    hunt.lastHealthScore = res.stats && res.stats[0] ? 1 : 0.8;
-                    if (hunt.encounterIdx >= encounters.length) { finishHunt(true); return; }
-                  } else {
-                    hunt.failedOnce = true; // not a perfect run anymore
-                  }
-                  G.save();
-                  UI.show('adventures');
-                },
-              });
-            }, { title: 'Choose your hunting pouch' });
+            const pouch = standing.map(id => me.tokens[id]).filter(Boolean);
+            if (!pouch.length) { failHunt('Your party is spent.'); return; }
+            DYA.play.startMatch({
+              mode: 'hunt', format: 'Hunt — ' + (hunt.huntName || (sp && sp.name) || 'Quarry'), skipSetup: true, noRecord: true,
+              hunt: { enemies: cur.enemies },
+              terrain: cur.terrain, pouch,
+              opponent: { name: 'The Wild' },
+              onFinish: (res, iWon) => {
+                /* permadeath: retire every token that fell */
+                (res.playerDeadTokIds || []).forEach(id => { if (hunt.fallenIds.indexOf(id) < 0) hunt.fallenIds.push(id); });
+                hunt.losses = hunt.fallenIds.length;
+                const left = hunt.partyIds.filter(id => me.tokens[id] && hunt.fallenIds.indexOf(id) < 0);
+                if (iWon) {
+                  hunt.encounterIdx++;
+                  if (hunt.encounterIdx >= encounters.length) { finishHunt(true); return; }
+                  if (!left.length) { failHunt('The quarry is cornered, but your party is spent — it slips away.'); return; }
+                } else {
+                  hunt.failedOnce = true;
+                  if (!left.length) { failHunt('Your whole party fell. The hunt is over.'); return; }
+                }
+                G.save();
+                UI.show('adventures');
+              },
+            });
           },
         }));
         row.appendChild(U.el('button', {
           cls: 'btn danger', text: 'Abandon Hunt', onclick: () => {
-            UI.confirm('Abandon the Hunt?', 'The slot stays open — you can start the Track again. The creature will not wait around, though.', () => {
+            UI.confirm('Abandon the Hunt?', 'The slot stays open — you can start the Track again. Your fallen tokens are still yours; they simply weren’t lost for real.', () => {
               me.activeHunt = null; G.save(); UI.show('adventures');
             }, 'Abandon');
           },
         }));
         box.appendChild(row);
         body.appendChild(box);
+
+        /* ---- party assembler: self (locked) + up to 4 chosen ---- */
+        function assembleParty(host) {
+          const self = huntSelfToken();
+          host.appendChild(U.el('p', { cls: 'muted center', text: 'Assemble your hunting party. ' + (self ? 'Your own Eikar always rides along; ' : '') + 'choose up to ' + (self ? HUNT_PARTY_MAX - 1 : HUNT_PARTY_MAX) + ' more. A token that falls on this Hunt is out for the rest of it — choose, and spend, wisely.' }));
+          const chosen = new Set();
+          const pool = Object.values(me.tokens).filter(t => t.status !== 'market' && !t.frozen && (!self || t.id !== self.id));
+          const info = U.el('div', { cls: 'gold center mt' });
+          const grid = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px' });
+          function upd() {
+            const cap = self ? HUNT_PARTY_MAX - 1 : HUNT_PARTY_MAX;
+            info.textContent = (chosen.size + (self ? 1 : 0)) + ' / ' + HUNT_PARTY_MAX + ' chosen' + (self ? ' (you + ' + chosen.size + ')' : '');
+            U.qsa('.hunt-pick', grid).forEach(el => {
+              const id = el.getAttribute('data-id');
+              el.classList.toggle('selected', chosen.has(id));
+              el.style.opacity = (!chosen.has(id) && chosen.size >= cap) ? '0.4' : '1';
+            });
+          }
+          if (self) {
+            const c = UI.tokenCard(self, { size: 96 });
+            c.style.outline = '2px solid var(--gold)';
+            const wrap = U.el('div', {}, [c, U.el('div', { cls: 'small gold center', text: 'YOU (always)' })]);
+            grid.appendChild(wrap);
+          }
+          pool.forEach(t => {
+            const card = UI.tokenCard(t, { size: 96 });
+            card.classList.add('hunt-pick'); card.setAttribute('data-id', t.id);
+            card.style.cursor = 'pointer';
+            card.onclick = () => {
+              const cap = self ? HUNT_PARTY_MAX - 1 : HUNT_PARTY_MAX;
+              if (chosen.has(t.id)) chosen.delete(t.id);
+              else { if (chosen.size >= cap) return; chosen.add(t.id); }
+              upd();
+            };
+            grid.appendChild(card);
+          });
+          host.appendChild(info);
+          host.appendChild(grid);
+          const acts = U.el('div', { cls: 'flex center mt', style: 'justify-content:center' });
+          acts.appendChild(U.el('button', {
+            cls: 'btn primary', text: '▶ Begin the Hunt', onclick: () => {
+              const ids = (self ? [self.id] : []).concat(Array.from(chosen));
+              if (!ids.length) { UI.alert('No party', 'Choose at least one token to hunt with.'); return; }
+              hunt.partyIds = ids; hunt.fallenIds = [];
+              G.save(); UI.show('adventures');
+            },
+          }));
+          acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Abandon Hunt', onclick: () => { me.activeHunt = null; G.save(); UI.show('adventures'); } }));
+          host.appendChild(acts);
+        }
+
+        function partyRoster(hunt, standing) {
+          const wrap = U.el('div', { cls: 'panel center', style: 'max-width:560px;margin:0 auto 12px' });
+          wrap.appendChild(U.el('div', { cls: 'small gold mb', text: 'YOUR PARTY — ' + standing.length + ' of ' + hunt.partyIds.length + ' standing' }));
+          const strip = U.el('div', { cls: 'flex', style: 'justify-content:center;gap:8px;flex-wrap:wrap' });
+          hunt.partyIds.forEach(id => {
+            const t = me.tokens[id]; if (!t) return;
+            const fallen = hunt.fallenIds.indexOf(id) >= 0;
+            const cell = U.el('div', { cls: 'center', style: fallen ? 'opacity:0.35;filter:grayscale(1)' : '' });
+            cell.appendChild(UI.tokenArt(t.speciesId, 46));
+            cell.appendChild(U.el('div', { cls: 'small', text: (t.isSelf ? '★ ' : '') + (t.name || '').slice(0, 12) + (fallen ? ' †' : '') }));
+            strip.appendChild(cell);
+          });
+          wrap.appendChild(strip);
+          return wrap;
+        }
+
+        function failHunt(msg) {
+          me.activeHunt = null; G.save();
+          UI.show('adventures');
+          UI.alert('The hunt fails', msg + ' Your fallen tokens are safe in your collection — a Hunt loss is not a real loss. The slot stays open.');
+        }
 
         function finishHunt(success) {
           const spid = hunt.speciesId;
