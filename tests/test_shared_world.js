@@ -120,6 +120,17 @@ function bootDevice(seedTag) {
   const fr2 = await GB.fetchAdminWorld();
   check('device B does not re-adopt an unchanged shared world', fr2.adopted === false);
 
+  /* ---- live poll: a lightweight meta check drives adoption for a logged-in device ---- */
+  check('publish wrote a lightweight meta row', db.dya_config.some(r => r.key === 'adminworld_meta'));
+  const C = bootDevice('C');
+  const GC = C.state;
+  const cHad = GC.world.accounts[aiId] ? Object.keys(GC.world.accounts[aiId].tokens).length : -1;
+  const pr = await GC.pollAdminWorld();
+  check('device C poll adopts the newer shared world', pr.adopted === true, JSON.stringify(pr));
+  check('device C poll applied the curation (emptied collection)', GC.world.accounts[aiId] && Object.keys(GC.world.accounts[aiId].tokens).length === 0, 'had ' + cHad);
+  const pr2 = await GC.pollAdminWorld();
+  check('device C poll is a no-op when nothing changed', pr2.adopted === false);
+
   /* ---- mods (creature/economy edits) adopt by timestamp, not stuck rev ---- */
   // device A edits an economy value and pushes it to the shared config
   A.economy.LISTING_FEE = 777;

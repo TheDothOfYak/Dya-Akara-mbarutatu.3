@@ -52,6 +52,14 @@
     if (DYA.tutorial) DYA.tutorial.onScreen(name, params);
   };
 
+  /* Re-render whatever screen is showing (used when the shared world updates
+     live). Never disturbs an active battle/login, and no-ops if nothing shown. */
+  const NO_REFRESH = { match: 1, spectate: 1, play: 1, login: 1 };
+  UI.refreshCurrent = function () {
+    if (!UI.currentName || NO_REFRESH[UI.currentName]) return;
+    try { UI.show(UI.currentName); } catch (e) { /* a refresh must never crash the app */ }
+  };
+
   /* player seal as a faint background on every non-battle screen (§3).
      Battle surfaces (arena + HUD) stay clean. */
   const NO_SEAL_SCREENS = { match: 1, spectate: 1, login: 1 };

@@ -203,6 +203,20 @@
        sounds the horn on its own; it is exactly as smart as its keeper */
     c.isCommander = !!(tok.isSelf || (tok.isStarter && sp.eikarLayer));
 
+    /* ------- MOUNT + RIDER (design doc: an Eikar/Keilia rides as one unit) -------
+       A creature whose species carries a rider (features.rider, or the "mount"
+       tag) fights with an Eikar on its back: the pair is a little tougher, hits
+       a little harder, the rider shields it from part of every blow (see
+       M.damage), and the rider's command makes it target intelligently (see the
+       smart-AI gate). The rider itself is drawn by the sprite layer. */
+    c.hasRider = !!(sp.features.rider || (sp.tags && sp.tags.includes('mount')));
+    if (c.hasRider) {
+      c.maxHp = Math.round(c.maxHp * 1.12); c.hp = c.maxHp;
+      c.dmg = Math.round(c.dmg * 1.12 * 10) / 10;
+      /* protection fraction the rider provides (default when untuned) */
+      c.riderProtect = U.clamp(c.vars.riderProtection != null ? c.vars.riderProtection : 0.15, 0, 0.5);
+    }
+
     /* life-history quirks (Part V): each individual's lived experience,
        applied as real field effects. Stat-shaping ones land here; the
        situational ones are read during the sim. All deterministic. */
@@ -684,7 +698,7 @@
        Smart creatures never abandon a fight to fetch — that lives in their
        behavior trees as a lowest-priority errand. */
     if (!c.sp.tags.includes('passive') && M.tick % 10 === 0 && M.pickups.length) {
-      const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
+      const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.hasRider || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
       const carried = M.pickups.find(pk => pk.carrier === c.id);
       if (carried) {
         carried.x = c.x; carried.y = c.y - c.radius - 10;
@@ -809,6 +823,8 @@
       const firstHeadPortion = t.maxHp * 0.55;
       if (t.hp <= firstHeadPortion || t.headCount === 1) dmg *= 0.16;
     }
+    /* a rider shields its mount from part of every blow */
+    if (t.hasRider && t.riderProtect) dmg *= (1 - t.riderProtect);
     dmg = Math.max(0.2, dmg);
     t.hp -= dmg;
     /* in-match XP (§2): damage dealt + damage absorbed */
@@ -1298,7 +1314,7 @@
         /* the smart don't stand around: with nothing better to do — and ONLY
            then — they stroll to a nearby morsel. They never abandon a fight
            for food; this is the lowest branch of every tree that reaches it. */
-        const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
+        const smart = !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.hasRider || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
         if (smart && !c.rooted && !M._api.nearestEnemy(c, 220) &&
             !M.pickups.some(pk => pk.carrier === c.id)) {
           const pk = M._api.nearestPickup(c, 200);
