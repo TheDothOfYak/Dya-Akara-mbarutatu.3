@@ -1549,48 +1549,20 @@
         const bossChk = U.el('input', { type: 'checkbox' }); bossChk.checked = !!en.boss;
         bossChk.onchange = () => { if (bossChk.checked) en.boss = true; else delete en.boss; };
         bossWrap.appendChild(bossChk); bossWrap.appendChild(U.el('span', { text: 'boss' }));
-        const exactBtn = U.el('button', { cls: 'btn small ghost', text: en._open ? '⚙ hide' : '⚙ exact' });
-        exactBtn.onclick = () => { en._open = !en._open; paintEnemies(enc, container); };
+        /* summary of the overrides authored on this creature */
+        const ov = [];
+        if (en.name) ov.push('“' + en.name + '”');
+        if (en.sizeIdx != null) ov.push(SP.SIZES[en.sizeIdx]);
+        if (en.stats && (en.stats.hp != null || en.stats.dmg != null || en.stats.speed != null)) ov.push('stats');
+        if (en.picks && en.picks.headCount != null) ov.push(en.picks.headCount + ' heads');
+        if (en.behavior) ov.push(en.behavior);
+        if (en.vars && Object.keys(en.vars).length) ov.push(Object.keys(en.vars).length + ' vars');
+        if (en.picks && Object.keys(en.picks).filter(k => k !== 'headCount').length) ov.push('picks');
+        const editBtn = U.el('button', { cls: 'btn small', text: '✎ edit creature' + (ov.length ? ' (' + ov.join(', ') + ')' : '') });
+        editBtn.onclick = () => editHuntEnemy(en, () => paintEnemies(enc, container));
         const delBtn = U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { enc.enemies.splice(idx, 1); paintEnemies(enc, container); } });
-        top.appendChild(spSel); top.appendChild(rSel); top.appendChild(bossWrap); top.appendChild(exactBtn); top.appendChild(delBtn);
+        top.appendChild(spSel); top.appendChild(rSel); top.appendChild(bossWrap); top.appendChild(editBtn); top.appendChild(delBtn);
         row.appendChild(top);
-
-        if (en._open) {
-          en.stats = en.stats || {};
-          const grid = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px' });
-          function ex(label, val, onset, step) {
-            const c = U.el('div', {});
-            c.appendChild(U.el('label', { cls: 'lbl', text: label }));
-            const inp = numIn(val != null ? val : '', { step: step || 1, placeholder: 'auto' });
-            inp.oninput = () => { const v = inp.value.trim(); onset(v === '' ? null : parseFloat(v)); };
-            c.appendChild(inp); grid.appendChild(c);
-          }
-          const nameC = U.el('div', {});
-          nameC.appendChild(U.el('label', { cls: 'lbl', text: 'Name (blank = auto)' }));
-          const nameI = U.el('input', { cls: 'txt', value: en.name || '', placeholder: 'auto' });
-          nameI.oninput = () => { if (nameI.value.trim()) en.name = nameI.value.trim(); else delete en.name; };
-          nameC.appendChild(nameI); grid.appendChild(nameC);
-          const sizeC = U.el('div', {});
-          sizeC.appendChild(U.el('label', { cls: 'lbl', text: 'Size' }));
-          const sizeSel = selectEl([['', 'roll']].concat(SP.SIZES.map((s, i) => [String(i), s])), en.sizeIdx != null ? String(en.sizeIdx) : '');
-          sizeSel.onchange = () => { if (sizeSel.value === '') delete en.sizeIdx; else en.sizeIdx = parseInt(sizeSel.value, 10); };
-          sizeC.appendChild(sizeSel); grid.appendChild(sizeC);
-          ex('HP', en.stats.hp, v => { if (v == null) delete en.stats.hp; else en.stats.hp = v; });
-          ex('Damage', en.stats.dmg, v => { if (v == null) delete en.stats.dmg; else en.stats.dmg = v; }, 0.1);
-          ex('Speed', en.stats.speed, v => { if (v == null) delete en.stats.speed; else en.stats.speed = v; });
-          ex('Behavior value', en.behaviorValue, v => { if (v == null) delete en.behaviorValue; else en.behaviorValue = v; });
-          row.appendChild(grid);
-          const vlabel = U.el('label', { cls: 'lbl', text: 'Variable overrides (JSON — aggressionThreshold, teleportRange, breathCooldown…)' });
-          const vTa = U.el('textarea', { cls: 'txt', rows: 2, style: 'width:100%;font-family:monospace;font-size:11px' });
-          vTa.value = en.vars ? JSON.stringify(en.vars) : '';
-          const vErr = U.el('div', { cls: 'small', style: 'color:var(--red);min-height:12px' });
-          vTa.oninput = () => {
-            const s = vTa.value.trim();
-            if (!s) { delete en.vars; vErr.textContent = ''; return; }
-            try { en.vars = JSON.parse(s); vErr.textContent = ''; } catch (e) { vErr.textContent = 'Invalid JSON'; }
-          };
-          row.appendChild(vlabel); row.appendChild(vTa); row.appendChild(vErr);
-        }
         container.appendChild(row);
       });
       container.appendChild(U.el('button', {
@@ -1673,8 +1645,11 @@
           if (en.boss) out.boss = true;
           if (en.name) out.name = en.name;
           if (en.sizeIdx != null) out.sizeIdx = en.sizeIdx;
+          if (en.element) out.element = en.element;
+          if (en.behavior) out.behavior = en.behavior;
           if (en.behaviorValue != null) out.behaviorValue = en.behaviorValue;
           if (en.vars && Object.keys(en.vars).length) out.vars = en.vars;
+          if (en.picks && Object.keys(en.picks).length) out.picks = en.picks;
           if (en.stats && Object.keys(en.stats).some(k => en.stats[k] != null)) {
             out.stats = {};
             ['hp', 'dmg', 'speed'].forEach(k => { if (en.stats[k] != null) out.stats[k] = en.stats[k]; });
@@ -1694,6 +1669,164 @@
     }));
     acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: closeAll }));
     if (!isNew) acts.appendChild(U.el('button', { cls: 'btn danger', text: 'Delete Hunt', onclick: () => { if (confirm('Delete this Hunt permanently?')) { M.deleteHunt(work.id); closeAll(); } } }));
+    w.appendChild(acts);
+  }
+
+  /* ================= HUNT CREATURE EDITOR =================
+     Authors ONE hunt enemy down to the last detail. Any field left blank rolls
+     at spawn; anything set is used exactly by the match engine. Uses the same
+     ability catalog dropdowns as the species editor, but with single values
+     (this is one specific creature, not a template). */
+  function editHuntEnemy(en, onDone) {
+    en.stats = en.stats || {};
+    en.vars = en.vars || {};
+    en.picks = en.picks || {};
+    let curSp = en.speciesId || (SP.list[0] && SP.list[0].id);
+    en.speciesId = curSp;
+    const { w, close } = modal('3% 8%');
+    const closeAll = () => { stopPreviews(); close(); if (onDone) onDone(); };
+    const cat = abilityCatalog();
+    w.appendChild(U.el('h2', { cls: 'gold', text: 'Hunt creature — ' + (SP.get(curSp) ? SP.get(curSp).name : curSp) }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Author this ONE creature completely. Blank fields roll at spawn; anything you set is used exactly. Heads, every variable and trait pick, even the decision tree — all yours.' }));
+
+    const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:280px 1fr;gap:18px;align-items:start' });
+    w.appendChild(cols);
+    const left = U.el('div', {}), right = U.el('div', {});
+    cols.appendChild(left); cols.appendChild(right);
+
+    /* ---- LEFT: preview of the chosen species ---- */
+    left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Preview' }));
+    left.appendChild(livePreview(() => SP.get(curSp) || SP.list[0]));
+    const spSel = selectEl(SP.list.map(s => [s.id, s.name]), curSp);
+    spSel.onchange = () => { curSp = spSel.value; en.speciesId = curSp; };
+    lblIn(left, 'Species', spSel);
+
+    /* ---- RIGHT: identity ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Identity' }));
+    const g1 = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px' });
+    right.appendChild(g1);
+    function hcell(parent, label, el) { const c = U.el('div', {}); c.appendChild(U.el('label', { cls: 'lbl', text: label })); c.appendChild(el); parent.appendChild(c); return el; }
+    const nameI = hcell(g1, 'Name (blank = auto)', U.el('input', { cls: 'txt', value: en.name || '', placeholder: 'auto' }));
+    nameI.oninput = () => { if (nameI.value.trim()) en.name = nameI.value.trim(); else delete en.name; };
+    const bossWrap = U.el('div', { cls: 'toggle' + (en.boss ? ' on' : ''), style: 'margin-top:4px' });
+    bossWrap.onclick = () => { if (en.boss) delete en.boss; else en.boss = true; bossWrap.classList.toggle('on'); };
+    hcell(g1, 'Boss (the quarry itself)', bossWrap);
+    const rSel = hcell(g1, 'Rarity', selectEl([['', 'roll']].concat(SP.RARITIES.map((r, i) => [String(i), r])), en.rarity != null ? String(en.rarity) : ''));
+    rSel.onchange = () => { if (rSel.value === '') delete en.rarity; else en.rarity = parseInt(rSel.value, 10); };
+    const sizeSel = hcell(g1, 'Size', selectEl([['', 'roll']].concat(SP.SIZES.map((s, i) => [String(i), s])), en.sizeIdx != null ? String(en.sizeIdx) : ''));
+    sizeSel.onchange = () => { if (sizeSel.value === '') delete en.sizeIdx; else en.sizeIdx = parseInt(sizeSel.value, 10); };
+    const elSel = hcell(g1, 'Element', selectEl([['', 'default']].concat(SP.ELEMENTS.map(e => [e, e])), en.element || ''));
+    elSel.onchange = () => { if (elSel.value === '') delete en.element; else en.element = elSel.value; };
+    const behSel = hcell(g1, 'Behavior tree', selectEl([['', '(species default)']].concat(Object.keys(DYA.behaviors || {}).sort().map(b => [b, b])), en.behavior || ''));
+    behSel.onchange = () => { if (behSel.value === '') delete en.behavior; else en.behavior = behSel.value; };
+
+    /* ---- Heads (Naga) ---- */
+    const headsC = hcell(g1, '🐍 Heads (blank = roll)', numIn(en.picks.headCount != null ? en.picks.headCount : '', { step: 1, min: 1, placeholder: 'roll' }));
+    headsC.oninput = () => { const v = parseInt(headsC.value, 10); if (isNaN(v)) delete en.picks.headCount; else en.picks.headCount = Math.max(1, v); };
+
+    /* ---- exact stats ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Exact stats (blank = roll)' }));
+    const g2 = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px' });
+    right.appendChild(g2);
+    function statIn(label, val, onset, step) {
+      const inp = hcell(g2, label, numIn(val != null ? val : '', { step: step || 1, placeholder: 'roll' }));
+      inp.oninput = () => { const v = inp.value.trim(); onset(v === '' ? null : parseFloat(v)); };
+    }
+    statIn('HP', en.stats.hp, v => { if (v == null) delete en.stats.hp; else en.stats.hp = Math.max(1, v); });
+    statIn('Damage', en.stats.dmg, v => { if (v == null) delete en.stats.dmg; else en.stats.dmg = Math.max(0, v); }, 0.1);
+    statIn('Speed', en.stats.speed, v => { if (v == null) delete en.stats.speed; else en.stats.speed = Math.max(0, v); });
+    statIn('Behavior value (5–3000)', en.behaviorValue, v => { if (v == null) delete en.behaviorValue; else en.behaviorValue = U.clamp(Math.round(v), 5, 3000); });
+
+    /* ---- variables (single values) ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Abilities — variables (exact value for this creature)' }));
+    const varsBox = U.el('div', {});
+    right.appendChild(varsBox);
+    function paintHVars() {
+      varsBox.innerHTML = '';
+      Object.keys(en.vars).forEach(k => {
+        const wrap = U.el('div', { style: 'margin-bottom:6px' });
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px' });
+        const kIn = U.el('input', { cls: 'txt', value: k, style: 'flex:2' });
+        const vIn = numIn(en.vars[k], { step: 'any', style: 'flex:1' });
+        const commit = () => { const nk = kIn.value.trim(); if (nk !== k) delete en.vars[k]; if (nk) en.vars[nk] = parseFloat(vIn.value) || 0; };
+        kIn.onchange = commit; vIn.onchange = commit;
+        r.appendChild(kIn); r.appendChild(vIn);
+        r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { delete en.vars[k]; paintHVars(); } }));
+        wrap.appendChild(r);
+        if (cat.vars[k] && cat.vars[k].desc) wrap.appendChild(U.el('div', { cls: 'small muted', style: 'margin:2px 0 0 2px', text: cat.vars[k].desc }));
+        varsBox.appendChild(wrap);
+      });
+      const addRow = U.el('div', { cls: 'flex mt', style: 'gap:6px;flex-wrap:wrap' });
+      const sel = U.el('select', { cls: 'txt', style: 'flex:1;min-width:180px' });
+      sel.appendChild(U.el('option', { value: '', text: '＋ Add a variable…' }));
+      Object.keys(cat.vars).sort((a, b) => cat.vars[a].label.localeCompare(cat.vars[b].label)).forEach(k => {
+        if (k in en.vars) return;
+        sel.appendChild(U.el('option', { value: k, text: cat.vars[k].label + (cat.vars[k].desc ? ' — ' + cat.vars[k].desc.slice(0, 60) : '') }));
+      });
+      sel.onchange = () => { const k = sel.value; if (!k) return; const info = cat.vars[k] || { lo: 0, hi: 1 }; en.vars[k] = Math.round(((info.lo + info.hi) / 2) * 100) / 100; paintHVars(); };
+      addRow.appendChild(sel);
+      addRow.appendChild(U.el('button', { cls: 'btn small ghost', text: 'custom', onclick: () => { en.vars['newVar' + Object.keys(en.vars).length] = 1; paintHVars(); } }));
+      varsBox.appendChild(addRow);
+    }
+    paintHVars();
+
+    /* ---- trait picks (single chosen value) ---- */
+    right.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Abilities — trait picks (the chosen option for this creature)' }));
+    const picksBox = U.el('div', {});
+    right.appendChild(picksBox);
+    function paintHPicks() {
+      picksBox.innerHTML = '';
+      Object.keys(en.picks).forEach(k => {
+        if (k === 'headCount') return; /* headCount has its own Heads control above */
+        const wrap = U.el('div', { style: 'margin-bottom:6px' });
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px' });
+        const kIn = U.el('input', { cls: 'txt', value: k, style: 'flex:1' });
+        const opts = (cat.picks[k] && cat.picks[k].options) || [];
+        let vIn;
+        if (opts.length) {
+          vIn = selectEl(opts.map(o => [String(o), String(o)]), String(en.picks[k]));
+          vIn.style.flex = '2';
+          vIn.onchange = () => { const raw = vIn.value; en.picks[k] = (raw !== '' && !isNaN(Number(raw))) ? Number(raw) : raw; };
+        } else {
+          vIn = U.el('input', { cls: 'txt', value: String(en.picks[k]), style: 'flex:2' });
+          vIn.onchange = () => { const raw = vIn.value.trim(); en.picks[k] = (raw !== '' && !isNaN(Number(raw))) ? Number(raw) : raw; };
+        }
+        const commitK = () => { const nk = kIn.value.trim(); if (nk !== k) { const val = en.picks[k]; delete en.picks[k]; if (nk) en.picks[nk] = val; paintHPicks(); } };
+        kIn.onchange = commitK;
+        r.appendChild(kIn); r.appendChild(vIn);
+        r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { delete en.picks[k]; paintHPicks(); } }));
+        wrap.appendChild(r);
+        if (cat.picks[k] && cat.picks[k].desc) wrap.appendChild(U.el('div', { cls: 'small muted', style: 'margin:2px 0 0 2px', text: cat.picks[k].desc }));
+        picksBox.appendChild(wrap);
+      });
+      const addRow = U.el('div', { cls: 'flex mt', style: 'gap:6px;flex-wrap:wrap' });
+      const sel = U.el('select', { cls: 'txt', style: 'flex:1;min-width:180px' });
+      sel.appendChild(U.el('option', { value: '', text: '＋ Add a trait pick…' }));
+      Object.keys(cat.picks).sort((a, b) => cat.picks[a].label.localeCompare(cat.picks[b].label)).forEach(k => {
+        if (k === 'headCount' || k in en.picks) return;
+        sel.appendChild(U.el('option', { value: k, text: cat.picks[k].label + (cat.picks[k].desc ? ' — ' + cat.picks[k].desc.slice(0, 60) : '') }));
+      });
+      sel.onchange = () => { const k = sel.value; if (!k) return; const opts = (cat.picks[k] && cat.picks[k].options) || []; en.picks[k] = opts.length ? ((opts[0] !== '' && !isNaN(Number(opts[0]))) ? Number(opts[0]) : opts[0]) : 'option'; paintHPicks(); };
+      addRow.appendChild(sel);
+      addRow.appendChild(U.el('button', { cls: 'btn small ghost', text: 'custom', onclick: () => { en.picks['newPick' + Object.keys(en.picks).length] = 'option'; paintHPicks(); } }));
+      picksBox.appendChild(addRow);
+    }
+    paintHPicks();
+
+    /* ---- actions ---- */
+    const acts = U.el('div', { cls: 'flex mt', style: 'gap:8px;flex-wrap:wrap' });
+    acts.appendChild(U.el('button', { cls: 'btn primary', text: 'Done', onclick: closeAll }));
+    acts.appendChild(U.el('button', {
+      cls: 'btn ghost', text: '↺ Clear all overrides', onclick: () => {
+        if (!confirm('Reset this creature to a plain roll of its species (keeps species, rarity, boss)?')) return;
+        const keep = { speciesId: en.speciesId };
+        if (en.rarity != null) keep.rarity = en.rarity;
+        if (en.boss) keep.boss = true;
+        Object.keys(en).forEach(k => delete en[k]);
+        Object.assign(en, keep);
+        closeAll();
+      },
+    }));
     w.appendChild(acts);
   }
 

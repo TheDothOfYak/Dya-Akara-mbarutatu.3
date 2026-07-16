@@ -135,8 +135,12 @@
            fights exactly as designed rather than as a random roll. */
         if (e.sizeIdx != null) tok.sizeIdx = U.clamp(e.sizeIdx | 0, 0, 4);
         if (e.name) tok.name = e.name;
+        if (e.element) tok.element = e.element;
         if (e.behaviorValue != null) tok.behaviorValue = e.behaviorValue;
         if (e.vars && typeof e.vars === 'object') tok.vars = Object.assign({}, tok.vars, e.vars);
+        /* trait picks (headCount for Nagas, vine behavior, breath tier, target
+           priority…) — applied BEFORE spawn so head count etc. take effect */
+        if (e.picks && typeof e.picks === 'object') tok.picks = Object.assign({}, tok.picks, e.picks);
         if (e.stats && typeof e.stats === 'object') {
           tok.stats = Object.assign({}, tok.stats);
           if (e.stats.hp != null) tok.stats.hp = Math.max(1, e.stats.hp);
@@ -145,6 +149,8 @@
         }
         const cx = WORLD.w * 0.72 + M.rng.range(-90, 90), cy = WORLD.h / 2 + M.rng.range(-190, 190);
         const c = M.spawnFromToken(tok, 1, cx, cy);
+        /* per-creature behavior-tree override (utterly unique quarry) */
+        if (e.behavior && BV[e.behavior]) c.behaviorOverride = e.behavior;
         /* a boss gets the classic 1.6× health bump ONLY when the author left
            the health at default — an explicit exact HP override is honored as-is */
         if (e.boss) { c.isBoss = true; if (!(e.stats && e.stats.hp != null)) { c.maxHp *= 1.6; c.hp = c.maxHp; } }
@@ -359,7 +365,9 @@
           const foe = api.nearestEnemy(c, 99999);
           if (foe) api.attack(c, foe, false, true, (c.vars.breathRange || c.sp.behavior === 'grothyn' || c.headCount > 1));
         } else {
-          const b = BV[c.sp.behavior];
+          /* a hunt creature may be given a different decision tree than its
+             species' default (Admin → Hunts → creature "Behavior tree") */
+          const b = BV[c.behaviorOverride || c.sp.behavior];
           if (b) { api._c = c; b(c, api); }
         }
         /* hunt drive: hunter-side creatures press toward the quarry when idle */
