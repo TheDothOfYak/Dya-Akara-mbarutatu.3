@@ -55,7 +55,7 @@
     desc: 'A sapient, pumpkin-bodied creature trailing long vines, long kept alongside Eikar and Keilia as companions and mounts.',
     temperament: 'Loyal, steady, and protective — it favors defense over aggression and bonds closely with its rider or partner.',
     special: 'Water breath is passive Su resource generation only — never a weapon. Can carry an Eikar or Keilia rider; the pair fight as one unit.',
-    vars: { vineLength: [45, 95], aggressionThreshold: [0.35, 0.8], loyalty: [0.5, 1], breathCooldown: [8, 16], carryCapacity: [1, 2] },
+    vars: { vineLength: [45, 95], aggressionThreshold: [0.35, 0.8], loyalty: [0.5, 1], breathCooldown: [8, 16], carryCapacity: [1, 2], riderProtection: [0.12, 0.3], commandResponse: [0.4, 0.9] },
     picks: {
       vineBehavior: ['grab', 'hold', 'strangle', 'smash', 'bring close', 'throw'],
       breathTier: [1, 1, 2, 2, 3],

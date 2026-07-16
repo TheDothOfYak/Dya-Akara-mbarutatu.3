@@ -99,11 +99,15 @@
     };
   }
 
+  const ADMIN_WORLD_META_KEY = 'adminworld_meta';
   G.publishAdminWorld = async function () {
     if (!onlineConfigured()) return { err: 'Online is not configured.' };
     try {
       const snap = buildAdminWorldSnapshot();
       await supaRest('POST', 'dya_config?on_conflict=key', { key: ADMIN_WORLD_KEY, value: snap, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates');
+      /* a tiny companion row so live pollers can check "is there anything new?"
+         cheaply, without downloading the whole (multi-account) world each time */
+      try { await supaRest('POST', 'dya_config?on_conflict=key', { key: ADMIN_WORLD_META_KEY, value: { updatedAt: snap.updatedAt, rev: snap.rev }, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates'); } catch (e) { /* non-fatal */ }
       G.world.adminWorldRev = snap.rev; G.world.adminWorldAt = snap.updatedAt;
       store.save(G.world);
       G.adminWorldSync.lastPush = Date.now(); G.adminWorldSync.error = null;
@@ -147,6 +151,19 @@
       if ((snap.updatedAt || 0) <= (G.world.adminWorldAt || 0)) return { ok: true, adopted: false };
       adoptAdminWorld(snap);
       return { ok: true, adopted: true };
+    } catch (e) { G.adminWorldSync.error = e.message; return { err: e.message }; }
+  };
+
+  /* Live poll: cheaply read the meta row; only when it announces a newer world
+     do we pull the full snapshot and adopt it. Lets an admin's curation reach
+     players who are already logged in, without a heavy download every tick. */
+  G.pollAdminWorld = async function () {
+    if (!onlineConfigured()) return { ok: false };
+    try {
+      const rows = await supaRest('GET', 'dya_config?key=eq.' + ADMIN_WORLD_META_KEY + '&select=value');
+      const meta = rows && rows[0] && rows[0].value;
+      if (!meta || (meta.updatedAt || 0) <= (G.world.adminWorldAt || 0)) return { ok: true, adopted: false };
+      return await G.fetchAdminWorld();
     } catch (e) { G.adminWorldSync.error = e.message; return { err: e.message }; }
   };
 
