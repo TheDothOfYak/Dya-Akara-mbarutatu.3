@@ -1844,6 +1844,19 @@
       return { tok };
     },
     grantTrusted(accId) { const a = G.world.accounts[accId]; if (a) { a.trustedSeller = true; G.saveNow(); pushAccountToCloud(a); } },
+    /* grant Hunt slots directly to a player (admin gift). These never expire
+       (expiresAtBand null) so an admin grant doesn't quietly vanish at the next
+       level band the way earned slots do. */
+    grantHuntSlots(accId, n) {
+      const a = G.world.accounts[accId];
+      if (!a) return { err: 'Account not found' };
+      a.huntSlots = a.huntSlots || [];
+      const count = Math.max(1, n | 0);
+      for (let i = 0; i < count; i++) a.huntSlots.push({ id: U.uid('hs'), huntId: null, source: 'admin', expiresAtBand: null });
+      if (!a.ai) a.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'system', title: count > 1 ? count + ' Hunt slots granted' : 'Hunt slot granted', body: 'The Dya Guild grants you ' + count + ' Hunt slot' + (count > 1 ? 's' : '') + '. Choose your quarry in Adventures.', icon: '🏹' });
+      G.saveNow(); pushAccountToCloud(a);
+      return { ok: true, count };
+    },
     /* count of procedurally-generated filler tokens still in the world */
     countAutoGenTokens() {
       let n = 0;

@@ -139,6 +139,7 @@
             me.activeHunt = {
               slotId: slot.id, huntId: hunt.id, huntName: hunt.name, speciesId: spid,
               encounters: U.deepCopy(hunt.encounters || []), rewards: U.deepCopy(hunt.rewards || {}),
+              partySize: hunt.partySize != null ? hunt.partySize : 5,
               encounterIdx: 0, answers, temperBias: bias / 2, /* hidden ~5% acquisition influence */
               losses: 0, startedAt: Date.now(), attemptStart: Date.now(),
             };
@@ -171,7 +172,7 @@
          be fielded again. Win by bringing the quarry down before your party is
          wiped. That is the strategy: who you bring, and who you spend. */
       function renderActiveHunt(body) {
-        const HUNT_PARTY_MAX = 5; // self + 4
+        const HUNT_PARTY_MAX = U.clamp(me.activeHunt.partySize || 5, 1, 13); // admin-set per hunt (incl. the player)
         const huntSelfToken = () => Object.values(me.tokens).find(t => t.isSelf) || null;
         const hunt = me.activeHunt;
         const sp = SP.get(hunt.speciesId);
