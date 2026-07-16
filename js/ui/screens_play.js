@@ -1161,6 +1161,10 @@
       const T0 = M.teams[MY];
       const OPP = M.teams[1 - MY];
       const isDuel = M.mode === 'duel';
+      /* Hunts: the party you brought deploys for free, any time — no resource
+         cost and no re-ready tax. The wheel reflects that (no cost row, always
+         ready-able up to the 5-slot board limit). */
+      const isHunt = M.mode === 'hunt';
       if (isDuel) wheelEl.style.display = 'none';
 
       /* every local action goes through here: direct for local play,
@@ -1278,9 +1282,9 @@
       /* shared ready flow: wheel-card click and the Shift hotkey both land here */
       function tryReady(en, i, card) {
         const costV = TK.costVec(en.tok);
-        const tax = en.deaths || 0;
-        const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
-          (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
+        const tax = isHunt ? 0 : (en.deaths || 0);
+        const afford = isHunt || (SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
+          (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax)));
         if (!afford) { DYA.audio.play('deny'); renderWheel(); return; }
         if (T0.readied.length >= 5) { UI.toast({ title: 'Ready panel full', body: 'Five readied tokens is the limit.', icon: '⚠' }); renderWheel(); return; }
         const doReady = (taxRes) => {
@@ -1315,13 +1319,13 @@
           if (avail.length <= Math.abs(k)) continue;
           const { en, i } = avail[idx];
           const costV = TK.costVec(en.tok);
-          const tax = en.deaths || 0; /* additional cost: +1 per prior defeat, any one resource */
-          const afford = SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
-            (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax));
+          const tax = isHunt ? 0 : (en.deaths || 0); /* additional cost: +1 per prior defeat, any one resource */
+          const afford = isHunt || (SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
+            (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax)));
           const card = U.el('div', { cls: 'wheel-card' + (k === 0 ? ' center' : Math.abs(k) >= 3 ? ' fade3' : Math.abs(k) === 2 ? ' fade2' : ' fade1') });
           card.appendChild(UI.tokenArt(en.tok.speciesId, k === 0 ? 62 : 46, 'idle', en.tok.picks && en.tok.picks.headCount, en.tok));
           card.appendChild(U.el('div', { cls: 'wc-name', text: en.tok.name }));
-          card.appendChild(U.el('div', { cls: 'wc-meta', html: SP.ELEMENTS.filter(el => costV[el] > 0).map(el => '<span class="el-' + el + '">' + costV[el] + '</span>').join('·') + (tax ? ' <span style="color:var(--red)">+' + tax + '</span>' : '') }));
+          card.appendChild(U.el('div', { cls: 'wc-meta', html: isHunt ? '<span class="muted">ready</span>' : (SP.ELEMENTS.filter(el => costV[el] > 0).map(el => '<span class="el-' + el + '">' + costV[el] + '</span>').join('·') + (tax ? ' <span style="color:var(--red)">+' + tax + '</span>' : '')) }));
           card.appendChild(U.el('div', { cls: 'wc-dot ' + (afford ? 'ok' : 'no') }));
           card.onmouseenter = () => {
             const sp = SP.get(en.tok.speciesId);

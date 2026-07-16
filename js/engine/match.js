@@ -267,23 +267,34 @@
       const entry = T.pouch[input.pouchIdx];
       if (!entry || entry.state !== 'pouch') return;
       if (T.readied.length >= 5) { M.uiEvent(team, 'deny', 'Ready panel is full (5 slots).'); return; }
-      const cost = Object.assign({}, TK.costVec(entry.tok));
-      /* additional cost (July update §1): +1 per prior defeat, any resource */
-      const tax = entry.deaths || 0;
-      if (tax > 0) {
-        const taxRes = input.taxRes && ELS.includes(input.taxRes) ? input.taxRes : mostAbundant(T.resources);
-        cost[taxRes] = (cost[taxRes] || 0) + tax;
+      /* Hunts: the party you bring is yours to deploy freely — no resource
+         cost, and no re-ready tax for prior defeats. Standard/duel matches
+         keep the economy (base cost + additional cost per prior defeat). */
+      if (M.mode !== 'hunt') {
+        const cost = Object.assign({}, TK.costVec(entry.tok));
+        /* additional cost (July update §1): +1 per prior defeat, any resource */
+        const tax = entry.deaths || 0;
+        if (tax > 0) {
+          const taxRes = input.taxRes && ELS.includes(input.taxRes) ? input.taxRes : mostAbundant(T.resources);
+          cost[taxRes] = (cost[taxRes] || 0) + tax;
+        }
+        if (!canAfford(T.resources, cost)) { M.uiEvent(team, 'deny', 'Not enough resources' + (tax ? ' (additional cost +' + tax + ')' : '') + '.'); return; }
+        payCost(T.resources, cost);
+        entry.state = 'readied';
+        entry.readiedAtPulse = M.pulseIndex;
+        T.readied.push(entry);
+        M.uiEvent(team, 'ready', entry.tok.name + ' readied' + (tax ? ' (additional cost +' + tax + ')' : '') + '.');
+      } else {
+        entry.state = 'readied';
+        entry.readiedAtPulse = M.pulseIndex;
+        T.readied.push(entry);
+        M.uiEvent(team, 'ready', entry.tok.name + ' readied.');
       }
-      if (!canAfford(T.resources, cost)) { M.uiEvent(team, 'deny', 'Not enough resources' + (tax ? ' (additional cost +' + tax + ')' : '') + '.'); return; }
-      payCost(T.resources, cost);
-      entry.state = 'readied';
-      entry.readiedAtPulse = M.pulseIndex;
-      T.readied.push(entry);
-      M.uiEvent(team, 'ready', entry.tok.name + ' readied' + (tax ? ' (additional cost +' + tax + ')' : '') + '.');
     } else if (input.type === 'trigger') {
       const entry = T.readied[input.slot];
       if (!entry) return;
-      if (entry.readiedAtPulse === M.pulseIndex) { M.uiEvent(team, 'deny', 'Cannot trigger in the same pulse it was readied.'); return; }
+      /* Hunts: deploy your party whenever you like — no same-pulse hold. */
+      if (M.mode !== 'hunt' && entry.readiedAtPulse === M.pulseIndex) { M.uiEvent(team, 'deny', 'Cannot trigger in the same pulse it was readied.'); return; }
       let x = input.x, y = input.y;
       const eh = M.teams[1 - team].hoard;
       if (U.dist(x, y, eh.x, eh.y) < 130) { const a = Math.atan2(y - eh.y, x - eh.x); x = eh.x + Math.cos(a) * 130; y = eh.y + Math.sin(a) * 130; }
@@ -416,8 +427,9 @@
   Match.prototype.doPulse = function () {
     const M = this;
     M.pulseIndex++;
-    /* hoard-sense quirk: every 4th pulse a living hoarder sniffs out +1 extra */
-    for (const c of M.creatures) {
+    /* hoard-sense quirk: every 4th pulse a living hoarder sniffs out +1 extra
+       (hunts don't run a resource economy, so no sniff bonus there) */
+    if (M.mode !== 'hunt') for (const c of M.creatures) {
       if (c.dead || !c.quirks || !c.quirks.hoard_sense) continue;
       c.mem.hoardPulses = (c.mem.hoardPulses || 0) + 1;
       if (c.mem.hoardPulses % 4 === 0 && M.teams[c.team] && M.teams[c.team].resources) {
@@ -477,12 +489,16 @@
         }
         if (c.speciesId === 'stryx' && c.vars.absorbRate > 0.2) units.push('Ular');
       });
-      units.forEach(el => { T.resources[el]++; });
-      T.stats.resourcesEarned += units.length;
-      /* orb visuals near hoard, colored by resource type */
-      units.slice(0, 6).forEach(el => {
-        M.orbs.push({ x: T.hoard.x + M.rng.range(-50, 50), y: T.hoard.y + M.rng.range(-50, 50), el, t0: M.time, team: T.idx });
-      });
+      /* Hunts: the pulse still ticks (for time-based abilities) but grants no
+         team resources — your party deploys for free, so there's no economy. */
+      if (M.mode !== 'hunt') {
+        units.forEach(el => { T.resources[el]++; });
+        T.stats.resourcesEarned += units.length;
+        /* orb visuals near hoard, colored by resource type */
+        units.slice(0, 6).forEach(el => {
+          M.orbs.push({ x: T.hoard.x + M.rng.range(-50, 50), y: T.hoard.y + M.rng.range(-50, 50), el, t0: M.time, team: T.idx });
+        });
+      }
     });
 
     /* growth milestones (July update §2): Naga regrowth/new heads on

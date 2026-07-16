@@ -118,5 +118,62 @@ const sEntry = sm.teams[0].pouch.find(e => e.tok.id === sTok.id); sEntry.state =
 sm.damage(sc, 99999, { dead: false, x: sc.x, y: sc.y, sp: sc.sp, vars: {}, quirks: {} }, { noAnim: true });
 check('a downed token in a STANDARD match returns to the pouch (not permadeath)', sEntry.state === 'pouch', 'state=' + sEntry.state);
 
+/* ---- hunt economy: free/anytime readying, pulses grant no resources ---- */
+console.log('  -- hunt ready/pulse economy --');
+(function () {
+  const t1 = TK.mint({ speciesId: 'harkal', rng, rarity: 2 });
+  const hm = new DYAG.match.Match({
+    seed: 30, mode: 'hunt', terrain: 'plains',
+    settings: { pulseInterval: 5, pulseAmount: 2, chaos: false },
+    hunt: { enemies: [{ speciesId: 'lutut', boss: true }] },
+    teams: [
+      { name: 'Hunter', controller: 'ai', pouch: [t1] },
+      { name: 'Wild', controller: 'wild', pouch: [] },
+    ],
+  });
+  hm.headless = true;
+  const HT = hm.teams[0];
+  // strip all resources: readying must still succeed (it's free in a hunt)
+  HT.resources = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+  const before = HT.readied.length;
+  hm.applyInput(0, { type: 'ready', pouchIdx: 0 });
+  check('hunt readying is free (no resources needed)', HT.readied.length === before + 1, 'readied=' + HT.readied.length);
+  check('hunt readying spends no resources', HT.resources.Fti + HT.resources.Su + HT.resources.Eldi + HT.resources.Ular === 0);
+
+  // deploy in the SAME pulse it was readied — allowed in a hunt
+  const readiedEntry = HT.readied[0];
+  hm.applyInput(0, { type: 'trigger', slot: 0, x: 400, y: 400 });
+  check('hunt lets you deploy the same pulse you readied', readiedEntry.state === 'played', 'state=' + readiedEntry.state);
+
+  // a pulse grants NO team resources in a hunt, but still advances the index
+  HT.resources = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+  const pi0 = hm.pulseIndex;
+  hm.doPulse();
+  check('hunt pulse still ticks (index advances) for time-based abilities', hm.pulseIndex === pi0 + 1, 'pi=' + hm.pulseIndex);
+  check('hunt pulse grants no team resources', HT.resources.Fti + HT.resources.Su + HT.resources.Eldi + HT.resources.Ular === 0);
+})();
+
+/* re-ready tax and pulse resources STILL apply in a standard match */
+(function () {
+  const t1 = TK.mint({ speciesId: 'harkal', rng, rarity: 1 });
+  const sm2 = new DYAG.match.Match({
+    seed: 31, mode: 'standard', terrain: 'plains',
+    settings: { pulseInterval: 5, pulseAmount: 2, chaos: false },
+    teams: [
+      { name: 'A', controller: 'ai', pouch: [t1] },
+      { name: 'B', controller: 'ai', pouch: [TK.mint({ speciesId: 'lutut', rng, rarity: 1 })] },
+    ],
+  });
+  sm2.headless = true;
+  const ST = sm2.teams[0];
+  ST.resources = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+  sm2.applyInput(0, { type: 'ready', pouchIdx: 0 });
+  check('standard readying still requires resources (denied when broke)', ST.readied.length === 0, 'readied=' + ST.readied.length);
+  const pi0 = ST.resources.Fti + ST.resources.Su + ST.resources.Eldi + ST.resources.Ular;
+  sm2.doPulse();
+  const pi1 = ST.resources.Fti + ST.resources.Su + ST.resources.Eldi + ST.resources.Ular;
+  check('standard pulse still grants team resources', pi1 > pi0, 'gained=' + (pi1 - pi0));
+})();
+
 console.log(failures ? ('\nHUNT CREATURE: ' + failures + ' FAILURE(S)') : '\nHUNT CREATURE: ALL PASS');
 process.exit(failures ? 1 : 0);
