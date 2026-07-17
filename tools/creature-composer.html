@@ -59,7 +59,7 @@
 (function () {
   'use strict';
   const SPR = DYA.sprites, CAT = DYA.parts.CATALOG;
-  const cfg = { color:'#c9a24b', color2:'#7ec8e3', body:'fish', wings:null, shell:null, tail:null, feet:'fin', eyes:'round', mouth:'none', bodyW:0.9, bodyH:0.72, wingSpan:1, size:78 };
+  const cfg = { color:'#c9a24b', color2:'#7ec8e3', body:'fish', wings:null, horn:null, ridge:null, shell:null, tail:null, feet:'fin', eyes:'round', mouth:'none', bodyW:0.9, bodyH:0.72, wingSpan:1, size:78 };
   let state = 'idle', facing = 1;
   const controls = document.getElementById('controls');
 
@@ -106,7 +106,10 @@
 
   function species(){
     const parts={ body:cfg.body, bodyW:+cfg.bodyW.toFixed(2), bodyH:+cfg.bodyH.toFixed(2) };
-    ['wings','shell','tail','feet','eyes','mouth'].forEach(k=>{ if(cfg[k]!==null && cfg[k]!=='none') parts[k]=cfg[k]; else if(k==='eyes'||k==='mouth') parts[k]=cfg[k]; });
+    Object.keys(CAT).filter(k=>k!=='body').forEach(k=>{
+      if(k==='eyes'||k==='mouth') parts[k]=cfg[k];
+      else if(cfg[k]!==null && cfg[k]!==undefined) parts[k]=cfg[k];
+    });
     if(cfg.wings) parts.wingSpan=+cfg.wingSpan.toFixed(2);
     return { id:'preview', rig:'composed', color:cfg.color, color2:cfg.color2, features:{}, parts };
   }

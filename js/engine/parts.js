@@ -68,7 +68,8 @@
   BODY.oval = function (ctx, E) {
     ctx.fillStyle = bodyGrad(ctx, E, E.col);
     ctx.beginPath(); ctx.ellipse(0, E.y0, E.bodyW, E.bodyH * (E.limp ? 0.85 : 1), 0, 0, TAU); ctx.fill();
-    E.hx = E.bodyW * 0.68; E.hy = E.y0 - E.bodyH * 0.35; E.hr = E.r * 0.3;
+    /* no separate head — the face sits right on the front of the main oval */
+    E.hx = E.bodyW * 0.5; E.hy = E.y0 - E.bodyH * 0.12; E.hr = E.r * 0.34;
   };
 
   /* round chick — big fluffy round body + small round head on top */
@@ -272,6 +273,17 @@
     ctx.beginPath(); ctx.ellipse(-E.bodyW * 1.0, E.y0 - E.r * 0.2 + wag * E.r * 0.5, E.r * 0.4, E.r * 0.24, -0.5 + wag, 0, TAU); ctx.fill();
   };
   TAIL.fish = function (ctx, E) { /* fish body already carries its fin */ };
+  TAIL.pointed = function (ctx, E) {
+    const sway = Math.sin(E.t * (E.moving ? 6 : 2.5)) * E.r * 0.18;
+    const bx = -E.bodyW * 0.8, by = E.y0;
+    const tx = -E.bodyW * 1.5, ty = E.y0 - E.r * 0.15 + sway;
+    ctx.fillStyle = shade(E.col, -12);
+    ctx.beginPath();
+    ctx.moveTo(bx, by - E.r * 0.22);
+    ctx.quadraticCurveTo((bx + tx) / 2, (by + ty) / 2 - E.r * 0.12, tx, ty);
+    ctx.quadraticCurveTo((bx + tx) / 2, (by + ty) / 2 + E.r * 0.12, bx, by + E.r * 0.22);
+    ctx.closePath(); ctx.fill();
+  };
 
   /* ============================ FEET ============================ */
   const FEET = {};
@@ -360,12 +372,60 @@
     for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(E.hx + E.hr * (0.4 + i * 0.25), E.hy + E.hr * 0.32); ctx.lineTo(E.hx + E.hr * (0.5 + i * 0.25), E.hy + E.hr * 0.5); ctx.lineTo(E.hx + E.hr * (0.6 + i * 0.25), E.hy + E.hr * 0.32); ctx.fill(); }
   };
 
+  /* ============================ HORNS ============================ */
+  const HORN = {};
+  function oneHorn(ctx, E, cx, cy, hr, lean) {
+    ctx.fillStyle = shade(E.col2 || E.col, 25);
+    ctx.beginPath();
+    ctx.moveTo(cx - hr * 0.28, cy);
+    ctx.quadraticCurveTo(cx + lean * hr * 0.5, cy - hr * 1.6, cx + lean * hr * 0.8, cy - hr * 2.05);
+    ctx.quadraticCurveTo(cx + lean * hr * 0.15, cy - hr * 1.3, cx + hr * 0.28, cy);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(E.col2 || E.col, -22); ctx.lineWidth = Math.max(1, E.r * 0.02);
+    for (let i = 1; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(cx - hr * 0.18, cy - hr * 0.45 * i); ctx.lineTo(cx + lean * hr * 0.2 + hr * 0.14, cy - hr * 0.5 * i); ctx.stroke(); }
+  }
+  HORN.single = function (ctx, E) { oneHorn(ctx, E, E.hx, E.hy - E.hr * 0.7, E.hr, 0.5); };
+  HORN.pair = function (ctx, E) { oneHorn(ctx, E, E.hx - E.hr * 0.35, E.hy - E.hr * 0.7, E.hr * 0.8, -0.4); oneHorn(ctx, E, E.hx + E.hr * 0.35, E.hy - E.hr * 0.7, E.hr * 0.8, 0.5); };
+  HORN.five = function (ctx, E) { for (let i = 0; i < 5; i++) { const f = i / 4 - 0.5; oneHorn(ctx, E, E.hx + f * E.hr * 0.95, E.hy - E.hr * 0.55, E.hr * 0.6, f * 1.6); } };
+
+  /* ============================ RIDGE (back spikes / sail) ============================ */
+  const RIDGE = {};
+  RIDGE.spikes = function (ctx, E) {
+    const bh = E.bodyH * (E.limp ? 0.86 : 1);
+    const n = E.P.ridgeCount != null ? E.P.ridgeCount : 7;
+    ctx.fillStyle = shade(E.col2 || E.col, -8);
+    for (let i = 0; i < n; i++) {
+      const bx = (n === 1 ? 0 : (i / (n - 1) - 0.5) * 1.5) * E.bodyW;
+      const surf = Math.sqrt(Math.max(0, 1 - (bx / E.bodyW) * (bx / E.bodyW)));
+      const topY = E.y0 - bh * surf;
+      const h = E.r * (0.16 + 0.18 * surf);
+      ctx.beginPath();
+      ctx.moveTo(bx - E.r * 0.1, topY);
+      ctx.lineTo(bx - E.r * 0.03, topY - h);   // lean slightly back
+      ctx.lineTo(bx + E.r * 0.1, topY);
+      ctx.closePath(); ctx.fill();
+    }
+  };
+  RIDGE.sail = function (ctx, E) {
+    const bh = E.bodyH * (E.limp ? 0.86 : 1);
+    ctx.fillStyle = shade(E.col2 || E.col, -4) + 'ee';
+    ctx.beginPath();
+    ctx.moveTo(-E.bodyW * 0.6, E.y0 - bh * 0.78);
+    ctx.quadraticCurveTo(0, E.y0 - bh * 2.0, E.bodyW * 0.5, E.y0 - bh * 0.68);
+    ctx.quadraticCurveTo(0, E.y0 - bh * 1.05, -E.bodyW * 0.6, E.y0 - bh * 0.78);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = shade(E.col2 || E.col, -26); ctx.lineWidth = Math.max(1, E.r * 0.03);
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * E.bodyW * 0.22, E.y0 - bh * 0.85); ctx.lineTo(i * E.bodyW * 0.22, E.y0 - bh * 1.55); ctx.stroke(); }
+  };
+
   /* ============================ ASSEMBLY ============================ */
   const CATALOG = {
     body: ['oval', 'chick', 'bird', 'fish', 'serpent'],
     wings: [null, 'angel', 'bird', 'bat', 'butterfly'],
+    horn: [null, 'single', 'pair', 'five'],
+    ridge: [null, 'spikes', 'sail'],
     shell: [null, 'turtle'],
-    tail: [null, 'fluff', 'fish'],
+    tail: [null, 'pointed', 'fluff', 'fish'],
     feet: [null, 'talon', 'paw', 'fin'],
     eyes: ['round', 'slit', 'many', 'none'],
     mouth: ['none', 'beak', 'jaw'],
@@ -377,13 +437,15 @@
     /* back-to-front assembly */
     if (P.wings && WINGS[P.wings]) WINGS[P.wings](ctx, E);
     if (P.tail && TAIL[P.tail]) TAIL[P.tail](ctx, E);
+    if (P.ridge && RIDGE[P.ridge]) RIDGE[P.ridge](ctx, E);   // behind body, spikes rise over the back
     (BODY[P.body] || BODY.oval)(ctx, E);           // stamps head anchor onto E
     if (P.shell && SHELL[P.shell]) SHELL[P.shell](ctx, E);
     if (P.feet && FEET[P.feet]) FEET[P.feet](ctx, E);
+    if (P.horn && HORN[P.horn]) HORN[P.horn](ctx, E);
     if (P.mouth && P.mouth !== 'none' && MOUTH[P.mouth]) MOUTH[P.mouth](ctx, E);
     if (P.eyes !== 'none') (EYES[P.eyes] || EYES.round)(ctx, E);
   }
 
   window.DYA = window.DYA || {};
-  DYA.parts = { draw, CATALOG, BODY, WINGS, SHELL, TAIL, FEET, EYES, MOUTH, shade };
+  DYA.parts = { draw, CATALOG, BODY, WINGS, HORN, RIDGE, SHELL, TAIL, FEET, EYES, MOUTH, shade };
 })();
