@@ -101,6 +101,11 @@
       economy: {},        // key -> replacement value
       ai: {},             // AI tuning knobs (see AI_DEFAULTS)
       hunts: {},          // id -> admin-authored individual Hunt (see Hunts tab)
+      guild: {            // the Dya Guild's own market stall (see Guild Market tab)
+        poolPrice: 100,   // price of one random "Guild stall token"
+        poolEntries: [],  // [{ id, spec, qty }] designed creatures + remaining stock
+        listings: {},     // id -> individual creature the Guild sells outright
+      },
       season: { live: false, openedAt: 0 }, // the Guild's official season: OFF until the organizer (admin) opens it
     };
   }
@@ -248,6 +253,120 @@
     return { ok: true };
   };
 
+  /* ================= GUILD MARKET =================
+     The Dya Guild's own stall. Two admin-authored parts, both riding the
+     same dya_config channel as every other edit so every player's game
+     picks them up within a minute:
+       • pool  — the species the RANDOM "Guild stall token" draws from,
+                 plus its price and the highest rarity a pull may roll.
+       • listings — individual creatures the Guild sells outright: each is
+                 a specific species/rarity/name/price the player can buy
+                 directly, minted deterministically so what's shown is what
+                 you get. */
+  /* Built-in fallback: when the admin hasn't stocked the pool at all, the
+     random Guild stall token keeps its original behaviour — an unlimited
+     draw of a common creature from these seven (so the tutorial's "buy a
+     Guild stall token" step always works). Stock any pool entry and the
+     stall becomes the curated, LIMITED pool instead. */
+  const GUILD_DEFAULT_POOL = ['kipsu', 'wild_punk', 'uff', 'raf_krabbi', 'rodak', 'mikolo_moko', 'karnen'];
+  M.GUILD_DEFAULT_POOL = GUILD_DEFAULT_POOL;
+  M.guildData = function () {
+    const g = M.data.guild || {};
+    return {
+      poolPrice: g.poolPrice != null ? g.poolPrice : 100,
+      poolEntries: Array.isArray(g.poolEntries) ? g.poolEntries : [],
+      listings: g.listings || {},
+    };
+  };
+  M.guildPoolEntries = function () { return M.guildData().poolEntries; };
+  /* pool entries with stock left */
+  M.availablePoolEntries = function () { return M.guildPoolEntries().filter(e => (e.qty | 0) > 0); };
+  /* total tokens still in the random pool */
+  M.poolStock = function () { return M.guildPoolEntries().reduce((n, e) => n + Math.max(0, e.qty | 0), 0); };
+  /* has the admin stocked a curated (limited) pool at all? */
+  M.poolConfigured = function () { return M.guildPoolEntries().length > 0; };
+  M.guildListings = function () { return Object.values((M.data.guild && M.data.guild.listings) || {}); };
+  /* Only the listings still for sale — a listing is one-of-a-kind, so once
+     any player buys it, it's gone from every player's stall. */
+  M.availableGuildListings = function () { return M.guildListings().filter(l => !l.sold); };
+  M.soldGuildListings = function () { return M.guildListings().filter(l => l.sold); };
+  /* The designed creature behind a listing. Newer listings carry a full
+     `spec`; older ones stored species/name/rarity flat — normalize both. */
+  M.listingSpec = function (l) {
+    if (l && l.spec && l.spec.speciesId) return l.spec;
+    return { speciesId: l && l.speciesId, name: l && l.name, rarity: l && l.rarity };
+  };
+  /* Replace the whole random pool (list of { id, spec, qty }) and its price. */
+  M.setGuildPool = function (entries, price) {
+    M.data.guild = M.data.guild || {};
+    M.data.guild.poolEntries = (entries || []).map(e => ({
+      id: e.id || U.uid('gpe'),
+      spec: U.deepCopy(e.spec || { speciesId: (e.spec && e.spec.speciesId) || 'kipsu' }),
+      qty: Math.max(0, e.qty | 0),
+    }));
+    if (price != null) M.data.guild.poolPrice = Math.max(0, price);
+    M.save();
+  };
+  /* Atomically pull one token from the LIMITED random pool: adopt the newest
+     admin state, pick a random in-stock entry (weighted by remaining stock),
+     decrement it, then push — the same first-writer-wins model as listings so
+     two players can't claim the last one. Returns { spec } on success, or
+     { legacy:true } when the pool is unconfigured (caller does the classic
+     unlimited built-in draw), or { empty:true } when a stocked pool is dry. */
+  M.drawGuildPool = async function (seed) {
+    if (!M.poolConfigured()) return { legacy: true };
+    if (M.configured()) { try { await M.fetchRemote(); } catch (e) { /* offline is fine */ } }
+    const avail = M.availablePoolEntries();
+    if (!avail.length) return { empty: true };
+    const rng = new U.Rng(seed != null ? seed : U.newSeed());
+    /* weight the pick by remaining stock */
+    let total = avail.reduce((n, e) => n + (e.qty | 0), 0);
+    let roll = rng.int(1, total), picked = avail[0];
+    for (const e of avail) { roll -= (e.qty | 0); if (roll <= 0) { picked = e; break; } }
+    /* decrement the real entry in the stored order */
+    const real = M.guildPoolEntries().find(e => e.id === picked.id);
+    if (!real || (real.qty | 0) <= 0) return { empty: true };
+    real.qty = (real.qty | 0) - 1;
+    M.save();
+    if (M.configured()) { try { await M.pushRemote(); } catch (e) { /* debounced push retries */ } }
+    return { ok: true, spec: U.deepCopy(real.spec) };
+  };
+  M.setGuildListing = function (l) {
+    if (!l || !l.id) return;
+    M.data.guild = M.data.guild || {};
+    M.data.guild.listings = M.data.guild.listings || {};
+    M.data.guild.listings[l.id] = U.deepCopy(l);
+    M.save();
+  };
+  M.deleteGuildListing = function (id) {
+    if (M.data.guild && M.data.guild.listings && M.data.guild.listings[id]) {
+      delete M.data.guild.listings[id];
+      M.save();
+    }
+  };
+  /* Put a sold listing back on the stall (admin action). */
+  M.relistGuildListing = function (id) {
+    const l = M.data.guild && M.data.guild.listings && M.data.guild.listings[id];
+    if (!l) return;
+    l.sold = false; l.soldBy = null; l.soldAt = 0;
+    M.save();
+  };
+  /* Atomically claim a one-of-a-kind listing for a buyer. Same optimistic,
+     first-writer-wins model as Hunts and the online market: adopt the newest
+     admin state first so we don't clobber a concurrent sale, refuse if it's
+     already gone, otherwise flag it sold and push straight away. The caller
+     only mints the token and charges gold when this returns { ok: true }. */
+  M.buyGuildListing = async function (id, by) {
+    if (M.configured()) { try { await M.fetchRemote(); } catch (e) { /* offline is fine */ } }
+    const l = M.data.guild && M.data.guild.listings && M.data.guild.listings[id];
+    if (!l) return { missing: true };
+    if (l.sold) return { already: true, by: l.soldBy };
+    l.sold = true; l.soldBy = by || null; l.soldAt = Date.now();
+    M.save();
+    if (M.configured()) { try { await M.pushRemote(); } catch (e) { /* debounced push will retry */ } }
+    return { ok: true };
+  };
+
   /* ================= EDIT HELPERS (used by the Admin Panel) ================= */
   /* Compute the minimal per-key diff of an edited species vs its base. */
   M.setSpecies = function (id, edited) {
@@ -312,6 +431,7 @@
       ai: Object.keys(d.ai || {}).length,
       hunts: Object.keys(d.hunts || {}).length,
       huntsAvailable: Object.values(d.hunts || {}).filter(h => !h.hunted).length,
+      guildListings: Object.keys((d.guild && d.guild.listings) || {}).length,
       rev: d.rev,
       updatedAt: d.updatedAt,
     };

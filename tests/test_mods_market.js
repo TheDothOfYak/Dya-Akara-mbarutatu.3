@@ -162,6 +162,47 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   check('global AI skill dial multiplies per-AI skill', Math.abs(G.aiSkill(someAI) - Math.min(1.5, someAI.aiCfg.matchSkill * 2)) < 1e-9);
   M.set('ai', 'matchSkillMul', null);
 
+  /* mintSpec — a designed token comes out exactly as authored */
+  const spec = { speciesId: 'kipsu', name: 'Old Sparks', rarity: 3, sizeIdx: 4, stats: { hp: 777, dmg: 42, speed: 33 }, behaviorValue: 2100, vars: { intelligence: 0.9 } };
+  const st = DYAG.token.mintSpec(spec, { rng: new U.Rng(5) });
+  check('mintSpec honors every designed field', st.name === 'Old Sparks' && st.rarity === 3 && st.sizeIdx === 4 && st.stats.hp === 777 && st.stats.dmg === 42 && st.stats.speed === 33 && st.behaviorValue === 2100 && st.vars.intelligence === 0.9);
+  check('mintSpec leaves blank fields to roll (unique id)', !!st.id && st.speciesId === 'kipsu');
+
+  /* guild pool — LIMITED, designed entries with stock */
+  check('an unstocked pool is unconfigured (classic draw)', M.poolConfigured() === false);
+  M.setGuildPool([
+    { spec: { speciesId: 'gynge', rarity: 2 }, qty: 1 },
+    { spec: { speciesId: 'harkal', rarity: 1 }, qty: 2 },
+  ], 250);
+  check('the pool is stocked and limited', M.poolConfigured() === true && M.poolStock() === 3 && M.guildData().poolPrice === 250);
+  const draws = [];
+  for (let i = 0; i < 3; i++) { const d = await M.drawGuildPool(100 + i); if (d.ok) draws.push(d.spec.speciesId); }
+  check('three draws empty the stock', draws.length === 3 && M.poolStock() === 0);
+  check('a dry pool reports empty (sold out)', (await M.drawGuildPool(9)).empty === true);
+  M.setGuildPool([], 100);
+  check('emptying the pool returns to the classic draw', M.poolConfigured() === false && (await M.drawGuildPool(1)).legacy === true);
+
+  /* guild listings — designed spec, one of a kind */
+  const listing = { id: 'glst_test', spec: { speciesId: 'kipsu', name: 'Old Sparks', rarity: 2, stats: { hp: 500 } }, price: 480, desc: 'A steady hand.', createdAt: Date.now() };
+  M.setGuildListing(listing);
+  check('a guild listing is stored and available', M.guildListings().length === 1 && M.availableGuildListings().length === 1 && M.listingSpec(M.guildListings()[0]).name === 'Old Sparks');
+  /* the game mints it deterministically from the listing id — WYSIWYG */
+  const previewA = DYAG.token.mintSpec(M.listingSpec(listing), { rng: new U.Rng(U.hashStr(listing.id)) });
+  const previewB = DYAG.token.mintSpec(M.listingSpec(listing), { rng: new U.Rng(U.hashStr(listing.id)) });
+  check('listing mints deterministically (shown == bought)', previewA.stats.hp === previewB.stats.hp && previewA.stats.hp === 500 && previewA.name === 'Old Sparks' && previewA.rarity === 2);
+  /* legacy flat listing still resolves through listingSpec */
+  check('a legacy flat listing normalizes to a spec', M.listingSpec({ speciesId: 'uff', name: 'Flat', rarity: 1 }).speciesId === 'uff');
+  /* one of a kind: first buyer claims it, a second is refused */
+  const claim1 = await M.buyGuildListing('glst_test', 'buyer-one');
+  check('first buyer claims the listing', claim1.ok === true);
+  check('a claimed listing leaves the available stall', M.availableGuildListings().length === 0 && M.soldGuildListings().length === 1);
+  const claim2 = await M.buyGuildListing('glst_test', 'buyer-two');
+  check('a second buyer is refused — one of a kind', !claim2.ok && claim2.already === true && claim2.by === 'buyer-one');
+  M.relistGuildListing('glst_test');
+  check('admin can relist a sold listing', M.availableGuildListings().length === 1);
+  M.deleteGuildListing('glst_test');
+  check('a guild listing can be deleted', M.guildListings().length === 0);
+
   /* persistence across a reload */
   const e3 = U.deepCopy(SP.get('uff'));
   e3.desc = 'A very odd creature indeed.';
