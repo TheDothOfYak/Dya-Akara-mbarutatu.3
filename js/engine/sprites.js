@@ -169,7 +169,8 @@
        (falls back to the rig until the image has decoded) */
     if (!(sp.spriteImg && drawImageSprite(ctx, o, t, state))) {
       const rig = sp.rig || 'quad';
-      if (rig === 'quad') drawQuad(ctx, o, t, state);
+      if (rig === 'composed' && DYA.parts) DYA.parts.draw(ctx, o, t, state);
+      else if (rig === 'quad') drawQuad(ctx, o, t, state);
       else if (rig === 'punk') drawPunk(ctx, o, t, state);
       else if (rig === 'biped') drawBiped(ctx, o, t, state);
       else if (rig === 'flame') drawFlame(ctx, o, t, state);
