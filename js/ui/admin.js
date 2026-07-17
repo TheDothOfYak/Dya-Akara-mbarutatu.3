@@ -2046,7 +2046,7 @@
   }
 
   /* ================= SPECIES EDITOR ================= */
-  const RIGS = ['quad', 'biped', 'flame', 'swarm', 'tree', 'blob', 'field', 'relic', 'crab', 'mcfly', 'bird'];
+  const RIGS = ['quad', 'punk', 'composed', 'biped', 'flame', 'swarm', 'tree', 'blob', 'field', 'relic', 'crab', 'mcfly', 'bird'];
 
   /* Ability catalog for the dropdown menus: merges the curated descriptions in
      data/abilities.js with the real ranges/options learned from every existing
@@ -2101,8 +2101,56 @@
     const rig = U.el('select', { cls: 'txt' });
     RIGS.forEach(r => rig.appendChild(U.el('option', { value: r, text: r })));
     rig.value = work.rig || 'quad';
-    rig.onchange = () => work.rig = rig.value;
+    rig.onchange = () => { work.rig = rig.value; paintRigPanel(); };
     lblIn(left, 'Rig (placeholder body type)', rig);
+
+    /* ---- rig-specific controls: the same complete sprite control the
+       standalone designer/composer tools give (punk vines, composed parts).
+       Everything writes straight onto work, and the live preview above
+       re-reads work each frame, so edits show instantly. ---- */
+    const rigPanel = U.el('div', { style: 'margin:6px 0' });
+    left.appendChild(rigPanel);
+    function rigSlider(parent, label, obj, key, min, max, step, dflt) {
+      const val = obj[key] != null ? obj[key] : (dflt != null ? dflt : min);
+      const row = U.el('div', { cls: 'flex', style: 'align-items:center;gap:8px;margin:3px 0' });
+      row.appendChild(U.el('label', { cls: 'lbl', style: 'margin:0;flex:0 0 96px;font-size:11px', text: label }));
+      const rng = U.el('input', { type: 'range', min: min, max: max, step: step, value: val, style: 'flex:1' });
+      const out = U.el('span', { cls: 'small gold', style: 'flex:0 0 42px;text-align:right', text: step < 1 ? Number(val).toFixed(2) : String(val) });
+      rng.oninput = () => { obj[key] = parseFloat(rng.value); out.textContent = step < 1 ? obj[key].toFixed(2) : String(obj[key]); };
+      row.appendChild(rng); row.appendChild(out); parent.appendChild(row);
+    }
+    function rigSelect(parent, label, obj, key, options) {
+      const sel = U.el('select', { cls: 'txt' });
+      options.forEach(opt => sel.appendChild(U.el('option', { value: opt === null ? '__none__' : opt, text: opt === null ? '— none —' : opt })));
+      sel.value = obj[key] == null ? '__none__' : obj[key];
+      sel.onchange = () => { if (sel.value === '__none__') delete obj[key]; else obj[key] = sel.value; };
+      lblIn(parent, label, sel);
+    }
+    function paintRigPanel() {
+      rigPanel.innerHTML = '';
+      if (work.rig === 'punk') {
+        work.punk = Object.assign({ legs: 4, arms: 3, ribs: 6, bodyW: 1.0, bodyH: 0.86, legReach: 1.05, armReach: 1.1, legWidth: 0.12, armWidth: 0.1 }, work.punk || {});
+        rigPanel.appendChild(U.el('label', { cls: 'lbl', text: 'Punk — vines & pumpkin body' }));
+        rigSlider(rigPanel, 'Vine legs', work.punk, 'legs', 1, 8, 1);
+        rigSlider(rigPanel, 'Grasp vines', work.punk, 'arms', 0, 6, 1);
+        rigSlider(rigPanel, 'Ribs', work.punk, 'ribs', 2, 12, 1);
+        rigSlider(rigPanel, 'Body width', work.punk, 'bodyW', 0.5, 1.6, 0.01);
+        rigSlider(rigPanel, 'Body height', work.punk, 'bodyH', 0.4, 1.4, 0.01);
+        rigSlider(rigPanel, 'Leg reach', work.punk, 'legReach', 0.5, 2, 0.01);
+        rigSlider(rigPanel, 'Arm reach', work.punk, 'armReach', 0.4, 2.2, 0.01);
+        rigSlider(rigPanel, 'Leg thickness', work.punk, 'legWidth', 0.04, 0.3, 0.005);
+        rigSlider(rigPanel, 'Arm thickness', work.punk, 'armWidth', 0.03, 0.25, 0.005);
+      } else if (work.rig === 'composed') {
+        const CAT = (window.DYA && DYA.parts && DYA.parts.CATALOG) || {};
+        work.parts = Object.assign({ body: 'oval', bodyW: 0.9, bodyH: 0.72, eyes: 'round', mouth: 'none' }, work.parts || {});
+        rigPanel.appendChild(U.el('label', { cls: 'lbl', text: 'Composed — mix body shape & parts' }));
+        Object.keys(CAT).forEach(cat => rigSelect(rigPanel, cat, work.parts, cat, CAT[cat]));
+        rigSlider(rigPanel, 'Body width', work.parts, 'bodyW', 0.4, 1.6, 0.01);
+        rigSlider(rigPanel, 'Body height', work.parts, 'bodyH', 0.3, 1.4, 0.01);
+        rigSlider(rigPanel, 'Wing span', work.parts, 'wingSpan', 0.5, 2, 0.01, 1);
+      }
+    }
+    paintRigPanel();
 
     const c1 = U.el('input', { cls: 'txt', type: 'color', value: /^#[0-9a-f]{6}$/i.test(work.color || '') ? work.color : '#888888' });
     c1.oninput = () => work.color = c1.value;
