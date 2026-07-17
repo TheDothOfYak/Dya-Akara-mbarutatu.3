@@ -588,20 +588,12 @@
     ctx.quadraticCurveTo(r * 0.05, y0 - bodyH * 1.1, r * 0.14, y0 - bodyH * 1.28);
     ctx.stroke();
 
-    /* ---- face ---- */
-    if (!limp) {
-      ctx.fillStyle = '#1a1208';
-      ctx.beginPath(); ctx.ellipse(bodyW * 0.22, y0 - bodyH * 0.08, r * 0.1, r * 0.14, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(bodyW * 0.5, y0 - bodyH * 0.08, r * 0.1, r * 0.14, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#ffffffaa';
-      ctx.beginPath(); ctx.arc(bodyW * 0.24, y0 - bodyH * 0.13, r * 0.03, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(bodyW * 0.52, y0 - bodyH * 0.13, r * 0.03, 0, TAU); ctx.fill();
-    } else {
-      ctx.strokeStyle = '#1a1208'; ctx.lineWidth = Math.max(1, r * 0.04);
-      ctx.beginPath();
-      ctx.moveTo(bodyW * 0.12, y0 - bodyH * 0.08); ctx.lineTo(bodyW * 0.32, y0 - bodyH * 0.08);
-      ctx.moveTo(bodyW * 0.4, y0 - bodyH * 0.08); ctx.lineTo(bodyW * 0.6, y0 - bodyH * 0.08);
-      ctx.stroke();
+    /* Punks are faceless pumpkins — no eyes or mouth. */
+
+    /* ---- Eikar / Keilia rider, seated on the crown (design: the pair fights
+       as one unit; a Domestic Punk carries the 'mount' tag) ---- */
+    if ((sp.features.rider || o.hasRider) && state !== 'death') {
+      drawMiniAcorn(ctx, bodyW * 0.06, y0 - bodyH * 0.6 + idleBob, r * 0.42, t, '#c8a05c', '#6d4a2e');
     }
 
     /* ---- grasping vine ARMS (in front, reaching up/out) ---- */
