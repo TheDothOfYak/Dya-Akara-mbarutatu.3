@@ -572,13 +572,15 @@
     grd.addColorStop(1, shade(bodyCol, -22));
     ctx.fillStyle = grd;
     ctx.beginPath(); ctx.ellipse(0, y0, bodyW, bodyH * (limp ? 0.86 : 1), 0, 0, TAU); ctx.fill();
-    /* ribs — curved verticals radiating from crown to base */
-    ctx.strokeStyle = shade(bodyCol, -34) + 'aa'; ctx.lineWidth = Math.max(1, r * 0.035);
-    for (let i = 1; i < ribs; i++) {
-      const bow = ((i / ribs) - 0.5) * 2 * bodyW;
+    /* ribs — pumpkin grooves: evenly spread longitudinal curves that bow out
+       with the body and converge toward the poles (near the stem and base) */
+    ctx.strokeStyle = shade(bodyCol, -32) + 'cc'; ctx.lineWidth = Math.max(1, r * 0.045); ctx.lineCap = 'round';
+    const ribTop = y0 - bodyH * 0.86, ribBot = y0 + bodyH * 0.86;
+    for (let i = 0; i < ribs; i++) {
+      const px = (((i + 0.5) / ribs) * 2 - 1) * bodyW * 0.72;   // equator offset of this groove
       ctx.beginPath();
-      ctx.moveTo(0, y0 - bodyH * 0.9);
-      ctx.quadraticCurveTo(bow, y0, 0, y0 + bodyH * 0.9);
+      ctx.moveTo(0, ribTop);
+      ctx.quadraticCurveTo(px * 2, y0, 0, ribBot);
       ctx.stroke();
     }
     /* stem at the crown */
