@@ -169,7 +169,8 @@
        (falls back to the rig until the image has decoded) */
     if (!(sp.spriteImg && drawImageSprite(ctx, o, t, state))) {
       const rig = sp.rig || 'quad';
-      if (rig === 'quad') drawQuad(ctx, o, t, state);
+      if (rig === 'composed' && DYA.parts) DYA.parts.draw(ctx, o, t, state);
+      else if (rig === 'quad') drawQuad(ctx, o, t, state);
       else if (rig === 'punk') drawPunk(ctx, o, t, state);
       else if (rig === 'biped') drawBiped(ctx, o, t, state);
       else if (rig === 'flame') drawFlame(ctx, o, t, state);
@@ -544,8 +545,9 @@
     for (let i = 0; i < legs; i++) {
       const f = legs === 1 ? 0.5 : i / (legs - 1);      // 0..1 across the crown
       const dir = f < 0.5 ? -1 : 1;
-      const ox = (f - 0.5) * bodyW * 0.55;
-      const oy = crownY + Math.abs(f - 0.5) * bodyH * 0.25;
+      // every vine sprouts from the stem cluster, then fans out to its foot
+      const ox = (f - 0.5) * bodyW * 0.16;
+      const oy = crownY + Math.abs(f - 0.5) * bodyH * 0.05;
       const step = moving ? Math.sin(t * rate + i * Math.PI * 0.7) : 0;
       const lift = moving ? Math.max(0, step) * r * 0.18 : 0;
       const swayX = limp ? 0 : (moving ? step * r * 0.12 : Math.sin(t * 1.8 + i) * r * 0.025);
@@ -571,13 +573,15 @@
     grd.addColorStop(1, shade(bodyCol, -22));
     ctx.fillStyle = grd;
     ctx.beginPath(); ctx.ellipse(0, y0, bodyW, bodyH * (limp ? 0.86 : 1), 0, 0, TAU); ctx.fill();
-    /* ribs — curved verticals radiating from crown to base */
-    ctx.strokeStyle = shade(bodyCol, -34) + 'aa'; ctx.lineWidth = Math.max(1, r * 0.035);
-    for (let i = 1; i < ribs; i++) {
-      const bow = ((i / ribs) - 0.5) * 2 * bodyW;
+    /* ribs — pumpkin grooves: evenly spread longitudinal curves that bow out
+       with the body and converge toward the poles (near the stem and base) */
+    ctx.strokeStyle = shade(bodyCol, -32) + 'cc'; ctx.lineWidth = Math.max(1, r * 0.045); ctx.lineCap = 'round';
+    const ribTop = y0 - bodyH * 0.86, ribBot = y0 + bodyH * 0.86;
+    for (let i = 0; i < ribs; i++) {
+      const px = (((i + 0.5) / ribs) * 2 - 1) * bodyW * 0.72;   // equator offset of this groove
       ctx.beginPath();
-      ctx.moveTo(0, y0 - bodyH * 0.9);
-      ctx.quadraticCurveTo(bow, y0, 0, y0 + bodyH * 0.9);
+      ctx.moveTo(0, ribTop);
+      ctx.quadraticCurveTo(px * 2, y0, 0, ribBot);
       ctx.stroke();
     }
     /* stem at the crown */
@@ -587,20 +591,12 @@
     ctx.quadraticCurveTo(r * 0.05, y0 - bodyH * 1.1, r * 0.14, y0 - bodyH * 1.28);
     ctx.stroke();
 
-    /* ---- face ---- */
-    if (!limp) {
-      ctx.fillStyle = '#1a1208';
-      ctx.beginPath(); ctx.ellipse(bodyW * 0.22, y0 - bodyH * 0.08, r * 0.1, r * 0.14, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(bodyW * 0.5, y0 - bodyH * 0.08, r * 0.1, r * 0.14, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#ffffffaa';
-      ctx.beginPath(); ctx.arc(bodyW * 0.24, y0 - bodyH * 0.13, r * 0.03, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(bodyW * 0.52, y0 - bodyH * 0.13, r * 0.03, 0, TAU); ctx.fill();
-    } else {
-      ctx.strokeStyle = '#1a1208'; ctx.lineWidth = Math.max(1, r * 0.04);
-      ctx.beginPath();
-      ctx.moveTo(bodyW * 0.12, y0 - bodyH * 0.08); ctx.lineTo(bodyW * 0.32, y0 - bodyH * 0.08);
-      ctx.moveTo(bodyW * 0.4, y0 - bodyH * 0.08); ctx.lineTo(bodyW * 0.6, y0 - bodyH * 0.08);
-      ctx.stroke();
+    /* Punks are faceless pumpkins — no eyes or mouth. */
+
+    /* ---- Eikar / Keilia rider, seated on the crown (design: the pair fights
+       as one unit; a Domestic Punk carries the 'mount' tag) ---- */
+    if ((sp.features.rider || o.hasRider) && state !== 'death') {
+      drawMiniAcorn(ctx, bodyW * 0.06, y0 - bodyH * 0.6 + idleBob, r * 0.42, t, '#c8a05c', '#6d4a2e');
     }
 
     /* ---- grasping vine ARMS (in front, reaching up/out) ---- */
@@ -616,7 +612,7 @@
       } else if (limp) {
         ang = 0.5 + spread * 0.4; ext = 0.7;                 // droop
       }
-      const ox = spread * bodyW * 0.4, oy = crownY;
+      const ox = spread * bodyW * 0.14, oy = crownY;  // also from the stem cluster
       const tipX = ox + Math.cos(ang) * reach * ext;
       const tipY = oy + Math.sin(ang) * reach * ext;
       const midX = ox + Math.cos(ang) * reach * 0.5 * ext - Math.sin(ang) * r * 0.12;

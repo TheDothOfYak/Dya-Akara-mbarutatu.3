@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dya'akara — Creature Composer</title>
+<style>
+  :root { --bg:#161310; --panel:#221d17; --ink:#efe6d6; --muted:#9a8f7d; --gold:#d9b87a; --line:#3a3128; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:17px; margin:0; color:var(--gold); }
+  header .sub { color:var(--muted); font-size:12px; }
+  .wrap { display:grid; grid-template-columns: 340px 1fr; min-height:calc(100vh - 52px); }
+  .controls { padding:16px 20px; border-right:1px solid var(--line); overflow-y:auto; max-height:calc(100vh - 52px); }
+  .stage { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; }
+  canvas#preview { background:#0f0d0b; border:1px solid var(--line); border-radius:10px; }
+  .grp { margin-bottom:16px; }
+  .grp h2 { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  .row { display:grid; grid-template-columns:96px 1fr; align-items:center; gap:8px; margin:6px 0; }
+  .row label { font-size:12px; }
+  select, button { font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 8px; width:100%; }
+  input[type=color] { width:100%; height:26px; border:1px solid var(--line); background:none; border-radius:6px; }
+  input[type=range] { width:100%; accent-color:var(--gold); }
+  button { cursor:pointer; width:auto; }
+  button.primary { background:var(--gold); color:#241d14; border:none; font-weight:700; }
+  .states { display:flex; flex-wrap:wrap; gap:6px; }
+  .states button.on { background:var(--gold); color:#241d14; }
+  textarea { width:100%; height:120px; background:#0f0d0b; color:#cfe6c8; border:1px solid var(--line); border-radius:8px; padding:10px; font:12px/1.5 ui-monospace,monospace; }
+  .hint { color:var(--muted); font-size:11px; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dya'akara Creature Composer</h1>
+  <span class="sub">Mix body shapes and parts, watch them animate, export the <code>parts</code> JSON — no tokens.</span>
+</header>
+<div class="wrap">
+  <div class="controls" id="controls"></div>
+  <div class="stage">
+    <canvas id="preview" width="440" height="380"></canvas>
+    <div class="states" id="states"></div>
+    <div style="width:100%;max-width:440px">
+      <div class="grp"><h2>Export</h2>
+        <textarea id="out" readonly></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="primary" id="copy">Copy JSON</button>
+        </div>
+        <div class="hint">Paste as <code>rig: 'composed', parts: {…}</code> into a species def in <code>js/data/species.js</code>.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>window.DYA = { util: {} };</script>
+<script src="../js/engine/sprites.js"></script>
+<script src="../js/engine/parts.js"></script>
+<script>
+(function () {
+  'use strict';
+  const SPR = DYA.sprites, CAT = DYA.parts.CATALOG;
+  const cfg = { color:'#c9a24b', color2:'#7ec8e3', body:'fish', wings:null, shell:null, tail:null, feet:'fin', eyes:'round', mouth:'none', bodyW:0.9, bodyH:0.72, wingSpan:1, size:78 };
+  let state = 'idle', facing = 1;
+  const controls = document.getElementById('controls');
+
+  function grp(title){ const d=document.createElement('div'); d.className='grp'; d.innerHTML='<h2>'+title+'</h2>'; controls.appendChild(d); return d; }
+  function label(v){ return v===null ? '— none —' : v; }
+
+  // colours
+  const gc = grp('Colours');
+  [['color','Primary'],['color2','Accent']].forEach(([k,lab])=>{
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML='<label>'+lab+'</label>';
+    const inp=document.createElement('input'); inp.type='color'; inp.value=cfg[k];
+    inp.oninput=()=>{cfg[k]=inp.value; sync();}; row.appendChild(inp); gc.appendChild(row);
+  });
+
+  // part dropdowns
+  const gp = grp('Parts');
+  Object.keys(CAT).forEach(cat=>{
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML='<label>'+cat+'</label>';
+    const sel=document.createElement('select');
+    CAT[cat].forEach(opt=>{ const o=document.createElement('option'); o.value=String(opt); o.textContent=label(opt); if(opt===cfg[cat]) o.selected=true; sel.appendChild(o); });
+    sel.onchange=()=>{ const v=sel.value; cfg[cat]= (v==='null')?null:v; sync(); };
+    row.appendChild(sel); gp.appendChild(row);
+  });
+
+  // sliders
+  const gs = grp('Proportions');
+  [['bodyW','Body width',0.4,1.6,0.01],['bodyH','Body height',0.3,1.4,0.01],['wingSpan','Wing span',0.5,2.0,0.01],['size','Preview size',36,130,1]].forEach(([k,lab,mn,mx,st])=>{
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML='<label>'+lab+'</label>';
+    const inp=document.createElement('input'); inp.type='range'; inp.min=mn; inp.max=mx; inp.step=st; inp.value=cfg[k];
+    inp.oninput=()=>{cfg[k]=parseFloat(inp.value); sync();}; row.appendChild(inp); gs.appendChild(row);
+  });
+
+  // states
+  const statesEl=document.getElementById('states');
+  ['idle','walk','run','attack','special','dormant','death'].forEach(s=>{
+    const b=document.createElement('button'); b.textContent=s; if(s===state)b.className='on';
+    b.onclick=()=>{state=s; [...statesEl.children].forEach(c=>c.className=''); b.className='on';};
+    statesEl.appendChild(b);
+  });
+  const flip=document.createElement('button'); flip.textContent='⇋ face'; flip.onclick=()=>{facing=-facing;}; statesEl.appendChild(flip);
+
+  function species(){
+    const parts={ body:cfg.body, bodyW:+cfg.bodyW.toFixed(2), bodyH:+cfg.bodyH.toFixed(2) };
+    ['wings','shell','tail','feet','eyes','mouth'].forEach(k=>{ if(cfg[k]!==null && cfg[k]!=='none') parts[k]=cfg[k]; else if(k==='eyes'||k==='mouth') parts[k]=cfg[k]; });
+    if(cfg.wings) parts.wingSpan=+cfg.wingSpan.toFixed(2);
+    return { id:'preview', rig:'composed', color:cfg.color, color2:cfg.color2, features:{}, parts };
+  }
+  function sync(){
+    const sp=species();
+    document.getElementById('out').value =
+      "color: '"+cfg.color+"', color2: '"+cfg.color2+"',\n"+
+      "rig: 'composed',\nparts: "+JSON.stringify(sp.parts)+',';
+  }
+
+  const cv=document.getElementById('preview'), ctx=cv.getContext('2d'); const t0=performance.now();
+  function frame(now){
+    const t=(now-t0)/1000;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.strokeStyle='#2a241c'; ctx.beginPath(); ctx.moveTo(0,cv.height*0.72); ctx.lineTo(cv.width,cv.height*0.72); ctx.stroke();
+    ctx.save(); ctx.translate(cv.width/2, cv.height*0.6);
+    SPR.draw(ctx,{ sp:species(), r:cfg.size, state, t, facing });
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+  document.getElementById('copy').onclick=()=>{ const ta=document.getElementById('out'); ta.select(); navigator.clipboard&&navigator.clipboard.writeText(ta.value); const b=document.getElementById('copy'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy JSON',1200); };
+
+  sync(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
