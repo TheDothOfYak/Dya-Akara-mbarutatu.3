@@ -118,9 +118,10 @@
 
   def('kofi', {
     name: 'Kofi', family: 'Creature', element: 'Ular',
-    rarity: [0, 0], size: [0, 0], rig: 'quad',
+    rarity: [0, 0], size: [0, 0], rig: 'composed',
     color: '#c9a26b', color2: '#8a6f4a',
     features: { soft: true },
+    parts: { body: 'chick', ears: 'long', feet: 'paw', legCount: 2, eyes: 'round', mouth: 'none', bodyW: 0.72, bodyH: 0.7 },
     tags: ['prey', 'herbivore', 'spawned'],
     behavior: 'kofi',
     statMul: { hp: 0.4, dmg: 0.1, speed: 1.1 },
@@ -165,9 +166,10 @@
 
   def('rodak', {
     name: 'Rodak', family: 'Creature', element: 'Ular',
-    rarity: [0, 2], size: [1, 1], rig: 'quad',
+    rarity: [0, 2], size: [1, 1], rig: 'composed',
     color: '#3a3a42', color2: '#23232a', // dark oily
     features: { lean: true, pack: 3 },
+    parts: { body: 'lizard', tail: 'pointed', feet: 'paw', legLength: 0.8, eyes: 'slit', mouth: 'jaw', bodyW: 1.05, bodyH: 0.52 },
     tags: ['carnivore', 'pack', 'scavenger'],
     behavior: 'rodak',
     statMul: { hp: 0.7, dmg: 0.9, speed: 1.25 },
@@ -286,9 +288,10 @@
 
   def('kipsu', {
     name: 'Kipsu', family: 'Creature', element: 'Ular',
-    rarity: [0, 3], size: [0, 3], rig: 'quad',
+    rarity: [0, 3], size: [0, 3], rig: 'composed',
     color: '#a3703f', color2: '#68e0c8', // fox-brown, biolum teal tail
     features: { fluffTail: true, biolumTail: true, ears: true },
+    parts: { body: 'beast', ears: 'fox', tail: 'fluff', feet: 'paw', eyes: 'round', mouth: 'none', bodyW: 0.85, bodyH: 0.6 },
     tags: ['pack', 'biolum', 'omnivore'],
     behavior: 'kipsu',
     statMul: { hp: 0.85, dmg: 0.75, speed: 1.2 },
@@ -407,9 +410,10 @@
 
   def('mikolo_moko', {
     name: 'Mikolo Moko', family: 'Creature', element: 'Ular',
-    rarity: [0, 3], size: [0, 1], rig: 'quad',
+    rarity: [0, 3], size: [0, 1], rig: 'composed',
     color: '#7a9455', color2: '#55703a',
     features: { lean: true, snake: true },
+    parts: { body: 'serpent', eyes: 'slit', mouth: 'none', bodyW: 0.85, bodyH: 0.62 },
     tags: ['thief', 'relic'],
     behavior: 'mikolo_moko',
     statMul: { hp: 0.55, dmg: 0.1, speed: 1.5 },
