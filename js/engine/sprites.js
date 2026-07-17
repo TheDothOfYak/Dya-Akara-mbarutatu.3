@@ -573,15 +573,23 @@
     grd.addColorStop(1, shade(bodyCol, -22));
     ctx.fillStyle = grd;
     ctx.beginPath(); ctx.ellipse(0, y0, bodyW, bodyH * (limp ? 0.86 : 1), 0, 0, TAU); ctx.fill();
-    /* ribs — pumpkin grooves: evenly spread longitudinal curves that bow out
-       with the body and converge toward the poles (near the stem and base) */
+    /* ribs — pumpkin grooves: longitude curves that hug the body surface out
+       to the rim (widest ribs reach ~the edge) and converge at the stem and
+       base. Following the ellipse (x = px·√(1−v²)) keeps them inside the
+       silhouette so they never poke out. */
+    const bh = bodyH * (limp ? 0.86 : 1);
     ctx.strokeStyle = shade(bodyCol, -32) + 'cc'; ctx.lineWidth = Math.max(1, r * 0.045); ctx.lineCap = 'round';
-    const ribTop = y0 - bodyH * 0.86, ribBot = y0 + bodyH * 0.86;
     for (let i = 0; i < ribs; i++) {
-      const px = (((i + 0.5) / ribs) * 2 - 1) * bodyW * 0.72;   // equator offset of this groove
+      const frac = ribs === 1 ? 0 : (i / (ribs - 1)) * 2 - 1;   // -1..1 across the face
+      const px = frac * bodyW * 0.98;                            // reach out to the rim
       ctx.beginPath();
-      ctx.moveTo(0, ribTop);
-      ctx.quadraticCurveTo(px * 2, y0, 0, ribBot);
+      const N = 16;
+      for (let k = 0; k <= N; k++) {
+        const v = -1 + 2 * (k / N);
+        const x = px * Math.sqrt(Math.max(0, 1 - v * v));
+        const y = y0 + v * bh;
+        k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
       ctx.stroke();
     }
     /* stem at the crown */
