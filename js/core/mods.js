@@ -106,6 +106,8 @@
         poolEntries: [],  // [{ id, spec, qty }] designed creatures + remaining stock
         listings: {},     // id -> individual creature the Guild sells outright
       },
+      reserve: {},         // id -> { id, spec, createdAt } — designed tokens owned by no one yet (Crafting Station)
+      levelChestPools: {}, // level -> [{speciesId, rarity}] manual milestone-chest token options
       season: { live: false, openedAt: 0 }, // the Guild's official season: OFF until the organizer (admin) opens it
     };
   }
@@ -367,6 +369,41 @@
     return { ok: true };
   };
 
+  /* ================= RESERVE =================
+     Tokens designed with the universal token designer (Crafting Station)
+     that belong to no one yet — a stockpile the admin draws from to grant
+     the EXACT token to a player, an exact tournament placement reward, or
+     push it onto the Guild stall, instead of minting a fresh random roll
+     each time. Rides the same dya_config channel as Hunts / Guild Market. */
+  M.reserveEntries = function () { return Object.values(M.data.reserve || {}); };
+  M.getReserveEntry = function (id) { return (M.data.reserve || {})[id] || null; };
+  M.setReserveEntry = function (entry) {
+    if (!entry || !entry.id) return;
+    M.data.reserve = M.data.reserve || {};
+    M.data.reserve[entry.id] = U.deepCopy(entry);
+    M.save();
+  };
+  M.deleteReserveEntry = function (id) {
+    if (M.data.reserve && M.data.reserve[id]) { delete M.data.reserve[id]; M.save(); }
+  };
+
+  /* ================= LEVEL CHEST POOLS =================
+     Manual curation of what a milestone level-up chest CAN contain: for a
+     given level, an admin-picked list of {speciesId, rarity}. When a pool
+     is set for a level, the chest draws only from it instead of rolling any
+     craftable species at random. Levels with no pool keep the old behavior. */
+  M.getLevelChestPool = function (level) { return (M.data.levelChestPools || {})[level] || null; };
+  M.setLevelChestPool = function (level, pool) {
+    M.data.levelChestPools = M.data.levelChestPools || {};
+    if (!pool || !pool.length) delete M.data.levelChestPools[level];
+    else M.data.levelChestPools[level] = pool;
+    M.save();
+  };
+  M.deleteLevelChestPool = function (level) {
+    if (M.data.levelChestPools && M.data.levelChestPools[level]) { delete M.data.levelChestPools[level]; M.save(); }
+  };
+  M.levelChestPoolLevels = function () { return Object.keys(M.data.levelChestPools || {}).map(Number).sort((a, b) => a - b); };
+
   /* ================= EDIT HELPERS (used by the Admin Panel) ================= */
   /* Compute the minimal per-key diff of an edited species vs its base. */
   M.setSpecies = function (id, edited) {
@@ -432,6 +469,8 @@
       hunts: Object.keys(d.hunts || {}).length,
       huntsAvailable: Object.values(d.hunts || {}).filter(h => !h.hunted).length,
       guildListings: Object.keys((d.guild && d.guild.listings) || {}).length,
+      reserve: Object.keys(d.reserve || {}).length,
+      levelChestPools: Object.keys(d.levelChestPools || {}).length,
       rev: d.rev,
       updatedAt: d.updatedAt,
     };

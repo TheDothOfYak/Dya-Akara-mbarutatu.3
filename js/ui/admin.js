@@ -350,7 +350,7 @@
   }
 
   /* ---------- main panel ---------- */
-  const NAV = ['Overview', 'Creatures', 'Hunts', 'Guild Market', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
+  const NAV = ['Overview', 'Creatures', 'Hunts', 'Guild Market', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Crafting Station', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
   function panel() {
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap' });
@@ -383,7 +383,7 @@
       const ms = M.summary();
       const tiles = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(160px,1fr))' });
       [['Real players', humans.length], ['AI players', ais.length], ['Local listings', listings], ['Open reports/appeals', openReports], ['Tournaments', Object.values(G.world.tournaments).length], ['Season', G.world.season.number],
-      ['Species edited', ms.species + ms.customSpecies], ['Hunts available', ms.huntsAvailable + '/' + ms.hunts], ['Text overrides', ms.text + ms.lore], ['Balance overrides', ms.balance], ['Edit revision', ms.rev]].forEach(([l, v]) => {
+      ['Species edited', ms.species + ms.customSpecies], ['Hunts available', ms.huntsAvailable + '/' + ms.hunts], ['Guild listings', ms.guildListings], ['Reserve tokens', ms.reserve], ['Level chest pools set', ms.levelChestPools], ['Text overrides', ms.text + ms.lore], ['Balance overrides', ms.balance], ['Edit revision', ms.rev]].forEach(([l, v]) => {
         tiles.appendChild(U.el('div', { cls: 'stat-tile' }, [U.el('div', { cls: 'st-num', text: v }), U.el('div', { cls: 'st-lbl', text: l })]));
       });
       body.appendChild(tiles);
@@ -842,6 +842,39 @@
       paintOkidTable();
       body.appendChild(pbox);
 
+      /* --- Milestone level-chest token pools (manual curation) --- */
+      const lbox = U.el('div', { cls: 'panel mb' });
+      lbox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Level chest — milestone token pools' }));
+      lbox.appendChild(U.el('p', { cls: 'small muted mb', text: 'Milestone levels (3, 5, 10, 15, 20, 30, 40, 50, then every 10) grant a bonus token in the level-up chest. By default that token is any random craftable species. Set a pool for a level to replace that randomness with a hand-picked list of species/rarity options — the chest will only ever draw from your list.' }));
+      const lholder = U.el('div', {});
+      lbox.appendChild(lholder);
+      function paintLevelPools() {
+        lholder.innerHTML = '';
+        const levels = M.levelChestPoolLevels();
+        if (!levels.length) lholder.appendChild(U.el('p', { cls: 'muted small', text: 'No level pools set yet — every milestone still rolls any craftable species.' }));
+        levels.forEach(lv => {
+          const pool = M.getLevelChestPool(lv) || [];
+          const row = U.el('div', { cls: 'flex', style: 'gap:8px;align-items:center;margin-bottom:6px' });
+          row.appendChild(U.el('b', { cls: 'gold', style: 'min-width:70px', text: 'Level ' + lv }));
+          row.appendChild(U.el('div', { cls: 'small muted', style: 'flex:1', text: pool.map(p => ((SP.get(p.speciesId) || {}).name || p.speciesId) + (p.rarity != null ? ' (' + SP.RARITIES[p.rarity] + ')' : ' (rarity: roll)')).join(', ') || '(empty)' }));
+          row.appendChild(U.el('button', { cls: 'btn small ghost', text: '✎ Edit', onclick: () => editLevelChestPool(lv, pool, paintLevelPools) }));
+          row.appendChild(U.el('button', { cls: 'btn small danger', text: '🗑', onclick: () => { if (confirm('Remove the pool for level ' + lv + '? It will go back to rolling any craftable species.')) { M.deleteLevelChestPool(lv); paintLevelPools(); } } }));
+          lholder.appendChild(row);
+        });
+      }
+      paintLevelPools();
+      const laddRow = U.el('div', { cls: 'flex mt', style: 'gap:8px;align-items:end' });
+      const lvIn = numIn(10, { step: 1, min: 1, style: 'max-width:100px' });
+      laddRow.appendChild(U.el('div', {}, [U.el('label', { cls: 'lbl', text: 'Level' }), lvIn]));
+      laddRow.appendChild(U.el('button', {
+        cls: 'btn small primary', text: '＋ Add / edit a level’s pool', onclick: () => {
+          const lv = Math.max(1, parseInt(lvIn.value, 10) || 10);
+          editLevelChestPool(lv, M.getLevelChestPool(lv) || [], paintLevelPools);
+        },
+      }));
+      lbox.appendChild(laddRow);
+      body.appendChild(lbox);
+
       /* scalar knobs */
       const sbox = U.el('div', { cls: 'panel mb' });
       sbox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Other dials' }));
@@ -1060,7 +1093,7 @@
 
     /* ================= SPAWN TOKENS ================= */
     'Spawn Tokens'(body) {
-      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Spawn tokens into any account — prizes, events, testing.' }));
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Spawn tokens into any account — prizes, events, testing. Stats are rolled fresh from the rarity band. For an exact, hand-designed token, craft it in the Crafting Station tab and grant it from the Reserve instead.' }));
       const acc = U.el('select', { cls: 'txt' });
       Object.values(G.world.accounts).forEach(a => acc.appendChild(U.el('option', { value: a.id, text: a.displayName + (a.ai ? ' (AI)' : '') })));
       const spc = U.el('select', { cls: 'txt' });
@@ -1100,6 +1133,63 @@
           G.saveNow(); G.pushAccountToCloud(a); alert('Granted' + (hs > 0 ? ' (incl. ' + hs + ' Hunt slot' + (hs > 1 ? 's' : '') + ')' : '') + '.');
         },
       })]));
+    },
+
+    /* ================= CRAFTING STATION ================= */
+    'Crafting Station'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Design a token from scratch with the universal token designer — species, name, rarity, size, exact stats, abilities, behavior tree, everything. Then either place it in the Reserve — a stockpile you can grant to any player, use as an exact tournament reward, or push to the Guild stall later — or push it straight onto the Guild stall now.' }));
+      body.appendChild(U.el('button', { cls: 'btn primary mb', text: '✎ Craft a new token…', onclick: () => craftToken() }));
+
+      const entries = M.reserveEntries();
+      body.appendChild(U.el('h3', { cls: 'gold mb', text: 'Reserve — ' + entries.length + ' token' + (entries.length === 1 ? '' : 's') + ' waiting' }));
+      body.appendChild(U.el('p', { cls: 'small muted mb', text: 'Belongs to no one yet. Grant it directly into a player’s collection, push it to the Guild stall, or pick it as an exact tournament reward from the Tournaments tab.' }));
+      if (!entries.length) { body.appendChild(U.el('p', { cls: 'muted small', text: 'The Reserve is empty. Craft a token above to add one.' })); return; }
+
+      const tbl = U.el('table', { cls: 'adm' });
+      tbl.appendChild(U.el('tr', {}, ['', 'Design', ''].map(h => U.el('th', { text: h }))));
+      entries.forEach(entry => {
+        const sp = SP.get(entry.spec.speciesId);
+        const tr = U.el('tr', {});
+        const iconTd = U.el('td', {});
+        if (sp) iconTd.appendChild(spriteThumb(sp, 34));
+        tr.appendChild(iconTd);
+        tr.appendChild(U.el('td', { text: specSummary(entry.spec) }));
+        const actTd = U.el('td', { style: 'white-space:nowrap' });
+        actTd.appendChild(U.el('button', {
+          cls: 'btn small ghost', text: '✎ Edit', onclick: () => editHuntEnemy(entry.spec, () => { M.setReserveEntry(entry); rerender(); }, { hideBoss: true, title: 'Reserve token — design every detail', intro: 'Anything you set is minted true when this is granted; blank fields roll then.' }),
+        }));
+        actTd.appendChild(U.el('button', {
+          cls: 'btn small ghost', text: '🏪 Push to stall', onclick: () => {
+            const raw = prompt('List this token on the Guild stall for how much gold?', '150');
+            if (raw == null) return;
+            const price = parseInt(raw, 10);
+            if (!price || price <= 0) { alert('Enter a price greater than 0.'); return; }
+            const r = G.admin.pushReserveToStall(entry.id, price);
+            if (r.err) alert(r.err); else rerender();
+          },
+        }));
+        const grantSel = U.el('select', { cls: 'txt', style: 'max-width:170px' });
+        Object.values(G.world.accounts).forEach(a => grantSel.appendChild(U.el('option', { value: a.id, text: a.displayName + (a.ai ? ' (AI)' : '') })));
+        actTd.appendChild(grantSel);
+        actTd.appendChild(U.el('button', {
+          cls: 'btn small ghost', text: '🎁 Grant', onclick: () => {
+            const acc = G.world.accounts[grantSel.value];
+            if (!acc || !confirm('Grant this token directly to ' + acc.displayName + '\'s collection?')) return;
+            const r = G.admin.grantReserveEntry(entry.id, acc.id);
+            if (r.err) alert(r.err); else rerender();
+          },
+        }));
+        actTd.appendChild(U.el('button', {
+          cls: 'btn small danger', text: '🗑', onclick: () => {
+            if (!confirm('Delete this token from the Reserve permanently?')) return;
+            M.deleteReserveEntry(entry.id);
+            rerender();
+          },
+        }));
+        tr.appendChild(actTd);
+        tbl.appendChild(tr);
+      });
+      body.appendChild(tbl);
     },
 
     /* ================= ALL TOKENS ================= */
@@ -1877,6 +1967,111 @@
     acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: closeAll }));
     if (!isNew) acts.appendChild(U.el('button', { cls: 'btn danger', text: 'Delete listing', onclick: () => { if (confirm('Delete this listing permanently?')) { M.deleteGuildListing(work.id); closeAll(); } } }));
     w.appendChild(acts);
+  }
+
+  /* ================= CRAFTING STATION =================
+     Design a token from scratch with the universal designer, then decide
+     where it goes: the Reserve (grant it to a player or a tournament winner
+     later) or straight onto the Guild stall as a one-of-a-kind listing. */
+  function craftToken() {
+    const firstSpid = (SP.list[0] && SP.list[0].id) || '';
+    const work = { spec: { speciesId: firstSpid, rarity: 1 } };
+    const { w, close } = modal('4% 10%');
+    const closeAll = () => { stopPreviews(); close(); rerender(); };
+    w.appendChild(U.el('h2', { cls: 'gold', text: 'Craft a token' }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'Design the exact token — species, name, rarity, size, exact stats, abilities, everything — then decide where it goes.' }));
+
+    const cols = U.el('div', { cls: 'grid', style: 'grid-template-columns:320px 1fr;gap:18px;align-items:start' });
+    w.appendChild(cols);
+    const left = U.el('div', {}), right = U.el('div', {});
+    cols.appendChild(left); cols.appendChild(right);
+
+    left.appendChild(U.el('h3', { cls: 'gold mb', text: 'The token' }));
+    left.appendChild(livePreview(() => SP.get(work.spec.speciesId) || SP.list[0]));
+
+    right.appendChild(U.el('label', { cls: 'lbl', text: 'The designed token' }));
+    const summaryLine = U.el('div', { cls: 'small muted mb', text: specSummary(work.spec) });
+    right.appendChild(summaryLine);
+    right.appendChild(U.el('button', {
+      cls: 'btn mb', text: '✎ Design the token (every detail)', onclick: () => {
+        editHuntEnemy(work.spec, () => { summaryLine.textContent = specSummary(work.spec); }, { hideBoss: true, title: 'Craft a token — design every detail', intro: 'Species, name, rarity, size, precise stats, abilities, behavior tree — anything you set here is minted true; anything left blank rolls once it’s placed.' });
+      },
+    }));
+
+    const acts = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:8px' });
+    acts.appendChild(U.el('button', {
+      cls: 'btn primary', text: '📦 Place in Reserve', onclick: () => {
+        if (!SP.get(work.spec.speciesId)) { alert('Pick a valid species (Design the token).'); return; }
+        M.setReserveEntry({ id: U.uid('rsv'), spec: work.spec, createdAt: Date.now() });
+        closeAll();
+      },
+    }));
+    acts.appendChild(U.el('button', {
+      cls: 'btn', text: '🏪 Push to Guild stall…', onclick: () => {
+        if (!SP.get(work.spec.speciesId)) { alert('Pick a valid species (Design the token).'); return; }
+        const raw = prompt('List this token on the Guild stall for how much gold?', '150');
+        if (raw == null) return;
+        const price = parseInt(raw, 10);
+        if (!price || price <= 0) { alert('Enter a price greater than 0.'); return; }
+        M.setGuildListing({ id: U.uid('glst'), spec: work.spec, price, desc: '', createdAt: Date.now() });
+        closeAll();
+      },
+    }));
+    acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: closeAll }));
+    w.appendChild(acts);
+  }
+
+  /* A lightweight picker for choosing one Reserve entry (used by the
+     tournament reward editor's "From Reserve" button). */
+  function pickReserveEntry(entries, onPick) {
+    const { w, close } = modal('20% 20%');
+    w.appendChild(U.el('h3', { cls: 'gold mb', text: 'Choose a Reserve token' }));
+    entries.forEach(entry => {
+      const sp = SP.get(entry.spec.speciesId);
+      const row = U.el('div', { cls: 'flex', style: 'gap:8px;align-items:center;cursor:pointer;padding:6px;border-bottom:1px solid var(--line)' });
+      if (sp) row.appendChild(spriteThumb(sp, 30));
+      row.appendChild(U.el('div', { cls: 'small', style: 'flex:1', text: specSummary(entry.spec) }));
+      row.onclick = () => { onPick(entry); close(); };
+      w.appendChild(row);
+    });
+    w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: close }));
+  }
+
+  /* ================= LEVEL CHEST POOL EDITOR =================
+     A milestone level's chest token options: a hand-picked list of
+     {speciesId, rarity}. The chest rolls only among these instead of any
+     random craftable species. Leaving rarity unset rolls it as before. */
+  function editLevelChestPool(level, initial, onSave) {
+    const { w, close } = modal('20% 20%');
+    w.appendChild(U.el('h2', { cls: 'gold', text: 'Level ' + level + ' chest — token pool' }));
+    w.appendChild(U.el('p', { cls: 'small muted mb', text: 'When this level\'s chest grants its bonus token, it will draw only from this list. Leave the list empty to fall back to rolling any craftable species.' }));
+    const pool = U.deepCopy(initial || []);
+    const holder = U.el('div', {});
+    w.appendChild(holder);
+    function paint() {
+      holder.innerHTML = '';
+      pool.forEach((p, i) => {
+        const r = U.el('div', { cls: 'flex', style: 'gap:6px;margin-bottom:4px' });
+        const spSel = selectEl(SP.list.map(s => [s.id, s.name]), p.speciesId || (SP.list[0] && SP.list[0].id));
+        spSel.style.flex = '2'; spSel.onchange = () => p.speciesId = spSel.value;
+        const rSel = selectEl([['', 'rarity: roll']].concat(SP.RARITIES.map((rn, i2) => [String(i2), rn])), p.rarity != null ? String(p.rarity) : '');
+        rSel.onchange = () => { if (rSel.value === '') delete p.rarity; else p.rarity = parseInt(rSel.value, 10); };
+        r.appendChild(spSel); r.appendChild(rSel);
+        r.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { pool.splice(i, 1); paint(); } }));
+        holder.appendChild(r);
+      });
+    }
+    paint();
+    w.appendChild(U.el('button', { cls: 'btn small ghost mt', text: '＋ Add an option', onclick: () => { pool.push({ speciesId: SP.list[0] && SP.list[0].id }); paint(); } }));
+    w.appendChild(U.el('div', { cls: 'flex mt' }, [
+      U.el('button', {
+        cls: 'btn primary', text: 'Save pool', onclick: () => {
+          M.setLevelChestPool(level, pool.filter(p => p.speciesId && SP.get(p.speciesId)));
+          close(); onSave();
+        },
+      }),
+      U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => close() }),
+    ]));
   }
 
   /* ================= HUNT CREATURE EDITOR =================
@@ -2933,26 +3128,40 @@
         });
         box.appendChild(U.el('button', { cls: 'btn small ghost', text: '＋ Okid', onclick: () => { rw.okid.push({ rarity: 0, qty: 1 }); paint(); } }));
 
-        /* Token rows — each is a hand-designed token (species, rarity, and any
-           exact stat/variable/trait/tree override) minted fresh for the winner */
-        box.appendChild(U.el('label', { cls: 'lbl mt', text: 'Tokens (designed, minted fresh for the winner)' }));
+        /* Token rows — EITHER a hand-designed token minted fresh for the
+           winner, OR the EXACT token pulled from the Reserve (consumed on
+           grant, like a Guild listing sold once). */
+        box.appendChild(U.el('label', { cls: 'lbl mt', text: 'Tokens' }));
         rw.tokens.forEach((tk, ti) => {
           /* migrate a legacy flat token reward into a spec */
           if (!tk.spec) { tk.spec = { speciesId: tk.speciesId || (SP.list[0] && SP.list[0].id) }; if (tk.rarity != null) tk.spec.rarity = tk.rarity; delete tk.speciesId; delete tk.rarity; }
           const r = U.el('div', { style: 'margin-bottom:6px' });
           const line = U.el('div', { cls: 'flex', style: 'gap:6px;align-items:center;flex-wrap:wrap' });
-          const spSel = selectEl(SP.list.map(s => [s.id, s.name]), tk.spec.speciesId || (SP.list[0] && SP.list[0].id));
-          spSel.style.flex = '2'; spSel.onchange = () => { tk.spec.speciesId = spSel.value; sumLine.textContent = specSummary(tk.spec); };
-          const rSel = selectEl([['', 'rarity: roll']].concat(SP.RARITIES.map((rn, i) => [String(i), rn])), tk.spec.rarity != null ? String(tk.spec.rarity) : '');
-          rSel.onchange = () => { if (rSel.value === '') delete tk.spec.rarity; else tk.spec.rarity = parseInt(rSel.value, 10); sumLine.textContent = specSummary(tk.spec); };
-          const qIn = numIn(tk.qty || 1, { step: 1, min: 1, style: 'max-width:70px' });
-          qIn.oninput = () => tk.qty = parseInt(qIn.value, 10) || 1;
-          const designBtn = U.el('button', { cls: 'btn small', text: '✎ Design', onclick: () => editHuntEnemy(tk.spec, () => { sumLine.textContent = specSummary(tk.spec); }, { hideBoss: true, title: 'Reward token — design every detail', intro: 'Design the exact token this placement awards. Anything you set is minted true for the winner; blank fields roll fresh when it’s granted.' }) });
-          line.appendChild(spSel); line.appendChild(rSel); line.appendChild(qIn); line.appendChild(designBtn);
+          if (tk.reserveId) {
+            const entry = M.getReserveEntry(tk.reserveId);
+            line.appendChild(U.el('div', { cls: 'small', style: 'flex:1', text: '📦 ' + (entry ? specSummary(entry.spec) : '(this Reserve token is gone)') }));
+            line.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Unlink', onclick: () => { delete tk.reserveId; tk.spec = { speciesId: (SP.list[0] && SP.list[0].id) }; paint(); } }));
+          } else {
+            const spSel = selectEl(SP.list.map(s => [s.id, s.name]), tk.spec.speciesId || (SP.list[0] && SP.list[0].id));
+            spSel.style.flex = '2'; spSel.onchange = () => { tk.spec.speciesId = spSel.value; sumLine.textContent = specSummary(tk.spec); };
+            const rSel = selectEl([['', 'rarity: roll']].concat(SP.RARITIES.map((rn, i) => [String(i), rn])), tk.spec.rarity != null ? String(tk.spec.rarity) : '');
+            rSel.onchange = () => { if (rSel.value === '') delete tk.spec.rarity; else tk.spec.rarity = parseInt(rSel.value, 10); sumLine.textContent = specSummary(tk.spec); };
+            const qIn = numIn(tk.qty || 1, { step: 1, min: 1, style: 'max-width:70px' });
+            qIn.oninput = () => tk.qty = parseInt(qIn.value, 10) || 1;
+            const designBtn = U.el('button', { cls: 'btn small', text: '✎ Design', onclick: () => editHuntEnemy(tk.spec, () => { sumLine.textContent = specSummary(tk.spec); }, { hideBoss: true, title: 'Reward token — design every detail', intro: 'Design the exact token this placement awards. Anything you set is minted true for the winner; blank fields roll fresh when it’s granted.' }) });
+            const resToks = M.reserveEntries();
+            const reserveBtn = U.el('button', {
+              cls: 'btn small ghost', text: '📦 From Reserve', onclick: () => {
+                if (!resToks.length) { alert('The Reserve is empty — craft a token in the Crafting Station tab first.'); return; }
+                pickReserveEntry(resToks, (entry) => { tk.reserveId = entry.id; delete tk.qty; paint(); });
+              },
+            });
+            line.appendChild(spSel); line.appendChild(rSel); line.appendChild(qIn); line.appendChild(designBtn); line.appendChild(reserveBtn);
+            var sumLine = U.el('div', { cls: 'small muted', style: 'margin:2px 0 0 2px', text: specSummary(tk.spec) });
+          }
           line.appendChild(U.el('button', { cls: 'btn small danger', text: '✕', onclick: () => { rw.tokens.splice(ti, 1); paint(); } }));
           r.appendChild(line);
-          const sumLine = U.el('div', { cls: 'small muted', style: 'margin:2px 0 0 2px', text: specSummary(tk.spec) });
-          r.appendChild(sumLine);
+          if (sumLine) r.appendChild(sumLine);
           box.appendChild(r);
         });
         box.appendChild(U.el('button', { cls: 'btn small ghost', text: '＋ Token', onclick: () => { rw.tokens.push({ spec: { speciesId: (SP.list[0] && SP.list[0].id) }, qty: 1 }); paint(); } }));
@@ -2972,6 +3181,7 @@
         gold: rw.gold || 0, ngakara: rw.ngakara || 0, huntSlots: rw.huntSlots || 0,
         okid: (rw.okid || []).filter(o => (o.qty | 0) > 0),
         tokens: (rw.tokens || []).filter(t => {
+          if (t.reserveId) return true;
           const sid = (t.spec && t.spec.speciesId) || t.speciesId;
           return sid && SP.get(sid);
         }),
