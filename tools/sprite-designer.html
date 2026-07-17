@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dya'akara — Sprite Designer</title>
+<style>
+  :root { --bg:#161310; --panel:#221d17; --ink:#efe6d6; --muted:#9a8f7d; --gold:#d9b87a; --line:#3a3128; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; color:var(--gold); font-weight:700; }
+  header .sub { color:var(--muted); font-size:12px; }
+  .wrap { display:grid; grid-template-columns: 360px 1fr; gap:0; min-height:calc(100vh - 52px); }
+  .controls { padding:16px 20px; border-right:1px solid var(--line); overflow-y:auto; max-height:calc(100vh - 52px); }
+  .stage { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; }
+  canvas#preview { background:#0f0d0b; border:1px solid var(--line); border-radius:10px; }
+  .grp { margin-bottom:18px; }
+  .grp h2 { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  .row { display:grid; grid-template-columns: 96px 1fr 44px; align-items:center; gap:8px; margin:6px 0; }
+  .row label { font-size:12px; color:var(--ink); }
+  .row output { font-size:12px; color:var(--gold); text-align:right; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--gold); }
+  input[type=color] { width:100%; height:26px; border:1px solid var(--line); background:none; border-radius:6px; }
+  select, button { font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
+  button { cursor:pointer; }
+  button.primary { background:var(--gold); color:#241d14; border-color:var(--gold); font-weight:700; }
+  .states { display:flex; flex-wrap:wrap; gap:6px; }
+  .states button.on { background:var(--gold); color:#241d14; border-color:var(--gold); }
+  textarea { width:100%; height:150px; background:#0f0d0b; color:#cfe6c8; border:1px solid var(--line); border-radius:8px; padding:10px; font:12px/1.5 ui-monospace,monospace; resize:vertical; }
+  .hint { color:var(--muted); font-size:11px; margin-top:6px; }
+  .btnrow { display:flex; gap:8px; margin-top:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dya'akara Sprite Designer</h1>
+  <span class="sub">Tune a Punk live · export JSON into <code>species.js</code> or the Admin Panel — no tokens, no AI.</span>
+</header>
+<div class="wrap">
+  <div class="controls" id="controls"></div>
+  <div class="stage">
+    <canvas id="preview" width="420" height="360"></canvas>
+    <div class="states" id="states"></div>
+    <div style="width:100%;max-width:420px">
+      <div class="grp"><h2>Export</h2>
+        <textarea id="out" readonly></textarea>
+        <div class="btnrow">
+          <button class="primary" id="copy">Copy JSON</button>
+          <button id="reset">Reset to Punk defaults</button>
+        </div>
+        <div class="hint">Paste the <code>punk:</code> block (and colors) into a species def in <code>js/data/species.js</code>, or the whole object into the Admin Panel's features field.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- minimal namespace shim so the real engine loads standalone -->
+<script>window.DYA = { util: {} };</script>
+<script src="../js/engine/sprites.js"></script>
+<script>
+(function () {
+  'use strict';
+  const SPR = DYA.sprites;
+
+  const DEFAULTS = {
+    color: '#d97c2b', color2: '#3f7d3a',
+    legs: 4, arms: 3, ribs: 6,
+    bodyW: 1.0, bodyH: 0.86, legReach: 1.05, armReach: 1.1,
+    legWidth: 0.12, armWidth: 0.10, size: 90,
+  };
+  let cfg = Object.assign({}, DEFAULTS);
+  let state = 'idle', facing = 1;
+
+  const SLIDERS = [
+    ['legs', 'Vine legs', 1, 8, 1],
+    ['arms', 'Grasp vines', 0, 6, 1],
+    ['ribs', 'Ribs', 2, 12, 1],
+    ['bodyW', 'Body width', 0.5, 1.6, 0.01],
+    ['bodyH', 'Body height', 0.4, 1.4, 0.01],
+    ['legReach', 'Leg reach', 0.5, 2.0, 0.01],
+    ['armReach', 'Arm reach', 0.4, 2.2, 0.01],
+    ['legWidth', 'Leg thickness', 0.04, 0.3, 0.005],
+    ['armWidth', 'Arm thickness', 0.03, 0.25, 0.005],
+    ['size', 'Preview size', 40, 150, 1],
+  ];
+  const STATES = ['idle', 'walk', 'run', 'attack', 'special', 'dormant', 'death'];
+
+  const controls = document.getElementById('controls');
+
+  function group(title) { const d = document.createElement('div'); d.className = 'grp'; d.innerHTML = '<h2>' + title + '</h2>'; controls.appendChild(d); return d; }
+
+  // colors
+  const gColor = group('Colours');
+  [['color', 'Pumpkin'], ['color2', 'Vine']].forEach(([k, lab]) => {
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = '<label>' + lab + '</label>';
+    const inp = document.createElement('input'); inp.type = 'color'; inp.value = cfg[k];
+    inp.style.gridColumn = '2 / span 2';
+    inp.oninput = () => { cfg[k] = inp.value; sync(); };
+    row.appendChild(inp); gColor.appendChild(row);
+  });
+
+  // sliders
+  const gShape = group('Shape & appendages');
+  const outputs = {};
+  SLIDERS.forEach(([k, lab, min, max, step]) => {
+    const row = document.createElement('div'); row.className = 'row';
+    const l = document.createElement('label'); l.textContent = lab;
+    const inp = document.createElement('input'); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = cfg[k];
+    const out = document.createElement('output'); out.textContent = cfg[k];
+    outputs[k] = { inp, out };
+    inp.oninput = () => { cfg[k] = parseFloat(inp.value); out.textContent = (step < 1 ? cfg[k].toFixed(2) : cfg[k]); sync(); };
+    row.appendChild(l); row.appendChild(inp); row.appendChild(out); gShape.appendChild(row);
+  });
+
+  // states + facing
+  const statesEl = document.getElementById('states');
+  STATES.forEach(s => {
+    const b = document.createElement('button'); b.textContent = s;
+    if (s === state) b.className = 'on';
+    b.onclick = () => { state = s; [...statesEl.children].forEach(c => c.className = ''); b.className = 'on'; };
+    statesEl.appendChild(b);
+  });
+  const flip = document.createElement('button'); flip.textContent = '⇋ face';
+  flip.onclick = () => { facing = -facing; };
+  statesEl.appendChild(flip);
+
+  // build species-like object the engine understands
+  function species() {
+    return {
+      id: 'punk_preview', rig: 'punk', color: cfg.color, color2: cfg.color2, features: {},
+      punk: {
+        legs: cfg.legs, arms: cfg.arms, ribs: cfg.ribs,
+        bodyW: +cfg.bodyW.toFixed(2), bodyH: +cfg.bodyH.toFixed(2),
+        legReach: +cfg.legReach.toFixed(2), armReach: +cfg.armReach.toFixed(2),
+        legWidth: +cfg.legWidth.toFixed(3), armWidth: +cfg.armWidth.toFixed(3),
+      },
+    };
+  }
+
+  function sync() {
+    const sp = species();
+    document.getElementById('out').value =
+      'color: \'' + cfg.color + '\', color2: \'' + cfg.color2 + '\',\n' +
+      'punk: ' + JSON.stringify(sp.punk) + ',';
+  }
+
+  const cv = document.getElementById('preview'), ctx = cv.getContext('2d');
+  let t0 = performance.now();
+  function frame(now) {
+    const t = (now - t0) / 1000;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    // ground line
+    ctx.strokeStyle = '#2a241c'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, cv.height * 0.72); ctx.lineTo(cv.width, cv.height * 0.72); ctx.stroke();
+    ctx.save();
+    ctx.translate(cv.width / 2, cv.height * 0.62);
+    SPR.draw(ctx, { sp: species(), r: cfg.size, state: state, t: t, facing: facing, phase: 0 });
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+
+  document.getElementById('copy').onclick = () => {
+    const ta = document.getElementById('out'); ta.select();
+    navigator.clipboard && navigator.clipboard.writeText(ta.value);
+    const b = document.getElementById('copy'); b.textContent = 'Copied!'; setTimeout(() => b.textContent = 'Copy JSON', 1200);
+  };
+  document.getElementById('reset').onclick = () => {
+    cfg = Object.assign({}, DEFAULTS);
+    [['color'], ['color2']].forEach(([k]) => { const el = [...gColor.querySelectorAll('input')].find(i => i); });
+    gColor.querySelectorAll('input')[0].value = cfg.color;
+    gColor.querySelectorAll('input')[1].value = cfg.color2;
+    SLIDERS.forEach(([k, , , , step]) => { outputs[k].inp.value = cfg[k]; outputs[k].out.textContent = (step < 1 ? cfg[k].toFixed(2) : cfg[k]); });
+    sync();
+  };
+
+  sync();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
