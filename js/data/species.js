@@ -45,9 +45,10 @@
 
   def('domestic_punk', {
     name: 'Domestic Punk', family: 'Punk Family', element: 'Ular', element2: 'Su',
-    rarity: [1, 4], size: [1, 2], rig: 'quad',
+    rarity: [1, 4], size: [1, 2], rig: 'punk',
     color: '#d97c2b', color2: '#3f7d3a', // pumpkin body, vine green
     features: { vines: true },
+    punk: { legs: 4, arms: 3, ribs: 6, bodyW: 1.0, bodyH: 0.86, legReach: 1.05, armReach: 1.1 },
     tags: ['forest', 'mount', 'sapient', 'herbivore'],
     behavior: 'domestic_punk',
     statMul: { hp: 1.15, dmg: 0.9, speed: 1.0 },
@@ -65,9 +66,10 @@
 
   def('wild_punk', {
     name: 'Wild Punk', family: 'Punk Family', element: 'Ular',
-    rarity: [1, 3], size: [1, 1], rig: 'quad',
+    rarity: [1, 3], size: [1, 1], rig: 'punk',
     color: '#b8641f', color2: '#2e5c2a',
     features: { vines: true, lean: true },
+    punk: { legs: 4, arms: 2, ribs: 5, bodyW: 0.82, bodyH: 0.72, legReach: 1.25, armReach: 1.0 },
     tags: ['forest', 'herbivore'],
     behavior: 'wild_punk',
     statMul: { hp: 0.9, dmg: 1.05, speed: 1.3 },
@@ -81,9 +83,10 @@
 
   def('malsti_punk', {
     name: 'Malsti Punk', family: 'Punk Family', element: 'Fti',
-    rarity: [2, 5], size: [0, 0], rig: 'quad',
+    rarity: [2, 5], size: [0, 0], rig: 'punk',
     color: '#5a3a75', color2: '#241733', // duat-born: violet-dark
     features: { vines: true, duat: true },
+    punk: { legs: 4, arms: 2, ribs: 5, bodyW: 0.72, bodyH: 0.7, legReach: 1.0, armReach: 0.95 },
     tags: ['duat', 'thief'],
     behavior: 'malsti_punk',
     statMul: { hp: 0.75, dmg: 0.8, speed: 1.35 },

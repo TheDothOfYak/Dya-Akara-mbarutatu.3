@@ -71,7 +71,7 @@
 
   /* identifying markings — spots, a dorsal stripe, a facial blaze, pale
      feet — drawn over the body rigs that can carry them */
-  const MARKABLE = { quad: 1, biped: 1, bird: 1, crab: 1, blob: 1 };
+  const MARKABLE = { quad: 1, biped: 1, bird: 1, crab: 1, blob: 1, punk: 1 };
   function drawMarking(ctx, o, indiv) {
     if (!indiv || !indiv.marking || indiv.marking === 'none' || !MARKABLE[o.sp.rig || 'quad']) return;
     const r = o.r;
@@ -170,6 +170,7 @@
     if (!(sp.spriteImg && drawImageSprite(ctx, o, t, state))) {
       const rig = sp.rig || 'quad';
       if (rig === 'quad') drawQuad(ctx, o, t, state);
+      else if (rig === 'punk') drawPunk(ctx, o, t, state);
       else if (rig === 'biped') drawBiped(ctx, o, t, state);
       else if (rig === 'flame') drawFlame(ctx, o, t, state);
       else if (rig === 'swarm') drawSwarm(ctx, o, t, state);
@@ -502,6 +503,135 @@
     /* rider (acorn on back) */
     if ((F.rider || o.hasRider) && !dormant) {
       drawMiniAcorn(ctx, -bodyW * 0.15, y0 - bodyH * 1.15 + idleBob, r * 0.4, t, '#c8a05c', '#6d4a2e');
+    }
+  }
+
+  /* ============ PUNK — pumpkin body, vines-as-legs + grasping vines ============
+     Per creator's direction: a large ribbed pumpkin. From the stem crown sprout
+     4 vine-legs that drape to the ground and walk, plus 2-4 grasping vine-arms
+     that reach, lift, and swing from branches.
+
+     Data-driven via sp.punk (every field optional — sensible Punk defaults):
+       { legs, arms, ribs, bodyW, bodyH, legWidth, armWidth,
+         legReach, armReach, bodyColor, vineColor }
+     Editable live in tools/sprite-designer.html; exported straight into a
+     species def or the Admin Panel features JSON. */
+  function drawPunk(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const P = sp.punk || {};
+    const legs = P.legs != null ? P.legs : 4;
+    const arms = P.arms != null ? P.arms : 3;
+    const ribs = P.ribs != null ? P.ribs : 6;
+    const bodyW = r * (P.bodyW != null ? P.bodyW : 0.98);
+    const bodyH = r * (P.bodyH != null ? P.bodyH : 0.84);
+    const legW = Math.max(2, r * (P.legWidth != null ? P.legWidth : 0.12));
+    const armW = Math.max(1.5, r * (P.armWidth != null ? P.armWidth : 0.1));
+    const legReach = P.legReach != null ? P.legReach : 1.0;
+    const armReach = P.armReach != null ? P.armReach : 1.0;
+    const bodyCol = P.bodyColor || sp.color || '#d97c2b';
+    const vineCol = P.vineColor || sp.color2 || '#3f7d3a';
+
+    const moving = state === 'walk' || state === 'run';
+    const rate = state === 'run' ? 13 : 7;
+    const idleBob = state === 'idle' ? Math.sin(t * 2.2) * r * 0.05 : 0;
+    const limp = state === 'dormant' || state === 'death';
+    const attack = state === 'attack' || state === 'special';
+    const y0 = -r * 0.08 + idleBob + (limp ? r * 0.22 : 0);
+    const footY = r * 0.92;
+    const crownY = y0 - bodyH * 0.78;
+
+    /* ---- vine LEGS (drawn behind the body, draping to the ground) ---- */
+    for (let i = 0; i < legs; i++) {
+      const f = legs === 1 ? 0.5 : i / (legs - 1);      // 0..1 across the crown
+      const dir = f < 0.5 ? -1 : 1;
+      const ox = (f - 0.5) * bodyW * 0.55;
+      const oy = crownY + Math.abs(f - 0.5) * bodyH * 0.25;
+      const step = moving ? Math.sin(t * rate + i * Math.PI * 0.7) : 0;
+      const lift = moving ? Math.max(0, step) * r * 0.18 : 0;
+      const swayX = limp ? 0 : (moving ? step * r * 0.12 : Math.sin(t * 1.8 + i) * r * 0.025);
+      const fx = (f - 0.5) * bodyW * 2.0 * legReach + swayX;
+      const fy = footY - lift + (limp ? r * 0.06 : 0);
+      const midX = (ox + fx) / 2 + dir * bodyW * 0.4;
+      const midY = (oy + fy) / 2 + Math.sin(t * 2 + i) * r * 0.025;
+      ctx.strokeStyle = shade(vineCol, -18); ctx.lineWidth = legW; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.bezierCurveTo(ox + (midX - ox) * 0.4, midY - r * 0.1, midX, midY, fx, fy);
+      ctx.stroke();
+      /* curled foot tip */
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.quadraticCurveTo(fx + dir * r * 0.12, fy + r * 0.02, fx + dir * r * 0.05, fy - r * 0.1);
+      ctx.stroke();
+    }
+
+    /* ---- pumpkin BODY ---- */
+    const grd = ctx.createLinearGradient(0, y0 - bodyH, 0, y0 + bodyH);
+    grd.addColorStop(0, shade(bodyCol, 26));
+    grd.addColorStop(1, shade(bodyCol, -22));
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(0, y0, bodyW, bodyH * (limp ? 0.86 : 1), 0, 0, TAU); ctx.fill();
+    /* ribs — curved verticals radiating from crown to base */
+    ctx.strokeStyle = shade(bodyCol, -34) + 'aa'; ctx.lineWidth = Math.max(1, r * 0.035);
+    for (let i = 1; i < ribs; i++) {
+      const bow = ((i / ribs) - 0.5) * 2 * bodyW;
+      ctx.beginPath();
+      ctx.moveTo(0, y0 - bodyH * 0.9);
+      ctx.quadraticCurveTo(bow, y0, 0, y0 + bodyH * 0.9);
+      ctx.stroke();
+    }
+    /* stem at the crown */
+    ctx.strokeStyle = shade(vineCol, -34); ctx.lineWidth = Math.max(3, r * 0.14); ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, y0 - bodyH * 0.86);
+    ctx.quadraticCurveTo(r * 0.05, y0 - bodyH * 1.1, r * 0.14, y0 - bodyH * 1.28);
+    ctx.stroke();
+
+    /* ---- face ---- */
+    if (!limp) {
+      ctx.fillStyle = '#1a1208';
+      ctx.beginPath(); ctx.ellipse(bodyW * 0.22, y0 - bodyH * 0.08, r * 0.1, r * 0.14, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(bodyW * 0.5, y0 - bodyH * 0.08, r * 0.1, r * 0.14, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffffffaa';
+      ctx.beginPath(); ctx.arc(bodyW * 0.24, y0 - bodyH * 0.13, r * 0.03, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(bodyW * 0.52, y0 - bodyH * 0.13, r * 0.03, 0, TAU); ctx.fill();
+    } else {
+      ctx.strokeStyle = '#1a1208'; ctx.lineWidth = Math.max(1, r * 0.04);
+      ctx.beginPath();
+      ctx.moveTo(bodyW * 0.12, y0 - bodyH * 0.08); ctx.lineTo(bodyW * 0.32, y0 - bodyH * 0.08);
+      ctx.moveTo(bodyW * 0.4, y0 - bodyH * 0.08); ctx.lineTo(bodyW * 0.6, y0 - bodyH * 0.08);
+      ctx.stroke();
+    }
+
+    /* ---- grasping vine ARMS (in front, reaching up/out) ---- */
+    for (let i = 0; i < arms; i++) {
+      const spread = arms === 1 ? 0 : (i / (arms - 1) - 0.5);   // -0.5..0.5
+      const reach = r * 1.05 * armReach;
+      let ang = -Math.PI / 2 + spread * 1.5 + Math.sin(t * 2.3 + i * 1.7) * 0.22;
+      let ext = 1;
+      if (attack) {
+        const lash = Math.max(0, Math.sin(t * 12 - i));
+        ang = -0.2 + spread * 0.4 - lash * 0.5;             // lash forward (+x)
+        ext = 1 + lash * 0.55;
+      } else if (limp) {
+        ang = 0.5 + spread * 0.4; ext = 0.7;                 // droop
+      }
+      const ox = spread * bodyW * 0.4, oy = crownY;
+      const tipX = ox + Math.cos(ang) * reach * ext;
+      const tipY = oy + Math.sin(ang) * reach * ext;
+      const midX = ox + Math.cos(ang) * reach * 0.5 * ext - Math.sin(ang) * r * 0.12;
+      const midY = oy + Math.sin(ang) * reach * 0.5 * ext;
+      ctx.strokeStyle = shade(vineCol, 8); ctx.lineWidth = armW; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+      ctx.stroke();
+      /* curled grasping tip */
+      const curl = attack ? 1.0 : 0.5 + Math.sin(t * 3 + i) * 0.2;
+      ctx.beginPath(); ctx.arc(tipX, tipY, r * 0.09, ang, ang + Math.PI * 1.4 * curl); ctx.stroke();
+      /* leaf partway along */
+      ctx.fillStyle = shade(vineCol, -10);
+      ctx.beginPath(); ctx.ellipse(midX, midY, r * 0.1, r * 0.05, ang, 0, TAU); ctx.fill();
     }
   }
 
