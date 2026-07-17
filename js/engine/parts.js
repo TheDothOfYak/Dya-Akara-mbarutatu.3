@@ -158,6 +158,46 @@
     E.hx = hx + r * 0.12; E.hy = hy - r * 0.02; E.hr = r * 0.26;
   };
 
+  /* quadruped beast — horizontal body with a head on a short neck up front */
+  BODY.beast = function (ctx, E) {
+    const bw = E.bodyW * 1.1, bh = E.bodyH * 0.9, hr = E.r * 0.32;
+    const hx = bw * 0.82, hy = E.y0 - bh * 0.5;
+    ctx.strokeStyle = shade(E.col, -6); ctx.lineWidth = hr * 0.95; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bw * 0.45, E.y0 - bh * 0.2); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.fillStyle = bodyGrad(ctx, E, E.col);
+    ctx.beginPath(); ctx.ellipse(-E.r * 0.05, E.y0, bw, bh, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = shade(E.col, 12);
+    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx + hr * 0.7, hy + hr * 0.2, hr * 0.5, hr * 0.4, 0, 0, TAU); ctx.fill(); // snout
+    E.hx = hx + hr * 0.45; E.hy = hy; E.hr = hr;
+  };
+
+  /* low lizard — long, close to the ground, snouted head up front */
+  BODY.lizard = function (ctx, E) {
+    const bw = E.bodyW * 1.25, bh = E.bodyH * 0.58, cy = E.y0 + E.bodyH * 0.25;
+    ctx.fillStyle = bodyGrad(ctx, E, E.col);
+    ctx.beginPath(); ctx.ellipse(0, cy, bw, bh, 0, 0, TAU); ctx.fill();
+    const hx = bw * 0.85, hy = cy - bh * 0.2, hr = E.r * 0.3;
+    ctx.fillStyle = shade(E.col, 12);
+    ctx.beginPath(); ctx.ellipse(hx, hy, hr * 1.25, hr * 0.85, 0, 0, TAU); ctx.fill();
+    E.hx = hx + hr * 0.5; E.hy = hy - hr * 0.1; E.hr = hr;
+  };
+
+  /* whale / leviathan — big rounded body with a tail fluke */
+  BODY.whale = function (ctx, E) {
+    const bw = E.bodyW * 1.3, bh = E.bodyH * 0.95, swim = Math.sin(E.t * (E.moving ? 5 : 2.5));
+    ctx.fillStyle = shade(E.col, -16);
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.85, E.y0);
+    ctx.lineTo(-bw * 1.35, E.y0 - E.r * 0.42 + swim * E.r * 0.15);
+    ctx.lineTo(-bw * 1.08, E.y0);
+    ctx.lineTo(-bw * 1.35, E.y0 + E.r * 0.42 + swim * E.r * 0.15);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = bodyGrad(ctx, E, E.col);
+    ctx.beginPath(); ctx.ellipse(0, E.y0, bw, bh, 0, 0, TAU); ctx.fill();
+    E.hx = bw * 0.72; E.hy = E.y0 - bh * 0.18; E.hr = E.r * 0.3;
+  };
+
   /* ============================ WINGS ============================ */
   /* drawn behind the body; each renders the pair */
   const WINGS = {};
@@ -286,6 +326,76 @@
     ctx.quadraticCurveTo((bx + tx) / 2, (by + ty) / 2 - E.r * 0.12, tx, ty);
     ctx.quadraticCurveTo((bx + tx) / 2, (by + ty) / 2 + E.r * 0.12, bx, by + E.r * 0.22);
     ctx.closePath(); ctx.fill();
+  };
+  TAIL.club = function (ctx, E) {   // spiked club tail (Naga, Sru Vorn)
+    const len = pv(E, 'tailLength', 1), wag = Math.sin(E.t * 3) * 0.15;
+    const bx = -E.bodyW * 0.8, ex = -E.bodyW * (0.9 + 0.6 * len), ey = E.y0 + wag * E.r;
+    ctx.strokeStyle = shade(E.col, -20); ctx.lineWidth = E.r * 0.16; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bx, E.y0); ctx.quadraticCurveTo((bx + ex) / 2, E.y0 - E.r * 0.2 + wag * E.r, ex, ey); ctx.stroke();
+    ctx.fillStyle = shade(E.col, -30);
+    ctx.beginPath(); ctx.arc(ex, ey, E.r * 0.26, 0, TAU); ctx.fill();
+    ctx.strokeStyle = shade(E.col, -55); ctx.lineWidth = Math.max(1, E.r * 0.05);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; ctx.beginPath(); ctx.moveTo(ex + Math.cos(a) * E.r * 0.24, ey + Math.sin(a) * E.r * 0.24); ctx.lineTo(ex + Math.cos(a) * E.r * 0.4, ey + Math.sin(a) * E.r * 0.4); ctx.stroke(); }
+  };
+  TAIL.ball = function (ctx, E) {   // smooth heavy ball tail
+    const len = pv(E, 'tailLength', 1), wag = Math.sin(E.t * 3.5) * 0.2;
+    const bx = -E.bodyW * 0.8, ex = -E.bodyW * (0.9 + 0.5 * len), ey = E.y0 + wag * E.r;
+    ctx.strokeStyle = shade(E.col, -16); ctx.lineWidth = E.r * 0.14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bx, E.y0); ctx.quadraticCurveTo((bx + ex) / 2, E.y0 - E.r * 0.25 + wag * E.r, ex, ey); ctx.stroke();
+    ctx.fillStyle = shade(E.col, -24);
+    ctx.beginPath(); ctx.arc(ex, ey, E.r * 0.22, 0, TAU); ctx.fill();
+  };
+
+  /* ============================ EARS ============================ */
+  const EARS = {};
+  EARS.fox = function (ctx, E) {
+    const z = pv(E, 'earSize', 1); ctx.fillStyle = shade(E.col, 6);
+    for (const s of [-0.5, 0.1]) {
+      ctx.beginPath();
+      ctx.moveTo(E.hx + E.hr * s, E.hy - E.hr * 0.55);
+      ctx.lineTo(E.hx + E.hr * (s + 0.15), E.hy - E.hr * (1.4 * z));
+      ctx.lineTo(E.hx + E.hr * (s + 0.55), E.hy - E.hr * 0.45);
+      ctx.closePath(); ctx.fill();
+    }
+  };
+  EARS.round = function (ctx, E) {
+    const z = pv(E, 'earSize', 1); ctx.fillStyle = shade(E.col, 6);
+    for (const s of [-0.55, 0.45]) { ctx.beginPath(); ctx.arc(E.hx + E.hr * s, E.hy - E.hr * 0.7, E.hr * 0.4 * z, 0, TAU); ctx.fill(); }
+  };
+  EARS.long = function (ctx, E) {
+    const z = pv(E, 'earSize', 1); ctx.fillStyle = shade(E.col, 4);
+    for (const s of [-0.4, 0.2]) { ctx.beginPath(); ctx.ellipse(E.hx + E.hr * s, E.hy - E.hr * (1.1 * z), E.hr * 0.18, E.hr * 0.7 * z, s * 0.3, 0, TAU); ctx.fill(); }
+  };
+
+  /* ============================ TUSKS ============================ */
+  const TUSKS = {};
+  TUSKS.pair = function (ctx, E) {
+    const z = pv(E, 'tuskSize', 1);
+    ctx.strokeStyle = '#e8e0c8'; ctx.lineWidth = Math.max(2, E.r * 0.06 * z); ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(E.hx + s * E.hr * 0.4, E.hy + E.hr * 0.3); ctx.quadraticCurveTo(E.hx + s * E.hr * 0.55, E.hy + E.hr * (0.6 + 0.5 * z), E.hx + s * E.hr * 0.3, E.hy + E.hr * (0.9 + 0.6 * z)); ctx.stroke(); }
+  };
+  TUSKS.curved = function (ctx, E) {
+    const z = pv(E, 'tuskSize', 1);
+    ctx.strokeStyle = '#e8e0c8'; ctx.lineWidth = Math.max(2, E.r * 0.07 * z); ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(E.hx + s * E.hr * 0.3, E.hy + E.hr * 0.4); ctx.quadraticCurveTo(E.hx + s * E.hr * (1.1 * z), E.hy + E.hr * 0.5, E.hx + s * E.hr * (1.2 * z), E.hy - E.hr * 0.35); ctx.stroke(); }
+  };
+
+  /* ============================ COAT (body covering) ============================ */
+  const COAT = {};
+  COAT.plates = function (ctx, E) {
+    const bh = E.bodyH * (E.limp ? 0.86 : 1);
+    ctx.strokeStyle = shade(E.col, -32) + 'cc'; ctx.lineWidth = Math.max(1.5, E.r * 0.06); ctx.lineCap = 'round';
+    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(i * E.bodyW * 0.32, E.y0, E.bodyW * 0.5, bh * 0.95, 0, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); }
+  };
+  COAT.fur = function (ctx, E) {
+    const bh = E.bodyH * (E.limp ? 0.86 : 1); ctx.fillStyle = shade(E.col, 8);
+    const n = 20;
+    for (let i = 0; i < n; i++) { const a = Math.PI * 0.08 + (i / (n - 1)) * Math.PI * 0.84; ctx.beginPath(); ctx.arc(Math.cos(a) * E.bodyW, E.y0 + Math.sin(a) * bh, E.r * 0.09, 0, TAU); ctx.fill(); }
+  };
+  COAT.rocky = function (ctx, E) {
+    const bh = E.bodyH * (E.limp ? 0.86 : 1);
+    ctx.strokeStyle = shade(E.col, -45) + '99'; ctx.lineWidth = Math.max(1, E.r * 0.05);
+    for (let i = 0; i < 5; i++) { const a = i * 1.7 + 0.4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * E.bodyW * 0.55, E.y0 + Math.sin(a) * bh * 0.55); ctx.lineTo(Math.cos(a) * E.bodyW * 0.2, E.y0 + Math.sin(a) * bh * 0.15); ctx.stroke(); }
   };
 
   /* ============================ FEET ============================ */
@@ -431,12 +541,15 @@
 
   /* ============================ ASSEMBLY ============================ */
   const CATALOG = {
-    body: ['oval', 'chick', 'bird', 'fish', 'serpent'],
+    body: ['oval', 'chick', 'bird', 'fish', 'serpent', 'beast', 'lizard', 'whale'],
     wings: [null, 'angel', 'bird', 'bat', 'butterfly'],
+    ears: [null, 'fox', 'round', 'long'],
     horn: [null, 'single', 'pair', 'five'],
+    tusks: [null, 'pair', 'curved'],
     ridge: [null, 'spikes', 'sail'],
+    coat: [null, 'plates', 'fur', 'rocky'],
     shell: [null, 'turtle'],
-    tail: [null, 'pointed', 'fluff', 'fish'],
+    tail: [null, 'pointed', 'fluff', 'fish', 'club', 'ball'],
     feet: [null, 'talon', 'paw', 'fin'],
     eyes: ['round', 'slit', 'many', 'none'],
     mouth: ['none', 'beak', 'jaw'],
@@ -452,6 +565,8 @@
     { key: 'ridgeCount', label: 'Ridge spikes', min: 2, max: 16, step: 1, def: 7, when: p => p.ridge === 'spikes' },
     { key: 'ridgeHeight', label: 'Ridge height', min: 0.3, max: 2.2, step: 0.05, def: 1, when: p => !!p.ridge },
     { key: 'hornSize', label: 'Horn size', min: 0.4, max: 2.5, step: 0.05, def: 1, when: p => !!p.horn },
+    { key: 'earSize', label: 'Ear size', min: 0.4, max: 2, step: 0.05, def: 1, when: p => !!p.ears },
+    { key: 'tuskSize', label: 'Tusk size', min: 0.4, max: 2.2, step: 0.05, def: 1, when: p => !!p.tusks },
     { key: 'tailLength', label: 'Tail length', min: 0.5, max: 2.2, step: 0.05, def: 1, when: p => !!p.tail },
     { key: 'legCount', label: 'Leg count', min: 2, max: 6, step: 1, def: 4, when: p => p.feet === 'paw' },
     { key: 'legLength', label: 'Leg length', min: 0.3, max: 1.6, step: 0.05, def: 1, when: p => p.feet === 'paw' || p.feet === 'talon' },
@@ -471,13 +586,16 @@
     if (P.ridge && RIDGE[P.ridge]) RIDGE[P.ridge](ctx, E);   // behind body, spikes rise over the back
     if (P.feet && FEET[P.feet] && P.feet !== 'fin') FEET[P.feet](ctx, E);  // legs root behind the body
     (BODY[P.body] || BODY.oval)(ctx, E);           // stamps head anchor onto E
+    if (P.coat && COAT[P.coat]) COAT[P.coat](ctx, E);
     if (P.feet === 'fin' && FEET.fin) FEET.fin(ctx, E);      // side fins sit in front
     if (P.shell && SHELL[P.shell]) SHELL[P.shell](ctx, E);
+    if (P.ears && EARS[P.ears]) EARS[P.ears](ctx, E);
     if (P.horn && HORN[P.horn]) HORN[P.horn](ctx, E);
+    if (P.tusks && TUSKS[P.tusks]) TUSKS[P.tusks](ctx, E);
     if (P.mouth && P.mouth !== 'none' && MOUTH[P.mouth]) MOUTH[P.mouth](ctx, E);
     if (P.eyes !== 'none') (EYES[P.eyes] || EYES.round)(ctx, E);
   }
 
   window.DYA = window.DYA || {};
-  DYA.parts = { draw, CATALOG, PARAMS, BODY, WINGS, HORN, RIDGE, SHELL, TAIL, FEET, EYES, MOUTH, shade };
+  DYA.parts = { draw, CATALOG, PARAMS, BODY, WINGS, EARS, HORN, TUSKS, RIDGE, COAT, SHELL, TAIL, FEET, EYES, MOUTH, shade };
 })();
