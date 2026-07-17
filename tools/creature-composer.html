@@ -58,8 +58,8 @@
 <script>
 (function () {
   'use strict';
-  const SPR = DYA.sprites, CAT = DYA.parts.CATALOG;
-  const cfg = { color:'#c9a24b', color2:'#7ec8e3', body:'fish', wings:null, shell:null, tail:null, feet:'fin', eyes:'round', mouth:'none', bodyW:0.9, bodyH:0.72, wingSpan:1, size:78 };
+  const SPR = DYA.sprites, CAT = DYA.parts.CATALOG, PAR = DYA.parts.PARAMS;
+  const cfg = { color:'#c9a24b', color2:'#7ec8e3', body:'fish', wings:null, horn:null, ridge:null, shell:null, tail:null, feet:'fin', eyes:'round', mouth:'none', bodyW:0.9, bodyH:0.72, wingSpan:1, size:78 };
   let state = 'idle', facing = 1;
   const controls = document.getElementById('controls');
 
@@ -82,18 +82,30 @@
     row.innerHTML='<label>'+cat+'</label>';
     const sel=document.createElement('select');
     CAT[cat].forEach(opt=>{ const o=document.createElement('option'); o.value=String(opt); o.textContent=label(opt); if(opt===cfg[cat]) o.selected=true; sel.appendChild(o); });
-    sel.onchange=()=>{ const v=sel.value; cfg[cat]= (v==='null')?null:v; sync(); };
+    sel.onchange=()=>{ const v=sel.value; cfg[cat]= (v==='null')?null:v; sync(); paintParams(); };
     row.appendChild(sel); gp.appendChild(row);
   });
 
-  // sliders
-  const gs = grp('Proportions');
-  [['bodyW','Body width',0.4,1.6,0.01],['bodyH','Body height',0.3,1.4,0.01],['wingSpan','Wing span',0.5,2.0,0.01],['size','Preview size',36,130,1]].forEach(([k,lab,mn,mx,st])=>{
+  // per-part sliders — one for every applicable parameter, rebuilt when the
+  // selected parts change. Seed cfg with each param's default.
+  PAR.forEach(p=>{ if(cfg[p.key]===undefined) cfg[p.key]=p.def; });
+  const gs = grp('Fine tuning');
+  const paramsBox = document.createElement('div'); gs.appendChild(paramsBox);
+  function slider(box,k,lab,mn,mx,st,val){
     const row=document.createElement('div'); row.className='row';
     row.innerHTML='<label>'+lab+'</label>';
-    const inp=document.createElement('input'); inp.type='range'; inp.min=mn; inp.max=mx; inp.step=st; inp.value=cfg[k];
-    inp.oninput=()=>{cfg[k]=parseFloat(inp.value); sync();}; row.appendChild(inp); gs.appendChild(row);
-  });
+    const inp=document.createElement('input'); inp.type='range'; inp.min=mn; inp.max=mx; inp.step=st; inp.value=val;
+    const out=document.createElement('output'); out.textContent = st<1 ? Number(val).toFixed(2) : String(val);
+    inp.oninput=()=>{ cfg[k]=parseFloat(inp.value); out.textContent = st<1?cfg[k].toFixed(2):String(cfg[k]); sync(); };
+    row.appendChild(inp); row.appendChild(out); box.appendChild(row);
+  }
+  function paintParams(){
+    paramsBox.innerHTML='';
+    PAR.forEach(p=>{ if(!p.when || p.when(cfg)) slider(paramsBox,p.key,p.label,p.min,p.max,p.step,cfg[p.key]); });
+  }
+  paintParams();
+  // preview-only size control (not part of the exported creature)
+  const gz = grp('Preview'); slider(gz,'size','Preview size',36,130,1,cfg.size);
 
   // states
   const statesEl=document.getElementById('states');
@@ -105,9 +117,16 @@
   const flip=document.createElement('button'); flip.textContent='⇋ face'; flip.onclick=()=>{facing=-facing;}; statesEl.appendChild(flip);
 
   function species(){
-    const parts={ body:cfg.body, bodyW:+cfg.bodyW.toFixed(2), bodyH:+cfg.bodyH.toFixed(2) };
-    ['wings','shell','tail','feet','eyes','mouth'].forEach(k=>{ if(cfg[k]!==null && cfg[k]!=='none') parts[k]=cfg[k]; else if(k==='eyes'||k==='mouth') parts[k]=cfg[k]; });
-    if(cfg.wings) parts.wingSpan=+cfg.wingSpan.toFixed(2);
+    const parts={ body:cfg.body };
+    Object.keys(CAT).filter(k=>k!=='body').forEach(k=>{
+      if(k==='eyes'||k==='mouth') parts[k]=cfg[k];
+      else if(cfg[k]!==null && cfg[k]!==undefined) parts[k]=cfg[k];
+    });
+    PAR.forEach(p=>{
+      if(p.when && !p.when(parts)) return;
+      const v=cfg[p.key];
+      if(v!=null && Math.abs(v-p.def)>1e-9) parts[p.key]= p.step<1 ? +Number(v).toFixed(2) : v;
+    });
     return { id:'preview', rig:'composed', color:cfg.color, color2:cfg.color2, features:{}, parts };
   }
   function sync(){
