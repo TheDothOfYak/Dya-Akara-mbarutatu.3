@@ -544,8 +544,9 @@
     for (let i = 0; i < legs; i++) {
       const f = legs === 1 ? 0.5 : i / (legs - 1);      // 0..1 across the crown
       const dir = f < 0.5 ? -1 : 1;
-      const ox = (f - 0.5) * bodyW * 0.55;
-      const oy = crownY + Math.abs(f - 0.5) * bodyH * 0.25;
+      // every vine sprouts from the stem cluster, then fans out to its foot
+      const ox = (f - 0.5) * bodyW * 0.16;
+      const oy = crownY + Math.abs(f - 0.5) * bodyH * 0.05;
       const step = moving ? Math.sin(t * rate + i * Math.PI * 0.7) : 0;
       const lift = moving ? Math.max(0, step) * r * 0.18 : 0;
       const swayX = limp ? 0 : (moving ? step * r * 0.12 : Math.sin(t * 1.8 + i) * r * 0.025);
@@ -616,7 +617,7 @@
       } else if (limp) {
         ang = 0.5 + spread * 0.4; ext = 0.7;                 // droop
       }
-      const ox = spread * bodyW * 0.4, oy = crownY;
+      const ox = spread * bodyW * 0.14, oy = crownY;  // also from the stem cluster
       const tipX = ox + Math.cos(ang) * reach * ext;
       const tipY = oy + Math.sin(ang) * reach * ext;
       const midX = ox + Math.cos(ang) * reach * 0.5 * ext - Math.sin(ang) * r * 0.12;
