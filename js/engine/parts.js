@@ -61,6 +61,8 @@
     g.addColorStop(0, shade(col, 24)); g.addColorStop(1, shade(col, -20));
     return g;
   }
+  /* per-part tunable value (E.P.<key>), falling back to a default */
+  function pv(E, key, def) { return E.P[key] != null ? E.P[key] : def; }
 
   /* ============================ BODIES ============================ */
   const BODY = {};
@@ -274,9 +276,10 @@
   };
   TAIL.fish = function (ctx, E) { /* fish body already carries its fin */ };
   TAIL.pointed = function (ctx, E) {
+    const len = pv(E, 'tailLength', 1);
     const sway = Math.sin(E.t * (E.moving ? 6 : 2.5)) * E.r * 0.18;
     const bx = -E.bodyW * 0.8, by = E.y0;
-    const tx = -E.bodyW * 1.5, ty = E.y0 - E.r * 0.15 + sway;
+    const tx = -E.bodyW * (0.8 + 0.7 * len), ty = E.y0 - E.r * 0.15 + sway;
     ctx.fillStyle = shade(E.col, -12);
     ctx.beginPath();
     ctx.moveTo(bx, by - E.r * 0.22);
@@ -287,23 +290,27 @@
 
   /* ============================ FEET ============================ */
   const FEET = {};
+  /* legs root inside the body (hidden behind it — feet are drawn before the
+     body) and reach down to the ground; length/thickness/spread tunable */
   FEET.talon = function (ctx, E) {
-    const r = E.r;
-    ctx.strokeStyle = '#d9a441'; ctx.lineWidth = Math.max(1.5, r * 0.09); ctx.lineCap = 'round';
-    for (const side of [-0.2, 0.24]) {
+    const r = E.r, len = pv(E, 'legLength', 1), thick = pv(E, 'legThick', 1), spread = pv(E, 'legSpread', 1);
+    const top = E.y0 + E.bodyH * 0.4, bot = (E.y0 + E.bodyH) + (E.footY - (E.y0 + E.bodyH)) * len;
+    ctx.strokeStyle = '#d9a441'; ctx.lineWidth = Math.max(1.5, r * 0.09 * thick); ctx.lineCap = 'round';
+    for (const side of [-0.22 * spread, 0.26 * spread]) {
       const sw = E.moving ? Math.sin(E.t * E.rate + side * 20) * r * 0.12 : 0;
-      ctx.beginPath(); ctx.moveTo(side * r, E.y0 + E.bodyH * 0.6); ctx.lineTo(side * r + sw, E.footY); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(side * r + sw - r * 0.09, E.footY + r * 0.02); ctx.lineTo(side * r + sw + r * 0.12, E.footY + r * 0.02); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(side * r, top); ctx.lineTo(side * r + sw, bot); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(side * r + sw - r * 0.09, bot + r * 0.02); ctx.lineTo(side * r + sw + r * 0.12, bot + r * 0.02); ctx.stroke();
     }
   };
   FEET.paw = function (ctx, E) {
-    const r = E.r;
-    ctx.strokeStyle = shade(E.col, -40); ctx.lineWidth = Math.max(2, r * 0.14); ctx.lineCap = 'round';
-    const xs = [-E.bodyW * 0.5, -E.bodyW * 0.2, E.bodyW * 0.2, E.bodyW * 0.5];
-    xs.forEach((lx, i) => {
+    const r = E.r, n = Math.round(pv(E, 'legCount', 4)), len = pv(E, 'legLength', 1), thick = pv(E, 'legThick', 1), spread = pv(E, 'legSpread', 1);
+    const top = E.y0 + E.bodyH * 0.35, bot = (E.y0 + E.bodyH) + (E.footY - (E.y0 + E.bodyH)) * len;
+    ctx.strokeStyle = shade(E.col, -40); ctx.lineWidth = Math.max(2, r * 0.14 * thick); ctx.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const lx = (n === 1 ? 0 : i / (n - 1) - 0.5) * E.bodyW * 1.1 * spread;
       const sw = E.moving ? Math.sin(E.t * E.rate + i * Math.PI * 0.9) * r * 0.2 : 0;
-      ctx.beginPath(); ctx.moveTo(lx, E.y0 + E.bodyH * 0.5); ctx.lineTo(lx + sw, E.footY); ctx.stroke();
-    });
+      ctx.beginPath(); ctx.moveTo(lx, top); ctx.lineTo(lx + sw, bot); ctx.stroke();
+    }
   };
   FEET.fin = function (ctx, E) {
     const r = E.r, swim = Math.sin(E.t * (E.moving ? 9 : 4));
@@ -318,28 +325,30 @@
   const EYES = {};
   EYES.round = function (ctx, E) {
     if (E.limp) { eyesClosed(ctx, E); return; }
-    const s = E.hr * 0.4;
+    const s = E.hr * 0.4 * pv(E, 'eyeSpread', 1), rad = Math.max(1, E.hr * 0.2 * pv(E, 'eyeSize', 1));
     ctx.fillStyle = '#1a1208';
-    ctx.beginPath(); ctx.arc(E.hx - s, E.hy - s * 0.3, Math.max(1, E.hr * 0.2), 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(E.hx + s * 0.4, E.hy - s * 0.3, Math.max(1, E.hr * 0.2), 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(E.hx - s, E.hy - s * 0.3, rad, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(E.hx + s * 0.4, E.hy - s * 0.3, rad, 0, TAU); ctx.fill();
     ctx.fillStyle = '#ffffffcc';
-    ctx.beginPath(); ctx.arc(E.hx - s - E.hr * 0.06, E.hy - s * 0.4, E.hr * 0.06, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(E.hx - s - rad * 0.3, E.hy - s * 0.4, rad * 0.3, 0, TAU); ctx.fill();
   };
   EYES.slit = function (ctx, E) {
     if (E.limp) { eyesClosed(ctx, E); return; }
+    const sp = pv(E, 'eyeSpread', 1), sz = pv(E, 'eyeSize', 1);
     ctx.fillStyle = '#f2d84a';
     ctx.strokeStyle = '#1a1208'; ctx.lineWidth = Math.max(1, E.hr * 0.08);
-    for (const dx of [-E.hr * 0.4, E.hr * 0.4]) {
-      ctx.beginPath(); ctx.ellipse(E.hx + dx, E.hy - E.hr * 0.1, E.hr * 0.22, E.hr * 0.3, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(E.hx + dx, E.hy - E.hr * 0.35); ctx.lineTo(E.hx + dx, E.hy + E.hr * 0.15); ctx.stroke();
+    for (const dx of [-E.hr * 0.4 * sp, E.hr * 0.4 * sp]) {
+      ctx.beginPath(); ctx.ellipse(E.hx + dx, E.hy - E.hr * 0.1, E.hr * 0.22 * sz, E.hr * 0.3 * sz, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(E.hx + dx, E.hy - E.hr * 0.35 * sz); ctx.lineTo(E.hx + dx, E.hy + E.hr * 0.15 * sz); ctx.stroke();
     }
   };
   EYES.many = function (ctx, E) {
     if (E.limp) { eyesClosed(ctx, E); return; }
+    const sz = pv(E, 'eyeSize', 1), sp = pv(E, 'eyeSpread', 1);
     ctx.fillStyle = '#1a1208';
     for (let i = 0; i < 4; i++) {
       const a = -0.6 + i * 0.5;
-      ctx.beginPath(); ctx.arc(E.hx + Math.cos(a) * E.hr * 0.5, E.hy + Math.sin(a) * E.hr * 0.4 - E.hr * 0.1, Math.max(1, E.hr * 0.13), 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(E.hx + Math.cos(a) * E.hr * 0.5 * sp, E.hy + Math.sin(a) * E.hr * 0.4 * sp - E.hr * 0.1, Math.max(1, E.hr * 0.13 * sz), 0, TAU); ctx.fill();
     }
   };
   function eyesClosed(ctx, E) {
@@ -350,26 +359,28 @@
   /* ============================ MOUTHS ============================ */
   const MOUTH = {};
   MOUTH.beak = function (ctx, E) {
-    const r = E.r, open = E.attack ? Math.max(0, Math.sin(E.t * 12)) * E.hr * 0.5 : 0;
+    const hr = E.hr * pv(E, 'mouthSize', 1);
+    const open = E.attack ? Math.max(0, Math.sin(E.t * 12)) * hr * 0.5 : 0;
     ctx.fillStyle = '#d9a441';
     ctx.beginPath();
-    ctx.moveTo(E.hx + E.hr * 0.5, E.hy - E.hr * 0.05);
-    ctx.lineTo(E.hx + E.hr * 1.25, E.hy + E.hr * 0.05 - open);
-    ctx.lineTo(E.hx + E.hr * 0.5, E.hy + E.hr * 0.28);
+    ctx.moveTo(E.hx + hr * 0.5, E.hy - hr * 0.05);
+    ctx.lineTo(E.hx + hr * 1.25, E.hy + hr * 0.05 - open);
+    ctx.lineTo(E.hx + hr * 0.5, E.hy + hr * 0.28);
     ctx.closePath(); ctx.fill();
-    if (open > 0) { ctx.fillStyle = '#7a3b1c'; ctx.beginPath(); ctx.moveTo(E.hx + E.hr * 0.5, E.hy + E.hr * 0.1); ctx.lineTo(E.hx + E.hr * 1.2, E.hy + E.hr * 0.1 + open); ctx.lineTo(E.hx + E.hr * 0.5, E.hy + E.hr * 0.28); ctx.fill(); }
+    if (open > 0) { ctx.fillStyle = '#7a3b1c'; ctx.beginPath(); ctx.moveTo(E.hx + hr * 0.5, E.hy + hr * 0.1); ctx.lineTo(E.hx + hr * 1.2, E.hy + hr * 0.1 + open); ctx.lineTo(E.hx + hr * 0.5, E.hy + hr * 0.28); ctx.fill(); }
   };
   MOUTH.jaw = function (ctx, E) {
+    const hr = E.hr * pv(E, 'mouthSize', 1);
     const open = E.attack ? 0.5 + 0.3 * Math.sin(E.t * 14) : (E.limp ? 0 : 0.1);
     ctx.fillStyle = shade(E.col, -60);
     ctx.beginPath();
-    ctx.moveTo(E.hx + E.hr * 0.1, E.hy + E.hr * 0.3);
-    ctx.lineTo(E.hx + E.hr * (1.05 + open * 0.3), E.hy + E.hr * (0.1 - open));
-    ctx.lineTo(E.hx + E.hr * (1.05 + open * 0.3), E.hy + E.hr * (0.5 + open));
+    ctx.moveTo(E.hx + hr * 0.1, E.hy + hr * 0.3);
+    ctx.lineTo(E.hx + hr * (1.05 + open * 0.3), E.hy + hr * (0.1 - open));
+    ctx.lineTo(E.hx + hr * (1.05 + open * 0.3), E.hy + hr * (0.5 + open));
     ctx.closePath(); ctx.fill();
     // teeth
     ctx.fillStyle = '#f0ead8';
-    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(E.hx + E.hr * (0.4 + i * 0.25), E.hy + E.hr * 0.32); ctx.lineTo(E.hx + E.hr * (0.5 + i * 0.25), E.hy + E.hr * 0.5); ctx.lineTo(E.hx + E.hr * (0.6 + i * 0.25), E.hy + E.hr * 0.32); ctx.fill(); }
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(E.hx + hr * (0.4 + i * 0.25), E.hy + hr * 0.32); ctx.lineTo(E.hx + hr * (0.5 + i * 0.25), E.hy + hr * 0.5); ctx.lineTo(E.hx + hr * (0.6 + i * 0.25), E.hy + hr * 0.32); ctx.fill(); }
   };
 
   /* ============================ HORNS ============================ */
@@ -384,21 +395,21 @@
     ctx.strokeStyle = shade(E.col2 || E.col, -22); ctx.lineWidth = Math.max(1, E.r * 0.02);
     for (let i = 1; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(cx - hr * 0.18, cy - hr * 0.45 * i); ctx.lineTo(cx + lean * hr * 0.2 + hr * 0.14, cy - hr * 0.5 * i); ctx.stroke(); }
   }
-  HORN.single = function (ctx, E) { oneHorn(ctx, E, E.hx, E.hy - E.hr * 0.7, E.hr, 0.5); };
-  HORN.pair = function (ctx, E) { oneHorn(ctx, E, E.hx - E.hr * 0.35, E.hy - E.hr * 0.7, E.hr * 0.8, -0.4); oneHorn(ctx, E, E.hx + E.hr * 0.35, E.hy - E.hr * 0.7, E.hr * 0.8, 0.5); };
-  HORN.five = function (ctx, E) { for (let i = 0; i < 5; i++) { const f = i / 4 - 0.5; oneHorn(ctx, E, E.hx + f * E.hr * 0.95, E.hy - E.hr * 0.55, E.hr * 0.6, f * 1.6); } };
+  HORN.single = function (ctx, E) { const z = pv(E, 'hornSize', 1); oneHorn(ctx, E, E.hx, E.hy - E.hr * 0.7, E.hr * z, 0.5); };
+  HORN.pair = function (ctx, E) { const z = pv(E, 'hornSize', 1); oneHorn(ctx, E, E.hx - E.hr * 0.35, E.hy - E.hr * 0.7, E.hr * 0.8 * z, -0.4); oneHorn(ctx, E, E.hx + E.hr * 0.35, E.hy - E.hr * 0.7, E.hr * 0.8 * z, 0.5); };
+  HORN.five = function (ctx, E) { const z = pv(E, 'hornSize', 1); for (let i = 0; i < 5; i++) { const f = i / 4 - 0.5; oneHorn(ctx, E, E.hx + f * E.hr * 0.95, E.hy - E.hr * 0.55, E.hr * 0.6 * z, f * 1.6); } };
 
   /* ============================ RIDGE (back spikes / sail) ============================ */
   const RIDGE = {};
   RIDGE.spikes = function (ctx, E) {
     const bh = E.bodyH * (E.limp ? 0.86 : 1);
-    const n = E.P.ridgeCount != null ? E.P.ridgeCount : 7;
+    const n = Math.round(pv(E, 'ridgeCount', 7)), hMul = pv(E, 'ridgeHeight', 1);
     ctx.fillStyle = shade(E.col2 || E.col, -8);
     for (let i = 0; i < n; i++) {
       const bx = (n === 1 ? 0 : (i / (n - 1) - 0.5) * 1.5) * E.bodyW;
       const surf = Math.sqrt(Math.max(0, 1 - (bx / E.bodyW) * (bx / E.bodyW)));
       const topY = E.y0 - bh * surf;
-      const h = E.r * (0.16 + 0.18 * surf);
+      const h = E.r * (0.16 + 0.18 * surf) * hMul;
       ctx.beginPath();
       ctx.moveTo(bx - E.r * 0.1, topY);
       ctx.lineTo(bx - E.r * 0.03, topY - h);   // lean slightly back
@@ -407,11 +418,11 @@
     }
   };
   RIDGE.sail = function (ctx, E) {
-    const bh = E.bodyH * (E.limp ? 0.86 : 1);
+    const bh = E.bodyH * (E.limp ? 0.86 : 1), hM = pv(E, 'ridgeHeight', 1);
     ctx.fillStyle = shade(E.col2 || E.col, -4) + 'ee';
     ctx.beginPath();
     ctx.moveTo(-E.bodyW * 0.6, E.y0 - bh * 0.78);
-    ctx.quadraticCurveTo(0, E.y0 - bh * 2.0, E.bodyW * 0.5, E.y0 - bh * 0.68);
+    ctx.quadraticCurveTo(0, E.y0 - bh * (0.78 + 1.22 * hM), E.bodyW * 0.5, E.y0 - bh * 0.68);
     ctx.quadraticCurveTo(0, E.y0 - bh * 1.05, -E.bodyW * 0.6, E.y0 - bh * 0.78);
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = shade(E.col2 || E.col, -26); ctx.lineWidth = Math.max(1, E.r * 0.03);
@@ -431,6 +442,26 @@
     mouth: ['none', 'beak', 'jaw'],
   };
 
+  /* tunable numeric parameters, with a `when(parts)` gate so the UIs only show
+     a slider when its part is actually selected. Both the composer and the
+     admin species editor render these automatically. */
+  const PARAMS = [
+    { key: 'bodyW', label: 'Body width', min: 0.4, max: 1.6, step: 0.01, def: 0.9 },
+    { key: 'bodyH', label: 'Body height', min: 0.3, max: 1.4, step: 0.01, def: 0.72 },
+    { key: 'wingSpan', label: 'Wing span', min: 0.5, max: 2, step: 0.01, def: 1, when: p => !!p.wings },
+    { key: 'ridgeCount', label: 'Ridge spikes', min: 2, max: 16, step: 1, def: 7, when: p => p.ridge === 'spikes' },
+    { key: 'ridgeHeight', label: 'Ridge height', min: 0.3, max: 2.2, step: 0.05, def: 1, when: p => !!p.ridge },
+    { key: 'hornSize', label: 'Horn size', min: 0.4, max: 2.5, step: 0.05, def: 1, when: p => !!p.horn },
+    { key: 'tailLength', label: 'Tail length', min: 0.5, max: 2.2, step: 0.05, def: 1, when: p => !!p.tail },
+    { key: 'legCount', label: 'Leg count', min: 2, max: 6, step: 1, def: 4, when: p => p.feet === 'paw' },
+    { key: 'legLength', label: 'Leg length', min: 0.3, max: 1.6, step: 0.05, def: 1, when: p => p.feet === 'paw' || p.feet === 'talon' },
+    { key: 'legThick', label: 'Leg thickness', min: 0.4, max: 2.4, step: 0.05, def: 1, when: p => p.feet === 'paw' || p.feet === 'talon' },
+    { key: 'legSpread', label: 'Leg spread', min: 0.4, max: 1.8, step: 0.05, def: 1, when: p => p.feet === 'paw' || p.feet === 'talon' },
+    { key: 'eyeSize', label: 'Eye size', min: 0.4, max: 2.2, step: 0.05, def: 1, when: p => p.eyes !== 'none' },
+    { key: 'eyeSpread', label: 'Eye spread', min: 0.3, max: 2, step: 0.05, def: 1, when: p => p.eyes !== 'none' },
+    { key: 'mouthSize', label: 'Mouth size', min: 0.4, max: 2.2, step: 0.05, def: 1, when: p => p.mouth && p.mouth !== 'none' },
+  ];
+
   function draw(ctx, o, t, state) {
     const E = env(o, t, state);
     const P = E.P;
@@ -438,14 +469,15 @@
     if (P.wings && WINGS[P.wings]) WINGS[P.wings](ctx, E);
     if (P.tail && TAIL[P.tail]) TAIL[P.tail](ctx, E);
     if (P.ridge && RIDGE[P.ridge]) RIDGE[P.ridge](ctx, E);   // behind body, spikes rise over the back
+    if (P.feet && FEET[P.feet] && P.feet !== 'fin') FEET[P.feet](ctx, E);  // legs root behind the body
     (BODY[P.body] || BODY.oval)(ctx, E);           // stamps head anchor onto E
+    if (P.feet === 'fin' && FEET.fin) FEET.fin(ctx, E);      // side fins sit in front
     if (P.shell && SHELL[P.shell]) SHELL[P.shell](ctx, E);
-    if (P.feet && FEET[P.feet]) FEET[P.feet](ctx, E);
     if (P.horn && HORN[P.horn]) HORN[P.horn](ctx, E);
     if (P.mouth && P.mouth !== 'none' && MOUTH[P.mouth]) MOUTH[P.mouth](ctx, E);
     if (P.eyes !== 'none') (EYES[P.eyes] || EYES.round)(ctx, E);
   }
 
   window.DYA = window.DYA || {};
-  DYA.parts = { draw, CATALOG, BODY, WINGS, HORN, RIDGE, SHELL, TAIL, FEET, EYES, MOUTH, shade };
+  DYA.parts = { draw, CATALOG, PARAMS, BODY, WINGS, HORN, RIDGE, SHELL, TAIL, FEET, EYES, MOUTH, shade };
 })();

@@ -2119,11 +2119,11 @@
       rng.oninput = () => { obj[key] = parseFloat(rng.value); out.textContent = step < 1 ? obj[key].toFixed(2) : String(obj[key]); };
       row.appendChild(rng); row.appendChild(out); parent.appendChild(row);
     }
-    function rigSelect(parent, label, obj, key, options) {
+    function rigSelect(parent, label, obj, key, options, after) {
       const sel = U.el('select', { cls: 'txt' });
       options.forEach(opt => sel.appendChild(U.el('option', { value: opt === null ? '__none__' : opt, text: opt === null ? '— none —' : opt })));
       sel.value = obj[key] == null ? '__none__' : obj[key];
-      sel.onchange = () => { if (sel.value === '__none__') delete obj[key]; else obj[key] = sel.value; };
+      sel.onchange = () => { if (sel.value === '__none__') delete obj[key]; else obj[key] = sel.value; if (after) after(); };
       lblIn(parent, label, sel);
     }
     function paintRigPanel() {
@@ -2142,12 +2142,11 @@
         rigSlider(rigPanel, 'Arm thickness', work.punk, 'armWidth', 0.03, 0.25, 0.005);
       } else if (work.rig === 'composed') {
         const CAT = (window.DYA && DYA.parts && DYA.parts.CATALOG) || {};
-        work.parts = Object.assign({ body: 'oval', bodyW: 0.9, bodyH: 0.72, eyes: 'round', mouth: 'none' }, work.parts || {});
+        const PAR = (window.DYA && DYA.parts && DYA.parts.PARAMS) || [];
+        work.parts = Object.assign({ body: 'oval', eyes: 'round', mouth: 'none' }, work.parts || {});
         rigPanel.appendChild(U.el('label', { cls: 'lbl', text: 'Composed — mix body shape & parts' }));
-        Object.keys(CAT).forEach(cat => rigSelect(rigPanel, cat, work.parts, cat, CAT[cat]));
-        rigSlider(rigPanel, 'Body width', work.parts, 'bodyW', 0.4, 1.6, 0.01);
-        rigSlider(rigPanel, 'Body height', work.parts, 'bodyH', 0.3, 1.4, 0.01);
-        rigSlider(rigPanel, 'Wing span', work.parts, 'wingSpan', 0.5, 2, 0.01, 1);
+        Object.keys(CAT).forEach(cat => rigSelect(rigPanel, cat, work.parts, cat, CAT[cat], paintRigPanel));
+        PAR.forEach(p => { if (!p.when || p.when(work.parts)) rigSlider(rigPanel, p.label, work.parts, p.key, p.min, p.max, p.step, p.def); });
       }
     }
     paintRigPanel();
