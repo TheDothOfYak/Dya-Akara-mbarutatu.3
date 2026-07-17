@@ -520,8 +520,21 @@
       if (rng.chance(chest.ngakaraChance)) { G.me.ngakara += 1; gained.ngakara += 1; }
       if (chest.milestone) {
         const m = chest.milestone;
-        const spid = rng.pick(SP.craftable);
-        const tok = TK.mint({ speciesId: spid, rng, owner: G.me.id, rarity: Math.min(m.tokenRarity, SP.get(spid).rarity[1]) });
+        /* admin-curated milestone pool (Admin → Balance & Economy → Level
+           chest pools): a manually-picked list of {speciesId, rarity} this
+           level's chest may contain, in place of any random craftable
+           species. Levels with no pool set keep the old random roll. */
+        const pool = DYA.mods && DYA.mods.getLevelChestPool(G.me.level);
+        let tok;
+        if (pool && pool.length) {
+          const pick = rng.pick(pool);
+          const sp = SP.get(pick.speciesId);
+          const rarity = pick.rarity != null ? pick.rarity : Math.min(m.tokenRarity, sp ? sp.rarity[1] : m.tokenRarity);
+          tok = TK.mint({ speciesId: pick.speciesId, rng, owner: G.me.id, rarity });
+        } else {
+          const spid = rng.pick(SP.craftable);
+          tok = TK.mint({ speciesId: spid, rng, owner: G.me.id, rarity: Math.min(m.tokenRarity, SP.get(spid).rarity[1]) });
+        }
         G.me.tokens[tok.id] = tok;
         gained.tokens.push(tok);
         G.me.okid[m.okidRarity] += m.okidQty;
@@ -1334,6 +1347,17 @@
       if (q > 0) { acc.okid[r] = (acc.okid[r] || 0) + q; summary.okid.push({ rarity: r, qty: q }); }
     });
     (reward.tokens || []).forEach(tk => {
+      /* an exact, already-designed token pulled from the Reserve (Crafting
+         Station), consumed on grant — rather than minted fresh from a spec */
+      if (tk.reserveId) {
+        const entry = DYA.mods && DYA.mods.getReserveEntry(tk.reserveId);
+        if (!entry) return;
+        DYA.mods.deleteReserveEntry(tk.reserveId);
+        const tok = TK.mintSpec(entry.spec, { rng: new U.Rng(U.newSeed()), owner: acc.id, aiOwner: !!acc.ai });
+        acc.tokens[tok.id] = tok;
+        summary.tokens.push(tok);
+        return;
+      }
       /* a reward token may be a fully designed spec (Admin → token designer)
          or the simple species/rarity form — mint the same way either way */
       const spec = (tk.spec && tk.spec.speciesId) ? tk.spec : { speciesId: tk.speciesId, rarity: tk.rarity };
@@ -1847,6 +1871,32 @@
       return { tok };
     },
     grantTrusted(accId) { const a = G.world.accounts[accId]; if (a) { a.trustedSeller = true; G.saveNow(); pushAccountToCloud(a); } },
+    /* Reserve (Crafting Station): grant a designed, unowned token directly
+       into a player's collection — minted true to the design, then consumed
+       (removed) from the Reserve, exactly like a sold Guild listing. */
+    grantReserveEntry(id, accId) {
+      const entry = DYA.mods && DYA.mods.getReserveEntry(id);
+      if (!entry) return { err: 'That token is not in the Reserve.' };
+      const acc = G.world.accounts[accId];
+      if (!acc) return { err: 'Account not found.' };
+      DYA.mods.deleteReserveEntry(id);
+      const tok = TK.mintSpec(entry.spec, { rng: new U.Rng(U.newSeed()), owner: acc.id, aiOwner: !!acc.ai });
+      acc.tokens[tok.id] = tok;
+      if (!acc.ai) acc.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'system', title: 'Token granted', body: 'The Dya Guild has granted you ' + tok.name + ' (' + (SP.get(tok.speciesId) || {}).name + ').', icon: '🎁' });
+      G.saveNow();
+      pushAccountToCloud(acc);
+      return { ok: true, tok };
+    },
+    /* Reserve (Crafting Station): push a designed, unowned token onto the
+       Guild stall as a one-of-a-kind listing (sold once, like the market),
+       removing it from the Reserve. */
+    pushReserveToStall(id, price) {
+      const entry = DYA.mods && DYA.mods.getReserveEntry(id);
+      if (!entry) return { err: 'That token is not in the Reserve.' };
+      DYA.mods.deleteReserveEntry(id);
+      DYA.mods.setGuildListing({ id: U.uid('glst'), spec: entry.spec, price: Math.max(0, price | 0), desc: '', createdAt: Date.now() });
+      return { ok: true };
+    },
     /* grant Hunt slots directly to a player (admin gift). These never expire
        (expiresAtBand null) so an admin grant doesn't quietly vanish at the next
        level band the way earned slots do. */

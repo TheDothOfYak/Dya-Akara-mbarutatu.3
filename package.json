@@ -7,6 +7,6 @@
     "dev": "python3 -m http.server 8000 || npx --yes http-server -p 8000 -c-1 .",
     "start": "python3 -m http.server 8000 || npx --yes http-server -p 8000 -c-1 .",
     "dev:node": "npx --yes http-server -p 8000 -c-1 .",
-    "test": "node tests/test_engine.js && node tests/test_netplay.js && node tests/test_mods_market.js && node tests/test_cloud_accounts.js && node tests/test_tournaments_online.js && node tests/test_season.js && node tests/test_admin_features.js && node tests/test_shared_world.js && node tests/test_riding.js && node tests/test_hunt_creature.js"
+    "test": "node tests/test_engine.js && node tests/test_netplay.js && node tests/test_mods_market.js && node tests/test_cloud_accounts.js && node tests/test_tournaments_online.js && node tests/test_season.js && node tests/test_admin_features.js && node tests/test_shared_world.js && node tests/test_riding.js && node tests/test_hunt_creature.js && node tests/test_reserve_crafting.js"
   }
 }
