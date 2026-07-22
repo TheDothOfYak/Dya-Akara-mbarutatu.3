@@ -288,10 +288,9 @@
 
   def('kipsu', {
     name: 'Kipsu', family: 'Creature', element: 'Ular',
-    rarity: [0, 3], size: [0, 3], rig: 'composed',
+    rarity: [0, 3], size: [0, 3], rig: 'kipsu',
     color: '#a3703f', color2: '#68e0c8', // fox-brown, biolum teal tail
     features: { fluffTail: true, biolumTail: true, ears: true },
-    parts: { body: 'beast', ears: 'fox', tail: 'fluff', feet: 'paw', eyes: 'round', mouth: 'none', bodyW: 0.85, bodyH: 0.6 },
     tags: ['pack', 'biolum', 'omnivore'],
     behavior: 'kipsu',
     statMul: { hp: 0.85, dmg: 0.75, speed: 1.2 },

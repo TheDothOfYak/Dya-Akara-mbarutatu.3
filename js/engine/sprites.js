@@ -177,6 +177,7 @@
       else if (rig === 'swarm') drawSwarm(ctx, o, t, state);
       else if (rig === 'tree') drawTree(ctx, o, t, state);
       else if (rig === 'stryx') drawStryx(ctx, o, t, state);
+      else if (rig === 'kipsu') drawKipsu(ctx, o, t, state);
       else if (rig === 'blob') drawBlob(ctx, o, t, state);
       else if (rig === 'field') drawField(ctx, o, t, state);
       else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
@@ -1078,6 +1079,163 @@
         ctx.fillStyle = shade(vine, -6);
         ctx.beginPath(); ctx.ellipse(midX, midY, r * 0.12, r * 0.06, ang, 0, TAU); ctx.fill();
       }
+    }
+  }
+
+  /* ============ KIPSU — pack weasel-fox with a patterned biolum tail ========
+     "A weasel's face, a fox's ears, and a fluffy bioluminescent tail whose
+     pattern is unique to each individual." A low, sleek, curious pack animal:
+     bounding gait, swivelling ears, and a bushy tail that carries this
+     individual's glow pattern (rings / waves / spots / spiral / twin-stripe,
+     chosen from its stable markSeed so it reads the same on card, field and
+     in the Vakarborac). The tail only lights when bioluminescence is on;
+     otherwise the pattern reads as pale fur markings. */
+  const KIPSU_PATTERNS = ['rings', 'waves', 'spots', 'spiral', 'twin-stripe'];
+  function kipsuNormal(pts, i) {
+    const n = pts.length, a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+    return [-dy / L, dx / L];
+  }
+  function drawKipsu(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const coat = sp.color || '#a3703f';
+    const glow = sp.color2 || '#68e0c8';
+    const moving = state === 'walk' || state === 'run';
+    const rate = state === 'run' ? 14 : 8;
+    const idleBob = state === 'idle' ? Math.sin(t * 2.4) * r * 0.05 : 0;
+    const dormant = state === 'dormant';
+    const dead = state === 'death';
+    const attack = state === 'attack' || state === 'special';
+    const lunge = attack ? Math.max(0, Math.sin(t * 12)) * r * 0.3 : 0;
+    const biolumOn = !!o.biolum;
+    const bodyW = r * 0.9, bodyH = r * 0.5;   // low + sleek
+    const y0 = -r * 0.05 + idleBob + (dormant ? r * 0.3 : 0);
+    const pat = KIPSU_PATTERNS[(o.indiv && o.indiv.markSeed != null ? o.indiv.markSeed : 0) % 5];
+
+    /* ---- legs (behind body): bounding gait; tucked away when curled ---- */
+    if (!dormant && !dead) {
+      ctx.strokeStyle = shade(coat, -42); ctx.lineWidth = Math.max(2, r * 0.13); ctx.lineCap = 'round';
+      const legY = y0 + bodyH * 0.5, footY = r * 0.82;
+      [-bodyW * 0.55, -bodyW * 0.28, bodyW * 0.22, bodyW * 0.5].forEach((lx, i) => {
+        const sw = moving ? Math.sin(t * rate + i * Math.PI * 0.9) * r * 0.24 : Math.sin(t * 2 + i) * r * 0.02;
+        ctx.beginPath(); ctx.moveTo(lx, legY); ctx.lineTo(lx + sw, footY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lx + sw - r * 0.06, footY); ctx.lineTo(lx + sw + r * 0.09, footY); ctx.stroke();
+      });
+    }
+
+    /* ---- tail: bushy plume carrying the biolum pattern ---- */
+    const wag = dead ? 0 : Math.sin(t * (moving ? 7 : 3)) * 0.22;
+    const tBaseX = -bodyW * 0.78, tBaseY = y0;
+    let tCX, tCY, tEX, tEY;
+    if (dormant) { tCX = -bodyW * 0.15; tCY = y0 - r * 0.55; tEX = bodyW * 0.55; tEY = y0 - r * 0.05; }   // curls over the body
+    else if (dead) { tCX = -bodyW * 1.15; tCY = y0 + r * 0.25; tEX = -bodyW * 1.4; tEY = r * 0.7; }        // limp to the ground
+    else { tCX = -bodyW * 1.3; tCY = y0 - r * 0.45 + wag * r; tEX = -bodyW * 1.55; tEY = y0 - r * 0.6 + wag * r * 1.3; }
+    const N = 8, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, m = 1 - u;
+      pts.push([m * m * tBaseX + 2 * m * u * tCX + u * u * tEX, m * m * tBaseY + 2 * m * u * tCY + u * u * tEY]);
+    }
+    const wfn = (u) => r * (0.13 + 0.42 * u);   // thin at the root, bushy at the tip
+    /* plume outline */
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N);
+      top.push([pts[i][0] + nx * w, pts[i][1] + ny * w]);
+      bot.push([pts[i][0] - nx * w, pts[i][1] - ny * w]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(top[0][0], top[0][1]);
+    for (let i = 1; i <= N; i++) ctx.lineTo(top[i][0], top[i][1]);
+    for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.closePath();
+    const tg = ctx.createLinearGradient(tBaseX, y0, tEX, tEY);
+    tg.addColorStop(0, shade(coat, -6)); tg.addColorStop(1, shade(coat, 14));
+    ctx.fillStyle = tg; ctx.fill();
+    /* pattern, clipped inside the plume */
+    ctx.save(); ctx.clip();
+    const patCol = biolumOn ? glow : shade(coat, 24);
+    ctx.strokeStyle = patCol; ctx.fillStyle = patCol;
+    ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+    if (biolumOn) { ctx.shadowColor = glow; ctx.shadowBlur = r * 0.45; }
+    if (pat === 'rings') {
+      for (let i = 2; i <= N; i += 2) { const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N) * 1.1; ctx.beginPath(); ctx.moveTo(pts[i][0] - nx * w, pts[i][1] - ny * w); ctx.lineTo(pts[i][0] + nx * w, pts[i][1] + ny * w); ctx.stroke(); }
+    } else if (pat === 'twin-stripe') {
+      for (const s of [-0.45, 0.45]) { ctx.beginPath(); for (let i = 0; i <= N; i++) { const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N); const x = pts[i][0] + nx * w * s, y = pts[i][1] + ny * w * s; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); }
+    } else if (pat === 'waves') {
+      ctx.beginPath(); for (let i = 0; i <= N; i++) { const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N) * 0.6 * Math.sin(i * 1.5); const x = pts[i][0] + nx * w, y = pts[i][1] + ny * w; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+    } else if (pat === 'spots') {
+      for (let i = 1; i <= N; i++) { const [nx, ny] = kipsuNormal(pts, i), s = (i % 2 ? 0.4 : -0.4) * wfn(i / N); ctx.beginPath(); ctx.arc(pts[i][0] + nx * s, pts[i][1] + ny * s, r * 0.09, 0, TAU); ctx.fill(); }
+    } else { /* spiral — concentric arcs near the bushy tip */
+      const c = pts[N - 1]; for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.12 * k, t * 0.5 + k, t * 0.5 + k + Math.PI * 1.4); ctx.stroke(); }
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    /* glowing pale tip pom (unclipped, so its bloom shows) */
+    const tip = pts[N];
+    if (biolumOn) { ctx.shadowColor = glow; ctx.shadowBlur = r * 0.8; }
+    ctx.fillStyle = biolumOn ? '#eafffb' : shade(coat, 30);
+    ctx.beginPath(); ctx.arc(tip[0], tip[1], r * 0.15, 0, TAU); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    /* ---- head placement (tucks in when curled) ---- */
+    let hx, hy; const hr = r * 0.3;
+    if (dormant) { hx = bodyW * 0.45; hy = y0 + r * 0.06; }
+    else { hx = bodyW * 0.9 + lunge; hy = y0 - bodyH * 0.35 + Math.sin(t * 2.4) * r * 0.03; }
+
+    /* ---- fox ears (behind the head so it overlaps their base) ---- */
+    if (!dead) {
+      const swiv = dormant ? 0 : Math.sin(t * 1.8) * 0.12;
+      for (const s of [-0.5, 0.15]) {
+        const bx = hx + hr * s, by = hy - hr * 0.5;
+        const tipX = bx + hr * (s < 0 ? -0.15 : 0.35) + (dormant ? (s < 0 ? -0.5 : 0.5) * hr : swiv * hr * 2);
+        const tipY = by - hr * (dormant ? 0.35 : 1.35);   // folded back when curled
+        ctx.fillStyle = shade(coat, 2);
+        ctx.beginPath();
+        ctx.moveTo(bx - hr * 0.28, by);
+        ctx.lineTo(tipX, tipY);
+        ctx.lineTo(bx + hr * 0.32, by);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = shade(coat, 26);   // inner ear
+        ctx.beginPath();
+        ctx.moveTo(bx - hr * 0.1, by - hr * 0.05);
+        ctx.lineTo((bx + tipX) / 2, (by + tipY) / 2);
+        ctx.lineTo(bx + hr * 0.14, by - hr * 0.05);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    /* ---- body (sleek) + pale belly ---- */
+    const grd = ctx.createLinearGradient(0, y0 - bodyH, 0, y0 + bodyH);
+    grd.addColorStop(0, shade(coat, 20)); grd.addColorStop(1, shade(coat, -16));
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(lunge * 0.3, y0, bodyW, bodyH * (dormant ? 1.15 : 1), 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = shade(coat, 34) + 'aa';
+    ctx.beginPath(); ctx.ellipse(bodyW * 0.22 + lunge * 0.3, y0 + bodyH * 0.32, bodyW * 0.55, bodyH * 0.48, 0, 0, TAU); ctx.fill();
+
+    /* ---- head + weasel snout ---- */
+    ctx.fillStyle = shade(coat, 12);
+    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, TAU); ctx.fill();
+    /* elongated snout */
+    const snX = hx + hr * (dormant ? 0.2 : 0.85), snY = hy + hr * 0.28;
+    ctx.beginPath(); ctx.ellipse(snX, snY, hr * 0.6, hr * 0.42, dormant ? 0.3 : 0, 0, TAU); ctx.fill();
+    /* nose */
+    ctx.fillStyle = '#1c130c';
+    ctx.beginPath(); ctx.arc(snX + hr * 0.5, snY, Math.max(1.2, hr * 0.16), 0, TAU); ctx.fill();
+    /* whiskers */
+    if (!dormant && !dead) {
+      ctx.strokeStyle = '#e8e0d066'; ctx.lineWidth = 1;
+      for (const wy of [-0.15, 0.1, 0.35]) { ctx.beginPath(); ctx.moveTo(snX + hr * 0.35, snY + hr * wy); ctx.lineTo(snX + hr * 1.3, snY + hr * (wy - 0.15)); ctx.stroke(); }
+    }
+    /* eye — big + curious; closes when curled or dead; narrows on a strike */
+    if (dormant || dead) {
+      ctx.strokeStyle = '#1c130c'; ctx.lineWidth = Math.max(1, hr * 0.12); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx + hr * 0.05, hy - hr * 0.1); ctx.lineTo(hx + hr * 0.5, hy - hr * 0.1); ctx.stroke();
+    } else {
+      const eyH = attack ? 0.6 : 1;
+      ctx.fillStyle = '#1c130c';
+      ctx.beginPath(); ctx.ellipse(hx + hr * 0.35, hy - hr * 0.08, hr * 0.2, hr * 0.24 * eyH, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffffffcc';
+      ctx.beginPath(); ctx.arc(hx + hr * 0.29, hy - hr * 0.18, hr * 0.07, 0, TAU); ctx.fill();
     }
   }
 
