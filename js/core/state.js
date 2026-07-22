@@ -771,7 +771,9 @@
     tok.stats.dmg = pre.dmg;
     tok.stats.speed = pre.speed;
     tok.rarity = target;
-    tok.cost = TK.deriveCostVec(SP.get(tok.speciesId), target, new U.Rng(U.hashStr((tok.id || tok.speciesId) + ':up' + target)));
+    /* price tracks power: refresh from the boosted stats (admin-pinned prices
+       are left untouched) */
+    if (!tok.costLocked) tok.cost = TK.costVec(tok);
     tok.upgraded = (tok.upgraded || 0) + 1;
     if (target === 6) checkAchievement('torcain_own', 1);
     G.save();

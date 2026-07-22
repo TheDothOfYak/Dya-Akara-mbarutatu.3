@@ -150,7 +150,7 @@
 
   def('stryx', {
     name: 'Stryx', family: 'Creature', element: 'Ular',
-    rarity: [1, 5], size: [1, 3], rig: 'quad',
+    rarity: [1, 5], size: [1, 3], rig: 'stryx',
     color: '#7d766a', color2: '#4d7a44', // stone armor, vine limbs
     features: { rocky: true, vines: true, rootsOnDeploy: true, legless: true },
     tags: ['stationary', 'forest'],
@@ -274,7 +274,7 @@
     name: 'Ular Naga', family: 'Naga', element: 'Ular',
     rarity: [2, 6], size: [2, 4], rig: 'quad',
     color: '#57713d', color2: '#3c4f2a',
-    features: { heads: [1, 5], serpent: true, ridge: true },
+    features: { heads: [1, 5], serpent: true, ridge: true, scaled: true, clubTail: true },
     tags: ['carnivore', 'apex', 'naga'],
     behavior: 'ular_naga',
     statMul: { hp: 1.6, dmg: 1.4, speed: 0.9 },
@@ -288,10 +288,9 @@
 
   def('kipsu', {
     name: 'Kipsu', family: 'Creature', element: 'Ular',
-    rarity: [0, 3], size: [0, 3], rig: 'composed',
+    rarity: [0, 3], size: [0, 3], rig: 'kipsu',
     color: '#a3703f', color2: '#68e0c8', // fox-brown, biolum teal tail
     features: { fluffTail: true, biolumTail: true, ears: true },
-    parts: { body: 'beast', ears: 'fox', tail: 'fluff', feet: 'paw', eyes: 'round', mouth: 'none', bodyW: 0.85, bodyH: 0.6 },
     tags: ['pack', 'biolum', 'omnivore'],
     behavior: 'kipsu',
     statMul: { hp: 0.85, dmg: 0.75, speed: 1.2 },

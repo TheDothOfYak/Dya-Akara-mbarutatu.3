@@ -706,7 +706,7 @@
         body.appendChild(box);
       }
 
-      tableEditor('Resource cost to ready, per rarity', SP.RARITIES, () => SP.RARITY_COST, 'RARITY_COST', 'balance');
+      tableEditor('Fallback ready cost, per rarity (cost is power-based by default)', SP.RARITIES, () => SP.RARITY_COST, 'RARITY_COST', 'balance');
       tableEditor('Baseline market value (gold), per rarity', SP.RARITIES, () => SP.RARITY_VALUE, 'RARITY_VALUE', 'balance');
       tableEditor('Base HP, per size band', SP.SIZES, () => SP.SIZE_HP, 'SIZE_HP', 'balance');
       tableEditor('Base damage, per size band', SP.SIZES, () => SP.SIZE_DMG, 'SIZE_DMG', 'balance');
@@ -2241,7 +2241,7 @@
   }
 
   /* ================= SPECIES EDITOR ================= */
-  const RIGS = ['quad', 'punk', 'composed', 'biped', 'flame', 'swarm', 'tree', 'blob', 'field', 'relic', 'crab', 'mcfly', 'bird'];
+  const RIGS = ['quad', 'punk', 'composed', 'biped', 'flame', 'swarm', 'tree', 'stryx', 'kipsu', 'blob', 'field', 'relic', 'crab', 'mcfly', 'bird'];
 
   /* Ability catalog for the dropdown menus: merges the curated descriptions in
      data/abilities.js with the real ranges/options learned from every existing
@@ -2499,7 +2499,7 @@
     /* per-species base ready-cost range — overrides the rarity cost table so
        cost is not driven by rarity alone (each mint rolls between lo and hi) */
     const hasCR = Array.isArray(work.costRange);
-    const crLo = cell(g1, 'Base cost min (blank = use rarity)', numIn(hasCR ? work.costRange[0] : '', { step: 1, min: 0, placeholder: 'rarity' }));
+    const crLo = cell(g1, 'Base cost min (blank = from power)', numIn(hasCR ? work.costRange[0] : '', { step: 1, min: 0, placeholder: 'power' }));
     const crHi = cell(g1, 'Base cost max', numIn(hasCR ? work.costRange[1] : '', { step: 1, min: 0, placeholder: 'rarity' }));
     const syncCR = () => {
       const lo = crLo.value.trim(), hi = crHi.value.trim();
@@ -2878,12 +2878,22 @@
         tok.behaviorValue = U.clamp(Math.round(parseFloat(behIn.value) || 0), 5, 3000);
         tok.age = U.clamp(parseFloat(ageIn.value) || 0, 0, 1);
         tok.combatExp = U.clamp(parseFloat(expIn.value) || 0, 0, 1);
-        tok.cost = {
+        /* Ready cost is stat-power based and live by default. Only pin (lock)
+           it if the admin actually changed a value away from the derived
+           price; otherwise leave it live so it keeps tracking the token's
+           power. */
+        const entered = {
           Fti: Math.max(0, parseInt(costIns.Fti.value, 10) || 0),
           Su: Math.max(0, parseInt(costIns.Su.value, 10) || 0),
           Eldi: Math.max(0, parseInt(costIns.Eldi.value, 10) || 0),
           Ular: Math.max(0, parseInt(costIns.Ular.value, 10) || 0),
         };
+        const derived = TK.deriveCostVec(SP.get(tok.speciesId), tok.rarity, new U.Rng(U.hashStr((tok.id || tok.speciesId) + '::cost')), tok.stats);
+        if (SP.ELEMENTS.every(e => (entered[e] || 0) === (derived[e] || 0))) {
+          delete tok.cost; delete tok.costLocked;   // keep it live (power-based)
+        } else {
+          tok.cost = entered; tok.costLocked = true; // admin pinned a custom price
+        }
         tok.status = statusSel.value;
         tok.nameLocked = nameLocked; tok.frozen = frozen; tok.famous = famous;
         tok.material = matIn.value.trim();

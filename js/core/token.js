@@ -234,18 +234,13 @@
       (outlier === 'prodigy' ? 'Even hunters who dislike superlatives call it an exceptional specimen. ' : outlier === 'runt' ? 'It is small for its kind and has spent its whole life making that everyone else\u2019s problem. ' : '') +
       rng.pick(L.STORY_MATERIAL).replace('{mat}', mat).replace('{place}', place);
 
-    /* Per-token resource cost vector (July update §1): total scales with
-       rarity, split across the four resources by element affinity. A token
-       may cost any combination, including zero of a type. Locked at mint. */
-    const costVec = T.deriveCostVec(sp, rarity, rng);
-
     const now = Date.now();
     const tok = {
       id: U.uid('tok'),
       speciesId: sp.id,
       name,
       nameLocked: !!opts.nameLocked,
-      cost: costVec,
+      cost: null,   /* filled from live stat-power below; recomputed on read */
       ownerId: opts.owner || null,
       crafterId: opts.crafter || opts.owner || null,
       rarity, sizeIdx,
@@ -274,6 +269,7 @@
       autoGen: !!(opts.autoGen || opts.aiOwner),
     };
     T.physique(tok); /* bake in this individual's look */
+    tok.cost = T.costVec(tok); /* stat-power price, stored for back-compat/serialisation */
     return tok;
   };
 
@@ -316,6 +312,7 @@
     }
     /* the look depends on size/picks, so re-bake after applying overrides */
     T.physique(tok);
+    tok.cost = T.costVec(tok); /* refresh stat-power price after stat overrides */
     return tok;
   };
 
@@ -325,24 +322,57 @@
     return v.Fti + v.Su + v.Eldi + v.Ular;
   };
 
-  /* Resource cost vector; derives one for tokens minted before the update */
-  T.costVec = function (tok) {
-    if (tok.cost && typeof tok.cost === 'object') return tok.cost;
-    const sp = SP.get(tok.speciesId);
-    return T.deriveCostVec(sp, tok.rarity, new U.Rng(U.hashStr(tok.id || sp.id)));
+  /* ---- Power-based ready cost ----
+     A token's cost to field reflects its OVERALL POWER — a weighted blend of
+     health (40%), attack (35%) and speed (25%). Each stat is normalised
+     against the top of the size tables so the blend is scale-free, then mapped
+     into the resource-cost band. Calibrated to a cheap ~1–15 spread: a small
+     skirmisher lands near 1, a mid creature near 2–4, a size-4 bruiser near
+     7, and only the largest leviathans reach the hard cap of 15. A stronger
+     individual of a given species costs more than a weaker one, and upgrading
+     a token raises its price. */
+  const COST_W = { hp: 0.40, dmg: 0.35, speed: 0.25 };
+  const COST_SCALE = 12, COST_FLOOR = 3.3, COST_MAX = 15;
+
+  T.statPower = function (stats) {
+    stats = stats || {};
+    const hpRef = SP.SIZE_HP[SP.SIZE_HP.length - 1] || 480;
+    const dmgRef = SP.SIZE_DMG[SP.SIZE_DMG.length - 1] || 34;
+    const spdRef = Math.max.apply(null, SP.SIZE_SPEED) || 58;
+    return COST_W.hp * ((stats.hp || 0) / hpRef)
+      + COST_W.dmg * ((stats.dmg || 0) / dmgRef)
+      + COST_W.speed * ((stats.speed || 0) / spdRef);
   };
 
-  T.deriveCostVec = function (sp, rarity, rng) {
-    /* Base cost is normally read straight off the rarity table, but a species
-       may define its OWN base-cost range (Admin → Creatures → "Base ready
-       cost"). When present it overrides rarity as the driver: each individual
-       rolls a total between the low and high, so cost varies token to token
-       independently of rarity. (design: rarity is not the only factor). */
-    let total = SP.RARITY_COST[rarity];
+  /* Map a token's stat power to a whole-number ready-cost total */
+  T.costTotal = function (stats) {
+    return U.clamp(Math.round(T.statPower(stats) * COST_SCALE - COST_FLOOR), 1, COST_MAX);
+  };
+
+  /* Resource cost vector. An admin-pinned price (costLocked) is honoured
+     verbatim; every other token derives its cost LIVE from its current stats,
+     so the price always reflects the token's real power — including after an
+     upgrade — and applies to tokens minted before this model existed. */
+  T.costVec = function (tok) {
+    if (tok.costLocked && tok.cost && typeof tok.cost === 'object') return tok.cost;
+    const sp = SP.get(tok.speciesId);
+    return T.deriveCostVec(sp, tok.rarity, new U.Rng(U.hashStr((tok.id || sp.id) + '::cost')), tok.stats);
+  };
+
+  T.deriveCostVec = function (sp, rarity, rng, stats) {
+    /* Total to ready. Power (from stats) is the driver. A species may still
+       pin its own base-cost range in the Admin Panel ("Base ready cost"),
+       which overrides power when set; rarity is only a last-ditch fallback for
+       a call made without stats. */
+    let total;
     if (sp && Array.isArray(sp.costRange) && sp.costRange.length === 2) {
       const lo = Math.min(sp.costRange[0], sp.costRange[1]);
       const hi = Math.max(sp.costRange[0], sp.costRange[1]);
       total = Math.max(0, Math.round(rng.range(lo, hi)));
+    } else if (stats) {
+      total = T.costTotal(stats);
+    } else {
+      total = SP.RARITY_COST[rarity];
     }
     const v = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
     if (total <= 0) return v; /* a deliberately free token */

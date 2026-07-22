@@ -176,6 +176,8 @@
       else if (rig === 'flame') drawFlame(ctx, o, t, state);
       else if (rig === 'swarm') drawSwarm(ctx, o, t, state);
       else if (rig === 'tree') drawTree(ctx, o, t, state);
+      else if (rig === 'stryx') drawStryx(ctx, o, t, state);
+      else if (rig === 'kipsu') drawKipsu(ctx, o, t, state);
       else if (rig === 'blob') drawBlob(ctx, o, t, state);
       else if (rig === 'field') drawField(ctx, o, t, state);
       else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
@@ -306,7 +308,23 @@
     }
 
     /* --- tail --- */
-    if (F.ballTail) {
+    if (F.clubTail && !F.aquatic) {
+      /* spiked club tail (Ular Naga): a thick, tapering, mace-tipped tail */
+      const wag = Math.sin(t * 3) * 0.16;
+      const bx = -bodyW * 0.85, ex = -bodyW * 1.52, ey = y0 + wag * r;
+      ctx.strokeStyle = shade(sp.color, -24); ctx.lineWidth = r * 0.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bx, y0); ctx.quadraticCurveTo((bx + ex) / 2, y0 - r * 0.28 + wag * r, ex, ey); ctx.stroke();
+      ctx.fillStyle = shade(sp.color, -36);
+      ctx.beginPath(); ctx.arc(ex, ey, r * 0.3, 0, TAU); ctx.fill();
+      ctx.strokeStyle = shade(sp.color, -62); ctx.lineWidth = Math.max(1, r * 0.06); ctx.lineCap = 'round';
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * TAU;
+        ctx.beginPath();
+        ctx.moveTo(ex + Math.cos(a) * r * 0.28, ey + Math.sin(a) * r * 0.28);
+        ctx.lineTo(ex + Math.cos(a) * r * 0.48, ey + Math.sin(a) * r * 0.48);
+        ctx.stroke();
+      }
+    } else if (F.ballTail) {
       const wag = Math.sin(t * 3) * 0.2;
       ctx.strokeStyle = shade(sp.color, -30); ctx.lineWidth = r * 0.14;
       ctx.beginPath(); ctx.moveTo(-bodyW * 0.9, y0); ctx.quadraticCurveTo(-bodyW * 1.3, y0 - r * 0.3 + wag * r, -bodyW * 1.5, y0 + wag * r); ctx.stroke();
@@ -340,6 +358,23 @@
     ctx.fillStyle = grd;
     const undul = F.aquatic ? Math.sin(t * 6) * 0.05 : 0;
     ctx.beginPath(); ctx.ellipse(attackLunge * 0.3, y0, bodyW, bodyH * (dormant ? 0.75 : 1), undul, 0, TAU); ctx.fill();
+
+    /* scaled, armored hide — overlapping reptilian scales, clipped to the body */
+    if (F.scaled) {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(attackLunge * 0.3, y0, bodyW, bodyH * (dormant ? 0.75 : 1), undul, 0, TAU); ctx.clip();
+      ctx.strokeStyle = shade(sp.color, -30) + 'aa'; ctx.lineWidth = Math.max(1, r * 0.028);
+      const sc = r * 0.22;
+      let row = 0;
+      for (let ry = -1.1; ry <= 1.2; ry += 0.55, row++) {
+        const cy2 = y0 + ry * bodyH * 0.75;
+        const rowOff = (row % 2) ? sc * 0.5 : 0;
+        for (let cx = -bodyW - sc; cx < bodyW + sc; cx += sc) {
+          ctx.beginPath(); ctx.arc(cx + rowOff, cy2 - sc * 0.4, sc * 0.55, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
 
     /* rocky / carved / scars / plates texture */
     if (F.rocky || F.carved) {
@@ -417,6 +452,13 @@
       }
       ctx.fillStyle = h === 0 ? shade(sp.color, 12) : shade(sp.color, 12 - h * 8);
       ctx.beginPath(); ctx.arc(hx, hy, headR, 0, TAU); ctx.fill();
+      /* serpent head: extend into a wedge snout with a hooded brow */
+      if (F.serpent) {
+        ctx.fillStyle = h === 0 ? shade(sp.color, 12) : shade(sp.color, 12 - h * 8);
+        ctx.beginPath(); ctx.ellipse(hx + headR * 0.68, hy + headR * 0.12, headR * 0.72, headR * 0.5, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = shade(sp.color, -14);
+        ctx.beginPath(); ctx.ellipse(hx + headR * 0.22, hy - headR * 0.42, headR * 0.52, headR * 0.26, -0.3, 0, TAU); ctx.fill();
+      }
       /* first-head marker for nagas (near-invincible) */
       if (h === 0 && headCount > 1) {
         ctx.strokeStyle = (sp.color2 || '#fff') + 'cc'; ctx.lineWidth = Math.max(1, r * 0.05);
@@ -444,6 +486,34 @@
         ctx.lineTo(hx + headR * (1.1 + open * 0.3), hy + headR * (0.05 - open));
         ctx.lineTo(hx + headR * (1.1 + open * 0.3), hy + headR * (0.45 + open));
         ctx.closePath(); ctx.fill();
+      }
+      /* serpent maw: fangs + a flicking forked tongue */
+      if (F.serpent && !dormant) {
+        const striking = state === 'attack' || state === 'special';
+        const open = striking ? 0.35 + 0.25 * Math.sin(t * 14) : 0.05;
+        ctx.strokeStyle = shade(sp.color, -62); ctx.lineWidth = Math.max(1, headR * 0.16); ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(hx + headR * 0.35, hy + headR * 0.42);
+        ctx.lineTo(hx + headR * 1.32, hy + headR * (0.34 + open));
+        ctx.stroke();
+        ctx.fillStyle = '#f2ecd8';
+        for (const fx of [0.72, 1.02]) {
+          ctx.beginPath();
+          ctx.moveTo(hx + headR * fx, hy + headR * 0.4);
+          ctx.lineTo(hx + headR * (fx + 0.05), hy + headR * (0.78 + open * 1.4));
+          ctx.lineTo(hx + headR * (fx + 0.16), hy + headR * 0.42);
+          ctx.closePath(); ctx.fill();
+        }
+        if (striking || Math.sin(t * 2.4 + h * 2.3) > 0.72) {
+          const ext = headR * (1.0 + 0.6 * Math.abs(Math.sin(t * 11 + h)));
+          const bx = hx + headR * 1.3, by = hy + headR * 0.5;
+          ctx.strokeStyle = '#c23a52'; ctx.lineWidth = Math.max(1, headR * 0.09); ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + ext, by + headR * 0.05); ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(bx + ext, by + headR * 0.05); ctx.lineTo(bx + ext + headR * 0.22, by - headR * 0.1);
+          ctx.moveTo(bx + ext, by + headR * 0.05); ctx.lineTo(bx + ext + headR * 0.22, by + headR * 0.2);
+          ctx.stroke();
+        }
       }
       /* tusks */
       if (F.tusks && h === 0) {
@@ -914,6 +984,326 @@
     ctx.fillStyle = '#d9a441';
     for (let i = 0; i < 4; i++) {
       ctx.beginPath(); ctx.arc(Math.sin(i * 2.1) * r * 0.5 + sway * r * 4, -r * 0.65 + Math.cos(i * 1.7) * r * 0.3, r * 0.07, 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ============ STRYX — rooted stone-seed with grasping vine limbs ============
+     A seed that lands, roots where fortune takes it, and never moves again:
+     a boulder-like stone pod gripping the ground with roots, plated and
+     cracked (stone armor), a single watchful eye set in the stone, and
+     vine limbs that sway when it watches and lash out to its reach when it
+     strikes. Legless and stationary by design — walk/run read as idle.
+     Colors: sp.color = stone, sp.color2 = vine/moss. */
+  function drawStryx(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const stone = sp.color || '#7d766a';
+    const vine = sp.color2 || '#4d7a44';
+    const dormant = state === 'dormant';
+    const dead = state === 'death';
+    const attack = state === 'attack' || state === 'special';
+
+    const breathe = dead ? 0 : Math.sin(t * 1.6) * r * 0.02;   // faint stone "settle"
+    const sink = (dormant ? r * 0.16 : 0) + (dead ? r * 0.1 : 0);
+    const groundY = r * 0.85;
+    const bodyW = r * 0.8, bodyH = r * 0.92;
+    const cy = -r * 0.02 + breathe + sink;   // pod centre
+    const topY = cy - bodyH;                  // crown
+
+    /* --- roots: grip the ground, behind everything (pull in when dormant) --- */
+    ctx.strokeStyle = shade(vine, -34); ctx.lineCap = 'round';
+    const rootN = 5;
+    for (let i = 0; i < rootN; i++) {
+      const f = rootN === 1 ? 0 : i / (rootN - 1) - 0.5;   // -0.5..0.5
+      const grip = dormant ? 0.6 : 1;
+      const bx = f * bodyW * 0.5;
+      const ex = f * bodyW * 2.5 * grip;
+      const flex = Math.sin(t * 1.4 + i) * r * 0.02;
+      ctx.lineWidth = Math.max(1.5, r * 0.12 * (1 - Math.abs(f) * 0.5));
+      ctx.beginPath();
+      ctx.moveTo(bx, cy + bodyH * 0.55);
+      ctx.quadraticCurveTo((bx + ex) / 2, groundY - r * 0.05 + flex, ex, groundY + r * 0.05);
+      ctx.stroke();
+      ctx.lineWidth = Math.max(1, r * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(ex, groundY + r * 0.05);
+      ctx.lineTo(ex + (f < 0 ? -1 : 1) * r * 0.09, groundY + r * 0.13);
+      ctx.stroke();
+    }
+
+    /* --- stone pod body (a seed / boulder: pointed crown, rounded base) --- */
+    const grd = ctx.createLinearGradient(0, topY, 0, cy + bodyH);
+    grd.addColorStop(0, shade(stone, 26));
+    grd.addColorStop(1, shade(stone, -22));
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.moveTo(0, topY);
+    ctx.bezierCurveTo(bodyW * 1.05, cy - bodyH * 0.55, bodyW * 0.98, cy + bodyH * 0.6, 0, cy + bodyH);
+    ctx.bezierCurveTo(-bodyW * 0.98, cy + bodyH * 0.6, -bodyW * 1.05, cy - bodyH * 0.55, 0, topY);
+    ctx.closePath(); ctx.fill();
+
+    /* faceted highlight plane (reads as carved stone) */
+    ctx.fillStyle = shade(stone, 16) + '55';
+    ctx.beginPath();
+    ctx.moveTo(-bodyW * 0.12, topY + bodyH * 0.18);
+    ctx.lineTo(bodyW * 0.38, cy - bodyH * 0.15);
+    ctx.lineTo(-bodyW * 0.08, cy + bodyH * 0.15);
+    ctx.closePath(); ctx.fill();
+
+    /* stone-armor cracks (rocky) */
+    ctx.strokeStyle = shade(stone, -50) + 'aa'; ctx.lineWidth = Math.max(1, r * 0.05); ctx.lineCap = 'round';
+    const cracks = [[-0.3, -0.5, -0.15, 0.1], [0.35, -0.35, 0.15, 0.2], [0.0, 0.15, -0.28, 0.6], [0.2, 0.35, 0.42, 0.7]];
+    cracks.forEach(k => {
+      ctx.beginPath();
+      ctx.moveTo(k[0] * bodyW, cy + k[1] * bodyH);
+      ctx.lineTo(k[2] * bodyW, cy + k[3] * bodyH);
+      ctx.stroke();
+    });
+    if (dead) {   // a broad split opens as it crumbles
+      ctx.strokeStyle = shade(stone, -66); ctx.lineWidth = Math.max(1.5, r * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.05, topY + bodyH * 0.2);
+      ctx.lineTo(r * 0.12, cy);
+      ctx.lineTo(-r * 0.08, cy + bodyH * 0.7);
+      ctx.stroke();
+    }
+
+    /* moss / lichen creeping up the base — raised by its surroundings */
+    ctx.fillStyle = shade(vine, 4) + 'cc';
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI * 0.55 + i * 0.5;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * bodyW * 0.7, cy + bodyH * 0.55 + Math.sin(a) * bodyH * 0.2, r * 0.1, r * 0.06, a, 0, TAU);
+      ctx.fill();
+    }
+
+    /* seedling sprout at the crown (it began life as a seed) */
+    if (!dead) {
+      const sway = Math.sin(t * 2) * 0.15;
+      ctx.strokeStyle = shade(vine, 10); ctx.lineWidth = Math.max(1.5, r * 0.05);
+      ctx.beginPath(); ctx.moveTo(0, topY); ctx.quadraticCurveTo(sway * r, topY - r * 0.2, sway * r * 1.5, topY - r * 0.32); ctx.stroke();
+      ctx.fillStyle = shade(vine, 6);
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(sway * r * 1.2 + s * r * 0.08, topY - r * 0.3, r * 0.09, r * 0.05, s * 0.6 + sway, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    /* single watchful eye set in the stone */
+    const ex0 = bodyW * 0.12, ey0 = cy - bodyH * 0.18, eR = r * 0.24;
+    if (dormant || dead) {
+      ctx.strokeStyle = shade(stone, -55); ctx.lineWidth = Math.max(1.5, r * 0.06); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ex0 - eR * 0.9, ey0); ctx.quadraticCurveTo(ex0, ey0 + eR * 0.5, ex0 + eR * 0.9, ey0); ctx.stroke();
+    } else {
+      ctx.fillStyle = shade(stone, -40);
+      ctx.beginPath(); ctx.ellipse(ex0, ey0, eR, eR * 0.8, 0, 0, TAU); ctx.fill();
+      const blink = Math.sin(t * 0.6 + (o.phase || 0) * 7) > 0.96 ? 0.14 : 1;   // occasional blink
+      ctx.fillStyle = shade(vine, 40);
+      ctx.beginPath(); ctx.ellipse(ex0, ey0, eR * 0.8, eR * 0.62 * blink, 0, 0, TAU); ctx.fill();
+      if (blink > 0.5) {
+        const pupR = eR * (attack ? 0.5 : 0.34), look = attack ? eR * 0.4 : eR * 0.25;
+        ctx.fillStyle = '#161410';
+        ctx.beginPath(); ctx.arc(ex0 + look, ey0, pupR, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ffffffbb';
+        ctx.beginPath(); ctx.arc(ex0 + look - pupR * 0.3, ey0 - pupR * 0.3, pupR * 0.35, 0, TAU); ctx.fill();
+      }
+    }
+    /* stone brow ridge over the eye */
+    ctx.strokeStyle = shade(stone, -30); ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(ex0 - eR, ey0 - eR * 0.9); ctx.quadraticCurveTo(ex0, ey0 - eR * 1.25, ex0 + eR * 1.1, ey0 - eR * 0.7); ctx.stroke();
+
+    /* --- vine limbs (in front): sway when watching, lash to reach on strike --- */
+    const vineN = 3, reach = r * 1.15, shoulderY = cy - bodyH * 0.45;
+    for (let i = 0; i < vineN; i++) {
+      const spread = vineN === 1 ? 0 : i / (vineN - 1) - 0.5;   // -0.5..0.5
+      const ox = spread * bodyW * 0.7;
+      const oy = shoulderY + Math.abs(spread) * bodyH * 0.15;
+      let ang, ext;
+      if (attack) {
+        const lash = Math.max(0, Math.sin(t * 12 - i * 1.2));
+        ang = -0.15 + spread * 0.5 - lash * 0.5;   // whip forward
+        ext = 1 + lash * 1.0;                       // reach out to strike
+      } else if (dormant) {
+        ang = 0.7 + spread * 0.5; ext = 0.55;       // coil down against the pod
+      } else if (dead) {
+        ang = 0.9 + spread * 0.35; ext = 0.6;       // wilt
+      } else {
+        ang = -Math.PI / 2 + spread * 1.4 + Math.sin(t * 2.2 + i * 1.7) * 0.22;   // reach up, sway
+        ext = 1;
+      }
+      const tipX = ox + Math.cos(ang) * reach * ext, tipY = oy + Math.sin(ang) * reach * ext;
+      const midX = ox + Math.cos(ang) * reach * 0.5 * ext - Math.sin(ang) * r * 0.14;
+      const midY = oy + Math.sin(ang) * reach * 0.5 * ext;
+      ctx.strokeStyle = shade(vine, i === 1 ? 6 : -10); ctx.lineWidth = Math.max(1.5, r * 0.1); ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+      ctx.stroke();
+      /* curled grasping tip — clenches on attack, limp when dead */
+      const curl = attack ? 1.1 : (dead ? 0.2 : 0.55 + Math.sin(t * 3 + i) * 0.2);
+      ctx.beginPath(); ctx.arc(tipX, tipY, r * 0.1, ang, ang + Math.PI * 1.5 * curl); ctx.stroke();
+      /* a leaf partway along */
+      if (!dead) {
+        ctx.fillStyle = shade(vine, -6);
+        ctx.beginPath(); ctx.ellipse(midX, midY, r * 0.12, r * 0.06, ang, 0, TAU); ctx.fill();
+      }
+    }
+  }
+
+  /* ============ KIPSU — pack weasel-fox with a patterned biolum tail ========
+     "A weasel's face, a fox's ears, and a fluffy bioluminescent tail whose
+     pattern is unique to each individual." A low, sleek, curious pack animal:
+     bounding gait, swivelling ears, and a bushy tail that carries this
+     individual's glow pattern (rings / waves / spots / spiral / twin-stripe,
+     chosen from its stable markSeed so it reads the same on card, field and
+     in the Vakarborac). The tail only lights when bioluminescence is on;
+     otherwise the pattern reads as pale fur markings. */
+  const KIPSU_PATTERNS = ['rings', 'waves', 'spots', 'spiral', 'twin-stripe'];
+  function kipsuNormal(pts, i) {
+    const n = pts.length, a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+    return [-dy / L, dx / L];
+  }
+  function drawKipsu(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const coat = sp.color || '#a3703f';
+    const glow = sp.color2 || '#68e0c8';
+    const moving = state === 'walk' || state === 'run';
+    const rate = state === 'run' ? 14 : 8;
+    const idleBob = state === 'idle' ? Math.sin(t * 2.4) * r * 0.05 : 0;
+    const dormant = state === 'dormant';
+    const dead = state === 'death';
+    const attack = state === 'attack' || state === 'special';
+    const lunge = attack ? Math.max(0, Math.sin(t * 12)) * r * 0.3 : 0;
+    const biolumOn = !!o.biolum;
+    const bodyW = r * 0.9, bodyH = r * 0.5;   // low + sleek
+    const y0 = -r * 0.05 + idleBob + (dormant ? r * 0.3 : 0);
+    const pat = KIPSU_PATTERNS[(o.indiv && o.indiv.markSeed != null ? o.indiv.markSeed : 0) % 5];
+
+    /* ---- legs (behind body): bounding gait; tucked away when curled ---- */
+    if (!dormant && !dead) {
+      ctx.strokeStyle = shade(coat, -42); ctx.lineWidth = Math.max(2, r * 0.13); ctx.lineCap = 'round';
+      const legY = y0 + bodyH * 0.5, footY = r * 0.82;
+      [-bodyW * 0.55, -bodyW * 0.28, bodyW * 0.22, bodyW * 0.5].forEach((lx, i) => {
+        const sw = moving ? Math.sin(t * rate + i * Math.PI * 0.9) * r * 0.24 : Math.sin(t * 2 + i) * r * 0.02;
+        ctx.beginPath(); ctx.moveTo(lx, legY); ctx.lineTo(lx + sw, footY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lx + sw - r * 0.06, footY); ctx.lineTo(lx + sw + r * 0.09, footY); ctx.stroke();
+      });
+    }
+
+    /* ---- tail: bushy plume carrying the biolum pattern ---- */
+    const wag = dead ? 0 : Math.sin(t * (moving ? 7 : 3)) * 0.22;
+    const tBaseX = -bodyW * 0.78, tBaseY = y0;
+    let tCX, tCY, tEX, tEY;
+    if (dormant) { tCX = -bodyW * 0.15; tCY = y0 - r * 0.55; tEX = bodyW * 0.55; tEY = y0 - r * 0.05; }   // curls over the body
+    else if (dead) { tCX = -bodyW * 1.15; tCY = y0 + r * 0.25; tEX = -bodyW * 1.4; tEY = r * 0.7; }        // limp to the ground
+    else { tCX = -bodyW * 1.3; tCY = y0 - r * 0.45 + wag * r; tEX = -bodyW * 1.55; tEY = y0 - r * 0.6 + wag * r * 1.3; }
+    const N = 8, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, m = 1 - u;
+      pts.push([m * m * tBaseX + 2 * m * u * tCX + u * u * tEX, m * m * tBaseY + 2 * m * u * tCY + u * u * tEY]);
+    }
+    const wfn = (u) => r * (0.13 + 0.42 * u);   // thin at the root, bushy at the tip
+    /* plume outline */
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N);
+      top.push([pts[i][0] + nx * w, pts[i][1] + ny * w]);
+      bot.push([pts[i][0] - nx * w, pts[i][1] - ny * w]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(top[0][0], top[0][1]);
+    for (let i = 1; i <= N; i++) ctx.lineTo(top[i][0], top[i][1]);
+    for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.closePath();
+    const tg = ctx.createLinearGradient(tBaseX, y0, tEX, tEY);
+    tg.addColorStop(0, shade(coat, -6)); tg.addColorStop(1, shade(coat, 14));
+    ctx.fillStyle = tg; ctx.fill();
+    /* pattern, clipped inside the plume */
+    ctx.save(); ctx.clip();
+    const patCol = biolumOn ? glow : shade(coat, 24);
+    ctx.strokeStyle = patCol; ctx.fillStyle = patCol;
+    ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+    if (biolumOn) { ctx.shadowColor = glow; ctx.shadowBlur = r * 0.45; }
+    if (pat === 'rings') {
+      for (let i = 2; i <= N; i += 2) { const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N) * 1.1; ctx.beginPath(); ctx.moveTo(pts[i][0] - nx * w, pts[i][1] - ny * w); ctx.lineTo(pts[i][0] + nx * w, pts[i][1] + ny * w); ctx.stroke(); }
+    } else if (pat === 'twin-stripe') {
+      for (const s of [-0.45, 0.45]) { ctx.beginPath(); for (let i = 0; i <= N; i++) { const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N); const x = pts[i][0] + nx * w * s, y = pts[i][1] + ny * w * s; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); }
+    } else if (pat === 'waves') {
+      ctx.beginPath(); for (let i = 0; i <= N; i++) { const [nx, ny] = kipsuNormal(pts, i), w = wfn(i / N) * 0.6 * Math.sin(i * 1.5); const x = pts[i][0] + nx * w, y = pts[i][1] + ny * w; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+    } else if (pat === 'spots') {
+      for (let i = 1; i <= N; i++) { const [nx, ny] = kipsuNormal(pts, i), s = (i % 2 ? 0.4 : -0.4) * wfn(i / N); ctx.beginPath(); ctx.arc(pts[i][0] + nx * s, pts[i][1] + ny * s, r * 0.09, 0, TAU); ctx.fill(); }
+    } else { /* spiral — concentric arcs near the bushy tip */
+      const c = pts[N - 1]; for (let k = 1; k <= 3; k++) { ctx.beginPath(); ctx.arc(c[0], c[1], r * 0.12 * k, t * 0.5 + k, t * 0.5 + k + Math.PI * 1.4); ctx.stroke(); }
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    /* glowing pale tip pom (unclipped, so its bloom shows) */
+    const tip = pts[N];
+    if (biolumOn) { ctx.shadowColor = glow; ctx.shadowBlur = r * 0.8; }
+    ctx.fillStyle = biolumOn ? '#eafffb' : shade(coat, 30);
+    ctx.beginPath(); ctx.arc(tip[0], tip[1], r * 0.15, 0, TAU); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    /* ---- head placement (tucks in when curled) ---- */
+    let hx, hy; const hr = r * 0.3;
+    if (dormant) { hx = bodyW * 0.45; hy = y0 + r * 0.06; }
+    else { hx = bodyW * 0.9 + lunge; hy = y0 - bodyH * 0.35 + Math.sin(t * 2.4) * r * 0.03; }
+
+    /* ---- fox ears (behind the head so it overlaps their base) ---- */
+    if (!dead) {
+      const swiv = dormant ? 0 : Math.sin(t * 1.8) * 0.12;
+      for (const s of [-0.5, 0.15]) {
+        const bx = hx + hr * s, by = hy - hr * 0.5;
+        const tipX = bx + hr * (s < 0 ? -0.15 : 0.35) + (dormant ? (s < 0 ? -0.5 : 0.5) * hr : swiv * hr * 2);
+        const tipY = by - hr * (dormant ? 0.35 : 1.35);   // folded back when curled
+        ctx.fillStyle = shade(coat, 2);
+        ctx.beginPath();
+        ctx.moveTo(bx - hr * 0.28, by);
+        ctx.lineTo(tipX, tipY);
+        ctx.lineTo(bx + hr * 0.32, by);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = shade(coat, 26);   // inner ear
+        ctx.beginPath();
+        ctx.moveTo(bx - hr * 0.1, by - hr * 0.05);
+        ctx.lineTo((bx + tipX) / 2, (by + tipY) / 2);
+        ctx.lineTo(bx + hr * 0.14, by - hr * 0.05);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    /* ---- body (sleek) + pale belly ---- */
+    const grd = ctx.createLinearGradient(0, y0 - bodyH, 0, y0 + bodyH);
+    grd.addColorStop(0, shade(coat, 20)); grd.addColorStop(1, shade(coat, -16));
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(lunge * 0.3, y0, bodyW, bodyH * (dormant ? 1.15 : 1), 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = shade(coat, 34) + 'aa';
+    ctx.beginPath(); ctx.ellipse(bodyW * 0.22 + lunge * 0.3, y0 + bodyH * 0.32, bodyW * 0.55, bodyH * 0.48, 0, 0, TAU); ctx.fill();
+
+    /* ---- head + weasel snout ---- */
+    ctx.fillStyle = shade(coat, 12);
+    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, TAU); ctx.fill();
+    /* elongated snout */
+    const snX = hx + hr * (dormant ? 0.2 : 0.85), snY = hy + hr * 0.28;
+    ctx.beginPath(); ctx.ellipse(snX, snY, hr * 0.6, hr * 0.42, dormant ? 0.3 : 0, 0, TAU); ctx.fill();
+    /* nose */
+    ctx.fillStyle = '#1c130c';
+    ctx.beginPath(); ctx.arc(snX + hr * 0.5, snY, Math.max(1.2, hr * 0.16), 0, TAU); ctx.fill();
+    /* whiskers */
+    if (!dormant && !dead) {
+      ctx.strokeStyle = '#e8e0d066'; ctx.lineWidth = 1;
+      for (const wy of [-0.15, 0.1, 0.35]) { ctx.beginPath(); ctx.moveTo(snX + hr * 0.35, snY + hr * wy); ctx.lineTo(snX + hr * 1.3, snY + hr * (wy - 0.15)); ctx.stroke(); }
+    }
+    /* eye — big + curious; closes when curled or dead; narrows on a strike */
+    if (dormant || dead) {
+      ctx.strokeStyle = '#1c130c'; ctx.lineWidth = Math.max(1, hr * 0.12); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx + hr * 0.05, hy - hr * 0.1); ctx.lineTo(hx + hr * 0.5, hy - hr * 0.1); ctx.stroke();
+    } else {
+      const eyH = attack ? 0.6 : 1;
+      ctx.fillStyle = '#1c130c';
+      ctx.beginPath(); ctx.ellipse(hx + hr * 0.35, hy - hr * 0.08, hr * 0.2, hr * 0.24 * eyH, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffffffcc';
+      ctx.beginPath(); ctx.arc(hx + hr * 0.29, hy - hr * 0.18, hr * 0.07, 0, TAU); ctx.fill();
     }
   }
 
