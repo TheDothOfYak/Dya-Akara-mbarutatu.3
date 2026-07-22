@@ -308,7 +308,23 @@
     }
 
     /* --- tail --- */
-    if (F.ballTail) {
+    if (F.clubTail && !F.aquatic) {
+      /* spiked club tail (Ular Naga): a thick, tapering, mace-tipped tail */
+      const wag = Math.sin(t * 3) * 0.16;
+      const bx = -bodyW * 0.85, ex = -bodyW * 1.52, ey = y0 + wag * r;
+      ctx.strokeStyle = shade(sp.color, -24); ctx.lineWidth = r * 0.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bx, y0); ctx.quadraticCurveTo((bx + ex) / 2, y0 - r * 0.28 + wag * r, ex, ey); ctx.stroke();
+      ctx.fillStyle = shade(sp.color, -36);
+      ctx.beginPath(); ctx.arc(ex, ey, r * 0.3, 0, TAU); ctx.fill();
+      ctx.strokeStyle = shade(sp.color, -62); ctx.lineWidth = Math.max(1, r * 0.06); ctx.lineCap = 'round';
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * TAU;
+        ctx.beginPath();
+        ctx.moveTo(ex + Math.cos(a) * r * 0.28, ey + Math.sin(a) * r * 0.28);
+        ctx.lineTo(ex + Math.cos(a) * r * 0.48, ey + Math.sin(a) * r * 0.48);
+        ctx.stroke();
+      }
+    } else if (F.ballTail) {
       const wag = Math.sin(t * 3) * 0.2;
       ctx.strokeStyle = shade(sp.color, -30); ctx.lineWidth = r * 0.14;
       ctx.beginPath(); ctx.moveTo(-bodyW * 0.9, y0); ctx.quadraticCurveTo(-bodyW * 1.3, y0 - r * 0.3 + wag * r, -bodyW * 1.5, y0 + wag * r); ctx.stroke();
@@ -342,6 +358,23 @@
     ctx.fillStyle = grd;
     const undul = F.aquatic ? Math.sin(t * 6) * 0.05 : 0;
     ctx.beginPath(); ctx.ellipse(attackLunge * 0.3, y0, bodyW, bodyH * (dormant ? 0.75 : 1), undul, 0, TAU); ctx.fill();
+
+    /* scaled, armored hide — overlapping reptilian scales, clipped to the body */
+    if (F.scaled) {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(attackLunge * 0.3, y0, bodyW, bodyH * (dormant ? 0.75 : 1), undul, 0, TAU); ctx.clip();
+      ctx.strokeStyle = shade(sp.color, -30) + 'aa'; ctx.lineWidth = Math.max(1, r * 0.028);
+      const sc = r * 0.22;
+      let row = 0;
+      for (let ry = -1.1; ry <= 1.2; ry += 0.55, row++) {
+        const cy2 = y0 + ry * bodyH * 0.75;
+        const rowOff = (row % 2) ? sc * 0.5 : 0;
+        for (let cx = -bodyW - sc; cx < bodyW + sc; cx += sc) {
+          ctx.beginPath(); ctx.arc(cx + rowOff, cy2 - sc * 0.4, sc * 0.55, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
 
     /* rocky / carved / scars / plates texture */
     if (F.rocky || F.carved) {
@@ -419,6 +452,13 @@
       }
       ctx.fillStyle = h === 0 ? shade(sp.color, 12) : shade(sp.color, 12 - h * 8);
       ctx.beginPath(); ctx.arc(hx, hy, headR, 0, TAU); ctx.fill();
+      /* serpent head: extend into a wedge snout with a hooded brow */
+      if (F.serpent) {
+        ctx.fillStyle = h === 0 ? shade(sp.color, 12) : shade(sp.color, 12 - h * 8);
+        ctx.beginPath(); ctx.ellipse(hx + headR * 0.68, hy + headR * 0.12, headR * 0.72, headR * 0.5, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = shade(sp.color, -14);
+        ctx.beginPath(); ctx.ellipse(hx + headR * 0.22, hy - headR * 0.42, headR * 0.52, headR * 0.26, -0.3, 0, TAU); ctx.fill();
+      }
       /* first-head marker for nagas (near-invincible) */
       if (h === 0 && headCount > 1) {
         ctx.strokeStyle = (sp.color2 || '#fff') + 'cc'; ctx.lineWidth = Math.max(1, r * 0.05);
@@ -446,6 +486,34 @@
         ctx.lineTo(hx + headR * (1.1 + open * 0.3), hy + headR * (0.05 - open));
         ctx.lineTo(hx + headR * (1.1 + open * 0.3), hy + headR * (0.45 + open));
         ctx.closePath(); ctx.fill();
+      }
+      /* serpent maw: fangs + a flicking forked tongue */
+      if (F.serpent && !dormant) {
+        const striking = state === 'attack' || state === 'special';
+        const open = striking ? 0.35 + 0.25 * Math.sin(t * 14) : 0.05;
+        ctx.strokeStyle = shade(sp.color, -62); ctx.lineWidth = Math.max(1, headR * 0.16); ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(hx + headR * 0.35, hy + headR * 0.42);
+        ctx.lineTo(hx + headR * 1.32, hy + headR * (0.34 + open));
+        ctx.stroke();
+        ctx.fillStyle = '#f2ecd8';
+        for (const fx of [0.72, 1.02]) {
+          ctx.beginPath();
+          ctx.moveTo(hx + headR * fx, hy + headR * 0.4);
+          ctx.lineTo(hx + headR * (fx + 0.05), hy + headR * (0.78 + open * 1.4));
+          ctx.lineTo(hx + headR * (fx + 0.16), hy + headR * 0.42);
+          ctx.closePath(); ctx.fill();
+        }
+        if (striking || Math.sin(t * 2.4 + h * 2.3) > 0.72) {
+          const ext = headR * (1.0 + 0.6 * Math.abs(Math.sin(t * 11 + h)));
+          const bx = hx + headR * 1.3, by = hy + headR * 0.5;
+          ctx.strokeStyle = '#c23a52'; ctx.lineWidth = Math.max(1, headR * 0.09); ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + ext, by + headR * 0.05); ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(bx + ext, by + headR * 0.05); ctx.lineTo(bx + ext + headR * 0.22, by - headR * 0.1);
+          ctx.moveTo(bx + ext, by + headR * 0.05); ctx.lineTo(bx + ext + headR * 0.22, by + headR * 0.2);
+          ctx.stroke();
+        }
       }
       /* tusks */
       if (F.tusks && h === 0) {

@@ -274,7 +274,7 @@
     name: 'Ular Naga', family: 'Naga', element: 'Ular',
     rarity: [2, 6], size: [2, 4], rig: 'quad',
     color: '#57713d', color2: '#3c4f2a',
-    features: { heads: [1, 5], serpent: true, ridge: true },
+    features: { heads: [1, 5], serpent: true, ridge: true, scaled: true, clubTail: true },
     tags: ['carnivore', 'apex', 'naga'],
     behavior: 'ular_naga',
     statMul: { hp: 1.6, dmg: 1.4, speed: 0.9 },
