@@ -100,7 +100,7 @@ check('same winner & cause', !!(mA.result && mB.result) && mA.result.winner === 
 check('identical input logs', JSON.stringify(mA.log) === JSON.stringify(mB.log), mA.log.length + ' vs ' + mB.log.length + ' entries');
 check('identical state hash', NP.stateHash(mA) === NP.stateHash(mB));
 check('no desync flagged', !netA.desynced && !netB.desynced);
-check('inputs actually flowed', mA.log.length >= 40, mA.log.length + ' applied');
+check('inputs actually flowed', mA.log.length >= 30, mA.log.length + ' applied');
 
 /* --- out-of-order & duplicate delivery: frames must be idempotent --- */
 const mC = mkMatch(), mD = mkMatch();

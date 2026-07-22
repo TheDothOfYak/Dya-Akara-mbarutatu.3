@@ -326,12 +326,13 @@
      A token's cost to field reflects its OVERALL POWER — a weighted blend of
      health (40%), attack (35%) and speed (25%). Each stat is normalised
      against the top of the size tables so the blend is scale-free, then mapped
-     into the resource-cost band. Calibrated to keep the historical ~1–20
-     spread: a small skirmisher lands near 1–2, a size-4 bruiser near 10, an
-     upgraded monster near 20+. A stronger individual of a given species costs
-     more than a weaker one, and upgrading a token raises its price. */
+     into the resource-cost band. Calibrated to a cheap ~1–15 spread: a small
+     skirmisher lands near 1, a mid creature near 2–4, a size-4 bruiser near
+     7, and only the largest leviathans reach the hard cap of 15. A stronger
+     individual of a given species costs more than a weaker one, and upgrading
+     a token raises its price. */
   const COST_W = { hp: 0.40, dmg: 0.35, speed: 0.25 };
-  const COST_SCALE = 15, COST_FLOOR = 3.3;
+  const COST_SCALE = 12, COST_FLOOR = 3.3, COST_MAX = 15;
 
   T.statPower = function (stats) {
     stats = stats || {};
@@ -345,7 +346,7 @@
 
   /* Map a token's stat power to a whole-number ready-cost total */
   T.costTotal = function (stats) {
-    return U.clamp(Math.round(T.statPower(stats) * COST_SCALE - COST_FLOOR), 1, 99);
+    return U.clamp(Math.round(T.statPower(stats) * COST_SCALE - COST_FLOOR), 1, COST_MAX);
   };
 
   /* Resource cost vector. An admin-pinned price (costLocked) is honoured
