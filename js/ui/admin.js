@@ -2241,7 +2241,7 @@
   }
 
   /* ================= SPECIES EDITOR ================= */
-  const RIGS = ['quad', 'punk', 'composed', 'biped', 'flame', 'swarm', 'tree', 'blob', 'field', 'relic', 'crab', 'mcfly', 'bird'];
+  const RIGS = ['quad', 'punk', 'composed', 'biped', 'flame', 'swarm', 'tree', 'stryx', 'blob', 'field', 'relic', 'crab', 'mcfly', 'bird'];
 
   /* Ability catalog for the dropdown menus: merges the curated descriptions in
      data/abilities.js with the real ranges/options learned from every existing

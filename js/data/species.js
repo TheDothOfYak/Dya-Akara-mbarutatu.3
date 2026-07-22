@@ -150,7 +150,7 @@
 
   def('stryx', {
     name: 'Stryx', family: 'Creature', element: 'Ular',
-    rarity: [1, 5], size: [1, 3], rig: 'quad',
+    rarity: [1, 5], size: [1, 3], rig: 'stryx',
     color: '#7d766a', color2: '#4d7a44', // stone armor, vine limbs
     features: { rocky: true, vines: true, rootsOnDeploy: true, legless: true },
     tags: ['stationary', 'forest'],
