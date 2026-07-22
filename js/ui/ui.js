@@ -298,7 +298,7 @@
       card.appendChild(U.el('div', { cls: 'tc-meta', text: sp.name + ' · ' + SP.SIZES[tok.sizeIdx] }));
       card.appendChild(U.el('div', { cls: 'small muted', style: 'margin-top:4px;height:44px;overflow:hidden', text: sp.desc }));
     }
-    card.appendChild(U.el('div', { cls: 'tc-cost', text: '◈' + SP.RARITY_COST[tok.rarity] }));
+    card.appendChild(U.el('div', { cls: 'tc-cost', text: '◈' + TK.cost(tok) }));
     if (opts.onclick) card.onclick = () => opts.onclick(tok);
     if (tok.frozen) card.appendChild(U.el('div', { style: 'position:absolute;inset:0;background:#2a4a6a44;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#9ac4df;font-size:12px', text: '❄ FROZEN — under review' }));
     if (opts.hover !== false) UI.attachHoverInfo(card, tok);
@@ -385,7 +385,7 @@
     const vecSpan = U.el('span', {});
     SP.ELEMENTS.forEach(e => { if (costVec[e] > 0) vecSpan.appendChild(U.el('span', { cls: 'el-' + e, style: 'margin-right:8px', text: costVec[e] + ' ' + e })); });
     costRow.appendChild(vecSpan);
-    costRow.appendChild(U.el('span', { cls: 'gold', text: '(' + SP.RARITY_COST[tok.rarity] + ' total)' }));
+    costRow.appendChild(U.el('span', { cls: 'gold', text: '(' + TK.cost(tok) + ' total)' }));
     right.appendChild(costRow);
     right.appendChild(U.el('div', { cls: 'divider' }));
     right.appendChild(U.el('div', { html: '<span class="muted small">DESCRIPTION</span><br>' + U.esc(sp.desc) }));

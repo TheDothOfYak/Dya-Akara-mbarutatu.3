@@ -290,7 +290,7 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   seller.ngakara = 999;
   const upTok = DYAG.token.mint({ speciesId: 'harkal', rng: new U.Rng(21), rarity: 1, owner: seller.id });
   seller.tokens[upTok.id] = upTok;
-  const before = { rarity: upTok.rarity, hp: upTok.stats.hp, dmg: upTok.stats.dmg, cost: JSON.stringify(upTok.cost) };
+  const before = { rarity: upTok.rarity, hp: upTok.stats.hp, dmg: upTok.stats.dmg, cost: JSON.stringify(upTok.cost), total: DYAG.token.cost(upTok) };
   const pre = G.upgradePreview(upTok);
   check('preview targets the next rarity', pre.target === before.rarity + 1);
   check('preview raises HP and damage', pre.hp > before.hp && pre.dmg >= before.dmg);
@@ -299,13 +299,16 @@ const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG
   check('rarity went up one tier', upTok.rarity === before.rarity + 1);
   check('HP actually increased', upTok.stats.hp > before.hp && upTok.stats.hp === pre.hp);
   check('damage actually increased (or held)', upTok.stats.dmg >= before.dmg && upTok.stats.dmg === pre.dmg);
-  check('ready-cost vector was refreshed for the new rarity', JSON.stringify(upTok.cost) !== before.cost || upTok.rarity === before.rarity);
+  /* cost is power-based now: raising the stats refreshes the price and never
+     lowers it (a single tier may not always cross an integer boundary). */
+  check('ready-cost was refreshed and did not drop', DYAG.token.cost(upTok) >= before.total);
   check('materials were spent', seller.ngakara < 999);
 
   /* upgrade all the way to Torcain, then it must refuse */
   let guard = 0;
   while (upTok.rarity < 6 && guard++ < 10) G.upgradeToken(upTok);
   check('can climb to Torcain', upTok.rarity === 6);
+  check('a full upgrade climb raised the power-based price', DYAG.token.cost(upTok) > before.total);
   const capped = G.upgradeToken(upTok);
   check('Torcain cannot be upgraded further', !!capped.err && !G.canUpgrade(upTok));
 
