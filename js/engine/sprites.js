@@ -1654,18 +1654,76 @@
 
   /* ============ BLOB (buds, fruit, sprengju) ============ */
   function drawBlob(ctx, o, t, state) {
-    const sp = o.sp, r = o.r;
+    const sp = o.sp, r = o.r, F = sp.features || {};
+    const col = sp.color || '#8a6f4a', col2 = sp.color2 || col;
+    const fruit = F.fruit;                 // 'strike' | 'pace' | 'mend' | 'guard' | undefined
     const puls = 1 + Math.sin(t * 3) * 0.06;
-    const g = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r * 0.8 * puls);
-    g.addColorStop(0, shade(sp.color, 30));
-    g.addColorStop(1, shade(sp.color, -15));
+    const R = r * 0.75 * puls;
+
+    /* Skith Grass (pace): a wind-bleached bundle of blades, no orb */
+    if (fruit === 'pace') {
+      ctx.strokeStyle = shade(col, -8); ctx.lineWidth = Math.max(1.5, r * 0.07); ctx.lineCap = 'round';
+      const blades = 7;
+      for (let i = 0; i < blades; i++) {
+        const f = i / (blades - 1) - 0.5, sway = Math.sin(t * 2.2 + i) * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(f * r * 0.5, r * 0.7);
+        ctx.quadraticCurveTo(f * r * 0.8 + sway * r, -r * 0.1, f * r * 0.6 + sway * r * 1.6, -r * 0.85);
+        ctx.stroke();
+      }
+      ctx.fillStyle = shade(col2, 12);
+      for (let i = 0; i < blades; i += 2) { const f = i / (blades - 1) - 0.5; ctx.beginPath(); ctx.arc(f * r * 0.6 + Math.sin(t * 2.2 + i) * r * 0.2, -r * 0.85, r * 0.08, 0, TAU); ctx.fill(); }
+      return;
+    }
+
+    /* body: a faceted stone (guard) or a soft orb (everything else) */
+    const g = ctx.createRadialGradient(-R * 0.25, -R * 0.25, R * 0.1, 0, 0, R);
+    g.addColorStop(0, shade(col, fruit === 'guard' ? 24 : 30));
+    g.addColorStop(1, shade(col, fruit === 'guard' ? -26 : -15));
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.75 * puls, 0, TAU); ctx.fill();
-    ctx.strokeStyle = sp.color2; ctx.lineWidth = Math.max(1.5, r * 0.08);
-    ctx.beginPath(); ctx.moveTo(0, -r * 0.7); ctx.quadraticCurveTo(r * 0.2, -r * 1.0, r * 0.1, -r * 1.15); ctx.stroke();
-    if (sp.features.glow) {
-      ctx.fillStyle = '#fff8';
-      ctx.beginPath(); ctx.arc(-r * 0.2, -r * 0.2, r * 0.16, 0, TAU); ctx.fill();
+    if (fruit === 'guard') {
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + 0.3, rr = R * (0.92 + 0.12 * ((i * 37 % 10) / 10)); const x = Math.cos(a) * rr, y = Math.sin(a) * rr * 0.92; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = shade(col, -42); ctx.lineWidth = Math.max(1, r * 0.04); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-R * 0.35, -R * 0.4); ctx.lineTo(0, 0); ctx.lineTo(R * 0.4, -R * 0.18); ctx.moveTo(0, 0); ctx.lineTo(-R * 0.12, R * 0.5); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+    }
+
+    /* Mirrordew (mend): reflective dewdrop + expanding ripple */
+    if (fruit === 'mend') {
+      ctx.fillStyle = '#ffffff88';
+      ctx.beginPath(); ctx.ellipse(-R * 0.25, -R * 0.3, R * 0.28, R * 0.18, -0.5, 0, TAU); ctx.fill();
+      const rr = (t * 0.4) % 1;
+      ctx.save(); ctx.globalAlpha *= (1 - rr) * 0.7;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, r * 0.03);
+      ctx.beginPath(); ctx.arc(0, 0, R * (0.4 + rr * 0.7), 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
+    /* Ember Root (strike): hot core + rising ember flecks */
+    if (fruit === 'strike') {
+      const cg = ctx.createRadialGradient(0, 0, 1, 0, 0, R * 0.55);
+      cg.addColorStop(0, '#fff3c8aa'); cg.addColorStop(1, col2 + '00');
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, 0, R * 0.55, 0, TAU); ctx.fill();
+      for (let i = 0; i < 4; i++) {
+        const ph = (t * 0.9 + i * 0.3) % 1;
+        ctx.save(); ctx.globalAlpha *= (1 - ph) * 0.9;
+        ctx.fillStyle = col2 || '#ffb03a';
+        ctx.beginPath(); ctx.arc(Math.sin(i * 2 + t) * R * 0.4, -ph * r * 1.05, r * 0.05, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /* stem (not on the stone fruit) */
+    if (fruit !== 'guard') {
+      ctx.strokeStyle = col2; ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -R * 0.95); ctx.quadraticCurveTo(r * 0.2, -R * 1.25, r * 0.1, -R * 1.4); ctx.stroke();
+    }
+    /* generic glow highlight (Sprengju, Albali bud/fruit, etc.) */
+    if (F.glow && !fruit) {
+      ctx.fillStyle = '#ffffff88';
+      ctx.beginPath(); ctx.arc(-R * 0.25, -R * 0.25, R * 0.22, 0, TAU); ctx.fill();
     }
   }
 
