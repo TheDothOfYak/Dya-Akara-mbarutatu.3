@@ -271,6 +271,7 @@
         heat: c.heat, swarmFrac: c.swarmFrac,
         heads: c.headsLeft, hasRider: c.hasRider != null ? c.hasRider : (c.sp.features && c.sp.features.rider),
         charged: c.mem && c.mem.charge >= 1,
+        hasRelic: !!c.carryingRelic,
       });
       ctx.restore();
 

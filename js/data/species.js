@@ -409,10 +409,9 @@
 
   def('mikolo_moko', {
     name: 'Mikolo Moko', family: 'Creature', element: 'Ular',
-    rarity: [0, 3], size: [0, 1], rig: 'composed',
+    rarity: [0, 3], size: [0, 1], rig: 'mikolo',
     color: '#7a9455', color2: '#55703a',
     features: { lean: true, snake: true },
-    parts: { body: 'serpent', eyes: 'slit', mouth: 'none', bodyW: 0.85, bodyH: 0.62 },
     tags: ['thief', 'relic'],
     behavior: 'mikolo_moko',
     statMul: { hp: 0.55, dmg: 0.1, speed: 1.5 },

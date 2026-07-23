@@ -178,6 +178,7 @@
       else if (rig === 'tree') drawTree(ctx, o, t, state);
       else if (rig === 'stryx') drawStryx(ctx, o, t, state);
       else if (rig === 'kipsu') drawKipsu(ctx, o, t, state);
+      else if (rig === 'mikolo') drawMikolo(ctx, o, t, state);
       else if (rig === 'blob') drawBlob(ctx, o, t, state);
       else if (rig === 'field') drawField(ctx, o, t, state);
       else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
@@ -1305,6 +1306,126 @@
       ctx.fillStyle = '#ffffffcc';
       ctx.beginPath(); ctx.arc(hx + hr * 0.29, hy - hr * 0.18, hr * 0.07, 0, TAU); ctx.fill();
     }
+  }
+
+  /* ============ MIKOLO MOKO — small snake-bodied relic thief ============
+     "A small, snake-bodied, single-minded thief" — the premier Relic runner.
+     Fast and sinuous unburdened (a travelling S-wave, flicking forked tongue,
+     slit thief's eyes), and hunched low, slow and strained when hauling the
+     Relic. Coils up to lurk and wait. Camouflage (its only defense) is the
+     caller's alpha fade; here we just read as a sleek, sneaky serpent. */
+  function mikoloNormal(pts, i) {
+    const n = pts.length, a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+    return [-dy / L, dx / L];
+  }
+  function drawMikolo(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const coat = sp.color || '#7a9455';
+    const belly = shade(coat, 30);
+    const mark = sp.color2 || '#55703a';
+    const moving = state === 'walk' || state === 'run';
+    const running = state === 'run';
+    const dormant = state === 'dormant';
+    const dead = state === 'death';
+    const attack = state === 'attack' || state === 'special';
+    const carrying = !!o.hasRelic;
+
+    /* --- snake head (reused by the coiled + extended poses) --- */
+    function head(hx, hy, hr, ang, closed) {
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang);
+      ctx.fillStyle = shade(coat, 14);
+      ctx.beginPath(); ctx.ellipse(0, 0, hr * 1.15, hr * 0.8, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(hr * 0.72, hr * 0.1, hr * 0.55, hr * 0.5, 0, 0, TAU); ctx.fill();   // snout
+      ctx.fillStyle = mark;                                                                              // dark crown marking
+      ctx.beginPath(); ctx.ellipse(-hr * 0.1, -hr * 0.16, hr * 0.72, hr * 0.34, 0, 0, TAU); ctx.fill();
+      if (closed) {
+        ctx.strokeStyle = '#161009'; ctx.lineWidth = Math.max(1, hr * 0.1); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(hr * 0.02, -hr * 0.28); ctx.lineTo(hr * 0.34, -hr * 0.28); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#f2d84a';                                                                       // slit thief's eye
+        ctx.beginPath(); ctx.ellipse(hr * 0.16, -hr * 0.28, hr * 0.24, hr * 0.17, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#161009'; ctx.lineWidth = Math.max(1, hr * 0.09); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(hr * 0.16, -hr * 0.43); ctx.lineTo(hr * 0.16, -hr * 0.13); ctx.stroke();
+      }
+      ctx.fillStyle = '#161009';                                                                         // nostril
+      ctx.beginPath(); ctx.arc(hr * 1.08, hr * 0.04, Math.max(0.8, hr * 0.06), 0, TAU); ctx.fill();
+      /* forked tongue — tastes the air when unburdened & alert */
+      if (!carrying && !closed && (attack || Math.sin(t * 3 + (o.phase || 0)) > 0.5)) {
+        const ext = hr * (1.05 + 0.8 * Math.abs(Math.sin(t * 13)));
+        const bx = hr * 1.15, by = hr * 0.14;
+        ctx.strokeStyle = '#c23a52'; ctx.lineWidth = Math.max(1, hr * 0.1); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + ext, by); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx + ext, by); ctx.lineTo(bx + ext + hr * 0.28, by - hr * 0.16);
+        ctx.moveTo(bx + ext, by); ctx.lineTo(bx + ext + hr * 0.28, by + hr * 0.16);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    /* --- coiled at rest (lurking / waiting) --- */
+    if (dormant) {
+      const cy = r * 0.2, turns = 2.3, steps = 46, maxR = r * 0.7;
+      for (let i = steps; i >= 0; i--) {
+        const f = i / steps, ang = f * turns * TAU;
+        const x = Math.cos(ang) * maxR * (0.25 + 0.75 * f);
+        const y = cy + Math.sin(ang) * maxR * (0.25 + 0.75 * f) * 0.55;
+        ctx.fillStyle = shade(coat, -14 + (1 - f) * 26);
+        ctx.beginPath(); ctx.arc(x, y, r * (0.09 + 0.12 * f), 0, TAU); ctx.fill();
+      }
+      head(maxR * 0.24, cy - r * 0.04, r * 0.24, 0.15, true);
+      return;
+    }
+
+    /* --- extended body: a travelling S-wave --- */
+    const speed = running ? 9 : moving ? 6 : (carrying ? 1.6 : 2.6);
+    const humps = carrying ? 1.1 : 1.7;
+    const amp = (carrying ? 0.08 : running ? 0.4 : moving ? 0.32 : 0.2) * r;
+    const ground = r * 0.34;                                   // lies low to the ground
+    const frontLift = dead ? 0 : (carrying ? r * 0.2 : r * 0.6);   // neck/head rears up
+    const x0 = -r * 1.35, x1 = r * (carrying ? 0.72 : 0.95);
+    const N = 12, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;
+      const taper = 0.55 + 0.45 * (1 - u);                    // tail waves the most
+      const wob = dead ? 0 : Math.sin(u * Math.PI * humps * 2 - t * speed) * amp * taper;
+      pts.push([x0 + (x1 - x0) * u, ground + wob - frontLift * (u * u)]);
+    }
+    const wfn = (u) => r * (0.05 + 0.2 * u);                   // pointy tail → thick neck
+
+    /* body outline */
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const [nx, ny] = mikoloNormal(pts, i), w = wfn(i / N);
+      top.push([pts[i][0] + nx * w, pts[i][1] + ny * w]);
+      bot.push([pts[i][0] - nx * w, pts[i][1] - ny * w]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i <= N; i++) ctx.lineTo(top[i][0], top[i][1]);
+    for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.closePath();
+    const grd = ctx.createLinearGradient(0, ground - r * 0.3, 0, ground + r * 0.3);
+    grd.addColorStop(0, shade(coat, 16)); grd.addColorStop(1, shade(coat, -14));
+    ctx.fillStyle = grd; ctx.fill();
+    /* pale belly along the underside */
+    ctx.strokeStyle = belly + '88'; ctx.lineWidth = Math.max(1, r * 0.045); ctx.lineCap = 'round';
+    ctx.beginPath(); for (let i = 0; i <= N; i++) { const p = bot[i]; i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]); } ctx.stroke();
+    /* dorsal diamond markings */
+    if (!dead) {
+      ctx.fillStyle = mark + 'dd';
+      for (let i = 2; i < N; i += 2) {
+        const p = pts[i], w = wfn(i / N);
+        const a = Math.atan2(pts[i + 1][1] - pts[i - 1][1], pts[i + 1][0] - pts[i - 1][0]);
+        ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(a);
+        ctx.beginPath(); ctx.moveTo(0, -w * 0.6); ctx.lineTo(w * 0.5, 0); ctx.lineTo(0, w * 0.6); ctx.lineTo(-w * 0.5, 0); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+    }
+    /* head, angled along the neck */
+    const hd = pts[N], pv = pts[N - 1];
+    head(hd[0], hd[1], r * 0.3, Math.atan2(hd[1] - pv[1], hd[0] - pv[0]) + (carrying ? 0.25 : 0), dead);
   }
 
   /* ============ BLOB (buds, fruit, sprengju) ============ */
