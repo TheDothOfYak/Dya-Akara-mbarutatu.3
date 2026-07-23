@@ -102,7 +102,7 @@
 
   def('gynge', {
     name: 'Gynge', family: 'Creature', element: 'Ular',
-    rarity: [0, 6], size: [0, 4], rig: 'quad',
+    rarity: [0, 6], size: [0, 4], rig: 'gynge',
     color: '#8a8578', color2: '#5d594f', // living rock
     features: { rocky: true, stationary: true, mouth: true },
     tags: ['stationary', 'ambush', 'biolum'],
@@ -336,7 +336,7 @@
 
   def('hvaleia', {
     name: 'Hvaleia', family: 'Creature', element: 'Su',
-    rarity: [4, 6], size: [3, 4], rig: 'quad',
+    rarity: [4, 6], size: [3, 4], rig: 'hvaleia',
     color: '#33658a', color2: '#1e3f57',
     features: { blowholes: true, clubTail: true, manyEyes: true, low: true, aquatic: true },
     tags: ['su', 'carnivore', 'apex', 'tank'],

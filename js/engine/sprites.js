@@ -179,6 +179,8 @@
       else if (rig === 'stryx') drawStryx(ctx, o, t, state);
       else if (rig === 'kipsu') drawKipsu(ctx, o, t, state);
       else if (rig === 'mikolo') drawMikolo(ctx, o, t, state);
+      else if (rig === 'gynge') drawGynge(ctx, o, t, state);
+      else if (rig === 'hvaleia') drawHvaleia(ctx, o, t, state);
       else if (rig === 'blob') drawBlob(ctx, o, t, state);
       else if (rig === 'field') drawField(ctx, o, t, state);
       else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
@@ -1426,6 +1428,189 @@
     /* head, angled along the neck */
     const hd = pts[N], pv = pts[N - 1];
     head(hd[0], hd[1], r * 0.3, Math.atan2(hd[1] - pv[1], hd[0] - pv[0]) + (carrying ? 0.25 : 0), dead);
+  }
+
+  /* ============ GYNGE — living rock that erupts and bites ============
+     "A living creature of rock that erupts up from the ground... utterly
+     motionless until something warm or vibrating comes close — then its mouth
+     opens like a cave and it strikes." Dormant it reads as an inert craggy
+     boulder; awake, biolum eyes kindle in a crack; striking, a cave-maw yawns
+     open with stone teeth and an inner glow. Fully stationary — no legs. */
+  function gyngeHash(i) { const s = Math.sin(i * 12.9898) * 43758.5453; return s - Math.floor(s); }
+  function drawGynge(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const rock = sp.color || '#8a8578';
+    const glow = sp.color2 || '#7fe0a0';
+    const dormant = state === 'dormant';
+    const dead = state === 'death';
+    const striking = state === 'attack' || state === 'special';
+    const awake = !dormant && !dead;
+    const base = r * 0.85;                 // ground line
+    const bw = r * 1.12, bh = r * 1.05;
+
+    /* craggy rock silhouette (deterministic jitter) */
+    const M = 10, pts = [];
+    pts.push([-bw, base]);
+    for (let i = 0; i <= M; i++) {
+      const u = i / M, ang = Math.PI * (1 - u);
+      const j = gyngeHash(i + 3);
+      const rr = 0.8 + 0.24 * j;
+      pts.push([Math.cos(ang) * bw * rr, base - Math.sin(ang) * bh * (0.85 + 0.28 * gyngeHash(i + 9))]);
+    }
+    pts.push([bw, base]);
+    const grd = ctx.createLinearGradient(0, base - bh, 0, base);
+    grd.addColorStop(0, shade(rock, 20)); grd.addColorStop(1, shade(rock, -22));
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]));
+    ctx.closePath(); ctx.fill();
+    /* facet cracks */
+    ctx.strokeStyle = shade(rock, -48) + '99'; ctx.lineWidth = Math.max(1, r * 0.04); ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const a = gyngeHash(i + 20);
+      ctx.beginPath();
+      ctx.moveTo((a - 0.5) * bw * 1.2, base - bh * (0.2 + 0.5 * gyngeHash(i + 30)));
+      ctx.lineTo((gyngeHash(i + 40) - 0.5) * bw, base - bh * 0.02);
+      ctx.stroke();
+    }
+    /* moss cap when awake/alive (a hint of life on the stone) */
+    if (!dead) {
+      ctx.fillStyle = shade(glow, -30) + '66';
+      for (let i = 0; i < 4; i++) {
+        const a = gyngeHash(i + 50);
+        ctx.beginPath(); ctx.ellipse((a - 0.5) * bw * 1.1, base - bh * (0.75 + 0.15 * a), r * 0.12, r * 0.06, 0, 0, TAU); ctx.fill();
+      }
+    }
+
+    /* cave-maw across the lower face */
+    const open = striking ? 0.42 + 0.32 * Math.sin(t * 12) : (awake ? 0.05 : 0);
+    const my = base - bh * 0.3, mw = bw * 0.6, mh = bh * (0.07 + open * 0.72);
+    if (open > 0.12) {   // inner throat glow (biolum)
+      const ig = ctx.createRadialGradient(0, my, 2, 0, my, mw);
+      ig.addColorStop(0, glow + 'cc'); ig.addColorStop(1, glow + '00');
+      ctx.fillStyle = ig; ctx.beginPath(); ctx.ellipse(0, my, mw * 1.1, mh * 1.4, 0, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = '#100d0a';
+    ctx.beginPath(); ctx.ellipse(0, my, mw, mh, 0, 0, TAU); ctx.fill();
+    if (open > 0.08) {   // stone teeth top + bottom
+      ctx.fillStyle = shade(rock, 8);
+      const teeth = 6;
+      for (let i = 0; i < teeth; i++) {
+        const tx = -mw * 0.82 + (i / (teeth - 1)) * mw * 1.64;
+        ctx.beginPath(); ctx.moveTo(tx - mw * 0.09, my - mh); ctx.lineTo(tx, my - mh * 0.3); ctx.lineTo(tx + mw * 0.09, my - mh); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(tx - mw * 0.09, my + mh); ctx.lineTo(tx, my + mh * 0.3); ctx.lineTo(tx + mw * 0.09, my + mh); ctx.fill();
+      }
+    }
+
+    /* biolum eyes peer from an upper crack when awake */
+    if (awake) {
+      const blink = Math.sin(t * 0.7 + (o.phase || 0) * 5) > 0.95 ? 0.15 : 1;
+      for (const dx of [-0.26, 0.24]) {
+        const ex = dx * bw, ey = base - bh * 0.62;
+        const eg = ctx.createRadialGradient(ex, ey, 0.5, ex, ey, r * 0.16);
+        eg.addColorStop(0, '#eafff0'); eg.addColorStop(0.5, glow); eg.addColorStop(1, glow + '00');
+        ctx.fillStyle = eg;
+        ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.14, r * 0.11 * blink, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#0d1410';
+        ctx.beginPath(); ctx.arc(ex + r * 0.03, ey, Math.max(1, r * 0.045) * blink, 0, TAU); ctx.fill();
+      }
+    }
+  }
+
+  /* ============ HVALEIA — many-eyed leviathan of water and air ============
+     "An enormous, many-eyed hunter of the open water and the air above it,
+     with a row of blowholes and a heavy clubbed tail." Hovers (never legs),
+     a big rounded body with a dorsal ridge (its one soft spot beneath it),
+     side flippers, a row of eyes for all-around vision, blowholes that spout
+     on a jet, and a heavy spiked club tail that answers everything else. */
+  function drawHvaleia(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const skin = sp.color || '#33658a';
+    const lite = sp.color2 || '#68e0e8';
+    const moving = state === 'walk' || state === 'run';
+    const dead = state === 'death';
+    const jetting = state === 'special';
+    const striking = state === 'attack';
+    const hover = dead ? 0 : Math.sin(t * 2.2) * r * 0.06;
+    const undel = Math.sin(t * (moving ? 5 : 2.6)) * 0.04;
+    const y0 = -r * 0.05 + hover;
+    const bw = r * 1.28, bh = r * 0.72;
+
+    /* heavy spiked club tail (rear-left), swings on a strike */
+    const swing = striking ? Math.sin(t * 12) * 0.5 : Math.sin(t * 2.5) * 0.12;
+    const tbx = -bw * 0.85, tex = -bw * 1.5, tey = y0 + swing * r;
+    ctx.strokeStyle = shade(skin, -20); ctx.lineWidth = r * 0.26; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(tbx, y0); ctx.quadraticCurveTo((tbx + tex) / 2, y0 - r * 0.2 + swing * r, tex, tey); ctx.stroke();
+    ctx.fillStyle = shade(skin, -32);
+    ctx.beginPath(); ctx.arc(tex, tey, r * 0.34, 0, TAU); ctx.fill();
+    ctx.strokeStyle = shade(skin, -55); ctx.lineWidth = Math.max(1, r * 0.06);
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; ctx.beginPath(); ctx.moveTo(tex + Math.cos(a) * r * 0.32, tey + Math.sin(a) * r * 0.32); ctx.lineTo(tex + Math.cos(a) * r * 0.52, tey + Math.sin(a) * r * 0.52); ctx.stroke(); }
+
+    /* side flippers */
+    const fin = Math.sin(t * (moving ? 6 : 3)) * 0.2;
+    ctx.fillStyle = shade(skin, -14);
+    for (const s of [0.5, -0.2]) {
+      ctx.save(); ctx.translate(bw * 0.1, y0 + bh * 0.55); ctx.rotate(0.5 + s + fin);
+      ctx.beginPath(); ctx.ellipse(0, r * 0.3, r * 0.16, r * 0.42, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+
+    /* body */
+    const grd = ctx.createLinearGradient(0, y0 - bh, 0, y0 + bh);
+    grd.addColorStop(0, shade(skin, 20)); grd.addColorStop(1, shade(skin, -20));
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(0, y0, bw, bh, undel, 0, TAU); ctx.fill();
+    /* pale underside (the soft spot) */
+    ctx.fillStyle = shade(lite, 10) + '55';
+    ctx.beginPath(); ctx.ellipse(-bw * 0.05, y0 + bh * 0.42, bw * 0.8, bh * 0.42, 0, 0, TAU); ctx.fill();
+
+    /* dorsal ridge along the back */
+    ctx.fillStyle = shade(skin, -30);
+    for (let i = -2; i <= 2; i++) {
+      const bx = i * bw * 0.26;
+      const surf = Math.sqrt(Math.max(0, 1 - (bx / bw) * (bx / bw)));
+      ctx.beginPath();
+      ctx.moveTo(bx - r * 0.1, y0 - bh * surf); ctx.lineTo(bx, y0 - bh * surf - r * 0.24); ctx.lineTo(bx + r * 0.1, y0 - bh * surf);
+      ctx.closePath(); ctx.fill();
+    }
+    /* blowholes on top — spout when jetting */
+    for (let i = 0; i < 3; i++) {
+      const bx = -bw * 0.28 + i * bw * 0.3;
+      ctx.fillStyle = shade(skin, -55);
+      ctx.beginPath(); ctx.arc(bx, y0 - bh * 0.72, r * 0.06, 0, TAU); ctx.fill();
+      if (jetting) {
+        const h = (0.7 + 0.4 * Math.sin(t * 18 + i)) * r;
+        const sg = ctx.createLinearGradient(bx, y0 - bh * 0.8, bx, y0 - bh * 0.8 - h);
+        sg.addColorStop(0, '#bfe8ffcc'); sg.addColorStop(1, '#bfe8ff00');
+        ctx.strokeStyle = sg; ctx.lineWidth = r * 0.12; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, y0 - bh * 0.78); ctx.lineTo(bx + Math.sin(t * 9 + i) * r * 0.1, y0 - bh * 0.78 - h); ctx.stroke();
+      }
+    }
+
+    /* many eyes down the flank — all-around vision */
+    if (!dead) {
+      const blink = Math.sin(t * 0.6 + (o.phase || 0)) > 0.96 ? 0.15 : 1;
+      const eyeXs = [bw * 0.72, bw * 0.5, bw * 0.24, -bw * 0.04, -bw * 0.32];
+      const eyeYs = [y0 - bh * 0.15, y0 - bh * 0.4, y0 - bh * 0.5, y0 - bh * 0.45, y0 - bh * 0.32];
+      for (let i = 0; i < eyeXs.length; i++) {
+        const er = r * (i === 0 ? 0.14 : 0.1);
+        ctx.fillStyle = '#f0f4ea';
+        ctx.beginPath(); ctx.ellipse(eyeXs[i], eyeYs[i], er, er * blink, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#12202a';
+        ctx.beginPath(); ctx.arc(eyeXs[i] + er * 0.3, eyeYs[i], Math.max(1, er * 0.5) * blink, 0, TAU); ctx.fill();
+      }
+    }
+    /* wide jaw at the front, opens on a strike */
+    const jaw = striking ? 0.4 + 0.3 * Math.sin(t * 13) : 0.08;
+    ctx.fillStyle = shade(skin, -62);
+    ctx.beginPath();
+    ctx.moveTo(bw * 0.62, y0 + bh * 0.05);
+    ctx.lineTo(bw * (1.02 + jaw * 0.2), y0 + bh * (0.02 - jaw));
+    ctx.lineTo(bw * (1.02 + jaw * 0.2), y0 + bh * (0.35 + jaw));
+    ctx.lineTo(bw * 0.62, y0 + bh * 0.4);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#eef2e6';   // baleen/teeth
+    for (let i = 0; i < 5; i++) { const tx = bw * (0.7 + i * 0.06); ctx.beginPath(); ctx.moveTo(tx, y0 + bh * 0.06); ctx.lineTo(tx + r * 0.03, y0 + bh * (0.06 + jaw * 0.6)); ctx.lineTo(tx + r * 0.06, y0 + bh * 0.06); ctx.fill(); }
   }
 
   /* ============ BLOB (buds, fruit, sprengju) ============ */
