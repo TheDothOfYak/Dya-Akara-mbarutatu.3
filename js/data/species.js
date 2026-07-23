@@ -258,7 +258,7 @@
     name: 'Sru Vorn', family: 'Creature', element: 'Ular', element2: 'Su',
     rarity: [4, 6], size: [3, 4], rig: 'quad',
     color: '#6b5b45', color2: '#8fbf3f', // matted fur, acid green
-    features: { tusks: true, ballTail: true, low: true },
+    features: { tusks: true, ballTail: true, low: true, fur: true, acid: true },
     tags: ['carnivore', 'ambush', 'apex'],
     behavior: 'sru_vorn',
     statMul: { hp: 1.7, dmg: 1.5, speed: 0.85 },
@@ -356,7 +356,7 @@
       name, family: 'Grothyn', element,
       rarity: rarity, size: [1, 3], rig: 'quad',
       color, color2,
-      features: { shell: true, rootsOnDeploy: true, stalk: true, aquatic: true },
+      features: { shell: true, rootsOnDeploy: true, stalk: true, aquatic: true, noHead: true, singleVine: true },
       tags: ['stationary', 'shell'],
       behavior: 'grothyn',
       statMul: { hp: 1.7, dmg: 1.1, speed: 0 },
@@ -395,7 +395,7 @@
     name: 'Tonguatjis', family: 'Creature', element: 'Ular',
     rarity: [2, 5], size: [2, 3], rig: 'quad',
     color: '#4f6b3a', color2: '#d46a6a', // forest shell, pink tongue
-    features: { shell: true, tongue: true, low: true },
+    features: { shell: true, tongue: true, low: true, mouth: true },
     tags: ['ambush', 'carnivore', 'shell'],
     behavior: 'tonguatjis',
     statMul: { hp: 1.6, dmg: 1.25, speed: 0.7 },
@@ -459,7 +459,7 @@
     name: 'Su Naga', family: 'Naga', element: 'Su',
     rarity: [4, 6], size: [3, 4], rig: 'quad',
     color: '#2a6f8f', color2: '#68e0e8', // deep sea, electric-blue biolum
-    features: { heads: [2, 5], serpent: true, ridge: true, biolum: true, aquatic: true },
+    features: { heads: [2, 5], serpent: true, ridge: true, biolum: true, aquatic: true, scaled: true },
     tags: ['su', 'carnivore', 'apex', 'naga', 'biolum'],
     behavior: 'su_naga',
     statMul: { hp: 1.9, dmg: 1.5, speed: 0.85 },

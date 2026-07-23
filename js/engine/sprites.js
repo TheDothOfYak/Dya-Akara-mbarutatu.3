@@ -397,6 +397,19 @@
         ctx.lineTo(-bodyW * 0.25 + i * bodyW * 0.3, y0 + bodyH * 0.3); ctx.stroke();
       }
     }
+    /* matted fur — shaggy tufts along the back/perimeter (Sru Vorn) */
+    if (F.fur) {
+      ctx.strokeStyle = shade(sp.color, -18); ctx.lineWidth = Math.max(1, r * 0.05); ctx.lineCap = 'round';
+      const n = 16;
+      for (let i = 0; i < n; i++) {
+        const a = Math.PI + (i / (n - 1)) * Math.PI;                 // top perimeter
+        const px = Math.cos(a) * bodyW * 0.96, py = y0 + Math.sin(a) * bodyH * 0.96;
+        const jit = 0.7 + 0.6 * ((Math.sin(i * 71.3) * 0.5) + 0.5);
+        ctx.beginPath(); ctx.moveTo(px, py);
+        ctx.lineTo(px + Math.cos(a) * r * 0.16 * jit, py + Math.sin(a) * r * 0.16 * jit - r * 0.02);
+        ctx.stroke();
+      }
+    }
     /* ridge along back (naga/hvaleia) */
     if (F.ridge) {
       ctx.fillStyle = shade(sp.color2 || sp.color, -10);
@@ -439,8 +452,8 @@
       }
     }
 
-    /* --- head(s) --- */
-    const headCount = o.heads || (F.heads ? F.heads[0] : 1);
+    /* --- head(s) --- (shell-dwellers like the Grothyn show no head) --- */
+    const headCount = F.noHead ? 0 : (o.heads || (F.heads ? F.heads[0] : 1));
     const headR = r * (F.bigJaw ? 0.42 : 0.34) * (headCount > 1 ? 0.8 : 1);
     for (let h = 0; h < headCount; h++) {
       const spread = headCount > 1 ? (h - (headCount - 1) / 2) * 0.55 : 0;
@@ -573,6 +586,32 @@
       ctx.stroke();
       ctx.fillStyle = sp.color2;
       ctx.beginPath(); ctx.arc(-bodyW * 0.1, y0 - bodyH * 1.8, r * 0.12, 0, TAU); ctx.fill();
+    }
+    /* single long vine — the Grothyn's one weapon and hand, reaching from the
+       shell; lashes forward when it strikes */
+    if (F.singleVine) {
+      const vcol = sp.color2 || '#5f7a45';
+      const lash = (state === 'attack' || state === 'special') ? Math.max(0, Math.sin(t * 13)) : 0;
+      const ang = -0.5 + Math.sin(t * 1.5) * 0.15 - lash * 0.7;
+      const ext = 1 + lash * 0.5, reach = r * 1.7;
+      const ox = bodyW * 0.2, oy = y0 - bodyH * 0.7;
+      const tipX = ox + Math.cos(ang) * reach * ext, tipY = oy + Math.sin(ang) * reach * ext;
+      const midX = ox + Math.cos(ang) * reach * 0.5 * ext - Math.sin(ang) * r * 0.22;
+      const midY = oy + Math.sin(ang) * reach * 0.5 * ext;
+      ctx.strokeStyle = shade(vcol, -6); ctx.lineWidth = Math.max(2, r * 0.11); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.quadraticCurveTo(midX, midY, tipX, tipY); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tipX, tipY, r * 0.1, ang, ang + Math.PI * 1.4 * (lash > 0 ? 1 : 0.6)); ctx.stroke();
+      ctx.fillStyle = shade(vcol, -10);
+      ctx.beginPath(); ctx.ellipse(midX, midY, r * 0.13, r * 0.06, ang, 0, TAU); ctx.fill();
+    }
+    /* acid saliva — green drool dripping from the maw (Sru Vorn) */
+    if (F.acid && !dormant && state !== 'death') {
+      ctx.fillStyle = (sp.color2 || '#8fbf3f') + 'cc';
+      for (let i = 0; i < 3; i++) {
+        const ph = (t * 0.8 + i * 0.4) % 1;
+        const dx = bodyW * (0.72 + i * 0.1), dy = y0 - bodyH * 0.05 + ph * r * 0.6;
+        ctx.beginPath(); ctx.ellipse(dx, dy, r * 0.05, r * 0.08 + ph * r * 0.03, 0, 0, TAU); ctx.fill();
+      }
     }
     /* rider (acorn on back) */
     if ((F.rider || o.hasRider) && !dormant) {
