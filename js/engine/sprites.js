@@ -178,6 +178,9 @@
       else if (rig === 'tree') drawTree(ctx, o, t, state);
       else if (rig === 'stryx') drawStryx(ctx, o, t, state);
       else if (rig === 'kipsu') drawKipsu(ctx, o, t, state);
+      else if (rig === 'mikolo') drawMikolo(ctx, o, t, state);
+      else if (rig === 'gynge') drawGynge(ctx, o, t, state);
+      else if (rig === 'hvaleia') drawHvaleia(ctx, o, t, state);
       else if (rig === 'blob') drawBlob(ctx, o, t, state);
       else if (rig === 'field') drawField(ctx, o, t, state);
       else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
@@ -394,6 +397,19 @@
         ctx.lineTo(-bodyW * 0.25 + i * bodyW * 0.3, y0 + bodyH * 0.3); ctx.stroke();
       }
     }
+    /* matted fur — shaggy tufts along the back/perimeter (Sru Vorn) */
+    if (F.fur) {
+      ctx.strokeStyle = shade(sp.color, -18); ctx.lineWidth = Math.max(1, r * 0.05); ctx.lineCap = 'round';
+      const n = 16;
+      for (let i = 0; i < n; i++) {
+        const a = Math.PI + (i / (n - 1)) * Math.PI;                 // top perimeter
+        const px = Math.cos(a) * bodyW * 0.96, py = y0 + Math.sin(a) * bodyH * 0.96;
+        const jit = 0.7 + 0.6 * ((Math.sin(i * 71.3) * 0.5) + 0.5);
+        ctx.beginPath(); ctx.moveTo(px, py);
+        ctx.lineTo(px + Math.cos(a) * r * 0.16 * jit, py + Math.sin(a) * r * 0.16 * jit - r * 0.02);
+        ctx.stroke();
+      }
+    }
     /* ridge along back (naga/hvaleia) */
     if (F.ridge) {
       ctx.fillStyle = shade(sp.color2 || sp.color, -10);
@@ -436,8 +452,8 @@
       }
     }
 
-    /* --- head(s) --- */
-    const headCount = o.heads || (F.heads ? F.heads[0] : 1);
+    /* --- head(s) --- (shell-dwellers like the Grothyn show no head) --- */
+    const headCount = F.noHead ? 0 : (o.heads || (F.heads ? F.heads[0] : 1));
     const headR = r * (F.bigJaw ? 0.42 : 0.34) * (headCount > 1 ? 0.8 : 1);
     for (let h = 0; h < headCount; h++) {
       const spread = headCount > 1 ? (h - (headCount - 1) / 2) * 0.55 : 0;
@@ -570,6 +586,32 @@
       ctx.stroke();
       ctx.fillStyle = sp.color2;
       ctx.beginPath(); ctx.arc(-bodyW * 0.1, y0 - bodyH * 1.8, r * 0.12, 0, TAU); ctx.fill();
+    }
+    /* single long vine — the Grothyn's one weapon and hand, reaching from the
+       shell; lashes forward when it strikes */
+    if (F.singleVine) {
+      const vcol = sp.color2 || '#5f7a45';
+      const lash = (state === 'attack' || state === 'special') ? Math.max(0, Math.sin(t * 13)) : 0;
+      const ang = -0.5 + Math.sin(t * 1.5) * 0.15 - lash * 0.7;
+      const ext = 1 + lash * 0.5, reach = r * 1.7;
+      const ox = bodyW * 0.2, oy = y0 - bodyH * 0.7;
+      const tipX = ox + Math.cos(ang) * reach * ext, tipY = oy + Math.sin(ang) * reach * ext;
+      const midX = ox + Math.cos(ang) * reach * 0.5 * ext - Math.sin(ang) * r * 0.22;
+      const midY = oy + Math.sin(ang) * reach * 0.5 * ext;
+      ctx.strokeStyle = shade(vcol, -6); ctx.lineWidth = Math.max(2, r * 0.11); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.quadraticCurveTo(midX, midY, tipX, tipY); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tipX, tipY, r * 0.1, ang, ang + Math.PI * 1.4 * (lash > 0 ? 1 : 0.6)); ctx.stroke();
+      ctx.fillStyle = shade(vcol, -10);
+      ctx.beginPath(); ctx.ellipse(midX, midY, r * 0.13, r * 0.06, ang, 0, TAU); ctx.fill();
+    }
+    /* acid saliva — green drool dripping from the maw (Sru Vorn) */
+    if (F.acid && !dormant && state !== 'death') {
+      ctx.fillStyle = (sp.color2 || '#8fbf3f') + 'cc';
+      for (let i = 0; i < 3; i++) {
+        const ph = (t * 0.8 + i * 0.4) % 1;
+        const dx = bodyW * (0.72 + i * 0.1), dy = y0 - bodyH * 0.05 + ph * r * 0.6;
+        ctx.beginPath(); ctx.ellipse(dx, dy, r * 0.05, r * 0.08 + ph * r * 0.03, 0, 0, TAU); ctx.fill();
+      }
     }
     /* rider (acorn on back) */
     if ((F.rider || o.hasRider) && !dormant) {
@@ -1307,20 +1349,381 @@
     }
   }
 
+  /* ============ MIKOLO MOKO — small snake-bodied relic thief ============
+     "A small, snake-bodied, single-minded thief" — the premier Relic runner.
+     Fast and sinuous unburdened (a travelling S-wave, flicking forked tongue,
+     slit thief's eyes), and hunched low, slow and strained when hauling the
+     Relic. Coils up to lurk and wait. Camouflage (its only defense) is the
+     caller's alpha fade; here we just read as a sleek, sneaky serpent. */
+  function mikoloNormal(pts, i) {
+    const n = pts.length, a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+    return [-dy / L, dx / L];
+  }
+  function drawMikolo(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const coat = sp.color || '#7a9455';
+    const belly = shade(coat, 30);
+    const mark = sp.color2 || '#55703a';
+    const moving = state === 'walk' || state === 'run';
+    const running = state === 'run';
+    const dormant = state === 'dormant';
+    const dead = state === 'death';
+    const attack = state === 'attack' || state === 'special';
+    const carrying = !!o.hasRelic;
+
+    /* --- snake head (reused by the coiled + extended poses) --- */
+    function head(hx, hy, hr, ang, closed) {
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang);
+      ctx.fillStyle = shade(coat, 14);
+      ctx.beginPath(); ctx.ellipse(0, 0, hr * 1.15, hr * 0.8, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(hr * 0.72, hr * 0.1, hr * 0.55, hr * 0.5, 0, 0, TAU); ctx.fill();   // snout
+      ctx.fillStyle = mark;                                                                              // dark crown marking
+      ctx.beginPath(); ctx.ellipse(-hr * 0.1, -hr * 0.16, hr * 0.72, hr * 0.34, 0, 0, TAU); ctx.fill();
+      if (closed) {
+        ctx.strokeStyle = '#161009'; ctx.lineWidth = Math.max(1, hr * 0.1); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(hr * 0.02, -hr * 0.28); ctx.lineTo(hr * 0.34, -hr * 0.28); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#f2d84a';                                                                       // slit thief's eye
+        ctx.beginPath(); ctx.ellipse(hr * 0.16, -hr * 0.28, hr * 0.24, hr * 0.17, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#161009'; ctx.lineWidth = Math.max(1, hr * 0.09); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(hr * 0.16, -hr * 0.43); ctx.lineTo(hr * 0.16, -hr * 0.13); ctx.stroke();
+      }
+      ctx.fillStyle = '#161009';                                                                         // nostril
+      ctx.beginPath(); ctx.arc(hr * 1.08, hr * 0.04, Math.max(0.8, hr * 0.06), 0, TAU); ctx.fill();
+      /* forked tongue — tastes the air when unburdened & alert */
+      if (!carrying && !closed && (attack || Math.sin(t * 3 + (o.phase || 0)) > 0.5)) {
+        const ext = hr * (1.05 + 0.8 * Math.abs(Math.sin(t * 13)));
+        const bx = hr * 1.15, by = hr * 0.14;
+        ctx.strokeStyle = '#c23a52'; ctx.lineWidth = Math.max(1, hr * 0.1); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + ext, by); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx + ext, by); ctx.lineTo(bx + ext + hr * 0.28, by - hr * 0.16);
+        ctx.moveTo(bx + ext, by); ctx.lineTo(bx + ext + hr * 0.28, by + hr * 0.16);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    /* --- coiled at rest (lurking / waiting) --- */
+    if (dormant) {
+      const cy = r * 0.2, turns = 2.3, steps = 46, maxR = r * 0.7;
+      for (let i = steps; i >= 0; i--) {
+        const f = i / steps, ang = f * turns * TAU;
+        const x = Math.cos(ang) * maxR * (0.25 + 0.75 * f);
+        const y = cy + Math.sin(ang) * maxR * (0.25 + 0.75 * f) * 0.55;
+        ctx.fillStyle = shade(coat, -14 + (1 - f) * 26);
+        ctx.beginPath(); ctx.arc(x, y, r * (0.09 + 0.12 * f), 0, TAU); ctx.fill();
+      }
+      head(maxR * 0.24, cy - r * 0.04, r * 0.24, 0.15, true);
+      return;
+    }
+
+    /* --- extended body: a travelling S-wave --- */
+    const speed = running ? 9 : moving ? 6 : (carrying ? 1.6 : 2.6);
+    const humps = carrying ? 1.1 : 1.7;
+    const amp = (carrying ? 0.08 : running ? 0.4 : moving ? 0.32 : 0.2) * r;
+    const ground = r * 0.34;                                   // lies low to the ground
+    const frontLift = dead ? 0 : (carrying ? r * 0.2 : r * 0.6);   // neck/head rears up
+    const x0 = -r * 1.35, x1 = r * (carrying ? 0.72 : 0.95);
+    const N = 12, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;
+      const taper = 0.55 + 0.45 * (1 - u);                    // tail waves the most
+      const wob = dead ? 0 : Math.sin(u * Math.PI * humps * 2 - t * speed) * amp * taper;
+      pts.push([x0 + (x1 - x0) * u, ground + wob - frontLift * (u * u)]);
+    }
+    const wfn = (u) => r * (0.05 + 0.2 * u);                   // pointy tail → thick neck
+
+    /* body outline */
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const [nx, ny] = mikoloNormal(pts, i), w = wfn(i / N);
+      top.push([pts[i][0] + nx * w, pts[i][1] + ny * w]);
+      bot.push([pts[i][0] - nx * w, pts[i][1] - ny * w]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i <= N; i++) ctx.lineTo(top[i][0], top[i][1]);
+    for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.closePath();
+    const grd = ctx.createLinearGradient(0, ground - r * 0.3, 0, ground + r * 0.3);
+    grd.addColorStop(0, shade(coat, 16)); grd.addColorStop(1, shade(coat, -14));
+    ctx.fillStyle = grd; ctx.fill();
+    /* pale belly along the underside */
+    ctx.strokeStyle = belly + '88'; ctx.lineWidth = Math.max(1, r * 0.045); ctx.lineCap = 'round';
+    ctx.beginPath(); for (let i = 0; i <= N; i++) { const p = bot[i]; i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]); } ctx.stroke();
+    /* dorsal diamond markings */
+    if (!dead) {
+      ctx.fillStyle = mark + 'dd';
+      for (let i = 2; i < N; i += 2) {
+        const p = pts[i], w = wfn(i / N);
+        const a = Math.atan2(pts[i + 1][1] - pts[i - 1][1], pts[i + 1][0] - pts[i - 1][0]);
+        ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(a);
+        ctx.beginPath(); ctx.moveTo(0, -w * 0.6); ctx.lineTo(w * 0.5, 0); ctx.lineTo(0, w * 0.6); ctx.lineTo(-w * 0.5, 0); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+    }
+    /* head, angled along the neck */
+    const hd = pts[N], pv = pts[N - 1];
+    head(hd[0], hd[1], r * 0.3, Math.atan2(hd[1] - pv[1], hd[0] - pv[0]) + (carrying ? 0.25 : 0), dead);
+  }
+
+  /* ============ GYNGE — living rock that erupts and bites ============
+     "A living creature of rock that erupts up from the ground... utterly
+     motionless until something warm or vibrating comes close — then its mouth
+     opens like a cave and it strikes." Dormant it reads as an inert craggy
+     boulder; awake, biolum eyes kindle in a crack; striking, a cave-maw yawns
+     open with stone teeth and an inner glow. Fully stationary — no legs. */
+  function gyngeHash(i) { const s = Math.sin(i * 12.9898) * 43758.5453; return s - Math.floor(s); }
+  function drawGynge(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const rock = sp.color || '#8a8578';
+    const glow = sp.color2 || '#7fe0a0';
+    const dormant = state === 'dormant';
+    const dead = state === 'death';
+    const striking = state === 'attack' || state === 'special';
+    const awake = !dormant && !dead;
+    const base = r * 0.85;                 // ground line
+    const bw = r * 1.12, bh = r * 1.05;
+
+    /* craggy rock silhouette (deterministic jitter) */
+    const M = 10, pts = [];
+    pts.push([-bw, base]);
+    for (let i = 0; i <= M; i++) {
+      const u = i / M, ang = Math.PI * (1 - u);
+      const j = gyngeHash(i + 3);
+      const rr = 0.8 + 0.24 * j;
+      pts.push([Math.cos(ang) * bw * rr, base - Math.sin(ang) * bh * (0.85 + 0.28 * gyngeHash(i + 9))]);
+    }
+    pts.push([bw, base]);
+    const grd = ctx.createLinearGradient(0, base - bh, 0, base);
+    grd.addColorStop(0, shade(rock, 20)); grd.addColorStop(1, shade(rock, -22));
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]));
+    ctx.closePath(); ctx.fill();
+    /* facet cracks */
+    ctx.strokeStyle = shade(rock, -48) + '99'; ctx.lineWidth = Math.max(1, r * 0.04); ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const a = gyngeHash(i + 20);
+      ctx.beginPath();
+      ctx.moveTo((a - 0.5) * bw * 1.2, base - bh * (0.2 + 0.5 * gyngeHash(i + 30)));
+      ctx.lineTo((gyngeHash(i + 40) - 0.5) * bw, base - bh * 0.02);
+      ctx.stroke();
+    }
+    /* moss cap when awake/alive (a hint of life on the stone) */
+    if (!dead) {
+      ctx.fillStyle = shade(glow, -30) + '66';
+      for (let i = 0; i < 4; i++) {
+        const a = gyngeHash(i + 50);
+        ctx.beginPath(); ctx.ellipse((a - 0.5) * bw * 1.1, base - bh * (0.75 + 0.15 * a), r * 0.12, r * 0.06, 0, 0, TAU); ctx.fill();
+      }
+    }
+
+    /* cave-maw across the lower face */
+    const open = striking ? 0.42 + 0.32 * Math.sin(t * 12) : (awake ? 0.05 : 0);
+    const my = base - bh * 0.3, mw = bw * 0.6, mh = bh * (0.07 + open * 0.72);
+    if (open > 0.12) {   // inner throat glow (biolum)
+      const ig = ctx.createRadialGradient(0, my, 2, 0, my, mw);
+      ig.addColorStop(0, glow + 'cc'); ig.addColorStop(1, glow + '00');
+      ctx.fillStyle = ig; ctx.beginPath(); ctx.ellipse(0, my, mw * 1.1, mh * 1.4, 0, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = '#100d0a';
+    ctx.beginPath(); ctx.ellipse(0, my, mw, mh, 0, 0, TAU); ctx.fill();
+    if (open > 0.08) {   // stone teeth top + bottom
+      ctx.fillStyle = shade(rock, 8);
+      const teeth = 6;
+      for (let i = 0; i < teeth; i++) {
+        const tx = -mw * 0.82 + (i / (teeth - 1)) * mw * 1.64;
+        ctx.beginPath(); ctx.moveTo(tx - mw * 0.09, my - mh); ctx.lineTo(tx, my - mh * 0.3); ctx.lineTo(tx + mw * 0.09, my - mh); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(tx - mw * 0.09, my + mh); ctx.lineTo(tx, my + mh * 0.3); ctx.lineTo(tx + mw * 0.09, my + mh); ctx.fill();
+      }
+    }
+
+    /* biolum eyes peer from an upper crack when awake */
+    if (awake) {
+      const blink = Math.sin(t * 0.7 + (o.phase || 0) * 5) > 0.95 ? 0.15 : 1;
+      for (const dx of [-0.26, 0.24]) {
+        const ex = dx * bw, ey = base - bh * 0.62;
+        const eg = ctx.createRadialGradient(ex, ey, 0.5, ex, ey, r * 0.16);
+        eg.addColorStop(0, '#eafff0'); eg.addColorStop(0.5, glow); eg.addColorStop(1, glow + '00');
+        ctx.fillStyle = eg;
+        ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.14, r * 0.11 * blink, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#0d1410';
+        ctx.beginPath(); ctx.arc(ex + r * 0.03, ey, Math.max(1, r * 0.045) * blink, 0, TAU); ctx.fill();
+      }
+    }
+  }
+
+  /* ============ HVALEIA — many-eyed leviathan of water and air ============
+     "An enormous, many-eyed hunter of the open water and the air above it,
+     with a row of blowholes and a heavy clubbed tail." Hovers (never legs),
+     a big rounded body with a dorsal ridge (its one soft spot beneath it),
+     side flippers, a row of eyes for all-around vision, blowholes that spout
+     on a jet, and a heavy spiked club tail that answers everything else. */
+  function drawHvaleia(ctx, o, t, state) {
+    const sp = o.sp, r = o.r;
+    const skin = sp.color || '#33658a';
+    const lite = sp.color2 || '#68e0e8';
+    const moving = state === 'walk' || state === 'run';
+    const dead = state === 'death';
+    const jetting = state === 'special';
+    const striking = state === 'attack';
+    const hover = dead ? 0 : Math.sin(t * 2.2) * r * 0.06;
+    const undel = Math.sin(t * (moving ? 5 : 2.6)) * 0.04;
+    const y0 = -r * 0.05 + hover;
+    const bw = r * 1.28, bh = r * 0.72;
+
+    /* heavy spiked club tail (rear-left), swings on a strike */
+    const swing = striking ? Math.sin(t * 12) * 0.5 : Math.sin(t * 2.5) * 0.12;
+    const tbx = -bw * 0.85, tex = -bw * 1.5, tey = y0 + swing * r;
+    ctx.strokeStyle = shade(skin, -20); ctx.lineWidth = r * 0.26; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(tbx, y0); ctx.quadraticCurveTo((tbx + tex) / 2, y0 - r * 0.2 + swing * r, tex, tey); ctx.stroke();
+    ctx.fillStyle = shade(skin, -32);
+    ctx.beginPath(); ctx.arc(tex, tey, r * 0.34, 0, TAU); ctx.fill();
+    ctx.strokeStyle = shade(skin, -55); ctx.lineWidth = Math.max(1, r * 0.06);
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; ctx.beginPath(); ctx.moveTo(tex + Math.cos(a) * r * 0.32, tey + Math.sin(a) * r * 0.32); ctx.lineTo(tex + Math.cos(a) * r * 0.52, tey + Math.sin(a) * r * 0.52); ctx.stroke(); }
+
+    /* side flippers */
+    const fin = Math.sin(t * (moving ? 6 : 3)) * 0.2;
+    ctx.fillStyle = shade(skin, -14);
+    for (const s of [0.5, -0.2]) {
+      ctx.save(); ctx.translate(bw * 0.1, y0 + bh * 0.55); ctx.rotate(0.5 + s + fin);
+      ctx.beginPath(); ctx.ellipse(0, r * 0.3, r * 0.16, r * 0.42, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+
+    /* body */
+    const grd = ctx.createLinearGradient(0, y0 - bh, 0, y0 + bh);
+    grd.addColorStop(0, shade(skin, 20)); grd.addColorStop(1, shade(skin, -20));
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(0, y0, bw, bh, undel, 0, TAU); ctx.fill();
+    /* pale underside (the soft spot) */
+    ctx.fillStyle = shade(lite, 10) + '55';
+    ctx.beginPath(); ctx.ellipse(-bw * 0.05, y0 + bh * 0.42, bw * 0.8, bh * 0.42, 0, 0, TAU); ctx.fill();
+
+    /* dorsal ridge along the back */
+    ctx.fillStyle = shade(skin, -30);
+    for (let i = -2; i <= 2; i++) {
+      const bx = i * bw * 0.26;
+      const surf = Math.sqrt(Math.max(0, 1 - (bx / bw) * (bx / bw)));
+      ctx.beginPath();
+      ctx.moveTo(bx - r * 0.1, y0 - bh * surf); ctx.lineTo(bx, y0 - bh * surf - r * 0.24); ctx.lineTo(bx + r * 0.1, y0 - bh * surf);
+      ctx.closePath(); ctx.fill();
+    }
+    /* blowholes on top — spout when jetting */
+    for (let i = 0; i < 3; i++) {
+      const bx = -bw * 0.28 + i * bw * 0.3;
+      ctx.fillStyle = shade(skin, -55);
+      ctx.beginPath(); ctx.arc(bx, y0 - bh * 0.72, r * 0.06, 0, TAU); ctx.fill();
+      if (jetting) {
+        const h = (0.7 + 0.4 * Math.sin(t * 18 + i)) * r;
+        const sg = ctx.createLinearGradient(bx, y0 - bh * 0.8, bx, y0 - bh * 0.8 - h);
+        sg.addColorStop(0, '#bfe8ffcc'); sg.addColorStop(1, '#bfe8ff00');
+        ctx.strokeStyle = sg; ctx.lineWidth = r * 0.12; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, y0 - bh * 0.78); ctx.lineTo(bx + Math.sin(t * 9 + i) * r * 0.1, y0 - bh * 0.78 - h); ctx.stroke();
+      }
+    }
+
+    /* many eyes down the flank — all-around vision */
+    if (!dead) {
+      const blink = Math.sin(t * 0.6 + (o.phase || 0)) > 0.96 ? 0.15 : 1;
+      const eyeXs = [bw * 0.72, bw * 0.5, bw * 0.24, -bw * 0.04, -bw * 0.32];
+      const eyeYs = [y0 - bh * 0.15, y0 - bh * 0.4, y0 - bh * 0.5, y0 - bh * 0.45, y0 - bh * 0.32];
+      for (let i = 0; i < eyeXs.length; i++) {
+        const er = r * (i === 0 ? 0.14 : 0.1);
+        ctx.fillStyle = '#f0f4ea';
+        ctx.beginPath(); ctx.ellipse(eyeXs[i], eyeYs[i], er, er * blink, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#12202a';
+        ctx.beginPath(); ctx.arc(eyeXs[i] + er * 0.3, eyeYs[i], Math.max(1, er * 0.5) * blink, 0, TAU); ctx.fill();
+      }
+    }
+    /* wide jaw at the front, opens on a strike */
+    const jaw = striking ? 0.4 + 0.3 * Math.sin(t * 13) : 0.08;
+    ctx.fillStyle = shade(skin, -62);
+    ctx.beginPath();
+    ctx.moveTo(bw * 0.62, y0 + bh * 0.05);
+    ctx.lineTo(bw * (1.02 + jaw * 0.2), y0 + bh * (0.02 - jaw));
+    ctx.lineTo(bw * (1.02 + jaw * 0.2), y0 + bh * (0.35 + jaw));
+    ctx.lineTo(bw * 0.62, y0 + bh * 0.4);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#eef2e6';   // baleen/teeth
+    for (let i = 0; i < 5; i++) { const tx = bw * (0.7 + i * 0.06); ctx.beginPath(); ctx.moveTo(tx, y0 + bh * 0.06); ctx.lineTo(tx + r * 0.03, y0 + bh * (0.06 + jaw * 0.6)); ctx.lineTo(tx + r * 0.06, y0 + bh * 0.06); ctx.fill(); }
+  }
+
   /* ============ BLOB (buds, fruit, sprengju) ============ */
   function drawBlob(ctx, o, t, state) {
-    const sp = o.sp, r = o.r;
+    const sp = o.sp, r = o.r, F = sp.features || {};
+    const col = sp.color || '#8a6f4a', col2 = sp.color2 || col;
+    const fruit = F.fruit;                 // 'strike' | 'pace' | 'mend' | 'guard' | undefined
     const puls = 1 + Math.sin(t * 3) * 0.06;
-    const g = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r * 0.8 * puls);
-    g.addColorStop(0, shade(sp.color, 30));
-    g.addColorStop(1, shade(sp.color, -15));
+    const R = r * 0.75 * puls;
+
+    /* Skith Grass (pace): a wind-bleached bundle of blades, no orb */
+    if (fruit === 'pace') {
+      ctx.strokeStyle = shade(col, -8); ctx.lineWidth = Math.max(1.5, r * 0.07); ctx.lineCap = 'round';
+      const blades = 7;
+      for (let i = 0; i < blades; i++) {
+        const f = i / (blades - 1) - 0.5, sway = Math.sin(t * 2.2 + i) * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(f * r * 0.5, r * 0.7);
+        ctx.quadraticCurveTo(f * r * 0.8 + sway * r, -r * 0.1, f * r * 0.6 + sway * r * 1.6, -r * 0.85);
+        ctx.stroke();
+      }
+      ctx.fillStyle = shade(col2, 12);
+      for (let i = 0; i < blades; i += 2) { const f = i / (blades - 1) - 0.5; ctx.beginPath(); ctx.arc(f * r * 0.6 + Math.sin(t * 2.2 + i) * r * 0.2, -r * 0.85, r * 0.08, 0, TAU); ctx.fill(); }
+      return;
+    }
+
+    /* body: a faceted stone (guard) or a soft orb (everything else) */
+    const g = ctx.createRadialGradient(-R * 0.25, -R * 0.25, R * 0.1, 0, 0, R);
+    g.addColorStop(0, shade(col, fruit === 'guard' ? 24 : 30));
+    g.addColorStop(1, shade(col, fruit === 'guard' ? -26 : -15));
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.75 * puls, 0, TAU); ctx.fill();
-    ctx.strokeStyle = sp.color2; ctx.lineWidth = Math.max(1.5, r * 0.08);
-    ctx.beginPath(); ctx.moveTo(0, -r * 0.7); ctx.quadraticCurveTo(r * 0.2, -r * 1.0, r * 0.1, -r * 1.15); ctx.stroke();
-    if (sp.features.glow) {
-      ctx.fillStyle = '#fff8';
-      ctx.beginPath(); ctx.arc(-r * 0.2, -r * 0.2, r * 0.16, 0, TAU); ctx.fill();
+    if (fruit === 'guard') {
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + 0.3, rr = R * (0.92 + 0.12 * ((i * 37 % 10) / 10)); const x = Math.cos(a) * rr, y = Math.sin(a) * rr * 0.92; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = shade(col, -42); ctx.lineWidth = Math.max(1, r * 0.04); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-R * 0.35, -R * 0.4); ctx.lineTo(0, 0); ctx.lineTo(R * 0.4, -R * 0.18); ctx.moveTo(0, 0); ctx.lineTo(-R * 0.12, R * 0.5); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+    }
+
+    /* Mirrordew (mend): reflective dewdrop + expanding ripple */
+    if (fruit === 'mend') {
+      ctx.fillStyle = '#ffffff88';
+      ctx.beginPath(); ctx.ellipse(-R * 0.25, -R * 0.3, R * 0.28, R * 0.18, -0.5, 0, TAU); ctx.fill();
+      const rr = (t * 0.4) % 1;
+      ctx.save(); ctx.globalAlpha *= (1 - rr) * 0.7;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, r * 0.03);
+      ctx.beginPath(); ctx.arc(0, 0, R * (0.4 + rr * 0.7), 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
+    /* Ember Root (strike): hot core + rising ember flecks */
+    if (fruit === 'strike') {
+      const cg = ctx.createRadialGradient(0, 0, 1, 0, 0, R * 0.55);
+      cg.addColorStop(0, '#fff3c8aa'); cg.addColorStop(1, col2 + '00');
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, 0, R * 0.55, 0, TAU); ctx.fill();
+      for (let i = 0; i < 4; i++) {
+        const ph = (t * 0.9 + i * 0.3) % 1;
+        ctx.save(); ctx.globalAlpha *= (1 - ph) * 0.9;
+        ctx.fillStyle = col2 || '#ffb03a';
+        ctx.beginPath(); ctx.arc(Math.sin(i * 2 + t) * R * 0.4, -ph * r * 1.05, r * 0.05, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /* stem (not on the stone fruit) */
+    if (fruit !== 'guard') {
+      ctx.strokeStyle = col2; ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -R * 0.95); ctx.quadraticCurveTo(r * 0.2, -R * 1.25, r * 0.1, -R * 1.4); ctx.stroke();
+    }
+    /* generic glow highlight (Sprengju, Albali bud/fruit, etc.) */
+    if (F.glow && !fruit) {
+      ctx.fillStyle = '#ffffff88';
+      ctx.beginPath(); ctx.arc(-R * 0.25, -R * 0.25, R * 0.22, 0, TAU); ctx.fill();
     }
   }
 
