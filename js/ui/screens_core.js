@@ -178,14 +178,18 @@
      up to two pattern rings around it. Built once, then locked. */
   UI.sealDesigner = function (onDone) {
     const me = G.me;
-    if (me.seal && me.seal.locked) { UI.alert('Seal already struck', 'A seal is struck once and carried for life. Yours is on your avatar page.'); if (onDone) onDone(); return; }
+    const editing = !!(me.seal && me.seal.locked);   // re-striking an existing seal
     const TAU = Math.PI * 2;
     const w = U.el('div', { cls: 'center' });
-    w.appendChild(U.el('h3', { cls: 'gold', text: 'Strike Your Seal' }));
-    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Choose your metal, your emblem, and up to two engraved ring patterns. This coin marks your screens, your creatures on the field, and your victories — and it is struck exactly once.' }));
+    w.appendChild(U.el('h3', { cls: 'gold', text: editing ? 'Re-strike Your Seal' : 'Strike Your Seal' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: editing
+      ? 'Choose a new metal, emblem, and up to two ring patterns. Re-striking replaces your seal everywhere it appears.'
+      : 'Choose your metal, your emblem, and up to two engraved ring patterns. This coin marks your screens, your creatures on the field, and your victories.' }));
 
-    let metal = SPR.SEAL_METALS[0].id, emblem = 'acorn';
-    const patterns = [];
+    /* pre-fill from the current seal when re-striking */
+    let metal = (me.seal && me.seal.metal) || SPR.SEAL_METALS[0].id;
+    let emblem = (me.seal && me.seal.emblem) || 'acorn';
+    const patterns = ((me.seal && me.seal.patterns) || []).slice(0, 2);
     const curSeal = () => ({ avatarIdx: me.avatarIdx, metal, emblem, patterns: patterns.slice() });
 
     /* live preview with a roaming glint */
@@ -242,7 +246,7 @@
     w.appendChild(U.el('div', { cls: 'muted small mt', text: 'RINGS — up to two' }));
     const patRow = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap;justify-content:center;gap:6px' });
     SPR.PATTERNS.forEach(p => {
-      const b = U.el('button', { cls: 'btn small ghost', text: p });
+      const b = U.el('button', { cls: 'btn small' + (patterns.includes(p) ? '' : ' ghost'), text: p });
       b.onclick = () => {
         const i = patterns.indexOf(p);
         if (i >= 0) { patterns.splice(i, 1); b.classList.add('ghost'); }
@@ -272,11 +276,11 @@
     markMetal();
     frame();
     w.appendChild(U.el('button', {
-      cls: 'btn primary mt', text: '⚒ Strike it — forever', onclick: () => {
+      cls: 'btn primary mt', text: editing ? '⚒ Re-strike' : '⚒ Strike it', onclick: () => {
         me.seal = { avatarIdx: me.avatarIdx, metal, emblem, patterns: patterns.slice(), locked: true };
         G.save(); cancelAnimationFrame(raf); m.close();
         DYA.audio.play('levelup');
-        UI.toast({ title: 'Seal struck', body: 'Your mark is now on everything that is yours.', icon: '🪙' });
+        UI.toast({ title: editing ? 'Seal re-struck' : 'Seal struck', body: 'Your mark is now on everything that is yours.', icon: '🪙' });
         if (onDone) onDone();
       },
     }));
@@ -1005,7 +1009,7 @@
         const sc = U.el('canvas', { width: 120, height: 120 });
         SPR.drawSeal(sc.getContext('2d'), 60, 60, 56, me.seal);
         prev.appendChild(sc);
-        prev.appendChild(U.el('div', { cls: 'small muted mt', text: 'Struck once. Carried for life.' }));
+        prev.appendChild(U.el('button', { cls: 'btn small ghost mt', text: '⚒ Re-strike seal', onclick: () => UI.sealDesigner(() => UI.show('avatar')) }));
       } else {
         prev.appendChild(U.el('p', { cls: 'small muted', text: 'You have not struck your seal yet.' }));
         prev.appendChild(U.el('button', { cls: 'btn small mt', text: '🪙 Strike your seal', onclick: () => UI.sealDesigner(() => UI.show('avatar')) }));
