@@ -68,7 +68,7 @@
     if (NO_SEAL_SCREENS[name]) return;
     const me = G.me;
     if (!me || !me.seal || !SPR.drawSeal) return;
-    const key = (me.seal.avatarIdx || 0) + '|' + (me.seal.patterns || []).join(',');
+    const key = [me.seal.avatarIdx || 0, me.seal.metal || 'gold', me.seal.emblem || 'acorn', (me.seal.patterns || []).join(',')].join('|');
     if (!sealWmCache || sealWmKey !== key) {
       sealWmCache = U.el('canvas', { width: 560, height: 560 });
       SPR.drawSeal(sealWmCache.getContext('2d'), 280, 280, 268, me.seal);
