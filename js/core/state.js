@@ -300,7 +300,13 @@
     }
     /* every player has a seal — AI seals derive from their identity */
     acc.avatarIdx = rng.int(0, 16);
-    acc.seal = { avatarIdx: acc.avatarIdx, patterns: rng.shuffle(['runes', 'laurel', 'dots', 'waves', 'chevrons', 'stars', 'vines', 'knots']).slice(0, rng.int(1, 2)), locked: true };
+    acc.seal = {
+      avatarIdx: acc.avatarIdx,
+      metal: rng.pick(['gold', 'silver', 'bronze', 'obsidian', 'verdigris', 'crimson']),
+      emblem: rng.pick(['acorn', 'acorn', 'flame', 'wave', 'leaf', 'gust', 'star', 'skull', 'crystal', 'serpent']),
+      patterns: rng.shuffle(['runes', 'laurel', 'dots', 'waves', 'chevrons', 'stars', 'vines', 'knots']).slice(0, rng.int(1, 2)),
+      locked: true,
+    };
     /* one pouch */
     const pouchToks = rng.shuffle(Object.keys(acc.tokens)).slice(0, Math.min(25, count));
     acc.pouches = [{ id: U.uid('pch'), name: name + '’s Pouch', tokenIds: pouchToks }];
