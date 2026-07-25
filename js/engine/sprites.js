@@ -1853,10 +1853,26 @@
   /* ============ PLAYER SEAL — engraved coin crest (§3) ============ */
   const sealCache = {};
   SPR.PATTERNS = ['runes', 'laurel', 'dots', 'waves', 'chevrons', 'stars', 'vines', 'knots'];
+  /* struck-metal finishes — each is a full palette for the coin */
+  SPR.SEAL_METALS = [
+    { id: 'gold', label: 'Gold', disc: '#241d14', base: '#c9a25f', light: '#f7e9bd', dark: '#8a6f42', engrave: '#f2dfa4' },
+    { id: 'silver', label: 'Silver', disc: '#1b1f26', base: '#b8c0cc', light: '#f2f6fb', dark: '#6f7885', engrave: '#e9eff7' },
+    { id: 'bronze', label: 'Bronze', disc: '#20160e', base: '#b5763f', light: '#eab586', dark: '#6e4321', engrave: '#edc199' },
+    { id: 'obsidian', label: 'Obsidian', disc: '#120c1e', base: '#6a4ab0', light: '#cebcf5', dark: '#2c1c4a', engrave: '#dccbf7' },
+    { id: 'verdigris', label: 'Verdigris', disc: '#0e1f18', base: '#3f9d7a', light: '#a6f3d2', dark: '#1e4f3c', engrave: '#c9f4e0' },
+    { id: 'crimson', label: 'Crimson', disc: '#1e0d0a', base: '#b0463a', light: '#f2a898', dark: '#5a1710', engrave: '#f4c8bb' },
+  ];
+  SPR.SEAL_EMBLEMS = [
+    { id: 'acorn', label: 'Acorn' }, { id: 'flame', label: 'Flame' }, { id: 'wave', label: 'Tide' },
+    { id: 'leaf', label: 'Leaf' }, { id: 'gust', label: 'Gale' }, { id: 'star', label: 'Star' },
+    { id: 'skull', label: 'Skull' }, { id: 'crystal', label: 'Relic' }, { id: 'serpent', label: 'Serpent' },
+  ];
+  function sealMetal(id) { return SPR.SEAL_METALS.find(m => m.id === id) || SPR.SEAL_METALS[0]; }
+
   SPR.drawSeal = function (ctx, x, y, R, seal, opts) {
     seal = seal || { avatarIdx: 0, patterns: [] };
     opts = opts || {};
-    const key = (seal.avatarIdx || 0) + ':' + (seal.patterns || []).join(',') + ':' + Math.round(R);
+    const key = [seal.avatarIdx || 0, seal.metal || 'gold', seal.emblem || 'acorn', (seal.patterns || []).join(','), Math.round(R)].join('|');
     let cv = sealCache[key];
     if (!cv) {
       cv = document.createElement('canvas');
@@ -1871,94 +1887,152 @@
     ctx.restore();
   };
 
+  /* ---- central emblems (line-art motifs, drawn in the current style) ---- */
+  const EMBLEM_FN = {
+    acorn(ctx, r, seal) {
+      const idx = (seal && seal.avatarIdx) || 0;
+      ctx.save(); ctx.translate(0, r * 0.12);
+      const a = r * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(-a, -a * 0.1); ctx.quadraticCurveTo(-a * 1.05, a * 1.05, 0, a * 1.05); ctx.quadraticCurveTo(a * 1.05, a * 1.05, a, -a * 0.1); ctx.stroke();
+      if (idx % 5 === 4) { ctx.beginPath(); ctx.moveTo(-a * 1.05, -a * 0.05); ctx.lineTo(0, -a * 1.35); ctx.lineTo(a * 1.05, -a * 0.05); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.ellipse(0, -a * 0.14, a * 1.08, a * 0.48, 0, Math.PI, TAU); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -a * 0.58); ctx.lineTo(a * 0.16, -a * 0.92); ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(-a * 0.35, a * 0.22, a * 0.09, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(a * 0.35, a * 0.22, a * 0.09, 0, TAU); ctx.fill();
+      ctx.restore();
+    },
+    flame(ctx, r) {
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.85);
+      ctx.bezierCurveTo(r * 0.6, -r * 0.15, r * 0.42, r * 0.7, 0, r * 0.78);
+      ctx.bezierCurveTo(-r * 0.42, r * 0.7, -r * 0.6, -r * 0.15, 0, -r * 0.85);
+      ctx.closePath(); ctx.fill();
+    },
+    wave(ctx, r) { for (let k = -1; k <= 1; k++) { const y = k * r * 0.36; ctx.beginPath(); ctx.moveTo(-r * 0.75, y); ctx.quadraticCurveTo(-r * 0.37, y - r * 0.28, 0, y); ctx.quadraticCurveTo(r * 0.37, y + r * 0.28, r * 0.75, y); ctx.stroke(); } },
+    leaf(ctx, r) {
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.82); ctx.quadraticCurveTo(r * 0.6, -r * 0.05, 0, r * 0.82); ctx.quadraticCurveTo(-r * 0.6, -r * 0.05, 0, -r * 0.82); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.6); ctx.lineTo(0, r * 0.6); ctx.stroke();
+      for (let k = 0; k < 2; k++) { const y = -r * 0.25 + k * r * 0.38; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(r * 0.28, y - r * 0.18); ctx.moveTo(0, y); ctx.lineTo(-r * 0.28, y - r * 0.18); ctx.stroke(); }
+    },
+    gust(ctx, r) { for (let k = 0; k < 3; k++) { const y = -r * 0.42 + k * r * 0.42; ctx.beginPath(); ctx.moveTo(-r * 0.72, y); ctx.quadraticCurveTo(r * 0.45, y - r * 0.18, r * 0.5, y - r * 0.42); ctx.stroke(); ctx.beginPath(); ctx.arc(r * 0.46, y - r * 0.5, r * 0.13, 0.6, TAU); ctx.stroke(); } },
+    star(ctx, r) { ctx.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rad = k % 2 ? r * 0.34 : r * 0.82; const x = Math.cos(a) * rad, y = Math.sin(a) * rad; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); ctx.fill(); },
+    skull(ctx, r) {
+      ctx.beginPath(); ctx.arc(0, -r * 0.12, r * 0.55, Math.PI, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * 0.55, -r * 0.12); ctx.lineTo(-r * 0.48, r * 0.34); ctx.lineTo(r * 0.48, r * 0.34); ctx.lineTo(r * 0.55, -r * 0.12); ctx.stroke();
+      ctx.beginPath(); for (const dx of [-0.28, 0, 0.28]) { ctx.moveTo(r * dx, r * 0.34); ctx.lineTo(r * dx, r * 0.58); } ctx.stroke();
+      ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.02, r * 0.16, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.25, -r * 0.02, r * 0.16, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0, r * 0.08); ctx.lineTo(-r * 0.08, r * 0.26); ctx.lineTo(r * 0.08, r * 0.26); ctx.closePath(); ctx.fill();
+    },
+    crystal(ctx, r) {
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.82); ctx.lineTo(r * 0.5, -r * 0.2); ctx.lineTo(r * 0.3, r * 0.8); ctx.lineTo(-r * 0.3, r * 0.8); ctx.lineTo(-r * 0.5, -r * 0.2); ctx.closePath(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5, -r * 0.2); ctx.lineTo(r * 0.5, -r * 0.2);
+      ctx.moveTo(0, -r * 0.82); ctx.lineTo(-r * 0.16, -r * 0.2); ctx.lineTo(-r * 0.3, r * 0.8);
+      ctx.moveTo(0, -r * 0.82); ctx.lineTo(r * 0.16, -r * 0.2); ctx.lineTo(r * 0.3, r * 0.8);
+      ctx.moveTo(-r * 0.16, -r * 0.2); ctx.lineTo(0, r * 0.8);
+      ctx.moveTo(r * 0.16, -r * 0.2); ctx.lineTo(0, r * 0.8);
+      ctx.stroke();
+    },
+    serpent(ctx, r) {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.7, r * 0.5);
+      ctx.bezierCurveTo(-r * 0.2, r * 0.2, -r * 0.9, -r * 0.3, -r * 0.2, -r * 0.5);
+      ctx.bezierCurveTo(r * 0.5, -r * 0.7, r * 0.7, -r * 0.1, r * 0.35, r * 0.1);
+      ctx.stroke();
+      /* head + forked tongue */
+      ctx.beginPath(); ctx.ellipse(r * 0.4, r * 0.16, r * 0.18, r * 0.13, 0.5, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(r * 0.5, r * 0.28); ctx.lineTo(r * 0.72, r * 0.42); ctx.moveTo(r * 0.62, r * 0.3); ctx.lineTo(r * 0.72, r * 0.42); ctx.stroke();
+    },
+  };
+  function drawSealEmblem(ctx, id, r, M, seal) {
+    const fn = EMBLEM_FN[id] || EMBLEM_FN.acorn;
+    const paint = (col, dx, dy, lw) => {
+      ctx.save(); ctx.translate(dx, dy);
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      fn(ctx, r, seal); ctx.restore();
+    };
+    paint(M.dark, r * 0.05, r * 0.06, Math.max(1, r * 0.11));   // incised shadow
+    paint(M.engrave, 0, 0, Math.max(1, r * 0.09));              // struck highlight
+  }
+
   function renderSeal(ctx, R, seal) {
-    const gold = '#d9b87a';
-    /* coin disc */
-    ctx.fillStyle = '#241d14';
-    ctx.beginPath(); ctx.arc(R, R, R * 0.98, 0, TAU); ctx.fill();
-    ctx.strokeStyle = gold; ctx.lineWidth = Math.max(1, R * 0.05);
-    ctx.beginPath(); ctx.arc(R, R, R * 0.94, 0, TAU); ctx.stroke();
-    ctx.lineWidth = Math.max(0.7, R * 0.025);
+    const M = sealMetal(seal && seal.metal);
+    const pats = ((seal && seal.patterns) || []).slice(0, 2);
+    /* metallic rim (lit from the upper-left) */
+    const rim = ctx.createRadialGradient(R * 0.62, R * 0.55, R * 0.1, R, R, R);
+    rim.addColorStop(0, M.light); rim.addColorStop(0.55, M.base); rim.addColorStop(1, M.dark);
+    ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(R, R, R * 0.98, 0, TAU); ctx.fill();
+    /* recessed inner face */
+    const face = ctx.createRadialGradient(R * 0.72, R * 0.6, R * 0.1, R, R, R * 0.85);
+    face.addColorStop(0, shade(M.disc, 20)); face.addColorStop(1, M.disc);
+    ctx.fillStyle = face; ctx.beginPath(); ctx.arc(R, R, R * 0.85, 0, TAU); ctx.fill();
+    /* beveled rim: bright arc up-left, shadow arc down-right */
+    ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1, R * 0.05);
+    ctx.strokeStyle = M.light + 'dd'; ctx.beginPath(); ctx.arc(R, R, R * 0.905, Math.PI * 0.95, Math.PI * 1.75); ctx.stroke();
+    ctx.strokeStyle = M.dark + 'dd'; ctx.beginPath(); ctx.arc(R, R, R * 0.905, Math.PI * -0.05, Math.PI * 0.75); ctx.stroke();
+    /* inner engraved ring */
+    ctx.strokeStyle = M.engrave + '99'; ctx.lineWidth = Math.max(0.7, R * 0.02);
     ctx.beginPath(); ctx.arc(R, R, R * 0.58, 0, TAU); ctx.stroke();
-    /* outer ring: up to two engraved patterns */
-    const pats = (seal.patterns || []).slice(0, 2);
-    pats.forEach((p, pi) => {
-      const rr = R * (pats.length === 1 ? 0.76 : pi === 0 ? 0.82 : 0.68);
-      drawPatternRing(ctx, R, rr, p, gold);
-    });
-    /* center: engraving-style acorn portrait (line work, no fill color) */
+    /* engraved pattern rings */
+    pats.forEach((p, pi) => { const rr = R * (pats.length === 1 ? 0.735 : pi === 0 ? 0.79 : 0.66); drawPatternRing(ctx, R, rr, p, M); });
+    /* central emblem */
+    ctx.save(); ctx.translate(R, R); drawSealEmblem(ctx, (seal && seal.emblem) || 'acorn', R * 0.46, M, seal); ctx.restore();
+    /* specular gleam sweeping across the struck metal */
     ctx.save();
-    ctx.translate(R, R * 1.08);
-    ctx.strokeStyle = gold; ctx.lineWidth = Math.max(1, R * 0.045); ctx.lineJoin = 'round';
-    const r = R * 0.34;
-    const idx = seal.avatarIdx || 0;
-    ctx.beginPath(); /* acorn body */
-    ctx.moveTo(-r, -r * 0.1);
-    ctx.quadraticCurveTo(-r * 1.05, r * 1.05, 0, r * 1.05);
-    ctx.quadraticCurveTo(r * 1.05, r * 1.05, r, -r * 0.1);
-    ctx.stroke();
-    if (idx % 5 === 4) { /* pointed cap */
-      ctx.beginPath(); ctx.moveTo(-r * 1.05, -r * 0.05); ctx.lineTo(0, -r * 1.4); ctx.lineTo(r * 1.05, -r * 0.05); ctx.stroke();
-    } else {
-      ctx.beginPath(); ctx.ellipse(0, -r * 0.14, r * 1.08, r * 0.48, 0, Math.PI, TAU); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, -r * 0.6); ctx.lineTo(r * 0.16, -r * 0.95); ctx.stroke();
-    }
-    /* eyes */
-    ctx.fillStyle = gold;
-    ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.22, r * 0.09, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(r * 0.35, r * 0.22, r * 0.09, 0, TAU); ctx.fill();
-    if (idx >= 7 && idx % 2 === 1) { /* eyepatch line */
-      ctx.beginPath(); ctx.arc(r * 0.35, r * 0.22, r * 0.17, 0, TAU); ctx.stroke();
-    }
+    ctx.beginPath(); ctx.arc(R, R, R * 0.98, 0, TAU); ctx.clip();
+    const gl = ctx.createLinearGradient(R * 0.1, 0, R * 1.7, R * 2);
+    gl.addColorStop(0.42, '#ffffff00'); gl.addColorStop(0.5, '#ffffff55'); gl.addColorStop(0.57, '#ffffff00');
+    ctx.fillStyle = gl; ctx.fillRect(0, 0, R * 2, R * 2);
     ctx.restore();
   }
 
-  function drawPatternRing(ctx, R, rr, pattern, gold) {
-    ctx.save();
-    ctx.strokeStyle = gold; ctx.fillStyle = gold;
-    ctx.lineWidth = Math.max(0.7, R * 0.03); ctx.lineCap = 'round';
-    const n = 16;
-    for (let i = 0; i < n; i++) {
-      const a = i / n * TAU;
-      ctx.save();
-      ctx.translate(R + Math.cos(a) * rr, R + Math.sin(a) * rr);
-      ctx.rotate(a + Math.PI / 2);
-      const u = R * 0.07;
-      switch (pattern) {
-        case 'runes':
-          ctx.strokeRect(-u * 0.5, -u, u, u * 2);
-          ctx.beginPath(); ctx.moveTo(-u * 0.5, 0); ctx.lineTo(u * 0.5, i % 2 ? -u * 0.6 : u * 0.6); ctx.stroke();
-          break;
-        case 'laurel':
-          ctx.beginPath(); ctx.ellipse(0, 0, u * 0.5, u * 1.1, 0.5, 0, TAU); ctx.stroke();
-          break;
-        case 'dots':
-          ctx.beginPath(); ctx.arc(0, 0, u * 0.45, 0, TAU); ctx.fill();
-          break;
-        case 'waves':
-          ctx.beginPath(); ctx.moveTo(-u, 0); ctx.quadraticCurveTo(-u * 0.3, -u, 0, 0); ctx.quadraticCurveTo(u * 0.3, u, u, 0); ctx.stroke();
-          break;
-        case 'chevrons':
-          ctx.beginPath(); ctx.moveTo(-u * 0.7, u * 0.5); ctx.lineTo(0, -u * 0.6); ctx.lineTo(u * 0.7, u * 0.5); ctx.stroke();
-          break;
-        case 'stars':
-          for (let k = 0; k < 4; k++) {
-            const sa = k / 4 * TAU;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(sa) * u * 0.8, Math.sin(sa) * u * 0.8); ctx.stroke();
-          }
-          break;
-        case 'vines':
-          ctx.beginPath(); ctx.moveTo(-u, u * 0.4); ctx.quadraticCurveTo(0, -u * 1.1, u, u * 0.4); ctx.stroke();
-          ctx.beginPath(); ctx.arc(0, -u * 0.4, u * 0.2, 0, TAU); ctx.fill();
-          break;
-        case 'knots':
-          ctx.beginPath(); ctx.arc(-u * 0.3, 0, u * 0.45, 0, TAU); ctx.stroke();
-          ctx.beginPath(); ctx.arc(u * 0.3, 0, u * 0.45, 0, TAU); ctx.stroke();
-          break;
+  function drawPatternRing(ctx, R, rr, pattern, M) {
+    const stamp = (col, dx, dy) => {
+      ctx.save(); ctx.translate(dx, dy);
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = Math.max(0.7, R * 0.03); ctx.lineCap = 'round';
+      const n = 16;
+      for (let i = 0; i < n; i++) {
+        const a = i / n * TAU;
+        ctx.save();
+        ctx.translate(R + Math.cos(a) * rr, R + Math.sin(a) * rr);
+        ctx.rotate(a + Math.PI / 2);
+        const u = R * 0.07;
+        switch (pattern) {
+          case 'runes':
+            ctx.strokeRect(-u * 0.5, -u, u, u * 2);
+            ctx.beginPath(); ctx.moveTo(-u * 0.5, 0); ctx.lineTo(u * 0.5, i % 2 ? -u * 0.6 : u * 0.6); ctx.stroke();
+            break;
+          case 'laurel':
+            ctx.beginPath(); ctx.ellipse(0, 0, u * 0.5, u * 1.1, 0.5, 0, TAU); ctx.stroke();
+            break;
+          case 'dots':
+            ctx.beginPath(); ctx.arc(0, 0, u * 0.45, 0, TAU); ctx.fill();
+            break;
+          case 'waves':
+            ctx.beginPath(); ctx.moveTo(-u, 0); ctx.quadraticCurveTo(-u * 0.3, -u, 0, 0); ctx.quadraticCurveTo(u * 0.3, u, u, 0); ctx.stroke();
+            break;
+          case 'chevrons':
+            ctx.beginPath(); ctx.moveTo(-u * 0.7, u * 0.5); ctx.lineTo(0, -u * 0.6); ctx.lineTo(u * 0.7, u * 0.5); ctx.stroke();
+            break;
+          case 'stars':
+            for (let k = 0; k < 4; k++) { const sa = k / 4 * TAU; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(sa) * u * 0.8, Math.sin(sa) * u * 0.8); ctx.stroke(); }
+            break;
+          case 'vines':
+            ctx.beginPath(); ctx.moveTo(-u, u * 0.4); ctx.quadraticCurveTo(0, -u * 1.1, u, u * 0.4); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, -u * 0.4, u * 0.2, 0, TAU); ctx.fill();
+            break;
+          case 'knots':
+            ctx.beginPath(); ctx.arc(-u * 0.3, 0, u * 0.45, 0, TAU); ctx.stroke();
+            ctx.beginPath(); ctx.arc(u * 0.3, 0, u * 0.45, 0, TAU); ctx.stroke();
+            break;
+        }
+        ctx.restore();
       }
       ctx.restore();
-    }
-    ctx.restore();
+    };
+    stamp(M.dark, R * 0.015, R * 0.02);   // incised shadow
+    stamp(M.engrave, 0, 0);               // struck highlight
   }
 
   /* ============ token coin (loading screen, market, okid) ============ */

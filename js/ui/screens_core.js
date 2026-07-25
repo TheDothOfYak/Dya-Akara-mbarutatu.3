@@ -179,19 +179,68 @@
   UI.sealDesigner = function (onDone) {
     const me = G.me;
     if (me.seal && me.seal.locked) { UI.alert('Seal already struck', 'A seal is struck once and carried for life. Yours is on your avatar page.'); if (onDone) onDone(); return; }
+    const TAU = Math.PI * 2;
     const w = U.el('div', { cls: 'center' });
     w.appendChild(U.el('h3', { cls: 'gold', text: 'Strike Your Seal' }));
-    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Your engraving at the center. Choose up to TWO patterns for the outer rings. This coin marks your screens, your creatures on the field, and your victories — and it is struck exactly once.' }));
-    const cv = U.el('canvas', { width: 200, height: 200, cls: 'mt' });
-    w.appendChild(U.el('div', {}, [cv]));
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Choose your metal, your emblem, and up to two engraved ring patterns. This coin marks your screens, your creatures on the field, and your victories — and it is struck exactly once.' }));
+
+    let metal = SPR.SEAL_METALS[0].id, emblem = 'acorn';
     const patterns = [];
-    function redraw() {
-      const ctx = cv.getContext('2d');
-      ctx.clearRect(0, 0, 200, 200);
-      SPR.drawSeal(ctx, 100, 100, 94, { avatarIdx: me.avatarIdx, patterns: patterns.slice() });
+    const curSeal = () => ({ avatarIdx: me.avatarIdx, metal, emblem, patterns: patterns.slice() });
+
+    /* live preview with a roaming glint */
+    const cv = U.el('canvas', { width: 220, height: 220, cls: 'mt' });
+    w.appendChild(U.el('div', {}, [cv]));
+    const pctx = cv.getContext('2d');
+    let raf = 0;
+    function frame() {
+      if (!document.body.contains(cv)) { cancelAnimationFrame(raf); return; }
+      pctx.clearRect(0, 0, 220, 220);
+      SPR.drawSeal(pctx, 110, 110, 102, curSeal());
+      const tt = performance.now() / 1000;
+      pctx.save(); pctx.beginPath(); pctx.arc(110, 110, 102, 0, TAU); pctx.clip();
+      const cx = 110 + Math.cos(tt * 0.9) * 46, cy = 110 + Math.sin(tt * 0.9) * 46;
+      const g = pctx.createRadialGradient(cx, cy, 2, cx, cy, 72);
+      g.addColorStop(0, '#ffffff44'); g.addColorStop(1, '#ffffff00');
+      pctx.fillStyle = g; pctx.fillRect(8, 8, 204, 204); pctx.restore();
+      raf = requestAnimationFrame(frame);
     }
-    redraw();
-    const row = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;justify-content:center' });
+
+    /* metal swatches */
+    w.appendChild(U.el('div', { cls: 'muted small mt', text: 'METAL' }));
+    const metalRow = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap;justify-content:center;gap:8px' });
+    const metalBtns = {};
+    SPR.SEAL_METALS.forEach(mt => {
+      const b = U.el('button', { cls: 'btn small', title: mt.label, style: 'padding:4px;line-height:0' });
+      b.appendChild(U.el('span', { style: 'display:inline-block;width:20px;height:20px;border-radius:50%;background:' + mt.base + ';border:2px solid ' + mt.light }));
+      b.onclick = () => { metal = mt.id; markMetal(); buildEmblems(); DYA.audio.play('click'); };
+      metalBtns[mt.id] = b; metalRow.appendChild(b);
+    });
+    w.appendChild(metalRow);
+    function markMetal() { Object.keys(metalBtns).forEach(id => { metalBtns[id].style.outline = id === metal ? '2px solid #d9b87a' : 'none'; metalBtns[id].style.outlineOffset = '1px'; }); }
+
+    /* emblem picker (mini seals in the chosen metal) */
+    w.appendChild(U.el('div', { cls: 'muted small mt', text: 'EMBLEM' }));
+    const emblemRow = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap;justify-content:center;gap:6px' });
+    w.appendChild(emblemRow);
+    function buildEmblems() {
+      emblemRow.innerHTML = '';
+      SPR.SEAL_EMBLEMS.forEach(e => {
+        const b = U.el('button', { cls: 'btn small', title: e.label, style: 'padding:3px;line-height:0' });
+        const c = U.el('canvas', { width: 40, height: 40 });
+        SPR.drawSeal(c.getContext('2d'), 20, 20, 20, { avatarIdx: me.avatarIdx, metal, emblem: e.id, patterns: [] });
+        b.appendChild(c);
+        b.style.outline = e.id === emblem ? '2px solid #d9b87a' : 'none';
+        b.style.outlineOffset = '1px';
+        b.onclick = () => { emblem = e.id; buildEmblems(); DYA.audio.play('click'); };
+        emblemRow.appendChild(b);
+      });
+    }
+    buildEmblems();
+
+    /* ring patterns (up to two) */
+    w.appendChild(U.el('div', { cls: 'muted small mt', text: 'RINGS — up to two' }));
+    const patRow = U.el('div', { cls: 'flex', style: 'flex-wrap:wrap;justify-content:center;gap:6px' });
     SPR.PATTERNS.forEach(p => {
       const b = U.el('button', { cls: 'btn small ghost', text: p });
       b.onclick = () => {
@@ -201,17 +250,31 @@
           if (patterns.length >= 2) { UI.toast({ title: 'Two rings at most', body: 'A seal carries one or two patterns — remove one first.', icon: '⭕' }); return; }
           patterns.push(p); b.classList.remove('ghost');
         }
-        redraw(); DYA.audio.play('click');
+        DYA.audio.play('click');
       };
-      row.appendChild(b);
+      patRow.appendChild(b);
     });
-    w.appendChild(row);
+    w.appendChild(patRow);
+
+    /* surprise-me */
+    const surprise = U.el('button', { cls: 'btn ghost small mt', text: '🎲 Surprise me' });
+    surprise.onclick = () => {
+      const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+      metal = pick(SPR.SEAL_METALS).id; emblem = pick(SPR.SEAL_EMBLEMS).id;
+      patterns.length = 0;
+      SPR.PATTERNS.slice().sort(() => Math.random() - 0.5).slice(0, 1 + Math.floor(Math.random() * 2)).forEach(p => patterns.push(p));
+      Array.from(patRow.children).forEach(b => b.classList.toggle('ghost', !patterns.includes(b.textContent)));
+      markMetal(); buildEmblems(); DYA.audio.play('click');
+    };
+    w.appendChild(surprise);
+
     const m = UI.modal(w, { sticky: true });
+    markMetal();
+    frame();
     w.appendChild(U.el('button', {
       cls: 'btn primary mt', text: '⚒ Strike it — forever', onclick: () => {
-        if (!patterns.length) { UI.toast({ title: 'Choose a pattern', body: 'At least one ring pattern, keeper.', icon: '⭕' }); return; }
-        me.seal = { avatarIdx: me.avatarIdx, patterns: patterns.slice(), locked: true };
-        G.save(); m.close();
+        me.seal = { avatarIdx: me.avatarIdx, metal, emblem, patterns: patterns.slice(), locked: true };
+        G.save(); cancelAnimationFrame(raf); m.close();
         DYA.audio.play('levelup');
         UI.toast({ title: 'Seal struck', body: 'Your mark is now on everything that is yours.', icon: '🪙' });
         if (onDone) onDone();
