@@ -320,7 +320,7 @@
 
   def('lutut', {
     name: 'Lutut', family: 'Creature', element: 'Fti',
-    rarity: [3, 6], size: [3, 4], rig: 'quad',
+    rarity: [3, 6], size: [3, 4], rig: 'lutut',
     color: '#6d6a80', color2: '#44415c', // stone-carving patterned
     features: { wings: true, carved: true, bigJaw: true },
     tags: ['flyer', 'carnivore', 'apex'],
