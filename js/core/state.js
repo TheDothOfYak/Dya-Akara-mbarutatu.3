@@ -111,20 +111,28 @@
      newer — so a stale cloud snapshot can never clobber newer local
      progress (and vice-versa). */
   function stampSave() { if (G.me && !G.me.ai) G.me.savedAt = Date.now(); }
+  /* set whenever a save is requested; cleared once the exit-flush has
+     forced the latest state all the way out to the cloud. Lets the
+     frequent visibilitychange handler skip redundant full-world writes
+     when nothing has changed since the last flush. */
+  let unflushed = false;
   G.save = function () {
+    unflushed = true;
     clearTimeout(G.saveTimer);
     G.saveTimer = setTimeout(() => { stampSave(); store.save(G.world); pushMeToCloud(); adminAutoPublish(); }, 400);
   };
-  G.saveNow = () => { stampSave(); store.save(G.world); pushMeToCloud(); adminAutoPublish(); };
+  G.saveNow = () => { unflushed = true; stampSave(); store.save(G.world); pushMeToCloud(); adminAutoPublish(); };
   /* Best-effort final flush when the tab is closing or being hidden. The
      debounced cloud push (account_cloud.js) is ~1s behind the last save,
      so without this a quick close between "last action" and "next login"
      is exactly how progress silently fails to reach the cloud. */
   function flushMeOnExit() {
+    if (!unflushed) return;   // nothing new since the last flush — don't re-serialize the world
     try {
       stampSave();
       store.save(G.world);
       if (G.me && !G.me.ai && DYA.accountCloud && DYA.accountCloud.configured() && DYA.accountCloud.flush) DYA.accountCloud.flush(G.me);
+      unflushed = false;
     } catch (e) { /* never block teardown */ }
   }
   if (typeof window !== 'undefined' && window.addEventListener) {
