@@ -580,8 +580,8 @@
       api.moveAway(c, closeThreat.x, closeThreat.y, true); return;
     }
     // prioritize flyers and Su creatures
-    let target = api.nearestEnemy(c, c.attackRange, o => (o.sp.tags.includes('flyer') || o.element === 'Su') && !api.losBlocked(c.x, c.y, o.x, o.y));
-    if (!target) target = api.nearestEnemy(c, c.attackRange, o => !api.losBlocked(c.x, c.y, o.x, o.y));
+    let target = api.nearestEnemy(c, c.attackRange, o => (o.sp.tags.includes('flyer') || o.element === 'Su') && !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
+    if (!target) target = api.nearestEnemy(c, c.attackRange, o => !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
     if (target) {
       if (c.quiver <= 0) { api.hold(c); return; } // out of arrows (Karnen refills)
       api.shoot(c, target);
@@ -651,29 +651,35 @@
     const cornered = api.enemiesNear(c, 40);
     if (cornered.length) { api.attack(c, cornered[0]); return; }
     if (fleeThreats(c, api, 60)) return;
-    // tower first priority: build whenever the team fields ranged allies (or
-    // any Eikar at all) and has no tower yet — Eikar garrison and shoot from it
-    const rangedAlly = api.alliesNear(c, 1200).find(a => a.sp.behavior === 'archer_unit' || a.sp.tags.includes('eikar'));
-    const haveTower = api.structuresOf(c.team, 'tower').length;
-    if (!haveTower && (rangedAlly || true)) { api.startBuild(c, 'tower'); return; }
-    // enemy pressure at key position → wall
+
     const own = api.ownHoard(c.team);
-    const pressure = api.enemiesNear({ x: own.x, y: own.y, team: c.team }, 260).length;
+    // Relic Ward (master builders): seal our own relic early — it defends the
+    // win condition against runners, camouflaged ones included.
+    const haveWard = api.structuresOf(c.team, 'ward').length;
+    if (c.picks.relicIntegration && !haveWard) { api.startBuild(c, 'ward'); return; }
+    // tower: a fortified strongpoint whenever we have none
+    const haveTower = api.structuresOf(c.team, 'tower').length;
+    if (!haveTower) { api.startBuild(c, 'tower'); return; }
+    // defensive wall line on the threatened side when the enemy presses the
+    // hoard (or the relic) — up to three
+    const relic = api.ownRelic(c.team);
+    const guardPt = relic || { x: own.x, y: own.y, team: c.team };
+    const pressure = api.enemiesNear({ x: guardPt.x, y: guardPt.y, team: c.team }, 300).length;
     if (pressure && api.structuresOf(c.team, 'wall').length < 3) { api.startBuild(c, 'wall'); return; }
-    // repair damaged allied structure
-    const damaged = api.structuresOf(c.team).find(s => s.hp < s.maxHp * 0.7);
+    // repair a damaged structure (walls, ward, tower)
+    const damaged = api.structuresOf(c.team).find(s => s.hp < s.maxHp * 0.75);
     if (damaged) {
       if (api.dist(c, damaged) > 30) { api.moveToward(c, damaged.x, damaged.y, false); return; }
       api.repair(c, damaged); return;
     }
-    // siege: demolish enemy structures
+    // siege: tear down enemy fortifications
     const enemyStruct = api.structuresOf(1 - c.team)[0];
     if (enemyStruct && c.picks.siegeProficiency) {
       if (api.dist(c, enemyStruct) > 60) { api.moveToward(c, enemyStruct.x, enemyStruct.y, false); return; }
       api.demolish(c, enemyStruct); return;
     }
-    // read the field: move toward best construction position
-    api.moveToward(c, own.x + (api.enemyHoard(c.team).x - own.x) * 0.25, own.y, false);
+    // hold near our fortifications, ready to repair
+    api.moveToward(c, own.x + (api.enemyHoard(c.team).x - own.x) * 0.14, own.y, false);
   };
 
   B.karnen = function (c, api) {

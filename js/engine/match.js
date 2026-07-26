@@ -202,6 +202,7 @@
       frenzy: 0,
       onTower: null,
       camoUntil: 0,
+      fortifiedUntil: 0,
       intent: {},
       animPhase: (M.idCounter * 0.61803) % 1 * 6.28,
     };
@@ -839,6 +840,7 @@
     if (t.vars.scarToughness) dmg *= 1 - t.vars.scarToughness * 0.5;
     if (t.vars.hairArmor && source && source.x < t.x === (t.facing > 0)) dmg *= 1 - t.vars.hairArmor; // back armor
     if (t.onTower) dmg *= 0.7;
+    if (t.fortifiedUntil > M.tick) dmg *= 0.85;   // sheltered near a friendly tower
     /* guard buffs (Stonefruit, chemist pieces) */
     for (const b of t.buffs) { if (b.armorMul && b.until > M.tick) dmg *= b.armorMul; }
     /* defensive life-history quirks */
@@ -1060,6 +1062,53 @@
         }
       }
     }
+
+    /* ===== fortifications: walls block, towers fortify, wards guard ===== */
+    if (M.structures.length) {
+      for (const s of M.structures) {
+        if (s.hp <= 0) continue;
+        if (s.type === 'wall') {
+          const hw = (s.w || 22) / 2, hh = (s.h || 64) / 2;
+          for (const c of M.creatures) {
+            if (c.dead || c.team === s.team || c.rooted || c.onTower) continue;
+            if (c.sp.tags.includes('flyer') || (c.sp.features && c.sp.features.hover)) continue; // flyers pass over
+            const dx = c.x - s.x, dy = c.y - s.y;
+            const px = (hw + c.radius) - Math.abs(dx), py = (hh + c.radius) - Math.abs(dy);
+            if (px > 0 && py > 0) {                 // overlapping — shove out the short axis
+              if (px < py) c.x = s.x + (dx < 0 ? -1 : 1) * (hw + c.radius);
+              else c.y = s.y + (dy < 0 ? -1 : 1) * (hh + c.radius);
+              c.x = U.clamp(c.x, 14, WORLD.w - 14); c.y = U.clamp(c.y, 14, WORLD.h - 14);
+              if (s.trapped && M.tick >= (s.trapCd || 0)) {   // spiked wall: punish the presser
+                s.trapCd = M.tick + Math.round(1.2 / TICK);
+                c.hp -= 5 * (s.quality || 1);
+                c.buffs.push({ speedMul: 0.5, until: M.tick + Math.round(1.4 / TICK) });
+                M.addEffect('hit', c.x, c.y, {});
+                if (c.hp <= 0) M.kill(c, null, 'trap');
+              }
+            }
+          }
+        } else if (s.type === 'tower') {
+          for (const c of M.creatures) {
+            if (c.dead) continue;
+            const d = U.dist(c.x, c.y, s.x, s.y);
+            if (d > 132) continue;
+            if (c.team === s.team) c.fortifiedUntil = M.tick + 3;   // aura: reduced damage near a friendly tower
+            else if (c.camoUntil > M.tick) c.camoUntil = M.tick;    // elevated vision reveals enemy camo
+          }
+        }
+        /* structures under siege: enemies pressed against them wear them down
+           (so walls/wards buy time but are not permanent) */
+        const reach = (s.radius || Math.max(s.w || 22, s.h || 40) / 2);
+        let siege = 0;
+        for (const c of M.creatures) {
+          if (c.dead || c.team === s.team || c.sp.tags.includes('passive') || c.dmg <= 0) continue;
+          if (U.dist(c.x, c.y, s.x, s.y) < reach + c.radius + 6) siege += c.dmg;
+        }
+        if (siege > 0) { s.hp -= siege * TICK * 0.6; if (s.hp <= 0) { s.hp = 0; M.uiEvent(-1, 'event', 'A ' + s.type + ' is torn down.'); } }
+      }
+      M.structures = M.structures.filter(s => s.hp > 0);
+    }
+
     /* uff respawns */
     for (let i = M.pendingSpawns.length - 1; i >= 0; i--) {
       const p = M.pendingSpawns[i];
@@ -1256,16 +1305,23 @@
 
   /* ================= UI EVENTS ================= */
   /* segment vs forest-zone circles: forest patches block ranged targeting */
-  Match.prototype.losBlocked = function (x1, y1, x2, y2) {
+  Match.prototype.losBlocked = function (x1, y1, x2, y2, team) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    const nearest = (cx, cy) => { if (len2 < 1) return { x: x1, y: y1 }; let t = ((cx - x1) * dx + (cy - y1) * dy) / len2; t = Math.max(0, Math.min(1, t)); return { x: x1 + t * dx, y: y1 + t * dy }; };
     for (const z of this.zones) {
       if (z.type !== 'forest') continue;
-      const dx = x2 - x1, dy = y2 - y1;
-      const len2 = dx * dx + dy * dy;
-      if (len2 < 1) continue;
-      let t = ((z.x - x1) * dx + (z.y - y1) * dy) / len2;
-      t = Math.max(0, Math.min(1, t));
-      const px = x1 + t * dx, py = y1 + t * dy;
-      if (U.dist(px, py, z.x, z.y) < z.r * 0.85) return true;
+      const p = nearest(z.x, z.y);
+      if (U.dist(p.x, p.y, z.x, z.y) < z.r * 0.85) return true;
+    }
+    /* enemy walls give cover — a shot is blocked if it crosses one (own walls
+       never block your own shooters) */
+    if (team != null && this.structures) {
+      for (const s of this.structures) {
+        if (s.type !== 'wall' || s.hp <= 0 || s.team === team) continue;
+        const p = nearest(s.x, s.y);
+        if (Math.abs(p.x - s.x) < (s.w || 22) / 2 + 4 && Math.abs(p.y - s.y) < (s.h || 64) / 2 + 4) return true;
+      }
     }
     return false;
   };
@@ -1297,7 +1353,7 @@
         return M.relics.find(r => r.ownerTeam !== t && !r.disabled) || { x: WORLD.w / 2, y: WORLD.h / 2, captured: true, disabled: true, carrier: null };
       },
       ownRelic: (team) => M.relics.find(r => r.ownerTeam === team && !r.disabled) || null,
-      losBlocked: (x1, y1, x2, y2) => M.losBlocked(x1, y1, x2, y2),
+      losBlocked: (x1, y1, x2, y2, team) => M.losBlocked(x1, y1, x2, y2, team),
       ownHoard: (team) => M.teams[team] ? M.teams[team].hoard : M.teams[0].hoard,
       enemyHoard: (team) => M.teams[1 - team] ? M.teams[1 - team].hoard : M.teams[0].hoard,
       teamRes: (team) => M.teams[team].resources,
@@ -1450,7 +1506,7 @@
       },
       shoot(c, target) {
         if (c.attackCd > 0) return;
-        if (M.losBlocked(c.x, c.y, target.x, target.y)) return; // forest blocks the shot (§15)
+        if (M.losBlocked(c.x, c.y, target.x, target.y, c.team)) return; // forest & enemy walls block the shot (§15)
         c.state = 'attack';
         c.facing = target.x >= c.x ? 1 : -1;
         c.attackCd = 1.6 / (c.vars.drawSpeed || 1);
@@ -1520,6 +1576,9 @@
         const rl = M.relics.find(r => r.ownerTeam !== c.team && !r.disabled && !r.captured && r.carrier == null);
         if (!rl) return;
         if (U.dist(c.x, c.y, rl.x, rl.y) > RELIC_PICK_R + c.radius) return;
+        /* a standing Relic Ward seals the relic — break it first */
+        const ward = M.structures.find(s => s.type === 'ward' && s.team === rl.ownerTeam && s.hp > 0 && U.dist(s.x, s.y, rl.x, rl.y) < (s.radius || 66) + 30);
+        if (ward) { if (c.team === 0 || M.tick % 40 === 0) M.uiEvent(c.team, 'deny', 'The Relic Ward holds — break it first.'); return; }
         rl.carrier = c.id; rl.carrierTeam = c.team;
         c.carryingRelic = true;
         c.matchXp = (c.matchXp || 0) + 15;
@@ -1612,22 +1671,38 @@
       /* construction */
       startBuild(c, type) {
         const own = M.teams[c.team].hoard;
-        const dir = M.teams[1 - c.team] ? Math.sign(M.teams[1 - c.team].hoard.x - own.x) : 1;
-        let x, y;
-        if (type === 'tower') { x = own.x + dir * 220 + M.rng.range(-30, 30); y = own.y + M.rng.range(-160, 160); }
-        else { x = own.x + dir * 150; y = own.y + M.rng.range(-120, 120); }
-        c.mem.building = { type, x, y, progress: 0 };
+        const foe = M.teams[1 - c.team] ? M.teams[1 - c.team].hoard : own;
+        const dir = Math.sign(foe.x - own.x) || 1;
+        let x, y, extra = {};
+        if (type === 'tower') {
+          /* backline, just behind the hoard, where archers actually stand */
+          x = own.x - dir * 70 + M.rng.range(-20, 20);
+          y = own.y + M.rng.range(-140, 140);
+        } else if (type === 'ward') {
+          const rl = M.relics.find(r => r.ownerTeam === c.team && !r.disabled);
+          x = rl ? rl.x : own.x; y = rl ? rl.y : own.y;
+        } else { /* wall — a defensive line on the threatened side of the hoard */
+          const n = M.structures.filter(s => s.team === c.team && s.type === 'wall').length;
+          x = own.x + dir * 150;
+          y = own.y + [0, -74, 74, -148, 148][n % 5];
+          extra.trapped = !!(c.picks && c.picks.trapIntegration);
+        }
+        c.mem.building = { type, x, y, progress: 0, extra };
       },
       continueBuild(c) {
         const b = c.mem.building;
         if (!b) return;
-        if (U.dist(c.x, c.y, b.x, b.y) > 26) { c.intent.move = { x: b.x, y: b.y, run: false }; return; }
+        if (U.dist(c.x, c.y, b.x, b.y) > 42) { c.intent.move = { x: b.x, y: b.y, run: true }; return; }
         c.state = 'special';
-        b.progress += (c.vars.buildSpeed || 1) * TICK * 0.2;
+        b.progress += (c.vars.buildSpeed || 1) * TICK * 1.0;
         if (b.progress >= 1) {
           const q = b.type === 'tower' ? (c.vars.towerQuality || 1) : (c.vars.structureQuality || 1);
-          M.structures.push({ id: 'st' + (M.idCounter++), type: b.type, team: c.team, x: b.x, y: b.y, hp: 120 * q, maxHp: 120 * q, occupant: null, quality: q });
-          M.uiEvent(c.team, 'event', c.tokName + ' completes a ' + b.type + '.');
+          const s = { id: 'st' + (M.idCounter++), type: b.type, team: c.team, x: b.x, y: b.y, occupant: null, quality: q };
+          if (b.type === 'wall') { s.w = 22; s.h = 64; s.trapped = !!(b.extra && b.extra.trapped); s.trapCd = 0; s.hp = s.maxHp = 170 * q; }
+          else if (b.type === 'ward') { s.radius = 66; s.hp = s.maxHp = 110 * q; }
+          else { s.w = 32; s.h = 48; s.hp = s.maxHp = 120 * q; }
+          M.structures.push(s);
+          M.uiEvent(c.team, 'event', c.tokName + ' completes a ' + (b.type === 'ward' ? 'Relic Ward' : b.type) + (s.trapped ? ' (spiked)' : '') + '.');
           c.mem.building = null;
         }
       },

@@ -436,27 +436,54 @@
     ctx.save();
     ctx.translate(s.x, s.y);
     const teamCol = M.teams[s.team] ? M.teams[s.team].color : '#999';
+    let barTop = -50;
     if (s.type === 'tower') {
-      ctx.fillStyle = '#6b5b45';
-      ctx.fillRect(-12, -34, 24, 40);
-      ctx.fillStyle = '#57493a';
-      ctx.fillRect(-16, -42, 32, 10);
-      ctx.fillStyle = teamCol;
-      ctx.fillRect(-2, -54, 3, 12); // flag pole
+      /* faint fortify aura */
+      ctx.strokeStyle = teamCol + '22'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 132, 0, TAU); ctx.stroke();
+      ctx.fillStyle = '#6b5b45'; ctx.fillRect(-12, -34, 24, 40);
+      ctx.fillStyle = '#57493a'; ctx.fillRect(-16, -42, 32, 10);
+      ctx.fillStyle = teamCol; ctx.fillRect(-2, -54, 3, 12); // flag pole
       ctx.beginPath(); ctx.moveTo(1, -54); ctx.lineTo(12, -50); ctx.lineTo(1, -47); ctx.fill();
-      /* crenellations */
       ctx.fillStyle = '#57493a';
       for (let i = -1; i <= 1; i++) ctx.fillRect(i * 10 - 3, -46, 6, 5);
     } else if (s.type === 'wall') {
-      ctx.fillStyle = '#7d766a';
-      ctx.fillRect(-26, -14, 52, 20);
+      const hw = (s.w || 22) / 2, hh = (s.h || 64) / 2;
+      const g = ctx.createLinearGradient(-hw, 0, hw, 0);
+      g.addColorStop(0, '#6a635a'); g.addColorStop(0.5, '#8a8377'); g.addColorStop(1, '#6a635a');
+      ctx.fillStyle = g; ctx.fillRect(-hw, -hh, hw * 2, hh * 2);
+      /* team-tinted cap + coursing */
+      ctx.fillStyle = teamCol; ctx.fillRect(-hw, -hh, hw * 2, 3);
       ctx.strokeStyle = '#5d574c'; ctx.lineWidth = 1;
-      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-26, -14 + i * 7); ctx.lineTo(26, -14 + i * 7); ctx.stroke(); }
+      for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(-hw, -hh + i * (hh * 2 / 5)); ctx.lineTo(hw, -hh + i * (hh * 2 / 5)); ctx.stroke(); }
+      /* spikes on a trapped wall */
+      if (s.trapped) {
+        ctx.fillStyle = '#c9ccd4';
+        for (const dir of [-1, 1]) for (let i = -1; i <= 1; i++) {
+          const y = i * hh * 0.6;
+          ctx.beginPath(); ctx.moveTo(dir * hw, y - 3); ctx.lineTo(dir * (hw + 6), y); ctx.lineTo(dir * hw, y + 3); ctx.fill();
+        }
+      }
+      barTop = -hh - 8;
+    } else if (s.type === 'ward') {
+      const rr = s.radius || 66, pulse = 1 + Math.sin(t * 3) * 0.05;
+      const rg = ctx.createRadialGradient(0, 0, rr * 0.2, 0, 0, rr * pulse);
+      rg.addColorStop(0, teamCol + '10'); rg.addColorStop(0.7, teamCol + '22'); rg.addColorStop(1, teamCol + '00');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, 0, rr * pulse, 0, TAU); ctx.fill();
+      ctx.strokeStyle = teamCol + 'cc'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, rr * pulse, 0, TAU); ctx.stroke();
+      /* rotating rune ticks */
+      ctx.strokeStyle = teamCol; ctx.lineWidth = 2;
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * TAU + t * 0.4;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * rr * 0.86, Math.sin(a) * rr * 0.86); ctx.lineTo(Math.cos(a) * rr * 0.98, Math.sin(a) * rr * 0.98); ctx.stroke();
+      }
+      barTop = -rr - 10;
     }
     /* structure hp */
     if (s.hp < s.maxHp) {
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-16, -50, 32, 3);
-      ctx.fillStyle = '#d9b23a'; ctx.fillRect(-16, -50, 32 * (s.hp / s.maxHp), 3);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-16, barTop, 32, 3);
+      ctx.fillStyle = '#d9b23a'; ctx.fillRect(-16, barTop, 32 * (s.hp / s.maxHp), 3);
     }
     ctx.restore();
   }
