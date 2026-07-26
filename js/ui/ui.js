@@ -60,6 +60,11 @@
     try { UI.show(UI.currentName); } catch (e) { /* a refresh must never crash the app */ }
   };
 
+  /* the mods layer calls this whenever admin edits (species, balance, text…)
+     are applied — repaint the current screen so the change shows live, with
+     no manual reload */
+  UI.onModsApplied = function () { UI.refreshCurrent(); };
+
   /* player seal as a faint background on every non-battle screen (§3).
      Battle surfaces (arena + HUD) stay clean. */
   const NO_SEAL_SCREENS = { match: 1, spectate: 1, login: 1 };
