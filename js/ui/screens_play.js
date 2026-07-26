@@ -1198,6 +1198,7 @@
           const card = TK.descriptionCard(hov.tok);
           fieldTip.innerHTML = '<div class="gold">' + U.esc(hov.tokName) + ' — ' + U.esc(hov.sp.name) + '</div>' +
             '<div class="small muted">' + U.esc(card.temperament) + '</div>' +
+            (hov.sp.special ? '<div class="small mt"><span class="gold">On the field:</span> ' + U.esc(hov.sp.special) + '</div>' : '') +
             '<div class="small mt">HP ' + Math.max(0, Math.round(hov.hp)) + '/' + Math.round(hov.maxHp) +
             ' · ' + hov.state + (hov.carryingRelic ? ' · <span class="gold">CARRYING RELIC</span>' : '') +
             (hov.stunnedUntil > M.tick ? ' · stunned' : '') +

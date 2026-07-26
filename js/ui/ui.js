@@ -317,6 +317,7 @@
       hoverTip.innerHTML =
         '<div class="hi-name">' + U.esc(tok.name) + '</div>' +
         '<div class="hi-line">' + U.esc(sp.name) + ' · <span class="el-' + sp.element + '">' + sp.element + '</span> · ' + SP.RARITIES[tok.rarity] + '</div>' +
+        (sp.special ? '<div class="hi-line" style="margin-top:4px"><span class="gold">On the field:</span> ' + U.esc(sp.special) + '</div>' : '') +
         (card ? '<div class="hi-temper">' + U.esc(card.temperament) + '</div>' : '') +
         (card && card.fieldNotes && card.fieldNotes.length ? '<div class="hi-line" style="color:var(--gold-dim)">\u25B8 ' + U.esc(card.fieldNotes[0]) + '</div>' : '') +
         '<div class="hi-line">Health ' + tok.stats.hp + ' · Strike ' + tok.stats.dmg + ' · Pace ' + tok.stats.speed + '</div>' +
@@ -396,7 +397,7 @@
     if (card.fieldNotes && card.fieldNotes.length) {
       right.appendChild(U.el('div', { cls: 'mt', html: '<span class="muted small">FIELD NOTES (LIFE HISTORY)</span><br>' + card.fieldNotes.map(n => '\u25B8 ' + U.esc(n)).join('<br>') }));
     }
-    right.appendChild(U.el('div', { cls: 'mt', html: '<span class="muted small">SPECIAL RULES</span><br>' + U.esc(sp.special || '—') }));
+    right.appendChild(U.el('div', { cls: 'mt', html: '<span class="muted small">ON THE FIELD</span><br>' + U.esc(sp.special || '—') }));
     right.appendChild(U.el('div', { cls: 'mt', html: '<span class="muted small">BACKGROUND</span><br><i>' + U.esc(tok.story) + '</i>' }));
     /* diamonds */
     const dia = U.el('div', { cls: 'mt' });

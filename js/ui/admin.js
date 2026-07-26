@@ -2667,7 +2667,7 @@
     lblIn(right, 'Temperament', tempIn);
     const specIn = U.el('textarea', { cls: 'txt', rows: 2 }); specIn.value = work.special || '';
     specIn.oninput = () => work.special = specIn.value;
-    lblIn(right, 'Special rules (field notes)', specIn);
+    lblIn(right, 'On the field (what it does)', specIn);
 
     /* ---------- actions ---------- */
     const acts = U.el('div', { cls: 'flex mt', style: 'gap:8px;flex-wrap:wrap' });
