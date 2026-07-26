@@ -13,6 +13,55 @@
 
   /* ================== STORAGE ADAPTER ================== */
   const KEY = 'dyaakara_world_v1';
+
+  /* Replays (seed + full input log) are by far the heaviest thing a human
+     account carries — 50 of them can be 2 MB+, enough to blow past the
+     browser's ~5 MB localStorage quota and make EVERY save silently fail,
+     which resets progress on the next reload. We cap total replay bytes
+     per account (keeping tournament replays preferentially, then the
+     newest casuals) so a save can never be starved out by replay history. */
+  const REPLAY_BUDGET = 500 * 1024;   // ~0.5 MB of replays kept per account
+  function jsonSize(v) { try { return JSON.stringify(v).length; } catch (e) { return 0; } }
+  function trimReplays(acc, budget) {
+    if (!acc || !Array.isArray(acc.replays) || !acc.replays.length) return false;
+    budget = budget || REPLAY_BUDGET;
+    const order = new Map(acc.replays.map((r, i) => [r, i]));   // newest-first
+    const perms = acc.replays.filter(r => r.permanent);
+    const casual = acc.replays.filter(r => !r.permanent);
+    const kept = []; let used = 0;
+    for (const r of perms.concat(casual)) {
+      const s = jsonSize(r);
+      if (used + s > budget && kept.length) continue;
+      used += s; kept.push(r);
+    }
+    kept.sort((a, b) => order.get(a) - order.get(b));           // restore newest-first
+    if (kept.length === acc.replays.length) return false;
+    acc.replays = kept;
+    return true;
+  }
+  function isQuotaError(e) {
+    return e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 || /quota/i.test(e.message || ''));
+  }
+  /* progressively shed the most disposable data until the world fits, so a
+     full disk degrades replay history instead of silently losing progress */
+  function shedAndSave(world) {
+    const humans = Object.values(world.accounts || {}).filter(a => !a.ai);
+    // 1) tighten each human's replay budget
+    let changed = false;
+    humans.forEach(a => { changed = trimReplays(a, 200 * 1024) || changed; });
+    if (changed && trySet(world)) return true;
+    // 2) drop the heavy input logs from all non-permanent replays
+    humans.forEach(a => (a.replays || []).forEach(r => { if (!r.permanent && r.log) { r.log = []; r.logTrimmed = true; } }));
+    if (trySet(world)) return true;
+    // 3) drop non-permanent replays entirely
+    humans.forEach(a => { if (Array.isArray(a.replays)) a.replays = a.replays.filter(r => r.permanent); });
+    if (trySet(world)) return true;
+    return false;
+  }
+  function trySet(world) {
+    try { localStorage.setItem(KEY, JSON.stringify(world)); return true; }
+    catch (e) { if (isQuotaError(e)) return false; throw e; }
+  }
   const store = {
     backend: 'local', // future: 'firebase' — plug adapter here
     load() {
@@ -21,7 +70,15 @@
     },
     save(world) {
       try { localStorage.setItem(KEY, JSON.stringify(world)); return true; }
-      catch (e) { console.error('save failed', e); return false; }
+      catch (e) {
+        if (isQuotaError(e)) {
+          if (shedAndSave(world)) { console.warn('save: storage was full — trimmed replay history to fit'); return true; }
+          console.error('save failed: storage quota exceeded even after shedding replays', e);
+          if (DYA.ui && DYA.ui.toast) DYA.ui.toast('⚠ Save failed — this browser’s storage is full. Free space or your progress may not persist.', 'error');
+          return false;
+        }
+        console.error('save failed', e); return false;
+      }
     },
     reset() { localStorage.removeItem(KEY); },
     export() { return JSON.stringify(G.world); },
@@ -213,6 +270,13 @@
     if (!G.world || G.world.version !== 3) {
       G.world = freshWorld();
       store.save(G.world);
+    } else {
+      /* one-time reclaim for saves bloated by pre-cap replay history: bring
+         every human account back under the replay budget so an already-full
+         localStorage stops rejecting saves on this device */
+      let trimmed = false;
+      Object.values(G.world.accounts || {}).forEach(a => { if (!a.ai) trimmed = trimReplays(a) || trimmed; });
+      if (trimmed) store.save(G.world);
     }
     return G.world;
   };
@@ -1271,11 +1335,10 @@
       result.replay.id = entry.id;
       result.replay.permanent = !!result.tournament;
       me.replays.unshift(result.replay);
-      const casualReplays = me.replays.filter(r => !r.permanent);
-      if (casualReplays.length > 50) {
-        const drop = casualReplays.slice(50).map(r => r.id);
-        me.replays = me.replays.filter(r => r.permanent || !drop.includes(r.id));
-      }
+      /* keep replays within a fixed byte budget (tournaments preferred,
+         then newest casuals) so replay history can never grow the save
+         past the localStorage quota and break persistence */
+      trimReplays(me);
     }
     /* rewards */
     let xp = 0, gold = 0;
