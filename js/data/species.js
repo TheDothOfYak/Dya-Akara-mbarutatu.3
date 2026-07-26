@@ -771,9 +771,9 @@
     attackRange: 24,
     desc: 'A Keilia field construction specialist with a Kalo-made hammer — reads the field and builds what is needed.',
     temperament: 'Never fights unless forced. Always looking for the next thing worth building.',
-    special: 'Builds archer towers (allied Archers relocate to them), defensive walls at threatened positions, and repairs damaged structures. Master builders may weave traps or Relics into their work.',
-    vars: { buildSpeed: [0.6, 1.3], structureQuality: [0.6, 1.4], towerQuality: [0.6, 1.4], repairSpeed: [0.5, 1.2], brawl: [0.2, 0.8] },
-    picks: { siegeProficiency: [0, 0, 1], trapIntegration: [0, 0, 0, 1], relicIntegration: [0, 0, 0, 0, 0, 1] },
+    special: 'Raises real fortifications. Towers are strongpoints: allied Archers garrison them (+range, −damage taken), nearby allies are sheltered, and elevated sight reveals enemy camouflage. Walls physically block the enemy and their line of fire — allies pass through, flyers cross over — forming a defensive line before the hoard; the enemy must go around or tear them down. Master builders weave in traps (a spiked wall wounds and slows whoever presses it) or a Relic Ward that seals the team’s own Relic until it is broken. Also repairs structures and, with siege training, demolishes the enemy’s.',
+    vars: { buildSpeed: [0.7, 1.4], structureQuality: [0.7, 1.5], towerQuality: [0.7, 1.5], repairSpeed: [0.6, 1.3], brawl: [0.2, 0.8] },
+    picks: { siegeProficiency: [0, 0, 1], trapIntegration: [0, 0, 1], relicIntegration: [0, 0, 0, 1] },
   }));
 
   /* ---- Eikar middle-layer trait pools (Part V) ---- */
