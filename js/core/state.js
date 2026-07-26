@@ -13,6 +13,16 @@
 
   /* ================== STORAGE ADAPTER ================== */
   const KEY = 'dyaakara_world_v1';
+  /* The ~100 Dya'kukull AI accounts are ~2.8 MB and change only rarely
+     (a few market actions every ~45s via G.simTick, or admin curation),
+     while the player's own account changes constantly. Persisting them in
+     the same blob meant every gold tick re-serialized and re-wrote all
+     2.8 MB. We keep the AI world in its own key, rewritten ONLY when it
+     actually changed, so ordinary saves write just the small player blob.
+     (AI accounts can't be regenerated instead of stored — their ids come
+     from U.uid, which is not deterministic.) */
+  const AI_KEY = 'dyaakara_aiworld_v1';
+  let lastAiJson = null;   // last AI blob written this session; null forces a write (e.g. migration)
 
   /* Replays (seed + full input log) are by far the heaviest thing a human
      account carries — 50 of them can be 2 MB+, enough to blow past the
@@ -58,18 +68,50 @@
     if (trySet(world)) return true;
     return false;
   }
+  /* Persist the world across two keys: the player blob (everything except AI
+     accounts) always, and the AI blob only when it changed since the last
+     write. The player-blob write is the one guarded against quota — trimming
+     replays shrinks it; the AI write is best-effort so a full disk can never
+     block the player's own progress from being saved. */
+  function writeWorld(world) {
+    const human = {}, ai = {};
+    const accts = world.accounts || {};
+    for (const id in accts) { const a = accts[id]; if (a && a.ai) ai[id] = a; else human[id] = a; }
+    // player blob (small, frequent) — may throw quota, handled by the caller
+    localStorage.setItem(KEY, JSON.stringify(Object.assign({}, world, { accounts: human })));
+    // AI blob (large, rare) — only when it actually changed, and never fatal
+    try {
+      const aiJson = JSON.stringify(ai);
+      if (aiJson !== lastAiJson) { localStorage.setItem(AI_KEY, aiJson); lastAiJson = aiJson; }
+    } catch (e) { if (!isQuotaError(e)) throw e; console.warn('AI world not persisted (storage full) — player progress still saved'); }
+  }
   function trySet(world) {
-    try { localStorage.setItem(KEY, JSON.stringify(world)); return true; }
+    try { writeWorld(world); return true; }
     catch (e) { if (isQuotaError(e)) return false; throw e; }
   }
   const store = {
     backend: 'local', // future: 'firebase' — plug adapter here
     load() {
-      try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; }
-      catch (e) { console.error('load failed', e); return null; }
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return null;
+        const world = JSON.parse(raw);
+        world.accounts = world.accounts || {};
+        const aiRaw = localStorage.getItem(AI_KEY);
+        if (aiRaw != null) {
+          lastAiJson = aiRaw;
+          const ai = JSON.parse(aiRaw);
+          for (const id in ai) world.accounts[id] = ai[id];   // merge AI back in
+        } else {
+          /* old single-blob save (AI still inside the player blob) — force the
+             next save to split the AI world out into its own key */
+          lastAiJson = null;
+        }
+        return world;
+      } catch (e) { console.error('load failed', e); return null; }
     },
     save(world) {
-      try { localStorage.setItem(KEY, JSON.stringify(world)); return true; }
+      try { writeWorld(world); return true; }
       catch (e) {
         if (isQuotaError(e)) {
           if (shedAndSave(world)) { console.warn('save: storage was full — trimmed replay history to fit'); return true; }
@@ -80,9 +122,9 @@
         console.error('save failed', e); return false;
       }
     },
-    reset() { localStorage.removeItem(KEY); },
+    reset() { localStorage.removeItem(KEY); localStorage.removeItem(AI_KEY); lastAiJson = null; },
     export() { return JSON.stringify(G.world); },
-    import(json) { G.world = JSON.parse(json); store.save(G.world); },
+    import(json) { G.world = JSON.parse(json); lastAiJson = null; store.save(G.world); },
   };
 
   /* ================== GAME STATE ================== */
