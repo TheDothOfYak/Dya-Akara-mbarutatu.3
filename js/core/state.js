@@ -48,11 +48,34 @@
     if (acc && !acc.ai && DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.push(acc);
   }
   G.pushAccountToCloud = pushAccountToCloud;
+  /* stamp a monotonic save clock on the human's account before every
+     persist. Login uses it to decide, when a device holds both a local
+     copy and a cloud copy of the same account, which one is actually
+     newer — so a stale cloud snapshot can never clobber newer local
+     progress (and vice-versa). */
+  function stampSave() { if (G.me && !G.me.ai) G.me.savedAt = Date.now(); }
   G.save = function () {
     clearTimeout(G.saveTimer);
-    G.saveTimer = setTimeout(() => { store.save(G.world); pushMeToCloud(); adminAutoPublish(); }, 400);
+    G.saveTimer = setTimeout(() => { stampSave(); store.save(G.world); pushMeToCloud(); adminAutoPublish(); }, 400);
   };
-  G.saveNow = () => { store.save(G.world); pushMeToCloud(); adminAutoPublish(); };
+  G.saveNow = () => { stampSave(); store.save(G.world); pushMeToCloud(); adminAutoPublish(); };
+  /* Best-effort final flush when the tab is closing or being hidden. The
+     debounced cloud push (account_cloud.js) is ~1s behind the last save,
+     so without this a quick close between "last action" and "next login"
+     is exactly how progress silently fails to reach the cloud. */
+  function flushMeOnExit() {
+    try {
+      stampSave();
+      store.save(G.world);
+      if (G.me && !G.me.ai && DYA.accountCloud && DYA.accountCloud.configured() && DYA.accountCloud.flush) DYA.accountCloud.flush(G.me);
+    } catch (e) { /* never block teardown */ }
+  }
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('pagehide', flushMeOnExit);
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flushMeOnExit(); });
+    }
+  }
   /* when an admin session mutates the world (deleting/editing/spawning AI
      tokens, curating Dya'kukull), publish the shared AI world so it reaches
      every device. No-op outside the admin panel and when offline. */
@@ -445,9 +468,24 @@
       catch (e) { return { err: 'Could not reach the account service: ' + e.message }; }
       if (remote) {
         if (remote.pass_hash !== hashPass(pass)) return { err: 'Incorrect password.' };
-        const acc = remote.data;
-        acc.id = remote.id; acc.email = email; acc.passHash = remote.pass_hash;
-        installAccount(acc, email);
+        const cloudAcc = remote.data;
+        cloudAcc.id = remote.id; cloudAcc.email = email; cloudAcc.passHash = remote.pass_hash;
+        /* last-writer-wins reconciliation. If THIS device already holds a
+           newer local copy of the same account than the cloud does, keep
+           local and push it up — never let a lagging/stale cloud snapshot
+           overwrite newer progress. Otherwise adopt the cloud copy (the
+           normal cross-device case, incl. a fresh device with no local). */
+        const localAcc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
+        let acc;
+        if (localAcc && (localAcc.savedAt || 0) > (cloudAcc.savedAt || 0)) {
+          acc = localAcc;
+          acc.id = remote.id; acc.email = email; acc.passHash = remote.pass_hash;
+          installAccount(acc, email);
+          if (DYA.accountCloud && DYA.accountCloud.pushNow) DYA.accountCloud.pushNow(acc); // shove newer local up
+        } else {
+          acc = cloudAcc;
+          installAccount(acc, email);
+        }
         await pullBanFromCloud(acc.id);
         acc.lastLogin = Date.now();
         G.me = acc;
