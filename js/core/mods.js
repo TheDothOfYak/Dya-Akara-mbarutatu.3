@@ -584,4 +584,20 @@
        fetches once so an open editor is never clobbered mid-edit */
     if (!IS_ADMIN_PAGE) setInterval(() => { M.fetchRemote(); }, POLL_MS);
   }
+
+  /* Live cross-tab sync: when the Admin Panel (a sibling tab on the same
+     origin) saves an edit, the browser fires a `storage` event here. Adopt it
+     into the running game at once — no reload, and no Supabase required. This
+     is the primary path that makes admin edits show up in the game instantly
+     when both are open in the same browser. */
+  if (!IS_ADMIN_PAGE && typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('storage', function (e) {
+      if (e.key !== LS_KEY || e.newValue == null) return;
+      try {
+        M.data = Object.assign(emptyMods(), JSON.parse(e.newValue));
+        M.apply();
+        if (DYA.ui && DYA.ui.toast) DYA.ui.toast({ title: 'Game updated', body: 'An admin edit was just applied.', icon: '✨' });
+      } catch (err) { /* ignore a malformed write */ }
+    });
+  }
 })();
