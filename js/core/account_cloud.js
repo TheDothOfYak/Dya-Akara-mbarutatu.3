@@ -34,10 +34,11 @@
 
   AC.state = { error: null, lastPush: 0, lastFetch: 0 };
 
-  function rest(method, path, body, prefer) {
+  function rest(method, path, body, prefer, keepalive) {
     const c = cfg();
     return fetch(c.url + '/rest/v1/' + path, {
       method,
+      keepalive: !!keepalive,   // let a final push outlive a closing/hidden tab
       headers: Object.assign({
         'apikey': c.anonKey,
         'Authorization': 'Bearer ' + c.anonKey,
@@ -106,16 +107,25 @@
     clearTimeout(pushTimers[account.id]);
     pushTimers[account.id] = setTimeout(() => { AC.pushNow(account); }, 1000);
   };
-  AC.pushNow = async function (account) {
+  AC.pushNow = async function (account, keepalive) {
     if (!AC.configured() || !account || account.ai) return { ok: false };
     try {
-      await rest('POST', 'dya_accounts?on_conflict=id', row(account), 'resolution=merge-duplicates');
+      await rest('POST', 'dya_accounts?on_conflict=id', row(account), 'resolution=merge-duplicates', keepalive);
       AC.state.lastPush = Date.now(); AC.state.error = null;
       return { ok: true };
     } catch (e) {
       AC.state.error = e.message;
       return { err: e.message };
     }
+  };
+  /* immediate flush that beats the debounce — used when the tab is closing
+     or being hidden, so the very latest save reaches the cloud instead of
+     dying with a pending 1s timer. keepalive keeps the request alive past
+     page teardown. */
+  AC.flush = function (account) {
+    if (!AC.configured() || !account || account.ai) return;
+    clearTimeout(pushTimers[account.id]);
+    return AC.pushNow(account, true);
   };
 
   /* permanently remove a player account from the cloud (admin delete) */

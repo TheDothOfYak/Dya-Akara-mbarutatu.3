@@ -13,6 +13,55 @@
 
   /* ================== STORAGE ADAPTER ================== */
   const KEY = 'dyaakara_world_v1';
+
+  /* Replays (seed + full input log) are by far the heaviest thing a human
+     account carries — 50 of them can be 2 MB+, enough to blow past the
+     browser's ~5 MB localStorage quota and make EVERY save silently fail,
+     which resets progress on the next reload. We cap total replay bytes
+     per account (keeping tournament replays preferentially, then the
+     newest casuals) so a save can never be starved out by replay history. */
+  const REPLAY_BUDGET = 500 * 1024;   // ~0.5 MB of replays kept per account
+  function jsonSize(v) { try { return JSON.stringify(v).length; } catch (e) { return 0; } }
+  function trimReplays(acc, budget) {
+    if (!acc || !Array.isArray(acc.replays) || !acc.replays.length) return false;
+    budget = budget || REPLAY_BUDGET;
+    const order = new Map(acc.replays.map((r, i) => [r, i]));   // newest-first
+    const perms = acc.replays.filter(r => r.permanent);
+    const casual = acc.replays.filter(r => !r.permanent);
+    const kept = []; let used = 0;
+    for (const r of perms.concat(casual)) {
+      const s = jsonSize(r);
+      if (used + s > budget && kept.length) continue;
+      used += s; kept.push(r);
+    }
+    kept.sort((a, b) => order.get(a) - order.get(b));           // restore newest-first
+    if (kept.length === acc.replays.length) return false;
+    acc.replays = kept;
+    return true;
+  }
+  function isQuotaError(e) {
+    return e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 || /quota/i.test(e.message || ''));
+  }
+  /* progressively shed the most disposable data until the world fits, so a
+     full disk degrades replay history instead of silently losing progress */
+  function shedAndSave(world) {
+    const humans = Object.values(world.accounts || {}).filter(a => !a.ai);
+    // 1) tighten each human's replay budget
+    let changed = false;
+    humans.forEach(a => { changed = trimReplays(a, 200 * 1024) || changed; });
+    if (changed && trySet(world)) return true;
+    // 2) drop the heavy input logs from all non-permanent replays
+    humans.forEach(a => (a.replays || []).forEach(r => { if (!r.permanent && r.log) { r.log = []; r.logTrimmed = true; } }));
+    if (trySet(world)) return true;
+    // 3) drop non-permanent replays entirely
+    humans.forEach(a => { if (Array.isArray(a.replays)) a.replays = a.replays.filter(r => r.permanent); });
+    if (trySet(world)) return true;
+    return false;
+  }
+  function trySet(world) {
+    try { localStorage.setItem(KEY, JSON.stringify(world)); return true; }
+    catch (e) { if (isQuotaError(e)) return false; throw e; }
+  }
   const store = {
     backend: 'local', // future: 'firebase' — plug adapter here
     load() {
@@ -21,7 +70,15 @@
     },
     save(world) {
       try { localStorage.setItem(KEY, JSON.stringify(world)); return true; }
-      catch (e) { console.error('save failed', e); return false; }
+      catch (e) {
+        if (isQuotaError(e)) {
+          if (shedAndSave(world)) { console.warn('save: storage was full — trimmed replay history to fit'); return true; }
+          console.error('save failed: storage quota exceeded even after shedding replays', e);
+          if (DYA.ui && DYA.ui.toast) DYA.ui.toast('⚠ Save failed — this browser’s storage is full. Free space or your progress may not persist.', 'error');
+          return false;
+        }
+        console.error('save failed', e); return false;
+      }
     },
     reset() { localStorage.removeItem(KEY); },
     export() { return JSON.stringify(G.world); },
@@ -48,11 +105,34 @@
     if (acc && !acc.ai && DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.push(acc);
   }
   G.pushAccountToCloud = pushAccountToCloud;
+  /* stamp a monotonic save clock on the human's account before every
+     persist. Login uses it to decide, when a device holds both a local
+     copy and a cloud copy of the same account, which one is actually
+     newer — so a stale cloud snapshot can never clobber newer local
+     progress (and vice-versa). */
+  function stampSave() { if (G.me && !G.me.ai) G.me.savedAt = Date.now(); }
   G.save = function () {
     clearTimeout(G.saveTimer);
-    G.saveTimer = setTimeout(() => { store.save(G.world); pushMeToCloud(); adminAutoPublish(); }, 400);
+    G.saveTimer = setTimeout(() => { stampSave(); store.save(G.world); pushMeToCloud(); adminAutoPublish(); }, 400);
   };
-  G.saveNow = () => { store.save(G.world); pushMeToCloud(); adminAutoPublish(); };
+  G.saveNow = () => { stampSave(); store.save(G.world); pushMeToCloud(); adminAutoPublish(); };
+  /* Best-effort final flush when the tab is closing or being hidden. The
+     debounced cloud push (account_cloud.js) is ~1s behind the last save,
+     so without this a quick close between "last action" and "next login"
+     is exactly how progress silently fails to reach the cloud. */
+  function flushMeOnExit() {
+    try {
+      stampSave();
+      store.save(G.world);
+      if (G.me && !G.me.ai && DYA.accountCloud && DYA.accountCloud.configured() && DYA.accountCloud.flush) DYA.accountCloud.flush(G.me);
+    } catch (e) { /* never block teardown */ }
+  }
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('pagehide', flushMeOnExit);
+    if (typeof document !== 'undefined' && document.addEventListener) {
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flushMeOnExit(); });
+    }
+  }
   /* when an admin session mutates the world (deleting/editing/spawning AI
      tokens, curating Dya'kukull), publish the shared AI world so it reaches
      every device. No-op outside the admin panel and when offline. */
@@ -190,6 +270,13 @@
     if (!G.world || G.world.version !== 3) {
       G.world = freshWorld();
       store.save(G.world);
+    } else {
+      /* one-time reclaim for saves bloated by pre-cap replay history: bring
+         every human account back under the replay budget so an already-full
+         localStorage stops rejecting saves on this device */
+      let trimmed = false;
+      Object.values(G.world.accounts || {}).forEach(a => { if (!a.ai) trimmed = trimReplays(a) || trimmed; });
+      if (trimmed) store.save(G.world);
     }
     return G.world;
   };
@@ -445,9 +532,24 @@
       catch (e) { return { err: 'Could not reach the account service: ' + e.message }; }
       if (remote) {
         if (remote.pass_hash !== hashPass(pass)) return { err: 'Incorrect password.' };
-        const acc = remote.data;
-        acc.id = remote.id; acc.email = email; acc.passHash = remote.pass_hash;
-        installAccount(acc, email);
+        const cloudAcc = remote.data;
+        cloudAcc.id = remote.id; cloudAcc.email = email; cloudAcc.passHash = remote.pass_hash;
+        /* last-writer-wins reconciliation. If THIS device already holds a
+           newer local copy of the same account than the cloud does, keep
+           local and push it up — never let a lagging/stale cloud snapshot
+           overwrite newer progress. Otherwise adopt the cloud copy (the
+           normal cross-device case, incl. a fresh device with no local). */
+        const localAcc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
+        let acc;
+        if (localAcc && (localAcc.savedAt || 0) > (cloudAcc.savedAt || 0)) {
+          acc = localAcc;
+          acc.id = remote.id; acc.email = email; acc.passHash = remote.pass_hash;
+          installAccount(acc, email);
+          if (DYA.accountCloud && DYA.accountCloud.pushNow) DYA.accountCloud.pushNow(acc); // shove newer local up
+        } else {
+          acc = cloudAcc;
+          installAccount(acc, email);
+        }
         await pullBanFromCloud(acc.id);
         acc.lastLogin = Date.now();
         G.me = acc;
@@ -1233,11 +1335,10 @@
       result.replay.id = entry.id;
       result.replay.permanent = !!result.tournament;
       me.replays.unshift(result.replay);
-      const casualReplays = me.replays.filter(r => !r.permanent);
-      if (casualReplays.length > 50) {
-        const drop = casualReplays.slice(50).map(r => r.id);
-        me.replays = me.replays.filter(r => r.permanent || !drop.includes(r.id));
-      }
+      /* keep replays within a fixed byte budget (tournaments preferred,
+         then newest casuals) so replay history can never grow the save
+         past the localStorage quota and break persistence */
+      trimReplays(me);
     }
     /* rewards */
     let xp = 0, gold = 0;

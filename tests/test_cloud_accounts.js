@@ -163,6 +163,32 @@ let G = DYAG.state;
   const r5 = await G.login('alice@example.com', 'secret123');
   check('a fresh device no longer sees the ban after unban', !!r5.acc && !G.isBanned(r5.acc.id));
 
+  /* ---------- regression: a stale cloud snapshot must NOT clobber newer local progress ----------
+     This is the "I got to level 9 yesterday but the game reset" bug: the last
+     session's cloud push lagged/failed, so the cloud holds an OLDER copy than
+     this browser's localStorage. Logging in must keep the newer local copy
+     (last-writer-wins by savedAt), and push it back up — not overwrite it. */
+  newDevice();
+  G.init();
+  // cloud goes stale: an old, low snapshot (level 7, tiny savedAt)
+  const stale = JSON.parse(JSON.stringify(db.dya_accounts[0].data));
+  stale.level = 7; stale.savedAt = 1000;
+  db.dya_accounts[0].data = stale;
+  // this browser holds a newer copy the cloud never received (level 12)
+  const newerLocal = JSON.parse(JSON.stringify(stale));
+  newerLocal.level = 12; newerLocal.savedAt = 9e12;
+  G.world.accounts[newerLocal.id] = newerLocal;
+  const win = await G.login('alice@example.com', 'secret123');
+  check('newer local progress survives login (not clobbered by stale cloud)', !win.err && win.acc.level === 12, 'level=' + (win.acc && win.acc.level));
+  await new Promise(r => setTimeout(r, 60)); // let the fire-and-forget push land
+  check('the recovered local copy is pushed back up to the cloud', db.dya_accounts[0].data.level === 12, 'cloud level=' + db.dya_accounts[0].data.level);
+
+  /* and the normal direction still holds: a genuinely newer CLOUD wins on a fresh device */
+  newDevice();
+  G.init();
+  const r7 = await G.login('alice@example.com', 'secret123');
+  check('a fresh device with no local copy adopts the cloud', !r7.err && r7.acc.level === 12, 'level=' + (r7.acc && r7.acc.level));
+
   /* ---------- offline fallback: cloud not configured behaves exactly as before ---------- */
   delete window.DYA_CONFIG.supabase.url;
   newDevice();
