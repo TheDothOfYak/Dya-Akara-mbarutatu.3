@@ -1607,12 +1607,11 @@
       ctx.fillStyle = shade(dark, 2);
       for (let i = 0; i < 9; i++) { const a = i / 9 * TAU; ctx.beginPath(); ctx.moveTo(ex + Math.cos(a) * R * 0.24, ey + Math.sin(a) * R * 0.24); ctx.lineTo(ex + Math.cos(a - 0.13) * R * 0.5, ey + Math.sin(a - 0.13) * R * 0.5); ctx.lineTo(ex + Math.cos(a + 0.13) * R * 0.5, ey + Math.sin(a + 0.13) * R * 0.5); ctx.closePath(); ctx.fill(); }
       ctx.fillStyle = shade(body, -26); ctx.beginPath(); ctx.arc(ex, ey, R * 0.28, 0, TAU); ctx.fill();
-      if (!dead) { ctx.fillStyle = '#ffcf3a'; ctx.beginPath(); ctx.arc(ex - R * 0.09, ey - R * 0.03, R * 0.035, 0, TAU); ctx.arc(ex + R * 0.07, ey - R * 0.03, R * 0.035, 0, TAU); ctx.fill(); }
     }
 
     /* ---- little clawed legs dangling under the body ---- */
     ctx.strokeStyle = shade(body, -30); ctx.lineWidth = Math.max(2, R * 0.13); ctx.lineCap = 'round';
-    [-0.34, 0.02, 0.36].forEach((lx, i) => {
+    [-0.42, -0.14, 0.14, 0.42].forEach((lx, i) => {
       const x = cx + lx * R, topY = cy + R * 0.58, botY = cy + R * (0.98 + 0.05 * Math.sin(t * 3 + i));
       ctx.lineWidth = Math.max(2, R * 0.13);
       ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x + R * 0.04, botY); ctx.stroke();
