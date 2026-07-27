@@ -376,15 +376,21 @@
       if (c.stunnedUntil > M.tick) { c.state = 'hit'; continue; }
       if ((M.tick + c.id) % 6 === 0) {
         c.intent = {};
-        /* Duel: creatures ALWAYS fight — pursue to elimination, no idling (§1) */
+        /* a hunt creature may be given a different decision tree than its
+           species' default (Admin → Hunts → creature "Behavior tree") */
+        const b = BV[c.behaviorOverride || c.sp.behavior];
+        if (b) { api._c = c; b(c, api); }
+        /* Duel: creatures ALWAYS fight — pursue to elimination, no idling (§1).
+           We still run the species brain above so every ability (screech,
+           jet, breath, tongue, hanii…) fires in duels too; we only force the
+           creature onto the nearest foe when its brain produced no attack or
+           ability this tick, so a duel can never stall on patrol/forage/flee. */
         if (M.mode === 'duel') {
-          const foe = api.nearestEnemy(c, 99999);
-          if (foe) api.attack(c, foe, false, true, (c.vars.breathRange || c.sp.behavior === 'grothyn' || c.headCount > 1));
-        } else {
-          /* a hunt creature may be given a different decision tree than its
-             species' default (Admin → Hunts → creature "Behavior tree") */
-          const b = BV[c.behaviorOverride || c.sp.behavior];
-          if (b) { api._c = c; b(c, api); }
+          const acting = c.state === 'special' || c.state === 'attack' || c.intent.state === 'special' || !!c.intent.attackTarget;
+          if (!acting) {
+            const foe = api.nearestEnemy(c, 99999);
+            if (foe) api.attack(c, foe, false, true, (c.vars.breathRange || c.sp.behavior === 'grothyn' || c.headCount > 1));
+          }
         }
         /* hunt drive: hunter-side creatures press toward the quarry when idle */
         if (M.mode === 'hunt' && c.team === 0 && !c.rooted && !c.intent.attackTarget &&
@@ -1670,6 +1676,7 @@
 
       /* construction */
       startBuild(c, type) {
+        if (M.mode === 'duel') return;   // no base-building in a 1v1 duel — the builder brawls instead
         const own = M.teams[c.team].hoard;
         const foe = M.teams[1 - c.team] ? M.teams[1 - c.team].hoard : own;
         const dir = Math.sign(foe.x - own.x) || 1;
