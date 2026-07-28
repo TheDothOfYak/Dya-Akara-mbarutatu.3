@@ -105,7 +105,39 @@
   AC.push = function (account) {
     if (!AC.configured() || !account || account.ai) return;
     clearTimeout(pushTimers[account.id]);
-    pushTimers[account.id] = setTimeout(() => { AC.pushNow(account); }, 1000);
+    pushTimers[account.id] = setTimeout(() => {
+      /* the admin panel writes authoritative curation and must always land;
+         a player's own device must NEVER overwrite a newer admin edit — it
+         yields to it and adopts it instead (see pushSelfGuarded). */
+      const admin = !!(DYA.state && DYA.state.isAdminSession);
+      if (admin) AC.pushNow(account); else AC.pushSelfGuarded(account);
+    }, 1000);
+  };
+  /* a player's routine save of their OWN account. Before overwriting the cloud
+     copy, check whether the Dya Guild (admin) edited it more recently — a
+     higher adminRev — and if so adopt that edit rather than clobbering it. */
+  AC.pushSelfGuarded = async function (account) {
+    if (!AC.configured() || !account || account.ai) return { ok: false };
+    try {
+      const rows = await rest('GET', 'dya_accounts?id=eq.' + encodeURIComponent(account.id) + '&select=data');
+      const remote = rows && rows[0] && rows[0].data;
+      if (remote && (remote.adminRev || 0) > (account.adminRev || 0)) {
+        if (DYA.state && DYA.state.adoptRemoteAccount) DYA.state.adoptRemoteAccount(remote);
+        return { ok: false, adopted: true };
+      }
+    } catch (e) { /* if the pre-check fails, fall through to a normal push */ }
+    return AC.pushNow(account);
+  };
+  /* pull the cloud copy of an account; report whether it carries a newer admin
+     edit than the local one (drives the live self-sync in state.js). */
+  AC.syncSelf = async function (account) {
+    if (!AC.configured() || !account || account.ai) return { ok: false };
+    try {
+      const rows = await rest('GET', 'dya_accounts?id=eq.' + encodeURIComponent(account.id) + '&select=data');
+      const remote = rows && rows[0] && rows[0].data;
+      if (remote && (remote.adminRev || 0) > (account.adminRev || 0)) return { ok: true, adopted: true, data: remote };
+      return { ok: true, adopted: false };
+    } catch (e) { return { err: e.message }; }
   };
   AC.pushNow = async function (account, keepalive) {
     if (!AC.configured() || !account || account.ai) return { ok: false };

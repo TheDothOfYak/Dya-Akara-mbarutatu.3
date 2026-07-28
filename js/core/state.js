@@ -144,9 +144,52 @@
      admin.html never logs in as a player), so its mutations push the
      specific account they touched explicitly. */
   function pushAccountToCloud(acc) {
-    if (acc && !acc.ai && DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.push(acc);
+    if (!acc || acc.ai || !(DYA.accountCloud && DYA.accountCloud.configured())) return;
+    /* Admin curation is AUTHORITATIVE. Bump the account's admin revision and
+       freshen its save clock so the target player's device recognises the
+       change as newer, adopts it live, and never overwrites it with a stale
+       local copy. Land it immediately rather than on the 1s save debounce. */
+    if (G.isAdminSession) {
+      acc.adminRev = (acc.adminRev || 0) + 1;
+      acc.savedAt = Date.now();
+      DYA.accountCloud.pushNow(acc);
+    } else {
+      DYA.accountCloud.push(acc);
+    }
   }
   G.pushAccountToCloud = pushAccountToCloud;
+
+  /* Install a cloud copy of MY OWN account into the live world — used when the
+     device detects the Dya Guild (admin) edited this account more recently than
+     the local copy. Skipped mid-battle so a live match is never yanked out from
+     under the player; the next sync adopts it once the match ends. */
+  G.adoptRemoteAccount = function (remote) {
+    if (!remote || !remote.id) return false;
+    if (DYA.ui && DYA.ui.currentName === 'match') return false;   // don't disrupt a live match
+    const isMe = G.me && G.me.id === remote.id;
+    const prev = G.world.accounts[remote.id] || (isMe ? G.me : null);
+    /* the data blob may not carry the identity/security keys — keep the ones
+       we already hold so the account stays logged in and cloud-linked */
+    if (prev) { remote.email = remote.email || prev.email; remote.passHash = remote.passHash || prev.passHash; }
+    remote.cloudAccount = true;
+    installAccount(remote, remote.email);
+    if (isMe) G.me = remote;
+    store.save(G.world);
+    if (DYA.ui) { if (DYA.ui.refreshTopbar) DYA.ui.refreshTopbar(); if (DYA.ui.refreshCurrent) DYA.ui.refreshCurrent(); }
+    if (isMe && G.notify) G.notify({ type: 'system', title: 'Account updated', body: 'The Dya Guild made a change to your account.', icon: '⚖️' });
+    return true;
+  };
+
+  /* Live self-sync: pull my own cloud row and adopt it if an admin edited it
+     more recently than my local copy. Cheap; safe to call on a timer. */
+  G.pullMyAccountEdits = async function () {
+    const AC = DYA.accountCloud;
+    if (!AC || !AC.syncSelf || !G.me || G.me.ai) return { ok: false };
+    if (DYA.ui && DYA.ui.currentName === 'match') return { ok: false };
+    const r = await AC.syncSelf(G.me);
+    if (r && r.adopted && r.data) return { adopted: G.adoptRemoteAccount(r.data) };
+    return { adopted: false };
+  };
   /* stamp a monotonic save clock on the human's account before every
      persist. Login uses it to decide, when a device holds both a local
      copy and a cloud copy of the same account, which one is actually

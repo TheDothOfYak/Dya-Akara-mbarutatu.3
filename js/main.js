@@ -36,6 +36,16 @@
       }, 90000);
     }
 
+    /* live account self-sync: pick up Dya Guild (admin) edits to THIS player's
+       OWN account — a re-statted creature, a granted token, a flag change —
+       without waiting for a relog. Cheap poll; adopts only when the admin's
+       revision is newer than the local copy. */
+    if (G.pullMyAccountEdits) {
+      setInterval(() => {
+        if (G.me && !G.me.ai) G.pullMyAccountEdits().catch(() => {});
+      }, 20000);
+    }
+
     /* sync audio settings if a session was left logged-in previously */
     UI.loading(true);
     setTimeout(() => {
