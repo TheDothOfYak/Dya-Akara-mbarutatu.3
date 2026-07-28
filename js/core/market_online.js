@@ -26,7 +26,7 @@
   const MO = {};
   DYA.marketOnline = MO;
 
-  const POLL_MS = 20000;
+  const POLL_MS = 8000;   // background heartbeat; the open market screen polls faster still
 
   function cfg() { return (window.DYA_CONFIG && window.DYA_CONFIG.supabase) || {}; }
   MO.configured = function () { const c = cfg(); return !!(c.url && c.anonKey); };

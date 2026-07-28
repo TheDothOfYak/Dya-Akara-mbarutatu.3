@@ -1757,13 +1757,16 @@
     const status = U.el('p', { cls: 'muted mt', text: 'Looking for another player to duel.' });
     w.appendChild(status);
     const m = UI.modal(w, { sticky: true });
-    let cancelled = false, done = false, elapsed = 0;
+    let cancelled = false, done = false, elapsed = 0, started = false;
     const fallBack = () => { if (done) return; done = true; S.dequeue(); m.close(); P.duelVsKukull(); };
     w.appendChild(U.el('button', { cls: 'btn', text: 'Duel a Dya’kukull instead', onclick: fallBack }));
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { cancelled = done = true; S.dequeue(); m.close(); } }));
 
     const tick = async () => {
       if (cancelled || done) return;
+      /* re-enter the queue CLEAN each search: clear any stale row from an
+         earlier duel so we never instant-pair with a peer who has left */
+      if (!started) { started = true; try { await S.dequeue(); } catch (e) { } if (cancelled || done) return; }
       elapsed++;
       let r; try { r = await S.pollDuel(); } catch (e) { r = { err: e.message }; }
       if (cancelled || done) return;
@@ -2026,7 +2029,7 @@
     }
 
     function withdraw() { send({ t: 'bye' }); teardown(); UI.show('play'); }
-    function teardown() { if (closed) return; closed = true; try { if (room) room.leave(); } catch (e) { } room = null; }
+    function teardown() { if (closed) return; closed = true; try { if (room) room.leave(); } catch (e) { } room = null; try { S.dequeue(); } catch (e) { } }
 
     (async function connect() {
       try {

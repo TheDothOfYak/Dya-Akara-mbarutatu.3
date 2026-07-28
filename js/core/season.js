@@ -121,13 +121,19 @@
     const season = DYA.state.world.season.number;
     const nowIso = new Date().toISOString();
 
-    /* has someone already claimed me since last poll? */
+    /* has someone already claimed me since last poll? Only honor a FRESH
+       claim — a 'matched' row left over from an earlier session (the peer is
+       long gone) must NOT instantly re-pair us. A stale one is reset back to
+       seeking so we cleanly re-enter the queue instead. */
     try {
       const mineRows = await rest('GET', 'dya_season_queue?net_id=eq.' + encodeURIComponent(myNet) + '&select=*');
       const mine = mineRows && mineRows[0];
       if (mine && mine.status === 'matched' && mine.opponent_net_id && mine.room_code) {
-        const opp = await fetchQueueRow(mine.opponent_net_id);
-        return { pairing: makePairing(myNet, mine.room_code, opp || { net_id: mine.opponent_net_id, name: 'Player', pouch: [] }) };
+        if (Date.now() - Date.parse(mine.updated_at || 0) < FRESH_MS) {
+          const opp = await fetchQueueRow(mine.opponent_net_id);
+          return { pairing: makePairing(myNet, mine.room_code, opp || { net_id: mine.opponent_net_id, name: 'Player', pouch: [] }) };
+        }
+        try { await rest('PATCH', 'dya_season_queue?net_id=eq.' + encodeURIComponent(myNet), { status: 'seeking', opponent_net_id: null, room_code: null, updated_at: nowIso }); } catch (e) { /* non-fatal */ }
       }
     } catch (e) { return { err: e.message }; }
 

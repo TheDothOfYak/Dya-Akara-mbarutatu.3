@@ -152,6 +152,20 @@ function pouchOf(acc) { return Object.values(acc.tokens).slice(0, 5); }
   check('duel searcher does NOT get matched into the ranked queue', duelWait.waiting === true, JSON.stringify(duelWait));
   check('the two searchers sit on different channels', db.dya_season_queue.length === 2 && db.dya_season_queue.some(r => r.circuit === 'Local') && db.dya_season_queue.some(r => r.circuit === S.DUEL_CHANNEL));
 
+  /* regression: a STALE 'matched' row (a duel finished long ago, the peer is
+     gone) must NOT instantly re-pair — it is reset so we re-enter the queue */
+  db.dya_season_queue.length = 0;
+  G.me = aliceAcc;
+  db.dya_season_queue.push({ net_id: aliceAcc.netId, status: 'matched', opponent_net_id: 'ghost-net-id', room_code: 'GHOST', circuit: S.DUEL_CHANNEL, season: G.world.season.number, updated_at: new Date(Date.now() - 60000).toISOString() });
+  const stale = await S.pollDuel();
+  check('a stale matched row does NOT instantly re-pair', !stale.pairing, JSON.stringify(stale));
+  check('the stale row is reset back to seeking', db.dya_season_queue[0].status === 'seeking' && !db.dya_season_queue[0].opponent_net_id);
+  /* and a FRESH claim is still honored immediately */
+  db.dya_season_queue.length = 0;
+  db.dya_season_queue.push({ net_id: aliceAcc.netId, status: 'matched', opponent_net_id: 'live-peer', room_code: 'LIVE', circuit: S.DUEL_CHANNEL, season: G.world.season.number, updated_at: new Date().toISOString() });
+  const fresh = await S.pollDuel();
+  check('a fresh claim still pairs immediately', !!fresh.pairing && fresh.pairing.roomCode === 'LIVE', JSON.stringify(fresh));
+
   /* ---------- the season is closed until the organizer opens it ---------- */
   const M = DYAG.mods;
   check('online season starts CLOSED until opened', S.isOpen() === false);
