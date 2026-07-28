@@ -326,7 +326,10 @@
          localStorage stops rejecting saves on this device */
       let trimmed = false;
       Object.values(G.world.accounts || {}).forEach(a => { if (!a.ai) trimmed = trimReplays(a) || trimmed; });
-      if (trimmed) store.save(G.world);
+      /* pull any market listings of species the organizer has since marked
+         unobtainable, so a disabled species can't linger for sale */
+      const pulled = G.delistUnobtainable();
+      if (trimmed || pulled) store.save(G.world);
     }
     return G.world;
   };
@@ -939,6 +942,31 @@
   };
 
   /* ================== MARKET ================== */
+  /* A species the organizer marked "not obtainable by players" (notCraftable,
+     toggled in Admin → Creatures) must not reach players through the MARKET
+     either — not just the random-grant rolls that already read SP.craftable.
+     AI stock of it is never listed, existing listings are pulled, and it can
+     never be bought or offered on. Tokens already minted stay in their owner's
+     collection; they simply can't circulate on the open market anymore. */
+  function isUnobtainable(speciesId) { const sp = SP.get(speciesId); return !!(sp && sp.notCraftable); }
+  G.isUnobtainable = isUnobtainable;
+  /* pull every market listing of a now-unobtainable species (any seller),
+     returning the token to its owner's collection. Returns how many it pulled. */
+  G.delistUnobtainable = function () {
+    if (!G.world || !G.world.market) return 0;
+    let n = 0;
+    Object.values(G.world.market.listings).forEach(l => {
+      const seller = G.world.accounts[l.sellerId];
+      const tok = seller && seller.tokens[l.tokenId];
+      if (tok && isUnobtainable(tok.speciesId)) {
+        tok.status = 'collection';
+        delete G.world.market.listings[l.id];
+        n++;
+      }
+    });
+    return n;
+  };
+
   G.marketAverage = function (speciesId, rarity) {
     // sellers-only market average: base value with a stable pseudo-market wobble
     const base = SP.RARITY_VALUE[rarity] * (SP.get(speciesId).tags.includes('apex') ? 1.2 : 1);
@@ -948,6 +976,7 @@
 
   G.createListing = function (tok, price, status, want) {
     if (tok.frozen) return { err: 'This token is frozen pending Guild review.' };
+    if (isUnobtainable(tok.speciesId)) return { err: 'The Guild has pulled this species from circulation — it can no longer be listed.' };
     tok.status = 'market';
     const lst = {
       id: U.uid('lst'), tokenId: tok.id, sellerId: G.me.id, price: Math.round(price),
@@ -994,6 +1023,7 @@
     const seller = G.world.accounts[lst.sellerId];
     const tok = seller.tokens[lst.tokenId];
     if (!tok) return { err: 'Token unavailable.' };
+    if (isUnobtainable(tok.speciesId)) return { err: 'The Guild has pulled this species from circulation — it can no longer be acquired.' };
     if (G.me.gold < lst.price) return { err: 'Not enough gold.' };
     const w2 = lst.want;
     if (w2) {
@@ -1049,6 +1079,8 @@
   G.makeOffer = function (lstId, amount, note, extras) {
     const lst = G.world.market.listings[lstId];
     if (!lst) return { err: 'Listing gone.' };
+    const offTok = (G.world.accounts[lst.sellerId] || {}).tokens;
+    if (offTok && offTok[lst.tokenId] && isUnobtainable(offTok[lst.tokenId].speciesId)) return { err: 'The Guild has pulled this species from circulation — it can no longer be acquired.' };
     if (G.me.gold < amount) return { err: 'You cannot offer more gold than you hold.' };
     if (extras) {
       if ((extras.ngakara || 0) > G.me.ngakara) return { err: 'You cannot offer NgAkara you do not hold.' };
@@ -1948,6 +1980,8 @@
   };
   function aiCreateListing(w, ai, tok, rng) {
     if (tok.status !== 'collection') return;
+    if (isUnobtainable(tok.speciesId)) return;   // never put a pulled-from-circulation species on the market
+
     tok.status = 'market';
     const T = aiTune();
     const avg = SP.RARITY_VALUE[tok.rarity];
