@@ -655,16 +655,46 @@
           }
           return true;
         }
+        /* build one listing card for either an online (real-player) entry
+           or a local Dya'kukull entry */
+        function cardFor(en) {
+          if (en.online) {
+            const card = UI.tokenCard(en.tok, { size: mktState.view === 'grid' ? 92 : 60, onclick: () => openOnlineListing(en.row) });
+            card.classList.add('listing-card');
+            card.appendChild(U.el('div', { cls: 'lc-price', text: U.fmt(en.price) + 'g' }));
+            card.appendChild(U.el('div', {}, [U.el('span', { cls: 'status-badge sale', text: en.friend ? '🤝 FRIEND' : '🌐 PLAYER' })]));
+            card.appendChild(U.el('div', { cls: 'small muted', text: en.row.seller_name || 'A player' }));
+            return card;
+          }
+          const seller = en.seller, l = en.l, tok = en.tok;
+          const card = UI.tokenCard(tok, { size: mktState.view === 'grid' ? 92 : 60, onclick: () => openListing(l) });
+          card.classList.add('listing-card');
+          card.appendChild(U.el('div', { cls: 'lc-price', text: l.status === 'display' ? '—' : U.fmt(l.price) + 'g' }));
+          card.appendChild(U.el('div', {}, [U.el('span', { cls: 'status-badge ' + l.status, text: l.status === 'sale' ? 'FOR SALE' : l.status === 'offer' ? 'MAKE OFFER' : 'DISPLAY' })]));
+          card.appendChild(U.el('div', { cls: 'small muted', style: 'cursor:pointer;text-decoration:underline dotted', text: seller.stall.name || seller.displayName, onclick: (e) => { e.stopPropagation(); UI.show('playerStall', { seller }); } }));
+          return card;
+        }
         function grid() {
           gwrap.innerHTML = '';
           const MO = DYA.marketOnline;
+          /* who counts as a friend: real cross-device friends (matched by
+             online netId) and any local-world account you've befriended */
+          const friendNet = {};
+          if (DYA.online && DYA.online.state) (DYA.online.state.friends || []).forEach(f => { friendNet[f.id] = true; });
+          const friendLocal = {};
+          (me.friends || []).forEach(id => { friendLocal[id] = true; });
           /* unified entries: real player listings from the shared online
-             market + the local Dya'kukull stalls */
+             market + the local Dya'kukull stalls. Each is tiered so they
+             stack friends → real players → Dya'kukull:
+               0 = a friend's stall  (its own section, on top)
+               1 = a real player     (before the Dya'kukull)
+               2 = the Dya'kukull    (the world's own traders) */
           const entries = [];
           if (MO && MO.enabled()) {
             MO.others().forEach(row => {
               if (!row.token || !matchesFilters(row.token)) return;
-              entries.push({ online: true, row, tok: row.token, price: row.price, at: Date.parse(row.created_at) || 0 });
+              const friend = !!friendNet[row.seller_net_id];
+              entries.push({ online: true, row, tok: row.token, price: row.price, at: Date.parse(row.created_at) || 0, friend, tier: friend ? 0 : 1 });
             });
           }
           Object.values(G.world.market.listings).forEach(l => {
@@ -673,36 +703,35 @@
             if (me.blocked.includes(seller.id) || seller.blocked.includes(me.id)) return;
             const tok = seller.tokens[l.tokenId];
             if (!tok || !matchesFilters(tok)) return;
-            entries.push({ online: false, l, seller, tok, price: l.price, at: l.at });
+            const friend = !!friendLocal[seller.id];
+            entries.push({ online: false, l, seller, tok, price: l.price, at: l.at, friend, tier: friend ? 0 : 2 });
           });
-          entries.sort((a, b) => {
+          const bySort = (a, b) => {
             if (mktState.sort === 'cheap') return a.price - b.price;
             if (mktState.sort === 'pricey') return b.price - a.price;
             if (mktState.sort === 'rare') return b.tok.rarity - a.tok.rarity;
             return b.at - a.at;
-          });
+          };
+          /* friends first (own section), then real players, then the
+             Dya'kukull — each tier internally ordered by the chosen sort */
+          entries.sort((a, b) => (a.tier - b.tier) || bySort(a, b));
           if (!entries.length) { gwrap.appendChild(U.el('p', { cls: 'muted center', text: 'The stalls are bare. Check back — the Dya\'kukull are always trading.' })); return; }
-          const grd = U.el('div', { cls: mktState.view === 'grid' ? 'grid cols-auto' : 'grid cols-list' });
-          if (mktState.view === 'grid') grd.style.gridTemplateColumns = 'repeat(auto-fill,minmax(150px,1fr))';
+          const TIER = [
+            { label: '🤝 Friends’ Stalls', cls: 'friends' },
+            { label: '🌐 Real Players', cls: 'players' },
+            { label: 'Dya’kukull Stalls', cls: 'kukull' },
+          ];
+          let lastTier = -1, grd = null;
           entries.slice(0, 80).forEach(en => {
-            if (en.online) {
-              const card = UI.tokenCard(en.tok, { size: mktState.view === 'grid' ? 92 : 60, onclick: () => openOnlineListing(en.row) });
-              card.classList.add('listing-card');
-              card.appendChild(U.el('div', { cls: 'lc-price', text: U.fmt(en.price) + 'g' }));
-              card.appendChild(U.el('div', {}, [U.el('span', { cls: 'status-badge sale', text: '🌐 PLAYER' })]));
-              card.appendChild(U.el('div', { cls: 'small muted', text: en.row.seller_name || 'A player' }));
-              grd.appendChild(card);
-            } else {
-              const seller = en.seller, l = en.l, tok = en.tok;
-              const card = UI.tokenCard(tok, { size: mktState.view === 'grid' ? 92 : 60, onclick: () => openListing(l) });
-              card.classList.add('listing-card');
-              card.appendChild(U.el('div', { cls: 'lc-price', text: l.status === 'display' ? '—' : U.fmt(l.price) + 'g' }));
-              card.appendChild(U.el('div', {}, [U.el('span', { cls: 'status-badge ' + l.status, text: l.status === 'sale' ? 'FOR SALE' : l.status === 'offer' ? 'MAKE OFFER' : 'DISPLAY' })]));
-              card.appendChild(U.el('div', { cls: 'small muted', style: 'cursor:pointer;text-decoration:underline dotted', text: seller.stall.name || seller.displayName, onclick: (e) => { e.stopPropagation(); UI.show('playerStall', { seller }); } }));
-              grd.appendChild(card);
+            if (en.tier !== lastTier) {
+              lastTier = en.tier;
+              gwrap.appendChild(U.el('div', { cls: 'market-section market-section-' + TIER[en.tier].cls, text: TIER[en.tier].label }));
+              grd = U.el('div', { cls: mktState.view === 'grid' ? 'grid cols-auto' : 'grid cols-list' });
+              if (mktState.view === 'grid') grd.style.gridTemplateColumns = 'repeat(auto-fill,minmax(150px,1fr))';
+              gwrap.appendChild(grd);
             }
+            grd.appendChild(cardFor(en));
           });
-          gwrap.appendChild(grd);
         }
         grid();
         /* pull the freshest shared-market state when the stalls open */
