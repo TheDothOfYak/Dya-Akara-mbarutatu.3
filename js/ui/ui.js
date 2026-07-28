@@ -63,7 +63,12 @@
   /* the mods layer calls this whenever admin edits (species, balance, text…)
      are applied — repaint the current screen so the change shows live, with
      no manual reload */
-  UI.onModsApplied = function () { UI.refreshCurrent(); };
+  UI.onModsApplied = function () {
+    /* if an organizer just marked a species unobtainable, pull it from the
+       market on this client immediately (not only on next load) */
+    if (DYA.state && DYA.state.delistUnobtainable) { if (DYA.state.delistUnobtainable() > 0) DYA.state.save(); }
+    UI.refreshCurrent();
+  };
 
   /* player seal as a faint background on every non-battle screen (§3).
      Battle surfaces (arena + HUD) stay clean. */
