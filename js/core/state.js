@@ -1599,8 +1599,10 @@
         if (G.me.dmReplies[otherId] <= Date.now()) { delete G.me.dmReplies[otherId]; aiDMReply(otherId); }
       });
     }
-    // Called periodically from the UI loop. Keeps market/world alive.
-    if (Date.now() - lastSim < 45000) return;
+    // Called periodically from the UI loop (and faster while the market is
+    // open). Keeps the Dya'kukull market visibly alive — they list, buy and
+    // haggle on this beat.
+    if (Date.now() - lastSim < 20000) return;
     lastSim = Date.now();
     const rng = new U.Rng(U.newSeed());
     const T = aiTune();

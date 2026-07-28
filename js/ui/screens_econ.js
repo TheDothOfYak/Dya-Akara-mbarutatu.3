@@ -523,6 +523,7 @@
 
   /* ================= MARKET ================= */
   const mktState = { tab: 'Browse', filter: 'All', search: '', view: 'grid', sort: 'newest', panelOpen: true };
+  let mktLiveIv = null;   // single live-market poll; re-armed on each market render
 
   UI.register('market', {
     enter(root, params) {
@@ -550,7 +551,24 @@
       page.appendChild(body);
       scr.appendChild(page);
       root.appendChild(scr);
-      UI.onMarketUpdate = () => { if (UI.currentName === 'market') UI.show('market'); };
+      /* don't yank the screen out from under a search the player is typing */
+      const typingHere = () => { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); };
+      UI.onMarketUpdate = () => { if (UI.currentName === 'market' && !typingHere()) UI.show('market'); };
+
+      /* LIVE market: while you browse, keep BOTH markets moving in real time —
+         the shared player listings (polled fast) and the Dya'kukull stalls
+         (their trades run on the world tick). A self-clearing interval, so it
+         stops the moment you leave. onMarketUpdate repaints on any change. */
+      const localSig = () => Object.values(G.world.market.listings).map(l => l.id + l.status).join(',');
+      clearInterval(mktLiveIv);   // exactly one live loop, re-armed on each render
+      mktLiveIv = setInterval(() => {
+        if (UI.currentName !== 'market') { clearInterval(mktLiveIv); mktLiveIv = null; return; }
+        if (mktState.tab !== 'Browse') return;
+        const before = localSig();
+        if (G.simTick) G.simTick();                                   // Dya'kukull list/buy/haggle
+        if (DYA.marketOnline && DYA.marketOnline.enabled()) DYA.marketOnline.refresh(); // shared player listings (repaints on change)
+        if (localSig() !== before && !typingHere()) UI.show('market');
+      }, 4000);
 
       if (mktState.tab === 'Browse') renderBrowse(body);
       else if (mktState.tab === 'Stalls') renderStalls(body);
