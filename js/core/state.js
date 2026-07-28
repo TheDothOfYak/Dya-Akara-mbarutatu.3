@@ -1429,19 +1429,25 @@
     if (result.draw) { xp = Math.round((result.ranked ? EC.XP.rankedWin : EC.XP.casualWin) / 2); gold = Math.round((result.ranked ? EC.GOLD.rankedWin : EC.GOLD.casualWin) / 2); }
     else if (result.win) { xp = result.ranked ? EC.XP.rankedWin : EC.XP.casualWin; gold = result.ranked ? EC.GOLD.rankedWin : EC.GOLD.casualWin; }
     else { xp = result.ranked ? EC.XP.rankedLoss : EC.XP.casualLoss; gold = result.ranked ? EC.GOLD.rankedLoss : EC.GOLD.casualLoss; }
+    /* some modes grant NO XP at all — practice against the machine (Quick
+       Play vs AI) and Duels. Gold, stats, and achievements still apply; only
+       progression toward levels is withheld, so the AI can't be farmed for XP. */
+    if (result.noXp) xp = 0;
     /* bonus XP */
     const bonuses = [];
     if (result.win) {
       me.winStreak++;
-      const streak = Math.min(EC.XP_BONUS.winStreakCap, (me.winStreak - 1) * EC.XP_BONUS.winStreakPerWin);
-      if (streak > 0) { xp += streak; bonuses.push(['Win streak ×' + me.winStreak, streak]); }
-      const day = new Date().toDateString();
-      if (me.lastWinDay !== day) { me.lastWinDay = day; xp += EC.XP_BONUS.firstWinOfDay; bonuses.push(['First win of the day', EC.XP_BONUS.firstWinOfDay]); }
-      if (result.usedNewToken) { xp += EC.XP_BONUS.newTokenMatch; bonuses.push(['New token’s first match', EC.XP_BONUS.newTokenMatch]); }
-      if (result.fastRelic) { xp += EC.XP_BONUS.fastRelic; bonuses.push(['Swift Relic capture', EC.XP_BONUS.fastRelic]); }
-      /* in-match combo achievements (Part IX bonus XP) */
-      const combos = result.stats && result.stats.combos ? Object.keys(result.stats.combos) : [];
-      combos.slice(0, 2).forEach(cn => { xp += EC.XP_BONUS.comboAchieved; bonuses.push(['Combo: ' + cn, EC.XP_BONUS.comboAchieved]); });
+      if (!result.noXp) {
+        const streak = Math.min(EC.XP_BONUS.winStreakCap, (me.winStreak - 1) * EC.XP_BONUS.winStreakPerWin);
+        if (streak > 0) { xp += streak; bonuses.push(['Win streak ×' + me.winStreak, streak]); }
+        const day = new Date().toDateString();
+        if (me.lastWinDay !== day) { me.lastWinDay = day; xp += EC.XP_BONUS.firstWinOfDay; bonuses.push(['First win of the day', EC.XP_BONUS.firstWinOfDay]); }
+        if (result.usedNewToken) { xp += EC.XP_BONUS.newTokenMatch; bonuses.push(['New token’s first match', EC.XP_BONUS.newTokenMatch]); }
+        if (result.fastRelic) { xp += EC.XP_BONUS.fastRelic; bonuses.push(['Swift Relic capture', EC.XP_BONUS.fastRelic]); }
+        /* in-match combo achievements (Part IX bonus XP) */
+        const combos = result.stats && result.stats.combos ? Object.keys(result.stats.combos) : [];
+        combos.slice(0, 2).forEach(cn => { xp += EC.XP_BONUS.comboAchieved; bonuses.push(['Combo: ' + cn, EC.XP_BONUS.comboAchieved]); });
+      }
     } else {
       me.winStreak = 0;
     }

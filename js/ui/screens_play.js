@@ -379,7 +379,7 @@
             P.startMatch({
               mode: 'standard', ranked: false, format: 'Quick Play vs AI (' + d + ')',
               opponent: { name: 'Dya’kukull ' + d, aiSkill: G.aiSkill({ aiCfg: { matchSkill: AI_SKILL[d] } }), pouch: P.aiPouch(AI_SKILL[d]) },
-              pouch, vsAI: true,
+              pouch, vsAI: true, noXp: true,   // practice against the machine — no XP
             });
           });
         },
@@ -660,7 +660,7 @@
     const statusEl = U.el('p', { cls: 'muted mt', text: 'Connecting…' });
     wait.appendChild(statusEl);
     const wm = UI.modal(wait, { sticky: true });
-    let room = null, launched = false, closed = false, readyTimer = null, giveUpAt = Date.now() + (o.waitMs || 30000);
+    let room = null, launched = false, closed = false, readyTimer = null, giveUpAt = Date.now() + (o.waitMs || 10000);
 
     function stop() { clearInterval(readyTimer); if (room && !launched) { try { room.leave(); } catch (e) { } } }
     function fallback() { if (closed) return; closed = true; stop(); wm.close(); if (o.onFallback) o.onFallback(); }
@@ -703,19 +703,13 @@
       }, 1200);
     }
 
-    function offerFallback() {
-      statusEl.innerHTML = '<b>' + U.esc(o.oppName) + '</b> isn’t at the table yet.';
-      const rowb = U.el('div', { cls: 'flex mt' });
-      rowb.appendChild(U.el('button', { cls: 'btn primary', text: o.fallbackLabel || 'Play a Dya’kukull instead', onclick: fallback }));
-      rowb.appendChild(U.el('button', { cls: 'btn', text: 'Keep waiting', onclick: () => { giveUpAt = Date.now() + 30000; statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…'; rowb.remove(); armTimer(); } }));
-      rowb.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: cancel }));
-      wait.appendChild(rowb);
-    }
     function armTimer() {
       readyTimer = setInterval(() => {
         if (launched || closed) { clearInterval(readyTimer); return; }
         try { room.send({ t: 'lmready' }); } catch (e) { }
-        if (Date.now() > giveUpAt) { clearInterval(readyTimer); offerFallback(); }
+        /* no manual "play the AI now" shortcut — if the real opponent hasn't
+           sat down by the ~10s mark, a Dya'kukull automatically fills in */
+        if (Date.now() > giveUpAt) { clearInterval(readyTimer); fallback(); }
       }, 1500);
     }
 
@@ -731,7 +725,7 @@
           onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
         });
         statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…';
-        wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: o.fallbackLabel || 'Play a Dya’kukull instead', onclick: fallback }));
+        wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: cancel }));
         room.send({ t: 'lmready' });
         armTimer();
       } catch (e) {
@@ -1581,13 +1575,17 @@
         const iWon = res.winner === MY;
         const draw = res.winner === -1;
         const replay = M.serializeReplay();
+        /* no XP from practice-against-the-machine (Quick Play vs AI, flagged
+           cfg.noXp) or from any Duel (mode 'duel', online or off) — those
+           award gold/stats but never level progression */
+        const noXp = !!cfg.noXp || cfg.mode === 'duel';
         let rewards = null;
         if (!cfg.noRecord) {
           const usedNew = T0.stats.tokensPlayed.some(spid => Object.values(me.tokens).some(t => t.speciesId === spid && t.newlyCrafted));
           rewards = G.recordMatch({
             win: iWon && !draw, draw, ranked: cfg.ranked,
             opponentName: OPP.name, format: cfg.format || 'Casual',
-            duration: res.duration,
+            duration: res.duration, noXp,
             stats: { eliminations: T0.stats.eliminations, relicCaptured: T0.stats.relicCaptured, tokensPlayed: T0.stats.tokensPlayed, combos: T0.stats.combos },
             replay, tournament: cfg.tournament || null,
             usedNewToken: usedNew, fastRelic: iWon && res.duration < 300 && T0.stats.relicCaptured,
@@ -1610,7 +1608,8 @@
         ov.appendChild(U.el('p', { cls: 'muted', text: 'vs ' + OPP.name + (oppAcc ? ' · rank ' + oppAcc.rank : '') + (cfg.ranked ? ' · Ranked' : '') }));
         if (rewards) {
           const rw = U.el('div', { cls: 'panel mt', style: 'min-width:340px;text-align:center' });
-          rw.appendChild(U.el('div', { html: '⭐ <b class="gold">+' + rewards.xp + ' XP</b> &nbsp; 🪙 <b class="gold">+' + rewards.gold + ' gold</b>' }));
+          rw.appendChild(U.el('div', { html: (noXp ? '' : '⭐ <b class="gold">+' + rewards.xp + ' XP</b> &nbsp; ') + '🪙 <b class="gold">+' + rewards.gold + ' gold</b>' }));
+          if (noXp) rw.appendChild(U.el('div', { cls: 'small muted', text: 'Practice — no XP awarded' }));
           /* NgAkara and Okid shown only if earned (Part XII) */
           if (rewards.salvage && (rewards.salvage.okid || rewards.salvage.ngakara)) {
             rw.appendChild(U.el('div', { cls: 'small gold', text: 'Field salvage: ' + (rewards.salvage.okid ? '⬡ +' + rewards.salvage.okid + ' Okid ' : '') + (rewards.salvage.ngakara ? '🧪 +' + rewards.salvage.ngakara + ' NgAkara' : '') }));
@@ -1759,7 +1758,8 @@
     const m = UI.modal(w, { sticky: true });
     let cancelled = false, done = false, elapsed = 0, started = false;
     const fallBack = () => { if (done) return; done = true; S.dequeue(); m.close(); P.duelVsKukull(); };
-    w.appendChild(U.el('button', { cls: 'btn', text: 'Duel a Dya’kukull instead', onclick: fallBack }));
+    /* no manual "play the AI now" shortcut — a Dya'kukull only fills in
+       automatically once the ~10s search for a real duelist comes up empty */
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { cancelled = done = true; S.dequeue(); m.close(); } }));
 
     const tick = async () => {
