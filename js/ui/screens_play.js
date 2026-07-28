@@ -675,8 +675,8 @@
         startResources: 0, seal: { avatarIdx: 0, patterns: [] },
       });
       const match = new DYA.match.Match({
-        seed: U.hashStr(o.seedStr), mode: 'standard', terrain: o.terrain || 'plains',
-        settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
+        seed: U.hashStr(o.seedStr), mode: o.mode || 'standard', terrain: o.terrain || 'plains',
+        settings: o.settings || { pulseInterval: 8, pulseAmount: 2, chaos: false },
         teams: [buildTeam(o.hostNet), buildTeam(o.guestNet)],
       });
       const myTeam = iAmHost ? 0 : 1;
@@ -686,7 +686,7 @@
       UI.showWithLoading('match', {
         match,
         cfg: {
-          mode: 'standard', ranked: !!o.ranked, format: o.format || 'Match', tournament: o.tournament || null,
+          mode: o.mode || 'standard', ranked: !!o.ranked, format: o.format || 'Match', tournament: o.tournament || null,
           myTeam, net,
           opponent: { name: o.oppName, accId: o.oppNet, remoteHuman: true },
           pouch: (o.pouchFor(o.myNet) || []).map(x => U.deepCopy(x)),
@@ -1727,17 +1727,226 @@
     }
   }
 
-  /* ---------- vs Player (a Dya'kukull — wager negotiation) ---------- */
+  /* ---------- vs Player ----------
+     Look for a REAL human duelist first (over the shared online queue); only
+     if none turns up in ~10s do we seat a Dya'kukull instead. */
   P.duelVsPlayerFlow = function () {
     const me = G.me;
     const toks = Object.values(me.tokens).filter(t => !t.frozen);
     if (!toks.length) { UI.alert('No tokens', 'You need at least one token to duel.'); return; }
+    const S = DYA.season;
+    if (S && S.enabled && S.enabled()) { P.duelOnlineSearch(); return; }
+    P.duelVsKukull();
+  };
+
+  /* the original behaviour — seat a Dya'kukull and open the wager table */
+  P.duelVsKukull = function () {
     const ais = Object.values(G.world.accounts).filter(a => a.ai);
     if (!ais.length) { UI.alert('No opponents', 'No players are available to duel right now.'); return; }
     let pool = ais.filter(a => G.aiStatus(a.id) === 'online');
     if (!pool.length) pool = ais;
     const opp = pool[Math.floor(Math.random() * pool.length)];
     UI.show('duelSetup', { opp });
+  };
+
+  /* ---------- search the shared queue for a real player, ~10s then fall back --- */
+  P.duelOnlineSearch = function () {
+    const S = DYA.season;
+    const w = U.el('div', { cls: 'center' });
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Searching for a duelist…' }));
+    const status = U.el('p', { cls: 'muted mt', text: 'Looking for another player to duel.' });
+    w.appendChild(status);
+    const m = UI.modal(w, { sticky: true });
+    let cancelled = false, done = false, elapsed = 0;
+    const fallBack = () => { if (done) return; done = true; S.dequeue(); m.close(); P.duelVsKukull(); };
+    w.appendChild(U.el('button', { cls: 'btn', text: 'Duel a Dya’kukull instead', onclick: fallBack }));
+    w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { cancelled = done = true; S.dequeue(); m.close(); } }));
+
+    const tick = async () => {
+      if (cancelled || done) return;
+      elapsed++;
+      let r; try { r = await S.pollDuel(); } catch (e) { r = { err: e.message }; }
+      if (cancelled || done) return;
+      if (r && r.pairing) { done = true; m.close(); P.duelOnlineSetup(r.pairing); return; }
+      status.textContent = 'Looking for another player to duel… (' + elapsed + 's)';
+      if (elapsed >= 10) { fallBack(); return; }   // ~10s window, then a Dya'kukull fills in
+      setTimeout(tick, 2000);
+    };
+    setTimeout(tick, 600);
+  };
+
+  /* ---------- networked duel: live wager negotiation against a real player ----------
+     Both clients meet in the paired netplay room and haggle over the wire:
+     each sets a wager (gold + tokens), both must AGREE to the current mutual
+     stakes, then both pick a duelist. When both are ready we launch the duel
+     in lockstep (P.liveMatch, mode 'duel'); on a clean finish each client
+     settles its OWN account (DYA.duelOnline.settle), so the winner gains
+     exactly what the loser forfeits. A disconnect before the result settles
+     nothing — the stakes stay with their owners. */
+  P.duelOnlineSetup = function (pairing) {
+    const me = G.me, S = DYA.season, DO = DYA.duelOnline;
+    const myNet = S.netId();
+    let myWager = { gold: 0, tokens: [] }, oppWager = { gold: 0, tokens: [] };
+    let myWagerRev = 0, oppWagerRev = 0;
+    let myAgree = false, oppAgree = false, oppAgreeOnRev = -1;
+    let phase = 'bet';                 // 'bet' | 'pick'
+    let myTok = null, oppTok = null;
+    let room = null, closed = false, launched = false;
+
+    const scr = U.el('div', { cls: 'screen' });
+    scr.appendChild(UI.topbar({ title: 'Duel — vs ' + pairing.oppName }));
+    const wrap = U.el('div', { cls: 'setup-wrap' });
+    const left = U.el('div', { cls: 'setup-col panel' });
+    const mid = U.el('div', { cls: 'setup-col panel', style: 'max-width:440px' });
+    const right = U.el('div', { cls: 'setup-col panel' });
+    wrap.appendChild(left); wrap.appendChild(mid); wrap.appendChild(right);
+    scr.appendChild(wrap);
+    if (UI.current && UI.current.leave) UI.current.leave();
+    UI.root.innerHTML = '';
+    UI.root.appendChild(scr);
+    UI.current = { leave: () => teardown() }; UI.currentName = 'duelOnlineSetup';
+
+    function send(msg) { try { if (room) room.send(msg); } catch (e) { } }
+    function bothAgreed() { return myAgree && oppAgree && oppAgreeOnRev === myWagerRev; }
+
+    /* ---- chat ---- */
+    const chatLog = U.el('div', { cls: 'duel-chat-log', style: 'max-height:180px;overflow:auto' });
+    function logChat(who, text) { chatLog.appendChild(U.el('div', { cls: 'duel-msg', html: '<b>' + U.esc(who) + ':</b> ' + U.esc(text) })); chatLog.scrollTop = chatLog.scrollHeight; }
+    function say(text) { logChat(me.displayName, text); send({ t: 'c', text }); }
+
+    function repaint() {
+      /* ---- left: my side ---- */
+      left.innerHTML = '';
+      if (phase === 'bet') {
+        left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your wager' }));
+        const goldRow = U.el('div', { cls: 'flex', style: 'align-items:center;gap:8px' });
+        goldRow.appendChild(U.el('span', { cls: 'muted small', text: 'Gold:' }));
+        const gi = U.el('input', { cls: 'txt', type: 'number', value: String(myWager.gold), style: 'width:120px' });
+        gi.oninput = () => { myWager.gold = Math.max(0, Math.min(me.gold, Math.round(+gi.value || 0))); changedWager(); };
+        goldRow.appendChild(gi);
+        left.appendChild(goldRow);
+        left.appendChild(U.el('p', { cls: 'small muted mt', text: 'You hold ' + U.fmt(me.gold) + 'g.' }));
+        const tl = U.el('div', { cls: 'mt' });
+        myWager.tokens.forEach(t => {
+          const rowT = U.el('div', { cls: 'flex', style: 'align-items:center;gap:6px;justify-content:space-between' });
+          rowT.appendChild(U.el('span', { cls: 'small', text: (SP.get(t.speciesId) ? SP.get(t.speciesId).name : t.speciesId) + (t.name ? ' “' + t.name + '”' : '') }));
+          rowT.appendChild(U.el('button', { cls: 'btn ghost small', text: '✕', onclick: () => { myWager.tokens = myWager.tokens.filter(x => x.id !== t.id); changedWager(); } }));
+          tl.appendChild(rowT);
+        });
+        left.appendChild(tl);
+        left.appendChild(U.el('button', {
+          cls: 'btn small mt', text: '+ Stake a token', onclick: () => {
+            const avail = Object.values(me.tokens).filter(t => !t.frozen && t.status !== 'market' && !t.isRental && !myWager.tokens.some(x => x.id === t.id));
+            if (!avail.length) { UI.alert('No tokens', 'You have no free tokens left to stake.'); return; }
+            pickTokenModal(avail, t => { myWager.tokens.push(U.deepCopy(t)); changedWager(); });
+          },
+        }));
+        const agreeBtn = U.el('button', { cls: 'btn primary mt', text: myAgree ? '✓ You agreed — waiting…' : 'Agree to these stakes' });
+        agreeBtn.onclick = () => {
+          if (!myAgree) {
+            if (!DO.canCover(me, myWager)) { UI.alert('Can’t cover that', 'You can’t stake gold or tokens you don’t hold.'); return; }
+            myAgree = true;
+          } else myAgree = false;
+          send({ t: 'a', v: myAgree, onRev: oppWagerRev });   // I agree to the opponent's current wager rev
+          maybeAdvance(); repaint();
+        };
+        left.appendChild(agreeBtn);
+      } else {
+        left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your duelist' }));
+        left.appendChild(U.el('p', { cls: 'small muted', text: myTok ? 'Chosen: ' + (SP.get(myTok.speciesId) ? SP.get(myTok.speciesId).name : myTok.speciesId) : 'Pick the token you’ll fight with.' }));
+        left.appendChild(U.el('button', {
+          cls: 'btn primary mt', text: myTok ? 'Change duelist' : 'Pick your duelist', onclick: () => {
+            const fighters = Object.values(me.tokens).filter(t => !t.frozen && SP.canDuel(t.speciesId));
+            if (!fighters.length) { UI.alert('No duel-fit tokens', 'You need a token that actually fights.'); return; }
+            pickTokenModal(fighters, t => { myTok = U.deepCopy(t); send({ t: 'p', tok: myTok }); maybeAdvance(); repaint(); });
+          },
+        }));
+      }
+
+      /* ---- middle: stakes + chat ---- */
+      mid.innerHTML = '';
+      mid.appendChild(U.el('h3', { cls: 'gold mb', text: 'Stakes' }));
+      mid.appendChild(U.el('div', { cls: 'duel-total' + (myAgree ? ' agreed' : ''), html: '<b>You:</b> ' + U.esc(DO.describe(myWager, SP)) + (myAgree ? ' ✓' : '') }));
+      mid.appendChild(U.el('div', { cls: 'duel-total' + (oppAgree ? ' agreed' : ''), html: '<b>' + U.esc(pairing.oppName) + ':</b> ' + U.esc(DO.describe(oppWager, SP)) + (oppAgree ? ' ✓' : '') }));
+      mid.appendChild(U.el('p', { cls: 'small muted mt', text: phase === 'bet' ? 'Both must agree to the same stakes to proceed. A draw returns everything.' : 'Both pick a duelist — the fight begins when both are ready.' }));
+      mid.appendChild(chatLog);
+      const ci = U.el('input', { cls: 'txt mt', placeholder: 'Say something…' });
+      ci.onkeydown = e => { if (e.key === 'Enter' && ci.value.trim()) { say(ci.value.trim()); ci.value = ''; } };
+      mid.appendChild(ci);
+
+      /* ---- right: opponent ---- */
+      right.innerHTML = '';
+      right.appendChild(U.el('h3', { cls: 'gold mb', text: pairing.oppName }));
+      right.appendChild(U.el('p', { cls: 'muted small', text: 'A real player, live. Rank ' + (pairing.oppRank || 1000) + '.' }));
+      right.appendChild(U.el('p', { cls: 'small mt', html: phase === 'pick' ? (oppTok ? '✓ Their duelist is ready.' : '…choosing a duelist.') : (oppAgree ? '✓ They’ve agreed to the current stakes.' : '…still deciding.') }));
+      right.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Withdraw', onclick: () => { send({ t: 'bye' }); teardown(); UI.show('play'); } }));
+    }
+
+    function changedWager() {
+      myWagerRev++; myAgree = false; oppAgree = false;   // any change reopens agreement
+      send({ t: 'w', gold: myWager.gold, tokens: myWager.tokens, rev: myWagerRev });
+      repaint();
+    }
+    function maybeAdvance() {
+      if (phase === 'bet' && bothAgreed()) { phase = 'pick'; }
+      if (phase === 'pick' && myTok && oppTok && !launched) startFight();
+    }
+
+    function startFight() {
+      if (launched || closed) return;
+      launched = true;
+      const seedStr = 'duel:' + pairing.roomCode;
+      const terr = ['plains', 'forest', 'mountain', 'desert'][Math.abs(U.hashStr(pairing.roomCode)) % 4];
+      const myWagerSnap = U.deepCopy(myWager), oppWagerSnap = U.deepCopy(oppWager);
+      try { if (room) room.leave(); } catch (e) { }   // liveMatch opens its own room off seedStr
+      room = null;
+      P.liveMatch({
+        seedStr, mode: 'duel', settings: { pulseInterval: 9999, pulseAmount: 0, chaos: false },
+        myNet, oppNet: pairing.oppNet, oppName: pairing.oppName,
+        hostNet: pairing.hostNet, guestNet: pairing.guestNet,
+        pouchFor: (net) => net === myNet ? [myTok] : [oppTok],
+        nameFor: (net) => net === myNet ? me.displayName : pairing.oppName,
+        terrain: terr, ranked: false, format: 'Duel — vs ' + pairing.oppName,
+        waitTitle: 'Duel vs ' + pairing.oppName, fallbackLabel: 'Abandon duel',
+        onFinish: (res, iWon, draw) => {
+          /* clean result on both clients → settle each side's own account.
+             A draw returns everything (settle is a no-op). */
+          const staked = myWagerSnap.gold || myWagerSnap.tokens.length || oppWagerSnap.gold || oppWagerSnap.tokens.length;
+          if (!draw) { if (iWon) { me.stats.duelsWon++; G.grantAchievement('first_duel'); } else me.stats.duelsLost++; }
+          DO.settle(me, myWagerSnap, oppWagerSnap, iWon, draw);
+          G.save();
+          if (draw) UI.toast({ title: 'Draw — stakes returned', icon: '🤝' });
+          else if (staked) UI.toast({ title: iWon ? 'You won the duel!' : 'You lost the duel', body: iWon ? 'You took ' + DO.describe(oppWagerSnap, SP) + '.' : 'You forfeited ' + DO.describe(myWagerSnap, SP) + '.', icon: '⚔' });
+          else UI.toast({ title: iWon ? 'You won the duel!' : 'You lost the duel', icon: '⚔' });
+          UI.show('play');
+        },
+        onFallback: () => { UI.toast({ title: 'Duel abandoned', body: 'No stakes changed hands.', icon: '⚔' }); UI.show('play'); },
+        onCancel: () => UI.show('play'),
+      });
+    }
+
+    function teardown() { if (closed) return; closed = true; try { if (room) room.leave(); } catch (e) { } room = null; }
+
+    (async function connect() {
+      try {
+        room = await DYA.netplay.joinRoom(pairing.roomCode, myNet, {
+          onMessage(msg) {
+            if (!msg || closed) return;
+            if (msg.t === 'w') { oppWager = { gold: Math.max(0, Math.round(msg.gold || 0)), tokens: Array.isArray(msg.tokens) ? msg.tokens : [] }; oppWagerRev = msg.rev || (oppWagerRev + 1); oppAgree = false; myAgree = false; repaint(); }
+            else if (msg.t === 'a') { oppAgree = !!msg.v; oppAgreeOnRev = msg.onRev != null ? msg.onRev : myWagerRev; maybeAdvance(); repaint(); }
+            else if (msg.t === 'p') { oppTok = msg.tok; maybeAdvance(); repaint(); }
+            else if (msg.t === 'c') { logChat(pairing.oppName, String(msg.text || '')); }
+            else if (msg.t === 'bye') { if (!launched) { UI.toast({ title: pairing.oppName + ' withdrew', icon: '⚔' }); teardown(); UI.show('play'); } }
+          },
+          onPeerLeave() { if (!launched && !closed) { UI.toast({ title: pairing.oppName + ' left', icon: '⚔' }); teardown(); UI.show('play'); } },
+        });
+        send({ t: 'c', text: 'Ready to duel.' });
+        repaint();
+      } catch (e) {
+        UI.toast({ title: 'Could not connect', body: 'Dueling a Dya’kukull instead.', icon: '⚠' });
+        P.duelVsKukull();
+      }
+    })();
   };
 
   function pickTokenModal(toks, cb) {
