@@ -144,9 +144,128 @@
      admin.html never logs in as a player), so its mutations push the
      specific account they touched explicitly. */
   function pushAccountToCloud(acc) {
-    if (acc && !acc.ai && DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.push(acc);
+    if (!acc || acc.ai || !(DYA.accountCloud && DYA.accountCloud.configured())) return;
+    /* Admin curation is AUTHORITATIVE. Bump the account's admin revision and
+       freshen its save clock so the target player's device recognises the
+       change as newer, adopts it live, and never overwrites it with a stale
+       local copy. Land it immediately rather than on the 1s save debounce. */
+    if (G.isAdminSession) {
+      acc.adminRev = (acc.adminRev || 0) + 1;
+      acc.savedAt = Date.now();
+      DYA.accountCloud.pushNow(acc);
+    } else {
+      DYA.accountCloud.push(acc);
+    }
   }
   G.pushAccountToCloud = pushAccountToCloud;
+
+  /* Install a cloud copy of MY OWN account into the live world — used when the
+     device detects the Dya Guild (admin) edited this account more recently than
+     the local copy. Skipped mid-battle so a live match is never yanked out from
+     under the player; the next sync adopts it once the match ends. */
+  G.adoptRemoteAccount = function (remote) {
+    if (!remote || !remote.id) return false;
+    if (DYA.ui && DYA.ui.currentName === 'match') return false;   // don't disrupt a live match
+    const isMe = G.me && G.me.id === remote.id;
+    const prev = G.world.accounts[remote.id] || (isMe ? G.me : null);
+    /* the data blob may not carry the identity/security keys — keep the ones
+       we already hold so the account stays logged in and cloud-linked */
+    if (prev) { remote.email = remote.email || prev.email; remote.passHash = remote.passHash || prev.passHash; }
+    remote.cloudAccount = true;
+    installAccount(remote, remote.email);
+    if (isMe) G.me = remote;
+    store.save(G.world);
+    if (DYA.ui) { if (DYA.ui.refreshTopbar) DYA.ui.refreshTopbar(); if (DYA.ui.refreshCurrent) DYA.ui.refreshCurrent(); }
+    if (isMe && G.notify) G.notify({ type: 'system', title: 'Account updated', body: 'The Dya Guild made a change to your account.', icon: '⚖️' });
+    return true;
+  };
+
+  /* union two {id,…} lists, keeping the local order and appending any new
+     remote entries — used to fold in admin-appended notices, hunt slots, etc.
+     without dropping anything the player already has */
+  function unionById(localArr, remoteArr) {
+    localArr = Array.isArray(localArr) ? localArr : [];
+    if (!Array.isArray(remoteArr) || !remoteArr.length) return localArr;
+    const seen = {};
+    localArr.forEach(x => { if (x && x.id) seen[x.id] = true; });
+    const out = localArr.slice();
+    remoteArr.forEach(x => { if (x && x.id && !seen[x.id]) { out.push(x); seen[x.id] = true; } });
+    return out;
+  }
+
+  /* MERGE a newer admin-edited cloud copy of MY account onto my LOCAL one,
+     keeping every bit of the player's own progress (gold, XP, level, stats,
+     pouches, and any tokens they've earned since) and overlaying ONLY the Dya
+     Guild's authoritative changes:
+       • tokens the admin re-statted (adminEdited) or granted (adminGranted)
+       • tokens the admin deleted (adminDeleted tombstones)
+       • guild notices & hunt slots (unioned by id)
+       • trusted-seller / frozen flags
+       • resource grants (an additive ledger, applied exactly once)
+     Skipped mid-battle so a live match is never disrupted. */
+  G.mergeRemoteAccount = function (remote) {
+    if (!remote || !remote.id) return false;
+    if (DYA.ui && DYA.ui.currentName === 'match') return false;
+    const isMe = G.me && G.me.id === remote.id;
+    const local = (isMe && G.me) || G.world.accounts[remote.id];
+    if (!local) return G.adoptRemoteAccount(remote);   // nothing local to merge onto — take the cloud copy whole
+    local.tokens = local.tokens || {};
+
+    /* admin token edits & grants → apply the Guild's version of those tokens */
+    Object.keys(remote.tokens || {}).forEach(id => {
+      const rt = remote.tokens[id];
+      if (rt && (rt.adminEdited || rt.adminGranted)) local.tokens[id] = U.deepCopy(rt);
+    });
+    /* admin token deletions → remove locally, scrub pouches & this player's listings */
+    (remote.adminDeleted || []).forEach(id => {
+      if (local.tokens[id]) delete local.tokens[id];
+      (local.pouches || []).forEach(p => { if (p.tokenIds) p.tokenIds = p.tokenIds.filter(x => x !== id); });
+      Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === id && l.sellerId === local.id) delete G.world.market.listings[l.id]; });
+    });
+    if (remote.adminDeleted) local.adminDeleted = remote.adminDeleted;   // carry tombstones forward (idempotent)
+
+    /* additive collections — never drop what the player already has */
+    local.notifications = unionById(local.notifications, remote.notifications);
+    local.huntSlots = unionById(local.huntSlots, remote.huntSlots);
+
+    /* admin-owned account flags */
+    if (remote.trustedSeller) local.trustedSeller = true;
+    if (remote.frozen != null) local.frozen = remote.frozen;
+
+    /* resource grants — apply any the player hasn't yet, additively (so a grant
+       is never lost to, nor double-counts against, the player's own earnings) */
+    local.adminGrantsApplied = local.adminGrantsApplied || {};
+    (remote.adminGrants || []).forEach(gr => {
+      if (!gr || !gr.id || local.adminGrantsApplied[gr.id]) return;
+      if (gr.gold) local.gold = Math.max(0, (local.gold || 0) + gr.gold);
+      if (gr.ngakara) local.ngakara = Math.max(0, (local.ngakara || 0) + gr.ngakara);
+      if (Array.isArray(gr.okid)) gr.okid.forEach((n, i) => { if (n) local.okid[i] = (local.okid[i] || 0) + n; });
+      local.adminGrantsApplied[gr.id] = true;
+    });
+    if (remote.adminGrants) local.adminGrants = remote.adminGrants.slice(-50);   // keep the (capped) ledger
+
+    local.adminRev = remote.adminRev || 0;   // caught up with the Guild's revision
+    local.savedAt = Date.now();
+    if (isMe) G.me = local;
+    store.save(G.world);
+    /* push the merged truth back so the cloud reflects the merge (player
+       progress + admin edits) and the guard stops re-firing */
+    if (isMe && DYA.accountCloud && DYA.accountCloud.pushNow) DYA.accountCloud.pushNow(local);
+    if (DYA.ui) { if (DYA.ui.refreshTopbar) DYA.ui.refreshTopbar(); if (DYA.ui.refreshCurrent) DYA.ui.refreshCurrent(); }
+    if (isMe && G.notify) G.notify({ type: 'system', title: 'Account updated', body: 'The Dya Guild made a change to your account.', icon: '⚖️' });
+    return true;
+  };
+
+  /* Live self-sync: pull my own cloud row and merge in any admin edit newer
+     than my local copy. Cheap; safe to call on a timer. */
+  G.pullMyAccountEdits = async function () {
+    const AC = DYA.accountCloud;
+    if (!AC || !AC.syncSelf || !G.me || G.me.ai) return { ok: false };
+    if (DYA.ui && DYA.ui.currentName === 'match') return { ok: false };
+    const r = await AC.syncSelf(G.me);
+    if (r && r.adopted && r.data) return { adopted: G.mergeRemoteAccount(r.data) };
+    return { adopted: false };
+  };
   /* stamp a monotonic save clock on the human's account before every
      persist. Login uses it to decide, when a device holds both a local
      copy and a cloud copy of the same account, which one is actually
@@ -551,7 +670,7 @@
     G.world.accounts[acc.id] = acc;
     G.me = acc;
     G.save();
-    if (DYA.online) DYA.online.onAuthChange();
+    if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
     return { acc };
   };
   G.login = async function (email, pass) {
@@ -573,7 +692,7 @@
       G.world.accounts[acc.id] = acc;
       G.me = acc;
       G.save();
-      if (DYA.online) DYA.online.onAuthChange();
+      if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
       return { acc, auth: res };
     }
 
@@ -607,7 +726,7 @@
         acc.lastLogin = Date.now();
         G.me = acc;
         G.save();
-        if (DYA.online) DYA.online.onAuthChange();
+        if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
         return { acc };
       }
       /* not in the cloud yet: a local-only account from before this
@@ -621,7 +740,7 @@
       localAcc.lastLogin = Date.now();
       G.me = localAcc;
       G.save();
-      if (DYA.online) DYA.online.onAuthChange();
+      if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
       return { acc: localAcc };
     }
 
@@ -632,17 +751,18 @@
     acc.lastLogin = Date.now();
     G.me = acc;
     G.save();
-    if (DYA.online) DYA.online.onAuthChange();
+    if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
     return { acc };
   };
   G.logout = function () {
+    if (DYA.sessionGuard) DYA.sessionGuard.release();   // give up this account's single-session slot
     G.me = null;
     /* a tutorial spotlight is a fixed element parented to <body>, outside
        the normal screen container — it survives UI.show() transitions and
        must be torn down explicitly, or it sits on top of (and swallows
        clicks on) whatever renders next, including the login form */
     if (DYA.tutorial) { DYA.tutorial.active = false; DYA.tutorial.clear(); }
-    if (DYA.online) DYA.online.onAuthChange();
+    if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
   };
   G.banInfo = function (accId) { return G.world.bans[accId || (G.me && G.me.id)] || null; };
   G.isBanned = function (accId) {
@@ -1428,19 +1548,25 @@
     if (result.draw) { xp = Math.round((result.ranked ? EC.XP.rankedWin : EC.XP.casualWin) / 2); gold = Math.round((result.ranked ? EC.GOLD.rankedWin : EC.GOLD.casualWin) / 2); }
     else if (result.win) { xp = result.ranked ? EC.XP.rankedWin : EC.XP.casualWin; gold = result.ranked ? EC.GOLD.rankedWin : EC.GOLD.casualWin; }
     else { xp = result.ranked ? EC.XP.rankedLoss : EC.XP.casualLoss; gold = result.ranked ? EC.GOLD.rankedLoss : EC.GOLD.casualLoss; }
+    /* some modes grant NO XP at all — practice against the machine (Quick
+       Play vs AI) and Duels. Gold, stats, and achievements still apply; only
+       progression toward levels is withheld, so the AI can't be farmed for XP. */
+    if (result.noXp) xp = 0;
     /* bonus XP */
     const bonuses = [];
     if (result.win) {
       me.winStreak++;
-      const streak = Math.min(EC.XP_BONUS.winStreakCap, (me.winStreak - 1) * EC.XP_BONUS.winStreakPerWin);
-      if (streak > 0) { xp += streak; bonuses.push(['Win streak ×' + me.winStreak, streak]); }
-      const day = new Date().toDateString();
-      if (me.lastWinDay !== day) { me.lastWinDay = day; xp += EC.XP_BONUS.firstWinOfDay; bonuses.push(['First win of the day', EC.XP_BONUS.firstWinOfDay]); }
-      if (result.usedNewToken) { xp += EC.XP_BONUS.newTokenMatch; bonuses.push(['New token’s first match', EC.XP_BONUS.newTokenMatch]); }
-      if (result.fastRelic) { xp += EC.XP_BONUS.fastRelic; bonuses.push(['Swift Relic capture', EC.XP_BONUS.fastRelic]); }
-      /* in-match combo achievements (Part IX bonus XP) */
-      const combos = result.stats && result.stats.combos ? Object.keys(result.stats.combos) : [];
-      combos.slice(0, 2).forEach(cn => { xp += EC.XP_BONUS.comboAchieved; bonuses.push(['Combo: ' + cn, EC.XP_BONUS.comboAchieved]); });
+      if (!result.noXp) {
+        const streak = Math.min(EC.XP_BONUS.winStreakCap, (me.winStreak - 1) * EC.XP_BONUS.winStreakPerWin);
+        if (streak > 0) { xp += streak; bonuses.push(['Win streak ×' + me.winStreak, streak]); }
+        const day = new Date().toDateString();
+        if (me.lastWinDay !== day) { me.lastWinDay = day; xp += EC.XP_BONUS.firstWinOfDay; bonuses.push(['First win of the day', EC.XP_BONUS.firstWinOfDay]); }
+        if (result.usedNewToken) { xp += EC.XP_BONUS.newTokenMatch; bonuses.push(['New token’s first match', EC.XP_BONUS.newTokenMatch]); }
+        if (result.fastRelic) { xp += EC.XP_BONUS.fastRelic; bonuses.push(['Swift Relic capture', EC.XP_BONUS.fastRelic]); }
+        /* in-match combo achievements (Part IX bonus XP) */
+        const combos = result.stats && result.stats.combos ? Object.keys(result.stats.combos) : [];
+        combos.slice(0, 2).forEach(cn => { xp += EC.XP_BONUS.comboAchieved; bonuses.push(['Combo: ' + cn, EC.XP_BONUS.comboAchieved]); });
+      }
     } else {
       me.winStreak = 0;
     }
@@ -2059,6 +2185,7 @@
       /* §4 famous tokens: the editable-name flag is set at creation, here */
       if (opts.name && !opts.nameEditable) tok.nameLocked = true;
       if (opts.name) tok.famous = true;
+      if (!acc.ai) tok.adminGranted = true;   // so the player's live merge ADDS this granted token
       acc.tokens[tok.id] = tok;
       if (!acc.ai) acc.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'system', title: 'Token granted', body: 'The Dya Guild has granted you ' + tok.name + ' (' + SP.get(speciesId).name + ').', icon: '🎁' });
       G.saveNow();
@@ -2066,6 +2193,28 @@
       return { tok };
     },
     grantTrusted(accId) { const a = G.world.accounts[accId]; if (a) { a.trustedSeller = true; G.saveNow(); pushAccountToCloud(a); } },
+    /* additive resource grant (gold / NgAkara / Okid) recorded as a one-time
+       ledger entry, so it MERGES into a player's account without being lost to —
+       or double-counting against — their own earnings. */
+    grantResources(accId, res) {
+      const a = G.world.accounts[accId];
+      if (!a) return { err: 'Account not found' };
+      res = res || {};
+      const gold = Math.round(res.gold || 0), ngakara = Math.round(res.ngakara || 0);
+      const okid = Array.isArray(res.okid) ? res.okid.map(n => Math.round(n || 0)) : null;
+      if (!gold && !ngakara && !(okid && okid.some(n => n))) return { ok: true, empty: true };
+      const entry = { id: U.uid('agr'), at: Date.now(), gold, ngakara, okid };
+      a.adminGrants = (a.adminGrants || []).concat([entry]).slice(-50);
+      a.adminGrantsApplied = a.adminGrantsApplied || {};
+      /* apply to the admin-held copy now, and mark applied so this copy never re-adds it */
+      if (gold) a.gold = Math.max(0, (a.gold || 0) + gold);
+      if (ngakara) a.ngakara = Math.max(0, (a.ngakara || 0) + ngakara);
+      if (okid) okid.forEach((n, i) => { if (n) a.okid[i] = (a.okid[i] || 0) + n; });
+      a.adminGrantsApplied[entry.id] = true;
+      if (!a.ai) a.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'system', title: 'Guild grant', body: 'The Dya Guild has granted you' + (gold ? ' ' + U.fmt(gold) + 'g' : '') + (ngakara ? ' ' + ngakara + ' NgAkara' : '') + (okid && okid.some(n => n) ? ' Okid' : '') + '.', icon: '🎁' });
+      G.saveNow(); pushAccountToCloud(a);
+      return { ok: true };
+    },
     /* Reserve (Crafting Station): grant a designed, unowned token directly
        into a player's collection — minted true to the design, then consumed
        (removed) from the Reserve, exactly like a sold Guild listing. */
@@ -2076,6 +2225,7 @@
       if (!acc) return { err: 'Account not found.' };
       DYA.mods.deleteReserveEntry(id);
       const tok = TK.mintSpec(entry.spec, { rng: new U.Rng(U.newSeed()), owner: acc.id, aiOwner: !!acc.ai });
+      if (!acc.ai) tok.adminGranted = true;   // so the player's live merge ADDS this granted token
       acc.tokens[tok.id] = tok;
       if (!acc.ai) acc.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'system', title: 'Token granted', body: 'The Dya Guild has granted you ' + tok.name + ' (' + (SP.get(tok.speciesId) || {}).name + ').', icon: '🎁' });
       G.saveNow();

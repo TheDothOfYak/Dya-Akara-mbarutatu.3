@@ -9,6 +9,18 @@
     G.init();
     UI.init();
 
+    /* one account = one active session (one tab, one device). When a newer
+       sign-in elsewhere claims the slot, this tab is signed out and dropped
+       back at the login screen with an explanation. */
+    if (DYA.sessionGuard) {
+      DYA.sessionGuard.onKicked = (reason) => {
+        if (!G.me) return;
+        G.logout();
+        UI.show('login');
+        UI.alert('Signed out', reason);
+      };
+    }
+
     /* pull the admin-curated shared world (Dya'kukull + AI market) before the
        player logs in, so admin token deletions/edits/spawns show up here too.
        Fire-and-forget: it updates G.world in place and the login flow (1.6s
@@ -22,6 +34,16 @@
       setInterval(() => {
         G.pollAdminWorld().then(r => { if (r && r.adopted && UI.refreshCurrent) UI.refreshCurrent(); }).catch(() => {});
       }, 90000);
+    }
+
+    /* live account self-sync: pick up Dya Guild (admin) edits to THIS player's
+       OWN account — a re-statted creature, a granted token, a flag change —
+       without waiting for a relog. Cheap poll; adopts only when the admin's
+       revision is newer than the local copy. */
+    if (G.pullMyAccountEdits) {
+      setInterval(() => {
+        if (G.me && !G.me.ai) G.pullMyAccountEdits().catch(() => {});
+      }, 20000);
     }
 
     /* sync audio settings if a session was left logged-in previously */

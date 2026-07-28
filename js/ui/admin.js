@@ -1126,11 +1126,12 @@
       body.appendChild(U.el('div', { cls: 'flex' }, [gold, ngak, hslots, U.el('button', {
         cls: 'btn', text: 'Grant to selected account', onclick: () => {
           const a = G.world.accounts[acc.value];
-          a.gold += parseInt(gold.value) || 0;
-          a.ngakara += parseInt(ngak.value) || 0;
+          /* recorded as a one-time ledger entry so it merges into the player's
+             account additively, never clobbering their own gold/NgAkara */
+          G.admin.grantResources(a.id, { gold: parseInt(gold.value) || 0, ngakara: parseInt(ngak.value) || 0 });
           const hs = parseInt(hslots.value) || 0;
           if (hs > 0) G.admin.grantHuntSlots(a.id, hs);
-          G.saveNow(); G.pushAccountToCloud(a); alert('Granted' + (hs > 0 ? ' (incl. ' + hs + ' Hunt slot' + (hs > 1 ? 's' : '') + ')' : '') + '.');
+          alert('Granted' + (hs > 0 ? ' (incl. ' + hs + ' Hunt slot' + (hs > 1 ? 's' : '') + ')' : '') + '.');
         },
       })]));
     },
@@ -1280,6 +1281,7 @@
               delete owner.tokens[tok.id];
               (owner.pouches || []).forEach(p => { if (p.tokenIds) p.tokenIds = p.tokenIds.filter(x => x !== tok.id); });
               Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === tok.id) delete G.world.market.listings[l.id]; });
+              if (!owner.ai) owner.adminDeleted = (owner.adminDeleted || []).concat([tok.id]).slice(-200);   // tombstone so the player's merge removes it
               /* drop it from the flattened list backing this tab, then repaint */
               for (let i = all.length - 1; i >= 0; i--) { if (all[i].tok === tok) all.splice(i, 1); }
               G.saveNow(); G.pushAccountToCloud(owner);
@@ -2912,6 +2914,7 @@
           delete owner.tokens[tok.id];
           (owner.pouches || []).forEach(p => { if (p.tokenIds) p.tokenIds = p.tokenIds.filter(x => x !== tok.id); });
           Object.values(G.world.market.listings).forEach(l => { if (l.tokenId === tok.id) delete G.world.market.listings[l.id]; });
+          if (!owner.ai) owner.adminDeleted = (owner.adminDeleted || []).concat([tok.id]).slice(-200);   // tombstone so the player's merge removes it
           G.saveNow(); G.pushAccountToCloud(owner);
         }
         closeAll();
