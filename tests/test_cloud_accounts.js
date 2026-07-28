@@ -189,6 +189,45 @@ let G = DYAG.state;
   const r7 = await G.login('alice@example.com', 'secret123');
   check('a fresh device with no local copy adopts the cloud', !r7.err && r7.acc.level === 12, 'level=' + (r7.acc && r7.acc.level));
 
+  /* ---------- regression: CLOCK SKEW must not lose progress across devices ----------
+     The reported bug: play for hours on one computer, log in on another, and the
+     progress is gone. Cause: reconciliation used the wall clock (savedAt), which is
+     NOT comparable between two machines. If the computer you played on has a clock
+     even a little behind the one you switch to — and that second computer still holds
+     an older local copy of the account — its later clock reading made the STALE local
+     copy "win", and it got pushed up over the real progress.
+
+     Here the cloud holds the real, newer save (level 30) but with an EARLIER savedAt
+     than a stale local copy (level 12) left on this machine. Ordering by the monotonic
+     saveRev, the cloud must win; the wall clock must not override it. */
+  newDevice();
+  G.init();
+  const realCloud = JSON.parse(JSON.stringify(db.dya_accounts[0].data));
+  realCloud.level = 30; realCloud.saveRev = 40; realCloud.savedAt = 1000;   // real progress, but a "slow" clock
+  db.dya_accounts[0].data = realCloud;
+  const staleLocal = JSON.parse(JSON.stringify(realCloud));
+  staleLocal.level = 12; staleLocal.saveRev = 12; staleLocal.savedAt = 9e12; // older save, but a "fast" clock
+  G.world.accounts[staleLocal.id] = staleLocal;
+  const skew = await G.login('alice@example.com', 'secret123');
+  check('cross-device: the higher-rev cloud save wins despite an earlier clock', !skew.err && skew.acc.level === 30, 'level=' + (skew.acc && skew.acc.level));
+  await new Promise(r => setTimeout(r, 60));
+  check('the stale local copy did NOT clobber the cloud', db.dya_accounts[0].data.level === 30, 'cloud level=' + db.dya_accounts[0].data.level);
+
+  /* the offline-recovery direction still works with the rev: unsynced local saves
+     (a higher rev the cloud never received) survive login and are pushed up */
+  newDevice();
+  G.init();
+  const laggedCloud = JSON.parse(JSON.stringify(db.dya_accounts[0].data));
+  laggedCloud.level = 30; laggedCloud.saveRev = 40;
+  db.dya_accounts[0].data = laggedCloud;
+  const unsyncedLocal = JSON.parse(JSON.stringify(laggedCloud));
+  unsyncedLocal.level = 33; unsyncedLocal.saveRev = 45;   // kept playing offline past the cloud's rev
+  G.world.accounts[unsyncedLocal.id] = unsyncedLocal;
+  const recover = await G.login('alice@example.com', 'secret123');
+  check('unsynced newer local progress (higher rev) survives login', !recover.err && recover.acc.level === 33, 'level=' + (recover.acc && recover.acc.level));
+  await new Promise(r => setTimeout(r, 60));
+  check('the recovered local copy is pushed back up to the cloud', db.dya_accounts[0].data.level === 33, 'cloud level=' + db.dya_accounts[0].data.level);
+
   /* ---------- offline fallback: cloud not configured behaves exactly as before ---------- */
   delete window.DYA_CONFIG.supabase.url;
   newDevice();

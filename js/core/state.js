@@ -151,7 +151,7 @@
        local copy. Land it immediately rather than on the 1s save debounce. */
     if (G.isAdminSession) {
       acc.adminRev = (acc.adminRev || 0) + 1;
-      acc.savedAt = Date.now();
+      bumpSaveClock(acc);
       DYA.accountCloud.pushNow(acc);
     } else {
       DYA.accountCloud.push(acc);
@@ -245,7 +245,10 @@
     if (remote.adminGrants) local.adminGrants = remote.adminGrants.slice(-50);   // keep the (capped) ledger
 
     local.adminRev = remote.adminRev || 0;   // caught up with the Guild's revision
-    local.savedAt = Date.now();
+    /* the merged copy must out-rev the admin snapshot it absorbed, so the
+       re-push below is recognised as the newest save and the guard settles */
+    if ((remote.saveRev || 0) > (local.saveRev || 0)) local.saveRev = remote.saveRev;
+    bumpSaveClock(local);
     if (isMe) G.me = local;
     store.save(G.world);
     /* push the merged truth back so the cloud reflects the merge (player
@@ -266,12 +269,38 @@
     if (r && r.adopted && r.data) return { adopted: G.mergeRemoteAccount(r.data) };
     return { adopted: false };
   };
-  /* stamp a monotonic save clock on the human's account before every
-     persist. Login uses it to decide, when a device holds both a local
-     copy and a cloud copy of the same account, which one is actually
-     newer — so a stale cloud snapshot can never clobber newer local
-     progress (and vice-versa). */
-  function stampSave() { if (G.me && !G.me.ai) G.me.savedAt = Date.now(); }
+  /* Stamp a save clock on the human's account before every persist. Login
+     uses it to decide, when a device holds both a local copy and a cloud
+     copy of the same account, which one is actually newer — so a stale
+     cloud snapshot can never clobber newer local progress (and vice-versa).
+
+     `saveRev` is a per-account counter that increases by one on every save,
+     on whatever device made it. It is the PRIMARY ordering key because it is
+     genuinely monotonic: a device that adopts the cloud copy keeps its rev
+     and counts up from there, so the cloud's rev only ever climbs and a copy
+     with a lower rev is always the older one — regardless of what the two
+     computers' wall clocks say. `savedAt` (Date.now()) is kept only as a
+     tiebreaker and for display; on its own it is NOT comparable across
+     devices, because two computers' clocks can disagree by minutes or hours,
+     which is exactly how hours of real progress used to be lost when a player
+     switched machines. */
+  function bumpSaveClock(acc) {
+    if (!acc || acc.ai) return;
+    acc.saveRev = (acc.saveRev || 0) + 1;
+    acc.savedAt = Date.now();
+  }
+  /* True when copy `a` is a later save than copy `b` of the same account.
+     Compare by the monotonic rev first; fall back to wall-clock only when
+     revs are equal or absent (e.g. an older cloud row saved before this
+     counter existed), which preserves the previous behaviour for legacy
+     data without ever letting a clock skew override a real rev difference. */
+  function saveIsNewer(a, b) {
+    const ar = (a && a.saveRev) || 0, br = (b && b.saveRev) || 0;
+    if (ar !== br) return ar > br;
+    return ((a && a.savedAt) || 0) > ((b && b.savedAt) || 0);
+  }
+  G.saveIsNewer = saveIsNewer;
+  function stampSave() { bumpSaveClock(G.me); }
   /* set whenever a save is requested; cleared once the exit-flush has
      forced the latest state all the way out to the cloud. Lets the
      frequent visibilitychange handler skip redundant full-world writes
@@ -706,14 +735,18 @@
         if (remote.pass_hash !== hashPass(pass)) return { err: 'Incorrect password.' };
         const cloudAcc = remote.data;
         cloudAcc.id = remote.id; cloudAcc.email = email; cloudAcc.passHash = remote.pass_hash;
-        /* last-writer-wins reconciliation. If THIS device already holds a
-           newer local copy of the same account than the cloud does, keep
-           local and push it up — never let a lagging/stale cloud snapshot
-           overwrite newer progress. Otherwise adopt the cloud copy (the
-           normal cross-device case, incl. a fresh device with no local). */
+        /* last-writer-wins reconciliation, ordered by the monotonic saveRev
+           (not the wall clock — two computers' clocks can't be compared).
+           Keep THIS device's local copy only when it is genuinely a later
+           save than the cloud's — i.e. it holds progress a lagging/failed
+           push never delivered — and shove it back up. Otherwise adopt the
+           cloud copy (the normal cross-device case, incl. a fresh device
+           with no local, and the case that was silently losing hours of
+           play: the cloud has newer progress but a stale local copy's later
+           clock reading used to win). */
         const localAcc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
         let acc;
-        if (localAcc && (localAcc.savedAt || 0) > (cloudAcc.savedAt || 0)) {
+        if (localAcc && saveIsNewer(localAcc, cloudAcc)) {
           acc = localAcc;
           acc.id = remote.id; acc.email = email; acc.passHash = remote.pass_hash;
           installAccount(acc, email);
