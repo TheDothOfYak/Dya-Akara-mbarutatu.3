@@ -689,18 +689,18 @@
         function grid() {
           gwrap.innerHTML = '';
           const MO = DYA.marketOnline;
-          /* who counts as a friend: real cross-device friends (matched by
-             online netId) and any local-world account you've befriended */
+          /* friends here means REAL-player friends (matched by online netId).
+             A local "friend" is a Dya'kukull — the game lets you befriend the
+             AI — and a Dya'kukull must NEVER jump ahead of a real player, so
+             local accounts are never elevated. */
           const friendNet = {};
           if (DYA.online && DYA.online.state) (DYA.online.state.friends || []).forEach(f => { friendNet[f.id] = true; });
-          const friendLocal = {};
-          (me.friends || []).forEach(id => { friendLocal[id] = true; });
           /* unified entries: real player listings from the shared online
-             market + the local Dya'kukull stalls. Each is tiered so they
-             stack friends → real players → Dya'kukull:
-               0 = a friend's stall  (its own section, on top)
-               1 = a real player     (before the Dya'kukull)
-               2 = the Dya'kukull    (the world's own traders) */
+             market + the local Dya'kukull stalls. Each is tiered so real
+             players always come before any Dya'kukull:
+               0 = a real-player friend  (its own section, on top)
+               1 = a real player         (before every Dya'kukull)
+               2 = a Dya'kukull          (the world's own traders — always last) */
           const entries = [];
           if (MO && MO.enabled()) {
             MO.others().forEach(row => {
@@ -715,8 +715,7 @@
             if (me.blocked.includes(seller.id) || seller.blocked.includes(me.id)) return;
             const tok = seller.tokens[l.tokenId];
             if (!tok || !matchesFilters(tok)) return;
-            const friend = !!friendLocal[seller.id];
-            entries.push({ online: false, l, seller, tok, price: l.price, at: l.at, friend, tier: friend ? 0 : 2 });
+            entries.push({ online: false, l, seller, tok, price: l.price, at: l.at, friend: false, tier: 2 });
           });
           const bySort = (a, b) => {
             if (mktState.sort === 'cheap') return a.price - b.price;
@@ -836,12 +835,11 @@
         const gwrap = U.el('div', { cls: 'market-grid' });
         const MO = DYA.marketOnline;
 
-        /* friend identity: real cross-device friends (online netId) + any
-           local-world account you've befriended */
+        /* friends here means REAL-player friends only (online netId). A local
+           "friend" is a Dya'kukull, and no Dya'kukull may ever appear before a
+           real player, so local accounts are never elevated. */
         const friendNet = {};
         if (DYA.online && DYA.online.state) (DYA.online.state.friends || []).forEach(f => { friendNet[f.id] = true; });
-        const friendLocal = {};
-        (me.friends || []).forEach(id => { friendLocal[id] = true; });
 
         /* real player stalls from the shared online market — one card per
            seller, aggregating that player's live listings */
@@ -857,15 +855,15 @@
         const localSellers = Object.values(G.world.accounts).filter(a =>
           a.id !== me.id && Object.values(G.world.market.listings).some(l => l.sellerId === a.id));
 
-        /* tier every stall: 0 = a friend, 1 = a real player, 2 = a Dya'kukull */
+        /* tier every stall so real players always precede the Dya'kukull:
+           0 = a real-player friend, 1 = a real player, 2 = a Dya'kukull */
         const cards = [];
         Object.values(online).forEach(s => {
           const friend = !!friendNet[s.netId];
           cards.push({ tier: friend ? 0 : 1, weight: s.rows.length, el: onlineStallCard(s, friend) });
         });
         localSellers.forEach(acc => {
-          const friend = !!friendLocal[acc.id];
-          cards.push({ tier: friend ? 0 : 2, weight: acc.stats.sales, el: localStallCard(acc) });
+          cards.push({ tier: 2, weight: acc.stats.sales, el: localStallCard(acc) });
         });
         cards.sort((a, b) => (a.tier - b.tier) || (b.weight - a.weight));
 
