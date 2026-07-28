@@ -104,11 +104,20 @@
        { waiting: true }   — in queue, nobody to pair with yet
        { err }             — transient error (caller keeps polling)
      Call it repeatedly (~every 2s) while the player searches. */
-  S.poll = async function (pouch) {
+  S.poll = function (pouch) { return pollChannel(pouch, S.circuit(me() || {})); };
+  /* Casual DUEL matchmaking rides the SAME shared queue on a private channel
+     ('__duel__') so duel-seekers only ever pair with other duel-seekers, never
+     with ranked-ladder searchers (who filter on their own circuit). The queue
+     row's pouch is empty — a duel's wager and token are settled live in the
+     room after pairing, not carried in the queue. */
+  S.pollDuel = function () { return pollChannel([], DUEL_CHANNEL); };
+  const DUEL_CHANNEL = '__duel__';
+  S.DUEL_CHANNEL = DUEL_CHANNEL;
+
+  async function pollChannel(pouch, circuit) {
     const m = me();
     if (!m || !S.configured()) return { err: 'offline' };
     const myNet = myNetId();
-    const circuit = S.circuit(m);
     const season = DYA.state.world.season.number;
     const nowIso = new Date().toISOString();
 

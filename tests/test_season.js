@@ -132,6 +132,26 @@ function pouchOf(acc) { return Object.values(acc.tokens).slice(0, 5); }
   check('both sides agree who hosts', rA2.pairing && rB.pairing && rA2.pairing.hostNet === rB.pairing.hostNet && rA2.pairing.guestNet === rB.pairing.guestNet);
   check('exactly one pairing formed (no extra claims)', db.dya_season_queue.filter(r => r.status === 'matched').length === 2);
 
+  /* ---------- duel matchmaking rides a private channel ('__duel__') ---------- */
+  db.dya_season_queue.length = 0;                 // clear the ranked pairing above
+  G.me = aliceAcc;
+  const dA = await S.pollDuel();
+  check('a duel searcher waits on the duel channel', dA.waiting === true, JSON.stringify(dA));
+  check('the duel queue row is on the __duel__ circuit', db.dya_season_queue.length === 1 && db.dya_season_queue[0].circuit === S.DUEL_CHANNEL, JSON.stringify(db.dya_season_queue[0]));
+  G.me = bobAcc;
+  const dB = await S.pollDuel();
+  check('a second duel searcher pairs with the first', !!(dB.pairing) && dB.pairing.oppNet === aliceAcc.netId, JSON.stringify(dB));
+
+  /* isolation: a duel searcher must NEVER be claimed by a ranked searcher */
+  db.dya_season_queue.length = 0;
+  G.me = aliceAcc; aliceAcc.rank = 1000;          // Local circuit ranked search
+  const rankWait = await S.poll(pouchOf(aliceAcc));
+  check('ranked searcher waits (Local circuit)', rankWait.waiting === true);
+  G.me = bobAcc;
+  const duelWait = await S.pollDuel();
+  check('duel searcher does NOT get matched into the ranked queue', duelWait.waiting === true, JSON.stringify(duelWait));
+  check('the two searchers sit on different channels', db.dya_season_queue.length === 2 && db.dya_season_queue.some(r => r.circuit === 'Local') && db.dya_season_queue.some(r => r.circuit === S.DUEL_CHANNEL));
+
   /* ---------- the season is closed until the organizer opens it ---------- */
   const M = DYAG.mods;
   check('online season starts CLOSED until opened', S.isOpen() === false);
