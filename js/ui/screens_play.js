@@ -652,31 +652,46 @@
           onFinish(res,iWon,draw,winnerLocalId), onFallback(), onCancel() } */
   P.liveMatch = function (o) {
     const me = G.me;
+    const MV = DYA.matchvote;
     const roomCode = derivedRoomCode(o.seedStr);
     const iAmHost = o.myNet === o.hostNet;
+    const isStandard = (o.mode || 'standard') === 'standard';   // duels have no pulse to vote on
+    const voteSecs = o.voteSecs || 25;
+    /* THIS player's title effects, exchanged so they apply in every live match */
+    const mySeal = me.seal || { avatarIdx: me.avatarIdx || 0, patterns: [] };
+    const myStartRes = isStandard ? (G.titleBuff('startRes') || 0) : 0;
 
     const wait = U.el('div', { cls: 'center' });
     wait.appendChild(U.el('h3', { cls: 'gold', text: o.waitTitle || ('Live match vs ' + o.oppName) }));
     const statusEl = U.el('p', { cls: 'muted mt', text: 'Connecting…' });
     wait.appendChild(statusEl);
     const wm = UI.modal(wait, { sticky: true });
-    let room = null, launched = false, closed = false, readyTimer = null, giveUpAt = Date.now() + (o.waitMs || 10000);
 
-    function stop() { clearInterval(readyTimer); if (room && !launched) { try { room.leave(); } catch (e) { } } }
-    function fallback() { if (closed) return; closed = true; stop(); wm.close(); if (o.onFallback) o.onFallback(); }
+    let room = null, launched = false, closed = false, readyTimer = null, goTimer = null;
+    let giveUpAt = Date.now() + (o.waitMs || 10000);
+    let votingStarted = false, finalized = false, guestInSim = false, finalizeDeadline = 0;
+    let myVote = { interval: 8, amount: 2, mode: 'Standard' };
+    let mySetup = null, peerSetup = null, paintPeerVotes = null;
+
+    function stopTimers() { clearInterval(readyTimer); clearInterval(goTimer); }
+    function stop() { stopTimers(); if (room && !launched) { try { room.leave(); } catch (e) { } } }
+    function fallback() { if (closed || launched) return; closed = true; stop(); wm.close(); if (o.onFallback) o.onFallback(); }
     function cancel() { if (closed) return; closed = true; stop(); wm.close(); if (o.onCancel) o.onCancel(); }
 
-    function launch() {
+    /* both sides build the SAME match from the host's authoritative `info`
+       (agreed settings + each seat's title bonus + seal), keyed by net id */
+    function launchWith(info) {
       if (launched || closed) return;
-      launched = true; clearInterval(readyTimer); wm.close();
+      launched = true; stopTimers(); wm.close();
+      const seals = (info && info.seals) || {}, res = (info && info.res) || {};
       const buildTeam = (net) => ({
         name: (o.nameFor ? o.nameFor(net) : (net === o.myNet ? me.displayName : o.oppName)) || 'Player',
         controller: 'human', pouch: (o.pouchFor(net) || []).map(x => U.deepCopy(x)),
-        startResources: 0, seal: { avatarIdx: 0, patterns: [] },
+        startResources: res[net] || 0, seal: seals[net] || MV.DEFAULT_SEAL,
       });
       const match = new DYA.match.Match({
         seed: U.hashStr(o.seedStr), mode: o.mode || 'standard', terrain: o.terrain || 'plains',
-        settings: o.settings || { pulseInterval: 8, pulseAmount: 2, chaos: false },
+        settings: (info && info.settings) || o.settings || { pulseInterval: 8, pulseAmount: 2, chaos: false },
         teams: [buildTeam(o.hostNet), buildTeam(o.guestNet)],
       });
       const myTeam = iAmHost ? 0 : 1;
@@ -690,44 +705,152 @@
           myTeam, net,
           opponent: { name: o.oppName, accId: o.oppNet, remoteHuman: true },
           pouch: (o.pouchFor(o.myNet) || []).map(x => U.deepCopy(x)),
-          onFinish: (res, iWon, draw) => {
+          onFinish: (res2, iWon, draw) => {
             /* both devices ran the same sim → same winner. Draws break on a
                shared coin so both report the same seat. */
             let winnerNet;
             if (draw) winnerNet = (Math.abs(U.hashStr(o.seedStr + ':tie')) % 2 === 0) ? o.hostNet : o.guestNet;
             else winnerNet = iWon ? o.myNet : o.oppNet;
             const winnerLocalId = winnerNet === o.myNet ? me.id : winnerNet;
-            if (o.onFinish) o.onFinish(res, iWon, draw, winnerLocalId);
+            if (o.onFinish) o.onFinish(res2, iWon, draw, winnerLocalId);
           },
         },
       }, 1200);
     }
 
-    function armTimer() {
-      readyTimer = setInterval(() => {
-        if (launched || closed) { clearInterval(readyTimer); return; }
-        try { room.send({ t: 'lmready' }); } catch (e) { }
-        /* no manual "play the AI now" shortcut — if the real opponent hasn't
-           sat down by the ~10s mark, a Dya'kukull automatically fills in */
-        if (Date.now() > giveUpAt) { clearInterval(readyTimer); fallback(); }
-      }, 1500);
+    /* host only: once both setups are in (or after a grace), fix the match info
+       and broadcast GO. The host keeps re-announcing GO until the guest is
+       actually simulating (its frames arrive) so a dropped GO can't strand it. */
+    function finalize() {
+      if (finalized || launched || closed || !iAmHost || !mySetup) return;
+      /* give the guest's vote + seal a chance to arrive before locking it in;
+         proceed once we have it, or when the grace deadline passes */
+      if (!peerSetup && (!finalizeDeadline || Date.now() < finalizeDeadline)) return;
+      finalized = true;
+      const info = MV.buildInfo(o.hostNet, o.guestNet, mySetup, peerSetup, o.mode, o.settings);
+      const sendGo = () => { try { room.send({ t: 'lmgo', info: info }); } catch (e) { } };
+      sendGo();
+      goTimer = setInterval(() => { if (closed || (launched && guestInSim)) { clearInterval(goTimer); return; } sendGo(); }, 1200);
+      launchWith(info);
+    }
+
+    function sendSetup() {
+      if (mySetup || closed || launched) return;
+      mySetup = { startRes: myStartRes, seal: mySeal, vote: myVote };
+      try { room.send({ t: 'lmsetup', startRes: mySetup.startRes, seal: mySetup.seal, vote: mySetup.vote }); } catch (e) { }
+      if (iAmHost) finalize();
+    }
+
+    /* if the host never sends GO (it vanished), the guest falls back so it
+       is never left staring at a dead vote screen */
+    function guestWatchdog() {
+      if (iAmHost) return;
+      setTimeout(() => { if (!launched && !closed) fallback(); }, (voteSecs + 20) * 1000);
+    }
+
+    function beginVoting() {
+      if (votingStarted || launched || closed) return;
+      votingStarted = true;
+      clearInterval(readyTimer);   // paired — stop the connect-timeout
+      /* a light presence ping so a peer that (re)appears still finds us */
+      readyTimer = setInterval(() => { if (launched || closed) { clearInterval(readyTimer); return; } try { room.send({ t: 'lmready' }); } catch (e) { } }, 2000);
+      if (iAmHost) {   // host waits for the guest, then proceeds no matter what
+        const graceMs = (isStandard ? voteSecs + 6 : 4) * 1000;
+        finalizeDeadline = Date.now() + graceMs;
+        setTimeout(finalize, graceMs + 150);
+      }
+      if (!isStandard) {   // duels: nothing to vote on — swap seals silently and go
+        statusEl.textContent = 'Preparing the duel…';
+        sendSetup();
+        guestWatchdog();
+        return;
+      }
+      renderVoteUI();
+    }
+
+    function renderVoteUI() {
+      wait.innerHTML = '';
+      wait.appendChild(U.el('h3', { cls: 'gold', text: 'Match settings' }));
+      wait.appendChild(U.el('p', { cls: 'small muted', text: 'You and ' + o.oppName + ' each vote — the middle ground wins. Chaos needs both.' }));
+      let timeLeft = voteSecs;
+      const timer = U.el('div', { cls: 'setup-timer', text: timeLeft });
+      wait.appendChild(timer);
+      const rows = [];
+      function voteRow(label, opts, key, fmt) {
+        const row = U.el('div', { cls: 'vote-row' });
+        row.appendChild(U.el('div', { cls: 'muted small', text: label }));
+        const box = U.el('div', { cls: 'vote-opts' });
+        opts.forEach(op => {
+          const b = U.el('div', { cls: 'vote-opt' + (myVote[key] === op ? ' mine' : ''), text: fmt ? fmt(op) : op });
+          b.onclick = () => { if (mySetup) return; myVote[key] = op; U.qsa('.vote-opt', box).forEach((x, i) => x.classList.toggle('mine', opts[i] === op)); DYA.audio.play('click'); };
+          box.appendChild(b);
+        });
+        row.appendChild(box);
+        rows.push({ opts: opts, key: key, box: box });
+        return row;
+      }
+      wait.appendChild(voteRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, 'interval', v => v + 's'));
+      wait.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
+      wait.appendChild(voteRow('MODE — Chaos randomizes every pulse (needs both)', ['Standard', 'Chaos'], 'mode'));
+      wait.appendChild(U.el('p', { cls: 'small muted', html: '◆ = ' + U.esc(o.oppName) + '’s vote' }));
+      paintPeerVotes = () => {
+        if (!peerSetup || !peerSetup.vote) return;
+        rows.forEach(r => U.qsa('.vote-opt', r.box).forEach((x, i) => x.classList.toggle('theirs', r.opts[i] === peerSetup.vote[r.key])));
+      };
+      paintPeerVotes();
+      const lockBtn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: '✓ Lock in vote' });
+      lockBtn.onclick = () => { if (mySetup) return; lockBtn.textContent = 'Voted — waiting for the match to begin…'; lockBtn.disabled = 'true'; sendSetup(); };
+      wait.appendChild(lockBtn);
+      wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: cancel }));
+      const iv = setInterval(() => {
+        if (launched || closed) { clearInterval(iv); return; }
+        timeLeft--; timer.textContent = Math.max(0, timeLeft);
+        if (timeLeft <= 5) timer.classList.add('urgent');
+        if (timeLeft <= 0) { clearInterval(iv); if (!mySetup) { lockBtn.textContent = 'Voted — waiting for the match to begin…'; lockBtn.disabled = 'true'; sendSetup(); } }
+      }, 1000);
+      guestWatchdog();
+    }
+
+    function onMessage(msg) {
+      if (!msg) return;
+      if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) {
+        if (iAmHost && (msg.t === 'frame' || msg.t === 'need')) guestInSim = true;   // guest is simulating → stop re-announcing GO
+        P._netSession.route(msg); return;
+      }
+      if (msg.t === 'lmready') { if (!launched && !closed) { try { room.send({ t: 'lmready' }); } catch (e) { } beginVoting(); } }
+      else if (msg.t === 'lmsetup') {
+        peerSetup = { startRes: msg.startRes || 0, seal: msg.seal || MV.DEFAULT_SEAL, vote: msg.vote || MV.DEFAULT_VOTE };
+        if (paintPeerVotes) paintPeerVotes();
+        if (iAmHost) finalize();
+      } else if (msg.t === 'lmgo') { if (!iAmHost) launchWith(msg.info); }
     }
 
     (async function connect() {
       try {
         room = await DYA.netplay.joinRoom(roomCode, o.myNet, {
-          onMessage(msg) {
-            if (!msg) return;
-            if (P._netSession && P._netSession.route && (msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye')) { P._netSession.route(msg); return; }
-            if (msg.t === 'lmready') { if (!launched && !closed) { try { room.send({ t: 'lmready' }); } catch (e) { } launch(); } }
-          },
+          onMessage: onMessage,
           onPeerJoin() { if (room && !launched && !closed) { try { room.send({ t: 'lmready' }); } catch (e) { } } },
-          onPeerLeave() { if (P._netSession) P._netSession.peerLeft = Date.now(); },
+          onPeerLeave() {
+            if (P._netSession) P._netSession.peerLeft = Date.now();
+            /* opponent walked away DURING setup (before the match built) — don't
+               strand this player on a dead vote screen; a Dya'kukull fills in */
+            if (votingStarted && !launched && !closed) fallback();
+          },
         });
-        statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…';
-        wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: cancel }));
+        /* the peer may have already paired us during the await (voting begun) —
+           only paint the "waiting to connect" state if we're still connecting */
+        if (!votingStarted && !launched && !closed) {
+          statusEl.textContent = 'Waiting for ' + o.oppName + ' to sit down…';
+          wait.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: cancel }));
+        }
         room.send({ t: 'lmready' });
-        armTimer();
+        readyTimer = setInterval(() => {
+          if (launched || closed || votingStarted) { clearInterval(readyTimer); return; }
+          try { room.send({ t: 'lmready' }); } catch (e) { }
+          /* no manual "play the AI now" shortcut — if the real opponent hasn't
+             sat down by the ~10s mark, a Dya'kukull automatically fills in */
+          if (Date.now() > giveUpAt) { clearInterval(readyTimer); fallback(); }
+        }, 1500);
       } catch (e) {
         wm.close();
         UI.alert('Could not connect', e.message + ' — ' + (o.fallbackLabel ? o.fallbackLabel.toLowerCase() : 'playing a Dya’kukull instead') + '.');
@@ -1060,14 +1183,9 @@
       function finish() {
         if (done) return; done = true;
         clearInterval(iv);
-        /* middle ground auto-calculated from votes */
-        const settings = {
-          pulseInterval: Math.round((myVote.interval + oppVote.interval) / 2),
-          pulseAmount: Math.round((myVote.amount + oppVote.amount) / 2),
-          /* chaos requires majority — in 1v1 that means both */
-          chaos: myVote.mode === 'Chaos' && oppVote.mode === 'Chaos',
-        };
-        launchMatch(cfg, settings);
+        /* middle ground auto-calculated from votes (shared rule, so live PvP
+           and local matches agree) */
+        launchMatch(cfg, DYA.matchvote.combine(myVote, oppVote));
       }
       this.leave = () => { done = true; clearInterval(iv); };
     },
@@ -2389,8 +2507,9 @@
     const match = new DYA.match.Match({
       seed, mode: 'duel',
       teams: [
-        { name: me.displayName, controller: 'human', pouch: [U.deepCopy(myTok)] },
-        { name: opp.displayName, controller: 'ai', aiSkill, pouch: [U.deepCopy(oppTok)] },
+        /* your title's seal rides into every match, duels included */
+        { name: me.displayName, controller: 'human', pouch: [U.deepCopy(myTok)], seal: me.seal || { avatarIdx: me.avatarIdx, patterns: [] } },
+        { name: opp.displayName, controller: 'ai', aiSkill, pouch: [U.deepCopy(oppTok)], seal: (opp && opp.seal) || { avatarIdx: 3, patterns: ['runes'] } },
       ],
     });
     const staked = !opts.vsAI && (!betEmpty(myBet) || !betEmpty(oppBet));
