@@ -128,6 +128,43 @@
     return AC.pushNow(account, true);
   };
 
+  /* ================= SINGLE-SESSION SLOT =================
+     One tab / one device per account. The account row carries a
+     `session_id` claimed by the newest sign-in; other clients poll it
+     and sign out when it stops being theirs. Stored in its OWN column
+     (not inside `data`) so a routine save never clobbers the claim.
+     Deployments that haven't run the migration yet report `missing`,
+     and the guard falls back to cross-tab-only enforcement. */
+  function columnMissing(e) {
+    return !!(e && (e.status === 400 || e.status === 404 || e.status === 406) &&
+      /session_id|schema cache|does not exist|Could not find/i.test(e.message || ''));
+  }
+  AC.claimSession = async function (accountId, token) {
+    if (!AC.configured()) return { ok: false };
+    try {
+      await rest('PATCH', 'dya_accounts?id=eq.' + encodeURIComponent(accountId), { session_id: token });
+      return { ok: true };
+    } catch (e) {
+      if (columnMissing(e)) return { missing: true };
+      AC.state.error = e.message;
+      return { err: e.message };
+    }
+  };
+  AC.fetchSession = async function (accountId) {
+    if (!AC.configured()) return null;
+    try {
+      const rows = await rest('GET', 'dya_accounts?id=eq.' + encodeURIComponent(accountId) + '&select=session_id');
+      const r = rows && rows[0];
+      return { sessionId: r ? r.session_id : null };
+    } catch (e) {
+      if (columnMissing(e)) return { missing: true };
+      return null;
+    }
+  };
+  /* drop this account's pending debounced push — used when a session is
+     taken over, so the losing tab can't overwrite the winner's save */
+  AC.cancelPending = function (accountId) { clearTimeout(pushTimers[accountId]); };
+
   /* permanently remove a player account from the cloud (admin delete) */
   AC.remove = async function (accountId) {
     if (!AC.configured()) return { ok: false };

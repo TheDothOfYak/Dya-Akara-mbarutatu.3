@@ -120,9 +120,12 @@ create table if not exists public.dya_accounts (
   email      text not null unique,
   pass_hash  text not null,
   data       jsonb not null,
+  session_id text,                                    -- single active session (one tab / one device)
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
+-- existing deployments: add the single-session column if the table predates it
+alter table public.dya_accounts add column if not exists session_id text;
 
 -- ---------- bans (public record, enforced on every device) ----------
 create table if not exists public.dya_bans (

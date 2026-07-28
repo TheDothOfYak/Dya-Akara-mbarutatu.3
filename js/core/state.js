@@ -551,7 +551,7 @@
     G.world.accounts[acc.id] = acc;
     G.me = acc;
     G.save();
-    if (DYA.online) DYA.online.onAuthChange();
+    if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
     return { acc };
   };
   G.login = async function (email, pass) {
@@ -573,7 +573,7 @@
       G.world.accounts[acc.id] = acc;
       G.me = acc;
       G.save();
-      if (DYA.online) DYA.online.onAuthChange();
+      if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
       return { acc, auth: res };
     }
 
@@ -607,7 +607,7 @@
         acc.lastLogin = Date.now();
         G.me = acc;
         G.save();
-        if (DYA.online) DYA.online.onAuthChange();
+        if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
         return { acc };
       }
       /* not in the cloud yet: a local-only account from before this
@@ -621,7 +621,7 @@
       localAcc.lastLogin = Date.now();
       G.me = localAcc;
       G.save();
-      if (DYA.online) DYA.online.onAuthChange();
+      if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
       return { acc: localAcc };
     }
 
@@ -632,17 +632,18 @@
     acc.lastLogin = Date.now();
     G.me = acc;
     G.save();
-    if (DYA.online) DYA.online.onAuthChange();
+    if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
     return { acc };
   };
   G.logout = function () {
+    if (DYA.sessionGuard) DYA.sessionGuard.release();   // give up this account's single-session slot
     G.me = null;
     /* a tutorial spotlight is a fixed element parented to <body>, outside
        the normal screen container — it survives UI.show() transitions and
        must be torn down explicitly, or it sits on top of (and swallows
        clicks on) whatever renders next, including the login form */
     if (DYA.tutorial) { DYA.tutorial.active = false; DYA.tutorial.clear(); }
-    if (DYA.online) DYA.online.onAuthChange();
+    if (DYA.sessionGuard) DYA.sessionGuard.claim(G.me); if (DYA.online) DYA.online.onAuthChange();
   };
   G.banInfo = function (accId) { return G.world.bans[accId || (G.me && G.me.id)] || null; };
   G.isBanned = function (accId) {
