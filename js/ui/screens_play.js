@@ -114,25 +114,32 @@
         c.onmouseleave = () => c.style.borderColor = '';
         return c;
       }
+      /* Quick Play and Duel-vs-machine are the only two modes playable on
+         your own; every other mode is the shared world and passes through
+         UI.requireOnline. */
       grid.appendChild(bigCard('⚡', 'Quick Play — vs AI', 'Straight into a match against the machine. Pick a difficulty, pick a pouch, go.', () => P.quickPlayFlow()));
-      grid.appendChild(bigCard('🏆', 'Ranked Season', 'The Guild’s official ladder. Play your circuit, rank up, climb Local → Interplanetary. Titles are earned here.', () => UI.show('seasonLadder')));
-      grid.appendChild(bigCard('🌐', 'Matchmaking Queue', 'Casual queue — matched with the next player near your level. No rank implications.', () => P.matchmakingFlow()));
-      grid.appendChild(bigCard('🤝', 'Private Match', 'Invite a friend, or share a room code.', () => P.privateFlow()));
+      grid.appendChild(bigCard('🏆', 'Ranked Season', 'The Guild’s official ladder. Play your circuit, rank up, climb Local → Interplanetary. Titles are earned here.', () => UI.requireOnline(() => UI.show('seasonLadder'))));
+      grid.appendChild(bigCard('🌐', 'Matchmaking Queue', 'Casual queue — matched with the next player near your level. No rank implications.', () => UI.requireOnline(() => P.matchmakingFlow())));
+      grid.appendChild(bigCard('🤝', 'Private Match', 'Invite a friend, or share a room code.', () => UI.requireOnline(() => P.privateFlow())));
       grid.appendChild(bigCard('⚔', 'Duel', '1 token vs 1 token. No resources, no Relic. Anything can be wagered. No Guild cut.', () => P.duelFlow()));
-      grid.appendChild(bigCard('👁', 'Spectate', 'Watch a public match in progress. React freely; the players never see it.', () => P.spectateFlow()));
+      grid.appendChild(bigCard('👁', 'Spectate', 'Watch a public match in progress. React freely; the players never see it.', () => UI.requireOnline(() => P.spectateFlow())));
       grid.appendChild(bigCard('🎞', 'Replays', 'Your last 50 casual matches and every tournament match, stored as seed + inputs.', () => P.replayList()));
       body.appendChild(grid);
 
-      /* ---- LIVE NOW: the Dya'kukull are playing right now ---- */
-      const livePanel = U.el('div', { cls: 'panel mt', style: 'max-width:1000px;margin:18px auto 0' });
-      body.appendChild(livePanel);
+      /* ---- LIVE NOW: the players of the world, live right now ----
+         This is the living world of the Mbaru Tatu, so it only shows when the
+         Guild network is up. The world's own players (the Dya'kukull) fill it
+         out and are shown exactly as any other player. */
+      const liveOnline = DYA.online && DYA.online.enabled;
+      const livePanel = liveOnline ? U.el('div', { cls: 'panel mt', style: 'max-width:1000px;margin:18px auto 0' }) : null;
+      if (livePanel) body.appendChild(livePanel);
       function renderLive() {
-        if (!livePanel.isConnected) return;
+        if (!livePanel || !livePanel.isConnected) return;
         const ln = G.liveNow();
         livePanel.innerHTML = '';
         livePanel.appendChild(U.el('div', { cls: 'flex' }, [
           U.el('h3', { cls: 'gold', text: 'Live Now' }),
-          U.el('span', { cls: 'pill', html: '<span class="online-dot online" style="display:inline-block"></span> ' + ln.online.length + ' Dya\u2019kukull online' }),
+          U.el('span', { cls: 'pill', html: '<span class="online-dot online" style="display:inline-block"></span> ' + ln.online.length + ' players online' }),
         ]));
         /* challenges to YOU first */
         ln.challenges.forEach(ch => {
@@ -156,7 +163,7 @@
           livePanel.appendChild(row);
         });
         /* matches happening right now — watch any of them */
-        if (!ln.matches.length) livePanel.appendChild(U.el('p', { cls: 'muted small', text: 'No matches on right now. Someone will start one soon — the Dya\u2019kukull are always playing.' }));
+        if (!ln.matches.length) livePanel.appendChild(U.el('p', { cls: 'muted small', text: 'No matches on right now. Someone will start one soon — the arena is never quiet for long.' }));
         ln.matches.forEach(mrec => {
           const a = G.world.accounts[mrec.aId], b = G.world.accounts[mrec.bId];
           if (!a || !b) return;
@@ -187,8 +194,10 @@
       page.appendChild(body);
       scr.appendChild(page);
       root.appendChild(scr);
-      renderLive(); /* after attach — the isConnected guard needs a live DOM */
-      const liveIv = setInterval(() => { if (!livePanel.isConnected) { clearInterval(liveIv); return; } renderLive(); }, 6000);
+      if (livePanel) {
+        renderLive(); /* after attach — the isConnected guard needs a live DOM */
+        const liveIv = setInterval(() => { if (!livePanel.isConnected) { clearInterval(liveIv); return; } renderLive(); }, 6000);
+      }
     },
   });
 
@@ -233,8 +242,8 @@
       body.appendChild(U.el('p', { cls: 'small muted mt', text: !seasonOpen
         ? 'The Guild hasn’t opened this season yet. The season begins when the organizer starts it from the Admin Panel — check back soon.'
         : (S && S.enabled && S.enabled())
-          ? 'You’ll be matched with a real player in your circuit if one is searching — otherwise a Dya’kukull fills in so you never wait. Every match is ranked.'
-          : 'Online isn’t set up, so you’ll play the Dya’kukull of your circuit. Set up online play (Friends) to face real players.' }));
+          ? 'You’ll be matched with a player in your circuit. Every match is ranked — climb the circuits from Local to Interplanetary.'
+          : 'You’ll be matched with a player in your circuit. Every match is ranked.' }));
 
       const lad = U.el('div', { cls: 'panel mt' });
       lad.appendChild(U.el('h3', { cls: 'gold mb', text: 'The circuit climb' }));
@@ -317,7 +326,7 @@
 
     function aiMatch(pouch, prevRank, circuit) {
       const opp = (DYA.season && DYA.season.aiOpponentFor(circuit)) || Object.values(G.world.accounts).find(a => a.ai);
-      if (!opp) { UI.alert('No opponent', 'The Dya’kukull are all busy right now. Try again in a moment.'); return; }
+      if (!opp) { UI.alert('No opponent', 'No opponents are available right now. Try again in a moment.'); return; }
       P.startMatch({
         mode: 'standard', ranked: true, format: circuit + ' Season',
         opponent: { name: opp.displayName, accId: opp.id, aiSkill: G.aiSkill(opp), pouch: P.accountPouch(opp), simulatedHuman: true },
@@ -378,7 +387,7 @@
           P.pickPouch(pouch => {
             P.startMatch({
               mode: 'standard', ranked: false, format: 'Quick Play vs AI (' + d + ')',
-              opponent: { name: 'Dya’kukull ' + d, aiSkill: G.aiSkill({ aiCfg: { matchSkill: AI_SKILL[d] } }), pouch: P.aiPouch(AI_SKILL[d]) },
+              opponent: { name: 'AI ' + d, aiSkill: G.aiSkill({ aiCfg: { matchSkill: AI_SKILL[d] } }), pouch: P.aiPouch(AI_SKILL[d]) },
               pouch, vsAI: true, noXp: true,   // practice against the machine — no XP
             });
           });
@@ -437,27 +446,10 @@
   };
 
   P.privateFlow = function () {
-    /* with the online service configured, private matches are REAL
-       cross-device rooms; otherwise the offline stand-in flow runs */
-    if (DYA.online && DYA.online.enabled) { P.privateOnlineFlow(); return; }
-    const w = U.el('div', {});
-    w.appendChild(U.el('h3', { cls: 'gold', text: 'Private Match — offline' }));
-    const m = UI.modal(w);
-    const code = Math.random().toString(36).slice(2, 7).toUpperCase();
-    w.appendChild(U.el('p', { cls: 'mt', html: 'You are in <b>offline mode</b> — rooms here are practice rooms against a Dya’kukull stand-in.<br><span class="small muted">To play a friend on another computer, set up online play first (it takes ~5 minutes, once).</span>' }));
-    const row = U.el('div', { cls: 'flex mt' });
-    row.appendChild(U.el('button', { cls: 'btn primary', text: '🌐 Set up online play', onclick: () => { m.close(); UI.onlineSetup(() => P.privateFlow()); } }));
-    row.appendChild(U.el('button', {
-      cls: 'btn', text: 'Practice room (vs AI)', onclick: () => {
-        m.close();
-        const friends = G.me.friends.map(id => G.world.accounts[id]).filter(Boolean);
-        const opp = friends.length ? friends[Math.floor(Math.random() * friends.length)] : Object.values(G.world.accounts).find(a => a.ai);
-        UI.toast({ title: 'Room ' + code, body: opp.displayName + ' joined your practice room.', icon: '🤝' });
-        setTimeout(() => P.inviteFriendMatch(opp), 900);
-      },
-    }));
-    row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => m.close() }));
-    w.appendChild(row);
+    /* Private matches are REAL cross-device rooms — they need the Guild
+       network. (Playing on your own is Quick Play / Duel vs the machine.) */
+    UI.requireOnline(() => P.privateOnlineFlow(), { title: 'Private Match',
+      body: 'A private match is a real room another player joins from their own device — it needs the Guild network. To play on your own, use <b>Quick Play</b> or a <b>Duel</b> against the machine.' });
   };
 
   /* ---------- REAL cross-device private matches ---------- */
@@ -853,7 +845,7 @@
         }, 1500);
       } catch (e) {
         wm.close();
-        UI.alert('Could not connect', e.message + ' — ' + (o.fallbackLabel ? o.fallbackLabel.toLowerCase() : 'playing a Dya’kukull instead') + '.');
+        UI.alert('Could not connect', e.message + ' — ' + (o.fallbackLabel ? o.fallbackLabel.toLowerCase() : 'seating another opponent') + '.');
         if (o.onFallback) o.onFallback();
       }
     })();
@@ -879,11 +871,13 @@
   };
 
   P.inviteFriendMatch = function (acc) {
-    P.pickPouch(pouch => {
-      P.startMatch({
-        mode: 'standard', ranked: false, format: 'Private Match',
-        opponent: { name: acc.displayName, accId: acc.id, aiSkill: G.aiSkill(acc), pouch: P.accountPouch(acc), simulatedHuman: true },
-        pouch,
+    UI.requireOnline(() => {
+      P.pickPouch(pouch => {
+        P.startMatch({
+          mode: 'standard', ranked: false, format: 'Private Match',
+          opponent: { name: acc.displayName, accId: acc.id, aiSkill: G.aiSkill(acc), pouch: P.accountPouch(acc), simulatedHuman: true },
+          pouch,
+        });
       });
     });
   };
@@ -1805,7 +1799,7 @@
     row.appendChild(U.el('button', { cls: 'btn primary', text: '⚔ vs Player', onclick: () => { m.close(); P.duelVsPlayerFlow(); } }));
     row.appendChild(U.el('button', { cls: 'btn', text: '🤖 vs AI', onclick: () => { m.close(); P.duelVsAIFlow(); } }));
     w.appendChild(row);
-    w.appendChild(U.el('p', { cls: 'small muted mt', html: '<b>vs Player</b> — a Dya’kukull, a real player. Wager anything; both must agree. <br><b>vs AI</b> — the machine. Practice only, nothing at stake.' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', html: '<b>vs Player</b> — another player of the world. Wager anything; both must agree. <br><b>vs AI</b> — the machine. Practice only, nothing at stake.' }));
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   };
 
@@ -1848,12 +1842,14 @@
      Look for a REAL human duelist first (over the shared online queue); only
      if none turns up in ~10s do we seat a Dya'kukull instead. */
   P.duelVsPlayerFlow = function () {
-    const me = G.me;
-    const toks = Object.values(me.tokens).filter(t => !t.frozen);
-    if (!toks.length) { UI.alert('No tokens', 'You need at least one token to duel.'); return; }
-    const S = DYA.season;
-    if (S && S.enabled && S.enabled()) { P.duelOnlineSearch(); return; }
-    P.duelVsKukull();
+    UI.requireOnline(() => {
+      const me = G.me;
+      const toks = Object.values(me.tokens).filter(t => !t.frozen);
+      if (!toks.length) { UI.alert('No tokens', 'You need at least one token to duel.'); return; }
+      const S = DYA.season;
+      if (S && S.enabled && S.enabled()) { P.duelOnlineSearch(); return; }
+      P.duelVsKukull();
+    }, { title: 'Duel a player', body: 'Dueling a player of the world needs the Guild network. To duel on your own, choose <b>vs AI</b> instead — that’s a practice bout against the machine.' });
   };
 
   /* the original behaviour — seat a Dya'kukull and open the wager table */
@@ -2168,7 +2164,7 @@
         renderLeft(); renderMid(); renderRight();
         sysChat('You’re matched with ' + pairing.oppName + '. Lay down a stake — or none.');
       } catch (e) {
-        UI.toast({ title: 'Could not connect', body: 'Dueling a Dya’kukull instead.', icon: '⚠' });
+        UI.toast({ title: 'Could not connect', body: 'Seating another opponent.', icon: '⚠' });
         P.duelVsKukull();
       }
     })();
@@ -2221,7 +2217,7 @@
       /* ---- right: opponent ---- */
       const right = U.el('div', { cls: 'setup-col panel' });
       right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Opponent — ' + opp.displayName }));
-      right.appendChild(U.el('p', { cls: 'muted small', html: 'A live player — one of the Dya’kukull. <span class="' + (G.aiStatus(opp.id) === 'online' ? 'gold' : 'muted') + '">' + (G.aiStatus(opp.id) === 'online' ? 'Online now.' : 'Just stepped in.') + '</span>' }));
+      right.appendChild(U.el('p', { cls: 'muted small', html: 'A live player of the Mbaru Tatu. <span class="' + (G.aiStatus(opp.id) === 'online' ? 'gold' : 'muted') + '">' + (G.aiStatus(opp.id) === 'online' ? 'Online now.' : 'Just stepped in.') + '</span>' }));
       right.appendChild(U.el('p', { cls: 'muted small mt', text: 'Their side of the stakes shows in the middle. They pick their own duelist when the wager is set.' }));
       const rightBody = U.el('div', { cls: 'mt' });
       right.appendChild(rightBody);

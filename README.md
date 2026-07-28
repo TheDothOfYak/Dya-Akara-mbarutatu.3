@@ -92,7 +92,14 @@ The game now has a real online layer — see **[ONLINE_SETUP.md](ONLINE_SETUP.md
 - Configure once in `js/config.js` (bakes it into the deployment), or per-browser in-game via **Friends → Set up online play**. If you set up Supabase before this update, re-run `supabase/schema.sql` once — it's idempotent and just adds the new tables.
 - ⚠ Same open-policy security model as the rest of this online layer (see [ONLINE_SETUP.md](ONLINE_SETUP.md#a-note-on-security)): fine for a game shared among people you trust, not equivalent to real per-account authentication.
 
-Without online configured, everything still runs fully local exactly as before: accounts, world, the local Dya'kukull stalls, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). Matchmaking and duels are always played against the AI populace, which stays a per-browser simulation even with online configured — it's world flavor, not portable player data. Tournaments are local (AI-run flavor) offline, but become **real and shared** the moment online is configured.
+**What may be played offline — and what may not.** Dya'Akara is the shared world of the Mbaru Tatu, so only **two** modes are playable without the Guild network:
+
+- **Quick Play — vs AI** (an honest practice match against the machine), and
+- **Duel — vs AI** (an honest, no-stakes practice bout).
+
+Everything else — Ranked Season, the Matchmaking Queue, Private Match, Spectate, dueling a player, the Market, Tournaments, and the Hunts — is part of the shared world and requires online. Choosing one of them without online configured opens a single prompt to connect (`UI.requireOnline`), never a local silo. Online is configured out of the box in `js/config.js`, so the deployed game is online for everyone by default.
+
+**The Dya'kukull are players.** The world's own hundred inhabitants fill the market, the queues, the brackets, and any empty seat — and to a player they are simply *players*. Nothing in the game reveals them as anything else: no "vs AI" label, no "offline stand-in", no "so you never wait". They still live in `localStorage` behind the storage adapter (`DYA.store` in `js/core/state.js`) as world flavor rather than portable player data, but a real player always seats ahead of them, and a Dya'kukull only ever fills in seamlessly — indistinguishable from the person on the next computer.
 
 ## Deferred (matches Part XVII)
 
