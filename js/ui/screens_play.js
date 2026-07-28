@@ -1786,15 +1786,16 @@
   P.duelOnlineSetup = function (pairing) {
     const me = G.me, S = DYA.season, DO = DYA.duelOnline;
     const myNet = S.netId();
-    let myWager = { gold: 0, tokens: [] }, oppWager = { gold: 0, tokens: [] };
-    let myWagerRev = 0, oppWagerRev = 0;
-    let myAgree = false, oppAgree = false, oppAgreeOnRev = -1;
-    let phase = 'bet';                 // 'bet' | 'pick'
+    let myBet = emptyBet(), oppBet = emptyBet();       // same bet shape as the Dya'kukull screen
+    let myBetRev = 0, oppBetRev = 0;
+    let myAgreed = false, oppAgreed = false, oppAgreedOnRev = -1;
+    let phase = 'bet';                                  // 'bet' | 'select'
+    let myMode = null, oppMode = null, myReady = false, oppReady = false;
     let myTok = null, oppTok = null;
     let room = null, closed = false, launched = false;
 
     const scr = U.el('div', { cls: 'screen' });
-    scr.appendChild(UI.topbar({ title: 'Duel — vs ' + pairing.oppName }));
+    scr.appendChild(UI.topbar({ title: 'Duel Setup — vs ' + pairing.oppName }));
     const wrap = U.el('div', { cls: 'setup-wrap' });
     const left = U.el('div', { cls: 'setup-col panel' });
     const mid = U.el('div', { cls: 'setup-col panel', style: 'max-width:440px' });
@@ -1807,89 +1808,187 @@
     UI.current = { leave: () => teardown() }; UI.currentName = 'duelOnlineSetup';
 
     function send(msg) { try { if (room) room.send(msg); } catch (e) { } }
-    function bothAgreed() { return myAgree && oppAgree && oppAgreeOnRev === myWagerRev; }
+    function bothAgreed() { return myAgreed && oppAgreed; }
+    function serialBet(b) { return { gold: b.gold, ngakara: b.ngakara, okid: b.okid.slice(), tokens: b.tokens.map(t => U.deepCopy(t)) }; }
 
-    /* ---- chat ---- */
-    const chatLog = U.el('div', { cls: 'duel-chat-log', style: 'max-height:180px;overflow:auto' });
-    function logChat(who, text) { chatLog.appendChild(U.el('div', { cls: 'duel-msg', html: '<b>' + U.esc(who) + ':</b> ' + U.esc(text) })); chatLog.scrollTop = chatLog.scrollHeight; }
-    function say(text) { logChat(me.displayName, text); send({ t: 'c', text }); }
+    /* ---------- persistent chat (survives re-renders; keeps typed text) ---------- */
+    const chatLog = U.el('div', { cls: 'duel-chat-log' });
+    const chatBox = U.el('div', { cls: 'duel-chat' });
+    const chatIn = U.el('div', { cls: 'duel-chat-in' });
+    (L.QUICK_CHAT || []).forEach(q => chatIn.appendChild(U.el('button', { cls: 'btn small ghost', style: 'margin:1px', text: q, onclick: () => sayMine(q) })));
+    const chatType = U.el('input', { cls: 'txt', maxlength: 120, placeholder: 'Type a message…', style: 'flex:1;min-width:120px' });
+    const sendTyped = () => { const t = chatType.value.trim(); if (!t || launched) return; sayMine(t); chatType.value = ''; };
+    chatType.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendTyped(); } });
+    const chatTypeRow = U.el('div', { style: 'display:flex;gap:4px;margin-top:4px' }, [chatType, U.el('button', { cls: 'btn small primary', style: 'margin:1px', text: 'Send', onclick: sendTyped })]);
+    chatBox.appendChild(chatLog); chatBox.appendChild(chatIn); chatBox.appendChild(chatTypeRow);
+    function addChat(cls, who, text) {
+      const msg = U.el('div', { cls: 'duel-msg ' + cls });
+      if (who) msg.appendChild(U.el('span', { cls: 'who', text: who }));
+      msg.appendChild(U.el('span', { text: text }));
+      chatLog.appendChild(msg); chatLog.scrollTop = chatLog.scrollHeight;
+    }
+    function sysChat(text) { addChat('sys', '', text); }
+    function sayMine(text) { if (launched) return; addChat('me', me.displayName, text); DYA.audio.play('click'); send({ t: 'chat', text }); }
 
-    function repaint() {
-      /* ---- left: my side ---- */
+    /* ---------- LEFT: your stake (only re-rendered on phase / token changes, so
+       the number inputs keep focus while you type — a live keystroke updates
+       only the middle) ---------- */
+    function renderLeft() {
       left.innerHTML = '';
-      if (phase === 'bet') {
-        left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your wager' }));
-        const goldRow = U.el('div', { cls: 'flex', style: 'align-items:center;gap:8px' });
-        goldRow.appendChild(U.el('span', { cls: 'muted small', text: 'Gold:' }));
-        const gi = U.el('input', { cls: 'txt', type: 'number', value: String(myWager.gold), style: 'width:120px' });
-        gi.oninput = () => { myWager.gold = Math.max(0, Math.min(me.gold, Math.round(+gi.value || 0))); changedWager(); };
-        goldRow.appendChild(gi);
-        left.appendChild(goldRow);
-        left.appendChild(U.el('p', { cls: 'small muted mt', text: 'You hold ' + U.fmt(me.gold) + 'g.' }));
-        const tl = U.el('div', { cls: 'mt' });
-        myWager.tokens.forEach(t => {
-          const rowT = U.el('div', { cls: 'flex', style: 'align-items:center;gap:6px;justify-content:space-between' });
-          rowT.appendChild(U.el('span', { cls: 'small', text: (SP.get(t.speciesId) ? SP.get(t.speciesId).name : t.speciesId) + (t.name ? ' “' + t.name + '”' : '') }));
-          rowT.appendChild(U.el('button', { cls: 'btn ghost small', text: '✕', onclick: () => { myWager.tokens = myWager.tokens.filter(x => x.id !== t.id); changedWager(); } }));
-          tl.appendChild(rowT);
-        });
-        left.appendChild(tl);
-        left.appendChild(U.el('button', {
-          cls: 'btn small mt', text: '+ Stake a token', onclick: () => {
-            const avail = Object.values(me.tokens).filter(t => !t.frozen && t.status !== 'market' && !t.isRental && !myWager.tokens.some(x => x.id === t.id));
-            if (!avail.length) { UI.alert('No tokens', 'You have no free tokens left to stake.'); return; }
-            pickTokenModal(avail, t => { myWager.tokens.push(U.deepCopy(t)); changedWager(); });
-          },
-        }));
-        const agreeBtn = U.el('button', { cls: 'btn primary mt', text: myAgree ? '✓ You agreed — waiting…' : 'Agree to these stakes' });
-        agreeBtn.onclick = () => {
-          if (!myAgree) {
-            if (!DO.canCover(me, myWager)) { UI.alert('Can’t cover that', 'You can’t stake gold or tokens you don’t hold.'); return; }
-            myAgree = true;
-          } else myAgree = false;
-          send({ t: 'a', v: myAgree, onRev: oppWagerRev });   // I agree to the opponent's current wager rev
-          maybeAdvance(); repaint();
-        };
-        left.appendChild(agreeBtn);
-      } else {
+      if (phase === 'select') {
         left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your duelist' }));
-        left.appendChild(U.el('p', { cls: 'small muted', text: myTok ? 'Chosen: ' + (SP.get(myTok.speciesId) ? SP.get(myTok.speciesId).name : myTok.speciesId) : 'Pick the token you’ll fight with.' }));
-        left.appendChild(U.el('button', {
-          cls: 'btn primary mt', text: myTok ? 'Change duelist' : 'Pick your duelist', onclick: () => {
-            const fighters = Object.values(me.tokens).filter(t => !t.frozen && SP.canDuel(t.speciesId));
-            if (!fighters.length) { UI.alert('No duel-fit tokens', 'You need a token that actually fights.'); return; }
-            pickTokenModal(fighters, t => { myTok = U.deepCopy(t); send({ t: 'p', tok: myTok }); maybeAdvance(); repaint(); });
-          },
-        }));
+        left.appendChild(U.el('p', { cls: 'muted small', text: 'Choose how your token is decided. For a Random duel, both of you must choose Random — talk it over in the middle.' }));
+        left.appendChild(U.el('p', { cls: 'muted small mt', html: 'Locked stake: <span class="gold">' + U.esc(betSummary(myBet)) + '</span>' }));
+        return;
       }
+      left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your stake' }));
+      left.appendChild(U.el('p', { cls: 'muted small', text: 'Lay down what you’re willing to wager. Nothing is lost until the duel is fought — and a draw returns everything.' }));
+      left.appendChild(betNumberField('GOLD', me.gold, myBet.gold, v => { myBet.gold = v; }));
+      left.appendChild(betNumberField('NGAKARA', me.ngakara, myBet.ngakara, v => { myBet.ngakara = v; }));
+      /* okid — per rarity tier */
+      const okidField = U.el('div', { cls: 'bet-field' });
+      okidField.appendChild(U.el('label', { html: 'OKID <span class="hold">— by tier</span>' }));
+      const okidRow = U.el('div', { cls: 'flex', style: 'gap:6px' });
+      const okidRar = U.el('select', { cls: 'txt', style: 'max-width:150px' });
+      SP.RARITIES.forEach((r, i) => okidRar.appendChild(U.el('option', { value: i, text: r + ' (' + me.okid[i] + ')' })));
+      const okidNum = U.el('input', { cls: 'txt', type: 'number', min: '0', style: 'max-width:100px', value: String(myBet.okid[0] || 0) });
+      okidRar.onchange = () => { okidNum.value = String(myBet.okid[+okidRar.value] || 0); };
+      okidNum.oninput = () => { const i = +okidRar.value; const v = Math.max(0, Math.min(me.okid[i], parseInt(okidNum.value) || 0)); okidNum.value = String(v); myBet.okid[i] = v; onBetChange(); };
+      okidRow.appendChild(okidRar); okidRow.appendChild(okidNum);
+      okidField.appendChild(okidRow);
+      left.appendChild(okidField);
+      /* staked tokens */
+      const tokField = U.el('div', { cls: 'bet-field' });
+      tokField.appendChild(U.el('label', { text: 'TOKENS' }));
+      const chips = U.el('div', {});
+      myBet.tokens.forEach(t => {
+        const chip = U.el('span', { cls: 'bet-chip' }, [U.el('span', { text: t.name })]);
+        chip.appendChild(U.el('span', { cls: 'x', text: '✕', onclick: () => { myBet.tokens = myBet.tokens.filter(x => x.id !== t.id); onBetChange(); renderLeft(); } }));
+        chips.appendChild(chip);
+      });
+      tokField.appendChild(chips);
+      tokField.appendChild(U.el('button', {
+        cls: 'btn small ghost mt', text: '＋ Stake a token', onclick: () => {
+          const avail = Object.values(me.tokens).filter(t => !t.frozen && t.status !== 'market' && !t.isRental && !myBet.tokens.some(x => x.id === t.id));
+          if (!avail.length) { UI.alert('No tokens', 'Nothing left to stake.'); return; }
+          pickTokenModal(avail, t => { myBet.tokens.push(U.deepCopy(t)); onBetChange(); renderLeft(); });
+        },
+      }));
+      tokField.appendChild(U.el('p', { cls: 'muted small mt', text: 'A staked token lost is lost forever — the Guild does not retrieve it.' }));
+      left.appendChild(tokField);
+    }
+    function betNumberField(label, held, cur, set) {
+      const f = U.el('div', { cls: 'bet-field' });
+      f.appendChild(U.el('label', { html: label + ' <span class="hold">— you hold ' + U.fmt(held) + '</span>' }));
+      const inp = U.el('input', { cls: 'txt', type: 'number', min: '0', value: String(cur || 0), style: 'max-width:160px' });
+      inp.oninput = () => { const v = Math.max(0, Math.min(held, parseInt(inp.value) || 0)); inp.value = String(v); set(v); onBetChange(); };
+      f.appendChild(inp);
+      return f;
+    }
+    /* a stake changed → reopen agreement, tell the opponent live, refresh the
+       middle only (never re-render LEFT here, or the input loses focus) */
+    function onBetChange() {
+      myAgreed = false; oppAgreed = false; myBetRev++;
+      send({ t: 'bet', bet: serialBet(myBet), rev: myBetRev });
+      renderMid(); renderRight();
+    }
 
-      /* ---- middle: stakes + chat ---- */
+    /* a small card row for the creatures in a wager (so you can see what the
+       other player is putting up, not just its name) */
+    function stakeCards(bet) {
+      if (!bet.tokens.length) return null;
+      const row = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px' });
+      bet.tokens.forEach(t => row.appendChild(UI.tokenCard(t, { size: 66, mode: 'minimal' })));
+      return row;
+    }
+
+    /* ---------- MIDDLE: totals (+ creature cards) + chat + action ---------- */
+    function renderMid() {
       mid.innerHTML = '';
-      mid.appendChild(U.el('h3', { cls: 'gold mb', text: 'Stakes' }));
-      mid.appendChild(U.el('div', { cls: 'duel-total' + (myAgree ? ' agreed' : ''), html: '<b>You:</b> ' + U.esc(DO.describe(myWager, SP)) + (myAgree ? ' ✓' : '') }));
-      mid.appendChild(U.el('div', { cls: 'duel-total' + (oppAgree ? ' agreed' : ''), html: '<b>' + U.esc(pairing.oppName) + ':</b> ' + U.esc(DO.describe(oppWager, SP)) + (oppAgree ? ' ✓' : '') }));
-      mid.appendChild(U.el('p', { cls: 'small muted mt', text: phase === 'bet' ? 'Both must agree to the same stakes to proceed. A draw returns everything.' : 'Both pick a duelist — the fight begins when both are ready.' }));
-      mid.appendChild(chatLog);
-      const ci = U.el('input', { cls: 'txt mt', placeholder: 'Say something…' });
-      ci.onkeydown = e => { if (e.key === 'Enter' && ci.value.trim()) { say(ci.value.trim()); ci.value = ''; } };
-      mid.appendChild(ci);
+      if (phase === 'bet') {
+        mid.appendChild(U.el('h3', { cls: 'gold center', text: 'The Wager' }));
+        mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Both sides must agree. No timer — haggle in the chat, and withdraw any time with no consequences.' }));
+        const mine = U.el('div', { cls: 'duel-total' + (myAgreed ? ' agreed' : '') }, [
+          U.el('div', {}, [U.el('div', { cls: 'small muted', text: 'YOU STAKE' }), U.el('div', { text: betSummary(myBet) })]),
+          U.el('div', { cls: 'dt-val', text: '~' + U.fmt(betValue(myBet)) + 'g' }),
+        ]);
+        mid.appendChild(mine);
+        const myCards = stakeCards(myBet); if (myCards) mid.appendChild(myCards);
+        const theirs = U.el('div', { cls: 'duel-total' + (oppAgreed ? ' agreed' : '') }, [
+          U.el('div', {}, [U.el('div', { cls: 'small muted', text: pairing.oppName.toUpperCase() + ' STAKES' }), U.el('div', { text: betSummary(oppBet) })]),
+          U.el('div', { cls: 'dt-val', text: '~' + U.fmt(betValue(oppBet)) + 'g' }),
+        ]);
+        mid.appendChild(theirs);
+        const oppCards = stakeCards(oppBet); if (oppCards) mid.appendChild(oppCards);
+        mid.appendChild(U.el('p', { cls: 'small mb' }, [
+          U.el('span', { cls: 'duel-agree ' + (myAgreed ? 'yes' : 'no'), text: (myAgreed ? '✓' : '○') + ' You ' }),
+          U.el('span', { text: '   ' }),
+          U.el('span', { cls: 'duel-agree ' + (oppAgreed ? 'yes' : 'no'), text: (oppAgreed ? '✓' : '○') + ' ' + pairing.oppName }),
+        ]));
+        mid.appendChild(chatBox);
+        const agreeBtn = U.el('button', { cls: 'btn ' + (myAgreed ? 'ghost' : 'primary'), style: 'width:100%;margin-top:10px', text: myAgreed ? '✓ Agreed — click to change' : '✓ Agree to these stakes' });
+        agreeBtn.onclick = () => {
+          if (!myAgreed && !DO.canCover(me, myBet)) { UI.alert('Can’t cover that', 'You can’t stake gold, NgAkara, Okid or tokens you don’t hold.'); return; }
+          myAgreed = !myAgreed; DYA.audio.play('click');
+          send({ t: 'agree', v: myAgreed, onRev: oppBetRev });
+          renderMid(); renderRight();
+        };
+        mid.appendChild(agreeBtn);
+        const goBtn = U.el('button', { cls: 'btn primary', style: 'width:100%;margin-top:8px', text: bothAgreed() ? 'Stakes set — choose tokens →' : 'Both must agree first' });
+        goBtn.disabled = !bothAgreed() ? 'true' : null;
+        goBtn.onclick = () => { if (bothAgreed()) { send({ t: 'phase' }); toSelectPhase(); } };
+        mid.appendChild(goBtn);
+        mid.appendChild(U.el('button', { cls: 'btn ghost', style: 'width:100%;margin-top:8px', text: 'Withdraw — no consequences', onclick: withdraw }));
+      } else {
+        mid.appendChild(U.el('h3', { cls: 'gold center', text: 'Choose Tokens' }));
+        mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Both pick the same method. Random needs both of you to choose Random — settle it in the chat.' }));
+        const modes = [['pick', 'Pick', 'Choose your token'], ['random', 'Random', 'Assigned from your collection'], ['blind', 'Blind', 'Chosen secretly, revealed at the clash']];
+        const row = U.el('div', { cls: 'vote-opts', style: 'justify-content:center' });
+        modes.forEach(([v, label]) => {
+          const b = U.el('div', { cls: 'vote-opt' + (myMode === v ? ' mine' : '') + (oppMode === v ? ' theirs' : ''), text: label });
+          b.onclick = () => setMyMode(v);
+          row.appendChild(b);
+        });
+        mid.appendChild(row);
+        const chosen = modes.find(m => m[0] === myMode);
+        mid.appendChild(U.el('p', { cls: 'center small muted mt', text: chosen ? chosen[2] : 'Pick a method.' }));
+        mid.appendChild(U.el('p', { cls: 'small muted center', html: '◆ = ' + pairing.oppName + '’s choice' }));
+        mid.appendChild(chatBox);
+        const matched = myMode && myMode === oppMode;
+        const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%;margin-top:10px', text: myReady ? (matched && oppReady ? 'Starting…' : '✓ Ready — waiting for ' + pairing.oppName + '…') : '✓ Ready' });
+        readyBtn.disabled = !myMode ? 'true' : null;
+        readyBtn.onclick = () => { if (myMode) chooseAndReady(); };
+        mid.appendChild(readyBtn);
+        mid.appendChild(U.el('button', { cls: 'btn ghost', style: 'width:100%;margin-top:8px', text: 'Withdraw — no consequences', onclick: withdraw }));
+      }
+    }
 
-      /* ---- right: opponent ---- */
+    /* ---------- RIGHT: opponent live view ---------- */
+    function renderRight() {
       right.innerHTML = '';
-      right.appendChild(U.el('h3', { cls: 'gold mb', text: pairing.oppName }));
+      right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Opponent — ' + pairing.oppName }));
       right.appendChild(U.el('p', { cls: 'muted small', text: 'A real player, live. Rank ' + (pairing.oppRank || 1000) + '.' }));
-      right.appendChild(U.el('p', { cls: 'small mt', html: phase === 'pick' ? (oppTok ? '✓ Their duelist is ready.' : '…choosing a duelist.') : (oppAgree ? '✓ They’ve agreed to the current stakes.' : '…still deciding.') }));
-      right.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Withdraw', onclick: () => { send({ t: 'bye' }); teardown(); UI.show('play'); } }));
+      right.appendChild(U.el('p', { cls: 'mt ' + (oppAgreed || oppReady ? 'gold' : 'muted') + ' small', text: phase === 'bet' ? (oppAgreed ? '✓ Agreed to the stakes.' : 'Weighing the stakes…') : (oppReady ? '✓ Ready.' : (oppMode ? 'Chose ' + oppMode + '.' : 'Choosing a method…')) }));
+      right.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Withdraw', onclick: withdraw }));
     }
 
-    function changedWager() {
-      myWagerRev++; myAgree = false; oppAgree = false;   // any change reopens agreement
-      send({ t: 'w', gold: myWager.gold, tokens: myWager.tokens, rev: myWagerRev });
-      repaint();
+    function toSelectPhase() {
+      if (phase !== 'bet') return;
+      phase = 'select';
+      sysChat('Stakes locked. Now choose how you field your token.');
+      renderLeft(); renderMid(); renderRight();
     }
-    function maybeAdvance() {
-      if (phase === 'bet' && bothAgreed()) { phase = 'pick'; }
-      if (phase === 'pick' && myTok && oppTok && !launched) startFight();
+    function setMyMode(v) { myMode = v; myReady = false; DYA.audio.play('click'); send({ t: 'mode', v }); renderMid(); }
+    function chooseAndReady() {
+      if (myMode !== oppMode) { sysChat('Waiting — ' + pairing.oppName + ' must choose ' + myMode + ' too.'); return; }
+      const fighters = Object.values(me.tokens).filter(t => !t.frozen && SP.canDuel(t.speciesId));
+      if (!fighters.length) { UI.alert('No duel-fit tokens', 'You need a token that actually fights. Withdraw and try again.'); return; }
+      const commit = (t) => { myTok = U.deepCopy(t); myReady = true; send({ t: 'token', tok: myTok }); send({ t: 'ready' }); renderMid(); renderRight(); maybeLaunch(); };
+      if (myMode === 'random') commit(fighters[Math.floor(Math.random() * fighters.length)]);
+      else pickTokenModal(fighters, commit);
+    }
+    function maybeLaunch() {
+      if (phase === 'select' && myReady && oppReady && myMode && myMode === oppMode && myTok && oppTok && !launched) startFight();
     }
 
     function startFight() {
@@ -1897,7 +1996,8 @@
       launched = true;
       const seedStr = 'duel:' + pairing.roomCode;
       const terr = ['plains', 'forest', 'mountain', 'desert'][Math.abs(U.hashStr(pairing.roomCode)) % 4];
-      const myWagerSnap = U.deepCopy(myWager), oppWagerSnap = U.deepCopy(oppWager);
+      const myBetSnap = U.deepCopy(myBet), oppBetSnap = U.deepCopy(oppBet);
+      if (myMode === 'blind') UI.toast({ title: 'Blind pick', body: 'Tokens revealed at the clash!', icon: '🎭' });
       try { if (room) room.leave(); } catch (e) { }   // liveMatch opens its own room off seedStr
       room = null;
       P.liveMatch({
@@ -1911,12 +2011,12 @@
         onFinish: (res, iWon, draw) => {
           /* clean result on both clients → settle each side's own account.
              A draw returns everything (settle is a no-op). */
-          const staked = myWagerSnap.gold || myWagerSnap.tokens.length || oppWagerSnap.gold || oppWagerSnap.tokens.length;
+          const staked = !DO.isEmpty(myBetSnap) || !DO.isEmpty(oppBetSnap);
           if (!draw) { if (iWon) { me.stats.duelsWon++; G.grantAchievement('first_duel'); } else me.stats.duelsLost++; }
-          DO.settle(me, myWagerSnap, oppWagerSnap, iWon, draw);
+          DO.settle(me, myBetSnap, oppBetSnap, iWon, draw);
           G.save();
           if (draw) UI.toast({ title: 'Draw — stakes returned', icon: '🤝' });
-          else if (staked) UI.toast({ title: iWon ? 'You won the duel!' : 'You lost the duel', body: iWon ? 'You took ' + DO.describe(oppWagerSnap, SP) + '.' : 'You forfeited ' + DO.describe(myWagerSnap, SP) + '.', icon: '⚔' });
+          else if (staked) UI.toast({ title: iWon ? 'You won the duel!' : 'You lost the duel', body: iWon ? 'You took ' + DO.describe(oppBetSnap, SP) + '.' : 'You forfeited ' + DO.describe(myBetSnap, SP) + '.', icon: '⚔' });
           else UI.toast({ title: iWon ? 'You won the duel!' : 'You lost the duel', icon: '⚔' });
           UI.show('play');
         },
@@ -1925,6 +2025,7 @@
       });
     }
 
+    function withdraw() { send({ t: 'bye' }); teardown(); UI.show('play'); }
     function teardown() { if (closed) return; closed = true; try { if (room) room.leave(); } catch (e) { } room = null; }
 
     (async function connect() {
@@ -1932,16 +2033,19 @@
         room = await DYA.netplay.joinRoom(pairing.roomCode, myNet, {
           onMessage(msg) {
             if (!msg || closed) return;
-            if (msg.t === 'w') { oppWager = { gold: Math.max(0, Math.round(msg.gold || 0)), tokens: Array.isArray(msg.tokens) ? msg.tokens : [] }; oppWagerRev = msg.rev || (oppWagerRev + 1); oppAgree = false; myAgree = false; repaint(); }
-            else if (msg.t === 'a') { oppAgree = !!msg.v; oppAgreeOnRev = msg.onRev != null ? msg.onRev : myWagerRev; maybeAdvance(); repaint(); }
-            else if (msg.t === 'p') { oppTok = msg.tok; maybeAdvance(); repaint(); }
-            else if (msg.t === 'c') { logChat(pairing.oppName, String(msg.text || '')); }
+            if (msg.t === 'bet') { const b = DO.normBet(msg.bet); oppBet = { gold: b.gold, ngakara: b.ngakara, okid: b.okid, tokens: b.tokens }; oppBetRev = msg.rev || (oppBetRev + 1); oppAgreed = false; myAgreed = false; renderMid(); renderRight(); }
+            else if (msg.t === 'agree') { oppAgreed = !!msg.v && (msg.onRev === myBetRev); renderMid(); renderRight(); }
+            else if (msg.t === 'phase') { toSelectPhase(); }
+            else if (msg.t === 'mode') { oppMode = msg.v; oppReady = false; renderMid(); renderRight(); }
+            else if (msg.t === 'token') { oppTok = msg.tok; maybeLaunch(); }
+            else if (msg.t === 'ready') { oppReady = true; renderMid(); renderRight(); maybeLaunch(); }
+            else if (msg.t === 'chat') { addChat('them', pairing.oppName, String(msg.text || '')); }
             else if (msg.t === 'bye') { if (!launched) { UI.toast({ title: pairing.oppName + ' withdrew', icon: '⚔' }); teardown(); UI.show('play'); } }
           },
           onPeerLeave() { if (!launched && !closed) { UI.toast({ title: pairing.oppName + ' left', icon: '⚔' }); teardown(); UI.show('play'); } },
         });
-        send({ t: 'c', text: 'Ready to duel.' });
-        repaint();
+        renderLeft(); renderMid(); renderRight();
+        sysChat('You’re matched with ' + pairing.oppName + '. Lay down a stake — or none.');
       } catch (e) {
         UI.toast({ title: 'Could not connect', body: 'Dueling a Dya’kukull instead.', icon: '⚠' });
         P.duelVsKukull();
