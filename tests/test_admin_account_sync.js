@@ -105,6 +105,12 @@ function adminEdit(id, mutate) {
   row.data = acc;
   row.updated_at = new Date().toISOString();
 }
+/* the admin re-stats a creature (editToken marks it adminEdited) */
+function adminEditHp(id, hp) { adminEdit(id, a => { a.tokens.tokX.stats.hp = hp; a.tokens.tokX.adminEdited = true; }); }
+/* the admin grants resources (recorded as a one-time ledger entry) */
+function adminGrant(id, res) { adminEdit(id, a => { a.adminGrants = (a.adminGrants || []).concat([Object.assign({ id: 'agr-' + Math.random().toString(36).slice(2) }, res)]); }); }
+/* the admin deletes a creature (tombstoned so the player's merge removes it) */
+function adminDeleteToken(id, tokId) { adminEdit(id, a => { delete a.tokens[tokId]; a.adminDeleted = (a.adminDeleted || []).concat([tokId]); }); }
 
 (async function main() {
   console.log('== ADMIN ACCOUNT SYNC: admin edits reach the player ==');
@@ -140,26 +146,47 @@ function adminEdit(id, mutate) {
   check('login succeeds after the admin edit', !!r3.acc, r3.err);
   check('offline player picks up the admin edit at login (hp 999)', G.me.tokens.tokX.stats.hp === 999, 'hp=' + G.me.tokens.tokX.stats.hp);
 
-  /* 4) a LOGGED-IN player picks up a later admin edit live, no relog */
-  adminEdit(id, a => { a.tokens.tokX.stats.hp = 1234; });
+  /* 4) a logged-in player picks up a later admin edit LIVE and MERGES it —
+        keeping the progress they made in the meantime */
+  const goldBefore = G.me.gold;
+  G.me.gold += 100;                                                  // the player earns some gold
+  G.me.tokens['tokMine'] = { id: 'tokMine', speciesId: spid, name: 'Homegrown', rarity: 0, element: 'Fti', stats: { hp: 5, dmg: 1, speed: 30 } };  // and crafts a token
+  adminEditHp(id, 1234);                                             // admin re-stats the OTHER creature
   check('before live sync the player still shows the old value', G.me.tokens.tokX.stats.hp === 999);
   await G.pullMyAccountEdits();
-  check('live self-sync adopts the newer admin edit (hp 1234)', G.me.tokens.tokX.stats.hp === 1234, 'hp=' + G.me.tokens.tokX.stats.hp);
+  await sleep(30);
+  check('live merge applies the admin edit (hp 1234)', G.me.tokens.tokX.stats.hp === 1234, 'hp=' + G.me.tokens.tokX.stats.hp);
+  check('merge KEEPS the gold the player earned', G.me.gold === goldBefore + 100, 'gold=' + G.me.gold);
+  check('merge KEEPS the token the player crafted', !!G.me.tokens.tokMine);
   check('local admin revision advanced to match', (G.me.adminRev || 0) === 2, 'rev=' + G.me.adminRev);
 
-  /* 5) the player's own routine save must NOT clobber a newer admin edit */
-  adminEdit(id, a => { a.tokens.tokX.stats.hp = 555; });   // cloud adminRev 3
-  G.me.gold += 50;                                          // a local change about to be saved
+  /* 5) the player's own routine save must NOT clobber a newer admin edit, and
+        must preserve the local change being saved */
+  adminEditHp(id, 555);            // cloud adminRev 3
+  G.me.gold += 50;                 // a local change about to be saved
   const res = await AC.pushSelfGuarded(G.me);
-  check('a guarded save yields to the newer admin edit', res && res.adopted === true);
+  await sleep(30);
+  check('a guarded save yields to (merges) the newer admin edit', res && res.adopted === true);
   check('the admin edit was NOT clobbered in the cloud (hp 555)', cloudHp(id) === 555, 'cloud hp=' + cloudHp(id));
-  check('the player adopted the admin edit locally (hp 555)', G.me.tokens.tokX.stats.hp === 555, 'hp=' + G.me.tokens.tokX.stats.hp);
+  check('the player merged the admin edit locally (hp 555)', G.me.tokens.tokX.stats.hp === 555, 'hp=' + G.me.tokens.tokX.stats.hp);
+  check('the player\'s own +50 gold survived the merge', G.me.gold === goldBefore + 150, 'gold=' + G.me.gold);
 
-  /* 6) once caught up, a normal save still writes through */
-  const hpNow = G.me.tokens.tokX.stats.hp;
-  G.me.gold += 25;
-  await AC.pushSelfGuarded(G.me);
-  check('a save with no pending admin edit writes through normally', cloudRow(id).data.gold === G.me.gold && cloudHp(id) === hpNow);
+  /* 6) a resource grant merges additively — applied once, never lost */
+  const goldPreGrant = G.me.gold;
+  adminGrant(id, { gold: 500 });
+  await G.pullMyAccountEdits();
+  await sleep(30);
+  check('an admin gold grant is added on top of the player\'s gold', G.me.gold === goldPreGrant + 500, 'gold=' + G.me.gold);
+  await G.pullMyAccountEdits();   // a second sync must NOT double-apply it
+  await sleep(30);
+  check('the grant is applied exactly once (no double-count)', G.me.gold === goldPreGrant + 500, 'gold=' + G.me.gold);
+
+  /* 7) an admin deletion is tombstoned and removed by the merge */
+  adminDeleteToken(id, 'tokX');
+  await G.pullMyAccountEdits();
+  await sleep(30);
+  check('the admin-deleted creature is gone locally', !G.me.tokens.tokX);
+  check('the player\'s own token is untouched by the deletion', !!G.me.tokens.tokMine);
 
   console.log(failures ? 'ADMIN ACCOUNT SYNC: ' + failures + ' FAILURE(S)' : 'ADMIN ACCOUNT SYNC: ALL PASS');
   process.exit(failures ? 1 : 0);

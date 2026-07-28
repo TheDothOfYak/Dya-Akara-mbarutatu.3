@@ -122,7 +122,8 @@
       const rows = await rest('GET', 'dya_accounts?id=eq.' + encodeURIComponent(account.id) + '&select=data');
       const remote = rows && rows[0] && rows[0].data;
       if (remote && (remote.adminRev || 0) > (account.adminRev || 0)) {
-        if (DYA.state && DYA.state.adoptRemoteAccount) DYA.state.adoptRemoteAccount(remote);
+        const merge = DYA.state && (DYA.state.mergeRemoteAccount || DYA.state.adoptRemoteAccount);
+        if (merge) merge(remote);
         return { ok: false, adopted: true };
       }
     } catch (e) { /* if the pre-check fails, fall through to a normal push */ }
