@@ -255,10 +255,16 @@ create index if not exists dya_friends_a     on public.dya_friends (a_id);
 create index if not exists dya_friends_b     on public.dya_friends (b_id);
 create index if not exists dya_listings_active on public.dya_listings (status, created_at desc);
 create index if not exists dya_listings_seller on public.dya_listings (seller_net_id, status, claimed);
-create index if not exists dya_accounts_email  on public.dya_accounts (email);
+-- (no dya_accounts(email) index: the `email … unique` constraint above
+--  already provides an identical btree — a second one only costs writes.)
 create index if not exists dya_tournaments_state on public.dya_tournaments (state, created_at desc);
-create index if not exists dya_trn_players_trn   on public.dya_tournament_players (tournament_id);
+-- (no dya_tournament_players(tournament_id) index: the `unique
+--  (tournament_id, net_id)` constraint's index already covers lookups by
+--  tournament_id as its left-most column.)
 create index if not exists dya_players_rank       on public.dya_players (rank desc);
+-- keep older deployments tidy too: retire the redundant duplicates if present
+drop index if exists public.dya_accounts_email;
+drop index if exists public.dya_trn_players_trn;
 create index if not exists dya_season_queue_find  on public.dya_season_queue (circuit, status, updated_at desc);
 create index if not exists dya_messages_to     on public.dya_messages (to_id, created_at);
 create index if not exists dya_messages_from   on public.dya_messages (from_id, created_at);
