@@ -478,3 +478,38 @@ input[type=range] { flex: 1; accent-color: var(--gold); }
   content: '⟡ READIED ⟡'; display: block; text-align: center;
   color: var(--gold-dim); font-size: 10px; letter-spacing: .22em; margin-bottom: 2px;
 }
+
+/* ============================================================
+   Online-first gate — the blocking overlay shown while the cloud
+   is unreachable (js/core/online_gate.js). Sits above everything,
+   including the loading coin, and swallows all interaction so no
+   play can happen offline.
+   ============================================================ */
+#onlineGateOverlay {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 38%, rgba(28,22,16,.955), rgba(9,7,4,.985));
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  animation: fadeIn .3s ease;
+}
+#onlineGateOverlay .ogate-card {
+  width: min(440px, 88vw); text-align: center; padding: 34px 30px;
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  border: 1px solid var(--gold-dim); border-radius: 14px;
+  box-shadow: 0 14px 60px #000a, 0 0 44px #d9b87a11;
+}
+#onlineGateOverlay .ogate-brand {
+  color: var(--gold); letter-spacing: .24em; font-size: 13px;
+  margin-bottom: 16px; opacity: .8;
+}
+#onlineGateOverlay .ogate-title { color: var(--ink); font-size: 21px; margin-bottom: 11px; }
+#onlineGateOverlay .ogate-body {
+  color: var(--ink-dim); font-size: 14px; line-height: 1.55; margin-bottom: 22px;
+}
+#onlineGateOverlay .ogate-spin {
+  width: 42px; height: 42px; margin: 0 auto 20px;
+  border: 3px solid #d9b87a33; border-top-color: var(--gold);
+  border-radius: 50%; animation: ogate-spin 1s linear infinite;
+}
+@keyframes ogate-spin { to { transform: rotate(360deg); } }
+#onlineGateOverlay .btn { min-width: 132px; }

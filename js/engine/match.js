@@ -381,7 +381,7 @@
       /* a rider riding a mount is not an independent actor — the mount carries
          it (position synced in M.updateMounting); it re-enters if thrown clear */
       if (c.riding) continue;
-      if (c.stunnedUntil > M.tick) { c.state = 'hit'; continue; }
+      if (c.stunnedUntil > M.tick) { c.state = 'hit'; if (c.carryingRelic) M.dropRelic(c, 'stun'); continue; }
       if ((M.tick + c.id) % 6 === 0) {
         c.intent = {};
         /* a hunt creature may be given a different decision tree than its
@@ -1007,7 +1007,32 @@
       if (newLeft < t.headsLeft) { t.headsLeft = newLeft; M.addEffect('headLost', t.x, t.y - t.radius, {}); M.uiEvent(-1, 'event', t.tokName + ' loses a head — it keeps fighting.'); }
     }
 
+    /* a heavy blow — 45%+ of max HP in one hit — jars a carried relic loose.
+       (A killing blow drops it via kill(); this covers survivors.) */
+    if (t.carryingRelic && t.hp > 0 && dmg >= t.maxHp * 0.45) M.dropRelic(t, 'hit');
+
     if (t.hp <= 0) M.kill(t, source, 'combat');
+  };
+
+  /* Release a carried relic where the carrier stands. Triggered on the
+     carrier's death, a heavy blow (≥45% of max HP in one hit), or being
+     stunned. Returns true if a relic was actually dropped. */
+  Match.prototype.dropRelic = function (c, cause) {
+    const M = this;
+    if (!c.carryingRelic) return false;
+    c.carryingRelic = false;
+    const rl = M.relics.find(r => r.carrier === c.id);
+    if (rl) {
+      rl.carrier = null; rl.carrierTeam = null;
+      rl.x = c.x; rl.y = c.y;
+      const whose = rl.ownerTeam === 0 ? 'Your' : 'Their';
+      const how = cause === 'stun' ? ' — ' + c.tokName + ' is stunned!'
+        : cause === 'hit' ? ' — ' + c.tokName + ' reels from the blow!'
+        : '';
+      M.uiEvent(-1, 'relic', whose + ' Relic is dropped!' + how);
+    }
+    if (!M.headless) DYA.audio.play('relicDrop');
+    return true;
   };
 
   Match.prototype.kill = function (c, source, cause) {
@@ -1044,16 +1069,7 @@
     }
 
     /* relic drop */
-    if (c.carryingRelic) {
-      c.carryingRelic = false;
-      const rl = M.relics.find(r => r.carrier === c.id);
-      if (rl) {
-        rl.carrier = null; rl.carrierTeam = null;
-        rl.x = c.x; rl.y = c.y;
-        M.uiEvent(-1, 'relic', (rl.ownerTeam === 0 ? 'Your' : 'Their') + ' Relic is dropped!');
-      }
-      if (!M.headless) DYA.audio.play('relicDrop');
-    }
+    M.dropRelic(c, 'death');
 
     /* additional cost (§1): a defeated token returns to the pouch; replaying it
        costs +1 resource per prior defeat. Uff excepted while self-respawning. */
