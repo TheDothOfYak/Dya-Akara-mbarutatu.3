@@ -11,6 +11,13 @@ ladder**, the **shared player market**, and the **admin panel's live game edits*
 free **Supabase** project. One of you sets it up once; then it works for everyone who plays
 your deployment.
 
+> **Dya'Akara is online-first.** The cloud is the source of truth and the game will not start
+> a session without a reachable Supabase project — on boot it holds behind a "Reaching the
+> Guild…" overlay until the servers answer, and re-blocks if the connection drops. The
+> deployment shipped in `js/config.js` already has a live project baked in, so players are
+> online by default. (A future offline-vs-AI mode will let you play against the AI with no
+> connection; until then, being offline means the overlay, not a private local game.)
+
 > **Already set up from an earlier version?** Just re-run `supabase/schema.sql` (Step 2) —
 > every statement is idempotent, so it only adds the new tables (`dya_listings` for the
 > shared market, `dya_tournaments`/`dya_tournament_players` for shared tournaments,

@@ -87,14 +87,17 @@ global.fetch = async function (url, opts) {
 window.DYA_CONFIG = { supabase: { url: 'https://fake.supabase.co', anonKey: 'x'.repeat(40) } };
 const files = [
   'js/core/util.js', 'js/core/audio.js', 'js/data/species.js', 'js/data/economy.js',
-  'js/data/lore.js', 'js/core/mods.js', 'js/core/token.js', 'js/core/state.js',
-  'js/core/market_online.js', 'js/engine/behaviors.js',
+  'js/data/lore.js', 'js/core/mods.js', 'js/core/online_gate.js', 'js/core/token.js',
+  'js/core/state.js', 'js/core/market_online.js', 'js/engine/behaviors.js',
 ];
 for (const f of files) {
   try { eval(fs.readFileSync(path.join(ROOT, f), 'utf8') + '\n//# sourceURL=' + f); }
   catch (e) { console.error('LOAD FAIL', f, e.message); process.exit(1); }
 }
 const DYAG = global.DYA;
+/* This harness exercises the shared market with locally-created accounts and
+   no account_cloud layer, so it runs the game's explicit offline mode. */
+DYAG.onlineGate.allowOffline = true;
 const U = DYAG.util, SP = DYAG.species, M = DYAG.mods, G = DYAG.state, MO = DYAG.marketOnline, EC = DYAG.economy;
 
 (async function main() {

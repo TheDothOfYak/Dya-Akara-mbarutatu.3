@@ -82,8 +82,8 @@ global.fetch = async function (url, opts) {
 window.DYA_CONFIG = { supabase: { url: 'https://fake.supabase.co', anonKey: 'x'.repeat(40) } };
 const files = [
   'js/core/util.js', 'js/core/audio.js', 'js/data/species.js', 'js/data/economy.js',
-  'js/data/lore.js', 'js/core/mods.js', 'js/core/account_cloud.js', 'js/core/token.js',
-  'js/core/state.js', 'js/engine/behaviors.js',
+  'js/data/lore.js', 'js/core/mods.js', 'js/core/account_cloud.js', 'js/core/online_gate.js',
+  'js/core/token.js', 'js/core/state.js', 'js/engine/behaviors.js',
 ];
 for (const f of files) {
   try { eval(fs.readFileSync(path.join(ROOT, f), 'utf8') + '\n//# sourceURL=' + f); }
@@ -189,15 +189,31 @@ let G = DYAG.state;
   const r7 = await G.login('alice@example.com', 'secret123');
   check('a fresh device with no local copy adopts the cloud', !r7.err && r7.acc.level === 12, 'level=' + (r7.acc && r7.acc.level));
 
-  /* ---------- offline fallback: cloud not configured behaves exactly as before ---------- */
+  /* ---------- online-first: no cloud, no local-first fallback ----------
+     The game is no longer local-first. With the cloud unconfigured AND the
+     deliberate offline mode OFF, signing in or creating an account is
+     refused outright instead of silently dropping into a local-only game. */
   delete window.DYA_CONFIG.supabase.url;
   newDevice();
   G.init();
+  DYAG.onlineGate.allowOffline = false;
+  const refusedNew = await G.createAccount('bob@example.com', 'passpass', 'Bob');
+  check('online-first: sign-up refused when the cloud is unavailable', !!refusedNew.err);
+  const refusedLogin = await G.login('alice@example.com', 'secret123');
+  check('online-first: login refused when the cloud is unavailable', !!refusedLogin.err);
+  check('online-first: nothing was created locally', Object.values(G.world.accounts).filter(a => !a.ai).length === 0);
+
+  /* ---------- explicit offline mode (future offline-vs-AI "camping" mode) ----------
+     When the game deliberately opts into offline play, the local engine is
+     still fully functional — accounts create and log in against localStorage,
+     exactly as the old local-first path did, and nothing reaches the cloud. */
+  DYAG.onlineGate.allowOffline = true;
   const localOnly = await G.createAccount('bob@example.com', 'passpass', 'Bob');
-  check('offline: account creation still works without cloud config', !!localOnly.acc);
+  check('offline mode: account creation works locally when explicitly allowed', !!localOnly.acc, localOnly.err);
   const localLogin = await G.login('bob@example.com', 'passpass');
-  check('offline: login still works locally without cloud config', !localLogin.err && localLogin.acc.displayName === 'Bob');
-  check('offline: nothing was pushed to the cloud', db.dya_accounts.length === 1); // still just Alice from before
+  check('offline mode: login works locally when explicitly allowed', !localLogin.err && localLogin.acc.displayName === 'Bob', localLogin.err);
+  check('offline mode: nothing was pushed to the cloud', db.dya_accounts.length === 1); // still just Alice from before
+  DYAG.onlineGate.allowOffline = false;
 
   console.log(failures ? 'CLOUD ACCOUNTS: ' + failures + ' FAILURE(S)' : 'CLOUD ACCOUNTS: ALL PASS');
   process.exit(failures ? 1 : 0);

@@ -646,7 +646,22 @@
       else delete G.world.bans[accId];
     } catch (e) { /* keep whatever local ban state we already had */ }
   }
+  /* Online-first guard. The game is no longer local-first: signing in or
+     creating an account requires the cloud, unless the deliberate offline
+     mode (DYA.onlineGate.allowOffline — the future offline-vs-AI "camping"
+     mode) is switched on. When the cloud is configured but merely
+     unreachable this returns null and the caller's own cloud fetch fails
+     with a clearer "couldn't reach the account service" message. */
+  function requireCloudOrOffline() {
+    const gate = DYA.onlineGate;
+    if (!gate) return null;               // gate module not present (headless logic tests) — don't enforce
+    if (gate.allowOffline) return null;   // deliberate offline mode (future offline-vs-AI)
+    const AC = DYA.accountCloud;
+    if (AC && AC.configured()) return null;
+    return 'Dya’Akara is an online game — set up online play to sign in.';
+  }
   G.createAccount = async function (email, pass, displayName) {
+    const gate = requireCloudOrOffline(); if (gate) return { err: gate };
     if (!displayName || displayName.length < 2 || displayName.length > 20) return { err: 'Display name must be 2–20 characters.' };
     if (!U.profanityOk(displayName)) return { err: 'That name is not permitted by the Dya Guild.' };
     email = String(email || '').trim().toLowerCase();
@@ -674,6 +689,7 @@
     return { acc };
   };
   G.login = async function (email, pass) {
+    const gate = requireCloudOrOffline(); if (gate) return { err: gate };
     /* Supabase email/password auth is OPT-IN (config.supabase.useAuth)
        and unrelated to cross-device accounts below — it's a separate,
        stronger (but unfinished) path some deployments may adopt later. */
