@@ -243,6 +243,7 @@
     /* ------- creatures (sorted by y for depth) ------- */
     const sorted = M.creatures.slice().sort((a, b) => a.y - b.y);
     for (const c of sorted) {
+      if (c.riding) continue;   // drawn as its mount's rider, not as its own creature
       let alpha = 1;
       if (c.dead) {
         alpha = Math.max(0, 1 - (M.tick - c.deadTick) / 50);

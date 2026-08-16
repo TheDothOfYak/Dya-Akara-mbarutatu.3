@@ -210,18 +210,24 @@
        sounds the horn on its own; it is exactly as smart as its keeper */
     c.isCommander = !!(tok.isSelf || (tok.isStarter && sp.eikarLayer));
 
-    /* ------- MOUNT + RIDER (design doc: an Eikar/Keilia rides as one unit) -------
-       A creature whose species carries a rider (features.rider, or the "mount"
-       tag) fights with an Eikar on its back: the pair is a little tougher, hits
-       a little harder, the rider shields it from part of every blow (see
-       M.damage), and the rider's command makes it target intelligently (see the
-       smart-AI gate). The rider itself is drawn by the sprite layer. */
-    c.hasRider = !!(sp.features.rider || (sp.tags && sp.tags.includes('mount')));
-    if (c.hasRider) {
-      c.maxHp = Math.round(c.maxHp * 1.12); c.hp = c.maxHp;
-      c.dmg = Math.round(c.dmg * 1.12 * 10) / 10;
-      /* protection fraction the rider provides (default when untuned) */
-      c.riderProtect = U.clamp(c.vars.riderProtection != null ? c.vars.riderProtection : 0.15, 0, 0.5);
+    /* ------- MOUNT + RIDER (an Eikar/Keilia mounts it on the field) -------
+       A creature tagged "mount" (the Domestic Punk, the Kuni Byrd) is rideable
+       but spawns RIDERLESS — it fights its own wild brain until a friendly
+       Eikar or Keilia physically reaches it and climbs on (see M.updateMounting).
+       Only then does the pair grow tougher, hit harder, shield each blow, and
+       fight on command like an Eikar (M.mountRider); the bond then deepens the
+       longer they ride (bond growth in step). The rider is drawn by the sprite
+       layer via c.hasRider, and thrown clear if the mount falls (M.dismountRider). */
+    c.mountable = !!(sp.tags && sp.tags.includes('mount'));
+    c.hasRider = false;
+    c.riderUnit = null;
+    c.riderProtect = 0;
+    if (c.mountable) {
+      c.riderlessBehavior = sp.riderlessBehavior || sp.behavior;
+      c.riddenBehavior = sp.riddenBehavior || 'mounted_eikar';
+      /* remember the on-foot baseline so mount boosts + bond stay reversible */
+      c.mountBaseHp = c.maxHp; c.mountBaseDmg = c.dmg; c.mountBaseRange = c.attackRange;
+      c.bond = 0; c.bondTick = 0;
     }
 
     /* life-history quirks (Part V): each individual's lived experience,
@@ -249,7 +255,6 @@
        (TK.mintSpec) — honored whenever the token is fielded, not just when
        it's spawned as a hunt enemy */
     if (tok.behavior && BV[tok.behavior]) c.behaviorOverride = tok.behavior;
-    if ((sp.features.rider || sp.tags.includes('mount')) && M.teams[teamIdx] && M.teams[teamIdx].stats) M.teams[teamIdx].stats.combos['Rider on the field'] = true;
     M.creatures.push(c);
     M.addEffect('deploy', x, y, { r: c.radius });
     return c;
@@ -373,12 +378,17 @@
     const api = M.api();
     for (const c of M.creatures) {
       if (c.dead) continue;
+      /* a rider riding a mount is not an independent actor — the mount carries
+         it (position synced in M.updateMounting); it re-enters if thrown clear */
+      if (c.riding) continue;
       if (c.stunnedUntil > M.tick) { c.state = 'hit'; continue; }
       if ((M.tick + c.id) % 6 === 0) {
         c.intent = {};
         /* a hunt creature may be given a different decision tree than its
-           species' default (Admin → Hunts → creature "Behavior tree") */
-        const b = BV[c.behaviorOverride || c.sp.behavior];
+           species' default (Admin → Hunts → creature "Behavior tree"); a
+           mount fights its ridden brain while carrying a rider, its riderless
+           brain otherwise */
+        const b = BV[c.behaviorOverride || (c.mountable ? (c.riderUnit ? c.riddenBehavior : c.riderlessBehavior) : null) || c.sp.behavior];
         if (b) { api._c = c; b(c, api); }
         /* Duel: creatures ALWAYS fight — pursue to elimination, no idling (§1).
            We still run the species brain above so every ability (screech,
@@ -413,6 +423,9 @@
       M.execIntent(c);
     }
 
+    /* Eikar mount up, and let a riding bond deepen over time */
+    M.updateMounting();
+
     /* projectiles */
     M.stepProjectiles();
     /* zones: bogs slow/damage, fire burns */
@@ -422,6 +435,102 @@
 
     /* win conditions */
     M.checkEnd();
+  };
+
+  /* ================= MOUNTING (Eikar rides a mount) =================
+     A free Eikar/Keilia walks up to a friendly, unmounted "mount"-tagged
+     creature and climbs on. The pair then fights as one, grows stronger the
+     longer they ride, and the rider is thrown clear if the mount falls.
+     Deterministic (position + distance only) so lockstep netplay and replays
+     stay byte-identical. */
+  Match.prototype.updateMounting = function () {
+    const M = this;
+    /* 1) keep each rider glued to its mount, and let the bond deepen */
+    for (const c of M.creatures) {
+      if (c.dead || !c.riderUnit) continue;
+      const e = c.riderUnit;
+      if (e.dead) { M.dismountRider(c, false); continue; }
+      e.x = c.x; e.y = c.y; e.facing = c.facing;      // the rider travels with the mount
+      if (M.tick - c.bondTick >= Math.round(1 / TICK) && (c.bond || 0) < 8) {
+        c.bondTick = M.tick; c.bond = (c.bond || 0) + 1;
+        M.applyMountStats(c);
+        M.addEffect('buff', c.x, c.y - c.radius, {});
+        if (c.bond === 8) M.uiEvent(-1, 'event', (c.tokName || 'The pair') + ' and ' + (e.tokName || 'its rider') + ' are fully bonded — they fight as one.');
+      }
+    }
+    /* 2) a free Eikar/Keilia seeks the nearest unmounted friendly mount */
+    let mounts = null;
+    for (const e of M.creatures) {
+      if (e.dead || e.riding || e.mountable) continue;
+      if (!(e.sp.eikarLayer || e.sp.keiliaLayer) || e.rooted) continue;
+      if (mounts === null) mounts = M.creatures.filter(c => c.mountable && !c.dead && !c.riderUnit);
+      if (!mounts.length) break;
+      let best = null, bd = 1e9;
+      for (const c of mounts) {
+        if (c.riderUnit || c.team !== e.team) continue;
+        const d = U.dist(e.x, e.y, c.x, c.y);
+        if (d < bd) { bd = d; best = c; }
+      }
+      if (!best) continue;
+      if (bd <= e.radius + best.radius + 12) { M.mountRider(e, best); continue; }
+      if (bd > 460) continue;                                    // too far — fight on foot
+      if (e.intent && e.intent.attackTarget) continue;           // committed to a strike
+      if (e.state === 'attack' || e.state === 'special') continue;
+      /* no enemy right on top of it → close the distance and mount */
+      let threatened = false;
+      for (const o of M.creatures) { if (!o.dead && o.team !== e.team && o.team !== -1 && U.dist(e.x, e.y, o.x, o.y) < 120) { threatened = true; break; } }
+      if (threatened) continue;
+      const dx = best.x - e.x, dy = best.y - e.y, d = Math.hypot(dx, dy) || 1;
+      const step = e.speed * (bd > 130 ? 1.35 : 1) * TICK;
+      e.x = U.clamp(e.x + dx / d * step, 14, WORLD.w - 14);
+      e.y = U.clamp(e.y + dy / d * step, 14, WORLD.h - 14);
+      e.facing = dx >= 0 ? 1 : -1;
+      e.state = 'run';
+    }
+  };
+
+  /* mount + bond → tougher, harder-hitting; the rider lends part of its own
+     bite and (archers) its reach. All scaled off the on-foot baseline so it
+     reverts cleanly when the rider dismounts. */
+  Match.prototype.applyMountStats = function (c) {
+    const e = c.riderUnit; if (!e) return;
+    const bond = c.bond || 0;
+    const newMax = Math.round(c.mountBaseHp * (1.15 + bond * 0.02));   // up to ~+31% hp
+    c.hp = Math.min(newMax, c.hp + Math.max(0, newMax - c.maxHp));     // gain the delta only
+    c.maxHp = newMax;
+    c.dmg = Math.round((c.mountBaseDmg * (1.12 + bond * 0.045) + e.dmg * 0.4) * 10) / 10;  // up to ~+48% + rider's bite
+    c.attackRange = Math.max(c.mountBaseRange, Math.round(e.attackRange * 0.9));
+    c.riderProtect = U.clamp((c.vars.riderProtection != null ? c.vars.riderProtection : 0.15) + (e.sp.keiliaLayer ? 0.05 : 0) + bond * 0.012, 0.08, 0.5);
+  };
+
+  Match.prototype.mountRider = function (e, c) {
+    const M = this;
+    if (!e || !c || c.riderUnit || e.riding || c.dead || e.dead) return;
+    c.riderUnit = e; c.hasRider = true;
+    e.riding = true; e.mountedOn = c.id; e.state = 'idle'; e.intent = {};
+    c.bond = 0; c.bondTick = M.tick;
+    M.applyMountStats(c);
+    if (M.teams[c.team] && M.teams[c.team].stats) M.teams[c.team].stats.combos['Eikar mounts up'] = true;
+    M.addEffect('deploy', c.x, c.y, { r: c.radius });
+    M.uiEvent(-1, 'event', (e.tokName || 'An Eikar') + ' mounts ' + (c.tokName || 'the mount') + ' — they ride as one.');
+  };
+
+  Match.prototype.dismountRider = function (c, thrown) {
+    const M = this;
+    const e = c.riderUnit;
+    c.riderUnit = null; c.hasRider = false; c.riderProtect = 0; c.bond = 0;
+    /* the mount reverts to its on-foot strength */
+    c.maxHp = c.mountBaseHp; if (c.hp > c.maxHp) c.hp = c.maxHp;
+    c.dmg = c.mountBaseDmg; c.attackRange = c.mountBaseRange;
+    if (!e) return;
+    e.riding = false; e.mountedOn = null;
+    if (thrown && !e.dead) {
+      /* the mount fell — the rider is thrown clear and fights on foot, shaken */
+      e.x = U.clamp(c.x + 14, 14, WORLD.w - 14); e.y = c.y; e.state = 'hit'; e.intent = {};
+      if (e.hp > e.maxHp * 0.5) e.hp = Math.round(e.maxHp * 0.5);
+      M.addEffect('deploy', e.x, e.y, { r: e.radius });
+      M.uiEvent(-1, 'event', (e.tokName || 'The rider') + ' is thrown clear and fights on.');
+    }
   };
 
   /* ================= PULSES & RESOURCES ================= */
@@ -836,6 +945,9 @@
   Match.prototype.damage = function (t, amount, source, opts) {
     const M = this;
     if (t.dead || M.over) return;
+    /* a rider up on its mount cannot be struck directly — blows land on the
+       mount (whose riderProtect already softens them) */
+    if (t.riding) return;
     opts = opts || {};
     M.lastCombatTick = M.tick;
 
@@ -902,6 +1014,10 @@
     const M = this;
     if (c.dead) return;
     c.dead = true; c.deadTick = M.tick; c.state = 'death';
+    /* a mount that falls throws its rider clear; a rider that somehow dies
+       frees its mount back to fighting on foot */
+    if (c.riderUnit) M.dismountRider(c, true);
+    if (c.mountedOn != null) { const mt = M.creatures.find(o => o.id === c.mountedOn); if (mt && mt.riderUnit === c) M.dismountRider(mt, false); }
     if (!M.headless) DYA.audio.play('death');
     if (source && source.team !== c.team && M.teams[source.team]) M.teams[source.team].stats.eliminations++;
     if (source && !source.dead) source.matchXp = (source.matchXp || 0) + 25; // kill XP (§2)
@@ -1048,7 +1164,7 @@
        the outer band (80% of the way from arena center) and are eliminated
        at the border itself. */
     for (const c of M.creatures) {
-      if (c.dead) continue;
+      if (c.dead || c.riding) continue;   // a mounted rider rides with its mount — not tethered/separated on its own
       const nx = Math.abs(c.x - WORLD.w / 2) / (WORLD.w / 2 - 14);
       const ny = Math.abs(c.y - WORLD.h / 2) / (WORLD.h / 2 - 14);
       c.tetherFrac = Math.max(nx, ny);
@@ -1058,7 +1174,7 @@
       /* separation (cheap, every 4 ticks) */
       if ((M.tick + c.id) % 4 === 0 && !c.rooted) {
         for (const o of M.creatures) {
-          if (o === c || o.dead || o.rooted) continue;
+          if (o === c || o.dead || o.rooted || o.riding) continue;
           const d = U.dist(c.x, c.y, o.x, o.y), min = (c.radius + o.radius) * 0.8;
           if (d < min && d > 0.01) {
             const push = (min - d) / 2;
@@ -1351,7 +1467,7 @@
       get time() { return M.time; },
       dist: (a, b) => U.dist(a.x, a.y, b.x, b.y),
       byId: (id) => M.creatures.find(c => c.id === id),
-      creaturesOf: (spid) => M.creatures.filter(c => c.speciesId === spid && !c.dead),
+      creaturesOf: (spid) => M.creatures.filter(c => c.speciesId === spid && !c.dead && !c.riding),
       /* dual relics: 'the relic' from a creature's point of view is the
          ENEMY's relic (the thing it can steal). */
       relic: (team) => {
@@ -1379,20 +1495,20 @@
       offCooldown: (c, key) => !c.mem['cd_' + key] || c.mem['cd_' + key] <= M.tick,
 
       enemiesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && o.team !== c.team && o.team !== -1 &&
+        return M.creatures.filter(o => !o.dead && !o.riding && o.team !== c.team && o.team !== -1 &&
           !(o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) &&
           U.dist(c.x, c.y, o.x, o.y) < range && !o.sp.tags.includes('inert'));
       },
       alliesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && o !== c && o.team === c.team && U.dist(c.x, c.y, o.x, o.y) < range);
+        return M.creatures.filter(o => !o.dead && !o.riding && o !== c && o.team === c.team && U.dist(c.x, c.y, o.x, o.y) < range);
       },
       allCreaturesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && o !== c && U.dist(c.x, c.y, o.x, o.y) < range);
+        return M.creatures.filter(o => !o.dead && !o.riding && o !== c && U.dist(c.x, c.y, o.x, o.y) < range);
       },
       nearestEnemy(c, range, filter) {
         let best = null, bd = 1e9;
         for (const o of M.creatures) {
-          if (o.dead || o.team === c.team || o.team === -1) continue;
+          if (o.dead || o.riding || o.team === c.team || o.team === -1) continue;
           if (o.sp && o.sp.tags.includes('inert')) continue;
           if (o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) continue;
           if (filter && !filter(o)) continue;

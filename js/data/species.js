@@ -51,6 +51,7 @@
     punk: { legs: 4, arms: 3, ribs: 6, bodyW: 1.0, bodyH: 0.86, legReach: 1.05, armReach: 1.1 },
     tags: ['forest', 'mount', 'sapient', 'herbivore'],
     behavior: 'domestic_punk',
+    riddenBehavior: 'mounted_eikar',   // when an Eikar/Keilia mounts it, it fights on command like an Eikar
     statMul: { hp: 1.15, dmg: 0.9, speed: 1.0 },
     attackRange: 60,
     desc: 'A sapient, pumpkin-bodied creature trailing long vines, long kept alongside Eikar and Keilia as companions and mounts.',
@@ -523,12 +524,14 @@
     name: 'Kuni Byrd (Ridden)', family: 'Kuni Byrd', element: 'Fti',
     rarity: [4, 6], size: [2, 3], rig: 'bird',
     color: '#8a6d3b', color2: '#b03a2e', // saddle red
-    features: { wings: true, talons: true, rider: true },
+    features: { wings: true, talons: true },   // rider is no longer inherent — an Eikar mounts it on the field
     tags: ['flyer', 'carnivore', 'mount'],
-    behavior: 'kuni_byrd_ridden',
+    behavior: 'kuni_byrd',            // riderless it flies wild; a mount switches it to its ridden brain
+    riderlessBehavior: 'kuni_byrd',
+    riddenBehavior: 'kuni_byrd_ridden',
     statMul: { hp: 1.25, dmg: 1.5, speed: 1.25 },
     attackRange: 36,
-    desc: 'A Kuni Byrd bonded to a rider — all the wild instincts, plus loyalty.',
+    desc: 'A Kuni Byrd raised to be flown — wild until an Eikar or Keilia takes the saddle, then the two hunt as one.',
     temperament: 'The wild hunter’s heart, tempered by the bond.',
     special: 'Rider attacks from the air while the Byrd flies and dives — two tokens functioning as one. Rider protection instinct can override the hunt. Keilia-compatible individuals are significantly rarer.',
     vars: { bondStrength: [0.4, 1], commandResponse: [0.3, 1], riderProtection: [0.3, 1], diveSpeed: [1.4, 2], preyThreshold: [0.8, 2], recovery: [0.4, 1] },
