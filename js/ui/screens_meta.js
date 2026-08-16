@@ -398,7 +398,7 @@
         body.appendChild(U.el('p', { cls: 'small ' + (s.error ? '' : 'muted'), style: s.error ? 'color:var(--red)' : '',
           text: s.tablesMissing ? '⚠ Online tournaments need the new tables — re-run supabase/schema.sql.'
             : s.error ? '⚠ Online tournaments: ' + s.error
-            : '🌐 Online tournaments are ON — real players across every device share this browser. The Dya’kukull only fill empty seats.' }));
+            : '🌐 Online tournaments are ON — real players across every device share this bracket. Empty seats are filled so the bracket never stalls.' }));
       }
 
       /* season banner */
@@ -422,7 +422,7 @@
         const seatInfo = t.online
           ? (t.state === 'open'
               ? (t.registered ? t.registered.length : (t.players || []).length) + '/' + t.size + ' real players joined'
-              : t.size + ' players (Dya’kukull filled empty seats)')
+              : t.size + ' players (empty seats filled)')
           : t.size + ' players';
         card.appendChild(U.el('div', { cls: 'flex1' }, [
           U.el('div', { cls: 'flex' }, [
@@ -495,10 +495,10 @@
 
       /* ---- online: organizer goes live ---- */
       function startOnline(t) {
-        UI.confirm('Go live?', 'Seats fill with your registered players first; the Dya’kukull only pad the empty seats (never a whole field). Start ' + t.name + '?', () => {
+        UI.confirm('Go live?', 'Seats fill with your registered players first; any empty seats are padded (never a whole field). Start ' + t.name + '?', () => {
           TO.start(t).then(r => {
             if (r.err) { UI.alert('Not yet', r.err); return; }
-            UI.toast({ title: 'Tournament is live', body: r.reals + ' real player(s) seated' + (r.fillers ? ', ' + r.fillers + ' Dya’kukull filling in' : '') + '. To the bracket!', icon: '🏆' });
+            UI.toast({ title: 'Tournament is live', body: r.reals + ' real player(s) seated' + (r.fillers ? ', ' + r.fillers + ' seat(s) filled' : '') + '. To the bracket!', icon: '🏆' });
             UI.show('bracket', { trn: G.world.tournaments[t.onlineId || t.id] || t });
           });
         });
@@ -552,7 +552,7 @@
         let online = onlineOn;
         let pwInput = null;
         if (onlineOn) {
-          const onlineBtn = U.el('button', { cls: 'btn small mt', style: 'display:block', text: '🌐 Online — friends can join: ON', title: 'An online tournament is shared across every device. Real players fill the seats; the Dya’kukull only pad what’s left. Titles come from official season events only.' });
+          const onlineBtn = U.el('button', { cls: 'btn small mt', style: 'display:block', text: '🌐 Online — friends can join: ON', title: 'An online tournament is shared across every device. Real players fill the seats; any that remain are padded. Titles come from official season events only.' });
           onlineBtn.onclick = () => { online = !online; onlineBtn.textContent = '🌐 Online — friends can join: ' + (online ? 'ON' : 'OFF'); onlineBtn.classList.toggle('ghost', !online); pwWrap.style.display = online ? '' : 'none'; };
           w.appendChild(onlineBtn);
           const pwWrap = U.el('div', { cls: 'mt' });
@@ -750,7 +750,7 @@
         },
         Schedule() {
           body.innerHTML = '';
-          body.appendChild(U.el('p', { cls: 'muted', text: t.schedule + '. Play your match whenever you’re ready — the bracket waits for you (the Dya’kukull are patient).' }));
+          body.appendChild(U.el('p', { cls: 'muted', text: t.schedule + '. Play your match whenever you’re ready — the bracket waits for you.' }));
         },
         'Live/Results'() {
           body.innerHTML = '';
@@ -857,7 +857,7 @@
                    match by match, over the next while. Results land here. */
                 UI.toast({ title: 'Eliminated', body: 'The bracket plays on without you — watch it fill in from the bracket page. There is always next season.', icon: '🏆' });
               } else if (!t.bracket[t.bracket.length - 1].every(m2 => m2.winner)) {
-                UI.toast({ title: 'Match recorded', body: 'The other Dya\u2019kukull play their matches on their own time. You\u2019ll be told when your next round is ready.', icon: '🏆' });
+                UI.toast({ title: 'Match recorded', body: 'The other players play their matches on their own time. You\u2019ll be told when your next round is ready.', icon: '🏆' });
               }
               G.save();
               UI.show('bracket', { trn: t });

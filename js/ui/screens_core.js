@@ -300,10 +300,13 @@
       const items = [
         ['⚔ Play', () => UI.show('play')],
         ['🎴 Collection', () => UI.show('collection')],
-        ['🛒 Market', () => UI.show('market')],
+        /* the market, the hunts, and the tournaments are all the shared world
+           of the Mbaru Tatu — they need the Guild network (only Quick Play and
+           Duel vs the machine are playable on your own) */
+        ['🛒 Market', () => UI.requireOnline(() => UI.show('market'))],
         ['⚗ Crafting', () => UI.show('crafting')],
-        ['🏹 Adventures', () => UI.show('adventures')],
-        ['🏆 Tournaments', () => UI.show('tournaments')],
+        ['🏹 Adventures', () => UI.requireOnline(() => UI.show('adventures'))],
+        ['🏆 Tournaments', () => UI.requireOnline(() => UI.show('tournaments'))],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['👥 Friends', () => UI.show('friends')],
@@ -680,6 +683,28 @@
     }));
     if (O.configured()) row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Go offline', onclick: () => { O.clearConfig(); location.reload(); } }));
     row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => m.close() }));
+    w.appendChild(row);
+  };
+
+  /* The whole of Dya'Akara is the shared world of the Mbaru Tatu — the only
+     things a player may do without the Guild network are Quick Play against
+     the machine and a Duel against the machine. Every other mode and feature
+     needs to be online. UI.requireOnline is the single gate the rest of the
+     game passes through: online → run the action; offline → offer to connect.
+     (Presentation note: the players of the world are never labelled as
+     anything but players — see the Dya'kukull, who fill in seamlessly.) */
+  UI.requireOnline = function (onOk, opts) {
+    const O = DYA.online;
+    if (O && O.enabled) { onOk(); return; }
+    opts = opts || {};
+    const w = U.el('div', {});
+    w.appendChild(U.el('h3', { cls: 'gold', text: opts.title || 'Join the Mbaru Tatu' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', html: opts.body ||
+      'This part of Dya’Akara lives in the shared world of the Mbaru Tatu. Only <b>Quick Play</b> and a <b>Duel</b> against the machine can be played on your own. Connect to take your place among the players of the world.' }));
+    const m = UI.modal(w);
+    const row = U.el('div', { cls: 'flex mt' });
+    row.appendChild(U.el('button', { cls: 'btn primary', text: '🌐 Connect', onclick: () => { m.close(); UI.onlineSetup(() => { if (onOk) onOk(); }); } }));
+    row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Not now', onclick: () => m.close() }));
     w.appendChild(row);
   };
 

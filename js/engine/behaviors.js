@@ -62,6 +62,37 @@
     api.patrol(c, 60);
   };
 
+  /* A mount with an Eikar/Keilia on its back (Domestic Punk, and any ground
+     mount without its own ridden brain). The rider's command turns a defensive
+     beast into a decisive, target-aware fighter — it protects the pair, breaks
+     the enemy's key pieces first, then presses the nearest foe. */
+  B.mounted_eikar = function (c, api) {
+    const reach = c.vars.vineLength || c.attackRange || 60;
+    const cr = c.vars.commandResponse != null ? c.vars.commandResponse : 0.7;
+    // protect the pair: ride down whoever just struck
+    const attacker = attackedRecently(c, api) && c.lastAttacker && !c.lastAttacker.dead ? c.lastAttacker : null;
+    if (attacker) { api.moveToward(c, attacker.x, attacker.y, true); if (api.dist(c, attacker) < reach * 1.3) api.attack(c, attacker); return; }
+    // command layer: take down the enemy relic carrier
+    const relic = api.relic ? api.relic() : null;
+    if (relic && relic.carrier && relic.carrierTeam !== c.team && cr > 0.4) {
+      const carrier = api.byId(relic.carrier);
+      if (carrier && !carrier.dead) { api.moveToward(c, carrier.x, carrier.y, true); if (api.dist(c, carrier) < reach) api.attack(c, carrier); return; }
+    }
+    // then break enemy support (chemist / archer) — an Eikar knows what to end first
+    const support = api.nearestEnemy(c, 340, o => o.sp.behavior === 'chemist' || o.sp.behavior === 'archer_unit' || (o.sp.tags && o.sp.tags.includes('support')));
+    if (support && cr > 0.5) { api.moveToward(c, support.x, support.y, true); if (api.dist(c, support) < reach * 1.1) api.attack(c, support); return; }
+    // shield a wounded ally under attack
+    const ally = api.alliesNear(c, 220).find(a => a !== c && attackedRecently(a, api) && a.lastAttacker && !a.lastAttacker.dead);
+    if (ally) { const th = ally.lastAttacker; api.moveToward(c, th.x, th.y, true); if (api.dist(c, th) < reach) api.attack(c, th); return; }
+    // otherwise press the nearest foe decisively (the rider makes it bold)
+    const foe = api.nearestEnemy(c, 280);
+    if (foe) { if (api.dist(c, foe) < reach) api.attack(c, foe); else api.moveToward(c, foe.x, foe.y, true); return; }
+    // no foe in sight — hold the line near the vanguard
+    const friend = api.alliesNear(c, 400).filter(a => a.sp.tags.includes('sentient'))[0];
+    if (friend && api.dist(c, friend) > 100) { api.moveToward(c, friend.x, friend.y, false); return; }
+    api.patrol(c, 70);
+  };
+
   B.wild_punk = function (c, api) {
     const inTerritory = api.dist(c, { x: c.homeX, y: c.homeY }) < c.vars.territory;
     const attacker = attackedRecently(c, api) && c.lastAttacker && !c.lastAttacker.dead ? c.lastAttacker : null;

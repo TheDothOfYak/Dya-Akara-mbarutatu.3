@@ -726,11 +726,11 @@
           /* friends first (own section), then real players, then the
              Dya'kukull — each tier internally ordered by the chosen sort */
           entries.sort((a, b) => (a.tier - b.tier) || bySort(a, b));
-          if (!entries.length) { gwrap.appendChild(U.el('p', { cls: 'muted center', text: 'The stalls are bare. Check back — the Dya\'kukull are always trading.' })); return; }
+          if (!entries.length) { gwrap.appendChild(U.el('p', { cls: 'muted center', text: 'The stalls are bare. Check back — the stalls fill again soon.' })); return; }
           const TIER = [
             { label: '🤝 Friends’ Stalls', cls: 'friends' },
             { label: '🌐 Real Players', cls: 'players' },
-            { label: 'Dya’kukull Stalls', cls: 'kukull' },
+            { label: 'Guild Stalls', cls: 'kukull' },
           ];
           let lastTier = -1, grd = null;
           entries.slice(0, 80).forEach(en => {
@@ -867,11 +867,11 @@
         });
         cards.sort((a, b) => (a.tier - b.tier) || (b.weight - a.weight));
 
-        if (!cards.length) gwrap.appendChild(U.el('p', { cls: 'muted center', text: 'No stalls are open right now. The Dya\'kukull will have some up shortly.' }));
+        if (!cards.length) gwrap.appendChild(U.el('p', { cls: 'muted center', text: 'No stalls are open right now. More will open shortly.' }));
         const TIER = [
           { label: '🤝 Friends’ Stalls', cls: 'friends' },
           { label: '🌐 Real Players', cls: 'players' },
-          { label: 'Dya’kukull Stalls', cls: 'kukull' },
+          { label: 'Guild Stalls', cls: 'kukull' },
         ];
         let lastTier = -1, grd = null;
         cards.forEach(c => {
