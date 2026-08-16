@@ -108,5 +108,38 @@ function stageTheft(m, thief) {
     'dropped=' + dropped + ' thiefDead=' + thief.dead + ' carrier=' + ours.carrier);
 }
 
+/* ---------- 4) a stunned carrier drops the relic ---------- */
+{
+  const m = newMatch(34);
+  const thief = m.spawnFromToken(TK.mint({ speciesId: 'harkal', rng, rarity: 3 }), 1, 700, 300);
+  const ours = stageTheft(m, thief);
+  thief.stunnedUntil = m.tick + 20;
+  m.doTick();
+  check('a stunned carrier drops the relic', ours.carrier == null && !thief.carryingRelic,
+    'carrier=' + ours.carrier + ' carrying=' + thief.carryingRelic);
+}
+
+/* ---------- 5) a heavy single blow (>=45% max HP) knocks it loose ---------- */
+{
+  const m = newMatch(35);
+  const thief = m.spawnFromToken(TK.mint({ speciesId: 'harkal', rng, rarity: 3 }), 1, 700, 300);
+  const ours = stageTheft(m, thief);
+  const src = m.spawnFromToken(TK.mint({ speciesId: 'sword_eikar', rng, rarity: 3 }), 0, 690, 300);
+  thief.maxHp = 200; thief.hp = 200;
+
+  // a modest hit (under 45%) must NOT drop it
+  m.damage(thief, 40, src, { noAnim: true }); // 20% of maxHp
+  check('a light hit does NOT drop the relic', ours.carrier === thief.id && thief.carryingRelic,
+    'carrier=' + ours.carrier);
+
+  // a heavy hit (>=45%) knocks it loose, and the carrier survives it
+  const before = thief.hp;
+  m.damage(thief, 150, src, { noAnim: true }); // 75% of maxHp
+  check('a 45%+ single hit knocks the relic loose', ours.carrier == null && !thief.carryingRelic,
+    'carrier=' + ours.carrier);
+  check('the heavy-hit carrier survives the blow (not a kill-drop)', !thief.dead && thief.hp < before,
+    'dead=' + thief.dead + ' hp=' + thief.hp.toFixed(1));
+}
+
 console.log(failures ? ('\nRELIC DEFENSE: ' + failures + ' FAILURE(S)') : '\nRELIC DEFENSE: ALL PASS');
 process.exit(failures ? 1 : 0);
