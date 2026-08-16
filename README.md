@@ -80,7 +80,11 @@ Per the creator's direction, all creatures use **animated placeholder rigs**: a 
 
 ## Online Play (real cross-device multiplayer)
 
-The game now has a real online layer — see **[ONLINE_SETUP.md](ONLINE_SETUP.md)** for the 10-minute setup. It runs on a free Supabase project (Firebase, if you use it, only *hosts the files* — it does not make the game online by itself):
+**Dya'Akara is an online-first game.** The cloud (a free Supabase project) is the source of truth — a player's account lives in `dya_accounts`, and `localStorage` is only a local cache. On boot the game holds behind a blocking "Reaching the Guild…" overlay until the servers answer, and if the connection drops mid-session the same overlay returns until it comes back — so play never silently forks into a private local copy (`js/core/online_gate.js`). The deployment in `js/config.js` already ships with a live Supabase project baked in.
+
+> **Offline mode is deliberate, not a fallback.** The local match engine is fully intact behind `DYA.onlineGate.allowOffline`, reserved for a future offline-vs-AI "camping" mode (play against the Dya'kukull with no connection). Until that mode ships, the game requires the cloud to sign in.
+
+See **[ONLINE_SETUP.md](ONLINE_SETUP.md)** for the 10-minute setup. Everything below runs on that Supabase project (Firebase, if you use it, only *hosts the files* — it does not make the game online by itself):
 
 - **Cross-device accounts — log in anywhere** — a player's whole save (collection, gold, level, friends, settings, achievements) is keyed to their email and lives in a `dya_accounts` table, not just one browser's `localStorage`. Log in with the same email+password on any computer — home, work, a phone browser — and pick up exactly where you left off. Bans travel the same way, enforced the moment you log in anywhere. (`js/core/account_cloud.js`.)
 - **Cross-device friends** — every player gets a permanent 6-character **friend code** (shown at the top of the Friends screen once online). Exchange codes, send/accept requests, and see each other's live online status from any two computers. (`js/core/online.js`, plain REST, polled every 15s.)
@@ -92,7 +96,7 @@ The game now has a real online layer — see **[ONLINE_SETUP.md](ONLINE_SETUP.md
 - Configure once in `js/config.js` (bakes it into the deployment), or per-browser in-game via **Friends → Set up online play**. If you set up Supabase before this update, re-run `supabase/schema.sql` once — it's idempotent and just adds the new tables.
 - ⚠ Same open-policy security model as the rest of this online layer (see [ONLINE_SETUP.md](ONLINE_SETUP.md#a-note-on-security)): fine for a game shared among people you trust, not equivalent to real per-account authentication.
 
-Without online configured, everything still runs fully local exactly as before: accounts, world, the local Dya'kukull stalls, and the 100 Dya'kukull live in `localStorage` behind a storage adapter (`DYA.store` in `js/core/state.js`). Matchmaking and duels are always played against the AI populace, which stays a per-browser simulation even with online configured — it's world flavor, not portable player data. Tournaments are local (AI-run flavor) offline, but become **real and shared** the moment online is configured.
+The 100 Dya'kukull AI populace stays a per-browser simulation even with online configured (behind the `DYA.store` storage adapter in `js/core/state.js`) — it's world flavor, not portable player data — and matchmaking and duels are always played against them. Tournaments become **real and shared** across devices with the cloud reachable, which (being online-first) is the normal state. A deployment with no Supabase configured, or one that can't reach it, shows the online-gate overlay and won't start a session — the future offline-vs-AI mode is the sanctioned way to play without a connection.
 
 ## Deferred (matches Part XVII)
 
