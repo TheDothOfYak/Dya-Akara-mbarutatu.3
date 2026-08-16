@@ -379,9 +379,12 @@
       api.moveToward(c, relic.x + 50, relic.y + 30, false);
       return;
     }
-    // our own relic stolen → run it down (defense duty)
+    // our own relic stolen → run the thief down and STRIKE, forcing a drop
+    // (shadowing the carrier without attacking let it stroll the relic home)
     const ours = api.ownRelic(c.team);
     if (ours && ours.carrier != null) {
+      const thief = api.byId(ours.carrier);
+      if (thief && !thief.dead) { api.attack(c, thief, false, true); return; }
       api.moveToward(c, ours.x, ours.y, true);
       return;
     }
@@ -499,7 +502,17 @@
     }
     // our own relic was stolen → highest duty is getting it back
     const ours = api.ownRelic(c.team);
-    if (ours && (ours.carrier != null || (Math.abs(ours.x - ours.homeX) > 6 && !ours.captured))) {
+    if (ours && ours.carrier != null) {
+      // an enemy is hauling it off — chase the thief down and actually
+      // STRIKE them. moveToward alone only shadows the carrier without ever
+      // landing a hit, so the thief just walks the relic home unopposed.
+      const thief = api.byId(ours.carrier);
+      if (thief && !thief.dead) { api.attack(c, thief, false, true); return true; }
+      api.moveToward(c, ours.x, ours.y, true);
+      return true;
+    }
+    if (ours && Math.abs(ours.x - ours.homeX) > 6 && !ours.captured) {
+      // dropped but sitting out in the open — go touch it to send it home
       api.moveToward(c, ours.x, ours.y, true);
       return true;
     }
