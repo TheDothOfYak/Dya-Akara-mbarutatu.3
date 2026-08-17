@@ -614,11 +614,11 @@
   };
 
   B.archer_unit = function (c, api) {
-    // tower relocation
-    const tower = api.structuresOf(c.team, 'tower').find(s => !s.occupant || s.occupant === c.id);
+    // tower relocation (a mounted archer rides its mount — it shoots from the saddle instead)
+    const tower = c.riding ? null : api.structuresOf(c.team, 'tower').find(s => !s.occupant || s.occupant === c.id);
     if (tower && !c.onTower) { api.moveToward(c, tower.x, tower.y, false); if (api.dist(c, tower) < 20) api.mountTower(c, tower); return; }
-    // evade close range at all costs
-    const closeThreat = api.nearestEnemy(c, 60);
+    // evade close range at all costs (a rider can't flee — it fights from the mount)
+    const closeThreat = c.riding ? null : api.nearestEnemy(c, 60);
     if (closeThreat && !c.onTower) {
       if (api.enemiesNear(c, 40).length) { api.attack(c, closeThreat); return; } // cornered — secondary weapon
       api.moveAway(c, closeThreat.x, closeThreat.y, true); return;

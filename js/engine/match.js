@@ -214,10 +214,13 @@
        A creature tagged "mount" (the Domestic Punk, the Kuni Byrd) is rideable
        but spawns RIDERLESS — it fights its own wild brain until a friendly
        Eikar or Keilia physically reaches it and climbs on (see M.updateMounting).
-       Only then does the pair grow tougher, hit harder, shield each blow, and
-       fight on command like an Eikar (M.mountRider); the bond then deepens the
-       longer they ride (bond growth in step). The rider is drawn by the sprite
-       layer via c.hasRider, and thrown clear if the mount falls (M.dismountRider). */
+       The rider does NOT vanish: it rides along, drawn on the mount's back, and
+       keeps fighting with its OWN weapon (an Archer keeps shooting, a Spear
+       throws its Hanii) on top of the mount's attacks — which is why a mounted
+       pair is so strong. The mount also grows tougher, faster, and hits harder,
+       and the bond deepens the longer they ride (M.mountRider / M.applyMountStats).
+       The rider can't be struck directly while up there; if the mount falls it's
+       thrown clear and fights on foot (M.dismountRider). */
     c.mountable = !!(sp.tags && sp.tags.includes('mount'));
     c.hasRider = false;
     c.riderUnit = null;
@@ -226,7 +229,7 @@
       c.riderlessBehavior = sp.riderlessBehavior || sp.behavior;
       c.riddenBehavior = sp.riddenBehavior || 'mounted_eikar';
       /* remember the on-foot baseline so mount boosts + bond stay reversible */
-      c.mountBaseHp = c.maxHp; c.mountBaseDmg = c.dmg; c.mountBaseRange = c.attackRange;
+      c.mountBaseHp = c.maxHp; c.mountBaseDmg = c.dmg; c.mountBaseRange = c.attackRange; c.mountBaseSpeed = c.speed;
       c.bond = 0; c.bondTick = 0;
     }
 
@@ -378,9 +381,10 @@
     const api = M.api();
     for (const c of M.creatures) {
       if (c.dead) continue;
-      /* a rider riding a mount is not an independent actor — the mount carries
-         it (position synced in M.updateMounting); it re-enters if thrown clear */
-      if (c.riding) continue;
+      /* A rider up on a mount still runs its OWN brain here — an Archer keeps
+         shooting, a Spear keeps throwing — but its self-movement is suppressed
+         in execIntent (it rides where the mount takes it, position synced in
+         M.updateMounting). It just can't be targeted or move on its own. */
       if (c.stunnedUntil > M.tick) { c.state = 'hit'; if (c.carryingRelic) M.dropRelic(c, 'stun'); continue; }
       if ((M.tick + c.id) % 6 === 0) {
         c.intent = {};
@@ -450,7 +454,7 @@
       if (c.dead || !c.riderUnit) continue;
       const e = c.riderUnit;
       if (e.dead) { M.dismountRider(c, false); continue; }
-      e.x = c.x; e.y = c.y; e.facing = c.facing;      // the rider travels with the mount
+      e.x = c.x; e.y = c.y; e.facing = c.facing; e.rideR = c.radius;   // the rider travels with the mount (its shots fire from up there)
       if (M.tick - c.bondTick >= Math.round(1 / TICK) && (c.bond || 0) < 8) {
         c.bondTick = M.tick; c.bond = (c.bond || 0) + 1;
         M.applyMountStats(c);
@@ -489,17 +493,19 @@
     }
   };
 
-  /* mount + bond → tougher, harder-hitting; the rider lends part of its own
-     bite and (archers) its reach. All scaled off the on-foot baseline so it
-     reverts cleanly when the rider dismounts. */
+  /* mount + bond → tougher, harder-hitting, and FASTER. The rider fights with
+     its own weapon on top of this (so we don't fold the rider's damage in — that
+     would double-count it). All scaled off the on-foot baseline so it reverts
+     cleanly when the rider dismounts. */
   Match.prototype.applyMountStats = function (c) {
     const e = c.riderUnit; if (!e) return;
     const bond = c.bond || 0;
     const newMax = Math.round(c.mountBaseHp * (1.15 + bond * 0.02));   // up to ~+31% hp
     c.hp = Math.min(newMax, c.hp + Math.max(0, newMax - c.maxHp));     // gain the delta only
     c.maxHp = newMax;
-    c.dmg = Math.round((c.mountBaseDmg * (1.12 + bond * 0.045) + e.dmg * 0.4) * 10) / 10;  // up to ~+48% + rider's bite
-    c.attackRange = Math.max(c.mountBaseRange, Math.round(e.attackRange * 0.9));
+    c.dmg = Math.round(c.mountBaseDmg * (1.15 + bond * 0.05) * 10) / 10;  // the mount's own bite — up to ~+55%
+    c.speed = Math.round(c.mountBaseSpeed * (1.18 + bond * 0.03));        // carrying a rider spurs it faster — up to ~+42%
+    c.attackRange = c.mountBaseRange;
     c.riderProtect = U.clamp((c.vars.riderProtection != null ? c.vars.riderProtection : 0.15) + (e.sp.keiliaLayer ? 0.05 : 0) + bond * 0.012, 0.08, 0.5);
   };
 
@@ -507,7 +513,7 @@
     const M = this;
     if (!e || !c || c.riderUnit || e.riding || c.dead || e.dead) return;
     c.riderUnit = e; c.hasRider = true;
-    e.riding = true; e.mountedOn = c.id; e.state = 'idle'; e.intent = {};
+    e.riding = true; e.mountedOn = c.id; e.mountedAt = M.tick; e.rideR = c.radius; e.intent = {};
     c.bond = 0; c.bondTick = M.tick;
     M.applyMountStats(c);
     if (M.teams[c.team] && M.teams[c.team].stats) M.teams[c.team].stats.combos['Eikar mounts up'] = true;
@@ -521,9 +527,9 @@
     c.riderUnit = null; c.hasRider = false; c.riderProtect = 0; c.bond = 0;
     /* the mount reverts to its on-foot strength */
     c.maxHp = c.mountBaseHp; if (c.hp > c.maxHp) c.hp = c.maxHp;
-    c.dmg = c.mountBaseDmg; c.attackRange = c.mountBaseRange;
+    c.dmg = c.mountBaseDmg; c.attackRange = c.mountBaseRange; c.speed = c.mountBaseSpeed;
     if (!e) return;
-    e.riding = false; e.mountedOn = null;
+    e.riding = false; e.mountedOn = null; e.rideR = 0;
     if (thrown && !e.dead) {
       /* the mount fell — the rider is thrown clear and fights on foot, shaken */
       e.x = U.clamp(c.x + 14, 14, WORLD.w - 14); e.y = c.y; e.state = 'hit'; e.intent = {};
@@ -695,8 +701,9 @@
     }
     if (c.frenzy > 0) c.frenzy = Math.max(0, c.frenzy - TICK * 0.05);
 
-    /* movement */
-    if (it.move && !c.rooted && !(c.onTower)) {
+    /* movement (a mounted rider doesn't move on its own — it rides where the
+       mount takes it; M.updateMounting keeps it glued to the mount) */
+    if (it.move && !c.rooted && !(c.onTower) && !c.riding) {
       let sp = c.speed * (it.move.run ? 1.45 : 1) * buffMul('speedMul');
       if (c.carryingRelic) {
         sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;

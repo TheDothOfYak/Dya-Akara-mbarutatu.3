@@ -241,9 +241,10 @@
     }
 
     /* ------- creatures (sorted by y for depth) ------- */
-    const sorted = M.creatures.slice().sort((a, b) => a.y - b.y);
+    /* a rider sits at its mount's position — nudge its sort key so it draws
+       just after (on top of) the mount */
+    const sorted = M.creatures.slice().sort((a, b) => (a.y + (a.riding ? 1 : 0)) - (b.y + (b.riding ? 1 : 0)));
     for (const c of sorted) {
-      if (c.riding) continue;   // drawn as its mount's rider, not as its own creature
       let alpha = 1;
       if (c.dead) {
         alpha = Math.max(0, 1 - (M.tick - c.deadTick) / 50);
@@ -257,10 +258,20 @@
         c.sp.features.biolumTail ||
         (c.speciesId === 'rubbermcfly' && zik) ||
         c.sp.features.glow);
+      /* a mounted rider is drawn seated on its mount's back, with a quick
+         hop-up when it first climbs on. Its shot origin stays at c.x/c.y. */
+      let drawY = c.y, rMul = 1.35;
+      if (c.riding) {
+        const seat = (c.rideR || c.radius) * 1.05;
+        const p = Math.max(0, Math.min(1, (M.tick - (c.mountedAt || 0)) / 7));
+        const ease = 1 - (1 - p) * (1 - p);
+        drawY = c.y - seat * ease - Math.sin(p * Math.PI) * (c.rideR || c.radius) * 0.35;   // rise + a little arc
+        rMul = 1.35 * 0.82;   // sit a touch smaller on the mount
+      }
       ctx.save();
-      ctx.translate(c.x, c.y);
+      ctx.translate(c.x, drawY);
       SPR.draw(ctx, {
-        sp: c.sp, r: c.radius * 1.35, state: c.dead ? 'death' : c.state,
+        sp: c.sp, r: c.radius * rMul, state: c.dead ? 'death' : c.state,
         indiv: c.tok && DYA.token.physique ? DYA.token.physique(c.tok) : null,
         t: R.t, phase: c.animPhase, facing: c.facing,
         teamColor: M.mode === 'hunt' && c.team === 1 ? '#9c3a3a' : M.teams[c.team] ? M.teams[c.team].color : null,
@@ -270,14 +281,17 @@
         shimmer: dset.holographic && !c.dead,
         biolum: biolumOn,
         heat: c.heat, swarmFrac: c.swarmFrac,
-        heads: c.headsLeft, hasRider: c.hasRider != null ? c.hasRider : (c.sp.features && c.sp.features.rider),
+        /* the mount does NOT draw the generic acorn rider — its real rider
+           (Archer, Spear, Keilia…) is drawn as its own creature, seated above */
+        heads: c.headsLeft, hasRider: !!c.hasRider && !c.riderUnit,
         charged: c.mem && c.mem.charge >= 1,
         hasRelic: !!c.carryingRelic,
       });
       ctx.restore();
 
-      /* hp bar */
-      if (!c.dead && c.hp < c.maxHp && !c.sp.tags.includes('inert')) {
+      /* hp bar (a mounted rider shows none — it can't be hit up there, and the
+         mount already carries the pair's health bar) */
+      if (!c.dead && !c.riding && c.hp < c.maxHp && !c.sp.tags.includes('inert')) {
         const bw = Math.max(22, c.radius * 2);
         const frac = Math.max(0, c.hp / c.maxHp);
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
