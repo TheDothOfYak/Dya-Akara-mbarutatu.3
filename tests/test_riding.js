@@ -85,6 +85,9 @@ check('the mounted pair grows stronger — more damage', punk.dmg > dmg0, dmg0 +
 check('the mounted pair grows tougher — more max HP', punk.maxHp > hp0, hp0 + ' → ' + punk.maxHp);
 check('protection deepens with the bond', punk.riderProtect >= prot0);
 
+/* carrying a rider spurs the mount FASTER */
+check('mounting increases the mount’s speed', punk.speed > punk.mountBaseSpeed, punk.mountBaseSpeed + ' → ' + punk.speed);
+
 /* if the mount falls, the rider is thrown clear and fights on foot */
 m.kill(punk, enemy, 'combat');
 check('the mount losing frees the rider', !punk.riderUnit && punk.hasRider === false);
@@ -103,10 +106,42 @@ m2.updateMounting();
 check('a Keilia can mount the Byrd', byrd && byrd.hasRider === true && byrd.riderUnit === keilia);
 check('the mounted Byrd flies its ridden brain', byrd && byrd.riddenBehavior === 'kuni_byrd_ridden');
 
-/* a lone Eikar with no mount simply fights on foot */
-const m3 = newMatch(11);
-const soloEikar = m3.spawnFromToken(TK.mint({ speciesId: 'spear_eikar', rng, rarity: 3 }), 0, 300, 300);
+/* THE POINT: the rider keeps its own trait. An Archer mounted on a Punk still
+   shoots its bow (in addition to the mount's attacks) — its quiver drains as it
+   flooses arrows at an in-range enemy while riding. */
+const m3 = newMatch(13);
+const apunk = m3.spawnFromToken(TK.mint({ speciesId: 'domestic_punk', rng, rarity: 3 }), 0, 300, 300);
+const archer = m3.spawnFromToken(TK.mint({ speciesId: 'archer_eikar', rng, rarity: 4 }), 0, 312, 300);
+const foe = m3.spawnFromToken(TK.mint({ speciesId: 'harkal', rng, rarity: 5 }), 1, 300, 170);  // ~130px up — inside bow range
 m3.updateMounting();
+check('the archer mounted the punk', apunk.riderUnit === archer && archer.riding === true);
+const quiver0 = archer.quiver;
+check('the mounted archer keeps its bow (arrows nocked)', quiver0 > 0, 'quiver=' + quiver0);
+let sawArrow = false;
+for (let i = 0; i < 40 && !foe.dead; i++) {   // ~2s of real stepping
+  m3.step(1 / 20);
+  if (m3.projectiles.some(p => p.type === 'arrow' && p.source === archer)) sawArrow = true;
+}
+check('a mounted Archer still shoots its own bow', sawArrow || archer.quiver < quiver0, 'quiver ' + quiver0 + ' → ' + archer.quiver);
+check('the archer is still riding while it shoots (fights from the saddle)', archer.riding === true || apunk.dead);
+
+/* a mounted Chemist keeps its trait too — it heals allies from the saddle */
+const m5 = newMatch(17);
+const cpunk = m5.spawnFromToken(TK.mint({ speciesId: 'domestic_punk', rng, rarity: 3 }), 0, 300, 300);
+const chemist = m5.spawnFromToken(TK.mint({ speciesId: 'chemist_eikar', rng, rarity: 4 }), 0, 312, 300);
+const wounded = m5.spawnFromToken(TK.mint({ speciesId: 'gynge', rng, rarity: 2 }), 0, 336, 300);  // stationary ally, stays in range
+m5.updateMounting();
+check('the chemist mounted the punk', cpunk.riderUnit === chemist && chemist.riding === true);
+wounded.hp = Math.round(wounded.maxHp * 0.35);
+const woundStart = wounded.hp;
+for (let i = 0; i < 220; i++) m5.step(1 / 20);   // ~11s — long enough for a heal cooldown
+check('a mounted Chemist heals allies from the saddle', wounded.hp > woundStart, woundStart + ' → ' + wounded.hp);
+check('the chemist is still riding while it heals', chemist.riding === true || cpunk.dead);
+
+/* a lone Eikar with no mount simply fights on foot */
+const m4 = newMatch(11);
+const soloEikar = m4.spawnFromToken(TK.mint({ speciesId: 'spear_eikar', rng, rarity: 3 }), 0, 300, 300);
+m4.updateMounting();
 check('a lone Eikar with no mount never enters a riding state', soloEikar && !soloEikar.riding && !soloEikar.mountedOn);
 
 console.log(failures ? ('\nMOUNTING: ' + failures + ' FAILURE(S)') : '\nMOUNTING: ALL PASS');

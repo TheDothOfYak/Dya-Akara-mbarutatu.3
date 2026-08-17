@@ -614,11 +614,11 @@
   };
 
   B.archer_unit = function (c, api) {
-    // tower relocation
-    const tower = api.structuresOf(c.team, 'tower').find(s => !s.occupant || s.occupant === c.id);
+    // tower relocation (a mounted archer rides its mount — it shoots from the saddle instead)
+    const tower = c.riding ? null : api.structuresOf(c.team, 'tower').find(s => !s.occupant || s.occupant === c.id);
     if (tower && !c.onTower) { api.moveToward(c, tower.x, tower.y, false); if (api.dist(c, tower) < 20) api.mountTower(c, tower); return; }
-    // evade close range at all costs
-    const closeThreat = api.nearestEnemy(c, 60);
+    // evade close range at all costs (a rider can't flee — it fights from the mount)
+    const closeThreat = c.riding ? null : api.nearestEnemy(c, 60);
     if (closeThreat && !c.onTower) {
       if (api.enemiesNear(c, 40).length) { api.attack(c, closeThreat); return; } // cornered — secondary weapon
       api.moveAway(c, closeThreat.x, closeThreat.y, true); return;
@@ -651,6 +651,16 @@
   };
 
   B.chemist = function (c, api) {
+    /* mounted: a chemist can't move (it rides where the mount takes it), but
+       support is its whole reason for being — so it keeps healing and buffing
+       allies from the saddle, its mount included */
+    if (c.riding) {
+      const hurtR = api.alliesNear(c, c.vars.seekRange).filter(a => a !== c && a.hp < a.maxHp * 0.7).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      if (hurtR && api.offCooldown(c, 'heal')) { api.heal(c, hurtR); return; }
+      const buffR = api.alliesNear(c, c.vars.seekRange).filter(a => a !== c && (!a.buffedUntil || (a.buffedUntil || 0) < api.tick) && a.dmg > 1);
+      if (buffR.length && api.offCooldown(c, 'buff')) { api.buff(c, buffR.sort((a, b) => b.dmg - a.dmg)[0]); return; }
+      api.hold(c); return;
+    }
     if (fleeThreats(c, api, 70)) return; // never engage; reposition to safe range
     // critically injured ally → heal (first priority when urgent)
     const hurt = api.alliesNear(c, c.vars.seekRange).filter(a => a !== c && a.hp < a.maxHp * 0.55).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
