@@ -589,29 +589,43 @@
     return { x: U.clamp(own.x + dx, 30, WORLD.w - 30), y: U.clamp(own.y + dy, 30, WORLD.h - 30) };
   };
 
-  /* the ordered blueprint list (roles are stable so structures/claims line up) */
+  /* the ordered blueprint list (roles are stable so structures/claims line up).
+     Two main towers sit BEHIND a battlemented front wall; that wall runs
+     wall–tower–wall–tower–wall between them, with the wall-towers spaced well
+     apart. The rear cone tower + the full wall ring only unlock once the works
+     have been upgraded to Level 2. */
   Match.prototype.builderBlueprints = function (team) {
     const sp = this.builderSpec(team);
     const own = this.teams[team].hoard;
     const foe = this.teams[1 - team] ? this.teams[1 - team].hoard : own;
     const dir = Math.sign(foe.x - own.x) || 1;
-    const R = 96 + sp.radius;                     // a little off the hoard border, inside the wall line
+    const R = 96 + sp.radius;
+    const level = this.fortLevel(team);
     const spearmen = this.creatures.filter(c => !c.dead && c.team === team && c.sp.behavior === 'spear_unit').length;
+    const cx = v => U.clamp(v, 34, WORLD.w - 34), cy = v => U.clamp(v, 44, WORLD.h - 44);
+    const towerX = cx(own.x + dir * R);          // main towers — a little back, inside the wall
+    const frontX = cx(own.x + dir * (R + 50));   // the front wall line, out toward the enemy
     const bp = [];
-    /* 1 — tower one (5 o’clock), 2 — wall-towers + wall, 3 — tower two (1 o’clock) */
-    bp.push({ role: 'tower1', kind: 'tower', ...this._clock(team, 5, R), spec: sp });
-    bp.push({ role: 'wallTowerA', kind: 'wallTower', ...this._clock(team, 2.4, R + 8), spec: sp });
-    bp.push({ role: 'wallTowerB', kind: 'wallTower', ...this._clock(team, 3.6, R + 8), spec: sp });
-    bp.push({ role: 'wallFront', kind: 'wall', ...this._clock(team, 3, R + 8), spec: sp, extra: { trapped: sp.trapped } });
-    bp.push({ role: 'tower2', kind: 'tower', ...this._clock(team, 1, R), spec: sp });
-    /* 4 — the Builder’s Hut, behind the hoard */
-    bp.push({ role: 'hut', kind: 'hut', x: U.clamp(own.x - dir * (R + 30), 30, WORLD.w - 30), y: own.y, spec: sp });
-    /* with 2+ spearmen: a third, cone-ranged tower at 9 o’clock + a full ring */
-    if (spearmen >= 2) {
-      const cone = this._clock(team, 9, R);
-      const coneDir = Math.atan2(own.y - cone.y, own.x - cone.x);   // apex at the tower, cone reaches the field centre
-      bp.push({ role: 'towerCone', kind: 'cone', x: cone.x, y: cone.y, spec: { ...sp, coneDir, coneHalf: Math.PI / 5, coneRange: sp.far } });
-      [7, 8, 10, 11, 0].forEach((h, i) => bp.push({ role: 'ring' + i, kind: 'wall', ...this._clock(team, h, R + 8), spec: sp, extra: { trapped: sp.trapped } }));
+    /* stage 1 — tower one (lower front) */
+    bp.push({ role: 'tower1', kind: 'tower', x: towerX, y: cy(own.y + 122), spec: sp });
+    /* stage 2 — the front wall line: wall · wall-tower · wall · wall-tower · wall */
+    [-120, -60, 0, 60, 120].forEach((oy, i) => {
+      const y = cy(own.y + oy);
+      if (i % 2 === 1) bp.push({ role: 'wallTower' + i, kind: 'wallTower', x: frontX, y, spec: sp });
+      else bp.push({ role: 'wall' + i, kind: 'wall', x: frontX, y, spec: sp, extra: { trapped: sp.trapped, vertical: true } });
+    });
+    /* stage 3 — tower two (upper front) */
+    bp.push({ role: 'tower2', kind: 'tower', x: towerX, y: cy(own.y - 122), spec: sp });
+    /* stage 4 — the Builder's Hut, behind the hoard */
+    bp.push({ role: 'hut', kind: 'hut', x: cx(own.x - dir * (R + 34)), y: own.y, spec: sp });
+    /* Level 2 + 2 spearmen: a rear cone tower + a full wall ring around the hoard */
+    if (level >= 2 && spearmen >= 2) {
+      const coneX = cx(own.x - dir * (R + 16)), coneY = own.y;
+      const coneDir = dir > 0 ? 0 : Math.PI;      // apex at the tower, opening toward the enemy / field centre
+      bp.push({ role: 'towerCone', kind: 'cone', x: coneX, y: coneY, spec: Object.assign({}, sp, { coneDir, coneHalf: Math.PI / 5, coneRange: sp.far }) });
+      const backX = cx(own.x - dir * (R + 50));
+      [-120, -60, 60, 120].forEach((oy, i) => bp.push({ role: 'ringBack' + i, kind: 'wall', x: backX, y: cy(own.y + oy), spec: sp, extra: { trapped: sp.trapped, vertical: true } }));
+      [-1, 1].forEach((sgn, si) => [0, 1].forEach(k => bp.push({ role: 'ringSide' + si + k, kind: 'wall', x: cx(own.x + dir * (R - 6 - k * 66)), y: cy(own.y + sgn * 150), spec: sp, extra: { trapped: sp.trapped, vertical: false } })));
     }
     return bp;
   };
@@ -619,23 +633,29 @@
   Match.prototype.raiseStructure = function (c, bp) {
     const M = this, sp = bp.spec || M.builderSpec(c.team);
     const q = (c.vars && c.vars.structureQuality) || 1;
+    const foe = M.teams[1 - c.team] ? M.teams[1 - c.team].hoard : M.teams[c.team].hoard;
     const s = { id: 'st' + (M.idCounter++), type: bp.kind === 'wall' ? 'wall' : bp.kind === 'ward' ? 'ward' : 'tower',
-      kind: bp.kind, role: bp.role, team: c.team, x: bp.x, y: bp.y, occupants: [], quality: q, upgraded: false, powerMul: 1, fireCd: 0 };
+      kind: bp.kind, role: bp.role, team: c.team, x: bp.x, y: bp.y, occupants: [], quality: q, upgraded: false, powerMul: 1, fireCd: 0,
+      face: Math.sign(foe.x - bp.x) || 1 };
     if (bp.kind === 'wall') {
-      s.w = 22; s.h = 68; s.trapped = !!(bp.extra && bp.extra.trapped); s.trapCd = 0; s.hp = s.maxHp = sp.wallHp;
+      const vert = !bp.extra || bp.extra.vertical !== false;   // front/back walls run vertically; ring sides horizontally
+      s.w = vert ? 24 : 84; s.h = vert ? 84 : 24; s.vertical = vert;
+      s.trapped = !!(bp.extra && bp.extra.trapped); s.trapCd = 0; s.hp = s.maxHp = sp.wallHp;
     } else if (bp.kind === 'ward') {
       s.radius = 66; s.hp = s.maxHp = Math.round(110 * q);
     } else if (bp.kind === 'wallTower') {
       s.w = 26; s.h = 46; s.capacity = 0; s.baseDmg = sp.wallTowerDmg; s.range = 50; s.close = 50; s.far = 50;
       s.hp = s.maxHp = sp.wallTowerHp;
     } else if (bp.kind === 'hut') {
-      s.w = 52; s.h = 42; s.capacity = 99; s.isHut = true; s.hp = s.maxHp = Math.round(200 * q);
+      s.w = 54; s.h = 44; s.capacity = 99; s.isHut = true; s.level = 1; s.hp = s.maxHp = Math.round(220 * q);
     } else { /* tower / cone — manned */
       s.w = 30 + sp.capacity * 4; s.h = 52; s.capacity = sp.capacity; s.close = sp.close; s.far = sp.far; s.radius = sp.radius;
       s.hp = s.maxHp = sp.towerHp;
       if (bp.kind === 'cone') { s.coneDir = sp.coneDir; s.coneHalf = sp.coneHalf; s.coneRange = sp.coneRange; s.far = sp.coneRange; }
     }
     M.structures.push(s);
+    /* if the works are already Level 2, anything raised later comes up upgraded */
+    if (M.fortLevel(c.team) === 2) M.upgradeOne(s);
     const label = s.isHut ? 'Builder’s Hut' : s.kind === 'wallTower' ? 'wall-tower' : s.kind === 'cone' ? 'cone tower' : s.type;
     M.uiEvent(c.team, 'event', c.tokName + ' completes a ' + label + (s.trapped ? ' (spiked)' : '') + '.');
     return s;
@@ -658,19 +678,32 @@
     }
   };
 
-  /* after a builder sits a full pulse in the Hut: towers ×2 power & range, ×3 hp;
-     walls ×4 hp; wall-towers ×2 power & range, ×3 hp. Once. */
-  Match.prototype.upgradeFortifications = function (team) {
-    let did = false;
-    for (const s of this.structures) {
-      if (s.team !== team || s.hp <= 0 || s.upgraded || s.isHut || s.type === 'ward') continue;
-      s.upgraded = true; did = true;
-      if (s.type === 'wall') { s.maxHp *= 4; s.hp = s.maxHp; }
-      else if (s.kind === 'wallTower') { s.powerMul = 2; s.baseDmg *= 2; s.range *= 2; s.close = s.range; s.far = s.range; s.maxHp *= 3; s.hp = s.maxHp; }
-      else { s.powerMul = 2; s.close *= 2; s.far *= 2; if (s.coneRange) s.coneRange *= 2; s.maxHp *= 3; s.hp = s.maxHp; }
+  /* current fortification level of a team: Level 2 once the Hut is a Stronghold */
+  Match.prototype.fortLevel = function (team) {
+    const h = this.structures.find(s => s.team === team && s.isHut && s.hp > 0);
+    return (h && h.level >= 2) ? 2 : 1;
+  };
+  /* a builder has sheltered a full pulse in the Hut → upgrading is unlocked */
+  Match.prototype.upgradeReady = function (team) { return !!(this.teams[team] && this.teams[team].upgradeUnlocked); };
+  Match.prototype.pendingUpgrades = function (team) {
+    return this.structures.filter(s => s.team === team && s.hp > 0 && !s.upgraded && !s.isHut && s.type !== 'ward');
+  };
+
+  /* upgrade ONE structure (this is the job a builder completes over build-time):
+     towers ×2 power & range and ×3 hp; walls ×4 hp; wall-towers ×2 power & range
+     and ×3 hp. When the last one is done, the Hut advances to Level 2. */
+  Match.prototype.upgradeOne = function (s) {
+    if (!s || s.hp <= 0 || s.upgraded || s.isHut || s.type === 'ward') return false;
+    s.upgraded = true;
+    if (s.type === 'wall') { s.maxHp *= 4; s.hp = s.maxHp; }
+    else if (s.kind === 'wallTower') { s.powerMul = 2; s.baseDmg *= 2; s.range *= 2; s.close = s.range; s.far = s.range; s.maxHp *= 3; s.hp = s.maxHp; }
+    else { s.powerMul = 2; s.close *= 2; s.far *= 2; if (s.coneRange) s.coneRange *= 2; s.maxHp *= 3; s.hp = s.maxHp; }
+    this.addEffect('buff', s.x, s.y - 10, { big: true });
+    if (!this.pendingUpgrades(s.team).length) {
+      const hut = this.structures.find(x => x.team === s.team && x.isHut && x.hp > 0);
+      if (hut && hut.level !== 2) { hut.level = 2; this.uiEvent(s.team, 'event', 'The Builder’s Hut is raised to a Stronghold — the works stand at Level 2.'); }
     }
-    if (did) this.uiEvent(team, 'event', 'The Builder reinforces the works — towers and walls upgraded.');
-    return did;
+    return true;
   };
 
   /* ================= PULSES & RESOURCES ================= */
@@ -1418,10 +1451,12 @@
         }
         if (siege > 0) { s.hp -= siege * TICK * 0.5; if (s.hp <= 0) { s.hp = 0; M.freeOccupants(s); M.uiEvent(-1, 'event', 'A ' + (s.isHut ? 'Builder’s Hut' : s.kind === 'wallTower' ? 'wall-tower' : 'tower') + ' is torn down.'); } }
       }
-      /* a builder that has sheltered in the Hut for a full pulse keeps the works upgraded */
+      /* once a builder has sheltered in the Hut for a full pulse, upgrading is
+         unlocked — the builders then sally out and upgrade each structure over
+         build-time (handled in the Builder behavior), not instantly */
       for (const c of M.creatures) {
         if (c.dead || !c.inHut || c.sp.behavior !== 'builder') continue;
-        if (c.mem.hutSincePulse != null && M.pulseIndex > c.mem.hutSincePulse) M.upgradeFortifications(c.team);
+        if (c.mem.hutSincePulse != null && M.pulseIndex > c.mem.hutSincePulse && M.teams[c.team]) M.teams[c.team].upgradeUnlocked = true;
       }
       M.structures.forEach(s => { if (s.hp <= 0) M.freeOccupants(s); });
       M.structures = M.structures.filter(s => s.hp > 0);
@@ -2028,19 +2063,32 @@
         const b = c.mem.building;
         if (!b) return;
         const bp = b.bp;
-        if (U.dist(c.x, c.y, bp.x, bp.y) > 42) { c.intent.move = { x: bp.x, y: bp.y, run: true }; return; }
+        /* an upgrade job tracks the live structure (and takes the same build-time) */
+        let tx = bp.x, ty = bp.y;
+        if (bp.kind === 'upgrade') {
+          const st = M.structures.find(s => s.id === bp.targetId && s.hp > 0);
+          if (!st || st.upgraded) { c.mem.building = null; return; }
+          tx = st.x; ty = st.y;
+        }
+        if (U.dist(c.x, c.y, tx, ty) > 40) { c.intent.move = { x: tx, y: ty, run: true }; return; }
         c.state = 'special';
-        /* extra builders on the same blueprint speed it up */
+        /* extra builders on the same job speed it up */
         const helpers = M.creatures.filter(o => !o.dead && o.team === c.team && o.mem.building && o.mem.building.bp && o.mem.building.bp.role === bp.role).length;
         b.progress += (c.vars.buildSpeed || 1) * TICK * (1 + 0.6 * (helpers - 1));
+        if (bp.kind === 'upgrade' && M.tick % 5 === 0) M.addEffect('buff', tx, ty - 8, {});   // visible reinforcing
         if (b.progress >= 1) {
-          if (!M.structures.some(s => s.team === c.team && s.role === bp.role && s.hp > 0)) {
-            M.raiseStructure(c, bp);
-          }
+          if (bp.kind === 'upgrade') { const st = M.structures.find(s => s.id === bp.targetId && s.hp > 0); if (st) M.upgradeOne(st); }
+          else if (!M.structures.some(s => s.team === c.team && s.role === bp.role && s.hp > 0)) M.raiseStructure(c, bp);
           c.mem.building = null;
         }
       },
-      repair(c, s) { c.state = 'special'; s.hp = Math.min(s.maxHp, s.hp + (c.vars.repairSpeed || 1) * 9 * TICK); },
+      /* start a timed upgrade job on a specific structure (same duration as a build) */
+      startUpgrade(c, s) { if (M.mode === 'duel') return; c.mem.building = { bp: { role: 'up:' + s.role, kind: 'upgrade', targetId: s.id, x: s.x, y: s.y }, progress: 0 }; },
+      repair(c, s) {
+        c.state = 'special';
+        s.hp = Math.min(s.maxHp, s.hp + (c.vars.repairSpeed || 1) * 12 * TICK);
+        if (M.tick % 6 === 0) M.addEffect('buff', s.x, s.y - 8, {});   // visible mending
+      },
       demolish(c, s) {
         c.state = 'attack';
         if (c.attackCd <= 0) { c.attackCd = 1; s.hp -= c.dmg * 1.5; if (s.hp <= 0) { M.freeOccupants(s); M.structures = M.structures.filter(x => x !== s); } }
@@ -2066,7 +2114,9 @@
         if (M.teams[c.team]) M.teams[c.team].stats.combos['Builder’s Hut raised'] = true;
       },
       leaveHut(c) { c.inHut = null; c.mem.hutSincePulse = null; },
-      upgradeFortifications: (team) => M.upgradeFortifications(team),
+      fortLevel: (team) => M.fortLevel(team),
+      upgradeReady: (team) => M.upgradeReady(team),
+      pendingUpgrades: (team) => M.pendingUpgrades(team),
 
       addEffect: (type, x, y, data) => M.addEffect(type, x, y, data),
     };

@@ -714,8 +714,9 @@
      down tools entirely during the Sunear'Zikhron. */
   B.builder = function (c, api) {
     const own = api.ownHoard(c.team);
-    const myStructs = () => api.structuresOf(c.team);
-    const hutOf = () => myStructs().find(s => s.isHut);
+    const S = () => api.structuresOf(c.team);
+    const hutOf = () => S().find(s => s.isHut);
+    const safe = (s) => api.enemiesNear({ x: s.x, y: s.y, team: c.team }, 80).length === 0;
 
     // the memory storm halts all construction — shelter in the Hut, or hold
     if (api.storm()) {
@@ -725,17 +726,7 @@
       api.moveToward(c, own.x, own.y, false); return;
     }
 
-    // already sheltering: only sally out to repair once the threat has cleared
-    if (c.inHut) {
-      const hut = myStructs().find(s => s.id === c.inHut);
-      if (!hut) { api.leaveHut(c); }
-      else {
-        const needsRepair = myStructs().some(s => !s.isHut && s.hp < s.maxHp * 0.7 && api.enemiesNear({ x: s.x, y: s.y, team: c.team }, 90).length === 0);
-        if (needsRepair) { api.leaveHut(c); }        // fall through to repair below
-        else { api.guard(c); return; }               // hold — stepMisc upgrades after a full pulse
-      }
-    }
-
+    // an active build/upgrade job carries on
     if (c.mem.building) { api.continueBuild(c); return; }
 
     // forced into combat → brawl as a last resort
@@ -743,39 +734,57 @@
     if (cornered.length) { api.attack(c, cornered[0]); return; }
     if (fleeThreats(c, api, 60)) return;
 
+    const bps = api.builderBlueprints(c.team);
+    const built = new Set(S().map(s => s.role));
+    const unbuilt = bps.filter(bp => !built.has(bp.role));
+    const damaged = S().filter(s => !s.isHut && s.hp < s.maxHp * 0.85 && safe(s)).sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
+    const upTarget = () => {
+      if (!api.upgradeReady(c.team)) return null;
+      const claimed = api.rolesInProgress(c.team);
+      return api.pendingUpgrades(c.team).filter(s => claimed.indexOf('up:' + s.role) < 0).sort((a, b) => api.dist(c, a) - api.dist(c, b))[0] || null;
+    };
+
+    // sheltering in the Hut: only step out when there's real work to do
+    if (c.inHut) {
+      const hut = S().find(s => s.id === c.inHut);
+      const work = !hut || unbuilt.length || damaged || upTarget();
+      if (work) { api.leaveHut(c); } else { api.guard(c); return; }   // else hold — the pulse timer runs
+    }
+
     // Relic Ward (master builders): seal our own relic early
     if (c.picks.relicIntegration && !api.structuresOf(c.team, 'ward').length) { api.startBuild(c, 'ward'); api.continueBuild(c); return; }
 
-    // work the blueprint in order: the first unbuilt, unclaimed non-Hut structure
-    const bps = api.builderBlueprints(c.team);
-    const built = new Set(myStructs().map(s => s.role));
-    const inProg = api.rolesInProgress(c.team);
-    const nextCore = bps.find(bp => bp.kind !== 'hut' && !built.has(bp.role) && inProg.indexOf(bp.role) < 0);
-    if (nextCore) { api.startBuild(c, nextCore); api.continueBuild(c); return; }
-
-    // repair the most-damaged structure — but only the closest free builder does
-    const damaged = myStructs().filter(s => !s.isHut && s.hp < s.maxHp * 0.9).sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
+    // 1) repair the most-damaged, un-threatened structure — closest free builder only
     if (damaged) {
-      const closerFree = api.alliesNear(c, 900).some(a => a.sp.behavior === 'builder' && !a.mem.building && !a.inHut && api.dist(a, damaged) < api.dist(c, damaged) - 1);
+      const closerFree = api.alliesNear(c, 1000).some(a => a.sp.behavior === 'builder' && !a.inHut && (!a.mem.building || (a.mem.building.bp && a.mem.building.bp.kind === 'repair')) && api.dist(a, damaged) < api.dist(c, damaged) - 1);
       if (!closerFree) {
         if (api.dist(c, damaged) > 30) { api.moveToward(c, damaged.x, damaged.y, true); return; }
         api.repair(c, damaged); return;
       }
     }
 
-    // core works done & healthy → raise (or enter) the Builder's Hut
-    const hutBp = bps.find(bp => bp.kind === 'hut');
-    const hut = hutOf();
-    if (!hut) { if (hutBp && inProg.indexOf('hut') < 0) { api.startBuild(c, hutBp); api.continueBuild(c); return; } }
-    else { if (api.dist(c, hut) > 30) { api.moveToward(c, hut.x, hut.y, true); return; } api.enterHut(c, hut); return; }
+    // 2) build the next structure in the plan — join (help) one already claimed so
+    //    no builder is ever left standing idle
+    if (unbuilt.length) {
+      const inProg = api.rolesInProgress(c.team);
+      const target = unbuilt.find(bp => inProg.indexOf(bp.role) < 0) || unbuilt[0];
+      api.startBuild(c, target); api.continueBuild(c); return;
+    }
 
-    // siege: tear down enemy fortifications
+    // 3) upgrade to Level 2 once unlocked — a timed job per structure (build-time)
+    const up = upTarget();
+    if (up) { api.startUpgrade(c, up); api.continueBuild(c); return; }
+
+    // 4) nothing to build/repair/upgrade → shelter in the Hut (out of sight, safe)
+    const hut = hutOf();
+    if (hut) { if (api.dist(c, hut) > 30) { api.moveToward(c, hut.x, hut.y, true); return; } api.enterHut(c, hut); return; }
+
+    // 5) siege enemy fortifications, or hold near ours
     const enemyStruct = api.structuresOf(1 - c.team)[0];
     if (enemyStruct && c.picks.siegeProficiency) {
       if (api.dist(c, enemyStruct) > 60) { api.moveToward(c, enemyStruct.x, enemyStruct.y, false); return; }
       api.demolish(c, enemyStruct); return;
     }
-    // hold near our fortifications, ready to repair
     api.moveToward(c, own.x + (api.enemyHoard(c.team).x - own.x) * 0.14, own.y, false);
   };
 
