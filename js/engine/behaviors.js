@@ -651,6 +651,16 @@
   };
 
   B.chemist = function (c, api) {
+    /* mounted: a chemist can't move (it rides where the mount takes it), but
+       support is its whole reason for being — so it keeps healing and buffing
+       allies from the saddle, its mount included */
+    if (c.riding) {
+      const hurtR = api.alliesNear(c, c.vars.seekRange).filter(a => a !== c && a.hp < a.maxHp * 0.7).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      if (hurtR && api.offCooldown(c, 'heal')) { api.heal(c, hurtR); return; }
+      const buffR = api.alliesNear(c, c.vars.seekRange).filter(a => a !== c && (!a.buffedUntil || (a.buffedUntil || 0) < api.tick) && a.dmg > 1);
+      if (buffR.length && api.offCooldown(c, 'buff')) { api.buff(c, buffR.sort((a, b) => b.dmg - a.dmg)[0]); return; }
+      api.hold(c); return;
+    }
     if (fleeThreats(c, api, 70)) return; // never engage; reposition to safe range
     // critically injured ally → heal (first priority when urgent)
     const hurt = api.alliesNear(c, c.vars.seekRange).filter(a => a !== c && a.hp < a.maxHp * 0.55).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];

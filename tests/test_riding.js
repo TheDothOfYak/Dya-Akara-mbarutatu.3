@@ -125,6 +125,19 @@ for (let i = 0; i < 40 && !foe.dead; i++) {   // ~2s of real stepping
 check('a mounted Archer still shoots its own bow', sawArrow || archer.quiver < quiver0, 'quiver ' + quiver0 + ' → ' + archer.quiver);
 check('the archer is still riding while it shoots (fights from the saddle)', archer.riding === true || apunk.dead);
 
+/* a mounted Chemist keeps its trait too — it heals allies from the saddle */
+const m5 = newMatch(17);
+const cpunk = m5.spawnFromToken(TK.mint({ speciesId: 'domestic_punk', rng, rarity: 3 }), 0, 300, 300);
+const chemist = m5.spawnFromToken(TK.mint({ speciesId: 'chemist_eikar', rng, rarity: 4 }), 0, 312, 300);
+const wounded = m5.spawnFromToken(TK.mint({ speciesId: 'gynge', rng, rarity: 2 }), 0, 336, 300);  // stationary ally, stays in range
+m5.updateMounting();
+check('the chemist mounted the punk', cpunk.riderUnit === chemist && chemist.riding === true);
+wounded.hp = Math.round(wounded.maxHp * 0.35);
+const woundStart = wounded.hp;
+for (let i = 0; i < 220; i++) m5.step(1 / 20);   // ~11s — long enough for a heal cooldown
+check('a mounted Chemist heals allies from the saddle', wounded.hp > woundStart, woundStart + ' → ' + wounded.hp);
+check('the chemist is still riding while it heals', chemist.riding === true || cpunk.dead);
+
 /* a lone Eikar with no mount simply fights on foot */
 const m4 = newMatch(11);
 const soloEikar = m4.spawnFromToken(TK.mint({ speciesId: 'spear_eikar', rng, rarity: 3 }), 0, 300, 300);
