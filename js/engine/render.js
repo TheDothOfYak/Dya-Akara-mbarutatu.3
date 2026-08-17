@@ -245,7 +245,7 @@
        just after (on top of) the mount */
     const sorted = M.creatures.slice().sort((a, b) => (a.y + (a.riding ? 1 : 0)) - (b.y + (b.riding ? 1 : 0)));
     for (const c of sorted) {
-      if (c.inHut) continue;   // sheltering inside the Builder's Hut — not on the field
+      if (c.inHut || c.onTower) continue;   // sheltering in the Hut / garrisoned inside a tower — not drawn on the field
       let alpha = 1;
       if (c.dead) {
         alpha = Math.max(0, 1 - (M.tick - c.deadTick) / 50);
