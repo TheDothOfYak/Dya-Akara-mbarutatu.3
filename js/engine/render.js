@@ -452,16 +452,57 @@
     ctx.translate(s.x, s.y);
     const teamCol = M.teams[s.team] ? M.teams[s.team].color : '#999';
     let barTop = -50;
-    if (s.type === 'tower') {
-      /* faint fortify aura */
-      ctx.strokeStyle = teamCol + '22'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(0, 0, 132, 0, TAU); ctx.stroke();
-      ctx.fillStyle = '#6b5b45'; ctx.fillRect(-12, -34, 24, 40);
-      ctx.fillStyle = '#57493a'; ctx.fillRect(-16, -42, 32, 10);
-      ctx.fillStyle = teamCol; ctx.fillRect(-2, -54, 3, 12); // flag pole
-      ctx.beginPath(); ctx.moveTo(1, -54); ctx.lineTo(12, -50); ctx.lineTo(1, -47); ctx.fill();
-      ctx.fillStyle = '#57493a';
-      for (let i = -1; i <= 1; i++) ctx.fillRect(i * 10 - 3, -46, 6, 5);
+    if (s.kind === 'tower' || s.kind === 'cone') {
+      const cap = s.capacity || 1, occ = s.occupants ? s.occupants.length : 0;
+      const bw = 12 + cap * 5, bh = 30 + cap * 6;   // bigger tower for more archers
+      /* range bands: FAR (1.5×) faint, then CLOSE (2.5×), or a forward cone */
+      if (s.kind === 'cone') {
+        const cr = s.coneRange || s.far || 120, ch = s.coneHalf || 0.6, cd = s.coneDir || 0;
+        const grd = ctx.createRadialGradient(0, 0, 6, 0, 0, cr);
+        grd.addColorStop(0, teamCol + '30'); grd.addColorStop(1, teamCol + '00');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, cr, cd - ch, cd + ch); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = teamCol + '55'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, cr, cd - ch, cd + ch); ctx.closePath(); ctx.stroke();
+      } else {
+        ctx.strokeStyle = teamCol + '18'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(0, 0, s.far || 240, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = teamCol + (s.upgraded ? '3a' : '28'); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, s.close || 80, 0, TAU); ctx.stroke();
+      }
+      /* the tower body (taller/wider with capacity; brighter when upgraded) */
+      ctx.fillStyle = s.upgraded ? '#7d6a4e' : '#6b5b45'; ctx.fillRect(-bw / 2, -bh, bw, bh + 6);
+      ctx.fillStyle = '#57493a'; ctx.fillRect(-bw / 2 - 4, -bh - 10, bw + 8, 12);
+      /* crenellations */
+      ctx.fillStyle = '#4c4033';
+      for (let i = 0; i * 8 < bw + 8; i++) ctx.fillRect(-bw / 2 - 4 + i * 8, -bh - 14, 4, 5);
+      /* garrison pips — one per seated archer, capacity shown faint */
+      for (let i = 0; i < cap; i++) {
+        ctx.fillStyle = i < occ ? teamCol : '#3a3229';
+        ctx.beginPath(); ctx.arc(-((cap - 1) * 5) + i * 10, -bh - 20, 3, 0, TAU); ctx.fill();
+      }
+      /* flag */
+      ctx.fillStyle = teamCol; ctx.fillRect(bw / 2 - 1, -bh - 24, 2, 12);
+      ctx.beginPath(); ctx.moveTo(bw / 2 + 1, -bh - 24); ctx.lineTo(bw / 2 + 11, -bh - 20); ctx.lineTo(bw / 2 + 1, -bh - 17); ctx.fill();
+      barTop = -bh - 30;
+    } else if (s.kind === 'wallTower') {
+      /* squat unmanned wall-tower that auto-fires */
+      ctx.strokeStyle = teamCol + '20'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0, 0, s.range || 50, 0, TAU); ctx.stroke();
+      ctx.fillStyle = s.upgraded ? '#6c5f4c' : '#5d5241'; ctx.fillRect(-9, -24, 18, 30);
+      ctx.fillStyle = '#4c4033';
+      for (let i = -1; i <= 1; i++) ctx.fillRect(i * 7 - 3, -28, 5, 5);
+      ctx.fillStyle = teamCol; ctx.fillRect(-1, -22, 2, 8); // arrow slit marker
+      barTop = -34;
+    } else if (s.isHut) {
+      /* the Builder's Hut behind the hoard */
+      ctx.fillStyle = '#5a4a34'; ctx.fillRect(-24, -20, 48, 26);
+      ctx.fillStyle = '#6e5a3f'; ctx.beginPath(); ctx.moveTo(-28, -20); ctx.lineTo(0, -36); ctx.lineTo(28, -20); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2c2419'; ctx.fillRect(-7, -14, 14, 20); // doorway
+      ctx.fillStyle = teamCol; ctx.fillRect(-1, -38, 2, 8);
+      ctx.strokeStyle = '#3a2f1d'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-24, -8); ctx.lineTo(24, -8); ctx.stroke();
+      barTop = -44;
     } else if (s.type === 'wall') {
       const hw = (s.w || 22) / 2, hh = (s.h || 64) / 2;
       const g = ctx.createLinearGradient(-hw, 0, hw, 0);

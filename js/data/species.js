@@ -767,16 +767,16 @@
   }));
   def('builder_keilia', Object.assign({}, KEILIA_BASE, {
     name: 'Builder Keilia',
-    rarity: [2, 5], size: [2, 2],
+    rarity: [2, 5], size: [2, 3],
     features: { acorn: true, weapon: 'hammer', hairArmor: true },
     behavior: 'builder',
-    statMul: { hp: 1.4, dmg: 0.9, speed: 0.85 },
+    statMul: { hp: 1.6, dmg: 0.9, speed: 0.85 },
     attackRange: 24,
-    desc: 'A Keilia field construction specialist with a Kalo-made hammer — reads the field and builds what is needed.',
+    desc: 'A Keilia field construction specialist with a Kalo-made hammer — reads the field and raises a fortress around the hoard, tower by tower.',
     temperament: 'Never fights unless forced. Always looking for the next thing worth building.',
-    special: 'Raises real fortifications. Towers are strongpoints: allied Archers garrison them (+range, −damage taken), nearby allies are sheltered, and elevated sight reveals enemy camouflage. Walls physically block the enemy and their line of fire — allies pass through, flyers cross over — forming a defensive line before the hoard; the enemy must go around or tear them down. Master builders weave in traps (a spiked wall wounds and slows whoever presses it) or a Relic Ward that seals the team’s own Relic until it is broken. Also repairs structures and, with siege training, demolishes the enemy’s.',
-    vars: { buildSpeed: [0.7, 1.4], structureQuality: [0.7, 1.5], towerQuality: [0.7, 1.5], repairSpeed: [0.6, 1.3], brawl: [0.2, 0.8] },
-    picks: { siegeProficiency: [0, 0, 1], trapIntegration: [0, 0, 1], relicIntegration: [0, 0, 0, 1] },
+    special: 'The field engineer. Works a real build order: a manned Tower, two auto-firing Wall-Towers with a wall between, a second Tower, then a Builder’s Hut behind the hoard. Towers garrison 1–3 Archers who cannot be touched until the tower is broken — and hit for 2.5× inside close range, 1.5× out to three times that. Bigger builders raise bigger towers: larger radius, more archers, longer reach. Wall-towers fire on their own. Two allied Spearmen add a third, cone-ranged tower and a full wall ring. From the Hut the Builder repairs whatever’s hit once the threat clears, and after a full pulse inside upgrades the whole works — towers double in power and range and triple in health, walls quadruple. Master builders add spiked walls or a Relic Ward, and with siege training tear the enemy’s works down. Everything is dimensioned off the best Builder in your pouch. (Builders down tools during the Sunear’Zikhron.)',
+    vars: { buildSpeed: [0.9, 1.8], structureQuality: [0.9, 1.7], towerQuality: [0.9, 1.7], repairSpeed: [0.8, 1.6], brawl: [0.2, 0.8] },
+    picks: { siegeProficiency: [0, 1, 1], trapIntegration: [0, 0, 1], relicIntegration: [0, 0, 1] },
   }));
 
   /* ---- Eikar middle-layer trait pools (Part V) ---- */
