@@ -1296,6 +1296,9 @@
       const M = params.match, cfg = params.cfg;
       DYA.currentMatch = M;
       const me = G.me;
+      /* Sandbox: one player commands BOTH sides (declared up here because the
+         HUD scaffolding below reads it before the team vars are set up) */
+      const controlBoth = !!(cfg && cfg.controlBoth);
       const scr = U.el('div', { cls: 'screen', id: 'matchScreen' });
       const canvas = U.el('canvas', { id: 'matchCanvas' });
       scr.appendChild(canvas);
@@ -1360,7 +1363,6 @@
       const NET = cfg && cfg.net;
       let T0 = M.teams[MY];
       let OPP = M.teams[1 - MY];
-      const controlBoth = !!(cfg && cfg.controlBoth);
       const isDuel = M.mode === 'duel';
       /* Hunts: the party you brought deploys for free, any time — no resource
          cost and no re-ready tax. The wheel reflects that (no cost row, always
