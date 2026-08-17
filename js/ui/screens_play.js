@@ -120,7 +120,7 @@
          your own; every other mode is the shared world and passes through
          UI.requireOnline. */
       grid.appendChild(bigCard('⚡', 'Quick Play — vs AI', 'Straight into a match against the machine. Pick a difficulty, pick a pouch, go.', () => P.quickPlayFlow()));
-      grid.appendChild(bigCard('🧪', 'Sandbox', 'Pit your own tokens against each other. Set both teams, control either side or just watch them fight. No stakes, no rewards — pure testing.', () => P.sandboxFlow()));
+      grid.appendChild(bigCard('🧪', 'Sandbox', 'Pit your own tokens against each other. Set both teams and the pulse rules, then command either side and switch between them to test how creatures interact. No stakes, no rewards.', () => P.sandboxFlow()));
       grid.appendChild(bigCard('🏆', 'Ranked Season', 'The Guild’s official ladder. Play your circuit, rank up, climb Local → Interplanetary. Titles are earned here.', () => UI.requireOnline(() => UI.show('seasonLadder'))));
       grid.appendChild(bigCard('🌐', 'Matchmaking Queue', 'Casual queue — matched with the next player near your level. No rank implications.', () => UI.requireOnline(() => P.matchmakingFlow())));
       grid.appendChild(bigCard('🤝', 'Private Match', 'Invite a friend, or share a room code.', () => UI.requireOnline(() => P.privateFlow())));
@@ -433,8 +433,10 @@
   function sandboxArena(pOne, pTwo) {
     const w = U.el('div', {});
     w.appendChild(U.el('h3', { cls: 'gold', text: 'Sandbox arena' }));
-    w.appendChild(U.el('p', { cls: 'small muted', html: 'Team One <b class="gold">' + pOne.length + '</b> tokens · Team Two <b class="gold">' + pTwo.length + '</b> tokens. No rewards — this is a testing ground.' }));
+    w.appendChild(U.el('p', { cls: 'small muted', html: 'Team One <b class="gold">' + pOne.length + '</b> · Team Two <b class="gold">' + pTwo.length + '</b> tokens. You command <b>both</b> sides — ready and deploy for one, then press <b>Tab</b> (or the ⇄ button) to switch and watch them fight. No rewards — pure testing.' }));
     const m = UI.modal(w);
+
+    const settings = { pulseInterval: 8, pulseAmount: 2, chaos: false };
 
     /* terrain choice — the same basic sets the organizer can pick pre-match */
     const terrRow = U.el('div', { cls: 'vote-row mt' });
@@ -445,49 +447,51 @@
     terrRow.appendChild(tSel);
     w.appendChild(terrRow);
 
-    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Choose your seat:' }));
-    const go = (side) => { m.close(); sandboxLaunch(pOne, pTwo, side, tSel.value); };
+    /* pulse settings — you set them directly here (no vote, it's your sandbox) */
+    function optRow(label, opts, cur, fmt, onPick) {
+      const row = U.el('div', { cls: 'vote-row' });
+      row.appendChild(U.el('div', { cls: 'muted small', text: label }));
+      const box = U.el('div', { cls: 'vote-opts' });
+      opts.forEach(op => {
+        const b = U.el('div', { cls: 'vote-opt' + (cur === op ? ' mine' : ''), text: fmt ? fmt(op) : op });
+        b.onclick = () => { U.qsa('.vote-opt', box).forEach((x, i) => x.classList.toggle('mine', opts[i] === op)); onPick(op); DYA.audio.play('click'); };
+        box.appendChild(b);
+      });
+      row.appendChild(box);
+      return row;
+    }
+    w.appendChild(optRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, settings.pulseInterval, v => v + 's', v => settings.pulseInterval = v));
+    w.appendChild(optRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, settings.pulseAmount, null, v => settings.pulseAmount = v));
+    w.appendChild(optRow('MODE — Chaos randomizes every pulse', ['Standard', 'Chaos'], 'Standard', null, v => settings.chaos = (v === 'Chaos')));
+
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Start by commanding:' }));
+    const go = (side) => { m.close(); sandboxLaunch(pOne, pTwo, side, tSel.value, settings); };
     const btns = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
-    btns.appendChild(U.el('button', { cls: 'btn primary', text: '◀ Control Team One', onclick: () => go(0) }));
-    btns.appendChild(U.el('button', { cls: 'btn primary', text: 'Control Team Two ▶', onclick: () => go(1) }));
-    btns.appendChild(U.el('button', { cls: 'btn', text: '👁 Watch (both AI)', onclick: () => go('watch') }));
+    btns.appendChild(U.el('button', { cls: 'btn primary', text: '◀ Team One', onclick: () => go(0) }));
+    btns.appendChild(U.el('button', { cls: 'btn primary', text: 'Team Two ▶', onclick: () => go(1) }));
     w.appendChild(btns);
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   }
 
-  function sandboxLaunch(pOne, pTwo, side, terrain) {
+  function sandboxLaunch(pOne, pTwo, startSide, terrain, settings) {
     const me = G.me;
-    const settings = { pulseInterval: 8, pulseAmount: 2, chaos: false };
-    const AI = 0.7;   // a competent-but-not-brutal AI for whichever side(s) it runs
-    const mySeal = me.seal || { avatarIdx: me.avatarIdx || 0, patterns: [] };
-    const foeSeal = { avatarIdx: 3, patterns: ['runes'] };
-    const mkTeam = (name, pouch, human, seal) => ({
-      name, controller: human ? 'human' : 'ai', aiSkill: AI,
-      pouch: pouch.map(t => U.deepCopy(t)), startResources: 0, seal,
+    const s = settings || { pulseInterval: 8, pulseAmount: 2, chaos: false };
+    const sealOne = me.seal || { avatarIdx: me.avatarIdx || 0, patterns: [] };
+    const sealTwo = { avatarIdx: 3, patterns: ['runes'] };   // a distinct look so the two sides read apart on the field
+    const mkTeam = (name, pouch, seal) => ({
+      name, controller: 'human', pouch: pouch.map(t => U.deepCopy(t)), startResources: 0, seal,
     });
-
-    if (side === 'watch') {
-      const match = new DYA.match.Match({
-        seed: U.newSeed(), mode: 'standard', terrain, settings,
-        teams: [mkTeam('Team One', pOne, false, mySeal), mkTeam('Team Two', pTwo, false, foeSeal)],
-      });
-      UI.showWithLoading('spectate', { match, title: 'SANDBOX — Team One vs Team Two' }, 900);
-      return;
-    }
-
-    const myTeam = side; // 0 or 1
-    const teams = [
-      mkTeam('Team One', pOne, myTeam === 0, myTeam === 0 ? mySeal : foeSeal),
-      mkTeam('Team Two', pTwo, myTeam === 1, myTeam === 1 ? mySeal : foeSeal),
-    ];
-    const match = new DYA.match.Match({ seed: U.newSeed(), mode: 'standard', terrain, settings, teams });
+    const match = new DYA.match.Match({
+      seed: U.newSeed(), mode: 'standard', terrain, settings: s,
+      teams: [mkTeam('Team One', pOne, sealOne), mkTeam('Team Two', pTwo, sealTwo)],
+    });
     const cfg = {
       mode: 'standard', ranked: false, format: 'Sandbox',
-      myTeam, noRecord: true, noXp: true,
-      pouch: myTeam === 0 ? pOne : pTwo,
-      opponent: { name: myTeam === 0 ? 'Team Two' : 'Team One' },
+      myTeam: startSide, controlBoth: true, noRecord: true, noXp: true,
+      pouch: startSide === 0 ? pOne : pTwo,
+      opponent: { name: startSide === 0 ? 'Team Two' : 'Team One' },
       onFinish: (res, iWon, draw, toMenu) => { if (toMenu) UI.show('play'); else P.sandboxFlow(); },
-      rematch: () => sandboxLaunch(pOne, pTwo, side, terrain),
+      rematch: () => sandboxLaunch(pOne, pTwo, startSide, terrain, s),
     };
     UI.showWithLoading('match', { match, cfg }, 1300);
   }
@@ -1320,6 +1324,12 @@
       const tc = U.el('div', { cls: 'hud hud-topcenter' });
       const pauseBtn = U.el('button', { cls: 'btn small', text: '❚❚ Pause' });
       tc.appendChild(pauseBtn);
+      /* Sandbox: a toggle to hand command to the other team */
+      let switchBtn = null;
+      if (controlBoth) {
+        switchBtn = U.el('button', { cls: 'btn small', style: 'margin-left:6px', title: 'Command the other team (Tab)', onclick: () => switchSide() });
+        tc.appendChild(switchBtn);
+      }
       scr.appendChild(tc);
 
       /* event feed */
@@ -1343,11 +1353,14 @@
       let wheelIndex = 0;
       let tooltip = null;
 
-      /* networked matches: the local player may be team 1 (the guest) */
-      const MY = (cfg && cfg.myTeam) || 0;
+      /* networked matches: the local player may be team 1 (the guest).
+         Sandbox (cfg.controlBoth): one player commands BOTH sides and can hand
+         command back and forth, so MY / T0 / OPP are switchable at runtime. */
+      let MY = (cfg && cfg.myTeam) || 0;
       const NET = cfg && cfg.net;
-      const T0 = M.teams[MY];
-      const OPP = M.teams[1 - MY];
+      let T0 = M.teams[MY];
+      let OPP = M.teams[1 - MY];
+      const controlBoth = !!(cfg && cfg.controlBoth);
       const isDuel = M.mode === 'duel';
       /* Hunts: the party you brought deploys for free, any time — no resource
          cost and no re-ready tax. The wheel reflects that (no cost row, always
@@ -1568,6 +1581,26 @@
         });
       }
 
+      /* Sandbox: hand command to the other team. Both teams are human here, so
+         nothing is AI-driven — the player readies and deploys for whichever side
+         they currently hold, then switches to command the other and watch them
+         fight. Resources and relic status track the active team automatically. */
+      function updateSwitchLabel() { if (switchBtn) switchBtn.textContent = '⇄ ' + (M.teams[MY] ? M.teams[MY].name : ('Team ' + (MY + 1))); }
+      function switchSide() {
+        if (!controlBoth) return;
+        if (costPicker) costPicker.close();
+        MY = 1 - MY;
+        T0 = M.teams[MY];
+        OPP = M.teams[1 - MY];
+        wheelIndex = 0;
+        selectedSlot = null;
+        updateSwitchLabel();
+        renderWheel(); renderReadied();
+        DYA.audio.play('click');
+        UI.toast({ title: 'Commanding ' + T0.name, body: 'Ready and deploy for ' + T0.name + '. Tab (or ⇄) switches back.', icon: '⇄' });
+      }
+      updateSwitchLabel();
+
       /* keyboard: space + 2–5 trigger readied at cursor (rebindable);
          Shift readies the centered wheel card; A/D or W/S turn the wheel */
       const keyHandler = (e) => {
@@ -1575,6 +1608,7 @@
         if (costPicker) return; /* additional-cost picker owns the keyboard */
         const c = me.settings.controls;
         if (e.key === c.pause || e.key === 'Escape') { e.preventDefault(); togglePause(); return; }
+        if (controlBoth && e.key === 'Tab') { e.preventDefault(); switchSide(); return; }
         const slotKeys = [c.trigger1, c.trigger2, c.trigger3, c.trigger4, c.trigger5];
         const slot = slotKeys.indexOf(e.key);
         if (slot >= 0) {
