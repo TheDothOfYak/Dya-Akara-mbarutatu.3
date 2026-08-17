@@ -130,6 +130,77 @@ console.log('== FRONT LINE: wall–tower–wall–tower–wall, towers behind th
   ok('main towers sit behind the wall line', towers.every(t => Math.abs(t.x - 240) < Math.abs(wallX - 240)));
 }
 
+console.log('== NO MOUNT: a Builder never rides, but a normal Keilia/Eikar does ==');
+{ const m = mk();
+  const b = m.spawnFromToken(mint('builder_keilia', 500), 0, 500, 500);
+  const mount1 = m.spawnFromToken(mint('domestic_punk', 501), 0, 502, 500);
+  const sword = m.spawnFromToken(mint('sword_eikar', 502), 0, 800, 500);
+  const mount2 = m.spawnFromToken(mint('domestic_punk', 503), 0, 802, 500);
+  for (let i = 0; i < 20; i++) m.updateMounting();
+  ok('the Builder does not mount', b.riding !== true && mount1.riderUnit == null);
+  ok('a Sword Eikar DOES mount (control)', sword.riding === true || mount2.riderUnit != null);
+}
+
+console.log('== REPAIR IS HAMMER-WORK: swings (state attack) and mends in chunks ==');
+{ const m = mk(); const b = m.spawnFromToken(mint('builder_keilia', 510), 0, 320, 500);
+  const wall = m.raiseStructure(b, { role: 'wall0', kind: 'wall', x: 320, y: 500, spec: m.builderSpec(0) });
+  wall.hp = wall.maxHp * 0.4; const hp0 = wall.hp;
+  const api = m.api(); b.x = wall.x; b.y = wall.y;
+  for (let i = 0; i < 40; i++) { b.attackCd = 0; api.repair(b, wall); }
+  ok('builder swings its hammer while repairing', b.state === 'attack');
+  ok('repair mends the structure', wall.hp > hp0, 'hp ' + hp0.toFixed(0) + '->' + wall.hp.toFixed(0));
+}
+
+console.log('== CLOSED RING: sealed on all four sides → interior is protected ==');
+function buildRing(m, team) {
+  const own = m.teams[team].hoard;
+  const b = m.spawnFromToken(mint('builder_keilia', 900 + team), team, own.x, own.y);
+  const sp = m.builderSpec(team);
+  const w = (x, y, vert) => m.raiseStructure(b, { role: 'ring_' + Math.round(x) + '_' + Math.round(y), kind: 'wall', x, y, spec: sp, extra: { vertical: vert } });
+  for (let dy = -140; dy <= 140; dy += 70) { w(own.x - 180, own.y + dy, true); w(own.x + 180, own.y + dy, true); }
+  for (let dx = -180; dx <= 180; dx += 70) { w(own.x + dx, own.y - 150, false); w(own.x + dx, own.y + 150, false); }
+  return b;
+}
+{ const m = mk();
+  // front-only walls do NOT seal
+  const b = m.spawnFromToken(mint('builder_keilia', 520), 0, 300, 500);
+  const sp = m.builderSpec(0);
+  for (let dy = -120; dy <= 120; dy += 60) m.raiseStructure(b, { role: 'f' + dy, kind: 'wall', x: 360, y: 500 + dy, spec: sp });
+  ok('an open front line is NOT a sealed enclosure', m.wallEnclosure(0) === null);
+  // a full ring seals it
+  const m2 = mk(); buildRing(m2, 0);
+  const enc = m2.wallEnclosure(0);
+  ok('a full ring reports a sealed interior', !!enc && enc.maxX > enc.minX && enc.maxY > enc.minY);
+}
+
+console.log('== NO DEPLOY INSIDE: enemy blocked from a sealed ring, Malsti blinks in ==');
+{ const m = mk(); buildRing(m, 1);                    // team 1 fully walled
+  const enc = m.wallEnclosure(1);
+  const inX = m.teams[1].hoard.x - 150, inY = m.teams[1].hoard.y;   // a point inside the ring, clear of the hoard
+  const T0 = m.teams[0];
+  // team 0 tries to deploy a rodak inside the enemy ring
+  T0.readied = [{ tok: mint('rodak', 530), state: 'ready', readiedAtPulse: -5, deaths: 0 }];
+  const n0 = m.creatures.length;
+  m.applyInput(0, { type: 'trigger', slot: 0, x: inX, y: inY });
+  const placed = m.creatures[m.creatures.length - 1];
+  const inside = (c) => c.x > enc.minX && c.x < enc.maxX && c.y > enc.minY && c.y < enc.maxY;
+  ok('a normal creature is pushed OUT of the sealed ring', m.creatures.length === n0 + 1 && !inside(placed), 'at ' + placed.x.toFixed(0) + ',' + placed.y.toFixed(0));
+  // a Malsti Punk is allowed to blink inside
+  T0.readied = [{ tok: mint('malsti_punk', 531), state: 'ready', readiedAtPulse: -5, deaths: 0 }];
+  m.applyInput(0, { type: 'trigger', slot: 0, x: inX, y: inY });
+  const punk = m.creatures[m.creatures.length - 1];
+  ok('a Malsti Punk CAN deploy inside the ring', punk.speciesId === 'malsti_punk' && inside(punk), 'at ' + punk.x.toFixed(0) + ',' + punk.y.toFixed(0));
+}
+
+console.log('== MALSTI PHASES: not shoved by an enemy wall ==');
+{ const m = mk();
+  m.structures.push({ id: 'w', type: 'wall', kind: 'wall', team: 0, x: 800, y: 500, w: 24, h: 84, hp: 200, maxHp: 200, quality: 1, vertical: true });
+  const punk = m.spawnFromToken(mint('malsti_punk', 540), 1, 800, 500);
+  punk.rooted = false; const px = punk.x, py = punk.y;
+  m.stepMisc();
+  ok('a Malsti Punk is not shoved out of the wall', Math.abs(punk.x - px) < 1 && Math.abs(punk.y - py) < 1);
+}
+
 console.log('== STORM: Builders down tools during the Sunear’Zikhron ==');
 { const m = mk(); const h = m.teams[0].hoard;
   const b = m.spawnFromToken(mint('builder_keilia', 26), 0, h.x, h.y);
