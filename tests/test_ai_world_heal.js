@@ -87,6 +87,14 @@ const aiListings = (G) => Object.values(G.world.market.listings).filter(l => { c
   check('the market is repopulated', aiListings(A).length > 0, aiListings(A).length + ' AI listings');
   check('a healthy world is left alone (no-op)', A.ensureAiPopulation() === false);
 
+  /* ---- 2b. liveNow() shows a living world immediately (no sim tick needed) ---- */
+  // wipe again, then ask liveNow directly — the Play panel calls this on render
+  Object.keys(A.world.accounts).forEach(id => { if (A.world.accounts[id].ai) delete A.world.accounts[id]; });
+  A.world.elbergiId = null;
+  const ln = A.liveNow();
+  check('liveNow() self-heals the population', aiAccounts(A).length >= 90, 'got ' + aiAccounts(A).length);
+  check('liveNow() reports players online right away', ln.online.length > 0, ln.online.length + ' online');
+
   /* ---- 3. a device must NOT adopt an AI-less shared snapshot ---- */
   db.dya_config.length = 0;
   const now = Date.now();

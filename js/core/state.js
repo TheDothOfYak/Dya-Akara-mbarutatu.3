@@ -1892,8 +1892,18 @@
     return sess ? sess.status : 'offline';
   };
   G.liveNow = function () {
+    /* self-heal so the world is never a ghost town when this panel renders:
+       (1) if the AI world was emptied (a wipe, or a lost/blank AI blob on this
+       device), regenerate the Dya'kukull; (2) if none are online yet — e.g.
+       right after a reseed, before the first sim tick — kick one heartbeat so
+       the panel shows a living world immediately instead of "0 players". */
+    G.ensureAiPopulation();
     const live = liveState();
-    const online = Object.values(G.world.accounts).filter(a => a.ai && G.aiStatus(a.id) === 'online');
+    let online = Object.values(G.world.accounts).filter(a => a.ai && G.aiStatus(a.id) === 'online');
+    if (!online.length && Object.values(G.world.accounts).some(a => a.ai && a.aiCfg && a.aiCfg.active)) {
+      liveBeat(new U.Rng(U.newSeed()), false);
+      online = Object.values(G.world.accounts).filter(a => a.ai && G.aiStatus(a.id) === 'online');
+    }
     return { online, matches: live.matches.filter(m => !m.resolved), challenges: live.challenges.filter(ch => ch.expiresAt > Date.now()), recent: live.recent };
   };
 
