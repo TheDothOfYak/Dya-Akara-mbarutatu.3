@@ -707,22 +707,55 @@
   /* a builder has sheltered a full pulse in the Hut → upgrading is unlocked */
   Match.prototype.upgradeReady = function (team) { return !!(this.teams[team] && this.teams[team].upgradeUnlocked); };
 
-  /* If a team's walls form a CLOSED ring around its hoard (segments on all four
-     sides), return the sealed interior box; else null. Used to forbid the enemy
-     from deploying inside a completed fortress. */
+  /* The wall ring seals the hoard ONLY when it is 100% complete — any gap (an
+     unbuilt or destroyed segment) breaks the seal. We prove completeness by a
+     flood-fill from the hoard over a fine grid: if the fill can leak out to the
+     surrounding border, the ring is open; if it is fully contained by walls,
+     it's sealed and we return the enclosed interior box. Returns null when open.
+     Used to forbid the enemy from deploying inside a finished fortress. */
   Match.prototype.wallEnclosure = function (team) {
     const own = this.teams[team] && this.teams[team].hoard;
     if (!own) return null;
     const walls = this.structures.filter(s => s.team === team && s.type === 'wall' && s.hp > 0);
-    if (walls.length < 10) return null;
-    let l = false, r = false, u = false, d = false, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
-    for (const w of walls) {
-      if (w.x < own.x - 40) l = true; if (w.x > own.x + 40) r = true;
-      if (w.y < own.y - 40) u = true; if (w.y > own.y + 40) d = true;
-      minX = Math.min(minX, w.x); maxX = Math.max(maxX, w.x); minY = Math.min(minY, w.y); maxY = Math.max(maxY, w.y);
+    if (walls.length < 6) return null;                 // not enough for a ring
+    /* the barrier is walls PLUS the towers/wall-towers/hut that sit in the line
+       and fill its gaps — all of them seal the ground the enemy can deploy on */
+    const solids = this.structures.filter(s => s.team === team && s.hp > 0 && s.w && s.h &&
+      (s.type === 'wall' || s.kind === 'tower' || s.kind === 'cone' || s.kind === 'wallTower' || s.isHut));
+    /* region = barrier bounding box + margin (the border must lie outside every piece) */
+    let minX = own.x, maxX = own.x, minY = own.y, maxY = own.y;
+    for (const w of solids) { minX = Math.min(minX, w.x - w.w / 2); maxX = Math.max(maxX, w.x + w.w / 2); minY = Math.min(minY, w.y - w.h / 2); maxY = Math.max(maxY, w.y + w.h / 2); }
+    const margin = 40; minX -= margin; maxX += margin; minY -= margin; maxY += margin;
+    const cell = 12;
+    const cols = Math.ceil((maxX - minX) / cell), rows = Math.ceil((maxY - minY) / cell);
+    if (cols < 4 || rows < 4 || cols * rows > 40000) return null;
+    const blocked = (cxi, cyi) => {
+      const x = minX + cxi * cell + cell / 2, y = minY + cyi * cell + cell / 2;
+      for (const w of solids) if (Math.abs(x - w.x) <= w.w / 2 + 1 && Math.abs(y - w.y) <= w.h / 2 + 1) return true;
+      return false;
+    };
+    const startX = Math.floor((own.x - minX) / cell), startY = Math.floor((own.y - minY) / cell);
+    if (startX < 0 || startY < 0 || startX >= cols || startY >= rows || blocked(startX, startY)) return null;
+    const seen = new Uint8Array(cols * rows);
+    const stack = [[startX, startY]]; seen[startY * cols + startX] = 1;
+    let leak = false, bMinX = own.x, bMaxX = own.x, bMinY = own.y, bMaxY = own.y;
+    while (stack.length) {
+      const cur = stack.pop(), cxi = cur[0], cyi = cur[1];
+      const wx = minX + cxi * cell + cell / 2, wy = minY + cyi * cell + cell / 2;
+      if (wx < bMinX) bMinX = wx; if (wx > bMaxX) bMaxX = wx; if (wy < bMinY) bMinY = wy; if (wy > bMaxY) bMaxY = wy;
+      const nb = [[cxi + 1, cyi], [cxi - 1, cyi], [cxi, cyi + 1], [cxi, cyi - 1]];
+      for (let k = 0; k < 4; k++) {
+        const nx = nb[k][0], ny = nb[k][1];
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) { leak = true; continue; }   // reached the border → gap
+        const idx = ny * cols + nx;
+        if (seen[idx]) continue;
+        seen[idx] = 1;
+        if (blocked(nx, ny)) continue;
+        stack.push([nx, ny]);
+      }
     }
-    if (!(l && r && u && d)) return null;   // not sealed on every side
-    return { minX: minX - 6, maxX: maxX + 6, minY: minY - 6, maxY: maxY + 6 };
+    if (leak) return null;                             // the fill escaped — the ring is not 100% closed
+    return { minX: bMinX - cell, maxX: bMaxX + cell, minY: bMinY - cell, maxY: bMaxY + cell };
   };
   Match.prototype.pendingUpgrades = function (team) {
     return this.structures.filter(s => s.team === team && s.hp > 0 && !s.upgraded && !s.isHut && s.type !== 'ward');
