@@ -41,11 +41,13 @@
     } else {
       list.appendChild(U.el('p', { cls: 'muted', text: 'You own no tokens. The tutorial should have prevented this. See the Guild.' }));
     }
-    /* rentals */
-    const rentRow = U.el('div', { cls: 'friend-row', style: 'cursor:pointer' });
-    rentRow.appendChild(U.el('div', { cls: 'flex1', html: '<b>Guild rentals</b> <span class="small muted">rent up to 13 tokens to fill a pouch (1 Nurtui — 5 hours)</span>' }));
-    rentRow.onclick = () => { m.close(); P.rentalFlow(cb); };
-    list.appendChild(rentRow);
+    /* rentals — hidden when the caller wants owned tokens only (e.g. Sandbox) */
+    if (!opts.noRentals) {
+      const rentRow = U.el('div', { cls: 'friend-row', style: 'cursor:pointer' });
+      rentRow.appendChild(U.el('div', { cls: 'flex1', html: '<b>Guild rentals</b> <span class="small muted">rent up to 13 tokens to fill a pouch (1 Nurtui — 5 hours)</span>' }));
+      rentRow.onclick = () => { m.close(); P.rentalFlow(cb); };
+      list.appendChild(rentRow);
+    }
     w.appendChild(list);
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   };
@@ -118,6 +120,7 @@
          your own; every other mode is the shared world and passes through
          UI.requireOnline. */
       grid.appendChild(bigCard('⚡', 'Quick Play — vs AI', 'Straight into a match against the machine. Pick a difficulty, pick a pouch, go.', () => P.quickPlayFlow()));
+      grid.appendChild(bigCard('🧪', 'Sandbox', 'Pit your own tokens against each other. Set both teams, control either side or just watch them fight. No stakes, no rewards — pure testing.', () => P.sandboxFlow()));
       grid.appendChild(bigCard('🏆', 'Ranked Season', 'The Guild’s official ladder. Play your circuit, rank up, climb Local → Interplanetary. Titles are earned here.', () => UI.requireOnline(() => UI.show('seasonLadder'))));
       grid.appendChild(bigCard('🌐', 'Matchmaking Queue', 'Casual queue — matched with the next player near your level. No rank implications.', () => UI.requireOnline(() => P.matchmakingFlow())));
       grid.appendChild(bigCard('🤝', 'Private Match', 'Invite a friend, or share a room code.', () => UI.requireOnline(() => P.privateFlow())));
@@ -409,6 +412,85 @@
     }
     return pouch;
   };
+
+  /* ---------- SANDBOX: test your own tokens against each other ----------
+     Build two teams from tokens YOU own, pick a terrain, then control either
+     side (the other runs on AI) or just watch both sides fight. Nothing is
+     recorded — no XP, no gold, no stats, no rank — so it can't be farmed and
+     stays a pure testing ground. */
+  P.sandboxFlow = function () {
+    if (!Object.keys(G.me.tokens).length) {
+      UI.alert('No tokens yet', 'Sandbox pits your own tokens against each other — craft or collect a few first, then come back to test them.');
+      return;
+    }
+    P.pickPouch(pOne => {
+      P.pickPouch(pTwo => {
+        sandboxArena(pOne, pTwo);
+      }, { title: 'Sandbox — Team Two’s tokens', noRentals: true });
+    }, { title: 'Sandbox — Team One’s tokens', noRentals: true });
+  };
+
+  function sandboxArena(pOne, pTwo) {
+    const w = U.el('div', {});
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Sandbox arena' }));
+    w.appendChild(U.el('p', { cls: 'small muted', html: 'Team One <b class="gold">' + pOne.length + '</b> tokens · Team Two <b class="gold">' + pTwo.length + '</b> tokens. No rewards — this is a testing ground.' }));
+    const m = UI.modal(w);
+
+    /* terrain choice — the same basic sets the organizer can pick pre-match */
+    const terrRow = U.el('div', { cls: 'vote-row mt' });
+    terrRow.appendChild(U.el('div', { cls: 'muted small', text: 'TERRAIN' }));
+    const tSel = U.el('select', { cls: 'txt', style: 'max-width:280px' });
+    (DYA.lore.TERRAIN_SETS.filter(t => t.basic)).forEach(t => tSel.appendChild(U.el('option', { value: t.id, text: t.name })));
+    tSel.value = 'plains';
+    terrRow.appendChild(tSel);
+    w.appendChild(terrRow);
+
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'Choose your seat:' }));
+    const go = (side) => { m.close(); sandboxLaunch(pOne, pTwo, side, tSel.value); };
+    const btns = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap' });
+    btns.appendChild(U.el('button', { cls: 'btn primary', text: '◀ Control Team One', onclick: () => go(0) }));
+    btns.appendChild(U.el('button', { cls: 'btn primary', text: 'Control Team Two ▶', onclick: () => go(1) }));
+    btns.appendChild(U.el('button', { cls: 'btn', text: '👁 Watch (both AI)', onclick: () => go('watch') }));
+    w.appendChild(btns);
+    w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
+  }
+
+  function sandboxLaunch(pOne, pTwo, side, terrain) {
+    const me = G.me;
+    const settings = { pulseInterval: 8, pulseAmount: 2, chaos: false };
+    const AI = 0.7;   // a competent-but-not-brutal AI for whichever side(s) it runs
+    const mySeal = me.seal || { avatarIdx: me.avatarIdx || 0, patterns: [] };
+    const foeSeal = { avatarIdx: 3, patterns: ['runes'] };
+    const mkTeam = (name, pouch, human, seal) => ({
+      name, controller: human ? 'human' : 'ai', aiSkill: AI,
+      pouch: pouch.map(t => U.deepCopy(t)), startResources: 0, seal,
+    });
+
+    if (side === 'watch') {
+      const match = new DYA.match.Match({
+        seed: U.newSeed(), mode: 'standard', terrain, settings,
+        teams: [mkTeam('Team One', pOne, false, mySeal), mkTeam('Team Two', pTwo, false, foeSeal)],
+      });
+      UI.showWithLoading('spectate', { match, title: 'SANDBOX — Team One vs Team Two' }, 900);
+      return;
+    }
+
+    const myTeam = side; // 0 or 1
+    const teams = [
+      mkTeam('Team One', pOne, myTeam === 0, myTeam === 0 ? mySeal : foeSeal),
+      mkTeam('Team Two', pTwo, myTeam === 1, myTeam === 1 ? mySeal : foeSeal),
+    ];
+    const match = new DYA.match.Match({ seed: U.newSeed(), mode: 'standard', terrain, settings, teams });
+    const cfg = {
+      mode: 'standard', ranked: false, format: 'Sandbox',
+      myTeam, noRecord: true, noXp: true,
+      pouch: myTeam === 0 ? pOne : pTwo,
+      opponent: { name: myTeam === 0 ? 'Team Two' : 'Team One' },
+      onFinish: (res, iWon, draw, toMenu) => { if (toMenu) UI.show('play'); else P.sandboxFlow(); },
+      rematch: () => sandboxLaunch(pOne, pTwo, side, terrain),
+    };
+    UI.showWithLoading('match', { match, cfg }, 1300);
+  }
 
   P.matchmakingFlow = function () {
     P.pickPouch(pouch => {
@@ -1735,7 +1817,8 @@
         const row = U.el('div', { cls: 'flex mt' });
         row.appendChild(U.el('button', { cls: 'btn primary', text: 'Play again', onclick: () => { ov.remove(); if (cfg.onFinish) { cfg.onFinish(res, iWon, draw); } else UI.show('play'); } }));
         const rematch = U.el('button', { cls: 'btn', text: 'Rematch' });
-        if (NET) { rematch.disabled = true; rematch.title = 'Open a fresh room for a rematch'; }
+        if (cfg.rematch) rematch.onclick = () => { ov.remove(); cfg.rematch(); };
+        else if (NET) { rematch.disabled = true; rematch.title = 'Open a fresh room for a rematch'; }
         else if (cfg.opponent && !cfg.tournament) rematch.onclick = () => { ov.remove(); P.startMatch(Object.assign({}, cfg)); };
         else { rematch.disabled = true; rematch.title = 'Opponent left'; }
         row.appendChild(rematch);
