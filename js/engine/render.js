@@ -245,6 +245,7 @@
        just after (on top of) the mount */
     const sorted = M.creatures.slice().sort((a, b) => (a.y + (a.riding ? 1 : 0)) - (b.y + (b.riding ? 1 : 0)));
     for (const c of sorted) {
+      if (c.inHut) continue;   // sheltering inside the Builder's Hut — not on the field
       let alpha = 1;
       if (c.dead) {
         alpha = Math.max(0, 1 - (M.tick - c.deadTick) / 50);
@@ -470,55 +471,102 @@
         ctx.strokeStyle = teamCol + (s.upgraded ? '3a' : '28'); ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(0, 0, s.close || 80, 0, TAU); ctx.stroke();
       }
-      /* the tower body (taller/wider with capacity; brighter when upgraded) */
-      ctx.fillStyle = s.upgraded ? '#7d6a4e' : '#6b5b45'; ctx.fillRect(-bw / 2, -bh, bw, bh + 6);
-      ctx.fillStyle = '#57493a'; ctx.fillRect(-bw / 2 - 4, -bh - 10, bw + 8, 12);
-      /* crenellations */
-      ctx.fillStyle = '#4c4033';
-      for (let i = 0; i * 8 < bw + 8; i++) ctx.fillRect(-bw / 2 - 4 + i * 8, -bh - 14, 4, 5);
+      /* the tower body — an upgraded tower is a distinctly different two-tier
+         stone keep in pale stone with a gold trim and twin pennants */
+      const up = s.upgraded;
+      const lite = up ? '#9c8a63' : '#6b5b45', dark = up ? '#786641' : '#57493a';
+      ctx.fillStyle = dark; ctx.fillRect(-bw / 2 - 3, -bh, bw + 6, bh + 6);
+      ctx.fillStyle = lite; ctx.fillRect(-bw / 2, -bh + 4, bw, bh);
+      let deckTop = -bh - 12, capW = bw + 8;
+      if (up) {
+        ctx.fillStyle = dark; ctx.fillRect(-bw / 2 - 6, -12, 6, 18); ctx.fillRect(bw / 2, -12, 6, 18);  // corner buttresses
+        ctx.fillStyle = dark; ctx.fillRect(-bw / 2 - 6, -bh - 14, bw + 12, 16);                          // wide battlement deck
+        ctx.fillStyle = lite; ctx.fillRect(-bw / 2 + 2, -bh - 27, bw - 4, 15);                            // upper tier
+        deckTop = -bh - 31; capW = bw + 12;
+        ctx.strokeStyle = '#d9b23a99'; ctx.lineWidth = 1.5; ctx.strokeRect(-bw / 2 - 3, -bh, bw + 6, bh + 6);
+      } else {
+        ctx.fillStyle = '#57493a'; ctx.fillRect(-bw / 2 - 4, -bh - 10, bw + 8, 12);
+      }
+      /* crenellations (chunkier when upgraded) */
+      ctx.fillStyle = up ? '#5a4d38' : '#4c4033';
+      for (let i = 0; i * 8 < capW; i++) ctx.fillRect(-capW / 2 + i * 8, deckTop, 4, 5);
       /* garrison pips — one per seated archer, capacity shown faint */
       for (let i = 0; i < cap; i++) {
         ctx.fillStyle = i < occ ? teamCol : '#3a3229';
-        ctx.beginPath(); ctx.arc(-((cap - 1) * 5) + i * 10, -bh - 20, 3, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(-((cap - 1) * 5) + i * 10, deckTop - 6, 3, 0, TAU); ctx.fill();
       }
-      /* flag */
-      ctx.fillStyle = teamCol; ctx.fillRect(bw / 2 - 1, -bh - 24, 2, 12);
-      ctx.beginPath(); ctx.moveTo(bw / 2 + 1, -bh - 24); ctx.lineTo(bw / 2 + 11, -bh - 20); ctx.lineTo(bw / 2 + 1, -bh - 17); ctx.fill();
-      barTop = -bh - 30;
+      /* pennant(s) */
+      const flagY = deckTop - 12;
+      ctx.fillStyle = teamCol; ctx.fillRect(bw / 2 - 1, flagY, 2, 12);
+      ctx.beginPath(); ctx.moveTo(bw / 2 + 1, flagY); ctx.lineTo(bw / 2 + 11, flagY + 4); ctx.lineTo(bw / 2 + 1, flagY + 7); ctx.fill();
+      if (up) { ctx.fillStyle = teamCol; ctx.fillRect(-bw / 2 - 1, flagY, 2, 12); ctx.beginPath(); ctx.moveTo(-bw / 2 - 1, flagY); ctx.lineTo(-bw / 2 - 11, flagY + 4); ctx.lineTo(-bw / 2 - 1, flagY + 7); ctx.fill(); }
+      barTop = flagY - 6;
     } else if (s.kind === 'wallTower') {
-      /* squat unmanned wall-tower that auto-fires */
+      /* squat unmanned wall-tower that auto-fires (taller with a banner when upgraded) */
+      const up = s.upgraded;
       ctx.strokeStyle = teamCol + '20'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(0, 0, s.range || 50, 0, TAU); ctx.stroke();
-      ctx.fillStyle = s.upgraded ? '#6c5f4c' : '#5d5241'; ctx.fillRect(-9, -24, 18, 30);
-      ctx.fillStyle = '#4c4033';
-      for (let i = -1; i <= 1; i++) ctx.fillRect(i * 7 - 3, -28, 5, 5);
-      ctx.fillStyle = teamCol; ctx.fillRect(-1, -22, 2, 8); // arrow slit marker
-      barTop = -34;
+      const th = up ? 34 : 26;
+      ctx.fillStyle = up ? '#8a7a58' : '#5d5241'; ctx.fillRect(-9, -th, 18, th + 6);
+      ctx.fillStyle = up ? '#5a4d38' : '#4c4033';
+      for (let i = -1; i <= 1; i++) ctx.fillRect(i * 7 - 3, -th - 4, 5, 5);
+      ctx.fillStyle = teamCol; ctx.fillRect(-1, -th + 4, 2, 10); // arrow slit marker
+      if (up) { ctx.strokeStyle = '#d9b23a99'; ctx.lineWidth = 1.2; ctx.strokeRect(-9, -th, 18, th + 6); ctx.fillStyle = teamCol; ctx.fillRect(7, -th - 2, 2, 9); }
+      barTop = -th - 10;
     } else if (s.isHut) {
-      /* the Builder's Hut behind the hoard */
-      ctx.fillStyle = '#5a4a34'; ctx.fillRect(-24, -20, 48, 26);
-      ctx.fillStyle = '#6e5a3f'; ctx.beginPath(); ctx.moveTo(-28, -20); ctx.lineTo(0, -36); ctx.lineTo(28, -20); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#2c2419'; ctx.fillRect(-7, -14, 14, 20); // doorway
-      ctx.fillStyle = teamCol; ctx.fillRect(-1, -38, 2, 8);
-      ctx.strokeStyle = '#3a2f1d'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(-24, -8); ctx.lineTo(24, -8); ctx.stroke();
-      barTop = -44;
+      /* the Builder's Hut — a wooden lodge at Level 1, a stone stronghold at Level 2 */
+      const lvl2 = s.level >= 2;
+      if (lvl2) {
+        ctx.fillStyle = '#7f7768'; ctx.fillRect(-28, -24, 56, 30);           // stone body
+        ctx.fillStyle = '#5f584e'; for (let i = 0; i < 4; i++) ctx.fillRect(-28 + i * 15, -30, 10, 7); // battlements
+        ctx.fillStyle = '#2c2419'; ctx.fillRect(-8, -16, 16, 22);            // doorway
+        ctx.strokeStyle = '#4a443b'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-28, -10); ctx.lineTo(28, -10); ctx.stroke();
+        ctx.strokeStyle = '#d9b23a'; ctx.lineWidth = 1.5; ctx.strokeRect(-28, -24, 56, 30);
+        // tall banner marking the level
+        ctx.fillStyle = teamCol; ctx.fillRect(-1, -46, 2, 16);
+        ctx.fillRect(1, -46, 12, 9);
+        ctx.fillStyle = '#f4e6b8'; ctx.font = '7px sans-serif'; ctx.fillText('II', 3, -39);
+        barTop = -52;
+      } else {
+        ctx.fillStyle = '#5a4a34'; ctx.fillRect(-24, -20, 48, 26);
+        ctx.fillStyle = '#6e5a3f'; ctx.beginPath(); ctx.moveTo(-28, -20); ctx.lineTo(0, -36); ctx.lineTo(28, -20); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#2c2419'; ctx.fillRect(-7, -14, 14, 20);
+        ctx.fillStyle = teamCol; ctx.fillRect(-1, -38, 2, 8);
+        ctx.strokeStyle = '#3a2f1d'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-24, -8); ctx.lineTo(24, -8); ctx.stroke();
+        barTop = -44;
+      }
     } else if (s.type === 'wall') {
-      const hw = (s.w || 22) / 2, hh = (s.h || 64) / 2;
-      const g = ctx.createLinearGradient(-hw, 0, hw, 0);
-      g.addColorStop(0, '#6a635a'); g.addColorStop(0.5, '#8a8377'); g.addColorStop(1, '#6a635a');
+      /* a proper battlemented stone wall (vertical front/back, or horizontal
+         side); merlons run along the enemy-facing edge, gold-trimmed at Level 2 */
+      const hw = (s.w || 24) / 2, hh = (s.h || 84) / 2, up = s.upgraded, face = s.face || 1, vert = s.vertical !== false;
+      const lite = up ? '#b7b0a0' : '#8a8377', dark = up ? '#7d766a' : '#5f584e';
+      const g = ctx.createLinearGradient(-hw, -hh, hw, hh);
+      g.addColorStop(0, dark); g.addColorStop(0.5, lite); g.addColorStop(1, dark);
       ctx.fillStyle = g; ctx.fillRect(-hw, -hh, hw * 2, hh * 2);
-      /* team-tinted cap + coursing */
-      ctx.fillStyle = teamCol; ctx.fillRect(-hw, -hh, hw * 2, 3);
-      ctx.strokeStyle = '#5d574c'; ctx.lineWidth = 1;
-      for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(-hw, -hh + i * (hh * 2 / 5)); ctx.lineTo(hw, -hh + i * (hh * 2 / 5)); ctx.stroke(); }
-      /* spikes on a trapped wall */
+      /* stone-block coursing (staggered) */
+      ctx.strokeStyle = '#4a443b'; ctx.lineWidth = 1;
+      if (vert) {
+        const n = Math.max(3, Math.round(hh * 2 / 15));
+        for (let i = 1; i < n; i++) { const y = -hh + i * (hh * 2 / n); ctx.beginPath(); ctx.moveTo(-hw, y); ctx.lineTo(hw, y); ctx.stroke(); }
+        for (let i = 0; i < n; i++) { const y = -hh + i * (hh * 2 / n), x = (i % 2) ? 0 : -hw * 0.4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + hh * 2 / n); ctx.stroke(); }
+      } else {
+        const n = Math.max(3, Math.round(hw * 2 / 15));
+        for (let i = 1; i < n; i++) { const x = -hw + i * (hw * 2 / n); ctx.beginPath(); ctx.moveTo(x, -hh); ctx.lineTo(x, hh); ctx.stroke(); }
+        for (let i = 0; i < n; i++) { const x = -hw + i * (hw * 2 / n), y = (i % 2) ? 0 : -hh * 0.4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + hw * 2 / n, y); ctx.stroke(); }
+      }
+      /* battlement merlons along the enemy-facing long edge */
+      ctx.fillStyle = up ? '#c9c2b2' : '#9a9387';
+      if (vert) { for (let i = -2; i <= 2; i++) { const y = i * (hh * 2 / 5.5); ctx.fillRect(face > 0 ? hw - 1 : -hw - 5, y - 5, 6, 9); } }
+      else { for (let i = -2; i <= 2; i++) { const x = i * (hw * 2 / 5.5); ctx.fillRect(x - 5, face > 0 ? hh - 1 : -hh - 5, 9, 6); } }
+      /* team-tinted rampart line + gold trim when upgraded */
+      ctx.fillStyle = teamCol;
+      if (vert) ctx.fillRect(face > 0 ? hw - 2 : -hw, -hh, 2, hh * 2); else ctx.fillRect(-hw, face > 0 ? hh - 2 : -hh, hw * 2, 2);
+      if (up) { ctx.strokeStyle = '#d9b23a88'; ctx.lineWidth = 1.5; ctx.strokeRect(-hw, -hh, hw * 2, hh * 2); }
+      /* spikes on a trapped wall (outer edge) */
       if (s.trapped) {
         ctx.fillStyle = '#c9ccd4';
-        for (const dir of [-1, 1]) for (let i = -1; i <= 1; i++) {
-          const y = i * hh * 0.6;
-          ctx.beginPath(); ctx.moveTo(dir * hw, y - 3); ctx.lineTo(dir * (hw + 6), y); ctx.lineTo(dir * hw, y + 3); ctx.fill();
-        }
+        if (vert) for (let i = -1; i <= 1; i++) { const y = i * hh * 0.55, ex = face > 0 ? hw : -hw; ctx.beginPath(); ctx.moveTo(ex, y - 3); ctx.lineTo(ex + face * 7, y); ctx.lineTo(ex, y + 3); ctx.fill(); }
+        else for (let i = -1; i <= 1; i++) { const x = i * hw * 0.55, ey = face > 0 ? hh : -hh; ctx.beginPath(); ctx.moveTo(x - 3, ey); ctx.lineTo(x, ey + face * 7); ctx.lineTo(x + 3, ey); ctx.fill(); }
       }
       barTop = -hh - 8;
     } else if (s.type === 'ward') {

@@ -71,29 +71,63 @@ console.log('== WALL-TOWER: unmanned, auto-fires within range 50 ==');
   ok('wall-tower fires on a foe in range', m.projectiles.some(p => p.team === 0), '(' + m.projectiles.length + ' proj)');
 }
 
-console.log('== HUT UPGRADE: after a full pulse, towers ×2 range/×3 hp, walls ×4 hp ==');
+console.log('== REPAIR: a builder mends a damaged structure over time ==');
+{ const m = mk(); const b = m.spawnFromToken(mint('builder_keilia', 240), 0, 300, 500);
+  const wall = m.raiseStructure(b, { role: 'wall0', kind: 'wall', x: 320, y: 500, spec: m.builderSpec(0) });
+  wall.hp = wall.maxHp * 0.4; const hp0 = wall.hp;
+  const api = m.api();
+  for (let i = 0; i < 60; i++) { b.x = wall.x; b.y = wall.y; api.repair(b, wall); }
+  ok('repair raises the structure hp', wall.hp > hp0, 'hp ' + hp0.toFixed(0) + '->' + wall.hp.toFixed(0));
+}
+
+console.log('== UPGRADE: unlocked by a hut pulse, then a TIMED job (not instant) ==');
 { const m = mk(); const b = m.spawnFromToken(mint('builder_keilia', 24), 0, 300, 500);
   const spec = m.builderSpec(0);
   const tower = m.raiseStructure(b, { role: 'tower1', kind: 'tower', x: 300, y: 500, spec });
-  const wall = m.raiseStructure(b, { role: 'wallFront', kind: 'wall', x: 360, y: 500, spec });
+  const wall = m.raiseStructure(b, { role: 'wall0', kind: 'wall', x: 360, y: 500, spec });
   const hut = m.raiseStructure(b, { role: 'hut', kind: 'hut', x: 240, y: 500, spec });
   const towerHp0 = tower.maxHp, close0 = tower.close, wallHp0 = wall.maxHp;
   const api = m.api(); api.enterHut(b, hut);
-  b.mem.hutSincePulse = m.pulseIndex; m.pulseIndex += 1;   // a full pulse elapses in the hut
+  b.mem.hutSincePulse = m.pulseIndex; m.pulseIndex += 1;
   m.stepMisc();
+  ok('a hut pulse UNLOCKS upgrading (not instant)', m.upgradeReady(0) && !tower.upgraded);
+  ok('fort still Level 1 before the job runs', m.fortLevel(0) === 1);
+  // run the timed upgrade job on the tower
+  api.startUpgrade(b, tower); b.inHut = null;
+  for (let i = 0; i < 400 && !tower.upgraded; i++) { b.x = tower.x; b.y = tower.y; api.continueBuild(b); if (!b.mem.building) break; }
   ok('tower power & range doubled', tower.upgraded && tower.close === close0 * 2);
   ok('tower health tripled', tower.maxHp === towerHp0 * 3);
+  api.startUpgrade(b, wall);
+  for (let i = 0; i < 400 && !wall.upgraded; i++) { b.x = wall.x; b.y = wall.y; api.continueBuild(b); if (!b.mem.building) break; }
   ok('wall health quadrupled', wall.maxHp === wallHp0 * 4);
+  ok('Hut advances to Level 2 when the works are done', m.fortLevel(0) === 2 && hut.level === 2);
 }
 
-console.log('== SPEARMEN: 2+ add a cone tower and a full wall ring ==');
+console.log('== LEVEL-2 GATE: cone + ring only planned once the works are Level 2 ==');
 { const m = mk();
   m.spawnFromToken(mint('builder_keilia', 25), 0, 300, 500);
   m.spawnFromToken(mint('spear_keilia', 251), 0, 320, 500);
   m.spawnFromToken(mint('spear_keilia', 252), 0, 340, 500);
+  const before = m.builderBlueprints(0);
+  ok('no cone tower at Level 1', !before.some(bp => bp.kind === 'cone'));
+  ok('no full ring at Level 1', before.filter(bp => bp.kind === 'wall').length <= 3, before.filter(bp => bp.kind === 'wall').length + ' walls');
+  // stand up a Level-2 hut, then the ring/cone should appear
+  const hut = m.raiseStructure(m.creatures[0], { role: 'hut', kind: 'hut', x: 240, y: 500, spec: m.builderSpec(0) });
+  hut.level = 2;
+  const after = m.builderBlueprints(0);
+  ok('a cone tower is planned at Level 2', after.some(bp => bp.kind === 'cone'));
+  ok('a full wall ring is planned at Level 2', after.filter(bp => bp.kind === 'wall').length >= 6, after.filter(bp => bp.kind === 'wall').length + ' walls');
+}
+
+console.log('== FRONT LINE: wall–tower–wall–tower–wall, towers behind the wall ==');
+{ const m = mk(); m.spawnFromToken(mint('builder_keilia', 27), 0, 300, 500);
   const bps = m.builderBlueprints(0);
-  ok('a cone tower is planned', bps.some(bp => bp.kind === 'cone'));
-  ok('a full wall ring is planned', bps.filter(bp => bp.kind === 'wall').length >= 5, bps.filter(bp => bp.kind === 'wall').length + ' walls');
+  const wt = bps.filter(bp => bp.kind === 'wallTower');
+  ok('two wall-towers on the front line', wt.length === 2);
+  ok('wall-towers spaced well apart', Math.abs(wt[0].y - wt[1].y) >= 100, 'gap ' + Math.abs(wt[0].y - wt[1].y).toFixed(0));
+  const towers = bps.filter(bp => bp.kind === 'tower');
+  const wallX = bps.find(bp => bp.kind === 'wallTower').x;
+  ok('main towers sit behind the wall line', towers.every(t => Math.abs(t.x - 240) < Math.abs(wallX - 240)));
 }
 
 console.log('== STORM: Builders down tools during the Sunear’Zikhron ==');
@@ -129,6 +163,37 @@ console.log('== END-TO-END: a Builder raises the full works and garrisons archer
   ok('a wall-tower was raised', sawWallTower);
   ok('the Builder’s Hut was raised', sawHut);
   ok('an archer garrisoned a tower', sawGarrison);
+}
+
+console.log('== THREE BUILDERS: all stay productive (none left idle) & reach Level 2 ==');
+{ const m = mk(); const h0 = m.teams[0].hoard;
+  for (let i = 0; i < 3; i++) m.spawnFromToken(mint('builder_keilia', 400 + i), 0, h0.x, h0.y + (i - 1) * 24);
+  m.spawnFromToken(mint('spear_keilia', 410), 0, h0.x + 40, h0.y);
+  m.spawnFromToken(mint('spear_keilia', 411), 0, h0.x + 40, h0.y + 30);
+  m.spawnFromToken(mint('sword_keilia', 412), 0, h0.x + 120, h0.y);   // a screen
+  m.spawnFromToken(mint('rodak', 420), 1, m.teams[1].hoard.x, m.teams[1].hoard.y);
+  const builders = m.creatures.filter(c => c.sp.behavior === 'builder');
+  let maxIdleStreak = 0, idleStreak = 0, reachedL2 = false, sawInHut = false;
+  for (let i = 0; i < 8000 && !m.over; i++) {
+    m.doTick();
+    if (m.fortLevel(0) === 2) reachedL2 = true;
+    if (builders.some(b => b.inHut)) sawInHut = true;
+    // an idle builder = alive, not in the hut, no job, and loitering away from
+    // any structure while a hut already exists (i.e. nothing to do but standing)
+    if (i > 400) {
+      const anyIdle = builders.some(b => {
+        if (b.dead || b.inHut || b.mem.building) return false;
+        const nearStruct = m.structures.some(s => s.team === 0 && U.dist(b.x, b.y, s.x, s.y) < 44);
+        const hut = m.structures.find(s => s.team === 0 && s.isHut);
+        return hut && !nearStruct;   // hut exists but this builder is loitering away from any structure
+      });
+      idleStreak = anyIdle ? idleStreak + 1 : 0;
+      maxIdleStreak = Math.max(maxIdleStreak, idleStreak);
+    }
+  }
+  ok('the works reach Level 2 with 3 builders + 2 spearmen', reachedL2);
+  ok('at least one builder shelters in the Hut', sawInHut);
+  ok('no builder is left idle for long', maxIdleStreak < 240, 'max idle streak ' + maxIdleStreak + ' ticks');
 }
 
 console.log(fails ? ('\nBUILDER FORTRESS: ' + fails + ' FAILURE(S)') : '\nBUILDER FORTRESS: ALL PASS');
