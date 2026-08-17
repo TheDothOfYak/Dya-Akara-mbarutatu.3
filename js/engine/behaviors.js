@@ -614,23 +614,33 @@
   };
 
   B.archer_unit = function (c, api) {
-    // tower relocation (a mounted archer rides its mount — it shoots from the saddle instead)
-    const tower = c.riding ? null : api.structuresOf(c.team, 'tower').find(s => !s.occupant || s.occupant === c.id);
-    if (tower && !c.onTower) { api.moveToward(c, tower.x, tower.y, false); if (api.dist(c, tower) < 20) api.mountTower(c, tower); return; }
-    // evade close range at all costs (a rider can't flee — it fights from the mount)
-    const closeThreat = c.riding ? null : api.nearestEnemy(c, 60);
-    if (closeThreat && !c.onTower) {
+    // relocate to a friendly MANNED tower with a free garrison slot (a mounted
+    // archer rides its mount and shoots from the saddle instead). Once inside a
+    // tower an archer never climbs down — it holds and fires from the works.
+    if (!c.riding && !c.onTower) {
+      const tower = api.structuresOf(c.team)
+        .filter(s => (s.kind === 'tower' || s.kind === 'cone') && (s.occupants ? s.occupants.length : 0) < (s.capacity || 1))
+        .sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
+      if (tower) { if (api.dist(c, tower) < 22) api.mountTower(c, tower); else api.moveToward(c, tower.x, tower.y, false); return; }
+    }
+    // effective firing range: from a tower it is the tower's FAR band (3× close)
+    let range = c.attackRange;
+    if (c.onTower) { const tw = api.structuresOf(c.team).find(s => s.id === c.onTower); if (tw) range = tw.coneRange || tw.far || range; }
+    // evade close range at all costs — but a garrisoned/mounted archer can't be reached
+    const closeThreat = (c.riding || c.onTower) ? null : api.nearestEnemy(c, 60);
+    if (closeThreat) {
       if (api.enemiesNear(c, 40).length) { api.attack(c, closeThreat); return; } // cornered — secondary weapon
       api.moveAway(c, closeThreat.x, closeThreat.y, true); return;
     }
     // prioritize flyers and Su creatures
-    let target = api.nearestEnemy(c, c.attackRange, o => (o.sp.tags.includes('flyer') || o.element === 'Su') && !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
-    if (!target) target = api.nearestEnemy(c, c.attackRange, o => !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
+    let target = api.nearestEnemy(c, range, o => (o.sp.tags.includes('flyer') || o.element === 'Su') && !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
+    if (!target) target = api.nearestEnemy(c, range, o => !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
     if (target) {
       if (c.quiver <= 0) { api.hold(c); return; } // out of arrows (Karnen refills)
       api.shoot(c, target);
       return;
     }
+    if (c.onTower) { api.hold(c); return; }   // garrisoned with nothing in range — hold the tower
     // tactical positioning (§8): stand behind the nearest allied frontliner
     const tank = api.alliesNear(c, 400).filter(a => a.dmg > 6 && !a.rooted && !a.sp.tags.includes('passive'))
       .sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
@@ -696,36 +706,69 @@
     api.guard(c);
   };
 
+  /* The Keilia Builder stage machine. The whole plan is dimensioned off the
+     BEST builder on the field (M.builderSpec). Stages: tower 1 → two wall-towers
+     + the wall between → tower 2 → the Builder's Hut behind the hoard, then the
+     builder shelters in the Hut, sallies out to repair when the threat clears,
+     and — after a full pulse inside — keeps the whole works upgraded. Builders
+     down tools entirely during the Sunear'Zikhron. */
   B.builder = function (c, api) {
-    if (c.mem.building) {
-      api.continueBuild(c);
-      return;
+    const own = api.ownHoard(c.team);
+    const myStructs = () => api.structuresOf(c.team);
+    const hutOf = () => myStructs().find(s => s.isHut);
+
+    // the memory storm halts all construction — shelter in the Hut, or hold
+    if (api.storm()) {
+      if (c.mem.building) c.mem.building = null;
+      const hut = hutOf();
+      if (hut) { if (!c.inHut) { if (api.dist(c, hut) > 30) { api.moveToward(c, hut.x, hut.y, true); return; } api.enterHut(c, hut); } return; }
+      api.moveToward(c, own.x, own.y, false); return;
     }
-    // forced into combat → brawl as last resort
+
+    // already sheltering: only sally out to repair once the threat has cleared
+    if (c.inHut) {
+      const hut = myStructs().find(s => s.id === c.inHut);
+      if (!hut) { api.leaveHut(c); }
+      else {
+        const needsRepair = myStructs().some(s => !s.isHut && s.hp < s.maxHp * 0.7 && api.enemiesNear({ x: s.x, y: s.y, team: c.team }, 90).length === 0);
+        if (needsRepair) { api.leaveHut(c); }        // fall through to repair below
+        else { api.guard(c); return; }               // hold — stepMisc upgrades after a full pulse
+      }
+    }
+
+    if (c.mem.building) { api.continueBuild(c); return; }
+
+    // forced into combat → brawl as a last resort
     const cornered = api.enemiesNear(c, 40);
     if (cornered.length) { api.attack(c, cornered[0]); return; }
     if (fleeThreats(c, api, 60)) return;
 
-    const own = api.ownHoard(c.team);
-    // Relic Ward (master builders): seal our own relic early — it defends the
-    // win condition against runners, camouflaged ones included.
-    const haveWard = api.structuresOf(c.team, 'ward').length;
-    if (c.picks.relicIntegration && !haveWard) { api.startBuild(c, 'ward'); return; }
-    // tower: a fortified strongpoint whenever we have none
-    const haveTower = api.structuresOf(c.team, 'tower').length;
-    if (!haveTower) { api.startBuild(c, 'tower'); return; }
-    // defensive wall line on the threatened side when the enemy presses the
-    // hoard (or the relic) — up to three
-    const relic = api.ownRelic(c.team);
-    const guardPt = relic || { x: own.x, y: own.y, team: c.team };
-    const pressure = api.enemiesNear({ x: guardPt.x, y: guardPt.y, team: c.team }, 300).length;
-    if (pressure && api.structuresOf(c.team, 'wall').length < 3) { api.startBuild(c, 'wall'); return; }
-    // repair a damaged structure (walls, ward, tower)
-    const damaged = api.structuresOf(c.team).find(s => s.hp < s.maxHp * 0.75);
+    // Relic Ward (master builders): seal our own relic early
+    if (c.picks.relicIntegration && !api.structuresOf(c.team, 'ward').length) { api.startBuild(c, 'ward'); api.continueBuild(c); return; }
+
+    // work the blueprint in order: the first unbuilt, unclaimed non-Hut structure
+    const bps = api.builderBlueprints(c.team);
+    const built = new Set(myStructs().map(s => s.role));
+    const inProg = api.rolesInProgress(c.team);
+    const nextCore = bps.find(bp => bp.kind !== 'hut' && !built.has(bp.role) && inProg.indexOf(bp.role) < 0);
+    if (nextCore) { api.startBuild(c, nextCore); api.continueBuild(c); return; }
+
+    // repair the most-damaged structure — but only the closest free builder does
+    const damaged = myStructs().filter(s => !s.isHut && s.hp < s.maxHp * 0.9).sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
     if (damaged) {
-      if (api.dist(c, damaged) > 30) { api.moveToward(c, damaged.x, damaged.y, false); return; }
-      api.repair(c, damaged); return;
+      const closerFree = api.alliesNear(c, 900).some(a => a.sp.behavior === 'builder' && !a.mem.building && !a.inHut && api.dist(a, damaged) < api.dist(c, damaged) - 1);
+      if (!closerFree) {
+        if (api.dist(c, damaged) > 30) { api.moveToward(c, damaged.x, damaged.y, true); return; }
+        api.repair(c, damaged); return;
+      }
     }
+
+    // core works done & healthy → raise (or enter) the Builder's Hut
+    const hutBp = bps.find(bp => bp.kind === 'hut');
+    const hut = hutOf();
+    if (!hut) { if (hutBp && inProg.indexOf('hut') < 0) { api.startBuild(c, hutBp); api.continueBuild(c); return; } }
+    else { if (api.dist(c, hut) > 30) { api.moveToward(c, hut.x, hut.y, true); return; } api.enterHut(c, hut); return; }
+
     // siege: tear down enemy fortifications
     const enemyStruct = api.structuresOf(1 - c.team)[0];
     if (enemyStruct && c.picks.siegeProficiency) {

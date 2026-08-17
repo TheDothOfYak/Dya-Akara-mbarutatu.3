@@ -466,6 +466,7 @@
     let mounts = null;
     for (const e of M.creatures) {
       if (e.dead || e.riding || e.mountable) continue;
+      if (e.onTower || e.inHut) continue;   // a garrisoned archer never climbs down to go mount something
       if (!(e.sp.eikarLayer || e.sp.keiliaLayer) || e.rooted) continue;
       if (mounts === null) mounts = M.creatures.filter(c => c.mountable && !c.dead && !c.riderUnit);
       if (!mounts.length) break;
@@ -537,6 +538,139 @@
       M.addEffect('deploy', e.x, e.y, { r: e.radius });
       M.uiEvent(-1, 'event', (e.tokName || 'The rider') + ' is thrown clear and fights on.');
     }
+  };
+
+  /* ================= FORTIFICATIONS (Keilia Builder) =================
+     The whole plan is dimensioned off the BEST builder on the field: tower
+     size, garrison capacity, ranges, and structure health all scale with it.
+     Stages: tower 1 → two wall-towers + the wall between → tower 2 → the
+     Builder’s Hut behind the hoard. With 2+ spearmen the plan adds a third,
+     cone-ranged tower and a full wall ring. */
+  Match.prototype.structuresList = function (team) { return this.structures.filter(s => s.team === team && s.hp > 0); };
+
+  Match.prototype.bestBuilder = function (team) {
+    let best = null, bestScore = -1;
+    for (const c of this.creatures) {
+      if (c.dead || c.team !== team || c.sp.behavior !== 'builder') continue;
+      const v = c.vars || {};
+      const score = (v.towerQuality || 1) * (v.structureQuality || 1) * (1 + (c.sizeIdx || 0) * 0.15);
+      if (score > bestScore) { bestScore = score; best = c; }
+    }
+    return best;
+  };
+
+  /* dimension the fortifications off the best builder */
+  Match.prototype.builderSpec = function (team) {
+    const b = this.bestBuilder(team);
+    const v = b ? (b.vars || {}) : {};
+    const q = v.towerQuality || 1, sq = v.structureQuality || 1, size = b ? (b.sizeIdx || 2) : 2;
+    /* CLOSE (2.5×) range — the current tower footprint, ~80, variable 30–100.
+       FAR (1.5×) range is 3× the close range. */
+    const close = U.clamp(Math.round(46 + q * 30 + size * 4), 30, 100);
+    const far = close * 3;
+    const capacity = U.clamp(1 + Math.floor((close - 40) / 28), 1, 3);
+    const towerHp = Math.round(120 * sq * (1 + capacity * 0.3));
+    const wallHp = Math.round(180 * sq);
+    const wallTowerDmg = Math.round(3 + sq * 4 + q * 3);
+    const wallTowerHp = Math.round(110 * sq);
+    const radius = 22 + capacity * 6 + Math.round((close - 60) * 0.12);
+    return { q, sq, size, close, far, capacity, towerHp, wallHp, wallTowerDmg, wallTowerHp, radius,
+      trapped: !!(b && b.picks && b.picks.trapIntegration) };
+  };
+
+  /* clock-face geometry around the hoard, oriented so 3 o’clock faces the enemy */
+  Match.prototype._clock = function (team, hour, r) {
+    const own = this.teams[team].hoard;
+    const foe = this.teams[1 - team] ? this.teams[1 - team].hoard : own;
+    const dir = Math.sign(foe.x - own.x) || 1;
+    const ang = (hour / 12) * Math.PI * 2;      // from 12 o’clock, clockwise
+    let dx = Math.sin(ang) * r, dy = -Math.cos(ang) * r;
+    if (dir < 0) dx = -dx;                        // mirror so 3 o’clock always faces the foe
+    return { x: U.clamp(own.x + dx, 30, WORLD.w - 30), y: U.clamp(own.y + dy, 30, WORLD.h - 30) };
+  };
+
+  /* the ordered blueprint list (roles are stable so structures/claims line up) */
+  Match.prototype.builderBlueprints = function (team) {
+    const sp = this.builderSpec(team);
+    const own = this.teams[team].hoard;
+    const foe = this.teams[1 - team] ? this.teams[1 - team].hoard : own;
+    const dir = Math.sign(foe.x - own.x) || 1;
+    const R = 96 + sp.radius;                     // a little off the hoard border, inside the wall line
+    const spearmen = this.creatures.filter(c => !c.dead && c.team === team && c.sp.behavior === 'spear_unit').length;
+    const bp = [];
+    /* 1 — tower one (5 o’clock), 2 — wall-towers + wall, 3 — tower two (1 o’clock) */
+    bp.push({ role: 'tower1', kind: 'tower', ...this._clock(team, 5, R), spec: sp });
+    bp.push({ role: 'wallTowerA', kind: 'wallTower', ...this._clock(team, 2.4, R + 8), spec: sp });
+    bp.push({ role: 'wallTowerB', kind: 'wallTower', ...this._clock(team, 3.6, R + 8), spec: sp });
+    bp.push({ role: 'wallFront', kind: 'wall', ...this._clock(team, 3, R + 8), spec: sp, extra: { trapped: sp.trapped } });
+    bp.push({ role: 'tower2', kind: 'tower', ...this._clock(team, 1, R), spec: sp });
+    /* 4 — the Builder’s Hut, behind the hoard */
+    bp.push({ role: 'hut', kind: 'hut', x: U.clamp(own.x - dir * (R + 30), 30, WORLD.w - 30), y: own.y, spec: sp });
+    /* with 2+ spearmen: a third, cone-ranged tower at 9 o’clock + a full ring */
+    if (spearmen >= 2) {
+      const cone = this._clock(team, 9, R);
+      const coneDir = Math.atan2(own.y - cone.y, own.x - cone.x);   // apex at the tower, cone reaches the field centre
+      bp.push({ role: 'towerCone', kind: 'cone', x: cone.x, y: cone.y, spec: { ...sp, coneDir, coneHalf: Math.PI / 5, coneRange: sp.far } });
+      [7, 8, 10, 11, 0].forEach((h, i) => bp.push({ role: 'ring' + i, kind: 'wall', ...this._clock(team, h, R + 8), spec: sp, extra: { trapped: sp.trapped } }));
+    }
+    return bp;
+  };
+
+  Match.prototype.raiseStructure = function (c, bp) {
+    const M = this, sp = bp.spec || M.builderSpec(c.team);
+    const q = (c.vars && c.vars.structureQuality) || 1;
+    const s = { id: 'st' + (M.idCounter++), type: bp.kind === 'wall' ? 'wall' : bp.kind === 'ward' ? 'ward' : 'tower',
+      kind: bp.kind, role: bp.role, team: c.team, x: bp.x, y: bp.y, occupants: [], quality: q, upgraded: false, powerMul: 1, fireCd: 0 };
+    if (bp.kind === 'wall') {
+      s.w = 22; s.h = 68; s.trapped = !!(bp.extra && bp.extra.trapped); s.trapCd = 0; s.hp = s.maxHp = sp.wallHp;
+    } else if (bp.kind === 'ward') {
+      s.radius = 66; s.hp = s.maxHp = Math.round(110 * q);
+    } else if (bp.kind === 'wallTower') {
+      s.w = 26; s.h = 46; s.capacity = 0; s.baseDmg = sp.wallTowerDmg; s.range = 50; s.close = 50; s.far = 50;
+      s.hp = s.maxHp = sp.wallTowerHp;
+    } else if (bp.kind === 'hut') {
+      s.w = 52; s.h = 42; s.capacity = 99; s.isHut = true; s.hp = s.maxHp = Math.round(200 * q);
+    } else { /* tower / cone — manned */
+      s.w = 30 + sp.capacity * 4; s.h = 52; s.capacity = sp.capacity; s.close = sp.close; s.far = sp.far; s.radius = sp.radius;
+      s.hp = s.maxHp = sp.towerHp;
+      if (bp.kind === 'cone') { s.coneDir = sp.coneDir; s.coneHalf = sp.coneHalf; s.coneRange = sp.coneRange; s.far = sp.coneRange; }
+    }
+    M.structures.push(s);
+    const label = s.isHut ? 'Builder’s Hut' : s.kind === 'wallTower' ? 'wall-tower' : s.kind === 'cone' ? 'cone tower' : s.type;
+    M.uiEvent(c.team, 'event', c.tokName + ' completes a ' + label + (s.trapped ? ' (spiked)' : '') + '.');
+    return s;
+  };
+
+  /* free any garrisoned archers when a tower collapses — and turn out any
+     builders sheltering in a Hut that is torn down, so they never get stranded */
+  Match.prototype.freeOccupants = function (s) {
+    if (s.occupants && s.occupants.length) {
+      for (const id of s.occupants) {
+        const o = this.creatures.find(cc => cc.id === id && !cc.dead);
+        if (o) { o.onTower = null; o.mem.vantage = null; }
+      }
+      s.occupants = [];
+    }
+    if (s.isHut) {
+      for (const o of this.creatures) {
+        if (!o.dead && o.inHut === s.id) { o.inHut = null; o.mem.hutSincePulse = null; }
+      }
+    }
+  };
+
+  /* after a builder sits a full pulse in the Hut: towers ×2 power & range, ×3 hp;
+     walls ×4 hp; wall-towers ×2 power & range, ×3 hp. Once. */
+  Match.prototype.upgradeFortifications = function (team) {
+    let did = false;
+    for (const s of this.structures) {
+      if (s.team !== team || s.hp <= 0 || s.upgraded || s.isHut || s.type === 'ward') continue;
+      s.upgraded = true; did = true;
+      if (s.type === 'wall') { s.maxHp *= 4; s.hp = s.maxHp; }
+      else if (s.kind === 'wallTower') { s.powerMul = 2; s.baseDmg *= 2; s.range *= 2; s.close = s.range; s.far = s.range; s.maxHp *= 3; s.hp = s.maxHp; }
+      else { s.powerMul = 2; s.close *= 2; s.far *= 2; if (s.coneRange) s.coneRange *= 2; s.maxHp *= 3; s.hp = s.maxHp; }
+    }
+    if (did) this.uiEvent(team, 'event', 'The Builder reinforces the works — towers and walls upgraded.');
+    return did;
   };
 
   /* ================= PULSES & RESOURCES ================= */
@@ -703,7 +837,7 @@
 
     /* movement (a mounted rider doesn't move on its own — it rides where the
        mount takes it; M.updateMounting keeps it glued to the mount) */
-    if (it.move && !c.rooted && !(c.onTower) && !c.riding) {
+    if (it.move && !c.rooted && !(c.onTower) && !c.inHut && !c.riding) {
       let sp = c.speed * (it.move.run ? 1.45 : 1) * buffMul('speedMul');
       if (c.carryingRelic) {
         sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;
@@ -955,6 +1089,10 @@
     /* a rider up on its mount cannot be struck directly — blows land on the
        mount (whose riderProtect already softens them) */
     if (t.riding) return;
+    /* an archer garrisoned inside a tower — or a builder sheltering in the Hut —
+       cannot be struck at all; the structure must be destroyed first (occupants
+       are freed when it collapses) */
+    if (t.onTower || t.inHut) return;
     opts = opts || {};
     M.lastCombatTick = M.tick;
 
@@ -964,7 +1102,6 @@
     if (t.vars.shellDurability) dmg /= t.vars.shellDurability;
     if (t.vars.scarToughness) dmg *= 1 - t.vars.scarToughness * 0.5;
     if (t.vars.hairArmor && source && source.x < t.x === (t.facing > 0)) dmg *= 1 - t.vars.hairArmor; // back armor
-    if (t.onTower) dmg *= 0.7;
     if (t.fortifiedUntil > M.tick) dmg *= 0.85;   // sheltered near a friendly tower
     /* guard buffs (Stonefruit, chemist pieces) */
     for (const b of t.buffs) { if (b.armorMul && b.until > M.tick) dmg *= b.armorMul; }
@@ -1208,14 +1345,14 @@
       }
     }
 
-    /* ===== fortifications: walls block, towers fortify, wards guard ===== */
+    /* ===== fortifications: walls block, towers garrison & fire, wards guard ===== */
     if (M.structures.length) {
       for (const s of M.structures) {
         if (s.hp <= 0) continue;
         if (s.type === 'wall') {
           const hw = (s.w || 22) / 2, hh = (s.h || 64) / 2;
           for (const c of M.creatures) {
-            if (c.dead || c.team === s.team || c.rooted || c.onTower) continue;
+            if (c.dead || c.team === s.team || c.rooted || c.onTower || c.inHut) continue;
             if (c.sp.tags.includes('flyer') || (c.sp.features && c.sp.features.hover)) continue; // flyers pass over
             const dx = c.x - s.x, dy = c.y - s.y;
             const px = (hw + c.radius) - Math.abs(dx), py = (hh + c.radius) - Math.abs(dy);
@@ -1225,32 +1362,68 @@
               c.x = U.clamp(c.x, 14, WORLD.w - 14); c.y = U.clamp(c.y, 14, WORLD.h - 14);
               if (s.trapped && M.tick >= (s.trapCd || 0)) {   // spiked wall: punish the presser
                 s.trapCd = M.tick + Math.round(1.2 / TICK);
-                c.hp -= 5 * (s.quality || 1);
+                c.hp -= 5 * (s.quality || 1) * (s.upgraded ? 1.5 : 1);
                 c.buffs.push({ speedMul: 0.5, until: M.tick + Math.round(1.4 / TICK) });
                 M.addEffect('hit', c.x, c.y, {});
                 if (c.hp <= 0) M.kill(c, null, 'trap');
               }
             }
           }
-        } else if (s.type === 'tower') {
+        } else if (s.kind === 'tower' || s.kind === 'cone') {
+          /* keep garrisoned archers glued to the tower, and drop any that died
+             or were freed; friendly shelter aura + camo reveal around it */
+          if (s.occupants && s.occupants.length) {
+            s.occupants = s.occupants.filter(id => {
+              const o = M.creatures.find(cc => cc.id === id);
+              if (!o || o.dead || o.onTower !== s.id) { if (o && o.onTower === s.id) o.onTower = null; return false; }
+              return true;
+            });
+            s.occupants.forEach((id, i) => {
+              const o = M.creatures.find(cc => cc.id === id);
+              if (o) { o.x = s.x + (i - ((s.capacity - 1) / 2)) * 12; o.y = s.y - 18; }
+            });
+          }
+          const aura = (s.radius || 40) + 46;
           for (const c of M.creatures) {
             if (c.dead) continue;
             const d = U.dist(c.x, c.y, s.x, s.y);
-            if (d > 132) continue;
-            if (c.team === s.team) c.fortifiedUntil = M.tick + 3;   // aura: reduced damage near a friendly tower
-            else if (c.camoUntil > M.tick) c.camoUntil = M.tick;    // elevated vision reveals enemy camo
+            if (d > aura) continue;
+            if (c.team === s.team) c.fortifiedUntil = M.tick + 3;
+            else if (c.camoUntil > M.tick) c.camoUntil = M.tick;
+          }
+        } else if (s.kind === 'wallTower') {
+          /* unmanned wall-tower: auto-fires base damage at the nearest foe in range */
+          if (s.fireCd > 0) s.fireCd -= TICK;
+          else {
+            let best = null, bd = (s.range || 50) + 1;
+            for (const c of M.creatures) {
+              if (c.dead || c.team === s.team || c.onTower || c.riding || c.inHut) continue;
+              const d = U.dist(s.x, s.y, c.x, c.y);
+              if (d < bd && !M.losBlocked(s.x, s.y, c.x, c.y, s.team)) { bd = d; best = c; }
+            }
+            if (best) {
+              s.fireCd = 1.3;
+              const a = Math.atan2(best.y - s.y, best.x - s.x);
+              M.projectiles.push({ x: s.x, y: s.y - 10, vx: Math.cos(a) * 440, vy: Math.sin(a) * 440, team: s.team, dmg: s.baseDmg || 5, type: 'arrow', life: (s.range || 50) / 440 + 0.05, source: null });
+            }
           }
         }
-        /* structures under siege: enemies pressed against them wear them down
-           (so walls/wards buy time but are not permanent) */
+        /* structures under siege: enemies pressed against them wear them down.
+           The Hut and manned towers must be broken to reach who’s inside. */
         const reach = (s.radius || Math.max(s.w || 22, s.h || 40) / 2);
         let siege = 0;
         for (const c of M.creatures) {
-          if (c.dead || c.team === s.team || c.sp.tags.includes('passive') || c.dmg <= 0) continue;
+          if (c.dead || c.team === s.team || c.onTower || c.inHut || c.sp.tags.includes('passive') || c.dmg <= 0) continue;
           if (U.dist(c.x, c.y, s.x, s.y) < reach + c.radius + 6) siege += c.dmg;
         }
-        if (siege > 0) { s.hp -= siege * TICK * 0.6; if (s.hp <= 0) { s.hp = 0; M.uiEvent(-1, 'event', 'A ' + s.type + ' is torn down.'); } }
+        if (siege > 0) { s.hp -= siege * TICK * 0.5; if (s.hp <= 0) { s.hp = 0; M.freeOccupants(s); M.uiEvent(-1, 'event', 'A ' + (s.isHut ? 'Builder’s Hut' : s.kind === 'wallTower' ? 'wall-tower' : 'tower') + ' is torn down.'); } }
       }
+      /* a builder that has sheltered in the Hut for a full pulse keeps the works upgraded */
+      for (const c of M.creatures) {
+        if (c.dead || !c.inHut || c.sp.behavior !== 'builder') continue;
+        if (c.mem.hutSincePulse != null && M.pulseIndex > c.mem.hutSincePulse) M.upgradeFortifications(c.team);
+      }
+      M.structures.forEach(s => { if (s.hp <= 0) M.freeOccupants(s); });
       M.structures = M.structures.filter(s => s.hp > 0);
     }
 
@@ -1503,6 +1676,8 @@
       enemyHoard: (team) => M.teams[1 - team] ? M.teams[1 - team].hoard : M.teams[0].hoard,
       teamRes: (team) => M.teams[team].resources,
       structuresOf: (team, type) => M.structures.filter(s => s.team === team && (!type || s.type === type) && s.hp > 0),
+      rolesInProgress: (team) => M.creatures.filter(o => !o.dead && o.team === team && o.mem.building && o.mem.building.bp).map(o => o.mem.building.bp.role),
+      storm: () => M.zikhron(),
       makariRemnants: () => M.remnants,
       inBog: (c) => M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r),
       inWater: (c) => M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r),
@@ -1518,7 +1693,7 @@
       offCooldown: (c, key) => !c.mem['cd_' + key] || c.mem['cd_' + key] <= M.tick,
 
       enemiesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && !o.riding && o.team !== c.team && o.team !== -1 &&
+        return M.creatures.filter(o => !o.dead && !o.riding && !o.onTower && !o.inHut && o.team !== c.team && o.team !== -1 &&
           !(o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) &&
           U.dist(c.x, c.y, o.x, o.y) < range && !o.sp.tags.includes('inert'));
       },
@@ -1531,7 +1706,7 @@
       nearestEnemy(c, range, filter) {
         let best = null, bd = 1e9;
         for (const o of M.creatures) {
-          if (o.dead || o.riding || o.team === c.team || o.team === -1) continue;
+          if (o.dead || o.riding || o.onTower || o.inHut || o.team === c.team || o.team === -1) continue;
           if (o.sp && o.sp.tags.includes('inert')) continue;
           if (o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) continue;
           if (filter && !filter(o)) continue;
@@ -1652,6 +1827,26 @@
       shoot(c, target) {
         if (c.attackCd > 0) return;
         if (M.losBlocked(c.x, c.y, target.x, target.y, c.team)) return; // forest & enemy walls block the shot (§15)
+        /* garrisoned in a tower: damage scales with the tower’s range bands —
+           2.5× within CLOSE range, 1.5× within FAR range (3× close), and a cone
+           tower can only fire within its forward arc. Upgrades double the power. */
+        let towerMul = 1, reach = c.attackRange;
+        if (c.onTower) {
+          const tw = M.structures.find(s => s.id === c.onTower && s.hp > 0);
+          if (tw) {
+            const d = U.dist(tw.x, tw.y, target.x, target.y);
+            if (tw.coneHalf != null) {
+              const ang = Math.atan2(target.y - tw.y, target.x - tw.x);
+              let diff = Math.abs(((ang - tw.coneDir + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+              if (diff > tw.coneHalf || d > (tw.coneRange || tw.far)) return;   // outside the cone
+              towerMul = 2.5 * (tw.powerMul || 1); reach = tw.coneRange || tw.far;
+            } else {
+              if (d > tw.far) return;
+              towerMul = (d <= tw.close ? 2.5 : 1.5) * (tw.powerMul || 1);
+              reach = tw.far;
+            }
+          }
+        }
         c.state = 'attack';
         c.facing = target.x >= c.x ? 1 : -1;
         c.attackCd = 1.6 / (c.vars.drawSpeed || 1);
@@ -1659,9 +1854,8 @@
         const lead = 0.35;
         const tx = target.x + (target.intent && target.intent.move ? (target.intent.move.x - target.x) * lead * 0.1 : 0);
         const a = Math.atan2(target.y - c.y, tx - c.x);
-        const rangeMul = c.onTower ? 1.3 : 1;
         const airBonus = (target.sp.tags.includes('flyer') || target.element === 'Su') ? 1.35 : 1;
-        M.projectiles.push({ x: c.x, y: c.y - c.radius, vx: Math.cos(a) * 420, vy: Math.sin(a) * 420, team: c.team, dmg: c.dmg * (c.vars.bowQuality || 1) * airBonus, type: 'arrow', life: (c.attackRange * rangeMul) / 420, source: c });
+        M.projectiles.push({ x: c.x, y: c.y - c.radius, vx: Math.cos(a) * 460, vy: Math.sin(a) * 460, team: c.team, dmg: c.dmg * (c.vars.bowQuality || 1) * airBonus * towerMul, type: 'arrow', life: reach / 460 + 0.05, source: c });
       },
       throwHanii(c, target) {
         c.mem.cd_hanii = M.tick + Math.round(7 / TICK);
@@ -1813,54 +2007,66 @@
         c.state = 'special';
       },
 
-      /* construction */
-      startBuild(c, type) {
+      /* construction — the Builder’s fortification plan (roles, geometry and
+         per-structure specs) is computed by M.builderBlueprints from the BEST
+         builder on the field. A builder claims the next unbuilt blueprint and
+         raises it here; walls, towers (manned), wall-towers (auto-firing),
+         the cone tower and the Builder’s Hut are all realized by kind. */
+      builderBlueprints: (team) => M.builderBlueprints(team),
+      startBuild(c, bp) {
         if (M.mode === 'duel') return;   // no base-building in a 1v1 duel — the builder brawls instead
-        const own = M.teams[c.team].hoard;
-        const foe = M.teams[1 - c.team] ? M.teams[1 - c.team].hoard : own;
-        const dir = Math.sign(foe.x - own.x) || 1;
-        let x, y, extra = {};
-        if (type === 'tower') {
-          /* backline, just behind the hoard, where archers actually stand */
-          x = own.x - dir * 70 + M.rng.range(-20, 20);
-          y = own.y + M.rng.range(-140, 140);
-        } else if (type === 'ward') {
+        /* legacy string form (only the Relic Ward still uses it) */
+        if (typeof bp === 'string') {
+          if (bp !== 'ward') return;
           const rl = M.relics.find(r => r.ownerTeam === c.team && !r.disabled);
-          x = rl ? rl.x : own.x; y = rl ? rl.y : own.y;
-        } else { /* wall — a defensive line on the threatened side of the hoard */
-          const n = M.structures.filter(s => s.team === c.team && s.type === 'wall').length;
-          x = own.x + dir * 150;
-          y = own.y + [0, -74, 74, -148, 148][n % 5];
-          extra.trapped = !!(c.picks && c.picks.trapIntegration);
+          const own = M.teams[c.team].hoard;
+          bp = { role: 'ward', kind: 'ward', x: rl ? rl.x : own.x, y: rl ? rl.y : own.y, spec: {} };
         }
-        c.mem.building = { type, x, y, progress: 0, extra };
+        c.mem.building = { bp, progress: 0 };
       },
       continueBuild(c) {
         const b = c.mem.building;
         if (!b) return;
-        if (U.dist(c.x, c.y, b.x, b.y) > 42) { c.intent.move = { x: b.x, y: b.y, run: true }; return; }
+        const bp = b.bp;
+        if (U.dist(c.x, c.y, bp.x, bp.y) > 42) { c.intent.move = { x: bp.x, y: bp.y, run: true }; return; }
         c.state = 'special';
-        b.progress += (c.vars.buildSpeed || 1) * TICK * 1.0;
+        /* extra builders on the same blueprint speed it up */
+        const helpers = M.creatures.filter(o => !o.dead && o.team === c.team && o.mem.building && o.mem.building.bp && o.mem.building.bp.role === bp.role).length;
+        b.progress += (c.vars.buildSpeed || 1) * TICK * (1 + 0.6 * (helpers - 1));
         if (b.progress >= 1) {
-          const q = b.type === 'tower' ? (c.vars.towerQuality || 1) : (c.vars.structureQuality || 1);
-          const s = { id: 'st' + (M.idCounter++), type: b.type, team: c.team, x: b.x, y: b.y, occupant: null, quality: q };
-          if (b.type === 'wall') { s.w = 22; s.h = 64; s.trapped = !!(b.extra && b.extra.trapped); s.trapCd = 0; s.hp = s.maxHp = 170 * q; }
-          else if (b.type === 'ward') { s.radius = 66; s.hp = s.maxHp = 110 * q; }
-          else { s.w = 32; s.h = 48; s.hp = s.maxHp = 120 * q; }
-          M.structures.push(s);
-          M.uiEvent(c.team, 'event', c.tokName + ' completes a ' + (b.type === 'ward' ? 'Relic Ward' : b.type) + (s.trapped ? ' (spiked)' : '') + '.');
+          if (!M.structures.some(s => s.team === c.team && s.role === bp.role && s.hp > 0)) {
+            M.raiseStructure(c, bp);
+          }
           c.mem.building = null;
         }
       },
-      repair(c, s) { c.state = 'special'; s.hp = Math.min(s.maxHp, s.hp + (c.vars.repairSpeed || 1) * 8 * TICK); },
+      repair(c, s) { c.state = 'special'; s.hp = Math.min(s.maxHp, s.hp + (c.vars.repairSpeed || 1) * 9 * TICK); },
       demolish(c, s) {
         c.state = 'attack';
-        if (c.attackCd <= 0) { c.attackCd = 1; s.hp -= c.dmg * 1.5; if (s.hp <= 0) { M.structures = M.structures.filter(x => x !== s); } }
+        if (c.attackCd <= 0) { c.attackCd = 1; s.hp -= c.dmg * 1.5; if (s.hp <= 0) { M.freeOccupants(s); M.structures = M.structures.filter(x => x !== s); } }
       },
+      /* an archer garrisons a manned tower (up to its capacity); it is then
+         untargetable and shoots with the tower’s range/damage multipliers */
       mountTower(c, s) {
-        s.occupant = c.id; c.onTower = s.id; c.x = s.x; c.y = s.y - 16;
+        s.occupants = s.occupants || [];
+        if (s.occupants.length >= (s.capacity || 1) || s.occupants.includes(c.id)) return;
+        s.occupants.push(c.id);
+        c.onTower = s.id;
+        const slot = s.occupants.length - 1, spread = (slot - ((s.capacity - 1) / 2)) * 12;
+        c.x = s.x + spread; c.y = s.y - 18;
         if (M.teams[c.team]) M.teams[c.team].stats.combos['Builder’s tower manned'] = true;
       },
+      towerFull: (team) => M.structuresList(team).filter(s => (s.kind === 'tower' || s.kind === 'cone') && (s.occupants ? s.occupants.length : 0) < (s.capacity || 1)),
+      /* the Builder’s Hut: a builder shelters inside, sallies out to repair when
+         the threat clears, and — after a full pulse inside — upgrades everything */
+      enterHut(c, hut) {
+        c.inHut = hut.id; c.onTower = null;
+        c.x = hut.x; c.y = hut.y;
+        if (c.mem.hutSincePulse == null) c.mem.hutSincePulse = M.pulseIndex;
+        if (M.teams[c.team]) M.teams[c.team].stats.combos['Builder’s Hut raised'] = true;
+      },
+      leaveHut(c) { c.inHut = null; c.mem.hutSincePulse = null; },
+      upgradeFortifications: (team) => M.upgradeFortifications(team),
 
       addEffect: (type, x, y, data) => M.addEffect(type, x, y, data),
     };
