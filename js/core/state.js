@@ -353,6 +353,13 @@
     if (!onlineConfigured()) return { err: 'Online is not configured.' };
     try {
       const snap = buildAdminWorldSnapshot();
+      /* refuse to poison the shared world with an empty snapshot — that is what
+         wiped everyone's Dya'kukull. If the local AI world is empty, heal it
+         first (or bail) rather than publishing a ghost town to every device. */
+      if (!Object.keys(snap.accounts).length) {
+        if (G.ensureAiPopulation && G.ensureAiPopulation()) return G.publishAdminWorld();
+        return { err: 'Refusing to publish an empty world — there are no Dya’kukull to share. Seed or restore the AI world first.' };
+      }
       await supaRest('POST', 'dya_config?on_conflict=key', { key: ADMIN_WORLD_KEY, value: snap, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates');
       /* a tiny companion row so live pollers can check "is there anything new?"
          cheaply, without downloading the whole (multi-account) world each time */
@@ -372,6 +379,9 @@
   };
 
   function adoptAdminWorld(snap) {
+    /* NEVER adopt an AI-less world: a blank/bad snapshot must not be allowed to
+       wipe the local Dya'kukull and leave the player in a ghost town. */
+    if (!snap || !snap.accounts || !Object.keys(snap.accounts).length) return;
     /* remove every locally-generated AI account… */
     Object.keys(G.world.accounts).forEach(id => { if (G.world.accounts[id] && G.world.accounts[id].ai) delete G.world.accounts[id]; });
     /* …and any market listing now missing its seller (the AI ones); real
@@ -396,6 +406,9 @@
       G.adminWorldSync.lastFetch = Date.now(); G.adminWorldSync.error = null;
       const snap = rows && rows[0] && rows[0].value;
       if (!snap) return { ok: true, adopted: false };
+      /* an AI-less snapshot is a bad/blank publish — skip it so it can't wipe
+         the local Dya'kukull (the self-heal keeps this device populated) */
+      if (!snap.accounts || !Object.keys(snap.accounts).length) return { ok: true, adopted: false };
       /* last-writer-wins by wall clock — never re-adopt our own latest push */
       if ((snap.updatedAt || 0) <= (G.world.adminWorldAt || 0)) return { ok: true, adopted: false };
       adoptAdminWorld(snap);
@@ -450,6 +463,10 @@
       const pulled = G.delistUnobtainable();
       if (trimmed || pulled) store.save(G.world);
     }
+    /* self-heal: if a prior wipe (or an adopted empty shared snapshot) left the
+       AI world empty, regenerate the Dya'kukull so the world is never a ghost
+       town. No-op on a healthy world. */
+    G.ensureAiPopulation();
     return G.world;
   };
 
@@ -515,6 +532,52 @@
     seedTournaments(w, rng);
     return w;
   }
+
+  /* Regenerate the Dya'kukull AI world when it's been emptied — a wipe, or a
+     device that adopted an empty/blank shared snapshot. Additive and
+     re-runnable: it only fills in what's missing (Elbergi + up to 100 players +
+     a little market), so a healthy or admin-curated world is left untouched.
+     Not seed-locked — the heal path only needs a lively world, not a
+     byte-identical one. */
+  function seedAiWorld(w, rng) {
+    if (!w.elbergiId || !w.accounts[w.elbergiId]) {
+      const elbergi = makeAIAccount(rng, { name: L.ELBERGI.name, stallName: L.ELBERGI.stallName, bio: L.ELBERGI.bio, level: 42, region: 'fyrsti', merchant: true });
+      w.accounts[elbergi.id] = elbergi;
+      w.elbergiId = elbergi.id;
+      /* Elbergi lists a chunk of his own stock plus a few honest cheap staples
+         (the tutorial depends on his stall having something to buy) */
+      rng.shuffle(Object.values(elbergi.tokens)).slice(0, 8).forEach(t => aiCreateListing(w, elbergi, t, rng));
+      for (let i = 0; i < 4; i++) {
+        const spid = rng.pick(['kipsu', 'wild_punk', 'uff', 'rodak', 'mikolo_moko', 'karnen', 'raf_krabbi']);
+        const t = TK.mint({ speciesId: spid, rng, owner: elbergi.id, rarity: Math.min(SP.get(spid).rarity[1], rng.int(0, 1)), aiOwner: true });
+        elbergi.tokens[t.id] = t; t.status = 'market';
+        const lst = { id: U.uid('lst'), tokenId: t.id, sellerId: elbergi.id, price: rng.int(80, 160), status: 'sale', at: Date.now(), featured: false };
+        w.market.listings[lst.id] = lst;
+      }
+    }
+    /* top up to 100 Dya'kukull players, each stocking a few of its tokens */
+    let dyaCount = Object.values(w.accounts).filter(a => a.ai && !(a.aiCfg && a.aiCfg.merchant)).length;
+    for (; dyaCount < 100; dyaCount++) {
+      const ai = makeAIAccount(rng, {});
+      w.accounts[ai.id] = ai;
+      const listCount = rng.chance(ai.aiCfg.marketActivity) ? rng.int(1, 3) : 0;
+      rng.shuffle(Object.values(ai.tokens)).slice(0, listCount).forEach(t => aiCreateListing(w, ai, t, rng));
+    }
+  }
+
+  /* Never leave the player in a ghost town. If the local AI world has been
+     emptied, regenerate it. Threshold is deliberately low so genuine admin
+     curation (dozens of Dya'kukull) is left alone — only a real wipe heals. */
+  G.ensureAiPopulation = function () {
+    const w = G.world;
+    if (!w || !w.accounts) return false;
+    const aiCount = Object.values(w.accounts).filter(a => a.ai).length;
+    if (aiCount >= 25) return false;
+    const rng = new U.Rng(U.newSeed());
+    seedAiWorld(w, rng);
+    store.save(w);
+    return true;
+  };
 
   /* ---------- AI account factory (Dya'kukull) ---------- */
   function makeAIAccount(rng, opt) {
@@ -1748,7 +1811,10 @@
     lastSim = Date.now();
     const rng = new U.Rng(U.newSeed());
     const T = aiTune();
-    const ais = Object.values(G.world.accounts).filter(a => a.ai && a.aiCfg.active);
+    let ais = Object.values(G.world.accounts).filter(a => a.ai && a.aiCfg.active);
+    /* a mid-session wipe (or empty-snapshot adoption) self-heals here too, so
+       the world doesn't silently go quiet while the player is logged in */
+    if (!ais.length && G.ensureAiPopulation()) ais = Object.values(G.world.accounts).filter(a => a.ai && a.aiCfg.active);
     if (!ais.length) return;
     /* a few AIs act */
     const acts = Math.max(0, Math.round(T.actionsPerBeat != null ? T.actionsPerBeat : 3));
