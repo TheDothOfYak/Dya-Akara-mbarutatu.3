@@ -311,6 +311,18 @@
       let x = input.x, y = input.y;
       const eh = M.teams[1 - team].hoard;
       if (U.dist(x, y, eh.x, eh.y) < 130) { const a = Math.atan2(y - eh.y, x - eh.x); x = eh.x + Math.cos(a) * 130; y = eh.y + Math.sin(a) * 130; }
+      /* a completed enemy wall ring seals the ground inside it — you cannot
+         deploy there. A Malsti Punk is the exception: it blinks in through the
+         Duat. Anyone else is nudged out to just beyond the nearest wall. */
+      if (entry.tok.speciesId !== 'malsti_punk') {
+        const enc = M.wallEnclosure(1 - team);
+        if (enc && x > enc.minX && x < enc.maxX && y > enc.minY && y < enc.maxY) {
+          const dl = x - enc.minX, dr = enc.maxX - x, dt = y - enc.minY, db = enc.maxY - y, mn = Math.min(dl, dr, dt, db);
+          if (mn === dl) x = enc.minX - 16; else if (mn === dr) x = enc.maxX + 16; else if (mn === dt) y = enc.minY - 16; else y = enc.maxY + 16;
+          x = U.clamp(x, 20, WORLD.w - 20); y = U.clamp(y, 20, WORLD.h - 20);
+          M.uiEvent(team, 'deny', 'Their walls seal the ground — deploy pushed outside.');
+        }
+      }
       T.readied.splice(input.slot, 1);
       entry.state = 'played';
       T.stats.tokensPlayed.push(entry.tok.speciesId);
@@ -467,6 +479,7 @@
     for (const e of M.creatures) {
       if (e.dead || e.riding || e.mountable) continue;
       if (e.onTower || e.inHut) continue;   // a garrisoned archer never climbs down to go mount something
+      if (e.sp.behavior === 'builder') continue;   // a Builder never mounts up — it stays on the works
       if (!(e.sp.eikarLayer || e.sp.keiliaLayer) || e.rooted) continue;
       if (mounts === null) mounts = M.creatures.filter(c => c.mountable && !c.dead && !c.riderUnit);
       if (!mounts.length) break;
@@ -618,14 +631,22 @@
     bp.push({ role: 'tower2', kind: 'tower', x: towerX, y: cy(own.y - 122), spec: sp });
     /* stage 4 — the Builder's Hut, behind the hoard */
     bp.push({ role: 'hut', kind: 'hut', x: cx(own.x - dir * (R + 34)), y: own.y, spec: sp });
-    /* Level 2 + 2 spearmen: a rear cone tower + a full wall ring around the hoard */
+    /* Level 2 + 2 spearmen: a rear cone tower + a CLOSED wall ring around the
+       hoard. The front edge already exists (stage 2); here we lay the back edge
+       and the top/bottom edges, overlapping at the corners so the square seals
+       with no gaps — the enemy then cannot deploy inside it. */
     if (level >= 2 && spearmen >= 2) {
       const coneX = cx(own.x - dir * (R + 16)), coneY = own.y;
       const coneDir = dir > 0 ? 0 : Math.PI;      // apex at the tower, opening toward the enemy / field centre
       bp.push({ role: 'towerCone', kind: 'cone', x: coneX, y: coneY, spec: Object.assign({}, sp, { coneDir, coneHalf: Math.PI / 5, coneRange: sp.far }) });
-      const backX = cx(own.x - dir * (R + 50));
-      [-120, -60, 60, 120].forEach((oy, i) => bp.push({ role: 'ringBack' + i, kind: 'wall', x: backX, y: cy(own.y + oy), spec: sp, extra: { trapped: sp.trapped, vertical: true } }));
-      [-1, 1].forEach((sgn, si) => [0, 1].forEach(k => bp.push({ role: 'ringSide' + si + k, kind: 'wall', x: cx(own.x + dir * (R - 6 - k * 66)), y: cy(own.y + sgn * 150), spec: sp, extra: { trapped: sp.trapped, vertical: false } })));
+      const xL = own.x - dir * (R + 50), xR = own.x + dir * (R + 50), yT = own.y - 150, yB = own.y + 150;
+      const line = (role, x1, y1, x2, y2, vertical) => {
+        const n = Math.max(2, Math.round(Math.hypot(x2 - x1, y2 - y1) / 60));
+        for (let i = 0; i <= n; i++) { const t = i / n; bp.push({ role: role + i, kind: 'wall', x: cx(x1 + (x2 - x1) * t), y: cy(y1 + (y2 - y1) * t), spec: sp, extra: { trapped: sp.trapped, vertical } }); }
+      };
+      line('ringBack', xL, yT, xL, yB, true);     // rear edge (vertical)
+      line('ringTop', xL, yT, xR, yT, false);      // top edge (horizontal)
+      line('ringBot', xL, yB, xR, yB, false);      // bottom edge (horizontal)
     }
     return bp;
   };
@@ -685,6 +706,24 @@
   };
   /* a builder has sheltered a full pulse in the Hut → upgrading is unlocked */
   Match.prototype.upgradeReady = function (team) { return !!(this.teams[team] && this.teams[team].upgradeUnlocked); };
+
+  /* If a team's walls form a CLOSED ring around its hoard (segments on all four
+     sides), return the sealed interior box; else null. Used to forbid the enemy
+     from deploying inside a completed fortress. */
+  Match.prototype.wallEnclosure = function (team) {
+    const own = this.teams[team] && this.teams[team].hoard;
+    if (!own) return null;
+    const walls = this.structures.filter(s => s.team === team && s.type === 'wall' && s.hp > 0);
+    if (walls.length < 10) return null;
+    let l = false, r = false, u = false, d = false, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+    for (const w of walls) {
+      if (w.x < own.x - 40) l = true; if (w.x > own.x + 40) r = true;
+      if (w.y < own.y - 40) u = true; if (w.y > own.y + 40) d = true;
+      minX = Math.min(minX, w.x); maxX = Math.max(maxX, w.x); minY = Math.min(minY, w.y); maxY = Math.max(maxY, w.y);
+    }
+    if (!(l && r && u && d)) return null;   // not sealed on every side
+    return { minX: minX - 6, maxX: maxX + 6, minY: minY - 6, maxY: maxY + 6 };
+  };
   Match.prototype.pendingUpgrades = function (team) {
     return this.structures.filter(s => s.team === team && s.hp > 0 && !s.upgraded && !s.isHut && s.type !== 'ward');
   };
@@ -1387,6 +1426,10 @@
           for (const c of M.creatures) {
             if (c.dead || c.team === s.team || c.rooted || c.onTower || c.inHut) continue;
             if (c.sp.tags.includes('flyer') || (c.sp.features && c.sp.features.hover)) continue; // flyers pass over
+            if (c.speciesId === 'malsti_punk') {   // a Malsti Punk blinks through the wall via the Duat
+              if (Math.abs(c.x - s.x) < hw + c.radius && Math.abs(c.y - s.y) < hh + c.radius && M.tick % 12 === 0) M.addEffect('teleport', c.x, c.y, {});
+              continue;
+            }
             const dx = c.x - s.x, dy = c.y - s.y;
             const px = (hw + c.radius) - Math.abs(dx), py = (hh + c.radius) - Math.abs(dy);
             if (px > 0 && py > 0) {                 // overlapping — shove out the short axis
@@ -2071,11 +2114,13 @@
           tx = st.x; ty = st.y;
         }
         if (U.dist(c.x, c.y, tx, ty) > 40) { c.intent.move = { x: tx, y: ty, run: true }; return; }
-        c.state = 'special';
+        /* swing the hammer while working (state 'attack' animates the swing;
+           it.state persists it across the decision window) */
+        c.state = 'attack'; c.intent.state = 'attack'; c.facing = tx >= c.x ? 1 : -1;
         /* extra builders on the same job speed it up */
         const helpers = M.creatures.filter(o => !o.dead && o.team === c.team && o.mem.building && o.mem.building.bp && o.mem.building.bp.role === bp.role).length;
         b.progress += (c.vars.buildSpeed || 1) * TICK * (1 + 0.6 * (helpers - 1));
-        if (bp.kind === 'upgrade' && M.tick % 5 === 0) M.addEffect('buff', tx, ty - 8, {});   // visible reinforcing
+        if (M.tick % 7 === 0) M.addEffect('buff', tx + M.rng.range(-8, 8), ty - 6, {});   // hammer sparks
         if (b.progress >= 1) {
           if (bp.kind === 'upgrade') { const st = M.structures.find(s => s.id === bp.targetId && s.hp > 0); if (st) M.upgradeOne(st); }
           else if (!M.structures.some(s => s.team === c.team && s.role === bp.role && s.hp > 0)) M.raiseStructure(c, bp);
@@ -2084,10 +2129,15 @@
       },
       /* start a timed upgrade job on a specific structure (same duration as a build) */
       startUpgrade(c, s) { if (M.mode === 'duel') return; c.mem.building = { bp: { role: 'up:' + s.role, kind: 'upgrade', targetId: s.id, x: s.x, y: s.y }, progress: 0 }; },
+      /* repair is HAMMER-WORK, not a heal: the builder swings on a cadence and
+         each blow mends a chunk, so it reads exactly like building */
       repair(c, s) {
-        c.state = 'special';
-        s.hp = Math.min(s.maxHp, s.hp + (c.vars.repairSpeed || 1) * 12 * TICK);
-        if (M.tick % 6 === 0) M.addEffect('buff', s.x, s.y - 8, {});   // visible mending
+        c.state = 'attack'; c.intent.state = 'attack'; c.facing = s.x >= c.x ? 1 : -1;
+        if (c.attackCd <= 0) {
+          c.attackCd = 0.7 / (c.vars.buildSpeed || 1);
+          s.hp = Math.min(s.maxHp, s.hp + (c.vars.repairSpeed || 1) * 18);
+          M.addEffect('buff', s.x + M.rng.range(-8, 8), s.y - 6, {});   // spark on each blow
+        }
       },
       demolish(c, s) {
         c.state = 'attack';
