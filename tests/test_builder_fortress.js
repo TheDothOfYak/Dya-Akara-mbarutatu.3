@@ -211,6 +211,11 @@ console.log('== NO DEPLOY INSIDE: enemy blocked from a sealed ring, Malsti blink
   m.applyInput(0, { type: 'trigger', slot: 0, x: inX, y: inY });
   const punk = m.creatures[m.creatures.length - 1];
   ok('a Malsti Punk CAN deploy inside the ring', punk.speciesId === 'malsti_punk' && inside(punk), 'at ' + punk.x.toFixed(0) + ',' + punk.y.toFixed(0));
+  // a FLYER can fly over walls but still can't be DEPLOYED inside a sealed ring
+  T0.readied = [{ tok: mint('harkal', 532), state: 'ready', readiedAtPulse: -5, deaths: 0 }];
+  m.applyInput(0, { type: 'trigger', slot: 0, x: inX, y: inY });
+  const flyer = m.creatures[m.creatures.length - 1];
+  ok('a flyer still cannot be DEPLOYED inside a sealed ring', flyer.sp.tags.includes('flyer') && !inside(flyer), 'at ' + flyer.x.toFixed(0) + ',' + flyer.y.toFixed(0));
 }
 
 console.log('== MALSTI PHASES: not shoved by an enemy wall ==');

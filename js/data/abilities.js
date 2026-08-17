@@ -39,6 +39,7 @@
     teleportRange: { desc: 'How far a Duat-blinker can teleport.' },
     teleportCooldown: { desc: 'Seconds between teleports.' },
     duatCapacity: { desc: 'How much stolen loot it can stash in the Duat.' },
+    dodge: { desc: 'Chance to weave/blink aside and take no damage from a hit.' },
     stealRate: { desc: 'How quickly a thief drains resources it reaches.' },
     dominance: { desc: 'Contest weight vs. rivals of its kind (bigger/multi-headed win).' },
     riderProtection: { desc: 'How strongly a mount defends its rider when the rider is attacked.' },

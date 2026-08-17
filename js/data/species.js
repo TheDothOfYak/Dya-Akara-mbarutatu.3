@@ -78,7 +78,7 @@
     desc: 'A faster, leaner cousin of the Domestic Punk — same pumpkin-and-vine family, grown wild.',
     temperament: 'Territorial and evasive — it would rather fight while fleeing than ever stand its ground.',
     special: 'Hoarder instinct: opportunistically grabs anything smaller that wanders too close. Some individuals carry a weak passive water breath.',
-    vars: { vineLength: [40, 80], territory: [90, 200], aggressionThreshold: [0.3, 0.7], breathCooldown: [14, 24] },
+    vars: { vineLength: [40, 80], territory: [90, 200], aggressionThreshold: [0.3, 0.7], breathCooldown: [14, 24], dodge: [0.25, 0.5] },
     picks: { vineBehavior: ['grab', 'smash', 'throw'], hasBreath: [0, 0, 0, 1], ularAffinity: [0.1, 0.2, 0.3] },
   });
 
@@ -94,8 +94,8 @@
     attackRange: 40,
     desc: 'The smallest of the Punk family, born of the Duat itself.',
     temperament: 'Highly intelligent, restless, and single-minded about raiding — it slips into an enemy’s hoard to steal, disrupt, and harass.',
-    special: 'Teleports through the Duat. Cannot teleport with the Relic, ever. Cannot blink into an occupied space. Stashes stolen resources in the Duat.',
-    vars: { teleportRange: [120, 260], teleportCooldown: [4, 9], duatCapacity: [2, 6], stealth: [0.3, 0.9], precision: [0.5, 1] },
+    special: 'Teleports through the Duat — often, and even through walls — and dodges 80% of attacks outright. Grabs resources instantly (a whole Duat-load at once, capacity varies), reading the enemy’s starting pouch to steal the colours they lean on, then blinks home to stash. Cannot teleport with the Relic, ever. Cannot blink into an occupied space.',
+    vars: { teleportRange: [120, 260], teleportCooldown: [2, 5], duatCapacity: [2, 6], dodge: [0.8, 0.8], stealth: [0.3, 0.9], precision: [0.5, 1] },
     picks: { tendency: ['collector', 'harasser'], targetPreference: ['smallest', 'nearest', 'support'] },
   });
 

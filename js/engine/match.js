@@ -406,6 +406,13 @@
            brain otherwise */
         const b = BV[c.behaviorOverride || (c.mountable ? (c.riderUnit ? c.riddenBehavior : c.riderlessBehavior) : null) || c.sp.behavior];
         if (b) { api._c = c; b(c, api); }
+        /* a fighting flyer that a tower is shooting turns and presses the tower
+           (the siege loop wears it down while the flyer is on top of it) */
+        if (c.mem.towerAggro && (M.tick - (c.mem.towerAggroAt || 0)) < Math.round(5 / TICK)) {
+          const tw = M.structures.find(s2 => s2.id === c.mem.towerAggro && s2.hp > 0);
+          if (tw) c.intent = { move: { x: tw.x, y: tw.y, run: true }, state: 'attack' };
+          else c.mem.towerAggro = null;
+        }
         /* Duel: creatures ALWAYS fight — pursue to elimination, no idling (§1).
            We still run the species brain above so every ability (screech,
            jet, breath, tongue, hanii…) fires in duels too; we only force the
@@ -707,6 +714,23 @@
   /* a builder has sheltered a full pulse in the Hut → upgrading is unlocked */
   Match.prototype.upgradeReady = function (team) { return !!(this.teams[team] && this.teams[team].upgradeUnlocked); };
 
+  /* a tower just shot this creature — if it's a fighting flyer, it may wheel
+     around and attack the tower that's shooting it ("some flying creatures") */
+  Match.prototype.markTowerAggro = function (c, s) {
+    if (!c || c.dead || !c.sp.tags.includes('flyer')) return;
+    if (c.sp.tags.includes('passive') || c.dmg <= 4) return;
+    c.mem.towerAggro = s.id; c.mem.towerAggroAt = this.tick;
+  };
+
+  /* element mix of a team's STARTING POUCH — the Malsti Punk reads this and
+     steals the colours the enemy leans on (a green-heavy pouch loses Ular most) */
+  Match.prototype.pouchElementWeights = function (team) {
+    const T = this.teams[team], w = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
+    if (T && T.pouch) for (const e of T.pouch) { const el = e.tok && e.tok.element; if (w[el] != null) w[el]++; }
+    if (!ELS.some(e => w[e] > 0)) ELS.forEach(e => w[e] = 1);
+    return w;
+  };
+
   /* The wall ring seals the hoard ONLY when it is 100% complete — any gap (an
      unbuilt or destroyed segment) breaks the seal. We prove completeness by a
      flood-fill from the hoard over a fine grid: if the fill can leak out to the
@@ -944,8 +968,8 @@
        mount takes it; M.updateMounting keeps it glued to the mount) */
     if (it.move && !c.rooted && !(c.onTower) && !c.inHut && !c.riding) {
       let sp = c.speed * (it.move.run ? 1.45 : 1) * buffMul('speedMul');
-      if (c.carryingRelic) {
-        sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;
+      if (c.carryingRelic || (c.riderUnit && c.riderUnit.carryingRelic)) {
+        sp *= c.sp.tags.includes('thief') ? (c.vars.carrySpeed || 0.2) / 1.5 * 5 : 0.45;   // a laden mount is slowed too
         if (c.quirks && c.quirks.relic_runner) sp *= 1.2;
       }
       if (c.speciesId === 'mikolo_moko' && !c.carryingRelic) sp *= c.vars.sprint || 1.3;
@@ -1199,6 +1223,12 @@
        are freed when it collapses) */
     if (t.onTower || t.inHut) return;
     opts = opts || {};
+    /* dodge — a Malsti Punk (80%) or Wild Punk (≤50%) weaves/blinks aside and
+       takes nothing. Deterministic via the match rng (lockstep-safe). */
+    if (t.vars.dodge > 0 && M.rng.next() < t.vars.dodge) {
+      if (!opts.noAnim) M.addEffect('teleport', t.x, t.y - t.radius * 0.3, {});
+      return;
+    }
     M.lastCombatTick = M.tick;
 
     /* mitigations */
@@ -1476,6 +1506,19 @@
                 M.addEffect('hit', c.x, c.y, {});
                 if (c.hp <= 0) M.kill(c, null, 'trap');
               }
+              /* pressed against an enemy wall → it hacks at it to break through
+                 (a real attack, not just the passive siege), unless it's hauling
+                 the relic home — then it just gets shoved and slips around */
+              if (c.dmg > 0 && !c.sp.tags.includes('passive') && !c.carryingRelic) {
+                c.state = 'attack'; if (c.intent) c.intent.state = 'attack';
+                c.facing = s.x >= c.x ? 1 : -1;
+                if (c.attackCd <= 0) {
+                  c.attackCd = 1 / ((c.vars && c.vars.tongueSpeed) || 1);
+                  s.hp -= c.dmg * 1.3;
+                  M.addEffect('hit', s.x + M.rng.range(-6, 6), s.y + M.rng.range(-6, 6), {});
+                  if (s.hp <= 0) { s.hp = 0; M.freeOccupants(s); M.uiEvent(-1, 'event', 'A wall is breached.'); }
+                }
+              }
             }
           }
         } else if (s.kind === 'tower' || s.kind === 'cone') {
@@ -1498,7 +1541,7 @@
             const d = U.dist(c.x, c.y, s.x, s.y);
             if (d > aura) continue;
             if (c.team === s.team) c.fortifiedUntil = M.tick + 3;
-            else if (c.camoUntil > M.tick) c.camoUntil = M.tick;
+            else if (c.camoUntil > M.tick && ((c.vars.camo || c.vars.stealth || 0) < 0.5)) c.camoUntil = M.tick;   // elevated sight only pierces light camo (<50)
           }
         } else if (s.kind === 'wallTower') {
           /* unmanned wall-tower: auto-fires base damage at the nearest foe in range */
@@ -1514,6 +1557,7 @@
               s.fireCd = 1.3;
               const a = Math.atan2(best.y - s.y, best.x - s.x);
               M.projectiles.push({ x: s.x, y: s.y - 10, vx: Math.cos(a) * 440, vy: Math.sin(a) * 440, team: s.team, dmg: s.baseDmg || 5, type: 'arrow', life: (s.range || 50) / 440 + 0.05, source: null });
+              M.markTowerAggro(best, s);   // a fighting flyer may turn and attack the tower shooting it
             }
           }
         }
@@ -1960,13 +2004,18 @@
         }
         c.state = 'attack';
         c.facing = target.x >= c.x ? 1 : -1;
-        c.attackCd = 1.6 / (c.vars.drawSpeed || 1);
-        c.quiver--;
-        const lead = 0.35;
-        const tx = target.x + (target.intent && target.intent.move ? (target.intent.move.x - target.x) * lead * 0.1 : 0);
-        const a = Math.atan2(target.y - c.y, tx - c.x);
+        const inTower = !!c.onTower;
+        c.attackCd = (1.6 / (c.vars.drawSpeed || 1)) * (inTower ? 0.82 : 1);   // slightly faster fire from a tower
+        if (!inTower) c.quiver--;                                              // a garrisoned archer never runs dry
+        /* tower archers are more accurate: faster arrows and better target lead */
+        const projSpeed = inTower ? 640 : 460, leadK = inTower ? 0.32 : 0.1;
+        const mv = target.intent && target.intent.move;
+        const tx = target.x + (mv ? (mv.x - target.x) * leadK : 0);
+        const ty = target.y + (mv ? (mv.y - target.y) * leadK : 0);
+        const a = Math.atan2(ty - c.y, tx - c.x);
         const airBonus = (target.sp.tags.includes('flyer') || target.element === 'Su') ? 1.35 : 1;
-        M.projectiles.push({ x: c.x, y: c.y - c.radius, vx: Math.cos(a) * 460, vy: Math.sin(a) * 460, team: c.team, dmg: c.dmg * (c.vars.bowQuality || 1) * airBonus * towerMul, type: 'arrow', life: reach / 460 + 0.05, source: c });
+        M.projectiles.push({ x: c.x, y: c.y - c.radius, vx: Math.cos(a) * projSpeed, vy: Math.sin(a) * projSpeed, team: c.team, dmg: c.dmg * (c.vars.bowQuality || 1) * airBonus * towerMul, type: 'arrow', life: reach / projSpeed + 0.05, source: c });
+        if (inTower && target.sp.tags.includes('flyer')) { const tw = M.structures.find(s => s.id === c.onTower && s.hp > 0); if (tw) M.markTowerAggro(target, tw); }
       },
       throwHanii(c, target) {
         c.mem.cd_hanii = M.tick + Math.round(7 / TICK);
@@ -2064,18 +2113,27 @@
         M.addEffect('teleport', c.x, c.y, {});
         if (!M.headless) DYA.audio.play('teleport');
       },
+      /* the Duat raid: grabbing costs no time — the Malsti snatches a whole
+         Duat-load at once (up to its varying capacity), weighted toward the
+         colours the enemy's starting pouch leans on, then books it home. */
       stealResource(c) {
+        c.intent.state = 'special';
         const T = M.teams[1 - c.team];
-        if (T && resTotal(T.resources) >= 1 && (M.tick % 20 === 0)) {
-          const el = mostAbundant(T.resources);
+        if (!T || resTotal(T.resources) < 1) return;
+        const cap = Math.max(1, Math.round(c.vars.duatCapacity || 4));
+        const w = M.pouchElementWeights(1 - c.team);
+        let grabbed = 0;
+        while ((c.mem.stolen || 0) < cap && resTotal(T.resources) >= 1) {
+          let tot = 0; const wt = ELS.map(e => { const v = T.resources[e] > 0 ? (w[e] || 0.001) : 0; tot += v; return v; });
+          if (tot <= 0) break;
+          let r = M.rng.next() * tot, el = ELS[0];
+          for (let i = 0; i < ELS.length; i++) { r -= wt[i]; if (r <= 0) { el = ELS[i]; break; } }
           T.resources[el] -= 1;
           c.mem.stolenVec = c.mem.stolenVec || { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
-          c.mem.stolenVec[el]++;
-          c.mem.stolen = (c.mem.stolen || 0) + 1;
-          M.teams[c.team].stats.stolen++;
-          M.addEffect('steal', c.x, c.y, {});
+          c.mem.stolenVec[el]++; c.mem.stolen = (c.mem.stolen || 0) + 1;
+          M.teams[c.team].stats.stolen++; grabbed++;
         }
-        c.intent.state = 'special';
+        if (grabbed) M.addEffect('steal', c.x, c.y, {});
       },
       depositStolen(c) {
         if (c.mem.stolenVec) ELS.forEach(e => { M.teams[c.team].resources[e] += c.mem.stolenVec[e]; });
@@ -2183,6 +2241,7 @@
         if (s.occupants.length >= (s.capacity || 1) || s.occupants.includes(c.id)) return;
         s.occupants.push(c.id);
         c.onTower = s.id;
+        c.quiver = Math.max(c.quiver || 0, Math.round((c.vars && c.vars.quiver) || 20));   // the tower keeps the garrison supplied
         const slot = s.occupants.length - 1, spread = (slot - ((s.capacity - 1) / 2)) * 12;
         c.x = s.x + spread; c.y = s.y - 18;
         if (M.teams[c.team]) M.teams[c.team].stats.combos['Builder’s tower manned'] = true;

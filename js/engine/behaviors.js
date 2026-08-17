@@ -69,6 +69,19 @@
   B.mounted_eikar = function (c, api) {
     const reach = c.vars.vineLength || c.attackRange || 60;
     const cr = c.vars.commandResponse != null ? c.vars.commandResponse : 0.7;
+    // carry the enemy Relic HOME together — if the mount or its rider holds it,
+    // the pair runs for the hoard (the rider, glued on, scores when they arrive)
+    if (c.carryingRelic || (c.riderUnit && c.riderUnit.carryingRelic)) {
+      const own = api.ownHoard(c.team);
+      api.moveToward(c, own.x, own.y, true);
+      return;
+    }
+    // snatch a free enemy Relic the pair rides past, then break for home
+    const freeRelic = api.relic ? api.relic() : null;
+    if (freeRelic && !freeRelic.carrier && !freeRelic.captured && !freeRelic.disabled && api.dist(c, freeRelic) < reach + 24) {
+      api.pickRelic(c);
+      if (c.carryingRelic) { const own = api.ownHoard(c.team); api.moveToward(c, own.x, own.y, true); return; }
+    }
     // protect the pair: ride down whoever just struck
     const attacker = attackedRecently(c, api) && c.lastAttacker && !c.lastAttacker.dead ? c.lastAttacker : null;
     if (attacker) { api.moveToward(c, attacker.x, attacker.y, true); if (api.dist(c, attacker) < reach * 1.3) api.attack(c, attacker); return; }
@@ -117,7 +130,7 @@
   };
 
   B.malsti_punk = function (c, api) {
-    const hoard = api.enemyHoard(c.team);
+    const enemyH = api.enemyHoard(c.team), ownH = api.ownHoard(c.team);
     // imprint target threatened → only override
     const imprint = c.mem.imprintId != null ? api.byId(c.mem.imprintId) : null;
     if (imprint && !imprint.dead && attackedRecently(imprint, api)) {
@@ -126,28 +139,19 @@
       if (th && !th.dead && api.dist(c, th) < 50) api.attack(c, th);
       return;
     }
-    // threatened by Vel or larger → teleport away
-    const bigThreat = api.enemiesNear(c, 70).find(o => o.sizeIdx >= 2);
-    if (bigThreat && api.canTeleport(c)) { api.teleport(c, hoard.x + api.rng.range(-120, 120), hoard.y + api.rng.range(-120, 120)); return; }
-    // carrying stolen resources → stash / deposit
-    if (c.mem.stolen > 0 && c.mem.stolen >= c.vars.duatCapacity) {
-      const own = api.ownHoard(c.team);
-      api.moveToward(c, own.x, own.y, true);
-      if (api.dist(c, own) < 60) { api.depositStolen(c); }
-      return;
+    // threatened → blink to safety (Malsti teleport very readily)
+    const threat2 = api.enemiesNear(c, 90).find(o => o.sizeIdx >= 1);
+    if (threat2 && api.canTeleport(c)) { api.teleport(c, ownH.x + api.rng.range(-140, 140), ownH.y + api.rng.range(-140, 140)); return; }
+    // carrying loot → BOOK IT home and stash (blink across the gap when far)
+    if ((c.mem.stolen || 0) > 0) {
+      if (api.dist(c, ownH) < 60) { api.depositStolen(c); return; }
+      if (api.dist(c, ownH) > 170 && api.canTeleport(c)) { api.teleport(c, ownH.x, ownH.y); return; }
+      api.moveToward(c, ownH.x, ownH.y, true); return;
     }
-    // at enemy hoard → steal + disrupt
-    if (api.dist(c, hoard) < 90) {
-      api.stealResource(c);
-      const guard = api.nearestEnemy(c, 90);
-      if (guard && guard.sizeIdx <= 1) api.attack(c, guard);
-      return;
-    }
-    // enemy hoard in range → go straight to it (primary objective)
-    api.moveToward(c, hoard.x, hoard.y, true);
-    // harass litk/mael creatures en route
-    const small = api.nearestEnemy(c, 60, o => o.sizeIdx <= 1);
-    if (small) api.attack(c, small);
+    // empty → reach the enemy hoard (blink toward it), grab a Duat-load instantly, then leave
+    if (api.dist(c, enemyH) < 80) { api.stealResource(c); return; }
+    if (api.dist(c, enemyH) > 170 && api.canTeleport(c)) { api.teleport(c, enemyH.x + api.rng.range(-60, 60), enemyH.y + api.rng.range(-60, 60)); return; }
+    api.moveToward(c, enemyH.x, enemyH.y, true);
   };
 
   /* ================= CREATURES ================= */
@@ -626,6 +630,20 @@
     // effective firing range: from a tower it is the tower's FAR band (3× close)
     let range = c.attackRange;
     if (c.onTower) { const tw = api.structuresOf(c.team).find(s => s.id === c.onTower); if (tw) range = tw.coneRange || tw.far || range; }
+    // GARRISONED: never stop shooting while anything is in range, and always
+    // pick the BIGGEST threat (size × damage; relic thieves and air/Su first)
+    if (c.onTower) {
+      let best = null, bestScore = -1;
+      for (const o of api.enemiesNear(c, range)) {
+        if (api.losBlocked(c.x, c.y, o.x, o.y, c.team)) continue;
+        let sc = (o.sizeIdx + 1) * (1 + o.dmg / 10);
+        if (o.sp.tags.includes('flyer') || o.element === 'Su') sc *= 1.4;
+        if (o.carryingRelic) sc *= 3;
+        if (sc > bestScore) { bestScore = sc; best = o; }
+      }
+      if (best) { if (c.quiver <= 0) c.quiver = Math.round(c.vars.quiver || 20); api.shoot(c, best); return; }
+      api.hold(c); return;
+    }
     // evade close range at all costs — but a garrisoned/mounted archer can't be reached
     const closeThreat = (c.riding || c.onTower) ? null : api.nearestEnemy(c, 60);
     if (closeThreat) {
