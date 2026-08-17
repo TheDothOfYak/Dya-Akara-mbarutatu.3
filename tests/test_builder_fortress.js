@@ -151,26 +151,47 @@ console.log('== REPAIR IS HAMMER-WORK: swings (state attack) and mends in chunks
   ok('repair mends the structure', wall.hp > hp0, 'hp ' + hp0.toFixed(0) + '->' + wall.hp.toFixed(0));
 }
 
-console.log('== CLOSED RING: sealed on all four sides → interior is protected ==');
+console.log('== CLOSED RING: only a 100%-complete wall seals the interior ==');
+// build the REAL blueprint fort (Level-2 ring included) for a team
 function buildRing(m, team) {
   const own = m.teams[team].hoard;
   const b = m.spawnFromToken(mint('builder_keilia', 900 + team), team, own.x, own.y);
-  const sp = m.builderSpec(team);
-  const w = (x, y, vert) => m.raiseStructure(b, { role: 'ring_' + Math.round(x) + '_' + Math.round(y), kind: 'wall', x, y, spec: sp, extra: { vertical: vert } });
-  for (let dy = -140; dy <= 140; dy += 70) { w(own.x - 180, own.y + dy, true); w(own.x + 180, own.y + dy, true); }
-  for (let dx = -180; dx <= 180; dx += 70) { w(own.x + dx, own.y - 150, false); w(own.x + dx, own.y + 150, false); }
+  m.spawnFromToken(mint('spear_keilia', 950 + team), team, own.x + 20, own.y);
+  m.spawnFromToken(mint('spear_keilia', 960 + team), team, own.x + 20, own.y + 20);
+  for (const bp of m.builderBlueprints(team)) if (!m.structures.some(s => s.team === team && s.role === bp.role)) m.raiseStructure(b, bp);
+  const hut = m.structures.find(s => s.team === team && s.isHut); hut.level = 2;
+  for (const bp of m.builderBlueprints(team)) if (!m.structures.some(s => s.team === team && s.role === bp.role)) m.raiseStructure(b, bp);
   return b;
 }
 { const m = mk();
-  // front-only walls do NOT seal
+  // an open front line is NOT sealed
   const b = m.spawnFromToken(mint('builder_keilia', 520), 0, 300, 500);
   const sp = m.builderSpec(0);
   for (let dy = -120; dy <= 120; dy += 60) m.raiseStructure(b, { role: 'f' + dy, kind: 'wall', x: 360, y: 500 + dy, spec: sp });
   ok('an open front line is NOT a sealed enclosure', m.wallEnclosure(0) === null);
   // a full ring seals it
   const m2 = mk(); buildRing(m2, 0);
-  const enc = m2.wallEnclosure(0);
-  ok('a full ring reports a sealed interior', !!enc && enc.maxX > enc.minX && enc.maxY > enc.minY);
+  ok('a completed ring reports a sealed interior', !!m2.wallEnclosure(0));
+  // removing ONE wall segment breaks the seal — must be 100% complete
+  const wall = m2.structures.find(s => s.team === 0 && s.type === 'wall');
+  m2.structures = m2.structures.filter(s => s !== wall);
+  ok('one missing wall segment breaks the seal (100% required)', m2.wallEnclosure(0) === null);
+}
+
+console.log('== REBUILD: builders rebuild a destroyed structure ==');
+{ const m = mk(); const h0 = m.teams[0].hoard;
+  m.spawnFromToken(mint('builder_keilia', 600), 0, h0.x, h0.y);
+  m.spawnFromToken(mint('sword_keilia', 601), 0, h0.x + 120, h0.y);                 // a screen
+  m.spawnFromToken(mint('rodak', 602), 1, m.teams[1].hoard.x, m.teams[1].hoard.y);  // keep the match alive, far off
+  let built = false;
+  for (let i = 0; i < 2500 && !m.over; i++) { m.doTick(); if (m.structures.some(s => s.team === 0 && s.role === 'tower1')) { built = true; break; } }
+  ok('a tower was first built', built);
+  const t = m.structures.find(s => s.team === 0 && s.role === 'tower1');
+  m.freeOccupants(t); m.structures = m.structures.filter(s => s !== t);
+  ok('the tower is destroyed', !m.structures.some(s => s.team === 0 && s.role === 'tower1'));
+  let rebuilt = false;
+  for (let i = 0; i < 4000 && !m.over; i++) { m.doTick(); if (m.structures.some(s => s.team === 0 && s.role === 'tower1')) { rebuilt = true; break; } }
+  ok('builders rebuild the destroyed tower', rebuilt);
 }
 
 console.log('== NO DEPLOY INSIDE: enemy blocked from a sealed ring, Malsti blinks in ==');
