@@ -1223,9 +1223,14 @@
        are freed when it collapses) */
     if (t.onTower || t.inHut) return;
     opts = opts || {};
-    /* dodge — a Malsti Punk (80%) or Wild Punk (≤50%) weaves/blinks aside and
-       takes nothing. Deterministic via the match rng (lockstep-safe). */
-    if (t.vars.dodge > 0 && M.rng.next() < t.vars.dodge) {
+    /* dodge — a Malsti Punk (80%) or Wild Punk weaves/blinks aside and takes
+       nothing. Read the token's rolled stat, but fall back to a species floor
+       so Punks minted BEFORE the dodge stat existed still dodge. Deterministic
+       via the match rng (lockstep-safe). */
+    let dodge = t.vars.dodge;
+    if (dodge == null) dodge = t.speciesId === 'malsti_punk' ? 0.8 : t.speciesId === 'wild_punk' ? 0.4 : 0;
+    if (t.speciesId === 'malsti_punk' && dodge < 0.8) dodge = 0.8;   // Malsti is always 80%
+    if (dodge > 0 && M.rng.next() < dodge) {
       if (!opts.noAnim) M.addEffect('teleport', t.x, t.y - t.radius * 0.3, {});
       return;
     }
