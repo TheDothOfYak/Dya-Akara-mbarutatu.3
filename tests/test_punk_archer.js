@@ -26,6 +26,11 @@ console.log('== DODGE: Malsti 80%, Wild Punk ≤50% ==');
   ok('~80% of hits are dodged', landed < 500 * 0.4, landed + '/500 landed (expect ~100)');
   const wp = m.spawnFromToken(mint('wild_punk', 2), 0, 400, 500);
   ok('Wild Punk has dodge, ≤50%', wp.vars.dodge > 0 && wp.vars.dodge <= 0.5, 'dodge=' + wp.vars.dodge);
+  // OLD token minted before dodge existed: no vars.dodge → species floor still applies
+  const old = m.spawnFromToken(mint('malsti_punk', 20), 0, 600, 500); delete old.vars.dodge;
+  old.hp = old.maxHp = 100000;
+  let oldLanded = 0; for (let i = 0; i < 500; i++) { const b = old.hp; m.damage(old, 10, null); if (old.hp < b) oldLanded++; }
+  ok('a pre-dodge Malsti token still dodges ~80%', oldLanded < 500 * 0.4, oldLanded + '/500 landed');
 }
 
 console.log('== MALSTI: instant grab, pouch-weighted, faster teleport ==');
