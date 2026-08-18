@@ -18,36 +18,57 @@ function mk() {
   m.headless = true; return m;
 }
 
-console.log('== DODGE: Malsti 80%, Wild Punk ≤50% ==');
+console.log('== DODGE: Malsti 90%, Wild Punk ≤50% ==');
 { const m = mk(); const punk = m.spawnFromToken(mint('malsti_punk', 1), 0, 500, 500);
-  ok('Malsti dodge stat is 80%', Math.abs(punk.vars.dodge - 0.8) < 0.001, 'dodge=' + punk.vars.dodge);
+  ok('Malsti dodge stat is 90%', Math.abs(punk.vars.dodge - 0.9) < 0.001, 'dodge=' + punk.vars.dodge);
   punk.hp = punk.maxHp = 100000;
   let landed = 0; for (let i = 0; i < 500; i++) { const before = punk.hp; m.damage(punk, 10, null); if (punk.hp < before) landed++; }
-  ok('~80% of hits are dodged', landed < 500 * 0.4, landed + '/500 landed (expect ~100)');
+  ok('~90% of hits are dodged', landed < 500 * 0.25, landed + '/500 landed (expect ~50)');
   const wp = m.spawnFromToken(mint('wild_punk', 2), 0, 400, 500);
   ok('Wild Punk has dodge, ≤50%', wp.vars.dodge > 0 && wp.vars.dodge <= 0.5, 'dodge=' + wp.vars.dodge);
   // OLD token minted before dodge existed: no vars.dodge → species floor still applies
   const old = m.spawnFromToken(mint('malsti_punk', 20), 0, 600, 500); delete old.vars.dodge;
   old.hp = old.maxHp = 100000;
   let oldLanded = 0; for (let i = 0; i < 500; i++) { const b = old.hp; m.damage(old, 10, null); if (old.hp < b) oldLanded++; }
-  ok('a pre-dodge Malsti token still dodges ~80%', oldLanded < 500 * 0.4, oldLanded + '/500 landed');
+  ok('a pre-dodge Malsti token still dodges ~90%', oldLanded < 500 * 0.25, oldLanded + '/500 landed');
 }
 
-console.log('== MALSTI: instant grab, pouch-weighted, faster teleport ==');
+console.log('== MALSTI: one resource (Torcain hauls more), pouch-weighted, faster teleport ==');
 { const m = mk();
   ok('Malsti teleports more often (cooldown ≤5s)', mint('malsti_punk', 9).vars.teleportCooldown <= 5);
   // victim pouch heavy Ular; resources plentiful
   const pou = []; for (let i = 0; i < 8; i++) { const t = mint('rodak', 100 + i); t.element = 'Ular'; pou.push({ tok: t }); }
   m.teams[1].pouch = pou;
-  const punk = m.spawnFromToken(mint('malsti_punk', 3), 0, m.teams[1].hoard.x, m.teams[1].hoard.y);
+  // a common (non-Torcain) Malsti grabs ONE at a time
+  const punk = m.spawnFromToken(D.token.mint({ speciesId: 'malsti_punk', rng: new U.Rng(3), rarity: 3 }), 0, m.teams[1].hoard.x, m.teams[1].hoard.y);
   const api = m.api(); api._c = punk;
   m.teams[1].resources = { Fti: 50, Su: 50, Eldi: 50, Ular: 50 };
   api.stealResource(punk);
-  ok('grabs a whole Duat-load in one instant', punk.mem.stolen === Math.round(punk.vars.duatCapacity), 'grabbed ' + punk.mem.stolen + '/' + Math.round(punk.vars.duatCapacity));
-  // over many raids it steals the pouch-heavy colour most
+  ok('a non-Torcain grabs only ONE resource', punk.mem.stolen === 1, 'grabbed ' + punk.mem.stolen);
+  // a Torcain Malsti hauls a full Duat-load
+  const tor = m.spawnFromToken(D.token.mint({ speciesId: 'malsti_punk', rng: new U.Rng(4), rarity: 6 }), 0, m.teams[1].hoard.x, m.teams[1].hoard.y);
+  api._c = tor; m.teams[1].resources = { Fti: 50, Su: 50, Eldi: 50, Ular: 50 };
+  api.stealResource(tor);
+  ok('a Torcain hauls a whole Duat-load', tor.mem.stolen === Math.round(tor.vars.duatCapacity) && tor.mem.stolen > 1, 'grabbed ' + tor.mem.stolen + '/' + Math.round(tor.vars.duatCapacity));
+  // over many raids it steals the pouch-heavy colour most (use the Torcain for volume)
   const cnt = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
-  for (let k = 0; k < 40; k++) { punk.mem.stolen = 0; punk.mem.stolenVec = null; m.teams[1].resources = { Fti: 50, Su: 50, Eldi: 50, Ular: 50 }; api.stealResource(punk); ELS.forEach(e => cnt[e] += (punk.mem.stolenVec ? punk.mem.stolenVec[e] : 0)); }
+  for (let k = 0; k < 40; k++) { tor.mem.stolen = 0; tor.mem.stolenVec = null; m.teams[1].resources = { Fti: 50, Su: 50, Eldi: 50, Ular: 50 }; api.stealResource(tor); ELS.forEach(e => cnt[e] += (tor.mem.stolenVec ? tor.mem.stolenVec[e] : 0)); }
   ok('steals the enemy pouch’s dominant colour most', cnt.Ular > cnt.Fti && cnt.Ular > cnt.Su && cnt.Ular > cnt.Eldi, JSON.stringify(cnt));
+}
+
+console.log('== BUILDER SPEC: dimensioned by the best Builder in the POUCH ==');
+{ const m = mk();
+  // a strong Builder sits UN-deployed in the pouch; a weak one is on the field
+  const strong = D.token.mint({ speciesId: 'builder_keilia', rng: new U.Rng(70) });
+  strong.vars = Object.assign({}, strong.vars, { towerQuality: 1.7, structureQuality: 1.7 }); strong.sizeIdx = 3;
+  m.teams[0].pouch = [{ tok: strong, state: 'pouch', readiedAtPulse: -1, deaths: 0 }];
+  const weak = D.token.mint({ speciesId: 'builder_keilia', rng: new U.Rng(71) });
+  weak.vars = Object.assign({}, weak.vars, { towerQuality: 0.9, structureQuality: 0.9 }); weak.sizeIdx = 2;
+  m.spawnFromToken(weak, 0, 300, 500);
+  const sp = m.builderSpec(0);
+  // spec should reflect the STRONG pouch builder (bigger close range than the weak one alone)
+  const weakOnly = (() => { const q = 0.9, size = 2; return U.clamp(Math.round(46 + q * 30 + size * 4), 30, 100); })();
+  ok('spec uses the strong pouch builder, not the weak fielded one', sp.close > weakOnly, 'close=' + sp.close + ' vs weak-only ' + weakOnly);
 }
 
 console.log('== TOWER ARCHER: never runs dry, fires faster, hits the biggest threat ==');
