@@ -94,8 +94,8 @@
     attackRange: 40,
     desc: 'The smallest of the Punk family, born of the Duat itself.',
     temperament: 'Highly intelligent, restless, and single-minded about raiding — it slips into an enemy’s hoard to steal, disrupt, and harass.',
-    special: 'Teleports through the Duat — often, and even through walls — and dodges 80% of attacks outright. Grabs resources instantly (a whole Duat-load at once, capacity varies), reading the enemy’s starting pouch to steal the colours they lean on, then blinks home to stash. Cannot teleport with the Relic, ever. Cannot blink into an occupied space.',
-    vars: { teleportRange: [120, 260], teleportCooldown: [2, 5], duatCapacity: [2, 6], dodge: [0.8, 0.8], stealth: [0.3, 0.9], precision: [0.5, 1] },
+    special: 'Teleports through the Duat — often, and even through walls — never runs in a straight line, and dodges 90% of attacks outright. Grabs a resource instantly and blinks home to stash it — one at a time, unless it is a Torcain, which hauls a whole Duat-load (capacity varies). Reads the enemy’s starting pouch to steal the colours they lean on. Cannot teleport with the Relic, ever. Cannot blink into an occupied space.',
+    vars: { teleportRange: [120, 260], teleportCooldown: [2, 5], duatCapacity: [2, 6], dodge: [0.9, 0.9], stealth: [0.3, 0.9], precision: [0.5, 1] },
     picks: { tendency: ['collector', 'harasser'], targetPreference: ['smallest', 'nearest', 'support'] },
   });
 

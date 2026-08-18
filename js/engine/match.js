@@ -568,13 +568,26 @@
      cone-ranged tower and a full wall ring. */
   Match.prototype.structuresList = function (team) { return this.structures.filter(s => s.team === team && s.hp > 0); };
 
+  /* The best Builder in the whole POUCH sets the blueprint — not just the ones
+     currently on the field. So a lesser builder can raise the works dimensioned
+     by a stronger one still sitting in the pouch. Considers pouch tokens and any
+     fielded builders, and returns a plain {vars, sizeIdx, picks} spec. */
   Match.prototype.bestBuilder = function (team) {
     let best = null, bestScore = -1;
+    const consider = (vars, sizeIdx, picks) => {
+      const v = vars || {};
+      const score = (v.towerQuality || 1) * (v.structureQuality || 1) * (1 + ((sizeIdx || 0)) * 0.15);
+      if (score > bestScore) { bestScore = score; best = { vars: v, sizeIdx: sizeIdx == null ? 2 : sizeIdx, picks: picks || {} }; }
+    };
+    const T = this.teams[team];
+    if (T && T.pouch) for (const e of T.pouch) {
+      const tk = e.tok; if (!tk) continue;
+      const sp = SP.get(tk.speciesId);
+      if (sp && sp.behavior === 'builder') consider(tk.vars, tk.sizeIdx, tk.picks);
+    }
     for (const c of this.creatures) {
       if (c.dead || c.team !== team || c.sp.behavior !== 'builder') continue;
-      const v = c.vars || {};
-      const score = (v.towerQuality || 1) * (v.structureQuality || 1) * (1 + (c.sizeIdx || 0) * 0.15);
-      if (score > bestScore) { bestScore = score; best = c; }
+      consider(c.vars, c.sizeIdx, c.picks);
     }
     return best;
   };
@@ -985,6 +998,13 @@
       if (d > 3) {
         c.x += dx / d * sp * TICK;
         c.y += dy / d * sp * TICK;
+        /* a Malsti Punk never runs in a straight line — it weaves side to side
+           (a perpendicular sine wobble on top of its forward motion) */
+        if (c.speciesId === 'malsti_punk' && d > 12) {
+          const wob = Math.sin(M.time * 7 + c.id) * 0.85;
+          c.x += (-dy / d) * sp * TICK * wob;
+          c.y += (dx / d) * sp * TICK * wob;
+        }
         c.x = U.clamp(c.x, 14, WORLD.w - 14); c.y = U.clamp(c.y, 14, WORLD.h - 14);
         c.facing = dx >= 0 ? 1 : -1;
         c.state = it.move.run ? 'run' : 'walk';
@@ -1228,8 +1248,8 @@
        so Punks minted BEFORE the dodge stat existed still dodge. Deterministic
        via the match rng (lockstep-safe). */
     let dodge = t.vars.dodge;
-    if (dodge == null) dodge = t.speciesId === 'malsti_punk' ? 0.8 : t.speciesId === 'wild_punk' ? 0.4 : 0;
-    if (t.speciesId === 'malsti_punk' && dodge < 0.8) dodge = 0.8;   // Malsti is always 80%
+    if (dodge == null) dodge = t.speciesId === 'malsti_punk' ? 0.9 : t.speciesId === 'wild_punk' ? 0.4 : 0;
+    if (t.speciesId === 'malsti_punk' && dodge < 0.9) dodge = 0.9;   // Malsti is always 90%
     if (dodge > 0 && M.rng.next() < dodge) {
       if (!opts.noAnim) M.addEffect('teleport', t.x, t.y - t.radius * 0.3, {});
       return;
@@ -2125,7 +2145,10 @@
         c.intent.state = 'special';
         const T = M.teams[1 - c.team];
         if (!T || resTotal(T.resources) < 1) return;
-        const cap = Math.max(1, Math.round(c.vars.duatCapacity || 4));
+        /* one resource at a time — only a Torcain-rarity Malsti hauls a bigger
+           Duat-load (its varying capacity) */
+        const isTorcain = c.tok && c.tok.rarity >= 6;
+        const cap = isTorcain ? Math.max(1, Math.round(c.vars.duatCapacity || 4)) : 1;
         const w = M.pouchElementWeights(1 - c.team);
         let grabbed = 0;
         while ((c.mem.stolen || 0) < cap && resTotal(T.resources) >= 1) {
