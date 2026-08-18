@@ -2149,9 +2149,13 @@
            Duat-load (its varying capacity) */
         const isTorcain = c.tok && c.tok.rarity >= 6;
         const cap = isTorcain ? Math.max(1, Math.round(c.vars.duatCapacity || 4)) : 1;
+        /* skim only the SURPLUS — never take a team below a working floor, so the
+           opponent can always field cheap units. Malsti deny the economy; they
+           don't lock it to zero (that made the AI "slowly stop playing"). */
+        const floor = Math.max(4, Math.round((M.settings.pulseAmount || 2) * 2));
         const w = M.pouchElementWeights(1 - c.team);
         let grabbed = 0;
-        while ((c.mem.stolen || 0) < cap && resTotal(T.resources) >= 1) {
+        while ((c.mem.stolen || 0) < cap && resTotal(T.resources) > floor) {
           let tot = 0; const wt = ELS.map(e => { const v = T.resources[e] > 0 ? (w[e] || 0.001) : 0; tot += v; return v; });
           if (tot <= 0) break;
           let r = M.rng.next() * tot, el = ELS[0];

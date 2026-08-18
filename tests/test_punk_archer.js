@@ -54,6 +54,13 @@ console.log('== MALSTI: one resource (Torcain hauls more), pouch-weighted, faste
   const cnt = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
   for (let k = 0; k < 40; k++) { tor.mem.stolen = 0; tor.mem.stolenVec = null; m.teams[1].resources = { Fti: 50, Su: 50, Eldi: 50, Ular: 50 }; api.stealResource(tor); ELS.forEach(e => cnt[e] += (tor.mem.stolenVec ? tor.mem.stolenVec[e] : 0)); }
   ok('steals the enemy pouch’s dominant colour most', cnt.Ular > cnt.Fti && cnt.Ular > cnt.Su && cnt.Ular > cnt.Eldi, JSON.stringify(cnt));
+  // the raid skims the SURPLUS but never zeroes the opponent (fixes "AI slowly stops playing")
+  m.teams[1].resources = { Fti: 1, Su: 1, Eldi: 1, Ular: 0 };  // total 3, below the floor
+  const floorPunk = m.spawnFromToken(D.token.mint({ speciesId: 'malsti_punk', rng: new U.Rng(8), rarity: 6 }), 0, m.teams[1].hoard.x, m.teams[1].hoard.y);
+  api._c = floorPunk;
+  for (let k = 0; k < 20; k++) { floorPunk.mem.stolen = 0; floorPunk.mem.stolenVec = null; api.stealResource(floorPunk); }
+  const left = ['Fti', 'Su', 'Eldi', 'Ular'].reduce((a, e) => a + m.teams[1].resources[e], 0);
+  ok('leaves a working floor — never drains the opponent to nothing', left >= 3, 'opponent left with ' + left);
 }
 
 console.log('== BUILDER SPEC: dimensioned by the best Builder in the POUCH ==');
