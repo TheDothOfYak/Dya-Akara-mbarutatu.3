@@ -10,9 +10,12 @@
      possible draw is a RubberMcFly in play (ShurgrEdan retribution
      taking both sides down, or a McFly standoff).
    - Hunt mode: encounter objectives against wild creatures.
-   - Brawl mode: multi-token, multi-team elimination — 2v2/3v3/5v5 team
-     battles and a 4-player free-for-all. Like a duel: no resources/pulse/
-     Relic, every token fielded at once, last team standing wins.
+   - Multi-team standard matches (Brawl): the ordinary standard match —
+     resources, pulses, Relics, deploy-your-tokens — but with more than two
+     teams grouped into alliances (sides). 2v2/3v3/5v5 team battles, a
+     free-for-all, and a surrounded "one team in the middle" mode all fall
+     out of the same rules. Allies never target each other; a side wins by
+     carrying any rival Relic home or by outlasting every rival side.
    ============================================================ */
 (function () {
   'use strict';
@@ -82,16 +85,23 @@
     M.events = [];         // UI-facing event feed
     M.idCounter = 1;
 
-    /* teams */
+    /* teams. `side` groups teams into alliances: allies share a side, never
+       target each other, and win or lose together. Two-team standard matches
+       leave `side` unset, so it defaults to the team index (0 vs 1) and every
+       existing match behaves exactly as before. Multi-team Brawls pass an
+       explicit side per team (e.g. a 2v2 is sides 0,0,1,1) and may override the
+       hoard position to lay the field out — teams down a side, a ring around a
+       centre, and so on. */
     M.teams = cfg.teams.map((t, i) => ({
       idx: i,
+      side: t.side != null ? t.side : i,
       name: t.name,
       accId: t.accId || null,
       controller: t.controller,             // 'human' | 'ai' | 'replay' | 'wild'
       seal: t.seal || null,
       aiSkill: t.aiSkill || 0.6,
       color: t.color || TEAM_COLORS[i % TEAM_COLORS.length],
-      hoard: teamAnchor(i, cfg.teams.length),
+      hoard: t.hoard || teamAnchor(i, cfg.teams.length),
       resources: startVec(t.startResources || 0),
       pouch: (t.pouch || []).map(tok => ({ tok, state: 'pouch', readiedAtPulse: -1, deaths: 0 })),
       readied: [],                          // pouch entries, max 5
@@ -105,8 +115,15 @@
     M.relics = M.teams.map((T2, i) => ({
       ownerTeam: i, x: T2.hoard.x, y: T2.hoard.y - 26,
       homeX: T2.hoard.x, homeY: T2.hoard.y - 26,
-      carrier: null, carrierTeam: null, captured: false, disabled: false,
+      carrier: null, carrierTeam: null, capturedBy: null, captured: false, disabled: false,
     }));
+
+    /* alliance helpers. hostile(a,b): teams a and b are on opposing sides.
+       allied(a,b): same side (a creature never friendly-fires or heals across
+       sides). Wild (-1) has no side and is hostile to everyone. */
+    M.sideOf = function (teamIdx) { const T = M.teams[teamIdx]; return T ? T.side : teamIdx; };
+    M.allied = function (a, b) { return a === b || (a !== -1 && b !== -1 && M.sideOf(a) === M.sideOf(b)); };
+    M.hostile = function (a, b) { return !M.allied(a, b); };
 
     /* terrain features → obstacles & water zones (visual + light gameplay: bogs/water flags) */
     M.props = [];
@@ -141,29 +158,8 @@
       });
     }
 
-    /* brawl mode: multi-token, multi-team elimination (2v2/3v3/5v5 and the
-       4-player free-for-all). Like a duel there is no economy, pulse or Relic —
-       every pouch token for every side takes the field at once, arranged in a
-       little line at its team's stand, facing the middle of the arena. Last
-       team standing wins. Targeting is team-relative (any other team is a foe),
-       so a free-for-all needs no special handling in combat. */
-    if (M.mode === 'brawl') {
-      M.teams.forEach((t, i) => {
-        const anchor = t.hoard;
-        const toC = Math.atan2(WORLD.h / 2 - anchor.y, WORLD.w / 2 - anchor.x);
-        const px = Math.cos(toC + Math.PI / 2), py = Math.sin(toC + Math.PI / 2);   // line perpendicular to the charge
-        const entries = t.pouch.filter(Boolean);
-        entries.forEach((entry, k) => {
-          const off = (k - (entries.length - 1) / 2) * 64;
-          const x = anchor.x + Math.cos(toC) * 84 + px * off;
-          const y = anchor.y + Math.sin(toC) * 84 + py * off;
-          M.spawnFromToken(entry.tok, i, x, y);
-        });
-      });
-    }
-
-    /* hunt/duel/brawl: no relics on the field */
-    if (M.mode === 'hunt' || M.mode === 'duel' || M.mode === 'brawl') { M.relics.forEach(r => { r.captured = true; r.disabled = true; }); }
+    /* hunt/duel: no relics on the field */
+    if (M.mode === 'hunt' || M.mode === 'duel') { M.relics.forEach(r => { r.captured = true; r.disabled = true; }); }
 
     /* hunt mode: spawn wild side */
     if (M.mode === 'hunt' && cfg.hunt) {
@@ -212,6 +208,7 @@
       tokId: tok.id, tokName: tok.name, tok,
       speciesId: sp.id, sp,
       team: teamIdx,
+      side: M.sideOf(teamIdx),
       x: U.clamp(x, 20, WORLD.w - 20), y: U.clamp(y, 20, WORLD.h - 20),
       homeX: x, homeY: y,
       facing: teamIdx === 0 ? 1 : -1,
@@ -349,18 +346,26 @@
       /* Hunts: deploy your party whenever you like — no same-pulse hold. */
       if (M.mode !== 'hunt' && entry.readiedAtPulse === M.pulseIndex) { M.uiEvent(team, 'deny', 'Cannot trigger in the same pulse it was readied.'); return; }
       let x = input.x, y = input.y;
-      const eh = M.teams[1 - team].hoard;
-      if (U.dist(x, y, eh.x, eh.y) < 130) { const a = Math.atan2(y - eh.y, x - eh.x); x = eh.x + Math.cos(a) * 130; y = eh.y + Math.sin(a) * 130; }
+      /* you can't deploy on top of a HOSTILE hoard (an ally's is fine) */
+      for (let ti = 0; ti < M.teams.length; ti++) {
+        if (!M.hostile(team, ti)) continue;
+        const eh = M.teams[ti].hoard;
+        if (U.dist(x, y, eh.x, eh.y) < 130) { const a = Math.atan2(y - eh.y, x - eh.x); x = eh.x + Math.cos(a) * 130; y = eh.y + Math.sin(a) * 130; break; }
+      }
       /* a completed enemy wall ring seals the ground inside it — you cannot
          deploy there. A Malsti Punk is the exception: it blinks in through the
          Duat. Anyone else is nudged out to just beyond the nearest wall. */
       if (entry.tok.speciesId !== 'malsti_punk') {
-        const enc = M.wallEnclosure(1 - team);
-        if (enc && x > enc.minX && x < enc.maxX && y > enc.minY && y < enc.maxY) {
-          const dl = x - enc.minX, dr = enc.maxX - x, dt = y - enc.minY, db = enc.maxY - y, mn = Math.min(dl, dr, dt, db);
-          if (mn === dl) x = enc.minX - 16; else if (mn === dr) x = enc.maxX + 16; else if (mn === dt) y = enc.minY - 16; else y = enc.maxY + 16;
-          x = U.clamp(x, 20, WORLD.w - 20); y = U.clamp(y, 20, WORLD.h - 20);
-          M.uiEvent(team, 'deny', 'Their walls seal the ground — deploy pushed outside.');
+        for (let ti = 0; ti < M.teams.length; ti++) {
+          if (!M.hostile(team, ti)) continue;
+          const enc = M.wallEnclosure(ti);
+          if (enc && x > enc.minX && x < enc.maxX && y > enc.minY && y < enc.maxY) {
+            const dl = x - enc.minX, dr = enc.maxX - x, dt = y - enc.minY, db = enc.maxY - y, mn = Math.min(dl, dr, dt, db);
+            if (mn === dl) x = enc.minX - 16; else if (mn === dr) x = enc.maxX + 16; else if (mn === dt) y = enc.minY - 16; else y = enc.maxY + 16;
+            x = U.clamp(x, 20, WORLD.w - 20); y = U.clamp(y, 20, WORLD.h - 20);
+            M.uiEvent(team, 'deny', 'Their walls seal the ground — deploy pushed outside.');
+            break;
+          }
         }
       }
       T.readied.splice(input.slot, 1);
@@ -374,19 +379,7 @@
         c.mem.fedUntil = M.tick + Math.round((6 + (c.vars.foodMotivation || 0.5) * 8) / TICK);
       }
     } else if (input.type === 'concede') {
-      let winner = 1 - team;
-      /* free-for-all: there is no single "other" side, so credit the strongest
-         surviving rival with the win the conceding player hands over */
-      if (M.mode === 'brawl' && M.teams.length > 2) {
-        let best = -1, bf = -1;
-        M.teams.forEach((T2, i) => {
-          if (i === team) return;
-          const f = M.creatures.filter(c => !c.dead && c.team === i).reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0);
-          if (f > bf) { bf = f; best = i; }
-        });
-        if (best >= 0) winner = best;
-      }
-      M.finish(winner, 'concede');
+      M.concede(team);
     } else if (input.type === 'chat') {
       M.uiEvent(team, 'chat', input.msg);
     }
@@ -435,8 +428,8 @@
       }
     }
 
-    /* pulses (standard + hunt) — none in the resource-free duel/brawl modes */
-    if (M.mode !== 'duel' && M.mode !== 'brawl' && M.time >= M.nextPulseAt) M.doPulse();
+    /* pulses (standard + hunt) */
+    if (M.mode !== 'duel' && M.time >= M.nextPulseAt) M.doPulse();
 
     /* AI controllers */
     M.teams.forEach(T => { if (T.controller === 'ai' && !M.cfg.replayLog) M.aiThink(T); });
@@ -470,7 +463,7 @@
            jet, breath, tongue, hanii…) fires in duels too; we only force the
            creature onto the nearest foe when its brain produced no attack or
            ability this tick, so a duel can never stall on patrol/forage/flee. */
-        if (M.mode === 'duel' || M.mode === 'brawl') {
+        if (M.mode === 'duel') {
           const acting = c.state === 'special' || c.state === 'attack' || c.intent.state === 'special' || !!c.intent.attackTarget;
           if (!acting) {
             const foe = api.nearestEnemy(c, 99999);
@@ -555,7 +548,7 @@
       if (e.state === 'attack' || e.state === 'special') continue;
       /* no enemy right on top of it → close the distance and mount */
       let threatened = false;
-      for (const o of M.creatures) { if (!o.dead && o.team !== e.team && o.team !== -1 && U.dist(e.x, e.y, o.x, o.y) < 120) { threatened = true; break; } }
+      for (const o of M.creatures) { if (!o.dead && o.side !== e.side && o.team !== -1 && U.dist(e.x, e.y, o.x, o.y) < 120) { threatened = true; break; } }
       if (threatened) continue;
       const dx = best.x - e.x, dy = best.y - e.y, d = Math.hypot(dx, dy) || 1;
       const step = e.speed * (bd > 130 ? 1.35 : 1) * TICK;
@@ -666,7 +659,7 @@
   /* clock-face geometry around the hoard, oriented so 3 o’clock faces the enemy */
   Match.prototype._clock = function (team, hour, r) {
     const own = this.teams[team].hoard;
-    const foe = this.teams[1 - team] ? this.teams[1 - team].hoard : own;
+    const foe = this.nearestFoeHoard(team) || own;
     const dir = Math.sign(foe.x - own.x) || 1;
     const ang = (hour / 12) * Math.PI * 2;      // from 12 o’clock, clockwise
     let dx = Math.sin(ang) * r, dy = -Math.cos(ang) * r;
@@ -682,7 +675,7 @@
   Match.prototype.builderBlueprints = function (team) {
     const sp = this.builderSpec(team);
     const own = this.teams[team].hoard;
-    const foe = this.teams[1 - team] ? this.teams[1 - team].hoard : own;
+    const foe = this.nearestFoeHoard(team) || own;
     const dir = Math.sign(foe.x - own.x) || 1;
     const R = 96 + sp.radius;
     const level = this.fortLevel(team);
@@ -726,9 +719,9 @@
   Match.prototype.raiseStructure = function (c, bp) {
     const M = this, sp = bp.spec || M.builderSpec(c.team);
     const q = (c.vars && c.vars.structureQuality) || 1;
-    const foe = M.teams[1 - c.team] ? M.teams[1 - c.team].hoard : M.teams[c.team].hoard;
+    const foe = M.nearestFoeHoard(c.team) || M.teams[c.team].hoard;
     const s = { id: 'st' + (M.idCounter++), type: bp.kind === 'wall' ? 'wall' : bp.kind === 'ward' ? 'ward' : 'tower',
-      kind: bp.kind, role: bp.role, team: c.team, x: bp.x, y: bp.y, occupants: [], quality: q, upgraded: false, powerMul: 1, fireCd: 0,
+      kind: bp.kind, role: bp.role, team: c.team, side: M.sideOf(c.team), x: bp.x, y: bp.y, occupants: [], quality: q, upgraded: false, powerMul: 1, fireCd: 0,
       face: Math.sign(foe.x - bp.x) || 1 };
     if (bp.kind === 'wall') {
       const vert = !bp.extra || bp.extra.vertical !== false;   // front/back walls run vertically; ring sides horizontally
@@ -1040,7 +1033,7 @@
       if (c.speciesId === 'mikolo_moko' && !c.carryingRelic) sp *= c.vars.sprint || 1.3;
       if (c.speciesId === 'tyndael') sp *= 0.7 + c.heat * 0.6;
       if (c.speciesId === 'harkal') sp *= 1 + c.frenzy * 0.4;
-      const inBog = M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r);
+      const inBog = M.zones.some(z => z.type === 'bog' && M.hostile(c.team, z.team) && U.dist(c.x, c.y, z.x, z.y) < z.r);
       if (inBog && !c.sp.tags.includes('flyer') && !(c.quirks && c.quirks.bog_raised)) sp *= 0.45;
       /* water pools: aquatic/flying pass freely, ground-only creatures slow (§15) */
       const inWater = M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r);
@@ -1086,7 +1079,7 @@
             if (c.mem.charge >= 1) {
               c.mem.charge = 0;
               M.addEffect('electric', t.x, t.y, {});
-              M.creatures.forEach(o => { if (!o.dead && o.team !== c.team && U.dist(t.x, t.y, o.x, o.y) < 50) M.damage(o, c.vars.electricPotency, c); });
+              M.creatures.forEach(o => { if (!o.dead && o.side !== c.side && U.dist(t.x, t.y, o.x, o.y) < 50) M.damage(o, c.vars.electricPotency, c); });
             }
           }
           if (c.speciesId === 'harkal') c.frenzy = Math.min(1, c.frenzy + 0.15);
@@ -1131,7 +1124,7 @@
       if (M.time >= c.mem.rockAt) {
         let best = null, bd = 260;
         for (const o of M.creatures) {
-          if (o.dead || o.team === c.team || o.sp.rig === 'relic') continue;
+          if (o.dead || o.side === c.side || o.sp.rig === 'relic') continue;
           const d2 = U.dist(c.x, c.y, o.x, o.y);
           if (d2 < bd && d2 > c.attackRange + c.radius) { bd = d2; best = o; }
         }
@@ -1191,7 +1184,7 @@
         /* feed a wounded ally — mounts first (an Eikar feeds its Byrd) */
         let target = null;
         for (const o of M.creatures) {
-          if (o.dead || o === c || o.team !== c.team || o.hp >= o.maxHp * 0.7) continue;
+          if (o.dead || o === c || o.side !== c.side || o.hp >= o.maxHp * 0.7) continue;
           if (U.dist(c.x, c.y, o.x, o.y) > 70) continue;
           if (!target || (o.sp.tags.includes('mount') && !target.sp.tags.includes('mount'))) target = o;
         }
@@ -1262,7 +1255,7 @@
     if (q.pack_raised || q.loner) {
       let allies = 0;
       for (const o of M.creatures) {
-        if (o.dead || o === c || o.team !== c.team) continue;
+        if (o.dead || o === c || o.side !== c.side) continue;
         if (U.dist(c.x, c.y, o.x, o.y) < (q.loner ? 200 : 160)) { allies++; if (allies >= 2) break; }
       }
       if (q.pack_raised) m *= 1 + 0.08 * allies;
@@ -1275,7 +1268,7 @@
     if (q.duelist) {
       let foes = 0;
       for (const o of M.creatures) {
-        if (o.dead || o.team === c.team || o.sp.tags.includes('passive')) continue;
+        if (o.dead || o.side === c.side || o.sp.tags.includes('passive')) continue;
         if (U.dist(c.x, c.y, o.x, o.y) < 220) { foes++; if (foes >= 2) break; }
       }
       m *= foes === 1 ? 1.15 : foes >= 2 ? 0.95 : 1; /* sharp alone, sloppy in a brawl */
@@ -1400,12 +1393,12 @@
     if (c.riderUnit) M.dismountRider(c, true);
     if (c.mountedOn != null) { const mt = M.creatures.find(o => o.id === c.mountedOn); if (mt && mt.riderUnit === c) M.dismountRider(mt, false); }
     if (!M.headless) DYA.audio.play('death');
-    if (source && source.team !== c.team && M.teams[source.team]) M.teams[source.team].stats.eliminations++;
+    if (source && source.side !== c.side && M.teams[source.team]) M.teams[source.team].stats.eliminations++;
     if (source && !source.dead) source.matchXp = (source.matchXp || 0) + 25; // kill XP (§2)
 
     /* feeding: a predator eats what it kills — the meal closes wounds,
        and a Naga's feeding hurries the growth of its next head */
-    if (source && !source.dead && cause === 'combat' && source.team !== c.team &&
+    if (source && !source.dead && cause === 'combat' && source.side !== c.side &&
         (source.sp.tags.includes('carnivore') || source.sp.tags.includes('omnivore')) &&
         !c.sp.tags.includes('inert') && !c.sp.features.fruit && c.speciesId !== 'sprengju') {
       source.hp = Math.min(source.maxHp, source.hp + Math.min(source.maxHp * 0.25, c.maxHp * 0.12));
@@ -1417,7 +1410,7 @@
 
     /* vengeful quirk: nearby allies of the fallen enter a brief fury */
     for (const o of M.creatures) {
-      if (o.dead || o === c || o.team !== c.team) continue;
+      if (o.dead || o === c || o.side !== c.side) continue;
       if (o.quirks && o.quirks.vengeful && U.dist(o.x, o.y, c.x, c.y) < 180) {
         o.mem.vengeUntil = M.time + 6;
         M.addEffect('buff', o.x, o.y, {});
@@ -1486,7 +1479,7 @@
       p.x += p.vx * TICK; p.y += p.vy * TICK; p.life -= TICK;
       let hit = false;
       for (const c of M.creatures) {
-        if (c.dead || c.team === p.team) continue;
+        if (c.dead || M.allied(c.team, p.team)) continue;
         if (U.dist(p.x, p.y, c.x, c.y) < c.radius + 5) {
           M.damage(c, p.dmg, p.source);
           if (p.type === 'jet' && c.sizeIdx <= 1) {
@@ -1514,7 +1507,7 @@
     M.zones.forEach(z => {
       if (z.type === 'bog') {
         M.creatures.forEach(c => {
-          if (!c.dead && c.team !== z.team && !c.sp.tags.includes('flyer') && U.dist(c.x, c.y, z.x, z.y) < z.r) {
+          if (!c.dead && M.hostile(c.team, z.team) && !c.sp.tags.includes('flyer') && U.dist(c.x, c.y, z.x, z.y) < z.r) {
             M.damage(c, z.potency * 0.5, z.owner && !z.owner.dead ? z.owner : null, { noAnim: true });
           }
         });
@@ -1564,7 +1557,7 @@
         if (s.type === 'wall') {
           const hw = (s.w || 22) / 2, hh = (s.h || 64) / 2;
           for (const c of M.creatures) {
-            if (c.dead || c.team === s.team || c.rooted || c.onTower || c.inHut) continue;
+            if (c.dead || M.allied(c.team, s.team) || c.rooted || c.onTower || c.inHut) continue;
             if (c.sp.tags.includes('flyer') || (c.sp.features && c.sp.features.hover)) continue; // flyers pass over
             if (c.speciesId === 'malsti_punk') {   // a Malsti Punk blinks through the wall via the Duat
               if (Math.abs(c.x - s.x) < hw + c.radius && Math.abs(c.y - s.y) < hh + c.radius && M.tick % 12 === 0) M.addEffect('teleport', c.x, c.y, {});
@@ -1617,7 +1610,7 @@
             if (c.dead) continue;
             const d = U.dist(c.x, c.y, s.x, s.y);
             if (d > aura) continue;
-            if (c.team === s.team) c.fortifiedUntil = M.tick + 3;
+            if (M.allied(c.team, s.team)) c.fortifiedUntil = M.tick + 3;
             else if (c.camoUntil > M.tick && ((c.vars.camo || c.vars.stealth || 0) < 0.5)) c.camoUntil = M.tick;   // elevated sight only pierces light camo (<50)
           }
         } else if (s.kind === 'wallTower') {
@@ -1626,7 +1619,7 @@
           else {
             let best = null, bd = (s.range || 50) + 1;
             for (const c of M.creatures) {
-              if (c.dead || c.team === s.team || c.onTower || c.riding || c.inHut) continue;
+              if (c.dead || M.allied(c.team, s.team) || c.onTower || c.riding || c.inHut) continue;
               const d = U.dist(s.x, s.y, c.x, c.y);
               if (d < bd && !M.losBlocked(s.x, s.y, c.x, c.y, s.team)) { bd = d; best = c; }
             }
@@ -1643,7 +1636,7 @@
         const reach = (s.radius || Math.max(s.w || 22, s.h || 40) / 2);
         let siege = 0;
         for (const c of M.creatures) {
-          if (c.dead || c.team === s.team || c.onTower || c.inHut || c.sp.tags.includes('passive') || c.dmg <= 0) continue;
+          if (c.dead || M.allied(c.team, s.team) || c.onTower || c.inHut || c.sp.tags.includes('passive') || c.dmg <= 0) continue;
           if (U.dist(c.x, c.y, s.x, s.y) < reach + c.radius + 6) siege += c.dmg;
         }
         if (siege > 0) { s.hp -= siege * TICK * 0.5; if (s.hp <= 0) { s.hp = 0; M.freeOccupants(s); M.uiEvent(-1, 'event', 'A ' + (s.isHut ? 'Builder’s Hut' : s.kind === 'wallTower' ? 'wall-tower' : 'tower') + ' is torn down.'); } }
@@ -1676,9 +1669,9 @@
       for (const cm of M.creatures) {
         if (cm.dead || !cm.isCommander) continue;
         const myRelic = M.relics.find(r => r.ownerTeam === cm.team);
-        const foeRelic = M.relics.find(r => r.ownerTeam !== cm.team);
+        const foeRelic = M.nearestFoeRelic(cm.team, cm.x, cm.y);
         let call = null;
-        if (myRelic && myRelic.carrier != null && myRelic.carrierTeam !== cm.team) {
+        if (myRelic && myRelic.carrier != null && !M.allied(myRelic.carrierTeam, cm.team)) {
           call = 'INTERCEPT THE THIEF';
           for (const o of M.creatures) {
             if (o.dead || o.team !== cm.team || o === cm || o.rooted) continue;
@@ -1693,7 +1686,7 @@
           }
         } else {
           const hoard = M.teams[cm.team] && M.teams[cm.team].hoard;
-          if (hoard && M.creatures.some(o => !o.dead && o.team !== cm.team && !o.sp.tags.includes('passive') && U.dist(o.x, o.y, hoard.x, hoard.y) < 240)) {
+          if (hoard && M.creatures.some(o => !o.dead && o.side !== cm.side && !o.sp.tags.includes('passive') && U.dist(o.x, o.y, hoard.x, hoard.y) < 240)) {
             call = 'HOLD THE HOARD';
             for (const o of M.creatures) {
               if (o.dead || o.team !== cm.team) continue;
@@ -1720,7 +1713,7 @@
           if (car && !car.dead) {
             const own = M.teams[car.team].hoard;
             if (U.dist(car.x, car.y, own.x, own.y) < HOARD_R) {
-              rl.captured = true; rl.x = own.x; rl.y = own.y - 26;
+              rl.captured = true; rl.capturedBy = car.team; rl.x = own.x; rl.y = own.y - 26;
               car.carryingRelic = false; rl.carrier = null;
               car.matchXp = (car.matchXp || 0) + 40;
               M.teams[car.team].stats.relicCaptured = true;
@@ -1757,27 +1750,6 @@
   Match.prototype.checkEnd = function () {
     const M = this;
     if (M.over) return;
-
-    if (M.mode === 'brawl') {
-      /* let any pending ShurgrEdan retribution land before the call */
-      if (M._timeouts && M._timeouts.length) return;
-      const alive = M.teams.map((T, i) => M.creatures.some(c => !c.dead && c.team === i));
-      const standing = alive.map((a, i) => (a ? i : -1)).filter(i => i >= 0);
-      if (standing.length === 1) { M.finish(standing[0], 'brawl'); return; }
-      if (standing.length === 0) { M.finish(-1, 'draw'); return; }
-      /* stalemate guard (mirrors the duel): tokens that cannot reach or hurt
-         each other are called on condition — the team with the most total
-         health remaining takes it. */
-      if (M.time > 90 && (M.tick - M.lastCombatTick) > Math.round(90 / TICK)) {
-        const frac = (team) => M.creatures.filter(c => !c.dead && c.team === team)
-          .reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0);
-        let best = standing[0], bf = -1;
-        standing.forEach(i => { const f = frac(i); if (f > bf) { bf = f; best = i; } });
-        M.finish(best, 'condition');
-        return;
-      }
-      return;
-    }
 
     if (M.mode === 'duel') {
       /* a pending ShurgrEdan strike (RubberMcFly retribution) must land
@@ -1822,20 +1794,84 @@
       return;
     }
 
-    /* standard: win = the opponent's relic sits in your hoard (all of them
-       in multiplayer; in 1v1 that is the single enemy relic) */
+    /* standard: a side wins by carrying a rival's Relic into one of its hoards.
+       In 1v1 that is the single enemy relic; in a multi-team Brawl it is any
+       hostile side's relic, and the winner is the side that carried it home. */
     for (const rl of M.relics) {
       if (rl.captured && !rl.disabled) {
-        const winner = 1 - rl.ownerTeam;
+        const winner = rl.capturedBy != null ? rl.capturedBy : (1 - rl.ownerTeam);
         M.finish(winner, 'relic');
         return;
       }
     }
-    /* draw: both pouches empty AND all field creatures semi-idle 5 straight minutes */
+    /* multi-team Brawl: last side standing also wins — a side is out once it
+       has no creature on the field and nothing left to deploy. (Two-team
+       standard keeps its original relic-or-draw ending, unchanged.) */
+    if (M.teams.length > 2) {
+      const sidesIn = M.sidesInPlay();
+      if (sidesIn.length === 1) { M.finish(M.anyTeamOnSide(sidesIn[0]), 'elimination'); return; }
+      if (sidesIn.length === 0) { M.finish(-1, 'draw'); return; }
+    }
+    /* draw: all pouches empty AND all field creatures semi-idle 5 straight minutes */
     const bothEmpty = M.teams.every(T => T.controller === 'wild' || (!T.pouch.some(e => e.state === 'pouch') && !T.readied.length));
     if (bothEmpty && (M.tick - M.lastCombatTick) > Math.round(300 / TICK)) {
       M.finish(-1, 'draw');
     }
+  };
+
+  /* --- alliance / multi-team helpers (used by combat, AI, and end conditions) --- */
+  /* the nearest hostile side's relic that can still be taken, within `range`
+     (unbounded if range omitted) — never an ally's or your own */
+  Match.prototype.nearestFoeRelic = function (team, x, y, range) {
+    const M = this;
+    let best = null, bd = range != null ? range : 1e9;
+    for (const r of M.relics) {
+      if (r.disabled || r.captured || r.carrier != null) continue;
+      if (!M.hostile(team, r.ownerTeam)) continue;
+      const d = U.dist(x, y, r.x, r.y);
+      if (d <= bd && d < (best ? bd : 1e9)) { bd = d; best = r; }
+    }
+    return best;
+  };
+  /* the nearest hostile side's hoard to `team`'s own hoard (for builder facing,
+     AI push targets, etc.) */
+  Match.prototype.nearestFoeHoard = function (team) {
+    const M = this, own = M.teams[team] && M.teams[team].hoard;
+    let best = null, bd = 1e9;
+    M.teams.forEach((T, i) => {
+      if (T.controller === 'wild' || !M.hostile(team, i)) return;
+      const d = own ? U.dist(own.x, own.y, T.hoard.x, T.hoard.y) : 0;
+      if (d < bd) { bd = d; best = T.hoard; }
+    });
+    return best;
+  };
+  /* a side is "still in" if any of its teams has a living creature or something
+     left to deploy; returns the distinct sides still in play */
+  Match.prototype.sidesInPlay = function () {
+    const M = this, sides = [];
+    M.teams.forEach((T, i) => {
+      if (T.controller === 'wild') return;
+      const alive = M.creatures.some(c => !c.dead && c.team === i && !c.sp.tags.includes('passive'));
+      const left = T.pouch.some(e => e.state === 'pouch') || T.readied.length > 0;
+      if ((alive || left) && sides.indexOf(T.side) < 0) sides.push(T.side);
+    });
+    return sides;
+  };
+  Match.prototype.anyTeamOnSide = function (side) {
+    const M = this, T = M.teams.find(t => t.side === side);
+    return T ? T.idx : 0;
+  };
+  /* a player leaves the match: their whole side forfeits. Credit the win to the
+     strongest surviving rival side (its representative team). */
+  Match.prototype.concede = function (team) {
+    const M = this, mySide = M.sideOf(team);
+    let bestSide = null, bf = -1;
+    M.teams.forEach((T, i) => {
+      if (T.side === mySide) return;
+      const f = M.creatures.filter(c => !c.dead && c.team === i).reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0.001);
+      if (f > bf) { bf = f; bestSide = T.side; }
+    });
+    M.finish(bestSide != null ? M.anyTeamOnSide(bestSide) : (1 - team), 'concede');
   };
 
   /* accumulate a creature's in-match XP/growth against its source token
@@ -1859,7 +1895,7 @@
     M.over = true;
     M.creatures.forEach(c => M.recordTokenXp(c));
     M.result = {
-      winner: winnerIdx, how,
+      winner: winnerIdx, winnerSide: winnerIdx >= 0 ? M.sideOf(winnerIdx) : -1, how,
       duration: M.time,
       stats: M.teams.map(T => T.stats),
       tokenXp: M.tokenXp || {},
@@ -1921,18 +1957,20 @@
          ENEMY's relic (the thing it can steal). */
       relic: (team) => {
         const t = team != null ? team : (api._c ? api._c.team : 0);
-        return M.relics.find(r => r.ownerTeam !== t && !r.disabled) || { x: WORLD.w / 2, y: WORLD.h / 2, captured: true, disabled: true, carrier: null };
+        const c = api._c;
+        return M.nearestFoeRelic(t, c ? c.x : M.teams[t].hoard.x, c ? c.y : M.teams[t].hoard.y)
+          || { x: WORLD.w / 2, y: WORLD.h / 2, captured: true, disabled: true, carrier: null };
       },
       ownRelic: (team) => M.relics.find(r => r.ownerTeam === team && !r.disabled) || null,
       losBlocked: (x1, y1, x2, y2, team) => M.losBlocked(x1, y1, x2, y2, team),
       ownHoard: (team) => M.teams[team] ? M.teams[team].hoard : M.teams[0].hoard,
-      enemyHoard: (team) => M.teams[1 - team] ? M.teams[1 - team].hoard : M.teams[0].hoard,
+      enemyHoard: (team) => M.nearestFoeHoard(team) || M.teams[0].hoard,
       teamRes: (team) => M.teams[team].resources,
       structuresOf: (team, type) => M.structures.filter(s => s.team === team && (!type || s.type === type) && s.hp > 0),
       rolesInProgress: (team) => M.creatures.filter(o => !o.dead && o.team === team && o.mem.building && o.mem.building.bp).map(o => o.mem.building.bp.role),
       storm: () => M.zikhron(),
       makariRemnants: () => M.remnants,
-      inBog: (c) => M.zones.some(z => z.type === 'bog' && z.team !== c.team && U.dist(c.x, c.y, z.x, z.y) < z.r),
+      inBog: (c) => M.zones.some(z => z.type === 'bog' && M.hostile(c.team, z.team) && U.dist(c.x, c.y, z.x, z.y) < z.r),
       inWater: (c) => M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r),
       nearestPickup: (c, range) => {
         let best = null, bd = range || 200;
@@ -1946,12 +1984,12 @@
       offCooldown: (c, key) => !c.mem['cd_' + key] || c.mem['cd_' + key] <= M.tick,
 
       enemiesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && !o.riding && !o.onTower && !o.inHut && o.team !== c.team && o.team !== -1 &&
+        return M.creatures.filter(o => !o.dead && !o.riding && !o.onTower && !o.inHut && o.side !== c.side && o.team !== -1 &&
           !(o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) &&
           U.dist(c.x, c.y, o.x, o.y) < range && !o.sp.tags.includes('inert'));
       },
       alliesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && !o.riding && o !== c && o.team === c.team && U.dist(c.x, c.y, o.x, o.y) < range);
+        return M.creatures.filter(o => !o.dead && !o.riding && o !== c && o.side === c.side && U.dist(c.x, c.y, o.x, o.y) < range);
       },
       allCreaturesNear(c, range) {
         return M.creatures.filter(o => !o.dead && !o.riding && o !== c && U.dist(c.x, c.y, o.x, o.y) < range);
@@ -1959,7 +1997,7 @@
       nearestEnemy(c, range, filter) {
         let best = null, bd = 1e9;
         for (const o of M.creatures) {
-          if (o.dead || o.riding || o.onTower || o.inHut || o.team === c.team || o.team === -1) continue;
+          if (o.dead || o.riding || o.onTower || o.inHut || o.side === c.side || o.team === -1) continue;
           if (o.sp && o.sp.tags.includes('inert')) continue;
           if (o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) continue;
           if (filter && !filter(o)) continue;
@@ -2051,7 +2089,7 @@
         if (!M.headless) DYA.audio.play('screech');
         const power = c.vars.screechPower || 2;
         if (c.picks.screechType === 'area') {
-          M.creatures.forEach(o => { if (!o.dead && o.team !== c.team && U.dist(c.x, c.y, o.x, o.y) < 160) o.stunnedUntil = M.tick + Math.round(power * 0.7 / TICK); });
+          M.creatures.forEach(o => { if (!o.dead && o.side !== c.side && U.dist(c.x, c.y, o.x, o.y) < 160) o.stunnedUntil = M.tick + Math.round(power * 0.7 / TICK); });
         } else {
           target.stunnedUntil = M.tick + Math.round(power / TICK);
         }
@@ -2168,18 +2206,17 @@
         }
       },
 
-      /* relic (steals the ENEMY relic only) */
+      /* relic (steals a HOSTILE side's relic only — never an ally's) */
       pickRelic(c) {
-        const rl = M.relics.find(r => r.ownerTeam !== c.team && !r.disabled && !r.captured && r.carrier == null);
+        const rl = M.nearestFoeRelic(c.team, c.x, c.y, RELIC_PICK_R + c.radius);
         if (!rl) return;
-        if (U.dist(c.x, c.y, rl.x, rl.y) > RELIC_PICK_R + c.radius) return;
         /* a standing Relic Ward seals the relic — break it first */
         const ward = M.structures.find(s => s.type === 'ward' && s.team === rl.ownerTeam && s.hp > 0 && U.dist(s.x, s.y, rl.x, rl.y) < (s.radius || 66) + 30);
         if (ward) { if (c.team === 0 || M.tick % 40 === 0) M.uiEvent(c.team, 'deny', 'The Relic Ward holds — break it first.'); return; }
         rl.carrier = c.id; rl.carrierTeam = c.team;
         c.carryingRelic = true;
         c.matchXp = (c.matchXp || 0) + 15;
-        M.uiEvent(-1, 'relic', c.tokName + ' grabs ' + (rl.ownerTeam === 0 ? 'YOUR' : 'the enemy') + ' Relic!');
+        M.uiEvent(-1, 'relic', c.tokName + ' grabs ' + (rl.ownerTeam === 0 ? 'YOUR' : (M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].name + '’s' : 'the enemy')) + ' Relic!');
         if (!M.headless) DYA.audio.play('relicPick');
       },
       dropRelic(c) {
@@ -2216,8 +2253,15 @@
          colours the enemy's starting pouch leans on, then books it home. */
       stealResource(c) {
         c.intent.state = 'special';
-        const T = M.teams[1 - c.team];
+        /* raid the nearest HOSTILE side's hoard (never an ally's) */
+        let T = null, bd = 1e9;
+        M.teams.forEach((t2, i) => {
+          if (t2.controller === 'wild' || !M.hostile(c.team, i)) return;
+          const d = U.dist(c.x, c.y, t2.hoard.x, t2.hoard.y);
+          if (d < bd) { bd = d; T = t2; }
+        });
         if (!T || resTotal(T.resources) < 1) return;
+        const tgtIdx = T.idx;
         /* one resource at a time — only a Torcain-rarity Malsti hauls a bigger
            Duat-load (its varying capacity) */
         const isTorcain = c.tok && c.tok.rarity >= 6;
@@ -2226,7 +2270,7 @@
            opponent can always field cheap units. Malsti deny the economy; they
            don't lock it to zero (that made the AI "slowly stop playing"). */
         const floor = Math.max(4, Math.round((M.settings.pulseAmount || 2) * 2));
-        const w = M.pouchElementWeights(1 - c.team);
+        const w = M.pouchElementWeights(tgtIdx);
         let grabbed = 0;
         while ((c.mem.stolen || 0) < cap && resTotal(T.resources) > floor) {
           let tot = 0; const wt = ELS.map(e => { const v = T.resources[e] > 0 ? (w[e] || 0.001) : 0; tot += v; return v; });
@@ -2374,19 +2418,18 @@
   /* ================= AI OPPONENT CONTROLLER ================= */
   Match.prototype.aiThink = function (T) {
     const M = this;
-    /* Duel and Brawl have no economy to run — every token is already on the
-       field fighting to elimination — and a free-for-all has more than two
-       teams (so the 1-team-vs-the-other bookkeeping below wouldn't hold). */
-    if (M.mode === 'duel' || M.mode === 'brawl') return;
     if (M.time < T.aiMem.nextThink) return;
     const skill = T.aiSkill;
 
     /* ---------- read the field ---------- */
+    /* enemy = any HOSTILE side (not just team 1); the AI aims at the nearest
+       rival hoard and the nearest takeable rival relic, so the same controller
+       drives a 1v1, a team battle, or a free-for-all. */
     const myCreatures = M.creatures.filter(c => !c.dead && c.team === T.idx);
-    const enemyCreatures = M.creatures.filter(c => !c.dead && c.team === 1 - T.idx);
-    const own = T.hoard, enemy = M.teams[1 - T.idx].hoard;
+    const enemyCreatures = M.creatures.filter(c => !c.dead && M.hostile(T.idx, c.team));
+    const own = T.hoard, enemy = M.nearestFoeHoard(T.idx) || own;
     const myRelic = M.relics.find(r => r.ownerTeam === T.idx);
-    const enemyRelic = M.relics.find(r => r.ownerTeam !== T.idx);
+    const enemyRelic = M.nearestFoeRelic(T.idx, own.x, own.y) || M.relics.find(r => M.hostile(T.idx, r.ownerTeam) && !r.disabled);
     /* the thief: an enemy creature carrying MY relic home */
     const thief = myRelic && myRelic.carrier != null ? M.creatures.find(c => c.id === myRelic.carrier && !c.dead) : null;
     /* my carrier: my creature hauling THEIR relic toward my hoard */
@@ -2579,5 +2622,5 @@
     });
   };
 
-  DYA.match = { Match, TICK, WORLD, HOARD_R };
+  DYA.match = { Match, TICK, WORLD, HOARD_R, TEAM_COLORS };
 })();

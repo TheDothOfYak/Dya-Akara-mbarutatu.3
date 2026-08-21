@@ -125,7 +125,7 @@
       grid.appendChild(bigCard('🌐', 'Matchmaking Queue', 'Casual queue — matched with the next player near your level. No rank implications.', () => UI.requireOnline(() => P.matchmakingFlow())));
       grid.appendChild(bigCard('🤝', 'Private Match', 'Invite a friend, or share a room code.', () => UI.requireOnline(() => P.privateFlow())));
       grid.appendChild(bigCard('⚔', 'Duel', '1 token vs 1 token. No resources, no Relic. Anything can be wagered. No Guild cut.', () => P.duelFlow()));
-      grid.appendChild(bigCard('🛡', 'Brawl', 'Squad battles against the machine — 2v2, 3v3, 5v5, or a 4-player free-for-all. Field your team all at once. Last team standing wins.', () => P.brawlFlow()));
+      grid.appendChild(bigCard('🛡', 'Brawl', 'A full match with more players — 2v2/3v3/5v5 team battles, a free-for-all, or a surrounded last stand. Resources, pulses and Relics, vs the machine.', () => P.brawlFlow()));
       grid.appendChild(bigCard('👁', 'Spectate', 'Watch a public match in progress. React freely; the players never see it.', () => UI.requireOnline(() => P.spectateFlow())));
       grid.appendChild(bigCard('🎞', 'Replays', 'Your last 50 casual matches and every tournament match, stored as seed + inputs.', () => P.replayList()));
       body.appendChild(grid);
@@ -1363,17 +1363,24 @@
       let MY = (cfg && cfg.myTeam) || 0;
       const NET = cfg && cfg.net;
       let T0 = M.teams[MY];
-      let OPP = M.teams[1 - MY];
+      /* "OPP" is the primary rival to name in the HUD. In a 1v1 that is the
+         other team; in a multi-team Brawl it is any hostile team (the nearest
+         other side), used only for labels — real hostility is side-based. */
+      const foeTeam = () => {
+        for (let i = 0; i < M.teams.length; i++) if (i !== MY && (!M.hostile || M.hostile(MY, i))) return M.teams[i];
+        return M.teams[1 - MY] || M.teams[0];
+      };
+      let OPP = foeTeam();
       const isDuel = M.mode === 'duel';
-      /* Brawl (2v2/3v3/5v5, 4-player FFA): like a duel, every token is already
-         on the field fighting to elimination, so there is no token wheel or
-         readied board to command — you watch your squad win or fall. */
-      const isBrawl = M.mode === 'brawl';
+      /* a multi-team Brawl (2v2/3v3/5v5, free-for-all, surrounded) is an
+         ordinary standard match with more than two sides — the wheel, economy,
+         pulses and Relics all work as normal. */
+      const isMulti = M.teams.length > 2;
       /* Hunts: the party you brought deploys for free, any time — no resource
          cost and no re-ready tax. The wheel reflects that (no cost row, always
          ready-able up to the 5-slot board limit). */
       const isHunt = M.mode === 'hunt';
-      if (isDuel || isBrawl) wheelEl.style.display = 'none';
+      if (isDuel) wheelEl.style.display = 'none';
 
       /* every local action goes through here: direct for local play,
          lockstep-scheduled + broadcast for networked play */
@@ -1573,7 +1580,7 @@
 
       function renderReadied() {
         readiedEl.innerHTML = '';
-        readiedEl.appendChild(U.el('div', { cls: 'small muted center', text: (isDuel || isBrawl) ? '' : 'READIED' }));
+        readiedEl.appendChild(U.el('div', { cls: 'small muted center', text: isDuel ? '' : 'READIED' }));
         const keys = ['SPACE', '2', '3', '4', '5'];
         T0.readied.forEach((en, slot) => {
           const cool = en.readiedAtPulse === M.pulseIndex;
@@ -1623,7 +1630,7 @@
           triggerSlot(slot, mouseWorld.x, mouseWorld.y);
           return;
         }
-        if (isDuel || isBrawl) return;
+        if (isDuel) return;
         const k = e.key.toLowerCase();
         if (k === 'a' || k === 'w' || e.key === 'ArrowLeft') { e.preventDefault(); moveWheel(-1); return; }
         if (k === 'd' || k === 's' || e.key === 'ArrowRight') { e.preventDefault(); moveWheel(1); return; }
@@ -1672,24 +1679,32 @@
       function closePause() { if (pauseOverlay) { pauseOverlay.remove(); pauseOverlay = null; } if (!NET) M.paused = false; }
       pauseBtn.onclick = togglePause;
 
-      /* Brawl HUD: each side's name coloured its team colour with a live count
-         of how many of its creatures are still standing. A side at 0 is struck
-         through — the field tells you at a glance who is left. */
-      function brawlStandings() {
+      /* Multi-team HUD: each team's name in its colour, a live count of its
+         standing creatures, and a Relic marker (◈ home · ✦ on the move · ✗
+         captured). A team with nothing left is struck through. */
+      function multiStandings() {
         return M.teams.map((T, i) => {
+          if (T.controller === 'wild') return '';
           const n = M.creatures.filter(c => !c.dead && c.team === i).length;
-          const out = n === 0;
-          return '<span style="color:' + T.color + (out ? ';text-decoration:line-through;opacity:.55' : '') + '">'
-            + U.esc(T.name) + ' ' + n + '</span>';
-        }).join(' · ');
+          const rl = M.relics.find(r => r.ownerTeam === i && !r.disabled);
+          const mark = !rl ? '' : rl.captured ? ' ✗' : rl.carrier != null ? ' ✦' : '';
+          const gone = M.sidesInPlay ? M.sidesInPlay().indexOf(T.side) < 0 : n === 0;
+          return '<span style="color:' + T.color + (gone ? ';text-decoration:line-through;opacity:.55' : '') + (i === MY ? ';font-weight:700' : '') + '">'
+            + U.esc(T.name) + ' ' + n + mark + '</span>';
+        }).filter(Boolean).join(' · ');
       }
 
       function relicText() {
         const mine = M.relics && M.relics.find(r => r.ownerTeam === MY);
-        const theirs = M.relics && M.relics.find(r => r.ownerTeam === 1 - MY);
         if (!mine || mine.disabled) return '—';
         const mineTxt = mine.carrier != null ? '<span style="color:var(--red)">STOLEN!</span>' : (Math.abs(mine.x - mine.homeX) > 6 ? '<span style="color:var(--eldi)">DROPPED</span>' : '<span style="color:var(--green)">SAFE</span>');
-        const theirsTxt = theirs.captured ? '<span style="color:var(--green)">CAPTURED</span>' : theirs.carrier != null ? '<span style="color:var(--green)">TAKEN</span>' : 'home';
+        if (isMulti && M.hostile) {
+          const rivals = M.relics.filter(r => !r.disabled && M.hostile(MY, r.ownerTeam));
+          const taken = rivals.filter(r => r.captured || (r.carrierTeam != null && M.sideOf(r.carrierTeam) === M.sideOf(MY))).length;
+          return 'Yours: ' + mineTxt + ' · Rival relics taken: ' + taken + '/' + rivals.length;
+        }
+        const theirs = M.relics.find(r => r.ownerTeam === 1 - MY);
+        const theirsTxt = !theirs ? '—' : theirs.captured ? '<span style="color:var(--green)">CAPTURED</span>' : theirs.carrier != null ? '<span style="color:var(--green)">TAKEN</span>' : 'home';
         return 'Yours: ' + mineTxt + ' · Theirs: ' + theirsTxt;
       }
 
@@ -1777,7 +1792,7 @@
         pulseBar.firstChild.style.width = Math.min(100, frac * 100) + '%';
         relicRow.innerHTML = M.mode === 'hunt'
           ? '☠ Quarry: ' + (M.creatures.some(c => !c.dead && c.isBoss) ? '<b style="color:var(--red)">ALIVE</b>' : 'DOWN')
-          : isBrawl ? brawlStandings()
+          : isMulti ? multiStandings()
           : 'Relic: ' + relicText();
         const resHtml = SP.ELEMENTS.map(el => '<span class="el-' + el + '" style="margin-left:8px">◈' + Math.floor(T0.resources[el]) + '</span>').join('');
         resBox.innerHTML = resCollapsed
@@ -1820,7 +1835,9 @@
 
       function showWinLoss() {
         const res = M.result;
-        const iWon = res.winner === MY;
+        /* a win counts for the whole SIDE — in a team Brawl an ally carrying the
+           Relic home is your victory too */
+        const iWon = res.winner === MY || (res.winnerSide != null && res.winnerSide >= 0 && M.sideOf && M.sideOf(MY) === res.winnerSide);
         const draw = res.winner === -1;
         const replay = M.serializeReplay();
         /* no XP from practice-against-the-machine (Quick Play vs AI, flagged
@@ -2703,42 +2720,99 @@
     }
   }
 
-  /* ================= BRAWL — multi-token / multi-team battles =================
-     Squad fights against the machine: 2v2 / 3v3 / 5v5 team battles and a
-     4-player free-for-all. Like a Duel there is no economy, pulse or Relic —
-     you pick your side's fighters, the machine fills every other side, and
-     the whole field takes the ground at once. Last team standing wins.
-     A practice mode: gold-and-glory only, never ranked and never XP. */
-  const BRAWL_FORMATS = [
-    { id: '2v2', label: '2 v 2', teams: 2, perTeam: 2, desc: 'Two on two.' },
-    { id: '3v3', label: '3 v 3', teams: 2, perTeam: 3, desc: 'Three on three.' },
-    { id: '5v5', label: '5 v 5', teams: 2, perTeam: 5, desc: 'Five on five — a full melee.' },
-    { id: 'ffa', label: 'Free-for-all', teams: 4, perTeam: 1, ffa: true, desc: 'Four fighters, no allies. Last one standing wins.' },
+  /* ================= BRAWL — multi-player standard matches =================
+     An ordinary standard match — resources, pulses, Relics, deploy your tokens
+     over the pulse — but with more than two players, each their OWN hoard and
+     Relic, their name floating above their camp. Three shapes:
+       • Team Battle — allied sides (2v2 / 3v3 / 5v5). Allies never fight; a
+         side wins by carrying any rival Relic home, or by outlasting the rest.
+         Bases can sit apart down each flank, or clustered as one shared camp.
+       • Free-for-all — everyone for themselves (3 or 4 players).
+       • Surrounded — you hold the centre, ringed by rivals who each play for
+         themselves.
+     Practice against the machine: no rank, no XP, nothing staked. */
+  const W_ = 1600, H_ = 1000;
+  const BRAWL_RIVALS = ['Vekar', 'Skorn', 'Ashfoot', 'Duskclaw', 'Ormun', 'Talra', 'Byndel', 'Kesh', 'Oru'];
+
+  /* --- layout generators: each returns an array of player slots
+         {side, x, y}; slot 0 is always the human. --- */
+  function colPositions(cx, n, shared) {
+    const pts = [];
+    if (shared) {
+      for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2; pts.push({ x: cx + (n > 1 ? Math.cos(a) * 52 : 0), y: H_ / 2 + (n > 1 ? Math.sin(a) * 92 : 0) }); }
+    } else {
+      const top = 160, bot = H_ - 160;
+      for (let i = 0; i < n; i++) pts.push({ x: cx, y: n === 1 ? H_ / 2 : top + (bot - top) * (i / (n - 1)) });
+    }
+    return pts;
+  }
+  function teamBattleLayout(perSide, shared) {
+    const left = colPositions(340, perSide, shared).map(p => ({ side: 0, x: p.x, y: p.y }));
+    const right = colPositions(W_ - 340, perSide, shared).map(p => ({ side: 1, x: p.x, y: p.y }));
+    return left.concat(right);          // human is left slot 0
+  }
+  function ffaLayout(n) {
+    const ring = { 3: [[300, 300], [1300, 300], [800, H_ - 240]],
+                   4: [[320, 280], [W_ - 320, 280], [320, H_ - 280], [W_ - 320, H_ - 280]] }[n];
+    return ring.map((xy, i) => ({ side: i, x: xy[0], y: xy[1] }));
+  }
+  function surroundedLayout(ringN) {
+    const players = [{ side: 0, x: W_ / 2, y: H_ / 2 }];   // you, in the middle
+    for (let i = 0; i < ringN; i++) {
+      const a = -Math.PI / 2 + (i / ringN) * Math.PI * 2;
+      players.push({ side: i + 1, x: W_ / 2 + Math.cos(a) * 590, y: H_ / 2 + Math.sin(a) * 340 });
+    }
+    return players;
+  }
+
+  const BRAWL_MODES = [
+    { id: 'team', label: 'Team Battle', desc: 'Allied sides fight to the Relic. Pick a size, and whether each ally holds their own base or you all share one camp.',
+      sizes: [['2', '2 v 2'], ['3', '3 v 3'], ['5', '5 v 5']], hasShared: true,
+      build: (size, shared) => teamBattleLayout(size, shared) },
+    { id: 'ffa', label: 'Free-for-all', desc: 'Everyone for themselves — no allies. The last player standing (or the first to steal a rival Relic) wins.',
+      sizes: [['3', '3 players'], ['4', '4 players']], hasShared: false,
+      build: (size) => ffaLayout(size) },
+    { id: 'surrounded', label: 'Surrounded', desc: 'You hold the centre of the arena, ringed by rivals who each play for themselves. Hold your Relic and break out.',
+      sizes: [['3', 'ringed by 3'], ['4', 'ringed by 4']], hasShared: false,
+      build: (size) => surroundedLayout(size) },
   ];
-  /* names for the machine's sides in a free-for-all */
-  const BRAWL_RIVALS = ['Vekar’s Band', 'The Skorn', 'Ashfoot Pack', 'Duskclaw Raiders', 'The Mbaru Nine'];
 
   P.brawlFlow = function () {
-    const me = G.me;
     const w = U.el('div', {});
-    w.appendChild(U.el('h3', { cls: 'gold', text: 'Brawl — squad battle vs the machine' }));
-    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'No resources, no pulse, no Relic. Field your whole side at once and fight to elimination. Practice only — nothing is staked, and no XP is earned.' }));
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Brawl — a match with more players' }));
+    w.appendChild(U.el('p', { cls: 'small muted mt', text: 'A normal match — resources, pulses, Relics, deploy your tokens — but with more than two players. Every player keeps their own hoard and Relic, their name above their camp. Practice vs the machine: no rank, no XP.' }));
 
-    w.appendChild(U.el('div', { cls: 'small muted mt', text: 'FORMAT' }));
-    const fmtRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
-    let fmt = BRAWL_FORMATS[0];
-    const fmtBtns = [];
-    BRAWL_FORMATS.forEach(f => {
-      const b = U.el('button', { cls: 'btn small', text: f.label, onclick: () => { fmt = f; sync(); } });
-      fmtBtns.push([b, f]); fmtRow.appendChild(b);
-    });
-    w.appendChild(fmtRow);
-    const fmtDesc = U.el('p', { cls: 'small muted mt' });
-    w.appendChild(fmtDesc);
+    let mode = BRAWL_MODES[0], size = 2, shared = false;
+
+    w.appendChild(U.el('div', { cls: 'small muted mt', text: 'MODE' }));
+    const modeRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
+    const modeBtns = [];
+    BRAWL_MODES.forEach(md => { const b = U.el('button', { cls: 'btn small', text: md.label, onclick: () => { mode = md; size = parseInt(md.sizes[0][0], 10); sync(); } }); modeBtns.push([b, md]); modeRow.appendChild(b); });
+    w.appendChild(modeRow);
+    const modeDesc = U.el('p', { cls: 'small muted mt' });
+    w.appendChild(modeDesc);
+
+    const sizeLbl = U.el('div', { cls: 'small muted mt', text: 'SIZE' });
+    w.appendChild(sizeLbl);
+    const sizeRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
+    w.appendChild(sizeRow);
+
+    const sharedWrap = U.el('div', { cls: 'mt' });
+    const sharedChk = U.el('input', { type: 'checkbox' });
+    const sharedLine = U.el('label', { cls: 'small', style: 'display:flex;gap:8px;align-items:center;cursor:pointer' }, [sharedChk, U.el('span', { text: 'Shared camp — allies cluster their hoards into one base' })]);
+    sharedChk.onchange = () => { shared = sharedChk.checked; };
+    sharedWrap.appendChild(sharedLine);
+    w.appendChild(sharedWrap);
+
     function sync() {
-      fmtBtns.forEach(([b, f]) => b.classList.toggle('primary', f === fmt));
-      fmtDesc.textContent = fmt.desc + ' You command one side of ' + fmt.perTeam + '; the machine fields '
-        + (fmt.ffa ? (fmt.teams - 1) + ' rival fighters.' : fmt.perTeam + '.');
+      modeBtns.forEach(([b, md]) => b.classList.toggle('primary', md === mode));
+      modeDesc.textContent = mode.desc;
+      sizeRow.innerHTML = '';
+      mode.sizes.forEach(([v, l]) => {
+        const b = U.el('button', { cls: 'btn small' + (parseInt(v, 10) === size ? ' primary' : ''), text: l, onclick: () => { size = parseInt(v, 10); sync(); } });
+        sizeRow.appendChild(b);
+      });
+      sharedWrap.style.display = mode.hasShared ? '' : 'none';
     }
     sync();
 
@@ -2750,86 +2824,60 @@
 
     const m = UI.modal(w);
     w.appendChild(U.el('button', {
-      cls: 'btn primary mt', text: 'Choose your squad', onclick: () => {
-        const fighters = Object.values(me.tokens).filter(t => !t.frozen && SP.canDuel(t.speciesId));
-        if (!fighters.length) { UI.alert('No fighters', 'A Brawl needs at least one token that actually fights — fruit, relics, and Ju Fields can’t brawl.'); return; }
+      cls: 'btn primary mt', text: 'Choose your pouch', onclick: () => {
+        const layout = mode.build(size, shared);
         m.close();
-        pickBrawlSquad(fighters, fmt.perTeam, squad => beginBrawl(fmt, parseFloat(diffSel.value), squad));
+        P.pickPouch(pouch => beginBrawl({ mode: mode, label: mode.label + ' · ' + size + (mode.id === 'team' ? 'v' + size : ''), layout }, parseFloat(diffSel.value), pouch));
       },
     }));
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   };
 
-  /* pick up to `count` of your fighting tokens; short squads are topped up with
-     minted fighters so any collection can play any format */
-  function pickBrawlSquad(fighters, count, cb) {
-    const chosen = [];
-    const w = U.el('div', {});
-    w.appendChild(U.el('h3', { cls: 'gold', text: 'Your squad' }));
-    const info = U.el('p', { cls: 'small muted mt' });
-    w.appendChild(info);
-    const grid = U.el('div', { cls: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(96px,1fr));max-height:46vh;overflow:auto' });
-    w.appendChild(grid);
-    const m = UI.modal(w);
-    const goBtn = U.el('button', { cls: 'btn primary mt', text: 'Fight' });
-    function upd() {
-      info.innerHTML = 'Pick up to <b>' + count + '</b> — chosen <b class="gold">' + chosen.length + '/' + count + '</b>.'
-        + (chosen.length < count ? ' Any empty slots are filled by minted allies.' : '');
-      goBtn.textContent = chosen.length ? 'Fight (' + chosen.length + (chosen.length < count ? ' + ' + (count - chosen.length) + ' minted' : '') + ')' : 'Fight';
-      goBtn.disabled = false;
-    }
-    fighters.forEach(t => {
-      const card = UI.tokenCard(t, { size: 76 });
-      card.style.cursor = 'pointer';
-      card.onclick = () => {
-        const at = chosen.indexOf(t.id);
-        if (at >= 0) { chosen.splice(at, 1); card.style.borderColor = ''; }
-        else if (chosen.length < count) { chosen.push(t.id); card.style.borderColor = 'var(--gold)'; }
-        upd();
-      };
-      grid.appendChild(card);
-    });
-    upd();
-    goBtn.onclick = () => { m.close(); cb(fighters.filter(t => chosen.includes(t.id))); };
-    w.appendChild(goBtn);
-    w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
-  }
-
-  /* mint N random duel-fit fighters for a machine side (or to top up a short
-     player squad) */
-  function mintFighters(n) {
-    const ids = SP.list.filter(sp => SP.canDuel(sp.id)).map(sp => sp.id);
-    const out = [];
-    for (let i = 0; i < n; i++) out.push(TK.mint({ speciesId: ids[Math.floor(Math.random() * ids.length)], rng: new U.Rng(U.newSeed()) }));
-    return out;
-  }
-
-  function beginBrawl(fmt, aiSkill, squad) {
+  function beginBrawl(fmt, aiSkill, pouch) {
     const me = G.me;
-    /* top a short player squad up to the format size with minted allies */
-    const mine = squad.map(t => U.deepCopy(t));
-    while (mine.length < fmt.perTeam) mine.push(mintFighters(1)[0]);
-
+    const startRes = G.titleBuff('startRes') || 0;
     const mySeal = me.seal || { avatarIdx: me.avatarIdx, patterns: [] };
-    const teams = [{ name: me.displayName, accId: me.id, controller: 'human', pouch: mine, seal: mySeal }];
-    const rivals = BRAWL_RIVALS.slice();
-    for (let i = 1; i < fmt.teams; i++) {
-      const name = fmt.teams === 2 ? 'The Machine' : rivals[(i - 1) % rivals.length];
-      teams.push({ name, controller: 'ai', aiSkill, pouch: mintFighters(fmt.perTeam), seal: { avatarIdx: 3, patterns: ['runes'] } });
-    }
+
+    /* seat the machine's players from the world's Dya'kukull so rival camps
+       carry real player names; fall back to made-up bands and minted pouches */
+    const ais = Object.values(G.world.accounts || {}).filter(a => a.ai);
+    const pool = ais.slice().sort(() => Math.random() - 0.5);
+    let aiN = 0;
+
+    const teams = fmt.layout.map((slot, i) => {
+      const base = { side: slot.side, hoard: { x: slot.x, y: slot.y }, color: DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[slot.side % 6] : undefined };
+      if (i === 0) {
+        return Object.assign(base, { name: me.displayName, accId: me.id, controller: 'human', pouch: pouch.map(t => U.deepCopy(t)), startResources: startRes, seal: mySeal });
+      }
+      const acc = pool[aiN++];
+      const name = acc ? acc.displayName : (BRAWL_RIVALS[(aiN) % BRAWL_RIVALS.length] + '’s Band');
+      const aiPouch = acc ? P.accountPouch(acc).map(t => U.deepCopy(t)) : mintBrawlPouch();
+      return Object.assign(base, { name, accId: acc ? acc.id : null, controller: 'ai', aiSkill: acc ? G.aiSkill(acc) : aiSkill, pouch: aiPouch, startResources: startRes, seal: (acc && acc.seal) || { avatarIdx: 3, patterns: ['runes'] } });
+    });
 
     const seed = U.newSeed();
     const terrain = ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)];
-    const match = new DYA.match.Match({ seed, mode: 'brawl', terrain, teams });
+    const match = new DYA.match.Match({
+      seed, mode: 'standard', terrain,
+      settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
+      teams,
+    });
     UI.showWithLoading('match', {
       match,
       cfg: {
-        mode: 'brawl', format: fmt.label + ' Brawl', noRecord: true, noXp: true,
-        opponent: { name: fmt.ffa ? 'the field' : 'The Machine' },
-        rematch: () => beginBrawl(fmt, aiSkill, squad),
+        mode: 'standard', format: fmt.label + ' Brawl', noRecord: true, noXp: true,
+        opponent: { name: fmt.mode.id === 'team' ? 'the rival side' : 'the field' },
+        rematch: () => beginBrawl(fmt, aiSkill, pouch),
         onFinish: (res, iWon, draw, toMenu) => { G.save(); UI.show(toMenu ? 'menu' : 'play'); },
       },
-    }, 1000);
+    }, 1100);
+  }
+
+  /* a minted stand-in pouch (used only when no Dya'kukull is free to seat) */
+  function mintBrawlPouch() {
+    const out = [];
+    for (let i = 0; i < 18; i++) out.push(TK.mint({ speciesId: SP.craftable[Math.floor(Math.random() * SP.craftable.length)], rng: new U.Rng(U.newSeed()) }));
+    return out;
   }
 
   /* ================= REPLAYS ================= */
