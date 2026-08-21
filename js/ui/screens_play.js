@@ -2734,22 +2734,48 @@
   const W_ = 1600, H_ = 1000;
   const BRAWL_RIVALS = ['Vekar', 'Skorn', 'Ashfoot', 'Duskclaw', 'Ormun', 'Talra', 'Byndel', 'Kesh', 'Oru'];
 
-  /* --- layout generators: each returns an array of player slots
-         {side, x, y}; slot 0 is always the human. --- */
-  function colPositions(cx, n, shared) {
+  /* --- 15 team-battle maps -------------------------------------------------
+     Each map lays out one side's hoards (up to 5, ordered so the first N stay
+     well-spread for 2v2 / 3v3 / 5v5); the opposing side is the mirror across
+     the centre line, so it's always ONE team on the left and the other on the
+     right — but never a straight column. A random map is drawn per match. */
+  const BRAWL_MAPS = [
+    { name: 'Stagger',    pts: [[300, 500], [250, 180], [350, 820], [300, 340], [280, 660]] },
+    { name: 'Crescent',   pts: [[300, 500], [200, 240], [200, 760], [380, 380], [380, 620]] },
+    { name: 'Vanguard',   pts: [[540, 430], [220, 520], [540, 600], [220, 300], [220, 740]] },
+    { name: 'Slant',      pts: [[200, 220], [300, 400], [400, 580], [480, 740], [240, 850]] },
+    { name: 'Diamond',    pts: [[360, 500], [220, 320], [220, 680], [500, 320], [500, 680]] },
+    { name: 'Tidewave',   pts: [[250, 200], [460, 340], [250, 500], [460, 660], [250, 820]] },
+    { name: 'Echelon',    pts: [[200, 300], [300, 430], [400, 560], [500, 690], [300, 800]] },
+    { name: 'Pincer',     pts: [[280, 230], [280, 780], [420, 300], [420, 710], [230, 500]] },
+    { name: 'Rampart',    pts: [[190, 260], [240, 460], [190, 660], [240, 850], [440, 500]] },
+    { name: 'Arrowhead',  pts: [[520, 500], [370, 350], [370, 650], [230, 230], [230, 770]] },
+    { name: 'Highground', pts: [[250, 190], [380, 780], [420, 250], [230, 600], [300, 420]] },
+    { name: 'Ringfort',   pts: [[350, 500], [230, 340], [470, 340], [230, 660], [470, 660]] },
+    { name: 'Cliffside',  pts: [[170, 260], [230, 440], [170, 620], [230, 800], [330, 500]] },
+    { name: 'Scatterlow', pts: [[240, 300], [470, 440], [300, 650], [500, 780], [200, 830]] },
+    { name: 'Broadfront', pts: [[300, 240], [190, 470], [430, 560], [260, 760], [500, 300]] },
+  ];
+
+  /* allies clustered into one shared camp on their side */
+  function clusterPositions(cx, n) {
     const pts = [];
-    if (shared) {
-      for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2; pts.push({ x: cx + (n > 1 ? Math.cos(a) * 52 : 0), y: H_ / 2 + (n > 1 ? Math.sin(a) * 92 : 0) }); }
-    } else {
-      const top = 160, bot = H_ - 160;
-      for (let i = 0; i < n; i++) pts.push({ x: cx, y: n === 1 ? H_ / 2 : top + (bot - top) * (i / (n - 1)) });
-    }
+    for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2; pts.push({ x: cx + (n > 1 ? Math.cos(a) * 52 : 0), y: H_ / 2 + (n > 1 ? Math.sin(a) * 92 : 0) }); }
     return pts;
   }
-  function teamBattleLayout(perSide, shared) {
-    const left = colPositions(340, perSide, shared).map(p => ({ side: 0, x: p.x, y: p.y }));
-    const right = colPositions(W_ - 340, perSide, shared).map(p => ({ side: 1, x: p.x, y: p.y }));
-    return left.concat(right);          // human is left slot 0
+  /* one side takes the map's first `perSide` hoards; the other mirrors across
+     the centre line. Shared camps ignore the map and cluster instead. */
+  function teamBattleLayout(perSide, shared, map) {
+    map = map || BRAWL_MAPS[0];
+    let left, right;
+    if (shared) {
+      left = clusterPositions(340, perSide);
+      right = clusterPositions(W_ - 340, perSide);
+    } else {
+      left = map.pts.slice(0, perSide).map(([x, y]) => ({ x, y }));
+      right = map.pts.slice(0, perSide).map(([x, y]) => ({ x: W_ - x, y }));
+    }
+    return left.map(p => ({ side: 0, x: p.x, y: p.y })).concat(right.map(p => ({ side: 1, x: p.x, y: p.y })));
   }
   function ffaLayout(n) {
     const ring = { 3: [[300, 300], [1300, 300], [800, H_ - 240]],
@@ -2766,9 +2792,9 @@
   }
 
   const BRAWL_MODES = [
-    { id: 'team', label: 'Team Battle', desc: 'Allied sides fight to the Relic. Pick a size, and whether each ally holds their own base or you all share one camp.',
+    { id: 'team', label: 'Team Battle', desc: 'Allied sides fight to the Relic on one of 15 maps. Pick a size, and whether each ally holds their own base or you all share one camp.',
       sizes: [['2', '2 v 2'], ['3', '3 v 3'], ['5', '5 v 5']], hasShared: true,
-      build: (size, shared) => teamBattleLayout(size, shared) },
+      build: (size, shared, map) => teamBattleLayout(size, shared, map) },
     { id: 'ffa', label: 'Free-for-all', desc: 'Everyone for themselves — no allies. The last player standing (or the first to steal a rival Relic) wins.',
       sizes: [['3', '3 players'], ['4', '4 players']], hasShared: false,
       build: (size) => ffaLayout(size) },
@@ -2825,16 +2851,108 @@
     const m = UI.modal(w);
     w.appendChild(U.el('button', {
       cls: 'btn primary mt', text: 'Choose your pouch', onclick: () => {
-        const layout = mode.build(size, shared);
+        const map = mode.id === 'team' && !shared ? BRAWL_MAPS[Math.floor(Math.random() * BRAWL_MAPS.length)] : null;
+        const layout = mode.build(size, shared, map);
+        const fmt = {
+          mode: mode, size, layout, map,
+          label: mode.label + ' · ' + (mode.id === 'team' ? size + 'v' + size : size + ' players'),
+        };
         m.close();
-        P.pickPouch(pouch => beginBrawl({ mode: mode, label: mode.label + ' · ' + size + (mode.id === 'team' ? 'v' + size : ''), layout }, parseFloat(diffSel.value), pouch));
+        /* pick your pouch, then the shared pulse-settings vote screen (same as
+           every other match), then the match itself */
+        P.pickPouch(pouch => UI.show('brawlSetup', { fmt, pouch, aiSkill: parseFloat(diffSel.value) }));
       },
     }));
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   };
 
-  function beginBrawl(fmt, aiSkill, pouch) {
+  /* ---- Brawl pre-match: the SAME pulse-settings vote screen the other modes
+     use (interval / resources-per-pulse / Standard-Chaos), adapted to show the
+     whole roster of camps. Ready or let the timer run, then the match starts. */
+  UI.register('brawlSetup', {
+    enter(root, params) {
+      const fmt = params.fmt, pouch = params.pouch;
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Brawl Setup' }));
+      const wrap = U.el('div', { cls: 'setup-wrap' });
+
+      /* left: your pouch */
+      const left = U.el('div', { cls: 'setup-col panel' });
+      left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your pouch — ' + G.me.displayName }));
+      const pl = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(78px,1fr))' });
+      pouch.forEach(t => pl.appendChild(UI.tokenCard(t, { size: 56, mode: 'minimal' })));
+      left.appendChild(pl);
+      wrap.appendChild(left);
+
+      /* center: the vote (identical dials to matchSetup) */
+      const mid = U.el('div', { cls: 'setup-col panel', style: 'max-width:420px' });
+      let timeLeft = 30;
+      const timer = U.el('div', { cls: 'setup-timer', text: timeLeft });
+      mid.appendChild(timer);
+      mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Votes lock when the timer ends. The middle ground wins.' }));
+      const myVote = { interval: 8, amount: 2, mode: 'Standard' };
+      const rngV = new U.Rng(U.newSeed());
+      const oppVote = { interval: rngV.pick(EC.PULSE_INTERVALS), amount: rngV.pick(EC.PULSE_AMOUNTS), mode: rngV.chance(0.25) ? 'Chaos' : 'Standard' };
+      function voteRow(label, opts, key, f) {
+        const row = U.el('div', { cls: 'vote-row' });
+        row.appendChild(U.el('div', { cls: 'muted small', text: label }));
+        const w2 = U.el('div', { cls: 'vote-opts' });
+        opts.forEach(o => {
+          const b = U.el('div', { cls: 'vote-opt' + (myVote[key] === o ? ' mine' : '') + (oppVote[key] === o ? ' theirs' : ''), text: f ? f(o) : o });
+          b.onclick = () => { myVote[key] = o; U.qsa('.vote-opt', w2).forEach((x, i) => x.classList.toggle('mine', opts[i] === o)); DYA.audio.play('click'); };
+          w2.appendChild(b);
+        });
+        row.appendChild(w2);
+        return row;
+      }
+      mid.appendChild(voteRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, 'interval', v => v + 's'));
+      mid.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
+      mid.appendChild(voteRow('MODE — Chaos randomizes every pulse (majority required)', ['Standard', 'Chaos'], 'mode'));
+      mid.appendChild(U.el('p', { cls: 'small muted', html: '◆ = the field’s current vote' }));
+      mid.appendChild(U.el('div', { cls: 'vote-row' }, [U.el('div', { cls: 'muted small', html: 'MAP — <span class="gold">' + U.esc(fmt.map ? fmt.map.name : (fmt.mode.label)) + '</span> · terrain assigned randomly' })]));
+      const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready — skip the wait' });
+      mid.appendChild(readyBtn);
+      wrap.appendChild(mid);
+
+      /* right: the roster of camps in this Brawl */
+      const right = U.el('div', { cls: 'setup-col panel' });
+      right.appendChild(U.el('h3', { cls: 'gold mb', text: 'The field — ' + fmt.label }));
+      const sideCount = {};
+      fmt.layout.forEach(s => { sideCount[s.side] = (sideCount[s.side] || 0) + 1; });
+      const nSides = Object.keys(sideCount).length;
+      right.appendChild(U.el('p', { cls: 'muted small', html: fmt.mode.id === 'team'
+        ? 'Two allied sides of <b>' + (sideCount[0] || 0) + '</b>. You lead the gold side; allies never fight each other.'
+        : nSides + ' camps, every one for itself.' }));
+      const roster = U.el('div', { cls: 'mt' });
+      fmt.layout.forEach((s, i) => {
+        const col = DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[s.side % 6] : '#d9b87a';
+        roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + (i === 0 ? '<b>' + U.esc(G.me.displayName) + '</b> (you)' : 'a rival camp') }));
+      });
+      right.appendChild(roster);
+      wrap.appendChild(right);
+
+      scr.appendChild(wrap);
+      root.appendChild(scr);
+
+      let done = false;
+      const iv = setInterval(() => {
+        if (done) return;
+        timeLeft--; timer.textContent = timeLeft;
+        if (timeLeft <= 5) timer.classList.add('urgent');
+        if (timeLeft <= 0) finish();
+      }, 1000);
+      readyBtn.onclick = () => finish();
+      function finish() {
+        if (done) return; done = true; clearInterval(iv);
+        beginBrawl(fmt, params.aiSkill, pouch, DYA.matchvote.combine(myVote, oppVote));
+      }
+      this.leave = () => { done = true; clearInterval(iv); };
+    },
+  });
+
+  function beginBrawl(fmt, aiSkill, pouch, settings) {
     const me = G.me;
+    settings = settings || { pulseInterval: 8, pulseAmount: 2, chaos: false };
     const startRes = G.titleBuff('startRes') || 0;
     const mySeal = me.seal || { avatarIdx: me.avatarIdx, patterns: [] };
 
@@ -2857,17 +2975,13 @@
 
     const seed = U.newSeed();
     const terrain = ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)];
-    const match = new DYA.match.Match({
-      seed, mode: 'standard', terrain,
-      settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
-      teams,
-    });
+    const match = new DYA.match.Match({ seed, mode: 'standard', terrain, settings, teams });
     UI.showWithLoading('match', {
       match,
       cfg: {
         mode: 'standard', format: fmt.label + ' Brawl', noRecord: true, noXp: true,
         opponent: { name: fmt.mode.id === 'team' ? 'the rival side' : 'the field' },
-        rematch: () => beginBrawl(fmt, aiSkill, pouch),
+        rematch: () => beginBrawl(fmt, aiSkill, pouch, settings),
         onFinish: (res, iWon, draw, toMenu) => { G.save(); UI.show(toMenu ? 'menu' : 'play'); },
       },
     }, 1100);
