@@ -172,6 +172,22 @@
       for (let k = 0; k < 5; k++) {
         ctx.beginPath(); ctx.arc(hx - 12 + k * 6, hy - 6 + Math.sin(k * 2.7) * 4, 3.5, 0, TAU); ctx.fill();
       }
+      /* the player's name floats above their hoard, in their team colour, so
+         every side of a multi-team Brawl is named on the field */
+      if (Tm.name) {
+        const label = Tm.name;
+        ctx.font = '600 13px system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(label).width;
+        const ly = hy - 62;
+        ctx.fillStyle = 'rgba(12,10,16,0.62)';
+        ctx.fillRect(hx - tw / 2 - 7, ly - 10, tw + 14, 20);
+        ctx.strokeStyle = Tm.color + 'aa'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(hx - tw / 2 - 7, ly - 10, tw + 14, 20);
+        ctx.fillStyle = Tm.color;
+        ctx.fillText(label, hx, ly);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      }
     });
 
     /* ------- resource orbs ------- */
