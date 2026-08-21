@@ -2849,20 +2849,29 @@
     w.appendChild(diffSel);
 
     const m = UI.modal(w);
-    w.appendChild(U.el('button', {
-      cls: 'btn primary mt', text: 'Choose your pouch', onclick: () => {
-        const map = mode.id === 'team' && !shared ? BRAWL_MAPS[Math.floor(Math.random() * BRAWL_MAPS.length)] : null;
-        const layout = mode.build(size, shared, map);
-        const fmt = {
-          mode: mode, size, layout, map,
-          label: mode.label + ' · ' + (mode.id === 'team' ? size + 'v' + size : size + ' players'),
-        };
+    function makeFmt() {
+      const map = mode.id === 'team' && !shared ? BRAWL_MAPS[Math.floor(Math.random() * BRAWL_MAPS.length)] : null;
+      const layout = mode.build(size, shared, map);
+      return { mode: mode, size, shared, layout, map, label: mode.label + ' · ' + (mode.id === 'team' ? size + 'v' + size : size + ' players') };
+    }
+    const btnRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:10px;flex-wrap:wrap' });
+    /* Multiplayer — the online lobby: invite friends, pick your team, and any
+       empty seats fill with Dya'kukull after a short search for real players */
+    btnRow.appendChild(U.el('button', {
+      cls: 'btn primary', text: '🌐 Multiplayer', onclick: () => {
         m.close();
-        /* pick your pouch, then the shared pulse-settings vote screen (same as
-           every other match), then the match itself */
-        P.pickPouch(pouch => UI.show('brawlSetup', { fmt, pouch, aiSkill: parseFloat(diffSel.value) }));
+        UI.requireOnline(() => P.pickPouch(pouch => UI.show('brawlLobby', { fmt: makeFmt(), pouch, aiSkill: parseFloat(diffSel.value) })),
+          { title: 'Multiplayer Brawl', body: 'A Brawl with other players of the world needs the Guild network. To play on your own, choose <b>Practice vs the machine</b> instead.' });
       },
     }));
+    /* Practice — straight to the vote screen against the machine */
+    btnRow.appendChild(U.el('button', {
+      cls: 'btn', text: '🤖 Practice vs the machine', onclick: () => {
+        m.close();
+        P.pickPouch(pouch => UI.show('brawlSetup', { fmt: makeFmt(), pouch, aiSkill: parseFloat(diffSel.value) }));
+      },
+    }));
+    w.appendChild(btnRow);
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   };
 
@@ -2924,9 +2933,10 @@
         ? 'Two allied sides of <b>' + (sideCount[0] || 0) + '</b>. You lead the gold side; allies never fight each other.'
         : nSides + ' camps, every one for itself.' }));
       const roster = U.el('div', { cls: 'mt' });
+      const mySlot = params.humanSlot || 0;
       fmt.layout.forEach((s, i) => {
         const col = DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[s.side % 6] : '#d9b87a';
-        roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + (i === 0 ? '<b>' + U.esc(G.me.displayName) + '</b> (you)' : 'a rival camp') }));
+        roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + (i === mySlot ? '<b>' + U.esc(G.me.displayName) + '</b> (you)' : 'a rival camp') }));
       });
       right.appendChild(roster);
       wrap.appendChild(right);
@@ -2944,15 +2954,151 @@
       readyBtn.onclick = () => finish();
       function finish() {
         if (done) return; done = true; clearInterval(iv);
-        beginBrawl(fmt, params.aiSkill, pouch, DYA.matchvote.combine(myVote, oppVote));
+        beginBrawl(fmt, params.aiSkill, pouch, DYA.matchvote.combine(myVote, oppVote), params.humanSlot || 0);
       }
       this.leave = () => { done = true; clearInterval(iv); };
     },
   });
 
-  function beginBrawl(fmt, aiSkill, pouch, settings) {
+  /* ---- Brawl MULTIPLAYER LOBBY (the first of the two lobbies; the pulse-vote
+     screen is the second). You enter here on tapping Multiplayer: invite
+     friends, pick your team, then Ready. Readying searches ~10s for real
+     players of the world and fills any empty seats with Dya'kukull — the same
+     rule the Duel uses — then hands off to the vote screen and the match.
+
+     Cross-device play rides the N-seat lockstep (js/core/netplay.js): a real
+     friend who joins occupies a human seat; every unfilled seat is an AI that
+     each client simulates identically, so no seat that isn't a real person
+     ever touches the wire. */
+  UI.register('brawlLobby', {
+    enter(root, params) {
+      const fmt = params.fmt, pouch = params.pouch, me = G.me;
+      const O = DYA.online;
+      const isTeam = fmt.mode.id === 'team';
+      /* seats-per-side / total; you always hold one seat */
+      const total = fmt.layout.length;
+      let myChoice = 'team1';                 // team1 | random | team2  (team battles only)
+
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Multiplayer Lobby' }));
+      const page = U.el('div', { cls: 'page' });
+      const head = U.el('div', { cls: 'page-head' });
+      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('play') }));
+      head.appendChild(U.el('h2', { text: 'Brawl Lobby — ' + fmt.label }));
+      page.appendChild(head);
+      const body = U.el('div', { cls: 'page-body', style: 'max-width:640px;margin:0 auto' });
+
+      /* --- team choice (team battles only): Team 1 / Random / Team 2 --- */
+      if (isTeam) {
+        const tp = U.el('div', { cls: 'panel mb' });
+        tp.appendChild(U.el('div', { cls: 'small muted', text: 'YOUR TEAM' }));
+        const row = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
+        const gold = DYA.match.TEAM_COLORS[0], red = DYA.match.TEAM_COLORS[1];
+        [['team1', 'Team 1', gold], ['random', 'Random', 'var(--muted)'], ['team2', 'Team 2', red]].forEach(([v, l, c]) => {
+          const b = U.el('button', { cls: 'btn small' + (myChoice === v ? ' primary' : ''), style: 'border-color:' + c, text: l, onclick: () => { myChoice = v; U.qsa('button', row).forEach((x, i) => x.classList.toggle('primary', ['team1', 'random', 'team2'][i] === v)); DYA.audio.play('click'); } });
+          row.appendChild(b);
+        });
+        tp.appendChild(row);
+        body.appendChild(tp);
+      }
+
+      /* --- roster of seats --- */
+      const rosterPanel = U.el('div', { cls: 'panel mb' });
+      rosterPanel.appendChild(U.el('div', { cls: 'flex', style: 'justify-content:space-between' }, [
+        U.el('div', { cls: 'small muted', text: 'THE FIELD — ' + total + ' camps' }),
+        U.el('div', { cls: 'small muted', text: isTeam ? (fmt.size + ' per side') : 'free-for-all' }),
+      ]));
+      const roster = U.el('div', { cls: 'mt' });
+      rosterPanel.appendChild(roster);
+      body.appendChild(rosterPanel);
+      /* joined humans beyond yourself (real peers who accepted). Empty here
+         until a friend joins the room; each fills a seat, the rest are AI. */
+      const joined = [];   // {name, netId}
+      function renderRoster() {
+        roster.innerHTML = '';
+        fmt.layout.forEach((slot, i) => {
+          const col = DYA.match.TEAM_COLORS[slot.side % 6];
+          let who;
+          if (i === 0) who = '<b>' + U.esc(me.displayName) + '</b> <span class="small muted">(you)</span>';
+          else if (joined[i - 1]) who = '<b>' + U.esc(joined[i - 1].name) + '</b> <span class="small muted">(joined)</span>';
+          else who = '<span class="muted">open — fills with a Dya’kukull</span>';
+          roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + who }));
+        });
+      }
+      renderRoster();
+
+      /* --- invite friends --- */
+      const invPanel = U.el('div', { cls: 'panel mb' });
+      invPanel.appendChild(U.el('div', { cls: 'small muted', text: 'INVITE FRIENDS' }));
+      const friends = (O && O.state && O.state.friends) || [];
+      if (!friends.length) {
+        invPanel.appendChild(U.el('p', { cls: 'muted small mt', text: 'No friends online to invite yet — add friends in the Friends screen. You can still Ready up; the lobby will find players or seat Dya’kukull.' }));
+      } else {
+        const fl = U.el('div', { cls: 'mt' });
+        friends.forEach(f => {
+          const r = U.el('div', { cls: 'friend-row' });
+          r.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(f.displayName || f.name || 'Friend') + '</b>' }));
+          r.appendChild(U.el('button', {
+            cls: 'btn small', text: 'Invite', onclick: async (e) => {
+              e.target.disabled = true; e.target.textContent = 'Invited';
+              try {
+                if (O && O.sendMessage) await O.sendMessage(f.id, '⚔ Come brawl! Join my ' + fmt.label + ' lobby in Play → Brawl → Multiplayer.');
+                UI.toast({ title: 'Invite sent', body: (f.displayName || 'Your friend') + ' will see it in their notifications.', icon: '⚔' });
+              } catch (err) { UI.toast({ title: 'Could not invite', body: err.message, icon: '⚠' }); e.target.disabled = false; e.target.textContent = 'Invite'; }
+            },
+          }));
+          fl.appendChild(r);
+        });
+        invPanel.appendChild(fl);
+      }
+      body.appendChild(invPanel);
+
+      /* --- ready / search / fill --- */
+      const status = U.el('p', { cls: 'muted mt center' });
+      body.appendChild(status);
+      const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready' });
+      body.appendChild(readyBtn);
+
+      let searching = false, done = false, elapsed = 0, tmr = null;
+      readyBtn.onclick = () => {
+        if (searching || done) return;
+        searching = true; readyBtn.disabled = true;
+        status.textContent = 'Searching for players… (0s)';
+        /* ~10s search for real players (same window as the Duel), then fill
+           empty seats with Dya'kukull and go to the vote screen. */
+        tmr = setInterval(() => {
+          if (done) return;
+          elapsed++;
+          status.textContent = joined.length
+            ? joined.length + ' player(s) joined — starting…'
+            : 'Searching for players… (' + elapsed + 's)';
+          if (elapsed >= 10) startMatch();
+        }, 1000);
+      };
+      function humanSlotFor() {
+        if (!isTeam) return 0;                 // FFA / surrounded: you are slot 0
+        const choice = myChoice === 'random' ? (Math.random() < 0.5 ? 'team1' : 'team2') : myChoice;
+        const wantSide = choice === 'team2' ? 1 : 0;
+        const idx = fmt.layout.findIndex(s => s.side === wantSide);
+        return idx < 0 ? 0 : idx;
+      }
+      function startMatch() {
+        if (done) return; done = true; if (tmr) clearInterval(tmr);
+        /* second lobby: the shared pulse-settings vote screen, then the match */
+        UI.show('brawlSetup', { fmt, pouch, aiSkill: params.aiSkill, humanSlot: humanSlotFor() });
+      }
+      this.leave = () => { done = true; if (tmr) clearInterval(tmr); };
+
+      page.appendChild(body);
+      scr.appendChild(page);
+      root.appendChild(scr);
+    },
+  });
+
+  function beginBrawl(fmt, aiSkill, pouch, settings, humanSlot) {
     const me = G.me;
     settings = settings || { pulseInterval: 8, pulseAmount: 2, chaos: false };
+    humanSlot = humanSlot || 0;
     const startRes = G.titleBuff('startRes') || 0;
     const mySeal = me.seal || { avatarIdx: me.avatarIdx, patterns: [] };
 
@@ -2964,7 +3110,7 @@
 
     const teams = fmt.layout.map((slot, i) => {
       const base = { side: slot.side, hoard: { x: slot.x, y: slot.y }, color: DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[slot.side % 6] : undefined };
-      if (i === 0) {
+      if (i === humanSlot) {
         return Object.assign(base, { name: me.displayName, accId: me.id, controller: 'human', pouch: pouch.map(t => U.deepCopy(t)), startResources: startRes, seal: mySeal });
       }
       const acc = pool[aiN++];
@@ -2979,9 +3125,9 @@
     UI.showWithLoading('match', {
       match,
       cfg: {
-        mode: 'standard', format: fmt.label + ' Brawl', noRecord: true, noXp: true,
+        mode: 'standard', format: fmt.label + ' Brawl', noRecord: true, noXp: true, myTeam: humanSlot,
         opponent: { name: fmt.mode.id === 'team' ? 'the rival side' : 'the field' },
-        rematch: () => beginBrawl(fmt, aiSkill, pouch, settings),
+        rematch: () => beginBrawl(fmt, aiSkill, pouch, settings, humanSlot),
         onFinish: (res, iWon, draw, toMenu) => { G.save(); UI.show(toMenu ? 'menu' : 'play'); },
       },
     }, 1100);
