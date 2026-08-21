@@ -47,30 +47,46 @@
     return h | 0;
   };
 
-  /* ================= Lockstep core ================= */
-  /* match: a DYA.match.Match with both teams controller:'human'
-     myTeam: 0 (host) or 1 (guest)
-     send(payload): transport hook — broadcasts to the other player */
-  N.Lockstep = function (match, myTeam, send) {
+  /* ================= Lockstep core =================
+     N-player generalization. A match may seat any number of HUMAN teams
+     plus any number of AI (Dya'kukull) teams. AI seats run the deterministic
+     seeded brain (Match.aiThink) identically on every client, so they need
+     no networking at all — only the human seats exchange inputs. Each human
+     client owns one seat (a team index) and streams that seat's frames; it
+     may not outrun the slowest OTHER human seat's known inputs.
+
+     match: a DYA.match.Match
+     mySeat: the team index this client controls
+     send(payload): transport hook — broadcast to every other human client
+     humanSeats: array of team indices that are human (defaults to [0,1], the
+       classic 1v1, so existing two-player callers are unchanged). */
+  N.Lockstep = function (match, mySeat, send, humanSeats) {
     const L = this;
     L.M = match;
-    L.myTeam = myTeam;
+    L.mySeat = mySeat;
+    L.myTeam = mySeat;     // back-compat alias
     L.send = send;
+    L.seats = (humanSeats && humanSeats.length ? humanSeats.slice() : [0, 1]).sort((a, b) => a - b);
+    L.others = L.seats.filter(s => s !== mySeat);
     L.K = N.FRAME_TICKS;
     L.DELAY = N.DELAY_FRAMES;
     L.pending = [];        // local inputs collected during the current frame
     L.sent = {};           // my flushed frames, kept for re-send: n -> inputs
     L.myFrame = 0;         // next frame index I will flush
-    L.oppFrame = -1;       // highest CONTIGUOUS opponent frame received
-    L.oppBuffer = {};      // out-of-order opponent frames
+    L.oppFrame = {};       // seat -> highest CONTIGUOUS frame received
+    L.oppBuffer = {};      // seat -> { frameN -> inputs } (out-of-order buffer)
+    L.others.forEach(s => { L.oppFrame[s] = -1; L.oppBuffer[s] = {}; });
     L.seq = 0;
     L.myHashes = {};       // tick -> my hash (ring)
-    L.oppHashes = {};      // tick -> opponent hash, compared when I pass that tick
+    L.oppHashes = {};      // tick -> { seat -> hash }, compared when I pass that tick
     L.desynced = false;
     L.acc = 0;
     L.stallSince = null;   // wall-clock ms when we first hit the safety wall
     L.needAsked = 0;
   };
+
+  /* the single other human seat (used to attribute a legacy, seat-less frame) */
+  N.Lockstep.prototype._soleOther = function () { return this.others.length === 1 ? this.others[0] : null; };
 
   /* local player issued an input NOW */
   N.Lockstep.prototype.queueLocal = function (input) {
@@ -80,15 +96,20 @@
     const execTick = (frame + L.DELAY) * L.K + 1; // first tick of frame+DELAY
     const seq = L.seq++;
     L.pending.push({ input, seq });
-    M.queueInput(L.myTeam, input, execTick, seq);
+    M.queueInput(L.mySeat, input, execTick, seq);
   };
 
   /* the tick a given frame's inputs execute at */
   N.Lockstep.prototype.execTickOf = function (frame) { return (frame + this.DELAY) * this.K + 1; };
 
-  /* highest tick we may simulate without outrunning the opponent's inputs */
+  /* highest tick we may simulate without outrunning any other human seat.
+     With no other human seats (everyone else is AI) there is nothing to wait
+     for, so the sim runs free. */
   N.Lockstep.prototype.maxSafeTick = function () {
-    return (this.oppFrame + this.DELAY + 1) * this.K;
+    if (!this.others.length) return Infinity;
+    let m = Infinity;
+    for (const s of this.others) m = Math.min(m, (this.oppFrame[s] + this.DELAY + 1) * this.K);
+    return m;
   };
 
   N.Lockstep.prototype.flushFrame = function () {
@@ -97,7 +118,7 @@
     const inputs = L.pending.map(p => ({ i: p.input, s: p.seq }));
     L.pending = [];
     L.sent[n] = inputs;
-    const msg = { t: 'frame', frames: [] };
+    const msg = { t: 'frame', seat: L.mySeat, frames: [] };
     for (let k = Math.max(0, n - 2); k <= n; k++) if (L.sent[k]) msg.frames.push({ n: k, inputs: L.sent[k] });
     if (n % N.HASH_EVERY === 0) {
       const ht = (n + 1) * L.K; // frame n completed at tick (n+1)*K
@@ -111,24 +132,27 @@
     const L = this, M = L.M;
     if (!msg || M.over) return;
     if (msg.t === 'frame') {
-      (msg.frames || []).forEach(f => {
-        if (f.n <= L.oppFrame || L.oppBuffer[f.n]) return;
-        L.oppBuffer[f.n] = f.inputs || [];
-      });
-      /* advance contiguously, scheduling the opponent's inputs */
-      while (L.oppBuffer[L.oppFrame + 1]) {
-        const n = ++L.oppFrame;
-        const at = L.execTickOf(n);
-        for (const e of L.oppBuffer[n]) M.queueInput(1 - L.myTeam, e.i, at, e.s);
-        delete L.oppBuffer[n];
-      }
-      if (msg.ht != null) {
-        L.oppHashes[msg.ht] = msg.h;
-        L.compareHashes();
+      const seat = msg.seat != null ? msg.seat : L._soleOther();
+      if (seat != null && seat !== L.mySeat && L.oppBuffer[seat]) {
+        (msg.frames || []).forEach(f => {
+          if (f.n <= L.oppFrame[seat] || L.oppBuffer[seat][f.n]) return;
+          L.oppBuffer[seat][f.n] = f.inputs || [];
+        });
+        /* advance THAT seat contiguously, scheduling its inputs */
+        while (L.oppBuffer[seat][L.oppFrame[seat] + 1]) {
+          const n = ++L.oppFrame[seat];
+          const at = L.execTickOf(n);
+          for (const e of L.oppBuffer[seat][n]) M.queueInput(seat, e.i, at, e.s);
+          delete L.oppBuffer[seat][n];
+        }
+        if (msg.ht != null) {
+          (L.oppHashes[msg.ht] = L.oppHashes[msg.ht] || {})[seat] = msg.h;
+          L.compareHashes();
+        }
       }
     } else if (msg.t === 'need') {
-      /* opponent lost frames — re-send from what they have */
-      const out = { t: 'frame', frames: [] };
+      /* a peer lost frames — re-send MY frames from where they are */
+      const out = { t: 'frame', seat: L.mySeat, frames: [] };
       for (let k = msg.from; k < L.myFrame && out.frames.length < 40; k++) if (L.sent[k]) out.frames.push({ n: k, inputs: L.sent[k] });
       if (out.frames.length) L.send(out);
     }
@@ -138,9 +162,9 @@
     const L = this;
     for (const t in L.oppHashes) {
       if (L.myHashes[t] === undefined) continue;
-      if (L.myHashes[t] !== L.oppHashes[t]) L.desynced = true;
-      delete L.oppHashes[t];
-      delete L.myHashes[t];
+      const bySeat = L.oppHashes[t];
+      for (const s in bySeat) { if (L.myHashes[t] !== bySeat[s]) L.desynced = true; }
+      delete L.oppHashes[t];   // myHashes[t] is left to age out, so late peers still compare
     }
   };
 
@@ -157,7 +181,10 @@
         if (L.stallSince == null) L.stallSince = Date.now();
         else if (Date.now() - L.stallSince > 1500 && Date.now() - L.needAsked > 2000) {
           L.needAsked = Date.now();
-          L.send({ t: 'need', from: L.oppFrame + 1 });
+          /* ask from the lowest frame any lagging seat still owes us */
+          let from = Infinity;
+          for (const s of L.others) from = Math.min(from, L.oppFrame[s] + 1);
+          L.send({ t: 'need', from: from === Infinity ? 0 : from });
         }
         break;
       }
@@ -173,7 +200,7 @@
         delete L.sent[f - 60];
         delete L.myHashes[M.tick - 60 * L.K];
       }
-      if (M.over) { L.send({ t: 'frame', frames: [] }); break; }
+      if (M.over) { L.send({ t: 'frame', seat: L.mySeat, frames: [] }); break; }
     }
     if (advanced) L.stallSince = null;
     return advanced;
