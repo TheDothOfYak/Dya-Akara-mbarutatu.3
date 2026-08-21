@@ -10,6 +10,9 @@
      possible draw is a RubberMcFly in play (ShurgrEdan retribution
      taking both sides down, or a McFly standoff).
    - Hunt mode: encounter objectives against wild creatures.
+   - Brawl mode: multi-token, multi-team elimination — 2v2/3v3/5v5 team
+     battles and a 4-player free-for-all. Like a duel: no resources/pulse/
+     Relic, every token fielded at once, last team standing wins.
    ============================================================ */
 (function () {
   'use strict';
@@ -20,6 +23,22 @@
   const HOARD_R = 70;
   const RELIC_PICK_R = 26;
   const ELS = ['Fti', 'Su', 'Eldi', 'Ular'];
+
+  /* Team colours. The first two keep the classic gold-vs-red so 1v1 and
+     standard matches look exactly as before; the rest fill out the multi-team
+     Brawl modes (2v2/3v3/5v5 and the 4-player free-for-all). */
+  const TEAM_COLORS = ['#d9b87a', '#b05a5a', '#6a9bd1', '#7bbf6a', '#c58ad9', '#d9a25a'];
+
+  /* Where each team makes its stand. Two teams keep the original left/right
+     hoards; three or four teams spread to the edges/corners of the arena so a
+     free-for-all opens with everyone apart. Larger counts ring the field. */
+  function teamAnchor(i, n) {
+    if (n <= 2) return i === 0 ? { x: 240, y: WORLD.h / 2 } : { x: WORLD.w - 240, y: WORLD.h / 2 };
+    if (n === 3) return [{ x: 280, y: WORLD.h / 2 }, { x: WORLD.w - 340, y: 260 }, { x: WORLD.w - 340, y: WORLD.h - 260 }][i];
+    if (n === 4) return [{ x: 320, y: 260 }, { x: WORLD.w - 320, y: 260 }, { x: 320, y: WORLD.h - 260 }, { x: WORLD.w - 320, y: WORLD.h - 260 }][i];
+    const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+    return { x: WORLD.w / 2 + Math.cos(a) * 560, y: WORLD.h / 2 + Math.sin(a) * 360 };
+  }
 
   function startVec(n) {
     const v = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
@@ -71,8 +90,8 @@
       controller: t.controller,             // 'human' | 'ai' | 'replay' | 'wild'
       seal: t.seal || null,
       aiSkill: t.aiSkill || 0.6,
-      color: i === 0 ? '#d9b87a' : '#b05a5a',
-      hoard: i === 0 ? { x: 240, y: WORLD.h / 2 } : { x: WORLD.w - 240, y: WORLD.h / 2 },
+      color: t.color || TEAM_COLORS[i % TEAM_COLORS.length],
+      hoard: teamAnchor(i, cfg.teams.length),
       resources: startVec(t.startResources || 0),
       pouch: (t.pouch || []).map(tok => ({ tok, state: 'pouch', readiedAtPulse: -1, deaths: 0 })),
       readied: [],                          // pouch entries, max 5
@@ -122,8 +141,29 @@
       });
     }
 
-    /* hunt/duel: no relics on the field */
-    if (M.mode === 'hunt' || M.mode === 'duel') { M.relics.forEach(r => { r.captured = true; r.disabled = true; }); }
+    /* brawl mode: multi-token, multi-team elimination (2v2/3v3/5v5 and the
+       4-player free-for-all). Like a duel there is no economy, pulse or Relic —
+       every pouch token for every side takes the field at once, arranged in a
+       little line at its team's stand, facing the middle of the arena. Last
+       team standing wins. Targeting is team-relative (any other team is a foe),
+       so a free-for-all needs no special handling in combat. */
+    if (M.mode === 'brawl') {
+      M.teams.forEach((t, i) => {
+        const anchor = t.hoard;
+        const toC = Math.atan2(WORLD.h / 2 - anchor.y, WORLD.w / 2 - anchor.x);
+        const px = Math.cos(toC + Math.PI / 2), py = Math.sin(toC + Math.PI / 2);   // line perpendicular to the charge
+        const entries = t.pouch.filter(Boolean);
+        entries.forEach((entry, k) => {
+          const off = (k - (entries.length - 1) / 2) * 64;
+          const x = anchor.x + Math.cos(toC) * 84 + px * off;
+          const y = anchor.y + Math.sin(toC) * 84 + py * off;
+          M.spawnFromToken(entry.tok, i, x, y);
+        });
+      });
+    }
+
+    /* hunt/duel/brawl: no relics on the field */
+    if (M.mode === 'hunt' || M.mode === 'duel' || M.mode === 'brawl') { M.relics.forEach(r => { r.captured = true; r.disabled = true; }); }
 
     /* hunt mode: spawn wild side */
     if (M.mode === 'hunt' && cfg.hunt) {
@@ -334,7 +374,19 @@
         c.mem.fedUntil = M.tick + Math.round((6 + (c.vars.foodMotivation || 0.5) * 8) / TICK);
       }
     } else if (input.type === 'concede') {
-      M.finish(1 - team, 'concede');
+      let winner = 1 - team;
+      /* free-for-all: there is no single "other" side, so credit the strongest
+         surviving rival with the win the conceding player hands over */
+      if (M.mode === 'brawl' && M.teams.length > 2) {
+        let best = -1, bf = -1;
+        M.teams.forEach((T2, i) => {
+          if (i === team) return;
+          const f = M.creatures.filter(c => !c.dead && c.team === i).reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0);
+          if (f > bf) { bf = f; best = i; }
+        });
+        if (best >= 0) winner = best;
+      }
+      M.finish(winner, 'concede');
     } else if (input.type === 'chat') {
       M.uiEvent(team, 'chat', input.msg);
     }
@@ -383,8 +435,8 @@
       }
     }
 
-    /* pulses (standard + hunt) */
-    if (M.mode !== 'duel' && M.time >= M.nextPulseAt) M.doPulse();
+    /* pulses (standard + hunt) — none in the resource-free duel/brawl modes */
+    if (M.mode !== 'duel' && M.mode !== 'brawl' && M.time >= M.nextPulseAt) M.doPulse();
 
     /* AI controllers */
     M.teams.forEach(T => { if (T.controller === 'ai' && !M.cfg.replayLog) M.aiThink(T); });
@@ -418,7 +470,7 @@
            jet, breath, tongue, hanii…) fires in duels too; we only force the
            creature onto the nearest foe when its brain produced no attack or
            ability this tick, so a duel can never stall on patrol/forage/flee. */
-        if (M.mode === 'duel') {
+        if (M.mode === 'duel' || M.mode === 'brawl') {
           const acting = c.state === 'special' || c.state === 'attack' || c.intent.state === 'special' || !!c.intent.attackTarget;
           if (!acting) {
             const foe = api.nearestEnemy(c, 99999);
@@ -1706,6 +1758,27 @@
     const M = this;
     if (M.over) return;
 
+    if (M.mode === 'brawl') {
+      /* let any pending ShurgrEdan retribution land before the call */
+      if (M._timeouts && M._timeouts.length) return;
+      const alive = M.teams.map((T, i) => M.creatures.some(c => !c.dead && c.team === i));
+      const standing = alive.map((a, i) => (a ? i : -1)).filter(i => i >= 0);
+      if (standing.length === 1) { M.finish(standing[0], 'brawl'); return; }
+      if (standing.length === 0) { M.finish(-1, 'draw'); return; }
+      /* stalemate guard (mirrors the duel): tokens that cannot reach or hurt
+         each other are called on condition — the team with the most total
+         health remaining takes it. */
+      if (M.time > 90 && (M.tick - M.lastCombatTick) > Math.round(90 / TICK)) {
+        const frac = (team) => M.creatures.filter(c => !c.dead && c.team === team)
+          .reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0);
+        let best = standing[0], bf = -1;
+        standing.forEach(i => { const f = frac(i); if (f > bf) { bf = f; best = i; } });
+        M.finish(best, 'condition');
+        return;
+      }
+      return;
+    }
+
     if (M.mode === 'duel') {
       /* a pending ShurgrEdan strike (RubberMcFly retribution) must land
          before the duel can be called — it can turn a win into the tie */
@@ -2301,6 +2374,10 @@
   /* ================= AI OPPONENT CONTROLLER ================= */
   Match.prototype.aiThink = function (T) {
     const M = this;
+    /* Duel and Brawl have no economy to run — every token is already on the
+       field fighting to elimination — and a free-for-all has more than two
+       teams (so the 1-team-vs-the-other bookkeeping below wouldn't hold). */
+    if (M.mode === 'duel' || M.mode === 'brawl') return;
     if (M.time < T.aiMem.nextThink) return;
     const skill = T.aiSkill;
 
