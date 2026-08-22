@@ -115,7 +115,10 @@
     M.relics = M.teams.map((T2, i) => ({
       ownerTeam: i, x: T2.hoard.x, y: T2.hoard.y - 26,
       homeX: T2.hoard.x, homeY: T2.hoard.y - 26,
-      carrier: null, carrierTeam: null, capturedBy: null, captured: false, disabled: false,
+      carrier: null, carrierTeam: null, capturedBy: null, capturedBySide: null, captured: false,
+      /* a side sharing one big hoard keeps ONE relic — allies past the first
+         are seated with cfg.teams[i].noRelic so their relic sits disabled */
+      disabled: !!(cfg.teams[i] && cfg.teams[i].noRelic),
     }));
 
     /* alliance helpers. hostile(a,b): teams a and b are on opposing sides.
@@ -1016,8 +1019,8 @@
     if (c.speciesId === 'tyndael') {
       c.heat = Math.max(0.05, c.heat - TICK * 0.008 / Math.max(0.2, c.vars.flameSustain));
       if (M.tick % 20 === 0 && c.heat > 0.6) {
-        // flame spread — being near a high-heat Tyndael is dangerous
-        M.creatures.forEach(o => { if (!o.dead && o !== c && U.dist(c.x, c.y, o.x, o.y) < 46) M.damage(o, 1.5, c, { noAnim: true }); });
+        // flame spread — being near a high-heat Tyndael is dangerous (but never to its own side)
+        M.creatures.forEach(o => { if (!o.dead && o.side !== c.side && U.dist(c.x, c.y, o.x, o.y) < 46) M.damage(o, 1.5, c, { noAnim: true }); });
       }
     }
     if (c.frenzy > 0) c.frenzy = Math.max(0, c.frenzy - TICK * 0.05);
@@ -1707,25 +1710,37 @@
     /* relic capture + defensive recovery */
     if (M.mode === 'standard' && M.tick % 5 === 0) {
       for (const rl of M.relics) {
-        if (rl.disabled || rl.captured) continue;
+        if (rl.disabled) continue;
         if (rl.carrier != null) {
           const car = M.creatures.find(cr => cr.id === rl.carrier);
           if (car && !car.dead) {
-            const own = M.teams[car.team].hoard;
-            if (U.dist(car.x, car.y, own.x, own.y) < HOARD_R) {
-              rl.captured = true; rl.capturedBy = car.team; rl.x = own.x; rl.y = own.y - 26;
+            /* delivered to ANY hoard on the carrier's own side (allies share
+               the goal — and a shared camp is one big hoard) */
+            const home = M.teams.find(T => M.sideOf(T.idx) === car.side && U.dist(car.x, car.y, T.hoard.x, T.hoard.y) < HOARD_R);
+            if (home) {
               car.carryingRelic = false; rl.carrier = null;
               car.matchXp = (car.matchXp || 0) + 40;
-              M.teams[car.team].stats.relicCaptured = true;
-              M.teams[car.team].stats.relicMethod = 'Carried home by ' + car.tokName;
-              M.uiEvent(-1, 'relic', car.tokName + ' delivers the enemy Relic!');
+              if (M.hostile(car.team, rl.ownerTeam)) {
+                /* captured a rival's relic — it's secured in your camp */
+                rl.captured = true; rl.capturedBy = car.team; rl.capturedBySide = car.side;
+                rl.x = home.hoard.x; rl.y = home.hoard.y - 26;
+                M.teams[car.team].stats.relicCaptured = true;
+                M.teams[car.team].stats.relicMethod = 'Carried home by ' + car.tokName;
+                M.uiEvent(-1, 'relic', car.tokName + ' delivers ' + (M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].name + '’s' : 'the enemy') + ' Relic!');
+              } else {
+                /* reclaimed your side's own relic — back home, safe */
+                rl.captured = false; rl.capturedBy = null; rl.capturedBySide = null;
+                rl.x = rl.homeX; rl.y = rl.homeY;
+                M.uiEvent(-1, 'relic', car.tokName + ' brings the Relic safely home!');
+              }
             }
           }
-        } else {
-          /* a dropped relic touched by its owners returns home */
+        } else if (!rl.captured) {
+          /* a dropped relic (loose in the field, not secured in a camp) is
+             carried home the instant one of its own side touches it */
           const atHome = Math.abs(rl.x - rl.homeX) < 4 && Math.abs(rl.y - rl.homeY) < 4;
           if (!atHome) {
-            const defender = M.creatures.find(cr => !cr.dead && cr.team === rl.ownerTeam && !cr.sp.tags.includes('inert') && U.dist(cr.x, cr.y, rl.x, rl.y) < RELIC_PICK_R + cr.radius);
+            const defender = M.creatures.find(cr => !cr.dead && M.allied(cr.team, rl.ownerTeam) && !cr.sp.tags.includes('inert') && U.dist(cr.x, cr.y, rl.x, rl.y) < RELIC_PICK_R + cr.radius);
             if (defender) {
               rl.x = rl.homeX; rl.y = rl.homeY;
               defender.matchXp = (defender.matchXp || 0) + 20;
@@ -1794,13 +1809,18 @@
       return;
     }
 
-    /* standard: a side wins by carrying a rival's Relic into one of its hoards.
-       In 1v1 that is the single enemy relic; in a multi-team Brawl it is any
-       hostile side's relic, and the winner is the side that carried it home. */
-    for (const rl of M.relics) {
-      if (rl.captured && !rl.disabled) {
-        const winner = rl.capturedBy != null ? rl.capturedBy : (1 - rl.ownerTeam);
-        M.finish(winner, 'relic');
+    /* standard: a side wins once it has captured EVERY rival's Relic (and holds
+       them all in its camp). In 1v1 there is only one enemy relic, so this is
+       the classic "carry the enemy relic home" — unchanged. In a team Brawl a
+       side must collect all of the other side's relics, and a rival can steal
+       one back to undo it. */
+    const activeRelics = M.relics.filter(r => !r.disabled);
+    const sidesWithRelics = [];
+    activeRelics.forEach(r => { const s = M.sideOf(r.ownerTeam); if (sidesWithRelics.indexOf(s) < 0) sidesWithRelics.push(s); });
+    for (const S of sidesWithRelics) {
+      const rivalRelics = activeRelics.filter(r => M.sideOf(r.ownerTeam) !== S);
+      if (rivalRelics.length && rivalRelics.every(r => r.captured && r.capturedBySide === S)) {
+        M.finish(M.anyTeamOnSide(S), 'relic');
         return;
       }
     }
@@ -1811,6 +1831,22 @@
       const sidesIn = M.sidesInPlay();
       if (sidesIn.length === 1) { M.finish(M.anyTeamOnSide(sidesIn[0]), 'elimination'); return; }
       if (sidesIn.length === 0) { M.finish(-1, 'draw'); return; }
+      /* "collect ALL the relics" can leave a defensive field in a long
+         standoff, so a Brawl is called on time: after the cap the side that
+         has captured the most rival relics (health remaining breaks a tie)
+         takes it — no Brawl runs forever. */
+      const cap = M.settings.brawlCap || 900;   // 15 minutes
+      if (M.time > cap) {
+        const score = (S) => {
+          const caps = M.relics.filter(r => !r.disabled && r.captured && r.capturedBySide === S).length;
+          const hp = M.creatures.filter(c => !c.dead && c.side === S).reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0);
+          return caps * 1000 + hp;
+        };
+        let best = sidesIn[0], bs = -1;
+        sidesIn.forEach(S => { const v = score(S); if (v > bs) { bs = v; best = S; } });
+        M.finish(M.anyTeamOnSide(best), 'time');
+        return;
+      }
     }
     /* draw: all pouches empty AND all field creatures semi-idle 5 straight minutes */
     const bothEmpty = M.teams.every(T => T.controller === 'wild' || (!T.pouch.some(e => e.state === 'pouch') && !T.readied.length));
@@ -1822,16 +1858,33 @@
   /* --- alliance / multi-team helpers (used by combat, AI, and end conditions) --- */
   /* the nearest hostile side's relic that can still be taken, within `range`
      (unbounded if range omitted) — never an ally's or your own */
-  Match.prototype.nearestFoeRelic = function (team, x, y, range) {
+  /* can `team` pick this relic up right now? Either a hostile side's relic
+     that has not yet been captured (grab it to capture), OR your OWN side's
+     relic that a rival captured (grab it to steal it back). Never one already
+     in someone's hands. */
+  Match.prototype.takeableRelic = function (rl, team) {
+    if (!rl || rl.disabled || rl.carrier != null) return false;
+    const mySide = this.sideOf(team), ownSide = this.sideOf(rl.ownerTeam);
+    if (rl.captured) return ownSide === mySide;   // reclaim your side's captured relic
+    return ownSide !== mySide;                     // capture a hostile relic
+  };
+  /* nearest relic `team` may take (capture a rival's, or reclaim its own),
+     within `range` (unbounded if omitted). */
+  Match.prototype.nearestTakeableRelic = function (team, x, y, range) {
     const M = this;
     let best = null, bd = range != null ? range : 1e9;
     for (const r of M.relics) {
-      if (r.disabled || r.captured || r.carrier != null) continue;
-      if (!M.hostile(team, r.ownerTeam)) continue;
+      if (!M.takeableRelic(r, team)) continue;
       const d = U.dist(x, y, r.x, r.y);
       if (d <= bd && d < (best ? bd : 1e9)) { bd = d; best = r; }
     }
     return best;
+  };
+  /* back-compat alias — the AI and behaviors read "the relic to go for", which
+     now includes reclaiming your own captured relic as well as capturing a
+     rival's. */
+  Match.prototype.nearestFoeRelic = function (team, x, y, range) {
+    return this.nearestTakeableRelic(team, x, y, range);
   };
   /* the nearest hostile side's hoard to `team`'s own hoard (for builder facing,
      AI push targets, etc.) */
@@ -2176,7 +2229,7 @@
         if (c.attackCd <= 0) {
           c.attackCd = 0.8;
           M.creatures.forEach(o => {
-            if (!o.dead && o !== c && U.dist(c.x, c.y, o.x, o.y) < (c.vars.reach || 26) + c.radius + o.radius) {
+            if (!o.dead && o.side !== c.side && U.dist(c.x, c.y, o.x, o.y) < (c.vars.reach || 26) + c.radius + o.radius) {
               M.damage(o, c.vars.spikeDamage || 3, c);
             }
           });
@@ -2206,17 +2259,22 @@
         }
       },
 
-      /* relic (steals a HOSTILE side's relic only — never an ally's) */
+      /* relic: grab a HOSTILE side's relic (to capture it), or your OWN side's
+         relic that a rival has captured (to steal it back). Grabbing always
+         un-captures — a relic in transit is contested, no longer secured. */
       pickRelic(c) {
-        const rl = M.nearestFoeRelic(c.team, c.x, c.y, RELIC_PICK_R + c.radius);
+        const rl = M.nearestTakeableRelic(c.team, c.x, c.y, RELIC_PICK_R + c.radius);
         if (!rl) return;
-        /* a standing Relic Ward seals the relic — break it first */
+        /* a standing Relic Ward seals a relic still at its owner's hoard */
         const ward = M.structures.find(s => s.type === 'ward' && s.team === rl.ownerTeam && s.hp > 0 && U.dist(s.x, s.y, rl.x, rl.y) < (s.radius || 66) + 30);
-        if (ward) { if (c.team === 0 || M.tick % 40 === 0) M.uiEvent(c.team, 'deny', 'The Relic Ward holds — break it first.'); return; }
+        if (ward && M.hostile(c.team, rl.ownerTeam)) { if (c.team === 0 || M.tick % 40 === 0) M.uiEvent(c.team, 'deny', 'The Relic Ward holds — break it first.'); return; }
+        const reclaim = M.allied(c.team, rl.ownerTeam);
+        rl.captured = false; rl.capturedBy = null; rl.capturedBySide = null;
         rl.carrier = c.id; rl.carrierTeam = c.team;
         c.carryingRelic = true;
         c.matchXp = (c.matchXp || 0) + 15;
-        M.uiEvent(-1, 'relic', c.tokName + ' grabs ' + (rl.ownerTeam === 0 ? 'YOUR' : (M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].name + '’s' : 'the enemy')) + ' Relic!');
+        const whose = reclaim ? 'back its own' : (M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].name + '’s' : 'the enemy');
+        M.uiEvent(-1, 'relic', c.tokName + (reclaim ? ' steals ' : ' grabs ') + whose + ' Relic!');
         if (!M.headless) DYA.audio.play('relicPick');
       },
       dropRelic(c) {

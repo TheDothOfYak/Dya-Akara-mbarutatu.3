@@ -42,7 +42,7 @@ function mk(sides, opts) {
     startResources: opts.startRes || 0,
   }));
   const M = new DYAG.match.Match({ seed: opts.seed || 4242, mode: 'standard',
-    settings: { pulseInterval: 6, pulseAmount: 3, chaos: false }, teams });
+    settings: { pulseInterval: 6, pulseAmount: 3, chaos: false, brawlCap: opts.brawlCap }, teams });
   M.headless = true;
   return M;
 }
@@ -108,15 +108,65 @@ console.log('== BRAWL MODES: multi-player standard matches with alliances ==');
   check('relic() targets a hostile side, never an ally\'s', M.hostile(0, target.ownerTeam), 'owner team ' + target.ownerTeam);
 }
 
-/* ---- win is SIDE-based: a captured relic wins for the carrying side ---- */
+/* ---- win = collect ALL of the other side's relics ---- */
+{
+  const M = mk([0, 0, 1, 1]);   // side 0 = teams 0,1 ; side 1 = teams 2,3
+  /* keep every side in play so the relic rule — not an empty-field draw — decides */
+  [0, 1, 2, 3].forEach(t => M.spawnFromToken(fighter(t + 1), t, 400 + t * 60, 500));
+  const cap = (team, by) => { const r = M.relics.find(x => x.ownerTeam === team); r.captured = true; r.capturedBy = by; r.capturedBySide = M.sideOf(by); };
+  /* side 0 captures just ONE of side 1's two relics — not enough */
+  cap(2, 1);
+  M.checkEnd();
+  check('capturing ONE of two rival relics does NOT win', !M.over, 'over=' + M.over);
+  /* now side 0 captures the SECOND rival relic — the set is complete */
+  cap(3, 0);
+  M.checkEnd();
+  check('capturing ALL rival relics wins the match', M.over);
+  check('the win is credited to the capturing SIDE (0)', M.result.winnerSide === 0, 'winnerSide=' + (M.result && M.result.winnerSide));
+}
+
+/* ---- steal your own relic back: it undoes a rival's capture ---- */
 {
   const M = mk([0, 0, 1, 1]);
-  /* team 1 (side 0) carries team 2's relic (side 1) home */
-  const rl = M.relics.find(r => r.ownerTeam === 2);
-  rl.captured = true; rl.capturedBy = 1;
+  const mine = M.relics.find(r => r.ownerTeam === 0);          // a side-0 relic
+  mine.captured = true; mine.capturedBy = 2; mine.capturedBySide = 1;  // side 1 grabbed it
+  check('a rival CANNOT take a relic already secured in its captor’s camp', !M.takeableRelic(mine, 2));
+  check('the owner side CAN take its own captured relic back', M.takeableRelic(mine, 0));
+  /* a side-0 creature reclaims it — grabbing un-captures immediately */
+  const c = M.spawnFromToken(fighter(1), 1, mine.x, mine.y);   // team 1 (side 0), on the relic
+  M.api()._c = c; M.api().pickRelic(c);
+  check('reclaiming a captured relic un-captures it on pickup', !mine.captured && mine.carrier === c.id);
+}
+
+/* ---- shared camp = one big hoard, one relic per side ---- */
+{
+  const teams = [0, 0, 1, 1].map((s, i) => ({
+    name: 'T' + i, side: s, controller: 'ai', aiSkill: 0.6, pouch: [],
+    noRelic: (i === 1 || i === 3),                 // second ally on each side has no relic
+    hoard: { x: s ? 1260 : 340, y: 500 },          // both allies of a side share the spot
+  }));
+  const M = new DYAG.match.Match({ seed: 7, mode: 'standard', settings: { pulseInterval: 6, pulseAmount: 3, chaos: false }, teams });
+  M.headless = true;
+  check('shared camp: allies past the first hold no relic', M.relics.filter(r => !r.disabled).length === 2, 'active=' + M.relics.filter(r => !r.disabled).length);
+  check('shared camp: one active relic per side', M.sideOf(M.relics.filter(r => !r.disabled)[0].ownerTeam) !== M.sideOf(M.relics.filter(r => !r.disabled)[1].ownerTeam));
+  /* side 0 captures side 1's single active relic → wins (only one to collect) */
+  const foe = M.relics.find(r => !r.disabled && M.sideOf(r.ownerTeam) === 1);
+  foe.captured = true; foe.capturedBy = 0; foe.capturedBySide = 0;
   M.checkEnd();
-  check('capturing a rival Relic ends the match', M.over);
-  check('the win is credited to the capturing SIDE (0), not just the team', M.result.winnerSide === 0, 'winnerSide=' + (M.result && M.result.winnerSide));
+  check('shared camp: taking the side’s one relic wins', M.over && M.result.winnerSide === 0, 'over=' + M.over);
+}
+
+/* ---- teammates never friendly-fire, even from an area attack ---- */
+{
+  const M = mk([0, 0, 1, 1]);
+  const tyn = M.spawnFromToken(TK.mint({ speciesId: 'tyndael', rng: new U.Rng(3) }), 0, 700, 500);
+  tyn.heat = 1;                                    // hot enough to spread flame
+  const ally = M.spawnFromToken(fighter(9), 1, 720, 500);   // same side, in range
+  const foe = M.spawnFromToken(fighter(8), 2, 680, 500);    // rival, in range
+  const aHp = ally.hp, fHp = foe.hp;
+  for (let i = 0; i < 40; i++) M.doTick();
+  check('an allied area attack (Tyndael flame) never burns a teammate', ally.hp >= aHp, 'ally ' + aHp + '→' + ally.hp);
+  check('the same area attack does burn a rival', foe.hp < fHp || foe.dead, 'foe ' + fHp + '→' + foe.hp);
 }
 
 /* ---- elimination: last side standing wins a multi-team match ---- */
@@ -138,12 +188,13 @@ console.log('== BRAWL MODES: multi-player standard matches with alliances ==');
   check('the conceding side (0) does not win the concede', M.result.winnerSide !== 0, 'winnerSide=' + (M.result && M.result.winnerSide));
 }
 
-/* ---- full matches resolve for every shape, without hanging ---- */
+/* ---- full matches always resolve: collect-all-relics can stand off, so a
+       Brawl is called on time (most rival relics, then health). No match hangs. ---- */
 function resolves(sides, seeds) {
   let ok = 0, hang = 0;
   seeds.forEach(s => {
-    const M = mk(sides, { pouchN: 4, startRes: 6, seed: s });
-    let n = 0; const cap = 700 * 20;
+    const M = mk(sides, { pouchN: 4, startRes: 6, seed: s, brawlCap: 120 });
+    let n = 0; const cap = 200 * 20;   // must resolve well before this
     while (!M.over && n < cap) { M.doTick(); n++; }
     if (M.over && M.result && (M.result.winner === -1 || M.result.winnerSide >= 0)) ok++; else hang++;
   });

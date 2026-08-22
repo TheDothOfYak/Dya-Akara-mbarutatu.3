@@ -1700,8 +1700,9 @@
         const mineTxt = mine.carrier != null ? '<span style="color:var(--red)">STOLEN!</span>' : (Math.abs(mine.x - mine.homeX) > 6 ? '<span style="color:var(--eldi)">DROPPED</span>' : '<span style="color:var(--green)">SAFE</span>');
         if (isMulti && M.hostile) {
           const rivals = M.relics.filter(r => !r.disabled && M.hostile(MY, r.ownerTeam));
-          const taken = rivals.filter(r => r.captured || (r.carrierTeam != null && M.sideOf(r.carrierTeam) === M.sideOf(MY))).length;
-          return 'Yours: ' + mineTxt + ' · Rival relics taken: ' + taken + '/' + rivals.length;
+          const mine2 = M.sideOf(MY);
+          const taken = rivals.filter(r => (r.captured && r.capturedBySide === mine2) || (r.carrierTeam != null && M.sideOf(r.carrierTeam) === mine2)).length;
+          return 'Yours: ' + mineTxt + ' · Rival relics: ' + taken + '/' + rivals.length + ' (need all)';
         }
         const theirs = M.relics.find(r => r.ownerTeam === 1 - MY);
         const theirsTxt = !theirs ? '—' : theirs.captured ? '<span style="color:var(--green)">CAPTURED</span>' : theirs.carrier != null ? '<span style="color:var(--green)">TAKEN</span>' : 'home';
@@ -2734,22 +2735,50 @@
   const W_ = 1600, H_ = 1000;
   const BRAWL_RIVALS = ['Vekar', 'Skorn', 'Ashfoot', 'Duskclaw', 'Ormun', 'Talra', 'Byndel', 'Kesh', 'Oru'];
 
-  /* --- layout generators: each returns an array of player slots
-         {side, x, y}; slot 0 is always the human. --- */
-  function colPositions(cx, n, shared) {
+  /* --- 15 team-battle maps -------------------------------------------------
+     Each map lays out one side's hoards (up to 5, ordered so the first N stay
+     well-spread for 2v2 / 3v3 / 5v5); the opposing side is the mirror across
+     the centre line, so it's always ONE team on the left and the other on the
+     right — but never a straight column. A random map is drawn per match. */
+  const BRAWL_MAPS = [
+    { name: 'Stagger',    pts: [[300, 500], [250, 180], [350, 820], [300, 340], [280, 660]] },
+    { name: 'Crescent',   pts: [[300, 500], [200, 240], [200, 760], [380, 380], [380, 620]] },
+    { name: 'Vanguard',   pts: [[540, 430], [220, 520], [540, 600], [220, 300], [220, 740]] },
+    { name: 'Slant',      pts: [[200, 220], [300, 400], [400, 580], [480, 740], [240, 850]] },
+    { name: 'Diamond',    pts: [[360, 500], [220, 320], [220, 680], [500, 320], [500, 680]] },
+    { name: 'Tidewave',   pts: [[250, 200], [460, 340], [250, 500], [460, 660], [250, 820]] },
+    { name: 'Echelon',    pts: [[200, 300], [300, 430], [400, 560], [500, 690], [300, 800]] },
+    { name: 'Pincer',     pts: [[280, 230], [280, 780], [420, 300], [420, 710], [230, 500]] },
+    { name: 'Rampart',    pts: [[190, 260], [240, 460], [190, 660], [240, 850], [440, 500]] },
+    { name: 'Arrowhead',  pts: [[520, 500], [370, 350], [370, 650], [230, 230], [230, 770]] },
+    { name: 'Highground', pts: [[250, 190], [380, 780], [420, 250], [230, 600], [300, 420]] },
+    { name: 'Ringfort',   pts: [[350, 500], [230, 340], [470, 340], [230, 660], [470, 660]] },
+    { name: 'Cliffside',  pts: [[170, 260], [230, 440], [170, 620], [230, 800], [330, 500]] },
+    { name: 'Scatterlow', pts: [[240, 300], [470, 440], [300, 650], [500, 780], [200, 830]] },
+    { name: 'Broadfront', pts: [[300, 240], [190, 470], [430, 560], [260, 760], [500, 300]] },
+  ];
+
+  /* a shared camp is ONE big hoard: every ally on the side sits at the same
+     spot (they overlap into a single camp) and the side keeps a single relic
+     (allies past the first are seated noRelic in beginBrawl) */
+  function clusterPositions(cx, n) {
     const pts = [];
-    if (shared) {
-      for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2; pts.push({ x: cx + (n > 1 ? Math.cos(a) * 52 : 0), y: H_ / 2 + (n > 1 ? Math.sin(a) * 92 : 0) }); }
-    } else {
-      const top = 160, bot = H_ - 160;
-      for (let i = 0; i < n; i++) pts.push({ x: cx, y: n === 1 ? H_ / 2 : top + (bot - top) * (i / (n - 1)) });
-    }
+    for (let i = 0; i < n; i++) pts.push({ x: cx, y: H_ / 2 });
     return pts;
   }
-  function teamBattleLayout(perSide, shared) {
-    const left = colPositions(340, perSide, shared).map(p => ({ side: 0, x: p.x, y: p.y }));
-    const right = colPositions(W_ - 340, perSide, shared).map(p => ({ side: 1, x: p.x, y: p.y }));
-    return left.concat(right);          // human is left slot 0
+  /* one side takes the map's first `perSide` hoards; the other mirrors across
+     the centre line. Shared camps ignore the map and cluster instead. */
+  function teamBattleLayout(perSide, shared, map) {
+    map = map || BRAWL_MAPS[0];
+    let left, right;
+    if (shared) {
+      left = clusterPositions(340, perSide);
+      right = clusterPositions(W_ - 340, perSide);
+    } else {
+      left = map.pts.slice(0, perSide).map(([x, y]) => ({ x, y }));
+      right = map.pts.slice(0, perSide).map(([x, y]) => ({ x: W_ - x, y }));
+    }
+    return left.map(p => ({ side: 0, x: p.x, y: p.y })).concat(right.map(p => ({ side: 1, x: p.x, y: p.y })));
   }
   function ffaLayout(n) {
     const ring = { 3: [[300, 300], [1300, 300], [800, H_ - 240]],
@@ -2766,9 +2795,9 @@
   }
 
   const BRAWL_MODES = [
-    { id: 'team', label: 'Team Battle', desc: 'Allied sides fight to the Relic. Pick a size, and whether each ally holds their own base or you all share one camp.',
+    { id: 'team', label: 'Team Battle', desc: 'Allied sides fight to the Relic on one of 15 maps. Pick a size, and whether each ally holds their own base or you all share one camp.',
       sizes: [['2', '2 v 2'], ['3', '3 v 3'], ['5', '5 v 5']], hasShared: true,
-      build: (size, shared) => teamBattleLayout(size, shared) },
+      build: (size, shared, map) => teamBattleLayout(size, shared, map) },
     { id: 'ffa', label: 'Free-for-all', desc: 'Everyone for themselves — no allies. The last player standing (or the first to steal a rival Relic) wins.',
       sizes: [['3', '3 players'], ['4', '4 players']], hasShared: false,
       build: (size) => ffaLayout(size) },
@@ -2823,18 +2852,356 @@
     w.appendChild(diffSel);
 
     const m = UI.modal(w);
-    w.appendChild(U.el('button', {
-      cls: 'btn primary mt', text: 'Choose your pouch', onclick: () => {
-        const layout = mode.build(size, shared);
+    function makeFmt() {
+      const map = mode.id === 'team' && !shared ? BRAWL_MAPS[Math.floor(Math.random() * BRAWL_MAPS.length)] : null;
+      const layout = mode.build(size, shared, map);
+      return { mode: mode, size, shared, layout, map, label: mode.label + ' · ' + (mode.id === 'team' ? size + 'v' + size : size + ' players') };
+    }
+    const btnRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:10px;flex-wrap:wrap' });
+    /* Multiplayer — the online lobby: invite friends, pick your team, and any
+       empty seats fill with Dya'kukull after a short search for real players */
+    btnRow.appendChild(U.el('button', {
+      cls: 'btn primary', text: '🌐 Multiplayer', onclick: () => {
         m.close();
-        P.pickPouch(pouch => beginBrawl({ mode: mode, label: mode.label + ' · ' + size + (mode.id === 'team' ? 'v' + size : ''), layout }, parseFloat(diffSel.value), pouch));
+        UI.requireOnline(() => P.pickPouch(pouch => UI.show('brawlLobby', { fmt: makeFmt(), pouch, aiSkill: parseFloat(diffSel.value) })),
+          { title: 'Multiplayer Brawl', body: 'A Brawl with other players of the world needs the Guild network. To play on your own, choose <b>Practice vs the machine</b> instead.' });
       },
     }));
+    /* Practice — straight to the vote screen against the machine */
+    btnRow.appendChild(U.el('button', {
+      cls: 'btn', text: '🤖 Practice vs the machine', onclick: () => {
+        m.close();
+        P.pickPouch(pouch => UI.show('brawlSetup', { fmt: makeFmt(), pouch, aiSkill: parseFloat(diffSel.value) }));
+      },
+    }));
+    w.appendChild(btnRow);
+    /* Join a friend's room by the code they shared (or that arrived in your invite) */
+    const joinRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;align-items:center' });
+    const codeIn = U.el('input', { cls: 'txt', maxlength: 5, placeholder: 'room code', style: 'text-transform:uppercase;max-width:130px' });
+    joinRow.appendChild(codeIn);
+    joinRow.appendChild(U.el('button', {
+      cls: 'btn small', text: 'Join a room', onclick: () => {
+        const code = (codeIn.value || '').trim().toUpperCase();
+        if (code.length < 4) { UI.toast({ title: 'Enter a code', body: 'Ask your friend for their 5-letter room code.', icon: '⌨' }); return; }
+        m.close();
+        P.pickPouch(pouch => P.joinBrawlRoom(code, pouch));
+      },
+    }));
+    w.appendChild(joinRow);
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   };
 
-  function beginBrawl(fmt, aiSkill, pouch) {
+  /* ---- Brawl pre-match: the SAME pulse-settings vote screen the other modes
+     use (interval / resources-per-pulse / Standard-Chaos), adapted to show the
+     whole roster of camps. Ready or let the timer run, then the match starts. */
+  UI.register('brawlSetup', {
+    enter(root, params) {
+      const fmt = params.fmt, pouch = params.pouch;
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Brawl Setup' }));
+      const wrap = U.el('div', { cls: 'setup-wrap' });
+
+      /* left: your pouch */
+      const left = U.el('div', { cls: 'setup-col panel' });
+      left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your pouch — ' + G.me.displayName }));
+      const pl = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(78px,1fr))' });
+      pouch.forEach(t => pl.appendChild(UI.tokenCard(t, { size: 56, mode: 'minimal' })));
+      left.appendChild(pl);
+      wrap.appendChild(left);
+
+      /* center: the vote (identical dials to matchSetup) */
+      const mid = U.el('div', { cls: 'setup-col panel', style: 'max-width:420px' });
+      let timeLeft = 30;
+      const timer = U.el('div', { cls: 'setup-timer', text: timeLeft });
+      mid.appendChild(timer);
+      mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Votes lock when the timer ends. The middle ground wins.' }));
+      const myVote = { interval: 8, amount: 2, mode: 'Standard' };
+      const rngV = new U.Rng(U.newSeed());
+      const oppVote = { interval: rngV.pick(EC.PULSE_INTERVALS), amount: rngV.pick(EC.PULSE_AMOUNTS), mode: rngV.chance(0.25) ? 'Chaos' : 'Standard' };
+      function voteRow(label, opts, key, f) {
+        const row = U.el('div', { cls: 'vote-row' });
+        row.appendChild(U.el('div', { cls: 'muted small', text: label }));
+        const w2 = U.el('div', { cls: 'vote-opts' });
+        opts.forEach(o => {
+          const b = U.el('div', { cls: 'vote-opt' + (myVote[key] === o ? ' mine' : '') + (oppVote[key] === o ? ' theirs' : ''), text: f ? f(o) : o });
+          b.onclick = () => { myVote[key] = o; U.qsa('.vote-opt', w2).forEach((x, i) => x.classList.toggle('mine', opts[i] === o)); DYA.audio.play('click'); };
+          w2.appendChild(b);
+        });
+        row.appendChild(w2);
+        return row;
+      }
+      mid.appendChild(voteRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, 'interval', v => v + 's'));
+      mid.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
+      mid.appendChild(voteRow('MODE — Chaos randomizes every pulse (majority required)', ['Standard', 'Chaos'], 'mode'));
+      mid.appendChild(U.el('p', { cls: 'small muted', html: '◆ = the field’s current vote' }));
+      mid.appendChild(U.el('div', { cls: 'vote-row' }, [U.el('div', { cls: 'muted small', html: 'MAP — <span class="gold">' + U.esc(fmt.map ? fmt.map.name : (fmt.mode.label)) + '</span> · terrain assigned randomly' })]));
+      const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready — skip the wait' });
+      mid.appendChild(readyBtn);
+      wrap.appendChild(mid);
+
+      /* right: the roster of camps in this Brawl */
+      const right = U.el('div', { cls: 'setup-col panel' });
+      right.appendChild(U.el('h3', { cls: 'gold mb', text: 'The field — ' + fmt.label }));
+      const sideCount = {};
+      fmt.layout.forEach(s => { sideCount[s.side] = (sideCount[s.side] || 0) + 1; });
+      const nSides = Object.keys(sideCount).length;
+      right.appendChild(U.el('p', { cls: 'muted small', html: fmt.mode.id === 'team'
+        ? 'Two allied sides of <b>' + (sideCount[0] || 0) + '</b>. You lead the gold side; allies never fight each other.'
+        : nSides + ' camps, every one for itself.' }));
+      const roster = U.el('div', { cls: 'mt' });
+      const mySlot = params.humanSlot || 0;
+      fmt.layout.forEach((s, i) => {
+        const col = DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[s.side % 6] : '#d9b87a';
+        roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + (i === mySlot ? '<b>' + U.esc(G.me.displayName) + '</b> (you)' : 'a rival camp') }));
+      });
+      right.appendChild(roster);
+      wrap.appendChild(right);
+
+      scr.appendChild(wrap);
+      root.appendChild(scr);
+
+      let done = false;
+      const iv = setInterval(() => {
+        if (done) return;
+        timeLeft--; timer.textContent = timeLeft;
+        if (timeLeft <= 5) timer.classList.add('urgent');
+        if (timeLeft <= 0) finish();
+      }, 1000);
+      readyBtn.onclick = () => finish();
+      function finish() {
+        if (done) return; done = true; clearInterval(iv);
+        const settings = DYA.matchvote.combine(myVote, oppVote);
+        /* online host: hand the agreed settings back to the lobby so it can
+           broadcast the descriptor and launch the netmatch. Otherwise launch
+           the local (AI-filled) match directly. */
+        if (params.onSettings) params.onSettings(settings);
+        else beginBrawl(fmt, params.aiSkill, pouch, settings, params.humanSlot || 0);
+      }
+      this.leave = () => { done = true; clearInterval(iv); };
+    },
+  });
+
+  /* ---- Brawl MULTIPLAYER LOBBY (the first of the two lobbies; the pulse-vote
+     screen is the second). You enter here on tapping Multiplayer: invite
+     friends, pick your team, then Ready. Readying searches ~10s for real
+     players of the world and fills any empty seats with Dya'kukull — the same
+     rule the Duel uses — then hands off to the vote screen and the match.
+
+     Cross-device play rides the N-seat lockstep (js/core/netplay.js): a real
+     friend who joins occupies a human seat; every unfilled seat is an AI that
+     each client simulates identically, so no seat that isn't a real person
+     ever touches the wire. */
+  UI.register('brawlLobby', {
+    enter(root, params) {
+      const fmt = params.fmt, pouch = params.pouch, me = G.me;
+      const O = DYA.online;
+      const isTeam = fmt.mode.id === 'team';
+      /* seats-per-side / total; you always hold one seat */
+      const total = fmt.layout.length;
+      let myChoice = 'team1';                 // team1 | random | team2  (team battles only)
+
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Multiplayer Lobby' }));
+      const page = U.el('div', { cls: 'page' });
+      const head = U.el('div', { cls: 'page-head' });
+      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('play') }));
+      head.appendChild(U.el('h2', { text: 'Brawl Lobby — ' + fmt.label }));
+      page.appendChild(head);
+      const body = U.el('div', { cls: 'page-body', style: 'max-width:640px;margin:0 auto' });
+
+      /* --- team choice (team battles only): Team 1 / Random / Team 2 --- */
+      if (isTeam) {
+        const tp = U.el('div', { cls: 'panel mb' });
+        tp.appendChild(U.el('div', { cls: 'small muted', text: 'YOUR TEAM' }));
+        const row = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
+        const gold = DYA.match.TEAM_COLORS[0], red = DYA.match.TEAM_COLORS[1];
+        [['team1', 'Team 1', gold], ['random', 'Random', 'var(--muted)'], ['team2', 'Team 2', red]].forEach(([v, l, c]) => {
+          const b = U.el('button', { cls: 'btn small' + (myChoice === v ? ' primary' : ''), style: 'border-color:' + c, text: l, onclick: () => { myChoice = v; U.qsa('button', row).forEach((x, i) => x.classList.toggle('primary', ['team1', 'random', 'team2'][i] === v)); DYA.audio.play('click'); } });
+          row.appendChild(b);
+        });
+        tp.appendChild(row);
+        body.appendChild(tp);
+      }
+
+      /* --- roster of seats --- */
+      const rosterPanel = U.el('div', { cls: 'panel mb' });
+      rosterPanel.appendChild(U.el('div', { cls: 'flex', style: 'justify-content:space-between' }, [
+        U.el('div', { cls: 'small muted', text: 'THE FIELD — ' + total + ' camps' }),
+        U.el('div', { cls: 'small muted', text: isTeam ? (fmt.size + ' per side') : 'free-for-all' }),
+      ]));
+      const roster = U.el('div', { cls: 'mt' });
+      rosterPanel.appendChild(roster);
+      body.appendChild(rosterPanel);
+      /* real peers who joined the room (netId -> {netId,name,seal,pouch}); every
+         other seat fills with a Dya'kukull at start */
+      const peers = {};
+      function hostSeat() {
+        if (!isTeam) return 0;                 // FFA / surrounded: you are slot 0
+        const choice = myChoice === 'random' ? 'team1' : myChoice;   // random resolved for real at start
+        const wantSide = choice === 'team2' ? 1 : 0;
+        const idx = fmt.layout.findIndex(s => s.side === wantSide);
+        return idx < 0 ? 0 : idx;
+      }
+      function renderRoster() {
+        roster.innerHTML = '';
+        const pl = Object.values(peers);
+        let pi = 0;
+        fmt.layout.forEach((slot, i) => {
+          const col = DYA.match.TEAM_COLORS[slot.side % 6];
+          let who;
+          if (i === hostSeat()) who = '<b>' + U.esc(me.displayName) + '</b> <span class="small muted">(you)</span>';
+          else if (pi < pl.length) { who = '<b>' + U.esc(pl[pi].name) + '</b> <span class="small muted">(joined)</span>'; pi++; }
+          else who = '<span class="muted">open — fills with a Dya’kukull</span>';
+          roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + who }));
+        });
+      }
+      renderRoster();
+
+      /* --- invite friends --- */
+      const invPanel = U.el('div', { cls: 'panel mb' });
+      invPanel.appendChild(U.el('div', { cls: 'small muted', text: 'INVITE FRIENDS' }));
+      const friends = (O && O.state && O.state.friends) || [];
+      if (!friends.length) {
+        invPanel.appendChild(U.el('p', { cls: 'muted small mt', text: 'No friends online to invite yet — add friends in the Friends screen. You can still Ready up; the lobby will find players or seat Dya’kukull.' }));
+      } else {
+        const fl = U.el('div', { cls: 'mt' });
+        friends.forEach(f => {
+          const r = U.el('div', { cls: 'friend-row' });
+          r.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(f.displayName || f.name || 'Friend') + '</b>' }));
+          r.appendChild(U.el('button', {
+            cls: 'btn small', text: 'Invite', onclick: async (e) => {
+              e.target.disabled = true; e.target.textContent = 'Invited';
+              try {
+                const codeMsg = roomCode ? ('room code ' + roomCode + ' — Play → Brawl → Multiplayer → Join a room') : 'Play → Brawl → Multiplayer';
+                if (O && O.sendMessage) await O.sendMessage(f.id, '⚔ Come brawl my ' + fmt.label + '! ' + codeMsg);
+                UI.toast({ title: 'Invite sent', body: (f.displayName || 'Your friend') + ' will see it in their notifications.', icon: '⚔' });
+              } catch (err) { UI.toast({ title: 'Could not invite', body: err.message, icon: '⚠' }); e.target.disabled = false; e.target.textContent = 'Invite'; }
+            },
+          }));
+          fl.appendChild(r);
+        });
+        invPanel.appendChild(fl);
+      }
+      body.appendChild(invPanel);
+
+      /* --- room code (for sharing) --- */
+      const codeLine = U.el('p', { cls: 'small muted center mt' });
+      body.appendChild(codeLine);
+
+      /* --- ready / search / fill --- */
+      const status = U.el('p', { cls: 'muted mt center' });
+      body.appendChild(status);
+      const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready' });
+      body.appendChild(readyBtn);
+
+      /* ---- host a real room so friends can join across devices; if the
+             network can't be reached we still work locally (AI fill) ---- */
+      let room = null, roomCode = null, done = false;
+      const myNet = (O && O.me && O.me() && O.me().netId) || me.id;
+      (async () => {
+        if (!(DYA.netplay && DYA.netplay.joinRoom && O && O.configured && O.configured())) { codeLine.textContent = 'Playing locally — empty seats fill with Dya’kukull.'; return; }
+        try {
+          roomCode = DYA.netplay.genRoomCode();
+          room = await DYA.netplay.joinRoom(roomCode, myNet, {
+            onMessage(msg) {
+              if (!msg) return;
+              if ((msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye') && P._netSession && P._netSession.route) { P._netSession.route(msg); return; }
+              if (msg.t === 'joinBrawl' && msg.netId && !peers[msg.netId]) {
+                peers[msg.netId] = { netId: msg.netId, name: msg.name || 'Player', seal: msg.seal, pouch: msg.pouch || [] };
+                renderRoster();
+                room.send({ t: 'lobbyAck', to: msg.netId, label: fmt.label });   // let them know they're in
+              }
+            },
+            onPeerLeave(key) { if (peers[key]) { delete peers[key]; renderRoster(); } },
+          });
+          codeLine.innerHTML = 'Room code: <b class="gold">' + roomCode + '</b> — share it, or invite a friend above.';
+        } catch (e) {
+          room = null; codeLine.textContent = 'Couldn’t reach the room service — playing locally (Dya’kukull fill).';
+        }
+      })();
+
+      let elapsed = 0, tmr = null;
+      readyBtn.onclick = () => {
+        if (tmr || done) return; readyBtn.disabled = true;
+        status.textContent = 'Searching for players… (0s)';
+        tmr = setInterval(() => {
+          if (done) return;
+          elapsed++;
+          const n = Object.keys(peers).length;
+          status.textContent = n ? (n + ' player(s) joined — starting…') : ('Searching for players… (' + elapsed + 's)');
+          if (elapsed >= 10 || (n && n >= total - 1)) startMatch();
+        }, 1000);
+      };
+
+      function startMatch() {
+        if (done) return; done = true; if (tmr) clearInterval(tmr);
+        /* seat the host at their chosen team; drop joined peers into the other
+           open seats; the rest become Dya'kukull */
+        const seats = new Array(total).fill(null);
+        const hs = hostSeat();
+        seats[hs] = { human: true, netId: myNet, name: me.displayName, seal: me.seal || { avatarIdx: me.avatarIdx, patterns: [] }, pouch, accId: me.id };
+        Object.values(peers).forEach(p => {
+          let idx = seats.findIndex((s, i) => !s && i !== hs);
+          if (idx >= 0) seats[idx] = { human: true, netId: p.netId, name: p.name, seal: p.seal, pouch: p.pouch };
+        });
+        /* second lobby: the shared pulse-settings vote screen (host authoritative),
+           then the match. Offline/local → just the vote screen and beginBrawl. */
+        if (room) {
+          UI.show('brawlSetup', {
+            fmt, pouch, aiSkill: params.aiSkill, humanSlot: hs,
+            onSettings: (settings) => {
+              const desc = buildBrawlDescriptor(fmt, seats, settings);
+              room.send({ t: 'start', desc });
+              launchNetBrawl(room, desc, myNet);
+            },
+          });
+        } else {
+          UI.show('brawlSetup', { fmt, pouch, aiSkill: params.aiSkill, humanSlot: hs });
+        }
+      }
+
+      this.leave = () => { done = true; if (tmr) clearInterval(tmr); };
+      page.appendChild(body);
+      scr.appendChild(page);
+      root.appendChild(scr);
+    },
+  });
+
+  /* ---- guest side: join a friend's brawl room by code, then wait for the
+     host to start; the descriptor arrives over the wire and every client
+     builds the identical match. ---- */
+  P.joinBrawlRoom = function (code, pouch) {
+    UI.requireOnline(async () => {
+      const me = G.me, O = DYA.online;
+      const myNet = (O && O.me && O.me() && O.me().netId) || me.id;
+      const w = U.el('div', { cls: 'center' });
+      w.appendChild(U.el('h3', { cls: 'gold', text: 'Joining brawl ' + String(code).toUpperCase() + '…' }));
+      const st = U.el('p', { cls: 'muted mt', text: 'Connecting to the room…' });
+      w.appendChild(st);
+      const m = UI.modal(w, { sticky: true });
+      let started = false, room = null;
+      w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { if (room && !started) try { room.leave(); } catch (e) { } m.close(); } }));
+      try {
+        room = await DYA.netplay.joinRoom(code, myNet, {
+          onMessage(msg) {
+            if (!msg) return;
+            if ((msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye') && P._netSession && P._netSession.route) { P._netSession.route(msg); return; }
+            if (msg.t === 'lobbyAck') { st.textContent = 'In the lobby — waiting for the host to start…'; }
+            if (msg.t === 'start' && msg.desc && !started) { started = true; m.close(); launchNetBrawl(room, msg.desc, myNet); }
+          },
+        });
+        st.textContent = 'In the lobby — waiting for the host to start…';
+        room.send({ t: 'joinBrawl', netId: myNet, name: me.displayName, seal: me.seal || { avatarIdx: me.avatarIdx, patterns: [] }, pouch: pouch });
+      } catch (e) {
+        st.textContent = 'Could not join: ' + e.message;
+      }
+    }, { title: 'Join a Brawl', body: 'Joining a friend’s Brawl needs the Guild network.' });
+  };
+
+  function beginBrawl(fmt, aiSkill, pouch, settings, humanSlot) {
     const me = G.me;
+    settings = settings || { pulseInterval: 8, pulseAmount: 2, chaos: false };
+    humanSlot = humanSlot || 0;
     const startRes = G.titleBuff('startRes') || 0;
     const mySeal = me.seal || { avatarIdx: me.avatarIdx, patterns: [] };
 
@@ -2844,9 +3211,14 @@
     const pool = ais.slice().sort(() => Math.random() - 0.5);
     let aiN = 0;
 
+    /* a shared camp keeps ONE relic per side: the first team on each side holds
+       it, allies after that are seated noRelic (their relic sits disabled) */
+    const sideHasRelic = {};
     const teams = fmt.layout.map((slot, i) => {
-      const base = { side: slot.side, hoard: { x: slot.x, y: slot.y }, color: DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[slot.side % 6] : undefined };
-      if (i === 0) {
+      let noRelic = false;
+      if (fmt.shared) { if (sideHasRelic[slot.side]) noRelic = true; else sideHasRelic[slot.side] = true; }
+      const base = { side: slot.side, noRelic, hoard: { x: slot.x, y: slot.y }, color: DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[slot.side % 6] : undefined };
+      if (i === humanSlot) {
         return Object.assign(base, { name: me.displayName, accId: me.id, controller: 'human', pouch: pouch.map(t => U.deepCopy(t)), startResources: startRes, seal: mySeal });
       }
       const acc = pool[aiN++];
@@ -2857,17 +3229,13 @@
 
     const seed = U.newSeed();
     const terrain = ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)];
-    const match = new DYA.match.Match({
-      seed, mode: 'standard', terrain,
-      settings: { pulseInterval: 8, pulseAmount: 2, chaos: false },
-      teams,
-    });
+    const match = new DYA.match.Match({ seed, mode: 'standard', terrain, settings, teams });
     UI.showWithLoading('match', {
       match,
       cfg: {
-        mode: 'standard', format: fmt.label + ' Brawl', noRecord: true, noXp: true,
+        mode: 'standard', format: fmt.label + ' Brawl', noRecord: true, noXp: true, myTeam: humanSlot,
         opponent: { name: fmt.mode.id === 'team' ? 'the rival side' : 'the field' },
-        rematch: () => beginBrawl(fmt, aiSkill, pouch),
+        rematch: () => beginBrawl(fmt, aiSkill, pouch, settings, humanSlot),
         onFinish: (res, iWon, draw, toMenu) => { G.save(); UI.show(toMenu ? 'menu' : 'play'); },
       },
     }, 1100);
@@ -2878,6 +3246,67 @@
     const out = [];
     for (let i = 0; i < 18; i++) out.push(TK.mint({ speciesId: SP.craftable[Math.floor(Math.random() * SP.craftable.length)], rng: new U.Rng(U.newSeed()) }));
     return out;
+  }
+
+  /* ============ ONLINE BRAWL — the authoritative match descriptor ============
+     The HOST builds ONE descriptor that fully specifies the match — seed,
+     terrain, agreed settings, and EVERY seat's full team (name, side, hoard,
+     colour, controller, and its complete pouch). It is broadcast to the room
+     so all clients build a byte-identical Match. Human seats carry the peer's
+     netId; the rest are Dya'kukull that every client simulates identically
+     (their pouches are IN the descriptor, never re-minted per client, so no
+     seat that isn't a real person ever needs the wire). */
+  function buildBrawlDescriptor(fmt, seats, settings) {
+    const startRes = G.titleBuff('startRes') || 0;
+    const ais = Object.values(G.world.accounts || {}).filter(a => a.ai);
+    const pool = ais.slice().sort(() => Math.random() - 0.5);
+    let aiN = 0;
+    const sideHasRelic = {};
+    const teams = fmt.layout.map((slot, i) => {
+      let noRelic = false;
+      if (fmt.shared) { if (sideHasRelic[slot.side]) noRelic = true; else sideHasRelic[slot.side] = true; }
+      const t = { side: slot.side, noRelic, hoard: { x: slot.x, y: slot.y }, color: DYA.match.TEAM_COLORS[slot.side % 6], startRes };
+      const seat = seats[i];
+      if (seat && seat.human) {
+        t.name = seat.name; t.controller = 'human'; t.netId = seat.netId; t.accId = seat.accId || null;
+        t.pouch = (seat.pouch || []).map(x => U.deepCopy(x)); t.seal = seat.seal || { avatarIdx: 0, patterns: [] };
+      } else {
+        const acc = pool[aiN++];
+        t.name = acc ? acc.displayName : (BRAWL_RIVALS[aiN % BRAWL_RIVALS.length] + '’s Band');
+        t.controller = 'ai'; t.accId = acc ? acc.id : null; t.aiSkill = acc ? G.aiSkill(acc) : 0.7;
+        t.pouch = acc ? P.accountPouch(acc).map(x => U.deepCopy(x)) : mintBrawlPouch();
+        t.seal = (acc && acc.seal) || { avatarIdx: 3, patterns: ['runes'] };
+      }
+      return t;
+    });
+    return { seed: U.newSeed(), terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)], settings, label: fmt.label, mode: fmt.mode.id, teams };
+  }
+
+  /* every client builds the SAME Match from the descriptor and starts the
+     N-seat lockstep; human seats network, AI seats run free on all clients. */
+  function launchNetBrawl(room, desc, myNetId) {
+    const teams = desc.teams.map(t => ({
+      name: t.name, side: t.side, noRelic: t.noRelic, hoard: t.hoard, color: t.color,
+      controller: t.controller, aiSkill: t.aiSkill, accId: t.accId || null,
+      pouch: (t.pouch || []).map(x => U.deepCopy(x)), startResources: t.startRes || 0, seal: t.seal,
+    }));
+    const match = new DYA.match.Match({ seed: desc.seed, mode: 'standard', terrain: desc.terrain, settings: desc.settings, teams });
+    const humanSeats = desc.teams.map((t, i) => (t.controller === 'human' ? i : -1)).filter(i => i >= 0);
+    let mySeat = desc.teams.findIndex(t => t.netId && t.netId === myNetId);
+    if (mySeat < 0) mySeat = humanSeats[0] != null ? humanSeats[0] : 0;
+    const net = new DYA.netplay.Lockstep(match, mySeat, payload => { try { room.send(payload); } catch (e) { } }, humanSeats);
+    net.room = room; P._netSession = net;
+    net.route = (msg) => { if (!msg) return; if (msg.t === 'frame' || msg.t === 'need') net.onRemote(msg); else if (msg.t === 'bye') net.peerLeft = Date.now(); };
+    const myPouch = (desc.teams[mySeat] && desc.teams[mySeat].pouch) || [];
+    UI.showWithLoading('match', {
+      match,
+      cfg: {
+        mode: 'standard', format: desc.label + ' Brawl (Online)', noRecord: true, noXp: true, myTeam: mySeat, net,
+        opponent: { name: desc.mode === 'team' ? 'the rival side' : 'the field', remoteHuman: humanSeats.length > 1 },
+        pouch: myPouch,
+        onFinish: (res, iWon, draw, toMenu) => { if (room) try { room.leave(); } catch (e) { } P._netSession = null; G.save(); UI.show(toMenu ? 'menu' : 'play'); },
+      },
+    }, 1300);
   }
 
   /* ================= REPLAYS ================= */

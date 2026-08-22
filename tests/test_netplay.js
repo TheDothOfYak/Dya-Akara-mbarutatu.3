@@ -122,5 +122,84 @@ while ((!mC.over || !mD.over) && iter2 < MAX_ITERS) {
 }
 check('duplicate/uneven delivery stays in sync', mC.over && mD.over && mC.tick === mD.tick && JSON.stringify(mC.log) === JSON.stringify(mD.log) && NP.stateHash(mC) === NP.stateHash(mD));
 
+/* ===================================================================
+   N-PLAYER lockstep: a multi-seat Brawl. Four teams (a 4-player
+   free-for-all, sides 0/1/2/3); three are HUMAN seats on separate
+   devices, the fourth is a Dya'kukull (AI) that every client simulates
+   identically from the seeded brain — so only the three humans network.
+   All three clients must stay byte-identical and reach one result. */
+const brawlPouches = [mkPouch(16), mkPouch(16), mkPouch(16), mkPouch(16)];
+const HUMANS = [0, 1, 2];          // teams 0,1,2 are human; team 3 is AI
+function mkBrawl() {
+  const m = new DYAG.match.Match({
+    seed: 0xBEEF, mode: 'standard', terrain: 'plains',
+    settings: { pulseInterval: 5, pulseAmount: 3, chaos: false },
+    teams: [0, 1, 2, 3].map(i => ({
+      name: 'P' + i, side: i,
+      controller: HUMANS.indexOf(i) >= 0 ? 'human' : 'ai', aiSkill: 0.7,
+      pouch: JSON.parse(JSON.stringify(brawlPouches[i])),
+      hoard: { x: i % 2 ? 1300 : 300, y: i < 2 ? 300 : 700 },
+    })),
+  });
+  m.headless = true;
+  return m;
+}
+
+const N_CLIENTS = HUMANS.length;
+const bMatches = HUMANS.map(mkBrawl);
+const bWires = [];                 // {at, to, msg}
+let bIter = 0;
+const BLAT = 3;
+const bNets = HUMANS.map((seat, ci) => new NP.Lockstep(bMatches[ci], seat, (msg) => {
+  const cp = JSON.parse(JSON.stringify(msg));
+  for (let j = 0; j < N_CLIENTS; j++) if (j !== ci) bWires.push({ at: bIter + BLAT, to: j, msg: cp });
+}, HUMANS));
+function bDeliver() {
+  for (let i = bWires.length - 1; i >= 0; i--) {
+    if (bWires[i].at <= bIter) { const w = bWires.splice(i, 1)[0]; bNets[w.to].onRemote(w.msg); }
+  }
+}
+/* each human client scripts inputs for ITS OWN seat */
+const bScript = [];
+for (let k = 0; k < 24; k++) {
+  const ci = k % N_CLIENTS;
+  bScript.push({ at: 100 + k * 70, ci, input: { type: 'ready', pouchIdx: k % 16 } });
+  bScript.push({ at: 210 + k * 70, ci, input: { type: 'trigger', slot: 0, x: 300 + (k * 61) % 1000, y: 200 + (k * 37) % 600 } });
+}
+bScript.push({ at: 7000, ci: 0, input: { type: 'concede' } });   // seat 0 bows out → decisive end
+let bIdx = 0;
+while (bMatches.some(m => !m.over) && bIter < MAX_ITERS) {
+  bIter++;
+  bDeliver();
+  while (bIdx < bScript.length && bScript[bIdx].at <= bIter) {
+    const s = bScript[bIdx++];
+    if (!bMatches[s.ci].over) bNets[s.ci].queueLocal(s.input);
+  }
+  bNets.forEach(n => n.step(0.05));
+}
+bDeliver();
+for (let k = 0; k < 600 && bMatches.some(m => !m.over); k++) { bIter++; bDeliver(); bNets.forEach(n => n.step(0.05)); }
+
+const allOver = bMatches.every(m => m.over);
+const sameTick = bMatches.every(m => m.tick === bMatches[0].tick);
+const sameLog = bMatches.every(m => JSON.stringify(m.log) === JSON.stringify(bMatches[0].log));
+const sameHash = bMatches.every(m => NP.stateHash(m) === NP.stateHash(bMatches[0]));
+const sameResult = bMatches.every(m => m.result && bMatches[0].result && m.result.winner === bMatches[0].result.winner && m.result.winnerSide === bMatches[0].result.winnerSide);
+const noDesync = bNets.every(n => !n.desynced);
+console.log('N-player brawl lockstep (3 humans + 1 AI):');
+console.log('  ticks=', bMatches.map(m => m.tick).join('/'), 'winnerSide=', bMatches.map(m => m.result && m.result.winnerSide).join('/'));
+check('all three clients finished', allOver, bMatches.map(m => m.over).join('/'));
+check('all three at the same tick', sameTick, bMatches.map(m => m.tick).join('/'));
+check('identical input logs across clients', sameLog, bMatches.map(m => m.log.length).join('/'));
+check('identical state hash across clients', sameHash);
+check('same winning side across clients', sameResult);
+check('no desync flagged on any client', noDesync);
+check('the AI seat played without any of its own frames on the wire (it was never networked)', bMatches[0].log.some(e => e.team === 3), 'AI seat inputs present in the synced log');
+
+/* a solo human whose rivals are ALL AI never waits on the wire */
+const solo = mkBrawl();
+const soloNet = new NP.Lockstep(solo, 0, () => {}, [0]);   // only seat 0 is human
+check('solo human (all-AI rivals) runs free — maxSafeTick is unbounded', soloNet.maxSafeTick() === Infinity);
+
 if (fails) { console.log('NETPLAY: ' + fails + ' FAILURE(S)'); process.exit(1); }
 console.log('NETPLAY: ALL PASS');
