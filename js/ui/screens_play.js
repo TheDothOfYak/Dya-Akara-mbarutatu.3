@@ -1700,8 +1700,9 @@
         const mineTxt = mine.carrier != null ? '<span style="color:var(--red)">STOLEN!</span>' : (Math.abs(mine.x - mine.homeX) > 6 ? '<span style="color:var(--eldi)">DROPPED</span>' : '<span style="color:var(--green)">SAFE</span>');
         if (isMulti && M.hostile) {
           const rivals = M.relics.filter(r => !r.disabled && M.hostile(MY, r.ownerTeam));
-          const taken = rivals.filter(r => r.captured || (r.carrierTeam != null && M.sideOf(r.carrierTeam) === M.sideOf(MY))).length;
-          return 'Yours: ' + mineTxt + ' · Rival relics taken: ' + taken + '/' + rivals.length;
+          const mine2 = M.sideOf(MY);
+          const taken = rivals.filter(r => (r.captured && r.capturedBySide === mine2) || (r.carrierTeam != null && M.sideOf(r.carrierTeam) === mine2)).length;
+          return 'Yours: ' + mineTxt + ' · Rival relics: ' + taken + '/' + rivals.length + ' (need all)';
         }
         const theirs = M.relics.find(r => r.ownerTeam === 1 - MY);
         const theirsTxt = !theirs ? '—' : theirs.captured ? '<span style="color:var(--green)">CAPTURED</span>' : theirs.carrier != null ? '<span style="color:var(--green)">TAKEN</span>' : 'home';
@@ -2757,10 +2758,12 @@
     { name: 'Broadfront', pts: [[300, 240], [190, 470], [430, 560], [260, 760], [500, 300]] },
   ];
 
-  /* allies clustered into one shared camp on their side */
+  /* a shared camp is ONE big hoard: every ally on the side sits at the same
+     spot (they overlap into a single camp) and the side keeps a single relic
+     (allies past the first are seated noRelic in beginBrawl) */
   function clusterPositions(cx, n) {
     const pts = [];
-    for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2; pts.push({ x: cx + (n > 1 ? Math.cos(a) * 52 : 0), y: H_ / 2 + (n > 1 ? Math.sin(a) * 92 : 0) }); }
+    for (let i = 0; i < n; i++) pts.push({ x: cx, y: H_ / 2 });
     return pts;
   }
   /* one side takes the map's first `perSide` hoards; the other mirrors across
@@ -3108,8 +3111,13 @@
     const pool = ais.slice().sort(() => Math.random() - 0.5);
     let aiN = 0;
 
+    /* a shared camp keeps ONE relic per side: the first team on each side holds
+       it, allies after that are seated noRelic (their relic sits disabled) */
+    const sideHasRelic = {};
     const teams = fmt.layout.map((slot, i) => {
-      const base = { side: slot.side, hoard: { x: slot.x, y: slot.y }, color: DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[slot.side % 6] : undefined };
+      let noRelic = false;
+      if (fmt.shared) { if (sideHasRelic[slot.side]) noRelic = true; else sideHasRelic[slot.side] = true; }
+      const base = { side: slot.side, noRelic, hoard: { x: slot.x, y: slot.y }, color: DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[slot.side % 6] : undefined };
       if (i === humanSlot) {
         return Object.assign(base, { name: me.displayName, accId: me.id, controller: 'human', pouch: pouch.map(t => U.deepCopy(t)), startResources: startRes, seal: mySeal });
       }
