@@ -1283,6 +1283,12 @@
   Match.prototype.damage = function (t, amount, source, opts) {
     const M = this;
     if (t.dead || M.over) return;
+    /* TEAMMATES NEVER HARM EACH OTHER. A creature never damages a unit on its
+       own side — whatever the source (melee, projectile, breath, area burst,
+       a fire patch, a bog). This is the single authoritative guard so no
+       attack path can slip friendly fire through. A self-hit, or damage from a
+       source with no side (pure environment), is unaffected. */
+    if (source && source !== t && source.side != null && source.side === t.side) return;
     /* a rider up on its mount cannot be struck directly — blows land on the
        mount (whose riderProtect already softens them) */
     if (t.riding) return;
