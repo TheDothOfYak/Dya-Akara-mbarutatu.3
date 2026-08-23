@@ -506,9 +506,11 @@
       /* crenellations (chunkier when upgraded) */
       ctx.fillStyle = up ? '#5a4d38' : '#4c4033';
       for (let i = 0; i * 8 < capW; i++) ctx.fillRect(-capW / 2 + i * 8, deckTop, 4, 5);
-      /* garrison pips — one per seated archer, capacity shown faint */
+      /* garrison pips — one per seated archer, capacity shown faint. A
+         permanently-manned keep always shows its archers filled. */
+      const manned = Math.max(occ, s.permManned || 0);
       for (let i = 0; i < cap; i++) {
-        ctx.fillStyle = i < occ ? teamCol : '#3a3229';
+        ctx.fillStyle = i < manned ? teamCol : '#3a3229';
         ctx.beginPath(); ctx.arc(-((cap - 1) * 5) + i * 10, deckTop - 6, 3, 0, TAU); ctx.fill();
       }
       /* pennant(s) */

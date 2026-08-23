@@ -1788,7 +1788,14 @@
         /* HUD updates */
         const esc = EC.escalationMult(M.time);
         const zf = M.zikFrac ? M.zikFrac() : 0;
-        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '') + (zf > 0 ? ' · <span style="color:var(--r6)">☄ SUNEAR’ZIKHRON</span>' : '');
+        /* king-of-the-hill: show how long the king must still hold the Relic */
+        let kingHillTag = '';
+        if (M.kingHill) {
+          const left = Math.max(0, (M.kingHill.protect || 300) - M.time);
+          const iAmKing = M.sideOf(MY) === M.sideOf(M.kingTeam);
+          kingHillTag = ' · <span class="gold">👑 ' + (iAmKing ? 'HOLD' : 'BREAK') + ' ' + U.fmtTime(left) + '</span>';
+        }
+        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + kingHillTag + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '') + (zf > 0 ? ' · <span style="color:var(--r6)">☄ SUNEAR’ZIKHRON</span>' : '');
         const frac = Math.max(0, 1 - (M.nextPulseAt - M.time) / (M.settings.pulseInterval || 8));
         pulseBar.firstChild.style.width = Math.min(100, frac * 100) + '%';
         relicRow.innerHTML = M.mode === 'hunt'
@@ -2946,10 +2953,13 @@
       mapName: fmt.map ? fmt.map.name : null,
     };
   }
-  /* the layout slot the host takes, honouring their team choice (team battles
-     only; FFA / surrounded put you in slot 0) */
+  /* the layout slot the host takes, honouring their team choice. Team battles:
+     team1/team2. Surrounded king-of-the-hill: the KING is always the centre
+     (slot 0); an ATTACKER takes the first ring seat (slot 1). FFA: slot 0. */
   function brawlHostSeat(fmt, choice) {
-    if (!fmt || fmt.mode.id !== 'team') return 0;
+    if (!fmt) return 0;
+    if (fmt.mode.id === 'surrounded') return choice === 'attacker' ? 1 : 0;
+    if (fmt.mode.id !== 'team') return 0;
     const want = (choice === 'team2') ? 1 : 0;   // 'random' resolves to team1 here
     const idx = fmt.layout.findIndex(s => s.side === want);
     return idx < 0 ? 0 : idx;
@@ -2971,7 +2981,8 @@
 
       let phase = 'ready';            // 'ready' -> 'vote'
       let done = false, room = null, closedMM = false, mmBeat = null, voteTimer = null;
-      let myChoice = 'team1';         // team battles only
+      /* team battles: team1|random|team2. Surrounded: king|attacker. */
+      let myChoice = (fmt && fmt.mode.id === 'surrounded') ? 'king' : 'team1';
       let seatPlan = null;            // set at the vote transition: [{human,netId,...}|null]
       let myHumanSlot = 0, realCount = 1;
 
@@ -2981,7 +2992,9 @@
       members[myNet] = { netId: myNet, name: me.displayName, seal: mySeal, pouch: pouch, ready1: false, ready2: false, vote: null };
       let roster = rosterFromMembers();     // guests overwrite from host broadcasts
 
-      const myVote = { interval: 8, amount: 2, mode: 'Standard' };
+      const isSurround = !!(fmt && fmt.mode.id === 'surrounded');
+      const PROTECT_MINUTES = [3, 5, 7, 10];
+      const myVote = { interval: 8, amount: 2, mode: 'Standard', protect: 5 };
       const chatLog = [];
       let voteTimeLeft = BRAWL_VOTE_SECONDS;
       /* live element handles for the vote screen */
@@ -3037,6 +3050,21 @@
             row.appendChild(U.el('button', { cls: 'btn small' + (myChoice === v ? ' primary' : ''), style: 'border-color:' + c, text: l, onclick: () => { myChoice = v; renderReady(); } }));
           });
           tp.appendChild(row);
+          bodyWrap.appendChild(tp);
+        }
+
+        /* Surrounded: choose to hold the hill as KING, or be an ATTACKER */
+        if (isHost && info && info.modeId === 'surrounded') {
+          const tp = U.el('div', { cls: 'panel mb' });
+          tp.appendChild(U.el('div', { cls: 'small muted', text: 'YOUR ROLE' }));
+          const row = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
+          [['king', '👑 King of the Hill'], ['attacker', '⚔ Attacker']].forEach(([v, l]) => {
+            row.appendChild(U.el('button', { cls: 'btn small' + (myChoice === v ? ' primary' : ''), text: l, onclick: () => { myChoice = v; renderReady(); } }));
+          });
+          tp.appendChild(row);
+          tp.appendChild(U.el('p', { cls: 'small muted mt', text: myChoice === 'king'
+            ? 'Hold the centre castle and protect your Relic until the timer runs out. +50% resources, walls, corner archer towers and a manned keep. A Builder upgrades your walls and towers.'
+            : 'Break the castle and steal the king’s Relic before the timer ends. You have no Relic to defend — all that matters is the hill.' }));
           bodyWrap.appendChild(tp);
         }
 
@@ -3180,6 +3208,7 @@
         mid.appendChild(voteRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, 'interval', v => v + 's'));
         mid.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
         mid.appendChild(voteRow('MODE — Chaos randomizes every pulse (majority required)', ['Standard', 'Chaos'], 'mode'));
+        if (isSurround) mid.appendChild(voteRow('HOLD THE HILL — minutes the king must protect the Relic', PROTECT_MINUTES, 'protect', v => v + ' min'));
         readyLineEl = U.el('p', { cls: 'small muted center' });
         mid.appendChild(readyLineEl);
         readyBtnEl = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready — skip the wait', onclick: () => toggleReady2() });
@@ -3273,11 +3302,19 @@
           for (let i = 0; i < aiSeats; i++) votes.push({ interval: rngV.pick(EC.PULSE_INTERVALS), amount: rngV.pick(EC.PULSE_AMOUNTS), mode: rngV.chance(0.25) ? 'Chaos' : 'Standard' });
         }
         const settings = DYA.matchvote.combineMany(votes);
+        /* Surrounded king-of-the-hill: the protect timer is part of the vote too */
+        let kingHill = null;
+        if (isSurround) {
+          let sum = 0, n = 0;
+          votes.forEach(v => { if (v && v.protect) { sum += v.protect; n++; } });
+          const mins = n ? PROTECT_MINUTES.reduce((b, o) => Math.abs(o - sum / n) < Math.abs(b - sum / n) ? o : b, PROTECT_MINUTES[0]) : 5;
+          kingHill = { protect: mins * 60 };
+        }
         if (isSolo || !room) {
           cleanupKeepRoom();
-          beginBrawl(fmt, pouch, settings, myHumanSlot);
+          beginBrawl(fmt, pouch, settings, myHumanSlot, kingHill);
         } else {
-          const desc = buildBrawlDescriptor(fmt, seatPlan, settings);
+          const desc = buildBrawlDescriptor(fmt, seatPlan, settings, kingHill);
           sendToRoom({ t: 'start', desc });
           const r = room; room = null; cleanupKeepRoom();
           launchNetBrawl(r, desc, myNet);
@@ -3379,7 +3416,7 @@
     },
   });
 
-  function beginBrawl(fmt, pouch, settings, humanSlot) {
+  function beginBrawl(fmt, pouch, settings, humanSlot, kingHill) {
     const me = G.me;
     settings = settings || { pulseInterval: 8, pulseAmount: 2, chaos: false };
     humanSlot = humanSlot || 0;
@@ -3407,17 +3444,19 @@
       const aiPouch = acc ? P.accountPouch(acc).map(t => U.deepCopy(t)) : mintBrawlPouch();
       return Object.assign(base, { name, accId: acc ? acc.id : null, controller: 'ai', aiSkill: acc ? G.aiSkill(acc) : 0.7, pouch: aiPouch, startResources: startRes, seal: (acc && acc.seal) || { avatarIdx: 3, patterns: ['runes'] } });
     });
+    /* Surrounded king-of-the-hill: the centre (slot 0) is the king */
+    if (kingHill && teams[0]) teams[0].king = true;
 
     const seed = U.newSeed();
     const terrain = ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)];
-    const match = new DYA.match.Match({ seed, mode: 'standard', terrain, settings, teams });
+    const match = new DYA.match.Match({ seed, mode: 'standard', terrain, settings, teams, kingHill: kingHill || null });
     UI.showWithLoading('match', {
       match,
       cfg: {
         /* a Brawl is a real casual match now — it records and pays gold + XP */
         mode: 'standard', format: fmt.label + ' Brawl', myTeam: humanSlot,
         opponent: { name: fmt.mode.id === 'team' ? 'the rival side' : 'the field' },
-        rematch: () => beginBrawl(fmt, pouch, settings, humanSlot),
+        rematch: () => beginBrawl(fmt, pouch, settings, humanSlot, kingHill),
         onFinish: (res, iWon, draw, toMenu) => { G.save(); UI.show(toMenu ? 'menu' : 'play'); },
       },
     }, 1100);
@@ -3438,7 +3477,7 @@
      netId; the rest are Dya'kukull that every client simulates identically
      (their pouches are IN the descriptor, never re-minted per client, so no
      seat that isn't a real person ever needs the wire). */
-  function buildBrawlDescriptor(fmt, seats, settings) {
+  function buildBrawlDescriptor(fmt, seats, settings, kingHill) {
     const startRes = G.titleBuff('startRes') || 0;
     const ais = Object.values(G.world.accounts || {}).filter(a => a.ai);
     const pool = ais.slice().sort(() => Math.random() - 0.5);
@@ -3461,18 +3500,20 @@
       }
       return t;
     });
-    return { seed: U.newSeed(), terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)], settings, label: fmt.label, mode: fmt.mode.id, teams };
+    /* Surrounded king-of-the-hill: the centre (slot 0) is the king */
+    if (kingHill && teams[0]) teams[0].king = true;
+    return { seed: U.newSeed(), terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)], settings, label: fmt.label, mode: fmt.mode.id, teams, kingHill: kingHill || null };
   }
 
   /* every client builds the SAME Match from the descriptor and starts the
      N-seat lockstep; human seats network, AI seats run free on all clients. */
   function launchNetBrawl(room, desc, myNetId) {
     const teams = desc.teams.map(t => ({
-      name: t.name, side: t.side, noRelic: t.noRelic, hoard: t.hoard, color: t.color,
+      name: t.name, side: t.side, noRelic: t.noRelic, king: !!t.king, hoard: t.hoard, color: t.color,
       controller: t.controller, aiSkill: t.aiSkill, accId: t.accId || null,
       pouch: (t.pouch || []).map(x => U.deepCopy(x)), startResources: t.startRes || 0, seal: t.seal,
     }));
-    const match = new DYA.match.Match({ seed: desc.seed, mode: 'standard', terrain: desc.terrain, settings: desc.settings, teams });
+    const match = new DYA.match.Match({ seed: desc.seed, mode: 'standard', terrain: desc.terrain, settings: desc.settings, teams, kingHill: desc.kingHill || null });
     const humanSeats = desc.teams.map((t, i) => (t.controller === 'human' ? i : -1)).filter(i => i >= 0);
     let mySeat = desc.teams.findIndex(t => t.netId && t.netId === myNetId);
     if (mySeat < 0) mySeat = humanSeats[0] != null ? humanSeats[0] : 0;
