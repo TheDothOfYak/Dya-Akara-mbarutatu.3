@@ -186,6 +186,55 @@
     catch (e) { return null; }
   }
 
+  /* ---------- BRAWL matchmaking ("just enter — it finds an open brawl") ----------
+     The shared queue doubles as an open-brawl directory. A brawl "type" (mode +
+     size + shared) is its own channel, so a searcher only ever joins a brawl of
+     the SAME type it picked. Unlike the 1v1 ladder this is a FUNNEL, not a claim:
+       • findOpenBrawl(type) → the room_code of a fresh host waiting on this type,
+         or null. The searcher JOINS that room by code (many guests, one host).
+       • hostBrawl(type, roomCode) advertises MY room as open on this type; call
+         it again to heartbeat while the lobby waits.
+       • closeBrawl() removes my advertisement the instant the lobby starts, so no
+         new player funnels into a match already under way.
+     Rows are keyed by net_id in `circuit` = '__brawl__<type>', carrying the host's
+     room_code. Everything is best-effort: with no cloud, the caller just hosts
+     locally and fills with Dya'kukull. */
+  const BRAWL_PREFIX = '__brawl__';
+  S.brawlChannel = function (type) { return BRAWL_PREFIX + String(type || 'any'); };
+
+  S.findOpenBrawl = async function (type) {
+    const m = me(); if (!m || !S.configured()) return null;
+    const myNet = myNetId();
+    const chan = S.brawlChannel(type);
+    try {
+      const rows = await rest('GET', 'dya_season_queue?circuit=eq.' + encodeURIComponent(chan) +
+        '&status=eq.seeking&room_code=not.is.null&select=net_id,room_code,updated_at,name&order=updated_at.desc&limit=10') || [];
+      const cutoff = Date.now() - FRESH_MS;
+      const host = rows.find(r => r.net_id !== myNet && r.room_code && Date.parse(r.updated_at || 0) > cutoff);
+      return host ? { roomCode: host.room_code, hostName: host.name || 'Player' } : null;
+    } catch (e) { return null; }
+  };
+
+  S.hostBrawl = async function (type, roomCode) {
+    const m = me(); if (!m || !S.configured() || !roomCode) return false;
+    const chan = S.brawlChannel(type);
+    try {
+      await rest('POST', 'dya_season_queue?on_conflict=net_id', {
+        net_id: myNetId(), name: m.displayName, level: m.level, rank: m.rank || 1000,
+        avatar_idx: m.avatarIdx || 0, circuit: chan, season: (DYA.state.world.season && DYA.state.world.season.number) || 1,
+        pouch: [], status: 'seeking', opponent_net_id: null, room_code: roomCode, updated_at: new Date().toISOString(),
+      }, 'resolution=merge-duplicates');
+      return true;
+    } catch (e) { return false; }
+  };
+
+  /* stop advertising my brawl (best effort) */
+  S.closeBrawl = async function () {
+    const myNet = me() && me().netId;
+    if (!myNet || !S.configured()) return;
+    try { await rest('DELETE', 'dya_season_queue?net_id=eq.' + encodeURIComponent(myNet)); } catch (e) { }
+  };
+
   /* leave the queue (best effort) */
   S.dequeue = async function () {
     const myNet = me() && me().netId;

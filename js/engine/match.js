@@ -1734,26 +1734,19 @@
                 M.teams[car.team].stats.relicMethod = 'Carried home by ' + car.tokName;
                 M.uiEvent(-1, 'relic', car.tokName + ' delivers ' + (M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].name + '’s' : 'the enemy') + ' Relic!');
               } else {
-                /* reclaimed your side's own relic — back home, safe */
+                /* an ally can no longer be carrying its own side's relic — the
+                   owning side can never pick its own Relic up (no take-backs) —
+                   so this branch is unreachable; kept defensively. */
                 rl.captured = false; rl.capturedBy = null; rl.capturedBySide = null;
                 rl.x = rl.homeX; rl.y = rl.homeY;
-                M.uiEvent(-1, 'relic', car.tokName + ' brings the Relic safely home!');
               }
             }
           }
-        } else if (!rl.captured) {
-          /* a dropped relic (loose in the field, not secured in a camp) is
-             carried home the instant one of its own side touches it */
-          const atHome = Math.abs(rl.x - rl.homeX) < 4 && Math.abs(rl.y - rl.homeY) < 4;
-          if (!atHome) {
-            const defender = M.creatures.find(cr => !cr.dead && M.allied(cr.team, rl.ownerTeam) && !cr.sp.tags.includes('inert') && U.dist(cr.x, cr.y, rl.x, rl.y) < RELIC_PICK_R + cr.radius);
-            if (defender) {
-              rl.x = rl.homeX; rl.y = rl.homeY;
-              defender.matchXp = (defender.matchXp || 0) + 20;
-              M.uiEvent(-1, 'relic', defender.tokName + ' returns the Relic home!');
-            }
-          }
         }
+        /* No defensive recovery: a Relic knocked loose in the field is NOT
+           carried home by its owners — there are no take-backs. It lies where
+           it fell until a rival hauls it away, so every capture is progress
+           that sticks and a side racing to grab every Relic can actually win. */
       }
     }
 
@@ -1818,8 +1811,8 @@
     /* standard: a side wins once it has captured EVERY rival's Relic (and holds
        them all in its camp). In 1v1 there is only one enemy relic, so this is
        the classic "carry the enemy relic home" — unchanged. In a team Brawl a
-       side must collect all of the other side's relics, and a rival can steal
-       one back to undo it. */
+       side must collect all of the other side's relics; captures are permanent
+       (no take-backs), so once a side holds every rival Relic the win stands. */
     const activeRelics = M.relics.filter(r => !r.disabled);
     const sidesWithRelics = [];
     activeRelics.forEach(r => { const s = M.sideOf(r.ownerTeam); if (sidesWithRelics.indexOf(s) < 0) sidesWithRelics.push(s); });
@@ -1871,7 +1864,10 @@
   Match.prototype.takeableRelic = function (rl, team) {
     if (!rl || rl.disabled || rl.carrier != null) return false;
     const mySide = this.sideOf(team), ownSide = this.sideOf(rl.ownerTeam);
-    if (rl.captured) return ownSide === mySide;   // reclaim your side's captured relic
+    /* no take-backs: a relic once captured stays with its captor — the owning
+       side can NEVER reclaim it, so a captured Relic is a permanent gain and a
+       side that has captured every rival's Relic has won for good. */
+    if (rl.captured) return false;
     return ownSide !== mySide;                     // capture a hostile relic
   };
   /* nearest relic `team` may take (capture a rival's, or reclaim its own),
