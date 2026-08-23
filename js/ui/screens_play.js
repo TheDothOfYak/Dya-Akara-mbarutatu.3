@@ -1424,6 +1424,13 @@
         } else if (fieldTip) { fieldTip.remove(); fieldTip = null; }
       });
       canvas.addEventListener('click', e => {
+        /* Read the tap/click position straight from the event. Touch devices
+           never fire mousemove before a tap, so relying on the cached
+           mouseWorld dropped readied tokens at a stale spot on mobile.
+           Refreshing mouseWorld here also keeps keyboard triggers aimed at
+           the last tapped location. */
+        const r = canvas.getBoundingClientRect();
+        mouseWorld = renderer.toWorld(e.clientX - r.left, e.clientY - r.top);
         if (selectedSlot != null) { triggerSlot(selectedSlot, mouseWorld.x, mouseWorld.y); selectedSlot = null; }
       });
       canvas.addEventListener('dragover', e => e.preventDefault());
