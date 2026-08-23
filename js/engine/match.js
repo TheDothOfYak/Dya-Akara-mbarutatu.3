@@ -101,6 +101,7 @@
       seal: t.seal || null,
       aiSkill: t.aiSkill || 0.6,
       color: t.color || TEAM_COLORS[i % TEAM_COLORS.length],
+      king: !!t.king,                       // Surrounded king-of-the-hill: holds the castle
       hoard: t.hoard || teamAnchor(i, cfg.teams.length),
       resources: startVec(t.startResources || 0),
       pouch: (t.pouch || []).map(tok => ({ tok, state: 'pouch', readiedAtPulse: -1, deaths: 0 })),
@@ -120,6 +121,19 @@
          are seated with cfg.teams[i].noRelic so their relic sits disabled */
       disabled: !!(cfg.teams[i] && cfg.teams[i].noRelic),
     }));
+
+    /* Surrounded KING OF THE HILL (optional): one team holds the centre as the
+       king and must protect its Relic for `protect` seconds; every other team
+       is an attacker racing to steal it. The king's castle is pre-built (walls,
+       corner towers, a permanently-manned keep) and it draws +50% resources a
+       pulse. Attackers hold NO relic of their own — the only prize is the hill.
+       kingHill = { protect: seconds }. */
+    M.kingHill = cfg.kingHill ? { protect: (cfg.kingHill.protect || 300) } : null;
+    if (M.kingHill) {
+      M.kingTeam = M.teams.findIndex(T => T.king);
+      if (M.kingTeam < 0) { M.kingTeam = 0; M.teams[0].king = true; }
+      M.relics.forEach((r, i) => { if (i !== M.kingTeam) { r.disabled = true; r.captured = true; } });
+    }
 
     /* alliance helpers. hostile(a,b): teams a and b are on opposing sides.
        allied(a,b): same side (a creature never friendly-fires or heals across
@@ -196,7 +210,46 @@
       });
       M.teams[1].controller = 'wild';
     }
+
+    /* Surrounded king-of-the-hill: raise the king's castle at the centre */
+    if (M.mode === 'standard' && M.kingHill) M.seedKingCastle(M.kingTeam);
   }
+
+  /* ================= KING-OF-THE-HILL CASTLE =================
+     A pre-built fortress for the Surrounded king: a full wall ring around the
+     hoard, a level-1 manned archer tower on each corner (each holds ONE archer
+     the king must garrison), and a permanently-manned Level-2 keep that fires
+     as two archers on its own. A builder in the king's pouch upgrades the
+     corner towers and the walls through the normal fortification path. */
+  Match.prototype.seedKingCastle = function (team) {
+    const M = this, T = M.teams[team]; if (!T) return;
+    const cx0 = T.hoard.x, cy0 = T.hoard.y, side = M.sideOf(team);
+    const H = 156;                                  // half-extent of the wall ring
+    const push = (s) => { s.id = 'st' + (M.idCounter++); s.team = team; s.side = side; s.occupants = s.occupants || []; s.quality = s.quality || 1; s.powerMul = s.powerMul || 1; s.fireCd = 0; s.face = 1; M.structures.push(s); };
+
+    /* four corner archer towers — level 1, capacity 1 (garrison your own archer) */
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach((c, i) => {
+      push({ type: 'tower', kind: 'tower', role: 'castleCorner' + i, x: U.clamp(cx0 + c[0] * H, 34, WORLD.w - 34), y: U.clamp(cy0 + c[1] * H, 44, WORLD.h - 44),
+        w: 34, h: 52, capacity: 1, close: 78, far: 234, radius: 26, upgraded: false, hp: 150, maxHp: 150 });
+    });
+    /* the keep — a permanently-manned Level-2 tower firing as two archers */
+    push({ type: 'tower', kind: 'tower', role: 'castleKeep', x: cx0, y: U.clamp(cy0 + 34, 44, WORLD.h - 44),
+      w: 46, h: 62, capacity: 2, close: 108, far: 324, radius: 34, upgraded: true, permManned: 2, keep: true,
+      baseDmg: 8, hp: 420, maxHp: 420 });
+
+    /* the wall ring — four battlemented edges, segments overlapping so the ring
+       seals completely (the corner towers plug the corners) */
+    const seg = (x, y, vertical) => push({ type: 'wall', kind: 'wall', role: 'castleWall', x: U.clamp(x, 34, WORLD.w - 34), y: U.clamp(y, 44, WORLD.h - 44),
+      w: vertical ? 24 : 84, h: vertical ? 84 : 24, vertical, trapped: false, trapCd: 0, upgraded: false, hp: 220, maxHp: 220 });
+    const edge = (x1, y1, x2, y2, vertical) => {
+      const n = Math.max(3, Math.round(Math.hypot(x2 - x1, y2 - y1) / 52));
+      for (let i = 0; i <= n; i++) { const t = i / n; seg(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, vertical); }
+    };
+    edge(cx0 - H, cy0 - H, cx0 - H, cy0 + H, true);   // left edge
+    edge(cx0 + H, cy0 - H, cx0 + H, cy0 + H, true);   // right edge
+    edge(cx0 - H, cy0 - H, cx0 + H, cy0 - H, false);  // top edge
+    edge(cx0 - H, cy0 + H, cx0 + H, cy0 + H, false);  // bottom edge
+  };
 
   /* ================= CREATURES ================= */
 
@@ -939,6 +992,11 @@
         }
         if (c.speciesId === 'stryx' && c.vars.absorbRate > 0.2) units.push('Ular');
       });
+      /* the Surrounded king draws +50% resources every pulse to hold the hill */
+      if (T.king && M.kingHill) {
+        const extra = Math.round(units.length * 0.5);
+        for (let i = 0; i < extra; i++) units.push(M.rng.pick(ELS));
+      }
       /* Hunts: the pulse still ticks (for time-based abilities) but grants no
          team resources — your party deploys for free, so there's no economy. */
       if (M.mode !== 'hunt') {
@@ -1622,6 +1680,28 @@
             if (M.allied(c.team, s.team)) c.fortifiedUntil = M.tick + 3;
             else if (c.camoUntil > M.tick && ((c.vars.camo || c.vars.stealth || 0) < 0.5)) c.camoUntil = M.tick;   // elevated sight only pierces light camo (<50)
           }
+          /* the king's keep is permanently manned — it looses as `permManned`
+             archers on its own, needing no garrison, at the tower's range */
+          if (s.permManned) {
+            if (s.fireCd > 0) s.fireCd -= TICK;
+            else {
+              const rng = (s.close || 100) * (s.upgraded ? 2 : 1);
+              let best = null, bd = rng + 1;
+              for (const c of M.creatures) {
+                if (c.dead || M.allied(c.team, s.team) || c.onTower || c.riding || c.inHut) continue;
+                const d = U.dist(s.x, s.y, c.x, c.y);
+                if (d < bd && !M.losBlocked(s.x, s.y, c.x, c.y, s.team)) { bd = d; best = c; }
+              }
+              if (best) {
+                s.fireCd = 1.1;
+                for (let k = 0; k < (s.permManned || 1); k++) {
+                  const a = Math.atan2(best.y - s.y, best.x - s.x) + (k - (s.permManned - 1) / 2) * 0.05;
+                  M.projectiles.push({ x: s.x + (k - (s.permManned - 1) / 2) * 10, y: s.y - 20, vx: Math.cos(a) * 460, vy: Math.sin(a) * 460, team: s.team, dmg: (s.baseDmg || 8) * (s.powerMul || 1), type: 'arrow', life: rng / 460 + 0.06, source: null });
+                }
+                M.markTowerAggro(best, s);
+              }
+            }
+          }
         } else if (s.kind === 'wallTower') {
           /* unmanned wall-tower: auto-fires base damage at the nearest foe in range */
           if (s.fireCd > 0) s.fireCd -= TICK;
@@ -1734,26 +1814,19 @@
                 M.teams[car.team].stats.relicMethod = 'Carried home by ' + car.tokName;
                 M.uiEvent(-1, 'relic', car.tokName + ' delivers ' + (M.teams[rl.ownerTeam] ? M.teams[rl.ownerTeam].name + '’s' : 'the enemy') + ' Relic!');
               } else {
-                /* reclaimed your side's own relic — back home, safe */
+                /* an ally can no longer be carrying its own side's relic — the
+                   owning side can never pick its own Relic up (no take-backs) —
+                   so this branch is unreachable; kept defensively. */
                 rl.captured = false; rl.capturedBy = null; rl.capturedBySide = null;
                 rl.x = rl.homeX; rl.y = rl.homeY;
-                M.uiEvent(-1, 'relic', car.tokName + ' brings the Relic safely home!');
               }
             }
           }
-        } else if (!rl.captured) {
-          /* a dropped relic (loose in the field, not secured in a camp) is
-             carried home the instant one of its own side touches it */
-          const atHome = Math.abs(rl.x - rl.homeX) < 4 && Math.abs(rl.y - rl.homeY) < 4;
-          if (!atHome) {
-            const defender = M.creatures.find(cr => !cr.dead && M.allied(cr.team, rl.ownerTeam) && !cr.sp.tags.includes('inert') && U.dist(cr.x, cr.y, rl.x, rl.y) < RELIC_PICK_R + cr.radius);
-            if (defender) {
-              rl.x = rl.homeX; rl.y = rl.homeY;
-              defender.matchXp = (defender.matchXp || 0) + 20;
-              M.uiEvent(-1, 'relic', defender.tokName + ' returns the Relic home!');
-            }
-          }
         }
+        /* No defensive recovery: a Relic knocked loose in the field is NOT
+           carried home by its owners — there are no take-backs. It lies where
+           it fell until a rival hauls it away, so every capture is progress
+           that sticks and a side racing to grab every Relic can actually win. */
       }
     }
 
@@ -1815,11 +1888,33 @@
       return;
     }
 
+    /* Surrounded KING OF THE HILL decides the whole match: the only prize is
+       the king's Relic. An attacker that carries it home wins at once; if the
+       king still holds it when the protect timer elapses (or every attacker is
+       spent), the king wins the hill. The fight otherwise continues — a
+       king-of-the-hill match is never a draw and never a bare empty-field end,
+       because the castle keeps defending even with no units left to deploy. */
+    if (M.kingHill) {
+      const kSide = M.sideOf(M.kingTeam);
+      const kr = M.relics[M.kingTeam];
+      if (kr && kr.captured && kr.capturedBySide != null && kr.capturedBySide !== kSide) {
+        M.finish(M.anyTeamOnSide(kr.capturedBySide), 'relic');
+        return;
+      }
+      if (M.time >= (M.kingHill.protect || 300)) {
+        M.finish(M.anyTeamOnSide(kSide), 'defended');
+        return;
+      }
+      const sidesIn = M.sidesInPlay();
+      if (!sidesIn.some(s => s !== kSide)) { M.finish(M.anyTeamOnSide(kSide), 'defended'); return; }
+      return;
+    }
+
     /* standard: a side wins once it has captured EVERY rival's Relic (and holds
        them all in its camp). In 1v1 there is only one enemy relic, so this is
        the classic "carry the enemy relic home" — unchanged. In a team Brawl a
-       side must collect all of the other side's relics, and a rival can steal
-       one back to undo it. */
+       side must collect all of the other side's relics; captures are permanent
+       (no take-backs), so once a side holds every rival Relic the win stands. */
     const activeRelics = M.relics.filter(r => !r.disabled);
     const sidesWithRelics = [];
     activeRelics.forEach(r => { const s = M.sideOf(r.ownerTeam); if (sidesWithRelics.indexOf(s) < 0) sidesWithRelics.push(s); });
@@ -1871,7 +1966,10 @@
   Match.prototype.takeableRelic = function (rl, team) {
     if (!rl || rl.disabled || rl.carrier != null) return false;
     const mySide = this.sideOf(team), ownSide = this.sideOf(rl.ownerTeam);
-    if (rl.captured) return ownSide === mySide;   // reclaim your side's captured relic
+    /* no take-backs: a relic once captured stays with its captor — the owning
+       side can NEVER reclaim it, so a captured Relic is a permanent gain and a
+       side that has captured every rival's Relic has won for good. */
+    if (rl.captured) return false;
     return ownSide !== mySide;                     // capture a hostile relic
   };
   /* nearest relic `team` may take (capture a rival's, or reclaim its own),

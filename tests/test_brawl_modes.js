@@ -125,17 +125,17 @@ console.log('== BRAWL MODES: multi-player standard matches with alliances ==');
   check('the win is credited to the capturing SIDE (0)', M.result.winnerSide === 0, 'winnerSide=' + (M.result && M.result.winnerSide));
 }
 
-/* ---- steal your own relic back: it undoes a rival's capture ---- */
+/* ---- no take-backs: a captured relic can NEVER be reclaimed by anyone ---- */
 {
   const M = mk([0, 0, 1, 1]);
   const mine = M.relics.find(r => r.ownerTeam === 0);          // a side-0 relic
   mine.captured = true; mine.capturedBy = 2; mine.capturedBySide = 1;  // side 1 grabbed it
   check('a rival CANNOT take a relic already secured in its captor’s camp', !M.takeableRelic(mine, 2));
-  check('the owner side CAN take its own captured relic back', M.takeableRelic(mine, 0));
-  /* a side-0 creature reclaims it — grabbing un-captures immediately */
+  check('the owner side CANNOT take its own captured relic back (no take-backs)', !M.takeableRelic(mine, 0));
+  /* a side-0 creature standing on its own captured relic cannot pick it up */
   const c = M.spawnFromToken(fighter(1), 1, mine.x, mine.y);   // team 1 (side 0), on the relic
   M.api()._c = c; M.api().pickRelic(c);
-  check('reclaiming a captured relic un-captures it on pickup', !mine.captured && mine.carrier === c.id);
+  check('a captured relic stays captured — it cannot be grabbed back', mine.captured && mine.carrier == null && !c.carryingRelic);
 }
 
 /* ---- shared camp = one big hoard, one relic per side ---- */

@@ -1788,7 +1788,14 @@
         /* HUD updates */
         const esc = EC.escalationMult(M.time);
         const zf = M.zikFrac ? M.zikFrac() : 0;
-        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '') + (zf > 0 ? ' · <span style="color:var(--r6)">☄ SUNEAR’ZIKHRON</span>' : '');
+        /* king-of-the-hill: show how long the king must still hold the Relic */
+        let kingHillTag = '';
+        if (M.kingHill) {
+          const left = Math.max(0, (M.kingHill.protect || 300) - M.time);
+          const iAmKing = M.sideOf(MY) === M.sideOf(M.kingTeam);
+          kingHillTag = ' · <span class="gold">👑 ' + (iAmKing ? 'HOLD' : 'BREAK') + ' ' + U.fmtTime(left) + '</span>';
+        }
+        pulseLabel.innerHTML = '⏱ ' + U.fmtTime(M.time) + ' · Pulse ' + M.pulseIndex + kingHillTag + (esc > 1 ? ' · <span class="gold">×' + esc + ' ESCALATION</span>' : '') + (M.settings.chaos ? ' · <span style="color:var(--red)">CHAOS</span>' : '') + (zf > 0 ? ' · <span style="color:var(--r6)">☄ SUNEAR’ZIKHRON</span>' : '');
         const frac = Math.max(0, 1 - (M.nextPulseAt - M.time) / (M.settings.pulseInterval || 8));
         pulseBar.firstChild.style.width = Math.min(100, frac * 100) + '%';
         relicRow.innerHTML = M.mode === 'hunt'
@@ -2845,12 +2852,6 @@
     }
     sync();
 
-    w.appendChild(U.el('div', { cls: 'small muted mt', text: 'DIFFICULTY' }));
-    const diffSel = U.el('select', { cls: 'txt mt' });
-    [['0.3', 'Litk — gentle'], ['0.6', 'Vel — even'], ['0.95', 'Skor — hard'], ['1.2', 'Skaar — brutal']].forEach(([v, l]) => diffSel.appendChild(U.el('option', { value: v, text: l })));
-    diffSel.value = '0.6';
-    w.appendChild(diffSel);
-
     const m = UI.modal(w);
     function makeFmt() {
       const map = mode.id === 'team' && !shared ? BRAWL_MAPS[Math.floor(Math.random() * BRAWL_MAPS.length)] : null;
@@ -2858,20 +2859,22 @@
       return { mode: mode, size, shared, layout, map, label: mode.label + ' · ' + (mode.id === 'team' ? size + 'v' + size : size + ' players') };
     }
     const btnRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:10px;flex-wrap:wrap' });
-    /* Multiplayer — the online lobby: invite friends, pick your team, and any
-       empty seats fill with Dya'kukull after a short search for real players */
+    /* Find a match — enter the lobby. The game searches for an OPEN brawl of the
+       same shape you picked and drops you into its lobby; if none is open you
+       host one, and other searchers join you. Everyone readies up, empty seats
+       fill with Dya'kukull, then all vote together. */
     btnRow.appendChild(U.el('button', {
-      cls: 'btn primary', text: '🌐 Multiplayer', onclick: () => {
+      cls: 'btn primary', text: '🌐 Find a match', onclick: () => {
         m.close();
-        UI.requireOnline(() => P.pickPouch(pouch => UI.show('brawlLobby', { fmt: makeFmt(), pouch, aiSkill: parseFloat(diffSel.value) })),
+        UI.requireOnline(() => P.pickPouch(pouch => P.matchmakeBrawl(makeFmt(), pouch)),
           { title: 'Multiplayer Brawl', body: 'A Brawl with other players of the world needs the Guild network. To play on your own, choose <b>Practice vs the machine</b> instead.' });
       },
     }));
-    /* Practice — straight to the vote screen against the machine */
+    /* Practice — a solo lobby against the machine (still readies up and votes) */
     btnRow.appendChild(U.el('button', {
       cls: 'btn', text: '🤖 Practice vs the machine', onclick: () => {
         m.close();
-        P.pickPouch(pouch => UI.show('brawlSetup', { fmt: makeFmt(), pouch, aiSkill: parseFloat(diffSel.value) }));
+        P.pickPouch(pouch => UI.show('brawlLobby', { fmt: makeFmt(), pouch, role: 'solo' }));
       },
     }));
     w.appendChild(btnRow);
@@ -2884,321 +2887,536 @@
         const code = (codeIn.value || '').trim().toUpperCase();
         if (code.length < 4) { UI.toast({ title: 'Enter a code', body: 'Ask your friend for their 5-letter room code.', icon: '⌨' }); return; }
         m.close();
-        P.pickPouch(pouch => P.joinBrawlRoom(code, pouch));
+        P.pickPouch(pouch => UI.show('brawlLobby', { fmt: makeFmt(), pouch, role: 'guest', roomCode: code }));
       },
     }));
     w.appendChild(joinRow);
     w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
   };
 
-  /* ---- Brawl pre-match: the SAME pulse-settings vote screen the other modes
-     use (interval / resources-per-pulse / Standard-Chaos), adapted to show the
-     whole roster of camps. Ready or let the timer run, then the match starts. */
-  UI.register('brawlSetup', {
-    enter(root, params) {
-      const fmt = params.fmt, pouch = params.pouch;
-      const scr = U.el('div', { cls: 'screen' });
-      scr.appendChild(UI.topbar({ title: 'Brawl Setup' }));
-      const wrap = U.el('div', { cls: 'setup-wrap' });
+  /* the matchmaking "type" — a searcher only ever joins an OPEN brawl of the
+     exact same shape (mode + size + shared camp), so sizes and sides line up. */
+  function brawlType(fmt) { return fmt.mode.id + '-' + fmt.size + (fmt.shared ? '-s' : ''); }
 
-      /* left: your pouch */
-      const left = U.el('div', { cls: 'setup-col panel' });
-      left.appendChild(U.el('h3', { cls: 'gold mb', text: 'Your pouch — ' + G.me.displayName }));
-      const pl = U.el('div', { cls: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(78px,1fr))' });
-      pouch.forEach(t => pl.appendChild(UI.tokenCard(t, { size: 56, mode: 'minimal' })));
-      left.appendChild(pl);
-      wrap.appendChild(left);
-
-      /* center: the vote (identical dials to matchSetup) */
-      const mid = U.el('div', { cls: 'setup-col panel', style: 'max-width:420px' });
-      let timeLeft = 30;
-      const timer = U.el('div', { cls: 'setup-timer', text: timeLeft });
-      mid.appendChild(timer);
-      mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Votes lock when the timer ends. The middle ground wins.' }));
-      const myVote = { interval: 8, amount: 2, mode: 'Standard' };
-      const rngV = new U.Rng(U.newSeed());
-      const oppVote = { interval: rngV.pick(EC.PULSE_INTERVALS), amount: rngV.pick(EC.PULSE_AMOUNTS), mode: rngV.chance(0.25) ? 'Chaos' : 'Standard' };
-      function voteRow(label, opts, key, f) {
-        const row = U.el('div', { cls: 'vote-row' });
-        row.appendChild(U.el('div', { cls: 'muted small', text: label }));
-        const w2 = U.el('div', { cls: 'vote-opts' });
-        opts.forEach(o => {
-          const b = U.el('div', { cls: 'vote-opt' + (myVote[key] === o ? ' mine' : '') + (oppVote[key] === o ? ' theirs' : ''), text: f ? f(o) : o });
-          b.onclick = () => { myVote[key] = o; U.qsa('.vote-opt', w2).forEach((x, i) => x.classList.toggle('mine', opts[i] === o)); DYA.audio.play('click'); };
-          w2.appendChild(b);
-        });
-        row.appendChild(w2);
-        return row;
-      }
-      mid.appendChild(voteRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, 'interval', v => v + 's'));
-      mid.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
-      mid.appendChild(voteRow('MODE — Chaos randomizes every pulse (majority required)', ['Standard', 'Chaos'], 'mode'));
-      mid.appendChild(U.el('p', { cls: 'small muted', html: '◆ = the field’s current vote' }));
-      mid.appendChild(U.el('div', { cls: 'vote-row' }, [U.el('div', { cls: 'muted small', html: 'MAP — <span class="gold">' + U.esc(fmt.map ? fmt.map.name : (fmt.mode.label)) + '</span> · terrain assigned randomly' })]));
-      const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready — skip the wait' });
-      mid.appendChild(readyBtn);
-      wrap.appendChild(mid);
-
-      /* right: the roster of camps in this Brawl */
-      const right = U.el('div', { cls: 'setup-col panel' });
-      right.appendChild(U.el('h3', { cls: 'gold mb', text: 'The field — ' + fmt.label }));
-      const sideCount = {};
-      fmt.layout.forEach(s => { sideCount[s.side] = (sideCount[s.side] || 0) + 1; });
-      const nSides = Object.keys(sideCount).length;
-      right.appendChild(U.el('p', { cls: 'muted small', html: fmt.mode.id === 'team'
-        ? 'Two allied sides of <b>' + (sideCount[0] || 0) + '</b>. You lead the gold side; allies never fight each other.'
-        : nSides + ' camps, every one for itself.' }));
-      const roster = U.el('div', { cls: 'mt' });
-      const mySlot = params.humanSlot || 0;
-      fmt.layout.forEach((s, i) => {
-        const col = DYA.match.TEAM_COLORS ? DYA.match.TEAM_COLORS[s.side % 6] : '#d9b87a';
-        roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + (i === mySlot ? '<b>' + U.esc(G.me.displayName) + '</b> (you)' : 'a rival camp') }));
-      });
-      right.appendChild(roster);
-      wrap.appendChild(right);
-
-      scr.appendChild(wrap);
-      root.appendChild(scr);
-
-      let done = false;
-      const iv = setInterval(() => {
-        if (done) return;
-        timeLeft--; timer.textContent = timeLeft;
-        if (timeLeft <= 5) timer.classList.add('urgent');
-        if (timeLeft <= 0) finish();
-      }, 1000);
-      readyBtn.onclick = () => finish();
-      function finish() {
-        if (done) return; done = true; clearInterval(iv);
-        const settings = DYA.matchvote.combine(myVote, oppVote);
-        /* online host: hand the agreed settings back to the lobby so it can
-           broadcast the descriptor and launch the netmatch. Otherwise launch
-           the local (AI-filled) match directly. */
-        if (params.onSettings) params.onSettings(settings);
-        else beginBrawl(fmt, params.aiSkill, pouch, settings, params.humanSlot || 0);
-      }
-      this.leave = () => { done = true; clearInterval(iv); };
-    },
-  });
-
-  /* ---- Brawl MULTIPLAYER LOBBY (the first of the two lobbies; the pulse-vote
-     screen is the second). You enter here on tapping Multiplayer: invite
-     friends, pick your team, then Ready. Readying searches ~10s for real
-     players of the world and fills any empty seats with Dya'kukull — the same
-     rule the Duel uses — then hands off to the vote screen and the match.
-
-     Cross-device play rides the N-seat lockstep (js/core/netplay.js): a real
-     friend who joins occupies a human seat; every unfilled seat is an AI that
-     each client simulates identically, so no seat that isn't a real person
-     ever touches the wire. */
-  UI.register('brawlLobby', {
-    enter(root, params) {
-      const fmt = params.fmt, pouch = params.pouch, me = G.me;
-      const O = DYA.online;
-      const isTeam = fmt.mode.id === 'team';
-      /* seats-per-side / total; you always hold one seat */
-      const total = fmt.layout.length;
-      let myChoice = 'team1';                 // team1 | random | team2  (team battles only)
-
-      const scr = U.el('div', { cls: 'screen' });
-      scr.appendChild(UI.topbar({ title: 'Multiplayer Lobby' }));
-      const page = U.el('div', { cls: 'page' });
-      const head = U.el('div', { cls: 'page-head' });
-      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('play') }));
-      head.appendChild(U.el('h2', { text: 'Brawl Lobby — ' + fmt.label }));
-      page.appendChild(head);
-      const body = U.el('div', { cls: 'page-body', style: 'max-width:640px;margin:0 auto' });
-
-      /* --- team choice (team battles only): Team 1 / Random / Team 2 --- */
-      if (isTeam) {
-        const tp = U.el('div', { cls: 'panel mb' });
-        tp.appendChild(U.el('div', { cls: 'small muted', text: 'YOUR TEAM' }));
-        const row = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
-        const gold = DYA.match.TEAM_COLORS[0], red = DYA.match.TEAM_COLORS[1];
-        [['team1', 'Team 1', gold], ['random', 'Random', 'var(--muted)'], ['team2', 'Team 2', red]].forEach(([v, l, c]) => {
-          const b = U.el('button', { cls: 'btn small' + (myChoice === v ? ' primary' : ''), style: 'border-color:' + c, text: l, onclick: () => { myChoice = v; U.qsa('button', row).forEach((x, i) => x.classList.toggle('primary', ['team1', 'random', 'team2'][i] === v)); DYA.audio.play('click'); } });
-          row.appendChild(b);
-        });
-        tp.appendChild(row);
-        body.appendChild(tp);
-      }
-
-      /* --- roster of seats --- */
-      const rosterPanel = U.el('div', { cls: 'panel mb' });
-      rosterPanel.appendChild(U.el('div', { cls: 'flex', style: 'justify-content:space-between' }, [
-        U.el('div', { cls: 'small muted', text: 'THE FIELD — ' + total + ' camps' }),
-        U.el('div', { cls: 'small muted', text: isTeam ? (fmt.size + ' per side') : 'free-for-all' }),
-      ]));
-      const roster = U.el('div', { cls: 'mt' });
-      rosterPanel.appendChild(roster);
-      body.appendChild(rosterPanel);
-      /* real peers who joined the room (netId -> {netId,name,seal,pouch}); every
-         other seat fills with a Dya'kukull at start */
-      const peers = {};
-      function hostSeat() {
-        if (!isTeam) return 0;                 // FFA / surrounded: you are slot 0
-        const choice = myChoice === 'random' ? 'team1' : myChoice;   // random resolved for real at start
-        const wantSide = choice === 'team2' ? 1 : 0;
-        const idx = fmt.layout.findIndex(s => s.side === wantSide);
-        return idx < 0 ? 0 : idx;
-      }
-      function renderRoster() {
-        roster.innerHTML = '';
-        const pl = Object.values(peers);
-        let pi = 0;
-        fmt.layout.forEach((slot, i) => {
-          const col = DYA.match.TEAM_COLORS[slot.side % 6];
-          let who;
-          if (i === hostSeat()) who = '<b>' + U.esc(me.displayName) + '</b> <span class="small muted">(you)</span>';
-          else if (pi < pl.length) { who = '<b>' + U.esc(pl[pi].name) + '</b> <span class="small muted">(joined)</span>'; pi++; }
-          else who = '<span class="muted">open — fills with a Dya’kukull</span>';
-          roster.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + who }));
-        });
-      }
-      renderRoster();
-
-      /* --- invite friends --- */
-      const invPanel = U.el('div', { cls: 'panel mb' });
-      invPanel.appendChild(U.el('div', { cls: 'small muted', text: 'INVITE FRIENDS' }));
-      const friends = (O && O.state && O.state.friends) || [];
-      if (!friends.length) {
-        invPanel.appendChild(U.el('p', { cls: 'muted small mt', text: 'No friends online to invite yet — add friends in the Friends screen. You can still Ready up; the lobby will find players or seat Dya’kukull.' }));
+  /* ENTER THE BRAWL — search the world for an open brawl of this shape and drop
+     into its lobby; if none is open, host one so other searchers can join. */
+  P.matchmakeBrawl = function (fmt, pouch) {
+    const w = U.el('div', { cls: 'center' });
+    w.appendChild(U.el('h3', { cls: 'gold', text: 'Finding a ' + fmt.label + '…' }));
+    const st = U.el('p', { cls: 'muted mt', text: 'Searching for an open brawl of the world…' });
+    w.appendChild(st);
+    const m = UI.modal(w, { sticky: true });
+    let cancelled = false;
+    w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { cancelled = true; m.close(); UI.show('play'); } }));
+    (async () => {
+      let found = null;
+      try { found = DYA.season && DYA.season.findOpenBrawl ? await DYA.season.findOpenBrawl(brawlType(fmt)) : null; } catch (e) { found = null; }
+      if (cancelled) return;
+      m.close();
+      if (found && found.roomCode) {
+        UI.show('brawlLobby', { fmt, pouch, role: 'guest', roomCode: found.roomCode });
       } else {
-        const fl = U.el('div', { cls: 'mt' });
-        friends.forEach(f => {
-          const r = U.el('div', { cls: 'friend-row' });
-          r.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(f.displayName || f.name || 'Friend') + '</b>' }));
-          r.appendChild(U.el('button', {
-            cls: 'btn small', text: 'Invite', onclick: async (e) => {
-              e.target.disabled = true; e.target.textContent = 'Invited';
-              try {
-                const codeMsg = roomCode ? ('room code ' + roomCode + ' — Play → Brawl → Multiplayer → Join a room') : 'Play → Brawl → Multiplayer';
-                if (O && O.sendMessage) await O.sendMessage(f.id, '⚔ Come brawl my ' + fmt.label + '! ' + codeMsg);
-                UI.toast({ title: 'Invite sent', body: (f.displayName || 'Your friend') + ' will see it in their notifications.', icon: '⚔' });
-              } catch (err) { UI.toast({ title: 'Could not invite', body: err.message, icon: '⚠' }); e.target.disabled = false; e.target.textContent = 'Invite'; }
-            },
-          }));
-          fl.appendChild(r);
-        });
-        invPanel.appendChild(fl);
+        /* nobody waiting — host a fresh room and advertise it for this shape */
+        const code = (DYA.netplay && DYA.netplay.genRoomCode) ? DYA.netplay.genRoomCode() : ('R' + Math.floor(Math.random() * 1e5));
+        UI.show('brawlLobby', { fmt, pouch, role: 'host', roomCode: code, mmType: brawlType(fmt) });
       }
-      body.appendChild(invPanel);
-
-      /* --- room code (for sharing) --- */
-      const codeLine = U.el('p', { cls: 'small muted center mt' });
-      body.appendChild(codeLine);
-
-      /* --- ready / search / fill --- */
-      const status = U.el('p', { cls: 'muted mt center' });
-      body.appendChild(status);
-      const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready' });
-      body.appendChild(readyBtn);
-
-      /* ---- host a real room so friends can join across devices; if the
-             network can't be reached we still work locally (AI fill) ---- */
-      let room = null, roomCode = null, done = false;
-      const myNet = (O && O.me && O.me() && O.me().netId) || me.id;
-      (async () => {
-        if (!(DYA.netplay && DYA.netplay.joinRoom && O && O.configured && O.configured())) { codeLine.textContent = 'Playing locally — empty seats fill with Dya’kukull.'; return; }
-        try {
-          roomCode = DYA.netplay.genRoomCode();
-          room = await DYA.netplay.joinRoom(roomCode, myNet, {
-            onMessage(msg) {
-              if (!msg) return;
-              if ((msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye') && P._netSession && P._netSession.route) { P._netSession.route(msg); return; }
-              if (msg.t === 'joinBrawl' && msg.netId && !peers[msg.netId]) {
-                peers[msg.netId] = { netId: msg.netId, name: msg.name || 'Player', seal: msg.seal, pouch: msg.pouch || [] };
-                renderRoster();
-                room.send({ t: 'lobbyAck', to: msg.netId, label: fmt.label });   // let them know they're in
-              }
-            },
-            onPeerLeave(key) { if (peers[key]) { delete peers[key]; renderRoster(); } },
-          });
-          codeLine.innerHTML = 'Room code: <b class="gold">' + roomCode + '</b> — share it, or invite a friend above.';
-        } catch (e) {
-          room = null; codeLine.textContent = 'Couldn’t reach the room service — playing locally (Dya’kukull fill).';
-        }
-      })();
-
-      let elapsed = 0, tmr = null;
-      readyBtn.onclick = () => {
-        if (tmr || done) return; readyBtn.disabled = true;
-        status.textContent = 'Searching for players… (0s)';
-        tmr = setInterval(() => {
-          if (done) return;
-          elapsed++;
-          const n = Object.keys(peers).length;
-          status.textContent = n ? (n + ' player(s) joined — starting…') : ('Searching for players… (' + elapsed + 's)');
-          if (elapsed >= 10 || (n && n >= total - 1)) startMatch();
-        }, 1000);
-      };
-
-      function startMatch() {
-        if (done) return; done = true; if (tmr) clearInterval(tmr);
-        /* seat the host at their chosen team; drop joined peers into the other
-           open seats; the rest become Dya'kukull */
-        const seats = new Array(total).fill(null);
-        const hs = hostSeat();
-        seats[hs] = { human: true, netId: myNet, name: me.displayName, seal: me.seal || { avatarIdx: me.avatarIdx, patterns: [] }, pouch, accId: me.id };
-        Object.values(peers).forEach(p => {
-          let idx = seats.findIndex((s, i) => !s && i !== hs);
-          if (idx >= 0) seats[idx] = { human: true, netId: p.netId, name: p.name, seal: p.seal, pouch: p.pouch };
-        });
-        /* second lobby: the shared pulse-settings vote screen (host authoritative),
-           then the match. Offline/local → just the vote screen and beginBrawl. */
-        if (room) {
-          UI.show('brawlSetup', {
-            fmt, pouch, aiSkill: params.aiSkill, humanSlot: hs,
-            onSettings: (settings) => {
-              const desc = buildBrawlDescriptor(fmt, seats, settings);
-              room.send({ t: 'start', desc });
-              launchNetBrawl(room, desc, myNet);
-            },
-          });
-        } else {
-          UI.show('brawlSetup', { fmt, pouch, aiSkill: params.aiSkill, humanSlot: hs });
-        }
-      }
-
-      this.leave = () => { done = true; if (tmr) clearInterval(tmr); };
-      page.appendChild(body);
-      scr.appendChild(page);
-      root.appendChild(scr);
-    },
-  });
-
-  /* ---- guest side: join a friend's brawl room by code, then wait for the
-     host to start; the descriptor arrives over the wire and every client
-     builds the identical match. ---- */
-  P.joinBrawlRoom = function (code, pouch) {
-    UI.requireOnline(async () => {
-      const me = G.me, O = DYA.online;
-      const myNet = (O && O.me && O.me() && O.me().netId) || me.id;
-      const w = U.el('div', { cls: 'center' });
-      w.appendChild(U.el('h3', { cls: 'gold', text: 'Joining brawl ' + String(code).toUpperCase() + '…' }));
-      const st = U.el('p', { cls: 'muted mt', text: 'Connecting to the room…' });
-      w.appendChild(st);
-      const m = UI.modal(w, { sticky: true });
-      let started = false, room = null;
-      w.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { if (room && !started) try { room.leave(); } catch (e) { } m.close(); } }));
-      try {
-        room = await DYA.netplay.joinRoom(code, myNet, {
-          onMessage(msg) {
-            if (!msg) return;
-            if ((msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye') && P._netSession && P._netSession.route) { P._netSession.route(msg); return; }
-            if (msg.t === 'lobbyAck') { st.textContent = 'In the lobby — waiting for the host to start…'; }
-            if (msg.t === 'start' && msg.desc && !started) { started = true; m.close(); launchNetBrawl(room, msg.desc, myNet); }
-          },
-        });
-        st.textContent = 'In the lobby — waiting for the host to start…';
-        room.send({ t: 'joinBrawl', netId: myNet, name: me.displayName, seal: me.seal || { avatarIdx: me.avatarIdx, patterns: [] }, pouch: pouch });
-      } catch (e) {
-        st.textContent = 'Could not join: ' + e.message;
-      }
-    }, { title: 'Join a Brawl', body: 'Joining a friend’s Brawl needs the Guild network.' });
+    })();
   };
 
-  function beginBrawl(fmt, aiSkill, pouch, settings, humanSlot) {
+  /* ================= BRAWL LOBBIES — the two-lobby ceremony =================
+     EVERY player — the host, code-joiners, and matchmade searchers alike —
+     lands in the SAME two lobbies and readies up in both:
+
+       Lobby 1 (ready-up): the roster of camps. Real players trickle in (by code
+         or matchmaking) and each readies. Once everyone PRESENT is ready, any
+         still-empty seats fill with Dya'kukull and the whole room advances.
+       Lobby 2 (vote + chat): the pulse-settings vote, with a live chat. Every
+         real player votes and chats; the Dya'kukull only add votes when there
+         are fewer than two real players. Ready (or let the timer run) and the
+         host launches the byte-identical lockstep match for everyone.
+
+     The host is authoritative: it owns the roster, decides when all present are
+     ready, seats the Dya'kukull, tallies the votes and broadcasts the one match
+     descriptor. Guests render from the host's broadcasts and send their ready /
+     vote / chat up. With no cloud reachable (or the Practice button) the same
+     screen runs solo — you ready, the machine fills every seat, you vote, and
+     the local match begins. */
+
+  const BRAWL_VOTE_SECONDS = 30;
+
+  /* a slim, serialisable format snapshot for guests (the mode object holds
+     functions and can't cross the wire) */
+  function fmtInfo(fmt) {
+    return {
+      label: fmt.label, modeId: fmt.mode.id, size: fmt.size, shared: !!fmt.shared,
+      layout: fmt.layout.map(s => ({ side: s.side, x: s.x, y: s.y })),
+      mapName: fmt.map ? fmt.map.name : null,
+    };
+  }
+  /* the layout slot the host takes, honouring their team choice. Team battles:
+     team1/team2. Surrounded king-of-the-hill: the KING is always the centre
+     (slot 0); an ATTACKER takes the first ring seat (slot 1). FFA: slot 0. */
+  function brawlHostSeat(fmt, choice) {
+    if (!fmt) return 0;
+    if (fmt.mode.id === 'surrounded') return choice === 'attacker' ? 1 : 0;
+    if (fmt.mode.id !== 'team') return 0;
+    const want = (choice === 'team2') ? 1 : 0;   // 'random' resolves to team1 here
+    const idx = fmt.layout.findIndex(s => s.side === want);
+    return idx < 0 ? 0 : idx;
+  }
+
+  UI.register('brawlLobby', {
+    enter(root, params) {
+      const fmt = params.fmt, pouch = params.pouch, me = G.me, O = DYA.online;
+      let isSolo = params.role === 'solo';
+      let isHost = params.role === 'host';
+      let isGuest = params.role === 'guest';
+      const myNet = (O && O.me && O.me() && O.me().netId) || me.id;
+      const mySeal = me.seal || { avatarIdx: me.avatarIdx, patterns: [] };
+
+      /* guests learn the shape from the host's first broadcast; until then we
+         render from whatever fmt hint we have (may be null for a bare code join) */
+      let info = fmt ? fmtInfo(fmt) : null;
+      const total = () => (info ? info.layout.length : 0);
+
+      let phase = 'ready';            // 'ready' -> 'vote'
+      let done = false, room = null, closedMM = false, mmBeat = null, voteTimer = null;
+      /* team battles: team1|random|team2. Surrounded: king|attacker. */
+      let myChoice = (fmt && fmt.mode.id === 'surrounded') ? 'king' : 'team1';
+      let seatPlan = null;            // set at the vote transition: [{human,netId,...}|null]
+      let myHumanSlot = 0, realCount = 1;
+
+      /* authoritative roster (host) / mirrored roster (guest):
+         member = { netId, name, seal, pouch, ready1, ready2, vote } */
+      const members = {};
+      members[myNet] = { netId: myNet, name: me.displayName, seal: mySeal, pouch: pouch, ready1: false, ready2: false, vote: null };
+      let roster = rosterFromMembers();     // guests overwrite from host broadcasts
+
+      const isSurround = !!(fmt && fmt.mode.id === 'surrounded');
+      const PROTECT_MINUTES = [3, 5, 7, 10];
+      const myVote = { interval: 8, amount: 2, mode: 'Standard', protect: 5 };
+      const chatLog = [];
+      let voteTimeLeft = BRAWL_VOTE_SECONDS;
+      /* live element handles for the vote screen */
+      let chatBoxEl = null, readyLineEl = null, readyBtnEl = null, rlistEl = null, timerEl = null;
+
+      /* ---------- screen scaffold ---------- */
+      const scr = U.el('div', { cls: 'screen' });
+      scr.appendChild(UI.topbar({ title: 'Brawl Lobby' }));
+      const page = U.el('div', { cls: 'page' });
+      const head = U.el('div', { cls: 'page-head' });
+      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => leaveLobby() }));
+      const heading = U.el('h2', { text: 'Brawl Lobby' + (info ? ' — ' + info.label : '') });
+      head.appendChild(heading);
+      page.appendChild(head);
+      const bodyWrap = U.el('div', { cls: 'page-body', style: 'max-width:680px;margin:0 auto' });
+      page.appendChild(bodyWrap);
+      scr.appendChild(page);
+      root.appendChild(scr);
+
+      this.leave = () => cleanup();
+      function cleanup() {
+        done = true;
+        if (mmBeat) { clearInterval(mmBeat); mmBeat = null; }
+        if (voteTimer) { clearInterval(voteTimer); voteTimer = null; }
+        if (isHost && !closedMM && DYA.season && DYA.season.closeBrawl) { closedMM = true; DYA.season.closeBrawl(); }
+        if (room) { try { room.leave(); } catch (e) { } room = null; }
+      }
+      /* like cleanup, but keeps `room` alive (it's handed to the running match) */
+      function cleanupKeepRoom() {
+        if (mmBeat) { clearInterval(mmBeat); mmBeat = null; }
+        if (voteTimer) { clearInterval(voteTimer); voteTimer = null; }
+        if (isHost && !closedMM && DYA.season && DYA.season.closeBrawl) { closedMM = true; DYA.season.closeBrawl(); }
+      }
+      function leaveLobby() { cleanup(); UI.show('play'); }
+
+      function rosterFromMembers() {
+        return Object.values(members).map(m => ({ netId: m.netId, name: m.name, ready1: m.ready1, ready2: m.ready2, you: m.netId === myNet }));
+      }
+      function sendToRoom(msg) { if (room) { try { room.send(msg); } catch (e) { } } }
+
+      /* ================= LOBBY 1 — ready up ================= */
+      function renderReady() {
+        phase = 'ready';
+        bodyWrap.innerHTML = '';
+        heading.textContent = 'Brawl Lobby' + (info ? ' — ' + info.label : '');
+
+        if (isHost && info && info.modeId === 'team') {
+          const tp = U.el('div', { cls: 'panel mb' });
+          tp.appendChild(U.el('div', { cls: 'small muted', text: 'YOUR TEAM' }));
+          const row = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
+          const gold = DYA.match.TEAM_COLORS[0], red = DYA.match.TEAM_COLORS[1];
+          [['team1', 'Team 1', gold], ['random', 'Random', 'var(--muted)'], ['team2', 'Team 2', red]].forEach(([v, l, c]) => {
+            row.appendChild(U.el('button', { cls: 'btn small' + (myChoice === v ? ' primary' : ''), style: 'border-color:' + c, text: l, onclick: () => { myChoice = v; renderReady(); } }));
+          });
+          tp.appendChild(row);
+          bodyWrap.appendChild(tp);
+        }
+
+        /* Surrounded: choose to hold the hill as KING, or be an ATTACKER */
+        if (isHost && info && info.modeId === 'surrounded') {
+          const tp = U.el('div', { cls: 'panel mb' });
+          tp.appendChild(U.el('div', { cls: 'small muted', text: 'YOUR ROLE' }));
+          const row = U.el('div', { cls: 'mt', style: 'display:flex;gap:8px;flex-wrap:wrap' });
+          [['king', '👑 King of the Hill'], ['attacker', '⚔ Attacker']].forEach(([v, l]) => {
+            row.appendChild(U.el('button', { cls: 'btn small' + (myChoice === v ? ' primary' : ''), text: l, onclick: () => { myChoice = v; renderReady(); } }));
+          });
+          tp.appendChild(row);
+          tp.appendChild(U.el('p', { cls: 'small muted mt', text: myChoice === 'king'
+            ? 'Hold the centre castle and protect your Relic until the timer runs out. +50% resources, walls, corner archer towers and a manned keep. A Builder upgrades your walls and towers.'
+            : 'Break the castle and steal the king’s Relic before the timer ends. You have no Relic to defend — all that matters is the hill.' }));
+          bodyWrap.appendChild(tp);
+        }
+
+        const rp = U.el('div', { cls: 'panel mb' });
+        rp.appendChild(U.el('div', { cls: 'flex', style: 'justify-content:space-between' }, [
+          U.el('div', { cls: 'small muted', text: 'THE FIELD — ' + total() + ' camps' }),
+          U.el('div', { cls: 'small muted', text: info && info.modeId === 'team' ? (info.size + ' per side') : 'free-for-all' }),
+        ]));
+        const list = U.el('div', { cls: 'mt' });
+        const layout = (info && info.layout) || [];
+        layout.forEach((slot, i) => {
+          const col = DYA.match.TEAM_COLORS[slot.side % 6];
+          let who;
+          if (i < roster.length) {
+            const h = roster[i];
+            const rd = h.ready1 ? '<span class="gold">✓ ready</span>' : '<span class="muted">…not ready</span>';
+            who = '<b>' + U.esc(h.name) + '</b>' + (h.you ? ' <span class="small muted">(you)</span>' : ' <span class="small muted">(joined)</span>') + ' — ' + rd;
+          } else who = '<span class="muted">open — fills with a Dya’kukull</span>';
+          list.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + who }));
+        });
+        rp.appendChild(list);
+        bodyWrap.appendChild(rp);
+
+        if (!isSolo) {
+          const inv = U.el('div', { cls: 'panel mb' });
+          inv.appendChild(U.el('div', { cls: 'small muted', text: 'INVITE' }));
+          const cl = U.el('p', { cls: 'small mt' });
+          if (params.roomCode && room && isHost) cl.innerHTML = 'Room code: <b class="gold">' + U.esc(params.roomCode) + '</b> — share it so friends can join.';
+          else if (params.roomCode && room) cl.innerHTML = 'In room <b class="gold">' + U.esc(params.roomCode) + '</b> — waiting for the host.';
+          else cl.textContent = 'Connecting…';
+          inv.appendChild(cl);
+          const friends = (O && O.state && O.state.friends) || [];
+          if (isHost && friends.length) {
+            const fl = U.el('div', { cls: 'mt' });
+            friends.forEach(f => {
+              const r = U.el('div', { cls: 'friend-row' });
+              r.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(f.displayName || f.name || 'Friend') + '</b>' }));
+              r.appendChild(U.el('button', {
+                cls: 'btn small', text: 'Invite', onclick: async (e) => {
+                  e.target.disabled = true; e.target.textContent = 'Invited';
+                  try {
+                    const msg = params.roomCode ? ('room code ' + params.roomCode + ' — Play → Brawl → Join a room') : 'Play → Brawl → Find a match';
+                    if (O && O.sendMessage) await O.sendMessage(f.id, '⚔ Come brawl my ' + (info ? info.label : 'Brawl') + '! ' + msg);
+                    UI.toast({ title: 'Invite sent', icon: '⚔' });
+                  } catch (err) { e.target.disabled = false; e.target.textContent = 'Invite'; }
+                },
+              }));
+              fl.appendChild(r);
+            });
+            inv.appendChild(fl);
+          }
+          bodyWrap.appendChild(inv);
+        }
+
+        const status = U.el('p', { cls: 'muted center mt' });
+        const rc = roster.filter(h => h.ready1).length;
+        status.textContent = isSolo
+          ? 'Ready up — the machine fills the other camps.'
+          : (rc + ' of ' + roster.length + ' player(s) ready' + (isHost ? ' — the match starts when everyone here is ready.' : ' — waiting for all players and the host.'));
+        bodyWrap.appendChild(status);
+
+        const mem = members[myNet];
+        readyBtnEl = U.el('button', { cls: 'btn primary', style: 'width:100%', text: (mem && mem.ready1) ? '✓ Ready — waiting for others' : '✓ Ready', onclick: () => toggleReady1() });
+        bodyWrap.appendChild(readyBtnEl);
+        if (isHost && !isSolo) {
+          bodyWrap.appendChild(U.el('button', { cls: 'btn ghost mt', style: 'width:100%', text: 'Start now — fill the rest with Dya’kukull', onclick: () => hostAdvanceToVote() }));
+        }
+      }
+
+      function toggleReady1() {
+        const mem = members[myNet];
+        mem.ready1 = !mem.ready1;
+        if (isHost || isSolo) {
+          roster = rosterFromMembers();
+          if (isSolo) { if (mem.ready1) return hostAdvanceToVote(); renderReady(); return; }
+          broadcastLobby(); renderReady(); maybeAdvance();
+        } else {
+          const meRow = roster.find(r => r.you); if (meRow) meRow.ready1 = mem.ready1;
+          sendToRoom({ t: 'ready1', netId: myNet, v: mem.ready1 });
+          renderReady();
+        }
+      }
+      function allReady1() { return Object.values(members).every(m => m.ready1); }
+      function maybeAdvance() { if ((isHost || isSolo) && phase === 'ready' && allReady1()) hostAdvanceToVote(); }
+
+      function broadcastLobby() { if (isHost && room) sendToRoom({ t: 'lobby', phase, info, roster: rosterFromMembers() }); }
+
+      /* ---- host/solo: seat everyone, then move the whole room to the vote ---- */
+      function hostAdvanceToVote() {
+        if (done || phase !== 'ready') return;
+        phase = 'vote';
+        if (isHost && !closedMM && DYA.season && DYA.season.closeBrawl) { closedMM = true; DYA.season.closeBrawl(); }
+        const n = total();
+        const seats = new Array(n).fill(null);
+        const hs = brawlHostSeat(fmt, myChoice);
+        const hostMem = members[myNet];
+        seats[hs] = { human: true, netId: myNet, name: hostMem.name, seal: hostMem.seal, pouch: hostMem.pouch, accId: me.id };
+        Object.values(members).filter(m => m.netId !== myNet).forEach(m => {
+          const idx = seats.findIndex(s => !s);
+          if (idx >= 0) seats[idx] = { human: true, netId: m.netId, name: m.name, seal: m.seal, pouch: m.pouch || [], accId: null };
+        });
+        seatPlan = seats;
+        myHumanSlot = hs;
+        realCount = Object.keys(members).length;
+        if (room) sendToRoom({ t: 'toVote', info, seats: seats.map(s => s ? { human: true, netId: s.netId, name: s.name } : null) });
+        renderVote();
+      }
+
+      /* ================= LOBBY 2 — vote + chat ================= */
+      function adoptSeatPlan(seats) {
+        seatPlan = seats;
+        realCount = seats.filter(s => s && s.human).length;
+        const mine = seats.findIndex(s => s && s.netId === myNet);
+        myHumanSlot = mine < 0 ? 0 : mine;
+      }
+
+      function renderVote() {
+        phase = 'vote';
+        if (voteTimer) { clearInterval(voteTimer); voteTimer = null; }
+        bodyWrap.innerHTML = '';
+        heading.textContent = 'Brawl Vote' + (info ? ' — ' + info.label : '');
+
+        const grid = U.el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start' });
+
+        const mid = U.el('div', { cls: 'panel', style: 'flex:1;min-width:300px' });
+        timerEl = U.el('div', { cls: 'setup-timer', text: voteTimeLeft });
+        mid.appendChild(timerEl);
+        mid.appendChild(U.el('p', { cls: 'center muted small mb', text: 'Every player votes. Ready, or let the timer run — the middle ground wins.' }));
+        function voteRow(label, opts, key, f) {
+          const row = U.el('div', { cls: 'vote-row' });
+          row.appendChild(U.el('div', { cls: 'muted small', text: label }));
+          const w2 = U.el('div', { cls: 'vote-opts' });
+          opts.forEach(o => {
+            const b = U.el('div', { cls: 'vote-opt' + (myVote[key] === o ? ' mine' : ''), text: f ? f(o) : o });
+            b.onclick = () => { myVote[key] = o; U.qsa('.vote-opt', w2).forEach((x, i) => x.classList.toggle('mine', opts[i] === o)); DYA.audio.play('click'); castVote(); };
+            w2.appendChild(b);
+          });
+          row.appendChild(w2);
+          return row;
+        }
+        mid.appendChild(voteRow('PULSE INTERVAL — seconds between resource pulses', EC.PULSE_INTERVALS, 'interval', v => v + 's'));
+        mid.appendChild(voteRow('RESOURCES PER PULSE', EC.PULSE_AMOUNTS, 'amount'));
+        mid.appendChild(voteRow('MODE — Chaos randomizes every pulse (majority required)', ['Standard', 'Chaos'], 'mode'));
+        if (isSurround) mid.appendChild(voteRow('HOLD THE HILL — minutes the king must protect the Relic', PROTECT_MINUTES, 'protect', v => v + ' min'));
+        readyLineEl = U.el('p', { cls: 'small muted center' });
+        mid.appendChild(readyLineEl);
+        readyBtnEl = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready — skip the wait', onclick: () => toggleReady2() });
+        mid.appendChild(readyBtnEl);
+        grid.appendChild(mid);
+
+        const sidep = U.el('div', { cls: 'panel', style: 'flex:1;min-width:240px;display:flex;flex-direction:column' });
+        sidep.appendChild(U.el('div', { cls: 'small muted', text: 'THE FIELD' }));
+        rlistEl = U.el('div', { cls: 'mt', style: 'max-height:120px;overflow:auto' });
+        renderVoteRoster();
+        sidep.appendChild(rlistEl);
+
+        sidep.appendChild(U.el('div', { cls: 'small muted mt', text: 'CHAT' }));
+        chatBoxEl = U.el('div', { style: 'flex:1;min-height:120px;max-height:180px;overflow:auto;background:#0003;border-radius:8px;padding:8px;margin-top:4px' });
+        chatLog.forEach(c => chatBoxEl.appendChild(U.el('div', { cls: 'small', html: '<b class="gold">' + U.esc(c.name) + ':</b> ' + U.esc(c.text) })));
+        sidep.appendChild(chatBoxEl);
+        const chatRow = U.el('div', { cls: 'mt', style: 'display:flex;gap:6px' });
+        const chatIn = U.el('input', { cls: 'txt', maxlength: 120, placeholder: isSolo ? 'chat (just you here)' : 'say something…', style: 'flex:1' });
+        const sendChat = () => {
+          const t = (chatIn.value || '').trim(); if (!t) return; chatIn.value = '';
+          pushChat(me.displayName, t);
+          if (!isSolo) sendToRoom({ t: 'bchat', netId: myNet, name: me.displayName, text: t });
+        };
+        chatIn.onkeydown = (e) => { if (e.key === 'Enter') sendChat(); };
+        chatRow.appendChild(chatIn);
+        chatRow.appendChild(U.el('button', { cls: 'btn small', text: 'Send', onclick: sendChat }));
+        sidep.appendChild(chatRow);
+        grid.appendChild(sidep);
+
+        bodyWrap.appendChild(grid);
+        updateReadyLine();
+
+        voteTimer = setInterval(() => {
+          if (done) return;
+          voteTimeLeft--; if (timerEl) timerEl.textContent = voteTimeLeft;
+          if (voteTimeLeft <= 5 && timerEl) timerEl.classList.add('urgent');
+          if (voteTimeLeft <= 0) { if (isHost || isSolo) hostStart(); }
+        }, 1000);
+      }
+
+      function renderVoteRoster() {
+        if (!rlistEl) return;
+        rlistEl.innerHTML = '';
+        (seatPlan || []).forEach((s, i) => {
+          const slot = (info && info.layout[i]) || { side: 0 };
+          const col = DYA.match.TEAM_COLORS[slot.side % 6];
+          const nm = s ? (s.human ? (s.netId === myNet ? me.displayName + ' (you)' : s.name) : 'a Dya’kukull') : 'a Dya’kukull';
+          const rd = s && s.human ? readyMark(s.netId) : '';
+          rlistEl.appendChild(U.el('div', { cls: 'friend-row', html: '<span style="color:' + col + '">●</span> ' + U.esc(nm) + ' ' + rd }));
+        });
+      }
+      function readyMark(netId) { const m = members[netId]; return (m && m.ready2) ? '<span class="gold small">✓</span>' : ''; }
+      function pushChat(name, text) {
+        chatLog.push({ name, text });
+        if (chatBoxEl) { chatBoxEl.appendChild(U.el('div', { cls: 'small', html: '<b class="gold">' + U.esc(name) + ':</b> ' + U.esc(text) })); chatBoxEl.scrollTop = chatBoxEl.scrollHeight; }
+      }
+      function updateReadyLine() {
+        const humans = Object.values(members);
+        const rc = humans.filter(h => h.ready2).length;
+        const mem = members[myNet];
+        if (readyBtnEl) readyBtnEl.textContent = (mem && mem.ready2) ? '✓ Ready — waiting…' : '✓ Ready — skip the wait';
+        if (readyLineEl) readyLineEl.textContent = isSolo ? '' : (rc + ' of ' + humans.length + ' ready');
+      }
+
+      function castVote() { const mem = members[myNet]; if (mem) mem.vote = Object.assign({}, myVote); if (isGuest && !isSolo) sendToRoom({ t: 'bvote', netId: myNet, vote: Object.assign({}, myVote) }); }
+      function toggleReady2() {
+        const mem = members[myNet];
+        mem.ready2 = !mem.ready2; mem.vote = Object.assign({}, myVote);
+        if (isHost || isSolo) {
+          updateReadyLine(); renderVoteRoster();
+          if (isSolo) { if (mem.ready2) return hostStart(); return; }
+          broadcastVoteState(); maybeStart();
+        } else {
+          sendToRoom({ t: 'ready2', netId: myNet, v: mem.ready2, vote: mem.vote });
+          updateReadyLine();
+        }
+      }
+      function broadcastVoteState() { if (isHost && room) sendToRoom({ t: 'voteState', roster: Object.values(members).map(m => ({ netId: m.netId, name: m.name, ready2: m.ready2 })) }); }
+      function allReady2() { return Object.values(members).every(m => m.ready2); }
+      function maybeStart() { if ((isHost || isSolo) && phase === 'vote' && allReady2()) hostStart(); }
+
+      /* ---- host/solo: tally the votes and launch for everyone ---- */
+      function hostStart() {
+        if (done) return; done = true;
+        if (voteTimer) { clearInterval(voteTimer); voteTimer = null; }
+        const humans = Object.values(members);
+        const votes = humans.map(m => m.vote || (m.netId === myNet ? myVote : DYA.matchvote.DEFAULT_VOTE));
+        if (DYA.matchvote.shouldAIVote(realCount)) {
+          const aiSeats = (seatPlan || []).filter(s => !s || !s.human).length || Math.max(0, total() - realCount);
+          const rngV = new U.Rng(U.newSeed());
+          for (let i = 0; i < aiSeats; i++) votes.push({ interval: rngV.pick(EC.PULSE_INTERVALS), amount: rngV.pick(EC.PULSE_AMOUNTS), mode: rngV.chance(0.25) ? 'Chaos' : 'Standard' });
+        }
+        const settings = DYA.matchvote.combineMany(votes);
+        /* Surrounded king-of-the-hill: the protect timer is part of the vote too */
+        let kingHill = null;
+        if (isSurround) {
+          let sum = 0, n = 0;
+          votes.forEach(v => { if (v && v.protect) { sum += v.protect; n++; } });
+          const mins = n ? PROTECT_MINUTES.reduce((b, o) => Math.abs(o - sum / n) < Math.abs(b - sum / n) ? o : b, PROTECT_MINUTES[0]) : 5;
+          kingHill = { protect: mins * 60 };
+        }
+        if (isSolo || !room) {
+          cleanupKeepRoom();
+          beginBrawl(fmt, pouch, settings, myHumanSlot, kingHill);
+        } else {
+          const desc = buildBrawlDescriptor(fmt, seatPlan, settings, kingHill);
+          sendToRoom({ t: 'start', desc });
+          const r = room; room = null; cleanupKeepRoom();
+          launchNetBrawl(r, desc, myNet);
+        }
+      }
+
+      /* ================= networking ================= */
+      function onRoomMessage(msg) {
+        if (!msg || done) return;
+        if ((msg.t === 'frame' || msg.t === 'need' || msg.t === 'bye') && P._netSession && P._netSession.route) { P._netSession.route(msg); return; }
+
+        if (isHost) {
+          if (msg.t === 'joinBrawl' && msg.netId && !members[msg.netId]) {
+            if (phase !== 'ready' || Object.keys(members).length >= total()) { sendToRoom({ t: 'lobbyFull', to: msg.netId }); return; }
+            members[msg.netId] = { netId: msg.netId, name: msg.name || 'Player', seal: msg.seal, pouch: msg.pouch || [], ready1: false, ready2: false, vote: null };
+            roster = rosterFromMembers(); renderReady(); broadcastLobby();
+          } else if (msg.t === 'ready1' && members[msg.netId]) {
+            members[msg.netId].ready1 = !!msg.v; roster = rosterFromMembers();
+            if (phase === 'ready') renderReady();
+            broadcastLobby(); maybeAdvance();
+          } else if (msg.t === 'ready2' && members[msg.netId]) {
+            members[msg.netId].ready2 = !!msg.v; if (msg.vote) members[msg.netId].vote = msg.vote;
+            renderVoteRoster(); updateReadyLine(); broadcastVoteState(); maybeStart();
+          } else if (msg.t === 'bvote' && members[msg.netId]) {
+            members[msg.netId].vote = msg.vote;
+          } else if (msg.t === 'bchat' && msg.netId !== myNet) {
+            pushChat(msg.name || 'Player', msg.text || '');
+            sendToRoom({ t: 'bchat', netId: msg.netId, name: msg.name, text: msg.text });   // relay to other guests
+          }
+          return;
+        }
+
+        /* ---- guest ---- */
+        if (msg.t === 'lobby') {
+          info = msg.info || info;
+          roster = (msg.roster || roster).map(r => Object.assign({}, r, { you: r.netId === myNet }));
+          const meRow = roster.find(r => r.you); if (meRow) members[myNet].ready1 = !!meRow.ready1;
+          if (phase === 'ready') renderReady();
+        } else if (msg.t === 'toVote') {
+          info = msg.info || info;
+          adoptSeatPlan(msg.seats || []);
+          (msg.seats || []).forEach(s => { if (s && s.human && !members[s.netId]) members[s.netId] = { netId: s.netId, name: s.name, ready1: true, ready2: false, vote: null }; });
+          renderVote();
+        } else if (msg.t === 'voteState') {
+          (msg.roster || []).forEach(r => { if (members[r.netId]) members[r.netId].ready2 = r.ready2; else members[r.netId] = { netId: r.netId, name: r.name, ready1: true, ready2: r.ready2, vote: null }; });
+          renderVoteRoster(); updateReadyLine();
+        } else if (msg.t === 'bchat' && msg.netId !== myNet) {
+          pushChat(msg.name || 'Player', msg.text || '');
+        } else if (msg.t === 'start' && msg.desc) {
+          done = true; const r = room; room = null; cleanupKeepRoom();
+          launchNetBrawl(r, msg.desc, myNet);
+        } else if (msg.t === 'lobbyFull') {
+          UI.toast({ title: 'That brawl is full', body: 'It already started or filled up. Try Find a match again.', icon: '⚔' });
+          leaveLobby();
+        }
+      }
+      function onPeerLeave(key) {
+        if (!isHost || !members[key]) return;
+        delete members[key]; roster = rosterFromMembers();
+        if (phase === 'ready') { renderReady(); broadcastLobby(); maybeAdvance(); }
+        else { renderVoteRoster(); updateReadyLine(); broadcastVoteState(); maybeStart(); }
+      }
+
+      /* demote a failed online lobby to a solo one so play still happens */
+      function demoteToSolo() {
+        room = null; isSolo = true; isHost = false; isGuest = false;
+        Object.keys(members).forEach(k => { if (k !== myNet) delete members[k]; });
+        members[myNet].ready1 = false; members[myNet].ready2 = false;
+        roster = rosterFromMembers();
+        if (phase === 'ready') renderReady(); else renderVote();
+      }
+
+      /* ---------- open / join the room, then run lobby 1 ---------- */
+      renderReady();
+      if (isSolo) return;   // no networking — you ready, machine fills, you vote
+
+      (async () => {
+        if (!(DYA.netplay && DYA.netplay.joinRoom && O && O.configured && O.configured())) {
+          UI.toast({ title: 'Playing locally', body: 'Couldn’t reach the Guild network — the machine will fill the other camps.', icon: '📡' });
+          demoteToSolo(); return;
+        }
+        try {
+          room = await DYA.netplay.joinRoom(params.roomCode, myNet, { onMessage: onRoomMessage, onPeerLeave });
+          if (isHost) {
+            if (params.mmType && DYA.season && DYA.season.hostBrawl) {
+              DYA.season.hostBrawl(params.mmType, params.roomCode);
+              mmBeat = setInterval(() => { if (!done && phase === 'ready' && DYA.season.hostBrawl) DYA.season.hostBrawl(params.mmType, params.roomCode); }, 10000);
+            }
+            renderReady(); broadcastLobby();
+          } else {
+            sendToRoom({ t: 'joinBrawl', netId: myNet, name: me.displayName, seal: mySeal, pouch: pouch });
+            renderReady();
+          }
+        } catch (e) {
+          UI.toast({ title: 'Couldn’t reach the room', body: 'Playing locally instead.', icon: '📡' });
+          demoteToSolo();
+        }
+      })();
+    },
+  });
+
+  function beginBrawl(fmt, pouch, settings, humanSlot, kingHill) {
     const me = G.me;
     settings = settings || { pulseInterval: 8, pulseAmount: 2, chaos: false };
     humanSlot = humanSlot || 0;
@@ -3224,18 +3442,21 @@
       const acc = pool[aiN++];
       const name = acc ? acc.displayName : (BRAWL_RIVALS[(aiN) % BRAWL_RIVALS.length] + '’s Band');
       const aiPouch = acc ? P.accountPouch(acc).map(t => U.deepCopy(t)) : mintBrawlPouch();
-      return Object.assign(base, { name, accId: acc ? acc.id : null, controller: 'ai', aiSkill: acc ? G.aiSkill(acc) : aiSkill, pouch: aiPouch, startResources: startRes, seal: (acc && acc.seal) || { avatarIdx: 3, patterns: ['runes'] } });
+      return Object.assign(base, { name, accId: acc ? acc.id : null, controller: 'ai', aiSkill: acc ? G.aiSkill(acc) : 0.7, pouch: aiPouch, startResources: startRes, seal: (acc && acc.seal) || { avatarIdx: 3, patterns: ['runes'] } });
     });
+    /* Surrounded king-of-the-hill: the centre (slot 0) is the king */
+    if (kingHill && teams[0]) teams[0].king = true;
 
     const seed = U.newSeed();
     const terrain = ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)];
-    const match = new DYA.match.Match({ seed, mode: 'standard', terrain, settings, teams });
+    const match = new DYA.match.Match({ seed, mode: 'standard', terrain, settings, teams, kingHill: kingHill || null });
     UI.showWithLoading('match', {
       match,
       cfg: {
-        mode: 'standard', format: fmt.label + ' Brawl', noRecord: true, noXp: true, myTeam: humanSlot,
+        /* a Brawl is a real casual match now — it records and pays gold + XP */
+        mode: 'standard', format: fmt.label + ' Brawl', myTeam: humanSlot,
         opponent: { name: fmt.mode.id === 'team' ? 'the rival side' : 'the field' },
-        rematch: () => beginBrawl(fmt, aiSkill, pouch, settings, humanSlot),
+        rematch: () => beginBrawl(fmt, pouch, settings, humanSlot, kingHill),
         onFinish: (res, iWon, draw, toMenu) => { G.save(); UI.show(toMenu ? 'menu' : 'play'); },
       },
     }, 1100);
@@ -3256,7 +3477,7 @@
      netId; the rest are Dya'kukull that every client simulates identically
      (their pouches are IN the descriptor, never re-minted per client, so no
      seat that isn't a real person ever needs the wire). */
-  function buildBrawlDescriptor(fmt, seats, settings) {
+  function buildBrawlDescriptor(fmt, seats, settings, kingHill) {
     const startRes = G.titleBuff('startRes') || 0;
     const ais = Object.values(G.world.accounts || {}).filter(a => a.ai);
     const pool = ais.slice().sort(() => Math.random() - 0.5);
@@ -3279,18 +3500,20 @@
       }
       return t;
     });
-    return { seed: U.newSeed(), terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)], settings, label: fmt.label, mode: fmt.mode.id, teams };
+    /* Surrounded king-of-the-hill: the centre (slot 0) is the king */
+    if (kingHill && teams[0]) teams[0].king = true;
+    return { seed: U.newSeed(), terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)], settings, label: fmt.label, mode: fmt.mode.id, teams, kingHill: kingHill || null };
   }
 
   /* every client builds the SAME Match from the descriptor and starts the
      N-seat lockstep; human seats network, AI seats run free on all clients. */
   function launchNetBrawl(room, desc, myNetId) {
     const teams = desc.teams.map(t => ({
-      name: t.name, side: t.side, noRelic: t.noRelic, hoard: t.hoard, color: t.color,
+      name: t.name, side: t.side, noRelic: t.noRelic, king: !!t.king, hoard: t.hoard, color: t.color,
       controller: t.controller, aiSkill: t.aiSkill, accId: t.accId || null,
       pouch: (t.pouch || []).map(x => U.deepCopy(x)), startResources: t.startRes || 0, seal: t.seal,
     }));
-    const match = new DYA.match.Match({ seed: desc.seed, mode: 'standard', terrain: desc.terrain, settings: desc.settings, teams });
+    const match = new DYA.match.Match({ seed: desc.seed, mode: 'standard', terrain: desc.terrain, settings: desc.settings, teams, kingHill: desc.kingHill || null });
     const humanSeats = desc.teams.map((t, i) => (t.controller === 'human' ? i : -1)).filter(i => i >= 0);
     let mySeat = desc.teams.findIndex(t => t.netId && t.netId === myNetId);
     if (mySeat < 0) mySeat = humanSeats[0] != null ? humanSeats[0] : 0;
@@ -3301,7 +3524,8 @@
     UI.showWithLoading('match', {
       match,
       cfg: {
-        mode: 'standard', format: desc.label + ' Brawl (Online)', noRecord: true, noXp: true, myTeam: mySeat, net,
+        /* a Brawl is a real casual match now — it records and pays gold + XP */
+        mode: 'standard', format: desc.label + ' Brawl (Online)', myTeam: mySeat, net,
         opponent: { name: desc.mode === 'team' ? 'the rival side' : 'the field', remoteHuman: humanSeats.length > 1 },
         pouch: myPouch,
         onFinish: (res, iWon, draw, toMenu) => { if (room) try { room.leave(); } catch (e) { } P._netSession = null; G.save(); UI.show(toMenu ? 'menu' : 'play'); },
