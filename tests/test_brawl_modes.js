@@ -169,6 +169,25 @@ console.log('== BRAWL MODES: multi-player standard matches with alliances ==');
   check('the same area attack does burn a rival', foe.hp < fHp || foe.dead, 'foe ' + fHp + '→' + foe.hp);
 }
 
+/* ---- the authoritative guard: across a FULL 2v2, NO damage is ever applied
+        from a source to a unit on its own side (every attack path — melee,
+        projectile, breath, area, fire patch, bog) ---- */
+{
+  let appliedSameSide = 0;
+  [11, 22, 33].forEach(seed => {
+    const M = mk([0, 0, 1, 1], { pouchN: 5, startRes: 8, seed, brawlCap: 100 });
+    const orig = M.damage.bind(M);
+    M.damage = function (target, amt, source, opts) {
+      const before = target ? target.hp : 0;
+      const r = orig(target, amt, source, opts);
+      if (source && target && source !== target && source.side === target.side && target.hp < before) appliedSameSide += (before - target.hp);
+      return r;
+    };
+    let n = 0; while (!M.over && n < 140 * 20) { M.doTick(); n++; }
+  });
+  check('across full 2v2 matches, NO same-side damage is ever applied', appliedSameSide === 0, 'applied=' + appliedSameSide);
+}
+
 /* ---- elimination: last side standing wins a multi-team match ---- */
 {
   const M = mk([0, 0, 1, 1]);
