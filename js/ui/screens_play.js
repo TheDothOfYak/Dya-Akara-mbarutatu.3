@@ -1356,6 +1356,7 @@
       scr.appendChild(wheelEl);
       let wheelIndex = 0;
       let tooltip = null;
+      let wheelSwiped = false; /* set while a touch-drag is cycling the wheel, so the follow-up tap doesn't ready a token */
 
       /* networked matches: the local player may be team 1 (the guest).
          Sandbox (cfg.controlBoth): one player commands BOTH sides and can hand
@@ -1466,6 +1467,27 @@
         moveWheel(e.deltaY > 0 ? 1 : -1);
       }, { passive: false });
 
+      /* touch: drag horizontally across the wheel to cycle the pouch.
+         Every ~46px of drag steps one card; dragging right reveals earlier
+         cards (moveWheel -1), left reveals later ones. */
+      let swipeStartX = null, swipeSteps = 0;
+      const SWIPE_STEP = 46;
+      wheelEl.addEventListener('touchstart', e => {
+        if (e.touches.length !== 1) { swipeStartX = null; return; }
+        swipeStartX = e.touches[0].clientX; swipeSteps = 0; wheelSwiped = false;
+      }, { passive: true });
+      wheelEl.addEventListener('touchmove', e => {
+        if (swipeStartX == null) return;
+        const dx = e.touches[0].clientX - swipeStartX;
+        const target = -Math.trunc(dx / SWIPE_STEP); // right drag (dx>0) → negative → earlier cards
+        while (swipeSteps !== target) {
+          const dir = target > swipeSteps ? 1 : -1;
+          moveWheel(dir); swipeSteps += dir; wheelSwiped = true;
+        }
+        if (Math.abs(dx) > 8) e.preventDefault(); // claim the gesture so the page doesn't scroll
+      }, { passive: false });
+      wheelEl.addEventListener('touchend', () => { swipeStartX = null; }, { passive: true });
+
       /* additional cost (§1): a fallen token costs +1 per prior defeat, paid
          from any one resource — the player picks it here (click or keys 1–4) */
       let costPicker = null;
@@ -1560,6 +1582,7 @@
           };
           card.onmouseleave = () => { if (tooltip) { tooltip.remove(); tooltip = null; } };
           card.onclick = () => {
+            if (wheelSwiped) { wheelSwiped = false; return; } // a swipe just cycled the wheel — don't also ready
             wheelIndex = idx; // click centers it…
             tryReady(en, i, card);
           };
