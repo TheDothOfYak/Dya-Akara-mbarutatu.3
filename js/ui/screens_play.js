@@ -1357,6 +1357,11 @@
       let wheelIndex = 0;
       let tooltip = null;
       let wheelSwiped = false; /* set while a touch-drag is cycling the wheel, so the follow-up tap doesn't ready a token */
+      /* touch devices only: a first tap selects (centers) a card, a second tap
+         on that same selected card readies it — so tapping to browse/scroll the
+         wheel never buys a token. Desktop is unchanged: one click readies. */
+      const IS_TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      let armedIdx = null; /* pouch index of the card awaiting its confirming second tap */
 
       /* networked matches: the local player may be team 1 (the guest).
          Sandbox (cfg.controlBoth): one player commands BOTH sides and can hand
@@ -1449,7 +1454,7 @@
       function triggerSlot(slot, x, y) {
         const entry = T0.readied[slot];
         if (!entry) return;
-        if (entry.readiedAtPulse === M.pulseIndex) { UI.toast({ title: 'Not yet', body: 'A token cannot trigger in the pulse it was readied. Next pulse.', icon: '⏳' }); DYA.audio.play('deny'); return; }
+        if (entry.readiedAtPulse === M.pulseIndex) { UI.toast(IS_TOUCH ? { title: 'Not yet — next pulse', icon: '⏳' } : { title: 'Not yet', body: 'A token cannot trigger in the pulse it was readied. Next pulse.', icon: '⏳' }); DYA.audio.play('deny'); return; }
         sendInput({ type: 'trigger', slot, x, y });
         DYA.audio.play('deploy');
         if (DYA.tutorial) DYA.tutorial.onEvent('deployed');
@@ -1459,6 +1464,7 @@
       function moveWheel(dir) {
         const avail = T0.pouch.filter(en => en.state === 'pouch');
         if (!avail.length) return;
+        armedIdx = null; /* scrolling deselects any card awaiting its second tap */
         wheelIndex = (wheelIndex + dir + avail.length) % avail.length;
         renderWheel();
       }
@@ -1567,11 +1573,13 @@
           const tax = isHunt ? 0 : (en.deaths || 0); /* additional cost: +1 per prior defeat, any one resource */
           const afford = isHunt || (SP.ELEMENTS.every(el => (T0.resources[el] || 0) >= (costV[el] || 0)) &&
             (tax === 0 || SP.ELEMENTS.some(el => (T0.resources[el] || 0) >= (costV[el] || 0) + tax)));
-          const card = U.el('div', { cls: 'wheel-card' + (k === 0 ? ' center' : Math.abs(k) >= 3 ? ' fade3' : Math.abs(k) === 2 ? ' fade2' : ' fade1') });
+          const armed = IS_TOUCH && armedIdx === i && k === 0;
+          const card = U.el('div', { cls: 'wheel-card' + (k === 0 ? ' center' : Math.abs(k) >= 3 ? ' fade3' : Math.abs(k) === 2 ? ' fade2' : ' fade1') + (armed ? ' armed' : '') });
           card.appendChild(UI.tokenArt(en.tok.speciesId, k === 0 ? 62 : 46, 'idle', en.tok.picks && en.tok.picks.headCount, en.tok));
           card.appendChild(U.el('div', { cls: 'wc-name', text: en.tok.name }));
           card.appendChild(U.el('div', { cls: 'wc-meta', html: isHunt ? '<span class="muted">ready</span>' : (SP.ELEMENTS.filter(el => costV[el] > 0).map(el => '<span class="el-' + el + '">' + costV[el] + '</span>').join('·') + (tax ? ' <span style="color:var(--red)">+' + tax + '</span>' : '')) }));
           card.appendChild(U.el('div', { cls: 'wc-dot ' + (afford ? 'ok' : 'no') }));
+          if (armed) card.appendChild(U.el('div', { cls: 'wc-confirm', text: 'tap to ready' }));
           card.onmouseenter = () => {
             const sp = SP.get(en.tok.speciesId);
             tooltip = U.el('div', { cls: 'wheel-tip' });
@@ -1583,8 +1591,14 @@
           card.onmouseleave = () => { if (tooltip) { tooltip.remove(); tooltip = null; } };
           card.onclick = () => {
             if (wheelSwiped) { wheelSwiped = false; return; } // a swipe just cycled the wheel — don't also ready
-            wheelIndex = idx; // click centers it…
-            tryReady(en, i, card);
+            if (IS_TOUCH) {
+              // first tap selects & centers; a second tap on the same card readies it
+              if (armedIdx === i) { armedIdx = null; tryReady(en, i, card); }
+              else { armedIdx = i; wheelIndex = idx; renderWheel(); }
+              return;
+            }
+            wheelIndex = idx; // desktop: click centers…
+            tryReady(en, i, card); // …and readies in one press
           };
           wheelEl.appendChild(card);
         }
@@ -1620,7 +1634,7 @@
           el.appendChild(U.el('div', { cls: 'small', style: 'font-size:10px', text: en.tok.name }));
           if (cool) el.appendChild(U.el('div', { cls: 'small muted', style: 'font-size:9px', text: 'next pulse' }));
           el.addEventListener('dragstart', e => { e.dataTransfer.setData('slot', slot); });
-          el.onclick = () => { selectedSlot = slot; UI.toast({ title: 'Placing ' + en.tok.name, body: 'Click the field to trigger it there.', icon: '🎯' }); };
+          el.onclick = () => { selectedSlot = slot; UI.toast(IS_TOUCH ? { title: 'Tap the field to place', icon: '🎯' } : { title: 'Placing ' + en.tok.name, body: 'Click the field to trigger it there.', icon: '🎯' }); };
           readiedEl.appendChild(el);
         });
       }

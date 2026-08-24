@@ -678,3 +678,65 @@ body { -webkit-tap-highlight-color: transparent; }
     padding: 30px;
   }
 }
+
+/* ------------------------------------------------------------
+   Tap-to-select on the wheel (touch only, driven by JS)
+   A first tap arms the centered card; the follow-up tap readies it.
+   The armed card glows and shows a "tap to ready" confirm hint so it
+   is obvious a second press is needed. Plain markup on desktop never
+   gets the .armed class, so desktop is unaffected.
+   ------------------------------------------------------------ */
+.wheel-card.armed { border-color: var(--gold); box-shadow: 0 0 22px #d9b87a99, 0 0 0 1px var(--gold) inset; }
+.wheel-card .wc-confirm {
+  position: absolute; left: 50%; top: -15px; transform: translateX(-50%);
+  white-space: nowrap; font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+  color: #0e0b06; background: var(--gold); border-radius: 6px; padding: 1px 7px;
+  box-shadow: 0 2px 8px #000a;
+}
+
+/* ============================================================
+   Landscape-phone combat: a leaner, less-cluttered HUD
+   ------------------------------------------------------------
+   Once combat is forced landscape a phone is WIDE but SHORT, so the
+   plain max-width breakpoints miss it. Keying on a coarse pointer plus
+   a short viewport targets phones in battle without ever matching a
+   desktop (fine pointer, tall) or a tablet (tall). Everything here only
+   trims the on-screen furniture — nothing changes on desktop.
+   ============================================================ */
+@media (pointer: coarse) and (max-height: 540px) {
+  /* top-left pulse/relic readout */
+  .hud-topleft { top: 8px; }
+  .pulse-box { min-width: 0; padding: 5px 9px; font-size: 12px; }
+  .pulse-box .relic-status { font-size: 11px; }
+  /* top-right resources */
+  .hud-topright { top: 8px; }
+  .res-box { padding: 5px 10px; }
+  .res-box .rb-big { font-size: 18px; }
+  /* top-center pause/switch buttons */
+  .hud-topcenter { top: 8px; }
+  .hud-topcenter .btn.small { padding: 4px 10px; font-size: 12px; }
+  /* event feed sits below the top row — keep it small and out of the way */
+  .hud-events { top: 46px; }
+  .hud-event { font-size: 11px; padding: 3px 12px; }
+  /* smaller circular minimap (canvas bitmap is fixed in JS; scale via CSS) */
+  .hud-minimap { bottom: 92px; left: 10px; }
+  .hud-minimap canvas { width: 92px !important; height: 92px !important; }
+  /* readied board: narrower, tucked to the top-right under the resources */
+  .hud-readied {
+    width: 84px; right: 10px; top: 92px; padding: 6px 5px; gap: 5px;
+  }
+  .hud-readied::before { font-size: 8px; letter-spacing: .14em; }
+  .readied-slot { padding: 4px; }
+  .readied-slot canvas { width: 42px !important; height: 42px !important; }
+  /* token wheel: shorter strip, smaller cards, so it eats less height */
+  .hud-wheel { height: 92px; gap: 3px; padding: 3px 8px 4px; }
+  .wheel-card { width: 52px; }
+  .wheel-card.center { width: 70px; transform: translateY(-6px); }
+  .wheel-card .wc-name { font-size: 9px; }
+  .wheel-tip { width: min(300px, 90vw); bottom: 100px; }
+  /* compact, corner-pinned toasts so match hints stop hogging the screen */
+  #toasts { top: 8px; right: 8px; left: auto; width: 220px; gap: 6px; }
+  .toast { padding: 6px 10px; }
+  .toast .t-title { font-size: 12px; }
+  .toast .t-body { font-size: 11px; }
+}
