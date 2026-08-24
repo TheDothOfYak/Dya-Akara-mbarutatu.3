@@ -653,3 +653,28 @@ body { -webkit-tap-highlight-color: transparent; }
   .avatar-cell:hover { border-color: var(--line); }
   .btn:hover { box-shadow: none; }
 }
+
+/* ============================================================
+   Combat is a landscape experience on phones
+   ------------------------------------------------------------
+   The battle wants width — the field, the token wheel, and the
+   readied board all read best side-by-side. On a touch device held
+   in portrait we ask the player to turn it, and the field owns its
+   own horizontal drag so swiping the wheel never scrolls the page.
+   ============================================================ */
+/* the wheel handles its own horizontal drag (swipe to cycle the pouch) */
+#matchScreen .hud-wheel { touch-action: none; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  /* full-screen "rotate to battle" curtain over any combat screen */
+  #matchScreen::after {
+    content: '↻\A Rotate your device\A to do battle';
+    white-space: pre;
+    position: absolute; inset: 0; z-index: 200;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; line-height: 2.1;
+    font-size: 22px; letter-spacing: .06em; color: var(--gold);
+    background: radial-gradient(ellipse at 50% 40%, #2d2114 0%, #0c0906 78%);
+    padding: 30px;
+  }
+}
