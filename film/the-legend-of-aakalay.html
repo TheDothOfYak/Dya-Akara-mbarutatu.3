@@ -186,99 +186,135 @@ function cinebars(){
 }
 
 /* ---- The Mbaru Tatu night sky: 3 planets, moons, Piadon ring, quasar, nebulae ---- */
-const starField = (function(){
+const STARS = (function(){
   const rnd=mulberry32(20260824);
-  const stars=[];
-  for(let i=0;i<420;i++){
-    stars.push({x:rnd()*VW,y:rnd()*VH*0.8,r:rnd()*1.5+0.3,tw:rnd()*TAU,sp:rnd()*2+0.5,h:rnd()});
-  }
-  return stars;
+  const stars=[], bright=[], milky=[];
+  for(let i=0;i<520;i++) stars.push({x:rnd()*VW,y:rnd()*VH*0.82,r:rnd()*1.3+0.25,tw:rnd()*TAU,sp:rnd()*2+0.5,h:rnd()});
+  for(let i=0;i<26;i++) bright.push({x:rnd()*VW,y:rnd()*VH*0.6,r:rnd()*1.3+1.1,tw:rnd()*TAU,sp:rnd()*1.4+0.4,h:rnd()});
+  // milky-way band — a soft river of stars from lower-left up to upper-right
+  for(let i=0;i<260;i++){ const u=rnd(); const bx=lerp(-0.1,1.1,u)*VW, by=lerp(0.62,0.06,u)*VH+(rnd()-0.5)*VH*0.15;
+    milky.push({x:bx,y:by,r:rnd()*1.0+0.2,tw:rnd()*TAU,sp:rnd()*2+0.5}); }
+  return {stars,bright,milky};
 })();
+/* a soft radial glow — the workhorse for atmosphere, light pools, bloom */
+function softGlow(x,y,r,col,a){
+  const g=ctx.createRadialGradient(x,y,0,x,y,r);
+  g.addColorStop(0,rgba(col,a)); g.addColorStop(1,rgba(col,0));
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.fill();
+}
 function drawSky(t, opt={}){
   const horizon = opt.horizon!=null?opt.horizon:VH;
   const bright = opt.bright!=null?opt.bright:1;
-  // deep gradient
+  const sA = opt.starA!=null?opt.starA:1;
+  // deep layered gradient — indigo up top, warmer toward the horizon
   const g=ctx.createLinearGradient(0,0,0,horizon);
-  g.addColorStop(0,'#080611');
-  g.addColorStop(0.5,'#0d0a18');
-  g.addColorStop(1, opt.dawn?'#241528':'#120d17');
+  g.addColorStop(0,'#05040d'); g.addColorStop(0.4,'#0a0819'); g.addColorStop(0.72,'#120d20');
+  g.addColorStop(1, opt.dawn?'#2a1730':'#171021');
   ctx.fillStyle=g; ctx.fillRect(0,0,VW,horizon);
 
-  // nebulae (Piadon's outer cloud + a couple faint ones)
-  const neb=(cx,cy,rw,rh,col,a)=>{
-    const ng=ctx.createRadialGradient(cx,cy,0,cx,cy,rw);
-    ng.addColorStop(0,rgba(col,a)); ng.addColorStop(1,rgba(col,0));
-    ctx.save(); ctx.translate(cx,cy); ctx.scale(1,rh/rw); ctx.translate(-cx,-cy);
-    ctx.fillStyle=ng; ctx.beginPath(); ctx.arc(cx,cy,rw,0,TAU); ctx.fill(); ctx.restore();
-  };
-  neb(VW*0.22,VH*0.30,340,190,'#5a3a7a',0.18*bright);
-  neb(VW*0.80,VH*0.20,300,170,'#2f5a6e',0.16*bright);
+  // milky-way band + its stars (screen-blended)
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  ctx.save(); ctx.translate(VW*0.5,VH*0.32); ctx.rotate(-0.5); ctx.translate(-VW*0.5,-VH*0.32);
+  softGlow(VW*0.5,VH*0.32, VW*0.60,'#3b3f7a',0.10*bright);
+  softGlow(VW*0.42,VH*0.30, VW*0.36,'#6a4a7a',0.07*bright);
+  ctx.restore();
+  for(const s of STARS.milky){ if(s.y>horizon) continue; const tw=0.4+0.6*Math.sin(t*s.sp+s.tw);
+    ctx.globalAlpha=tw*bright*sA*0.7; ctx.fillStyle='#e9ecff'; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,TAU); ctx.fill(); }
+  ctx.restore(); ctx.globalAlpha=1;
 
-  // stars
-  for(const s of starField){
-    if(s.y>horizon) continue;
-    const tw=0.55+0.45*Math.sin(t*s.sp+s.tw);
-    ctx.globalAlpha=tw*bright*(opt.starA!=null?opt.starA:1);
-    ctx.fillStyle = s.h<0.15?'#bcd0ff':s.h>0.85?'#ffe6c0':'#ffffff';
-    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,TAU); ctx.fill();
-  }
-  ctx.globalAlpha=1;
-
-  // dim quasar — a sharp point with faint cross flare
-  const qx=VW*0.86,qy=VH*0.13;
-  ctx.globalAlpha=0.9*bright;
-  ctx.fillStyle='#cfe0ff';
-  ctx.beginPath(); ctx.arc(qx,qy,1.6,0,TAU); ctx.fill();
-  ctx.strokeStyle=rgba('#9fb8ff',0.35*bright); ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(qx-16,qy); ctx.lineTo(qx+16,qy);
-  ctx.moveTo(qx,qy-16); ctx.lineTo(qx,qy+16); ctx.stroke();
-  ctx.globalAlpha=1;
-
-  // Piadon's bright ring — a faint arc across upper sky
-  ctx.save();
-  ctx.strokeStyle=rgba('#c9b3e0',0.10*bright); ctx.lineWidth=54;
-  ctx.beginPath(); ctx.arc(VW*0.5,-VH*0.7,VW*1.05,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
-  ctx.strokeStyle=rgba('#e8dcff',0.06*bright); ctx.lineWidth=16;
-  ctx.beginPath(); ctx.arc(VW*0.5,-VH*0.7,VW*1.05,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  // nebulae — layered radial blobs for a cloudy, textured look
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  softGlow(VW*0.22,VH*0.30,300,'#5a3a7a',0.13*bright); softGlow(VW*0.28,VH*0.24,170,'#7a4a8a',0.09*bright);
+  softGlow(VW*0.80,VH*0.20,260,'#2f5a6e',0.12*bright); softGlow(VW*0.74,VH*0.16,150,'#3a6e7e',0.08*bright);
   ctx.restore();
 
+  // faint stars
+  for(const s of STARS.stars){ if(s.y>horizon) continue; const tw=0.5+0.5*Math.sin(t*s.sp+s.tw);
+    ctx.globalAlpha=tw*bright*sA; ctx.fillStyle=s.h<0.18?'#b9ccff':s.h>0.82?'#ffe4bf':'#ffffff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,TAU); ctx.fill(); }
+  ctx.globalAlpha=1;
+  // bright stars — glow + a small cross flare
+  for(const s of STARS.bright){ if(s.y>horizon) continue; const tw=0.6+0.4*Math.sin(t*s.sp+s.tw);
+    const col=s.h<0.3?'#cfe0ff':s.h>0.7?'#ffdca8':'#ffffff';
+    ctx.globalAlpha=tw*bright*sA*0.6; softGlow(s.x,s.y,s.r*6,col,0.5);
+    ctx.globalAlpha=tw*bright*sA; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,TAU); ctx.fill();
+    ctx.globalAlpha=tw*bright*sA*0.45; ctx.strokeStyle=col; ctx.lineWidth=0.6;
+    ctx.beginPath(); ctx.moveTo(s.x-s.r*4,s.y); ctx.lineTo(s.x+s.r*4,s.y); ctx.moveTo(s.x,s.y-s.r*4); ctx.lineTo(s.x,s.y+s.r*4); ctx.stroke(); }
+  ctx.globalAlpha=1;
+
+  // an occasional shooting star
+  const ss=(t*0.06)%1; if(ss<0.05 && horizon>VH*0.4){ const p=ss/0.05; const sx=VW*0.16+p*VW*0.5, sy=VH*0.10+p*VH*0.12;
+    ctx.globalAlpha=Math.sin(p*Math.PI)*0.8*bright; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx-48,sy-15); ctx.stroke(); ctx.globalAlpha=1; }
+
+  // dim quasar — a sharp point with a cross flare
+  const qx=VW*0.86,qy=VH*0.12; ctx.globalAlpha=0.9*bright*sA; softGlow(qx,qy,10,'#cfe0ff',0.5);
+  ctx.fillStyle='#e8f0ff'; ctx.beginPath(); ctx.arc(qx,qy,1.7,0,TAU); ctx.fill();
+  ctx.strokeStyle=rgba('#9fb8ff',0.35*bright); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(qx-18,qy); ctx.lineTo(qx+18,qy); ctx.moveTo(qx,qy-18); ctx.lineTo(qx,qy+18); ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // Piadon's bright ring
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  ctx.strokeStyle=rgba('#c9b3e0',0.10*bright); ctx.lineWidth=60; ctx.beginPath(); ctx.arc(VW*0.5,-VH*0.7,VW*1.05,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  ctx.strokeStyle=rgba('#efe4ff',0.06*bright); ctx.lineWidth=14; ctx.beginPath(); ctx.arc(VW*0.5,-VH*0.7,VW*1.05,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  ctx.restore();
+
+  // atmospheric haze along a low horizon
+  if(horizon<VH*0.95){ const hz=ctx.createLinearGradient(0,horizon-140,0,horizon+12);
+    hz.addColorStop(0,rgba('#20304e',0)); hz.addColorStop(1,rgba('#2a3a58',0.30*bright));
+    ctx.fillStyle=hz; ctx.fillRect(0,horizon-140,VW,152); }
+
   if(opt.surface){
-    // Standing on Xikia (the Eikar homeworld, where Aakalay stands): the sky
-    // shows only the two OTHER sister worlds — Velki and Leotik.
+    // Standing on Xikia (where Aakalay stands): the sky shows the two OTHER worlds.
     drawPlanet(VW*0.20,VH*0.19,62,'#5b74a8','#2c3b5e',{moons:4,t,id:'velki'});
     drawPlanet(VW*0.70,VH*0.15,26,'#6a8a6e','#33463a',{moons:1,t,id:'leotik'});
   } else {
-    // Cosmic establishing view — the full cluster of three.
-    drawPlanet(VW*0.17,VH*0.20,58,'#5b74a8','#2c3b5e',{moons:4,t,ring:false,id:'velki'});
+    drawPlanet(VW*0.17,VH*0.20,58,'#5b74a8','#2c3b5e',{moons:4,t,id:'velki'});
     drawPlanet(VW*0.335,VH*0.145,34,'#a86f4e','#5e3a26',{moons:2,t,dancing:true,id:'xikia'});
     drawPlanet(VW*0.62,VH*0.11,15,'#6a8a6e','#33463a',{moons:1,t,id:'leotik'});
   }
 }
 function drawPlanet(x,y,r,col,dark,o={}){
   ctx.save();
-  // glow
-  const gl=ctx.createRadialGradient(x,y,r*0.6,x,y,r*2.2);
-  gl.addColorStop(0,rgba(col,0.25)); gl.addColorStop(1,rgba(col,0));
-  ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(x,y,r*2.2,0,TAU); ctx.fill();
-  // body with terminator shading
-  const g=ctx.createRadialGradient(x-r*0.4,y-r*0.4,r*0.2,x,y,r);
-  g.addColorStop(0,shade(col,35)); g.addColorStop(0.7,col); g.addColorStop(1,dark);
+  // atmosphere halo
+  ctx.save(); ctx.globalCompositeOperation='screen'; softGlow(x,y,r*2.1,col,0.22); ctx.restore();
+  // body — lit from upper-left
+  const g=ctx.createRadialGradient(x-r*0.45,y-r*0.45,r*0.15,x,y,r*1.05);
+  g.addColorStop(0,shade(col,48)); g.addColorStop(0.55,col); g.addColorStop(1,shade(dark,-8));
   ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.fill();
-  // bands / continents hint
+  // surface detail, clipped to the disc
   ctx.save(); ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.clip();
-  ctx.globalAlpha=0.35; ctx.fillStyle=dark;
-  for(let i=0;i<3;i++){ ctx.beginPath(); ctx.ellipse(x-r*0.2+i*r*0.4, y-r*0.3+i*r*0.35, r*0.5, r*0.16,0.3,0,TAU); ctx.fill(); }
+  const rnd=mulberry32((o.id||'p').charCodeAt(0)*97+Math.round(r));
+  // continents / banding
+  ctx.globalAlpha=0.30; ctx.fillStyle=shade(dark,8);
+  for(let i=0;i<5;i++){ ctx.beginPath();
+    ctx.ellipse(x-r*0.3+rnd()*r*0.8, y-r*0.4+i*r*0.28, r*(0.35+rnd()*0.4), r*(0.09+rnd()*0.12), rnd()*0.6-0.3,0,TAU); ctx.fill(); }
+  // faint cloud swirls
+  ctx.globalAlpha=0.14; ctx.strokeStyle=shade(col,60); ctx.lineWidth=Math.max(1,r*0.05);
+  for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(x-r*0.2,y-r*0.1+i*r*0.25, r*(0.6+i*0.1), 0.2, 2.2); ctx.stroke(); }
+  // terminator — night side sinks toward lower-right
+  ctx.globalAlpha=1; const term=ctx.createRadialGradient(x+r*0.5,y+r*0.5,r*0.1,x+r*0.15,y+r*0.15,r*1.5);
+  term.addColorStop(0,rgba(shade(dark,-24),0.78)); term.addColorStop(1,rgba(dark,0));
+  ctx.fillStyle=term; ctx.fillRect(x-r,y-r,2*r,2*r);
+  // bright limb, upper-left
+  ctx.globalAlpha=0.5; ctx.strokeStyle=rgba(shade(col,72),0.6); ctx.lineWidth=Math.max(1,r*0.05);
+  ctx.beginPath(); ctx.arc(x,y,r*0.97,Math.PI*0.88,Math.PI*1.5); ctx.stroke();
   ctx.restore();
-  // moons
+  // a subtle ring on the largest world (Velki)
+  if(r>50){ ctx.save(); ctx.translate(x,y); ctx.rotate(-0.4); ctx.scale(1,0.26);
+    ctx.strokeStyle=rgba('#9fb0d8',0.26); ctx.lineWidth=r*0.10; ctx.beginPath(); ctx.arc(0,0,r*1.5,0,TAU); ctx.stroke();
+    ctx.strokeStyle=rgba('#c9d6f0',0.15); ctx.lineWidth=r*0.05; ctx.beginPath(); ctx.arc(0,0,r*1.72,0,TAU); ctx.stroke(); ctx.restore(); }
+  // moons — glowing, shaded
   const mn=o.moons||0;
   for(let i=0;i<mn;i++){
-    const orbit=r*(1.9+i*0.7);
-    const sp=(o.t||0)*(0.25+i*0.12)+i*2.1;
-    // Xikia loses its dancing small moon on near passes: fade one moon in/out
-    let a=1, mr=Math.max(1.5,r*0.14);
+    const orbit=r*(1.9+i*0.7), sp=(o.t||0)*(0.25+i*0.12)+i*2.1;
+    let a=1, mr=Math.max(1.6,r*0.14);
     if(o.dancing && i===1){ a=0.35+0.35*Math.sin((o.t||0)*0.5); mr=r*0.10; }
     const mx=x+Math.cos(sp)*orbit, my=y+Math.sin(sp)*orbit*0.6;
-    ctx.globalAlpha=a; ctx.fillStyle=shade(col,60);
+    ctx.save(); ctx.globalCompositeOperation='screen'; ctx.globalAlpha=a*0.5; softGlow(mx,my,mr*3,'#cdd6ea',0.4); ctx.restore();
+    ctx.globalAlpha=a; const mg=ctx.createRadialGradient(mx-mr*0.4,my-mr*0.4,mr*0.2,mx,my,mr);
+    mg.addColorStop(0,'#e8ecf5'); mg.addColorStop(1,shade(col,18)); ctx.fillStyle=mg;
     ctx.beginPath(); ctx.arc(mx,my,mr,0,TAU); ctx.fill(); ctx.globalAlpha=1;
   }
   ctx.restore();
@@ -300,27 +336,42 @@ function sunearVeil(t, intensity=1){
   ctx.restore();
 }
 
-/* ---- ground / rolling fields silhouette ---- */
+/* ---- ground / rolling fields: parallax hill bands + fog + textured foreground ---- */
 function drawGround(t, opt={}){
   const hy=opt.horizon!=null?opt.horizon:VH*0.66;
-  // distant hill band
-  ctx.fillStyle=opt.far||'#161018';
-  ctx.beginPath(); ctx.moveTo(0,hy);
-  for(let x=0;x<=VW;x+=40){ ctx.lineTo(x,hy-18-Math.sin(x*0.004+2)*16); }
-  ctx.lineTo(VW,VH); ctx.lineTo(0,VH); ctx.fill();
-  // near ground
-  const g=ctx.createLinearGradient(0,hy,0,VH);
-  g.addColorStop(0,opt.near||'#0f0b08'); g.addColorStop(1,'#070504');
-  ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(0,hy+6);
-  for(let x=0;x<=VW;x+=30){ ctx.lineTo(x,hy+6-Math.sin(x*0.01)*6); }
-  ctx.lineTo(VW,VH); ctx.lineTo(0,VH); ctx.fill();
-  // low foliage tufts
-  if(opt.foliage){
-    ctx.strokeStyle='#0c1a0e'; ctx.lineWidth=2;
-    const rnd=mulberry32(7);
-    for(let i=0;i<60;i++){ const x=rnd()*VW,y=hy+8+rnd()*(VH-hy-8);
-      for(let b=-1;b<=1;b++){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+b*4,y-8-rnd()*6); ctx.stroke(); } }
+  // three receding hill bands; farther ones are hazier and lighter (aerial perspective)
+  const bands=[
+    {off:-4, amp:26, col:opt.far||'#1a1526', freq:0.0034, ph:2,  hazeCol:'#28324e', hazeA:0.55},
+    {off:12, amp:34, col:'#141020',           freq:0.0052, ph:5,  hazeCol:'#20283e', hazeA:0.30},
+    {off:34, amp:22, col:'#0c0812',           freq:0.0082, ph:0.5,hazeCol:'#000000', hazeA:0.0}
+  ];
+  for(const b of bands){
+    ctx.fillStyle=b.col; ctx.beginPath(); ctx.moveTo(0,hy+b.off);
+    for(let x=0;x<=VW;x+=24){ ctx.lineTo(x, hy+b.off - b.amp*0.5 - Math.sin(x*b.freq+b.ph)*b.amp*0.5); }
+    ctx.lineTo(VW,VH); ctx.lineTo(0,VH); ctx.fill();
+    if(b.hazeA>0){ const hz=ctx.createLinearGradient(0,hy+b.off-b.amp,0,hy+b.off+44);
+      hz.addColorStop(0,rgba(b.hazeCol,b.hazeA)); hz.addColorStop(1,rgba(b.hazeCol,0));
+      ctx.fillStyle=hz; ctx.fillRect(0,hy+b.off-b.amp,VW,b.amp+44); }
   }
+  // near ground with a soft gradient
+  const g=ctx.createLinearGradient(0,hy+30,0,VH);
+  g.addColorStop(0,opt.near||'#0e0b09'); g.addColorStop(1,'#050403');
+  ctx.fillStyle=g; ctx.fillRect(0,hy+30,VW,VH-hy);
+  // ground speckle texture (breaks up the flat fill)
+  ctx.save(); const rnd=mulberry32(51); ctx.globalAlpha=0.06;
+  for(let i=0;i<150;i++){ const x=rnd()*VW, y=hy+34+rnd()*(VH-hy-34); ctx.fillStyle=rnd()<0.5?'#000':'#3a2f22'; ctx.fillRect(x,y,rnd()*2+1,rnd()*2+1); }
+  ctx.restore();
+  // drifting ground fog
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  for(let i=0;i<4;i++){ const fx=(t*(8+i*4)+i*380)%(VW+400)-200; softGlow(fx, hy+42+i*22, 210+i*30, '#3a4a5e', 0.05); }
+  ctx.restore();
+  // varied foliage tufts + a few stones, scaled by distance
+  if(opt.foliage){ const rnd2=mulberry32(7);
+    for(let i=0;i<74;i++){ const x=rnd2()*VW, y=hy+16+rnd2()*(VH-hy-16); const s=0.45+(y-hy)/(VH-hy);
+      ctx.strokeStyle=rgba('#0e1c10',0.85*s); ctx.lineWidth=1.4*s; ctx.lineCap='round';
+      for(let b=-2;b<=2;b++){ ctx.beginPath(); ctx.moveTo(x,y); ctx.quadraticCurveTo(x+b*3, y-6*s, x+b*5, y-(10+rnd2()*8)*s); ctx.stroke(); } }
+    for(let i=0;i<16;i++){ const x=rnd2()*VW, y=hy+50+rnd2()*(VH-hy-50); const s=(y-hy)/(VH-hy);
+      ctx.fillStyle=rgba('#14100c',0.9); ctx.beginPath(); ctx.ellipse(x,y,4*s+1,2.5*s+1,0,0,TAU); ctx.fill(); } }
 }
 
 /* ---- The shining city of Aakalay — silhouette of slender spires, lit, sheened ---- */
@@ -329,81 +380,108 @@ function drawAakalay(t, opt={}){
   const cx=opt.cx!=null?opt.cx:VW*0.5;
   const scale=opt.scale!=null?opt.scale:1;
   const glow=opt.glow!=null?opt.glow:1;
-  const rnd=mulberry32(99);
+  const wallW=560*scale, wallH=42*scale;
   ctx.save();
-  // pale sheen halo over the city (shiny even at night)
-  const halo=ctx.createRadialGradient(cx,baseY-120*scale,20,cx,baseY-120*scale,360*scale);
-  halo.addColorStop(0,rgba('#dfe8ff',0.14*glow)); halo.addColorStop(1,rgba('#dfe8ff',0));
-  ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(cx,baseY-120*scale,360*scale,0,TAU); ctx.fill();
-  // outer wall
-  const wallH=42*scale, wallW=560*scale;
-  ctx.fillStyle=shade(C.stone,-6);
-  ctx.fillRect(cx-wallW/2, baseY-wallH, wallW, wallH+40);
-  ctx.fillStyle=shade(C.stone,8);
-  for(let x=cx-wallW/2;x<cx+wallW/2;x+=26*scale){ ctx.fillRect(x, baseY-wallH-8*scale, 14*scale, 8*scale); } // crenellations
-  // spires behind wall
-  const towers=14;
+  // glow dome over the city (shiny even at night)
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  softGlow(cx, baseY-120*scale, 400*scale, '#cfe0ff', 0.12*glow);
+  softGlow(cx, baseY-40*scale, 300*scale, '#dfe8ff', 0.08*glow);
+  ctx.restore();
+  // far, hazy tower layer (bluish, no detail — reads as depth)
+  const rndB=mulberry32(77);
+  for(let i=0;i<22;i++){ const tx=cx-wallW/2+rndB()*wallW; const th=(60+rndB()*120)*scale, tw=(10+rndB()*12)*scale;
+    ctx.fillStyle=rgba('#2a3450',0.5); ctx.fillRect(tx-tw/2, baseY-wallH*0.5-th, tw, th); }
+  const wash=ctx.createLinearGradient(0,baseY-260*scale,0,baseY);
+  wash.addColorStop(0,rgba('#1a2440',0)); wash.addColorStop(1,rgba('#1a2440',0.35));
+  ctx.fillStyle=wash; ctx.fillRect(cx-wallW/2-40, baseY-260*scale, wallW+80, 260*scale);
+  // outer wall with a face gradient + crenellations
+  ctx.fillStyle=shade(C.stone,-8); ctx.fillRect(cx-wallW/2, baseY-wallH, wallW, wallH+60);
+  const wg=ctx.createLinearGradient(0,baseY-wallH,0,baseY+20);
+  wg.addColorStop(0,shade(C.stone,4)); wg.addColorStop(1,shade(C.stone,-16));
+  ctx.fillStyle=wg; ctx.fillRect(cx-wallW/2, baseY-wallH, wallW, wallH+20);
+  ctx.fillStyle=shade(C.stone,10);
+  for(let x=cx-wallW/2;x<cx+wallW/2;x+=26*scale){ ctx.fillRect(x, baseY-wallH-8*scale, 14*scale, 8*scale); }
+  // detailed front spires, varied roofs, warm+cool windows
+  const rnd=mulberry32(99); const towers=16;
   for(let i=0;i<towers;i++){
-    const tx=cx-wallW/2+ (i+0.5)*(wallW/towers) + (rnd()-0.5)*10*scale;
-    const th=(70+rnd()*150)*scale;
-    const tw=(14+rnd()*16)*scale;
-    const depth=0.5+rnd()*0.5;
-    ctx.fillStyle=shade(C.stone, -20+depth*26);
-    ctx.beginPath();
-    ctx.moveTo(tx-tw/2, baseY-wallH*0.6);
-    ctx.lineTo(tx-tw/2, baseY-wallH*0.6-th);
-    ctx.lineTo(tx, baseY-wallH*0.6-th-tw*0.9);  // pointed roof
-    ctx.lineTo(tx+tw/2, baseY-wallH*0.6-th);
-    ctx.lineTo(tx+tw/2, baseY-wallH*0.6);
-    ctx.closePath(); ctx.fill();
-    // lit windows — cold pale light
-    for(let w=0;w<Math.floor(th/26);w++){
-      if(rnd()<0.55){
-        const fl = 0.5+0.5*Math.sin(t*(1+rnd()*2)+i*3+w);
-        ctx.fillStyle=rgba('#cfe0ff',(0.25+0.4*fl)*glow*depth);
-        ctx.fillRect(tx-tw*0.16, baseY-wallH*0.6-20*scale-w*24*scale, tw*0.32, 8*scale);
-      }
+    const tx=cx-wallW/2+(i+0.5)*(wallW/towers)+(rnd()-0.5)*10*scale;
+    const th=(70+rnd()*160)*scale, tw=(14+rnd()*18)*scale, depth=0.55+rnd()*0.45, roof=rnd();
+    const topY=baseY-wallH*0.6-th;
+    const tg=ctx.createLinearGradient(tx-tw/2,0,tx+tw/2,0);
+    tg.addColorStop(0,shade(C.stone,-26+depth*24)); tg.addColorStop(0.5,shade(C.stone,-12+depth*30)); tg.addColorStop(1,shade(C.stone,-30+depth*18));
+    ctx.fillStyle=tg;
+    ctx.beginPath(); ctx.moveTo(tx-tw/2, baseY-wallH*0.6); ctx.lineTo(tx-tw/2, topY);
+    if(roof<0.5){ ctx.lineTo(tx, topY-tw*0.9); }                                  // slender spire
+    else if(roof<0.8){ ctx.lineTo(tx-tw*0.3, topY-tw*0.45); ctx.lineTo(tx+tw*0.3, topY-tw*0.45); } // small peak
+    else { ctx.lineTo(tx-tw*0.5, topY); ctx.arc(tx, topY, tw*0.5, Math.PI, 0, false); }            // dome
+    ctx.lineTo(tx+tw/2, topY); ctx.lineTo(tx+tw/2, baseY-wallH*0.6); ctx.closePath(); ctx.fill();
+    // a lit finial on some spires
+    if(roof<0.5 && rnd()<0.5){ ctx.save(); ctx.globalCompositeOperation='screen'; softGlow(tx, topY-tw*0.9, 12*scale, '#ffe6b0', 0.5*glow); ctx.restore(); }
+    // windows
+    for(let w=0;w<Math.floor(th/24);w++){
+      if(rnd()<0.5){ const warm=rnd()<0.35; const fl=0.4+0.6*Math.abs(Math.sin(t*(0.6+rnd()*1.6)+i*3+w));
+        ctx.fillStyle=rgba(warm?'#ffd9a0':'#cfe0ff',(0.22+0.4*fl)*glow*depth);
+        ctx.fillRect(tx-tw*0.16, topY+16*scale+w*22*scale, tw*0.32, 7*scale); }
     }
   }
+  // mist pooling at the base of the wall
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  for(let i=0;i<5;i++){ const mx=cx-wallW/2+(i/4)*wallW; softGlow(mx, baseY+8, 130*scale, '#41506a', 0.06); }
+  ctx.restore();
   ctx.restore();
 }
 
 /* ---- Interior street: two converging facades + road (silent city) ---- */
 function drawStreet(t, opt={}){
   const vpx=opt.vpx!=null?opt.vpx:VW*0.5, vpy=VH*0.42;
-  // sky slit / dark
-  ctx.fillStyle='#0a0810'; ctx.fillRect(0,0,VW,VH);
-  const sheen=ctx.createLinearGradient(0,0,0,VH);
-  sheen.addColorStop(0,'#12101c'); sheen.addColorStop(1,'#08070c');
-  ctx.fillStyle=sheen; ctx.fillRect(0,0,VW,VH);
-  // road
-  ctx.fillStyle='#100d0a';
-  ctx.beginPath(); ctx.moveTo(0,VH); ctx.lineTo(vpx-30,vpy); ctx.lineTo(vpx+30,vpy); ctx.lineTo(VW,VH); ctx.fill();
-  // wet sheen streaks on road (shiny even at night)
-  ctx.strokeStyle=rgba('#9fb8d8',0.05); ctx.lineWidth=2;
-  for(let i=0;i<6;i++){ const f=i/6; ctx.beginPath(); ctx.moveTo(lerp(0,vpx-30,f), lerp(VH,vpy,f*0.8)); ctx.lineTo(lerp(VW,vpx+30,f), lerp(VH,vpy,f*0.8)); ctx.stroke(); }
-  // facades left & right
+  const sky=ctx.createLinearGradient(0,0,0,VH);
+  sky.addColorStop(0,'#0b0a16'); sky.addColorStop(0.5,'#0d0b16'); sky.addColorStop(1,'#08070c');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,VW,VH);
+  // a sliver of night sky between the rooftops, with a few stars
+  ctx.save(); ctx.beginPath(); ctx.moveTo(vpx-70,0); ctx.lineTo(vpx-30,vpy); ctx.lineTo(vpx+30,vpy); ctx.lineTo(vpx+70,0); ctx.closePath(); ctx.clip();
+  const g2=ctx.createLinearGradient(0,0,0,vpy); g2.addColorStop(0,'#13152c'); g2.addColorStop(1,'#0c0b18');
+  ctx.fillStyle=g2; ctx.fillRect(0,0,VW,vpy);
+  const rndS=mulberry32(5);
+  for(let i=0;i<16;i++){ ctx.globalAlpha=0.4+0.5*Math.sin(t*0.8+i); ctx.fillStyle='#cfe0ff';
+    ctx.beginPath(); ctx.arc(vpx-50+rndS()*100, rndS()*vpy, rndS()*1.1+0.3,0,TAU); ctx.fill(); }
+  ctx.restore(); ctx.globalAlpha=1;
+  // road base
+  ctx.fillStyle='#0e0b08'; ctx.beginPath(); ctx.moveTo(0,VH); ctx.lineTo(vpx-30,vpy); ctx.lineTo(vpx+30,vpy); ctx.lineTo(VW,VH); ctx.closePath(); ctx.fill();
+  // cobblestones in perspective (rows tighten toward the vanishing point)
+  ctx.save(); ctx.beginPath(); ctx.moveTo(0,VH); ctx.lineTo(vpx-30,vpy); ctx.lineTo(vpx+30,vpy); ctx.lineTo(VW,VH); ctx.closePath(); ctx.clip();
+  ctx.strokeStyle=rgba('#000',0.5); ctx.lineWidth=1.4;
+  for(let i=1;i<=12;i++){ const f=Math.pow(i/12,1.7); const yy=lerp(vpy,VH,f), lw=lerp(60,VW*1.2,f);
+    ctx.beginPath(); ctx.moveTo(vpx-lw/2,yy); ctx.lineTo(vpx+lw/2,yy); ctx.stroke();
+    for(let c=-3;c<=3;c++){ ctx.beginPath(); ctx.moveTo(vpx+c*lw*0.13, yy); ctx.lineTo(vpx+c*lw*0.15, yy+(VH-vpy)/12); ctx.stroke(); } }
+  // wet reflective sheen down the centre
+  const sheen=ctx.createLinearGradient(vpx,vpy,vpx,VH); sheen.addColorStop(0,rgba('#9fb8d8',0)); sheen.addColorStop(1,rgba('#9fb8d8',0.10));
+  ctx.fillStyle=sheen; ctx.fillRect(vpx-90,vpy,180,VH-vpy);
+  ctx.restore();
+  // facades left & right, with brick coursing + framed, sometimes-lit openings
   const facade=(side)=>{
-    const nearX = side<0?0:VW, farX=vpx+side*30;
-    const nearYtop=VH*0.02, farYtop=vpy;
-    ctx.fillStyle=shade(C.stone,-8);
-    ctx.beginPath();
-    ctx.moveTo(nearX,nearYtop); ctx.lineTo(farX,farYtop); ctx.lineTo(farX,VH); ctx.lineTo(nearX,VH); ctx.closePath(); ctx.fill();
-    // windows/doors receding
+    const nearX=side<0?0:VW, farX=vpx+side*30, nearYtop=0, farYtop=vpy;
+    const fg=ctx.createLinearGradient(nearX,0,farX,0); fg.addColorStop(0,shade(C.stone,-4)); fg.addColorStop(1,shade(C.stone,-22));
+    ctx.fillStyle=fg; ctx.beginPath(); ctx.moveTo(nearX,nearYtop); ctx.lineTo(farX,farYtop); ctx.lineTo(farX,VH); ctx.lineTo(nearX,VH); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.moveTo(nearX,nearYtop); ctx.lineTo(farX,farYtop); ctx.lineTo(farX,VH); ctx.lineTo(nearX,VH); ctx.closePath(); ctx.clip();
+    ctx.strokeStyle=rgba('#000',0.22); ctx.lineWidth=1;
+    for(let r=0;r<14;r++){ const f=r/14, y=lerp(VH*0.05,VH*0.98,f); ctx.beginPath(); ctx.moveTo(nearX,y); ctx.lineTo(farX, lerp(farYtop,VH,f)); ctx.stroke(); }
+    ctx.restore();
     const rnd=mulberry32(side<0?11:22);
-    for(let i=0;i<7;i++){
-      const f=i/7;
-      const x=lerp(nearX,farX,f), yTop=lerp(nearYtop,farYtop,f);
-      const wSc=1-f*0.8;
-      ctx.fillStyle=shade(C.stone,-24);
-      const doorH=200*wSc, doorW=70*wSc;
-      const dx = x - side*doorW*0.5 - side*30*wSc;
-      ctx.fillRect(dx, VH-doorH-20*wSc, doorW, doorH);
-      // faint pale window glow occasionally
-      if(rnd()<0.4){ ctx.fillStyle=rgba('#cfe0ff',0.12); ctx.fillRect(dx+doorW*0.2, VH-doorH+20*wSc, doorW*0.6, 40*wSc); }
-    }
+    for(let i=0;i<7;i++){ const f=i/7, x=lerp(nearX,farX,f), wSc=1-f*0.8;
+      const doorH=200*wSc, doorW=70*wSc, dx=x - side*doorW*0.5 - side*30*wSc;
+      ctx.fillStyle=shade(C.stone,-30); ctx.fillRect(dx-3*wSc, VH-doorH-22*wSc, doorW+6*wSc, doorH+4*wSc);
+      ctx.fillStyle=shade(C.stone,-42); ctx.fillRect(dx, VH-doorH-20*wSc, doorW, doorH);
+      if(rnd()<0.4){ const warm=rnd()<0.4; ctx.save(); ctx.globalCompositeOperation='screen'; softGlow(dx+doorW*0.5, VH-doorH+34*wSc, 44*wSc, warm?'#ffcf88':'#bcd0ff', 0.18); ctx.restore();
+        ctx.fillStyle=rgba(warm?'#ffcf88':'#bcd0ff',0.14); ctx.fillRect(dx+doorW*0.2, VH-doorH+18*wSc, doorW*0.6, 42*wSc); } }
   };
   facade(-1); facade(1);
+  // depth fog toward the vanishing point
+  ctx.save(); ctx.globalCompositeOperation='screen'; softGlow(vpx, vpy+24, 230, '#2a3550', 0.10); ctx.restore();
+  // floating dust motes drifting in the air
+  ctx.save(); const rndM=mulberry32(88);
+  for(let i=0;i<26;i++){ const bx=rndM()*VW, by=rndM()*VH*0.72; const dx=bx+Math.sin(t*0.5+i)*8, dy=by+Math.cos(t*0.4+i)*6;
+    ctx.globalAlpha=0.08+0.08*Math.sin(t*1.5+i); ctx.fillStyle='#cfd8e8'; ctx.beginPath(); ctx.arc(dx,dy,0.8,0,TAU); ctx.fill(); }
+  ctx.restore(); ctx.globalAlpha=1;
 }
 
 /* ============================================================================
