@@ -15,6 +15,31 @@
     ['IV. Workers & Riders', ['karnen', 'chemist_eikar', 'sword_eikar', 'spear_eikar', 'archer_eikar', 'sword_keilia', 'spear_keilia', 'archer_keilia', 'builder_keilia', 'kuni_byrd_wild', 'kuni_byrd_ridden']],
   ];
 
+  /* ---------- Tellings: the animated short film, watched in an in-game
+     overlay so the player never leaves the app. The film is a standalone,
+     self-contained page under /film — hosted alongside the game. ---------- */
+  const FILM_SRC = 'film/the-legend-of-aakalay.html';
+  function escClose(e) { if (e.key === 'Escape') closeTelling(); }
+  function closeTelling() {
+    const o = document.getElementById('telling-overlay');
+    if (o) o.remove();
+    document.removeEventListener('keydown', escClose);
+  }
+  function openTelling() {
+    if (document.getElementById('telling-overlay')) return;
+    const overlay = U.el('div', { id: 'telling-overlay', style: 'position:fixed;inset:0;z-index:9000;background:#000;display:flex;flex-direction:column' });
+    const bar = U.el('div', { style: 'display:flex;align-items:center;gap:12px;padding:8px 14px;background:linear-gradient(180deg,#201a11,#191309);border-bottom:1px solid #3d3323;flex-shrink:0' });
+    bar.appendChild(U.el('span', { cls: 'gold', style: 'letter-spacing:.05em', text: 'da ávErk á Aakalay — The Legend of Aakalay' }));
+    bar.appendChild(U.el('span', { cls: 'small muted', style: 'white-space:nowrap', text: '· a telling in the old style · ~23 min' }));
+    bar.appendChild(U.el('div', { style: 'flex:1' }));
+    bar.appendChild(U.el('button', { cls: 'btn small', text: '✕ Close', onclick: closeTelling }));
+    const frame = U.el('iframe', { src: FILM_SRC, allow: 'autoplay; fullscreen', style: 'flex:1;width:100%;border:0;background:#000' });
+    overlay.appendChild(bar);
+    overlay.appendChild(frame);
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', escClose);
+  }
+
   UI.register('compendium', {
     enter(root) {
       const me = G.me;
@@ -42,6 +67,19 @@
         body.innerHTML = '';
         const q = search.value.trim().toLowerCase();
         body.appendChild(U.el('p', { cls: 'muted small mb', html: '<i>“From the smallest carrot-fields of the Ju to the great Su Naga of the deep.” A note on size: Litk → Mael → Vel → Skor → Skaar, varying widely between individuals. A note on terrain: no creature is ever weak to a terrain — comfort is a preference, never a vulnerability.</i>' }));
+        /* Tellings — the animated short film, watchable in-app */
+        if (!q) {
+          const telling = U.el('div', { cls: 'panel mb', style: 'display:flex;gap:16px;align-items:center;border-color:#8a6f42' });
+          const tinfo = U.el('div', { cls: 'flex1' });
+          const trow = U.el('div', { cls: 'flex' });
+          trow.appendChild(U.el('b', { cls: 'gold', style: 'font-size:17px', text: '▷ Tellings — da ávErk á Aakalay' }));
+          trow.appendChild(U.el('span', { cls: 'pill', text: '~23 min' }));
+          tinfo.appendChild(trow);
+          tinfo.appendChild(U.el('div', { cls: 'small mt', html: '<span class="muted">The Legend of Aakalay, Part the First —</span> Kiet and his Great Nekh’Vorran, Jhealanil, in the last days of the Era of the Nekh’Vorran. A short film in the manner of the Mbaru Tatu.' }));
+          tinfo.appendChild(U.el('button', { cls: 'btn primary mt', text: '▶ Watch the telling', onclick: openTelling }));
+          telling.appendChild(tinfo);
+          body.appendChild(telling);
+        }
         SECTIONS.forEach(([title, ids]) => {
           const shown = ids.filter(id => {
             const sp = SP.get(id);
@@ -78,6 +116,10 @@
           body.appendChild(U.el('div', { cls: 'panel mb', style: 'opacity:.65' }, [
             U.el('div', { html: '<b class="gold">Vyrenalur · Aerolhorn · Sniller · the Kalo’Eik · the Fuzzies of Katkan · the Ghosties of Oskerarean</b><br><span class="small muted">Await future volumes. The Vyrenalur is rarely seen; the Aerolhorn has not been seen in a very long time; each Sniller is designed personally, never given a generic baseline. Noka knows more, and speaks in riddles.</span>' }),
           ]));
+          const legendRow = U.el('div', { cls: 'panel mb', style: 'display:flex;gap:14px;align-items:center' });
+          legendRow.appendChild(U.el('div', { cls: 'flex1', html: '<b class="gold">The Legend of Aakalay</b><br><span class="small muted">The first telling, set down as a short film — the Sunear’Zikhron, the Duat, and the quiet cruelty behind Aakalay’s shining walls.</span>' }));
+          legendRow.appendChild(U.el('button', { cls: 'btn small', style: 'flex-shrink:0', text: '▶ Watch', onclick: openTelling }));
+          body.appendChild(legendRow);
           body.appendChild(U.el('p', { cls: 'muted small center mt', text: '— End of Volume One —' }));
         }
       }

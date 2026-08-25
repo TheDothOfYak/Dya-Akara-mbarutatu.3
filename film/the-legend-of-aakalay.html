@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>VakskElzikh — da ávErk á Aakalay</title>
+<style>
+  /* ============================================================
+     THE LEGEND OF AAKALAY — a short film in the Dya'Akara style
+     Warm leather-and-stone, torchlit. Gold Guild accents.
+     Palette mirrors the game's css/style.css.
+     ============================================================ */
+  :root{
+    --bg:#0c0a07; --bg2:#14100b; --panel:#241d14; --panel2:#2d2519;
+    --line:#3d3323; --gold:#d9b87a; --gold-dim:#8a6f42; --ink:#e8dfc8;
+    --ink-dim:#a89878; --red:#c14953; --su:#3b9ae1; --eldi:#e8842c;
+    --fti:#f0f0f5; --ular:#4caf50;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#000}
+  body{
+    font-family:Georgia,'Times New Roman',serif;color:var(--ink);
+    user-select:none;-webkit-user-select:none;
+  }
+  #stage{position:fixed;inset:0;background:#000;overflow:hidden;cursor:default}
+  #stage.hidecursor{cursor:none}
+  canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
+
+  /* ---------- Begin / title veil ---------- */
+  #veil{
+    position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    background:radial-gradient(120% 120% at 50% 35%, #1a140c 0%, #0c0a07 60%, #000 100%);
+    transition:opacity 1.2s ease;
+  }
+  #veil.gone{opacity:0;pointer-events:none}
+  #veil .kicker{color:var(--gold-dim);letter-spacing:.42em;font-size:13px;text-transform:uppercase;margin-bottom:22px}
+  #veil h1{
+    font-weight:normal;font-size:clamp(30px,6.2vw,74px);letter-spacing:.06em;
+    color:var(--gold);text-shadow:0 0 34px #d9b87a44,0 2px 2px #000;line-height:1.08;
+  }
+  #veil h1 .sub{display:block;font-size:.42em;color:var(--ink);letter-spacing:.34em;margin-top:16px;text-shadow:none}
+  #veil .rule{width:min(340px,58vw);height:1px;margin:30px 0;
+    background:linear-gradient(90deg,transparent,var(--gold-dim),transparent)}
+  #veil p.blurb{max-width:620px;color:var(--ink-dim);font-size:15px;line-height:1.7;font-style:italic;padding:0 20px}
+  #begin{
+    margin-top:40px;background:linear-gradient(180deg,#6d5528,#4a3a1c);
+    border:1px solid var(--gold);color:#ffedc4;font-family:inherit;
+    padding:14px 40px;border-radius:8px;font-size:18px;letter-spacing:.12em;
+    cursor:pointer;transition:all .18s;text-transform:uppercase;
+  }
+  #begin:hover{box-shadow:0 0 26px #d9b87a66;transform:translateY(-1px)}
+  #veil .hint{margin-top:22px;color:#6b5c3f;font-size:12px;letter-spacing:.14em}
+  #veil .runtime{margin-top:8px;color:#5a4d35;font-size:12px;letter-spacing:.18em}
+
+  /* ---------- transport bar ---------- */
+  #bar{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    padding:14px 20px 12px;
+    background:linear-gradient(0deg,#000000cc,#00000000);
+    display:flex;flex-direction:column;gap:9px;
+    opacity:0;transition:opacity .4s ease;pointer-events:none;
+  }
+  #bar.show{opacity:1;pointer-events:auto}
+  #track{position:relative;height:16px;display:flex;align-items:center;cursor:pointer}
+  #trackbg{position:absolute;left:0;right:0;height:4px;border-radius:3px;background:#ffffff22}
+  #trackfill{position:absolute;left:0;height:4px;border-radius:3px;background:linear-gradient(90deg,var(--gold-dim),var(--gold))}
+  #chapters{position:absolute;left:0;right:0;height:16px;top:0}
+  .chapmark{position:absolute;top:5px;width:2px;height:6px;background:#ffffff55;transform:translateX(-1px)}
+  #knob{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--gold);
+    box-shadow:0 0 8px #d9b87a99;transform:translate(-50%,0);top:1px}
+  #ctrls{display:flex;align-items:center;gap:16px;color:var(--ink-dim);font-size:13px;letter-spacing:.06em}
+  #ctrls button{background:none;border:none;color:var(--ink);font-family:inherit;font-size:19px;cursor:pointer;line-height:1;padding:2px 4px;opacity:.85}
+  #ctrls button:hover{opacity:1;color:var(--gold)}
+  #scenelabel{flex:1;text-align:center;color:var(--gold-dim);font-style:italic;letter-spacing:.14em;font-size:12.5px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #time{font-variant-numeric:tabular-nums;color:var(--ink-dim);min-width:96px;text-align:right}
+  #restart{font-size:15px !important}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+</div>
+
+<div id="bar">
+  <div id="track"><div id="trackbg"></div><div id="trackfill"></div><div id="chapters"></div><div id="knob"></div></div>
+  <div id="ctrls">
+    <button id="play" title="Play / Pause (Space)">❚❚</button>
+    <button id="restart" title="Restart">↺</button>
+    <button id="mute" title="Mute (M)">♪</button>
+    <div id="scenelabel">—</div>
+    <div id="time">0:00 / 0:00</div>
+    <button id="full" title="Fullscreen (F)">⛶</button>
+  </div>
+</div>
+
+<div id="veil">
+  <div class="kicker">Vaksk&nbsp;Elzikh — the telling of</div>
+  <h1>da ávErk á Aakalay<span class="sub">THE LEGEND OF AAKALAY</span></h1>
+  <div class="rule"></div>
+  <p class="blurb">Told in the manner of the Mbaru Tatu, where a story is remembered
+    not by the year but by the sky above it — and where a beast and its rider are one name spoken twice.</p>
+  <button id="begin">▶ &nbsp;Begin</button>
+  <div class="hint">Best in a dark room · headphones recommended · Space to pause · F for fullscreen</div>
+  <div class="runtime" id="runtimeLabel">— running time —</div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   0. STAGE, CLOCK, HELPERS
+   ==========================================================================*/
+const VW = 1280, VH = 720;                  // virtual stage (16:9)
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const stageEl = document.getElementById('stage');
+let DPR = 1, viewRect = {x:0,y:0,w:VW,h:VH,scale:1};
+
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const w = window.innerWidth, h = window.innerHeight;
+  cv.width = Math.floor(w*DPR); cv.height = Math.floor(h*DPR);
+  cv.style.width = w+'px'; cv.style.height = h+'px';
+  const scale = Math.min(w/VW, h/VH);
+  viewRect = { x:(w-VW*scale)/2, y:(h-VH*scale)/2, w:VW*scale, h:VH*scale, scale };
+}
+window.addEventListener('resize', resize); resize();
+
+const TAU = Math.PI*2;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=t=>t<=0?0:t>=1?1:t*t*(3-2*t);
+const ease=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;   // easeInOutQuad
+const easeOut=t=>1-Math.pow(1-t,3);
+const easeIn=t=>t*t*t;
+function seg(lt,a,b){ return clamp((lt-a)/(b-a),0,1); }        // linear ramp a..b -> 0..1
+function pulse(lt,a,b){ const t=seg(lt,a,b); return Math.sin(t*Math.PI); } // 0..1..0
+// fade helper: 1 in the middle, fading at both ends of a scene
+function fadeInOut(lt,dur,fin,fout){ return Math.min(seg(lt,0,fin), 1-seg(lt,dur-fout,dur)); }
+
+/* color from the game's sprites.js */
+function shade(hex, amt){
+  const n=parseInt(hex.slice(1),16);
+  let r=(n>>16)+amt, g=((n>>8)&255)+amt, b=(n&255)+amt;
+  r=clamp(r,0,255); g=clamp(g,0,255); b=clamp(b,0,255);
+  return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');
+}
+function rgba(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`;
+}
+
+/* palette */
+const C = {
+  bg:'#0c0a07', bg2:'#14100b', gold:'#d9b87a', goldDim:'#8a6f42',
+  ink:'#e8dfc8', inkDim:'#a89878', red:'#c14953',
+  su:'#3b9ae1', eldi:'#e8842c', fti:'#f0f0f5', ular:'#4caf50',
+  stone:'#2a2318', stoneLit:'#4a3f2c', duat:'#2a1030', duatEdge:'#7a2f6a',
+  sunear:'#9fd6d0', violet:'#b58ce0', white:'#f4efe2', bloodOld:'#5a2224'
+};
+
+/* seeded rng for stable star fields etc. */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ============================================================================
+   1. ART LIBRARY — matches the game's rigs (acorn Eikar, Nekh'Vorran) + world
+   ==========================================================================*/
+
+/* ---- torch vignette + film grain overlay ---- */
+function vignette(a=0.55){
+  const g=ctx.createRadialGradient(VW/2,VH*0.46,VH*0.25, VW/2,VH*0.5,VW*0.72);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,`rgba(0,0,0,${a})`);
+  ctx.fillStyle=g; ctx.fillRect(0,0,VW,VH);
+}
+let grainSeed=0;
+function grain(amt=0.05){
+  grainSeed=(grainSeed+1)%1000;
+  ctx.globalAlpha=amt; ctx.fillStyle='#000';
+  const r=mulberry32(grainSeed*2654435761>>>0);
+  for(let i=0;i<70;i++){ const x=r()*VW,y=r()*VH,s=r()*2+0.5; ctx.fillRect(x,y,s,s); }
+  ctx.globalAlpha=1;
+}
+/* letterbox handled by CSS bg; add subtle top/bottom shade inside stage */
+function cinebars(){
+  ctx.fillStyle='rgba(0,0,0,0.0)';
+}
+
+/* ---- The Mbaru Tatu night sky: 3 planets, moons, Piadon ring, quasar, nebulae ---- */
+const starField = (function(){
+  const rnd=mulberry32(20260824);
+  const stars=[];
+  for(let i=0;i<420;i++){
+    stars.push({x:rnd()*VW,y:rnd()*VH*0.8,r:rnd()*1.5+0.3,tw:rnd()*TAU,sp:rnd()*2+0.5,h:rnd()});
+  }
+  return stars;
+})();
+function drawSky(t, opt={}){
+  const horizon = opt.horizon!=null?opt.horizon:VH;
+  const bright = opt.bright!=null?opt.bright:1;
+  // deep gradient
+  const g=ctx.createLinearGradient(0,0,0,horizon);
+  g.addColorStop(0,'#080611');
+  g.addColorStop(0.5,'#0d0a18');
+  g.addColorStop(1, opt.dawn?'#241528':'#120d17');
+  ctx.fillStyle=g; ctx.fillRect(0,0,VW,horizon);
+
+  // nebulae (Piadon's outer cloud + a couple faint ones)
+  const neb=(cx,cy,rw,rh,col,a)=>{
+    const ng=ctx.createRadialGradient(cx,cy,0,cx,cy,rw);
+    ng.addColorStop(0,rgba(col,a)); ng.addColorStop(1,rgba(col,0));
+    ctx.save(); ctx.translate(cx,cy); ctx.scale(1,rh/rw); ctx.translate(-cx,-cy);
+    ctx.fillStyle=ng; ctx.beginPath(); ctx.arc(cx,cy,rw,0,TAU); ctx.fill(); ctx.restore();
+  };
+  neb(VW*0.22,VH*0.30,340,190,'#5a3a7a',0.18*bright);
+  neb(VW*0.80,VH*0.20,300,170,'#2f5a6e',0.16*bright);
+
+  // stars
+  for(const s of starField){
+    if(s.y>horizon) continue;
+    const tw=0.55+0.45*Math.sin(t*s.sp+s.tw);
+    ctx.globalAlpha=tw*bright*(opt.starA!=null?opt.starA:1);
+    ctx.fillStyle = s.h<0.15?'#bcd0ff':s.h>0.85?'#ffe6c0':'#ffffff';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,TAU); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // dim quasar — a sharp point with faint cross flare
+  const qx=VW*0.86,qy=VH*0.13;
+  ctx.globalAlpha=0.9*bright;
+  ctx.fillStyle='#cfe0ff';
+  ctx.beginPath(); ctx.arc(qx,qy,1.6,0,TAU); ctx.fill();
+  ctx.strokeStyle=rgba('#9fb8ff',0.35*bright); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(qx-16,qy); ctx.lineTo(qx+16,qy);
+  ctx.moveTo(qx,qy-16); ctx.lineTo(qx,qy+16); ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // Piadon's bright ring — a faint arc across upper sky
+  ctx.save();
+  ctx.strokeStyle=rgba('#c9b3e0',0.10*bright); ctx.lineWidth=54;
+  ctx.beginPath(); ctx.arc(VW*0.5,-VH*0.7,VW*1.05,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  ctx.strokeStyle=rgba('#e8dcff',0.06*bright); ctx.lineWidth=16;
+  ctx.beginPath(); ctx.arc(VW*0.5,-VH*0.7,VW*1.05,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  ctx.restore();
+
+  // The three sister planets clustered — Velki (largest), Xikia (mid), Leotik (far/small)
+  drawPlanet(VW*0.17,VH*0.20,58,'#5b74a8','#2c3b5e',{moons:4,t,ring:false,id:'velki'});
+  drawPlanet(VW*0.335,VH*0.145,34,'#a86f4e','#5e3a26',{moons:2,t,dancing:true,id:'xikia'});
+  drawPlanet(VW*0.62,VH*0.11,15,'#6a8a6e','#33463a',{moons:1,t,id:'leotik'});
+}
+function drawPlanet(x,y,r,col,dark,o={}){
+  ctx.save();
+  // glow
+  const gl=ctx.createRadialGradient(x,y,r*0.6,x,y,r*2.2);
+  gl.addColorStop(0,rgba(col,0.25)); gl.addColorStop(1,rgba(col,0));
+  ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(x,y,r*2.2,0,TAU); ctx.fill();
+  // body with terminator shading
+  const g=ctx.createRadialGradient(x-r*0.4,y-r*0.4,r*0.2,x,y,r);
+  g.addColorStop(0,shade(col,35)); g.addColorStop(0.7,col); g.addColorStop(1,dark);
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.fill();
+  // bands / continents hint
+  ctx.save(); ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.clip();
+  ctx.globalAlpha=0.35; ctx.fillStyle=dark;
+  for(let i=0;i<3;i++){ ctx.beginPath(); ctx.ellipse(x-r*0.2+i*r*0.4, y-r*0.3+i*r*0.35, r*0.5, r*0.16,0.3,0,TAU); ctx.fill(); }
+  ctx.restore();
+  // moons
+  const mn=o.moons||0;
+  for(let i=0;i<mn;i++){
+    const orbit=r*(1.9+i*0.7);
+    const sp=(o.t||0)*(0.25+i*0.12)+i*2.1;
+    // Xikia loses its dancing small moon on near passes: fade one moon in/out
+    let a=1, mr=Math.max(1.5,r*0.14);
+    if(o.dancing && i===1){ a=0.35+0.35*Math.sin((o.t||0)*0.5); mr=r*0.10; }
+    const mx=x+Math.cos(sp)*orbit, my=y+Math.sin(sp)*orbit*0.6;
+    ctx.globalAlpha=a; ctx.fillStyle=shade(col,60);
+    ctx.beginPath(); ctx.arc(mx,my,mr,0,TAU); ctx.fill(); ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+/* ---- Sunear'Zikhron: pale celestial veil / aurora, drifting ---- */
+function sunearVeil(t, intensity=1){
+  ctx.save(); ctx.globalCompositeOperation='screen';
+  for(let i=0;i<3;i++){
+    const yy=VH*(0.12+i*0.10);
+    const g=ctx.createLinearGradient(0,yy-70,0,yy+70);
+    const col=[C.sunear,C.violet,'#7fd0c0'][i];
+    g.addColorStop(0,rgba(col,0)); g.addColorStop(0.5,rgba(col,0.10*intensity)); g.addColorStop(1,rgba(col,0));
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.moveTo(0,yy);
+    for(let x=0;x<=VW;x+=24){ ctx.lineTo(x, yy+Math.sin(x*0.006+t*(0.4+i*0.2)+i)*24); }
+    ctx.lineTo(VW,yy+90); ctx.lineTo(0,yy+90); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---- ground / rolling fields silhouette ---- */
+function drawGround(t, opt={}){
+  const hy=opt.horizon!=null?opt.horizon:VH*0.66;
+  // distant hill band
+  ctx.fillStyle=opt.far||'#161018';
+  ctx.beginPath(); ctx.moveTo(0,hy);
+  for(let x=0;x<=VW;x+=40){ ctx.lineTo(x,hy-18-Math.sin(x*0.004+2)*16); }
+  ctx.lineTo(VW,VH); ctx.lineTo(0,VH); ctx.fill();
+  // near ground
+  const g=ctx.createLinearGradient(0,hy,0,VH);
+  g.addColorStop(0,opt.near||'#0f0b08'); g.addColorStop(1,'#070504');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(0,hy+6);
+  for(let x=0;x<=VW;x+=30){ ctx.lineTo(x,hy+6-Math.sin(x*0.01)*6); }
+  ctx.lineTo(VW,VH); ctx.lineTo(0,VH); ctx.fill();
+  // low foliage tufts
+  if(opt.foliage){
+    ctx.strokeStyle='#0c1a0e'; ctx.lineWidth=2;
+    const rnd=mulberry32(7);
+    for(let i=0;i<60;i++){ const x=rnd()*VW,y=hy+8+rnd()*(VH-hy-8);
+      for(let b=-1;b<=1;b++){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+b*4,y-8-rnd()*6); ctx.stroke(); } }
+  }
+}
+
+/* ---- The shining city of Aakalay — silhouette of slender spires, lit, sheened ---- */
+function drawAakalay(t, opt={}){
+  const baseY=opt.baseY!=null?opt.baseY:VH*0.68;
+  const cx=opt.cx!=null?opt.cx:VW*0.5;
+  const scale=opt.scale!=null?opt.scale:1;
+  const glow=opt.glow!=null?opt.glow:1;
+  const rnd=mulberry32(99);
+  ctx.save();
+  // pale sheen halo over the city (shiny even at night)
+  const halo=ctx.createRadialGradient(cx,baseY-120*scale,20,cx,baseY-120*scale,360*scale);
+  halo.addColorStop(0,rgba('#dfe8ff',0.14*glow)); halo.addColorStop(1,rgba('#dfe8ff',0));
+  ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(cx,baseY-120*scale,360*scale,0,TAU); ctx.fill();
+  // outer wall
+  const wallH=42*scale, wallW=560*scale;
+  ctx.fillStyle=shade(C.stone,-6);
+  ctx.fillRect(cx-wallW/2, baseY-wallH, wallW, wallH+40);
+  ctx.fillStyle=shade(C.stone,8);
+  for(let x=cx-wallW/2;x<cx+wallW/2;x+=26*scale){ ctx.fillRect(x, baseY-wallH-8*scale, 14*scale, 8*scale); } // crenellations
+  // spires behind wall
+  const towers=14;
+  for(let i=0;i<towers;i++){
+    const tx=cx-wallW/2+ (i+0.5)*(wallW/towers) + (rnd()-0.5)*10*scale;
+    const th=(70+rnd()*150)*scale;
+    const tw=(14+rnd()*16)*scale;
+    const depth=0.5+rnd()*0.5;
+    ctx.fillStyle=shade(C.stone, -20+depth*26);
+    ctx.beginPath();
+    ctx.moveTo(tx-tw/2, baseY-wallH*0.6);
+    ctx.lineTo(tx-tw/2, baseY-wallH*0.6-th);
+    ctx.lineTo(tx, baseY-wallH*0.6-th-tw*0.9);  // pointed roof
+    ctx.lineTo(tx+tw/2, baseY-wallH*0.6-th);
+    ctx.lineTo(tx+tw/2, baseY-wallH*0.6);
+    ctx.closePath(); ctx.fill();
+    // lit windows — cold pale light
+    for(let w=0;w<Math.floor(th/26);w++){
+      if(rnd()<0.55){
+        const fl = 0.5+0.5*Math.sin(t*(1+rnd()*2)+i*3+w);
+        ctx.fillStyle=rgba('#cfe0ff',(0.25+0.4*fl)*glow*depth);
+        ctx.fillRect(tx-tw*0.16, baseY-wallH*0.6-20*scale-w*24*scale, tw*0.32, 8*scale);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/* ---- Interior street: two converging facades + road (silent city) ---- */
+function drawStreet(t, opt={}){
+  const vpx=opt.vpx!=null?opt.vpx:VW*0.5, vpy=VH*0.42;
+  // sky slit / dark
+  ctx.fillStyle='#0a0810'; ctx.fillRect(0,0,VW,VH);
+  const sheen=ctx.createLinearGradient(0,0,0,VH);
+  sheen.addColorStop(0,'#12101c'); sheen.addColorStop(1,'#08070c');
+  ctx.fillStyle=sheen; ctx.fillRect(0,0,VW,VH);
+  // road
+  ctx.fillStyle='#100d0a';
+  ctx.beginPath(); ctx.moveTo(0,VH); ctx.lineTo(vpx-30,vpy); ctx.lineTo(vpx+30,vpy); ctx.lineTo(VW,VH); ctx.fill();
+  // wet sheen streaks on road (shiny even at night)
+  ctx.strokeStyle=rgba('#9fb8d8',0.05); ctx.lineWidth=2;
+  for(let i=0;i<6;i++){ const f=i/6; ctx.beginPath(); ctx.moveTo(lerp(0,vpx-30,f), lerp(VH,vpy,f*0.8)); ctx.lineTo(lerp(VW,vpx+30,f), lerp(VH,vpy,f*0.8)); ctx.stroke(); }
+  // facades left & right
+  const facade=(side)=>{
+    const nearX = side<0?0:VW, farX=vpx+side*30;
+    const nearYtop=VH*0.02, farYtop=vpy;
+    ctx.fillStyle=shade(C.stone,-8);
+    ctx.beginPath();
+    ctx.moveTo(nearX,nearYtop); ctx.lineTo(farX,farYtop); ctx.lineTo(farX,VH); ctx.lineTo(nearX,VH); ctx.closePath(); ctx.fill();
+    // windows/doors receding
+    const rnd=mulberry32(side<0?11:22);
+    for(let i=0;i<7;i++){
+      const f=i/7;
+      const x=lerp(nearX,farX,f), yTop=lerp(nearYtop,farYtop,f);
+      const wSc=1-f*0.8;
+      ctx.fillStyle=shade(C.stone,-24);
+      const doorH=200*wSc, doorW=70*wSc;
+      const dx = x - side*doorW*0.5 - side*30*wSc;
+      ctx.fillRect(dx, VH-doorH-20*wSc, doorW, doorH);
+      // faint pale window glow occasionally
+      if(rnd()<0.4){ ctx.fillStyle=rgba('#cfe0ff',0.12); ctx.fillRect(dx+doorW*0.2, VH-doorH+20*wSc, doorW*0.6, 40*wSc); }
+    }
+  };
+  facade(-1); facade(1);
+}
+
+/* ============================================================================
+   2. ACORN EIKAR RIG  (adapted from the game's drawBiped)
+   opt: {r, color, cap, weapon, state, t, face(1/-1), hood, cloakCol, glowEye}
+   drawn centered at (0,0) baseline near feet; caller translates.
+   ==========================================================================*/
+function drawAcorn(x, y, opt={}){
+  const r=opt.r||60, color=opt.color||'#c8a05c', cap=opt.cap||'#6d4a2e';
+  const state=opt.state||'idle', t=opt.t||0, F=opt.face||1;
+  ctx.save(); ctx.translate(x,y); ctx.scale(F,1);
+  const moving = state==='walk'||state==='run';
+  const rate = state==='run'?13:8;
+  const gait = moving?Math.sin(t*rate):0;
+  const idleBob = state==='idle'?Math.sin(t*2.4)*r*0.04:0;
+  const attackSwing = state==='attack'?Math.sin(t*14):0;
+  const bodyR=r*0.62, y0=-r*0.25+idleBob;
+
+  // cloak behind (cinematic traveler look)
+  if(opt.cloakCol){
+    ctx.fillStyle=shade(opt.cloakCol,-6);
+    const sway=Math.sin(t*2+0.6)*r*0.06 + (moving?gait*r*0.12:0);
+    ctx.beginPath();
+    ctx.moveTo(-bodyR*0.7, y0-bodyR*0.7);
+    ctx.quadraticCurveTo(-bodyR*1.5+sway, y0+bodyR*0.6, -bodyR*0.9+sway, r*0.95);
+    ctx.lineTo(bodyR*0.5, r*0.95);
+    ctx.quadraticCurveTo(bodyR*0.7, y0+bodyR*0.2, bodyR*0.4, y0-bodyR*0.6);
+    ctx.closePath(); ctx.fill();
+  }
+  // legs
+  ctx.strokeStyle=shade(color,-45); ctx.lineWidth=Math.max(2,r*0.13); ctx.lineCap='round';
+  for(const s of [-1,1]){ const sw=moving?gait*s*r*0.2:0;
+    ctx.beginPath(); ctx.moveTo(s*bodyR*0.35,y0+bodyR*0.7); ctx.lineTo(s*bodyR*0.35+sw,r*0.9); ctx.stroke(); }
+  // acorn body
+  const grd=ctx.createLinearGradient(0,y0-bodyR,0,y0+bodyR);
+  grd.addColorStop(0,shade(color,25)); grd.addColorStop(1,shade(color,-20));
+  ctx.fillStyle=grd;
+  ctx.beginPath();
+  ctx.moveTo(-bodyR*0.85,y0-bodyR*0.1);
+  ctx.quadraticCurveTo(-bodyR*0.9,y0+bodyR,0,y0+bodyR);
+  ctx.quadraticCurveTo(bodyR*0.9,y0+bodyR,bodyR*0.85,y0-bodyR*0.1);
+  ctx.closePath(); ctx.fill();
+  // face — eyes (glow option for Duat/among the visions)
+  const eyeCol = opt.glowEye||'#241a10';
+  ctx.fillStyle=eyeCol;
+  if(opt.glowEye){ ctx.shadowColor=opt.glowEye; ctx.shadowBlur=10; }
+  ctx.beginPath(); ctx.arc(bodyR*0.25,y0+bodyR*0.1,Math.max(1,r*0.07),0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(bodyR*0.55,y0+bodyR*0.1,Math.max(1,r*0.07),0,TAU); ctx.fill();
+  ctx.shadowBlur=0;
+  // Eikar eye markings
+  ctx.strokeStyle='#241a1099'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(bodyR*0.2,y0+bodyR*0.25); ctx.lineTo(bodyR*0.32,y0+bodyR*0.38); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bodyR*0.5,y0+bodyR*0.25); ctx.lineTo(bodyR*0.62,y0+bodyR*0.38); ctx.stroke();
+
+  // head cover: cap (acorn) or hood or triangle-hat (Karnen)
+  if(opt.triangleHat){
+    ctx.fillStyle=cap;
+    ctx.beginPath(); ctx.moveTo(-bodyR*0.9,y0-bodyR*0.15); ctx.lineTo(0,y0-bodyR*1.5); ctx.lineTo(bodyR*0.9,y0-bodyR*0.15); ctx.closePath(); ctx.fill();
+  } else if(opt.hood){
+    ctx.fillStyle=shade(opt.cloakCol||cap,-4);
+    ctx.beginPath();
+    ctx.moveTo(-bodyR*0.95,y0-bodyR*0.05);
+    ctx.quadraticCurveTo(-bodyR*0.7,y0-bodyR*1.1,0,y0-bodyR*1.05);
+    ctx.quadraticCurveTo(bodyR*0.7,y0-bodyR*1.05,bodyR*0.6,y0-bodyR*0.1);
+    ctx.quadraticCurveTo(bodyR*0.2,y0-bodyR*0.55,-bodyR*0.95,y0-bodyR*0.05);
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle=cap;
+    ctx.beginPath(); ctx.ellipse(0,y0-bodyR*0.25,bodyR*0.95,bodyR*0.5,0,Math.PI,TAU); ctx.fill();
+    ctx.strokeStyle=shade(cap,-25); ctx.lineWidth=1;
+    for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(i*bodyR*0.3,y0-bodyR*0.3); ctx.lineTo(i*bodyR*0.32,y0-bodyR*0.6); ctx.stroke(); }
+    ctx.strokeStyle=shade(cap,-35); ctx.lineWidth=Math.max(2,r*0.08);
+    ctx.beginPath(); ctx.moveTo(0,y0-bodyR*0.72); ctx.lineTo(bodyR*0.12,y0-bodyR*1.05); ctx.stroke();
+  }
+  // arms + weapon
+  ctx.strokeStyle=shade(color,-45); ctx.lineWidth=Math.max(2,r*0.12);
+  const armY=y0+bodyR*0.05;
+  ctx.beginPath(); ctx.moveTo(-bodyR*0.7,armY); ctx.lineTo(-bodyR*1.1,armY+bodyR*0.4+gait*r*0.08); ctx.stroke();
+  const wx=bodyR*0.95, wy=armY+bodyR*0.15;
+  ctx.beginPath(); ctx.moveTo(bodyR*0.7,armY); ctx.lineTo(wx,wy); ctx.stroke();
+  if(opt.weapon) drawWeapon(opt.weapon,wx,wy,r,t,attackSwing,state);
+  ctx.restore();
+}
+function drawWeapon(weapon,x,y,r,t,swing,state){
+  ctx.save(); ctx.translate(x,y);
+  if(weapon==='sword'){ ctx.rotate(-0.6+swing*1.4);
+    ctx.strokeStyle='#c9ccd4'; ctx.lineWidth=Math.max(2,r*0.09);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-r*1.1); ctx.stroke();
+    ctx.strokeStyle='#6d4a2e'; ctx.lineWidth=Math.max(2,r*0.08);
+    ctx.beginPath(); ctx.moveTo(-r*0.14,-r*0.16); ctx.lineTo(r*0.14,-r*0.16); ctx.stroke();
+  } else if(weapon==='spear'){ ctx.rotate(-0.25+swing*0.9);
+    ctx.strokeStyle='#8a6f4a'; ctx.lineWidth=Math.max(2,r*0.07);
+    ctx.beginPath(); ctx.moveTo(0,r*0.5); ctx.lineTo(0,-r*1.5); ctx.stroke();
+    ctx.fillStyle='#c9ccd4'; ctx.beginPath(); ctx.moveTo(-r*0.1,-r*1.45); ctx.lineTo(0,-r*1.8); ctx.lineTo(r*0.1,-r*1.45); ctx.fill();
+  } else if(weapon==='staff'){ ctx.rotate(0.05);
+    ctx.strokeStyle='#6d4a2e'; ctx.lineWidth=Math.max(2,r*0.07);
+    ctx.beginPath(); ctx.moveTo(0,r*0.6); ctx.lineTo(0,-r*1.6); ctx.stroke();
+    ctx.fillStyle=rgba(C.gold,0.9); ctx.shadowColor=C.gold; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(0,-r*1.65,r*0.14,0,TAU); ctx.fill(); ctx.shadowBlur=0;
+  }
+  ctx.restore();
+}
+function drawMiniAcorn(x,y,r,t,col,capCol){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.moveTo(-r*0.6,-r*0.05); ctx.quadraticCurveTo(-r*0.65,r*0.7,0,r*0.7);
+  ctx.quadraticCurveTo(r*0.65,r*0.7,r*0.6,-r*0.05); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=capCol; ctx.beginPath(); ctx.ellipse(0,-r*0.15,r*0.68,r*0.38,0,Math.PI,TAU); ctx.fill();
+  // tiny eyes
+  ctx.fillStyle='#241a10'; ctx.beginPath(); ctx.arc(-r*0.12,r*0.12,r*0.06,0,TAU); ctx.arc(r*0.16,r*0.12,r*0.06,0,TAU); ctx.fill();
+  ctx.restore();
+}
+
+/* ============================================================================
+   3. NEKH'VORRAN — Jhealanil.  A great beast: serpentine dragon quadruped,
+   long neck, horned head with su-blue glowing eyes, membrane wings, tail,
+   scaled hide with a bioluminescent dorsal ridge (glows in the Sunear'Zikhron).
+   opt:{scale, t, run(0..1), glow, face, rider, wingBeat, headTurn}
+   Drawn with feet near y=0.
+   ==========================================================================*/
+function drawNekh(x,y,opt={}){
+  const S=opt.scale||1, t=opt.t||0, F=opt.face||1;
+  const run=opt.run||0, glow=opt.glow!=null?opt.glow:0.5;
+  const col='#2b3b52', col2='#1a2536', ridge=C.su;
+  ctx.save(); ctx.translate(x,y); ctx.scale(F*S,S);
+  const rate=lerp(3,12,run);
+  const bob=Math.sin(t*rate)* (2+run*10);
+  const gy=-90+bob;   // body center height above feet
+  const bodyW=150, bodyH=64;
+
+  // ---- far wings (behind) ----
+  const beat = opt.wingBeat!=null?opt.wingBeat: (run>0.3? (0.5+0.5*Math.sin(t*rate*0.5)) : 0.15+0.1*Math.sin(t*1.2));
+  drawWing(-40, gy-30, -1, beat, col2, glow, t);
+
+  // ---- tail ----
+  ctx.strokeStyle=col2; ctx.lineCap='round';
+  const tailBase=-bodyW*0.9;
+  for(let i=0;i<1;i++){
+    ctx.lineWidth=26;
+    const sw=Math.sin(t*rate*0.5)*30;
+    ctx.beginPath(); ctx.moveTo(tailBase,gy);
+    ctx.quadraticCurveTo(tailBase-120, gy-20+sw, tailBase-230, gy+30+sw*1.4);
+    ctx.stroke();
+    // tail fin
+    ctx.fillStyle=rgba(ridge,0.5+glow*0.4);
+    ctx.beginPath(); ctx.moveTo(tailBase-230,gy+30+sw*1.4);
+    ctx.lineTo(tailBase-275,gy+6+sw*1.4); ctx.lineTo(tailBase-268,gy+58+sw*1.4); ctx.closePath(); ctx.fill();
+  }
+
+  // ---- legs (four) ----
+  ctx.strokeStyle=col2; ctx.lineWidth=18; ctx.lineCap='round';
+  const legDefs=[[-bodyW*0.55,0.0],[-bodyW*0.30,0.5],[bodyW*0.30,0.25],[bodyW*0.55,0.75]];
+  legDefs.forEach((L,i)=>{
+    const ph=t*rate + L[1]*TAU;
+    const swing=run>0.05?Math.sin(ph)*26:0;
+    const lift=run>0.05?Math.max(0,Math.cos(ph))*16:0;
+    const hipX=L[0], hipY=gy+bodyH*0.5;
+    const footX=hipX+swing, footY=0-lift;
+    const kneeX=(hipX+footX)/2 + (i<2?-8:8), kneeY=(hipY+footY)/2+10;
+    ctx.beginPath(); ctx.moveTo(hipX,hipY); ctx.quadraticCurveTo(kneeX,kneeY,footX,footY); ctx.stroke();
+    // clawed foot
+    ctx.strokeStyle=col2; ctx.lineWidth=5;
+    for(let c=-1;c<=1;c++){ ctx.beginPath(); ctx.moveTo(footX,footY); ctx.lineTo(footX+c*8+6,footY+10); ctx.stroke(); }
+    ctx.lineWidth=18;
+  });
+
+  // ---- body ----
+  const grd=ctx.createLinearGradient(0,gy-bodyH,0,gy+bodyH);
+  grd.addColorStop(0,shade(col,26)); grd.addColorStop(1,shade(col,-22));
+  ctx.fillStyle=grd;
+  ctx.beginPath(); ctx.ellipse(0,gy,bodyW,bodyH,0,0,TAU); ctx.fill();
+  // scales
+  ctx.save(); ctx.beginPath(); ctx.ellipse(0,gy,bodyW,bodyH,0,0,TAU); ctx.clip();
+  ctx.strokeStyle=rgba(col2,0.6); ctx.lineWidth=2;
+  const sc=18;
+  for(let ry=-1;ry<1;ry+=0.5){ const rowOff=(ry*2%1)*sc*0.5; const cy2=gy+ry*bodyH*0.8;
+    for(let cx=-bodyW-sc;cx<bodyW+sc;cx+=sc){ ctx.beginPath(); ctx.arc(cx+rowOff,cy2-sc*0.4,sc*0.55,Math.PI*0.15,Math.PI*0.85); ctx.stroke(); } }
+  ctx.restore();
+  // bioluminescent dorsal ridge (glows in the Sunear'Zikhron)
+  ctx.save();
+  ctx.strokeStyle=rgba(ridge,0.35+glow*0.55); ctx.shadowColor=ridge; ctx.shadowBlur=14*(0.3+glow);
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  for(let i=0;i<=10;i++){ const px=lerp(-bodyW*0.85,bodyW*0.7,i/10); const py=gy-bodyH*0.85 - Math.sin(i/10*Math.PI)*8; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+  ctx.stroke();
+  // ridge spines
+  ctx.fillStyle=rgba(ridge,0.4+glow*0.5);
+  for(let i=1;i<10;i++){ const px=lerp(-bodyW*0.85,bodyW*0.7,i/10); const py=gy-bodyH*0.85-Math.sin(i/10*Math.PI)*8;
+    ctx.beginPath(); ctx.moveTo(px-5,py); ctx.lineTo(px,py-14-Math.sin(i)*3); ctx.lineTo(px+5,py); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+
+  // ---- rider (Kiet) on the back ----
+  if(opt.rider){
+    ctx.save(); ctx.translate(bodyW*0.05, gy-bodyH*0.9);
+    // scale mini acorn relative (undo the beast scale a touch)
+    drawMiniAcorn(0,-6+Math.sin(t*rate)*2,34,t,'#b9863f','#3a2a17');
+    // cloak trailing in wind
+    ctx.fillStyle=rgba('#3a2a17',0.85);
+    const w=Math.sin(t*8)*10;
+    ctx.beginPath(); ctx.moveTo(-6,-2); ctx.quadraticCurveTo(-70-run*40, 10+w, -110-run*50, 40+w);
+    ctx.quadraticCurveTo(-60,26,-4,18); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- neck + head ----
+  const neckBaseX=bodyW*0.72, neckBaseY=gy-bodyH*0.3;
+  const headTurn=opt.headTurn||0;
+  const nsway=Math.sin(t*rate*0.5)*10 + headTurn*40;
+  const hx=neckBaseX+70, hy2=neckBaseY-70+nsway*0.4+Math.sin(t*1.5)*4;
+  ctx.strokeStyle=grd; ctx.lineWidth=34; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(neckBaseX,neckBaseY);
+  ctx.quadraticCurveTo(neckBaseX+50,neckBaseY-70, hx,hy2); ctx.stroke();
+  // neck ridge
+  ctx.strokeStyle=rgba(ridge,0.3+glow*0.4); ctx.lineWidth=2; ctx.shadowColor=ridge; ctx.shadowBlur=8*glow;
+  ctx.beginPath(); ctx.moveTo(neckBaseX,neckBaseY-14); ctx.quadraticCurveTo(neckBaseX+50,neckBaseY-84,hx,hy2-14); ctx.stroke();
+  ctx.shadowBlur=0;
+  // head
+  ctx.save(); ctx.translate(hx,hy2); ctx.rotate(-0.35+headTurn*0.3);
+  ctx.fillStyle=grd;
+  ctx.beginPath(); ctx.ellipse(18,0,40,24,0,0,TAU); ctx.fill();          // skull
+  ctx.beginPath(); ctx.moveTo(40,-6); ctx.quadraticCurveTo(78,-2,86,6); ctx.quadraticCurveTo(70,14,40,14); ctx.closePath(); ctx.fill(); // snout
+  // horns
+  ctx.strokeStyle=shade(col2,-10); ctx.lineWidth=8; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(6,-16); ctx.quadraticCurveTo(-18,-46,-40,-42); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(16,-18); ctx.quadraticCurveTo(-2,-52,-18,-58); ctx.stroke();
+  // jaw fins
+  ctx.fillStyle=rgba(ridge,0.4+glow*0.4);
+  ctx.beginPath(); ctx.moveTo(-2,10); ctx.lineTo(-24,26); ctx.lineTo(4,20); ctx.closePath(); ctx.fill();
+  // eye — su-blue glow
+  ctx.fillStyle=rgba(C.su,0.95); ctx.shadowColor=C.su; ctx.shadowBlur=16;
+  ctx.beginPath(); ctx.ellipse(28,-4,7,4,0,0,TAU); ctx.fill();
+  ctx.shadowBlur=0; ctx.fillStyle='#04121e';
+  ctx.beginPath(); ctx.ellipse(29,-4,2.4,4,0,0,TAU); ctx.fill();
+  ctx.restore();
+
+  // ---- near wing (front) ----
+  drawWing(-20, gy-34, 1, beat, shade(col,10), glow, t);
+  ctx.restore();
+}
+function drawWing(bx,by,dir,beat,col,glow,t){
+  ctx.save(); ctx.translate(bx,by);
+  const open=lerp(0.5,1.1,beat);
+  const tipX=dir*40, tipY=-120*open;
+  ctx.strokeStyle=col; ctx.lineWidth=8; ctx.lineCap='round';
+  // main spar
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(dir*30,-90*open,tipX,tipY); ctx.stroke();
+  // finger spars + membrane
+  const fingers=[[dir*80,-60*open],[dir*110,-10*open],[dir*95,40*open]];
+  ctx.fillStyle=rgba(col,0.55); ctx.beginPath(); ctx.moveTo(0,0);
+  ctx.quadraticCurveTo(dir*30,-90*open,tipX,tipY);
+  for(const f of fingers){ ctx.quadraticCurveTo(dir*40,f[1]-20,f[0],f[1]); }
+  ctx.quadraticCurveTo(dir*20,30,0,10); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=rgba(col,0.8); ctx.lineWidth=3;
+  for(const f of fingers){ ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(f[0],f[1]); ctx.stroke(); }
+  // faint bioluminescent veins
+  ctx.strokeStyle=rgba(C.su,0.12+glow*0.2); ctx.lineWidth=1.5;
+  for(const f of fingers){ ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(f[0]*0.9,f[1]*0.9); ctx.stroke(); }
+  ctx.restore();
+}
+
+/* ============================================================================
+   4. THE DUAT — a rip in the world; travel space; the tendril vision
+   ==========================================================================*/
+function drawRift(cx,cy,w,h,t,open){
+  // open: 0 closed -> 1 fully torn
+  ctx.save();
+  const oo=easeOut(clamp(open,0,1));
+  // outer glow
+  const gl=ctx.createRadialGradient(cx,cy,0,cx,cy,w*1.6*oo+1);
+  gl.addColorStop(0,rgba(C.duatEdge,0.5*oo)); gl.addColorStop(0.5,rgba('#3a1240',0.35*oo)); gl.addColorStop(1,rgba(C.duat,0));
+  ctx.fillStyle=gl; ctx.beginPath(); ctx.ellipse(cx,cy,w*1.6*oo+1,h*1.3*oo+1,0,0,TAU); ctx.fill();
+  // the tear interior
+  ctx.save();
+  ctx.beginPath();
+  const segs=22;
+  for(let i=0;i<=segs;i++){ const a=i/segs*TAU; const jag=(i%2?0.82:1)+Math.sin(a*3+t*4)*0.06;
+    const px=cx+Math.cos(a)*w*oo*jag, py=cy+Math.sin(a)*h*oo*jag; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+  ctx.closePath(); ctx.clip();
+  const inner=ctx.createRadialGradient(cx,cy,0,cx,cy,w*oo);
+  inner.addColorStop(0,'#000006'); inner.addColorStop(0.6,'#180126'); inner.addColorStop(1,C.duat);
+  ctx.fillStyle=inner; ctx.fillRect(cx-w,cy-h,w*2,h*2);
+  // swirling motes inside
+  for(let i=0;i<40;i++){ const a=i*2.4+t*0.6; const rr=(i/40)*w*oo*0.9;
+    ctx.globalAlpha=0.5; ctx.fillStyle=i%3?rgba(C.violet,0.5):rgba(C.red,0.4);
+    ctx.beginPath(); ctx.arc(cx+Math.cos(a)*rr, cy+Math.sin(a)*rr*0.8, 1.4,0,TAU); ctx.fill(); }
+  ctx.globalAlpha=1; ctx.restore();
+  // chromatic torn edge
+  ctx.lineWidth=3; ctx.strokeStyle=rgba(C.duatEdge,0.8*oo); ctx.shadowColor=C.duatEdge; ctx.shadowBlur=18*oo;
+  ctx.beginPath();
+  for(let i=0;i<=segs;i++){ const a=i/segs*TAU; const jag=(i%2?0.82:1)+Math.sin(a*3+t*4)*0.06;
+    const px=cx+Math.cos(a)*w*oo*jag, py=cy+Math.sin(a)*h*oo*jag; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+  ctx.closePath(); ctx.stroke(); ctx.shadowBlur=0;
+  ctx.restore();
+}
+/* faint suppressed Thar Norvek — screaming faces pressing at the edges */
+function tharNorvek(cx,cy,w,h,t,a){
+  ctx.save(); ctx.globalAlpha=a;
+  for(let i=0;i<5;i++){ const ang=i/5*TAU+t*0.2; const px=cx+Math.cos(ang)*w*1.05, py=cy+Math.sin(ang)*h*1.05;
+    ctx.fillStyle=rgba('#c9b0d8',0.5); ctx.beginPath(); ctx.ellipse(px,py,10,14,ang,0,TAU); ctx.fill();
+    ctx.fillStyle='#1a0a1e'; ctx.beginPath(); ctx.ellipse(px-2,py-3,2,3,0,0,TAU); ctx.ellipse(px+3,py-3,2,3,0,0,TAU);
+    ctx.ellipse(px,py+4,2.5,4,0,0,TAU); ctx.fill(); }  // open screaming mouth
+  ctx.restore();
+}
+/* rubbermcfly — glowing bioluminescent motes (glow in the Sunear'Zikhron) */
+function rubberMcFlies(list,t){
+  for(const f of list){
+    const gx=f.x+Math.sin(t*f.s+f.p)*f.a, gy=f.y+Math.cos(t*f.s*0.7+f.p)*f.a*0.6;
+    ctx.fillStyle=rgba(C.sunear,0.9); ctx.shadowColor=C.sunear; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.arc(gx,gy,f.r,0,TAU); ctx.fill();
+    // little wings
+    ctx.globalAlpha=0.4; ctx.beginPath(); ctx.ellipse(gx-f.r,gy,f.r*1.4,f.r*0.6,0.5+Math.sin(t*20)*0.4,0,TAU);
+    ctx.ellipse(gx+f.r,gy,f.r*1.4,f.r*0.6,-0.5-Math.sin(t*20)*0.4,0,TAU); ctx.fill(); ctx.globalAlpha=1;
+  }
+  ctx.shadowBlur=0;
+}
+
+/* ============================================================================
+   5. CAPTION SYSTEM
+   kinds: title, narr, kiet, mind(Jhealanil), guard, patriarch, naelst, stam, farmboy
+   ==========================================================================*/
+const CAPKIND={
+  narr:{col:C.gold, it:true, prefix:''},
+  title:{col:C.gold, it:false, prefix:''},
+  kiet:{col:C.ink, it:false, prefix:'KIET'},
+  mind:{col:C.su, it:true, prefix:'JHEALANIL'},
+  guard:{col:'#b6b0a2', it:false, prefix:'GATE GUARD'},
+  patriarch:{col:'#d8b48c', it:false, prefix:'THE FATHER'},
+  naelst:{col:'#bcd0b0', it:false, prefix:'NAELST'},
+  stam:{col:'#cbb6d8', it:false, prefix:'STAMIJAN'},
+  farmboy:{col:'#c9c1a2', it:false, prefix:"FARMBOY'S LETTER"},
+  rune:{col:C.red, it:false, prefix:''}
+};
+function drawCaption(cap, alpha){
+  if(!cap) return;
+  const k=CAPKIND[cap.kind]||CAPKIND.narr;
+  ctx.save();
+  ctx.globalAlpha*=alpha;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const isTitle=cap.kind==='title';
+  const size = cap.size|| (isTitle?46: (cap.kind==='narr'?27:26));
+  const y = cap.y!=null?cap.y: (isTitle?VH*0.46: VH-84);
+  // speaker label
+  let lines = wrapText(cap.text, size, VW*0.78);
+  const lh=size*1.34;
+  const totalH=lines.length*lh;
+  // subtle backing for legibility (not for titles)
+  if(!isTitle){
+    ctx.fillStyle='rgba(0,0,0,0.34)';
+    const bw=VW*0.86, bh=totalH+ (k.prefix?34:20);
+    roundRect(VW/2-bw/2, y-totalH/2-(k.prefix?26:8), bw, bh, 8); ctx.fill();
+  }
+  if(k.prefix){
+    ctx.font=`600 ${Math.round(size*0.5)}px Georgia, serif`;
+    ctx.fillStyle=C.goldDim; ctx.globalAlpha*=1;
+    ctx.fillText(k.prefix, VW/2, y-totalH/2-16);
+  }
+  ctx.font=`${k.it?'italic ':''}${size}px Georgia, 'Times New Roman', serif`;
+  ctx.fillStyle=k.col;
+  if(isTitle){ ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=10; }
+  lines.forEach((ln,i)=>{ ctx.fillText(ln, VW/2, y-totalH/2+lh*0.5+i*lh); });
+  ctx.restore();
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+const _measCtx=document.createElement('canvas').getContext('2d');
+function wrapText(text,size,maxW){
+  _measCtx.font=`${size}px Georgia, serif`;
+  const words=text.split(' '); const lines=[]; let line='';
+  for(const w of words){ const test=line?line+' '+w:w;
+    if(_measCtx.measureText(test).width>maxW && line){ lines.push(line); line=w; } else line=test; }
+  if(line) lines.push(line); return lines;
+}
+/* find active caption for a scene at local time */
+function activeCaption(caps, lt){
+  if(!caps) return null;
+  for(const c of caps){ if(lt>=c.t && lt<c.t+ (c.d||3.2)) {
+    const inA=seg(lt,c.t,c.t+0.4), outA=1-seg(lt,c.t+(c.d||3.2)-0.4,c.t+(c.d||3.2));
+    return {cap:c, a:Math.min(inA,outA)};
+  }}
+  return null;
+}
+
+/* ============================================================================
+   6. PROCEDURAL AMBIENT AUDIO
+   ==========================================================================*/
+const Audio2 = (function(){
+  let actx=null, master=null, muted=false;
+  let bed={};  // current bed nodes
+  function init(){
+    if(actx) return;
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    master=actx.createGain(); master.gain.value=0.9; master.connect(actx.destination);
+    // wind bed: brown noise -> lowpass with slow LFO
+    const buf=actx.createBuffer(1, actx.sampleRate*4, actx.sampleRate);
+    const d=buf.getChannelData(0); let last=0;
+    for(let i=0;i<d.length;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.2; }
+    const wind=actx.createBufferSource(); wind.buffer=buf; wind.loop=true;
+    const wf=actx.createBiquadFilter(); wf.type='lowpass'; wf.frequency.value=420;
+    const wg=actx.createGain(); wg.gain.value=0.0;
+    wind.connect(wf); wf.connect(wg); wg.connect(master); wind.start();
+    const lfo=actx.createOscillator(); lfo.frequency.value=0.08;
+    const lg=actx.createGain(); lg.gain.value=180; lfo.connect(lg); lg.connect(wf.frequency); lfo.start();
+    bed.wind={g:wg,f:wf};
+    // drone: two detuned oscillators + gain
+    const d1=actx.createOscillator(), d2=actx.createOscillator();
+    d1.type='sawtooth'; d2.type='sine'; d1.frequency.value=55; d2.frequency.value=55*1.5;
+    const df=actx.createBiquadFilter(); df.type='lowpass'; df.frequency.value=300;
+    const dg=actx.createGain(); dg.gain.value=0.0;
+    d1.connect(df); d2.connect(df); df.connect(dg); dg.connect(master);
+    d1.start(); d2.start();
+    bed.drone={g:dg,o1:d1,o2:d2,f:df};
+    // shimmer pad (for Sunear'Zikhron / visions): triangle chord
+    const pg=actx.createGain(); pg.gain.value=0.0; pg.connect(master);
+    const freqs=[220,277.2,329.6]; bed.pad={g:pg,osc:[]};
+    for(const f of freqs){ const o=actx.createOscillator(); o.type='triangle'; o.frequency.value=f;
+      const g=actx.createGain(); g.gain.value=0.33; o.connect(g); g.connect(pg); o.start(); bed.pad.osc.push(o); }
+    // heartbeat via periodic — handled by scheduler flag
+  }
+  function T(){ return actx?actx.currentTime:0; }
+  function ramp(param,v,tc){ if(!param)return; param.cancelScheduledValues(T()); param.setTargetAtTime(v, T(), tc); }
+  // mood: {wind, drone, droneHz, pad, padHz[]}
+  function mood(m){
+    if(!actx||muted) { pending=m; return; }
+    pending=null;
+    if(m.wind!=null) ramp(bed.wind.g.gain, m.wind, 1.2);
+    if(m.windCut!=null) ramp(bed.wind.f.frequency, m.windCut, 1.5);
+    if(m.drone!=null) ramp(bed.drone.g.gain, m.drone, 1.4);
+    if(m.droneHz!=null){ ramp(bed.drone.o1.frequency, m.droneHz, 2); ramp(bed.drone.o2.frequency, m.droneHz*1.5, 2); }
+    if(m.droneCut!=null) ramp(bed.drone.f.frequency, m.droneCut, 2);
+    if(m.pad!=null) ramp(bed.pad.g.gain, m.pad, 1.8);
+    if(m.padHz){ m.padHz.forEach((f,i)=>{ if(bed.pad.osc[i]) ramp(bed.pad.osc[i].frequency,f,2); }); }
+  }
+  let pending=null;
+  // one-shot stingers
+  function ping(freq,dur,type,vol,glideTo){
+    if(!actx||muted) return;
+    const o=actx.createOscillator(); o.type=type||'sine'; o.frequency.value=freq;
+    const g=actx.createGain(); g.gain.value=0; o.connect(g); g.connect(master);
+    const t=T(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||0.2,t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    if(glideTo) o.frequency.exponentialRampToValueAtTime(glideTo,t+dur);
+    o.start(t); o.stop(t+dur+0.05);
+  }
+  function rip(){ // Duat tear
+    if(!actx||muted) return;
+    const t=T();
+    // noise burst
+    const buf=actx.createBuffer(1,actx.sampleRate*0.6,actx.sampleRate);
+    const d=buf.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); }
+    const s=actx.createBufferSource(); s.buffer=buf;
+    const f=actx.createBiquadFilter(); f.type='bandpass'; f.frequency.setValueAtTime(1800,t); f.frequency.exponentialRampToValueAtTime(180,t+0.5); f.Q.value=6;
+    const g=actx.createGain(); g.gain.value=0.5; s.connect(f); f.connect(g); g.connect(master); s.start(t);
+    ping(180,0.7,'sawtooth',0.18,60);
+  }
+  function relic(){ ping(880,0.16,'square',0.10,760); setTimeout(()=>ping(760,0.14,'square',0.08,700),90); }
+  let hb=null;
+  function heartbeat(on){
+    if(!actx) return;
+    if(on&&!hb){ hb=setInterval(()=>{ if(muted)return; ping(60,0.18,'sine',0.28,42); setTimeout(()=>ping(56,0.16,'sine',0.2,40),150); }, 1100); }
+    if(!on&&hb){ clearInterval(hb); hb=null; }
+  }
+  return {
+    init, mood, ping, rip, relic, heartbeat,
+    resume(){ if(actx&&actx.state==='suspended') actx.resume(); if(pending){mood(pending);} },
+    toggleMute(){ muted=!muted; if(master) ramp(master.gain, muted?0:0.9, 0.3); return muted; },
+    isMuted(){ return muted; }
+  };
+})();
+
+/* ============================================================================
+   7. SCENES
+   Each: {id,name,dur,mood, once?, draw(lt), caps:[{t,d,kind,text,...}]}
+   Camera helpers per scene via ctx transforms.
+   ==========================================================================*/
+function bg(fill){ ctx.fillStyle=fill||C.bg; ctx.fillRect(0,0,VW,VH); }
+function fadeFromBlack(lt,dur){ const a=1-seg(lt,0,dur); if(a>0){ ctx.fillStyle=`rgba(0,0,0,${a})`; ctx.fillRect(0,0,VW,VH);} }
+function fadeToBlack(lt,scdur,dur){ const a=seg(lt,scdur-dur,scdur); if(a>0){ ctx.fillStyle=`rgba(0,0,0,${a})`; ctx.fillRect(0,0,VW,VH);} }
+
+const SCENES = [];
+
+/* ---------- SCENE 1 · COLD OPEN — the sky & the title (100s) ---------- */
+SCENES.push({
+  id:'open', name:'I · The Sky Over the Mbaru Tatu', dur:100,
+  mood:{wind:0.05,windCut:300,drone:0.10,droneHz:44,pad:0.05,padHz:[196,246.9,293.7]},
+  draw(lt){
+    bg('#05040a');
+    drawSky(lt*0.4, {horizon:VH, bright:1});
+    sunearVeil(lt*0.5, 0.7+0.3*Math.sin(lt*0.2));
+    // slow drifting comet dust
+    ctx.globalAlpha=0.5;
+    for(let i=0;i<30;i++){ const x=(i*137.5+lt*8)%VW, y=(i*80.3)%(VH*0.7); ctx.fillStyle=rgba(C.sunear,0.3);
+      ctx.beginPath(); ctx.arc(x,y,0.8,0,TAU); ctx.fill(); }
+    ctx.globalAlpha=1;
+    vignette(0.5);
+    fadeFromBlack(lt,3);
+    fadeToBlack(lt,this.dur,3.5);
+  },
+  caps:[
+    {t:4,d:6,kind:'narr',text:'The Mbaru Tatu — three sister worlds in one orbit, wound about each other like a knot of light.'},
+    {t:11,d:6,kind:'narr',text:'Velki, eldest of waters. Xikia, that carries the most of us. Wild Leotik, least known of all.'},
+    {t:19,d:6,kind:'narr',text:'Above them turns Pia’don — its bright ring, its nebulae, and a dim quasar that has hung there for fifty Vaartui.'},
+    {t:27,d:6.5,kind:'narr',text:'Read the sky, the scholars say, and you read the age. And in these nights the sky spoke of an ending.'},
+    {t:35,d:6,kind:'narr',text:'For the Sunear’Zikhron was coming — that veil of reverence and dread — and every king believed the era was turning.'},
+    {t:44,d:5,kind:'narr',text:'This is a telling from the last days of the Era of the Nekh’Vorran.'},
+    // Title cards
+    {t:52,d:9,kind:'title',text:'Vaksk Elzikh',y:VH*0.42,size:40},
+    {t:52.4,d:8.6,kind:'title',text:'da ávErk á Aakalay',y:VH*0.55,size:52},
+    {t:63,d:8,kind:'title',text:'THE LEGEND OF AAKALAY',y:VH*0.5,size:38},
+    {t:74,d:8,kind:'narr',text:'It begins, as the old tellings do, with a rider and the beast whose name he speaks as his own.'},
+    {t:88,d:7,kind:'narr',text:'An Eikar called Kiet. And his Great Nekh’Vorran — Jhealanil.'},
+  ]
+});
+
+/* ---------- SCENE 2 · THE RIDE toward Aakalay (140s) ---------- */
+SCENES.push({
+  id:'ride', name:'II · The Ride to Aakalay', dur:140,
+  mood:{wind:0.30,windCut:900,drone:0.16,droneHz:48,droneCut:500,pad:0.06,padHz:[220,277.2,329.6]},
+  draw(lt){
+    bg('#0a0812');
+    // parallax sky
+    ctx.save();
+    drawSky(lt*0.2,{horizon:VH*0.7,bright:0.9});
+    sunearVeil(lt*0.4, 0.8);
+    ctx.restore();
+    // distant city ahead, growing slowly (approach)
+    const grow=lerp(0.55,0.9,seg(lt,0,this.dur));
+    drawAakalay(lt, {baseY:VH*0.62, cx:VW*0.72, scale:grow*0.7, glow:1.1});
+    // rushing ground
+    drawGround(lt,{horizon:VH*0.66, near:'#0d0a08', far:'#141018', foliage:false});
+    // speed streaks of Sunear'Zikhron residue near ground
+    ctx.globalAlpha=0.5;
+    for(let i=0;i<40;i++){ const x=(i*90 - lt*520)%(VW+200); const xx=x<0?x+VW+200:x; const y=VH*0.68+ (i%7)*7;
+      ctx.strokeStyle=rgba(C.sunear,0.10); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(xx,y); ctx.lineTo(xx+40,y); ctx.stroke(); }
+    ctx.globalAlpha=1;
+    // Jhealanil galloping with Kiet, center-left, slight bob
+    const gx=VW*0.40+Math.sin(lt*1.1)*8, gy=VH*0.78;
+    drawNekh(gx,gy,{scale:1.15,t:lt,run:0.9,glow:0.7+0.25*Math.sin(lt*0.4),face:1,rider:true});
+    // dust kicked behind
+    ctx.globalAlpha=0.25; ctx.fillStyle='#2a2018';
+    for(let i=0;i<10;i++){ const p=(lt*3+i)%3/3; ctx.beginPath(); ctx.arc(gx-160-p*120, gy-10-p*30, 10+p*30,0,TAU); ctx.fill(); }
+    ctx.globalAlpha=1;
+    vignette(0.5); grain(0.04);
+    fadeFromBlack(lt,3);
+    fadeToBlack(lt,this.dur,4);
+  },
+  caps:[
+    {t:5,d:6,kind:'narr',text:'The wind whipped around him, and the remains of the last Sunear’Zikhron still clung to the grass like cold breath.'},
+    {t:13,d:5.5,kind:'narr',text:'Kiet rode toward the shining city — his rage building with every stride Jhealanil took.'},
+    {t:22,d:5,kind:'kiet',text:'I do hope this was worth our time.'},
+    {t:29,d:6,kind:'mind',text:'You have seen what these people carry, Kiet. You know it is worth a duel. Perhaps more.'},
+    {t:37,d:5,kind:'kiet',text:'You realise we don’t have to be grim until we arrive.'},
+    {t:44,d:6,kind:'mind',text:'This is not the ShurgrEdan we jest around. These ones keep their cruelty quiet.'},
+    {t:53,d:6,kind:'narr',text:'She was always too serious when it came to avenging the folk of the Mbaru Tatu. And she was always right.'},
+    {t:62,d:6,kind:'kiet',text:'Then we shall be quiet cruelty’s answer. Loud, and impossible to ignore.'},
+    {t:71,d:6,kind:'narr',text:'Kiet had ever been the most dramatic of the nekhic’eik — small tricks to confuse, and displays of power no one forgot.'},
+    {t:80,d:6,kind:'mind',text:'You are smiling. You promised me you would not enjoy this.'},
+    {t:88,d:5,kind:'kiet',text:'I promised I would end it. I said nothing of joy.'},
+    {t:96,d:6,kind:'narr',text:'Ahead, Aakalay grew from a smear of pale light into towers — bright, and far too silent.'},
+    {t:106,d:6,kind:'narr',text:'To understand his rage, you must go back. Three nights, to the sleeping city.'},
+    {t:118,d:6.5,kind:'narr',text:'Three nights ago —'},
+  ]
+});
+
+/* ---------- SCENE 3 · THE LETTERS / THE DECISION (100s) ---------- */
+SCENES.push({
+  id:'letters', name:'III · Fifty Letters', dur:100,
+  mood:{wind:0.10,windCut:500,drone:0.12,droneHz:46,pad:0.05,padHz:[174.6,220,261.6]},
+  draw(lt){
+    bg('#0e0b07');
+    // warm interior — a table, candle, letters piling
+    const cx=VW*0.5, ty=VH*0.62;
+    // candle glow
+    const cg=ctx.createRadialGradient(VW*0.30,VH*0.5,10,VW*0.30,VH*0.5,420);
+    cg.addColorStop(0,rgba(C.eldi,0.30)); cg.addColorStop(1,rgba(C.eldi,0));
+    ctx.fillStyle=cg; ctx.fillRect(0,0,VW,VH);
+    // table
+    ctx.fillStyle='#241a10'; ctx.fillRect(0,ty,VW,VH-ty);
+    ctx.fillStyle='#2e2214'; ctx.fillRect(0,ty,VW,8);
+    // candle
+    const flick=0.85+0.15*Math.sin(lt*12)+0.05*Math.sin(lt*30);
+    ctx.fillStyle='#e8dfc8'; ctx.fillRect(VW*0.30-6,ty-70,12,70);
+    ctx.save(); ctx.globalAlpha=flick;
+    const fg=ctx.createRadialGradient(VW*0.30,ty-80,0,VW*0.30,ty-80,26);
+    fg.addColorStop(0,'#fff6d8'); fg.addColorStop(0.4,C.eldi); fg.addColorStop(1,rgba(C.eldi,0));
+    ctx.fillStyle=fg; ctx.beginPath(); ctx.ellipse(VW*0.30,ty-84,10,18*flick,0,0,TAU); ctx.fill();
+    ctx.restore();
+    // letters accumulate over time (months compressed)
+    const n=Math.floor(seg(lt,4,40)*50);
+    const rnd=mulberry32(3);
+    for(let i=0;i<n;i++){ const px=cx+ (rnd()-0.5)*520, py=ty-14-(rnd())*70; const rot=(rnd()-0.5)*0.5;
+      ctx.save(); ctx.translate(px,py); ctx.rotate(rot);
+      ctx.fillStyle=i===n-1?'#efe6cf':'#d8ccae'; ctx.fillRect(-38,-26,76,52);
+      ctx.strokeStyle='#b3a887'; ctx.lineWidth=1; ctx.strokeRect(-38,-26,76,52);
+      // wax seal
+      ctx.fillStyle=C.red; ctx.beginPath(); ctx.arc(0,0,6,0,TAU); ctx.fill();
+      // ink lines
+      ctx.strokeStyle='#8a7a55'; ctx.lineWidth=1;
+      for(let l=0;l<3;l++){ ctx.beginPath(); ctx.moveTo(-30,-12+l*10); ctx.lineTo(30-(l===2?18:0),-12+l*10); ctx.stroke(); }
+      ctx.restore();
+    }
+    // a hand (mini acorn) at right reading the newest, later in scene
+    if(lt>42){ drawAcorn(VW*0.72, ty+40, {r:120, color:'#b9863f', cap:'#3a2a17', state:'idle', t:lt, face:-1, cloakCol:'#2a1f12'}); }
+    vignette(0.55); grain(0.04);
+    fadeFromBlack(lt,2.5); fadeToBlack(lt,this.dur,3.5);
+  },
+  caps:[
+    {t:3,d:6,kind:'narr',text:'For months the letters had come — from the Great City of Aakalay, and the misery growing behind its walls.'},
+    {t:11,d:6,kind:'narr',text:'Merchants who would not return. Names that stopped being spoken. A brightness that felt like a held breath.'},
+    {t:20,d:6,kind:'narr',text:'Kiet read them all. He answered few. He counted them, and the counting became its own dread.'},
+    {t:30,d:6,kind:'narr',text:'The fiftieth came from a farmboy on the outskirts — barely lettered, pressed hard into the page.'},
+    {t:40,d:6.5,kind:'farmboy',text:'“There is a maiden inside the walls. I have not seen her in a fortnight. No one will say her name. Please.”'},
+    {t:50,d:6,kind:'narr',text:'A fortnight. One name, gone quiet among a city of quiet names.'},
+    {t:60,d:6,kind:'kiet',text:'Fifty letters. I have read enough. Gather a few of the Dya’Can — we go, and we go unseen.'},
+    {t:70,d:6.5,kind:'narr',text:'His Dya’Can — guildmates, companions, brothers and sisters at arms — did not need convincing.'},
+    {t:79,d:6,kind:'narr',text:'They and their Nekh’Vorran rode to within sight of the city and stopped behind a low rise.'},
+    {t:88,d:7,kind:'narr',text:'There they left the beasts. The rest of the way, they would walk — as no one, and nothing at all.'},
+  ]
+});
+
+/* ---------- SCENE 4 · APPROACH ON FOOT + READING THE SKY (95s) ---------- */
+SCENES.push({
+  id:'approach', name:'IV · Reading the Sky', dur:95,
+  mood:{wind:0.16,windCut:600,drone:0.13,droneHz:44,pad:0.06,padHz:[196,246.9,311.1]},
+  draw(lt){
+    bg('#0a0810');
+    drawSky(lt*0.15,{horizon:VH*0.62,bright:1});
+    sunearVeil(lt*0.3,0.9);
+    drawAakalay(lt,{baseY:VH*0.64,cx:VW*0.5,scale:1.0,glow:1.0});
+    drawGround(lt,{horizon:VH*0.66,foliage:true});
+    // small band of Eikar walking toward the city (silhouettes), slow drift closer
+    const march=seg(lt,0,this.dur);
+    const baseY=VH*0.80;
+    const party=[[0.42,'#b9863f','sword'],[0.50,'#8a7a55','spear'],[0.57,'#7d6a8f','staff'],[0.36,'#6f8a6e','bow']];
+    party.forEach((p,i)=>{ const x=VW*p[0]-i*6 + Math.sin(lt*0.6+i)*3;
+      drawAcorn(x, baseY - i*3, {r:44+ i*2, color:p[1], cap:shade(p[1],-30), weapon:p[2], state:'walk', t:lt+i*0.7, face:1, cloakCol:'#241a12', hood:i%2===0}); });
+    // sky annotations glimmer (Velki close with moons already in drawSky)
+    vignette(0.5); grain(0.04);
+    fadeFromBlack(lt,2.5); fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:3,d:6,kind:'narr',text:'On foot the city was almost serene. Peaceful — with an undertone that sat wrong beneath the peace.'},
+    {t:11,d:6,kind:'narr',text:'They could feel the Sunear’Zikhron on its way. No better time to investigate — and, if it came to it, to duel.'},
+    {t:20,d:6.5,kind:'narr',text:'They studied the land, and they studied the sky.'},
+    {t:29,d:6,kind:'narr',text:'Velki leaned close, several of its moons in view. Xikia was losing the small moon that dances on near passes.'},
+    {t:38,d:6,kind:'narr',text:'Far off, Leotik, small and dim — among a sea of stars, Pia’don’s bright ring, a few nebulae, that old quasar.'},
+    {t:48,d:7,kind:'narr',text:'Anyone in their right mind could read how much the sky told of the times — and of the weight of this one.'},
+    {t:58,d:6.5,kind:'narr',text:'Scholars and kings believed, with conviction, that it was the turn of an era. And they acted as such.'},
+    {t:68,d:6,kind:'narr',text:'Across the short fields came the smell of dew, of rotting stone and wood — and something a little deeper.'},
+    {t:77,d:7,kind:'narr',text:'The forest was too still for a place so made for small life. The quiet spoke of an influence they could not yet name.'},
+  ]
+});
+
+/* ---------- SCENE 5 · THE GATE (55s) ---------- */
+SCENES.push({
+  id:'gate', name:'V · The Gate of Aakalay', dur:55,
+  mood:{wind:0.14,windCut:500,drone:0.16,droneHz:50,pad:0.03},
+  draw(lt){
+    bg('#0a0810');
+    drawSky(lt*0.1,{horizon:VH*0.5,bright:0.8});
+    // massive gate wall filling frame
+    ctx.fillStyle=shade(C.stone,-10); ctx.fillRect(0,VH*0.28,VW,VH);
+    // stone blocks
+    ctx.strokeStyle='#181209'; ctx.lineWidth=2;
+    for(let y=VH*0.30;y<VH;y+=44){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(VW,y); ctx.stroke();
+      for(let x=(y/44%2?0:44);x<VW;x+=88){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+44); ctx.stroke(); } }
+    // the gate arch (closed, faint light within seams)
+    const gx=VW*0.5, gw=260, gtop=VH*0.36;
+    ctx.fillStyle='#0c0906'; ctx.beginPath();
+    ctx.moveTo(gx-gw/2,VH); ctx.lineTo(gx-gw/2,gtop+80); ctx.quadraticCurveTo(gx,gtop-30,gx+gw/2,gtop+80); ctx.lineTo(gx+gw/2,VH); ctx.fill();
+    ctx.strokeStyle=rgba('#cfe0ff',0.10); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(gx,gtop+80); ctx.lineTo(gx,VH); ctx.stroke();
+    // two guards atop small ledges, barely moving
+    drawAcorn(gx-170,VH*0.66,{r:52,color:'#6b6355',cap:'#3a352b',weapon:'spear',state:'idle',t:lt*0.3,face:1});
+    drawAcorn(gx+170,VH*0.66,{r:52,color:'#6b6355',cap:'#3a352b',weapon:'spear',state:'idle',t:lt*0.3+1,face:-1});
+    // the party small, at the base, looking up
+    const party=[[0.42,'#b9863f','sword'],[0.50,'#8a7a55','spear'],[0.57,'#7d6a8f','staff']];
+    party.forEach((p,i)=>{ drawAcorn(VW*p[0],VH*0.92,{r:34,color:p[1],cap:shade(p[1],-30),weapon:p[2],state:'idle',t:lt+i,face:1,hood:true,cloakCol:'#241a12'}); });
+    // torch flicker at gate
+    ctx.save(); ctx.globalAlpha=0.4+0.2*Math.sin(lt*10);
+    for(const tx of [gx-gw/2-30,gx+gw/2+30]){ const fg=ctx.createRadialGradient(tx,gtop+120,0,tx,gtop+120,80);
+      fg.addColorStop(0,rgba(C.eldi,0.6)); fg.addColorStop(1,rgba(C.eldi,0)); ctx.fillStyle=fg; ctx.beginPath(); ctx.arc(tx,gtop+120,80,0,TAU); ctx.fill(); }
+    ctx.restore();
+    vignette(0.55); grain(0.04);
+    fadeFromBlack(lt,2); fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:3,d:5.5,kind:'narr',text:'They hailed the guards for safe passage. The men barely looked at them.'},
+    {t:11,d:6.5,kind:'guard',text:'No able-bodied man enters the city without first meeting the Master of the Keep.'},
+    {t:20,d:6,kind:'narr',text:'The Master of the Keep. His name the ShurgrEdan had cut out of every core they kept. We will call him Otlið.'},
+    {t:30,d:6.5,kind:'guard',text:'He has retired for the night. There is a camp along the east wall, for those who come too late.'},
+    {t:40,d:6.5,kind:'narr',text:'A camp for the turned-away. The band thanked them, and turned east — as if they meant to obey.'},
+    {t:48,d:5,kind:'narr',text:'They did not mean to obey.'},
+  ]
+});
+
+/* ---------- SCENE 6 · THE STILL FIELDS (round the wall) (70s) ---------- */
+SCENES.push({
+  id:'still', name:'VI · The Wrong Quiet', dur:70,
+  mood:{wind:0.08,windCut:360,drone:0.18,droneHz:41,droneCut:220,pad:0.0},
+  draw(lt){
+    bg('#080609');
+    drawSky(lt*0.08,{horizon:VH*0.42,bright:0.6});
+    // the great wall curving away to the right
+    ctx.fillStyle=shade(C.stone,-16);
+    ctx.beginPath(); ctx.moveTo(VW,VH*0.10); ctx.quadraticCurveTo(VW*0.5,VH*0.34,VW*0.1,VH*0.5); ctx.lineTo(0,VH); ctx.lineTo(VW,VH); ctx.closePath(); ctx.fill();
+    drawGround(lt,{horizon:VH*0.62,foliage:true,near:'#0a0806'});
+    // dead-still trees (no movement, no animals)
+    const rnd=mulberry32(15);
+    for(let i=0;i<9;i++){ const x=rnd()*VW*0.6; const y=VH*0.60+rnd()*40; const h=60+rnd()*80;
+      ctx.strokeStyle='#0c0a07'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y-h); ctx.stroke();
+      ctx.lineWidth=3; for(let b=0;b<4;b++){ const a=-0.4-b*0.3; ctx.beginPath(); ctx.moveTo(x,y-h+b*12); ctx.lineTo(x+Math.cos(a)*30*(b%2?-1:1),y-h-10+b*8); ctx.stroke(); } }
+    // the band walking the curve, studying
+    const party=[[0.30,'#b9863f','sword'],[0.24,'#8a7a55','spear'],[0.18,'#7d6a8f','staff'],[0.12,'#6f8a6e','bow']];
+    party.forEach((p,i)=>{ const prog=seg(lt,0,this.dur); const x=VW*(p[0]+prog*0.18);
+      drawAcorn(x,VH*0.80-i*2,{r:40,color:p[1],cap:shade(p[1],-30),weapon:p[2],state:'walk',t:lt+i*0.6,face:1,hood:i%2===0,cloakCol:'#20160f'}); });
+    // faint rot mist near ground
+    ctx.globalAlpha=0.18; for(let i=0;i<5;i++){ const x=(lt*10+i*280)%VW; const g=ctx.createRadialGradient(x,VH*0.78,0,x,VH*0.78,140);
+      g.addColorStop(0,rgba('#3a4a30',0.5)); g.addColorStop(1,rgba('#3a4a30',0)); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,VH*0.78,140,0,TAU); ctx.fill(); }
+    ctx.globalAlpha=1;
+    vignette(0.6); grain(0.05);
+    fadeFromBlack(lt,2.5); fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:3,d:6,kind:'narr',text:'They walked the curve of the east wall, out of the guards’ sight, and out of the reach of the patrols.'},
+    {t:12,d:6.5,kind:'narr',text:'Nothing moved in the forest. No small things in the hedges, no larger things hunting them.'},
+    {t:22,d:6.5,kind:'narr',text:'A place made for life, gone perfectly still. The smell and the silence spoke of an influence — they could not name its shape.'},
+    {t:33,d:6,kind:'narr',text:'Dew, rotting wood, cold stone. And beneath it, that deeper note, like something kept too long in the dark.'},
+    {t:43,d:6.5,kind:'narr',text:'When the wall hid them from every watching eye, Kiet stopped. It was time to take the other road into the city.'},
+    {t:53,d:6,kind:'narr',text:'The road beneath the world. The Duat.'},
+  ]
+});
+
+/* ---------- SCENE 7 · RIPPING THE DUAT — travel & apparitions (90s) ---------- */
+SCENES.push({
+  id:'duat', name:'VII · The Road Beneath — the Duat', dur:90,
+  mood:{wind:0.04,windCut:240,drone:0.22,droneHz:38,droneCut:200,pad:0.10,padHz:[155.6,185,233.1]},
+  once(){ Audio2.rip(); },
+  draw(lt){
+    bg('#050208');
+    // opening rip grows then we're "inside"
+    const openT=seg(lt,0,4);
+    // inside-the-Duat backdrop after entry
+    if(lt>3.5){
+      const ing=ctx.createRadialGradient(VW/2,VH/2,20,VW/2,VH/2,VW*0.8);
+      ing.addColorStop(0,'#160126'); ing.addColorStop(0.6,'#0c0116'); ing.addColorStop(1,'#02010a');
+      ctx.fillStyle=ing; ctx.fillRect(0,0,VW,VH);
+      // drifting streams of light (passage)
+      for(let i=0;i<60;i++){ const a=i*0.62; const rr=((i*53+lt*80)%600);
+        ctx.globalAlpha=0.4*(1-rr/600); ctx.strokeStyle=i%3?rgba(C.violet,0.5):rgba(C.su,0.4);
+        const x=VW/2+Math.cos(a)*rr, y=VH/2+Math.sin(a)*rr*0.7;
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(a)*20,y+Math.sin(a)*14); ctx.stroke(); }
+      ctx.globalAlpha=1;
+    }
+    // the tear (front) during entry
+    if(lt<8){ drawRift(VW/2,VH/2, 260, 200, lt, openT); tharNorvek(VW/2,VH/2,260*easeOut(openT),200*easeOut(openT),lt, 0.5*pulse(lt,0.5,4)); }
+    // Kiet stepping through (silhouette with glowing eyes) center foreground
+    if(lt>5){ const cx=VW*0.5+Math.sin(lt*0.4)*10;
+      drawAcorn(cx,VH*0.86,{r:80,color:'#1a1522',cap:'#120e18',state:'idle',t:lt,face:1,glowEye:C.su,cloakCol:'#0e0a16',hood:true}); }
+    // apparitions — clearer than usual, and aware
+    // group 1: many folk walking as one thought (left)
+    const showWalk=seg(lt,12,18);
+    if(lt>12){ ctx.globalAlpha=0.5*showWalk*(1-seg(lt,40,48));
+      for(let i=0;i<7;i++){ const x=VW*0.16+i*36; const drift=Math.sin(lt*0.6+i)*4;
+        drawAcorn(x,VH*0.6+drift,{r:26,color:'#3a3346',cap:'#2a2434',state:'walk',t:lt*0.4+i,face:1});
+        // one flickers into light then gives in
+        if(i===3){ ctx.save(); ctx.globalAlpha=0.4*Math.max(0,Math.sin(lt*0.8))*(1-seg(lt,30,40));
+          const fg=ctx.createRadialGradient(x,VH*0.6,0,x,VH*0.6,40); fg.addColorStop(0,rgba(C.sunear,0.6)); fg.addColorStop(1,rgba(C.sunear,0));
+          ctx.fillStyle=fg; ctx.beginPath(); ctx.arc(x,VH*0.55,40,0,TAU); ctx.fill(); ctx.restore(); } }
+      ctx.globalAlpha=1; }
+    // group 2: a man kneeling before a shadow (center-right)
+    if(lt>26){ ctx.globalAlpha=0.6*seg(lt,26,31)*(1-seg(lt,52,60));
+      const sx=VW*0.66;
+      // shadow
+      ctx.fillStyle='#05030a'; ctx.beginPath(); ctx.moveTo(sx+70,VH*0.4); ctx.quadraticCurveTo(sx+130,VH*0.55,sx+90,VH*0.82);
+      ctx.quadraticCurveTo(sx+60,VH*0.6,sx+50,VH*0.42); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle=rgba(C.duatEdge,0.4); ctx.lineWidth=2; ctx.stroke();
+      // kneeling man (body low)
+      drawAcorn(sx,VH*0.88,{r:40,color:'#3a3346',cap:'#2a2434',state:'idle',t:lt,face:1});
+      ctx.globalAlpha=1; }
+    // group 3: shadow with a small stone, questioning 3 young Dearcan (later)
+    if(lt>44){ ctx.globalAlpha=0.6*seg(lt,44,49)*(1-seg(lt,66,74));
+      const sx=VW*0.34;
+      ctx.fillStyle='#05030a'; ctx.beginPath(); ctx.ellipse(sx,VH*0.58,26,70,0,0,TAU); ctx.fill();
+      // the stone — a cold point of light beside it
+      ctx.fillStyle=rgba('#8fa0c0',0.8); ctx.shadowColor='#8fa0c0'; ctx.shadowBlur=14;
+      ctx.beginPath(); ctx.arc(sx+34,VH*0.66,6,0,TAU); ctx.fill(); ctx.shadowBlur=0;
+      for(let i=0;i<3;i++){ drawAcorn(sx+120+i*54,VH*0.86,{r:28,color:'#4a4038',cap:'#2e281f',state:'idle',t:lt+i,face:-1}); }
+      ctx.globalAlpha=1; }
+    vignette(0.5); grain(0.05);
+    fadeFromBlack(lt,2); fadeToBlack(lt,this.dur,3.5);
+  },
+  caps:[
+    {t:1.4,d:5,kind:'narr',text:'Kiet ripped through the Duat.'},
+    {t:7,d:6.5,kind:'narr',text:'Alone among them he could hold the Thar Norvek at bay — the scream of the folk of the Duskareth that rides the tear.'},
+    {t:15,d:6.5,kind:'narr',text:'The passage always shows moving apparitions. But these were clearer. And they seemed aware of where they were.'},
+    {t:23,d:6.5,kind:'narr',text:'Eikar and Keilia and Karnen, walking slow — as if a single thought had been set in every head.'},
+    {t:31,d:6,kind:'narr',text:'One or two would flicker and gain light. Then give in — to another’s despair.'},
+    {t:39,d:6,kind:'narr',text:'A man knelt before a shadow, swearing he would do no harm, and offer no disobedience.'},
+    {t:47,d:6.5,kind:'narr',text:'The same shadow — a small stone set beside it — spoke with three young Dearcan. Pursued them. Caught them. Questioned them.'},
+    {t:57,d:6.5,kind:'narr',text:'The Duat does not invent such things. It remembers them. And it was showing Kiet what the city was.'},
+    {t:68,d:6.5,kind:'narr',text:'Then it showed him one more. The one he would carry longest.'},
+  ]
+});
+
+/* ---------- SCENE 8 · THE KARNEN VISION — six steps (140s) centerpiece --- */
+SCENES.push({
+  id:'karnen', name:'VIII · The Vision of the Karnen', dur:140,
+  mood:{wind:0.02,windCut:200,drone:0.16,droneHz:40,pad:0.14,padHz:[196,246.9,293.7]},
+  draw(lt){
+    // Six "steps", each ~ a beat. Total inner ~ 8..128
+    const inside=ctx.createRadialGradient(VW/2,VH*0.52,10,VW/2,VH*0.52,VW*0.7);
+    inside.addColorStop(0,'#0d0518'); inside.addColorStop(1,'#040110');
+    ctx.fillStyle=inside; ctx.fillRect(0,0,VW,VH);
+    const cx=VW/2, cy=VH*0.60;
+    // step phases (seconds)
+    const S=[8,28,48,70,92,112,128]; // boundaries for steps 1..6
+    const step = lt<S[0]?0: lt<S[1]?1: lt<S[2]?2: lt<S[3]?3: lt<S[4]?4: lt<S[5]?5:6;
+    // The Karnen — acorn with triangle hat; rises over the vision
+    const kneel = step>=4? clamp(1-seg(lt,S[3],S[3]+6),0,1) : 1; // still kneeling until step 5
+    const risen = step>=4? seg(lt,S[3]+2,S[4]) : 0;
+    const age = step>=5? seg(lt,S[4]+4,S[5]+8) : 0;
+    const kY = VH*0.86 - risen*40;
+    const kR = lerp(70, 96, age);   // grows old and strong
+    // ---- red/orange/yellow tendrils (steps 1-3 build; consumed 3-4) ----
+    const redAmt = step<3? seg(lt,4,S[1]) : clamp(1 - seg(lt,S[2],S[3]) + (step>=5? seg(lt,S[4],S[4]+8):0),0,1);
+    drawTendrils(cx,cy, lt, redAmt, ['#c14953','#e8842c','#e8c34a'], step);
+    // black tendril returns at step 4/5
+    const blackAmt = (step>=4? seg(lt,S[3],S[3]+5)*(1-seg(lt,S[4]+6,S[5])) : 0);
+    if(blackAmt>0) drawTendrils(cx,cy,lt*1.2, blackAmt, ['#0a0710','#160a1e','#241033'], step, true);
+    // ---- white & violet response (steps 3-4 grow, consume red) ----
+    const whiteAmt = step>=2? seg(lt,S[1],S[3]) * (step>=4?1:1) : 0;
+    if(whiteAmt>0) drawWhiteViolet(cx,cy,lt, whiteAmt*(1-blackAmt*0.5));
+    // ---- the Karnen figure ----
+    ctx.save();
+    // when risen, wrap in white light + rubbermcfly
+    if(risen>0){ ctx.save(); ctx.globalAlpha=risen;
+      const wl=ctx.createRadialGradient(cx,kY-kR*0.5,0,cx,kY-kR*0.5,kR*2.2);
+      wl.addColorStop(0,rgba(C.white,0.5)); wl.addColorStop(0.5,rgba(C.violet,0.25)); wl.addColorStop(1,rgba(C.violet,0));
+      ctx.fillStyle=wl; ctx.beginPath(); ctx.arc(cx,kY-kR*0.5,kR*2.2,0,TAU); ctx.fill(); ctx.restore(); }
+    // figure — kneeling: draw lower & squashed; standing: normal
+    ctx.save(); ctx.translate(cx,kY); ctx.translate(-cx,-kY);
+    drawAcorn(cx, kY + kneel*30, {r:kR, color: age>0.4?'#8a5a8f':'#6f4a6e', cap:'#7a3b3b', triangleHat:true, state: risen>0.5?'idle':'idle', t:lt, face:1, glowEye: whiteAmt>0.5?C.violet:'#241a10'});
+    ctx.restore();
+    ctx.restore();
+    // rubbermcfly appear at step 5
+    if(step>=4){ const flies=[]; const rnd=mulberry32(88);
+      for(let i=0;i<14;i++){ flies.push({x:cx+(rnd()-0.5)*300, y:kY-40-(rnd())*160, r:2+rnd()*2, s:2+rnd()*3, p:rnd()*TAU, a:8+rnd()*10}); }
+      ctx.globalAlpha=clamp(seg(lt,S[4],S[4]+6),0,1); rubberMcFlies(flies,lt); ctx.globalAlpha=1; }
+    // shadow (returns without the stone at step 4)
+    if(step>=3 && blackAmt>0.05){ ctx.globalAlpha=blackAmt*0.8;
+      ctx.fillStyle='#05030a'; ctx.beginPath();
+      ctx.moveTo(cx+180,cy-140); ctx.quadraticCurveTo(cx+260,cy,cx+200,cy+180);
+      ctx.quadraticCurveTo(cx+150,cy,cx+150,cy-120); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1; }
+    // Xwi crown at the very end — she becomes a Xwi among Karnen
+    if(age>0.6){ ctx.globalAlpha=seg(lt,S[5],S[5]+6);
+      ctx.strokeStyle=rgba(C.violet,0.9); ctx.shadowColor=C.violet; ctx.shadowBlur=20; ctx.lineWidth=3;
+      for(let i=0;i<7;i++){ const a=-Math.PI+ i/6*Math.PI; const r1=kR*1.1, r2=kR*1.5;
+        ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r1, kY-kR*1.2+Math.sin(a)*r1*0.4); ctx.lineTo(cx+Math.cos(a)*r2, kY-kR*1.2+Math.sin(a)*r2*0.4); ctx.stroke(); }
+      ctx.shadowBlur=0; ctx.globalAlpha=1; }
+    vignette(0.5); grain(0.05);
+    fadeFromBlack(lt,2.5); fadeToBlack(lt,this.dur,4);
+  },
+  caps:[
+    {t:2,d:6,kind:'narr',text:'A Karnen — young — screaming in agony, pushing through what looked like nothing at all.'},
+    {t:10,d:6.5,kind:'narr',text:'The first step. And then he could see it: she was wrapped in dark red tendrils — some angled sharp as lightning, some smooth, most between.'},
+    {t:22,d:6,kind:'narr',text:'The second step. The tendrils writhed, and pushed into the young one.'},
+    {t:34,d:6,kind:'narr',text:'The third step. They grew ecstatic, feeding — red and orange and a sickly yellow.'},
+    {t:46,d:7,kind:'narr',text:'The fourth step. New colors joined the fight — a soft white, a deep violet, rising out of the Karnen herself.'},
+    {t:57,d:6.5,kind:'narr',text:'The white and violet consumed the red, the orange, the yellow. And she began, at last, to relax.'},
+    {t:68,d:7,kind:'narr',text:'Then the shadow was there — without its stone. In a wave the attacking colors returned, and a black tendril came with them.'},
+    {t:80,d:6,kind:'narr',text:'She knelt. She hunkered down beneath it.'},
+    {t:92,d:7,kind:'narr',text:'The fifth step. She fell forward into white light — and small glowing things, rubbermcfly, gathered to her. She breathed out. She stood.'},
+    {t:106,d:7,kind:'narr',text:'The sixth step out of the Duat: he saw her grow old, and strong, and lead.'},
+    {t:118,d:7,kind:'narr',text:'He saw her become a Xwi among the Karnen. The Duat had shown Kiet not only the wound — but that it could be survived.'},
+    {t:130,d:6,kind:'narr',text:'He held that. And he stepped up, into the shining city.'},
+  ]
+});
+
+/* ---------- SCENE 9 · INSIDE — the silent shining city (70s) ---------- */
+SCENES.push({
+  id:'city', name:'IX · The Silent City', dur:70,
+  mood:{wind:0.05,windCut:340,drone:0.14,droneHz:46,droneCut:300,pad:0.03},
+  draw(lt){
+    // emerge: quick white flash then street
+    const emerge=seg(lt,0,2.5);
+    drawStreet(lt,{vpx:VW*0.52});
+    // pale sheen — shiny even at night
+    ctx.globalAlpha=0.5+0.2*Math.sin(lt*0.6);
+    const sg=ctx.createLinearGradient(0,0,0,VH); sg.addColorStop(0,rgba('#cfe0ff',0.05)); sg.addColorStop(1,rgba('#cfe0ff',0));
+    ctx.fillStyle=sg; ctx.fillRect(0,0,VW,VH); ctx.globalAlpha=1;
+    // Kiet & party creeping, peering around a corner (foreground right)
+    drawAcorn(VW*0.80,VH*0.9,{r:70,color:'#b9863f',cap:'#3a2a17',weapon:'sword',state: lt%8<4?'idle':'walk',t:lt,face:-1,hood:true,cloakCol:'#241a12'});
+    drawAcorn(VW*0.90,VH*0.94,{r:56,color:'#7d6a8f',cap:'#3a3348',weapon:'staff',state:'idle',t:lt+1,face:-1,hood:true,cloakCol:'#20192a'});
+    // emptiness — a single shutter swinging? no; utter stillness. faint dust in light
+    if(emerge<1){ ctx.fillStyle=`rgba(244,239,226,${(1-emerge)*0.8})`; ctx.fillRect(0,0,VW,VH); }
+    vignette(0.55); grain(0.04);
+    fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:3,d:6,kind:'narr',text:'Their first impression, inside, was that the city was nearly shining — even at night.'},
+    {t:12,d:6,kind:'narr',text:'Then that it was bright, and utterly silent, and utterly still.'},
+    {t:22,d:6.5,kind:'narr',text:'They wandered, keeping low, peering around each corner before they took it.'},
+    {t:33,d:6.5,kind:'narr',text:'And the deeper into the city they went, the quieter it became — as though sound itself had been asked to leave.'},
+    {t:45,d:6,kind:'narr',text:'Then, past a long low building, they heard it. The faint clink of metal.'},
+    {t:56,d:6,kind:'narr',text:'They ducked into the shadows of an alley. And Kiet opened a small window through the Duat, to see inside.'},
+  ]
+});
+
+/* ---------- SCENE 10 · THE LOW BUILDING (peering through the Duat) (90s) -- */
+SCENES.push({
+  id:'lowbuilding', name:'X · The Low Building', dur:90,
+  mood:{wind:0.03,windCut:260,drone:0.16,droneHz:43,pad:0.04},
+  once(){ Audio2.ping(1200,0.1,'square',0.06,900); },
+  draw(lt){
+    bg('#070509');
+    // alley foreground frame (dark), and a glowing Duat "window" into the hall
+    ctx.fillStyle='#0a0709'; ctx.fillRect(0,0,VW,VH);
+    // Kiet at edge of frame holding the rip open
+    drawAcorn(VW*0.12,VH*0.92,{r:70,color:'#b9863f',cap:'#3a2a17',state:'idle',t:lt,face:1,glowEye:C.su,hood:true,cloakCol:'#241a12'});
+    // the window
+    const wx=VW*0.56, wy=VH*0.48, ww=360, wh=250;
+    const op=seg(lt,0,3);
+    drawRift(wx,wy,ww,wh,lt,op);
+    // scene inside, clipped to rift shape
+    if(lt>2){
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(wx,wy,ww*0.94,wh*0.9,0,0,TAU); ctx.clip();
+      // warm interior
+      const ig=ctx.createLinearGradient(0,wy-wh,0,wy+wh); ig.addColorStop(0,'#241a10'); ig.addColorStop(1,'#12100a');
+      ctx.fillStyle=ig; ctx.fillRect(wx-ww,wy-wh,ww*2,wh*2);
+      // floor
+      ctx.fillStyle='#1a140c'; ctx.fillRect(wx-ww,wy+40,ww*2,wh);
+      // a dozen men near the door (left), around a small Rokarvac (a glowing relic-device)
+      for(let i=0;i<12;i++){ const col=i%3?'#5a5347':'#4a4a52'; const x=wx-ww*0.7+ (i%6)*26; const y=wy-40+(i<6?0:36);
+        drawAcorn(x,y+70,{r:22,color:col,cap:shade(col,-25),state:'idle',t:lt*0.3+i,face:1}); }
+      // the Rokarvac — small device glowing between them
+      const rg=0.6+0.4*Math.sin(lt*3); ctx.fillStyle=rgba(C.eldi,rg); ctx.shadowColor=C.eldi; ctx.shadowBlur=16;
+      ctx.beginPath(); ctx.arc(wx-ww*0.55,wy+34,7,0,TAU); ctx.fill(); ctx.shadowBlur=0;
+      // women & children (right), eating quietly, flinching on the clink
+      const clink = Math.sin(lt*1.7)>0.96; // occasional
+      for(let i=0;i<9;i++){ const x=wx+ww*0.08+ (i%5)*34; const y=wy-10+(i<5?0:44);
+        const flinch = clink? -3: 0;
+        drawAcorn(x,y+90+flinch,{r: i%3? 18:24, color:'#8a7a55', cap:'#5a4a30', state:'idle', t:lt*0.2+i, face:-1}); }
+      // long table
+      ctx.fillStyle='#2e2214'; ctx.fillRect(wx+ww*0.02, wy+70, ww*0.8, 10);
+      ctx.restore();
+      // clink glints
+      if(Math.sin(lt*1.7)>0.9){ ctx.fillStyle=rgba('#fff',0.5); ctx.beginPath(); ctx.arc(wx+ww*0.3,wy+66,2,0,TAU); ctx.fill(); }
+    }
+    vignette(0.55); grain(0.04);
+    fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:4,d:6,kind:'narr',text:'Through the window in the world, the hall opened before him.'},
+    {t:12,d:6.5,kind:'narr',text:'A dozen men stood together near the door, speaking low over a small Rokarvac.'},
+    {t:22,d:7,kind:'narr',text:'And beyond them — women, and children none older than sixteen — eating as quietly as they were able.'},
+    {t:33,d:6.5,kind:'narr',text:'None of them spoke. And several flinched, hard, at the smallest clink of the dinnerware.'},
+    {t:44,d:6.5,kind:'narr',text:'Kiet watched a long moment, and let the anger settle into something colder and more useful.'},
+    {t:55,d:6.5,kind:'narr',text:'This was not a city that had fallen to a battle. It was a city being kept. Fed, and afraid, and kept.'},
+    {t:66,d:6,kind:'narr',text:'He drew back into the alley, to the two of his Dya’Can who had come this far with him.'},
+    {t:75,d:6,kind:'narr',text:'The rest of the band could hold the Thar Norvek at bay — so long as no living thing passed through their rifts.'},
+  ]
+});
+
+/* ---------- SCENE 11 · THE SPLIT (50s) ---------- */
+SCENES.push({
+  id:'split', name:'XI · Stamijan West, Naelst Stays', dur:50,
+  mood:{wind:0.05,windCut:340,drone:0.13,droneHz:47,pad:0.02},
+  draw(lt){
+    drawStreet(lt,{vpx:VW*0.5});
+    ctx.globalAlpha=0.3; const sg=ctx.createLinearGradient(0,0,0,VH); sg.addColorStop(0,rgba('#cfe0ff',0.06)); sg.addColorStop(1,rgba('#cfe0ff',0)); ctx.fillStyle=sg; ctx.fillRect(0,0,VW,VH); ctx.globalAlpha=1;
+    // three acorns in the alley — Kiet center, Stamijan (violet) going left/west, Naelst (green) staying
+    const kx=VW*0.5;
+    drawAcorn(kx,VH*0.9,{r:64,color:'#b9863f',cap:'#3a2a17',weapon:'sword',state:'idle',t:lt,face:1,hood:true,cloakCol:'#241a12'});
+    // Stamijan peeling off to the west (moves left as scene progresses)
+    const sMove=seg(lt,14,40); const sx=lerp(VW*0.40, VW*0.10, sMove);
+    drawAcorn(sx,VH*0.93,{r:58,color:'#7d6a8f',cap:'#3a3348',weapon:'staff',state: sMove>0&&sMove<1?'walk':'idle',t:lt+1,face:-1,hood:true,cloakCol:'#20192a'});
+    // Naelst staying, near the low-building side (right), watchful idle
+    drawAcorn(VW*0.66,VH*0.95,{r:58,color:'#6f8a6e',cap:'#33463a',weapon:'bow',state:'idle',t:lt+2,face:-1,hood:true,cloakCol:'#1c241d'});
+    vignette(0.55); grain(0.04);
+    fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:3,d:6.5,kind:'narr',text:'As the most senior among them, the choice fell to Kiet. He gave it quickly.'},
+    {t:11,d:5.5,kind:'kiet',text:'Stamijan — west. Learn the shape of this place. Naelst — you stay. Watch the low building.'},
+    {t:19,d:6,kind:'narr',text:'Naelst would hold the shadows by the hall. Stamijan would press into the far quarters.'},
+    {t:28,d:6.5,kind:'narr',text:'And Kiet would go toward the weather districts, where he judged the house of Otlið would stand.'},
+    {t:38,d:6,kind:'narr',text:'They parted without another word. In a city this quiet, words were a luxury none of them would spend.'},
+  ]
+});
+
+/* ---------- SCENE 12 · THE WRONG STREETS (60s) ---------- */
+SCENES.push({
+  id:'streets', name:'XII · What the Streets Kept', dur:60,
+  mood:{wind:0.05,windCut:300,drone:0.16,droneHz:42,droneCut:260,pad:0.02},
+  draw(lt){
+    // slowly panning street, Kiet walking alone toward higher districts
+    const pan=seg(lt,0,this.dur);
+    drawStreet(lt,{vpx: lerp(VW*0.42,VW*0.58,pan)});
+    // scrubbed-clean alley — but with maroon/brown streaks where cleaning failed
+    ctx.save();
+    ctx.globalAlpha=0.6;
+    const rnd=mulberry32(41);
+    for(let i=0;i<7;i++){ const x=rnd()*VW; const y=VH*0.6+rnd()*VH*0.3; const w=20+rnd()*90;
+      ctx.strokeStyle=rgba(C.bloodOld,0.5); ctx.lineWidth=3+rnd()*4;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.quadraticCurveTo(x+w*0.4,y+10,x+w,y+30+rnd()*20); ctx.stroke(); }
+    // a faint brown wash on the "too clean" stones
+    ctx.fillStyle=rgba('#4a3520',0.10); ctx.fillRect(0,VH*0.6,VW,VH*0.4);
+    ctx.restore(); ctx.globalAlpha=1;
+    // Kiet walking, center
+    drawAcorn(VW*0.5,VH*0.9,{r:74,color:'#b9863f',cap:'#3a2a17',weapon:'sword',state:'walk',t:lt,face:1,hood:true,cloakCol:'#241a12'});
+    // an exhausted man marching past the other way — near-dead but continuing
+    const mMove=(lt*30)%(VW+200); const mx=VW+120-mMove;
+    if(mx>-120){ drawAcorn(mx,VH*0.95,{r:52,color:'#5a5045',cap:'#3a342b',state:'walk',t:lt*0.6,face:-1}); }
+    vignette(0.6); grain(0.05);
+    fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:3,d:6,kind:'narr',text:'The higher streets told him more than any letter had.'},
+    {t:11,d:6.5,kind:'narr',text:'Alleyways scrubbed bare — too bare. And in the corners, a brown the scrubbing had not reached.'},
+    {t:21,d:6.5,kind:'narr',text:'Streaks of deep maroon where something had not been cleaned away cleanly, or quickly enough.'},
+    {t:32,d:6.5,kind:'narr',text:'Twice he passed men who looked ready to drop dead where they stood — and marched on, as if the choice were not theirs.'},
+    {t:43,d:6.5,kind:'narr',text:'On a high street he heard something worse than the silence. A family. Whispering, and weeping.'},
+    {t:53,d:5,kind:'narr',text:'He went toward it.'},
+  ]
+});
+
+/* ---------- SCENE 13 · OATHTAKEN — the family, the Gustniptune (90s) ------ */
+SCENES.push({
+  id:'oath', name:'XIII · OathTaken', dur:90,
+  mood:{wind:0.02,windCut:220,drone:0.18,droneHz:44,pad:0.05,padHz:[174.6,207.7,261.6]},
+  once(){ Audio2.heartbeat(true); },
+  draw(lt){
+    bg('#08060a');
+    // a battered bakery/inn doorway; splintered sign shaft; red runes "OathTaken"
+    // building face
+    ctx.fillStyle=shade(C.stone,-14); ctx.fillRect(0,VH*0.1,VW,VH);
+    ctx.strokeStyle='#140f08'; ctx.lineWidth=2;
+    for(let y=VH*0.14;y<VH;y+=50){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(VW,y); ctx.stroke(); }
+    // doorway
+    const dx=VW*0.5, dw=200, dtop=VH*0.30;
+    ctx.fillStyle='#0a0705'; ctx.fillRect(dx-dw/2,dtop,dw,VH-dtop);
+    // warm dim light within
+    const dg=ctx.createLinearGradient(dx,dtop,dx,VH); dg.addColorStop(0,rgba(C.eldi,0.14)); dg.addColorStop(1,rgba(C.eldi,0));
+    ctx.fillStyle=dg; ctx.fillRect(dx-dw/2,dtop,dw,VH-dtop);
+    // splintered sign shaft above the door
+    ctx.strokeStyle='#3a2a18'; ctx.lineWidth=8; ctx.beginPath(); ctx.moveTo(dx-40,dtop-10); ctx.lineTo(dx-46,dtop-46); ctx.stroke();
+    ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(dx-46,dtop-46); ctx.lineTo(dx-40,dtop-64); ctx.moveTo(dx-46,dtop-46); ctx.lineTo(dx-58,dtop-58); ctx.stroke();
+    // red runes above the doorway: "OathTaken" with the Rune of Permanence — glowing, "tried" (attempted to remove)
+    drawRunesOathTaken(dx, dtop-30, lt);
+    // the family huddled against the building, to the side of the door
+    const fx=VW*0.30;
+    // patriarch (larger), keeling over in pain when he tries to speak
+    const painPhase = Math.max(0, Math.sin(lt*0.9)); // he tries, then pain
+    const patKeel = (activeSpeaking(this.caps,lt,'patriarch')? Math.abs(Math.sin(lt*3))*20 : 0);
+    drawAcorn(fx, VH*0.94, {r:66, color:'#9a6a3a', cap:'#3a2a17', state:'idle', t:lt*0.5, face:1, cloakCol:'#241a12'});
+    // huddled family — smaller acorns, close, trembling
+    for(let i=0;i<4;i++){ const tremble=Math.sin(lt*8+i)*2;
+      drawAcorn(fx+70+i*46, VH*0.96, {r: i%2?34:42, color:'#8a7a55', cap:'#5a4a30', state:'idle', t:lt*0.4+i, face:-1});
+    }
+    // Kiet, stepped into a shadow near them (right), listening (Nae'Urverk shimmer)
+    drawAcorn(VW*0.82, VH*0.95, {r:60, color:'#b9863f', cap:'#3a2a17', state:'idle', t:lt, face:-1, glowEye:C.su, hood:true, cloakCol:'#1e150d'});
+    // Nae'Urverk — faint listening sigil floating between Kiet and the family
+    ctx.save(); ctx.globalAlpha=0.4+0.2*Math.sin(lt*3);
+    ctx.strokeStyle=rgba(C.su,0.6); ctx.lineWidth=1.5;
+    const nx=VW*0.62, ny=VH*0.55; ctx.beginPath(); ctx.arc(nx,ny,18,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(nx,ny,10,lt%TAU,lt%TAU+Math.PI); ctx.stroke(); ctx.restore();
+    vignette(0.6); grain(0.05);
+    fadeToBlack(lt,this.dur,4);
+  },
+  caps:[
+    {t:3,d:6,kind:'narr',text:'It had been a bakery once. An inn, perhaps. Both. Above the door, a splintered shaft where a sign once hung.'},
+    {t:12,d:7,kind:'rune',text:'“OATHTAKEN”'},
+    {t:13.5,d:6,kind:'narr',text:'Two runes, in deep red ink. Someone had tried to scrape them away. But Kiet could know the Rune of Permanence anywhere.'},
+    {t:22,d:6.5,kind:'narr',text:'He stepped through into a shadow beside them, and made a Nae’Urverk — a small listening — and held still.'},
+    {t:33,d:5.5,kind:'patriarch',text:'I have agreed … to the Gustniptune.'},
+    {t:40,d:6,kind:'narr',text:'The family gasped, and broke. Kiet did not yet know what the Gustniptune was. Only that the man had not agreed freely.'},
+    {t:50,d:6,kind:'narr',text:'Each time the father tried to tell them more, he keeled over in pain — as though the words themselves had been forbidden.'},
+    {t:60,d:5.5,kind:'patriarch',text:'It is — it is so that you — … — forgive me. Forgive —'},
+    {t:69,d:6.5,kind:'narr',text:'Gasping, he would try again. And again the pain took the words before they reached his children.'},
+    {t:79,d:6,kind:'narr',text:'Then, against Kiet’s chest, the Coin of Buzz — the Bzukot’lic — began to vibrate.'},
+  ]
+});
+
+/* ---------- SCENE 14 · THE RELIC, THE SIGNAL, THE REPORT (110s) ---------- */
+SCENES.push({
+  id:'relic', name:'XIV · The Bzukot’lic', dur:110,
+  mood:{wind:0.06,windCut:360,drone:0.16,droneHz:46,pad:0.03},
+  once(){ Audio2.heartbeat(false); },
+  draw(lt){
+    drawStreet(lt,{vpx:VW*0.5});
+    // Kiet in the street, holding the relic (a glowing coin on his chest)
+    const kx=VW*0.5;
+    // walking a few blocks: pan the street horizontally between vibrations
+    const walkT=seg(lt,10,40);
+    drawAcorn(kx, VH*0.9, {r:76, color:'#b9863f', cap:'#3a2a17', weapon:'sword', state: (walkT>0&&walkT<1)?'walk':'idle', t:lt, face:1, hood:true, cloakCol:'#241a12'});
+    // the relic glow on chest, pulsing on vibrations
+    const vibTimes=[3, 42, 60]; // first (on chest), third (all ready), and opening portal
+    let vib=0; for(const vt of vibTimes){ vib+=Math.max(0, 1-Math.abs(lt-vt))*1; }
+    vib=clamp(vib,0,1);
+    ctx.save(); ctx.globalAlpha=0.7+0.3*vib;
+    const rg=ctx.createRadialGradient(kx+6,VH*0.9-40,0,kx+6,VH*0.9-40,40+vib*30);
+    rg.addColorStop(0,rgba(C.gold,0.9)); rg.addColorStop(1,rgba(C.gold,0));
+    ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(kx+6,VH*0.9-40,40+vib*30,0,TAU); ctx.fill(); ctx.restore();
+    // when portal opens (after ~66s): a Nae'Urverk to Stamijan, then Naelst reporting
+    if(lt>66){
+      const op=seg(lt,66,70);
+      const px=VW*0.72, py=VH*0.5;
+      drawRift(px,py,180,160,lt,op);
+      // Naelst's face/silhouette visible through it, speaking
+      if(lt>68){ ctx.save(); ctx.beginPath(); ctx.ellipse(px,py,168,150,0,0,TAU); ctx.clip();
+        const ig=ctx.createLinearGradient(0,py-160,0,py+160); ig.addColorStop(0,'#141a12'); ig.addColorStop(1,'#0a0d08'); ctx.fillStyle=ig; ctx.fillRect(px-180,py-160,360,320);
+        drawAcorn(px,py+120,{r:70,color:'#6f8a6e',cap:'#33463a',state:'idle',t:lt,face:1,glowEye:C.su}); ctx.restore(); }
+    }
+    vignette(0.55); grain(0.04);
+    fadeToBlack(lt,this.dur,3.5);
+  },
+  once_fired:false,
+  caps:[
+    {t:3,d:6,kind:'narr',text:'The Bzukot’lic. He drew back to the street, and triggered the relic once — a call, sent silent through the Duat.'},
+    {t:12,d:6.5,kind:'narr',text:'He walked. Perhaps a Nae’s worth of blocks — that is, a few; the Dya’Can name their distances after one another.'},
+    {t:24,d:6.5,kind:'narr',text:'One vibration, to Stamijan in the west. A second, waiting. He walked, and he counted, and he watched the empty windows.'},
+    {t:38,d:6,kind:'narr',text:'Then the third vibration came. Three. It meant the same in any of their hands: all of us are ready.'},
+    {t:48,d:6.5,kind:'narr',text:'Kiet held the relic and opened Stamijan’s Nae’Urverk. As the portal rose, he triggered the relic again.'},
+    {t:60,d:5.5,kind:'narr',text:'And on the other side, Naelst began at once to speak.'},
+    {t:70,d:7,kind:'naelst',text:'A group — eight strong — has been marching the low building. They’ve stopped now, at the door to the main hall.'},
+    {t:80,d:6.5,kind:'naelst',text:'They’re talking. About how best to “serve justice” to the folk inside.'},
+    {t:89,d:6,kind:'narr',text:'Justice. The word they used for whatever the Gustniptune truly was.'},
+    {t:97,d:6.5,kind:'kiet',text:'Hold. Both of you. I’m bringing Stamijan to you now.'},
+  ]
+});
+
+/* ---------- SCENE 15 · THE REUNION at the low building + END (120s) ------ */
+SCENES.push({
+  id:'reunion', name:'XV · At the Low Building', dur:120,
+  mood:{wind:0.10,windCut:520,drone:0.18,droneHz:50,pad:0.06,padHz:[196,261.6,329.6]},
+  once(){ Audio2.rip(); },
+  draw(lt){
+    bg('#08060a');
+    drawStreet(lt,{vpx:VW*0.5});
+    ctx.globalAlpha=0.3; const sg=ctx.createLinearGradient(0,0,0,VH); sg.addColorStop(0,rgba('#cfe0ff',0.06)); sg.addColorStop(1,rgba('#cfe0ff',0)); ctx.fillStyle=sg; ctx.fillRect(0,0,VW,VH); ctx.globalAlpha=1;
+    // Kiet steps through the Duat, grabs Stamijan, brings him back
+    // phase A (0-14): rift opens, Kiet + Stamijan step through
+    // phase B (14-40): the three gather in shadow near the low building
+    // phase C (40+): the eight approach the hall door in the distance; hold on resolve
+    const px=VW*0.36, py=VH*0.62;
+    if(lt<16){ const op=seg(lt,0,3)*(1-seg(lt,12,16)); drawRift(px,py,150,150,lt,op); }
+    // the low building down the street (right), a warm-lit door + 8 figures gathering at it
+    const bx=VW*0.82, by=VH*0.5;
+    ctx.fillStyle='#12100a'; ctx.fillRect(bx-90,by-30,180,VH-by+30); // low long building block
+    const doorG=ctx.createLinearGradient(bx,by,bx,VH); doorG.addColorStop(0,rgba(C.eldi,0.12)); doorG.addColorStop(1,rgba(C.eldi,0));
+    ctx.fillStyle=doorG; ctx.fillRect(bx-30,by-10,60,VH-by+10);
+    // eight menacing figures gathering at the door (appear over phase C)
+    if(lt>40){ const app=seg(lt,40,60);
+      for(let i=0;i<8;i++){ if(i/8>app) break; const x=bx-60+ (i%4)*30; const y=by+60+(i<4?0:20);
+        drawAcorn(x,y,{r:20,color:'#4a4a52',cap:'#2a2a30',weapon:'spear',state:'idle',t:lt*0.4+i,face:-1}); } }
+    // the three Dya'Can in the near shadow (left-center), resolute
+    const kx=VW*0.34;
+    // Kiet
+    drawAcorn(kx, VH*0.9, {r:72, color:'#b9863f', cap:'#3a2a17', weapon:'sword', state:'idle', t:lt, face:-1, hood:true, cloakCol:'#241a12', glowEye: lt>70?C.su:null});
+    // Stamijan (just arrived)
+    const stArr= clamp(1-seg(lt,14,20),0,1); // squeeze in from the rift
+    const stx = lerp(px+20, kx+70, seg(lt,10,24));
+    drawAcorn(stx, VH*0.93, {r:60, color:'#7d6a8f', cap:'#3a3348', weapon:'staff', state: seg(lt,10,24)>0&&seg(lt,10,24)<1?'walk':'idle', t:lt+1, face:-1, hood:true, cloakCol:'#20192a'});
+    // Naelst
+    drawAcorn(kx-90, VH*0.95, {r:60, color:'#6f8a6e', cap:'#33463a', weapon:'bow', state:'idle', t:lt+2, face:-1, hood:true, cloakCol:'#1c241d'});
+    // Sunear'Zikhron beginning to brighten the sky slit above (the timing is right)
+    if(lt>50){ ctx.globalAlpha=seg(lt,50,90)*0.6; sunearVeil(lt*0.3, 0.8); ctx.globalAlpha=1; }
+    vignette(0.55); grain(0.04);
+
+    // ---- END CARD sequence (last ~24s) ----
+    const endStart=this.dur-26;
+    if(lt>endStart){ const ea=seg(lt,endStart,endStart+3);
+      ctx.fillStyle=`rgba(0,0,0,${ea})`; ctx.fillRect(0,0,VW,VH); }
+    fadeToBlack(lt,this.dur,3);
+  },
+  caps:[
+    {t:3,d:6,kind:'narr',text:'Kiet stepped through the Duat, and crossed the whole of the city in a stride.'},
+    {t:11,d:6,kind:'narr',text:'He took Stamijan by the arm — and brought him back, to the low building, to Naelst.'},
+    {t:20,d:6.5,kind:'narr',text:'The three of them stood together again in the shadow by the hall, and took the measure of it.'},
+    {t:30,d:6,kind:'stam',text:'The whole far quarter is the same. Fed. Frightened. Kept.'},
+    {t:38,d:6,kind:'naelst',text:'Eight at the door now. And they mean to begin their “justice” before the night is out.'},
+    {t:47,d:6,kind:'kiet',text:'Then we begin first.'},
+    {t:56,d:6.5,kind:'narr',text:'Above them the sky began, at last, to shine — the Sunear’Zikhron, arriving exactly when it was meant to.'},
+    {t:65,d:6.5,kind:'narr',text:'Everyone had always met the Sunear’Zikhron with reverence. Kiet meant to give it something to witness.'},
+    {t:75,d:6,kind:'mind',text:'I feel you from the rise, Kiet. When you are ready to be loud — I am coming.'},
+    {t:84,d:6,kind:'kiet',text:'Be ready, Jhealanil. It is nearly time.'},
+    // end cards
+    {t:96,d:6.5,kind:'title',text:'Here the first telling ends.',y:VH*0.42,size:36},
+    {t:97,d:6.5,kind:'narr',text:'What Kiet did in Aakalay that night is another part of the legend.',y:VH*0.56,size:24},
+    {t:106,d:9,kind:'title',text:'da ávErk á Aakalay',y:VH*0.44,size:46},
+    {t:107,d:8,kind:'narr',text:'The Legend of Aakalay · Part the First',y:VH*0.56,size:22},
+  ]
+});
+
+/* helper: is a given caption kind currently speaking (for lip/pain sync) */
+function activeSpeaking(caps,lt,kind){ const a=activeCaption(caps,lt); return a && a.cap.kind===kind; }
+
+/* the OathTaken runes: two red glyphs + rune of permanence, partly scraped */
+function drawRunesOathTaken(cx,cy,t){
+  ctx.save();
+  const glow=0.5+0.3*Math.sin(t*2);
+  ctx.strokeStyle=rgba(C.red,0.85); ctx.lineWidth=4; ctx.lineCap='round';
+  ctx.shadowColor=C.red; ctx.shadowBlur=12*glow;
+  // rune 1 — angular
+  ctx.beginPath(); ctx.moveTo(cx-70,cy+16); ctx.lineTo(cx-70,cy-18); ctx.lineTo(cx-46,cy-2); ctx.lineTo(cx-46,cy+16); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-70,cy-2); ctx.lineTo(cx-52,cy-2); ctx.stroke();
+  // rune 2 — spiral-ish
+  ctx.beginPath(); ctx.moveTo(cx-10,cy-18); ctx.lineTo(cx-10,cy+16); ctx.moveTo(cx-10,cy-18); ctx.lineTo(cx+14,cy-18); ctx.lineTo(cx+14,cy+2); ctx.lineTo(cx-10,cy+2); ctx.stroke();
+  // Rune of Permanence — a ringed cross, unmistakable; scrape-marks over it but it persists
+  ctx.beginPath(); ctx.arc(cx+56,cy-2,16,0,TAU); ctx.moveTo(cx+56,cy-20); ctx.lineTo(cx+56,cy+16); ctx.moveTo(cx+40,cy-2); ctx.lineTo(cx+72,cy-2); ctx.stroke();
+  ctx.shadowBlur=0;
+  // scrape marks (grey), tried but failed
+  ctx.strokeStyle=rgba('#9a8a6a',0.4); ctx.lineWidth=6;
+  ctx.beginPath(); ctx.moveTo(cx-80,cy+20); ctx.lineTo(cx+40,cy-24); ctx.moveTo(cx-30,cy+22); ctx.lineTo(cx+78,cy-18); ctx.stroke();
+  ctx.restore();
+}
+
+/* tendrils for the Karnen vision */
+function drawTendrils(cx,cy,t,amt,cols,step,dark){
+  if(amt<=0.01) return;
+  ctx.save();
+  const N=dark?4:14;
+  for(let i=0;i<N;i++){
+    const a=i/N*TAU + (dark?0.3:0);
+    const len=lerp(40,170,amt)* (0.7+0.5*Math.sin(i*1.7));
+    const col=cols[i%cols.length];
+    ctx.strokeStyle=rgba(col,0.55*amt); ctx.lineWidth=dark?4:3; ctx.lineCap='round';
+    ctx.shadowColor=col; ctx.shadowBlur=8*amt;
+    const sharp = i%3===0; // some sharply angled like lightning
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    if(sharp){ let x=cx,y=cy; const segs=4; for(let s=1;s<=segs;s++){ const f=s/segs;
+        x=cx+Math.cos(a)*len*f + (Math.random()-0.5)*0; // deterministic-ish
+        const jx=Math.cos(a+ (s%2?0.5:-0.5))*len*0.16;
+        y=cy+Math.sin(a)*len*f;
+        ctx.lineTo(cx+Math.cos(a)*len*f + Math.cos(a+ (s%2?1:-1))*20, cy+Math.sin(a)*len*f + Math.sin(a+(s%2?1:-1))*20); }
+    } else { const mx=cx+Math.cos(a)*len*0.5 - Math.sin(a)*30*Math.sin(t*2+i);
+      const my=cy+Math.sin(a)*len*0.5 + Math.cos(a)*30*Math.sin(t*2+i);
+      ctx.quadraticCurveTo(mx,my, cx+Math.cos(a)*len, cy+Math.sin(a)*len); }
+    ctx.stroke();
+    // writhing tip pushing inward (into the young one)
+    const push=Math.sin(t*3+i)*4*amt;
+    ctx.fillStyle=rgba(col,0.6*amt);
+    ctx.beginPath(); ctx.arc(cx+Math.cos(a)*(len*0.2+push), cy+Math.sin(a)*(len*0.2+push), 3,0,TAU); ctx.fill();
+  }
+  ctx.shadowBlur=0; ctx.restore();
+}
+function drawWhiteViolet(cx,cy,t,amt){
+  ctx.save();
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,lerp(30,180,amt));
+  g.addColorStop(0,rgba(C.white,0.55*amt)); g.addColorStop(0.5,rgba(C.violet,0.35*amt)); g.addColorStop(1,rgba(C.violet,0));
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,lerp(30,180,amt),0,TAU); ctx.fill();
+  // radiant filaments outward, consuming
+  const N=12;
+  for(let i=0;i<N;i++){ const a=i/N*TAU - t*0.3; const len=lerp(20,150,amt)*(0.8+0.3*Math.sin(t*3+i));
+    ctx.strokeStyle=rgba(i%2?C.white:C.violet,0.5*amt); ctx.lineWidth=2; ctx.shadowColor=C.violet; ctx.shadowBlur=10*amt;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*len, cy+Math.sin(a)*len); ctx.stroke(); }
+  ctx.shadowBlur=0; ctx.restore();
+}
+
+/* ============================================================================
+   8. TIMELINE / PLAYER
+   ==========================================================================*/
+let starts=[], total=0;
+(function computeStarts(){ let acc=0; for(const s of SCENES){ starts.push(acc); acc+=s.dur; } total=acc; })();
+function fmt(s){ s=Math.max(0,Math.floor(s)); const m=Math.floor(s/60); const ss=(s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
+
+let T=0, playing=false, lastRAF=0, started=false;
+let firedOnce = new Set();
+let curSceneIdx=-1;
+
+function sceneAt(t){ let i=SCENES.length-1; for(let k=0;k<SCENES.length;k++){ if(t< starts[k]+SCENES[k].dur){ i=k; break; } } return i; }
+
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(0.05,(now-lastRAF)/1000||0); lastRAF=now;
+  if(playing){ T+=dt; if(T>=total){ T=total; playing=false; updatePlayBtn(); } }
+  const idx=sceneAt(T);
+  const sc=SCENES[idx];
+  const lt=T-starts[idx];
+  // scene change
+  if(idx!==curSceneIdx){
+    curSceneIdx=idx;
+    Audio2.mood(sc.mood||{});
+    document.getElementById('scenelabel').textContent=sc.name;
+    // reset heartbeat unless the scene manages it
+    if(sc.id!=='oath' && sc.id!=='relic') Audio2.heartbeat(false);
+  }
+  // once-hooks (fire when we cross into their trigger window while playing)
+  const key=sc.id;
+  if(sc.once && !firedOnce.has(key) && lt>0.05 && playing){ sc.once(); firedOnce.add(key); }
+  // draw into virtual space, letterboxed
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // black outside stage
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,cv.width/DPR,cv.height/DPR);
+  ctx.save();
+  ctx.translate(viewRect.x,viewRect.y); ctx.scale(viewRect.scale,viewRect.scale);
+  // clip to stage
+  ctx.beginPath(); ctx.rect(0,0,VW,VH); ctx.clip();
+  try{ sc.draw(lt); }catch(e){ /* keep the film running */ bg('#0c0a07'); }
+  // captions on top (within stage)
+  const ac=activeCaption(sc.caps, lt);
+  if(ac) drawCaption(ac.cap, ac.a);
+  ctx.restore();
+  // transport time / progress
+  updateTransport();
+}
+requestAnimationFrame(frame);
+
+/* ---- transport UI ---- */
+const bar=document.getElementById('bar');
+const trackEl=document.getElementById('track');
+const fillEl=document.getElementById('trackfill');
+const knobEl=document.getElementById('knob');
+const timeEl=document.getElementById('time');
+const playBtn=document.getElementById('play');
+function updateTransport(){
+  const p=total? T/total:0;
+  fillEl.style.width=(p*100)+'%';
+  knobEl.style.left=(p*100)+'%';
+  timeEl.textContent=`${fmt(T)} / ${fmt(total)}`;
+}
+function updatePlayBtn(){ playBtn.textContent=playing?'❚❚':'▶'; }
+// chapter marks
+(function chapters(){ const wrap=document.getElementById('chapters');
+  starts.forEach((st,i)=>{ if(i===0) return; const m=document.createElement('div'); m.className='chapmark'; m.style.left=(st/total*100)+'%'; wrap.appendChild(m); });
+})();
+function seekTo(clientX){ const r=trackEl.getBoundingClientRect(); const p=clamp((clientX-r.left)/r.width,0,1); T=p*total;
+  // reset once-hooks for scenes at/after this point so stingers can re-fire appropriately
+  firedOnce.clear(); curSceneIdx=-1;
+}
+let scrubbing=false;
+trackEl.addEventListener('pointerdown',e=>{scrubbing=true; seekTo(e.clientX); trackEl.setPointerCapture(e.pointerId);});
+trackEl.addEventListener('pointermove',e=>{ if(scrubbing) seekTo(e.clientX); });
+trackEl.addEventListener('pointerup',e=>{scrubbing=false;});
+
+playBtn.onclick=()=>{ if(T>=total){ T=0; firedOnce.clear(); } playing=!playing; Audio2.resume(); updatePlayBtn(); };
+document.getElementById('restart').onclick=()=>{ T=0; firedOnce.clear(); curSceneIdx=-1; playing=true; Audio2.resume(); updatePlayBtn(); };
+document.getElementById('mute').onclick=()=>{ const m=Audio2.toggleMute(); document.getElementById('mute').textContent=m?'✕':'♪'; };
+document.getElementById('full').onclick=()=>{ if(!document.fullscreenElement) stageEl.requestFullscreen&&stageEl.requestFullscreen(); else document.exitFullscreen&&document.exitFullscreen(); };
+
+/* show/hide the bar on activity */
+let hideTimer=null;
+function showBar(){ bar.classList.add('show'); stageEl.classList.remove('hidecursor'); clearTimeout(hideTimer);
+  hideTimer=setTimeout(()=>{ if(playing){ bar.classList.remove('show'); stageEl.classList.add('hidecursor'); } },2600); }
+window.addEventListener('pointermove',showBar);
+window.addEventListener('pointerdown',showBar);
+
+/* keyboard */
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){ e.preventDefault(); playBtn.onclick(); showBar(); }
+  else if(e.key==='m'||e.key==='M'){ document.getElementById('mute').onclick(); }
+  else if(e.key==='f'||e.key==='F'){ document.getElementById('full').onclick(); }
+  else if(e.key==='ArrowRight'){ T=Math.min(total,T+10); firedOnce.clear(); curSceneIdx=-1; showBar(); }
+  else if(e.key==='ArrowLeft'){ T=Math.max(0,T-10); firedOnce.clear(); curSceneIdx=-1; showBar(); }
+});
+
+/* ---- Begin ---- */
+document.getElementById('runtimeLabel').textContent = `running time · ${fmt(total)}`;
+document.getElementById('begin').onclick=()=>{
+  Audio2.init(); Audio2.resume();
+  const veil=document.getElementById('veil'); veil.classList.add('gone');
+  setTimeout(()=>veil.remove(),1300);
+  started=true; playing=true; T=0; curSceneIdx=-1; updatePlayBtn(); showBar();
+};
+</script>
+</body>
+</html>
