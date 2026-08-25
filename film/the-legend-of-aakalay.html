@@ -770,6 +770,13 @@ const Audio2 = (function(){
     const freqs=[220,277.2,329.6]; bed.pad={g:pg,osc:[]};
     for(const f of freqs){ const o=actx.createOscillator(); o.type='triangle'; o.frequency.value=f;
       const g=actx.createGain(); g.gain.value=0.33; o.connect(g); g.connect(pg); o.start(); bed.pad.osc.push(o); }
+    // music bus — the procedural score, soft and low-passed, sitting under the ambience
+    const mBus=actx.createGain(); mBus.gain.value=0.0001;
+    const mLp=actx.createBiquadFilter(); mLp.type='lowpass'; mLp.frequency.value=2400;
+    mBus.connect(mLp); mLp.connect(master);
+    bed.music={bus:mBus, lp:mLp};
+    startScheduler();
+    if(MUSIC_FILE) useTrack(MUSIC_FILE);   // ← drop in your own track later (see MUSIC_FILE below)
     // heartbeat via periodic — handled by scheduler flag
   }
   function T(){ return actx?actx.currentTime:0; }
@@ -815,9 +822,97 @@ const Audio2 = (function(){
     if(on&&!hb){ hb=setInterval(()=>{ if(muted)return; ping(60,0.18,'sine',0.28,42); setTimeout(()=>ping(56,0.16,'sine',0.2,40),150); }, 1100); }
     if(!on&&hb){ clearInterval(hb); hb=null; }
   }
+  /* -------- PROCEDURAL SCORE --------------------------------------------
+     A small note-scheduler plays a per-act musical cue (melody + bass, some
+     with an arpeggio) in a chosen mode. Cues crossfade when the scene changes.
+     To use YOUR OWN recorded track instead: set MUSIC_FILE below to its path
+     (e.g. 'aakalay-score.mp3', placed next to this HTML). The file then plays
+     as the score and the synth cues step aside automatically. */
+  const MUSIC_FILE = null;  // ← e.g. 'aakalay-score.mp3' to swap in a real track
+
+  const SCALES = {
+    aeolian:[0,2,3,5,7,8,10], dorian:[0,2,3,5,7,9,10], phrygian:[0,1,3,5,7,8,10],
+    major:[0,2,4,5,7,9,11], lydian:[0,2,4,6,7,9,11]
+  };
+  function degSemi(scale,deg){ const n=scale.length; const idx=((deg%n)+n)%n; return scale[idx]+12*Math.floor(deg/n); }
+  function hz(root,scale,deg){ return root*Math.pow(2, degSemi(scale,deg)/12); }
+  const _=null;  // rest, for readable arrays
+  // each mel/bass/arp array is a step grid of eighth-notes (loops by modulo)
+  const CUES = {
+    title:  {bpm:52, root:146.83, scale:'aeolian', bright:2200, busGain:0.5, melType:'triangle', melGain:0.13,
+             mel:[0,_,2,_, 3,_,4,_, 3,_,2,_, 0,_,_,_], bass:[0,_,_,_,_,_,_,_, -3,_,_,_,_,_,_,_]},
+    ride:   {bpm:104, root:146.83, scale:'dorian', bright:3000, busGain:0.62, melType:'triangle', melGain:0.12, bassType:'triangle', bassGain:0.14,
+             mel:[7,_,_,_, 6,_,4,_, 5,_,_,_, 4,_,2,_], bass:[0,_,0,_,4,_,0,_, -3,_,-3,_,3,_,0,_]},
+    intimate:{bpm:60, root:220, scale:'aeolian', bright:2400, busGain:0.42, melType:'triangle', melGain:0.10, melLen:0.9,
+             mel:[0,2,4,2, 0,2,4,2, -1,1,3,1, -1,1,3,1], bass:[0,_,_,_,_,_,_,_, -1,_,_,_,_,_,_,_]},
+    dread:  {bpm:50, root:130.81, scale:'phrygian', bright:1400, busGain:0.34, melType:'sine', melGain:0.11,
+             mel:[0,_,_,_,_,_,_,_, 1,_,_,_,_,_,_,_], bass:[0,_,_,_,_,_,_,_,0,_,_,_,_,_,_,_]},
+    vision: {bpm:60, root:196, scale:'dorian', bright:3400, busGain:0.44, melType:'sine', melGain:0.10, melLen:2.4,
+             mel:[7,_,_,_, 9,_,_,_, 11,_,_,_, 9,_,7,_], bass:[0,_,_,_,_,_,_,_, 4,_,_,_,_,_,_,_]},
+    hush:   {bpm:48, root:164.81, scale:'aeolian', bright:1500, busGain:0.24, melType:'sine', melGain:0.09, melLen:3.0,
+             mel:[0,_,_,_,_,_,_,_, _,_,_,_, 2,_,_,_], bass:[0,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]},
+    tragic: {bpm:54, root:174.61, scale:'aeolian', bright:2000, busGain:0.42, melType:'triangle', melGain:0.12,
+             mel:[4,_,3,_, 2,_,1,_, 0,_,_,_, -3,_,_,_], bass:[0,_,_,_,4,_,_,_, -3,_,_,_,-3,_,_,_]},
+    rising: {bpm:72, root:146.83, scale:'aeolian', bright:2600, busGain:0.46, melType:'triangle', melGain:0.11,
+             mel:[0,_,2,_, 3,_,4,_, 2,_,4,_, 5,_,4,_], bass:[0,_,_,_,4,_,_,_,0,_,_,_,4,_,_,_], arp:[0,4,7,4,0,4,7,4], arpGain:0.045},
+    resolve:{bpm:58, root:146.83, scale:'dorian', bright:2600, busGain:0.5, melType:'triangle', melGain:0.12,
+             mel:[0,_,2,_, 4,_,2,_, 3,_,_,_, 0,_,_,_], bass:[0,_,_,_,4,_,_,_, -3,_,_,_,0,_,_,_]}
+  };
+
+  let curCue=null, pendingCue=null, playing=false, externalTrack=null;
+  let stepIdx=0, nextStepTime=0, schedTimer=null;
+  function voice(freq, tStart, dur, type, gain){
+    const o=actx.createOscillator(); o.type=type||'triangle'; o.frequency.value=freq;
+    const g=actx.createGain(); const a=0.02, r=Math.min(0.28,dur*0.4);
+    g.gain.setValueAtTime(0.0001,tStart);
+    g.gain.linearRampToValueAtTime(gain,tStart+a);
+    g.gain.setValueAtTime(gain,tStart+Math.max(a,dur-r));
+    g.gain.exponentialRampToValueAtTime(0.0008,tStart+dur);
+    o.connect(g); g.connect(bed.music.bus); o.start(tStart); o.stop(tStart+dur+0.05);
+  }
+  function tick(){
+    if(!actx){ return; }
+    if(!playing || muted || externalTrack || !curCue){ nextStepTime=T()+0.05; return; }
+    const c=CUES[curCue]; if(!c){ return; }
+    const stepDur=(60/c.bpm)/2;              // one eighth-note
+    let guard=0;
+    while(nextStepTime < T()+0.13 && guard++<32){
+      const md=c.mel[stepIdx % c.mel.length];
+      if(md!=null) voice(hz(c.root, SCALES[c.scale], md), nextStepTime, stepDur*(c.melLen||1.8), c.melType, c.melGain||0.12);
+      const bd=c.bass[stepIdx % c.bass.length];
+      if(bd!=null) voice(hz(c.root/2, SCALES[c.scale], bd), nextStepTime, stepDur*1.9, c.bassType||'sine', c.bassGain||0.11);
+      if(c.arp){ const ad=c.arp[stepIdx % c.arp.length]; if(ad!=null) voice(hz(c.root*2, SCALES[c.scale], ad), nextStepTime, stepDur*0.9, 'triangle', c.arpGain||0.05); }
+      stepIdx++; nextStepTime+=stepDur;
+    }
+  }
+  function startScheduler(){ if(schedTimer) return; nextStepTime=T()+0.1; schedTimer=setInterval(tick,25); }
+  function music(name){
+    if(!name || name===curCue) return;
+    if(!actx){ pendingCue=name; return; }
+    ramp(bed.music.bus.gain, 0.0001, 0.3);       // dip out of the old cue
+    setTimeout(()=>{ curCue=name; const c=CUES[name];
+      if(c){ ramp(bed.music.lp.frequency, c.bright||2400, 0.7);
+        ramp(bed.music.bus.gain, (playing&&!muted&&!externalTrack)?(c.busGain!=null?c.busGain:0.5):0.0001, 0.9); }
+    }, 300);
+  }
+  function setPlaying(p){ playing=p;
+    if(actx&&bed.music&&!externalTrack){ const c=CUES[curCue];
+      ramp(bed.music.bus.gain, (p&&!muted&&c)?(c.busGain!=null?c.busGain:0.5):0.0001, 0.4); }
+    if(externalTrack){ try{ p?externalTrack.el.play():externalTrack.el.pause(); }catch(e){} }
+  }
+  function useTrack(url){
+    try{
+      const el=new Audio(); el.src=url; el.loop=true; el.preload='auto'; el.crossOrigin='anonymous';
+      const src=actx.createMediaElementSource(el); const g=actx.createGain(); g.gain.value=0.6;
+      src.connect(g); g.connect(master); externalTrack={el,g};
+      ramp(bed.music.bus.gain, 0.0001, 0.5);     // step the synth score aside
+      if(playing) el.play().catch(()=>{});
+    }catch(e){ /* leave the synth score running */ }
+  }
+
   return {
-    init, mood, ping, rip, relic, heartbeat,
-    resume(){ if(actx&&actx.state==='suspended') actx.resume(); if(pending){mood(pending);} },
+    init, mood, ping, rip, relic, heartbeat, music, setPlaying, useTrack,
+    resume(){ if(actx&&actx.state==='suspended') actx.resume(); if(pending){mood(pending);} if(pendingCue){ const n=pendingCue; pendingCue=null; music(n);} },
     toggleMute(){ muted=!muted; if(master) ramp(master.gain, muted?0:0.9, 0.3); return muted; },
     isMuted(){ return muted; }
   };
@@ -1632,10 +1727,17 @@ let curSceneIdx=-1;
 
 function sceneAt(t){ let i=SCENES.length-1; for(let k=0;k<SCENES.length;k++){ if(t< starts[k]+SCENES[k].dur){ i=k; break; } } return i; }
 
+/* which musical cue plays over each scene */
+const MUSIC_CUES = {
+  open:'title', ride:'ride', letters:'intimate', approach:'dread', gate:'dread',
+  still:'dread', duat:'vision', karnen:'vision', city:'hush', lowbuilding:'hush',
+  split:'hush', streets:'hush', oath:'tragic', relic:'rising', reunion:'resolve'
+};
+
 function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(0.05,(now-lastRAF)/1000||0); lastRAF=now;
-  if(playing){ T+=dt; if(T>=total){ T=total; playing=false; updatePlayBtn(); } }
+  if(playing){ T+=dt; if(T>=total){ T=total; playing=false; Audio2.setPlaying(false); updatePlayBtn(); } }
   const idx=sceneAt(T);
   const sc=SCENES[idx];
   const lt=T-starts[idx];
@@ -1643,6 +1745,7 @@ function frame(now){
   if(idx!==curSceneIdx){
     curSceneIdx=idx;
     Audio2.mood(sc.mood||{});
+    Audio2.music(MUSIC_CUES[sc.id]);
     document.getElementById('scenelabel').textContent=sc.name;
     // reset heartbeat unless the scene manages it
     if(sc.id!=='oath' && sc.id!=='relic') Audio2.heartbeat(false);
@@ -1696,8 +1799,8 @@ trackEl.addEventListener('pointerdown',e=>{scrubbing=true; seekTo(e.clientX); tr
 trackEl.addEventListener('pointermove',e=>{ if(scrubbing) seekTo(e.clientX); });
 trackEl.addEventListener('pointerup',e=>{scrubbing=false;});
 
-playBtn.onclick=()=>{ if(T>=total){ T=0; firedOnce.clear(); } playing=!playing; Audio2.resume(); updatePlayBtn(); };
-document.getElementById('restart').onclick=()=>{ T=0; firedOnce.clear(); curSceneIdx=-1; playing=true; Audio2.resume(); updatePlayBtn(); };
+playBtn.onclick=()=>{ if(T>=total){ T=0; firedOnce.clear(); } playing=!playing; Audio2.resume(); Audio2.setPlaying(playing); updatePlayBtn(); };
+document.getElementById('restart').onclick=()=>{ T=0; firedOnce.clear(); curSceneIdx=-1; playing=true; Audio2.resume(); Audio2.setPlaying(true); updatePlayBtn(); };
 document.getElementById('mute').onclick=()=>{ const m=Audio2.toggleMute(); document.getElementById('mute').textContent=m?'✕':'♪'; };
 document.getElementById('full').onclick=()=>{ if(!document.fullscreenElement) stageEl.requestFullscreen&&stageEl.requestFullscreen(); else document.exitFullscreen&&document.exitFullscreen(); };
 
@@ -1723,7 +1826,7 @@ document.getElementById('begin').onclick=()=>{
   Audio2.init(); Audio2.resume();
   const veil=document.getElementById('veil'); veil.classList.add('gone');
   setTimeout(()=>veil.remove(),1300);
-  started=true; playing=true; T=0; curSceneIdx=-1; updatePlayBtn(); showBar();
+  started=true; playing=true; T=0; curSceneIdx=-1; Audio2.setPlaying(true); updatePlayBtn(); showBar();
 };
 </script>
 </body>

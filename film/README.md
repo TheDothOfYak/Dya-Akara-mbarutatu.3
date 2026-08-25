@@ -19,9 +19,21 @@ it's one file. Best in a dark room with headphones.
 
 - **Space** — play / pause
 - **← / →** — skip back / forward 10s
-- **M** — mute (audio is procedural ambient + closed-caption dialogue; no voices)
+- **M** — mute (audio is a procedural score + ambient bed; dialogue is closed-captioned, no voices)
 - **F** — fullscreen
 - Scrub or click chapter marks on the timeline.
+
+## Music
+
+The film plays an **original procedural score** (generated in code, per act — a
+driving cue for the worm ride, something fragile for the Karnen vision, a
+tragic line for OathTaken, a resolve for the ending) layered over the ambient
+bed. Nothing is streamed or licensed.
+
+**To swap in your own track later:** drop an audio file (e.g. `aakalay-score.mp3`)
+next to this HTML and set `MUSIC_FILE = 'aakalay-score.mp3'` in the film's script
+(it's marked with a comment in the `Audio2` engine). The synth cues then step
+aside and your track plays as the score, still synced to play/pause and mute.
 
 ## Notes
 
