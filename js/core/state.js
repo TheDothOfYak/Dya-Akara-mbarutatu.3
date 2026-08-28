@@ -1014,6 +1014,28 @@
     // piece: {speciesId, rarity?} from a Hunt (or market pieces)
     const sp = SP.get(piece.speciesId);
     const rng = new U.Rng(U.newSeed());
+
+    /* ---- exact-stats path: a Quarry piece from a Hunt clear reproduces the
+       boss verbatim (its exact HP/damage/speed/size/behaviour), regardless of
+       any Okid remap. Cost follows the piece's own rarity. ---- */
+    if (piece.spec) {
+      const rarity = piece.spec.rarity != null ? piece.spec.rarity : (piece.rarity != null ? piece.rarity : sp.rarity[1]);
+      if (!G.canCraft(rarity)) return { err: 'Not enough materials — a Quarry of this power needs ' + EC.CRAFT_COST[rarity].okid + ' ' + SP.RARITIES[rarity] + '+ Okid and ' + EC.CRAFT_COST[rarity].ngakara + ' NgAkara.' };
+      const cost = EC.CRAFT_COST[rarity];
+      let okidNeed = Math.max(1, cost.okid - G.titleBuff('craftDiscount'));
+      for (let i = rarity; i < 7 && okidNeed > 0; i++) { const use = Math.min(G.me.okid[i], okidNeed); G.me.okid[i] -= use; okidNeed -= use; }
+      G.me.ngakara -= cost.ngakara;
+      const tok = TK.mintSpec(piece.spec, { rng: rng, owner: G.me.id, crafter: G.me.id, nameLocked: !!(piece.spec.name) });
+      tok.newlyCrafted = true;
+      G.addToken(tok);
+      G.me.pieces = G.me.pieces.filter(p => p !== piece);
+      G.me.stats.crafted++;
+      checkAchievement('first_craft', 1);
+      checkAchievement('craft_10', G.me.stats.crafted);
+      G.save();
+      return { tok: tok };
+    }
+
     const map = G.craftByOkidMap(okidRarity);
 
     /* ---- designer path: the chosen Okid rarity decides the token's power ---- */

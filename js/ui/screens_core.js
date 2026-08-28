@@ -302,12 +302,12 @@
            Expedition lives under Adventures, and Profile lives under Settings. */
         ['⚔ Play', () => UI.show('play')],
         ['🎴 Collection', () => UI.show('collection')],
-        /* the market and the hunts are the shared world of the Mbaru Tatu —
-           they need the Guild network (only Quick Play and Duel vs the machine,
-           and the solo Expedition, are playable on your own) */
+        /* the market is the shared world of the Mbaru Tatu — it needs the Guild
+           network (only Quick Play and Duel vs the machine, and the solo Hunt,
+           are playable on your own) */
         ['🛒 Market', () => UI.requireOnline(() => UI.show('market'))],
         ['⚗ Crafting', () => UI.show('crafting')],
-        ['🏹 Adventures', () => UI.show('adventures')],
+        ['🏹 Hunt', () => UI.show('huntRun')],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['👥 Friends', () => UI.show('friends')],

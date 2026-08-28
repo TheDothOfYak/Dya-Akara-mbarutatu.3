@@ -294,7 +294,7 @@
       function renderPieces() {
         pieceList.innerHTML = '';
         if (!me.pieces.length) {
-          pieceList.appendChild(U.el('p', { cls: 'muted small', text: 'No creature pieces. Complete Hunts in Adventures to earn them — a tooth, a scale, a shaving. Then sing them true here.' }));
+          pieceList.appendChild(U.el('p', { cls: 'muted small', text: 'No creature pieces. Bring down a Hunt Quarry to earn one — it carries the Quarry’s exact stats. Then sing it true here.' }));
         }
         me.pieces.forEach(p => {
           const sp = SP.get(p.speciesId);
@@ -357,8 +357,25 @@
         })(t0);
 
         const info = U.el('div', { cls: 'center', style: 'max-width:380px' });
-        info.appendChild(U.el('h2', { cls: 'gold', text: sp.name }));
+        info.appendChild(U.el('h2', { cls: 'gold', text: (selected.spec && selected.spec.name) || sp.name }));
         info.appendChild(U.el('div', { cls: 'muted small', text: 'From a ' + (selected.material || 'piece') + (selected.from ? ' — ' + selected.from : '') }));
+
+        /* Quarry piece: reproduces the boss verbatim — no Okid remap, exact stats. */
+        if (selected.spec) {
+          const s = selected.spec;
+          const rar = s.rarity != null ? s.rarity : rarity;
+          const cost2 = EC.CRAFT_COST[rar];
+          const can2 = G.canCraft(rar);
+          info.appendChild(U.el('div', { cls: 'mt', html: '<span class="type-badge r' + rar + '" style="border-color:currentColor">' + SP.RARITIES[rar] + '</span> <span class="pill gold">✦ EXACT STATS</span>' }));
+          info.appendChild(U.el('div', { cls: 'small mt', html: 'The Quarry, sung true exactly as it fought — Health <b class="gold">' + s.stats.hp + '</b> · Strike <b class="gold">' + s.stats.dmg + '</b> · Pace <b class="gold">' + s.stats.speed + '</b> · ' + SP.SIZES[s.sizeIdx] }));
+          info.appendChild(U.el('div', { cls: 'mt small', html: 'Cost: <b class="gold">' + cost2.okid + '</b> Okid (' + SP.RARITIES[rar] + '+) · <b class="gold">' + cost2.ngakara + '</b> NgAkara' }));
+          const cb = U.el('button', { cls: 'btn primary mt', text: '⚗ Sing the Quarry true', disabled: can2 ? undefined : 'true' });
+          if (!can2) info.appendChild(U.el('div', { cls: 'small mt', style: 'color:var(--red)', text: 'Not enough materials — a Quarry of this power is costly to sing true.' }));
+          cb.onclick = () => runRitual(selected, rar, null);
+          info.appendChild(U.el('div', {}, [cb]));
+          center.appendChild(info);
+          return;
+        }
 
         /* craft-by-Okid (admin feature): the player chooses which Okid rarity to
            spend, and that decides the crafted token's power. */

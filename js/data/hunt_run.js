@@ -1,34 +1,30 @@
 /* ============================================================
-   DYA'AKARA — data/expedition.js
-   Expedition Mode (Roguelike Summoner) — static design data.
+   DYA'AKARA — data/hunt_run.js
+   The HUNT — a run-based summoner mode (static design data).
 
-   Single-player, run-based. A Hero (locked to one element) enters a
-   planet gauntlet of node battles, spends Vaelk to summon creatures
-   from an element-filtered draft pool, and clears the planet by
-   defeating its Guardian. Lose a fight and the run ends.
+   Single-player, run-based. A Hunter (locked to one element) enters a
+   gauntlet of node battles across a hunting ground, spends Vaelk to
+   summon beasts to their side, and runs the ground's great Quarry to
+   ground. Defeat the Quarry and you claim a PIECE of it — carrying its
+   EXACT stats — to sing true at the workbench. Lose a fight and the run
+   ends. It is meant to be brutally hard.
 
-   This file holds ONLY the data + pure helpers: the Vaelk resource,
-   the hero roster (with Artifact Forms), the three planet gauntlets,
-   and the Guardian assignments. The run engine lives in
-   core/expedition.js; the screens in ui/screens_expedition.js.
-
-   Open items deliberately left as tunable constants (see DEFAULTS):
-   exact Vaelk regen/summon costs, node counts, guardian rosters.
+   This file holds ONLY the data + pure helpers: the Vaelk resource, the
+   Hunter roster (with Artifact Forms), the three hunting grounds, and
+   their Quarry (final-boss) assignments. The run engine lives in
+   core/hunt_run.js; the screens in ui/screens_hunt_run.js.
    ============================================================ */
 (function () {
   'use strict';
   const SP = DYA.species;
 
   /* ================= VAELK ================= */
-  /* A brand-new resource, separate from a token's Fti/Su/Eldi/Ular ready
-     cost. It represents a hero's inner drive to call creatures to their
-     side. It comes in the four elemental flavors; a hero only ever
-     generates and spends their own flavor. Plural uses the standard -ar
-     rule: Vaelk → Vaelkar.
-
-     Under the hood a run's Vaelk maps onto the match economy's resource
-     pool, forced to a single element so the whole pool reads as one
-     flavor of Vaelk. */
+  /* A resource all its own, separate from a token's Fti/Su/Eldi/Ular ready
+     cost. It is a Hunter's inner drive to call beasts to their side. Four
+     elemental flavors; a Hunter generates and spends only their own. Plural
+     uses the standard -ar rule: Vaelk → Vaelkar. Under the hood a run's
+     Vaelk maps onto the match economy's resource pool, forced to a single
+     element so the whole pool reads as one flavor. */
   const VAELK = {
     Fti:  { flavor: "Fti'Vaelk",  plural: "Fti'Vaelkar",  color: SP.ELEMENT_COLORS.Fti,  aspect: 'Air'  },
     Su:   { flavor: "Su'Vaelk",   plural: "Su'Vaelkar",   color: SP.ELEMENT_COLORS.Su,   aspect: 'Water' },
@@ -36,25 +32,31 @@
     Ular: { flavor: "Ular'Vaelk", plural: "Ular'Vaelkar", color: SP.ELEMENT_COLORS.Ular, aspect: 'Earth' },
   };
 
+  /* Deliberately punishing. A Hunt is not meant to be won on a first,
+     under-levelled attempt. */
   const DEFAULTS = {
-    vaelkRegen: 3,       // Vaelk gained each pulse/turn (start at 3 — tune later)
-    startVaelk: 3,       // Vaelk in hand at the top of a node
-    pulseInterval: 8,    // seconds between Vaelk pulses
-    heroHpMul: 2.4,      // the hero is a durable anchor on the field
-    nodeTimeLimit: 300,  // a node run-out (seconds) counts as a loss
+    vaelkRegen: 3,        // Vaelk gained each pulse/turn
+    startVaelk: 3,        // Vaelk in hand at the top of a node
+    pulseInterval: 8,     // seconds between Vaelk pulses
+    heroHpMul: 2.0,       // the Hunter is durable, but killable
+    nodeTimeLimit: 300,   // a node run-out (seconds) counts as a loss
+    /* --- the Quarry is a monster --- */
+    bossHpMul: 6.0,       // on top of a max-rarity mint: a vast health pool
+    bossDmgMul: 1.7,      // and it hits far harder than its base form
+    bossSizeIdx: 4,       // rendered at the largest size band
   };
 
-  /* ================= HEROES ================= */
-  /* Eight heroes + one form-variant (Torcain, Tanoc's evolved form — it does
-     NOT count against the eight). Each hero is locked to one element, which
+  /* ================= HUNTERS ================= */
+  /* Eight Hunters + one form-variant (Torcain, Tanoc's evolved form — it does
+     NOT count against the eight). Each Hunter is locked to one element, which
      fixes its Vaelk flavor and its draft pool. `avatar` is the existing
-     species whose locked behavior tree stands in as the hero's field unit
+     species whose locked behavior tree stands in as the Hunter's field unit
      and base attack (no new card-text — it reuses the standard creature AI).
 
-     Artifact Forms: a hero may hold more than one form, each of which can
+     Artifact Forms: a Hunter may hold more than one form, each of which can
      change element (and therefore Vaelk flavor + draft pool), base ability,
-     and starting summon pool. Torcain is Tanoc's post-Stamijan form and
-     shows the system off: a wider, hybrid pool not locked to one element. */
+     and starting summon pool. Torcain is Tanoc's post-Stamijan form and shows
+     the system off: a wider, hybrid pool not locked to one element. */
   const HEROES = [
     /* ---- Ular ---- */
     {
@@ -137,14 +139,14 @@
     },
   ];
 
-  /* ================= PLANETS (gauntlets) ================= */
-  /* Each planet is a string of node encounters reusing the Expedition
-     map-node idea: a run of ordinary battles, then a Guardian boss as the
-     final node. Guardians are built from existing high-rarity/legendary
-     roster creatures using the same "summons minions" pattern as their
-     standard-match versions — just scaled up (multiple summons, higher
-     tiers). `enemyPool` seeds the ordinary nodes; the run engine scales
-     rarity by node depth. */
+  /* ================= HUNTING GROUNDS ================= */
+  /* Each ground is a string of node encounters: a run of ordinary battles,
+     then the ground's great Quarry as the final node. The Quarry is built
+     from an existing high-rarity/legendary roster creature — but scaled into
+     a true boss (a vast health pool, harder hits, largest size) that summons
+     minions each pulse, the Big Momma Kofi pattern scaled up. Beat it and you
+     claim a PIECE of it carrying its exact stats. `enemyPool` seeds the
+     ordinary nodes; the run engine scales rarity and count by node depth. */
   const PLANETS = [
     {
       id: 'velki', name: 'Velki', theme: 'Su',
@@ -152,9 +154,9 @@
       nodes: 5,
       enemyPool: ['raf_krabbi', 'harkal', 'su_grothyn', 'mirrordew', 'hvaleia'],
       guardian: {
-        species: 'su_naga', rarity: 5, name: 'Vaelmyr, the Tidewyrm',
-        blurb: 'A Su Naga grown vast in the deep — first head near-unkillable, and it never stops calling the shoals.',
-        summon: { species: 'harkal', rarity: 2, count: 2, everyPulses: 2, cap: 6 },
+        species: 'su_naga', rarity: 6, name: 'Vaelmyr, the Tidewyrm',
+        blurb: 'A Su Naga swollen to legend in the deep — its first head near-unkillable, and it never stops calling the shoals.',
+        summon: { species: 'harkal', rarity: 3, count: 3, everyPulses: 2, cap: 8 },
       },
     },
     {
@@ -163,9 +165,9 @@
       nodes: 5,
       enemyPool: ['wild_punk', 'kipsu', 'rodak', 'albali_aagac', 'stryx', 'makari_swarm'],
       guardian: {
-        species: 'ular_naga', rarity: 5, name: 'Kravaxis, the Coil of Xikia',
+        species: 'ular_naga', rarity: 6, name: 'Kravaxis, the Coil of Xikia',
         blurb: 'An Ular Naga that rules the shelves by dominance — it floods the field with swarms as it coils.',
-        summon: { species: 'makari_swarm', rarity: 3, count: 2, everyPulses: 2, cap: 7 },
+        summon: { species: 'makari_swarm', rarity: 4, count: 3, everyPulses: 2, cap: 9 },
       },
     },
     {
@@ -176,47 +178,42 @@
       guardian: {
         species: 'albali_villtur', rarity: 5, name: 'Skarn Vhal, the Frontier Wing',
         blurb: 'A five-horned Albali Villtur that owns the ridgeline — it keeps calling its flock down out of the wind.',
-        summon: { species: 'kuni_byrd_wild', rarity: 3, count: 2, everyPulses: 3, cap: 5 },
+        summon: { species: 'kuni_byrd_wild', rarity: 4, count: 3, everyPulses: 2, cap: 7 },
       },
     },
   ];
 
   /* ================= PURE HELPERS ================= */
 
-  /* every hero form, flattened, tagged with its parent hero */
   function allForms() {
     const out = [];
     HEROES.forEach(h => (h.forms || []).forEach(f => out.push(Object.assign({ heroId: h.id, heroName: h.name, origin: h.origin }, f))));
     return out;
   }
-
   function getHero(id) { return HEROES.find(h => h.id === id) || null; }
-
   function getForm(formId) {
     for (const h of HEROES) { const f = (h.forms || []).find(x => x.id === formId); if (f) return Object.assign({ heroId: h.id, heroName: h.name }, f); }
     return null;
   }
-
   function getPlanet(id) { return PLANETS.find(p => p.id === id) || null; }
-
   function vaelkOf(element) { return VAELK[element] || VAELK.Ular; }
 
   /* A form's draftable pool = the Collection roster filtered to its element's
-     affinity (primary OR secondary element), keeping only creatures that
-     actually fight. A neutral form (Torcain) draws from every element. This
-     keeps pool curation automatic — no separate card set to hand-author. */
+     affinity (primary OR secondary), keeping only creatures that actually
+     fight. A neutral form (Torcain) draws from every element. Automatic
+     curation — no separate card set to hand-author. */
   function draftPool(form) {
     const el = form.element;
     return SP.list.filter(sp => {
-      if (!SP.canDuel(sp.id)) return false;           // must be a real fighter
-      if (sp.notCraftable) return false;              // no spawn-only/promo tokens
+      if (!SP.canDuel(sp.id)) return false;
+      if (sp.notCraftable) return false;
       if (sp.tags && sp.tags.indexOf('passive') >= 0) return false;
-      if (form.neutral) return true;                  // hybrid: all elements
-      return sp.element === el || sp.element2 === el;  // element affinity
+      if (form.neutral) return true;
+      return sp.element === el || sp.element2 === el;
     }).map(sp => sp.id);
   }
 
-  DYA.expeditionData = {
+  DYA.huntRunData = {
     VAELK, DEFAULTS, HEROES, PLANETS,
     allForms, getHero, getForm, getPlanet, vaelkOf, draftPool,
     ELEMENT_NAMES: SP.ELEMENT_NAMES,
