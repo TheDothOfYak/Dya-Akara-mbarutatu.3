@@ -27,7 +27,7 @@
       scr.appendChild(UI.topbar({ title: 'Expedition' }));
       const page = U.el('div', { cls: 'page' });
       const head = U.el('div', { cls: 'page-head' });
-      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('menu') }));
+      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('adventures') }));
       head.appendChild(U.el('h2', { text: 'Expedition — the Vaelkar Gauntlet' }));
       head.appendChild(U.el('div', { cls: 'muted small', text: 'A run-based summoner mode. Single-player: the run ends when you fall, or when a planet’s Guardian does.' }));
       page.appendChild(head);

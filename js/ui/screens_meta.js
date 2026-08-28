@@ -18,13 +18,33 @@
       const page = U.el('div', { cls: 'page' });
       const head = U.el('div', { cls: 'page-head' });
       head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('menu') }));
-      head.appendChild(U.el('h2', { text: 'Adventures — Hunt' }));
-      head.appendChild(U.el('div', { cls: 'muted small', text: 'Expedition — the run-based Vaelkar summoner mode — is on the main menu. Challenge content arrives in a future update.' }));
+      head.appendChild(U.el('h2', { text: 'Adventures' }));
+      head.appendChild(U.el('div', { cls: 'muted small', text: 'Two paths: the Hunt — a shared-world pursuit of one great creature — and Expedition, a solo Vaelkar summoner run. Challenge content arrives in a future update.' }));
       page.appendChild(head);
       const body = U.el('div', { cls: 'page-body', style: 'max-width:880px;width:100%;margin:0 auto' });
 
+      /* Expedition — the run-based summoner mode. Single-player, so it needs no
+         Guild connection; it lives here at the top of Adventures. */
+      const exp = U.el('div', { cls: 'panel mb', style: 'display:flex;gap:14px;align-items:center' });
+      exp.appendChild(U.el('div', { style: 'font-size:34px', text: '🗺' }));
+      exp.appendChild(U.el('div', { cls: 'flex1', html: '<b class="gold">Expedition — the Vaelkar Gauntlet</b><br><span class="small muted">A single-player, run-based summoner mode. Pick a hero, spend Vaelk to summon your drafted creatures, and clear a planet’s Guardian. Playable on your own.</span>' + (me.expedition ? '<br><span class="small" style="color:var(--eldi)">▶ A run is in progress — ' + U.esc(me.expedition.formName) + ' on ' + U.esc(me.expedition.planetName) + '.</span>' : '') }));
+      exp.appendChild(U.el('button', { cls: 'btn primary', text: me.expedition ? 'Resume run' : 'Enter Expedition', onclick: () => UI.show('expedition') }));
+      body.appendChild(exp);
+
       if (me.activeHunt) { renderActiveHunt(body); page.appendChild(body); scr.appendChild(page); root.appendChild(scr); return; }
 
+      /* The Hunt is part of the shared world of the Mbaru Tatu — it needs the
+         Guild network. (Expedition above does not.) */
+      if (!(DYA.online && DYA.online.enabled)) {
+        const gate = U.el('div', { cls: 'panel', style: 'display:flex;gap:14px;align-items:center' });
+        gate.appendChild(U.el('div', { style: 'font-size:30px', text: '🏹' }));
+        gate.appendChild(U.el('div', { cls: 'flex1', html: '<b class="gold">The Hunt</b><br><span class="small muted">Hunts live in the shared world of the Mbaru Tatu — connect to the Guild network to pursue one.</span>' }));
+        gate.appendChild(U.el('button', { cls: 'btn', text: '🌐 Connect', onclick: () => UI.requireOnline(() => UI.show('adventures')) }));
+        body.appendChild(gate);
+        page.appendChild(body); scr.appendChild(page); root.appendChild(scr); return;
+      }
+
+      body.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'The Hunt' }));
       body.appendChild(U.el('p', { cls: 'muted', text: 'A Hunt is a narrative pursuit of one specific creature. Each is a single individual — once someone brings it down, it is gone for good. Success earns a crafting piece of that creature — the token itself must still be sung true at the workbench. You earn one Hunt slot every 10 levels; unused slots expire at the next 10-level mark.' }));
 
       /* prune expired slots and any choice whose Hunt has vanished */
@@ -377,7 +397,7 @@
       scr.appendChild(UI.topbar({ title: 'Tournaments' }));
       const page = U.el('div', { cls: 'page' });
       const head = U.el('div', { cls: 'page-head' });
-      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('menu') }));
+      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('play') }));
       head.appendChild(U.el('h2', { text: 'Tournament Browser' }));
       head.appendChild(U.el('div', { cls: 'spacer' }));
       ['All'].concat(EC.CIRCUITS).forEach(c => {
