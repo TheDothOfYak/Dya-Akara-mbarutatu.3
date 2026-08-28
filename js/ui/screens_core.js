@@ -298,22 +298,19 @@
       const nav = U.el('div', { cls: 'menu-nav' });
       const banned = G.isBanned(G.me.id);
       const items = [
+        /* Home is kept lean: Ranked Season & Tournaments live under Play,
+           Expedition lives under Adventures, and Profile lives under Settings. */
         ['⚔ Play', () => UI.show('play')],
         ['🎴 Collection', () => UI.show('collection')],
-        /* the market, the hunts, and the tournaments are all the shared world
-           of the Mbaru Tatu — they need the Guild network (only Quick Play and
-           Duel vs the machine are playable on your own) */
+        /* the market and the hunts are the shared world of the Mbaru Tatu —
+           they need the Guild network (only Quick Play and Duel vs the machine,
+           and the solo Expedition, are playable on your own) */
         ['🛒 Market', () => UI.requireOnline(() => UI.show('market'))],
         ['⚗ Crafting', () => UI.show('crafting')],
-        ['🏹 Adventures', () => UI.requireOnline(() => UI.show('adventures'))],
-        /* Expedition is a single-player, run-only summoner mode — no shared
-           world, so it needs no Guild connection. */
-        ['🗺 Expedition', () => UI.show('expedition')],
-        ['🏆 Tournaments', () => UI.requireOnline(() => UI.show('tournaments'))],
+        ['🏹 Adventures', () => UI.show('adventures')],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['👥 Friends', () => UI.show('friends')],
-        ['📜 Profile', () => UI.show('profile')],
         ['⚙ Settings', () => UI.show('settings')],
       ];
       items.forEach(([label, fn]) => {
@@ -481,6 +478,10 @@
         tab.onclick = () => { U.qsa('.tab', tabs).forEach(x => x.classList.remove('active')); tab.classList.add('active'); views[t](); };
         tabs.appendChild(tab);
       });
+      /* Profile lives here now — its own tab that opens the full Profile screen */
+      const profTab = U.el('div', { cls: 'tab', text: '📜 Profile' });
+      profTab.onclick = () => UI.show('profile');
+      tabs.appendChild(profTab);
       views.Audio();
     },
   });
@@ -538,7 +539,8 @@
       /* main tabs */
       const main = U.el('div', { cls: 'profile-main' });
       const head = U.el('div', { cls: 'page-head' });
-      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('menu') }));
+      /* your own Profile is reached from Settings now; someone else's from the menu */
+      head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show(isMe ? 'settings' : 'menu') }));
       const tabs = U.el('div', { cls: 'tabs' });
       head.appendChild(tabs);
       main.appendChild(head);

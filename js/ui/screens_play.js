@@ -122,6 +122,7 @@
       grid.appendChild(bigCard('⚡', 'Quick Play — vs AI', 'Straight into a match against the machine. Pick a difficulty, pick a pouch, go.', () => P.quickPlayFlow()));
       grid.appendChild(bigCard('🧪', 'Sandbox', 'Pit your own tokens against each other. Set both teams and the pulse rules, then command either side and switch between them to test how creatures interact. No stakes, no rewards.', () => P.sandboxFlow()));
       grid.appendChild(bigCard('🏆', 'Ranked Season', 'The Guild’s official ladder. Play your circuit, rank up, climb Local → Interplanetary. Titles are earned here.', () => UI.requireOnline(() => UI.show('seasonLadder'))));
+      grid.appendChild(bigCard('🎖', 'Tournaments', 'Guild-sealed and player-run brackets across every circuit. Create your own or join one from your friends’ devices.', () => UI.requireOnline(() => UI.show('tournaments'))));
       grid.appendChild(bigCard('🌐', 'Matchmaking Queue', 'Casual queue — matched with the next player near your level. No rank implications.', () => UI.requireOnline(() => P.matchmakingFlow())));
       grid.appendChild(bigCard('🤝', 'Private Match', 'Invite a friend, or share a room code.', () => UI.requireOnline(() => P.privateFlow())));
       grid.appendChild(bigCard('⚔', 'Duel', '1 token vs 1 token. No resources, no Relic. Anything can be wagered. No Guild cut.', () => P.duelFlow()));
