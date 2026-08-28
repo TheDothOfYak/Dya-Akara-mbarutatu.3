@@ -306,6 +306,9 @@
         ['🛒 Market', () => UI.requireOnline(() => UI.show('market'))],
         ['⚗ Crafting', () => UI.show('crafting')],
         ['🏹 Adventures', () => UI.requireOnline(() => UI.show('adventures'))],
+        /* Expedition is a single-player, run-only summoner mode — no shared
+           world, so it needs no Guild connection. */
+        ['🗺 Expedition', () => UI.show('expedition')],
         ['🏆 Tournaments', () => UI.requireOnline(() => UI.show('tournaments'))],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],

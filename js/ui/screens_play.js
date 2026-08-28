@@ -1143,7 +1143,7 @@
   /* ================= MATCH SETUP (vote system) ================= */
   /* cfg: {mode, ranked, format, opponent:{name, aiSkill, pouch, simulatedHuman}, pouch, skipSetup, terrain, tournament, onFinish} */
   P.startMatch = function (cfg) {
-    if (cfg.skipSetup) { launchMatch(cfg, { pulseInterval: 8, pulseAmount: 2, chaos: false }); return; }
+    if (cfg.skipSetup) { launchMatch(cfg, cfg.settings || { pulseInterval: 8, pulseAmount: 2, chaos: false }); return; }
     UI.show('matchSetup', cfg);
   };
 
@@ -1282,12 +1282,13 @@
       settings,
       teams: [
         { name: G.me.displayName, accId: G.me.id, controller: 'human', pouch: cfg.pouch.map(t => U.deepCopy(t)), startResources: startRes, seal: G.me.seal || { avatarIdx: G.me.avatarIdx, patterns: [] } },
-        cfg.mode === 'hunt'
-          ? { name: 'The Wild', controller: 'wild', pouch: [] }
+        (cfg.mode === 'hunt' || cfg.mode === 'expedition')
+          ? { name: (cfg.opponent && cfg.opponent.name) || 'The Wild', controller: 'wild', pouch: [] }
           : { name: cfg.opponent.name, accId: cfg.opponent.accId, controller: 'ai', aiSkill: cfg.opponent.aiSkill, pouch: (cfg.opponent.pouch || []).map(t => U.deepCopy(t)), seal: (cfg.opponent.accId && G.world.accounts[cfg.opponent.accId] && G.world.accounts[cfg.opponent.accId].seal) || { avatarIdx: 3, patterns: ['runes'] } },
       ],
       terrainTokens: cfg.terrainTokens,
       hunt: cfg.hunt,
+      expedition: cfg.expedition,
     });
     UI.showWithLoading('match', { match, cfg }, 1300);
   }
@@ -1844,6 +1845,10 @@
         pulseBar.firstChild.style.width = Math.min(100, frac * 100) + '%';
         relicRow.innerHTML = M.mode === 'hunt'
           ? '☠ Quarry: ' + (M.creatures.some(c => !c.dead && c.isBoss) ? '<b style="color:var(--red)">ALIVE</b>' : 'DOWN')
+          : M.mode === 'expedition'
+          ? (M.expeditionHadBoss
+              ? '☠ Guardian: ' + (M.creatures.some(c => !c.dead && c.isBoss) ? '<b style="color:var(--red)">ALIVE</b>' : 'DOWN')
+              : '⚔ Enemies left: ' + M.creatures.filter(c => !c.dead && c.team === 1).length)
           : isMulti ? multiStandings()
           : 'Relic: ' + relicText();
         const resHtml = SP.ELEMENTS.map(el => '<span class="el-' + el + '" style="margin-left:8px">◈' + Math.floor(T0.resources[el]) + '</span>').join('');

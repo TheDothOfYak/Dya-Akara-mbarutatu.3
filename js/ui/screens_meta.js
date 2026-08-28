@@ -19,7 +19,7 @@
       const head = U.el('div', { cls: 'page-head' });
       head.appendChild(U.el('div', { cls: 'back-arrow', text: '‹', onclick: () => UI.show('menu') }));
       head.appendChild(U.el('h2', { text: 'Adventures — Hunt' }));
-      head.appendChild(U.el('div', { cls: 'muted small', text: 'Expedition and Challenge content arrive in future updates.' }));
+      head.appendChild(U.el('div', { cls: 'muted small', text: 'Expedition — the run-based Vaelkar summoner mode — is on the main menu. Challenge content arrives in a future update.' }));
       page.appendChild(head);
       const body = U.el('div', { cls: 'page-body', style: 'max-width:880px;width:100%;margin:0 auto' });
 
