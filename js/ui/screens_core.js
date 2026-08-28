@@ -482,6 +482,10 @@
       const profTab = U.el('div', { cls: 'tab', text: '📜 Profile' });
       profTab.onclick = () => UI.show('profile');
       tabs.appendChild(profTab);
+      /* Replays live here too — a tab that opens the replay list */
+      const repTab = U.el('div', { cls: 'tab', text: '🎞 Replays' });
+      repTab.onclick = () => { if (DYA.play && DYA.play.replayList) DYA.play.replayList(); };
+      tabs.appendChild(repTab);
       views.Audio();
     },
   });
