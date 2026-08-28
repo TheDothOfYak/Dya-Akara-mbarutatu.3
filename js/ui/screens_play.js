@@ -128,7 +128,6 @@
       grid.appendChild(bigCard('⚔', 'Duel', '1 token vs 1 token. No resources, no Relic. Anything can be wagered. No Guild cut.', () => P.duelFlow()));
       grid.appendChild(bigCard('🛡', 'Brawl', 'A full match with more players — 2v2/3v3/5v5 team battles, a free-for-all, or a surrounded last stand. Resources, pulses and Relics, vs the machine.', () => P.brawlFlow()));
       grid.appendChild(bigCard('👁', 'Spectate', 'Watch a public match in progress. React freely; the players never see it.', () => UI.requireOnline(() => P.spectateFlow())));
-      grid.appendChild(bigCard('🎞', 'Replays', 'Your last 50 casual matches and every tournament match, stored as seed + inputs.', () => P.replayList()));
       body.appendChild(grid);
 
       /* ---- LIVE NOW: the players of the world, live right now ----
