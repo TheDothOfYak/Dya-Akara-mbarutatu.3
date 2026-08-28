@@ -175,11 +175,11 @@
       });
     }
 
-    /* hunt/duel/expedition: no relics on the field */
-    if (M.mode === 'hunt' || M.mode === 'duel' || M.mode === 'expedition') { M.relics.forEach(r => { r.captured = true; r.disabled = true; }); }
+    /* hunt/duel/huntrun: no relics on the field */
+    if (M.mode === 'hunt' || M.mode === 'duel' || M.mode === 'huntrun') { M.relics.forEach(r => { r.captured = true; r.disabled = true; }); }
 
-    /* hunt & expedition modes: spawn the wild / enemy side from cfg.hunt */
-    if ((M.mode === 'hunt' || M.mode === 'expedition') && cfg.hunt) {
+    /* hunt & huntrun modes: spawn the wild / enemy side from cfg.hunt */
+    if ((M.mode === 'hunt' || M.mode === 'huntrun') && cfg.hunt) {
       cfg.hunt.enemies.forEach((e, i) => {
         const tok = e.tok || TK.mint({ speciesId: e.speciesId, rng: M.rng, rarity: e.rarity });
         /* admin-authored exact overrides (Admin → Hunts → encounter enemies):
@@ -207,30 +207,31 @@
         /* a boss gets the classic 1.6× health bump ONLY when the author left
            the health at default — an explicit exact HP override is honored as-is */
         if (e.boss) { c.isBoss = true; if (!(e.stats && e.stats.hp != null)) { c.maxHp *= 1.6; c.hp = c.maxHp; } }
-        /* Expedition Guardians summon minions each pulse — same pattern as
+        /* Hunt Guardians summon minions each pulse — same pattern as
            Big Momma Kofi, scaled up (see doPulse). */
-        if (e.guardian) { c.isGuardian = true; c.guardianSummon = e.guardian; if (e.boss) { c.maxHp *= 1.4; c.hp = c.maxHp; } }
+        /* the Quarry's exact stats come from cfg (e.stats), so no extra bump */
+        if (e.guardian) { c.isGuardian = true; c.guardianSummon = e.guardian; }
       });
       M.teams[1].controller = 'wild';
-      M.expeditionHadBoss = cfg.hunt.enemies.some(e => e.boss);
+      M.huntrunHadBoss = cfg.hunt.enemies.some(e => e.boss);
     }
 
-    /* Expedition: the hero takes the field as a persistent unit with a base
+    /* Hunt: the hero takes the field as a persistent unit with a base
        attack, and the team's resource pool is the hero's single Vaelk flavor. */
-    if (M.mode === 'expedition' && cfg.expedition) {
-      const ex = cfg.expedition;
-      M.expeditionElement = ELS.includes(ex.element) ? ex.element : 'Ular';
-      M.expeditionTimeLimit = ex.timeLimit || 300;
+    if (M.mode === 'huntrun' && cfg.huntrun) {
+      const ex = cfg.huntrun;
+      M.huntrunElement = ELS.includes(ex.element) ? ex.element : 'Ular';
+      M.huntrunTimeLimit = ex.timeLimit || 300;
       const T0 = M.teams[0];
       T0.resources = { Fti: 0, Su: 0, Eldi: 0, Ular: 0 };
-      T0.resources[M.expeditionElement] = ex.startPool || 0;
+      T0.resources[M.huntrunElement] = ex.startPool || 0;
       if (ex.hero) {
         const hh = T0.hoard;
         const hc = M.spawnFromToken(ex.hero, 0, hh.x + 44, hh.y);
         hc.isHero = true;
         const mul = ex.heroHpMul || 2.2;
         hc.maxHp = Math.round(hc.maxHp * mul); hc.hp = hc.maxHp;
-        M.expeditionHasHero = true;
+        M.huntrunHasHero = true;
       }
     }
 
@@ -550,7 +551,7 @@
           }
         }
         /* hunt drive: hunter-side creatures press toward the quarry when idle */
-        if ((M.mode === 'hunt' || M.mode === 'expedition') && c.team === 0 && !c.rooted && !c.intent.attackTarget &&
+        if ((M.mode === 'hunt' || M.mode === 'huntrun') && c.team === 0 && !c.rooted && !c.intent.attackTarget &&
             !c.sp.tags.includes('passive') && c.sp.behavior !== 'kofi' && c.sp.behavior !== 'chemist' && c.sp.behavior !== 'karnen') {
           const quarry = api.nearestEnemy(c, 3000);
           if (quarry && U.dist(c.x, c.y, quarry.x, quarry.y) > 150) {
@@ -559,7 +560,7 @@
         }
         /* hunt hunger: if the field goes quiet too long, the wild side hunts the hunters —
            and a starving beast eats whatever it reaches, prey threshold or not */
-        if ((M.mode === 'hunt' || M.mode === 'expedition') && c.team === 1 && !c.rooted && (M.tick - M.lastCombatTick) > 600 && !c.intent.attackTarget) {
+        if ((M.mode === 'hunt' || M.mode === 'huntrun') && c.team === 1 && !c.rooted && (M.tick - M.lastCombatTick) > 600 && !c.intent.attackTarget) {
           const prey = api.nearestEnemy(c, 3000);
           if (prey) {
             if (U.dist(c.x, c.y, prey.x, prey.y) < 220) c.intent.attackTarget = prey;
@@ -959,8 +960,8 @@
       if (c.dead || !c.quirks || !c.quirks.hoard_sense) continue;
       c.mem.hoardPulses = (c.mem.hoardPulses || 0) + 1;
       if (c.mem.hoardPulses % 4 === 0 && M.teams[c.team] && M.teams[c.team].resources) {
-        /* Expedition keeps a single Vaelk flavor, so a sniff yields that flavor */
-        M.teams[c.team].resources[M.expeditionElement || ELS[M.rng.int(0, 3)]] += 1;
+        /* Hunt keeps a single Vaelk flavor, so a sniff yields that flavor */
+        M.teams[c.team].resources[M.huntrunElement || ELS[M.rng.int(0, 3)]] += 1;
         M.addEffect('steal', c.x, c.y - c.radius, {});
       }
     }
@@ -1021,9 +1022,9 @@
         const extra = Math.round(units.length * 0.5);
         for (let i = 0; i < extra; i++) units.push(M.rng.pick(ELS));
       }
-      /* Expedition: a hero generates only their own flavor of Vaelk, so the
+      /* Hunt: a hero generates only their own flavor of Vaelk, so the
          whole pulse pours into one element. */
-      if (M.expeditionElement) for (let ui = 0; ui < units.length; ui++) units[ui] = M.expeditionElement;
+      if (M.huntrunElement) for (let ui = 0; ui < units.length; ui++) units[ui] = M.huntrunElement;
       /* Hunts: the pulse still ticks (for time-based abilities) but grants no
          team resources — your party deploys for free, so there's no economy. */
       if (M.mode !== 'hunt') {
@@ -1069,7 +1070,7 @@
         const k = M.spawnFromToken(kofiTok, c.team, c.x + M.rng.range(-30, 30), c.y + M.rng.range(-30, 30));
         k.isKofiSpawn = true;
       }
-      /* Expedition Guardian: summons minions each pulse — the Big Momma Kofi
+      /* Hunt Guardian: summons minions each pulse — the Big Momma Kofi
          pattern, scaled up (several higher-tier creatures, capped). */
       if (c.isGuardian && c.guardianSummon) {
         const gs = c.guardianSummon;
@@ -1533,11 +1534,11 @@
 
     /* additional cost (§1): a defeated token returns to the pouch; replaying it
        costs +1 resource per prior defeat. Uff excepted while self-respawning. */
-    /* Standard & Expedition: a defeated summon returns to the pouch and may be
-       re-fielded (Expedition re-summons it by spending more Vaelk — the +1
+    /* Standard & Hunt: a defeated summon returns to the pouch and may be
+       re-fielded (Hunt re-summons it by spending more Vaelk — the +1
        per-death cost still applies). The hero is not in the pouch, so a fallen
        hero stays down for the node. */
-    if ((M.mode === 'standard' || M.mode === 'expedition') && M.teams[c.team] && M.teams[c.team].controller !== 'wild' &&
+    if ((M.mode === 'standard' || M.mode === 'huntrun') && M.teams[c.team] && M.teams[c.team].controller !== 'wild' &&
         !c.isKofiSpawn && !c.isHero && c.speciesId !== 'kofi' && c.speciesId !== 'sprengju' &&
         !(c.speciesId === 'uff' && cause !== 'retribution')) {
       const entry = M.teams[c.team].pouch.find(e => e.tok.id === c.tokId);
@@ -1922,12 +1923,12 @@
       return;
     }
 
-    if (M.mode === 'expedition') {
+    if (M.mode === 'huntrun') {
       /* win: the Guardian (or, on ordinary nodes, the whole enemy side) is down */
-      const bossDown = M.expeditionHadBoss
+      const bossDown = M.huntrunHadBoss
         ? !M.creatures.some(c => !c.dead && c.team === 1 && c.isBoss)
         : !M.creatures.some(c => !c.dead && c.team === 1);
-      if (bossDown) { M.finish(0, 'expedition'); return; }
+      if (bossDown) { M.finish(0, 'huntrun'); return; }
       /* lose: your whole side is wiped with nothing left to summon (the hero
          and every summoned creature down, deck spent), or the node runs out of
          time. The hero falling is a heavy blow but not an automatic loss — the
@@ -1935,8 +1936,8 @@
       const T = M.teams[0];
       const anyAlive = M.creatures.some(c => !c.dead && c.team === 0 && !c.sp.tags.includes('passive'));
       const anyLeft = T.pouch.some(e => e.state === 'pouch') || T.readied.length > 0;
-      const overtime = M.time > (M.expeditionTimeLimit || 300);
-      if ((!anyAlive && !anyLeft && M.time > 15) || overtime) { M.finish(1, 'expedition'); return; }
+      const overtime = M.time > (M.huntrunTimeLimit || 300);
+      if ((!anyAlive && !anyLeft && M.time > 15) || overtime) { M.finish(1, 'huntrun'); return; }
       return;
     }
 

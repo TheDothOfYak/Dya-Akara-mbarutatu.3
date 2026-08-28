@@ -304,6 +304,9 @@
     if (spec.behavior) tok.behavior = spec.behavior;
     if (spec.vars && typeof spec.vars === 'object') tok.vars = Object.assign({}, tok.vars, spec.vars);
     if (spec.picks && typeof spec.picks === 'object') tok.picks = Object.assign({}, tok.picks, spec.picks);
+    /* exact-stats specs (e.g. a Hunt Quarry piece) carry their own quirk set so
+       the fielded token reproduces the original's stats verbatim */
+    if (Array.isArray(spec.quirks)) tok.quirks = spec.quirks.slice();
     if (spec.stats && typeof spec.stats === 'object') {
       tok.stats = Object.assign({}, tok.stats);
       if (spec.stats.hp != null) tok.stats.hp = Math.max(1, spec.stats.hp);

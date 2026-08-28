@@ -1283,13 +1283,13 @@
       settings,
       teams: [
         { name: G.me.displayName, accId: G.me.id, controller: 'human', pouch: cfg.pouch.map(t => U.deepCopy(t)), startResources: startRes, seal: G.me.seal || { avatarIdx: G.me.avatarIdx, patterns: [] } },
-        (cfg.mode === 'hunt' || cfg.mode === 'expedition')
+        (cfg.mode === 'hunt' || cfg.mode === 'huntrun')
           ? { name: (cfg.opponent && cfg.opponent.name) || 'The Wild', controller: 'wild', pouch: [] }
           : { name: cfg.opponent.name, accId: cfg.opponent.accId, controller: 'ai', aiSkill: cfg.opponent.aiSkill, pouch: (cfg.opponent.pouch || []).map(t => U.deepCopy(t)), seal: (cfg.opponent.accId && G.world.accounts[cfg.opponent.accId] && G.world.accounts[cfg.opponent.accId].seal) || { avatarIdx: 3, patterns: ['runes'] } },
       ],
       terrainTokens: cfg.terrainTokens,
       hunt: cfg.hunt,
-      expedition: cfg.expedition,
+      huntrun: cfg.huntrun,
     });
     UI.showWithLoading('match', { match, cfg }, 1300);
   }
@@ -1846,10 +1846,10 @@
         pulseBar.firstChild.style.width = Math.min(100, frac * 100) + '%';
         relicRow.innerHTML = M.mode === 'hunt'
           ? '☠ Quarry: ' + (M.creatures.some(c => !c.dead && c.isBoss) ? '<b style="color:var(--red)">ALIVE</b>' : 'DOWN')
-          : M.mode === 'expedition'
-          ? (M.expeditionHadBoss
-              ? '☠ Guardian: ' + (M.creatures.some(c => !c.dead && c.isBoss) ? '<b style="color:var(--red)">ALIVE</b>' : 'DOWN')
-              : '⚔ Enemies left: ' + M.creatures.filter(c => !c.dead && c.team === 1).length)
+          : M.mode === 'huntrun'
+          ? (M.huntrunHadBoss
+              ? '☠ Quarry: ' + (M.creatures.some(c => !c.dead && c.isBoss) ? '<b style="color:var(--red)">ALIVE</b>' : 'DOWN')
+              : '⚔ Beasts left: ' + M.creatures.filter(c => !c.dead && c.team === 1).length)
           : isMulti ? multiStandings()
           : 'Relic: ' + relicText();
         const resHtml = SP.ELEMENTS.map(el => '<span class="el-' + el + '" style="margin-left:8px">◈' + Math.floor(T0.resources[el]) + '</span>').join('');
