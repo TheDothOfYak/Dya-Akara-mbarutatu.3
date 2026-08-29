@@ -37,11 +37,12 @@
     _sendToHost: null,       // client: (action) => void
   };
 
-  S.startSolo = function (guardianId, planet) {
+  S.startSolo = function (guardianId, planet, opts) {
+    opts = opts || {};
     const me = DYA.state && DYA.state.me;
     S.myId = me ? me.id : 'solo';
     S.mode = 'solo'; S.isHost = true; S._broadcast = null; S._sendToHost = null;
-    S.run = R.create({ planet, mode: 'solo', players: [{ id: S.myId, name: me ? me.name : 'You', guardianId }] });
+    S.run = R.create({ planet, mode: 'solo', difficulty: opts.difficulty, campaignLen: opts.campaignLen, players: [{ id: S.myId, name: me ? me.name : 'You', guardianId }] });
     R.saveSolo(S.run);
     return S.run;
   };
@@ -117,12 +118,12 @@
     return { id: me ? me.id : ('guest_' + Math.random().toString(36).slice(2, 7)), name: me ? me.name : 'Guardian' };
   }
 
-  /* HOST a new co-op room. planet fixed by host. */
-  C.host = async function (planet) {
+  /* HOST a new co-op room. planet, difficulty and length fixed by host. */
+  C.host = async function (planet, difficulty, campaignLen) {
     const who = meIdName();
     C.myId = who.id; C.myName = who.name; C.isHost = true;
     C.code = N.genRoomCode();
-    C.lobby = { players: [{ id: who.id, name: who.name, guardianId: DYA.piaData.GUARDIANS[0].id, ready: false }], planet: planet || 'velki', hostId: who.id, started: false };
+    C.lobby = { players: [{ id: who.id, name: who.name, guardianId: DYA.piaData.GUARDIANS[0].id, ready: false }], planet: planet || 'velki', difficulty: difficulty || 'hunter', campaignLen: campaignLen || 1, hostId: who.id, started: false };
     C.room = await N.joinRoom(C.code, who.id, {
       onMessage: hostOnMessage,
       onPeerJoin: () => { broadcastLobby(); },
@@ -160,6 +161,13 @@
     }
   };
 
+  /* host-only: change the trial difficulty in the lobby */
+  C.setDifficulty = function (id) {
+    if (!C.isHost || !C.lobby) return;
+    C.lobby.difficulty = id;
+    broadcastLobby(); if (C.onLobby) C.onLobby(C.lobby);
+  };
+
   C.toggleReady = function () {
     if (C.isHost) {
       const p = C.lobby.players.find(x => x.id === C.myId); if (p) p.ready = !p.ready;
@@ -175,7 +183,7 @@
     if (!C.isHost || !C.lobby) return;
     C.lobby.started = true;
     const players = C.lobby.players.slice(0, MAX_PLAYERS).map(p => ({ id: p.id, name: p.name, guardianId: p.guardianId }));
-    const run = R.create({ planet: C.lobby.planet, mode: 'coop', players });
+    const run = R.create({ planet: C.lobby.planet, mode: 'coop', difficulty: C.lobby.difficulty, campaignLen: C.lobby.campaignLen, players });
     S._becomeHost(run, C.room, C.myId);
     if (C.onStart) C.onStart();
   };

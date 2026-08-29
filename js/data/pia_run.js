@@ -384,8 +384,38 @@
     restHeal: 0.30,          // fraction of max HP a rest heals
   };
 
+  /* ================= DIFFICULTIES =================
+     A ladder of trial-tiers, in the Guild's own escalation. Each layers
+     complications on top of raw hp/dmg: bigger packs, foes that enter
+     armored, elites sooner, and creatures bearing affixes (armor, thorns,
+     venom, regen). `affixChance` is per elite/boss (and, high up, per foe). */
+  const DIFFICULTIES = [
+    { id: 'fledgling', name: 'Fledgling', tier: 0, hpMul: 0.85, dmgMul: 0.85, restHealMul: 1.25, goldMul: 1.1, extraEnemyChance: 0, enemyStartBlock: 0, eliteFloorMin: 4, eliteChance: 0.10, affixChance: 0, affixOnFodder: false, bossSummonReduce: 0,
+      blurb: 'A gentler climb. Softer foes, fuller rests — learn the Vaelk.' },
+    { id: 'hunter', name: 'Hunter', tier: 1, hpMul: 1, dmgMul: 1, restHealMul: 1, goldMul: 1, extraEnemyChance: 0, enemyStartBlock: 0, eliteFloorMin: 3, eliteChance: 0.14, affixChance: 0, affixOnFodder: false, bossSummonReduce: 0,
+      blurb: 'The intended trial. A fair, dangerous hunt.' },
+    { id: 'warden', name: 'Warden', tier: 2, hpMul: 1.25, dmgMul: 1.12, restHealMul: 0.9, goldMul: 1.1, extraEnemyChance: 0.35, enemyStartBlock: 0, eliteFloorMin: 2, eliteChance: 0.20, affixChance: 0.4, affixOnFodder: false, bossSummonReduce: 0,
+      blurb: 'Bigger packs, elites sooner, and elites bearing affixes.' },
+    { id: 'elster', name: 'Elster', tier: 3, hpMul: 1.5, dmgMul: 1.28, restHealMul: 0.8, goldMul: 1.2, extraEnemyChance: 0.6, enemyStartBlock: 5, eliteFloorMin: 2, eliteChance: 0.26, affixChance: 0.7, affixOnFodder: false, bossSummonReduce: 1,
+      blurb: 'Foes enter armored; the Quarry calls its shoals more often.' },
+    { id: 'torcain', name: 'Torcain', tier: 4, hpMul: 1.8, dmgMul: 1.45, restHealMul: 0.7, goldMul: 1.3, extraEnemyChance: 0.95, enemyStartBlock: 8, eliteFloorMin: 1, eliteChance: 0.32, affixChance: 1.0, affixOnFodder: true, bossSummonReduce: 1,
+      blurb: 'Brutal. Affixes everywhere, relentless Quarries, thin rest.' },
+  ];
+
+  /* ================= ENEMY AFFIXES =================
+     A creature can carry one. Read by the engine. */
+  const AFFIXES = {
+    armored:  { name: 'Armored', icon: '🛡', desc: 'Gains Block at the start of each of its turns.', armor: 6 },
+    thorned:  { name: 'Thorned', icon: '🌵', desc: 'When struck by an attack, deals damage back to the attacker.', thorns: 4 },
+    venomous: { name: 'Venomous', icon: '🐍', desc: 'Its attacks also apply Poison.', venom: 3 },
+    vital:    { name: 'Vital', icon: '💚', desc: 'Heals a little at the start of each of its turns.', regen: 6 },
+  };
+  const AFFIX_KEYS = Object.keys(AFFIXES);
+
   /* ================= PURE HELPERS ================= */
   function guardian(id) { return GUARDIANS.find(g => g.id === id) || null; }
+  function difficulty(id) { return DIFFICULTIES.find(d => d.id === id) || DIFFICULTIES[1]; }
+  function affix(id) { const a = AFFIXES[id]; return a ? Object.assign({ id }, a) : null; }
   function planet(id) { return PLANETS.find(p => p.id === id) || null; }
   function card(id) { const c = CARDS[id]; return c ? Object.assign({ id }, c) : null; }
   function relic(id) { const r = RELICS[id]; return r ? Object.assign({ id }, r) : null; }
@@ -413,7 +443,8 @@
 
   DYA.piaData = {
     GUARDIANS, SUMMONS, CARDS, RELICS, ENEMIES, BOSSES, PLANETS, TUNE,
-    guardian, planet, card, relic, summonDef, enemyDef, bossDef,
+    DIFFICULTIES, AFFIXES, AFFIX_KEYS,
+    guardian, planet, card, relic, summonDef, enemyDef, bossDef, difficulty, affix,
     rewardPool, expandDeck,
     ELEMENT_COLORS: SP.ELEMENT_COLORS, ELEMENT_NAMES: SP.ELEMENT_NAMES,
   };

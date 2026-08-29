@@ -184,6 +184,8 @@ function autoResolveRun(run) {
       R.leaveShop(run);
     } else if (run.phase === 'treasure') {
       run.players.forEach(pl => R.takeTreasure(run, pl.id, true));
+    } else if (run.phase === 'legcomplete') {
+      R.applyAction(run, { type: 'nextLeg', playerId: 'p1' });
     } else if (run.phase === 'gameover' || run.phase === 'win') {
       break;
     } else break;
@@ -203,6 +205,57 @@ function fingerprint(seed) {
   return [bb.victory, bb.turn, bb.players[0].hp, bb.enemies.map(e => e.hp).join(',')].join('|');
 }
 ok(fingerprint(31337) === fingerprint(31337), 'same seed => identical battle outcome');
+
+/* ---------- 9. difficulty scaling + affixes ---------- */
+console.log('9. Difficulty + affixes');
+function battleWithDiff(diffId, enemies, seed) {
+  return EN.create({ seed: seed || 5, planet: 'velki', node: { type: 'battle', enemies }, playerCount: 1, diff: D.difficulty(diffId),
+    players: [{ id: 'p1', name: 'T', guardianId: 'tanoc', deck: null, relics: [], hp: 80, maxHp: 80 }] });
+}
+ok(D.DIFFICULTIES.length >= 5, 'at least 5 difficulty tiers');
+const hpHunter = battleWithDiff('hunter', ['e_krabbi'], 5).enemies[0].maxHp;
+const hpTorcain = battleWithDiff('torcain', ['e_krabbi'], 5).enemies[0].maxHp;
+ok(hpTorcain > hpHunter * 1.5, 'Torcain enemies are far tougher (' + hpHunter + ' -> ' + hpTorcain + ')');
+// Torcain: affixChance 1 + affixOnFodder => the fodder carries an affix
+const bt = battleWithDiff('torcain', ['e_krabbi'], 9);
+ok(bt.enemies[0].affix, 'a Torcain foe carries an affix (' + bt.enemies[0].affix + ')');
+ok(bt.enemies[0].block >= 8, 'Torcain foes enter with a starting shield (' + bt.enemies[0].block + ')');
+// Thorns retaliation: give an enemy thorns and attack it
+const bthorn = battleWithDiff('hunter', ['e_grothyn_su'], 3);
+const en = bthorn.enemies[0]; en.thorns = 4;
+const p1 = bthorn.players[0]; const hpBefore = p1.hp;
+p1.hand = [{ id: 'strike_ular', upg: false }]; p1.energy = 3; p1.block = 0;
+EN.playCard(bthorn, 'p1', 0, en.uid);
+ok(p1.hp < hpBefore, 'Thorned foe retaliates when struck (' + hpBefore + ' -> ' + p1.hp + ')');
+
+/* ---------- 10. Pilgrimage (multi-run) ---------- */
+console.log('10. Pilgrimage multi-run');
+const camp = R.create({ seed: 12345, planet: 'velki', mode: 'solo', difficulty: 'fledgling', campaignLen: 3, players: [{ id: 'p1', name: 'T', guardianId: 'tanoc' }] });
+ok(camp.campaign && camp.campaign.total === 3, 'campaign has 3 legs');
+ok(camp.campaign.worlds.length === 3, 'pilgrimage spans 3 worlds');
+ok(camp.campaign.worlds[0] === 'velki', 'pilgrimage starts on the chosen world');
+// simulate: drive until the first world Quarry falls, verify leg-complete then advance
+let cg = 0, sawLeg = false, startPlanet = camp.planet;
+while (cg++ < 400 && camp.phase !== 'win' && camp.phase !== 'gameover') {
+  if (camp.phase === 'legcomplete') { sawLeg = true; }
+  const before = camp.campaign.leg, planetBefore = camp.planet, deckBefore = camp.players[0].deck.length, goldBefore = camp.players[0].gold;
+  if (camp.phase === 'map') { if (!camp.available.length) break; R.enterNode(camp, camp.available[0]); }
+  else if (camp.phase === 'battle') { let t = 0; while (!camp.battle.over && t++ < 200) autoTurn(camp.battle, 'p1'); R.syncBattleResult(camp); if (!camp.battle) {} }
+  else if (camp.phase === 'reward') { camp.players.forEach(pl => R.takeReward(camp, pl.id, pl.rewardChoices ? pl.rewardChoices[0] : null)); }
+  else if (camp.phase === 'rest') { camp.players.forEach(pl => R.restHeal(camp, pl.id)); }
+  else if (camp.phase === 'shop') { R.leaveShop(camp); }
+  else if (camp.phase === 'treasure') { camp.players.forEach(pl => R.takeTreasure(camp, pl.id, true)); }
+  else if (camp.phase === 'legcomplete') {
+    R.applyAction(camp, { type: 'nextLeg', playerId: 'p1' });
+    ok(camp.campaign.leg === before + 1, 'nextLeg advances the leg (' + before + ' -> ' + camp.campaign.leg + ')');
+    ok(camp.planet !== planetBefore, 'the world changes between legs (' + planetBefore + ' -> ' + camp.planet + ')');
+    ok(camp.players[0].deck.length >= deckBefore, 'deck carries across the world (' + deckBefore + ' -> ' + camp.players[0].deck.length + ')');
+    ok(camp.players[0].gold >= goldBefore, 'gold carries across the world');
+  }
+  else break;
+}
+if (camp.phase === 'win') { ok(sawLeg, 'a winning pilgrimage passed through a leg-complete beat'); ok(camp.campaign.leg === 3, 'a winning pilgrimage reached the final world'); }
+else ok(camp.phase === 'gameover', 'pilgrimage concluded: ' + camp.phase);
 
 /* ---------- done ---------- */
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

@@ -493,13 +493,39 @@
       });
       wrap.appendChild(pRow);
 
+      /* difficulty picker */
+      wrap.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Choose your trial' }));
+      let difficulty = 'hunter';
+      const dRow = U.el('div', { cls: 'pia-diff-row' });
+      D.DIFFICULTIES.forEach(d => {
+        const c = U.el('div', { cls: 'pia-diff-cell t' + d.tier + (d.id === difficulty ? ' sel' : '') });
+        c.appendChild(U.el('div', { cls: 'pd-name', text: d.name }));
+        c.appendChild(U.el('div', { cls: 'tiny muted mt', text: d.blurb }));
+        c.onclick = () => { difficulty = d.id; U.qsa('.pia-diff-cell', dRow).forEach(x => x.classList.remove('sel')); c.classList.add('sel'); };
+        dRow.appendChild(c);
+      });
+      wrap.appendChild(dRow);
+
+      /* pilgrimage length — a multi-run on one hero */
+      wrap.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Length' }));
+      let campaignLen = 1;
+      const lRow = U.el('div', { cls: 'pia-len-row' });
+      [[1, 'Single Run', 'One world, one Quarry.'], [2, 'Pilgrimage · 2', 'Two worlds back to back — keep your deck, relics & gold.'], [3, 'Pilgrimage · 3', 'All three worlds on one hero. Each hits harder than the last.']].forEach(([n, name, blurb]) => {
+        const c = U.el('div', { cls: 'pia-len-cell' + (n === campaignLen ? ' sel' : '') });
+        c.appendChild(U.el('div', { cls: 'pp-name', text: name }));
+        c.appendChild(U.el('div', { cls: 'tiny muted mt', text: blurb }));
+        c.onclick = () => { campaignLen = n; U.qsa('.pia-len-cell', lRow).forEach(x => x.classList.remove('sel')); c.classList.add('sel'); };
+        lRow.appendChild(c);
+      });
+      wrap.appendChild(lRow);
+
       /* actions */
       const acts = U.el('div', { cls: 'pia-home-acts mt' });
-      acts.appendChild(U.el('button', { cls: 'btn big', text: '⚔ Play Solo', onclick: () => { R.clearSolo(); S.startSolo(chosen, planet); openRun(); } }));
-      acts.appendChild(U.el('button', { cls: 'btn big', text: '👥 Host Co-op', onclick: () => UI.requireOnline(() => openLobbyHost(planet, chosen)) }));
+      acts.appendChild(U.el('button', { cls: 'btn big', text: '⚔ Play Solo', onclick: () => { R.clearSolo(); S.startSolo(chosen, planet, { difficulty: difficulty, campaignLen: campaignLen }); openRun(); } }));
+      acts.appendChild(U.el('button', { cls: 'btn big', text: '👥 Host Co-op', onclick: () => UI.requireOnline(() => openLobbyHost(planet, chosen, difficulty, campaignLen)) }));
       acts.appendChild(U.el('button', { cls: 'btn big ghost', text: '🔑 Join Co-op', onclick: () => UI.requireOnline(() => promptJoin()) }));
       wrap.appendChild(acts);
-      wrap.appendChild(U.el('div', { cls: 'tiny muted mt', text: 'Co-op scales the foes to your party — bigger packs, and a Quarry that seats guards for every extra Guardian.' }));
+      wrap.appendChild(U.el('div', { cls: 'tiny muted mt', text: 'Co-op scales the foes to your party — bigger packs, and a Quarry that seats guards for every extra Guardian. A Pilgrimage carries one hero across up to three worlds.' }));
 
       scr.appendChild(wrap);
       root.appendChild(scr);
@@ -524,9 +550,9 @@
     setTimeout(() => input.focus(), 50);
   }
 
-  function openLobbyHost(planet, guardianId) {
+  function openLobbyHost(planet, guardianId, difficulty, campaignLen) {
     UI.loading(true);
-    C.host(planet).then((code) => {
+    C.host(planet, difficulty, campaignLen).then((code) => {
       UI.loading(false);
       C.setGuardian(guardianId);
       wireLobby();
@@ -553,7 +579,22 @@
         U.el('button', { cls: 'btn small ghost', text: 'Copy', onclick: () => { try { navigator.clipboard.writeText(C.code); UI.toast({ title: 'Copied', body: 'Room code copied.', icon: '📋' }); } catch (e) { } } }),
       ]));
       const pl = D.planet((C.lobby && C.lobby.planet) || 'velki');
-      wrap.appendChild(U.el('div', { cls: 'muted', text: 'World: ' + pl.name + ' · ' + D.ELEMENT_NAMES[pl.element] + '. Up to 3 Guardians.' }));
+      const clen = (C.lobby && C.lobby.campaignLen) || 1;
+      wrap.appendChild(U.el('div', { cls: 'muted', text: 'World: ' + pl.name + ' · ' + D.ELEMENT_NAMES[pl.element] + (clen > 1 ? ' · Pilgrimage of ' + clen : '') + '. Up to 3 Guardians.' }));
+
+      /* trial difficulty (host sets it) */
+      const curDiff = D.difficulty((C.lobby && C.lobby.difficulty) || 'hunter');
+      wrap.appendChild(U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:6px;align-items:center' }, (function () {
+        const out = [U.el('span', { cls: 'tiny muted', text: 'Trial:' })];
+        D.DIFFICULTIES.forEach(d => {
+          const chip = U.el('span', { cls: 'pia-diff-chip t' + d.tier + (d.id === curDiff.id ? ' sel' : '') + (C.isHost ? ' pia-hint' : ''), text: d.name });
+          if (C.isHost) chip.onclick = () => { C.setDifficulty(d.id); UI.show('piaLobby'); };
+          out.push(chip);
+        });
+        if (!C.isHost) out.push(U.el('span', { cls: 'tiny muted', text: '(host chooses)' }));
+        return out;
+      })()));
+      wrap.appendChild(U.el('div', { cls: 'tiny muted', text: curDiff.blurb }));
 
       /* roster */
       const roster = U.el('div', { cls: 'pia-roster mt' });
@@ -630,7 +671,7 @@
     const prevPhase = lastPhase; lastPhase = run.phase;
     if (prevPhase === 'battle' && run.phase !== 'battle') {
       if (run.phase === 'win') flourish('quarry');
-      else if (run.phase === 'reward') flourish('victory');
+      else if (run.phase === 'reward') flourish(run._legBossCleared ? 'quarry' : 'victory');
       else if (run.phase === 'gameover') flourish('defeat');
     }
     if (prevPhase !== 'battle' && run.phase === 'battle') lastHandTurn = -1; // deal in the opening hand
@@ -650,6 +691,7 @@
       case 'rest': host.appendChild(renderRest(run)); break;
       case 'shop': host.appendChild(renderShop(run)); break;
       case 'treasure': host.appendChild(renderTreasure(run)); break;
+      case 'legcomplete': host.appendChild(renderLegComplete(run)); break;
       case 'win': host.appendChild(renderEnd(run, true)); break;
       case 'gameover': host.appendChild(renderEnd(run, false)); break;
       default: host.appendChild(U.el('div', { text: '…' }));
@@ -674,6 +716,8 @@
       me.relics.forEach(rid => { const r = D.relic(rid); if (r) { const chip = U.el('span', { cls: 'pia-relic-chip pia-hint', text: r.icon }); attachTip(chip, '<div class="pt-title">' + r.icon + ' ' + U.esc(r.name) + '</div><div>' + U.esc(r.text) + '</div>'); bar.appendChild(chip); } });
     }
     if (run.mode === 'coop') bar.appendChild(U.el('span', { cls: 'res-chip', html: '👥 <b>' + run.players.length + '</b>' }));
+    if (run.diffId) { const d = D.difficulty(run.diffId); const dc = U.el('span', { cls: 'res-chip pia-hint pia-diff-chip t' + d.tier, html: '⚔ ' + d.name }); attachTip(dc, '<div class="pt-title">' + d.name + ' trial</div><div>' + U.esc(d.blurb) + '</div>'); bar.appendChild(dc); }
+    if (run.campaign) { const wc = U.el('span', { cls: 'res-chip pia-hint', html: '🗺 World <b>' + run.campaign.leg + '</b>/' + run.campaign.total }); attachTip(wc, '<div class="pt-title">Pilgrimage</div><div>World ' + run.campaign.leg + ' of ' + run.campaign.total + '. Your deck, relics and gold carry between worlds; each world hits harder.</div>'); bar.appendChild(wc); }
     bar.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Quit', onclick: () => leaveRun() }));
     return bar;
   }
@@ -823,6 +867,7 @@
     }
     const size = e.boss ? 176 : e.elite ? 116 : 92;
     cell.appendChild(UI.tokenArt(e.species, size, 'idle', e.heads, null));
+    if (e.affix) { const a = D.affix(e.affix); if (a) { const ab = U.el('div', { cls: 'pia-affix pia-hint', text: a.icon }); attachTip(ab, '<div class="pt-title">' + a.icon + ' ' + a.name + '</div><div>' + U.esc(a.desc) + '</div>'); cell.appendChild(ab); } }
     cell.appendChild(U.el('div', { cls: 'pia-name', text: e.name }));
     const bar = hpBar(e.hp, e.maxHp, e.block);
     cell.appendChild(bar);
@@ -1101,17 +1146,39 @@
   }
 
   /* ---------- END ---------- */
+  /* between-worlds interstitial on a Pilgrimage */
+  function renderLegComplete(run) {
+    const wrap = U.el('div', {});
+    wrap.appendChild(runHeader(run, 'A world felled'));
+    const nextPlanet = run.campaign ? D.planet(run.campaign.worlds[run.campaign.leg] || run.planet) : null;
+    const body = U.el('div', { cls: 'pia-reward panel' });
+    body.appendChild(U.el('h1', { cls: 'gold', text: '★ ' + D.planet(run.planet).name + "'s Quarry Felled ★" }));
+    body.appendChild(U.el('div', { cls: 'muted', text: 'World ' + (run.campaign ? run.campaign.leg : 1) + ' of ' + (run.campaign ? run.campaign.total : 1) + ' complete. You carry your deck, relics, and gold onward — and mend some wounds on the way.' }));
+    if (nextPlanet) {
+      body.appendChild(U.el('div', { cls: 'pia-leg-next mt', html: 'Next world: <b class="gold">' + U.esc(nextPlanet.name) + '</b> — <span class="el-' + nextPlanet.element + '">' + D.ELEMENT_NAMES[nextPlanet.element] + '</span>. It will hunt harder than the last.' }));
+    }
+    const me = R.player(run, S.myId) || run.players[0];
+    if (me) body.appendChild(U.el('div', { cls: 'tiny muted mt', text: 'Carrying: ' + me.deck.length + ' cards · ' + me.relics.length + ' relics · ' + me.gold + ' gold · ' + me.hp + '/' + me.maxHp + ' HP.' }));
+    body.appendChild(U.el('button', { cls: 'btn big mt', text: '▶ Descend to ' + (nextPlanet ? nextPlanet.name : 'the next world'), onclick: () => { sfx('horn'); S.act({ type: 'nextLeg' }); } }));
+    if (run.mode === 'coop') body.appendChild(U.el('div', { cls: 'tiny muted mt', text: 'The host leads the party onward.' }));
+    wrap.appendChild(body);
+    return wrap;
+  }
+
   function renderEnd(run, victory) {
     if (run.mode === 'solo') R.clearSolo();
+    const isPilgrimage = !!(run.campaign && run.campaign.total > 1);
     const wrap = U.el('div', {});
-    wrap.appendChild(runHeader(run, victory ? 'The Quarry falls' : 'The run ends'));
+    wrap.appendChild(runHeader(run, victory ? (isPilgrimage ? 'The Pilgrimage ends' : 'The Quarry falls') : 'The run ends'));
     const body = U.el('div', { cls: 'pia-end panel ' + (victory ? 'win' : 'lose') });
     if (victory) {
-      body.appendChild(U.el('h1', { cls: 'gold', text: '★ Quarry Felled ★' }));
-      body.appendChild(U.el('div', { text: 'You ran the great beast of ' + D.planet(run.planet).name + ' to ground. The Guild will remember it.' }));
-      /* award a little gold to the account as a nod (solo, real account only) */
-      if (run.mode === 'solo' && G.me && !G.me.ai && !run._paid) { run._paid = true; try { G.me.gold += 250; G.save && G.save(); UI.refreshTopbar && UI.refreshTopbar(); } catch (e) { } }
-      if (run.mode === 'solo') body.appendChild(U.el('div', { cls: 'gold mt', text: '+250 gold added to your account.' }));
+      body.appendChild(U.el('h1', { cls: 'gold', text: isPilgrimage ? '★ Pilgrimage Complete ★' : '★ Quarry Felled ★' }));
+      body.appendChild(U.el('div', { text: isPilgrimage ? 'You ran all ' + run.campaign.total + ' great Quarries to ground on one hero. Songs will be sung.' : 'You ran the great beast of ' + D.planet(run.planet).name + ' to ground. The Guild will remember it.' }));
+      /* account reward scales with pilgrimage length and trial tier */
+      const tier = D.difficulty(run.diffId).tier || 0;
+      const payout = Math.round((isPilgrimage ? 250 * run.campaign.total : 250) * (1 + tier * 0.25));
+      if (run.mode === 'solo' && G.me && !G.me.ai && !run._paid) { run._paid = true; try { G.me.gold += payout; G.save && G.save(); UI.refreshTopbar && UI.refreshTopbar(); } catch (e) { } }
+      if (run.mode === 'solo') body.appendChild(U.el('div', { cls: 'gold mt', text: '+' + payout + ' gold added to your account.' }));
     } else {
       body.appendChild(U.el('h1', { style: 'color:#c25', text: 'Fallen' }));
       body.appendChild(U.el('div', { text: 'The party could not hold. The Quarry hunts on.' }));

@@ -20,8 +20,9 @@
   const REST_FLOOR = 8;
 
   /* ================= MAP GENERATION ================= */
-  R.genMap = function (seed, planetId) {
+  R.genMap = function (seed, planetId, diffId) {
     const rng = new U.Rng((seed >>> 0) ^ 0x5eed);
+    const diff = D.difficulty(diffId);
     const floors = [];
     for (let f = 0; f < FLOORS; f++) {
       let nodes;
@@ -30,7 +31,7 @@
       else {
         const width = rng.int(2, 3);
         nodes = [];
-        for (let i = 0; i < width; i++) nodes.push({ type: pickType(rng, f) });
+        for (let i = 0; i < width; i++) nodes.push({ type: pickType(rng, f, diff) });
       }
       nodes.forEach((n, i) => { n.id = 'f' + f + 'n' + i; n.f = f; n.i = i; n.w = nodes.length; n.to = []; });
       floors.push(nodes);
@@ -59,32 +60,51 @@
     return { floors, byId, start: floors[0].map(n => n.id) };
   };
 
-  function pickType(rng, f) {
+  function pickType(rng, f, diff) {
     if (f <= 1) return 'battle';
     const r = rng.next();
-    if (f >= 3 && r < 0.14) return 'elite';
-    if (r < 0.14 + 0.16) return 'event';
-    if (r < 0.14 + 0.16 + 0.10) return 'merchant';
-    if (f >= 2 && r < 0.14 + 0.16 + 0.10 + 0.06) return 'treasure';
+    const eMin = diff ? diff.eliteFloorMin : 3;
+    const eCh = diff ? diff.eliteChance : 0.14;
+    if (f >= eMin && r < eCh) return 'elite';
+    if (r < eCh + 0.16) return 'event';
+    if (r < eCh + 0.16 + 0.10) return 'merchant';
+    if (f >= 2 && r < eCh + 0.16 + 0.10 + 0.06) return 'treasure';
     return 'battle';
   }
 
   /* ================= RUN CREATION ================= */
-  /* opts: { seed, planet, mode, players:[{id,name,guardianId}] } */
+  /* opts: { seed, planet, mode, difficulty, campaignLen, players:[{id,name,guardianId}] }
+     campaignLen 1 = a single run; 2–3 = a Pilgrimage across that many worlds,
+     one hero carrying deck / relics / gold between them. */
   R.create = function (opts) {
     const seed = (opts.seed != null ? opts.seed : U.newSeed()) >>> 0;
+    const startPlanet = opts.planet || 'velki';
+    const diffId = D.difficulty(opts.difficulty).id;
+    const len = U.clamp(opts.campaignLen || 1, 1, 3);
+    /* pilgrimage worlds: start planet, then the rest in order, no repeats */
+    const order = D.PLANETS.map(p => p.id);
+    const worlds = [startPlanet];
+    order.forEach(id => { if (worlds.length < len && worlds.indexOf(id) < 0) worlds.push(id); });
     const run = {
-      seed, planet: opts.planet || 'velki', mode: opts.mode || 'solo',
+      seed, planet: startPlanet, mode: opts.mode || 'solo', diffId: diffId,
       hostId: opts.players[0].id,
       players: opts.players.map((pc, idx) => newRunPlayer(pc, idx)),
-      map: R.genMap(seed, opts.planet || 'velki'),
+      map: R.genMap(seed, startPlanet, diffId),
       currentNodeId: null, available: null, floor: -1,
       battle: null, phase: 'map', rewards: null, shop: null,
-      _battleSeed: seed,
+      campaign: len > 1 ? { total: len, leg: 1, worlds: worlds } : null,
+      legScale: 1, _battleSeed: seed,
     };
     run.available = run.map.start.slice();
     return run;
   };
+
+  /* the difficulty combat mods for this run, scaled up per Pilgrimage leg */
+  function diffMods(run) {
+    const d = D.difficulty(run.diffId), leg = (run.legScale || 1);
+    return Object.assign({}, d, { hpMul: d.hpMul * leg, dmgMul: d.dmgMul * (1 + (leg - 1) * 0.5) });
+  }
+  R.diffMods = diffMods;
 
   function newRunPlayer(pc, idx) {
     const g = D.guardian(pc.guardianId) || D.GUARDIANS[0];
@@ -106,15 +126,18 @@
   /* ================= ENCOUNTER BUILDING ================= */
   R.encounterFor = function (run, node) {
     const pl = D.planet(run.planet);
-    const rng = new U.Rng((run.seed ^ U.hashStr(node.id)) >>> 0);
+    const diff = D.difficulty(run.diffId);
+    const rng = new U.Rng((run.seed ^ U.hashStr(node.id) ^ ((run.campaign ? run.campaign.leg : 1) * 2654435761)) >>> 0);
     if (node.type === 'boss') return { type: 'boss', boss: pl.boss };
     if (node.type === 'elite') {
       const keys = [rng.pick(pl.elites)];
       if (node.f >= 6) keys.push(rng.pick(pl.fodder));
+      if (diff.extraEnemyChance > 0 && rng.chance(diff.extraEnemyChance)) keys.push(rng.pick(pl.fodder));
       return { type: 'elite', enemies: keys };
     }
-    /* ordinary battle: 1–3 fodder, scaling by floor depth */
-    const count = U.clamp(1 + Math.floor(node.f / 4) + (rng.chance(0.4) ? 1 : 0), 1, 3);
+    /* ordinary battle: 1–3 fodder, scaling by floor depth (+difficulty extra) */
+    let count = U.clamp(1 + Math.floor(node.f / 4) + (rng.chance(0.4) ? 1 : 0), 1, 3);
+    if (diff.extraEnemyChance > 0 && rng.chance(diff.extraEnemyChance)) count = Math.min(4, count + 1);
     const keys = [];
     for (let i = 0; i < count; i++) keys.push(rng.pick(pl.fodder));
     return { type: 'battle', enemies: keys };
@@ -144,10 +167,11 @@
   R.startBattle = function (run, node) {
     const enc = R.encounterFor(run, node);
     run.battle = EN.create({
-      seed: (run.seed ^ U.hashStr(node.id) ^ (run.floor * 7919)) >>> 0,
+      seed: (run.seed ^ U.hashStr(node.id) ^ (run.floor * 7919) ^ ((run.campaign ? run.campaign.leg : 1) * 104729)) >>> 0,
       planet: run.planet,
       node: enc,
       playerCount: run.players.length,
+      diff: diffMods(run),
       players: run.players.map(p => ({
         id: p.id, name: p.name, guardianId: p.guardianId,
         deck: p.deck, relics: p.relics, hp: p.hp, maxHp: p.maxHp,
@@ -174,12 +198,13 @@
   R.grantVictory = function (run, node) {
     const isBoss = node.type === 'boss';
     const isElite = node.type === 'elite';
+    const diff = D.difficulty(run.diffId);
     const rng = new U.Rng((run.seed ^ U.hashStr(node.id) ^ 0xbeef) >>> 0);
     run.players.forEach(p => {
       if (p.hp <= 0) return;
-      /* gold */
+      /* gold (scaled by difficulty) */
       const baseGold = isBoss ? 100 : isElite ? 45 : rng.int(14, 26);
-      const gm = 1 + relicSum(p, 'goldMul');
+      const gm = (1 + relicSum(p, 'goldMul')) * (diff.goldMul || 1);
       p.gold += Math.round(baseGold * gm);
       /* post-battle relic heals */
       p.hp = U.clamp(p.hp + relicSum(p, 'nodeHeal'), 0, p.maxHp);
@@ -187,10 +212,14 @@
       /* card reward: 3 choices */
       p.rewardChoices = R.rollCardChoices(run, p, rng, isElite || isBoss);
       p.rewardTaken = false;
-      /* elites/bosses also drop a relic choice for the party lead — kept simple: a relic option */
+      /* elites/bosses also drop a relic choice */
       if (isElite || isBoss) p.relicReward = R.rollRelic(run, p, rng);
     });
-    run.phase = isBoss ? 'win' : 'reward';
+    /* a Pilgrimage: felling a world's Quarry with legs remaining opens a
+       reward, then a leg-complete interstitial rather than the final win. */
+    const moreLegs = isBoss && run.campaign && run.campaign.leg < run.campaign.total;
+    run._legBossCleared = moreLegs;
+    run.phase = (isBoss && !moreLegs) ? 'win' : 'reward';
   };
 
   R.rollCardChoices = function (run, p, rng, better) {
@@ -231,17 +260,35 @@
     p.relicReward = null;
   };
 
-  /* once every connected player has taken their reward, return to map */
+  /* once every connected player has taken their reward, return to map —
+     or, if this was a Pilgrimage world's Quarry, to the leg-complete beat */
   R.maybeAdvance = function (run) {
     if (run.phase !== 'reward') return;
     const pending = run.players.filter(p => p.connected && !p.rewardTaken && p.hp > 0);
-    if (pending.length === 0) R.toMap(run);
+    if (pending.length > 0) return;
+    if (run._legBossCleared) { run._legBossCleared = false; run.phase = 'legcomplete'; return; }
+    R.toMap(run);
+  };
+
+  /* advance a Pilgrimage to its next world, carrying the hero intact */
+  R.nextLeg = function (run) {
+    if (!run.campaign || run.campaign.leg >= run.campaign.total) { run.phase = 'win'; return; }
+    run.campaign.leg++;
+    run.legScale = 1 + (run.campaign.leg - 1) * 0.3;   // each world hits harder
+    run.planet = run.campaign.worlds[run.campaign.leg - 1] || run.planet;
+    run.map = R.genMap((run.seed ^ (run.campaign.leg * 40503)) >>> 0, run.planet, run.diffId);
+    run.available = run.map.start.slice();
+    run.currentNodeId = null; run.floor = -1; run.battle = null; run.shop = null;
+    /* a breather between worlds — mend a good chunk, but not to full */
+    run.players.forEach(p => { if (p.hp > 0) p.hp = U.clamp(p.hp + Math.round(p.maxHp * 0.4), 0, p.maxHp); p.rewardChoices = null; p.relicReward = null; p.treasureRelic = null; });
+    run.phase = 'map';
   };
 
   /* ================= REST / EVENT ================= */
   R.restHeal = function (run, playerId) {
     const p = R.player(run, playerId); if (!p || p.restDone) return;
-    p.hp = U.clamp(p.hp + Math.round(p.maxHp * D.TUNE.restHeal), 0, p.maxHp);
+    const mul = D.difficulty(run.diffId).restHealMul || 1;
+    p.hp = U.clamp(p.hp + Math.round(p.maxHp * D.TUNE.restHeal * mul), 0, p.maxHp);
     p.restDone = true;
     R.maybeAdvanceRest(run);
   };
@@ -361,6 +408,7 @@
       case 'buyCard': return R.buyCard(run, action.playerId, action.idx);
       case 'buyRelic': return R.buyRelic(run, action.playerId, action.idx);
       case 'leaveShop': R.leaveShop(run); return true;
+      case 'nextLeg': if (run.phase === 'legcomplete') { R.nextLeg(run); return true; } return false;
       default: return false;
     }
   };

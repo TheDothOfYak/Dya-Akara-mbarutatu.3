@@ -65,6 +65,8 @@
          at the start of each action; the reference changes so the UI knows
          a fresh batch arrived. */
       events: [], evId: 0, _src: null,
+      /* difficulty combat mods (defaults = Hunter / 1×, no complications) */
+      diff: Object.assign({ hpMul: 1, dmgMul: 1, enemyStartBlock: 0, affixChance: 0, affixOnFodder: false, bossSummonReduce: 0 }, config.diff || {}),
     };
 
     config.players.forEach((pc, i) => {
@@ -104,38 +106,60 @@
 
   function makeEnemy(b, key, hpScale, dmgScale) {
     const def = D.enemyDef(key); if (!def) return null;
+    const dm = b.diff || {};
+    const hp = Math.max(1, Math.round(def.hp * hpScale * (dm.hpMul || 1)));
     const e = {
       uid: 'E' + (b.enemyUid++), key: key, species: def.species, name: def.name,
-      maxHp: Math.round(def.hp * hpScale), hp: Math.round(def.hp * hpScale),
+      maxHp: hp, hp: hp,
       block: 0, size: def.size || 1, boss: !!def.boss, elite: !!def.elite,
       heads: def.heads || 0,
       st: { vuln: 0, weak: 0, poison: 0, str: 0 },
       moves: def.moves, summonEvery: def.summonEvery || 0,
-      dmgScale: dmgScale, history: [], intent: null, summonCounter: 0,
+      dmgScale: dmgScale * (dm.dmgMul || 1), history: [], intent: null, summonCounter: 0,
+      armor: 0, thorns: 0, venom: 0, regen: 0, affix: null,
     };
+    /* the Quarry calls its shoals more often on higher trials */
+    if (e.summonEvery && dm.bossSummonReduce) e.summonEvery = Math.max(2, e.summonEvery - dm.bossSummonReduce);
     return e;
   }
 
+  /* difficulty complications: a starting shield, and a possible affix */
+  function applyDiff(b, e, eligible) {
+    const dm = b.diff || {};
+    if (dm.enemyStartBlock) e.block += dm.enemyStartBlock;
+    if (eligible && dm.affixChance > 0 && b._rng.chance(dm.affixChance)) {
+      const key = b._rng.pick(D.AFFIX_KEYS); const a = D.affix(key);
+      if (a) {
+        e.affix = key;
+        if (a.armor) e.armor = a.armor;
+        if (a.thorns) e.thorns = a.thorns;
+        if (a.venom) e.venom = a.venom;
+        if (a.regen) e.regen = a.regen;
+        e.name = a.name + ' ' + e.name;
+      }
+    }
+  }
+
   function buildEnemies(b, node) {
-    const n = b.playerCount;
+    const n = b.playerCount, dm = b.diff || {};
     const hpScale = (D.TUNE.enemyHpScale[U.clamp(n, 0, 3)] || 1);
     const dmgScale = (D.TUNE.enemyDmgScale[U.clamp(n, 0, 3)] || 1);
     if (node.boss) {
       const e = makeEnemy(b, node.boss, hpScale, dmgScale);
-      if (e) b.enemies.push(e);
+      if (e) { applyDiff(b, e, true); b.enemies.push(e); }
       /* a boss gets one guard minion per extra player, for pressure */
       const extra = Math.max(0, n - 1);
       const boss = D.bossDef(node.boss);
       const minionKey = boss && boss.moves.find(m => m.summon) ? boss.moves.find(m => m.summon).summon : null;
       for (let i = 0; i < extra && minionKey; i++) {
-        const m = makeEnemy(b, minionKey, hpScale, dmgScale); if (m) b.enemies.push(m);
+        const m = makeEnemy(b, minionKey, hpScale, dmgScale); if (m) { applyDiff(b, m, !!dm.affixOnFodder); b.enemies.push(m); }
       }
     } else {
       let keys = (node.enemies || []).slice();
       /* bigger packs with more Guardians */
       const add = Math.max(0, (n - 1)) * (D.TUNE.extraEnemiesPerPlayer || 0);
       if (add && keys.length) { for (let i = 0; i < add; i++) keys.push(keys[i % keys.length]); }
-      keys.forEach(k => { const e = makeEnemy(b, k, hpScale, dmgScale); if (e) b.enemies.push(e); });
+      keys.forEach(k => { const e = makeEnemy(b, k, hpScale, dmgScale); if (e) { applyDiff(b, e, (e.elite || !!dm.affixOnFodder)); b.enemies.push(e); } });
     }
   }
 
@@ -184,8 +208,20 @@
     if (e.block > 0) { const s = Math.min(e.block, remaining); e.block -= s; remaining -= s; blocked = s; }
     e.hp -= remaining;
     emit(b, { t: 'dmg', src: opts.src || b._src || null, tgt: e.uid, amt: remaining, blocked: blocked, kind: opts.kind || 'hit' });
+    /* affix: Thorned strikes the attacker back on a melee/card attack */
+    if (e.thorns && opts.kind === 'attack' && opts.src) {
+      const src = entityById(b, opts.src);
+      if (src) { if (src.kind === 'player') dealToPlayer(b, src.ref, e.thorns, { src: e.uid, kind: 'thorns' }); else dealToAlly(b, src.ref, e.thorns, { src: e.uid, kind: 'thorns' }); }
+    }
     if (e.hp <= 0) { e.hp = 0; log(b, e.name + ' is felled.'); emit(b, { t: 'die', tgt: e.uid }); }
     return dmg;
+  }
+
+  /* resolve an event source id to the acting player or ally */
+  function entityById(b, id) {
+    const p = b.players.find(x => x.id === id); if (p) return { kind: 'player', ref: p };
+    const a = b.allies.find(x => x.uid === id); if (a) return { kind: 'ally', ref: a };
+    return null;
   }
 
   function dealToPlayer(b, p, amount, opts) {
@@ -464,7 +500,11 @@
       /* poison ticks on the enemy */
       if (e.st.poison > 0) { dealToEnemy(b, e, e.st.poison, { kind: 'poison' }); e.st.poison = Math.max(0, e.st.poison - 1); }
       if (e.hp <= 0) return;
+      /* affix: Vital heals a little each turn */
+      if (e.regen) healEntity(b, e, e.uid, e.regen, 'regen');
       e.block = 0;
+      /* affix: Armored raises a shield each turn */
+      if (e.armor) gainBlock(b, e, e.uid, e.armor);
       executeIntent(b, e);
       if (e.st.weak > 0) e.st.weak--;
       if (e.st.vuln > 0) e.st.vuln--;
@@ -503,8 +543,8 @@
         for (let h = 0; h < hits; h++) {
           const tgt = pickPlayerTarget(b); if (!tgt) return;
           const dmg = outgoing(Math.round(m.dmg * dmgScale), e);
-          if (tgt.type === 'ally') dealToAlly(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' });
-          else dealToPlayer(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' });
+          if (tgt.type === 'ally') { dealToAlly(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' }); }
+          else { dealToPlayer(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' }); if (e.venom && !tgt.ref.dead) { tgt.ref.st.poison = (tgt.ref.st.poison || 0) + e.venom; emitStatus(b, tgt.ref.id, 'poison', e.venom); } }
         }
         break;
       }
@@ -524,7 +564,7 @@
         const count = m.count || 1;
         for (let i = 0; i < count; i++) {
           const nm = makeEnemy(b, m.summon, 1, dmgScale);
-          if (nm && aliveEnemies(b).length < 8) { nm.intent = chooseIntent(b, nm); b.enemies.push(nm); emit(b, { t: 'spawn', tgt: nm.uid, src: e.uid }); }
+          if (nm && aliveEnemies(b).length < 8) { applyDiff(b, nm, !!(b.diff && b.diff.affixOnFodder)); nm.intent = chooseIntent(b, nm); b.enemies.push(nm); emit(b, { t: 'spawn', tgt: nm.uid, src: e.uid }); }
         }
         log(b, e.name + ' summons reinforcements!');
         break;
