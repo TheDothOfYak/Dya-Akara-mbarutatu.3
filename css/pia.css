@@ -158,3 +158,89 @@
   .pia-enemy, .pia-ally, .pia-guardian { width: 96px; }
   .pia-hpbar { width: 80px; }
 }
+
+/* ============================================================
+   BATTLE ANIMATION — floats, flashes, lunges, banners
+   ============================================================ */
+
+/* each combatant cell can be nudged/flashed without disturbing layout */
+.pia-enemy, .pia-ally, .pia-guardian { will-change: transform; }
+
+/* incoming hit: quick red flash + shake */
+.pia-hit { animation: pia-hit .42s ease-out; }
+@keyframes pia-hit {
+  0% { filter: none; transform: translateX(0); }
+  15% { filter: brightness(1.8) drop-shadow(0 0 10px #ff5a4a); transform: translateX(-4px); }
+  35% { transform: translateX(4px); }
+  55% { transform: translateX(-3px); }
+  75% { transform: translateX(2px); filter: brightness(1.2); }
+  100% { filter: none; transform: translateX(0); }
+}
+
+/* attacker wind-up pulse */
+.pia-act { animation: pia-act .24s ease-out; }
+@keyframes pia-act { 0% { transform: scale(1); } 50% { transform: scale(1.08); filter: brightness(1.3); } 100% { transform: scale(1); } }
+
+/* summon / spawn pop-in */
+.pia-pop { animation: pia-pop .42s cubic-bezier(.2,1.5,.4,1); }
+@keyframes pia-pop { 0% { transform: scale(.2); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+
+/* death fade + shrink */
+.pia-die { animation: pia-die .34s ease-in forwards; pointer-events: none; }
+@keyframes pia-die { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.55) rotate(6deg); filter: grayscale(1) brightness(.4); } }
+
+/* block gained: brief blue ring */
+.pia-shield::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 14px;
+  border: 2px solid #8ac8e8; box-shadow: 0 0 14px #8ac8e8aa; animation: pia-shield .42s ease-out; pointer-events: none;
+}
+@keyframes pia-shield { 0% { opacity: 0; transform: scale(.9); } 40% { opacity: 1; } 100% { opacity: 0; transform: scale(1.15); } }
+
+/* floating combat numbers */
+.pia-float {
+  position: fixed; transform: translate(-50%, -50%); z-index: 60; pointer-events: none;
+  font-weight: bold; font-size: 20px; text-shadow: 0 2px 4px #000, 0 0 8px #000;
+  animation: pia-float 1s ease-out forwards; white-space: nowrap;
+}
+@keyframes pia-float {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); }
+  18% { opacity: 1; transform: translate(-50%, -70%) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -170%) scale(1); }
+}
+.pia-float.f-dmg { color: #ff6a58; }
+.pia-float.f-poison { color: #9fe07a; }
+.pia-float.f-heal { color: #7ee69a; }
+.pia-float.f-block { color: #9cd4f0; font-size: 16px; }
+.pia-float.f-status { color: #e8c88a; font-size: 15px; }
+
+/* phase / event banner across the arena */
+.pia-banner {
+  position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%); z-index: 61; pointer-events: none;
+  font-size: 26px; letter-spacing: .12em; color: var(--gold); text-transform: uppercase;
+  text-shadow: 0 2px 8px #000, 0 0 20px #d9b87a66; animation: pia-banner .95s ease-out forwards;
+}
+@keyframes pia-banner {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.8); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1.05); }
+}
+
+/* input is frozen while the enemy phase plays out */
+.fx-lock .pia-hand, .fx-lock .pia-ctrl { pointer-events: none; opacity: .55; transition: opacity .2s; }
+
+/* gentle idle life so the board never feels static */
+.pia-enemy > canvas { animation: pia-bob 3.4s ease-in-out infinite; }
+.pia-enemy.boss > canvas { animation-duration: 4.6s; }
+.pia-ally > canvas { animation: pia-bob 3s ease-in-out infinite; }
+@keyframes pia-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+/* the intent badge gives a small nudge so it draws the eye */
+.pia-intent { animation: pia-intent-in .3s ease-out; }
+@keyframes pia-intent-in { 0% { opacity: 0; transform: translate(-50%, -4px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+
+/* soft fade when a run screen (map/reward/rest/shop) swaps in */
+.pia-run #pia-root > div { animation: pia-fade .28s ease-out; }
+@keyframes pia-fade { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: translateY(0); } }
+/* ...but never fade the battle arena itself (it repaints constantly) */
+.pia-run #pia-root > div:has(.pia-arena) { animation: none; }

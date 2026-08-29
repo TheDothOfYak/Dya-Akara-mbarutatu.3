@@ -28,6 +28,11 @@
   function playerById(b, id) { return b.players.find(p => p.id === id); }
   function log(b, s) { b.log.push(s); if (b.log.length > 60) b.log.shift(); }
 
+  /* record a UI event on the current batch */
+  function emit(b, o) { if (b && b.events) { o.n = b.evId++; b.events.push(o); } }
+  /* start a fresh event batch (new array reference so the UI detects it) */
+  function freshEvents(b) { b.events = []; }
+
   /* aggregate all relic mods for a player into one bag */
   function relicMods(relicIds) {
     const m = {};
@@ -55,6 +60,11 @@
       players: [], allies: [], enemies: [],
       turn: 0, phase: 'player', over: false, victory: null, log: [],
       allyUid: 1, enemyUid: 1,
+      /* an ordered stream of what happened during the last applied action,
+         for the UI to animate (who hit whom, ticks, heals, deaths). Reset
+         at the start of each action; the reference changes so the UI knows
+         a fresh batch arrived. */
+      events: [], evId: 0, _src: null,
     };
 
     config.players.forEach((pc, i) => {
@@ -166,35 +176,58 @@
 
   function dealToEnemy(b, e, amount, opts) {
     if (e.hp <= 0) return 0;
+    opts = opts || {};
     let dmg = amount;
     if (e.st.vuln > 0) dmg = Math.floor(dmg * 1.5);
     dmg = Math.max(0, dmg);
-    let remaining = dmg;
-    if (e.block > 0) { const s = Math.min(e.block, remaining); e.block -= s; remaining -= s; }
+    let remaining = dmg, blocked = 0;
+    if (e.block > 0) { const s = Math.min(e.block, remaining); e.block -= s; remaining -= s; blocked = s; }
     e.hp -= remaining;
-    if (e.hp <= 0) { e.hp = 0; log(b, e.name + ' is felled.'); }
+    emit(b, { t: 'dmg', src: opts.src || b._src || null, tgt: e.uid, amt: remaining, blocked: blocked, kind: opts.kind || 'hit' });
+    if (e.hp <= 0) { e.hp = 0; log(b, e.name + ' is felled.'); emit(b, { t: 'die', tgt: e.uid }); }
     return dmg;
   }
 
-  function dealToPlayer(b, p, amount) {
+  function dealToPlayer(b, p, amount, opts) {
     if (p.dead) return;
+    opts = opts || {};
     let dmg = amount;
     if (p.st.vuln > 0) dmg = Math.floor(dmg * 1.5);
     dmg = Math.max(0, dmg);
-    if (p.block > 0) { const s = Math.min(p.block, dmg); p.block -= s; dmg -= s; }
-    if (dmg <= 0) return;
+    let blocked = 0;
+    if (p.block > 0) { const s = Math.min(p.block, dmg); p.block -= s; dmg -= s; blocked = s; }
+    if (dmg <= 0) { emit(b, { t: 'dmg', src: opts.src || b._src || null, tgt: p.id, amt: 0, blocked: blocked, kind: opts.kind || 'hit' }); return; }
     if (p.hp - dmg <= 0 && p.mods.deathWard && !p.deathWardUsed) {
       p.deathWardUsed = true; p.hp = 1; log(b, p.name + ' is saved by the Stone Totem!');
+      emit(b, { t: 'dmg', src: opts.src || b._src || null, tgt: p.id, amt: dmg, blocked: blocked, kind: opts.kind || 'hit' });
+      emit(b, { t: 'ward', tgt: p.id });
       return;
     }
     p.hp -= dmg;
-    if (p.hp <= 0) { p.hp = 0; p.dead = true; log(b, p.name + ' falls!'); }
+    emit(b, { t: 'dmg', src: opts.src || b._src || null, tgt: p.id, amt: dmg, blocked: blocked, kind: opts.kind || 'hit' });
+    if (p.hp <= 0) { p.hp = 0; p.dead = true; log(b, p.name + ' falls!'); emit(b, { t: 'die', tgt: p.id }); }
   }
 
-  function dealToAlly(b, a, amount) {
-    a.hp -= Math.max(0, amount);
-    if (a.hp <= 0) { a.hp = 0; log(b, a.name + ' is destroyed.'); }
+  function dealToAlly(b, a, amount, opts) {
+    opts = opts || {};
+    const d = Math.max(0, amount);
+    a.hp -= d;
+    emit(b, { t: 'dmg', src: opts.src || b._src || null, tgt: a.uid, amt: d, blocked: 0, kind: opts.kind || 'hit' });
+    if (a.hp <= 0) { a.hp = 0; log(b, a.name + ' is destroyed.'); emit(b, { t: 'die', tgt: a.uid }); }
   }
+
+  /* heal / block / status emitters (so the UI can show +N and pulses) */
+  function healEntity(b, ent, tgtId, amount, kind) {
+    const before = ent.hp; ent.hp = U.clamp(ent.hp + amount, 0, ent.maxHp);
+    const gained = ent.hp - before;
+    if (gained > 0) emit(b, { t: 'heal', tgt: tgtId, amt: gained, kind: kind || 'heal' });
+    return gained;
+  }
+  function gainBlock(b, ent, tgtId, amount) {
+    if (amount <= 0) return; ent.block += amount;
+    emit(b, { t: 'block', tgt: tgtId, amt: amount });
+  }
+  function emitStatus(b, tgtId, key, amt) { if (amt > 0) emit(b, { t: 'status', tgt: tgtId, key: key, amt: amt }); }
 
   /* ================= SUMMONS ================= */
   function summon(b, p, key) {
@@ -213,6 +246,8 @@
     };
     b.allies.push(a);
     log(b, p.name + ' calls a ' + def.name + '.');
+    emit(b, { t: 'summon', tgt: a.uid, owner: p.id });
+    return a;
   }
 
   /* ================= CARD COST / PLAY ================= */
@@ -242,20 +277,22 @@
       if (!target) return { ok: false, err: 'No target.' };
     }
 
+    freshEvents(b);
+    emit(b, { t: 'play', src: p.id, card: card.name, ctype: card.type });
     p.energy -= cost;
     p.firstPlayed = true;
     /* remove from hand -> discard (or exhaust) */
     p.hand.splice(handIdx, 1);
 
     /* on-play power: Thousand Cuts */
-    if (p.powers.cutsOnPlay) aliveEnemies(b).forEach(e => dealToEnemy(b, e, p.powers.cutsOnPlay));
+    if (p.powers.cutsOnPlay) aliveEnemies(b).forEach(e => dealToEnemy(b, e, p.powers.cutsOnPlay, { src: p.id, kind: 'cuts' }));
 
     applyEffects(b, p, card, target);
 
     /* on-attack power: Urverk Stance */
-    if (card.type === 'attack' && p.powers.blockOnAttack) p.block += p.powers.blockOnAttack;
+    if (card.type === 'attack' && p.powers.blockOnAttack) gainBlock(b, p, p.id, p.powers.blockOnAttack);
     /* on-skill power: Tidal Bulwark */
-    if (card.type === 'skill' && p.powers.blockOnSkill) p.block += p.powers.blockOnSkill;
+    if (card.type === 'skill' && p.powers.blockOnSkill) gainBlock(b, p, p.id, p.powers.blockOnSkill);
 
     if (card.exhaust) p.exhaust.push({ id: inst.id, upg: inst.upg });
     else p.discard.push({ id: inst.id, upg: inst.upg });
@@ -305,20 +342,20 @@
     }
 
     /* self buffs */
-    if (e.str) p.st.str += e.str;
-    if (e.dex) p.st.dex += e.dex;
-    if (e.regen) p.st.regen += e.regen;
-    if (e.block) p.block += e.block + (p.st.dex || 0);
-    if (e.heal) p.hp = U.clamp(p.hp + e.heal, 0, p.maxHp);
+    if (e.str) { p.st.str += e.str; emitStatus(b, p.id, 'str', e.str); }
+    if (e.dex) { p.st.dex += e.dex; emitStatus(b, p.id, 'dex', e.dex); }
+    if (e.regen) { p.st.regen += e.regen; emitStatus(b, p.id, 'regen', e.regen); }
+    if (e.block) gainBlock(b, p, p.id, e.block + (p.st.dex || 0));
+    if (e.heal) healEntity(b, p, p.id, e.heal, 'heal');
     if (e.energy) p.energy += e.energy;
     if (e.draw) draw(b, p, e.draw);
-    if (e.strAllies) b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => a.str += e.strAllies);
-    if (e.blockAllies) b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => a.block += e.blockAllies);
+    if (e.strAllies) b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => { a.str += e.strAllies; emitStatus(b, a.uid, 'str', e.strAllies); });
+    if (e.blockAllies) b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => gainBlock(b, a, a.uid, e.blockAllies));
     if (e.power) p.powers[e.power] = (e.amount != null ? e.amount : true);
 
     /* damage */
     if (e.detonatePoison) {
-      aliveEnemies(b).forEach(en => { if (en.st.poison > 0) dealToEnemy(b, en, en.st.poison); });
+      aliveEnemies(b).forEach(en => { if (en.st.poison > 0) dealToEnemy(b, en, en.st.poison, { src: p.id, kind: 'detonate' }); });
     }
     if (e.damage) {
       const hits = e.hits || 1;
@@ -328,18 +365,18 @@
           if (en.hp <= 0) return;
           let base = e.damage;
           if (e.bonusIfBlock && p.block > 0) base += e.bonusIfBlock;
-          const dealt = dealToEnemy(b, en, outgoing(base, p));
-          if (e.lifesteal) p.hp = U.clamp(p.hp + dealt, 0, p.maxHp);
+          const dealt = dealToEnemy(b, en, outgoing(base, p), { src: p.id, kind: 'attack' });
+          if (e.lifesteal) healEntity(b, p, p.id, dealt, 'lifesteal');
           if (e.refundOnKill && en.hp <= 0) p.energy += e.refundOnKill;
         });
       }
     }
     /* debuffs on target(s) */
     const debuffTargets = (e.aoe || card.target === 'allEnemies' || e.poisonAll) ? aliveEnemies(b) : (target ? [target] : []);
-    if (e.poison) debuffTargets.forEach(en => en.hp > 0 && applyPoison(en, e.poison));
-    if (e.poisonAll) aliveEnemies(b).forEach(en => applyPoison(en, e.poisonAll));
-    if (e.vuln) debuffTargets.forEach(en => en.hp > 0 && applyVuln(en, e.vuln));
-    if (e.weak) debuffTargets.forEach(en => en.hp > 0 && applyWeak(en, e.weak));
+    if (e.poison) debuffTargets.forEach(en => { if (en.hp > 0) { applyPoison(en, e.poison); emitStatus(b, en.uid, 'poison', e.poison); } });
+    if (e.poisonAll) aliveEnemies(b).forEach(en => { applyPoison(en, e.poisonAll); emitStatus(b, en.uid, 'poison', e.poisonAll); });
+    if (e.vuln) debuffTargets.forEach(en => { if (en.hp > 0) { applyVuln(en, e.vuln); emitStatus(b, en.uid, 'vuln', e.vuln); } });
+    if (e.weak) debuffTargets.forEach(en => { if (en.hp > 0) { applyWeak(en, e.weak); emitStatus(b, en.uid, 'weak', e.weak); } });
   }
 
   /* ================= DRAW ================= */
@@ -363,14 +400,14 @@
       /* battle-start relic effects land on the first turn (so start
          Block survives the turn-start block reset) */
       if (p.turnOne) {
-        if (p.mods.startBlock) p.block += p.mods.startBlock;
-        if (p.mods.startRegen) p.st.regen += p.mods.startRegen;
-        if (p.mods.startPoisonRandom) { const es = aliveEnemies(b); if (es.length) applyPoison(b._rng.pick(es), p.mods.startPoisonRandom); }
+        if (p.mods.startBlock) gainBlock(b, p, p.id, p.mods.startBlock);
+        if (p.mods.startRegen) { p.st.regen += p.mods.startRegen; emitStatus(b, p.id, 'regen', p.mods.startRegen); }
+        if (p.mods.startPoisonRandom) { const es = aliveEnemies(b); if (es.length) { const en = b._rng.pick(es); applyPoison(en, p.mods.startPoisonRandom); emitStatus(b, en.uid, 'poison', p.mods.startPoisonRandom); } }
       }
       /* poison ticks on the player at the top of their turn */
-      if (p.st.poison > 0) { dealToPlayer(b, p, p.st.poison); p.st.poison = Math.max(0, p.st.poison - 1); if (p.dead) return; }
+      if (p.st.poison > 0) { dealToPlayer(b, p, p.st.poison, { kind: 'poison' }); p.st.poison = Math.max(0, p.st.poison - 1); if (p.dead) return; }
       /* regen heals */
-      if (p.st.regen > 0) { p.hp = U.clamp(p.hp + p.st.regen, 0, p.maxHp); p.st.regen = Math.max(0, p.st.regen - 1); }
+      if (p.st.regen > 0) { healEntity(b, p, p.id, p.st.regen, 'regen'); p.st.regen = Math.max(0, p.st.regen - 1); }
       /* energy */
       p.energy = p.baseEnergy + (p.mods.energyPerTurn || 0);
       if (p.turnOne && p.mods.startEnergyOnce) p.energy += p.mods.startEnergyOnce;
@@ -401,28 +438,31 @@
 
   E.resolveEnemyTurn = function (b) {
     if (b.over) return;
+    freshEvents(b);
     b.phase = 'enemy';
+    emit(b, { t: 'phase', phase: 'ally' });
 
     /* ---- ally phase: your summons act ---- */
     aliveAllies(b).forEach(a => {
       const owner = playerById(b, a.ownerId);
-      if (a.block && owner && !owner.dead) owner.block += a.block;
+      if (a.block && owner && !owner.dead) gainBlock(b, owner, owner.id, a.block);
       if (a.healAlly) {
         const hurt = alivePlayers(b).sort((x, y) => (x.hp / x.maxHp) - (y.hp / y.maxHp))[0];
-        if (hurt) hurt.hp = U.clamp(hurt.hp + a.healAlly, 0, hurt.maxHp);
+        if (hurt) healEntity(b, hurt, hurt.id, a.healAlly, 'heal');
       }
       if (a.dmg > 0) {
         const en = pickEnemyTarget(b);
-        if (en) { const dealt = dealToEnemy(b, en, outgoing(a.dmg + a.str, a)); if (a.poison) applyPoison(en, a.poison); }
+        if (en) { dealToEnemy(b, en, outgoing(a.dmg + a.str, a), { src: a.uid, kind: 'attack' }); if (a.poison && en.hp > 0) { applyPoison(en, a.poison); emitStatus(b, en.uid, 'poison', a.poison); } }
       }
     });
     checkOver(b);
     if (b.over) return;
 
     /* ---- enemy phase ---- */
+    emit(b, { t: 'phase', phase: 'enemy' });
     aliveEnemies(b).forEach(e => {
       /* poison ticks on the enemy */
-      if (e.st.poison > 0) { dealToEnemy(b, e, e.st.poison); e.st.poison = Math.max(0, e.st.poison - 1); }
+      if (e.st.poison > 0) { dealToEnemy(b, e, e.st.poison, { kind: 'poison' }); e.st.poison = Math.max(0, e.st.poison - 1); }
       if (e.hp <= 0) return;
       e.block = 0;
       executeIntent(b, e);
@@ -463,20 +503,20 @@
         for (let h = 0; h < hits; h++) {
           const tgt = pickPlayerTarget(b); if (!tgt) return;
           const dmg = outgoing(Math.round(m.dmg * dmgScale), e);
-          if (tgt.type === 'ally') dealToAlly(b, tgt.ref, dmg);
-          else dealToPlayer(b, tgt.ref, dmg);
+          if (tgt.type === 'ally') dealToAlly(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' });
+          else dealToPlayer(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' });
         }
         break;
       }
-      case 'block': e.block += m.block || 0; break;
-      case 'buff': if (m.str) e.st.str += m.str; break;
+      case 'block': gainBlock(b, e, e.uid, m.block || 0); break;
+      case 'buff': if (m.str) { e.st.str += m.str; emitStatus(b, e.uid, 'str', m.str); } break;
       case 'debuff': {
         const tgt = pickPlayerTarget(b);
         if (m.dmg) { const dmg = outgoing(Math.round(m.dmg * dmgScale), e);
-          if (tgt) { if (tgt.type === 'ally') dealToAlly(b, tgt.ref, dmg); else dealToPlayer(b, tgt.ref, dmg); } }
+          if (tgt) { if (tgt.type === 'ally') dealToAlly(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' }); else dealToPlayer(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' }); } }
         if (tgt && tgt.type === 'player') {
-          if (m.weak) tgt.ref.st.weak += m.weak;
-          if (m.vuln) tgt.ref.st.vuln += m.vuln;
+          if (m.weak) { tgt.ref.st.weak += m.weak; emitStatus(b, tgt.ref.id, 'weak', m.weak); }
+          if (m.vuln) { tgt.ref.st.vuln += m.vuln; emitStatus(b, tgt.ref.id, 'vuln', m.vuln); }
         }
         break;
       }
@@ -484,7 +524,7 @@
         const count = m.count || 1;
         for (let i = 0; i < count; i++) {
           const nm = makeEnemy(b, m.summon, 1, dmgScale);
-          if (nm && aliveEnemies(b).length < 8) { nm.intent = chooseIntent(b, nm); b.enemies.push(nm); }
+          if (nm && aliveEnemies(b).length < 8) { nm.intent = chooseIntent(b, nm); b.enemies.push(nm); emit(b, { t: 'spawn', tgt: nm.uid, src: e.uid }); }
         }
         log(b, e.name + ' summons reinforcements!');
         break;

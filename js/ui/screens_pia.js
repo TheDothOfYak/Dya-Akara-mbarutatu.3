@@ -30,6 +30,121 @@
     return cv;
   }
 
+  /* ================= BATTLE ANIMATION =================
+     The engine records an ordered `events` stream for each action (who hit
+     whom, ticks, heals, blocks, summons, deaths). We play it as a timeline:
+     the acting figure lunges, the target flashes and floats a number, and
+     its HP bar falls in step — so every change reads as a cause, not a jump.
+     Bars are seeded to their PRE-batch values (reconstructed from the events)
+     and walked forward, so you watch each hit land. */
+  let fxRefs = {};           // uid -> { cell, fill, text, max, hp }
+  let runHost = null;        // #pia-root, for the post-timeline repaint
+  let lastEventsRef = null;  // the events array we last animated
+  let fxToken = 0;           // cancels a superseded timeline
+  let inputLocked = false;
+  const EMPTY_SET = { has: () => false };
+
+  function regRef(uid, cell, fill, text, max, hp) {
+    fxRefs[uid] = { cell: cell, fill: fill, text: text, max: max, hp: hp };
+    cell.setAttribute('data-uid', uid);
+  }
+  function setBar(ref, hp) {
+    if (!ref) return;
+    ref.fill.style.width = Math.max(0, Math.min(100, Math.round(100 * hp / ref.max))) + '%';
+    ref.text.textContent = Math.max(0, Math.round(hp)) + '/' + ref.max;
+  }
+  function centerRect(el) { return el.getBoundingClientRect(); }
+  function floatText(cell, text, cls) {
+    if (!cell) return;
+    const r = centerRect(cell);
+    const f = U.el('div', { cls: 'pia-float ' + (cls || ''), text: text });
+    f.style.left = (r.left + r.width / 2) + 'px'; f.style.top = (r.top + 10) + 'px';
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 950);
+  }
+  function flashHit(cell) { if (!cell) return; cell.classList.remove('pia-hit'); void cell.offsetWidth; cell.classList.add('pia-hit'); setTimeout(() => cell.classList.remove('pia-hit'), 440); }
+  function popIn(cell) { if (!cell) return; cell.classList.add('pia-pop'); setTimeout(() => cell.classList.remove('pia-pop'), 420); }
+  function fadeDie(cell) { if (!cell) return; cell.classList.add('pia-die'); }
+  function pulseEl(cell) { if (!cell) return; cell.classList.add('pia-act'); setTimeout(() => cell.classList.remove('pia-act'), 240); }
+  function shieldPulse(cell) { if (!cell) return; cell.classList.add('pia-shield'); setTimeout(() => cell.classList.remove('pia-shield'), 420); }
+  function lunge(srcCell, tgtCell) {
+    if (!srcCell || !tgtCell) return;
+    const s = centerRect(srcCell), t = centerRect(tgtCell);
+    let dx = (t.left + t.width / 2) - (s.left + s.width / 2);
+    let dy = (t.top + t.height / 2) - (s.top + s.height / 2);
+    const d = Math.hypot(dx, dy) || 1, reach = Math.min(38, d * 0.4);
+    dx = dx / d * reach; dy = dy / d * reach;
+    srcCell.style.transition = 'transform .12s ease-out';
+    srcCell.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+    setTimeout(() => { srcCell.style.transform = ''; setTimeout(() => { srcCell.style.transition = ''; }, 150); }, 120);
+  }
+  function banner(text) {
+    const el = U.el('div', { cls: 'pia-banner', text: text });
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 950);
+  }
+  function setInputLocked(v) { inputLocked = v; if (runHost) runHost.classList.toggle('fx-lock', v); }
+
+  const FLOAT_CLS = { poison: 'f-poison', detonate: 'f-poison', cuts: 'f-dmg' };
+  function statusFloat(key, amt) {
+    return ({ poison: '☠+' + amt, vuln: '⤈+' + amt, weak: '⬇+' + amt, str: '💪+' + amt, regen: '✚+' + amt, dex: '✧+' + amt })[key] || (key + '+' + amt);
+  }
+  function dyingSet(b) {
+    const s = {};
+    (b.events || []).forEach(ev => { if (ev.t === 'die' && ev.tgt) s[ev.tgt] = 1; });
+    return { has: (u) => !!s[u] };
+  }
+
+  /* play the current battle's event batch as a timed sequence */
+  function runTimeline(b) {
+    const my = ++fxToken;
+    const events = b.events || [];
+    const refs = fxRefs;
+    /* seed each bar to its pre-batch value (add back damage, remove heals) */
+    const cur = {};
+    Object.keys(refs).forEach(uid => { cur[uid] = refs[uid].hp; });
+    events.forEach(ev => {
+      if (ev.tgt != null && cur[ev.tgt] != null) {
+        if (ev.t === 'dmg') cur[ev.tgt] += ev.amt;
+        else if (ev.t === 'heal') cur[ev.tgt] -= ev.amt;
+      }
+    });
+    Object.keys(refs).forEach(uid => setBar(refs[uid], cur[uid]));
+
+    const lockInput = events.some(e => e.t === 'phase' || e.t === 'die');
+    if (lockInput) setInputLocked(true);
+
+    let t = 0;
+    const at = (fn, dur) => { const when = t; setTimeout(() => { if (fxToken === my) fn(); }, when); t += dur; };
+    events.forEach(ev => {
+      const tref = ev.tgt != null ? refs[ev.tgt] : null;
+      const sref = ev.src != null ? refs[ev.src] : null;
+      switch (ev.t) {
+        case 'play': at(() => pulseEl(sref && sref.cell), 60); break;
+        case 'phase': at(() => banner(ev.phase === 'ally' ? 'Your allies strike' : 'Enemy turn'), 480); break;
+        case 'dmg': at(() => {
+          if (sref && (ev.kind === 'attack')) lunge(sref.cell, tref && tref.cell);
+          if (tref) {
+            flashHit(tref.cell);
+            if (ev.amt > 0) { floatText(tref.cell, '-' + ev.amt, FLOAT_CLS[ev.kind] || 'f-dmg'); if (cur[ev.tgt] != null) { cur[ev.tgt] -= ev.amt; setBar(tref, cur[ev.tgt]); } }
+            else floatText(tref.cell, ev.blocked ? '🛡 blocked' : '0', 'f-block');
+          }
+        }, ev.kind === 'poison' || ev.kind === 'detonate' ? 220 : 260); break;
+        case 'heal': at(() => { if (tref) { floatText(tref.cell, '+' + ev.amt, 'f-heal'); if (cur[ev.tgt] != null) { cur[ev.tgt] += ev.amt; setBar(tref, cur[ev.tgt]); } } }, 210); break;
+        case 'block': at(() => { if (tref) { floatText(tref.cell, '🛡+' + ev.amt, 'f-block'); shieldPulse(tref.cell); } }, 150); break;
+        case 'status': at(() => { if (tref) floatText(tref.cell, statusFloat(ev.key, ev.amt), 'f-status'); }, 140); break;
+        case 'summon': case 'spawn': at(() => popIn(tref && tref.cell), 200); break;
+        case 'die': at(() => fadeDie(tref && tref.cell), 320); break;
+        case 'ward': at(() => banner('Saved!'), 240); break;
+        default: break;
+      }
+    });
+    at(() => { if (fxToken !== my) return; if (lockInput) setInputLocked(false); if (runHost && runHost.isConnected) paintRun(runHost); }, 90);
+  }
+
+  /* battle actions route through here so input locks during the enemy phase */
+  function battleAct(action) { if (inputLocked) return; S.act(action); }
+
   /* ================= HOME / GUARDIAN SELECT ================= */
   UI.register('pia', {
     enter(root) {
@@ -235,11 +350,20 @@
 
   function paintRun(host) {
     if (!host || !host.isConnected) return;
+    runHost = host;
     const run = S.run; if (!run) { UI.show('pia'); return; }
+    /* a phase change other than battle-staying clears any leftover input lock */
+    if (run.phase !== 'battle') { if (inputLocked) setInputLocked(false); lastEventsRef = null; }
     host.innerHTML = '';
     switch (run.phase) {
       case 'map': host.appendChild(renderMap(run)); break;
-      case 'battle': host.appendChild(renderBattle(run)); break;
+      case 'battle': {
+        const b = run.battle;
+        const hasNew = b && b.events && b.events.length && b.events !== lastEventsRef;
+        host.appendChild(renderBattle(run, hasNew ? dyingSet(b) : EMPTY_SET));
+        if (hasNew) { lastEventsRef = b.events; requestAnimationFrame(() => runTimeline(b)); }
+        break;
+      }
       case 'reward': host.appendChild(renderReward(run)); break;
       case 'rest': host.appendChild(renderRest(run)); break;
       case 'shop': host.appendChild(renderShop(run)); break;
@@ -307,20 +431,22 @@
   }
 
   /* ---------- BATTLE ---------- */
-  function renderBattle(run) {
+  function renderBattle(run, dying) {
     const b = run.battle;
+    dying = dying || EMPTY_SET;
+    fxRefs = {};                       // fresh element registry for this paint
     const wrap = U.el('div', {});
     wrap.appendChild(runHeader(run, 'Battle · turn ' + b.turn));
 
     const arena = U.el('div', { cls: 'pia-arena' });
 
-    /* enemies */
+    /* enemies (include any that die in the pending batch, for the death anim) */
     const enemyRow = U.el('div', { cls: 'pia-enemy-row' });
-    EN.aliveEnemies(b).forEach(e => enemyRow.appendChild(renderEnemy(b, e)));
+    b.enemies.filter(e => e.hp > 0 || dying.has(e.uid)).forEach(e => enemyRow.appendChild(renderEnemy(b, e)));
     arena.appendChild(enemyRow);
 
     /* allies (summons) */
-    const allies = EN.aliveAllies(b);
+    const allies = b.allies.filter(a => a.hp > 0 || dying.has(a.uid));
     if (allies.length) {
       const allyRow = U.el('div', { cls: 'pia-ally-row' });
       allies.forEach(a => allyRow.appendChild(renderAlly(b, a)));
@@ -349,7 +475,7 @@
         ctrl.appendChild(U.el('div', { cls: 'pia-targeting', text: 'Pick a target enemy…' }));
         ctrl.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Cancel', onclick: () => { targeting = null; S.onUpdate && S.onUpdate(); } }));
       } else if (isMine && !me.ended && !me.dead) {
-        ctrl.appendChild(U.el('button', { cls: 'btn', text: 'End Turn ▶', onclick: () => { targeting = null; S.act({ type: 'endTurn', playerId: me.id }); } }));
+        ctrl.appendChild(U.el('button', { cls: 'btn', text: 'End Turn ▶', onclick: () => { targeting = null; battleAct({ type: 'endTurn', playerId: me.id }); } }));
       } else if (me.dead) {
         ctrl.appendChild(U.el('div', { cls: 'muted', text: 'You have fallen. The others fight on…' }));
       } else if (me.ended) {
@@ -403,11 +529,14 @@
     const size = e.boss ? 132 : e.elite ? 96 : 72;
     cell.appendChild(UI.tokenArt(e.species, size, 'idle', e.heads, null));
     cell.appendChild(U.el('div', { cls: 'pia-name', text: e.name }));
-    cell.appendChild(hpBar(e.hp, e.maxHp, e.block));
+    const bar = hpBar(e.hp, e.maxHp, e.block);
+    cell.appendChild(bar);
     cell.appendChild(statusRow(e.st));
+    regRef(e.uid, cell, bar._fill, bar._text, e.maxHp, e.hp);
     if (targeting != null) cell.onclick = () => {
+      if (inputLocked) return;
       const me = EN.playerById(b, S.myId); const idx = targeting; targeting = null;
-      S.act({ type: 'playCard', playerId: me.id, handIdx: idx, targetUid: e.uid });
+      battleAct({ type: 'playCard', playerId: me.id, handIdx: idx, targetUid: e.uid });
     };
     return cell;
   }
@@ -416,12 +545,14 @@
     const cell = U.el('div', { cls: 'pia-ally' });
     cell.appendChild(UI.tokenArt(a.species, 56, 'idle', null, null));
     cell.appendChild(U.el('div', { cls: 'pia-name tiny', text: a.name + (a.str ? ' +' + a.str : '') }));
-    cell.appendChild(hpBar(a.hp, a.maxHp, a.block));
+    const bar = hpBar(a.hp, a.maxHp, a.block);
+    cell.appendChild(bar);
     const tags = [];
     if (a.dmg) tags.push('⚔' + (a.dmg + a.str));
     if (a.taunt) tags.push('🛡taunt');
     if (a.healAlly) tags.push('✚' + a.healAlly);
     cell.appendChild(U.el('div', { cls: 'tiny muted', text: tags.join(' ') }));
+    regRef(a.uid, cell, bar._fill, bar._text, a.maxHp, a.hp);
     return cell;
   }
 
@@ -430,8 +561,10 @@
     const cell = U.el('div', { cls: 'pia-guardian' + (p.id === S.myId ? ' me' : '') + (p.dead ? ' dead' : '') + (p.ended ? ' ended' : '') });
     cell.appendChild(guardArt(g, 72, p.dead ? 'death' : 'idle'));
     cell.appendChild(U.el('div', { cls: 'pia-name', text: p.name + (p.id === S.myId ? ' (you)' : '') }));
-    cell.appendChild(hpBar(p.hp, p.maxHp, p.block));
+    const bar = hpBar(p.hp, p.maxHp, p.block);
+    cell.appendChild(bar);
     cell.appendChild(statusRow(p.st, true));
+    regRef(p.id, cell, bar._fill, bar._text, p.maxHp, p.hp);
     if (p.ended && !p.dead) cell.appendChild(U.el('div', { cls: 'tiny gold', text: '✓ ready' }));
     return cell;
   }
@@ -441,9 +574,11 @@
     const bar = U.el('div', { cls: 'pia-hpbar' });
     const fill = U.el('div', { cls: 'pia-hpfill', style: 'width:' + Math.max(0, Math.round(100 * hp / max)) + '%' });
     bar.appendChild(fill);
-    bar.appendChild(U.el('div', { cls: 'pia-hptext', text: hp + '/' + max }));
+    const text = U.el('div', { cls: 'pia-hptext', text: Math.max(0, hp) + '/' + max });
+    bar.appendChild(text);
     wrap.appendChild(bar);
     if (block > 0) wrap.appendChild(U.el('div', { cls: 'pia-block', title: 'Block', text: '🛡' + block }));
+    wrap._fill = fill; wrap._text = text;   // for the animation registry
     return wrap;
   }
 
@@ -473,8 +608,9 @@
     el.appendChild(U.el('div', { cls: 'pia-card-name', text: card.name }));
     el.appendChild(U.el('div', { cls: 'pia-card-text', text: cardText(card) }));
     if (playable) el.onclick = () => {
+      if (inputLocked) return;
       if (needsTargetUI(card)) { targeting = idx; S.onUpdate && S.onUpdate(); }
-      else S.act({ type: 'playCard', playerId: p.id, handIdx: idx, targetUid: null });
+      else battleAct({ type: 'playCard', playerId: p.id, handIdx: idx, targetUid: null });
     };
     return el;
   }
