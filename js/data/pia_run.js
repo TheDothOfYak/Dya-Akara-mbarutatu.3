@@ -241,6 +241,83 @@
       text: 'Summon a Rodak Pack (14 HP, hits for 6).', summon: 'call_rodak', upgrade: { summonBonus: { hp: 6, dmg: 2 } } },
     mikolo_gambit: { name: 'Mikolo Gambit', cls: 'neutral', type: 'attack', cost: 1, rarity: 'uncommon',
       text: 'Deal 9 damage. Lifesteal.', e: { damage: 9, lifesteal: true }, upgrade: { e: { damage: 13, lifesteal: true } } },
+    second_wind: { name: 'Second Wind', cls: 'neutral', type: 'skill', cost: 1, rarity: 'uncommon',
+      text: 'Draw 3. Exhaust.', target: 'self', e: { draw: 3 }, exhaust: true, upgrade: { cost: 0 } },
+    guild_rations: { name: 'Guild Rations', cls: 'neutral', type: 'skill', cost: 0, rarity: 'common',
+      text: 'Heal 5 HP. Gain 3 Block.', target: 'self', e: { heal: 5, block: 3 }, upgrade: { e: { heal: 8, block: 5 } } },
+    war_drum: { name: 'War Drum', cls: 'neutral', type: 'power', cost: 2, rarity: 'rare',
+      text: 'Power. At the start of your turn, gain 1 Strength.', target: 'self', e: { power: 'strGrowth', amount: 1 }, upgrade: { e: { power: 'strGrowth', amount: 2 } } },
+    honed_edge: { name: 'Honed Edge', cls: 'neutral', type: 'attack', cost: 1, rarity: 'common',
+      text: 'Deal 7 damage.', e: { damage: 7 }, upgrade: { e: { damage: 11 } } },
+
+    /* ---------- more Tanoc (Ular) ---------- */
+    boulder_toss: { name: 'Boulder Toss', cls: 'tanoc', type: 'attack', cost: 1, rarity: 'common',
+      text: 'Deal 8 damage.', e: { damage: 8 }, upgrade: { e: { damage: 12 } } },
+    ironwall: { name: 'Ironwall', cls: 'tanoc', type: 'skill', cost: 2, rarity: 'rare',
+      text: 'Gain 18 Block. Gain 2 Strength.', target: 'self', e: { block: 18, str: 2 }, upgrade: { e: { block: 24, str: 2 } } },
+    earthshaker: { name: 'Earthshaker', cls: 'tanoc', type: 'attack', cost: 2, rarity: 'uncommon',
+      text: 'Deal 6 damage to ALL enemies. Apply 2 Weak to all.', target: 'allEnemies', e: { damage: 6, weak: 2 }, upgrade: { e: { damage: 9, weak: 2 } } },
+
+    /* ---------- more Kiet (Fti) ---------- */
+    twin_fang: { name: 'Twin Fang', cls: 'kiet', type: 'attack', cost: 1, rarity: 'uncommon',
+      text: 'Deal 3 damage 3 times.', e: { damage: 3, hits: 3 }, upgrade: { e: { damage: 5, hits: 3 } } },
+    slip: { name: 'Slip', cls: 'kiet', type: 'skill', cost: 0, rarity: 'common',
+      text: 'Gain 1 Dexterity. Draw 1.', target: 'self', e: { dex: 1, draw: 1 }, upgrade: { e: { dex: 2, draw: 1 } } },
+    wind_wall: { name: 'Wind Wall', cls: 'kiet', type: 'skill', cost: 1, rarity: 'common',
+      text: 'Gain 6 Block. Gain 6 more if you have Dexterity.', target: 'self', e: { block: 6, bonusBlockIfDex: 6 }, upgrade: { e: { block: 9, bonusBlockIfDex: 6 } } },
+
+    /* ---------- more Buhkon (Eldi) ---------- */
+    cinder_rain: { name: 'Cinder Rain', cls: 'buhkon', type: 'attack', cost: 1, rarity: 'uncommon',
+      text: 'Apply 3 Poison to ALL enemies.', target: 'allEnemies', e: { poisonAll: 3 }, upgrade: { e: { poisonAll: 5 } } },
+    ashling: { name: 'Ashling', cls: 'buhkon', type: 'summon', cost: 1, rarity: 'common',
+      text: 'Summon a Rodak Pack (14 HP). Apply 2 Poison to ALL enemies.', summon: 'call_rodak', e: { poisonAll: 2 }, upgrade: { e: { poisonAll: 4 } } },
+    slow_burn: { name: 'Slow Burn', cls: 'buhkon', type: 'power', cost: 1, rarity: 'rare',
+      text: 'Power. At the start of your turn, apply 2 Poison to ALL enemies.', target: 'self', e: { power: 'poisonGrowth', amount: 2 }, upgrade: { e: { power: 'poisonGrowth', amount: 3 } } },
+
+    /* ---------- more Phorus (Su) ---------- */
+    frostbind: { name: 'Frostbind', cls: 'phorus', type: 'skill', cost: 1, rarity: 'uncommon',
+      text: 'Apply 2 Weak and 2 Vulnerable to a foe.', e: { weak: 2, vuln: 2 }, upgrade: { e: { weak: 3, vuln: 3 } } },
+    bulwark_wave: { name: 'Bulwark Wave', cls: 'phorus', type: 'skill', cost: 1, rarity: 'common',
+      text: 'Gain 6 Block. All your allies gain 6 Block.', target: 'self', e: { block: 6, blockAllies: 6 }, upgrade: { e: { block: 9, blockAllies: 8 } } },
+    deep_freeze: { name: 'Deep Freeze', cls: 'phorus', type: 'attack', cost: 2, rarity: 'rare',
+      text: 'Deal 10 damage. Apply 3 Weak and 3 Vulnerable.', e: { damage: 10, weak: 3, vuln: 3 }, upgrade: { e: { damage: 14, weak: 3, vuln: 3 } } },
+
+    /* ---------- WORLD cards — offered on their planet, any class ----------
+       cls 'world' + a `world` tag; the reward roll mixes these in when you
+       fight on that planet, so each world flavours your draft. */
+    /* Velki (Su / tide, chill, mend) */
+    w_velki_tide: { name: 'Tidewater', cls: 'world', world: 'velki', type: 'attack', cost: 1, rarity: 'common',
+      text: 'Deal 5 damage. Apply 1 Weak.', e: { damage: 5, weak: 1 }, upgrade: { e: { damage: 8, weak: 1 } } },
+    w_velki_kelp: { name: 'Kelp Ward', cls: 'world', world: 'velki', type: 'skill', cost: 1, rarity: 'common',
+      text: 'Gain 7 Block. Draw 1.', target: 'self', e: { block: 7, draw: 1 }, upgrade: { e: { block: 10, draw: 1 } } },
+    w_velki_spring: { name: 'Springwater', cls: 'world', world: 'velki', type: 'skill', cost: 1, rarity: 'uncommon',
+      text: 'Heal 9 HP. Gain 2 Regen.', target: 'self', e: { heal: 9, regen: 2 }, upgrade: { e: { heal: 13, regen: 3 } } },
+    w_velki_undertow: { name: 'Undertow', cls: 'world', world: 'velki', type: 'attack', cost: 2, rarity: 'uncommon',
+      text: 'Deal 6 damage to ALL enemies. Apply 1 Weak to all.', target: 'allEnemies', e: { damage: 6, weak: 1 }, upgrade: { e: { damage: 9, weak: 1 } } },
+    w_velki_drown: { name: 'Drown', cls: 'world', world: 'velki', type: 'attack', cost: 2, rarity: 'rare',
+      text: 'Deal 18 damage. Apply 3 Weak.', e: { damage: 18, weak: 3 }, upgrade: { e: { damage: 24, weak: 3 } } },
+    /* Xikia (Ular / earth, strength, block) */
+    w_xikia_stone: { name: 'Stoneskin', cls: 'world', world: 'xikia', type: 'skill', cost: 1, rarity: 'common',
+      text: 'Gain 11 Block.', target: 'self', e: { block: 11 }, upgrade: { e: { block: 15 } } },
+    w_xikia_rockfall: { name: 'Rockfall', cls: 'world', world: 'xikia', type: 'attack', cost: 1, rarity: 'common',
+      text: 'Deal 8 damage. Deal 4 more if you have Block.', e: { damage: 8, bonusIfBlock: 4 }, upgrade: { e: { damage: 11, bonusIfBlock: 5 } } },
+    w_xikia_bedrock: { name: 'Bedrock', cls: 'world', world: 'xikia', type: 'skill', cost: 1, rarity: 'uncommon',
+      text: 'Gain 2 Strength. Gain 6 Block.', target: 'self', e: { str: 2, block: 6 }, upgrade: { e: { str: 3, block: 8 } } },
+    w_xikia_tremor: { name: 'Tremor', cls: 'world', world: 'xikia', type: 'attack', cost: 2, rarity: 'uncommon',
+      text: 'Deal 7 damage to ALL enemies. Apply 1 Vulnerable to all.', target: 'allEnemies', e: { damage: 7, vuln: 1 }, upgrade: { e: { damage: 10, vuln: 1 } } },
+    w_xikia_avalanche: { name: 'Avalanche', cls: 'world', world: 'xikia', type: 'attack', cost: 2, rarity: 'rare',
+      text: 'Deal 12 damage. Gain 10 Block.', e: { damage: 12, block: 10 }, upgrade: { e: { damage: 16, block: 12 } } },
+    /* Leotik (Fti / air, tempo, draw) */
+    w_leotik_gust: { name: 'Gust', cls: 'world', world: 'leotik', type: 'attack', cost: 0, rarity: 'common',
+      text: 'Deal 4 damage. Draw 1.', e: { damage: 4, draw: 1 }, upgrade: { e: { damage: 6, draw: 1 } } },
+    w_leotik_glide: { name: 'Glide', cls: 'world', world: 'leotik', type: 'skill', cost: 1, rarity: 'common',
+      text: 'Gain 5 Block. Gain 1 Dexterity.', target: 'self', e: { block: 5, dex: 1 }, upgrade: { e: { block: 7, dex: 2 } } },
+    w_leotik_squall: { name: 'Squall', cls: 'world', world: 'leotik', type: 'attack', cost: 1, rarity: 'uncommon',
+      text: 'Deal 4 damage 2 times. Apply 1 Weak.', e: { damage: 4, hits: 2, weak: 1 }, upgrade: { e: { damage: 6, hits: 2, weak: 1 } } },
+    w_leotik_updraft: { name: 'Updraft', cls: 'world', world: 'leotik', type: 'skill', cost: 1, rarity: 'uncommon',
+      text: 'Gain 1 energy. Draw 2.', target: 'self', e: { energy: 1, draw: 2 }, upgrade: { cost: 0 } },
+    w_leotik_shear: { name: 'Wind Shear', cls: 'world', world: 'leotik', type: 'attack', cost: 2, rarity: 'rare',
+      text: 'Deal 5 damage to ALL enemies 2 times.', target: 'allEnemies', e: { damage: 5, hits: 2 }, upgrade: { e: { damage: 7, hits: 2 } } },
   };
 
   /* ================= RELICS =================
@@ -425,11 +502,12 @@
 
   /* The reward pool for a Guardian: its own class cards + neutrals,
      of a given rarity. */
-  function rewardPool(clsId, rarity) {
+  function rewardPool(clsId, rarity, worldId) {
     return Object.keys(CARDS).filter(id => {
       const c = CARDS[id];
       if (c.rarity === 'starter') return false;
       if (c.rarity !== rarity) return false;
+      if (c.cls === 'world') return worldId ? c.world === worldId : false;
       return c.cls === clsId || c.cls === 'neutral';
     });
   }

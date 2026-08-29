@@ -987,12 +987,12 @@
     const body = U.el('div', { cls: 'pia-reward panel' });
     body.appendChild(U.el('h2', { cls: 'gold', text: 'The field is yours.' }));
 
-    if (me && me.relicReward) {
-      const r = D.relic(me.relicReward);
-      const rc = U.el('div', { cls: 'pia-relic-offer mt' }, [
-        U.el('div', { html: r.icon + ' <b>' + U.esc(r.name) + '</b> — ' + U.esc(r.text) }),
-        U.el('button', { cls: 'btn small', text: 'Take relic', onclick: () => { S.act({ type: 'takeRelic', accept: true }); } }),
+    if (me && me.gainedRelic) {
+      const r = D.relic(me.gainedRelic);
+      const rc = U.el('div', { cls: 'pia-relic-offer pia-relic-got mt pia-hint' }, [
+        U.el('div', { html: '✨ Relic collected — ' + r.icon + ' <b>' + U.esc(r.name) + '</b> — ' + U.esc(r.text) }),
       ]);
+      attachTip(rc, '<div class="pt-title">' + r.icon + ' ' + U.esc(r.name) + '</div><div>' + U.esc(r.text) + '</div><div class="pt-kw">Relics are kept for the rest of the run — you can hold any number.</div>');
       body.appendChild(rc);
     }
 
@@ -1081,19 +1081,34 @@
     wrap.appendChild(body);
     return wrap;
   }
+  /* describe exactly what an upgrade changes (numbers, cost, summon) */
+  const UP_LABEL = { damage: 'Damage', hits: 'Hits', block: 'Block', draw: 'Draw', energy: 'Vaelk', heal: 'Heal', poison: 'Poison', poisonAll: 'Poison (all)', vuln: 'Vulnerable', weak: 'Weak', str: 'Strength', dex: 'Dexterity', regen: 'Regen', blockAllies: 'Ally Block', strAllies: 'Ally Strength', bonusIfBlock: 'Bonus (if Block)', bonusBlockIfDex: 'Bonus Block (if Dex)', amount: 'Power', poisonGrowth: 'Poison/turn', strGrowth: 'Strength/turn', allyGrowth: 'Ally growth', lifesteal: 'Lifesteal', detonatePoison: 'Detonate' };
+  function describeUpgrade(cardId) {
+    const base = D.card(cardId); if (!base || !base.upgrade) return '';
+    const up = base.upgrade, be = base.e || {}, ue = up.e || {}, parts = [];
+    if (up.cost != null && up.cost !== (base.cost || 0)) parts.push('Cost <b>' + (base.cost || 0) + ' → ' + up.cost + '</b>');
+    for (const k in ue) { if (be[k] !== ue[k] && typeof ue[k] === 'number') parts.push((UP_LABEL[k] || k) + ' <b>' + (be[k] != null ? be[k] : 0) + ' → ' + ue[k] + '</b>'); }
+    if (up.summonBonus) { const sb = up.summonBonus, bits = []; if (sb.hp) bits.push('+' + sb.hp + ' HP'); if (sb.dmg) bits.push('+' + sb.dmg + ' Strike'); if (sb.healAlly) bits.push('+' + sb.healAlly + ' heal'); parts.push('Summon ' + bits.join(', ')); }
+    return parts.length ? parts.join('<br>') : 'Sharper in every way.';
+  }
+  function upgradeTipHtml(cardId) {
+    const base = D.card(cardId);
+    return '<div class="pt-title">⚒ ' + U.esc(base.name) + '</div><div class="pt-body">' + U.esc(base.text || '') + '</div><div class="pt-kw"><span class="pt-k">Upgrades to:</span><br>' + describeUpgrade(cardId) + '</div>';
+  }
+
   function openUpgrade(run, me) {
-    const wrap = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Upgrade a card' })]);
+    const wrap = U.el('div', {}, [U.el('h3', { cls: 'gold', text: 'Upgrade a card' }), U.el('div', { cls: 'tiny muted', text: 'Hover a card to preview exactly what its upgrade changes.' })]);
     const grid = U.el('div', { cls: 'pia-reward-cards', style: 'max-height:52vh;overflow:auto' });
     me.deck.forEach((c, i) => {
       const base = D.card(c.id); if (!base) return;
       const cell = renderStaticCard(c.id);
-      if (c.upg || !base.upgrade) { cell.classList.add('disabled'); }
-      else cell.onclick = () => { m.close(); S.act({ type: 'rest', mode: 'upgrade', deckIndex: i }); };
+      if (c.upg || !base.upgrade) { cell.classList.add('disabled'); if (c.upg) cell.classList.add('upg'); }
+      else { cell.classList.add('pia-upgradable'); attachTip(cell, upgradeTipHtml(c.id)); cell.onclick = () => { hideTip(); m.close(); S.act({ type: 'rest', mode: 'upgrade', deckIndex: i }); }; }
       grid.appendChild(cell);
     });
     wrap.appendChild(grid);
     const m = UI.modal(wrap);
-    wrap.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => m.close() }));
+    wrap.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Cancel', onclick: () => { hideTip(); m.close(); } }));
   }
 
   /* ---------- SHOP ---------- */
@@ -1117,10 +1132,13 @@
     body.appendChild(cards);
     (run.shop.relics || []).forEach((item, i) => {
       const r = D.relic(item.id);
-      const rc = U.el('div', { cls: 'pia-relic-offer mt' }, [
+      const rc = U.el('div', { cls: 'pia-relic-offer mt pia-hint' }, [
         U.el('div', { html: r.icon + ' <b>' + U.esc(r.name) + '</b> — ' + U.esc(r.text) + '  <span class="pia-price">' + (item.sold ? 'SOLD' : '🪙 ' + item.price) + '</span>' }),
       ]);
-      if (!item.sold && me.gold >= item.price && me.relics.indexOf(item.id) < 0) rc.appendChild(U.el('button', { cls: 'btn small', text: 'Buy', onclick: () => { S.act({ type: 'buyRelic', idx: i }); } }));
+      attachTip(rc, '<div class="pt-title">' + r.icon + ' ' + U.esc(r.name) + '</div><div>' + U.esc(r.text) + '</div>');
+      if (item.sold) { /* sold out */ }
+      else if (me.gold >= item.price) rc.appendChild(U.el('button', { cls: 'btn small', text: 'Buy', onclick: () => { S.act({ type: 'buyRelic', idx: i }); } }));
+      else rc.appendChild(U.el('span', { cls: 'tiny muted', text: 'Not enough gold' }));
       body.appendChild(rc);
     });
     body.appendChild(U.el('button', { cls: 'btn mt', text: 'Leave the merchant ▶', onclick: () => { S.act({ type: 'leaveShop' }); } }));
@@ -1137,13 +1155,12 @@
     body.appendChild(U.el('h2', { cls: 'gold', text: 'A cache in the rocks.' }));
     if (me && me.treasureRelic && !me.restDone) {
       const r = D.relic(me.treasureRelic);
-      body.appendChild(U.el('div', { cls: 'pia-relic-offer mt' }, [U.el('div', { html: r.icon + ' <b>' + U.esc(r.name) + '</b> — ' + U.esc(r.text) })]));
-      const acts = U.el('div', { cls: 'flex mt' });
-      acts.appendChild(U.el('button', { cls: 'btn', text: 'Take it', onclick: () => { S.act({ type: 'takeTreasure', accept: true }); } }));
-      acts.appendChild(U.el('button', { cls: 'btn ghost', text: 'Leave it', onclick: () => { S.act({ type: 'takeTreasure', accept: false }); } }));
-      body.appendChild(acts);
+      const rc = U.el('div', { cls: 'pia-relic-offer pia-relic-got mt pia-hint' }, [U.el('div', { html: '✨ Collected — ' + r.icon + ' <b>' + U.esc(r.name) + '</b> — ' + U.esc(r.text) })]);
+      attachTip(rc, '<div class="pt-title">' + r.icon + ' ' + U.esc(r.name) + '</div><div>' + U.esc(r.text) + '</div>');
+      body.appendChild(rc);
+      body.appendChild(U.el('button', { cls: 'btn mt', text: 'Onward ▶', onclick: () => { S.act({ type: 'takeTreasure', accept: true }); } }));
     } else {
-      body.appendChild(U.el('div', { cls: 'gold mt', text: 'Taken. ' + (run.mode === 'coop' ? 'Waiting for the party…' : '') }));
+      body.appendChild(U.el('div', { cls: 'gold mt', text: 'Collected. ' + (run.mode === 'coop' ? 'Waiting for the party…' : '') }));
     }
     if (run.mode === 'coop') body.appendChild(partyPending(run, p => p.restDone || p.hp <= 0));
     wrap.appendChild(body);

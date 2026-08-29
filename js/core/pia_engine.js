@@ -387,7 +387,7 @@
     if (e.str) { p.st.str += e.str; emitStatus(b, p.id, 'str', e.str); }
     if (e.dex) { p.st.dex += e.dex; emitStatus(b, p.id, 'dex', e.dex); }
     if (e.regen) { p.st.regen += e.regen; emitStatus(b, p.id, 'regen', e.regen); }
-    if (e.block) gainBlock(b, p, p.id, e.block + (p.st.dex || 0));
+    if (e.block) gainBlock(b, p, p.id, e.block + (p.st.dex || 0) + (e.bonusBlockIfDex && p.st.dex > 0 ? e.bonusBlockIfDex : 0));
     if (e.heal) healEntity(b, p, p.id, e.heal, 'heal');
     if (e.energy) p.energy += e.energy;
     if (e.draw) draw(b, p, e.draw);
@@ -459,6 +459,10 @@
       /* ally growth powers / relics */
       const grow = (p.powers.allyGrowth || 0) + (p.mods.allyGrowthPerTurn || 0);
       if (grow) b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => a.str += grow);
+      /* self-strength power (War Drum) */
+      if (p.powers.strGrowth) { p.st.str += p.powers.strGrowth; emitStatus(b, p.id, 'str', p.powers.strGrowth); }
+      /* recurring poison power (Slow Burn) */
+      if (p.powers.poisonGrowth) aliveEnemies(b).forEach(en => { applyPoison(en, p.powers.poisonGrowth); emitStatus(b, en.uid, 'poison', p.powers.poisonGrowth); });
       /* draw */
       draw(b, p, D.TUNE.handSize + (p.mods.drawPerTurn || 0));
       p.turnOne = false;

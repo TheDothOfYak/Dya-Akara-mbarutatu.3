@@ -201,6 +201,7 @@
     const diff = D.difficulty(run.diffId);
     const rng = new U.Rng((run.seed ^ U.hashStr(node.id) ^ 0xbeef) >>> 0);
     run.players.forEach(p => {
+      p.gainedRelic = null;
       if (p.hp <= 0) return;
       /* gold (scaled by difficulty) */
       const baseGold = isBoss ? 100 : isElite ? 45 : rng.int(14, 26);
@@ -213,7 +214,8 @@
       p.rewardChoices = R.rollCardChoices(run, p, rng, isElite || isBoss);
       p.rewardTaken = false;
       /* elites/bosses also drop a relic choice */
-      if (isElite || isBoss) p.relicReward = R.rollRelic(run, p, rng);
+      /* relics are collected automatically now — no click, no cap */
+      if (isElite || isBoss) { const rid = R.rollRelic(run, p, rng); if (rid) { p.relics.push(rid); p.gainedRelic = rid; } }
     });
     /* a Pilgrimage: felling a world's Quarry with legs remaining opens a
        reward, then a leg-complete interstitial rather than the final win. */
@@ -231,7 +233,7 @@
       let rar = 'common';
       if (better) { if (r < 0.5) rar = 'uncommon'; else if (r < 0.72) rar = 'rare'; else rar = 'common'; }
       else { if (r < odds.common) rar = 'common'; else if (r < odds.common + odds.uncommon) rar = 'uncommon'; else rar = 'rare'; }
-      const pool = D.rewardPool(p.guardianId, rar).filter(id => out.indexOf(id) < 0);
+      const pool = D.rewardPool(p.guardianId, rar, run.planet).filter(id => out.indexOf(id) < 0);
       if (!pool.length) continue;
       out.push(rng.pick(pool));
       if (out.length > 20) break;
@@ -239,9 +241,9 @@
     return out;
   };
 
+  /* any non-starter relic — duplicates allowed (you can hold as many as you like) */
   R.rollRelic = function (run, p, rng) {
-    const owned = p.relics;
-    const pool = Object.keys(D.RELICS).filter(id => D.RELICS[id].rarity !== 'starter' && owned.indexOf(id) < 0);
+    const pool = Object.keys(D.RELICS).filter(id => D.RELICS[id].rarity !== 'starter');
     return pool.length ? rng.pick(pool) : null;
   };
 
@@ -310,11 +312,12 @@
     const lead = run.players[0];
     const cards = [];
     ['common', 'common', 'uncommon', 'uncommon', 'rare'].forEach(rar => {
-      const pool = D.rewardPool(lead.guardianId, rar);
+      const pool = D.rewardPool(lead.guardianId, rar, run.planet);
       if (pool.length) cards.push({ id: rng.pick(pool), price: rar === 'rare' ? 130 : rar === 'uncommon' ? 75 : 45 });
     });
     const relicPool = Object.keys(D.RELICS).filter(id => D.RELICS[id].rarity !== 'starter');
-    const relics = [{ id: rng.pick(relicPool), price: 140 }];
+    /* two relics on offer; duplicates are fine (you can hold any number) */
+    const relics = [{ id: rng.pick(relicPool), price: 140 }, { id: rng.pick(relicPool), price: 175 }];
     run.shop = { cards, relics, potions: [] };
   };
   R.buyCard = function (run, playerId, idx) {
@@ -324,7 +327,7 @@
   };
   R.buyRelic = function (run, playerId, idx) {
     const p = R.player(run, playerId), item = run.shop && run.shop.relics[idx];
-    if (!p || !item || item.sold || p.gold < item.price || p.relics.indexOf(item.id) >= 0) return false;
+    if (!p || !item || item.sold || p.gold < item.price) return false;   // no owned-cap: buy any relic you can afford
     p.gold -= item.price; p.relics.push(item.id); item.sold = true; return true;
   };
   R.leaveShop = function (run) { R.toMap(run); };
@@ -333,13 +336,15 @@
   R.rollTreasure = function (run) {
     const rng = new U.Rng((run.seed ^ U.hashStr(run.currentNodeId) ^ 0x7a3) >>> 0);
     run.players.forEach(p => {
-      const pool = Object.keys(D.RELICS).filter(id => D.RELICS[id].rarity !== 'starter' && p.relics.indexOf(id) < 0);
+      const pool = Object.keys(D.RELICS).filter(id => D.RELICS[id].rarity !== 'starter');
+      /* found treasure is collected automatically */
       p.treasureRelic = pool.length ? rng.pick(pool) : null;
+      if (p.treasureRelic) p.relics.push(p.treasureRelic);
     });
   };
   R.takeTreasure = function (run, playerId, accept) {
     const p = R.player(run, playerId); if (!p) return;
-    if (accept && p.treasureRelic && p.relics.indexOf(p.treasureRelic) < 0) p.relics.push(p.treasureRelic);
+    /* the relic was already collected at roll time; this just acknowledges it */
     p.treasureRelic = null; p.restDone = true;
     R.maybeAdvanceRest(run);
   };
@@ -349,7 +354,7 @@
     const node = run.map.byId[run.currentNodeId];
     run.available = node ? node.to.slice() : [];
     run.battle = null; run.shop = null;
-    run.players.forEach(p => { p.rewardChoices = null; p.relicReward = null; p.treasureRelic = null; });
+    run.players.forEach(p => { p.rewardChoices = null; p.relicReward = null; p.treasureRelic = null; p.gainedRelic = null; });
     run.phase = (run.available.length === 0) ? 'win' : 'map';
   };
 

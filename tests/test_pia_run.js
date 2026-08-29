@@ -290,6 +290,52 @@ evn.intent = evn.moves.find(m => m.intent === 'attack');
 EN.resolveEnemyTurn(bv);
 ok(pv.st.poison > 0 || pv.dead, 'a Venomous-warded foe poisons on its next strike (' + pv.st.poison + ')');
 
+/* ---------- 12. cards, world pools, relics ---------- */
+console.log('12. Cards / world pools / relics');
+// world cards exist and are keyed to a planet
+const worldCards = Object.keys(D.CARDS).filter(id => D.CARDS[id].cls === 'world');
+ok(worldCards.length >= 12, 'a set of world cards exists (' + worldCards.length + ')');
+D.PLANETS.forEach(pl => ok(worldCards.some(id => D.CARDS[id].world === pl.id), pl.id + ' has world cards'));
+// rewardPool mixes in world cards for the current planet, and only that planet's
+const velkiCommons = D.rewardPool('tanoc', 'common', 'velki');
+ok(velkiCommons.some(id => D.CARDS[id].world === 'velki'), 'reward pool on Velki includes Velki world cards');
+ok(!velkiCommons.some(id => D.CARDS[id].world === 'xikia'), 'reward pool on Velki excludes other worlds');
+ok(!D.rewardPool('tanoc', 'common').some(id => D.CARDS[id].cls === 'world'), 'no world tag => no world cards');
+// every card is valid (effects/summons resolve); a quick play of each doesn't throw
+Object.keys(D.CARDS).forEach(id => {
+  const b2 = soloBattle('tanoc', ['e_grothyn_su', 'e_krabbi'], 3);
+  const p2 = b2.players[0]; p2.energy = 9; p2.st.dex = 1; p2.st.str = 1;
+  p2.hand = [{ id: id, upg: false }];
+  const en2 = EN.aliveEnemies(b2)[0];
+  let threw = false; try { EN.playCard(b2, 'p1', 0, en2 ? en2.uid : null); } catch (e) { threw = true; console.error('   card threw: ' + id + ' :: ' + e.message); }
+  ok(!threw, 'card plays without error: ' + id);
+});
+// upgrade merge works for every upgradeable card
+Object.keys(D.CARDS).forEach(id => { if (D.CARDS[id].upgrade) { const m = EN.mergedCard({ id: id, upg: true }); ok(m && m.upg, 'upgrade merges: ' + id); } });
+
+// relics: elite/boss victory auto-collects (no click), duplicates allowed
+const rr = R.create({ seed: 5, planet: 'velki', mode: 'solo', difficulty: 'hunter', players: [{ id: 'p1', name: 'T', guardianId: 'tanoc' }] });
+const relBefore = rr.players[0].relics.length;
+R.grantVictory(rr, { type: 'elite', id: 'f2n0' });
+ok(rr.players[0].relics.length === relBefore + 1, 'elite victory auto-collects a relic (' + relBefore + ' -> ' + rr.players[0].relics.length + ')');
+ok(rr.players[0].gainedRelic, 'gainedRelic is recorded for the reward screen');
+// shop: can buy a relic you can afford (the reported bug), and a second one (no cap)
+rr.currentNodeId = 'f3n0'; R.rollShop(rr);
+const sp = rr.players[0]; sp.gold = 1000;
+ok(rr.shop.relics.length >= 2, 'shop offers relics');
+ok(R.buyRelic(rr, 'p1', 0) === true, 'a relic you can afford actually buys');
+ok(R.buyRelic(rr, 'p1', 1) === true, 'a second relic buys too (no ownership cap)');
+// treasure auto-collects
+const tBefore = sp.relics.length; rr.currentNodeId = 'f4n0'; R.rollTreasure(rr);
+ok(sp.relics.length > tBefore, 'treasure relic is collected automatically');
+// War Drum grows strength each turn
+const bd = soloBattle('tanoc', ['e_grothyn_su'], 8);
+bd.players[0].hand = [{ id: 'war_drum', upg: false }]; bd.players[0].energy = 3;
+EN.playCard(bd, 'p1', 0, null);
+const strB = bd.players[0].st.str;
+EN.endTurn(bd, 'p1');
+ok(bd.players[0].dead || bd.players[0].st.str > strB, 'War Drum grows Strength on the next turn (' + strB + ' -> ' + bd.players[0].st.str + ')');
+
 /* ---------- done ---------- */
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -147,6 +147,10 @@
 .pia-reward-cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
 .pia-relic-offer { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--gold-dim); border-radius: 8px; background: var(--panel); flex-wrap: wrap; }
 .pia-price { color: var(--gold); font-weight: bold; }
+.pia-relic-got { border-color: var(--gold); box-shadow: 0 0 14px #d9b87a44; }
+.pia-card.pia-upgradable { cursor: pointer; }
+.pia-card.pia-upgradable:hover { border-color: var(--gold); box-shadow: 0 0 16px #d9b87a66; transform: translateY(-4px); }
+.pia-card.upg { box-shadow: inset 0 0 0 2px #d9b87a88; }
 .pia-party-pending { display: flex; gap: 8px; flex-wrap: wrap; }
 .pia-party-pending .pill.done { border-color: var(--gold-dim); color: var(--gold); }
 .pia-end.win h1 { text-shadow: 0 0 24px #d9b87a55; }
