@@ -1,0 +1,160 @@
+/* ============================================================
+   LEGENDS OF PIA'DON — deckbuilder mode styles.
+   Uses the game's existing design tokens (--gold, --panel, …).
+   ============================================================ */
+
+.tiny { font-size: 11px; }
+.btn.big { padding: 12px 22px; font-size: 16px; }
+.input {
+  background: #171209; border: 1px solid var(--line); color: var(--ink);
+  border-radius: 8px; padding: 10px 14px; width: 100%; outline: none;
+}
+.input:focus { border-color: var(--gold-dim); box-shadow: 0 0 8px #d9b87a22; }
+
+/* ---------- home ---------- */
+.pia-home-wrap { max-width: 1040px; margin: 0 auto; padding: 22px 18px 60px; }
+.pia-title { font-size: 30px; color: var(--gold); letter-spacing: .12em; text-align: center; }
+.pia-sub { text-align: center; max-width: 720px; margin: 6px auto 22px; font-size: 13px; }
+.pia-home-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.pia-guard-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.pia-guard-cell {
+  width: 92px; padding: 8px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); text-align: center; cursor: pointer; transition: .12s;
+}
+.pia-guard-cell:hover { border-color: var(--gold-dim); }
+.pia-guard-cell.sel { border-color: var(--gold); box-shadow: 0 0 14px #d9b87a33; background: var(--panel2); }
+.pia-guard-cell canvas { display: block; margin: 0 auto; }
+.pia-guard-detail { min-height: 210px; }
+.pia-gd-name { font-size: 18px; margin: 6px 0; }
+.pia-relic-line { font-size: 13px; color: var(--ink); }
+.pia-planet-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pia-planet-cell { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); cursor: pointer; }
+.pia-planet-cell:hover { border-color: var(--gold-dim); }
+.pia-planet-cell.sel { border-color: var(--gold); box-shadow: 0 0 12px #d9b87a33; }
+.pp-name { font-size: 17px; color: var(--gold); }
+.pia-home-acts { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.pia-resume { border-color: var(--gold-dim); margin-bottom: 18px; }
+
+/* ---------- lobby ---------- */
+.pia-lobby-wrap { max-width: 640px; margin: 22px auto; }
+.pia-code { font-size: 26px; letter-spacing: 8px; color: var(--gold); font-weight: bold; }
+.pia-roster-row { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; background: var(--panel); }
+.pia-roster-row.me { border-color: var(--gold-dim); }
+.pia-roster-row .spacer { flex: 1; }
+.pia-ready.on { color: var(--gold); } .pia-ready.off { color: var(--ink-dim); }
+
+/* ---------- run / hud ---------- */
+.pia-run { display: flex; flex-direction: column; height: 100%; }
+#pia-root { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pia-hud {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 14px; background: var(--bg2); border-bottom: 1px solid var(--line);
+}
+.pia-hud .logo { font-size: 18px; color: var(--gold); letter-spacing: .12em; cursor: pointer; }
+.pia-hud .spacer { flex: 1; }
+.pia-relic-chip { font-size: 16px; padding: 2px 6px; border: 1px solid var(--gold-dim); border-radius: 6px; cursor: default; }
+
+/* ---------- map ---------- */
+.pia-map { max-width: 720px; margin: 0 auto; padding: 16px; width: 100%; }
+.pia-map-tip { text-align: center; margin-bottom: 12px; }
+.pia-map-floor { display: flex; align-items: center; gap: 12px; margin: 4px 0; }
+.pia-floor-label { width: 54px; text-align: right; flex-shrink: 0; }
+.pia-floor-nodes { display: flex; gap: 14px; flex: 1; justify-content: center; }
+.pia-node {
+  width: 54px; height: 54px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--panel); display: flex; align-items: center; justify-content: center;
+  opacity: .4; transition: .12s;
+}
+.pia-node-icon { font-size: 24px; }
+.pia-node.avail { opacity: 1; cursor: pointer; border-color: var(--gold-dim); box-shadow: 0 0 12px #d9b87a22; }
+.pia-node.avail:hover { border-color: var(--gold); transform: translateY(-2px); }
+.pia-node.current { opacity: 1; border-color: var(--gold); }
+.pia-node.boss { border-color: #7d3a3a; }
+.pia-node.elite { border-color: #8a5a2a; }
+
+/* ---------- battle arena ---------- */
+.pia-arena { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; padding: 12px; min-height: 0; overflow: auto; }
+.pia-enemy-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; align-items: flex-end; }
+.pia-ally-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; opacity: .95; }
+.pia-guardian-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+
+.pia-enemy, .pia-ally, .pia-guardian { position: relative; text-align: center; width: 128px; }
+.pia-enemy.boss { width: 180px; }
+.pia-enemy.targetable { cursor: crosshair; }
+.pia-enemy.targetable:hover { filter: drop-shadow(0 0 10px #e05a5a); }
+.pia-enemy canvas, .pia-ally canvas, .pia-guardian canvas { display: block; margin: 0 auto; }
+.pia-name { font-size: 12px; color: var(--ink); margin-top: 2px; }
+.pia-guardian.me .pia-name { color: var(--gold); }
+.pia-guardian.dead { opacity: .45; filter: grayscale(1); }
+.pia-guardian.ended { outline: 1px solid var(--gold-dim); border-radius: 10px; }
+
+.pia-intent {
+  position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 12px;
+  background: #0008; border: 1px solid var(--line); font-size: 13px; z-index: 2; white-space: nowrap;
+}
+.pia-intent .pi-val { font-weight: bold; }
+.pia-intent.i-atk { border-color: #b8453a; color: #ff9a8a; }
+.pia-intent.i-blk { border-color: #4a72a8; color: #a8c8e8; }
+.pia-intent.i-buf { border-color: #b89a3a; color: #ffe08a; }
+.pia-intent.i-deb { border-color: #8a4ab8; color: #d0a8e8; }
+.pia-intent.i-sum { border-color: #4a9a5a; color: #a8e8b8; }
+
+.pia-hpwrap { display: flex; align-items: center; gap: 5px; justify-content: center; margin-top: 3px; }
+.pia-hpbar { position: relative; width: 96px; height: 15px; background: #2a1414; border: 1px solid #000; border-radius: 8px; overflow: hidden; }
+.pia-hpfill { height: 100%; background: linear-gradient(90deg, #7a2a2a, #c04a3a); transition: width .25s; }
+.pia-hptext { position: absolute; inset: 0; font-size: 10px; text-align: center; line-height: 15px; color: #fff; text-shadow: 0 1px 2px #000; }
+.pia-guardian .pia-hpfill { background: linear-gradient(90deg, #2a6a3a, #4caf50); }
+.pia-block { font-size: 11px; color: #a8c8e8; }
+.pia-status { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 2px; min-height: 14px; }
+.pia-st { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: #0006; border: 1px solid var(--line); }
+.st-poison { color: #9fe07a; } .st-vuln { color: #ff9a6a; } .st-weak { color: #c8a8e8; }
+.st-str { color: #ffd08a; } .st-regen { color: #8ae0a0; } .st-dex { color: #8ac8e8; }
+
+/* ---------- hand / cards ---------- */
+.pia-foot { border-top: 1px solid var(--line); background: var(--bg2); padding: 8px 12px 12px; }
+.pia-ctrl { display: flex; align-items: center; gap: 14px; justify-content: center; margin-bottom: 8px; min-height: 34px; }
+.pia-energy-val { font-size: 18px; color: #8ac8e8; }
+.pia-targeting { color: var(--gold); font-size: 13px; }
+.pia-hand { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.pia-card {
+  width: 132px; min-height: 168px; border-radius: 10px; padding: 8px; position: relative;
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  border: 1px solid var(--gold-dim); cursor: pointer; transition: .12s; text-align: center;
+}
+.pia-card:hover:not(.disabled):not(.static) { transform: translateY(-8px); box-shadow: 0 8px 20px #000a, 0 0 12px #d9b87a44; border-color: var(--gold); }
+.pia-card.disabled { opacity: .5; cursor: default; }
+.pia-card.static { cursor: pointer; }
+.pia-card.t-attack { border-color: #a8503a; }
+.pia-card.t-skill { border-color: #4a72a8; }
+.pia-card.t-power { border-color: #b89a3a; }
+.pia-card.t-summon { border-color: #4a9a5a; }
+.pia-card.upg { box-shadow: inset 0 0 0 1px #d9b87a55; }
+.pia-card-cost {
+  position: absolute; top: 6px; left: 6px; width: 24px; height: 24px; border-radius: 50%;
+  background: #1a3a5a; border: 1px solid #8ac8e8; color: #cfe8ff; font-weight: bold;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.pia-card-type { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); }
+.pia-card-name { font-size: 13px; color: var(--gold); margin: 4px 0; font-weight: bold; }
+.pia-card-text { font-size: 11px; color: var(--ink); line-height: 1.35; }
+.pia-card canvas { margin: 2px auto; display: block; }
+
+.pia-log { padding: 4px 14px 8px; font-size: 12px; color: var(--ink-dim); text-align: center; max-height: 74px; overflow: hidden; }
+
+/* ---------- reward / rest / shop ---------- */
+.pia-reward, .pia-end { max-width: 720px; margin: 22px auto; }
+.pia-reward-cards { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+.pia-relic-offer { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--gold-dim); border-radius: 8px; background: var(--panel); flex-wrap: wrap; }
+.pia-price { color: var(--gold); font-weight: bold; }
+.pia-party-pending { display: flex; gap: 8px; flex-wrap: wrap; }
+.pia-party-pending .pill.done { border-color: var(--gold-dim); color: var(--gold); }
+.pia-end.win h1 { text-shadow: 0 0 24px #d9b87a55; }
+
+@media (max-width: 720px) {
+  .pia-home-cols { grid-template-columns: 1fr; }
+  .pia-planet-row { grid-template-columns: 1fr; }
+  .pia-card { width: 108px; min-height: 150px; }
+  .pia-enemy, .pia-ally, .pia-guardian { width: 96px; }
+  .pia-hpbar { width: 80px; }
+}

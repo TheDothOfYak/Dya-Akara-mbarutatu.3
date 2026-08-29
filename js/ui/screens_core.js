@@ -308,6 +308,7 @@
         ['🛒 Market', () => UI.requireOnline(() => UI.show('market'))],
         ['⚗ Crafting', () => UI.show('crafting')],
         ['🏹 Hunt', () => UI.show('huntRun')],
+        ['🃏 Legends of Pia’don', () => UI.show('pia')],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['👥 Friends', () => UI.show('friends')],
