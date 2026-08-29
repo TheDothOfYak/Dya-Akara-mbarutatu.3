@@ -21,6 +21,15 @@
 
   let targeting = null;   // {handIdx} while choosing an enemy target
 
+  /* Guardian art — every Guardian is an Eikar, but each wears its own coat,
+     build, and markings (its `phys`) so the four read as distinct individuals
+     wherever they're drawn (home, lobby, battle). */
+  function guardArt(g, size, state) {
+    const cv = UI.tokenArt(g.avatar, size, state || 'idle', null, null);
+    if (g.phys) cv._indiv = g.phys;    // picked up on the next animation frame
+    return cv;
+  }
+
   /* ================= HOME / GUARDIAN SELECT ================= */
   UI.register('pia', {
     enter(root) {
@@ -56,7 +65,7 @@
       function paintDetail() {
         const g = D.guardian(chosen);
         detail.innerHTML = '';
-        detail.appendChild(UI.tokenArt(g.avatar, 120, 'idle', null, null));
+        detail.appendChild(guardArt(g, 120, 'idle'));
         detail.appendChild(U.el('div', { cls: 'pia-gd-name gold', text: g.name + ' — ' + g.title }));
         detail.appendChild(U.el('div', { cls: 'pill', text: g.element + ' · ' + D.ELEMENT_NAMES[g.element] + ' · ' + g.maxHp + ' HP' }));
         detail.appendChild(U.el('div', { cls: 'muted mt', text: g.blurb }));
@@ -69,7 +78,7 @@
       }
       D.GUARDIANS.forEach(g => {
         const cell = U.el('div', { cls: 'pia-guard-cell' });
-        cell.appendChild(UI.tokenArt(g.avatar, 64, 'idle', null, null));
+        cell.appendChild(guardArt(g, 64, 'idle'));
         cell.appendChild(U.el('div', { cls: 'small', text: g.name }));
         cell.appendChild(U.el('div', { cls: 'tiny muted', text: D.ELEMENT_NAMES[g.element] }));
         cell.onclick = () => { chosen = g.id; U.qsa('.pia-guard-cell', gGrid).forEach(c => c.classList.remove('sel')); cell.classList.add('sel'); paintDetail(); DYA.audio.play('click'); };
@@ -164,7 +173,7 @@
       C.roster().forEach(p => {
         const g = D.guardian(p.guardianId);
         const row = U.el('div', { cls: 'pia-roster-row' + (p.id === C.myId ? ' me' : '') });
-        row.appendChild(UI.tokenArt(g.avatar, 44, 'idle', null, null));
+        row.appendChild(guardArt(g, 44, 'idle'));
         row.appendChild(U.el('div', {}, [
           U.el('div', { text: p.name + (p.id === C.lobby.hostId ? ' (host)' : '') }),
           U.el('div', { cls: 'tiny muted', text: g.name + ' · ' + D.ELEMENT_NAMES[g.element] }),
@@ -181,7 +190,7 @@
       const mine = C.roster().find(p => p.id === C.myId);
       D.GUARDIANS.forEach(g => {
         const cell = U.el('div', { cls: 'pia-guard-cell' + (mine && mine.guardianId === g.id ? ' sel' : '') });
-        cell.appendChild(UI.tokenArt(g.avatar, 54, 'idle', null, null));
+        cell.appendChild(guardArt(g, 54, 'idle'));
         cell.appendChild(U.el('div', { cls: 'tiny', text: g.name }));
         cell.onclick = () => { C.setGuardian(g.id); UI.show('piaLobby'); };
         gRow.appendChild(cell);
@@ -419,7 +428,7 @@
   function renderGuardian(b, p) {
     const g = D.guardian(p.guardianId);
     const cell = U.el('div', { cls: 'pia-guardian' + (p.id === S.myId ? ' me' : '') + (p.dead ? ' dead' : '') + (p.ended ? ' ended' : '') });
-    cell.appendChild(UI.tokenArt(g.avatar, 72, p.dead ? 'death' : 'idle', null, null));
+    cell.appendChild(guardArt(g, 72, p.dead ? 'death' : 'idle'));
     cell.appendChild(U.el('div', { cls: 'pia-name', text: p.name + (p.id === S.myId ? ' (you)' : '') }));
     cell.appendChild(hpBar(p.hp, p.maxHp, p.block));
     cell.appendChild(statusRow(p.st, true));

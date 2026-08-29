@@ -58,29 +58,37 @@
     {
       id: 'tanoc', name: 'Tanoc', title: 'the Urverk', element: 'Ular',
       avatar: 'sword_eikar', maxHp: 80, color: EL.Ular,
-      blurb: 'A brawler who learned the Urverk at Aakalay. He trades blows up close, stacks his own strength, and holds the line while the earth answers his call.',
+      // a heavy-built Eikar with a duskier, earth-dark coat and a dorsal stripe
+      phys: { hue: -12, light: -7, build: 1.12, marking: 'stripe', markSeed: 1201 },
+      blurb: 'A sword-Eikar brawler who learned the Urverk at Aakalay. He trades blows up close, stacks his own strength, and holds the line while the earth answers his call.',
       // starting deck: card ids repeated by count
       deck: { strike_ular: 4, guard: 4, urverk_slam: 1, callearth: 1 },
       startRelic: 'okid_charm',
     },
     {
       id: 'kiet', name: 'Kiet', title: 'the Winddancer', element: 'Fti',
-      avatar: 'albali_byrd', maxHp: 68, color: EL.Fti,
-      blurb: 'A theatrical Nekhic’Eik duelist — wind and showmanship. He plays a flurry of cheap cards, never stands still, and punishes anything that overcommits.',
+      avatar: 'archer_eikar', maxHp: 68, color: EL.Fti,
+      // a lean, pale, airy Eikar with a facial blaze
+      phys: { hue: 10, light: 15, build: 0.9, marking: 'blaze', markSeed: 5533 },
+      blurb: 'A theatrical Nekhic’Eik archer-Eikar — wind and showmanship. He plays a flurry of cheap cards, never stands still, and punishes anything that overcommits.',
       deck: { strike_fti: 4, guard: 3, feint: 2, flourish: 1 },
       startRelic: 'nekhic_bell',
     },
     {
       id: 'buhkon', name: 'Buhkon Eldi', title: 'the Kindler', element: 'Eldi',
-      avatar: 'eldi_grothyn', maxHp: 74, color: EL.Eldi,
-      blurb: 'The Carpenter — calm, deliberate, a mentor. He builds his side up rather than rushing it down, kindling burns and calling creatures to carry the fight.',
+      avatar: 'chemist_eikar', maxHp: 74, color: EL.Eldi,
+      // a solid, ember-warm Eikar dappled with pale spots
+      phys: { hue: 20, light: -2, build: 1.05, marking: 'spots', markSeed: 3007 },
+      blurb: 'The Carpenter — a chemist-Eikar; calm, deliberate, a mentor. He builds his side up rather than rushing it down, kindling burns and calling creatures to carry the fight.',
       deck: { strike_eldi: 4, guard: 3, ember: 2, kindle_call: 1 },
       startRelic: 'ember_seed',
     },
     {
       id: 'phorus', name: 'Phorus', title: 'the Tidewarden', element: 'Su',
-      avatar: 'raf_krabbi', maxHp: 82, color: EL.Su,
-      blurb: 'A coastal tide-warden who fights like the sea itself — patient, heavy, inexorable. He walls up behind block, chills his foes to a crawl, and calls the depths up to drown them.',
+      avatar: 'spear_eikar', maxHp: 82, color: EL.Su,
+      // a heavy, deep-coated Eikar with pale sea-marked feet
+      phys: { hue: -28, light: -10, build: 1.14, marking: 'socks', markSeed: 8842 },
+      blurb: 'A coastal tide-warden — a spear-Eikar who fights like the sea itself: patient, heavy, inexorable. He walls up behind block, chills his foes to a crawl, and calls the depths up to drown them.',
       deck: { strike_su: 4, guard: 3, undertow: 1, calltide: 1 },
       startRelic: 'brine_charm',
     },
