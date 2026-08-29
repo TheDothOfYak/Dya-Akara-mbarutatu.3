@@ -257,6 +257,39 @@ while (cg++ < 400 && camp.phase !== 'win' && camp.phase !== 'gameover') {
 if (camp.phase === 'win') { ok(sawLeg, 'a winning pilgrimage passed through a leg-complete beat'); ok(camp.campaign.leg === 3, 'a winning pilgrimage reached the final world'); }
 else ok(camp.phase === 'gameover', 'pilgrimage concluded: ' + camp.phase);
 
+/* ---------- 11. temporary ward abilities (any foe, not just Torcain) ---------- */
+console.log('11. Ward abilities');
+// every enemy ward move points at a real affix
+Object.keys(D.ENEMIES).forEach(k => (D.ENEMIES[k].moves || []).forEach(m => { if (m.intent === 'ward') ok(D.affix(m.ward), k + ' ward targets a real affix: ' + m.ward); }));
+// several ordinary (non-Torcain) enemies can ward
+const warders = Object.keys(D.ENEMIES).filter(k => (D.ENEMIES[k].moves || []).some(m => m.intent === 'ward'));
+ok(warders.length >= 4, 'multiple ordinary foes can ward (' + warders.length + ')');
+// a Thorned ward retaliates for a turn, then fades
+const bw = battleWithDiff('hunter', ['e_wildpunk'], 11);
+const ew = bw.enemies[0];
+ew.intent = ew.moves.find(m => m.intent === 'ward' && m.ward === 'thorned');
+EN.resolveEnemyTurn(bw);
+ok(ew.temp && ew.temp.thorns > 0, 'enemy raised a temporary Thorned ward (' + (ew.temp && ew.temp.key) + ')');
+ok(!ew.affix, 'the ward is temporary, not a permanent affix');
+// attacking it while warded retaliates
+const pw = bw.players[0], hpBw = pw.hp;
+pw.hand = [{ id: 'strike_ular', upg: false }]; pw.energy = 3;
+EN.playCard(bw, 'p1', 0, ew.uid);
+ok(pw.hp < hpBw, 'temporary Thorned ward retaliates when struck (' + hpBw + ' -> ' + pw.hp + ')');
+// after the enemy's next turn the ward fades
+ew.intent = ew.moves.find(m => m.intent === 'attack');
+EN.resolveEnemyTurn(bw);
+ok(!ew.temp, 'temporary ward fades after a turn');
+// Venomous ward makes the NEXT attack apply poison
+const bv = battleWithDiff('hunter', ['e_makari'], 21);
+const evn = bv.enemies[0];
+evn.intent = evn.moves.find(m => m.intent === 'ward' && m.ward === 'venomous');
+EN.resolveEnemyTurn(bv);
+const pv = bv.players[0]; pv.st.poison = 0;
+evn.intent = evn.moves.find(m => m.intent === 'attack');
+EN.resolveEnemyTurn(bv);
+ok(pv.st.poison > 0 || pv.dead, 'a Venomous-warded foe poisons on its next strike (' + pv.st.poison + ')');
+
 /* ---------- done ---------- */
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

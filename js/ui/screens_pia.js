@@ -17,7 +17,9 @@
   const INTENT = {
     attack: { icon: '⚔', cls: 'i-atk' }, block: { icon: '🛡', cls: 'i-blk' },
     buff: { icon: '💪', cls: 'i-buf' }, debuff: { icon: '☠', cls: 'i-deb' }, summon: { icon: '➕', cls: 'i-sum' },
+    ward: { icon: '✦', cls: 'i-buf' },
   };
+  const WARD_ICON = { armored: '🛡', thorned: '🌵', venomous: '🐍', vital: '💚' };
 
   let targeting = null;   // {handIdx} while choosing an enemy target
 
@@ -145,7 +147,7 @@
 
   const FLOAT_CLS = { poison: 'f-poison', detonate: 'f-poison', cuts: 'f-dmg' };
   function statusFloat(key, amt) {
-    return ({ poison: '☠+' + amt, vuln: '⤈+' + amt, weak: '⬇+' + amt, str: '💪+' + amt, regen: '✚+' + amt, dex: '✧+' + amt })[key] || (key + '+' + amt);
+    return ({ poison: '☠+' + amt, vuln: '⤈+' + amt, weak: '⬇+' + amt, str: '💪+' + amt, regen: '✚+' + amt, dex: '✧+' + amt, thorns: '🌵', venom: '🐍' })[key] || (key + '+' + amt);
   }
   function dyingSet(b) {
     const s = {};
@@ -376,6 +378,7 @@
       return '<div class="pt-title">Curse</div><div>About to ' + (bits.join(' and ') || 'weaken you') + '.</div>';
     }
     if (m.intent === 'summon') return '<div class="pt-title">Summon</div><div>About to call <b>' + (m.count || 1) + '</b> reinforcement' + ((m.count || 1) > 1 ? 's' : '') + ' to the field.</div>';
+    if (m.intent === 'ward') { const a = D.affix(m.ward); return a ? '<div class="pt-title">' + (WARD_ICON[m.ward] || '✦') + ' Ward — ' + a.name + '</div><div>About to grant itself <b>' + a.name + '</b> for a turn: ' + U.esc(a.desc) + '</div>' : ''; }
     return '';
   }
 
@@ -850,6 +853,7 @@
     if (m.intent === 'block') return String(m.block || 0);
     if (m.intent === 'buff') return '+' + (m.str || 0);
     if (m.intent === 'summon') return '+' + (m.count || 1);
+    if (m.intent === 'ward') return WARD_ICON[m.ward] || '';
     return '';
   }
 
@@ -868,6 +872,7 @@
     const size = e.boss ? 176 : e.elite ? 116 : 92;
     cell.appendChild(UI.tokenArt(e.species, size, 'idle', e.heads, null));
     if (e.affix) { const a = D.affix(e.affix); if (a) { const ab = U.el('div', { cls: 'pia-affix pia-hint', text: a.icon }); attachTip(ab, '<div class="pt-title">' + a.icon + ' ' + a.name + '</div><div>' + U.esc(a.desc) + '</div>'); cell.appendChild(ab); } }
+    if (e.temp && e.temp.turns > 0) { const a = D.affix(e.temp.key); if (a) { const tb = U.el('div', { cls: 'pia-affix pia-temp pia-hint', text: a.icon }); attachTip(tb, '<div class="pt-title">' + a.icon + ' ' + a.name + ' (warded)</div><div>A temporary self-buff, fading soon: ' + U.esc(a.desc) + '</div>'); cell.appendChild(tb); } }
     cell.appendChild(U.el('div', { cls: 'pia-name', text: e.name }));
     const bar = hpBar(e.hp, e.maxHp, e.block);
     cell.appendChild(bar);

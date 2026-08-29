@@ -186,6 +186,11 @@
     return b._rng.pick(moves);
   }
 
+  /* effective affix values = permanent (difficulty) + a temporary self-buff
+     an enemy raised with a `ward` move (lasts a turn). */
+  function effThorns(e) { return (e.thorns || 0) + (e.temp && e.temp.turns > 0 ? (e.temp.thorns || 0) : 0); }
+  function effVenom(e) { return (e.venom || 0) + (e.temp && e.temp.turns > 0 ? (e.temp.venom || 0) : 0); }
+
   /* ================= STATUS + DAMAGE ================= */
   function applyPoison(target, n) { target.st.poison = (target.st.poison || 0) + n; }
   function applyVuln(target, n) { target.st.vuln = (target.st.vuln || 0) + n; }
@@ -209,9 +214,10 @@
     e.hp -= remaining;
     emit(b, { t: 'dmg', src: opts.src || b._src || null, tgt: e.uid, amt: remaining, blocked: blocked, kind: opts.kind || 'hit' });
     /* affix: Thorned strikes the attacker back on a melee/card attack */
-    if (e.thorns && opts.kind === 'attack' && opts.src) {
+    const th = effThorns(e);
+    if (th && opts.kind === 'attack' && opts.src) {
       const src = entityById(b, opts.src);
-      if (src) { if (src.kind === 'player') dealToPlayer(b, src.ref, e.thorns, { src: e.uid, kind: 'thorns' }); else dealToAlly(b, src.ref, e.thorns, { src: e.uid, kind: 'thorns' }); }
+      if (src) { if (src.kind === 'player') dealToPlayer(b, src.ref, th, { src: e.uid, kind: 'thorns' }); else dealToAlly(b, src.ref, th, { src: e.uid, kind: 'thorns' }); }
     }
     if (e.hp <= 0) { e.hp = 0; log(b, e.name + ' is felled.'); emit(b, { t: 'die', tgt: e.uid }); }
     return dmg;
@@ -505,7 +511,10 @@
       e.block = 0;
       /* affix: Armored raises a shield each turn */
       if (e.armor) gainBlock(b, e, e.uid, e.armor);
+      e._tempJustSet = false;
       executeIntent(b, e);
+      /* a temporary ward fades a turn after it was raised */
+      if (e.temp) { if (!e._tempJustSet) { e.temp.turns--; if (e.temp.turns <= 0) e.temp = null; } }
       if (e.st.weak > 0) e.st.weak--;
       if (e.st.vuln > 0) e.st.vuln--;
       e.history.push(e.intent ? e.intent.id : '');
@@ -544,7 +553,7 @@
           const tgt = pickPlayerTarget(b); if (!tgt) return;
           const dmg = outgoing(Math.round(m.dmg * dmgScale), e);
           if (tgt.type === 'ally') { dealToAlly(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' }); }
-          else { dealToPlayer(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' }); if (e.venom && !tgt.ref.dead) { tgt.ref.st.poison = (tgt.ref.st.poison || 0) + e.venom; emitStatus(b, tgt.ref.id, 'poison', e.venom); } }
+          else { const vn = effVenom(e); dealToPlayer(b, tgt.ref, dmg, { src: e.uid, kind: 'attack' }); if (vn && !tgt.ref.dead) { tgt.ref.st.poison = (tgt.ref.st.poison || 0) + vn; emitStatus(b, tgt.ref.id, 'poison', vn); } }
         }
         break;
       }
@@ -567,6 +576,16 @@
           if (nm && aliveEnemies(b).length < 8) { applyDiff(b, nm, !!(b.diff && b.diff.affixOnFodder)); nm.intent = chooseIntent(b, nm); b.enemies.push(nm); emit(b, { t: 'spawn', tgt: nm.uid, src: e.uid }); }
         }
         log(b, e.name + ' summons reinforcements!');
+        break;
+      }
+      case 'ward': {
+        /* a temporary self-buff — one of the affixes, lasting a turn. Any
+           foe can do this occasionally (not just the top difficulty). */
+        const key = m.ward, a = D.affix(key); if (!a) break;
+        if (key === 'armored') gainBlock(b, e, e.uid, a.armor);
+        else if (key === 'vital') healEntity(b, e, e.uid, a.regen, 'regen');
+        else { e.temp = { key: key, thorns: a.thorns || 0, venom: a.venom || 0, turns: (m.wardTurns || 1) }; e._tempJustSet = true; emitStatus(b, e.uid, key === 'thorned' ? 'thorns' : 'venom', a.thorns || a.venom || 1); }
+        log(b, e.name + ' braces (' + a.name + ').');
         break;
       }
     }

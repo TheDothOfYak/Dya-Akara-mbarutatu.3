@@ -281,33 +281,33 @@
   const ENEMIES = {
     /* -- Velki (Su) fodder & elites -- */
     e_krabbi: { species: 'raf_krabbi', name: 'Raf Krabbi', hp: 26, size: 1,
-      moves: [{ id: 'pinch', intent: 'attack', dmg: 7 }, { id: 'spark', intent: 'attack', dmg: 4, hits: 2 }, { id: 'shell', intent: 'block', block: 6 }] },
+      moves: [{ id: 'pinch', intent: 'attack', dmg: 7 }, { id: 'spark', intent: 'attack', dmg: 4, hits: 2 }, { id: 'shell', intent: 'block', block: 6 }, { id: 'shellup', intent: 'ward', ward: 'thorned', name: 'Spiny Shell' }] },
     e_harkal: { species: 'harkal', name: 'Harkal', hp: 20, size: 1,
       moves: [{ id: 'dive', intent: 'attack', dmg: 9 }, { id: 'screech', intent: 'debuff', weak: 1, name: 'Screech' }] },
     e_hvaleia: { species: 'hvaleia', name: 'Hvaleia', hp: 55, size: 3, elite: true,
-      moves: [{ id: 'maw', intent: 'attack', dmg: 14 }, { id: 'sound', intent: 'attack', dmg: 5, hits: 3 }, { id: 'harden', intent: 'block', block: 12 }] },
+      moves: [{ id: 'maw', intent: 'attack', dmg: 14 }, { id: 'sound', intent: 'attack', dmg: 5, hits: 3 }, { id: 'harden', intent: 'block', block: 12 }, { id: 'brace', intent: 'ward', ward: 'armored', name: 'Deepen' }] },
     e_grothyn_su: { species: 'su_grothyn', name: 'Su Grothyn', hp: 34, size: 1,
-      moves: [{ id: 'harden', intent: 'block', block: 10 }, { id: 'spew', intent: 'attack', dmg: 8 }] },
+      moves: [{ id: 'harden', intent: 'block', block: 10 }, { id: 'spew', intent: 'attack', dmg: 8 }, { id: 'spikes', intent: 'ward', ward: 'thorned', name: 'Raise Spikes' }] },
 
     /* -- Xikia (Ular) fodder & elites -- */
     e_rodak: { species: 'rodak', name: 'Rodak', hp: 14, size: 0,
-      moves: [{ id: 'bite', intent: 'attack', dmg: 6 }, { id: 'circle', intent: 'buff', str: 2, name: 'Circle' }] },
+      moves: [{ id: 'bite', intent: 'attack', dmg: 6 }, { id: 'circle', intent: 'buff', str: 2, name: 'Circle' }, { id: 'rally', intent: 'ward', ward: 'vital', name: 'Pack Lick' }] },
     e_wildpunk: { species: 'wild_punk', name: 'Wild Punk', hp: 22, size: 1,
-      moves: [{ id: 'lash', intent: 'attack', dmg: 8 }, { id: 'grab', intent: 'debuff', weak: 1, dmg: 3, name: 'Vine Grab' }] },
+      moves: [{ id: 'lash', intent: 'attack', dmg: 8 }, { id: 'grab', intent: 'debuff', weak: 1, dmg: 3, name: 'Vine Grab' }, { id: 'bramble', intent: 'ward', ward: 'thorned', name: 'Bramble Up' }] },
     e_sruvorn: { species: 'sru_vorn', name: 'Sru Vorn', hp: 60, size: 3, elite: true,
-      moves: [{ id: 'ambush', intent: 'attack', dmg: 16 }, { id: 'acid', intent: 'debuff', vuln: 2, dmg: 6, name: 'Acid Spray' }, { id: 'coil', intent: 'block', block: 10 }] },
+      moves: [{ id: 'ambush', intent: 'attack', dmg: 16 }, { id: 'acid', intent: 'debuff', vuln: 2, dmg: 6, name: 'Acid Spray' }, { id: 'coil', intent: 'block', block: 10 }, { id: 'coat', intent: 'ward', ward: 'venomous', name: 'Acid Coat' }] },
     e_makari: { species: 'makari_swarm', name: 'Makari Swarm', hp: 18, size: 1,
-      moves: [{ id: 'swarm', intent: 'attack', dmg: 3, hits: 3 }, { id: 'thin', intent: 'block', block: 5 }] },
+      moves: [{ id: 'swarm', intent: 'attack', dmg: 3, hits: 3 }, { id: 'thin', intent: 'block', block: 5 }, { id: 'cloud', intent: 'ward', ward: 'venomous', name: 'Venom Cloud' }] },
 
     /* -- Leotik (Fti) fodder & elites -- */
     e_albali: { species: 'albali_byrd', name: 'Albali Byrd', hp: 24, size: 1,
-      moves: [{ id: 'peck', intent: 'attack', dmg: 8 }, { id: 'guard', intent: 'block', block: 8 }] },
+      moves: [{ id: 'peck', intent: 'attack', dmg: 8 }, { id: 'guard', intent: 'block', block: 8 }, { id: 'feathers', intent: 'ward', ward: 'armored', name: 'Feather Guard' }] },
     e_kuni: { species: 'kuni_byrd_wild', name: 'Kuni Byrd', hp: 30, size: 2,
-      moves: [{ id: 'stoop', intent: 'attack', dmg: 12 }, { id: 'shadow', intent: 'debuff', vuln: 2, name: 'Shadow Pass' }] },
+      moves: [{ id: 'stoop', intent: 'attack', dmg: 12 }, { id: 'shadow', intent: 'debuff', vuln: 2, name: 'Shadow Pass' }, { id: 'preen', intent: 'ward', ward: 'vital', name: 'Preen' }] },
     e_lutut: { species: 'lutut', name: 'Lutut', hp: 58, size: 3, elite: true,
-      moves: [{ id: 'screech', intent: 'debuff', weak: 2, dmg: 4, name: 'Stun Screech' }, { id: 'dive', intent: 'attack', dmg: 15 }, { id: 'circle', intent: 'buff', str: 3, name: 'Circle' }] },
+      moves: [{ id: 'screech', intent: 'debuff', weak: 2, dmg: 4, name: 'Stun Screech' }, { id: 'dive', intent: 'attack', dmg: 15 }, { id: 'circle', intent: 'buff', str: 3, name: 'Circle' }, { id: 'talons', intent: 'ward', ward: 'thorned', name: 'Bare Talons' }] },
     e_malstipunk: { species: 'malsti_punk', name: 'Malsti Punk', hp: 16, size: 0,
-      moves: [{ id: 'blink', intent: 'debuff', weak: 1, name: 'Duat Blink' }, { id: 'raid', intent: 'attack', dmg: 7 }] },
+      moves: [{ id: 'blink', intent: 'debuff', weak: 1, name: 'Duat Blink' }, { id: 'raid', intent: 'attack', dmg: 7 }, { id: 'ichor', intent: 'ward', ward: 'venomous', name: 'Duat Ichor' }] },
 
     /* -- shared: a minion the bosses summon -- */
     m_harkal: { species: 'harkal', name: 'Shoal Harkal', hp: 12, size: 0,

@@ -449,6 +449,12 @@
   background: #0009; border: 1px solid #b06a2a; border-radius: 8px; cursor: help;
   box-shadow: 0 0 8px #b06a2a66;
 }
+/* a temporary ward (self-buff lasting a turn) — cooler colour, top-left, pulsing */
+.pia-affix.pia-temp {
+  right: auto; left: 8px; border-color: #6a8ad8; box-shadow: 0 0 8px #6a8ad899;
+  animation: pia-temp-pulse 1.4s ease-in-out infinite;
+}
+@keyframes pia-temp-pulse { 0%,100% { box-shadow: 0 0 6px #6a8ad866; } 50% { box-shadow: 0 0 12px #6a8ad8dd; } }
 
 @media (max-width: 720px) {
   .pia-diff-row { grid-template-columns: 1fr 1fr; }
