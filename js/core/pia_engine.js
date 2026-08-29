@@ -254,6 +254,8 @@
 
     /* on-attack power: Urverk Stance */
     if (card.type === 'attack' && p.powers.blockOnAttack) p.block += p.powers.blockOnAttack;
+    /* on-skill power: Tidal Bulwark */
+    if (card.type === 'skill' && p.powers.blockOnSkill) p.block += p.powers.blockOnSkill;
 
     if (card.exhaust) p.exhaust.push({ id: inst.id, upg: inst.upg });
     else p.discard.push({ id: inst.id, upg: inst.upg });

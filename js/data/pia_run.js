@@ -77,6 +77,13 @@
       deck: { strike_eldi: 4, guard: 3, ember: 2, kindle_call: 1 },
       startRelic: 'ember_seed',
     },
+    {
+      id: 'phorus', name: 'Phorus', title: 'the Tidewarden', element: 'Su',
+      avatar: 'raf_krabbi', maxHp: 82, color: EL.Su,
+      blurb: 'A coastal tide-warden who fights like the sea itself — patient, heavy, inexorable. He walls up behind block, chills his foes to a crawl, and calls the depths up to drown them.',
+      deck: { strike_su: 4, guard: 3, undertow: 1, calltide: 1 },
+      startRelic: 'brine_charm',
+    },
   ];
 
   /* ================= SUMMONS =================
@@ -101,6 +108,8 @@
     call_albali: { species: 'albali_byrd', name: 'Albali Byrd', hp: 18, dmg: 6, block: 4 },
     call_eikar: { species: 'spear_eikar', name: 'Spear Eikar', hp: 22, dmg: 8 },
     call_lutut: { species: 'lutut', name: 'Lutut', hp: 30, dmg: 12 },
+    call_hvaleia: { species: 'hvaleia', name: 'Called Hvaleia', hp: 42, dmg: 10, block: 6, taunt: true, guardPct: 0.5 },
+    call_sugrothyn: { species: 'su_grothyn', name: 'Su Grothyn', hp: 28, dmg: 4, block: 6, taunt: true },
   };
 
   /* ================= CARD LIBRARY =================
@@ -183,6 +192,34 @@
     twin_call: { name: 'Twin Call', cls: 'buhkon', type: 'summon', cost: 2, rarity: 'uncommon',
       text: 'Summon a Rooted Stryx (26 HP, hits for 9) AND a Called Harkal (22 HP, hits for 8).', summon: ['call_stryx', 'call_harkal'], upgrade: { summonBonus: { hp: 8 } } },
 
+    /* ---------- Phorus (Su / tide control & defense) ---------- */
+    strike_su: { name: 'Tide Lash', cls: 'phorus', type: 'attack', cost: 1, rarity: 'starter',
+      text: 'Deal 6 damage.', e: { damage: 6 }, upgrade: { e: { damage: 9 } } },
+    undertow: { name: 'Undertow', cls: 'phorus', type: 'attack', cost: 2, rarity: 'starter',
+      text: 'Deal 8 damage. Apply 2 Weak.', e: { damage: 8, weak: 2 }, upgrade: { e: { damage: 11, weak: 2 } } },
+    calltide: { name: 'Call the Tide', cls: 'phorus', type: 'summon', cost: 1, rarity: 'starter',
+      text: 'Summon a Called Harkal (22 HP, hits for 8).', summon: 'call_harkal', upgrade: { summonBonus: { hp: 6, dmg: 2 } } },
+    brine_ward: { name: 'Brine Ward', cls: 'phorus', type: 'skill', cost: 1, rarity: 'common',
+      text: 'Gain 8 Block. Gain 2 Regen.', target: 'self', e: { block: 8, regen: 2 }, upgrade: { e: { block: 11, regen: 3 } } },
+    riptide: { name: 'Riptide', cls: 'phorus', type: 'attack', cost: 1, rarity: 'common',
+      text: 'Deal 7 damage. Apply 1 Weak.', e: { damage: 7, weak: 1 }, upgrade: { e: { damage: 10, weak: 1 } } },
+    deepdraw: { name: 'Deep Draw', cls: 'phorus', type: 'skill', cost: 1, rarity: 'common',
+      text: 'Gain 5 Block. Draw 2.', target: 'self', e: { block: 5, draw: 2 }, upgrade: { e: { block: 8, draw: 2 } } },
+    call_depths: { name: 'Call the Depths', cls: 'phorus', type: 'summon', cost: 2, rarity: 'common',
+      text: 'Summon a Su Grothyn (28 HP, taunts, guards you, gains 6 Block/turn).', summon: 'call_sugrothyn', upgrade: { summonBonus: { hp: 10 } } },
+    chillwater: { name: 'Chillwater', cls: 'phorus', type: 'skill', cost: 2, rarity: 'uncommon',
+      text: 'Gain 8 Block. Apply 3 Weak to ALL enemies.', target: 'allEnemies', e: { block: 8, weak: 3 }, upgrade: { e: { block: 11, weak: 3 } } },
+    tide_surge: { name: 'Tide Surge', cls: 'phorus', type: 'attack', cost: 2, rarity: 'uncommon',
+      text: 'Deal 6 damage to ALL enemies. Apply 1 Weak to all.', target: 'allEnemies', e: { damage: 6, weak: 1 }, upgrade: { e: { damage: 9, weak: 1 } } },
+    tidal_bulwark: { name: 'Tidal Bulwark', cls: 'phorus', type: 'power', cost: 1, rarity: 'uncommon',
+      text: 'Power. Whenever you play a Skill, gain 3 Block.', target: 'self', e: { power: 'blockOnSkill', amount: 3 }, upgrade: { e: { power: 'blockOnSkill', amount: 4 } } },
+    leviathan_call: { name: 'Leviathan Call', cls: 'phorus', type: 'summon', cost: 2, rarity: 'rare',
+      text: 'Summon a Called Hvaleia (42 HP, taunts, guards you, hits for 10).', summon: 'call_hvaleia', upgrade: { summonBonus: { hp: 16 } } },
+    maelstrom: { name: 'Maelstrom', cls: 'phorus', type: 'attack', cost: 3, rarity: 'rare',
+      text: 'Deal 10 damage to ALL enemies. Apply 2 Weak to all.', target: 'allEnemies', e: { damage: 10, weak: 2 }, upgrade: { e: { damage: 14, weak: 2 } } },
+    drowned_might: { name: 'Drowned Might', cls: 'phorus', type: 'attack', cost: 2, rarity: 'rare',
+      text: 'Deal 14 damage. Lifesteal.', e: { damage: 14, lifesteal: true }, upgrade: { e: { damage: 19, lifesteal: true } } },
+
     /* ---------- neutral (reward pool for everyone) ---------- */
     steady_breath: { name: 'Steady Breath', cls: 'neutral', type: 'skill', cost: 0, rarity: 'common',
       text: 'Gain 3 Block. Draw 1.', target: 'self', e: { block: 3, draw: 1 }, upgrade: { e: { block: 5, draw: 1 } } },
@@ -208,6 +245,8 @@
       text: 'The first turn of each battle, gain 1 extra energy.', mods: { startEnergyOnce: 1 } },
     ember_seed: { name: 'Ember Seed', icon: '🌱', rarity: 'starter',
       text: 'At the start of each battle, apply 2 Poison to a random enemy.', mods: { startPoisonRandom: 2 } },
+    brine_charm: { name: 'Brine Charm', icon: '🐚', rarity: 'starter',
+      text: 'At the start of each battle, gain 4 Block and 2 Regen.', mods: { startBlock: 4, startRegen: 2 } },
     tide_pearl: { name: 'Tide Pearl', icon: '🔵', rarity: 'common',
       text: 'At the start of each battle, gain 3 Regen.', mods: { startRegen: 3 } },
     vaelk_core: { name: 'Vaelk Core', icon: '◈', rarity: 'boss',

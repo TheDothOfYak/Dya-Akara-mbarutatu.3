@@ -107,6 +107,28 @@ EN.endTurn(b, 'p1');
 ok(en0.hp <= hpBeforePoison - 4 || en0.hp === 0, 'poison ticked at enemy phase');
 ok(en0.hp === 0 || en0.st.poison === 3, 'poison decremented by 1');
 
+/* ---------- 4b. Phorus (Su) mechanics ---------- */
+console.log('4b. Phorus / Su');
+ok(D.guardian('phorus') && D.guardian('phorus').element === 'Su', 'Phorus exists and is a Su Guardian');
+b = soloBattle('phorus', ['e_krabbi', 'e_harkal'], 21);
+// Chillwater: block self + Weak to all enemies
+b.players[0].hand = [{ id: 'chillwater', upg: false }]; b.players[0].energy = 3; b.players[0].block = 0;
+EN.playCard(b, 'p1', 0, null);
+ok(b.players[0].block >= 8, 'Chillwater grants self Block (' + b.players[0].block + ')');
+ok(EN.aliveEnemies(b).every(e => e.st.weak >= 3), 'Chillwater applies Weak to ALL enemies');
+// Tidal Bulwark power: gain block whenever a Skill is played
+b = soloBattle('phorus', ['e_krabbi'], 22);
+b.players[0].hand = [{ id: 'tidal_bulwark', upg: false }, { id: 'deepdraw', upg: false }]; b.players[0].energy = 3; b.players[0].block = 0;
+EN.playCard(b, 'p1', 0, null); // play the power
+const blkBefore = b.players[0].block;
+EN.playCard(b, 'p1', 0, null); // play a Skill (deepdraw) -> +3 block from the power (plus the card's own block)
+ok(b.players[0].block >= blkBefore + 3 + 5, 'Tidal Bulwark adds Block on playing a Skill');
+// Leviathan Call: a big taunt guard summon
+b = soloBattle('phorus', ['e_krabbi'], 23);
+b.players[0].hand = [{ id: 'leviathan_call', upg: false }]; b.players[0].energy = 3;
+EN.playCard(b, 'p1', 0, null);
+ok(EN.aliveAllies(b).length === 1 && b.allies[0].taunt, 'Leviathan Call summons a taunting guard');
+
 /* ---------- 5. co-op scaling ---------- */
 console.log('5. Co-op scaling');
 function party(n, enemies) {
