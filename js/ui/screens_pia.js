@@ -145,11 +145,126 @@
   /* battle actions route through here so input locks during the enemy phase */
   function battleAct(action) { if (inputLocked) return; S.act(action); }
 
+  /* ================= AMBIENT BACKGROUND =================
+     A living Pia'don sky behind every screen of the mode: a tinted
+     gradient, drifting nebulae, a soft celestial orb, a twinkling
+     starfield, and element-flavored particles (embers rise on Eldi,
+     bubbles on Su, motes drift on Ular, wind streaks race on Fti;
+     the home screen gets the whole cosmos). One canvas per screen,
+     torn down on leave. Pure decoration — wrapped so it can never
+     break the game. */
+  let bgStop = null;
+  const BG_THEMES = {
+    cosmos: { sky: ['#0c0a16', '#161022'], orb: '#d9b87a', neb: ['#3a2f5e', '#5e3a3a'], particle: '#d9b87a', mode: 'drift' },
+    Su:     { sky: ['#071820', '#0c2430'], orb: '#3b9ae1', neb: ['#134b5e', '#0f3550'], particle: '#8ad0f0', mode: 'rise' },
+    Ular:   { sky: ['#101706', '#182210'], orb: '#4caf50', neb: ['#2e5220', '#3a4a1c'], particle: '#a8d878', mode: 'drift' },
+    Eldi:   { sky: ['#1a0c06', '#26120a'], orb: '#e8842c', neb: ['#5e3320', '#5e2020'], particle: '#ffb060', mode: 'ember' },
+    Fti:    { sky: ['#12141a', '#1c2028'], orb: '#e8ecf5', neb: ['#3a4256', '#2e3646'], particle: '#e8f0ff', mode: 'wind' },
+  };
+  function hexA(hex, a) {
+    const h = hex.replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function startBg(container, theme) {
+    stopBg();
+    try {
+      const P = BG_THEMES[theme] || BG_THEMES.cosmos;
+      const cv = U.el('canvas', { cls: 'pia-bg' });
+      container.insertBefore(cv, container.firstChild);
+      const ctx = cv.getContext('2d');
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      let W = 0, H = 0, stars = [], motes = [], orbs = [], raf = 0, t0 = performance.now();
+      function newMote() {
+        const m = P.mode;
+        if (m === 'wind') return { x: -20 - Math.random() * W, y: Math.random() * H, len: 30 + Math.random() * 60, v: 120 + Math.random() * 160, a: 0.05 + Math.random() * 0.12 };
+        if (m === 'rise' || m === 'ember') return { x: Math.random() * W, y: H + Math.random() * H, r: (m === 'ember' ? 1.4 : 1.8) + Math.random() * 2, v: 14 + Math.random() * 30, dx: (Math.random() - 0.5) * 12, a: 0.25 + Math.random() * 0.5, ph: Math.random() * 6.28 };
+        return { x: Math.random() * W, y: Math.random() * H, r: 1 + Math.random() * 2, v: 4 + Math.random() * 10, dx: (Math.random() - 0.5) * 8, a: 0.15 + Math.random() * 0.35, ph: Math.random() * 6.28 };
+      }
+      function rebuild() {
+        stars = []; const ns = Math.round(W * H / 6500);
+        for (let i = 0; i < ns; i++) stars.push({ x: Math.random() * W, y: Math.random() * H * 0.85, r: Math.random() * 1.3 + 0.2, ph: Math.random() * 6.28, sp: 0.4 + Math.random() * 1.1 });
+        motes = []; const nm = Math.round(W / 22);
+        for (let i = 0; i < nm; i++) { const mo = newMote(); if (P.mode === 'rise' || P.mode === 'ember') mo.y = Math.random() * H; motes.push(mo); }
+        orbs = [{ x: W * 0.74, y: H * 0.24, r: Math.min(W, H) * 0.3, c: P.orb, drift: 0.02 }];
+        if (theme === 'cosmos') { orbs.push({ x: W * 0.2, y: H * 0.7, r: Math.min(W, H) * 0.16, c: '#5e6ea8', drift: 0.03 }); orbs.push({ x: W * 0.5, y: H * 0.4, r: Math.min(W, H) * 0.1, c: '#a8607a', drift: 0.05 }); }
+      }
+      function resize() {
+        W = container.clientWidth || window.innerWidth; H = container.clientHeight || window.innerHeight;
+        cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); rebuild();
+      }
+      function frame(now) {
+        if (!cv.isConnected) { cancelAnimationFrame(raf); return; }
+        const t = (now - t0) / 1000, dt = 1 / 60;
+        // sky
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, P.sky[0]); g.addColorStop(1, P.sky[1]);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        // nebulae (slow breathing blobs)
+        for (let i = 0; i < 2; i++) {
+          const nx = W * (0.3 + 0.4 * i) + Math.sin(t * 0.05 + i) * 60;
+          const ny = H * (0.35 + 0.2 * i) + Math.cos(t * 0.04 + i) * 40;
+          const rr = Math.min(W, H) * (0.4 + 0.1 * Math.sin(t * 0.1 + i));
+          const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, rr);
+          ng.addColorStop(0, hexA(P.neb[i % P.neb.length], 0.28));
+          ng.addColorStop(1, hexA(P.neb[i % P.neb.length], 0));
+          ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+        }
+        // orbs (planets / sun)
+        orbs.forEach(o => {
+          const ox = o.x + Math.sin(t * o.drift) * 20, oy = o.y + Math.cos(t * o.drift) * 12;
+          const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, o.r);
+          og.addColorStop(0, hexA(o.c, 0.5)); og.addColorStop(0.5, hexA(o.c, 0.14)); og.addColorStop(1, hexA(o.c, 0));
+          ctx.fillStyle = og; ctx.beginPath(); ctx.arc(ox, oy, o.r, 0, 6.29); ctx.fill();
+        });
+        // stars
+        for (const s of stars) {
+          const a = 0.35 + 0.55 * Math.abs(Math.sin(t * s.sp + s.ph));
+          ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(2) + ')';
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.29); ctx.fill();
+        }
+        // particles
+        ctx.save();
+        if (P.mode === 'ember') ctx.globalCompositeOperation = 'lighter';
+        for (const m of motes) {
+          if (P.mode === 'wind') {
+            m.x += m.v * dt; if (m.x > W + 40) { Object.assign(m, newMote()); m.x = -30; }
+            ctx.strokeStyle = hexA(P.particle, m.a); ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(m.x - m.len, m.y + 2); ctx.stroke();
+          } else if (P.mode === 'rise' || P.mode === 'ember') {
+            m.y -= m.v * dt; m.x += Math.sin(t + m.ph) * 0.4 + m.dx * dt;
+            if (m.y < -10) { Object.assign(m, newMote()); m.y = H + 10; }
+            ctx.fillStyle = hexA(P.particle, m.a);
+            ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.29); ctx.fill();
+          } else {
+            m.y -= m.v * dt * 0.4; m.x += Math.sin(t * 0.5 + m.ph) * 0.3 + m.dx * dt;
+            if (m.y < -10) { Object.assign(m, newMote()); m.y = H + 10; }
+            ctx.fillStyle = hexA(P.particle, m.a);
+            ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.29); ctx.fill();
+          }
+        }
+        ctx.restore();
+        // horizon glow
+        const hg = ctx.createLinearGradient(0, H, 0, H * 0.72);
+        hg.addColorStop(0, hexA(P.orb, 0.16)); hg.addColorStop(1, hexA(P.orb, 0));
+        ctx.fillStyle = hg; ctx.fillRect(0, H * 0.72, W, H * 0.28);
+        raf = requestAnimationFrame(frame);
+      }
+      window.addEventListener('resize', resize);
+      resize();
+      raf = requestAnimationFrame(frame);
+      bgStop = () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); cv.remove(); };
+    } catch (e) { /* ambiance must never break the game */ }
+  }
+  function stopBg() { if (bgStop) { try { bgStop(); } catch (e) { } bgStop = null; } }
+  function planetTheme() { const run = S.run; return (run && D.planet(run.planet)) ? D.planet(run.planet).element : 'cosmos'; }
+
   /* ================= HOME / GUARDIAN SELECT ================= */
   UI.register('pia', {
     enter(root) {
       targeting = null;
       const scr = U.el('div', { cls: 'screen pia-home' });
+      startBg(scr, 'cosmos');
       const bar = UI.topbar({ title: "Legends of Pia'don" });
       scr.appendChild(bar);
       const back = U.el('div', { cls: 'back-arrow', text: '‹', style: 'position:absolute;top:70px;left:18px;font-size:30px;z-index:3', onclick: () => UI.show('menu') });
@@ -233,6 +348,7 @@
       scr.appendChild(wrap);
       root.appendChild(scr);
     },
+    leave() { stopBg(); },
   });
 
   function promptJoin() {
@@ -342,10 +458,11 @@
       const host = U.el('div', { id: 'pia-root' });
       scr.appendChild(host);
       root.appendChild(scr);
+      startBg(scr, planetTheme());
       S.onUpdate = () => paintRun(host);
       paintRun(host);
     },
-    leave() { S.onUpdate = null; },
+    leave() { S.onUpdate = null; stopBg(); },
   });
 
   function paintRun(host) {
@@ -435,7 +552,7 @@
     const b = run.battle;
     dying = dying || EMPTY_SET;
     fxRefs = {};                       // fresh element registry for this paint
-    const wrap = U.el('div', {});
+    const wrap = U.el('div', { cls: 'pia-battle' });
     wrap.appendChild(runHeader(run, 'Battle · turn ' + b.turn));
 
     const arena = U.el('div', { cls: 'pia-arena' });
@@ -526,7 +643,7 @@
       const t = intentText(b, e); if (t) badge.appendChild(U.el('span', { cls: 'pi-val', text: t }));
       cell.appendChild(badge);
     }
-    const size = e.boss ? 132 : e.elite ? 96 : 72;
+    const size = e.boss ? 176 : e.elite ? 116 : 92;
     cell.appendChild(UI.tokenArt(e.species, size, 'idle', e.heads, null));
     cell.appendChild(U.el('div', { cls: 'pia-name', text: e.name }));
     const bar = hpBar(e.hp, e.maxHp, e.block);
@@ -543,7 +660,7 @@
 
   function renderAlly(b, a) {
     const cell = U.el('div', { cls: 'pia-ally' });
-    cell.appendChild(UI.tokenArt(a.species, 56, 'idle', null, null));
+    cell.appendChild(UI.tokenArt(a.species, 74, 'idle', null, null));
     cell.appendChild(U.el('div', { cls: 'pia-name tiny', text: a.name + (a.str ? ' +' + a.str : '') }));
     const bar = hpBar(a.hp, a.maxHp, a.block);
     cell.appendChild(bar);
@@ -559,7 +676,7 @@
   function renderGuardian(b, p) {
     const g = D.guardian(p.guardianId);
     const cell = U.el('div', { cls: 'pia-guardian' + (p.id === S.myId ? ' me' : '') + (p.dead ? ' dead' : '') + (p.ended ? ' ended' : '') });
-    cell.appendChild(guardArt(g, 72, p.dead ? 'death' : 'idle'));
+    cell.appendChild(guardArt(g, 96, p.dead ? 'death' : 'idle'));
     cell.appendChild(U.el('div', { cls: 'pia-name', text: p.name + (p.id === S.myId ? ' (you)' : '') }));
     const bar = hpBar(p.hp, p.maxHp, p.block);
     cell.appendChild(bar);
