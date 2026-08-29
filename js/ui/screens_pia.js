@@ -42,6 +42,8 @@
   let lastEventsRef = null;  // the events array we last animated
   let fxToken = 0;           // cancels a superseded timeline
   let inputLocked = false;
+  let lastHandTurn = -1;     // to trigger deal-in + "your turn" once per turn
+  let lastPhase = null;      // to trigger the battle->end flourish
   const EMPTY_SET = { has: () => false };
 
   function regRef(uid, cell, fill, text, max, hp) {
@@ -78,12 +80,68 @@
     srcCell.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
     setTimeout(() => { srcCell.style.transform = ''; setTimeout(() => { srcCell.style.transition = ''; }, 150); }, 120);
   }
-  function banner(text) {
-    const el = U.el('div', { cls: 'pia-banner', text: text });
+  function banner(text, kind) {
+    const el = U.el('div', { cls: 'pia-banner' + (kind ? ' b-' + kind : '') }, [U.el('span', { cls: 'pia-banner-txt', text: text })]);
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 950);
+    setTimeout(() => el.remove(), 1050);
+  }
+  /* a full-screen sweep when a battle ends */
+  function flourish(kind) {
+    try {
+      const label = kind === 'quarry' ? 'Quarry Felled' : kind === 'victory' ? 'Victory' : 'The Run Ends';
+      const el = U.el('div', { cls: 'pia-flourish k-' + kind }, [
+        U.el('div', { cls: 'pf-ray' }),
+        U.el('div', { cls: 'pf-label', text: label }),
+      ]);
+      document.body.appendChild(el);
+      sfx(kind === 'defeat' ? 'defeat' : 'victory');
+      if (kind === 'quarry') setTimeout(() => sfx('levelup'), 300);
+      setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 500); }, kind === 'defeat' ? 1500 : 1300);
+    } catch (e) { }
   }
   function setInputLocked(v) { inputLocked = v; if (runHost) runHost.classList.toggle('fx-lock', v); }
+  function sfx(name) { try { DYA.audio && DYA.audio.play(name); } catch (e) { } }
+  function shakeArena(big) {
+    const a = runHost && runHost.querySelector('.pia-arena'); if (!a) return;
+    const cls = big ? 'pia-shake-big' : 'pia-shake';
+    a.classList.remove('pia-shake', 'pia-shake-big'); void a.offsetWidth; a.classList.add(cls);
+    setTimeout(() => a.classList.remove(cls), big ? 460 : 300);
+  }
+  /* a ghost of the played card flies from the hand to its target */
+  function flyCard(srcEl, destX, destY) {
+    if (!srcEl) return;
+    try {
+      const r = srcEl.getBoundingClientRect();
+      const g = U.el('div', { cls: 'pia-fly' });
+      g.style.left = r.left + 'px'; g.style.top = r.top + 'px'; g.style.width = r.width + 'px'; g.style.height = r.height + 'px';
+      // mirror the card's face
+      g.innerHTML = srcEl.innerHTML;
+      g.className = 'pia-fly ' + srcEl.className.replace('pia-card', '').replace('disabled', '').trim();
+      document.body.appendChild(g);
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      requestAnimationFrame(() => {
+        g.style.transform = 'translate(' + (destX - cx) + 'px,' + (destY - cy) + 'px) scale(.55) rotate(8deg)';
+        g.style.opacity = '0';
+      });
+      setTimeout(() => g.remove(), 340);
+    } catch (e) { }
+  }
+  function arenaPoint(frac) {
+    const a = runHost && runHost.querySelector('.pia-arena'); if (!a) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const r = a.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height * (frac == null ? 0.5 : frac) };
+  }
+  function cellCenter(uid) { const ref = fxRefs[uid]; if (!ref) return null; const r = ref.cell.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+
+  /* discrete Vaelk (energy) orbs that deplete as you spend */
+  function energyOrbs(me) {
+    const wrap = U.el('div', { cls: 'pia-vaelk', title: 'Vaelk — your energy this turn' });
+    const base = (me.baseEnergy || 3) + (me.mods && me.mods.energyPerTurn ? me.mods.energyPerTurn : 0);
+    const max = Math.max(base, me.energy, 1);
+    for (let i = 0; i < max; i++) wrap.appendChild(U.el('span', { cls: 'pia-orb' + (i < me.energy ? ' on' : '') }));
+    wrap.appendChild(U.el('span', { cls: 'pia-vaelk-n', html: '<b>' + me.energy + '</b> Vaelk' }));
+    return wrap;
+  }
 
   const FLOAT_CLS = { poison: 'f-poison', detonate: 'f-poison', cuts: 'f-dmg' };
   function statusFloat(key, amt) {
@@ -120,22 +178,27 @@
       const tref = ev.tgt != null ? refs[ev.tgt] : null;
       const sref = ev.src != null ? refs[ev.src] : null;
       switch (ev.t) {
-        case 'play': at(() => pulseEl(sref && sref.cell), 60); break;
-        case 'phase': at(() => banner(ev.phase === 'ally' ? 'Your allies strike' : 'Enemy turn'), 480); break;
+        case 'play': at(() => { pulseEl(sref && sref.cell); sfx(ev.ctype === 'summon' ? 'horn' : ev.ctype === 'skill' ? 'ready' : 'deploy'); }, 60); break;
+        case 'phase': at(() => { banner(ev.phase === 'ally' ? 'Your allies strike' : 'Enemy turn', ev.phase === 'ally' ? 'ally' : 'enemy'); sfx(ev.phase === 'enemy' ? 'horn' : 'ready'); }, 480); break;
         case 'dmg': at(() => {
           if (sref && (ev.kind === 'attack')) lunge(sref.cell, tref && tref.cell);
           if (tref) {
             flashHit(tref.cell);
-            if (ev.amt > 0) { floatText(tref.cell, '-' + ev.amt, FLOAT_CLS[ev.kind] || 'f-dmg'); if (cur[ev.tgt] != null) { cur[ev.tgt] -= ev.amt; setBar(tref, cur[ev.tgt]); } }
-            else floatText(tref.cell, ev.blocked ? '🛡 blocked' : '0', 'f-block');
+            if (ev.amt > 0) {
+              floatText(tref.cell, '-' + ev.amt, FLOAT_CLS[ev.kind] || 'f-dmg');
+              if (cur[ev.tgt] != null) { cur[ev.tgt] -= ev.amt; setBar(tref, cur[ev.tgt]); }
+              const big = ev.amt >= 12;
+              if (ev.kind === 'attack') { sfx(big ? 'bigHit' : 'hit'); shakeArena(big); }
+              else if (ev.kind === 'poison' || ev.kind === 'detonate') sfx('breath');
+            } else { floatText(tref.cell, ev.blocked ? '🛡 blocked' : '0', 'f-block'); sfx('hit'); }
           }
         }, ev.kind === 'poison' || ev.kind === 'detonate' ? 220 : 260); break;
-        case 'heal': at(() => { if (tref) { floatText(tref.cell, '+' + ev.amt, 'f-heal'); if (cur[ev.tgt] != null) { cur[ev.tgt] += ev.amt; setBar(tref, cur[ev.tgt]); } } }, 210); break;
+        case 'heal': at(() => { if (tref) { floatText(tref.cell, '+' + ev.amt, 'f-heal'); if (cur[ev.tgt] != null) { cur[ev.tgt] += ev.amt; setBar(tref, cur[ev.tgt]); } sfx('ready'); } }, 210); break;
         case 'block': at(() => { if (tref) { floatText(tref.cell, '🛡+' + ev.amt, 'f-block'); shieldPulse(tref.cell); } }, 150); break;
         case 'status': at(() => { if (tref) floatText(tref.cell, statusFloat(ev.key, ev.amt), 'f-status'); }, 140); break;
-        case 'summon': case 'spawn': at(() => popIn(tref && tref.cell), 200); break;
-        case 'die': at(() => fadeDie(tref && tref.cell), 320); break;
-        case 'ward': at(() => banner('Saved!'), 240); break;
+        case 'summon': case 'spawn': at(() => { popIn(tref && tref.cell); sfx('deploy'); }, 200); break;
+        case 'die': at(() => { fadeDie(tref && tref.cell); sfx('death'); }, 320); break;
+        case 'ward': at(() => { banner('Saved!', 'ally'); sfx('relicPick'); }, 240); break;
         default: break;
       }
     });
@@ -469,6 +532,14 @@
     if (!host || !host.isConnected) return;
     runHost = host;
     const run = S.run; if (!run) { UI.show('pia'); return; }
+    /* phase-transition flourishes + bookkeeping */
+    const prevPhase = lastPhase; lastPhase = run.phase;
+    if (prevPhase === 'battle' && run.phase !== 'battle') {
+      if (run.phase === 'win') flourish('quarry');
+      else if (run.phase === 'reward') flourish('victory');
+      else if (run.phase === 'gameover') flourish('defeat');
+    }
+    if (prevPhase !== 'battle' && run.phase === 'battle') lastHandTurn = -1; // deal in the opening hand
     /* a phase change other than battle-staying clears any leftover input lock */
     if (run.phase !== 'battle') { if (inputLocked) setInputLocked(false); lastEventsRef = null; }
     host.innerHTML = '';
@@ -585,9 +656,7 @@
     if (me) {
       /* energy + end turn */
       const ctrl = U.el('div', { cls: 'pia-ctrl' });
-      const pips = U.el('div', { cls: 'pia-energy', title: 'Vaelk' });
-      pips.appendChild(U.el('span', { cls: 'pia-energy-val', html: '◈ <b>' + me.energy + '</b>' }));
-      ctrl.appendChild(pips);
+      ctrl.appendChild(energyOrbs(me));
       if (targeting != null) {
         ctrl.appendChild(U.el('div', { cls: 'pia-targeting', text: 'Pick a target enemy…' }));
         ctrl.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Cancel', onclick: () => { targeting = null; S.onUpdate && S.onUpdate(); } }));
@@ -600,14 +669,23 @@
       }
       foot.appendChild(ctrl);
 
-      /* hand */
+      /* hand — deals in with a stagger at the top of a fresh turn */
       const handEl = U.el('div', { cls: 'pia-hand' });
+      const freshTurn = isMine && !me.dead && !me.ended && b.phase === 'player' && b.turn !== lastHandTurn;
       if (isMine && !me.dead) {
-        me.hand.forEach((inst, idx) => handEl.appendChild(renderCard(b, me, inst, idx)));
+        me.hand.forEach((inst, idx) => {
+          const c = renderCard(b, me, inst, idx);
+          if (freshTurn) { c.classList.add('pia-dealt'); c.style.animationDelay = (idx * 55) + 'ms'; }
+          handEl.appendChild(c);
+        });
       } else {
         handEl.appendChild(U.el('div', { cls: 'muted', style: 'padding:20px', text: me.dead ? 'Defeated.' : 'This Guardian is played by someone else.' }));
       }
       foot.appendChild(handEl);
+      if (freshTurn) {
+        lastHandTurn = b.turn;
+        if (b.turn > 1) setTimeout(() => { if (S.run && S.run.phase === 'battle' && !inputLocked) { banner('Your Turn', 'you'); sfx('pulse'); } }, 140);
+      }
     }
     wrap.appendChild(foot);
 
@@ -653,6 +731,10 @@
     if (targeting != null) cell.onclick = () => {
       if (inputLocked) return;
       const me = EN.playerById(b, S.myId); const idx = targeting; targeting = null;
+      const handEl = runHost && runHost.querySelector('.pia-hand');
+      const cardEl = handEl && handEl.children[idx];
+      const ec = cell.getBoundingClientRect();
+      flyCard(cardEl, ec.left + ec.width / 2, ec.top + ec.height / 2);
       battleAct({ type: 'playCard', playerId: me.id, handIdx: idx, targetUid: e.uid });
     };
     return cell;
@@ -726,8 +808,12 @@
     el.appendChild(U.el('div', { cls: 'pia-card-text', text: cardText(card) }));
     if (playable) el.onclick = () => {
       if (inputLocked) return;
-      if (needsTargetUI(card)) { targeting = idx; S.onUpdate && S.onUpdate(); }
-      else battleAct({ type: 'playCard', playerId: p.id, handIdx: idx, targetUid: null });
+      if (needsTargetUI(card)) { targeting = idx; sfx('hover'); S.onUpdate && S.onUpdate(); }
+      else {
+        const dest = arenaPoint(card.type === 'attack' ? 0.22 : 0.82);
+        flyCard(el, dest.x, dest.y);
+        battleAct({ type: 'playCard', playerId: p.id, handIdx: idx, targetUid: null });
+      }
     };
     return el;
   }
