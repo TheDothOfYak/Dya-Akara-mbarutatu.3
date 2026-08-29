@@ -206,7 +206,7 @@
   }
 
   /* battle actions route through here so input locks during the enemy phase */
-  function battleAct(action) { if (inputLocked) return; S.act(action); }
+  function battleAct(action) { if (inputLocked) return; hideTip(); S.act(action); }
 
   /* ================= AMBIENT BACKGROUND =================
      A living Pia'don sky behind every screen of the mode: a tinted
@@ -321,6 +321,99 @@
   }
   function stopBg() { if (bgStop) { try { bgStop(); } catch (e) { } bgStop = null; } }
   function planetTheme() { const run = S.run; return (run && D.planet(run.planet)) ? D.planet(run.planet).element : 'cosmos'; }
+
+  /* ================= HOVER TOOLTIPS + GLOSSARY =================
+     A floating tip that follows the cursor, used to explain every status
+     symbol (on all combatants), the enemy's telegraphed intent, and a
+     card's keywords. Written in the game's own terms — Vaelk, the Guild. */
+  const GLOSSARY = {
+    vaelk:  ['Vaelk', 'Your energy for the turn. Cards cost Vaelk to play; it refills at the start of each of your turns.'],
+    block:  ['Block', 'Absorbs incoming damage. Whatever is left is lost at the start of your next turn.'],
+    poison: ['Poison', 'At the start of its turn the bearer loses HP equal to its Poison, then the Poison drops by 1.'],
+    vuln:   ['Vulnerable', 'Takes 50% more damage from attacks. Drops by 1 at the end of each of its turns.'],
+    weak:   ['Weak', 'Deals 25% less attack damage. Drops by 1 at the end of each of its turns.'],
+    str:    ['Strength', 'Adds its value to the damage of every attack the bearer makes.'],
+    dex:    ['Dexterity', 'Adds its value to the Block you gain from cards.'],
+    regen:  ['Regen', 'Heals HP equal to its value at the start of the turn, then drops by 1.'],
+    taunt:  ['Taunt', 'Foes must strike this called creature before they can reach your Guardians.'],
+    lifesteal: ['Lifesteal', 'Heals you for the damage this attack deals.'],
+  };
+  let piaTipEl = null;
+  function showTip(html) {
+    if (!html) return;
+    if (!piaTipEl) { piaTipEl = U.el('div', { cls: 'pia-tip' }); document.body.appendChild(piaTipEl); }
+    piaTipEl.innerHTML = html; piaTipEl.style.display = 'block';
+  }
+  function moveTip(x, y) {
+    if (!piaTipEl) return;
+    const w = piaTipEl.offsetWidth || 220, h = piaTipEl.offsetHeight || 80;
+    let lx = x + 15, ly = y + 16;
+    if (lx + w > window.innerWidth - 8) lx = x - w - 15;
+    if (ly + h > window.innerHeight - 8) ly = y - h - 12;
+    piaTipEl.style.left = Math.max(6, lx) + 'px'; piaTipEl.style.top = Math.max(6, ly) + 'px';
+  }
+  function hideTip() { if (piaTipEl) piaTipEl.style.display = 'none'; }
+  function attachTip(el, contentFn) {
+    el.addEventListener('mouseenter', (e) => { const html = typeof contentFn === 'function' ? contentFn() : contentFn; if (html) { showTip(html); moveTip(e.clientX, e.clientY); } });
+    el.addEventListener('mousemove', (e) => moveTip(e.clientX, e.clientY));
+    el.addEventListener('mouseleave', hideTip);
+  }
+  function gLine(g, valSuffix) { return '<div class="pt-title">' + U.esc(g[0]) + (valSuffix != null ? ' ' + valSuffix : '') + '</div><div>' + U.esc(g[1]) + '</div>'; }
+  function statusTipHtml(key, val) { const g = GLOSSARY[key]; return g ? gLine(g, val) : ''; }
+
+  /* explain the enemy's telegraphed move ("the I'm-gonna-do-this box") */
+  function intentTipHtml(b, e) {
+    const m = e.intent; if (!m) return '';
+    const dtxt = intentText(b, e);
+    if (m.intent === 'attack') return '<div class="pt-title">Attack</div><div>About to strike for <b>' + dtxt + '</b> damage' + ((m.hits || 1) > 1 ? ' (multiple hits)' : '') + '. Play Block to soften it.</div>';
+    if (m.intent === 'block') return '<div class="pt-title">Defend</div><div>About to gain <b>' + (m.block || 0) + '</b> Block, absorbing your next damage.</div>';
+    if (m.intent === 'buff') return '<div class="pt-title">Empower</div><div>About to gain <b>' + (m.str || 0) + '</b> Strength — its attacks will hit harder from now on.</div>';
+    if (m.intent === 'debuff') {
+      const bits = [];
+      if (m.dmg) bits.push('strike for <b>' + dtxt + '</b>');
+      if (m.weak) bits.push('apply <b>' + m.weak + ' Weak</b>');
+      if (m.vuln) bits.push('apply <b>' + m.vuln + ' Vulnerable</b>');
+      return '<div class="pt-title">Curse</div><div>About to ' + (bits.join(' and ') || 'weaken you') + '.</div>';
+    }
+    if (m.intent === 'summon') return '<div class="pt-title">Summon</div><div>About to call <b>' + (m.count || 1) + '</b> reinforcement' + ((m.count || 1) > 1 ? 's' : '') + ' to the field.</div>';
+    return '';
+  }
+
+  /* card keyword breakdown */
+  function cardKeywords(card) {
+    const e = card.e || {}, out = [];
+    const add = (k) => { if (out.indexOf(k) < 0) out.push(k); };
+    if (e.block || e.blockAllies || e.bonusIfBlock) add('block');
+    if (e.poison || e.poisonAll || e.detonatePoison) add('poison');
+    if (e.vuln) add('vuln');
+    if (e.weak) add('weak');
+    if (e.str || e.strAllies) add('str');
+    if (e.dex) add('dex');
+    if (e.regen) add('regen');
+    if (e.lifesteal) add('lifesteal');
+    return out;
+  }
+  function cardTipHtml(card) {
+    const cost = (card.cost || 0);
+    let html = '<div class="pt-title">' + U.esc(card.name) + '</div>';
+    html += '<div class="pt-sub">' + card.type + ' · <b>' + cost + '</b> Vaelk' + (card.upg ? ' · upgraded' : '') + '</div>';
+    html += '<div class="pt-body">' + U.esc(card.text || '') + '</div>';
+    if (card.type === 'summon' || card.summon) {
+      const keys = Array.isArray(card.summon) ? card.summon : (card.summon ? [card.summon] : []);
+      keys.forEach(k => {
+        const s = D.summonDef(k); if (!s) return;
+        const parts = ['<b>' + s.hp + '</b> HP'];
+        if (s.dmg) parts.push('hits <b>' + s.dmg + '</b>');
+        if (s.block) parts.push('gives <b>' + s.block + '</b> Block/turn');
+        if (s.healAlly) parts.push('heals <b>' + s.healAlly + '</b>/turn');
+        if (s.poison) parts.push('applies <b>' + s.poison + '</b> Poison');
+        if (s.taunt) parts.push('taunts');
+        html += '<div class="pt-kw"><span class="pt-k">Summons ' + U.esc(s.name) + ':</span> ' + parts.join(', ') + '.</div>';
+      });
+    }
+    cardKeywords(card).forEach(k => { const g = GLOSSARY[k]; if (g) html += '<div class="pt-kw"><span class="pt-k">' + U.esc(g[0]) + ':</span> ' + U.esc(g[1]) + '</div>'; });
+    return html;
+  }
 
   /* ================= HOME / GUARDIAN SELECT ================= */
   UI.register('pia', {
@@ -530,6 +623,7 @@
 
   function paintRun(host) {
     if (!host || !host.isConnected) return;
+    hideTip();
     runHost = host;
     const run = S.run; if (!run) { UI.show('pia'); return; }
     /* phase-transition flourishes + bookkeeping */
@@ -569,10 +663,15 @@
     bar.appendChild(U.el('div', { cls: 'spacer' }));
     const me = R.player(run, S.myId) || run.players[0];
     if (me) {
-      bar.appendChild(U.el('span', { cls: 'res-chip', html: '❤ <b>' + me.hp + '</b>/' + me.maxHp }));
+      const hpChip = U.el('span', { cls: 'res-chip pia-hint', html: '❤ <b>' + me.hp + '</b>/' + me.maxHp });
+      attachTip(hpChip, '<div class="pt-title">Health</div><div>When it reaches 0 your Guardian falls. Rest sites and some cards restore it.</div>');
+      bar.appendChild(hpChip);
       bar.appendChild(U.el('span', { cls: 'res-chip', html: '🪙 <b>' + me.gold + '</b>' }));
-      bar.appendChild(U.el('span', { cls: 'res-chip', html: '🎴 <b>' + me.deck.length + '</b>' }));
-      me.relics.forEach(rid => { const r = D.relic(rid); if (r) bar.appendChild(U.el('span', { cls: 'pia-relic-chip', title: r.name + ' — ' + r.text, text: r.icon })); });
+      const deckBtn = U.el('span', { cls: 'res-chip pia-hint pia-deckchip', html: '🎴 <b>' + me.deck.length + '</b> cards' });
+      attachTip(deckBtn, '<div class="pt-title">Your deck</div><div>Click to look through every card you carry.</div>');
+      deckBtn.onclick = () => openDeckView(run);
+      bar.appendChild(deckBtn);
+      me.relics.forEach(rid => { const r = D.relic(rid); if (r) { const chip = U.el('span', { cls: 'pia-relic-chip pia-hint', text: r.icon }); attachTip(chip, '<div class="pt-title">' + r.icon + ' ' + U.esc(r.name) + '</div><div>' + U.esc(r.text) + '</div>'); bar.appendChild(chip); } });
     }
     if (run.mode === 'coop') bar.appendChild(U.el('span', { cls: 'res-chip', html: '👥 <b>' + run.players.length + '</b>' }));
     bar.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Quit', onclick: () => leaveRun() }));
@@ -716,9 +815,10 @@
     /* intent badge */
     const m = e.intent; const info = m ? (INTENT[m.intent] || INTENT.attack) : null;
     if (info) {
-      const badge = U.el('div', { cls: 'pia-intent ' + info.cls, title: (m.name || m.intent) });
+      const badge = U.el('div', { cls: 'pia-intent pia-hint ' + info.cls });
       badge.appendChild(U.el('span', { cls: 'pi-icon', text: info.icon }));
       const t = intentText(b, e); if (t) badge.appendChild(U.el('span', { cls: 'pi-val', text: t }));
+      attachTip(badge, intentTipHtml(b, e));
       cell.appendChild(badge);
     }
     const size = e.boss ? 176 : e.elite ? 116 : 92;
@@ -783,12 +883,12 @@
 
   function statusRow(st, isPlayer) {
     const row = U.el('div', { cls: 'pia-status' });
-    const add = (cond, cls, label, title) => { if (cond) row.appendChild(U.el('span', { cls: 'pia-st ' + cls, title: title, text: label })); };
-    add(st.poison, 'st-poison', '☠' + st.poison, 'Poison');
-    add(st.vuln, 'st-vuln', '⤈' + st.vuln, 'Vulnerable (+50% damage taken)');
-    add(st.weak, 'st-weak', '⬇' + st.weak, 'Weak (-25% damage dealt)');
-    if (isPlayer) { add(st.str, 'st-str', '💪' + st.str, 'Strength'); add(st.regen, 'st-regen', '✚' + st.regen, 'Regen'); add(st.dex, 'st-dex', '✧' + st.dex, 'Dexterity'); }
-    else add(st.str, 'st-str', '💪' + st.str, 'Strength');
+    const add = (cond, cls, label, key) => { if (cond) { const s = U.el('span', { cls: 'pia-st ' + cls + ' pia-hint', text: label }); attachTip(s, statusTipHtml(key, st[key])); row.appendChild(s); } };
+    add(st.poison, 'st-poison', '☠' + st.poison, 'poison');
+    add(st.vuln, 'st-vuln', '⤈' + st.vuln, 'vuln');
+    add(st.weak, 'st-weak', '⬇' + st.weak, 'weak');
+    if (isPlayer) { add(st.str, 'st-str', '💪' + st.str, 'str'); add(st.regen, 'st-regen', '✚' + st.regen, 'regen'); add(st.dex, 'st-dex', '✧' + st.dex, 'dex'); }
+    else add(st.str, 'st-str', '💪' + st.str, 'str');
     return row;
   }
 
@@ -806,6 +906,7 @@
     }
     el.appendChild(U.el('div', { cls: 'pia-card-name', text: card.name }));
     el.appendChild(U.el('div', { cls: 'pia-card-text', text: cardText(card) }));
+    attachTip(el, cardTipHtml(card));
     if (playable) el.onclick = () => {
       if (inputLocked) return;
       if (needsTargetUI(card)) { targeting = idx; sfx('hover'); S.onUpdate && S.onUpdate(); }
@@ -873,7 +974,33 @@
     el.appendChild(U.el('div', { cls: 'pia-card-name', text: card.name }));
     el.appendChild(U.el('div', { cls: 'pia-card-text', text: card.text || '' }));
     el.appendChild(U.el('div', { cls: 'tiny muted', text: card.rarity }));
+    attachTip(el, cardTipHtml(card));
     return el;
+  }
+
+  /* look through the whole run deck, grouped and counted */
+  function openDeckView(run) {
+    const me = R.player(run, S.myId) || run.players[0]; if (!me) return;
+    hideTip();
+    const counts = {};
+    me.deck.forEach(c => { const key = c.id + (c.upg ? '+' : ''); (counts[key] = counts[key] || { id: c.id, upg: c.upg, n: 0 }).n++; });
+    const items = Object.values(counts).sort((a, b) => (D.card(a.id).cost - D.card(b.id).cost) || D.card(a.id).name.localeCompare(D.card(b.id).name));
+    const wrap = U.el('div', {}, [
+      U.el('h3', { cls: 'gold', text: '🎴 Your Deck — ' + me.deck.length + ' cards' }),
+      U.el('div', { cls: 'tiny muted', text: 'Hover any card for what its keywords mean.' }),
+    ]);
+    const grid = U.el('div', { cls: 'pia-reward-cards', style: 'max-height:60vh;overflow:auto;justify-content:flex-start' });
+    items.forEach(it => {
+      const holder = U.el('div', { style: 'position:relative' });
+      const c = renderStaticCard(it.id);
+      if (it.upg) c.classList.add('upg');
+      if (it.n > 1) holder.appendChild(U.el('div', { cls: 'pia-deck-count', text: '×' + it.n }));
+      holder.appendChild(c);
+      grid.appendChild(holder);
+    });
+    wrap.appendChild(grid);
+    const m = UI.modal(wrap);
+    wrap.appendChild(U.el('button', { cls: 'btn ghost mt', text: 'Close', onclick: () => { hideTip(); m.close(); } }));
   }
 
   function partyPending(run, doneFn) {
