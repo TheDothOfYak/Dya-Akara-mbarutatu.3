@@ -81,13 +81,28 @@
       });
       if (to) clearTimeout(to);
       if (res.ok) return { online: true, reason: 'ok' };
-      if (res.status === 401 || res.status === 403) return { online: false, reason: 'auth' };
-      if (res.status === 404) return { online: false, reason: 'schema' };
+      if (res.status === 401 || res.status === 403) { warnUnreachable('server rejected the key (HTTP ' + res.status + ')', c); return { online: false, reason: 'auth' }; }
+      if (res.status === 404) { warnUnreachable('endpoint returned HTTP 404 (schema/tables missing)', c); return { online: false, reason: 'schema' }; }
+      warnUnreachable('server returned HTTP ' + res.status, c);
       return { online: false, reason: 'server' };
     } catch (e) {
       if (to) clearTimeout(to);
+      warnUnreachable('request failed (' + ((e && e.name) || 'error') + ': ' + ((e && e.message) || e) + ')', c);
       return { online: false, reason: 'network' };
     }
+  }
+
+  /* Surface *why* a probe failed in the console — otherwise a single machine
+     that can't reach the cloud (blocked by an extension/firewall, a stale
+     custom-server override, a wrong system clock breaking TLS) just shows a
+     bare "You're offline" with no clue. This is the first thing to check when
+     the game works on one device but not another. */
+  function warnUnreachable(detail, c) {
+    try {
+      const target = (c && c.url) || '(no server configured)';
+      const overridden = hasLocalOverride() ? ' [using a per-browser custom server — Reset online settings to use this site’s default]' : '';
+      console.warn('[online-gate] cannot reach ' + target + ': ' + detail + overridden);
+    } catch (e) { /* console may be unavailable */ }
   }
 
   GATE.ping = async function (timeoutMs) {
@@ -114,6 +129,30 @@
     return r;
   };
 
+  /* ================= per-browser override recovery ================= */
+  /* config.js lets a saved override (Friends → "Set up online play", stored in
+     THIS browser only) win over the baked-in default server. A stale or wrong
+     override — e.g. inherited from an old deployment whose Supabase project no
+     longer exists — leaves one machine permanently "offline" while every other
+     device is fine. Detect that so the overlay can offer a one-click escape. */
+  const OVERRIDE_KEY = 'dyaakara_online_cfg';
+  function hasLocalOverride() {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+      const s = JSON.parse(localStorage.getItem(OVERRIDE_KEY) || 'null');
+      return !!(s && s.url && s.anonKey);
+    } catch (e) { return false; }
+  }
+  /* Clear the per-browser override and reload so config.js falls back to this
+     site's baked-in default server (or, if there is none, the setup prompt). */
+  function resetOnlineConfig() {
+    try {
+      if (DYA.online && typeof DYA.online.clearConfig === 'function') DYA.online.clearConfig();
+      else if (typeof localStorage !== 'undefined') localStorage.removeItem(OVERRIDE_KEY);
+    } catch (e) { /* ignore */ }
+    try { if (typeof location !== 'undefined' && location.reload) location.reload(); } catch (e) { /* ignore */ }
+  }
+
   /* ================= blocking overlay ================= */
   const MSG = {
     connecting:   { t: 'Reaching the Guild…',        b: 'Connecting to the online world.',                                                                        retry: false, spin: true },
@@ -130,11 +169,12 @@
     const title = U.el('div',    { cls: 'ogate-title' });
     const body  = U.el('div',    { cls: 'ogate-body' });
     const retry = U.el('button', { cls: 'btn primary', text: 'Retry now', onclick: () => GATE.recheck() });
+    const reset = U.el('button', { cls: 'btn small', text: 'Reset online settings', onclick: () => resetOnlineConfig() });
     const card  = U.el('div', { cls: 'ogate-card' }, [
-      spin, U.el('div', { cls: 'ogate-brand', text: "DYA'AKARA" }), title, body, retry,
+      spin, U.el('div', { cls: 'ogate-brand', text: "DYA'AKARA" }), title, body, retry, reset,
     ]);
     overlayEl = U.el('div', { id: 'onlineGateOverlay' }, [card]);
-    els = { spin, title, body, retry };
+    els = { spin, title, body, retry, reset };
     document.body.appendChild(overlayEl);
   }
 
@@ -146,6 +186,10 @@
     els.body.textContent = m.b;
     els.retry.style.display = m.retry ? '' : 'none';
     els.spin.style.display = m.spin ? '' : 'none';
+    /* Offer the escape hatch only when a per-browser override is actually in
+       effect and we're stuck (not while merely connecting) — otherwise it's
+       noise. This is what unsticks a single machine pinned to a dead server. */
+    els.reset.style.display = (state !== 'connecting' && hasLocalOverride()) ? '' : 'none';
     overlayEl.style.display = 'flex';
   }
 
