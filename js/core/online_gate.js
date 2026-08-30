@@ -36,10 +36,22 @@
   /* how often we re-probe the cloud — relaxed while healthy, brisk while down */
   GATE.ONLINE_EVERY = 30000;
   GATE.OFFLINE_EVERY = 4000;
+  /* while a blip is being confirmed we re-probe fast (see FAIL_TOLERANCE) */
+  GATE.VERIFY_EVERY = 2000;
+
+  /* How many consecutive *transient* probe failures (network / server) we
+     tolerate before actually blocking play. Mobile browsers fire spurious
+     `offline` events and briefly report navigator.onLine === false on screen
+     lock, tab backgrounding, and Wi-Fi↔cellular handoffs; a single failure is
+     almost always one of those blips rather than a real disconnect, so we
+     verify before yanking the player out. Definitive failures (auth / schema /
+     unconfigured) still block on the first probe — retrying won't fix those. */
+  GATE.FAIL_TOLERANCE = 2;
 
   let overlayEl = null, els = null;
   let monitorTimer = null, netAttached = false;
   let readyCb = null, passedOnce = false, probing = false;
+  let failStreak = 0;
 
   /* ================= reachability probe ================= */
   /* A cheap GET against the REST endpoint. Any 2xx means the online world is
@@ -47,9 +59,11 @@
      something useful instead of a generic "offline". */
   GATE.ping = async function (timeoutMs) {
     if (!GATE.configured()) return { online: false, reason: 'unconfigured' };
-    if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
-      return { online: false, reason: 'network' };
-    }
+    /* We deliberately do NOT short-circuit on navigator.onLine === false here.
+       On mobile that flag is unreliable — it flips false on screen lock and
+       network handoffs while the connection is actually fine — so we let the
+       real fetch below be the source of truth for reachability. If we truly
+       are offline the fetch just fails and we classify it as 'network' anyway. */
     const c = cfg();
     let ctrl = null, to = null;
     try { ctrl = new AbortController(); to = setTimeout(() => ctrl.abort(), timeoutMs || 8000); }
@@ -124,23 +138,52 @@
     probing = true;
     let r;
     try { r = await GATE.ping(); } finally { probing = false; }
-    GATE.online = r.online;
+
     if (r.online) {
+      failStreak = 0;
+      GATE.online = true;
       hideOverlay();
       if (!passedOnce) { passedOnce = true; if (readyCb) { try { readyCb(); } catch (e) { console.error(e); } } }
       scheduleMonitor(GATE.ONLINE_EVERY);
-    } else {
-      showOverlay(r.reason === 'unconfigured' ? 'unconfigured' : r.reason);
+      return;
+    }
+
+    /* Definitive failures can't be fixed by retrying, so block immediately. */
+    const definitive = (r.reason === 'unconfigured' || r.reason === 'auth' || r.reason === 'schema');
+    if (definitive) {
+      failStreak = 0;
+      GATE.online = false;
+      showOverlay(r.reason);
       /* an unconfigured deployment can't recover by retrying — stop polling and
-         wait for a reload; every other failure keeps trying on the brisk cadence */
+         wait for a reload; auth/schema keep trying on the brisk cadence */
       if (r.reason !== 'unconfigured') scheduleMonitor(GATE.OFFLINE_EVERY);
+      return;
+    }
+
+    /* Transient failure (network / server): don't block on the first blip.
+       Keep the player in the game and re-probe quickly; only once failures pile
+       up past the tolerance do we treat it as a genuine disconnect. */
+    failStreak++;
+    if (failStreak >= GATE.FAIL_TOLERANCE) {
+      GATE.online = false;
+      showOverlay(r.reason);
+      scheduleMonitor(GATE.OFFLINE_EVERY);
+    } else {
+      /* While still booting the connecting spinner stays up; mid-session we
+         leave GATE.online untouched so play continues during verification. */
+      if (!passedOnce) showOverlay('connecting');
+      scheduleMonitor(GATE.VERIFY_EVERY);
     }
   }
 
   function attachNetEvents() {
     if (netAttached || typeof window === 'undefined' || !window.addEventListener) return;
     netAttached = true;
-    window.addEventListener('offline', () => { GATE.online = false; showOverlay('network'); scheduleMonitor(1000); });
+    /* The browser's `offline` event is a hint, not proof — mobile fires it
+       spuriously. Don't block on it; just probe soon to confirm real state.
+       A genuine disconnect fails the probe FAIL_TOLERANCE times and blocks;
+       a blip recovers before the player ever sees the overlay. */
+    window.addEventListener('offline', () => { clearTimeout(monitorTimer); scheduleMonitor(GATE.VERIFY_EVERY); });
     window.addEventListener('online', () => { GATE.recheck(); });
   }
 
