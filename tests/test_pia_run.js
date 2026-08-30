@@ -336,6 +336,53 @@ const strB = bd.players[0].st.str;
 EN.endTurn(bd, 'p1');
 ok(bd.players[0].dead || bd.players[0].st.str > strB, 'War Drum grows Strength on the next turn (' + strB + ' -> ' + bd.players[0].st.str + ')');
 
+/* ---------- 13. ally buffs reach teammates in co-op ---------- */
+console.log('13. Co-op ally buffs');
+const bt2 = party(2, ['e_wildpunk']);
+const A = EN.playerById(bt2, 'p0'), Bp = EN.playerById(bt2, 'p1');
+A.hand = [{ id: 'relic_ward', upg: false }]; A.energy = 3; Bp.block = 0;
+EN.playCard(bt2, 'p0', 0, null);
+ok(Bp.block >= 6, 'blockAllies also shields the other Guardian in co-op (' + Bp.block + ')');
+const strBefore2 = Bp.st.str;
+A.hand = [{ id: 'warcall', upg: false }]; A.energy = 3;
+EN.playCard(bt2, 'p0', 0, null);
+ok(Bp.st.str > strBefore2, 'strAllies also strengthens the other Guardian in co-op (' + strBefore2 + ' -> ' + Bp.st.str + ')');
+// solo is unchanged: no phantom teammate to buff
+const bs1 = soloBattle('tanoc', ['e_krabbi'], 4);
+bs1.players[0].hand = [{ id: 'relic_ward', upg: false }]; bs1.players[0].energy = 3;
+ok(EN.playCard(bs1, 'p1', 0, null).ok, 'ally-buff card still plays fine in solo');
+
+/* ---------- 14. powers stay on the field (exhaust, never redrawn) ---------- */
+console.log('14. Powers exhaust like enchantments');
+const bp1 = soloBattle('tanoc', ['e_krabbi'], 7);
+const pp = bp1.players[0];
+pp.hand = [{ id: 'war_drum', upg: false }]; pp.energy = 3;
+const exhaustBefore = pp.exhaust.length, discardBefore = pp.discard.length;
+EN.playCard(bp1, 'p1', 0, null);
+ok(pp.exhaust.some(c => c.id === 'war_drum'), 'a Power goes to exhaust when played');
+ok(!pp.discard.some(c => c.id === 'war_drum'), 'a Power does NOT go to the discard pile');
+ok(!pp.draw.some(c => c.id === 'war_drum') && !pp.hand.some(c => c.id === 'war_drum'), 'a played Power can never be drawn again');
+ok(pp.exhaust.length === exhaustBefore + 1 && pp.discard.length === discardBefore, 'Power lands only in exhaust');
+
+/* ---------- 15. summon cap gates creature draws ---------- */
+console.log('15. Creature draw cap (4 on the field)');
+const bc = soloBattle('tanoc', ['e_krabbi'], 9);
+const cp = bc.players[0];
+// fill the field to the cap
+for (let i = 0; i < D.TUNE.maxSummons; i++) EN.summon(bc, cp, 'call_eikar');
+ok(EN.aliveAllies(bc).filter(a => a.ownerId === cp.id).length === D.TUNE.maxSummons, 'field is full at ' + D.TUNE.maxSummons + ' creatures');
+// stack the draw pile with creature cards + one non-creature and draw
+cp.hand = []; cp.discard = [];
+cp.draw = [{ id: 'summon_eikar', upg: false }, { id: 'summon_eikar', upg: false }, { id: 'strike_ular', upg: false }];
+EN._draw(bc, cp, 1);
+ok(cp.hand.length === 1 && cp.hand[0].id === 'strike_ular', 'with the field full, draw skips creatures and takes a non-creature (' + (cp.hand[0] && cp.hand[0].id) + ')');
+ok(cp.draw.filter(c => c.id === 'summon_eikar').length === 2, 'skipped creature cards are left in the deck');
+// drop below the cap -> creatures can be drawn again
+EN.aliveAllies(bc).filter(a => a.ownerId === cp.id).slice(0, 2).forEach(a => { a.hp = 0; });
+cp.hand = [];
+EN._draw(bc, cp, 1);
+ok(cp.hand.length === 1 && cp.hand[0].id === 'summon_eikar', 'once down to 3 or fewer, creatures are drawn again');
+
 /* ---------- done ---------- */
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

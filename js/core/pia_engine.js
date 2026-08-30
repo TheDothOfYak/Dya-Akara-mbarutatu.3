@@ -336,7 +336,10 @@
     /* on-skill power: Tidal Bulwark */
     if (card.type === 'skill' && p.powers.blockOnSkill) gainBlock(b, p, p.id, p.powers.blockOnSkill);
 
-    if (card.exhaust) p.exhaust.push({ id: inst.id, upg: inst.upg });
+    /* Powers stay "on the field" like an enchantment: once played their
+       effect is permanent, so the card is removed from the deck for the rest
+       of the battle instead of being shuffled back to be drawn again. */
+    if (card.exhaust || card.type === 'power') p.exhaust.push({ id: inst.id, upg: inst.upg });
     else p.discard.push({ id: inst.id, upg: inst.upg });
 
     checkOver(b);
@@ -391,8 +394,16 @@
     if (e.heal) healEntity(b, p, p.id, e.heal, 'heal');
     if (e.energy) p.energy += e.energy;
     if (e.draw) draw(b, p, e.draw);
-    if (e.strAllies) b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => { a.str += e.strAllies; emitStatus(b, a.uid, 'str', e.strAllies); });
-    if (e.blockAllies) b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => gainBlock(b, a, a.uid, e.blockAllies));
+    /* "your allies" = your summoned creatures AND, in co-op, your fellow
+       Guardians. In solo there are no other players, so this is unchanged. */
+    if (e.strAllies) {
+      b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => { a.str += e.strAllies; emitStatus(b, a.uid, 'str', e.strAllies); });
+      alivePlayers(b).forEach(o => { if (o.id !== p.id) { o.st.str += e.strAllies; emitStatus(b, o.id, 'str', e.strAllies); } });
+    }
+    if (e.blockAllies) {
+      b.allies.filter(a => a.ownerId === p.id && a.hp > 0).forEach(a => gainBlock(b, a, a.uid, e.blockAllies));
+      alivePlayers(b).forEach(o => { if (o.id !== p.id) gainBlock(b, o, o.id, e.blockAllies); });
+    }
     if (e.power) p.powers[e.power] = (e.amount != null ? e.amount : true);
 
     /* damage */
@@ -422,15 +433,33 @@
   }
 
   /* ================= DRAW ================= */
+  function livingAllies(b, p) {
+    return b.allies.filter(a => a.ownerId === p.id && a.hp > 0).length;
+  }
   function draw(b, p, n) {
-    for (let i = 0; i < n; i++) {
+    const held = [];   /* creature cards skipped while the field is full */
+    let guard = 0;
+    for (let i = 0; i < n; ) {
+      if (++guard > 500) break;
       if (p.draw.length === 0) {
         if (p.discard.length === 0) break;
         p.draw = b._rng.shuffle(p.discard); p.discard = [];
       }
-      if (p.hand.length >= 10) { p.discard.push(p.draw.pop()); continue; }
-      p.hand.push(p.draw.pop());
+      if (p.draw.length === 0) break;
+      const inst = p.draw[p.draw.length - 1];
+      const c = D.card(inst.id);
+      /* At the summon cap you don't draw more creatures until you're down to
+         3 or fewer — leave the creature card in the deck and try the next. */
+      if (c && (c.type === 'summon' || c.summon) && livingAllies(b, p) >= D.TUNE.maxSummons) {
+        held.push(p.draw.pop());
+        continue;
+      }
+      p.draw.pop();
+      i++;
+      if (p.hand.length >= 10) { p.discard.push(inst); continue; }
+      p.hand.push(inst);
     }
+    while (held.length) p.draw.push(held.pop());   /* put skipped creatures back */
   }
 
   /* ================= PHASES ================= */
@@ -622,6 +651,8 @@
   E.alivePlayers = alivePlayers;
   E.aliveAllies = aliveAllies;
   E.playerById = playerById;
+  E.summon = summon;   /* exposed for headless tests */
+  E._draw = draw;      /* exposed for headless tests */
 
   DYA.piaEngine = E;
 })();
