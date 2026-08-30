@@ -48,6 +48,15 @@
      unconfigured) still block on the first probe — retrying won't fix those. */
   GATE.FAIL_TOLERANCE = 2;
 
+  /* How long a single reachability probe may run before we give up on it, and
+     how many times we retry a probe that failed with a hard network error
+     (connection dropped / timed out — not a real HTTP answer). Congested school
+     and office Wi-Fi is slow and drops the odd request even while it's up, so a
+     stingy timeout or a one-shot probe reads a working-but-busy network as
+     offline. A generous timeout plus a quiet retry rides over those hiccups. */
+  GATE.PING_TIMEOUT = 15000;
+  GATE.PING_TRIES = 2;
+
   let overlayEl = null, els = null;
   let monitorTimer = null, netAttached = false;
   let readyCb = null, passedOnce = false, probing = false;
@@ -57,16 +66,11 @@
   /* A cheap GET against the REST endpoint. Any 2xx means the online world is
      live; we classify the common failure modes so the overlay can say
      something useful instead of a generic "offline". */
-  GATE.ping = async function (timeoutMs) {
-    if (!GATE.configured()) return { online: false, reason: 'unconfigured' };
-    /* We deliberately do NOT short-circuit on navigator.onLine === false here.
-       On mobile that flag is unreliable — it flips false on screen lock and
-       network handoffs while the connection is actually fine — so we let the
-       real fetch below be the source of truth for reachability. If we truly
-       are offline the fetch just fails and we classify it as 'network' anyway. */
-    const c = cfg();
+  /* One reachability attempt: resolves to {online, reason}. A hard failure
+     (fetch rejected, or aborted by our own timeout) comes back as 'network'. */
+  async function pingOnce(c, timeoutMs) {
     let ctrl = null, to = null;
-    try { ctrl = new AbortController(); to = setTimeout(() => ctrl.abort(), timeoutMs || 8000); }
+    try { ctrl = new AbortController(); to = setTimeout(() => ctrl.abort(), timeoutMs); }
     catch (e) { ctrl = null; }
     try {
       const res = await fetch(c.url + '/rest/v1/dya_config?select=key&limit=1', {
@@ -84,6 +88,30 @@
       if (to) clearTimeout(to);
       return { online: false, reason: 'network' };
     }
+  }
+
+  GATE.ping = async function (timeoutMs) {
+    if (!GATE.configured()) return { online: false, reason: 'unconfigured' };
+    /* We deliberately do NOT short-circuit on navigator.onLine === false here.
+       On mobile that flag is unreliable — it flips false on screen lock and
+       network handoffs while the connection is actually fine — so we let the
+       real fetch below be the source of truth for reachability. If we truly
+       are offline the fetch just fails and we classify it as 'network' anyway. */
+    const c = cfg();
+    const timeout = timeoutMs || GATE.PING_TIMEOUT;
+    let r = { online: false, reason: 'network' };
+    for (let attempt = 0; attempt < GATE.PING_TRIES; attempt++) {
+      r = await pingOnce(c, timeout);
+      /* A real HTTP answer (online / auth / schema / server) is authoritative —
+         take it as-is. Only a hard network failure is worth retrying, since a
+         busy Wi-Fi drops the occasional request even when it's genuinely up.
+         A truly blocked network keeps failing and we still end up offline. */
+      if (r.reason !== 'network') return r;
+      if (attempt < GATE.PING_TRIES - 1) {
+        await new Promise((res) => setTimeout(res, 400));
+      }
+    }
+    return r;
   };
 
   /* ================= blocking overlay ================= */
