@@ -356,9 +356,25 @@
   }
   function hideTip() { if (piaTipEl) piaTipEl.style.display = 'none'; }
   function attachTip(el, contentFn) {
-    el.addEventListener('mouseenter', (e) => { const html = typeof contentFn === 'function' ? contentFn() : contentFn; if (html) { showTip(html); moveTip(e.clientX, e.clientY); } });
+    const html = () => (typeof contentFn === 'function' ? contentFn() : contentFn);
+    el.addEventListener('mouseenter', (e) => { const h = html(); if (h) { showTip(h); moveTip(e.clientX, e.clientY); } });
     el.addEventListener('mousemove', (e) => moveTip(e.clientX, e.clientY));
     el.addEventListener('mouseleave', hideTip);
+    /* Touch has no hover: long-press to inspect. A short tap still acts on the
+       element (plays the card, upgrades it, …); holding ~350ms shows the tip
+       instead and swallows the tap that would otherwise follow. */
+    let lpTimer = null, held = false, sx = 0, sy = 0;
+    el.addEventListener('touchstart', (e) => {
+      const t = e.touches[0]; if (!t) return; sx = t.clientX; sy = t.clientY; held = false;
+      lpTimer = setTimeout(() => { held = true; const h = html(); if (h) { showTip(h); moveTip(sx, sy); } }, 350);
+    }, { passive: true });
+    el.addEventListener('touchmove', (e) => {
+      const t = e.touches[0]; if (!t) return;
+      if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) clearTimeout(lpTimer);
+    }, { passive: true });
+    el.addEventListener('touchend', () => { clearTimeout(lpTimer); if (held) setTimeout(hideTip, 1800); });
+    el.addEventListener('touchcancel', () => { clearTimeout(lpTimer); });
+    el.addEventListener('click', (e) => { if (held) { e.preventDefault(); e.stopImmediatePropagation(); held = false; } }, true);
   }
   function gLine(g, valSuffix) { return '<div class="pt-title">' + U.esc(g[0]) + (valSuffix != null ? ' ' + valSuffix : '') + '</div><div>' + U.esc(g[1]) + '</div>'; }
   function statusTipHtml(key, val) { const g = GLOSSARY[key]; return g ? gLine(g, val) : ''; }
