@@ -1,0 +1,71 @@
+name: Keep Supabase awake
+
+# Supabase free-tier projects auto-pause after ~7 days with no API
+# activity — and a paused project takes the whole online layer (friends,
+# market, duels, tournaments, cloud accounts) down with it. This workflow
+# makes one tiny REST request on a schedule so the project never crosses
+# that idle threshold.
+#
+# It reads the project URL + anon key straight out of js/config.js — the
+# same values already shipped (publicly) in the deployed site — so there
+# is a single source of truth and nothing to configure. If the deployment
+# ever points at a different Supabase project, this follows automatically.
+
+on:
+  schedule:
+    # Mon & Thu at 06:00 UTC — max gap ~4 days, comfortably under the
+    # ~7-day auto-pause window even if one run is skipped/delayed.
+    - cron: '0 6 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive-supabase
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ping Supabase REST (counts as activity)
+        run: |
+          set -euo pipefail
+
+          # Pull the REAL project values, skipping the placeholder example
+          # in the comment block (url 'https://YOURPROJECT.supabase.co',
+          # key 'eyJ…'). A real project ref is lower-case alphanumeric, and
+          # a real anon key is a long JWT — both filters exclude the sample.
+          URL=$(grep -oP "'\Khttps://[a-z0-9]{15,}\.supabase\.co" js/config.js | head -1)
+          KEY=$(grep -oP "anonKey:\s*'\K[^']{40,}" js/config.js | head -1)
+
+          if [ -z "${URL:-}" ] || [ -z "${KEY:-}" ]; then
+            echo "Could not read Supabase url/anonKey from js/config.js" >&2
+            exit 1
+          fi
+          echo "Pinging ${URL} ..."
+
+          # Cheapest possible activity: fetch a single key from dya_config
+          # (HEAD-style, count only). Retries ride out a project that is
+          # still waking from a paused state.
+          code=0
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -m 30 \
+              -H "apikey: ${KEY}" \
+              -H "Authorization: Bearer ${KEY}" \
+              -H "Accept: application/json" \
+              -H "Range: 0-0" \
+              "${URL}/rest/v1/dya_config?select=key" || echo 000)
+            echo "attempt ${attempt}: HTTP ${code}"
+            case "$code" in
+              200|206) echo "Supabase is awake."; exit 0 ;;
+            esac
+            sleep $((attempt * 15))
+          done
+
+          echo "Supabase did not return a healthy response (last: ${code})" >&2
+          exit 1
