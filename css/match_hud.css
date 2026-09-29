@@ -1,0 +1,59 @@
+/* ============================================================
+   DYA'AKARA — match_hud.css
+   Visual polish for the in-match HUD. Layered on top of style.css;
+   delete this file's <link> in index.html to go back to the
+   original look. Each block below is independent — remove any
+   one of them on its own.
+   ============================================================ */
+
+/* ---- 1. Glass panels: pulse timer, resources, readied board ---- */
+#matchScreen .pulse-box,
+#matchScreen .res-box {
+  background: linear-gradient(180deg, rgba(36,28,18,.82), rgba(18,13,8,.82));
+  border: 1px solid #8a6f4299;
+  box-shadow: 0 6px 22px #000a, inset 0 1px 0 #d9b87a22;
+  backdrop-filter: blur(6px);
+}
+#matchScreen .hud-readied {
+  background: linear-gradient(180deg, rgba(36,28,18,.7), rgba(14,10,6,.7));
+  backdrop-filter: blur(6px);
+}
+
+/* ---- 2. Pulse bar: a slow shimmer runs along the fill ---- */
+#matchScreen .pulse-bar { height: 7px; background: #0b0805; border: 1px solid #3d332388; }
+#matchScreen .pulse-bar > div {
+  background: linear-gradient(90deg, #8a6f42, #d9b87a 45%, #fff0c8 50%, #d9b87a 55%, #8a6f42) 0 0 / 300% 100%;
+  animation: hudShimmer 3.2s linear infinite;
+  box-shadow: 0 0 8px #d9b87a66;
+}
+@keyframes hudShimmer { from { background-position: 100% 0 } to { background-position: -200% 0 } }
+
+/* ---- 3. Event chips: gold-edged, with a soft entrance ---- */
+#matchScreen .hud-event {
+  background: linear-gradient(180deg, rgba(30,23,14,.9), rgba(14,10,6,.9));
+  border: 1px solid #8a6f4277; box-shadow: 0 4px 14px #0008;
+  letter-spacing: .02em;
+}
+
+/* ---- 4. Minimap: a gold bezel ring ---- */
+#matchScreen .hud-minimap canvas {
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #1c1610, 0 0 0 4px #8a6f42, 0 8px 24px #000c, inset 0 0 18px #000a;
+}
+
+/* ---- 5. Token wheel: a tray with a gold lip, lifted centre card ---- */
+#matchScreen .hud-wheel {
+  background: linear-gradient(180deg, transparent, rgba(10,7,4,.88) 38%);
+  border-top: 1px solid #8a6f4244;
+}
+#matchScreen .wheel-card { box-shadow: 0 -2px 10px #0007; }
+#matchScreen .wheel-card:not(.spent):hover { transform: translateY(-6px); border-color: var(--gold-dim); }
+#matchScreen .wheel-card.center {
+  background: radial-gradient(120% 90% at 50% 0, #4a3a1c, var(--panel) 70%);
+  box-shadow: 0 0 22px #d9b87a55, 0 -4px 16px #000a;
+}
+#matchScreen .wheel-card.center:hover { transform: translateY(-14px); }
+
+@media (prefers-reduced-motion: reduce) {
+  #matchScreen .pulse-bar > div { animation: none; }
+}
