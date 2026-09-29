@@ -54,6 +54,9 @@
     const cw = R.canvas.clientWidth, ch = R.canvas.clientHeight;
     const dset = settings();
     const zik = zikhronActive(M);
+    /* match visual plug-ins (engine/match_fx.js + engine/fx/*) */
+    const FX = DYA.matchFx;
+    if (FX) { FX.frame(R, M, dset, dt, cw, ch); FX.run('begin', ctx, R, M); }
 
     /* ------- background / arena surround ------- */
     ctx.fillStyle = '#14110c';
@@ -105,6 +108,7 @@
       }
       ctx.globalAlpha = 1;
     }
+    if (FX) FX.run('ground', ctx, R, M);
 
     /* ------- zones under everything ------- */
     for (const z of M.zones) {
@@ -259,6 +263,7 @@
     /* ------- creatures (sorted by y for depth) ------- */
     /* a rider sits at its mount's position — nudge its sort key so it draws
        just after (on top of) the mount */
+    if (FX) FX.run('under', ctx, R, M);
     const sorted = M.creatures.slice().sort((a, b) => (a.y + (a.riding ? 1 : 0)) - (b.y + (b.riding ? 1 : 0)));
     for (const c of sorted) {
       if (c.inHut || c.onTower) continue;   // sheltering in the Hut / garrisoned inside a tower — not drawn on the field
@@ -366,8 +371,10 @@
       const f = age / e.dur;
       drawEffect(ctx, e, f, R.t, dset);
     }
+    if (FX) FX.run('world', ctx, R, M);
 
     ctx.restore();
+    if (FX) { ctx.save(); ctx.scale(dpr, dpr); FX.run('screen', ctx, R, M); ctx.restore(); }
   };
 
   /* ---------------- props ---------------- */

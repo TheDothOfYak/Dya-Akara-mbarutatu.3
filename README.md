@@ -79,6 +79,25 @@ Everything in the design document that can exist without a live backend or final
 - **The Rokarvac of the Mbaru Tatu** — a world codex (main menu → 🪐 The Mbaru Tatu) drawn from the creator's Rokarvac: the three Tatu and their Kalo, the elements as directions, the peoples, the Skaar Uverkhron, the Sunear'Zikhron, how the token game began, and a Dearcineon glossary. Content lives in `DYA.lore.WORLD` (`js/data/lore.js`).
 - **The sky over the Mbaru Tatu** (`js/ui/mbaru_sky.js`) — the login shot, the main menu, and the codex share one canon-accurate sky: Velki at the heart of the cluster with Xikia and Leotik swinging around it, each Tatu with its own Kalo (Bolo Kalo among Velki's), Velki's misted north, Leotik's volcanic glints, the Sunear'Zikhron wrapping one world and then crossing through the Duat to the next with RubberMcFly glowing in it, Pia'don's outer cloud, and the far worlds Katkan, Oskerarean, and Su'Kryulndael. Honors reduced-motion. The main menu also shows a rotating field note from the lore tips.
 
+## Match Visuals (each one removable on its own)
+
+Every visual layer on the match field is a separate plug-in file in `js/engine/fx/`, loaded by one `<script>` line in `index.html`. They only *draw* — none of them touches the simulation — so replays, lockstep netplay, and the tests are unaffected. Players can switch each one off under **Settings → Display → Match visuals**. To remove one for everybody, delete its file and its `<script>` line; nothing else refers to it.
+
+| File | What it adds |
+|---|---|
+| `fx/ground_detail.js` | Grass, pebbles, cracks, dune ripples, ash, flagstones, and soft sunlight on the field (by terrain). Off on Low quality. |
+| `fx/arena_frame.js` | Shaded field edges and a gold-trimmed border around the arena. |
+| `fx/contact_shadows.js` | Soft shadows under creatures; flyers cast theirs from above. |
+| `fx/pulse_ripple.js` | A ring rolls out from a hoard when resources pulse in. |
+| `fx/relic_beacon.js` | A light column over each Relic, a trail behind its carrier, a flash on pickup. |
+| `fx/hit_sparks.js` | Element-tinted sparks on hits; dust and a rising mote when a creature falls. |
+| `fx/damage_numbers.js` | Floating damage/heal numbers (2 or more, merged so they never flood). |
+| `fx/ambient_motes.js` | Fireflies, Elsha'ryn spores, embers, dust or sea spray, by terrain. Off on Low quality. |
+| `fx/lighting.js` | Campfire glow at each hoard and a vignette that cools to teal in the Sunear'Zikhron. |
+| `fx/camera_shake.js` | A short jolt when something big falls or the ShurgrEdan strikes (off with reduced motion). |
+
+The HUD restyle (glass panels, shimmering pulse bar, gold minimap bezel, wheel tray) is `css/match_hud.css` — remove its `<link>` line to go back to the original HUD, or delete any one of its numbered blocks. The plug-in slots themselves are `js/engine/match_fx.js` plus five one-line hooks in `js/engine/render.js`.
+
 ## Placeholder Art
 
 Per the creator's direction, all creatures use **animated placeholder rigs**: a small four-legged animal for beasts, a small two-legged, two-armed acorn for humanoids — with species feature layers (extra heads for Naga, five horns for Albali Byrd, the flame crown for Tyndael, hair armor for Keilia…) so everything reads on the field. All animation states are in: idle, walk, run, attack, hit, death fade, dormant, plus signature specials (tongue strike, jet blast, screech, teleport, swarm thinning). Shader treatments per Part XIV: magical shimmer, per-creature bioluminescence (RubberMcFly only glows during the Sunear'Zikhron), tether fade, element-colored resource orbs.

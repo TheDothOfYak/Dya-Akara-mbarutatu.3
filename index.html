@@ -12,6 +12,8 @@
   <title>Dya'Akara — Token Game of the Mbaru Tatu</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/pia.css">
+  <!-- match HUD polish — remove this line to restore the original HUD -->
+  <link rel="stylesheet" href="css/match_hud.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%238a6f42'/><circle cx='50' cy='50' r='38' fill='%233a2f1d'/><circle cx='50' cy='50' r='14' fill='%2368e0e8'/></svg>">
 </head>
 <body>
@@ -57,6 +59,18 @@
   <script src="js/engine/behaviors.js"></script>
   <script src="js/engine/match.js"></script>
   <script src="js/engine/render.js"></script>
+  <!-- match visuals: each fx/ file is independent — delete a file and its line to remove it -->
+  <script src="js/engine/match_fx.js"></script>
+  <script src="js/engine/fx/ground_detail.js"></script>
+  <script src="js/engine/fx/arena_frame.js"></script>
+  <script src="js/engine/fx/contact_shadows.js"></script>
+  <script src="js/engine/fx/pulse_ripple.js"></script>
+  <script src="js/engine/fx/relic_beacon.js"></script>
+  <script src="js/engine/fx/hit_sparks.js"></script>
+  <script src="js/engine/fx/damage_numbers.js"></script>
+  <script src="js/engine/fx/ambient_motes.js"></script>
+  <script src="js/engine/fx/lighting.js"></script>
+  <script src="js/engine/fx/camera_shake.js"></script>
   <!-- ui -->
   <script src="js/ui/ui.js"></script>
   <!-- the sky over the Mbaru Tatu (login, main menu, world codex) -->

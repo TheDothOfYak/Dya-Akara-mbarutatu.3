@@ -413,6 +413,19 @@
           body.appendChild(toggle('Holographic shimmer', () => s.display.holographic, v => s.display.holographic = v));
           body.appendChild(toggle('Colorblind mode', () => s.display.colorblind, v => s.display.colorblind = v));
           body.appendChild(toggle('Seal badges floating above creatures (in matches)', () => !!s.display.sealBadges, v => s.display.sealBadges = v));
+          /* one switch per match visual plug-in (engine/fx/*) — the list builds
+             itself, so removing a plug-in file removes its switch too */
+          const fxList = (DYA.matchFx && DYA.matchFx.list) || [];
+          if (fxList.length) {
+            body.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Match visuals' }));
+            fxList.forEach(def => {
+              const row = toggle(def.name + (def.heavy ? ' (off on Low quality)' : ''),
+                () => !(s.display.matchFx && s.display.matchFx[def.id] === false),
+                v => { s.display.matchFx = s.display.matchFx || {}; s.display.matchFx[def.id] = v; });
+              if (def.desc) row.title = def.desc;
+              body.appendChild(row);
+            });
+          }
         },
         Controls() {
           body.innerHTML = '';
