@@ -1,0 +1,31 @@
+name: Keep Supabase awake
+
+# Supabase pauses free-plan projects after ~7 days without activity, which
+# makes the game report "offline" for everyone. This job reads one row from
+# dya_config every 3 days so the project never counts as idle.
+# It only PREVENTS a pause — it cannot un-pause a project that is already
+# paused (use Restore project in the Supabase dashboard for that).
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query the database
+        run: |
+          # Same public project URL + anon key that ships in js/config.js
+          URL='https://pfqokjuztareqjdxaaiw.supabase.co'
+          KEY=$(grep -o "eyJ[A-Za-z0-9._-]*" js/config.js | head -1 || true)
+          if [ -z "$KEY" ]; then
+            echo "Could not find the anon key in js/config.js" >&2; exit 1
+          fi
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            "$URL/rest/v1/dya_config?select=key&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          [ "$code" = "200" ] || { echo "Supabase did not answer — it may be paused. Restore it in the dashboard." >&2; exit 1; }
