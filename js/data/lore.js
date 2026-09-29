@@ -9,7 +9,29 @@
 
   /* ---------- Loading screen lore tips ---------- */
   L.TIPS = [
-    'The Mbaru Tatu are three sister planets — Velki, Xikia, and Leotik — sharing one orbit within Pia’don.',
+    'The Mbaru Tatu are three Tatu — Velki, Xikia, and Leotik — that circle one another like a world and two great moons, while all three circle Pia’don’s star together.',
+    'Tatu means planets. Kalo means moons. Each of the Mbaru Tatu keeps its own Kalo.',
+    'Velki is the largest Tatu: twelve continents and the largest ocean on any of the three. The Su Naga first appeared in its waters.',
+    'Xikia swings so close under Velki’s pull that it nearly orbits it like a moon. About four in ten of all Eikar live there.',
+    'Leotik is the smallest Tatu, and the wildest — six and a half continents, most unexplored, and an absurd number of venomous things.',
+    'Fti is Air and the North. Su is Water and the South. Eldi is Fire and the West. Ular is Earth and the East.',
+    'Nekh FtiSular, the misted supercontinent at the top of Velki, is named for the Air and the Water: the land of mist.',
+    'The Nekh’Vorran first came through out of the Duat into Velki’s heart. Before them, the north of the world was barren and cold.',
+    'An Eikar’s Aagac — their acorn hat — is part of their very being. Folk know the hat before they know the face.',
+    'Most Keilia are builders. Their master hammers are made for them by the Kalo — and a Keilia who takes a hammer to battle is banished.',
+    'The Keilia ran the Mbaru Tatu first. The Great War is where the world passed from the Keilia to the Eikar.',
+    'The Skaar Uverkhron are the three greatest factions: the Duskareth follow the Nekh’Vorran, the SkarValorin the Aerolhorn, the Elsha’ryn the Vyrenalur.',
+    'The Kalo’Eik can change the shape of Stygian itself. Since the Xwi left, they will not shape it into weapons.',
+    'Find the eye of the Sunear’Zikhron and keep pace with it, and what lives there will give you a true prophecy.',
+    'The Sunear’Zikhron must touch every inch of a Tatu before it moves on. The Su Naga help it mix with the oceans.',
+    'The token game began as research: a creature’s song, liquid Stygian poured into a piece of it, and an Okid’Relic to hold the truth.',
+    'Stryx are exactly as clever as they are raised to be. The World Arena’s Stryx only know how to stab. A ship’s pilot Stryx outthinks everyone aboard.',
+    'Songs told in the old way bring visions — best in the dark, by firelight or bioluminescence. Young Eikar, with their third eyelid, see them brightest.',
+    'Kipsu hatch about the size of a ten-coin, one to three to an egg — and a parent’s size says nothing of the pup’s.',
+    'The Albali Byrd’s healing film is bound to the Byrd that made it. If the Byrd dies, the film is only water.',
+    'Duat Seedlings most often grow into Megla Aagac. About one in twenty-five sprouts a Malsti Punk instead.',
+    'A Dya’Can is a companion of the road — guildmate, brother or sister in arms.',
+    'In Dearcineon, saka is the bow, akalay the arrow, and saklay the two together. Hanii is the spear; tuun, the sword.',
     'A token captures the truth of one specific creature — not its species. Two Gynge tokens will never behave alike.',
     'Same-source tokens behave identically. It is, after all, the same truth.',
     'NgAkara is drawn from the head of the Su Naga. You do not have to kill the Naga to take it.',
@@ -19,7 +41,7 @@
     'Kill a RubberMcFly and the ShurgrEdan will answer before the day is out.',
     'The Duskareth can split a Stygian Relic through the Duat — but the split dissolves when its maker dies.',
     'Kipsu are distant kin to the Vyrenalur. If one ever walks the field, every Kipsu will follow it. Without exception.',
-    'Rodak hunt in threes. Fell one, and the whole pack vanishes.',
+    'Rodak travel in threes and follow trouble, waiting for the aftermath. Fell one, and the whole pack vanishes.',
     'The Sunear’Zikhron — the Waves of Memory — is a perpetual storm that circles the planets, carrying memory itself.',
     'Seed races like the Eikar are immortal through memory. To be remembered is to continue.',
     'Noka has watched the Mbaru Tatu for two and a half million years. She narrates only the rarest of Hunts.',
@@ -187,6 +209,94 @@
 
   /* ---------- AI merchant ---------- */
   L.ELBERGI = { name: 'Elbergi Plass', stallName: 'Elbergi’s Fine Truths', bio: 'Purveyor of honest tokens since before your grandmother’s grandmother. All sales final. All truths genuine.' };
+
+  /* ---------- The Rokarvac of the Mbaru Tatu (world codex) ----------
+     A player-facing primer on the worlds, drawn from the creator's
+     Rokarvac. Kept to what the folk of the Mbaru Tatu could know —
+     no hidden truths. Each chapter: { id, title, intro, entries:[{ name, sub, body }] }. */
+  L.WORLD = [
+    {
+      id: 'tatu', title: 'The Three Tatu',
+      intro: 'Tatu means planets; Kalo means moons. The Mbaru Tatu are three Tatu and their Kalo. They are not a solar system of their own: Velki holds the centre, Xikia and Leotik swing around it the way great moons would, and all three circle Pia’don’s star together.',
+      entries: [
+        { name: 'Velki', sub: 'The largest Tatu · twelve continents · the largest ocean', body: 'The heart of the cluster’s dance. The Su Naga first appeared in Velki’s ocean, and the largest and oldest of them still keep its deeps. Velki is also where the Nekh’Vorran first came through out of the Duat, into Velki’s heart. Among its continents: Nekh FtiSular, the misted supercontinent across the north; Velkinovek, the most populous, joined to Nekh FtiSular’s southern reach and running past the equator; long, thin Xyra’kharraen to the southeast; Quarethen, home of famous and infamous generals and tacticians; Gi’Adefus; Moravarethese, more water than land; frozen Su’Kryundel at the southern pole; and Fti and Su Aurvareth, neighbours on good terms since anyone can remember. Fyrsti’Vilag and its World Arena stand on Velki.' },
+        { name: 'Xikia', sub: 'The middle Tatu · nine continents', body: 'Held so tightly by Velki’s pull that it nearly orbits Velki like a moon. About 41% of all Eikar live on Xikia — owed, it is said, to the Inventor and his apprentice renaming the capital, and to the destruction of the World Arena. Northern Xikia is high country: dense green forest, mountain ranges, crisp air and big skies. Xikia holds the largest of the three Fti Megla Aagac, and the Stryx Rakarvorac — the great academy of Stryx — stands here.' },
+        { name: 'Leotik', sub: 'The smallest Tatu · six and a half continents', body: 'Still far larger than any Kalo, and by far the wildest of the three. Most of Leotik is unexplored. It is home to some of the most aggressive beasts in the Mbaru Tatu and an absurd number of poisonous and venomous plants and animals — the feral Villtur forms of familiar creatures among them. For ages Leotik was all but lost; when Eikar finally learned the trigger of the Urverk that leads there, they arrived on an island of ruins. The ruins of Villtur and the castle of UlarKlug are their foothold.' },
+        { name: 'The Kalo', sub: 'Moons of the Mbaru Tatu', body: 'Every Tatu keeps its own Kalo. Bolo Kalo, one of the smaller, is home to the Kalo’Eik; their capital is guarded by Relics upon Relics, made to turn aside falling space rock — and, once, most of the Sunear’Zikhron itself. On a near pass, one small Kalo of Xikia is known to dance.' },
+        { name: 'Pia’don', sub: 'The solar system', body: 'The Mbaru Tatu share their star with other worlds: Katkan, the world of the Fuzzies; Oskerarean, the sub-corporeal world of the Ghosties, where True Raw Stygian comes from; and Su’Kryulndael, a waterworld with massive caverns beneath. On clear nights, Pia’don’s outer cloud is a pale ring across the sky.' },
+      ],
+    },
+    {
+      id: 'elements', title: 'Elements & Directions',
+      intro: 'In Dearcineon, the four elements are also the four directions. Every pulse of resources on the field is one of these four.',
+      entries: [
+        { name: 'Fti', sub: 'Air · sky · flight — and North', body: 'The root for air, the sky, and flying. Fti creatures are the flyers and the swift.' },
+        { name: 'Su', sub: 'Water · liquid — and South', body: 'The root for water and anything that flows. Su Naga, Hvaleia, Harkal and the Su Grothyn are its great beasts.' },
+        { name: 'Eldi', sub: 'Fire — and West', body: 'Fire, and an aggressive symbol to the Eikar. The Eldi Aagac — the fire trees — are never harmed by fire.' },
+        { name: 'Ular', sub: 'Earth · ground · land — and East', body: 'The root for land, earth, ground and dirt. Put the roots together and you have names: SuUlar is the southeast; Nekh FtiSular, the misted continent, is the land of the Air-Water.' },
+        { name: 'Comfort, never weakness', sub: 'A rule of the token game', body: 'No creature is weak to a terrain. Comfort is a preference, never a vulnerability.' },
+      ],
+    },
+    {
+      id: 'peoples', title: 'The Peoples',
+      intro: 'Dearcàn is the word for the beings of the Mbaru Tatu. Eikar and Keilia are both seed beings — both came from trees — and both are immortal through zikhron, through memory.',
+      entries: [
+        { name: 'Eikar', sub: 'The acorn people', body: 'Eikar is Dearcineon for acorn. Acorn-textured skin, markings beneath the eyes, and an Aagac — an acorn hat — that is part of their very being. Every Aagac is as unique as a fingerprint; folk recognise the hat before the face. Some young Eikar have an extra eyelid that lets them see more of the spectrum. The Eikar developed after the Keilia and were long treated as lesser; they did not stay that way.' },
+        { name: 'Keilia', sub: 'Builders of the Mbaru Tatu', body: 'Almost always far larger than the Eikar. Their hair overlaps like armour, growing thick from the shoulders down to the calf like a cape. Most Keilia are builders — it has been the pride of their people as long as anyone remembers — while only a few are smiths. Their master hammers are made by the Kalo, and a Keilia who uses their hammer in battle is banished and shamed. The Keilia ran the world first and were nearly wiped out when the Nekh’Vorran came; those who survived had mastered their erokeria — their many minds.' },
+        { name: 'Kalo’Eik', sub: 'The moon-folk', body: 'A peaceful people who can change the shape of Stygian itself. Since the Xwi left, they refuse to shape it into weapons — the only tool-that-could-be-a-weapon they make is the Keilia hammer. The best libraries and schools in the Mbaru Tatu are theirs or the Keilia’s, built on or near an Urverk so books and memory cores move with ease.' },
+        { name: 'Karnen', sub: 'People, not beasts', body: 'A small people long woven into Eikar towns as skilled workers. The Guild is very clear on this.' },
+        { name: 'Xwi & Xiw', sub: 'Higher and lower', body: 'Xwi means higher, or angel; Xiw means lower, or devil. The Xwi came to Pia’don, warred with the Snillers through the Skyfalls, and then — after the last Sniller Burst — cursed the Snillers into amulets and left. No Skyfall has come since.' },
+      ],
+    },
+    {
+      id: 'factions', title: 'The Skaar Uverkhron',
+      intro: 'Skaar means greatest. The Skaar Uverkhron are the three greatest factions of the Mbaru Tatu — and each follows one of the great beasts, in its way.',
+      entries: [
+        { name: 'The Duskareth', sub: 'The Duat Dwellers · follow the Nekh’Vorran', body: 'Arguably the most powerful of the three. Their powers flow from the Stygian Ring of the Elster Velki, down through the Onnar — the Naelst and Stamijan Velki — to the Ver, the Thar Norvek or Dark Screamers, and on to the Vel, who move objects through the Duat. Their closely guarded art is the Stygian Link: splitting a Relic through the Duat so both halves act as one. A Link dissolves when the Dweller who made it dies. They carry the curse of the Oskeraren.' },
+        { name: 'The SkarValorin', sub: 'The Greatest of Valor · follow the Aerolhorn', body: 'Once they could forge Stygian of every kind — raw, zikhron, and Relic — on the Great Anvil, a gift of the ShurgrEdan, without corrupting it. When their ocean keep fell, the Anvil and every mould vanished. Now they can only add Stygian to a core or Relic. They still hold more Stygian weapons than anyone, and speak of the day the Aerolhorn returns.' },
+        { name: 'The Elsha’ryn', sub: 'The luminous forest · follow the Vyrenalur', body: 'Trackers of memory: they can find folk, cores, and those who were there in a memory. They grow-forge — growing a plant or raw metal onto a Relic until it becomes part of it. The songs of their Protected Grove work only there; carry one out and you forget it. An Elsha’ryn who has been changed and then breaks their oath is taken by the forest.' },
+      ],
+    },
+    {
+      id: 'storm', title: 'The Sunear’Zikhron',
+      intro: 'Sunear means waves; zikhron means memory. The Waves of Memory are a storm that has always existed, and has never been weak.',
+      entries: [
+        { name: 'A storm that must touch everything', sub: 'How the Waves move', body: 'The storm must touch every inch of a Tatu before it moves on — flooding caves, cresting mountains, sinking into roots and sealed caverns if it must — then it passes through the Duat to the next world. Underground rivers and ocean currents are part of it too. The Kalo read what each passing wave brings.' },
+        { name: 'RubberMcFly', sub: 'The storm’s companions', body: 'Among the only creatures able to fly in the storm, and the only time they glow at all. The strength of the storm follows how many RubberMcFly play in it. When it needs more strength they gather the Su Naga to the shore to raise ocean spray with their breath — and when it needs more still, the Api Buta.' },
+        { name: 'The eye', sub: 'A true prophecy', body: 'Some Dearcineon and some Relics can glimpse strands of the future, but those glimpses are unreliable. Find the eye of the Sunear’Zikhron and keep pace with it, and what dwells there will give a true prophecy — the only foolproof glimpse of what is not yet known.' },
+      ],
+    },
+    {
+      id: 'token', title: 'The Token Game',
+      intro: 'Dya’Akara began as research, became a schoolroom spectacle, and is now the great competitive game of the Dya Guild.',
+      entries: [
+        { name: 'Singing a truth', sub: 'How a token is made', body: 'Researchers found that singing a creature’s song while pouring liquid Stygian into a piece of that creature — a tooth, a bone, a shed scale — and setting it inside an Okid’Relic captures the truth of that creature as a living hologram. Two tokens woken near each other behave as the creatures would in the wild.' },
+        { name: 'One individual, not a species', sub: 'Why no two tokens are alike', body: 'A token holds one specific creature’s truth. Its nature is the weighted average of that creature’s whole life — its energy and temper — and the moment its material was taken adds about a twentieth more. Two tokens of the same creature behave identically, whoever owns them; two of the same species never do.' },
+        { name: 'The Okid’Relic', sub: 'Not a true Relic', body: 'Like a Quarigen, but with no Hurst inside and no power of its own — only a trigger its owner chooses. It houses the creature’s material and the truth sung into it.' },
+        { name: 'Everywhere, at every table', sub: 'Who plays', body: 'Libraries and schools keep educational sets. Rich houses keep impressive collections. Everyone else plays in taverns, backyards, and — if they are good enough — the World Arena.' },
+      ],
+    },
+    {
+      id: 'words', title: 'Dearcineon',
+      intro: 'Dearcineon is the most common language on the Mbaru Tatu, and the tongue of the Eikar. Names here are given as they are in Dearcineon.',
+      glossary: [
+        ['Tatu', 'planets'], ['Kalo', 'moons'], ['Pia’don', 'the solar system of the Mbaru Tatu'],
+        ['Fti', 'air, sky, flight; north'], ['Su', 'water; south'], ['Eldi', 'fire; west'], ['Ular', 'earth, ground; east'],
+        ['Eikar', 'acorn'], ['Esik', 'monster, animal'], ['Skepna', 'creature'], ['Canavar', 'beast'],
+        ['Skor', 'large, big'], ['Skaar', 'greatest'], ['Mar', 'sea'], ['Megla', 'mist'],
+        ['Borac', 'fighter'], ['Vakar', 'guardian'], ['Vakarborac', 'the Great Beasts'], ['Vakar’Eik', 'Eikar of the old guardians; ancestors'],
+        ['Zahreh', 'flower'], ['Zahreh’Eik', 'nobles, lords and ladies'], ['Rokarvac', 'journal, story, writing book'],
+        ['Zikhron', 'memory'], ['Sunear', 'waves'], ['Kahizecvar', 'a trance that forces a transfer of memory'],
+        ['Urverk', 'portal'], ['Nekh', 'darkness'], ['Vorran', 'forceful wanderer'], ['Nekhic', 'of the Nekh’Vorran'],
+        ['Nur', 'light'], ['Lun', 'shadow; moon'], ['Tynde', 'spark'], ['Ael', 'fire'], ['Thar', 'power'], ['Novek', 'marked'],
+        ['Quora', 'knowledge'], ['Thalos', 'a cold, ancient city'], ['Habosh', 'holy'], ['Ndok', 'not'],
+        ['Xwi', 'higher; angel'], ['Xiw', 'lower; devil'], ['Ako', 'yes-and-no'],
+        ['Saka', 'bow'], ['Akalay', 'arrow'], ['Saklay', 'bow and arrow'], ['Hanii', 'spear'], ['Tuun', 'sword'],
+        ['Mikolo Moko', 'weird leg'], ['Dya’Can', 'companions of the road; brothers and sisters in arms'],
+        ['Hurst', 'soul'], ['Stygian', 'soul iron'], ['Quarigen', 'a Stygian housing'],
+      ],
+    },
+  ];
 
   DYA.lore = L;
 })();

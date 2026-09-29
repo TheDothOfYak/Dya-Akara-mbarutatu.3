@@ -50,61 +50,12 @@
       forgot.onclick = () => UI.alert('Forgot Password', 'The local build stores accounts on this device only. When the Firebase backend is connected, a reset email flow appears here. For now: make a new account, or remember harder.');
       create.onclick = () => showCreateFlow();
 
-      /* Pia'don establishing shot: star, three co-orbiting planets, moon */
-      const ctx = cv.getContext('2d');
-      const stars = [];
-      for (let i = 0; i < 160; i++) stars.push([Math.random(), Math.random(), Math.random() * 1.6 + 0.4]);
-      let raf;
-      function draw(now) {
-        if (!cv.isConnected) { cancelAnimationFrame(raf); return; }
-        const w = cv.width = cv.clientWidth, h = cv.height = cv.clientHeight;
-        const t = now / 1000;
-        const g = ctx.createLinearGradient(0, 0, 0, h);
-        g.addColorStop(0, '#05060f'); g.addColorStop(0.7, '#0d0a14'); g.addColorStop(1, '#171009');
-        ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = '#fff';
-        stars.forEach(s => { ctx.globalAlpha = 0.3 + 0.5 * Math.abs(Math.sin(t * 0.5 + s[0] * 20)); ctx.fillRect(s[0] * w, s[1] * h, s[2], s[2]); });
-        ctx.globalAlpha = 1;
-        /* Pia'don's star */
-        const sx = w * 0.82, sy = h * 0.2;
-        const sg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 120);
-        sg.addColorStop(0, '#fff6d8'); sg.addColorStop(0.25, '#ffd76a88'); sg.addColorStop(1, '#ffd76a00');
-        ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 120, 0, 6.29); ctx.fill();
-        /* the Mbaru Tatu — three planets sharing an orbit, rotating around each other */
-        const cx = w * 0.3, cy = h * 0.52, R = Math.min(w, h) * 0.13;
-        ctx.strokeStyle = '#d9b87a18'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.ellipse(cx, cy, R * 1.6, R * 0.62, -0.2, 0, 6.29); ctx.stroke();
-        const planets = [
-          { name: 'Velki', col: '#4c7a5f', r: 26 },   // largest
-          { name: 'Xikia', col: '#8a6f4a', r: 20 },
-          { name: 'Leotik', col: '#5d7a3a', r: 15 },  // smallest, wildest
-        ];
-        planets.forEach((p, i) => {
-          const a = t * 0.22 + i * (Math.PI * 2 / 3);
-          const px = cx + Math.cos(a) * R * 1.6, py = cy + Math.sin(a) * R * 0.62;
-          const pg = ctx.createRadialGradient(px - p.r * 0.4, py - p.r * 0.4, 1, px, py, p.r);
-          pg.addColorStop(0, SPR.shade(p.col, 55)); pg.addColorStop(1, SPR.shade(p.col, -35));
-          ctx.fillStyle = pg;
-          ctx.beginPath(); ctx.arc(px, py, p.r, 0, 6.29); ctx.fill();
-          ctx.fillStyle = '#e8dfc855'; ctx.font = '10px Georgia'; ctx.textAlign = 'center';
-          ctx.fillText(p.name, px, py + p.r + 13);
-          if (i === 0) { /* Bolo Kalo, the great moon */
-            const ma = t * 0.9;
-            ctx.fillStyle = '#b8b2c8';
-            ctx.beginPath(); ctx.arc(px + Math.cos(ma) * p.r * 1.8, py + Math.sin(ma) * p.r * 0.7, 4, 0, 6.29); ctx.fill();
-          }
-        });
-        /* the Sunear'Zikhron storm band drifting */
-        ctx.strokeStyle = '#68e0e822'; ctx.lineWidth = 8;
-        ctx.beginPath();
-        for (let x = 0; x < w; x += 8) {
-          const y = h * 0.78 + Math.sin(x * 0.01 + t * 0.6) * 16;
-          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-        raf = requestAnimationFrame(draw);
-      }
-      raf = requestAnimationFrame(draw);
+      /* Pia'don establishing shot: Velki at the heart of the cluster, Xikia
+         and Leotik swinging around it, each with its Kalo, and the
+         Sunear'Zikhron passing from world to world (ui/mbaru_sky.js).
+         On a narrow screen the cluster rises above the login panel. */
+      const narrow = window.innerWidth < 760;
+      DYA.mbaruSky.mount(cv, narrow ? { cx: 0.5, cy: 0.13, labels: true, maxR: 30 } : { cx: 0.25, cy: 0.52, labels: true, maxR: 58 });
     },
   });
 
@@ -293,6 +244,10 @@
       scr.appendChild(UI.topbar({}));
       const wrap = U.el('div', { cls: 'menu-wrap' });
       const left = U.el('div', { cls: 'menu-left' });
+      /* the Mbaru Tatu turning quietly behind the menu */
+      const sky = U.el('canvas', { cls: 'menu-sky', 'aria-hidden': 'true' });
+      left.appendChild(sky);
+      DYA.mbaruSky.mount(sky, { cx: 0.74, cy: 0.5, labels: true, maxR: 40, far: false, sun: [0.98, 0.08] });
       left.appendChild(U.el('div', { cls: 'menu-title', text: "DYA'AKARA" }));
       left.appendChild(U.el('div', { cls: 'menu-sub', text: 'SEASON ' + G.world.season.number + ' — ' + (G.me ? EC.REGIONS.find(r => r.id === G.me.region).name.toUpperCase() + ' CIRCUIT' : '') }));
       const nav = U.el('div', { cls: 'menu-nav' });
@@ -311,12 +266,13 @@
         ['🃏 Legends of Pia’don', () => UI.show('pia')],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
+        ['🪐 The Mbaru Tatu', () => UI.show('world')],
         ['👥 Friends', () => UI.show('friends')],
         ['⚙ Settings', () => UI.show('settings')],
       ];
       items.forEach(([label, fn]) => {
         const b = U.el('button', { cls: 'btn', text: label });
-        const allowed = !banned || label.includes('Collection') || label.includes('Guild') || label.includes('Settings') || label.includes('Profile');
+        const allowed = !banned || label.includes('Collection') || label.includes('Guild') || label.includes('Settings') || label.includes('Profile') || label.includes('Mbaru');
         if (!allowed) { b.disabled = true; b.title = 'Restricted while banned'; }
         b.onclick = () => { DYA.audio.play('click'); fn(); };
         nav.appendChild(b);
@@ -329,6 +285,24 @@
 
       /* right: announcements / news (admin posts land here) */
       const right = U.el('div', { cls: 'menu-right' });
+      /* a field note from the Rokarvac — a new one each visit, or on request */
+      const tips = DYA.lore.TIPS || [];
+      if (tips.length) {
+        let ti = Math.floor(Math.random() * tips.length);
+        const noteBody = U.el('div', { cls: 'fn-body', text: tips[ti] });
+        const note = U.el('div', { cls: 'field-note' }, [
+          U.el('div', { cls: 'fn-head' }, [
+            U.el('span', { cls: 'fn-title', text: 'From the Rokarvac' }),
+            U.el('button', { cls: 'btn ghost small', title: 'Another note', text: '↻', onclick: () => {
+              ti = (ti + 1 + Math.floor(Math.random() * (tips.length - 1))) % tips.length;
+              noteBody.textContent = tips[ti];
+            } }),
+          ]),
+          noteBody,
+          U.el('button', { cls: 'btn ghost small mt', text: 'Read about the Mbaru Tatu ›', onclick: () => { DYA.audio.play('click'); UI.show('world'); } }),
+        ]);
+        right.appendChild(note);
+      }
       right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Announcements' }));
       G.world.announcements.slice(0, 6).forEach(a => {
         right.appendChild(U.el('div', { cls: 'news-card' }, [
