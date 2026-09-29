@@ -426,6 +426,18 @@
               body.appendChild(row);
             });
           }
+          /* one switch per character look (engine/looks/*) — same self-building list */
+          const lookList = (DYA.charLooks && DYA.charLooks.list) || [];
+          if (lookList.length) {
+            body.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Character looks' }));
+            lookList.forEach(def => {
+              const row = toggle(def.name + (def.heavy ? ' (off on Low quality)' : ''),
+                () => !(s.display.charLooks && s.display.charLooks[def.id] === false),
+                v => { s.display.charLooks = s.display.charLooks || {}; s.display.charLooks[def.id] = v; });
+              if (def.desc) row.title = def.desc;
+              body.appendChild(row);
+            });
+          }
         },
         Controls() {
           body.innerHTML = '';

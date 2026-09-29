@@ -165,34 +165,41 @@
 
     ctx.scale(o.facing < 0 ? -1 : 1, squash);
 
-    /* admin-uploaded sprite image replaces the procedural rig entirely
-       (falls back to the rig until the image has decoded) */
-    if (!(sp.spriteImg && drawImageSprite(ctx, o, t, state))) {
-      const rig = sp.rig || 'quad';
-      if (rig === 'composed' && DYA.parts) DYA.parts.draw(ctx, o, t, state);
-      else if (rig === 'quad') drawQuad(ctx, o, t, state);
-      else if (rig === 'punk') drawPunk(ctx, o, t, state);
-      else if (rig === 'biped') drawBiped(ctx, o, t, state);
-      else if (rig === 'flame') drawFlame(ctx, o, t, state);
-      else if (rig === 'swarm') drawSwarm(ctx, o, t, state);
-      else if (rig === 'tree') drawTree(ctx, o, t, state);
-      else if (rig === 'stryx') drawStryx(ctx, o, t, state);
-      else if (rig === 'kipsu') drawKipsu(ctx, o, t, state);
-      else if (rig === 'mikolo') drawMikolo(ctx, o, t, state);
-      else if (rig === 'gynge') drawGynge(ctx, o, t, state);
-      else if (rig === 'hvaleia') drawHvaleia(ctx, o, t, state);
-      else if (rig === 'lutut') drawLutut(ctx, o, t, state);
-      else if (rig === 'blob') drawBlob(ctx, o, t, state);
-      else if (rig === 'field') drawField(ctx, o, t, state);
-      else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
-      else if (rig === 'crab') drawCrab(ctx, o, t, state);
-      else if (rig === 'mcfly') drawMcFly(ctx, o, t, state);
-      else if (rig === 'bird') drawBird(ctx, o, t, state);
-      else drawQuad(ctx, o, t, state);
-    }
+    /* the creature's body. Character-look plug-ins (engine/char_looks.js +
+       engine/looks/*) may redraw a species or layer shading/outline over it;
+       without them this is exactly the original rig. */
+    const drawBody = (ctx) => {
+      /* admin-uploaded sprite image replaces the procedural rig entirely
+         (falls back to the rig until the image has decoded) */
+      if (!(sp.spriteImg && drawImageSprite(ctx, o, t, state))) {
+        const rig = sp.rig || 'quad';
+        if (rig === 'composed' && DYA.parts) DYA.parts.draw(ctx, o, t, state);
+        else if (rig === 'quad') drawQuad(ctx, o, t, state);
+        else if (rig === 'punk') drawPunk(ctx, o, t, state);
+        else if (rig === 'biped') drawBiped(ctx, o, t, state);
+        else if (rig === 'flame') drawFlame(ctx, o, t, state);
+        else if (rig === 'swarm') drawSwarm(ctx, o, t, state);
+        else if (rig === 'tree') drawTree(ctx, o, t, state);
+        else if (rig === 'stryx') drawStryx(ctx, o, t, state);
+        else if (rig === 'kipsu') drawKipsu(ctx, o, t, state);
+        else if (rig === 'mikolo') drawMikolo(ctx, o, t, state);
+        else if (rig === 'gynge') drawGynge(ctx, o, t, state);
+        else if (rig === 'hvaleia') drawHvaleia(ctx, o, t, state);
+        else if (rig === 'lutut') drawLutut(ctx, o, t, state);
+        else if (rig === 'blob') drawBlob(ctx, o, t, state);
+        else if (rig === 'field') drawField(ctx, o, t, state);
+        else if (rig === 'relic') drawRelicShard(ctx, o, t, state);
+        else if (rig === 'crab') drawCrab(ctx, o, t, state);
+        else if (rig === 'mcfly') drawMcFly(ctx, o, t, state);
+        else if (rig === 'bird') drawBird(ctx, o, t, state);
+        else drawQuad(ctx, o, t, state);
+      }
 
-    /* this individual's identifying marks, over the coat */
-    if (o.indiv && state !== 'death') drawMarking(ctx, o, o.indiv);
+      /* this individual's identifying marks, over the coat */
+      if (o.indiv && state !== 'death') drawMarking(ctx, o, o.indiv);
+    };
+    if (DYA.charLooks) DYA.charLooks.body(ctx, o, t, state, drawBody);
+    else drawBody(ctx);
 
     ctx.scale(o.facing < 0 ? -1 : 1, 1); // unflip for shimmer
 
@@ -2331,5 +2338,7 @@
     ctx.restore();
   };
 
+  /* shared with character-look plug-ins that redraw a species (engine/looks/*) */
+  SPR.drawMarking = drawMarking;
   DYA.sprites = SPR;
 })();

@@ -308,6 +308,7 @@
         heads: c.headsLeft, hasRider: !!c.hasRider && !c.riderUnit,
         charged: c.mem && c.mem.charge >= 1,
         hasRelic: !!c.carryingRelic,
+        creature: c,   // read-only, for character looks (e.g. hit flash)
       });
       ctx.restore();
 
