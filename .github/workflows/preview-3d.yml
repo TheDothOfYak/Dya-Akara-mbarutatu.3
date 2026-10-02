@@ -1,0 +1,44 @@
+name: Preview the 3D battle branch (Firebase preview channel)
+
+# Every push to the 3d-battle branch deploys it to its own Firebase
+# Hosting *preview channel* — a separate URL like
+#   https://dyaakara-yak--3d-battle-<hash>.web.app
+# The live game (the "live" channel, deployed from main) is never touched.
+on:
+  push:
+    branches: [3d-battle]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-3d
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Deploy to the 3d-battle preview channel
+        id: deploy
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          projectId: dyaakara-yak
+          channelId: 3d-battle
+          expires: 30d
+      - name: Show the preview link
+        run: |
+          echo "3D PREVIEW: ${{ steps.deploy.outputs.details_url }}"
+          echo "3D test arena (no login): ${{ steps.deploy.outputs.details_url }}/tools/arena3d.html"
+          {
+            echo "## 3D battle preview"
+            echo ""
+            echo "- Game: ${{ steps.deploy.outputs.details_url }}"
+            echo "- 3D test arena (no login): ${{ steps.deploy.outputs.details_url }}/tools/arena3d.html"
+            echo "- Link expires: ${{ steps.deploy.outputs.expire_time }} (renewed on every push)"
+          } >> "$GITHUB_STEP_SUMMARY"

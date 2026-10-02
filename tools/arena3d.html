@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dya'Akara — 3D Arena Preview</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #14100b; }
+    #stage { position: fixed; inset: 0; }
+    #matchCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    #bar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 40; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center;
+           background: rgba(20,16,11,0.82); border: 1px solid #5a4a32; border-radius: 10px; padding: 6px 10px; font: 13px system-ui, sans-serif; color: #e8dcc0; max-width: calc(100vw - 32px); }
+    #bar select, #bar button { font: 13px system-ui, sans-serif; }
+    #mm { position: fixed; left: 14px; bottom: 16px; z-index: 30; border-radius: 50%; }
+    #info { position: fixed; right: 14px; bottom: 16px; z-index: 30; font: 12px system-ui, sans-serif; color: #e8dcc0b0; text-align: right; line-height: 1.5; }
+    #label { position: fixed; top: 96px; left: 50%; transform: translateX(-50%); z-index: 30; font: 600 14px system-ui, sans-serif; color: #f0e2c0; text-shadow: 0 1px 3px #000; }
+  </style>
+</head>
+<body>
+  <div id="stage"><canvas id="matchCanvas"></canvas></div>
+  <div id="bar">
+    <b style="color:#d9b87a">3D Arena Preview</b>
+    <select id="mode"><option value="battle">AI vs AI battle</option><option value="gallery">Creature gallery</option></select>
+    <select id="terrain"></select>
+    <select id="pose" title="Gallery pose"><option value="idle">Idle</option><option value="walk">Walk</option><option value="attack">Attack</option><option value="hit">Hit</option></select>
+    <button class="btn small" id="speed">×1</button>
+    <button class="btn small" id="restart">New match</button>
+  </div>
+  <div id="label"></div>
+  <canvas id="mm" width="150" height="150"></canvas>
+  <div id="info">Right-drag: orbit · Wheel: zoom · Middle-drag: pan · Q / E: rotate</div>
+
+  <script src="../js/core/util.js"></script>
+  <script src="../js/core/audio.js"></script>
+  <script src="../js/data/species.js"></script>
+  <script src="../js/data/economy.js"></script>
+  <script src="../js/data/lore.js"></script>
+  <script src="../js/data/abilities.js"></script>
+  <script src="../js/core/token.js"></script>
+  <script src="../js/engine/sprites.js"></script>
+  <script src="../js/engine/parts.js"></script>
+  <script src="../js/engine/behaviors.js"></script>
+  <script src="../js/engine/match.js"></script>
+  <script src="../js/engine/render.js"></script>
+  <script src="../js/vendor/three.min.js"></script>
+  <script src="../js/engine3d/models.js"></script>
+  <script src="../js/engine3d/render3d.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const U = DYA.util, SP = DYA.species, TK = DYA.token;
+    const qs = new URLSearchParams(location.search);
+    const $ = (id) => document.getElementById(id);
+    const terrSel = $('terrain');
+    DYA.lore.TERRAIN_SETS.forEach(t => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; terrSel.appendChild(o); });
+    terrSel.value = qs.get('terrain') || 'forest';
+    $('mode').value = qs.get('mode') || 'battle';
+    $('pose').value = qs.get('pose') || 'idle';
+    let mult = 1, M = null, renderer = null, raf = 0, gallery = [];
+
+    function pouch(rng, n) {
+      const ids = SP.craftable.filter(id => !SP.get(id).notCraftable);
+      const out = [];
+      for (let i = 0; i < n; i++) out.push(TK.mint({ speciesId: ids[Math.floor(rng.next() * ids.length)], rng }));
+      return out;
+    }
+    function freshCanvas() {
+      /* a WebGL canvas cannot be reused for a new context — swap it */
+      const old = $('matchCanvas');
+      const cv = document.createElement('canvas'); cv.id = 'matchCanvas';
+      old.parentNode.replaceChild(cv, old);
+      return cv;
+    }
+    function start() {
+      cancelAnimationFrame(raf);
+      const seed = +(qs.get('seed') || U.newSeed());
+      const rng = new U.Rng(seed);
+      const mode = $('mode').value;
+      M = new DYA.match.Match({
+        seed, mode: 'standard', terrain: terrSel.value,
+        settings: { pulseInterval: 2, pulseAmount: 5, chaos: false },
+        teams: [
+          { name: 'Ama of the Vel', controller: 'ai', aiSkill: 0.95, pouch: mode === 'battle' ? pouch(rng, 25) : [] },
+          { name: 'House Vorthyx', controller: 'ai', aiSkill: 0.95, pouch: mode === 'battle' ? pouch(rng, 25) : [] },
+        ],
+      });
+      gallery = [];
+      if (mode === 'gallery') {
+        /* every species, one of each, in rows across the field */
+        const ids = Object.keys(SP.all || {}).length ? Object.keys(SP.all) : SP.craftable.concat(['kofi']);
+        const list = ids.filter(id => SP.get(id));
+        const cols = 8;
+        list.forEach((id, i) => {
+          const sp = SP.get(id);
+          const tok = TK.mint({ speciesId: id, rng: new U.Rng(1000 + i), rarity: sp.rarity[1] });
+          const x = 160 + (i % cols) * 182, y = 150 + Math.floor(i / cols) * 150;
+          const c = M.spawnFromToken(tok, i % 2, x, y);
+          gallery.push({ c, x, y });
+        });
+        M.effects.length = 0;   /* skip the deploy flashes in the gallery */
+      }
+      renderer = new DYA.render.Renderer(freshCanvas(), M);
+      let last = performance.now(), t = 0;
+      function frame(now) {
+        const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
+        if (mode === 'battle') { for (let i = 0; i < mult; i++) M.step(dt); }
+        else {
+          const pose = $('pose').value;
+          gallery.forEach((g, i) => {
+            g.c.state = pose === 'walk' ? 'walk' : pose;
+            g.c.x = pose === 'walk' ? g.x + Math.sin(t * 0.8 + i) * 30 : g.x;
+            g.c.facing = 1;
+          });
+          M.time += dt;
+        }
+        renderer.draw(dt);
+        renderer.drawMinimap($('mm').getContext('2d'), 150);
+        const alive = M.creatures.filter(c => !c.dead).length;
+        $('label').textContent = mode === 'battle'
+          ? (M.over ? (M.result.winner === -1 ? 'DRAW' : M.teams[M.result.winner].name + ' WINS') : Math.floor(M.time) + 's · ' + alive + ' creatures on the field')
+          : gallery.length + ' creatures — hover-free gallery (' + $('pose').value + ')';
+        raf = requestAnimationFrame(frame);
+      }
+      raf = requestAnimationFrame(frame);
+      window.__M = M; window.__R = renderer;
+    }
+    $('speed').onclick = () => { mult = mult === 1 ? 2 : mult === 2 ? 4 : 1; $('speed').textContent = '×' + mult; };
+    $('restart').onclick = start;
+    terrSel.onchange = start;
+    $('mode').onchange = start;
+    start();
+  })();
+  </script>
+</body>
+</html>
