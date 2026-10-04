@@ -446,6 +446,10 @@
     (DYA.lore.TERRAIN_SETS.filter(t => t.basic)).forEach(t => tSel.appendChild(U.el('option', { value: t.id, text: t.name })));
     tSel.value = 'plains';
     terrRow.appendChild(tSel);
+    const tRules = U.el('div', { cls: 'small muted', style: 'max-width:320px' });
+    const showRules = () => { const ts = DYA.lore.TERRAIN_SETS.find(t => t.id === tSel.value); tRules.textContent = ts && ts.rules ? ts.rules : ''; };
+    tSel.addEventListener('change', showRules); showRules();
+    terrRow.appendChild(tRules);
     w.appendChild(terrRow);
 
     /* pulse settings — you set them directly here (no vote, it's your sandbox) */
@@ -1049,8 +1053,11 @@
         const tSel = U.el('select', { cls: 'txt mt', style: 'max-width:280px' });
         DYA.lore.TERRAIN_SETS.filter(t => t.basic).forEach(t => tSel.appendChild(U.el('option', { value: t.id, text: t.name })));
         tSel.value = terrain;
-        tSel.onchange = () => { terrain = tSel.value; };
+        const tRules = U.el('div', { cls: 'small muted mt', style: 'max-width:320px' });
+        const showRules = () => { const ts = DYA.lore.TERRAIN_SETS.find(t => t.id === terrain); tRules.textContent = ts && ts.rules ? ts.rules : ''; };
+        tSel.onchange = () => { terrain = tSel.value; showRules(); };
         terrRow.appendChild(tSel);
+        terrRow.appendChild(tRules); showRules();
         mid.appendChild(terrRow);
       } else {
         mid.appendChild(U.el('p', { cls: 'muted small mt', html: 'TERRAIN — <span class="gold">set by the host</span> (the organizer).' }));
@@ -1197,10 +1204,13 @@
         terrRow.appendChild(U.el('div', { cls: 'muted small', text: 'TERRAIN SET — you are the organizer' }));
         const tSel = U.el('select', { cls: 'txt mt', style: 'max-width:280px' });
         DYA.lore.TERRAIN_SETS.filter(t => t.basic).forEach(t => tSel.appendChild(U.el('option', { value: t.id, text: t.name })));
-        tSel.onchange = () => { cfg.terrain = tSel.value; };
+        const tRules = U.el('div', { cls: 'small muted mt', style: 'max-width:320px' });
+        const showRules = () => { const ts = DYA.lore.TERRAIN_SETS.find(t => t.id === cfg.terrain); tRules.textContent = ts && ts.rules ? ts.rules : ''; };
+        tSel.onchange = () => { cfg.terrain = tSel.value; showRules(); };
         cfg.terrain = cfg.terrain || 'plains';
         tSel.value = cfg.terrain;
         terrRow.appendChild(tSel);
+        terrRow.appendChild(tRules); showRules();
         /* §15 terrain tokens — the launch pair, placed by the organizer during setup ONLY */
         terrRow.appendChild(U.el('div', { cls: 'muted small mt', text: 'TERRAIN TOKENS — organizer places them before the match; none can be added later' }));
         cfg.terrainTokens = cfg.terrainTokens || [];
@@ -1220,6 +1230,7 @@
       } else {
         const tset = DYA.lore.TERRAIN_SETS.find(t => t.id === cfg.terrain);
         terrRow.appendChild(U.el('div', { cls: 'muted small', html: 'TERRAIN SET — ' + (tset ? '<span class="gold">' + tset.name + '</span> (set by the organizer)' : '<span class="gold">assigned randomly</span> for casual matches') }));
+        if (tset && tset.rules) terrRow.appendChild(U.el('div', { cls: 'small muted mt', style: 'max-width:320px', text: tset.rules }));
       }
       mid.appendChild(terrRow);
       const readyBtn = U.el('button', { cls: 'btn primary', style: 'width:100%', text: '✓ Ready — skip the wait' });
@@ -1732,8 +1743,8 @@
           if (T.controller === 'wild') return '';
           const n = M.creatures.filter(c => !c.dead && c.team === i).length;
           const rl = M.relics.find(r => r.ownerTeam === i && !r.disabled);
-          const mark = !rl ? '' : rl.captured ? ' ✗' : rl.carrier != null ? ' ✦' : '';
-          const gone = M.sidesInPlay ? M.sidesInPlay().indexOf(T.side) < 0 : n === 0;
+          const mark = T.out ? ' ☠' : !rl ? '' : rl.captured ? ' ✗' : rl.carrier != null ? ' ✦' : '';
+          const gone = T.out || (M.sidesInPlay ? M.sidesInPlay().indexOf(T.side) < 0 : n === 0);
           return '<span style="color:' + T.color + (gone ? ';text-decoration:line-through;opacity:.55' : '') + (i === MY ? ';font-weight:700' : '') + '">'
             + U.esc(T.name) + ' ' + n + mark + '</span>';
         }).filter(Boolean).join(' · ');
@@ -1744,10 +1755,13 @@
         if (!mine || mine.disabled) return '—';
         const mineTxt = mine.carrier != null ? '<span style="color:var(--red)">STOLEN!</span>' : (Math.abs(mine.x - mine.homeX) > 6 ? '<span style="color:var(--eldi)">DROPPED</span>' : '<span style="color:var(--green)">SAFE</span>');
         if (isMulti && M.hostile) {
-          const rivals = M.relics.filter(r => !r.disabled && M.hostile(MY, r.ownerTeam));
+          /* knockouts: a side that loses every Relic it owns is out; the last
+             side still holding one wins */
           const mine2 = M.sideOf(MY);
-          const taken = rivals.filter(r => (r.captured && r.capturedBySide === mine2) || (r.carrierTeam != null && M.sideOf(r.carrierTeam) === mine2)).length;
-          return 'Yours: ' + mineTxt + ' · Rival relics: ' + taken + '/' + rivals.length + ' (need all)';
+          const standing = new Set(M.relics.filter(r => !r.disabled && !r.captured && M.sideOf(r.ownerTeam) !== mine2 && !(M.teams[r.ownerTeam] && M.teams[r.ownerTeam].out)).map(r => M.sideOf(r.ownerTeam))).size;
+          const taken = M.relics.filter(r => !r.disabled && r.captured && r.capturedBySide === mine2 && M.sideOf(r.ownerTeam) !== mine2).length;
+          if (T0.out) return '<span style="color:var(--red)">KNOCKED OUT</span> · rivals still standing: ' + standing;
+          return 'Yours: ' + mineTxt + ' · Relics taken: ' + taken + ' · Rivals standing: ' + standing;
         }
         const theirs = M.relics.find(r => r.ownerTeam === 1 - MY);
         const theirsTxt = !theirs ? '—' : theirs.captured ? '<span style="color:var(--green)">CAPTURED</span>' : theirs.carrier != null ? '<span style="color:var(--green)">TAKEN</span>' : 'home';
@@ -1877,8 +1891,29 @@
           if (eventsEl.children.length > 4) eventsEl.firstChild.remove();
         }
 
-        if (M.over && !finished) { finished = true; onMatchEnd(); return; }
+        /* Brawl knockout: your last Relic is gone — say so plainly, and let the
+           player watch the brawl out or leave (a loss) */
+        if (isMulti && T0.out && !M.over && !koShown) { koShown = true; showKnockout(); }
+
+        if (M.over && !finished) { finished = true; if (koOverlay) { koOverlay.remove(); koOverlay = null; } onMatchEnd(); return; }
         raf = requestAnimationFrame(frame);
+      }
+      let koShown = false, koOverlay = null;
+      function showKnockout() {
+        koOverlay = U.el('div', { cls: 'match-overlay', style: 'background:#000a' });
+        koOverlay.appendChild(U.el('h1', { cls: 'defeat', text: 'KNOCKED OUT' }));
+        koOverlay.appendChild(U.el('p', { cls: 'muted center', text: 'Your last Relic has been carried off — your band leaves the field and its hoard is plundered. The brawl goes on without you.' }));
+        const row = U.el('div', { cls: 'flex mt' });
+        row.appendChild(U.el('button', { cls: 'btn primary', text: 'Watch the rest', onclick: () => { koOverlay.remove(); koOverlay = null; } }));
+        if (!NET) {
+          /* leaving a local brawl calls it for whoever leads the table — you
+             were knocked out, so it records as a loss */
+          row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Leave the brawl', onclick: () => { koOverlay.remove(); koOverlay = null; if (!M.over) M.finish(M.anyTeamOnSide(M.leadingSide()), 'knockout'); } }));
+        } else {
+          koOverlay.appendChild(U.el('p', { cls: 'small muted center', text: 'Online: stay to the end so the other players’ match keeps running in step.' }));
+        }
+        koOverlay.appendChild(row);
+        scr.appendChild(koOverlay);
       }
       raf = requestAnimationFrame(frame);
       renderWheel(); renderReadied();
@@ -2851,13 +2886,13 @@
   }
 
   const BRAWL_MODES = [
-    { id: 'team', label: 'Team Battle', desc: 'Allied sides fight to the Relic on one of 15 maps. Pick a size, and whether each ally holds their own base or you all share one camp.',
+    { id: 'team', label: 'Team Battle', desc: 'Allied sides fight to the Relic on one of 15 maps. A player whose Relic is taken fights on at half income; a side is beaten once every Relic it owns is carried off. Pick a size, and whether each ally holds their own base or you all share one camp.',
       sizes: [['2', '2 v 2'], ['3', '3 v 3'], ['5', '5 v 5']], hasShared: true,
       build: (size, shared, map) => teamBattleLayout(size, shared, map) },
-    { id: 'ffa', label: 'Free-for-all', desc: 'Everyone for themselves — no allies. The last player standing (or the first to steal a rival Relic) wins.',
+    { id: 'ffa', label: 'Free-for-all', desc: 'Everyone for themselves — no allies. Lose your Relic and you are knocked out (the thief plunders your hoard); the last player still holding theirs wins.',
       sizes: [['3', '3 players'], ['4', '4 players']], hasShared: false,
       build: (size) => ffaLayout(size) },
-    { id: 'surrounded', label: 'Surrounded', desc: 'You hold the centre of the arena, ringed by rivals who each play for themselves. Hold your Relic and break out.',
+    { id: 'surrounded', label: 'Surrounded', desc: 'You hold the centre of the arena, ringed by rivals who each play for themselves. Lose your Relic and you are out — hold it, break out, and be the last one standing.',
       sizes: [['3', 'ringed by 3'], ['4', 'ringed by 4']], hasShared: false,
       build: (size) => surroundedLayout(size) },
   ];
@@ -3497,7 +3532,7 @@
     if (kingHill && teams[0]) teams[0].king = true;
 
     const seed = U.newSeed();
-    const terrain = ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)];
+    const terrain = ['plains', 'forest', 'mountain', 'desert', 'ocean'][Math.floor(Math.random() * 5)];
     const match = new DYA.match.Match({ seed, mode: 'standard', terrain, settings, teams, kingHill: kingHill || null });
     UI.showWithLoading('match', {
       match,
@@ -3551,7 +3586,7 @@
     });
     /* Surrounded king-of-the-hill: the centre (slot 0) is the king */
     if (kingHill && teams[0]) teams[0].king = true;
-    return { seed: U.newSeed(), terrain: ['plains', 'forest', 'mountain', 'desert'][Math.floor(Math.random() * 4)], settings, label: fmt.label, mode: fmt.mode.id, teams, kingHill: kingHill || null };
+    return { seed: U.newSeed(), terrain: ['plains', 'forest', 'mountain', 'desert', 'ocean'][Math.floor(Math.random() * 5)], settings, label: fmt.label, mode: fmt.mode.id, teams, kingHill: kingHill || null };
   }
 
   /* every client builds the SAME Match from the descriptor and starts the

@@ -123,16 +123,60 @@
           ctx.beginPath(); ctx.ellipse(z.x, z.y, rr, rr * 0.7, 0, 0, TAU); ctx.stroke();
         }
       } else if (z.type === 'forest') {
-        ctx.fillStyle = '#3c5530cc';
+        /* a grove: ordinary forest, a fire-tree stand (Eldi Aagac) or a
+           luminous Elsha'ryn stand — all block sight the same way */
+        const base = z.fire ? '#4a2c22' : z.glow ? '#2c4a44' : '#3c5530';
+        ctx.fillStyle = base + 'cc';
         ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.8, 0, 0, TAU); ctx.fill();
-        for (let i = 0; i < 7; i++) {
-          const a = i / 7 * TAU;
-          const tx = z.x + Math.cos(a) * z.r * 0.55, ty = z.y + Math.sin(a) * z.r * 0.45;
+        ctx.strokeStyle = base; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.8, 0, 0, TAU); ctx.stroke();
+        const nT = Math.max(7, Math.round(z.r / 11));
+        for (let i = 0; i < nT; i++) {
+          const a = i / nT * TAU + (i % 2) * 0.3, rr = (i % 2 ? 0.3 : 0.62);
+          const tx = z.x + Math.cos(a) * z.r * rr, ty = z.y + Math.sin(a) * z.r * rr * 0.8;
           ctx.fillStyle = '#4a3520';
           ctx.fillRect(tx - 2.5, ty - 4, 5, 14);
-          ctx.fillStyle = SPR.shade('#3c5530', 18 + (i % 3) * 10);
+          if (z.fire) {
+            const fg2 = ctx.createRadialGradient(tx, ty - 14, 2, tx, ty - 14, 16);
+            fg2.addColorStop(0, '#ffd24a'); fg2.addColorStop(0.6, '#e8842c'); fg2.addColorStop(1, '#b3502c55');
+            ctx.fillStyle = fg2;
+          } else ctx.fillStyle = SPR.shade(z.glow ? '#3f8a7a' : '#3c5530', 18 + (i % 3) * 10);
           ctx.beginPath(); ctx.arc(tx, ty - 14, 13 + (i % 3) * 3, 0, TAU); ctx.fill();
+          if (z.glow) { ctx.fillStyle = '#68e0c8' + (Math.sin(R.t * 2 + i) > 0 ? '88' : '44'); ctx.beginPath(); ctx.arc(tx + 4, ty - 18, 2.5, 0, TAU); ctx.fill(); }
         }
+      } else if (z.type === 'sand') {
+        /* deep drift: paler sand with wind ripples */
+        const sg = ctx.createRadialGradient(z.x, z.y, z.r * 0.2, z.x, z.y, z.r);
+        sg.addColorStop(0, '#e9d49acc'); sg.addColorStop(0.75, '#dcc386aa'); sg.addColorStop(1, '#dcc38600');
+        ctx.fillStyle = sg;
+        ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.7, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#b9a06a88'; ctx.lineWidth = 1.5;
+        for (let i = -2; i <= 2; i++) {
+          const yy = z.y + i * z.r * 0.18, hw = z.r * (0.8 - Math.abs(i) * 0.14);
+          ctx.beginPath(); ctx.moveTo(z.x - hw, yy); ctx.quadraticCurveTo(z.x, yy - 7, z.x + hw, yy); ctx.stroke();
+        }
+      } else if (z.type === 'oasis' || z.type === 'glowmoss') {
+        const oas = z.type === 'oasis';
+        if (oas) {
+          ctx.fillStyle = '#6f9a4a99';
+          ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.72, 0, 0, TAU); ctx.fill();
+          const wg = ctx.createRadialGradient(z.x, z.y, 4, z.x, z.y, z.r * 0.62);
+          wg.addColorStop(0, '#5fb4e8dd'); wg.addColorStop(1, '#2a6f8f99');
+          ctx.fillStyle = wg;
+          ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r * 0.62, z.r * 0.42, 0, 0, TAU); ctx.fill();
+          for (let i = 0; i < 4; i++) {   // palms
+            const a = i / 4 * TAU + 0.6, px = z.x + Math.cos(a) * z.r * 0.82, py = z.y + Math.sin(a) * z.r * 0.6;
+            ctx.strokeStyle = '#6b4f2e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 3, py - 22); ctx.stroke();
+            ctx.fillStyle = '#4f7d36'; for (let k = 0; k < 5; k++) { const b = k / 5 * TAU; ctx.beginPath(); ctx.ellipse(px + 3 + Math.cos(b) * 9, py - 22 + Math.sin(b) * 4, 9, 3, b, 0, TAU); ctx.fill(); }
+          }
+        } else {
+          ctx.fillStyle = '#68e0c8' + (Math.sin(R.t * 1.6 + z.x) > 0 ? '3a' : '28');
+          ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.7, 0, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#9ff5e2aa';
+          for (let i = 0; i < 9; i++) { const a = i * 2.39, rr = z.r * 0.75 * Math.sqrt((i + 1) / 9); ctx.beginPath(); ctx.arc(z.x + Math.cos(a) * rr, z.y + Math.sin(a) * rr * 0.7, 2 + Math.sin(R.t * 2 + i) * 0.8, 0, TAU); ctx.fill(); }
+        }
+        ctx.strokeStyle = oas ? '#bfe8ff55' : '#68e0c855'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 6]);
+        ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.72, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
       } else if (z.type === 'bog') {
         ctx.fillStyle = '#8fbf3f55';
         ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.72, 0, 0, TAU); ctx.fill();
@@ -158,8 +202,9 @@
       }
     }
 
-    /* ------- terrain props ------- */
+    /* ------- terrain props, then the solid terrain (rock, pillars, chasms) ------- */
     for (const p of M.props) drawProp(ctx, p, T, R.t);
+    if (M.obstacles) for (const o of M.obstacles) drawObstacle(ctx, o, T, R.t);
 
     /* ------- hoards ------- */
     M.teams.forEach((Tm, i) => {
@@ -210,7 +255,11 @@
     }
 
     /* ------- structures ------- */
-    for (const s of M.structures) drawStructure(ctx, s, M, R.t);
+    /* walls lie flat at ground level, so they go down first; towers, the Hut
+       and wards stand up out of the ground and are drawn back-to-front (by
+       their base line) so a nearer piece always overlaps a farther one */
+    const byDepth = M.structures.slice().sort((a, b) => ((a.type === 'wall' ? 0 : 1) - (b.type === 'wall' ? 0 : 1)) || (a.y - b.y));
+    for (const s of byDepth) drawStructure(ctx, s, M, R.t);
 
     /* ------- makari remnants ------- */
     ctx.fillStyle = '#c2b23a99';
@@ -377,6 +426,57 @@
     if (FX) { ctx.save(); ctx.scale(dpr, dpr); FX.run('screen', ctx, R, M); ctx.restore(); }
   };
 
+  /* ---------------- solid terrain ----------------
+     drawn to the SAME footprint the engine collides with, so what blocks you
+     is exactly what you see */
+  function drawObstacle(ctx, o, T, t) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    const r = o.r, rng = new U.Rng(o.seed + 7);
+    if (o.kind === 'chasm') {
+      /* a jagged pit falling away into the dark */
+      const pts = [];
+      for (let i = 0; i < 14; i++) { const a = i / 14 * TAU, rr = r * (0.9 + rng.next() * 0.18); pts.push([Math.cos(a) * rr, Math.sin(a) * rr * 0.72]); }
+      ctx.fillStyle = SPR.shade(T.ground, -18);
+      ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0] * 1.08, p[1] * 1.08 + 3) : ctx.moveTo(p[0] * 1.08, p[1] * 1.08 + 3)); ctx.closePath(); ctx.fill();
+      const pg = ctx.createRadialGradient(0, 4, 2, 0, 0, r);
+      pg.addColorStop(0, '#000000'); pg.addColorStop(0.7, '#0d0a12'); pg.addColorStop(1, '#2a2430');
+      ctx.fillStyle = pg;
+      ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#7d6a8a88'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = 'rgba(160,140,190,' + (0.08 + Math.sin(t * 0.8 + o.seed) * 0.04) + ')';
+      ctx.beginPath(); ctx.ellipse(0, 6, r * 0.5, r * 0.2, 0, 0, TAU); ctx.fill();
+    } else if (o.kind === 'pillar' || o.kind === 'spire') {
+      const pil = o.kind === 'pillar', h = pil ? r * 3.2 : r * 3.6;
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(0, 2, r, r * 0.45, 0, 0, TAU); ctx.fill();
+      if (pil) {
+        ctx.fillStyle = SPR.shade(T.accent, -6); ctx.fillRect(-r * 0.75, -h, r * 1.5, h);
+        ctx.fillStyle = SPR.shade(T.accent, 12); ctx.fillRect(-r * 0.75, -h, r * 0.45, h);
+        ctx.fillStyle = SPR.shade(T.accent, -16); ctx.fillRect(-r, -h - 8, r * 2, 9); ctx.fillRect(-r, -6, r * 2, 8);
+      } else {
+        ctx.fillStyle = SPR.shade(T.accent, -22);
+        ctx.beginPath(); ctx.moveTo(-r, 4); ctx.lineTo(-r * 0.2, -h); ctx.lineTo(r * 0.35, -h * 0.82); ctx.lineTo(r, 4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = SPR.shade(T.accent, -6);
+        ctx.beginPath(); ctx.moveTo(-r * 0.2, -h); ctx.lineTo(r * 0.35, -h * 0.82); ctx.lineTo(r * 0.1, 2); ctx.lineTo(-r * 0.4, 2); ctx.closePath(); ctx.fill();
+      }
+    } else {
+      /* a rock outcrop: a heap of boulders filling its footprint */
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(0, r * 0.25, r * 1.02, r * 0.6, 0, 0, TAU); ctx.fill();
+      const n = 5 + Math.round(r / 14);
+      for (let i = 0; i < n; i++) {
+        const a = rng.next() * TAU, rr = rng.next() * r * 0.55, br = r * (0.34 + rng.next() * 0.3);
+        const bx = Math.cos(a) * rr, by = Math.sin(a) * rr * 0.6 - br * 0.3;
+        ctx.fillStyle = SPR.shade(T.ground, -34 + rng.next() * 14);
+        ctx.beginPath();
+        for (let k = 0; k < 7; k++) { const b = k / 7 * TAU, q = br * (0.8 + rng.next() * 0.3); k ? ctx.lineTo(bx + Math.cos(b) * q, by + Math.sin(b) * q * 0.8) : ctx.moveTo(bx + Math.cos(b) * q, by + Math.sin(b) * q * 0.8); }
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = SPR.shade(T.ground, -8);
+        ctx.beginPath(); ctx.ellipse(bx - br * 0.25, by - br * 0.35, br * 0.4, br * 0.22, -0.4, 0, TAU); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   /* ---------------- props ---------------- */
   function drawProp(ctx, p, T, t) {
     const s = p.s;
@@ -532,6 +632,13 @@
       ctx.strokeStyle = teamCol + '20'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(0, 0, s.range || 50, 0, TAU); ctx.stroke();
       const th = up ? 34 : 26;
+      /* the stone footing fills the wall-tower's whole slot in the wall line,
+         so the run reads as one continuous wall with a turret rising from it */
+      if (s.w && s.h) {
+        const fw = s.w / 2, fh = s.h / 2;
+        ctx.fillStyle = up ? '#9a927f' : '#6f685b'; ctx.fillRect(-fw, -fh, fw * 2, fh * 2);
+        ctx.strokeStyle = '#4a443b'; ctx.lineWidth = 1; ctx.strokeRect(-fw + 0.5, -fh + 0.5, fw * 2 - 1, fh * 2 - 1);
+      }
       ctx.fillStyle = up ? '#8a7a58' : '#5d5241'; ctx.fillRect(-9, -th, 18, th + 6);
       ctx.fillStyle = up ? '#5a4d38' : '#4c4033';
       for (let i = -1; i <= 1; i++) ctx.fillRect(i * 7 - 3, -th - 4, 5, 5);
@@ -825,8 +932,13 @@
     const ox = (size - M.world.w * s) / 2, oy = (size - M.world.h * s) / 2;
     /* zones */
     M.zones.forEach(z => {
-      ctx2.fillStyle = z.type === 'water' ? '#3b9ae188' : z.type === 'bog' ? '#8fbf3f66' : z.type === 'forest' ? '#3c553088' : '#e8842c66';
+      ctx2.fillStyle = ({ water: '#3b9ae188', bog: '#8fbf3f66', forest: '#3c553088', sand: '#e9d49a66', oasis: '#5fb4e899', glowmoss: '#68e0c866' })[z.type] || '#e8842c66';
       ctx2.beginPath(); ctx2.arc(ox + z.x * s, oy + z.y * s, z.r * s, 0, TAU); ctx2.fill();
+    });
+    /* solid terrain */
+    (M.obstacles || []).forEach(o => {
+      ctx2.fillStyle = o.kind === 'chasm' ? '#000000cc' : '#2a2620cc';
+      ctx2.beginPath(); ctx2.arc(ox + o.x * s, oy + o.y * s, Math.max(1.5, o.r * s), 0, TAU); ctx2.fill();
     });
     /* hoards */
     M.teams.forEach(T => {

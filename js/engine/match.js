@@ -142,30 +142,12 @@
     M.allied = function (a, b) { return a === b || (a !== -1 && b !== -1 && M.sideOf(a) === M.sideOf(b)); };
     M.hostile = function (a, b) { return !M.allied(a, b); };
 
-    /* terrain features → obstacles & water zones (visual + light gameplay: bogs/water flags) */
+    /* terrain → real field features (see M.genTerrain): cover, rock, sand,
+       water, chasms — every map plays differently, not just looks different */
     M.props = [];
-    (function genTerrain() {
-      const trng = new U.Rng(M.seed ^ 0x7E44);
-      const feats = M.terrain.features || [];
-      const n = 14;
-      for (let i = 0; i < n; i++) {
-        const x = trng.range(240, WORLD.w - 240), y = trng.range(90, WORLD.h - 90);
-        if (Math.abs(x - WORLD.w / 2) < 130 && Math.abs(y - WORLD.h / 2) < 130) continue;
-        const kind = trng.pick(feats.length ? feats : ['rocks']);
-        M.props.push({ kind, x, y, s: trng.range(0.7, 1.5), seed: trng.int(0, 999) });
-      }
-      if (M.terrain.water) {
-        M.zones.push({ type: 'water', x: WORLD.w / 2, y: WORLD.h - 140, r: 260, team: -1 });
-        M.zones.push({ type: 'water', x: WORLD.w / 2 - 380, y: 160, r: 180, team: -1 });
-      }
-      /* organizer-placed terrain tokens (July update §15) */
-      (cfg.terrainTokens || []).forEach((tt, i) => {
-        const tx = WORLD.w / 2 + (i === 0 ? -1 : 1) * trng.range(80, 260);
-        const ty = trng.range(WORLD.h * 0.3, WORLD.h * 0.7);
-        if (tt === 'forest') M.zones.push({ type: 'forest', x: tx, y: ty, r: 120, team: -1 });
-        else if (tt === 'water') M.zones.push({ type: 'water', x: tx, y: ty, r: 130, team: -1 });
-      });
-    })();
+    M.obstacles = [];
+    M.genTerrain();
+    if (M.terrain.rules && M.mode !== 'duel') M.uiEvent(-1, 'event', '🗺 ' + M.terrain.name + ' — ' + M.terrain.rules);
 
     /* duel mode: spawn both tokens immediately, no economy */
     if (M.mode === 'duel') {
@@ -239,6 +221,169 @@
     if (M.mode === 'standard' && M.kingHill) M.seedKingCastle(M.kingTeam);
   }
 
+  /* ================= TERRAIN =================
+     Each terrain set lays out real features, all from the match seed (so
+     lockstep peers and replays see the same field):
+       • zones     — forest groves (block sight; slow the huge), water (slows
+                     walkers; Su swim it), sand drifts (slow walkers), an oasis
+                     and glowmoss beds (mend), plus bogs/fire made in play
+       • obstacles — rock outcrops, pillars and spires (impassable on foot and
+                     solid cover) and chasms (impassable on foot; anything
+                     knocked into one falls). Flyers pass over all of them.
+     Features keep clear of every camp and spawn point, and are spaced so a
+     creature can always walk between them. */
+  const BLOCKING_DECOR = ['trees', 'firetrees', 'cliffs', 'spires', 'pillars', 'rocks'];
+  Match.prototype.genTerrain = function () {
+    const M = this, cfg = M.cfg, T = M.terrain;
+    const trng = new U.Rng(M.seed ^ 0x7E44);
+    /* keep-clear points: every camp (its fort grows ~210 out), and the duel /
+       hunt spawn points */
+    const clear = M.teams.filter(t => t.controller !== 'wild' || M.mode === 'standard').map(t => ({ x: t.hoard.x, y: t.hoard.y, r: 265 }));
+    if (M.mode === 'duel') clear.push({ x: WORLD.w * 0.35, y: WORLD.h / 2, r: 150 }, { x: WORLD.w * 0.65, y: WORLD.h / 2, r: 150 });
+    if (M.mode === 'hunt' || M.mode === 'huntrun') clear.push({ x: WORLD.w * 0.72, y: WORLD.h / 2, r: 240 });
+    const placed = [];
+    const fits = (x, y, r, gap) => x - r > 70 && x + r < WORLD.w - 70 && y - r > 60 && y + r < WORLD.h - 60 &&
+      clear.every(k => U.dist(x, y, k.x, k.y) > k.r + r) &&
+      placed.every(o => U.dist(x, y, o.x, o.y) > o.r + r + (gap != null ? gap : 70));
+    /* scatter n features of radius [r0,r1]; mirrored left/right so neither
+       side of a 1v1 gets the better ground */
+    const scatter = (n, r0, r1, make, gap, mirror) => {
+      let made = 0;
+      for (let tries = 0; tries < n * 40 && made < n; tries++) {
+        const r = trng.range(r0, r1);
+        const x = trng.range(120, WORLD.w - 120), y = trng.range(100, WORLD.h - 100);
+        const pts = mirror ? [[x, y], [WORLD.w - x, y]] : [[x, y]];
+        if (mirror && Math.abs(x - WORLD.w / 2) < r + 40) { if (!fits(WORLD.w / 2, y, r, gap)) continue; placed.push({ x: WORLD.w / 2, y, r }); make(WORLD.w / 2, y, r); made++; continue; }
+        if (!pts.every(p => fits(p[0], p[1], r, gap))) continue;
+        pts.forEach(p => { placed.push({ x: p[0], y: p[1], r }); make(p[0], p[1], r); });
+        made += pts.length;
+      }
+    };
+    const zone = (type, extra) => (x, y, r) => M.zones.push(Object.assign({ type, x, y, r, team: -1 }, extra || {}));
+    const obstacle = (kind, sight) => (x, y, r) => M.obstacles.push({ kind, x, y, r, blocksSight: !!sight, seed: trng.int(0, 999) });
+    const mirror = M.teams.length === 2;
+
+    switch (T.id) {
+      case 'forest':
+        scatter(6, 85, 125, zone('forest'), 60, mirror);
+        break;
+      case 'mountain':
+        /* rock outcrops that carve the field into lanes */
+        scatter(8, 44, 74, obstacle('outcrop', true), 80, mirror);
+        break;
+      case 'desert':
+        if (fits(WORLD.w / 2, WORLD.h / 2, 95, 0)) { placed.push({ x: WORLD.w / 2, y: WORLD.h / 2, r: 95 }); zone('oasis')(WORLD.w / 2, WORLD.h / 2, 95); }
+        scatter(6, 105, 150, zone('sand'), 20, mirror);
+        break;
+      case 'ocean': {
+        /* a tidal channel down the middle with two fords, plus two side pools */
+        /* overlapping pools make one continuous channel; the gap in the middle
+           is the ford (a camp sitting on the line simply interrupts it) */
+        [110, 215, 320, 680, 785, 890].forEach(y => {
+          const x = WORLD.w / 2, r = 92;
+          if (!clear.every(k => U.dist(x, y, k.x, k.y) > k.r + r)) return;
+          placed.push({ x, y, r }); zone('water')(x, y, r);
+        });
+        scatter(2, 90, 120, zone('water'), 60, mirror);
+        break;
+      }
+      case 'eldi_aagac':
+        scatter(5, 80, 110, zone('forest', { fire: true }), 70, mirror);
+        break;
+      case 'elsharyn':
+        scatter(4, 85, 115, zone('forest', { glow: true }), 70, mirror);
+        scatter(4, 50, 64, zone('glowmoss'), 40, mirror);
+        break;
+      case 'arpeggio': {
+        /* a great ring of standing pillars around the middle */
+        const n = 10;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + 0.31, x = WORLD.w / 2 + Math.cos(a) * 330, y = WORLD.h / 2 + Math.sin(a) * 250;
+          if (fits(x, y, 26, 40)) { placed.push({ x, y, r: 26 }); obstacle('pillar', true)(x, y, 26); }
+        }
+        break;
+      }
+      case 'spire_cliffs':
+        scatter(4, 60, 88, obstacle('chasm', false), 90, mirror);
+        scatter(6, 18, 26, obstacle('spire', true), 60, mirror);
+        break;
+      default: break;   // plains: open ground
+    }
+
+    /* decorative props (no gameplay) — kept off the real features, and only
+       non-blocking kinds where the terrain has real obstacles/groves */
+    const feats = (T.features || []).filter(k => k !== 'water');
+    const decor = (M.obstacles.length || M.zones.some(z => z.type === 'forest')) ? feats.filter(k => BLOCKING_DECOR.indexOf(k) < 0) : feats;
+    for (let i = 0; i < 14 && decor.length; i++) {
+      const x = trng.range(240, WORLD.w - 240), y = trng.range(90, WORLD.h - 90);
+      if (Math.abs(x - WORLD.w / 2) < 130 && Math.abs(y - WORLD.h / 2) < 130) continue;
+      if (placed.some(o => U.dist(x, y, o.x, o.y) < o.r + 20)) continue;
+      M.props.push({ kind: trng.pick(decor), x, y, s: trng.range(0.7, 1.5), seed: trng.int(0, 999) });
+    }
+    /* organizer-placed terrain tokens (July update §15) */
+    (cfg.terrainTokens || []).forEach((tt, i) => {
+      const tx = WORLD.w / 2 + (i === 0 ? -1 : 1) * trng.range(80, 260);
+      const ty = trng.range(WORLD.h * 0.3, WORLD.h * 0.7);
+      if (tt === 'forest') M.zones.push({ type: 'forest', x: tx, y: ty, r: 120, team: -1 });
+      else if (tt === 'water') M.zones.push({ type: 'water', x: tx, y: ty, r: 130, team: -1 });
+    });
+  };
+
+  /* ground speed on this patch of terrain: water slows walkers (Su creatures
+     swim it faster instead), deep sand drags, and a grove's trunks slow
+     anything huge. Flyers are unaffected. */
+  Match.prototype.terrainSpeedMul = function (c) {
+    if (!this.walks(c) || !this.zones.length) return 1;
+    let m = 1;
+    const su = c.sp.tags.includes('su') || c.sp.element === 'Su';
+    if (this.inZone(c, 'water')) m *= su ? 1.2 : (c.quirks && c.quirks.water_raised) ? 1 : 0.55;
+    if (this.inZone(c, 'sand')) m *= 0.68;
+    if (c.sizeIdx >= 3 && this.inZone(c, 'forest')) m *= 0.75;
+    return m;
+  };
+
+  /* does this creature walk on the ground (so terrain can stop or slow it)? */
+  Match.prototype.walks = function (c) {
+    return !(c.sp.tags.includes('flyer') || (c.sp.features && c.sp.features.hover) || c.rooted || c.riding || c.onTower || c.inHut);
+  };
+  Match.prototype.inZone = function (c, type) {
+    for (const z of this.zones) if (z.type === type && U.dist(c.x, c.y, z.x, z.y) < z.r) return z;
+    return null;
+  };
+  /* a point a walker of radius `r` can actually stand on: anything inside rock
+     or a chasm is moved out to its edge (on the side facing `from`) */
+  Match.prototype.freeSpot = function (x, y, r, from) {
+    for (const o of this.obstacles || []) {
+      const dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy), min = o.r + (r || 10) + 6;
+      if (d >= min) continue;
+      let a = d > 0.5 ? Math.atan2(dy, dx) : (from ? Math.atan2(from.y - o.y, from.x - o.x) : 0);
+      x = o.x + Math.cos(a) * min; y = o.y + Math.sin(a) * min;
+    }
+    return { x: U.clamp(x, 40, WORLD.w - 40), y: U.clamp(y, 40, WORLD.h - 40) };
+  };
+
+  /* steer a walker around obstacles: if the step ahead runs into one, turn
+     along its edge (toward whichever side the goal lies) instead of pushing
+     straight into the rock */
+  Match.prototype.steer = function (c, ux, uy) {
+    if (!this.obstacles.length || !this.walks(c)) return [ux, uy];
+    const look = c.radius + 26;
+    for (const o of this.obstacles) {
+      const ox = o.x - c.x, oy = o.y - c.y, R = o.r + c.radius + 4;
+      const along = ox * ux + oy * uy;
+      if (along <= 0 || along > R + look) continue;            // behind us, or too far ahead
+      const perp = ox * uy - oy * ux;                           // signed side offset of the obstacle
+      if (Math.abs(perp) >= R) continue;                        // the path clears it
+      const sgn = perp > 0 ? -1 : 1;                            // pass on the far side from its centre
+      /* tangent direction, blended so the creature curves round smoothly */
+      const tx = -uy * sgn * -1, ty = ux * sgn * -1;
+      const k = 1 - Math.abs(perp) / R;
+      const nx = ux * (1 - k) + tx * k, ny = uy * (1 - k) + ty * k, nl = Math.hypot(nx, ny) || 1;
+      return [nx / nl, ny / nl];
+    }
+    return [ux, uy];
+  };
+
   /* ================= KING-OF-THE-HILL CASTLE =================
      A pre-built fortress for the Surrounded king: a full wall ring around the
      hoard, a level-1 manned archer tower on each corner (each holds ONE archer
@@ -261,18 +406,23 @@
       w: 46, h: 62, capacity: 2, close: 108, far: 324, radius: 34, upgraded: true, permManned: 2, keep: true,
       baseDmg: 8, hp: 420, maxHp: 420 });
 
-    /* the wall ring — four battlemented edges, segments overlapping so the ring
-       seals completely (the corner towers plug the corners) */
-    const seg = (x, y, vertical) => push({ type: 'wall', kind: 'wall', role: 'castleWall', x: U.clamp(x, 34, WORLD.w - 34), y: U.clamp(y, 44, WORLD.h - 44),
-      w: vertical ? 24 : 84, h: vertical ? 84 : 24, vertical, trapped: false, trapCd: 0, upgraded: false, hp: 220, maxHp: 220 });
-    const edge = (x1, y1, x2, y2, vertical) => {
-      const n = Math.max(3, Math.round(Math.hypot(x2 - x1, y2 - y1) / 52));
-      for (let i = 0; i <= n; i++) { const t = i / n; seg(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, vertical); }
+    /* the wall ring — four battlemented edges tiled EXACTLY between the corner
+       towers (each piece abuts the next, and each run ends flush against a
+       tower's footprint), so the ring seals with nothing stacked on anything */
+    const TH = 24;
+    const seg = (x1, x2, y1, y2, face) => {
+      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+      push({ type: 'wall', kind: 'wall', role: 'castleWall', x: (x1 + x2) / 2, y: (y1 + y2) / 2, w, h, vertical: h > w, face,
+        trapped: false, trapCd: 0, upgraded: false, hp: 220, maxHp: 220 });
     };
-    edge(cx0 - H, cy0 - H, cx0 - H, cy0 + H, true);   // left edge
-    edge(cx0 + H, cy0 - H, cx0 + H, cy0 + H, true);   // right edge
-    edge(cx0 - H, cy0 - H, cx0 + H, cy0 - H, false);  // top edge
-    edge(cx0 - H, cy0 + H, cx0 + H, cy0 + H, false);  // bottom edge
+    const corner = M.structures.filter(s2 => s2.team === team && /castleCorner/.test(s2.role));
+    const cTL = corner[0], cTR = corner[1], cBL = corner[2], cBR = corner[3];
+    const runX = (a, b, y, face) => tileRun(a.x + a.w / 2, b.x - b.w / 2, 72).forEach(r => seg(r[0], r[1], y - TH / 2, y + TH / 2, face));
+    const runY = (a, b, x, face) => tileRun(a.y + a.h / 2, b.y - b.h / 2, 72).forEach(r => seg(x - TH / 2, x + TH / 2, r[0], r[1], face));
+    runX(cTL, cTR, cTL.y, -1);   // top edge (faces up/out)
+    runX(cBL, cBR, cBL.y, 1);    // bottom edge
+    runY(cTL, cBL, cTL.x, -1);   // left edge
+    runY(cTR, cBR, cTR.x, 1);    // right edge
   };
 
   /* ================= CREATURES ================= */
@@ -366,6 +516,14 @@
     }
     if (c.quirks.hoard_sense && c.vars.stealRate) c.vars.stealRate *= 1.25;
 
+    /* nothing that walks is ever set down inside rock or a chasm — it lands
+       at the edge instead (flyers may hover over either) */
+    if (!(sp.tags.includes('flyer') || (sp.features && sp.features.hover))) {
+      for (const o of M.obstacles || []) {
+        const dx = c.x - o.x, dy = c.y - o.y, d = Math.hypot(dx, dy), min = o.r + c.radius + 2;
+        if (d < min) { const a = d > 0.01 ? Math.atan2(dy, dx) : (teamIdx === 0 ? Math.PI : 0); c.x = U.clamp(o.x + Math.cos(a) * min, 20, WORLD.w - 20); c.y = U.clamp(o.y + Math.sin(a) * min, 20, WORLD.h - 20); c.homeX = c.x; c.homeY = c.y; }
+      }
+    }
     /* rooted species anchor where they land */
     if (sp.features.rootsOnDeploy || sp.features.stationary || sp.features.rooted || sp.rig === 'field' || sp.rig === 'tree' || sp.rig === 'relic') {
       c.rooted = true;
@@ -393,6 +551,8 @@
 
   Match.prototype.applyInput = function (team, input) {
     const M = this, T = M.teams[team];
+    /* a knocked-out brawler can still chat (and leave), but fields nothing */
+    if (T && T.out && (input.type === 'ready' || input.type === 'trigger' || input.type === 'feed')) return;
     if (input.type === 'ready') {
       const entry = T.pouch[input.pouchIdx];
       if (!entry || entry.state !== 'pouch') return;
@@ -512,7 +672,7 @@
     if (M.mode !== 'duel' && M.time >= M.nextPulseAt) M.doPulse();
 
     /* AI controllers */
-    M.teams.forEach(T => { if (T.controller === 'ai' && !M.cfg.replayLog) M.aiThink(T); });
+    M.teams.forEach(T => { if (T.controller === 'ai' && !T.out && !M.cfg.replayLog) M.aiThink(T); });
 
     /* creature decisions (staggered) */
     const api = M.api();
@@ -567,6 +727,21 @@
             else c.intent.move = { x: prey.x, y: prey.y, run: false };
           }
         }
+        /* BRAWL MARCH: in a multi-team Brawl a fighter with nothing to fight
+           doesn't idle at home — about two in three march on the nearest rival
+           camp still in the brawl (the rest hold their own), so a stronger side
+           breaks a weaker one instead of sitting on its lead. Support units,
+           guardians, builders and the rooted keep to their own jobs. */
+        if (M.mode === 'standard' && M.teams.length > 2 && M.time > 90 && c.id % 3 !== 0 && c.team >= 0 &&
+            !c.rooted && !c.riding && !c.onTower && !c.inHut && !c.carryingRelic && !c.intent.attackTarget &&
+            c.intent.state !== 'special' && c.dmg > 3 && !c.sp.tags.includes('passive') && !c.sp.tags.includes('guardian') &&
+            !c.sp.tags.includes('thief') && MARCH_SKIP.indexOf(c.sp.behavior) < 0 && !api.nearestEnemy(c, 260)) {
+          const goal = M.marchTarget(c.team);
+          if (goal && U.dist(c.x, c.y, goal.x, goal.y) > 150) {
+            const a = Math.atan2(goal.y - c.y, goal.x - c.x);
+            c.intent.move = { x: goal.x - Math.cos(a) * 120, y: goal.y - Math.sin(a) * 120, run: false };
+          }
+        }
       }
       M.execIntent(c);
     }
@@ -583,6 +758,24 @@
 
     /* win conditions */
     M.checkEnd();
+  };
+
+  /* species brains that keep their own jobs during a Brawl march */
+  const MARCH_SKIP = ['builder', 'chemist', 'karnen', 'kofi', 'big_momma_kofi', 'uff', 'makari_swarm', 'rubbermcfly', 'albali_byrd'];
+  /* where a team's idle fighters march in a Brawl: the nearest rival camp that
+     still holds a Relic (the prize), else the nearest rival camp still in it */
+  Match.prototype.marchTarget = function (team) {
+    const M = this, own = M.teams[team] && M.teams[team].hoard;
+    if (!own) return null;
+    let best = null, bd = 1e9;
+    M.teams.forEach((T, i) => {
+      if (T.controller === 'wild' || T.out || !M.hostile(team, i)) return;
+      const rl = M.relics[i];
+      const prize = rl && !rl.disabled && !rl.captured;
+      const d = U.dist(own.x, own.y, T.hoard.x, T.hoard.y) + (prize ? 0 : 2000);
+      if (d < bd) { bd = d; best = T.hoard; }
+    });
+    return best;
   };
 
   /* ================= MOUNTING (Eikar rides a mount) =================
@@ -736,81 +929,187 @@
       trapped: !!(b && b.picks && b.picks.trapIntegration) };
   };
 
-  /* clock-face geometry around the hoard, oriented so 3 o’clock faces the enemy */
-  Match.prototype._clock = function (team, hour, r) {
+  /* ---------- fort geometry ----------
+     Walls are axis-aligned boxes, so a fort is laid out in a LOCAL frame:
+     "forward" points at the nearest rival camp along whichever axis it mostly
+     lies on (left/right, or up/down for camps stacked above each other), and
+     "lateral" runs across it. Every piece gets an exact footprint and the wall
+     runs are TILED edge-to-edge — no overlapping slabs, no gaps — so the ring
+     reads cleanly and seals exactly. */
+  Match.prototype.fortFrame = function (team) {
     const own = this.teams[team].hoard;
-    const foe = this.nearestFoeHoard(team) || own;
-    const dir = Math.sign(foe.x - own.x) || 1;
-    const ang = (hour / 12) * Math.PI * 2;      // from 12 o’clock, clockwise
-    let dx = Math.sin(ang) * r, dy = -Math.cos(ang) * r;
-    if (dir < 0) dx = -dx;                        // mirror so 3 o’clock always faces the foe
-    return { x: U.clamp(own.x + dx, 30, WORLD.w - 30), y: U.clamp(own.y + dy, 30, WORLD.h - 30) };
+    const foe = this.nearestFoeHoard(team) || { x: own.x + 1, y: own.y };
+    const fx = foe.x - own.x, fy = foe.y - own.y;
+    const axisX = Math.abs(fx) >= Math.abs(fy);
+    const dir = (axisX ? Math.sign(fx) : Math.sign(fy)) || 1;
+    return {
+      axisX, dir, own,
+      /* local (forward f, lateral l) → world */
+      pt: (f, l) => axisX ? { x: own.x + dir * f, y: own.y + l } : { x: own.x + l, y: own.y + dir * f },
+      /* a box spanning forward [f1,f2] × lateral [l1,l2] → world centre + size */
+      box: (f1, f2, l1, l2) => {
+        const fc = (f1 + f2) / 2, lc = (l1 + l2) / 2, fl = Math.abs(f2 - f1), ll = Math.abs(l2 - l1);
+        return axisX ? { x: own.x + dir * fc, y: own.y + lc, w: fl, h: ll } : { x: own.x + lc, y: own.y + dir * fc, w: ll, h: fl };
+      },
+    };
   };
+
+  /* the team whose camp a team's builders fortify. Allies seated on the SAME
+     spot (a shared Brawl camp) raise ONE fort together — owned by the first of
+     them — instead of stacking a copy of the works per ally. */
+  Match.prototype.fortTeam = function (team) {
+    const T = this.teams[team]; if (!T) return team;
+    for (let i = 0; i < team; i++) {
+      const o = this.teams[i];
+      if (o.controller !== 'wild' && this.allied(i, team) && U.dist(o.hoard.x, o.hoard.y, T.hoard.x, T.hoard.y) < 60) return i;
+    }
+    return team;
+  };
+
+  /* how far the fort may reach each way before it hits the arena edge or runs
+     into a neighbouring camp (it stops halfway to any other hoard, so two
+     nearby camps' walls never overlap). Returns {front, back, left, right}
+     in local units (left = negative lateral, right = positive lateral). */
+  Match.prototype.fortRoom = function (team, F) {
+    const M = this, own = M.teams[team].hoard, edge = 30;
+    const room = F.axisX
+      ? { front: F.dir > 0 ? WORLD.w - edge - own.x : own.x - edge, back: F.dir > 0 ? own.x - edge : WORLD.w - edge - own.x, left: own.y - 44, right: WORLD.h - 44 - own.y }
+      : { front: F.dir > 0 ? WORLD.h - 44 - own.y : own.y - 44, back: F.dir > 0 ? own.y - 44 : WORLD.h - 44 - own.y, left: own.x - edge, right: WORLD.w - edge - own.x };
+    const ft = M.fortTeam(team);
+    M.teams.forEach((T, i) => {
+      if (T.controller === 'wild' || M.fortTeam(i) === ft) return;
+      const dx = T.hoard.x - own.x, dy = T.hoard.y - own.y;
+      const f = F.axisX ? dx * F.dir : dy * F.dir, l = F.axisX ? dy : dx;
+      const half = Math.max(Math.abs(f), Math.abs(l)) / 2 - 16;
+      if (Math.abs(f) >= Math.abs(l)) { if (f > 0) room.front = Math.min(room.front, half); else room.back = Math.min(room.back, half); }
+      else { if (l > 0) room.right = Math.min(room.right, half); else room.left = Math.min(room.left, half); }
+    });
+    return room;
+  };
+
+  /* tile a straight wall run exactly: `len` is split into equal pieces of
+     about 80, each piece's footprint covering its share with no overlap */
+  function tileRun(from, to, approx) {
+    const len = to - from, n = Math.max(1, Math.round(Math.abs(len) / (approx || 80))), step = len / n, out = [];
+    for (let i = 0; i < n; i++) out.push([from + step * i, from + step * (i + 1)]);
+    return out;
+  }
 
   /* the ordered blueprint list (roles are stable so structures/claims line up).
      Two main towers sit BEHIND a battlemented front wall; that wall runs
-     wall–tower–wall–tower–wall between them, with the wall-towers spaced well
-     apart. The rear cone tower + the full wall ring only unlock once the works
-     have been upgraded to Level 2. */
+     wall–tower–wall–tower–wall across the whole front, with the wall-towers
+     spaced well apart. The rear cone tower + the full wall ring only unlock
+     once the works have been upgraded to Level 2. Each blueprint carries its
+     exact footprint (w/h) so nothing is ever raised on top of anything else. */
   Match.prototype.builderBlueprints = function (team) {
-    const sp = this.builderSpec(team);
-    const own = this.teams[team].hoard;
-    const foe = this.nearestFoeHoard(team) || own;
-    const dir = Math.sign(foe.x - own.x) || 1;
-    const R = 96 + sp.radius;
-    const level = this.fortLevel(team);
-    const spearmen = this.creatures.filter(c => !c.dead && c.team === team && c.sp.behavior === 'spear_unit').length;
-    const cx = v => U.clamp(v, 34, WORLD.w - 34), cy = v => U.clamp(v, 44, WORLD.h - 44);
-    const towerX = cx(own.x + dir * R);          // main towers — a little back, inside the wall
-    const frontX = cx(own.x + dir * (R + 50));   // the front wall line, out toward the enemy
-    const bp = [];
-    /* stage 1 — tower one (lower front) */
-    bp.push({ role: 'tower1', kind: 'tower', x: towerX, y: cy(own.y + 122), spec: sp });
-    /* stage 2 — the front wall line: wall · wall-tower · wall · wall-tower · wall */
-    [-120, -60, 0, 60, 120].forEach((oy, i) => {
-      const y = cy(own.y + oy);
-      if (i % 2 === 1) bp.push({ role: 'wallTower' + i, kind: 'wallTower', x: frontX, y, spec: sp });
-      else bp.push({ role: 'wall' + i, kind: 'wall', x: frontX, y, spec: sp, extra: { trapped: sp.trapped, vertical: true } });
-    });
-    /* stage 3 — tower two (upper front) */
-    bp.push({ role: 'tower2', kind: 'tower', x: towerX, y: cy(own.y - 122), spec: sp });
-    /* stage 4 — the Builder's Hut, behind the hoard */
-    bp.push({ role: 'hut', kind: 'hut', x: cx(own.x - dir * (R + 34)), y: own.y, spec: sp });
-    /* Level 2 + 2 spearmen: a rear cone tower + a CLOSED wall ring around the
-       hoard. The front edge already exists (stage 2); here we lay the back edge
-       and the top/bottom edges, overlapping at the corners so the square seals
-       with no gaps — the enemy then cannot deploy inside it. */
-    if (level >= 2 && spearmen >= 2) {
-      const coneX = cx(own.x - dir * (R + 16)), coneY = own.y;
-      const coneDir = dir > 0 ? 0 : Math.PI;      // apex at the tower, opening toward the enemy / field centre
-      bp.push({ role: 'towerCone', kind: 'cone', x: coneX, y: coneY, spec: Object.assign({}, sp, { coneDir, coneHalf: Math.PI / 5, coneRange: sp.far }) });
-      const xL = own.x - dir * (R + 50), xR = own.x + dir * (R + 50), yT = own.y - 150, yB = own.y + 150;
-      const line = (role, x1, y1, x2, y2, vertical) => {
-        const n = Math.max(2, Math.round(Math.hypot(x2 - x1, y2 - y1) / 60));
-        for (let i = 0; i <= n; i++) { const t = i / n; bp.push({ role: role + i, kind: 'wall', x: cx(x1 + (x2 - x1) * t), y: cy(y1 + (y2 - y1) * t), spec: sp, extra: { trapped: sp.trapped, vertical } }); }
-      };
-      line('ringBack', xL, yT, xL, yB, true);     // rear edge (vertical)
-      line('ringTop', xL, yT, xR, yT, false);      // top edge (horizontal)
-      line('ringBot', xL, yB, xR, yB, false);      // bottom edge (horizontal)
+    const M = this;
+    team = M.fortTeam(team);
+    const own = M.teams[team].hoard;
+    const sp = M.builderSpec(team);
+    const level = M.fortLevel(team);
+    /* a king's castle is already a complete fort — the builder only adds its
+       Hut inside the walls (shelter + the Level-2 upgrade path) and then
+       upgrades the castle's corner towers and walls */
+    if (M.structures.some(s => s.team === team && /^castle/.test(s.role || ''))) {
+      return [{ role: 'hut', kind: 'hut', x: own.x, y: U.clamp(own.y - 104, 44, WORLD.h - 44), w: 54, h: 44, spec: sp }];
     }
-    return bp;
+    const F = M.fortFrame(team);
+    const room = M.fortRoom(team, F);
+    const TH = 24;                                           // wall thickness
+    const R = 96 + sp.radius;
+    /* the box: front line out toward the foe, back line behind the hoard,
+       lateral sides either way — each pulled in if the room is short */
+    const front = U.clamp(Math.min(R + 50, room.front - TH / 2), 96, 260);
+    const back = U.clamp(Math.min(R + 50, room.back - TH / 2), 96, 260);
+    /* a camp squeezed between neighbours builds a narrower fort (never less
+       than the hoard itself) rather than a full-size one with clipped pieces */
+    const left = U.clamp(Math.min(156, room.left - TH / 2), 60, 200);
+    const right = U.clamp(Math.min(156, room.right - TH / 2), 60, 200);
+    const bp = [];
+    const wallBp = (role, f1, f2, l1, l2, face) => {
+      const b = F.box(f1, f2, l1, l2);
+      bp.push({ role, kind: 'wall', x: b.x, y: b.y, w: b.w, h: b.h, spec: sp,
+        extra: { trapped: sp.trapped, vertical: b.h > b.w, face } });
+    };
+    /* outward-facing direction of a run, as the renderer reads it (sign along
+       the wall's thin axis): the front faces the foe, the back away from it */
+    const faceFwd = F.dir, faceSide = (sgn) => sgn;          // lateral +/- is world +/- on the cross axis
+
+    /* towers and the Hut are drawn standing UP out of the ground (toward -y), so
+       on a side that faces up they sit a little further in — their roofs and
+       pennants then never poke up into the wall behind them */
+    const fwdUp = !F.axisX && F.dir < 0, backUp = !F.axisX && F.dir > 0;
+    /* stage 1 — tower one, behind the front wall on the right flank */
+    const tw = 30 + sp.capacity * 4;
+    let towerL = Math.max(0, Math.min(96, right - 52)), towerL2 = Math.max(0, Math.min(F.axisX ? 74 : 96, left - 52));
+    const towerF = front - 62 - (fwdUp ? 28 : 0);
+    /* too narrow for two towers side by side → one tower, centred */
+    const twoTowers = towerL + towerL2 >= tw + 10;
+    if (!twoTowers) towerL = 0;
+    { const p = F.pt(towerF, towerL); bp.push({ role: 'tower1', kind: 'tower', x: p.x, y: p.y, w: tw, h: 52, spec: sp }); }
+
+    /* stage 2 — the front wall line across the whole front (corners included):
+       wall · wall-tower · wall · wall-tower · wall, tiled exactly */
+    {
+      const L0 = -left - TH / 2, L1 = right + TH / 2, WT = 40;   // wall-tower width along the line
+      const wallLen = (L1 - L0 - 2 * WT) / 3;
+      const cuts = [L0, L0 + wallLen, L0 + wallLen + WT, L0 + 2 * wallLen + WT, L0 + 2 * wallLen + 2 * WT, L1];
+      for (let i = 0; i < 5; i++) {
+        const a = cuts[i], b = cuts[i + 1];
+        if (i % 2 === 1) {
+          const c0 = F.box(front - TH / 2, front + TH / 2, a, b);
+          bp.push({ role: 'wallTower' + i, kind: 'wallTower', x: c0.x, y: c0.y, w: c0.w, h: c0.h, spec: sp });
+        } else wallBp('wall' + i, front - TH / 2, front + TH / 2, a, b, faceFwd);
+      }
+    }
+    /* stage 3 — tower two, mirrored on the left flank */
+    if (twoTowers) { const p = F.pt(towerF, -towerL2); bp.push({ role: 'tower2', kind: 'tower', x: p.x, y: p.y, w: tw, h: 52, spec: sp }); }
+    /* stage 4 — the Builder's Hut, behind the hoard, clear of the back wall */
+    const hutF = -(back - TH / 2 - 34 - (backUp ? 26 : 0));
+    { const p = F.pt(hutF, 0); bp.push({ role: 'hut', kind: 'hut', x: p.x, y: p.y, w: 54, h: 44, spec: sp }); }
+    /* Level 2 + 2 spearmen: a rear cone tower (beside the Hut, never on it) and
+       a CLOSED wall ring. The front line already spans corner to corner; the
+       back line does too, and the two sides run between them — so the ring
+       seals with no gaps and no doubled-up corners, and the enemy then cannot
+       deploy inside it. */
+    const spearmen = M.creatures.filter(c => !c.dead && M.fortTeam(c.team) === team && c.sp.behavior === 'spear_unit').length;
+    if (level >= 2 && spearmen >= 2) {
+      /* the cone tower stands beside the Hut on whichever flank has room for it
+         (a cramped camp with no room either side simply goes without) */
+      const roomL = Math.min(100, left - 50), roomR = Math.min(100, right - 50);
+      const coneL = roomL >= 56 ? -roomL : roomR >= 56 ? roomR : null;
+      if (coneL != null) {
+        const p = F.pt(hutF, coneL);
+        const coneDir = F.axisX ? (F.dir > 0 ? 0 : Math.PI) : (F.dir > 0 ? Math.PI / 2 : -Math.PI / 2);   // opens toward the foe
+        bp.push({ role: 'towerCone', kind: 'cone', x: p.x, y: p.y, w: tw, h: 52, spec: Object.assign({}, sp, { coneDir, coneHalf: Math.PI / 5, coneRange: sp.far }) });
+      }
+      tileRun(-left - TH / 2, right + TH / 2).forEach((seg, i) => wallBp('ringBack' + i, -back - TH / 2, -back + TH / 2, seg[0], seg[1], -F.dir));
+      tileRun(-back + TH / 2, front - TH / 2).forEach((seg, i) => wallBp('ringTop' + i, seg[0], seg[1], -left - TH / 2, -left + TH / 2, faceSide(-1)));
+      tileRun(-back + TH / 2, front - TH / 2).forEach((seg, i) => wallBp('ringBot' + i, seg[0], seg[1], right - TH / 2, right + TH / 2, faceSide(1)));
+    }
+    /* never plan a piece on top of another team's works (an ally's fort next
+       door, or anything already standing that isn't ours) */
+    const foreign = M.structures.filter(s2 => s2.hp > 0 && s2.team !== team && s2.w && s2.h);
+    return bp.filter(b => !foreign.some(o => Math.abs(o.x - b.x) < (o.w + b.w) / 2 - 1 && Math.abs(o.y - b.y) < (o.h + b.h) / 2 - 1));
   };
 
   Match.prototype.raiseStructure = function (c, bp) {
     const M = this, sp = bp.spec || M.builderSpec(c.team);
     const q = (c.vars && c.vars.structureQuality) || 1;
-    const foe = M.nearestFoeHoard(c.team) || M.teams[c.team].hoard;
+    /* a shared camp's works belong to the camp's fort team (allies all use them) */
+    const team = bp.kind === 'ward' ? c.team : M.fortTeam(c.team);
+    const foe = M.nearestFoeHoard(team) || M.teams[team].hoard;
     const s = { id: 'st' + (M.idCounter++), type: bp.kind === 'wall' ? 'wall' : bp.kind === 'ward' ? 'ward' : 'tower',
-      kind: bp.kind, role: bp.role, team: c.team, side: M.sideOf(c.team), x: bp.x, y: bp.y, occupants: [], quality: q, upgraded: false, powerMul: 1, fireCd: 0,
-      face: Math.sign(foe.x - bp.x) || 1 };
+      kind: bp.kind, role: bp.role, team, side: M.sideOf(team), x: bp.x, y: bp.y, occupants: [], quality: q, upgraded: false, powerMul: 1, fireCd: 0,
+      face: (bp.extra && bp.extra.face) || Math.sign(foe.x - bp.x) || 1 };
     if (bp.kind === 'wall') {
-      const vert = !bp.extra || bp.extra.vertical !== false;   // front/back walls run vertically; ring sides horizontally
-      s.w = vert ? 24 : 84; s.h = vert ? 84 : 24; s.vertical = vert;
+      const vert = bp.w && bp.h ? bp.h > bp.w : (!bp.extra || bp.extra.vertical !== false);   // runs along its long axis
+      s.w = bp.w || (vert ? 24 : 84); s.h = bp.h || (vert ? 84 : 24); s.vertical = vert;
       s.trapped = !!(bp.extra && bp.extra.trapped); s.trapCd = 0; s.hp = s.maxHp = sp.wallHp;
     } else if (bp.kind === 'ward') {
       s.radius = 66; s.hp = s.maxHp = Math.round(110 * q);
     } else if (bp.kind === 'wallTower') {
-      s.w = 26; s.h = 46; s.capacity = 0; s.baseDmg = sp.wallTowerDmg; s.range = 50; s.close = 50; s.far = 50;
+      s.w = bp.w || 26; s.h = bp.h || 46; s.capacity = 0; s.baseDmg = sp.wallTowerDmg; s.range = 50; s.close = 50; s.far = 50;
       s.hp = s.maxHp = sp.wallTowerHp;
     } else if (bp.kind === 'hut') {
       s.w = 54; s.h = 44; s.capacity = 99; s.isHut = true; s.level = 1; s.hp = s.maxHp = Math.round(220 * q);
@@ -821,9 +1120,9 @@
     }
     M.structures.push(s);
     /* if the works are already Level 2, anything raised later comes up upgraded */
-    if (M.fortLevel(c.team) === 2) M.upgradeOne(s);
+    if (M.fortLevel(team) === 2) M.upgradeOne(s);
     const label = s.isHut ? 'Builder’s Hut' : s.kind === 'wallTower' ? 'wall-tower' : s.kind === 'cone' ? 'cone tower' : s.type;
-    M.uiEvent(c.team, 'event', c.tokName + ' completes a ' + label + (s.trapped ? ' (spiked)' : '') + '.');
+    M.uiEvent(team, 'event', c.tokName + ' completes a ' + label + (s.trapped ? ' (spiked)' : '') + '.');
     return s;
   };
 
@@ -984,7 +1283,7 @@
     M.nextPulseAt = M.time + interval;
     M.pulseElement = M.rng.pick(SP.ELEMENTS);
     M.teams.forEach(T => {
-      if (T.controller === 'wild') return;
+      if (T.controller === 'wild' || T.out) return;
       /* four resources: each pulse distributes randomly among Fti/Su/Eldi/Ular */
       const units = [];
       for (let i = 0; i < amount * esc; i++) units.push(M.rng.pick(ELS));
@@ -1022,6 +1321,9 @@
         const extra = Math.round(units.length * 0.5);
         for (let i = 0; i < extra; i++) units.push(M.rng.pick(ELS));
       }
+      /* Brawl: a player whose own Relic has been carried off (while allies
+         still hold theirs) fights on from a plundered hoard — half the pulse */
+      if (M.teams.length > 2 && M.relics[T.idx] && !M.relics[T.idx].disabled && M.relics[T.idx].captured) units.length = Math.ceil(units.length / 2);
       /* Hunt: a hero generates only their own flavor of Vaelk, so the
          whole pulse pours into one element. */
       if (M.huntrunElement) for (let ui = 0; ui < units.length; ui++) units[ui] = M.huntrunElement;
@@ -1104,6 +1406,12 @@
       }
     });
 
+    /* Eldi Aagac: every pulse the fire-tree groves shed burning embers */
+    M.zones.filter(z => z.type === 'forest' && z.fire).forEach(z => {
+      const a = M.rng.range(0, Math.PI * 2), r = z.r + M.rng.range(10, 60);
+      M.zones.push({ type: 'fire', x: U.clamp(z.x + Math.cos(a) * r, 40, WORLD.w - 40), y: U.clamp(z.y + Math.sin(a) * r, 40, WORLD.h - 40), r: 30, life: 5, owner: null });
+    });
+
     /* pending respawns measured in pulses (Uff) */
     M.pendingSpawns.forEach(p => p.pulsesLeft--);
 
@@ -1142,13 +1450,19 @@
       const inBog = M.zones.some(z => z.type === 'bog' && M.hostile(c.team, z.team) && U.dist(c.x, c.y, z.x, z.y) < z.r);
       if (inBog && !c.sp.tags.includes('flyer') && !(c.quirks && c.quirks.bog_raised)) sp *= 0.45;
       /* water pools: aquatic/flying pass freely, ground-only creatures slow (§15) */
-      const inWater = M.zones.some(z => z.type === 'water' && U.dist(c.x, c.y, z.x, z.y) < z.r);
-      if (inWater && !c.sp.tags.includes('flyer') && !c.sp.tags.includes('su') && c.sp.element !== 'Su' && !(c.quirks && c.quirks.water_raised)) sp *= 0.55;
-      const dx = it.move.x - c.x, dy = it.move.y - c.y;
+      sp *= M.terrainSpeedMul(c);
+      /* never walk a creature into the tether on purpose: a flee/forage goal
+         off the edge of the arena is pulled back inside the safe band, so the
+         border only claims things that are knocked or lured out to it */
+      let gx = U.clamp(it.move.x, 40, WORLD.w - 40), gy = U.clamp(it.move.y, 40, WORLD.h - 40);
+      /* a goal inside rock or a chasm is unreachable on foot — aim for its edge */
+      if (M.obstacles.length && M.walks(c)) { const fs = M.freeSpot(gx, gy, c.radius, c); gx = fs.x; gy = fs.y; }
+      const dx = gx - c.x, dy = gy - c.y;
       const d = Math.hypot(dx, dy);
       if (d > 3) {
-        c.x += dx / d * sp * TICK;
-        c.y += dy / d * sp * TICK;
+        const st = M.steer(c, dx / d, dy / d);   // walk round rock, pillar and chasm
+        c.x += st[0] * sp * TICK;
+        c.y += st[1] * sp * TICK;
         /* a Malsti Punk never runs in a straight line — it weaves side to side
            (a perpendicular sine wobble on top of its forward motion) */
         if (c.speciesId === 'malsti_punk' && d > 12) {
@@ -1193,10 +1507,11 @@
         }
       } else if (!c.rooted) {
         // close the distance
-        let sp = c.speed * (it.rush ? 1.5 : 1.15) * buffMul('speedMul');
+        let sp = c.speed * (it.rush ? 1.5 : 1.15) * buffMul('speedMul') * M.terrainSpeedMul(c);
         if (c.speciesId === 'tyndael') sp *= 0.7 + c.heat * 0.6;
-        c.x += (t.x - c.x) / d * sp * TICK;
-        c.y += (t.y - c.y) / d * sp * TICK;
+        const st = M.steer(c, (t.x - c.x) / d, (t.y - c.y) / d);
+        c.x += st[0] * sp * TICK;
+        c.y += st[1] * sp * TICK;
         c.facing = t.x >= c.x ? 1 : -1;
         c.state = it.rush ? 'run' : 'walk';
       } else {
@@ -1216,6 +1531,18 @@
         c.mem.breathAcc = (c.mem.breathAcc || 0) + tier * 0.5;
         if (c.mem.breathAcc >= 1) { c.mem.breathAcc -= 1; M.teams[c.team].resources.Su++; }
         M.addEffect('breathSu', c.x, c.y - c.radius, {});
+      }
+    }
+
+    /* archers re-fletch: an archer gathers spent shafts and cuts new ones, so
+       an empty quiver slowly refills (one arrow every 2.5s, faster when it
+       hasn't loosed for a while). A Karnen resupply still refills it at once. */
+    if (c.sp.behavior === 'archer_unit' && !c.onTower && M.tick % 10 === 0) {
+      const maxQ = Math.max(1, Math.round(c.vars.quiver || 20));
+      if (c.quiver < maxQ) {
+        const idle = M.tick - (c.mem.lastShotTick || 0) > Math.round(4 / TICK);
+        c.mem.fletch = (c.mem.fletch || 0) + (idle ? 2 : 1) * 10 * TICK;
+        if (c.mem.fletch >= 2.5) { c.mem.fletch -= 2.5; c.quiver++; }
       }
     }
 
@@ -1538,7 +1865,7 @@
        re-fielded (Hunt re-summons it by spending more Vaelk — the +1
        per-death cost still applies). The hero is not in the pouch, so a fallen
        hero stays down for the node. */
-    if ((M.mode === 'standard' || M.mode === 'huntrun') && M.teams[c.team] && M.teams[c.team].controller !== 'wild' &&
+    if ((M.mode === 'standard' || M.mode === 'huntrun') && M.teams[c.team] && M.teams[c.team].controller !== 'wild' && cause !== 'knockout' &&
         !c.isKofiSpawn && !c.isHero && c.speciesId !== 'kofi' && c.speciesId !== 'sprengju' &&
         !(c.speciesId === 'uff' && cause !== 'retribution')) {
       const entry = M.teams[c.team].pouch.find(e => e.tok.id === c.tokId);
@@ -1570,7 +1897,7 @@
     }
 
     /* Uff respawn from same spot */
-    if (c.speciesId === 'uff' && cause !== 'retribution') {
+    if (c.speciesId === 'uff' && cause !== 'retribution' && cause !== 'knockout') {
       const pulses = { Slow: 4, Standard: 3, Fast: 2 }[c.picks.respawnTier] || 3;
       M.pendingSpawns.push({ tok: c.tok, team: c.team, x: c.homeX, y: c.homeY, pulsesLeft: pulses });
       M.addEffect('plant', c.homeX, c.homeY, {});
@@ -1590,11 +1917,23 @@
     const M = this;
     for (let i = M.projectiles.length - 1; i >= 0; i--) {
       const p = M.projectiles[i];
+      const px0 = p.x, py0 = p.y;
       p.x += p.vx * TICK; p.y += p.vy * TICK; p.life -= TICK;
-      let hit = false;
+      /* swept hit test: a fast arrow covers ~23px a tick — more than a small
+         creature is wide — so test the whole segment flown this tick and strike
+         the FIRST body along it (no tunnelling through small targets) */
+      const sx = p.x - px0, sy = p.y - py0, sl2 = sx * sx + sy * sy || 1;
+      let hitC = null, hitT = 2;
       for (const c of M.creatures) {
-        if (c.dead || M.allied(c.team, p.team)) continue;
-        if (U.dist(p.x, p.y, c.x, c.y) < c.radius + 5) {
+        if (c.dead || c.riding || c.onTower || c.inHut || M.allied(c.team, p.team)) continue;
+        let t = ((c.x - px0) * sx + (c.y - py0) * sy) / sl2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        if (U.dist(px0 + sx * t, py0 + sy * t, c.x, c.y) < c.radius + 5 && t < hitT) { hitT = t; hitC = c; }
+      }
+      let hit = false;
+      if (hitC) {
+        const c = hitC;
+        {
           M.damage(c, p.dmg, p.source);
           if (p.type === 'jet' && c.sizeIdx <= 1) {
             /* knockback + stun — smalls only */
@@ -1602,7 +1941,7 @@
             c.x += Math.cos(a) * 46; c.y += Math.sin(a) * 46;
             c.stunnedUntil = M.tick + Math.round(0.8 / TICK);
           }
-          hit = true; break;
+          hit = true;
         }
       }
       if (hit || p.life <= 0 || p.x < 0 || p.x > WORLD.w || p.y < 0 || p.y > WORLD.h) M.projectiles.splice(i, 1);
@@ -1660,6 +1999,39 @@
             c.x = U.clamp(c.x + (c.x - o.x) / d * push, 14, WORLD.w - 14);
             c.y = U.clamp(c.y + (c.y - o.y) / d * push, 14, WORLD.h - 14);
           }
+        }
+      }
+    }
+
+    /* ===== terrain: rock/pillar/chasm push walkers out; a creature forced
+       into a chasm falls; the oasis and glowmoss mend whoever rests there ===== */
+    if (M.obstacles.length) {
+      for (const c of M.creatures) {
+        if (c.dead || !M.walks(c)) continue;
+        for (const o of M.obstacles) {
+          const dx = c.x - o.x, dy = c.y - o.y, d = Math.hypot(dx, dy) || 0.01, min = o.r + c.radius * 0.6;
+          if (d >= min) continue;
+          /* nobody walks into a chasm — a walker is always held at its lip, so
+             one found deep inside was knocked, thrown or blinked there: it falls
+             (a Malsti Punk blinks back out through the Duat) */
+          if (o.kind === 'chasm' && d < o.r - 6 && c.speciesId !== 'malsti_punk' && !c.isBoss) {
+            M.addEffect('dive', c.x, c.y, { tx: o.x, ty: o.y });
+            M.uiEvent(-1, 'event', c.tokName + ' falls into the chasm!');
+            M.kill(c, c.lastAttacker && !c.lastAttacker.dead && M.tick - (c.lastHitTick || -999) < 40 ? c.lastAttacker : null, 'fell');
+            break;
+          }
+          c.x = U.clamp(o.x + dx / d * min, 14, WORLD.w - 14);
+          c.y = U.clamp(o.y + dy / d * min, 14, WORLD.h - 14);
+        }
+      }
+    }
+    if (M.tick % 20 === 0) {
+      for (const z of M.zones) {
+        if (z.type !== 'oasis' && z.type !== 'glowmoss') continue;
+        for (const c of M.creatures) {
+          if (c.dead || c.hp >= c.maxHp || U.dist(c.x, c.y, z.x, z.y) >= z.r) continue;
+          c.hp = Math.min(c.maxHp, c.hp + c.maxHp * (z.type === 'oasis' ? 0.012 : 0.015) + 0.3);
+          if (M.tick % 60 === 0) M.addEffect('heal', c.x, c.y, {});
         }
       }
     }
@@ -1742,8 +2114,10 @@
               if (best) {
                 s.fireCd = 1.1;
                 for (let k = 0; k < (s.permManned || 1); k++) {
-                  const a = Math.atan2(best.y - s.y, best.x - s.x) + (k - (s.permManned - 1) / 2) * 0.05;
-                  M.projectiles.push({ x: s.x + (k - (s.permManned - 1) / 2) * 10, y: s.y - 20, vx: Math.cos(a) * 460, vy: Math.sin(a) * 460, team: s.team, dmg: (s.baseDmg || 8) * (s.powerMul || 1), type: 'arrow', life: rng / 460 + 0.06, source: null });
+                  /* aim from where the arrow actually leaves the battlements */
+                  const ox = s.x + (k - (s.permManned - 1) / 2) * 10, oy = s.y - 20;
+                  const a = Math.atan2(best.y - oy, best.x - ox) + (k - (s.permManned - 1) / 2) * 0.03;
+                  M.projectiles.push({ x: ox, y: oy, vx: Math.cos(a) * 460, vy: Math.sin(a) * 460, team: s.team, dmg: (s.baseDmg || 8) * (s.powerMul || 1), type: 'arrow', life: (rng + 30) / 460 + 0.06, source: null });
                 }
                 M.markTowerAggro(best, s);
               }
@@ -1761,8 +2135,8 @@
             }
             if (best) {
               s.fireCd = 1.3;
-              const a = Math.atan2(best.y - s.y, best.x - s.x);
-              M.projectiles.push({ x: s.x, y: s.y - 10, vx: Math.cos(a) * 440, vy: Math.sin(a) * 440, team: s.team, dmg: s.baseDmg || 5, type: 'arrow', life: (s.range || 50) / 440 + 0.05, source: null });
+              const a = Math.atan2(best.y - (s.y - 10), best.x - s.x);
+              M.projectiles.push({ x: s.x, y: s.y - 10, vx: Math.cos(a) * 440, vy: Math.sin(a) * 440, team: s.team, dmg: s.baseDmg || 5, type: 'arrow', life: ((s.range || 50) + 20) / 440 + 0.05, source: null });
               M.markTowerAggro(best, s);   // a fighting flyer may turn and attack the tower shooting it
             }
           }
@@ -1782,7 +2156,8 @@
          build-time (handled in the Builder behavior), not instantly */
       for (const c of M.creatures) {
         if (c.dead || !c.inHut || c.sp.behavior !== 'builder') continue;
-        if (c.mem.hutSincePulse != null && M.pulseIndex > c.mem.hutSincePulse && M.teams[c.team]) M.teams[c.team].upgradeUnlocked = true;
+        const ft = M.fortTeam(c.team);
+        if (c.mem.hutSincePulse != null && M.pulseIndex > c.mem.hutSincePulse && M.teams[ft]) M.teams[ft].upgradeUnlocked = true;
       }
       M.structures.forEach(s => { if (s.hp <= 0) M.freeOccupants(s); });
       M.structures = M.structures.filter(s => s.hp > 0);
@@ -1855,7 +2230,7 @@
               car.matchXp = (car.matchXp || 0) + 40;
               if (M.hostile(car.team, rl.ownerTeam)) {
                 /* captured a rival's relic — it's secured in your camp */
-                rl.captured = true; rl.capturedBy = car.team; rl.capturedBySide = car.side;
+                rl.captured = true; rl.capturedBy = car.team; rl.capturedBySide = car.side; rl.capturedAt = M.time;
                 rl.x = home.hoard.x; rl.y = home.hoard.y - 26;
                 M.teams[car.team].stats.relicCaptured = true;
                 M.teams[car.team].stats.relicMethod = 'Carried home by ' + car.tokName;
@@ -1983,6 +2358,21 @@
     const activeRelics = M.relics.filter(r => !r.disabled);
     const sidesWithRelics = [];
     activeRelics.forEach(r => { const s = M.sideOf(r.ownerTeam); if (sidesWithRelics.indexOf(s) < 0) sidesWithRelics.push(s); });
+    /* multi-team Brawl KNOCKOUTS: a side that has lost EVERY Relic it owns is
+       out — its creatures leave the field, its works crumble and its captor
+       plunders half its hoard. The last side still holding a Relic wins. With
+       two sides this is exactly "carry home all of the rival side's Relics";
+       with three or more it is what lets a free-for-all actually finish
+       instead of every rival having to be robbed by one player. */
+    if (M.teams.length > 2) {
+      for (const S of sidesWithRelics) {
+        if (M.sideOut(S)) continue;
+        const own = activeRelics.filter(r => M.sideOf(r.ownerTeam) === S);
+        if (own.length && own.every(r => r.captured)) M.knockOutSide(S, own.reduce((a, r) => (r.capturedAt || 0) >= (a.capturedAt || 0) ? r : a, own[0]).capturedBy);
+      }
+      const standing = sidesWithRelics.filter(S => !M.sideOut(S));
+      if (standing.length === 1) { M.finish(M.anyTeamOnSide(standing[0]), 'relic'); return; }
+    }
     for (const S of sidesWithRelics) {
       const rivalRelics = activeRelics.filter(r => M.sideOf(r.ownerTeam) !== S);
       if (rivalRelics.length && rivalRelics.every(r => r.captured && r.capturedBySide === S)) {
@@ -1997,19 +2387,13 @@
       const sidesIn = M.sidesInPlay();
       if (sidesIn.length === 1) { M.finish(M.anyTeamOnSide(sidesIn[0]), 'elimination'); return; }
       if (sidesIn.length === 0) { M.finish(-1, 'draw'); return; }
-      /* "collect ALL the relics" can leave a defensive field in a long
-         standoff, so a Brawl is called on time: after the cap the side that
-         has captured the most rival relics (health remaining breaks a tie)
-         takes it — no Brawl runs forever. */
+      /* a defensive field can still dig in, so a Brawl is called on time:
+         after the cap the leading side (most rival relics captured, then its
+         own relics still held, then health on the field) takes it — no Brawl
+         runs forever. */
       const cap = M.settings.brawlCap || 900;   // 15 minutes
       if (M.time > cap) {
-        const score = (S) => {
-          const caps = M.relics.filter(r => !r.disabled && r.captured && r.capturedBySide === S).length;
-          const hp = M.creatures.filter(c => !c.dead && c.side === S).reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0);
-          return caps * 1000 + hp;
-        };
-        let best = sidesIn[0], bs = -1;
-        sidesIn.forEach(S => { const v = score(S); if (v > bs) { bs = v; best = S; } });
+        const best = M.leadingSide(sidesIn);
         M.finish(M.anyTeamOnSide(best), 'time');
         return;
       }
@@ -2072,7 +2456,7 @@
   Match.prototype.sidesInPlay = function () {
     const M = this, sides = [];
     M.teams.forEach((T, i) => {
-      if (T.controller === 'wild') return;
+      if (T.controller === 'wild' || T.out) return;
       const alive = M.creatures.some(c => !c.dead && c.team === i && !c.sp.tags.includes('passive'));
       const left = T.pouch.some(e => e.state === 'pouch') || T.readied.length > 0;
       if ((alive || left) && sides.indexOf(T.side) < 0) sides.push(T.side);
@@ -2080,14 +2464,65 @@
     return sides;
   };
   Match.prototype.anyTeamOnSide = function (side) {
-    const M = this, T = M.teams.find(t => t.side === side);
+    const M = this, T = M.teams.find(t => t.side === side && !t.out) || M.teams.find(t => t.side === side);
     return T ? T.idx : 0;
+  };
+  /* --- Brawl knockouts --- */
+  Match.prototype.sideOut = function (side) { return !!(this.knockedOut && this.knockedOut[side]); };
+  /* the side ahead on the brawl table: rival relics captured, then its own
+     relics still held, then fighting strength left on the field */
+  Match.prototype.leadingSide = function (sides) {
+    const M = this;
+    sides = sides || M.sidesInPlay();
+    const score = (S) => {
+      const caps = M.relics.filter(r => !r.disabled && r.captured && r.capturedBySide === S && M.sideOf(r.ownerTeam) !== S).length;
+      const held = M.relics.filter(r => !r.disabled && !r.captured && M.sideOf(r.ownerTeam) === S).length;
+      const hp = M.creatures.filter(c => !c.dead && c.side === S).reduce((s2, c) => s2 + c.hp / Math.max(1, c.maxHp), 0);
+      return caps * 1000 + held * 100 + Math.min(99, hp);
+    };
+    let best = sides[0], bs = -1;
+    sides.forEach(S => { const v = score(S); if (v > bs) { bs = v; best = S; } });
+    return best;
+  };
+  Match.prototype.knockOutSide = function (side, byTeam) {
+    const M = this;
+    M.knockedOut = M.knockedOut || {};
+    if (M.knockedOut[side]) return;
+    M.knockedOut[side] = { at: M.time, by: byTeam != null ? byTeam : null };
+    const captor = byTeam != null && M.teams[byTeam] && !M.teams[byTeam].out ? M.teams[byTeam] : null;
+    M.teams.forEach((T, i) => {
+      if (T.side !== side || T.controller === 'wild') return;
+      T.out = true;
+      /* plunder: the captor carries off half of the fallen hoard */
+      ELS.forEach(e => { const half = Math.floor(T.resources[e] / 2); if (captor) captor.resources[e] += half; T.resources[e] = 0; });
+      T.readied.forEach(en => { en.state = 'out'; });
+      T.readied = [];
+      T.pouch.forEach(en => { if (en.state === 'pouch' || en.state === 'readied') en.state = 'out'; });
+      /* its creatures leave the field (no feeding, XP or pouch return) */
+      for (const c of M.creatures) {
+        if (c.dead || c.team !== i) continue;
+        M.addEffect('teleport', c.x, c.y, {});
+        M.kill(c, null, 'knockout');
+      }
+      M.pendingSpawns = M.pendingSpawns.filter(p => p.team !== i);
+      /* and its works crumble */
+      for (const s2 of M.structures) if (s2.team === i && s2.hp > 0) { s2.hp = 0; M.freeOccupants(s2); }
+      M.uiEvent(i, 'knockout', 'Your last Relic is gone — you are knocked out of the brawl.');
+    });
+    const names = M.teams.filter(T => T.side === side).map(T => T.name).join(' & ');
+    M.uiEvent(-1, 'event', '☠ ' + names + (M.teams.filter(T => T.side === side).length > 1 ? ' are' : ' is') + ' knocked out' + (captor ? ' — ' + captor.name + ' plunders the hoard!' : '!'));
   };
   /* a player leaves the match: their whole side forfeits. Credit the win to the
      strongest surviving rival side (its representative team). */
   Match.prototype.concede = function (team) {
     const M = this, mySide = M.sideOf(team);
     let bestSide = null, bf = -1;
+    /* in a multi-team Brawl the win goes to the side leading the table among
+       those still in it (a knocked-out side can't inherit a win) */
+    if (M.teams.length > 2) {
+      const rivals = M.sidesInPlay().filter(S => S !== mySide);
+      if (rivals.length) { M.finish(M.anyTeamOnSide(M.leadingSide(rivals)), 'concede'); return; }
+    }
     M.teams.forEach((T, i) => {
       if (T.side === mySide) return;
       const f = M.creatures.filter(c => !c.dead && c.team === i).reduce((s, c) => s + c.hp / Math.max(1, c.maxHp), 0.001);
@@ -2143,6 +2578,12 @@
       const p = nearest(z.x, z.y);
       if (U.dist(p.x, p.y, z.x, z.y) < z.r * 0.85) return true;
     }
+    /* rock outcrops, pillars and spires are solid cover */
+    for (const o of this.obstacles || []) {
+      if (!o.blocksSight) continue;
+      const p = nearest(o.x, o.y);
+      if (U.dist(p.x, p.y, o.x, o.y) < o.r * 0.9) return true;
+    }
     /* enemy walls give cover — a shot is blocked if it crosses one (own walls
        never block your own shooters) */
     if (team != null && this.structures) {
@@ -2189,7 +2630,17 @@
       enemyHoard: (team) => M.nearestFoeHoard(team) || M.teams[0].hoard,
       teamRes: (team) => M.teams[team].resources,
       structuresOf: (team, type) => M.structures.filter(s => s.team === team && (!type || s.type === type) && s.hp > 0),
-      rolesInProgress: (team) => M.creatures.filter(o => !o.dead && o.team === team && o.mem.building && o.mem.building.bp).map(o => o.mem.building.bp.role),
+      /* works any ALLY may use (garrison a tower, shelter in a hut) */
+      alliedStructures: (team, type) => M.structures.filter(s => s.hp > 0 && M.allied(s.team, team) && (!type || s.type === type)),
+      /* the camp whose works a team's builders raise (a shared camp builds one fort) */
+      fortTeam: (team) => M.fortTeam(team),
+      /* the nearest standing structure of a HOSTILE side (siege target) */
+      nearestFoeStructure: (c) => {
+        let best = null, bd = 1e9;
+        for (const s of M.structures) { if (s.hp <= 0 || !M.hostile(c.team, s.team)) continue; const d = U.dist(c.x, c.y, s.x, s.y); if (d < bd) { bd = d; best = s; } }
+        return best;
+      },
+      rolesInProgress: (team) => M.creatures.filter(o => !o.dead && M.fortTeam(o.team) === M.fortTeam(team) && o.mem.building && o.mem.building.bp).map(o => o.mem.building.bp.role),
       storm: () => M.zikhron(),
       makariRemnants: () => M.remnants,
       inBog: (c) => M.zones.some(z => z.type === 'bog' && M.hostile(c.team, z.team) && U.dist(c.x, c.y, z.x, z.y) < z.r),
@@ -2205,21 +2656,27 @@
       },
       offCooldown: (c, key) => !c.mem['cd_' + key] || c.mem['cd_' + key] <= M.tick,
 
+      /* `c` may be a bare point {x, y, team} (e.g. "who guards that relic?") —
+         its side is then read from its team, so allies are never miscounted
+         as enemies */
       enemiesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && !o.riding && !o.onTower && !o.inHut && o.side !== c.side && o.team !== -1 &&
+        const cs = c.side != null ? c.side : M.sideOf(c.team);
+        return M.creatures.filter(o => !o.dead && !o.riding && !o.onTower && !o.inHut && o.side !== cs && o.team !== -1 &&
           !(o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) &&
           U.dist(c.x, c.y, o.x, o.y) < range && !o.sp.tags.includes('inert'));
       },
       alliesNear(c, range) {
-        return M.creatures.filter(o => !o.dead && !o.riding && o !== c && o.side === c.side && U.dist(c.x, c.y, o.x, o.y) < range);
+        const cs = c.side != null ? c.side : M.sideOf(c.team);
+        return M.creatures.filter(o => !o.dead && !o.riding && o !== c && o.side === cs && U.dist(c.x, c.y, o.x, o.y) < range);
       },
       allCreaturesNear(c, range) {
         return M.creatures.filter(o => !o.dead && !o.riding && o !== c && U.dist(c.x, c.y, o.x, o.y) < range);
       },
       nearestEnemy(c, range, filter) {
         let best = null, bd = 1e9;
+        const cs = c.side != null ? c.side : M.sideOf(c.team);
         for (const o of M.creatures) {
-          if (o.dead || o.riding || o.onTower || o.inHut || o.side === c.side || o.team === -1) continue;
+          if (o.dead || o.riding || o.onTower || o.inHut || o.side === cs || o.team === -1) continue;
           if (o.sp && o.sp.tags.includes('inert')) continue;
           if (o.camoUntil > M.tick && U.dist(c.x, c.y, o.x, o.y) > 34) continue;
           if (filter && !filter(o)) continue;
@@ -2259,14 +2716,17 @@
       shellUp(c) { c.intent.state = 'dormant'; },
       posture(c, target) { c.intent.state = 'special'; c.facing = target.x >= c.x ? 1 : -1; },
       patrol(c, radius) {
-        if (!c.mem.patrolTarget || U.dist(c.x, c.y, c.mem.patrolTarget.x, c.mem.patrolTarget.y) < 12) {
-          c.mem.patrolTarget = { x: c.homeX + M.rng.range(-radius, radius), y: c.homeY + M.rng.range(-radius, radius) };
+        /* a target not reached in 8s (rock in the way, shoved about) is given up */
+        if (!c.mem.patrolTarget || U.dist(c.x, c.y, c.mem.patrolTarget.x, c.mem.patrolTarget.y) < 12 || M.tick - (c.mem.patrolAt || 0) > 160) {
+          c.mem.patrolAt = M.tick;
+          c.mem.patrolTarget = M.freeSpot(c.homeX + M.rng.range(-radius, radius), c.homeY + M.rng.range(-radius, radius), c.radius, c);
         }
         c.intent.move = { x: c.mem.patrolTarget.x, y: c.mem.patrolTarget.y, run: false };
       },
       forage(c) {
-        if (!c.mem.forageTarget || U.dist(c.x, c.y, c.mem.forageTarget.x, c.mem.forageTarget.y) < 14) {
-          c.mem.forageTarget = { x: U.clamp(c.x + M.rng.range(-160, 160), 90, WORLD.w - 90), y: U.clamp(c.y + M.rng.range(-160, 160), 90, WORLD.h - 90) };
+        if (!c.mem.forageTarget || U.dist(c.x, c.y, c.mem.forageTarget.x, c.mem.forageTarget.y) < 14 || M.tick - (c.mem.forageAt || 0) > 160) {
+          c.mem.forageAt = M.tick;
+          c.mem.forageTarget = M.freeSpot(U.clamp(c.x + M.rng.range(-160, 160), 90, WORLD.w - 90), U.clamp(c.y + M.rng.range(-160, 160), 90, WORLD.h - 90), c.radius, c);
         }
         c.intent.move = { x: c.mem.forageTarget.x, y: c.mem.forageTarget.y, run: false };
       },
@@ -2321,8 +2781,10 @@
         c.state = 'special';
         const holes = Math.round(c.vars.blowholes || 3);
         targets.slice(0, holes).forEach(t => {
-          const a = Math.atan2(t.y - c.y, t.x - c.x);
-          M.projectiles.push({ x: c.x, y: c.y - c.radius, x0: c.x, y0: c.y, vx: Math.cos(a) * 320, vy: Math.sin(a) * 320, team: c.team, dmg: c.vars.jetPotency || 6, type: 'jet', life: (c.vars.jetRange || 120) / 320, source: c });
+          /* the jet leaves the blowhole (above the body) — aim from there */
+          const oy = c.y - c.radius * 0.5;
+          const a = Math.atan2(t.y - oy, t.x - c.x);
+          M.projectiles.push({ x: c.x, y: oy, x0: c.x, y0: c.y, vx: Math.cos(a) * 320, vy: Math.sin(a) * 320, team: c.team, dmg: c.vars.jetPotency || 6, type: 'jet', life: ((c.vars.jetRange || 120) + c.radius) / 320, source: c });
         });
       },
       tongueStrike(c, target) {
@@ -2338,7 +2800,7 @@
         if (target.dmg > 18 && M.rng.chance(0.02)) { c.mem.tongueSevered = true; M.uiEvent(-1, 'event', c.tokName + '’s tongue is severed! Snap-only from here.'); }
       },
       shoot(c, target) {
-        if (c.attackCd > 0) return;
+        if (c.attackCd > 0) { c.intent.state = 'attack'; c.facing = target.x >= c.x ? 1 : -1; return; }   // nocking the next arrow
         if (M.losBlocked(c.x, c.y, target.x, target.y, c.team)) return; // forest & enemy walls block the shot (§15)
         /* garrisoned in a tower: damage scales with the tower’s range bands —
            2.5× within CLOSE range, 1.5× within FAR range (3× close), and a cone
@@ -2360,8 +2822,9 @@
             }
           }
         }
-        c.state = 'attack';
+        c.state = 'attack'; c.intent.state = 'attack';   // hold the draw pose across the decision window
         c.facing = target.x >= c.x ? 1 : -1;
+        c.mem.lastShotTick = M.tick;
         const inTower = !!c.onTower;
         c.attackCd = (1.6 / (c.vars.drawSpeed || 1)) * (inTower ? 0.82 : 1);   // slightly faster fire from a tower
         if (!inTower) c.quiver--;                                              // a garrisoned archer never runs dry
@@ -2370,16 +2833,20 @@
         const mv = target.intent && target.intent.move;
         const tx = target.x + (mv ? (mv.x - target.x) * leadK : 0);
         const ty = target.y + (mv ? (mv.y - target.y) * leadK : 0);
-        const a = Math.atan2(ty - c.y, tx - c.x);
+        /* aim from where the arrow is loosed (shoulder height), not the feet —
+           aiming from the feet made every level shot sail over its target */
+        const oy = c.y - c.radius * 0.5;
+        const a = Math.atan2(ty - oy, tx - c.x);
         const airBonus = (target.sp.tags.includes('flyer') || target.element === 'Su') ? 1.35 : 1;
-        M.projectiles.push({ x: c.x, y: c.y - c.radius, vx: Math.cos(a) * projSpeed, vy: Math.sin(a) * projSpeed, team: c.team, dmg: c.dmg * (c.vars.bowQuality || 1) * airBonus * towerMul, type: 'arrow', life: reach / projSpeed + 0.05, source: c });
+        M.projectiles.push({ x: c.x, y: oy, vx: Math.cos(a) * projSpeed, vy: Math.sin(a) * projSpeed, team: c.team, dmg: c.dmg * (c.vars.bowQuality || 1) * airBonus * towerMul, type: 'arrow', life: (reach + c.radius) / projSpeed + 0.05, source: c });
         if (inTower && target.sp.tags.includes('flyer')) { const tw = M.structures.find(s => s.id === c.onTower && s.hp > 0); if (tw) M.markTowerAggro(target, tw); }
       },
       throwHanii(c, target) {
         c.mem.cd_hanii = M.tick + Math.round(7 / TICK);
         c.state = 'special';
-        const a = Math.atan2(target.y - c.y, target.x - c.x);
-        M.projectiles.push({ x: c.x, y: c.y - c.radius, vx: Math.cos(a) * 360, vy: Math.sin(a) * 360, team: c.team, dmg: c.dmg * 1.6 * (c.vars.haniiAccuracy || 0.8), type: 'hanii', life: (c.vars.haniiRange || 100) / 360, source: c });
+        const oy = c.y - c.radius * 0.5;
+        const a = Math.atan2(target.y - oy, target.x - c.x);
+        M.projectiles.push({ x: c.x, y: oy, vx: Math.cos(a) * 360, vy: Math.sin(a) * 360, team: c.team, dmg: c.dmg * 1.6 * (c.vars.haniiAccuracy || 0.8), type: 'hanii', life: ((c.vars.haniiRange || 100) + c.radius) / 360, source: c });
       },
       dive(c, target) {
         c.intent.attackTarget = target; c.intent.rush = true; c.intent.dmgMul = c.vars.diveSpeed || 1.5;
@@ -2585,12 +3052,12 @@
            it.state persists it across the decision window) */
         c.state = 'attack'; c.intent.state = 'attack'; c.facing = tx >= c.x ? 1 : -1;
         /* extra builders on the same job speed it up */
-        const helpers = M.creatures.filter(o => !o.dead && o.team === c.team && o.mem.building && o.mem.building.bp && o.mem.building.bp.role === bp.role).length;
+        const helpers = M.creatures.filter(o => !o.dead && M.fortTeam(o.team) === M.fortTeam(c.team) && o.mem.building && o.mem.building.bp && o.mem.building.bp.role === bp.role).length;
         b.progress += (c.vars.buildSpeed || 1) * TICK * (1 + 0.6 * (helpers - 1));
         if (M.tick % 7 === 0) M.addEffect('buff', tx + M.rng.range(-8, 8), ty - 6, {});   // hammer sparks
         if (b.progress >= 1) {
           if (bp.kind === 'upgrade') { const st = M.structures.find(s => s.id === bp.targetId && s.hp > 0); if (st) M.upgradeOne(st); }
-          else if (!M.structures.some(s => s.team === c.team && s.role === bp.role && s.hp > 0)) M.raiseStructure(c, bp);
+          else if (!M.structures.some(s => s.team === (bp.kind === 'ward' ? c.team : M.fortTeam(c.team)) && s.role === bp.role && s.hp > 0)) M.raiseStructure(c, bp);
           c.mem.building = null;
         }
       },

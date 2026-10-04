@@ -182,16 +182,28 @@
   };
 
   /* ---------- Terrain sets (Part XV) ---------- */
+  /* Each terrain set plays differently, not just looks different. `rules` is
+     the one-line field guide shown before and at the start of a match; the
+     match engine (engine/match.js → genTerrain) lays out the real features. */
   L.TERRAIN_SETS = [
-    { id: 'plains', name: 'Plains Variant', tier: 'Local', basic: true, ground: '#7a8a52', accent: '#93a463', water: false, features: ['grass', 'rocks'] },
-    { id: 'forest', name: 'Forest Variant', tier: 'Local', basic: true, ground: '#4e6b3c', accent: '#3c5530', water: false, features: ['trees', 'grass'] },
-    { id: 'mountain', name: 'Mountain Variant', tier: 'Local', basic: true, ground: '#6d675e', accent: '#57524a', water: false, features: ['rocks', 'cliffs'] },
-    { id: 'desert', name: 'Desert Variant', tier: 'Local', basic: true, ground: '#c2a76b', accent: '#ab9159', water: false, features: ['dunes', 'rocks'] },
-    { id: 'ocean', name: 'Coastal Shallows', tier: 'Regional', basic: true, ground: '#5c8a7a', accent: '#3b9ae1', water: true, features: ['water', 'rocks'] },
-    { id: 'eldi_aagac', name: 'Eldi Aagac Forest', tier: 'Regional', named: true, ground: '#5e4238', accent: '#b3502c', water: false, features: ['firetrees', 'embers'], blurb: 'A patch of massive fireproof fire trees. Owned by a wealthy house; available on request.' },
-    { id: 'elsharyn', name: 'Elsha’ryn Forest', tier: 'Half Planet', named: true, ground: '#39544d', accent: '#68e0c8', water: false, features: ['trees', 'glowmoss'], blurb: 'The sacred luminous forest. Half Planet circuits and above.' },
-    { id: 'arpeggio', name: '6 Tribes Arpeggio', tier: 'Whole Planet', named: true, ground: '#8a7a5c', accent: '#c9b487', water: false, features: ['pillars', 'banners'], blurb: 'Massive scale, traditionally large beast matches. Named for the Mar Esik hunt of the six tribes.' },
-    { id: 'spire_cliffs', name: 'Spire Cliffs, Leotik', tier: 'Interplanetary', named: true, ground: '#55504f', accent: '#7d6a8a', water: false, features: ['cliffs', 'spires'], blurb: 'Guild-owned. Crowd favorite. Do not look down.' },
+    { id: 'plains', name: 'Plains Variant', tier: 'Local', basic: true, ground: '#7a8a52', accent: '#93a463', water: false, features: ['grass', 'rocks'],
+      rules: 'Open ground — no cover, nothing in the way. Pure token against token.' },
+    { id: 'forest', name: 'Forest Variant', tier: 'Local', basic: true, ground: '#4e6b3c', accent: '#3c5530', water: false, features: ['trees', 'grass'],
+      rules: 'Groves block arrows and breath sightlines, and their trunks slow anything huge. Forest-reared creatures fight harder inside.' },
+    { id: 'mountain', name: 'Mountain Variant', tier: 'Local', basic: true, ground: '#6d675e', accent: '#57524a', water: false, features: ['rocks', 'cliffs'],
+      rules: 'Rock outcrops wall off the field into lanes — impassable on foot and solid cover. Flyers soar over them.' },
+    { id: 'desert', name: 'Desert Variant', tier: 'Local', basic: true, ground: '#c2a76b', accent: '#ab9159', water: false, features: ['dunes', 'rocks'],
+      rules: 'Deep sand drifts drag at every walker. A single oasis mid-field slowly heals whoever holds it.' },
+    { id: 'ocean', name: 'Coastal Shallows', tier: 'Regional', basic: true, ground: '#5c8a7a', accent: '#3b9ae1', water: true, features: ['water', 'rocks'],
+      rules: 'A tidal channel splits the field — cross at the fords or wade slowly. Su creatures swim it fast.' },
+    { id: 'eldi_aagac', name: 'Eldi Aagac Forest', tier: 'Regional', named: true, ground: '#5e4238', accent: '#b3502c', water: false, features: ['firetrees', 'embers'], blurb: 'A patch of massive fireproof fire trees. Owned by a wealthy house; available on request.',
+      rules: 'Fire-tree groves block sight — and every pulse they drop burning embers around themselves.' },
+    { id: 'elsharyn', name: 'Elsha’ryn Forest', tier: 'Half Planet', named: true, ground: '#39544d', accent: '#68e0c8', water: false, features: ['trees', 'glowmoss'], blurb: 'The sacred luminous forest. Half Planet circuits and above.',
+      rules: 'Luminous groves block sight; glowmoss beds between them mend any creature resting on them.' },
+    { id: 'arpeggio', name: '6 Tribes Arpeggio', tier: 'Whole Planet', named: true, ground: '#8a7a5c', accent: '#c9b487', water: false, features: ['pillars', 'banners'], blurb: 'Massive scale, traditionally large beast matches. Named for the Mar Esik hunt of the six tribes.',
+      rules: 'A great ring of standing pillars: solid cover to shoot around and fight between.' },
+    { id: 'spire_cliffs', name: 'Spire Cliffs, Leotik', tier: 'Interplanetary', named: true, ground: '#55504f', accent: '#7d6a8a', water: false, features: ['cliffs', 'spires'], blurb: 'Guild-owned. Crowd favorite. Do not look down.',
+      rules: 'Chasms gape between the spires. Walkers go around them — but anything knocked or thrown in falls. Do not look down.' },
   ];
 
   /* ---------- Arenas (visual venues per circuit) ---------- */

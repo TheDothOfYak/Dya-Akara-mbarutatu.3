@@ -329,6 +329,10 @@
     if (smalls.length && api.offCooldown(c, 'jet')) { api.jetBlast(c, smalls); return; }
     const big = api.nearestEnemy(c, 180, o => o.sizeIdx >= 2);
     if (big) { api.attack(c, big); return; } // tail club
+    // jets recharging: anything small that has come right up to it gets the
+    // tail club too (it used to sit on top of small prey doing nothing)
+    const underfoot = api.nearestEnemy(c, c.attackRange + c.radius + 16);
+    if (underfoot) { api.attack(c, underfoot); return; }
     const pod = api.alliesNear(c, 400).filter(o => o.speciesId === 'hvaleia');
     const anyPrey = api.nearestEnemy(c, 420);
     if (anyPrey) {
@@ -527,6 +531,25 @@
 
   /* ================= SENTIENT UNITS ================= */
 
+  /* Every sentient unit can carry a Relic ("Mikolo Moko and your sentient
+     units carry it"). Support units — archers, chemists — don't hunt for it
+     the way a swordsman does; they take it when the chance is plainly there:
+     it lies close with nobody hostile on it, or the escalation era has begun
+     and it's within a run. Returns true when it took over the decision. */
+  function relicErrand(c, api) {
+    if (c.riding || c.onTower || c.inHut) return false;
+    const own = api.ownHoard(c.team);
+    if (c.carryingRelic) { api.moveToward(c, own.x, own.y, false); return true; }
+    const relic = api.relic(c.team);
+    if (!relic || relic.carrier != null || relic.captured || relic.disabled) return false;
+    const d = api.dist(c, relic);
+    if (d < 24 + c.radius) { api.pickRelic(c); if (c.carryingRelic) { api.moveToward(c, own.x, own.y, false); return true; } }
+    const guarded = api.enemiesNear({ x: relic.x, y: relic.y, team: c.team }, 140).length > 0;
+    if (guarded || c.hp < c.maxHp * 0.4) return false;
+    if (d < 240 || (api.time > 480 && d < 620)) { api.moveToward(c, relic.x, relic.y, true); return true; }
+    return false;
+  }
+
   function sentientCommon(c, api) {
     // relic-carrying: run the stolen enemy relic home
     const relic = api.relic(c.team);
@@ -618,18 +641,19 @@
   };
 
   B.archer_unit = function (c, api) {
+    if (relicErrand(c, api)) return;
     // relocate to a friendly MANNED tower with a free garrison slot (a mounted
     // archer rides its mount and shoots from the saddle instead). Once inside a
     // tower an archer never climbs down — it holds and fires from the works.
     if (!c.riding && !c.onTower) {
-      const tower = api.structuresOf(c.team)
+      const tower = api.alliedStructures(c.team)
         .filter(s => (s.kind === 'tower' || s.kind === 'cone') && (s.occupants ? s.occupants.length : 0) < (s.capacity || 1))
         .sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
       if (tower) { if (api.dist(c, tower) < 22) api.mountTower(c, tower); else api.moveToward(c, tower.x, tower.y, false); return; }
     }
     // effective firing range: from a tower it is the tower's FAR band (3× close)
     let range = c.attackRange;
-    if (c.onTower) { const tw = api.structuresOf(c.team).find(s => s.id === c.onTower); if (tw) range = tw.coneRange || tw.far || range; }
+    if (c.onTower) { const tw = api.alliedStructures(c.team).find(s => s.id === c.onTower); if (tw) range = tw.coneRange || tw.far || range; }
     // GARRISONED: never stop shooting while anything is in range, and always
     // pick the BIGGEST threat (size × damage; relic thieves and air/Su first)
     if (c.onTower) {
@@ -653,12 +677,26 @@
     // prioritize flyers and Su creatures
     let target = api.nearestEnemy(c, range, o => (o.sp.tags.includes('flyer') || o.element === 'Su') && !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
     if (!target) target = api.nearestEnemy(c, range, o => !api.losBlocked(c.x, c.y, o.x, o.y, c.team));
-    if (target) {
-      if (c.quiver <= 0) { api.hold(c); return; } // out of arrows (Karnen refills)
-      api.shoot(c, target);
+    if (target && c.quiver > 0) { api.shoot(c, target); return; }
+    // out of arrows: it re-fletches over time (a Karnen refills it at once).
+    // Until then it draws its knife on anything that closes, or falls back
+    // toward its own lines rather than standing in the open.
+    if (c.quiver <= 0) {
+      const brawl = api.nearestEnemy(c, 90);
+      if (brawl) { api.attack(c, brawl); return; }
+      const own = api.ownHoard(c.team);
+      if (api.dist(c, own) > 160) { api.moveToward(c, own.x, own.y, false); return; }
+      api.guard(c); return;
+    }
+    // a foe just beyond bowshot: step up into range (never closer than ~85%
+    // of it) instead of standing idle while the field is fought without it
+    const nearFoe = api.nearestEnemy(c, range + 140);
+    if (nearFoe) {
+      const d = api.dist(c, nearFoe);
+      const k = Math.max(0, (d - range * 0.85) / Math.max(1, d));
+      api.moveToward(c, c.x + (nearFoe.x - c.x) * k, c.y + (nearFoe.y - c.y) * k, false);
       return;
     }
-    if (c.onTower) { api.hold(c); return; }   // garrisoned with nothing in range — hold the tower
     // tactical positioning (§8): stand behind the nearest allied frontliner
     const tank = api.alliesNear(c, 400).filter(a => a.dmg > 6 && !a.rooted && !a.sp.tags.includes('passive'))
       .sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
@@ -690,6 +728,7 @@
       api.hold(c); return;
     }
     if (fleeThreats(c, api, 70)) return; // never engage; reposition to safe range
+    if (relicErrand(c, api)) return;     // an unguarded Relic within reach — carry it home
     // critically injured ally → heal (first priority when urgent)
     const hurt = api.alliesNear(c, c.vars.seekRange).filter(a => a !== c && a.hp < a.maxHp * 0.55).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
     if (hurt && api.offCooldown(c, 'heal')) {
@@ -732,7 +771,8 @@
      down tools entirely during the Sunear'Zikhron. */
   B.builder = function (c, api) {
     const own = api.ownHoard(c.team);
-    const S = () => api.structuresOf(c.team);
+    const ft = api.fortTeam(c.team);              // a shared camp raises ONE fort together
+    const S = () => api.structuresOf(ft);
     const hutOf = () => S().find(s => s.isHut);
     const safe = (s) => api.enemiesNear({ x: s.x, y: s.y, team: c.team }, 80).length === 0;
 
@@ -757,9 +797,9 @@
     const unbuilt = bps.filter(bp => !built.has(bp.role));
     const damaged = S().filter(s => !s.isHut && s.hp < s.maxHp * 0.85 && safe(s)).sort((a, b) => api.dist(c, a) - api.dist(c, b))[0];
     const upTarget = () => {
-      if (!api.upgradeReady(c.team)) return null;
+      if (!api.upgradeReady(ft)) return null;
       const claimed = api.rolesInProgress(c.team);
-      return api.pendingUpgrades(c.team).filter(s => claimed.indexOf('up:' + s.role) < 0).sort((a, b) => api.dist(c, a) - api.dist(c, b))[0] || null;
+      return api.pendingUpgrades(ft).filter(s => claimed.indexOf('up:' + s.role) < 0).sort((a, b) => api.dist(c, a) - api.dist(c, b))[0] || null;
     };
 
     // sheltering in the Hut: only step out when there's real work to do
@@ -797,8 +837,8 @@
     const hut = hutOf();
     if (hut) { if (api.dist(c, hut) > 30) { api.moveToward(c, hut.x, hut.y, true); return; } api.enterHut(c, hut); return; }
 
-    // 5) siege enemy fortifications, or hold near ours
-    const enemyStruct = api.structuresOf(1 - c.team)[0];
+    // 5) siege enemy fortifications (the nearest hostile works, any rival), or hold near ours
+    const enemyStruct = api.nearestFoeStructure(c);
     if (enemyStruct && c.picks.siegeProficiency) {
       if (api.dist(c, enemyStruct) > 60) { api.moveToward(c, enemyStruct.x, enemyStruct.y, false); return; }
       api.demolish(c, enemyStruct); return;
