@@ -22,6 +22,7 @@ while the live game on `main` stays exactly as it is.
 
 ## Controls
 Right-drag to orbit · mouse wheel to zoom · middle-drag (or shift + right-drag) to pan · Q / E to rotate.
+🎬 Action cam follows the fighting (on by default when you're spectating). Double-click a creature to follow it; double-click empty ground to stop.
 On touch: two-finger pinch and twist. The camera panel on the left has rotate,
 zoom, reset, bird's-eye and a **2D** switch. In 2D a **3D** button switches back.
 `?2d=1` or `?3d=1` on the URL forces either view.

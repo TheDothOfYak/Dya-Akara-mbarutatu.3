@@ -160,6 +160,9 @@
       e.castShadow = false;
       const p = mesh(parent, SPH_LO(), dark, size * 0.55, size * (opts.slit ? 0.75 : 0.55), size * (opts.slit ? 0.22 : 0.55), x + size * 0.62, y, z * s);
       p.castShadow = false;
+      /* a catch-light so the eyes read as alive */
+      const hl = mesh(parent, SPH_LO(), kit.hiMat || (kit.hiMat = kit.mat('#ffffff', { emissive: '#ffffff', ei: 0.9, rough: 0.1 })), size * 0.16, size * 0.16, size * 0.16, x + size * 0.95, y + size * 0.25, z * s + size * 0.15 * (s || 1));
+      hl.castShadow = false;
     }
   }
   function shadeHex(hex, amt) { return DYA.sprites.shade(hex, amt); }
@@ -316,8 +319,9 @@
           neck.rotation.y = -fan;
           const segs = [];
           let prev = neck;
-          for (let k = 0; k < 4; k++) {
-            const s = group(prev, k === 0 ? 0 : 0.32, 0, 0);
+          const nSeg = n > 3 ? 5 : 4, segLen = 0.3 + (i % 2) * 0.06;
+          for (let k = 0; k < nSeg; k++) {
+            const s = group(prev, k === 0 ? 0 : segLen, 0, 0);
             const m = mesh(s, SPH(), skin, 0.24 - k * 0.015, 0.22 - k * 0.015, 0.22 - k * 0.015, 0.16, 0, 0);
             m.scale.x = 0.3;
             s.rotation.z = k === 0 ? 0.75 : -0.12;
@@ -326,7 +330,7 @@
           const hd = makeHead(prev, 0.32, {});
           hd.position.x = 0.42; hd.rotation.z = -0.35;
           if (i === 0 && n > 1) hd.scale.setScalar(1.18);  // the first head — near-invincible, and bigger
-          parts.heads.push({ neck, segs, head: hd, fan });
+          parts.heads.push({ neck, segs, head: hd, fan, lift: (i % 2 ? 0.22 : 0) - Math.abs(n === 1 ? 0 : i / (n - 1) - 0.5) * 0.3 });
         }
       } else {
         const neck = group(torso, bw * 0.82, bh * (low ? 0.2 : 0.45), 0);
@@ -430,7 +434,7 @@
       torso.position.x = st.attack * 0.25;
       parts.legs.forEach((l, i) => { l.rotation.z = Math.sin(ph + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.6 * mv; });
       parts.heads.forEach((h, i) => {
-        h.neck.rotation.z = Math.sin(t * 1.6 + i * 1.3) * 0.08 + st.attack * -0.35;
+        h.neck.rotation.z = (h.lift || 0) + Math.sin(t * 1.6 + i * 1.3) * 0.08 + st.attack * -0.35;
         h.neck.rotation.y = -h.fan + Math.sin(t * 1.1 + i * 2.1) * 0.12;
         h.segs.forEach((s, k) => { if (k) s.rotation.z = -0.12 + Math.sin(t * 2 + i + k) * 0.06 - st.attack * 0.1; });
         const jaw = h.head.userData.jaw;
@@ -636,7 +640,7 @@
   function buildFlame(sp, kit) {
     const root = group(null);
     const core = group(root, 0, 0.9, 0);
-    const outer = kit.mat(sp.color, { emissive: sp.color, ei: 0.75, glow: true, rough: 1 });
+    const outer = kit.mat('#ff5a1a', { emissive: '#e8401a', ei: 0.7, glow: true, rough: 1 });
     const inner = kit.mat(sp.color2, { emissive: sp.color2, ei: 0.9, glow: true, rough: 1 });
     const tongues = [];
     for (let i = 0; i < 7; i++) {
@@ -784,11 +788,66 @@
   }
 
   /* ---------- HVALEIA (the many-eyed sky-whale) ---------- */
-  function buildHvaleia(sp, kit, st0) {
-    const s2 = Object.assign({}, sp, { features: Object.assign({}, sp.features, { hover: true }) });
-    const q = buildQuad(s2, kit, st0);
-    q.root.scale.set(1.25, 1, 1);
-    return q;
+  function buildHvaleia(sp, kit) {
+    /* the many-eyed hunter of the open water and the air above it: a long
+       whale body, a row of blowholes, broad wing-fins, a clubbed fluke and
+       the soft pale underside beneath its ridge (its only weakness) */
+    const root = group(null);
+    const col = sp.color, col2 = sp.color2;
+    const skin = kit.mat(col, { rough: 0.45 });
+    const belly = kit.mat('#d8d2c0', { rough: 0.6 });
+    const dark = kit.mat(col2);
+    const body = group(root, 0, 1.15, 0);
+    mesh(body, SPH(), skin, 1.55, 0.62, 0.72);
+    mesh(body, SPH(), belly, 1.35, 0.42, 0.6, 0.05, -0.24, 0).castShadow = false;
+    /* head bulge with a wide mouth line */
+    mesh(body, SPH(), skin, 0.75, 0.55, 0.62, 1.05, 0.02, 0);
+    mesh(body, BOX(), kit.mat('#16222c'), 0.7, 0.03, 0.9, 1.2, -0.2, 0).castShadow = false;
+    /* many eyes: 360° vision */
+    for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) {
+      const e = group(body, 1.35 - i * 0.28, 0.12 + (i % 2) * 0.1, sd * (0.48 + i * 0.05));
+      mesh(e, SPH_LO(), kit.mat('#f0ead8', { rough: 0.2 }), 0.09, 0.09, 0.09).castShadow = false;
+      mesh(e, SPH_LO(), kit.mat('#101820', { emissive: '#3a6a8a', ei: 0.5 }), 0.055, 0.055, 0.055, 0.03, 0, sd * 0.05).castShadow = false;
+    }
+    /* dorsal ridge and blowholes */
+    for (let i = -3; i <= 3; i++) { const r = mesh(body, CONE(), dark, 0.07, 0.25 - Math.abs(i) * 0.025, 0.05, -i * 0.3, 0.55 - Math.abs(i) * 0.03, 0); r.rotation.z = 0.35; }
+    const holes = [];
+    for (let i = 0; i < 4; i++) { mesh(body, CYL(), kit.mat('#0b141b'), 0.06, 0.06, 0.06, 0.65 - i * 0.22, 0.6, (i % 2 ? 0.12 : -0.12)).castShadow = false; holes.push([0.65 - i * 0.22, (i % 2 ? 0.12 : -0.12)]); }
+    /* jet spray: little spheres rising from the blowholes */
+    const sprayM = kit.mat('#d8f0ff', { emissive: '#7ec8ff', ei: 0.4, rough: 0.1 });
+    sprayM.userData.baseOpacity = 0.8;
+    const spray = [];
+    for (let i = 0; i < 10; i++) { const d = mesh(body, SPH_LO(), sprayM, 0.06, 0.06, 0.06); d.castShadow = false; spray.push(d); }
+    /* broad wing-fins */
+    const fm = kit.mat(shadeHex(col, -15), { side: THREE.DoubleSide, rough: 0.55 });
+    const fins = [];
+    for (const sd of [-1, 1]) { const f = group(body, 0.35, -0.15, sd * 0.6); mesh(f, wingGeo('fin'), fm, 1.3, 1, 1.5 * sd); fins.push({ g: f, s: sd }); }
+    /* tail: three segments, a horizontal fluke and the club */
+    const tail = [];
+    let prev = group(body, -1.4, 0, 0);
+    for (let k = 0; k < 3; k++) { const sg = group(prev, k ? -0.42 : 0, 0, 0); mesh(sg, SPH(), skin, 0.36, 0.32 - k * 0.07, 0.36 - k * 0.07, -0.2, 0, 0); tail.push(sg); prev = sg; }
+    const fluke = group(prev, -0.5, 0, 0);
+    for (const sd of [-1, 1]) mesh(fluke, wingGeo('fin'), fm, 0.7, 1, 0.8 * sd).rotation.y = Math.PI / 2 * 0;
+    mesh(fluke, rockGeo(2), kit.mat(shadeHex(col, -35), { flat: true }), 0.3, 0.26, 0.3, -0.15, 0, 0);
+    function anim(st) {
+      const t = st.t, mv = st.speed;
+      body.position.y = 1.15 + Math.sin(t * 1.4) * 0.12;
+      body.rotation.z = Math.sin(t * 1.4 + 0.6) * 0.05 - mv * 0.05;
+      body.position.x = st.attack * 0.2;
+      fins.forEach(f => { f.g.rotation.x = f.s * (Math.sin(t * (2.2 + mv * 2)) * 0.45 + 0.1); });
+      tail.forEach((sg, k) => { sg.rotation.z = Math.sin(t * (2 + mv * 2) - k * 0.8) * 0.18; });
+      if (st.state === 'attack') tail.forEach((sg, k) => { sg.rotation.y = Math.sin(t * 9 - k) * 0.35; });
+      else tail.forEach(sg => { sg.rotation.y *= 0.9; });
+      const jetting = st.state === 'special' || st.attack > 0.5;
+      spray.forEach((d, i) => {
+        const h = holes[i % holes.length];
+        const ph = (t * 1.6 + i * 0.37) % 1;
+        d.visible = jetting || (Math.sin(t * 0.5) > 0.92);
+        d.position.set(h[0] + ph * 0.25, 0.62 + ph * (jetting ? 1.4 : 0.6), h[1] + Math.sin(i * 2.1) * ph * 0.25);
+        d.scale.setScalar(0.07 * (1 - ph) + 0.02);
+      });
+    }
+    return { root, anim, height: 1.9 };
   }
 
   /* ---------- LUTUT (apex aerial predator, carved stone pattern) ---------- */

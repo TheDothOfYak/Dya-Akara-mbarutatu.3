@@ -129,7 +129,12 @@
     R.scene = new THREE.Scene();
     R.camera = new THREE.PerspectiveCamera(34, 1, 10, 16000);
     const W = match.world.w, H = match.world.h;
-    R.cam = { yaw: 0, pitch: 0.92, zoom: 1, tx: W / 2, tz: H / 2 + 20, fit: 1800, fitKey: '' };
+    R.cam = { yaw: 0, pitch: 0.92, zoom: 1, tx: W / 2, tz: H / 2 + 20, fit: 1800, fitKey: '', mode: 'free', followId: null };
+    /* nobody human on the field (spectating / AI vs AI) → the action cam starts on */
+    R.defaultMode = match.teams.every(T => T.controller !== 'human') ? 'action' : 'free';
+    R.cam.mode = R.defaultMode;
+    R.nums = []; R.bursts = []; R.cheer = 0;
+    R.perf = { acc: 0, n: 0, stage: 0 };
     R.objs = { creatures: new Map(), structures: new Map(), zones: new Map(), relics: new Map(), pickups: new Map(), orbs: new Map(), proj: new Map(), fx: new Map(), remnants: new Map() };
     R.ray = new THREE.Raycaster();
     R.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -152,18 +157,31 @@
     /* sky dome: a vertical gradient */
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false,
-      uniforms: { top: { value: col(sky.top) }, mid: { value: col(sky.horizon) }, bot: { value: col(sky.bottom) }, zik: { value: 0 } },
+      uniforms: { top: { value: col(sky.top) }, mid: { value: col(sky.horizon) }, bot: { value: col(sky.bottom) }, zik: { value: 0 }, gain: { value: 1 } },
       vertexShader: 'varying vec3 vP; void main(){ vP = (modelMatrix * vec4(position,1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 bot; uniform float zik; varying vec3 vP; void main(){ float h = normalize(vP - cameraPosition).y; vec3 c = h > 0.0 ? mix(mid, top, pow(h, 0.55)) : mix(mid, bot, pow(-h, 0.4)); c = mix(c, vec3(0.32,0.82,0.86), zik * 0.35 * (1.0 - abs(h))); gl_FragColor = vec4(c, 1.0); }',
+      fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 bot; uniform float zik; uniform float gain; varying vec3 vP; void main(){ float h = normalize(vP - cameraPosition).y; vec3 c = h > 0.0 ? mix(mid, top, pow(h, 0.55)) : mix(mid, bot, pow(-h, 0.4)); c = mix(c, vec3(0.32,0.82,0.86), zik * 0.35 * (1.0 - abs(h))); gl_FragColor = vec4(c * gain, 1.0); }',
     });
     R.skyMat = skyMat;
     const dome = new THREE.Mesh(new THREE.SphereGeometry(12000, 32, 16), skyMat);
     dome.position.set(W / 2, 0, H / 2);
     S.add(dome);
     S.fog = new THREE.Fog(col(sky.horizon), 4200, 11000);
+    /* image-based light: the sky dome baked into an environment map, so
+       every surface picks up soft sky colour and a little sheen */
+    try {
+      const pm = new THREE.PMREMGenerator(R.gl);
+      const envScene = new THREE.Scene();
+      envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), skyMat));
+      envScene.add(new THREE.Mesh(new THREE.CircleGeometry(100, 32).rotateX(-Math.PI / 2).translate(0, -2, 0), new THREE.MeshBasicMaterial({ color: col(shade(T.ground, -10)) })));
+      skyMat.uniforms.gain.value = 0.42;
+      R.envTex = pm.fromScene(envScene, 0.04).texture;
+      skyMat.uniforms.gain.value = 1;
+      S.environment = R.envTex;
+      pm.dispose();
+    } catch (e) { /* environment lighting is optional */ }
 
     /* lights */
-    R.hemi = new THREE.HemisphereLight(col(sky.hemiSky), col(sky.hemiGround), 0.55);
+    R.hemi = new THREE.HemisphereLight(col(sky.hemiSky), col(sky.hemiGround), R.envTex ? 0.25 : 0.55);
     S.add(R.hemi);
     const sun = new THREE.DirectionalLight(col(sky.sun), 0.9);
     sun.position.set(W / 2 - 700, 1500, H / 2 + 650);
@@ -517,10 +535,37 @@
     c.fit = hi; c.fitKey = key;
     return hi;
   };
+  /* action cam / follow cam: glide toward where the fight is */
+  P3.autoCamera = function (dt) {
+    const R = this, c = R.cam, M = R.match;
+    let tx, tz, zoom, pitch;
+    if (c.mode === 'follow') {
+      const o = R.objs.creatures.get(c.followId);
+      if (!o || !o.c || o.c.dead) { c.mode = R.defaultMode; c.followId = null; R.updatePanel(); return; }
+      tx = o.c.x; tz = o.c.y;
+      zoom = Math.max(0.2, Math.min(0.5, 0.18 + o.r * 0.006)); pitch = 0.62;
+    } else {
+      let sx = 0, sz = 0, w = 0;
+      const wt = (cc) => (cc.dead || cc.inHut || cc.onTower) ? 0 : cc.carryingRelic ? 6 : (cc.state === 'attack' || cc.state === 'special') ? 4 : 0.35;
+      for (const cc of M.creatures) { const k = wt(cc); sx += cc.x * k; sz += cc.y * k; w += k; }
+      if (w > 0) { tx = sx / w; tz = sz / w; } else { tx = M.world.w / 2; tz = M.world.h / 2; }
+      let spread = 0;
+      for (const cc of M.creatures) { const k = wt(cc); if (k) spread += k * Math.hypot(cc.x - tx, cc.y - tz); }
+      spread = w > 0 ? spread / w : 400;
+      zoom = Math.max(0.42, Math.min(0.9, 0.36 + spread / 800));
+      pitch = 0.78;
+      c.yaw += dt * 0.04;   // a slow cinematic drift
+    }
+    const k = 1 - Math.exp(-dt * 1.5);
+    c.tx += (tx - c.tx) * k; c.tz += (tz - c.tz) * k;
+    c.zoom += (zoom - c.zoom) * k * 0.6;
+    c.pitch += (pitch - c.pitch) * k * 0.4;
+  };
   P3.updateCamera = function (dt) {
     const R = this, c = R.cam;
     if (R.keys.q) c.yaw -= dt * 1.2;
     if (R.keys.e) c.yaw += dt * 1.2;
+    if (dt > 0 && c.mode !== 'free') R.autoCamera(dt);
     /* fit uses the centred target so zoom stays stable while panning */
     const ctx = c.tx, ctz = c.tz;
     c.tx = R.match.world.w / 2; c.tz = R.match.world.h / 2 + 20;
@@ -534,7 +579,22 @@
     R.camera.updateMatrixWorld();
     if (R.shake > 0) R.shake = Math.max(0, R.shake - dt * 30);
   };
+  P3.setMode = function (m) {
+    if (this.cam.mode === m) return;
+    this.cam.mode = m;
+    if (m !== 'follow') this.cam.followId = null;
+    this.updatePanel();
+  };
+  P3.updatePanel = function () {
+    const b = this.actionBtn;
+    if (!b) return;
+    const on = this.cam.mode !== 'free';
+    b.style.background = on ? 'rgba(217,178,58,0.85)' : 'rgba(20,16,11,0.72)';
+    b.style.color = on ? '#1a140c' : '#f0e2c0';
+    b.title = this.cam.mode === 'follow' ? 'Following a creature — click to stop (or double-click empty ground)' : on ? 'Action cam ON — follows the fighting. Click to turn off' : 'Action cam — the camera follows the fighting (double-click a creature to follow it)';
+  };
   P3.resetView = function (top) {
+    this.setMode('free');
     const c = this.cam, M = this.match;
     c.yaw = 0; c.pitch = top ? 1.45 : 0.92; c.zoom = 1; c.tx = M.world.w / 2; c.tz = M.world.h / 2 + 20;
   };
@@ -553,6 +613,7 @@
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.x = e.clientX; drag.y = e.clientY;
       if (drag.pan) {
+        R.setMode('free');
         const k = R.cam.fit * c.zoom * 0.0012;
         const sy = Math.sin(c.yaw), cy = Math.cos(c.yaw);
         c.tx -= (dx * cy + dy * sy) * k;
@@ -568,8 +629,23 @@
     const onUp = () => { drag = null; };
     const onWheel = (e) => {
       e.preventDefault();
-      c.zoom = Math.max(0.28, Math.min(1.7, c.zoom * Math.exp(e.deltaY * 0.0011)));
+      if (c.mode === 'action') R.setMode('free');
+      c.zoom = Math.max(0.2, Math.min(1.7, c.zoom * Math.exp(e.deltaY * 0.0011)));
     };
+    /* double-click a creature to follow it; double-click empty ground to stop */
+    const onDbl = (e) => {
+      const r = cv.getBoundingClientRect();
+      const w = R.toWorld(e.clientX - r.left, e.clientY - r.top);
+      let best = null, bd = 1e9;
+      for (const [id, o] of R.objs.creatures) {
+        if (!o.c || o.c.dead || !o.obj.visible) continue;
+        const d = Math.hypot(o.c.x - w.x, o.c.y - w.y) - o.r;
+        if (d < bd) { bd = d; best = id; }
+      }
+      if (best != null && bd < 40) { c.followId = best; R.setMode('follow'); }
+      else if (c.mode === 'follow') R.setMode('free');
+    };
+    cv.addEventListener('dblclick', onDbl);
     const onCtx = (e) => e.preventDefault();
     /* two-finger touch: pinch to zoom, twist / sideways drag to orbit */
     const touches = new Map();
@@ -611,6 +687,7 @@
     document.addEventListener('keyup', kUp);
     R.unbind = () => {
       cv.removeEventListener('mousedown', onDown);
+      cv.removeEventListener('dblclick', onDbl);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       cv.removeEventListener('wheel', onWheel);
@@ -646,6 +723,7 @@
         p.appendChild(b);
         return b;
       };
+      R.actionBtn = mk('🎬', '', () => R.setMode(R.cam.mode === 'free' ? 'action' : 'free'));
       mk('⟲', 'Rotate left (Q) — or right-drag the field', () => { R.cam.yaw -= Math.PI / 4; });
       mk('⟳', 'Rotate right (E)', () => { R.cam.yaw += Math.PI / 4; });
       mk('⊕', 'Zoom in (mouse wheel)', () => { R.cam.zoom = Math.max(0.28, R.cam.zoom * 0.8); });
@@ -658,6 +736,7 @@
       });
       par.appendChild(p);
       R.panel = p;
+      R.updatePanel();
     }
   };
 
@@ -744,7 +823,7 @@
     const R = this, M = R.match;
     if (R.disposed) return;
     R.ensureUi();
-    R.t += dt; R.frame++;
+    R.t += dt; R.frame++; R._lastDt = dt;
     M3.time.value = R.t;
     R.dset = settings();
     R.resize();
@@ -761,7 +840,7 @@
       R.moteSeeds.forEach((s, i) => { pa.setXYZ(i, (s[0] + t * s[3]) % M.world.w, s[1] + Math.sin(t * 1.3 + i) * 10, s[2] + Math.sin(t * 0.7 + i) * 20); });
       pa.needsUpdate = true;
     }
-    R.hemi.intensity = 0.55 + zf * 0.15;
+    R.hemi.intensity = (R.envTex ? 0.25 : 0.55) + zf * 0.15;
     R.hemi.color.set(R.sky.hemiSky).lerp(col('#7fe8f0'), zf * 0.45);
 
     /* animated scenery */
@@ -776,7 +855,8 @@
     if (R.crowd) {
       /* the crowd bounces — harder while a fight is on */
       const fights = M.creatures.reduce((n, c) => n + (!c.dead && c.state === 'attack' ? 1 : 0), 0);
-      const energy = Math.min(1, 0.15 + fights * 0.08);
+      R.cheer = Math.max(0, R.cheer - dt * 0.35);
+      const energy = Math.min(1, 0.15 + fights * 0.08 + R.cheer);
       const m4 = R._m4 || (R._m4 = new THREE.Matrix4());
       R.crowd.seats.forEach((p, i) => { m4.makeTranslation(p[0], p[1] + Math.max(0, Math.sin(t * (6 + (i % 5)) + i)) * 3.5 * energy, p[2]); R.crowd.mesh.setMatrixAt(i, m4); });
       R.crowd.mesh.instanceMatrix.needsUpdate = true;
@@ -793,6 +873,8 @@
     R.syncCreatures(dt, t);
     R.syncProjectiles();
     R.syncEffects(t);
+    R.updateBursts(dt);
+    R.autoQuality(dt);
 
     R.gl.render(R.scene, R.camera);
     R.drawOverlay();
@@ -1103,6 +1185,7 @@
     const o = {
       obj: holder, scaler, model, ring, shadowDisc, glow, speciesId: c.speciesId,
       heading: c.facing < 0 ? Math.PI : 0, px: c.x, py: c.y, mv: 0, alt: 0, alpha: -1,
+      born: R.frame > 3 && !c.dead ? R.t : -10, lastHp: c.hp, hitT: 0, deadSeen: !!c.dead, teamCol,
       r, shimmerK: 0.16 + hash(c.id) * 0.16, flier: M3.isFlier(c.sp), topY: r * model.height,
       dispose() { model.kit.mats.forEach(m => m.dispose()); disposeTree(holder); },
     };
@@ -1164,9 +1247,25 @@
         s = o.r * 0.82;
         if (mo) o.heading = mo.heading;
       }
-      o.obj.position.set(c.x, 0, c.y);
-      o.scaler.position.y = y;
-      o.scaler.scale.setScalar(s);
+      /* damage / healing numbers + a hit flinch; a burst of light on death */
+      if (!c.dead) {
+        const dh = o.lastHp - c.hp;
+        if (dh > 0.05) { R.addNumber(c, o, dh, false); o.hitT = 0.28; }
+        else if (dh < -0.05) R.addNumber(c, o, -dh, true);
+      } else if (!o.deadSeen) {
+        o.deadSeen = true;
+        R.burst(c.x, Math.max(8, o.topY * 0.5), c.y, o.teamCol, o.r);
+      }
+      o.lastHp = c.hp;
+      o.hitT = Math.max(0, o.hitT - dt);
+      const hk = o.hitT / 0.28;
+      /* summoned from the Okid coin: grow in with a little overshoot */
+      const ga = Math.min(1, (R.t - o.born) / 0.55);
+      const grow = ga >= 1 ? 1 : Math.max(0.01, 1 + 2.70158 * Math.pow(ga - 1, 3) + 1.70158 * Math.pow(ga - 1, 2));
+      const kb = o.r * 0.22 * hk;
+      o.obj.position.set(c.x - Math.cos(o.heading) * kb, 0, c.y + Math.sin(o.heading) * kb);
+      o.scaler.position.y = y + (ga < 1 ? (1 - ga) * o.r * 1.5 : 0);
+      o.scaler.scale.set(s * grow * (1 + 0.08 * hk), s * grow * (1 - 0.14 * hk), s * grow * (1 + 0.08 * hk));
       o.scaler.rotation.y = o.heading;
       o.topY = y + s * o.model.height;
       /* death: topple and sink */
@@ -1206,6 +1305,59 @@
       });
       o.c = c;
     });
+  };
+  /* floating numbers: hits on the same creature in quick succession merge */
+  P3.addNumber = function (c, o, v, heal) {
+    const L = this.nums;
+    const open = L.find(n => n.id === c.id && n.heal === heal && n.age < 0.3);
+    if (open) { open.v += v; return; }
+    if (L.length > 70) L.shift();
+    L.push({ id: c.id, heal, v, age: 0, x: c.x, z: c.y, h: o.topY + 4, max: c.maxHp || 1, jx: (Math.random() - 0.5) * 18 });
+  };
+  /* a creature's token releases its truth: shards of light rising away */
+  P3.burst = function (x, y, z, color, r) {
+    const R = this;
+    const g = new THREE.Group(); g.position.set(x, y, z); R.scene.add(g);
+    const mA = basic(color, { add: true }), mB = basic('#fff4d8', { add: true });
+    const parts = [];
+    const geo = GEO.SPH_LO();
+    const n = Math.min(26, 10 + Math.round(r / 3));
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(geo, i % 3 ? mA : mB);
+      const a = Math.random() * TAU, sp = 20 + Math.random() * 60;
+      m.userData.v = [Math.cos(a) * sp, 40 + Math.random() * 90, Math.sin(a) * sp];
+      m.scale.setScalar(1.5 + Math.random() * 2.5);
+      g.add(m); parts.push(m);
+    }
+    const gl = glowSprite(color, r * 5, 0.9); g.add(gl);
+    R.bursts.push({ g, parts, gl, age: 0, mats: [mA, mB] });
+    R.cheer = Math.min(1, R.cheer + 0.5);
+    R.shake = Math.max(R.shake || 0, 2);
+  };
+  P3.updateBursts = function (dt) {
+    const R = this;
+    R.bursts = R.bursts.filter(b => {
+      b.age += dt;
+      const f = b.age / 1.3;
+      if (f >= 1) { b.mats.forEach(m => m.dispose()); disposeTree(b.g); return false; }
+      b.parts.forEach(m => { const v = m.userData.v; m.position.x += v[0] * dt; m.position.y += v[1] * dt; m.position.z += v[2] * dt; v[1] -= 30 * dt; m.rotation.y += dt * 4; });
+      b.mats.forEach(m => { m.opacity = 1 - f; });
+      b.gl.material.opacity = 0.9 * Math.max(0, 1 - f * 2.5);
+      return true;
+    });
+  };
+  /* keep it smooth: drop resolution, then shadows, on slow devices */
+  P3.autoQuality = function (dt) {
+    const R = this, P = R.perf;
+    if (dt <= 0 || R.frame < 30) return;
+    P.acc += dt; P.n++;
+    if (P.acc < 3) return;
+    const avg = P.acc / P.n;
+    P.acc = 0; P.n = 0;
+    if (avg < 1 / 40 || P.stage >= 2) return;
+    P.stage++;
+    if (P.stage === 1 && R.gl.getPixelRatio() > 1) { R.gl.setPixelRatio(1); R.w = 0; }
+    else { P.stage = 2; R.sun.castShadow = false; }
   };
   function turn(a, b, k) {
     let d = ((b - a) % TAU + TAU * 1.5) % TAU - Math.PI;
@@ -1471,6 +1623,30 @@
         for (let i = 0; i < 3; i++) { const a = R.t * 4 + i * TAU / 3; g.beginPath(); g.arc(p.x + Math.cos(a) * 12, p.y - 8 + Math.sin(a) * 4, 2.2, 0, TAU); g.fill(); }
       }
     }
+    /* floating damage / healing numbers */
+    const dtn = Math.min(0.05, R._lastDt || 0.016);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    let w = 0;
+    for (const n of R.nums) {
+      n.age += dtn;
+      if (n.age >= 1.1) continue;
+      R.nums[w++] = n;
+      const v = Math.round(n.v);
+      if (v < 2) continue;
+      const p = R.toScreen(n.x, n.z, n.h);
+      if (p.behind) continue;
+      const big = Math.min(1, n.v / n.max);
+      const size = 14 + big * 16, pop = n.age < 0.12 ? 1 + (0.12 - n.age) * 4 : 1;
+      g.globalAlpha = n.age < 0.66 ? 1 : 1 - (n.age - 0.66) / 0.44;
+      g.font = 'bold ' + Math.round(size * pop) + 'px Georgia, serif';
+      const yy = p.y - n.age * 40;
+      g.lineWidth = 3; g.strokeStyle = 'rgba(20,12,6,0.85)';
+      g.strokeText((n.heal ? '+' : '') + v, p.x + n.jx, yy);
+      g.fillStyle = n.heal ? '#8ee89a' : (big > 0.3 ? '#ffb347' : '#ffe6c2');
+      g.fillText((n.heal ? '+' : '') + v, p.x + n.jx, yy);
+    }
+    R.nums.length = w;
+    g.globalAlpha = 1;
     /* structure hp */
     for (const [, o] of R.objs.structures) {
       const s = o.s;
