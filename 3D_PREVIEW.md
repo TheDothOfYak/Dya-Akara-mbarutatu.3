@@ -18,7 +18,8 @@ while the live game on `main` stays exactly as it is.
   the arena, stands and crowd, terrain props, structures, relics, orbs, projectiles,
   effects and an HP-bar overlay. The simulation (`engine/match.js`) is untouched.
 - `js/vendor/three.min.js`: three.js r149 (MIT), vendored so nothing loads from a CDN.
-- `index.html`: three extra `<script>` lines. Delete them to go back to 2D only.
+- `js/engine3d/viewer3d.js`: the token detail page shows the token's battle model on a pedestal. Drag to spin, scroll or pinch to zoom, and use the pose buttons (idle, walk, run, attack, special, hit, fly).
+- `index.html`: four extra `<script>` lines. Delete them to go back to 2D only.
 
 ## Controls
 Right-drag to orbit · mouse wheel to zoom · middle-drag (or shift + right-drag) to pan · Q / E to rotate.

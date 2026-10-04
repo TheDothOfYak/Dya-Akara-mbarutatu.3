@@ -359,6 +359,9 @@
     back.onclick = () => opts.onBack && opts.onBack();
     left.appendChild(back);
     let raf, t0 = performance.now();
+    /* 3D build: the token's real battle model on a pedestal you can spin */
+    const v3 = DYA.viewer3d && DYA.viewer3d.available() ? DYA.viewer3d.mount(left, tok) : null;
+    if (v3) cv.remove();
     function turntable(now) {
       if (!cv.isConnected) { cancelAnimationFrame(raf); return; }
       const t = (now - t0) / 1000;
@@ -380,7 +383,7 @@
       ctx.restore();
       raf = requestAnimationFrame(turntable);
     }
-    raf = requestAnimationFrame(turntable);
+    if (!v3) raf = requestAnimationFrame(turntable);
 
     /* right: all info */
     const right = U.el('div', { cls: 'detail-right' });
