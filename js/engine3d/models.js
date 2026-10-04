@@ -452,62 +452,162 @@
     return { root, anim, height: legLen + bh * 2 };
   }
 
-  /* ---------- PUNK (pumpkin body, vine legs and arms) ---------- */
-  function buildPunk(sp, kit) {
-    const F = sp.features || {}, P = sp.punk || { legs: 4, arms: 2, ribs: 6, bodyW: 1, bodyH: 0.85, legReach: 1, armReach: 1 };
-    const root = group(null);
-    const col = sp.color, col2 = sp.color2;
-    const skin = kit.mat(col, { rough: 0.55, emissive: F.duat ? '#3a1e5a' : null, ei: 0.35 });
-    const vineMat = kit.mat(col2, { rough: 0.8 });
-    const legLen = 0.55 * P.legReach;
-    const torso = group(root, 0, legLen + 0.78 * P.bodyH, 0);
-    mesh(torso, pumpkinGeo(P.ribs * 2 || 10), skin, P.bodyW * 0.95, P.bodyH * 0.95, P.bodyW * 0.95);
-    /* curled stem */
-    const stem = mesh(torso, BONE(), kit.mat('#5a4a28'), 0.1, 0.32, 0.1, 0, P.bodyH * 0.7, 0);
-    stem.rotation.z = -0.35;
-    /* carved face — glowing eyes and a jagged grin on the front */
-    const glow = kit.mat(F.duat ? '#c48ae8' : '#ffd24a', { emissive: F.duat ? '#c48ae8' : '#ffb03a', ei: 1.2, glow: true });
-    for (const s of [-1, 1]) {
-      const e = mesh(torso, CONE(), glow, 0.14, 0.2, 0.06, P.bodyW * 0.86, 0.12, s * 0.27);
-      e.rotation.z = -Math.PI / 2; e.rotation.x = Math.PI; e.castShadow = false;
+  /* a living vine: one tapered tube whose shape is re-bent every frame along a
+     cubic curve (one mesh per vine — cheap, and smooth however it bends) */
+  const _vp = new THREE.Vector3(), _vt = new THREE.Vector3(), _vn = new THREE.Vector3(), _vb = new THREE.Vector3(), _vr = new THREE.Vector3();
+  function bez(out, p0, p1, p2, p3, t) {
+    const u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+    return out.set(a * p0.x + b * p1.x + c * p2.x + d * p3.x, a * p0.y + b * p1.y + c * p2.y + d * p3.y, a * p0.z + b * p1.z + c * p2.z + d * p3.z);
+  }
+  function bezTan(out, p0, p1, p2, p3, t) {
+    const u = 1 - t, a = -3 * u * u, b = 3 * u * u - 6 * u * t, c = 6 * u * t - 3 * t * t, d = 3 * t * t;
+    return out.set(a * p0.x + b * p1.x + c * p2.x + d * p3.x, a * p0.y + b * p1.y + c * p2.y + d * p3.y, a * p0.z + b * p1.z + c * p2.z + d * p3.z).normalize();
+  }
+  function VineTube(parent, mat, r0, r1, segs, rad) {
+    segs = segs || 16; rad = rad || 7;
+    const n = (segs + 1) * rad;
+    const g = new THREE.BufferGeometry();
+    const pos = new THREE.BufferAttribute(new Float32Array(n * 3), 3), nor = new THREE.BufferAttribute(new Float32Array(n * 3), 3);
+    pos.setUsage(THREE.DynamicDrawUsage); nor.setUsage(THREE.DynamicDrawUsage);
+    g.setAttribute('position', pos); g.setAttribute('normal', nor);
+    const idx = [];
+    for (let i = 0; i < segs; i++) for (let j = 0; j < rad; j++) {
+      const a = i * rad + j, b = i * rad + (j + 1) % rad, c = (i + 1) * rad + j, d = (i + 1) * rad + (j + 1) % rad;
+      idx.push(a, b, c, b, d, c);
     }
-    const mouth = mesh(torso, BOX(), glow, 0.06, 0.1, 0.5, P.bodyW * 0.88, -0.2, 0); mouth.castShadow = false;
-    const legs = [], arms = [];
-    for (let i = 0; i < P.legs; i++) {
-      const a = (i / P.legs) * TAU + Math.PI / P.legs;
-      const pv = limb(torso, Math.cos(a) * P.bodyW * 0.55, -P.bodyH * 0.55, Math.sin(a) * P.bodyW * 0.55, legLen + 0.3, 0.13, vineMat);
-      pv.rotation.x = -Math.sin(a) * 0.35; pv.userData.a = a;
-      legs.push(pv);
-    }
-    for (let i = 0; i < P.arms; i++) {
-      const s = i % 2 ? 1 : -1;
-      const pv = group(torso, P.bodyW * 0.25, 0.1 + Math.floor(i / 2) * 0.15, s * P.bodyW * 0.82);
-      let prev = pv;
-      const segs = [];
-      for (let k = 0; k < 4; k++) {
-        const sg = group(prev, k === 0 ? 0 : 0.26 * P.armReach, 0, 0);
-        const m = mesh(sg, BONE(), vineMat, 0.07, 0.27 * P.armReach, 0.07);
-        m.rotation.z = -Math.PI / 2;
-        segs.push(sg); prev = sg;
+    g.setIndex(idx);
+    const m = new THREE.Mesh(g, mat);
+    m.userData.ownGeo = true; m.castShadow = true; m.frustumCulled = false;
+    parent.add(m);
+    this.mesh = m; this.segs = segs; this.rad = rad; this.r0 = r0; this.r1 = r1;
+    this.p = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  }
+  VineTube.prototype.update = function () {
+    const [p0, p1, p2, p3] = this.p, S = this.segs, Rd = this.rad;
+    const pos = this.mesh.geometry.attributes.position, nor = this.mesh.geometry.attributes.normal;
+    for (let i = 0; i <= S; i++) {
+      const t = i / S;
+      bez(_vp, p0, p1, p2, p3, t);
+      bezTan(_vt, p0, p1, p2, p3, t);
+      _vr.set(0, 1, 0);
+      if (Math.abs(_vt.y) > 0.92) _vr.set(1, 0, 0);
+      _vn.crossVectors(_vr, _vt).normalize();
+      _vb.crossVectors(_vt, _vn);
+      const r = this.r0 + (this.r1 - this.r0) * t;
+      for (let j = 0; j < Rd; j++) {
+        const a = j / Rd * TAU, c = Math.cos(a), s = Math.sin(a);
+        const nx = _vn.x * c + _vb.x * s, ny = _vn.y * c + _vb.y * s, nz = _vn.z * c + _vb.z * s;
+        const k = i * Rd + j;
+        pos.setXYZ(k, _vp.x + nx * r, _vp.y + ny * r, _vp.z + nz * r);
+        nor.setXYZ(k, nx, ny, nz);
       }
-      /* leaf at the vine tip */
-      const leaf = mesh(prev, wingGeo('petal'), kit.mat(shadeHex(col2, 25), { side: THREE.DoubleSide }), 0.22, 1, 0.22, 0.27 * P.armReach, 0, 0);
-      leaf.rotation.y = Math.PI / 2;
-      pv.rotation.y = -s * 0.9;
-      arms.push({ pv, segs, s, i });
     }
+    pos.needsUpdate = true; nor.needsUpdate = true;
+  };
+  VineTube.prototype.at = function (out, t) { return bez(out, this.p[0], this.p[1], this.p[2], this.p[3], t); };
+  VineTube.prototype.tan = function (out, t) { return bezTan(out, this.p[0], this.p[1], this.p[2], this.p[3], t); };
+
+  /* ---------- PUNK — a faceless pumpkin; every vine sprouts from the stem ---------- */
+  function buildPunk(sp, kit) {
+    const F = sp.features || {}, P = sp.punk || { legs: 4, arms: 3, ribs: 6, bodyW: 1, bodyH: 0.85, legReach: 1, armReach: 1 };
+    const root = group(null);
+    const col = (P.bodyColor || sp.color), vcol = (P.vineColor || sp.color2);
+    const skin = kit.mat(col, { rough: 0.5, emissive: F.duat ? '#3a1e5a' : null, ei: 0.35 });
+    const legMat = kit.mat(shadeHex(vcol, -18), { rough: 0.75, side: THREE.DoubleSide });
+    const armMat = kit.mat(shadeHex(vcol, 8), { rough: 0.7, side: THREE.DoubleSide });
+    const leafMat = kit.mat(shadeHex(vcol, 22), { rough: 0.7, side: THREE.DoubleSide });
+    const bw = (P.bodyW || 1) * 0.95, bhHalf = (P.bodyH || 0.85) * 0.95 * 0.82;
+    const lift0 = 0.16;                              // the body rides just above the ground on its vines
+    const torso = group(root, 0, lift0 + bhHalf, 0);
+    const body = mesh(torso, pumpkinGeo((P.ribs || 6) * 2), skin, bw, (P.bodyH || 0.85) * 0.95, bw);
+    /* the stem: a short curled woody stalk the whole vine cluster grows from */
+    const stemMat = kit.mat(shadeHex(vcol, -34), { rough: 0.85 });
+    const stem = group(torso, 0, bhHalf * 0.92, 0);
+    mesh(stem, CYL(), stemMat, 0.13, 0.14, 0.13, 0, 0.04, 0);
+    const curl = mesh(stem, BONE(), stemMat, 0.08, 0.22, 0.08, 0, 0.08, 0);
+    curl.rotation.z = -0.55;
+    const S = new THREE.Vector3(0, bhHalf * 0.92 + 0.08, 0);   // the stem cluster, in torso space
+    const legR = Math.max(0.055, (P.legWidth || 0.12) * 0.6), armR = Math.max(0.045, (P.armWidth || 0.1) * 0.55);
+
+    const legs = [];
+    const nL = P.legs != null ? P.legs : 4;
+    for (let i = 0; i < nL; i++) {
+      const a = (i / nL) * TAU + Math.PI / nL;     // spread evenly around the pumpkin
+      const tube = new VineTube(torso, legMat, legR * 1.15, legR * 0.8, 16, 7);
+      const foot = mesh(torso, SPH_LO(), legMat, legR * 1.5, legR * 0.9, legR * 1.5);
+      legs.push({ tube, foot, a, i });
+    }
+    const arms = [];
+    const nA = P.arms != null ? P.arms : 3;
+    const TIP = geo('vinecurl', () => new THREE.TorusGeometry(0.09, 0.022, 5, 12, Math.PI * 1.4));
+    for (let i = 0; i < nA; i++) {
+      const spread = nA === 1 ? 0 : (i / (nA - 1) - 0.5);
+      const tube = new VineTube(torso, armMat, armR * 1.2, armR * 0.65, 14, 6);
+      const tip = new THREE.Mesh(TIP, armMat); tip.castShadow = true; torso.add(tip);
+      const leaf = mesh(torso, wingGeo('petal'), leafMat, 0.3, 1, 0.22);
+      arms.push({ tube, tip, leaf, spread, i });
+    }
+    const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion();
+
     function anim(st) {
-      const t = st.t, mv = st.speed, ph = t * (st.state === 'run' ? 13 : 8);
-      torso.position.y = legLen + 0.78 * P.bodyH + Math.sin(t * 2.2) * 0.02 + Math.abs(Math.sin(ph)) * 0.08 * mv;
-      torso.position.x = st.attack * 0.2;
-      torso.rotation.x = Math.sin(ph * 0.5) * 0.05 * mv;
-      legs.forEach((l, i) => { l.rotation.z = Math.sin(ph + i * Math.PI) * 0.55 * mv; });
-      arms.forEach(a => {
-        a.pv.rotation.z = Math.sin(t * 2 + a.i) * 0.2 + st.attack * 0.6;
-        a.segs.forEach((s, k) => { if (k) { s.rotation.z = Math.sin(t * 3 + k + a.i) * 0.22 - st.attack * 0.25; s.rotation.y = a.s * Math.sin(t * 2.3 + k) * 0.2; } });
-      });
+      const t = st.t, mv = st.speed, run = st.state === 'run';
+      const limp = st.dormant || st.dead;
+      const attack = st.state === 'attack' || st.state === 'special';
+      const rate = run ? 13 : 7;
+      const bob = limp ? -0.08 : Math.sin(t * 2.2) * 0.02 + Math.abs(Math.sin(t * rate)) * 0.05 * mv;
+      torso.position.y = lift0 + bhHalf + bob;
+      torso.rotation.z = -mv * 0.06 + Math.sin(t * rate * 0.5) * 0.03 * mv;
+      torso.position.x = st.attack * 0.12;
+      const groundY = -(lift0 + bhHalf + bob);           // ground level in torso space
+      /* legs: from the stem, arching out over the shoulder and draping to a curled foot */
+      for (const L of legs) {
+        const dx = Math.cos(L.a), dz = Math.sin(L.a);
+        const step = mv > 0.02 ? Math.sin(t * rate + L.i * Math.PI * 0.7) : 0;
+        const stride = step * 0.28 * Math.min(1, mv);
+        const lift = mv > 0.02 ? Math.max(0, Math.cos(t * rate + L.i * Math.PI * 0.7)) * 0.16 * Math.min(1, mv) : 0;
+        const reach = bw * 1.22 * (P.legReach || 1);
+        const sway = limp ? 0 : Math.sin(t * 1.8 + L.i) * 0.03;
+        const p = L.tube.p;
+        p[0].set(S.x + dx * 0.05, S.y - 0.02, S.z + dz * 0.05);
+        p[1].set(dx * bw * 0.75, S.y + 0.25, dz * bw * 0.75);
+        p[2].set(dx * reach * 1.08 + stride * 0.4, bhHalf * 0.1, dz * reach * 1.08);
+        p[3].set(dx * reach + stride + sway, groundY + 0.04 + lift + (limp ? 0.02 : 0), dz * reach + sway);
+        L.tube.update();
+        L.foot.position.copy(p[3]).add(tmp.set(dx * 0.05, 0, dz * 0.05));
+      }
+      /* arms: grasping vines reaching up and out from the same stem */
+      for (const A of arms) {
+        let yaw = A.spread * 2.2 + Math.sin(t * 1.3 + A.i) * 0.12;
+        let el = 0.95 + Math.sin(t * 2.3 + A.i * 1.7) * 0.18;
+        let ext = 1;
+        if (attack) {
+          const lash = Math.max(0, Math.sin(t * 12 - A.i));
+          yaw = A.spread * 0.6; el = 0.25 - lash * 0.45; ext = 1 + lash * 0.55;
+        } else if (limp) { el = -0.5; ext = 0.75; }
+        const reach = 1.05 * (P.armReach || 1) * ext;
+        const dx = Math.cos(yaw) * Math.cos(el), dy = Math.sin(el), dz = -Math.sin(yaw) * Math.cos(el);
+        const p = A.tube.p;
+        p[0].set(S.x, S.y - 0.01, S.z);
+        p[1].set(S.x + dx * 0.15, S.y + 0.28, S.z + dz * 0.15);
+        p[2].set(S.x + dx * reach * 0.6 - dz * 0.1, S.y + dy * reach * 0.6 + 0.12, S.z + dz * reach * 0.6 + dx * 0.1);
+        p[3].set(S.x + dx * reach, S.y + dy * reach, S.z + dz * reach);
+        A.tube.update();
+        /* curled grasping tip, turned along the vine */
+        A.tube.tan(tmp, 1);
+        A.tip.position.copy(p[3]);
+        q.setFromUnitVectors(tmp2.set(1, 0, 0), tmp);
+        A.tip.quaternion.copy(q);
+        A.tip.rotateX(t * 0.5 + A.i);
+        A.tip.scale.setScalar(attack ? 1.3 : 1 + Math.sin(t * 3 + A.i) * 0.15);
+        /* a leaf partway along */
+        A.tube.at(A.leaf.position, 0.55);
+        A.tube.tan(tmp, 0.55);
+        A.leaf.quaternion.setFromUnitVectors(tmp2.set(0, 0, 1), tmp);
+        A.leaf.rotateZ(0.6 + A.i);
+      }
     }
-    return { root, anim, height: legLen + 1.6 * P.bodyH };
+    anim({ t: 0, speed: 0, state: 'idle', attack: 0 });
+    return { root, anim, height: lift0 + bhHalf * 2 + 0.35 };
   }
 
   /* ---------- BIPED (Eikar / Keilia acorns, Uff, Karnen) ---------- */
