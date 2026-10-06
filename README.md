@@ -55,6 +55,26 @@ Two chapters so far. Your run is saved in the browser at every Nur Lantern and s
 
 **Creatures:** Wild Punks, Malsti Punks (they blink through the Duat), Rodak (they shadow you and attack when you're weak), Kipsu (they steal shards and run), Albali Byrds (they dive from above; their horns paralyse, or poison on Leotik), Duskareth Vel (they throw knives out of the Duat), Tyndael (they spit venom that pools on the ground), and the **Sru Vorn** mini-boss.
 
+**Open-world RPG systems:**
+- **Camps** in both regions with folk you can talk to:
+  - Hemla, a Kalo'Eik trader
+  - Duro, an Eikar smith
+  - Venkin, a Keilia builder
+  - Old Ruut, a Punk herder
+  - Sefa and Fennek
+  - Ila Vos, an Elsha'ryn herbalist (Leotik only)
+  - Kesh, a Duskareth deserter (Leotik only)
+- **Nine side quests**, with dialogue choices.
+- **Friendly creatures** that only fight if attacked: Kipsu families you can pet, a domestic Punk herd, and Albali that leave you alone.
+- **A Punk mount, Brindle**: whistle with `H`, ride with `E`.
+- **Gliding**: hold `Space` in the air.
+- **Levels and perks**: three perk trees (Axe, Duat, Survival).
+- **Spells** on keys `1`–`4`: Duat Pull, Fti Gust, Ular Quake and Nur Ward.
+- **Items and crafting**: an inventory of materials, meals, axes and trinkets. Forge axes at Duro's cauldron and cook at the camp fire.
+- **The world**: loot chests, gathering spots (ore, bark, stone, moss), and six **Kalo Trials** (puzzles) that reward spells and Hurst seeds.
+- **A world map** (`M`) with fast travel between lit lanterns.
+- **Cloud saves**: progress saves to your Dya'Akara account when you're signed in, either from the title screen or by launching from the main menu while signed in.
+
 **Nur Lanterns** are the checkpoints. Resting at one heals you, refills your Albali film, respawns enemies, and lets you spend zikhron shards on Vigor, Edge, Breath, Duat mastery, extra film vials and Tukang.
 
 | Input | Action |
@@ -67,7 +87,9 @@ Two chapters so far. Your run is saved in the browser at every Nur Lantern and s
 | `R` | Drink Albali film (heals and cures poison) |
 | `Q` | **Tukang Flare**: releases full heat as a fire nova |
 | `F` | **Nur Sense**: Phorus points out the next objective |
-| `E` / `Tab` / `Esc` | Interact or rest / Rokarvac journal / pause and settings |
+| `1`–`4` / `H` | Spells / whistle for your Punk |
+| `I` `K` `J` `M` | Gear and pack / skills / quests / map |
+| `E` / `Tab` / `Esc` | Interact, talk or rest / Rokarvac journal / pause and settings |
 
 Code (`rpg/js/`): `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
 

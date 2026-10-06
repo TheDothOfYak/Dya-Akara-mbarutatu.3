@@ -16,7 +16,10 @@ export const TYPES = {
   malsti: { name: 'Malsti Punk', build: () => buildPunk(true), hp: 26, dmg: 6, speed: 7.2, rad: 0.4, range: 1.5, aggro: 17, windup: 0.35, recover: 0.5, lunge: 9, shards: 3, ai: 'melee', blink: true, color: 0xc08aff },
   rodak: { name: 'Rodak', build: buildRodak, hp: 75, dmg: 15, speed: 8.6, rad: 0.7, range: 2.7, aggro: 14, windup: 0.45, recover: 0.7, lunge: 13, shards: 10, ai: 'scavenger', color: 0x6a8a8a },
   kipsu: { name: 'Kipsu', build: () => buildKipsu(0.55), hp: 32, dmg: 4, speed: 9.5, rad: 0.45, range: 1.5, aggro: 11, windup: 0.3, recover: 0.4, lunge: 9, shards: 5, ai: 'thief', color: 0x6af0e0 },
-  albali: { name: 'Albali Byrd', build: () => buildAlbali(false), hp: 48, dmg: 10, speed: 9, rad: 0.7, range: 1.8, aggro: 20, shards: 9, ai: 'flyer', status: 'paralyze', color: 0xffe0a0 },
+  albali: { name: 'Albali Byrd', build: () => buildAlbali(false), hp: 48, dmg: 10, speed: 9, rad: 0.7, range: 1.8, aggro: 20, shards: 9, ai: 'flyer', status: 'paralyze', color: 0xffe0a0, disp: 'neutral' },
+  /* friendly folk of the wilds — they only fight if you start it */
+  kipsu_f: { name: 'Kipsu', build: () => buildKipsu(0.75), hp: 40, dmg: 6, speed: 9, rad: 0.5, range: 1.6, aggro: 0, windup: 0.35, recover: 0.5, lunge: 9, shards: 2, ai: 'melee', color: 0x6af0e0, disp: 'friendly' },
+  punk_d: { name: 'Domestic Punk', build: () => buildPunk(false, { domestic: true }), hp: 90, dmg: 10, speed: 6, rad: 1.0, range: 2.6, aggro: 0, windup: 0.6, recover: 0.8, lunge: 8, shards: 3, ai: 'melee', color: 0xe8a85a, disp: 'friendly' },
   albali_t: { name: 'Villtur Albali', build: () => buildAlbali(true), hp: 58, dmg: 11, speed: 9.5, rad: 0.7, range: 1.8, aggro: 22, shards: 12, ai: 'flyer', status: 'poison', color: 0x9aff5a },
   vel: { name: 'Duskareth Vel', build: buildVel, hp: 190, dmg: 17, speed: 6.2, rad: 0.5, range: 2.4, aggro: 22, windup: 0.5, shards: 60, ai: 'vel', stagger: 0.35, elite: true, color: 0xb070ff },
   tyndael: { name: 'Tyndael', build: buildTyndael, hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
@@ -38,7 +41,7 @@ export function createEnemies(ctx) {
     const e = Object.assign({
       kind, T, actor, group, pos: V3(x, ctx.world.col.ground(x, z, ctx.world.heightAt(x, z) + 0.5), z), vel: V3(), yaw: Math.random() * 6,
       hp, maxHp: hp, state: 'idle', timer: Math.random() * 2, home: V3(x, 0, z), wander: V3(x, 0, z), flash: 0, stun: 0, dead: false,
-      blinkCd: 2 + Math.random() * 2, windup: 0, attackA: 0, alt: T.ai === 'flyer' ? 3 : 0, hostile: T.ai !== 'scavenger', stolen: 0,
+      blinkCd: 2 + Math.random() * 2, windup: 0, attackA: 0, alt: T.ai === 'flyer' ? 3 : 0, hostile: T.ai !== 'scavenger' && !T.disp, stolen: 0,
       cd: 1 + Math.random() * 2, lastHit: -99, act: null,
     }, extra);
     list.push(e);
@@ -50,7 +53,8 @@ export function createEnemies(ctx) {
       if (g.unique && cleared[g.unique]) return;
       g.kinds.forEach((k, i) => {
         const a = i / g.kinds.length * Math.PI * 2;
-        spawn(k, g.at[0] + Math.cos(a) * 3, g.at[1] + Math.sin(a) * 3, gi, { unique: i === 0 ? g.unique : null });
+        const e = spawn(k, g.at[0] + Math.cos(a) * 3, g.at[1] + Math.sin(a) * 3, gi, Object.assign({ unique: i === 0 ? g.unique : null, tag: g.tag }, g.extra || {}));
+        if (g.extra && g.extra.scale) e.actor.root.scale.multiplyScalar(g.extra.scale / 0.75);
       });
     });
   }
@@ -70,6 +74,8 @@ export function createEnemies(ctx) {
 
   function damage(e, dmg, from, kb = 4, opts = {}) {
     if (e.dead) return;
+    if (e.stray || e.pet || e.pup) return;            // someone's beloved — the axe turns aside
+    if (opts.burn) e.burn = Math.max(e.burn || 0, 3);
     dmg *= opts.raw ? 1 : D().playerDmg;
     e.hp -= dmg; e.flash = 1; e.lastHit = ctx.G.t;
     const st = e.T.stagger ?? 1;
@@ -79,6 +85,7 @@ export function createEnemies(ctx) {
     const stun = (opts.stun ?? 0.32) * st;
     if (stun > 0.15) { e.stun = Math.max(e.stun, stun); e.windup = 0; if (e.state === 'windup') e.state = 'chase'; }
     if (e.T.ai === 'flyer' && opts.stun >= 0.3) { e.state = 'recover'; e.timer = 1.4; }
+    if (T_isPassive(e) && !e.hostile) ctx.onProvoke && ctx.onProvoke(e);
     e.hostile = true;
     if (e.state === 'idle' || e.state === 'shadow') e.state = 'chase';
     aggroGroup(e);
@@ -87,6 +94,8 @@ export function createEnemies(ctx) {
     ctx.sfx.hit();
     if (e.hp <= 0) kill(e);
   }
+
+  function T_isPassive(e) { return !!e.T.disp; }
 
   function kill(e) {
     e.dead = true; e.state = 'dead'; e.timer = 0;
@@ -161,12 +170,30 @@ export function createEnemies(ctx) {
     let wantV = 0, wantYaw = e.yaw;
     e.flash = Math.max(0, e.flash - dt * 5); a.flash(e.flash * 0.9);
     e.stun = Math.max(0, e.stun - dt);
+    if (e.burn > 0) {
+      e.burn -= dt; e.hp -= 6 * dt;
+      if (Math.random() < 0.5) ctx.particles.emit(e.pos.x, e.pos.y + 1, e.pos.z, { vy: 2, speed: 1, color: 0xff7a2a, size: 0.4, life: 0.5 });
+      if (e.hp <= 0) { kill(e); return; }
+    }
     e.windup = Math.max(0, e.windup - dt * 3); e.attackA = Math.max(0, e.attackA - dt * 4);
     const playing = G.mode === 'play' && !P.dead;
     const wf = D().windup;
     const aggroR = T.aggro * D().aggro;
 
     if (!playing && e.state !== 'idle' && e.state !== 'return' && e.state !== 'flee') e.state = 'return';
+
+    /* friendly and neutral creatures go about their lives until someone starts a fight */
+    if (T.disp && !e.hostile) {
+      if (T.ai === 'flyer') { e.state = 'idle'; updateFlyer(e, dt, d, toP); return finishMove(e, dt, d, dx, dz); }
+      e.timer -= dt;
+      if (e.timer <= 0) { e.timer = 3 + Math.random() * 5; e.wander.set(e.home.x + (Math.random() - 0.5) * 16, 0, e.home.z + (Math.random() - 0.5) * 16); }
+      const wx = e.wander.x - e.pos.x, wz = e.wander.z - e.pos.z;
+      if (e.follow && d > 3.5) { wantYaw = toP; wantV = Math.min(T.speed, d * 1.5); }
+      else if (Math.hypot(wx, wz) > 1.2 && !(d < 3 && T.disp === 'friendly')) { wantV = T.speed * 0.25; wantYaw = Math.atan2(wx, wz); }
+      else if (d < 6) wantYaw = toP;     // curious: turn to look at you
+      moveTo(e, wantYaw, wantV, dt);
+      return finishMove(e, dt, d, dx, dz);
+    }
 
     if (e.stun > 0) {
       // reeling
@@ -328,7 +355,7 @@ export function createEnemies(ctx) {
     } else if (e.state === 'return' || e.state === 'idle') {
       wantPos = V3(e.home.x + Math.cos(G.t * 0.4 + e.home.z) * 6, 0, e.home.z + Math.sin(G.t * 0.4 + e.home.z) * 6); wantAlt = 4;
       if (e.state === 'return' && Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) < 8) e.state = 'idle';
-      if (d < T.aggro * D().aggro && G.mode === 'play' && !P.dead) { e.state = 'chase'; ctx.onAggro(e); }
+      if (e.hostile && d < T.aggro * D().aggro && G.mode === 'play' && !P.dead) { e.state = 'chase'; ctx.onAggro(e); }
       sp = T.speed * 0.5;
     }
     if (wantPos) {

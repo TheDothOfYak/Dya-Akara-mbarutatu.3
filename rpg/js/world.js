@@ -43,6 +43,10 @@ export function heightAt(x, z) {
 const STONE = ['#dcbd8c', '#cfa977', '#c39a68', '#e6cba0', '#b98e60', '#d6b07d'];
 const MOSS = ['#7f8f3a', '#6d7f34', '#93a046'];
 
+/* open ground kept clear for the camp and the Kalo Trials */
+export const CAMP = { x: -28, z: 108 };
+const CLEAR = [{ x: CAMP.x, z: CAMP.z, r: 30 }, { x: -36, z: -100, r: 15 }, { x: 100, z: -40, r: 15 }, { x: -100, z: 40, r: 15 }];
+
 /* ================================================================= */
 export function buildWorld(scene) {
   const rng = mulberry32(1307);
@@ -179,6 +183,7 @@ export function buildWorld(scene) {
   }
 
   const keepOut = (x, z, extra = 0) => {
+    if (CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r + extra)) return true;
     if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 40 + extra) return true;
     for (const k in SITES) if (Math.hypot(x - SITES[k].x, z - SITES[k].z) < 30 + extra) return true;
     if (roadDist(x, z) < 9 + extra) return true;
@@ -413,7 +418,7 @@ export function buildWorld(scene) {
   // boulders
   for (let i = 0; i < 220; i++) {
     const a = rng() * Math.PI * 2, r = rng() * 175, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (Math.hypot(x, z) > edgeRadius(x, z) - 4 || roadDist(x, z) < 5 || Math.hypot(x - PLAZA.x, z - PLAZA.z) < 32) continue;
+    if (Math.hypot(x, z) > edgeRadius(x, z) - 4 || roadDist(x, z) < 5 || Math.hypot(x - PLAZA.x, z - PLAZA.z) < 32 || CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
     const s = 0.4 + Math.pow(rng(), 3) * 2.6;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(['#a98a6a', '#9a7a5c', '#b8977a', '#8b6e55']));
     if (s > 1.2) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
@@ -549,7 +554,16 @@ export function buildWorld(scene) {
 
   /* where trouble waits */
   const spawnGroups = [
-    { at: [0, 92], kinds: ['punk', 'punk'] },
+    { at: [14, 70], kinds: ['punk', 'punk'] },
+    // friendly folk: Ruut's herd in its pen, Kipsu families in the fields
+    { at: [CAMP.x + 22, CAMP.z + 22], kinds: ['punk_d', 'punk_d', 'punk_d'], tag: 'herd' },
+    { at: [60, 110], kinds: ['kipsu_f', 'kipsu_f', 'kipsu_f', 'kipsu_f'] },
+    { at: [-110, -20], kinds: ['kipsu_f', 'kipsu_f', 'kipsu_f'] },
+    // the quest-folk: three strays, and Fennek
+    { at: [64, -6], kinds: ['punk_d'], unique: 'stray_1', extra: { stray: 1 } },
+    { at: [-60, -64], kinds: ['punk_d'], unique: 'stray_2', extra: { stray: 2 } },
+    { at: [104, 70], kinds: ['punk_d'], unique: 'stray_3', extra: { stray: 3 } },
+    { at: [-92, -82], kinds: ['kipsu_f'], unique: 'fennek', extra: { pet: 'fennek' } },
     { at: [-30, 46], kinds: ['punk', 'malsti', 'malsti'] },
     { at: [SITES.library.x + 4, SITES.library.z], kinds: ['vel', 'malsti', 'malsti'], unique: 'vel_library' },
     { at: [SITES.library.x + 20, SITES.library.z + 10], kinds: ['punk', 'punk'] },
@@ -571,7 +585,7 @@ export function buildWorld(scene) {
 
   let time = 0;
   return {
-    name: 'aakalay', hazards: [], pillars: [],
+    name: 'aakalay', hazards: [], pillars: [], camp: CAMP,
     lanterns: [
       { id: 'a_pier', name: 'The Pier', x: 5, z: dockZ0 - 10 },
       { id: 'a_gate', name: 'The Great Gate', x: 10, z: 126 },

@@ -218,6 +218,56 @@
   #signin{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,16,.7)}
   #signin input{width:100%;font:17px var(--body);padding:10px 12px;margin:6px 0 10px;border-radius:8px;border:1px solid var(--brass-dim);background:rgba(0,0,0,.35);color:var(--ink)}
   #signin label{font-family:var(--display);font-size:12px;letter-spacing:.15em;color:var(--brass)}
+  /* ---------------- the RPG book ---------------- */
+  #rpg{position:fixed;inset:0;z-index:42;display:flex;align-items:center;justify-content:center;background:rgba(5,8,16,.62);backdrop-filter:blur(3px)}
+  .rpgp{width:min(900px,96vw);max-height:92vh;display:flex;flex-direction:column;padding:18px 24px}
+  #rtabs{display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap}
+  .rtab{font-family:var(--display);letter-spacing:.12em;font-size:13px;background:transparent;color:var(--ink-dim);border:1px solid var(--brass-dim);border-radius:999px;padding:6px 16px;cursor:pointer}
+  .rtab.on{background:var(--brass);color:var(--navy)}
+  #rbody{overflow:auto;padding-right:6px}
+  #rbody h3{font-family:var(--display);font-size:13px;letter-spacing:.2em;color:var(--brass);text-transform:uppercase;margin:14px 0 8px}
+  #rbody h3 small{font-family:var(--body);text-transform:none;letter-spacing:0;color:var(--ink-dim);font-size:14px;margin-left:8px}
+  .rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+  .rcard{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid rgba(243,207,122,.18);border-radius:8px;background:rgba(0,0,0,.2)}
+  .rcard.on{border-color:var(--violet);box-shadow:0 0 10px rgba(180,138,255,.3)}
+  .rcard .ri{font-size:24px;text-align:center}
+  .rcard b{font-family:var(--display);font-weight:500;color:var(--brass2);font-size:14px}
+  .rcard small{display:block;color:var(--ink-dim);font-size:13px;line-height:1.3}
+  .rcard em{color:var(--su);font-style:normal}
+  .rn{color:var(--violet)}
+  .rstats{display:flex;gap:18px;flex-wrap:wrap;font-size:15px;color:var(--ink-dim)} .rstats b{color:var(--ink)}
+  .rshards{display:inline-flex;align-items:center;gap:6px;color:var(--violet);font-family:var(--display)}
+  .shard{display:inline-block;width:10px;height:10px;transform:rotate(45deg);background:var(--violet);box-shadow:0 0 6px var(--violet)}
+  .rperks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+  .rperk{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;border:1px solid rgba(243,207,122,.18)}
+  .rperk.have{border-color:var(--violet);background:rgba(180,138,255,.08)}
+  .rperk b{font-family:var(--display);font-weight:500;color:var(--brass2);font-size:14px}
+  .rperk small{grid-column:1/2;color:var(--ink-dim);font-size:13px}
+  .rperk .rk{color:var(--violet);font-size:18px}
+  .rperk kbd{font-size:11px;background:var(--brass);color:var(--navy);border-radius:4px;padding:0 5px}
+  .xpbar{height:7px;border-radius:999px;background:rgba(0,0,0,.5);border:1px solid var(--brass-dim);overflow:hidden;margin:4px 0 8px}
+  .xpbar i{display:block;height:100%;background:linear-gradient(90deg,#9a6aff,#e0c8ff)}
+  .rquest{padding:10px 12px;border:1px solid rgba(243,207,122,.18);border-radius:8px;margin-bottom:8px}
+  .rquest b{font-family:var(--display);color:var(--brass2)} .rquest p{font-size:15px;margin:4px 0} .rgoal{color:var(--su)}
+  .rmuted{color:var(--ink-dim);font-style:italic}
+  .rmapwrap{display:flex;justify-content:center}
+  #rmap{width:min(620px,80vh,90vw);height:auto;border-radius:10px;border:1px solid var(--brass-dim);cursor:crosshair}
+  /* dialogue choices */
+  #d-choices{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  #d-choices button{text-align:left;font:16px var(--body);color:var(--ink);background:rgba(0,0,0,.3);border:1px solid var(--brass-dim);border-radius:8px;padding:7px 12px;cursor:pointer}
+  #d-choices button:hover{border-color:var(--brass2);color:var(--brass2)}
+  #d-choices button kbd{font-family:var(--display);font-size:11px;background:var(--brass);color:var(--navy);border-radius:4px;padding:0 6px;margin-right:8px}
+  /* quest tracker, level, spells */
+  #qtrack{margin-top:8px;font-size:13px;color:var(--ink-dim);border-top:1px solid rgba(243,207,122,.15);padding-top:6px}
+  #qtrack div{margin:3px 0} #qtrack b{color:var(--su);font-weight:normal}
+  #lvl{font-family:var(--display);font-size:12px;color:var(--violet);margin-left:8px}
+  #xpline{width:220px;height:4px;border-radius:999px;background:rgba(0,0,0,.5);overflow:hidden}
+  #xpline i{display:block;height:100%;background:linear-gradient(90deg,#9a6aff,#e0c8ff)}
+  #spells{position:absolute;right:22px;bottom:96px;display:flex;gap:8px}
+  #spells .ab{width:46px;height:46px;font-size:19px}
+  #spells .ab.locked{opacity:.3}
+  #levelup{position:absolute;top:30%;left:0;right:0;text-align:center;font-family:var(--display);font-size:clamp(26px,4vw,44px);color:#e0c8ff;text-shadow:0 0 24px #7a3cff,0 3px 0 #000;opacity:0;transition:opacity .6s;letter-spacing:.14em}
+  #levelup.show{opacity:1}
   @media (max-width:760px){ #quest{width:220px} .bar{width:180px} .bar.thin{width:150px} #abilities{transform:scale(.8);transform-origin:bottom right} }
 </style>
 </head>
@@ -235,6 +285,7 @@
     <div class="q-text" id="q-text"></div>
     <div class="pips" id="q-pips"></div>
     <div class="q-hint" id="q-hint"></div>
+    <div id="qtrack"></div>
   </div>
   <div id="boss" class="hidden">
     <div class="bname" id="boss-name">THE OATH-ROOTED</div>
@@ -251,7 +302,8 @@
   <div id="vitals">
     <div id="portrait"></div>
     <div class="bars">
-      <div class="name">TORCAIN <small>Stamijan</small></div>
+      <div class="name">TORCAIN <small>Stamijan</small><span id="lvl">LV 1</span></div>
+      <div id="xpline"><i id="xp-fill"></i></div>
       <div class="bar" id="hp"><div class="lag" id="hp-lag"></div><div class="fill" id="hp-fill"></div></div>
       <div class="bar thin stam" id="stam"><div class="fill" id="stam-fill"></div></div>
       <div class="bar thin" id="heat"><div class="fill" id="heat-fill"></div></div>
@@ -259,6 +311,8 @@
       <div id="status"></div>
     </div>
   </div>
+  <div id="levelup"></div>
+  <div id="spells"></div>
   <div id="abilities">
     <div class="ab brass" id="ab-duat"><span class="lbl">Duat Strike</span>🜂<span class="key">RMB</span><div class="cd"></div></div>
     <div class="ab brass" id="ab-flare"><span class="lbl">Tukang</span>🔥<span class="key">Q</span><div class="cd"></div></div>
@@ -266,7 +320,7 @@
   </div>
 </div>
 
-<div id="dialog" class="brass hidden"><div class="face" id="d-face"></div><div class="who" id="d-who"></div><div class="text" id="d-text"></div><div class="next">CLICK ▸</div></div>
+<div id="dialog" class="brass hidden"><div class="face" id="d-face"></div><div class="who" id="d-who"></div><div class="text" id="d-text"></div><div id="d-choices"></div><div class="next" id="d-next">CLICK ▸</div></div>
 <div id="memory" class="brass hidden"><div class="mh">Memory Core · Zikhron</div><div class="mw" id="m-who"></div><div id="m-lines"></div><div class="mc">CLICK TO CONTINUE</div></div>
 <div id="toast" class="brass"></div>
 <div id="fade"></div>
@@ -296,6 +350,8 @@
       <b>F</b><span>Nur Sense — Phorus feels for singing stygian</span>
       <b>E</b><span>Talk · take · use · rest at a Nur Lantern</span>
       <b>R</b><span>Drink Albali film (heal) · <b>T</b> / middle-click lock on</span>
+      <b>I · K · J · M</b><span>Gear &amp; pack · skills · quests · map (fast travel)</span>
+      <b>1–4</b><span>Spells, once learned · <b>H</b> whistle for your Punk · hold <b>SPACE</b> in the air to glide</span>
       <b>TAB</b><span>Rokarvac (journal) · <b>ESC</b> pause</span>
     </div>
     <div class="t-note" id="t-note">Best with a keyboard and mouse. Click the world to take the mouse; Esc gives it back.</div>
@@ -314,6 +370,14 @@
     <div class="row"><span>Shadows</span><input type="checkbox" id="opt-shadows" checked></div>
     <div class="row"><span>Render scale</span><input type="range" id="opt-scale" min="0.5" max="1" step="0.05" value="1"></div>
     <div class="btn-row"><button class="btn" id="btn-resume">Resume</button><button class="btn ghost" id="btn-journal">Rokarvac</button><a class="btn ghost" href="../index.html">Quit</a></div>
+  </div>
+</div>
+
+<div id="rpg" class="hidden">
+  <div class="panel brass rpgp">
+    <div id="rtabs"></div>
+    <div id="rbody"></div>
+    <div class="btn-row" style="margin-top:12px"><button class="btn small" id="rclose">Close</button></div>
   </div>
 </div>
 

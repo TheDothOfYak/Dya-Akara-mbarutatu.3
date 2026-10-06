@@ -52,6 +52,9 @@ export function heightAt(x, z) {
   return Math.max(h, -180);
 }
 
+export const CAMP = { x: -26, z: 130 };
+const CLEAR = [{ x: CAMP.x, z: CAMP.z, r: 30 }, { x: 40, z: -60, r: 15 }, { x: -30, z: 70, r: 15 }, { x: 70, z: 50, r: 15 }];
+
 const STONE = ['#7f7a6c', '#6e6a5e', '#8a8474', '#5f5c52', '#777064'];
 const MOSS = ['#3f6a34', '#4a7a3a', '#2f5a2e'];
 const LEAF = ['#2f6a3a', '#3a7a40', '#24583a', '#4a8a3a', '#2a5048'];
@@ -153,6 +156,7 @@ export function buildLeotik(scene) {
     for (let s = 0; s < 4; s++) wall(k[s][0], k[s][1], k[(s + 1) % 4][0], k[(s + 1) % 4][1], 0.8, hMax, { door: s === door ? 0.5 : null, gaps: 0.25 });
   }
   const keepOut = (x, z, extra = 0) => {
+    if (CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r + extra)) return true;
     for (const k in SITES) if (Math.hypot(x - SITES[k].x, z - SITES[k].z) < 30 + extra) return true;
     if (roadDist(x, z) < 7 + extra) return true;
     if (Math.hypot(x, z) > edgeRadius(x, z) - 14) return true;
@@ -201,7 +205,7 @@ export function buildLeotik(scene) {
   }
   for (let i = 0; i < 160; i++) {
     const a = rng() * Math.PI * 2, r = rng() * 180, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (Math.hypot(x, z) > edgeRadius(x, z) - 4 || roadDist(x, z) < 5) continue;
+    if (Math.hypot(x, z) > edgeRadius(x, z) - 4 || roadDist(x, z) < 5 || CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
     const s = 0.5 + Math.pow(rng(), 3) * 3;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(STONE));
     if (s > 1.2) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
@@ -394,12 +398,17 @@ export function buildLeotik(scene) {
     { at: [-30, -70], kinds: ['rodak', 'rodak', 'rodak'] },
     { at: [0, -112], kinds: ['vel', 'malsti', 'malsti'], unique: 'vel_keep' },
     { at: [30, -110], kinds: ['punk', 'punk', 'tyndael'] },
-    { at: [-30, 120], kinds: ['kipsu', 'kipsu'] },
+    { at: [-60, 100], kinds: ['kipsu', 'kipsu'] },
+    // friendly Kipsu families, and three lost pups crying in the rain
+    { at: [30, 120], kinds: ['kipsu_f', 'kipsu_f', 'kipsu_f'] },
+    { at: [110, -40], kinds: ['kipsu_f'], unique: 'pup_1', extra: { pup: 1, scale: 0.5 } },
+    { at: [-110, -40], kinds: ['kipsu_f'], unique: 'pup_2', extra: { pup: 2, scale: 0.5 } },
+    { at: [20, -40], kinds: ['kipsu_f'], unique: 'pup_3', extra: { pup: 3, scale: 0.5 } },
     { at: [50, 100], kinds: ['albali_t', 'albali_t'] },
   ];
 
   return {
-    name: 'leotik', heightAt, col, SITES, PLAZA: { x: KEEP.x, z: KEEP.z, y: kg }, urverk: { group: urverk, ringMat, portalMat },
+    name: 'leotik', camp: CAMP, heightAt, col, SITES, PLAZA: { x: KEEP.x, z: KEEP.z, y: kg }, urverk: { group: urverk, ringMat, portalMat },
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, hazards, pillars, lanterns, stones, falls: [],
     update(t, dt, particles, camPos) {
