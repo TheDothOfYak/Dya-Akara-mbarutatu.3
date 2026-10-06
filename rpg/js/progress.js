@@ -39,7 +39,7 @@ export const saveKey = accountId => accountId ? BASE + ':' + accountId : BASE;
 
 export function freshSave(difficulty) {
   return {
-    v: 2, difficulty, region: 'aakalay', shards: 0, ups: {}, lantern: null, lit: {},
+    v: 2, difficulty, region: 'xilia', shards: 0, ups: {}, lantern: null, lit: {},
     flags: {}, cores: {}, codex: {}, lost: null, time: 0, deaths: 0, kills: 0, cleared: {}, savedAt: 0,
     runId: Math.random().toString(36).slice(2, 10),
   };

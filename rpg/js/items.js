@@ -68,7 +68,8 @@ export const FORGE = [
 
 /* what the trader keeps on her mat (price in shards) */
 export const SHOP = {
-  aakalay: ['salad', 'stew', 'petal', 'vine', 'bark', 'ore', 't_breath', 't_seed'],
+  xilia: ['salad', 'stew', 'petal', 'vine', 'bark', 'ore', 't_breath', 't_seed'],
+  aakalay: [],
   leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 't_ring', 't_ver'],
 };
 

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildPunk } from './actors.js';
-import { buildRodak, buildKipsu, buildAlbali, buildVel, buildTyndael, buildSruVorn } from './creatures.js';
+import { buildRodak, buildKipsu, buildAlbali, buildVel, buildTyndael, buildSruVorn, buildDummy } from './creatures.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
@@ -17,6 +17,9 @@ export const TYPES = {
   rodak: { name: 'Rodak', build: buildRodak, hp: 75, dmg: 15, speed: 8.6, rad: 0.7, range: 2.7, aggro: 14, windup: 0.45, recover: 0.7, lunge: 13, shards: 10, ai: 'scavenger', color: 0x6a8a8a },
   kipsu: { name: 'Kipsu', build: () => buildKipsu(0.55), hp: 32, dmg: 4, speed: 9.5, rad: 0.45, range: 1.5, aggro: 11, windup: 0.3, recover: 0.4, lunge: 9, shards: 5, ai: 'thief', color: 0x6af0e0 },
   albali: { name: 'Albali Byrd', build: () => buildAlbali(false), hp: 48, dmg: 10, speed: 9, rad: 0.7, range: 1.8, aggro: 20, shards: 9, ai: 'flyer', status: 'paralyze', color: 0xffe0a0, disp: 'neutral' },
+  /* the Carpenter's straw dummies — they only stand there and take it */
+  dummy: { name: 'Training dummy', build: buildDummy, hp: 30, dmg: 0, speed: 0, rad: 0.45, range: 0, aggro: 0, shards: 1, ai: 'static', color: 0xd8c098, disp: 'training' },
+  dummy_far: { name: 'High dummy', build: buildDummy, hp: 30, dmg: 0, speed: 0, rad: 0.45, range: 0, aggro: 0, shards: 1, ai: 'static', color: 0xd8c098, disp: 'training', perch: 6 },
   /* friendly folk of the wilds — they only fight if you start it */
   kipsu_f: { name: 'Kipsu', build: () => buildKipsu(0.75), hp: 40, dmg: 6, speed: 9, rad: 0.5, range: 1.6, aggro: 0, windup: 0.35, recover: 0.5, lunge: 9, shards: 2, ai: 'melee', color: 0x6af0e0, disp: 'friendly' },
   punk_d: { name: 'Domestic Punk', build: () => buildPunk(false, { domestic: true }), hp: 90, dmg: 10, speed: 6, rad: 1.0, range: 2.6, aggro: 0, windup: 0.6, recover: 0.8, lunge: 8, shards: 3, ai: 'melee', color: 0xe8a85a, disp: 'friendly' },
@@ -85,7 +88,7 @@ export function createEnemies(ctx) {
     const stun = (opts.stun ?? 0.32) * st;
     if (stun > 0.15) { e.stun = Math.max(e.stun, stun); e.windup = 0; if (e.state === 'windup') e.state = 'chase'; }
     if (e.T.ai === 'flyer' && opts.stun >= 0.3) { e.state = 'recover'; e.timer = 1.4; }
-    if (T_isPassive(e) && !e.hostile) ctx.onProvoke && ctx.onProvoke(e);
+    if (T_isPassive(e) && !e.hostile && e.T.disp !== 'training') ctx.onProvoke && ctx.onProvoke(e);
     e.hostile = true;
     if (e.state === 'idle' || e.state === 'shadow') e.state = 'chase';
     aggroGroup(e);
@@ -181,6 +184,14 @@ export function createEnemies(ctx) {
     const aggroR = T.aggro * D().aggro;
 
     if (!playing && e.state !== 'idle' && e.state !== 'return' && e.state !== 'flee') e.state = 'return';
+
+    /* dummies stand still on their posts */
+    if (T.ai === 'static') {
+      e.pos.set(e.home.x, ctx.world.heightAt(e.home.x, e.home.z) + (T.perch || 0), e.home.z); e.vel.set(0, 0, 0);
+      a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
+      a.animate(dt, { t: ctx.G.t });
+      return;
+    }
 
     /* friendly and neutral creatures go about their lives until someone starts a fight */
     if (T.disp && !e.hostile) {

@@ -322,3 +322,22 @@ export function buildMalstiLord() {
     flash(v) { rind.emissive.setRGB(v + 0.12, v * 0.85 + 0.03, v + 0.22); },
   };
 }
+
+/* ---------------- a straw training dummy ---------------- */
+export function buildDummy() {
+  const root = new THREE.Group();
+  const sack = mat(0xc8a868), wood = mat(0x6a4428), rope = mat(0x8a6a3a);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.2, 6), wood); post.position.y = 1.1; root.add(post);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 0.6, 4, 8), sack); body.position.y = 1.35; root.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), sack); head.position.y = 2.15; root.add(head);
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 5), wood); arm.rotation.z = Math.PI / 2; arm.position.y = 1.65; root.add(arm);
+  for (const y of [1.15, 1.6]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.39, 0.03, 4, 14), rope); r.rotation.x = Math.PI / 2; r.position.y = y; root.add(r); }
+  const target = new THREE.Mesh(new THREE.CircleGeometry(0.16, 12), new THREE.MeshBasicMaterial({ color: 0xc0392b })); target.position.set(0, 1.45, 0.39); target.userData.noOutline = true; root.add(target);
+  finish(root, 0.025);
+  let wob = 0;
+  return {
+    root, mats: [sack],
+    animate(dt, st) { wob = Math.max(0, wob - dt * 3); root.rotation.z = Math.sin(st.t * 18) * wob * 0.15; },
+    flash(v) { sack.emissive.setRGB(v, v * 0.9, v * 0.8); if (v > 0.5) wob = 1; },
+  };
+}

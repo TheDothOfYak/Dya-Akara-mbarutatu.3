@@ -14,6 +14,7 @@ import { buildSky, SUN_DIR } from './sky.js';
 import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
+import { buildXilia } from './xilia.js';
 import { buildTorcain, buildPhorus, buildMegla, buildCore, buildPunk } from './actors.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
@@ -81,7 +82,7 @@ renderer.toneMappingExposure = REGION === 'leotik' ? 1.15 : 1.08;
 $('game').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = REGION === 'leotik' ? new THREE.Fog(0x4a5a58, 70, 650) : new THREE.Fog(0xf2b88e, 140, 1100);
+scene.fog = REGION === 'leotik' ? new THREE.Fog(0x4a5a58, 70, 650) : REGION === 'xilia' ? new THREE.Fog(0xf6c89a, 160, 1200) : new THREE.Fog(0xf2b88e, 140, 1100);
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 12000);
 
 const hemi = REGION === 'leotik' ? new THREE.HemisphereLight(0x9ab8b0, 0x3a4a30, 1.35) : new THREE.HemisphereLight(0xb8d0ff, 0xc0804e, 1.25);
@@ -111,7 +112,7 @@ function resize() {
 }
 
 /* ---------------- world ---------------- */
-const world = REGION === 'leotik' ? buildLeotik(scene) : buildWorld(scene);
+const world = REGION === 'leotik' ? buildLeotik(scene) : REGION === 'xilia' ? buildXilia(scene) : buildWorld(scene);
 const sky = buildSky(scene, buildEldiShip, REGION === 'leotik' ? 'storm' : 'golden');
 particles = new Particles(scene, 3500);
 resize();
@@ -284,6 +285,7 @@ const enemies = createEnemies({
   stealShards(n) { G.shards -= n; toast(`A Kipsu snatched ${n} shards! Catch it before it gets away!`, 3); },
   onEscape(e) { toast(`The Kipsu escaped with ${e.stolen} shards.`, 3); },
   onKill(e) {
+    if (e.T.disp === 'training') { dummyBroken(e); return; }
     const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4) * FX.shards) + (e.stolen || 0);
     G.shards += n; SAVE.kills++;
     SAVE.killsBy[e.kind.replace('_t', '')] = (SAVE.killsBy[e.kind.replace('_t', '')] || 0) + 1;
@@ -824,6 +826,11 @@ function nurSense() {
 
 function senseTarget() {
   let best = null, bd = 1e9;
+  if (REGION === 'xilia') {
+    const p = xiliaGoal();
+    if (p) return { pos: p.pos, label: p.label, line: p.line };
+    return null;
+  }
   if (REGION === 'aakalay') {
     if (coreCount() < 5) {
       for (const c of cores) { if (c.got) continue; const d = c.pos.distanceTo(P.pos); if (d < bd) { bd = d; best = c; } }
@@ -959,12 +966,15 @@ function wakePillarVisual(p) { p.woken = true; p.mat.emissiveIntensity = 0.9; p.
 function interactables() {
   const list = [];
   if (G.mode !== 'play' || P.dead) return list;
-  if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
+  if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
+  else if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
   else list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => talkPhorus(), far: 2.6 });
-  list.push({ pos: STRYX_SPOT, label: (REGION === 'aakalay' && F_.done) ? 'Set sail for Leotik' : 'Hail the Stryx pilot', act: () => stryx() });
+  list.push({ pos: STRYX_SPOT, label: (REGION === 'aakalay' && F_.done) ? 'Set sail for Leotik' : (REGION === 'xilia' && F_.xseed) ? 'Give the Stryx the fire seed' : 'Hail the Stryx pilot', act: () => stryx() });
   for (const l of lanterns) list.push({ pos: V3(l.x, l.y, l.z), label: lanternLit(l) ? 'Rest at the Nur Lantern' : 'Wake the Nur Lantern', act: () => useLantern(l), far: 2.8 });
   for (const s of stones) list.push({ pos: V3(s.x, s.y, s.z), label: 'Read the carving', act: () => readStone(s), far: 2.6 });
   for (const n of npcs) list.push({ pos: n.pos, label: `Talk to ${n.def.name} <small style="opacity:.7">${n.def.title}</small>`, act: () => npcTalk(n), far: 3.2 });
+  if (REGION === 'xilia' && SAVE.quests.q_camp === 'done') list.push({ pos: V3(world.hearth.x, world.heightAt(world.hearth.x, world.hearth.z), world.hearth.z), label: 'Cook at the hearth', act: () => openBook('cook'), far: 3 });
+  if (REGION === 'xilia' && F_.seedQuest && !F_.xseed) list.push({ pos: world.seedSpot, label: 'Take the fire seed', act: () => takeSeed(), far: 3 });
   if (camp && (REGION === 'leotik' || SAVE.quests.q_camp === 'done')) list.push({ pos: V3(world.camp.x, world.heightAt(world.camp.x, world.camp.z), world.camp.z), label: 'Cook at the fire', act: () => openBook('cook'), far: 2.8 });
   for (const e of enemies.list) {
     if (e.dead || e.hostile || !e.T.disp || e.T.ai === 'flyer') continue;
@@ -997,13 +1007,20 @@ function talkPhorus() {
     'Rest at the lanterns. I can sing your shards into you there — but resting wakes everything else up too.',
   ];
   let line;
-  if (REGION === 'aakalay') line = F_.done ? 'The Punk with a lord in its head. Lovely. The Stryx is waiting when you are.' : coreCount() >= 5 ? 'The plaza, Torcain. The Oath Stone. It’s waiting.' : tips[Math.floor(G.t) % tips.length];
+  if (REGION === 'xilia') line = F_.xseed ? 'Back to the docks — the Stryx will want that seed while it’s warm.' : F_.seedQuest ? 'The Ember Grove is north-east. I’ll feel for the seed if you press F.' : (F_.tut || 0) < 5 ? 'Buhkon’s yard is south-east of the square. Go on — I’ll be near the bakery.' : tips[Math.floor(G.t) % tips.length];
+  else if (REGION === 'aakalay') line = F_.done ? 'The Punk with a lord in its head. Lovely. The Stryx is waiting when you are.' : coreCount() >= 5 ? 'The plaza, Torcain. The Oath Stone. It’s waiting.' : tips[Math.floor(G.t) % tips.length];
   else line = F_.lordDead ? 'The door is open. I’m not going through it without a proper meal first.' : pillarCount() >= 3 ? 'The keep. The Urverk. Let’s finish it.' : tips[Math.floor(G.t) % tips.length];
   dialog([['phorus', line]]);
 }
 
 function stryx() {
   if (REGION === 'aakalay' && F_.done) { setSail(); return; }
+  if (REGION === 'xilia') {
+    if (F_.xseed) { sailToAakalay(); return; }
+    if ((F_.tut || 0) < 5) { dialog(STORY.XILIA.stryxEarly); return; }
+    if (!F_.seedQuest) { dialog(STORY.XILIA.stryxSeed, () => { F_.seedQuest = true; persist(); setObjective(); toast('New quest: The Warm Seed', 3); sfx.core(); }); return; }
+    dialog(STORY.XILIA.stryxWait); return;
+  }
   dialog(REGION === 'leotik' ? [['stryx', 'Kreee. Wet. Stryx does not like wet. Stryx waits anyway.']] : STORY.DIALOG.stryx);
 }
 
@@ -1112,6 +1129,87 @@ function trance() {
   });
 }
 
+/* ---------------- Xilia: the Carpenter's drills, and the warm seed ---------------- */
+function xiliaGoal() {
+  const tut = F_.tut || 0;
+  const bk = npcs.find(n => n.def.id === 'buhkon');
+  if (!F_.xtalked) return { pos: F.pos, label: 'Phorus', line: '' };
+  if (tut === 0 || tut === 4) return bk && { pos: bk.pos, label: 'Buhkon', line: 'Buhkon’s yard — south-east of the square. You know the way better than I do.' };
+  if (tut === 1) { const e = enemies.list.find(e => e.kind === 'dummy' && !e.dead); return e ? { pos: e.pos, label: 'Dummies', line: 'The straw ones. Go on, they won’t hit back.' } : null; }
+  if (tut === 2) { const e = enemies.list.find(e => e.kind === 'dummy_far' && !e.dead); return e ? { pos: e.pos, label: 'High dummy', line: 'Up on the post. Aim, and right-click.' } : null; }
+  if (tut === 3) return { pos: V3(world.tower.x, world.tower.y, world.tower.z), label: 'Tower', line: 'The tower. Up the stair, then jump and hold Space.' };
+  if (F_.xseed || !F_.seedQuest) return { pos: STRYX_SPOT, label: 'The Stryx', line: 'The Stryx, at the end of the pier.' };
+  const d = Math.round(Math.hypot(world.seedSpot.x - P.pos.x, world.seedSpot.z - P.pos.z));
+  return { pos: world.seedSpot, label: 'The fire seed', line: `The seed — it’s warm, I can feel it from here. The Ember Grove, ${d} paces.` };
+}
+const seedMesh = REGION === 'xilia' && !F_.xseed ? (() => {
+  const g = new THREE.Group();
+  const nut = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), toon(0xff7a2a, { emissive: 0xff4a10, emissiveIntensity: 0.9 })); nut.scale.y = 1.25; addOutline(nut, 0.04); g.add(nut);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.46, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), toon(0x6a2c1c)); cap.position.y = 0.22; addOutline(cap, 0.04); g.add(cap);
+  g.add(glowSprite(0xff8a3a, 4, 0.8));
+  g.position.copy(world.seedSpot); scene.add(g);
+  return g;
+})() : null;
+function tutStep(to) {
+  if ((F_.tut || 0) >= to) return;
+  const lines = STORY.XILIA.tut[to - 1];
+  F_.tut = to; persist();
+  const bk = npcs.find(n => n.def.id === 'buhkon');
+  if (bk) bk.talking = 4;
+  if (to === 2 || to === 3 || to === 4) { sfx.core(); toast(to === 4 ? 'Gliding — learned!' : to === 3 ? 'Duat Strike — learned!' : 'Combos — learned!', 2.5); xp(40); }
+  if (to === 1 || to === 5) dialog(lines.map(l => [l[0], l[1]]), () => { setObjective(); if (to === 5) { xp(120); G.shards += 30; toast('Prologue drills complete · +30 shards', 3); persist(); } });
+  else { for (const [, l] of lines.slice(0, 1)) bark('buhkon', l, 4); setTimeout(() => { if (lines[1]) bark('buhkon', lines[1][1], 5); }, 4200); setObjective(); }
+}
+function buhkonTalk(n) {
+  const tut = F_.tut || 0;
+  npcSpeaker(n.def);
+  if (tut === 0) { tutStep(1); return; }
+  if (tut === 4) { tutStep(5); return; }
+  if (tut < 4) { dialog(STORY.XILIA.tut[tut - 1].map(l => [l[0], l[1]])); return; }
+  ask('buhkon', STORY.XILIA.buhkonAfter[Math.floor(Math.random() * STORY.XILIA.buhkonAfter.length)], [
+    { label: 'Run the dummy drills again', act: () => { enemies.list.filter(e => e.T.disp === 'training' && e.dead).forEach(e => respawnDummy(e, 0)); toast('Buhkon props the dummies back up.', 2); lockMouse(); } },
+    { label: 'Goodbye', act: null },
+  ]);
+}
+function respawnDummy(e, delay) {
+  setTimeout(() => {
+    const i = enemies.list.indexOf(e); if (i >= 0) enemies.list.splice(i, 1);
+    scene.remove(e.actor.root);
+    enemies.spawn(e.kind, e.home.x, e.home.z, e.group, { tag: e.tag });
+  }, delay);
+}
+function dummyBroken(e) {
+  particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 26, { color: 0xe8d098, speed: 6, size: 0.45, life: 0.9, gravity: 8 });
+  if (G.lock === e) G.lock = null;
+  const tut = F_.tut || 0;
+  if (e.kind === 'dummy' && tut === 1) {
+    SAVE.counters.tut_dummy = (SAVE.counters.tut_dummy || 0) + 1;
+    setObjective();
+    if (SAVE.counters.tut_dummy >= 3) tutStep(2);
+  }
+  if (e.kind === 'dummy_far' && tut === 2) tutStep(3);
+  respawnDummy(e, 6000);
+}
+function takeSeed() {
+  F_.xseed = true; invAdd(SAVE.inv, 'seed', 1); lootToast('seed', 1);
+  if (seedMesh) seedMesh.visible = false;
+  particles.burst(world.seedSpot.x, world.seedSpot.y + 0.5, world.seedSpot.z, 40, { color: 0xff8a3a, speed: 6, size: 0.6, life: 1, gravity: 2 });
+  sfx.core(); xp(80); persist();
+  dialog(STORY.XILIA.seedTaken, () => setObjective());
+}
+function sailToAakalay() {
+  dialog(STORY.XILIA.setSail, () => {
+    G.mode = 'trance';
+    if (document.pointerLockElement) document.exitPointerLock();
+    fade(0.9, 1.5);
+    playCards(STORY.XILIA.sailCards, 4200, () => {
+      takeAll(SAVE.inv, { seed: 1 }); SAVE.region = 'aakalay'; SAVE.lantern = null; F_.xdone = true; persist(); CLOUD.flush();
+      try { sessionStorage.setItem('torcain-boot', 'arriveA'); } catch (e) { /* ignore */ }
+      location.reload();
+    });
+  });
+}
+
 function setSail() {
   dialog(STORY.DIALOG2.setSail, () => {
     G.mode = 'trance';
@@ -1213,7 +1311,18 @@ function nearestPrompt() {
 /* ---------------- objective text ---------------- */
 function setObjective() {
   let txt, hintTxt = '', pips = 0, on = 0;
-  if (REGION === 'aakalay') {
+  const X = STORY.OBJECTIVES.xilia, tut = F_.tut || 0;
+  if (REGION === 'xilia') {
+    if (!F_.xtalked) txt = X.talk;
+    else if (tut === 0) txt = X.buhkon;
+    else if (tut === 1) { txt = X.dummies(Math.min(3, SAVE.counters.tut_dummy || 0)); hintTxt = 'Left-click to swing — keep clicking to combo'; pips = 3; on = Math.min(3, SAVE.counters.tut_dummy || 0); }
+    else if (tut === 2) { txt = X.high; hintTxt = 'Right-click throws the axe through the Duat'; }
+    else if (tut === 3) { txt = X.glide; hintTxt = 'Jump, then hold Space while falling'; }
+    else if (tut === 4) txt = X.back;
+    else if (F_.xseed) txt = X.sail;
+    else if (F_.seedQuest) { txt = X.seed; hintTxt = 'F — Phorus senses the seed'; }
+    else txt = X.stryx;
+  } else if (REGION === 'aakalay') {
     if (!F_.talked) txt = STORY.OBJECTIVES.talk;
     else if (F_.done) { txt = 'Board the Eldi ship — the Stryx will fly you to Leotik'; }
     else if (G.bossActive) txt = STORY.OBJECTIVES.boss;
@@ -1227,7 +1336,7 @@ function setObjective() {
     else { txt = STORY.LEOTIK_OBJ.pillars(pillarCount()); hintTxt = 'F — Phorus senses the nearest pillar'; }
     pips = 3; on = pillarCount();
   }
-  $('q-head').textContent = REGION === 'aakalay' ? 'Rokarvac I · Aakalay' : 'Rokarvac II · Leotik';
+  $('q-head').textContent = REGION === 'xilia' ? 'Prologue · Xilia' : REGION === 'aakalay' ? 'Rokarvac I · Aakalay' : 'Rokarvac II · Leotik';
   $('q-text').textContent = txt;
   $('q-hint').textContent = hintTxt;
   const el = $('q-pips'); el.innerHTML = '';
@@ -1423,7 +1532,9 @@ function updateCompass() {
 }
 function objectivePoint() {
   let p = null;
-  if (REGION === 'aakalay') {
+  if (REGION === 'xilia') {
+    const g = xiliaGoal(); if (g) p = g.pos;
+  } else if (REGION === 'aakalay') {
     if (!F_.talked) p = F.pos;
     else if (G.bossActive) return null;
     else if (F_.done) p = STRYX_SPOT;
@@ -1443,7 +1554,7 @@ let locTimer = 0;
 function showLocation(a, b) { $('loc1').textContent = a; $('loc2').textContent = b; $('location').classList.add('show'); locTimer = 3.6; }
 function checkLocations() {
   if (G.mode !== 'play') return;
-  const sub = REGION === 'aakalay' ? 'Ruins of Aakalay' : 'Leotik';
+  const sub = REGION === 'xilia' ? 'Xilia' : REGION === 'aakalay' ? 'Ruins of Aakalay' : 'Leotik';
   for (const [k, s] of Object.entries(world.SITES)) {
     if (!G.visited[k] && Math.hypot(P.pos.x - s.x, P.pos.z - s.z) < 26) { G.visited[k] = true; showLocation(s.name, sub); if (!SAVE.flags['seen_site_' + k]) { SAVE.flags['seen_site_' + k] = true; xp(30); } }
   }
@@ -1511,27 +1622,50 @@ function lootToast(id, n) { lootQ.push(`${ITEMS[id].icon} ${ITEMS[id].name}${n >
 
 /* ---------------- the camp and its folk ---------------- */
 const camp = world.camp ? buildCamp(scene, world, world.camp.x, world.camp.z, { banner: true, seed: REGION === 'leotik' ? 7 : 3 }) : null;
-const npcs = camp ? NPCS[REGION].map(def => {
+const npcs = (NPCS[REGION] || []).filter(def => camp || def.pos).map(def => {
   const actor = buildNpc(def);
-  const x = world.camp.x + def.at[0], z = world.camp.z + def.at[1];
+  const x = def.pos ? def.pos[0] : world.camp.x + def.at[0], z = def.pos ? def.pos[1] : world.camp.z + def.at[1];
   const pos = V3(x, world.col.ground(x, z, world.heightAt(x, z) + 0.5), z);
   actor.root.position.copy(pos);
-  const yaw = Math.atan2(world.camp.x - x, world.camp.z - z);
+  const yaw = camp ? Math.atan2(world.camp.x - x, world.camp.z - z) : Math.atan2(world.PLAZA.x - x, world.PLAZA.z - z);
   actor.root.rotation.y = yaw;
   scene.add(actor.root);
-  world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);
-  return { def, actor, pos, yaw, talking: 0 };
-}) : [];
-const npcName = id => { const n = NPCS.aakalay.concat(NPCS.leotik).find(d => d.id === id); return n ? n.name : id; };
+  if (!def.wander) world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);
+  return { def, actor, pos, home: pos.clone(), goal: null, pause: Math.random() * 4, yaw, talking: 0 };
+});
+const npcName = id => { const n = Object.values(NPCS).flat().find(d => d.id === id); return n ? n.name : id; };
 const npcSpeaker = def => { if (!STORY.SPEAKERS[def.id]) STORY.SPEAKERS[def.id] = { name: def.name, color: def.look === 'keilia' ? '#e0b070' : '#e8d8a8', sub: def.title }; return def.id; };
 
 function updateNpcs(dt) {
   for (const n of npcs) {
     const d = n.pos.distanceTo(P.pos);
+    let speed = 0;
+    // townsfolk stroll about, and stop to look at you when you come close
+    if (n.def.wander && d > 5 && n.talking <= 0) {
+      if (!n.goal) {
+        n.pause -= dt;
+        if (n.pause <= 0) {
+          const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 12;
+          n.goal = V3(n.home.x + Math.cos(a) * r, 0, n.home.z + Math.sin(a) * r);
+        }
+      } else {
+        const dx = n.goal.x - n.pos.x, dz = n.goal.z - n.pos.z, gd = Math.hypot(dx, dz);
+        if (gd < 0.6) { n.goal = null; n.pause = 2 + Math.random() * 5; }
+        else {
+          const before = n.pos.clone();
+          n.pos.x += dx / gd * 1.6 * dt; n.pos.z += dz / gd * 1.6 * dt;
+          world.col.resolve(n.pos, 0.45, 1.9);
+          n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6);
+          if (n.pos.distanceTo(before) < 0.5 * dt) { n.goal = null; n.pause = 1; }
+          n.yaw = Math.atan2(dx, dz); speed = 1.6;
+        }
+      }
+      n.actor.root.position.copy(n.pos);
+    }
     const want = d < 7 ? Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z) : n.yaw;
     n.actor.root.rotation.y = dampAngle(n.actor.root.rotation.y, want, 4, dt);
     n.talking = Math.max(0, n.talking - dt);
-    n.actor.animate(dt, { speed: 0, onGround: true, t: G.t + n.pos.x, talking: n.talking > 0 });
+    n.actor.animate(dt, { speed, onGround: true, t: G.t + n.home.x, talking: n.talking > 0 });
   }
   if (camp) camp.update(G.t, particles);
 }
@@ -1563,6 +1697,7 @@ function pickChoice(i) {
 function npcTalk(n) {
   const def = n.def, who = npcSpeaker(def);
   n.talking = 3;
+  if (def.id === 'buhkon') { buhkonTalk(n); return; }
   const opts = [];
   for (const qid of def.quests) {
     const q = QUESTS[qid], st = SAVE.quests[qid];
@@ -1574,12 +1709,12 @@ function npcTalk(n) {
   }
   if (def.roles.includes('shop')) opts.push({ label: 'Trade', act: () => openBook('shop') });
   if (def.roles.includes('forge')) {
-    const ok = REGION === 'leotik' || SAVE.quests.q_ore === 'done';
+    const ok = REGION !== 'xilia' || SAVE.quests.q_ore === 'done';
     opts.push({ label: ok ? 'Forge an axe' : 'Forge an axe <small>(his cauldron is cold)</small>', act: () => ok ? openBook('forge') : dialog([[who, 'No ore, no bark, no fire. Ask me about work.']], () => npcTalk(n)) });
   }
   if (def.roles.includes('cook')) {
-    const ok = REGION === 'leotik' || SAVE.quests.q_camp === 'done';
-    opts.push({ label: ok ? 'Cook at the hearth' : 'Cook <small>(the hearth isn’t built yet)</small>', act: () => ok ? openBook('cook') : dialog([[who, 'Help me raise the camp and I’ll build a hearth worth cooking on.']], () => npcTalk(n)) });
+    const ok = REGION !== 'xilia' || SAVE.quests.q_camp === 'done';
+    opts.push({ label: ok ? 'Cook at the hearth' : 'Cook <small>(the hearth isn’t built yet)</small>', act: () => ok ? openBook('cook') : dialog([[who, 'Help me raise the storehouse and I’ll build a hearth worth cooking on.']], () => npcTalk(n)) });
   }
   if (def.roles.includes('stable') && SAVE.flags.mount) opts.push({ label: 'Ask about Brindle', act: () => dialog([[who, 'Whistle (H) and she’ll come. Ride her with E. Don’t let her eat the Zahreh.']], () => npcTalk(n)) });
   opts.push({ label: 'Goodbye', act: null });
@@ -1653,7 +1788,7 @@ let mount = null;
 function makeMount(nearPlayer) {
   if (mount) return;
   const actor = buildPunk(false, { domestic: true, blanket: 0x8a2a3a });
-  const p = nearPlayer ? P.pos.clone().add(V3(3, 0, 3)) : camp ? V3(camp.pen.x, 0, camp.pen.z) : P.pos.clone().add(V3(4, 0, 4));
+  const p = nearPlayer ? P.pos.clone().add(V3(3, 0, 3)) : camp ? V3(camp.pen.x, 0, camp.pen.z) : world.pen ? V3(world.pen.x + 3, 0, world.pen.z) : P.pos.clone().add(V3(4, 0, 4));
   p.y = world.col.ground(p.x, p.z, world.heightAt(p.x, p.z) + 1);
   actor.root.position.copy(p); scene.add(actor.root);
   mount = { actor, pos: p, vel: V3(), yaw: 0, coming: false };
@@ -1893,7 +2028,7 @@ function bookAct(act, arg) {
       sfx.heal();
     }
   } else if (act === 'buy') {
-    const price = Math.max(2, Math.round(ITEMS[arg].value * (REGION === 'leotik' ? 1.4 : 1.2)));
+    const price = Math.max(2, Math.round(ITEMS[arg].value * (REGION === 'leotik' ? 1.4 : REGION === 'xilia' ? 1.0 : 1.2)));
     if (G.shards >= price) { G.shards -= price; invAdd(inv, arg, 1); sfx.core(); }
   } else if (act === 'sell') {
     if (inv.items[arg] > 0) { inv.items[arg]--; if (inv.items[arg] <= 0) delete inv.items[arg]; G.shards += Math.max(1, Math.round(ITEMS[arg].value * 0.5)); sfx.ui(); }
@@ -1922,6 +2057,10 @@ function mapMarkers() {
   const m = [];
   for (const l of lanterns) m.push({ x: l.x, z: l.z, ch: '◉', col: lanternLit(l) ? '#bfeaff' : '#5a6a7a', size: 15, label: lanternLit(l) ? l.name : null, travel: lanternLit(l) ? l.id : null });
   if (camp) m.push({ x: world.camp.x, z: world.camp.z, ch: '⌂', col: '#ffd27a', size: 20, label: 'Camp' });
+  if (REGION === 'xilia') {
+    m.push({ x: world.PLAZA.x, z: world.PLAZA.z, ch: '⌂', col: '#ffd27a', size: 20, label: 'Xilia' });
+    for (const n of npcs) if (!n.def.wander) m.push({ x: n.pos.x, z: n.pos.z, ch: '●', col: '#e8d8a8', size: 11 });
+  }
   for (const t of feats.trials) m.push({ x: t.x, z: t.z, ch: '▲', col: t.done ? '#6a7a6a' : '#7ad8ff', size: 15 });
   const o = objectivePoint(); if (o) m.push({ x: o.p.x, z: o.p.z, ch: '◆', col: '#f3cf7a', size: 18 });
   for (const e of enemies.list) if (!e.dead && ((e.stray && SAVE.quests.q_strays === 'active') || (e.pet && SAVE.quests.q_fennek === 'active') || (e.pup && SAVE.quests.q_pups === 'active'))) m.push({ x: e.pos.x, z: e.pos.z, ch: '✦', col: '#ff9ad0', size: 15 });
@@ -2043,7 +2182,7 @@ function updatePlayer(dt) {
   P.vel.y -= 28 * dt;
   // gliding: hold Space while falling and Torcain's coat catches the wind
   P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
-  const glideOk = act && !P.riding && keys.Space && !P.onGround && P.airT > 0.25 && P.vel.y < 0 && (P.stam > 0 || D.stamina.jump === 0 || perk('glider'));
+  const glideOk = !!(act && !P.riding && keys.Space && !P.onGround && P.airT > 0.25 && P.vel.y < 0 && (P.stam > 0 || D.stamina.jump === 0 || perk('glider')));
   P.gliding = glideOk;
   glider.visible = glideOk;
   if (glideOk) {
@@ -2335,6 +2474,10 @@ function frame() {
       updateDialog(dt);
       updateCamera(dt);
       checkLocations();
+      if (REGION === 'xilia') {
+        if (F_.tut === 3 && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
+        if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
+      }
     } else if (G.mode === 'intro') {
       updateIntroCamera(dt);
       updatePhorus(dt);
@@ -2380,7 +2523,7 @@ function beginNew() {
   CAM.yaw = 0; P.yaw = Math.PI;
   playCards(STORY.OPENING, 4200, () => {
     enterPlay();
-    showLocation('The Ruins of Aakalay', 'the riddle’s first step');
+    showLocation('Xilia', 'home, for a little while');
     hint('Walk to Phorus and press E');
   });
 }
@@ -2395,12 +2538,23 @@ function arriveLeotik() {
   });
 }
 
+function arriveAakalay() {
+  P.pos.copy(world.pier.start); F.pos.copy(P.pos).add(V3(-2, 0, -3));
+  G.mode = 'intro'; introT = 0; G.t = 0; CAM.yaw = 0; P.yaw = Math.PI;
+  playCards(STORY.ARRIVE_AAKALAY, 3800, () => {
+    enterPlay();
+    showLocation('The Ruins of Aakalay', 'the riddle’s first step');
+    if (!F_.arrivedA) { F_.arrivedA = true; persist(); }
+    hint('Walk to Phorus and press E');
+  });
+}
+
 function continueRun() {
   P.pos.copy(spawnPoint()); F.pos.copy(P.pos).add(V3(-2, 0, 2));
   CAM.yaw = 0; G.t = 0;
   fade(1, 0); setTimeout(() => fade(0, 1.2), 50);
   enterPlay();
-  showLocation(REGION === 'aakalay' ? 'The Ruins of Aakalay' : 'Leotik', `${D.label} · ${fmtTime(SAVE.time)}`);
+  showLocation(REGION === 'xilia' ? 'Xilia' : REGION === 'aakalay' ? 'The Ruins of Aakalay' : 'Leotik', `${D.label} · ${fmtTime(SAVE.time)}`);
 }
 
 function startFromTitle(fn) {
@@ -2425,8 +2579,8 @@ function newRun(diff) {
   startFromTitle(beginNew);
 }
 
-$('t-kicker').textContent = REGION === 'leotik' ? "Torcain's Run · Rokarvac II" : STORY.TITLE.kicker;
-$('t-title').textContent = REGION === 'leotik' ? 'The Isle of the Urverk' : STORY.TITLE.title;
+$('t-kicker').textContent = REGION === 'leotik' ? "Torcain's Run · Rokarvac II" : REGION === 'xilia' ? STORY.XILIA.kicker : STORY.TITLE.kicker;
+$('t-title').textContent = REGION === 'leotik' ? 'The Isle of the Urverk' : REGION === 'xilia' ? STORY.XILIA.title : STORY.TITLE.title;
 $('t-sub').textContent = STORY.TITLE.sub;
 $('t-riddle').innerHTML = (REGION === 'leotik' ? STORY.NEXT_RIDDLE : STORY.RIDDLE).join('<br>');
 $('loading').textContent = 'THE HIGHLAND IS READY';
@@ -2434,7 +2588,7 @@ $('btn-begin').disabled = false;
 $('d-easy-p').textContent = DIFFICULTY.easy.blurb;
 $('d-real-p').textContent = DIFFICULTY.realistic.blurb;
 if (SAVE_AT_LOAD) {
-  const where = SAVE.region === 'leotik' ? 'Rokarvac II · Leotik' : 'Rokarvac I · Aakalay';
+  const where = SAVE.region === 'leotik' ? 'Rokarvac II · Leotik' : SAVE.region === 'xilia' ? 'Prologue · Xilia' : 'Rokarvac I · Aakalay';
   $('t-save').textContent = `Saved run: ${where} · ${DIFFICULTY[SAVE.difficulty].label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls`;
   $('btn-continue').style.display = ''; $('btn-continue').disabled = false;
 }
@@ -2464,7 +2618,8 @@ $('si-form').onsubmit = async ev => {
 
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'This is a keyboard-and-mouse game — on a phone or tablet the controls won’t work.';
 $('btn-continue').onclick = () => startFromTitle(() => {
-  if (REGION === 'aakalay' && !F_.talked) beginNew();
+  if (REGION === 'xilia' && !F_.xtalked) beginNew();
+  else if (REGION === 'aakalay' && !F_.arrivedA && !F_.talked) arriveAakalay();
   else if (REGION === 'leotik' && !F_.arrivedL) arriveLeotik();
   else continueRun();
 });
@@ -2480,10 +2635,11 @@ frame();
 
 if (BOOT === 'new' && SAVE_AT_LOAD) { $('title').classList.add('hidden'); startFromTitle(beginNew); }
 else if (BOOT === 'arrive' && REGION === 'leotik') { $('title').classList.add('hidden'); startFromTitle(arriveLeotik); }
+else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add('hidden'); startFromTitle(arriveAakalay); }
 
 /* debugging handle for the console */
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  glider, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };
