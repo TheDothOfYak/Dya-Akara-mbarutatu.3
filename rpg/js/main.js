@@ -1860,8 +1860,7 @@ function renderAccount() {
   const el = $('t-acct');
   if (WHO) {
     const where = !CLOUD.configured() ? 'saving in this browser only'
-      : !CLOUD.state.available ? 'cloud saves aren’t switched on for this site yet — saving in this browser'
-      : CLOUD.state.error ? 'couldn’t reach the Dya Guild — saving here and will sync when it’s back'
+      : !CLOUD.state.available ? 'couldn’t reach the Dya Guild — this session saves in this browser only (reload to try again)'
       : 'your run saves to your Dya’Akara account';
     el.innerHTML = `Signed in as <b>${WHO.name.replace(/[<>&]/g, '')}</b> · ${where} · <a href="#" id="t-signout">Sign out</a>`;
     $('t-signout').onclick = ev => { ev.preventDefault(); CLOUD.flush(); CLOUD.signOut(); location.reload(); };
