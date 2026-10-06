@@ -265,7 +265,11 @@
         ['🏹 Hunt', () => UI.show('huntRun')],
         ['🃏 Legends of Pia’don', () => UI.show('pia')],
         /* Torcain's Run — the 3D single-player RPG, its own page under rpg/ */
-        ['⛵ Torcain’s Run', () => { location.href = 'rpg/index.html'; }],
+        ['⛵ Torcain’s Run', () => {
+          /* hand the signed-in account to the RPG so its story progress saves to this account */
+          try { sessionStorage.setItem('torcain-identity', JSON.stringify({ id: G.me.id, email: G.me.email, name: G.me.displayName })); } catch (e) { /* ignore */ }
+          location.href = 'rpg/index.html';
+        }],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['🪐 The Mbaru Tatu', () => UI.show('world')],

@@ -44,19 +44,32 @@ Create an account (email/password — cross-device when online is configured, ot
 
 A separate, semi-3D action RPG lives in **`rpg/`** — open `rpg/index.html` (or pick **⛵ Torcain’s Run** on the main menu). It runs on a vendored copy of three.js (`rpg/vendor/`), so it still needs no build step and works offline.
 
-**Rokarvac I: The Ruins of Aakalay.** Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc, now Stamijan) with **Phorus**, the Kalo’Eik Nur, as your companion. Search the dead city on its floating highland for five singing memory cores, take them to the Oath Stone, and fight the **Megla Aagac** that grows out of the city’s old lord.
+Two chapters so far. Your run is saved in the browser at every Nur Lantern and story beat; use **Continue** on the title screen to pick it back up.
+
+- **Rokarvac I: The Ruins of Aakalay.** Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc, now Stamijan) with **Phorus**, the Kalo’Eik Nur, as your companion. Recover five singing memory cores, wake the Oath Stone, and fight the **Megla Aagac** that grew out of the city’s lord. Then board the Eldi ship.
+- **Rokarvac II: The Isle of the Urverk (Leotik).** A stormy jungle isle with acid bogs, the ruins of Villtur and an Albali roost. Wake three Klug pillars, then face the **Malsti Lord** at the Urverk.
+
+**Difficulty** is picked when you start a run:
+- **Easy:** forgiving enemies, health regenerates, 5 healing vials, and you keep your shards when you fall.
+- **Realistic:** enemies hit about 3.5× harder than on Easy and have nearly twice the health. Attacks, rolls, sprinting and jumping cost stamina. Nothing heals on its own and you get only 3 vials. When you die, your shards drop where you fell, and the wilds respawn whenever you rest. It is built to take several sittings.
+
+**Creatures:** Wild Punks, Malsti Punks (they blink through the Duat), Rodak (they shadow you and attack when you're weak), Kipsu (they steal shards and run), Albali Byrds (they dive from above; their horns paralyse, or poison on Leotik), Duskareth Vel (they throw knives out of the Duat), Tyndael (they spit venom that pools on the ground), and the **Sru Vorn** mini-boss.
+
+**Nur Lanterns** are the checkpoints. Resting at one heals you, refills your Albali film, respawns enemies, and lets you spend zikhron shards on Vigor, Edge, Breath, Duat mastery, extra film vials and Tukang.
 
 | Input | Action |
 |---|---|
 | `W A S D` + mouse | Move and look (click the world to capture the mouse) |
-| `Shift` / `Space` | Sprint (Tukang ember trail) / jump |
+| `Shift` / `Space` / `C` | Sprint / jump / dodge roll |
 | Left click | Three-strike axe combo |
 | Right click | **Duat Strike**: the axe passes through the Duat to the foe you’re aiming at |
+| `T` or middle click | Lock on to a target |
+| `R` | Drink Albali film (heals and cures poison) |
 | `Q` | **Tukang Flare**: releases full heat as a fire nova |
-| `F` | **Nur Sense**: Phorus points out the nearest singing core |
-| `E` / `Tab` / `Esc` | Interact / Rokarvac journal / pause and settings |
+| `F` | **Nur Sense**: Phorus points out the next objective |
+| `E` / `Tab` / `Esc` | Interact or rest / Rokarvac journal / pause and settings |
 
-Code: `rpg/js/world.js` (highland, ruins, collision), `sky.js` (sky, planets, cloud sea), `ship.js` (the Eldi ship), `actors.js` (Eikar, Punks, Megla Aagac), `story.js` (all dialogue and lore text), `main.js` (controls, combat, AI, quest flow).
+Code (`rpg/js/`): `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
 
 ## Match Controls
 
