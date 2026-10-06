@@ -34,19 +34,24 @@ export const UPGRADES = [
 export const upgradeCost = (u, rank) => u.base + u.step * rank;
 
 const BASE = 'torcain-save-v2';
+/* bump to reset every run (v3: the Xilia prologue — all earlier runs start over) */
+export const SAVE_V = 3;
 /* each signed-in account keeps its own local copy; guests share one */
 export const saveKey = accountId => accountId ? BASE + ':' + accountId : BASE;
 
 export function freshSave(difficulty) {
   return {
-    v: 2, difficulty, region: 'xilia', shards: 0, ups: {}, lantern: null, lit: {},
+    v: SAVE_V, difficulty, region: 'xilia', shards: 0, ups: {}, lantern: null, lit: {},
     flags: {}, cores: {}, codex: {}, lost: null, time: 0, deaths: 0, kills: 0, cleared: {}, savedAt: 0,
     runId: Math.random().toString(36).slice(2, 10),
   };
 }
 
 export function loadSave(key = BASE) {
-  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); return s && s.v === 2 ? s : null; } catch (e) { return null; }
+  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); return s && s.v === SAVE_V ? s : null; } catch (e) { return null; }
+}
+export function isOldSave(key = BASE) {
+  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); return !!(s && s.v && s.v !== SAVE_V); } catch (e) { return false; }
 }
 export function writeSave(s, key = BASE) {
   s.savedAt = Date.now();

@@ -27,6 +27,7 @@ export const ITEMS = {
   skewer: { name: 'Rodak skewer', kind: 'meal', icon: '🍢', value: 22, desc: '+15% damage for 3 minutes.', buff: { dmg: 1.15 }, dur: 180, heal: 15 },
   broth: { name: 'Fire-seed broth', kind: 'meal', icon: '🍵', value: 40, desc: 'Heat builds twice as fast for 3 minutes.', buff: { heat: 2 }, dur: 180, heal: 20 },
   tea: { name: 'Antidote tea', kind: 'meal', icon: '🫖', value: 30, desc: 'No poison can touch you for 4 minutes.', buff: { antidote: 1 }, dur: 240, heal: 10 },
+  bun: { name: 'Zahreh bun', kind: 'meal', icon: '🥯', value: 16, desc: 'Ama’s recipe. Heals 35; stamina returns 25% faster for 2 minutes.', buff: { stamRegen: 1.25 }, dur: 120, heal: 35 },
   roast: { name: 'Ember roast', kind: 'meal', icon: '🍖', value: 30, desc: 'Take 15% less damage for 3 minutes.', buff: { armor: 0.85 }, dur: 180, heal: 25 },
 
   /* ---- axes ---- */
@@ -42,6 +43,9 @@ export const ITEMS = {
   t_seed: { name: 'Ember seed', kind: 'trinket', icon: '🌰', value: 90, desc: 'Heat builds 30% faster.', perk: { heat: 1.3 } },
   t_breath: { name: 'Breath stone', kind: 'trinket', icon: '🪨', value: 100, desc: 'Stamina returns 25% faster.', perk: { stamRegen: 1.25 } },
   t_ring: { name: 'Hurst ring', kind: 'trinket', icon: '💍', value: 140, desc: '+25 maximum health.', perk: { hp: 25 } },
+  t_knot: { name: 'Farmer’s knot', kind: 'trinket', icon: '🪢', value: 110, desc: 'Teodr’s lucky knot. Take 8% less damage.', perk: { armor: 0.92 } },
+  t_compass: { name: 'Bosk’s compass', kind: 'trinket', icon: '🧭', value: 120, desc: 'It never points north. +15% experience.', perk: { xp: 1.15 } },
+  t_oath: { name: 'Broken oath-ring', kind: 'trinket', icon: '⭕', value: 220, desc: 'Cut from Thornback’s vines. +10% damage, heat builds 20% faster.', perk: { dmg: 1.1, heat: 1.2 } },
   t_ver: { name: 'Ver’s eye', kind: 'trinket', icon: '👁', value: 160, desc: 'Spells recover 20% faster.', perk: { cd: 0.8 } },
 
   /* ---- key items ---- */
@@ -53,6 +57,7 @@ export const RECIPES = [
   { out: 'salad', need: { petal: 2 } },
   { out: 'stew', need: { vine: 2, petal: 1 } },
   { out: 'skewer', need: { oil: 1, vine: 1 } },
+  { out: 'bun', need: { petal: 2, fluff: 1 } },
   { out: 'roast', need: { ember: 1, oil: 1 } },
   { out: 'broth', need: { seed: 1, petal: 1 } },
   { out: 'tea', need: { moss: 2, thorn: 1 } },
@@ -68,7 +73,7 @@ export const FORGE = [
 
 /* what the trader keeps on her mat (price in shards) */
 export const SHOP = {
-  xilia: ['salad', 'stew', 'petal', 'vine', 'bark', 'ore', 't_breath', 't_seed'],
+  xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed'],
   aakalay: [],
   leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 't_ring', 't_ver'],
 };
@@ -105,7 +110,7 @@ export function freshInventory() {
 
 /* the combined effect of what you wear and what you've eaten */
 export function effects(inv, now) {
-  const fx = { dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
+  const fx = { xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
   const axe = ITEMS[inv.axe] || ITEMS.axe_tanoc;
   fx.dmg *= axe.dmg || 1; if (axe.burn) fx.burn = true; fx.duatCd += axe.duatCd || 0; fx.stagger *= axe.stagger || 1;
   for (const t of inv.trinkets) {

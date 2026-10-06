@@ -14,7 +14,7 @@ export function createRpgUI(api) {
   const root = $('rpg'), body = $('rbody'), tabs = $('rtabs');
   let page = 'gear', mapCanvas = null;
 
-  const TABS = [['gear', 'Gear'], ['pack', 'Pack'], ['skills', 'Skills'], ['quests', 'Quests'], ['map', 'Map']];
+  const TABS = [['gear', 'Gear'], ['pack', 'Pack'], ['skills', 'Skills'], ['quests', 'Quests'], ['beasts', 'Beasts'], ['map', 'Map']];
 
   function open(p) {
     page = p || page;
@@ -76,8 +76,15 @@ export function createRpgUI(api) {
       h += `<h3>Side quests</h3>` + (act.length ? act.map(([id]) => {
         const q = QUESTS[id], p = questProgress(id, q, S, inv);
         return `<div class="rquest"><b>${q.name}</b> <small>from ${esc(api.npcName(q.giver))} · ${q.region === 'leotik' ? 'Leotik' : q.region === 'xilia' ? 'Xilia' : 'Aakalay'}</small><p>${q.desc}</p>${goalText(id, q, S, inv)}<div class="xpbar"><i style="width:${p * 100}%"></i></div></div>`;
-      }).join('') : '<p class="rmuted">No side quests. Talk to the folk at the camp.</p>');
+      }).join('') : '<p class="rmuted">No side quests. Talk to people — anyone might need a hand.</p>');
+      const b = api.bounty();
+      h += `<h3>Bounty</h3>` + (b ? `<div class="rquest"><b>Hunt ${b.n} ${esc(b.name)}</b> <small>posted by ${esc(b.from)} · ${b.shards} shards</small><p class="rgoal">${Math.min(b.got, b.n)} / ${b.n}${b.got >= b.n ? ' — claim it at any bounty board' : ''}</p><div class="xpbar"><i style="width:${Math.min(1, b.got / b.n) * 100}%"></i></div></div>` : '<p class="rmuted">No bounty taken. Boards in Xilia and the Leotik camp post hunts.</p>');
       if (done.length) h += `<h3>Finished</h3><p class="rmuted">` + done.map(([id]) => QUESTS[id].name).join(' · ') + `</p>`;
+    } else if (page === 'beasts') {
+      const list = api.beasts();
+      h += `<p class="rmuted">Hunt enough of a creature and Torcain has <b>studied</b> it: +15% damage against its kind.</p><div class="rperks">` + list.map(b => b.seen
+        ? `<div class="rperk${b.studied ? ' have' : ''}"><b>${esc(b.name)}</b><small>${b.lore}<br><em>${b.kills} felled · ${b.studied ? 'studied ✓' : `study at ${b.at}`}</em></small></div>`
+        : `<div class="rperk"><b>???</b><small class="rmuted">Not yet met.</small></div>`).join('') + `</div>`;
     } else if (page === 'map') {
       h += `<p class="rmuted" style="text-align:center">Click a lit Nur Lantern to travel there. ◆ objective · ✦ quest · ◉ lantern · ▲ trial · ⌂ camp</p><div class="rmapwrap"><canvas id="rmap" width="620" height="620"></canvas></div>`;
     } else if (page === 'shop') {
@@ -92,7 +99,7 @@ export function createRpgUI(api) {
         return card(r.out, owned ? 'Owned' : locked ? 'Duro needs a tusk first' : `Forge · ${r.shards} ◆`, ok ? `forge:${r.out}` : null, false, `${needText(r.need)} + ${r.shards} shards`);
       }).join('') + `</div>`;
     } else if (page === 'cook') {
-      h += `<h3>The cookfire <small>cook</small></h3><div class="rgrid">` + RECIPES.filter(r => r.out !== 'tea' || (S.flags || {}).recipe_tea).map(r => {
+      h += `<h3>The cookfire <small>cook</small></h3><div class="rgrid">` + RECIPES.filter(r => (r.out !== 'tea' || (S.flags || {}).recipe_tea) && (r.out !== 'bun' || (S.flags || {}).recipe_bun)).map(r => {
         const ok = hasAll(inv, r.need);
         return card(r.out, 'Cook', ok ? `cook:${r.out}` : null, false, needText(r.need));
       }).join('') + `</div>`;
@@ -115,6 +122,7 @@ export function createRpgUI(api) {
     const g = q.goal;
     if (g.type === 'items') return '<p class="rgoal">' + Object.entries(g.need).map(([k, n]) => `${ITEMS[k].icon} ${Math.min(n, count(inv, k))}/${n} ${ITEMS[k].name}`).join(' · ') + '</p>';
     if (g.type === 'count') return `<p class="rgoal">${Math.min(g.n, (S.counters || {})[g.counter] || 0)} / ${g.n}</p>`;
+    if (g.type === 'lit') return `<p class="rgoal">${Object.keys(S.lit || {}).filter(k => k.startsWith(g.prefix)).length} / ${g.n} lanterns awake</p>`;
     if (g.type === 'kills') return `<p class="rgoal">${Math.min(g.n, Math.max(0, ((S.killsBy || {})[g.kind] || 0) - ((S.qstart || {})[id] || 0)))} / ${g.n}</p>`;
     return '';
   }
