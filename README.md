@@ -40,6 +40,24 @@ Create an account (email/password — cross-device when online is configured, ot
 
 **The Admin Panel** lives at `admin.html` on either hosting domain — outside the game UI, as specified. First visit on a given domain sets that domain's admin password (the password, the local Dya'kukull AI population, and local market/tournament flavor are stored per-browser-origin, so github.io and web.app each get their own — but real player accounts, the shared market, and admin's game-content edits are cloud-based via Supabase and identical on both). You are the admin.
 
+## Torcain's Run (3D single-player RPG)
+
+A separate, semi-3D action RPG lives in **`rpg/`** — open `rpg/index.html` (or pick **⛵ Torcain’s Run** on the main menu). It runs on a vendored copy of three.js (`rpg/vendor/`), so it still needs no build step and works offline.
+
+**Rokarvac I: The Ruins of Aakalay.** Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc, now Stamijan) with **Phorus**, the Kalo’Eik Nur, as your companion. Search the dead city on its floating highland for five singing memory cores, take them to the Oath Stone, and fight the **Megla Aagac** that grows out of the city’s old lord.
+
+| Input | Action |
+|---|---|
+| `W A S D` + mouse | Move and look (click the world to capture the mouse) |
+| `Shift` / `Space` | Sprint (Tukang ember trail) / jump |
+| Left click | Three-strike axe combo |
+| Right click | **Duat Strike**: the axe passes through the Duat to the foe you’re aiming at |
+| `Q` | **Tukang Flare**: releases full heat as a fire nova |
+| `F` | **Nur Sense**: Phorus points out the nearest singing core |
+| `E` / `Tab` / `Esc` | Interact / Rokarvac journal / pause and settings |
+
+Code: `rpg/js/world.js` (highland, ruins, collision), `sky.js` (sky, planets, cloud sea), `ship.js` (the Eldi ship), `actors.js` (Eikar, Punks, Megla Aagac), `story.js` (all dialogue and lore text), `main.js` (controls, combat, AI, quest flow).
+
 ## Match Controls
 
 | Input | Action |
