@@ -103,10 +103,10 @@
   .ab.ready{box-shadow:0 0 14px rgba(255,190,90,.45)}
   .ab .lbl{position:absolute;top:-18px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-family:var(--display);color:var(--ink-dim)}
 
-  #prompt{position:absolute;left:50%;top:62%;transform:translateX(-50%);padding:8px 16px;font-size:17px;white-space:nowrap}
+  #prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);padding:8px 16px;font-size:17px;white-space:nowrap}
   #prompt kbd{font-family:var(--display);background:var(--brass);color:var(--navy);border-radius:5px;padding:1px 7px;margin-right:8px;font-size:14px}
 
-  #bark{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);max-width:640px;text-align:center;font-size:19px;text-shadow:0 2px 4px #000,0 0 12px #000;transition:opacity .4s}
+  #bark{position:absolute;left:50%;bottom:170px;transform:translateX(-50%);max-width:640px;text-align:center;font-size:19px;text-shadow:0 2px 4px #000,0 0 12px #000;transition:opacity .4s}
   #bark b{font-family:var(--display);color:var(--su);font-weight:500;margin-right:8px}
 
   #boss{position:absolute;top:66px;left:50%;transform:translateX(-50%);width:min(620px,70vw);text-align:center}
@@ -172,6 +172,46 @@
   #toast.show{opacity:1}
   #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;box-shadow:inset 0 0 160px rgba(10,6,20,.55)}
   #hurtfx{position:fixed;inset:0;pointer-events:none;z-index:6;box-shadow:inset 0 0 120px rgba(200,30,40,.7);opacity:0;transition:opacity .35s}
+  #stam .fill{background:linear-gradient(90deg,#7ac86a,#d8f08a)}
+  #stam.low .fill{background:linear-gradient(90deg,#c86a4a,#f0a08a)}
+  .bar.thin.stam{height:7px}
+  #belt{display:flex;gap:14px;align-items:center;margin-top:2px;font-family:var(--display);font-size:13px;color:var(--brass2)}
+  #belt span{display:flex;align-items:center;gap:5px}
+  #belt .vial{width:10px;height:16px;border-radius:3px 3px 6px 6px;border:1px solid #f3cf7a;background:linear-gradient(180deg,#fff0c0,#e8b850);box-shadow:0 0 6px #ffd27a}
+  #belt .vial.empty{background:transparent;box-shadow:none;opacity:.4}
+  #belt .shard{width:10px;height:10px;transform:rotate(45deg);background:var(--violet);box-shadow:0 0 6px var(--violet)}
+  #status{display:flex;gap:6px;margin-top:3px;min-height:16px;font-size:12px;font-family:var(--display)}
+  #status .st{padding:1px 7px;border-radius:999px;border:1px solid}
+  #status .poison{color:#b0ff7a;border-color:#6aa03a;background:rgba(60,110,20,.4)}
+  #status .para{color:#ffe0a0;border-color:#b09040;background:rgba(110,90,20,.4)}
+  #poisonfx{position:fixed;inset:0;pointer-events:none;z-index:6;box-shadow:inset 0 0 140px rgba(90,200,40,.55);opacity:0;transition:opacity .4s}
+  #lock{position:absolute;width:34px;height:34px;transform:translate(-50%,-50%);border:2px solid var(--violet);border-radius:50%;box-shadow:0 0 10px var(--violet);display:none}
+  #lock::after{content:'';position:absolute;inset:11px;border-radius:50%;background:var(--violet)}
+  #ehp{position:absolute;inset:0}
+  .ehp{position:absolute;width:64px;height:6px;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);border:1px solid rgba(243,207,122,.5);border-radius:3px;overflow:hidden}
+  .ehp i{position:absolute;inset:0;background:linear-gradient(90deg,#c8323a,#ff8c7a);transform-origin:left}
+  .ehp.elite{width:90px;border-color:var(--violet)}
+  .ehp b{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);white-space:nowrap;font:11px var(--display);color:#e9d8ff;text-shadow:0 1px 2px #000}
+  #lantern{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(5,8,16,.55);backdrop-filter:blur(2px)}
+  #lantern .panel{width:min(620px,94vw);max-height:94vh;overflow:auto}
+  .uprow{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(243,207,122,.15)}
+  .uprow b{font-family:var(--display);font-weight:500;color:var(--brass2)}
+  .uprow small{display:block;color:var(--ink-dim);font-size:14px}
+  .uprow .rank{font-family:var(--display);font-size:13px;color:var(--violet)}
+  .btn.small{font-size:12px;padding:7px 14px}
+  .btn:disabled{filter:grayscale(.8);opacity:.5;cursor:default;transform:none}
+  #death{position:fixed;inset:0;z-index:35;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle,rgba(40,0,10,.55),rgba(0,0,0,.92));opacity:0;pointer-events:none;transition:opacity 1.2s}
+  #death.show{opacity:1}
+  #death h1{font-family:var(--display);font-size:clamp(40px,7vw,84px);color:#c8323a;letter-spacing:.2em;text-shadow:0 0 30px #600}
+  #death p{font-style:italic;color:var(--ink-dim);font-size:19px;margin-top:10px}
+  .diffs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:10px 0 4px}
+  .diff{cursor:pointer;padding:18px;border-radius:10px;border:1px solid var(--brass-dim);background:rgba(0,0,0,.25);transition:border-color .15s, transform .15s}
+  .diff:hover{border-color:var(--brass2);transform:translateY(-2px)}
+  .diff h3{font-family:var(--display);color:var(--brass2);font-size:20px;letter-spacing:.1em}
+  .diff p{font-size:15px;color:var(--ink-dim);margin-top:6px;line-height:1.4}
+  .diff.real h3{color:#ff8a7a}
+  #newgame{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,16,.7)}
+  .t-save{font-size:14px;color:var(--ink-dim);margin:-14px 0 18px}
   @media (max-width:760px){ #quest{width:220px} .bar{width:180px} .bar.thin{width:150px} #abilities{transform:scale(.8);transform-origin:bottom right} }
 </style>
 </head>
@@ -179,21 +219,25 @@
 <div id="game"></div>
 <div id="vignette"></div>
 <div id="hurtfx"></div>
+<div id="poisonfx"></div>
+<div id="death"><h1>YOU FELL</h1><p id="death-sub">Phorus drags you back to the lantern.</p></div>
 
 <div id="hud" class="hidden">
   <div id="compass"><div id="compass-strip"></div><div id="compass-pin"></div></div>
   <div id="quest" class="brass">
-    <div class="q-head">Torcain's Run</div>
+    <div class="q-head" id="q-head">Torcain's Run</div>
     <div class="q-text" id="q-text"></div>
     <div class="pips" id="q-pips"></div>
     <div class="q-hint" id="q-hint"></div>
   </div>
   <div id="boss" class="hidden">
-    <div class="bname">THE OATH-ROOTED</div>
-    <div class="bsub">Megla Aagac of Aakalay</div>
+    <div class="bname" id="boss-name">THE OATH-ROOTED</div>
+    <div class="bsub" id="boss-sub">Megla Aagac of Aakalay</div>
     <div class="bar"><div class="lag" id="boss-lag"></div><div class="fill" id="boss-fill"></div></div>
   </div>
   <div id="crosshair"></div>
+  <div id="ehp"></div>
+  <div id="lock"></div>
   <div id="location"><div class="l1" id="loc1"></div><div class="rule"></div><div class="l2" id="loc2"></div></div>
   <div id="prompt" class="brass hidden"></div>
   <div id="bark"></div>
@@ -203,7 +247,10 @@
     <div class="bars">
       <div class="name">TORCAIN <small>Stamijan</small></div>
       <div class="bar" id="hp"><div class="lag" id="hp-lag"></div><div class="fill" id="hp-fill"></div></div>
+      <div class="bar thin stam" id="stam"><div class="fill" id="stam-fill"></div></div>
       <div class="bar thin" id="heat"><div class="fill" id="heat-fill"></div></div>
+      <div id="belt"><span id="vials"></span><span><i class="shard"></i><b id="shards">0</b></span></div>
+      <div id="status"></div>
     </div>
   </div>
   <div id="abilities">
@@ -227,18 +274,21 @@
     <div class="t-title" id="t-title"></div>
     <div class="t-sub" id="t-sub"></div>
     <div class="riddle" id="t-riddle"></div>
+    <div class="t-save" id="t-save"></div>
     <div class="btn-row">
-      <button class="btn" id="btn-begin" disabled>Begin the Run</button>
+      <button class="btn" id="btn-continue" disabled style="display:none">Continue</button>
+      <button class="btn" id="btn-begin" disabled>New Run</button>
       <a class="btn ghost" href="../index.html">Back to Dya'Akara</a>
     </div>
     <div class="controls">
       <b>WASD</b><span>Move · <b>SHIFT</b> sprint · <b>SPACE</b> jump</span>
       <b>MOUSE</b><span>Look · wheel to zoom</span>
-      <b>LMB</b><span>Axe combo (three strikes)</span>
+      <b>LMB</b><span>Axe combo (three strikes) · <b>C</b> dodge roll</span>
       <b>RMB</b><span>Duat Strike — your axe goes through the Duat to the foe you aim at</span>
       <b>Q</b><span>Tukang Flare — release built-up heat</span>
       <b>F</b><span>Nur Sense — Phorus feels for singing stygian</span>
-      <b>E</b><span>Talk · take · use</span>
+      <b>E</b><span>Talk · take · use · rest at a Nur Lantern</span>
+      <b>R</b><span>Drink Albali film (heal) · <b>T</b> / middle-click lock on</span>
       <b>TAB</b><span>Rokarvac (journal) · <b>ESC</b> pause</span>
     </div>
     <div class="t-note" id="t-note">Best with a keyboard and mouse. Click the world to take the mouse; Esc gives it back.</div>
@@ -271,14 +321,36 @@
   </div>
 </div>
 
+<div id="newgame" class="hidden">
+  <div class="panel brass" style="width:min(640px,94vw)">
+    <h2>Choose your Run</h2>
+    <div class="diffs">
+      <div class="diff" id="d-easy"><h3>Easy</h3><p id="d-easy-p"></p></div>
+      <div class="diff real" id="d-real"><h3>Realistic</h3><p id="d-real-p"></p></div>
+    </div>
+    <p id="ng-warn" style="color:#ff9a8a;font-size:14px;text-align:center;margin-top:8px"></p>
+    <div class="btn-row"><button class="btn ghost" id="btn-ngback">Back</button></div>
+  </div>
+</div>
+
+<div id="lantern" class="hidden">
+  <div class="panel brass">
+    <h2 id="lan-name">Nur Lantern</h2>
+    <p style="text-align:center;color:var(--ink-dim);font-style:italic;margin:-8px 0 12px" id="lan-sub">You rest. Wounds close, the film refills — and the wilds stir awake again.</p>
+    <p style="text-align:center;font-family:var(--display);color:var(--violet);margin-bottom:6px"><i class="shard" style="display:inline-block;width:10px;height:10px;transform:rotate(45deg);background:var(--violet);margin-right:8px"></i><span id="lan-shards">0</span> zikhron shards</p>
+    <div id="lan-ups"></div>
+    <div class="btn-row"><button class="btn" id="btn-lanleave">Rise</button></div>
+  </div>
+</div>
+
 <div id="endcard" class="hidden">
   <div class="panel brass">
-    <div class="t-kicker">Rokarvac I · Complete</div>
-    <h2 style="margin-top:10px">The Ruins of Aakalay</h2>
-    <p style="color:var(--ink-dim);font-style:italic">Noka's next riddle, found at the edge of the trance:</p>
+    <div class="t-kicker" id="e-kicker">Rokarvac I · Complete</div>
+    <h2 style="margin-top:10px" id="e-title">The Ruins of Aakalay</h2>
+    <p style="color:var(--ink-dim);font-style:italic" id="e-lead">Noka's next riddle, found at the edge of the trance:</p>
     <div class="riddle" id="e-riddle"></div>
-    <p style="color:var(--ink-dim);font-size:15px;margin-bottom:20px">Torcain's Run continues…</p>
-    <div class="btn-row"><button class="btn" id="btn-explore">Keep exploring</button><a class="btn ghost" href="../index.html">Back to Dya'Akara</a></div>
+    <p style="color:var(--ink-dim);font-size:15px;margin-bottom:20px" id="e-stats">Torcain's Run continues…</p>
+    <div class="btn-row"><button class="btn" id="btn-sail">Board the Eldi ship</button><button class="btn ghost" id="btn-explore">Keep exploring</button><a class="btn ghost" href="../index.html">Back to Dya'Akara</a></div>
   </div>
 </div>
 

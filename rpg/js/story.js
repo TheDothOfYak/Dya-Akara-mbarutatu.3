@@ -170,3 +170,102 @@ export const CODEX = [
   ['Eldi Ship', 'A mature fire tree, hollowed out. Fire never harms the wood. A living seed in the stern pushes it through the sky, and a Stryx grown in the pilot stump flies it.'],
   ['Zahreh', 'Flowers — and, in the old tongue, the name for a city’s rich and noble. The flowers of the garden still heal.'],
 ];
+
+/* ================================================================
+   additions: lanterns, lore stones, more creatures, Rokarvac II
+   ================================================================ */
+SPEAKERS.stone = { name: 'Carved Stone', color: '#d9b87a', sub: 'an inscription' };
+
+export const CODEX_MORE = [
+  ['Nur Lantern', 'Phorus can wake a Nur-light in an old lantern. Rest beside one to heal, refill the Albali film, and spend zikhron shards to strengthen your Hurst. Resting wakes the wilds again.'],
+  ['Zikhron shards', 'Splinters of memory that fall from whatever you defeat. A Nur Lantern can sing them into you.'],
+  ['Albali film', 'The healing film from an Albali Byrd’s horn, kept in vials. It stings, but it closes wounds and burns out poison. (R)'],
+  ['Rodak', 'Dark, oily, lean and tall, all the same size. Scavengers that follow things expecting an aftermath. They keep their distance — until you are hurt, or until you strike one.'],
+  ['Kipsu', 'Weasel face, fox ears, big paws and a very fluffy tail, with glowing patterns all their own. The small ones love trouble — and your shards. Catch the thief to get them back.'],
+  ['Albali Byrd', 'Five horns coated in a healing film that stings so badly it paralyses. On Leotik a poison has turned the film toxic. They circle high; strike them when they dive.'],
+  ['Duskareth Vel', 'Eikar of the Duskareth who train to throw objects out of the Duat with precision. Watch for knives appearing in the air around you.'],
+  ['Tyndael', 'A spark of fire with legs. Keeps its distance and spits burning venom that lingers on the ground.'],
+  ['Sru Vorn', 'Long, low and heavy, with matted fur armour, tusks, a spiked ball tail and acid saliva. Its acid pits are farmed like fields.'],
+  ['Klug Pillars', 'Great pillars of stygian in the keep on Leotik, each carved with the word "Klug". They feel like many Relics, cores and a grow-forge all at once. Nobody knows what they are for.'],
+  ['The Urverk', 'A portal. Most no longer know their triggers.'],
+];
+
+export const STONES = {
+  a_gate: ['Carved over the gate, worn almost smooth:', '"AAKALAY — WHERE EVERY OATH IS KEPT."', 'Someone has scratched beneath it, much later: "by force."'],
+  a_library: ['A shelf-plaque from the library:', '"Memory stores are for recalling history accurately. Dwellers may use them for travel. Do not drink from the cistern — it remembers."'],
+  a_tower: ['A watchman’s tally, gouged into the stone.', 'Hundreds of marks. The last row is only half finished.'],
+  a_grove: ['Pinned to the fire tree’s root with a smith’s nail:', '"Fire trees are never harmed by fire. Their seeds are. Ask any shipwright."'],
+  a_plaza: ['A list of names around the dais, each one sworn.', 'Many have been struck through. A few have been struck through and then — very carefully — written in again.'],
+  l_villtur: ['Villtur stone, carved in an older hand:', '"What lives here was here first. Build quietly."'],
+  l_bogs: ['A warning post, half dissolved:', '"DON’T STEP IN THE BOGS. That’s the whole trick to a Sru Vorn hunt. The pits are farmed, same as a field of Ju."'],
+  l_roost: ['Scratched on a fallen stone beneath the nests:', '"The byrds’ film went green this season. It doesn’t heal anymore. It just hurts."'],
+  l_keep: ['On the keep’s threshold, in a hand you almost recognise:', '"Five cores, three pillars, one door. Do keep up, little Eikar."'],
+};
+
+export const DIALOG2 = {
+  setSail: [
+    ['torcain', '"Follow the Punk with a lord in its head, to the isle where the Urverk wakes the dead."'],
+    ['phorus', 'Leotik. Of course it’s Leotik. Everything there is either poisonous, venomous, or both.'],
+    ['stryx', 'Kreee! Long flight. Stryx likes long flights.'],
+  ],
+  firstLantern: [
+    ['phorus', 'Hold on — this old lantern still has a wick of Nur in it. Let me wake it.'],
+    ['phorus', 'There. Rest here and I can pull the shards you’ve gathered into your Hurst. And it’ll be where I drag you back to, if you fall.'],
+    ['torcain', 'Comforting.'],
+  ],
+  arriveLeotik: [
+    ['phorus', 'Leotik. Smell that? Rot and rain and something sweet that’s definitely poisonous.'],
+    ['torcain', 'The Punk came here. I can almost feel the lord’s memory in the air.'],
+    ['phorus', 'That’s the Urverk you’re feeling. There’s a keep to the north — and three big pieces of stygian singing louder than anything in Aakalay.'],
+    ['phorus', 'Pillars. One in the bogs to the west, one in the ruins of Villtur to the east, one up on the byrd roost. The Punk is hiding behind all three of them.'],
+    ['torcain', 'Then we wake the pillars.'],
+    ['phorus', 'And try very hard not to step in anything green.'],
+  ],
+  pillarWoken: [
+    ['phorus', 'It’s awake — feel that? It’s reaching toward the keep.'],
+  ],
+  allPillars: [
+    ['phorus', 'All three. The keep is humming like a struck bell. Whatever’s in there knows we’re coming.'],
+  ],
+  sruvorn: [
+    ['phorus', 'Sru Vorn! Don’t stand behind it — that tail — and don’t stand in front of it either!'],
+  ],
+  lordRise: [
+    ['phorus', 'The Urverk — it’s opening!'],
+    ['torcain', 'Something’s coming through.'],
+    ['phorus', 'That’s — that’s the Punk. The little one from the memory. Except it isn’t little anymore.'],
+    ['torcain', 'And it’s wearing his hat.'],
+    ['phorus', 'The lord of Aakalay. Still swearing people to him from inside a pumpkin. Cut him out, Torcain!'],
+  ],
+  lordHalf: [
+    ['phorus', 'He’s pulling from the Urverk — watch the floor!'],
+  ],
+  lordDown: [
+    ['torcain', 'It’s over. The stem — his memory is in the stem.'],
+    ['phorus', 'Don’t you dare drink that.'],
+    ['torcain', 'I’m going to keep it. Somebody should remember what he did. Properly, this time.'],
+    ['noka', 'Well, well. The little Eikar with the borrowed name keeps his promises after all.'],
+    ['phorus', 'Noka?!'],
+    ['noka', 'The door is open, children. It leads where all old roads lead. I shall be at the top of it, waiting — riddles ready.'],
+  ],
+};
+
+export const LEOTIK_OBJ = {
+  pillars: n => `Wake the three Klug pillars (${n}/3)`,
+  keep: 'Go to the Urverk in the keep to the north',
+  boss: 'Cut the lord of Aakalay out of the Malsti Lord',
+  done: 'Rokarvac II complete',
+};
+
+export const ENDING2 = [
+  'Through the Urverk, the light is a colour that has no name in Dearcineon.',
+  'Phorus takes one step, and then another, and does not let go of your arm.',
+  'Somewhere at the top of everything, an old voice is laughing.',
+];
+
+export const NEXT_RIDDLE2 = [
+  'Up the old road where the mountains are made,',
+  'past the iron that sings and the iron that’s weighed —',
+  'the peak that is me is the peak that is not.',
+  'Come find what the Duat forgot that it forgot.',
+];
