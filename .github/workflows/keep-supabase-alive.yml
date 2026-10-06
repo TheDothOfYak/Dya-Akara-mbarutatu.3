@@ -20,7 +20,8 @@ jobs:
         run: |
           # Same public project URL + anon key that ships in js/config.js
           URL='https://pfqokjuztareqjdxaaiw.supabase.co'
-          KEY=$(grep -o "eyJ[A-Za-z0-9._-]*" js/config.js | head -1 || true)
+          # a real JWT is well over 100 characters; skips the "eyJ…" example in the comment above it
+          KEY=$(grep -oE "eyJ[A-Za-z0-9._-]{100,}" js/config.js | head -1 || true)
           if [ -z "$KEY" ]; then
             echo "Could not find the anon key in js/config.js" >&2; exit 1
           fi
@@ -28,4 +29,8 @@ jobs:
             "$URL/rest/v1/dya_config?select=key&limit=1" \
             -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
           echo "HTTP $code"; cat /tmp/out.json; echo
-          [ "$code" = "200" ] || { echo "Supabase did not answer — it may be paused. Restore it in the dashboard." >&2; exit 1; }
+          case "$code" in
+            200) ;;
+            401|403) echo "Supabase rejected the anon key in js/config.js — check it against the dashboard's API keys." >&2; exit 1 ;;
+            *) echo "Supabase did not answer (HTTP $code) — the project may be paused. Restore it in the dashboard." >&2; exit 1 ;;
+          esac
