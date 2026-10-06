@@ -21,6 +21,7 @@ function spots(world, rng, n, opts = {}) {
     if (world.col.ground(x, z, h + 0.4) > h + 0.3) continue;              // something built here
     if (world.hazards.some(b => Math.hypot(x - b.x, z - b.z) < b.r + 3)) continue;
     if (world.camp && Math.hypot(x - world.camp.x, z - world.camp.z) < 28) continue;
+    if (world.clear && world.clear.some(c => Math.hypot(x - c.x, z - c.z) < c.r + 4)) continue;
     if (Math.hypot(x - world.PLAZA.x, z - world.PLAZA.z) < 34) continue;
     if (out.some(p => Math.hypot(p.x - x, p.z - z) < (opts.gap || 14))) continue;
     if (opts.near && Math.hypot(x - opts.near.x, z - opts.near.z) > opts.near.r) continue;
@@ -31,6 +32,7 @@ function spots(world, rng, n, opts = {}) {
 
 const CHEST_LOOT = {
   aakalay: [['petal', 2], ['ore', 2], ['bark', 2], ['salad', 1], ['stew', 1], ['vine', 3], ['t_seed', 1], ['oil', 2]],
+  xilia: [['petal', 2], ['vine', 2], ['bark', 2], ['salad', 1], ['ore', 1], ['stone', 2]],
   leotik: [['moss', 2], ['ore', 3], ['ember', 2], ['tea', 1], ['seed', 1], ['thorn', 1], ['skewer', 1], ['t_ring', 1]],
 };
 
@@ -50,7 +52,7 @@ function chestMesh() {
 }
 
 export function buildFeatures(scene, world, region, save) {
-  const rng = mulberry32(region === 'leotik' ? 8811 : 5521);
+  const rng = mulberry32(region === 'leotik' ? 8811 : region === 'xilia' ? 3301 : 5521);
   const picked = save.picked || (save.picked = {});
 
   /* ---------- chests ---------- */
@@ -107,8 +109,11 @@ export function buildFeatures(scene, world, region, save) {
   }
 
   /* ---------- the Kalo Trials ---------- */
-  const TRIALS = region === 'aakalay'
-    ? [{ id: 'a_chime', kind: 'chime', name: 'Trial of Echoes', at: [-36, -100], reward: { spell: 'quake', xp: 200 } },
+  const TRIALS = region === 'xilia'
+    ? [{ id: 'x_chime', kind: 'chime', name: 'Trial of Echoes', at: [96, 10], reward: { spell: 'quake', xp: 160 } },
+       { id: 'x_fire', kind: 'brazier', name: 'Trial of Kindling', at: [-62, -40], reward: { seed: 1, xp: 160 } }]
+    : region === 'aakalay'
+    ? [{ id: 'a_chime', kind: 'chime', name: 'Trial of Echoes', at: [-36, -100], reward: { seed: 1, xp: 220, shards: 100 } },
        { id: 'a_duat', kind: 'duat', name: 'Trial of the Seam', at: [100, -40], reward: { seed: 1, xp: 200, shards: 80 } },
        { id: 'a_fire', kind: 'brazier', name: 'Trial of Kindling', at: [-100, 40], reward: { seed: 1, xp: 180, items: { seed: 1 } } }]
     : [{ id: 'l_duat', kind: 'duat', name: 'Trial of the Seam', at: [40, -60], reward: { spell: 'ward', xp: 300 } },

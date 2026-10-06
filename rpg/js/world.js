@@ -553,39 +553,21 @@ export function buildWorld(scene) {
   }
 
   /* where trouble waits */
+  /* Aakalay is dead — no folk at all, and only a few beasts left picking through the ruins */
   const spawnGroups = [
     { at: [14, 70], kinds: ['punk', 'punk'] },
-    // friendly folk: Ruut's herd in its pen, Kipsu families in the fields
-    { at: [CAMP.x + 22, CAMP.z + 22], kinds: ['punk_d', 'punk_d', 'punk_d'], tag: 'herd' },
-    { at: [60, 110], kinds: ['kipsu_f', 'kipsu_f', 'kipsu_f', 'kipsu_f'] },
-    { at: [-110, -20], kinds: ['kipsu_f', 'kipsu_f', 'kipsu_f'] },
-    // the quest-folk: three strays, and Fennek
-    { at: [64, -6], kinds: ['punk_d'], unique: 'stray_1', extra: { stray: 1 } },
-    { at: [-60, -64], kinds: ['punk_d'], unique: 'stray_2', extra: { stray: 2 } },
-    { at: [104, 70], kinds: ['punk_d'], unique: 'stray_3', extra: { stray: 3 } },
-    { at: [-92, -82], kinds: ['kipsu_f'], unique: 'fennek', extra: { pet: 'fennek' } },
-    { at: [-30, 46], kinds: ['punk', 'malsti', 'malsti'] },
-    { at: [SITES.library.x + 4, SITES.library.z], kinds: ['vel', 'malsti', 'malsti'], unique: 'vel_library' },
-    { at: [SITES.library.x + 20, SITES.library.z + 10], kinds: ['punk', 'punk'] },
-    { at: [SITES.tower.x - 10, SITES.tower.z + 8], kinds: ['punk', 'punk', 'punk'] },
+    { at: [SITES.library.x + 8, SITES.library.z + 4], kinds: ['punk', 'malsti', 'malsti'] },
     { at: [SITES.tower.x + 2, SITES.tower.z - 14], kinds: ['albali', 'albali'] },
-    { at: [SITES.grove.x - 6, SITES.grove.z + 16], kinds: ['punk', 'malsti', 'malsti', 'malsti'] },
-    { at: [SITES.grove.x + 18, SITES.grove.z + 4], kinds: ['rodak', 'rodak', 'rodak'] },
-    { at: [SITES.shrine.x + 6, SITES.shrine.z + 12], kinds: ['punk', 'punk', 'malsti', 'malsti'] },
-    { at: [SITES.shrine.x - 8, SITES.shrine.z - 4], kinds: ['albali', 'albali', 'albali'] },
-    { at: [SITES.garden.x + 6, SITES.garden.z - 6], kinds: ['punk', 'malsti'] },
-    { at: [SITES.garden.x - 12, SITES.garden.z + 10], kinds: ['kipsu', 'kipsu', 'kipsu'] },
-    { at: [56, -20], kinds: ['punk', 'punk'] },
-    { at: [-60, -30], kinds: ['punk', 'malsti', 'malsti'] },
+    { at: [SITES.grove.x - 6, SITES.grove.z + 16], kinds: ['punk', 'malsti', 'malsti'] },
+    { at: [SITES.shrine.x + 6, SITES.shrine.z + 12], kinds: ['punk', 'punk', 'malsti'] },
+    { at: [SITES.garden.x - 12, SITES.garden.z + 10], kinds: ['kipsu', 'kipsu'] },
     { at: [40, 100], kinds: ['rodak', 'rodak'] },
-    { at: [70, 70], kinds: ['kipsu', 'kipsu'] },
-    { at: [-90, 60], kinds: ['punk', 'punk', 'malsti'] },
-    { at: [20, -60], kinds: ['rodak', 'rodak', 'rodak'] },
+    { at: [-60, -30], kinds: ['malsti', 'malsti'] },
   ];
 
   let time = 0;
   return {
-    name: 'aakalay', hazards: [], pillars: [], camp: CAMP,
+    name: 'aakalay', hazards: [], pillars: [], camp: null,
     lanterns: [
       { id: 'a_pier', name: 'The Pier', x: 5, z: dockZ0 - 10 },
       { id: 'a_gate', name: 'The Great Gate', x: 10, z: 126 },

@@ -95,6 +95,11 @@ export function buildKeilia(o = {}) {
 
 /* ---------------- who lives in the camps ---------------- */
 export const NPC_LOOKS = {
+  buhkon: { skin: '#b8804a', cap: '#5a3018', marking: 0xfff0c8, emblem: 0xff9a3a, build: 1.12, weapon: 'axe', leg: 0x5a3420, foot: 0x3a2010, beltColor: 0x8a5a2a, relic: 0xffb050, scale: 1.08, capTall: 0.75 },
+  v1: { skin: '#c89a6a', cap: '#6a3a1a', marking: 0xffe0a0, emblem: 0xd8c070, build: 1.0, weapon: 'spear', leg: 0x5a3a20, foot: 0x3a2412, beltColor: 0x2f6f8a, scale: 0.95 },
+  v2: { skin: '#a8784a', cap: '#3a2a1a', marking: 0xffc0a0, emblem: 0xc89070, build: 1.1, weapon: 'axe', leg: 0x4a3a2a, foot: 0x2a1a0a, beltColor: 0x8a3a2a, scale: 1.0 },
+  v3: { skin: '#d8b080', cap: '#7a4a2a', marking: 0xffd0e0, emblem: 0xff9ac8, build: 0.92, weapon: 'spear', leg: 0x6a4a30, foot: 0x3a2a1a, beltColor: 0x5a8a3a, scale: 0.9 },
+  v4: { skin: '#9a7050', cap: '#4a2a14', marking: 0xe0e0a0, emblem: 0xb0d070, build: 1.15, weapon: 'axe', leg: 0x3a2a1a, foot: 0x2a1a0a, beltColor: 0xc28b2c, scale: 1.05 },
   hemla: { skin: '#6a7a90', cap: '#334458', marking: 0xd8f0ff, emblem: 0x7ad8ff, build: 1.05, weapon: 'spear', leg: 0x3a4a5a, foot: 0xe0e8f0, beltColor: 0xc8a050, cape: 0x2a5a6a, scale: 1.0 },
   duro: { skin: '#9a6a3a', cap: '#4a2a14', marking: 0xffc060, emblem: 0xff8a3a, build: 1.2, weapon: 'axe', leg: 0x4a2c1a, foot: 0x2a160c, beltColor: 0x2a1a10, relic: 0xff7a2a, scale: 1.05 },
   ruut: { skin: '#a08050', cap: '#5a4a2a', marking: 0xe0d0a0, emblem: 0xb0d070, build: 1.15, weapon: 'spear', leg: 0x5a4a30, foot: 0x3a2a14, beltColor: 0x6a5a2a, scale: 0.95, capTall: 0.5 },
@@ -104,17 +109,32 @@ export const NPC_LOOKS = {
 };
 
 export const NPCS = {
-  aakalay: [
-    { id: 'hemla', name: 'Hemla', title: 'Kalo’Eik trader', look: 'hemla', at: [-6, 4], roles: ['shop'], quests: ['q_vel'],
-      hello: ['Shards for goods, goods for shards. The Kalo keep fair books, little Stamijan.', 'You smell like Punk. That’s not a complaint — it’s a sales opportunity.'] },
-    { id: 'duro', name: 'Duro', title: 'Eikar smith', look: 'duro', at: [8, -6], roles: ['forge'], quests: ['q_ore'],
-      hello: ['A smith keeps his cauldron on the fire tree’s branch. Mine came with me in a sack.', 'Bring me ore and bark and I’ll grow you a blade that bites.'] },
-    { id: 'venkin', name: 'Venkin', title: 'Keilia builder', look: 'keilia', at: [-12, -8], roles: ['cook'], quests: ['q_camp'],
-      hello: ['I build. Walls, roofs, bridges. Weapons? Passable, at best — ask Duro.', 'A camp is just a ruin that somebody decided to love.'] },
-    { id: 'ruut', name: 'Old Ruut', title: 'Punk herder', look: 'ruut', at: [14, 10], roles: ['stable'], quests: ['q_strays'],
-      hello: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Three of my herd wandered into the ruins. Brainless, the lot of them. Bless them.'] },
-    { id: 'sefa', name: 'Sefa', title: 'a young Eikar', look: 'sefa', at: [2, 14], roles: [], quests: ['q_fennek'],
-      hello: ['Have you seen Fennek? He’s a Kipsu. He’s THIS big. Okay, maybe this big.'] },
+  /* Aakalay is abandoned — nobody lives there now */
+  aakalay: [],
+  /* Xilia, the home town (positions are absolute here) */
+  xilia: [
+    { id: 'buhkon', name: 'Buhkon Eldi', title: 'the Carpenter', look: 'buhkon', pos: [52, 98], roles: [], quests: [],
+      hello: ['Calm first, then quick. Calm first.', 'You wore that hat the day I found you. It still suits you, little one.'] },
+    { id: 'hemla', name: 'Hemla', title: 'Kalo\u2019Eik trader', look: 'hemla', pos: [-8, 60], roles: ['shop'], quests: ['q_vel'],
+      hello: ['Shards for goods, goods for shards. The Kalo keep fair books, little Stamijan.', 'You smell like Punk. That\u2019s not a complaint — it\u2019s a sales opportunity.'] },
+    { id: 'duro', name: 'Duro', title: 'Eikar smith', look: 'duro', pos: [16, 44], roles: ['forge'], quests: ['q_ore'],
+      hello: ['A smith keeps his cauldron on the fire tree\u2019s branch. Mine came with me in a sack.', 'Bring me ore and bark and I\u2019ll grow you a blade that bites.'] },
+    { id: 'venkin', name: 'Venkin', title: 'Keilia builder', look: 'keilia', pos: [-16, 40], roles: ['cook'], quests: ['q_camp'],
+      hello: ['I build. Walls, roofs, bridges. Weapons? Passable, at best — ask Duro.', 'Half of Xilia\u2019s roofs are mine. The good half.'] },
+    { id: 'ruut', name: 'Old Ruut', title: 'Punk herder', look: 'ruut', pos: [-34, 98], roles: ['stable'], quests: ['q_strays'],
+      hello: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Three of my herd wandered off into the countryside. Brainless, the lot of them. Bless them.'] },
+    { id: 'sefa', name: 'Sefa', title: 'a young Eikar', look: 'sefa', pos: [4, 70], roles: [], quests: ['q_fennek'],
+      hello: ['Have you seen Fennek? He\u2019s a Kipsu. He\u2019s THIS big. Okay, maybe this big.'] },
+    { id: 'v1', name: 'Ama', title: 'a baker', look: 'v1', pos: [-24, 52], wander: true, roles: [], quests: [],
+      hello: ['Fresh Zahreh buns! Well. Fresh-ish.', 'They say Aakalay swore itself away. My gran says it was the stone that drank it.'] },
+    { id: 'v2', name: 'Teodr', title: 'a farmer', look: 'v2', pos: [-60, 40], wander: true, roles: [], quests: [],
+      hello: ['Rodak in the north wood again. They never bother you — till you\u2019re bleeding.', 'Mind the crops, Stamijan.'] },
+    { id: 'v3', name: 'Lirra', title: 'a lamplighter', look: 'v3', pos: [20, 30], wander: true, roles: [], quests: [],
+      hello: ['The old Nur Lanterns only wake for a Nur. Lucky you\u2019ve got Phorus.', 'Glide off the Carpenter\u2019s tower sometime. Everyone does it once. Most people only once.'] },
+    { id: 'v4', name: 'Bosk', title: 'a dockhand', look: 'v4', pos: [8, 120], wander: true, roles: [], quests: [],
+      hello: ['The Stryx won\u2019t fly without a hot seed in the stern. Ask it yourself.', 'Fire trees never burn. Their seeds, though — whoosh.'] },
+    { id: 'kw1', name: 'Orrin', title: 'a Keilia builder', look: 'keilia', pos: [30, 70], wander: true, roles: [], quests: [],
+      hello: ['Mind the scaffold.', 'We build. The Kalo make our hammers. Never the other way round.'] },
   ],
   leotik: [
     { id: 'venkin', name: 'Venkin', title: 'Keilia builder', look: 'keilia', at: [-12, -8], roles: ['cook'], quests: ['q_pups'],

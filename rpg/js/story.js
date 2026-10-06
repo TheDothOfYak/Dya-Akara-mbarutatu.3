@@ -23,9 +23,88 @@ export const RIDDLE = [
 export const OPENING = [
   'Noka is gone again.',
   'The old soul in the stygian iron has left her mountain, as she always does — and, as she always does, she has left a riddle behind.',
-  'Three days of hiking. Two more riding wild Punks. One night aboard an Eldi ship, its Stryx pilot humming in the stump.',
-  'The riddle’s first step points to a city that has been dead for a very long time.',
+  'The riddle points to a city that has been dead for a very long time. Getting there will take a ship, a seed, and an axe-arm that hasn’t gone soft.',
+  'So Torcain goes home first — to Xilia, and to the Carpenter who taught him everything.',
 ];
+
+/* ---------------- Xilia: the prologue ---------------- */
+export const XILIA = {
+  kicker: "Torcain's Run · Prologue",
+  title: 'Home to Xilia',
+  intro: [
+    ['phorus', 'Xilia! Fresh bread, warm hearths, Punks that don’t want to eat us. I could live here, Torcain.'],
+    ['torcain', 'You say that about every town with an oven.'],
+    ['phorus', 'And I mean it every time. So — the riddle. "Five cores still hum, where every oath is kept." That’s Aakalay.'],
+    ['torcain', 'Aakalay’s a ruin. Nobody’s sailed there in a lifetime.'],
+    ['phorus', 'Then we’ll need a ship, and you’ll need your arm back. You’ve been carrying that axe like a shopping basket.'],
+    ['torcain', 'Buhkon will set me right. His yard is south-east of the square, by the docks road.'],
+    ['phorus', 'Go on, then. Find the Carpenter. I’ll be smelling the bakery.'],
+  ],
+  tut: [
+    /* 0 → 1 meeting */
+    [
+      ['buhkon', 'Tanoc! — Torcain, I should say. Look at you. Stamijan, and still too thin.'],
+      ['torcain', 'Noka’s gone again, Buhkon. The riddle points to Aakalay.'],
+      ['buhkon', 'Aakalay. Hah. Then you’ll want the old drills before you go. Those straw dummies — break all three. Left-click, and keep clicking to chain a combo.'],
+      ['buhkon', 'WASD to move, the mouse to look. Shift to run, Space to jump. Go on.'],
+    ],
+    /* 1 → 2 dummies broken */
+    [
+      ['buhkon', 'Good! Heavy hands, same as ever. Now — see the one up on the high post?'],
+      ['buhkon', 'Aim at it and RIGHT-click. The Duat will carry your axe there and bring it home. That’s your Duat Strike.'],
+    ],
+    /* 2 → 3 high dummy */
+    [
+      ['buhkon', 'Ha! Clean through. Last thing: the tower. Climb the stair to the top.'],
+      ['buhkon', 'Jump off, then HOLD Space while you fall. Your coat will catch the wind, and you glide. Don’t look down. Or do. It’s nice.'],
+    ],
+    /* 3 → 4 glided */
+    [
+      ['buhkon', 'Like a seed on the wind! Come back and talk to me, little Eikar.'],
+    ],
+    /* 4 → 5 graduation */
+    [
+      ['buhkon', 'That’s everything I can teach you in a yard. The rest the wilds will teach you, and they’re less patient.'],
+      ['buhkon', 'Remember: C to roll — they can’t hit what isn’t there. R drinks Albali film to heal. T locks on. Q lets the Tukang’s heat out when it’s full.'],
+      ['buhkon', 'F asks Phorus to sense the way. I for your pack, K for your skills, M for the map, J for your journal. Rest at Nur Lanterns.'],
+      ['buhkon', 'And talk to people! Half this town wants a favour, and favours make friends — and friends lend Punks.'],
+      ['buhkon', 'Now. The Stryx at the docks has been squawking since you landed. Go see what it wants.'],
+    ],
+  ],
+  buhkonAfter: [
+    'The tower’s still there if you want to practice gliding. Or I could find you more dummies. I have a lot of straw.',
+    'Go find Noka. And eat something — you look like a twig.',
+    'The Ember Grove is north-east, past the forest road. Tyndaels nest there. Mind your eyebrows.',
+  ],
+  stryxSeed: [
+    ['stryx', 'Kreee. Eikar is back. Good. Bad news. Seed is tired.'],
+    ['torcain', 'The ship’s seed? Can it fly?'],
+    ['stryx', 'Fly to the end of the pier. Not to Aakalay. Stryx needs a new fire seed, warm one, from the Ember Grove.'],
+    ['phorus', 'The Ember Grove — north-east of town. The old fire tree drops seeds there. Something hot lives in it now, though.'],
+    ['stryx', 'Bring seed. Stryx sings to seed. Then we go where the city is dead. Kree.'],
+  ],
+  stryxWait: [
+    ['stryx', 'Kree. Warm seed. From the grove. North-east. Stryx waits.'],
+  ],
+  stryxEarly: [
+    ['stryx', 'Kree. Eikar should see the Carpenter first. Stryx can wait. Stryx is very good at waiting.'],
+  ],
+  seedTaken: [
+    ['phorus', 'That’s it — I can feel it humming from here. It’s like holding a sunset.'],
+    ['torcain', 'Back to the docks, then. Aakalay.'],
+  ],
+  setSail: [
+    ['stryx', 'Kreeeee! Warm seed! Good seed! Stryx sings now!'],
+    ['phorus', 'Last hot meal for a while, Torcain. I hope you’re happy.'],
+    ['torcain', 'I will be. When Noka’s found.'],
+  ],
+  sailCards: [
+    'The seed takes root in the stern, and the old fire tree shakes off its moorings.',
+    'Xilia falls behind — smoke from the chimneys, Buhkon waving from his tower.',
+    'A night across the etherium. At dawn, a dead city rises out of the gold.',
+  ],
+};
+export const ARRIVE_AAKALAY = ['The Eldi ship comes down through golden haze.', 'Nobody lives here anymore. Not Eikar. Not Keilia. Only animals, and the quiet.', 'Aakalay.'];
 
 /* dialogue lines: [speaker, text] — speaker keys map to portraits */
 export const SPEAKERS = {
@@ -34,18 +113,19 @@ export const SPEAKERS = {
   noka: { name: 'Noka', color: '#ffd27a', sub: 'the soul in the iron' },
   memory: { name: 'Zikhron', color: '#b48aff', sub: 'a memory core' },
   stryx: { name: 'The Stryx', color: '#9ad86a', sub: 'pilot of the stump' },
+  buhkon: { name: 'Buhkon Eldi', color: '#ffb050', sub: 'the Carpenter' },
 };
 
 export const DIALOG = {
   arrive: [
-    ['phorus', 'Three days hiking, two on Punks that wanted to eat us, and a night on a fire tree. You owe me a hot meal, Torcain.'],
+    ['phorus', 'A night on a fire tree and not one hot meal since Xilia. You owe me, Torcain.'],
     ['torcain', 'When Noka’s found. Not before.'],
     ['phorus', 'Mm. Well. There it is. Aakalay. Or what’s left of it.'],
     ['torcain', 'The riddle starts here. "Five cores still hum." Can you hear them?'],
     ['phorus', 'I can feel stygian everywhere — this whole city is lousy with it. Most of it has gone quiet.'],
     ['phorus', 'But five pieces are still singing. Memory cores. Old ones. I’ll point the way when you need it.'],
     ['torcain', 'Then we follow the singing.'],
-    ['phorus', 'One more thing. Wild Punks have nested in the old streets. And the mist here doesn’t move with the wind. Keep that axe close.'],
+    ['phorus', 'One more thing. Nobody has lived here in a lifetime — only animals now, nested in the old streets. And the mist doesn’t move with the wind. Keep that axe close.'],
   ],
   stryx: [
     ['stryx', 'Kreee. Seed is warm. Ship is ready. Stryx waits.'],
@@ -153,6 +233,17 @@ export const OBJECTIVES = {
   stone: 'Bring the cores to the Oath Stone in the Zahreh plaza',
   boss: 'Cut the Oath-Rooted loose',
   done: 'Rokarvac I complete — explore, or return to the ship',
+  xilia: {
+    talk: 'Speak with Phorus on the pier',
+    buhkon: 'Find Buhkon the Carpenter in his yard, south-east of the square',
+    dummies: n => `Break the training dummies (${n}/3)`,
+    high: 'Duat Strike the dummy on the high post (aim + right-click)',
+    glide: 'Climb the tower, jump, and hold Space to glide',
+    back: 'Return to Buhkon',
+    stryx: 'See what the Stryx wants at the docks',
+    seed: 'Bring a fire seed from the Ember Grove (north-east)',
+    sail: 'Bring the fire seed to the Stryx — set sail for Aakalay',
+  },
 };
 
 export const CODEX = [
@@ -177,6 +268,9 @@ export const CODEX = [
 SPEAKERS.stone = { name: 'Carved Stone', color: '#d9b87a', sub: 'an inscription' };
 
 export const CODEX_MORE = [
+  ['Xilia', 'A farming town of acorn-cap cottages, fields of Ju, and a windmill that never stops. Torcain grew up here, after Buhkon found him.'],
+  ['Buhkon Eldi', 'The Carpenter. He builds ships, sheds and cradles, and once mended a boy who fell across Eternal Space. Torcain’s first Aagac came from his hands.'],
+  ['Training dummy', 'Straw, sacking and a turnip for a head. Buhkon has a great deal of straw.'],
   ['Nur Lantern', 'Phorus can wake a Nur-light in an old lantern. Rest beside one to heal, refill the Albali film, and spend zikhron shards to strengthen your Hurst. Resting wakes the wilds again.'],
   ['Zikhron shards', 'Splinters of memory that fall from whatever you defeat. A Nur Lantern can sing them into you.'],
   ['Albali film', 'The healing film from an Albali Byrd’s horn, kept in vials. It stings, but it closes wounds and burns out poison. (R)'],
@@ -191,6 +285,9 @@ export const CODEX_MORE = [
 ];
 
 export const STONES = {
+  x_square: ['A brass plate on the fountain:', '"XILIA — come in, sit down, have you eaten?"'],
+  x_yard: ['Burned into a beam over the workshop door:', '"Buhkon Eldi, Carpenter. Ships, sheds, cradles, and lost boys mended."'],
+  x_hideout: ['Scratched into a tree by the hideout, in a Duskareth hand:', '"The Duat is closer here. It is closer everywhere, lately."'],
   a_gate: ['Carved over the gate, worn almost smooth:', '"AAKALAY — WHERE EVERY OATH IS KEPT."', 'Someone has scratched beneath it, much later: "by force."'],
   a_library: ['A shelf-plaque from the library:', '"Memory stores are for recalling history accurately. Dwellers may use them for travel. Do not drink from the cistern — it remembers."'],
   a_tower: ['A watchman’s tally, gouged into the stone.', 'Hundreds of marks. The last row is only half finished.'],

@@ -214,7 +214,7 @@ export function buildEikar(o) {
 
       // weapon: hover at the side, or whirl through a swing
       swingBlend = lerp(swingBlend, st.swing ? 1 : 0, 1 - Math.exp(-(st.swing ? 30 : 8) * dt));
-      const idleY = -1.95, R = o.weapon === 'spear' ? 0.85 : 0.95;
+      const idleY = -1.2, R = o.weapon === 'spear' ? 0.62 : 0.66;
       let py = idleY, px = 0, pz = 0, hx = 0, hz = 0, rad = R, wy = Math.sin(st.t * 2) * 0.08;
       if (st.swing) {
         const p = st.swing.p, e = 1 - Math.pow(1 - p, 2.4);
@@ -225,7 +225,8 @@ export function buildEikar(o) {
       }
       wPivot.rotation.set(lerp(0, px, swingBlend), lerp(idleY, py, swingBlend), lerp(0, pz, swingBlend));
       wHold.position.set(0, lerp(wy, 0, swingBlend), lerp(R, rad, swingBlend));
-      wHold.rotation.set(lerp(0.15, hx, swingBlend), lerp(0, 0, swingBlend), lerp(-0.2, hz, swingBlend));
+      wHold.position.y += lerp(o.weapon === 'spear' ? 0.25 : 0.12, 0, swingBlend);
+      wHold.rotation.set(lerp(o.weapon === 'spear' ? 0.05 : 0.3, hx, swingBlend), lerp(0, 0, swingBlend), lerp(o.weapon === 'spear' ? -0.05 : -0.15, hz, swingBlend));
       if (weapon.userData.glow) weapon.userData.glow.material.opacity = 0.35 + swingBlend * 0.65;
       // hands: right on the haft, left swinging (or raised to drink)
       root.updateMatrixWorld(true);

@@ -75,7 +75,7 @@ export function createRpgUI(api) {
       h += `<h3>Story</h3><p>${esc(api.mainObjective())}</p>`;
       h += `<h3>Side quests</h3>` + (act.length ? act.map(([id]) => {
         const q = QUESTS[id], p = questProgress(id, q, S, inv);
-        return `<div class="rquest"><b>${q.name}</b> <small>from ${esc(api.npcName(q.giver))} · ${q.region === 'leotik' ? 'Leotik' : 'Aakalay'}</small><p>${q.desc}</p>${goalText(id, q, S, inv)}<div class="xpbar"><i style="width:${p * 100}%"></i></div></div>`;
+        return `<div class="rquest"><b>${q.name}</b> <small>from ${esc(api.npcName(q.giver))} · ${q.region === 'leotik' ? 'Leotik' : q.region === 'xilia' ? 'Xilia' : 'Aakalay'}</small><p>${q.desc}</p>${goalText(id, q, S, inv)}<div class="xpbar"><i style="width:${p * 100}%"></i></div></div>`;
       }).join('') : '<p class="rmuted">No side quests. Talk to the folk at the camp.</p>');
       if (done.length) h += `<h3>Finished</h3><p class="rmuted">` + done.map(([id]) => QUESTS[id].name).join(' · ') + `</p>`;
     } else if (page === 'map') {
@@ -104,7 +104,7 @@ export function createRpgUI(api) {
     if (page === 'map') drawMap();
   }
 
-  function price(k) { return Math.max(2, Math.round(ITEMS[k].value * (api.region() === 'leotik' ? 1.4 : 1.2))); }
+  function price(k) { return Math.max(2, Math.round(ITEMS[k].value * (api.region() === 'leotik' ? 1.4 : api.region() === 'xilia' ? 1.0 : 1.2))); }
   function card(k, label, action, on, extra) {
     const it = ITEMS[k]; if (!it) return '';
     const n = count(api.save().inv, k);
