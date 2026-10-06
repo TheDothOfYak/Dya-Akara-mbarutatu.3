@@ -14,7 +14,13 @@ import { buildSky, SUN_DIR } from './sky.js';
 import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
-import { buildTorcain, buildPhorus, buildMegla, buildCore } from './actors.js';
+import { buildTorcain, buildPhorus, buildMegla, buildCore, buildPunk } from './actors.js';
+import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
+import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
+import { NPCS, NPC_LOOKS, buildNpc, buildCamp } from './npcs.js';
+import { QUESTS, questProgress } from './quests.js';
+import { buildFeatures, sigilMesh } from './features.js';
+import { createRpgUI } from './rpgui.js';
 import { buildMalstiLord } from './creatures.js';
 import { createEnemies } from './enemies.js';
 import * as STORY from './story.js';
@@ -43,6 +49,15 @@ if (WHO) {
 }
 const SAVE_AT_LOAD = newer(localSave, cloudSave);
 let SAVE = SAVE_AT_LOAD || freshSave('easy');
+/* older saves grow the newer RPG fields */
+function ensureSave(S) {
+  S.inv = S.inv || freshInventory(); S.inv.buffs = S.inv.buffs || {}; S.inv.trinkets = S.inv.trinkets || [];
+  S.skills = S.skills || freshSkills();
+  for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
+  S.seeds = S.seeds || 0;
+  return S;
+}
+ensureSave(SAVE);
 let BOOT = null;
 try { BOOT = sessionStorage.getItem('torcain-boot'); sessionStorage.removeItem('torcain-boot'); } catch (e) { /* ignore */ }
 const REGION = SAVE.region || 'aakalay';
@@ -156,17 +171,21 @@ const P = {
   roll: null, drink: 0, flasks: 3, flasksMax: 3, poison: 0, para: 0,
 };
 function rank(id) { return SAVE.ups[id] || 0; }
+const perk = id => !!SAVE.skills.perks[id];
+let FX = effects(SAVE.inv, SAVE.time);
 function applyUps(full) {
-  P.maxHp = 100 + 15 * rank('vigor');
-  P.stamMax = 100 + 18 * rank('breath');
+  FX = effects(SAVE.inv, SAVE.time);
+  P.maxHp = 100 + 15 * rank('vigor') + 5 * (SAVE.skills.lvl - 1) + 10 * SAVE.seeds + FX.hp;
+  P.stamMax = 100 + 18 * rank('breath') + 10 * SAVE.seeds;
   P.flasksMax = D.flasks + rank('film');
   if (full) { P.hp = P.maxHp; P.stam = P.stamMax; P.flasks = P.flasksMax; }
   P.hp = Math.min(P.hp, P.maxHp);
 }
 applyUps(true);
-const axeMul = () => 1 + 0.12 * rank('edge');
-const duatCdMax = () => 5 - 0.6 * rank('duat');
-const heatMul = () => D.heatGain * (1 + 0.2 * rank('tukang'));
+const axeMul = () => (1 + 0.12 * rank('edge')) * FX.dmg * (perk('heavy') ? 1.15 : 1);
+const cdMul = () => FX.cd * (perk('seam') ? 0.8 : 1);
+const duatCdMax = () => Math.max(1.5, (5 - 0.6 * rank('duat') - FX.duatCd) * cdMul());
+const heatMul = () => D.heatGain * (1 + 0.2 * rank('tukang')) * FX.heat;
 const addHeat = n => { P.heat = Math.min(100, P.heat + n * heatMul()); };
 
 /* ---------------- Phorus ---------------- */
@@ -197,10 +216,10 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = false; });
 const canvas = renderer.domElement;
-const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin'].some(id => !$(id).classList.contains('hidden'));
+const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin', 'rpg'].some(id => !$(id).classList.contains('hidden'));
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  if (!locked && !G.paused && (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory') && !overlayOpen()) openPause();
+  if (!locked && !G.paused && (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory') && !overlayOpen() && !(DLG && DLG.choices)) openPause();
 });
 document.addEventListener('mousemove', e => {
   if (!locked || G.paused) return;
@@ -211,10 +230,11 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mousedown', e => {
   if (G.mode !== 'title') initAudio();   // browsers only let sound start after a click
+  if (e.target.closest && e.target.closest('#d-choices, #rpg')) return;
   if (G.mode === 'title' || overlayOpen()) return;
   if (G.mode === 'intro' || G.mode === 'trance') { skipCards(); return; }
   if (!locked) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
-  if (G.mode === 'dialog') { advanceDialog(); return; }
+  if (G.mode === 'dialog') { if (!(DLG && DLG.choices)) advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
   if (G.mode !== 'play' || G.paused) return;
   if (e.button === 0) { mouseL = true; pressAttack(); }
@@ -228,7 +248,11 @@ function lockMouse() { try { const p = canvas.requestPointerLock(); if (p && p.c
 
 function onKey(code) {
   if (G.mode === 'intro' || G.mode === 'trance') { if (code === 'Space' || code === 'Enter' || code === 'Escape') skipCards(); return; }
-  if (G.mode === 'dialog') { if (code === 'KeyE' || code === 'Space' || code === 'Enter') advanceDialog(); return; }
+  if (G.mode === 'dialog') {
+    if (DLG && DLG.choices) { const n = parseInt(code.replace('Digit', ''), 10); if (n >= 1 && n <= DLG.choices.length) pickChoice(n - 1); if (code === 'Escape') pickChoice(DLG.choices.length - 1); return; }
+    if (code === 'KeyE' || code === 'Space' || code === 'Enter') advanceDialog(); return;
+  }
+  if (book && book.isOpen()) { if (code === 'Escape' || code === 'KeyI' || code === 'KeyK' || code === 'KeyJ' || code === 'KeyM' || code === 'Tab') book.close(); return; }
   if (G.mode === 'memory') { if (code === 'KeyE' || code === 'Space' || code === 'Enter' || code === 'Escape') closeMemory(); return; }
   if (!$('lantern').classList.contains('hidden')) { if (code === 'Escape' || code === 'KeyE') closeLantern(); return; }
   if (code === 'Tab' && G.mode === 'play') { toggleJournal(); return; }
@@ -240,6 +264,13 @@ function onKey(code) {
   if (code === 'KeyC') dodge();
   if (code === 'KeyR') drinkFilm();
   if (code === 'KeyT') toggleLock();
+  if (code === 'KeyI') openBook('gear');
+  if (code === 'KeyK') openBook('skills');
+  if (code === 'KeyJ') openBook('quests');
+  if (code === 'KeyM') openBook('map');
+  if (code === 'KeyH') whistle();
+  const si = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(code);
+  if (si >= 0) castSpell(SPELL_ORDER[si]);
 }
 
 /* ================================================================
@@ -253,8 +284,13 @@ const enemies = createEnemies({
   stealShards(n) { G.shards -= n; toast(`A Kipsu snatched ${n} shards! Catch it before it gets away!`, 3); },
   onEscape(e) { toast(`The Kipsu escaped with ${e.stolen} shards.`, 3); },
   onKill(e) {
-    const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4)) + (e.stolen || 0);
+    const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4) * FX.shards) + (e.stolen || 0);
     G.shards += n; SAVE.kills++;
+    SAVE.killsBy[e.kind.replace('_t', '')] = (SAVE.killsBy[e.kind.replace('_t', '')] || 0) + 1;
+    xp(Math.round(e.T.shards * 1.2 + 4));
+    for (const [it, ch, cnt] of (LOOT[e.kind] || [])) if (Math.random() < ch) { invAdd(SAVE.inv, it, cnt); lootToast(it, cnt); }
+    if (perk('wind') && !P.dead) P.hp = Math.min(P.maxHp, P.hp + (D === DIFFICULTY.realistic ? 4 : 8));
+    if (e.T.disp && !e.bossMinion) bark('phorus', 'It was only defending itself, Torcain.', 2.5);
     dmgNumber(e.pos.x, e.pos.y + 2.6, e.pos.z, '+' + n, 'shard');
     for (let i = 0; i < Math.min(14, 3 + n / 4); i++) particles.emit(e.pos.x, e.pos.y + 1, e.pos.z, { vx: (P.pos.x - e.pos.x) * 1.2, vy: 4, vz: (P.pos.z - e.pos.z) * 1.2, color: 0xb48aff, size: 0.35, life: 0.8, drag: 1.5 });
     addHeat(6);
@@ -282,6 +318,7 @@ const enemies = createEnemies({
     telegraphs.push({ mesh: m, x, z, r, t: 0, dur, kind: 'visual' });
   },
   arenaClamp: (p, R) => arenaClamp(p, R),
+  onProvoke(e) { bark('phorus', e.T.disp === 'friendly' ? 'Torcain! That one was friendly!' : 'Now you’ve made it angry.', 2.5); },
 });
 enemies.spawnAll(world.spawnGroups, SAVE.cleared);
 
@@ -608,6 +645,7 @@ const canAct = () => G.mode === 'play' && !P.dead && P.para <= 0 && !P.roll;
 
 function camForward() { return V3(-Math.sin(CAM.yaw), 0, -Math.cos(CAM.yaw)); }
 function spend(cost) {
+  if (perk('iron')) cost *= 0.7;
   if (cost <= 0) return true;
   if (P.stam < Math.min(cost, 8)) { $('stam').classList.add('low'); setTimeout(() => $('stam').classList.remove('low'), 300); return false; }
   P.stam -= cost; P.stamDelay = 0.75;
@@ -647,9 +685,11 @@ function updateAttack(dt) {
       if (e.dead || A.hit.has(e)) continue;
       const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
       if (d > def.range + e.T.rad || Math.abs(e.pos.y - P.pos.y) > 2.2) continue;
-      if (d > 0.8 + e.T.rad && (dx * fx + dz * fz) / d < 0.15) continue;
+      const whirl = A.kind === 3 && perk('whirl');
+      if (!whirl && d > 0.8 + e.T.rad && (dx * fx + dz * fz) / d < 0.15) continue;
       A.hit.add(e);
-      enemies.damage(e, dmg * (0.9 + Math.random() * 0.2), P.pos, def.kb, { big: A.kind === 3, stun: A.kind === 3 ? 0.6 : 0.32 });
+      const exec = perk('exec') && e.stun > 0 ? 1.5 : 1;
+      enemies.damage(e, dmg * exec * (0.9 + Math.random() * 0.2), P.pos, def.kb, { big: A.kind === 3, stun: (A.kind === 3 ? 0.6 : 0.32) * FX.stagger, burn: FX.burn });
       addHeat(7);
       G.hitstop = A.kind === 3 ? 0.07 : 0.04;
       G.shake = Math.max(G.shake, A.kind === 3 ? 0.35 : 0.15);
@@ -661,8 +701,9 @@ function updateAttack(dt) {
         addHeat(7); G.hitstop = 0.05; G.shake = Math.max(G.shake, 0.2);
       }
     }
+    if (!A.hit.has('trial')) { if (trialSwing(def.range)) A.hit.add('trial'); }
     const wp = torcain.weapon.getWorldPosition(V3());
-    particles.emit(wp.x, wp.y, wp.z, { color: A.kind === 3 ? 0xffa050 : 0xc8a0ff, size: 0.5, life: 0.25, speed: 0.3 });
+    particles.emit(wp.x, wp.y, wp.z, { color: FX.burn ? 0xff7a2a : A.kind === 3 ? 0xffa050 : 0xc8a0ff, size: 0.5, life: 0.25, speed: 0.3 });
   }
   if (A.kind === 3 && A.p > 0.55 && !A.slammed) {
     A.slammed = true;
@@ -679,6 +720,7 @@ function updateAttack(dt) {
 function targetCandidates() {
   const c = enemies.list.filter(e => !e.dead).map(e => ({ e, p: V3(e.pos.x, e.pos.y + 0.8, e.pos.z) }));
   if (boss && !boss.dead && boss.rising >= 1) c.push({ e: 'boss', p: bossTargetPoint() });
+  for (const sg of sigils) c.push({ e: { sigil: sg }, p: sg.mesh.position.clone() });
   return c;
 }
 function bestTarget(maxD, minDot) {
@@ -710,10 +752,17 @@ function duatStrike() {
     const a = i / 26 * Math.PI * 2;
     particles.emit(tp.x + Math.cos(a) * 1.4, tp.y + 2.4, tp.z + Math.sin(a) * 1.4, { vx: 0, vy: -6, vz: 0, color: 0xb07aff, size: 0.55, life: 0.45 });
   }
-  const mul = axeMul() * (1 + 0.15 * rank('duat'));
+  const mul = axeMul() * (1 + 0.15 * rank('duat')) * (perk('deep') ? 1.3 : 1);
   setTimeout(() => {
+    if (best.e.sigil) { breakSigil(best.e.sigil); return; }
     if (best.e === 'boss') damageBoss(55 * 2 * mul, { big: true });
-    else if (!best.e.dead) enemies.damage(best.e, 48 * mul, P.pos, 3, { big: true, stun: 1.0 });
+    else if (!best.e.dead) {
+      enemies.damage(best.e, 48 * mul, P.pos, 3, { big: true, stun: 1.0 });
+      if (perk('echo')) {
+        const near = enemies.list.filter(o => o !== best.e && !o.dead && o.hostile && o.pos.distanceTo(best.e.pos) < 10).sort((a, b) => a.pos.distanceTo(best.e.pos) - b.pos.distanceTo(best.e.pos))[0];
+        if (near) setTimeout(() => { if (!near.dead) { enemies.damage(near, 30 * mul, P.pos, 3, { big: true, stun: 0.8 }); particles.burst(near.pos.x, near.pos.y + 1, near.pos.z, 20, { color: 0xe0c0ff, speed: 7, size: 0.4, life: 0.5 }); } }, 160);
+      }
+    }
     particles.burst(tp.x, tp.y + 0.5, tp.z, 30, { color: 0xe0c0ff, speed: 9, size: 0.5, life: 0.6, gravity: -8 });
     G.shake = Math.max(G.shake, 0.4); G.hitstop = 0.06;
     addHeat(10);
@@ -738,6 +787,7 @@ function tukangFlare() {
 }
 
 function dodge() {
+  if (P.riding) { toggleRide(); return; }
   if (!canAct() || P.drink > 0) return;
   if (!spend(D.stamina.dodge)) return;
   const f = camForward(), r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
@@ -812,6 +862,13 @@ function hurtPlayer(dmg, from, kb = 7, opts = {}) {
     if (P.roll) { particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 6, { color: 0xffffff, speed: 3, size: 0.3, life: 0.3 }); }
     return false;
   }
+  dmg *= FX.armor * (perk('shell') ? 0.9 : 1);
+  if (P.ward > 0) {
+    const soak = Math.min(P.ward, dmg); P.ward -= soak; dmg -= soak;
+    particles.burst(P.pos.x, P.pos.y + 1.2, P.pos.z, 14, { color: 0xbfeaff, speed: 5, size: 0.4, life: 0.4 });
+    if (dmg <= 0.5) { P.iframes = 0.3; return false; }
+  }
+  if (FX.antidote) delete opts.poison;
   P.hp -= dmg; P.iframes = 0.55; P.lastHurt = G.t; P.drink = 0;
   const dir = V3(P.pos.x - from.x, 0, P.pos.z - from.z); if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1); dir.normalize();
   P.vel.addScaledVector(dir, kb); P.vel.y = Math.max(P.vel.y, 3.5);
@@ -873,6 +930,7 @@ function restWorld() {
   enemies.clear();
   enemies.spawnAll(world.spawnGroups, SAVE.cleared);
   world.flowers.forEach(f => { f.ready = true; f.grp.visible = true; });
+  if (typeof feats !== 'undefined') feats.nodes.forEach(n => { n.ready = true; n.mesh.visible = true; });
   P.poison = 0; applyUps(true);
 }
 
@@ -906,6 +964,19 @@ function interactables() {
   list.push({ pos: STRYX_SPOT, label: (REGION === 'aakalay' && F_.done) ? 'Set sail for Leotik' : 'Hail the Stryx pilot', act: () => stryx() });
   for (const l of lanterns) list.push({ pos: V3(l.x, l.y, l.z), label: lanternLit(l) ? 'Rest at the Nur Lantern' : 'Wake the Nur Lantern', act: () => useLantern(l), far: 2.8 });
   for (const s of stones) list.push({ pos: V3(s.x, s.y, s.z), label: 'Read the carving', act: () => readStone(s), far: 2.6 });
+  for (const n of npcs) list.push({ pos: n.pos, label: `Talk to ${n.def.name} <small style="opacity:.7">${n.def.title}</small>`, act: () => npcTalk(n), far: 3.2 });
+  if (camp && (REGION === 'leotik' || SAVE.quests.q_camp === 'done')) list.push({ pos: V3(world.camp.x, world.heightAt(world.camp.x, world.camp.z), world.camp.z), label: 'Cook at the fire', act: () => openBook('cook'), far: 2.8 });
+  for (const e of enemies.list) {
+    if (e.dead || e.hostile || !e.T.disp || e.T.ai === 'flyer') continue;
+    if (e.stray) list.push({ pos: e.pos, label: 'Send the stray Punk home', act: () => befriend(e), far: 3.2 });
+    else if (e.pet) list.push({ pos: e.pos, label: 'Pick up Fennek', act: () => befriend(e), far: 2.6 });
+    else if (e.pup) list.push({ pos: e.pos, label: 'Pick up the Kipsu pup', act: () => befriend(e), far: 2.4 });
+    else if (!e.petted) list.push({ pos: e.pos, label: e.kind === 'kipsu_f' ? 'Pet the Kipsu' : 'Pat the Punk', act: () => petCreature(e), far: 2.6 });
+  }
+  if (mount) list.push({ pos: mount.pos, label: P.riding ? 'Climb down from Brindle' : 'Ride Brindle', act: () => toggleRide(), far: P.riding ? 99 : 3 });
+  for (const c of feats.chests) if (!c.open) list.push({ pos: V3(c.x, c.y, c.z), label: 'Open the chest', act: () => openChest(c), far: 2.6 });
+  for (const n of feats.nodes) if (n.ready) list.push({ pos: V3(n.x, n.y, n.z), label: n.label, act: () => gather(n), far: 2.6 });
+  for (const t of feats.trials) list.push({ pos: V3(t.x, t.y, t.z), label: t.done ? `${t.name} — passed` : `Begin the ${t.name}`, act: () => startTrial(t), far: 2.8 });
   if (REGION === 'aakalay') {
     for (const c of cores) if (!c.got) list.push({ pos: c.pos, label: 'Take the memory core', act: () => takeCore(c), far: 3.2 });
     if (coreCount() >= 5 && !G.bossActive && !F_.bossDead) list.push({ pos: V3(world.PLAZA.x, world.PLAZA.y, world.PLAZA.z), label: 'Offer the cores to the Oath Stone', act: () => offerCores(), far: 9 });
@@ -938,13 +1009,14 @@ function stryx() {
 
 function readStone(s) {
   const lines = STORY.STONES[s.key] || ['The carving is too worn to read.'];
+  if (!SAVE.codex[s.key]) xp(15);
   SAVE.codex[s.key] = true; persist();
   dialog(lines.map(l => ['stone', l]));
 }
 
 function useLantern(l) {
   if (!lanternLit(l)) {
-    SAVE.lit[l.id] = true;
+    SAVE.lit[l.id] = true; xp(25);
     l.flame.material.opacity = 1;
     particles.burst(l.x, l.y + 2.9, l.z, 30, { color: 0xbfeaff, speed: 4, size: 0.5, life: 0.9 });
     sfx.sense();
@@ -986,7 +1058,7 @@ $('btn-lanleave').onclick = closeLantern;
 
 /* ---------------- Aakalay ---------------- */
 function takeCore(c) {
-  c.got = true; SAVE.cores[c.key] = true;
+  c.got = true; SAVE.cores[c.key] = true; xp(60);
   sfx.core();
   particles.burst(c.pos.x, c.pos.y, c.pos.z, 50, { color: 0xc8a0ff, speed: 7, size: 0.6, life: 1, gravity: 2 });
   scene.remove(c.mesh);
@@ -1017,7 +1089,7 @@ function offerCores() {
 }
 
 function afterMegla() {
-  F_.bossDead = true; persist();
+  F_.bossDead = true; xp(500); persist();
   dialog(STORY.DIALOG.bossDown, () => trance());
 }
 
@@ -1061,7 +1133,7 @@ function setSail() {
 /* ---------------- Leotik ---------------- */
 function wakePillar(p) {
   wakePillarVisual(p);
-  SAVE.flags['pillar_' + p.key] = true; persist();
+  SAVE.flags['pillar_' + p.key] = true; xp(90); persist();
   sfx.core(); G.shake = 0.6;
   particles.burst(p.x, p.y + 8, p.z, 60, { color: 0xc8a0ff, speed: 9, size: 0.7, life: 1.2 });
   const n = pillarCount();
@@ -1086,7 +1158,7 @@ function touchUrverk() {
 }
 
 function afterLord() {
-  F_.lordDead = true; persist();
+  F_.lordDead = true; xp(800); persist();
   dialog(STORY.DIALOG2.lordDown, () => {
     G.mode = 'trance';
     if (document.pointerLockElement) document.exitPointerLock();
@@ -1121,14 +1193,17 @@ $('btn-sail').onclick = () => { $('endcard').classList.add('hidden'); G.mode = '
 function interact() {
   let best = null, bd = 1e9;
   for (const it of interactables()) {
+    if (P.riding && it.far === 99) continue;
     const d = Math.hypot(it.pos.x - P.pos.x, it.pos.z - P.pos.z);
     if (d < (it.far || 3) && d < bd && Math.abs(it.pos.y - P.pos.y) < 4) { bd = d; best = it; }
   }
   if (best) { sfx.ui(); best.act(); }
+  else if (P.riding) toggleRide();
 }
 function nearestPrompt() {
   let best = null, bd = 1e9;
   for (const it of interactables()) {
+    if (P.riding && it.far === 99) continue;
     const d = Math.hypot(it.pos.x - P.pos.x, it.pos.z - P.pos.z);
     if (d < (it.far || 3) && d < bd && Math.abs(it.pos.y - P.pos.y) < 4) { bd = d; best = it; }
   }
@@ -1185,7 +1260,11 @@ function portrait(who) {
     memory: 'radial-gradient(circle,#c8a0ff 0 18%,#3a1a6a 60%,#0a0418)',
     stone: 'radial-gradient(circle,#d9b87a 0 14%,#6a5a40 50%,#1a140c)',
   };
-  return map[who] || map.memory;
+  if (map[who]) return map[who];
+  const lk = NPC_LOOKS[who];
+  if (lk) return `radial-gradient(circle at 50% 70%,${lk.skin} 0 32%,transparent 33%),radial-gradient(circle at 50% 42%,${lk.cap} 0 40%,transparent 41%),radial-gradient(circle,#2a2a3a,#0c0c14)`;
+  if (who === 'venkin') return 'radial-gradient(circle at 50% 50%,#c8a070 0 26%,transparent 27%),radial-gradient(circle at 50% 46%,#5a3a2a 0 42%,transparent 43%),radial-gradient(circle,#3a2a1a,#100a06)';
+  return map.memory;
 }
 function updateDialog(dt) {
   if (!DLG) return;
@@ -1197,7 +1276,7 @@ function updateDialog(dt) {
   $('d-text').textContent = text.slice(0, Math.floor(DLG.chars));
 }
 function advanceDialog() {
-  if (!DLG) return;
+  if (!DLG || DLG.choices) return;
   const text = DLG.lines[DLG.i][1];
   if (DLG.chars < text.length) { DLG.chars = text.length; return; }
   DLG.i++;
@@ -1366,7 +1445,7 @@ function checkLocations() {
   if (G.mode !== 'play') return;
   const sub = REGION === 'aakalay' ? 'Ruins of Aakalay' : 'Leotik';
   for (const [k, s] of Object.entries(world.SITES)) {
-    if (!G.visited[k] && Math.hypot(P.pos.x - s.x, P.pos.z - s.z) < 26) { G.visited[k] = true; showLocation(s.name, sub); }
+    if (!G.visited[k] && Math.hypot(P.pos.x - s.x, P.pos.z - s.z) < 26) { G.visited[k] = true; showLocation(s.name, sub); if (!SAVE.flags['seen_site_' + k]) { SAVE.flags['seen_site_' + k] = true; xp(30); } }
   }
   if (REGION === 'aakalay') {
     if (!G.visited.gate && P.pos.z < 140 && P.pos.z > 120 && Math.abs(P.pos.x) < 12) { G.visited.gate = true; showLocation('Aakalay', 'the city that swore itself away'); }
@@ -1412,9 +1491,491 @@ bindOpt('opt-scale', 'scale', resize);
 bloom.enabled = OPT.bloom;
 
 /* ================================================================
+   THE WIDER WORLD — experience, loot, the camp and its folk,
+   side quests, friendly creatures, a Punk to ride, gliding,
+   spells, chests, gathering and the Kalo Trials
+   ================================================================ */
+function xp(n) {
+  const up = gainXp(SAVE.skills, Math.round(n));
+  if (up > 0) {
+    applyUps(true);
+    $('levelup').textContent = `LEVEL ${SAVE.skills.lvl}`;
+    $('levelup').classList.add('show'); setTimeout(() => $('levelup').classList.remove('show'), 2600);
+    sfx.victory();
+    particles.ring(P.pos.x, P.pos.y + 1, P.pos.z, 50, 8, { color: 0xc8a0ff, size: 0.6, life: 0.9 });
+    toast(`Level ${SAVE.skills.lvl}! A perk point to spend — press K.`, 3.5);
+  }
+}
+let lootQ = [], lootT = 0;
+function lootToast(id, n) { lootQ.push(`${ITEMS[id].icon} ${ITEMS[id].name}${n > 1 ? ' ×' + n : ''}`); lootT = 0.25; }
+
+/* ---------------- the camp and its folk ---------------- */
+const camp = world.camp ? buildCamp(scene, world, world.camp.x, world.camp.z, { banner: true, seed: REGION === 'leotik' ? 7 : 3 }) : null;
+const npcs = camp ? NPCS[REGION].map(def => {
+  const actor = buildNpc(def);
+  const x = world.camp.x + def.at[0], z = world.camp.z + def.at[1];
+  const pos = V3(x, world.col.ground(x, z, world.heightAt(x, z) + 0.5), z);
+  actor.root.position.copy(pos);
+  const yaw = Math.atan2(world.camp.x - x, world.camp.z - z);
+  actor.root.rotation.y = yaw;
+  scene.add(actor.root);
+  world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);
+  return { def, actor, pos, yaw, talking: 0 };
+}) : [];
+const npcName = id => { const n = NPCS.aakalay.concat(NPCS.leotik).find(d => d.id === id); return n ? n.name : id; };
+const npcSpeaker = def => { if (!STORY.SPEAKERS[def.id]) STORY.SPEAKERS[def.id] = { name: def.name, color: def.look === 'keilia' ? '#e0b070' : '#e8d8a8', sub: def.title }; return def.id; };
+
+function updateNpcs(dt) {
+  for (const n of npcs) {
+    const d = n.pos.distanceTo(P.pos);
+    const want = d < 7 ? Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z) : n.yaw;
+    n.actor.root.rotation.y = dampAngle(n.actor.root.rotation.y, want, 4, dt);
+    n.talking = Math.max(0, n.talking - dt);
+    n.actor.animate(dt, { speed: 0, onGround: true, t: G.t + n.pos.x, talking: n.talking > 0 });
+  }
+  if (camp) camp.update(G.t, particles);
+}
+
+/* ---------------- talking, with choices ---------------- */
+function ask(who, text, options) {
+  DLG = { lines: [[who, text]], i: 0, chars: text.length, choices: options, onDone: null, tick: 0 };
+  G.mode = 'dialog'; P.atk = null;
+  $('dialog').classList.remove('hidden');
+  showLine(); DLG.chars = text.length;
+  const box = $('d-choices'); box.innerHTML = '';
+  options.forEach((o, i) => {
+    const b = document.createElement('button'); b.innerHTML = `<kbd>${i + 1}</kbd>${o.label}`;
+    b.onclick = ev => { ev.stopPropagation(); pickChoice(i); };
+    box.appendChild(b);
+  });
+  $('d-next').style.display = 'none';
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+function pickChoice(i) {
+  const o = DLG && DLG.choices && DLG.choices[i];
+  if (!o) return;
+  $('d-choices').innerHTML = ''; $('d-next').style.display = '';
+  DLG = null; $('dialog').classList.add('hidden'); G.mode = 'play';
+  sfx.ui();
+  if (o.act) o.act(); else lockMouse();
+}
+
+function npcTalk(n) {
+  const def = n.def, who = npcSpeaker(def);
+  n.talking = 3;
+  const opts = [];
+  for (const qid of def.quests) {
+    const q = QUESTS[qid], st = SAVE.quests[qid];
+    if (!st) opts.push({ label: `Ask about work <em style="color:var(--brass2)">· ${q.name}</em>`, act: () => offerQuest(n, qid) });
+    else if (st === 'active') {
+      if (questProgress(qid, q, SAVE, SAVE.inv) >= 1) opts.push({ label: `<b style="color:#9affc0">Finish: ${q.name}</b>`, act: () => turnIn(n, qid) });
+      else opts.push({ label: `About “${q.name}”`, act: () => { n.talking = 3; dialog(q.wait.map(l => [who, l]), () => npcTalk(n)); } });
+    }
+  }
+  if (def.roles.includes('shop')) opts.push({ label: 'Trade', act: () => openBook('shop') });
+  if (def.roles.includes('forge')) {
+    const ok = REGION === 'leotik' || SAVE.quests.q_ore === 'done';
+    opts.push({ label: ok ? 'Forge an axe' : 'Forge an axe <small>(his cauldron is cold)</small>', act: () => ok ? openBook('forge') : dialog([[who, 'No ore, no bark, no fire. Ask me about work.']], () => npcTalk(n)) });
+  }
+  if (def.roles.includes('cook')) {
+    const ok = REGION === 'leotik' || SAVE.quests.q_camp === 'done';
+    opts.push({ label: ok ? 'Cook at the hearth' : 'Cook <small>(the hearth isn’t built yet)</small>', act: () => ok ? openBook('cook') : dialog([[who, 'Help me raise the camp and I’ll build a hearth worth cooking on.']], () => npcTalk(n)) });
+  }
+  if (def.roles.includes('stable') && SAVE.flags.mount) opts.push({ label: 'Ask about Brindle', act: () => dialog([[who, 'Whistle (H) and she’ll come. Ride her with E. Don’t let her eat the Zahreh.']], () => npcTalk(n)) });
+  opts.push({ label: 'Goodbye', act: null });
+  ask(who, def.hello[Math.floor(Math.random() * def.hello.length)], opts);
+}
+
+function offerQuest(n, qid) {
+  const q = QUESTS[qid], who = npcSpeaker(n.def);
+  dialog(q.offer.map(l => [who, l]), () => ask(who, `“${q.name}” — will you help?`, [
+    { label: 'I’ll do it.', act: () => {
+      SAVE.quests[qid] = 'active';
+      if (q.goal.type === 'kills') SAVE.qstart[qid] = SAVE.killsBy[q.goal.kind] || 0;
+      persist(); toast(`New quest: ${q.name}`, 3); sfx.core(); lockMouse();
+    } },
+    { label: 'Not now.', act: null },
+  ]));
+}
+
+function turnIn(n, qid) {
+  const q = QUESTS[qid], who = npcSpeaker(n.def);
+  if (q.goal.type === 'items' && !takeAll(SAVE.inv, q.goal.need)) return;
+  SAVE.quests[qid] = 'done';
+  const r = q.reward;
+  if (r.shards) G.shards += r.shards;
+  if (r.items) for (const [k, c] of Object.entries(r.items)) { invAdd(SAVE.inv, k, c); lootToast(k, c); }
+  if (r.flag) SAVE.flags[r.flag] = true;
+  if (r.spell) learnSpell(r.spell);
+  if (r.flag === 'mount') makeMount(true);
+  persist();
+  n.talking = 4;
+  dialog(q.done.map(l => [who, l]), () => { toast(`Quest complete: ${q.name}${r.shards ? ` · +${r.shards} shards` : ''}`, 3.5); xp(r.xp || 0); persist(); });
+}
+
+function learnSpell(id) {
+  if (SAVE.skills.spells[id]) return;
+  SAVE.skills.spells[id] = true;
+  const sp = SPELLS[id];
+  setTimeout(() => toast(`Spell learned: ${sp.icon} ${sp.name} — press ${sp.key}`, 4), 600);
+  renderSpellBar();
+}
+
+/* ---------------- friendly creatures ---------------- */
+function befriend(e) {
+  const at = e.pos.clone();
+  if (e.stray) {
+    SAVE.counters.strays = (SAVE.counters.strays || 0) + 1; SAVE.cleared['stray_' + e.stray] = true;
+    toast(`The stray trots off home to Ruut (${SAVE.counters.strays}/3).`, 3);
+  } else if (e.pet) {
+    SAVE.counters.fennek = 1; SAVE.cleared.fennek = true;
+    toast('Fennek wriggles into your coat. Take him back to Sefa.', 3);
+  } else if (e.pup) {
+    SAVE.counters.pups = (SAVE.counters.pups || 0) + 1; SAVE.cleared['pup_' + e.pup] = true;
+    toast(`You tuck the pup into your coat, out of the rain (${SAVE.counters.pups}/3).`, 3);
+  }
+  particles.burst(at.x, at.y + 1, at.z, 24, { color: 0xffb0d0, speed: 4, size: 0.5, life: 0.8, gravity: 3 });
+  sfx.heal(); xp(30);
+  e.dead = true; e.gone = true; scene.remove(e.actor.root);
+  persist();
+}
+function petCreature(e) {
+  e.petted = true;
+  particles.burst(e.pos.x, e.pos.y + 1.2, e.pos.z, 16, { color: 0xff8ac8, speed: 3, size: 0.45, life: 0.8, gravity: 2 });
+  sfx.heal();
+  if (P.hp < P.maxHp) { P.hp = Math.min(P.maxHp, P.hp + 6); }
+  if (e.kind === 'kipsu_f' && Math.random() < 0.5) { invAdd(SAVE.inv, 'fluff', 1); lootToast('fluff', 1); }
+  bark('phorus', e.kind === 'kipsu_f' ? 'It likes you. They can tell, you know.' : 'Gentle as anything. Ruut’s herd, probably.', 2.5);
+}
+
+/* ---------------- Brindle, your Punk ---------------- */
+let mount = null;
+function makeMount(nearPlayer) {
+  if (mount) return;
+  const actor = buildPunk(false, { domestic: true, blanket: 0x8a2a3a });
+  const p = nearPlayer ? P.pos.clone().add(V3(3, 0, 3)) : camp ? V3(camp.pen.x, 0, camp.pen.z) : P.pos.clone().add(V3(4, 0, 4));
+  p.y = world.col.ground(p.x, p.z, world.heightAt(p.x, p.z) + 1);
+  actor.root.position.copy(p); scene.add(actor.root);
+  mount = { actor, pos: p, vel: V3(), yaw: 0, coming: false };
+}
+if (SAVE.flags.mount) makeMount(false);
+function whistle() {
+  if (!mount) { toast('You whistle. Nothing comes. (Old Ruut might lend you a Punk.)', 2.5); return; }
+  sfx.blink();
+  if (P.riding) return;
+  if (mount.pos.distanceTo(P.pos) > 60) { mount.pos.copy(P.pos).add(V3(-6, 0, 6)); mount.pos.y = world.col.ground(mount.pos.x, mount.pos.z, P.pos.y + 3); }
+  mount.coming = true; toast('Brindle comes running.', 1.8);
+}
+function toggleRide() {
+  if (!mount) return;
+  if (P.riding) {
+    P.riding = false;
+    P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
+    P.pos.y = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 3);
+  } else {
+    P.riding = true; mount.coming = false; P.atk = null;
+    sfx.jump();
+  }
+}
+function updateMount(dt) {
+  if (!mount) return;
+  const m = mount;
+  if (P.riding) {
+    m.pos.copy(P.pos); m.yaw = P.yaw;
+  } else if (m.coming) {
+    const dx = P.pos.x - m.pos.x, dz = P.pos.z - m.pos.z, d = Math.hypot(dx, dz);
+    if (d < 3) m.coming = false;
+    else { m.vel.x = dx / d * 13; m.vel.z = dz / d * 13; m.yaw = Math.atan2(dx, dz); }
+  } else { m.vel.x *= 0.85; m.vel.z *= 0.85; }
+  if (!P.riding) {
+    m.pos.x += m.vel.x * dt; m.pos.z += m.vel.z * dt;
+    world.col.resolve(m.pos, 1.0, 2.2);
+    m.pos.y = world.col.ground(m.pos.x, m.pos.z, m.pos.y + 1);
+  }
+  m.actor.root.position.copy(m.pos);
+  m.actor.root.rotation.y = m.yaw;
+  m.actor.animate(dt, { speed: P.riding ? Math.hypot(P.vel.x, P.vel.z) : Math.hypot(m.vel.x, m.vel.z), t: G.t });
+}
+
+/* ---------------- gliding: Torcain's coat spread like wings ---------------- */
+const glider = new THREE.Group();
+{
+  const gm = new THREE.MeshToonMaterial({ color: 0x7a1e26, side: THREE.DoubleSide });
+  for (const s of [-1, 1]) {
+    const shape = new THREE.Shape(); shape.moveTo(0, 0); shape.quadraticCurveTo(1.2, 0.5, 2.1, 0.1); shape.lineTo(1.6, -0.5); shape.quadraticCurveTo(0.8, -0.3, 0, -0.6); shape.lineTo(0, 0);
+    const w = new THREE.Mesh(new THREE.ShapeGeometry(shape), gm); w.scale.x = s; w.rotation.x = -Math.PI / 2 + 0.25; w.position.set(s * 0.3, 1.7, -0.2);
+    glider.add(w);
+  }
+  const trim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 4, 10), toon(0xe6b84a)); trim.position.y = 1.7; trim.rotation.x = Math.PI / 2; glider.add(trim);
+  glider.visible = false; torcain.root.add(glider);
+}
+
+/* ---------------- spells ---------------- */
+P.spellCd = {}; P.ward = 0; P.wardT = 0;
+const wardSprite = glowSprite(0xbfeaff, 3.4, 0); torcain.root.add(wardSprite); wardSprite.position.y = 1.1;
+function castSpell(id) {
+  if (!id || !canAct()) return;
+  if (!SAVE.skills.spells[id]) { toast('You haven’t learned that spell yet. Quests and trials teach them.', 2); return; }
+  if ((P.spellCd[id] || 0) > 0) return;
+  const sp = SPELLS[id];
+  if (id === 'pull') {
+    let tgt = G.lock && G.lock !== 'boss' ? G.lock : null;
+    if (!tgt) { const b = bestTarget(26, 0.75); tgt = b && b.e !== 'boss' && !b.e.sigil ? b.e : null; if (b && b.e === 'boss') { damageBoss(40, { big: true }); P.spellCd[id] = sp.cd * cdMul(); sfx.duat(); return; } }
+    if (!tgt || tgt.T.miniboss) { toast(tgt ? 'Too big for the Duat to drag.' : 'Nothing to pull.', 1.6); return; }
+    particles.burst(tgt.pos.x, tgt.pos.y + 1, tgt.pos.z, 24, { color: 0x9a4aff, speed: 5, size: 0.5, life: 0.5 });
+    const f = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw));
+    tgt.pos.set(P.pos.x + f.x * 2.4, P.pos.y + 0.3, P.pos.z + f.z * 2.4);
+    if (tgt.T.ai === 'flyer') { tgt.state = 'recover'; tgt.timer = 1.6; tgt.alt = 1.2; }
+    enemies.damage(tgt, 15, P.pos, 0.5, { stun: 1.4 });
+    particles.burst(tgt.pos.x, tgt.pos.y + 1, tgt.pos.z, 24, { color: 0xc08aff, speed: 5, size: 0.5, life: 0.5 });
+    sfx.duat();
+  } else if (id === 'gust') {
+    const f = camForward();
+    particles.burst(P.pos.x + f.x * 2, P.pos.y + 1.2, P.pos.z + f.z * 2, 40, { vx: f.x * 18, vy: 1, vz: f.z * 18, color: 0xe8f4ff, size: 0.6, life: 0.5, drag: 1 });
+    for (const e of enemies.list) {
+      if (e.dead) continue;
+      const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+      if (d < 10 && (dx * f.x + dz * f.z) / (d || 1) > 0.45) { enemies.damage(e, 20, P.pos, 18, { stun: 0.7 }); if (e.T.ai === 'flyer') { e.state = 'recover'; e.timer = 1.4; } }
+    }
+    if (!P.onGround) P.vel.y = Math.max(P.vel.y, 11);
+    sfx.swing(); sfx.jump();
+  } else if (id === 'quake') {
+    particles.ring(P.pos.x, P.pos.y + 0.3, P.pos.z, 70, 14, { color: 0xc8a070, size: 1, life: 0.6 });
+    for (const e of enemies.list) {
+      if (e.dead || e.T.ai === 'flyer' && e.alt > 3) continue;
+      if (e.pos.distanceTo(P.pos) < 8.5) enemies.damage(e, 35, P.pos, 9, { stun: 1.7, big: true });
+    }
+    if (boss && !boss.dead && Math.hypot(P.pos.x - boss.pos.x, P.pos.z - boss.pos.z) < 12) damageBoss(60, { big: true });
+    G.shake = 0.9; sfx.slam();
+  } else if (id === 'ward') {
+    P.ward = 60; P.wardT = 10; sfx.sense();
+    particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 30, { color: 0xbfeaff, speed: 4, size: 0.5, life: 0.7 });
+  }
+  P.spellCd[id] = sp.cd * cdMul();
+}
+function renderSpellBar() {
+  $('spells').innerHTML = SPELL_ORDER.map(id => {
+    const sp = SPELLS[id], have = SAVE.skills.spells[id];
+    return `<div class="ab brass${have ? '' : ' locked'}" id="sp-${id}" title="${sp.name}">${have ? sp.icon : '·'}<span class="key">${sp.key}</span><div class="cd"></div></div>`;
+  }).join('');
+}
+
+/* ---------------- chests, gathering, trials ---------------- */
+const feats = buildFeatures(scene, world, REGION, SAVE);
+const sigils = [];
+let activeTrial = null;
+
+function openChest(c) {
+  c.open = true; SAVE.picked[c.id] = true;
+  c.mesh.userData.glow.visible = false;
+  let t = 0; const anim = () => { t += 0.05; c.mesh.userData.lid.rotation.x = -1.9 * Math.min(1, t); if (t < 1) requestAnimationFrame(anim); }; anim();
+  G.shards += c.shards; dmgNumber(c.x, c.y + 2, c.z, '+' + c.shards, 'shard');
+  for (const [k, n] of Object.entries(c.items)) { invAdd(SAVE.inv, k, n); lootToast(k, n); }
+  if (c.seed) { SAVE.seeds++; applyUps(true); setTimeout(() => toast('A Hurst seed! Your health and stamina grow.', 3), 700); }
+  particles.burst(c.x, c.y + 1, c.z, 40, { color: 0xffd27a, speed: 6, size: 0.5, life: 0.9, gravity: -6 });
+  sfx.core(); xp(25); persist();
+}
+function gather(n) {
+  n.ready = false; n.mesh.visible = false;
+  const c = perk('forager') ? 2 : 1;
+  invAdd(SAVE.inv, n.item, c); lootToast(n.item, c);
+  particles.burst(n.x, n.y + 0.8, n.z, 16, { color: n.kind === 'ore' ? 0xb48aff : 0xd8c098, speed: 4, size: 0.4, life: 0.6, gravity: -8 });
+  n.kind === 'ore' ? sfx.hit() : sfx.step();
+  xp(3);
+}
+
+function startTrial(t) {
+  if (t.done) { toast(`${t.name} — already passed.`, 2); return; }
+  if (activeTrial) return;
+  activeTrial = t; t.active = true; t.step = 0;
+  sfx.sense(); showLocation(t.name, 'a Kalo Trial');
+  if (t.kind === 'chime') {
+    t.seq = Array.from({ length: D === DIFFICULTY.realistic ? 6 : 5 }, () => Math.floor(Math.random() * 4));
+    t.showT = 0; t.showing = true; t.timer = 999;
+    bark('phorus', 'Watch the stones — then strike them in the same order.', 3);
+  } else if (t.kind === 'duat') {
+    t.timer = D === DIFFICULTY.realistic ? 28 : 40;
+    for (let i = 0; i < 5; i++) {
+      const a = i / 5 * Math.PI * 2, m = sigilMesh();
+      m.position.set(t.x + Math.cos(a) * 9, t.y + 7 + (i % 3) * 2, t.z + Math.sin(a) * 9); scene.add(m);
+      sigils.push({ mesh: m, trial: t });
+    }
+    bark('phorus', 'Only the Duat can reach those. Aim and strike — quickly!', 3);
+  } else if (t.kind === 'brazier') {
+    t.timer = D === DIFFICULTY.realistic ? 26 : 38;
+    t.parts.forEach(p => { p.lit = false; p.flame.material.opacity = 0; });
+    bark('phorus', 'Light every brazier before the rune fades! Glide if you have to.', 3);
+  }
+}
+function finishTrial(t, ok) {
+  t.active = false; activeTrial = null;
+  sigils.filter(s => s.trial === t).forEach(s => scene.remove(s.mesh));
+  for (let i = sigils.length - 1; i >= 0; i--) if (sigils[i].trial === t) sigils.splice(i, 1);
+  if (!ok) { toast(`${t.name} failed — try again at the altar.`, 3); sfx.hurt(); t.parts.forEach(p => { if (p.flame) p.flame.material.opacity = 0; }); return; }
+  t.done = true; SAVE.trials[t.id] = true; t.rune.material.opacity = 0.15;
+  const r = t.reward;
+  if (r.spell) learnSpell(r.spell);
+  if (r.seed) { SAVE.seeds += r.seed; applyUps(true); setTimeout(() => toast('A Hurst seed! Health and stamina grow.', 3), 1200); }
+  if (r.shards) G.shards += r.shards;
+  if (r.items) for (const [k, n] of Object.entries(r.items)) { invAdd(SAVE.inv, k, n); lootToast(k, n); }
+  particles.burst(t.x, t.y + 2, t.z, 80, { color: 0x7ad8ff, speed: 9, size: 0.7, life: 1.2 });
+  sfx.victory(); toast(`${t.name} passed!`, 3); xp(r.xp || 150); persist();
+}
+function trialSwing(range) {
+  const t = activeTrial; if (!t || P.atk == null) return false;
+  const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
+  for (const p of t.parts) {
+    const dx = p.x - P.pos.x, dz = p.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (d > range + 1 || (dx * fx + dz * fz) / (d || 1) < 0.2) continue;
+    if (t.kind === 'chime') {
+      if (t.showing) return true;
+      p.glow = 1; sfx.core();
+      if (p.i === t.seq[t.step]) { t.step++; if (t.step >= t.seq.length) finishTrial(t, true); }
+      else { finishTrial(t, false); }
+      return true;
+    }
+    if (t.kind === 'brazier' && !p.lit) {
+      p.lit = true; p.flame.material.opacity = 1; sfx.flare();
+      if (t.parts.every(q => q.lit)) finishTrial(t, true);
+      return true;
+    }
+  }
+  return false;
+}
+function breakSigil(sg) {
+  const i = sigils.indexOf(sg); if (i < 0) return;
+  sigils.splice(i, 1); scene.remove(sg.mesh);
+  particles.burst(sg.mesh.position.x, sg.mesh.position.y, sg.mesh.position.z, 30, { color: 0xc8a0ff, speed: 7, size: 0.5, life: 0.6 });
+  sfx.core();
+  if (!sigils.some(s => s.trial === sg.trial)) finishTrial(sg.trial, true);
+}
+function updateTrials(dt) {
+  for (const t of feats.trials) {
+    t.rune.material.opacity = t.done ? 0.15 : 0.6 + Math.sin(G.t * 3 + t.x) * 0.25;
+    if (t.kind === 'chime') t.parts.forEach(p => { p.glow = Math.max(0, p.glow - dt * 2); p.mesh.material.emissiveIntensity = 0.1 + p.glow * 1.5; });
+  }
+  for (const s of sigils) { s.mesh.rotation.y += dt * 2; s.mesh.position.y += Math.sin(G.t * 2 + s.mesh.position.x) * dt * 0.3; }
+  const t = activeTrial; if (!t) return;
+  if (t.kind === 'chime' && t.showing) {
+    t.showT += dt;
+    const idx = Math.floor(t.showT / 0.8);
+    if (idx < t.seq.length) { const p = t.parts[t.seq[idx]]; if (t.showT % 0.8 < dt * 1.5) { p.glow = 1; sfx.core(); } }
+    else { t.showing = false; t.step = 0; toast('Now — strike them in that order.', 2); }
+    return;
+  }
+  t.timer -= dt;
+  if (t.timer <= 0) finishTrial(t, false);
+  else if (t.kind !== 'chime' && Math.floor(t.timer) !== Math.floor(t.timer + dt)) toast(`${Math.ceil(t.timer)}s`, 0.9);
+  if (Math.hypot(P.pos.x - t.x, P.pos.z - t.z) > 60) finishTrial(t, false);
+}
+
+/* ---------------- the book: gear, pack, skills, quests, map, trading ---------------- */
+let book = null;
+function openBook(tab) {
+  if (G.mode !== 'play' && G.mode !== 'dialog') return;
+  G.paused = true; G.lock = null;
+  if (document.pointerLockElement) document.exitPointerLock();
+  book.open(tab);
+}
+function bookAct(act, arg) {
+  const inv = SAVE.inv;
+  if (act === 'equip') { inv.axe = arg; restyleAxe(); sfx.ui(); }
+  else if (act === 'trinket') { if (inv.trinkets.length >= 2) inv.trinkets.shift(); inv.trinkets.push(arg); sfx.ui(); }
+  else if (act === 'untrinket') { inv.trinkets = inv.trinkets.filter(t => t !== arg); }
+  else if (act === 'use') {
+    const it = ITEMS[arg];
+    if (arg === 'k_scroll_pull') { learnSpell('pull'); delete inv.items[arg]; }
+    else if (it.kind === 'meal') {
+      inv.items[arg]--; if (inv.items[arg] <= 0) delete inv.items[arg];
+      if (it.heal) P.hp = Math.min(P.maxHp, P.hp + it.heal);
+      if (it.buff) inv.buffs[arg] = SAVE.time + it.dur;
+      if (it.buff && it.buff.antidote) P.poison = 0;
+      sfx.heal();
+    }
+  } else if (act === 'buy') {
+    const price = Math.max(2, Math.round(ITEMS[arg].value * (REGION === 'leotik' ? 1.4 : 1.2)));
+    if (G.shards >= price) { G.shards -= price; invAdd(inv, arg, 1); sfx.core(); }
+  } else if (act === 'sell') {
+    if (inv.items[arg] > 0) { inv.items[arg]--; if (inv.items[arg] <= 0) delete inv.items[arg]; G.shards += Math.max(1, Math.round(ITEMS[arg].value * 0.5)); sfx.ui(); }
+  } else if (act === 'forge') {
+    const r = FORGE.find(f => f.out === arg);
+    if (r && G.shards >= r.shards && takeAll(inv, r.need)) { G.shards -= r.shards; invAdd(inv, arg, 1); inv.axe = arg; restyleAxe(); sfx.flare(); xp(60); toast(`Forged: ${ITEMS[arg].name}`, 2.5); }
+  } else if (act === 'cook') {
+    const r = RECIPES.find(f => f.out === arg);
+    if (r && takeAll(inv, r.need)) { invAdd(inv, arg, 1); sfx.heal(); xp(8); }
+  } else if (act === 'perk') {
+    const pk = PERKS.find(q => q.id === arg);
+    if (pk && canTake(SAVE.skills, pk)) { SAVE.skills.perks[arg] = true; SAVE.skills.points--; sfx.victory(); }
+  }
+  applyUps(false); persist();
+}
+/* the wielded axe's blade takes its colour */
+function restyleAxe() {
+  const it = ITEMS[SAVE.inv.axe];
+  const blade = torcain.weapon.userData.blade;
+  if (blade) { blade.material.emissive.setHex(it && it.color ? it.color : 0x6a2cff); blade.material.emissiveIntensity = it && it.color ? 0.55 : 0.25; }
+  torcain.weapon.scale.setScalar(1 + ((it && it.dmg) || 1) * 0.1 - 0.1);
+}
+restyleAxe();
+
+function mapMarkers() {
+  const m = [];
+  for (const l of lanterns) m.push({ x: l.x, z: l.z, ch: '◉', col: lanternLit(l) ? '#bfeaff' : '#5a6a7a', size: 15, label: lanternLit(l) ? l.name : null, travel: lanternLit(l) ? l.id : null });
+  if (camp) m.push({ x: world.camp.x, z: world.camp.z, ch: '⌂', col: '#ffd27a', size: 20, label: 'Camp' });
+  for (const t of feats.trials) m.push({ x: t.x, z: t.z, ch: '▲', col: t.done ? '#6a7a6a' : '#7ad8ff', size: 15 });
+  const o = objectivePoint(); if (o) m.push({ x: o.p.x, z: o.p.z, ch: '◆', col: '#f3cf7a', size: 18 });
+  for (const e of enemies.list) if (!e.dead && ((e.stray && SAVE.quests.q_strays === 'active') || (e.pet && SAVE.quests.q_fennek === 'active') || (e.pup && SAVE.quests.q_pups === 'active'))) m.push({ x: e.pos.x, z: e.pos.z, ch: '✦', col: '#ff9ad0', size: 15 });
+  if (lostMark) m.push({ x: lostMark.position.x, z: lostMark.position.z, ch: '✦', col: '#d8b8ff', size: 15, label: 'Lost shards' });
+  return m;
+}
+function travel(id) {
+  const l = lanternById(id); if (!l) return;
+  if (G.bossActive) { toast('Not in the middle of a fight like this.', 2); return; }
+  if (enemies.list.some(e => !e.dead && e.hostile && e.state !== 'idle' && e.state !== 'return' && e.pos.distanceTo(P.pos) < 25)) { toast('You can’t travel with foes on your heels.', 2.5); return; }
+  book.close();
+  fade(1, 0.4);
+  setTimeout(() => {
+    P.pos.set(l.x + 1.6, l.y, l.z + 1.6); P.vel.set(0, 0, 0); P.riding = false;
+    F.pos.copy(P.pos).add(V3(-2, 0, 2));
+    if (mount) { mount.pos.copy(P.pos).add(V3(3, 0, -2)); mount.pos.y = world.col.ground(mount.pos.x, mount.pos.z, P.pos.y + 2); }
+    CAM.target.set(P.pos.x, P.pos.y + 1.9, P.pos.z);
+    fade(0, 0.8); showLocation(l.name, 'Nur Lantern');
+  }, 450);
+}
+book = createRpgUI({
+  save: () => SAVE, shards: () => G.shards, fx: () => FX, player: () => P, perkDmg: () => (perk('heavy') ? 1.15 : 1) * (1 + 0.12 * rank('edge')),
+  region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
+  mainObjective: () => $('q-text').textContent,
+  onClose: () => { G.paused = false; lockMouse(); },
+});
+renderSpellBar();
+
+function updateRpgHud() {
+  const sk = SAVE.skills;
+  $('lvl').textContent = `LV ${sk.lvl}` + (sk.points ? ' ✦' : '');
+  $('xp-fill').style.width = Math.min(100, sk.xp / xpForLevel(sk.lvl) * 100) + '%';
+  for (const id of SPELL_ORDER) {
+    const el = $('sp-' + id); if (!el) continue;
+    const cd = P.spellCd[id] || 0;
+    el.querySelector('.cd').style.transform = `scaleY(${SAVE.skills.spells[id] ? Math.min(1, cd / (SPELLS[id].cd * cdMul())) : 0})`;
+  }
+  const act = Object.entries(SAVE.quests).filter(([, s]) => s === 'active').slice(0, 3);
+  const html = act.map(([id]) => {
+    const q = QUESTS[id], p = questProgress(id, q, SAVE, SAVE.inv);
+    return `<div>${p >= 1 ? '✔' : '•'} ${q.name} <b>${p >= 1 ? 'return to ' + npcName(q.giver) : Math.round(p * 100) + '%'}</b></div>`;
+  }).join('');
+  if ($('qtrack')._h !== html) { $('qtrack')._h = html; $('qtrack').innerHTML = html; }
+  if (lootQ.length) { lootT -= 1 / 60; if (lootT <= 0) { toast('+ ' + lootQ.splice(0, 3).join('  ·  '), 2.2); lootT = 0.8; } }
+}
+
+/* ================================================================
    UPDATE
    ================================================================ */
 function updatePlayer(dt) {
+  FX = effects(SAVE.inv, SAVE.time);
+  for (const k in P.spellCd) P.spellCd[k] = Math.max(0, P.spellCd[k] - dt);
+  if (P.wardT > 0) { P.wardT -= dt; if (P.wardT <= 0) P.ward = 0; }
+  wardSprite.material.opacity = P.ward > 0 ? 0.35 + Math.sin(G.t * 6) * 0.1 : 0;
   P.iframes = Math.max(0, P.iframes - dt);
   P.duatCd = Math.max(0, P.duatCd - dt);
   P.senseCd = Math.max(0, P.senseCd - dt);
@@ -1440,7 +2001,8 @@ function updatePlayer(dt) {
   if (sprint && D.stamina.sprint > 0) { P.stam -= D.stamina.sprint * dt; P.stamDelay = 0.5; if (P.stam <= 0) { P.stam = 0; P.exhausted = true; sprint = false; } }
   if (P.exhausted && P.stam > 25) P.exhausted = false;
   let speed = sprint ? 11.5 : 7;
-  if (P.atk) speed *= 0.25;
+  if (P.riding) { speed = (keys.ShiftLeft || keys.ShiftRight) ? 19 : 10; sprint = false; }
+  if (P.atk) speed *= P.riding ? 0.7 : 0.25;
   if (P.drink > 0) speed *= 0.35;
   const accel = P.onGround ? 14 : 4;
 
@@ -1464,7 +2026,7 @@ function updatePlayer(dt) {
 
   // stamina recovers once you stop spending it
   P.stamDelay = Math.max(0, P.stamDelay - dt);
-  if (P.stamDelay <= 0 && !sprint) P.stam = Math.min(P.stamMax, P.stam + (34 + 5 * rank('breath')) * dt * (P.atk ? 0.3 : 1));
+  if (P.stamDelay <= 0 && !sprint && !P.gliding) P.stam = Math.min(P.stamMax, P.stam + (34 + 5 * rank('breath')) * FX.stamRegen * dt * (P.atk ? 0.3 : 1));
 
   // drinking the film
   if (P.drink > 0) {
@@ -1477,12 +2039,26 @@ function updatePlayer(dt) {
   }
 
   P.coyote = P.onGround ? 0.12 : Math.max(0, P.coyote - dt);
-  if (P.jumpBuf > 0 && P.coyote > 0 && act && spend(D.stamina.jump)) { P.vel.y = 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
+  if (P.jumpBuf > 0 && P.coyote > 0 && act && (P.riding || spend(D.stamina.jump))) { P.vel.y = P.riding ? 12 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
   P.vel.y -= 28 * dt;
+  // gliding: hold Space while falling and Torcain's coat catches the wind
+  P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
+  const glideOk = act && !P.riding && keys.Space && !P.onGround && P.airT > 0.25 && P.vel.y < 0 && (P.stam > 0 || D.stamina.jump === 0 || perk('glider'));
+  P.gliding = glideOk;
+  glider.visible = glideOk;
+  if (glideOk) {
+    const fall = FX.glide ? -1.4 : -2.4;
+    P.vel.y = Math.max(P.vel.y, fall);
+    const gs = perk('glider') ? 15 : 11, gf = camForward();
+    P.vel.x = damp(P.vel.x, gf.x * gs + wish.x * 3, 2.5, dt); P.vel.z = damp(P.vel.z, gf.z * gs + wish.z * 3, 2.5, dt);
+    P.yaw = dampAngle(P.yaw, Math.atan2(gf.x, gf.z), 6, dt);
+    if (D.stamina.jump > 0 && !perk('glider')) { P.stam = Math.max(0, P.stam - 8 * dt); P.stamDelay = 0.4; }
+    if (Math.random() < 0.3) particles.emit(P.pos.x, P.pos.y + 1.7, P.pos.z, { vx: -P.vel.x * 0.2, vy: 0.5, vz: -P.vel.z * 0.2, color: 0xffffff, size: 0.2, life: 0.6 });
+  }
 
   const wasGround = P.onGround;
   P.pos.addScaledVector(P.vel, dt);
-  world.col.resolve(P.pos, 0.45, 1.9);
+  world.col.resolve(P.pos, P.riding ? 0.95 : 0.45, P.riding ? 2.6 : 1.9);
   if (G.bossActive && boss) {
     arenaClamp(P.pos, G.arena);
     if (boss.kind === 'megla') {
@@ -1524,6 +2100,7 @@ function updatePlayer(dt) {
       if (Math.random() < 0.3) particles.emit(P.pos.x, P.pos.y + 0.3, P.pos.z, { vy: 2, color: 0xb0ff4a, size: 0.4, life: 0.5, speed: 1 });
       if (P.hp <= 0) playerDown();
     }
+    if (P.poison > 0 && FX.antidote) P.poison = 0;
     if (P.poison > 0) {
       P.poison -= dt;
       P.hp = Math.max(1, P.hp - D.poisonDps * dt); P.lastHurt = G.t;
@@ -1539,6 +2116,7 @@ function updatePlayer(dt) {
       dmgNumber(P.pos.x, P.pos.y + 2.4, P.pos.z, '+' + Math.round(h), 'heal');
       sfx.heal(); particles.burst(fl.x, fl.grp.position.y + 1, fl.z, 24, { color: 0xff9ad0, speed: 4, size: 0.4, life: 0.8, gravity: 3 });
       fl.ready = false; fl.timer = D.flowerRegrow; fl.grp.visible = false;
+      invAdd(SAVE.inv, 'petal', 1); lootToast('petal', 1);
     }
   }
 
@@ -1556,8 +2134,9 @@ function updatePlayer(dt) {
   updateAttack(dt);
 
   torcain.root.position.copy(P.pos);
+  if (P.riding) torcain.root.position.y += 1.35;
   torcain.root.rotation.y = P.yaw;
-  torcain.animate(dt, { speed: P.roll ? 0 : hs, onGround: P.onGround, t: G.t, swing: P.atk ? { kind: P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100 });
+  torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0 });
   if (P.roll) torcain.body.rotation.x = (P.roll.t / P.roll.dur) * Math.PI * 2;
 }
 
@@ -1581,11 +2160,11 @@ function updatePhorus(dt) {
     want = V3(tp.x, 0, tp.z).addScaledVector(away, tgt.isBoss ? 13 : 7).addScaledVector(side, 3);
     const aim = tgt.isBoss ? bossTargetPoint() : V3(tgt.pos.x, tgt.pos.y + 0.8, tgt.pos.z);
     if (F.cd <= 0 && F.pos.distanceTo(aim) < 28) {
-      F.cd = D === DIFFICULTY.realistic ? 1.8 : 1.3; F.cast = 0.35;
+      F.cd = (D === DIFFICULTY.realistic ? 1.8 : 1.3) * (perk('bond') ? 0.75 : 1); F.cast = 0.35;
       const start = phorus.weapon.getWorldPosition(V3());
       const sp = glowSprite(0x7ad8ff, 1.1, 1); sp.position.copy(start); scene.add(sp);
       const dir = aim.clone().sub(start).normalize();
-      projectiles.push({ sprite: sp, pos: start, vel: dir.multiplyScalar(22), dmg: tgt.isBoss ? 12 : 10, owner: 'phorus', life: 2.2, target: tgt.isBoss ? { isBoss: true } : tgt });
+      projectiles.push({ sprite: sp, pos: start, vel: dir.multiplyScalar(22), dmg: (tgt.isBoss ? 12 : 10) * (perk('bond') ? 1.5 : 1), owner: 'phorus', life: 2.2, target: tgt.isBoss ? { isBoss: true } : tgt });
       sfx.bolt();
       F.yaw = Math.atan2(tp.x - F.pos.x, tp.z - F.pos.z);
     }
@@ -1634,7 +2213,7 @@ function updateCamera(dt) {
       CAM.pitch = damp(CAM.pitch, 0.22, 3, dt);
     }
   }
-  const tgt = V3(P.pos.x, P.pos.y + 1.9, P.pos.z);
+  const tgt = V3(P.pos.x, P.pos.y + (P.riding ? 3.0 : 1.9), P.pos.z);
   CAM.target.lerp(tgt, 1 - Math.exp(-18 * dt));
   if (CAM.target.distanceTo(tgt) > 8) CAM.target.copy(tgt);
   const r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
@@ -1682,7 +2261,7 @@ function updateHUD() {
   const stk = (P.poison > 0 ? 'p' : '') + (P.para > 0 ? 'z' : '');
   if ($('status')._k !== stk) { $('status')._k = stk; $('status').innerHTML = (P.poison > 0 ? '<span class="st poison">POISONED</span>' : '') + (P.para > 0 ? '<span class="st para">PARALYSED</span>' : ''); }
   $('poisonfx').style.opacity = P.poison > 0 ? 0.8 : 0;
-  $('resume').classList.toggle('hidden', locked || G.paused || G.mode !== 'play' || overlayOpen());
+  $('resume').classList.toggle('hidden', locked || G.paused || G.mode !== 'play' || overlayOpen() || !!(DLG && DLG.choices));
   const pe = $('prompt'), pr = nearestPrompt();
   if (pr) { pe.innerHTML = `<kbd>E</kbd>${pr.label}`; pe.classList.remove('hidden'); } else pe.classList.add('hidden');
   // the lock reticle
@@ -1750,6 +2329,9 @@ function frame() {
       updateSpikes(dt);
       updateProjectiles(dt);
       updateWorldBits(dt);
+      updateNpcs(dt);
+      updateMount(dt);
+      updateTrials(dt);
       updateDialog(dt);
       updateCamera(dt);
       checkLocations();
@@ -1764,7 +2346,7 @@ function frame() {
     if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
     if (locTimer > 0) { locTimer -= dt; if (locTimer <= 0) $('location').classList.remove('show'); }
     updateNums(dt);
-    if (G.mode !== 'title') updateHUD();
+    if (G.mode !== 'title') { updateHUD(); updateRpgHud(); }
   } else if (G.mode === 'title') {
     const t = performance.now() / 1000;
     const a = 0.9 + t * 0.025;
@@ -1838,7 +2420,7 @@ function newRun(diff) {
     location.reload();
     return;
   }
-  SAVE = freshSave(diff); D = DIFFICULTY[diff]; F_ = SAVE.flags;
+  SAVE = ensureSave(freshSave(diff)); D = DIFFICULTY[diff]; F_ = SAVE.flags;
   restWorld(); persist();
   startFromTitle(beginNew);
 }
@@ -1903,5 +2485,5 @@ else if (BOOT === 'arrive' && REGION === 'leotik') { $('title').classList.add('h
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get boss() { return boss; }, startBoss, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

@@ -153,7 +153,27 @@ export function buildEikar(o) {
     legs.push(hip);
   }
 
-  // the floating weapon
+  // arms — the right hand keeps hold of the weapon, the left swings as they walk
+  const handMat = toon(o.hand || o.leg || 0x4a2c1a);
+  const arms = [-1, 1].map(s => {
+    const g = new THREE.Group(); g.position.set(s * 0.5 * (o.build || 1), 0.2, 0.04); body.add(g);
+    const up = new THREE.Mesh(new THREE.CapsuleGeometry(0.068, 0.42, 3, 8), skinMat); up.rotation.x = Math.PI / 2; up.position.z = 0.27; g.add(up);
+    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.025, 5, 10), toon(o.beltColor || 0x5a3420)); cuff.position.z = 0.42; g.add(cuff);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 8), handMat); hand.scale.set(1, 0.9, 1.15); hand.position.z = 0.55; g.add(hand);
+    const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.042, 6, 5), handMat); thumb.position.set(-s * 0.07, 0.05, -0.03); hand.add(thumb);
+    return { s, g, up, cuff, hand };
+  });
+  const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+  const rootScale = o.scale || 1;
+  function reach(arm, worldTarget) {
+    arm.g.lookAt(worldTarget);
+    arm.g.getWorldPosition(tmpB);
+    const d = Math.min(1.25, Math.max(0.3, tmpB.distanceTo(worldTarget) / rootScale));
+    arm.up.scale.y = d / 0.56; arm.up.position.z = d / 2;
+    arm.cuff.position.z = d - 0.13; arm.hand.position.z = d;
+  }
+
+  // the weapon, in hand
   const wPivot = new THREE.Group(); wPivot.position.y = 1.0; root.add(wPivot);
   const weapon = o.weapon === 'spear' ? makeSpear() : makeAxe();
   const wHold = new THREE.Group(); wPivot.add(wHold); wHold.add(weapon);
@@ -207,6 +227,14 @@ export function buildEikar(o) {
       wHold.position.set(0, lerp(wy, 0, swingBlend), lerp(R, rad, swingBlend));
       wHold.rotation.set(lerp(0.15, hx, swingBlend), lerp(0, 0, swingBlend), lerp(-0.2, hz, swingBlend));
       if (weapon.userData.glow) weapon.userData.glow.material.opacity = 0.35 + swingBlend * 0.65;
+      // hands: right on the haft, left swinging (or raised to drink)
+      root.updateMatrixWorld(true);
+      reach(arms[0], weapon.localToWorld(tmpA.set(0, o.weapon === 'spear' ? -0.15 : -0.42, 0)));
+      const sw = moving ? Math.sin(phase) * 0.35 * k : Math.sin(st.t * 1.6) * 0.04;
+      if (st.drink) body.localToWorld(tmpA.set(0.12, 0.05, 0.62));
+      else if (st.swing && st.swing.kind === 3) body.localToWorld(tmpA.set(0.2, 0.75, 0.45));
+      else body.localToWorld(tmpA.set(0.62 * (o.build || 1), -0.32, 0.05 - sw));
+      reach(arms[1], tmpA);
     },
     flash(v) { mats.forEach(m => m.emissive.setRGB(v + 0.07, v * 0.9 + 0.055, v * 0.8 + 0.04)); },
   };
@@ -243,16 +271,17 @@ function pumpkinGeo(r, ribs = 6) {
   return g;
 }
 
-export function buildPunk(malsti = false) {
+export function buildPunk(malsti = false, opts = {}) {
+  const tame = !!opts.domestic;
   const root = new THREE.Group();
-  const bodyMat = new THREE.MeshToonMaterial({ color: malsti ? 0x5a3a7a : 0xd9792a, gradientMap: ramp(), emissive: malsti ? 0x2a0a4a : 0x000000 });
-  const vineMat = toon(malsti ? 0x3a2a4a : 0x5a7a2a);
+  const bodyMat = new THREE.MeshToonMaterial({ color: malsti ? 0x5a3a7a : tame ? 0xe8a85a : 0xd9792a, gradientMap: ramp(), emissive: malsti ? 0x2a0a4a : 0x000000 });
+  const vineMat = toon(malsti ? 0x3a2a4a : tame ? 0x6a8a3a : 0x5a7a2a);
   const body = new THREE.Group(); body.position.y = 1.0; root.add(body);
   const pump = new THREE.Mesh(pumpkinGeo(0.75, malsti ? 5 : 6), bodyMat); body.add(pump);
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 0.4, 6), toon(malsti ? 0x2a1a3a : 0x4a5a1a)); stem.position.y = 0.66; stem.rotation.z = 0.4; body.add(stem);
   const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), vineMat); leaf.scale.set(1.4, 0.2, 0.8); leaf.position.set(0.18, 0.68, 0); body.add(leaf);
   // a face of embers
-  const eyeCol = malsti ? 0xd08aff : 0xffd040;
+  const eyeCol = malsti ? 0xd08aff : tame ? 0xfff2c0 : 0xffd040;
   const eyeMat = new THREE.MeshBasicMaterial({ color: eyeCol });
   for (const s of [-1, 1]) {
     const e = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.18, 3), eyeMat); e.rotation.x = Math.PI / 2; e.rotation.y = s * 0.2;
@@ -280,7 +309,14 @@ export function buildPunk(malsti = false) {
   if (malsti) { aura = glowSprite(0x9a4aff, 3, 0.35); aura.position.y = 1.0; root.add(aura); }
   outlineAll(root, 0.035);
   root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
-  root.scale.setScalar(malsti ? 0.5 : 1.0);
+  if (tame) {
+    // a herder's saddle and blanket on its back
+    const blanket = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 1.1), toon(opts.blanket || 0x2f6f8a)); blanket.position.y = 0.66; body.add(blanket);
+    const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.18, 0.7), toon(0x6a3a1e)); saddle.position.y = 0.76; body.add(saddle);
+    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.25, 6), toon(0x4a2a14)); horn.position.set(0, 0.92, 0.25); body.add(horn);
+    outlineAll(blanket, 0.02);
+  }
+  root.scale.setScalar(malsti ? 0.5 : tame ? 1.35 : 1.0);
   let ph = Math.random() * 6;
   return {
     root, body, mats: [bodyMat],
