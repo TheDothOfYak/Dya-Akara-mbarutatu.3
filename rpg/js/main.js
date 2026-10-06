@@ -18,7 +18,8 @@ import { buildTorcain, buildPhorus, buildMegla, buildCore } from './actors.js';
 import { buildMalstiLord } from './creatures.js';
 import { createEnemies } from './enemies.js';
 import * as STORY from './story.js';
-import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime } from './progress.js';
+import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime, saveKey, newer } from './progress.js';
+import * as CLOUD from './cloud.js';
 import { initAudio, sfx, setVolume } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -30,13 +31,31 @@ try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}'
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
 
 /* ---------------- the save, and which region this page is ---------------- */
-const SAVE_AT_LOAD = loadSave();
+/* signed in with a Dya'Akara account? Then the run lives on the account. */
+const WHO = CLOUD.identity();
+const KEY = saveKey(WHO && WHO.id);
+let localSave = loadSave(KEY);
+if (WHO && !localSave) localSave = loadSave();          // a guest run carries over the first time you sign in
+let cloudSave = null;
+if (WHO) {
+  $('loading').textContent = 'FETCHING YOUR RUN FROM THE DYA GUILD…';
+  cloudSave = await CLOUD.fetchSave(WHO.id);
+}
+const SAVE_AT_LOAD = newer(localSave, cloudSave);
 let SAVE = SAVE_AT_LOAD || freshSave('easy');
 let BOOT = null;
 try { BOOT = sessionStorage.getItem('torcain-boot'); sessionStorage.removeItem('torcain-boot'); } catch (e) { /* ignore */ }
 const REGION = SAVE.region || 'aakalay';
 let D = DIFFICULTY[SAVE.difficulty] || DIFFICULTY.easy;
-const persist = () => { SAVE.shards = G.shards; writeSave(SAVE); };
+const persist = () => {
+  SAVE.shards = G.shards;
+  writeSave(SAVE, KEY);
+  if (WHO) CLOUD.pushSave(WHO.id, SAVE);
+};
+/* a closing or hidden tab sends the latest save straight away */
+const flushSave = () => { try { if (G.mode !== 'title') persist(); } catch (e) { /* still loading */ } CLOUD.flush(); };
+addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); });
 
 /* ---------------- renderer ---------------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -178,7 +197,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = false; });
 const canvas = renderer.domElement;
-const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame'].some(id => !$(id).classList.contains('hidden'));
+const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin'].some(id => !$(id).classList.contains('hidden'));
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
   if (!locked && !G.paused && (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory') && !overlayOpen()) openPause();
@@ -1032,7 +1051,7 @@ function setSail() {
       'Two days across the etherium. The Stryx sings to the seed. Phorus sleeps. You do not.',
       'Leotik rises out of a storm — green, wet, and humming with something old.',
     ], 4200, () => {
-      SAVE.region = 'leotik'; SAVE.lantern = null; persist();
+      SAVE.region = 'leotik'; SAVE.lantern = null; persist(); CLOUD.flush();
       try { sessionStorage.setItem('torcain-boot', 'arrive'); } catch (e) { /* ignore */ }
       location.reload();
     });
@@ -1812,7 +1831,9 @@ function startFromTitle(fn) {
 function newRun(diff) {
   $('newgame').classList.add('hidden');
   if (SAVE_AT_LOAD) {
-    writeSave(freshSave(diff));
+    const fresh = freshSave(diff);
+    writeSave(fresh, KEY);
+    if (WHO) { CLOUD.pushSave(WHO.id, fresh); CLOUD.flush(); }
     try { sessionStorage.setItem('torcain-boot', 'new'); } catch (e) { /* ignore */ }
     location.reload();
     return;
@@ -1835,6 +1856,31 @@ if (SAVE_AT_LOAD) {
   $('t-save').textContent = `Saved run: ${where} · ${DIFFICULTY[SAVE.difficulty].label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls`;
   $('btn-continue').style.display = ''; $('btn-continue').disabled = false;
 }
+function renderAccount() {
+  const el = $('t-acct');
+  if (WHO) {
+    const where = !CLOUD.configured() ? 'saving in this browser only'
+      : !CLOUD.state.available ? 'cloud saves aren’t switched on for this site yet — saving in this browser'
+      : CLOUD.state.error ? 'couldn’t reach the Dya Guild — saving here and will sync when it’s back'
+      : 'your run saves to your Dya’Akara account';
+    el.innerHTML = `Signed in as <b>${WHO.name.replace(/[<>&]/g, '')}</b> · ${where} · <a href="#" id="t-signout">Sign out</a>`;
+    $('t-signout').onclick = ev => { ev.preventDefault(); CLOUD.flush(); CLOUD.signOut(); location.reload(); };
+  } else if (CLOUD.configured()) {
+    el.innerHTML = 'Playing as a guest — progress stays in this browser. <a href="#" id="t-signin">Sign in with your Dya’Akara account</a> to save it to your account.';
+    $('t-signin').onclick = ev => { ev.preventDefault(); $('signin').classList.remove('hidden'); $('si-email').focus(); };
+  } else el.textContent = 'Progress is saved in this browser.';
+}
+renderAccount();
+$('si-cancel').onclick = () => $('signin').classList.add('hidden');
+$('si-form').onsubmit = async ev => {
+  ev.preventDefault();
+  $('si-err').textContent = ''; $('si-go').disabled = true;
+  const r = await CLOUD.signIn($('si-email').value, $('si-pass').value);
+  $('si-go').disabled = false;
+  if (r.err) { $('si-err').textContent = r.err; return; }
+  location.reload();
+};
+
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'This is a keyboard-and-mouse game — on a phone or tablet the controls won’t work.';
 $('btn-continue').onclick = () => startFromTitle(() => {
   if (REGION === 'aakalay' && !F_.talked) beginNew();

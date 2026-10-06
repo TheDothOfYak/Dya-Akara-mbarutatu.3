@@ -262,3 +262,6 @@ create index if not exists dya_players_rank       on public.dya_players (rank de
 create index if not exists dya_season_queue_find  on public.dya_season_queue (circuit, status, updated_at desc);
 create index if not exists dya_messages_to     on public.dya_messages (to_id, created_at);
 create index if not exists dya_messages_from   on public.dya_messages (from_id, created_at);
+
+-- Torcain's Run (rpg/) keeps each account's story save in dya_config
+-- under the key 'rpg_save:<account id>' — no extra table needed.

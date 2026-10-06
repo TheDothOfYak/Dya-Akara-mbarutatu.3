@@ -33,22 +33,35 @@ export const UPGRADES = [
 ];
 export const upgradeCost = (u, rank) => u.base + u.step * rank;
 
-const KEY = 'torcain-save-v2';
+const BASE = 'torcain-save-v2';
+/* each signed-in account keeps its own local copy; guests share one */
+export const saveKey = accountId => accountId ? BASE + ':' + accountId : BASE;
 
 export function freshSave(difficulty) {
   return {
     v: 2, difficulty, region: 'aakalay', shards: 0, ups: {}, lantern: null, lit: {},
-    flags: {}, cores: {}, codex: {}, lost: null, time: 0, deaths: 0, kills: 0, cleared: {},
+    flags: {}, cores: {}, codex: {}, lost: null, time: 0, deaths: 0, kills: 0, cleared: {}, savedAt: 0,
+    runId: Math.random().toString(36).slice(2, 10),
   };
 }
 
-export function loadSave() {
-  try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); return s && s.v === 2 ? s : null; } catch (e) { return null; }
+export function loadSave(key = BASE) {
+  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); return s && s.v === 2 ? s : null; } catch (e) { return null; }
 }
-export function writeSave(s) {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); return true; } catch (e) { return false; }
+export function writeSave(s, key = BASE) {
+  s.savedAt = Date.now();
+  try { localStorage.setItem(key, JSON.stringify(s)); return true; } catch (e) { return false; }
 }
-export function clearSave() { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } }
+export function clearSave(key = BASE) { try { localStorage.removeItem(key); } catch (e) { /* ignore */ } }
+
+/* two copies of the same run: keep the one further along (a stale device can't
+   roll you back). Two different runs: the one saved most recently is the run
+   you chose to keep playing. */
+export function newer(a, b) {
+  if (!a) return b; if (!b) return a;
+  if (a.runId && a.runId === b.runId && Math.abs((a.time || 0) - (b.time || 0)) > 5) return (a.time || 0) > (b.time || 0) ? a : b;
+  return (a.savedAt || 0) >= (b.savedAt || 0) ? a : b;
+}
 
 export function fmtTime(sec) {
   const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60;
