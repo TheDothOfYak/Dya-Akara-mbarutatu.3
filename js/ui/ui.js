@@ -298,7 +298,8 @@
   UI.tokenCard = function (tok, opts) {
     opts = opts || {};
     const sp = SP.get(tok.speciesId);
-    const card = U.el('div', { cls: 'tok-card' + (tok.isRental ? ' rental' : '') });
+    /* rarity/element hooks for css/card_frames.css (harmless without it) */
+    const card = U.el('div', { cls: 'tok-card rar' + (tok.rarity || 0) + (sp ? ' tel-' + sp.element : '') + (tok.isRental ? ' rental' : '') });
     card.appendChild(UI.tokenArt(tok.speciesId, opts.size || 92, 'idle', tok.picks && tok.picks.headCount, tok));
     card.appendChild(U.el('div', { cls: 'tc-name', text: tok.name }));
     if (opts.mode !== 'minimal') {

@@ -1,0 +1,48 @@
+/* ============================================================
+   DYA'AKARA — card_frames.css
+   Rarity frames for token cards (Collection, pouch builder, market
+   grids — anywhere UI.tokenCard draws one). Delete this file's
+   <link> in index.html to go back to plain cards; each numbered
+   block below can also be removed on its own.
+   Rarity order: 0 Buri · 1 Tui · 2 Stamijan · 3 Naelst · 4 Onnar ·
+   5 Elster · 6 Torcain.
+   ============================================================ */
+
+/* ---- 1. A frame in the rarity's colour, brighter as rarity climbs ---- */
+.tok-card.rar0 { --rc: var(--r0); }
+.tok-card.rar1 { --rc: var(--r1); }
+.tok-card.rar2 { --rc: var(--r2); }
+.tok-card.rar3 { --rc: var(--r3); }
+.tok-card.rar4 { --rc: var(--r4); }
+.tok-card.rar5 { --rc: var(--r5); }
+.tok-card.rar6 { --rc: var(--r6); }
+.tok-card[class*=" rar"] {
+  border-color: color-mix(in srgb, var(--rc) 45%, var(--line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 14%, transparent), 0 4px 14px #0006;
+}
+.tok-card[class*=" rar"]:hover { border-color: var(--rc); box-shadow: 0 8px 22px #000a, 0 0 16px color-mix(in srgb, var(--rc) 35%, transparent); }
+
+/* ---- 2. A soft pool of the creature's element behind its art ---- */
+.tok-card[class*=" tel-"] canvas { border-radius: 50%; }
+.tok-card.tel-Fti canvas  { background: radial-gradient(circle at 50% 60%, #f0f0f51c, transparent 65%); }
+.tok-card.tel-Su canvas   { background: radial-gradient(circle at 50% 60%, #3b9ae124, transparent 65%); }
+.tok-card.tel-Eldi canvas { background: radial-gradient(circle at 50% 60%, #e8842c24, transparent 65%); }
+.tok-card.tel-Ular canvas { background: radial-gradient(circle at 50% 60%, #4caf5022, transparent 65%); }
+
+/* ---- 3. Foil: a slow shine crosses Onnar, Elster and Torcain cards ---- */
+.tok-card.rar4, .tok-card.rar5, .tok-card.rar6 { overflow: hidden; }
+.tok-card.rar4::before, .tok-card.rar5::before, .tok-card.rar6::before {
+  content: ''; position: absolute; inset: -40% -60%; pointer-events: none; z-index: 1;
+  background: linear-gradient(105deg, transparent 42%, color-mix(in srgb, var(--rc) 30%, #fff0) 48%, #ffffff33 50%, color-mix(in srgb, var(--rc) 30%, #fff0) 52%, transparent 58%);
+  animation: cardFoil 5.5s ease-in-out infinite;
+}
+.tok-card.rar6::before { animation-duration: 3.8s; }
+@keyframes cardFoil { 0% { transform: translateX(-60%) } 55%, 100% { transform: translateX(60%) } }
+
+/* ---- 4. Torcain: the rarest carry a faint living glow ---- */
+.tok-card.rar6 { animation: torcainGlow 3.2s ease-in-out infinite; }
+@keyframes torcainGlow { 0%, 100% { box-shadow: 0 4px 14px #0006, 0 0 10px #68e0e833 } 50% { box-shadow: 0 4px 14px #0006, 0 0 22px #68e0e866 } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tok-card.rar4::before, .tok-card.rar5::before, .tok-card.rar6::before, .tok-card.rar6 { animation: none; }
+}

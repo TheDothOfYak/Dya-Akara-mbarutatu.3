@@ -98,6 +98,22 @@ Every visual layer on the match field is a separate plug-in file in `js/engine/f
 
 The HUD restyle (glass panels, shimmering pulse bar, gold minimap bezel, wheel tray) is `css/match_hud.css` — remove its `<link>` line to go back to the original HUD, or delete any one of its numbered blocks. The plug-in slots themselves are `js/engine/match_fx.js` plus five one-line hooks in `js/engine/render.js`.
 
+## Character Looks (each one removable on its own)
+
+How creatures and people are drawn — on the field, on cards, in the Vakarborac — can be layered or redesigned by plug-ins in `js/engine/looks/`, one file each, switchable under **Settings → Display → Character looks**. Delete a file and its `<script>` line to remove it; a removed species redesign falls back to the original drawing. An admin-uploaded sprite image always wins over any redesign. Display-only — the sim never sees them.
+
+| File | What it does |
+|---|---|
+| `looks/eikar_canon.js` | Eikar as the creator draws them: acorn-textured triangular bodies, markings under the eyes, a scaled Aagac with a symbol for their kind (sword, spear, bow, flask), and no hands — weapons float beside them. |
+| `looks/keilia_canon.js` | Broad Keilia with overlapping hair growing thickest from the shoulders and falling to the calf like a cape; floating tools. |
+| `looks/kofi_galta.js` | The Kofi (and Big Momma Kofi) as the Kofi Galta: crescent body, blade-like spines, dark tail tuft. |
+| `looks/living_motion.js` | Breathing at rest, leaning into a run, stretching into strikes. |
+| `looks/volume_shading.js` | Light from the upper left and shade below, painted only on each body. Off on Low quality. |
+| `looks/hit_flash.js` | A creature's exact shape flashes pale when it is struck. |
+| `looks/ink_outline.js` | A thin dark outline around every creature. Off on Low quality. |
+
+The slots are `js/engine/char_looks.js` (which also holds the shared floating-weapon drawing) and one hook in `SPR.draw`. Token cards get rarity frames, element glows, and a foil shine on Onnar-and-up from `css/card_frames.css` — remove its `<link>` for plain cards.
+
 ## Placeholder Art
 
 Per the creator's direction, all creatures use **animated placeholder rigs**: a small four-legged animal for beasts, a small two-legged, two-armed acorn for humanoids — with species feature layers (extra heads for Naga, five horns for Albali Byrd, the flame crown for Tyndael, hair armor for Keilia…) so everything reads on the field. All animation states are in: idle, walk, run, attack, hit, death fade, dormant, plus signature specials (tongue strike, jet blast, screech, teleport, swarm thinning). Shader treatments per Part XIV: magical shimmer, per-creature bioluminescence (RubberMcFly only glows during the Sunear'Zikhron), tether fade, element-colored resource orbs.
