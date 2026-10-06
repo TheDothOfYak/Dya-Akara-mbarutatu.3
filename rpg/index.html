@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d1424">
+<title>Torcain's Run — The Ruins of Aakalay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IM+Fell+English:ital@0;1&display=swap">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23e8a33a'/><circle cx='50' cy='50' r='34' fill='%23142038'/><path d='M50 22 L58 50 L50 78 L42 50Z' fill='%23c89aff'/></svg>">
+<style>
+  :root{
+    --navy:#0d1424; --navy2:#16223a; --teal:#2a6f86; --brass:#d9a441; --brass2:#f3cf7a; --brass-dim:#8a6a2c;
+    --ink:#f4e6c6; --ink-dim:#b9a682; --violet:#b48aff; --su:#7ad8ff; --red:#e0524a; --ember:#ff9a3a;
+    --display:'Cinzel', Georgia, 'Times New Roman', serif; --body:'IM Fell English', Georgia, serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--navy);color:var(--ink);font-family:var(--body);user-select:none;-webkit-user-select:none}
+  #game{position:fixed;inset:0}
+  #game canvas{display:block;width:100%;height:100%}
+  .hidden{display:none !important}
+
+  /* brass frame used by every panel */
+  .brass{
+    background:linear-gradient(180deg, rgba(22,34,58,.92), rgba(13,20,36,.94));
+    border:1px solid var(--brass-dim); border-radius:10px;
+    box-shadow:0 0 0 1px rgba(0,0,0,.6), inset 0 0 0 1px rgba(243,207,122,.12), 0 8px 30px rgba(0,0,0,.45);
+    position:relative;
+  }
+  .brass::before,.brass::after{content:'';position:absolute;width:12px;height:12px;border:2px solid var(--brass);opacity:.85}
+  .brass::before{top:-3px;left:-3px;border-right:none;border-bottom:none;border-top-left-radius:6px}
+  .brass::after{bottom:-3px;right:-3px;border-left:none;border-top:none;border-bottom-right-radius:6px}
+
+  /* ---------------- title ---------------- */
+  #title{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:flex-start;padding:0 8vw;
+    background:linear-gradient(90deg, rgba(8,12,24,.88) 0%, rgba(8,12,24,.55) 45%, rgba(8,12,24,0) 75%);transition:opacity 1s}
+  #title.fade{opacity:0;pointer-events:none}
+  .t-box{max-width:560px}
+  .t-kicker{font-family:var(--display);letter-spacing:.38em;text-transform:uppercase;font-size:13px;color:var(--brass)}
+  .t-title{font-family:var(--display);font-weight:700;font-size:clamp(38px,6vw,78px);line-height:1.02;margin:14px 0 6px;
+    background:linear-gradient(180deg,#fff2c8 0%,#f3cf7a 45%,#c0812a 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 0 rgba(0,0,0,.6)) drop-shadow(0 0 22px rgba(243,170,80,.35))}
+  .t-sub{font-style:italic;color:var(--ink-dim);font-size:19px;margin-bottom:26px}
+  .riddle{font-style:italic;color:#e9d8ff;font-size:18px;line-height:1.55;border-left:2px solid var(--violet);padding:4px 0 4px 16px;margin:0 0 30px;opacity:.92}
+  .btn{font-family:var(--display);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--navy);cursor:pointer;
+    background:linear-gradient(180deg,#ffe3a0,#d9a441 60%,#a8741f);border:1px solid #6a4a14;border-radius:999px;padding:13px 30px;
+    box-shadow:0 3px 0 #5a3a0c, 0 8px 22px rgba(0,0,0,.4);transition:transform .12s, filter .12s}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 #5a3a0c}
+  .btn.ghost{background:transparent;color:var(--brass2);border-color:var(--brass-dim);box-shadow:none}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap}
+  .controls{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-top:26px;font-size:15px;color:var(--ink-dim)}
+  .controls b{font-family:var(--display);font-weight:500;color:var(--brass2);font-size:13px;letter-spacing:.05em}
+  .t-note{margin-top:18px;font-size:13px;color:var(--ink-dim);opacity:.8}
+  #loading{font-family:var(--display);letter-spacing:.3em;font-size:12px;color:var(--brass);margin-bottom:18px}
+
+  /* ---------------- HUD ---------------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  #crosshair{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);opacity:.75}
+  #crosshair::before,#crosshair::after{content:'';position:absolute;background:var(--brass2);box-shadow:0 0 4px #000}
+  #crosshair::before{left:10px;top:3px;width:2px;height:16px;transform:rotate(45deg)}
+  #crosshair::after{left:10px;top:3px;width:2px;height:16px;transform:rotate(-45deg)}
+  #crosshair.lock::before,#crosshair.lock::after{background:var(--violet)}
+
+  #compass{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:min(560px,70vw);height:34px;overflow:hidden;
+    border-radius:999px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);
+    background:linear-gradient(180deg,rgba(13,20,36,.75),rgba(13,20,36,.55));border-top:1px solid var(--brass-dim);border-bottom:1px solid var(--brass-dim)}
+  #compass .tick{position:absolute;top:6px;width:1px;height:8px;background:var(--ink-dim);opacity:.6}
+  #compass .card{position:absolute;top:7px;transform:translateX(-50%);font-family:var(--display);font-size:14px;color:var(--brass2)}
+  #compass .mark{position:absolute;top:4px;transform:translateX(-50%);font-size:15px;text-shadow:0 0 6px #000}
+  #compass .mark small{display:block;font-size:10px;font-family:var(--display);text-align:center;color:var(--ink);margin-top:-2px}
+  #compass-pin{position:absolute;top:13px;left:50%;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--brass);transform:translateX(-50%) translateY(-14px)}
+
+  #quest{position:absolute;top:18px;right:20px;width:300px;padding:12px 16px}
+  #quest .q-head{font-family:var(--display);font-size:11px;letter-spacing:.28em;color:var(--brass);text-transform:uppercase}
+  #quest .q-text{font-size:17px;margin-top:4px;line-height:1.3}
+  #quest .q-hint{font-size:13px;color:var(--ink-dim);margin-top:6px;font-style:italic}
+  .pips{display:flex;gap:6px;margin-top:8px}
+  .pip{width:14px;height:14px;transform:rotate(45deg);border:1px solid var(--violet);background:rgba(180,138,255,.08)}
+  .pip.on{background:var(--violet);box-shadow:0 0 10px var(--violet)}
+
+  #vitals{position:absolute;left:22px;bottom:22px;display:flex;gap:14px;align-items:flex-end}
+  #portrait{width:74px;height:74px;border-radius:50%;border:2px solid var(--brass);background:radial-gradient(circle at 50% 38%,#8a5a3a 0 28%,transparent 29%),radial-gradient(circle at 50% 30%,#3d2618 0 46%,transparent 47%),radial-gradient(circle,#2a2440,#141024);
+    box-shadow:0 0 0 3px rgba(0,0,0,.5),0 0 18px rgba(200,154,255,.35);position:relative}
+  #portrait::after{content:'';position:absolute;left:50%;top:16px;width:10px;height:10px;transform:translateX(-50%) rotate(45deg);background:var(--violet);box-shadow:0 0 8px var(--violet)}
+  .bars{display:flex;flex-direction:column;gap:7px;padding-bottom:6px}
+  .bars .name{font-family:var(--display);font-size:15px;color:var(--brass2);letter-spacing:.1em}
+  .bars .name small{font-family:var(--body);font-style:italic;color:var(--ink-dim);letter-spacing:0;font-size:13px;margin-left:6px}
+  .bar{width:280px;height:14px;border-radius:999px;background:rgba(0,0,0,.55);border:1px solid var(--brass-dim);overflow:hidden;position:relative}
+  .bar.thin{height:9px;width:220px}
+  .bar .fill{position:absolute;inset:0;transform-origin:left;transition:transform .15s}
+  .bar .lag{position:absolute;inset:0;transform-origin:left;background:#fff3;transition:transform .8s .25s}
+  #hp .fill{background:linear-gradient(180deg,#ff8c7a,#c8323a)}
+  #heat .fill{background:linear-gradient(90deg,#ff6a1a,#ffc04a)}
+  #heat.full{box-shadow:0 0 12px var(--ember)}
+  #heat.full .fill{animation:pulse .8s infinite alternate}
+  @keyframes pulse{to{filter:brightness(1.5)}}
+
+  #abilities{position:absolute;right:22px;bottom:22px;display:flex;gap:10px}
+  .ab{width:58px;height:58px;border-radius:12px;position:relative;display:flex;align-items:center;justify-content:center;font-size:24px;overflow:hidden}
+  .ab .key{position:absolute;bottom:2px;right:5px;font-family:var(--display);font-size:11px;color:var(--brass2)}
+  .ab .cd{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);transform-origin:bottom}
+  .ab.ready{box-shadow:0 0 14px rgba(255,190,90,.45)}
+  .ab .lbl{position:absolute;top:-18px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-family:var(--display);color:var(--ink-dim)}
+
+  #prompt{position:absolute;left:50%;top:62%;transform:translateX(-50%);padding:8px 16px;font-size:17px;white-space:nowrap}
+  #prompt kbd{font-family:var(--display);background:var(--brass);color:var(--navy);border-radius:5px;padding:1px 7px;margin-right:8px;font-size:14px}
+
+  #bark{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);max-width:640px;text-align:center;font-size:19px;text-shadow:0 2px 4px #000,0 0 12px #000;transition:opacity .4s}
+  #bark b{font-family:var(--display);color:var(--su);font-weight:500;margin-right:8px}
+
+  #boss{position:absolute;top:66px;left:50%;transform:translateX(-50%);width:min(620px,70vw);text-align:center}
+  #boss .bname{font-family:var(--display);font-size:18px;letter-spacing:.18em;color:#e9d8ff;text-shadow:0 0 12px #7a3cff,0 2px 2px #000}
+  #boss .bsub{font-style:italic;font-size:13px;color:var(--ink-dim);margin-bottom:6px}
+  #boss .bar{width:100%;height:12px}
+  #boss .fill{background:linear-gradient(90deg,#6a2cff,#c890ff)}
+
+  #location{position:absolute;top:24%;left:0;right:0;text-align:center;opacity:0;transition:opacity 1.2s}
+  #location.show{opacity:1}
+  #location .l1{font-family:var(--display);font-size:clamp(28px,4vw,48px);letter-spacing:.12em;color:var(--brass2);text-shadow:0 3px 0 #000,0 0 26px rgba(243,170,80,.4)}
+  #location .l2{font-style:italic;color:var(--ink);font-size:18px;text-shadow:0 2px 4px #000}
+  #location .rule{width:240px;height:1px;margin:10px auto;background:linear-gradient(90deg,transparent,var(--brass),transparent)}
+
+  #dmg{position:absolute;inset:0}
+  .num{position:absolute;font-family:var(--display);font-weight:700;font-size:20px;color:#fff3d0;text-shadow:0 2px 0 #000,0 0 8px rgba(0,0,0,.8);transform:translate(-50%,-50%);white-space:nowrap}
+  .num.big{font-size:28px;color:#e6c8ff}
+  .num.heal{color:#9affc0}
+  .num.hurt{color:#ff8a7a}
+
+  /* ---------------- dialogue ---------------- */
+  #dialog{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);width:min(820px,92vw);padding:20px 26px 18px 120px;z-index:20;min-height:128px}
+  #dialog .who{font-family:var(--display);font-size:20px;letter-spacing:.1em}
+  #dialog .who small{font-family:var(--body);font-style:italic;font-size:14px;color:var(--ink-dim);letter-spacing:0;margin-left:8px}
+  #dialog .text{font-size:20px;line-height:1.45;margin-top:6px;min-height:58px}
+  #dialog .next{position:absolute;right:18px;bottom:10px;font-family:var(--display);font-size:11px;color:var(--brass);letter-spacing:.2em;animation:blink 1.1s infinite}
+  @keyframes blink{50%{opacity:.25}}
+  #dialog .face{position:absolute;left:22px;top:22px;width:80px;height:80px;border-radius:50%;border:2px solid var(--brass)}
+
+  #memory{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(620px,90vw);padding:28px 34px;z-index:21;text-align:center;
+    background:radial-gradient(circle at 50% 0%, rgba(120,70,200,.35), transparent 60%), linear-gradient(180deg, rgba(22,18,44,.95), rgba(12,10,26,.96))}
+  #memory .mh{font-family:var(--display);font-size:12px;letter-spacing:.32em;color:var(--violet);text-transform:uppercase}
+  #memory .mw{font-style:italic;color:var(--ink-dim);margin:4px 0 14px}
+  #memory p{font-size:20px;line-height:1.5;margin:8px 0;color:#efe2ff}
+  #memory .mc{margin-top:14px;font-family:var(--display);font-size:11px;letter-spacing:.2em;color:var(--brass)}
+
+  /* ---------------- overlays ---------------- */
+  #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:30;transition:opacity .8s}
+  #cards{position:fixed;inset:0;z-index:31;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  #cards p{max-width:760px;text-align:center;font-size:clamp(20px,2.4vw,28px);line-height:1.5;padding:0 30px;opacity:0;transition:opacity 1s;text-shadow:0 2px 8px #000}
+  #cards p.show{opacity:1}
+  #cards.trance p{color:#efe2ff;text-shadow:0 0 18px #7a3cff,0 2px 6px #000}
+  #skip{position:fixed;right:22px;bottom:20px;z-index:32;font-family:var(--display);font-size:12px;letter-spacing:.2em;color:var(--ink-dim)}
+
+  #pause,#journal,#endcard,#resume{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(5,8,16,.62);backdrop-filter:blur(3px)}
+  .panel{padding:30px 36px;width:min(560px,92vw)}
+  .panel h2{font-family:var(--display);font-size:28px;color:var(--brass2);letter-spacing:.12em;margin-bottom:16px;text-align:center}
+  .panel .row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:12px 0;font-size:17px}
+  .panel input[type=range]{width:200px;accent-color:var(--brass)}
+  .panel input[type=checkbox]{width:18px;height:18px;accent-color:var(--brass)}
+  .panel .btn-row{justify-content:center;margin-top:22px}
+  #journal .panel{width:min(820px,94vw);max-height:84vh;overflow:auto}
+  .jgrid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .jgrid h3{font-family:var(--display);font-size:13px;letter-spacing:.24em;color:var(--brass);margin:6px 0 8px;text-transform:uppercase}
+  .jentry{margin-bottom:12px;font-size:15px;line-height:1.4;color:var(--ink)}
+  .jentry b{font-family:var(--display);font-weight:500;color:var(--brass2);display:block;font-size:14px}
+  .jentry.locked{opacity:.4;font-style:italic}
+  #endcard .panel{text-align:center;width:min(640px,92vw)}
+  #endcard .riddle{text-align:left;margin:18px auto 24px;max-width:440px}
+  #resume .panel{text-align:center}
+  #resume p{font-size:18px;color:var(--ink-dim)}
+  #toast{position:fixed;left:50%;top:110px;transform:translateX(-50%);z-index:25;padding:8px 18px;font-size:16px;opacity:0;transition:opacity .3s}
+  #toast.show{opacity:1}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;box-shadow:inset 0 0 160px rgba(10,6,20,.55)}
+  #hurtfx{position:fixed;inset:0;pointer-events:none;z-index:6;box-shadow:inset 0 0 120px rgba(200,30,40,.7);opacity:0;transition:opacity .35s}
+  @media (max-width:760px){ #quest{width:220px} .bar{width:180px} .bar.thin{width:150px} #abilities{transform:scale(.8);transform-origin:bottom right} }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="vignette"></div>
+<div id="hurtfx"></div>
+
+<div id="hud" class="hidden">
+  <div id="compass"><div id="compass-strip"></div><div id="compass-pin"></div></div>
+  <div id="quest" class="brass">
+    <div class="q-head">Torcain's Run</div>
+    <div class="q-text" id="q-text"></div>
+    <div class="pips" id="q-pips"></div>
+    <div class="q-hint" id="q-hint"></div>
+  </div>
+  <div id="boss" class="hidden">
+    <div class="bname">THE OATH-ROOTED</div>
+    <div class="bsub">Megla Aagac of Aakalay</div>
+    <div class="bar"><div class="lag" id="boss-lag"></div><div class="fill" id="boss-fill"></div></div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="location"><div class="l1" id="loc1"></div><div class="rule"></div><div class="l2" id="loc2"></div></div>
+  <div id="prompt" class="brass hidden"></div>
+  <div id="bark"></div>
+  <div id="dmg"></div>
+  <div id="vitals">
+    <div id="portrait"></div>
+    <div class="bars">
+      <div class="name">TORCAIN <small>Stamijan</small></div>
+      <div class="bar" id="hp"><div class="lag" id="hp-lag"></div><div class="fill" id="hp-fill"></div></div>
+      <div class="bar thin" id="heat"><div class="fill" id="heat-fill"></div></div>
+    </div>
+  </div>
+  <div id="abilities">
+    <div class="ab brass" id="ab-duat"><span class="lbl">Duat Strike</span>🜂<span class="key">RMB</span><div class="cd"></div></div>
+    <div class="ab brass" id="ab-flare"><span class="lbl">Tukang</span>🔥<span class="key">Q</span><div class="cd"></div></div>
+    <div class="ab brass" id="ab-sense"><span class="lbl">Nur Sense</span>✧<span class="key">F</span><div class="cd"></div></div>
+  </div>
+</div>
+
+<div id="dialog" class="brass hidden"><div class="face" id="d-face"></div><div class="who" id="d-who"></div><div class="text" id="d-text"></div><div class="next">CLICK ▸</div></div>
+<div id="memory" class="brass hidden"><div class="mh">Memory Core · Zikhron</div><div class="mw" id="m-who"></div><div id="m-lines"></div><div class="mc">CLICK TO CONTINUE</div></div>
+<div id="toast" class="brass"></div>
+<div id="fade"></div>
+<div id="cards"></div>
+<div id="skip" class="hidden">CLICK TO SKIP ▸▸</div>
+
+<div id="title">
+  <div class="t-box">
+    <div id="loading">RAISING THE HIGHLAND…</div>
+    <div class="t-kicker" id="t-kicker"></div>
+    <div class="t-title" id="t-title"></div>
+    <div class="t-sub" id="t-sub"></div>
+    <div class="riddle" id="t-riddle"></div>
+    <div class="btn-row">
+      <button class="btn" id="btn-begin" disabled>Begin the Run</button>
+      <a class="btn ghost" href="../index.html">Back to Dya'Akara</a>
+    </div>
+    <div class="controls">
+      <b>WASD</b><span>Move · <b>SHIFT</b> sprint · <b>SPACE</b> jump</span>
+      <b>MOUSE</b><span>Look · wheel to zoom</span>
+      <b>LMB</b><span>Axe combo (three strikes)</span>
+      <b>RMB</b><span>Duat Strike — your axe goes through the Duat to the foe you aim at</span>
+      <b>Q</b><span>Tukang Flare — release built-up heat</span>
+      <b>F</b><span>Nur Sense — Phorus feels for singing stygian</span>
+      <b>E</b><span>Talk · take · use</span>
+      <b>TAB</b><span>Rokarvac (journal) · <b>ESC</b> pause</span>
+    </div>
+    <div class="t-note" id="t-note">Best with a keyboard and mouse. Click the world to take the mouse; Esc gives it back.</div>
+  </div>
+</div>
+
+<div id="resume" class="hidden"><div class="panel brass"><h2>Paused</h2><p>Click to take up the axe again.</p></div></div>
+
+<div id="pause" class="hidden">
+  <div class="panel brass">
+    <h2>Paused</h2>
+    <div class="row"><span>Mouse sensitivity</span><input type="range" id="opt-sens" min="0.3" max="2.5" step="0.05" value="1"></div>
+    <div class="row"><span>Invert look up/down</span><input type="checkbox" id="opt-invert"></div>
+    <div class="row"><span>Volume</span><input type="range" id="opt-vol" min="0" max="1" step="0.05" value="0.7"></div>
+    <div class="row"><span>Glow (bloom)</span><input type="checkbox" id="opt-bloom" checked></div>
+    <div class="row"><span>Shadows</span><input type="checkbox" id="opt-shadows" checked></div>
+    <div class="row"><span>Render scale</span><input type="range" id="opt-scale" min="0.5" max="1" step="0.05" value="1"></div>
+    <div class="btn-row"><button class="btn" id="btn-resume">Resume</button><button class="btn ghost" id="btn-journal">Rokarvac</button><a class="btn ghost" href="../index.html">Quit</a></div>
+  </div>
+</div>
+
+<div id="journal" class="hidden">
+  <div class="panel brass">
+    <h2>The Rokarvac</h2>
+    <div class="jgrid">
+      <div><h3>The riddle</h3><div class="riddle" id="j-riddle"></div><h3>Memories recovered</h3><div id="j-mem"></div></div>
+      <div><h3>Notes</h3><div id="j-codex"></div></div>
+    </div>
+    <div class="btn-row"><button class="btn" id="btn-jclose">Close</button></div>
+  </div>
+</div>
+
+<div id="endcard" class="hidden">
+  <div class="panel brass">
+    <div class="t-kicker">Rokarvac I · Complete</div>
+    <h2 style="margin-top:10px">The Ruins of Aakalay</h2>
+    <p style="color:var(--ink-dim);font-style:italic">Noka's next riddle, found at the edge of the trance:</p>
+    <div class="riddle" id="e-riddle"></div>
+    <p style="color:var(--ink-dim);font-size:15px;margin-bottom:20px">Torcain's Run continues…</p>
+    <div class="btn-row"><button class="btn" id="btn-explore">Keep exploring</button><a class="btn ghost" href="../index.html">Back to Dya'Akara</a></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three.module.min.js",
+  "three/addons/": "./vendor/addons/"
+} }
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

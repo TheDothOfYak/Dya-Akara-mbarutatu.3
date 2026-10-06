@@ -264,6 +264,8 @@
         ['⚗ Crafting', () => UI.show('crafting')],
         ['🏹 Hunt', () => UI.show('huntRun')],
         ['🃏 Legends of Pia’don', () => UI.show('pia')],
+        /* Torcain's Run — the 3D single-player RPG, its own page under rpg/ */
+        ['⛵ Torcain’s Run', () => { location.href = 'rpg/index.html'; }],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['🪐 The Mbaru Tatu', () => UI.show('world')],
