@@ -26,6 +26,7 @@ export const TYPES = {
   albali_t: { name: 'Villtur Albali', build: () => buildAlbali(true), hp: 58, dmg: 11, speed: 9.5, rad: 0.7, range: 1.8, aggro: 22, shards: 12, ai: 'flyer', status: 'poison', color: 0x9aff5a },
   vel: { name: 'Duskareth Vel', build: buildVel, hp: 190, dmg: 17, speed: 6.2, rad: 0.5, range: 2.4, aggro: 22, windup: 0.5, shards: 60, ai: 'vel', stagger: 0.35, elite: true, color: 0xb070ff },
   tyndael: { name: 'Tyndael', build: buildTyndael, hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
+  punk_alpha: { name: 'Thornback, the Old Punk', build: () => buildPunk(false), hp: 520, dmg: 22, speed: 5.8, rad: 1.6, range: 3.6, aggro: 20, windup: 0.75, recover: 0.9, lunge: 11, shards: 160, ai: 'melee', stagger: 0.3, elite: true, color: 0xc06a20 },
   sruvorn: { name: 'Sru Vorn of the Bogs', build: buildSruVorn, hp: 1100, dmg: 26, speed: 4.6, rad: 2.6, range: 5.5, aggro: 26, shards: 220, ai: 'sruvorn', stagger: 0, miniboss: true, color: 0xb0ff4a },
 };
 
@@ -80,6 +81,7 @@ export function createEnemies(ctx) {
     if (e.stray || e.pet || e.pup) return;            // someone's beloved — the axe turns aside
     if (opts.burn) e.burn = Math.max(e.burn || 0, 3);
     dmg *= opts.raw ? 1 : D().playerDmg;
+    if (ctx.studyMul) dmg *= ctx.studyMul(e);
     e.hp -= dmg; e.flash = 1; e.lastHit = ctx.G.t;
     const st = e.T.stagger ?? 1;
     const dir = V3(e.pos.x - from.x, 0, e.pos.z - from.z).normalize();

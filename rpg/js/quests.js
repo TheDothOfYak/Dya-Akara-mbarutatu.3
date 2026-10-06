@@ -56,6 +56,70 @@ export const QUESTS = {
     done: ['Gone? Truly? Then here — the scroll. Read it and the Duat will drag your foes to your feet.'],
     reward: { xp: 260, shards: 120, spell: 'pull' },
   },
+  q_bake: {
+    name: 'Buns for the Festival', giver: 'v1', region: 'xilia',
+    desc: 'Ama the baker is short of Zahreh petals and Kipsu fluff for the harvest buns. (Fluff is for the glaze. Don’t ask.)',
+    goal: { type: 'items', need: { petal: 4, fluff: 2 } },
+    offer: ['The harvest festival is in three days and I have no petals. NO petals, Stamijan.', 'Four Zahreh petals — the pink flowers — and two tufts of Kipsu fluff. The friendly ones shed it if you give them a scratch.'],
+    wait: ['Four petals, two fluff. The festival waits for no one. Well. It waits for me.'],
+    done: ['Perfect! Here — the first batch is yours, and the recipe. You can cook them at any fire now.'],
+    reward: { xp: 140, shards: 30, items: { bun: 3 }, flag: 'recipe_bun' },
+  },
+  q_rodak: {
+    name: 'Rodak in the Rows', giver: 'v2', region: 'xilia',
+    desc: 'Rodak have been creeping out of the woods into Teodr’s fields at night. Thin them out.',
+    goal: { type: 'kills', kind: 'rodak', n: 3 },
+    offer: ['Rodak. Three of them at least, maybe more, digging up my Ju at night.', 'They den in the dark wood west of the forest road. Mind — they smell blood.'],
+    wait: ['Still hearing them at night. Three Rodak, Stamijan.'],
+    done: ['Quiet nights again. My grandfather tied this knot for luck. It worked for him. Mostly.'],
+    reward: { xp: 200, shards: 70, items: { t_knot: 1 } },
+  },
+  q_lamps: {
+    name: 'The Lamplighter', giver: 'v3', region: 'xilia',
+    desc: 'Lirra wants every Nur Lantern around Xilia awake again — five in all. Only a Nur can wake them, and you have Phorus.',
+    goal: { type: 'lit', prefix: 'x_', n: 5 },
+    offer: ['I light the lamps. But the old Nur Lanterns? Only a Nur can wake those, and ours left years ago.', 'There are five round Xilia — the docks, the square, the yard, the forest road, the grove road. Wake them all and the whole town sleeps safer.'],
+    wait: ['Five lanterns. The map in your book shows the ones you’ve found.'],
+    done: ['Look at them! Every one. Here — my mother’s spare film vial. You’ll carry one more from now on.'],
+    reward: { xp: 220, shards: 50, flag: 'flask_bonus' },
+  },
+  q_crates: {
+    name: 'Washed Ashore', giver: 'v4', region: 'xilia',
+    desc: 'A trade barge lost three crates over the edge in a squall. They snagged on the island’s rim. Bosk wants them back.',
+    goal: { type: 'count', counter: 'crates', n: 3 },
+    offer: ['Lost three crates off the barge in the storm. They’re caught on the rim somewhere — I can see the rope from the pier.', 'Fetch them back and there’s something in it for you. Phorus can probably feel which way.'],
+    wait: ['Three crates, out on the rim. Careful near the edge — it’s a long way down to the cloud sea.'],
+    done: ['All three! And not a dent. Here — my old compass. Never once pointed north. Always pointed somewhere interesting.'],
+    reward: { xp: 220, shards: 90, items: { t_compass: 1, ore: 2 } },
+  },
+  q_scaffold: {
+    name: 'The Scaffold', giver: 'kw1', region: 'xilia',
+    desc: 'Orrin is building a lookout over the fields and is short of materials.',
+    goal: { type: 'items', need: { stone: 4, bark: 2, vine: 2 } },
+    offer: ['A lookout over the fields. So we see the Rodak coming, for once.', 'Four cut stone, two fire-tree bark, two Punk vines for lashing. Simple. Mind the scaffold.'],
+    wait: ['Stone, bark, vine. Four, two, two.'],
+    done: ['Up she goes. You’ve a builder’s patience, Stamijan. That’s worth something — learn something new with it.'],
+    reward: { xp: 180, shards: 40, points: 1 },
+  },
+  /* ---------------- Aakalay: Phorus's own quests ---------------- */
+  q_pages: {
+    name: 'The Last Journal', giver: 'phorus', region: 'aakalay',
+    desc: 'Phorus can feel torn journal pages scattered through the dead city, still warm with memory. Find all four and learn why everyone left.',
+    goal: { type: 'count', counter: 'pages', n: 4 },
+    offer: ['Torcain — wait. There’s something else here, not a core. Paper. Pages, with a little memory still in the ink.', 'Someone wrote down what happened at the end. Four pages, scattered. I’d like to know why they left. Wouldn’t you?'],
+    wait: ['More pages out there. Press F and I’ll feel for them.'],
+    done: ['So that’s it. They didn’t die here — most of them. They walked away and swore never to come back.', 'And the thing in the last page… Thornback. The Old Punk. It’s still here, Torcain. I can feel it.'],
+    reward: { xp: 300, shards: 120 },
+  },
+  q_thorn: {
+    name: 'Thornback', giver: 'phorus', region: 'aakalay',
+    desc: 'An ancient wild Punk, swollen on old oath-magic, rules the north grove of Aakalay. Put it to rest.',
+    goal: { type: 'kill', unique: 'thornback' },
+    offer: ['The Old Punk from the journal. It ate something it shouldn’t have, a long time ago — an oath-ring, maybe.', 'It’s in the north grove. Big. Angry. Be ready for it.'],
+    wait: ['Thornback, in the north grove. Eat something first.'],
+    done: ['It’s over. Look — the ring, tangled in its vines. Whoever swore on that is long gone. Wear it. Make it mean something better.'],
+    reward: { xp: 500, shards: 250, items: { t_oath: 1 } },
+  },
   /* ---------------- Leotik ---------------- */
   q_pups: {
     name: 'Kipsu Pups', giver: 'venkin', region: 'leotik',
@@ -100,6 +164,7 @@ export function questProgress(id, q, save, inv) {
   if (g.type === 'items') return Object.entries(g.need).map(([k, n]) => Math.min(n, (inv.items[k] || 0)) / n).reduce((a, b) => a + b, 0) / Object.keys(g.need).length;
   if (g.type === 'count') return Math.min(1, ((save.counters || {})[g.counter] || 0) / g.n);
   if (g.type === 'kill') return save.cleared[g.unique] ? 1 : 0;
+  if (g.type === 'lit') return Math.min(1, Object.keys(save.lit || {}).filter(k => k.startsWith(g.prefix)).length / g.n);
   if (g.type === 'kills') return Math.min(1, Math.max(0, ((save.killsBy || {})[g.kind] || 0) - ((save.qstart || {})[id] || 0)) / g.n);
   return 0;
 }

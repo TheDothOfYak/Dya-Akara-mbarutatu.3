@@ -384,6 +384,8 @@ export function buildXilia(scene) {
 
   return {
     name: 'xilia', heightAt, col, SITES, PLAZA: { x: SQUARE.x, z: SQUARE.z, y: SQ_H }, hazards: [], pillars: [], camp: null,
+    board: { x: -18, z: 32 },
+    crates: [0.35, 2.5, 4.0].map(a => { const c = Math.cos(a), sn = Math.sin(a), r = edgeRadius(c * 100, sn * 100) - 9; return { x: c * r, z: sn * r }; }),
     hearth, pen: PEN, yard: YARD, tower: { x: YARD.x - 10, z: YARD.z - 10, y: SQ_H + 0.4 + 10 }, seedSpot, grove: GROVE,
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, lanterns, stones, falls: [], clear: CLEAR,

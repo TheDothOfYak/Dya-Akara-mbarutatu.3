@@ -23,9 +23,10 @@ import { QUESTS, questProgress } from './quests.js';
 import { buildFeatures, sigilMesh } from './features.js';
 import { createRpgUI } from './rpgui.js';
 import { buildMalstiLord } from './creatures.js';
-import { createEnemies } from './enemies.js';
+import { createEnemies, TYPES } from './enemies.js';
+import { hasBoard, offers as bountyOffers, bountyProgress } from './bounties.js';
 import * as STORY from './story.js';
-import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime, saveKey, newer } from './progress.js';
+import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime, saveKey, newer, SAVE_V, isOldSave } from './progress.js';
 import * as CLOUD from './cloud.js';
 import { initAudio, sfx, setVolume } from './audio.js';
 
@@ -48,6 +49,9 @@ if (WHO) {
   $('loading').textContent = 'FETCHING YOUR RUN FROM THE DYA GUILD…';
   cloudSave = await CLOUD.fetchSave(WHO.id);
 }
+/* runs from before the Xilia prologue were reset; remember that there was one, to say so */
+const HAD_OLD = isOldSave(KEY) || isOldSave() || !!(cloudSave && cloudSave.v !== SAVE_V);
+if (cloudSave && cloudSave.v !== SAVE_V) cloudSave = null;
 const SAVE_AT_LOAD = newer(localSave, cloudSave);
 let SAVE = SAVE_AT_LOAD || freshSave('easy');
 /* older saves grow the newer RPG fields */
@@ -55,7 +59,7 @@ function ensureSave(S) {
   S.inv = S.inv || freshInventory(); S.inv.buffs = S.inv.buffs || {}; S.inv.trinkets = S.inv.trinkets || [];
   S.skills = S.skills || freshSkills();
   for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
-  S.seeds = S.seeds || 0;
+  S.seeds = S.seeds || 0; S.bountiesDone = S.bountiesDone || 0; S.bounty = S.bounty || null;
   return S;
 }
 ensureSave(SAVE);
@@ -178,7 +182,7 @@ function applyUps(full) {
   FX = effects(SAVE.inv, SAVE.time);
   P.maxHp = 100 + 15 * rank('vigor') + 5 * (SAVE.skills.lvl - 1) + 10 * SAVE.seeds + FX.hp;
   P.stamMax = 100 + 18 * rank('breath') + 10 * SAVE.seeds;
-  P.flasksMax = D.flasks + rank('film');
+  P.flasksMax = D.flasks + rank('film') + (SAVE.flags.flask_bonus ? 1 : 0);
   if (full) { P.hp = P.maxHp; P.stam = P.stamMax; P.flasks = P.flasksMax; }
   P.hp = Math.min(P.hp, P.maxHp);
 }
@@ -282,13 +286,17 @@ const enemies = createEnemies({
   get D() { return D; },
   hurtPlayer: (d, from, kb, o) => hurtPlayer(d, from, kb, o),
   dmgNumber: (...a) => dmgNumber(...a),
+  studyMul: e => studied(e.kind) ? 1.15 : 1,
   stealShards(n) { G.shards -= n; toast(`A Kipsu snatched ${n} shards! Catch it before it gets away!`, 3); },
   onEscape(e) { toast(`The Kipsu escaped with ${e.stolen} shards.`, 3); },
   onKill(e) {
     if (e.T.disp === 'training') { dummyBroken(e); return; }
     const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4) * FX.shards) + (e.stolen || 0);
     G.shards += n; SAVE.kills++;
-    SAVE.killsBy[e.kind.replace('_t', '')] = (SAVE.killsBy[e.kind.replace('_t', '')] || 0) + 1;
+    const bk = beastKey(e.kind);
+    SAVE.killsBy[bk] = (SAVE.killsBy[bk] || 0) + 1;
+    if (SAVE.killsBy[bk] === studyAt(bk) && STORY.BEASTS[bk]) setTimeout(() => toast(`Studied: ${STORY.BEASTS[bk][0]} — +15% damage against them`, 3.5), 700);
+    if (SAVE.bounty && SAVE.bounty.kind === bk && bountyProgress(SAVE.bounty, SAVE) === SAVE.bounty.n) setTimeout(() => toast('Bounty complete — claim it at a bounty board', 3.5), 1400);
     xp(Math.round(e.T.shards * 1.2 + 4));
     for (const [it, ch, cnt] of (LOOT[e.kind] || [])) if (Math.random() < ch) { invAdd(SAVE.inv, it, cnt); lootToast(it, cnt); }
     if (perk('wind') && !P.dead) P.hp = Math.min(P.maxHp, P.hp + (D === DIFFICULTY.realistic ? 4 : 8));
@@ -828,14 +836,15 @@ function senseTarget() {
   let best = null, bd = 1e9;
   if (REGION === 'xilia') {
     const p = xiliaGoal();
-    if (p) return { pos: p.pos, label: p.label, line: p.line };
-    return null;
+    if (p && (F_.tut || 0) < 5 || (p && F_.seedQuest)) return { pos: p.pos, label: p.label, line: p.line };
+    return sideTarget() || (p ? { pos: p.pos, label: p.label, line: p.line } : null);
   }
   if (REGION === 'aakalay') {
     if (coreCount() < 5) {
       for (const c of cores) { if (c.got) continue; const d = c.pos.distanceTo(P.pos); if (d < bd) { bd = d; best = c; } }
       if (best) return { pos: best.pos, label: best.site.name, line: `There — one is singing near ${best.site.name}. ${Math.round(bd)} paces, give or take.` };
     } else if (!F_.bossDead) return { pos: V3(world.PLAZA.x, world.PLAZA.y + 6, world.PLAZA.z), label: 'The Oath Stone', line: 'The stone. It’s pulling at the cores — the plaza.' };
+    const side = sideTarget(); if (side) return side;
   } else {
     if (pillarCount() < 3) {
       for (const p of world.pillars) { if (p.woken) continue; const d = Math.hypot(p.x - P.pos.x, p.z - P.pos.z); if (d < bd) { bd = d; best = p; } }
@@ -976,6 +985,9 @@ function interactables() {
   if (REGION === 'xilia' && SAVE.quests.q_camp === 'done') list.push({ pos: V3(world.hearth.x, world.heightAt(world.hearth.x, world.hearth.z), world.hearth.z), label: 'Cook at the hearth', act: () => openBook('cook'), far: 3 });
   if (REGION === 'xilia' && F_.seedQuest && !F_.xseed) list.push({ pos: world.seedSpot, label: 'Take the fire seed', act: () => takeSeed(), far: 3 });
   if (camp && (REGION === 'leotik' || SAVE.quests.q_camp === 'done')) list.push({ pos: V3(world.camp.x, world.heightAt(world.camp.x, world.camp.z), world.camp.z), label: 'Cook at the fire', act: () => openBook('cook'), far: 2.8 });
+  if (board) list.push({ pos: V3(board.x, board.y, board.z), label: 'Read the bounty board', act: () => boardTalk(), far: 3 });
+  for (const c of crates) if (c.mesh.visible) list.push({ pos: V3(c.x, c.y, c.z), label: 'Haul up the crate', act: () => takeCrate(c), far: 3 });
+  for (const pg of pages) if (pg.mesh.visible) list.push({ pos: V3(pg.x, pg.y, pg.z), label: 'Read the torn page', act: () => readPage(pg), far: 2.8 });
   for (const e of enemies.list) {
     if (e.dead || e.hostile || !e.T.disp || e.T.ai === 'flyer') continue;
     if (e.stray) list.push({ pos: e.pos, label: 'Send the stray Punk home', act: () => befriend(e), far: 3.2 });
@@ -998,6 +1010,7 @@ function interactables() {
 }
 
 function talkPhorus() {
+  if (REGION === 'aakalay' && F_.talked && phorusQuest()) return;
   const tips = [
     'Zahreh flowers still grow here — the pink ones. They’ll close a wound if you walk through them.',
     'If you’re overwhelmed, let the Tukang build heat — then Q, and burn them all back.',
@@ -1208,6 +1221,125 @@ function sailToAakalay() {
       location.reload();
     });
   });
+}
+
+/* ---------------- the bestiary ---------------- */
+function beastKey(kind) { return kind === 'albali_t' ? 'albali' : kind; }
+function studyAt(k) { return STORY.STUDY_AT[k] || STORY.STUDY_DEFAULT; }
+function studied(kind) { const k = beastKey(kind); return (SAVE.killsBy[k] || 0) >= studyAt(k); }
+function beastName(k) { return (STORY.BEASTS[k] || [TYPES[k] ? TYPES[k].name : k])[0]; }
+
+/* ---------------- bounty boards ---------------- */
+STORY.SPEAKERS.board = { name: 'Bounty board', color: '#e8c890', sub: 'notices, nailed up' };
+const board = world.board && hasBoard(REGION) ? (() => {
+  const y = world.col.ground(world.board.x, world.board.z, world.heightAt(world.board.x, world.board.z) + 0.5);
+  const g = new THREE.Group();
+  for (const s of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 2.6, 6), toon(0x5a3a20)); post.position.set(s * 1.0, 1.3, 0); g.add(post); }
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.4, 0.12), toon(0x9a6a40)); plank.position.y = 1.7; g.add(plank);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.1, 0.6), toon(0x6a3a20)); roof.position.set(0, 2.55, 0.05); roof.rotation.x = 0.25; g.add(roof);
+  [[-0.6, 1.9], [0.15, 1.75], [0.7, 1.95], [-0.2, 1.4], [0.6, 1.4]].forEach(([x, yy], i) => {
+    const note = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.5), toon(i % 2 ? 0xf0e0c0 : 0xe8d0a0)); note.position.set(x, yy, 0.07); note.rotation.z = (i - 2) * 0.08; g.add(note);
+  });
+  const parts = []; g.traverse(m => { if (m.isMesh) parts.push(m); });
+  parts.forEach(m => { m.castShadow = true; addOutline(m, 0.03); });
+  g.position.set(world.board.x, y, world.board.z);
+  g.rotation.y = Math.atan2(world.PLAZA.x - world.board.x, world.PLAZA.z - world.board.z);
+  scene.add(g);
+  world.col.add(world.board.x, world.board.z, 1.2, 0.2, g.rotation.y, y - 1, y + 2.6);
+  return { x: world.board.x, y, z: world.board.z, mesh: g };
+})() : null;
+
+function boardTalk() {
+  const b = SAVE.bounty;
+  if (b) {
+    const got = bountyProgress(b, SAVE);
+    if (got >= b.n) {
+      SAVE.bounty = null; SAVE.bountiesDone++;
+      G.shards += b.shards; sfx.core();
+      dialog([['board', `Bounty claimed: ${b.n} ${beastName(b.kind)}. Someone has left a pouch of ${b.shards} shards pinned under the notice.`]], () => { xp(b.xp); toast(`Bounty complete · +${b.shards} shards`, 3); persist(); boardTalk(); });
+      persist();
+      return;
+    }
+    ask('board', `Your bounty: ${beastName(b.kind)} — ${got} of ${b.n}. Posted by ${b.from}. Reward ${b.shards} shards.`, [
+      { label: 'Keep hunting', act: null },
+      { label: 'Tear it down <small>(abandon)</small>', act: () => { SAVE.bounty = null; persist(); toast('Bounty abandoned.', 2); lockMouse(); } },
+    ]);
+    return;
+  }
+  const list = bountyOffers(REGION, SAVE.bountiesDone);
+  ask('board', SAVE.bountiesDone ? `Fresh notices. (${SAVE.bountiesDone} bount${SAVE.bountiesDone === 1 ? 'y' : 'ies'} claimed so far.)` : 'Notices, nailed up in a dozen hands. Pick one — hunt it anywhere — and claim it at any board.', [
+    ...list.map(o => ({ label: `Hunt ${o.n} ${beastName(o.kind)} <em style="color:var(--brass2)">· ${o.shards} shards</em> <small>— ${o.from}</small>`, act: () => {
+      SAVE.bounty = { ...o, start: SAVE.killsBy[o.kind] || 0 }; persist(); toast(`Bounty taken: ${o.n} ${beastName(o.kind)}`, 3); sfx.core(); lockMouse();
+    } })),
+    { label: 'Not now', act: null },
+  ]);
+}
+
+/* ---------------- Bosk's crates, out on the rim ---------------- */
+function crateMesh() {
+  const g = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 0.9), toon(0xa8744a)); box.position.y = 0.45; addOutline(box, 0.04); g.add(box);
+  for (const y of [0.15, 0.75]) { const band = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.08, 0.94), toon(0x4a3020)); band.position.y = y; g.add(band); }
+  const rope = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.05, 4, 10), toon(0xd8c090)); rope.position.set(0, 0.95, 0); rope.rotation.x = Math.PI / 2; g.add(rope);
+  const glow = glowSprite(0xffe0a0, 2.2, 0.35); glow.position.y = 1.4; g.add(glow);
+  return g;
+}
+const crates = (REGION === 'xilia' && world.crates ? world.crates : []).map((c, i) => {
+  const y = world.heightAt(c.x, c.z);
+  const mesh = crateMesh(); mesh.position.set(c.x, y, c.z); mesh.rotation.y = i * 1.3; scene.add(mesh);
+  return { id: 'crate_' + i, x: c.x, y, z: c.z, mesh };
+});
+function refreshCrates() { for (const c of crates) c.mesh.visible = SAVE.quests.q_crates === 'active' && !SAVE.cleared[c.id]; }
+refreshCrates();
+function takeCrate(c) {
+  SAVE.cleared[c.id] = true; SAVE.counters.crates = (SAVE.counters.crates || 0) + 1;
+  c.mesh.visible = false; sfx.core(); xp(30);
+  toast(`You haul the crate back from the edge (${SAVE.counters.crates}/3).`, 3);
+  persist();
+}
+
+/* ---------------- Aakalay: the last journal, and Thornback ---------------- */
+function pageMesh() {
+  const g = new THREE.Group();
+  const paper = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.8), toon(0xf0e4c8, { side: THREE.DoubleSide })); paper.position.y = 0.9; paper.rotation.z = 0.2; g.add(paper);
+  const glow = glowSprite(0xb48aff, 2.4, 0.55); glow.position.y = 0.9; g.add(glow);
+  return g;
+}
+const pages = (REGION === 'aakalay' && world.pages ? world.pages : []).map(pg => {
+  const y = world.col.ground(pg.x, pg.z, world.heightAt(pg.x, pg.z) + 0.5);
+  const mesh = pageMesh(); mesh.position.set(pg.x, y, pg.z); mesh.visible = !SAVE.cleared[pg.id]; scene.add(mesh);
+  return { ...pg, y, mesh };
+});
+function readPage(pg) {
+  SAVE.cleared[pg.id] = true; SAVE.counters.pages = (SAVE.counters.pages || 0) + 1;
+  pg.mesh.visible = false; xp(40); SAVE.codex[pg.id] = true; persist();
+  const n = SAVE.counters.pages;
+  dialog((STORY.JOURNAL[pg.id] || []).map(l => ['memory', l]).concat([['phorus', n >= 4 ? 'That’s the last of them. Talk to me, Torcain.' : `That’s ${n} of four. There are more — I can feel them.`]]));
+}
+const PHORUS_DEF = { id: 'phorus', name: 'Phorus', title: 'Kalo’Eik · Nur' };
+function phorusQuest() {
+  const fake = { def: PHORUS_DEF, talking: 0 };
+  for (const qid of ['q_pages', 'q_thorn']) {
+    const st = SAVE.quests[qid];
+    if (st === 'active' && questProgress(qid, QUESTS[qid], SAVE, SAVE.inv) >= 1) { turnIn(fake, qid); return true; }
+    if (st === 'active') return false;
+    if (!st && (qid === 'q_pages' || SAVE.quests.q_pages === 'done')) {
+      if (qid === 'q_pages' && !G.seen.offeredPages) { G.seen.offeredPages = true; offerQuest(fake, qid); return true; }
+      if (qid === 'q_thorn') { offerQuest(fake, qid); return true; }
+      return false;
+    }
+  }
+  return false;
+}
+/* Phorus also feels for side-quest things once the story leaves him free */
+function sideTarget() {
+  let best = null, bd = 1e9;
+  const consider = (x, y, z, label, what) => { const d = Math.hypot(x - P.pos.x, z - P.pos.z); if (d < bd) { bd = d; best = { pos: V3(x, y + 1, z), label, what }; } };
+  for (const c of crates) if (c.mesh.visible) consider(c.x, c.y, c.z, 'A crate', 'one of Bosk’s crates, snagged on the rim');
+  if (SAVE.quests.q_pages === 'active') for (const pg of pages) if (pg.mesh.visible) consider(pg.x, pg.y, pg.z, 'A torn page', 'a torn page, still warm with memory');
+  if (SAVE.quests.q_thorn === 'active' && world.thornback) consider(world.thornback.x, world.heightAt(world.thornback.x, world.thornback.z), world.thornback.z, 'Thornback', 'the Old Punk. Thornback. It’s huge');
+  if (!best) return null;
+  return { pos: best.pos, label: best.label, line: `There — ${best.what}. ${Math.round(bd)} paces.` };
 }
 
 function setSail() {
@@ -1607,7 +1739,7 @@ bloom.enabled = OPT.bloom;
    spells, chests, gathering and the Kalo Trials
    ================================================================ */
 function xp(n) {
-  const up = gainXp(SAVE.skills, Math.round(n));
+  const up = gainXp(SAVE.skills, Math.round(n * (FX.xp || 1)));
   if (up > 0) {
     applyUps(true);
     $('levelup').textContent = `LEVEL ${SAVE.skills.lvl}`;
@@ -1633,7 +1765,7 @@ const npcs = (NPCS[REGION] || []).filter(def => camp || def.pos).map(def => {
   if (!def.wander) world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);
   return { def, actor, pos, home: pos.clone(), goal: null, pause: Math.random() * 4, yaw, talking: 0 };
 });
-const npcName = id => { const n = Object.values(NPCS).flat().find(d => d.id === id); return n ? n.name : id; };
+const npcName = id => { if (id === 'phorus') return 'Phorus'; const n = Object.values(NPCS).flat().find(d => d.id === id); return n ? n.name : id; };
 const npcSpeaker = def => { if (!STORY.SPEAKERS[def.id]) STORY.SPEAKERS[def.id] = { name: def.name, color: def.look === 'keilia' ? '#e0b070' : '#e8d8a8', sub: def.title }; return def.id; };
 
 function updateNpcs(dt) {
@@ -1727,7 +1859,7 @@ function offerQuest(n, qid) {
     { label: 'I’ll do it.', act: () => {
       SAVE.quests[qid] = 'active';
       if (q.goal.type === 'kills') SAVE.qstart[qid] = SAVE.killsBy[q.goal.kind] || 0;
-      persist(); toast(`New quest: ${q.name}`, 3); sfx.core(); lockMouse();
+      persist(); toast(`New quest: ${q.name}`, 3); sfx.core(); lockMouse(); refreshCrates();
     } },
     { label: 'Not now.', act: null },
   ]));
@@ -1742,6 +1874,8 @@ function turnIn(n, qid) {
   if (r.items) for (const [k, c] of Object.entries(r.items)) { invAdd(SAVE.inv, k, c); lootToast(k, c); }
   if (r.flag) SAVE.flags[r.flag] = true;
   if (r.spell) learnSpell(r.spell);
+  if (r.points) { SAVE.skills.points += r.points; setTimeout(() => toast(`+${r.points} perk point — press K`, 3), 900); }
+  if (r.flag === 'flask_bonus') applyUps(true);
   if (r.flag === 'mount') makeMount(true);
   persist();
   n.talking = 4;
@@ -2064,6 +2198,10 @@ function mapMarkers() {
   for (const t of feats.trials) m.push({ x: t.x, z: t.z, ch: '▲', col: t.done ? '#6a7a6a' : '#7ad8ff', size: 15 });
   const o = objectivePoint(); if (o) m.push({ x: o.p.x, z: o.p.z, ch: '◆', col: '#f3cf7a', size: 18 });
   for (const e of enemies.list) if (!e.dead && ((e.stray && SAVE.quests.q_strays === 'active') || (e.pet && SAVE.quests.q_fennek === 'active') || (e.pup && SAVE.quests.q_pups === 'active'))) m.push({ x: e.pos.x, z: e.pos.z, ch: '✦', col: '#ff9ad0', size: 15 });
+  for (const c of crates) if (c.mesh.visible) m.push({ x: c.x, z: c.z, ch: '✦', col: '#ff9ad0', size: 15 });
+  for (const pg of pages) if (pg.mesh.visible && SAVE.quests.q_pages === 'active') m.push({ x: pg.x, z: pg.z, ch: '✦', col: '#ff9ad0', size: 15 });
+  if (board) m.push({ x: board.x, z: board.z, ch: '▤', col: '#e8c890', size: 15, label: 'Bounties' });
+  if (SAVE.quests.q_thorn === 'active' && world.thornback) m.push({ x: world.thornback.x, z: world.thornback.z, ch: '☠', col: '#ff7a5a', size: 18, label: 'Thornback' });
   if (lostMark) m.push({ x: lostMark.position.x, z: lostMark.position.z, ch: '✦', col: '#d8b8ff', size: 15, label: 'Lost shards' });
   return m;
 }
@@ -2085,6 +2223,8 @@ book = createRpgUI({
   save: () => SAVE, shards: () => G.shards, fx: () => FX, player: () => P, perkDmg: () => (perk('heavy') ? 1.15 : 1) * (1 + 0.12 * rank('edge')),
   region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
   mainObjective: () => $('q-text').textContent,
+  bounty: () => SAVE.bounty && { ...SAVE.bounty, name: beastName(SAVE.bounty.kind), got: bountyProgress(SAVE.bounty, SAVE) },
+  beasts: () => Object.entries(STORY.BEASTS).map(([k, [name, lore]]) => ({ k, name, lore, kills: SAVE.killsBy[k] || 0, seen: !!(SAVE.killsBy[k] || F_['seen_' + k]), at: studyAt(k), studied: studied(k) })),
   onClose: () => { G.paused = false; lockMouse(); },
 });
 renderSpellBar();
@@ -2099,10 +2239,11 @@ function updateRpgHud() {
     el.querySelector('.cd').style.transform = `scaleY(${SAVE.skills.spells[id] ? Math.min(1, cd / (SPELLS[id].cd * cdMul())) : 0})`;
   }
   const act = Object.entries(SAVE.quests).filter(([, s]) => s === 'active').slice(0, 3);
-  const html = act.map(([id]) => {
+  let html = act.map(([id]) => {
     const q = QUESTS[id], p = questProgress(id, q, SAVE, SAVE.inv);
     return `<div>${p >= 1 ? '✔' : '•'} ${q.name} <b>${p >= 1 ? 'return to ' + npcName(q.giver) : Math.round(p * 100) + '%'}</b></div>`;
   }).join('');
+  if (SAVE.bounty) { const b = SAVE.bounty, n = bountyProgress(b, SAVE); html += `<div>${n >= b.n ? '✔' : '▤'} Bounty: ${beastName(b.kind)} <b>${n >= b.n ? 'claim at a board' : n + '/' + b.n}</b></div>`; }
   if ($('qtrack')._h !== html) { $('qtrack')._h = html; $('qtrack').innerHTML = html; }
   if (lootQ.length) { lootT -= 1 / 60; if (lootT <= 0) { toast('+ ' + lootQ.splice(0, 3).join('  ·  '), 2.2); lootT = 0.8; } }
 }
@@ -2587,6 +2728,7 @@ $('loading').textContent = 'THE HIGHLAND IS READY';
 $('btn-begin').disabled = false;
 $('d-easy-p').textContent = DIFFICULTY.easy.blurb;
 $('d-real-p').textContent = DIFFICULTY.realistic.blurb;
+if (!SAVE_AT_LOAD && HAD_OLD) $('t-save').textContent = 'Torcain’s Run has a new beginning in Xilia — every earlier run was reset. Begin anew!';
 if (SAVE_AT_LOAD) {
   const where = SAVE.region === 'leotik' ? 'Rokarvac II · Leotik' : SAVE.region === 'xilia' ? 'Prologue · Xilia' : 'Rokarvac I · Aakalay';
   $('t-save').textContent = `Saved run: ${where} · ${DIFFICULTY[SAVE.difficulty].label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls`;
@@ -2641,5 +2783,5 @@ else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add(
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  glider, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  glider, board, crates, pages, boardTalk, talkPhorus, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

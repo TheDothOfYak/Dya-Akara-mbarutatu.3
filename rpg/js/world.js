@@ -563,11 +563,20 @@ export function buildWorld(scene) {
     { at: [SITES.garden.x - 12, SITES.garden.z + 10], kinds: ['kipsu', 'kipsu'] },
     { at: [40, 100], kinds: ['rodak', 'rodak'] },
     { at: [-60, -30], kinds: ['malsti', 'malsti'] },
+    // the Old Punk, in the far north wood
+    { at: [-22, -132], kinds: ['punk_alpha'], unique: 'thornback', extra: { scale: 1.35 } },
   ];
 
   let time = 0;
   return {
     name: 'aakalay', hazards: [], pillars: [], camp: null,
+    thornback: { x: -22, z: -132 },
+    pages: [
+      { id: 'page_1', x: SITES.library.x + 6, z: SITES.library.z - 8 },
+      { id: 'page_2', x: SITES.tower.x - 8, z: SITES.tower.z + 8 },
+      { id: 'page_3', x: SITES.garden.x + 10, z: SITES.garden.z - 6 },
+      { id: 'page_4', x: SITES.shrine.x + 10, z: SITES.shrine.z + 8 },
+    ],
     lanterns: [
       { id: 'a_pier', name: 'The Pier', x: 5, z: dockZ0 - 10 },
       { id: 'a_gate', name: 'The Great Gate', x: 10, z: 126 },

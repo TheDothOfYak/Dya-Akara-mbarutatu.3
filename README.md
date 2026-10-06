@@ -46,8 +46,8 @@ A separate, semi-3D action RPG lives in **`rpg/`** — open `rpg/index.html` (or
 
 Two chapters so far. Your run is saved in the browser at every Nur Lantern and story beat; use **Continue** on the title screen to pick it back up.
 
-- **Prologue: Xilia.** The game starts in Xilia, a busy farming town. Talk to the townsfolk, take on side quests, trade, cook and forge. Buhkon Eldi, the Carpenter, runs you through the controls in his yard: training dummies, a Duat Strike at a high dummy, and a glide off his tower. Then fetch a fire seed from the Ember Grove so the Stryx can fly you to Aakalay.
-- **Rokarvac I: The Ruins of Aakalay.** Abandoned: no Eikar or Keilia, only a few animals. Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc, now Stamijan) with **Phorus**, the Kalo’Eik Nur, as your companion. Recover five singing memory cores, wake the Oath Stone, and fight the **Megla Aagac** that grew out of the city’s lord. Then board the Eldi ship.
+- **Prologue: Xilia.** The game starts in Xilia, a busy farming town. Talk to the townsfolk, take on side quests, trade, cook and forge. Buhkon Eldi, the Carpenter, runs you through the controls in his yard: training dummies, a Duat Strike at a high dummy, and a glide off his tower. Then fetch a fire seed from the Ember Grove so the Stryx can fly you to Aakalay. Every townsperson has a side quest, and a bounty board in the square posts repeatable hunts (there's another at the Leotik camp).
+- **Rokarvac I: The Ruins of Aakalay.** Abandoned: no Eikar or Keilia, only a few animals. Phorus finds the torn pages of the last journal, which lead to Thornback, the Old Punk. Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc, now Stamijan) with **Phorus**, the Kalo’Eik Nur, as your companion. Recover five singing memory cores, wake the Oath Stone, and fight the **Megla Aagac** that grew out of the city’s lord. Then board the Eldi ship.
 - **Rokarvac II: The Isle of the Urverk (Leotik).** A stormy jungle isle with acid bogs, the ruins of Villtur and an Albali roost. Wake three Klug pillars, then face the **Malsti Lord** at the Urverk.
 
 **Difficulty** is picked when you start a run:
@@ -92,7 +92,7 @@ Two chapters so far. Your run is saved in the browser at every Nur Lantern and s
 | `I` `K` `J` `M` | Gear and pack / skills / quests / map |
 | `E` / `Tab` / `Esc` | Interact, talk or rest / Rokarvac journal / pause and settings |
 
-Code (`rpg/js/`): `xilia.js` (Xilia), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
+Code (`rpg/js/`): `xilia.js` (Xilia), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades (bump `SAVE_V` to reset every run), `bounties.js` the bounty boards, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
 
 ## Match Controls
 

@@ -408,6 +408,7 @@ export function buildLeotik(scene) {
   ];
 
   return {
+    board: { x: CAMP.x + 9, z: CAMP.z + 9 },
     name: 'leotik', camp: CAMP, heightAt, col, SITES, PLAZA: { x: KEEP.x, z: KEEP.z, y: kg }, urverk: { group: urverk, ringMat, portalMat },
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, hazards, pillars, lanterns, stones, falls: [],

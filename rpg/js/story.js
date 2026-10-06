@@ -366,3 +366,30 @@ export const NEXT_RIDDLE2 = [
   'the peak that is me is the peak that is not.',
   'Come find what the Duat forgot that it forgot.',
 ];
+
+/* ================================================================
+   the bestiary: what Torcain learns about each creature he hunts
+   ================================================================ */
+export const BEASTS = {
+  punk: ['Wild Punk', 'The pumpkin-and-vine family gone feral. They wind their vines up before they bite — watch for it, step aside, punish.'],
+  punk_d: ['Domestic Punk', 'Gentle, saddle-blanketed, and a little dim. Ruut’s herd. They’ll only fight if you start it.'],
+  malsti: ['Malsti Punk', 'Fist-sized Punks from Duat Seedlings. They blink through the Duat — keep turning.'],
+  rodak: ['Rodak', 'Lean scavengers that keep their distance until they smell blood. Then they come all at once.'],
+  kipsu: ['Kipsu (wild)', 'Thieves. A wild Kipsu will snatch your shards and bolt. Catch it before it gets away and you get them back.'],
+  kipsu_f: ['Kipsu (tame)', 'Fluffy, curious and fond of petals. They shed fluff if you give them a scratch.'],
+  albali: ['Albali Byrd', 'Big filmed byrds. They wait, then dive. Strike while they’re low. Their healing film is what fills your vials.'],
+  tyndael: ['Tyndael', 'Small fire-lizards that spit burning venom. Don’t stand in the puddles.'],
+  vel: ['Duskareth Vel', 'Duat-walkers who throw knives out of thin air. They stagger badly when hit hard.'],
+  sruvorn: ['Sru Vorn', 'A tusked bog-beast that farms acid pits. Never stand in front of it. Or behind it.'],
+  punk_alpha: ['Thornback', 'The Old Punk of Aakalay, swollen on a swallowed oath-ring. Its slam shakes the ground.'],
+};
+/* hunt this many of a kind and Torcain has "studied" it: +15% damage against it */
+export const STUDY_AT = { vel: 3, sruvorn: 1, punk_alpha: 1 };
+export const STUDY_DEFAULT = 10;
+
+export const JOURNAL = {
+  page_1: ['A torn page, the ink still faintly warm:', '"The stone wants more every season. First oaths. Then names. Last week it took Ilva’s memory of her own mother. She smiled and didn’t know why she was crying."'],
+  page_2: ['Another page, in the same tight hand:', '"The lord says the stone keeps us safe. Safe from what, I asked. He couldn’t remember. I don’t think he can remember anything that isn’t a promise."'],
+  page_3: ['The writing gets faster here:', '"We are leaving tonight. All of us who still remember why. We will not swear anything to anyone ever again. Not even to come back."'],
+  page_4: ['The last page, smeared with something green:', '"The old herd-Punk ate the lord’s ring when it fell. It grows every year now. We call it Thornback. Leave it to the stone. Leave all of it."'],
+};
