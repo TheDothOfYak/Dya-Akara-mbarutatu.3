@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildPunk } from './actors.js';
-import { buildRodak, buildKipsu, buildAlbali, buildVel, buildTyndael, buildSruVorn, buildDummy } from './creatures.js';
+import { buildRodak, buildKipsu, buildAlbali, buildVel, buildTyndael, buildSruVorn, buildDummy, buildKofi } from './creatures.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
@@ -17,6 +17,8 @@ export const TYPES = {
   rodak: { name: 'Rodak', build: buildRodak, hp: 75, dmg: 15, speed: 8.6, rad: 0.7, range: 2.7, aggro: 14, windup: 0.45, recover: 0.7, lunge: 13, shards: 10, ai: 'scavenger', color: 0x6a8a8a },
   kipsu: { name: 'Kipsu', build: () => buildKipsu(0.55), hp: 32, dmg: 4, speed: 9.5, rad: 0.45, range: 1.5, aggro: 11, windup: 0.3, recover: 0.4, lunge: 9, shards: 5, ai: 'thief', color: 0x6af0e0 },
   albali: { name: 'Albali Byrd', build: () => buildAlbali(false), hp: 48, dmg: 10, speed: 9, rad: 0.7, range: 1.8, aggro: 20, shards: 9, ai: 'flyer', status: 'paralyze', color: 0xffe0a0, disp: 'neutral' },
+  /* little wild things that run from everything */
+  kofi: { name: 'Kofi Galta', build: buildKofi, hp: 12, dmg: 0, speed: 8.5, rad: 0.35, range: 0, aggro: 0, shards: 1, ai: 'melee', color: 0xb8a070, disp: 'critter' },
   /* the Carpenter's straw dummies — they only stand there and take it */
   dummy: { name: 'Training dummy', build: buildDummy, hp: 30, dmg: 0, speed: 0, rad: 0.45, range: 0, aggro: 0, shards: 1, ai: 'static', color: 0xd8c098, disp: 'training' },
   dummy_far: { name: 'High dummy', build: buildDummy, hp: 30, dmg: 0, speed: 0, rad: 0.45, range: 0, aggro: 0, shards: 1, ai: 'static', color: 0xd8c098, disp: 'training', perch: 6 },
@@ -90,6 +92,7 @@ export function createEnemies(ctx) {
     const stun = (opts.stun ?? 0.32) * st;
     if (stun > 0.15) { e.stun = Math.max(e.stun, stun); e.windup = 0; if (e.state === 'windup') e.state = 'chase'; }
     if (e.T.ai === 'flyer' && opts.stun >= 0.3) { e.state = 'recover'; e.timer = 1.4; }
+    if (e.T.disp === 'critter') { if (e.hp <= 0) kill(e); return; }
     if (T_isPassive(e) && !e.hostile && e.T.disp !== 'training') ctx.onProvoke && ctx.onProvoke(e);
     e.hostile = true;
     if (e.state === 'idle' || e.state === 'shadow') e.state = 'chase';
@@ -201,7 +204,8 @@ export function createEnemies(ctx) {
       e.timer -= dt;
       if (e.timer <= 0) { e.timer = 3 + Math.random() * 5; e.wander.set(e.home.x + (Math.random() - 0.5) * 16, 0, e.home.z + (Math.random() - 0.5) * 16); }
       const wx = e.wander.x - e.pos.x, wz = e.wander.z - e.pos.z;
-      if (e.follow && d > 3.5) { wantYaw = toP; wantV = Math.min(T.speed, d * 1.5); }
+      if (T.disp === 'critter' && d < 8 && playing) { wantYaw = Math.atan2(-dx, -dz) + Math.sin(G.t * 3 + e.home.x) * 0.5; wantV = T.speed; e.wander.set(e.pos.x - dx, 0, e.pos.z - dz); }
+      else if (e.follow && d > 3.5) { wantYaw = toP; wantV = Math.min(T.speed, d * 1.5); }
       else if (Math.hypot(wx, wz) > 1.2 && !(d < 3 && T.disp === 'friendly')) { wantV = T.speed * 0.25; wantYaw = Math.atan2(wx, wz); }
       else if (d < 6) wantYaw = toP;     // curious: turn to look at you
       moveTo(e, wantYaw, wantV, dt);

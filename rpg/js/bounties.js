@@ -11,7 +11,7 @@ const POOLS = {
     ['rodak', 3, 70, 120, 'the night watch'],
     ['kipsu', 3, 60, 100, 'Hemla — “they took my float”'],
     ['tyndael', 2, 60, 110, 'Bosk — singed eyebrows'],
-    ['malsti', 4, 70, 120, 'the Kalo sisters'],
+    ['malsti', 4, 70, 120, 'Lirra — Duat seedlings by the hideout road'],
   ],
   leotik: [
     ['albali', 3, 90, 160, 'Ila Vos — green film samples'],

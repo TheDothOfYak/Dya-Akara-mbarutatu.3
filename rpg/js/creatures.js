@@ -341,3 +341,42 @@ export function buildDummy() {
     flash(v) { sack.emissive.setRGB(v, v * 0.9, v * 0.8); if (v > 0.5) wob = 1; },
   };
 }
+
+/* ---------------- KOFI GALTA ----------------
+   A long crescent-shaped body with blade-like spines along the top
+   and a fluffy dark tail tuft. Breeds like bunnies and is eaten by
+   basically everything, so it runs from basically everything. */
+export function buildKofi() {
+  const root = new THREE.Group();
+  const hide = mat(0xb8a070), spine = mat(0xe8dcc0), dark = mat(0x2a1e18);
+  const body = new THREE.Group(); body.position.y = 0.32; root.add(body);
+  const arc = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.13, 8, 16, Math.PI * 0.95), hide);
+  arc.rotation.set(0, Math.PI / 2, 0); arc.position.y = -0.22; body.add(arc);
+  for (let i = 0; i < 6; i++) {
+    const a = 0.25 + i / 5 * (Math.PI * 0.95 - 0.5);
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 4), spine);
+    b.position.set(0, Math.sin(a) * 0.55 - 0.22, Math.cos(a) * 0.55); b.rotation.x = -(a - Math.PI / 2); body.add(b);
+  }
+  const head = new THREE.Group(); head.position.set(0, -0.12, 0.42); body.add(head);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), hide); skull.scale.set(0.9, 0.85, 1.2); head.add(skull);
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), dark); eye.position.set(s * 0.08, 0.04, 0.11); head.add(eye);
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 4), hide); ear.position.set(s * 0.07, 0.13, -0.02); head.add(ear);
+  }
+  const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), dark); tuft.scale.set(0.8, 0.8, 1.3); tuft.position.set(0, -0.15, -0.5); body.add(tuft);
+  const legs = [];
+  [[-0.1, 0.25], [0.1, 0.25], [-0.1, -0.25], [0.1, -0.25]].forEach(([x, z]) => { const l = leg(0.22, 0.03, dark); l.position.set(x, 0.22, z); root.add(l); legs.push(l); });
+  finish(root, 0.02);
+  let ph = Math.random() * 6;
+  return {
+    root, mats: [hide],
+    animate(dt, st) {
+      ph += dt * (4 + st.speed * 4);
+      legs.forEach((l, i) => { l.rotation.x = st.speed > 0.3 ? Math.sin(ph + (i % 2 ? Math.PI : 0)) * 0.9 : 0; });
+      body.position.y = 0.32 + (st.speed > 0.3 ? Math.abs(Math.sin(ph)) * 0.08 : 0);
+      tuft.rotation.y = Math.sin(st.t * 5) * 0.5;
+      head.rotation.y = st.speed > 0.3 ? 0 : Math.sin(st.t * 1.7) * 0.5;
+    },
+    flash(v) { hide.emissive.setRGB(v, v * 0.9, v * 0.8); },
+  };
+}

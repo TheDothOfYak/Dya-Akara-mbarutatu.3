@@ -1,10 +1,11 @@
 /* ============================================================
-   TORCAIN'S RUN — Rokarvac I: The Ruins of Aakalay
+   TORCAIN'S RUN — all the words of the game.
    Drawn from the Rokarvac: Noka has been carried off to a new
-   mountain again and left a riddle. Its first step leads Tanoc —
-   Torcain, now that he is Stamijan — and his friend Phorus, a
-   Kalo'Eik and a Nur, to the dead city of Aakalay. There are
-   stygian pieces everywhere; most of them are memory cores.
+   mountain again and left a riddle. Tanoc — Torcain, now that he
+   is Stamijan — and his friend Phorus, a Kalo'Eik and a Nur, set
+   out from Xilia on Xikia, where the Carpenter Buhkon Eldi once
+   found him, to the abandoned city of Aakalay, and on through an
+   Urverk to Leotik.
    ============================================================ */
 
 export const TITLE = {
@@ -34,7 +35,7 @@ export const XILIA = {
   intro: [
     ['phorus', 'Xilia! Fresh bread, warm hearths, Punks that don’t want to eat us. I could live here, Torcain.'],
     ['torcain', 'You say that about every town with an oven.'],
-    ['phorus', 'And I mean it every time. So — the riddle. "Five cores still hum, where every oath is kept." That’s Aakalay.'],
+    ['phorus', 'And I mean it every time. So — the riddle. "Where the city swore and the swearing stung, five cores still hum." That’s Aakalay.'],
     ['torcain', 'Aakalay’s a ruin. Nobody’s sailed there in a lifetime.'],
     ['phorus', 'Then we’ll need a ship, and you’ll need your arm back. You’ve been carrying that axe like a shopping basket.'],
     ['torcain', 'Buhkon will set me right. His yard is south-east of the square, by the docks road.'],
@@ -66,7 +67,10 @@ export const XILIA = {
     [
       ['buhkon', 'That’s everything I can teach you in a yard. The rest the wilds will teach you, and they’re less patient.'],
       ['buhkon', 'Remember: C to roll — they can’t hit what isn’t there. R drinks Albali film to heal. T locks on. Q lets the Tukang’s heat out when it’s full.'],
-      ['buhkon', 'F asks Phorus to sense the way. I for your pack, K for your skills, M for the map, J for your journal. Rest at Nur Lanterns.'],
+      ['buhkon', 'F asks Phorus to sense the way. I for your pack, K for your skills, M for the map, J for your quests, Tab for your Rokarvac. Rest at Nur Lanterns.'],
+      ['buhkon', 'And one last thing — not a drill. Nur’Hlyst. Close your eyes. Listen with your Hurst, not your ears, and push.'],
+      ['buhkon', 'There. Feel the world light up? Press G, any time. Hidden things will answer — chests, ore, and Sniller amulets, if any are about.'],
+      ['buhkon', 'Bring the amulets to nobody — keep them. They hum toward old vaults; every few you gather will show you something worth having.'],
       ['buhkon', 'And talk to people! Half this town wants a favour, and favours make friends — and friends lend Punks.'],
       ['buhkon', 'Now. The Stryx at the docks has been squawking since you landed. Go see what it wants.'],
     ],
@@ -75,36 +79,41 @@ export const XILIA = {
     'The tower’s still there if you want to practice gliding. Or I could find you more dummies. I have a lot of straw.',
     'Go find Noka. And eat something — you look like a twig.',
     'The Ember Grove is north-east, past the forest road. Tyndaels nest there. Mind your eyebrows.',
+    'That tower will hold books one day. Cores, too. A zikhron library of your own — when you’re ready for one.',
+    'Sniller amulets in the rafters again. They wander, those things. Use your Nur’Hlyst; they glow cold teal.',
   ],
   stryxSeed: [
-    ['stryx', 'Kreee. Eikar is back. Good. Bad news. Seed is tired.'],
-    ['torcain', 'The ship’s seed? Can it fly?'],
-    ['stryx', 'Fly to the end of the pier. Not to Aakalay. Stryx needs a new fire seed, warm one, from the Ember Grove.'],
-    ['phorus', 'The Ember Grove — north-east of town. The old fire tree drops seeds there. Something hot lives in it now, though.'],
-    ['stryx', 'Bring seed. Stryx sings to seed. Then we go where the city is dead. Kree.'],
+    ['stryx', 'Torcain. Four minutes later than I estimated. Your Carpenter talks.'],
+    ['torcain', 'Can you fly us toward Aakalay?'],
+    ['stryx', 'Not on this seed. It is eleven years old and I have nursed it through the last three flights. Push it once more and we become a very large torch.'],
+    ['stryx', 'I need a fresh one — warm, from the young fire tree in the Ember Grove. The tree has only just begun to seed.'],
+    ['phorus', 'North-east of town. Something hot nests there now.'],
+    ['stryx', 'Tyndaels. Spark-lizards. They spit; you move. I have calculated that you will move most of the time.'],
   ],
   stryxWait: [
-    ['stryx', 'Kree. Warm seed. From the grove. North-east. Stryx waits.'],
+    ['stryx', 'The Ember Grove. North-east. A warm seed, not a cold one. I will be here, reading the wind.'],
   ],
   stryxEarly: [
-    ['stryx', 'Kree. Eikar should see the Carpenter first. Stryx can wait. Stryx is very good at waiting.'],
+    ['stryx', 'Your Carpenter asked me to wait until he has finished with you. This ship took eleven years to grow. I can wait an afternoon.'],
   ],
   seedTaken: [
-    ['phorus', 'That’s it — I can feel it humming from here. It’s like holding a sunset.'],
+    ['phorus', 'That’s it — I can feel it humming from here. It’s like holding a sunset. Don’t you dare sell it.'],
     ['torcain', 'Back to the docks, then. Aakalay.'],
   ],
   setSail: [
-    ['stryx', 'Kreeeee! Warm seed! Good seed! Stryx sings now!'],
-    ['phorus', 'Last hot meal for a while, Torcain. I hope you’re happy.'],
-    ['torcain', 'I will be. When Noka’s found.'],
+    ['stryx', 'Good seed. Very good seed. Stand clear of the stern.'],
+    ['stryx', 'One condition. No Eldi ship flies near Aakalay — the oath-mist chills a seed to death. I will set you down at the edge of the Ashen Reach. The rest is on foot.'],
+    ['phorus', 'On FOOT?'],
+    ['torcain', 'We’ve walked further for less.'],
   ],
   sailCards: [
     'The seed takes root in the stern, and the old fire tree shakes off its moorings.',
     'Xilia falls behind — smoke from the chimneys, Buhkon waving from his tower.',
-    'A night across the etherium. At dawn, a dead city rises out of the gold.',
+    'The Stryx sets you down at the edge of the Ashen Reach and is gone before Phorus has finished complaining.',
+    'Three days of hiking. Two more riding wild Punks that wanted to eat you.',
   ],
 };
-export const ARRIVE_AAKALAY = ['The Eldi ship comes down through golden haze.', 'Nobody lives here anymore. Not Eikar. Not Keilia. Only animals, and the quiet.', 'Aakalay.'];
+export const ARRIVE_AAKALAY = ['The old causeway ends at a dock nobody has used in a lifetime.', 'Nobody lives here anymore. Not Eikar. Not Keilia. Only animals, and the quiet.', 'Aakalay.'];
 
 /* dialogue lines: [speaker, text] — speaker keys map to portraits */
 export const SPEAKERS = {
@@ -112,13 +121,14 @@ export const SPEAKERS = {
   phorus: { name: 'Phorus', color: '#7ad8ff', sub: "Kalo'Eik · Nur" },
   noka: { name: 'Noka', color: '#ffd27a', sub: 'the soul in the iron' },
   memory: { name: 'Zikhron', color: '#b48aff', sub: 'a memory core' },
-  stryx: { name: 'The Stryx', color: '#9ad86a', sub: 'pilot of the stump' },
+  stryx: { name: 'The Stryx', color: '#9ad86a', sub: 'pilot of the Eldi ship' },
   buhkon: { name: 'Buhkon Eldi', color: '#ffb050', sub: 'the Carpenter' },
+  venkin: { name: 'Venkin', color: '#e0b070', sub: 'Keilia builder' },
 };
 
 export const DIALOG = {
   arrive: [
-    ['phorus', 'A night on a fire tree and not one hot meal since Xilia. You owe me, Torcain.'],
+    ['phorus', 'Three days hiking, two on Punks that wanted to eat us, and not one hot meal since Xilia. You owe me, Torcain.'],
     ['torcain', 'When Noka’s found. Not before.'],
     ['phorus', 'Mm. Well. There it is. Aakalay. Or what’s left of it.'],
     ['torcain', 'The riddle starts here. "Five cores still hum." Can you hear them?'],
@@ -128,9 +138,7 @@ export const DIALOG = {
     ['phorus', 'One more thing. Nobody has lived here in a lifetime — only animals now, nested in the old streets. And the mist doesn’t move with the wind. Keep that axe close.'],
   ],
   stryx: [
-    ['stryx', 'Kreee. Seed is warm. Ship is ready. Stryx waits.'],
-    ['torcain', 'We’re not done here yet.'],
-    ['stryx', 'Kree. Stryx is very good at waiting.'],
+    ['stryx', 'The seed is warm and the ship is ready. Whenever you are.'],
   ],
   firstFight: [
     ['phorus', 'Wild Punks! Mind the vines — they wind up before they bite.'],
@@ -165,7 +173,10 @@ export const DIALOG = {
   wake: [
     ['phorus', 'There you are. A fortnight and some change, by my count. I put you in water, like Noka said to — sorry about the stygian in it.'],
     ['torcain', 'I saw it, Phorus. All of it. From every one of them.'],
-    ['torcain', 'Two riders on a Nekh’Vorran came to duel him. They broke the stone’s hold — but the lord got out. Changed. The first Megla Aagac. The first Malsti Punk.'],
+    ['torcain', 'An Eikar named Kiet, and his Dya’Can, on a great Nekh’Vorran — Kireo’Nik. They came to duel the Master of the Keep. They broke the stone’s hold.'],
+    ['torcain', 'But the Master got out. Changed. A Keilia — the cores have his name cut out of them. Kiet’s people called him Otlið.'],
+    ['phorus', 'And the Duat seedling that grew where he fell. The Megla Aagac we just cut down. And the Malsti Punk that ran.'],
+    ['torcain', 'One more thing. The Oath Stone wasn’t just a Relic. It was built over an Urverk. Kiet opened it — I saw the trigger.'],
     ['phorus', 'And the riddle?'],
     ['torcain', 'Noka was in the memory too. Watching. She left the next line where only a trance would find it.'],
   ],
@@ -214,7 +225,8 @@ export const TRANCE = [
   'Kahizecvar.',
   'You are a scribe, a watchman, a smith, a child — all at once, without a single thought or feeling missing.',
   'You feel the oath close around the city like a fist.',
-  'You see Kiet on the back of Jhealanil, the great Nekh’Vorran, landing in the plaza with a grin — and the duel that ends the lord’s reign.',
+  'You see Kiet astride Kireo’Nik, his great Nekh’Vorran, landing in the plaza with a grin — and the duel that ends the reign of the Master of the Keep.',
+  'You see Kiet’s hand on the Oath Stone, and the old Urverk beneath it opening like an eye. You see the trigger.',
   'You see the oath break, and the people walk out of it, and the treasuries emptied into the streets.',
   'And you see what crawls out of the lord as he falls: a seedling of the Duat, rooting in the plaza… and a fist-sized Punk scuttling into the dark with his memory in its stem.',
   'At the very edge of the memory, an old voice, amused, speaking in riddles.',
@@ -250,15 +262,18 @@ export const CODEX = [
   ['Torcain', 'Tanoc Filugani’s name now that he is Stamijan. An Eikar torn across Eternal Space as a boy, saved by the Carpenter, Buhkon Eldi, who gave him his first Aagac. He uses the Duat to carry his axe where no arm could reach.'],
   ['Phorus', 'A Kalo’Eik and a Nur — the Kalo’Eik live on the moons. Phorus can sense stygian and tell a memory core from dead iron, and can wake the Kahizecvar trance.'],
   ['Noka', 'An ancient soul trapped in stygian iron, moving from mountain peak to mountain peak. She never says where she’ll go next — only riddles.'],
-  ['Eikar', 'The acorn people. Their Aagac — the acorn-cap hat — is part of their being, and the symbol on it shows what kind of Eikar they are. No hands: their weapons float beside them.'],
+  ['Eikar', 'The acorn people: humanoids with acorn-textured skin, markings beneath their eyes, and an Aagac — the acorn-cap hat — that is part of their being. 41% of all Eikar live on Xikia.'],
   ['Stygian', 'Soul iron. Most of the stygian scattered in Aakalay’s dust are memory cores, gone quiet.'],
   ['Zikhron', 'Memory. A memory core holds what it saw, and a Nur can make it show you.'],
   ['The Duat', 'The other side, where the Nekh’Vorran came from. It does not like things it does not know.'],
   ['Tukang', 'Torcain’s relic of fire, speed and heat, made by the Inventor from the first Aagac. It builds heat as he fights.'],
   ['Wild Punk', 'The pumpkin-and-vine family, grown wild. Faster and leaner than a domestic Punk, and much worse-tempered.'],
   ['Malsti Punk', 'Fist-sized Punks that sprout from Duat Seedlings. Already at home in the Duat, so they blink about the battlefield.'],
-  ['Megla Aagac', 'What a Duat Seedling most often grows into. In Aakalay, one grew out of the lord who held the Oath Stone.'],
-  ['Eldi Ship', 'A mature fire tree, hollowed out. Fire never harms the wood. A living seed in the stern pushes it through the sky, and a Stryx grown in the pilot stump flies it.'],
+  ['Megla Aagac', 'What a Duat Seedling most often grows into. In Aakalay, one grew where the Master of the Keep fell.'],
+  ['Otlið', 'The Master of the Keep at Aakalay — a Keilia. The ShurgrEdan cut his name out of every core they found; “Otlið” is what Kiet’s people called him.'],
+  ['The Oath Stone', 'A Relic that holds anyone who swears to it. Break away and it burns; push on and you break free — but the Relic makes its holder hunt down anyone who learns that.'],
+  ['Kiet', 'An Eikar at the end of the Era of the Nekh’Vorran who rode the great Nekh’Vorran Kireo’Nik to Aakalay with his Dya’Can, after fifty letters from a farmboy outside the walls.'],
+  ['Eldi Ship', 'A mature fire tree, hollowed out. Fire never harms the wood. Only the tree’s own seed can drive it, and a Stryx grown in the pilot stump flies it — smarter than any Esik or Eikar, with reflexes ten times as fast.'],
   ['Zahreh', 'Flowers — and, in the old tongue, the name for a city’s rich and noble. The flowers of the garden still heal.'],
 ];
 
@@ -271,6 +286,13 @@ export const CODEX_MORE = [
   ['Xilia', 'A farming town of acorn-cap cottages, fields of Ju, and a windmill that never stops. Torcain grew up here, after Buhkon found him.'],
   ['Buhkon Eldi', 'The Carpenter. He builds ships, sheds and cradles, and once mended a boy who fell across Eternal Space. Torcain’s first Aagac came from his hands.'],
   ['Training dummy', 'Straw, sacking and a turnip for a head. Buhkon has a great deal of straw.'],
+  ['Xikia', 'Second largest of the three Tatu, with nine continents. Xilia is on Xikia — and so, a long and dangerous walk away, is Aakalay.'],
+  ['Leotik', 'Smallest of the Mbaru Tatu: six and a half continents, mostly unexplored, and home to an absurd number of poisonous and venomous things.'],
+  ['Venkin', 'A young Keilia from a family of builders in Xilia, a few years younger than Torcain, and hopelessly obsessed with the token game.'],
+  ['Keilia', 'Builders without equal. The Kalo make their hammers; a Keilia who takes a hammer to war is banished, so Keilia weapons are passable at best.'],
+  ['Nur’Hlyst', 'Perception through the Hurst: a golden pulse that makes hidden things answer. Buhkon taught it to Torcain. (G)'],
+  ['Sniller amulets', 'A large round gem between two curved horns, cold teal. Snillers were cursed into them when the Angels left. They hum toward old memory vaults.'],
+  ['Kofi Galta', 'A crescent-shaped little thing with blade-like spines and a fluffy dark tail. Breeds like bunnies, found everywhere, eaten by basically everything — so it runs from basically everything.'],
   ['Nur Lantern', 'Phorus can wake a Nur-light in an old lantern. Rest beside one to heal, refill the Albali film, and spend zikhron shards to strengthen your Hurst. Resting wakes the wilds again.'],
   ['Zikhron shards', 'Splinters of memory that fall from whatever you defeat. A Nur Lantern can sing them into you.'],
   ['Albali film', 'The healing film from an Albali Byrd’s horn, kept in vials. It stings, but it closes wounds and burns out poison. (R)'],
@@ -281,7 +303,7 @@ export const CODEX_MORE = [
   ['Tyndael', 'A spark of fire with legs. Keeps its distance and spits burning venom that lingers on the ground.'],
   ['Sru Vorn', 'Long, low and heavy, with matted fur armour, tusks, a spiked ball tail and acid saliva. Its acid pits are farmed like fields.'],
   ['Klug Pillars', 'Great pillars of stygian in the keep on Leotik, each carved with the word "Klug". They feel like many Relics, cores and a grow-forge all at once. Nobody knows what they are for.'],
-  ['The Urverk', 'A portal. Most no longer know their triggers.'],
+  ['The Urverk', 'A portal. Each has a trigger, and most triggers are lost — but a memory core can still hold one. Kiet’s opened the Urverk beneath the Oath Stone to Leotik.'],
 ];
 
 export const STONES = {
@@ -302,8 +324,17 @@ export const STONES = {
 export const DIALOG2 = {
   setSail: [
     ['torcain', '"Follow the Punk with a lord in its head, to the isle where the Urverk wakes the dead."'],
-    ['phorus', 'Leotik. Of course it’s Leotik. Everything there is either poisonous, venomous, or both.'],
-    ['stryx', 'Kreee! Long flight. Stryx likes long flights.'],
+    ['phorus', 'Leotik. Of course it’s Leotik. A whole Tatu where everything is either poisonous, venomous, or both.'],
+    ['torcain', 'Kiet’s trigger opens this Urverk onto Leotik. I sent word to Xilia when we found the cores. Venkin answered.'],
+    ['venkin', 'Of course I answered. Duro’s bringing his cauldron, Hemla’s bringing everything else. Somebody has to build you a camp on the other side.'],
+    ['phorus', 'Venkin! How did you —'],
+    ['venkin', 'Three days hiking, two on wild Punks. I hear you know the way.'],
+  ],
+  urverkCards: [
+    'Torcain speaks Kiet’s trigger, and the Urverk under the Oath Stone opens like an eye.',
+    'The cold of the Duat. Apparitions on every side. Nobody looks at them for long.',
+    'And then rain — warm, heavy rain, on a Tatu none of you has ever stood on.',
+    'Behind you, the Urverk closes. It does not open again.',
   ],
   firstLantern: [
     ['phorus', 'Hold on — this old lantern still has a wick of Nur in it. Let me wake it.'],
@@ -312,11 +343,13 @@ export const DIALOG2 = {
   ],
   arriveLeotik: [
     ['phorus', 'Leotik. Smell that? Rot and rain and something sweet that’s definitely poisonous.'],
+    ['venkin', 'And the Urverk’s shut behind us. Stranded, then. Fine. I’ll put the camp up by the ruins — south, by the old dock.'],
     ['torcain', 'The Punk came here. I can almost feel the lord’s memory in the air.'],
     ['phorus', 'That’s the Urverk you’re feeling. There’s a keep to the north — and three big pieces of stygian singing louder than anything in Aakalay.'],
     ['phorus', 'Pillars. One in the bogs to the west, one in the ruins of Villtur to the east, one up on the byrd roost. The Punk is hiding behind all three of them.'],
     ['torcain', 'Then we wake the pillars.'],
     ['phorus', 'And try very hard not to step in anything green.'],
+    ['phorus', 'If the Punk opens the keep’s Urverk, it might be our way home, too.'],
   ],
   pillarWoken: [
     ['phorus', 'It’s awake — feel that? It’s reaching toward the keep.'],
@@ -381,6 +414,7 @@ export const BEASTS = {
   tyndael: ['Tyndael', 'Small fire-lizards that spit burning venom. Don’t stand in the puddles.'],
   vel: ['Duskareth Vel', 'Duat-walkers who throw knives out of thin air. They stagger badly when hit hard.'],
   sruvorn: ['Sru Vorn', 'A tusked bog-beast that farms acid pits. Never stand in front of it. Or behind it.'],
+  kofi: ['Kofi Galta', 'Crescent body, blade-like spines, fluffy dark tail. It runs from everything, because everything eats it.'],
   punk_alpha: ['Thornback', 'The Old Punk of Aakalay, swollen on a swallowed oath-ring. Its slam shakes the ground.'],
 };
 /* hunt this many of a kind and Torcain has "studied" it: +15% damage against it */

@@ -401,6 +401,7 @@ export function buildLeotik(scene) {
     { at: [-60, 100], kinds: ['kipsu', 'kipsu'] },
     // friendly Kipsu families, and three lost pups crying in the rain
     { at: [30, 120], kinds: ['kipsu_f', 'kipsu_f', 'kipsu_f'] },
+    { at: [60, 90], kinds: ['kofi', 'kofi', 'kofi'] }, { at: [-60, 40], kinds: ['kofi', 'kofi'] }, { at: [90, -90], kinds: ['kofi', 'kofi'] },
     { at: [110, -40], kinds: ['kipsu_f'], unique: 'pup_1', extra: { pup: 1, scale: 0.5 } },
     { at: [-110, -40], kinds: ['kipsu_f'], unique: 'pup_2', extra: { pup: 2, scale: 0.5 } },
     { at: [20, -40], kinds: ['kipsu_f'], unique: 'pup_3', extra: { pup: 3, scale: 0.5 } },

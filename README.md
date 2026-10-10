@@ -44,35 +44,32 @@ Create an account (email/password — cross-device when online is configured, ot
 
 A separate, semi-3D action RPG lives in **`rpg/`** — open `rpg/index.html` (or pick **⛵ Torcain’s Run** on the main menu). It runs on a vendored copy of three.js (`rpg/vendor/`), so it still needs no build step and works offline.
 
-Two chapters so far. Your run is saved in the browser at every Nur Lantern and story beat; use **Continue** on the title screen to pick it back up.
+A prologue and two chapters so far, following the lore of the Mbaru Tatu. Your run is saved in the browser at every Nur Lantern and story beat; use **Continue** on the title screen to pick it back up.
 
-- **Prologue: Xilia.** The game starts in Xilia, a busy farming town. Talk to the townsfolk, take on side quests, trade, cook and forge. Buhkon Eldi, the Carpenter, runs you through the controls in his yard: training dummies, a Duat Strike at a high dummy, and a glide off his tower. Then fetch a fire seed from the Ember Grove so the Stryx can fly you to Aakalay. Every townsperson has a side quest, and a bounty board in the square posts repeatable hunts (there's another at the Leotik camp).
-- **Rokarvac I: The Ruins of Aakalay.** Abandoned: no Eikar or Keilia, only a few animals. Phorus finds the torn pages of the last journal, which lead to Thornback, the Old Punk. Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc, now Stamijan) with **Phorus**, the Kalo’Eik Nur, as your companion. Recover five singing memory cores, wake the Oath Stone, and fight the **Megla Aagac** that grew out of the city’s lord. Then board the Eldi ship.
-- **Rokarvac II: The Isle of the Urverk (Leotik).** A stormy jungle isle with acid bogs, the ruins of Villtur and an Albali roost. Wake three Klug pillars, then face the **Malsti Lord** at the Urverk.
+Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc, now Stamijan) with **Phorus**, the Kalo’Eik Nur, as your companion.
+
+- **Prologue: Xilia (on Xikia).** The game starts in Xilia, a busy farming town where the Carpenter, Buhkon Eldi, once found Tanoc. Buhkon runs you through the controls in his yard: training dummies, a Duat Strike at a high dummy, a glide off his tower, and finally **Nur’Hlyst** (`G`). Every townsperson has a side quest, and there's a shop, a forge, a hearth and a bounty board. Then fetch a fire seed from the Ember Grove: the Stryx (a pilot far sharper than any Eikar) flies you to the edge of the Ashen Reach, and it's three days on foot and two on wild Punks to Aakalay.
+- **Rokarvac I: The Ruins of Aakalay.** Abandoned: no Eikar or Keilia, only a few animals. Recover five singing memory cores, wake the Oath Stone, and fight the **Megla Aagac** that grew where Otlið, the Keilia Master of the Keep, fell. The trance shows Kiet and his great Nekh’Vorran Kireo’Nik — and the trigger of the Urverk beneath the stone. Phorus also finds the torn pages of the last journal, which lead to **Thornback**, the Old Punk.
+- **Rokarvac II: The Isle of the Urverk (Leotik).** Through the Urverk with Venkin, Duro and Hemla, who follow you from Xilia — and stranded when it closes. A stormy jungle with acid bogs, the ruins of Villtur and an Albali roost. Wake three Klug pillars, then face the **Malsti Lord** at the keep's Urverk.
 
 **Difficulty** is picked when you start a run:
 - **Easy:** forgiving enemies, health regenerates, 5 healing vials, and you keep your shards when you fall.
 - **Realistic:** enemies hit about 3.5× harder than on Easy and have nearly twice the health. Attacks, rolls, sprinting and jumping cost stamina. Nothing heals on its own and you get only 3 vials. When you die, your shards drop where you fell, and the wilds respawn whenever you rest. It is built to take several sittings.
 
-**Creatures:** Wild Punks, Malsti Punks (they blink through the Duat), Rodak (they shadow you and attack when you're weak), Kipsu (they steal shards and run), Albali Byrds (they dive from above; their horns paralyse, or poison on Leotik), Duskareth Vel (they throw knives out of the Duat), Tyndael (they spit venom that pools on the ground), and the **Sru Vorn** mini-boss.
+**Creatures:** Wild Punks, Malsti Punks (they blink through the Duat), Rodak (they shadow you and attack when you're weak), Kipsu (they steal shards and run), Albali Byrds (they dive from above; their horns paralyse, or poison on Leotik), Duskareth Vel (they throw knives out of the Duat), Tyndael (they spit venom that pools on the ground), Kofi Galta (harmless; they run from everything), Thornback, and the **Sru Vorn** mini-boss.
 
 **Open-world RPG systems:**
-- **Camps** in both regions with folk you can talk to:
-  - Hemla, a Kalo'Eik trader
-  - Duro, an Eikar smith
-  - Venkin, a Keilia builder
-  - Old Ruut, a Punk herder
-  - Sefa and Fennek
-  - Ila Vos, an Elsha'ryn herbalist (Leotik only)
-  - Kesh, a Duskareth deserter (Leotik only)
-- **Nine side quests**, with dialogue choices.
+- **Folk to talk to.** In Xilia: Buhkon Eldi, Hemla (a Kalo'Eik trader), Duro (an Eikar smith), Venkin (a Keilia builder), Old Ruut (a Punk herder), Sefa and Fennek, and townsfolk Ama, Teodr, Lirra, Bosk and Orrin. At the Leotik camp: Venkin, Duro and Hemla again, plus Ila Vos (an Elsha'ryn herbalist) and Kesh (a Duskareth deserter).
+- **Sixteen side quests**, with dialogue choices, plus **bounty boards** (Xilia and the Leotik camp) with repeatable hunts.
+- **Nur’Hlyst** (`G`): a golden pulse that reveals chests, gathering spots and quest objects — and the 21 hidden **Sniller amulets**, which pay out at 5, 10, 15 and 21.
+- **A bestiary** (Beasts tab): hunt enough of a creature to study it for +15% damage against it.
 - **Friendly creatures** that only fight if attacked: Kipsu families you can pet, a domestic Punk herd, and Albali that leave you alone.
 - **A Punk mount, Brindle**: whistle with `H`, ride with `E`.
 - **Gliding**: hold `Space` in the air.
 - **Levels and perks**: three perk trees (Axe, Duat, Survival).
 - **Spells** on keys `1`–`4`: Duat Pull, Fti Gust, Ular Quake and Nur Ward.
-- **Items and crafting**: an inventory of materials, meals, axes and trinkets. Forge axes at Duro's cauldron and cook at the camp fire.
-- **The world**: loot chests, gathering spots (ore, bark, stone, moss), and six **Kalo Trials** (puzzles) that reward spells and Hurst seeds.
+- **Items and crafting**: an inventory of materials, meals, axes and trinkets. Forge axes at Duro's cauldron and cook at a hearth or camp fire.
+- **The world**: loot chests, gathering spots (ore, bark, stone, moss), and eight **Kalo Trials** (puzzles) that reward spells and Hurst seeds.
 - **A world map** (`M`) with fast travel between lit lanterns.
 - **Cloud saves**: progress saves to your Dya'Akara account when you're signed in, either from the title screen or by launching from the main menu while signed in.
 
@@ -88,6 +85,7 @@ Two chapters so far. Your run is saved in the browser at every Nur Lantern and s
 | `R` | Drink Albali film (heals and cures poison) |
 | `Q` | **Tukang Flare**: releases full heat as a fire nova |
 | `F` | **Nur Sense**: Phorus points out the next objective |
+| `G` | **Nur’Hlyst**: reveal hidden things nearby |
 | `1`–`4` / `H` | Spells / whistle for your Punk |
 | `I` `K` `J` `M` | Gear and pack / skills / quests / map |
 | `E` / `Tab` / `Esc` | Interact, talk or rest / Rokarvac journal / pause and settings |

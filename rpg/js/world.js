@@ -563,6 +563,7 @@ export function buildWorld(scene) {
     { at: [SITES.garden.x - 12, SITES.garden.z + 10], kinds: ['kipsu', 'kipsu'] },
     { at: [40, 100], kinds: ['rodak', 'rodak'] },
     { at: [-60, -30], kinds: ['malsti', 'malsti'] },
+    { at: [60, 60], kinds: ['kofi', 'kofi'] }, { at: [-90, 50], kinds: ['kofi', 'kofi', 'kofi'] }, { at: [20, -90], kinds: ['kofi', 'kofi'] },
     // the Old Punk, in the far north wood
     { at: [-22, -132], kinds: ['punk_alpha'], unique: 'thornback', extra: { scale: 1.35 } },
   ];
