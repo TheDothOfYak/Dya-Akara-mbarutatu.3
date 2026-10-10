@@ -300,7 +300,8 @@ const enemies = createEnemies({
     xp(Math.round(e.T.shards * 1.2 + 4));
     for (const [it, ch, cnt] of (LOOT[e.kind] || [])) if (Math.random() < ch) { invAdd(SAVE.inv, it, cnt); lootToast(it, cnt); }
     if (perk('wind') && !P.dead) P.hp = Math.min(P.maxHp, P.hp + (D === DIFFICULTY.realistic ? 4 : 8));
-    if (e.T.disp && !e.bossMinion) bark('phorus', 'It was only defending itself, Torcain.', 2.5);
+    if (e.T.disp === 'critter') { if (Math.random() < 0.3) bark('phorus', 'Torcain. It was a Kofi Galta. Everything already eats them.', 2.5); }
+    else if (e.T.disp && !e.bossMinion) bark('phorus', 'It was only defending itself, Torcain.', 2.5);
     dmgNumber(e.pos.x, e.pos.y + 2.6, e.pos.z, '+' + n, 'shard');
     for (let i = 0; i < Math.min(14, 3 + n / 4); i++) particles.emit(e.pos.x, e.pos.y + 1, e.pos.z, { vx: (P.pos.x - e.pos.x) * 1.2, vy: 4, vz: (P.pos.z - e.pos.z) * 1.2, color: 0xb48aff, size: 0.35, life: 0.8, drag: 1.5 });
     addHeat(6);
@@ -989,7 +990,7 @@ function interactables() {
   for (const c of crates) if (c.mesh.visible) list.push({ pos: V3(c.x, c.y, c.z), label: 'Haul up the crate', act: () => takeCrate(c), far: 3 });
   for (const pg of pages) if (pg.mesh.visible) list.push({ pos: V3(pg.x, pg.y, pg.z), label: 'Read the torn page', act: () => readPage(pg), far: 2.8 });
   for (const e of enemies.list) {
-    if (e.dead || e.hostile || !e.T.disp || e.T.ai === 'flyer') continue;
+    if (e.dead || e.hostile || !e.T.disp || e.T.ai === 'flyer' || e.T.disp === 'critter') continue;
     if (e.stray) list.push({ pos: e.pos, label: 'Send the stray Punk home', act: () => befriend(e), far: 3.2 });
     else if (e.pet) list.push({ pos: e.pos, label: 'Pick up Fennek', act: () => befriend(e), far: 2.6 });
     else if (e.pup) list.push({ pos: e.pos, label: 'Pick up the Kipsu pup', act: () => befriend(e), far: 2.4 });
