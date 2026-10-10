@@ -1,5 +1,5 @@
 /* ============================================================
-   Folk of the camps. Eikar of every sort, a Kalo'Eik trader,
+   Folk of Xilia and the Leotik camp. Eikar of every sort, a Kalo'Eik trader,
    and Venkin — a Keilia: far larger than the Eikar and built for
    building, hair overlapping like armour from the head and
    falling thick from the shoulders to the calf like a cape. The
@@ -93,7 +93,7 @@ export function buildKeilia(o = {}) {
   };
 }
 
-/* ---------------- who lives in the camps ---------------- */
+/* ---------------- who lives where ---------------- */
 export const NPC_LOOKS = {
   buhkon: { skin: '#b8804a', cap: '#5a3018', marking: 0xfff0c8, emblem: 0xff9a3a, build: 1.12, weapon: 'axe', leg: 0x5a3420, foot: 0x3a2010, beltColor: 0x8a5a2a, relic: 0xffb050, scale: 1.08, capTall: 0.75 },
   v1: { skin: '#c89a6a', cap: '#6a3a1a', marking: 0xffe0a0, emblem: 0xd8c070, build: 1.0, weapon: 'spear', leg: 0x5a3a20, foot: 0x3a2412, beltColor: 0x2f6f8a, scale: 0.95 },
@@ -183,7 +183,7 @@ export function buildCamp(scene, world, cx, cz, opts = {}) {
     const c = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), toon(rng() < 0.5 ? 0x8a5a36 : 0x6a4a2a)); c.rotation.y = rng() * 3; add(c, x, z, 0.45 + (i > 5 ? 0.9 : 0));
   }
   const mat = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), toon(0x8a2a3a)); mat.rotation.x = -Math.PI / 2; add(mat, -6, 6, 0.06);
-  // a little fence for Ruut's herd
+  // a hutch for the rescued Kipsu pups
   for (let i = 0; i < 14; i++) {
     const a = i / 14 * TAU; if (i === 3) continue;
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.2, 5), toon(0x5a3a20)); add(post, 22 + Math.cos(a) * 7, 22 + Math.sin(a) * 7, 0.6);

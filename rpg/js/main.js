@@ -1,7 +1,8 @@
 /* ============================================================
    TORCAIN'S RUN — a single-player action RPG in the Mbaru Tatu.
    Third person: WASD + mouse. Torcain and Phorus follow Noka's
-   riddles from the Ruins of Aakalay to the wilds of Leotik.
+   riddles from Xilia on Xikia, to the abandoned Ruins of Aakalay,
+   and through an Urverk to the wilds of Leotik.
    ============================================================ */
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -59,13 +60,13 @@ function ensureSave(S) {
   S.inv = S.inv || freshInventory(); S.inv.buffs = S.inv.buffs || {}; S.inv.trinkets = S.inv.trinkets || [];
   S.skills = S.skills || freshSkills();
   for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
-  S.seeds = S.seeds || 0; S.bountiesDone = S.bountiesDone || 0; S.bounty = S.bounty || null;
+  S.seeds = S.seeds || 0; S.amulets = S.amulets || 0; S.bountiesDone = S.bountiesDone || 0; S.bounty = S.bounty || null;
   return S;
 }
 ensureSave(SAVE);
 let BOOT = null;
 try { BOOT = sessionStorage.getItem('torcain-boot'); sessionStorage.removeItem('torcain-boot'); } catch (e) { /* ignore */ }
-const REGION = SAVE.region || 'aakalay';
+const REGION = SAVE.region || 'xilia';
 let D = DIFFICULTY[SAVE.difficulty] || DIFFICULTY.easy;
 const persist = () => {
   SAVE.shards = G.shards;
@@ -124,12 +125,30 @@ addEventListener('resize', resize);
 
 const ship = buildEldiShip();
 ship.group.position.set(13, world.pier.y - 1.6, world.pier.end - 16);
-scene.add(ship.group);
-{
+if (REGION === 'xilia') {
+  scene.add(ship.group);
   const plank = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.2, 1.4), toon(0x8a5a36));
   plank.position.set(6.4, world.pier.y + 0.35, world.pier.end - 13); plank.rotation.z = -0.08; plank.castShadow = true;
   scene.add(plank);
 }
+/* an Urverk: a ring of stygian with a trigger-lit membrane. Aakalay's sleeps under the Oath Stone;
+   on Leotik the one you came through has closed behind you. */
+function urverkRing(open) {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.42, 8, 32), toon(0x2a2236, { emissive: 0x6a3aff, emissiveIntensity: open ? 0.7 : 0.15 }));
+  ring.position.y = 3.6; addOutline(ring, 0.05); g.add(ring);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const k = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.6), toon(0x4a4060)); k.position.set(Math.cos(a) * 3.2, 3.6 + Math.sin(a) * 3.2, 0); k.rotation.z = a; g.add(k); }
+  const base = new THREE.Mesh(new THREE.BoxGeometry(5, 0.6, 1.6), toon(0x5a5060)); base.position.y = 0.2; addOutline(base, 0.04); g.add(base);
+  const film = new THREE.Mesh(new THREE.CircleGeometry(2.9, 32), new THREE.MeshBasicMaterial({ color: 0xb48aff, transparent: true, opacity: open ? 0.55 : 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+  film.position.y = 3.6; g.add(film);
+  g.userData.film = film; g.userData.ring = ring;
+  return g;
+}
+const gate = REGION === 'aakalay' ? (() => {
+  const g = urverkRing(!!SAVE.flags.bossDead); g.position.set(world.PLAZA.x, world.PLAZA.y - 0.2, world.PLAZA.z - 4); g.visible = !!SAVE.flags.bossDead; scene.add(g); return g;
+})() : REGION === 'leotik' ? (() => {
+  const z = world.pier.end - 1.5; const g = urverkRing(false); g.position.set(world.pier.start.x, world.col.ground(world.pier.start.x, z, 50) - 0.1, z); scene.add(g); return g;
+})() : null;
 const STRYX_SPOT = V3(3.5, world.pier.y, world.pier.end - 13);
 
 /* ---------------- Nur Lanterns ---------------- */
@@ -274,6 +293,7 @@ function onKey(code) {
   if (code === 'KeyJ') openBook('quests');
   if (code === 'KeyM') openBook('map');
   if (code === 'KeyH') whistle();
+  if (code === 'KeyG') nurHlyst();
   const si = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(code);
   if (si >= 0) castSpell(SPELL_ORDER[si]);
 }
@@ -979,13 +999,17 @@ function interactables() {
   if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
   else if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
   else list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => talkPhorus(), far: 2.6 });
-  list.push({ pos: STRYX_SPOT, label: (REGION === 'aakalay' && F_.done) ? 'Set sail for Leotik' : (REGION === 'xilia' && F_.xseed) ? 'Give the Stryx the fire seed' : 'Hail the Stryx pilot', act: () => stryx() });
+  if (REGION === 'xilia') list.push({ pos: STRYX_SPOT, label: F_.xseed ? 'Give the Stryx the fire seed' : 'Hail the Stryx pilot', act: () => stryx() });
+  if (REGION === 'aakalay' && F_.done && gate) list.push({ pos: V3(gate.position.x, gate.position.y, gate.position.z), label: 'Speak Kiet’s trigger at the Urverk', act: () => setSail(), far: 6 });
+  if (REGION === 'leotik' && gate) list.push({ pos: V3(gate.position.x, gate.position.y, gate.position.z), label: 'Touch the closed Urverk', act: () => dialog([['phorus', 'Shut tight. Whatever trigger opens it from this side, Kiet never needed it. We’re stranded until the keep says otherwise.']]), far: 5 });
   for (const l of lanterns) list.push({ pos: V3(l.x, l.y, l.z), label: lanternLit(l) ? 'Rest at the Nur Lantern' : 'Wake the Nur Lantern', act: () => useLantern(l), far: 2.8 });
   for (const s of stones) list.push({ pos: V3(s.x, s.y, s.z), label: 'Read the carving', act: () => readStone(s), far: 2.6 });
   for (const n of npcs) list.push({ pos: n.pos, label: `Talk to ${n.def.name} <small style="opacity:.7">${n.def.title}</small>`, act: () => npcTalk(n), far: 3.2 });
   if (REGION === 'xilia' && SAVE.quests.q_camp === 'done') list.push({ pos: V3(world.hearth.x, world.heightAt(world.hearth.x, world.hearth.z), world.hearth.z), label: 'Cook at the hearth', act: () => openBook('cook'), far: 3 });
   if (REGION === 'xilia' && F_.seedQuest && !F_.xseed) list.push({ pos: world.seedSpot, label: 'Take the fire seed', act: () => takeSeed(), far: 3 });
   if (camp && (REGION === 'leotik' || SAVE.quests.q_camp === 'done')) list.push({ pos: V3(world.camp.x, world.heightAt(world.camp.x, world.camp.z), world.camp.z), label: 'Cook at the fire', act: () => openBook('cook'), far: 2.8 });
+  for (const a of amulets) if (!a.got) list.push({ pos: V3(a.x, a.y, a.z), label: 'Pry loose the Sniller amulet', act: () => takeAmulet(a), far: 2.4 });
+  if (storehouse) { /* scenery only */ }
   if (board) list.push({ pos: V3(board.x, board.y, board.z), label: 'Read the bounty board', act: () => boardTalk(), far: 3 });
   for (const c of crates) if (c.mesh.visible) list.push({ pos: V3(c.x, c.y, c.z), label: 'Haul up the crate', act: () => takeCrate(c), far: 3 });
   for (const pg of pages) if (pg.mesh.visible) list.push({ pos: V3(pg.x, pg.y, pg.z), label: 'Read the torn page', act: () => readPage(pg), far: 2.8 });
@@ -1013,7 +1037,8 @@ function interactables() {
 function talkPhorus() {
   if (REGION === 'aakalay' && F_.talked && phorusQuest()) return;
   const tips = [
-    'Zahreh flowers still grow here — the pink ones. They’ll close a wound if you walk through them.',
+    'Zahreh flowers grow wild all over — the pink ones. They’ll close a wound if you walk through them.',
+    'Press G and push your Nur’Hlyst out — hidden things answer. Chests, ore, Sniller amulets.',
     'If you’re overwhelmed, let the Tukang build heat — then Q, and burn them all back.',
     'Aim and right-click, and the Duat will carry that axe wherever you’re looking.',
     'Roll with C — you’re hard to hit mid-roll. And drink the film with R before you’re desperate, not after.',
@@ -1022,20 +1047,21 @@ function talkPhorus() {
   ];
   let line;
   if (REGION === 'xilia') line = F_.xseed ? 'Back to the docks — the Stryx will want that seed while it’s warm.' : F_.seedQuest ? 'The Ember Grove is north-east. I’ll feel for the seed if you press F.' : (F_.tut || 0) < 5 ? 'Buhkon’s yard is south-east of the square. Go on — I’ll be near the bakery.' : tips[Math.floor(G.t) % tips.length];
-  else if (REGION === 'aakalay') line = F_.done ? 'The Punk with a lord in its head. Lovely. The Stryx is waiting when you are.' : coreCount() >= 5 ? 'The plaza, Torcain. The Oath Stone. It’s waiting.' : tips[Math.floor(G.t) % tips.length];
+  else if (REGION === 'aakalay') line = F_.done ? 'The Punk with a lord in its head. Lovely. The Urverk is in the plaza, under where the stone was — whenever you’re ready.' : coreCount() >= 5 ? 'The plaza, Torcain. The Oath Stone. It’s waiting.' : tips[Math.floor(G.t) % tips.length];
   else line = F_.lordDead ? 'The door is open. I’m not going through it without a proper meal first.' : pillarCount() >= 3 ? 'The keep. The Urverk. Let’s finish it.' : tips[Math.floor(G.t) % tips.length];
   dialog([['phorus', line]]);
 }
 
 function stryx() {
   if (REGION === 'aakalay' && F_.done) { setSail(); return; }
+  if (REGION !== 'xilia') return;
   if (REGION === 'xilia') {
     if (F_.xseed) { sailToAakalay(); return; }
     if ((F_.tut || 0) < 5) { dialog(STORY.XILIA.stryxEarly); return; }
     if (!F_.seedQuest) { dialog(STORY.XILIA.stryxSeed, () => { F_.seedQuest = true; persist(); setObjective(); toast('New quest: The Warm Seed', 3); sfx.core(); }); return; }
     dialog(STORY.XILIA.stryxWait); return;
   }
-  dialog(REGION === 'leotik' ? [['stryx', 'Kreee. Wet. Stryx does not like wet. Stryx waits anyway.']] : STORY.DIALOG.stryx);
+  dialog(STORY.DIALOG.stryx);
 }
 
 function readStone(s) {
@@ -1147,7 +1173,7 @@ function trance() {
 function xiliaGoal() {
   const tut = F_.tut || 0;
   const bk = npcs.find(n => n.def.id === 'buhkon');
-  if (!F_.xtalked) return { pos: F.pos, label: 'Phorus', line: '' };
+  if (!F_.xtalked) return { pos: F.pos, label: 'Phorus', line: 'I’m right here, Torcain. Talk to me first — E.' };
   if (tut === 0 || tut === 4) return bk && { pos: bk.pos, label: 'Buhkon', line: 'Buhkon’s yard — south-east of the square. You know the way better than I do.' };
   if (tut === 1) { const e = enemies.list.find(e => e.kind === 'dummy' && !e.dead); return e ? { pos: e.pos, label: 'Dummies', line: 'The straw ones. Go on, they won’t hit back.' } : null; }
   if (tut === 2) { const e = enemies.list.find(e => e.kind === 'dummy_far' && !e.dead); return e ? { pos: e.pos, label: 'High dummy', line: 'Up on the post. Aim, and right-click.' } : null; }
@@ -1205,7 +1231,7 @@ function dummyBroken(e) {
   respawnDummy(e, 6000);
 }
 function takeSeed() {
-  F_.xseed = true; invAdd(SAVE.inv, 'seed', 1); lootToast('seed', 1);
+  F_.xseed = true; invAdd(SAVE.inv, 'k_seed', 1); lootToast('k_seed', 1);
   if (seedMesh) seedMesh.visible = false;
   particles.burst(world.seedSpot.x, world.seedSpot.y + 0.5, world.seedSpot.z, 40, { color: 0xff8a3a, speed: 6, size: 0.6, life: 1, gravity: 2 });
   sfx.core(); xp(80); persist();
@@ -1217,7 +1243,7 @@ function sailToAakalay() {
     if (document.pointerLockElement) document.exitPointerLock();
     fade(0.9, 1.5);
     playCards(STORY.XILIA.sailCards, 4200, () => {
-      takeAll(SAVE.inv, { seed: 1 }); SAVE.region = 'aakalay'; SAVE.lantern = null; F_.xdone = true; persist(); CLOUD.flush();
+      delete SAVE.inv.items.k_seed; SAVE.region = 'aakalay'; SAVE.lantern = null; F_.xdone = true; persist(); CLOUD.flush();
       try { sessionStorage.setItem('torcain-boot', 'arriveA'); } catch (e) { /* ignore */ }
       location.reload();
     });
@@ -1338,10 +1364,139 @@ function sideTarget() {
   const consider = (x, y, z, label, what) => { const d = Math.hypot(x - P.pos.x, z - P.pos.z); if (d < bd) { bd = d; best = { pos: V3(x, y + 1, z), label, what }; } };
   for (const c of crates) if (c.mesh.visible) consider(c.x, c.y, c.z, 'A crate', 'one of Bosk’s crates, snagged on the rim');
   if (SAVE.quests.q_pages === 'active') for (const pg of pages) if (pg.mesh.visible) consider(pg.x, pg.y, pg.z, 'A torn page', 'a torn page, still warm with memory');
+  for (const e of enemies.list) {
+    if (e.dead) continue;
+    if (e.stray && SAVE.quests.q_strays === 'active') consider(e.pos.x, e.pos.y, e.pos.z, 'A stray', 'one of Ruut’s strays, with its saddle-blanket on');
+    if (e.pet && SAVE.quests.q_fennek === 'active') consider(e.pos.x, e.pos.y, e.pos.z, 'Fennek', 'Fennek — I can feel a very pleased little Kipsu');
+    if (e.pup && SAVE.quests.q_pups === 'active') consider(e.pos.x, e.pos.y, e.pos.z, 'A pup', 'a Kipsu pup, crying in the rain');
+  }
+  for (const a of amulets) if (!a.got && a.revealed) consider(a.x, a.y, a.z, 'A Sniller amulet', 'a Sniller amulet, cold as a winter well');
   if (SAVE.quests.q_thorn === 'active' && world.thornback) consider(world.thornback.x, world.heightAt(world.thornback.x, world.thornback.z), world.thornback.z, 'Thornback', 'the Old Punk. Thornback. It’s huge');
   if (!best) return null;
   return { pos: best.pos, label: best.label, line: `There — ${best.what}. ${Math.round(bd)} paces.` };
 }
+
+/* ---------------- Nur'Hlyst: Buhkon's golden pulse ---------------- */
+const hlyst = { cd: 0, marks: [], t: 0 };
+const canHlyst = () => REGION !== 'xilia' || (F_.tut || 0) >= 5;
+function nurHlyst() {
+  if (!canHlyst()) { toast('You don’t know how yet. (Buhkon will teach you.)', 2); return; }
+  if (hlyst.cd > 0 || G.mode !== 'play') return;
+  const range = 55 * (FX.hlyst ? 1.6 : 1);
+  hlyst.cd = 6; hlyst.t = 12;
+  for (const m of hlyst.marks) scene.remove(m); hlyst.marks.length = 0;
+  particles.ring(P.pos.x, P.pos.y + 0.6, P.pos.z, 90, 30, { color: 0xffd27a, size: 0.7, life: 1.3, drag: 0.2 });
+  sfx.sense();
+  const found = { amulet: 0, chest: 0, node: 0, other: 0 };
+  const mark = (x, y, z, col, kind) => {
+    if (Math.hypot(x - P.pos.x, z - P.pos.z) > range) return;
+    const sp = glowSprite(col, 2.6, 0.95); sp.position.set(x, y + 1.6, z); scene.add(sp); hlyst.marks.push(sp); found[kind]++;
+  };
+  for (const a of amulets) if (!a.got) { mark(a.x, a.y, a.z, 0x6af0e0, 'amulet'); if (Math.hypot(a.x - P.pos.x, a.z - P.pos.z) <= range) a.revealed = true; }
+  for (const c of feats.chests) if (!c.open) mark(c.x, c.y, c.z, 0xffd27a, 'chest');
+  for (const n of feats.nodes) if (n.ready) mark(n.x, n.y, n.z, 0xf3cf7a, 'node');
+  for (const c of crates) if (c.mesh.visible) mark(c.x, c.y, c.z, 0xff9ad0, 'other');
+  for (const pg of pages) if (pg.mesh.visible) mark(pg.x, pg.y, pg.z, 0xb48aff, 'other');
+  if (seedMesh && seedMesh.visible) mark(world.seedSpot.x, world.seedSpot.y, world.seedSpot.z, 0xff8a3a, 'other');
+  const bits = [];
+  if (found.amulet) bits.push(`${found.amulet} Sniller amulet${found.amulet > 1 ? 's' : ''}`);
+  if (found.chest) bits.push(`${found.chest} chest${found.chest > 1 ? 's' : ''}`);
+  if (found.node) bits.push(`${found.node} thing${found.node > 1 ? 's' : ''} to gather`);
+  toast(bits.length ? 'Nur’Hlyst — the world answers: ' + bits.join(' · ') : 'Nur’Hlyst — nothing hidden answers here.', 3);
+  for (const m of hlyst.marks) m.material.opacity = 0;
+}
+function hlystTick(dt) {
+  hlyst.cd = Math.max(0, hlyst.cd - dt);
+  if (hlyst.t <= 0) return;
+  hlyst.t -= dt;
+  const k = hlyst.t > 10 ? (12 - hlyst.t) / 2 : Math.min(1, hlyst.t / 3);
+  for (const m of hlyst.marks) { m.material.opacity = 0.9 * k * (0.75 + Math.sin(G.t * 4 + m.position.x) * 0.25); }
+  if (hlyst.t <= 0) { for (const m of hlyst.marks) scene.remove(m); hlyst.marks.length = 0; }
+}
+
+/* ---------------- Sniller amulets ---------------- */
+const AMULET_TOTAL = 21;
+const AMULET_TIERS = [
+  { n: 5, text: 'The amulets hum together and point you at a cache: a Sniller’s eye trinket.', items: { t_sniller: 1 } },
+  { n: 10, text: 'Ten amulets. Something in your Hurst learns from their humming. (+1 perk point)', points: 1 },
+  { n: 15, text: 'Fifteen. They lead you to a buried Hurst seed. (+max health and stamina)', seed: 1 },
+  { n: 21, text: 'Every amulet. Together they sing one note — the location of an old memory vault. (+2 perk points, +400 shards)', points: 2, shards: 400 },
+];
+function amuletSpots() {
+  let seed = REGION === 'xilia' ? 991 : REGION === 'aakalay' ? 1771 : 2203;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const anchors = Object.values(world.SITES).map(s => [s.x, s.z]).concat(lanterns.map(l => [l.x, l.z]));
+  const out = [];
+  // one always waits somewhere high: the top of the Carpenter's glide tower
+  if (world.tower) out.push({ id: `${REGION}_amulet_0`, x: world.tower.x + 0.8, y: world.col.ground(world.tower.x + 0.8, world.tower.z, 99) + 0.9, z: world.tower.z });
+  for (let tries = 0; out.length < 7 && tries < 400; tries++) {
+    const [ax, az] = anchors[(out.length * 3 + tries) % anchors.length];
+    const a = rnd() * Math.PI * 2, r = 6 + rnd() * 18, x = ax + Math.cos(a) * r, z = az + Math.sin(a) * r;
+    if (Math.hypot(x, z) > world.edgeRadius(x, z) - 10) continue;
+    if (world.hazards.some(h => Math.hypot(x - h.x, z - h.z) < h.r + 2)) continue;
+    if (out.some(o => Math.hypot(o.x - x, o.z - z) < 25)) continue;
+    const gy = world.heightAt(x, z);
+    let y = world.col.ground(x, z, gy + 6);           // perched on a roof or a wall top if there is one
+    if (y - gy > 5.5) y = gy;
+    out.push({ id: `${REGION}_amulet_${out.length}`, x, y: y + 0.9, z });
+  }
+  return out;
+}
+function amuletMesh() {
+  const g = new THREE.Group();
+  const gem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28, 0), toon(0x6af0e0, { emissive: 0x2aa0a0, emissiveIntensity: 0.8 })); addOutline(gem, 0.03); g.add(gem);
+  for (const s of [-1, 1]) { const horn = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 5, 10, Math.PI * 0.8), toon(0x9aa8b0)); horn.position.x = s * 0.3; horn.rotation.z = s > 0 ? -0.6 : Math.PI + 0.6; g.add(horn); }
+  const glow = glowSprite(0x6af0e0, 1.3, 0.3); g.add(glow);
+  return g;
+}
+const amulets = amuletSpots().map(a => {
+  const got = !!SAVE.cleared[a.id];
+  const mesh = amuletMesh(); mesh.position.set(a.x, a.y, a.z); mesh.visible = !got; scene.add(mesh);
+  return { ...a, mesh, got, revealed: false };
+});
+function takeAmulet(a) {
+  a.got = true; a.mesh.visible = false; SAVE.cleared[a.id] = true;
+  SAVE.amulets = (SAVE.amulets || 0) + 1;
+  particles.burst(a.x, a.y, a.z, 24, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.8, gravity: 2 });
+  sfx.core(); xp(25);
+  const tier = AMULET_TIERS.find(t => t.n === SAVE.amulets);
+  toast(`Sniller amulet (${SAVE.amulets}/${AMULET_TOTAL})`, 2.5);
+  if (tier) {
+    if (tier.items) for (const [k, c] of Object.entries(tier.items)) { invAdd(SAVE.inv, k, c); lootToast(k, c); }
+    if (tier.points) SAVE.skills.points += tier.points;
+    if (tier.seed) { SAVE.seeds++; applyUps(false); }
+    if (tier.shards) G.shards += tier.shards;
+    setTimeout(() => dialog([['phorus', tier.text]]), 600);
+  }
+  persist();
+}
+
+/* the bestiary notes anything you've had a good look at */
+let beastT = 0;
+function beastScan(dt) {
+  beastT -= dt; if (beastT > 0) return; beastT = 1;
+  for (const e of enemies.list) {
+    if (e.dead || e.T.disp === 'training') continue;
+    const k = beastKey(e.kind);
+    if (!SAVE.codex['beast_' + k] && e.pos.distanceTo(P.pos) < 16) SAVE.codex['beast_' + k] = true;
+  }
+}
+
+/* Venkin's storehouse goes up when the quest is done */
+const storehouse = REGION === 'xilia' ? (() => {
+  const x = world.PLAZA.x + 22, z = world.PLAZA.z + 16, y = world.col.ground(x, z, world.heightAt(x, z) + 0.5);
+  const g = new THREE.Group();
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 4.4), toon(0xc8a070)); walls.position.y = 1.6; g.add(walls);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(4.6, 2.2, 4), toon(0x7a4a2a)); roof.position.y = 4.3; roof.rotation.y = Math.PI / 4; roof.scale.z = 0.75; g.add(roof);
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.2), toon(0x4a2a18)); door.position.set(0, 1.1, 2.21); g.add(door);
+  for (let i = 0; i < 3; i++) { const sack = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 6), toon(0xd8c090)); sack.scale.y = 1.2; sack.position.set(-2.4 + i * 0.6, 0.5, 2.7); g.add(sack); }
+  const parts = []; g.traverse(m => { if (m.isMesh) parts.push(m); }); parts.forEach(m => { m.castShadow = true; addOutline(m, 0.04); });
+  g.position.set(x, y, z); g.rotation.y = Math.atan2(world.PLAZA.x - x, world.PLAZA.z - z);
+  g.visible = SAVE.quests.q_camp === 'done';
+  scene.add(g);
+  if (g.visible) world.col.add(x, z, 3, 2.2, g.rotation.y, y - 1, y + 3.2);
+  return g;
+})() : null;
 
 function setSail() {
   dialog(STORY.DIALOG2.setSail, () => {
@@ -1349,11 +1504,7 @@ function setSail() {
     $('endcard').classList.add('hidden');
     if (document.pointerLockElement) document.exitPointerLock();
     fade(0.9, 1.5);
-    playCards([
-      'The fire tree slips its moorings, and Aakalay falls away beneath the solar sails.',
-      'Two days across the etherium. The Stryx sings to the seed. Phorus sleeps. You do not.',
-      'Leotik rises out of a storm — green, wet, and humming with something old.',
-    ], 4200, () => {
+    playCards(STORY.DIALOG2.urverkCards, 4200, () => {
       SAVE.region = 'leotik'; SAVE.lantern = null; persist(); CLOUD.flush();
       try { sessionStorage.setItem('torcain-boot', 'arrive'); } catch (e) { /* ignore */ }
       location.reload();
@@ -1401,6 +1552,8 @@ function afterLord() {
   });
 }
 
+function revealGate() { if (gate) { gate.visible = true; gate.userData.film.material.opacity = 0.55; gate.userData.ring.material.emissiveIntensity = 0.7; } }
+
 function showEnd(n) {
   G.mode = 'end';
   if (document.pointerLockElement) document.exitPointerLock();
@@ -1408,7 +1561,7 @@ function showEnd(n) {
     $('e-kicker').textContent = 'Rokarvac I · Complete'; $('e-title').textContent = 'The Ruins of Aakalay';
     $('e-lead').textContent = 'Noka’s next riddle, found at the edge of the trance:';
     $('e-riddle').innerHTML = STORY.NEXT_RIDDLE.join('<br>');
-    $('btn-sail').style.display = '';
+    $('btn-sail').style.display = ''; revealGate();
   } else {
     $('e-kicker').textContent = 'Rokarvac II · Complete'; $('e-title').textContent = 'The Isle of the Urverk';
     $('e-lead').textContent = 'What Noka left on the far side of the door:';
@@ -1457,7 +1610,7 @@ function setObjective() {
     else txt = X.stryx;
   } else if (REGION === 'aakalay') {
     if (!F_.talked) txt = STORY.OBJECTIVES.talk;
-    else if (F_.done) { txt = 'Board the Eldi ship — the Stryx will fly you to Leotik'; }
+    else if (F_.done) { txt = 'Speak Kiet’s trigger at the Urverk beneath the Oath Stone — on to Leotik'; }
     else if (G.bossActive) txt = STORY.OBJECTIVES.boss;
     else if (coreCount() >= 5) txt = STORY.OBJECTIVES.stone;
     else { txt = STORY.OBJECTIVES.cores(coreCount()); hintTxt = 'F — Phorus senses the nearest core'; }
@@ -1505,7 +1658,8 @@ function portrait(who) {
   if (map[who]) return map[who];
   const lk = NPC_LOOKS[who];
   if (lk) return `radial-gradient(circle at 50% 70%,${lk.skin} 0 32%,transparent 33%),radial-gradient(circle at 50% 42%,${lk.cap} 0 40%,transparent 41%),radial-gradient(circle,#2a2a3a,#0c0c14)`;
-  if (who === 'venkin') return 'radial-gradient(circle at 50% 50%,#c8a070 0 26%,transparent 27%),radial-gradient(circle at 50% 46%,#5a3a2a 0 42%,transparent 43%),radial-gradient(circle,#3a2a1a,#100a06)';
+  const nd = Object.values(NPCS).flat().find(d => d.id === who);
+  if (who === 'venkin' || (nd && nd.look === 'keilia')) return 'radial-gradient(circle at 50% 50%,#c8a070 0 26%,transparent 27%),radial-gradient(circle at 50% 46%,#5a3a2a 0 42%,transparent 43%),radial-gradient(circle,#3a2a1a,#100a06)';
   return map.memory;
 }
 function updateDialog(dt) {
@@ -1670,7 +1824,7 @@ function objectivePoint() {
   } else if (REGION === 'aakalay') {
     if (!F_.talked) p = F.pos;
     else if (G.bossActive) return null;
-    else if (F_.done) p = STRYX_SPOT;
+    else if (F_.done) p = V3(world.PLAZA.x, 0, world.PLAZA.z);
     else if (coreCount() >= 5) p = V3(world.PLAZA.x, 0, world.PLAZA.z);
     else if (G.sensed) p = G.sensed.pos;
   } else {
@@ -1877,6 +2031,7 @@ function turnIn(n, qid) {
   if (r.spell) learnSpell(r.spell);
   if (r.points) { SAVE.skills.points += r.points; setTimeout(() => toast(`+${r.points} perk point — press K`, 3), 900); }
   if (r.flag === 'flask_bonus') applyUps(true);
+  if (qid === 'q_camp' && storehouse) { storehouse.visible = true; world.col.add(storehouse.position.x, storehouse.position.z, 3, 2.2, storehouse.rotation.y, storehouse.position.y - 1, storehouse.position.y + 3.2); }
   if (r.flag === 'mount') makeMount(true);
   persist();
   n.talking = 4;
@@ -2225,7 +2380,8 @@ book = createRpgUI({
   region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
   mainObjective: () => $('q-text').textContent,
   bounty: () => SAVE.bounty && { ...SAVE.bounty, name: beastName(SAVE.bounty.kind), got: bountyProgress(SAVE.bounty, SAVE) },
-  beasts: () => Object.entries(STORY.BEASTS).map(([k, [name, lore]]) => ({ k, name, lore, kills: SAVE.killsBy[k] || 0, seen: !!(SAVE.killsBy[k] || F_['seen_' + k]), at: studyAt(k), studied: studied(k) })),
+  amulets: () => ({ got: SAVE.amulets || 0, total: AMULET_TOTAL, next: AMULET_TIERS.find(t => t.n > (SAVE.amulets || 0)) }),
+  beasts: () => Object.entries(STORY.BEASTS).map(([k, [name, lore]]) => ({ k, name, lore, kills: SAVE.killsBy[k] || 0, seen: !!(SAVE.killsBy[k] || F_['seen_' + k] || SAVE.codex['beast_' + k]), at: studyAt(k), studied: studied(k) })),
   onClose: () => { G.paused = false; lockMouse(); },
 });
 renderSpellBar();
@@ -2564,6 +2720,12 @@ function updateHUD() {
 }
 
 function updateWorldBits(dt) {
+  if (gate && gate.visible && gate.userData.film.material.opacity > 0) {
+    gate.userData.film.material.opacity = 0.45 + Math.sin(G.t * 2.4) * 0.12; gate.userData.film.rotation.z = G.t * 0.3;
+    if (Math.random() < 0.3) particles.emit(gate.position.x + (Math.random() - 0.5) * 5, gate.position.y + 3.6 + (Math.random() - 0.5) * 5, gate.position.z, { vy: 0.5, color: 0xb48aff, size: 0.35, life: 1.2, speed: 0.6 });
+  }
+  hlystTick(dt);
+  beastScan(dt);
   for (const c of cores) {
     if (c.got) continue;
     c.mesh.position.y = c.pos.y + Math.sin(G.t * 2 + c.pos.x) * 0.18;
@@ -2673,7 +2835,7 @@ function beginNew() {
 function arriveLeotik() {
   P.pos.copy(world.pier.start); F.pos.copy(P.pos).add(V3(-2, 0, -3));
   G.mode = 'intro'; introT = 0; G.t = 0; CAM.yaw = 0; P.yaw = Math.PI;
-  playCards(['The Eldi ship comes down through the rain.', 'Leotik.'], 3500, () => {
+  playCards(['Leotik.', 'Stranded in the ruins of Villtur — Torcain, Phorus, and the three who followed you.'], 3500, () => {
     enterPlay();
     showLocation('Leotik', 'the isle where the Urverk wakes the dead');
     if (!F_.arrivedL) { F_.arrivedL = true; persist(); dialog(STORY.DIALOG2.arriveLeotik, () => { setObjective(); hint('F — Phorus senses the nearest pillar. Rest at Nur Lanterns.'); }); }
@@ -2784,5 +2946,5 @@ else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add(
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  glider, board, crates, pages, boardTalk, talkPhorus, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

@@ -13,7 +13,7 @@ export const ITEMS = {
   thorn: { name: 'Toxic horn', kind: 'mat', icon: '🧪', value: 14, desc: 'A Villtur Albali horn. The film has turned green.' },
   ore: { name: 'Stygian ore', kind: 'mat', icon: '💎', value: 10, desc: 'Raw soul-iron, cold and faintly humming.' },
   bark: { name: 'Fire-tree bark', kind: 'mat', icon: '🪵', value: 4, desc: 'Fire never harms it. Good for building and for forging.' },
-  stone: { name: 'Cut stone', kind: 'mat', icon: '🧱', value: 2, desc: 'Squared stone from the ruins.' },
+  stone: { name: 'Cut stone', kind: 'mat', icon: '🧱', value: 2, desc: 'Squared, honest stone. Builders always want more.' },
   petal: { name: 'Zahreh petal', kind: 'mat', icon: '🌸', value: 4, desc: 'Sweet, and a little healing. Cooks well.' },
   moss: { name: 'Bog moss', kind: 'mat', icon: '🍀', value: 6, desc: 'It soaks up acid. Bitter.' },
   seed: { name: 'Fire seed', kind: 'mat', icon: '🔥', value: 25, desc: 'A seed of an Eldi Aagac. Hot to the touch.' },
@@ -46,10 +46,13 @@ export const ITEMS = {
   t_knot: { name: 'Farmer’s knot', kind: 'trinket', icon: '🪢', value: 110, desc: 'Teodr’s lucky knot. Take 8% less damage.', perk: { armor: 0.92 } },
   t_compass: { name: 'Bosk’s compass', kind: 'trinket', icon: '🧭', value: 120, desc: 'It never points north. +15% experience.', perk: { xp: 1.15 } },
   t_oath: { name: 'Broken oath-ring', kind: 'trinket', icon: '⭕', value: 220, desc: 'Cut from Thornback’s vines. +10% damage, heat builds 20% faster.', perk: { dmg: 1.1, heat: 1.2 } },
+  t_sniller: { name: 'Sniller’s eye', kind: 'trinket', icon: '🔷', value: 150, desc: 'A cold teal gem that hums. Nur’Hlyst reaches 60% farther; +10% shards.', perk: { hlyst: 1, shards: 1.1 } },
   t_ver: { name: 'Ver’s eye', kind: 'trinket', icon: '👁', value: 160, desc: 'Spells recover 20% faster.', perk: { cd: 0.8 } },
 
   /* ---- key items ---- */
-  k_scroll_pull: { name: 'Scroll: Duat Pull', kind: 'key', icon: '📜', value: 0, desc: 'Read it to learn a spell.' },
+  k_scroll_pull: { name: 'Kalo scroll: Duat Pull', kind: 'key', icon: '📜', value: 0, read: true, desc: 'Stored willpower. Read it to learn the Duat Pull.' },
+  k_seed: { name: 'Warm fire seed', kind: 'key', icon: '🔥', value: 0, desc: 'From the young fire tree in the Ember Grove, for the Stryx’s ship. Hot to the touch.' },
+  amulet: { name: 'Sniller amulet', kind: 'key', icon: '🔹', value: 0, desc: 'A round gem between two curved horns, cold teal. It hums toward something far away.' },
 };
 
 /* cooking at a fire: [ingredients] → meal */
@@ -75,7 +78,7 @@ export const FORGE = [
 export const SHOP = {
   xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed'],
   aakalay: [],
-  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 't_ring', 't_ver'],
+  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 'ember', 't_ring'],
 };
 
 /* what each creature leaves behind: [item, chance, count] */
@@ -110,13 +113,13 @@ export function freshInventory() {
 
 /* the combined effect of what you wear and what you've eaten */
 export function effects(inv, now) {
-  const fx = { xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
+  const fx = { hlyst: 0, xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
   const axe = ITEMS[inv.axe] || ITEMS.axe_tanoc;
   fx.dmg *= axe.dmg || 1; if (axe.burn) fx.burn = true; fx.duatCd += axe.duatCd || 0; fx.stagger *= axe.stagger || 1;
   for (const t of inv.trinkets) {
     const p = (ITEMS[t] || {}).perk || {};
     for (const [k, v] of Object.entries(p)) {
-      if (k === 'hp' || k === 'glide') fx[k] += v; else fx[k] *= v;
+      if (k === 'hp' || k === 'glide' || k === 'hlyst') fx[k] += v; else fx[k] *= v;
     }
   }
   for (const [id, until] of Object.entries(inv.buffs || {})) {

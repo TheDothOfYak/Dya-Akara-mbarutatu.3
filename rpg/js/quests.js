@@ -1,5 +1,5 @@
 /* ============================================================
-   Side quests from the folk of the camps. Each has a goal the
+   Side quests from the folk of Xilia and the Leotik camp. Each has a goal the
    game can check, words for offering / waiting / finishing, and
    a reward.
    goal types:
@@ -40,11 +40,11 @@ export const QUESTS = {
   },
   q_camp: {
     name: 'Raise the Storehouse', giver: 'venkin', region: 'xilia',
-    desc: 'Venkin is raising a storehouse and a proper hearth by the square. Bring cut stone from the old rubble piles and fire-tree bark.',
+    desc: 'Venkin is raising a storehouse by the square for the winter Ju. Bring cut stone from the quarry heaps and fire-tree bark.',
     goal: { type: 'items', need: { stone: 6, bark: 4 } },
-    offer: ['A town is just a lot of people who decided to stay. I’d like to give them somewhere to keep their winter Ju.', 'Six cut stones — there are rubble piles all over from the old wall — and four strips of fire-tree bark. I’ll do the rest.'],
+    offer: ['A town is just a lot of people who decided to stay. I’d like to give them somewhere to keep their winter Ju.', 'Six cut stones — the quarry heaps around the island are free for the taking — and four strips of fire-tree bark. Help, and the town hearth is yours to cook at whenever you like.'],
     wait: ['Six stone, four bark. I’ve already drawn the plans.'],
-    done: ['Look at that. A proper hearth. Cook here any time — and I’ve set aside something I found in the rubble for you.'],
+    done: ['Look at that. A proper storehouse. The hearth’s yours to cook at any time — and I’ve set aside something I found in the quarry for you.'],
     reward: { xp: 180, shards: 60, items: { t_breath: 1, salad: 2 } },
   },
   q_vel: {
@@ -53,8 +53,8 @@ export const QUESTS = {
     goal: { type: 'kill', unique: 'vel_hideout' },
     offer: ['There’s a Duskareth Vel camped in the north-west woods, robbing my suppliers on the trade road. Bad for business.', 'Deal with it and I’ll give you a Kalo scroll that teaches the Duat to fetch.'],
     wait: ['The Vel is still in its hideout. North-west, along the woods road.'],
-    done: ['Gone? Truly? Then here — the scroll. Read it and the Duat will drag your foes to your feet.'],
-    reward: { xp: 260, shards: 120, spell: 'pull' },
+    done: ['Gone? Truly? Then here — the scroll. Kalo-made, stored willpower. Read it from your pack (I) and the Duat will drag your foes to your feet.'],
+    reward: { xp: 260, shards: 120, items: { k_scroll_pull: 1 } },
   },
   q_bake: {
     name: 'Buns for the Festival', giver: 'v1', region: 'xilia',
@@ -113,10 +113,10 @@ export const QUESTS = {
   },
   q_thorn: {
     name: 'Thornback', giver: 'phorus', region: 'aakalay',
-    desc: 'An ancient wild Punk, swollen on old oath-magic, rules the north grove of Aakalay. Put it to rest.',
+    desc: 'An ancient wild Punk, swollen on old oath-magic, rules the far north wood of Aakalay. Put it to rest.',
     goal: { type: 'kill', unique: 'thornback' },
-    offer: ['The Old Punk from the journal. It ate something it shouldn’t have, a long time ago — an oath-ring, maybe.', 'It’s in the north grove. Big. Angry. Be ready for it.'],
-    wait: ['Thornback, in the north grove. Eat something first.'],
+    offer: ['The Old Punk from the journal. It ate something it shouldn’t have, a long time ago — an oath-ring, maybe.', 'It’s in the far north wood, past the Grove Road. Big. Angry. Be ready for it.'],
+    wait: ['Thornback, in the far north wood. Eat something first.'],
     done: ['It’s over. Look — the ring, tangled in its vines. Whoever swore on that is long gone. Wear it. Make it mean something better.'],
     reward: { xp: 500, shards: 250, items: { t_oath: 1 } },
   },
@@ -132,11 +132,11 @@ export const QUESTS = {
   },
   q_sru: {
     name: 'The Tusk', giver: 'duro', region: 'leotik',
-    desc: 'Bring Duro a Sru Vorn tusk from the acid bogs and he’ll show you how to forge a Tusk Cleaver.',
-    goal: { type: 'items', need: { tusk: 1 } },
-    offer: ['There’s a Sru Vorn farming acid pits in the west bogs. Its tusks are the finest axe-stock on three Tatu.', 'Bring me one. I’ll teach the cauldron a new song.'],
+    desc: 'Bring down the Sru Vorn in the acid bogs, and Duro will show you how to forge its tusk into a Tusk Cleaver.',
+    goal: { type: 'kill', unique: 'sruvorn' },
+    offer: ['There’s a Sru Vorn farming acid pits in the west bogs. Its tusks are the finest axe-stock on three Tatu.', 'Bring it down and keep the tusk — then I’ll teach the cauldron a new song.'],
     wait: ['The bogs are west. Don’t stand in front of it. Or behind it.'],
-    done: ['Ha! Look at the grain on that. I can forge you a Tusk Cleaver now — bring ore and oil.'],
+    done: ['Ha! You actually did it. Keep that tusk — bring it to the cauldron with ore and oil, and I’ll forge you a Tusk Cleaver.'],
     reward: { xp: 400, shards: 150, flag: 'forge_tusk' },
   },
   q_antidote: {
@@ -151,7 +151,7 @@ export const QUESTS = {
   q_vels: {
     name: 'Old Friends', giver: 'kesh', region: 'leotik',
     desc: 'Kesh wants the Duskareth Vels on Leotik stopped before they find the Urverk. Defeat two of them.',
-    goal: { type: 'kills', kind: 'vel', n: 2 },
+    goal: { type: 'uniques', ids: ['vel_villtur', 'vel_keep'] },
     offer: ['Two Vels came through after me. One in Villtur, one at the keep. If they reach the Urverk first…', 'Stop them, and I’ll teach you the Fti Gust. The Duskareth hate wind.'],
     wait: ['Villtur, and the keep. They throw knives out of the air — keep moving.'],
     done: ['Both. You’re terrifying. Here — breathe out, and push. That’s the Gust.'],
@@ -164,6 +164,7 @@ export function questProgress(id, q, save, inv) {
   if (g.type === 'items') return Object.entries(g.need).map(([k, n]) => Math.min(n, (inv.items[k] || 0)) / n).reduce((a, b) => a + b, 0) / Object.keys(g.need).length;
   if (g.type === 'count') return Math.min(1, ((save.counters || {})[g.counter] || 0) / g.n);
   if (g.type === 'kill') return save.cleared[g.unique] ? 1 : 0;
+  if (g.type === 'uniques') return g.ids.filter(id => save.cleared[id]).length / g.ids.length;
   if (g.type === 'lit') return Math.min(1, Object.keys(save.lit || {}).filter(k => k.startsWith(g.prefix)).length / g.n);
   if (g.type === 'kills') return Math.min(1, Math.max(0, ((save.killsBy || {})[g.kind] || 0) - ((save.qstart || {})[id] || 0)) / g.n);
   return 0;

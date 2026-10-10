@@ -368,6 +368,12 @@ export function buildXilia(scene) {
     { at: [GROVE.x + 14, GROVE.z - 4], kinds: ['punk', 'punk', 'punk'] },
     { at: [HIDEOUT.x + 4, HIDEOUT.z], kinds: ['vel', 'malsti', 'malsti', 'malsti'], unique: 'vel_hideout' },
     { at: [120, -60], kinds: ['kipsu', 'kipsu', 'kipsu'] },
+    // Duat seedlings sprout near the hideout: Malsti Punks that come back
+    { at: [-84, -100], kinds: ['malsti', 'malsti', 'malsti'] },
+    { at: [-130, -40], kinds: ['malsti', 'malsti'] },
+    // Kofi Galta: everywhere, and running from everything
+    { at: [-70, 70], kinds: ['kofi', 'kofi', 'kofi'] }, { at: [80, 40], kinds: ['kofi', 'kofi'] },
+    { at: [-20, -40], kinds: ['kofi', 'kofi', 'kofi'] }, { at: [100, -100], kinds: ['kofi', 'kofi'] },
     { at: [-130, 60], kinds: ['punk', 'punk'] },
   ];
 

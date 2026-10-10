@@ -51,7 +51,7 @@ export function createRpgUI(api) {
       for (const [kind, label] of groups) {
         const ids = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === kind);
         if (!ids.length) continue;
-        h += `<h3>${label}</h3><div class="rgrid">` + ids.map(k => card(k, kind === 'meal' ? 'Eat' : kind === 'key' ? 'Read' : null, kind === 'meal' ? `use:${k}` : kind === 'key' ? `use:${k}` : null)).join('') + `</div>`;
+        h += `<h3>${label}</h3><div class="rgrid">` + ids.map(k => card(k, kind === 'meal' ? 'Eat' : ITEMS[k].read ? 'Read' : null, kind === 'meal' || ITEMS[k].read ? `use:${k}` : null)).join('') + `</div>`;
       }
       if (!Object.keys(inv.items).some(k => ITEMS[k] && ITEMS[k].kind !== 'axe' && ITEMS[k].kind !== 'trinket')) h += '<p class="rmuted">Your pack is empty. Gather ore, bark and stone in the wilds; creatures drop all sorts.</p>';
     } else if (page === 'skills') {
@@ -90,7 +90,7 @@ export function createRpgUI(api) {
     } else if (page === 'shop') {
       const stock = SHOP[api.region()];
       h += `<h3>Hemla’s mat <small>buy</small></h3><div class="rstats">${shards}</div><div class="rgrid">` + stock.map(k => card(k, `Buy · ${price(k)} ◆`, api.shards() >= price(k) ? `buy:${k}` : null)).join('') + `</div>`;
-      const sellable = Object.keys(inv.items).filter(k => ITEMS[k] && (ITEMS[k].kind === 'mat' || ITEMS[k].kind === 'meal' || (ITEMS[k].kind === 'trinket' && !inv.trinkets.includes(k)) || (ITEMS[k].kind === 'axe' && k !== inv.axe && k !== 'axe_tanoc')));
+      const sellable = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind !== 'key' && (ITEMS[k].kind === 'mat' || ITEMS[k].kind === 'meal' || (ITEMS[k].kind === 'trinket' && !inv.trinkets.includes(k)) || (ITEMS[k].kind === 'axe' && k !== inv.axe && k !== 'axe_tanoc')));
       h += `<h3>Sell</h3><div class="rgrid">` + (sellable.length ? sellable.map(k => card(k, `Sell · ${Math.max(1, Math.round(ITEMS[k].value * 0.5))} ◆`, `sell:${k}`)).join('') : '<p class="rmuted">Nothing to sell.</p>') + `</div>`;
     } else if (page === 'forge') {
       h += `<h3>Duro’s cauldron <small>forge</small></h3><div class="rstats">${shards}</div><div class="rgrid">` + FORGE.map(r => {
@@ -122,6 +122,7 @@ export function createRpgUI(api) {
     const g = q.goal;
     if (g.type === 'items') return '<p class="rgoal">' + Object.entries(g.need).map(([k, n]) => `${ITEMS[k].icon} ${Math.min(n, count(inv, k))}/${n} ${ITEMS[k].name}`).join(' · ') + '</p>';
     if (g.type === 'count') return `<p class="rgoal">${Math.min(g.n, (S.counters || {})[g.counter] || 0)} / ${g.n}</p>`;
+    if (g.type === 'uniques') return `<p class="rgoal">${g.ids.filter(id => (S.cleared || {})[id]).length} / ${g.ids.length}</p>`;
     if (g.type === 'lit') return `<p class="rgoal">${Object.keys(S.lit || {}).filter(k => k.startsWith(g.prefix)).length} / ${g.n} lanterns awake</p>`;
     if (g.type === 'kills') return `<p class="rgoal">${Math.min(g.n, Math.max(0, ((S.killsBy || {})[g.kind] || 0) - ((S.qstart || {})[id] || 0)))} / ${g.n}</p>`;
     return '';
