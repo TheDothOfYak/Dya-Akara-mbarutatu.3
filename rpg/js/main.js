@@ -16,7 +16,9 @@ import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
-import { buildTorcain, buildPhorus, buildCore, buildPunk } from './actors.js';
+import { buildTorcain, buildPhorus, buildCore } from './actors.js';
+import { buildDomesticPunk, buildMalstiPunk, buildSkorThal } from './esik_land.js';
+import { buildMeglaAagac } from './esik_sea.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -410,7 +412,7 @@ function buildOtlid(stygian) {
 /* the Kahizecvar: while the duel lasts, Torcain is Kiet, in golden memory */
 const memState = { on: false, fog: null };
 function enterMemory() {
-  memState.on = true;
+  memState.on = true; G.inMemory = true;   // the memory holds only Kiet and Otlið — today's creatures aren't in it
   memState.fog = { c: scene.fog.color.getHex(), n: scene.fog.near, f: scene.fog.far };
   scene.fog.color.setHex(0xf6d6a0); scene.fog.near = 30; scene.fog.far = 260;
   phorus.root.visible = false;
@@ -418,7 +420,7 @@ function enterMemory() {
 }
 function exitMemory() {
   if (!memState.on) return;
-  memState.on = false;
+  memState.on = false; G.inMemory = false;
   scene.fog.color.setHex(memState.fog.c); scene.fog.near = memState.fog.n; scene.fog.far = memState.fog.f;
   phorus.root.visible = true;
   document.body.classList.remove('in-memory');
@@ -1402,6 +1404,13 @@ function readPage(pg) {
   const n = SAVE.counters.pages;
   dialog((STORY.JOURNAL[pg.id] || []).map(l => ['memory', l]).concat([['phorus', n >= 4 ? 'That’s the last of them. Talk to me, Torcain.' : `That’s ${n} of four. There are more — I can feel them.`]]));
 }
+/* the Megla Aagac: the one dark tree that grew where Otlið fell — scenery, not a foe */
+if (REGION === 'aakalay') {
+  const pz = world.PLAZA, mx = pz.x + 21, mz = pz.z - 21, my = world.heightAt(mx, mz);
+  const megla = buildMeglaAagac({ seed: 31 }); megla.root.scale.setScalar(0.7); megla.root.position.set(mx, my - 0.2, mz); megla.root.rotation.y = 2.2; scene.add(megla.root);
+  world.col.add(mx, mz, 1.3, 1.3, 0, my - 1, my + 14);
+  let mt = 0; G.meglaTick = dt => { mt += dt; megla.animate(dt, { speed: 0, t: mt }); };
+}
 /* Skor'Thal: scarred trees that only answer Nur'Hlyst, then the den in the far north wood */
 function scarTree() {
   const g = new THREE.Group();
@@ -1429,8 +1438,7 @@ function readScar(sc) {
 let skor = null;
 if (REGION === 'aakalay' && world.skorthal) {
   const sx = world.skorthal.x, sz = world.skorthal.z, y = world.heightAt(sx, sz);
-  const m = buildPunk(false, { domestic: true, blanket: 0x5a4a3a });
-  m.root.scale.setScalar(2.6); m.root.position.set(sx, y, sz); m.root.rotation.y = Math.PI * 0.85; scene.add(m.root);
+  const m = buildSkorThal({ seed: 4711 }); m.root.position.set(sx, y, sz); m.root.rotation.y = Math.PI * 0.85; scene.add(m.root);
   skor = { m, pos: V3(sx, y, sz), t: 0 };
 }
 const skorShown = () => SAVE.quests.q_thorn === 'done' || SAVE.quests.q_skorthal;
@@ -1789,7 +1797,7 @@ function touchUrverk() {
 function afterLord() {
   F_.lordDead = true; xp(800); persist();
   // the little Malsti Punk that carried his memory goes free — causing chaos, as is traditional
-  { const pz = world.PLAZA; const m = buildPunk(true); m.root.scale.setScalar(0.28); m.root.position.set(pz.x, pz.y, pz.z - 10); scene.add(m.root);
+  { const pz = world.PLAZA; const m = buildMalstiPunk({ seed: 77 }); m.blink(1); m.root.position.set(pz.x, pz.y, pz.z - 10); scene.add(m.root);
     let t = 0; const hop = () => { t += 0.016; m.root.position.x = pz.x + Math.sin(t * 3) * 4 + t * 2; m.root.position.y = pz.y + Math.abs(Math.sin(t * 9)) * 0.6; m.animate(0.016, { speed: 3, t }); if (t < 6) requestAnimationFrame(hop); else scene.remove(m.root); }; hop(); }
   dialog(STORY.DIALOG2.lordDown, () => {
     G.mode = 'trance';
@@ -2330,7 +2338,7 @@ function petCreature(e) {
 let mount = null;
 function makeMount(nearPlayer) {
   if (mount) return;
-  const actor = buildPunk(false, { domestic: true, blanket: 0x8a2a3a });
+  const actor = buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 }); actor.root.scale.setScalar(0.8);   // Brindle: a horse-sized youngster
   const p = nearPlayer ? P.pos.clone().add(V3(3, 0, 3)) : camp ? V3(camp.pen.x, 0, camp.pen.z) : world.pen ? V3(world.pen.x + 3, 0, world.pen.z) : P.pos.clone().add(V3(4, 0, 4));
   p.y = world.col.ground(p.x, p.z, world.heightAt(p.x, p.z) + 1);
   actor.root.position.copy(p); scene.add(actor.root);
@@ -2378,7 +2386,7 @@ function updateMount(dt) {
 /* ---------------- gliding: Torcain's coat spread like wings ---------------- */
 const glider = new THREE.Group();
 {
-  const gm = new THREE.MeshToonMaterial({ color: 0x7a1e26, side: THREE.DoubleSide });
+  const gm = new THREE.MeshToonMaterial({ color: 0x5e1f3e, side: THREE.DoubleSide });
   for (const s of [-1, 1]) {
     const shape = new THREE.Shape(); shape.moveTo(0, 0); shape.quadraticCurveTo(1.2, 0.5, 2.1, 0.1); shape.lineTo(1.6, -0.5); shape.quadraticCurveTo(0.8, -0.3, 0, -0.6); shape.lineTo(0, 0);
     const w = new THREE.Mesh(new THREE.ShapeGeometry(shape), gm); w.scale.x = s; w.rotation.x = -Math.PI / 2 + 0.25; w.position.set(s * 0.3, 1.7, -0.2);
@@ -2989,7 +2997,7 @@ function updateWorldBits(dt) {
     gate.userData.film.material.opacity = 0.45 + Math.sin(G.t * 2.4) * 0.12; gate.userData.film.rotation.z = G.t * 0.3;
     if (Math.random() < 0.3) particles.emit(gate.position.x + (Math.random() - 0.5) * 5, gate.position.y + 3.6 + (Math.random() - 0.5) * 5, gate.position.z, { vy: 0.5, color: 0xb48aff, size: 0.35, life: 1.2, speed: 0.6 });
   }
-  hlystTick(dt); skorTick(dt);
+  hlystTick(dt); skorTick(dt); if (G.meglaTick) G.meglaTick(dt);
   beastScan(dt);
   for (const c of cores) {
     if (c.got) continue;
