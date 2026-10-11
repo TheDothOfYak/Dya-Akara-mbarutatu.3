@@ -26,6 +26,7 @@ import { createRpgUI } from './rpgui.js';
 import { buildMalstiLord } from './creatures.js';
 import { createEnemies, TYPES } from './enemies.js';
 import { hasBoard, offers as bountyOffers, bountyProgress } from './bounties.js';
+import * as DYA3 from './dya3d.js';
 import * as STORY from './story.js';
 import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime, saveKey, newer, SAVE_V, isOldSave } from './progress.js';
 import * as CLOUD from './cloud.js';
@@ -60,6 +61,7 @@ function ensureSave(S) {
   S.inv = S.inv || freshInventory(); S.inv.buffs = S.inv.buffs || {}; S.inv.trinkets = S.inv.trinkets || [];
   S.skills = S.skills || freshSkills();
   for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
+  if (!S.dya && DYA3.engineReady()) S.dya = DYA3.starterCollection(parseInt(String(S.runId || 'abc').replace(/[^0-9a-z]/g, '').slice(0, 6), 36) || 7);
   S.seeds = S.seeds || 0; S.amulets = S.amulets || 0; S.bountiesDone = S.bountiesDone || 0; S.bounty = S.bounty || null;
   return S;
 }
@@ -261,13 +263,14 @@ document.addEventListener('mousedown', e => {
   if (G.mode === 'dialog') { if (!(DLG && DLG.choices)) advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
   if (G.mode !== 'play' || G.paused) return;
+  if (dyaMatch) { if (e.button === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
   if (e.button === 0) { mouseL = true; pressAttack(); }
   if (e.button === 1) { e.preventDefault(); toggleLock(); }
   if (e.button === 2) duatStrike();
 });
 document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; });
 document.addEventListener('contextmenu', e => e.preventDefault());
-addEventListener('wheel', e => { CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * 0.8, 3.2, 11); }, { passive: true });
+addEventListener('wheel', e => { CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
 function lockMouse() { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } }
 
 function onKey(code) {
@@ -281,6 +284,11 @@ function onKey(code) {
   if (!$('lantern').classList.contains('hidden')) { if (code === 'Escape' || code === 'KeyE') closeLantern(); return; }
   if (code === 'Tab' && G.mode === 'play') { toggleJournal(); return; }
   if (G.mode !== 'play' || G.paused) return;
+  if (dyaMatch) {
+    if (code === 'KeyV') { dyaOverview = !dyaOverview; return; }
+    if (dyaMatch.key(code)) return;
+    if (code === 'KeyQ' || code === 'KeyF' || code === 'KeyG' || code === 'KeyT' || code === 'KeyH' || /^Digit/.test(code)) return;
+  }
   if (code === 'Space') P.jumpBuf = 0.15;
   if (code === 'KeyE') interact();
   if (code === 'KeyQ') tukangFlare();
@@ -339,7 +347,7 @@ const enemies = createEnemies({
       kipsu: 'Kipsu! Mind your shards — they’ll pick you clean and run.',
       albali: 'Albali Byrds. Wait for the dive, then hit them while they’re low!',
       vel: 'Duskareth! Watch for knives coming out of the air!',
-      tyndael: 'Tyndael — don’t stand in its venom.',
+      tyndael: 'Tyndael — it breathes fire from the air. Don’t stand where it burns.',
       sruvorn: STORY.DIALOG2.sruvorn[0][1],
     };
     if (lines[k]) bark('phorus', lines[k], 4);
@@ -1207,6 +1215,7 @@ function buhkonTalk(n) {
   if (tut === 4) { tutStep(5); return; }
   if (tut < 4) { dialog(STORY.XILIA.tut[tut - 1].map(l => [l[0], l[1]])); return; }
   ask('buhkon', STORY.XILIA.buhkonAfter[Math.floor(Math.random() * STORY.XILIA.buhkonAfter.length)], [
+    { label: SAVE.inv.items.okid ? 'Sing a token' : 'Ask about tokens <em style="color:var(--brass2)">· Dya’Akara</em>', act: () => buhkonTokens() },
     { label: 'Run the dummy drills again', act: () => { enemies.list.filter(e => e.T.disp === 'training' && e.dead).forEach(e => respawnDummy(e, 0)); toast('Buhkon props the dummies back up.', 2); lockMouse(); } },
     { label: 'Goodbye', act: null },
   ]);
@@ -1497,6 +1506,136 @@ const storehouse = REGION === 'xilia' ? (() => {
   if (g.visible) world.col.add(x, z, 3, 2.2, g.rotation.y, y - 1, y + 3.2);
   return g;
 })() : null;
+
+/* ================================================================
+   DYA'AKARA — the token game, played on the ground
+   ================================================================ */
+let dyaMatch = null, dyaOverview = false, dyaRival = null;
+const dyaCam = V3();
+const SPN = id => (window.DYA && DYA.species.get(id) || {}).name || id;
+function dyaRecord(id) { const r = SAVE.dya && SAVE.dya.record[REGION + ':' + id]; return r ? `${r.w}–${r.l}` : 'never played'; }
+function dyaAimPoint() {
+  if (!dyaMatch) return null;
+  const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const plane = new THREE.Plane(V3(0, 1, 0), -dyaMatch.o.planeY), hit = V3();
+  return ray.ray.intersectPlane(plane, hit) ? hit : null;
+}
+function dyaArena() {
+  if (REGION === 'xilia') return { x: world.PLAZA.x, z: world.PLAZA.z, y: world.PLAZA.y, name: 'the market square' };
+  if (REGION === 'leotik' && world.camp) return { x: world.camp.x, z: world.camp.z - 30, y: world.heightAt(world.camp.x, world.camp.z - 30), name: 'the camp green' };
+  return null;
+}
+function dyaChallenge(n) {
+  const R = DYA3.RIVALS[REGION][n.def.id], who = npcSpeaker(n.def);
+  if (!SAVE.dya || !SAVE.dya.pouch.length) { dialog([[who, 'You don’t have any tokens? Come back when you do.']]); return; }
+  ask(who, R.intro, [
+    { label: 'A full match <small>— resources, pulses, steal their Relic</small>', act: () => dyaScale(n, 'standard') },
+    { label: 'A duel <small>— one token each, last one standing</small>', act: () => dyaScale(n, 'duel') },
+    { label: 'Not now', act: null },
+  ]);
+}
+function dyaScale(n, mode) {
+  const who = npcSpeaker(n.def), ar = dyaArena();
+  const near = ar && Math.hypot(P.pos.x - ar.x, P.pos.z - ar.z) < 45;
+  ask(who, `What scale? ${near ? `We’ll play on ${ar.name}.` : 'We’ll play right here.'}`, DYA3.SCALES.map(sc => ({
+    label: `${sc.name} <small>— ${sc.desc}</small>`,
+    act: () => mode === 'duel' ? dyaPickDuel(n, sc) : startDya(n, 'standard', sc),
+  })).concat([{ label: 'Never mind', act: null }]));
+}
+function dyaPickDuel(n, sc) {
+  const toks = SAVE.dya.pouch.map(id => SAVE.dya.tokens[id]).filter(Boolean).slice(0, 8);
+  ask('torcain', 'Which token do I throw?', toks.map(t => ({ label: `${t.name} <small>— ${SPN(t.speciesId)}, ${DYA.species.SIZES[t.sizeIdx]}, ${DYA.species.RARITIES[t.rarity]}</small>`, act: () => startDya(n, 'duel', sc, t.id) })).concat([{ label: 'Never mind', act: null }]));
+}
+function startDya(n, mode, sc, duelTok) {
+  const R = DYA3.RIVALS[REGION][n.def.id];
+  const m = sc.m, ar = dyaArena();
+  const near = ar && Math.hypot(P.pos.x - ar.x, P.pos.z - ar.z) < 45;
+  let origin, yaw, planeY;
+  if (near) {
+    const d = V3(ar.x - P.pos.x, 0, ar.z - P.pos.z); if (d.lengthSq() < 1) d.set(0, 0, -1); d.normalize();
+    yaw = Math.atan2(d.x, d.z); origin = V3(ar.x, 0, ar.z); planeY = ar.y + 0.05;
+    P.pos.copy(origin).addScaledVector(d, -(560 * m + 3)); P.pos.y = world.col.ground(P.pos.x, P.pos.z, planeY + 3);
+  } else {
+    const f = camForward(); yaw = Math.atan2(f.x, f.z);
+    origin = P.pos.clone().addScaledVector(f, 560 * m + 3); planeY = P.pos.y + 0.05;
+  }
+  let myPouch = SAVE.dya.pouch.map(id => SAVE.dya.tokens[id]).filter(Boolean);
+  if (duelTok) myPouch = [SAVE.dya.tokens[duelTok]];
+  const rivalPouch = DYA3.rivalPouch(REGION, n.def.id);
+  dyaRival = { n, home: n.pos.clone(), yaw: n.actor.root.rotation.y };
+  const fwd = V3(Math.sin(yaw), 0, Math.cos(yaw));
+  const spot = origin.clone().addScaledVector(fwd, 560 * m + 4);
+  spot.y = world.col.ground(spot.x, spot.z, planeY + 3);
+  n.pos.copy(spot); n.actor.root.position.copy(spot); n.actor.root.rotation.y = yaw + Math.PI;
+  G.truce = true; G.lock = null; document.body.classList.add('dya-on');
+  CAM.yaw = Math.atan2(-fwd.x, -fwd.z); CAM.wantDist = clamp(6 + 160 * m, 6, 22); CAM.pitch = 0.42;
+  dyaOverview = false;
+  dyaMatch = new DYA3.DyaMatch3D({
+    scene, particles, sfx, toast, bark: msg => bark('phorus', msg, 3),
+    handPos: () => V3(P.pos.x, P.pos.y + 1.5, P.pos.z).addScaledVector(camForward(), 0.5),
+    onEnd: (result, mm) => endDya(result, mm, n, R, mode),
+  }, { mode, scale: sc, origin, yaw, planeY, myName: 'Torcain', myPouch, rival: { name: R.name, skill: R.skill, pouch: rivalPouch, actorPos: () => V3(n.pos.x, n.pos.y + 1.6, n.pos.z) }, terrain: REGION === 'leotik' ? 'forest' : 'plains' });
+  lockMouse();
+  if (!SAVE.flags.dya_hint) { SAVE.flags.dya_hint = true; setTimeout(() => bark('phorus', mode === 'duel' ? 'Duels throw themselves — just watch. Your token can’t touch anyone real.' : 'Q and E to choose, R to ready it with resources, 1–5 to pick it up, then click to throw. Pulses bring resources. Steal their Relic!', 7), 800); }
+}
+function endDya(result, mm, n, R, mode) {
+  if (dyaMatch !== mm) return;
+  mm.dispose(); dyaMatch = null; dyaOverview = false;
+  G.truce = false; document.body.classList.remove('dya-on');
+  if (dyaRival) { n.pos.copy(dyaRival.home); n.actor.root.position.copy(dyaRival.home); n.actor.root.rotation.y = dyaRival.yaw; dyaRival = null; }
+  const who = npcSpeaker(n.def), d = SAVE.dya, key = REGION + ':' + n.def.id;
+  d.record[key] = d.record[key] || { w: 0, l: 0 }; d.played++;
+  const won = result && result.winner === 0, draw = !result || result.winner < 0;
+  const lines = [];
+  if (won) {
+    d.wins++; d.record[key].w++;
+    const shards = Math.round(25 + 70 * R.skill) * (mode === 'duel' ? 1 : 2);
+    G.shards += shards; xp(mode === 'duel' ? 60 : 140);
+    lines.push([who, result.how === 'relic' ? 'You carried my Relic home. …Again! Fine. FINE.' : 'Well played. I’ll get you next time.']);
+    toast(`Dya’Akara — victory · +${shards} shards`, 3.5);
+    if (Math.random() < (mode === 'duel' ? 0.35 : 0.6)) {
+      const sp = R.species[Math.floor(Math.random() * R.species.length)];
+      const tok = DYA3.addToken(d, DYA3.mintToken(sp, (Math.random() * 1e9) >>> 0), d.pouch.length < 25);
+      lines.push([who, `Here — a ${SPN(sp)} token. ${DYA.species.SIZES[tok.sizeIdx] === 'Litk' ? 'A little one, but it’s yours.' : 'Don’t make me regret it.'}`]);
+      setTimeout(() => toast(`New token: ${tok.name} (${DYA.species.SIZES[tok.sizeIdx]} · ${DYA.species.RARITIES[tok.rarity]})`, 3.5), 300);
+    }
+  } else if (draw) { lines.push([who, 'A draw? Nobody wins a draw. Again sometime.']); xp(40); }
+  else { d.losses++; d.record[key].l++; xp(30); lines.push([who, result.how === 'concede' ? 'Giving up already? Ha!' : 'Ha! Your Relic’s mine. Better luck next pulse.']); }
+  persist();
+  dialog(lines);
+}
+function dyaBookData() {
+  if (!SAVE.dya || !window.DYA) return null;
+  const d = SAVE.dya, SP = DYA.species, TK = DYA.token;
+  const toks = Object.values(d.tokens).sort((a, b) => (d.pouch.includes(b.id) - d.pouch.includes(a.id)) || (b.rarity - a.rarity));
+  return {
+    record: `${d.wins} won · ${d.losses} lost`, pouch: d.pouch, okid: !!SAVE.inv.items.okid, singCost: DYA3.SING_COST.shards,
+    ecol: DYA3.ELEMENT_COL,
+    tokens: toks.map(t => ({ id: t.id, name: t.name, species: SPN(t.speciesId), size: SP.SIZES[t.sizeIdx], rarity: SP.RARITIES[t.rarity], element: t.element, hp: t.stats.hp, dmg: t.stats.dmg, speed: t.stats.speed, cost: TK.costVec(t), quirks: (t.quirks || []).map(q => q.name || q.id || q).join(', ') })),
+    singing: DYA3.SINGING.map(r => ({ part: r.part, name: SPN(r.species), have: SAVE.inv.items[r.part] || 0, ok: (SAVE.inv.items[r.part] || 0) > 0 && (SAVE.inv.items.ore || 0) > 0 && G.shards >= DYA3.SING_COST.shards })),
+  };
+}
+function singToken(part) {
+  const r = DYA3.SINGING.find(x => x.part === part);
+  if (!r || !SAVE.inv.items.okid) return;
+  if (!takeAll(SAVE.inv, { [part]: 1, ore: 1 }) ) { toast('You need the part and a lump of stygian ore.', 2); return; }
+  if (G.shards < DYA3.SING_COST.shards) { invAdd(SAVE.inv, part, 1); invAdd(SAVE.inv, 'ore', 1); toast('Not enough shards.', 2); return; }
+  G.shards -= DYA3.SING_COST.shards;
+  const tok = DYA3.addToken(SAVE.dya, DYA3.mintToken(r.species, (Math.random() * 1e9) >>> 0), SAVE.dya.pouch.length < 25);
+  particles.burst(P.pos.x, P.pos.y + 1.4, P.pos.z, 30, { color: 0x9adfff, speed: 4, size: 0.4, life: 0.9, gravity: 1 });
+  sfx.core(); xp(40);
+  toast(`You sing the ${SPN(r.species)}’s song — a ${DYA.species.SIZES[tok.sizeIdx]} ${DYA.species.RARITIES[tok.rarity]} token!`, 3.5);
+  persist();
+}
+function buhkonTokens() {
+  if (SAVE.inv.items.okid) { openBook('tokens'); return; }
+  dialog([
+    ['buhkon', 'Tokens. I wondered when you’d ask. You’ve carried those since Velki — don’t look at me like that, I know a pocketful of tokens when I hear one.'],
+    ['buhkon', 'A token is a creature’s truth. One creature — not the kind, the individual. Sing its song while you pour a little liquid stygian into a piece of it, inside an Okid’Relic, and the Relic keeps what it was.'],
+    ['buhkon', 'Here. My old Okid’Relic. A shaving from a sleeping Punk, a tuft of Kipsu fluff, an ember — and a lump of stygian ore. Most songs come out small. A big one is a rare thing.'],
+    ['buhkon', 'And go and lose to Venkin a few times. He’s been unbearable all summer.'],
+  ], () => { invAdd(SAVE.inv, 'okid', 1); lootToast('okid', 1); xp(30); persist(); openBook('tokens'); });
+}
 
 function setSail() {
   dialog(STORY.DIALOG2.setSail, () => {
@@ -1871,9 +2010,10 @@ function toggleJournal() {
   } else { j.classList.add('hidden'); G.paused = false; lockMouse(); }
 }
 $('btn-jclose').onclick = () => { toggleJournal(); };
-function openPause() { if (overlayOpen()) return; G.paused = true; $('pause').classList.remove('hidden'); }
+function openPause() { if (overlayOpen()) return; G.paused = true; $('pause').classList.remove('hidden'); $('btn-concede').style.display = dyaMatch ? '' : 'none'; }
 function closePause() { $('pause').classList.add('hidden'); G.paused = false; lockMouse(); }
 $('btn-resume').onclick = closePause;
+$('btn-concede').onclick = () => { if (dyaMatch) dyaMatch.concede(); closePause(); };
 $('btn-journal').onclick = () => { $('pause').classList.add('hidden'); G.paused = false; toggleJournal(); };
 function bindOpt(id, key, apply, isBool) {
   const el = $(id);
@@ -1994,6 +2134,7 @@ function npcTalk(n) {
       else opts.push({ label: `About “${q.name}”`, act: () => { n.talking = 3; dialog(q.wait.map(l => [who, l]), () => npcTalk(n)); } });
     }
   }
+  if (DYA3.engineReady() && DYA3.RIVALS[REGION] && DYA3.RIVALS[REGION][def.id]) opts.push({ label: `Play Dya’Akara <em style="color:var(--brass2)">· ${dyaRecord(def.id)}</em>`, act: () => dyaChallenge(n) });
   if (def.roles.includes('shop')) opts.push({ label: 'Trade', act: () => openBook('shop') });
   if (def.roles.includes('forge')) {
     const ok = REGION !== 'xilia' || SAVE.quests.q_ore === 'done';
@@ -2070,6 +2211,7 @@ function petCreature(e) {
   sfx.heal();
   if (P.hp < P.maxHp) { P.hp = Math.min(P.maxHp, P.hp + 6); }
   if (e.kind === 'kipsu_f' && Math.random() < 0.5) { invAdd(SAVE.inv, 'fluff', 1); lootToast('fluff', 1); }
+  if (e.kind === 'punk_d' && Math.random() < 0.4) { invAdd(SAVE.inv, 'shaving', 1); lootToast('shaving', 1); }
   bark('phorus', e.kind === 'kipsu_f' ? 'It likes you. They can tell, you know.' : 'Gentle as anything. Ruut’s herd, probably.', 2.5);
 }
 
@@ -2307,6 +2449,13 @@ function bookAct(act, arg) {
   if (act === 'equip') { inv.axe = arg; restyleAxe(); sfx.ui(); }
   else if (act === 'trinket') { if (inv.trinkets.length >= 2) inv.trinkets.shift(); inv.trinkets.push(arg); sfx.ui(); }
   else if (act === 'untrinket') { inv.trinkets = inv.trinkets.filter(t => t !== arg); }
+  else if (act === 'pouch') {
+    const d = SAVE.dya; if (!d) return;
+    const i = d.pouch.indexOf(arg);
+    if (i >= 0) { if (d.pouch.length <= 1) toast('Keep at least one token in your pouch.', 2); else d.pouch.splice(i, 1); }
+    else if (d.pouch.length >= 25) toast('Your pouch is full (25).', 2);
+    else d.pouch.push(arg);
+  } else if (act === 'sing') { singToken(arg); }
   else if (act === 'use') {
     const it = ITEMS[arg];
     if (arg === 'k_scroll_pull') { learnSpell('pull'); delete inv.items[arg]; }
@@ -2379,6 +2528,7 @@ book = createRpgUI({
   save: () => SAVE, shards: () => G.shards, fx: () => FX, player: () => P, perkDmg: () => (perk('heavy') ? 1.15 : 1) * (1 + 0.12 * rank('edge')),
   region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
   mainObjective: () => $('q-text').textContent,
+  dya: () => dyaBookData(),
   bounty: () => SAVE.bounty && { ...SAVE.bounty, name: beastName(SAVE.bounty.kind), got: bountyProgress(SAVE.bounty, SAVE) },
   amulets: () => ({ got: SAVE.amulets || 0, total: AMULET_TOTAL, next: AMULET_TIERS.find(t => t.n > (SAVE.amulets || 0)) }),
   beasts: () => Object.entries(STORY.BEASTS).map(([k, [name, lore]]) => ({ k, name, lore, kills: SAVE.killsBy[k] || 0, seen: !!(SAVE.killsBy[k] || F_['seen_' + k] || SAVE.codex['beast_' + k]), at: studyAt(k), studied: studied(k) })),
@@ -2666,6 +2816,13 @@ function updateCamera(dt) {
   const s = G.shake * G.shake * 0.5;
   camera.position.set(CAM.pos.x + (Math.random() - 0.5) * s, CAM.pos.y + (Math.random() - 0.5) * s, CAM.pos.z + (Math.random() - 0.5) * s);
   camera.lookAt(look);
+  if (dyaMatch && dyaOverview) {
+    const c = dyaMatch.toWorld(800, 500), m = dyaMatch.m;
+    const back = dyaMatch.toWorld(80, 500);
+    const want2 = V3(back.x, c.y + 900 * m, back.z);
+    dyaCam.lerp(want2, 1 - Math.exp(-4 * dt));
+    camera.position.copy(dyaCam); camera.lookAt(c);
+  } else if (dyaMatch) dyaCam.copy(camera.position);
 }
 
 let introT = 0;
@@ -2777,6 +2934,7 @@ function frame() {
       updateTrials(dt);
       updateDialog(dt);
       updateCamera(dt);
+      if (dyaMatch) { dyaMatch.update(dt, G.t); dyaMatch.updateAim(dyaAimPoint()); dyaMatch.placeBars(camera); }
       checkLocations();
       if (REGION === 'xilia') {
         if (F_.tut === 3 && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
@@ -2946,5 +3104,5 @@ else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add(
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

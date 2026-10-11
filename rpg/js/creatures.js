@@ -8,7 +8,8 @@
             paralyses; on Leotik a poison has turned the film toxic.
    DUSKARETH VEL — Eikar of the Duskareth who throw things out of
             the Duat with precision.
-   TYNDAEL — a spark of fire with legs; spits burning venom.
+   TYNDAEL — a hovering spark of fire with orange-to-violet wings;
+            its breath leaves the ground burning.
    SRU VORN — long, low, heavy; matted fur armour, tusks, a spiked
             ball tail, and acid saliva.
    THE MALSTI LORD — the fist-sized Punk that carried the lord of
@@ -181,39 +182,73 @@ export function buildVel() {
   return a;
 }
 
-/* ---------------- TYNDAEL ---------------- */
+/* ---------------- TYNDAEL ----------------
+   Tynde (spark) + Ael (fire): a hovering ball of flame with two
+   flapping wings that run orange to pink to violet, a crown of
+   flame that grows with its heat, two dark eyes, no mouth, and two
+   thin legs that dangle and never touch the ground. */
 export function buildTyndael() {
   const root = new THREE.Group();
-  const coal = mat(0x2a1a14, { emissive: 0x3a0a00 });
-  const fin = new THREE.MeshToonMaterial({ color: 0xff7a2a, emissive: 0xff4a10, emissiveIntensity: 0.9, gradientMap: ramp() });
-  const body = new THREE.Group(); body.position.y = 0.55; root.add(body);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.8, 4, 8), coal); torso.rotation.x = Math.PI / 2; body.add(torso);
-  for (let i = 0; i < 5; i++) {
-    const f = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.4 - i * 0.04, 4), fin); f.position.set(0, 0.3, 0.35 - i * 0.2); body.add(f);
+  const hover = new THREE.Group(); hover.position.y = 1.5; root.add(hover);
+  const coal = new THREE.MeshToonMaterial({ color: 0xffb030, gradientMap: ramp(), emissive: 0xff6a10, emissiveIntensity: 0.9 });
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), coal); hover.add(core);
+  const inner = glowSprite(0xfff3c8, 1.4, 0.85); hover.add(inner);
+  const halo = glowSprite(0xff7a1a, 3.2, 0.45); hover.add(halo);
+  // eyes — two dark dots, no mouth
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x2a1005 });
+  for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), eyeMat); e.position.set(s * 0.14, 0.06, 0.39); e.userData.noOutline = true; hover.add(e); }
+  // the flame crown
+  const crown = [];
+  for (let i = 0; i < 7; i++) {
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.5, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL((20 + i * 5) / 360, 0.95, 0.6), transparent: true, opacity: 0.9 }));
+    const a = (i / 7) * TAU; f.position.set(Math.cos(a) * 0.16, 0.42, Math.sin(a) * 0.16); f.rotation.set(Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35);
+    f.userData.noOutline = true; hover.add(f); crown.push(f);
   }
-  const head = new THREE.Group(); head.position.set(0, 0.1, 0.65); body.add(head);
-  const skull = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 6), coal); skull.rotation.x = Math.PI / 2; skull.position.z = 0.15; head.add(skull);
-  for (const s of [-1, 1]) { const e = glowSprite(0xffd040, 0.3, 1); e.position.set(s * 0.12, 0.1, 0.1); head.add(e); }
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.15, 1.0, 6), coal); tail.rotation.x = -Math.PI / 2; tail.position.z = -0.85; body.add(tail);
-  const ember = glowSprite(0xff7a2a, 1.6, 0.5); ember.position.y = 0.4; body.add(ember);
+  // wings with an orange → pink → violet gradient
+  const wingGeo = (() => {
+    const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(0.7, 0.75, 1.55, 0.35); sh.quadraticCurveTo(1.1, -0.05, 1.3, -0.35); sh.quadraticCurveTo(0.6, -0.2, 0, -0.15);
+    const g = new THREE.ShapeGeometry(sh, 10);
+    const pos = g.attributes.position, cols = [];
+    const c0 = new THREE.Color(0xff7a1a), c1 = new THREE.Color(0xe84a8a), c2 = new THREE.Color(0x7a4ae8), c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) { const t = Math.min(1, pos.getX(i) / 1.5); if (t < 0.5) c.copy(c0).lerp(c1, t * 2); else c.copy(c1).lerp(c2, (t - 0.5) * 2); cols.push(c.r, c.g, c.b); }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    return g;
+  })();
+  const wingMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
+  const wings = [];
+  for (const s of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.position.set(s * 0.25, 0.08, -0.05); hover.add(pivot);
+    const w = new THREE.Mesh(wingGeo, wingMat); w.scale.x = s; w.rotation.x = -Math.PI / 2 + 0.2; w.userData.noOutline = true; pivot.add(w);
+    wings.push(pivot);
+  }
+  // two thin dangling legs
+  const legMat = toon(0xff8a2a);
   const legs = [];
-  [[-0.25, 0.3], [0.25, 0.3], [-0.25, -0.3], [0.25, -0.3]].forEach(([x, z]) => {
-    const l = leg(0.4, 0.06, coal); l.position.set(x, 0.45, z); l.rotation.z = x > 0 ? -0.5 : 0.5; root.add(l); legs.push(l);
-  });
-  finish(root, 0.03);
-  root.scale.setScalar(1.1);
+  for (const s of [-1, 1]) {
+    const l = new THREE.Group(); l.position.set(s * 0.12, -0.36, 0); hover.add(l);
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, 0.55, 5), legMat); seg.position.y = -0.27; l.add(seg);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), legMat); foot.position.y = -0.55; l.add(foot);
+    legs.push(l);
+  }
+  finish(root, 0.025);
   let ph = Math.random() * 6;
+  const fin = coal;   // kept for callers that brighten the fire on wind-up
   return {
     root, mats: [coal], fin,
     animate(dt, st) {
-      ph += dt * (4 + st.speed * 3);
-      legs.forEach((l, i) => { l.rotation.x = st.speed > 0.3 ? Math.sin(ph + i * 1.5) * 0.6 : 0; });
-      body.rotation.y = st.speed > 0.3 ? Math.sin(ph) * 0.15 : 0;
-      head.rotation.x = -(st.windup || 0) * 0.5;
-      ember.material.opacity = 0.4 + Math.sin(st.t * 10) * 0.1 + (st.windup || 0) * 0.5;
-      fin.emissiveIntensity = 0.8 + (st.windup || 0);
+      ph += dt * 7;
+      const heat = 0.5 + (st.windup || 0) * 0.5 + (st.attack || 0) * 0.3;
+      hover.position.y = 1.5 + Math.sin(st.t * 2.4 + ph * 0.1) * 0.12;
+      wings.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * Math.sin(ph) * 0.55; });
+      legs.forEach((l, i) => { l.rotation.x = Math.sin(st.t * 3 + i) * 0.25 + (st.speed > 0.3 ? -0.5 : 0); });
+      crown.forEach((f, i) => { const k = 0.6 + heat * 0.9 + Math.sin(st.t * 14 + i * 1.7) * 0.15; f.scale.set(1, k, 1); });
+      core.scale.setScalar(1 + Math.sin(st.t * 11) * 0.04);
+      inner.material.opacity = 0.7 + Math.sin(st.t * 9) * 0.15;
+      halo.material.opacity = 0.3 + heat * 0.3;
+      hover.rotation.x = -(st.windup || 0) * 0.4;
+      coal.emissiveIntensity = 0.8 + heat * 0.6;
     },
-    flash(v) { coal.emissive.setRGB(v + 0.23, v * 0.9 + 0.04, v * 0.8); },
+    flash(v) { coal.emissive.setRGB(1, 0.42 + v * 0.5, 0.06 + v * 0.8); },
   };
 }
 
@@ -288,11 +323,6 @@ export function buildMalstiLord() {
   const capM = mat(0x3a2414);
   const cap = new THREE.Mesh(new THREE.SphereGeometry(1.6, 18, 10, 0, TAU, 0, Math.PI / 2), capM); cap.position.y = 2.2; cap.scale.y = 0.7; body.add(cap);
   const crown = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.18, 6, 24), mat(0xd8a840, { emissive: 0x5a3a00 })); crown.rotation.x = Math.PI / 2; crown.position.y = 2.25; body.add(crown);
-  const eyeM = new THREE.MeshBasicMaterial({ color: 0xe0a8ff });
-  for (const s of [-1, 1]) {
-    const e = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.7, 3), eyeM); e.rotation.x = Math.PI / 2; e.rotation.y = s * 0.2; e.position.set(s * 0.95, 0.5, 2.7); e.userData.noOutline = true; body.add(e);
-  }
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.35, 0.2), eyeM); mouth.position.set(0, -0.6, 2.75); mouth.userData.noOutline = true; body.add(mouth);
   const glow = glowSprite(0xb070ff, 12, 0.45); body.add(glow);
   // vine tentacles
   const arms = [];

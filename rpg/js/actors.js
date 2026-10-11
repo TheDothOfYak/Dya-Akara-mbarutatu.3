@@ -281,15 +281,7 @@ export function buildPunk(malsti = false, opts = {}) {
   const pump = new THREE.Mesh(pumpkinGeo(0.75, malsti ? 5 : 6), bodyMat); body.add(pump);
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 0.4, 6), toon(malsti ? 0x2a1a3a : 0x4a5a1a)); stem.position.y = 0.66; stem.rotation.z = 0.4; body.add(stem);
   const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), vineMat); leaf.scale.set(1.4, 0.2, 0.8); leaf.position.set(0.18, 0.68, 0); body.add(leaf);
-  // a face of embers
-  const eyeCol = malsti ? 0xd08aff : tame ? 0xfff2c0 : 0xffd040;
-  const eyeMat = new THREE.MeshBasicMaterial({ color: eyeCol });
-  for (const s of [-1, 1]) {
-    const e = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.18, 3), eyeMat); e.rotation.x = Math.PI / 2; e.rotation.y = s * 0.2;
-    e.position.set(s * 0.24, 0.12, 0.68); e.userData.noOutline = true; body.add(e);
-  }
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.05), eyeMat); mouth.position.set(0, -0.14, 0.7); mouth.userData.noOutline = true; body.add(mouth);
-  const eyeGlow = glowSprite(eyeCol, 1.0, 0.6); eyeGlow.position.set(0, 0.05, 0.72); body.add(eyeGlow);
+  // Punks have no face — just the pumpkin, the stem and the vines
   // vine legs and arms
   const legs = [];
   for (let i = 0; i < 4; i++) {
@@ -329,7 +321,6 @@ export function buildPunk(malsti = false, opts = {}) {
       body.scale.set(1 + wind * 0.15, 1 - wind * 0.15, 1 + wind * 0.15);
       body.rotation.x = -wind * 0.3 + atk * 0.5;
       arms.forEach((a, i) => { a.rotation.x = -wind * 1.2 + atk * 1.4 + Math.sin(ph + i * 3) * 0.2; });
-      eyeGlow.material.opacity = 0.5 + wind * 0.5;
       if (aura) aura.material.opacity = 0.25 + Math.sin(st.t * 5) * 0.1;
     },
     flash(v) { bodyMat.emissive.setRGB(v + (malsti ? 0.16 : 0), v * 0.9, v * 0.8 + (malsti ? 0.29 : 0)); },

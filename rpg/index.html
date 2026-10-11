@@ -269,6 +269,35 @@
   #levelup{position:absolute;top:30%;left:0;right:0;text-align:center;font-family:var(--display);font-size:clamp(26px,4vw,44px);color:#e0c8ff;text-shadow:0 0 24px #7a3cff,0 3px 0 #000;opacity:0;transition:opacity .6s;letter-spacing:.14em}
   #levelup.show{opacity:1}
   @media (max-width:760px){ #quest{width:220px} .bar{width:180px} .bar.thin{width:150px} #abilities{transform:scale(.8);transform-origin:bottom right} }
+
+  /* ---------- Dya'Akara, in the world ---------- */
+  #dya-hud{position:fixed;inset:0;pointer-events:none;z-index:6;font-family:var(--serif,Georgia,serif);color:#f4e6c6}
+  #dya-hud .dh-top{position:absolute;top:58px;left:50%;transform:translateX(-50%);text-align:center;background:rgba(10,14,30,.72);border:1px solid #b8964a;border-radius:10px;padding:6px 14px;min-width:360px}
+  #dya-hud .dh-title{font-family:var(--display,Georgia);letter-spacing:.06em;font-size:14px;color:#f3cf7a}
+  #dya-hud .dh-res{display:flex;gap:10px;justify-content:center;margin-top:4px;font-size:12px}
+  #dya-hud .dh-r{display:flex;align-items:center;gap:4px}
+  #dya-hud .dh-r b{display:inline-block;min-width:20px;padding:0 5px;border-radius:5px;background:var(--c);color:#111;font-size:13px}
+  #dya-hud .dh-pulse{height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin-top:6px;overflow:hidden}
+  #dya-hud .dh-pulse i{display:block;height:100%;background:#9adfff;width:0}
+  #dya-hud .dh-feed{position:absolute;top:150px;left:50%;transform:translateX(-50%);font-size:13px;text-align:center;text-shadow:0 1px 3px #000;opacity:.9}
+  #dya-hud .dh-slots{position:absolute;bottom:150px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+  #dya-hud .dh-slot{background:rgba(10,14,30,.75);border:1px solid #6a5a3a;border-radius:7px;padding:4px 9px;font-size:13px}
+  #dya-hud .dh-slot.on{border-color:#ffd27a;box-shadow:0 0 10px #ffd27a88}
+  #dya-hud .dh-slot.wait{opacity:.55}
+  #dya-hud .dh-slot kbd{background:#d9b87a;color:#111;border-radius:4px;padding:0 5px;margin-right:6px;font-size:11px}
+  #dya-hud .dh-pouch{position:absolute;bottom:62px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:flex-end}
+  #dya-hud .dh-card{width:118px;background:rgba(10,14,30,.8);border:1px solid #6a5a3a;border-radius:8px;padding:6px 8px;font-size:12px;display:flex;flex-direction:column;gap:2px;opacity:.75}
+  #dya-hud .dh-card.on{border-color:#ffd27a;opacity:1;transform:translateY(-8px);box-shadow:0 0 12px #ffd27a66}
+  #dya-hud .dh-card.used{filter:grayscale(.7)}
+  #dya-hud .dh-card b{font-size:13px;color:#f3cf7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #dya-hud .dh-card small{opacity:.75}
+  #dya-hud .dh-card i{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 2px 0 4px;vertical-align:middle}
+  #dya-hud .dh-card em{color:#ff9a8a;font-style:normal}
+  #dya-hud .dh-card u{text-decoration:none;color:#9adfff;font-size:11px}
+  #dya-hud .dh-help{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:12px;opacity:.75;text-shadow:0 1px 3px #000;white-space:nowrap}
+  #dya-hud .dh-hp{position:absolute;width:44px;height:5px;margin-left:-22px;background:rgba(0,0,0,.5);border:1px solid;border-radius:3px;overflow:hidden}
+  #dya-hud .dh-hp i{display:block;height:100%;background:#9aff9a}
+  body.dya-on #abilities, body.dya-on #spells{opacity:.2}
 </style>
 </head>
 <body>
@@ -369,7 +398,7 @@
     <div class="row"><span>Glow (bloom)</span><input type="checkbox" id="opt-bloom" checked></div>
     <div class="row"><span>Shadows</span><input type="checkbox" id="opt-shadows" checked></div>
     <div class="row"><span>Render scale</span><input type="range" id="opt-scale" min="0.5" max="1" step="0.05" value="1"></div>
-    <div class="btn-row"><button class="btn" id="btn-resume">Resume</button><button class="btn ghost" id="btn-journal">Rokarvac</button><a class="btn ghost" href="../index.html">Quit</a></div>
+    <div class="btn-row"><button class="btn" id="btn-resume">Resume</button><button class="btn ghost" id="btn-journal">Rokarvac</button><button class="btn ghost" id="btn-concede" style="display:none">Concede the match</button><a class="btn ghost" href="../index.html">Quit</a></div>
   </div>
 </div>
 
@@ -438,6 +467,16 @@
 
 <!-- the main game's online settings (Supabase url + public key) -->
 <script src="../js/config.js"></script>
+<!-- the Dya'Akara match engine, shared with the 2D game -->
+<script>window.DYA = window.DYA || {}; window.DYA.audio = window.DYA.audio || { play() {}, stop() {} };</script>
+<script src="../js/core/util.js"></script>
+<script src="../js/data/species.js"></script>
+<script src="../js/data/economy.js"></script>
+<script src="../js/data/lore.js"></script>
+<script src="../js/data/abilities.js"></script>
+<script src="../js/core/token.js"></script>
+<script src="../js/engine/behaviors.js"></script>
+<script src="../js/engine/match.js"></script>
 <script type="importmap">
 { "imports": {
   "three": "./vendor/three.module.min.js",
