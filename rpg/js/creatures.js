@@ -288,11 +288,6 @@ export function buildMalstiLord() {
   const capM = mat(0x3a2414);
   const cap = new THREE.Mesh(new THREE.SphereGeometry(1.6, 18, 10, 0, TAU, 0, Math.PI / 2), capM); cap.position.y = 2.2; cap.scale.y = 0.7; body.add(cap);
   const crown = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.18, 6, 24), mat(0xd8a840, { emissive: 0x5a3a00 })); crown.rotation.x = Math.PI / 2; crown.position.y = 2.25; body.add(crown);
-  const eyeM = new THREE.MeshBasicMaterial({ color: 0xe0a8ff });
-  for (const s of [-1, 1]) {
-    const e = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.7, 3), eyeM); e.rotation.x = Math.PI / 2; e.rotation.y = s * 0.2; e.position.set(s * 0.95, 0.5, 2.7); e.userData.noOutline = true; body.add(e);
-  }
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.35, 0.2), eyeM); mouth.position.set(0, -0.6, 2.75); mouth.userData.noOutline = true; body.add(mouth);
   const glow = glowSprite(0xb070ff, 12, 0.45); body.add(glow);
   // vine tentacles
   const arms = [];
