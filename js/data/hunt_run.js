@@ -152,7 +152,7 @@
       id: 'velki', name: 'Velki', theme: 'Su',
       blurb: 'Drowned coasts and tide-caves. The water remembers everyone who wades in.',
       nodes: 5,
-      enemyPool: ['raf_krabbi', 'harkal', 'su_grothyn', 'mirrordew', 'hvaleia'],
+      enemyPool: ['raf_krabbi', 'harkal', 'su_grothyn', 'hvaleia'],
       guardian: {
         species: 'su_naga', rarity: 6, name: 'Vaelmyr, the Tidewyrm',
         blurb: 'A Su Naga swollen to legend in the deep — its first head near-unkillable, and it never stops calling the shoals.',

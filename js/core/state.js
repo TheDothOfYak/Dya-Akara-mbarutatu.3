@@ -253,6 +253,7 @@
     if (isMe && DYA.accountCloud && DYA.accountCloud.pushNow) DYA.accountCloud.pushNow(local);
     if (DYA.ui) { if (DYA.ui.refreshTopbar) DYA.ui.refreshTopbar(); if (DYA.ui.refreshCurrent) DYA.ui.refreshCurrent(); }
     if (isMe && G.notify) G.notify({ type: 'system', title: 'Account updated', body: 'The Dya Guild made a change to your account.', icon: '⚖️' });
+    purgeAccountRetired(local);
     return true;
   };
 
@@ -391,7 +392,7 @@
       if (!seller || seller.ai) delete G.world.market.listings[l.id];
     });
     /* install the shared AI accounts + their listings */
-    Object.values(snap.accounts || {}).forEach(a => { a.ai = true; G.world.accounts[a.id] = a; });
+    Object.values(snap.accounts || {}).forEach(a => { a.ai = true; purgeAccountRetired(a); G.world.accounts[a.id] = a; });
     Object.values((snap.market && snap.market.listings) || {}).forEach(l => { if (G.world.accounts[l.sellerId]) G.world.market.listings[l.id] = l; });
     if (snap.elbergiId) G.world.elbergiId = snap.elbergiId;
     G.world.adminWorldRev = snap.rev || 0;
@@ -461,7 +462,8 @@
       /* pull any market listings of species the organizer has since marked
          unobtainable, so a disabled species can't linger for sale */
       const pulled = G.delistUnobtainable();
-      if (trimmed || pulled) store.save(G.world);
+      const purged = G.purgeRetired();
+      if (trimmed || pulled || purged) store.save(G.world);
     }
     /* self-heal: if a prior wipe (or an adopted empty shared snapshot) left the
        AI world empty, regenerate the Dya'kukull so the world is never a ghost
@@ -469,6 +471,25 @@
     G.ensureAiPopulation();
     return G.world;
   };
+
+  /* species taken out of the game (Ember Root, Mirrordew, Stonefruit): their
+     tokens leave every account, pouch and market listing */
+  function purgeAccountRetired(a) {
+    if (!a || !a.tokens) return false;
+    const gone = Object.keys(a.tokens).filter(id => { const t = a.tokens[id]; const sp = t && SP.get(t.speciesId); return !t || (sp && sp.retired); });
+    if (!gone.length) return false;
+    gone.forEach(id => { delete a.tokens[id]; });
+    (a.pouches || []).forEach(p => { if (Array.isArray(p.tokenIds)) p.tokenIds = p.tokenIds.filter(id => !gone.includes(id)); });
+    return true;
+  }
+  G.purgeRetired = function () {
+    let changed = false;
+    Object.values(G.world.accounts || {}).forEach(a => { changed = purgeAccountRetired(a) || changed; });
+    const L = (G.world.market && G.world.market.listings) || {};
+    Object.values(L).forEach(l => { const seller = G.world.accounts[l.sellerId]; if (seller && l.tokenId && !(seller.tokens || {})[l.tokenId]) { delete L[l.id]; changed = true; } });
+    return changed;
+  };
+  G.purgeAccountRetired = purgeAccountRetired;
 
   function freshWorld() {
     const rng = new U.Rng(20260607);
@@ -693,6 +714,7 @@
      as it did against a local-only world. Without online configured,
      accounts stay local to this device/browser only, as before. */
   function installAccount(acc, email) {
+    purgeAccountRetired(acc);
     /* drop any stale local-only duplicate of this email under a
        different id (e.g. this device's own pre-cloud copy) */
     Object.keys(G.world.accounts).forEach(id => {

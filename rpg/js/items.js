@@ -19,6 +19,7 @@ export const ITEMS = {
   seed: { name: 'Fire seed', kind: 'mat', icon: '🔥', value: 25, desc: 'A seed of an Eldi Aagac. Hot to the touch.' },
   ember: { name: 'Tyndael ember', kind: 'mat', icon: '✴', value: 9, desc: 'Still glowing.' },
   tusk: { name: 'Sru Vorn tusk', kind: 'mat', icon: '🦷', value: 60, desc: 'Long as your arm. Acid-etched.' },
+  skor_rind: { name: 'Skor’Thal’s rind', kind: 'mat', icon: '🟤', value: 0, desc: 'A scarred curl of rind the great old Punk let fall beside you. Sing it in an Okid’Relic.' },
   shaving: { name: 'Punk shaving', kind: 'mat', icon: '🎃', value: 8, desc: 'A curl of rind from a sleeping domestic Punk. Calm and content.' },
   stem: { name: 'Malsti stem', kind: 'mat', icon: '🟣', value: 12, desc: 'A Malsti Punk’s stem. It flickers half into the Duat.' },
   knife: { name: 'Duat knife', kind: 'mat', icon: '🗡', value: 20, desc: 'A Vel’s throwing knife. It shivers when you hold it.' },
@@ -47,7 +48,7 @@ export const ITEMS = {
   t_ring: { name: 'Hurst ring', kind: 'trinket', icon: '💍', value: 140, desc: '+25 maximum health.', perk: { hp: 25 } },
   t_knot: { name: 'Farmer’s knot', kind: 'trinket', icon: '🪢', value: 110, desc: 'Teodr’s lucky knot. Take 8% less damage.', perk: { armor: 0.92 } },
   t_compass: { name: 'Bosk’s compass', kind: 'trinket', icon: '🧭', value: 120, desc: 'It never points north. +15% experience.', perk: { xp: 1.15 } },
-  t_oath: { name: 'Broken oath-ring', kind: 'trinket', icon: '⭕', value: 220, desc: 'Cut from Thornback’s vines. +10% damage, heat builds 20% faster.', perk: { dmg: 1.1, heat: 1.2 } },
+  t_oath: { name: 'Broken oath-ring', kind: 'trinket', icon: '⭕', value: 220, desc: 'The lord’s ring, grown into Skor’Thal’s vines and given freely. +10% damage, heat builds 20% faster.', perk: { dmg: 1.1, heat: 1.2 } },
   t_sniller: { name: 'Sniller’s eye', kind: 'trinket', icon: '🔷', value: 150, desc: 'A cold teal gem that hums. Nur’Hlyst reaches 60% farther; +10% shards.', perk: { hlyst: 1, shards: 1.1 } },
   t_ver: { name: 'Ver’s eye', kind: 'trinket', icon: '👁', value: 160, desc: 'Spells recover 20% faster.', perk: { cd: 0.8 } },
 

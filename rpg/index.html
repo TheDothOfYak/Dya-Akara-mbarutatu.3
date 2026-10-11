@@ -298,6 +298,9 @@
   #dya-hud .dh-hp{position:absolute;width:44px;height:5px;margin-left:-22px;background:rgba(0,0,0,.5);border:1px solid;border-radius:3px;overflow:hidden}
   #dya-hud .dh-hp i{display:block;height:100%;background:#9aff9a}
   body.dya-on #abilities, body.dya-on #spells{opacity:.2}
+  /* the Kahizecvar: a golden memory */
+  body.in-memory::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse at center,rgba(255,226,160,0) 45%,rgba(255,200,110,.35) 80%,rgba(120,80,20,.55) 100%);mix-blend-mode:screen}
+  body.in-memory #game{filter:sepia(.35) saturate(1.2) brightness(1.06)}
 </style>
 </head>
 <body>

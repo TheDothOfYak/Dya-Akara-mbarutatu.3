@@ -564,14 +564,21 @@ export function buildWorld(scene) {
     { at: [40, 100], kinds: ['rodak', 'rodak'] },
     { at: [-60, -30], kinds: ['malsti', 'malsti'] },
     { at: [60, 60], kinds: ['kofi', 'kofi'] }, { at: [-90, 50], kinds: ['kofi', 'kofi', 'kofi'] }, { at: [20, -90], kinds: ['kofi', 'kofi'] },
-    // the Old Punk, in the far north wood
-    { at: [-22, -132], kinds: ['punk_alpha'], unique: 'thornback', extra: { scale: 1.35 } },
+    // the Rodak that shadow Skor'Thal around its den in the far north wood
+    { at: [-14, -122], kinds: ['rodak', 'rodak', 'rodak'], tag: 'skorden' },
+    { at: [-32, -126], kinds: ['rodak', 'rodak', 'punk'], tag: 'skorden' },
   ];
 
   let time = 0;
   return {
     name: 'aakalay', hazards: [], pillars: [], camp: null,
-    thornback: { x: -22, z: -132 },
+    skorthal: { x: -22, z: -136 },
+    /* where Skor'Thal has rubbed its rind — only Nur'Hlyst shows them */
+    scars: [
+      { id: 'scar_1', x: 46, z: 106 },
+      { id: 'scar_2', x: -66, z: -36 },
+      { id: 'scar_3', x: -8, z: -98 },
+    ],
     pages: [
       { id: 'page_1', x: SITES.library.x + 6, z: SITES.library.z - 8 },
       { id: 'page_2', x: SITES.tower.x - 8, z: SITES.tower.z + 8 },

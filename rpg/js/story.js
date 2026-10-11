@@ -154,28 +154,36 @@ export const DIALOG = {
     ['phorus', 'This is it. Can you feel it pulling? It wants the cores. It wants anything that remembers.'],
     ['torcain', 'Then let’s give it something to remember.'],
   ],
+  /* the Kahizecvar: the Oath Stone drinks the cores, and Torcain lives the duel */
+  tranceIn: [
+    ['phorus', 'The stone’s drinking them — all five. Torcain, the cores are pulling at you. This is it. The Kahizecvar.'],
+    ['torcain', 'Then let it take me.'],
+    ['phorus', 'I’ll be right here. If you drool, I’m telling everyone.'],
+  ],
+  tranceCards: [
+    'Kahizecvar.',
+    'The ruin falls away. Aakalay is shining — every street scrubbed clean, every window dark, every soul silent.',
+    'You are not Torcain. You are Kiet, at the end of the Era of the Nekh’Vorran, and Kireo’Nik is circling overhead.',
+    'In the plaza, beside the stone that drinks oaths, the Master of the Keep is waiting.',
+  ],
   bossRise: [
-    ['phorus', 'The ground — Torcain, get back!'],
-    ['phorus', 'That’s no tree. That’s a Hurst forced into bark — a Megla Aagac, grown out of whoever swore this city away!'],
-    ['torcain', 'The lord of Aakalay. Still holding on to his oaths.'],
-    ['phorus', 'Then cut them. Its heart is the glowing knot in the trunk. I’ll keep its little ones off you!'],
+    ['memory', 'Otlið, Master of the Keep. A Keilia, tall as a door, with the Oath Stone’s light running through his scales.'],
+    ['memory', '“No able-bodied man walks my city without swearing to me first, nekhic. Kneel, or be sworn.”'],
+    ['memory', 'Kiet laughs, and rips the Duat open beside him. This is a duel, and the whole city is watching from behind its shutters.'],
   ],
   bossHalf: [
-    ['phorus', 'It’s angry now — watch the roots, they’re coming faster!'],
+    ['memory', 'Otlið calls on the oaths of every soul in the city — golden rings close around you. Don’t let them bind.'],
   ],
   bossDown: [
-    ['phorus', 'It’s… quiet. The mist is going still.'],
-    ['torcain', 'The cores are still singing. Louder.'],
-    ['phorus', 'They want to show you something. Noka told us about this — the Kahizecvar. A trance. It could take a while.'],
-    ['torcain', 'Do it.'],
-    ['phorus', 'If you drool, I’m telling everyone.'],
+    ['memory', 'Otlið falls to one knee. The oaths snap like strings — all over the city, people breathe at once.'],
+    ['memory', 'And from where he fell, something dark puts down a root. A Duat seedling. Something small and violet scuttles off with his memory in its stem.'],
   ],
   wake: [
     ['phorus', 'There you are. A fortnight and some change, by my count. I put you in water, like Noka said to — sorry about the stygian in it.'],
     ['torcain', 'I saw it, Phorus. All of it. From every one of them.'],
     ['torcain', 'An Eikar named Kiet, and his Dya’Can, on a great Nekh’Vorran — Kireo’Nik. They came to duel the Master of the Keep. They broke the stone’s hold.'],
     ['torcain', 'But the Master got out. Changed. A Keilia — the cores have his name cut out of them. Kiet’s people called him Otlið.'],
-    ['phorus', 'And the Duat seedling that grew where he fell. The Megla Aagac we just cut down. And the Malsti Punk that ran.'],
+    ['phorus', 'And the seedling that took root where he fell — that’s the Megla Aagac standing over the plaza. It’s only a tree now. And the Malsti Punk that ran off with his memory.'],
     ['torcain', 'One more thing. The Oath Stone wasn’t just a Relic. It was built over an Urverk. Kiet opened it — I saw the trigger.'],
     ['phorus', 'And the riddle?'],
     ['torcain', 'Noka was in the memory too. Watching. She left the next line where only a trance would find it.'],
@@ -243,7 +251,7 @@ export const OBJECTIVES = {
   talk: 'Speak with Phorus on the pier',
   cores: n => `Recover the singing memory cores (${n}/5)`,
   stone: 'Bring the cores to the Oath Stone in the Zahreh plaza',
-  boss: 'Cut the Oath-Rooted loose',
+  boss: 'Win the duel against Otlið — you are Kiet, in the Kahizecvar',
   done: 'Rokarvac I complete — explore, or return to the ship',
   xilia: {
     talk: 'Speak with Phorus on the pier',
@@ -269,7 +277,7 @@ export const CODEX = [
   ['Tukang', 'Torcain’s relic of fire, speed and heat, made by the Inventor from the first Aagac. It builds heat as he fights.'],
   ['Wild Punk', 'The pumpkin-and-vine family, grown wild. Faster and leaner than a domestic Punk, and much worse-tempered.'],
   ['Malsti Punk', 'Fist-sized Punks that sprout from Duat Seedlings. Already at home in the Duat, so they blink about the battlefield.'],
-  ['Megla Aagac', 'What a Duat Seedling most often grows into. In Aakalay, one grew where the Master of the Keep fell.'],
+  ['Megla Aagac', 'A single dark tree, not a forest and not a mind — what a Duat Seedling most often grows into. In Aakalay, one grew where the Master of the Keep fell.'],
   ['Otlið', 'The Master of the Keep at Aakalay — a Keilia. The ShurgrEdan cut his name out of every core they found; “Otlið” is what Kiet’s people called him.'],
   ['The Oath Stone', 'A Relic that holds anyone who swears to it. Break away and it burns; push on and you break free — but the Relic makes its holder hunt down anyone who learns that.'],
   ['Kiet', 'An Eikar at the end of the Era of the Nekh’Vorran who rode the great Nekh’Vorran Kireo’Nik to Aakalay with his Dya’Can, after fifty letters from a farmboy outside the walls.'],
@@ -362,19 +370,19 @@ export const DIALOG2 = {
     ['phorus', 'Sru Vorn! Don’t stand behind it — that tail — and don’t stand in front of it either!'],
   ],
   lordRise: [
-    ['phorus', 'The Urverk — it’s opening!'],
-    ['torcain', 'Something’s coming through.'],
-    ['phorus', 'That’s — that’s the Punk. The little one from the memory. Except it isn’t little anymore.'],
-    ['torcain', 'And it’s wearing his hat.'],
-    ['phorus', 'The lord of Aakalay. Still swearing people to him from inside a pumpkin. Cut him out, Torcain!'],
+    ['phorus', 'The Urverk — it’s opening! And look — the Malsti Punk. The little one from the memory. It’s been hiding in the keep.'],
+    ['torcain', 'It isn’t doing anything. It’s scared.'],
+    ['phorus', 'The Urverk wakes the dead, Torcain. It’s pulling his memory out of the poor thing’s stem — and pouring it into the stygian.'],
+    ['memory', 'The pillars’ stygian runs like wax and stands up. Tall as a door, one eye, scales of black iron. Otlið, Master of the Keep — woken.'],
+    ['phorus', 'Same duel, Torcain. Different century. Finish what Kiet started!'],
   ],
   lordHalf: [
-    ['phorus', 'He’s pulling from the Urverk — watch the floor!'],
+    ['phorus', 'He’s pulling more stygian from the Urverk — watch the floor, and stay out of his oath-rings!'],
   ],
   lordDown: [
-    ['torcain', 'It’s over. The stem — his memory is in the stem.'],
-    ['phorus', 'Don’t you dare drink that.'],
-    ['torcain', 'I’m going to keep it. Somebody should remember what he did. Properly, this time.'],
+    ['torcain', 'It’s over. He’s just iron again.'],
+    ['phorus', 'And look who’s free. The Malsti Punk — bouncing off the walls. Causing chaos. As is traditional.'],
+    ['torcain', 'Go on, little one. Nobody’s carrying anybody’s oaths anymore.'],
     ['noka', 'Well, well. The little Eikar with the borrowed name keeps his promises after all.'],
     ['phorus', 'Noka?!'],
     ['noka', 'The door is open, children. It leads where all old roads lead. I shall be at the top of it, waiting — riddles ready.'],
@@ -405,26 +413,36 @@ export const NEXT_RIDDLE2 = [
    the bestiary: what Torcain learns about each creature he hunts
    ================================================================ */
 export const BEASTS = {
-  punk: ['Wild Punk', 'The pumpkin-and-vine family gone feral. They wind their vines up before they bite — watch for it, step aside, punish.'],
-  punk_d: ['Domestic Punk', 'Gentle, saddle-blanketed, and a little dim. Ruut’s herd. They’ll only fight if you start it.'],
-  malsti: ['Malsti Punk', 'Fist-sized Punks from Duat Seedlings. They blink through the Duat — keep turning.'],
-  rodak: ['Rodak', 'Lean scavengers that keep their distance until they smell blood. Then they come all at once.'],
+  punk: ['Wild Punk', 'Smaller and quicker than their herd cousins. No eyes, no mouth — just a rind and the vines that grow from the top, legs and arms both. They wind the vines up before they lash — watch for it, step aside, punish.'],
+  punk_d: ['Domestic Punk', 'Horse-sized to elephant-sized, saddle-blanketed, and a little dim. Ruut’s herd walks on its vines. They’ll only fight if you start it.'],
+  malsti: ['Malsti Punk', 'Hand-sized Punks from Duat Seedlings. Not aggressive — they love chaos, and your shards. The cracks in their rind only glow when they blink through the Duat.'],
+  rodak: ['Rodak', 'Lean, tall, wolf-like, short oily fur and a long thin tail. Yellow slit eyes — or black. They keep their distance until they smell blood. Then they come all at once.'],
   kipsu: ['Kipsu (wild)', 'Thieves. A wild Kipsu will snatch your shards and bolt. Catch it before it gets away and you get them back.'],
   kipsu_f: ['Kipsu (tame)', 'Fluffy, curious and fond of petals. They shed fluff if you give them a scratch.'],
-  albali: ['Albali Byrd', 'Big filmed byrds. They wait, then dive. Strike while they’re low. Their healing film is what fills your vials.'],
-  tyndael: ['Tyndael', 'A flying spark with wings. It keeps its distance and breathes fire that keeps burning on the ground. Don’t stand in it.'],
+  albali: ['Albali Byrd', 'Round, dog-sized, wide-winged, one retractable bone-white horn with a wet sheen. Each one falls as a fruit from an Albali Aagac. Villtur (wild) ones wait, then dive — strike while they’re low.'],
+  tyndael: ['Tyndael', 'A flying creature made entirely of flame. It keeps its distance and throws fire that keeps burning on the ground. Don’t stand in it.'],
   vel: ['Duskareth Vel', 'Duat-walkers who throw knives out of thin air. They stagger badly when hit hard.'],
-  sruvorn: ['Sru Vorn', 'A tusked bog-beast that farms acid pits. Never stand in front of it. Or behind it.'],
-  kofi: ['Kofi Galta', 'Crescent body, blade-like spines, fluffy dark tail. It runs from everything, because everything eats it.'],
-  punk_alpha: ['Thornback', 'The Old Punk of Aakalay, swollen on a swallowed oath-ring. Its slam shakes the ground.'],
+  sruvorn: ['Sru Vorn', 'Two tusks, dense hair, a mace-ball tail, and it walks high like a hunting lizard. Big as a large horse and still growing. Never stand in front of it. Or behind it.'],
+  kofi: ['Kofi', 'A cat-sized ball of hair with two horns and a lot of tiny legs, whiskers streaming off its back. No ears. It scurries from everything, because everything eats it.'],
+  skorthal: ['Skor’Thal', 'The great old Punk of Aakalay. Its cut stem shows its rings, and patterns glow under a scarred, vine-choked rind. It harms no one. Few have ever found it.'],
 };
 /* hunt this many of a kind and Torcain has "studied" it: +15% damage against it */
-export const STUDY_AT = { vel: 3, sruvorn: 1, punk_alpha: 1 };
+export const STUDY_AT = { vel: 3, sruvorn: 1 };
 export const STUDY_DEFAULT = 10;
+
+export const SKORTHAL = {
+  sit: [
+    ['torcain', '(You sit down in the moss, an arm’s length from the biggest Punk you have ever seen. It doesn’t move.)'],
+    ['memory', 'Its stem was cut, long ago — you can count the rings. Hundreds. Under the scarred rind, slow patterns glow and fade like breathing.'],
+    ['torcain', '(A vine uncurls from the top of it, slow as a sunrise, and settles across your knees. Wound into it, grown right through, is a ring.)'],
+    ['phorus', 'Don’t move. …It’s giving it to you. The lord’s oath-ring. It carried that for a hundred years and it’s giving it to you.'],
+    ['memory', 'A curl of rind falls beside you. The vine slides back. Skor’Thal settles deeper into the moss, and goes on being old.'],
+  ],
+};
 
 export const JOURNAL = {
   page_1: ['A torn page, the ink still faintly warm:', '"The stone wants more every season. First oaths. Then names. Last week it took Ilva’s memory of her own mother. She smiled and didn’t know why she was crying."'],
   page_2: ['Another page, in the same tight hand:', '"The lord says the stone keeps us safe. Safe from what, I asked. He couldn’t remember. I don’t think he can remember anything that isn’t a promise."'],
   page_3: ['The writing gets faster here:', '"We are leaving tonight. All of us who still remember why. We will not swear anything to anyone ever again. Not even to come back."'],
-  page_4: ['The last page, smeared with something green:', '"The old herd-Punk ate the lord’s ring when it fell. It grows every year now. We call it Thornback. Leave it to the stone. Leave all of it."'],
+  page_4: ['The last page, smeared with something green:', '"The old herd-Punk took the lord’s ring when it fell and wandered north with it. It grows every year now. The old folk call it Skor’Thal. It scars the trees where it rubs. Leave it be. Leave all of it."'],
 };

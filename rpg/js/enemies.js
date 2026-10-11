@@ -6,30 +6,35 @@
 import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
-import { buildPunk } from './actors.js';
-import { buildRodak, buildKipsu, buildAlbali, buildVel, buildTyndael, buildSruVorn, buildDummy, buildKofi } from './creatures.js';
+import { buildVel, buildDummy } from './creatures.js';
+import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn } from './esik_land.js';
+import { buildAlbaliByrd, buildTyndael } from './esik_sky.js';
+
+const seed = () => (Math.random() * 1e9) >>> 0;
+/* a Kipsu can be anything from a lapful to a big dog */
+const kipsu = (lo, hi) => { const k = buildKipsu({ seed: seed() }); k.root.scale.multiplyScalar(lo + Math.random() * (hi - lo)); return k; };
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 export const TYPES = {
-  punk: { name: 'Wild Punk', build: () => buildPunk(false), hp: 60, dmg: 12, speed: 5.4, rad: 0.85, range: 2.4, aggro: 15, windup: 0.6, recover: 0.75, lunge: 9, shards: 6, ai: 'melee', color: 0xffb040 },
-  malsti: { name: 'Malsti Punk', build: () => buildPunk(true), hp: 26, dmg: 6, speed: 7.2, rad: 0.4, range: 1.5, aggro: 17, windup: 0.35, recover: 0.5, lunge: 9, shards: 3, ai: 'melee', blink: true, color: 0xc08aff },
-  rodak: { name: 'Rodak', build: buildRodak, hp: 75, dmg: 15, speed: 8.6, rad: 0.7, range: 2.7, aggro: 14, windup: 0.45, recover: 0.7, lunge: 13, shards: 10, ai: 'scavenger', color: 0x6a8a8a },
-  kipsu: { name: 'Kipsu', build: () => buildKipsu(0.55), hp: 32, dmg: 4, speed: 9.5, rad: 0.45, range: 1.5, aggro: 11, windup: 0.3, recover: 0.4, lunge: 9, shards: 5, ai: 'thief', color: 0x6af0e0 },
-  albali: { name: 'Albali Byrd', build: () => buildAlbali(false), hp: 48, dmg: 10, speed: 9, rad: 0.7, range: 1.8, aggro: 20, shards: 9, ai: 'flyer', status: 'paralyze', color: 0xffe0a0, disp: 'neutral' },
+  punk: { name: 'Wild Punk', build: () => buildWildPunk({ seed: seed() }), hp: 60, dmg: 12, speed: 5.4, rad: 0.85, range: 2.4, aggro: 15, windup: 0.6, recover: 0.75, lunge: 9, shards: 6, ai: 'melee', color: 0xffb040 },
+  /* fist-sized and never truly aggressive — they blink through the Duat to cause chaos and pinch your shards */
+  malsti: { name: 'Malsti Punk', build: () => buildMalstiPunk({ seed: seed() }), hp: 18, dmg: 0, speed: 7.2, rad: 0.22, range: 1.1, aggro: 11, windup: 0.3, recover: 0.5, lunge: 8, shards: 3, ai: 'thief', blink: true, color: 0xc08aff },
+  rodak: { name: 'Rodak', build: () => buildRodak({ seed: seed() }), hp: 75, dmg: 15, speed: 8.6, rad: 0.7, range: 2.7, aggro: 14, windup: 0.45, recover: 0.7, lunge: 13, shards: 10, ai: 'scavenger', color: 0x6a8a8a },
+  kipsu: { name: 'Kipsu', build: () => kipsu(1.1, 1.8), hp: 32, dmg: 4, speed: 9.5, rad: 0.45, range: 1.5, aggro: 11, windup: 0.3, recover: 0.4, lunge: 9, shards: 5, ai: 'thief', color: 0x6af0e0 },
+  albali: { name: 'Albali Byrd', build: () => buildAlbaliByrd({ seed: seed() }), hp: 48, dmg: 10, speed: 9, rad: 0.7, range: 1.8, aggro: 20, shards: 9, ai: 'flyer', status: 'paralyze', color: 0xffe0a0, disp: 'neutral' },
   /* little wild things that run from everything */
-  kofi: { name: 'Kofi Galta', build: buildKofi, hp: 12, dmg: 0, speed: 8.5, rad: 0.35, range: 0, aggro: 0, shards: 1, ai: 'melee', color: 0xb8a070, disp: 'critter' },
+  kofi: { name: 'Kofi Galta', build: () => buildKofi({ seed: seed() }), hp: 12, dmg: 0, speed: 8.5, rad: 0.35, range: 0, aggro: 0, shards: 1, ai: 'melee', color: 0xb8a070, disp: 'critter' },
   /* the Carpenter's straw dummies — they only stand there and take it */
   dummy: { name: 'Training dummy', build: buildDummy, hp: 30, dmg: 0, speed: 0, rad: 0.45, range: 0, aggro: 0, shards: 1, ai: 'static', color: 0xd8c098, disp: 'training' },
   dummy_far: { name: 'High dummy', build: buildDummy, hp: 30, dmg: 0, speed: 0, rad: 0.45, range: 0, aggro: 0, shards: 1, ai: 'static', color: 0xd8c098, disp: 'training', perch: 6 },
   /* friendly folk of the wilds — they only fight if you start it */
-  kipsu_f: { name: 'Kipsu', build: () => buildKipsu(0.75), hp: 40, dmg: 6, speed: 9, rad: 0.5, range: 1.6, aggro: 0, windup: 0.35, recover: 0.5, lunge: 9, shards: 2, ai: 'melee', color: 0x6af0e0, disp: 'friendly' },
-  punk_d: { name: 'Domestic Punk', build: () => buildPunk(false, { domestic: true }), hp: 90, dmg: 10, speed: 6, rad: 1.0, range: 2.6, aggro: 0, windup: 0.6, recover: 0.8, lunge: 8, shards: 3, ai: 'melee', color: 0xe8a85a, disp: 'friendly' },
-  albali_t: { name: 'Villtur Albali', build: () => buildAlbali(true), hp: 58, dmg: 11, speed: 9.5, rad: 0.7, range: 1.8, aggro: 22, shards: 12, ai: 'flyer', status: 'poison', color: 0x9aff5a },
+  kipsu_f: { name: 'Kipsu', build: () => kipsu(1.2, 2.2), hp: 40, dmg: 6, speed: 9, rad: 0.5, range: 1.6, aggro: 0, windup: 0.35, recover: 0.5, lunge: 9, shards: 2, ai: 'melee', color: 0x6af0e0, disp: 'friendly' },
+  punk_d: { name: 'Domestic Punk', build: () => buildDomesticPunk({ seed: seed(), saddle: Math.random() < 0.5 }), hp: 90, dmg: 10, speed: 6, rad: 1.1, range: 2.6, aggro: 0, windup: 0.6, recover: 0.8, lunge: 8, shards: 3, ai: 'melee', color: 0xe8a85a, disp: 'friendly' },
+  albali_t: { name: 'Villtur Albali', build: () => buildAlbaliByrd({ villtur: true, toxic: true, seed: seed() }), hp: 58, dmg: 11, speed: 9.5, rad: 0.7, range: 1.8, aggro: 22, shards: 12, ai: 'flyer', status: 'poison', color: 0x9aff5a },
   vel: { name: 'Duskareth Vel', build: buildVel, hp: 190, dmg: 17, speed: 6.2, rad: 0.5, range: 2.4, aggro: 22, windup: 0.5, shards: 60, ai: 'vel', stagger: 0.35, elite: true, color: 0xb070ff },
-  tyndael: { name: 'Tyndael', build: buildTyndael, hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
-  punk_alpha: { name: 'Thornback, the Old Punk', build: () => buildPunk(false), hp: 520, dmg: 22, speed: 5.8, rad: 1.6, range: 3.6, aggro: 20, windup: 0.75, recover: 0.9, lunge: 11, shards: 160, ai: 'melee', stagger: 0.3, elite: true, color: 0xc06a20 },
-  sruvorn: { name: 'Sru Vorn of the Bogs', build: buildSruVorn, hp: 1100, dmg: 26, speed: 4.6, rad: 2.6, range: 5.5, aggro: 26, shards: 220, ai: 'sruvorn', stagger: 0, miniboss: true, color: 0xb0ff4a },
+  tyndael: { name: 'Tyndael', build: () => buildTyndael({ seed: seed() }), hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
+  sruvorn: { name: 'Sru Vorn of the Bogs', build: () => buildSruVorn({ seed: seed() }), hp: 1100, dmg: 26, speed: 4.6, rad: 2.6, range: 5.5, aggro: 26, shards: 220, ai: 'sruvorn', stagger: 0, miniboss: true, color: 0xb0ff4a },
 };
 
 export function createEnemies(ctx) {
@@ -79,7 +84,7 @@ export function createEnemies(ctx) {
   }
 
   function damage(e, dmg, from, kb = 4, opts = {}) {
-    if (e.dead) return;
+    if (e.dead || ctx.G.inMemory) return;
     if (e.stray || e.pet || e.pup) return;            // someone's beloved — the axe turns aside
     if (opts.burn) e.burn = Math.max(e.burn || 0, 3);
     dmg *= opts.raw ? 1 : D().playerDmg;
@@ -167,7 +172,8 @@ export function createEnemies(ctx) {
     const P = ctx.P, G = ctx.G, a = e.actor, T = e.T;
     if (e.dead) {
       e.timer += dt;
-      const s0 = T.ai === 'flyer' ? 1 : (e.kind === 'malsti' ? 0.5 : e.kind === 'kipsu' ? 0.55 : T.miniboss ? 1.25 : 1.0);
+      if (e.s0 == null) e.s0 = a.root.scale.x;
+      const s0 = e.baseScale || e.s0;
       a.root.scale.setScalar(Math.max(0.001, s0 * (1 - e.timer / (T.miniboss ? 2 : 0.6))));
       a.root.rotation.z += dt * (T.miniboss ? 0.5 : 6);
       if (e.timer > (T.miniboss ? 2 : 0.6)) { ctx.scene.remove(a.root); e.gone = true; }
@@ -177,6 +183,10 @@ export function createEnemies(ctx) {
     const toP = Math.atan2(dx, dz);
     let wantV = 0, wantYaw = e.yaw;
     e.flash = Math.max(0, e.flash - dt * 5); a.flash(e.flash * 0.9);
+    if (ctx.G.inMemory) { a.root.visible = false; e.vel.set(0, 0, 0); return; }
+    /* far-off creatures aren't drawn or animated — small ones vanish sooner than big ones */
+    a.root.visible = Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) < 90 + T.rad * 40;
+    if (a.blink) { e.blinkGlow = Math.max(0, (e.blinkGlow || 0) - dt * 2.5); a.blink(e.blinkGlow); }
     e.stun = Math.max(0, e.stun - dt);
     if (e.burn > 0) {
       e.burn -= dt; e.hp -= 6 * dt;
@@ -278,6 +288,7 @@ export function createEnemies(ctx) {
             e.pos.x = P.pos.x + Math.cos(ang) * r; e.pos.z = P.pos.z + Math.sin(ang) * r;
             e.pos.y = ctx.world.col.ground(e.pos.x, e.pos.z, P.pos.y + 2);
             ctx.particles.burst(e.pos.x, e.pos.y + 0.5, e.pos.z, 14, { color: 0xc08aff, speed: 4, size: 0.4, life: 0.5 });
+            e.blinkGlow = 1;
             ctx.sfx.blink();
           }
         }
@@ -329,7 +340,7 @@ export function createEnemies(ctx) {
     if (e.pos.y < -60) { e.hp = 0; kill(e); }
     a.root.position.copy(e.pos);
     a.root.rotation.y = e.yaw;
-    a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, windup: e.windup, attack: e.attackA, diving: e.state === 'dive', tail: e.tailT || 0, tailUp: e.windup && e.act === 'tail' ? 1 : 0, thrown: e.state === 'cast' });
+    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, windup: e.windup, attack: e.attackA, diving: e.state === 'dive', tail: e.tailT || 0, tailUp: e.windup && e.act === 'tail' ? 1 : 0, thrown: e.state === 'cast' });
   }
 
   /* --------- Albali: circle high, dive, then hang low and vulnerable --------- */
@@ -392,7 +403,7 @@ export function createEnemies(ctx) {
     const a = e.actor;
     a.root.position.copy(e.pos);
     a.root.rotation.y = e.yaw;
-    a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, diving: e.state === 'dive' });
+    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, diving: e.state === 'dive' });
   }
 
   /* --------- Duskareth Vel --------- */

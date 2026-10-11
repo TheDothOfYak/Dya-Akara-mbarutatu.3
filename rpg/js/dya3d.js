@@ -9,10 +9,12 @@
    not Torcain, not the folk watching, not the creatures nearby.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, glowSprite } from './gfx.js';
-import { buildPunk, buildEikar } from './actors.js';
-import { buildRodak, buildKipsu, buildAlbali, buildTyndael, buildSruVorn, buildKofi } from './creatures.js';
-import { buildKeilia } from './npcs.js';
+import { glowSprite } from './gfx.js';
+import { buildEikar } from './actors.js';
+import * as L from './esik_land.js';
+import * as A from './esik_sky.js';
+import * as W from './esik_sea.js';
+import { buildKeilia, buildKarnen } from './npcs.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -79,6 +81,7 @@ export const SINGING = [
   { part: 'thorn', species: 'albali_villtur' },
   { part: 'ember', species: 'tyndael' },
   { part: 'tusk', species: 'sru_vorn' },
+  { part: 'skor_rind', species: 'domestic_punk', big: true, name: 'Skor’Thal' },
 ];
 export const SING_COST = { ore: 1, shards: 20 };
 
@@ -103,45 +106,9 @@ export function rivalPouch(region, id) {
 }
 
 /* ================================================================
-   3D models for every species — the RPG's own creatures where they
-   exist, and simple sculpted stand-ins for the rest
+   3D models for every species — each one built from the Esik field
+   notes (esik_land / esik_sky / esik_sea), and the RPG's own people
    ================================================================ */
-const mat = (c, o = {}) => toon(c, o);
-function simple(build) {
-  const root = new THREE.Group(); const parts = build(root) || {};
-  let ph = Math.random() * 6;
-  return {
-    root,
-    animate(dt, st) { ph += dt * (3 + st.speed * 2); if (parts.bob) parts.bob.position.y = parts.bobY + Math.sin(ph) * (st.speed > 0.3 ? 0.08 : 0.03); if (parts.spin) parts.spin.rotation.y += dt * (parts.spinRate || 1); if (parts.flap) parts.flap.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * Math.sin(ph * 2.2) * 0.6; }); if (parts.anim) parts.anim(dt, st, ph); },
-    flash() {},
-  };
-}
-function rockLump(r, col) { const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), mat(col)); m.scale.y = 0.75; return m; }
-function quad(o) {
-  // a generic four-legged body: Naga, Grothyn, Hvaleia, Tonguatjis, Harkal, Big Momma Kofi
-  return simple(root => {
-    const body = new THREE.Group(); body.position.y = o.h || 1; root.add(body);
-    const torso = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), mat(o.col)); torso.scale.set(o.w || 0.8, o.t || 0.6, o.l || 1.4); body.add(torso);
-    if (o.shell) { const sh = new THREE.Mesh(new THREE.SphereGeometry(1.05, 14, 8, 0, TAU, 0, Math.PI / 2), mat(o.shell)); sh.scale.set((o.w || 0.8) * 1.05, (o.t || 0.6) * 1.4, (o.l || 1.4) * 0.95); body.add(sh); }
-    for (const [x, z] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, o.h || 1, 6), mat(o.leg || o.col)); l.position.set(x * (o.w || 0.8) * 0.7, (o.h || 1) / 2, z * (o.l || 1.4) * 0.55); root.add(l); }
-    const heads = o.heads || 1;
-    for (let i = 0; i < heads; i++) {
-      const a = (i - (heads - 1) / 2) * 0.35;
-      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, o.neck || 0.6, 6), mat(o.col)); neck.position.set(Math.sin(a) * 0.4, (o.h || 1) + 0.3 + (o.neck || 0.6) / 2 - 0.3, (o.l || 1.4) * 0.85); neck.rotation.x = 0.7; neck.rotation.z = -a; root.add(neck);
-      const head = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.6, 6), mat(o.head || o.col)); head.rotation.x = Math.PI / 2; head.position.set(Math.sin(a) * 0.6, (o.h || 1) + (o.neck || 0.6) * 0.7, (o.l || 1.4) * 0.85 + 0.55); root.add(head);
-    }
-    if (o.tail) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.2, 6), mat(o.col)); t.rotation.x = -Math.PI / 2 - 0.2; t.position.set(0, o.h || 1, -(o.l || 1.4) - 0.4); root.add(t); if (o.club) { const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28, 0), mat(o.club)); c.position.set(0, (o.h || 1) - 0.2, -(o.l || 1.4) - 1.0); root.add(c); } }
-    if (o.glow) { const g = glowSprite(o.glow, 2.2, 0.35); g.position.y = o.h || 1; root.add(g); }
-    return { bob: body, bobY: o.h || 1 };
-  });
-}
-function bipedSmall(col, capCol) {
-  return simple(root => {
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.4, 4, 8), mat(col)); body.position.y = 0.6; root.add(body);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 6, 0, TAU, 0, Math.PI / 2), mat(capCol)); cap.position.y = 0.95; root.add(cap);
-    return { bob: body, bobY: 0.6 };
-  });
-}
 const EIKAR_LOOK = {
   sword_eikar: { skin: '#a8743e', cap: '#4a2a14', weapon: 'axe', emblem: 0xffd27a },
   spear_eikar: { skin: '#b8844a', cap: '#3a2a1a', weapon: 'spear', emblem: 0x9adfff },
@@ -149,74 +116,50 @@ const EIKAR_LOOK = {
   chemist_eikar: { skin: '#b07a48', cap: '#3a1a3a', weapon: 'axe', emblem: 0xc8a0ff },
 };
 export function speciesModel(id) {
-  const sp = DY().species.get(id) || {};
+  const seed = (Math.random() * 1e9) >>> 0;
   switch (id) {
-    case 'wild_punk': return buildPunk(false);
-    case 'domestic_punk': return buildPunk(false, { domestic: true, blanket: 0x8a2a3a });
-    case 'malsti_punk': return buildPunk(true);
-    case 'kipsu': return buildKipsu(0.75);
-    case 'rodak': return buildRodak();
-    case 'kofi': return buildKofi();
-    case 'big_momma_kofi': { const k = buildKofi(); k.root.scale.setScalar(2.6); return k; }
-    case 'albali_byrd': return buildAlbali(false);
-    case 'albali_villtur': return buildAlbali(true);
-    case 'kuni_byrd_wild': case 'kuni_byrd_ridden': { const b = buildAlbali(false); b.root.scale.setScalar(1.25); return b; }
-    case 'tyndael': return buildTyndael();
-    case 'sru_vorn': return buildSruVorn();
+    case 'wild_punk': return L.buildWildPunk({ seed });
+    case 'domestic_punk': return L.buildDomesticPunk({ seed, saddle: Math.random() < 0.4 });
+    case 'malsti_punk': return L.buildMalstiPunk({ seed });
+    case 'kipsu': return L.buildKipsu({ seed });
+    case 'rodak': return L.buildRodak({ seed });
+    case 'kofi': return L.buildKofi({ seed });
+    case 'big_momma_kofi': return L.buildBigMommaKofi({ seed });
+    case 'sru_vorn': return L.buildSruVorn({ seed });
+    case 'ular_naga': return L.buildUlarNaga({ heads: 3 });
+    case 'gynge': return L.buildGynge();
+    case 'stryx': return L.buildStryx({ seed });
+    case 'tonguatjis': return L.buildTonguatjis();
+    case 'mikolo_moko': return L.buildMikoloMoko({ seed });
+    case 'uff': return L.buildUff({ seed });
+    case 'albali_byrd': return A.buildAlbaliByrd({ seed });
+    case 'albali_villtur': return A.buildAlbaliByrd({ seed, villtur: true });
+    case 'kuni_byrd_wild': return A.buildKuniByrd({ seed });
+    case 'kuni_byrd_ridden': return A.buildKuniByrd({ seed, saddle: true });
+    case 'tyndael': return A.buildTyndael({ seed });
+    case 'lutut': return A.buildLutut({ seed, age: Math.random() });
+    case 'rubbermcfly': return A.buildRubberMcFly({ seed });
+    case 'makari_swarm': return A.buildMakariSwarm({ seed, moteScale: 4 });
+    case 'hvaleia': return W.buildHvaleia();
+    case 'su_naga': return W.buildSuNaga({ heads: 3 });
+    case 'harkal': return W.buildHarkal({ seed });
+    case 'raf_krabbi': return W.buildRafKrabbi({ seed });
+    case 'ular_grothyn': return W.buildGrothyn({ element: 'Ular' });
+    case 'su_grothyn': return W.buildGrothyn({ element: 'Su' });
+    case 'eldi_grothyn': return W.buildGrothyn({ element: 'Eldi' });
+    case 'albali_aagac': return W.buildAlbaliAagac({ seed });
+    case 'albali_bud': return W.buildAlbaliBud();
+    case 'albali_fruit': return W.buildAlbaliFruit();
+    case 'ju_field': return W.buildJuField({ seed });
+    case 'sprengju': return W.buildSprengju();
+    case 'sprengju_shaving': return W.buildSprengjuShaving();
+    case 'skith_grass': return W.buildSkithGrass({ seed });
     case 'sword_eikar': case 'spear_eikar': case 'archer_eikar': case 'chemist_eikar': {
-      const L = EIKAR_LOOK[id]; return buildEikar({ skin: L.skin, cap: L.cap, weapon: L.weapon, emblem: L.emblem, marking: 0xf3dca0, build: 1, leg: 0x4a2a14, foot: 0x2a1a0a, beltColor: 0x5a3420 });
+      const E = EIKAR_LOOK[id]; return buildEikar({ skin: E.skin, cap: E.cap, weapon: E.weapon, emblem: E.emblem, marking: 0xf3dca0, build: 1, leg: 0x4a2a14, foot: 0x2a1a0a, beltColor: 0x5a3420 });
     }
-    case 'sword_keilia': case 'spear_keilia': case 'archer_keilia': case 'builder_keilia': return buildKeilia({ skin: 0xc8a070, hair: id === 'builder_keilia' ? 0x7a5232 : 0x4a2a1a });
-    case 'karnen': return bipedSmall(0x9a8a6a, 0x5a4a3a);
-    case 'uff': return bipedSmall(0xd8b8a0, 0xa07a6a);
-    case 'ular_naga': return quad({ col: 0x5a7a3a, head: 0x4a6a2a, heads: 3, neck: 1.6, h: 1.3, l: 2.2, w: 1, tail: true, club: 0x8a8a6a });
-    case 'su_naga': return quad({ col: 0x2a6a8a, head: 0x1a5a7a, heads: 3, neck: 1.8, h: 1.3, l: 2.3, w: 1, tail: true, glow: 0x6ad8ff });
-    case 'hvaleia': return quad({ col: 0x3a7aa8, h: 1.4, l: 2.6, w: 1.2, t: 0.8, tail: true, club: 0x2a5a8a });
-    case 'ular_grothyn': return quad({ col: 0x6a5a3a, shell: 0x5a7a3a, h: 0.6, l: 1.1, w: 1.0 });
-    case 'su_grothyn': return quad({ col: 0x4a6a7a, shell: 0x3a8aa8, h: 0.6, l: 1.1, w: 1.0 });
-    case 'eldi_grothyn': return quad({ col: 0x7a4a2a, shell: 0xc8602a, h: 0.6, l: 1.1, w: 1.0, glow: 0xff8a3a });
-    case 'tonguatjis': return quad({ col: 0x6a6a4a, shell: 0x8a7a5a, h: 0.7, l: 1.4, w: 1.1, neck: 0.3 });
-    case 'harkal': return quad({ col: 0x5a7a8a, h: 0.9, l: 1.5, w: 0.6, t: 0.5, tail: true });
-    case 'stryx': return simple(root => {
-      const rock = rockLump(0.9, 0x7d766a); rock.position.y = 0.7; root.add(rock);
-      for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), new THREE.MeshBasicMaterial({ color: 0x9aff6a })); e.position.set(s * 0.25, 0.85, 0.75); root.add(e); }
-      for (let i = 0; i < 4; i++) { const v = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 1.4, 5), mat(0x4d7a44)); const a = i / 4 * TAU; v.position.set(Math.cos(a) * 0.3, 1.8, Math.sin(a) * 0.3); v.rotation.set(Math.sin(a) * 0.5, 0, Math.cos(a) * 0.5); root.add(v); }
-      for (const s of [-1, 1]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.06, 5, 12, Math.PI * 1.4), mat(0x5a5248)); h.position.set(s * 0.6, 1.4, 0); h.rotation.y = Math.PI / 2; root.add(h); }
-    });
-    case 'gynge': return simple(root => { const r = rockLump(0.8, 0x6a6058); r.position.y = 0.45; root.add(r); const g = glowSprite(0xff8a3a, 0.9, 0.5); g.position.set(0, 0.25, 0.7); root.add(g); });
-    case 'albali_aagac': return simple(root => { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 3, 8), mat(0x6a4a2a)); t.position.y = 1.5; root.add(t); const c = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8, 1), mat(0xd8e0a0)); c.position.y = 3.6; root.add(c); });
-    case 'lutut': return simple(root => {
-      const body = new THREE.Group(); body.position.y = 2.2; root.add(body);
-      const t = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), mat(0x4a3a5a)); t.scale.set(0.7, 0.6, 1.4); body.add(t);
-      const wings = [];
-      for (const s of [-1, 1]) { const piv = new THREE.Group(); body.add(piv); const w = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.6, 3), mat(0x6a4a8a)); w.rotation.z = s * Math.PI / 2; w.position.x = s * 1.4; w.scale.z = 0.15; piv.add(w); wings.push(piv); }
-      return { bob: body, bobY: 2.2, flap: wings };
-    });
-    case 'rubbermcfly': return simple(root => {
-      const body = new THREE.Group(); body.position.y = 1.2; root.add(body);
-      body.add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 8), mat(0xffe08a)));
-      const wings = [];
-      for (const s of [-1, 1]) { const piv = new THREE.Group(); body.add(piv); const w = new THREE.Mesh(new THREE.CircleGeometry(0.3, 10), new THREE.MeshBasicMaterial({ color: 0xbfeaff, transparent: true, opacity: 0.6, side: THREE.DoubleSide })); w.position.x = s * 0.32; w.rotation.y = Math.PI / 2; piv.add(w); wings.push(piv); }
-      const g = glowSprite(0xffe08a, 1.4, 0.6); body.add(g);
-      return { bob: body, bobY: 1.2, flap: wings };
-    });
-    case 'makari_swarm': return simple(root => {
-      const sw = new THREE.Group(); sw.position.y = 0.8; root.add(sw);
-      for (let i = 0; i < 18; i++) { const b = glowSprite(i % 2 ? 0x9aff6a : 0xff9ad0, 0.35, 0.85); b.position.set((Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 1.6); sw.add(b); }
-      return { spin: sw, spinRate: 2 };
-    });
-    case 'mikolo_moko': return simple(root => { const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), mat(0xb89a6a)); b.position.y = 0.35; root.add(b); const t = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mat(0x6a5a3a)); t.position.set(0, 0.4, -0.35); root.add(t); return { bob: b, bobY: 0.35 }; });
-    case 'raf_krabbi': return simple(root => {
-      const b = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 8), mat(0x3a8aa8)); b.scale.set(1.3, 0.5, 1); b.position.y = 0.35; root.add(b);
-      for (const s of [-1, 1]) { const c = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), mat(0x5aaac8)); c.scale.set(1, 0.7, 1.4); c.position.set(s * 0.55, 0.4, 0.35); root.add(c); }
-      const g = glowSprite(0x9adfff, 0.9, 0.4); g.position.y = 0.5; root.add(g);
-      return { bob: b, bobY: 0.35 };
-    });
-    default: {
-      // fruits, fields and Relic shavings: small glowing things
-      const col = { Fti: 0xf0f0f5, Su: 0x3b9ae1, Eldi: 0xe8842c, Ular: 0x4caf50 }[sp.element] || 0xd8c098;
-      return simple(root => { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 1), mat(col, { emissive: col, emissiveIntensity: 0.3 })); b.position.y = 0.35; root.add(b); const g = glowSprite(col, 1, 0.5); g.position.y = 0.35; root.add(g); return { spin: b }; });
-    }
+    case 'sword_keilia': case 'spear_keilia': case 'archer_keilia': case 'builder_keilia': return buildKeilia({ seed, hammer: id === 'builder_keilia' });
+    case 'karnen': return buildKarnen();
+    default: return L.buildWildPunk({ seed });
   }
 }
 
@@ -244,7 +187,8 @@ function naturalRadius(id, model) {
   return (natural[id] = Math.max(0.25, Math.max(s.x, s.z) / 2));
 }
 /* species' true size in metres (footprint radius at its largest size class) */
-const LIFE_R = { kofi: 0.3, big_momma_kofi: 0.8, kipsu: 0.55, rodak: 0.7, wild_punk: 0.9, domestic_punk: 1.2, malsti_punk: 0.2, tyndael: 0.7, albali_byrd: 1.2, albali_villtur: 1.2, kuni_byrd_wild: 1.6, kuni_byrd_ridden: 1.6, sru_vorn: 2.6, ular_naga: 3.4, su_naga: 3.8, hvaleia: 3.6, lutut: 2.8, stryx: 1.1, gynge: 1.4, sword_eikar: 0.45, spear_eikar: 0.45, archer_eikar: 0.45, chemist_eikar: 0.45, sword_keilia: 0.8, spear_keilia: 0.8, archer_keilia: 0.8, builder_keilia: 0.85, karnen: 0.35, uff: 0.35, raf_krabbi: 0.45, harkal: 1.0, ular_grothyn: 1.1, su_grothyn: 1.1, eldi_grothyn: 1.1, tonguatjis: 1.4, makari_swarm: 0.9, mikolo_moko: 0.35, rubbermcfly: 0.3, albali_aagac: 2.2 };
+/* the true size (rough radius, metres) of the biggest of each kind, from the Esik field notes */
+const LIFE_R = { kofi: 0.3, big_momma_kofi: 0.35, kipsu: 0.8, rodak: 0.85, wild_punk: 0.9, domestic_punk: 2.2, malsti_punk: 0.1, tyndael: 0.9, albali_byrd: 0.5, albali_villtur: 0.5, kuni_byrd_wild: 4.5, kuni_byrd_ridden: 4.5, sru_vorn: 2.0, ular_naga: 6, su_naga: 9, hvaleia: 4.5, lutut: 3.2, stryx: 1.6, gynge: 2.6, sword_eikar: 0.45, spear_eikar: 0.45, archer_eikar: 0.45, chemist_eikar: 0.45, sword_keilia: 0.6, spear_keilia: 0.6, archer_keilia: 0.6, builder_keilia: 0.62, karnen: 0.35, uff: 0.25, raf_krabbi: 0.25, harkal: 1.2, ular_grothyn: 0.5, su_grothyn: 0.5, eldi_grothyn: 0.5, tonguatjis: 1.3, makari_swarm: 0.9, mikolo_moko: 0.3, rubbermcfly: 0.15, albali_aagac: 4, albali_bud: 0.08, albali_fruit: 0.15, ju_field: 0.6, sprengju: 0.25, sprengju_shaving: 0.15, skith_grass: 0.2 };
 
 /* ================================================================
    THE MATCH, in 3D
