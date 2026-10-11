@@ -138,7 +138,7 @@ export function createEnemies(ctx) {
       const tx = P.pos.x + P.vel.x * lead, tz = P.pos.z + P.vel.z * lead;
       const ang = Math.atan2(tx - e.pos.x, tz - e.pos.z) + off;
       const dist = Math.min(18, Math.hypot(tx - e.pos.x, tz - e.pos.z));
-      const T = 0.9, start = V3(e.pos.x, e.pos.y + (e.T.miniboss ? 3 : 1.2), e.pos.z);
+      const T = 0.9, start = V3(e.pos.x, e.pos.y + (e.T.miniboss ? 3 : e.kind === 'tyndael' ? 1.6 : 1.2), e.pos.z);
       const vel = V3(Math.sin(ang) * dist / T, 0, Math.cos(ang) * dist / T);
       vel.y = ((P.pos.y - start.y) + 0.5 * 24 * T * T) / T;
       const mesh = glowSprite(e.T.miniboss ? 0xb0ff4a : 0xff8a2a, 1.4, 1);
@@ -184,7 +184,7 @@ export function createEnemies(ctx) {
       if (e.hp <= 0) { kill(e); return; }
     }
     e.windup = Math.max(0, e.windup - dt * 3); e.attackA = Math.max(0, e.attackA - dt * 4);
-    const playing = G.mode === 'play' && !P.dead;
+    const playing = G.mode === 'play' && !P.dead && !G.truce;
     const wf = D().windup;
     const aggroR = T.aggro * D().aggro;
 

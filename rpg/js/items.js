@@ -19,6 +19,8 @@ export const ITEMS = {
   seed: { name: 'Fire seed', kind: 'mat', icon: '🔥', value: 25, desc: 'A seed of an Eldi Aagac. Hot to the touch.' },
   ember: { name: 'Tyndael ember', kind: 'mat', icon: '✴', value: 9, desc: 'Still glowing.' },
   tusk: { name: 'Sru Vorn tusk', kind: 'mat', icon: '🦷', value: 60, desc: 'Long as your arm. Acid-etched.' },
+  shaving: { name: 'Punk shaving', kind: 'mat', icon: '🎃', value: 8, desc: 'A curl of rind from a sleeping domestic Punk. Calm and content.' },
+  stem: { name: 'Malsti stem', kind: 'mat', icon: '🟣', value: 12, desc: 'A Malsti Punk’s stem. It flickers half into the Duat.' },
   knife: { name: 'Duat knife', kind: 'mat', icon: '🗡', value: 20, desc: 'A Vel’s throwing knife. It shivers when you hold it.' },
 
   /* ---- meals (eat for a while-lasting boon) ---- */
@@ -51,6 +53,7 @@ export const ITEMS = {
 
   /* ---- key items ---- */
   k_scroll_pull: { name: 'Kalo scroll: Duat Pull', kind: 'key', icon: '📜', value: 0, read: true, desc: 'Stored willpower. Read it to learn the Duat Pull.' },
+  okid: { name: 'Okid’Relic', kind: 'key', icon: '🔮', value: 0, desc: 'Buhkon’s gift. Sing a creature’s song into a piece of it with a little stygian, and the Relic catches its truth as a token.' },
   k_seed: { name: 'Warm fire seed', kind: 'key', icon: '🔥', value: 0, desc: 'From the young fire tree in the Ember Grove, for the Stryx’s ship. Hot to the touch.' },
   amulet: { name: 'Sniller amulet', kind: 'key', icon: '🔹', value: 0, desc: 'A round gem between two curved horns, cold teal. It hums toward something far away.' },
 };
@@ -84,7 +87,7 @@ export const SHOP = {
 /* what each creature leaves behind: [item, chance, count] */
 export const LOOT = {
   punk: [['vine', 0.7, 1], ['petal', 0.15, 1]],
-  malsti: [['vine', 0.3, 1], ['ore', 0.12, 1]],
+  malsti: [['vine', 0.3, 1], ['ore', 0.12, 1], ['stem', 0.35, 1]],
   rodak: [['oil', 0.75, 1]],
   kipsu: [['fluff', 0.8, 1]],
   kipsu_f: [['fluff', 0.8, 1]],

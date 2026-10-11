@@ -14,7 +14,7 @@ export function createRpgUI(api) {
   const root = $('rpg'), body = $('rbody'), tabs = $('rtabs');
   let page = 'gear', mapCanvas = null;
 
-  const TABS = [['gear', 'Gear'], ['pack', 'Pack'], ['skills', 'Skills'], ['quests', 'Quests'], ['beasts', 'Beasts'], ['map', 'Map']];
+  const TABS = [['gear', 'Gear'], ['pack', 'Pack'], ['skills', 'Skills'], ['quests', 'Quests'], ['beasts', 'Beasts'], ['tokens', 'Tokens'], ['map', 'Map']];
 
   function open(p) {
     page = p || page;
@@ -85,6 +85,20 @@ export function createRpgUI(api) {
       h += `<p class="rmuted">Hunt enough of a creature and Torcain has <b>studied</b> it: +15% damage against its kind.</p><div class="rperks">` + list.map(b => b.seen
         ? `<div class="rperk${b.studied ? ' have' : ''}"><b>${esc(b.name)}</b><small>${b.lore}<br><em>${b.kills} felled · ${b.studied ? 'studied ✓' : `study at ${b.at}`}</em></small></div>`
         : `<div class="rperk"><b>???</b><small class="rmuted">Not yet met.</small></div>`).join('') + `</div>`;
+    } else if (page === 'tokens') {
+      const d = api.dya();
+      if (!d) h += '<p class="rmuted">The Dya’Akara engine didn’t load.</p>';
+      else {
+        h += `<h3>Dya’Akara <small>${d.record}</small></h3><p class="rmuted">Your pouch holds up to 25 tokens (${d.pouch.length}/25). Challenge Venkin, Sefa or Bosk in Xilia — or anyone at the Leotik camp who plays.</p>`;
+        h += `<div class="rgrid">` + d.tokens.map(t => {
+          const inP = d.pouch.includes(t.id);
+          const cost = Object.entries(t.cost).filter(([, v]) => v).map(([e, v]) => `<i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${d.ecol[e]};margin:0 2px 0 5px"></i>${v}`).join('');
+          return `<div class="rcard${inP ? ' on' : ''}"><div class="ri" style="color:${d.ecol[t.element] || '#fff'}">◈</div><div class="rt"><b>${esc(t.name)}</b><small>${esc(t.species)} · ${t.size} · ${t.rarity}<br>HP ${t.hp} · DMG ${t.dmg} · SPD ${t.speed}${t.quirks ? ' · ' + esc(t.quirks) : ''}<br>Cost ${cost}</small></div>
+            <button class="btn small" data-a="pouch:${t.id}">${inP ? 'In pouch ✓' : 'Add to pouch'}</button></div>`;
+        }).join('') + `</div>`;
+        h += `<h3>Sing a token <small>${d.okid ? 'with your Okid’Relic' : 'Buhkon can show you how'}</small></h3>`;
+        h += d.okid ? `<p class="rmuted">A piece of a creature, a lump of stygian ore and ${d.singCost} shards. Big tokens are rare — most songs come out small.</p><div class="rgrid">` + d.singing.map(r => card(r.part, `Sing a ${esc(r.name)}`, r.ok ? `sing:${r.part}` : null, false, `${r.have} in pack · + 1 Stygian ore`)).join('') + `</div>` : '<p class="rmuted">Talk to Buhkon in Xilia about singing tokens.</p>';
+      }
     } else if (page === 'map') {
       h += `<p class="rmuted" style="text-align:center">Click a lit Nur Lantern to travel there. ◆ objective · ✦ quest · ◉ lantern · ▲ trial · ⌂ camp</p><div class="rmapwrap"><canvas id="rmap" width="620" height="620"></canvas></div>`;
     } else if (page === 'shop') {
