@@ -79,6 +79,7 @@ export const SINGING = [
   { part: 'thorn', species: 'albali_villtur' },
   { part: 'ember', species: 'tyndael' },
   { part: 'tusk', species: 'sru_vorn' },
+  { part: 'skor_rind', species: 'domestic_punk', big: true, name: 'Skor’Thal' },
 ];
 export const SING_COST = { ore: 1, shards: 20 };
 
@@ -244,7 +245,8 @@ function naturalRadius(id, model) {
   return (natural[id] = Math.max(0.25, Math.max(s.x, s.z) / 2));
 }
 /* species' true size in metres (footprint radius at its largest size class) */
-const LIFE_R = { kofi: 0.3, big_momma_kofi: 0.8, kipsu: 0.55, rodak: 0.7, wild_punk: 0.9, domestic_punk: 1.2, malsti_punk: 0.2, tyndael: 0.7, albali_byrd: 1.2, albali_villtur: 1.2, kuni_byrd_wild: 1.6, kuni_byrd_ridden: 1.6, sru_vorn: 2.6, ular_naga: 3.4, su_naga: 3.8, hvaleia: 3.6, lutut: 2.8, stryx: 1.1, gynge: 1.4, sword_eikar: 0.45, spear_eikar: 0.45, archer_eikar: 0.45, chemist_eikar: 0.45, sword_keilia: 0.8, spear_keilia: 0.8, archer_keilia: 0.8, builder_keilia: 0.85, karnen: 0.35, uff: 0.35, raf_krabbi: 0.45, harkal: 1.0, ular_grothyn: 1.1, su_grothyn: 1.1, eldi_grothyn: 1.1, tonguatjis: 1.4, makari_swarm: 0.9, mikolo_moko: 0.35, rubbermcfly: 0.3, albali_aagac: 2.2 };
+/* the true size (rough radius, metres) of the biggest of each kind, from the Esik field notes */
+const LIFE_R = { kofi: 0.3, big_momma_kofi: 0.35, kipsu: 0.8, rodak: 0.85, wild_punk: 0.9, domestic_punk: 2.2, malsti_punk: 0.1, tyndael: 0.9, albali_byrd: 0.5, albali_villtur: 0.5, kuni_byrd_wild: 4.5, kuni_byrd_ridden: 4.5, sru_vorn: 2.0, ular_naga: 6, su_naga: 9, hvaleia: 4.5, lutut: 3.2, stryx: 1.6, gynge: 2.6, sword_eikar: 0.45, spear_eikar: 0.45, archer_eikar: 0.45, chemist_eikar: 0.45, sword_keilia: 0.6, spear_keilia: 0.6, archer_keilia: 0.6, builder_keilia: 0.62, karnen: 0.35, uff: 0.25, raf_krabbi: 0.25, harkal: 1.2, ular_grothyn: 0.5, su_grothyn: 0.5, eldi_grothyn: 0.5, tonguatjis: 1.3, makari_swarm: 0.9, mikolo_moko: 0.3, rubbermcfly: 0.15, albali_aagac: 4 };
 
 /* ================================================================
    THE MATCH, in 3D

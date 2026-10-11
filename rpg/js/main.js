@@ -10,20 +10,19 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
-import { Particles, glowSprite, toon, addOutline } from './gfx.js';
+import { Particles, glowSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { buildSky, SUN_DIR } from './sky.js';
 import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
-import { buildTorcain, buildPhorus, buildMegla, buildCore, buildPunk } from './actors.js';
+import { buildTorcain, buildPhorus, buildCore, buildPunk } from './actors.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
-import { NPCS, NPC_LOOKS, buildNpc, buildCamp } from './npcs.js';
+import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
 import { QUESTS, questProgress } from './quests.js';
 import { buildFeatures, sigilMesh } from './features.js';
 import { createRpgUI } from './rpgui.js';
-import { buildMalstiLord } from './creatures.js';
 import { createEnemies, TYPES } from './enemies.js';
 import { hasBoard, offers as bountyOffers, bountyProgress } from './bounties.js';
 import * as DYA3 from './dya3d.js';
@@ -315,8 +314,8 @@ const enemies = createEnemies({
   hurtPlayer: (d, from, kb, o) => hurtPlayer(d, from, kb, o),
   dmgNumber: (...a) => dmgNumber(...a),
   studyMul: e => studied(e.kind) ? 1.15 : 1,
-  stealShards(n) { G.shards -= n; toast(`A Kipsu snatched ${n} shards! Catch it before it gets away!`, 3); },
-  onEscape(e) { toast(`The Kipsu escaped with ${e.stolen} shards.`, 3); },
+  stealShards(n, e) { G.shards -= n; toast(`${e && e.kind === 'malsti' ? 'A Malsti Punk' : 'A Kipsu'} snatched ${n} shards! Catch it before it gets away!`, 3); },
+  onEscape(e) { toast(`${e.kind === 'malsti' ? 'The Malsti Punk' : 'The Kipsu'} escaped with ${e.stolen} shards.`, 3); },
   onKill(e) {
     if (e.T.disp === 'training') { dummyBroken(e); return; }
     const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4) * FX.shards) + (e.stolen || 0);
@@ -343,7 +342,7 @@ const enemies = createEnemies({
     F_['seen_' + k] = true;
     const lines = {
       punk: STORY.DIALOG.firstFight[0][1],
-      malsti: 'Malsti Punks — they blink through the Duat. Keep turning!',
+      malsti: 'Malsti Punks! They’re not fighting you — they just love chaos. And your shards. Catch the thief!',
       kipsu: 'Kipsu! Mind your shards — they’ll pick you clean and run.',
       albali: 'Albali Byrds. Wait for the dive, then hit them while they’re low!',
       vel: 'Duskareth! Watch for knives coming out of the air!',
@@ -378,28 +377,63 @@ function ringMesh(r, color) {
 }
 
 const BOSSDEF = {
-  megla: { name: 'THE OATH-ROOTED', sub: 'Megla Aagac of Aakalay', hp: 1500, arena: 29 },
-  lord: { name: 'THE MALSTI LORD', sub: 'the lord of Aakalay, in a Punk’s stem', hp: 2300, arena: 25 },
+  duel: { name: 'OTLIÐ', sub: 'Master of the Keep · the Kahizecvar duel', hp: 1500, arena: 24 },
+  lord: { name: 'OTLIÐ, WOKEN', sub: 'the Master of the Keep, poured into stygian', hp: 2300, arena: 25 },
 };
-let removedStoneCol = null;
+/* Otlið: a Keilia, tall as a door, with the Oath Stone's light in his scales.
+   In the memory he is gold-lit flesh and pinecone wood; on Leotik the Urverk
+   has poured his memory into black stygian. */
+function buildOtlid(stygian) {
+  const k = buildKeilia({ skin: stygian ? 0x2a2436 : 0x6a4a2a, hair: stygian ? 0x1a1424 : 0x3e4a2a, hair2: stygian ? 0x2a1f3a : 0x4f5a30, scale: 1 });
+  const s = stygian ? 2.1 : 1.35;
+  k.root.scale.multiplyScalar(s);
+  const glowCol = stygian ? 0xb070ff : 0xffd060;
+  if (stygian) k.root.traverse(o => { if (o.isMesh && o.material && o.material.emissive && o.name !== 'outline') { o.material = o.material.clone(); o.material.emissive.setHex(0x2a0a4a); o.material.emissiveIntensity = 0.6; } });
+  // the Oath relic, circling him like a small dark moon
+  const relic = new THREE.Group();
+  const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), toon(stygian ? 0x3a2a4a : 0x6a5a48, { emissive: glowCol, emissiveIntensity: 0.35 }));
+  relic.add(stone); relic.add(glowSprite(glowCol, 1.6, 0.6));
+  k.root.add(relic);
+  const halo = glowSprite(glowCol, 6, 0.25); halo.position.y = 1.4; k.root.add(halo);
+  return {
+    root: k.root, tgtH: 1.4 * s, mats: k.mats,
+    animate(dt, st) {
+      const t = st.t || 0;
+      k.animate(dt, { speed: st.moving ? 1.4 : 0, t, onGround: true, swing: st.slam || st.sweep || 0, attack: st.slam || 0 });
+      relic.position.set(Math.cos(t * 1.3) * 1.1, 1.7 + Math.sin(t * 2.1) * 0.15, Math.sin(t * 1.3) * 1.1);
+      stone.rotation.y += dt * 2;
+      halo.material.opacity = 0.2 + (st.enraged ? 0.2 : 0) + Math.sin(t * 3) * 0.06;
+    },
+    flash(v) { k.flash && k.flash(v); },
+  };
+}
+/* the Kahizecvar: while the duel lasts, Torcain is Kiet, in golden memory */
+const memState = { on: false, fog: null };
+function enterMemory() {
+  memState.on = true;
+  memState.fog = { c: scene.fog.color.getHex(), n: scene.fog.near, f: scene.fog.far };
+  scene.fog.color.setHex(0xf6d6a0); scene.fog.near = 30; scene.fog.far = 260;
+  phorus.root.visible = false;
+  document.body.classList.add('in-memory');
+}
+function exitMemory() {
+  if (!memState.on) return;
+  memState.on = false;
+  scene.fog.color.setHex(memState.fog.c); scene.fog.near = memState.fog.n; scene.fog.far = memState.fog.f;
+  phorus.root.visible = true;
+  document.body.classList.remove('in-memory');
+}
 
 function startBoss(kind) {
   const def = BOSSDEF[kind], pz = world.PLAZA;
-  const actor = kind === 'megla' ? buildMegla() : buildMalstiLord();
+  const actor = buildOtlid(kind === 'lord');
   scene.add(actor.root);
   const hp = Math.round(def.hp * D.bossHp);
-  boss = { kind, def, actor, hp, maxHp: hp, t: 0, next: 3, phase: 1, rising: 0, sweep: 0, slam: 0, flash: 0, col: null, dead: false, deadT: 0, summonT: 12,
-    pos: kind === 'megla' ? V3(pz.x, pz.y, pz.z) : V3(pz.x, pz.y, pz.z - 10), saidHalf: false };
+  boss = { kind, def, actor, hp, maxHp: hp, t: 0, next: 3, phase: 1, rising: 0, sweep: 0, slam: 0, flash: 0, col: null, dead: false, deadT: 0, summonT: kind === 'duel' ? 1e9 : 12,
+    pos: kind === 'duel' ? V3(pz.x, pz.y, pz.z + 9) : V3(pz.x, pz.y, pz.z - 10), saidHalf: false, baseScale: actor.root.scale.x };
   G.bossActive = true; G.arena = def.arena;
-  if (kind === 'megla') {
-    actor.root.position.set(pz.x, pz.y - 14, pz.z);
-    removedStoneCol = world.col.list.filter(c => Math.abs(c.x - pz.x) < 0.1 && Math.abs(c.z - pz.z) < 0.1 && c.top > pz.y + 5);
-    removedStoneCol.forEach(c => world.col.remove(c));
-    boss.col = world.col.add(pz.x, pz.z, 3.2, 3.2, 0, pz.y - 2, pz.y + 14);
-  } else {
-    actor.root.position.set(boss.pos.x, pz.y - 2, boss.pos.z);
-    actor.root.scale.setScalar(0.01);
-  }
+  actor.root.position.set(boss.pos.x, pz.y, boss.pos.z);
+  actor.root.scale.setScalar(0.01);
   $('boss-name').textContent = def.name; $('boss-sub').textContent = def.sub;
   $('boss').classList.remove('hidden');
   sfx.roar(); G.shake = 1.2;
@@ -410,10 +444,7 @@ function abortBoss() {
   if (!boss) return;
   scene.remove(boss.actor.root);
   if (boss.col) world.col.remove(boss.col);
-  if (boss.kind === 'megla') {
-    world.oath.group.position.y = world.PLAZA.y;
-    (removedStoneCol || []).forEach(c => world.col.list.includes(c) || world.col.add(c.x, c.z, c.hw, c.hd, Math.atan2(c.s, c.c), c.bot, c.top));
-  }
+  if (boss.kind === 'duel') exitMemory();
   enemies.list.forEach(e => { if (e.bossMinion && !e.dead) { e.dead = true; e.gone = true; scene.remove(e.actor.root); } });
   telegraphs.forEach(t => scene.remove(t.mesh)); telegraphs.length = 0;
   boss = null; G.bossActive = false; G.arena = 0; G.lock = null;
@@ -423,10 +454,9 @@ function abortBoss() {
 
 function bossTargetPoint() {
   if (!boss) return V3();
-  if (boss.kind === 'megla') return V3(world.PLAZA.x, world.PLAZA.y + 6.5, world.PLAZA.z);
-  return V3(boss.pos.x, boss.actor.root.position.y + 4.2, boss.pos.z);
+  return V3(boss.pos.x, boss.actor.root.position.y + (boss.actor.tgtH || 3), boss.pos.z);
 }
-function bossReach() { return boss.kind === 'megla' ? 3.4 : 3.6; }
+function bossReach() { return boss.kind === 'duel' ? 2.6 : 3.6; }
 
 function damageBoss(dmg, opts = {}) {
   if (!boss || boss.dead || boss.rising < 1) return;
@@ -437,14 +467,14 @@ function damageBoss(dmg, opts = {}) {
   sfx.hit();
   if (boss.phase === 1 && boss.hp < boss.maxHp * 0.5) {
     boss.phase = 2; sfx.roar(); G.shake = 0.8;
-    bark('phorus', boss.kind === 'megla' ? STORY.DIALOG.bossHalf[0][1] : STORY.DIALOG2.lordHalf[0][1]);
+    if (boss.kind === 'duel') bark('memory', STORY.DIALOG.bossHalf[0][1], 3.5); else bark('phorus', STORY.DIALOG2.lordHalf[0][1]);
   }
   if (boss.hp <= 0) {
     boss.hp = 0; boss.dead = true; boss.deadT = 0; sfx.victory(); G.shake = 1.5;
     enemies.list.forEach(e => { if (!e.dead && e.bossMinion) { e.hp = 0; enemies.kill(e); } });
     telegraphs.forEach(tg => scene.remove(tg.mesh)); telegraphs.length = 0;
     projectiles.filter(p => p.owner === 'boss').forEach(p => { p.life = 0; });
-    G.shards += Math.round((boss.kind === 'megla' ? 400 : 700) * (D === DIFFICULTY.realistic ? 1.3 : 1));
+    G.shards += Math.round((boss.kind === 'duel' ? 400 : 700) * (D === DIFFICULTY.realistic ? 1.3 : 1));
   }
 }
 
@@ -490,28 +520,23 @@ function updateBoss(dt) {
   if (b.rising < 1) {
     b.rising = Math.min(1, b.rising + dt / 3);
     const k = 1 - Math.pow(1 - b.rising, 3);
-    if (b.kind === 'megla') {
-      a.root.position.y = pz.y - 14 + 14 * k;
-      world.oath.group.position.y = pz.y - b.rising * 12;
-    } else {
-      a.root.scale.setScalar(Math.max(0.01, k));
-      a.root.position.y = pz.y;
-    }
-    if (Math.random() < 0.9) particles.emit(b.pos.x + (Math.random() - 0.5) * 14, pz.y + 0.5, b.pos.z + (Math.random() - 0.5) * 14, { vy: 4 + Math.random() * 4, color: 0x9a7ad8, size: 2.4, life: 1.6, drag: 0.5 });
+    a.root.scale.setScalar(Math.max(0.01, k * b.baseScale));
+    a.root.position.y = pz.y;
+    if (Math.random() < 0.9) particles.emit(b.pos.x + (Math.random() - 0.5) * 6, pz.y + 0.5, b.pos.z + (Math.random() - 0.5) * 6, { vy: 3 + Math.random() * 3, color: b.kind === 'duel' ? 0xffd27a : 0x9a7ad8, size: 1.4, life: 1.4, drag: 0.5 });
     G.shake = Math.max(G.shake, 0.3);
     a.animate(dt, { t: G.t });
     return;
   }
   if (b.dead) {
     b.deadT += dt;
-    a.root.position.y = pz.y - b.deadT * 4;
-    if (b.kind === 'lord') a.root.scale.setScalar(Math.max(0.01, 1 - b.deadT / 3.6));
+    a.root.position.y = pz.y - b.deadT * (b.kind === 'lord' ? 1.2 : 0.3);
+    a.root.scale.setScalar(Math.max(0.01, b.baseScale * (1 - b.deadT / 3.6)));
     if (Math.random() < 0.9) particles.emit(b.pos.x + (Math.random() - 0.5) * 8, pz.y + Math.random() * 14, b.pos.z + (Math.random() - 0.5) * 8, { vy: 3, color: 0xd0b0ff, size: 1.6, life: 1.4, speed: 4 });
     if (b.deadT > 3.6) {
       scene.remove(a.root); if (b.col) world.col.remove(b.col);
       const kind = b.kind;
       boss = null; G.bossActive = false; G.arena = 0; $('boss').classList.add('hidden');
-      kind === 'megla' ? afterMegla() : afterLord();
+      kind === 'duel' ? afterDuel() : afterLord();
     }
     return;
   }
@@ -522,20 +547,21 @@ function updateBoss(dt) {
   b.next -= dt; b.summonT -= dt;
   const dP = Math.hypot(P.pos.x - b.pos.x, P.pos.z - b.pos.z);
 
-  if (b.kind === 'lord') {
-    // drift after Torcain, keeping a little distance
-    const want = 7;
+  {
+    // stalk Torcain, keeping a little distance
+    const want = b.kind === 'duel' ? 3.2 : 7;
     if (!b.blink) {
       const dx = P.pos.x - b.pos.x, dz = P.pos.z - b.pos.z;
-      if (dP > want) { b.pos.x += dx / dP * 2.6 * dt; b.pos.z += dz / dP * 2.6 * dt; }
+      b.moving = dP > want;
+      if (b.moving) { const sp = b.kind === 'duel' ? (b.phase === 2 ? 4.2 : 3.4) : 2.6; b.pos.x += dx / dP * sp * dt; b.pos.z += dz / dP * sp * dt; }
       arenaClamp(b.pos, b.def.arena - 5);
       a.root.position.set(b.pos.x, pz.y, b.pos.z);
       a.root.rotation.y = dampAngle(a.root.rotation.y, Math.atan2(dx, dz), 2, dt);
     } else {
       b.blink.t += dt;
-      a.root.scale.setScalar(Math.max(0.01, 1 - b.blink.t * 3));
+      a.root.scale.setScalar(Math.max(0.01, b.baseScale * (1 - b.blink.t * 3)));
       if (b.blink.t >= b.blink.dur) {
-        b.pos.set(b.blink.x, 0, b.blink.z); a.root.position.set(b.pos.x, pz.y, b.pos.z); a.root.scale.setScalar(1);
+        b.pos.set(b.blink.x, 0, b.blink.z); a.root.position.set(b.pos.x, pz.y, b.pos.z); a.root.scale.setScalar(b.baseScale);
         if (Math.hypot(P.pos.x - b.pos.x, P.pos.z - b.pos.z) < 5.5) hurtPlayer(30 * D.enemyDmg, b.pos, 18);
         particles.ring(b.pos.x, pz.y + 0.5, b.pos.z, 60, 16, { color: 0xc890ff, size: 0.9, life: 0.6 });
         sfx.slam(); G.shake = 0.7; b.blink = null;
@@ -545,18 +571,24 @@ function updateBoss(dt) {
 
   if (b.summonT <= 0) {
     b.summonT = (b.phase === 2 ? 15 : 20) * (D === DIFFICULTY.realistic ? 0.85 : 1.2);
-    summonMinions(b.phase === 2 ? 4 : 3, b.kind === 'megla' ? ['malsti'] : (b.phase === 2 ? ['malsti', 'tyndael', 'malsti'] : ['malsti']));
+    summonMinions(b.phase === 2 ? 3 : 2, b.phase === 2 ? ['rodak', 'tyndael'] : ['rodak']);
   }
   if (b.next <= 0 && !b.blink) {
     const roll = Math.random();
-    if (b.kind === 'megla') {
-      if (dP < 10 && roll < 0.45) {
-        b.next = 3.2 * fast;
-        const m = ringMesh(10, 0xff5aa0); m.position.set(pz.x, pz.y + 0.15, pz.z);
-        telegraphs.push({ mesh: m, x: pz.x, z: pz.z, r: 10, t: 0, dur: 1.0 * fast + 0.15, dmg: 22, kind: 'sweep' });
-        bark('phorus', 'Jump the sweep!', 1.6);
-      } else if (roll < 0.75) { b.next = 3.6 * fast; slamRings(b.phase === 2 ? 5 : 3, 0xb070ff, 22); b.slam = 1; }
-      else { b.next = 3.4 * fast; bossOrbs(b.phase === 2 ? 7 : 4, b.phase === 2 ? 9 : 7.5); b.sweep = 0.4; }
+    if (b.kind === 'duel') {
+      // Otlið fights with the Oath Stone's power: a ringing sweep, oath-rings that bind, chains from the ground, sworn light
+      if (dP < 6.5 && roll < 0.4) {
+        b.next = 2.8 * fast;
+        const m = ringMesh(6, 0xffd060); m.position.set(b.pos.x, pz.y + 0.15, b.pos.z);
+        telegraphs.push({ mesh: m, x: b.pos.x, z: b.pos.z, r: 6, t: 0, dur: 0.95 * fast + 0.15, dmg: 20, kind: 'sweep' });
+        b.sweep = 1;
+      } else if (roll < 0.65) {
+        b.next = 2.8 * fast;
+        const x = P.pos.x, z = P.pos.z;
+        const m = ringMesh(3.6, 0xffd060); m.position.set(x, world.col.ground(x, z, P.pos.y + 1) + 0.15, z);
+        telegraphs.push({ mesh: m, x, z, r: 3.6, t: 0, dur: 1.4 * fast, dmg: 12, kind: 'oath' });
+      } else if (roll < 0.85) { b.next = 3.2 * fast; slamRings(b.phase === 2 ? 5 : 3, 0xffc040, 20); b.slam = 1; }
+      else { b.next = 3.0 * fast; bossOrbs(b.phase === 2 ? 6 : 4, b.phase === 2 ? 9 : 7.5); }
     } else {
       if (roll < 0.25) {
         b.next = 3.4 * fast;
@@ -578,7 +610,7 @@ function updateBoss(dt) {
       }
     }
   }
-  a.animate(dt, { t: G.t, sweep: b.sweep, slam: b.slam, enraged: b.phase === 2 });
+  a.animate(dt, { t: G.t, sweep: b.sweep, slam: b.slam, enraged: b.phase === 2, moving: b.moving });
   const hpPct = b.hp / b.maxHp;
   $('boss-fill').style.transform = `scaleX(${hpPct})`;
   $('boss-lag').style.transform = `scaleX(${hpPct})`;
@@ -1021,6 +1053,8 @@ function interactables() {
   if (board) list.push({ pos: V3(board.x, board.y, board.z), label: 'Read the bounty board', act: () => boardTalk(), far: 3 });
   for (const c of crates) if (c.mesh.visible) list.push({ pos: V3(c.x, c.y, c.z), label: 'Haul up the crate', act: () => takeCrate(c), far: 3 });
   for (const pg of pages) if (pg.mesh.visible) list.push({ pos: V3(pg.x, pg.y, pg.z), label: 'Read the torn page', act: () => readPage(pg), far: 2.8 });
+  if (SAVE.quests.q_thorn === 'active') for (const sc of scars) if (sc.revealed && !SAVE.cleared[sc.id]) list.push({ pos: V3(sc.x, sc.y + 1, sc.z), label: 'Read the rind-scar', act: () => readScar(sc), far: 3 });
+  if (skor && SAVE.quests.q_skorthal === 'active' && !SAVE.counters.skorthal) list.push({ pos: skor.pos, label: 'Sit with Skor’Thal', act: () => sitWithSkor(), far: 7 });
   for (const e of enemies.list) {
     if (e.dead || e.hostile || !e.T.disp || e.T.ai === 'flyer' || e.T.disp === 'critter') continue;
     if (e.stray) list.push({ pos: e.pos, label: 'Send the stray Punk home', act: () => befriend(e), far: 3.2 });
@@ -1147,13 +1181,26 @@ function offerCores() {
     }, i * 380));
     setTimeout(() => {
       s.mat.emissiveIntensity = 1.4;
-      startBoss('megla');
-      setTimeout(() => dialog(STORY.DIALOG.bossRise, () => setObjective()), 2600);
+      dialog(STORY.DIALOG.tranceIn, () => {
+        G.mode = 'trance';
+        if (document.pointerLockElement) document.exitPointerLock();
+        fade(0.85, 1.2);
+        $('fade').style.background = 'radial-gradient(circle, #f6d6a0, #3a2a10)';
+        playCards(STORY.DIALOG.tranceCards, 4200, () => {
+          enterMemory();
+          P.pos.set(world.PLAZA.x, world.PLAZA.y, world.PLAZA.z + 20); P.vel.set(0, 0, 0); P.yaw = Math.PI; CAM.yaw = 0;
+          G.mode = 'play'; fade(0, 1.6);
+          setTimeout(() => { $('fade').style.background = '#000'; }, 1800);
+          lockMouse();
+          startBoss('duel');
+          setTimeout(() => dialog(STORY.DIALOG.bossRise, () => setObjective()), 2400);
+        });
+      });
     }, 2200);
   });
 }
 
-function afterMegla() {
+function afterDuel() {
   F_.bossDead = true; xp(500); persist();
   dialog(STORY.DIALOG.bossDown, () => trance());
 }
@@ -1166,6 +1213,9 @@ function trance() {
   $('fade').style.background = 'radial-gradient(circle, #3a1a6a, #0a0418)';
   playCards(STORY.TRANCE, 4600, () => {
     cards.classList.remove('trance');
+    exitMemory();
+    world.oath.group.position.y = world.PLAZA.y - 12;
+    world.col.list.filter(c => Math.abs(c.x - world.PLAZA.x) < 0.1 && Math.abs(c.z - world.PLAZA.z) < 0.1 && c.top > world.PLAZA.y + 5).forEach(c => world.col.remove(c));
     P.pos.set(world.SITES.garden.x + 6, 0, world.SITES.garden.z + 2);
     P.pos.y = world.col.ground(P.pos.x, P.pos.z, 50);
     F.pos.copy(P.pos).add(V3(-2, 0, 2));
@@ -1334,7 +1384,7 @@ function takeCrate(c) {
   persist();
 }
 
-/* ---------------- Aakalay: the last journal, and Thornback ---------------- */
+/* ---------------- Aakalay: the last journal, and Skor'Thal ---------------- */
 function pageMesh() {
   const g = new THREE.Group();
   const paper = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.8), toon(0xf0e4c8, { side: THREE.DoubleSide })); paper.position.y = 0.9; paper.rotation.z = 0.2; g.add(paper);
@@ -1352,16 +1402,66 @@ function readPage(pg) {
   const n = SAVE.counters.pages;
   dialog((STORY.JOURNAL[pg.id] || []).map(l => ['memory', l]).concat([['phorus', n >= 4 ? 'That’s the last of them. Talk to me, Torcain.' : `That’s ${n} of four. There are more — I can feel them.`]]));
 }
+/* Skor'Thal: scarred trees that only answer Nur'Hlyst, then the den in the far north wood */
+function scarTree() {
+  const g = new THREE.Group();
+  const bark = toon(0x4a3a2a), rub = toon(0xd8c8a0, { emissive: 0x6af08a, emissiveIntensity: 0.15 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.65, 5, 9), bark); trunk.position.y = 2.5; g.add(trunk);
+  for (let i = 0; i < 3; i++) {   // three long gouges where the rind rubbed through the bark
+    const gash = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 0.08), rub);
+    gash.position.set(-0.18 + i * 0.18, 1.6 + i * 0.12, 0.6 - Math.abs(i - 1) * 0.04); gash.rotation.z = 0.25; g.add(gash);
+  }
+  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.1, 0), toon(0x3d5a2a)); crown.position.y = 5.6; g.add(crown);
+  outlineAll(g);
+  return g;
+}
+const scars = (REGION === 'aakalay' && world.scars ? world.scars : []).map(sc => {
+  const y = world.heightAt(sc.x, sc.z);
+  const mesh = scarTree(); mesh.position.set(sc.x, y, sc.z); mesh.rotation.y = Math.atan2(world.skorthal.x - sc.x, world.skorthal.z - sc.z); scene.add(mesh);
+  return { ...sc, y, mesh, revealed: false };
+});
+function readScar(sc) {
+  SAVE.cleared[sc.id] = true; SAVE.counters.scars = (SAVE.counters.scars || 0) + 1; xp(50); persist();
+  const n = SAVE.counters.scars;
+  particles.burst(sc.x, sc.y + 1.8, sc.z, 16, { color: 0x9af0a0, speed: 2, size: 0.3, life: 0.8, gravity: 0 });
+  dialog([['phorus', n >= 3 ? 'That’s three. Every one of them leans north. Come back to me, Torcain — I know where it sleeps.' : `Rind-scar, higher than my head. It leans north. That’s ${n} of three.`]]);
+}
+let skor = null;
+if (REGION === 'aakalay' && world.skorthal) {
+  const sx = world.skorthal.x, sz = world.skorthal.z, y = world.heightAt(sx, sz);
+  const m = buildPunk(false, { domestic: true, blanket: 0x5a4a3a });
+  m.root.scale.setScalar(2.6); m.root.position.set(sx, y, sz); m.root.rotation.y = Math.PI * 0.85; scene.add(m.root);
+  skor = { m, pos: V3(sx, y, sz), t: 0 };
+}
+const skorShown = () => SAVE.quests.q_thorn === 'done' || SAVE.quests.q_skorthal;
+function skorTick(dt) {
+  if (!skor) return;
+  skor.m.root.visible = !!skorShown();
+  if (!skor.m.root.visible) return;
+  skor.t += dt;
+  skor.m.animate(dt, { speed: 0, t: skor.t * 0.4, windup: 0, attack: 0, swing: 0, onGround: true });
+}
+function denGuards() { return enemies.list.filter(e => !e.dead && e.tag === 'skorden' && Math.hypot(e.pos.x - skor.pos.x, e.pos.z - skor.pos.z) < 40).length; }
+function sitWithSkor() {
+  const left = denGuards();
+  if (left) { dialog([['phorus', `Not with ${left} Rodak circling. They’ll spook it — and they’ll go for your throat the moment you sit.`]]); return; }
+  dialog(STORY.SKORTHAL.sit, () => {
+    SAVE.counters.skorthal = 1; invAdd(SAVE.inv, 'skor_rind', 1); lootToast('skor_rind', 1); xp(100); persist();
+    particles.burst(skor.pos.x, skor.pos.y + 3, skor.pos.z, 40, { color: 0x9af0a0, speed: 3, size: 0.45, life: 1.4, gravity: -0.2 });
+    hint(SAVE.inv.items.okid ? 'Sing Skor’Thal’s rind in the Okid’Relic for a legendary token. Then tell Phorus.' : 'Skor’Thal’s rind could be sung into a token, if you had an Okid’Relic. Tell Phorus.');
+  });
+}
 const PHORUS_DEF = { id: 'phorus', name: 'Phorus', title: 'Kalo’Eik · Nur' };
 function phorusQuest() {
   const fake = { def: PHORUS_DEF, talking: 0 };
-  for (const qid of ['q_pages', 'q_thorn']) {
+  for (const qid of ['q_pages', 'q_thorn', 'q_skorthal']) {
     const st = SAVE.quests[qid];
     if (st === 'active' && questProgress(qid, QUESTS[qid], SAVE, SAVE.inv) >= 1) { turnIn(fake, qid); return true; }
     if (st === 'active') return false;
     if (!st && (qid === 'q_pages' || SAVE.quests.q_pages === 'done')) {
       if (qid === 'q_pages' && !G.seen.offeredPages) { G.seen.offeredPages = true; offerQuest(fake, qid); return true; }
       if (qid === 'q_thorn') { offerQuest(fake, qid); return true; }
+      if (qid === 'q_skorthal' && SAVE.quests.q_thorn === 'done') { offerQuest(fake, qid); return true; }
       return false;
     }
   }
@@ -1380,7 +1480,8 @@ function sideTarget() {
     if (e.pup && SAVE.quests.q_pups === 'active') consider(e.pos.x, e.pos.y, e.pos.z, 'A pup', 'a Kipsu pup, crying in the rain');
   }
   for (const a of amulets) if (!a.got && a.revealed) consider(a.x, a.y, a.z, 'A Sniller amulet', 'a Sniller amulet, cold as a winter well');
-  if (SAVE.quests.q_thorn === 'active' && world.thornback) consider(world.thornback.x, world.heightAt(world.thornback.x, world.thornback.z), world.thornback.z, 'Thornback', 'the Old Punk. Thornback. It’s huge');
+  if (SAVE.quests.q_thorn === 'active') for (const sc of scars) if (sc.revealed && !SAVE.cleared[sc.id]) consider(sc.x, sc.y, sc.z, 'A scarred tree', 'a scarred tree — Skor’Thal’s rind did that');
+  if (SAVE.quests.q_skorthal === 'active' && skor && !SAVE.counters.skorthal) consider(skor.pos.x, skor.pos.y, skor.pos.z, 'Skor’Thal', 'Skor’Thal. It’s asleep. It’s enormous');
   if (!best) return null;
   return { pos: best.pos, label: best.label, line: `There — ${best.what}. ${Math.round(bd)} paces.` };
 }
@@ -1396,7 +1497,7 @@ function nurHlyst() {
   for (const m of hlyst.marks) scene.remove(m); hlyst.marks.length = 0;
   particles.ring(P.pos.x, P.pos.y + 0.6, P.pos.z, 90, 30, { color: 0xffd27a, size: 0.7, life: 1.3, drag: 0.2 });
   sfx.sense();
-  const found = { amulet: 0, chest: 0, node: 0, other: 0 };
+  const found = { amulet: 0, chest: 0, node: 0, other: 0, scar: 0 };
   const mark = (x, y, z, col, kind) => {
     if (Math.hypot(x - P.pos.x, z - P.pos.z) > range) return;
     const sp = glowSprite(col, 2.6, 0.95); sp.position.set(x, y + 1.6, z); scene.add(sp); hlyst.marks.push(sp); found[kind]++;
@@ -1406,10 +1507,12 @@ function nurHlyst() {
   for (const n of feats.nodes) if (n.ready) mark(n.x, n.y, n.z, 0xf3cf7a, 'node');
   for (const c of crates) if (c.mesh.visible) mark(c.x, c.y, c.z, 0xff9ad0, 'other');
   for (const pg of pages) if (pg.mesh.visible) mark(pg.x, pg.y, pg.z, 0xb48aff, 'other');
+  if (SAVE.quests.q_thorn === 'active') for (const sc of scars) if (!SAVE.cleared[sc.id] && Math.hypot(sc.x - P.pos.x, sc.z - P.pos.z) <= range) { mark(sc.x, sc.y + 0.4, sc.z, 0x9af0a0, 'scar'); sc.revealed = true; }
   if (seedMesh && seedMesh.visible) mark(world.seedSpot.x, world.seedSpot.y, world.seedSpot.z, 0xff8a3a, 'other');
   const bits = [];
   if (found.amulet) bits.push(`${found.amulet} Sniller amulet${found.amulet > 1 ? 's' : ''}`);
   if (found.chest) bits.push(`${found.chest} chest${found.chest > 1 ? 's' : ''}`);
+  if (found.scar) bits.push(`${found.scar} scarred tree${found.scar > 1 ? 's' : ''}`);
   if (found.node) bits.push(`${found.node} thing${found.node > 1 ? 's' : ''} to gather`);
   toast(bits.length ? 'Nur’Hlyst — the world answers: ' + bits.join(' · ') : 'Nur’Hlyst — nothing hidden answers here.', 3);
   for (const m of hlyst.marks) m.material.opacity = 0;
@@ -1612,7 +1715,7 @@ function dyaBookData() {
     record: `${d.wins} won · ${d.losses} lost`, pouch: d.pouch, okid: !!SAVE.inv.items.okid, singCost: DYA3.SING_COST.shards,
     ecol: DYA3.ELEMENT_COL,
     tokens: toks.map(t => ({ id: t.id, name: t.name, species: SPN(t.speciesId), size: SP.SIZES[t.sizeIdx], rarity: SP.RARITIES[t.rarity], element: t.element, hp: t.stats.hp, dmg: t.stats.dmg, speed: t.stats.speed, cost: TK.costVec(t), quirks: (t.quirks || []).map(q => q.name || q.id || q).join(', ') })),
-    singing: DYA3.SINGING.map(r => ({ part: r.part, name: SPN(r.species), have: SAVE.inv.items[r.part] || 0, ok: (SAVE.inv.items[r.part] || 0) > 0 && (SAVE.inv.items.ore || 0) > 0 && G.shards >= DYA3.SING_COST.shards })),
+    singing: DYA3.SINGING.filter(r => !r.big || SAVE.inv.items[r.part]).map(r => ({ part: r.part, name: r.name || SPN(r.species), have: SAVE.inv.items[r.part] || 0, ok: (SAVE.inv.items[r.part] || 0) > 0 && (SAVE.inv.items.ore || 0) > 0 && G.shards >= DYA3.SING_COST.shards })),
   };
 }
 function singToken(part) {
@@ -1621,10 +1724,15 @@ function singToken(part) {
   if (!takeAll(SAVE.inv, { [part]: 1, ore: 1 }) ) { toast('You need the part and a lump of stygian ore.', 2); return; }
   if (G.shards < DYA3.SING_COST.shards) { invAdd(SAVE.inv, part, 1); invAdd(SAVE.inv, 'ore', 1); toast('Not enough shards.', 2); return; }
   G.shards -= DYA3.SING_COST.shards;
-  const tok = DYA3.addToken(SAVE.dya, DYA3.mintToken(r.species, (Math.random() * 1e9) >>> 0), SAVE.dya.pouch.length < 25);
+  let tok;
+  if (r.big) {   /* a legend's song always comes out as big and as fine as that kind can be */
+    let best = null;
+    for (let i = 0; i < 40; i++) { const t = DYA3.mintToken(r.species, (Math.random() * 1e9) >>> 0, { rarity: 4, name: r.name }); if (!best || t.sizeIdx > best.sizeIdx) best = t; }
+    tok = DYA3.addToken(SAVE.dya, best, SAVE.dya.pouch.length < 25);
+  } else tok = DYA3.addToken(SAVE.dya, DYA3.mintToken(r.species, (Math.random() * 1e9) >>> 0), SAVE.dya.pouch.length < 25);
   particles.burst(P.pos.x, P.pos.y + 1.4, P.pos.z, 30, { color: 0x9adfff, speed: 4, size: 0.4, life: 0.9, gravity: 1 });
   sfx.core(); xp(40);
-  toast(`You sing the ${SPN(r.species)}’s song — a ${DYA.species.SIZES[tok.sizeIdx]} ${DYA.species.RARITIES[tok.rarity]} token!`, 3.5);
+  toast(`You sing ${r.name ? r.name + '’s' : 'the ' + SPN(r.species) + '’s'} song — a ${DYA.species.SIZES[tok.sizeIdx]} ${DYA.species.RARITIES[tok.rarity]} token!`, 3.5);
   persist();
 }
 function buhkonTokens() {
@@ -1658,10 +1766,10 @@ function wakePillar(p) {
   sfx.core(); G.shake = 0.6;
   particles.burst(p.x, p.y + 8, p.z, 60, { color: 0xc8a0ff, speed: 9, size: 0.7, life: 1.2 });
   const n = pillarCount();
-  // waking it calls the Duat's little ones
+  // waking it rouses whatever has been nesting in the ruins
   for (let i = 0; i < (D === DIFFICULTY.realistic ? 5 : 3); i++) {
     const a = Math.random() * Math.PI * 2;
-    const e = enemies.spawn(i % 3 === 2 ? 'tyndael' : 'malsti', p.x + Math.cos(a) * 7, p.z + Math.sin(a) * 7, null, { state: 'chase', hostile: true, boss: true });
+    const e = enemies.spawn(i % 3 === 2 ? 'tyndael' : 'rodak', p.x + Math.cos(a) * 7, p.z + Math.sin(a) * 7, null, { state: 'chase', hostile: true, boss: true });
     particles.burst(e.pos.x, e.pos.y + 0.5, e.pos.z, 16, { color: 0x9a4aff, speed: 4, size: 0.4, life: 0.5 });
   }
   if (n >= 3) { world.urverk.ringMat.emissiveIntensity = 0.8; dialog(STORY.DIALOG2.allPillars, () => setObjective()); }
@@ -1680,6 +1788,9 @@ function touchUrverk() {
 
 function afterLord() {
   F_.lordDead = true; xp(800); persist();
+  // the little Malsti Punk that carried his memory goes free — causing chaos, as is traditional
+  { const pz = world.PLAZA; const m = buildPunk(true); m.root.scale.setScalar(0.28); m.root.position.set(pz.x, pz.y, pz.z - 10); scene.add(m.root);
+    let t = 0; const hop = () => { t += 0.016; m.root.position.x = pz.x + Math.sin(t * 3) * 4 + t * 2; m.root.position.y = pz.y + Math.abs(Math.sin(t * 9)) * 0.6; m.animate(0.016, { speed: 3, t }); if (t < 6) requestAnimationFrame(hop); else scene.remove(m.root); }; hop(); }
   dialog(STORY.DIALOG2.lordDown, () => {
     G.mode = 'trance';
     if (document.pointerLockElement) document.exitPointerLock();
@@ -2506,7 +2617,7 @@ function mapMarkers() {
   for (const c of crates) if (c.mesh.visible) m.push({ x: c.x, z: c.z, ch: '✦', col: '#ff9ad0', size: 15 });
   for (const pg of pages) if (pg.mesh.visible && SAVE.quests.q_pages === 'active') m.push({ x: pg.x, z: pg.z, ch: '✦', col: '#ff9ad0', size: 15 });
   if (board) m.push({ x: board.x, z: board.z, ch: '▤', col: '#e8c890', size: 15, label: 'Bounties' });
-  if (SAVE.quests.q_thorn === 'active' && world.thornback) m.push({ x: world.thornback.x, z: world.thornback.z, ch: '☠', col: '#ff7a5a', size: 18, label: 'Thornback' });
+  if (SAVE.quests.q_skorthal === 'active' && skor && !SAVE.counters.skorthal) m.push({ x: skor.pos.x, z: skor.pos.z, ch: '✦', col: '#9af0a0', size: 18, label: 'Skor’Thal' });
   if (lostMark) m.push({ x: lostMark.position.x, z: lostMark.position.z, ch: '✦', col: '#d8b8ff', size: 15, label: 'Lost shards' });
   return m;
 }
@@ -2648,10 +2759,7 @@ function updatePlayer(dt) {
   world.col.resolve(P.pos, P.riding ? 0.95 : 0.45, P.riding ? 2.6 : 1.9);
   if (G.bossActive && boss) {
     arenaClamp(P.pos, G.arena);
-    if (boss.kind === 'megla') {
-      const pz = world.PLAZA, d = Math.hypot(P.pos.x - pz.x, P.pos.z - pz.z);
-      if (d < 4.2) { P.pos.x = pz.x + (P.pos.x - pz.x) / d * 4.2; P.pos.z = pz.z + (P.pos.z - pz.z) / d * 4.2; }
-    }
+
   }
   const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y);
   if (P.pos.y <= g) {
@@ -2881,7 +2989,7 @@ function updateWorldBits(dt) {
     gate.userData.film.material.opacity = 0.45 + Math.sin(G.t * 2.4) * 0.12; gate.userData.film.rotation.z = G.t * 0.3;
     if (Math.random() < 0.3) particles.emit(gate.position.x + (Math.random() - 0.5) * 5, gate.position.y + 3.6 + (Math.random() - 0.5) * 5, gate.position.z, { vy: 0.5, color: 0xb48aff, size: 0.35, life: 1.2, speed: 0.6 });
   }
-  hlystTick(dt);
+  hlystTick(dt); skorTick(dt);
   beastScan(dt);
   for (const c of cores) {
     if (c.got) continue;
@@ -3104,5 +3212,5 @@ else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add(
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get dya() { return dyaMatch; }, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

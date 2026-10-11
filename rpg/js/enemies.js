@@ -13,7 +13,8 @@ const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 export const TYPES = {
   punk: { name: 'Wild Punk', build: () => buildPunk(false), hp: 60, dmg: 12, speed: 5.4, rad: 0.85, range: 2.4, aggro: 15, windup: 0.6, recover: 0.75, lunge: 9, shards: 6, ai: 'melee', color: 0xffb040 },
-  malsti: { name: 'Malsti Punk', build: () => buildPunk(true), hp: 26, dmg: 6, speed: 7.2, rad: 0.4, range: 1.5, aggro: 17, windup: 0.35, recover: 0.5, lunge: 9, shards: 3, ai: 'melee', blink: true, color: 0xc08aff },
+  /* fist-sized and never truly aggressive — they blink through the Duat to cause chaos and pinch your shards */
+  malsti: { name: 'Malsti Punk', build: () => buildPunk(true), hp: 18, dmg: 0, speed: 7.2, rad: 0.22, range: 1.1, aggro: 11, windup: 0.3, recover: 0.5, lunge: 8, shards: 3, ai: 'thief', blink: true, color: 0xc08aff },
   rodak: { name: 'Rodak', build: buildRodak, hp: 75, dmg: 15, speed: 8.6, rad: 0.7, range: 2.7, aggro: 14, windup: 0.45, recover: 0.7, lunge: 13, shards: 10, ai: 'scavenger', color: 0x6a8a8a },
   kipsu: { name: 'Kipsu', build: () => buildKipsu(0.55), hp: 32, dmg: 4, speed: 9.5, rad: 0.45, range: 1.5, aggro: 11, windup: 0.3, recover: 0.4, lunge: 9, shards: 5, ai: 'thief', color: 0x6af0e0 },
   albali: { name: 'Albali Byrd', build: () => buildAlbali(false), hp: 48, dmg: 10, speed: 9, rad: 0.7, range: 1.8, aggro: 20, shards: 9, ai: 'flyer', status: 'paralyze', color: 0xffe0a0, disp: 'neutral' },
@@ -28,7 +29,6 @@ export const TYPES = {
   albali_t: { name: 'Villtur Albali', build: () => buildAlbali(true), hp: 58, dmg: 11, speed: 9.5, rad: 0.7, range: 1.8, aggro: 22, shards: 12, ai: 'flyer', status: 'poison', color: 0x9aff5a },
   vel: { name: 'Duskareth Vel', build: buildVel, hp: 190, dmg: 17, speed: 6.2, rad: 0.5, range: 2.4, aggro: 22, windup: 0.5, shards: 60, ai: 'vel', stagger: 0.35, elite: true, color: 0xb070ff },
   tyndael: { name: 'Tyndael', build: buildTyndael, hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
-  punk_alpha: { name: 'Thornback, the Old Punk', build: () => buildPunk(false), hp: 520, dmg: 22, speed: 5.8, rad: 1.6, range: 3.6, aggro: 20, windup: 0.75, recover: 0.9, lunge: 11, shards: 160, ai: 'melee', stagger: 0.3, elite: true, color: 0xc06a20 },
   sruvorn: { name: 'Sru Vorn of the Bogs', build: buildSruVorn, hp: 1100, dmg: 26, speed: 4.6, rad: 2.6, range: 5.5, aggro: 26, shards: 220, ai: 'sruvorn', stagger: 0, miniboss: true, color: 0xb0ff4a },
 };
 
@@ -167,7 +167,7 @@ export function createEnemies(ctx) {
     const P = ctx.P, G = ctx.G, a = e.actor, T = e.T;
     if (e.dead) {
       e.timer += dt;
-      const s0 = T.ai === 'flyer' ? 1 : (e.kind === 'malsti' ? 0.5 : e.kind === 'kipsu' ? 0.55 : T.miniboss ? 1.25 : 1.0);
+      const s0 = e.baseScale || (T.ai === 'flyer' ? 1 : (e.kind === 'malsti' ? 0.5 : e.kind === 'kipsu' ? 0.55 : T.miniboss ? 1.25 : 1.0));
       a.root.scale.setScalar(Math.max(0.001, s0 * (1 - e.timer / (T.miniboss ? 2 : 0.6))));
       a.root.rotation.z += dt * (T.miniboss ? 0.5 : 6);
       if (e.timer > (T.miniboss ? 2 : 0.6)) { ctx.scene.remove(a.root); e.gone = true; }

@@ -158,9 +158,9 @@
     }
     /* ---- rebuild the derived rosters (live references, not copies) ---- */
     SP.list.length = 0;
-    Object.keys(SP.all).forEach(k => SP.list.push(SP.all[k]));
+    Object.keys(SP.all).forEach(k => { if (!SP.all[k].retired) SP.list.push(SP.all[k]); });
     SP.craftable.length = 0;
-    Object.keys(SP.all).forEach(k => { if (!SP.all[k].notCraftable) SP.craftable.push(k); });
+    Object.keys(SP.all).forEach(k => { if (!SP.all[k].notCraftable && !SP.all[k].retired) SP.craftable.push(k); });
 
     /* ---- balance tables (mutated in place — engine holds references) ---- */
     for (const k in BASE.balance) {

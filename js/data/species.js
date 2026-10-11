@@ -602,13 +602,13 @@
   def('skith_grass', {
     name: 'Skith Grass', family: 'Flora', element: 'Fti',
     rarity: [0, 2], size: [0, 0], rig: 'blob',
-    color: '#cfd4b8', color2: '#f0f0f5',
+    color: '#6fa046', color2: '#f4f6ee',
     features: { glow: true, fruit: 'pace' },
     tags: ['passive', 'buff'],
     behavior: 'sprengju',
     statMul: { hp: 0.12, dmg: 0, speed: 0 },
     attackRange: 0,
-    desc: 'A wind-bleached bundle of ridge grass. Eating it makes the legs forget how heavy the body is.',
+    desc: 'A tuft of ridge grass, green with white tips. Eating it makes the legs forget how heavy the body is.',
     temperament: 'Inert. Rustles when nothing is moving. First come, first served.',
     special: 'Consumed by the first creature to reach it — ANY team. Grants a burst of pace.',
     vars: { potency: [0.25, 0.45] }, picks: {},
@@ -656,6 +656,10 @@
     special: 'Boosts any creature that consumes it: damage, speed, and a heal, scaled by the Sprengju’s potency.',
     vars: { potency: [0.15, 0.5] }, picks: {},
   });
+
+  /* taken out of the game: Ember Root, Mirrordew, Stonefruit */
+  const RETIRED = ['ember_root', 'mirrordew', 'stonefruit'];
+  RETIRED.forEach(k => { if (S[k]) { S[k].retired = true; S[k].notCraftable = true; } });
 
   /* ================= SENTIENT UNITS ================= */
 
@@ -802,7 +806,10 @@
   /* ================= exported API ================= */
   DYA.species = {
     all: S,
-    list: Object.keys(S).map(k => S[k]),
+    /* retired species stay defined (so an old save never breaks) but are
+       out of the game: not listed, not craftable, purged from accounts on load */
+    retired: RETIRED,
+    list: Object.keys(S).filter(k => !S[k].retired).map(k => S[k]),
     get: (id) => S[id],
     RARITIES, RARITY_COST, RARITY_VALUE, SIZES, ELEMENTS, ELEMENT_COLORS, ELEMENT_NAMES,
     DIAMONDS, SIZE_HP, SIZE_DMG, SIZE_RADIUS, SIZE_SPEED,
@@ -820,7 +827,7 @@
        tab (DYA.mods.hunts). See ui/screens_meta.js / ui/admin.js. */
     huntable: [],
     /* craftable = everything except spawned/promo */
-    craftable: Object.keys(S).filter(k => !S[k].notCraftable),
+    craftable: Object.keys(S).filter(k => !S[k].notCraftable && !S[k].retired),
     /* duel-legal check: a duel needs a token that actually fights.
        Fruit, relic shavings, Ju Fields, Kofi, Mikolo Moko, Karnen,
        the RubberMcFly — anything with no attack — may still be picked
