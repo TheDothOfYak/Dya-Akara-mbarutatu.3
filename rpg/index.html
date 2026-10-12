@@ -271,6 +271,44 @@
   @media (max-width:760px){ #quest{width:220px} .bar{width:180px} .bar.thin{width:150px} #abilities{transform:scale(.8);transform-origin:bottom right} }
 
   /* ---------- Dya'Akara, in the world ---------- */
+
+  /* ---------- touch controls (body.touch is set on the first touch) ---------- */
+  #touch{position:fixed;inset:0;pointer-events:none;z-index:12;user-select:none;-webkit-user-select:none}
+  #touch.hide .tcluster,#touch.hide .tkit,#touch.hide .ttop,#touch.hide .tdya{display:none}
+  body.touch canvas{touch-action:none}
+  body.touch #touch,body.touch #touch *{touch-action:none;-webkit-tap-highlight-color:transparent}
+  .tb{pointer-events:auto;border:1.5px solid rgba(243,207,122,.55);background:rgba(20,14,28,.42);color:#f4e6c6;border-radius:50%;
+      font:600 20px/1 var(--serif,Georgia,serif);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:0}
+  .tb.down{background:rgba(243,207,122,.45);transform:scale(.93)}
+  .tb.lit{border-color:#ffe08a;box-shadow:0 0 14px rgba(255,224,138,.8);background:rgba(90,70,20,.55)}
+  .tcluster{position:absolute;right:calc(18px + env(safe-area-inset-right));bottom:calc(18px + env(safe-area-inset-bottom));width:210px;height:210px}
+  .tcluster .tb{position:absolute}
+  #tb-attack{width:92px;height:92px;right:0;bottom:0;font-size:34px}
+  #tb-jump{width:62px;height:62px;right:104px;bottom:6px}
+  #tb-dodge{width:62px;height:62px;right:8px;bottom:104px}
+  #tb-duat{width:56px;height:56px;right:96px;bottom:86px}
+  #tb-use{width:54px;height:54px;right:150px;bottom:132px;font-size:18px}
+  .tkit{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(240px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+  .tkit .tb,.ttop .tb{width:44px;height:44px;font-size:17px}
+  .ttop{position:absolute;left:50%;transform:translateX(-50%);top:calc(56px + env(safe-area-inset-top));display:flex;gap:8px}
+  .tdya{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));display:none;gap:6px;flex-wrap:wrap;justify-content:center;max-width:70vw}
+  .tdya .tb{width:auto;min-width:44px;height:40px;border-radius:20px;padding:0 10px;font-size:14px}
+  #touch.dya .tdya{display:flex}
+  #touch.dya #tb-duat,#touch.dya #tb-dodge,#touch.dya #tb-use,#touch.dya .tkit{display:none}
+  .trot{display:none;position:absolute;left:50%;top:40%;transform:translateX(-50%);padding:8px 14px;border-radius:14px;background:rgba(20,14,28,.75);color:#f4e6c6;font:15px var(--serif,Georgia,serif);border:1px solid rgba(243,207,122,.5)}
+  #touch.portrait .trot{display:block}
+  .tstick{position:absolute;width:120px;height:120px;border-radius:50%;border:2px solid rgba(243,207,122,.45);background:rgba(20,14,28,.25);display:none}
+  .tstick.on{display:block}
+  .tknob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(243,207,122,.55)}
+  body.touch #abilities{display:none}
+  body.touch #spells{right:auto;left:calc(12px + env(safe-area-inset-left));bottom:auto;top:calc(96px + env(safe-area-inset-top));pointer-events:auto;flex-direction:column}
+  body.touch #spells .ab.locked{display:none}
+  body.touch #spells .ab{width:44px;height:44px}
+  body.touch #vitals{bottom:auto;top:calc(12px + env(safe-area-inset-top));left:12px;transform:scale(.72);transform-origin:top left}
+  body.touch #crosshair{opacity:.5}
+  body.touch #prompt{top:46%;font-size:15px}
+  body.touch #prompt{pointer-events:auto;cursor:pointer}
+  @media (max-height:480px){ .tcluster{transform:scale(.82);transform-origin:bottom right} .tkit{bottom:calc(196px + env(safe-area-inset-bottom));flex-direction:row;flex-wrap:wrap;max-width:200px;justify-content:flex-end} }
   #dya-hud{position:fixed;inset:0;pointer-events:none;z-index:6;font-family:var(--serif,Georgia,serif);color:#f4e6c6}
   #dya-hud .dh-top{position:absolute;top:58px;left:50%;transform:translateX(-50%);text-align:center;background:rgba(10,14,30,.72);border:1px solid #b8964a;border-radius:10px;padding:6px 14px;min-width:360px}
   #dya-hud .dh-title{font-family:var(--display,Georgia);letter-spacing:.06em;font-size:14px;color:#f3cf7a}
