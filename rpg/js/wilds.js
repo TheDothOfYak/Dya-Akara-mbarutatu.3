@@ -46,7 +46,7 @@ const LAND = {
 const WATER = {
   xilia: [['raf_krabbi', COMMON, 0.3, [1, 3]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', RARE, 3, [1, 2], 2], ['hvaleia', VERY_RARE, 8, [1, 1], 1], ['su_naga', VERY_RARE, 10, [1, 1], 1]],
   aakalay: [['raf_krabbi', COMMON, 0.3, [1, 2]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', RARE, 3, [1, 1], 1], ['hvaleia', VERY_RARE, 8, [1, 1], 1], ['su_naga', VERY_RARE, 10, [1, 1], 1]],
-  leotik: [['raf_krabbi', COMMON, 0.3, [2, 4]], ['su_grothyn', UNCOMMON, 0.5, [1, 2]], ['harkal', UNCOMMON, 3, [1, 3], 4], ['hvaleia', RARE, 8, [1, 1], 2], ['su_naga', RARE, 10, [1, 1], 1]],
+  leotik: [['raf_krabbi', COMMON, 0.3, [1, 2]], ['su_grothyn', UNCOMMON, 0.5, [1, 2]], ['harkal', UNCOMMON, 3, [1, 3], 4], ['hvaleia', RARE, 8, [1, 1], 2], ['su_naga', RARE, 10, [1, 1], 1]],
 };
 const SLOTS = { xilia: 2, aakalay: 1, leotik: 3 };          // rolls per land zone — Aakalay is all but empty
 const WATER_SLOTS = { xilia: 10, aakalay: 7, leotik: 16 };
