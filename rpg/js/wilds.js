@@ -22,14 +22,14 @@ const COMMON = 10, UNCOMMON = 4, RARE = 1.2, VERY_RARE = 0.35;
 /* [kind, weight, biomes (null = any land), group size [min,max], cap per region] */
 const LAND = {
   xilia: [
-    ['kofi', COMMON, null, [2, 4]], ['uff', COMMON, ['meadow', 'forest', 'hills'], [1, 3]], ['makari', COMMON, ['meadow', 'lake', 'shore', 'forest'], [1, 1]],
+    ['kofi', UNCOMMON, null, [1, 2]], ['uff', COMMON, ['meadow', 'forest', 'hills'], [1, 3]], ['makari', COMMON, ['meadow', 'lake', 'shore', 'forest'], [1, 1]],
     ['mikolo_moko', UNCOMMON, ['forest', 'meadow'], [1, 2]], ['big_momma_kofi', UNCOMMON, ['meadow', 'forest'], [1, 1]], ['punk', UNCOMMON, ['meadow', 'hills'], [2, 3]],
     ['rubbermcfly', UNCOMMON, ['meadow', 'forest', 'lake'], [1, 2]], ['ular_grothyn', UNCOMMON, ['forest', 'hills'], [1, 1]], ['tonguatjis', UNCOMMON, ['lake', 'shore', 'meadow'], [1, 1]],
     ['rodak', RARE, ['forest', 'hills'], [2, 3]], ['stryx', RARE, ['hills', 'mountain'], [1, 1], 3], ['gynge', RARE, ['meadow', 'forest', 'hills'], [1, 1], 2],
     ['ular_naga', VERY_RARE, ['mountain', 'hills', 'forest'], [1, 1], 1], ['lutut', VERY_RARE, ['mountain', 'hills'], [1, 1], 1], ['kuni_wild', VERY_RARE, ['mountain'], [1, 1], 1],
   ],
   aakalay: [
-    ['kofi', COMMON, null, [1, 3]], ['uff', COMMON, ['forest', 'ruins', 'meadow'], [1, 2]], ['makari', COMMON, ['lake', 'forest', 'ruins'], [1, 1]],
+    ['kofi', UNCOMMON, null, [1, 2]], ['uff', COMMON, ['forest', 'ruins', 'meadow'], [1, 2]], ['makari', COMMON, ['lake', 'forest', 'ruins'], [1, 1]],
     ['mikolo_moko', UNCOMMON, ['forest'], [1, 1]], ['rubbermcfly', UNCOMMON, ['forest', 'ruins'], [1, 1]], ['eldi_grothyn', UNCOMMON, ['ash', 'hills'], [1, 1]],
     ['ular_grothyn', UNCOMMON, ['forest'], [1, 1]], ['stryx', RARE, ['hills', 'mountain', 'ash'], [1, 1], 2], ['gynge', RARE, ['ash', 'hills'], [1, 1], 1],
     ['tonguatjis', RARE, ['lake', 'shore'], [1, 1], 2], ['lutut', VERY_RARE, ['mountain', 'ash'], [1, 1], 1],
@@ -37,7 +37,7 @@ const LAND = {
   leotik: [
     ['uff', COMMON, ['jungle', 'forest'], [1, 3]], ['makari', COMMON, ['jungle', 'shore', 'bog'], [1, 1]], ['mikolo_moko', COMMON, ['jungle', 'forest'], [1, 2]],
     ['tonguatjis', UNCOMMON, ['bog', 'shore', 'lake'], [1, 1]], ['ular_grothyn', UNCOMMON, ['jungle', 'bog'], [1, 2]], ['eldi_grothyn', UNCOMMON, ['mountain', 'ash', 'hills'], [1, 2]],
-    ['rubbermcfly', UNCOMMON, ['jungle'], [1, 2]], ['kofi', UNCOMMON, null, [1, 3]], ['big_momma_kofi', RARE, ['jungle'], [1, 1]],
+    ['rubbermcfly', UNCOMMON, ['jungle'], [1, 2]], ['kofi', UNCOMMON, null, [1, 2]], ['big_momma_kofi', RARE, ['jungle'], [1, 1]],
     ['gynge', RARE, ['jungle', 'bog', 'hills'], [1, 1], 2], ['stryx', RARE, ['hills', 'mountain'], [1, 1], 2],
     ['ular_naga', RARE, ['jungle', 'mountain', 'bog'], [1, 1], 1], ['lutut', RARE, ['mountain', 'shore'], [1, 1], 1], ['kuni_wild', VERY_RARE, ['mountain', 'shore'], [1, 1], 1],
   ],

@@ -12,6 +12,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { buildSky, SUN_DIR } from './sky.js';
+import { createDayNight } from './daynight.js';
 import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
@@ -74,7 +75,7 @@ try { BOOT = sessionStorage.getItem('torcain-boot'); sessionStorage.removeItem('
 const REGION = SAVE.region || 'xilia';
 let D = DIFFICULTY[SAVE.difficulty] || DIFFICULTY.easy;
 const persist = () => {
-  SAVE.shards = G.shards;
+  SAVE.shards = G.shards; if (typeof dn !== 'undefined') SAVE.hour = Math.round(dn.hour * 10) / 10;
   writeSave(SAVE, KEY);
   if (WHO) CLOUD.pushSave(WHO.id, SAVE);
 };
@@ -124,6 +125,8 @@ function resize() {
 /* ---------------- world ---------------- */
 const world = REGION === 'leotik' ? buildLeotik(scene) : REGION === 'xilia' ? buildXilia(scene) : buildWorld(scene);
 const sky = buildSky(scene, buildEldiShip, REGION === 'leotik' ? 'storm' : 'golden');
+/* day and night: the sun crosses the sky; at night the Esik glow */
+const dn = createDayNight({ scene, sky, sun, hemi, rim, renderer, bloom, region: REGION, startHour: SAVE.hour ?? 9 });
 particles = new Particles(scene, 3500);
 resize();
 addEventListener('resize', resize);
@@ -425,7 +428,7 @@ function buildOtlid(stygian) {
 /* the Kahizecvar: while the duel lasts, Torcain is Kiet, in golden memory */
 const memState = { on: false, fog: null };
 function enterMemory() {
-  memState.on = true; G.inMemory = true;   // the memory holds only Kiet and Otlið — today's creatures aren't in it
+  memState.on = true; G.inMemory = true; dn.holdFog = true;   // the memory holds only Kiet and Otlið — today's creatures aren't in it
   memState.fog = { c: scene.fog.color.getHex(), n: scene.fog.near, f: scene.fog.far };
   scene.fog.color.setHex(0xf6d6a0); scene.fog.near = 30; scene.fog.far = 260;
   phorus.root.visible = false;
@@ -433,7 +436,7 @@ function enterMemory() {
 }
 function exitMemory() {
   if (!memState.on) return;
-  memState.on = false; G.inMemory = false;
+  memState.on = false; G.inMemory = false; dn.holdFog = false;
   scene.fog.color.setHex(memState.fog.c); scene.fog.near = memState.fog.n; scene.fog.far = memState.fog.f;
   phorus.root.visible = true;
   document.body.classList.remove('in-memory');
@@ -1896,7 +1899,7 @@ function setObjective() {
     else { txt = STORY.LEOTIK_OBJ.pillars(pillarCount()); hintTxt = 'F — Phorus senses the nearest pillar'; }
     pips = 3; on = pillarCount();
   }
-  $('q-head').textContent = REGION === 'xilia' ? 'Prologue · Xilia' : REGION === 'aakalay' ? 'Rokarvac I · Aakalay' : 'Rokarvac II · Leotik';
+  $('q-head').textContent = $('q-head').dataset.base = REGION === 'xilia' ? 'Prologue · Xilia' : REGION === 'aakalay' ? 'Rokarvac I · Aakalay' : 'Rokarvac II · Leotik';
   $('q-text').textContent = txt;
   $('q-hint').textContent = hintTxt;
   const el = $('q-pips'); el.innerHTML = '';
@@ -3134,7 +3137,6 @@ function updateWorldBits(dt) {
   for (const s of stones) s.rune.material.opacity = SAVE.codex[s.key] ? 0.2 : 0.45 + Math.sin(G.t * 2.5 + s.x) * 0.2;
   if (lostMark) { lostMark.rotation.y += dt; if (Math.random() < 0.4) particles.emit(lostMark.position.x, lostMark.position.y, lostMark.position.z, { vy: 1.5, speed: 1, color: 0xb48aff, size: 0.3, life: 1 }); }
   if (sky.thunder) { sfx.roar(); }
-  hemi.intensity = hemiBase + (sky.flash || 0) * 2.5;
 }
 
 /* ================================================================
@@ -3190,6 +3192,9 @@ function frame() {
   const tt = G.mode === 'title' ? performance.now() / 1000 : G.t;
   world.update(tt, dt, particles, camera.position);
   sky.update(tt, dt, camera.position);
+  dn.update(frozen && G.mode !== 'title' ? 0 : dt);
+  G.night = dn.night;
+  if ((G.hudT = (G.hudT || 0) - dt) <= 0) { G.hudT = 1; const qh = $('q-head'); if (qh && qh.dataset.base) qh.textContent = qh.dataset.base + ' · ' + dn.label(); }
   ship.update(tt, dt, particles);
   particles.update(frozen && G.mode !== 'title' ? 0 : dt);
   const focus = G.mode === 'title' ? V3(0, 0, 0) : P.pos;
@@ -3333,5 +3338,5 @@ else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add(
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get dya() { return dyaMatch; }, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };
