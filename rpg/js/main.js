@@ -1428,7 +1428,7 @@ if (REGION === 'aakalay') {
   const pz = world.PLAZA, mx = pz.x + 21, mz = pz.z - 21, my = world.heightAt(mx, mz);
   const megla = buildMeglaAagac({ seed: 31 }); megla.root.scale.setScalar(0.7); megla.root.position.set(mx, my - 0.2, mz); megla.root.rotation.y = 2.2; scene.add(megla.root);
   world.col.add(mx, mz, 1.3, 1.3, 0, my - 1, my + 14);
-  let mt = 0; G.meglaTick = dt => { mt += dt; megla.animate(dt, { speed: 0, t: mt }); };
+  let mt = 0; G.meglaTick = dt => { mt += dt; megla.animate(dt, { speed: 0, t: mt }); if (megla.glow) megla.glow(G.night || 0); };
 }
 /* Skor'Thal: scarred trees that only answer Nur'Hlyst, then the den in the far north wood */
 function scarTree() {
@@ -1467,6 +1467,7 @@ function skorTick(dt) {
   if (!skor.m.root.visible) return;
   skor.t += dt;
   skor.m.animate(dt, { speed: 0, t: skor.t * 0.4, windup: 0, attack: 0, swing: 0, onGround: true });
+  if (skor.m.glow) skor.m.glow(G.night || 0);
 }
 function denGuards() { return enemies.list.filter(e => !e.dead && e.tag === 'skorden' && Math.hypot(e.pos.x - skor.pos.x, e.pos.z - skor.pos.z) < 40).length; }
 function sitWithSkor() {
@@ -3194,6 +3195,12 @@ function frame() {
   sky.update(tt, dt, camera.position);
   dn.update(frozen && G.mode !== 'title' ? 0 : dt);
   G.night = dn.night;
+  /* everyone's bioluminescence follows the dark (creatures handle their own in enemies.js / wilds.js) */
+  if ((G.glowT = (G.glowT || 0) - dt) <= 0) {
+    G.glowT = 0.25; const n = G.night;
+    for (const a of [torcain, phorus, mount && mount.actor, boss && boss.actor]) if (a && a.glow) a.glow(n);
+    for (const c of npcs) if (c.actor.glow) c.actor.glow(n);
+  }
   if ((G.hudT = (G.hudT || 0) - dt) <= 0) { G.hudT = 1; const qh = $('q-head'); if (qh && qh.dataset.base) qh.textContent = qh.dataset.base + ' · ' + dn.label(); }
   ship.update(tt, dt, particles);
   particles.update(frozen && G.mode !== 'title' ? 0 : dt);

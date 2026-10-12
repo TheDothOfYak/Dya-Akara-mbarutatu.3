@@ -65,6 +65,69 @@ function finish(root, thick = 0.03) {
   outlineAll(root, thick);
   root.traverse(m => { if (m.isMesh && m.name !== 'outline' && !(m.material && m.material.transparent)) m.castShadow = true; });
 }
+/* ---------------- BIOLUMINESCENCE ----------------
+   Every living thing on the Mbaru Tatu glows a little. Pattern materials
+   come from bioKit(): pale, skin-tinted marks by day that shine at night.
+   glow(v) — v = 0 bright day .. 1 full night — sets them all. It touches
+   only these materials (never the flash() ones) and allocates nothing. */
+function bioKit() {
+  const tm = [], bm = [], sp = [];
+  const k = {
+    v: 0,
+    /* a pattern material: skin-tinted by day, shining colour c at night */
+    mat(c, skin = c, mix = 0.5, lo = 0.12, hi = 1.6) {
+      return k.reg(toon(new THREE.Color(skin).lerp(new THREE.Color(c), mix), { emissive: c }), lo, hi);
+    },
+    /* an existing lit material whose emissive rises at night */
+    reg(m, lo, hi) { m.userData.bio = [lo, hi]; m.emissiveIntensity = lo; tm.push(m); return m; },
+    /* an existing unlit glow: dimmer by day (lo), full (or `night`) at night */
+    basic(m, lo = 0.5, night) {
+      m.userData.c0 = m.color.clone(); m.userData.c1 = night !== undefined ? new THREE.Color(night) : m.color.clone(); m.userData.lo = lo; bm.push(m); return m;
+    },
+    /* a glow sprite: `day` fraction of its opacity by day, all of it at night */
+    sprite(s, op, day = 0) { s.userData.op = op ?? s.material.opacity; s.userData.day = day; sp.push(s); return s; },
+    glow(v) {
+      v = v < 0 ? 0 : v > 1 ? 1 : v; k.v = v;
+      for (let i = 0; i < tm.length; i++) { const b = tm[i].userData.bio; tm[i].emissiveIntensity = b[0] + (b[1] - b[0]) * v; }
+      for (let i = 0; i < bm.length; i++) { const u = bm[i].userData; bm[i].color.copy(u.c0).multiplyScalar(u.lo).lerp(u.c1, v); }
+      for (let i = 0; i < sp.length; i++) { const s = sp[i], o = s.userData.op * (s.userData.day + (1 - s.userData.day) * v); s.material.opacity = o; s.visible = o > 0.01; }
+    },
+  };
+  return k;
+}
+/* glowing dots merged into one geometry. Each entry is either
+   [dx, dy, dz, r, flat]                — a direction on an ellipsoid part of radii
+                                          (sx, sy, sz); the geometry is in the part's
+                                          unit space (add it to a sphere scaled sx,sy,sz)
+   [px, py, pz, nx, ny, nz, r, flat]    — an explicit surface point and normal. */
+const _bUP = new THREE.Vector3(0, 1, 0), _bq = new THREE.Quaternion(), _bn = new THREE.Vector3(), _bp = new THREE.Vector3(), _bsc = new THREE.Vector3(), _bm4 = new THREE.Matrix4(), _bS = new THREE.Matrix4();
+function bioDots(list, sx = 1, sy = 1, sz = 1, seg = 6) {
+  const unit = new THREE.SphereGeometry(1, seg, Math.max(3, seg - 2)).toNonIndexed();
+  const n = unit.attributes.position.count, pos = new Float32Array(n * 3 * list.length), nor = new Float32Array(n * 3 * list.length);
+  _bS.makeScale(1 / sx, 1 / sy, 1 / sz);
+  list.forEach((e, i) => {
+    let r, fl;
+    if (e.length >= 6) { _bp.set(e[0], e[1], e[2]); _bn.set(e[3], e[4], e[5]).normalize(); r = e[6] ?? 0.02; fl = e[7] ?? 0.4; }
+    else { _bn.set(e[0], e[1], e[2]).normalize(); _bp.set(_bn.x * sx, _bn.y * sy, _bn.z * sz); _bn.set(_bn.x / sx, _bn.y / sy, _bn.z / sz).normalize(); r = e[3]; fl = e[4] ?? 0.4; }
+    _bm4.compose(_bp, _bq.setFromUnitVectors(_bUP, _bn), _bsc.set(r, r * fl, r)).premultiply(_bS);
+    const g = unit.clone().applyMatrix4(_bm4);
+    pos.set(g.attributes.position.array, i * n * 3); nor.set(g.attributes.normal.array, i * n * 3);
+  });
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return out;
+}
+/* n dots evenly from entry a to entry b (same form), radius r0 → r1 */
+function dotRun(a, b, n, r0, r1 = r0, flat) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = n > 1 ? i / (n - 1) : 0, e = a.map((v, j) => v + (b[j] - v) * t);
+    e.push(r0 + (r1 - r0) * t); if (flat !== undefined) e.push(flat); out.push(e);
+  }
+  return out;
+}
+function bioMesh(geo, m, parent, x = 0, y = 0, z = 0) { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.userData.noOutline = true; parent.add(o); return o; }
+
 /* a glow sprite that darkens instead of adding light (for auras) */
 function darkSprite(color, size, opacity) {
   const s = glowSprite(color, size, opacity);
@@ -128,6 +191,17 @@ function buildChain(parent, D, cuts, m, o = {}) {
   return out;
 }
 const segAt = (chain, z) => chain.find(s => z >= s.zA && z <= s.zB) || chain[0];
+/* rows of glowing photophores on a lathe-chain body: rows = [[th, z0, z1, step, r]],
+   one merged mesh per body slice so the dots ride the undulation */
+function chainDots(chain, D, SX, SY, rows, m) {
+  const per = chain.map(() => []);
+  for (const [th, z0, z1, step, r] of rows) for (let z = z0; z >= z1; z -= step) {
+    if (profR(D, z) < r * 2) continue;
+    const si = chain.indexOf(segAt(chain, z)), p = surf(D, z, th, SX, SY, 1.0);
+    per[si].push([p.x, p.y, z - chain[si].pivot, Math.sin(th) / SX, Math.cos(th) / SY, 0, r * (0.75 + 0.25 * Math.min(1, profR(D, z))), 0.45]);
+  }
+  per.forEach((L, i) => { if (L.length) bioMesh(bioDots(L), m, chain[i].g); });
+}
 /* point on a lathe body: th = 0 on top, +PI/2 on +x side */
 function surf(D, z, th, sx = 1, sy = 1, off = 1) {
   const r = profR(D, z) * off;
@@ -234,6 +308,13 @@ export function buildHvaleia(opts = {}) {
   const finM = mat(top.clone().multiplyScalar(0.85));
   const darkM = mat(0x14202c), rimM = mat(0xb9d4ea), eyeW = mat(0xf4f0e2), pupilM = mat(0x0c0c14);
   const SX = 1, SY = 0.88;
+  // bioluminescence: two rows of photophores down each flank, a scatter along the pale
+  // belly line, and blowhole rims that glow
+  const bio = bioKit(), rndB = mulberry32(opts.seed ?? 1);
+  const HV_GLOW = [0x8af0ff, 0xa8b8ff, 0x7affd8];
+  const bioC = opts.seed != null ? HV_GLOW[Math.floor(rndB() * HV_GLOW.length)] : HV_GLOW[0];
+  const photoM = bio.mat(bioC, top, 0.3, 0.1, 2.0);
+  rimM.emissive.set(bioC); bio.reg(rimM, 0.0, 1.2);
   const D = smoothProfile([[-4.25, 0], [-4.12, 0.26], [-3.85, 0.43], [-3.55, 0.42], [-3.3, 0.28], [-3.0, 0.26], [-2.4, 0.42],
     [-1.4, 0.72], [-0.4, 1.0], [0.6, 1.2], [1.6, 1.3], [2.5, 1.28], [3.15, 1.12], [3.6, 0.82], [3.85, 0.4], [3.92, 0]], 90);
   const chain = buildChain(swim, D, [-0.6, -2.3, -3.2], bodyM, { segs: 22, sx: SX, sy: SY, colors: [top, belly, -0.3] });
@@ -272,6 +353,7 @@ export function buildHvaleia(opts = {}) {
     if (s < 0) mouthPts.push(...side); else { mouthPts.push(V3(0, -0.2, 3.9)); mouthPts.push(...side.reverse()); }
   }
   add(head, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(mouthPts), 40, 0.035, 5), darkM);
+  chainDots(chain, D, SX, SY, [[1.55, 2.6, -3.0, 0.42, 0.08], [-1.55, 2.6, -3.0, 0.42, 0.08], [1.95, 2.4, -2.4, 0.55, 0.06], [-1.95, 2.4, -2.4, 0.55, 0.06], [0.8, 0.4, -2.0, 0.6, 0.05], [-0.8, 0.4, -2.0, 0.6, 0.05]], photoM);
   // five fins: two each side, one underneath on the last third
   const fins = [];
   const sideFin = (seg, z, th, len, wid, droop) => {
@@ -291,9 +373,10 @@ export function buildHvaleia(opts = {}) {
   fins.push({ f: vf, droop: -Math.PI / 2, ph: 2, ventral: true });
 
   finish(root, 0.05);
+  bio.glow(0);
   let ph = 0;
   return {
-    root, mats: [bodyM, finM],
+    root, mats: [bodyM, finM], glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, w = st.windup || 0, a = st.attack || 0;
       ph += dt * (1.1 + sp * 0.35);
@@ -324,6 +407,12 @@ export function buildHarkal(opts = {}) {
   const toothM = mat(0xf4ecd6), darkM = mat(0x2a1418), scarM = new THREE.MeshToonMaterial({ color: 0xd8c4bc, gradientMap: ramp() });
   const gumM = mat(0x8a3a44), bellyM = mat(0xd9dfe2);
   const SX = 0.86, SY = 1;
+  // bioluminescence (a lantern shark's): a lateral line of dots, a glowing belly
+  // scatter, and a lit tip on THE tooth
+  const bio = bioKit();
+  const HK_GLOW = [0x7ab8ff, 0x8affe8, 0xc89aff];
+  const bioC = opts.seed != null ? HK_GLOW[Math.floor(rnd() * HK_GLOW.length)] : HK_GLOW[0];
+  const photoM = bio.mat(bioC, top, 0.25, 0.1, 2.0);
   const D = smoothProfile([[-1.1, 0], [-1.05, 0.05], [-0.85, 0.09], [-0.5, 0.17], [-0.1, 0.3], [0.3, 0.4], [0.65, 0.44],
     [0.95, 0.42], [1.12, 0.33], [1.22, 0.18], [1.26, 0]], 70);
   const chain = buildChain(swim, D, [-0.15, -0.62], bodyM, { segs: 18, sx: SX, sy: SY, colors: [top, belly, -0.15] });
@@ -350,6 +439,8 @@ export function buildHarkal(opts = {}) {
     const a = 0.35 + i * 0.3, t = add(head, new THREE.ConeGeometry(0.016, 0.06, 4), toothM, s * Math.sin(a) * 0.22, -0.13, 0.78 + Math.cos(a) * 0.32);
     t.rotation.x = Math.PI;
   }
+  add(big, new THREE.SphereGeometry(0.03, 8, 6), photoM, 0, 0.17, 0).userData.noOutline = true;
+  chainDots(chain, D, SX, SY, [[1.5, 0.9, -0.95, 0.12, 0.022], [-1.5, 0.9, -0.95, 0.12, 0.022], [2.55, 0.7, -0.5, 0.16, 0.026], [-2.55, 0.7, -0.5, 0.16, 0.026], [Math.PI, 0.6, -0.4, 0.2, 0.024]], photoM);
   // eyes and gills
   const eyeM = mat(0x0a0a10);
   for (const s of [-1, 1]) {
@@ -385,9 +476,10 @@ export function buildHarkal(opts = {}) {
   add(tail, smoothSlab([[0.12, 0], [-0.2, 0.3], [-0.42, 0.62], [-0.36, 0.64], [-0.2, 0.25], [-0.2, 0], [-0.32, -0.32], [-0.24, -0.34], [0.05, -0.04]], 0.05).rotateY(-Math.PI / 2), finM);
 
   finish(root, 0.022);
+  bio.glow(0);
   let ph = 0;
   return {
-    root, mats: [bodyM, finM],
+    root, mats: [bodyM, finM], glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, w = st.windup || 0, a = st.attack || 0;
       ph += dt * (2.2 + sp * 0.8);
@@ -415,6 +507,8 @@ export function buildSuNaga(opts = {}) {
   const darkM = mat(0x0c1420), jawM = mat(0x6fa2ab);
   const GLOW = [0x5ff4ff, 0x6a8cff, 0xb46aff, 0x8af0d8];
   const spotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  // its lots-of-bioluminescence: everything below is dimmer by day and full at night
+  const bio = bioKit();
   const spotGeo = new THREE.SphereGeometry(1, 8, 6);
   const SX = 1.15, SY = 0.9;
   const D = smoothProfile([[-10.2, 0], [-10.0, 0.3], [-9, 0.42], [-7.6, 0.66], [-6, 1.1], [-4.5, 1.75], [-3, 2.25], [-1, 2.5],
@@ -474,6 +568,7 @@ export function buildSuNaga(opts = {}) {
   for (let i = 0; i < 6; i++) {
     const z = -5.5 + i * 1.6, seg = segAt(chain, z), p = surf(D, z, 0, SX, SY, 1.15);
     const gs = glowSprite(GLOW[i % 3], 2.4, 0.35); gs.position.set(0, p.y + 0.4, z - seg.pivot); seg.g.add(gs);
+    bio.sprite(gs, 0.5, 0.3);
   }
 
   // massive flippers, two pairs
@@ -504,9 +599,13 @@ export function buildSuNaga(opts = {}) {
   add(fl, flG, finM);
   add(fl, smoothSlab([[0.6, 0], [0.1, 0.7], [-0.45, 1.5], [-0.75, 1.45], [-0.85, 0.5], [-0.9, 0]], 0.1).rotateY(-Math.PI / 2), finM, 0, 0.05, -0.1);
   const fGlow = glowSprite(GLOW[2], 3, 0.4); fGlow.position.set(0, 0.2, -0.5); fl.add(fGlow);
+  bio.sprite(fGlow, 0.6, 0.3);
+  // purple beads along the fluke's trailing edge
+  bioMesh(bioDots([[0.5, -0.95], [1.1, -0.82], [1.7, -0.75], [2.3, -0.92], [2.7, -1.05]].flatMap(([x, z]) => [-1, 1].map(s => [s * x * 1.3, 0.11, z * 1.3, 0, 1, 0, 0.13, 0.4]))), bio.mat(GLOW[2], 0x1a4a5e, 0.35, 0.15, 2.2), fl);
 
   // necks & heads — five built, opts.heads shown
   const necks = [];
+  const tendBall = bio.basic(glowMat(GLOW[0]), 0.55);
   const NSEG = 5, NL = 1.25;
   const neckR = [0.9, 0.8, 0.7, 0.62, 0.56, 0.52];
   for (let n = 0; n < 5; n++) {
@@ -532,11 +631,12 @@ export function buildSuNaga(opts = {}) {
     const tends = [];
     for (const s of [-1, 1]) {
       const tg = new THREE.Group(); tg.position.set(s * 0.6, 0.28, 1.15); head.add(tg);
-      noOut(add(tg, new THREE.SphereGeometry(0.13, 8, 6), glowMat(GLOW[0])));
+      noOut(add(tg, new THREE.SphereGeometry(0.13, 8, 6), tendBall));
       add(tg, taperTube([[0, 0, 0], [s * 0.45, 0.12, -0.12], [s * 0.85, -0.25, -0.45], [s * 0.95, -0.95, -0.75]], 0.09, 0.02, 12, 5), finM);
       add(tg, taperTube([[0, 0, 0], [s * 0.35, 0.2, -0.3], [s * 0.6, 0.0, -0.95], [s * 0.55, -0.45, -1.5]], 0.07, 0.015, 12, 5), finM);
       for (const [x, y, z, c] of [[0.95, -0.95, -0.75, 0], [0.55, -0.45, -1.5, 2]]) {
         const tip = glowSprite(GLOW[c], 0.6, 0.95); tip.position.set(s * x, y, z); tg.add(tip);
+        bio.sprite(tip, 0.95, 0.35);
       }
       tends.push(tg);
     }
@@ -557,9 +657,10 @@ export function buildSuNaga(opts = {}) {
   setHeads(opts.heads ?? 3);
 
   finish(root, 0.09);
+  bio.glow(0);
   let ph = 0;
   return {
-    root, mats: [bodyM, finM], setHeads,
+    root, mats: [bodyM, finM], setHeads, glow: bio.glow,
     get heads() { return heads; },
     animate(dt, st) {
       const sp = st.speed || 0, w = st.windup || 0, a = st.attack || 0;
@@ -585,8 +686,9 @@ export function buildSuNaga(opts = {}) {
         nk.tends.forEach((tg, k) => { tg.rotation.x = Math.sin(st.t * 1.6 + nk.ph + k) * 0.15; tg.rotation.y = Math.sin(st.t * 1.1 + k * 2) * 0.12; });
       });
       const pulse = 0.85 + Math.sin(st.t * 1.8) * 0.2;
-      spotMat.color.setScalar(pulse);
-      ridgeM.emissiveIntensity = 0.45 + Math.sin(st.t * 1.8 + 1) * 0.2 + w * 0.4;
+      const nf = 0.45 + 0.55 * bio.v;
+      spotMat.color.setScalar(pulse * nf);
+      ridgeM.emissiveIntensity = (0.45 + Math.sin(st.t * 1.8 + 1) * 0.2 + w * 0.4) * (0.5 + 0.9 * bio.v);
     },
     flash(v) { bodyM.emissive.setRGB(v, v, v); finM.emissive.setRGB(v, v, v); },
   };
@@ -610,6 +712,11 @@ export function buildRafKrabbi(opts = {}) {
   const col = krabbiColour(opts), hsl = {}; col.getHSL(hsl);
   const shellM = mat(col), plateM = mat(col.clone().offsetHSL(0, 0, -0.1)), legM = mat(col.clone().offsetHSL(0, -0.05, -0.05));
   const bellyM = mat(col.clone().lerp(new THREE.Color(0xf2e6d0), 0.6)), tipM = mat(0x241c1c), eyeM = mat(0x111111);
+  // bioluminescence: a row of lamps round the carapace rim and glowing eye-stalk tips,
+  // in a colour opposite its shell's hue (on top of its electric charge)
+  const bio = bioKit();
+  const glowC = new THREE.Color().setHSL((hsl.h + 0.5) % 1, 0.9, 0.65);
+  const rimGlow = bio.mat(glowC.getHex(), col, 0.3, 0.1, 2.0);
   const body = new THREE.Group(); body.position.y = 0.095; root.add(body);
   // thick plate armour: dome, stacked top plate, rear bands, craggy rim knobs
   add(body, new THREE.SphereGeometry(1, 22, 12).scale(0.13, 0.06, 0.1), shellM);
@@ -624,10 +731,12 @@ export function buildRafKrabbi(opts = {}) {
     k.rotation.set(rnd() * 3, rnd() * 3, 0);
   }
   for (let i = 0; i < 4; i++) { const k = add(body, craggy(0.014, rnd, 0.3, 0), plateM, (rnd() - 0.5) * 0.12, 0.07, (rnd() - 0.5) * 0.08); k.rotation.y = rnd() * 3; }
+  { const L = []; for (let i = 0; i < 12; i++) { const a = Math.PI * 0.25 + i / 11 * Math.PI * 1.5; L.push([Math.sin(a), -0.05, Math.cos(a), 0.012]); } bioMesh(bioDots(L, 0.13, 0.06, 0.1), rimGlow, body).scale.set(0.13, 0.06, 0.1); }
   // eyes on stalks
   for (const s of [-1, 1]) {
     const st = add(body, new THREE.CylinderGeometry(0.007, 0.009, 0.05, 5), legM, s * 0.03, 0.055, 0.075); st.rotation.x = 0.3;
     add(st, new THREE.SphereGeometry(0.011, 8, 6), eyeM, 0, 0.028, 0);
+    bioMesh(bioDots([[0, 0.038, 0, 0, 1, 0, 0.006, 0.8]]), rimGlow, st);
   }
   // four legs — two each side
   const legs = [];
@@ -687,10 +796,11 @@ export function buildRafKrabbi(opts = {}) {
   };
 
   finish(root, 0.006);
+  bio.glow(0);
   root.scale.setScalar(0.8 * (opts.size ? opts.size / 0.4 : 1));
   let ph = Math.random() * 6, flick = 0;
   return {
-    root, mats: [shellM, plateM, legM],
+    root, mats: [shellM, plateM, legM], glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, w = st.windup || 0, a = st.attack || 0;
       ph += dt * (2 + sp * 30);
@@ -726,7 +836,7 @@ export function buildRafKrabbi(opts = {}) {
         setArc(arcs[3], B, shellTop, amp); arcs[3].visible = Math.random() < on * 0.6;
         arcs.forEach(l => l.userData.beads.forEach(b => { b.visible = l.visible; b.scale.setScalar(0.025 + Math.random() * 0.03 + a * 0.03); }));
       }
-      halo.material.opacity = 0.15 + Math.random() * 0.15 + a * 0.3;
+      halo.material.opacity = (0.15 + Math.random() * 0.15 + a * 0.3) * (0.7 + 0.6 * bio.v);
     },
     flash(v) { shellM.emissive.setRGB(v, v, v); plateM.emissive.setRGB(v, v, v); },
   };
@@ -745,6 +855,10 @@ export function buildGrothyn(opts = {}) {
   const root = new THREE.Group();
   const shellM = mat(E.shell), petalM = mat(E.petal), vineM = mat(E.vine), innerM = mat(new THREE.Color(E.vine).multiplyScalar(0.45));
   const thornM = mat(0xe8dcc0);
+  // bioluminescence: the petal veins glow, beads of light ring the cone's growth lines,
+  // and the opening and vine tip shine brighter at night
+  const bio = bioKit();
+  const veinM = bio.mat(E.glow, E.shell, 0.3, 0.1, 2.0);
   // the cone shell: six wall plates with grooves and growth lines, open at the top
   const prof = [[0.82, 0], [0.82, 0.06], [0.74, 0.3], [0.62, 0.62], [0.5, 0.95], [0.43, 1.13], [0.39, 1.2], [0.33, 1.2], [0.3, 1.13], [0.28, 1.0], [0.0, 0.95]]
     .map(([r, y]) => new THREE.Vector2(r, y));
@@ -758,6 +872,7 @@ export function buildGrothyn(opts = {}) {
     }
     cone.computeVertexNormals(); }
   add(root, cone, shellM);
+  { const L = []; for (const [y, r] of [[0.3, 0.74], [0.62, 0.62]]) for (let i = 0; i < 12; i++) { const a = (i + 0.5) / 12 * TAU + y; L.push([Math.sin(a) * (r + 0.012), y, Math.cos(a) * (r + 0.012), Math.sin(a), 0.35, Math.cos(a), 0.03, 0.45]); } bioMesh(bioDots(L), veinM, root); }
   add(root, new THREE.CircleGeometry(0.29, 20).rotateX(-Math.PI / 2), innerM, 0, 1.0, 0);
   const hole = glowSprite(E.glow, 0.7, 0.35); hole.position.y = 1.05; root.add(hole);
   // four petals lying flush against the cone, hinged at the rim
@@ -769,7 +884,7 @@ export function buildGrothyn(opts = {}) {
     const hinge = new THREE.Group(); hinge.position.set(Math.sin(az) * 0.42, 1.13, Math.cos(az) * 0.42); hinge.rotation.y = az; root.add(hinge);
     const leaf = new THREE.Group(); hinge.add(leaf);
     add(leaf, petalG, petalM, 0, 0, 0.03);
-    add(leaf, veinG, shellM, 0, -0.36, 0.055);
+    noOut(add(leaf, veinG, veinM, 0, -0.36, 0.055));
     petals.push(leaf);
   }
   // the vine: a chain of tapered segments that lengthen as it lashes
@@ -792,8 +907,10 @@ export function buildGrothyn(opts = {}) {
   const tipGlow = glowSprite(E.glow, 0.35, 0.6); tipGlow.position.y = 0.15; tip.add(tipGlow);
 
   finish(root, 0.018);
+  bio.sprite(tipGlow, 0.85, 0.6);
+  bio.glow(0);
   return {
-    root, mats: [shellM, petalM],
+    root, mats: [shellM, petalM], glow: bio.glow,
     animate(dt, st) {
       const w = st.windup || 0, a = st.attack || 0, t = st.t || 0;
       const fan = Math.max(w, a);
@@ -813,7 +930,7 @@ export function buildGrothyn(opts = {}) {
         if (i > 0) g.position.y = SL * len;
       });
       vine.tip.position.y = SL * len;
-      hole.material.opacity = 0.3 + fan * 0.4;
+      hole.material.opacity = (0.3 + fan * 0.4) * (0.6 + 0.6 * bio.v);
       root.position.y = 0;
       root.scale.y = 1 + Math.sin(t * 1.2) * 0.008;
     },
@@ -831,6 +948,10 @@ export function buildAlbaliAagac(opts = {}) {
   const root = new THREE.Group();
   const barkM = mat(0x7a5a3e), leafM = mat(0xffffff, { vertexColors: true }), fruitM = mat(0xc4473b), budM = mat(0x8ab84e), stemM = mat(0x4a3424);
   const leafTop = new THREE.Color(0x6ea446), leafBot = new THREE.Color(0x3e6a30);
+  // faint glow: the fruit (where the byrds sleep) and the buds twinkle at night
+  const bio = bioKit();
+  fruitM.emissive.set(0xff6a4a); bio.reg(fruitM, 0.0, 0.75);
+  budM.emissive.set(0xb8ff6a); bio.reg(budM, 0.0, 0.8);
   // trunk with root flare
   const tp = [[1.4, 0], [1.0, 0.3], [0.78, 1.0], [0.7, 2.5], [0.66, 4.2], [0.6, 5.0], [0.0, 5.3]].map(([r, y]) => new THREE.Vector2(r, y));
   const trunkG = new THREE.LatheGeometry(new THREE.SplineCurve(tp).getSpacedPoints(24), 14);
@@ -867,8 +988,9 @@ export function buildAlbaliAagac(opts = {}) {
   }
 
   finish(root, 0.05);
+  bio.glow(0);
   return {
-    root, mats: [leafM, barkM],
+    root, mats: [leafM, barkM], glow: bio.glow,
     animate(dt, st) {
       const t = st.t || 0;
       canopy.rotation.z = Math.sin(t * 0.6) * 0.008; canopy.rotation.x = Math.sin(t * 0.47 + 1) * 0.006;
@@ -894,9 +1016,13 @@ export function buildAlbaliBud(opts = {}) {
     s.rotation.set(Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35); s.rotation.y = a;
   }
   const leaf = add(sway, new THREE.SphereGeometry(1, 8, 6).scale(0.03, 0.006, 0.06), sepM, 0.035, 0.022, 0); leaf.rotation.set(0, 0.8, -0.3);
+  // faint glow: a bright tip and five seams of light up the bud
+  const bio = bioKit(), seamM = bio.mat(0xc8ff7a, 0x86b84a, 0.15, 0.03, 1.6);
+  { const L = [[0, 0.17, 0, 0, 1, 0, 0.012, 0.8]]; for (let i = 0; i < 5; i++) { const a = (i + 0.5) / 5 * TAU; for (const [y, r] of [[0.11, 0.043], [0.14, 0.03]]) L.push([Math.sin(a) * r, y, Math.cos(a) * r, Math.sin(a), 0.3, Math.cos(a), 0.006, 0.5]); } bioMesh(bioDots(L), seamM, sway); }
   finish(root, 0.004);
+  bio.glow(0);
   return {
-    root, mats: [budM],
+    root, mats: [budM], glow: bio.glow,
     animate(dt, st) { sway.rotation.z = Math.sin((st.t || 0) * 1.3) * 0.05; },
     flash(v) { budM.emissive.setRGB(v, v, v); },
   };
@@ -906,7 +1032,10 @@ export function buildAlbaliBud(opts = {}) {
 export function buildAlbaliFruit(opts = {}) {
   const root = new THREE.Group();
   const R = 0.15;
-  const fruitM = mat(opts.color ?? 0xc8463c), lineM = mat(0x7a1f22), stemM = mat(0x5a3e24), leafM = mat(0x5f9a3e);
+  const fruitM = mat(opts.color ?? 0xc8463c), stemM = mat(0x5a3e24), leafM = mat(0x5f9a3e);
+  // faint glow: the two lines down from the top shine warm at night (a byrd stirring)
+  const bio = bioKit();
+  const lineM = bio.reg(mat(0x7a1f22, { emissive: 0xffa06a }), 0.0, 1.4);
   const body = new THREE.Group(); body.position.y = R * 0.92; root.add(body);
   const fg = new THREE.SphereGeometry(R, 22, 16); fg.scale(1, 0.92, 1);
   { const p = fg.attributes.position; // a soft dimple at the top where the stem sits
@@ -924,8 +1053,9 @@ export function buildAlbaliFruit(opts = {}) {
   void stem;
   const leaf = add(body, new THREE.SphereGeometry(1, 10, 6).scale(0.055, 0.008, 0.025), leafM, -0.04, R * 0.95 + 0.02, 0); leaf.rotation.set(0, 0.3, 0.35);
   finish(root, 0.005);
+  bio.glow(0);
   return {
-    root, mats: [fruitM],
+    root, mats: [fruitM], glow: bio.glow,
     animate(dt, st) { body.rotation.z = Math.sin((st.t || 0) * 0.9) * 0.015; },
     flash(v) { fruitM.emissive.setRGB(v, v, v); },
   };
@@ -944,20 +1074,25 @@ export function buildJuField(opts = {}) {
   const frondG = new THREE.ConeGeometry(0.03, 0.3, 4).translate(0, 0.15, 0).scale(1, 1, 0.3);
   const spots = [[0, 0], [0.3, 0.12], [-0.3, 0.14], [0.16, -0.25], [-0.18, -0.24], [0.4, -0.18], [-0.42, -0.08]];
   const tufts = [];
+  // faint glow: a ring of tiny lights round each carrot's shoulder
+  const bio = bioKit(), juM = bio.mat(0xffc86a, 0xe8782a, 0.3, 0.0, 2.4), juDots = [];
   spots.forEach(([x, z], i) => {
     const y = 0.115 * Math.sqrt(Math.max(0, 1 - (x / 0.62) ** 2 - (z / 0.56) ** 2)) - 0.005;
     const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rnd() * TAU; root.add(g);
     add(g, moundG, soilD, 0, 0.0, 0);
     add(g, shoulderG, carrotM, 0, 0.0, 0);
+    for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + i; juDots.push([x + Math.sin(a) * 0.05, y + 0.05, z + Math.cos(a) * 0.05, Math.sin(a), 0.6, Math.cos(a), 0.012, 0.6]); }
     for (let k = 0; k < 5; k++) {
       const a = k / 5 * TAU, f = add(g, frondG, k % 2 ? leafM : leafM2, 0, 0.04, 0);
       f.rotation.set(Math.cos(a) * 0.4, a, Math.sin(a) * 0.4); f.scale.setScalar(0.85 + rnd() * 0.4);
     }
     tufts.push({ g, ph: i });
   });
+  bioMesh(bioDots(juDots), juM, root);
   finish(root, 0.006);
+  bio.glow(0);
   return {
-    root, mats: [soilM, carrotM],
+    root, mats: [soilM, carrotM], glow: bio.glow,
     animate(dt, st) { const t = st.t || 0; tufts.forEach(tf => { tf.g.rotation.z = Math.sin(t * 1.4 + tf.ph) * 0.05; }); },
     flash(v) { carrotM.emissive.setRGB(v, v, v); },
   };
@@ -994,9 +1129,11 @@ export function buildSprengju(opts = {}) {
   const sparks = [];
   for (let i = 0; i < 7; i++) { const s = glowSprite(i % 2 ? 0xffe070 : 0xff7a2a, 0.07, 1); hover.add(s); sparks.push({ s, ph: i / 7 * TAU, r: 0.13 + (i % 3) * 0.03, y: -0.2 + (i % 4) * 0.1 }); }
   finish(root, 0.006);
-  let rot = 0;
+  let rot = 0, night = 0;
   return {
     root, mats: [carrotM],
+    /* the relic-cracks and sparks burn brighter in the dark */
+    glow(v) { night = Math.max(0, Math.min(1, v)); },
     animate(dt, st) {
       const sp = st.speed || 0, w = st.windup || 0, a = st.attack || 0, t = st.t || 0;
       rot += dt * (4 + sp * 2 + a * 10);
@@ -1006,14 +1143,15 @@ export function buildSprengju(opts = {}) {
       // swell as if about to burst
       const sw = 1 + a * 0.55 + w * 0.15, jit = a * 0.04 * Math.sin(t * 60);
       swell.scale.set(sw + jit, 1 + a * 0.25 - jit, sw + jit);
-      crackM.color.setRGB(1, 0.7 + a * 0.3, 0.25 + a * 0.6);
-      core.material.opacity = 0.3 + a * 0.3 + Math.sin(t * 15) * 0.05;
+      const nk = 0.7 + 0.3 * night;
+      crackM.color.setRGB(nk, (0.7 + a * 0.3) * nk, (0.25 + a * 0.6) * nk);
+      core.material.opacity = (0.3 + a * 0.3 + Math.sin(t * 15) * 0.05) * (0.8 + 0.7 * night);
       core.scale.setScalar(0.5 + a * 0.25);
       carrotM.emissive.setRGB(a * 0.45, a * 0.2, 0);
       sparks.forEach((s, i) => {
         const ang = t * 5 + s.ph;
         s.s.position.set(Math.cos(ang) * s.r * sw, s.y + Math.sin(t * 7 + i) * 0.03, Math.sin(ang) * s.r * sw);
-        s.s.material.opacity = Math.max(0, Math.sin(t * 13 + i * 2.1)) * (0.7 + a * 0.3);
+        s.s.material.opacity = Math.max(0, Math.sin(t * 13 + i * 2.1)) * (0.7 + a * 0.3) * (0.75 + 0.25 * night);
       });
     },
     flash(v) { carrotM.emissive.setRGB(v, v * 0.8, v * 0.6); },
@@ -1066,14 +1204,16 @@ export function buildSprengjuShaving(opts = {}) {
   }
   const glow = glowSprite(0xff8a2a, 0.55, 0.45); float.add(glow);
   finish(root, 0.004);
+  let night = 0;
   return {
     root, mats: [crysM],
+    glow(v) { night = Math.max(0, Math.min(1, v)); },
     animate(dt, st) {
       const t = st.t || 0;
       float.position.y = 0.8 + Math.sin(t * 1.6) * 0.05;
       shard.rotation.y = t * 0.6;
-      crysM.emissiveIntensity = 0.75 + Math.sin(t * 2.4) * 0.25;
-      glow.material.opacity = 0.35 + Math.sin(t * 2.4) * 0.12;
+      crysM.emissiveIntensity = (0.75 + Math.sin(t * 2.4) * 0.25) * (0.85 + 0.4 * night);
+      glow.material.opacity = (0.35 + Math.sin(t * 2.4) * 0.12) * (0.8 + 0.6 * night);
       chips.forEach((c, i) => { const a = t * 0.9 + c.ph; c.c.position.set(Math.cos(a) * 0.17, Math.sin(t * 2 + i) * 0.05, Math.sin(a) * 0.17); c.c.rotation.y = t * 2; });
     },
     flash(v) { crysM.color.setRGB(0.55 + v * 0.45, 0.56 + v * 0.44, 0.58 + v * 0.42); },
@@ -1105,6 +1245,7 @@ export function buildSkithGrass(opts = {}) {
   finish(root, 0.003);
   return {
     root, mats: [bladeM],
+    glow() {},   // just grass: no light of its own
     animate(dt, st) { const t = st.t || 0; blades.forEach(bl => { bl.b.rotation.x = bl.rx + Math.sin(t * 1.8 + bl.ph) * 0.06; }); },
     flash(v) { bladeM.emissive.setRGB(v, v, v); },
   };
@@ -1147,6 +1288,16 @@ export function buildMeglaAagac(opts = {}) {
   tips.forEach(([x, y, z]) => blobs.push([x * 1.15, y + 0.4, z * 1.15, 3.2 + rnd() * 0.8]));
   for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.8; blobs.push([Math.sin(a) * 3, 18.4, Math.cos(a) * 3, 2.4]); }
   blobs.forEach(([x, y, z, r]) => { const g = blobGeo(r, rnd, 0.14).scale(1, 0.75, 1); countershade(g, leafTop, leafBot, -0.15); add(canopy, g, leafM, x, y, z); });
+  // a little light: pale fungus-lamps scattered over the trunk and roots
+  const bio = bioKit(), fungM = bio.mat(0xa8b8ff, 0x3b2d22, 0.25, 0.0, 2.0);
+  {
+    const p = trunkG.attributes.position, nm = trunkG.attributes.normal, L = [];
+    for (let i = 0; i < p.count && L.length < 40; i += 7) {
+      const y = p.getY(i); if (y > 7 || y < 0.3 || rnd() < 0.55) continue;
+      const k = 0.1 + rnd() * 0.1; L.push([p.getX(i), y, p.getZ(i), nm.getX(i), nm.getY(i), nm.getZ(i), k, 0.5]);
+    }
+    bioMesh(bioDots(L), fungM, root);
+  }
   // the faint dark aura
   const aura = [];
   [[0, 6, 0, 13, 0.22], [0, 15, 0, 22, 0.18], [4, 10, 3, 9, 0.12], [-4, 11, -3, 9, 0.12]].forEach(([x, y, z, s, o]) => {
@@ -1155,8 +1306,9 @@ export function buildMeglaAagac(opts = {}) {
   const wisps = [];
   for (let i = 0; i < 8; i++) { const d = darkSprite(0x120e18, 4.5, 0.12); root.add(d); wisps.push({ d, a: i / 8 * TAU, r: 5 + rnd() * 4, y: 2 + rnd() * 14 }); }
   finish(root, 0.08);
+  bio.glow(0);
   return {
-    root, mats: [woodM, leafM],
+    root, mats: [woodM, leafM], glow: bio.glow,
     animate(dt, st) {
       const t = st.t || 0;
       canopy.rotation.z = Math.sin(t * 0.35) * 0.005;
