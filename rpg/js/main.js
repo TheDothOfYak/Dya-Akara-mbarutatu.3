@@ -239,7 +239,9 @@ function spawnPoint() {
 /* ---------------- input ---------------- */
 const keys = {};
 let mouseL = false, locked = false;
+const typing = e => { const t = e.target; return !!(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))); };
 addEventListener('keydown', e => {
+  if (typing(e)) return;   // typing in the sign-in box isn't playing the game
   if (G.mode !== 'title') initAudio();
   if (e.code === 'Tab') e.preventDefault();
   if (e.repeat) return;
@@ -277,7 +279,7 @@ document.addEventListener('mousedown', e => {
   if (e.button === 2) duatStrike();
 });
 document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; });
-document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });   // keep long-press paste in text fields
 addEventListener('wheel', e => { CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
 function lockMouse() { if (touch.on) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } }
 /* phones and tablets: a joystick, a look-drag and on-screen buttons (see touch.js) */
@@ -3351,7 +3353,7 @@ $('si-form').onsubmit = async ev => {
   location.reload();
 };
 
-if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'This is a keyboard-and-mouse game — on a phone or tablet the controls won’t work.';
+if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'On a phone or tablet: left thumb moves, drag on the right to look, and the buttons fight. Turn your phone sideways for the best view.';
 $('btn-continue').onclick = () => startFromTitle(() => {
   if (REGION === 'xilia' && !F_.xtalked) beginNew();
   else if (REGION === 'aakalay' && !F_.arrivedA && !F_.talked) arriveAakalay();

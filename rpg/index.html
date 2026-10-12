@@ -16,6 +16,8 @@
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;overflow:hidden;background:var(--navy);color:var(--ink);font-family:var(--body);user-select:none;-webkit-user-select:none}
+  /* text fields must stay selectable, or phones (iOS Safari especially) won't let you tap into them */
+  input,textarea,select{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
   #game{position:fixed;inset:0}
   #game canvas{display:block;width:100%;height:100%}
   .hidden{display:none !important}
@@ -32,10 +34,10 @@
   .brass::after{bottom:-3px;right:-3px;border-left:none;border-top:none;border-bottom-right-radius:6px}
 
   /* ---------------- title ---------------- */
-  #title{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:flex-start;padding:0 8vw;
+  #title{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:flex-start;padding:0 8vw;overflow-y:auto;-webkit-overflow-scrolling:touch;
     background:linear-gradient(90deg, rgba(8,12,24,.88) 0%, rgba(8,12,24,.55) 45%, rgba(8,12,24,0) 75%);transition:opacity 1s}
   #title.fade{opacity:0;pointer-events:none}
-  .t-box{max-width:560px}
+  .t-box{max-width:560px;margin:auto 0;padding:24px 0}   /* auto margins centre it, yet a tall title scrolls instead of being cut off */
   .t-kicker{font-family:var(--display);letter-spacing:.38em;text-transform:uppercase;font-size:13px;color:var(--brass)}
   .t-title{font-family:var(--display);font-weight:700;font-size:clamp(38px,6vw,78px);line-height:1.02;margin:14px 0 6px;
     background:linear-gradient(180deg,#fff2c8 0%,#f3cf7a 45%,#c0812a 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
@@ -210,12 +212,14 @@
   .diff h3{font-family:var(--display);color:var(--brass2);font-size:20px;letter-spacing:.1em}
   .diff p{font-size:15px;color:var(--ink-dim);margin-top:6px;line-height:1.4}
   .diff.real h3{color:#ff8a7a}
-  #newgame{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,16,.7)}
+  #newgame{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;justify-content:center;background:rgba(5,8,16,.7);overflow-y:auto;padding:16px 0}
+  #newgame>*{margin:auto 0}
   .t-save{font-size:14px;color:var(--ink-dim);margin:-14px 0 6px}
   .t-acct{font-size:14px;color:var(--ink-dim);margin:0 0 18px;max-width:560px}
   .t-acct b{color:var(--brass2);font-weight:normal}
   .t-acct a{color:var(--su)}
-  #signin{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,16,.7)}
+  #signin{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;justify-content:center;background:rgba(5,8,16,.7);overflow-y:auto;padding:16px 0}
+  #signin>*{margin:auto 0}
   #signin input{width:100%;font:17px var(--body);padding:10px 12px;margin:6px 0 10px;border-radius:8px;border:1px solid var(--brass-dim);background:rgba(0,0,0,.35);color:var(--ink)}
   #signin label{font-family:var(--display);font-size:12px;letter-spacing:.15em;color:var(--brass)}
   /* ---------------- the RPG book ---------------- */

@@ -18,8 +18,8 @@
       box.appendChild(U.el('h1', { text: "DYA'AKARA" }));
       box.appendChild(U.el('div', { cls: 'sub', text: 'TOKEN GAME OF THE MBARU TATU' }));
       const panel = U.el('div', { cls: 'panel' });
-      const email = U.el('input', { cls: 'txt', type: 'email', placeholder: 'you@example.com' });
-      const pass = U.el('input', { cls: 'txt', type: 'password', placeholder: '••••••••' });
+      const email = U.el('input', { cls: 'txt', type: 'email', autocomplete: 'username', placeholder: 'you@example.com' });
+      const pass = U.el('input', { cls: 'txt', type: 'password', autocomplete: 'current-password', placeholder: '••••••••' });
       const err = U.el('div', { cls: 'small', style: 'color:var(--red);min-height:18px;margin-top:8px' });
       panel.appendChild(U.el('label', { cls: 'lbl', text: 'Email' })); panel.appendChild(email);
       panel.appendChild(U.el('label', { cls: 'lbl', text: 'Password' })); panel.appendChild(pass);
@@ -47,6 +47,7 @@
       }
       loginBtn.onclick = doLogin;
       pass.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+      email.addEventListener('keydown', e => { if (e.key === 'Enter') pass.focus(); });
       forgot.onclick = () => UI.alert('Forgot Password', 'The local build stores accounts on this device only. When the Firebase backend is connected, a reset email flow appears here. For now: make a new account, or remember harder.');
       create.onclick = () => showCreateFlow();
 
