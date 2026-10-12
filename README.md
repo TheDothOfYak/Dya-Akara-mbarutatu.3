@@ -76,6 +76,8 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **Albali Aagac.** Oak-sized trees whose ripe fruit falls and, left alone, hatches into an Albali Byrd (tame in Xilia and Aakalay, Villtur on Leotik). Pick the fruit up before it hatches.
 
+**The Ash Road.** Like the exits out of Hyrule Field, a pass cut through the mountains joins Xilia and Aakalay: in Xilia it runs west over the Crown Ridge, in Aakalay north-west between the Western Scarp and the Rend. Cairns with lamps and a signpost mark where it leaves the land. Walk up the road into the mist and you come out at the top of the same road in the other region, with Brindle and Phorus. From Xilia it's blocked by a rockfall until the story has taken you to Aakalay. Each region remembers the lantern you last rested at, and the map shows the pass.
+
 **Swimming and steep ground.** Deep water no longer stops you: wade in and Torcain swims, head and shoulders above the surface, in every lake, river and lagoon, and a little way out to sea off Leotik. Only the far sea and water by the region's edge turn you back. Swimming is slower, there's no rolling in the water, and land creatures won't follow you in. Ground steeper than about 51° can't be walked or hopped up any more; you slide along it, and you slip off ground that steep if you stop on it. Built stairs, piers and roofs are unaffected.
 
 **Touch controls.** The RPG plays on phones and tablets, and the controls turn on at the first touch:
@@ -96,7 +98,7 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 - **Nur’Hlyst** (`G`): a golden pulse that reveals chests, gathering spots and quest objects — and the 21 hidden **Sniller amulets**, which pay out at 5, 10, 15 and 21.
 - **A bestiary** (Beasts tab): hunt enough of a creature to study it for +15% damage against it.
 - **Friendly creatures** that only fight if attacked: Kipsu families you can pet, a domestic Punk herd, and Albali that leave you alone.
-- **A Punk mount, Brindle**: whistle with `H`, ride with `E`.
+- **A Punk mount, Brindle**: whistle with `H`, ride with `E`. Phorus rides too: some days he climbs up behind you on Brindle, other days he takes his own Punk, Nettle, and keeps pace alongside.
 - **Gliding**: hold `Space` in the air.
 - **Levels and perks**: three perk trees (Axe, Duat, Survival).
 - **Spells** on keys `1`–`4`: Duat Pull, Fti Gust, Ular Quake and Nur Ward.

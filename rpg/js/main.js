@@ -1140,7 +1140,7 @@ function talkPhorus() {
     'Rest at the lanterns. I can sing your shards into you there — but resting wakes everything else up too.',
   ];
   let line;
-  if (REGION === 'xilia') line = F_.xseed ? 'Back to the docks — the Stryx will want that seed while it’s warm.' : F_.seedQuest ? 'The Ember Grove is north-east. I’ll feel for the seed if you press F.' : (F_.tut || 0) < 5 ? 'Buhkon’s yard is south-east of the square. Go on — I’ll be near the bakery.' : tips[Math.floor(G.t) % tips.length];
+  if (REGION === 'xilia') line = F_.xdone ? 'The Ash Road, west over the ridge, goes back to the Reach. Three days of it. I’ll complain the whole way.' : F_.xseed ? 'Back to the docks — the Stryx will want that seed while it’s warm.' : F_.seedQuest ? 'The Ember Grove is north-east. I’ll feel for the seed if you press F.' : (F_.tut || 0) < 5 ? 'Buhkon’s yard is south-east of the square. Go on — I’ll be near the bakery.' : tips[Math.floor(G.t) % tips.length];
   else if (REGION === 'aakalay') line = F_.done ? 'The Punk with a lord in its head. Lovely. The Urverk is in the plaza, under where the stone was — whenever you’re ready.' : coreCount() >= 5 ? 'The plaza, Torcain. The Oath Stone. It’s waiting.' : tips[Math.floor(G.t) % tips.length];
   else line = F_.lordDead ? 'The door is open. I’m not going through it without a proper meal first.' : pillarCount() >= 3 ? 'The keep. The Urverk. Let’s finish it.' : tips[Math.floor(G.t) % tips.length];
   dialog([['phorus', line]]);
@@ -1150,6 +1150,7 @@ function stryx() {
   if (REGION === 'aakalay' && F_.done) { setSail(); return; }
   if (REGION !== 'xilia') return;
   if (REGION === 'xilia') {
+    if (F_.xdone) { dialog([['stryx', 'The seed went to the Reach with you, and I don’t fly without one. Take the Ash Road — west, over the ridge.']]); return; }
     if (F_.xseed) { sailToAakalay(); return; }
     if ((F_.tut || 0) < 5) { dialog(STORY.XILIA.stryxEarly); return; }
     if (!F_.seedQuest) { dialog(STORY.XILIA.stryxSeed, () => { F_.seedQuest = true; persist(); setObjective(); toast('New quest: The Warm Seed', 3); sfx.core(); }); return; }
@@ -1908,7 +1909,8 @@ function setObjective() {
   let txt, hintTxt = '', pips = 0, on = 0;
   const X = STORY.OBJECTIVES.xilia, tut = F_.tut || 0;
   if (REGION === 'xilia') {
-    if (!F_.xtalked) txt = X.talk;
+    if (F_.xdone) txt = 'Home in Xilia for a while. The Ash Road over the western ridge leads back to Aakalay';
+    else if (!F_.xtalked) txt = X.talk;
     else if (tut === 0) txt = X.buhkon;
     else if (tut === 1) { txt = X.dummies(Math.min(3, SAVE.counters.tut_dummy || 0)); hintTxt = 'Left-click to swing — keep clicking to combo'; pips = 3; on = Math.min(3, SAVE.counters.tut_dummy || 0); }
     else if (tut === 2) { txt = X.high; hintTxt = 'Right-click throws the axe through the Duat'; }
@@ -2500,10 +2502,40 @@ function toggleRide() {
     P.riding = false;
     P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
     P.pos.y = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 3);
+    phorusDismount();
   } else {
     P.riding = true; mount.coming = false; P.atk = null;
     sfx.jump();
+    phorusMount();
   }
+}
+
+/* Phorus rides too: some days he climbs up behind you on Brindle, some days he
+   takes his own Punk, Nettle, and keeps pace alongside */
+const FR = { mode: null, punk: null, pos: V3(), yaw: 0 };
+const PILLION_LINES = ['Budge up. Brindle won’t mind.', 'I’m riding behind. Mind the bumps.', 'Room for one more. There’s always room for one more.'];
+const NETTLE_LINES = ['I’m taking Nettle. Try to keep up.', 'Nettle! Here, girl. We ride together today.', 'Race you. Nettle’s faster, don’t tell Brindle.'];
+function phorusMount() {
+  if (!phorus.root.visible || FR.mode) return;   // he's not about (on the Kuni, say)
+  FR.mode = Math.random() < 0.5 ? 'pillion' : 'own';
+  if (FR.mode === 'own') {
+    if (!FR.punk) { FR.punk = buildDomesticPunk({ saddle: true, blanket: 0x2a5a8a, seed: 23 }); FR.punk.root.scale.setScalar(0.72); scene.add(FR.punk.root); }
+    // Nettle trots over from wherever she was left, or out of the nearest bushes
+    if (!FR.punk.root.visible || FR.pos.distanceTo(F.pos) > 20) { FR.pos.copy(F.pos).add(V3(1.2, 0, 1.2)); FR.pos.y = world.col.ground(FR.pos.x, FR.pos.z, F.pos.y + 2); }
+    FR.punk.root.visible = true;
+    F.pos.copy(FR.pos); F.vel.set(0, 0, 0);
+    particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 12, { color: 0xd8c098, speed: 3, size: 0.5, life: 0.5 });
+    bark('phorus', NETTLE_LINES[Math.floor(Math.random() * NETTLE_LINES.length)], 2.4);
+  } else bark('phorus', PILLION_LINES[Math.floor(Math.random() * PILLION_LINES.length)], 2.4);
+}
+function phorusDismount() {
+  if (!FR.mode) return;
+  if (FR.mode === 'own') {          // he hops down beside Nettle, who waits there
+    FR.pos.copy(F.pos); FR.yaw = F.yaw;
+    F.pos.add(V3(Math.cos(F.yaw) * 1.5, 0, -Math.sin(F.yaw) * 1.5));
+  } else F.pos.copy(P.pos).add(V3(-Math.sin(P.yaw) * 2.2, 0, -Math.cos(P.yaw) * 2.2));   // slides off Brindle's back
+  F.pos.y = world.col.ground(F.pos.x, F.pos.z, F.pos.y + 3); F.vel.set(0, 0, 0);
+  FR.mode = null;
 }
 function updateMount(dt) {
   if (!mount) return;
@@ -2769,9 +2801,101 @@ function mapMarkers() {
   if (board) m.push({ x: board.x, z: board.z, ch: '▤', col: '#e8c890', size: 15, label: 'Bounties' });
   if (SAVE.quests.q_skorthal === 'active' && skor && !SAVE.counters.skorthal) m.push({ x: skor.pos.x, z: skor.pos.z, ch: '✦', col: '#9af0a0', size: 18, label: 'Skor’Thal' });
   if (lostMark) m.push({ x: lostMark.position.x, z: lostMark.position.z, ch: '✦', col: '#d8b8ff', size: 15, label: 'Lost shards' });
+  for (const ps of passes) { const q = ps.point(ps.r1); m.push({ x: q.x, z: q.z, ch: '⛰', col: passOpen(ps) ? '#f3cf7a' : '#7a6a5a', size: 18, label: passOpen(ps) ? `${ps.name} → ${REGION_NAME[ps.to]}` : `${ps.name} (rockfall)` }); }
   m.push(...wilds.markers());
   return m;
 }
+/* ---------------- mountain passes: walk out along the road and the next region loads ---------------- */
+const REGION_NAME = { xilia: 'Xilia', aakalay: 'The Ruins of Aakalay', leotik: 'Leotik' };
+const passOpen = ps => ps.to !== 'aakalay' || !!F_.xdone;    // the road to the Reach opens once the story has taken you there
+function signTexture(lines) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#6b4a2c'; x.fillRect(0, 0, 256, 128); x.strokeStyle = '#3a2614'; x.lineWidth = 8; x.strokeRect(4, 4, 248, 120);
+  x.fillStyle = '#f4e2b8'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = 'bold 30px Georgia, serif'; x.fillText(lines[0], 128, 46);
+  x.font = 'italic 22px Georgia, serif'; x.fillText(lines[1], 128, 88);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const passes = (world.passes || []).map(ps => {
+  const open = passOpen(ps), grp = new THREE.Group(), stone = toon(0x8a8478), stoneD = toon(0x6e6a62);
+  const at = (s, l) => { const q = ps.point(s, l); return V3(q.x, world.heightAt(q.x, q.z), q.z); };
+  // cairns with a Nur-lamp on top either side of where the road leaves the land
+  for (const side of [-1, 1]) {
+    const b = at(ps.r0 + 8, side * (ps.w + 1.2));
+    for (let k = 0; k < 4; k++) {
+      const r = 0.9 - k * 0.17, m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), k % 2 ? stoneD : stone);
+      m.position.set(b.x + (Math.random() - 0.5) * 0.2, b.y + 0.5 + k * r * 1.3, b.z + (Math.random() - 0.5) * 0.2); m.rotation.set(k, k * 2, 0); grp.add(m);
+    }
+    const lamp = glowSprite(0xffc870, 2.2, 0.85); lamp.position.set(b.x, b.y + 4.4, b.z); grp.add(lamp);
+    world.col.add(b.x, b.z, 0.8, 0.8, 0, b.y - 1, b.y + 4);
+  }
+  // a signpost: where the road goes
+  {
+    const b = at(ps.r0 + 12, ps.w - 2.2), post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3, 6), toon(0x5a3a22));
+    post.position.set(b.x, b.y + 1.5, b.z); grp.add(post);
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), new THREE.MeshToonMaterial({ map: signTexture([ps.name, '→ ' + REGION_NAME[ps.to]]), side: THREE.DoubleSide }));
+    board.position.set(b.x, b.y + 2.5, b.z); board.rotation.y = Math.atan2(-ps.cx, -ps.sz); grp.add(board);
+    world.col.add(b.x, b.z, 0.25, 0.25, 0, b.y - 1, b.y + 3);
+  }
+  // mist where the road tops the ridge and runs on out of sight
+  for (let k = 0; k < 7; k++) {
+    const m = at(ps.trigger + 6 + k * 5, (Math.random() - 0.5) * ps.w * 1.4), g = glowSprite(0xf2ece0, 16 + Math.random() * 8, 0.32);
+    g.position.set(m.x, m.y + 3 + Math.random() * 4, m.z); g.material.fog = false; grp.add(g);
+  }
+  // a closed road is blocked by an old rockfall
+  if (!open) for (let k = 0; k < 9; k++) {
+    const q = at(ps.gate + 3 + Math.random() * 4, (k / 8 - 0.5) * ps.w * 2), r = 1.4 + Math.random() * 1.6;
+    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), k % 2 ? stone : stoneD); m.position.set(q.x, q.y + r * 0.6, q.z); m.rotation.set(Math.random() * 3, Math.random() * 3, 0); grp.add(m);
+  }
+  outlineAll(grp, 0.05); scene.add(grp);
+  return ps;
+});
+/* called every frame from updatePlayer, after the move */
+function checkPasses(px0, pz0) {
+  for (const ps of passes) {
+    if (ps.lat(P.pos.x, P.pos.z) > ps.w + 3) continue;
+    const s = ps.along(P.pos.x, P.pos.z);
+    if (!passOpen(ps)) {
+      if (s > ps.gate && ps.along(px0, pz0) <= ps.gate + 0.5) {
+        P.pos.x = px0; P.pos.z = pz0; P.vel.x *= -0.2; P.vel.z *= -0.2;
+        if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', 'Rockfall. And it’s three days on foot to the Reach that way anyway. The Stryx is quicker.', 3); }
+      }
+    } else if (s > ps.trigger && G.mode === 'play') takePass(ps);
+  }
+}
+function takePass(ps) {
+  G.mode = 'trance'; P.vel.set(0, 0, 0);
+  if (document.pointerLockElement) document.exitPointerLock();
+  fade(1, 0.7);
+  showLocation(ps.name, 'on to ' + REGION_NAME[ps.to]);
+  SAVE.lanternBy = SAVE.lanternBy || {}; SAVE.lanternBy[REGION] = SAVE.lantern;   // each region remembers where you last rested
+  SAVE.region = ps.to; SAVE.lantern = SAVE.lanternBy[ps.to] || null;
+  SAVE.passIn = { id: ps.toPass, ride: !!P.riding };
+  persist(); CLOUD.flush();
+  try { sessionStorage.setItem('torcain-boot', 'pass'); } catch (e) { /* ignore */ }
+  setTimeout(() => location.reload(), 900);
+}
+/* coming in over a pass from another region: stand at the top of the road, facing into the land */
+function arriveByPass() {
+  const info = SAVE.passIn || {}; delete SAVE.passIn;
+  if (REGION === 'aakalay' && !F_.arrivedA) { arriveAakalay(); return; }
+  const ps = passes.find(q => q.id === info.id);
+  if (!ps) { continueRun(); return; }
+  const a = ps.point(ps.arrive);
+  P.pos.set(a.x, world.heightAt(a.x, a.z), a.z); P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos);
+  P.yaw = Math.atan2(-ps.cx, -ps.sz); CAM.yaw = Math.atan2(ps.cx, ps.sz); G.t = 0;
+  F.pos.copy(P.pos).add(V3(ps.cx * 2.5 - ps.sz * 2, 0, ps.sz * 2.5 + ps.cx * 2));
+  if (mount) {              // Brindle came over the pass with you
+    mount.pos.copy(P.pos).add(V3(-ps.sz * 3, 0, ps.cx * 3)); mount.pos.y = world.heightAt(mount.pos.x, mount.pos.z);
+    if (info.ride) toggleRide();
+  }
+  fade(1, 0); setTimeout(() => fade(0, 1.2), 50);
+  enterPlay();
+  showLocation(REGION_NAME[REGION], 'by ' + ps.name);
+  persist();
+}
+
 function travel(id) {
   const l = lanternById(id); if (!l) return;
   if (G.bossActive) { toast('Not in the middle of a fight like this.', 2); return; }
@@ -2925,6 +3049,7 @@ function updatePlayer(dt) {
     P.pos.x = px0; P.pos.z = pz0; P.vel.x *= -0.2; P.vel.z *= -0.2;
     if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', world.barrierLine ? world.barrierLine(P.pos.x, P.pos.z) : 'No way through here.', 2.4); }
   }
+  checkPasses(px0, pz0);
   // no walking (or hopping) straight up a cliff face: slide along it instead
   const hd = Math.hypot(P.pos.x - px0, P.pos.z - pz0);
   if (hd > 1e-4 && steepUp(P.pos.x, P.pos.z, py0, hd)) {
@@ -3069,7 +3194,17 @@ function updatePhorus(dt) {
     }
   } else {
     const back = V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), right = V3(-Math.cos(P.yaw), 0, Math.sin(P.yaw));
-    want = P.pos.clone().addScaledVector(back, 2.4).addScaledVector(right, 1.8);
+    want = FR.mode === 'own' ? P.pos.clone().addScaledVector(back, 3.5).addScaledVector(right, 3.2)   // Nettle keeps clear of Brindle
+      : P.pos.clone().addScaledVector(back, 2.4).addScaledVector(right, 1.8);
+  }
+  if (FR.mode && !P.riding) phorusDismount();
+  if (FR.punk && FR.mode !== 'own') { FR.punk.root.position.copy(FR.pos); FR.punk.root.rotation.y = FR.yaw; if (FR.punk.root.visible) FR.punk.animate(dt, { speed: 0, t: G.t }); }
+  if (FR.mode === 'pillion') {      // up behind Torcain on Brindle's back
+    F.pos.copy(P.pos).add(V3(-Math.sin(P.yaw) * 0.95, 0, -Math.cos(P.yaw) * 0.95)); F.vel.set(0, 0, 0); F.onGround = true;
+    if (!tgt) F.yaw = P.yaw;
+    phorus.root.position.set(F.pos.x, F.pos.y + 1.2, F.pos.z); phorus.root.rotation.y = F.yaw;
+    phorus.animate(dt, { speed: 0, onGround: true, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
+    return;
   }
   // Phorus will not wade into acid
   for (const h of world.hazards) { const dx = want.x - h.x, dz = want.z - h.z, d = Math.hypot(dx, dz); if (d < h.r + 1.5) { want.x = h.x + dx / (d || 1) * (h.r + 1.5); want.z = h.z + dz / (d || 1) * (h.r + 1.5); } }
@@ -3080,7 +3215,7 @@ function updatePhorus(dt) {
     F.pos.copy(P.pos).addScaledVector(V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), 2.5);
     particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 16, { color: 0x7ad8ff, speed: 4, size: 0.4, life: 0.5 });
   }
-  const sp = d > 1.2 ? Math.min(12, d * 2.2) : 0;
+  const sp = d > 1.2 ? Math.min(FR.mode === 'own' ? 22 : 12, d * 2.2) : 0;
   F.vel.x = damp(F.vel.x, d > 0.01 ? dx / d * sp : 0, 8, dt);
   F.vel.z = damp(F.vel.z, d > 0.01 ? dz / d * sp : 0, 8, dt);
   F.vel.y -= 28 * dt;
@@ -3089,6 +3224,9 @@ function updatePhorus(dt) {
   if (G.bossActive) arenaClamp(F.pos, G.arena - 1);
   const g = world.col.ground(F.pos.x, F.pos.z, F.pos.y);
   if (F.pos.y <= g || F.pos.y - g < 0.4) { F.pos.y = g; F.vel.y = 0; F.onGround = true; } else F.onGround = false;
+  if (world.water && g < world.water.level - SWIM_DEPTH && F.pos.y <= world.water.level - SWIM_DEPTH && world.water.depth(F.pos.x, F.pos.z) > SWIM_DEPTH) {   // he swims after you
+    F.pos.y = world.water.level - SWIM_DEPTH; F.vel.y = Math.max(0, F.vel.y); F.onGround = true;
+  }
   if (F.onGround && sp > 3 && world.col.ground(F.pos.x + F.vel.x * 0.12, F.pos.z + F.vel.z * 0.12, F.pos.y + 3) > F.pos.y + 0.7) F.vel.y = 10;
   if (F.pos.y < -30) F.pos.copy(P.pos);
   const hs = Math.hypot(F.vel.x, F.vel.z);
@@ -3096,6 +3234,14 @@ function updatePhorus(dt) {
   else if (!tgt && G.mode === 'dialog') F.yaw = dampAngle(F.yaw, Math.atan2(P.pos.x - F.pos.x, P.pos.z - F.pos.z), 6, dt);
   phorus.root.position.copy(F.pos);
   phorus.root.rotation.y = F.yaw;
+  if (FR.mode === 'own') {          // astride Nettle
+    FR.pos.copy(F.pos); FR.yaw = F.yaw;
+    FR.punk.root.position.copy(F.pos); FR.punk.root.rotation.y = F.yaw;
+    FR.punk.animate(dt, { speed: hs, t: G.t });
+    phorus.root.position.y += 1.2;
+    phorus.animate(dt, { speed: 0, onGround: true, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
+    return;
+  }
   phorus.animate(dt, { speed: hs, onGround: F.onGround, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
 }
 
@@ -3420,6 +3566,7 @@ frame();
 if (BOOT === 'new' && SAVE_AT_LOAD) { $('title').classList.add('hidden'); startFromTitle(beginNew); }
 else if (BOOT === 'arrive' && REGION === 'leotik') { $('title').classList.add('hidden'); startFromTitle(arriveLeotik); }
 else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add('hidden'); startFromTitle(arriveAakalay); }
+else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); startFromTitle(arriveByPass); }
 
 /* debugging handle for the console */
 window.__torcain = {
