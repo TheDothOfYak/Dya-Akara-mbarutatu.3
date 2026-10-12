@@ -23,22 +23,179 @@ const CLEAR = [
   { x: GROVE.x, z: GROVE.z, r: 20 }, { x: HIDEOUT.x, z: HIDEOUT.z, r: 18 }, { x: 96, z: 10, r: 15 }, { x: -62, z: -40, r: 15 },
 ];
 
-function edgeRadius(x, z) {
+/* the old island's rim — everything inside it is the town's home ground and stays exactly as it was */
+function oldEdge(x, z) {
   const a = Math.atan2(z, x);
   return 182 + (fbm(Math.cos(a) * 2.1 + 11, Math.sin(a) * 2.1 + 3, 3) - 0.5) * 40;
 }
-
-export function heightAt(x, z) {
-  const r = Math.hypot(x, z);
+function oldHeight(x, z) {
   let h = (fbm(x * 0.01 + 9, z * 0.01 - 2, 4) - 0.5) * 18 + (fbm(x * 0.05, z * 0.05, 2) - 0.5) * 1.6;
   h += smooth(10, -160, z) * 9;                                // the north rises into forest hills
   h = lerp(h, SQ_H, smooth(90, 50, Math.hypot(x - SQUARE.x, (z - SQUARE.z) * 0.8)));   // the town sits on a broad flat
   h = lerp(h, SQ_H + 0.4, smooth(28, 18, Math.hypot(x - YARD.x, z - YARD.z)));
   if (z > 120 && Math.abs(x) < 30) h = lerp(h, 0.6, smooth(16, 6, Math.abs(x)) * smooth(120, 150, z));
-  const R = edgeRadius(x, z);
-  if (r > R - 10) h -= smooth(R - 10, R, r) * 3;
-  if (r > R) h -= (r - R) * 5 + 4;
+  return h;
+}
+
+/* ============================================================
+   The northern Xikia highlands around the town: rolling meadows,
+   pine forest, a river into Mirrormere (the big lake under the
+   docks), ponds, hills — all ringed by the Crown Ridge, the
+   Greyfang cliffs and the Sundered Gorge. Ranges run on to the
+   horizon. One water level for every lake and river.
+   ============================================================ */
+export const WATER_LEVEL = -5.5;
+const DEEP = 1.6;                                              // deeper than this is swimming, not wading
+const LAKES = [
+  { id: 'mirrormere', x: 0, z: 295, rx: 150, rz: 112, d: 30 },   // the big lake under the pier
+  { id: 'highmere', x: 300, z: -255, rx: 72, rz: 56, d: 18 },
+  { id: 'pond_e', x: 235, z: 112, rx: 20, rz: 17, d: 4.5 },
+  { id: 'pond_nw', x: -178, z: -258, rx: 18, rz: 16, d: 4 },
+  { id: 'pond_n', x: 150, z: -332, rx: 16, rz: 15, d: 4 },
+  { id: 'fen', x: -300, z: 190, rx: 26, rz: 20, d: 2.6 },
+];
+const RIVER = [[-318, -392], [-292, -270], [-258, -150], [-240, -20], [-226, 100], [-178, 200], [-110, 262], [-50, 292]];
+const RIVER_W = 8, RIVER_D = 4.2;
+/* the barrier ring: where the walkable highlands meet the ranges */
+function barrierR(a) { return 480 + (fbm(Math.cos(a) * 1.7 + 5, Math.sin(a) * 1.7 - 7, 3) - 0.5) * 90; }
+const inArc = (a, a0, a1, f = 0.15) => smooth(a0 - f, a0, a) * smooth(a1 + f, a1, a);
+const gorgeW = a => inArc(a, -0.5, 0.38);                       // east: the Sundered Gorge
+const cliffW = a => inArc(a, -2.75, -1.95);                     // north-west: the Greyfang cliffs
+const KUNI_A = -1.25;
+const KUNI = { x: Math.cos(KUNI_A) * (barrierR(KUNI_A) + 22), z: Math.sin(KUNI_A) * (barrierR(KUNI_A) + 22) };
+
+function riverDist(x, z) {
+  let best = 1e9;
+  for (let i = 0; i < RIVER.length - 1; i++) {
+    const [ax, az] = RIVER[i], [bx, bz] = RIVER[i + 1], vx = bx - ax, vz = bz - az;
+    const t = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz), 0, 1);
+    best = Math.min(best, Math.hypot(x - ax - vx * t, z - az - vz * t));
+  }
+  return best;
+}
+/* the wild land, before water and mountains */
+function wildBase(x, z, r) {
+  let h = (fbm(x * 0.01 + 9, z * 0.01 - 2, 4) - 0.5) * 18 + (fbm(x * 0.05, z * 0.05, 2) - 0.5) * 1.6 + smooth(10, -160, z) * 9;
+  const meadow = smooth(0.42, 0.62, fbm(x * 0.004 + 50, z * 0.004 - 12, 2));
+  h += (fbm(x * 0.0065 + 3, z * 0.0065 + 8, 4) - 0.42) * 34 * smooth(170, 300, r) * (1 - meadow * 0.6);   // rolling hills
+  h += smooth(-200, -420, z) * 10;                              // the northern highlands climb toward the Crown Ridge
+  return Math.max(h, WATER_LEVEL + 1.5);
+}
+function mountains(x, z, r, a) {
+  const Rb = barrierR(a), gw = gorgeW(a), cw = cliffW(a);
+  const rg = 1 - Math.abs(2 * fbm(x * 0.006 + 31, z * 0.006 - 17, 4) - 1);
+  const R0 = Rb + gw * 45;                                      // past the gorge the ranges start further out
+  let m = smooth(R0 - 40 + cw * 18, R0 + 12, r) * (40 + 80 * rg) + cw * smooth(Rb - 26, Rb - 18, r) * 34;
+  const out = Math.max(0, r - R0);
+  m += Math.min(out * 0.45, 230) * (0.45 + rg) * (0.75 + 0.5 * fbm(x * 0.0015 - 4, z * 0.0015 + 9, 3));
+  const dk = Math.hypot(x - KUNI.x, z - KUNI.z);
+  if (dk < 60) m += 88 * Math.exp(-dk * dk / (2 * 13 * 13));   // the Kuni spire
+  return m;
+}
+function water(x, z, h, wc) {
+  for (const L of LAKES) {
+    const dx = (x - L.x) / L.rx, dz = (z - L.z) / L.rz, rm = Math.min(L.rx, L.rz);
+    if (Math.abs(dx) > 1 + 70 / rm || Math.abs(dz) > 1 + 70 / rm) continue;
+    const e = Math.hypot(dx, dz) * (1 + (fbm(x * 0.02 + L.x, z * 0.02, 2) - 0.5) * 0.22);
+    const t = e < 1 ? WATER_LEVEL - L.d * smooth(1, 0.5, e) - 0.4 * smooth(1, 0.9, e) : WATER_LEVEL - 0.4 + (e - 1) * rm * 0.3;
+    if (t < h) h = lerp(h, t, wc);
+  }
+  if (x < 0) {
+    const d = riverDist(x, z);
+    if (d < 70) {
+      const t = d < RIVER_W ? WATER_LEVEL - RIVER_D * smooth(RIVER_W, RIVER_W * 0.3, d) - 0.4 : WATER_LEVEL - 0.4 + (d - RIVER_W) * 0.3;
+      if (t < h) h = lerp(h, t, wc);
+    }
+  }
+  return h;
+}
+function heightRaw(x, z) {
+  const r = Math.hypot(x, z), R = oldEdge(x, z);
+  if (r < R - 10) return oldHeight(x, z);                       // home ground: untouched
+  const a = Math.atan2(z, x);
+  const b = smooth(R - 10, R + 30, r);
+  let h = b < 1 ? lerp(oldHeight(x, z), wildBase(x, z, r), b) : wildBase(x, z, r);
+  if (r > 360) h += mountains(x, z, r, a);
+  const gw = gorgeW(a);
+  if (gw > 0) {                                                 // the Sundered Gorge: a chasm with the river-water far below
+    const rc = barrierR(a) - 10, dg = Math.abs(r - rc);
+    h += gw * 14 * smooth(rc - 110, rc - 30, r) * smooth(rc + 40, rc + 10, r);   // the land lifts to a rim before it drops
+    if (dg < 26) h = lerp(h, -34, gw * smooth(25, 13, dg));
+  }
+  return water(x, z, h, smooth(R - 10, R + 2, r));
+}
+/* flat pads for the Albali Aagac */
+const ALBALI = [{ x: 215, z: 35 }, { x: -120, z: -235 }, { x: 160, z: -215 }, { x: -320, z: -40 }, { x: 150, z: 192 }];
+const PADS = ALBALI.map(p => ({ x: p.x, z: p.z, r: 10, h: heightRaw(p.x, p.z) }));
+
+export function heightAt(x, z) {
+  let h = heightRaw(x, z);
+  for (const p of PADS) {
+    const d = Math.hypot(x - p.x, z - p.z);
+    if (d < p.r + 10) h = lerp(h, p.h, smooth(p.r + 10, p.r, d));
+  }
   return Math.max(h, -180);
+}
+
+/* the region's edge for the old "safe ground" logic: just past the barrier everywhere */
+function edgeRadius(x, z) { return barrierR(Math.atan2(z, x)) + 10; }
+const waterDepth = (x, z) => Math.max(0, WATER_LEVEL - heightAt(x, z));
+function barrierKind(x, z) {
+  const r = Math.hypot(x, z), a = Math.atan2(z, x), Rb = barrierR(a);
+  const gw = gorgeW(a);
+  if (gw > 0.5 && r > Rb - 36) return 'gorge';
+  if (r > Rb - 26) return cliffW(a) > 0.5 ? 'cliff' : 'ridge';
+  if (waterDepth(x, z) > DEEP) return 'water';
+  return null;
+}
+
+/* Ju (carrot) plots beside the farms, and the high crag where a Kuni Byrd might nest */
+const JU = [{ x: -103, z: -6, r: 7 }, { x: -33, z: -4, r: 8 }, { x: 100, z: 54, r: 7 }];
+
+/* the natural barrier: the ridge, the cliffs, the gorge, and water too deep to wade */
+const PIER_BOX = { x0: -3.6, x1: 3.6 };
+function inBounds(x, z) {
+  if (Math.abs(x) < PIER_BOX.x1 && z > 150 && z < PIER_END + 1.5) return true;     // the pier runs out over Mirrormere
+  return barrierKind(x, z) === null;
+}
+const BARRIER_LINES = {
+  ridge: ['The ridge is too sheer to climb.', 'Too steep — the Crown Ridge won’t let us up here.'],
+  cliff: ['The Greyfang cliffs are sheer here — no handholds.', 'Straight rock wall. We go round.'],
+  gorge: ['The gorge drops away — no way across.', 'That’s the Sundered Gorge. A long fall to the water.'],
+  water: ['The water’s too deep to wade.', 'Any deeper and we’re swimming.'],
+};
+function barrierLine(x, z) {
+  const k = barrierKind(x, z) || 'ridge', l = BARRIER_LINES[k];
+  return l[(Math.floor(x / 23) + Math.floor(z / 31)) & 1];
+}
+const PIER_END = oldEdge(0, 170) - 6 + 46;
+
+/* the wilderness around the town, for wildlife spawning and tree cover */
+const ZONES = [
+  { id: 'x_sunfall', name: 'Sunfall Meadows', x: 230, z: 30, r: 85, biome: 'meadow' },
+  { id: 'x_downs', name: 'The Rolling Downs', x: 245, z: 235, r: 85, biome: 'hills' },
+  { id: 'x_reedmouth', name: 'Reedmouth', x: -115, z: 262, r: 50, biome: 'shore' },
+  { id: 'x_mirrormere', name: 'Mirrormere', x: 0, z: 295, r: 125, biome: 'lake' },
+  { id: 'x_mere_shore', name: 'Mirrormere Strand', x: 140, z: 315, r: 45, biome: 'shore' },
+  { id: 'x_tallpines', name: 'The Tall Pines', x: -40, z: -320, r: 120, biome: 'forest' },
+  { id: 'x_eastwood', name: 'Eastwood', x: 210, z: -150, r: 85, biome: 'forest' },
+  { id: 'x_westwood', name: 'Westwood', x: -340, z: 60, r: 85, biome: 'forest' },
+  { id: 'x_highmere', name: 'Highmere', x: 300, z: -255, r: 70, biome: 'lake' },
+  { id: 'x_riverlands', name: 'The Brightwater Banks', x: -250, z: -90, r: 70, biome: 'meadow' },
+  { id: 'x_mossfen', name: 'Mossfen', x: -300, z: 190, r: 40, biome: 'bog' },
+  { id: 'x_crown', name: 'Crown Ridge Foothills', x: 60, z: -430, r: 55, biome: 'mountain' },
+  { id: 'x_greyfang', name: 'Greyfang Scree', x: -300, z: -320, r: 50, biome: 'mountain' },
+  { id: 'x_gorge_rim', name: 'Sundered Gorge Rim', x: 395, z: -40, r: 45, biome: 'hills' },
+  { id: 'x_southdowns', name: 'Southdown Hills', x: -250, z: 330, r: 60, biome: 'hills' },
+];
+const FORESTS = ZONES.filter(z => z.biome === 'forest');
+function treeDensity(x, z) {
+  let d = 0;
+  for (const f of FORESTS) { const k = smooth(f.r * 1.15, f.r * 0.45, Math.hypot(x - f.x, z - f.z)); if (k > d) d = k; }
+  const r = Math.hypot(x, z);
+  d = Math.max(d, 0.14 * smooth(170, 260, r), smooth(-120, -330, z) * 0.55);          // scattered trees; the north is wooded
+  d = Math.max(d, 0.5 * smooth(barrierR(Math.atan2(z, x)) - 50, barrierR(Math.atan2(z, x)) + 30, r) * smooth(1300, 700, r)); // pines up the lower slopes
+  return d * (0.55 + 0.6 * fbm(x * 0.02 + 7, z * 0.02 - 3, 2));
 }
 
 const STONE = ['#e2c9a0', '#d4b88a', '#c9a878', '#ead6b0'];
@@ -60,51 +217,79 @@ export function buildXilia(scene) {
   const FIELDS = [{ x: -100, z: 30, w: 40, d: 50 }, { x: -60, z: -10, w: 30, d: 26 }, { x: 70, z: 60, w: 34, d: 30 }];
   const inField = (x, z) => FIELDS.find(f => Math.abs(x - f.x) < f.w / 2 && Math.abs(z - f.z) < f.d / 2);
 
-  /* ---------- terrain ---------- */
-  const SIZE = 460, SEG = 220;
-  const tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); tg.rotateX(-Math.PI / 2);
-  const tp = tg.attributes.position, tcol = new Float32Array(tp.count * 3);
-  const c = new THREE.Color(), gA = new THREE.Color('#8fbf52'), gB = new THREE.Color('#b8c45a'), gC = new THREE.Color('#6aa048'),
+  /* ---------- terrain: the town's fine mesh, a wider mid mesh, and a far ring of ranges out to the horizon ---------- */
+  const c = new THREE.Color(), cw = new THREE.Color(), gA = new THREE.Color('#8fbf52'), gB = new THREE.Color('#b8c45a'), gC = new THREE.Color('#6aa048'),
     dirt = new THREE.Color('#c9a06a'), pave = new THREE.Color('#e0caa0'), soil = new THREE.Color('#7a5232'), soilB = new THREE.Color('#9a6a3a'),
-    rock = new THREE.Color('#b07a52'), rockD = new THREE.Color('#7a4e38');
-  for (let i = 0; i < tp.count; i++) {
-    const x = tp.getX(i), z = tp.getZ(i), y = heightAt(x, z);
-    tp.setY(i, y);
-    const R = edgeRadius(x, z), r = Math.hypot(x, z);
-    const n = fbm(x * 0.03 + 4, z * 0.03, 3), n2 = fbm(x * 0.12, z * 0.12, 2);
-    c.copy(gA).lerp(gB, smooth(0.45, 0.72, n)).lerp(gC, smooth(0.5, 0.25, n2) * 0.6);
-    const f = inField(x, z);
-    if (f) c.copy(Math.sin((x - f.x) * 1.4) > 0 ? soil : soilB);
-    c.lerp(dirt, smooth(5, 2.5, roadDist(x, z)) * 0.9);
-    c.lerp(pave, smooth(24, 20, Math.hypot(x - SQUARE.x, z - SQUARE.z)));
-    c.lerp(dirt, smooth(20, 16, Math.hypot(x - YARD.x, z - YARD.z)) * 0.8);
-    if (r > R - 3) c.lerp(rock, smooth(R - 3, R + 1, r)).lerp(rockD, smooth(R + 4, R + 30, r) * (0.5 + 0.5 * Math.sin(y * 0.6)));
-    tcol[i * 3] = c.r; tcol[i * 3 + 1] = c.g; tcol[i * 3 + 2] = c.b;
-  }
-  tg.setAttribute('color', new THREE.BufferAttribute(tcol, 3));
-  tg.computeVertexNormals();
-  const terrain = new THREE.Mesh(tg, toon(0xffffff, { vertexColors: true }));
-  terrain.receiveShadow = true; scene.add(terrain);
-
-  /* the rock root beneath */
+    forestFloor = new THREE.Color('#4f8a3c'), meadowY = new THREE.Color('#c4cc62'), sand = new THREE.Color('#d6c48e'), bed = new THREE.Color('#5a7a62'),
+    rock = new THREE.Color('#8e8578'), rockD = new THREE.Color('#6a6470'), snow = new THREE.Color('#f2f2f6'), distantPine = new THREE.Color('#3c6a40');
+  const wildColor = (x, z, y, ny, out) => {
+    const n = fbm(x * 0.03 + 4, z * 0.03, 3);
+    out.copy(gA).lerp(gB, smooth(0.45, 0.72, n)).lerp(gC, smooth(0.5, 0.3, fbm(x * 0.09, z * 0.09, 2)) * 0.6);
+    out.lerp(meadowY, smooth(0.5, 0.7, fbm(x * 0.004 + 50, z * 0.004 - 12, 2)) * 0.45);
+    const td = treeDensity(x, z);
+    out.lerp(td > 0.4 && y > 60 ? distantPine : forestFloor, smooth(0.15, 0.6, td) * 0.85);
+    out.lerp(sand, smooth(WATER_LEVEL + 1.8, WATER_LEVEL + 0.5, y));
+    out.lerp(bed, smooth(WATER_LEVEL - 0.5, WATER_LEVEL - 6, y));
+    out.lerp(rock, smooth(0.86, 0.66, ny)).lerp(rockD, smooth(0.6, 0.4, ny) * 0.7);
+    out.lerp(rock, smooth(90, 150, y) * 0.5);
+    out.lerp(snow, smooth(150, 205, y + n * 30) * smooth(0.5, 0.72, ny));
+    return out;
+  };
+  const terrainMat = toon(0xffffff, { vertexColors: true });
+  const finish = (g, colorFn) => {
+    g.computeVertexNormals();
+    const P = g.attributes.position, N = g.attributes.normal, col = new Float32Array(P.count * 3);
+    for (let i = 0; i < P.count; i++) { colorFn(P.getX(i), P.getZ(i), P.getY(i), N.getY(i), c); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const m = new THREE.Mesh(g, terrainMat); m.receiveShadow = true; scene.add(m); return m;
+  };
   {
-    const A = 96, RINGS = 16, pos = [], cols = [], idx = [];
-    const strata = ['#c48a5a', '#a86a44', '#d49a6a', '#8a5a3e', '#b87a4a'].map(s => new THREE.Color(s));
-    for (let k = 0; k <= RINGS; k++) {
-      const t = k / RINGS, y = -8 - Math.pow(t, 1.25) * 300;
-      for (let j = 0; j <= A; j++) {
-        const a = j / A * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
-        const R = edgeRadius(ca * 170, sa * 170) + 6;
-        const rr = R * Math.pow(1 - t, 0.75) * (1 + (fbm(ca * 3 + k * 0.7, sa * 3, 3) - 0.5) * 0.5 * t) + (k === RINGS ? 0 : 2);
-        pos.push(ca * rr, y + (fbm(a * 4, k, 2) - 0.5) * 14 * t, sa * rr);
-        const sc = strata[Math.floor(Math.abs(y * 0.07 + fbm(a * 2, k, 2) * 2)) % strata.length]; cols.push(sc.r, sc.g, sc.b);
-      }
+    const SIZE = 460, SEG = 220;
+    const tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); tg.rotateX(-Math.PI / 2);
+    const tp = tg.attributes.position;
+    for (let i = 0; i < tp.count; i++) tp.setY(i, heightAt(tp.getX(i), tp.getZ(i)));
+    finish(tg, (x, z, y, ny, out) => {
+      const r = Math.hypot(x, z), R = oldEdge(x, z);
+      const n = fbm(x * 0.03 + 4, z * 0.03, 3), n2 = fbm(x * 0.12, z * 0.12, 2);
+      out.copy(gA).lerp(gB, smooth(0.45, 0.72, n)).lerp(gC, smooth(0.5, 0.25, n2) * 0.6);
+      const f = inField(x, z);
+      if (f) out.copy(Math.sin((x - f.x) * 1.4) > 0 ? soil : soilB);
+      out.lerp(dirt, smooth(5, 2.5, roadDist(x, z)) * 0.9);
+      out.lerp(pave, smooth(24, 20, Math.hypot(x - SQUARE.x, z - SQUARE.z)));
+      out.lerp(dirt, smooth(20, 16, Math.hypot(x - YARD.x, z - YARD.z)) * 0.8);
+      const b = smooth(R - 12, R + 25, r);
+      if (b > 0) out.lerp(wildColor(x, z, y, ny, cw), b);
+    });
+    // the mid mesh (6.2 m cells) with a hole under the town mesh; its overlap rim is tucked just below
+    const MS = 1240, MSEG = 200, HOLE = 226;
+    const mg = new THREE.PlaneGeometry(MS, MS, MSEG, MSEG); mg.rotateX(-Math.PI / 2);
+    const mp = mg.attributes.position;
+    for (let i = 0; i < mp.count; i++) {
+      const x = mp.getX(i), z = mp.getZ(i);
+      mp.setY(i, heightAt(x, z) - (Math.abs(x) < 231 && Math.abs(z) < 231 ? 0.6 : 0));
     }
-    for (let k = 0; k < RINGS; k++) for (let j = 0; j < A; j++) { const a = k * (A + 1) + j, b = a + A + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-    g.setIndex(idx); g.computeVertexNormals();
-    scene.add(new THREE.Mesh(g, toon(0xffffff, { vertexColors: true, side: THREE.DoubleSide })));
+    const src = mg.index.array, keep = [];
+    const inside = i => Math.abs(mp.getX(i)) < HOLE && Math.abs(mp.getZ(i)) < HOLE;
+    for (let t = 0; t < src.length; t += 3) if (!(inside(src[t]) && inside(src[t + 1]) && inside(src[t + 2]))) keep.push(src[t], src[t + 1], src[t + 2]);
+    mg.setIndex(keep);
+    finish(mg, wildColor);
+    // the far ring: ranges to the horizon (tucked under the mid mesh where they overlap)
+    const RADII = [560, 600, 650, 710, 780, 860, 950, 1050, 1170, 1300, 1450, 1650, 1900, 2200, 2600, 3000, 3500], A = 128;
+    const pos = [], idx = [];
+    for (const rr of RADII) for (let j = 0; j <= A; j++) {
+      const an = j / A * Math.PI * 2, x = Math.cos(an) * rr, z = Math.sin(an) * rr;
+      pos.push(x, heightAt(x, z) - (Math.abs(x) < 618 && Math.abs(z) < 618 ? 6 : 0), z);
+    }
+    for (let k = 0; k < RADII.length - 1; k++) for (let j = 0; j < A; j++) { const p0 = k * (A + 1) + j, p1 = p0 + A + 1; idx.push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1); }
+    const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); fg.setIndex(idx);
+    finish(fg, wildColor);
+  }
+
+  /* one water level for every lake, pond and river (and the far valleys) */
+  {
+    const wg = new THREE.CircleGeometry(3600, 72); wg.rotateX(-Math.PI / 2);
+    const wm = new THREE.MeshToonMaterial({ color: 0x4aa6c4, emissive: 0x0e4a62, emissiveIntensity: 0.35, gradientMap: ramp(), transparent: true, opacity: 0.86 });
+    const wmesh = new THREE.Mesh(wg, wm); wmesh.position.y = WATER_LEVEL; wmesh.receiveShadow = true; wmesh.renderOrder = 1; scene.add(wmesh);
   }
 
   /* ---------- kits ---------- */
@@ -113,7 +298,7 @@ export function buildXilia(scene) {
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false);
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 300);
-  const keepOut = (x, z, extra = 0) => CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r + extra) || roadDist(x, z) < 5 + extra || Math.hypot(x, z) > edgeRadius(x, z) - 14 || !!inField(x, z);
+  const keepOut = (x, z, extra = 0) => CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r + extra) || roadDist(x, z) < 5 + extra || Math.hypot(x, z) > oldEdge(x, z) - 14 || !!inField(x, z);
 
   /* ---------- Eikar cottages: round walls under an acorn-cap roof ---------- */
   const capTex = (() => {
@@ -297,7 +482,7 @@ export function buildXilia(scene) {
   }
 
   /* ---------- the dock and pier ---------- */
-  const dockZ0 = edgeRadius(0, 170) - 6;
+  const dockZ0 = oldEdge(0, 170) - 6;
   const pierY = 1.2, pierEnd = dockZ0 + 46;
   {
     for (let z = dockZ0 - 8; z < pierEnd; z += 1.6) blocks.put(0, pierY - 0.2, z, 6, 0.32, 1.45, 0, (rng() - 0.5) * 0.03, 0, rng() < 0.5 ? '#8a5a36' : '#9a6a40');
@@ -315,13 +500,61 @@ export function buildXilia(scene) {
     const top = new THREE.Mesh(new THREE.CylinderGeometry(s, s * 0.9, s * 0.35, 8), toon(0x9ac04a));
     const bottom = new THREE.Mesh(new THREE.ConeGeometry(s * 0.92, s * 2.2, 8), toon(0xb07a52)); bottom.rotation.x = Math.PI; bottom.position.y = -s * 1.25;
     grp.add(top, bottom); outlineAll(grp, 0.12);
-    grp.position.set(Math.cos(a) * r, -10 + rng() * 60, Math.sin(a) * r);
+    { const ix = Math.cos(a) * r, iz = Math.sin(a) * r; grp.position.set(ix, Math.max(heightAt(ix, iz), WATER_LEVEL) + 75 + rng() * 60, iz); }   // high over the meadows, out of reach
     grp.userData = { by: grp.position.y, ph: rng() * 6, sp: 0.2 + rng() * 0.3 };
     scene.add(grp); islets.push(grp);
   }
 
+  /* ---------- the wild highlands: pine forest, broadleaf stands, boulders, scree under the ridges ---------- */
+  const wrng = mulberry32(7331);            // its own stream, so the town's placements never shift
+  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), toon(0xffffff), 3400, false);
+  const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 6000, false);
+  const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 1800, false);
+  const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 700, false);
+  const PINE = ['#2f6a3a', '#3a7a40', '#2a5a34', '#467f44', '#356e3c'], BROAD = ['#6aa040', '#7ab04a', '#5a9a3a', '#8ab84a', '#c8a03a'];
+  const WILD_KEEP = [...ALBALI.map(p => ({ x: p.x, z: p.z, r: 14 })), ...JU.map(j => ({ x: j.x, z: j.z, r: j.r + 3 })), { x: 0, z: 200, r: 30 }];
+  const wildOK = (x, z) => {
+    const r = Math.hypot(x, z);
+    if (r < oldEdge(x, z) + 6) return false;
+    if (WILD_KEEP.some(k => Math.hypot(x - k.x, z - k.z) < k.r)) return false;
+    return true;
+  };
+  for (let i = 0; i < 26000 && wTrunks.mesh.count < 3300; i++) {
+    const a = wrng() * Math.PI * 2, r = 150 + Math.sqrt(wrng()) * 900, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (wrng() > treeDensity(x, z)) continue;
+    if (!wildOK(x, z)) continue;
+    const g = heightAt(x, z);
+    if (g < WATER_LEVEL + 0.8 || g > 135) continue;
+    const s = 0.8 + wrng() * 0.9, walk = inBounds(x, z);
+    if (wrng() < 0.8 || !walk) {                     // a Xikia pine
+      const h = (6 + wrng() * 5) * s;
+      wTrunks.put(x, g + h * 0.2, z, 0.5 * s, h * 0.45, 0.5 * s, 0, wrng() * 6, 0, '#5a3a26');
+      const pc = PINE[Math.floor(wrng() * PINE.length)];
+      wCones.put(x, g + h * 0.5, z, 2.6 * s, h * 0.6, 2.6 * s, 0, wrng() * 6, 0, pc);
+      wCones.put(x, g + h * 0.82, z, 1.8 * s, h * 0.45, 1.8 * s, 0, wrng() * 6, 0, pc);
+    } else {                                         // a broadleaf
+      const h = (4 + wrng() * 3) * s;
+      wTrunks.put(x, g + h / 2 - 0.4, z, 0.4 * s, h, 0.4 * s, 0, wrng() * 6, 0, '#6b4128');
+      const lc = BROAD[Math.floor(wrng() * BROAD.length)];
+      for (let k = 0; k < 3; k++) { const rr = (1.8 + wrng() * 1.2) * s; wCrowns.put(x + (wrng() - 0.5) * 2.4 * s, g + h + (wrng() - 0.2) * 1.6 * s, z + (wrng() - 0.5) * 2.4 * s, rr, rr * 0.85, rr, wrng(), wrng(), wrng(), lc); }
+    }
+    if (walk) col.add(x, z, 0.45 * s, 0.45 * s, 0, g - 1, g + 8);
+  }
+  for (let i = 0; i < 4000 && wRocks.mesh.count < 680; i++) {
+    const a = wrng() * Math.PI * 2, r = 190 + wrng() * 420, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (!wildOK(x, z)) continue;
+    const Rb = barrierR(a), g = heightAt(x, z);
+    if (g < WATER_LEVEL - 2) continue;
+    const scree = r > Rb - 45 && r < Rb + 20;          // big fallen blocks under the ridges
+    if (!scree && wrng() < 0.55) continue;
+    const s = scree ? 2 + wrng() * 6 : 0.5 + Math.pow(wrng(), 3) * 3;
+    wRocks.put(x, g + s * 0.25, z, s * (1 + wrng() * 0.5), s * 0.75, s, wrng() * 3, wrng() * 3, wrng() * 3, ['#9a9284', '#8a8478', '#a8a090', '#7e7a74'][Math.floor(wrng() * 4)]);
+    if (s > 1.2 && inBounds(x, z)) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
+  }
+  wTrunks.done(); wCones.done(); wCrowns.done(); wRocks.done();
+
   blocks.done(); trunks.done(); crowns.done(); crops.done(); rocks.done();
-  const grass = buildGrass(scene, rng, (x, z) => !(Math.hypot(x, z) > edgeRadius(x, z) - 3 || roadDist(x, z) < 3 || Math.hypot(x - SQUARE.x, z - SQUARE.z) < 23 || inField(x, z)), heightAt,
+  const grass = buildGrass(scene, rng, (x, z) => !(Math.hypot(x, z) > oldEdge(x, z) - 3 || roadDist(x, z) < 3 || Math.hypot(x - SQUARE.x, z - SQUARE.z) < 23 || inField(x, z)), heightAt,
     ['#8fbf52', '#a8c45a', '#7ab04a', '#c0c860', '#98b850'], 26000);
 
   /* Zahreh flowers — plenty, here at home */
@@ -391,10 +624,14 @@ export function buildXilia(scene) {
   return {
     name: 'xilia', heightAt, col, SITES, PLAZA: { x: SQUARE.x, z: SQUARE.z, y: SQ_H }, hazards: [], pillars: [], camp: null,
     board: { x: -18, z: 32 },
-    crates: [0.35, 2.5, 4.0].map(a => { const c = Math.cos(a), sn = Math.sin(a), r = edgeRadius(c * 100, sn * 100) - 9; return { x: c * r, z: sn * r }; }),
+    crates: [0.35, 2.5, 4.0].map(a => { const c = Math.cos(a), sn = Math.sin(a), r = oldEdge(c * 100, sn * 100) - 9; return { x: c * r, z: sn * r }; }),
     hearth, pen: PEN, yard: YARD, tower: { x: YARD.x - 10, z: YARD.z - 10, y: SQ_H + 0.4 + 10 }, seedSpot, grove: GROVE,
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, lanterns, stones, falls: [], clear: CLEAR,
+    inBounds, barrierLine, homeRadius: oldEdge,   // homeRadius = the old town rim (for anything that must keep its old placement, e.g. amulet rolls)
+    water: { level: WATER_LEVEL, isWater: (x, z) => waterDepth(x, z) > DEEP, depth: waterDepth, lakes: LAKES.map(l => ({ id: l.id, x: l.x, z: l.z, rx: l.rx, rz: l.rz, maxDepth: l.d })) },
+    zones: ZONES.map(z => ({ ...z })), albaliSpots: ALBALI.map(p => ({ x: p.x, z: p.z })), juFields: JU.map(j => ({ ...j })),
+    kuniPerch: { x: KUNI.x, z: KUNI.z, y: heightAt(KUNI.x, KUNI.z) },
     update(t, dt, particles, camPos) {
       grass.material.userData.shader && (grass.material.userData.shader.uniforms.uTime.value = t);
       islets.forEach(g => { g.position.y = g.userData.by + Math.sin(t * g.userData.sp + g.userData.ph) * 2.5; });

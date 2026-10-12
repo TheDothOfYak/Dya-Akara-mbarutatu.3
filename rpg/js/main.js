@@ -1572,7 +1572,7 @@ function amuletSpots() {
   for (let tries = 0; out.length < 7 && tries < 400; tries++) {
     const [ax, az] = anchors[(out.length * 3 + tries) % anchors.length];
     const a = rnd() * Math.PI * 2, r = 6 + rnd() * 18, x = ax + Math.cos(a) * r, z = az + Math.sin(a) * r;
-    if (Math.hypot(x, z) > world.edgeRadius(x, z) - 10) continue;
+    if (Math.hypot(x, z) > (world.homeRadius ? world.homeRadius(x, z) : world.edgeRadius(x, z)) - 10) continue;
     if (world.hazards.some(h => Math.hypot(x - h.x, z - h.z) < h.r + 2)) continue;
     if (out.some(o => Math.hypot(o.x - x, o.z - z) < 25)) continue;
     const gy = world.heightAt(x, z);
@@ -2905,7 +2905,7 @@ function updatePlayer(dt) {
     P.pos.y = -44; P.vel.set(0, 0, 0);
     const fallDmg = Math.round(P.maxHp * (D === DIFFICULTY.realistic ? 0.3 : 0.12));
     P.hp -= fallDmg; dmgNumber(P.lastSafe.x, P.lastSafe.y + 2.3, P.lastSafe.z, fallDmg, 'hurt');
-    bark('phorus', 'Mind the edge! It’s a long way down to the cloud sea.', 2.5);
+    bark('phorus', 'Mind your footing! That’s a long way down.', 2.5);
     if (P.hp <= 0) { P.hp = 1; playerDown(); }
   }
 
