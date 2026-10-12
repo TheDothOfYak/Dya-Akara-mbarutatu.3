@@ -137,17 +137,24 @@ function planet(radius, tex, atmo, pos) {
   return grp;
 }
 
-/* little flocks of far-off Albali Byrds wheeling around */
+/* little flocks of far-off Albali Byrds wheeling around: a round body and two wings that beat */
 function flock(rng) {
   const grp = new THREE.Group();
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute([-1, 0, 0, 0, 0, 0.3, 0, 0.12, 0, 0, 0, 0.3, 1, 0, 0, 0, 0.12, 0], 3));
+  const wingGeo = side => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0.22, 0, 0, -0.16, side * 1.05, 0, -0.02], 3));
+    return g;
+  };
+  const wR = wingGeo(1), wL = wingGeo(-1), bodyGeo = new THREE.SphereGeometry(0.2, 6, 4);
   const mat = new THREE.MeshBasicMaterial({ color: 0x3b2a2a, side: THREE.DoubleSide, fog: true });
   const birds = [];
   for (let i = 0; i < 9; i++) {
-    const b = new THREE.Mesh(geo, mat);
+    const b = new THREE.Group();
+    const L = new THREE.Mesh(wL, mat), R = new THREE.Mesh(wR, mat);
+    b.add(new THREE.Mesh(bodyGeo, mat), L, R);
     b.position.set((rng() - 0.5) * 18, (rng() - 0.5) * 5, (rng() - 0.5) * 18);
-    b.scale.setScalar(1.6); b.userData.ph = rng() * 6;
+    b.scale.setScalar(1.6);
+    b.userData = { ph: rng() * 6, rate: 7 + rng() * 3, by: b.position.y, L, R };
     grp.add(b); birds.push(b);
   }
   grp.userData = { birds, r: 260 + rng() * 260, h: 40 + rng() * 80, sp: (0.04 + rng() * 0.05) * (rng() < 0.5 ? -1 : 1), a: rng() * 6.28 };
@@ -262,7 +269,12 @@ export function buildSky(scene, buildShip, palName = 'golden') {
         const u = f.userData; u.a += u.sp * dt;
         f.position.set(Math.cos(u.a) * u.r, u.h, Math.sin(u.a) * u.r);
         f.rotation.y = -u.a + (u.sp > 0 ? Math.PI : 0);
-        u.birds.forEach(b => { b.scale.y = 1.6 * Math.sin(t * 9 + b.userData.ph) * 0.9; });
+        u.birds.forEach(b => {
+          // a few strong beats, then a short glide with the wings held out
+          const d = b.userData, c = (t * 0.35 + d.ph) % 3, beat = c < 2 ? Math.sin(t * d.rate + d.ph) : 0.15;
+          d.R.rotation.z = beat * 0.75; d.L.rotation.z = -beat * 0.75;
+          b.position.y = d.by - beat * 0.25;
+        });
       });
       if (farShip) {
         const a = t * 0.012;

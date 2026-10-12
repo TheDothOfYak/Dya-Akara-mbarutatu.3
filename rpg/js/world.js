@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline } from './gfx.js';
-import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
+import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
 const PLAZA = { x: 0, z: -10 };
@@ -136,8 +136,13 @@ function baseH(x, z) {
 for (const f of JU) FLATS.push({ x: f.x, z: f.z, r: f.r + 3, h: baseH(f.x, f.z) });
 for (const f of ALBALI) FLATS.push({ x: f.x, z: f.z, r: 9, h: baseH(f.x, f.z) });
 
+/* the Megla Pass (Megla: mist): the old road north — Fti — out of the Reach, the long way round to Xilia on foot */
+const PASS_A = -2.1;
+export const PASS = makePass({ id: 'a_ashroad', name: 'The Megla Pass', dir: 'Fti', to: 'xilia', toPass: 'x_ashroad', a: PASS_A,
+  r0: lut(LIM, PASS_A) - 75, r1: lut(LIM, PASS_A) + 28, w: 9, rise: 16 }, baseH);
+
 export function heightAt(x, z) {
-  let h = baseH(x, z);
+  let h = PASS.carve(x, z, baseH(x, z));
   for (const f of FLATS) { const dx = x - f.x, dz = z - f.z; if (dx * dx + dz * dz < (f.r + 9) * (f.r + 9)) h = lerp(h, f.h, smooth(f.r + 9, f.r, Math.hypot(dx, dz))); }
   // water beds
   let out = null;
@@ -160,13 +165,19 @@ function waterDepth(x, z) { return minE(x, z) < 1 ? Math.max(0, LEVEL - heightAt
 function onPier(x, z) { return PIER_BOX && Math.abs(x) < PIER_BOX.hw && z > PIER_BOX.z0 && z < PIER_BOX.z1; }
 function inBounds(x, z) {
   if (onPier(x, z)) return true;
+  if (PASS.inside(x, z)) return true;                     // the Megla Pass through the ridge
   if (Math.hypot(x, z) > limitR(x, z) - 3) return false;
   if (Math.hypot(x - SPIRE.x, z - SPIRE.z) < 22) return false;
   return waterDepth(x, z) <= WADE;
 }
+/* deep water you can swim in: anywhere well inside the barrier ring */
+function swimOk(x, z) {
+  if (Math.hypot(x - SPIRE.x, z - SPIRE.z) < 22) return false;
+  return Math.hypot(x, z) < limitR(x, z) - 14 && waterDepth(x, z) > WADE;
+}
 function barrierLine(x, z) {
   if (Math.hypot(x - SPIRE.x, z - SPIRE.z) < 24) return 'The crag goes straight up. Only wings get up there.';
-  if (Math.hypot(x, z) <= limitR(x, z) - 3 && waterDepth(x, z) > WADE) return 'The water’s too deep to wade.';
+  if (Math.hypot(x, z) <= limitR(x, z) - 3 && waterDepth(x, z) > WADE) return 'Too close to the edge to swim out any further. Back to shore.';
   const a = Math.atan2(z, x), wC = lut(W_CH, a), wW = lut(W_CL, a);
   if (wC > 0.5) return 'The Rend drops away into nothing. No way across.';
   if (wW > 0.5) return 'The scarp is sheer. Nothing to climb, nowhere to go.';
@@ -249,6 +260,7 @@ export function buildWorld(scene) {
       }
       if (y < -8) c.lerp(TC.abyss, smooth(-8, -60, y));
     }
+    if (PASS.near(x, z, 6)) c.lerp(dirt, smooth(PASS.w - 1, PASS.w - 4, PASS.lat(x, z)) * smooth(PASS.r0 - 30, PASS.r0, PASS.along(x, z)) * smooth(3, 1, Math.abs(y - PASS.floor(PASS.along(x, z)))) * 0.85);   // the Megla Pass
   }
 
   /* the land is two meshes: a fine 2 m grid over the old city and the pier, and a graded grid
@@ -768,7 +780,7 @@ export function buildWorld(scene) {
   const wildOk = (x, z, gap = 0) => {
     const r = Math.hypot(x, z);
     if (r < oldEdge(x, z) - 6 || r > limitR(x, z) - 4) return false;
-    if (minE(x, z) < 1.1) return false;
+    if (minE(x, z) < 1.1 || PASS.near(x, z, gap)) return false;
     if (trailDist(x, z) < 4 + gap) return false;
     if (reserved.some(q => Math.hypot(x - q.x, z - q.z) < q.r + gap)) return false;
     if (Math.abs(x) < 14 && z > 140 && z < 240) return false;     // the pier approach
@@ -818,7 +830,7 @@ export function buildWorld(scene) {
     const u = rng2(), r = Math.sqrt(lerp(165 * 165, 560 * 560, u)), a = rng2() * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
     const d = r - limitR(x, z);
     const p = 0.12 + smooth(-60, -6, d) * 0.6 + zw('crags', x, z) * 0.5 + zw('greyback', x, z) * 0.2;
-    if (rng2() > p || d > 30 || r < oldEdge(x, z) - 4 || minE(x, z) < 1.0 || trailDist(x, z) < 3) continue;
+    if (rng2() > p || d > 30 || r < oldEdge(x, z) - 4 || minE(x, z) < 1.0 || trailDist(x, z) < 3 || PASS.near(x, z)) continue;
     if (reserved.some(q => Math.hypot(x - q.x, z - q.z) < q.r)) continue;
     const s = 0.5 + Math.pow(rng2(), 2.5) * (d > -40 ? 4.5 : 2.6), g = heightAt(x, z);
     wRocks.put(x, g + s * 0.25, z, s * (1 + rng2() * 0.5), s * 0.75, s, rng2() * 3, rng2() * 3, rng2() * 3, pick2(['#8f8a84', '#7d7873', '#a39e97', '#6e6a66', '#9a8a74']));
@@ -910,7 +922,7 @@ export function buildWorld(scene) {
   /* low forests and ranges out to the horizon */
   for (let i = 0; i < 20000 && farTrees.mesh.count < 1580; i++) {
     const r = Math.sqrt(lerp(480 * 480, 1500 * 1500, rng2())), a = rng2() * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (r < limitR(x, z) + 25) continue;
+    if (r < limitR(x, z) + 25 || PASS.near(x, z, 20)) continue;
     const g = heightAt(x, z);
     if (g > 170 || g < 4 || slopeAt(x, z) > 0.9) continue;
     const s = 3 + rng2() * 3.5;
@@ -996,7 +1008,7 @@ export function buildWorld(scene) {
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, falls,
     /* the open Reach */
-    inBounds, barrierLine,
+    inBounds, barrierLine, swimOk, passes: [PASS],
     water: { level: LEVEL, isWater: (x, z) => waterDepth(x, z) > SWIM, depth: waterDepth, mesh: waterMesh },
     zones: ZONES.map(z => ({ ...z })),
     albaliSpots: ALBALI.map(a => ({ x: a.x, z: a.z })),

@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline } from './gfx.js';
-import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
+import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
 const SQUARE = { x: 0, z: 50 };
@@ -128,12 +128,18 @@ function heightRaw(x, z) {
 const ALBALI = [{ x: 215, z: 35 }, { x: -120, z: -235 }, { x: 160, z: -215 }, { x: -320, z: -40 }, { x: 150, z: 192 }];
 const PADS = ALBALI.map(p => ({ x: p.x, z: p.z, r: 10, h: heightRaw(p.x, p.z) }));
 
+/* the Megla Pass (Megla: mist): the old road west — Eldi — over the Crown Ridge, the long way round to Aakalay on foot */
+const PASS_A = 2.85;
+export const PASS = makePass({ id: 'x_ashroad', name: 'The Megla Pass', dir: 'Eldi', to: 'aakalay', toPass: 'a_ashroad', a: PASS_A,
+  r0: barrierR(PASS_A) - 75, r1: barrierR(PASS_A) + 28, w: 9, rise: 16 }, heightRaw);
+
 export function heightAt(x, z) {
   let h = heightRaw(x, z);
   for (const p of PADS) {
     const d = Math.hypot(x - p.x, z - p.z);
     if (d < p.r + 10) h = lerp(h, p.h, smooth(p.r + 10, p.r, d));
   }
+  h = PASS.carve(x, z, h);
   return Math.max(h, -180);
 }
 
@@ -156,13 +162,18 @@ const JU = [{ x: -103, z: -6, r: 7 }, { x: -33, z: -4, r: 8 }, { x: 100, z: 54, 
 const PIER_BOX = { x0: -3.6, x1: 3.6 };
 function inBounds(x, z) {
   if (Math.abs(x) < PIER_BOX.x1 && z > 150 && z < PIER_END + 1.5) return true;     // the pier runs out over Mirrormere
+  if (PASS.inside(x, z)) return true;                                               // the Megla Pass through the ridge
   return barrierKind(x, z) === null;
+}
+/* deep water you can swim in: every lake and river, but not the gorge or out past the ridge */
+function swimOk(x, z) {
+  return Math.hypot(x, z) < barrierR(Math.atan2(z, x)) - 40 && waterDepth(x, z) > DEEP;
 }
 const BARRIER_LINES = {
   ridge: ['The ridge is too sheer to climb.', 'Too steep — the Crown Ridge won’t let us up here.'],
   cliff: ['The Greyfang cliffs are sheer here — no handholds.', 'Straight rock wall. We go round.'],
   gorge: ['The gorge drops away — no way across.', 'That’s the Sundered Gorge. A long fall to the water.'],
-  water: ['The water’s too deep to wade.', 'Any deeper and we’re swimming.'],
+  water: ['The current’s too strong out here. Back the way we came.', 'Not past the ridge — swim back.'],
 };
 function barrierLine(x, z) {
   const k = barrierKind(x, z) || 'ridge', l = BARRIER_LINES[k];
@@ -233,6 +244,7 @@ export function buildXilia(scene) {
     out.lerp(rock, smooth(0.86, 0.66, ny)).lerp(rockD, smooth(0.6, 0.4, ny) * 0.7);
     out.lerp(rock, smooth(90, 150, y) * 0.5);
     out.lerp(snow, smooth(150, 205, y + n * 30) * smooth(0.5, 0.72, ny));
+    if (PASS.near(x, z, 6)) out.lerp(dirt, smooth(PASS.w - 1, PASS.w - 4, PASS.lat(x, z)) * smooth(PASS.r0 - 30, PASS.r0, PASS.along(x, z)) * smooth(3, 1, Math.abs(y - PASS.floor(PASS.along(x, z)))) * 0.85);   // the road
     return out;
   };
   const terrainMat = toon(0xffffff, { vertexColors: true });
@@ -516,6 +528,7 @@ export function buildXilia(scene) {
   const wildOK = (x, z) => {
     const r = Math.hypot(x, z);
     if (r < oldEdge(x, z) + 6) return false;
+    if (PASS.near(x, z)) return false;
     if (WILD_KEEP.some(k => Math.hypot(x - k.x, z - k.z) < k.r)) return false;
     return true;
   };
@@ -628,7 +641,7 @@ export function buildXilia(scene) {
     hearth, pen: PEN, yard: YARD, tower: { x: YARD.x - 10, z: YARD.z - 10, y: SQ_H + 0.4 + 10 }, seedSpot, grove: GROVE,
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, lanterns, stones, falls: [], clear: CLEAR,
-    inBounds, barrierLine, homeRadius: oldEdge,   // homeRadius = the old town rim (for anything that must keep its old placement, e.g. amulet rolls)
+    inBounds, barrierLine, swimOk, passes: [PASS], homeRadius: oldEdge,   // homeRadius = the old town rim (for anything that must keep its old placement, e.g. amulet rolls)
     water: { level: WATER_LEVEL, isWater: (x, z) => waterDepth(x, z) > DEEP, depth: waterDepth, lakes: LAKES.map(l => ({ id: l.id, x: l.x, z: l.z, rx: l.rx, rz: l.rz, maxDepth: l.d })) },
     zones: ZONES.map(z => ({ ...z })), albaliSpots: ALBALI.map(p => ({ x: p.x, z: p.z })), juFields: JU.map(j => ({ ...j })),
     kuniPerch: { x: KUNI.x, z: KUNI.z, y: heightAt(KUNI.x, KUNI.z) },

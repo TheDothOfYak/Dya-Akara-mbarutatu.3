@@ -145,3 +145,38 @@ export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84
   scene.add(mesh);
   return mesh;
 }
+
+/* ------------------------------------------------------------------
+   A mountain pass: a road cut straight out through a region's barrier
+   ridge that leads on to another region (walk to the far end and the
+   next region loads, the way Hyrule Field's exits work). Pure maths so
+   a region's heightAt / inBounds can use it before anything is built.
+     def: { id, name, to, toPass, a (bearing out from the centre),
+            r0 (where the cut starts), r1 (where the climb tops out),
+            w (half-width of the road), rise (how far the road climbs) }
+   ------------------------------------------------------------------ */
+const sm = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+export function makePass(def, rawHeight) {
+  const cx = Math.cos(def.a), sz = Math.sin(def.a);
+  const h0 = rawHeight(cx * def.r0, sz * def.r0);
+  const p = { ...def, cx, sz, h0, end: def.r1 + 70 };
+  p.along = (x, z) => x * cx + z * sz;
+  p.lat = (x, z) => Math.abs(z * cx - x * sz);
+  p.floor = s => h0 + def.rise * sm(def.r0, def.r1, s);
+  p.point = (s, l = 0) => ({ x: cx * s - sz * l, z: sz * s + cx * l });
+  /* blend the land down (or up) to the road, with steep walls either side */
+  p.carve = (x, z, h) => {
+    const s = p.along(x, z); if (s < def.r0 - 40 || s > p.end + 10) return h;
+    const l = p.lat(x, z); if (l > def.w + 22) return h;
+    const k = sm(def.w + 20, def.w, l) * sm(def.r0 - 35, def.r0, s) * sm(p.end + 10, p.end - 5, s);
+    return h + (p.floor(s) - h) * k;
+  };
+  /* on the road itself (the region's other rules don't apply here) */
+  p.inside = (x, z) => { const s = p.along(x, z); return s > def.r0 - 5 && s < p.end - 6 && p.lat(x, z) < def.w - 0.8; };
+  /* keep trees, rocks and scree off the road and its verges */
+  p.near = (x, z, extra = 0) => { const s = p.along(x, z); return s > def.r0 - 45 && s < p.end + 20 && p.lat(x, z) < def.w + 10 + extra; };
+  p.gate = def.r1 - 12;            // where a closed pass is blocked
+  p.trigger = def.r1 + 22;         // walk past this and you're on your way
+  p.arrive = def.r1 + 4;           // where you come in from the other side
+  return p;
+}

@@ -76,6 +76,14 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **Albali Aagac.** Oak-sized trees whose ripe fruit falls and, left alone, hatches into an Albali Byrd (tame in Xilia and Aakalay, Villtur on Leotik). Pick the fruit up before it hatches.
 
+**The Megla Pass.** Like the exits out of Hyrule Field, an old road over the mountains joins Xilia and Aakalay (*Megla* is Dearcineon for mist, and the road tops out in it). It runs Eldi-ward (west) from Xilia over the Crown Ridge, and Fti-ward (north) out of the Reach. Cairns with Nur-lamps and a waymarker in Dearcineon directions mark where it leaves the land. Walk up into the mist and the days of travel pass in a few cards: three on foot, two on Brindle. You come out at the top of the same road in the other region, with Brindle and Phorus. From Xilia it's blocked by a rockfall until the story has taken you to Aakalay. Each region remembers the lantern you last rested at, and the map shows the pass.
+
+**The Sunear'Zikhron.** Every so often the Waves of Memory roll over the region: bands of memory-light pour across a violet sky, the land dims, and echoes of the folk who once walked there walk past again, made of light. RubberMcFly come out to play in it, and it's the only time they glow. Somewhere the storm has an eye, a slow-drifting column of quiet. Find it and keep pace with it for twenty breaths, and what lives there gives you a **true prophecy**: each one points at something that really happens later in the story. Prophecies are written into the Rokarvac, and keeping pace also restores you and earns shards.
+
+**Lore in the wilds.** Kill a RubberMcFly, the most perfect creature, and the ShurgrEdan answers: a claw of light out of a quiet sky that can't be blocked (it takes most of your health, and can kill you on Realistic). Phorus will never shoot one. Rodak travel in threes, and if you fell one the rest of the pack is gone. The Rokarvac has new entries for the Sunear'Zikhron, RubberMcFly, the ShurgrEdan, the Megla Pass and the four Dearcineon directions.
+
+**Swimming and steep ground.** Deep water no longer stops you: wade in and Torcain swims, head and shoulders above the surface, in every lake, river and lagoon, and a little way out to sea off Leotik. Only the far sea and water by the region's edge turn you back. Swimming is slower, there's no rolling in the water, and land creatures won't follow you in. Ground steeper than about 51° can't be walked or hopped up any more; you slide along it, and you slip off ground that steep if you stop on it. Built stairs, piers and roofs are unaffected.
+
 **Touch controls.** The RPG plays on phones and tablets, and the controls turn on at the first touch:
 - **Moving:** a floating joystick on the left; push it past the rim to run.
 - **Camera:** drag anywhere on the right to look around.
@@ -94,7 +102,7 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 - **Nur’Hlyst** (`G`): a golden pulse that reveals chests, gathering spots and quest objects — and the 21 hidden **Sniller amulets**, which pay out at 5, 10, 15 and 21.
 - **A bestiary** (Beasts tab): hunt enough of a creature to study it for +15% damage against it.
 - **Friendly creatures** that only fight if attacked: Kipsu families you can pet, a domestic Punk herd, and Albali that leave you alone.
-- **A Punk mount, Brindle**: whistle with `H`, ride with `E`.
+- **A Punk mount, Brindle**: whistle with `H`, ride with `E`. Phorus rides too: some days he climbs up behind you on Brindle, other days he takes his own Punk, Lun (Dearcineon for moon and shadow; he's Kalo'Eik, moon-folk, and thinks this is very funny), and keeps pace alongside.
 - **Gliding**: hold `Space` in the air.
 - **Levels and perks**: three perk trees (Axe, Duat, Survival).
 - **Spells** on keys `1`–`4`: Duat Pull, Fti Gust, Ular Quake and Nur Ward.

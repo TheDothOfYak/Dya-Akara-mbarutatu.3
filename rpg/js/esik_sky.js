@@ -321,7 +321,8 @@ export function buildAlbaliByrd(opts = {}) {
     root, mats: [plume, wingM], glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wu = st.windup || 0, at = st.attack || 0;
-      const flying = sp > 2 || !!st.diving;
+      const flying = sp > 2 || !!st.diving || !!st.airborne;   // hovering in place still needs wings
+      const hover = flying && !st.diving && sp < 3;
       fly = damp(fly, flying ? 1 : 0, 5, dt);
       ext = damp(ext, Math.max(wu, at, st.diving ? 1 : 0) > 0.05 ? 1 : 0, 12, dt);
       // horn: a nub in the collar when calm, full spike when threatened
@@ -337,9 +338,9 @@ export function buildAlbaliByrd(opts = {}) {
       body.rotation.x = -wu * 0.35 + at * 0.45 + (st.diving ? 0.75 : 0) + fly * 0.12;
       body.rotation.y = (1 - fly) * Math.sin(st.t * 0.6) * 0.25;
       // wings: folded against the ball / spread & flapping / mantled on wind-up
-      ph += dt * (flying ? (st.diving ? 4 : 13) : 6);
+      ph += dt * (flying ? (st.diving ? 4 : hover ? 16 : 13) : 6);   // quicker, shallower beats to hang in the air
       const open = Math.max(fly, wu * 0.85, at * 0.5);
-      const flap = flying ? (st.diving ? 0.15 + Math.sin(ph) * 0.1 : Math.sin(ph) * 0.85 + 0.15) : wu * 0.7 + Math.sin(ph) * 0.06 * open;
+      const flap = flying ? (st.diving ? 0.15 + Math.sin(ph) * 0.1 : Math.sin(ph) * (hover ? 0.7 : 0.85) + 0.15) : wu * 0.7 + Math.sin(ph) * 0.06 * open;
       wings.forEach(w => {
         w.arm.rotation.x = lerp(-1.3, 0, open);
         w.arm.rotation.y = lerp(1.4, st.diving ? 0.6 : 0.05, open);

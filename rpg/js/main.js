@@ -23,6 +23,7 @@ import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
 import { createWilds } from './wilds.js';
 import { initTouch } from './touch.js';
+import { createSunear } from './sunear.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -349,15 +350,19 @@ function onKey(code) {
    ENEMIES
    ================================================================ */
 const enemies = createEnemies({
-  scene, world, particles, P, F, G, sfx, night: () => G.night || 0,
+  scene, world, particles, P, F, G, sfx, night: () => G.night || 0, storm: () => (sunear ? sunear.k : 0),
   get D() { return D; },
   hurtPlayer: (d, from, kb, o) => hurtPlayer(d, from, kb, o),
   dmgNumber: (...a) => dmgNumber(...a),
   studyMul: e => studied(e.kind) ? 1.15 : 1,
   stealShards(n, e) { G.shards -= n; toast(`${e && e.kind === 'malsti' ? 'A Malsti Punk' : 'A Kipsu'} snatched ${n} shards! Catch it before it gets away!`, 3); },
-  onEscape(e) { toast(`${e.kind === 'malsti' ? 'The Malsti Punk' : 'The Kipsu'} escaped with ${e.stolen} shards.`, 3); },
+  onEscape(e) {
+    if (e.kind === 'rodak') { if (!G.packGone || G.t - G.packGone > 20) { G.packGone = G.t; bark('phorus', 'And the rest of the pack’s gone. Rodak never stay to bury their own.', 3); } return; }
+    toast(`${e.kind === 'malsti' ? 'The Malsti Punk' : 'The Kipsu'} escaped with ${e.stolen} shards.`, 3);
+  },
   onKill(e) {
     if (e.T.disp === 'training') { dummyBroken(e); return; }
+    if (e.kind === 'rubbermcfly') { shurgrEdanCalled(e); return; }   // no shards for that. Nothing good comes of it.
     const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4) * FX.shards) + (e.stolen || 0);
     G.shards += n; SAVE.kills++;
     const bk = beastKey(e.kind);
@@ -907,7 +912,7 @@ function tukangFlare() {
 }
 
 function dodge() {
-  if (P.flying) return;
+  if (P.flying || P.swimming) return;
   if (P.riding) { toggleRide(); return; }
   if (!canAct() || P.drink > 0) return;
   if (!spend(D.stamina.dodge)) return;
@@ -1140,7 +1145,7 @@ function talkPhorus() {
     'Rest at the lanterns. I can sing your shards into you there — but resting wakes everything else up too.',
   ];
   let line;
-  if (REGION === 'xilia') line = F_.xseed ? 'Back to the docks — the Stryx will want that seed while it’s warm.' : F_.seedQuest ? 'The Ember Grove is north-east. I’ll feel for the seed if you press F.' : (F_.tut || 0) < 5 ? 'Buhkon’s yard is south-east of the square. Go on — I’ll be near the bakery.' : tips[Math.floor(G.t) % tips.length];
+  if (REGION === 'xilia') line = F_.xdone ? 'The Megla Pass — west, Eldi-ward, over the ridge — goes back to the Reach. Three days of mist. I’ll complain the whole way.' : F_.xseed ? 'Back to the docks — the Stryx will want that seed while it’s warm.' : F_.seedQuest ? 'The Ember Grove is north-east. I’ll feel for the seed if you press F.' : (F_.tut || 0) < 5 ? 'Buhkon’s yard is south-east of the square. Go on — I’ll be near the bakery.' : tips[Math.floor(G.t) % tips.length];
   else if (REGION === 'aakalay') line = F_.done ? 'The Punk with a lord in its head. Lovely. The Urverk is in the plaza, under where the stone was — whenever you’re ready.' : coreCount() >= 5 ? 'The plaza, Torcain. The Oath Stone. It’s waiting.' : tips[Math.floor(G.t) % tips.length];
   else line = F_.lordDead ? 'The door is open. I’m not going through it without a proper meal first.' : pillarCount() >= 3 ? 'The keep. The Urverk. Let’s finish it.' : tips[Math.floor(G.t) % tips.length];
   dialog([['phorus', line]]);
@@ -1150,6 +1155,7 @@ function stryx() {
   if (REGION === 'aakalay' && F_.done) { setSail(); return; }
   if (REGION !== 'xilia') return;
   if (REGION === 'xilia') {
+    if (F_.xdone) { dialog([['stryx', 'The seed went to the Reach with you, and I don’t fly without one. Take the Megla Pass — Eldi-ward, over the ridge.']]); return; }
     if (F_.xseed) { sailToAakalay(); return; }
     if ((F_.tut || 0) < 5) { dialog(STORY.XILIA.stryxEarly); return; }
     if (!F_.seedQuest) { dialog(STORY.XILIA.stryxSeed, () => { F_.seedQuest = true; persist(); setObjective(); toast('New quest: The Warm Seed', 3); sfx.core(); }); return; }
@@ -1908,7 +1914,8 @@ function setObjective() {
   let txt, hintTxt = '', pips = 0, on = 0;
   const X = STORY.OBJECTIVES.xilia, tut = F_.tut || 0;
   if (REGION === 'xilia') {
-    if (!F_.xtalked) txt = X.talk;
+    if (F_.xdone) txt = 'Home in Xilia for a while. The Megla Pass, Eldi-ward over the ridge, leads back to Aakalay';
+    else if (!F_.xtalked) txt = X.talk;
     else if (tut === 0) txt = X.buhkon;
     else if (tut === 1) { txt = X.dummies(Math.min(3, SAVE.counters.tut_dummy || 0)); hintTxt = 'Left-click to swing — keep clicking to combo'; pips = 3; on = Math.min(3, SAVE.counters.tut_dummy || 0); }
     else if (tut === 2) { txt = X.high; hintTxt = 'Right-click throws the axe through the Duat'; }
@@ -2174,7 +2181,8 @@ function toggleJournal() {
     const carv = Object.entries(STORY.STONES).filter(([k]) => SAVE.codex[k]).map(([k, l]) => `<div class="jentry"><b>Carving</b>${l.join(' ')}</div>`).join('');
     const stats = `<div class="jentry"><b>This Run</b>${D.label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls · ${SAVE.kills} foes · Hurst ranks ${Object.values(SAVE.ups).reduce((a, b) => a + b, 0)}</div>`;
     $('j-mem').innerHTML = stats + mem + carv;
-    $('j-codex').innerHTML = [...STORY.CODEX, ...STORY.CODEX_MORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
+    const proph = (SAVE.prophecies || []).map(l => `<div class="jentry"><b>A true prophecy</b>“${l}”</div>`).join('');
+    $('j-codex').innerHTML = proph + [...STORY.CODEX, ...STORY.CODEX_MORE, ...STORY.CODEX_LORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
     j.classList.remove('hidden'); G.paused = true;
     if (document.pointerLockElement) document.exitPointerLock();
   } else { j.classList.add('hidden'); G.paused = false; lockMouse(); }
@@ -2435,7 +2443,8 @@ function callKuni() {
   if (G.mode !== 'play' || P.dead || G.bossActive || dyaMatch) return;
   if (P.flying) {
     const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y);
-    if (P.pos.y - g > 4) { toast('Fly lower to land (hold C).', 1.8); return; }
+    if (P.pos.y - Math.max(g, world.water ? world.water.level : -1e9) > 4) { toast('Fly lower to land (hold C).', 1.8); return; }
+    if (world.inBounds && !world.inBounds(P.pos.x, P.pos.z) && !(world.swimOk && world.swimOk(P.pos.x, P.pos.z))) { toast('Nowhere to land here.', 1.8); return; }
     P.flying = false; P.pos.y = g; P.vel.set(0, 0, 0);
     kuni.actor.root.visible = false; F.pos.copy(P.pos).add(V3(2, 0, 2)); phorus.root.visible = true;
     toast('The Kuni Byrd wheels away into the sky.', 2); return;
@@ -2457,7 +2466,7 @@ function flyKuni(dt, wish, moving, act) {
   const R = world.edgeRadius(nx, nz);
   if (Math.hypot(nx, nz) < R + 60) { P.pos.x = nx; P.pos.z = nz; }
   else { P.vel.x *= -0.5; P.vel.z *= -0.5; if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', 'Even a Kuni won’t fly past the edge of what we know. Turn back.', 2.4); } }
-  const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 50);
+  const g = Math.max(world.col.ground(P.pos.x, P.pos.z, P.pos.y + 50), world.water ? world.water.level : -1e9);   // skim the water, don't fly through it
   P.pos.y = clamp(P.pos.y + P.vel.y * dt, g + 1.5, g + 140);
   if (moving) P.yaw = dampAngle(P.yaw, Math.atan2(P.vel.x, P.vel.z), 3, dt);
   P.onGround = false; P.stam = Math.min(P.stamMax, P.stam + 20 * dt);
@@ -2499,10 +2508,40 @@ function toggleRide() {
     P.riding = false;
     P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
     P.pos.y = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 3);
+    phorusDismount();
   } else {
     P.riding = true; mount.coming = false; P.atk = null;
     sfx.jump();
+    phorusMount();
   }
+}
+
+/* Phorus rides too: some days he climbs up behind you on Brindle, some days he
+   takes his own Punk, Lun (Dearcineon: moon, shadow — a Kalo'Eik's joke), and keeps pace alongside */
+const FR = { mode: null, punk: null, pos: V3(), yaw: 0 };
+const PILLION_LINES = ['Budge up. Brindle won’t mind.', 'I’m riding behind. Mind the bumps.', 'Room for one more. There’s always room for one more.'];
+const LUN_LINES = ['I’m taking Lun. Try to keep up.', 'Lun! Here, girl. We ride together today.', 'Race you. Lun’s faster, don’t tell Brindle.', 'A Kalo’Eik on a Punk called Moon. Don’t laugh.'];
+function phorusMount() {
+  if (!phorus.root.visible || FR.mode) return;   // he's not about (on the Kuni, say)
+  FR.mode = Math.random() < 0.5 ? 'pillion' : 'own';
+  if (FR.mode === 'own') {
+    if (!FR.punk) { FR.punk = buildDomesticPunk({ saddle: true, blanket: 0x2a5a8a, seed: 23 }); FR.punk.root.scale.setScalar(0.72); scene.add(FR.punk.root); }
+    // Lun trots over from wherever she was left, or out of the nearest bushes
+    if (!FR.punk.root.visible || FR.pos.distanceTo(F.pos) > 20) { FR.pos.copy(F.pos).add(V3(1.2, 0, 1.2)); FR.pos.y = world.col.ground(FR.pos.x, FR.pos.z, F.pos.y + 2); }
+    FR.punk.root.visible = true;
+    F.pos.copy(FR.pos); F.vel.set(0, 0, 0);
+    particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 12, { color: 0xd8c098, speed: 3, size: 0.5, life: 0.5 });
+    bark('phorus', LUN_LINES[Math.floor(Math.random() * LUN_LINES.length)], 2.4);
+  } else bark('phorus', PILLION_LINES[Math.floor(Math.random() * PILLION_LINES.length)], 2.4);
+}
+function phorusDismount() {
+  if (!FR.mode) return;
+  if (FR.mode === 'own') {          // he hops down beside Lun, who waits there
+    FR.pos.copy(F.pos); FR.yaw = F.yaw;
+    F.pos.add(V3(Math.cos(F.yaw) * 1.5, 0, -Math.sin(F.yaw) * 1.5));
+  } else F.pos.copy(P.pos).add(V3(-Math.sin(P.yaw) * 2.2, 0, -Math.cos(P.yaw) * 2.2));   // slides off Brindle's back
+  F.pos.y = world.col.ground(F.pos.x, F.pos.z, F.pos.y + 3); F.vel.set(0, 0, 0);
+  FR.mode = null;
 }
 function updateMount(dt) {
   if (!mount) return;
@@ -2768,9 +2807,209 @@ function mapMarkers() {
   if (board) m.push({ x: board.x, z: board.z, ch: '▤', col: '#e8c890', size: 15, label: 'Bounties' });
   if (SAVE.quests.q_skorthal === 'active' && skor && !SAVE.counters.skorthal) m.push({ x: skor.pos.x, z: skor.pos.z, ch: '✦', col: '#9af0a0', size: 18, label: 'Skor’Thal' });
   if (lostMark) m.push({ x: lostMark.position.x, z: lostMark.position.z, ch: '✦', col: '#d8b8ff', size: 15, label: 'Lost shards' });
+  for (const ps of passes) { const q = ps.point(ps.r1); m.push({ x: q.x, z: q.z, ch: '⛰', col: passOpen(ps) ? '#f3cf7a' : '#7a6a5a', size: 18, label: passOpen(ps) ? `${ps.name} → ${REGION_NAME[ps.to]}` : `${ps.name} (rockfall)` }); }
   m.push(...wilds.markers());
   return m;
 }
+/* ---------------- the ShurgrEdan: kill a RubberMcFly and it answers before the day is out ---------------- */
+function shurgrEdanCalled(e) {
+  if (G.shurgr) return;
+  G.shurgr = { t: 9 + Math.random() * 7 };
+  SAVE.counters.mcfly = (SAVE.counters.mcfly || 0) + 1; persist();
+  dialog(STORY.SHURGREDAN.warn.map(l => ['phorus', l]));
+}
+const shurgrFx = [];
+function updateShurgrEdan(dt) {
+  for (let i = shurgrFx.length - 1; i >= 0; i--) {
+    const f = shurgrFx[i]; f.t += dt;
+    const k = f.t < 0.35 ? f.t / 0.35 : Math.max(0, 1 - (f.t - 0.35) / 1.9);
+    f.grp.children.forEach((c, j) => { if (c.material) c.material.opacity = k * (j < 3 ? 0.9 : 0.6); });
+    if (f.t > 2.4) { scene.remove(f.grp); shurgrFx.splice(i, 1); }
+  }
+  if (!G.shurgr || G.mode !== 'play' || G.paused || P.dead || P.flying || G.inMemory) return;
+  if ((G.shurgr.t -= dt) > 0) return;
+  G.shurgr = null;
+  // a claw of light out of a quiet sky: three talons that meet where Torcain stands
+  const grp = new THREE.Group(), x = P.pos.x, y = P.pos.y, z = P.pos.z;
+  for (let i = -1; i <= 1; i++) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 2.2, 140, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff3c8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    m.position.set(x + i * 7, y + 70, z + i * 2); m.rotation.z = -i * 0.05; grp.add(m);
+  }
+  const flash = glowSprite(0xfff3c8, 14, 0); flash.position.set(x, y + 2, z); flash.material.fog = false; grp.add(flash);
+  scene.add(grp); shurgrFx.push({ grp, t: 0 });
+  particles.burst(x, y + 1, z, 70, { color: 0xffe8a8, speed: 14, size: 0.8, life: 1.2, gravity: 3 });
+  sfx.slam(); G.hitstop = 0.25; if (sky) sky.flash = 1;
+  const dmg = Math.round(P.maxHp * 0.7);
+  P.hp -= dmg; P.lastHurt = G.t; dmgNumber(x, y + 2.6, z, dmg, 'hurt');
+  toast(STORY.SHURGREDAN.strike, 3.5);
+  if (P.hp <= 0) { if (D === DIFFICULTY.realistic) { P.hp = 0; playerDown(); return; } P.hp = 1; }
+  setTimeout(() => bark('phorus', STORY.SHURGREDAN.after, 4), 1800);
+}
+
+/* ---------------- the Sunear'Zikhron: the Waves of Memory pass over now and then ---------------- */
+const sunear = createSunear({ scene, particles, world, region: REGION });
+const STORM_FOG = new THREE.Color(0x8a7aa8), STORM_SKY = new THREE.Color(0xc8b4ff);
+if (SAVE.sunearAt == null) SAVE.sunearAt = (SAVE.time || 0) + 420 + Math.random() * 300;
+const pick1 = a => a[Math.floor(Math.random() * a.length)];
+function stormMayCome() {
+  return G.mode === 'play' && !G.paused && !P.dead && !G.bossActive && !dyaMatch && !G.inMemory && !P.flying
+    && (REGION !== 'xilia' || (F_.tut || 0) >= 5);
+}
+function startStorm() {
+  if (sunear.active) return;
+  sunear.start(P.pos, 170);
+  G.eyeT = 0; G.eyeLost = 0; G.eyeDone = false; G.eyeSeen = false; G.stormLines = 0;
+  showLocation('The Sunear’Zikhron', 'the Waves of Memory');
+  bark('phorus', pick1(STORY.SUNEAR.arrive), 5);
+  // RubberMcFly come out to play in it — the only time they ever glow
+  const near = enemies.list.filter(e => e.kind === 'rubbermcfly' && !e.dead && e.pos.distanceTo(P.pos) < 90).length;
+  for (let i = near; i < 5; i++) {
+    const a = Math.random() * Math.PI * 2, d = 12 + Math.random() * 30, x = P.pos.x + Math.cos(a) * d, z = P.pos.z + Math.sin(a) * d;
+    if (world.inBounds && !world.inBounds(x, z)) continue;
+    enemies.spawn('rubbermcfly', x, z, 'sunear', { wild: true });
+  }
+}
+function updateStorm(dt) {
+  if (!sunear.active && stormMayCome() && SAVE.time > SAVE.sunearAt) startStorm();
+  const was = sunear.active;
+  sunear.update(dt, G.t, camera.position);
+  if (was && !sunear.active) {
+    SAVE.sunearAt = SAVE.time + 1080 + Math.random() * 720;
+    bark('phorus', STORY.SUNEAR.passed, 3.5); persist();
+  }
+  const k = sunear.k;
+  if (k > 0) {   // the land dims and goes violet under the waves
+    if (scene.fog) scene.fog.color.lerp(STORM_FOG, k * 0.55);
+    sun.intensity *= 1 - 0.55 * k;
+    hemi.color.lerp(STORM_SKY, k * 0.35);
+    bloom.strength += 0.35 * k;
+  }
+  if (!sunear.active || G.mode !== 'play') return;
+  // what Phorus notices, once each
+  if (k > 0.8 && G.stormLines === 0) { G.stormLines = 1; setTimeout(() => bark('phorus', STORY.SUNEAR.mcfly, 4), 2500); }
+  if (sunear.eyeOn && !G.eyeSeen) { G.eyeSeen = true; bark('phorus', STORY.SUNEAR.eye, 6); }
+  if (G.eyeDone || !sunear.eyeOn) return;
+  // keep pace with the eye: twenty breaths inside it, a few steps' grace if you slip out
+  if (sunear.inEye(P.pos)) {
+    G.eyeT += dt; G.eyeLost = 0;
+    const sec = Math.floor(G.eyeT);
+    if (sec !== G.eyeShown) { G.eyeShown = sec; toast(`Keeping pace with the eye — ${Math.min(sec, EYE_NEED)} / ${EYE_NEED}`, 1.2); }
+    if (G.eyeT >= EYE_NEED) prophecy();
+  } else if (G.eyeT > 0) {
+    G.eyeLost += dt;
+    if (G.eyeLost > 3) { G.eyeT = 0; G.eyeShown = -1; bark('phorus', STORY.SUNEAR.lost, 2.5); }
+  }
+}
+const EYE_NEED = 20;
+function prophecy() {
+  G.eyeDone = true;
+  SAVE.prophecies = SAVE.prophecies || [];
+  const pool = STORY.PROPHECY[REGION] || STORY.PROPHECY.aakalay;
+  const fresh = pool.filter(l => !SAVE.prophecies.includes(l));
+  const line = fresh.length ? fresh[0] : pick1(pool);
+  if (!SAVE.prophecies.includes(line)) SAVE.prophecies.push(line);
+  P.hp = P.maxHp; P.stam = P.stamMax; P.poison = 0;
+  G.shards += 30; xp(60); sfx.core();
+  particles.burst(P.pos.x, P.pos.y + 1.5, P.pos.z, 50, { color: 0xfff0c8, speed: 6, size: 0.5, life: 1.2, gravity: -2 });
+  persist();
+  dialog([['eye', line], ['phorus', pick1(STORY.SUNEAR.after)]], () => { sunear.end(); toast('A true prophecy, written in the Rokarvac. +30 shards', 3); });
+}
+
+/* ---------------- mountain passes: walk out along the road and the next region loads ---------------- */
+const REGION_NAME = { xilia: 'Xilia', aakalay: 'The Ruins of Aakalay', leotik: 'Leotik' };
+const passOpen = ps => ps.to !== 'aakalay' || !!F_.xdone;    // the road to the Reach opens once the story has taken you there
+function signTexture(lines) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#6b4a2c'; x.fillRect(0, 0, 256, 128); x.strokeStyle = '#3a2614'; x.lineWidth = 8; x.strokeRect(4, 4, 248, 120);
+  x.fillStyle = '#f4e2b8'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = 'bold 30px Georgia, serif'; x.fillText(lines[0], 128, 46);
+  x.font = 'italic 22px Georgia, serif'; x.fillText(lines[1], 128, 88);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const passes = (world.passes || []).map(ps => {
+  const open = passOpen(ps), grp = new THREE.Group(), stone = toon(0x8a8478), stoneD = toon(0x6e6a62);
+  const at = (s, l) => { const q = ps.point(s, l); return V3(q.x, world.heightAt(q.x, q.z), q.z); };
+  // cairns with a Nur-lamp on top either side of where the road leaves the land
+  for (const side of [-1, 1]) {
+    const b = at(ps.r0 + 8, side * (ps.w + 1.2));
+    for (let k = 0; k < 4; k++) {
+      const r = 0.9 - k * 0.17, m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), k % 2 ? stoneD : stone);
+      m.position.set(b.x + (Math.random() - 0.5) * 0.2, b.y + 0.5 + k * r * 1.3, b.z + (Math.random() - 0.5) * 0.2); m.rotation.set(k, k * 2, 0); grp.add(m);
+    }
+    const lamp = glowSprite(0xffc870, 2.2, 0.85); lamp.position.set(b.x, b.y + 4.4, b.z); grp.add(lamp);
+    world.col.add(b.x, b.z, 0.8, 0.8, 0, b.y - 1, b.y + 4);
+  }
+  // a signpost: where the road goes
+  {
+    const b = at(ps.r0 + 12, ps.w - 2.2), post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3, 6), toon(0x5a3a22));
+    post.position.set(b.x, b.y + 1.5, b.z); grp.add(post);
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), new THREE.MeshToonMaterial({ map: signTexture([ps.name, (ps.dir ? ps.dir + ' · ' : '→ ') + REGION_NAME[ps.to]]), side: THREE.DoubleSide }));
+    board.position.set(b.x, b.y + 2.5, b.z); board.rotation.y = Math.atan2(-ps.cx, -ps.sz); grp.add(board);
+    world.col.add(b.x, b.z, 0.25, 0.25, 0, b.y - 1, b.y + 3);
+  }
+  // mist where the road tops the ridge and runs on out of sight
+  for (let k = 0; k < 7; k++) {
+    const m = at(ps.trigger + 6 + k * 5, (Math.random() - 0.5) * ps.w * 1.4), g = glowSprite(0xf2ece0, 16 + Math.random() * 8, 0.32);
+    g.position.set(m.x, m.y + 3 + Math.random() * 4, m.z); g.material.fog = false; grp.add(g);
+  }
+  // a closed road is blocked by an old rockfall
+  if (!open) for (let k = 0; k < 9; k++) {
+    const q = at(ps.gate + 3 + Math.random() * 4, (k / 8 - 0.5) * ps.w * 2), r = 1.4 + Math.random() * 1.6;
+    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), k % 2 ? stone : stoneD); m.position.set(q.x, q.y + r * 0.6, q.z); m.rotation.set(Math.random() * 3, Math.random() * 3, 0); grp.add(m);
+  }
+  outlineAll(grp, 0.05); scene.add(grp);
+  return ps;
+});
+/* called every frame from updatePlayer, after the move */
+function checkPasses(px0, pz0) {
+  for (const ps of passes) {
+    if (ps.lat(P.pos.x, P.pos.z) > ps.w + 3) continue;
+    const s = ps.along(P.pos.x, P.pos.z);
+    if (!passOpen(ps)) {
+      if (s > ps.gate && ps.along(px0, pz0) <= ps.gate + 0.5) {
+        P.pos.x = px0; P.pos.z = pz0; P.vel.x *= -0.2; P.vel.z *= -0.2;
+        if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', 'Rockfall across the Megla Pass. And it’s three days on foot to the Reach that way anyway. The Stryx is quicker.', 3); }
+      }
+    } else if (s > ps.trigger && G.mode === 'play') takePass(ps);
+  }
+}
+const PASS_CARDS = {
+  aakalay: ride => [ride ? 'Over the Megla Pass on Brindle’s back. Two days of mist, and Phorus singing to keep the cold off.' : 'Over the Megla Pass on foot. Three days of mist, and Phorus complaining about every one of them.', 'The Crown Ridge falls behind. The land goes grey, then ash-white. The Reach.'],
+  xilia: ride => [ride ? 'Back over the Megla Pass, two days on Brindle’s back.' : 'Back over the Megla Pass, three days on foot.', 'Pine smoke, then cut Ju, then the windmill. Xilia.'],
+};
+function takePass(ps) {
+  G.mode = 'trance'; P.vel.set(0, 0, 0);
+  if (document.pointerLockElement) document.exitPointerLock();
+  fade(0.92, 0.9);
+  const cards = (PASS_CARDS[ps.to] || (() => [ps.name + '.']))(!!P.riding);
+  SAVE.lanternBy = SAVE.lanternBy || {}; SAVE.lanternBy[REGION] = SAVE.lantern;   // each region remembers where you last rested
+  SAVE.region = ps.to; SAVE.lantern = SAVE.lanternBy[ps.to] || null;
+  SAVE.passIn = { id: ps.toPass, ride: !!P.riding };
+  persist(); CLOUD.flush();
+  try { sessionStorage.setItem('torcain-boot', 'pass'); } catch (e) { /* ignore */ }
+  playCards(cards, 3600, () => { fade(1, 0.4); setTimeout(() => location.reload(), 450); });
+}
+/* coming in over a pass from another region: stand at the top of the road, facing into the land */
+function arriveByPass() {
+  const info = SAVE.passIn || {}; delete SAVE.passIn;
+  if (REGION === 'aakalay' && !F_.arrivedA) { arriveAakalay(); return; }
+  const ps = passes.find(q => q.id === info.id);
+  if (!ps) { continueRun(); return; }
+  const a = ps.point(ps.arrive);
+  P.pos.set(a.x, world.heightAt(a.x, a.z), a.z); P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos);
+  P.yaw = Math.atan2(-ps.cx, -ps.sz); CAM.yaw = Math.atan2(ps.cx, ps.sz); G.t = 0;
+  F.pos.copy(P.pos).add(V3(ps.cx * 2.5 - ps.sz * 2, 0, ps.sz * 2.5 + ps.cx * 2));
+  if (mount) {              // Brindle came over the pass with you
+    mount.pos.copy(P.pos).add(V3(-ps.sz * 3, 0, ps.cx * 3)); mount.pos.y = world.heightAt(mount.pos.x, mount.pos.z);
+    if (info.ride) toggleRide();
+  }
+  fade(1, 0); setTimeout(() => fade(0, 1.2), 50);
+  enterPlay();
+  showLocation(REGION_NAME[REGION], 'by ' + ps.name);
+  persist();
+}
+
 function travel(id) {
   const l = lanternById(id); if (!l) return;
   if (G.bossActive) { toast('Not in the middle of a fight like this.', 2); return; }
@@ -2819,6 +3058,16 @@ function updateRpgHud() {
 /* ================================================================
    UPDATE
    ================================================================ */
+/* how steep a slope you can walk up (rise over run), and how deep you float while swimming */
+const SLOPE_MAX = 1.25, SWIM_DEPTH = 1.3;
+/* would stepping to (x, z) climb the bare ground faster than a walkable slope?
+   Built surfaces — stairs, a pier, a roof — are always fine to step onto. */
+function steepUp(x, z, y0, hd) {
+  const t = world.heightAt(x, z);
+  if (t <= y0 + 0.02 + hd * SLOPE_MAX) return false;
+  return world.col.ground(x, z, y0) <= t + 0.01;
+}
+
 function updatePlayer(dt) {
   FX = effects(SAVE.inv, SAVE.time);
   for (const k in P.spellCd) P.spellCd[k] = Math.max(0, P.spellCd[k] - dt);
@@ -2854,6 +3103,7 @@ function updatePlayer(dt) {
   if (P.riding) { speed = (keys.ShiftLeft || keys.ShiftRight) ? 19 : 10; sprint = false; }
   if (P.atk) speed *= P.riding ? 0.7 : 0.25;
   if (P.drink > 0) speed *= 0.35;
+  if (P.swimming) speed *= 0.6;
   const accel = P.onGround ? 14 : 4;
 
   if (P.roll) {
@@ -2889,7 +3139,7 @@ function updatePlayer(dt) {
   }
 
   P.coyote = P.onGround ? 0.12 : Math.max(0, P.coyote - dt);
-  if (P.jumpBuf > 0 && P.coyote > 0 && act && (P.riding || spend(D.stamina.jump))) { P.vel.y = P.riding ? 12 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
+  if (P.jumpBuf > 0 && P.coyote > 0 && act && !P.steep && (P.riding || spend(D.stamina.jump))) { P.vel.y = P.swimming ? 9 : P.riding ? 12 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
   P.vel.y -= 28 * dt;
   // gliding: hold Space while falling and Torcain's coat catches the wind
   P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
@@ -2907,11 +3157,19 @@ function updatePlayer(dt) {
   }
 
   const wasGround = P.onGround;
-  const px0 = P.pos.x, pz0 = P.pos.z;
+  const px0 = P.pos.x, pz0 = P.pos.z, py0 = P.pos.y;
   P.pos.addScaledVector(P.vel, dt);
-  if (world.inBounds && !world.inBounds(P.pos.x, P.pos.z)) {   // the land itself says no: a sheer ridge, deep water, a thorn wall
+  if (world.inBounds && !world.inBounds(P.pos.x, P.pos.z) && !(world.swimOk && world.swimOk(P.pos.x, P.pos.z))) {   // the land itself says no: a sheer ridge, open sea, a thorn wall
     P.pos.x = px0; P.pos.z = pz0; P.vel.x *= -0.2; P.vel.z *= -0.2;
     if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', world.barrierLine ? world.barrierLine(P.pos.x, P.pos.z) : 'No way through here.', 2.4); }
+  }
+  checkPasses(px0, pz0);
+  // no walking (or hopping) straight up a cliff face: slide along it instead
+  const hd = Math.hypot(P.pos.x - px0, P.pos.z - pz0);
+  if (hd > 1e-4 && steepUp(P.pos.x, P.pos.z, py0, hd)) {
+    if (!steepUp(P.pos.x, pz0, py0, Math.abs(P.pos.x - px0))) P.pos.z = pz0;
+    else if (!steepUp(px0, P.pos.z, py0, Math.abs(P.pos.z - pz0))) P.pos.x = px0;
+    else { P.pos.x = px0; P.pos.z = pz0; }
   }
   world.col.resolve(P.pos, P.riding ? 0.95 : 0.45, P.riding ? 2.6 : 1.9);
   if (G.bossActive && boss) {
@@ -2925,8 +3183,36 @@ function updatePlayer(dt) {
   } else if (wasGround && P.vel.y <= 0 && P.pos.y - g < 0.45) { P.pos.y = g; P.vel.y = 0; P.onGround = true; }
   else P.onGround = false;
 
+  // swimming: deep water holds you up, head and shoulders clear of the surface
+  const wasSwim = P.swimming;
+  P.swimming = false;
+  if (world.water && g < world.water.level - SWIM_DEPTH - 0.05 && P.pos.y <= world.water.level - SWIM_DEPTH + 0.02 && world.water.depth(P.pos.x, P.pos.z) > SWIM_DEPTH) {
+    const lv = world.water.level;
+    if (!wasSwim) particles.burst(P.pos.x, lv, P.pos.z, P.vel.y < -6 ? 30 : 12, { color: 0xd8f4ff, speed: P.vel.y < -6 ? 5 : 2.5, size: 0.5, life: 0.7, gravity: 6 });
+    P.pos.y = lv - SWIM_DEPTH; if (P.vel.y < 0) P.vel.y = 0;
+    P.onGround = true; P.swimming = true;
+    if (P.roll) { P.roll = null; torcain.body.rotation.x = 0; }
+    if (Math.hypot(P.vel.x, P.vel.z) > 1 && Math.random() < 0.35) particles.emit(P.pos.x - P.vel.x * 0.05, lv + 0.05, P.pos.z - P.vel.z * 0.05, { vy: 0.6, color: 0xe8f8ff, size: 0.35, life: 0.6, speed: 0.8 });
+  }
+  if (wasSwim && !P.swimming && P.onGround) particles.burst(P.pos.x, P.pos.y + 0.2, P.pos.z, 8, { color: 0xd8f4ff, speed: 2, size: 0.35, life: 0.5, gravity: 6 });
+
+  // ground too steep to stand on: no jumping up it, and you slip back down
+  P.steep = false;
+  if (P.onGround && !P.swimming) {
+    const e = 0.6, gx = world.heightAt(P.pos.x + e, P.pos.z) - world.heightAt(P.pos.x - e, P.pos.z), gz = world.heightAt(P.pos.x, P.pos.z + e) - world.heightAt(P.pos.x, P.pos.z - e);
+    const sl = Math.hypot(gx, gz) / (2 * e);
+    if (sl > SLOPE_MAX + 0.1 && P.pos.y <= world.heightAt(P.pos.x, P.pos.z) + 0.05) {
+      P.steep = true;
+      const k = Math.min(6, (sl - SLOPE_MAX) * 5) * dt / Math.hypot(gx, gz), sx = P.pos.x - gx * k, sz = P.pos.z - gz * k;
+      if (!world.inBounds || world.inBounds(sx, sz) || (world.swimOk && world.swimOk(sx, sz))) {   // never slip out past the edge
+        P.pos.x = sx; P.pos.z = sz;
+        P.pos.y = Math.max(world.col.ground(P.pos.x, P.pos.z, P.pos.y), P.pos.y - 6 * dt);
+      }
+    }
+  }
+
   P.safeTimer -= dt;
-  if (P.onGround && P.safeTimer <= 0) {
+  if (P.onGround && !P.swimming && !P.steep && P.safeTimer <= 0) {
     const R = world.edgeRadius(P.pos.x, P.pos.z), rr = Math.hypot(P.pos.x, P.pos.z);
     const inHazard = world.hazards.some(h => Math.hypot(P.pos.x - h.x, P.pos.z - h.z) < h.r + 1);
     if (!inHazard && (rr < R - 6 || (Math.abs(P.pos.x) < 3 && P.pos.z > 150))) { P.lastSafe.copy(P.pos); P.safeTimer = 0.5; }
@@ -2997,7 +3283,7 @@ function updatePhorus(dt) {
   let tgt = null, bd = 1e9;
   if (G.mode === 'play' && !P.dead) {
     for (const e of enemies.list) {
-      if (e.dead || !e.hostile || e.state === 'idle' || e.state === 'return' || e.state === 'shadow') continue;
+      if (e.dead || !e.hostile || e.state === 'idle' || e.state === 'return' || e.state === 'shadow' || e.kind === 'rubbermcfly') continue;
       const d = e.pos.distanceTo(P.pos);
       if (d < 18 && d < bd) { bd = d; tgt = e; }
     }
@@ -3022,7 +3308,17 @@ function updatePhorus(dt) {
     }
   } else {
     const back = V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), right = V3(-Math.cos(P.yaw), 0, Math.sin(P.yaw));
-    want = P.pos.clone().addScaledVector(back, 2.4).addScaledVector(right, 1.8);
+    want = FR.mode === 'own' ? P.pos.clone().addScaledVector(back, 3.5).addScaledVector(right, 3.2)   // Lun keeps clear of Brindle
+      : P.pos.clone().addScaledVector(back, 2.4).addScaledVector(right, 1.8);
+  }
+  if (FR.mode && !P.riding) phorusDismount();
+  if (FR.punk && FR.mode !== 'own') { FR.punk.root.position.copy(FR.pos); FR.punk.root.rotation.y = FR.yaw; if (FR.punk.root.visible) FR.punk.animate(dt, { speed: 0, t: G.t }); }
+  if (FR.mode === 'pillion') {      // up behind Torcain on Brindle's back
+    F.pos.copy(P.pos).add(V3(-Math.sin(P.yaw) * 0.95, 0, -Math.cos(P.yaw) * 0.95)); F.vel.set(0, 0, 0); F.onGround = true;
+    if (!tgt) F.yaw = P.yaw;
+    phorus.root.position.set(F.pos.x, F.pos.y + 1.2, F.pos.z); phorus.root.rotation.y = F.yaw;
+    phorus.animate(dt, { speed: 0, onGround: true, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
+    return;
   }
   // Phorus will not wade into acid
   for (const h of world.hazards) { const dx = want.x - h.x, dz = want.z - h.z, d = Math.hypot(dx, dz); if (d < h.r + 1.5) { want.x = h.x + dx / (d || 1) * (h.r + 1.5); want.z = h.z + dz / (d || 1) * (h.r + 1.5); } }
@@ -3033,7 +3329,7 @@ function updatePhorus(dt) {
     F.pos.copy(P.pos).addScaledVector(V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), 2.5);
     particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 16, { color: 0x7ad8ff, speed: 4, size: 0.4, life: 0.5 });
   }
-  const sp = d > 1.2 ? Math.min(12, d * 2.2) : 0;
+  const sp = d > 1.2 ? Math.min(FR.mode === 'own' ? 22 : 12, d * 2.2) : 0;
   F.vel.x = damp(F.vel.x, d > 0.01 ? dx / d * sp : 0, 8, dt);
   F.vel.z = damp(F.vel.z, d > 0.01 ? dz / d * sp : 0, 8, dt);
   F.vel.y -= 28 * dt;
@@ -3042,6 +3338,9 @@ function updatePhorus(dt) {
   if (G.bossActive) arenaClamp(F.pos, G.arena - 1);
   const g = world.col.ground(F.pos.x, F.pos.z, F.pos.y);
   if (F.pos.y <= g || F.pos.y - g < 0.4) { F.pos.y = g; F.vel.y = 0; F.onGround = true; } else F.onGround = false;
+  if (world.water && g < world.water.level - SWIM_DEPTH && F.pos.y <= world.water.level - SWIM_DEPTH && world.water.depth(F.pos.x, F.pos.z) > SWIM_DEPTH) {   // he swims after you
+    F.pos.y = world.water.level - SWIM_DEPTH; F.vel.y = Math.max(0, F.vel.y); F.onGround = true;
+  }
   if (F.onGround && sp > 3 && world.col.ground(F.pos.x + F.vel.x * 0.12, F.pos.z + F.vel.z * 0.12, F.pos.y + 3) > F.pos.y + 0.7) F.vel.y = 10;
   if (F.pos.y < -30) F.pos.copy(P.pos);
   const hs = Math.hypot(F.vel.x, F.vel.z);
@@ -3049,6 +3348,14 @@ function updatePhorus(dt) {
   else if (!tgt && G.mode === 'dialog') F.yaw = dampAngle(F.yaw, Math.atan2(P.pos.x - F.pos.x, P.pos.z - F.pos.z), 6, dt);
   phorus.root.position.copy(F.pos);
   phorus.root.rotation.y = F.yaw;
+  if (FR.mode === 'own') {          // astride Lun
+    FR.pos.copy(F.pos); FR.yaw = F.yaw;
+    FR.punk.root.position.copy(F.pos); FR.punk.root.rotation.y = F.yaw;
+    FR.punk.animate(dt, { speed: hs, t: G.t });
+    phorus.root.position.y += 1.2;
+    phorus.animate(dt, { speed: 0, onGround: true, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
+    return;
+  }
   phorus.animate(dt, { speed: hs, onGround: F.onGround, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
 }
 
@@ -3195,6 +3502,7 @@ function frame() {
       updateWorldBits(dt);
       updateNpcs(dt);
       updateMount(dt);
+      updateShurgrEdan(dt);
       updateTrials(dt);
       updateDialog(dt);
       updateCamera(dt);
@@ -3226,6 +3534,7 @@ function frame() {
   world.update(tt, dt, particles, camera.position);
   sky.update(tt, dt, camera.position);
   dn.update(frozen && G.mode !== 'title' ? 0 : dt);
+  if (G.mode !== 'title') updateStorm(frozen ? 0 : dt);
   touch.update(dt);
   G.night = dn.night;
   /* everyone's bioluminescence follows the dark (creatures handle their own in enemies.js / wilds.js) */
@@ -3373,9 +3682,11 @@ frame();
 if (BOOT === 'new' && SAVE_AT_LOAD) { $('title').classList.add('hidden'); startFromTitle(beginNew); }
 else if (BOOT === 'arrive' && REGION === 'leotik') { $('title').classList.add('hidden'); startFromTitle(arriveLeotik); }
 else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add('hidden'); startFromTitle(arriveAakalay); }
+else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); startFromTitle(arriveByPass); }
 
 /* debugging handle for the console */
 window.__torcain = {
+  sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
   get dya() { return dyaMatch; }, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,

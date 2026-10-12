@@ -277,13 +277,14 @@ export function buildLeotik(scene) {
     const e = 1.5, gx = heightAt(x + e, z) - heightAt(x - e, z), gz = heightAt(x, z + e) - heightAt(x, z - e);
     return Math.hypot(gx, gz) / (2 * e) < 1.5;
   }
+  /* deep water you can swim in: rivers, the lagoon, and the sea close in round the island */
+  function swimOk(x, z) {
+    if (waterDepth(x, z) <= WADE) return false;
+    return Math.hypot(x, z) < coastR(Math.atan2(z, x)) + 30;
+  }
   function barrierLine(x, z) {
     if (inBounds(x, z)) return '';
-    if (waterDepth(x, z) > WADE) {
-      if (riverAt(x, z) && RQ.L < RQ.w + 1 && heightAt(x, z) > SEA - 1) return 'The river runs too deep and fast to wade. Find a shallower ford upstream.';
-      if (Math.hypot(x - LAG.x, z - LAG.z) < LAG.r + 5) return 'The lagoon drops away too deep to wade.';
-      return 'The water’s too deep to wade — that’s open sea.';
-    }
+    if (waterDepth(x, z) > WADE) return 'That’s open sea past here — the swell would drown us. Back to the island.';
     if (volcanoH(x, z) > 40) return 'The volcano’s flanks are too sheer and too hot to climb.';
     if (coastD(x, z) < 30) return 'The sea cliff is too sheer to climb.';
     return 'The ridge is too sheer to climb.';
@@ -890,7 +891,7 @@ export function buildLeotik(scene) {
     name: 'leotik', camp: CAMP, heightAt, col, SITES, PLAZA: { x: KEEP.x, z: KEEP.z, y: kg }, urverk: { group: urverk, ringMat, portalMat },
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, hazards, pillars, lanterns, stones, falls: [],
-    inBounds, barrierLine,
+    inBounds, barrierLine, swimOk,
     water: { level: SEA, isWater, depth: waterDepth, rivers: RIVERS.map(R => R.name), lagoon: { x: LAG.x, z: LAG.z, r: LAG.r } },
     zones, albaliSpots: ALBALI.map(p => ({ x: p.x, z: p.z })), juFields: JU.map(f => ({ ...f })), kuniPerch, clear: CLEAR,
     update(t, dt, particles, camPos) {
