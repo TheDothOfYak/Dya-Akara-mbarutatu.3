@@ -136,9 +136,9 @@ function baseH(x, z) {
 for (const f of JU) FLATS.push({ x: f.x, z: f.z, r: f.r + 3, h: baseH(f.x, f.z) });
 for (const f of ALBALI) FLATS.push({ x: f.x, z: f.z, r: 9, h: baseH(f.x, f.z) });
 
-/* the Ash Road: a pass north-west out of the Reach, the long way round to Xilia on foot */
+/* the Megla Pass (Megla: mist): the old road north — Fti — out of the Reach, the long way round to Xilia on foot */
 const PASS_A = -2.1;
-export const PASS = makePass({ id: 'a_ashroad', name: 'The Ash Road', to: 'xilia', toPass: 'x_ashroad', a: PASS_A,
+export const PASS = makePass({ id: 'a_ashroad', name: 'The Megla Pass', dir: 'Fti', to: 'xilia', toPass: 'x_ashroad', a: PASS_A,
   r0: lut(LIM, PASS_A) - 75, r1: lut(LIM, PASS_A) + 28, w: 9, rise: 16 }, baseH);
 
 export function heightAt(x, z) {
@@ -165,7 +165,7 @@ function waterDepth(x, z) { return minE(x, z) < 1 ? Math.max(0, LEVEL - heightAt
 function onPier(x, z) { return PIER_BOX && Math.abs(x) < PIER_BOX.hw && z > PIER_BOX.z0 && z < PIER_BOX.z1; }
 function inBounds(x, z) {
   if (onPier(x, z)) return true;
-  if (PASS.inside(x, z)) return true;                     // the Ash Road through the ridge
+  if (PASS.inside(x, z)) return true;                     // the Megla Pass through the ridge
   if (Math.hypot(x, z) > limitR(x, z) - 3) return false;
   if (Math.hypot(x - SPIRE.x, z - SPIRE.z) < 22) return false;
   return waterDepth(x, z) <= WADE;
@@ -260,7 +260,7 @@ export function buildWorld(scene) {
       }
       if (y < -8) c.lerp(TC.abyss, smooth(-8, -60, y));
     }
-    if (PASS.near(x, z, 6)) c.lerp(dirt, smooth(PASS.w - 1, PASS.w - 4, PASS.lat(x, z)) * smooth(PASS.r0 - 30, PASS.r0, PASS.along(x, z)) * smooth(3, 1, Math.abs(y - PASS.floor(PASS.along(x, z)))) * 0.85);   // the Ash Road
+    if (PASS.near(x, z, 6)) c.lerp(dirt, smooth(PASS.w - 1, PASS.w - 4, PASS.lat(x, z)) * smooth(PASS.r0 - 30, PASS.r0, PASS.along(x, z)) * smooth(3, 1, Math.abs(y - PASS.floor(PASS.along(x, z)))) * 0.85);   // the Megla Pass
   }
 
   /* the land is two meshes: a fine 2 m grid over the old city and the pier, and a graded grid

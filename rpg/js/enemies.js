@@ -136,6 +136,8 @@ export function createEnemies(ctx) {
     e.dead = true; e.state = 'dead'; e.timer = 0;
     ctx.sfx.die();
     ctx.particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 30, { color: e.T.color, speed: 9, size: 0.5, life: 0.9, gravity: -6 });
+    // Rodak travel in threes: fell one, and the whole pack is gone
+    if (e.kind === 'rodak' && e.group != null) for (const o of list) if (o !== e && !o.dead && o.kind === 'rodak' && o.group === e.group) { o.state = 'flee'; o.timer = 6; o.hostile = false; }
     ctx.onKill(e);
   }
 
@@ -256,7 +258,7 @@ export function createEnemies(ctx) {
     if (ctx.G.inMemory) { a.root.visible = false; e.vel.set(0, 0, 0); return; }
     /* far-off creatures aren't drawn or animated — small ones vanish sooner than big ones */
     a.root.visible = Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) < 90 + T.rad * 40;
-    if (a.glow && a.root.visible) a.glow(ctx.night ? ctx.night() : 0);
+    if (a.glow && a.root.visible) a.glow(e.kind === 'rubbermcfly' ? (ctx.storm ? ctx.storm() : 0) : ctx.night ? ctx.night() : 0);   // RubberMcFly glow only in the Sunear'Zikhron
     if (a.blink) { e.blinkGlow = Math.max(0, (e.blinkGlow || 0) - dt * 2.5); a.blink(e.blinkGlow); }
     e.stun = Math.max(0, e.stun - dt);
     if (e.burn > 0) {

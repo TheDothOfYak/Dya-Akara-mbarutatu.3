@@ -124,6 +124,7 @@ export const SPEAKERS = {
   stryx: { name: 'The Stryx', color: '#9ad86a', sub: 'pilot of the Eldi ship' },
   buhkon: { name: 'Buhkon Eldi', color: '#ffb050', sub: 'the Carpenter' },
   venkin: { name: 'Venkin', color: '#e0b070', sub: 'Keilia builder' },
+  eye: { name: 'The eye of the storm', color: '#fff0c8', sub: 'what lives in the Sunear’Zikhron' },
 };
 
 export const DIALOG = {
@@ -416,7 +417,7 @@ export const BEASTS = {
   punk: ['Wild Punk', 'Smaller and quicker than their herd cousins. No eyes, no mouth — just a rind and the vines that grow from the top, legs and arms both. They wind the vines up before they lash — watch for it, step aside, punish.'],
   punk_d: ['Domestic Punk', 'Horse-sized to elephant-sized, saddle-blanketed, and a little dim. Ruut’s herd walks on its vines. They’ll only fight if you start it.'],
   malsti: ['Malsti Punk', 'Hand-sized Punks from Duat Seedlings. Not aggressive — they love chaos, and your shards. The cracks in their rind only glow when they blink through the Duat.'],
-  rodak: ['Rodak', 'Lean, tall, wolf-like, short oily fur and a long thin tail. Yellow slit eyes — or black. They keep their distance until they smell blood. Then they come all at once.'],
+  rodak: ['Rodak', 'Lean, tall, wolf-like, short oily fur and a long thin tail. Yellow slit eyes — or black. They travel in threes and keep their distance until they smell blood. Then they come all at once. Fell one and the rest of the pack is gone.'],
   kipsu: ['Kipsu (wild)', 'Thieves. A wild Kipsu will snatch your shards and bolt. Catch it before it gets away and you get them back.'],
   kipsu_f: ['Kipsu (tame)', 'Fluffy, curious and fond of petals. They shed fluff if you give them a scratch.'],
   albali: ['Albali Byrd', 'Round, dog-sized, wide-winged, one retractable bone-white horn with a wet sheen. Each one falls as a fruit from an Albali Aagac. Villtur (wild) ones wait, then dive — strike while they’re low.'],
@@ -446,3 +447,52 @@ export const JOURNAL = {
   page_3: ['The writing gets faster here:', '"We are leaving tonight. All of us who still remember why. We will not swear anything to anyone ever again. Not even to come back."'],
   page_4: ['The last page, smeared with something green:', '"The old herd-Punk took the lord’s ring when it fell and wandered north with it. It grows every year now. The old folk call it Skor’Thal. It scars the trees where it rubs. Leave it be. Leave all of it."'],
 };
+
+/* ================================================================
+   the Sunear'Zikhron — the Waves of Memory — and what lives in its eye.
+   Every prophecy is true: each one points at something that happens.
+   ================================================================ */
+export const SUNEAR = {
+  arrive: [
+    'The Sunear’Zikhron. Waves of memory, Torcain. It has to touch every inch of a Tatu before it moves on, and today it’s touching us.',
+    'Feel that? The storm’s here. The Kalo read every wave that passes. Let me listen.',
+    'Memory weather. Don’t be frightened of the people you see in it. They’re only remembering.',
+  ],
+  eye: 'There — the eye. A column of quiet. If we find it and keep pace with it, what lives there gives a true prophecy. The only true one there is.',
+  echo: ['They walked here once. The storm remembers them for us.', 'Don’t wave. They can’t see you. Probably.'],
+  mcfly: 'RubberMcFly — glowing! They only glow in the storm. The more of them play in it, the stronger it blows.',
+  lost: 'We lost it. Keep up with the eye — it doesn’t wait.',
+  passed: 'It’s moving on. Through the Duat, to the next Tatu. It’ll be back.',
+  after: ['That voice… That wasn’t Noka. Was it?', 'A true prophecy. Write it in the Rokarvac. Every word.', 'The eye only ever tells the truth. It just doesn’t tell you when.'],
+};
+export const PROPHECY = {
+  xilia: [
+    'A seed that remembers fire will carry you past the mist. The ash will know your name before you know its.',
+    'Three days on foot and two on the backs of things that want to eat you. You will not mind. You will remember it fondly.',
+    'The Carpenter built you a cradle once. He will build you a road home, and you will not see him do it.',
+  ],
+  aakalay: [
+    'Five voices sleep in the dust of an oath. Wake them, and the stone that drinks oaths will drink yours.',
+    'You will wear another’s hands, and with them you will end a Master who is not finished ending.',
+    'The tree that grew where he fell is dark. Dark is not the same as dead.',
+    'A small thing with a lord in its head will run. Follow it and you will reach an isle that wakes the dead.',
+  ],
+  leotik: [
+    'Three stones of Ular are sleeping. Each will wake for a song only you can carry to it.',
+    'The Master will rise in stolen iron, and the frightened thing that carried him will go free.',
+    'Up the old road where mountains are made, a peak that is not a peak is waiting for you.',
+  ],
+};
+export const SHURGREDAN = {
+  warn: ['Torcain. What did you do. That was a RubberMcFly — the most perfect thing that flies.', 'The sky’s gone quiet. The ShurgrEdan will answer before the day is out. They always answer.'],
+  strike: 'THE SHURGREDAN ANSWERS.',
+  after: 'Some rules aren’t written down anywhere, Torcain. They don’t need to be.',
+};
+export const CODEX_LORE = [
+  ['The Sunear’Zikhron', 'Sunear means waves; zikhron, memory. A storm that has always existed and never been weak. It must touch every inch of a Tatu before it passes through the Duat to the next. The Kalo read what each wave brings. Find its eye and keep pace with it, and what lives there gives a true prophecy.'],
+  ['RubberMcFly', 'A small, round, winged creature, considered the most perfect of all. It never fights. It is among the only things that can fly in the Sunear’Zikhron, and the storm is the only time it glows.'],
+  ['The ShurgrEdan', 'Kill a RubberMcFly and the ShurgrEdan will answer before the day is out: a claw of light out of a quiet sky. It cannot be blocked or turned aside.'],
+  ['The Megla Pass', 'Megla means mist. The old road over the ridge between Xilia and the Ashen Reach tops out in a mist that never quite lifts. Three days on foot, two on a Punk.'],
+  ['Eldi · Fti · Su · Ular', 'In Dearcineon the four elements are also the four directions: Eldi is fire and the west, Fti air and the north, Su water and the south, Ular earth and the east. The waymarkers on the old roads still use them.'],
+];
+
