@@ -496,3 +496,141 @@ export const CODEX_LORE = [
   ['Eldi · Fti · Su · Ular', 'In Dearcineon the four elements are also the four directions: Eldi is fire and the west, Fti air and the north, Su water and the south, Ular earth and the east. The waymarkers on the old roads still use them.'],
 ];
 
+
+/* ================================================================
+   THE TRUE BEGINNING — Velki, year 307A, the last Skyfall.
+   Tanoc Filugani is thirteen. He wants to be an Ahoac. He climbs a
+   spire in Fyrsti'Vilag to watch the Angels and the Snillers fight,
+   walks out of the gate toward it of his own accord, and is caught
+   in it — and wakes on Xikia, in front of the Carpenter's stall.
+   ================================================================ */
+SPEAKERS.tanoc = { name: 'Tanoc', color: '#e0b080', sub: 'Tanoc Filugani · Eikar, thirteen' };
+SPEAKERS.tale = { name: 'Rokarvac', color: '#e8d8a8', sub: 'as it is written' };
+SPEAKERS.xwi = { name: 'Xwi', color: '#fff3c8', sub: 'an Angel' };
+SPEAKERS.guard = { name: 'Gate warden', color: '#d8c090', sub: 'Fyrsti’Vilag, Velki' };
+SPEAKERS.ahoac = { name: 'Ahoac', color: '#ffb46a', sub: 'a Firefall catcher' };
+
+export const PROLOGUE = {
+  kicker: "Torcain's Run · The Beginning",
+  title: 'The Last Skyfall',
+  cards: [
+    'Before Torcain, there was Tanoc.',
+    'Velki, in the year 307A. The sun is going down over Fyrsti’Vilag, and the sky is on fire for the last time.',
+    'Up there, the Xwi — the Angels — are at war with the Snillers. They have been at war through every Skyfall anyone can remember.',
+    'Tanoc Filugani is thirteen. He wants to be an Ahoac, one of the armoured acrobats who catch the Firefall before it lands.',
+    'He is curious. He is reckless. And he is not going to watch the last Skyfall from the street.',
+  ],
+  start: [
+    ['tanoc', 'Everyone’s on the rooftops. That’s no good — you can’t see anything past the wall from a roof.'],
+    ['tanoc', 'The spire, though. Nobody’s allowed up the spire. Which means nobody will be up there.'],
+  ],
+  barks: [
+    'Up, up, up. Don’t look down. …I looked down.',
+    'The Ahoac crews do this in armour. Uphill. Under fire.',
+    'Nearly there. I can hear it from here.',
+  ],
+  top: [
+    ['tale', 'From the top of the spire, the whole of Fyrsti’Vilag falls away, and the battle is right there past the north gate.'],
+    ['tale', 'The Angels burn white and gold. The Snillers are cold teal, a great gem between two curved horns and a shape behind it that will not sit still in the light.'],
+    ['tale', 'Neither of them stays put. They blink in and out of the world — here, gone, there — and wherever they have been, the air keeps sparking.'],
+    ['tanoc', 'The Ahoac are going out the north gate. They’re going to catch it. They’re actually going to catch it.'],
+    ['tanoc', 'If I’m ever going to be one of them, I have to see it up close. Not from up here.'],
+  ],
+  guard: [
+    ['guard', 'Filugani. Of course it’s you. The gate’s open for the Ahoac crews, not for boys in borrowed boots.'],
+    ['tanoc', 'I’m not going to touch anything. I just want to see.'],
+    ['guard', 'Everybody just wants to see. Stay this side of the wall, and you’ll live to tell your mother you saw it.'],
+  ],
+  ahoac: [
+    ['ahoac', 'Out of the road, little Eik! If it sparks near you, you drop flat. You hear me? FLAT.'],
+  ],
+  outside: [
+    'The air outside the wall tastes like a struck bell.',
+    'Somewhere, a spark goes off where nothing was. Then another, closer.',
+    'Closer. Just a little closer.',
+  ],
+  caught: [
+    'The air in front of you tears open.',
+    'Everything goes white.',
+    'Silence.',
+  ],
+};
+
+/* Xikia, a breath later — and a whole Tatu away */
+export const ARRIVAL = {
+  cards: [
+    'Light, and noise, and a smell of bread.',
+    'It was nearly sunset on Velki. It is midday here.',
+  ],
+  wake: [
+    ['tanoc', '…the sun was going down. It was nearly dark. Why is it — where —'],
+    ['buhkon', 'Easy. Easy, now. Inside, quick, before the whole market gets a look at you.'],
+    ['tale', 'A big Eikar with sawdust in his beard pulls you behind the stall’s awning. A few faces in the square turn, and stare, and look away again — not quickly enough.'],
+    ['tanoc', 'My hat. Where’s my hat? I can’t — everything’s — I can’t think —'],
+    ['buhkon', 'I know. I know. Hold still. Here.'],
+    ['tale', 'He sets an Aagac on your head — not yours, but warm, with stygian threaded through its veins like roots. It settles.'],
+    ['tale', 'And the world comes into focus all at once.'],
+  ],
+  focus: [
+    ['tanoc', 'That’s… that’s Velki. In the sky. Why is Velki in the sky?'],
+    ['buhkon', 'Because you’re on Xikia, little Eikar. A long way from home. My name is Buhkon Eldi. I’m a carpenter.'],
+    ['tanoc', 'Tanoc. Tanoc Filugani. I was outside the gate. There was a spark, and then —'],
+    ['buhkon', 'And then here. Yes. I know what happened to you, Tanoc. I’ll tell you when there’s time. There isn’t now.'],
+    ['buhkon', 'Help me pack the stall. Something followed you through, and I would like very much to be gone before it finds its feet.'],
+  ],
+  materialize: [
+    ['tale', 'The air over the square cracks like ice. An Angel and a Sniller come through together, still locked in their fight — and the shockwave knocks the hat clean off your head.'],
+  ],
+  freeze: [
+    ['tale', 'And everything stops.'],
+    ['tale', 'The Angel and the Sniller hang in the air, and the whole square holds its breath, and both of them are looking at you.'],
+    ['tale', 'Up close, the Sniller is enormous. Nobody has ever seen one whole before — not like this, not standing still.'],
+    ['buhkon', 'Tanoc. Your hat. Now.'],
+  ],
+  hatBack: [
+    ['xwi', 'There. You see it too.'],
+    ['xwi', 'Then it is done. We must go, and we will not come again. No Skyfall will follow this one.'],
+    ['xwi', 'And you — sleep in the stone, every one of you, until you are needed.'],
+    ['tale', 'The Sniller folds in on itself with a sound like a bell under water, and is gone. Where it hung, something small and teal clatters onto the cobbles. Then another. Then a rain of them.'],
+    ['tale', 'Across the sky, one by one, the Angels go out like lamps.'],
+    ['tale', 'And then the market screams.'],
+  ],
+  bag: [
+    ['buhkon', 'Here — take this. It’s Relic-bound: it holds what you put in it and won’t let go for anyone else.'],
+    ['buhkon', 'Those things that fell are Sniller amulets. Gather as many as you can before somebody who shouldn’t have them does.'],
+    ['buhkon', 'Some will be on the ground. Some will be up on the roofs, or stuck fast in a wall. Climb if you have to. Be quick.'],
+    ['buhkon', 'And take my hatchet. Blunt side out. Things are going to be frightened.'],
+  ],
+  punk: [
+    ['tanoc', 'A Punk! A little one — it’s gone wild with all the noise!'],
+    ['buhkon', 'It’s frightened, not wicked. Knock the fight out of it — don’t kill it.'],
+  ],
+  calmed: [
+    ['tale', 'The little Punk sags, vines limp, and stops fighting. For a long moment it just sits there with its rind against your boot.'],
+    ['tale', 'Then it scrambles off between the stalls. You have the strangest feeling it hasn’t gone far.'],
+  ],
+  called: [
+    ['buhkon', 'Tanoc! That’s enough — leave the rest. We go. Now.'],
+    ['tanoc', 'Go where?'],
+    ['buhkon', 'Home. My yard, across town by the docks road — yours too, if you want it. Shutters closed, and I’ll tell you everything I can.'],
+  ],
+  amuletSay: n => n === 1 ? 'Cold. It hums, like it’s listening.' : n === 3 ? 'They’re all humming the same note.' : n === 5 ? 'One more… there was one up high.' : '',
+  /* the bridge from the boy to the man */
+  bridge: [
+    'They leave the square in the chaos, and nobody stops them. A small Punk follows a little way behind, and thinks it isn’t seen.',
+    'Xilia keeps its shutters closed for a week. When they open again, the Carpenter has an apprentice.',
+    'The Carpenter teaches him to listen. To find a Relic’s trigger. To make his own Aagac. To throw an axe through the Duat and call it home.',
+    'Years pass. The boy grows. He goes looking for the Angels, and finds a great deal else instead.',
+    'He becomes Stamijan, and takes a new name for it: Torcain.',
+    'And one day, Noka goes missing.',
+  ],
+};
+
+export const PRO_OBJ = {
+  spire: 'Climb the spire to watch the last Skyfall',
+  gate: 'Go out the north gate, toward the battle',
+  hat: 'Put your hat back on',
+  amulets: n => `Gather the fallen Sniller amulets (${n}/6)`,
+  punk: 'Calm the frightened Punk — don’t kill it',
+  back: 'Run back to the Carpenter’s stall',
+};

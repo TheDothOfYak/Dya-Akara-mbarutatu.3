@@ -127,6 +127,8 @@ export function createEnemies(ctx) {
     ctx.dmgNumber(e.pos.x, e.pos.y + 1.8 + (e.T.miniboss ? 3 : 0), e.pos.z, Math.round(dmg), opts.big ? 'big' : '');
     ctx.particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, opts.big ? 22 : 12, { color: e.T.color, speed: 7, size: 0.35, life: 0.5, gravity: -12 });
     ctx.sfx.hit();
+    /* some fights are only to knock the fear out of a thing: it runs off instead of dying */
+    if (e.spare && e.hp <= 0) { e.hp = 1; e.spare = false; e.calmed = true; e.hostile = false; e.state = 'flee'; e.timer = 5; e.stun = 1.2; ctx.onSpare && ctx.onSpare(e); return; }
     if (e.hp <= 0) kill(e);
   }
 

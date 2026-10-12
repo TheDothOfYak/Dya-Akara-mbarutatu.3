@@ -24,6 +24,7 @@ import { buildKuniByrd } from './esik_sky.js';
 import { createWilds } from './wilds.js';
 import { initTouch } from './touch.js';
 import { createSunear } from './sunear.js';
+import { createVelki, buildAngel, buildSniller } from './velki.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -116,12 +117,15 @@ composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
 let particles = null;
+let VK = null, vkComposer = null;   // the Velki prologue's own little world, while it lasts
 function resize() {
   const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale;
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   particles && particles.setScale(innerHeight * pr * 0.9);
+  if (vkComposer) { vkComposer.setPixelRatio(pr); vkComposer.setSize(innerWidth, innerHeight); }
+  if (VK) VK.resize();
 }
 
 /* ---------------- world ---------------- */
@@ -273,6 +277,7 @@ document.addEventListener('mousedown', e => {
   if (G.mode === 'dialog') { if (!(DLG && DLG.choices)) advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
   if (G.mode !== 'play' || G.paused) return;
+  if (VK) return;
   if (touch.on) return;   // on a touch screen the buttons do the fighting
   if (dyaMatch) { if (e.button === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
   if (e.button === 0) { mouseL = true; pressAttack(); }
@@ -320,8 +325,10 @@ function onKey(code) {
   if (book && book.isOpen()) { if (code === 'Escape' || code === 'KeyI' || code === 'KeyK' || code === 'KeyJ' || code === 'KeyM' || code === 'Tab') book.close(); return; }
   if (G.mode === 'memory') { if (code === 'KeyE' || code === 'Space' || code === 'Enter' || code === 'Escape') closeMemory(); return; }
   if (!$('lantern').classList.contains('hidden')) { if (code === 'Escape' || code === 'KeyE') closeLantern(); return; }
+  if (VK) { if (G.mode === 'play' && !G.paused) { if (code === 'Space') VK.jump(); if (code === 'KeyE') VK.interact(); } return; }
   if (code === 'Tab' && G.mode === 'play') { toggleJournal(); return; }
   if (G.mode !== 'play' || G.paused) return;
+  if (G.pro && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM'].includes(code)) return;   // a boy of thirteen, with a hatchet and nothing else
   if (dyaMatch) {
     if (code === 'KeyV') { dyaOverview = !dyaOverview; return; }
     if (dyaMatch.key(code)) return;
@@ -356,7 +363,9 @@ const enemies = createEnemies({
   dmgNumber: (...a) => dmgNumber(...a),
   studyMul: e => studied(e.kind) ? 1.15 : 1,
   stealShards(n, e) { G.shards -= n; toast(`${e && e.kind === 'malsti' ? 'A Malsti Punk' : 'A Kipsu'} snatched ${n} shards! Catch it before it gets away!`, 3); },
+  onSpare(e) { if (G.pro) proPunkCalmed(e); },
   onEscape(e) {
+    if (e.calmed) return;
     if (e.kind === 'rodak') { if (!G.packGone || G.t - G.packGone > 20) { G.packGone = G.t; bark('phorus', 'And the rest of the pack’s gone. Rodak never stay to bury their own.', 3); } return; }
     toast(`${e.kind === 'malsti' ? 'The Malsti Punk' : 'The Kipsu'} escaped with ${e.stolen} shards.`, 3);
   },
@@ -778,7 +787,7 @@ function spend(cost) {
 }
 
 function pressAttack() {
-  if (!canAct() || P.drink > 0) return;
+  if (VK || (G.pro && G.pro.stage !== 'amulets') || !canAct() || P.drink > 0) return;
   if (!P.atk) startAttack(P.comboReset > 0 ? (P.comboIdx % 3) + 1 : 1);
   else if (P.atk.p > 0.35) P.queued = true;
 }
@@ -863,6 +872,7 @@ function bestTarget(maxD, minDot) {
 }
 
 function duatStrike() {
+  if (G.pro) { toast('Tanoc can’t reach the Duat. Not yet.', 2); return; }
   if (!canAct() || P.duatCd > 0) return;
   let best = null;
   if (G.lock) { const p = lockPoint(); if (p && p.distanceTo(P.pos) < 30) best = { e: G.lock, p }; }
@@ -1015,6 +1025,7 @@ function hurtPlayer(dmg, from, kb = 7, opts = {}) {
 }
 
 function playerDown() {
+  if (G.pro) { P.hp = Math.round(P.maxHp * 0.6); P.iframes = 1.5; toast('Buhkon hauls you up by the collar. “Up. Again.”', 3); return; }
   P.hp = 0; P.dead = true; P.atk = null; P.roll = null; G.lock = null;
   SAVE.deaths++;
   const real = D === DIFFICULTY.realistic;
@@ -1092,6 +1103,7 @@ function wakePillarVisual(p) { p.woken = true; p.mat.emissiveIntensity = 0.9; p.
 function interactables() {
   const list = [];
   if (G.mode !== 'play' || P.dead) return list;
+  if (G.pro) return proInteractables();
   if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
   else if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
   else list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => talkPhorus(), far: 2.6 });
@@ -1890,6 +1902,7 @@ $('btn-explore').onclick = () => { $('endcard').classList.add('hidden'); G.mode 
 $('btn-sail').onclick = () => { $('endcard').classList.add('hidden'); G.mode = 'play'; setSail(); };
 
 function interact() {
+  if (VK) { VK.interact(); return; }
   let best = null, bd = 1e9;
   for (const it of interactables()) {
     if (P.riding && it.far === 99) continue;
@@ -1911,6 +1924,7 @@ function nearestPrompt() {
 
 /* ---------------- objective text ---------------- */
 function setObjective() {
+  if (G.pro) { proSetObjective(); return; }
   let txt, hintTxt = '', pips = 0, on = 0;
   const X = STORY.OBJECTIVES.xilia, tut = F_.tut || 0;
   if (REGION === 'xilia') {
@@ -1970,6 +1984,11 @@ function portrait(who) {
     noka: 'radial-gradient(circle,#ffd27a 0 20%,#6a4a20 60%,#1a1008)',
     memory: 'radial-gradient(circle,#c8a0ff 0 18%,#3a1a6a 60%,#0a0418)',
     stone: 'radial-gradient(circle,#d9b87a 0 14%,#6a5a40 50%,#1a140c)',
+    tanoc: 'radial-gradient(circle at 50% 70%,#8a5a3a 0 26%,transparent 27%),radial-gradient(circle at 50% 44%,#4a3020 0 34%,transparent 35%),radial-gradient(circle,#5a3a28,#140c08)',
+    tale: 'radial-gradient(circle,#e8d8a8 0 14%,#7a6440 52%,#1a140c)',
+    xwi: 'radial-gradient(circle,#fff8e0 0 22%,#ffd070 48%,#5a3a10)',
+    guard: 'radial-gradient(circle at 50% 70%,#9a6a40 0 30%,transparent 31%),radial-gradient(circle at 50% 42%,#3a2a1a 0 40%,transparent 41%),radial-gradient(circle,#3a3a4a,#0c0c14)',
+    ahoac: 'radial-gradient(circle at 50% 70%,#b07a48 0 30%,transparent 31%),radial-gradient(circle at 50% 42%,#3a2414 0 40%,transparent 41%),radial-gradient(circle,#8a4a1a,#1a0c04)',
   };
   if (map[who]) return map[who];
   const lk = NPC_LOOKS[who];
@@ -2135,6 +2154,7 @@ function updateCompass() {
 }
 function objectivePoint() {
   let p = null;
+  if (G.pro) { p = proGoal(); return p ? { p, d: Math.round(Math.hypot(p.x - P.pos.x, p.z - P.pos.z)) } : null; }
   if (REGION === 'xilia') {
     const g = xiliaGoal(); if (g) p = g.pos;
   } else if (REGION === 'aakalay') {
@@ -3279,6 +3299,7 @@ function updatePlayer(dt) {
 }
 
 function updatePhorus(dt) {
+  if (G.pro) { phorus.root.visible = false; return; }   // Phorus is years away yet
   F.cd = Math.max(0, F.cd - dt); F.cast = Math.max(0, F.cast - dt);
   let tgt = null, bd = 1e9;
   if (G.mode === 'play' && !P.dead) {
@@ -3487,6 +3508,16 @@ function frame() {
   requestAnimationFrame(frame);
   let dt = Math.min(clock.getDelta(), 1 / 20);
   const frozen = G.paused || G.mode === 'title';
+  if (VK) {   // Velki: its own little world, until the air tears open
+    if (!G.paused) { G.t += dt; VK.update(dt, G.mode === 'play' && !overlayOpen()); updateDialog(dt); tickUi(dt); }
+    touch.update(dt);
+    if (VK) {
+      const pe = $('prompt'), pr = G.mode === 'play' ? VK.prompt() : null;
+      if (pr) { pe.innerHTML = `<kbd>E</kbd>${pr}`; pe.classList.remove('hidden'); } else pe.classList.add('hidden');
+      VK.render();
+    }
+    return;
+  }
   if (G.hitstop > 0) { G.hitstop -= dt; dt *= 0.08; }
   if (!frozen) {
     G.t += dt;
@@ -3508,6 +3539,7 @@ function frame() {
       updateCamera(dt);
       if (dyaMatch) { dyaMatch.update(dt, G.t); dyaMatch.updateAim(dyaAimPoint()); dyaMatch.placeBars(camera); }
       checkLocations();
+      if (G.pro) proTick(dt);
       if (REGION === 'xilia') {
         if (F_.tut === 3 && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
         if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
@@ -3518,10 +3550,7 @@ function frame() {
       torcain.animate(dt, { speed: 0, onGround: true, t: G.t });
       torcain.root.position.copy(P.pos); torcain.root.rotation.y = P.yaw;
     }
-    if (cardState) { cardState.timer -= dt; if (cardState.timer <= 0) nextCard(); }
-    if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) $('bark').style.opacity = 0; }
-    if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
-    if (locTimer > 0) { locTimer -= dt; if (locTimer <= 0) $('location').classList.remove('show'); }
+    tickUi(dt);
     updateNums(dt);
     if (G.mode !== 'title') { updateHUD(); updateRpgHud(); }
   } else if (G.mode === 'title') {
@@ -3563,7 +3592,252 @@ function enterPlay() {
   lockMouse();
 }
 
+/* ================================================================
+   THE TRUE BEGINNING — Velki at sunset, then Xikia at midday.
+   Tanoc is caught in the last Skyfall and wakes in front of the
+   Carpenter's stall in Xilia's market square, hatless.
+   ================================================================ */
+const whiteout = (() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:29'; document.body.appendChild(d); return d; })();
+function proObjective(head, text, hintTxt = '', pips = 0, on = 0) {
+  $('q-head').textContent = $('q-head').dataset.base = head;
+  $('q-text').textContent = text; $('q-hint').textContent = hintTxt;
+  const el = $('q-pips'); el.innerHTML = '';
+  for (let i = 0; i < pips; i++) { const d = document.createElement('div'); d.className = 'pip' + (i < on ? ' on' : ''); el.appendChild(d); }
+}
+function startVelki() {
+  F_.pro = 'velki'; persist();
+  G.mode = 'intro'; G.t = 0;
+  $('hud').classList.remove('hidden'); $('hud').classList.add('velki');
+  VK = createVelki({
+    camera, keys, touch, CAM, sfx,
+    makeComposer(sc) {
+      const c = new EffectComposer(renderer);
+      c.addPass(new RenderPass(sc, camera));
+      c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8));
+      c.addPass(new OutputPass());
+      const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
+      vkComposer = c; return c;
+    },
+    say: (lines, cb) => dialog(lines, cb), bark: (w, t, d) => bark(w, t, d), hint: t => hint(t), toast: (t, d) => toast(t, d),
+    objective: (text, h) => proObjective('The Beginning · Velki', text, h),
+    whiteness: v => { whiteout.style.transition = ''; whiteout.style.opacity = v; },
+    onCaught: () => leaveVelki(),
+  });
+  playCards(STORY.PROLOGUE.cards, 4600, () => {
+    G.mode = 'play';
+    showLocation('Fyrsti’Vilag', 'Velki · the last Skyfall · 307A');
+    lockMouse();
+  });
+}
+function leaveVelki() {
+  F_.pro = 'xikia'; persist();
+  G.mode = 'intro';
+  setVolume(0);   // silence
+  playCards(STORY.PROLOGUE.caught.slice(1), 3000, () => {
+    fade(1, 0);
+    whiteout.style.transition = 'opacity 1s'; whiteout.style.opacity = 0;
+    if (VK) VK.dispose();
+    VK = null; vkComposer = null;
+    $('hud').classList.remove('velki');
+    setVolume(OPT.vol);
+    arriveXikia();
+  });
+}
+
+/* the Carpenter's stall: the one on the south side of the square */
+const STALL = { x: 6, z: 40 };
+const stallFront = () => { const dx = world.PLAZA.x - STALL.x, dz = world.PLAZA.z - STALL.z, d = Math.hypot(dx, dz); return { x: dx / d, z: dz / d }; };
+const proGround = (x, z, up = 3) => world.col.ground(x, z, world.heightAt(x, z) + up);
+let vitalsName = '';
+function arriveXikia() {
+  if (REGION !== 'xilia') return;
+  const f = stallFront();
+  G.pro = { stage: 'wake', n: 0, t: 0, punk: null, calmed: false, hat: null, angel: null, sniller: null, amulets: [], leaving: 0 };
+  // a boy of thirteen, without his hat
+  torcain.root.scale.multiplyScalar(0.82);
+  torcain.hat.visible = false;
+  youngGear(false);
+  canvas.style.transition = ''; canvas.style.filter = 'blur(7px)';
+  vitalsName = document.querySelector('#vitals .name').innerHTML;
+  document.querySelector('#vitals .name').innerHTML = `TANOC <small>Filugani</small><span id="lvl">${$('lvl') ? $('lvl').textContent : 'LV 1'}</span>`;
+  $('hud').classList.add('young');
+  dn.setHour(12.5);
+  // in front of the stall, facing it; the Carpenter behind it
+  P.pos.set(STALL.x + f.x * 2.6, 0, STALL.z + f.z * 2.6); P.pos.y = proGround(P.pos.x, P.pos.z, 1.5);
+  P.vel.set(0, 0, 0); P.yaw = Math.atan2(-f.x, -f.z); P.lastSafe.copy(P.pos);
+  CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0.22;
+  const bk = npcs.find(n => n.def.id === 'buhkon');
+  if (bk) { bk.pos.set(STALL.x - f.x * 1.4, 0, STALL.z - f.z * 1.4); bk.pos.y = proGround(bk.pos.x, bk.pos.z, 1.5); bk.actor.root.position.copy(bk.pos); }
+  phorus.root.visible = false;
+  G.mode = 'intro'; introT = 0; G.t = 0;
+  fade(0, 1.6);
+  playCards(STORY.ARRIVAL.cards, 3600, () => {
+    enterPlay();
+    showLocation('Xilia', 'Xikia · midday · a whole Tatu from home');
+    const W = STORY.ARRIVAL.wake;
+    dialog(W.slice(0, 5), () => {
+      torcain.hat.visible = true; unblur(); sfx.heal();
+      dialog(W.slice(5), () => dialog(STORY.ARRIVAL.focus, () => { G.pro.stage = 'pack'; G.pro.t = 4; setObjective(); bark('buhkon', 'Crates first. Then the awning. Quick hands.', 3.5); }));
+    });
+  });
+}
+/* the cape and the Tukang came later; the hatchet comes from the Carpenter */
+function youngGear(on) { for (const k of ['cape', 'relic', 'weapon']) if (torcain[k]) torcain[k].visible = on; }
+function unblur() { canvas.style.transition = 'filter 1.6s'; canvas.style.filter = 'blur(0px)'; setTimeout(() => { if (!G.pro || torcain.hat.visible) canvas.style.filter = ''; }, 1700); }
+
+/* the Angel and the Sniller come through after him */
+function proMaterialize() {
+  const PZ = world.PLAZA, pr = G.pro;
+  pr.stage = 'hat';
+  pr.angel = buildAngel(1.6); pr.angel.position.set(PZ.x - 7, PZ.y + 7, PZ.z - 2); pr.angel.rotation.y = Math.atan2(P.pos.x - pr.angel.position.x, P.pos.z - pr.angel.position.z); scene.add(pr.angel);
+  pr.sniller = buildSniller(1.5); pr.sniller.position.set(PZ.x + 7, PZ.y + 6, PZ.z - 4); pr.sniller.rotation.y = Math.atan2(P.pos.x - pr.sniller.position.x, P.pos.z - pr.sniller.position.z); scene.add(pr.sniller);
+  for (const m of [pr.angel, pr.sniller]) particles.burst(m.position.x, m.position.y + 3, m.position.z, 50, { color: m === pr.angel ? 0xfff0c0 : 0x6af0e0, speed: 16, size: 0.9, life: 0.9 });
+  particles.ring(P.pos.x, P.pos.y + 0.4, P.pos.z, 48, 14, { color: 0xffffff, size: 0.6, life: 0.7 });
+  sfx.duat(); sfx.slam(); G.shake = 1.0;
+  // the shockwave takes the hat clean off his head
+  torcain.hat.visible = false;
+  const hat = torcain.hat.clone(); const ws = new THREE.Vector3(); torcain.hat.getWorldScale(ws); hat.scale.copy(ws);
+  const a = P.yaw + 2.3; hat.position.set(P.pos.x + Math.sin(a) * 2.6, 0, P.pos.z + Math.cos(a) * 2.6);
+  hat.position.y = proGround(hat.position.x, hat.position.z, 1.5) + 0.05; hat.rotation.set(0.5, a, 0.3); hat.visible = true;
+  scene.add(hat); pr.hat = hat;
+  canvas.style.transition = 'filter .4s'; canvas.style.filter = 'blur(6px)';
+  dialog(STORY.ARRIVAL.materialize.concat(STORY.ARRIVAL.freeze), () => setObjective());
+}
+function proHatOn() {
+  const pr = G.pro;
+  scene.remove(pr.hat); pr.hat = null;
+  torcain.hat.visible = true; unblur(); sfx.heal();
+  // the Sniller folds into the stone; the Angels go out like lamps
+  const s = pr.sniller.position;
+  particles.burst(s.x, s.y + 3, s.z, 70, { color: 0x6af0e0, speed: 12, size: 0.8, life: 1.2, gravity: -4 });
+  scene.remove(pr.sniller); pr.sniller = null; sfx.core();
+  pr.leaving = 0.001;
+  proScatterAmulets();
+  pr.stage = 'told';
+  dialog(STORY.ARRIVAL.hatBack, () => dialog(STORY.ARRIVAL.bag, () => {
+    pr.stage = 'amulets'; setObjective(); torcain.weapon.visible = true;
+    hint('Amulets glow cold teal. Some sit on stall tables — jump up for them.');
+  }));
+}
+/* the Sniller's rain of amulets, over the square: some on the cobbles, some up on the stalls */
+function proScatterAmulets() {
+  const PZ = world.PLAZA, spots = [[-12, 52], [10, 62]].map(([x, z]) => [x, z]);
+  for (let i = 0; spots.length < 8 && i < 40; i++) {
+    const a = i * 2.39996 + 0.7, r = 7 + (i % 4) * 5.5, x = PZ.x + Math.cos(a) * r, z = PZ.z + Math.sin(a) * r;
+    if (Math.hypot(x - STALL.x, z - STALL.z) < 4 || Math.hypot(x - PZ.x, z - (PZ.z - 6)) < 4.5) continue;
+    if (spots.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 6)) continue;
+    spots.push([x, z]);
+  }
+  G.pro.amulets = spots.map(([x, z]) => {
+    const y = proGround(x, z, 2.4) + 0.9, mesh = amuletMesh(); mesh.position.set(x, y, z); scene.add(mesh);
+    particles.burst(x, y + 6, z, 10, { color: 0x6af0e0, speed: 3, size: 0.4, life: 0.8, gravity: -10 });
+    return { x, y, z, mesh, got: false };
+  });
+}
+function proTakeAmulet(a) {
+  const pr = G.pro;
+  a.got = true; scene.remove(a.mesh); pr.n++;
+  particles.burst(a.x, a.y, a.z, 24, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.8, gravity: 2 });
+  sfx.core(); toast(`Sniller amulet (${Math.min(pr.n, 6)}/6) — into the Relic-bound bag`, 2.2);
+  const say = STORY.ARRIVAL.amuletSay(pr.n); if (say) bark('tanoc', say, 3);
+  if (pr.n === 2 && !pr.punk) proSpawnPunk();
+  setObjective(); proCheck();
+}
+function proSpawnPunk() {
+  const pr = G.pro, PZ = world.PLAZA;
+  const a = Math.atan2(PZ.x - P.pos.x, PZ.z - P.pos.z), x = P.pos.x + Math.sin(a) * 10, z = P.pos.z + Math.cos(a) * 10;
+  const e = enemies.spawn('punk', x, z, null, { spare: true, tag: 'pro' });
+  e.actor.root.scale.multiplyScalar(0.8);
+  e.hostile = true; e.state = 'chase';
+  pr.punk = e;
+  particles.burst(x, e.pos.y + 1, z, 20, { color: 0xffa040, speed: 6, size: 0.5, life: 0.6 });
+  dialog(STORY.ARRIVAL.punk, () => { setObjective(); hint('Left-click to swing. C to roll out of the way.'); });
+}
+function proPunkCalmed(e) {
+  if (!G.pro || G.pro.calmed) return;
+  G.pro.calmed = true; sfx.heal();
+  dialog(STORY.ARRIVAL.calmed, () => { setObjective(); proCheck(); });
+}
+function proCheck() {
+  const pr = G.pro;
+  if (pr.stage !== 'amulets' || pr.n < 6 || !pr.calmed || G.mode !== 'play') return;
+  pr.stage = 'called';
+  dialog(STORY.ARRIVAL.called, () => finishPro());
+}
+function proInteractables() {
+  const pr = G.pro, list = [];
+  if (pr.hat) list.push({ pos: pr.hat.position, label: 'Put your hat back on', act: () => proHatOn(), far: 2.8 });
+  if (pr.stage === 'amulets') for (const a of pr.amulets) if (!a.got) list.push({ pos: V3(a.x, a.y, a.z), label: 'Pick up the Sniller amulet', act: () => proTakeAmulet(a), far: 2.4 });
+  const bk = npcs.find(n => n.def.id === 'buhkon');
+  if (bk && pr.stage !== 'hat') list.push({ pos: bk.pos, label: 'Talk to Buhkon <small style="opacity:.7">the Carpenter</small>', act: () => { bk.talking = 3; dialog([['buhkon', pr.stage === 'pack' || pr.stage === 'wake' ? 'Crates, Tanoc. Questions after.' : pr.calmed ? 'More amulets, if you can find them. Then we go.' : 'Amulets — and mind that little Punk. Blunt side out.']]); }, far: 3.2 });
+  return list;
+}
+function proGoal() {
+  const pr = G.pro, bk = npcs.find(n => n.def.id === 'buhkon');
+  if (pr.hat) return pr.hat.position;
+  if (pr.stage !== 'amulets') return bk ? bk.pos : null;
+  if (pr.punk && !pr.calmed && !pr.punk.dead) return pr.punk.pos;
+  let best = null, bd = 1e9;
+  for (const a of pr.amulets) if (!a.got) { const d = Math.hypot(a.x - P.pos.x, a.z - P.pos.z); if (d < bd) { bd = d; best = a; } }
+  return best ? V3(best.x, best.y, best.z) : null;
+}
+function proSetObjective() {
+  const pr = G.pro, O = STORY.PRO_OBJ;
+  if (pr.stage === 'hat') proObjective('The Beginning · Xikia', O.hat, 'Walk to it and press E');
+  else if (pr.stage === 'amulets' && pr.punk && !pr.calmed) proObjective('The Beginning · Xikia', O.punk, `Amulets gathered: ${pr.n}/6`, 6, pr.n);
+  else if (pr.stage === 'amulets') proObjective('The Beginning · Xikia', O.amulets(Math.min(pr.n, 6)), pr.n >= 6 && !pr.calmed ? 'The little Punk is still loose somewhere' : '', 6, Math.min(pr.n, 6));
+  else proObjective('The Beginning · Xikia', 'Help the Carpenter pack his stall', '');
+}
+function proTick(dt) {
+  const pr = G.pro;
+  for (const m of [pr.angel, pr.sniller]) if (m && pr.stage !== 'hat') m.userData.tick(G.t);
+  for (const a of pr.amulets) if (!a.got) { a.mesh.rotation.y = G.t * 1.5; a.mesh.position.y = a.y + Math.sin(G.t * 2 + a.x) * 0.12; }
+  if (pr.leaving && pr.angel) {
+    pr.leaving += dt; pr.angel.position.y += dt * (4 + pr.leaving * 10);
+    if (pr.leaving > 4) { particles.burst(pr.angel.position.x, pr.angel.position.y + 3, pr.angel.position.z, 40, { color: 0xfff0c0, speed: 10, size: 1, life: 1 }); scene.remove(pr.angel); pr.angel = null; }
+  }
+  if (G.mode !== 'play') return;
+  if (pr.stage === 'pack') { pr.t -= dt; if (pr.t <= 0) proMaterialize(); }
+  if (pr.punk && !pr.calmed && pr.punk.dead) proPunkCalmed(pr.punk);   // however it went, it's out of the fight
+  proCheck();
+}
+function finishPro() {
+  const pr = G.pro;
+  G.mode = 'intro';
+  fade(1, 0.8);
+  setTimeout(() => playCards(STORY.ARRIVAL.bridge, 4600, () => {
+    // years later: the boy is Stamijan, and Torcain
+    for (const a of pr.amulets) if (!a.got) scene.remove(a.mesh);
+    if (pr.angel) scene.remove(pr.angel); if (pr.sniller) scene.remove(pr.sniller); if (pr.hat) scene.remove(pr.hat);
+    if (pr.punk && !pr.punk.gone) { scene.remove(pr.punk.actor.root); pr.punk.gone = true; }
+    invAdd(SAVE.inv, 'amulet', pr.n);
+    torcain.root.scale.multiplyScalar(1 / 0.82); torcain.hat.visible = true; canvas.style.filter = ''; youngGear(true);
+    document.querySelector('#vitals .name').innerHTML = vitalsName || document.querySelector('#vitals .name').innerHTML;
+    $('hud').classList.remove('young');
+    const bk = npcs.find(n => n.def.id === 'buhkon');
+    if (bk) { bk.pos.copy(bk.home); bk.actor.root.position.copy(bk.home); }
+    G.pro = null; F_.pro = 'done';
+    P.pos.copy(world.pier.start); P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos); F.pos.copy(P.pos).add(V3(-2, 0, -3));
+    phorus.root.visible = true; P.hp = P.maxHp;
+    dn.setHour(9); persist();
+    fade(0, 1.4);
+    beginXilia();
+  }), 900);
+}
+
+function tickUi(dt) {
+  if (cardState) { cardState.timer -= dt; if (cardState.timer <= 0) nextCard(); }
+  if (barkTimer > 0) { barkTimer -= dt; if (barkTimer <= 0) $('bark').style.opacity = 0; }
+  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
+  if (locTimer > 0) { locTimer -= dt; if (locTimer <= 0) $('location').classList.remove('show'); }
+}
+
+/* a new run starts where the story does: on Velki, at the last Skyfall */
 function beginNew() {
+  if (REGION === 'xilia' && !F_.xtalked && F_.pro !== 'done') { startVelki(); return; }
+  beginXilia();
+}
+function beginXilia() {
   G.mode = 'intro'; introT = 0; G.t = 0;
   CAM.yaw = 0; P.yaw = Math.PI;
   playCards(STORY.OPENING, 4200, () => {
@@ -3624,8 +3898,9 @@ function newRun(diff) {
   startFromTitle(beginNew);
 }
 
-$('t-kicker').textContent = REGION === 'leotik' ? "Torcain's Run · Rokarvac II" : REGION === 'xilia' ? STORY.XILIA.kicker : STORY.TITLE.kicker;
-$('t-title').textContent = REGION === 'leotik' ? 'The Isle of the Urverk' : REGION === 'xilia' ? STORY.XILIA.title : STORY.TITLE.title;
+const FROM_TOP = REGION === 'xilia' && !F_.xtalked && F_.pro !== 'done';   // the run hasn't left the beginning yet
+$('t-kicker').textContent = REGION === 'leotik' ? "Torcain's Run · Rokarvac II" : FROM_TOP ? STORY.PROLOGUE.kicker : REGION === 'xilia' ? STORY.XILIA.kicker : STORY.TITLE.kicker;
+$('t-title').textContent = REGION === 'leotik' ? 'The Isle of the Urverk' : FROM_TOP ? STORY.PROLOGUE.title : REGION === 'xilia' ? STORY.XILIA.title : STORY.TITLE.title;
 $('t-sub').textContent = STORY.TITLE.sub;
 $('t-riddle').innerHTML = (REGION === 'leotik' ? STORY.NEXT_RIDDLE : STORY.RIDDLE).join('<br>');
 $('loading').textContent = 'THE HIGHLAND IS READY';
@@ -3634,7 +3909,8 @@ $('d-easy-p').textContent = DIFFICULTY.easy.blurb;
 $('d-real-p').textContent = DIFFICULTY.realistic.blurb;
 if (!SAVE_AT_LOAD && HAD_OLD) $('t-save').textContent = 'Torcain’s Run has a new beginning in Xilia — every earlier run was reset. Begin anew!';
 if (SAVE_AT_LOAD) {
-  const where = SAVE.region === 'leotik' ? 'Rokarvac II · Leotik' : SAVE.region === 'xilia' ? 'Prologue · Xilia' : 'Rokarvac I · Aakalay';
+  const where = SAVE.region === 'leotik' ? 'Rokarvac II · Leotik' : SAVE.region === 'aakalay' ? 'Rokarvac I · Aakalay'
+    : FROM_TOP && F_.pro === 'xikia' ? 'The Beginning · Xikia' : FROM_TOP && F_.pro ? 'The Beginning · Velki' : 'Prologue · Xilia';
   $('t-save').textContent = `Saved run: ${where} · ${DIFFICULTY[SAVE.difficulty].label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls`;
   $('btn-continue').style.display = ''; $('btn-continue').disabled = false;
 }
@@ -3664,7 +3940,8 @@ $('si-form').onsubmit = async ev => {
 
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'On a phone or tablet: left thumb moves, drag on the right to look, and the buttons fight. Turn your phone sideways for the best view.';
 $('btn-continue').onclick = () => startFromTitle(() => {
-  if (REGION === 'xilia' && !F_.xtalked) beginNew();
+  if (REGION === 'xilia' && !F_.xtalked && F_.pro === 'xikia') arriveXikia();
+  else if (REGION === 'xilia' && !F_.xtalked) beginNew();
   else if (REGION === 'aakalay' && !F_.arrivedA && !F_.talked) arriveAakalay();
   else if (REGION === 'leotik' && !F_.arrivedL) arriveLeotik();
   else continueRun();
@@ -3686,6 +3963,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
+  get vk() { return VK; }, get pro() { return G.pro; }, arriveXikia, proHatOn, proTakeAmulet, finishPro, F_: () => F_,
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
