@@ -60,6 +60,24 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **Creatures:** Wild Punks (eyeless, mouthless, walking on the vines that grow from the top), hand-sized Malsti Punks (not aggressive; they blink through the Duat to steal shards), Rodak (they shadow you and attack when you're weak), Kipsu (they steal shards and run), Albali Byrds (they dive from above; their horns paralyse, or poison on Leotik), Duskareth Vel (they throw knives out of the Duat), Tyndael (flying creatures made entirely of flame, whose fire keeps burning on the ground), Kofi (harmless horned furballs that scurry from everything), the legendary Skor'Thal, and the **Sru Vorn** mini-boss. Every creature model was rebuilt from the Esik field notes.
 
+**An open world on a planet.** Xikia and Leotik are worlds, not floating islands. Each region is now open land roughly three times wider, bounded by natural barriers: ridges, cliffs, gorges and deep water. Phorus tells you why you can't go further. The land runs on to the horizon, and a few floating islets drift high overhead as scenery.
+- **Xilia:** the northern Xikia highlands, with Mirrormere, the Brightwater river, pine forests, the Crown Ridge, the Greyfang cliffs and the Sundered Gorge.
+- **Aakalay:** the Ashen Reach, with the Oath Mere, the Flooded Quarter, the Russet and Ember Woods, the Ash Flats, the Rend chasm and the Kuni Spire.
+- **Leotik:** a real island in a stormy ocean, with a harbour, beaches and sea cliffs, jungle river valleys, the Glass Lagoon, a smoking volcano and distant islands.
+
+**Day and night.** A full day lasts about 18 minutes, from dawn through golden noon and dusk to a starry night with Pia'don's pale band across the sky. All creatures and people are bioluminescent: faint by day, glowing at night.
+
+**The wilds.** Every Esik creature lives somewhere in the world, by biome, and most are rare:
+- Uff, Mikolo Moko, Makari swarms, RubberMcFly, Grothyn, Tonguatjis, Stryx and Gynge.
+- Very rarely, an Ular Naga, a Lutut or a wild Kuni Byrd.
+- Water creatures are only ever in water: Raf Krabbi, Su Grothyn, Harkal and Hvaleia (swimming through the air above the water), and the great Su Naga.
+
+**Ju fields and Sprengju.** Pull Ju (carrots) from the fields. Each region hides one Sprengju Relic Shaving; set it among the Ju and every pulse it wakes two Ju into Sprengju, which fly about the field. Catch them, then eat one for a boon or throw it with `X` and it bursts on impact.
+
+**Albali Aagac.** Oak-sized trees whose ripe fruit falls and, left alone, hatches into an Albali Byrd (tame in Xilia and Aakalay, Villtur on Leotik). Pick the fruit up before it hatches.
+
+**The Kuni Byrd (late game).** A Kuni Byrd nests on each region's highest perch. After Otlið, Woken falls, bring it three Albali fruit and it lets you ride. `B` calls it, `Space` climbs, `C` dives and `B` lands.
+
 **Removed:** Ember Root, Mirrordew and Stonefruit are gone from both games. Old saves are cleaned up on load. Skith grass is now just green grass with white tips.
 
 **Open-world RPG systems:**

@@ -82,6 +82,83 @@ function makeFlash(mats) {
   return v => mats.forEach(m => { const e = m.userData.e0; m.emissive.setRGB(e.r + v, e.g + v * 0.9, e.b + v * 0.8); });
 }
 
+/* ---------------- BIOLUMINESCENCE ----------------
+   Every living thing on the Mbaru Tatu glows a little. Pattern materials
+   come from bioKit(): pale, skin-tinted marks by day that shine at night.
+   glow(v) — v = 0 bright day .. 1 full night — sets them all. It touches
+   only these materials (never the flash() ones) and allocates nothing. */
+function bioKit() {
+  const tm = [], bm = [], sp = [];
+  const k = {
+    v: 0,
+    /* a pattern material: skin-tinted by day, shining colour c at night */
+    mat(c, skin = c, mix = 0.5, lo = 0.12, hi = 1.6) {
+      return k.reg(toon(new THREE.Color(skin).lerp(new THREE.Color(c), mix), { emissive: c }), lo, hi);
+    },
+    /* an existing lit material whose emissive rises at night */
+    reg(m, lo, hi) { m.userData.bio = [lo, hi]; m.emissiveIntensity = lo; tm.push(m); return m; },
+    /* an existing unlit glow: dimmer by day (lo), full (or `night`) at night */
+    basic(m, lo = 0.5, night) {
+      m.userData.c0 = m.color.clone(); m.userData.c1 = night !== undefined ? new THREE.Color(night) : m.color.clone(); m.userData.lo = lo; bm.push(m); return m;
+    },
+    /* a glow sprite: `day` fraction of its opacity by day, all of it at night */
+    sprite(s, op, day = 0) { s.userData.op = op ?? s.material.opacity; s.userData.day = day; sp.push(s); return s; },
+    glow(v) {
+      v = v < 0 ? 0 : v > 1 ? 1 : v; k.v = v;
+      for (let i = 0; i < tm.length; i++) { const b = tm[i].userData.bio; tm[i].emissiveIntensity = b[0] + (b[1] - b[0]) * v; }
+      for (let i = 0; i < bm.length; i++) { const u = bm[i].userData; bm[i].color.copy(u.c0).multiplyScalar(u.lo).lerp(u.c1, v); }
+      for (let i = 0; i < sp.length; i++) { const s = sp[i], o = s.userData.op * (s.userData.day + (1 - s.userData.day) * v); s.material.opacity = o; s.visible = o > 0.01; }
+    },
+  };
+  return k;
+}
+/* glowing dots merged into one geometry. Each entry is either
+   [dx, dy, dz, r, flat]                — a direction on an ellipsoid part of radii
+                                          (sx, sy, sz); the geometry is in the part's
+                                          unit space (add it to a sphere scaled sx,sy,sz)
+   [px, py, pz, nx, ny, nz, r, flat]    — an explicit surface point and normal. */
+const _bq = new THREE.Quaternion(), _bn = new THREE.Vector3(), _bp = new THREE.Vector3(), _bsc = new THREE.Vector3(), _bm4 = new THREE.Matrix4(), _bS = new THREE.Matrix4();
+function bioDots(list, sx = 1, sy = 1, sz = 1, seg = 6) {
+  const unit = new THREE.SphereGeometry(1, seg, Math.max(3, seg - 2)).toNonIndexed();
+  const n = unit.attributes.position.count, pos = new Float32Array(n * 3 * list.length), nor = new Float32Array(n * 3 * list.length);
+  _bS.makeScale(1 / sx, 1 / sy, 1 / sz);
+  list.forEach((e, i) => {
+    let r, fl;
+    if (e.length >= 6) { _bp.set(e[0], e[1], e[2]); _bn.set(e[3], e[4], e[5]).normalize(); r = e[6] ?? 0.02; fl = e[7] ?? 0.4; }
+    else { _bn.set(e[0], e[1], e[2]).normalize(); _bp.set(_bn.x * sx, _bn.y * sy, _bn.z * sz); _bn.set(_bn.x / sx, _bn.y / sy, _bn.z / sz).normalize(); r = e[3]; fl = e[4] ?? 0.4; }
+    _bm4.compose(_bp, _bq.setFromUnitVectors(UP, _bn), _bsc.set(r, r * fl, r)).premultiply(_bS);
+    const g = unit.clone().applyMatrix4(_bm4);
+    pos.set(g.attributes.position.array, i * n * 3); nor.set(g.attributes.normal.array, i * n * 3);
+  });
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return out;
+}
+/* n dots evenly from entry a to entry b (same form), radius r0 → r1 */
+function dotRun(a, b, n, r0, r1 = r0, flat) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = n > 1 ? i / (n - 1) : 0, e = a.map((v, j) => v + (b[j] - v) * t);
+    e.push(r0 + (r1 - r0) * t); if (flat !== undefined) e.push(flat); out.push(e);
+  }
+  return out;
+}
+/* dots on a geometry's own vertices where a noise field is high (lichen,
+   mineral patches): pick(x, y, z, nx, ny, nz) filters candidates */
+function patchDots(geo, rnd, max, r, thr, freq, pick) {
+  const p = geo.attributes.position, nm = geo.attributes.normal, out = [], seen = new Set();
+  for (let i = 0; i < p.count && out.length < max * 4; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), key = (x * 97 | 0) + ',' + (y * 97 | 0) + ',' + (z * 97 | 0);
+    if (seen.has(key)) continue; seen.add(key);
+    if (noise3(x * freq + 7.1, y * freq, z * freq - 3.3) < thr) continue;
+    if (pick && !pick(x, y, z, nm.getX(i), nm.getY(i), nm.getZ(i))) continue;
+    out.push([x, y, z, nm.getX(i), nm.getY(i), nm.getZ(i), r * (0.6 + rnd() * 0.7), 0.45]);
+  }
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = out[i]; out[i] = out[j]; out[j] = t; }
+  return out.slice(0, max);
+}
+const bioMesh = (geo, mat, parent, x = 0, y = 0, z = 0) => noOut(mesh(geo, mat, parent, x, y, z));
+
 /* smooth 3D value noise in [0,1] (deterministic) */
 function h3(x, y, z) {
   let h = (x * 374761393 + y * 668265263 + z * 2147483647) | 0;
@@ -267,6 +344,11 @@ function buildPunkKind(cfg, opts) {
   const rnd = seeded(opts);
   const R = cfg.R, sq = cfg.sq, bodyY = cfg.bodyY;
   const root = new THREE.Group();
+  // bioluminescence: glowing vine tips, and (most Punks) glowing rib stripes or spots
+  const bio = bioKit();
+  const bioPal = cfg.bioPal || [0xd8ff6a];
+  const bioC = rnd ? bioPal[Math.floor(rnd() * bioPal.length)] : bioPal[0];
+  const tipM = bio.mat(bioC, cfg.vine, 0.25, 0.08, 1.8);
   const rind = M(cfg.rind, cfg.rindOpts || {}), vineM = M(cfg.vine), stemM = M(cfg.stem), leafM = M(cfg.leaf || cfg.vine);
   leafM.side = THREE.DoubleSide;
   const body = new THREE.Group(); body.position.y = bodyY; root.add(body);
@@ -323,7 +405,7 @@ function buildPunkKind(cfg, opts) {
       return merge(parts);
     } : null;
     const rope = new Rope(root, cfg.segs || 6, cfg.vineR, cfg.vineR * 0.55, vineM, segExtra);
-    const tip = mesh(arm ? curlG : footCurlG, vineM, root);
+    const tip = noOut(mesh(arm ? curlG : footCurlG, tipM, root));
     const v = {
       arm, th, radial, rope, tip,
       side: Math.sign(Math.sin(th)) || 1,
@@ -374,6 +456,35 @@ function buildPunkKind(cfg, opts) {
     }
   }
 
+  // bioluminescent patterns on the rind: stripes along rib crowns, or spots
+  if (cfg.bioRibs) {
+    const ribM = bio.mat(bioC, cfg.rind, 0.3, 0.08, 2.4);
+    const style = rnd ? Math.floor(rnd() * 3) : 0, nr = cfg.ribs;
+    const crown = k => ((2 * k + 1) * Math.PI) / nr;
+    if (style < 2) {
+      // stripes down some rib crowns (style 1: broken into dashes)
+      const lines = [];
+      for (let k = 0; k < nr; k++) {
+        if (rnd ? rnd() > 0.55 : k % 2) continue;
+        const a = crown(k), top0 = 0.55 + (rnd ? rnd() * 0.2 : 0.1), bot = -0.45 - (rnd ? rnd() * 0.2 : 0.1);
+        const segsL = style === 1 ? [[top0, 0.15], [0.05, bot]] : [[top0, bot]];
+        for (const [l0, l1] of segsL) lines.push(rindLine(R * 1.005, sq, [[a, l0], [a + 0.03, (l0 + l1) / 2], [a, l1]], cfg.bioTube ?? R * 0.032));
+      }
+      if (lines.length) bioMesh(merge(lines), ribM, body);
+    } else {
+      // spots in a ring around the shoulders of the rind
+      const pts = [];
+      for (let k = 0; k < nr; k++) {
+        const a = crown(k);
+        for (const lat of [0.42, 0.05, -0.32]) {
+          if (rnd() < 0.45) continue;
+          const rx = Math.cos(lat), y = Math.sin(lat) * sq;
+          pts.push([Math.cos(a) * rx * R, y * R, Math.sin(a) * rx * R, Math.cos(a) * rx, Math.sin(lat) / sq, Math.sin(a) * rx, R * (0.045 + rnd() * 0.04), 0.35]);
+        }
+      }
+      if (pts.length) bioMesh(bioDots(pts), ribM, body);
+    }
+  }
   // glow (Duat for the Malsti, bioluminescence for the Old Punk)
   const glows = [];
   if (cfg.lines) {
@@ -451,11 +562,12 @@ function buildPunkKind(cfg, opts) {
       r.obj.quaternion.multiplyQuaternions(r.seg.quaternion, r.q);
     }
     if (aura) aura.material.opacity = 0.18 + Math.sin(t * 2) * 0.06;
-    if (cfg.capM) cfg.capM.emissiveIntensity = 0.7 + Math.sin(t * 1.4) * 0.25;
+    if (cfg.capM) cfg.capM.emissiveIntensity = (0.7 + Math.sin(t * 1.4) * 0.25) * (0.6 + 0.7 * bio.v);
   }
   animate(0, { speed: 0, t: 0 });
   const flash = makeFlash([rind]);
-  return { root, animate, flash, mats: [rind], body, vines, nVines: n, nLegs, cfg };
+  bio.glow(0);
+  return { root, animate, flash, glow: bio.glow, bio, mats: [rind], body, vines, nVines: n, nLegs, cfg };
 }
 
 /* ---------------- DOMESTIC PUNK ---------------- */
@@ -465,7 +577,7 @@ export function buildDomesticPunk(opts = {}) {
     rind: 0xd97c2b, vine: 0x3f7d3a, stem: 0x5c6b2a, leaf: 0x4f8f3e,
     stemR: 0.11, stemH: 0.42, stemZ: opts.saddle ? 0.3 : 0, ring: 0.2,
     vineR: 0.09, segs: 7, footR: 1.55, shoulder: 1.1, kneeH: -0.05, lift: 0.3, stride: 0.75, runSpeed: 4, reach: 2.6,
-    outline: 0.03,
+    outline: 0.03, bioRibs: true, bioPal: [0xffe27a, 0xd8ff6a, 0x8affd0, 0xffb86a],
   }, opts);
 }
 
@@ -476,7 +588,7 @@ export function buildWildPunk(opts = {}) {
     rind: 0xb8641f, vine: 0x2e5c2a, stem: 0x3a4a1a, leaf: 0x386a30,
     stemR: 0.07, stemH: 0.32, ring: 0.14,
     vineR: 0.045, segs: 8, footR: 2.4, shoulder: 1.5, kneeH: 0.9, lift: 0.5, stride: 1.1, runSpeed: 6, reach: 3.2,
-    leaves: 2, outline: 0.025,
+    leaves: 2, outline: 0.025, bioRibs: true, bioPal: [0x9aff5a, 0x5affc8, 0xffd84a, 0xff8a4a],
   }, opts);
 }
 
@@ -497,13 +609,16 @@ export function buildMalstiPunk(opts = {}) {
     stemR: 0.007, stemH: 0.035, ring: 0.012,
     vineR: 0.0036, segs: 6, footR: 1.55, shoulder: 1.15, kneeH: 0.3, lift: 0.4, stride: 0.9, runSpeed: 0.6, reach: 2.4,
     leaves: 1, outline: 0.0025,
-    lines: cracks, lineColor: 0x8a52c0, lineTube: 0.0012, aura: 0x9a4aff,
+    lines: cracks, lineColor: 0x8a52c0, lineTube: 0.0012, aura: 0x9a4aff, bioPal: [0xff7ae8, 0xc88aff, 0x7ab8ff],
   }, opts);
-  const lm = k.cfg.lineMat, dim = new THREE.Color(0x8a52c0), hot = new THREE.Color(0xe6b0ff);
-  const base = k.flash;
+  const lm = k.cfg.lineMat, dim0 = new THREE.Color(0x8a52c0), dim = dim0.clone(), hot = new THREE.Color(0xe6b0ff);
+  const base = k.flash, baseGlow = k.glow;
   let bl = 0;
   k.blink = v => { bl = clamp(v, 0, 1); lm.color.copy(dim).lerp(hot, bl); };
   k.flash = v => { base(v); lm.color.copy(dim).lerp(hot, Math.max(bl, v)); };
+  // by day the cracks are a dull violet; at night they smoulder brighter even unblinking
+  k.glow = v => { baseGlow(v); dim.copy(dim0).multiplyScalar(0.55 + 0.6 * clamp(v, 0, 1)); lm.color.copy(dim).lerp(hot, bl); };
+  k.glow(0);
   return k;
 }
 
@@ -525,17 +640,22 @@ export function buildSkorThal(opts = {}) {
     rind: 0xa85a22, vine: 0x2f4a22, stem: 0x5a4a2a, leaf: 0x3d5c2a,
     stemR: 0.55, stemH: 0.9, cutStem: true, ring: 0.62,
     vineR: 0.17, segs: 7, footR: 1.55, shoulder: 1.1, kneeH: 0.25, lift: 0.3, stride: 0.6, runSpeed: 4, reach: 2.3,
-    nVines: opts.nVines ?? 9, thorns: true, leaves: 4, outline: 0.06,
+    nVines: opts.nVines ?? 9, thorns: true, leaves: 4, outline: 0.06, bioPal: [0x5ff0c8, 0xffc94a],
     lines: veins, lineColor: 0x5ff0c8, lineTube: 0.03,
     scars, scarColor: 0xe0b070, scarTube: 0.045,
   }, opts);
   // the cut face glows softly
   const cg = glowSprite(0xffd870, 1.6, 0.5); cg.position.set(0, 2.0 * (0.8 - 0.13) + 0.95, 0.2); k.body.add(cg);
+  k.bio.sprite(cg, 0.7, 0.55);
   // gold glints along the veins
   for (let i = 0; i < 7; i++) {
     const a = i / 7 * TAU + 0.3, g = glowSprite(i % 2 ? 0xffc94a : 0x5ff0c8, 1.2, 0.45);
     g.position.set(Math.cos(a) * 2.0, 0.3, Math.sin(a) * 2.0); k.body.add(g);
+    k.bio.sprite(g, 0.6, 0.25);
   }
+  // the veins: dimmer by day, blazing teal at night
+  k.bio.basic(k.cfg.lineMat, 0.5, 0x7affe0);
+  k.glow(0);
   return k;
 }
 
@@ -585,7 +705,8 @@ export function buildKipsu(opts = {}) {
   if (opts.color !== undefined) furC = opts.color;
   const root = new THREE.Group();
   const fur = M(furC), belly = M(bellyC), dark = M(0x2a1a12), pink = M(0xe8a0a0);
-  const glow = basic(glowC);
+  const bio = bioKit();
+  const glowM = bio.mat(glowC, furC, 0.4, 0.15, 1.9);
   const body = new THREE.Group(); body.position.y = 0.2; root.add(body);
   const torso = mesh(new THREE.SphereGeometry(1, 16, 12), fur, body); torso.scale.set(0.105, 0.1, 0.22);
   const chest = mesh(new THREE.SphereGeometry(1, 12, 10), fur, body, 0, 0.0, 0.13); chest.scale.set(0.1, 0.1, 0.1);
@@ -643,13 +764,21 @@ export function buildKipsu(opts = {}) {
   const spotG = new THREE.SphereGeometry(1, 8, 6);
   for (const k of pick) {
     const [par, x, y, z] = anchors[k];
-    const sp = noOut(mesh(spotG, glow, par, x, y, z)); const r = rnd ? 0.012 + rnd() * 0.012 : 0.016;
+    const sp = noOut(mesh(spotG, glowM, par, x, y, z)); const r = rnd ? 0.012 + rnd() * 0.012 : 0.016;
     sp.scale.set(r, r * 0.8, r * 1.5);
     spots.push(sp);
+  }
+  // a second pattern on some: a dotted stripe down the spine, or glowing ear tips and tail tip
+  const style = rnd ? Math.floor(rnd() * 3) : 1;
+  if (style === 1) bioMesh(bioDots(dotRun([0, 1, 0.75], [0, 0.85, -0.85], 7, 0.012, 0.007), 0.105, 0.1, 0.22), glowM, torso);
+  else if (style === 2) {
+    for (const s of [-1, 1]) bioMesh(bioDots([[s * 0.05 + s * 0.012, 0.068 + 0.022, -0.012, s * 0.4, 1, 0, 0.009, 0.6]]), glowM, head);
+    const tipP = tj[3].children[0]; bioMesh(bioDots([[0, 1, 0, 0.5], [0.7, 0.5, 0.4, 0.35], [-0.7, 0.5, -0.3, 0.35]]), glowM, tipP);
   }
   const halo = glowSprite(glowC, 0.5, 0.25); halo.position.y = 0.22; root.add(halo);
 
   finish(root, 0.0055);
+  bio.glow(0); halo.visible = false;
   const sc = 1 * (opts.scale || 1); root.scale.setScalar(sc);
   let ph = Math.random() * TAU, walkW = 0;
   const flash = makeFlash([fur]);
@@ -670,8 +799,9 @@ export function buildKipsu(opts = {}) {
       jaw.rotation.x = atk * 0.6;
       tail.rotation.x = -2.15 + wind * 0.5 - walkW * 0.3;
       tj.forEach((j, i) => { j.rotation.z = Math.sin(t * 2.2 - i * 0.7) * 0.18 * (1 + walkW); j.rotation.x = i ? 0.28 : 0; });
-      halo.material.opacity = 0.2 + Math.sin(t * 2.5) * 0.08;
+      halo.material.opacity = (0.2 + Math.sin(t * 2.5) * 0.08) * bio.v; halo.visible = bio.v > 0.02;
     },
+    glow(v) { bio.glow(v); halo.visible = bio.v > 0.02; },
   };
 }
 
@@ -683,6 +813,10 @@ export function buildRodak(opts = {}) {
   const root = new THREE.Group();
   const oil = M(0x1d1c24, { emissive: 0x07060c }), sheen = M(0x2e3850, { emissive: 0x080c14 }), dark = M(0x0c0b10);
   const blackEyes = opts.eyes === 'black' || (rnd && rnd() < 0.25);
+  const bio = bioKit();
+  const RODAK_GLOW = [0x6a9cff, 0x7affc0, 0xb07aff, 0x5ae0ff];
+  const bioC = rnd ? RODAK_GLOW[Math.floor(rnd() * RODAK_GLOW.length)] : RODAK_GLOW[0];
+  const lineM = bio.mat(bioC, 0x1d1c24, 0.3, 0.12, 2.0);
   const body = new THREE.Group(); body.position.y = 1.0; root.add(body);
   // deep chest, tucked waist, narrow hips — lean
   const chest = mesh(new THREE.SphereGeometry(1, 16, 12), oil, body, 0, -0.04, 0.33); chest.scale.set(0.2, 0.27, 0.3);
@@ -692,6 +826,22 @@ export function buildRodak(opts = {}) {
   const spine = mesh(new THREE.CapsuleGeometry(0.06, 0.95, 3, 8), sheen, body, 0, 0.13, -0.05); spine.rotation.x = Math.PI / 2 - 0.05; spine.scale.set(1, 1, 0.5);
   for (const s of [-1, 1]) { const sh = mesh(new THREE.SphereGeometry(1, 10, 8), sheen, body, s * 0.12, 0.08, 0.38); sh.scale.set(0.05, 0.09, 0.12); }
 
+  // bioluminescence: a dotted lateral line down each flank, like a deep-sea fish, and a
+  // few dots along the spine; some Rodak carry a second broken row lower down
+  {
+    const sxAt = (y, z) => {
+      const ch = 1 - ((y + 0.04) / 0.27) ** 2 - ((z - 0.33) / 0.3) ** 2, hp = 1 - ((y - 0.02) / 0.18) ** 2 - ((z + 0.42) / 0.2) ** 2;
+      return Math.max(ch > 0 ? 0.2 * Math.sqrt(ch) : 0, hp > 0 ? 0.16 * Math.sqrt(hp) : 0, z > -0.42 && z < 0.3 ? Math.sqrt(Math.max(0, 0.0144 - (y - 0.03) ** 2)) : 0);
+    };
+    const pts = [], rows = [[0.02, 1]];
+    if (!rnd || rnd() < 0.5) rows.push([-0.07, 0]);
+    for (const [y, full] of rows) for (let i = 0; i < 11; i++) {
+      const z = lerp(0.52, -0.5, i / 10); if (!full && i % 3 === 2) continue;
+      for (const s of [-1, 1]) pts.push([s * (sxAt(y, z) + 0.004), y, z, s, 0, 0, full ? 0.014 : 0.01, 0.5]);
+    }
+    for (let i = 0; i < 6; i++) pts.push([0, 0.205, lerp(0.35, -0.42, i / 5), 0, 1, 0, 0.012, 0.5]);
+    bioMesh(bioDots(pts), lineM, body);
+  }
   // a neck reaching forward and down: the head is carried low and watchful
   const neck = mesh(new THREE.CylinderGeometry(0.09, 0.15, 0.42, 9), oil, body, 0, 0.0, 0.66); neck.rotation.x = 1.9;
   const head = new THREE.Group(); head.position.set(0, -0.12, 0.88); body.add(head);
@@ -709,6 +859,7 @@ export function buildRodak(opts = {}) {
       const e = noOut(mesh(new THREE.SphereGeometry(1, 10, 8), basic(0xf2cf2a), head, s * 0.062, 0.03, 0.09)); e.scale.set(0.024, 0.016, 0.014);
       noOut(mesh(new THREE.BoxGeometry(0.006, 0.026, 0.01), basic(0x050505), head, s * 0.064, 0.03, 0.102));
       const g = glowSprite(0xffe060, 0.09, 0.6); g.position.set(s * 0.064, 0.03, 0.1); head.add(g);
+      bio.sprite(g, 0.85, 0.65);  // eyeshine at night
     }
   }
 
@@ -733,10 +884,11 @@ export function buildRodak(opts = {}) {
   tail.rotation.x = -2.3;
 
   finish(root, 0.012);
+  bio.glow(0);
   let ph = Math.random() * TAU, walkW = 0;
   const flash = makeFlash([oil]);
   return {
-    root, mats: [oil], flash, head,
+    root, mats: [oil], flash, head, glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = st.t || 0;
       walkW += (clamp(sp / 0.5, 0, 1) - walkW) * Math.min(1, dt * 6);
@@ -776,6 +928,10 @@ function kofiCore(opts, mode) {
   const baby = mode === 'baby', momma = mode === 'momma';
   const root = new THREE.Group();
   const hair = M(c), hairD = M(new THREE.Color(c).multiplyScalar(0.72).getHex()), horn = M(0xeee2c4), dark = M(0x2a1e16);
+  // bioluminescence: the tips of the long back-hairs glow like fibre-optic threads
+  const bio = bioKit();
+  const glowC = opts.glowColor ?? (rnd ? hsl(0.45 + rnd() * 0.45, 0.85, 0.65).getHex() : 0x8ae8ff);
+  const tipM = bio.mat(glowC, c, 0.35, 0.1, 2.0);
   const R = 0.18;
   const body = new THREE.Group(); body.position.y = momma ? 0.2 : 0.19; root.add(body);
   // a shaggy ball of hair
@@ -803,9 +959,13 @@ function kofiCore(opts, mode) {
     const base = new THREE.Group(); base.position.set(Math.sin(a) * R * 0.8, Math.cos(a) * R * 0.75, -R * 0.55); body.add(base);
     base.rotation.set(-1.75 - Math.cos(a) * 0.2, 0, -Math.sin(a) * 0.5);
     const ch = chain(base, segs, 0.085, 0.006, 0.0015, i % 2 ? hairD : hair, { radial: 4, noBalls: true });
+    const last = ch.joints[segs - 1].userData.seg; last.material = tipM; noOut(last);
     strands.push({ base, joints: ch.joints, ph: i * 0.9 });
   }
-  return { root, body, ball, legs, strands, hair, nL };
+  // and a few freckles of light between the horns
+  if (!baby) bioMesh(bioDots([-0.42, -0.14, 0.14, 0.42].map((x, i) => { const n = new THREE.Vector3(x, 0.7 + (i % 2) * 0.12, 0.62).normalize(); return [n.x * 1.12, n.y * 1.12, n.z * 1.12, n.x, n.y, n.z, 0.075, 0.5]; })), tipM, ball);
+  bio.glow(0);
+  return { root, body, ball, legs, strands, hair, nL, bio };
 }
 function animateKofi(k, dt, st, ph) {
   const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = st.t || 0;
@@ -824,7 +984,7 @@ export function buildKofi(opts = {}) {
   finish(k.root, 0.006);
   let ph = Math.random() * TAU;
   return {
-    root: k.root, mats: [k.hair], flash: makeFlash([k.hair]),
+    root: k.root, mats: [k.hair], flash: makeFlash([k.hair]), glow: k.bio.glow,
     animate(dt, st) { ph += dt * (st.speed || 0) * 40; animateKofi(k, dt, st, ph); },
   };
 }
@@ -842,6 +1002,7 @@ export function buildBigMommaKofi(opts = {}) {
   let ph = Math.random() * TAU;
   return {
     root: k.root, mats: [k.hair], flash: makeFlash([k.hair]), babies,
+    glow(v) { k.bio.glow(v); for (let i = 0; i < babies.length; i++) babies[i].bio.glow(v); },
     animate(dt, st) {
       ph += dt * (st.speed || 0) * 36; animateKofi(k, dt, st, ph);
       for (let i = 0; i < babies.length; i++) animateKofi(babies[i], dt, { speed: i === 2 ? st.speed : 0, t: (st.t || 0) * 1.3 + i }, ph * 1.4 + i);
@@ -884,6 +1045,19 @@ export function buildSruVorn(opts = {}) {
   const acid = basic(0x9cff3a);
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.y = 1.32; root.add(body);
+  // bioluminescence: two staggered rows of rosettes along each flank and a glowing mace
+  const bio = bioKit();
+  const SRU_GLOW = [0xc8ff4a, 0x5affd0, 0xffb44a, 0x9a8aff];
+  const bioC = rnd ? SRU_GLOW[Math.floor(rnd() * SRU_GLOW.length)] : SRU_GLOW[0];
+  const rosM = bio.mat(bioC, c, 0.3, 0.1, 1.9);
+  {
+    const pts = [];
+    for (let i = 0; i < 9; i++) for (const [y, off] of [[0.24, 0], [0.08, 0.5]]) {
+      const z = lerp(0.8, -0.85, (i + off) / 9), x = 1.05 * Math.sqrt(0.3025 - y * y) + 0.03;
+      for (const s of [-1, 1]) pts.push([s * x, y, z, s * x / 1.1, y, 0, 0.06 - Math.abs(z) * 0.015, 0.4]);
+    }
+    bioMesh(bioDots(pts), rosM, body);
+  }
   // long, deep, hairy torso
   const tg = displace(new THREE.CapsuleGeometry(0.55, 1.15, 6, 14), 0.07, 4, 1, 0.7); tg.rotateX(Math.PI / 2);
   const torso = mesh(tg, fur, body); torso.scale.set(1.05, 1.0, 1);
@@ -911,6 +1085,7 @@ export function buildSruVorn(opts = {}) {
   for (const s of [-1, 1]) {
     const e = noOut(mesh(new THREE.SphereGeometry(0.04, 8, 6), basic(0xff9a20), head, s * 0.25, 0.13, 0.3));
     const g = glowSprite(0xffa030, 0.18, 0.7); g.position.copy(e.position); head.add(g);
+    bio.sprite(g, 0.9, 0.7);
     mesh(new THREE.SphereGeometry(0.025, 6, 4), claw, head, s * 0.08, 0.1, 0.88);
   }
   // acid drool: drips hanging from the jaw
@@ -939,13 +1114,14 @@ export function buildSruVorn(opts = {}) {
   const tail = new THREE.Group(); tail.position.set(0, 0.1, -1.0); body.add(tail);
   tail.rotation.x = -2.05;
   const tc = chain(tail, 3, 0.34, 0.4, 0.16, fur, { radial: 9 });
-  const mace = mesh(maceGeo(0.3, 18, 0.28, 0.08), M(0x3a3028), tc.end, 0, 0.2, 0);
+  const mace = mesh(maceGeo(0.3, 18, 0.28, 0.08), bio.mat(bioC, 0x3a3028, 0.1, 0.0, 0.7), tc.end, 0, 0.2, 0);
 
   finish(root, 0.03);
+  bio.glow(0);
   let ph = Math.random() * TAU, walkW = 0;
   const flash = makeFlash([fur, skin]);
   return {
-    root, mats: [fur], flash, head, tail, acid,
+    root, mats: [fur], flash, head, tail, acid, glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = st.t || 0;
       walkW += (clamp(sp / 0.5, 0, 1) - walkW) * Math.min(1, dt * 5);
@@ -998,7 +1174,13 @@ export function buildUlarNaga(opts = {}) {
   const root = new THREE.Group();
   const rig = new THREE.Group(); rig.scale.setScalar(0.72); root.add(rig); // modelled large, scaled to ~10 m
   const hide = M(0x4f6b34), plate = M(0x6b5a32), belly = M(0xb7a56a), dark = M(0x2a2418);
-  const sailM = M(0xa8743a, { side: THREE.DoubleSide }), tendM = M(0x7a8a4a), horn = M(0xd8caa0);
+  const sailM = M(0xa8743a, { side: THREE.DoubleSide }), horn = M(0xd8caa0);
+  // bioluminescence: lure-like glowing tendrils, beaded light along each sail's edge,
+  // and a row of lamps down each flank under the armour
+  const bio = bioKit(), rndB = seeded(opts);
+  const ULAR_GLOW = [0xd8ff6a, 0xffc85a, 0x6affb0];
+  const bioC = rndB ? ULAR_GLOW[Math.floor(rndB() * ULAR_GLOW.length)] : ULAR_GLOW[0];
+  const tendM = bio.mat(bioC, 0x7a8a4a, 0.3, 0.1, 1.8), lampM = bio.mat(bioC, 0x4f6b34, 0.3, 0.08, 2.0);
   const body = new THREE.Group(); body.position.y = 3.0; rig.add(body);
   const torso = mesh(new THREE.SphereGeometry(1, 24, 16), hide, body); torso.scale.set(1.55, 1.35, 2.6);
   const under = mesh(new THREE.SphereGeometry(1, 20, 12), belly, body, 0, -0.35, 0.1); under.scale.set(1.35, 1.05, 2.35);
@@ -1007,6 +1189,7 @@ export function buildUlarNaga(opts = {}) {
   const spikeG = hornGeo(0.55, 0.2, -0.4, 5), sp = [];
   for (let i = 0; i < 9; i++) { const z = lerp(-2.2, 1.9, i / 8); sp.push(placed(spikeG, 0, Math.sqrt(Math.max(0, 1 - (z / 2.6) ** 2)) * 1.35 + 0.05, z, -0.35, 0, 0, 1 - Math.abs(z) * 0.12)); }
   mesh(merge(sp), horn, body);
+  { const L = []; for (let i = 0; i < 9; i++) for (const s of [-1, 1]) L.push([s * 0.97, -0.17, lerp(0.72, -0.72, i / 8), 0.075 - Math.abs(i - 4) * 0.005]); bioMesh(bioDots(L, 1.55, 1.35, 2.6), lampM, torso); }
 
   // four sturdy pillar legs
   const legs = [], upG = new THREE.CylinderGeometry(0.5, 0.62, 1.5, 12), loG = new THREE.CylinderGeometry(0.42, 0.5, 1.4, 12);
@@ -1030,6 +1213,16 @@ export function buildUlarNaga(opts = {}) {
   const spinesG = merge([0.12, 0.42, 0.72, 0.98].map((z, i) => placed(new THREE.CylinderGeometry(0.018, 0.035, 1.25 - Math.abs(i - 1.2) * 0.22, 5).translate(0, 0.6 - Math.abs(i - 1.2) * 0.1, 0), 0, 0, -z, -0.25 - i * 0.12)));
   const tend1 = merge([new THREE.SphereGeometry(0.1, 8, 6), ...[0, 1, 2].map(i => placed(bendGeo(new THREE.CylinderGeometry(0.014, 0.055, 0.65, 5, 5).translate(0, 0.33, 0), 2.2), 0, 0, 0, Math.PI - 0.4 + i * 0.25, (i - 1) * 0.5, 0))]);
   const tendG = merge([-1, 1].map(s => placed(tend1, s * 0.42, 0.32, 0.32, 0, 0, s * 0.5)));
+  // beads of light just inside the sail's curved edge, on both faces
+  const sailDotsG = (() => {
+    const L = [];
+    for (const p of sailShape.getPoints(6)) {
+      if (p.y < 0.12) continue;
+      const x = 0.55 + (p.x - 0.55) * 0.86, y = 0.5 + (p.y - 0.5) * 0.86;
+      for (const s of [-1, 1]) L.push([s * 0.03, y, -x, s, 0, 0, 0.045, 0.4]);
+    }
+    return bioDots(L);
+  })();
   const skullG = merge([placed(new THREE.SphereGeometry(1, 16, 12), 0, 0.2, 0.1, 0, 0, 0, 0.5, 0.48, 0.55), placed(new THREE.SphereGeometry(1, 14, 10), 0, 0.1, 0.5, 0, 0, 0, 0.38, 0.3, 0.42)]);
   // neck segments: tube + joint ball + a dorsal plate, merged
   const neckSeg = (i, ra, rb) => merge([new THREE.CylinderGeometry(rb, ra, 0.62, 10).translate(0, 0.31, 0), new THREE.SphereGeometry(ra, 10, 6), placed(new THREE.ConeGeometry(0.12, 0.3, 4), 0, 0.3, -ra + 0.05, -0.5)]);
@@ -1049,6 +1242,7 @@ export function buildUlarNaga(opts = {}) {
     // the sail behind the head
     const sail = mesh(sailG, sailM, head, 0, 0.5, -0.05); sail.rotation.x = -0.15;
     mesh(spinesG, M(0x5a3a1a), sail);
+    bioMesh(sailDotsG, lampM, sail);
     necks.push({ base, joints: ch.joints, head, jaw, yaw, h });
   }
   function setHeads(n) {
@@ -1063,10 +1257,11 @@ export function buildUlarNaga(opts = {}) {
   mesh(maceGeo(0.55, 16, 0.6, 0.16), horn, tc.end, 0, 0.35, 0);
 
   finish(root, 0.06);
+  bio.glow(0);
   let ph = Math.random() * TAU, walkW = 0;
   const flash = makeFlash([hide]);
   return {
-    root, mats: [hide], flash, setHeads, necks,
+    root, mats: [hide], flash, setHeads, necks, glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = st.t || 0;
       walkW += (clamp(sp / 0.6, 0, 1) - walkW) * Math.min(1, dt * 4);
@@ -1108,7 +1303,13 @@ function rockGeo(detail, amp, freq, off) {
 export function buildGynge(opts = {}) {
   const root = new THREE.Group();
   const rock = M(0x7a7066), rockD = M(0x5a524a), moss = M(0x5f6e3a);
-  const flesh = M(0xe8c4b4), throat = M(0x3a1418), gum = M(0x8a3a40), tooth = M(0xcfc6b2);
+  const flesh = M(0xe8c4b4), gum = M(0x8a3a40), tooth = M(0xcfc6b2);
+  // bioluminescence: patches of glowing lichen on the dome, and an ember-red glow deep
+  // in the throat that shows when the maw yawns at night
+  const bio = bioKit(), rndB = seeded(opts) || mulberry32(41);
+  const GYNGE_GLOW = [0x7affc0, 0x8ad0ff, 0xd0ff7a];
+  const bioC = seeded(opts) ? GYNGE_GLOW[Math.floor(rndB() * GYNGE_GLOW.length)] : GYNGE_GLOW[0];
+  const throat = bio.reg(M(0x3a1418, { emissive: 0xc8401a }), 0.0, 0.3), lichenM = bio.mat(bioC, 0x7a7066, 0.3, 0.1, 1.8);
   const body = new THREE.Group(); root.add(body);
   // pale fleshy underbelly (seen when it heaves up)
   const belly = mesh(new THREE.SphereGeometry(1, 20, 10, 0, TAU, Math.PI * 0.45, Math.PI * 0.55), flesh, body, 0, 0.55, 0);
@@ -1134,6 +1335,7 @@ export function buildGynge(opts = {}) {
   { const p = dg.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) p.setY(i, p.getY(i) * 0.15); dg.computeVertexNormals(); }
   dg.scale(2.55, 1.75, 2.55);
   mesh(dg, rock, dome);
+  bioMesh(bioDots(patchDots(dg, rndB, 46, 0.13, 0.6, 1.1, (x, y) => y > 0.15)), lichenM, dome);
   mesh(merge(ut), tooth, dome);
   const palate = mesh(new THREE.SphereGeometry(1, 16, 8, 0, TAU, Math.PI / 2, Math.PI / 2), throat, dome, 0, 0.02, 0.3); palate.scale.set(1.9, 0.35, 1.7);
   // crags and boulders on the dome, a little moss
@@ -1146,12 +1348,13 @@ export function buildGynge(opts = {}) {
   [[-0.6, 1.7, 0.1], [1.0, 1.4, -0.9], [-1.4, 1.2, 0.9]].forEach(([x, y, z]) => mg.push(placed(new THREE.SphereGeometry(0.35, 7, 5), x, y, z, 0, 0, 0, 1, 0.3, 1)));
   mesh(merge(mg), moss, dome);
   finish(root, 0.05);
+  bio.glow(0);
   // the maw parts that only show when open
   const t0 = Math.random() * 10;
   let slide = 0;
   const flash = makeFlash([rock, rockD]);
   return {
-    root, mats: [rock], flash,
+    root, mats: [rock], flash, glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = (st.t || 0) + t0;
       slide += dt * sp;
@@ -1177,6 +1380,11 @@ export function buildStryx(opts = {}) {
   const root = new THREE.Group();
   const rock = M(0x8a7a62), rockD = M(0x6a5c4a), topM = M(0x7d8a4a);
   const vineM = M(0x3d6a32), root2 = M(0x4a3a28);
+  // bioluminescence: mineral seams glowing in the tiers' flanks, and glowing vine tips
+  const bio = bioKit();
+  const STRYX_GLOW = [0xb8ff7a, 0xffc86a, 0x7ad8ff];
+  const bioC = seeded(opts) ? STRYX_GLOW[Math.floor(rnd() * STRYX_GLOW.length)] : STRYX_GLOW[0];
+  const seamM = bio.mat(bioC, 0x8a7a62, 0.3, 0.1, 1.9), tipM = bio.mat(bioC, 0x3d6a32, 0.3, 0.1, 1.9);
   const body = new THREE.Group(); root.add(body);
   // three stepped tiers, slightly irregular; the top is flat (a mesa)
   const tiers = [[1.02, 1.12, 0.4, 0], [0.9, 0.97, 0.36, 0.4], [0.8, 0.86, 0.32, 0.76]];
@@ -1193,6 +1401,7 @@ export function buildStryx(opts = {}) {
   });
   mesh(merge(tg.slice(0, 2)), rock, body);
   mesh(tg[2], rockD, body);
+  { const all = merge(tg); bioMesh(bioDots(patchDots(all, rnd, 34, 0.05, 0.58, 2.2, (x, y, z, nx, ny) => Math.abs(ny) < 0.5 && y > 0.08)), seamM, body); }
   const cap = mesh(new THREE.CylinderGeometry(0.74, 0.8, 0.06, 9), topM, body, 0, 1.08, 0); cap.scale.z = 0.85;
   // loose boulders and ledges
   const bl = [];
@@ -1208,7 +1417,7 @@ export function buildStryx(opts = {}) {
   for (let i = 0; i < n; i++) {
     const a = i / n * TAU + 0.3;
     const rope = new Rope(root, 8, 0.07, 0.022, vineM);
-    const tip = mesh(curlG, vineM, root);
+    const tip = noOut(mesh(curlG, tipM, root));
     vines.push({ rope, tip, a, base: new THREE.Vector3(Math.cos(a) * 0.4, 1.1, Math.sin(a) * 0.34), ph: rnd() * TAU, len: 1.0 + rnd() * 0.5 });
   }
   // a tuft of grass and a couple of leaves on the top
@@ -1241,7 +1450,8 @@ export function buildStryx(opts = {}) {
     }
   }
   animate(0, { t: 0 });
-  return { root, mats: [rock], flash, animate };
+  bio.glow(0);
+  return { root, mats: [rock], flash, animate, glow: bio.glow };
 }
 
 /* ================================================================
@@ -1252,12 +1462,19 @@ export function buildTonguatjis(opts = {}) {
   const root = new THREE.Group();
   const shellM = M(0x6e6a3a), scute = M(0x8a7a44), rim = M(0x4e4a2a);
   const skin = M(0x7a8058), skinD = M(0x5a6040), plast = M(0xd2c088), pink = M(0xf08aa8), tooth = M(0xeee4cc), dark = M(0x1e1a12);
+  // bioluminescence: a ring of lamps round the shell's rim, a spot on each neck ring
+  // (they spread apart as the neck stretches) and a glowing lure-ball on the tongue
+  const bio = bioKit(), rndB = seeded(opts);
+  const TON_GLOW = [0x8affe0, 0xb8ff8a, 0xffd07a];
+  const bioC = rndB ? TON_GLOW[Math.floor(rndB() * TON_GLOW.length)] : TON_GLOW[0];
+  const rimGlow = bio.mat(bioC, 0x4e4a2a, 0.3, 0.1, 1.9), lureM = bio.mat(0xff7ad0, 0xf08aa8, 0.4, 0.15, 1.8);
   const body = new THREE.Group(); body.position.y = 0.0; root.add(body);
   // the dome and its scutes, a rim and the pale plastron underneath
   const shell = mesh(new THREE.SphereGeometry(1, 24, 12, 0, TAU, 0, Math.PI / 2), shellM, body, 0, 0.5, 0); shell.scale.set(0.78, 0.78, 0.95);
   mesh(scalesGeo(0.78, 0.78, 0.95, 4, 10, 0.15, 0.2, fr), scute, body, 0, 0.5, 0);
   const rimM = mesh(new THREE.TorusGeometry(0.8, 0.07, 6, 28), rim, body, 0, 0.5, 0); rimM.rotation.x = Math.PI / 2; rimM.scale.set(1, 1.18, 1);
   const pl = mesh(new THREE.SphereGeometry(1, 18, 8, 0, TAU, Math.PI / 2, Math.PI / 2), plast, body, 0, 0.5, 0); pl.scale.set(0.74, 0.22, 0.9);
+  { const L = []; for (let i = 0; i < 18; i++) { const a = i / 18 * TAU + 0.17; if (Math.sin(a) > 0.93) continue; L.push([Math.cos(a) * 0.865, 0.5, Math.sin(a) * 0.865 * 1.18, Math.cos(a), 0, Math.sin(a) / 1.18, 0.032, 0.5]); } bioMesh(bioDots(L), rimGlow, body); }
   // stumpy legs and claws
   const legs = [], legG = new THREE.CylinderGeometry(0.15, 0.17, 0.42, 9), footG = merge([placed(new THREE.SphereGeometry(1, 9, 6), 0, 0, 0.04, 0, 0, 0, 0.18, 0.08, 0.2),
     ...[-0.08, 0, 0.08].map(x => placed(hornGeo(0.08, 0.025, 0.5, 4), x, 0, 0.18, 1.4, 0, 0))]);
@@ -1270,7 +1487,8 @@ export function buildTonguatjis(opts = {}) {
   // the neck: wrinkled rings that slide apart as it stretches (up to the shell's length)
   const neck = new THREE.Group(); neck.position.set(0, 0.55, 0.78); body.add(neck);
   const rings = [], ringG = new THREE.CylinderGeometry(0.15, 0.17, 0.3, 10); ringG.rotateX(Math.PI / 2);
-  for (let i = 0; i < 6; i++) { const r = mesh(ringG, i % 2 ? skin : skinD, neck); r.scale.setScalar(1 - i * 0.04); rings.push(r); }
+  const ringDot = bioDots([[0, 0.16, 0.02, 0, 1, 0.1, 0.035, 0.5], [0.12, 0.1, 0.02, 0.8, 0.6, 0, 0.022, 0.5], [-0.12, 0.1, 0.02, -0.8, 0.6, 0, 0.022, 0.5]]);
+  for (let i = 0; i < 6; i++) { const r = mesh(ringG, i % 2 ? skin : skinD, neck); r.scale.setScalar(1 - i * 0.04); rings.push(r); bioMesh(ringDot, rimGlow, r); }
   // craggy alligator head
   const head = new THREE.Group(); head.scale.setScalar(1.3); neck.add(head);
   const upG = rockGeo(2, 0.12, 3, 7); upG.scale(0.2, 0.12, 0.42); upG.translate(0, 0.04, 0.3);
@@ -1290,13 +1508,14 @@ export function buildTonguatjis(opts = {}) {
   const tongue = new THREE.Group(); tongue.position.set(0, -0.02, 0.15); head.add(tongue);
   const tgeo = new THREE.CylinderGeometry(0.05, 0.07, 1, 8); tgeo.rotateX(Math.PI / 2); tgeo.translate(0, 0, 0.5);
   const tStrip = mesh(tgeo, pink, tongue); tStrip.scale.z = 0.01;
-  const tBall = mesh(new THREE.SphereGeometry(0.15, 12, 8), pink, tongue);
+  const tBall = noOut(mesh(new THREE.SphereGeometry(0.15, 12, 8), lureM, tongue));
   const TONGUE = 5.0;
   finish(root, 0.02);
+  bio.glow(0);
   let ph = Math.random() * TAU, walkW = 0;
   const flash = makeFlash([skin, skinD, shellM]);
   return {
-    root, mats: [shellM, skin], flash, head, tongue,
+    root, mats: [shellM, skin], flash, head, tongue, glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = st.t || 0;
       walkW += (clamp(sp / 0.3, 0, 1) - walkW) * Math.min(1, dt * 4);
@@ -1331,12 +1550,18 @@ export function buildMikoloMoko(opts = {}) {
   const furC = new THREE.Color(c);
   const fur = M(c), belly = M(furC.clone().lerp(new THREE.Color(0xf0f0c8), 0.55).getHex());
   const hairC = rnd ? hsl(rnd(), 0.6, 0.55).getHex() : 0xe8b040;
-  const hair = M(hairC), dark = M(0x1a1410);
+  // bioluminescence: the fun hairdo glows at night, with a dotted line down the spine
+  // and a dot above each set of eyes
+  const bio = bioKit();
+  const glowC = new THREE.Color(hairC).offsetHSL(0, 0.25, 0.12).getHex();
+  const hair = bio.reg(M(hairC, { emissive: glowC }), 0.05, 1.3), dark = M(0x1a1410);
+  const spotM = bio.mat(glowC, c, 0.35, 0.12, 1.9);
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.y = 0.17; root.add(body);
   // a long ferret body, deep haunches at the back
   const torso = mesh(new THREE.CapsuleGeometry(0.06, 0.3, 4, 12), fur, body); torso.rotation.x = Math.PI / 2;
   const tum = mesh(new THREE.CapsuleGeometry(0.05, 0.24, 4, 10), belly, body, 0, -0.018, 0.01); tum.rotation.x = Math.PI / 2;
+  { const L = []; for (let i = 0; i < 7; i++) { const z = lerp(0.15, -0.16, i / 6); L.push([0, 0.059, z, 0, 1, 0, 0.0085 - i * 0.0005, 0.5]); if (i % 2) for (const s of [-1, 1]) L.push([s * 0.042, 0.042, z, s, 1, 0, 0.006, 0.5]); } bioMesh(bioDots(L), spotM, body); }
   // kangaroo hind legs: big haunch, long foot flat on the ground
   const hinds = [];
   for (const s of [-1, 1]) {
@@ -1374,6 +1599,7 @@ export function buildMikoloMoko(opts = {}) {
     // three eyes on each side of the face
     for (let k = 0; k < 3; k++) eye(head, 0.009 - k * 0.0008, s * (0.046 + k * 0.002 - (k === 1 ? 0 : 0.002)), 0.022 + (k === 1 ? 0.01 : 0), 0.075 - k * 0.022);
   }
+  bioMesh(bioDots([-1, 1].map(s => [s * 0.044, 0.04, 0.05, s * 0.6, 1, 0.2, 0.0055, 0.5])), spotM, head);
   // the fun hairdo: a swept mohawk with a curl
   const hd = [];
   for (let i = 0; i < 6; i++) hd.push(placed(hornGeo(0.06 - i * 0.004, 0.012, -1.2, 5), 0, 0.045, 0.06 - i * 0.02, -0.3 - i * 0.12, 0, (i % 2 - 0.5) * 0.3));
@@ -1384,10 +1610,11 @@ export function buildMikoloMoko(opts = {}) {
   const tail = new THREE.Group(); tail.position.set(0, 0.02, -0.2); body.add(tail); tail.rotation.x = -1.9;
   const tc = chain(tail, 4, 0.05, 0.03, 0.012, fur, { radial: 7 });
   finish(root, 0.0045);
+  bio.glow(0);
   let ph = Math.random() * TAU, walkW = 0;
   const flash = makeFlash([fur]);
   return {
-    root, mats: [fur], flash, head,
+    root, mats: [fur], flash, head, glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = st.t || 0;
       walkW += (clamp(sp / 0.3, 0, 1) - walkW) * Math.min(1, dt * 6);
@@ -1419,7 +1646,11 @@ export function buildUff(opts = {}) {
   if (rnd) pc = hsl([0.97, 0.0, 0.9, 0.12, 0.8][Math.floor(rnd() * 5)] + (rnd() - 0.5) * 0.04, 0.6 + rnd() * 0.3, 0.55 + rnd() * 0.15).getHex();
   if (opts.color !== undefined) pc = opts.color;
   const root = new THREE.Group();
-  const stalkM = M(0x4f8a3a), leafM = M(0x5aa040), thornM = M(0x8a3a2a), petal = M(pc), petalD = M(new THREE.Color(pc).multiplyScalar(0.75).getHex());
+  // bioluminescence: a glowing heart in the bloom, glowing petal edges and thorn tips
+  const bio = bioKit();
+  const glowC = new THREE.Color(pc).offsetHSL(0.04, 0.2, 0.15).getHex();
+  const stalkM = M(0x4f8a3a), leafM = M(0x5aa040), petal = M(pc), petalD = bio.mat(glowC, new THREE.Color(pc).multiplyScalar(0.75).getHex(), 0.2, 0.15, 1.8);
+  const thornM = bio.mat(0xff6a8a, 0x8a3a2a, 0.15, 0.05, 1.2), edgeM = bio.mat(glowC, pc, 0.4, 0.1, 2.0);
   leafM.side = THREE.DoubleSide;
   const body = new THREE.Group(); root.add(body);
   // the thorny stalk (a gentle S-curve)
@@ -1455,13 +1686,15 @@ export function buildUff(opts = {}) {
     ptl.push(placed(pg, Math.cos(a) * r, 0.028 + ring * 0.008, Math.sin(a) * r, 0.25 + ring * 0.2, -a + Math.PI / 2, 0, 0.028 - ring * 0.006, 0.034 - ring * 0.004, 0.012));
   }
   mesh(merge(ptl), petal, headG);
+  { const L = []; for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; L.push([Math.cos(a) * 0.03, 0.06, Math.sin(a) * 0.03, Math.cos(a), 0.6, Math.sin(a), 0.0055, 0.6]); } bioMesh(bioDots(L), edgeM, headG); }
   const bud = mesh(new THREE.SphereGeometry(1, 10, 8), petalD, headG, 0, 0.04, 0); bud.scale.set(0.016, 0.024, 0.016);
   finish(root, 0.0028);
+  bio.glow(0);
   root.scale.setScalar(opts.scale || 1);
   let ph = Math.random() * TAU, walkW = 0;
   const flash = makeFlash([stalkM, petal]);
   return {
-    root, mats: [stalkM, petal], flash,
+    root, mats: [stalkM, petal], flash, glow: bio.glow,
     animate(dt, st) {
       const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = st.t || 0;
       walkW += (clamp(sp / 0.1, 0, 1) - walkW) * Math.min(1, dt * 5);

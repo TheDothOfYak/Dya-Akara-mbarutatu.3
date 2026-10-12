@@ -10,7 +10,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
-import { buildEikar, rigArm, poseArm, rigLeg, strideLegs } from './actors.js';
+import { buildEikar, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
 import { mulberry32, lerp, clamp } from './util.js';
 
 const TAU = Math.PI * 2;
@@ -120,6 +120,13 @@ export function buildKeilia(o = {}) {
   const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.006, 0.01), new THREE.MeshBasicMaterial({ color: 0x1a0e06 })); mouth.position.set(0, 0.062, 0.122); mouth.userData.noOutline = true; head.add(mouth);
   // minor hidden markings: faint pale lines at the sides of the neck, mostly under the scales
   const markMat = new THREE.MeshBasicMaterial({ color: o.marking || 0xa89068 });
+  // bioluminescence: the hidden markings glow moss-green at night — the neck lines, a
+  // few freckles at the temple, and a line down each inner wrist; mostly under the scales
+  const bio = bioKit();
+  const KEI_GLOW = [0x9affb8, 0x8ae0ff, 0xd8ff8a];
+  const kGlow = o.bioColor ?? KEI_GLOW[Math.floor(mulberry32((o.seed || 11) + 101)() * KEI_GLOW.length)];
+  bio.basic(markMat, 1, kGlow);
+  const freckM = bio.mat(kGlow, 0x5a3a24, 0.15, 0.0, 1.8);
   for (const s of [-1, 1]) for (let k = 0; k < 2; k++) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.05, 0.004), markMat); m.position.set(s * 0.062, 0.56 - k * 0.025, 0.02 + k * 0.012); m.rotation.set(0, s * 1.2, s * 0.4); m.userData.noOutline = true; torso.add(m);
   }
@@ -139,6 +146,7 @@ export function buildKeilia(o = {}) {
     }
   }
   const crest = scaleMesh(hs, scaleMat); head.add(crest);
+  bioMesh(bioDots([-1, 1].flatMap(s => [0, 1, 2].map(k => { const n = new THREE.Vector3(s * 0.85, 0.32 - k * 0.12, 0.3 + k * 0.08).normalize(); return [n.x * HR * 0.97, 0.15 + n.y * HR * 1.1, n.z * HR, n.x, n.y, n.z, 0.006 - k * 0.001, 0.5]; }))), freckM, head);
 
   // the thick scale-cape: from the head and shoulders down the back to the calves
   const cape = new THREE.Group(); cape.position.set(0, 0.6, -0.02); torso.add(cape);
@@ -167,6 +175,7 @@ export function buildKeilia(o = {}) {
   const armOpts = { L1: 0.33, L2: 0.36, ru: 0.06, rf: 0.05, rh: 0.055, skin, cuff: toon(0x6a5a3a) };
   const arms = [-1, 1].map(s => rigArm(torso, s, new THREE.Vector3(s * 0.235, 0.47, 0), armOpts));
   for (const s of [-1, 1]) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), skin); d.position.set(s * 0.235, 0.47, 0); torso.add(d); }
+  for (const a of arms) { const L = []; for (let k = 0; k < 4; k++) L.push([a.s * 0.045, -0.12 - k * 0.035, 0.02, a.s, 0, 0.3, 0.0065, 0.5]); bioMesh(bioDots(L), freckM, a.fore); }
   const legOpts = { Lt: 0.47, Ls: 0.44, rt: 0.08, rs: 0.06, leg: trousers, shin: trousers, boot: leather, bootTop: true, foot: 0.14, fh: 0.075, fw: 0.1, ah: 0.07 };
   const legs = [-1, 1].map(s => rigLeg(body, s, new THREE.Vector3(s * 0.1, -0.03, 0), legOpts));
 
@@ -178,12 +187,13 @@ export function buildKeilia(o = {}) {
   outlineAll(root, 0.015);
   root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
   root.scale.setScalar(o.scale || 1);
+  bio.glow(0);
 
   const rT = new THREE.Vector3(), rD = new THREE.Vector3(), rB = new THREE.Vector3();
   const lT = new THREE.Vector3(), lD = new THREE.Vector3(), lB = new THREE.Vector3();
   let ph = 0, act = 0;
   return {
-    root, body, head, hammer, cape, arms, legs, mats: [skin, cloth, scaleMat],
+    root, body, head, hammer, cape, arms, legs, mats: [skin, cloth, scaleMat], glow: bio.glow,
     animate(dt, st) {
       const t = st.t || 0, spd = st.speed || 0;
       const k = clamp(spd / 5, 0, 1.2), moving = k > 0.06;
@@ -219,6 +229,12 @@ export function buildKarnen(o = {}) {
   const vest = toon(o.cloth || 0x5a6e44, { emissive: 0x000000 });
   const hatMat = toon(o.hat || 0x5a4634, { emissive: 0x000000 });
   const dark = new THREE.MeshBasicMaterial({ color: 0x140c06 });
+  // bioluminescence: angular marks of light — a triangle on the brow, a little chevron
+  // under each eye, and the knobbly knees glint at night
+  const bio = bioKit();
+  const KAR_GLOW = [0xffd27a, 0x9affe0, 0xff9ad8];
+  const kGlow = o.bioColor ?? KAR_GLOW[Math.floor(mulberry32((o.seed || 5) + 101)() * KAR_GLOW.length)];
+  const markM = bio.mat(kGlow, o.skin || 0xb49a68, 0.2, 0.0, 1.9);
 
   // an inverted-triangle torso in a three-cornered vest
   const chest = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.34, 3), vest); chest.rotation.set(Math.PI, Math.PI / 3, 0); chest.scale.set(1, 1, 0.75); chest.position.y = 0.16; torso.add(chest);
@@ -239,6 +255,8 @@ export function buildKarnen(o = {}) {
     const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.008), dark); brow.position.set(s * 0.045, 0.232, 0.08); brow.rotation.set(0, s * 0.55, s * 0.35); brow.userData.noOutline = true; head.add(brow);
   }
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.08, 3), skin); nose.rotation.x = Math.PI / 2 + 0.35; nose.position.set(0, 0.16, 0.1); head.add(nose);
+  { const brow = new THREE.Mesh(new THREE.CircleGeometry(0.017, 3, -Math.PI / 2), markM); brow.position.set(0, 0.245, 0.074); brow.rotation.x = -0.3; brow.userData.noOutline = true; head.add(brow);
+    for (const s of [-1, 1]) { const ch = new THREE.Mesh(new THREE.CircleGeometry(0.009, 3, -Math.PI / 2), markM); ch.position.set(s * 0.05, 0.168, 0.078); ch.rotation.y = s * 0.55; ch.userData.noOutline = true; head.add(ch); } }
   const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.006, 0.006), dark); mouth.position.set(0, 0.095, 0.062); mouth.rotation.z = 0.12; mouth.userData.noOutline = true; head.add(mouth);
 
   // the worn triangular hat (worn, not grown): a three-cornered brim, a bent crown, a patch
@@ -254,17 +272,18 @@ export function buildKarnen(o = {}) {
   const arms = [-1, 1].map(s => rigArm(torso, s, new THREE.Vector3(s * 0.13, 0.3, 0), armOpts));
   const legOpts = { Lt: 0.28, Ls: 0.27, rt: 0.024, rs: 0.021, leg: skin, shin: skin, boot: toon(o.shoes || 0x3a2a1a), foot: 0.07, fh: 0.04, fw: 0.05, ah: 0.05 };
   const legs = [-1, 1].map(s => rigLeg(body, s, new THREE.Vector3(s * 0.05, -0.02, 0), legOpts));
-  for (const L of legs) { const kn = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), skin); L.knee.add(kn); }
+  for (const L of legs) { const kn = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), skin); L.knee.add(kn); bioMesh(bioDots([[0, 0, 0.03, 0, 0, 1, 0.008, 0.6]]), markM, L.knee); }
   const sack = new THREE.Mesh(new THREE.SphereGeometry(0.06, 7, 5), toon(0x8a7a5a)); sack.scale.set(0.8, 1, 0.7); sack.position.set(0.1, -0.03, -0.05); torso.add(sack);
 
   outlineAll(root, 0.01);
   root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
   root.scale.setScalar(o.scale || 1);
+  bio.glow(0);
 
   const T = new THREE.Vector3(), D = new THREE.Vector3(), B = new THREE.Vector3();
   let ph = rng() * 6, act = 0;
   return {
-    root, body, head, hat, arms, legs, mats: [skin, vest, hatMat],
+    root, body, head, hat, arms, legs, mats: [skin, vest, hatMat], glow: bio.glow,
     animate(dt, st) {
       const t = st.t || 0, spd = st.speed || 0;
       const k = clamp(spd / 4, 0, 1.3), moving = k > 0.06;

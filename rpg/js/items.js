@@ -19,6 +19,8 @@ export const ITEMS = {
   seed: { name: 'Fire seed', kind: 'mat', icon: '🔥', value: 25, desc: 'A seed of an Eldi Aagac. Hot to the touch.' },
   ember: { name: 'Tyndael ember', kind: 'mat', icon: '✴', value: 9, desc: 'Still glowing.' },
   tusk: { name: 'Sru Vorn tusk', kind: 'mat', icon: '🦷', value: 60, desc: 'Long as your arm. Acid-etched.' },
+  albali_fruit: { name: 'Albali fruit', kind: 'mat', icon: '🍎', value: 15, desc: 'Ripe, round, two dark lines down from the stem. Left on the ground it hatches into a Byrd. A Kuni Byrd would kill for one.' },
+  sprengju_shard: { name: 'Sprengju Relic Shaving', kind: 'mat', icon: '🔶', value: 0, desc: 'A grey sliver off a true Relic, its runes glowing red, orange and yellow. Set it in a Ju field and each pulse it wakes Ju into Sprengju.' },
   skor_rind: { name: 'Skor’Thal’s rind', kind: 'mat', icon: '🟤', value: 0, desc: 'A scarred curl of rind the great old Punk let fall beside you. Sing it in an Okid’Relic.' },
   shaving: { name: 'Punk shaving', kind: 'mat', icon: '🎃', value: 8, desc: 'A curl of rind from a sleeping domestic Punk. Calm and content.' },
   stem: { name: 'Malsti stem', kind: 'mat', icon: '🟣', value: 12, desc: 'A Malsti Punk’s stem. It flickers half into the Duat.' },
@@ -32,6 +34,9 @@ export const ITEMS = {
   tea: { name: 'Antidote tea', kind: 'meal', icon: '🫖', value: 30, desc: 'No poison can touch you for 4 minutes.', buff: { antidote: 1 }, dur: 240, heal: 10 },
   bun: { name: 'Zahreh bun', kind: 'meal', icon: '🥯', value: 16, desc: 'Ama’s recipe. Heals 35; stamina returns 25% faster for 2 minutes.', buff: { stamRegen: 1.25 }, dur: 120, heal: 35 },
   roast: { name: 'Ember roast', kind: 'meal', icon: '🍖', value: 30, desc: 'Take 15% less damage for 3 minutes.', buff: { armor: 0.85 }, dur: 180, heal: 25 },
+
+  ju: { name: 'Ju', kind: 'meal', icon: '🥕', value: 3, desc: 'It is a carrot. Heals 15.', heal: 15 },
+  sprengju: { name: 'Sprengju', kind: 'meal', icon: '🧨', value: 30, desc: 'An awake Ju. Eat it: heals 30, +25% damage and stamina returns 30% faster for 90 seconds. Or throw it (X) — it bursts on impact.', buff: { dmg: 1.25, stamRegen: 1.3 }, dur: 90, heal: 30 },
 
   /* ---- axes ---- */
   axe_tanoc: { name: 'Tanoc’s axe', kind: 'axe', icon: '🪓', value: 0, dmg: 1.0, desc: 'The axe Torcain has always carried.' },

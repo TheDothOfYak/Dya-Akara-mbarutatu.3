@@ -7,8 +7,9 @@ import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildVel, buildDummy } from './creatures.js';
-import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn } from './esik_land.js';
-import { buildAlbaliByrd, buildTyndael } from './esik_sky.js';
+import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
+import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
+import { buildHvaleia, buildSuNaga, buildHarkal, buildRafKrabbi, buildGrothyn } from './esik_sea.js';
 
 const seed = () => (Math.random() * 1e9) >>> 0;
 /* a Kipsu can be anything from a lapful to a big dog */
@@ -35,6 +36,27 @@ export const TYPES = {
   vel: { name: 'Duskareth Vel', build: buildVel, hp: 190, dmg: 17, speed: 6.2, rad: 0.5, range: 2.4, aggro: 22, windup: 0.5, shards: 60, ai: 'vel', stagger: 0.35, elite: true, color: 0xb070ff },
   tyndael: { name: 'Tyndael', build: () => buildTyndael({ seed: seed() }), hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
   sruvorn: { name: 'Sru Vorn of the Bogs', build: () => buildSruVorn({ seed: seed() }), hp: 1100, dmg: 26, speed: 4.6, rad: 2.6, range: 5.5, aggro: 26, shards: 220, ai: 'sruvorn', stagger: 0, miniboss: true, color: 0xb0ff4a },
+
+  /* ---------------- the wider wilds (spawned by wilds.js; most are rare) ----------------
+     water: true  = only ever in water ('swim' under/at the surface, 'airswim' through the air above it) */
+  big_momma_kofi: { name: 'Big Momma Kofi', build: () => buildBigMommaKofi({ seed: seed() }), hp: 20, dmg: 0, speed: 6.5, rad: 0.4, range: 0, aggro: 0, shards: 4, ai: 'melee', color: 0xb8a070, disp: 'critter' },
+  mikolo_moko: { name: 'Mikolo Moko', build: () => buildMikoloMoko({ seed: seed() }), hp: 14, dmg: 0, speed: 9.5, rad: 0.3, range: 0, aggro: 0, shards: 3, ai: 'melee', color: 0x7ad04a, disp: 'critter' },
+  uff: { name: 'Uff', build: () => { const u = buildUff({ seed: seed() }); u.root.scale.multiplyScalar(0.8 + Math.random() * 1.6); return u; }, hp: 10, dmg: 0, speed: 1.6, rad: 0.25, range: 0, aggro: 0, shards: 2, ai: 'melee', color: 0xff6a8a, disp: 'critter' },
+  stryx: { name: 'Wild Stryx', build: () => buildStryx({ seed: seed() }), hp: 420, dmg: 16, speed: 1.2, rad: 1.6, range: 4.2, aggro: 6, windup: 0.8, recover: 1.0, lunge: 3, shards: 40, ai: 'melee', stagger: 0.2, color: 0x8aa04a, disp: 'neutral' },
+  tonguatjis: { name: 'Tonguatjis', build: buildTonguatjis, hp: 260, dmg: 15, speed: 3.2, rad: 1.0, range: 5.5, aggro: 10, windup: 0.7, recover: 1.0, lunge: 2, shards: 30, ai: 'melee', stagger: 0.4, color: 0xf08aa8, disp: 'neutral' },
+  gynge: { name: 'Gynge', build: buildGynge, hp: 900, dmg: 26, speed: 3.4, rad: 2.4, range: 4.0, aggro: 9, windup: 1.0, recover: 1.3, lunge: 7, shards: 90, ai: 'melee', stagger: 0.15, elite: true, color: 0xe8c4b4, disp: 'neutral' },
+  ular_naga: { name: 'Ular Naga', build: () => buildUlarNaga({ heads: 3 + (Math.random() < 0.2 ? 2 : 0) }), hp: 2400, dmg: 30, speed: 4.2, rad: 3.2, range: 7, aggro: 18, windup: 0.9, recover: 1.1, lunge: 6, shards: 320, ai: 'melee', stagger: 0, elite: true, miniboss: true, color: 0x6a9a4a },
+  ular_grothyn: { name: 'Ular Grothyn', build: () => buildGrothyn({ element: 'Ular' }), hp: 120, dmg: 12, speed: 0.15, rad: 0.8, range: 5.5, aggro: 7, windup: 0.6, recover: 1.0, lunge: 0, shards: 14, ai: 'melee', color: 0x6a9a4a },
+  eldi_grothyn: { name: 'Eldi Grothyn', build: () => buildGrothyn({ element: 'Eldi' }), hp: 120, dmg: 12, speed: 0.15, rad: 0.8, range: 5.5, aggro: 7, windup: 0.6, recover: 1.0, lunge: 0, shards: 14, ai: 'melee', color: 0xff8a3a },
+  rubbermcfly: { name: 'RubberMcFly', build: () => buildRubberMcFly({ seed: seed() }), hp: 6, dmg: 0, speed: 4, rad: 0.15, range: 0, aggro: 0, shards: 2, ai: 'flyer', color: 0xffe08a, disp: 'neutral', altMul: 0.6, roam: 4 },
+  makari: { name: 'Makari swarm', build: () => buildMakariSwarm({ seed: seed(), moteScale: 2 }), hp: 8, dmg: 0, speed: 3, rad: 0.6, range: 0, aggro: 0, shards: 2, ai: 'flyer', color: 0x9aff6a, disp: 'neutral', altMul: 0.4, roam: 3 },
+  lutut: { name: 'Lutut', build: () => buildLutut({ seed: seed(), age: Math.random() }), hp: 1300, dmg: 28, speed: 10, rad: 3.0, range: 3, aggro: 26, shards: 200, ai: 'flyer', elite: true, color: 0x9a7ac8, disp: 'neutral', altMul: 3, roam: 22 },
+  kuni_wild: { name: 'Kuni Byrd', build: () => buildKuniByrd({ seed: seed() }), hp: 1600, dmg: 30, speed: 16, rad: 3.5, range: 3, aggro: 30, shards: 260, ai: 'flyer', elite: true, color: 0xd8c098, disp: 'neutral', altMul: 9, roam: 60 },
+  su_naga: { name: 'Su Naga', build: () => buildSuNaga({ heads: 3 }), hp: 3600, dmg: 34, speed: 5, rad: 6, range: 9, aggro: 16, windup: 1.0, recover: 1.2, lunge: 5, shards: 420, ai: 'swim', water: true, sink: 1.2, stagger: 0, elite: true, miniboss: true, color: 0x6ad8ff, disp: 'neutral' },
+  raf_krabbi: { name: 'Raf Krabbi', build: () => buildRafKrabbi({ seed: seed() }), hp: 26, dmg: 6, speed: 4, rad: 0.25, range: 1.2, aggro: 5, windup: 0.4, recover: 0.6, lunge: 4, shards: 5, ai: 'swim', water: true, shallow: true, status: 'paralyze', color: 0x6ad8ff },
+  su_grothyn: { name: 'Su Grothyn', build: () => buildGrothyn({ element: 'Su' }), hp: 120, dmg: 12, speed: 0.15, rad: 0.8, range: 5.5, aggro: 7, windup: 0.6, recover: 1.0, lunge: 0, shards: 14, ai: 'swim', water: true, shallow: true, color: 0x3a8aa8 },
+  hvaleia: { name: 'Hvaleia', build: buildHvaleia, hp: 1800, dmg: 22, speed: 5, rad: 3.5, range: 4, aggro: 0, shards: 160, ai: 'airswim', water: true, fly: 9, elite: true, color: 0x6ab8ff, disp: 'neutral' },
+  harkal: { name: 'Harkal', build: () => buildHarkal({ seed: seed() }), hp: 140, dmg: 14, speed: 9, rad: 1.0, range: 2.4, aggro: 16, windup: 0.5, recover: 0.7, lunge: 12, shards: 22, ai: 'airswim', water: true, fly: 2.2, color: 0x7aa0b8 },
 };
 
 export function createEnemies(ctx) {
@@ -160,6 +182,54 @@ export function createEnemies(ctx) {
     puddles.push({ mesh: m, x, z, y, r, t: 0, dur: 5, dps: acid ? 10 : 7, poison: 3 });
   }
 
+  /* --------- swimmers: under, at, or just above the water — and never anywhere else --------- */
+  function wet(x, z, shallow) {
+    const W = ctx.world.water; if (!W) return false;
+    if (!W.isWater(x, z)) return false;
+    return !shallow || W.depth(x, z) < 3;
+  }
+  function updateSwimmer(e, dt, d, toP, playing, aggroR, wf) {
+    const P = ctx.P, T = e.T, G = ctx.G, a = e.actor, W = ctx.world.water;
+    if (!W) { ctx.scene.remove(a.root); e.gone = true; return; }
+    const roam = T.rad > 3 ? 40 : T.rad > 0.9 ? 18 : 6;
+    let wantV = 0, wantYaw = e.yaw;
+    if (e.hostile && playing && d < aggroR * 1.4 && e.state !== 'wind') e.state = 'chase';
+    if (e.state === 'chase') {
+      if (!playing || d > aggroR * 2.2) e.state = 'idle';
+      wantYaw = toP; wantV = T.speed;
+      e.cd -= dt;
+      if (d < T.range + T.rad * 0.6 && e.cd <= 0) { e.state = 'wind'; e.timer = (T.windup || 0.6) * wf; }
+    } else if (e.state === 'wind') {
+      wantYaw = toP; e.windup = 1; e.timer -= dt;
+      if (e.timer <= 0) {
+        e.attackA = 1; e.state = 'chase'; e.cd = (T.recover || 1) + 0.6;
+        if (d < T.range + T.rad * 0.7 && T.dmg > 0) ctx.hurtPlayer(T.dmg * D().enemyDmg, e.pos, 6, T.status === 'paralyze' ? { paralyze: 0.6 } : {});
+      }
+    } else {
+      e.timer -= dt;
+      if (e.timer <= 0) {
+        e.timer = 4 + Math.random() * 6;
+        for (let i = 0; i < 8; i++) {
+          const x = e.home.x + (Math.random() - 0.5) * roam * 2, z = e.home.z + (Math.random() - 0.5) * roam * 2;
+          if (wet(x, z, T.shallow)) { e.wander.set(x, 0, z); break; }
+        }
+      }
+      const wx = e.wander.x - e.pos.x, wz = e.wander.z - e.pos.z;
+      if (Math.hypot(wx, wz) > 1.2) { wantV = T.speed * 0.35; wantYaw = Math.atan2(wx, wz); }
+      if (!e.hostile && T.aggro && d < T.aggro * 0.5 && playing && !T.disp) { e.hostile = true; e.state = 'chase'; ctx.onAggro(e); }
+    }
+    moveTo(e, wantYaw, wantV, dt);
+    const nx = e.pos.x + e.vel.x * dt, nz = e.pos.z + e.vel.z * dt;
+    if (wet(nx, nz, T.shallow)) { e.pos.x = nx; e.pos.z = nz; }
+    else { e.vel.x *= -0.3; e.vel.z *= -0.3; e.timer = 0; }
+    const ground = ctx.world.heightAt(e.pos.x, e.pos.z);
+    if (T.ai === 'airswim') e.pos.y = W.level + T.fly + Math.sin(G.t * 0.7 + e.home.x) * 0.5;
+    else if (T.shallow) e.pos.y = Math.max(ground, W.level - 2.5);
+    else e.pos.y = Math.max(ground + 0.5, W.level - (T.sink || 0.4) + Math.sin(G.t * 0.5 + e.home.x) * 0.25);
+    a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
+    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: G.t, windup: e.windup, attack: e.attackA, onGround: true });
+  }
+
   /* --------- per-frame --------- */
   function moveTo(e, wantYaw, wantV, dt) {
     e.yaw = dampAngle(e.yaw, wantYaw, 10, dt);
@@ -186,6 +256,7 @@ export function createEnemies(ctx) {
     if (ctx.G.inMemory) { a.root.visible = false; e.vel.set(0, 0, 0); return; }
     /* far-off creatures aren't drawn or animated — small ones vanish sooner than big ones */
     a.root.visible = Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) < 90 + T.rad * 40;
+    if (a.glow && a.root.visible) a.glow(ctx.night ? ctx.night() : 0);
     if (a.blink) { e.blinkGlow = Math.max(0, (e.blinkGlow || 0) - dt * 2.5); a.blink(e.blinkGlow); }
     e.stun = Math.max(0, e.stun - dt);
     if (e.burn > 0) {
@@ -199,6 +270,9 @@ export function createEnemies(ctx) {
     const aggroR = T.aggro * D().aggro;
 
     if (!playing && e.state !== 'idle' && e.state !== 'return' && e.state !== 'flee') e.state = 'return';
+
+    /* water folk never leave the water */
+    if (T.ai === 'swim' || T.ai === 'airswim') { updateSwimmer(e, dt, d, toP, playing, aggroR, wf); return; }
 
     /* dummies stand still on their posts */
     if (T.ai === 'static') {
@@ -348,11 +422,12 @@ export function createEnemies(ctx) {
     const P = ctx.P, T = e.T, G = ctx.G;
     const ground = ctx.world.heightAt(e.pos.x, e.pos.z);
     let wantAlt = 3, wantPos = null, sp = T.speed;
+    const AM = T.altMul || 1, RO = T.roam || 6;
     if (e.stun > 0) { wantAlt = 1.2; }
     else if (e.state === 'chase') {
       e.orbit = (e.orbit ?? Math.random() * 6) + dt * 0.8;
       wantPos = V3(P.pos.x + Math.cos(e.orbit) * 8, 0, P.pos.z + Math.sin(e.orbit) * 8);
-      wantAlt = 6.5;
+      wantAlt = 6.5 * Math.max(1, AM * 0.5);
       e.cd -= dt;
       if (e.cd <= 0) { e.state = 'rise'; e.timer = 0.65 * D().windup; }
       if (d > 50) e.state = 'return';
@@ -381,7 +456,7 @@ export function createEnemies(ctx) {
       e.timer -= dt; wantAlt = 1.4; wantPos = e.pos.clone();
       if (e.timer <= 0) { e.state = 'chase'; e.cd = 2.5 + Math.random() * 2; }
     } else if (e.state === 'return' || e.state === 'idle') {
-      wantPos = V3(e.home.x + Math.cos(G.t * 0.4 + e.home.z) * 6, 0, e.home.z + Math.sin(G.t * 0.4 + e.home.z) * 6); wantAlt = 4;
+      wantPos = V3(e.home.x + Math.cos(G.t * 0.4 * 6 / RO + e.home.z) * RO, 0, e.home.z + Math.sin(G.t * 0.4 * 6 / RO + e.home.z) * RO); wantAlt = 4 * AM;
       if (e.state === 'return' && Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) < 8) e.state = 'idle';
       if (e.hostile && d < T.aggro * D().aggro && G.mode === 'play' && !P.dead) { e.state = 'chase'; ctx.onAggro(e); }
       sp = T.speed * 0.5;

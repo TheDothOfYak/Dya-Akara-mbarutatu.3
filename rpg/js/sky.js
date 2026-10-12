@@ -1,13 +1,19 @@
 /* ============================================================
    The open sky of the Mbaru Tatu: a golden-hour etherium with
    daylight stars and nebula, the sister Tatu hanging close
-   overhead, their Kalo, and a cloud sea far below the highland.
+   overhead, their Kalo, high cloud banks — and, driven by
+   daynight.js, dawn, golden day, dusk and a blue-violet night with
+   Pia'don's outer cloud as a pale band across the stars.
    ============================================================ */
 import * as THREE from 'three';
 import { fbm, mulberry32 } from './util.js';
 import { glowSprite } from './gfx.js';
 
+/* SUN_DIR is the LIVE direction toward the shadow-casting light (sun by day, Velki-shine by
+   night). daynight.js rewrites it every frame; main places the DirectionalLight along it.
+   SKY_SUN is the true sun (sky glow, sun disc, planet lighting) — it can sit below the horizon. */
 export const SUN_DIR = new THREE.Vector3(-0.55, 0.32, 0.77).normalize();
+export const SKY_SUN = SUN_DIR.clone();
 
 const NOISE_GLSL = `
   float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -22,7 +28,8 @@ const NOISE_GLSL = `
 function skyDome(pal) {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      uSun: { value: SUN_DIR }, uTime: { value: 0 }, uFlash: { value: 0 },
+      uSun: { value: SKY_SUN }, uTime: { value: 0 }, uFlash: { value: 0 },
+      uSunVis: { value: 1 }, uStars: { value: 1 }, uNeb: { value: 1 }, uBand: { value: 0 }, uNight: { value: 0 },
       uZen: { value: new THREE.Vector3(...pal.zen) }, uMid: { value: new THREE.Vector3(...pal.mid) },
       uHor: { value: new THREE.Vector3(...pal.hor) }, uLow: { value: new THREE.Vector3(...pal.low) },
       uGlow: { value: new THREE.Vector3(...pal.glow) }, uStorm: { value: pal.storm },
@@ -32,6 +39,7 @@ function skyDome(pal) {
       void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`,
     fragmentShader: `
       varying vec3 vDir; uniform vec3 uSun; uniform float uTime; uniform float uFlash; uniform float uStorm;
+      uniform float uSunVis, uStars, uNeb, uBand, uNight;
       uniform vec3 uZen, uMid, uHor, uLow, uGlow;
       ${NOISE_GLSL}
       void main(){
@@ -41,18 +49,27 @@ function skyDome(pal) {
         if (h > 0.0) col = mix(mix(hor, mid, smoothstep(0.0, 0.28, h)), zen, smoothstep(0.28, 0.95, h));
         else col = mix(hor, low, smoothstep(0.0, -0.35, h));
         float s = max(dot(d, uSun), 0.0);
-        col += uGlow * pow(s, 6.0) * 0.55;
-        col += vec3(1.0, 0.92, 0.75) * pow(s, 900.0) * 6.0;
+        col += uGlow * pow(s, 6.0) * 0.55 * uSunVis;
+        col += vec3(1.0, 0.92, 0.75) * pow(s, 900.0) * 6.0 * uSunVis * step(-0.02, uSun.y);
         // the etherium: nebula wisps and stars, visible even by day
-        float up = smoothstep(0.04, 0.55, h) * (1.0 - pow(s, 3.0));
+        float up = mix(smoothstep(0.04, 0.55, h), smoothstep(-0.02, 0.25, h), uNight) * (1.0 - pow(s, 3.0) * uSunVis);
         float neb = fbm3(d * 2.6 + vec3(0.0, uTime * 0.004, 0.0));
         float neb2 = fbm3(d * 5.0 + vec3(9.1, 2.3, uTime * 0.006));
         vec3 nebCol = mix(vec3(0.55, 0.20, 0.55), vec3(0.12, 0.55, 0.62), neb2);
-        col += nebCol * smoothstep(0.48, 0.78, neb) * 0.55 * up;
+        col += nebCol * smoothstep(0.48 - uNight * 0.06, 0.78, neb) * 0.55 * up * uNeb;
+        // Pia'don's outer cloud: a pale, lumpy band arching across the night
+        vec3 bn = normalize(vec3(0.42, 0.38, -0.82));
+        float bd = dot(d, bn);
+        float bandN = fbm3(d * 7.0 + vec3(3.0, 1.0, uTime * 0.002));
+        float band = exp(-bd * bd / 0.018) * (0.45 + 0.9 * bandN) + exp(-bd * bd / 0.0025) * 0.35;
+        col += vec3(0.78, 0.76, 0.92) * band * 0.22 * uBand * up;
         vec3 sp = floor(d * 380.0);
         float st = h3(sp);
         float tw = 0.6 + 0.4 * sin(uTime * 2.0 + st * 60.0);
-        col += vec3(1.0, 0.95, 0.85) * step(0.9965, st) * tw * up * 1.6 * (1.0 - uStorm * 0.8);
+        float thr = mix(0.9965, 0.9945, uNight) - band * 0.0015 * uBand;
+        vec3 stCol = mix(vec3(1.0, 0.95, 0.85), mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.8, 0.7), h3(sp + 7.0)), uNight);
+        float pd = length(fract(d * 380.0) - 0.5);
+        col += stCol * step(thr, st) * smoothstep(0.5, 0.12, pd) * tw * up * 1.9 * uStars * (0.4 + 0.6 * h3(sp + 3.0)) * (1.0 - uStorm * 0.8);
         // storm banks rolling across the sky, lit by lightning
         if (uStorm > 0.0) {
           float cl = fbm3(vec3(d.x * 3.0 + uTime * 0.01, d.y * 6.0, d.z * 3.0));
@@ -90,24 +107,25 @@ function planetTexture(seed, pal) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
+const PLANET_LIFT = { value: 0 };   // shared: planets glow a touch brighter against the night
 function planet(radius, tex, atmo, pos) {
   const grp = new THREE.Group();
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uMap: { value: tex }, uSun: { value: SUN_DIR }, uAtmo: { value: new THREE.Color(atmo) } },
+    uniforms: { uMap: { value: tex }, uSun: { value: SKY_SUN }, uAtmo: { value: new THREE.Color(atmo) }, uLift: PLANET_LIFT },
     vertexShader: `
       varying vec2 vUv; varying vec3 vN; varying vec3 vV;
       void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal);
         vec4 wp = modelMatrix * vec4(position, 1.0); vV = normalize(cameraPosition - wp.xyz);
         gl_Position = projectionMatrix * viewMatrix * wp; }`,
     fragmentShader: `
-      uniform sampler2D uMap; uniform vec3 uSun; uniform vec3 uAtmo;
+      uniform sampler2D uMap; uniform vec3 uSun; uniform vec3 uAtmo; uniform float uLift;
       varying vec2 vUv; varying vec3 vN; varying vec3 vV;
       void main(){
         vec3 base = texture2D(uMap, vUv).rgb;
         float l = dot(normalize(vN), uSun);
         float band = l > 0.35 ? 1.0 : l > 0.05 ? 0.72 : l > -0.2 ? 0.42 : 0.24;
         float rim = pow(1.0 - max(dot(normalize(vN), normalize(vV)), 0.0), 2.5);
-        vec3 col = base * band + uAtmo * rim * 0.9;
+        vec3 col = base * (band + uLift) + uAtmo * rim * (0.9 + uLift);
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -117,36 +135,6 @@ function planet(radius, tex, atmo, pos) {
   grp.position.copy(pos);
   grp.userData.ball = ball;
   return grp;
-}
-
-function cloudSea(pal) {
-  const mat = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uSun: { value: SUN_DIR }, uDeep: { value: new THREE.Vector3(...pal.seaDeep) }, uLit: { value: new THREE.Vector3(...pal.seaLit) } }]),
-    vertexShader: `
-      varying vec3 vW;
-      #include <fog_pars_vertex>
-      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz;
-        vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
-        #include <fog_vertex>
-      }`,
-    fragmentShader: `
-      varying vec3 vW; uniform float uTime; uniform vec3 uDeep, uLit;
-      ${NOISE_GLSL}
-      #include <fog_pars_fragment>
-      void main(){
-        vec3 p = vec3(vW.x * 0.004 + uTime * 0.006, uTime * 0.01, vW.z * 0.004);
-        float c = fbm3(p) * 0.7 + fbm3(p * 3.1) * 0.3;
-        vec3 deep = uDeep, lit = uLit;
-        vec3 col = mix(deep, lit, smoothstep(0.35, 0.7, c));
-        col = mix(col, vec3(1.0, 0.95, 0.85), smoothstep(0.66, 0.8, c) * 0.6);
-        gl_FragColor = vec4(pow(col, vec3(2.2)), 1.0);
-        #include <fog_fragment>
-      }`,
-    fog: true,
-  });
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000, 1, 1), mat);
-  m.rotation.x = -Math.PI / 2; m.position.y = -230;
-  return m;
 }
 
 /* little flocks of far-off Albali Byrds wheeling around */
@@ -168,9 +156,9 @@ function flock(rng) {
 
 export const SKY_PALETTES = {
   golden: { zen: [0.045, 0.075, 0.2], mid: [0.22, 0.3, 0.52], hor: [1.0, 0.68, 0.42], low: [0.98, 0.55, 0.45], glow: [1.0, 0.62, 0.3], storm: 0,
-    seaDeep: [0.62, 0.38, 0.48], seaLit: [1.0, 0.86, 0.7], puff: 0xffe9d4 },
+    puff: 0xffe9d4 },
   storm: { zen: [0.03, 0.06, 0.09], mid: [0.12, 0.22, 0.26], hor: [0.55, 0.62, 0.5], low: [0.3, 0.4, 0.36], glow: [0.75, 0.8, 0.55], storm: 1,
-    seaDeep: [0.2, 0.28, 0.3], seaLit: [0.6, 0.7, 0.62], puff: 0x9aa8a4 },
+    puff: 0x9aa8a4 },
 };
 
 export function buildSky(scene, buildShip, palName = 'golden') {
@@ -198,27 +186,26 @@ export function buildSky(scene, buildShip, palName = 'golden') {
 
   // the sun's disc glow
   const sun = glowSprite(0xffd7a0, 900, 0.9);
-  sun.position.copy(SUN_DIR).multiplyScalar(3800); sun.material.fog = false; scene.add(sun);
+  sun.position.copy(SKY_SUN).multiplyScalar(3800); sun.material.fog = false; scene.add(sun);
 
   [big, wild, ringed, ...kalo].forEach(p => p.traverse(o => { if (o.material) o.material.fog = false; }));
 
-  const sea = cloudSea(pal); scene.add(sea);
-
-  // puffy cloud banks drifting around the highland's skirts
+  // high cloud banks drifting far overhead (no cloud sea below — the Tatu are whole worlds)
   const puffs = new THREE.Group();
+  const puffBase = new THREE.Color(pal.puff), puffEmis = new THREE.Color(0x6a3a40);
   const puffMat = new THREE.MeshToonMaterial({ color: pal.puff, emissive: 0x6a3a40, emissiveIntensity: 0.25 });
-  for (let i = 0; i < 46; i++) {
-    const a = rng() * Math.PI * 2, r = 330 + rng() * 650;
+  for (let i = 0; i < 40; i++) {
+    const a = rng() * Math.PI * 2, r = 520 + rng() * 1100;
     const bank = new THREE.Group();
     const n = 3 + Math.floor(rng() * 5);
     for (let j = 0; j < n; j++) {
-      const s = 14 + rng() * 26;
+      const s = 18 + rng() * 32;
       const b = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), puffMat);
       b.position.set((j - n / 2) * s * 0.9 + rng() * 6, rng() * s * 0.4, (rng() - 0.5) * s);
-      b.scale.y = 0.55;
+      b.scale.y = 0.42;
       bank.add(b);
     }
-    bank.position.set(Math.cos(a) * r, -150 + rng() * 120, Math.sin(a) * r);
+    bank.position.set(Math.cos(a) * r, 230 + rng() * 260 + r * 0.08, Math.sin(a) * r);
     bank.userData.drift = 0.6 + rng() * 1.4;
     puffs.add(bank);
   }
@@ -235,8 +222,25 @@ export function buildSky(scene, buildShip, palName = 'golden') {
   }
 
   let flash = 0, flashT = 3;
+  const U = dome.material.uniforms;
   const api = {
-    dome, flash: 0, thunder: false,
+    dome, flash: 0, thunder: false, palette: palName,
+    /* daynight.js drives the look: sky colours (linear-ish [r,g,b] in the dome's pre-gamma space),
+       star / nebula / Pia'don band strength, how visible the sun is, and a 0..1 night factor. */
+    setTime(st) {
+      U.uZen.value.fromArray(st.zen); U.uMid.value.fromArray(st.mid); U.uHor.value.fromArray(st.hor);
+      U.uLow.value.fromArray(st.low); U.uGlow.value.fromArray(st.glow);
+      U.uStars.value = st.stars; U.uNeb.value = st.neb; U.uBand.value = st.band; U.uNight.value = st.night;
+      U.uSunVis.value = st.sunVis;
+      sun.position.copy(SKY_SUN).multiplyScalar(3800);
+      sun.material.opacity = 0.9 * st.sunVis;
+      sun.visible = st.sunVis > 0.01;
+      PLANET_LIFT.value = st.night * 0.35;
+      // clouds: lit by the scene lights, plus a little self-tint so they read against the night
+      puffMat.color.copy(puffBase).lerp(st.cloudNight, st.night * 0.7);
+      puffMat.emissive.copy(puffEmis).lerp(st.cloudGlow, Math.max(st.night, st.twilight));
+      puffMat.emissiveIntensity = 0.25 + st.twilight * 0.25 - st.night * 0.05;
+    },
     update(t, dt, camPos) {
       dome.material.uniforms.uTime.value = t;
       api.thunder = false;
@@ -248,12 +252,11 @@ export function buildSky(scene, buildShip, palName = 'golden') {
         dome.material.uniforms.uFlash.value = api.flash;
       }
       dome.position.copy(camPos);
-      sea.material.uniforms.uTime.value = t;
       big.userData.ball.rotation.y = t * 0.004;
       wild.userData.ball.rotation.y = -t * 0.006;
       puffs.children.forEach(b => {
         b.position.x += b.userData.drift * dt;
-        if (b.position.x > 1000) b.position.x = -1000;
+        if (b.position.x > 1700) b.position.x = -1700;
       });
       flocks.forEach(f => {
         const u = f.userData; u.a += u.sp * dt;

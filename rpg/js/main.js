@@ -12,6 +12,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { buildSky, SUN_DIR } from './sky.js';
+import { createDayNight } from './daynight.js';
 import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
@@ -19,6 +20,8 @@ import { buildXilia } from './xilia.js';
 import { buildTorcain, buildPhorus, buildCore } from './actors.js';
 import { buildDomesticPunk, buildMalstiPunk, buildSkorThal } from './esik_land.js';
 import { buildMeglaAagac } from './esik_sea.js';
+import { buildKuniByrd } from './esik_sky.js';
+import { createWilds } from './wilds.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -72,7 +75,7 @@ try { BOOT = sessionStorage.getItem('torcain-boot'); sessionStorage.removeItem('
 const REGION = SAVE.region || 'xilia';
 let D = DIFFICULTY[SAVE.difficulty] || DIFFICULTY.easy;
 const persist = () => {
-  SAVE.shards = G.shards;
+  SAVE.shards = G.shards; if (typeof dn !== 'undefined') SAVE.hour = Math.round(dn.hour * 10) / 10;
   writeSave(SAVE, KEY);
   if (WHO) CLOUD.pushSave(WHO.id, SAVE);
 };
@@ -122,6 +125,8 @@ function resize() {
 /* ---------------- world ---------------- */
 const world = REGION === 'leotik' ? buildLeotik(scene) : REGION === 'xilia' ? buildXilia(scene) : buildWorld(scene);
 const sky = buildSky(scene, buildEldiShip, REGION === 'leotik' ? 'storm' : 'golden');
+/* day and night: the sun crosses the sky; at night the Esik glow */
+const dn = createDayNight({ scene, sky, sun, hemi, rim, renderer, bloom, region: REGION, startHour: SAVE.hour ?? 9 });
 particles = new Particles(scene, 3500);
 resize();
 addEventListener('resize', resize);
@@ -302,6 +307,8 @@ function onKey(code) {
   if (code === 'KeyJ') openBook('quests');
   if (code === 'KeyM') openBook('map');
   if (code === 'KeyH') whistle();
+  if (code === 'KeyX') throwSprengju();
+  if (code === 'KeyB') callKuni();
   if (code === 'KeyG') nurHlyst();
   const si = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(code);
   if (si >= 0) castSpell(SPELL_ORDER[si]);
@@ -311,7 +318,7 @@ function onKey(code) {
    ENEMIES
    ================================================================ */
 const enemies = createEnemies({
-  scene, world, particles, P, F, G, sfx,
+  scene, world, particles, P, F, G, sfx, night: () => G.night || 0,
   get D() { return D; },
   hurtPlayer: (d, from, kb, o) => hurtPlayer(d, from, kb, o),
   dmgNumber: (...a) => dmgNumber(...a),
@@ -361,6 +368,15 @@ const enemies = createEnemies({
   onProvoke(e) { bark('phorus', e.T.disp === 'friendly' ? 'Torcain! That one was friendly!' : 'Now you’ve made it angry.', 2.5); },
 });
 enemies.spawnAll(world.spawnGroups, SAVE.cleared);
+/* the wider wilds: wildlife, Ju fields, Albali trees, the Kuni Byrd's nest */
+const wilds = createWilds({
+  scene, world, enemies, region: REGION, particles,
+  save: () => SAVE, flags: () => F_, night: () => G.night || 0,
+  give: (id, n) => { invAdd(SAVE.inv, id, n); lootToast(id, n); },
+  take: id => { SAVE.inv.items[id]--; if (SAVE.inv.items[id] <= 0) delete SAVE.inv.items[id]; },
+  toast: (t, d) => toast(t, d), say: lines => dialog(lines), persist: () => persist(),
+  kuniNest: n => kuniNest(n),
+});
 
 /* ================================================================
    BOSSES — the Oath-Rooted (Aakalay) and the Malsti Lord (Leotik)
@@ -412,7 +428,7 @@ function buildOtlid(stygian) {
 /* the Kahizecvar: while the duel lasts, Torcain is Kiet, in golden memory */
 const memState = { on: false, fog: null };
 function enterMemory() {
-  memState.on = true; G.inMemory = true;   // the memory holds only Kiet and Otlið — today's creatures aren't in it
+  memState.on = true; G.inMemory = true; dn.holdFog = true;   // the memory holds only Kiet and Otlið — today's creatures aren't in it
   memState.fog = { c: scene.fog.color.getHex(), n: scene.fog.near, f: scene.fog.far };
   scene.fog.color.setHex(0xf6d6a0); scene.fog.near = 30; scene.fog.far = 260;
   phorus.root.visible = false;
@@ -420,7 +436,7 @@ function enterMemory() {
 }
 function exitMemory() {
   if (!memState.on) return;
-  memState.on = false; G.inMemory = false;
+  memState.on = false; G.inMemory = false; dn.holdFog = false;
   scene.fog.color.setHex(memState.fog.c); scene.fog.near = memState.fog.n; scene.fog.far = memState.fog.f;
   phorus.root.visible = true;
   document.body.classList.remove('in-memory');
@@ -860,6 +876,7 @@ function tukangFlare() {
 }
 
 function dodge() {
+  if (P.flying) return;
   if (P.riding) { toggleRide(); return; }
   if (!canAct() || P.drink > 0) return;
   if (!spend(D.stamina.dodge)) return;
@@ -1008,6 +1025,7 @@ placeLost();
 function restWorld() {
   enemies.clear();
   enemies.spawnAll(world.spawnGroups, SAVE.cleared);
+  wilds.respawn();
   world.flowers.forEach(f => { f.ready = true; f.grp.visible = true; });
   if (typeof feats !== 'undefined') feats.nodes.forEach(n => { n.ready = true; n.mesh.visible = true; });
   P.poison = 0; applyUps(true);
@@ -1064,6 +1082,7 @@ function interactables() {
     else if (e.pup) list.push({ pos: e.pos, label: 'Pick up the Kipsu pup', act: () => befriend(e), far: 2.4 });
     else if (!e.petted) list.push({ pos: e.pos, label: e.kind === 'kipsu_f' ? 'Pet the Kipsu' : 'Pat the Punk', act: () => petCreature(e), far: 2.6 });
   }
+  list.push(...wilds.interactables(P));
   if (mount) list.push({ pos: mount.pos, label: P.riding ? 'Climb down from Brindle' : 'Ride Brindle', act: () => toggleRide(), far: P.riding ? 99 : 3 });
   for (const c of feats.chests) if (!c.open) list.push({ pos: V3(c.x, c.y, c.z), label: 'Open the chest', act: () => openChest(c), far: 2.6 });
   for (const n of feats.nodes) if (n.ready) list.push({ pos: V3(n.x, n.y, n.z), label: n.label, act: () => gather(n), far: 2.6 });
@@ -1409,7 +1428,7 @@ if (REGION === 'aakalay') {
   const pz = world.PLAZA, mx = pz.x + 21, mz = pz.z - 21, my = world.heightAt(mx, mz);
   const megla = buildMeglaAagac({ seed: 31 }); megla.root.scale.setScalar(0.7); megla.root.position.set(mx, my - 0.2, mz); megla.root.rotation.y = 2.2; scene.add(megla.root);
   world.col.add(mx, mz, 1.3, 1.3, 0, my - 1, my + 14);
-  let mt = 0; G.meglaTick = dt => { mt += dt; megla.animate(dt, { speed: 0, t: mt }); };
+  let mt = 0; G.meglaTick = dt => { mt += dt; megla.animate(dt, { speed: 0, t: mt }); if (megla.glow) megla.glow(G.night || 0); };
 }
 /* Skor'Thal: scarred trees that only answer Nur'Hlyst, then the den in the far north wood */
 function scarTree() {
@@ -1448,6 +1467,7 @@ function skorTick(dt) {
   if (!skor.m.root.visible) return;
   skor.t += dt;
   skor.m.animate(dt, { speed: 0, t: skor.t * 0.4, windup: 0, attack: 0, swing: 0, onGround: true });
+  if (skor.m.glow) skor.m.glow(G.night || 0);
 }
 function denGuards() { return enemies.list.filter(e => !e.dead && e.tag === 'skorden' && Math.hypot(e.pos.x - skor.pos.x, e.pos.z - skor.pos.z) < 40).length; }
 function sitWithSkor() {
@@ -1552,7 +1572,7 @@ function amuletSpots() {
   for (let tries = 0; out.length < 7 && tries < 400; tries++) {
     const [ax, az] = anchors[(out.length * 3 + tries) % anchors.length];
     const a = rnd() * Math.PI * 2, r = 6 + rnd() * 18, x = ax + Math.cos(a) * r, z = az + Math.sin(a) * r;
-    if (Math.hypot(x, z) > world.edgeRadius(x, z) - 10) continue;
+    if (Math.hypot(x, z) > (world.homeRadius ? world.homeRadius(x, z) : world.edgeRadius(x, z)) - 10) continue;
     if (world.hazards.some(h => Math.hypot(x - h.x, z - h.z) < h.r + 2)) continue;
     if (out.some(o => Math.hypot(o.x - x, o.z - z) < 25)) continue;
     const gy = world.heightAt(x, z);
@@ -1880,7 +1900,7 @@ function setObjective() {
     else { txt = STORY.LEOTIK_OBJ.pillars(pillarCount()); hintTxt = 'F — Phorus senses the nearest pillar'; }
     pips = 3; on = pillarCount();
   }
-  $('q-head').textContent = REGION === 'xilia' ? 'Prologue · Xilia' : REGION === 'aakalay' ? 'Rokarvac I · Aakalay' : 'Rokarvac II · Leotik';
+  $('q-head').textContent = $('q-head').dataset.base = REGION === 'xilia' ? 'Prologue · Xilia' : REGION === 'aakalay' ? 'Rokarvac I · Aakalay' : 'Rokarvac II · Leotik';
   $('q-text').textContent = txt;
   $('q-hint').textContent = hintTxt;
   const el = $('q-pips'); el.innerHTML = '';
@@ -2334,6 +2354,96 @@ function petCreature(e) {
   bark('phorus', e.kind === 'kipsu_f' ? 'It likes you. They can tell, you know.' : 'Gentle as anything. Ruut’s herd, probably.', 2.5);
 }
 
+/* ---------------- Sprengju: throw it and it bursts ---------------- */
+const sprengjuShots = [];
+function throwSprengju() {
+  if (G.mode !== 'play' || P.dead) return;
+  if (!SAVE.inv.items.sprengju) { toast('No Sprengju to throw. Catch them over a woken Ju field.', 2.2); return; }
+  SAVE.inv.items.sprengju--; if (SAVE.inv.items.sprengju <= 0) delete SAVE.inv.items.sprengju;
+  const f = camForward(), g = new THREE.Group();
+  const core = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 6), toon(0xff8a2a, { emissive: 0xff6a10, emissiveIntensity: 0.8 })); core.rotation.x = Math.PI / 2; g.add(core);
+  g.add(glowSprite(0xffa040, 1.6, 0.8));
+  g.position.set(P.pos.x + f.x, P.pos.y + 1.6, P.pos.z + f.z); scene.add(g);
+  sprengjuShots.push({ g, vel: V3(f.x * 24, 4, f.z * 24), life: 3, wob: Math.random() * 6 });
+  sfx.jump();
+}
+function burstSprengju(p) {
+  particles.burst(p.x, p.y, p.z, 40, { color: 0xffa040, speed: 9, size: 0.6, life: 0.7, gravity: 4 });
+  particles.burst(p.x, p.y, p.z, 20, { color: 0xffe08a, speed: 5, size: 0.4, life: 0.5 });
+  sfx.hit(); G.shake = Math.max(G.shake || 0, 0.35);
+  for (const e of enemies.list) if (!e.dead && e.pos.distanceTo(p) < 4.2 + e.T.rad) enemies.damage(e, 70, p, 9, { stun: 0.5 });
+  if (boss && !boss.dead && boss.pos && boss.pos.distanceTo(p) < 6) damageBoss(70);
+}
+function updateSprengju(dt) {
+  for (let i = sprengjuShots.length - 1; i >= 0; i--) {
+    const s = sprengjuShots[i]; s.life -= dt; s.wob += dt * 12;
+    s.vel.y -= 6 * dt;   // it flies — mostly
+    s.g.position.addScaledVector(s.vel, dt);
+    s.g.position.x += Math.sin(s.wob) * 0.04; s.g.lookAt(s.g.position.clone().add(s.vel));
+    if (Math.random() < 0.6) particles.emit(s.g.position.x, s.g.position.y, s.g.position.z, { color: 0xffb040, size: 0.3, life: 0.3, speed: 0.4 });
+    const hit = s.life <= 0 || s.g.position.y <= world.col.ground(s.g.position.x, s.g.position.z, s.g.position.y + 1) + 0.1
+      || enemies.list.some(e => !e.dead && e.pos.distanceTo(s.g.position) < e.T.rad + 0.8);
+    if (hit) { burstSprengju(s.g.position.clone()); scene.remove(s.g); sprengjuShots.splice(i, 1); }
+  }
+}
+
+/* ---------------- the Kuni Byrd: late in the run, a mount that flies ---------------- */
+let kuni = null;   // { actor, landing }
+function kuniNest(n) {
+  if (!F_.lordDead) { dialog([['phorus', 'A Kuni Byrd’s nest. They hardly ever come down, Torcain — and never for strangers. Maybe once we’ve done something worth a Kuni’s notice.']]); return; }
+  if ((SAVE.inv.items.albali_fruit || 0) < 3) { dialog([['phorus', 'It’s watching your hands. Albali fruit — ripe ones, from under an Albali Aagac. Three, I’d say. Kuni Byrds are not cheap friends.']]); return; }
+  takeAll(SAVE.inv, { albali_fruit: 3 });
+  dialog([
+    ['torcain', '(You hold out the fruit. The Kuni Byrd looks at it, then at you, for a very long time.)'],
+    ['memory', 'It eats all three in three snaps. Then it lowers its head until the saddle-straps hanging from its old harness touch the ground.'],
+    ['phorus', 'Someone rode this one, once. …It’s choosing you. Press B whenever you want it, wherever the sky’s open.'],
+  ], () => { F_.kuni = true; xp(400); persist(); toast('The Kuni Byrd is yours. B to call it · Space up · C down · B again to land.', 5); });
+}
+function callKuni() {
+  if (!F_.kuni) return;
+  if (G.mode !== 'play' || P.dead || G.bossActive || dyaMatch) return;
+  if (P.flying) {
+    const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y);
+    if (P.pos.y - g > 4) { toast('Fly lower to land (hold C).', 1.8); return; }
+    P.flying = false; P.pos.y = g; P.vel.set(0, 0, 0);
+    kuni.actor.root.visible = false; F.pos.copy(P.pos).add(V3(2, 0, 2)); phorus.root.visible = true;
+    toast('The Kuni Byrd wheels away into the sky.', 2); return;
+  }
+  if (P.riding) toggleRide();
+  if (!kuni) { const a = buildKuniByrd({ saddle: true, seed: 3 }); scene.add(a.root); kuni = { actor: a, body: a.root.children[0] }; }
+  kuni.actor.root.visible = true;
+  P.flying = true; P.vel.set(0, 6, 0); P.atk = null; P.gliding = false; glider.visible = false;
+  phorus.root.visible = false;   // Phorus rides behind you
+  particles.burst(P.pos.x, P.pos.y + 2, P.pos.z, 40, { color: 0xffffff, speed: 6, size: 0.5, life: 0.8 });
+  sfx.jump(); bark('phorus', 'Hold on to something! Not me!', 2);
+}
+function flyKuni(dt, wish, moving, act) {
+  const fast = keys.ShiftLeft || keys.ShiftRight, sp = fast ? 34 : 20;
+  P.vel.x = damp(P.vel.x, wish.x * sp, 2.2, dt); P.vel.z = damp(P.vel.z, wish.z * sp, 2.2, dt);
+  const up = act && keys.Space ? 1 : 0, down = act && keys.KeyC ? 1 : 0;
+  P.vel.y = damp(P.vel.y, (up - down) * 11, 3, dt);
+  const nx = P.pos.x + P.vel.x * dt, nz = P.pos.z + P.vel.z * dt;
+  const R = world.edgeRadius(nx, nz);
+  if (Math.hypot(nx, nz) < R + 60) { P.pos.x = nx; P.pos.z = nz; }
+  else { P.vel.x *= -0.5; P.vel.z *= -0.5; if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', 'Even a Kuni won’t fly past the edge of what we know. Turn back.', 2.4); } }
+  const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 50);
+  P.pos.y = clamp(P.pos.y + P.vel.y * dt, g + 1.5, g + 140);
+  if (moving) P.yaw = dampAngle(P.yaw, Math.atan2(P.vel.x, P.vel.z), 3, dt);
+  P.onGround = false; P.stam = Math.min(P.stamMax, P.stam + 20 * dt);
+  // the byrd under you, the saddle under Torcain
+  const k = kuni.actor, hs = Math.hypot(P.vel.x, P.vel.z), bodyY = kuni.body ? kuni.body.position.y : 3;
+  k.root.rotation.y = P.yaw;
+  k.root.rotation.z = damp(k.root.rotation.z, clamp(-angleDiff(P.yaw, Math.atan2(wish.x || 1e-6, wish.z || 1e-6)) * 0.4 * (moving ? 1 : 0), -0.5, 0.5), 3, dt);
+  const back = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw)).multiplyScalar(-0.45);
+  k.root.position.set(P.pos.x - back.x, P.pos.y - bodyY - 0.56, P.pos.z - back.z);
+  k.animate(dt, { speed: hs, t: G.t, diving: P.vel.y < -6 });
+  if (k.glow) k.glow(G.night || 0);
+  torcain.root.position.copy(P.pos); torcain.root.rotation.y = P.yaw;
+  torcain.animate(dt, { speed: 0, onGround: true, t: G.t, heat: P.heat / 100 });
+  if (Math.random() < 0.15 * Math.min(1, hs / 20)) particles.emit(P.pos.x, P.pos.y + 1, P.pos.z, { vx: -P.vel.x * 0.1, vz: -P.vel.z * 0.1, color: 0xffffff, size: 0.3, life: 0.8, speed: 0.5 });
+  updateAttack(dt);
+}
+
 /* ---------------- Brindle, your Punk ---------------- */
 let mount = null;
 function makeMount(nearPlayer) {
@@ -2627,6 +2737,7 @@ function mapMarkers() {
   if (board) m.push({ x: board.x, z: board.z, ch: '▤', col: '#e8c890', size: 15, label: 'Bounties' });
   if (SAVE.quests.q_skorthal === 'active' && skor && !SAVE.counters.skorthal) m.push({ x: skor.pos.x, z: skor.pos.z, ch: '✦', col: '#9af0a0', size: 18, label: 'Skor’Thal' });
   if (lostMark) m.push({ x: lostMark.position.x, z: lostMark.position.z, ch: '✦', col: '#d8b8ff', size: 15, label: 'Lost shards' });
+  m.push(...wilds.markers());
   return m;
 }
 function travel(id) {
@@ -2703,6 +2814,7 @@ function updatePlayer(dt) {
   const wish = V3().addScaledVector(f, iz).addScaledVector(r, ix);
   const moving = wish.lengthSq() > 0.01;
   if (moving) wish.normalize();
+  if (P.flying) { flyKuni(dt, wish, moving, act); return; }
   let sprint = (keys.ShiftLeft || keys.ShiftRight) && moving && !P.exhausted;
   if (sprint && D.stamina.sprint > 0) { P.stam -= D.stamina.sprint * dt; P.stamDelay = 0.5; if (P.stam <= 0) { P.stam = 0; P.exhausted = true; sprint = false; } }
   if (P.exhausted && P.stam > 25) P.exhausted = false;
@@ -2763,7 +2875,12 @@ function updatePlayer(dt) {
   }
 
   const wasGround = P.onGround;
+  const px0 = P.pos.x, pz0 = P.pos.z;
   P.pos.addScaledVector(P.vel, dt);
+  if (world.inBounds && !world.inBounds(P.pos.x, P.pos.z)) {   // the land itself says no: a sheer ridge, deep water, a thorn wall
+    P.pos.x = px0; P.pos.z = pz0; P.vel.x *= -0.2; P.vel.z *= -0.2;
+    if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', world.barrierLine ? world.barrierLine(P.pos.x, P.pos.z) : 'No way through here.', 2.4); }
+  }
   world.col.resolve(P.pos, P.riding ? 0.95 : 0.45, P.riding ? 2.6 : 1.9);
   if (G.bossActive && boss) {
     arenaClamp(P.pos, G.arena);
@@ -2788,7 +2905,7 @@ function updatePlayer(dt) {
     P.pos.y = -44; P.vel.set(0, 0, 0);
     const fallDmg = Math.round(P.maxHp * (D === DIFFICULTY.realistic ? 0.3 : 0.12));
     P.hp -= fallDmg; dmgNumber(P.lastSafe.x, P.lastSafe.y + 2.3, P.lastSafe.z, fallDmg, 'hurt');
-    bark('phorus', 'Mind the edge! It’s a long way down to the cloud sea.', 2.5);
+    bark('phorus', 'Mind your footing! That’s a long way down.', 2.5);
     if (P.hp <= 0) { P.hp = 1; playerDown(); }
   }
 
@@ -2904,7 +3021,7 @@ function updatePhorus(dt) {
 }
 
 function updateCamera(dt) {
-  CAM.dist = damp(CAM.dist, CAM.wantDist, 8, dt);
+  CAM.dist = damp(CAM.dist, P.flying ? Math.max(CAM.wantDist, 14) : CAM.wantDist, 8, dt);
   // lock-on steers the camera toward the target
   const lp = lockPoint();
   if (G.lock && !lp) G.lock = null;
@@ -2916,7 +3033,7 @@ function updateCamera(dt) {
       CAM.pitch = damp(CAM.pitch, 0.22, 3, dt);
     }
   }
-  const tgt = V3(P.pos.x, P.pos.y + (P.riding ? 3.0 : 1.9), P.pos.z);
+  const tgt = V3(P.pos.x, P.pos.y + (P.flying ? 2.6 : P.riding ? 3.0 : 1.9), P.pos.z);
   CAM.target.lerp(tgt, 1 - Math.exp(-18 * dt));
   if (CAM.target.distanceTo(tgt) > 8) CAM.target.copy(tgt);
   const r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
@@ -2997,7 +3114,7 @@ function updateWorldBits(dt) {
     gate.userData.film.material.opacity = 0.45 + Math.sin(G.t * 2.4) * 0.12; gate.userData.film.rotation.z = G.t * 0.3;
     if (Math.random() < 0.3) particles.emit(gate.position.x + (Math.random() - 0.5) * 5, gate.position.y + 3.6 + (Math.random() - 0.5) * 5, gate.position.z, { vy: 0.5, color: 0xb48aff, size: 0.35, life: 1.2, speed: 0.6 });
   }
-  hlystTick(dt); skorTick(dt); if (G.meglaTick) G.meglaTick(dt);
+  hlystTick(dt); skorTick(dt); wilds.update(dt, G.t); updateSprengju(dt); if (G.meglaTick) G.meglaTick(dt);
   beastScan(dt);
   for (const c of cores) {
     if (c.got) continue;
@@ -3021,7 +3138,6 @@ function updateWorldBits(dt) {
   for (const s of stones) s.rune.material.opacity = SAVE.codex[s.key] ? 0.2 : 0.45 + Math.sin(G.t * 2.5 + s.x) * 0.2;
   if (lostMark) { lostMark.rotation.y += dt; if (Math.random() < 0.4) particles.emit(lostMark.position.x, lostMark.position.y, lostMark.position.z, { vy: 1.5, speed: 1, color: 0xb48aff, size: 0.3, life: 1 }); }
   if (sky.thunder) { sfx.roar(); }
-  hemi.intensity = hemiBase + (sky.flash || 0) * 2.5;
 }
 
 /* ================================================================
@@ -3077,6 +3193,15 @@ function frame() {
   const tt = G.mode === 'title' ? performance.now() / 1000 : G.t;
   world.update(tt, dt, particles, camera.position);
   sky.update(tt, dt, camera.position);
+  dn.update(frozen && G.mode !== 'title' ? 0 : dt);
+  G.night = dn.night;
+  /* everyone's bioluminescence follows the dark (creatures handle their own in enemies.js / wilds.js) */
+  if ((G.glowT = (G.glowT || 0) - dt) <= 0) {
+    G.glowT = 0.25; const n = G.night;
+    for (const a of [torcain, phorus, mount && mount.actor, boss && boss.actor]) if (a && a.glow) a.glow(n);
+    for (const c of npcs) if (c.actor.glow) c.actor.glow(n);
+  }
+  if ((G.hudT = (G.hudT || 0) - dt) <= 0) { G.hudT = 1; const qh = $('q-head'); if (qh && qh.dataset.base) qh.textContent = qh.dataset.base + ' · ' + dn.label(); }
   ship.update(tt, dt, particles);
   particles.update(frozen && G.mode !== 'title' ? 0 : dt);
   const focus = G.mode === 'title' ? V3(0, 0, 0) : P.pos;
@@ -3220,5 +3345,5 @@ else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add(
 window.__torcain = {
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get dya() { return dyaMatch; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

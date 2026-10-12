@@ -20,6 +20,69 @@ import { lerp, clamp } from './util.js';
 
 const TAU = Math.PI * 2;
 
+/* ---------------- BIOLUMINESCENCE ----------------
+   Every living thing on the Mbaru Tatu glows a little. Pattern materials
+   come from bioKit(): pale, skin-tinted marks by day that shine at night.
+   glow(v) — v = 0 bright day .. 1 full night — sets them all. It touches
+   only these materials (never the flash() ones) and allocates nothing. */
+export function bioKit() {
+  const tm = [], bm = [], sp = [];
+  const k = {
+    v: 0,
+    /* a pattern material: skin-tinted by day, shining colour c at night */
+    mat(c, skin = c, mix = 0.5, lo = 0.12, hi = 1.6) {
+      return k.reg(toon(new THREE.Color(skin).lerp(new THREE.Color(c), mix), { emissive: c }), lo, hi);
+    },
+    /* an existing lit material whose emissive rises at night */
+    reg(m, lo, hi) { m.userData.bio = [lo, hi]; m.emissiveIntensity = lo; tm.push(m); return m; },
+    /* an existing unlit glow: dimmer by day (lo), full (or `night`) at night */
+    basic(m, lo = 0.5, night) {
+      m.userData.c0 = m.color.clone(); m.userData.c1 = night !== undefined ? new THREE.Color(night) : m.color.clone(); m.userData.lo = lo; bm.push(m); return m;
+    },
+    /* a glow sprite: `day` fraction of its opacity by day, all of it at night */
+    sprite(s, op, day = 0) { s.userData.op = op ?? s.material.opacity; s.userData.day = day; sp.push(s); return s; },
+    glow(v) {
+      v = v < 0 ? 0 : v > 1 ? 1 : v; k.v = v;
+      for (let i = 0; i < tm.length; i++) { const b = tm[i].userData.bio; tm[i].emissiveIntensity = b[0] + (b[1] - b[0]) * v; }
+      for (let i = 0; i < bm.length; i++) { const u = bm[i].userData; bm[i].color.copy(u.c0).multiplyScalar(u.lo).lerp(u.c1, v); }
+      for (let i = 0; i < sp.length; i++) { const s = sp[i], o = s.userData.op * (s.userData.day + (1 - s.userData.day) * v); s.material.opacity = o; s.visible = o > 0.01; }
+    },
+  };
+  return k;
+}
+/* glowing dots merged into one geometry. Each entry is either
+   [dx, dy, dz, r, flat]                — a direction on an ellipsoid part of radii
+                                          (sx, sy, sz); the geometry is in the part's
+                                          unit space (add it to a sphere scaled sx,sy,sz)
+   [px, py, pz, nx, ny, nz, r, flat]    — an explicit surface point and normal. */
+const _bUP = new THREE.Vector3(0, 1, 0), _bq = new THREE.Quaternion(), _bn = new THREE.Vector3(), _bp = new THREE.Vector3(), _bsc = new THREE.Vector3(), _bm4 = new THREE.Matrix4(), _bS = new THREE.Matrix4();
+export function bioDots(list, sx = 1, sy = 1, sz = 1, seg = 6) {
+  const unit = new THREE.SphereGeometry(1, seg, Math.max(3, seg - 2)).toNonIndexed();
+  const n = unit.attributes.position.count, pos = new Float32Array(n * 3 * list.length), nor = new Float32Array(n * 3 * list.length);
+  _bS.makeScale(1 / sx, 1 / sy, 1 / sz);
+  list.forEach((e, i) => {
+    let r, fl;
+    if (e.length >= 6) { _bp.set(e[0], e[1], e[2]); _bn.set(e[3], e[4], e[5]).normalize(); r = e[6] ?? 0.02; fl = e[7] ?? 0.4; }
+    else { _bn.set(e[0], e[1], e[2]).normalize(); _bp.set(_bn.x * sx, _bn.y * sy, _bn.z * sz); _bn.set(_bn.x / sx, _bn.y / sy, _bn.z / sz).normalize(); r = e[3]; fl = e[4] ?? 0.4; }
+    _bm4.compose(_bp, _bq.setFromUnitVectors(_bUP, _bn), _bsc.set(r, r * fl, r)).premultiply(_bS);
+    const g = unit.clone().applyMatrix4(_bm4);
+    pos.set(g.attributes.position.array, i * n * 3); nor.set(g.attributes.normal.array, i * n * 3);
+  });
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return out;
+}
+/* n dots evenly from entry a to entry b (same form), radius r0 → r1 */
+export function dotRun(a, b, n, r0, r1 = r0, flat) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = n > 1 ? i / (n - 1) : 0, e = a.map((v, j) => v + (b[j] - v) * t);
+    e.push(r0 + (r1 - r0) * t); if (flat !== undefined) e.push(flat); out.push(e);
+  }
+  return out;
+}
+export function bioMesh(geo, m, parent, x = 0, y = 0, z = 0) { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.userData.noOutline = true; parent.add(o); return o; }
+
 function capTexture(base) {
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const g = c.getContext('2d');
@@ -282,6 +345,11 @@ export function buildEikar(o = {}) {
   const eyeR = kalo ? 0.03 : 0.027, ex = kalo ? 0.046 : 0.043;
   const zOn = (x, y, r) => Math.sqrt(Math.max(0, r * r - x * x - y * y));
   const markGlows = [];
+  // bioluminescence: every Eikar's under-eye markings glow at night (the Kalo's faintly
+  // by day too), with a few grain-dots of the same light on the backs of the forearms
+  const bio = bioKit();
+  const nightMark = duat ? new THREE.Color(0x6a18d8) : new THREE.Color(markMat.color).lerp(new THREE.Color(o.marking || 0xffc46a), kalo ? 1 : 0.85);
+  bio.basic(markMat, 1, nightMark);
   for (const s of [-1, 1]) {
     const ez = zOn(ex, 0.005, HR) * (kalo ? 1.0 : 0.98);
     const white = new THREE.Mesh(new THREE.SphereGeometry(eyeR, 10, 8), whiteMat);
@@ -297,9 +365,7 @@ export function buildEikar(o = {}) {
     const tri = new THREE.Mesh(new THREE.CircleGeometry(kalo ? 0.019 : 0.017, 3, -Math.PI / 2), markMat);
     tri.scale.set(0.85, 1.25, 1);
     tri.position.set(s * (ex + 0.004), my, mz); tri.rotation.set(0.32, s * 0.42, 0); tri.userData.noOutline = true; face.add(tri);
-    if (kalo || duat) {
-      const gl = glowSprite(markGlowCol, duat ? 0.13 : 0.09, duat ? 0.6 : 0.4); gl.position.set(s * (ex + 0.004), my, mz + 0.008); face.add(gl); markGlows.push(gl);
-    }
+    const gl = glowSprite(kalo || duat ? markGlowCol : (o.marking || 0xffc46a), duat ? 0.13 : 0.09, duat ? 0.6 : 0.4); gl.position.set(s * (ex + 0.004), my, mz + 0.008); face.add(gl); markGlows.push(gl);
   }
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), skinMat); nose.scale.set(0.9, 1.25, 0.9); nose.position.set(0, -0.018, HR * 0.98); face.add(nose);
   const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.0035, 3, 8, Math.PI * 0.8), eyeMat);
@@ -363,6 +429,14 @@ export function buildEikar(o = {}) {
   // arms and hands
   const armOpts = { L1: 0.25, L2: 0.27, ru: 0.043 * (kalo ? 1.08 : 1), rf: 0.036 * (kalo ? 1.08 : 1), rh: 0.04, skin: skinMat, cuff: beltMat };
   const arms = [-1, 1].map(s => rigArm(torso, s, new THREE.Vector3(s * SX, SH - 0.01, 0), armOpts));
+  {
+    const grainM = bio.mat(duat ? 0x9a5aff : (o.marking || 0xffc46a), new THREE.Color(o.skin || '#a8743e').getHex(), 0.2, 0.0, 1.8);
+    for (const a of arms) {
+      const rf = armOpts.rf, L = [];
+      for (let k = 0; k < 4; k++) L.push([-a.s * rf * 0.55, -0.07 - k * 0.035, -rf * 0.8, -a.s * 0.6, 0, -0.8, 0.0075 - k * 0.0008, 0.5]);
+      bioMesh(bioDots(L), grainM, a.fore);
+    }
+  }
   // legs and boots
   const legOpts = { Lt: 0.36, Ls: 0.34, rt: 0.06 * (kalo ? 1.06 : 1), rs: 0.044, leg: legMat, shin: legMat, boot: bootMat, bootTop: true, foot: 0.1, fh: 0.06, fw: 0.075, ah: 0.06 };
   const legs = [-1, 1].map(s => rigLeg(body, s, new THREE.Vector3(s * 0.08 * bw, -0.02, 0), legOpts));
@@ -411,6 +485,7 @@ export function buildEikar(o = {}) {
   const defKind = kind === 'spear' || kind === 'none' || kind === 'flask' ? 4 : kind === 'axe' ? 3 : 1;
   const s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0;
+  bio.glow(0);
 
   const A = {
     root, body, torso, head, hat, weapon, wPivot, wHold, cape, relic, nur, mats, arms, legs,
@@ -509,13 +584,21 @@ export function buildEikar(o = {}) {
       if (nur) nur.position.set(0.55 + Math.sin(t * 1.3) * 0.12, 1.7 + Math.sin(t * 2.1) * 0.12, -0.2);
       if (weapon.userData.glow) weapon.userData.glow.material.opacity = 0.35 + b * 0.65;
       // glowing markings: faint and slow for the Kalo; void-purple when the Duat moves
+      // (every Eikar's marks also glow by night: plain Eikar only after dark, the Kalo
+      // faintly by day and clearly at night, the Duat-touched whenever the Duat moves)
       if (markGlows.length) {
-        const g = duat ? Math.max(duat * 0.45, wind, atk, st.thrown ? 1 : 0, st.duat || 0) : 0.35 + Math.sin(t * 1.3) * 0.15 + (st.duat || 0);
+        const nv = bio.v;
+        const g = duat ? Math.max(duat * 0.45, wind, atk, st.thrown ? 1 : 0, st.duat || 0, nv * 0.4)
+          : kalo ? (0.35 + Math.sin(t * 1.3) * 0.15) * (0.6 + 0.6 * nv) + (st.duat || 0)
+          : (0.3 + Math.sin(t * 1.3) * 0.08) * nv;
         glowA = lerp(glowA, g, 1 - Math.exp(-8 * dt));
-        for (const m of markGlows) { m.material.opacity = clamp(glowA, 0, 1); m.scale.setScalar((duat ? 0.12 : 0.085) * (0.8 + glowA * 0.6)); }
+        for (const m of markGlows) { m.material.opacity = clamp(glowA, 0, 1); m.visible = glowA > 0.01; m.scale.setScalar((duat ? 0.12 : 0.085) * (0.8 + glowA * 0.6)); }
       }
     },
     flash(v) { mats.forEach(m => m.emissive.setRGB(v + 0.07, v * 0.9 + 0.055, v * 0.8 + 0.04)); },
+    /* v = 0 bright day .. 1 full night: the markings (and grain-dots) glow */
+    glow(v) { bio.glow(v); },
+    bio,
   };
   return A;
 }

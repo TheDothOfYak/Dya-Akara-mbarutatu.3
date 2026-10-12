@@ -46,8 +46,14 @@ export function buildVel() {
       k.rotation.set(Math.PI, 0, 0);
       k.visible = !st.thrown || i > 0;
     });
-    aura.material.opacity = 0.25 + (st.windup || 0) * 0.5;
+    aura.material.opacity = (0.25 + (st.windup || 0) * 0.5) * (0.8 + 0.5 * night);
   };
+  // bioluminescence (on top of the Eikar's own marks): at night the Duat-knives smoulder
+  // and the void aura spreads
+  let night = 0;
+  const baseGlow = a.glow;
+  a.glow = v => { night = Math.max(0, Math.min(1, v)); baseGlow(night); km.emissiveIntensity = 0.5 + night * 0.9; };
+  a.glow(0);
   return a;
 }
 
