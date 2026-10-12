@@ -158,11 +158,15 @@ function inBounds(x, z) {
   if (Math.abs(x) < PIER_BOX.x1 && z > 150 && z < PIER_END + 1.5) return true;     // the pier runs out over Mirrormere
   return barrierKind(x, z) === null;
 }
+/* deep water you can swim in: every lake and river, but not the gorge or out past the ridge */
+function swimOk(x, z) {
+  return Math.hypot(x, z) < barrierR(Math.atan2(z, x)) - 40 && waterDepth(x, z) > DEEP;
+}
 const BARRIER_LINES = {
   ridge: ['The ridge is too sheer to climb.', 'Too steep — the Crown Ridge won’t let us up here.'],
   cliff: ['The Greyfang cliffs are sheer here — no handholds.', 'Straight rock wall. We go round.'],
   gorge: ['The gorge drops away — no way across.', 'That’s the Sundered Gorge. A long fall to the water.'],
-  water: ['The water’s too deep to wade.', 'Any deeper and we’re swimming.'],
+  water: ['The current’s too strong out here. Back the way we came.', 'Not past the ridge — swim back.'],
 };
 function barrierLine(x, z) {
   const k = barrierKind(x, z) || 'ridge', l = BARRIER_LINES[k];
@@ -628,7 +632,7 @@ export function buildXilia(scene) {
     hearth, pen: PEN, yard: YARD, tower: { x: YARD.x - 10, z: YARD.z - 10, y: SQ_H + 0.4 + 10 }, seedSpot, grove: GROVE,
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, lanterns, stones, falls: [], clear: CLEAR,
-    inBounds, barrierLine, homeRadius: oldEdge,   // homeRadius = the old town rim (for anything that must keep its old placement, e.g. amulet rolls)
+    inBounds, barrierLine, swimOk, homeRadius: oldEdge,   // homeRadius = the old town rim (for anything that must keep its old placement, e.g. amulet rolls)
     water: { level: WATER_LEVEL, isWater: (x, z) => waterDepth(x, z) > DEEP, depth: waterDepth, lakes: LAKES.map(l => ({ id: l.id, x: l.x, z: l.z, rx: l.rx, rz: l.rz, maxDepth: l.d })) },
     zones: ZONES.map(z => ({ ...z })), albaliSpots: ALBALI.map(p => ({ x: p.x, z: p.z })), juFields: JU.map(j => ({ ...j })),
     kuniPerch: { x: KUNI.x, z: KUNI.z, y: heightAt(KUNI.x, KUNI.z) },

@@ -907,7 +907,7 @@ function tukangFlare() {
 }
 
 function dodge() {
-  if (P.flying) return;
+  if (P.flying || P.swimming) return;
   if (P.riding) { toggleRide(); return; }
   if (!canAct() || P.drink > 0) return;
   if (!spend(D.stamina.dodge)) return;
@@ -2435,7 +2435,8 @@ function callKuni() {
   if (G.mode !== 'play' || P.dead || G.bossActive || dyaMatch) return;
   if (P.flying) {
     const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y);
-    if (P.pos.y - g > 4) { toast('Fly lower to land (hold C).', 1.8); return; }
+    if (P.pos.y - Math.max(g, world.water ? world.water.level : -1e9) > 4) { toast('Fly lower to land (hold C).', 1.8); return; }
+    if (world.inBounds && !world.inBounds(P.pos.x, P.pos.z) && !(world.swimOk && world.swimOk(P.pos.x, P.pos.z))) { toast('Nowhere to land here.', 1.8); return; }
     P.flying = false; P.pos.y = g; P.vel.set(0, 0, 0);
     kuni.actor.root.visible = false; F.pos.copy(P.pos).add(V3(2, 0, 2)); phorus.root.visible = true;
     toast('The Kuni Byrd wheels away into the sky.', 2); return;
@@ -2457,7 +2458,7 @@ function flyKuni(dt, wish, moving, act) {
   const R = world.edgeRadius(nx, nz);
   if (Math.hypot(nx, nz) < R + 60) { P.pos.x = nx; P.pos.z = nz; }
   else { P.vel.x *= -0.5; P.vel.z *= -0.5; if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', 'Even a Kuni won’t fly past the edge of what we know. Turn back.', 2.4); } }
-  const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 50);
+  const g = Math.max(world.col.ground(P.pos.x, P.pos.z, P.pos.y + 50), world.water ? world.water.level : -1e9);   // skim the water, don't fly through it
   P.pos.y = clamp(P.pos.y + P.vel.y * dt, g + 1.5, g + 140);
   if (moving) P.yaw = dampAngle(P.yaw, Math.atan2(P.vel.x, P.vel.z), 3, dt);
   P.onGround = false; P.stam = Math.min(P.stamMax, P.stam + 20 * dt);
@@ -2819,6 +2820,16 @@ function updateRpgHud() {
 /* ================================================================
    UPDATE
    ================================================================ */
+/* how steep a slope you can walk up (rise over run), and how deep you float while swimming */
+const SLOPE_MAX = 1.25, SWIM_DEPTH = 1.3;
+/* would stepping to (x, z) climb the bare ground faster than a walkable slope?
+   Built surfaces — stairs, a pier, a roof — are always fine to step onto. */
+function steepUp(x, z, y0, hd) {
+  const t = world.heightAt(x, z);
+  if (t <= y0 + 0.02 + hd * SLOPE_MAX) return false;
+  return world.col.ground(x, z, y0) <= t + 0.01;
+}
+
 function updatePlayer(dt) {
   FX = effects(SAVE.inv, SAVE.time);
   for (const k in P.spellCd) P.spellCd[k] = Math.max(0, P.spellCd[k] - dt);
@@ -2854,6 +2865,7 @@ function updatePlayer(dt) {
   if (P.riding) { speed = (keys.ShiftLeft || keys.ShiftRight) ? 19 : 10; sprint = false; }
   if (P.atk) speed *= P.riding ? 0.7 : 0.25;
   if (P.drink > 0) speed *= 0.35;
+  if (P.swimming) speed *= 0.6;
   const accel = P.onGround ? 14 : 4;
 
   if (P.roll) {
@@ -2889,7 +2901,7 @@ function updatePlayer(dt) {
   }
 
   P.coyote = P.onGround ? 0.12 : Math.max(0, P.coyote - dt);
-  if (P.jumpBuf > 0 && P.coyote > 0 && act && (P.riding || spend(D.stamina.jump))) { P.vel.y = P.riding ? 12 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
+  if (P.jumpBuf > 0 && P.coyote > 0 && act && !P.steep && (P.riding || spend(D.stamina.jump))) { P.vel.y = P.swimming ? 9 : P.riding ? 12 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
   P.vel.y -= 28 * dt;
   // gliding: hold Space while falling and Torcain's coat catches the wind
   P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
@@ -2907,11 +2919,18 @@ function updatePlayer(dt) {
   }
 
   const wasGround = P.onGround;
-  const px0 = P.pos.x, pz0 = P.pos.z;
+  const px0 = P.pos.x, pz0 = P.pos.z, py0 = P.pos.y;
   P.pos.addScaledVector(P.vel, dt);
-  if (world.inBounds && !world.inBounds(P.pos.x, P.pos.z)) {   // the land itself says no: a sheer ridge, deep water, a thorn wall
+  if (world.inBounds && !world.inBounds(P.pos.x, P.pos.z) && !(world.swimOk && world.swimOk(P.pos.x, P.pos.z))) {   // the land itself says no: a sheer ridge, open sea, a thorn wall
     P.pos.x = px0; P.pos.z = pz0; P.vel.x *= -0.2; P.vel.z *= -0.2;
     if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', world.barrierLine ? world.barrierLine(P.pos.x, P.pos.z) : 'No way through here.', 2.4); }
+  }
+  // no walking (or hopping) straight up a cliff face: slide along it instead
+  const hd = Math.hypot(P.pos.x - px0, P.pos.z - pz0);
+  if (hd > 1e-4 && steepUp(P.pos.x, P.pos.z, py0, hd)) {
+    if (!steepUp(P.pos.x, pz0, py0, Math.abs(P.pos.x - px0))) P.pos.z = pz0;
+    else if (!steepUp(px0, P.pos.z, py0, Math.abs(P.pos.z - pz0))) P.pos.x = px0;
+    else { P.pos.x = px0; P.pos.z = pz0; }
   }
   world.col.resolve(P.pos, P.riding ? 0.95 : 0.45, P.riding ? 2.6 : 1.9);
   if (G.bossActive && boss) {
@@ -2925,8 +2944,36 @@ function updatePlayer(dt) {
   } else if (wasGround && P.vel.y <= 0 && P.pos.y - g < 0.45) { P.pos.y = g; P.vel.y = 0; P.onGround = true; }
   else P.onGround = false;
 
+  // swimming: deep water holds you up, head and shoulders clear of the surface
+  const wasSwim = P.swimming;
+  P.swimming = false;
+  if (world.water && g < world.water.level - SWIM_DEPTH - 0.05 && P.pos.y <= world.water.level - SWIM_DEPTH + 0.02 && world.water.depth(P.pos.x, P.pos.z) > SWIM_DEPTH) {
+    const lv = world.water.level;
+    if (!wasSwim) particles.burst(P.pos.x, lv, P.pos.z, P.vel.y < -6 ? 30 : 12, { color: 0xd8f4ff, speed: P.vel.y < -6 ? 5 : 2.5, size: 0.5, life: 0.7, gravity: 6 });
+    P.pos.y = lv - SWIM_DEPTH; if (P.vel.y < 0) P.vel.y = 0;
+    P.onGround = true; P.swimming = true;
+    if (P.roll) { P.roll = null; torcain.body.rotation.x = 0; }
+    if (Math.hypot(P.vel.x, P.vel.z) > 1 && Math.random() < 0.35) particles.emit(P.pos.x - P.vel.x * 0.05, lv + 0.05, P.pos.z - P.vel.z * 0.05, { vy: 0.6, color: 0xe8f8ff, size: 0.35, life: 0.6, speed: 0.8 });
+  }
+  if (wasSwim && !P.swimming && P.onGround) particles.burst(P.pos.x, P.pos.y + 0.2, P.pos.z, 8, { color: 0xd8f4ff, speed: 2, size: 0.35, life: 0.5, gravity: 6 });
+
+  // ground too steep to stand on: no jumping up it, and you slip back down
+  P.steep = false;
+  if (P.onGround && !P.swimming) {
+    const e = 0.6, gx = world.heightAt(P.pos.x + e, P.pos.z) - world.heightAt(P.pos.x - e, P.pos.z), gz = world.heightAt(P.pos.x, P.pos.z + e) - world.heightAt(P.pos.x, P.pos.z - e);
+    const sl = Math.hypot(gx, gz) / (2 * e);
+    if (sl > SLOPE_MAX + 0.1 && P.pos.y <= world.heightAt(P.pos.x, P.pos.z) + 0.05) {
+      P.steep = true;
+      const k = Math.min(6, (sl - SLOPE_MAX) * 5) * dt / Math.hypot(gx, gz), sx = P.pos.x - gx * k, sz = P.pos.z - gz * k;
+      if (!world.inBounds || world.inBounds(sx, sz) || (world.swimOk && world.swimOk(sx, sz))) {   // never slip out past the edge
+        P.pos.x = sx; P.pos.z = sz;
+        P.pos.y = Math.max(world.col.ground(P.pos.x, P.pos.z, P.pos.y), P.pos.y - 6 * dt);
+      }
+    }
+  }
+
   P.safeTimer -= dt;
-  if (P.onGround && P.safeTimer <= 0) {
+  if (P.onGround && !P.swimming && !P.steep && P.safeTimer <= 0) {
     const R = world.edgeRadius(P.pos.x, P.pos.z), rr = Math.hypot(P.pos.x, P.pos.z);
     const inHazard = world.hazards.some(h => Math.hypot(P.pos.x - h.x, P.pos.z - h.z) < h.r + 1);
     if (!inHazard && (rr < R - 6 || (Math.abs(P.pos.x) < 3 && P.pos.z > 150))) { P.lastSafe.copy(P.pos); P.safeTimer = 0.5; }

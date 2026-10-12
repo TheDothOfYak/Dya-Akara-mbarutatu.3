@@ -164,9 +164,14 @@ function inBounds(x, z) {
   if (Math.hypot(x - SPIRE.x, z - SPIRE.z) < 22) return false;
   return waterDepth(x, z) <= WADE;
 }
+/* deep water you can swim in: anywhere well inside the barrier ring */
+function swimOk(x, z) {
+  if (Math.hypot(x - SPIRE.x, z - SPIRE.z) < 22) return false;
+  return Math.hypot(x, z) < limitR(x, z) - 14 && waterDepth(x, z) > WADE;
+}
 function barrierLine(x, z) {
   if (Math.hypot(x - SPIRE.x, z - SPIRE.z) < 24) return 'The crag goes straight up. Only wings get up there.';
-  if (Math.hypot(x, z) <= limitR(x, z) - 3 && waterDepth(x, z) > WADE) return 'The water’s too deep to wade.';
+  if (Math.hypot(x, z) <= limitR(x, z) - 3 && waterDepth(x, z) > WADE) return 'Too close to the edge to swim out any further. Back to shore.';
   const a = Math.atan2(z, x), wC = lut(W_CH, a), wW = lut(W_CL, a);
   if (wC > 0.5) return 'The Rend drops away into nothing. No way across.';
   if (wW > 0.5) return 'The scarp is sheer. Nothing to climb, nowhere to go.';
@@ -996,7 +1001,7 @@ export function buildWorld(scene) {
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, falls,
     /* the open Reach */
-    inBounds, barrierLine,
+    inBounds, barrierLine, swimOk,
     water: { level: LEVEL, isWater: (x, z) => waterDepth(x, z) > SWIM, depth: waterDepth, mesh: waterMesh },
     zones: ZONES.map(z => ({ ...z })),
     albaliSpots: ALBALI.map(a => ({ x: a.x, z: a.z })),

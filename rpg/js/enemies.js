@@ -397,7 +397,12 @@ export function createEnemies(ctx) {
 
   function finishMove(e, dt, d, dx, dz) {
     const P = ctx.P, a = e.actor, T = e.T;
-    if (T.ai !== 'flyer') e.vel.y -= 30 * dt;
+    if (T.ai !== 'flyer') {
+      e.vel.y -= 30 * dt;
+      // land creatures stop at the water's edge rather than walking along the bottom
+      const W = ctx.world.water;
+      if (W) { const dn = W.depth(e.pos.x + e.vel.x * dt, e.pos.z + e.vel.z * dt); if (dn > 1.4 && dn > W.depth(e.pos.x, e.pos.z)) { e.vel.x = 0; e.vel.z = 0; } }
+    }
     e.pos.addScaledVector(e.vel, dt);
     for (const o of list) {
       if (o === e || o.dead || o.T.ai === 'flyer') continue;
@@ -478,7 +483,7 @@ export function createEnemies(ctx) {
     const a = e.actor;
     a.root.position.copy(e.pos);
     a.root.rotation.y = e.yaw;
-    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, diving: e.state === 'dive' });
+    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, diving: e.state === 'dive', airborne: e.alt > 0.6, windup: e.windup });
   }
 
   /* --------- Duskareth Vel --------- */

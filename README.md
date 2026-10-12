@@ -76,6 +76,8 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **Albali Aagac.** Oak-sized trees whose ripe fruit falls and, left alone, hatches into an Albali Byrd (tame in Xilia and Aakalay, Villtur on Leotik). Pick the fruit up before it hatches.
 
+**Swimming and steep ground.** Deep water no longer stops you: wade in and Torcain swims, head and shoulders above the surface, in every lake, river and lagoon, and a little way out to sea off Leotik. Only the far sea and water by the region's edge turn you back. Swimming is slower, there's no rolling in the water, and land creatures won't follow you in. Ground steeper than about 51° can't be walked or hopped up any more; you slide along it, and you slip off ground that steep if you stop on it. Built stairs, piers and roofs are unaffected.
+
 **Touch controls.** The RPG plays on phones and tablets, and the controls turn on at the first touch:
 - **Moving:** a floating joystick on the left; push it past the rim to run.
 - **Camera:** drag anywhere on the right to look around.
