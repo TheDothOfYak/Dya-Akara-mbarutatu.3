@@ -76,6 +76,14 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **Albali Aagac.** Oak-sized trees whose ripe fruit falls and, left alone, hatches into an Albali Byrd (tame in Xilia and Aakalay, Villtur on Leotik). Pick the fruit up before it hatches.
 
+**Touch controls.** The RPG plays on phones and tablets, and the controls turn on at the first touch:
+- **Moving:** a floating joystick on the left; push it past the rim to run.
+- **Camera:** drag anywhere on the right to look around.
+- **Buttons:** attack, jump/glide, dodge, Duat strike and interact. A row of Torcain's kit and tappable spell slots sit alongside. The top row opens pause, pack, skills, quests, map and the Rokarvac.
+- **Dialogue and menus:** tap to advance dialogue; every menu has tap-to-close.
+- **Dya'Akara:** ◀ ▶, Ready, 1–5, Throw and View buttons, or tap the field to throw.
+- **Kuni Byrd:** climb and dive with the jump and dodge buttons.
+
 **The Kuni Byrd (late game).** A Kuni Byrd nests on each region's highest perch. After Otlið, Woken falls, bring it three Albali fruit and it lets you ride. `B` calls it, `Space` climbs, `C` dives and `B` lands.
 
 **Removed:** Ember Root, Mirrordew and Stonefruit are gone from both games. Old saves are cleaned up on load. Skith grass is now just green grass with white tips.

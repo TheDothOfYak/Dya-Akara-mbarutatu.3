@@ -22,6 +22,7 @@ import { buildDomesticPunk, buildMalstiPunk, buildSkorThal } from './esik_land.j
 import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
 import { createWilds } from './wilds.js';
+import { initTouch } from './touch.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -265,10 +266,11 @@ document.addEventListener('mousedown', e => {
   if (e.target.closest && e.target.closest('#d-choices, #rpg')) return;
   if (G.mode === 'title' || overlayOpen()) return;
   if (G.mode === 'intro' || G.mode === 'trance') { skipCards(); return; }
-  if (!locked) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
+  if (!locked && !touch.on) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
   if (G.mode === 'dialog') { if (!(DLG && DLG.choices)) advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
   if (G.mode !== 'play' || G.paused) return;
+  if (touch.on) return;   // on a touch screen the buttons do the fighting
   if (dyaMatch) { if (e.button === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
   if (e.button === 0) { mouseL = true; pressAttack(); }
   if (e.button === 1) { e.preventDefault(); toggleLock(); }
@@ -277,7 +279,34 @@ document.addEventListener('mousedown', e => {
 document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; });
 document.addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('wheel', e => { CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
-function lockMouse() { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } }
+function lockMouse() { if (touch.on) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } }
+/* phones and tablets: a joystick, a look-drag and on-screen buttons (see touch.js) */
+$('spells').addEventListener('pointerdown', e => {   // tap a spell slot to cast it
+  const el = e.target.closest && e.target.closest('.ab'); if (!el || !touch.on) return;
+  const sp = SPELLS[el.id.replace('sp-', '')]; if (!sp || !SAVE.skills.spells[el.id.replace('sp-', '')]) return;
+  e.preventDefault(); e.stopPropagation(); onKey('Digit' + sp.key);
+});
+$('prompt').addEventListener('pointerdown', e => { if (!touch.on || G.mode !== 'play' || G.paused) return; e.preventDefault(); e.stopPropagation(); interact(); });
+const touch = initTouch({
+  keys, onKey: c => onKey(c), wake: () => { if (G.mode !== 'title') initAudio(); },
+  attack(down) { if (!down) { mouseL = false; return; } if (G.mode !== 'play' || G.paused) return; if (dyaMatch) { dyaMatch.throwAt(dyaAimPoint()); return; } mouseL = true; pressAttack(); },
+  duat() { if (G.mode === 'play' && !G.paused && !dyaMatch) duatStrike(); },
+  pause() { if (G.mode === 'play' || G.mode === 'dialog') openPause(); },
+  dyaThrow() { if (dyaMatch && G.mode === 'play' && !G.paused) dyaMatch.throwAt(dyaAimPoint()); },
+  tap() { if (dyaMatch && G.mode === 'play' && !G.paused) dyaMatch.throwAt(dyaAimPoint()); },
+  look(dx, dy) {
+    if (G.paused || (G.mode !== 'play' && G.mode !== 'dialog')) return;
+    const s = 0.0055 * OPT.sens;
+    CAM.yaw -= dx * s * (G.lock ? 0.25 : 1);
+    CAM.pitch = clamp(CAM.pitch + dy * s * (OPT.invert ? -1 : 1), -0.45, 1.25);
+  },
+  playing: () => G.mode === 'play' && !G.paused && !overlayOpen() && !(book && book.isOpen()),
+  state: () => ({
+    play: G.mode === 'play' && !G.paused && !overlayOpen() && !(book && book.isOpen()),
+    dya: !!dyaMatch, flying: !!P.flying, prompt: !$('prompt').classList.contains('hidden'),
+    sprengju: !!SAVE.inv.items.sprengju, kuni: !!F_.kuni, mount: !!mount, hlyst: canHlyst(),
+  }),
+});
 
 function onKey(code) {
   if (G.mode === 'intro' || G.mode === 'trance') { if (code === 'Space' || code === 'Enter' || code === 'Escape') skipCards(); return; }
@@ -2808,6 +2837,7 @@ function updatePlayer(dt) {
     if (keys.KeyS || keys.ArrowDown) iz -= 1;
     if (keys.KeyA || keys.ArrowLeft) ix -= 1;
     if (keys.KeyD || keys.ArrowRight) ix += 1;
+    if (touch.on) { ix += touch.move.x; iz += touch.move.y; }
     if (mouseL && !P.atk) pressAttack();
   }
   const f = camForward(), r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
@@ -3088,7 +3118,7 @@ function updateHUD() {
   const stk = (P.poison > 0 ? 'p' : '') + (P.para > 0 ? 'z' : '');
   if ($('status')._k !== stk) { $('status')._k = stk; $('status').innerHTML = (P.poison > 0 ? '<span class="st poison">POISONED</span>' : '') + (P.para > 0 ? '<span class="st para">PARALYSED</span>' : ''); }
   $('poisonfx').style.opacity = P.poison > 0 ? 0.8 : 0;
-  $('resume').classList.toggle('hidden', locked || G.paused || G.mode !== 'play' || overlayOpen() || !!(DLG && DLG.choices));
+  $('resume').classList.toggle('hidden', locked || touch.on || G.paused || G.mode !== 'play' || overlayOpen() || !!(DLG && DLG.choices));
   const pe = $('prompt'), pr = nearestPrompt();
   if (pr) { pe.innerHTML = `<kbd>E</kbd>${pr.label}`; pe.classList.remove('hidden'); } else pe.classList.add('hidden');
   // the lock reticle
@@ -3194,6 +3224,7 @@ function frame() {
   world.update(tt, dt, particles, camera.position);
   sky.update(tt, dt, camera.position);
   dn.update(frozen && G.mode !== 'title' ? 0 : dt);
+  touch.update(dt);
   G.night = dn.night;
   /* everyone's bioluminescence follows the dark (creatures handle their own in enemies.js / wilds.js) */
   if ((G.glowT = (G.glowT || 0) - dt) <= 0) {
