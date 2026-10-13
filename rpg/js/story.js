@@ -533,7 +533,7 @@ export const PROLOGUE = {
   ],
   top: [
     ['tale', 'From the top of the spire, the whole of Fyrsti’Vilag falls away, and the battle is right there past the north gate.'],
-    ['tale', 'The Angels burn white and gold. The Snillers are cold teal, a great gem between two curved horns and a shape behind it that will not sit still in the light.'],
+    ['tale', 'It is mostly light. The Angels are streaks of white and gold; the Snillers are cold teal and storm-grey, wind turning on itself. You catch a shape for a heartbeat — wings of light, a spinning funnel, one eye — and then it is only colour again.'],
     ['tale', 'Neither of them stays put. They blink in and out of the world — here, gone, there — and wherever they have been, the air keeps sparking.'],
     ['tanoc', 'The Ahoac are going out the north gate. They’re going to catch it. They’re actually going to catch it.'],
     ['tanoc', 'If I’m ever going to be one of them, I have to see it up close. Not from up here.'],
@@ -787,6 +787,8 @@ export const ROAD = {
     send: [
       ['buhkon', 'We’ll eat better if one of us hunts. Not me — I’m old and I’m comfortable.'],
       ['buhkon', 'There are Kofi Galta all through these woods. Bring one back. And don’t go further than you can still see the smoke.'],
+      ['tanoc', 'With the hatchet?'],
+      ['buhkon', 'With a hatchet you’ll be chasing Kofi till you’re grey. Take the fire-stone. A pebble’s quicker than any Kofi ever born.'],
     ],
     caught: [['tanoc', 'Got one! It’s — oh. It’s much smaller up close.']],
     reveal: [
@@ -865,14 +867,15 @@ export const ROAD = {
     cards: ['Day six.', 'The last of it: out of town by the little road west, over the river, and into the trees.'],
     obj: 'Take the forest path west out of Beuhk to the Carpenter’s',
     path: [
-      ['tale', 'The trees close over the road like a roof. Pine and cold green light, and the town noise gone all at once behind you.'],
+      ['tale', 'The trees close over the road like a roof — and then they are not trees any more but giants, trunks wider than a cart is long, going up and up into one roof of leaves that shuts the sky out entirely. Down here it is dim and blue-green, and the town noise is gone all at once behind you.'],
+      ['tale', 'And the wood has its own light. Seams of it run up the bark. Beads of it hang along the branches, specks of it among the leaves, far overhead like a second sky. The moss on the stones glows. So do the toadstools.'],
       ['tanoc', 'He said follow it to the top. …It’s a long way to the top.'],
     ],
     pathBarks: [
-      ['tanoc', 'Glowing toadstools. In the daytime. Or — no, they’re just pale. I bet they glow at night.'],
+      ['tanoc', 'Glowing toadstools. In the daytime! Well — it isn’t daytime, down here. It’s never daytime down here.'],
       ['tanoc', 'A brook! And a little bridge. Somebody looks after this path.'],
       ['tanoc', 'A carved stone, all moss. Something about the Eldi house. Eldi — that’s his name, isn’t it?'],
-      ['tanoc', 'The light’s getting brighter up ahead. The trees are thinning.'],
+      ['tanoc', 'Daylight, up ahead. Real daylight. The giants are thinning.'],
     ],
     crest: [
       'The trees open, and Tanoc stops dead at the top of the path.',
@@ -887,7 +890,7 @@ export const ROAD = {
     day1: 'Walk north with the Carpenter to the hedge-oak camp',
     stone: 'Find the fire-stone’s trigger',
     pebble: 'Pick up a pebble by the fire',
-    hunt: 'Hunt a Kofi Galta in the forest — stay in sight of the smoke',
+    hunt: 'Hunt a Kofi Galta with the fire-stone — stay in sight of the smoke',
     back: 'Bring it back to the camp',
     day4: 'Cross the mountain pass',
     cart: 'Find the family’s cart wheel in the field',

@@ -86,6 +86,25 @@ export function glowTexture() {
   return GLOW;
 }
 
+/* a soft sheet of mist: no glow, no hard centre — it greys the view rather than lighting it */
+let MIST = null;
+export function mistSprite(color = 0xe8eef4, w = 30, h = 9, opacity = 0.35) {
+  if (!MIST) {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    for (let i = 0; i < 9; i++) {   // a few overlapping puffs, so it reads as a cloud and not a disc
+      const x = 34 + Math.random() * 60, y = 50 + Math.random() * 28, r = 26 + Math.random() * 22;
+      const grd = g.createRadialGradient(x, y, 0, x, y, r);
+      grd.addColorStop(0, 'rgba(255,255,255,0.22)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+    }
+    MIST = new THREE.CanvasTexture(c); MIST.colorSpace = THREE.SRGBColorSpace;
+  }
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: MIST, color, transparent: true, opacity, depthWrite: false }));
+  s.scale.set(w, h, 1); s.userData.noOutline = true;
+  return s;
+}
+
 export function glowSprite(color, size = 1, opacity = 1) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({
     map: glowTexture(), color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending,

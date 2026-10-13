@@ -10,7 +10,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
-import { Particles, glowSprite, toon, addOutline, outlineAll } from './gfx.js';
+import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { buildSky, SUN_DIR } from './sky.js';
 import { createDayNight } from './daynight.js';
 import { buildEldiShip } from './ship.js';
@@ -28,6 +28,7 @@ import { initTouch } from './touch.js';
 import { createSunear } from './sunear.js';
 import { createVelki, buildAngel, buildSniller } from './velki.js';
 import { createRoad } from './road.js';
+import { createCine } from './cine.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -106,6 +107,7 @@ $('game').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = REGION === 'leotik' ? new THREE.Fog(0x4a5a58, 70, 650) : REGION === 'xilia' ? new THREE.Fog(0xf6c89a, 160, 1200) : REGION === 'property' ? new THREE.Fog(0xc8dcf0, 520, 4600) : new THREE.Fog(0xf2b88e, 140, 1100);
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 12000);
+const mainCine = createCine(camera);   // the moments you only watch, out in the regions themselves
 
 const hemi = REGION === 'leotik' ? new THREE.HemisphereLight(0x9ab8b0, 0x3a4a30, 1.35) : new THREE.HemisphereLight(0xb8d0ff, 0xc0804e, 1.25);
 scene.add(hemi);
@@ -297,7 +299,7 @@ document.addEventListener('mousedown', e => {
   if (G.mode === 'title' || overlayOpen()) return;
   if (G.mode === 'intro' || G.mode === 'trance') { skipCards(); return; }
   if (!locked && !touch.on) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
-  if (G.mode === 'dialog') { if (!(DLG && DLG.choices)) advanceDialog(); return; }
+  if (G.mode === 'dialog') { if (DLG && DLG.choices) pickChoice(DLG.sel); else advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
   if (G.mode !== 'play' || G.paused) return;
   if (VK) { if (e.button === 0 && VK.attack && !touch.on) VK.attack(); return; }
@@ -342,7 +344,13 @@ const touch = initTouch({
 function onKey(code) {
   if (G.mode === 'intro' || G.mode === 'trance') { if (code === 'Space' || code === 'Enter' || code === 'Escape') skipCards(); return; }
   if (G.mode === 'dialog') {
-    if (DLG && DLG.choices) { const n = parseInt(code.replace('Digit', ''), 10); if (n >= 1 && n <= DLG.choices.length) pickChoice(n - 1); if (code === 'Escape') pickChoice(DLG.choices.length - 1); return; }
+    if (DLG && DLG.choices) {
+      const n = parseInt(code.replace('Digit', ''), 10); if (n >= 1 && n <= DLG.choices.length) { pickChoice(n - 1); return; }
+      if (code === 'KeyW' || code === 'ArrowUp') { markChoice(DLG.sel - 1); return; }
+      if (code === 'KeyS' || code === 'ArrowDown') { markChoice(DLG.sel + 1); return; }
+      if (code === 'Space' || code === 'Enter' || code === 'KeyE') { pickChoice(DLG.sel); return; }
+      if (code === 'Escape') pickChoice(DLG.choices.length - 1); return;
+    }
     if (code === 'KeyE' || code === 'Space' || code === 'Enter') advanceDialog(); return;
   }
   if (book && book.isOpen()) { if (code === 'Escape' || code === 'KeyI' || code === 'KeyK' || code === 'KeyJ' || code === 'KeyM' || code === 'Tab') book.close(); return; }
@@ -2016,6 +2024,7 @@ function setObjective() {
    ================================================================ */
 let DLG = null;
 function dialog(lines, onDone) {
+  barkTimer = 0; $('bark').style.opacity = 0;   // a bark never talks over a conversation
   if (young() || (!phorusWith() && F.pos.distanceTo(P.pos) > 20)) lines = lines.map(l => l[0] === 'phorus' ? ['tale', l[1]] : l);
   DLG = { lines, i: 0, chars: 0, onDone, tick: 0 };
   G.mode = 'dialog'; P.atk = null;
@@ -2118,7 +2127,19 @@ function nextCard() {
   setTimeout(() => p.classList.add('show'), 450);
   cardState.timer = cardState.each / 1000;
 }
-function skipCards() { if (cardState) nextCard(); }
+/* the words over a moving picture instead of a black card: a slow drift around something worth looking at */
+function cineCards(lines, each, focus, done, o = {}) {
+  G.mode = 'intro';
+  const f = focus.clone(), R = o.r || 9, h = o.h || 2.4, a0 = o.a ?? (P.yaw + Math.PI * 0.8);
+  mainCine.play(lines.map((line, i) => {
+    const a = a0 + i * (o.step || 1.1), wide = i % 2 ? (o.wide || 1.7) : 1;
+    return { dur: each / 1000 + 1.4, caption: line, cam: k => {
+      const aa = a + k * 0.32, r = R * wide * (1.15 - 0.2 * k);
+      return { p: V3(f.x + Math.sin(aa) * r, f.y + h * wide + (1 - k) * 1.2, f.z + Math.cos(aa) * r), l: V3(f.x, f.y + (o.look || 1.3), f.z) };
+    } };
+  }), done);
+}
+function skipCards() { if (cardState) nextCard(); else if (VK && VK.skip) VK.skip(); else if (mainCine.active) mainCine.skip(); }
 
 const dmgLayer = $('dmg');
 const nums = [];
@@ -2364,10 +2385,18 @@ function ask(who, text, options) {
   options.forEach((o, i) => {
     const b = document.createElement('button'); b.innerHTML = `<kbd>${i + 1}</kbd>${o.label}`;
     b.onclick = ev => { ev.stopPropagation(); pickChoice(i); };
+    b.onmouseenter = () => markChoice(i);
     box.appendChild(b);
   });
+  DLG.sel = 0; markChoice(0);
   $('d-next').style.display = 'none';
   if (document.pointerLockElement) document.exitPointerLock();
+}
+/* W / S (or the arrows) walk the highlight; Space, Enter, E or a click takes it */
+function markChoice(i) {
+  if (!DLG || !DLG.choices) return;
+  const n = DLG.choices.length; DLG.sel = ((i % n) + n) % n;
+  [...$('d-choices').children].forEach((b, j) => b.classList.toggle('sel', j === DLG.sel));
 }
 function pickChoice(i) {
   const o = DLG && DLG.choices && DLG.choices[i];
@@ -3104,6 +3133,7 @@ function updateShurgrEdan(dt) {
 /* ---------------- the Sunear'Zikhron: the Waves of Memory pass over now and then ---------------- */
 const sunear = createSunear({ scene, particles, world, region: REGION });
 const STORM_FOG = new THREE.Color(0x8a7aa8), STORM_SKY = new THREE.Color(0xc8b4ff);
+const DEEP_FOG = new THREE.Color(0x0c2224), DEEP_SKY = new THREE.Color(0x5ac8b8), DEEP_GND = new THREE.Color(0x1a3a2a);
 if (SAVE.sunearAt == null) SAVE.sunearAt = (SAVE.time || 0) + 420 + Math.random() * 300;
 const pick1 = a => a[Math.floor(Math.random() * a.length)];
 function stormMayCome() {
@@ -3204,9 +3234,10 @@ const passes = (world.passes || []).map(ps => {
     world.col.add(b.x, b.z, 0.25, 0.25, 0, b.y - 1, b.y + 3);
   }
   // mist where the road tops the ridge and runs on out of sight
-  for (let k = 0; k < 7; k++) {
-    const m = at(ps.trigger + 6 + k * 5, (Math.random() - 0.5) * ps.w * 1.4), g = glowSprite(0xf2ece0, 16 + Math.random() * 8, 0.32);
-    g.position.set(m.x, m.y + 3 + Math.random() * 4, m.z); g.material.fog = false; grp.add(g);
+  // (soft grey sheets lying low over the stones; it used to be glow sprites, which read as floating orbs of light)
+  for (let k = 0; k < 14; k++) {
+    const m = at(ps.trigger - 6 + k * 3.5, (Math.random() - 0.5) * ps.w * 2.2), g = mistSprite(0xe6e8ea, 22 + Math.random() * 18, 6 + Math.random() * 5, 0.42);
+    g.position.set(m.x, m.y + 1.6 + Math.random() * 2.5, m.z); grp.add(g);
   }
   // a closed road is blocked by an old rockfall
   if (!open) for (let k = 0; k < 9; k++) {
@@ -3263,14 +3294,14 @@ function takeExit(ex) {
 function takePass(ps) {
   G.mode = 'trance'; P.vel.set(0, 0, 0);
   if (document.pointerLockElement) document.exitPointerLock();
-  fade(0.92, 0.9);
+  fade(0.18, 0.9);   // not a black card: the camera pulls away up the pass while the words come
   const cards = (PASS_CARDS[ps.to] || (() => [ps.name + '.']))(!!P.riding);
   SAVE.lanternBy = SAVE.lanternBy || {}; SAVE.lanternBy[REGION] = SAVE.lantern;   // each region remembers where you last rested
   SAVE.region = ps.to; SAVE.lantern = SAVE.lanternBy[ps.to] || null;
   SAVE.passIn = { id: ps.toPass, ride: !!P.riding };
   persist(); CLOUD.flush();
   try { sessionStorage.setItem('torcain-boot', 'pass'); } catch (e) { /* ignore */ }
-  playCards(cards, 3600, () => { fade(1, 0.4); setTimeout(() => location.reload(), 450); });
+  cineCards(cards, 3600, P.pos, () => { fade(1, 0.4); setTimeout(() => location.reload(), 450); }, { r: 14, h: 6, look: 2, step: 0.7 });
 }
 /* coming in over a pass from another region: stand at the top of the road, facing into the land */
 function arriveByPass() {
@@ -3886,7 +3917,7 @@ function frame() {
         if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
       }
     } else if (G.mode === 'intro') {
-      updateIntroCamera(dt);
+      if (!mainCine.update(dt)) updateIntroCamera(dt);
       updatePhorus(dt);
       torcain.animate(dt, { speed: 0, onGround: true, t: G.t });
       torcain.root.position.copy(P.pos); torcain.root.rotation.y = P.yaw;
@@ -3906,6 +3937,19 @@ function frame() {
   sky.update(tt, dt, camera.position);
   dn.update(frozen && G.mode !== 'title' ? 0 : dt);
   if (G.mode !== 'title') updateStorm(frozen ? 0 : dt);
+  // under the deepwood's roof the day goes dim and blue-green, and the wood's own light takes over
+  {
+    const want = world.shadeAt && !interiors.inside ? world.shadeAt(camera.position.x, camera.position.z) : 0;
+    G.shade = (G.shade || 0) + (want - (G.shade || 0)) * Math.min(1, Math.max(dt, 0.03) * 1.5);
+    const k = G.shade;
+    if (k > 0.005) {
+      if (scene.fog) { scene.fog.color.lerp(DEEP_FOG, k); scene.fog.near = lerp(scene.fog.near, 14, k); scene.fog.far = lerp(scene.fog.far, 320, k); }
+      sun.intensity *= 1 - 0.9 * k; rim.intensity *= 1 - 0.6 * k;
+      hemi.intensity *= 1 - 0.62 * k; hemi.color.lerp(DEEP_SKY, k * 0.8); hemi.groundColor.lerp(DEEP_GND, k * 0.8);
+      renderer.toneMappingExposure *= 1 - 0.38 * k;
+      bloom.strength += 0.5 * k; bloom.threshold -= 0.18 * k;
+    }
+  }
   touch.update(dt);
   G.night = dn.night;
   /* everyone's bioluminescence follows the dark (creatures handle their own in enemies.js / wilds.js) */
@@ -3965,7 +4009,7 @@ function startVelki() {
     whiteness: v => { whiteout.style.transition = ''; whiteout.style.opacity = v; },
     onCaught: () => leaveVelki(),
   });
-  playCards(STORY.PROLOGUE.cards, 4600, () => {
+  VK.intro(() => {
     G.mode = 'play';
     showLocation('Fyrsti’Vilag', 'Velki · the last Skyfall · 307A');
     lockMouse();
@@ -4024,6 +4068,7 @@ function startRoad(at) {
     bark: (w, t, d) => bark(w, t, d), hint: t => hint(t), toast: (t, d) => toast(t, d),
     cards: (lines, ms, cb) => { G.mode = 'intro'; playCards(lines, ms, cb); },
     play: () => { G.mode = 'play'; lockMouse(); },
+    cutscene: on => { G.mode = on ? 'intro' : 'play'; if (!on) lockMouse(); else if (document.pointerLockElement) document.exitPointerLock(); },
     location: (a, b) => showLocation(a, b),
     objective: (head, text, h, pips, on) => proObjective(head, text, h, pips, on),
     blur: px => { canvas.style.transition = px ? 'filter .4s' : 'filter 1.6s'; canvas.style.filter = `blur(${px}px)`; },
@@ -4069,7 +4114,7 @@ function arriveBeuhk() {
   fade(0, 1.4);
   const R = STORY.ROAD;
   if (st === 'rest') {
-    playCards([R.day5.cards[1]], 2600, () => {
+    cineCards(R.day5.cards, 2600, P.pos, () => {
       enterPlay(); showLocation(...R.day5.loc);
       dialog(R.day5.rest, () => { setObjective(); hint('Walk through town near people — and listen.'); });
     });
@@ -4105,15 +4150,24 @@ function pathTick() {
   if (G.pathSaid < W.length && prog > (G.pathSaid + 1) / (W.length + 1)) { const [w, l] = W[G.pathSaid]; bark(w, l, 4.5); G.pathSaid++; }
   if (P.pos.x < world.crestPoint.x + 4) {
     F_.bk = 'crest'; G.mode = 'intro'; P.vel.set(0, 0, 0);
-    // stand at the top and look: the camera swings out over the whole of it
+    // stand at the top and look: the camera leaves him at the gateposts and flies out over the whole of it
     CAM.yaw = Math.PI / 2; CAM.pitch = 0.08; CAM.wantDist = 9;
-    playCards(STORY.ROAD.day6.crest, 4200, () => { BK = null; F_.pro = 'done'; persist(); startMorning(); });
+    P.yaw = -Math.PI / 2; torcain.root.rotation.y = P.yaw;
+    const C = world.crestPoint, H = world.house, hy = x => world.heightAt(x.x, x.z), L = STORY.ROAD.day6.crest;
+    const house = V3(H.x, hy(H) + 6, H.z), lake = V3(-660, 0, 40);
+    mainCine.play([
+      { dur: 5.5, from: { p: [C.x + 7, C.y + 2.2, C.z + 3.5], l: [C.x - 40, C.y - 2, C.z - 2] }, to: { p: [C.x + 4, C.y + 2.6, C.z + 2.2], l: [C.x - 60, C.y - 6, C.z] }, caption: L[0] },
+      { dur: 8, ease: 'inout', from: { p: [C.x - 2, C.y + 4, C.z], l: [C.x - 120, C.y - 20, C.z] }, to: { p: [C.x - 120, C.y + 70, C.z + 30], l: [lake.x, 0, lake.z] }, caption: L[1] },
+      { dur: 8, cam: k => { const a = -0.6 + k * 1.5, R = 95 - k * 25; return { p: V3(H.x + Math.cos(a) * R, house.y + 38 - k * 14, H.z + Math.sin(a) * R), l: V3(H.x - 10 + k * 20, house.y - 2, H.z + 10) }; }, caption: L[2] },
+      { dur: 8, from: { p: [H.x - 80, house.y + 120, H.z - 220], l: [H.x - 300, 60, 2600] }, to: { p: [H.x - 200, house.y + 160, H.z - 120], l: [-500, 180, 2900] }, fov: 55, fovTo: 48, caption: L[3] },
+      { dur: 5.5, from: { p: [H.x + 46, house.y + 8, H.z + 30], l: [H.x, house.y - 2, H.z] }, to: { p: [H.x + 34, house.y + 4, H.z + 22], l: [H.x, house.y - 3, H.z] }, caption: L[4] },
+    ], () => { BK = null; F_.pro = 'done'; persist(); startMorning(); });
   }
 }
 function startDay6() {
   const bk = npcs.find(n => n.def.id === 'buhkon');
   if (bk) { bk.pos.copy(bk.home); bk.actor.root.position.copy(bk.home); }   // he went on ahead to open up the house
-  playCards(STORY.ROAD.day6.cards, 3200, () => {
+  cineCards(STORY.ROAD.day6.cards, 3200, P.pos, () => {
     enterPlay(); showLocation('The little road', 'Day six · out of Beuhk, west and up');
     dialog([['buhkon', 'I’ll go ahead and open the house up. The little road west, over the bridge, and into the trees — the forest path. Follow it to the top. You can’t miss it.']], () => setObjective());
   });
@@ -4176,11 +4230,11 @@ function startMorning() {
   dn.setHour(7.5);
   G.mode = 'intro'; introT = 0; G.t = 0;
   fade(0, 1.4);
-  playCards([STORY.YOUNG.title + '.', 'The Carpenter’s house. The next morning.'], 3200, () => {
+  cineCards([STORY.YOUNG.title + '.', 'The Carpenter’s house. The next morning.'], 3200, P.pos, () => {
     enterPlay();
     showLocation('The Big House', 'Chapter I · the Carpenter’s apprentice');
     dialog(STORY.YOUNG.morning, () => { setObjective(); hint('Follow the ◆ on your compass.'); });
-  });
+  }, interiors.inside ? { r: 3, h: 0.9, wide: 1.25, look: 0.9 } : {});
 }
 function youngSet(q) { F_.yq = q; persist(); setObjective(); }
 function youngTakeRelic() {

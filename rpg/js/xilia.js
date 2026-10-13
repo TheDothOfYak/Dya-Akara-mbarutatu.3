@@ -492,7 +492,7 @@ export function buildXilia(scene) {
     if (keepOut(x, z) || Math.hypot(x - SQUARE.x, z - SQUARE.z) < 70) continue;
     const s = 0.4 + Math.pow(rng(), 3) * 2.4;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(['#b8a080', '#a89070', '#c8b090']));
-    if (s > 1.2) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
+    if (s > 0.6) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
   }
 
   /* ---------- the Ember Grove: a young fire tree and its seed ---------- */
@@ -592,7 +592,7 @@ export function buildXilia(scene) {
     if (!scree && wrng() < 0.55) continue;
     const s = scree ? 2 + wrng() * 6 : 0.5 + Math.pow(wrng(), 3) * 3;
     wRocks.put(x, g + s * 0.25, z, s * (1 + wrng() * 0.5), s * 0.75, s, wrng() * 3, wrng() * 3, wrng() * 3, ['#9a9284', '#8a8478', '#a8a090', '#7e7a74'][Math.floor(wrng() * 4)]);
-    if (s > 1.2 && inBounds(x, z)) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
+    if (s > 0.6 && inBounds(x, z)) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
   }
   wTrunks.done(); wCones.done(); wCrowns.done(); wRocks.done();
 

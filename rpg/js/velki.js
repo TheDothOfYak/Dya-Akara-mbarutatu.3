@@ -14,161 +14,15 @@ import { toon, ramp, addOutline, outlineAll, glowSprite, Particles } from './gfx
 import { buildEikar } from './actors.js';
 import { clamp, damp, dampAngle, smooth, mulberry32 } from './util.js';
 import * as STORY from './story.js';
+import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
+import { createCine } from './cine.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
 
-/* ---------------- the folk of the sky, for here and for Xikia ---------------- */
-/* a Xwi: tall, white and gold, burning, with wings of light */
-export function buildAngel(s = 1) {
-  const g = new THREE.Group();
-  const robeMat = toon(0xfff4dc, { emissive: 0xffd890, emissiveIntensity: 0.55 });
-  const robe = new THREE.Mesh(new THREE.ConeGeometry(0.7, 3.2, 12, 1, true), robeMat); robe.position.y = 1.6; addOutline(robe, 0.03, 0x6a4a10); g.add(robe);
-  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), robeMat); chest.scale.set(1, 1.2, 0.8); chest.position.y = 3.05; g.add(chest);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), toon(0xffe6a0, { emissive: 0xffc860, emissiveIntensity: 0.9 })); head.position.y = 3.75; g.add(head);
-  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 24), new THREE.MeshBasicMaterial({ color: 0xffe08a })); halo.rotation.x = Math.PI / 2; halo.position.y = 4.2; g.add(halo);
-  const wingMat = new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
-  const wings = [];
-  for (const side of [-1, 1]) {
-    const sh = new THREE.Shape();
-    sh.moveTo(0, 0); sh.bezierCurveTo(1.2, 1.4, 3.2, 2.2, 4.6, 1.6); sh.lineTo(3.9, 0.8); sh.lineTo(4.3, 0.2); sh.lineTo(3.3, -0.4); sh.lineTo(3.6, -1.0); sh.lineTo(2.4, -1.2); sh.lineTo(2.5, -1.9); sh.bezierCurveTo(1.4, -1.6, 0.5, -0.8, 0, 0);
-    const w = new THREE.Mesh(new THREE.ShapeGeometry(sh, 10), wingMat);
-    w.scale.x = side; const piv = new THREE.Group(); piv.position.set(side * 0.25, 3.1, -0.2); piv.add(w); g.add(piv); wings.push(piv);
-  }
-  const glow = glowSprite(0xfff0c0, 9, 0.6); glow.position.y = 2.6; g.add(glow);
-  g.scale.setScalar(s);
-  g.userData = { wings, glow, halo, ph: Math.random() * TAU };
-  g.userData.tick = t => {
-    const f = Math.sin(t * 3 + g.userData.ph);
-    wings[0].rotation.y = -0.35 - f * 0.35; wings[1].rotation.y = 0.35 + f * 0.35;
-    halo.rotation.z = t; glow.material.opacity = 0.5 + Math.sin(t * 7 + g.userData.ph) * 0.12;
-  };
-  return g;
-}
-
-/* a Sniller: a storm-genie. Below the waist it is a tornado, a spinning funnel of grey storm that
-   never touches the ground; above, a torso of vine-like tendrils that swoop up and out into arms —
-   and the arms end in more tendrils, never hands. One head, one cold teal eye. */
-let snillerSwirl = null;
-function swirlTexture() {
-  if (snillerSwirl) return snillerSwirl;
-  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256; const g = cv.getContext('2d');
-  g.fillStyle = '#8fa2a8'; g.fillRect(0, 0, 128, 256);
-  for (let i = 0; i < 46; i++) {   // slanted storm streaks, darker and lighter
-    const y = Math.random() * 256, w = 20 + Math.random() * 70, h = 2 + Math.random() * 6;
-    g.fillStyle = Math.random() < 0.5 ? 'rgba(40,62,70,0.7)' : 'rgba(220,245,245,0.55)';
-    g.save(); g.translate(Math.random() * 128, y); g.rotate(-0.42); g.fillRect(-w / 2, -h / 2, w, h); g.restore();
-    g.save(); g.translate(Math.random() * 128 - 128, y); g.rotate(-0.42); g.fillRect(-w / 2, -h / 2, w, h); g.restore();
-  }
-  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 1); t.colorSpace = THREE.SRGBColorSpace;
-  snillerSwirl = t; return t;
-}
-function tendril(points, r0, r1, mat) {
-  const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
-  const geo = new THREE.TubeGeometry(curve, 18, 1, 6, false);
-  // taper the tube from r0 at its root to r1 at its tip
-  const pos = geo.attributes.position, n = 19, ring = 7, c = new THREE.Vector3();
-  for (let i = 0; i < n; i++) {
-    const k = i / (n - 1), r = r0 + (r1 - r0) * k; curve.getPointAt(k, c);
-    for (let j = 0; j < ring; j++) { const v = i * ring + j; pos.setXYZ(v, c.x + (pos.getX(v) - c.x) * r, c.y + (pos.getY(v) - c.y) * r, c.z + (pos.getZ(v) - c.z) * r); }
-  }
-  geo.computeVertexNormals();
-  return new THREE.Mesh(geo, mat);
-}
-export function buildSniller(s = 1) {
-  const g = new THREE.Group();
-  const storm = toon(0x4a5e66, { emissive: 0x0e2a30, emissiveIntensity: 0.35 });
-  const vine = toon(0x3a5a58, { emissive: 0x0a3a3a, emissiveIntensity: 0.45 });
-  const teal = 0x6af0e0;
-
-  /* the tornado: a funnel narrow at the tip, wide at the waist, with ragged rings of wind round it */
-  const fun = [];
-  for (let i = 0; i <= 12; i++) { const k = i / 12; fun.push(new THREE.Vector2(0.12 + Math.pow(k, 1.7) * 1.05, k * 2.6)); }
-  const funnelMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: swirlTexture(), gradientMap: ramp(), transparent: true, opacity: 0.82, side: THREE.DoubleSide, emissive: 0x0e3036, emissiveIntensity: 0.4 });
-  const funnel = new THREE.Mesh(new THREE.LatheGeometry(fun, 20), funnelMat); funnel.position.y = -0.4; g.add(funnel);
-  const inner = new THREE.Mesh(new THREE.LatheGeometry(fun.map(v => new THREE.Vector2(v.x * 0.7, v.y)), 14), new THREE.MeshBasicMaterial({ color: 0x2ad0c8, transparent: true, opacity: 0.25, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-  inner.position.y = -0.4; g.add(inner);
-  const rings = [];
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xcfeeee, transparent: true, opacity: 0.45, depthWrite: false });
-  for (let i = 0; i < 6; i++) {
-    const k = (i + 0.5) / 6, rr = 0.2 + Math.pow(k, 1.7) * 1.15;
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.035 + k * 0.03, 4, 18, Math.PI * (1.1 + Math.random() * 0.6)), ringMat);
-    ring.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.25; ring.position.y = -0.4 + k * 2.6; g.add(ring); rings.push(ring);
-  }
-  const debris = [];   // grit caught in the wind
-  for (let i = 0; i < 9; i++) { const d = new THREE.Mesh(new THREE.DodecahedronGeometry(0.06 + Math.random() * 0.06, 0), storm); d.userData = { a: Math.random() * TAU, y: Math.random() * 2.2, r: 0.4 + Math.random() * 0.8, sp: 2 + Math.random() * 3 }; g.add(d); debris.push(d); }
-
-  /* the torso: tendrils rise out of the storm at the waist, braid, and swoop out to the arms */
-  const torso = new THREE.Group(); torso.position.y = 2.1; g.add(torso);
-  const core = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), vine); core.scale.set(1.1, 1.3, 0.7); core.position.y = 0.2; torso.add(core);
-  for (let i = 0; i < 12; i++) {   // the braided chest, wide and flat: vines rise out of the storm and swoop to the shoulders
-    const side = i % 2 ? 1 : -1, o = (Math.floor(i / 2) / 5 - 0.5) * 0.6, z = ((i * 7) % 3 - 1) * 0.14;
-    const m = tendril([[o * 0.5, -0.75, z], [o * 0.6, 0.0, z + 0.1], [o + side * 0.2, 0.6, z + 0.06], [side * (0.55 + Math.abs(o) * 0.4), 1.08, z], [side * 0.95, 1.22, z - 0.05]], 0.12, 0.07, vine);
-    addOutline(m, 0.018, 0x061414); torso.add(m);
-  }
-  for (let k = 0; k < 5; k++) {   // the neck: a few vines climbing to the head
-    const a = k / 5 * TAU;
-    torso.add(tendril([[Math.cos(a) * 0.22, 0.9, Math.sin(a) * 0.12], [Math.cos(a + 0.8) * 0.12, 1.3, Math.sin(a + 0.8) * 0.1], [Math.cos(a + 1.6) * 0.1, 1.6, Math.sin(a + 1.6) * 0.08]], 0.07, 0.05, vine));
-  }
-  // the storm boils over at the waist, where the funnel ends and the vines begin
-  const puffs = [];
-  const puffMat = new THREE.MeshToonMaterial({ color: 0x7a8c92, gradientMap: ramp(), transparent: true, opacity: 0.88, emissive: 0x0e2a30, emissiveIntensity: 0.3 });
-  for (let k = 0; k < 9; k++) {
-    const a = k / 9 * TAU, pf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25 + (k % 3) * 0.06, 1), puffMat);
-    pf.userData.a = a; pf.position.set(Math.cos(a) * 0.95, -0.15 + (k % 2) * 0.12, Math.sin(a) * 0.95); torso.add(pf); puffs.push(pf);
-  }
-  const arms = [];
-  for (const side of [-1, 1]) {
-    const arm = new THREE.Group(); arm.position.set(side * 0.95, 1.2, 0); torso.add(arm); arms.push(arm);
-    // the upper arm: three vines twisted together, sweeping out and down
-    for (let k = 0; k < 3; k++) {
-      const tw = (k - 1) * 0.08;
-      const m = tendril([[0, 0, tw], [side * 0.5, -0.05 + tw, 0.1], [side * 1.0, -0.35, -tw], [side * 1.35, -0.75 + tw, 0.05]], 0.1, 0.07, vine);
-      addOutline(m, 0.02, 0x061414); arm.add(m);
-    }
-    // no hand: the arm frays into a spray of loose tendrils
-    const fray = new THREE.Group(); fray.position.set(side * 1.35, -0.75, 0.05); arm.add(fray);
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6 - 0.5) * 1.6, len = 0.8 + Math.random() * 0.7;
-      const m = tendril([[0, 0, 0], [side * 0.3, -0.25, Math.sin(a) * 0.2], [side * (0.45 + len * 0.3), -0.55 - len * 0.3, Math.sin(a) * 0.5], [side * (0.5 + len * 0.45), -0.7 - len * 0.6, Math.sin(a) * 0.75 + 0.1]], 0.06, 0.012, vine);
-      fray.add(m);
-    }
-    arm.userData.fray = fray;
-  }
-  // insubstantial armour: a faint plate of cold light on each shoulder
-  for (const side of [-1, 1]) {
-    const plate = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 6, 0, TAU, 0, Math.PI / 2.4), new THREE.MeshBasicMaterial({ color: teal, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }));
-    plate.position.set(side * 0.85, 1.28, 0); plate.rotation.z = -side * 0.6; torso.add(plate);
-  }
-
-  /* one head, and one eye */
-  const head = new THREE.Group(); head.position.y = 1.75; torso.add(head);
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), vine); skull.scale.set(0.95, 1.15, 0.9); addOutline(skull, 0.03, 0x061414); head.add(skull);
-  for (let k = 0; k < 5; k++) {   // a few tendrils trailing back off the crown
-    const a = (k / 4 - 0.5) * 1.4;
-    head.add(tendril([[Math.sin(a) * 0.2, 0.3, -0.1], [Math.sin(a) * 0.35, 0.55, -0.45], [Math.sin(a) * 0.5, 0.45, -0.95], [Math.sin(a) * 0.6, 0.15, -1.35]], 0.07, 0.015, vine));
-  }
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), new THREE.MeshBasicMaterial({ color: 0xd8fffa })); eye.scale.set(1.25, 0.8, 0.5); eye.position.set(0, 0.06, 0.37); head.add(eye);
-  const eyeGlow = glowSprite(teal, 1.4, 0.85); eyeGlow.position.copy(eye.position); head.add(eyeGlow);
-
-  const glow = glowSprite(0x5af0e0, 7, 0.32); glow.position.y = 2.6; g.add(glow);
-  g.scale.setScalar(s);
-  // the Sniller's own amulet face: kept on userData.gem for anything that still flashes it
-  g.userData = { gem: eye, body: funnel, tendrils: arms, glow, ph: Math.random() * TAU };
-  g.userData.tick = t => {
-    const ph = g.userData.ph;
-    funnelMat.map.offset.x = -t * 1.6; funnel.rotation.y = t * 0.6; inner.rotation.y = -t * 2.2;
-    rings.forEach((r, i) => { r.rotation.z = t * (3 + i * 0.7); r.position.x = Math.sin(t * 3 + i) * 0.06 * i; });
-    debris.forEach(d => { const u = d.userData; u.a += u.sp * 0.016; d.position.set(Math.cos(u.a) * u.r, -0.2 + u.y + Math.sin(t + u.a) * 0.2, Math.sin(u.a) * u.r); });
-    funnel.position.x = Math.sin(t * 1.7 + ph) * 0.12; funnel.position.z = Math.cos(t * 1.3 + ph) * 0.12;
-    torso.position.y = 2.1 + Math.sin(t * 1.4 + ph) * 0.1;
-    arms.forEach((a, i) => { const sd = i ? 1 : -1; a.rotation.z = sd * (Math.sin(t * 1.1 + ph + i) * 0.18); a.rotation.y = Math.sin(t * 0.8 + i * 2) * 0.2; a.userData.fray.rotation.x = Math.sin(t * 2.3 + i) * 0.35; });
-    head.rotation.y = Math.sin(t * 0.6 + ph) * 0.3;
-    puffs.forEach((pf, k) => { const a = pf.userData.a + t * 1.8; pf.position.x = Math.cos(a) * 0.95; pf.position.z = Math.sin(a) * 0.95; pf.scale.setScalar(1 + Math.sin(t * 4 + k) * 0.12); });
-    eyeGlow.material.opacity = 0.7 + Math.sin(t * 6 + ph) * 0.2; glow.material.opacity = 0.26 + Math.sin(t * 9 + ph) * 0.08;
-  };
-  return g;
-}
+/* the folk of the sky live in skyfolk.js now; these stay importable from here */
+export { buildAngel, buildSniller } from './skyfolk.js';
+import { createSkyWar } from './skyfolk.js';
 
 /* young Tanoc, thirteen, in his own first hat, with nothing in his hands */
 export function buildYoungTanoc() {
@@ -182,7 +36,7 @@ export function buildYoungTanoc() {
 export function createVelki(ctx) {
   const { camera, keys, touch, CAM, sfx } = ctx;
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xc8746a, 140, 950);
+  scene.fog = new THREE.Fog(0xd08a78, 280, 2600);
   const SUN = V3(-0.9, 0.12, -0.42).normalize();
 
   /* ---------------- sky: the sun going down, the sky on fire ---------------- */
@@ -283,31 +137,39 @@ export function createVelki(ctx) {
 
   /* ---------------- Fyrsti'Vilag ---------------- */
   const rng = mulberry32(307);
-  const stone = [0xd8b898, 0xc8a080, 0xe0c0a0, 0xb89070], capCols = [0x6a3a1c, 0x5a2a14, 0x7a4a24, 0x4a2a14];
   const lamps = [];
-  function house(x, z) {
-    const w = 5 + rng() * 3, d = 5 + rng() * 3, h = 4.2 + rng() * 2.6, g = heightAt(x, z);
-    const grp = new THREE.Group(); grp.position.set(x, g, z);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(stone[Math.floor(rng() * stone.length)])); body.position.y = h / 2; grp.add(body);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(Math.max(w, d) * 0.72, 16, 8, 0, TAU, 0, Math.PI / 2), toon(capCols[Math.floor(rng() * capCols.length)]));
-    cap.scale.y = 0.75; cap.position.y = h; grp.add(cap);
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 1.4, 6), toon(0x4a2a14)); stem.position.y = h + Math.max(w, d) * 0.54 + 0.5; grp.add(stem);
-    const win = glowSprite(0xffb060, 1.6, 0.85); win.position.set(0, h * 0.55, d / 2 + 0.05); grp.add(win); lamps.push(win);
-    grp.rotation.y = Math.round(Math.atan2(-x, -z) / (Math.PI / 2)) * (Math.PI / 2);
-    outlineAll(grp, 0.035); grp.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
-    scene.add(grp);
-    const swap = Math.abs(Math.sin(grp.rotation.y)) > 0.5;
-    box(x, z, (swap ? d : w) / 2, (swap ? w : d) / 2, g - 1, g + h + 2);
-  }
-  for (let ring = 0; ring < 4; ring++) {
-    const R = 18 + ring * 10.5, n = 9 + ring * 4;
+  const PLAZA = { x: 0, z: 34 };                      // the little fountain square in the south of the city, where Tanoc starts
+  const kit = createCityKit(scene, { rng, heightAt, box, cyl, palette: 'velki' });
+  const RINGS = [18, 28.5, 39, 49.5];
+  for (let ring = 0; ring < RINGS.length; ring++) {
+    const R = RINGS[ring], n = 9 + ring * 4;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * TAU + ring * 0.37 + rng() * 0.12, x = Math.cos(a) * R, z = Math.sin(a) * R;
-      if (Math.abs(x) < 8 && z < 0) continue;              // the north road to the gate
-      if (Math.abs(x) < 6 && z > 0 && ring < 3) continue;   // and the south lane you start on
-      house(x, z);
+      if (Math.abs(x) < 8.5 && z < 0) continue;              // the north road to the gate
+      if (Math.abs(x) < 6.5 && z > 0) continue;              // and the south lane
+      if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 13) continue;
+      kit.house(x, z, Math.atan2(-x, -z), ring === 0 && i % 3 === 0 ? 'tall' : null);
     }
   }
+  // street furniture: lamps round the ring streets, bunting across them, paving rings
+  const STREETS = [12, 23.2, 33.8, 44.3, 56];
+  for (const r of STREETS.slice(1)) for (let k = 0; k < Math.round(r / 5); k++) { const a = k / Math.round(r / 5) * TAU + 0.2, x = Math.cos(a) * (r + 2.4), z = Math.sin(a) * (r + 2.4); if (Math.abs(x) < 9 && z < 0) continue; if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 7) continue; kit.lampPost(x, z); }
+  for (const r of [23.2, 33.8, 44.3]) for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + 0.5; kit.bunting(V3(Math.cos(a) * (r - 4.5), 6.2, Math.sin(a) * (r - 4.5)), V3(Math.cos(a + 0.12) * (r + 4.5), 6.2, Math.sin(a + 0.12) * (r + 4.5)), 1.2); }
+  for (let k = 0; k < 6; k++) kit.bunting(V3(-7, 7.5, -10 - k * 8), V3(7, 7.5, -14 - k * 8), 1.4);     // across the north road, to the gate
+  kit.paving(0, 0, STREETS, 0xb8987a); kit.paving(PLAZA.x, PLAZA.z, [4.6, 8.8, 12.2], 0xa88868);
+  // the fountain square: a Stryx mud fountain, three stalls, benches
+  const fountain = buildMudFountain(scene, PLAZA.x, PLAZA.z, heightAt(PLAZA.x, PLAZA.z), { scale: 0.8, seed: 12 });
+  cyl(PLAZA.x, PLAZA.z, 3.9, -1, 0.9);
+  [[-9.5, 30, 1.2], [9.5, 31, -1.3], [-7, 42.5, 2.5]].forEach(([x, z, ry], i) => kit.stall(x, z, ry, i));
+  for (const [x, z, ry] of [[6, 41, 0.6], [-10, 37, -0.4]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.45, 0.7), toon(0x8a6a4a)); b.position.set(x, 0.45, z); b.rotation.y = ry; addOutline(b, 0.03); scene.add(b); box(x, z, 1.2, 0.5, -1, 0.5); }
+  // potted trees here and there
+  for (const [x, z] of [[11, 21], [-11, 21], [13, 46], [-13, 46], [4, -18], [-4, -18], [20, 2], [-20, -4]]) {
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.55, 0.9, 10), toon(0xa86a3a)); pot.position.set(x, 0.45, z); addOutline(pot, 0.03); scene.add(pot);
+    const tr = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), toon(0x6a9a3a)); tr.position.set(x, 2.6, z); tr.scale.y = 1.15; addOutline(tr, 0.04); tr.castShadow = true; scene.add(tr);
+    const tk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.6, 6), toon(0x5a3a22)); tk.position.set(x, 1.5, z); scene.add(tk);
+    cyl(x, z, 0.75, -1, 0.9);
+  }
+
   /* the spire: a stone needle with a stair winding up its outside */
   const SPIRE_TOP = 27, STEP_R = 4.5, NSTEPS = 48;
   {
@@ -369,11 +231,24 @@ export function createVelki(ctx) {
     const p = { a, pos: a.root.position, ph: rng() * 10, look: rng() < 0.7 };
     folk.push(p); return p;
   }
-  for (let i = 0; i < 16; i++) {
-    const a = rng() * TAU, r = 12 + rng() * 42, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (groundAt(x, z, 1) > 0.8 || solids.some(s => s.kind === 'box' && Math.abs(x - s.x) < s.hw + 1 && Math.abs(z - s.z) < s.hd + 1)) continue;
-    person(x, z, LOOKS[i % LOOKS.length]);
+  /* the city's own folk, out to watch the sky: they keep to the streets, gather where they can see north, sit on the fountain, mind stalls */
+  const BATTLE_LOOK = [0, -160];
+  const spots = [];
+  for (const r of [44.3, 56]) for (let k = 0; k < 9; k++) { const a = -Math.PI / 2 + (k / 8 - 0.5) * 1.6; if (Math.abs(Math.cos(a) * r) < 9) continue; spots.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, look: BATTLE_LOOK, kind: 'watch' }); }
+  for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; spots.push({ x: PLAZA.x + Math.cos(a) * 4.8, z: PLAZA.z + Math.sin(a) * 4.8, look: [PLAZA.x, PLAZA.z], kind: 'sit' }); }
+  for (const [x, z] of [[-6, 27], [7, 38], [-4, 44]]) for (let k = 0; k < 3; k++) { const a = k / 3 * TAU; spots.push({ x: x + Math.cos(a) * 0.9, z: z + Math.sin(a) * 0.9, look: [x, z], kind: 'chat' }); }
+  const crowd = createCrowd({
+    scene, rng, groundAt, C: { x: 0, z: 0 },
+    resolve: q => { const y = q.y; q.y = 0.2; resolve(q); q.y = y; },
+    streets: STREETS.slice(1).map(r => ({ r })), roads: [{ a: -Math.PI / 2 }, { a: Math.PI / 2 }], spots,
+  });
+  for (let i = 0; i < 34; i++) {
+    const r = STREETS[1 + (i % 4)], a = rng() * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const p = crowd.spawn(FOLK_LOOKS[i % FOLK_LOOKS.length], V3(x, 0, z));
+    if (i < 12) { const sp = spots[i]; p.pos.set(sp.x, 0, sp.z); p.spot = sp; p.wait = 4 + rng() * 10; p.look = V3(sp.look[0], 0, sp.look[1]); }
   }
+  // stallkeepers
+  for (const [x, z, ry] of [[-9.5, 30, 1.2], [9.5, 31, -1.3], [-7, 42.5, 2.5]]) { const p = crowd.spawn(FOLK_LOOKS[(x * 7 | 0) & 7], V3(x - Math.sin(ry) * 1.3, 0, z - Math.cos(ry) * 1.3)); p.fixed = true; p.look = V3(PLAZA.x, 0, PLAZA.z); }
   const warden = person(6.5, -54, { skin: '#9a6a40', cap: '#3a2a1a', tunic: 0x4a4a5a, trim: 0xb8a070 }, { weapon: 'spear', build: 1.15, scale: 1.05 });
   warden.look = false;
   const crew = [-2.5, 0, 2.5].map((x, i) => {
@@ -383,42 +258,24 @@ export function createVelki(ctx) {
 
   /* ---------------- the battle in the north ---------------- */
   const BATTLE = V3(0, 0, -160);
-  const fighters = [];
-  for (let i = 0; i < 9; i++) {
-    const angel = i % 2 === 0, m = angel ? buildAngel(2.6 + rng() * 1.2) : buildSniller(2.4 + rng() * 1.2);
-    scene.add(m);
-    const f = { m, angel, t: rng() * 2, gone: 0, pos: V3() };
-    placeFighter(f); fighters.push(f);
-  }
-  function placeFighter(f) {
-    f.pos.set(BATTLE.x + (rng() - 0.5) * 150, 16 + rng() * 40, BATTLE.z + (rng() - 0.5) * 100);
-    f.m.position.copy(f.pos); f.m.rotation.y = Math.atan2(-f.pos.x, -f.pos.z) + Math.PI;
-  }
-  const flashes = [];
-  function flash(x, y, z, size, color, life = 0.5) {
-    const s = glowSprite(color, 1, 1); s.position.set(x, y, z); scene.add(s);
-    flashes.push({ s, size, life, t: 0 });
-  }
-  const beams = [];
-  const beamGeo = new THREE.CylinderGeometry(0.25, 0.25, 1, 6, 1, true); beamGeo.translate(0, 0.5, 0); beamGeo.rotateX(Math.PI / 2);
-  function beam(a, b, color) {
-    const m = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending }));
-    m.position.copy(a); m.lookAt(b); m.scale.set(1, 1, a.distanceTo(b)); scene.add(m);
-    beams.push({ m, t: 0, life: 0.35 });
-  }
+  let war = null;   // made once the particles exist, below
+  const flash = (x, y, z, size, color, life) => war && war.flash(V3(x, y, z), size, color, life);
 
   /* ---------------- particles and post ---------------- */
-  const particles = new Particles(scene, 3000);
+  const particles = new Particles(scene, 4500);
+  war = createSkyWar({ scene, particles, center: V3(BATTLE.x, 46, BATTLE.z), spread: [230, 44, 150], count: 12, size: [2.6, 4.2], vis: 0.1,
+    onBlink: p => { if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 160) sfx.blink(); } });
+  const cine = createCine(camera);
   const composer = ctx.makeComposer(scene);
   function resize() { particles.setScale(innerHeight * Math.min(devicePixelRatio, 1.75) * 0.9); }
   resize();
 
   /* ---------------- Tanoc ---------------- */
   const tanoc = buildYoungTanoc(); scene.add(tanoc.root);
-  const P = { pos: V3(0, 0, 34), vel: V3(), yaw: Math.PI, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0 };
+  const P = { pos: V3(2.5, 0, 46), vel: V3(), yaw: Math.PI, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0 };
   P.pos.y = groundAt(P.pos.x, P.pos.z, 5);
   CAM.yaw = 0; CAM.pitch = 0.18;
-  const camPos = V3(0, 4, 42), camTgt = V3();
+  const camPos = V3(2.5, 4, 54), camTgt = V3();
 
   /* ---------------- the beat of it ---------------- */
   let stage = 'spire', t = 0, outT = 0, said = 0, barkI = 0, shake = 0, done = false, caughtT = -1, tear = null;
@@ -440,7 +297,14 @@ export function createVelki(ctx) {
     stage = 'top';
     // turn him to face the north gate and the battle beyond it
     P.pos.x = 0; P.pos.z = -2.6; P.yaw = Math.PI; CAM.yaw = 0; CAM.pitch = 0.08;   // round to the north rail, so nothing stands in the way
-    ctx.say(STORY.PROLOGUE.top, startGateStage);
+    // while he looks, the camera does too: round the spire's crown, out over the city, at the war in the air
+    const top = V3(0, SPIRE_TOP + 1.6, -2.6);
+    cine.play([{ dur: 999, cam: (k, tt) => {
+      const a = -Math.PI / 2 + Math.sin(tt * 0.12) * 0.9, r = 7 + Math.sin(tt * 0.2) * 2;
+      return { p: V3(Math.cos(a) * r, SPIRE_TOP + 3 + Math.sin(tt * 0.3), Math.sin(a) * r * -1 + 4), l: V3(BATTLE.x + Math.sin(tt * 0.15) * 40, 40, BATTLE.z) };
+    } }], null, { bars: false });
+    war.fighters.forEach((f, i) => setTimeout(() => war.reveal(f, 0.9), 1500 + i * 1700));
+    ctx.say(STORY.PROLOGUE.top, () => { cine.stop(); startGateStage(); });
   }
 
   function interact() {
@@ -515,31 +379,7 @@ export function createVelki(ctx) {
 
   function updateBattle(dt) {
     const near = Math.max(0, 1 - Math.max(0, -P.pos.z - WALL_R) / 50);   // 1 at the gate, 0 well outside
-    for (const f of fighters) {
-      f.m.userData.tick(t);
-      if (f.gone > 0) {
-        f.gone -= dt;
-        if (f.gone <= 0) { placeFighter(f); f.m.visible = true; flash(f.pos.x, f.pos.y + 6, f.pos.z, 26, f.angel ? 0xfff0c0 : 0x6af0e0, 0.45); }
-        continue;
-      }
-      f.t -= dt;
-      f.m.position.y = f.pos.y + Math.sin(t * 1.3 + f.m.userData.ph) * 1.5;
-      if (f.t <= 0) {
-        f.t = 0.8 + rng() * 2.6;
-        if (rng() < 0.55) {   // blink out
-          flash(f.m.position.x, f.m.position.y + 6, f.m.position.z, 22, f.angel ? 0xfff0c0 : 0x6af0e0, 0.4);
-          particles.burst(f.m.position.x, f.m.position.y + 6, f.m.position.z, 30, { color: f.angel ? 0xffe0a0 : 0x6af0e0, speed: 18, size: 1.4, life: 0.9, drag: 1 });
-          f.m.visible = false; f.gone = 0.25 + rng() * 1.2;
-          if (Math.hypot(P.pos.x - f.pos.x, P.pos.z - f.pos.z) < 150) sfx.blink();
-        } else {              // strike at a foe
-          const foe = fighters.find(o => o.angel !== f.angel && o.gone <= 0 && rng() < 0.5) || fighters.find(o => o.angel !== f.angel && o.gone <= 0);
-          if (foe) {
-            const a = f.m.position.clone().add(V3(0, 6, 0)), b = foe.m.position.clone().add(V3(0, 6, 0));
-            beam(a, b, f.angel ? 0xffe8a8 : 0x5af0e0); flash(b.x, b.y, b.z, 14, 0xffffff, 0.3);
-          }
-        }
-      }
-    }
+    war.update(dt, t, P.pos);
     // sparks where nothing was — anomalies in the air; closer to Tanoc the further out he goes
     G_spark -= dt;
     if (G_spark <= 0) {
@@ -556,15 +396,6 @@ export function createVelki(ctx) {
     // the distant thunder of it
     G_boom -= dt;
     if (G_boom <= 0) { G_boom = 2.5 + rng() * 4; if (near > 0.2 || P.pos.y > 15) sfx.slam(); }
-    for (let i = flashes.length - 1; i >= 0; i--) {
-      const f = flashes[i]; f.t += dt; const k = f.t / f.life;
-      f.s.scale.setScalar(f.size * (0.4 + k)); f.s.material.opacity = Math.max(0, 1 - k);
-      if (k >= 1) { scene.remove(f.s); flashes.splice(i, 1); }
-    }
-    for (let i = beams.length - 1; i >= 0; i--) {
-      const b = beams[i]; b.t += dt; b.m.material.opacity = Math.max(0, 0.9 * (1 - b.t / b.life));
-      if (b.t >= b.life) { scene.remove(b.m); b.m.material.dispose(); beams.splice(i, 1); }
-    }
   }
   let G_spark = 0, G_boom = 1;
 
@@ -594,6 +425,9 @@ export function createVelki(ctx) {
     skyMat.uniforms.uT.value = t;
     updatePlayer(dt, playing);
     updateFolk(dt);
+    crowd.update(dt, t, { sky: V3(BATTLE.x, 40, BATTLE.z) });
+    kit.update(t, dt, particles);
+    fountain.update(dt, t, particles, [P.pos]);
     updateBattle(dt);
     banners.forEach(b => { b.rotation.x = Math.sin(t * 2 + b.userData.ph) * 0.12; });
     lamps.forEach((l, i) => { l.material.opacity = 0.75 + Math.sin(t * 5 + i) * 0.12; });
@@ -630,18 +464,28 @@ export function createVelki(ctx) {
       ctx.whiteness(clamp((caughtT - 0.6) / 1.4, 0, 1));
       if (caughtT > 2.4 && !done) { done = true; ctx.onCaught(); }
     }
-    updateCamera(dt);
+    if (!cine.update(dt)) updateCamera(dt);
     // the sun follows the boy around for its shadows
     sun.position.copy(P.pos).addScaledVector(SUN, 140); sun.target.position.copy(P.pos);
   }
   let G_warned = false;
 
   function render() { composer.render(); }
+  /* the opening, before you have him: over the city at sunset, out to the war, the Ahoac at the gate, down to the boy */
+  function intro(done) {
+    const C = STORY.PROLOGUE.cards;
+    cine.play([
+      { dur: 7, from: { p: [80, 84, 150], l: [0, 22, -30] }, to: { p: [46, 64, 104], l: [0, 34, -90] }, caption: [C[0], C[1]] },
+      { dur: 6, from: { p: [-70, 38, -80], l: [0, 46, -160] }, to: { p: [-24, 54, -96], l: [24, 50, -170] }, caption: C[2], onStart: () => { war.reveal(war.fighters[0], 1.5); setTimeout(() => war.reveal(war.fighters[1], 1.2), 2600); } },
+      { dur: 5, from: { p: [15, 5, -40], l: [0, 2.2, -31] }, to: { p: [9, 3.6, -43], l: [0, 2.4, -32] }, caption: C[3] },
+      { dur: 6, from: { p: [16, 11, 70], l: [PLAZA.x, 1.5, PLAZA.z] }, to: { p: [5, 3.3, 54], l: [P.pos.x, 1.6, P.pos.z] }, caption: C[4] },
+    ], () => { camPos.copy(camera.position); done && done(); });
+  }
 
   function dispose() {
     scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
     composer.dispose && composer.dispose();
   }
 
-  return { scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught } };
+  return { intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught } };
 }

@@ -269,7 +269,8 @@
   /* dialogue choices */
   #d-choices{display:flex;flex-direction:column;gap:6px;margin-top:10px}
   #d-choices button{text-align:left;font:16px var(--body);color:var(--ink);background:rgba(0,0,0,.3);border:1px solid var(--brass-dim);border-radius:8px;padding:7px 12px;cursor:pointer}
-  #d-choices button:hover{border-color:var(--brass2);color:var(--brass2)}
+  #d-choices button:hover,#d-choices button.sel{border-color:var(--brass2);color:var(--brass2)}
+  #d-choices button.sel{background:rgba(212,170,90,.16);box-shadow:inset 3px 0 0 var(--brass2)}
   #d-choices button kbd{font-family:var(--display);font-size:11px;background:var(--brass);color:var(--navy);border-radius:4px;padding:0 6px;margin-right:8px}
   /* quest tracker, level, spells */
   #qtrack{margin-top:8px;font-size:13px;color:var(--ink-dim);border-top:1px solid rgba(243,207,122,.15);padding-top:6px}
@@ -405,7 +406,7 @@
   </div>
 </div>
 
-<div id="dialog" class="brass hidden"><div class="face" id="d-face"></div><div class="who" id="d-who"></div><div class="text" id="d-text"></div><div id="d-choices"></div><div class="next" id="d-next">CLICK ▸</div></div>
+<div id="dialog" class="brass hidden"><div class="face" id="d-face"></div><div class="who" id="d-who"></div><div class="text" id="d-text"></div><div id="d-choices"></div><div class="next" id="d-next">SPACE ▸</div></div>
 <div id="memory" class="brass hidden"><div class="mh">Memory Core · Zikhron</div><div class="mw" id="m-who"></div><div id="m-lines"></div><div class="mc">CLICK TO CONTINUE</div></div>
 <div id="toast" class="brass"></div>
 <div id="fade"></div>
