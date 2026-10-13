@@ -136,7 +136,7 @@ export function createFinale(ctx) {
         if (d > 7 && d < 15 && P.onGround && P.iframes <= 0) K.hurt(10, V3(BARN.x, 0, BARN.z - 2));
       }
     }
-    if (stage === 'peak' && Math.hypot(P.pos.x - PEAK.x, P.pos.z - PEAK.z) < 8) meetNoka();
+    if (stage === 'peak' && Math.hypot(P.pos.x - PEAK.x, P.pos.z - PEAK.z) < 13) meetNoka();
   }
   K.start = start;
   Object.defineProperty(K, 'stage', { get: () => stage });

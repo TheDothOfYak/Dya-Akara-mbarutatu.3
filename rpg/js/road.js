@@ -259,7 +259,8 @@ export function createRoad(ctx) {
     skin: '#8a5a3a', cap: '#4a3020', marking: 0xffb04a, markColor: 0x2a1208, emblem: 0xc89aff, build: 0.92, capTall: 0.66,
     weapon: 'axe', flasks: false, leg: 0x4a3420, foot: 0x2a1a0c, beltColor: 0x5a3a1c, tunic: 0x7a5a3a, trim: 0xc89a5a, scale: 0.86,
   });
-  { const bl = tanoc.weapon.userData.blade; if (bl) { bl.material.color.setHex(0x9a9aa2); bl.material.emissiveIntensity = 0; } if (tanoc.weapon.userData.glow) tanoc.weapon.userData.glow.visible = false; }
+  tanoc.weapon.traverse(o => { if (o.isSprite) o.visible = false; else if (o.material && o.material.emissive) { o.material = o.material.clone(); o.material.emissive.setHex(0x000000); } });
+  { const bl = tanoc.weapon.userData.blade; if (bl) bl.material.color.setHex(0x9a9aa2); }
   scene.add(tanoc.root);
   const buhkon = buildEikar(NPC_LOOKS.buhkon); scene.add(buhkon.root);
   const punk = buildWildPunk({ seed: 31 }); punk.root.scale.multiplyScalar(0.6); scene.add(punk.root);

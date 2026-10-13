@@ -143,7 +143,9 @@ export function createMini(ctx, opt) {
     skin: '#8a5a3a', cap: opt.newHat ? '#2e1c10' : '#4a3020', marking: 0xffb04a, markColor: 0x2a1208, emblem: 0xc89aff, build: 0.92 + (ctx.age || 0) * 0.04, capTall: opt.newHat ? 0.74 : 0.66,
     weapon: 'axe', flasks: false, leg: 0x4a3420, foot: 0x2a1a0c, beltColor: 0x5a3a1c, tunic: 0x7a5a3a, trim: 0xc89a5a, scale: 0.86 + (ctx.age || 0) * 0.035,
   });
-  { const bl = tanoc.weapon.userData.blade; if (bl) { bl.material.color.setHex(0x9a9aa2); bl.material.emissiveIntensity = 0; } if (tanoc.weapon.userData.glow) tanoc.weapon.userData.glow.visible = false; }
+  // the Carpenter's plain hatchet: steel and wood, no Duat in it (that comes much, much later)
+  tanoc.weapon.traverse(o => { if (o.isSprite) o.visible = false; else if (o.material && o.material.emissive) { o.material = o.material.clone(); o.material.emissive.setHex(0x000000); } });
+  { const bl = tanoc.weapon.userData.blade; if (bl) bl.material.color.setHex(0x9a9aa2); }
   scene.add(tanoc.root);
   const P = { pos: V3(), vel: V3(), yaw: 0, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0, hp: 100, swing: 0, hitDone: false, iframes: 0, swim: false, under: false, breath: 1, fsCd: 0 };
   const camPos = V3(), camTgt = V3();
