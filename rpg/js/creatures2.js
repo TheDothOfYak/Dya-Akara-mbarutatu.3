@@ -337,7 +337,7 @@ export function buildApiButa(opts = {}) {
   // heatwave armour: a shimmering additive skin over the same (rippling) geometry
   const heatM = addM(0xff7a2a, 0.08);
   const heat = noOut(mesh(bodyGeo, heatM, body)); heat.scale.set(1.06, 1.9, 1.05); heat.frustumCulled = false;
-  const heat2 = noOut(mesh(bodyGeo, addM(0xffc060, 0.05), body)); heat2.scale.set(1.12, 2.8, 1.1); heat2.frustumCulled = false;
+  const heat2 = noOut(mesh(bodyGeo, addM(0xffc060, 0.05), body)); heat2.scale.set(1.12, 1.5, 1.1); heat2.frustumCulled = false;
 
   // obsidian scutes down the spine (fireproof armour)
   const scuteM = mat(0x241a1e, { emissive: 0x000000 });
@@ -353,7 +353,7 @@ export function buildApiButa(opts = {}) {
   const lipM = mat(0x2c201c);
   const maw = noOut(mesh(new THREE.SphereGeometry(1, 20, 10), basicM(0x1a0604), mouthG)); maw.scale.set(0.82, 0.07, 0.28);
   const jaw = new THREE.Group(); jaw.position.set(0, -0.04, -0.15); mouthG.add(jaw);
-  const jawM = mesh(new THREE.SphereGeometry(1, 20, 8, 0, TAU, Math.PI / 2, Math.PI / 2), lipM, jaw); jawM.scale.set(0.86, 0.14, 0.42); jawM.position.z = 0.12;
+  const jawM = mesh(new THREE.SphereGeometry(1, 20, 8, 0, TAU, Math.PI / 2, Math.PI / 2), lipM, jaw); jawM.scale.set(0.72, 0.12, 0.36); jawM.position.z = 0.12;
   const throat = glowSprite(0xff8a2a, 1.6, 0); throat.position.set(0, 0, 0.1); mouthG.add(throat);
   const pitM = bio.mat(0xff9a40, 0x3a2620, 0.4, 0.4, 2.4);
   const pits = []; for (const s of [-1, 1]) for (let i = 0; i < 4; i++) pits.push([s * (0.3 + i * 0.16), 0.36 - i * 0.04, front - 0.55 - i * 0.12, s * 0.2, 1, 0.4, 0.045, 0.35]);
@@ -361,18 +361,21 @@ export function buildApiButa(opts = {}) {
 
   // fire tentacles: 2 cephalic (front, curling forward) + a trailing fringe beneath
   const fireMap = paintTex(64, 8, (u) => {
-    const k = u; return [lerp(70, 255, Math.min(1, k * 1.6)), lerp(22, 200, k * k), lerp(10, 60, k * k * k)];
+    const a = clamp01(u * 2), b = clamp01(u * 2 - 1);
+    return [lerp(lerp(120, 255, a), 255, b), lerp(lerp(24, 110, a), 225, b), lerp(lerp(8, 16, a), 110, b)];
   });
-  const fireM = mat(0xffffff, { map: fireMap, emissive: 0xffffff, emissiveMap: fireMap, emissiveIntensity: 0.9 });
+  const fireM = mat(0xffffff, { map: fireMap, emissive: 0xffffff, emissiveMap: fireMap, emissiveIntensity: 1.0 });
+  const tongueM = addM(0xff8a24, 0.75), tongueM2 = addM(0xffe080, 0.8);
   const tents = [];
   const mkTent = (x, y, z, len, r0, kind) => {
     const tube = new DeformTube(14, 7, t => r0 * (1 - t * 0.82) + 0.015);
     tube.mesh(fireM, body);
-    const sprites = [0.35, 0.65, 1].map((t, i) => { const s = glowSprite(i === 2 ? 0xffe090 : 0xff7a20, (0.7 + i * 0.25) * (kind === 'head' ? 1.1 : 1), 0.55); body.add(s); return { s, t }; });
+    const sprites = [0.2, 0.45, 0.7, 1].map((t, i) => { const s = glowSprite(i === 3 ? 0xffe090 : 0xff7a20, (0.8 + i * 0.25) * (kind === 'head' ? 1.1 : 1), 0.55); body.add(s); return { s, t }; });
+    const tongues = [0.3, 0.55, 0.8].map((t, i) => { const f = noOut(new THREE.Mesh(flameGeo(0.5 + i * 0.1, 0.1, 0.05), i % 2 ? tongueM2 : tongueM)); body.add(f); return { f, t, ph: rnd() * TAU }; });
     const tip = noOut(new THREE.Mesh(flameGeo(0.55, 0.13, 0.1), addM(0xffb040, 0.85))); body.add(tip);
-    tents.push({ tube, x, y, z, len, kind, ph: rnd() * TAU, fr: 0.8 + rnd() * 0.5, sprites, tip, side: Math.sign(x) || 1 });
+    tents.push({ tube, x, y, z, len, kind, ph: rnd() * TAU, fr: 0.8 + rnd() * 0.5, sprites, tongues, tip, side: Math.sign(x) || 1 });
   };
-  for (const s of [-1, 1]) mkTent(s * 0.62, -0.05, front - 0.25, 2.2, 0.16, 'head');
+  for (const s of [-1, 1]) mkTent(s * 0.62, -0.05, front - 0.25, 1.8, 0.15, 'head');
   const fringe = opts.tentacles ?? 7;
   for (let i = 0; i < fringe; i++) {
     const f = fringe > 1 ? i / (fringe - 1) : 0.5, x = (f - 0.5) * 2.6, z = -0.6 - Math.abs(f - 0.5) * 1.2 - rnd() * 0.3;
@@ -428,7 +431,7 @@ export function buildApiButa(opts = {}) {
       // heatwave armour shimmers, flares on a bellow
       const hk = 0.06 + bio.v * 0.04 + wu * 0.12 + at * 0.18;
       heatM.opacity = hk * (0.8 + Math.sin(T * 9) * 0.2);
-      heat2.material.opacity = hk * 0.6 * (0.8 + Math.sin(T * 6.3 + 1) * 0.2);
+      heat2.material.opacity = hk * 0.35 * (0.8 + Math.sin(T * 6.3 + 1) * 0.2);
       heat.scale.set(1.06 + Math.sin(T * 7) * 0.01, 1.9 + wu * 0.8, 1.05);
       // tentacles
       const fl = 0.9 + wu * 0.6 + at * 0.8;
@@ -441,7 +444,7 @@ export function buildApiButa(opts = {}) {
             // cephalic: forward and down, curling inward, lifting on a bellow
             const lift = wu * 0.9 + at * 0.6;
             const curl = t * t * (1.6 - lift);
-            P[i].set(tn.x + tn.side * (t * 0.35 - curl * 0.35) + w * 0.25 * tn.side, tn.y - d * (0.55 - lift * 0.7) + Math.sin(T * 1.7 + tn.ph + t * 3) * 0.15 * t, tn.z + d * 0.75 - curl * 0.5);
+            P[i].set(tn.x + tn.side * (t * 0.35 - curl * 0.35) + w * 0.25 * tn.side, tn.y - d * (0.3 - lift * 0.6) + Math.sin(T * 1.7 + tn.ph + t * 3) * 0.15 * t, tn.z + d * 0.75 - curl * 0.5);
           } else {
             const drag = 0.62 + Math.min(sp, 10) * 0.05 + at * 0.3;
             P[i].set(tn.x + w * 0.6, tn.y - d * (1 - drag * 0.45) + Math.sin(T * 1.3 + tn.ph) * 0.1 * t, tn.z - d * drag + Math.cos(T * 1.9 + tn.ph + t * 3) * 0.2 * t);
@@ -453,6 +456,12 @@ export function buildApiButa(opts = {}) {
           const k = S.t * (n - 1), i0 = Math.floor(k), i1 = Math.min(n - 1, i0 + 1);
           S.s.position.lerpVectors(P[i0], P[i1], k - i0);
           S.s.material.opacity = (0.35 + 0.2 * Math.sin(T * 13 + tn.ph + S.t * 5)) * (0.7 + bio.v * 0.5) * fl * 0.75;
+        }
+        for (const G of tn.tongues) {   // flame licks rise off the tentacle
+          const k = G.t * (n - 1), i0 = Math.floor(k), i1 = Math.min(n - 1, i0 + 1);
+          G.f.position.lerpVectors(P[i0], P[i1], k - i0);
+          G.f.rotation.set(Math.sin(T * 9 + G.ph) * 0.2 - pitch, 0, Math.sin(T * 7 + G.ph) * 0.25);
+          G.f.scale.setScalar(fl * 0.8 * (0.8 + 0.35 * Math.sin(T * 14 + G.ph)));
         }
         const tp = P[n - 1], tq = P[n - 2];
         tn.tip.position.copy(tp); _w.subVectors(tp, tq).normalize();
@@ -623,7 +632,7 @@ export function buildXiwKatkan(opts = {}) {
   const bio = bioKit();
   const furC = new THREE.Color(opts.color ?? 0xa3222e);
   if (opts.seed != null) furC.offsetHSL((rnd() - 0.5) * 0.04, 0, (rnd() - 0.5) * 0.1);
-  const furM = mat(furC), tipM = mat(furC.clone().lerp(new THREE.Color(0xff7a5a), 0.35)), bellyM = mat(furC.clone().lerp(new THREE.Color(0xffc0a0), 0.5));
+  const furM = mat(furC), tipM = mat(furC.clone().lerp(new THREE.Color(0xff7a5a), 0.18)), bellyM = mat(furC.clone().lerp(new THREE.Color(0xffc0a0), 0.5));
   const hornM = mat(0x2a1418), memM = mat(0x5a1626, { side: THREE.DoubleSide }), boneM = mat(0x2c0e14), ironM = mat(0x2e2830);
   const hellC = 0xff5a1a;
   const R = 0.36;
@@ -660,11 +669,13 @@ export function buildXiwKatkan(opts = {}) {
   const grin = mesh(new THREE.TorusGeometry(0.085, 0.014, 5, 14, Math.PI * 0.9), basicM(0x2a0608), body); grin.position.set(0, -0.06, 0.335); grin.rotation.set(0.15, 0, Math.PI + Math.PI * 0.05);
   for (const s of [-1, 1]) { const f = mesh(new THREE.ConeGeometry(0.014, 0.045, 5), mat(0xfff8ee), body); f.position.set(s * 0.045, -0.105, 0.335); f.rotation.x = Math.PI; }
   // devil horns
+  const hornTipList = [];
   for (const s of [-1, 1]) {
     const h = mesh(hornGeo(0.36, 0.075, -0.3, 7), hornM, body); h.position.set(s * 0.17, 0.3, 0.06); h.rotation.set(-0.15, 0, s * -0.55); h.scale.x = s;
+    hornTipList.push(h);
   }
   const hornTips = bio.mat(hellC, 0x2a1418, 0.2, 0.2, 2.2);
-  bioMesh(bioDots([[-0.23, 0.62, 0.0, -0.4, 1, 0, 0.026, 1], [0.23, 0.62, 0.0, 0.4, 1, 0, 0.026, 1]]), hornTips, body);
+  hornTipList.forEach(h => bioMesh(bioDots([[-0.104, 0.33, 0, -0.3, 1, 0, 0.024, 1]]), hornTips, h));
   // ember freckles on the belly
   const frM = bio.mat(hellC, furC, 0.3, 0.12, 2.0);
   const fr = []; for (let i = 0; i < 9; i++) { const a = -0.6 + (i % 3) * 0.6, y = -0.25 - Math.floor(i / 3) * 0.12; fr.push([Math.sin(a) * 0.7, y, Math.cos(a) * 0.9, 0.035, 0.4]); }
@@ -808,29 +819,29 @@ export function buildVyrenalur(opts = {}) {
       const L = [];
       for (let i = 0; i < count; i++) {
         const y = rnd() * 1.6 - 0.45, a = rnd() * TAU, rr = Math.sqrt(Math.max(0, 1 - y * y));
-        L.push([Math.cos(a) * rr, y, Math.sin(a) * rr, 0.05 + rnd() * 0.09, 0.25]);
+        L.push([Math.cos(a) * rr, y, Math.sin(a) * rr, 0.03 + Math.pow(rnd(), 2) * 0.14, 0.2]);
       }
       const holder = new THREE.Group(); part.add(holder);
       bioMesh(bioDots(L, sx, sy, sz, 8), dapM[k], holder);
       dapples.push({ holder, sp: (rnd() - 0.5) * 0.12, ph: rnd() * TAU, axis: k });
     }
   };
-  addDapples(torso, SX, SY, SZ, 14); addDapples(chest, 1.15, 1.35, 1.2, 8); addDapples(hips, 1.05, 1.15, 1.1, 8);
+  addDapples(torso, SX, SY, SZ, 11); addDapples(chest, 1.15, 1.35, 1.2, 6); addDapples(hips, 1.05, 1.15, 1.1, 6);
 
   // neck & head
-  const neckBase = V3(0, 0.6, 2.1), headPos = V3(0, 3.0, 3.9);
-  const neck = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([neckBase, V3(0, 1.6, 2.7), V3(0, 2.5, 3.3), headPos]), 12, 0.6, 12), hideM, body);
+  const neckBase = V3(0, 0.6, 2.1), headPos = V3(0, 2.5, 3.75);
+  const neck = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([neckBase, V3(0, 1.4, 2.75), V3(0, 2.1, 3.35), headPos]), 12, 0.72, 12), hideM, body);
   neck.geometry.computeVertexNormals();
   const { array: na } = neck.geometry.attributes.position; // taper the neck toward the head
   for (let i = 0; i < na.length; i += 3) {
-    const t = clamp01((na[i + 1] - 0.6) / 2.4), c = new THREE.Vector3(0, na[i + 1], 0);
-    const cz = lerp(2.1, 3.9, t), k = lerp(1.15, 0.62, t);
+    const t = clamp01((na[i + 1] - 0.6) / 1.9), c = new THREE.Vector3(0, na[i + 1], 0);
+    const cz = lerp(2.1, 3.75, t), k = lerp(1.15, 0.7, t);
     na[i] *= k; na[i + 2] = cz + (na[i + 2] - cz) * k; c.set(0, 0, 0);
   }
   neck.geometry.computeVertexNormals();
-  const headG = new THREE.Group(); headG.position.copy(headPos); body.add(headG);
-  const skull = mesh(new THREE.SphereGeometry(1, 20, 14), hideM, headG); skull.scale.set(0.55, 0.6, 0.85); skull.position.set(0, 0.1, 0.25);
-  const snout = mesh(new THREE.SphereGeometry(1, 16, 12), deepM, headG); snout.scale.set(0.36, 0.38, 0.85); snout.position.set(0, -0.22, 1.0); snout.rotation.x = 0.35;
+  const headG = new THREE.Group(); headG.position.copy(headPos); headG.scale.setScalar(1.2); body.add(headG);
+  const skull = mesh(new THREE.SphereGeometry(1, 20, 14), hideM, headG); skull.scale.set(0.5, 0.55, 0.92); skull.position.set(0, 0.1, 0.2);
+  const snout = mesh(new THREE.SphereGeometry(1, 16, 12), deepM, headG); snout.scale.set(0.3, 0.33, 0.85); snout.position.set(0, -0.22, 0.95); snout.rotation.x = 0.4;
   for (const s of [-1, 1]) {
     const ear = mesh(new THREE.ConeGeometry(0.16, 0.7, 6), hideM, headG); ear.position.set(s * 0.48, 0.45, -0.1); ear.rotation.set(-0.4, 0, s * -1.0); ear.scale.z = 0.5;
   }
@@ -857,13 +868,13 @@ export function buildVyrenalur(opts = {}) {
     for (let i = 0; i < kids; i++) {
       const d = dir.clone();
       const ang = (i - (kids - 1) / 2) * 0.75 + (rnd() - 0.5) * 0.3;
-      d.applyAxisAngle(V3(0, 0, 1), ang * 0.8).applyAxisAngle(V3(1, 0, 0), (rnd() - 0.5) * 0.7 - 0.15).normalize();
-      d.y += 0.25; d.normalize();
+      d.applyAxisAngle(V3(0, 0, 1), ang * 0.9 - 0.15).applyAxisAngle(V3(1, 0, 0), (rnd() - 0.5) * 0.7 - 0.15).normalize();
+      d.y += 0.12; d.normalize();
       branch(list, end, d, len * (0.68 + rnd() * 0.12), r * 0.68, depth - 1);
     }
   };
   const antlerList = [];
-  branch(antlerList, V3(0.2, 0.5, 0.0), V3(0.45, 1, -0.25).normalize(), 1.4, 0.13, 4);
+  branch(antlerList, V3(0.22, 0.5, 0.0), V3(1.0, 0.8, -0.3).normalize(), 1.3, 0.13, 4);
   const antlerGeo = mergeGeos(antlerList);
   const antlerTips = tips.slice();
   const crowns = [];
@@ -969,7 +980,7 @@ export function buildVyrenalur(opts = {}) {
       for (const w of wisps) {
         const k = (T * 0.25 + w.ph / TAU) % 1;
         w.s.position.set(w.x * (1 + k * 0.5), w.y + k * 1.4, w.z - k * 1.2 - Math.min(sp, 4) * k * 0.5);
-        w.s.material.opacity = Math.sin(k * Math.PI) * w.base * (0.6 + fade * 0.9);
+        w.s.material.opacity = Math.sin(k * Math.PI) * w.base * (0.35 + bio.v * 0.4 + fade * 0.9);
         w.s.scale.setScalar(1.6 + k * 2.4 + fade * 1.5);
       }
       for (const m of motes) {
@@ -1025,14 +1036,14 @@ export function buildAerolhorn(opts = {}) {
   }
 
   // wings: inner panel + outer hand with long fingered vanes
-  const wingGeo = (pts, depth) => { const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); pts.slice(1).forEach(p => sh.lineTo(p[0], p[1])); const g = slabGeo(sh, depth, 0.3, 2); g.rotateX(-Math.PI / 2); return countershade(g, top, belly, -0.1, 0.3); };
+  const wingGeo = (pts, depth) => { const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); pts.slice(1).forEach(p => sh.lineTo(p[0], p[1])); const g = slabGeo(sh, depth, 0.3, 2); g.rotateX(Math.PI / 2); return countershade(g, top, belly, -0.1, 0.3); };
   // shapes in (x out, -z back) → after rotateX(-90°) a shape y maps to world -z… use +y = forward
-  const inGeo = wingGeo([[0, 14], [30, 9], [34, 2], [32, -10], [24, -14], [12, -16], [0, -18]], 1.4);
-  const handGeo = wingGeo([[0, 9], [14, 6], [20, 3], [18, -6], [8, -10], [0, -10]], 1.0);
+  const inGeo = wingGeo([[0, 16], [18, 13], [34, 8], [34, -3], [24, -9], [12, -15], [0, -20]], 1.4);
+  const handGeo = wingGeo([[0, 7], [12, 5], [18, 2], [16, -4], [6, -5], [0, -3]], 1.0);
   const vane = (len, w) => wingGeo([[0, w], [len * 0.7, w * 0.8], [len, 0], [len * 0.7, -w * 0.8], [0, -w]], 0.7);
-  const vanes = [[30, 3.2, 0.12, 2], [32, 3.0, -0.12, -2], [28, 2.8, -0.38, -5.5], [22, 2.6, -0.65, -8], [16, 2.4, -0.95, -9.5]];
+  const vanes = [[36, 2.3, -0.08, 4], [40, 2.3, 0.06, 2.5], [38, 2.2, 0.2, 1], [34, 2.1, 0.36, -0.5], [29, 2.0, 0.52, -2], [24, 1.9, 0.7, -3], [19, 1.8, 0.9, -3.5]];
   const handParts = [[handGeo, null]];
-  vanes.forEach(([len, w, ang, z]) => handParts.push([vane(len, w), M4(16, 0, -z, 0, ang, 0)]));
+  vanes.forEach(([len, w, ang, z]) => handParts.push([vane(len, w), M4(12, 0, z, 0, ang, 0)]));
   const handAll = mergeGeos(handParts);
   { // re-shade the merged hand (mergeGeos dropped colours)
     countershade(handAll, top, belly, -0.1, 0.3); }
@@ -1042,11 +1053,11 @@ export function buildAerolhorn(opts = {}) {
     const sh = new THREE.Group(); sh.position.set(s * 9.5, 1.5, 4); sh.scale.x = s; body.add(sh);
     const arm = new THREE.Group(); arm.rotation.order = 'YXZ'; sh.add(arm);
     mesh(inGeo, skinM, arm);
-    bioMesh(edgeDots(3, -13, 30, -9, 9, 0.7, -0.75), starM, arm);
-    bioMesh(edgeDots(4, 12, 31, 7.5, 9, 0.55, -0.75), starM, arm);
-    const hand = new THREE.Group(); hand.position.set(32, 0, 2); arm.add(hand);
+    bioMesh(edgeDots(3, -17, 30, -8, 9, 0.7, 0.75), starM, arm);
+    bioMesh(edgeDots(4, 14, 32, 6.5, 9, 0.55, 0.75), starM, arm);
+    const hand = new THREE.Group(); hand.position.set(33, 0, 0); arm.add(hand);
     mesh(handAll, skinM, hand);
-    { const L = []; vanes.forEach(([len, w, ang, z]) => { for (let k = 1; k <= 3; k++) { const d = 16 + Math.cos(ang) * len * k / 4, zz = z + Math.sin(ang) * len * k / 4; L.push([d, -0.45, zz, 0, -1, 0, 0.55, 0.4]); } }); bioMesh(bioDots(L), starM, hand); }
+    { const L = []; vanes.forEach(([len, w, ang, z]) => { for (let k = 1; k <= 3; k++) { const d = 12 + Math.cos(ang) * len * k / 4, zz = z - Math.sin(ang) * len * k / 4; L.push([d, -0.45, zz, 0, -1, 0, 0.55, 0.4]); } }); bioMesh(bioDots(L), starM, hand); }
     wings.push({ arm, hand });
   }
   // the tail: a long undulating tube with a fan of three flukes
@@ -1172,8 +1183,8 @@ export function buildNekhVorran(opts = {}) {
     // fine violet seam where the rings meet, on the belly
     if (up < -0.5 && (sf < 0.04 || sf > 0.96)) e = Math.max(e, 0.5);
     // duat cracks on the back
-    const cr = Math.abs(fbm2(u * 70, v * 6, 11) - 0.5);
-    if (up > 0.2 && cr < 0.012) e = Math.max(e, 0.7);
+    const cr = Math.abs(fbm2(u * 40, v * 5, 11) - 0.5);
+    if (up > 0.2 && cr < 0.006) e = Math.max(e, 0.6);
     e = clamp01(e * 1.2);
     return [255 * e, 255 * e, 255 * e];
   }, false);
