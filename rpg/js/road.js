@@ -3,10 +3,14 @@
    He wakes in Fyrsti'Vilag (Xikia's city of that name) in front of
    the Carpenter's stall; the Angels leave; the amulets fall; and
    then six days on the road north with Buhkon Eldi:
-     Day 1  the low country, a Kofi on the road, the fire-stone's trigger
-     Day 2  the forest; hunting alone; the Punk that followed them
-     Day 3  rain at camp, and the Carpenter talks
-     Day 4  the mountain pass, and a Rodak pack that won't wait
+     Day 1  the low country: a family's cart in the ditch, an amulet in a
+            hedge, a Kofi on the road, a Sniller far off over the fields —
+            and at the hedge-oak camp, the fire-stone's trigger
+     Day 2  the forest: a fallen pine to chop through, the ford's stepping
+            stones; hunting alone; the Punk that followed them
+     Day 3  rain at camp, the Carpenter talks — and at night a pale Sniller
+            leads Tanoc off into the trees
+     Day 4  the mountain pass: a rockslide, then a Rodak pack and its leader
    Days 5 and 6 — Beuhk, and the little road up to the Carpenter's
    hill — happen in the Beuhk page itself.
 
@@ -30,6 +34,7 @@ const TAU = Math.PI * 2;
 const CITY = { x: 0, z: 70 }, CITY_R = 56, GATE_Z = CITY.z - CITY_R;     // the north gate
 const SQUARE = { x: 0, z: 70 }, STALL = { x: 6, z: 58 };
 const CAMP1 = { z: -250 }, CAMP2 = { z: -560 }, PASS0 = -650, AMBUSH = -800, END = -960;
+const CART_Z = -70, HEDGE_Z = -160, LOG_Z = -330, FORD_Z = -430, ROCK0 = -672, ROCK1 = -762;
 const roadX = z => (z > GATE_Z ? 0 : 16 * Math.sin((GATE_Z - z) * 0.009) + 8 * Math.sin((GATE_Z - z) * 0.023));
 const zone = z => (z > GATE_Z ? 'city' : z > -300 ? 'low' : z > PASS0 ? 'forest' : 'pass');
 function baseH(z) {
@@ -46,6 +51,7 @@ function heightAt(x, z) {
   let h = baseH(z) + smooth(14, 70, lat) * walls * (0.7 + 0.6 * fbm(x * 0.02 + 3, z * 0.02, 3));
   h += (fbm(x * 0.05, z * 0.05, 2) - 0.5) * (zz === 'pass' ? 3 : 1.4) * smooth(5, 14, lat);
   if (z > GATE_Z - 30) h = lerp(h, 0, smooth(GATE_Z - 30, GATE_Z, z));
+  h -= 2.6 * smooth(7, 3, Math.abs(z - FORD_Z));                                         // the ford's stream
   return h;
 }
 
@@ -286,6 +292,53 @@ export function createRoad(ctx) {
     g.add(glowSprite(0x6af0e0, 1.3, 0.3)); return g;
   };
   let MK = null;   // the market's own state
+  const give = (id, n) => ctx.give && ctx.give(id, n);
+  const fold = (o, op) => o.traverse(m => { if (m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = op; m.material.depthWrite = false; } });
+
+  /* ---------------- the road's own bits: a cart in the ditch, a fallen pine, the ford ---------------- */
+  const EV = { cart: null, log: null, ford: null };
+  {
+    // the cart, tipped in the ditch, and its family
+    const cx = roadX(CART_Z) + 6, cz = CART_Z, cg = heightAt(cx, cz);
+    const cart = new THREE.Group(); cart.position.set(cx, cg + 0.5, cz); cart.rotation.set(0, 0.2, -0.32);
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 3.8), toon(0x8a5a36)); cart.add(bed);
+    for (const sd of [-1, 1]) { const sideB = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 3.8), toon(0x7a4e2c)); sideB.position.set(sd * 1.2, 0.45, 0); cart.add(sideB); }
+    for (let k = 0; k < 5; k++) { const bx = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), toon([0x9a6a40, 0x8a3a2a, 0xd8b878][k % 3])); bx.position.set((k % 2 - 0.5) * 0.9, 0.45, -1.2 + k * 0.6); cart.add(bx); }
+    const wheelL = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.2, 14), toon(0x5a3a22)); wheelL.rotation.z = Math.PI / 2; wheelL.position.set(-1.3, -0.2, 0.9); cart.add(wheelL);
+    const wheelR = wheelL.clone(); wheelR.position.x = 1.3; wheelR.visible = false; cart.add(wheelR);
+    outlineAll(cart, 0.03); scene.add(cart); box(cx, cz, 1.4, 2.1, cg - 1, cg + 1.2);
+    const fam = [{ skin: '#b8844e', cap: '#4a2a14', tunic: 0x6a8a4a }, { skin: '#c89a6a', cap: '#6a3a1a', tunic: 0xd8b878, scale: 0.7 }].map((lk, i) => {
+      const a = buildEikar(Object.assign({ weapon: 'none', flasks: false }, lk)); a.root.position.set(cx + 2.4 + i * 1.1, heightAt(cx + 2.4, cz - 2), cz - 2 - i); a.root.rotation.y = -Math.PI / 2; scene.add(a.root); return a;
+    });
+    const wx = roadX(CART_Z - 26) + 30, wz = CART_Z - 26;
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.2, 14), toon(0x5a3a22)); wheel.rotation.set(Math.PI / 2, 0, 0.3); addOutline(wheel, 0.03);
+    EV.cart = { x: cx, z: cz, g: cg, cart, wheelR, fam, wx, wz, wheel, state: 'idle' };
+    // the fallen pine across the forest road: two heavy ends and a thinner middle you can chop
+    const lx = roadX(LOG_Z), lz = LOG_Z, lg = heightAt(lx, lz);
+    const logs = [];
+    for (const [ox, len, r] of [[-12, 16, 1.25], [0, 8, 0.95], [12, 16, 1.25]]) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, len, 10), toon(0x5a3a22)); m.rotation.z = Math.PI / 2; m.position.set(lx + ox, heightAt(lx + ox, lz) + r * 0.9, lz);
+      addOutline(m, 0.04); m.castShadow = true; scene.add(m); logs.push({ m, s: box(lx + ox, lz, len / 2, r, heightAt(lx + ox, lz) - 1, heightAt(lx + ox, lz) + r * 2.2) });
+    }
+    const roots = new THREE.Mesh(new THREE.DodecahedronGeometry(3.4, 0), toon(0x6a4a2e)); roots.position.set(lx - 21, lg + 2.4, lz); roots.scale.set(0.6, 1, 1); addOutline(roots, 0.05); scene.add(roots); cyl(lx - 21, lz, 3.4, lg - 1, lg + 6);
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(4.2, 9, 7), toon(0x2f6a3a)); crown.rotation.z = -Math.PI / 2; crown.position.set(lx + 24, lg + 2.5, lz); addOutline(crown, 0.05); scene.add(crown); cyl(lx + 24, lz, 4.2, lg - 1, lg + 5);
+    for (const sd of [-1, 1]) for (let k = 0; k < 9; k++) {   // brambles the rest of the way across
+      const bx = lx + sd * (26 + k * 3), bz = lz + (Math.random() - 0.5) * 2, bg = heightAt(bx, bz);
+      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(1.7, 0), toon(0x3a5a2a)); b.position.set(bx, bg + 1.2, bz); addOutline(b, 0.04); scene.add(b); cyl(bx, bz, 1.8, bg - 1, bg + 3);
+    }
+    EV.log = { x: lx, z: lz, logs, hits: 0, open: false };
+    // the ford: a cold stream right across the valley, and stepping stones over it
+    const fy = baseH(FORD_Z) - 1.5;
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(150, 9), toon(0x5ac0d8, { emissive: 0x1a6a80, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }));
+    water.rotation.x = -Math.PI / 2; water.position.set(roadX(FORD_Z), fy, FORD_Z); scene.add(water);
+    const stones = [];
+    [-3.4, -1.2, 1.1, 3.3].forEach((dz, i) => {
+      const sx = roadX(FORD_Z) + (i % 2 ? 0.8 : -0.6), sz = FORD_Z + dz, top = fy + 0.45;
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.0, 2.2, 8), toon(0x9a9284)); st.position.set(sx, top - 1.1, sz); addOutline(st, 0.04); scene.add(st);
+      cyl(sx, sz, 0.85, top - 3, top); stones.push(st);
+    });
+    EV.ford = { y: fy, water, stones, crossed: false };
+  }
 
   function place(o, x, z, yaw = 0) { o.pos.set(x, groundAt(x, z, 60), z); o.yaw = yaw; }
 
@@ -403,11 +456,25 @@ export function createRoad(ctx) {
     if (sub !== 'walk') return;
     const prog = clamp((GATE_Z - P.pos.z) / (GATE_Z - CAMP1.z), 0, 1);
     setDusk(0.1 + prog * 0.85);
-    const marks = [0.15, 0.3, 0.45, 0.7];
+    const marks = [0.12, 0.5, 0.62, 0.8];
     if (D1.said < marks.length && prog > marks[D1.said]) {
       const [who, line] = R.day1.barks[D1.said]; ctx.bark(who, line, 4);
       if (D1.said === 2) { const z = P.pos.z - 14; D1.kofi = addFoe('kofi', roadX(z) + 3, z); }
       D1.said++;
+    }
+    cartTick();
+    // the amulet in the hedge
+    if (!D1.hedge && P.pos.z < HEDGE_Z + 30) {
+      D1.hedge = true; const hx = roadX(HEDGE_Z) - 7.5, hz = HEDGE_Z;
+      const it = addItem(V3(hx, heightAt(hx, hz) + 1.1, hz), 'Pry the amulet out of the hedge', null, amuletMesh()); it.y0 = it.pos.y;
+      it.act = () => { dropItem(it); ctx.amulets(1); sfx.core(); ctx.toast('Sniller amulet — into the Relic-bound bag', 2.2); };
+      for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(1 + Math.random() * 0.5, 0), toon(0x4a7a34)); b.position.set(hx + (k - 2.5) * 1.6, heightAt(hx, hz) + 0.9, hz + (Math.random() - 0.5)); scene.add(b); }
+      ctx.say(R.day1.hedge);
+    }
+    // far off over the fields, at dusk: a Sniller, half there
+    if (!D1.sn && prog > 0.86) {
+      D1.sn = buildSniller(2.6); fold(D1.sn, 0.55); D1.sn.position.set(roadX(P.pos.z) - 110, heightAt(roadX(P.pos.z) - 110, P.pos.z - 60) + 18, P.pos.z - 60); scene.add(D1.sn); D1.snT = 0;
+      ctx.say(R.day1.sniller);
     }
     if (P.pos.distanceTo(V3(camps[0].x, camps[0].y, camps[0].z)) < 9) {
       sub = 'camp'; setGoal(); camps[0].on = true; B.stay = V3(camps[0].x + 2.2, 0, camps[0].z - 1.5);
@@ -418,6 +485,22 @@ export function createRoad(ctx) {
         ctx.hint('Press E anywhere to try the fire-stone.');
       });
     }
+  }
+  function cartTick() {
+    const C = EV.cart; if (!C || C.state === 'done') return;
+    const d = Math.hypot(P.pos.x - C.x, P.pos.z - C.z);
+    if (C.state === 'idle' && d < 16) {
+      C.state = 'ask'; ctx.say(R.day1.cartSee, () => {
+        C.state = 'find'; C.item = addItem(V3(C.wx, heightAt(C.wx, C.wz) + 0.8, C.wz), 'Take the cart wheel', () => { dropItem(C.item); C.state = 'carry'; ctx.toast(R.day1.wheelGot, 2.6); sfx.ui(); objective(R.obj.cartBack, 'Optional — the family will thank you'); setGoal(C.x, C.g, C.z); C.back = addItem(V3(C.x - 1.4, C.g + 0.6, C.z), 'Fit the wheel back on', () => fixCart()); }, C.wheel);
+        objective(R.obj.cart, 'Optional — out in the field, east of the road'); setGoal(C.wx, heightAt(C.wx, C.wz), C.wz);
+      });
+    }
+  }
+  function fixCart() {
+    const C = EV.cart; dropItem(C.back); C.state = 'done'; setGoal(camps[0].x, camps[0].y, camps[0].z);
+    C.cart.rotation.set(0, 0.2, 0); C.cart.position.y = C.g + 0.9; C.wheelR.visible = true;
+    particles.burst(C.x, C.g + 1, C.z, 20, { color: 0xd8c098, speed: 4, size: 0.5, life: 0.6 }); sfx.slam();
+    ctx.say(R.day1.cartFixed, () => { give('bun', 1); objective(R.obj.day1, 'Follow the road — the Carpenter keeps pace'); });
   }
   function stoneObjective() { objective(R.obj.stone, D1.pebble ? 'Try the stone again (E)' : 'Press E to try the stone · pebbles lie by the fire', 0, 0); }
   function tryStone() {
@@ -431,7 +514,7 @@ export function createRoad(ctx) {
         const from = V3(P.pos.x, P.pos.y + 1.3, P.pos.z), to = V3(camps[0].x + 9 - 2, camps[0].y + 2.5, camps[0].z - 3 + 1);
         for (let k = 0; k < 20; k++) { const q = from.clone().lerp(to, k / 20); particles.emit(q.x, q.y, q.z, { vx: 0, vy: 0.5, vz: 0, color: k % 2 ? 0xff8a2a : 0xffd060, size: 0.6, life: 0.7, drag: 1 }); }
         particles.burst(to.x, to.y, to.z, 30, { color: 0xff8a2a, speed: 6, size: 0.5, life: 0.8 }); sfx.flare();
-        ctx.say(S.trigger, () => { ctx.giveFireStone(true); ctx.toast('Fire-stone Relic — its trigger found! It’s yours.', 3.5); startDay2(); });
+        ctx.say(S.trigger, () => { ctx.giveFireStone(true); hasStone = true; ctx.slotsHud && ctx.slotsHud(true); ctx.toast('Fire-stone Relic — its trigger found! It’s yours, and it’s on a quick slot.', 3.5); startDay2(); });
       } },
       { label: 'Put it away for now', act: null },
     ]);
@@ -447,11 +530,27 @@ export function createRoad(ctx) {
       place(P, roadX(CAMP1.z - 6), CAMP1.z - 6, Math.PI); place(B, roadX(CAMP1.z - 4) + 2, CAMP1.z - 4, Math.PI); B.stay = null;
       CAM.yaw = 0; setDusk(0.05); D2 = { caught: false };
       ctx.play(); ctx.location('The Road North', 'Day two · the forest');
-      objective('Climb through the forest with the Carpenter', ''); setGoal(camps[1].x, camps[1].y, camps[1].z);
+      objective('Climb through the forest with the Carpenter', ''); setGoal(EV.log.x, heightAt(EV.log.x, EV.log.z) + 1, EV.log.z);
     });
   }
   function day2Tick() {
-    if (sub === 'walk' && P.pos.distanceTo(V3(camps[1].x, camps[1].y, camps[1].z)) < 10) {
+    const L = EV.log, F = EV.ford;
+    if (sub === 'walk' && !L.open && P.pos.z < LOG_Z + 14) {
+      sub = 'log'; setGoal(L.x, heightAt(L.x, L.z) + 1, L.z);
+      ctx.say(R.day2.log, () => { objective(R.obj.log, 'Left-click to swing the hatchet at the middle of the trunk'); ctx.hint('Swing at the thin middle of the trunk.'); });
+    }
+    if (sub === 'log' && L.open) { sub = 'walk'; objective('Climb through the forest with the Carpenter', ''); setGoal(roadX(FORD_Z), F.y, FORD_Z + 6); }
+    if (sub === 'walk' && L.open && !F.told && P.pos.z < FORD_Z + 16) { F.told = true; ctx.say(R.day2.stream, () => objective(R.obj.stream, 'Jump from stone to stone — Space')); }
+    if (F.told && !F.crossed) {
+      // in the water? Out, back to the near bank, and very cold
+      if (Math.abs(P.pos.z - FORD_Z) < 4.4 && P.pos.y < F.y + 0.1 && P.onGround) {
+        particles.burst(P.pos.x, F.y + 0.2, P.pos.z, 30, { color: 0xd8f4ff, speed: 5, size: 0.5, life: 0.7, gravity: 6 }); sfx.hurt();
+        ctx.bark('tanoc', R.day2.splash[(F.dunk = (F.dunk || 0) + 1) % R.day2.splash.length], 2.5);
+        place(P, roadX(FORD_Z + 7), FORD_Z + 7, Math.PI); P.vel.set(0, 0, 0);
+      }
+      if (P.pos.z < FORD_Z - 5) { F.crossed = true; ctx.say(R.day2.across, () => { objective('Climb through the forest with the Carpenter', ''); setGoal(camps[1].x, camps[1].y, camps[1].z); }); }
+    }
+    if (sub === 'walk' && F.crossed && P.pos.distanceTo(V3(camps[1].x, camps[1].y, camps[1].z)) < 10) {
       sub = 'send'; setGoal(); camps[1].on = true; B.stay = V3(camps[1].x + 2.2, 0, camps[1].z - 1.5);
       ctx.say(R.day2.send, () => {
         sub = 'hunt';
@@ -486,13 +585,55 @@ export function createRoad(ctx) {
   }
 
   /* ===== Day 3: rain, and the Carpenter talks ===== */
+  let D3 = null;
   function startDay3() {
-    stage = 'day3'; ctx.save('day3');
+    stage = 'day3'; sub = 'rain'; ctx.save('day3'); D3 = { rain: true };
     ctx.cards(R.day3.cards, 3400, () => {
       place(P, camps[1].x - 2, camps[1].z + 1.5, -Math.PI / 2); B.stay = V3(camps[1].x + 2.2, 0, camps[1].z - 1.5); place(B, B.stay.x, B.stay.z);
       setDusk(0.75); camps[1].on = true; ctx.play();
-      ctx.say(R.day3.talk, () => startDay4());
+      ctx.say(R.day3.talk, () => {
+        // night. The rain stops; the amulets hum; something pale waits in the trees
+        D3.rain = false; setDusk(1); sub = 'wisp';
+        const a = -0.6, wx = camps[1].x + Math.cos(a) * 16, wz = camps[1].z + Math.sin(a) * 16;
+        D3.w = buildSniller(0.75); fold(D3.w, 0.5); D3.w.position.set(wx, heightAt(wx, wz) + 1.2, wz); scene.add(D3.w);
+        // the stone ring it leads him to, off the road in the trees
+        D3.ring = V3(roadX(CAMP2.z) - 38, 0, CAMP2.z - 40);
+        for (let k = 0; k < 60 && trees3(D3.ring).length; k++) D3.ring.set(roadX(CAMP2.z) - 30 - Math.random() * 14, 0, CAMP2.z - 28 - Math.random() * 26);   // a clearing
+        D3.ring.y = heightAt(D3.ring.x, D3.ring.z);
+        for (const t of trees3(D3.ring)) solids.splice(solids.indexOf(t), 1);
+        for (let k = 0; k < 7; k++) { const ang = k / 7 * TAU, sx = D3.ring.x + Math.cos(ang) * 4.2, sz = D3.ring.z + Math.sin(ang) * 4.2, st = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8 + Math.random(), 0.7), toon(0x6a7a62)); st.position.set(sx, heightAt(sx, sz) + 0.8, sz); st.rotation.y = -ang; addOutline(st, 0.04); scene.add(st); cyl(sx, sz, 0.5, heightAt(sx, sz) - 1, heightAt(sx, sz) + 1.8); }
+        ctx.say(R.day3.hum, () => { objective(R.obj.wisp, 'It keeps just ahead of you'); setGoal(D3.w.position.x, D3.w.position.y - 1, D3.w.position.z); });
+      });
     });
+  }
+  /* clear any tree trunks out of the stone ring so the boy can walk in */
+  function trees3(c) { return solids.filter(t => t.kind === 'cyl' && Math.hypot(t.x - c.x, t.z - c.z) < 7 && t.r < 1.6); }
+  function day3Tick(dt) {
+    if (!D3) return;
+    if (sub === 'wisp' && D3.w) {
+      const w = D3.w.position, d = Math.hypot(P.pos.x - w.x, P.pos.z - w.z), to = D3.ring;
+      const rem = Math.hypot(to.x - w.x, to.z - w.z);
+      if (d < 11 && rem > 1) {   // drifts on ahead, toward the ring
+        const k = Math.min(1, 4.2 * dt / rem); w.x += (to.x - w.x) * k; w.z += (to.z - w.z) * k;
+        if (!D3.told) { D3.told = true; ctx.bark('tale', R.day3.wispNear, 3.5); }
+      }
+      w.y = heightAt(w.x, w.z) + 1.2 + Math.sin(t * 2) * 0.2;
+      D3.w.rotation.y = Math.atan2(P.pos.x - w.x, P.pos.z - w.z);
+      setGoal(w.x, w.y - 1, w.z);
+      if (rem < 1.2 && d < 9) {
+        sub = 'wispGone'; particles.burst(w.x, w.y + 2, w.z, 60, { color: 0x6af0e0, speed: 5, size: 0.6, life: 1.2, gravity: -2 }); sfx.core();
+        scene.remove(D3.w); D3.w = null;
+        ctx.say(R.day3.wispGone, () => {
+          const it = addItem(V3(to.x, to.y + 1.3, to.z), 'Pry loose the amulet in the stone', () => {
+            dropItem(it); ctx.amulets(1); sfx.core(); ctx.toast('Sniller amulet — into the Relic-bound bag', 2.2);
+            ctx.say(R.day3.wispAmulet, () => { sub = 'back'; objective(R.obj.wispBack, ''); setGoal(camps[1].x, camps[1].y, camps[1].z); });
+          }, amuletMesh());
+          const st = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 1.2), toon(0x5a6a52)); st.position.set(to.x, to.y + 1, to.z - 0.6); addOutline(st, 0.04); scene.add(st);
+          objective(R.obj.wispAmulet, ''); setGoal(to.x, to.y, to.z);
+        });
+      }
+    }
+    if (sub === 'back' && P.pos.distanceTo(V3(camps[1].x, P.pos.y, camps[1].z)) < 6) { sub = 'slept'; setGoal(); ctx.say(R.day3.back, () => startDay4()); }
   }
 
   /* ===== Day 4: the pass, and the Rodak ===== */
@@ -503,27 +644,59 @@ export function createRoad(ctx) {
     ctx.cards(R.day4.cards, 3400, () => {
       place(P, roadX(PASS0 + 10), PASS0 + 10, Math.PI); place(B, roadX(PASS0 + 12) + 2, PASS0 + 12, Math.PI); B.stay = null;
       if (K.on) place(K, roadX(PASS0 + 12) - 2, PASS0 + 12, Math.PI);
-      CAM.yaw = 0; setDusk(0.25); P.hp = 100; D4 = { left: 0 };
+      CAM.yaw = 0; setDusk(0.25); P.hp = 100; D4 = { left: 0, rocks: [], rockT: 1, alpha: null };
       ctx.play(); ctx.location('The Mountain Pass', 'Day four');
       objective(R.obj.day4, ''); setGoal(roadX(AMBUSH), heightAt(roadX(AMBUSH), AMBUSH), AMBUSH);
     });
   }
-  function day4Tick() {
-    if (sub === 'walk' && P.pos.z < AMBUSH + 25) {
+  function rockTick(dt) {
+    // falling rocks: a shadow first, then the rock
+    for (let i = D4.rocks.length - 1; i >= 0; i--) {
+      const r = D4.rocks[i]; r.t += dt;
+      const k = Math.min(1, r.t / r.fall); r.m.position.y = lerp(r.y0, r.g + r.s * 0.6, k * k); r.m.rotation.x += dt * 5;
+      r.sh.scale.setScalar(0.4 + k * 0.8); r.sh.material.opacity = 0.25 + k * 0.4;
+      if (k >= 1 && !r.hit) {
+        r.hit = true; particles.burst(r.x, r.g + 0.5, r.z, 22, { color: 0x9a9284, speed: 6, size: 0.5, life: 0.6, gravity: -10 }); sfx.slam(); shake = Math.max(shake, 0.3);
+        if (Math.hypot(P.pos.x - r.x, P.pos.z - r.z) < r.s + 0.9 && P.iframes <= 0) hurtTanoc(12, V3(r.x, r.g, r.z));
+      }
+      if (r.t > r.fall + 2.5) { scene.remove(r.m); scene.remove(r.sh); D4.rocks.splice(i, 1); }
+    }
+    if (sub !== 'rocks') return;
+    D4.rockT -= dt;
+    if (D4.rockT <= 0) {
+      D4.rockT = 0.55 + Math.random() * 0.5;
+      const lead = 2.5 + Math.random() * 4, x = P.pos.x + P.vel.x * 0.9 + (Math.random() - 0.5) * 6, z = P.pos.z + P.vel.z * 0.9 - lead * 0.3 + (Math.random() - 0.5) * 5;
+      const g = heightAt(x, z), sz = 0.8 + Math.random() * 0.9;
+      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(sz, 0), toon(0x8a8478)); m.position.set(x, g + 26, z); addOutline(m, 0.04); scene.add(m);
+      const sh = new THREE.Mesh(new THREE.CircleGeometry(sz + 0.6, 16), new THREE.MeshBasicMaterial({ color: 0x1a1008, transparent: true, opacity: 0.25, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.set(x, g + 0.08, z); scene.add(sh);
+      D4.rocks.push({ m, sh, x, z, g, s: sz, y0: g + 26, t: 0, fall: 1.15 });
+    }
+    if (P.pos.z < ROCK1) { sub = 'walk'; ctx.say(R.day4.rocksDone, () => objective(R.obj.day4, '')); }
+  }
+  function day4Tick(dt) {
+    rockTick(dt);
+    if (sub === 'walk' && !D4.rocked && P.pos.z < ROCK0) { D4.rocked = true; sub = 'rocks'; ctx.say(R.day4.rocks, () => objective(R.obj.rocks, 'Keep moving — a shadow means a rock')); }
+    if (sub === 'walk' && D4.rocked && P.pos.z < AMBUSH + 25) {
       sub = 'fight'; setGoal();
       for (let k = 0; k < 4; k++) { const a = -0.9 + k * 0.6, x = P.pos.x + Math.sin(a) * 18 + (k % 2 ? 6 : -6), z = P.pos.z - Math.cos(a) * 16; addFoe('rodak', x, z); }
       ctx.say(R.day4.warn, () => d4Objective());
     }
     if (sub === 'fight') {
-      const left = foes.filter(f => f.kind === 'rodak' && !f.dead && !f.fled).length;
+      const left = foes.filter(f => f.kind === 'rodak' && !f.dead && !f.fled && !f.alpha).length + (D4.alpha && !D4.alpha.dead ? 1 : 0);
       if (left !== D4.left) { D4.left = left; d4Objective(); }
+      if (left === 0 && !D4.alpha) {   // the leader comes for the boy himself
+        const a = P.yaw + Math.PI, ax = P.pos.x + Math.sin(a) * 14, az = P.pos.z + Math.cos(a) * 14;
+        D4.alpha = addFoe('rodak', ax, az); D4.alpha.alpha = true; D4.alpha.a.root.scale.multiplyScalar(1.4); D4.alpha.hp = D4.alpha.max = 95;
+        particles.burst(ax, D4.alpha.pos.y + 1, az, 30, { color: 0x3a3a4a, speed: 6, size: 0.5, life: 0.8 });
+        ctx.say(R.day4.alpha, () => d4Objective()); return;
+      }
       if (left === 0) {
         sub = 'won';
         ctx.say(R.day4.won, () => { ctx.save('day5'); ctx.cards(R.day5.cards, 3600, () => { done = true; ctx.onDone(); }); });
       }
     }
   }
-  function d4Objective() { objective(R.obj.rodak(D4.left), 'Left-click to swing — the Carpenter and your Punk fight beside you'); }
+  function d4Objective() { objective(D4.alpha && !D4.alpha.dead ? 'Bring down the pack’s leader' : R.obj.rodak(D4.left), D4.alpha ? 'Q — the fire-stone, if it’s on a quick slot · left-click to swing' : 'Left-click to swing — the Carpenter and your Punk fight beside you'); }
 
   /* ---------------- foes and critters ---------------- */
   function addFoe(kind, x, z) {
@@ -548,9 +721,9 @@ export function createRoad(ctx) {
     f.dead = true; sfx.die();
     particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 26, { color: 0x3a3a4a, speed: 8, size: 0.45, life: 0.8, gravity: -6 });
     f.deadT = 0;
-    // Rodak never stay to bury their own: past the second, the rest of the pack is gone
-    const rodakDown = foes.filter(o => o.kind === 'rodak' && o.dead).length;
-    if (rodakDown >= 2) for (const o of foes) if (o.kind === 'rodak' && !o.dead && !o.fled) { o.fled = true; o.state = 'flee'; o.timer = 4; }
+    // Rodak never stay to bury their own: past the second, the rest of the pack is gone — and the leader comes
+    const rodakDown = foes.filter(o => o.kind === 'rodak' && o.dead && !o.alpha).length;
+    if (rodakDown >= 2 && !f.alpha) for (const o of foes) if (o.kind === 'rodak' && !o.dead && !o.fled && !o.alpha) { o.fled = true; o.state = 'flee'; o.timer = 4; }
   }
   function updateFoes(dt, playing) {
     for (const f of foes) {
@@ -567,7 +740,7 @@ export function createRoad(ctx) {
         if (d < 11 && playing) { wy = Math.atan2(-dx, -dz) + Math.sin(t * 3 + f.pos.x) * 0.6; want = 5.6; }
         else { f.timer -= dt; if (f.timer <= 0) { f.timer = 2 + rng() * 3; f.wy = rng() * TAU; } wy = f.wy || 0; want = 1; }
       } else if (playing) {
-        const reach = f.kind === 'rodak' ? 2.2 : 1.9, dmg = f.kind === 'rodak' ? 9 : 6;
+        const reach = f.alpha ? 2.8 : f.kind === 'rodak' ? 2.2 : 1.9, dmg = f.alpha ? 13 : f.kind === 'rodak' ? 9 : 6;
         if (f.state === 'windup') {
           f.timer -= dt; wy = Math.atan2(dx, dz); f.windup = 1 - f.timer / 0.55;
           if (f.timer <= 0) {
@@ -597,11 +770,45 @@ export function createRoad(ctx) {
       f.a.animate(dt, { speed: Math.hypot(f.vel.x, f.vel.z), t, windup: f.windup || 0, attack: f.attackA || 0 });
     }
   }
+  function chopLog() {
+    const L = EV.log, mid = L.logs[1];
+    L.hits++; sfx.hit(); shake = Math.max(shake, 0.25);
+    particles.burst(mid.m.position.x + (P.pos.x - L.x) * 0.3, mid.m.position.y + 0.4, L.z, 18, { color: 0xc8a070, speed: 5, size: 0.35, life: 0.6, gravity: -8 });
+    if (L.hits < 3) { ctx.bark('buhkon', L.hits === 1 ? 'One.' : 'Two. Put your back in it.', 1.6); return; }
+    L.open = true; scene.remove(mid.m); const i = solids.indexOf(mid.s); if (i >= 0) solids.splice(i, 1);
+    particles.burst(L.x, mid.m.position.y, L.z, 50, { color: 0xb8905a, speed: 8, size: 0.5, life: 0.9, gravity: -8 }); sfx.slam();
+    ctx.say(R.day2.logDone);
+  }
   function hurtTanoc(dmg, from) {
     P.hp -= dmg; P.iframes = 0.6; shake = Math.max(shake, 0.35); sfx.hurt();
     const d = V3(P.pos.x - from.x, 0, P.pos.z - from.z).normalize(); P.vel.addScaledVector(d, 6);
     if (P.hp <= 0) { P.hp = 60; P.iframes = 1.5; ctx.toast('Buhkon hauls you up by the collar. “Up. Again.”', 3); }
     ctx.hp(P.hp / 100);
+  }
+
+  /* ---------------- the fire-stone, once its trigger is found: Q (or wherever it's slotted) ---------------- */
+  const bolts = [];
+  let boltCd = 0, hasStone = false;
+  function useSlot(id) {
+    if (id !== 'r_firestone' || !hasStone || boltCd > 0 || stage === 'market') return;
+    boltCd = 1.4;
+    let tgt = null, bd = 30;
+    for (const f of foes) { if (f.dead || f.fled) continue; const dx = f.pos.x - P.pos.x, dz = f.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < bd && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.6) { bd = d; tgt = f; } }
+    const from = V3(P.pos.x, P.pos.y + 1.3, P.pos.z);
+    const vel = tgt ? V3(tgt.pos.x, tgt.pos.y + 0.8, tgt.pos.z).sub(from).normalize().multiplyScalar(32) : V3(-Math.sin(CAM.yaw) * 32, 1, -Math.cos(CAM.yaw) * 32);
+    P.yaw = Math.atan2(vel.x, vel.z);
+    const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 0), toon(0xffd060, { emissive: 0xff7a20, emissiveIntensity: 1 }))); g.add(glowSprite(0xff8a2a, 1.8, 0.9));
+    g.position.copy(from); scene.add(g); bolts.push({ g, vel, life: 1.1 }); sfx.flare();
+  }
+  function updateBolts(dt) {
+    boltCd = Math.max(0, boltCd - dt);
+    for (let i = bolts.length - 1; i >= 0; i--) {
+      const b = bolts[i], p = b.g.position; b.life -= dt; p.addScaledVector(b.vel, dt);
+      particles.emit(p.x, p.y, p.z, { vx: 0, vy: 0.4, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.45, life: 0.35, drag: 1 });
+      let hit = b.life <= 0 || solidAt(p.x, p.y, p.z);
+      for (const f of foes) { if (hit || f.dead || f.fled || f.pos.distanceTo(p) > 1.6) continue; hitFoe(f, f.kind === 'kofi' ? 1 : 22, P.pos); hit = true; }
+      if (hit) { particles.burst(p.x, p.y, p.z, 16, { color: 0xff8a2a, speed: 5, size: 0.4, life: 0.5 }); scene.remove(b.g); bolts.splice(i, 1); }
+    }
   }
 
   /* ---------------- the walker, the Carpenter, the Punk ---------------- */
@@ -643,6 +850,8 @@ export function createRoad(ctx) {
           const dx = f.pos.x - P.pos.x, dz = f.pos.z - P.pos.z, d = Math.hypot(dx, dz);
           if (d < 2.7 && (dx * Math.sin(P.yaw) + dz * Math.cos(P.yaw)) / (d || 1) > 0.2) hitFoe(f, f.kind === 'kofi' ? 1 : 16, P.pos);
         }
+        const L = EV.log;
+        if (L && !L.open && Math.abs(P.pos.x - L.x) < 4.2 && Math.abs(P.pos.z - L.z) < 2.8) chopLog();
       }
     }
     const speed = Math.hypot(P.vel.x, P.vel.z);
@@ -709,7 +918,11 @@ export function createRoad(ctx) {
       }
       if (playing && sub === 'pack') { MK.t -= dt; if (MK.t <= 0) marketMaterialize(); }
     }
-    if (playing) { if (stage === 'day1') day1Tick(); if (stage === 'day2') { day2Tick(); day2Back(); } if (stage === 'day4') day4Tick(); }
+    if (playing) { if (stage === 'day1') day1Tick(); if (stage === 'day2') { day2Tick(); day2Back(); } if (stage === 'day3') day3Tick(dt); if (stage === 'day4') day4Tick(dt); }
+    updateBolts(dt);
+    if (D1 && D1.sn) { D1.snT += dt; D1.sn.userData.tick(t); D1.sn.position.x += dt * 3; if (D1.snT > 9) { particles.burst(D1.sn.position.x, D1.sn.position.y + 4, D1.sn.position.z, 40, { color: 0x6af0e0, speed: 8, size: 1, life: 1 }); scene.remove(D1.sn); D1.sn = null; } }
+    if (D3 && D3.w) D3.w.userData.tick(t);
+    if (D3 && D3.rain) for (let k = 0; k < 6; k++) particles.emit(camPos.x + (Math.random() - 0.5) * 30, camPos.y + 8 + Math.random() * 4, camPos.z + (Math.random() - 0.5) * 30, { vx: 0.5, vy: -22, vz: 0, color: 0xc8d8e8, size: 0.18, life: 0.6, drag: 0 });
     // camps glow at night
     for (const c of camps) { c.fire.visible = c.on; c.light.intensity = c.on ? 1.6 + Math.sin(t * 9) * 0.3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
     if (stage === 'day4' && Math.random() < 0.3) particles.emit(camPos.x + (Math.random() - 0.5) * 40, camPos.y + (Math.random() - 0.3) * 6, camPos.z + (Math.random() - 0.5) * 40, { vx: 0.6, vy: 0, vz: 0, color: 0xe8eef4, size: 2.4, life: 3, drag: 0.2 });   // mist in the pass
@@ -739,6 +952,12 @@ export function createRoad(ctx) {
   }
 
   function start(at) {
+    hasStone = at === 'day2' || at === 'day3' || at === 'day4' || at === 'day5';
+    if (ctx.slotsHud) ctx.slotsHud(hasStone);
+    if (at === 'day3' || at === 'day4') {   // the road behind is already cleared
+      const L = EV.log, mid = L.logs[1]; L.open = true; scene.remove(mid.m); const i = solids.indexOf(mid.s); if (i >= 0) solids.splice(i, 1);
+      EV.ford.crossed = true; EV.ford.told = true;
+    }
     if (at === 'day1') startDay1(); else if (at === 'day2') { D1 = { pebble: true }; startDay2(); } else if (at === 'day3') { K.on = true; startDay3(); } else if (at === 'day4') { K.on = true; startDay4(); } else startMarket();
   }
   function dispose() {
@@ -746,7 +965,7 @@ export function createRoad(ctx) {
     composer.dispose && composer.dispose();
   }
   return {
-    start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose,
-    get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, get MK() { return MK; } },
+    start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot,
+    get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }

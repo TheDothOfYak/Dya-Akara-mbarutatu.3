@@ -318,7 +318,9 @@ export const CODEX_MORE = [
 
 export const STONES = {
   x_square: ['A brass plate on the fountain:', '"XILIA — come in, sit down, have you eaten?"'],
-  x_yard: ['Burned into a beam over the workshop door:', '"Buhkon Eldi, Carpenter. Ships, sheds, cradles, and lost boys mended."'],
+  p_yard: ['Burned into a beam over the workshop door:', '"Buhkon Eldi, Carpenter. Ships, sheds, cradles, and lost boys mended."'],
+  p_path: ['A waystone beside the forest path, furred with moss:', '"Land of the House of Eldi. Walk softly. Leave the toadstools be — they light the way home."'],
+  p_lookout: ['Scratched into the flat rock at the top of the hill:', '"From here you can see the whole of it, and the whole of it can see you. — B."'],
   x_hideout: ['Scratched into a tree by the hideout, in a Duskareth hand:', '"The Duat is closer here. It is closer everywhere, lately."'],
   a_gate: ['Carved over the gate, worn almost smooth:', '"AAKALAY — WHERE EVERY OATH IS KEPT."', 'Someone has scratched beneath it, much later: "by force."'],
   a_library: ['A shelf-plaque from the library:', '"Memory stores are for recalling history accurately. Dwellers may use them for travel. Do not drink from the cistern — it remembers."'],
@@ -652,6 +654,9 @@ export const YOUNG = {
     ['tanoc', 'I… don’t know. It was glinting. And then it was humming. Is that calling?'],
     ['buhkon', 'It might be. That’s a Relic. There’s a Hurst in it — a soul that’s settled in for a long, quiet life. This one keeps you on your feet: a little less tired, a little less hungry.'],
     ['buhkon', 'Most folk carry a few. Few folk ever hear one hum. Keep it.'],
+    ['tanoc', 'What’s its trigger? The fire-stone wanted a pebble.'],
+    ['buhkon', 'Hold it flat against your chest and breathe slow — in for four, out for four. It likes a steady heart. When you’re spent, it’ll give you a second wind.'],
+    ['tale', 'You hold the stone to your chest and breathe. It hums back, in time. You have the humming stone’s trigger — set it on a quick slot in your book (I).'],
     ['buhkon', 'And since you can hear them — let me show you how to listen properly. Close your eyes. Listen with your Hurst, not your ears. And push.'],
   ],
   hlyst: [
@@ -670,7 +675,7 @@ export const YOUNG = {
     ['buhkon', 'That’s enough for one day. You’ll stay — for as long as you want to. There’s a lot to learn, and I’d rather you learned it here than out there.'],
     ['tanoc', 'Buhkon… the Angels. The Sniller. They all looked at me. Why?'],
     ['buhkon', 'Because of what you are. And that is a long story, and you have a long time to hear it.'],
-    ['buhkon', 'For now: the town’s yours. Meet people. Help where you can. Keep those amulets close — and keep your hat on.'],
+    ['buhkon', 'For now: the land’s yours, all of it, and the town along the path. Meet people. Help where you can. Keep those amulets close — and keep your hat on.'],
   ],
   stryx: [['stryx', 'An Eikar boy with somebody else’s hat. Not a passenger. Come back when you have a name of your own.']],
   buhkonIdle: [
@@ -680,7 +685,7 @@ export const YOUNG = {
     'Sniller amulets wander. Use your Nur’Hlyst — they glow cold teal.',
   ],
   pass: 'Rockfall across the Megla Pass — and Buhkon said three days of mist past it. Not today.',
-  chapterEnd: 'Chapter I ends here — more of Tanoc’s story is coming. Until then, Beuhk is yours.',
+  chapterEnd: 'Chapter I ends here — more of Tanoc’s story is coming. Until then, the property and Beuhk are yours.',
 };
 export const YOUNG_OBJ = {
   explore: 'Step outside and look around',
@@ -689,7 +694,7 @@ export const YOUNG_OBJ = {
   dummies: n => `Knock down Buhkon’s straw dummies (${n}/3)`,
   glide: 'Climb the tower, jump, and hold Space to glide',
   back: 'Return to Buhkon',
-  free: 'Chapter I — Beuhk is yours. More of Tanoc’s story is coming.',
+  free: 'Chapter I — the property and Beuhk are yours. More of Tanoc’s story is coming.',
 };
 
 /* ================================================================
@@ -699,6 +704,8 @@ export const YOUNG_OBJ = {
 SPEAKERS.hurst = { name: 'The Hurst', color: '#ff9a4a', sub: 'in the fire-stone' };
 SPEAKERS.punk = { name: 'The Punk', color: '#9ad86a', sub: 'young, and following' };
 SPEAKERS.folk = { name: 'Beuhk folk', color: '#e8d8a8', sub: 'overheard' };
+SPEAKERS.family = { name: 'A family on the road', color: '#e8d8a8', sub: 'out of Fyrsti’Vilag' };
+SPEAKERS.resident = { name: 'Townsfolk', color: '#e8d8a8', sub: 'at home' };
 
 export const ROAD = {
   /* the market scene now happens in Fyrsti'Vilag, Xikia's own city of that name */
@@ -732,6 +739,22 @@ export const ROAD = {
       ['tanoc', 'That’s it? That’s the whole lesson?'],
       ['buhkon', 'Listening is the whole lesson. Goodnight.'],
     ],
+    cartSee: [
+      ['family', 'Oh — oh, thank the Tatu, someone. Our wheel came off in the ditch and went rolling off into the field. With everything we own on this cart.'],
+      ['buhkon', 'Go on, Tanoc. Young legs. I’ll steady the axle.'],
+    ],
+    wheelGot: 'A cart wheel, nearly as tall as you. You roll it back toward the road.',
+    cartFixed: [
+      ['tale', 'You and the Carpenter heave the wheel onto the axle. The cart rights itself with a groan.'],
+      ['family', 'Out of Fyrsti’Vilag the same as you, I’d guess. Did you see it? The sky just — stopped. They say the Angels are gone. Gone!'],
+      ['family', 'Here — a bun, for the boy. Fresh this morning. Well. Fresh this morning in a city that was screaming.'],
+      ['buhkon', 'Safe roads to you. Keep north of the river tonight — the low road floods.'],
+    ],
+    hedge: [['tanoc', 'Something’s humming in the hedge… another amulet! It must have blown all the way out here.']],
+    sniller: [
+      ['tanoc', 'Buhkon. Buhkon, out over the fields — is that one of THEM?'],
+      ['buhkon', 'Keep walking. It isn’t looking for us. They can’t stay solid long now — the Angels saw to that.'],
+    ],
     stoneMenu: 'The fire-stone sits warm in your palm. A thumb-shaped dip in the top. What do you try?',
     press: [['tale', 'You press your thumb into the dip. It’s warm. Nothing else happens. Somewhere in the stone, something snickers.']],
     talkTo: [
@@ -750,6 +773,17 @@ export const ROAD = {
   },
   day2: {
     cards: ['Day two.', 'The road climbs into the forest. Dense, green, and old.'],
+    log: [
+      ['tale', 'A great pine lies across the road, roots and all, as if something pushed it over in the night.'],
+      ['buhkon', 'Well. Your hatchet, Tanoc. Middle of the trunk, where it’s thinnest — three good swings.'],
+    ],
+    logDone: [['buhkon', 'Hah! That’s an Ahoac’s swing. Through we go.']],
+    stream: [
+      ['buhkon', 'The ford. Mind the stones — the water’s snow-melt, and it bites.'],
+      ['tanoc', 'Stepping stones. I can do stepping stones. I was going to catch the Firefall.'],
+    ],
+    splash: ['COLD! Cold cold cold —', 'Ahh! It’s like ice!', 'Buhkon is laughing. You can hear him laughing.'],
+    across: [['buhkon', 'Dry feet. More or less. On to camp.']],
     send: [
       ['buhkon', 'We’ll eat better if one of us hunts. Not me — I’m old and I’m comfortable.'],
       ['buhkon', 'There are Kofi Galta all through these woods. Bring one back. And don’t go further than you can still see the smoke.'],
@@ -769,6 +803,24 @@ export const ROAD = {
     ],
   },
   day3: {
+    hum: [
+      ['tale', 'Night. The rain has stopped. The Carpenter sleeps — or pretends to — and the bag of amulets at your feet begins, very softly, to hum.'],
+      ['tale', 'At the edge of the firelight, between the trees, something pale is standing. A spinning storm where its legs should be. A single cold eye.'],
+      ['tanoc', '(…It’s not solid. I can see the trees through it. It wants me to follow.)'],
+    ],
+    wispNear: 'It drifts back as you come — always just ahead, always just beyond the light.',
+    wispGone: [
+      ['tale', 'In a ring of mossy stones the pale shape stops, turns its one eye on you — and comes apart like smoke in the wind.'],
+      ['tale', 'Where it stood, an amulet is set deep into the oldest stone, humming the same note as the ones in your bag.'],
+    ],
+    wispAmulet: [['tanoc', 'It brought me here. To this. …Why would it want me to have it?']],
+    back: [
+      ['buhkon', 'You followed one.'],
+      ['tanoc', 'You were awake!'],
+      ['buhkon', 'I’m always awake. Listen to me now: they hum toward something, and they will try to take you to it. Never follow one alone at night again. Promise me.'],
+      ['tanoc', '…I promise.'],
+      ['buhkon', 'Good. Sleep. The pass tomorrow.'],
+    ],
     cards: ['Day three.', 'Rain in the forest. They wait it out at the camp, and the Carpenter talks.'],
     talk: [
       ['buhkon', 'You want to know what happened to you. I’ll give you the pieces I have.'],
@@ -782,12 +834,15 @@ export const ROAD = {
   },
   day4: {
     cards: ['Day four.', 'The mountain pass. Thin air, loose stone, and too many shadows keeping pace on the ridge.'],
+    rocks: [['buhkon', 'Rocks! Off the ridge — watch the shadows, and keep moving!']],
+    rocksDone: [['buhkon', 'Through. Breathe. And don’t look up there again — there’s worse waiting.']],
+    alpha: [['buhkon', 'That’s the pack’s leader. Bigger, older, and hungry. Fire, Tanoc — if that stone of yours is willing!']],
     warn: [
       ['buhkon', 'Rodak. They’ve been following since the treeline — waiting for one of us to get hurt.'],
       ['buhkon', 'They won’t wait anymore. Back to back, Tanoc. Hatchet up.'],
     ],
     won: [
-      ['buhkon', 'Fell one and the rest of the pack goes. Rodak never stay to bury their own.'],
+      ['buhkon', 'The leader’s down, and the rest of the pack goes with it. Rodak never stay to bury their own.'],
       ['buhkon', 'You did well. Your Punk did better.'],
     ],
   },
@@ -807,13 +862,24 @@ export const ROAD = {
     heard: [['tanoc', '(…they’re talking about me.)'], ['buhkon', 'They are. Which is why we leave at first light.']],
   },
   day6: {
-    cards: ['Day six.', 'The last of it: out of town by the little road, west and up.'],
-    obj: 'Follow the little road west out of Beuhk to the Carpenter’s hill',
+    cards: ['Day six.', 'The last of it: out of town by the little road west, over the river, and into the trees.'],
+    obj: 'Take the forest path west out of Beuhk to the Carpenter’s',
+    path: [
+      ['tale', 'The trees close over the road like a roof. Pine and cold green light, and the town noise gone all at once behind you.'],
+      ['tanoc', 'He said follow it to the top. …It’s a long way to the top.'],
+    ],
+    pathBarks: [
+      ['tanoc', 'Glowing toadstools. In the daytime. Or — no, they’re just pale. I bet they glow at night.'],
+      ['tanoc', 'A brook! And a little bridge. Somebody looks after this path.'],
+      ['tanoc', 'A carved stone, all moss. Something about the Eldi house. Eldi — that’s his name, isn’t it?'],
+      ['tanoc', 'The light’s getting brighter up ahead. The trees are thinning.'],
+    ],
     crest: [
-      'Tanoc crests the hill.',
-      'A big house and a workshop at the top. A barn. A tower. Fenced fields, and a lake below, shining all the way to a dark forest on the far shore.',
-      'Mountains to the west and south. Big sky over all of it.',
-      'Home, the Carpenter says, as if it were nothing at all.',
+      'The trees open, and Tanoc stops dead at the top of the path.',
+      'The land falls away below him, long and slow and green, all the way down to a lake so big it shines to a dark forest on the far shore.',
+      'Partway down the slope: a big house — a very big house — and a workshop, a barn, a tower, a woodshed, fenced fields, a pasture full of Punks, a lane down to an old dock.',
+      'Far off to the south, one blue line of mountains. Everywhere else, forest, going on and on. Big sky over all of it.',
+      'Home, the Carpenter says from the porch, as if it were nothing at all.',
     ],
   },
   /* objectives for the road */
@@ -824,6 +890,14 @@ export const ROAD = {
     hunt: 'Hunt a Kofi Galta in the forest — stay in sight of the smoke',
     back: 'Bring it back to the camp',
     day4: 'Cross the mountain pass',
+    cart: 'Find the family’s cart wheel in the field',
+    cartBack: 'Roll the wheel back to the cart',
+    log: 'Chop through the fallen pine (three swings)',
+    stream: 'Cross the ford on the stepping stones',
+    wisp: 'Follow the pale shape into the trees',
+    wispAmulet: 'Pry loose the amulet in the stone ring',
+    wispBack: 'Go back to the camp',
+    rocks: 'Get through the rockslide — watch the shadows',
     rodak: n => `Drive off the Rodak (${n} left)`,
     day5: 'Rest in Beuhk — and listen',
     meet: 'Find the Carpenter by the town hearth',

@@ -110,7 +110,7 @@ export class Kit {
   done() { this.mesh.instanceMatrix.needsUpdate = true; if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true; this.mesh.computeBoundingSphere(); }
 }
 
-export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84a', '#8ea446', '#d2b860', '#b7b04e'], N = 26000) {
+export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84a', '#8ea446', '#d2b860', '#b7b04e'], N = 26000, cx = 0, cz = 0, span = 360) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute([-0.09, 0, 0, 0.09, 0, 0, 0, 1, 0.02], 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
@@ -129,7 +129,7 @@ export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), cc = new THREE.Color();
   let n = 0;
   for (let i = 0; i < N * 3 && n < N; i++) {
-    const x = (rng() - 0.5) * 360, z = (rng() - 0.5) * 360;
+    const x = cx + (rng() - 0.5) * span, z = cz + (rng() - 0.5) * span;
     if (!ok(x, z)) continue;
     const clump = fbm(x * 0.06, z * 0.06, 2);
     if (clump < 0.42 && rng() < 0.7) continue;

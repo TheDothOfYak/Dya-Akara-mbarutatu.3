@@ -150,7 +150,8 @@
   #hud.velki #compass,#hud.velki #vitals,#hud.velki #abilities,#hud.velki #spells,#hud.velki #crosshair,#hud.velki #qtrack,#hud.velki #levelup,#hud.velki #ehp,#hud.velki #lock,#hud.velki #boss{display:none}
   #hud.velki.roadhp #vitals{display:flex}
   #hud.velki.roadhp #xpline,#hud.velki.roadhp #stam,#hud.velki.roadhp #heat,#hud.velki.roadhp #belt{display:none}
-  #hud.young #abilities,#hud.young #spells,#hud.young #heat,#hud.young #qtrack{display:none}
+  #hud.young #abilities,#hud.young #heat,#hud.young #qtrack{display:none}
+  #hud.velki.roadhp.slots #spells{display:flex}
   #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:30;transition:opacity .8s}
   #cards{position:fixed;inset:0;z-index:31;display:flex;align-items:center;justify-content:center;pointer-events:none}
   #cards p{max-width:760px;text-align:center;font-size:clamp(20px,2.4vw,28px);line-height:1.5;padding:0 30px;opacity:0;transition:opacity 1s;text-shadow:0 2px 8px #000}
@@ -236,6 +237,10 @@
   #rbody{overflow:auto;padding-right:6px}
   #rbody h3{font-family:var(--display);font-size:13px;letter-spacing:.2em;color:var(--brass);text-transform:uppercase;margin:14px 0 8px}
   #rbody h3 small{font-family:var(--body);text-transform:none;letter-spacing:0;color:var(--ink-dim);font-size:14px;margin-left:8px}
+  .rslots{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 10px;margin-bottom:6px}
+  .rslot{display:flex;align-items:center;gap:8px}
+  .rslot kbd{font-family:var(--display);font-size:12px;min-width:22px;text-align:center;background:var(--brass);color:var(--navy);border-radius:4px;padding:2px 6px}
+  .rslot select{flex:1;font:14px var(--body);color:var(--ink);background:rgba(0,0,0,.35);border:1px solid var(--brass-dim);border-radius:6px;padding:4px 6px}
   .rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
   .rcard{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid rgba(243,207,122,.18);border-radius:8px;background:rgba(0,0,0,.2)}
   .rcard.on{border-color:var(--violet);box-shadow:0 0 10px rgba(180,138,255,.3)}
@@ -275,6 +280,7 @@
   #spells{position:absolute;right:22px;bottom:96px;display:flex;gap:8px}
   #spells .ab{width:46px;height:46px;font-size:19px}
   #spells .ab.locked{opacity:.3}
+  #spells .ab.empty{opacity:.35;font-size:14px}
   #levelup{position:absolute;top:30%;left:0;right:0;text-align:center;font-family:var(--display);font-size:clamp(26px,4vw,44px);color:#e0c8ff;text-shadow:0 0 24px #7a3cff,0 3px 0 #000;opacity:0;transition:opacity .6s;letter-spacing:.14em}
   #levelup.show{opacity:1}
   @media (max-width:760px){ #quest{width:220px} .bar{width:180px} .bar.thin{width:150px} #abilities{transform:scale(.8);transform-origin:bottom right} }
@@ -394,7 +400,7 @@
   <div id="spells"></div>
   <div id="abilities">
     <div class="ab brass" id="ab-duat"><span class="lbl">Duat Strike</span>🜂<span class="key">RMB</span><div class="cd"></div></div>
-    <div class="ab brass" id="ab-flare"><span class="lbl">Tukang</span>🔥<span class="key">Q</span><div class="cd"></div></div>
+    <div class="ab brass" id="ab-flare"><span class="lbl">Tukang heat</span>🔥<div class="cd"></div></div>
     <div class="ab brass" id="ab-sense"><span class="lbl">Nur Sense</span>✧<span class="key">F</span><div class="cd"></div></div>
   </div>
 </div>

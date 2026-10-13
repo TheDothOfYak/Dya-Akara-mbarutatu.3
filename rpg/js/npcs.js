@@ -326,7 +326,7 @@ export const NPCS = {
   aakalay: [],
   /* Beuhk, the home town (positions are absolute here) */
   xilia: [
-    { id: 'buhkon', name: 'Buhkon Eldi', title: 'the Carpenter', look: 'buhkon', pos: [-188, 52], roles: [], quests: [],
+    { id: 'buhkon', name: 'Buhkon Eldi', title: 'the Carpenter', look: 'buhkon', pos: [10, 64], roles: [], quests: [],
       hello: ['Calm first, then quick. Calm first.', 'You wore that hat the day I found you. It still suits you, little one.'] },
     { id: 'hemla', name: 'Hemla', title: 'Kalo\u2019Eik trader', look: 'hemla', pos: [-8, 60], roles: ['shop'], quests: ['q_vel'],
       hello: ['Shards for goods, goods for shards. The Kalo keep fair books, little Stamijan.', 'You smell like Punk. That\u2019s not a complaint — it\u2019s a sales opportunity.'] },
@@ -348,6 +348,11 @@ export const NPCS = {
       hello: ['The Stryx won\u2019t fly without a hot seed in the stern. Ask it yourself.', 'Fire trees never burn. Their seeds, though — whoosh.'] },
     { id: 'kw1', name: 'Orrin', title: 'a Keilia builder', look: 'keilia', pos: [30, 70], wander: true, roles: [], quests: ['q_scaffold'],
       hello: ['Mind the scaffold.', 'We build. The Kalo make our hammers. Never the other way round.'] },
+  ],
+  /* the Carpenter's own land, out along the forest path */
+  property: [
+    { id: 'buhkon', name: 'Buhkon Eldi', title: 'the Carpenter', look: 'buhkon', pos: [252, 34], roles: [], quests: [],
+      hello: ['Calm first, then quick. Calm first.', 'You wore that hat the day I found you. It still suits you, little one.'] },
   ],
   leotik: [
     { id: 'venkin', name: 'Venkin', title: 'Keilia builder', look: 'keilia', at: [-12, -8], roles: ['cook'], quests: ['q_pups'],

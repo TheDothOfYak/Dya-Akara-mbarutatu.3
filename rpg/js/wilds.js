@@ -28,6 +28,12 @@ const LAND = {
     ['rodak', RARE, ['forest', 'hills'], [2, 3]], ['stryx', RARE, ['hills', 'mountain'], [1, 1], 3], ['gynge', RARE, ['meadow', 'forest', 'hills'], [1, 1], 2],
     ['ular_naga', VERY_RARE, ['mountain', 'hills', 'forest'], [1, 1], 1], ['lutut', VERY_RARE, ['mountain', 'hills'], [1, 1], 1], ['kuni_wild', VERY_RARE, ['mountain'], [1, 1], 1],
   ],
+  /* the Carpenter's land: gentle, mostly — the wilder things keep to the far forest */
+  property: [
+    ['kofi', COMMON, null, [1, 3]], ['uff', COMMON, ['meadow', 'forest', 'hills'], [1, 3]], ['makari', COMMON, ['meadow', 'shore', 'forest'], [1, 1]],
+    ['mikolo_moko', UNCOMMON, ['forest', 'meadow'], [1, 2]], ['big_momma_kofi', UNCOMMON, ['meadow'], [1, 1]], ['kipsu_f', UNCOMMON, ['meadow', 'hills'], [2, 3]],
+    ['rubbermcfly', UNCOMMON, ['meadow', 'forest'], [1, 2]], ['tonguatjis', RARE, ['shore'], [1, 1], 1], ['punk', RARE, ['forest'], [2, 3]], ['rodak', RARE, ['forest'], [2, 3], 2],
+  ],
   aakalay: [
     ['kofi', UNCOMMON, null, [1, 2]], ['uff', COMMON, ['forest', 'ruins', 'meadow'], [1, 2]], ['makari', COMMON, ['lake', 'forest', 'ruins'], [1, 1]],
     ['mikolo_moko', UNCOMMON, ['forest'], [1, 1]], ['rubbermcfly', UNCOMMON, ['forest', 'ruins'], [1, 1]], ['eldi_grothyn', UNCOMMON, ['ash', 'hills'], [1, 1]],
@@ -45,11 +51,12 @@ const LAND = {
 /* water folk: [kind, weight, minDepth, group, cap] */
 const WATER = {
   xilia: [['raf_krabbi', COMMON, 0.3, [1, 3]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', RARE, 3, [1, 2], 2], ['hvaleia', VERY_RARE, 8, [1, 1], 1], ['su_naga', VERY_RARE, 10, [1, 1], 1]],
+  property: [['raf_krabbi', COMMON, 0.3, [1, 3]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', VERY_RARE, 8, [1, 1], 1]],
   aakalay: [['raf_krabbi', COMMON, 0.3, [1, 2]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', RARE, 3, [1, 1], 1], ['hvaleia', VERY_RARE, 8, [1, 1], 1], ['su_naga', VERY_RARE, 10, [1, 1], 1]],
   leotik: [['raf_krabbi', COMMON, 0.3, [1, 2]], ['su_grothyn', UNCOMMON, 0.5, [1, 2]], ['harkal', UNCOMMON, 3, [1, 3], 4], ['hvaleia', RARE, 8, [1, 1], 2], ['su_naga', RARE, 10, [1, 1], 1]],
 };
-const SLOTS = { xilia: 2, aakalay: 1, leotik: 3 };          // rolls per land zone — Aakalay is all but empty
-const WATER_SLOTS = { xilia: 10, aakalay: 7, leotik: 16 };
+const SLOTS = { xilia: 2, aakalay: 1, leotik: 3, property: 2 };          // rolls per land zone — Aakalay is all but empty
+const WATER_SLOTS = { xilia: 10, aakalay: 7, leotik: 16, property: 8 };
 
 function pick(table, ok) {
   const opts = table.filter(ok);
@@ -93,7 +100,7 @@ export function createWilds(ctx) {
   function spawnWater() {
     if (!W) return;
     // sample the water once: where it is, and how deep
-    const R = Math.max(250, world.edgeRadius(0, 0) * 1.6), pts = [];
+    const R = Math.max(250, world.edgeRadius(0, 0) * 1.6, ...(W.lakes || []).map(l => Math.max(Math.abs(l.x) + l.rx, Math.abs(l.z) + l.rz))), pts = [];
     for (let x = -R; x <= R; x += 12) for (let z = -R; z <= R; z += 12) {
       const jx = x + (Math.random() - 0.5) * 8, jz = z + (Math.random() - 0.5) * 8;
       if (W.isWater(jx, jz)) pts.push({ x: jx, z: jz, d: W.depth(jx, jz) });

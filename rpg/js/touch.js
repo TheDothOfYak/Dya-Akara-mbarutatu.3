@@ -15,7 +15,7 @@ const BTN = [
   ['dodge', '⤿', 'KeyC', true, 'main'],
   ['duat', '🜂', 'duat', false, 'main'],
   ['use', 'E', 'KeyE', false, 'main'],
-  ['flare', '🔥', 'KeyQ', false, 'kit'],
+  ['flare', 'Q', 'KeyQ', false, 'kit'],              // the Q quick slot (whatever's on it)
   ['sense', '✧', 'KeyF', false, 'kit'],
   ['hlyst', '◎', 'KeyG', false, 'kit'],
   ['flask', '⚗', 'KeyR', false, 'kit'],
@@ -23,6 +23,7 @@ const BTN = [
   ['throw', '🧨', 'KeyX', false, 'kit'],
   ['kuni', '🪶', 'KeyB', false, 'kit'],
   ['whistle', '♪', 'KeyH', false, 'kit'],
+  ['punkatk', '🎃', 'CapsLock', false, 'kit'],        // Brindle attacks, while you ride her
 ];
 const TOP = [['pause', '☰', 'pause'], ['pack', '🎒', 'KeyI'], ['skills', '✦', 'KeyK'], ['quests', '📜', 'KeyJ'], ['map', '🗺', 'KeyM'], ['book', '📖', 'Tab']];
 const DYA = [['dq', '◀', 'KeyQ'], ['de', '▶', 'KeyE'], ['dr', 'Ready', 'KeyR'], ['d1', '1', 'Digit1'], ['d2', '2', 'Digit2'], ['d3', '3', 'Digit3'], ['d4', '4', 'Digit4'], ['d5', '5', 'Digit5'], ['dthrow', 'Throw', 'dthrow'], ['dv', 'View', 'KeyV']];
