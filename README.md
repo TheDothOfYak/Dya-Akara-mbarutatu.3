@@ -97,6 +97,28 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **Lore in the wilds.** Kill a RubberMcFly, the most perfect creature, and the ShurgrEdan answers: a claw of light out of a quiet sky that can't be blocked (it takes most of your health, and can kill you on Realistic). Phorus will never shoot one. Rodak travel in threes, and if you fell one the rest of the pack is gone. The Rokarvac has new entries for the Sunear'Zikhron, RubberMcFly, the ShurgrEdan, the Megla Pass and the four Dearcineon directions.
 
+**The creatures of the lore.** Every creature from the Mbaru Tatu notes is in the worlds, each built to match its description. A few examples:
+- The Kofi Galta: a crescent body with blade spines and a fluffy dark tail tuft.
+- The Stryx: a wide, flat stone body with two huge spiral horns.
+- The RubberMcFly: a ball with a beak, butterfly wings and two little legs.
+- The Sru Vorn: long, low and heavy, with tusks and a spiked-ball tail.
+
+New ones:
+- The Api Buta: a blind manta of fire.
+- The Cyitor: a one-eyed ghost with two sword-blade arms.
+- The Xiw'Katkan: a fluffy, bat-winged devil with a trident.
+- The Vyrenalur: a stag of shadow crowned with light.
+- The Aerolhorn: vast, with long tendrils.
+- The Great Nekh'Vorran: a ringed, ancient worm.
+
+The Carpenter's land follows the notes:
+- On the land: Punk herds, Kipsu, Albali Byrds, a Stryx by the workshop, RubberMcFly, Makari and Kofi everywhere.
+- Across the lake: a territorial Sru Vorn and the wilder Kipsu packs.
+- North, toward the Megla Aagac: Rodak, Lutut and Malsti Punks.
+- In the lake: Harkal sharks, Grothyn, and down deep an ancient Su Naga.
+
+The great ones are only ever seen from far off. The Aerolhorn crosses the sky now and then, the Nekh'Vorran arcs out of the land in the distance, and the Vyrenalur shows itself only at night, deep in the far forest, and is gone when you come close.
+
 **Swimming and steep ground.** Deep water no longer stops you: wade in and Torcain swims, head and shoulders above the surface, in every lake, river and lagoon, and a little way out to sea off Leotik. Only the far sea and water by the region's edge turn you back. Swimming is slower, there's no rolling in the water, and land creatures won't follow you in. Ground steeper than about 51° can't be walked or hopped up any more; you slide along it, and you slip off ground that steep if you stop on it. Built stairs, piers and roofs are unaffected.
 
 **Touch controls.** The RPG plays on phones and tablets, and the controls turn on at the first touch:
