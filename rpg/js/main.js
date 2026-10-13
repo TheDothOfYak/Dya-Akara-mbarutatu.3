@@ -18,7 +18,7 @@ import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
 import { buildTorcain, buildPhorus, buildCore } from './actors.js';
-import { buildDomesticPunk, buildMalstiPunk, buildSkorThal } from './esik_land.js';
+import { buildDomesticPunk, buildMalstiPunk, buildSkorThal, buildStryx } from './esik_land.js';
 import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
 import { createWilds } from './wilds.js';
@@ -26,6 +26,10 @@ import { initTouch } from './touch.js';
 import { createSunear } from './sunear.js';
 import { createVelki, buildAngel, buildSniller } from './velki.js';
 import { createRoad } from './road.js';
+import { createCaves } from './caves.js';
+import { createMegla } from './megla.js';
+import { createCrater } from './crater.js';
+import { createFinale } from './finale.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -217,7 +221,7 @@ let FX = effects(SAVE.inv, SAVE.time);
 function applyUps(full) {
   FX = effects(SAVE.inv, SAVE.time);
   P.maxHp = 100 + 15 * rank('vigor') + 5 * (SAVE.skills.lvl - 1) + 10 * SAVE.seeds + FX.hp;
-  P.stamMax = 100 + 18 * rank('breath') + 10 * SAVE.seeds;
+  P.stamMax = 100 + 18 * rank('breath') + 10 * SAVE.seeds + (SAVE.flags.link === 'done' ? 20 : 0);
   P.flasksMax = D.flasks + rank('film') + (SAVE.flags.flask_bonus ? 1 : 0);
   if (full) { P.hp = P.maxHp; P.stam = P.stamMax; P.flasks = P.flasksMax; }
   P.hp = Math.min(P.hp, P.maxHp);
@@ -328,10 +332,10 @@ function onKey(code) {
   if (book && book.isOpen()) { if (code === 'Escape' || code === 'KeyI' || code === 'KeyK' || code === 'KeyJ' || code === 'KeyM' || code === 'Tab') book.close(); return; }
   if (G.mode === 'memory') { if (code === 'KeyE' || code === 'Space' || code === 'Enter' || code === 'Escape') closeMemory(); return; }
   if (!$('lantern').classList.contains('hidden')) { if (code === 'Escape' || code === 'KeyE') closeLantern(); return; }
-  if (VK) { if (G.mode === 'play' && !G.paused) { if (code === 'Space') VK.jump(); if (code === 'KeyE') VK.interact(); } return; }
+  if (VK) { if (G.mode === 'play' && !G.paused) { if (code === 'Space') VK.jump(); if (code === 'KeyE') VK.interact(); if (code === 'KeyQ' && VK.fireStone) VK.fireStone(); } return; }
   if (code === 'Tab' && G.mode === 'play') { toggleJournal(); return; }
   if (G.mode !== 'play' || G.paused) return;
-  if (young() && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM', 'KeyK', 'KeyJ', 'KeyG', 'KeyR', 'KeyT'].includes(code)) return;   // a boy of thirteen, with a hatchet and nothing else
+  if (young() && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM', 'KeyK', 'KeyJ', 'KeyG', 'KeyR', 'KeyT', 'KeyQ', 'KeyH'].includes(code)) return;   // a boy of thirteen, with a hatchet and nothing else
   if (dyaMatch) {
     if (code === 'KeyV') { dyaOverview = !dyaOverview; return; }
     if (dyaMatch.key(code)) return;
@@ -339,7 +343,7 @@ function onKey(code) {
   }
   if (code === 'Space') P.jumpBuf = 0.15;
   if (code === 'KeyE') interact();
-  if (code === 'KeyQ') tukangFlare();
+  if (code === 'KeyQ') { if (young()) fireStoneMain(); else tukangFlare(); }
   if (code === 'KeyF') nurSense();
   if (code === 'KeyC') dodge();
   if (code === 'KeyR') drinkFilm();
@@ -756,11 +760,11 @@ function updateProjectiles(dt) {
         p.vel.lerp(to.normalize().multiplyScalar(30), 1 - Math.exp(-8 * dt));
         if (d < (tgt.isBoss ? 3 : 1.1)) {
           if (tgt.isBoss) damageBoss(p.dmg, { raw: true }); else enemies.damage(tgt, p.dmg, F.pos, 2.5, { stun: 0.2, raw: true });
-          particles.burst(p.pos.x, p.pos.y, p.pos.z, 16, { color: 0x7ad8ff, speed: 6, size: 0.4, life: 0.5 });
+          particles.burst(p.pos.x, p.pos.y, p.pos.z, 16, { color: p.owner === 'tanoc' ? 0xff8a2a : 0x7ad8ff, speed: 6, size: 0.4, life: 0.5 });
           p.life = 0;
         }
       }
-      if (Math.random() < 0.8) particles.emit(p.pos.x, p.pos.y, p.pos.z, { color: 0x9adfff, size: 0.35, life: 0.35, speed: 0.4 });
+      if (Math.random() < 0.8) particles.emit(p.pos.x, p.pos.y, p.pos.z, { color: p.owner === 'tanoc' ? (Math.random() < 0.5 ? 0xff8a2a : 0xffd060) : 0x9adfff, size: 0.35, life: 0.35, speed: 0.4 });
     }
     p.pos.addScaledVector(p.vel, dt);
     p.sprite.position.copy(p.pos);
@@ -1107,7 +1111,7 @@ function wakePillarVisual(p) { p.woken = true; p.mat.emissiveIntensity = 0.9; p.
 function interactables() {
   const list = [];
   if (G.mode !== 'play' || P.dead) return list;
-  if (young()) { if (relicOut()) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); }
+  if (young()) { if (relicOut()) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); list.push(...arcInteractables()); }
   else if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
   else if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
   else list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => talkPhorus(), far: 2.6 });
@@ -1136,7 +1140,7 @@ function interactables() {
     else if (!e.petted) list.push({ pos: e.pos, label: e.kind === 'kipsu_f' ? 'Pet the Kipsu' : 'Pat the Punk', act: () => petCreature(e), far: 2.6 });
   }
   list.push(...wilds.interactables(P));
-  if (mount) list.push({ pos: mount.pos, label: P.riding ? 'Climb down from Brindle' : 'Ride Brindle', act: () => toggleRide(), far: P.riding ? 99 : 3 });
+  if (mount) list.push({ pos: mount.pos, label: P.riding ? `Climb down from ${mountName()}` : `Ride ${mountName()}`, act: () => toggleRide(), far: P.riding ? 99 : 3 });
   for (const c of feats.chests) if (!c.open) list.push({ pos: V3(c.x, c.y, c.z), label: 'Open the chest', act: () => openChest(c), far: 2.6 });
   for (const n of feats.nodes) if (n.ready) list.push({ pos: V3(n.x, n.y, n.z), label: n.label, act: () => gather(n), far: 2.6 });
   for (const t of feats.trials) list.push({ pos: V3(t.x, t.y, t.z), label: t.done ? `${t.name} — passed` : `Begin the ${t.name}`, act: () => startTrial(t), far: 2.8 });
@@ -1584,11 +1588,13 @@ function nurHlyst() {
   for (const m of hlyst.marks) scene.remove(m); hlyst.marks.length = 0;
   particles.ring(P.pos.x, P.pos.y + 0.6, P.pos.z, 90, 30, { color: 0xffd27a, size: 0.7, life: 1.3, drag: 0.2 });
   sfx.sense();
-  const found = { amulet: 0, chest: 0, node: 0, other: 0, scar: 0 };
+  const found = { amulet: 0, chest: 0, node: 0, other: 0, scar: 0, threat: 0 };
   const mark = (x, y, z, col, kind) => {
     if (Math.hypot(x - P.pos.x, z - P.pos.z) > range) return;
     const sp = glowSprite(col, 2.6, 0.95); sp.position.set(x, y + 1.6, z); scene.add(sp); hlyst.marks.push(sp); found[kind]++;
   };
+  // the Carpenter's buried chest answers faintly, in purple, to a boy who listens
+  if (young() && ARC_SPOTS.chest && F_.chest !== 'played' && Math.hypot(ARC_SPOTS.chest.x - P.pos.x, ARC_SPOTS.chest.z - P.pos.z) <= range) { mark(ARC_SPOTS.chest.x, ARC_SPOTS.chest.y + 0.3, ARC_SPOTS.chest.z, 0xb48aff, 'other'); if (!F_.chestSeen) { F_.chestSeen = true; persist(); toast('Something under the roots answers — faintly, in purple.', 3); } }
   for (const a of amulets) if (!a.got) { mark(a.x, a.y, a.z, 0x6af0e0, 'amulet'); if (Math.hypot(a.x - P.pos.x, a.z - P.pos.z) <= range) a.revealed = true; }
   for (const c of feats.chests) if (!c.open) mark(c.x, c.y, c.z, 0xffd27a, 'chest');
   for (const n of feats.nodes) if (n.ready) mark(n.x, n.y, n.z, 0xf3cf7a, 'node');
@@ -1596,11 +1602,15 @@ function nurHlyst() {
   for (const pg of pages) if (pg.mesh.visible) mark(pg.x, pg.y, pg.z, 0xb48aff, 'other');
   if (SAVE.quests.q_thorn === 'active') for (const sc of scars) if (!SAVE.cleared[sc.id] && Math.hypot(sc.x - P.pos.x, sc.z - P.pos.z) <= range) { mark(sc.x, sc.y + 0.4, sc.z, 0x9af0a0, 'scar'); sc.revealed = true; }
   if (seedMesh && seedMesh.visible) mark(world.seedSpot.x, world.seedSpot.y, world.seedSpot.z, 0xff8a3a, 'other');
+  // Relics answer blue; threats, red-orange
+  if (young() && relicOut()) mark(RELIC_SPOT.x, RELIC_SPOT.y, RELIC_SPOT.z, 0x5aa0ff, 'other');
+  for (const e of enemies.list) if (!e.dead && e.hostile && !e.T.disp) { mark(e.pos.x, e.pos.y + 0.6, e.pos.z, 0xff6a2a, 'threat'); }
   const bits = [];
   if (found.amulet) bits.push(`${found.amulet} Sniller amulet${found.amulet > 1 ? 's' : ''}`);
   if (found.chest) bits.push(`${found.chest} chest${found.chest > 1 ? 's' : ''}`);
   if (found.scar) bits.push(`${found.scar} scarred tree${found.scar > 1 ? 's' : ''}`);
   if (found.node) bits.push(`${found.node} thing${found.node > 1 ? 's' : ''} to gather`);
+  if (found.threat) bits.push(`${found.threat} threat${found.threat > 1 ? 's' : ''}`);
   toast(bits.length ? 'Nur’Hlyst — the world answers: ' + bits.join(' · ') : 'Nur’Hlyst — nothing hidden answers here.', 3);
   for (const m of hlyst.marks) m.material.opacity = 0;
 }
@@ -2347,6 +2357,7 @@ function npcTalk(n) {
   const def = n.def, who = npcSpeaker(def);
   n.talking = 3;
   if (def.id === 'buhkon') { if (young()) youngBuhkon(n); else buhkonTalk(n); return; }
+  if (def.id === 'venkin' && young() && F_.ch === 'venkin') { arcVenkin(n); return; }
   const opts = [];
   for (const qid of def.quests) {
     const q = QUESTS[qid], st = SAVE.quests[qid];
@@ -2530,24 +2541,29 @@ function flyKuni(dt, wish, moving, act) {
 
 /* ---------------- Brindle, your Punk ---------------- */
 let mount = null;
+const mountName = () => (young() && F_.punkName ? F_.punkName : 'Brindle');
 function makeMount(nearPlayer) {
   if (mount) return;
-  const actor = buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 }); actor.root.scale.setScalar(0.8);   // Brindle: a horse-sized youngster
+  const kid = young();
+  const actor = kid ? buildDomesticPunk({ saddle: (F_.year || 0) >= 2, blanket: 0x2a5a3a, seed: 31 }) : buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 });
+  actor.root.scale.setScalar(kid ? 0.5 + 0.07 * (F_.year || 0) : 0.8);   // Brindle: a horse-sized youngster; Tanoc's Punk grows up with him
   const p = nearPlayer ? P.pos.clone().add(V3(3, 0, 3)) : camp ? V3(camp.pen.x, 0, camp.pen.z) : world.pen ? V3(world.pen.x + 3, 0, world.pen.z) : P.pos.clone().add(V3(4, 0, 4));
   p.y = world.col.ground(p.x, p.z, world.heightAt(p.x, p.z) + 1);
   actor.root.position.copy(p); scene.add(actor.root);
   mount = { actor, pos: p, vel: V3(), yaw: 0, coming: false };
 }
 if (SAVE.flags.mount) makeMount(false);
+else if (young() && F_.pro === 'done' && F_.punkName) makeMount(false);
 function whistle() {
-  if (!mount) { toast('You whistle. Nothing comes. (Old Ruut might lend you a Punk.)', 2.5); return; }
+  if (!mount) { toast(young() ? 'You whistle. Nothing comes yet.' : 'You whistle. Nothing comes. (Old Ruut might lend you a Punk.)', 2.5); return; }
   sfx.blink();
   if (P.riding) return;
   if (mount.pos.distanceTo(P.pos) > 60) { mount.pos.copy(P.pos).add(V3(-6, 0, 6)); mount.pos.y = world.col.ground(mount.pos.x, mount.pos.z, P.pos.y + 3); }
-  mount.coming = true; toast('Brindle comes running.', 1.8);
+  mount.coming = true; toast(`${mountName()} comes running.`, 1.8);
 }
 function toggleRide() {
   if (!mount) return;
+  if (young() && !P.riding && (F_.year || 0) < 2) { toast(`${mountName()} is still too small to ride. Give it a year.`, 2.5); return; }
   if (P.riding) {
     P.riding = false;
     P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
@@ -3588,7 +3604,7 @@ function frame() {
       if (dyaMatch) { dyaMatch.update(dt, G.t); dyaMatch.updateAim(dyaAimPoint()); dyaMatch.placeBars(camera); }
       checkLocations();
       if (young() && F_.pro === 'beuhk') beuhkTick();
-      else if (young()) youngTick();
+      else if (young()) { youngTick(); arcTick(dt); }
       if (REGION === 'xilia') {
         if (F_.tut === 3 && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
         if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
@@ -3698,25 +3714,22 @@ function leaveVelki() {
 function youngHud() {
   document.querySelector('#vitals .name').innerHTML = `TANOC <small>Filugani</small><span id="lvl">${$('lvl') ? $('lvl').textContent : 'LV 1'}</span>`;
 }
-function askName(cb) {
+function askName(title, ph, cb) {
+  if (typeof title === 'function') { cb = title; title = 'NAME YOUR PUNK'; ph = 'Pip'; }
   G.mode = 'naming';   // not 'play': letting go of the mouse to type isn't a pause
   if (document.pointerLockElement) document.exitPointerLock();
   const box = document.createElement('div');
   box.id = 'pk-box'; box.className = 'brass'; box.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:45;padding:22px 26px;text-align:center;min-width:280px';
-  box.innerHTML = '<div style="font-family:var(--display);letter-spacing:.12em;margin-bottom:10px">NAME YOUR PUNK</div><input id="pk-name" maxlength="18" style="font:inherit;font-size:18px;padding:6px 10px;width:220px" placeholder="Pip"><div style="margin-top:12px"><button class="btn" id="pk-ok">That’s its name</button></div>';
+  box.innerHTML = `<div style="font-family:var(--display);letter-spacing:.12em;margin-bottom:10px">${title}</div><input id="pk-name" maxlength="18" style="font:inherit;font-size:18px;padding:6px 10px;width:220px" placeholder="${ph}"><div style="margin-top:12px"><button class="btn" id="pk-ok">That’s its name</button></div>`;
   document.body.appendChild(box);
   const inp = box.querySelector('#pk-name'); setTimeout(() => inp.focus(), 50);
-  const done = () => { const n = (inp.value || '').replace(/[<>&"]/g, '').trim() || 'Pip'; box.remove(); G.mode = 'play'; lockMouse(); cb(n); };
+  const done = () => { const n = (inp.value || '').replace(/[<>&"]/g, '').trim() || ph; box.remove(); G.mode = 'play'; lockMouse(); cb(n); };
   box.querySelector('#pk-ok').onclick = done;
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(); e.stopPropagation(); });
 }
-function startRoad(at) {
-  F_.pro = 'road'; F_.young = true; F_.roadAt = at || 'market'; persist();
-  G.mode = 'intro'; G.t = 0;
-  $('hud').classList.remove('hidden'); $('hud').classList.add('velki', 'roadhp');
-  youngHud();
-  if (F_.punkName) STORY.SPEAKERS.punk.name = F_.punkName;
-  VK = createRoad({
+/* what every story scene borrows from the page */
+function sceneCtx() {
+  return {
     camera, keys, touch, CAM, sfx,
     makeComposer(sc) {
       const c = new EffectComposer(renderer);
@@ -3734,12 +3747,53 @@ function startRoad(at) {
     objective: (head, text, h, pips, on) => proObjective(head, text, h, pips, on),
     blur: px => { canvas.style.transition = px ? 'filter .4s' : 'filter 1.6s'; canvas.style.filter = `blur(${px}px)`; },
     hp: v => { $('hp-fill').style.transform = $('hp-lag').style.transform = `scaleX(${Math.max(0, v)})`; },
+    give: (id, n = 1) => { invAdd(SAVE.inv, id, n); lootToast(id, n); persist(); },
+    flag: (k, v) => { F_[k] = v; persist(); }, flagged: k => !!F_[k],
+    hasFireStone: () => !!SAVE.inv.items.r_firestone, hasLongevity: () => !!SAVE.inv.items.r_longevity,
+    breath: () => (SAVE.inv.items.r_breath ? 60 : 12), age: F_.year || 0,
+    amuletCount: () => SAVE.inv.items.amulet || 0,
+  };
+}
+/* a story scene: the caves, the Megla Aagac, the crater, the night the Sniller woke */
+const SCENES = { caves: createCaves, megla: createMegla, crater: createCrater, finale: createFinale };
+function runScene(name, at) {
+  F_.scene = { name, at: at || '' }; persist();
+  G.mode = 'intro'; G.t = 0;
+  $('hud').classList.remove('hidden'); $('hud').classList.add('velki', 'roadhp');
+  youngHud();
+  if (F_.punkName) STORY.SPEAKERS.punk.name = F_.punkName;
+  if (F_.malstiName) STORY.SPEAKERS.malsti.name = F_.malstiName;
+  fade(1, 0.6);
+  setTimeout(() => {
+    VK = SCENES[name](Object.assign(sceneCtx(), {
+      save: a => { F_.scene = { name, at: a }; persist(); },
+      onDone: () => endScene(name),
+    }));
+    VK.start(at);
+    fade(0, 1.4);
+  }, 650);
+}
+function endScene(name) {
+  F_.scene = null; persist();
+  fade(1, 0);
+  if (VK) VK.dispose();
+  VK = null; vkComposer = null; canvas.style.filter = '';
+  $('hud').classList.remove('velki', 'roadhp');
+  arcReturn(name);
+}
+function startRoad(at) {
+  F_.pro = 'road'; F_.young = true; F_.roadAt = at || 'market'; persist();
+  G.mode = 'intro'; G.t = 0;
+  $('hud').classList.remove('hidden'); $('hud').classList.add('velki', 'roadhp');
+  youngHud();
+  if (F_.punkName) STORY.SPEAKERS.punk.name = F_.punkName;
+  VK = createRoad(Object.assign(sceneCtx(), {
     save: a => { F_.roadAt = a; persist(); },
     amulets: n => { invAdd(SAVE.inv, 'amulet', n); persist(); },
     giveFireStone: found => { if (found) { invAdd(SAVE.inv, 'r_firestone', 1); persist(); } },
     punkName: n => { F_.punkName = n; STORY.SPEAKERS.punk.name = n; persist(); },
     onDone: () => leaveRoad(),
-  });
+  }));
   VK.start(F_.roadAt);
   fade(0, 1.4);   // out of the white, out of the dark
 }
@@ -3822,13 +3876,14 @@ function youngGear(on) { for (const k of ['cape', 'relic', 'weapon']) if (torcai
 function applyYoung() {
   if (G.youngOn) return;
   G.youngOn = true;
-  torcain.root.scale.multiplyScalar(0.82);
+  torcain.root.scale.multiplyScalar(0.82 + 0.035 * (F_.year || 0));
   youngGear(false); torcain.weapon.visible = F_.pro === 'done' || F_.pro === 'beuhk';
   document.querySelector('#vitals .name').innerHTML = `TANOC <small>Filugani</small><span id="lvl">${$('lvl') ? $('lvl').textContent : 'LV 1'}</span>`;
   $('hud').classList.add('young');
   phorus.root.visible = false;
   F_.firstLantern = true;   // nobody to wake the lanterns for him with a speech
   restyleAxe();
+  arcDecor();
 }
 /* the humming stone in the lakeshore mud, by the docks */
 const RELIC_SPOT = REGION === 'xilia' ? (world.propShore ? world.propShore.clone() : (() => { const x = 9, z = world.pier.z0 - 3; return V3(x, world.heightAt(x, z), z); })()) : null;
@@ -3873,7 +3928,8 @@ function youngBuhkon(n) {
     });
     return;
   }
-  if (q === 4) { dialog(Y.end, () => { youngSet(5); xp(120); G.shards += 30; toast(Y.chapterEnd, 6); }); return; }
+  if (q === 4) { dialog(Y.end, () => { youngSet(5); xp(120); G.shards += 30; arcBegin(); }); return; }
+  if (q >= 5 && arcBuhkon(n)) return;
   if (q === 0) { dialog([['buhkon', 'Morning! Bread’s on the table. Go and have a look around — the lake’s just down the hill.']]); return; }
   if (q === 2 || q === 3) { dialog(q === 2 ? Y.hlyst.slice(-1) : Y.dummies.slice(-1)); return; }
   ask('buhkon', Y.buhkonIdle[Math.floor(Math.random() * Y.buhkonIdle.length)], [
@@ -3888,7 +3944,7 @@ function youngGoal() {
   if (q === 1 || q === 4) return bk ? bk.pos : null;
   if (q === 2) { const e = enemies.list.find(e => e.kind === 'dummy' && !e.dead); return e ? e.pos : null; }
   if (q === 3) return V3(world.tower.x, world.tower.y, world.tower.z);
-  return null;
+  return arcGoal();
 }
 function youngObjective() {
   const q = F_.yq || 0, O = STORY.YOUNG_OBJ, n = Math.min(3, SAVE.counters.y_dummy || 0);
@@ -3898,8 +3954,156 @@ function youngObjective() {
   else if (q === 2) proObjective(head, O.dummies(n), 'Left-click to swing — keep clicking to combo', 3, n);
   else if (q === 3) proObjective(head, O.glide, 'Jump, then hold Space while falling');
   else if (q === 4) proObjective(head, O.back, '');
-  else proObjective(head, O.free, 'Talk to folk in town — G for Nur’Hlyst');
+  else arcObjective();
 }
+/* ================================================================
+   TANOC'S FIRST ARC — task by task, the way the story goes:
+   link the stone (on the side) · Venkin · the caves under the lake ·
+   the Megla Aagac · the Gynge token · the meteor crater · year five
+   ================================================================ */
+const ARC_YARD = REGION === 'xilia' ? world.yard : { x: 0, z: 0 };
+const ARC_SPOTS = REGION === 'xilia' ? {
+  dock: world.propShore ? world.propShore.clone().add(V3(-2.5, 0, 4)) : V3(),
+  north: V3(ARC_YARD.x - 4, 0, ARC_YARD.z - 28),
+  gate: V3(ARC_YARD.x + 27, 0, ARC_YARD.z),
+  barn: V3(ARC_YARD.x - 14, 0, ARC_YARD.z + 17),
+  tower: V3(world.tower.x + 3.5, 0, world.tower.z + 3.5),
+  chest: V3(-336, 0, 34),
+} : {};
+for (const k in ARC_SPOTS) ARC_SPOTS[k].y = world.col.ground(ARC_SPOTS[k].x, ARC_SPOTS[k].z, world.heightAt(ARC_SPOTS[k].x, ARC_SPOTS[k].z) + 2);
+function setYear(y) {
+  const old = F_.year || 0; if (y <= old) return;
+  F_.year = y; persist();
+  if (G.youngOn) torcain.root.scale.multiplyScalar((0.82 + 0.035 * y) / (0.82 + 0.035 * old));
+  if (mount && young()) mount.actor.root.scale.setScalar(0.5 + 0.07 * y);
+}
+function arcBegin() {
+  F_.ch = 'venkin'; F_.link = 'active'; persist();
+  dialog(STORY.ARC.link.offer, () => { setObjective(); toast('Side task: link the humming stone', 3); });
+}
+function arcLinkReady() { const it = SAVE.inv.items; return (it.vine || 0) >= 2 && (it.ore || 0) >= 1 && (it.petal || 0) >= 2; }
+function arcBuhkon(n) {
+  const A = STORY.ARC, ch = F_.ch;
+  if (F_.link === 'active' && arcLinkReady()) {
+    for (const [id, k] of [['vine', 2], ['ore', 1], ['petal', 2]]) { SAVE.inv.items[id] -= k; if (SAVE.inv.items[id] <= 0) delete SAVE.inv.items[id]; }
+    dialog(A.link.done, () => { F_.link = 'done'; applyUps(false); xp(60); sfx.core(); toast('Longevity Relic linked — +20 stamina', 3); persist(); setObjective(); });
+    return true;
+  }
+  if (ch === 'venkin' && !F_.vOffer) { F_.vOffer = true; dialog(A.venkin.offer, () => setObjective()); return true; }
+  if (ch === 'caves' && !F_.cOffer) { F_.cOffer = true; dialog(A.caves.offer, () => setObjective()); return true; }
+  if (ch === 'megla' && !F_.mOffer) { F_.mOffer = true; dialog(A.megla.offer, () => setObjective()); return true; }
+  if (ch === 'token') {
+    dialog(A.token, () => {
+      if (SAVE.inv.items.gynge_chip) { delete SAVE.inv.items.gynge_chip; }
+      if (SAVE.dya && DYA3.engineReady()) { const tok = DYA3.mintToken('gynge', (Math.random() * 1e9) >>> 0, { name: 'The Megla Gynge' }); DYA3.addToken(SAVE.dya, tok); toast('New token: The Megla Gynge — your first self-made token', 4); }
+      F_.ch = 'crater'; persist();
+      G.mode = 'intro'; playCards(STORY.ARC.years.three, 3400, () => { setYear(3); enterPlay(); setObjective(); });
+    });
+    return true;
+  }
+  if (ch === 'crater' && !F_.crOffer) { F_.crOffer = true; dialog(A.crater.offer, () => setObjective()); return true; }
+  if (F_.link === 'active') { dialog(A.link.wait); return true; }
+  return false;
+}
+function arcVenkin(n) {
+  n.talking = 4;
+  dialog(STORY.ARC.venkin.meet, () => {
+    F_.ch = 'caves'; persist();
+    G.mode = 'intro'; playCards(STORY.ARC.years.one, 3400, () => { setYear(1); enterPlay(); setObjective(); if (DYA3.engineReady() && SAVE.dya && SAVE.dya.pouch.length) hint('Venkin will play Dya’Akara any time — talk to him in town.'); });
+  });
+}
+function arcObjective() {
+  const O = STORY.ARC.obj, ch = F_.ch, head = 'Chapter I · Beuhk', side = F_.link === 'active' ? 'Side task — ' + O.link : '';
+  const sub = t => side || t;
+  if (!ch) proObjective(head, STORY.YOUNG_OBJ.free, 'Talk to folk in town — G for Nur’Hlyst');
+  else if (ch === 'venkin') proObjective(head, F_.vOffer ? O.venkin : 'Talk to Buhkon', sub(''));
+  else if (ch === 'caves') proObjective(head, F_.cOffer ? O.caves : 'Talk to Buhkon — he has something to say about the lake', sub(''));
+  else if (ch === 'megla') proObjective(head, F_.mOffer ? O.meglaGo : O.megla, sub(''));
+  else if (ch === 'token') proObjective(head, O.token, sub(''));
+  else if (ch === 'crater') proObjective(head, F_.crOffer ? O.craterGo : O.crater, sub(''));
+  else if (ch === 'finale') proObjective('Chapter I · year five', O.finale, '');
+  else proObjective('Chapter I · Beuhk', O.free, 'The tower holds your copied cores now. Noka is half a day away.');
+}
+function arcGoal() {
+  const ch = F_.ch, bk = npcs.find(n => n.def.id === 'buhkon');
+  if (F_.link === 'active' && arcLinkReady()) return bk && bk.pos;
+  if (ch === 'venkin') { if (!F_.vOffer) return bk && bk.pos; const v = npcs.find(n => n.def.id === 'venkin'); return v && v.pos; }
+  if (ch === 'caves') return F_.cOffer ? ARC_SPOTS.dock : bk && bk.pos;
+  if (ch === 'megla') return F_.mOffer ? ARC_SPOTS.north : bk && bk.pos;
+  if (ch === 'token') return bk && bk.pos;
+  if (ch === 'crater') return F_.crOffer ? ARC_SPOTS.gate : bk && bk.pos;
+  if (ch === 'finale') return ARC_SPOTS.barn;
+  return null;
+}
+function arcInteractables() {
+  const L = [], ch = F_.ch;
+  if (!ch) return L;
+  if (ch === 'caves' && F_.cOffer) L.push({ pos: ARC_SPOTS.dock, label: 'Dive into the shallow cave under the dock', act: () => runScene('caves'), far: 4 });
+  if (ch === 'megla' && F_.mOffer) L.push({ pos: ARC_SPOTS.north, label: `Ride north to the Megla Aagac${mount ? ' with ' + mountName() : ''}`, act: () => runScene('megla'), far: 4 });
+  if (ch === 'crater' && F_.crOffer) L.push({ pos: ARC_SPOTS.gate, label: 'Set out east with the Carpenter', act: () => runScene('crater'), far: 4 });
+  if (ch === 'finale') L.push({ pos: ARC_SPOTS.barn, label: 'The amulets are ringing — into the barn', act: () => { setYear(5); runScene('finale'); }, far: 4 });
+  if (F_.chestSeen && F_.chest !== 'played') L.push({ pos: ARC_SPOTS.chest, label: F_.chest === 'found' ? 'Throw one of the strange tokens' : 'Dig under the roots', act: () => arcChest(), far: 3 });
+  return L;
+}
+function arcChest() {
+  const C = STORY.ARC.chest;
+  if (F_.chest !== 'found') {
+    dialog(C.found, () => { for (const id of ['ch_letters', 'ch_seals', 'ch_maps', 'ch_tokens']) { invAdd(SAVE.inv, id, 1); lootToast(id, 1); } F_.chest = 'found'; persist(); });
+    return;
+  }
+  const v = glowSprite(0xffd27a, 40, 0.4); v.position.set(ARC_SPOTS.chest.x, ARC_SPOTS.chest.y + 18, ARC_SPOTS.chest.z); scene.add(v);
+  setTimeout(() => scene.remove(v), 6000);
+  dialog(C.play, () => { F_.chest = 'played'; persist(); });
+}
+/* coming home from a story scene */
+function arcReturn(name) {
+  const at = name === 'caves' ? ARC_SPOTS.tower : ARC_SPOTS.gate.clone().add(V3(-8, 0, 2));
+  P.pos.set(at.x, 0, at.z); P.pos.y = world.col.ground(at.x, at.z, world.heightAt(at.x, at.z) + 3); P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos);
+  const bk = npcs.find(n => n.def.id === 'buhkon'); if (bk) { bk.pos.copy(bk.home); bk.actor.root.position.copy(bk.home); }
+  G.mode = 'intro'; introT = 0; G.t = 0;
+  fade(0, 1.4);
+  const home = () => { enterPlay(); showLocation('The Carpenter’s hill', 'home'); setObjective(); };
+  if (name === 'caves') { F_.ch = 'megla'; persist(); dialog(STORY.ARC.caves.home, () => playCards(STORY.ARC.years.two, 3400, () => { setYear(2); arcDecor(); home(); })); enterPlay(); G.mode = 'dialog'; return; }
+  if (name === 'megla') { F_.ch = 'token'; persist(); arcDecor(); playCards(['Home, down the river pass.', `${F_.punkName || 'The Punk'} and ${F_.malstiName || 'the Malsti Punk'} race each other up the hill.`], 3400, home); return; }
+  if (name === 'crater') { F_.ch = 'finale'; persist(); arcDecor(); playCards(['Home again, in a new hat.'].concat(STORY.ARC.years.four), 3400, () => { setYear(4); home(); }); return; }
+  if (name === 'finale') { F_.ch = 'open'; persist(); playCards(['Home.', 'The amulets are quiet. The Carpenter has the kettle on.'], 3400, () => { home(); toast(STORY.ARC.obj.free, 5); }); return; }
+  home();
+}
+/* what the hill gains as the years go: the deep library, the Malsti Punk, the Stryx, the new hat */
+let arcDecorDone = {};
+function arcDecor() {
+  if (REGION !== 'xilia' || !young()) return;
+  if (F_.ch && ['megla', 'token', 'crater', 'finale', 'open'].includes(F_.ch) && !arcDecorDone.lib) {
+    arcDecorDone.lib = true;
+    const l = glowSprite(0xc8d8ff, 3, 0.7); l.position.set(world.tower.x, world.tower.y - 8, world.tower.z); scene.add(l);   // the tower lit: cores, copied below
+  }
+  if (F_.keep && !arcDecorDone.malsti) {
+    arcDecorDone.malsti = true;
+    const m = buildMalstiPunk({ seed: 5 }); const p = ARC_SPOTS.tower.clone().add(V3(2, 0, -1)); m.root.position.copy(p); scene.add(m.root); arcDecorDone.malstiActor = m;
+  }
+  if (SAVE.inv.items.stryx_seedling && !arcDecorDone.stryx) {
+    arcDecorDone.stryx = true;
+    for (const [dx, dz] of [[20, -10], [-12, -14], [8, 22]]) { const s = buildStryx({ seed: dx + dz }); s.root.scale.setScalar(0.35); const x = ARC_YARD.x + dx, z = ARC_YARD.z + dz; s.root.position.set(x, world.heightAt(x, z), z); scene.add(s.root); }
+  }
+  if (F_.newHat && !arcDecorDone.hat) { arcDecorDone.hat = true; torcain.hat.scale.multiplyScalar(1.08); }
+}
+function arcTick(dt) {
+  if (arcDecorDone.malstiActor) { const m = arcDecorDone.malstiActor; m.root.position.y = world.heightAt(m.root.position.x, m.root.position.z) + Math.abs(Math.sin(G.t * 3)) * 0.4; m.animate && m.animate(dt, { speed: 0, t: G.t }); }
+}
+/* the fire-stone, out in the world: a pebble in the dip, and it flies */
+function fireStoneMain() {
+  if (!SAVE.inv.items.r_firestone || G.mode !== 'play' || P.dead) return;
+  if ((P.fsCd || 0) > G.t) return;
+  P.fsCd = G.t + 1.1;
+  const best = bestTarget(30, 0.75);
+  const start = V3(P.pos.x, P.pos.y + 1.3, P.pos.z);
+  const sp = glowSprite(0xff8a2a, 1.1, 1); sp.position.copy(start); scene.add(sp);
+  const dir = best ? best.p.clone().add(V3(0, 0.8, 0)).sub(start).normalize() : camForward();
+  const tgt = best && best.e === 'boss' ? { isBoss: true } : best && best.e && best.e.T ? best.e : null;
+  projectiles.push({ sprite: sp, pos: start, vel: dir.multiplyScalar(28), dmg: 14, owner: 'tanoc', life: 1.4, target: tgt });
+  sfx.flare(); if (best) P.yaw = Math.atan2(dir.x, dir.z);
+}
+
 function youngTick() {
   if (relicMesh) { relicMesh.visible = relicOut(); if (relicMesh.visible) { relicMesh.rotation.y = G.t; relicMesh.children[1].material.opacity = 0.5 + Math.sin(G.t * 3) * 0.3; } }
   if (G.mode !== 'play') return;
@@ -4025,7 +4229,8 @@ $('si-form').onsubmit = async ev => {
 
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'On a phone or tablet: left thumb moves, drag on the right to look, and the buttons fight. Turn your phone sideways for the best view.';
 $('btn-continue').onclick = () => startFromTitle(() => {
-  if (young() && F_.pro === 'done') { if (F_.yq == null) startMorning(); else continueRun(); }
+  if (young() && F_.pro === 'done' && F_.scene) runScene(F_.scene.name, F_.scene.at);
+  else if (young() && F_.pro === 'done') { if (F_.yq == null) startMorning(); else continueRun(); }
   else if (REGION === 'xilia' && F_.pro === 'beuhk') arriveBeuhk();
   else if (REGION === 'xilia' && !F_.xtalked && (F_.pro === 'road' || F_.pro === 'xikia')) startRoad(F_.pro === 'road' ? F_.roadAt : 'market');
   else if (REGION === 'xilia' && !F_.xtalked) beginNew();
@@ -4050,7 +4255,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  get vk() { return VK; }, F_: () => F_, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
+  get vk() { return VK; }, F_: () => F_, startRoad, arriveBeuhk, leaveRoad, runScene, endScene, setYear, arcBegin, get mount() { return mount; }, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,

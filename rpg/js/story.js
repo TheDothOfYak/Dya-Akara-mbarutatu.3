@@ -829,3 +829,268 @@ export const ROAD = {
     meet: 'Find the Carpenter by the town hearth',
   },
 };
+
+/* ================================================================
+   TANOC'S FIRST ARC — Chapter I onward, task by task.
+   Years 1–4 in snapshots, then Year 5 and the fake finale.
+   ================================================================ */
+SPEAKERS.venkin_y = { name: 'Venkin', color: '#e0b070', sub: 'Keilia, builder’s kid, token-mad' };
+SPEAKERS.sniller = { name: 'The Sniller', color: '#6af0e0', sub: 'in the amulet' };
+SPEAKERS.ver = { name: 'Ver master', color: '#b070ff', sub: 'Duskareth' };
+SPEAKERS.researcher = { name: 'Ilse Varrow', color: '#a8d8b0', sub: 'library researcher' };
+SPEAKERS.malsti = { name: 'The Malsti Punk', color: '#c890ff', sub: 'small, and pleased with itself' };
+SPEAKERS.wrath = { name: 'The Bound One', color: '#ff7a7a', sub: 'a Sniller in a Relic' };
+
+export const ARC = {
+  /* the side-objective from Quest 1: link the longevity Relic so it works from home */
+  link: {
+    offer: [
+      ['buhkon', 'That stone of yours. You have to carry it for it to work — unless it’s linked.'],
+      ['buhkon', 'Bring me two Punk vines, a little Stygian ore, and two Zahreh petals. I’ll show you how it’s done.'],
+    ],
+    wait: [['buhkon', 'Two Punk vines, one bit of Stygian ore, two Zahreh petals. The Punks on the hill shed vines; the ore glows gold to Nur’Hlyst; the petals grow all over.']],
+    done: [
+      ['tale', 'The Carpenter winds the vines round the stone, presses the ore in soft, and lays the petals over it like a bandage. Then he hums to it — the stone hums back.'],
+      ['buhkon', 'There. Linked. Leave it on the shelf by your bed, and it’ll still keep you on your feet out there.'],
+      ['buhkon', 'One day you’ll want more than one linked at once. That takes a ring. Not today.'],
+    ],
+  },
+  /* Venkin: one of the only kids in town */
+  venkin: {
+    offer: [
+      ['buhkon', 'There’s a Keilia family in town — builders, good ones. Their youngest, Venkin, is about the only other child in Beuhk.'],
+      ['buhkon', 'Go and find Venkin. Take your tokens. You’ll get on.'],
+    ],
+    meet: [
+      ['venkin_y', 'You’re the boy from the hill! The Carpenter’s boy! Do you play? Tell me you play.'],
+      ['tanoc', 'I’ve got… some tokens. A few I found. A few I, um. Borrowed. On Velki.'],
+      ['venkin_y', 'VELKI tokens?! Oh, they’ll be wild ones. Come on — throw one. Right here.'],
+      ['tale', 'You and Venkin play until the lamplighter chases you off the square. Then you play behind the bakery.'],
+    ],
+  },
+  /* years pass, in snapshots */
+  years: {
+    one: ['Year one.', 'Tanoc learns the hill: every fence-post, every fort, every place the Punk likes to sleep in the sun.'],
+    two: ['Year two.', 'He is taller. The Punk is a great deal taller. The lake has stopped being frightening.'],
+    three: ['Year three.', 'Venkin wins more games than Tanoc does, and says so, often.'],
+    four: ['Year four.', 'The tower fills, slowly, with copied cores. Tanoc reads them by lamplight.'],
+    five: ['Year five.', 'Tanoc is seventeen. The amulets have started to hum at night.'],
+  },
+  /* the lake and the caves beneath it */
+  caves: {
+    offer: [
+      ['buhkon', 'You swim like a stone, Tanoc. That won’t do, living above a lake.'],
+      ['buhkon', 'There’s a shallow cave off the old dock — safe, and lit by the moss. Learn to dive there. Space up, C down. Come up before your lungs complain.'],
+    ],
+    enter: ['The water is cold, and then it isn’t.', 'Under the old dock, a mouth of green-lit rock opens into the hill.'],
+    shallow: [['tale', 'The shallow cave: moss-light, still water, a sandy floor. A good place to practise holding your breath.']],
+    relicSpot: 'Something under the water is drawing a slow circle of light on the cave floor.',
+    relic: [
+      ['tale', 'A shell-stone, ridged like a fan, with a circle of stygian worked into it. It is cold, and very old, and asleep.'],
+      ['hurst', '…mmm… deep… the deep was so… dark… and you are… warm…'],
+      ['tanoc', 'Hello? Are you — are you dreaming?'],
+      ['hurst', '…breathe… with me… slow…'],
+      ['tale', 'Something in your chest unclenches. The water around you feels like air that has simply got thicker.'],
+    ],
+    learned: 'Breath Relic — the shell-stone’s Grothyn Hurst lets you stay under far longer.',
+    crack: 'Behind the curtain of roots, the rock is cracked through — and the crack goes down.',
+    deep: [['tale', 'The hidden cave. It goes on, and on — wet caves, dry caves, tunnels the water has been patient with for longer than there have been Eikar.']],
+    naga: [
+      ['tale', 'Far below, in the dark, something moves that is far too large to be in a lake.'],
+      ['tale', 'A head, then another, then the long gleam of a body. An ancient Su Naga, asleep in the deep, and young sea-things breeding in the warm water round its coils.'],
+      ['tanoc', '(Don’t breathe. Don’t breathe. Don’t — you can’t breathe anyway. Go. Quietly.)'],
+    ],
+    dry: [
+      ['tale', 'The tunnel climbs out of the water into dry stone. The air is still and old. Above you, through a crack, lamplight — and the sound of the Carpenter’s hammer.'],
+      ['tanoc', 'This is under the tower. This is right under the tower.'],
+      ['tale', 'A dry chamber, deep, safe from damp and from anyone who doesn’t know the way. Shelves would fit there. A great many shelves.'],
+    ],
+    home: [
+      ['buhkon', 'You were gone a long while. And you came up through my floor.'],
+      ['tanoc', 'There are caves under everything, Buhkon. There’s a room under the tower — dry, deep — we could keep copies of the cores there. A library nobody could ever burn.'],
+      ['buhkon', '…Yes. Yes, we could. Every core you find, a copy below. Start whenever you like.'],
+    ],
+  },
+  /* the buried chest in the forest — never spoken of */
+  chest: {
+    found: [
+      ['tale', 'Under the roots, a chest of black wood, banded in old brass with a crest you have seen once before — burnt into a beam in the Carpenter’s workshop.'],
+      ['tale', 'Letters, tied in ribbon. Seals of a great house. Jewellery far too fine for a carpenter. Maps — one marked with a single tree, and a name you can’t read.'],
+      ['tale', 'And three tokens, wrapped in silk, that hum against each other like they’re arguing.'],
+    ],
+    play: [
+      ['tale', 'You throw one, just to see. Something vast unfolds over the trees — a silhouette with tendrils and great curved horns — and turns its head to look at you.'],
+      ['tale', 'You put the tokens back exactly as you found them. You never mention it. Neither does he.'],
+    ],
+  },
+  /* Quest 2 — the Megla Aagac */
+  megla: {
+    offer: [
+      ['tale', 'One of the Sniller amulets from Fyrsti’Vilag won’t lie still. At night it turns itself to face north.'],
+      ['sniller', '…north. The Megla Aagac. Something of mine is held there. Something I was set to find.'],
+      ['buhkon', 'The Megla Aagac. It’s a forest — not a tree, a forest — a day north, past the river pass. Mist that doesn’t lift. Things live there that don’t like visitors.'],
+      ['buhkon', 'I won’t tell you not to go. I’ll tell you to go carefully, take the Punk, and come home.'],
+    ],
+    cards: ['The Megla Aagac.', 'A day north, following the river up through the mountain pass. The mist gets heavier with every mile.'],
+    clearing: [['tale', 'A clearing at the forest’s edge. Beyond it, massive dark tree shapes stand in fog so thick they look painted on it.']],
+    rodak: [['tale', 'Rodak in the treeline. Lean, dark, oily, tall — and curious, not hungry. They sense something is about to happen, and they want to be there for after.']],
+    night: [
+      ['tale', 'You camp at the forest’s edge. Behind you the mountains and fields still glow. Ahead, only dark — and now and then a flicker of light, gone too fast.'],
+      ['tale', 'A Lutut screeches, very far off. Silence. An Api Buta bellows. Silence. Then a sound like someone screaming through a closed door — and a very long silence.'],
+    ],
+    morning: [['tale', 'Morning. You and the Punk go in on foot. Your vision blurs a little; the mist thickens.']],
+    thud: [
+      ['tale', 'THUD — off the path, something enormous hitting the ground.'],
+      ['tale', 'The Punk grabs you with every vine it has and bolts back to the clearing.'],
+      ['tanoc', 'No — stay. Stay here. I’ll be back. I promise.'],
+    ],
+    drag: [['tale', 'Where the thud came from: a large animal, stunned and gone, and a drag trail leading deeper in.']],
+    rodakLine: [['tale', 'The Rodak come out of the mist all round you. They don’t block your way. Deeper in, they stop at a line you can’t see, and wait.']],
+    ruins: [['tale', 'Ruins. Old, old stone, half-swallowed by roots. And in one wall, a purple light.']],
+    wallRelic: 'A purple Relic is set into the wall. The stone around it is pristine — the further from it, the more ruined everything is.',
+    gynge: [['tale', 'The ground under your feet BULGES — and a Gynge erupts out of it, a living hill of rock with a mouth full of dark.']],
+    gyngeHint: 'Its soft spots: inside the mouth, and the belly. Q — throw fire-stone shots into its maw.',
+    gyngeUp: [['tale', 'Half-broken, the Gynge hauls its whole body out of the earth and comes for you. Its belly is soft — get underneath it.']],
+    gyngeDown: [['tale', 'The Gynge goes down like a landslide. When the dust settles you cut a chip of it free — a piece to keep. For a token, one day.']],
+    rune: [
+      ['tale', 'You clear the moss from the purple Relic. A rune: Akai Gek. You take a rubbing with charcoal and the back of a map.'],
+      ['tale', 'Then you touch it, and a song goes into your head and stays there, as if it was burned in.'],
+      ['tanoc', 'It won’t come out. The Relic, I mean. The song neither.'],
+    ],
+    campRuins: [
+      ['sniller', 'The rock-beast kept the others away. While it lived, nothing came near. Sleep here. It’s a good place.'],
+      ['tale', 'Night sounds, terrifying, just far enough apart to almost be all right. You and the Sniller talk quietly by the fire until you don’t.'],
+    ],
+    day2: ['Day two.', 'Smaller fights. Things worth gathering. The mist never lifts.'],
+    eclipse: [['tale', 'Midday, and Velki slides in front of the sun. The whole of Xikia goes dim.'], ['tale', 'In the dimness: the screaming again. Closer.'], ['sniller', 'There. That way. What I was set to find is there.']],
+    hideout: [['tale', 'A Duskareth hideout, camouflaged into the forest: four walls, an open courtyard, watchtower trees along the edge. The ring is inside. It can’t be carried through the Duat, so they’re keeping it here for now.']],
+    climb: 'Climb a watchtower tree in the mist and deal with the watcher',
+    caught: [['tale', 'The watcher drops without a sound — and every Duskareth in the keep looks up at once. They all know. They always all know.'], ['tale', 'You fumble down into the courtyard. They close in from every side.']],
+    down: [['tale', 'There are too many. You go down hard.']],
+    help: [['tanoc', 'Shut up and HELP.']],
+    release: [
+      ['tale', 'The amulet cracks open with light. The Sniller pours half out of it — still tethered at its base, but vast, ancient, filling the courtyard.'],
+      ['tale', 'It does not kill them. It puts every guard on the ground, gently, and holds them there.'],
+      ['tale', 'Then it turns back to you, and lays something like a hand over you, and the pain goes out like a tide.'],
+    ],
+    church: [['tale', 'The only real building in the keep: a small church-like room built into the northern wall.']],
+    ver: [
+      ['ver', 'You. The boy with the brown hat. They’ll all have seen you now.'],
+      ['tale', 'He attacks — and his weapon dissolves in his hand. He tears at the Duat — and the Sniller drinks it.'],
+      ['ver', 'Wait. Wait — please —'],
+      ['tale', 'The zikhron core in his chest breaks its own rule, and turns him into what he is now: a Malsti Punk, small and violet, blinking up at you. The ring sits on its stem.'],
+    ],
+    ring: [
+      ['tale', 'The Sniller reaches for the ring — and can’t touch it. For the first time, it loses its composure.'],
+      ['tale', 'You pick it up. A ripple goes through the whole keep, and for one moment the Sniller is completely solid.'],
+      ['sniller', '…You hold it. Then I owe you a request. One. Ask.'],
+    ],
+    request: [
+      ['tanoc', 'Make this place clean. And make it so nobody can come in unless I let them.'],
+      ['tale', 'The keep changes around you. The rot goes out of the walls. The mist stops at the gate, as if it had been told.'],
+      ['tale', 'The Megla Aagac keep is yours: your first base, on Xikia.'],
+    ],
+    malstiNight: [['tale', 'That night you sleep in the little church. The Malsti Punk watches you from the rafters, then from the floor, then from your boots. By morning it won’t leave your side.']],
+    out: [['tale', 'Leaving, you find a path out of the forest you couldn’t see on the way in.'], ['tale', 'At the treeline, your Punk is waiting. It and the Malsti Punk circle each other, sniff, and decide this is fine.']],
+    ringNote: 'The Relic Ring — link up to five Relics at once, without carrying them.',
+  },
+  /* the Gynge chip becomes a token */
+  token: [
+    ['buhkon', 'You kept a chip of it. Good. Here — the Okid’Relic, the stygian, and you sing.'],
+    ['tale', 'You sing the rock-beast’s song, as near as you can remember it, while the Carpenter pours. The chip takes the truth of that one Gynge, and keeps it.'],
+    ['buhkon', 'Your first token that’s truly yours. It’ll fight the way it lived.'],
+  ],
+  /* Quest 3 — the meteor crater and the new hat */
+  crater: {
+    offer: [
+      ['buhkon', 'The Duskareth saw your hat. And the Duskareth keep memories the way other people keep ledgers — by now it’s moving through all of them.'],
+      ['buhkon', 'Every Eikar’s hat is their own. If they know your hat, they know you. So we make you a new one.'],
+      ['buhkon', 'That needs raw stygian kept soft — which means close to True Raw. There’s a crater three days east. I’m coming with you this time.'],
+    ],
+    cards: ['The meteor crater.', 'Three days east, both of you looking over your shoulders the whole way. Tanoc’s old hat feels like a lantern on his head.'],
+    researchers: [
+      ['researcher', 'Buhkon Eldi! As I live. Come down off that ridge, you old hermit.'],
+      ['buhkon', 'Ilse. Still planting Stryx in places nobody sensible would go?'],
+      ['researcher', 'Next to True Raw, they grow strange. Strange is the whole point. And who is this?'],
+      ['buhkon', 'My apprentice. He listens to things.'],
+      ['researcher', 'Then he can have these. Three seedlings awake, and a bag of sleepers. Raise them well and they’ll be cleverer than both of us.'],
+      ['buhkon', '(quietly) Say thank you, Tanoc. And one day we’ll visit their Stryx school.'],
+    ],
+    scouts: 'Duskareth scouts on the far rim. The Carpenter steers you away from them without ever seeming to.',
+    rubbing: [['tanoc', 'Buhkon — look. From the ruins in the Megla Aagac. Akai Gek.'], ['buhkon', '…Keep that safe. Keep it very safe.']],
+    linkLesson: [['tale', 'The Carpenter sits with your longevity Relic a long time, talking to its Hurst. Afterwards he shows you how the linking really works — the part he didn’t say before.']],
+    tent: [
+      ['tale', 'The tent, by the crater’s edge, close enough to True Raw that the stygian stays soft.'],
+      ['tale', 'The Carpenter pushes raw stygian into the vein-channels of a new hat while it’s still warm. Then: “Take yours off.”'],
+      ['tale', 'You do, and the world goes far away, the way it did at the Skyfall.'],
+    ],
+    dream: [
+      'Tent canvas.',
+      'Muffled voices outside. Duskareth.',
+      'Something put into your hands — the hat, and a tool, cold.',
+      'The tent flap. A figure, outside, simply — gone.',
+      'The Carpenter stepping back in, and carrying on as if nothing happened.',
+    ],
+    after: [
+      ['tale', 'You don’t remember the rest. Only those pieces, and only in dreams, for years.'],
+      ['tale', 'The new hat is a little bigger than the old one. Otherwise perfectly ordinary. A different fingerprint — no Duskareth will know you by it now.'],
+      ['buhkon', 'Keep the old one. A spare face is a useful thing to own.'],
+    ],
+    song: [
+      ['tale', 'On the way home, by the fire, you teach the Carpenter the song the wall-Relic burned into you. You sing it together.'],
+      ['tale', 'Visions come — too fast, too bright to hold. And after them, a deep, quiet sense of purpose settles over both of you, and stays.'],
+    ],
+  },
+  /* Year five — the fake finale, and the real beginning */
+  finale: {
+    start: [
+      ['tale', 'Late at night, every Sniller amulet in the tower starts to ring at once.'],
+      ['buhkon', 'That’s not them. That’s something they’re afraid of. Tanoc — the old Relic, in the barn. The one I never let you touch.'],
+      ['tale', 'In the barn, a Relic the size of a door is splitting along a seam. Something inside it has been waiting since the first Skyfalls — no curse, no task, no path. Only centuries of fury.'],
+    ],
+    fight: 'Hold the Bound One back with the Carpenter — strike the shards when they glow',
+    noka: [
+      ['tale', 'High above the hill, a vast silhouette fills the stars: horns curving like a crown, tendrils snaking down toward you.'],
+      ['noka', 'Little Eikar. You are holding a door shut with your hands. Use the amulets instead.'],
+      ['noka', 'Ring them round it. Every one you carry. Then say the song the old wall gave you, and the Angels’ unfinished work will finish itself.'],
+    ],
+    ringObj: 'Set the amulets in a ring around the Bound One',
+    sing: 'Sing the Akai Gek song',
+    cursed: [
+      ['tale', 'The song goes out of you and into the amulets, and the amulets close like a hand.'],
+      ['tale', 'The Bound One folds into the stone. A new amulet lies in the straw — cold, quiet, properly cursed. The first ever finished.'],
+      ['buhkon', '…Well. I didn’t know that could be done.'],
+      ['noka', 'Neither did the Angels, Carpenter. Little Eikar — I am half a day from your door. Come and see me. Alone.'],
+    ],
+    walk: ['Half a day, alone, up a mountain the Carpenter says has no name.', 'At the top: a stygian Quarigen, and in it, an old soul.'],
+    nokaTalk: [
+      ['noka', 'There you are. Taller. Good.'],
+      ['noka', 'I am Noka. I go from peak to peak. I remember everything, and I tell almost none of it.'],
+      ['noka', 'But you I will show a little. Look.'],
+    ],
+    visions: [
+      'A shining city that swore an oath, and a lord who would not let it go.',
+      'A great worm out of the Duat, and an Eikar in a showman’s coat laughing on its back.',
+      'An island where everything is poisonous, and three friends stranded in the ruins of Villtur.',
+      'A name that is not yet yours: Torcain.',
+      'And the Angels — somewhere — still watching for you.',
+    ],
+    end: [
+      ['noka', 'That is enough for now. The world is open, little Eikar. Go and see it.'],
+    ],
+    endCards: ['The world opens.', 'Tanoc · Chapter I — complete.'],
+  },
+  /* objectives */
+  obj: {
+    link: 'Bring Buhkon two Punk vines, one Stygian ore, two Zahreh petals',
+    venkin: 'Find Venkin in Beuhk and throw a token',
+    caves: 'Dive into the shallow cave under the old dock',
+    megla: 'Talk to Buhkon about the amulet that faces north',
+    meglaGo: 'Ride north to the Megla Aagac — the road out past the Carpenter’s north fence',
+    token: 'Ask Buhkon to help sing the Gynge chip into a token',
+    crater: 'Talk to Buhkon — the Duskareth saw your hat',
+    craterGo: 'Set out east with the Carpenter — the gate at the yard',
+    finale: 'The amulets are ringing in the tower — go to the barn',
+    free: 'Chapter I complete — the world is open',
+  },
+};
