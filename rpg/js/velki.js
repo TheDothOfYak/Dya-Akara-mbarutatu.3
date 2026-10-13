@@ -221,9 +221,10 @@ export function createVelki(ctx) {
     cyl(0, 0, 3.6, -1, SPIRE_TOP);
     for (let k = 1; k < 6; k++) { const band = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.12, 5, 28), dark); band.rotation.x = Math.PI / 2; band.position.y = k * 4.8; scene.add(band); }
     const rail = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.1, 5, 28), dark); rail.rotation.x = Math.PI / 2; rail.position.y = SPIRE_TOP + 0.9; scene.add(rail);
-    const pin = new THREE.Mesh(new THREE.ConeGeometry(1.1, 11, 10), sm); pin.position.y = SPIRE_TOP + 5.5; pin.castShadow = true; addOutline(pin, 0.04); scene.add(pin);
-    cyl(0, 0, 1.15, SPIRE_TOP - 1, SPIRE_TOP + 11);
-    const tip = glowSprite(0xffd890, 5, 0.9); tip.position.y = SPIRE_TOP + 11.5; scene.add(tip); lamps.push(tip);
+    // a slim lamp-post at the very top, so nothing stands between you and the battle
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 4, 8), dark); pin.position.y = SPIRE_TOP + 2; pin.castShadow = true; addOutline(pin, 0.03); scene.add(pin);
+    cyl(0, 0, 0.25, SPIRE_TOP - 1, SPIRE_TOP + 4);
+    const tip = glowSprite(0xffd890, 3, 0.9); tip.position.y = SPIRE_TOP + 4.3; scene.add(tip); lamps.push(tip);
     const stepGeo = new THREE.BoxGeometry(1.9, 0.5, 1.9);
     for (let i = 0; i < NSTEPS; i++) {
       const a = Math.PI / 2 + i * 0.33, x = Math.cos(a) * STEP_R, z = Math.sin(a) * STEP_R, top = 0.6 + 0.55 * (i + 1);
@@ -284,7 +285,7 @@ export function createVelki(ctx) {
   });
 
   /* ---------------- the battle in the north ---------------- */
-  const BATTLE = V3(0, 0, -180);
+  const BATTLE = V3(0, 0, -160);
   const fighters = [];
   for (let i = 0; i < 9; i++) {
     const angel = i % 2 === 0, m = angel ? buildAngel(2.6 + rng() * 1.2) : buildSniller(2.4 + rng() * 1.2);
@@ -293,7 +294,7 @@ export function createVelki(ctx) {
     placeFighter(f); fighters.push(f);
   }
   function placeFighter(f) {
-    f.pos.set(BATTLE.x + (rng() - 0.5) * 170, 18 + rng() * 60, BATTLE.z + (rng() - 0.5) * 120);
+    f.pos.set(BATTLE.x + (rng() - 0.5) * 150, 16 + rng() * 40, BATTLE.z + (rng() - 0.5) * 100);
     f.m.position.copy(f.pos); f.m.rotation.y = Math.atan2(-f.pos.x, -f.pos.z) + Math.PI;
   }
   const flashes = [];
@@ -340,6 +341,8 @@ export function createVelki(ctx) {
   }
   function topReached() {
     stage = 'top';
+    // turn him to face the north gate and the battle beyond it
+    P.yaw = Math.PI; CAM.yaw = 0; CAM.pitch = 0.08;
     ctx.say(STORY.PROLOGUE.top, startGateStage);
   }
 

@@ -61,6 +61,7 @@ export const ITEMS = {
   k_scroll_pull: { name: 'Kalo scroll: Duat Pull', kind: 'key', icon: '📜', value: 0, read: true, desc: 'Stored willpower. Read it to learn the Duat Pull.' },
   okid: { name: 'Okid’Relic', kind: 'key', icon: '🔮', value: 0, desc: 'Buhkon’s gift. Sing a creature’s song into a piece of it with a little stygian, and the Relic catches its truth as a token.' },
   k_seed: { name: 'Warm fire seed', kind: 'key', icon: '🔥', value: 0, desc: 'From the young fire tree in the Ember Grove, for the Stryx’s ship. Hot to the touch.' },
+  r_longevity: { name: 'Humming stone', kind: 'key', icon: '🔵', value: 0, desc: 'A longevity Relic from the lakeshore. Its Hurst is settled and quiet; it keeps you a little less tired, a little less hungry.' },
   amulet: { name: 'Sniller amulet', kind: 'key', icon: '🔹', value: 0, desc: 'A round gem between two curved horns, cold teal. It hums toward something far away.' },
 };
 

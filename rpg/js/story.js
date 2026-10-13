@@ -615,14 +615,11 @@ export const ARRIVAL = {
     ['buhkon', 'Home. My yard, across town by the docks road — yours too, if you want it. Shutters closed, and I’ll tell you everything I can.'],
   ],
   amuletSay: n => n === 1 ? 'Cold. It hums, like it’s listening.' : n === 3 ? 'They’re all humming the same note.' : n === 5 ? 'One more… there was one up high.' : '',
-  /* the bridge from the boy to the man */
-  bridge: [
+  /* home with the Carpenter */
+  home: [
     'They leave the square in the chaos, and nobody stops them. A small Punk follows a little way behind, and thinks it isn’t seen.',
-    'Xilia keeps its shutters closed for a week. When they open again, the Carpenter has an apprentice.',
-    'The Carpenter teaches him to listen. To find a Relic’s trigger. To make his own Aagac. To throw an axe through the Duat and call it home.',
-    'Years pass. The boy grows. He goes looking for the Angels, and finds a great deal else instead.',
-    'He becomes Stamijan, and takes a new name for it: Torcain.',
-    'And one day, Noka goes missing.',
+    'The Carpenter’s yard, across town by the docks road. Shutters closed. Soup. A bed in the loft that smells of cedar shavings.',
+    'Tanoc sleeps for a day and a night.',
   ],
 };
 
@@ -633,4 +630,64 @@ export const PRO_OBJ = {
   amulets: n => `Gather the fallen Sniller amulets (${n}/6)`,
   punk: 'Calm the frightened Punk — don’t kill it',
   back: 'Run back to the Carpenter’s stall',
+};
+
+/* Chapter I — the Carpenter's apprentice. Young Tanoc in Xilia, before any of the rest. */
+export const YOUNG = {
+  kicker: "Tanoc · Chapter I",
+  title: "The Carpenter’s Apprentice",
+  morning: [
+    ['tale', 'Morning. There is bread and a pot of something warm on the table, and nobody at it. Hammering, from the workshop.'],
+    ['tanoc', 'The sky’s still wrong. Velki just… hanging there.'],
+    ['tanoc', 'I’m not sitting in a loft all day. Let’s see where I am.'],
+  ],
+  relicSpot: 'Something blue is glinting in the mud by the lakeshore.',
+  relicTaken: [
+    ['tale', 'A smooth grey stone, warm in your hand. Blue light moves under its skin like a slow pulse — and for a moment, you are certain it is looking back.'],
+    ['tanoc', 'It’s humming. Buhkon will know what it is.'],
+  ],
+  relicBuhkon: [
+    ['buhkon', 'Up and about, then. Good. What’s that you’ve — ah.'],
+    ['buhkon', 'Let me see. …Tanoc. Did it call to you, or did you just find it?'],
+    ['tanoc', 'I… don’t know. It was glinting. And then it was humming. Is that calling?'],
+    ['buhkon', 'It might be. That’s a Relic. There’s a Hurst in it — a soul that’s settled in for a long, quiet life. This one keeps you on your feet: a little less tired, a little less hungry.'],
+    ['buhkon', 'Most folk carry a few. Few folk ever hear one hum. Keep it.'],
+    ['buhkon', 'And since you can hear them — let me show you how to listen properly. Close your eyes. Listen with your Hurst, not your ears. And push.'],
+  ],
+  hlyst: [
+    ['tale', 'A golden pulse rolls out of you, across the yard, the lake, the rooftops — and the world lights up. Things answer: chests, ore, the cold teal of a Sniller amulet somewhere far off.'],
+    ['buhkon', 'That’s Nur’Hlyst. Press G, whenever you like. Hidden things will answer you.'],
+    ['buhkon', 'Now. Ahoac, you said? Catchers of the Firefall. Let’s see what those hands can do. The straw dummies, there — knock all three down. Blunt side.'],
+  ],
+  dummies: [
+    ['buhkon', 'Hah! Quick feet, heavy hands. Not bad at all.'],
+    ['buhkon', 'An Ahoac has to fall well, too. Climb the tower, jump, and HOLD Space as you fall. Arms out — let the wind take you.'],
+  ],
+  glided: [
+    ['buhkon', 'Like a seed on the wind! Come back down and talk to me.'],
+  ],
+  end: [
+    ['buhkon', 'That’s enough for one day. You’ll stay — for as long as you want to. There’s a lot to learn, and I’d rather you learned it here than out there.'],
+    ['tanoc', 'Buhkon… the Angels. The Sniller. They all looked at me. Why?'],
+    ['buhkon', 'Because of what you are. And that is a long story, and you have a long time to hear it.'],
+    ['buhkon', 'For now: the town’s yours. Meet people. Help where you can. Keep those amulets close — and keep your hat on.'],
+  ],
+  stryx: [['stryx', 'An Eikar boy with somebody else’s hat. Not a passenger. Come back when you have a name of your own.']],
+  buhkonIdle: [
+    'Explore. Help folk. Keep your hat on.',
+    'That tower will hold books one day. Yours, maybe.',
+    'The Relic still humming? Good. Talk to it. They like that.',
+    'Sniller amulets wander. Use your Nur’Hlyst — they glow cold teal.',
+  ],
+  pass: 'Rockfall across the Megla Pass — and Buhkon said three days of mist past it. Not today.',
+  chapterEnd: 'Chapter I ends here — more of Tanoc’s story is coming. Until then, Xilia is yours.',
+};
+export const YOUNG_OBJ = {
+  explore: 'Step outside and look around',
+  relic: 'Something blue is glinting at the lakeshore, by the docks',
+  bring: 'Bring the humming stone to Buhkon in his yard',
+  dummies: n => `Knock down Buhkon’s straw dummies (${n}/3)`,
+  glide: 'Climb the tower, jump, and hold Space to glide',
+  back: 'Return to Buhkon',
+  free: 'Chapter I — Xilia is yours. More of Tanoc’s story is coming.',
 };

@@ -197,6 +197,8 @@ const G = {
   sensed: null, senseTimer: 0, bossActive: false, visited: {}, lock: null, seen: {},
 };
 let F_ = SAVE.flags;       // persistent story flags
+/* a run that began at the last Skyfall stays with young Tanoc in Xilia (Chapter I) */
+const young = () => !!F_.young && REGION === 'xilia';
 
 /* ---------------- player ---------------- */
 const torcain = buildTorcain();
@@ -328,7 +330,8 @@ function onKey(code) {
   if (VK) { if (G.mode === 'play' && !G.paused) { if (code === 'Space') VK.jump(); if (code === 'KeyE') VK.interact(); } return; }
   if (code === 'Tab' && G.mode === 'play') { toggleJournal(); return; }
   if (G.mode !== 'play' || G.paused) return;
-  if (G.pro && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM'].includes(code)) return;   // a boy of thirteen, with a hatchet and nothing else
+  if (G.pro && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM'].includes(code)) return;
+  if (young() && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM', 'KeyK', 'KeyJ', 'KeyG', 'KeyR', 'KeyT'].includes(code)) return;   // a boy of thirteen, with a hatchet and nothing else
   if (dyaMatch) {
     if (code === 'KeyV') { dyaOverview = !dyaOverview; return; }
     if (dyaMatch.key(code)) return;
@@ -872,7 +875,7 @@ function bestTarget(maxD, minDot) {
 }
 
 function duatStrike() {
-  if (G.pro) { toast('Tanoc can’t reach the Duat. Not yet.', 2); return; }
+  if (G.pro || young()) { toast('Tanoc can’t reach the Duat. Not yet.', 2); return; }
   if (!canAct() || P.duatCd > 0) return;
   let best = null;
   if (G.lock) { const p = lockPoint(); if (p && p.distanceTo(P.pos) < 30) best = { e: G.lock, p }; }
@@ -905,6 +908,7 @@ function duatStrike() {
 }
 
 function tukangFlare() {
+  if (G.pro || young()) return;
   if (!canAct()) return;
   if (P.heat < 100) { toast('The Tukang needs more heat — land your strikes.'); return; }
   P.heat = 0; P.flareT = 0.6;
@@ -1031,7 +1035,7 @@ function playerDown() {
   const real = D === DIFFICULTY.realistic;
   $('death-sub').textContent = real && G.shards > 0
     ? `Your ${G.shards} zikhron shards spill where you fell. Phorus drags you back to the lantern.`
-    : 'Phorus drags you back to the lantern.';
+    : young() ? 'Buhkon finds you, and carries you back.' : 'Phorus drags you back to the lantern.';
   $('death').classList.add('show');
   setTimeout(() => {
     if (real) {
@@ -1104,10 +1108,12 @@ function interactables() {
   const list = [];
   if (G.mode !== 'play' || P.dead) return list;
   if (G.pro) return proInteractables();
-  if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
+  if (young()) { if (relicOut()) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); }
+  else if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
   else if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
   else list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => talkPhorus(), far: 2.6 });
-  if (REGION === 'xilia') list.push({ pos: STRYX_SPOT, label: F_.xseed ? 'Give the Stryx the fire seed' : 'Hail the Stryx pilot', act: () => stryx() });
+  if (young()) list.push({ pos: STRYX_SPOT, label: 'Hail the Stryx pilot', act: () => dialog(STORY.YOUNG.stryx) });
+  else if (REGION === 'xilia') list.push({ pos: STRYX_SPOT, label: F_.xseed ? 'Give the Stryx the fire seed' : 'Hail the Stryx pilot', act: () => stryx() });
   if (REGION === 'aakalay' && F_.done && gate) list.push({ pos: V3(gate.position.x, gate.position.y, gate.position.z), label: 'Speak Kiet’s trigger at the Urverk', act: () => setSail(), far: 6 });
   if (REGION === 'leotik' && gate) list.push({ pos: V3(gate.position.x, gate.position.y, gate.position.z), label: 'Touch the closed Urverk', act: () => dialog([['phorus', 'Shut tight. Whatever trigger opens it from this side, Kiet never needed it. We’re stranded until the keep says otherwise.']]), far: 5 });
   for (const l of lanterns) list.push({ pos: V3(l.x, l.y, l.z), label: lanternLit(l) ? 'Rest at the Nur Lantern' : 'Wake the Nur Lantern', act: () => useLantern(l), far: 2.8 });
@@ -1351,7 +1357,12 @@ function dummyBroken(e) {
   particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 26, { color: 0xe8d098, speed: 6, size: 0.45, life: 0.9, gravity: 8 });
   if (G.lock === e) G.lock = null;
   const tut = F_.tut || 0;
-  if (e.kind === 'dummy' && tut === 1) {
+  if (e.kind === 'dummy' && young() && F_.yq === 2) {
+    SAVE.counters.y_dummy = (SAVE.counters.y_dummy || 0) + 1;
+    setObjective();
+    if (SAVE.counters.y_dummy >= 3) { youngSet(3); sfx.core(); toast('Combos — learned!', 2.5); xp(40); dialog(STORY.YOUNG.dummies, () => setObjective()); }
+  }
+  if (e.kind === 'dummy' && tut === 1 && !young()) {
     SAVE.counters.tut_dummy = (SAVE.counters.tut_dummy || 0) + 1;
     setObjective();
     if (SAVE.counters.tut_dummy >= 3) tutStep(2);
@@ -1565,7 +1576,7 @@ function sideTarget() {
 
 /* ---------------- Nur'Hlyst: Buhkon's golden pulse ---------------- */
 const hlyst = { cd: 0, marks: [], t: 0 };
-const canHlyst = () => REGION !== 'xilia' || (F_.tut || 0) >= 5;
+const canHlyst = () => REGION !== 'xilia' || (F_.tut || 0) >= 5 || !!F_.yHlyst;
 function nurHlyst() {
   if (!canHlyst()) { toast('You don’t know how yet. (Buhkon will teach you.)', 2); return; }
   if (hlyst.cd > 0 || G.mode !== 'play') return;
@@ -1925,6 +1936,7 @@ function nearestPrompt() {
 /* ---------------- objective text ---------------- */
 function setObjective() {
   if (G.pro) { proSetObjective(); return; }
+  if (young()) { youngObjective(); return; }
   let txt, hintTxt = '', pips = 0, on = 0;
   const X = STORY.OBJECTIVES.xilia, tut = F_.tut || 0;
   if (REGION === 'xilia') {
@@ -1964,6 +1976,7 @@ function setObjective() {
    ================================================================ */
 let DLG = null;
 function dialog(lines, onDone) {
+  if (young()) lines = lines.map(l => l[0] === 'phorus' ? ['tale', l[1]] : l);
   DLG = { lines, i: 0, chars: 0, onDone, tick: 0 };
   G.mode = 'dialog'; P.atk = null;
   $('dialog').classList.remove('hidden');
@@ -2036,6 +2049,7 @@ function closeMemory() {
 
 let barkTimer = 0;
 function bark(who, text, dur = 3.5) {
+  if (who === 'phorus' && young()) return;
   const sp = STORY.SPEAKERS[who];
   $('bark').innerHTML = `<b style="color:${sp.color}">${sp.name}</b>${text}`;
   $('bark').style.opacity = 1; barkTimer = dur;
@@ -2154,7 +2168,7 @@ function updateCompass() {
 }
 function objectivePoint() {
   let p = null;
-  if (G.pro) { p = proGoal(); return p ? { p, d: Math.round(Math.hypot(p.x - P.pos.x, p.z - P.pos.z)) } : null; }
+  if (G.pro || young()) { p = G.pro ? proGoal() : youngGoal(); return p ? { p, d: Math.round(Math.hypot(p.x - P.pos.x, p.z - P.pos.z)) } : null; }
   if (REGION === 'xilia') {
     const g = xiliaGoal(); if (g) p = g.pos;
   } else if (REGION === 'aakalay') {
@@ -2322,7 +2336,7 @@ function pickChoice(i) {
 function npcTalk(n) {
   const def = n.def, who = npcSpeaker(def);
   n.talking = 3;
-  if (def.id === 'buhkon') { buhkonTalk(n); return; }
+  if (def.id === 'buhkon') { if (young()) youngBuhkon(n); else buhkonTalk(n); return; }
   const opts = [];
   for (const qid of def.quests) {
     const q = QUESTS[qid], st = SAVE.quests[qid];
@@ -2807,6 +2821,8 @@ function restyleAxe() {
   const it = ITEMS[SAVE.inv.axe];
   const blade = torcain.weapon.userData.blade;
   if (blade) { blade.material.emissive.setHex(it && it.color ? it.color : 0x6a2cff); blade.material.emissiveIntensity = it && it.color ? 0.55 : 0.25; }
+  if (blade && young() && !(it && it.color)) { blade.material.color.setHex(0x9a9aa2); blade.material.emissiveIntensity = 0; }   // the Carpenter's plain hatchet
+  if (torcain.weapon.userData.glow) torcain.weapon.userData.glow.visible = !young();
   torcain.weapon.scale.setScalar(1 + ((it && it.dmg) || 1) * 0.1 - 0.1);
 }
 restyleAxe();
@@ -2873,7 +2889,7 @@ if (SAVE.sunearAt == null) SAVE.sunearAt = (SAVE.time || 0) + 420 + Math.random(
 const pick1 = a => a[Math.floor(Math.random() * a.length)];
 function stormMayCome() {
   return G.mode === 'play' && !G.paused && !P.dead && !G.bossActive && !dyaMatch && !G.inMemory && !P.flying
-    && (REGION !== 'xilia' || (F_.tut || 0) >= 5);
+    && (REGION !== 'xilia' || (F_.tut || 0) >= 5) && !young();
 }
 function startStorm() {
   if (sunear.active) return;
@@ -2989,7 +3005,8 @@ function checkPasses(px0, pz0) {
     if (!passOpen(ps)) {
       if (s > ps.gate && ps.along(px0, pz0) <= ps.gate + 0.5) {
         P.pos.x = px0; P.pos.z = pz0; P.vel.x *= -0.2; P.vel.z *= -0.2;
-        if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', 'Rockfall across the Megla Pass. And it’s three days on foot to the Reach that way anyway. The Stryx is quicker.', 3); }
+        if (G.t - (P.barrierT || -99) > 6 && young()) { P.barrierT = G.t; toast(STORY.YOUNG.pass, 3.5); }
+        else if (G.t - (P.barrierT || -99) > 6) { P.barrierT = G.t; bark('phorus', 'Rockfall across the Megla Pass. And it’s three days on foot to the Reach that way anyway. The Stryx is quicker.', 3); }
       }
     } else if (s > ps.trigger && G.mode === 'play') takePass(ps);
   }
@@ -3299,7 +3316,7 @@ function updatePlayer(dt) {
 }
 
 function updatePhorus(dt) {
-  if (G.pro) { phorus.root.visible = false; return; }   // Phorus is years away yet
+  if (G.pro || young()) { phorus.root.visible = false; return; }   // Phorus is years away yet
   F.cd = Math.max(0, F.cd - dt); F.cast = Math.max(0, F.cast - dt);
   let tgt = null, bd = 1e9;
   if (G.mode === 'play' && !P.dead) {
@@ -3540,6 +3557,7 @@ function frame() {
       if (dyaMatch) { dyaMatch.update(dt, G.t); dyaMatch.updateAim(dyaAimPoint()); dyaMatch.placeBars(camera); }
       checkLocations();
       if (G.pro) proTick(dt);
+      else if (young()) youngTick();
       if (REGION === 'xilia') {
         if (F_.tut === 3 && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
         if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
@@ -3605,7 +3623,7 @@ function proObjective(head, text, hintTxt = '', pips = 0, on = 0) {
   for (let i = 0; i < pips; i++) { const d = document.createElement('div'); d.className = 'pip' + (i < on ? ' on' : ''); el.appendChild(d); }
 }
 function startVelki() {
-  F_.pro = 'velki'; persist();
+  F_.pro = 'velki'; F_.young = true; persist();
   G.mode = 'intro'; G.t = 0;
   $('hud').classList.remove('hidden'); $('hud').classList.add('velki');
   VK = createVelki({
@@ -3648,19 +3666,14 @@ function leaveVelki() {
 const STALL = { x: 6, z: 40 };
 const stallFront = () => { const dx = world.PLAZA.x - STALL.x, dz = world.PLAZA.z - STALL.z, d = Math.hypot(dx, dz); return { x: dx / d, z: dz / d }; };
 const proGround = (x, z, up = 3) => world.col.ground(x, z, world.heightAt(x, z) + up);
-let vitalsName = '';
 function arriveXikia() {
   if (REGION !== 'xilia') return;
   const f = stallFront();
   G.pro = { stage: 'wake', n: 0, t: 0, punk: null, calmed: false, hat: null, angel: null, sniller: null, amulets: [], leaving: 0 };
   // a boy of thirteen, without his hat
-  torcain.root.scale.multiplyScalar(0.82);
-  torcain.hat.visible = false;
-  youngGear(false);
+  F_.young = true; applyYoung();
+  torcain.hat.visible = false; torcain.weapon.visible = false;
   canvas.style.transition = ''; canvas.style.filter = 'blur(7px)';
-  vitalsName = document.querySelector('#vitals .name').innerHTML;
-  document.querySelector('#vitals .name').innerHTML = `TANOC <small>Filugani</small><span id="lvl">${$('lvl') ? $('lvl').textContent : 'LV 1'}</span>`;
-  $('hud').classList.add('young');
   dn.setHour(12.5);
   // in front of the stall, facing it; the Carpenter behind it
   P.pos.set(STALL.x + f.x * 2.6, 0, STALL.z + f.z * 2.6); P.pos.y = proGround(P.pos.x, P.pos.z, 1.5);
@@ -3805,24 +3818,107 @@ function finishPro() {
   const pr = G.pro;
   G.mode = 'intro';
   fade(1, 0.8);
-  setTimeout(() => playCards(STORY.ARRIVAL.bridge, 4600, () => {
-    // years later: the boy is Stamijan, and Torcain
+  setTimeout(() => playCards(STORY.ARRIVAL.home, 4400, () => {
     for (const a of pr.amulets) if (!a.got) scene.remove(a.mesh);
     if (pr.angel) scene.remove(pr.angel); if (pr.sniller) scene.remove(pr.sniller); if (pr.hat) scene.remove(pr.hat);
     if (pr.punk && !pr.punk.gone) { scene.remove(pr.punk.actor.root); pr.punk.gone = true; }
     invAdd(SAVE.inv, 'amulet', pr.n);
-    torcain.root.scale.multiplyScalar(1 / 0.82); torcain.hat.visible = true; canvas.style.filter = ''; youngGear(true);
-    document.querySelector('#vitals .name').innerHTML = vitalsName || document.querySelector('#vitals .name').innerHTML;
-    $('hud').classList.remove('young');
+    torcain.hat.visible = true; canvas.style.filter = '';
     const bk = npcs.find(n => n.def.id === 'buhkon');
     if (bk) { bk.pos.copy(bk.home); bk.actor.root.position.copy(bk.home); }
-    G.pro = null; F_.pro = 'done';
-    P.pos.copy(world.pier.start); P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos); F.pos.copy(P.pos).add(V3(-2, 0, -3));
-    phorus.root.visible = true; P.hp = P.maxHp;
-    dn.setHour(9); persist();
-    fade(0, 1.4);
-    beginXilia();
+    G.pro = null; F_.pro = 'done'; P.hp = P.maxHp;
+    startMorning();
   }), 900);
+}
+
+/* ================================================================
+   CHAPTER I — the Carpenter's apprentice: young Tanoc in Xilia
+   ================================================================ */
+function applyYoung() {
+  if (G.youngOn) return;
+  G.youngOn = true;
+  torcain.root.scale.multiplyScalar(0.82);
+  youngGear(false); torcain.weapon.visible = F_.pro === 'done';
+  document.querySelector('#vitals .name').innerHTML = `TANOC <small>Filugani</small><span id="lvl">${$('lvl') ? $('lvl').textContent : 'LV 1'}</span>`;
+  $('hud').classList.add('young');
+  phorus.root.visible = false;
+  F_.firstLantern = true;   // nobody to wake the lanterns for him with a speech
+  restyleAxe();
+}
+/* the humming stone in the lakeshore mud, by the docks */
+const RELIC_SPOT = REGION === 'xilia' ? (() => { const x = 9, z = world.pier.z0 - 3; return V3(x, world.heightAt(x, z), z); })() : null;
+const relicMesh = RELIC_SPOT ? (() => {
+  const g = new THREE.Group();
+  const st = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), toon(0x7a8090, { emissive: 0x2a6aff, emissiveIntensity: 0.6 })); st.scale.set(1.2, 0.7, 1); addOutline(st, 0.03); g.add(st);
+  g.add(glowSprite(0x5aa0ff, 1.6, 0.7));
+  g.position.copy(RELIC_SPOT).add(V3(0, 0.15, 0)); g.visible = false; scene.add(g);
+  return g;
+})() : null;
+const relicOut = () => young() && (F_.yq || 0) === 0;
+function startMorning() {
+  applyYoung();
+  F_.yq = F_.yq || 0; persist();
+  const Y = world.yard;
+  P.pos.set(Y.x - 8, 0, Y.z - 4); P.pos.y = world.col.ground(P.pos.x, P.pos.z, world.heightAt(P.pos.x, P.pos.z) + 2);
+  P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos); P.yaw = Math.atan2(-Y.x, -Y.z); CAM.yaw = P.yaw + Math.PI;
+  dn.setHour(7.5);
+  G.mode = 'intro'; introT = 0; G.t = 0;
+  fade(0, 1.4);
+  playCards([STORY.YOUNG.title + '.', 'Xilia, on Xikia. The next morning.'], 3200, () => {
+    enterPlay();
+    showLocation('Xilia', 'Chapter I · the Carpenter’s apprentice');
+    dialog(STORY.YOUNG.morning, () => { setObjective(); hint('Follow the ◆ on your compass.'); });
+  });
+}
+function youngSet(q) { F_.yq = q; persist(); setObjective(); }
+function youngTakeRelic() {
+  invAdd(SAVE.inv, 'r_longevity', 1); lootToast('r_longevity', 1); sfx.core(); xp(30);
+  particles.burst(RELIC_SPOT.x, RELIC_SPOT.y + 0.3, RELIC_SPOT.z, 24, { color: 0x5aa0ff, speed: 4, size: 0.4, life: 0.8, gravity: 2 });
+  youngSet(1);
+  dialog(STORY.YOUNG.relicTaken, () => setObjective());
+}
+function youngBuhkon(n) {
+  const q = F_.yq || 0, Y = STORY.YOUNG;
+  n.talking = 4;
+  if (q === 1) {
+    dialog(Y.relicBuhkon, () => {
+      F_.yHlyst = true; persist(); nurHlyst();
+      dialog(Y.hlyst, () => { SAVE.counters.y_dummy = 0; enemies.list.filter(e => e.T.disp === 'training' && e.dead).forEach(e => respawnDummy(e, 0)); youngSet(2); toast('Nur’Hlyst — learned! (G)', 3); });
+    });
+    return;
+  }
+  if (q === 4) { dialog(Y.end, () => { youngSet(5); xp(120); G.shards += 30; toast(Y.chapterEnd, 6); }); return; }
+  if (q === 0) { dialog([['buhkon', 'Morning! Bread’s on the table. Go and have a look around — the lake’s just past the docks.']]); return; }
+  if (q === 2 || q === 3) { dialog(q === 2 ? Y.hlyst.slice(-1) : Y.dummies.slice(-1)); return; }
+  ask('buhkon', Y.buhkonIdle[Math.floor(Math.random() * Y.buhkonIdle.length)], [
+    { label: SAVE.inv.items.okid ? 'Sing a token' : 'Ask about tokens <em style="color:var(--brass2)">· Dya’Akara</em>', act: () => buhkonTokens() },
+    { label: 'Run the dummy drills again', act: () => { enemies.list.filter(e => e.T.disp === 'training' && e.dead).forEach(e => respawnDummy(e, 0)); toast('Buhkon props the dummies back up.', 2); lockMouse(); } },
+    { label: 'Goodbye', act: null },
+  ]);
+}
+function youngGoal() {
+  const q = F_.yq || 0, bk = npcs.find(n => n.def.id === 'buhkon');
+  if (q === 0) return RELIC_SPOT;
+  if (q === 1 || q === 4) return bk ? bk.pos : null;
+  if (q === 2) { const e = enemies.list.find(e => e.kind === 'dummy' && !e.dead); return e ? e.pos : null; }
+  if (q === 3) return V3(world.tower.x, world.tower.y, world.tower.z);
+  return null;
+}
+function youngObjective() {
+  const q = F_.yq || 0, O = STORY.YOUNG_OBJ, n = Math.min(3, SAVE.counters.y_dummy || 0);
+  const head = 'Chapter I · Xilia';
+  if (q === 0) proObjective(head, O.relic, 'Out past the docks road, where the pier meets the shore');
+  else if (q === 1) proObjective(head, O.bring, 'Buhkon’s yard is south-east of the square');
+  else if (q === 2) proObjective(head, O.dummies(n), 'Left-click to swing — keep clicking to combo', 3, n);
+  else if (q === 3) proObjective(head, O.glide, 'Jump, then hold Space while falling');
+  else if (q === 4) proObjective(head, O.back, '');
+  else proObjective(head, O.free, 'Talk to folk in town — G for Nur’Hlyst');
+}
+function youngTick() {
+  if (relicMesh) { relicMesh.visible = relicOut(); if (relicMesh.visible) { relicMesh.rotation.y = G.t; relicMesh.children[1].material.opacity = 0.5 + Math.sin(G.t * 3) * 0.3; } }
+  if (G.mode !== 'play') return;
+  if (relicOut() && !G.relicSeen && P.pos.distanceTo(RELIC_SPOT) < 16) { G.relicSeen = true; bark('tale', STORY.YOUNG.relicSpot, 4); }
+  if (F_.yq === 3 && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) { youngSet(4); sfx.core(); toast('Gliding — learned!', 2.5); xp(40); bark('buhkon', STORY.YOUNG.glided[0][1], 4); }
 }
 
 function tickUi(dt) {
@@ -3873,6 +3969,7 @@ function continueRun() {
   CAM.yaw = 0; G.t = 0;
   fade(1, 0); setTimeout(() => fade(0, 1.2), 50);
   enterPlay();
+  if (young()) setObjective();
   showLocation(REGION === 'xilia' ? 'Xilia' : REGION === 'aakalay' ? 'The Ruins of Aakalay' : 'Leotik', `${D.label} · ${fmtTime(SAVE.time)}`);
 }
 
@@ -3898,9 +3995,11 @@ function newRun(diff) {
   startFromTitle(beginNew);
 }
 
+if (young() && F_.pro === 'done') applyYoung();
 const FROM_TOP = REGION === 'xilia' && !F_.xtalked && F_.pro !== 'done';   // the run hasn't left the beginning yet
-$('t-kicker').textContent = REGION === 'leotik' ? "Torcain's Run · Rokarvac II" : FROM_TOP ? STORY.PROLOGUE.kicker : REGION === 'xilia' ? STORY.XILIA.kicker : STORY.TITLE.kicker;
-$('t-title').textContent = REGION === 'leotik' ? 'The Isle of the Urverk' : FROM_TOP ? STORY.PROLOGUE.title : REGION === 'xilia' ? STORY.XILIA.title : STORY.TITLE.title;
+const IN_CH1 = young() && F_.pro === 'done';
+$('t-kicker').textContent = IN_CH1 ? STORY.YOUNG.kicker : REGION === 'leotik' ? "Torcain's Run · Rokarvac II" : FROM_TOP ? STORY.PROLOGUE.kicker : REGION === 'xilia' ? STORY.XILIA.kicker : STORY.TITLE.kicker;
+$('t-title').textContent = IN_CH1 ? STORY.YOUNG.title : REGION === 'leotik' ? 'The Isle of the Urverk' : FROM_TOP ? STORY.PROLOGUE.title : REGION === 'xilia' ? STORY.XILIA.title : STORY.TITLE.title;
 $('t-sub').textContent = STORY.TITLE.sub;
 $('t-riddle').innerHTML = (REGION === 'leotik' ? STORY.NEXT_RIDDLE : STORY.RIDDLE).join('<br>');
 $('loading').textContent = 'THE HIGHLAND IS READY';
@@ -3910,7 +4009,7 @@ $('d-real-p').textContent = DIFFICULTY.realistic.blurb;
 if (!SAVE_AT_LOAD && HAD_OLD) $('t-save').textContent = 'Torcain’s Run has a new beginning in Xilia — every earlier run was reset. Begin anew!';
 if (SAVE_AT_LOAD) {
   const where = SAVE.region === 'leotik' ? 'Rokarvac II · Leotik' : SAVE.region === 'aakalay' ? 'Rokarvac I · Aakalay'
-    : FROM_TOP && F_.pro === 'xikia' ? 'The Beginning · Xikia' : FROM_TOP && F_.pro ? 'The Beginning · Velki' : 'Prologue · Xilia';
+    : IN_CH1 ? 'Chapter I · Xilia' : FROM_TOP && F_.pro === 'xikia' ? 'The Beginning · Xikia' : FROM_TOP && F_.pro ? 'The Beginning · Velki' : 'Prologue · Xilia';
   $('t-save').textContent = `Saved run: ${where} · ${DIFFICULTY[SAVE.difficulty].label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls`;
   $('btn-continue').style.display = ''; $('btn-continue').disabled = false;
 }
@@ -3940,7 +4039,8 @@ $('si-form').onsubmit = async ev => {
 
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'On a phone or tablet: left thumb moves, drag on the right to look, and the buttons fight. Turn your phone sideways for the best view.';
 $('btn-continue').onclick = () => startFromTitle(() => {
-  if (REGION === 'xilia' && !F_.xtalked && F_.pro === 'xikia') arriveXikia();
+  if (young() && F_.pro === 'done') { if (F_.yq == null) startMorning(); else continueRun(); }
+  else if (REGION === 'xilia' && !F_.xtalked && F_.pro === 'xikia') arriveXikia();
   else if (REGION === 'xilia' && !F_.xtalked) beginNew();
   else if (REGION === 'aakalay' && !F_.arrivedA && !F_.talked) arriveAakalay();
   else if (REGION === 'leotik' && !F_.arrivedL) arriveLeotik();
@@ -3963,7 +4063,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  get vk() { return VK; }, get pro() { return G.pro; }, arriveXikia, proHatOn, proTakeAmulet, finishPro, F_: () => F_,
+  get vk() { return VK; }, get pro() { return G.pro; }, arriveXikia, proHatOn, proTakeAmulet, finishPro, F_: () => F_, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
