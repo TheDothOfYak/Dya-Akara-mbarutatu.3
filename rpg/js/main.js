@@ -284,7 +284,9 @@ const canvas = renderer.domElement;
 const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin', 'rpg'].some(id => !$(id).classList.contains('hidden'));
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  if (!locked && !G.paused && (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory') && !overlayOpen() && !(DLG && DLG.choices)) openPause();
+  if (locked) return;
+  if (performance.now() - selfUnlockT < 2000 || watching()) return;   // we let go of it ourselves, or a scene is playing
+  if (!G.paused && (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory') && !overlayOpen() && !(DLG && DLG.choices)) openPause();
 });
 document.addEventListener('mousemove', e => {
   if (!locked || G.paused) return;
@@ -312,6 +314,12 @@ document.addEventListener('mousedown', e => {
 document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; });
 document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });   // keep long-press paste in text fields
 addEventListener('wheel', e => { CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
+/* the game letting go of the mouse itself (a cutscene, a menu, a choice) is not you pressing Escape:
+   remember when we did it, so the pointer-lock change that follows doesn't open the pause menu */
+let selfUnlockT = -1e9;
+function unlockMouse() { selfUnlockT = performance.now(); if (document.pointerLockElement) document.exitPointerLock(); }
+/* is something being shown that you only watch? then losing the mouse is never a reason to pause */
+function watching() { return G.mode === 'intro' || G.mode === 'trance' || !!cardState || mainCine.active || document.body.classList.contains('cine-on') || (VK && VK.cinematic === true); }
 function lockMouse() { if (touch.on) return; try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } }
 /* phones and tablets: a joystick, a look-drag and on-screen buttons (see touch.js) */
 $('spells').addEventListener('pointerdown', e => {   // tap a quick slot to use it
@@ -1234,7 +1242,7 @@ function openLantern(l) {
   persist();
   sfx.heal();
   G.paused = true; G.lock = null;
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
   $('lan-name').textContent = l.name;
   renderUps();
   $('lantern').classList.remove('hidden');
@@ -1287,7 +1295,7 @@ function offerCores() {
       s.mat.emissiveIntensity = 1.4;
       dialog(STORY.DIALOG.tranceIn, () => {
         G.mode = 'trance';
-        if (document.pointerLockElement) document.exitPointerLock();
+        unlockMouse();
         fade(0.85, 1.2);
         $('fade').style.background = 'radial-gradient(circle, #f6d6a0, #3a2a10)';
         playCards(STORY.DIALOG.tranceCards, 4200, () => {
@@ -1311,7 +1319,7 @@ function afterDuel() {
 
 function trance() {
   G.mode = 'trance';
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
   const cards = $('cards'); cards.classList.add('trance');
   fade(0.85, 1.5);
   $('fade').style.background = 'radial-gradient(circle, #3a1a6a, #0a0418)';
@@ -1410,7 +1418,7 @@ function takeSeed() {
 function sailToAakalay() {
   dialog(STORY.XILIA.setSail, () => {
     G.mode = 'trance';
-    if (document.pointerLockElement) document.exitPointerLock();
+    unlockMouse();
     fade(0.9, 1.5);
     playCards(STORY.XILIA.sailCards, 4200, () => {
       delete SAVE.inv.items.k_seed; SAVE.region = 'aakalay'; SAVE.lantern = null; F_.xdone = true; persist(); CLOUD.flush();
@@ -1878,7 +1886,7 @@ function setSail() {
   dialog(STORY.DIALOG2.setSail, () => {
     G.mode = 'trance';
     $('endcard').classList.add('hidden');
-    if (document.pointerLockElement) document.exitPointerLock();
+    unlockMouse();
     fade(0.9, 1.5);
     playCards(STORY.DIALOG2.urverkCards, 4200, () => {
       SAVE.region = 'leotik'; SAVE.lantern = null; persist(); CLOUD.flush();
@@ -1922,7 +1930,7 @@ function afterLord() {
     let t = 0; const hop = () => { t += 0.016; m.root.position.x = pz.x + Math.sin(t * 3) * 4 + t * 2; m.root.position.y = pz.y + Math.abs(Math.sin(t * 9)) * 0.6; m.animate(0.016, { speed: 3, t }); if (t < 6) requestAnimationFrame(hop); else scene.remove(m.root); }; hop(); }
   dialog(STORY.DIALOG2.lordDown, () => {
     G.mode = 'trance';
-    if (document.pointerLockElement) document.exitPointerLock();
+    unlockMouse();
     fade(0.85, 1.5);
     playCards(STORY.ENDING2, 4600, () => {
       fade(0, 1.5);
@@ -1935,7 +1943,7 @@ function revealGate() { if (gate) { gate.visible = true; gate.userData.film.mate
 
 function showEnd(n) {
   G.mode = 'end';
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
   if (n === 1) {
     $('e-kicker').textContent = 'Rokarvac I · Complete'; $('e-title').textContent = 'The Ruins of Aakalay';
     $('e-lead').textContent = 'Noka’s next riddle, found at the edge of the trance:';
@@ -2280,7 +2288,7 @@ function toggleJournal() {
     const proph = (SAVE.prophecies || []).map(l => `<div class="jentry"><b>A true prophecy</b>“${l}”</div>`).join('');
     $('j-codex').innerHTML = proph + [...STORY.CODEX, ...STORY.CODEX_MORE, ...STORY.CODEX_LORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
     j.classList.remove('hidden'); G.paused = true;
-    if (document.pointerLockElement) document.exitPointerLock();
+    unlockMouse();
   } else { j.classList.add('hidden'); G.paused = false; lockMouse(); }
 }
 $('btn-jclose').onclick = () => { toggleJournal(); };
@@ -2390,7 +2398,7 @@ function ask(who, text, options) {
   });
   DLG.sel = 0; markChoice(0);
   $('d-next').style.display = 'none';
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
 }
 /* W / S (or the arrows) walk the highlight; Space, Enter, E or a click takes it */
 function markChoice(i) {
@@ -3077,7 +3085,7 @@ let book = null;
 function openBook(tab) {
   if (G.mode !== 'play' && G.mode !== 'dialog') return;
   G.paused = true; G.lock = null;
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
   book.open(tab);
 }
 function bookAct(act, arg) {
@@ -3340,7 +3348,7 @@ function checkExits(px0, pz0) {
 }
 function takeExit(ex) {
   G.mode = 'trance'; P.vel.set(0, 0, 0);
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
   fade(1, 0.7);
   SAVE.lanternBy = SAVE.lanternBy || {}; SAVE.lanternBy[REGION] = SAVE.lantern;
   SAVE.region = ex.to; SAVE.lantern = SAVE.lanternBy[ex.to] || null;
@@ -3351,7 +3359,7 @@ function takeExit(ex) {
 }
 function takePass(ps) {
   G.mode = 'trance'; P.vel.set(0, 0, 0);
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
   fade(0.18, 0.9);   // not a black card: the camera pulls away up the pass while the words come
   const cards = (PASS_CARDS[ps.to] || (() => [ps.name + '.']))(!!P.riding);
   SAVE.lanternBy = SAVE.lanternBy || {}; SAVE.lanternBy[REGION] = SAVE.lantern;   // each region remembers where you last rested
@@ -4103,7 +4111,7 @@ function youngHud() {
 }
 function askName(cb) {
   G.mode = 'naming';   // not 'play': letting go of the mouse to type isn't a pause
-  if (document.pointerLockElement) document.exitPointerLock();
+  unlockMouse();
   const box = document.createElement('div');
   box.id = 'pk-box'; box.className = 'brass'; box.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:45;padding:22px 26px;text-align:center;min-width:280px';
   box.innerHTML = '<div style="font-family:var(--display);letter-spacing:.12em;margin-bottom:10px">NAME YOUR PUNK</div><input id="pk-name" maxlength="18" style="font:inherit;font-size:18px;padding:6px 10px;width:220px" placeholder="Pip"><div style="margin-top:12px"><button class="btn" id="pk-ok">That’s its name</button></div>';
@@ -4134,7 +4142,7 @@ function startRoad(at) {
     bark: (w, t, d) => bark(w, t, d), hint: t => hint(t), toast: (t, d) => toast(t, d),
     cards: (lines, ms, cb) => { G.mode = 'intro'; playCards(lines, ms, cb); },
     play: () => { G.mode = 'play'; lockMouse(); },
-    cutscene: on => { G.mode = on ? 'intro' : 'play'; if (!on) lockMouse(); else if (document.pointerLockElement) document.exitPointerLock(); },
+    cutscene: on => { G.mode = on ? 'intro' : 'play'; if (!on) lockMouse(); else unlockMouse(); },
     location: (a, b) => showLocation(a, b),
     objective: (head, text, h, pips, on) => proObjective(head, text, h, pips, on),
     blur: px => { canvas.style.transition = px ? 'filter .4s' : 'filter 1.6s'; canvas.style.filter = `blur(${px}px)`; },
