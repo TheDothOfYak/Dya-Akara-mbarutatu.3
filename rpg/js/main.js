@@ -4004,6 +4004,7 @@ function frame() {
       checkLocations();
       if (young() && F_.pro === 'beuhk') { if (REGION === 'property') pathTick(); else beuhkTick(); }
       else if (young()) youngTick();
+      updateMalsti(dt);
       if (REGION === 'xilia' || REGION === 'property') {
         if (F_.tut === 3 && REGION === 'property' && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
         if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
@@ -4266,6 +4267,19 @@ function firstTokenLesson(n) {
     mainCine.play([{ dur: 99999, cam: (k, tt) => ({ p: TOK.cam, l: TOK.at.clone().setY(TOK.at.y + 0.15) }) }], null, { bars: true });
     tokObjective(T.stepChip);
   });
+}
+/* after the Megla Aagac: the Malsti Punk who was a Ver, never far from his heels */
+let malstiPal = null;
+function updateMalsti(dt) {
+  if (!F_.malstiName || !young() || interiors.inside) { if (malstiPal) malstiPal.root.visible = false; return; }
+  if (!malstiPal) { malstiPal = buildMalstiPunk({ seed: 61 }); malstiPal.root.scale.setScalar(5.5); malstiPal.root.position.copy(P.pos); scene.add(malstiPal.root); malstiPal.v = V3(); }
+  const m = malstiPal, R = m.root; R.visible = true;
+  const want = V3(P.pos.x - Math.sin(P.yaw) * 1.4 + Math.cos(P.yaw) * 0.9, 0, P.pos.z - Math.cos(P.yaw) * 1.4 - Math.sin(P.yaw) * 0.9);
+  if (R.position.distanceTo(P.pos) > 30) R.position.copy(want);
+  const dx = want.x - R.position.x, dz = want.z - R.position.z, d = Math.hypot(dx, dz), sp = d > 0.4 ? Math.min(14, d * 3.5) : 0;
+  if (sp > 0) { R.position.x += dx / d * sp * dt; R.position.z += dz / d * sp * dt; R.rotation.y = dampAngle(R.rotation.y, Math.atan2(dx, dz), 10, dt); }
+  R.position.y = world.col.ground(R.position.x, R.position.z, P.pos.y + 1);
+  m.animate(dt, { speed: sp, t: G.t });
 }
 function tokObjective(text) { proObjective('Chapter II · the first token', text, ''); mainCine.caption(text); }
 function tokKey(code, up) {   // the lesson takes E (held for the pour) and the song's notes
