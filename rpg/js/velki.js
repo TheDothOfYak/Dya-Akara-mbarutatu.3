@@ -10,7 +10,7 @@
    takes the run back when the air tears open.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
+import { toon, ramp, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
 import { buildEikar } from './actors.js';
 import { clamp, damp, dampAngle, smooth, mulberry32 } from './util.js';
 import * as STORY from './story.js';
@@ -46,29 +46,126 @@ export function buildAngel(s = 1) {
   return g;
 }
 
-/* a Sniller: a great cold-teal gem between two curved horns, and a shape behind it that won't sit still */
+/* a Sniller: a storm-genie. Below the waist it is a tornado, a spinning funnel of grey storm that
+   never touches the ground; above, a torso of vine-like tendrils that swoop up and out into arms —
+   and the arms end in more tendrils, never hands. One head, one cold teal eye. */
+let snillerSwirl = null;
+function swirlTexture() {
+  if (snillerSwirl) return snillerSwirl;
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256; const g = cv.getContext('2d');
+  g.fillStyle = '#8fa2a8'; g.fillRect(0, 0, 128, 256);
+  for (let i = 0; i < 46; i++) {   // slanted storm streaks, darker and lighter
+    const y = Math.random() * 256, w = 20 + Math.random() * 70, h = 2 + Math.random() * 6;
+    g.fillStyle = Math.random() < 0.5 ? 'rgba(40,62,70,0.7)' : 'rgba(220,245,245,0.55)';
+    g.save(); g.translate(Math.random() * 128, y); g.rotate(-0.42); g.fillRect(-w / 2, -h / 2, w, h); g.restore();
+    g.save(); g.translate(Math.random() * 128 - 128, y); g.rotate(-0.42); g.fillRect(-w / 2, -h / 2, w, h); g.restore();
+  }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 1); t.colorSpace = THREE.SRGBColorSpace;
+  snillerSwirl = t; return t;
+}
+function tendril(points, r0, r1, mat) {
+  const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
+  const geo = new THREE.TubeGeometry(curve, 18, 1, 6, false);
+  // taper the tube from r0 at its root to r1 at its tip
+  const pos = geo.attributes.position, n = 19, ring = 7, c = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    const k = i / (n - 1), r = r0 + (r1 - r0) * k; curve.getPointAt(k, c);
+    for (let j = 0; j < ring; j++) { const v = i * ring + j; pos.setXYZ(v, c.x + (pos.getX(v) - c.x) * r, c.y + (pos.getY(v) - c.y) * r, c.z + (pos.getZ(v) - c.z) * r); }
+  }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, mat);
+}
 export function buildSniller(s = 1) {
   const g = new THREE.Group();
-  const gem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), toon(0x6af0e0, { emissive: 0x2ab0b0, emissiveIntensity: 1.0 })); gem.position.y = 2.4; addOutline(gem, 0.04, 0x0a2a2a); g.add(gem);
-  const hornMat = toon(0x9aa8b0, { emissive: 0x203038, emissiveIntensity: 0.4 });
+  const storm = toon(0x4a5e66, { emissive: 0x0e2a30, emissiveIntensity: 0.35 });
+  const vine = toon(0x3a5a58, { emissive: 0x0a3a3a, emissiveIntensity: 0.45 });
+  const teal = 0x6af0e0;
+
+  /* the tornado: a funnel narrow at the tip, wide at the waist, with ragged rings of wind round it */
+  const fun = [];
+  for (let i = 0; i <= 12; i++) { const k = i / 12; fun.push(new THREE.Vector2(0.12 + Math.pow(k, 1.7) * 1.05, k * 2.6)); }
+  const funnelMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: swirlTexture(), gradientMap: ramp(), transparent: true, opacity: 0.82, side: THREE.DoubleSide, emissive: 0x0e3036, emissiveIntensity: 0.4 });
+  const funnel = new THREE.Mesh(new THREE.LatheGeometry(fun, 20), funnelMat); funnel.position.y = -0.4; g.add(funnel);
+  const inner = new THREE.Mesh(new THREE.LatheGeometry(fun.map(v => new THREE.Vector2(v.x * 0.7, v.y)), 14), new THREE.MeshBasicMaterial({ color: 0x2ad0c8, transparent: true, opacity: 0.25, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  inner.position.y = -0.4; g.add(inner);
+  const rings = [];
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xcfeeee, transparent: true, opacity: 0.45, depthWrite: false });
+  for (let i = 0; i < 6; i++) {
+    const k = (i + 0.5) / 6, rr = 0.2 + Math.pow(k, 1.7) * 1.15;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.035 + k * 0.03, 4, 18, Math.PI * (1.1 + Math.random() * 0.6)), ringMat);
+    ring.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.25; ring.position.y = -0.4 + k * 2.6; g.add(ring); rings.push(ring);
+  }
+  const debris = [];   // grit caught in the wind
+  for (let i = 0; i < 9; i++) { const d = new THREE.Mesh(new THREE.DodecahedronGeometry(0.06 + Math.random() * 0.06, 0), storm); d.userData = { a: Math.random() * TAU, y: Math.random() * 2.2, r: 0.4 + Math.random() * 0.8, sp: 2 + Math.random() * 3 }; g.add(d); debris.push(d); }
+
+  /* the torso: tendrils rise out of the storm at the waist, braid, and swoop out to the arms */
+  const torso = new THREE.Group(); torso.position.y = 2.1; g.add(torso);
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), vine); core.scale.set(1.1, 1.3, 0.7); core.position.y = 0.2; torso.add(core);
+  for (let i = 0; i < 12; i++) {   // the braided chest, wide and flat: vines rise out of the storm and swoop to the shoulders
+    const side = i % 2 ? 1 : -1, o = (Math.floor(i / 2) / 5 - 0.5) * 0.6, z = ((i * 7) % 3 - 1) * 0.14;
+    const m = tendril([[o * 0.5, -0.75, z], [o * 0.6, 0.0, z + 0.1], [o + side * 0.2, 0.6, z + 0.06], [side * (0.55 + Math.abs(o) * 0.4), 1.08, z], [side * 0.95, 1.22, z - 0.05]], 0.12, 0.07, vine);
+    addOutline(m, 0.018, 0x061414); torso.add(m);
+  }
+  for (let k = 0; k < 5; k++) {   // the neck: a few vines climbing to the head
+    const a = k / 5 * TAU;
+    torso.add(tendril([[Math.cos(a) * 0.22, 0.9, Math.sin(a) * 0.12], [Math.cos(a + 0.8) * 0.12, 1.3, Math.sin(a + 0.8) * 0.1], [Math.cos(a + 1.6) * 0.1, 1.6, Math.sin(a + 1.6) * 0.08]], 0.07, 0.05, vine));
+  }
+  // the storm boils over at the waist, where the funnel ends and the vines begin
+  const puffs = [];
+  const puffMat = new THREE.MeshToonMaterial({ color: 0x7a8c92, gradientMap: ramp(), transparent: true, opacity: 0.88, emissive: 0x0e2a30, emissiveIntensity: 0.3 });
+  for (let k = 0; k < 9; k++) {
+    const a = k / 9 * TAU, pf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25 + (k % 3) * 0.06, 1), puffMat);
+    pf.userData.a = a; pf.position.set(Math.cos(a) * 0.95, -0.15 + (k % 2) * 0.12, Math.sin(a) * 0.95); torso.add(pf); puffs.push(pf);
+  }
+  const arms = [];
   for (const side of [-1, 1]) {
-    const horn = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.16, 6, 16, Math.PI * 0.85), hornMat);
-    horn.position.set(side * 1.05, 2.4, 0); horn.rotation.z = side > 0 ? -0.7 : Math.PI + 0.7; addOutline(horn, 0.03); g.add(horn);
+    const arm = new THREE.Group(); arm.position.set(side * 0.95, 1.2, 0); torso.add(arm); arms.push(arm);
+    // the upper arm: three vines twisted together, sweeping out and down
+    for (let k = 0; k < 3; k++) {
+      const tw = (k - 1) * 0.08;
+      const m = tendril([[0, 0, tw], [side * 0.5, -0.05 + tw, 0.1], [side * 1.0, -0.35, -tw], [side * 1.35, -0.75 + tw, 0.05]], 0.1, 0.07, vine);
+      addOutline(m, 0.02, 0x061414); arm.add(m);
+    }
+    // no hand: the arm frays into a spray of loose tendrils
+    const fray = new THREE.Group(); fray.position.set(side * 1.35, -0.75, 0.05); arm.add(fray);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6 - 0.5) * 1.6, len = 0.8 + Math.random() * 0.7;
+      const m = tendril([[0, 0, 0], [side * 0.3, -0.25, Math.sin(a) * 0.2], [side * (0.45 + len * 0.3), -0.55 - len * 0.3, Math.sin(a) * 0.5], [side * (0.5 + len * 0.45), -0.7 - len * 0.6, Math.sin(a) * 0.75 + 0.1]], 0.06, 0.012, vine);
+      fray.add(m);
+    }
+    arm.userData.fray = fray;
   }
-  const shade = new THREE.MeshBasicMaterial({ color: 0x0c3a40, transparent: true, opacity: 0.55, depthWrite: false });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1.6, 14, 10), shade); body.scale.set(1.2, 1.5, 0.9); body.position.set(0, 2.2, -0.8); g.add(body);
-  const tendrils = [];
-  for (let i = 0; i < 7; i++) {
-    const t = new THREE.Mesh(new THREE.ConeGeometry(0.22, 3.2, 6), new THREE.MeshBasicMaterial({ color: 0x2ad0c8, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending }));
-    const a = (i / 7) * TAU; t.position.set(Math.cos(a) * 0.9, 0.9, -0.6 + Math.sin(a) * 0.5); t.rotation.x = Math.PI; g.add(t); tendrils.push(t);
+  // insubstantial armour: a faint plate of cold light on each shoulder
+  for (const side of [-1, 1]) {
+    const plate = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 6, 0, TAU, 0, Math.PI / 2.4), new THREE.MeshBasicMaterial({ color: teal, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }));
+    plate.position.set(side * 0.85, 1.28, 0); plate.rotation.z = -side * 0.6; torso.add(plate);
   }
-  const glow = glowSprite(0x5af0e0, 8, 0.55); glow.position.y = 2.4; g.add(glow);
+
+  /* one head, and one eye */
+  const head = new THREE.Group(); head.position.y = 1.75; torso.add(head);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), vine); skull.scale.set(0.95, 1.15, 0.9); addOutline(skull, 0.03, 0x061414); head.add(skull);
+  for (let k = 0; k < 5; k++) {   // a few tendrils trailing back off the crown
+    const a = (k / 4 - 0.5) * 1.4;
+    head.add(tendril([[Math.sin(a) * 0.2, 0.3, -0.1], [Math.sin(a) * 0.35, 0.55, -0.45], [Math.sin(a) * 0.5, 0.45, -0.95], [Math.sin(a) * 0.6, 0.15, -1.35]], 0.07, 0.015, vine));
+  }
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), new THREE.MeshBasicMaterial({ color: 0xd8fffa })); eye.scale.set(1.25, 0.8, 0.5); eye.position.set(0, 0.06, 0.37); head.add(eye);
+  const eyeGlow = glowSprite(teal, 1.4, 0.85); eyeGlow.position.copy(eye.position); head.add(eyeGlow);
+
+  const glow = glowSprite(0x5af0e0, 7, 0.32); glow.position.y = 2.6; g.add(glow);
   g.scale.setScalar(s);
-  g.userData = { gem, body, tendrils, glow, ph: Math.random() * TAU };
+  // the Sniller's own amulet face: kept on userData.gem for anything that still flashes it
+  g.userData = { gem: eye, body: funnel, tendrils: arms, glow, ph: Math.random() * TAU };
   g.userData.tick = t => {
     const ph = g.userData.ph;
-    gem.rotation.y = t * 0.8; body.scale.x = 1.2 + Math.sin(t * 5 + ph) * 0.15; body.material.opacity = 0.4 + Math.sin(t * 9 + ph) * 0.15;
-    tendrils.forEach((m, i) => { m.rotation.z = Math.sin(t * 2.4 + i + ph) * 0.4; });
+    funnelMat.map.offset.x = -t * 1.6; funnel.rotation.y = t * 0.6; inner.rotation.y = -t * 2.2;
+    rings.forEach((r, i) => { r.rotation.z = t * (3 + i * 0.7); r.position.x = Math.sin(t * 3 + i) * 0.06 * i; });
+    debris.forEach(d => { const u = d.userData; u.a += u.sp * 0.016; d.position.set(Math.cos(u.a) * u.r, -0.2 + u.y + Math.sin(t + u.a) * 0.2, Math.sin(u.a) * u.r); });
+    funnel.position.x = Math.sin(t * 1.7 + ph) * 0.12; funnel.position.z = Math.cos(t * 1.3 + ph) * 0.12;
+    torso.position.y = 2.1 + Math.sin(t * 1.4 + ph) * 0.1;
+    arms.forEach((a, i) => { const sd = i ? 1 : -1; a.rotation.z = sd * (Math.sin(t * 1.1 + ph + i) * 0.18); a.rotation.y = Math.sin(t * 0.8 + i * 2) * 0.2; a.userData.fray.rotation.x = Math.sin(t * 2.3 + i) * 0.35; });
+    head.rotation.y = Math.sin(t * 0.6 + ph) * 0.3;
+    puffs.forEach((pf, k) => { const a = pf.userData.a + t * 1.8; pf.position.x = Math.cos(a) * 0.95; pf.position.z = Math.sin(a) * 0.95; pf.scale.setScalar(1 + Math.sin(t * 4 + k) * 0.12); });
+    eyeGlow.material.opacity = 0.7 + Math.sin(t * 6 + ph) * 0.2; glow.material.opacity = 0.26 + Math.sin(t * 9 + ph) * 0.08;
   };
   return g;
 }

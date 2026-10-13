@@ -3,8 +3,11 @@
    carried his Hurst across, and where the Carpenter, Buhkon Eldi,
    saved the Eikar with no hat. Home. A busy little town of
    acorn-capped cottages on a sunny highland: a market square,
-   the Carpenter's yard, farms, a forest, and — out past the
-   fields — the Ember Grove and a Duskareth hideout.
+   farms, a forest, and — out past the fields — the Ember Grove
+   and a Duskareth hideout. West of town the little road crosses
+   the Brightwater and runs into the trees: the forest path to the
+   Carpenter's property, which is a land of its own (property.js).
+   Most of the cottages can be gone into (interiors.js).
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
@@ -14,14 +17,24 @@ export { STEP };
 
 const SQUARE = { x: 0, z: 50 };
 const SQ_H = 1.0;
-/* the Carpenter's property: on its own hill west of town, up a little road, with a lake below it to the west */
-export const YARD = { x: -200, z: 60 };
-const YARD_H = 10;
+/* the little road west out of town, over the river and into the trees: the forest path to the Carpenter's */
+const WEST_ROAD = [[-168, 58], [-205, 40], [-250, 12], [-292, -10], [-338, -26]];
+const WEST_EXIT = { x: -338, z: -26 };
+const WEST_N = (() => { const dx = -338 + 292, dz = -26 + 10, l = Math.hypot(dx, dz); return { x: dx / l, z: dz / l }; })();
+function westRoadDist(x, z) {
+  let best = 1e9;
+  for (let i = 0; i < WEST_ROAD.length - 1; i++) {
+    const [ax, az] = WEST_ROAD[i], [bx, bz] = WEST_ROAD[i + 1], vx = bx - ax, vz = bz - az;
+    const t = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz), 0, 1);
+    best = Math.min(best, Math.hypot(x - ax - vx * t, z - az - vz * t));
+  }
+  return best;
+}
 export const PEN = { x: -46, z: 104 };
 export const GROVE = { x: 64, z: -112 };
 export const HIDEOUT = { x: -108, z: -74 };
 const CLEAR = [
-  { x: SQUARE.x, z: SQUARE.z, r: 26 }, { x: YARD.x, z: YARD.z, r: 22 }, { x: PEN.x, z: PEN.z, r: 14 },
+  { x: SQUARE.x, z: SQUARE.z, r: 26 }, { x: PEN.x, z: PEN.z, r: 14 },
   { x: GROVE.x, z: GROVE.z, r: 20 }, { x: HIDEOUT.x, z: HIDEOUT.z, r: 18 }, { x: 96, z: 10, r: 15 }, { x: -62, z: -40, r: 15 },
 ];
 
@@ -34,7 +47,6 @@ function oldHeight(x, z) {
   let h = (fbm(x * 0.01 + 9, z * 0.01 - 2, 4) - 0.5) * 18 + (fbm(x * 0.05, z * 0.05, 2) - 0.5) * 1.6;
   h += smooth(10, -160, z) * 9;                                // the north rises into forest hills
   h = lerp(h, SQ_H, smooth(90, 50, Math.hypot(x - SQUARE.x, (z - SQUARE.z) * 0.8)));   // the town sits on a broad flat
-  h = lerp(h, SQ_H + 0.4, smooth(28, 18, Math.hypot(x - YARD.x, z - YARD.z)));
   if (z > 120 && Math.abs(x) < 30) h = lerp(h, 0.6, smooth(16, 6, Math.abs(x)) * smooth(120, 150, z));
   return h;
 }
@@ -55,7 +67,6 @@ const LAKES = [
   { id: 'pond_nw', x: -178, z: -258, rx: 18, rz: 16, d: 4 },
   { id: 'pond_n', x: 150, z: -332, rx: 16, rz: 15, d: 4 },
   { id: 'fen', x: -300, z: 190, rx: 26, rz: 20, d: 2.6 },
-  { id: 'carpmere', x: -270, z: 62, rx: 36, rz: 50, d: 9 },        // the Carpenter's lake, below his hill
 ];
 const RIVER = [[-318, -392], [-292, -270], [-258, -150], [-240, -20], [-226, 100], [-178, 200], [-110, 262], [-50, 292]];
 const RIVER_W = 8, RIVER_D = 4.2;
@@ -119,7 +130,6 @@ function heightRaw(x, z) {
   const b = smooth(R - 10, R + 30, r);
   let h = b < 1 ? lerp(oldHeight(x, z), wildBase(x, z, r), b) : wildBase(x, z, r);
   if (r > 360) h += mountains(x, z, r, a);
-  { const dy = Math.hypot(x - YARD.x, z - YARD.z); if (dy < 70) h = lerp(h, YARD_H, smooth(62, 24, dy)); }   // the Carpenter's hill
   const gw = gorgeW(a);
   if (gw > 0) {                                                 // the Sundered Gorge: a chasm with the river-water far below
     const rc = barrierR(a) - 10, dg = Math.abs(r - rc);
@@ -210,6 +220,7 @@ function treeDensity(x, z) {
   const r = Math.hypot(x, z);
   d = Math.max(d, 0.14 * smooth(170, 260, r), smooth(-120, -330, z) * 0.55);          // scattered trees; the north is wooded
   d = Math.max(d, 0.5 * smooth(barrierR(Math.atan2(z, x)) - 50, barrierR(Math.atan2(z, x)) + 30, r) * smooth(1300, 700, r)); // pines up the lower slopes
+  if (x < -200) d = Math.max(d, 0.95 * smooth(9, 18, westRoadDist(x, z)) * smooth(-235, -275, x) * smooth(150, 60, westRoadDist(x, z)));   // the trees close in round the forest path
   return d * (0.55 + 0.6 * fbm(x * 0.02 + 7, z * 0.02 - 3, 2));
 }
 
@@ -223,7 +234,8 @@ export function buildXilia(scene) {
   const col = new Colliders(heightAt);
   const roads = [[0, 175, 0, 50], [0, 50, 0, -80], [0, 50, 90, 10], [0, 50, -90, 40],
     [0, 80, PEN.x, PEN.z], [0, -80, GROVE.x, GROVE.z], [0, -60, HIDEOUT.x, HIDEOUT.z],
-    [-90, 40, -132, 50], [-132, 50, -168, 58], [-168, 58, YARD.x + 22, YARD.z]];          // the little road out of town to the Carpenter's hill
+    [-90, 40, -132, 50], [-132, 50, -168, 58],          // the little road west out of town …
+    ...WEST_ROAD.slice(0, -1).map((p, i) => [p[0], p[1], WEST_ROAD[i + 1][0], WEST_ROAD[i + 1][1]])];   // … over the river and into the forest
   const roadDist = (x, z) => {
     let best = 1e9;
     for (const [ax, az, bx, bz] of roads) {
@@ -233,7 +245,6 @@ export function buildXilia(scene) {
     return best;
   };
   const FIELDS = [{ x: -100, z: 30, w: 40, d: 50 }, { x: -60, z: -10, w: 30, d: 26 }, { x: 70, z: 60, w: 34, d: 30 }];
-  const PFIELDS = [{ x: YARD.x + 6, z: YARD.z + 38, w: 22, d: 14 }, { x: YARD.x + 30, z: YARD.z + 28, w: 16, d: 18 }];   // the Carpenter's own fenced fields
   const inField = (x, z) => FIELDS.find(f => Math.abs(x - f.x) < f.w / 2 && Math.abs(z - f.z) < f.d / 2);
 
   /* ---------- terrain: the town's fine mesh, a wider mid mesh, and a far ring of ranges out to the horizon ---------- */
@@ -252,6 +263,7 @@ export function buildXilia(scene) {
     out.lerp(rock, smooth(0.86, 0.66, ny)).lerp(rockD, smooth(0.6, 0.4, ny) * 0.7);
     out.lerp(rock, smooth(90, 150, y) * 0.5);
     out.lerp(snow, smooth(150, 205, y + n * 30) * smooth(0.5, 0.72, ny));
+    out.lerp(dirt, smooth(3.6, 1.8, westRoadDist(x, z)) * 0.85);
     if (PASS.near(x, z, 6)) out.lerp(dirt, smooth(PASS.w - 1, PASS.w - 4, PASS.lat(x, z)) * smooth(PASS.r0 - 30, PASS.r0, PASS.along(x, z)) * smooth(3, 1, Math.abs(y - PASS.floor(PASS.along(x, z)))) * 0.85);   // the road
     return out;
   };
@@ -278,11 +290,8 @@ export function buildXilia(scene) {
       out.lerp(pave, smooth(24, 20, Math.hypot(x - SQUARE.x, z - SQUARE.z)));
       const b = smooth(R - 12, R + 25, r);
       if (b > 0) out.lerp(wildColor(x, z, y, ny, cw), b);
-      // the little road and the Carpenter's yard show through, out past the town too
+      // the little road shows through, out past the town too
       out.lerp(dirt, smooth(4, 2, roadDist(x, z)) * 0.85 * b);
-      out.lerp(dirt, smooth(22, 18, Math.hypot(x - YARD.x, z - YARD.z)) * 0.75);
-      const pf = PFIELDS.find(f => Math.abs(x - f.x) < f.w / 2 && Math.abs(z - f.z) < f.d / 2);
-      if (pf) out.copy(Math.sin((x - pf.x) * 1.4) > 0 ? soil : soilB);
     });
     // the mid mesh (6.2 m cells) with a hole under the town mesh; its overlap rim is tucked just below
     const MS = 1240, MSEG = 200, HOLE = 226;
@@ -336,6 +345,7 @@ export function buildXilia(scene) {
   const windowMat = new THREE.MeshBasicMaterial({ color: 0xffd890 });
   const doorMat = toon(0x6a3a1e);
   const houses = [];
+  const doors = [];
   function cottage(x, z, r, rot, opts = {}) {
     const g = heightAt(x, z), H = opts.h || 3.2 + rng() * 1.2;
     const grp = new THREE.Group(); grp.position.set(x, g, z); grp.rotation.y = rot;
@@ -351,6 +361,8 @@ export function buildXilia(scene) {
     scene.add(grp);
     col.add(x, z, r * 0.85, r * 0.85, 0, g - 1, g + H + 2);
     houses.push({ x, z, r, chim: new THREE.Vector3(x + Math.cos(rot) * r * 0.6 + Math.sin(rot) * -r * 0.3, g + H + 1.4, z) });
+    // most of the cottages open: walk up to the door and press E
+    if (opts.door !== false && rng() < 0.85) doors.push({ id: 'x_c' + houses.length, name: opts.name || 'a cottage', kind: 'cottage', seed: 7000 + houses.length * 31, x: x + Math.sin(rot) * (r + 0.9), z: z + Math.cos(rot) * (r + 0.9), yaw: rot });
     return grp;
   }
 
@@ -398,77 +410,39 @@ export function buildXilia(scene) {
     cottage(x, z, 2.6 + rng() * 1.4, rng() * Math.PI * 2);
   }
 
-  /* ---------- the Carpenter's yard: workshop, glide tower, dummies' posts ---------- */
+  /* ---------- the west road: a bridge over the Brightwater, and an arch of old trees where the forest path begins ---------- */
   {
-    const { x, z } = YARD, g = heightAt(x, z);
-    // the big house (he comes from a very rich house, and it shows without a word said), and the workshop
-    cottage(x - 2, z - 15, 8, 0, { h: 6.5 });
-    cottage(x + 6, z - 22, 4.5, 0.4, { h: 5 });                      // the house's second wing
-    cottage(x + 14, z - 4, 5, -Math.PI / 2, { h: 4.5 });            // the workshop
-    // the barn, with a loft
-    {
-      const bx = x - 14, bz = z + 12, bg = heightAt(bx, bz);
-      blocks.put(bx, bg + 3, bz, 10, 6, 8, 0, 0.3, 0, '#8a3a2a');
-      blocks.put(bx, bg + 7.2, bz, 10.6, 0.4, 6, Math.PI / 4.5, 0.3, 0, '#5a3a24');
-      blocks.put(bx, bg + 7.2, bz, 10.6, 0.4, 6, -Math.PI / 4.5, 0.3, 0, '#5a3a24');
-      blocks.put(bx + Math.cos(0.3) * 0.2, bg + 1.6, bz + 4.05, 3, 3.2, 0.2, 0, 0.3, 0, '#4a2a18');
-      col.add(bx, bz, 5, 4, -0.3, bg - 1, bg + 8);
+    // the bridge, where the road crosses the river
+    const ax = -205, az = 40, bx = -250, bz = 12, ang = Math.atan2(bx - ax, bz - az);
+    let cx = 0, cz = 0, best = 1e9;
+    for (let t = 0; t <= 1; t += 0.01) { const x = ax + (bx - ax) * t, z = az + (bz - az) * t, d = riverDist(x, z); if (d < best) { best = d; cx = x; cz = z; } }
+    const dy = WATER_LEVEL + 1.6, L = 24;
+    for (let k = -L / 2; k <= L / 2; k += 1.2) blocks.put(cx + Math.sin(ang) * k, dy, cz + Math.cos(ang) * k, 3.4, 0.28, 1.1, 0, ang, 0, k % 2.4 ? '#8a5a36' : '#9a6a40');
+    col.add(cx, cz, 1.7, L / 2, ang, dy - 4, dy + 0.14);
+    for (const s of [-1, 1]) {
+      const ox = Math.cos(ang) * s * 1.7, oz = -Math.sin(ang) * s * 1.7;
+      blocks.put(cx + ox, dy + 0.9, cz + oz, 0.14, 0.14, L, 0, ang, 0, '#6a4428');
+      col.add(cx + ox, cz + oz, 0.12, L / 2, ang, dy, dy + 1.1);
+      for (let k = -L / 2; k <= L / 2; k += 4) blocks.put(cx + ox + Math.sin(ang) * k, dy + 0.45, cz + oz + Math.cos(ang) * k, 0.18, 0.9, 0.18, 0, 0, 0, '#6a4428');
     }
-    // a fence round the yard, with its gate toward the road
-    for (let i = 0; i < 40; i++) {
-      const a = i / 40 * Math.PI * 2; if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.16) continue;
-      const fx = x + Math.cos(a) * 25, fz = z + Math.sin(a) * 25, fg = heightAt(fx, fz);
-      blocks.put(fx, fg + 0.6, fz, 0.2, 1.2, 0.2, 0, 0, 0, '#6a4428');
-      blocks.put(x + Math.cos(a + 0.08) * 25, fg + 0.9, z + Math.sin(a + 0.08) * 25, 0.12, 0.12, 4.0, 0, -a, 0, '#7a5232');
+    for (let k = -L / 2 + 2; k <= L / 2 - 2; k += 4) for (const s of [-1, 1]) blocks.put(cx + Math.sin(ang) * k + Math.cos(ang) * s * 1.6, dy - 3, cz + Math.cos(ang) * k - Math.sin(ang) * s * 1.6, 0.4, 6, 0.4, 0, 0, 0, '#4a3020');
+    // the arch: two old pines leaning together over the path, and a signpost
+    const { x: ex, z: ez } = WEST_EXIT, px = -WEST_N.z, pz = WEST_N.x;
+    for (const s of [-1, 1]) {
+      const tx = ex - WEST_N.x * 6 + px * s * 5.5, tz = ez - WEST_N.z * 6 + pz * s * 5.5, tg = heightAt(tx, tz);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 16, 7), toon(0x5a3a26)); trunk.position.set(tx - px * s * 1.6, tg + 7.4, tz - pz * s * 1.6);
+      trunk.rotation.set(pz * s * 0.22, 0, -px * s * 0.22); addOutline(trunk, 0.05); trunk.castShadow = true; scene.add(trunk);
+      for (let k = 0; k < 3; k++) { const cone = new THREE.Mesh(new THREE.ConeGeometry(3.4 - k * 0.8, 4.4, 7), toon(0x2f6a3a)); cone.position.set(tx - px * s * (3.2 + k * 0.4), tg + 12 + k * 2.6, tz - pz * s * (3.2 + k * 0.4)); addOutline(cone, 0.05); cone.castShadow = true; scene.add(cone); }
+      col.add(tx, tz, 0.9, 0.9, 0, tg - 1, tg + 10);
     }
-    // the fenced fields below the yard
-    for (const f of PFIELDS) {
-      for (let k = 0; k < 120; k++) {
-        const cx = f.x + (rng() - 0.5) * f.w, cz = f.z + (rng() - 0.5) * f.d;
-        if (Math.sin((cx - f.x) * 1.4) < 0.2) continue;
-        crops.put(cx, heightAt(cx, cz) + 0.45, cz, 1 + rng() * 0.5, 0.9 + rng() * 0.6, 1 + rng() * 0.5, 0, rng() * 3, 0, pick(['#c8b040', '#8ab04a', '#e0a040']));
-      }
-      for (let t = 0; t <= 1.0001; t += 1 / 8) for (const [ax, az, bx2, bz2] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]) {
-        const px = f.x + (ax + (bx2 - ax) * t) * f.w / 2, pz = f.z + (az + (bz2 - az) * t) * f.d / 2;
-        blocks.put(px, heightAt(px, pz) + 0.55, pz, 0.16, 1.1, 0.16, 0, 0, 0, '#6a4428');
-      }
-    }
-    // the old tree at the edge of the yard, with a plank platform up in it — a fort, if you like
-    {
-      const tx2 = x + 18, tz2 = z + 20; tree(tx2, tz2, 1.9);
-      const tg = heightAt(tx2, tz2);
-      blocks.put(tx2, tg + 4.2, tz2, 4.2, 0.25, 4.2, 0, 0.4, 0, '#9a6a40');
-      col.add(tx2, tz2, 2.1, 2.1, 0.4, tg + 3.9, tg + 4.35);
-      for (let k = 0; k < 6; k++) { blocks.put(tx2 + 2.4, tg + 0.35 + k * 0.7, tz2 - 1.2, 0.8, 0.12, 0.12, 0, 0.4, 0, '#6a4428'); col.add(tx2 + 2.4, tz2 - 1.2 - k * 0.0, 0.45, 0.3, 0.4, tg - 1, tg + 0.4 + k * 0.7); }
-    }
-    // the old dock, out into the lake below
-    {
-      let sx = x - 20; while (sx > x - 120 && heightAt(sx, z + 2) > WATER_LEVEL + 0.4) sx -= 1;
-      const dy = WATER_LEVEL + 0.9;
-      for (let k = -2; k < 9; k++) blocks.put(sx - k * 1.6, dy, z + 2, 1.45, 0.25, 3.2, 0, 0.02 * (k % 3), 0, k % 2 ? '#7a5232' : '#8a6040');
-      for (let k = 0; k < 9; k += 2) for (const sd of [-1, 1]) blocks.put(sx - k * 1.6, dy - 2.5, z + 2 + sd * 1.5, 0.3, 5, 0.3, 0, 0, 0, '#4a3020');
-      col.add(sx - 5 * 1.6 + 1.6, z + 2, 8.8, 1.6, 0, dy - 3, dy + 0.12);
-      var propShore = new THREE.Vector3(sx + 3.5, heightAt(sx + 3.5, z - 2), z - 2);
-    }
-    // the glide tower: a lookout of fire-tree wood with a stair
-    const tx = x - 16, tz = z - 6, H = 10;
-    blocks.put(tx, g + H / 2 - 0.5, tz, 4, H + 1, 4, 0, 0, 0, '#8a5a36');
-    col.add(tx, tz, 2, 2, 0, g - 1, g + H);
-    // a stair winding round three sides of the tower, up to the top
-    const path = [];
-    for (let i = 0; i < 7; i++) path.push([tx - 3.2, tz + 3.2 - i * 0.92]);
-    for (let i = 0; i < 7; i++) path.push([tx - 3.2 + i * 0.92, tz - 3.2]);
-    for (let i = 0; i < 7; i++) path.push([tx + 3.2, tz - 3.2 + i * 0.92]);
-    path.forEach(([bx, bz], i) => {
-      const sy = Math.min(H, (i + 1) * (H / path.length));
-      blocks.put(bx, g + sy / 2 - 0.3, bz, 1.3, sy + 0.6, 1.3, 0, 0, 0, i % 2 ? '#9a6a40' : '#a8784a');
-      col.add(bx, bz, 0.65, 0.65, 0, g - 1, g + sy);
-    });
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.1), toon(0xd9a441, { side: THREE.DoubleSide })); flag.position.set(tx, g + H + 2.2, tz); scene.add(flag);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3, 5), toon(0x4a2a14)); pole.position.set(tx - 0.9, g + H + 1.5, tz); scene.add(pole);
-    // the high post for the far dummy
-    blocks.put(x + 6, g + 3, z + 10, 0.8, 6, 0.8, 0, 0, 0, '#6a4428');
-    col.add(x + 6, z + 10, 0.4, 0.4, 0, g - 1, g + 6);
+    const sx = ex - WEST_N.x * 12 + px * 4.6, sz = ez - WEST_N.z * 12 + pz * 4.6, sg = heightAt(sx, sz);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3, 6), toon(0x5a3a22)); post.position.set(sx, sg + 1.5, sz); scene.add(post);
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const cg = cv.getContext('2d');
+    cg.fillStyle = '#6b4a2c'; cg.fillRect(0, 0, 256, 128); cg.strokeStyle = '#3a2614'; cg.lineWidth = 8; cg.strokeRect(4, 4, 248, 120);
+    cg.fillStyle = '#f4e2b8'; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.font = 'bold 28px Georgia, serif'; cg.fillText('The Forest Path', 128, 46); cg.font = 'italic 21px Georgia, serif'; cg.fillText('→ Buhkon Eldi’s', 128, 88);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), new THREE.MeshToonMaterial({ map: tex, side: THREE.DoubleSide })); board.position.set(sx, sg + 2.5, sz); board.rotation.y = Math.atan2(-WEST_N.x, -WEST_N.z) + Math.PI / 2; scene.add(board);
+    col.add(sx, sz, 0.25, 0.25, 0, sg - 1, sg + 3);
   }
 
   /* ---------- Ruut's pen ---------- */
@@ -585,7 +559,7 @@ export function buildXilia(scene) {
     if (r < oldEdge(x, z) + 6) return false;
     if (PASS.near(x, z)) return false;
     if (WILD_KEEP.some(k => Math.hypot(x - k.x, z - k.z) < k.r)) return false;
-    if (Math.hypot(x - YARD.x, z - YARD.z) < 50 || roadDist(x, z) < 6) return false;   // the Carpenter keeps his hill clear
+    if (roadDist(x, z) < 6) return false;
     return true;
   };
   for (let i = 0; i < 26000 && wTrunks.mesh.count < 3300; i++) {
@@ -641,8 +615,7 @@ export function buildXilia(scene) {
 
   const SITES = {
     square: { name: 'Beuhk Market Square', x: SQUARE.x, z: SQUARE.z },
-    yard: { name: 'The Carpenter’s Hill', x: YARD.x, z: YARD.z },
-    lake: { name: 'The Carpenter’s Lake', x: -270, z: 62 },
+    westroad: { name: 'The West Road', x: -250, z: 12 },
     grove: { name: 'The Ember Grove', x: GROVE.x, z: GROVE.z },
     hideout: { name: 'The Duskareth Hideout', x: HIDEOUT.x, z: HIDEOUT.z },
     fields: { name: 'The West Fields', x: -100, z: 30 },
@@ -656,9 +629,6 @@ export function buildXilia(scene) {
     { at: [30, -30], kinds: ['albali', 'albali', 'albali'] },
     { at: [-40, -110], kinds: ['albali', 'albali'] },
     { at: [110, 80], kinds: ['punk_d', 'punk_d'] },
-    // the training dummies in the Carpenter's yard
-    { at: [YARD.x - 2, YARD.z + 2], kinds: ['dummy', 'dummy', 'dummy'] },
-    { at: [YARD.x + 6, YARD.z + 10], kinds: ['dummy_far'] },
     // quest-folk
     { at: [96, -40], kinds: ['punk_d'], unique: 'stray_1', extra: { stray: 1 } },
     { at: [-120, -10], kinds: ['punk_d'], unique: 'stray_2', extra: { stray: 2 } },
@@ -683,19 +653,22 @@ export function buildXilia(scene) {
   const lanterns = [
     { id: 'x_pier', name: 'Beuhk Docks', x: 5, z: dockZ0 - 10 },
     { id: 'x_square', name: 'Market Square', x: 14, z: 32 },
-    { id: 'x_yard', name: 'The Carpenter’s Gate', x: YARD.x + 28, z: YARD.z + 3 },
+    { id: 'x_west', name: 'The West Road', x: -282, z: -2 },
     { id: 'x_north', name: 'The Forest Road', x: 8, z: -70 },
     { id: 'x_grove', name: 'Ember Grove Road', x: 40, z: -96 },
   ];
   const stones = [
-    { key: 'x_square', x: -6, z: 30 }, { key: 'x_yard', x: YARD.x + 22, z: YARD.z - 6 }, { key: 'x_hideout', x: -92, z: -62 },
+    { key: 'x_square', x: -6, z: 30 }, { key: 'x_hideout', x: -92, z: -62 },
   ];
 
   return {
-    name: 'xilia', heightAt, col, SITES, trees, propShore, PLAZA: { x: SQUARE.x, z: SQUARE.z, y: SQ_H }, hazards: [], pillars: [], camp: null,
+    name: 'xilia', heightAt, col, SITES, trees, propShore: null, PLAZA: { x: SQUARE.x, z: SQUARE.z, y: SQ_H }, hazards: [], pillars: [], camp: null,
     board: { x: -18, z: 32 },
     crates: [0.35, 2.5, 4.0].map(a => { const c = Math.cos(a), sn = Math.sin(a), r = oldEdge(c * 100, sn * 100) - 9; return { x: c * r, z: sn * r }; }),
-    hearth, pen: PEN, yard: YARD, tower: { x: YARD.x - 16, z: YARD.z - 6, y: YARD_H + 10 }, seedSpot, grove: GROVE,
+    hearth, pen: PEN, yard: null, tower: null, seedSpot, grove: GROVE, doors,
+    // the forest path west to the Carpenter's: walk on past the arch of pines and the property loads
+    exits: [{ id: 'x_west', to: 'property', toExit: 'p_east', name: 'The Forest Path', dest: 'Buhkon’s property', x: WEST_EXIT.x, z: WEST_EXIT.z, nx: WEST_N.x, nz: WEST_N.z, w: 12, arrive: { x: WEST_EXIT.x - WEST_N.x * 16, z: WEST_EXIT.z - WEST_N.z * 16 } }],
+    westGoal: new THREE.Vector3(WEST_EXIT.x, heightAt(WEST_EXIT.x, WEST_EXIT.z), WEST_EXIT.z),
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, lanterns, stones, falls: [], clear: CLEAR,
     inBounds, barrierLine, swimOk, passes: [PASS], homeRadius: oldEdge,   // homeRadius = the old town rim (for anything that must keep its old placement, e.g. amulet rolls)

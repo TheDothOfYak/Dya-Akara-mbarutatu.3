@@ -15,7 +15,7 @@ const BTN = [
   ['dodge', '⤿', 'KeyC', true, 'main'],
   ['duat', '🜂', 'duat', false, 'main'],
   ['use', 'E', 'KeyE', false, 'main'],
-  ['flare', '🔥', 'KeyQ', false, 'kit'],
+  ['flare', 'Q', 'KeyQ', false, 'kit'],              // the Q quick slot (whatever's on it)
   ['sense', '✧', 'KeyF', false, 'kit'],
   ['hlyst', '◎', 'KeyG', false, 'kit'],
   ['flask', '⚗', 'KeyR', false, 'kit'],

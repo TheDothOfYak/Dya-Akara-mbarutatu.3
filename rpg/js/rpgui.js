@@ -35,9 +35,15 @@ export function createRpgUI(api) {
       const fx = api.fx();
       const axes = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === 'axe');
       const trink = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === 'trinket');
-      h += `<h3>Torcain · level ${sk.lvl}</h3><div class="rstats">
+      h += `<h3>${api.who ? api.who() : 'Torcain'} · level ${sk.lvl}</h3><div class="rstats">
         <span>Health <b>${Math.round(api.player().maxHp)}</b></span><span>Stamina <b>${Math.round(api.player().stamMax)}</b></span>
         <span>Damage <b>×${(fx.dmg * api.perkDmg()).toFixed(2)}</b></span><span>Hurst seeds <b>${S.seeds || 0}</b></span>${shards}</div>`;
+      const sl = api.slots && api.slots();
+      if (sl) {
+        h += `<h3>Quick slots <small>press the key in play — Q and 1–6</small></h3><div class="rslots">` + sl.keys.map(k => `<label class="rslot"><kbd>${k.label}</kbd><select data-slot="${k.code}"><option value="">— empty —</option>` +
+          sl.choices.map(c => `<option value="${c.id}"${c.id === k.id ? ' selected' : ''}>${c.icon} ${esc(c.name)} · ${c.kind}</option>`).join('') + `</select></label>`).join('') + `</div>`;
+        if (sl.relics.length) h += `<h3>Relics</h3><div class="rgrid">` + sl.relics.map(r => card(r.id, null, null, false, r.known ? 'Trigger found — put it on any quick slot: ' + sl.keys.map(k => `<button class="btn small" data-a="slot:${k.code}=${r.id}">${k.label}</button>`).join(' ') : 'Trigger not yet found. Listen to it.')).join('') + `</div>`;
+      }
       h += `<h3>Axe</h3><div class="rgrid">` + axes.map(k => card(k, inv.axe === k ? 'Wielding' : 'Wield', inv.axe === k ? null : `equip:${k}`)).join('') + `</div>`;
       h += `<h3>Trinkets <small>(wear two)</small></h3><div class="rgrid">` + (trink.length ? trink.map(k => {
         const on = inv.trinkets.includes(k);
@@ -120,8 +126,9 @@ export function createRpgUI(api) {
     }
     body.innerHTML = h;
     body.querySelectorAll('[data-a]').forEach(b => {
-      b.onclick = () => { const [act, arg] = b.dataset.a.split(':'); api.act(act, arg); render(); };
+      b.onclick = () => { const i = b.dataset.a.indexOf(':'); api.act(b.dataset.a.slice(0, i), b.dataset.a.slice(i + 1)); render(); };
     });
+    body.querySelectorAll('select[data-slot]').forEach(sel => { sel.onchange = () => { api.act('slot', sel.dataset.slot + '=' + sel.value); render(); }; });
     if (page === 'map') drawMap();
   }
 
@@ -147,15 +154,17 @@ export function createRpgUI(api) {
   function paintBase() {
     const W = 310, c = document.createElement('canvas'); c.width = c.height = W;
     const g = c.getContext('2d'), img = g.createImageData(W, W), world = api.world();
-    const span = 440; mapScale = 620 / span; const base = W / span;
+    const M = world.map || { cx: 0, cz: 0, span: 440 };
+    const span = M.span; mapScale = 620 / span; const base = W / span;
     for (let py = 0; py < W; py++) for (let px = 0; px < W; px++) {
-      const x = px / base - span / 2, z = py / base - span / 2;
+      const x = M.cx + px / base - span / 2, z = M.cz + py / base - span / 2;
       const R = world.edgeRadius(x, z), r = Math.hypot(x, z), i = (py * W + px) * 4;
       if (r > R) { img.data[i] = 20; img.data[i + 1] = 28; img.data[i + 2] = 48; img.data[i + 3] = 255; continue; }
       const h = world.heightAt(x, z);
       const hz = world.hazards.some(b => Math.hypot(x - b.x, z - b.z) < b.r);
       let col = api.region() === 'leotik' ? [52, 96, 58] : [168, 160, 88];
       if (hz) col = [140, 200, 60];
+      if (world.water && world.water.isWater && world.water.isWater(x, z)) col = [70, 120, 170];
       const shade = 0.75 + Math.max(-0.3, Math.min(0.35, h * 0.025));
       const edge = r > R - 4 ? 0.6 : 1;
       img.data[i] = col[0] * shade * edge; img.data[i + 1] = col[1] * shade * edge; img.data[i + 2] = col[2] * shade * edge; img.data[i + 3] = 255;
@@ -168,7 +177,8 @@ export function createRpgUI(api) {
     if (!mapBase) paintBase();
     const g = cv.getContext('2d'), W = cv.width;
     g.imageSmoothingEnabled = true; g.drawImage(mapBase, 0, 0, W, W);
-    const P = (x, z) => [(x + 220) * mapScale, (z + 220) * mapScale];
+    const M = api.world().map || { cx: 0, cz: 0, span: 440 };
+    const P = (x, z) => [(x - M.cx + M.span / 2) * mapScale, (z - M.cz + M.span / 2) * mapScale];
     mapHits = [];
     const mark = (x, z, ch, col, size = 16, label) => {
       const [px, py] = P(x, z);

@@ -33,6 +33,7 @@ function spots(world, rng, n, opts = {}) {
 const CHEST_LOOT = {
   aakalay: [['petal', 2], ['ore', 2], ['bark', 2], ['salad', 1], ['stew', 1], ['vine', 3], ['t_seed', 1], ['oil', 2]],
   xilia: [['petal', 2], ['vine', 2], ['bark', 2], ['salad', 1], ['ore', 1], ['stone', 2]],
+  property: [['petal', 2], ['vine', 2], ['bark', 3], ['bun', 1], ['ore', 1], ['fluff', 2], ['salad', 1]],
   leotik: [['moss', 2], ['ore', 3], ['ember', 2], ['tea', 1], ['seed', 1], ['thorn', 1], ['skewer', 1], ['t_ring', 1]],
 };
 
@@ -52,7 +53,7 @@ function chestMesh() {
 }
 
 export function buildFeatures(scene, world, region, save) {
-  const rng = mulberry32(region === 'leotik' ? 8811 : region === 'xilia' ? 3301 : 5521);
+  const rng = mulberry32(region === 'leotik' ? 8811 : region === 'xilia' ? 3301 : region === 'property' ? 4417 : 5521);
   const picked = save.picked || (save.picked = {});
 
   /* ---------- chests ---------- */
@@ -60,7 +61,7 @@ export function buildFeatures(scene, world, region, save) {
     const id = region + '_chest_' + i;
     const m = chestMesh(); m.position.set(p.x, p.y, p.z); m.rotation.y = rng() * TAU; scene.add(m);
     world.col.add(p.x, p.z, 0.65, 0.42, m.rotation.y, p.y - 1, p.y + 0.9);
-    const loot = CHEST_LOOT[region];
+    const loot = CHEST_LOOT[region] || CHEST_LOOT.xilia;
     const a = loot[Math.floor(rng() * loot.length)], b = loot[Math.floor(rng() * loot.length)];
     const c = { id, x: p.x, y: p.y, z: p.z, mesh: m, open: !!picked[id], items: { [a[0]]: a[1] }, shards: 20 + Math.floor(rng() * 40), seed: i % 4 === 0 };
     if (b[0] !== a[0]) c.items[b[0]] = b[1];
