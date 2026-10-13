@@ -97,6 +97,21 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **Lore in the wilds.** Kill a RubberMcFly, the most perfect creature, and the ShurgrEdan answers: a claw of light out of a quiet sky that can't be blocked (it takes most of your health, and can kill you on Realistic). Phorus will never shoot one. Rodak travel in threes, and if you fell one the rest of the pack is gone. The Rokarvac has new entries for the Sunear'Zikhron, RubberMcFly, the ShurgrEdan, the Megla Pass and the four Dearcineon directions.
 
+**Your Punk.** Tanoc's Punk is the young mutt he saved in Fyrsti'Vilag, the one that followed him north. She trots at his heels and grows over a few hours of play.
+- **The saddle:** Old Ruut in Beuhk gives you a saddle for finding his strays.
+- **The stall:** bring the saddle to Buhkon and you choose where her stall goes. A frame follows you about, green where it fits; press E to build it there.
+- **The steed:** the saddle is fitted, and she's yours to ride.
+- **Saddlebags:** Tanoc's pack holds 40 materials, and her saddlebags carry more as she grows.
+- **The cart:** the Carpenter's cart comes the whole way home with them. It's parked by the hearth in Beuhk, then in the yard.
+
+**Climbing the great trees.** The forest path's giants and the two colossi can be climbed.
+- Against the trunk, `Space` takes hold.
+- `W` and `S` climb up and down; `A` and `D` go round the trunk.
+- `Space` again leaps off, and holding it glides you down.
+- On your Punk it's three times as fast, her leg-vines gripping the bark.
+
+**Nur Lanterns** only wake for someone carrying Nur: a Nur at your side, or a Relic with a Hurst in it.
+
 **The creatures of the lore.** Every creature from the Mbaru Tatu notes is in the worlds, each built to match its description. A few examples:
 - The Kofi Galta: a crescent body with blade spines and a fluffy dark tail tuft.
 - The Stryx: a wide, flat stone body with two huge spiral horns.

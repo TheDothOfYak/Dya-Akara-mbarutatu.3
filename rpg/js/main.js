@@ -2941,6 +2941,7 @@ function climbTick(dt, act) {
   P.pos.set(cx + Math.cos(C.phi) * R, C.y, cz + Math.sin(C.phi) * R);
   P.vel.set(0, 0, 0);
   P.yaw = Math.atan2(cx - P.pos.x, cz - P.pos.z);
+  CAM.yaw = dampAngle(CAM.yaw, Math.atan2(Math.cos(C.phi), Math.sin(C.phi)), 3, dt);   // the camera swings round outside the trunk, behind him
   C.moving = Math.abs(up) + Math.abs(round) > 0.1;
   if (C.moving && Math.random() < 0.25) particles.emit(P.pos.x, P.pos.y + 0.5, P.pos.z, { color: 0x8a7a5a, size: 0.25, life: 0.5, speed: 1 });
   // back to the ground at the foot of it; or leap off
@@ -4966,5 +4967,5 @@ window.__torcain = {
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, aimInfo: () => aimAt ? `${aimAt.kind} d=${Math.hypot(aimAt.x - P.pos.x, aimAt.z - P.pos.z).toFixed(1)} up=${(aimAt.y - P.pos.y).toFixed(1)} at ${aimAt.x.toFixed(0)},${aimAt.z.toFixed(0)}` : "none", startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, aimInfo: () => aimAt ? `${aimAt.kind} d=${Math.hypot(aimAt.x - P.pos.x, aimAt.z - P.pos.z).toFixed(1)} up=${(aimAt.y - P.pos.y).toFixed(1)} at ${aimAt.x.toFixed(0)},${aimAt.z.toFixed(0)}` : "none", startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };
