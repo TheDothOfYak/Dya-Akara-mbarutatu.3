@@ -21,7 +21,7 @@ import { buildXilia } from './xilia.js';
 import { buildProperty } from './property.js';
 import { createInteriors } from './interiors.js';
 import { buildTorcain, buildPhorus, buildCore } from './actors.js';
-import { buildDomesticPunk, buildMalstiPunk, buildSkorThal } from './esik_land.js';
+import { buildDomesticPunk, buildMalstiPunk, buildSkorThal, buildGynge } from './esik_land.js';
 import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
 import { createWilds } from './wilds.js';
@@ -29,6 +29,7 @@ import { initTouch } from './touch.js';
 import { createSunear } from './sunear.js';
 import { createVelki, buildAngel, buildSniller } from './velki.js';
 import { createRoad } from './road.js';
+import { createMegla } from './megla.js';
 import { createCine } from './cine.js';
 import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
@@ -300,7 +301,7 @@ document.addEventListener('mousedown', e => {
   if (G.mode !== 'title') initAudio();   // browsers only let sound start after a click
   if (e.target.closest && e.target.closest('#d-choices, #rpg, #pk-box')) return;
   if (G.mode === 'title' || overlayOpen()) return;
-  if (G.mode === 'intro' || G.mode === 'trance') { skipCards(); return; }
+  if (G.mode === 'intro' || G.mode === 'trance') { if (!(TOK && !cardState)) skipCards(); return; }
   if (!locked && !touch.on) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
   if (G.mode === 'dialog') { if (DLG && DLG.choices) pickChoice(DLG.sel); else advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
@@ -351,6 +352,7 @@ const touch = initTouch({
 });
 
 function onKey(code) {
+  if (TOK && !cardState && G.mode === 'intro') { tokKey(code); return; }   // the token lesson takes its own keys
   if (G.mode === 'intro' || G.mode === 'trance') { if (code === 'Space' || code === 'Enter' || code === 'Escape') skipCards(); return; }
   if (G.mode === 'dialog') {
     if (DLG && DLG.choices) {
@@ -4008,6 +4010,7 @@ function frame() {
       }
     } else if (G.mode === 'intro') {
       if (!mainCine.update(dt)) updateIntroCamera(dt);
+      updateToken(dt);
       updatePhorus(dt);
       torcain.animate(dt, { speed: 0, onGround: true, t: G.t });
       torcain.root.position.copy(P.pos); torcain.root.rotation.y = P.yaw;
@@ -4125,26 +4128,21 @@ function leaveVelki() {
 function youngHud() {
   document.querySelector('#vitals .name').innerHTML = `TANOC <small>Filugani</small><span id="lvl">${$('lvl') ? $('lvl').textContent : 'LV 1'}</span>`;
 }
-function askName(cb) {
+function askName(cb, title = 'NAME YOUR PUNK', ph = 'Pip') {
   G.mode = 'naming';   // not 'play': letting go of the mouse to type isn't a pause
   unlockMouse();
   const box = document.createElement('div');
   box.id = 'pk-box'; box.className = 'brass'; box.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:45;padding:22px 26px;text-align:center;min-width:280px';
-  box.innerHTML = '<div style="font-family:var(--display);letter-spacing:.12em;margin-bottom:10px">NAME YOUR PUNK</div><input id="pk-name" maxlength="18" style="font:inherit;font-size:18px;padding:6px 10px;width:220px" placeholder="Pip"><div style="margin-top:12px"><button class="btn" id="pk-ok">That’s its name</button></div>';
+  box.innerHTML = `<div style="font-family:var(--display);letter-spacing:.12em;margin-bottom:10px">${title}</div><input id="pk-name" maxlength="18" style="font:inherit;font-size:18px;padding:6px 10px;width:220px" placeholder="${ph}"><div style="margin-top:12px"><button class="btn" id="pk-ok">That’s its name</button></div>`;
   document.body.appendChild(box);
   const inp = box.querySelector('#pk-name'); setTimeout(() => inp.focus(), 50);
-  const done = () => { const n = (inp.value || '').replace(/[<>&"]/g, '').trim() || 'Pip'; box.remove(); G.mode = 'play'; lockMouse(); cb(n); };
+  const done = () => { const n = (inp.value || '').replace(/[<>&"]/g, '').trim() || ph; box.remove(); G.mode = 'play'; lockMouse(); cb(n); };
   box.querySelector('#pk-ok').onclick = done;
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(); e.stopPropagation(); });
 }
-function startRoad(at) {
-  if (!F_.young) SAVE.slots = {};
-  F_.pro = 'road'; F_.young = true; F_.roadAt = at || 'market'; persist();
-  G.mode = 'intro'; G.t = 0;
-  $('hud').classList.remove('hidden'); $('hud').classList.add('velki', 'roadhp');
-  youngHud();
-  if (F_.punkName) STORY.SPEAKERS.punk.name = F_.punkName;
-  VK = createRoad({
+/* what a self-contained scene (the road north, the Megla Aagac) borrows from the game: renderer, input, talk, cards, HUD */
+function vkCtx() {
+  return {
     camera, keys, touch, CAM, sfx,
     makeComposer(sc) {
       const c = new EffectComposer(renderer);
@@ -4169,8 +4167,18 @@ function startRoad(at) {
     giveFireStone: found => { if (found) { invAdd(SAVE.inv, 'r_firestone', 1); learnTrigger('r_firestone'); persist(); } },
     slotsHud: on => $('hud').classList.toggle('slots', on),
     punkName: n => { F_.punkName = n; STORY.SPEAKERS.punk.name = n; persist(); },
+  };
+}
+function startRoad(at) {
+  if (!F_.young) SAVE.slots = {};
+  F_.pro = 'road'; F_.young = true; F_.roadAt = at || 'market'; persist();
+  G.mode = 'intro'; G.t = 0;
+  $('hud').classList.remove('hidden'); $('hud').classList.add('velki', 'roadhp');
+  youngHud();
+  if (F_.punkName) STORY.SPEAKERS.punk.name = F_.punkName;
+  VK = createRoad(Object.assign(vkCtx(), {
     onDone: () => leaveRoad(),
-  });
+  }));
   VK.start(F_.roadAt);
   fade(0, 1.4);   // out of the white, out of the dark
 }
@@ -4181,6 +4189,170 @@ function leaveRoad() {
   VK = null; vkComposer = null; canvas.style.filter = '';
   $('hud').classList.remove('velki', 'roadhp');
   arriveBeuhk();
+}
+
+/* ================================================================
+   CHAPTER II — THE MEGLA AAGAC (megla.js), and home again for the
+   first token
+   ================================================================ */
+function meglaBegin() {
+  const M = STORY.MEGLA;
+  dialog(M.pull, () => {
+    F_.megla = 'go'; persist();
+    G.mode = 'intro'; fade(1, 1.2);
+    setTimeout(() => startMegla('ride'), 1300);
+  });
+}
+function startMegla(at) {
+  F_.pro = 'megla'; F_.young = true; F_.meglaAt = at || 'ride'; persist();
+  if (interiors.inside) interiors.leave && interiors.leave();
+  // the fire-stone goes on Q if it isn't on a slot already
+  if (!SAVE.inv.items.r_firestone) invAdd(SAVE.inv, 'r_firestone', 1);
+  learnTrigger('r_firestone');
+  if (!SLOT_KEYS.some(k => SAVE.slots[k] === 'r_firestone')) SAVE.slots[SLOT_KEYS.find(k => !SAVE.slots[k]) || 'KeyQ'] = 'r_firestone';
+  G.mode = 'intro'; G.t = 0;
+  $('hud').classList.remove('hidden'); $('hud').classList.add('velki', 'roadhp');
+  youngHud();
+  STORY.SPEAKERS.punk.name = F_.punkName || 'Brindle'; STORY.SPEAKERS.punk.sub = 'your Punk, grown';
+  if (F_.malstiName) STORY.SPEAKERS.malsti.name = F_.malstiName;
+  VK = createMegla(Object.assign(vkCtx(), {
+    save: a => { F_.meglaAt = a; persist(); },
+    askName: (title, ph, cb) => askName(cb, title, ph),
+    ring: () => { invAdd(SAVE.inv, 'relic_ring', 1); F_.ring = true; persist(); },
+    malstiName: n => { F_.malstiName = n; persist(); },
+    fade: (v, sec) => fade(v, sec),
+    onDone: () => leaveMegla(),
+  }));
+  VK.start(F_.meglaAt);
+  fade(0, 1.4);
+  updateSlotHud && updateSlotHud(0);
+}
+function leaveMegla() {
+  F_.pro = 'token'; F_.megla = 'done'; persist();
+  fade(1, 0.4);
+  setTimeout(() => {
+    if (VK) VK.dispose();
+    VK = null; vkComposer = null; canvas.style.filter = '';
+    $('hud').classList.remove('velki', 'roadhp');
+    // home: down the lane into the yard, the Carpenter at the workshop door
+    const Y = world.yard || world.PLAZA;
+    P.pos.set(Y.x + 14, 0, Y.z + 8); P.pos.y = world.col.ground(P.pos.x, P.pos.z, world.heightAt(P.pos.x, P.pos.z) + 3); P.yaw = -Math.PI / 2; CAM.yaw = Math.PI / 2;
+    P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos);
+    dn.setHour(16.5);
+    fade(0, 1.4);
+    cineCards(['Home.'], 2600, P.pos, () => {
+      enterPlay(); showLocation('The Carpenter’s Yard', 'Chapter II · home again');
+      setObjective();
+      hint('Buhkon is in the workshop.');
+    });
+  }, 450);
+}
+/* the first token: the chip in the Okid'Relic, the stygian poured, the Gynge's song sung */
+let TOK = null;
+function firstTokenLesson(n) {
+  const T = STORY.FIRST_TOKEN;
+  n.talking = 6;
+  dialog(T.back.concat(T.ask), () => {
+    G.mode = 'intro'; unlockMouse();
+    // the bench: the Okid'Relic, the chip, a crucible of stygian; the camera close over his shoulder
+    const f = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw)), at = P.pos.clone().addScaledVector(f, 1.3).setY(P.pos.y + 1.05);
+    const g = new THREE.Group(); g.position.copy(at); scene.add(g);
+    const okid = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.16, 12), toon(0x6a5a8a, { emissive: 0x3a2a6a, emissiveIntensity: 0.4 })); addOutline(okid, 0.02); g.add(okid);
+    const cradle = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.035, 6, 16), toon(0xc8a060)); cradle.rotation.x = Math.PI / 2; cradle.position.y = 0.1; g.add(cradle);
+    const chip = new THREE.Mesh(new THREE.DodecahedronGeometry(0.09, 0), toon(0x8a7a62)); chip.position.set(0.5, 0.05, 0); g.add(chip);
+    const pour = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 6), new THREE.MeshBasicMaterial({ color: 0xb48aff, transparent: true, opacity: 0 })); pour.position.set(0, 0.6, 0); g.add(pour);
+    const glow = glowSprite(0xb48aff, 0.9, 0); glow.position.y = 0.18; g.add(glow);
+    TOK = { g, okid, chip, pour, glow, step: 'chip', poured: 0, at, cam: P.pos.clone().addScaledVector(f, -0.9).add(V3(Math.cos(P.yaw) * 0.9, 1.9, -Math.sin(P.yaw) * 0.9)) };
+    mainCine.play([{ dur: 99999, cam: (k, tt) => ({ p: TOK.cam, l: TOK.at.clone().setY(TOK.at.y + 0.15) }) }], null, { bars: true });
+    tokObjective(T.stepChip);
+  });
+}
+function tokObjective(text) { proObjective('Chapter II · the first token', text, ''); mainCine.caption(text); }
+function tokKey(code, up) {   // the lesson takes E (held for the pour) and the song's notes
+  if (!TOK) return false;
+  const T = STORY.FIRST_TOKEN;
+  if (TOK.step === 'chip' && code === 'KeyE' && !up) {
+    TOK.step = 'busy'; sfx.ui();
+    const c = TOK.chip, from = c.position.clone(), t0 = performance.now();
+    const mv = () => { const k = Math.min(1, (performance.now() - t0) / 700); c.position.lerpVectors(from, V3(0, 0.14, 0), k); c.position.y += Math.sin(k * Math.PI) * 0.2; if (k < 1) requestAnimationFrame(mv); else { sfx.core(); dialog(T.chipIn, () => { G.mode = 'intro'; TOK.step = 'pour'; tokObjective(T.stepPour); }); } };
+    mv(); return true;
+  }
+  if (TOK.step === 'sing' && !up && SONG.keys.includes(code)) { songPress(code); return true; }
+  return false;
+}
+/* the song: notes slide down four lanes; press each as it crosses the line */
+const SONG = { keys: ['KeyA', 'KeyS', 'KeyD', 'KeyF'], labels: ['A', 'S', 'D', 'F'], el: null, notes: [], t: 0, hit: 0, miss: 0 };
+function songStart() {
+  const T = STORY.FIRST_TOKEN;
+  TOK.step = 'sing'; tokObjective(T.stepSing);
+  const box = document.createElement('div'); box.id = 'song';
+  box.style.cssText = 'position:fixed;left:50%;bottom:16vh;transform:translateX(-50%);width:min(360px,80vw);height:46vh;z-index:31;pointer-events:none;border-radius:12px;background:linear-gradient(rgba(20,12,40,.0),rgba(20,12,40,.55));border:1px solid rgba(200,160,255,.25)';
+  box.innerHTML = SONG.labels.map((l, i) => `<div style="position:absolute;bottom:6px;left:${i * 25 + 12.5}%;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;border:2px solid #c8a0ff;color:#f0e0ff;font:600 15px var(--display,Georgia);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px #9a6aff">${l}</div>`).join('') + '<div style="position:absolute;left:0;right:0;bottom:28px;height:2px;background:rgba(220,190,255,.6)"></div>';
+  document.body.appendChild(box); SONG.el = box;
+  // the Gynge's song: slow and heavy, like rock grinding — then rising
+  const pat = [0, 0, 2, 1, 3, 3, 2, 0, 1, 1, 3, 2, 0, 2, 3, 3];
+  SONG.notes = pat.map((lane, i) => { const d = document.createElement('div'); d.style.cssText = `position:absolute;top:0;left:${lane * 25 + 12.5}%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:radial-gradient(#fff,#b48aff 60%,transparent 70%);opacity:0`; box.appendChild(d); return { lane, at: 1.6 + i * 0.62, d, done: false }; });
+  SONG.t = 0; SONG.hit = 0; SONG.miss = 0;
+}
+function songPress(code) {
+  const lane = SONG.keys.indexOf(code);
+  let best = null, bd = 0.28;
+  for (const n of SONG.notes) { if (n.done || n.lane !== lane) continue; const d = Math.abs(n.at - SONG.t); if (d < bd) { bd = d; best = n; } }
+  if (best) { best.done = true; best.d.style.opacity = 0; SONG.hit++; tone && tone(); sfx.core(); TOK.glow.material.opacity = Math.min(1, 0.2 + SONG.hit / SONG.notes.length); particles.burst(TOK.at.x, TOK.at.y + 0.3, TOK.at.z, 6, { color: 0xc8a0ff, speed: 1.5, size: 0.15, life: 0.6 }); }
+  else sfx.blink();
+}
+const tone = () => {};
+function updateToken(gameDt) {
+  if (!TOK) return;
+  // real time: the song has to keep its own beat however the frames come
+  const now = performance.now(), dt = Math.min(0.25, TOK.last ? (now - TOK.last) / 1000 : gameDt); TOK.last = now;
+  const T = STORY.FIRST_TOKEN;
+  if (TOK.step === 'pour') {
+    TOK.pour.material.opacity = damp(TOK.pour.material.opacity, TOK.pouring ? 0.85 : 0, 10, dt);
+    TOK.pouring = !!keys.KeyE;
+    if (TOK.pouring) { TOK.poured += dt; TOK.glow.material.opacity = Math.min(0.5, TOK.poured * 0.25); if (Math.random() < 0.6) particles.emit(TOK.at.x, TOK.at.y + 0.2, TOK.at.z, { vx: (Math.random() - 0.5) * 0.4, vy: 0.4, vz: (Math.random() - 0.5) * 0.4, color: 0xb48aff, size: 0.12, life: 0.6, drag: 1 }); }
+    if (TOK.poured > 2.2) { TOK.step = 'busy'; TOK.pouring = false; TOK.pour.material.opacity = 0; sfx.heal(); dialog(T.poured, () => { G.mode = 'intro'; songStart(); }); }
+  }
+  if (TOK.step === 'sing') {
+    SONG.t += dt;
+    const H = SONG.el.clientHeight;
+    for (const n of SONG.notes) {
+      if (n.done) continue;
+      const y = H - 28 - (n.at - SONG.t) * H * 0.55;
+      n.d.style.top = y + 'px'; n.d.style.opacity = y > 0 ? 1 : 0;
+      if (SONG.t - n.at > 0.3) { n.done = true; n.d.style.opacity = 0; SONG.miss++; }
+    }
+    if (SONG.notes.every(n => n.done)) {
+      SONG.el.remove(); SONG.el = null;
+      if (SONG.hit >= SONG.notes.length * 0.6) tokenMade();
+      else { TOK.step = 'busy'; dialog(T.missed, () => { G.mode = 'intro'; songStart(); }); }
+    }
+  }
+  if (TOK.holo) { TOK.holo.rotation.y += dt * 0.6; TOK.holo.position.y = TOK.at.y + 0.55 + Math.sin(performance.now() / 600) * 0.03; TOK.holoA && TOK.holoA.animate(dt, { speed: 0, t: performance.now() / 1000, windup: 0.5 + Math.sin(performance.now() / 700) * 0.5, attack: 0 }); }
+}
+function tokenMade() {
+  const T = STORY.FIRST_TOKEN;
+  TOK.step = 'busy'; sfx.victory();
+  // the truth of it, the size of his hand, turning in the air over the Okid'Relic
+  const a = buildGynge({ seed: 77 }); a.root.scale.setScalar(0.11);
+  a.root.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.82; if (o.material.emissive) { o.material.emissive.setHex(0x8a6aff); o.material.emissiveIntensity = 0.5; } } });
+  const holo = new THREE.Group(); holo.add(a.root, glowSprite(0xb48aff, 0.9, 0.5)); holo.position.copy(TOK.at); scene.add(holo);
+  TOK.holo = holo; TOK.holoA = a;
+  particles.burst(TOK.at.x, TOK.at.y + 0.4, TOK.at.z, 50, { color: 0xc8a0ff, speed: 2.5, size: 0.2, life: 1.2, gravity: 0.5 });
+  // a real token, in the Dya'Akara pouch: an individual — the one he met
+  try { const tk = DYA3.mintToken('gynge', 0x6a17a3c, { rarity: 3, name: T.tokenName }); DYA3.addToken(SAVE.dya, tk, SAVE.dya.pouch.length < 25); } catch (e) { /* the pouch keeps its own rules */ }
+  invAdd(SAVE.inv, 'tok_gynge', 1); if (SAVE.inv.items.gynge_chip) SAVE.inv.items.gynge_chip = 0;
+  if (!SAVE.inv.items.okid) invAdd(SAVE.inv, 'okid', 1);
+  xp(200); persist();
+  setTimeout(() => dialog(T.sang, () => {
+    G.mode = 'intro';
+    F_.pro = 'done'; F_.ch2 = true; persist();
+    playCards(T.end, 3600, () => {
+      mainCine.stop(); scene.remove(TOK.g); scene.remove(TOK.holo); TOK = null;
+      enterPlay(); setObjective();
+      toast('Your first token — the Gynge of the Megla Aagac — is in your Dya’Akara pouch.', 5);
+    });
+  }), 1600);
 }
 
 /* ---------------- Day 5: Beuhk, and what people are saying. Day 6: the little road up the hill ---------------- */
@@ -4337,6 +4509,15 @@ function youngBuhkon(n) {
   const q = F_.yq || 0, Y = STORY.YOUNG;
   n.talking = 4;
   if (F_.pro === 'beuhk') { dialog([['buhkon', F_.bk === 'rest' ? 'Go on, walk about. Ears open, hat on.' : 'Up the little road, west. I’ll have the kettle on.']]); return; }
+  if (F_.pro === 'token') { firstTokenLesson(n); return; }
+  if (q >= 5 && !F_.megla) {
+    ask('buhkon', 'Something on your mind? You keep touching that amulet.', [
+      { label: 'It’s pulling. North. <em style="color:var(--brass2)">· Chapter II: the Megla Aagac</em>', act: () => meglaBegin() },
+      { label: SAVE.inv.items.okid ? 'Sing a token' : 'Ask about tokens', act: () => buhkonTokens() },
+      { label: 'Not yet', act: null },
+    ]);
+    return;
+  }
   if (q === 1) {
     dialog(Y.relicBuhkon, () => {
       F_.yHlyst = true; learnTrigger('r_longevity'); persist(); nurHlyst();
@@ -4358,7 +4539,7 @@ function youngGoal() {
   if (interiors.inside) return interiors.room(interiors.inside.id) ? interiors.room(interiors.inside.id).out : null;
   if (REGION === 'xilia') return q >= 5 ? null : world.westGoal;   // Buhkon's is out west, along the forest path
   if (q === 0) return RELIC_SPOT;
-  if (q === 1 || q === 4) return bk ? bk.pos : null;
+  if (q === 1 || q === 4 || F_.pro === 'token' || (q >= 5 && !F_.megla)) return bk ? bk.pos : null;
   if (q === 2) { const e = enemies.list.find(e => e.kind === 'dummy' && !e.dead); return e ? e.pos : null; }
   if (q === 3) return V3(world.tower.x, world.tower.y, world.tower.z);
   return null;
@@ -4373,7 +4554,9 @@ function youngObjective() {
   else if (q === 2) proObjective(head, O.dummies(n), 'Left-click to swing — keep clicking to combo', 3, n);
   else if (q === 3) proObjective(head, O.glide, 'Jump, then hold Space while falling');
   else if (q === 4) proObjective(head, O.back, '');
-  else proObjective(head, O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');
+  else if (F_.pro === 'token') proObjective('Chapter II · home again', STORY.FIRST_TOKEN.findObj, 'Show him the Gynge chip');
+  else if (!F_.megla) proObjective(head, 'The Sniller amulet is tugging north — talk to Buhkon', 'When you’re ready: Chapter II, the Megla Aagac');
+  else proObjective(F_.ch2 ? 'Chapter II · done' : head, O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');
 }
 function youngTick() {
   if (relicMesh) { relicMesh.visible = relicOut(); if (relicMesh.visible) { relicMesh.rotation.y = G.t; relicMesh.children[1].material.opacity = 0.5 + Math.sin(G.t * 3) * 0.3; } }
@@ -4500,7 +4683,8 @@ $('si-form').onsubmit = async ev => {
 
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'On a phone or tablet: left thumb moves, drag on the right to look, and the buttons fight. Turn your phone sideways for the best view.';
 $('btn-continue').onclick = () => startFromTitle(() => {
-  if (young() && F_.pro === 'done') { if (F_.yq == null && REGION === 'property') startMorning(); else continueRun(); }
+  if (REGION === 'property' && F_.pro === 'megla') startMegla(F_.meglaAt);
+  else if (young() && F_.pro === 'done') { if (F_.yq == null && REGION === 'property') startMorning(); else continueRun(); }
   else if (REGION === 'property' && F_.pro === 'beuhk') { arriveByExit({ exit: 'p_east' }); }
   else if (REGION === 'xilia' && F_.pro === 'beuhk') arriveBeuhk();
   else if (REGION === 'xilia' && !F_.xtalked && (F_.pro === 'road' || F_.pro === 'xikia')) startRoad(F_.pro === 'road' ? F_.roadAt : 'market');
@@ -4530,5 +4714,5 @@ window.__torcain = {
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, aimInfo: () => aimAt ? `${aimAt.kind} d=${Math.hypot(aimAt.x - P.pos.x, aimAt.z - P.pos.z).toFixed(1)} up=${(aimAt.y - P.pos.y).toFixed(1)} at ${aimAt.x.toFixed(0)},${aimAt.z.toFixed(0)}` : "none", startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, aimInfo: () => aimAt ? `${aimAt.kind} d=${Math.hypot(aimAt.x - P.pos.x, aimAt.z - P.pos.z).toFixed(1)} up=${(aimAt.y - P.pos.y).toFixed(1)} at ${aimAt.x.toFixed(0)},${aimAt.z.toFixed(0)}` : "none", startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };
