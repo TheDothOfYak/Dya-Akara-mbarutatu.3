@@ -8,6 +8,7 @@ import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildVel, buildDummy } from './creatures.js';
 import { pivotNear, latchPoint } from './vines.js';
+import { buildApiButa, buildCyitor, buildXiwKatkan } from './creatures2.js';
 import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
 import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
 import { buildHvaleia, buildSuNaga, buildHarkal, buildRafKrabbi, buildGrothyn } from './esik_sea.js';
@@ -61,6 +62,12 @@ export const TYPES = {
   raf_krabbi: { name: 'Raf Krabbi', build: () => buildRafKrabbi({ seed: seed() }), hp: 26, dmg: 6, speed: 4, rad: 0.25, range: 1.2, aggro: 5, windup: 0.4, recover: 0.6, lunge: 4, shards: 5, ai: 'swim', water: true, shallow: true, status: 'paralyze', color: 0x6ad8ff },
   su_grothyn: { name: 'Su Grothyn', build: () => buildGrothyn({ element: 'Su' }), hp: 120, dmg: 12, speed: 0.15, rad: 0.8, range: 5.5, aggro: 7, windup: 0.6, recover: 1.0, lunge: 0, shards: 14, ai: 'swim', water: true, shallow: true, color: 0x3a8aa8 },
   hvaleia: { name: 'Hvaleia', build: buildHvaleia, hp: 1800, dmg: 22, speed: 5, rad: 3.5, range: 4, aggro: 0, shards: 160, ai: 'airswim', water: true, fly: 9, elite: true, color: 0x6ab8ff, disp: 'neutral' },
+  /* the Blind Beast: a great flat manta of fire, gliding low over the high ground; leave it be and it leaves you be */
+  apibuta: { name: 'Api Buta', build: () => buildApiButa({ seed: seed() }), hp: 2200, dmg: 26, speed: 6, rad: 4, range: 5, aggro: 9, windup: 1.0, recover: 1.4, lunge: 6, shards: 220, ai: 'flyer', elite: true, color: 0xff7a2a, disp: 'neutral', altMul: 1.4, roam: 26 },
+  /* from Katkan: ghost-shapes with one eye and two blade arms — nobody knows what they want */
+  cyitor: { name: 'Cyitor', build: () => buildCyitor({ seed: seed() }), hp: 160, dmg: 18, speed: 5.8, rad: 0.7, range: 2.8, aggro: 18, windup: 0.6, recover: 0.8, lunge: 9, shards: 45, ai: 'melee', stagger: 0.3, color: 0xd8e0ff },
+  /* the Fuzzy Devil: round, fluffy, big-eyed, bat-winged, with a trident and a temper */
+  xiwkatkan: { name: 'Xiw’Katkan', build: () => buildXiwKatkan({ seed: seed() }), hp: 90, dmg: 14, speed: 8, rad: 0.5, range: 2.2, aggro: 20, windup: 0.5, recover: 0.7, lunge: 10, shards: 35, ai: 'flyer', color: 0xff4a6a },
   harkal: { name: 'Harkal', build: () => buildHarkal({ seed: seed() }), hp: 140, dmg: 14, speed: 9, rad: 1.0, range: 2.4, aggro: 16, windup: 0.5, recover: 0.7, lunge: 12, shards: 22, ai: 'airswim', water: true, fly: 2.2, color: 0x7aa0b8 },
 };
 
