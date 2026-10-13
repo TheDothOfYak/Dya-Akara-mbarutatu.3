@@ -93,7 +93,7 @@ export function createEnemies(ctx) {
   }
 
   function clear() {
-    list.forEach(e => ctx.scene.remove(e.actor.root));
+    list.forEach(e => { endSwing(e); ctx.scene.remove(e.actor.root); });
     list.length = 0;
     knives.forEach(k => ctx.scene.remove(k.mesh)); knives.length = 0;
     globs.forEach(k => ctx.scene.remove(k.mesh)); globs.length = 0;
@@ -135,6 +135,7 @@ export function createEnemies(ctx) {
   function T_isPassive(e) { return !!e.T.disp; }
 
   function kill(e) {
+    endSwing(e);
     e.dead = true; e.state = 'dead'; e.timer = 0;
     ctx.sfx.die();
     ctx.particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 30, { color: e.T.color, speed: 9, size: 0.5, life: 0.9, gravity: -6 });
@@ -236,6 +237,7 @@ export function createEnemies(ctx) {
 
   /* --------- per-frame --------- */
   function moveTo(e, wantYaw, wantV, dt) {
+    e.wantYaw = wantYaw;
     e.yaw = dampAngle(e.yaw, wantYaw, 10, dt);
     const k = e.stun > 0 ? 2 : 10;
     e.vel.x = damp(e.vel.x, e.stun > 0 ? 0 : Math.sin(e.yaw) * wantV, k, dt);
@@ -331,7 +333,7 @@ export function createEnemies(ctx) {
     } else if (e.state === 'flee') {
       wantYaw = Math.atan2(-dx, -dz); wantV = T.speed * 1.1;
       e.timer -= dt;
-      if (d > 55 || e.timer <= 0) { ctx.scene.remove(a.root); e.gone = true; e.escaped = true; ctx.onEscape(e); return; }
+      if (d > 55 || e.timer <= 0) { endSwing(e); ctx.scene.remove(a.root); e.gone = true; e.escaped = true; ctx.onEscape(e); return; }
     } else if (T.ai === 'flyer') {
       updateFlyer(e, dt, d, toP);
       return finishMove(e, dt, d, dx, dz);
@@ -399,8 +401,73 @@ export function createEnemies(ctx) {
     finishMove(e, dt, d, dx, dz);
   }
 
+  /* ---------- Punks in the trees ----------
+     A Punk at a run through the woods throws a vine round a branch and swings
+     on it: round the trunk and off in a new direction, quicker than it could
+     ever turn on its feet. */
+  const SWINGERS = { punk: 1, punk_d: 1, malsti: 1 };
+  function findTrunk(e) {
+    const trees = ctx.world.trees; if (!trees) return null;
+    const vx = e.vel.x, vz = e.vel.z, v = Math.hypot(vx, vz);
+    let best = null, bd = 1e9;
+    for (const t of trees) {
+      const ox = t.x - e.pos.x, oz = t.z - e.pos.z;
+      if (Math.abs(ox) > 4 || Math.abs(oz) > 4) continue;
+      const d = Math.hypot(ox, oz);
+      if (d < e.T.rad + t.r + 0.4 || d > 3.6) continue;
+      if ((ox * vx + oz * vz) / (d * v) < -0.2) continue;   // only trunks beside or ahead of it
+      if (d < bd) { bd = d; best = t; }
+    }
+    return best;
+  }
+  function startSwing(e, t) {
+    const v = Math.max(Math.hypot(e.vel.x, e.vel.z), e.T.speed * 0.8);
+    const ox = e.pos.x - t.x, oz = e.pos.z - t.z, r = Math.hypot(ox, oz);
+    // swing round the side it's already moving toward
+    const dir = (ox * e.vel.z - oz * e.vel.x) > 0 ? 1 : -1;
+    // sweep as far round as it needs to come out facing where it wants to go
+    const head = Math.atan2(e.vel.x, e.vel.z), want = e.wantYaw != null ? e.wantYaw : head;
+    let turn = Math.abs(Math.atan2(Math.sin(want - head), Math.cos(want - head)));
+    const sweep = clamp(turn + 0.5, 0.9, 2.8);
+    const vine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(), V3()]), new THREE.LineBasicMaterial({ color: e.kind === 'malsti' ? 0x6a3aaa : 0x4a8a2a }));
+    vine.frustumCulled = false; ctx.scene.add(vine);
+    e.swing = { t, r, a: Math.atan2(oz, ox), dir, w: v / r, left: sweep, done: 0, g: e.pos.y, by: t.g + Math.min(t.h * 0.7, 4.5), v, vine };
+  }
+  function updateSwing(e, dt) {
+    const S = e.swing, a = e.actor;
+    const step = S.w * dt; S.a += S.dir * step; S.done += step;
+    const k = Math.min(1, S.done / S.left);
+    e.pos.x = S.t.x + Math.cos(S.a) * S.r; e.pos.z = S.t.z + Math.sin(S.a) * S.r;
+    const g = ctx.world.col.ground(e.pos.x, e.pos.z, S.g + 3);
+    e.pos.y = Math.max(g, lerp0(S.g, g, k) + Math.sin(k * Math.PI) * 1.4);
+    // moving along the circle: the tangent
+    const tx = -Math.sin(S.a) * S.dir, tz = Math.cos(S.a) * S.dir;
+    e.vel.set(tx * S.v, 0, tz * S.v); e.yaw = Math.atan2(tx, tz);
+    const pos = S.vine.geometry.attributes.position;
+    pos.setXYZ(0, e.pos.x, e.pos.y + 1.2 * (a.root.scale.y || 1), e.pos.z); pos.setXYZ(1, S.t.x, S.by, S.t.z); pos.needsUpdate = true;
+    a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
+    if (a.root.visible) a.animate(dt, { speed: S.v, t: ctx.G.t });
+    if (k >= 1 || e.dead || e.stun > 0) endSwing(e);
+  }
+  function endSwing(e) {
+    if (!e.swing) return;
+    ctx.scene.remove(e.swing.vine); e.swing.vine.geometry.dispose(); e.swing.vine.material.dispose();
+    e.swing = null; e.swingCd = 1.2 + Math.random() * 1.5;
+  }
+  const lerp0 = (a, b, k) => a + (b - a) * k;
+
   function finishMove(e, dt, d, dx, dz) {
     const P = ctx.P, a = e.actor, T = e.T;
+    if (SWINGERS[e.kind] && !e.dead) {
+      if (e.swing) { updateSwing(e, dt); return; }
+      e.swingCd = (e.swingCd || 0) - dt;
+      const v = Math.hypot(e.vel.x, e.vel.z);
+      if (e.swingCd <= 0 && v > T.speed * 0.75 && !e.windup && e.state !== 'windup' && e.state !== 'attack' && ctx.world.col.ground(e.pos.x, e.pos.z, e.pos.y + 0.5) <= e.pos.y + 0.1) {
+        e.swingCd = 0.25;   // look again in a moment
+        const t = findTrunk(e);
+        if (t) { startSwing(e, t); updateSwing(e, dt); return; }
+      }
+    }
     if (T.ai !== 'flyer') {
       e.vel.y -= 30 * dt;
       // land creatures stop at the water's edge rather than walking along the bottom

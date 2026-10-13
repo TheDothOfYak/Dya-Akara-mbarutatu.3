@@ -950,6 +950,7 @@ function drinkFilm() {
 }
 
 function nurSense() {
+  if (!phorusWith() && F.pos.distanceTo(P.pos) > 12) { toast('Phorus isn’t with you — he’s waiting back where the story left him.', 2.5); return; }
   if (P.senseCd > 0) return;
   P.senseCd = 7;
   sfx.sense();
@@ -1708,9 +1709,19 @@ function dyaRecord(id) { const r = SAVE.dya && SAVE.dya.record[REGION + ':' + id
 function dyaAimPoint() {
   if (!dyaMatch) return null;
   const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(0, 0), camera);
+  // the field lies on the real ground: find where the look-ray meets it
   const plane = new THREE.Plane(V3(0, 1, 0), -dyaMatch.o.planeY), hit = V3();
-  return ray.ray.intersectPlane(plane, hit) ? hit : null;
+  if (!ray.ray.intersectPlane(plane, hit)) return null;
+  for (let k = 0; k < 4; k++) { plane.constant = -dyaGround(hit.x, hit.z); if (!ray.ray.intersectPlane(plane, hit)) return null; }
+  hit.y = dyaGround(hit.x, hit.z);
+  return hit;
 }
+/* the surface a token stands on: the ground, or the top of the water */
+function dyaGround(x, z) {
+  const g = world.heightAt(x, z);
+  return dyaWet(x, z) ? Math.max(g, world.water.level) : g;
+}
+const dyaWet = (x, z) => !!world.water && (world.water.depth ? world.water.depth(x, z) > 0.4 : !!(world.water.isWater && world.water.isWater(x, z)));
 function dyaArena() {
   if (REGION === 'xilia') return { x: world.PLAZA.x, z: world.PLAZA.z, y: world.PLAZA.y, name: 'the market square' };
   if (REGION === 'leotik' && world.camp) return { x: world.camp.x, z: world.camp.z - 30, y: world.heightAt(world.camp.x, world.camp.z - 30), name: 'the camp green' };
@@ -1765,7 +1776,8 @@ function startDya(n, mode, sc, duelTok) {
     scene, particles, sfx, toast, bark: msg => bark('phorus', msg, 3),
     handPos: () => V3(P.pos.x, P.pos.y + 1.5, P.pos.z).addScaledVector(camForward(), 0.5),
     onEnd: (result, mm) => endDya(result, mm, n, R, mode),
-  }, { mode, scale: sc, origin, yaw, planeY, myName: 'Torcain', myPouch, rival: { name: R.name, skill: R.skill, pouch: rivalPouch, actorPos: () => V3(n.pos.x, n.pos.y + 1.6, n.pos.z) }, terrain: REGION === 'leotik' ? 'forest' : 'plains' });
+  }, { mode, scale: sc, origin, yaw, planeY, myName: young() ? 'Tanoc' : 'Torcain', myPouch,
+    world: { ground: dyaGround, colliders: world.col.list, isWater: world.water ? dyaWet : null }, rival: { name: R.name, skill: R.skill, pouch: rivalPouch, actorPos: () => V3(n.pos.x, n.pos.y + 1.6, n.pos.z) }, terrain: REGION === 'leotik' ? 'forest' : 'plains' });
   lockMouse();
   if (!SAVE.flags.dya_hint) { SAVE.flags.dya_hint = true; setTimeout(() => bark('phorus', mode === 'duel' ? 'Duels throw themselves — just watch. Your token can’t touch anyone real.' : 'Q and E to choose, R to ready it with resources, 1–5 to pick it up, then click to throw. Pulses bring resources. Steal their Relic!', 7), 800); }
 }
@@ -1976,7 +1988,7 @@ function setObjective() {
    ================================================================ */
 let DLG = null;
 function dialog(lines, onDone) {
-  if (young()) lines = lines.map(l => l[0] === 'phorus' ? ['tale', l[1]] : l);
+  if (young() || (!phorusWith() && F.pos.distanceTo(P.pos) > 20)) lines = lines.map(l => l[0] === 'phorus' ? ['tale', l[1]] : l);
   DLG = { lines, i: 0, chars: 0, onDone, tick: 0 };
   G.mode = 'dialog'; P.atk = null;
   $('dialog').classList.remove('hidden');
@@ -2049,7 +2061,7 @@ function closeMemory() {
 
 let barkTimer = 0;
 function bark(who, text, dur = 3.5) {
-  if (who === 'phorus' && young()) return;
+  if (who === 'phorus' && (young() || (!phorusWith() && F.pos.distanceTo(P.pos) > 20))) return;   // he's not here to say it
   const sp = STORY.SPEAKERS[who];
   $('bark').innerHTML = `<b style="color:${sp.color}">${sp.name}</b>${text}`;
   $('bark').style.opacity = 1; barkTimer = dur;
@@ -3315,11 +3327,28 @@ function updatePlayer(dt) {
   if (P.roll) torcain.body.rotation.x = (P.roll.t / P.roll.dur) * Math.PI * 2;
 }
 
+/* Phorus goes where the story takes him, and no further. On Torcain's own
+   errands — bounties, hunts, wandering — he waits behind. */
+function phorusWith() {
+  if (G.pro || young()) return false;
+  if (G.bossActive) return true;
+  if (REGION === 'xilia') return !!F_.seedQuest && !F_.xdone;                         // the warm seed, and the ship
+  if (REGION === 'aakalay') return !F_.done || ['q_pages', 'q_thorn', 'q_skorthal'].some(q => SAVE.quests[q] === 'active');   // the riddle, and his own errands
+  return !F_.doneL;                                                                    // Leotik: the pillars and the keep
+}
+function phorusHome() {
+  if (REGION === 'xilia') return F_.xtalked ? V3(world.PLAZA.x - 6, 0, world.PLAZA.z + 8) : world.pier.start.clone().add(V3(-2, 0, -3));   // near the bakery
+  if (REGION === 'leotik' && world.camp) return V3(world.camp.x + 4, 0, world.camp.z + 3);
+  const l = SAVE.lantern && lanternById(SAVE.lantern);
+  return l ? V3(l.x + 2, 0, l.z - 1.5) : world.pier.start.clone().add(V3(-2, 0, -3));
+}
 function updatePhorus(dt) {
   if (G.pro || young()) { phorus.root.visible = false; return; }   // Phorus is years away yet
   F.cd = Math.max(0, F.cd - dt); F.cast = Math.max(0, F.cast - dt);
+  const withP = phorusWith();
+  if (!withP && FR.mode) phorusDismount();
   let tgt = null, bd = 1e9;
-  if (G.mode === 'play' && !P.dead) {
+  if (G.mode === 'play' && !P.dead && withP) {
     for (const e of enemies.list) {
       if (e.dead || !e.hostile || e.state === 'idle' || e.state === 'return' || e.state === 'shadow' || e.kind === 'rubbermcfly') continue;
       const d = e.pos.distanceTo(P.pos);
@@ -3344,6 +3373,8 @@ function updatePhorus(dt) {
       sfx.bolt();
       F.yaw = Math.atan2(tp.x - F.pos.x, tp.z - F.pos.z);
     }
+  } else if (!withP) {
+    want = phorusHome();
   } else {
     const back = V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), right = V3(-Math.cos(P.yaw), 0, Math.sin(P.yaw));
     want = FR.mode === 'own' ? P.pos.clone().addScaledVector(back, 3.5).addScaledVector(right, 3.2)   // Lun keeps clear of Brindle
@@ -3362,7 +3393,9 @@ function updatePhorus(dt) {
   for (const h of world.hazards) { const dx = want.x - h.x, dz = want.z - h.z, d = Math.hypot(dx, dz); if (d < h.r + 1.5) { want.x = h.x + dx / (d || 1) * (h.r + 1.5); want.z = h.z + dz / (d || 1) * (h.r + 1.5); } }
   const dx = want.x - F.pos.x, dz = want.z - F.pos.z, d = Math.hypot(dx, dz);
   const pd = F.pos.distanceTo(P.pos);
-  if (pd > 34 || (pd > 18 && G.mode !== 'play')) {
+  if (!withP) {   // he makes his own way back to where he waits
+    if (F.pos.distanceTo(want) > 40 && pd > 30) { F.pos.copy(want); F.pos.y = world.col.ground(want.x, want.z, world.heightAt(want.x, want.z) + 2); F.vel.set(0, 0, 0); }
+  } else if (pd > 34 || (pd > 18 && G.mode !== 'play')) {
     particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 16, { color: 0x7ad8ff, speed: 4, size: 0.4, life: 0.5 });
     F.pos.copy(P.pos).addScaledVector(V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), 2.5);
     particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 16, { color: 0x7ad8ff, speed: 4, size: 0.4, life: 0.5 });

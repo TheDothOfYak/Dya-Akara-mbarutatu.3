@@ -440,8 +440,10 @@ export function buildXilia(scene) {
   }
 
   /* ---------- forests and trees ---------- */
+  const trees = [];   // trunks a Punk can swing round
   function tree(x, z, s) {
     const g = heightAt(x, z), h = 4 + s * 3.5;
+    trees.push({ x, z, g, h, r: 0.35 * s });
     trunks.put(x, g + h / 2 - 0.4, z, 0.35 * s, h, 0.35 * s, 0, rng() * 6, 0, '#6b4128');
     const lc = pick(LEAF);
     for (let k = 0; k < 3 + Math.floor(rng() * 3); k++) {
@@ -635,7 +637,7 @@ export function buildXilia(scene) {
   ];
 
   return {
-    name: 'xilia', heightAt, col, SITES, PLAZA: { x: SQUARE.x, z: SQUARE.z, y: SQ_H }, hazards: [], pillars: [], camp: null,
+    name: 'xilia', heightAt, col, SITES, trees, PLAZA: { x: SQUARE.x, z: SQUARE.z, y: SQ_H }, hazards: [], pillars: [], camp: null,
     board: { x: -18, z: 32 },
     crates: [0.35, 2.5, 4.0].map(a => { const c = Math.cos(a), sn = Math.sin(a), r = oldEdge(c * 100, sn * 100) - 9; return { x: c * r, z: sn * r }; }),
     hearth, pen: PEN, yard: YARD, tower: { x: YARD.x - 10, z: YARD.z - 10, y: SQ_H + 0.4 + 10 }, seedSpot, grove: GROVE,

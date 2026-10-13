@@ -261,6 +261,7 @@ export function buildLeotik(scene) {
   const rng = mulberry32(4409);
   const pick = a => a[Math.floor(rng() * a.length)];
   const col = new Colliders(heightAt);
+  const trees = [];   // trunks a Punk can swing round
 
   /* ---------- the pier's footing (fixed: quests and saves start here) ---------- */
   const dockZ0 = oldEdge(0, 170) - 6;
@@ -482,6 +483,7 @@ export function buildLeotik(scene) {
   /* ---------- the jungle ---------- */
   function jungleTree(x, z, s, lo) {
     const g = heightAt(x, z), h = 9 + s * 9;
+    trees.push({ x, z, g, h, r: 0.5 * s });
     trunks.put(x, g + h / 2 - 0.5, z, 0.5 * s, h, 0.5 * s, (rng() - 0.5) * 0.1, rng() * 6, (rng() - 0.5) * 0.1, pick(['#4a3a2a', '#3a3026', '#5a4630']));
     const lc = pick(LEAF), kit = lo ? crownsLo : crowns;
     for (let k = 0, nk = lo ? 3 : 4 + Math.floor(rng() * 3); k < nk; k++) {
@@ -888,7 +890,7 @@ export function buildLeotik(scene) {
 
   return {
     board: { x: CAMP.x + 9, z: CAMP.z + 9 },
-    name: 'leotik', camp: CAMP, heightAt, col, SITES, PLAZA: { x: KEEP.x, z: KEEP.z, y: kg }, urverk: { group: urverk, ringMat, portalMat },
+    name: 'leotik', camp: CAMP, heightAt, col, SITES, trees, PLAZA: { x: KEEP.x, z: KEEP.z, y: kg }, urverk: { group: urverk, ringMat, portalMat },
     pier: { y: pierY, start: new THREE.Vector3(0, pierY, pierEnd - 6), end: pierEnd, z0: dockZ0 },
     edgeRadius, flowers, spawnGroups, hazards, pillars, lanterns, stones, falls: [],
     inBounds, barrierLine, swimOk,

@@ -144,8 +144,16 @@
 
     /* terrain features → obstacles & water zones (visual + light gameplay: bogs/water flags) */
     M.props = [];
+    M.obstacles = [];
     (function genTerrain() {
       const trng = new U.Rng(M.seed ^ 0x7E44);
+      /* a match thrown down out in the world plays on the world itself: its
+         trees, rocks and walls are the cover, its ponds the water */
+      if (cfg.worldTerrain) {
+        for (const o of cfg.worldTerrain.obstacles || []) { M.obstacles.push({ x: o.x, y: o.y, r: o.r }); M.props.push({ kind: o.kind || 'rocks', x: o.x, y: o.y, s: 1, seed: 0, world: true }); }
+        for (const w of cfg.worldTerrain.water || []) M.zones.push({ type: 'water', x: w.x, y: w.y, r: w.r, team: -1, world: true });
+        return;
+      }
       const feats = M.terrain.features || [];
       const n = 14;
       for (let i = 0; i < n; i++) {
@@ -531,6 +539,10 @@
            brain otherwise */
         const b = BV[c.behaviorOverride || (c.mountable ? (c.riderUnit ? c.riddenBehavior : c.riderlessBehavior) : null) || c.sp.behavior];
         if (b) { api._c = c; b(c, api); }
+        /* the smart go for the Relic: a clever creature (sentient units run
+           their own relic plan) that its brain left without a fight makes for
+           a rival's Relic, and once it has it, runs it home */
+        if (c.team !== -1 && !c.rooted && !c.riding && M.isSmart(c) && !(c.sp.tags || []).includes('sentient')) M.smartRelic(c, api);
         /* a fighting flyer that a tower is shooting turns and presses the tower
            (the siege loop wears it down while the flyer is on top of it) */
         if (c.mem.towerAggro && (M.tick - (c.mem.towerAggroAt || 0)) < Math.round(5 / TICK)) {
@@ -1157,6 +1169,19 @@
           c.y += (dx / d) * sp * TICK * wob;
         }
         c.x = U.clamp(c.x, 14, WORLD.w - 14); c.y = U.clamp(c.y, 14, WORLD.h - 14);
+        /* real cover: walkers go around trunks, rocks and walls (flyers pass over) */
+        if (M.obstacles.length && !c.sp.tags.includes('flyer')) {
+          for (const o of M.obstacles) {
+            const ox = c.x - o.x, oy = c.y - o.y, od = Math.hypot(ox, oy), min = o.r + c.radius * 0.6;
+            if (od < min) {
+              if (od < 1e-3) { c.x += min; continue; }
+              c.x = o.x + ox / od * min; c.y = o.y + oy / od * min;
+              /* slide round it rather than stopping dead */
+              const side = (ox * dy - oy * dx) > 0 ? 1 : -1;
+              c.x += (-oy / od) * side * sp * TICK * 0.6; c.y += (ox / od) * side * sp * TICK * 0.6;
+            }
+          }
+        }
         c.facing = dx >= 0 ? 1 : -1;
         c.state = it.move.run ? 'run' : 'walk';
       } else c.state = 'idle';
@@ -2048,6 +2073,19 @@
       if (d <= bd && d < (best ? bd : 1e9)) { bd = d; best = r; }
     }
     return best;
+  };
+  /* clever enough to understand what the Relic is for */
+  Match.prototype.isSmart = function (c) {
+    return !!(c.sp.eikarLayer || c.sp.keiliaLayer || c.hasRider || c.sp.behavior === 'karnen' || c.speciesId === 'su_naga' || (c.vars.intelligence || 0) > 0.75);
+  };
+  Match.prototype.smartRelic = function (c, api) {
+    const M = this;
+    if (c.carryingRelic) { const own = api.ownHoard(c.team); c.intent.attackTarget = null; c.intent.move = { x: own.x, y: own.y, run: true }; return; }
+    if (c.intent.attackTarget || c.hp < c.maxHp * 0.4 || api.nearestEnemy(c, 160)) return;
+    const rl = M.nearestTakeableRelic(c.team, c.x, c.y);
+    if (!rl || rl.carrier != null || rl.disabled) return;
+    c.intent.move = { x: rl.x, y: rl.y, run: U.dist(c.x, c.y, rl.x, rl.y) < 260 };
+    if (U.dist(c.x, c.y, rl.x, rl.y) < RELIC_PICK_R + c.radius) api.pickRelic(c);
   };
   /* back-compat alias — the AI and behaviors read "the relic to go for", which
      now includes reclaiming your own captured relic as well as capturing a
