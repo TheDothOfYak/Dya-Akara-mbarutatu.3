@@ -54,6 +54,8 @@ function segDist(x, z, pts) {
 }
 const pathDist = (x, z) => segDist(x, z, PATH)[0];
 const laneDist = (x, z) => segDist(x, z, LANE)[0];
+// how deep under the deepwood's roof a point is: 0 out in the open, 1 in the heart of the wood
+const shadeAt = (x, z) => x < 560 || x > 1250 ? 0 : smooth(560, 640, x) * smooth(1250, 1215, x) * smooth(110, 70, pathDist(x, z));
 
 /* ---------------- the lie of the land ---------------- */
 function slope(x) {   // the long fall from the top of the path down to the lake
@@ -188,7 +190,7 @@ export function buildProperty(scene) {
   const c = new THREE.Color(), gA = new THREE.Color('#8fbf52'), gB = new THREE.Color('#b8c45a'), gC = new THREE.Color('#6aa048'),
     dirt = new THREE.Color('#c9a06a'), soil = new THREE.Color('#7a5232'), soilB = new THREE.Color('#9a6a3a'), forestFloor = new THREE.Color('#4a7a38'),
     meadowY = new THREE.Color('#c4cc62'), sand = new THREE.Color('#d6c48e'), bed = new THREE.Color('#4a6a62'), rock = new THREE.Color('#8e8578'),
-    rockD = new THREE.Color('#6a6470'), snow = new THREE.Color('#f2f2f6'), farPine = new THREE.Color('#2f5a3a'), haze = new THREE.Color('#8aa0b8');
+    rockD = new THREE.Color('#6a6470'), snow = new THREE.Color('#f2f2f6'), farPine = new THREE.Color('#2f5a3a'), haze = new THREE.Color('#8aa0b8'), deepFloor = new THREE.Color('#2a3a26');
   const colorAt = (x, z, y, ny, out) => {
     const n = fbm(x * 0.03 + 4, z * 0.03, 3);
     out.copy(gA).lerp(gB, smooth(0.45, 0.72, n)).lerp(gC, smooth(0.5, 0.3, fbm(x * 0.09, z * 0.09, 2)) * 0.6);
@@ -200,6 +202,7 @@ export function buildProperty(scene) {
     if (f) out.copy(Math.sin((x - f.x) * 1.2) > 0 ? soil : soilB);
     if (inPasture(x, z)) out.lerp(gB, 0.4);
     out.lerp(dirt, smooth(3.4, 1.6, pathDist(x, z)) * 0.9);
+    const sh = shadeAt(x, z); if (sh > 0) out.lerp(deepFloor, sh * 0.6);   // leaf-litter and moss under the giants
     out.lerp(dirt, smooth(2.8, 1.2, laneDist(x, z)) * 0.8);
     out.lerp(dirt, smooth(30, 18, Math.hypot(x - YARD.x, z - YARD.z)) * 0.55);
     out.lerp(sand, smooth(WATER_LEVEL + 2, WATER_LEVEL + 0.4, y));
@@ -296,12 +299,164 @@ export function buildProperty(scene) {
     for (let k = 0; k < 4; k++) { const rr = (1.8 + rng() * 1.3) * s; crowns.put(x + (rng() - 0.5) * 2.6 * s, g + h + (rng() - 0.2) * 1.8 * s, z + (rng() - 0.5) * 2.6 * s, rr, rr * 0.85, rr, rng(), rng(), rng(), new THREE.Color(lc).offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.08).getStyle()); }
     if (walk) { col.add(x, z, 0.4 * s, 0.4 * s, 0, g - 1, g + h); trees.push({ x, z, g, h, r: 0.4 * s }); }
   }
+  /* ---------------- the deepwood: the forest path under the old giants ----------------
+     Trunks wider than a cart is long, going up and up into one roof of leaves that
+     shuts the sky out entirely. Down here it is dim and blue-green, and the light
+     is the wood's own: seams of it running up the bark, beads along the branches,
+     specks among the leaves, moss glowing on the stones and toadstools in the litter. */
+  const giants = [];
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: true });
+  const GLOWS = ['#3ae8c8', '#5af0ff', '#8affb0', '#b48aff', '#3ad0a0', '#9ae0ff'];
+  const ceilY = (x, z) => (heightAt(x, z) * 0.4 + (heightAt(x - 24, z) + heightAt(x + 24, z) + heightAt(x, z - 24) + heightAt(x, z + 24)) * 0.15) + 44;
+  {
+    // the roof: one sheet of leaf-dark over the whole corridor, sagging down into the walls at its edges
+    const X0 = 584, X1 = 1250, Z0 = -170, Z1 = 170, SX = 112, SZ = 56;
+    const cg = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, SX, SZ); cg.rotateX(Math.PI / 2); cg.translate((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
+    const cp = cg.attributes.position, cc = new Float32Array(cp.count * 3), tc = new THREE.Color();
+    const keepV = [];
+    for (let i = 0; i < cp.count; i++) {
+      const x = cp.getX(i), z = cp.getZ(i), pd = pathDist(x, z);
+      const lump = (fbm(x * 0.03, z * 0.03, 2) - 0.5) * 9;
+      cp.setY(i, ceilY(x, z) + lump - 34 * smooth(80, 150, pd));
+      keepV[i] = pd < 160;
+      const spark = fbm(x * 0.21 + 3, z * 0.21, 1);
+      tc.set('#0d2016').lerp(new THREE.Color('#1a3a22'), fbm(x * 0.05, z * 0.05, 1));
+      if (spark > 0.72) tc.lerp(new THREE.Color(GLOWS[(Math.floor(x * 7 + z * 3) >>> 0) % GLOWS.length]), smooth(0.72, 0.85, spark) * 0.6);
+      cc[i * 3] = tc.r; cc[i * 3 + 1] = tc.g; cc[i * 3 + 2] = tc.b;
+    }
+    const src = cg.index.array, keep = [];
+    for (let t = 0; t < src.length; t += 3) if (keepV[src[t]] || keepV[src[t + 1]] || keepV[src[t + 2]]) keep.push(src[t], src[t + 1], src[t + 2]);
+    cg.setIndex(keep); cg.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+    const roof = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: true }));
+    scene.add(roof);
+  }
+  const gTrunks = new Kit(scene, new THREE.CylinderGeometry(0.72, 1, 1, 12, 1, true), toon(0xffffff), 260, false);
+  const gLimbs = new Kit(scene, new THREE.CylinderGeometry(0.55, 1, 1, 7, 1, true), toon(0xffffff), 1900, false);
+  const gLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1500, false);
+  const seams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), glowMat, 3400, false);
+  const beads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 17000, false);
+  const shelfG = new THREE.CylinderGeometry(1, 0.6, 0.18, 9, 1, false, 0, Math.PI); 
+  const shelves = new Kit(scene, shelfG, glowMat, 1200, false);
+  const mossCaps = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), glowMat, 500, false);
+  const floorGlow = new Kit(scene, new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2), glowMat, 700, false);
+  const stems = new Kit(scene, new THREE.CylinderGeometry(0.08, 0.11, 1, 5), toon(0xe8e0d0), 2400, false);
+  const caps = new Kit(scene, new THREE.SphereGeometry(1, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2), glowMat, 2400, false);
+  const halos = [];
+  const glowCol = () => new THREE.Color(pick(GLOWS)).multiplyScalar(0.75 + rng() * 0.35);
+  const V = new THREE.Vector3(), Q = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0);
+  // a limb from (ax,ay,az) out to (bx,by,bz), for any cylinder-shaped kit
+  const limb = (kit, ax, ay, az, bx, by, bz, r, col) => {
+    V.set(bx - ax, by - ay, bz - az); const L = V.length(); V.normalize(); Q.setFromUnitVectors(UP, V);
+    const e = new THREE.Euler().setFromQuaternion(Q);
+    kit.put((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, r, L, r, e.x, e.y, e.z, col);
+  };
+  // walk the path, planting giants either side
+  {
+    let acc = 0;
+    for (let i = 0; i < PATH.length - 1; i++) {
+      const [ax, az] = PATH[i], [bx, bz] = PATH[i + 1], L = Math.hypot(bx - ax, bz - az), nx = -(bz - az) / L, nz = (bx - ax) / L;
+      for (let d = 0; d < L; d += 4) {
+        acc += 4; if (acc < 15 + rng() * 6) continue; acc = 0;
+        const px = ax + (bx - ax) * d / L, pz = az + (bz - az) * d / L;
+        if (px < 600 || px > 1236) continue;
+        for (const side of [-1, 1]) {
+          if (rng() < 0.18) continue;
+          const off = 11 + rng() * 12 + (rng() < 0.3 ? 14 + rng() * 20 : 0), x = px + nx * off * side + (rng() - 0.5) * 6, z = pz + nz * off * side + (rng() - 0.5) * 6;
+          const R = 1.9 + rng() * 1.8;
+          if (pathDist(x, z) < R + 6.5 || Math.abs(x - BROOK_X(z)) < R + 6 || giants.some(gt => Math.hypot(gt.x - x, gt.z - z) < gt.R + R + 5)) continue;
+          giants.push({ x, z, R });
+        }
+      }
+    }
+    // a second rank, further back, so the walls are giants too and not just the first row
+    for (let i = 0; i < 1400 && giants.length < 150; i++) {
+      const x = 600 + rng() * 640, z = (rng() - 0.5) * 220, pd = pathDist(x, z), R = 2.2 + rng() * 2.2;
+      if (pd < 30 || pd > 95 || Math.abs(x - BROOK_X(z)) < R + 6 || giants.some(gt => Math.hypot(gt.x - x, gt.z - z) < gt.R + R + 9)) continue;
+      giants.push({ x, z, R });
+    }
+    for (const gt of giants) {
+      const { x, z, R } = gt, g = heightAt(x, z) - 0.6, top = ceilY(x, z) - 2, h = top - g;
+      gt.g = g;
+      const bark = new THREE.Color('#3e3228').offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.06).getStyle();
+      gTrunks.put(x, g + h / 2, z, R, h, R, 0, rng() * 6, 0, bark);
+      col.add(x, z, R * 0.85, R * 0.85, 0, g - 1, g + 30);
+      // buttress roots fanning out over the ground
+      const nr = 5 + Math.floor(rng() * 3);
+      for (let k = 0; k < nr; k++) {
+        const a = k / nr * Math.PI * 2 + rng() * 0.5, len = R * (1.6 + rng() * 1.2), ex = x + Math.cos(a) * (R + len), ez = z + Math.sin(a) * (R + len);
+        limb(gLimbs, x + Math.cos(a) * R * 0.6, g + R * 2.2, z + Math.sin(a) * R * 0.6, ex, heightAt(ex, ez) - 0.3, ez, R * 0.32, bark);
+      }
+      // seams of light up the bark
+      const ns = 4 + Math.floor(rng() * 4);
+      for (let k = 0; k < ns; k++) {
+        const a = rng() * Math.PI * 2, y0 = g + 1 + rng() * h * 0.5, len = 3 + rng() * h * 0.35, rr = R * (1 - 0.28 * ((y0 + len / 2 - g) / h)) * 0.99;
+        seams.put(x + Math.cos(a) * rr, y0 + len / 2, z + Math.sin(a) * rr, 0.16, len, 0.16, 0, -a, (rng() - 0.5) * 0.12, glowCol());
+        for (let b = 0; b < 3; b++) { const by = y0 + rng() * len; beads.put(x + Math.cos(a + 0.06) * (rr + 0.05), by, z + Math.sin(a + 0.06) * (rr + 0.05), 0.12, 0.12, 0.12, 0, 0, 0, glowCol()); }
+      }
+      // shelf fungus, glowing, in little stairs up one side
+      if (rng() < 0.7) {
+        const a = rng() * Math.PI * 2, y0 = g + 1.5 + rng() * 5, n = 3 + Math.floor(rng() * 4), c = glowCol();
+        for (let k = 0; k < n; k++) { const aa = a + (rng() - 0.5) * 0.6, yy = y0 + k * (0.7 + rng() * 0.5), rr = R * (1 - 0.28 * (yy - g) / h); shelves.put(x + Math.cos(aa) * rr, yy, z + Math.sin(aa) * rr, 0.5 + rng() * 0.5, 1, 0.5 + rng() * 0.5, 0, -aa + Math.PI / 2, 0, c); }
+        if (halos.length < 140) { const s = glowSprite(c.getHex(), 5, 0.35); s.position.set(x + Math.cos(a) * (R + 0.8), y0 + n * 0.5, z + Math.sin(a) * (R + 0.8)); scene.add(s); halos.push(s); }
+      }
+      // great limbs, out and up into the roof, with beads of light along them and leaf-clouds at the ends
+      const nl = 3 + Math.floor(rng() * 3);
+      for (let k = 0; k < nl; k++) {
+        const a = rng() * Math.PI * 2, y0 = g + h * (0.45 + rng() * 0.35), reach = 12 + rng() * 14;
+        const ex = x + Math.cos(a) * reach, ez = z + Math.sin(a) * reach, ey = Math.min(ceilY(ex, ez) - 4, y0 + 6 + rng() * 10);
+        const rr = R * (0.28 + rng() * 0.12);
+        limb(gLimbs, x + Math.cos(a) * R * 0.5, y0, z + Math.sin(a) * R * 0.5, ex, ey, ez, rr, bark);
+        const c = glowCol();
+        for (let b = 1; b < 7; b++) { const t = b / 7 + (rng() - 0.5) * 0.04, bx = x + (ex - x) * t, by = y0 + (ey - y0) * t + rr * (1 - t * 0.5) + 0.1, bz = z + (ez - z) * t; beads.put(bx, by, bz, 0.16, 0.16, 0.16, 0, 0, 0, c); }
+        const lc = new THREE.Color('#183a24').offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.05).getStyle();
+        const cr = 6 + rng() * 5;
+        gLeaves.put(ex, ey + 2, ez, cr, cr * 0.5, cr, rng(), rng() * 6, rng() * 0.2, lc);
+        // specks of light among the leaves, and threads hanging from them
+        for (let b = 0; b < 12; b++) { const u = rng() * Math.PI * 2, v = Math.sqrt(rng()); beads.put(ex + Math.cos(u) * cr * v * 0.95, ey + 2 - cr * 0.5 * Math.sqrt(1 - v * v) * 0.95 - 0.1, ez + Math.sin(u) * cr * v * 0.95, 0.13, 0.13, 0.13, 0, 0, 0, glowCol()); }
+        for (let b = 0; b < 3; b++) {
+          const u = rng() * Math.PI * 2, v = rng() * cr * 0.8, hx = ex + Math.cos(u) * v, hz = ez + Math.sin(u) * v, hl = 4 + rng() * 9, hy = ey + 1 - cr * 0.3;
+          seams.put(hx, hy - hl / 2, hz, 0.05, hl, 0.05, 0, 0, 0, new THREE.Color('#1f4a3a'));
+          beads.put(hx, hy - hl, hz, 0.22, 0.3, 0.22, 0, 0, 0, glowCol());
+        }
+      }
+    }
+    // the roof's underside, hung with leaf-clouds and their specks, so there is never a gap to see sky through
+    for (let i = 0, n0 = gLeaves.mesh.count; i < 4000 && gLeaves.mesh.count < n0 + 640; i++) {
+      const x = 590 + rng() * 650, z = (rng() - 0.5) * 300, pd = pathDist(x, z);
+      if (pd > 120) continue;
+      const cy = ceilY(x, z) - 34 * smooth(80, 150, pd), cr = 9 + rng() * 9;
+      gLeaves.put(x, cy - cr * 0.15, z, cr, cr * 0.45, cr, rng(), rng() * 6, 0, new THREE.Color('#14301e').offsetHSL(0, 0, (rng() - 0.5) * 0.05).getStyle());
+      if (pd < 50) for (let b = 0; b < 8; b++) { const u = rng() * Math.PI * 2, v = Math.sqrt(rng()); beads.put(x + Math.cos(u) * cr * v * 0.9, cy - cr * 0.15 - cr * 0.45 * Math.sqrt(1 - v * v) * 0.92, z + Math.sin(u) * cr * v * 0.9, 0.15, 0.15, 0.15, 0, 0, 0, glowCol()); }
+    }
+    // the floor: mossy stones that glow, toadstools in rings and clusters, pools of glowing moss
+    for (let i = 0; i < 6000 && mossCaps.mesh.count < 160; i++) {
+      const x = 600 + rng() * 640, z = (rng() - 0.5) * 120, pd = pathDist(x, z);
+      if (pd < 4.5 || pd > 40 || Math.abs(x - BROOK_X(z)) < 4 || giants.some(gt => Math.hypot(gt.x - x, gt.z - z) < gt.R + 2)) continue;
+      const g = heightAt(x, z), s = 0.6 + Math.pow(rng(), 2) * 2.6, ry = rng() * 6;
+      rocks.put(x, g + s * 0.3, z, s * 1.2, s * 0.8, s, 0, ry, 0, pick(['#5a5a54', '#4e504a', '#62605a']));
+      mossCaps.put(x, g + s * 0.3 + s * 0.6, z, s * 1.0, s * 0.26, s * 0.86, (rng() - 0.5) * 0.3, ry, (rng() - 0.5) * 0.3, new THREE.Color(pick(['#2ad890', '#3ae8a8', '#5af0c8', '#4ac8e8'])).multiplyScalar(0.3 + rng() * 0.22));
+      col.add(x, z, s * 0.95, s * 0.85, ry, g - 1, g + s * 0.95);
+    }
+    for (let i = 0; i < 9000 && caps.mesh.count < 2300; i++) {
+      const x = 600 + rng() * 640, z = (rng() - 0.5) * 140, pd = pathDist(x, z);
+      if (pd < 3.2 || pd > 50 || Math.abs(x - BROOK_X(z)) < 3.5) continue;
+      const g = heightAt(x, z), c = glowCol(), n = 2 + Math.floor(rng() * 6), ring = rng() < 0.15;
+      for (let k = 0; k < n; k++) {
+        const a = ring ? k / n * Math.PI * 2 : rng() * Math.PI * 2, d = ring ? 1.6 : rng() * 0.9, sx = x + Math.cos(a) * d, sz = z + Math.sin(a) * d, s = 0.4 + rng() * (rng() < 0.1 ? 1.6 : 0.7);
+        stems.put(sx, g + s * 0.3, sz, s, s * 0.6, s, 0, 0, 0, '#e0d8c8');
+        caps.put(sx, g + s * 0.58, sz, s * 0.36, s * 0.26, s * 0.36, 0, 0, 0, c);
+      }
+      if (rng() < 0.5) floorGlow.put(x, g + 0.06, z, 1.4 + rng() * 2.4, 1, 1.4 + rng() * 2.4, 0, 0, 0, c.clone().multiplyScalar(0.28));
+      if (halos.length < 260 && rng() < 0.12) { const sp = glowSprite(c.getHex(), 3.4, 0.4); sp.position.set(x, g + 0.6, z); scene.add(sp); halos.push(sp); }
+    }
+    for (const k of [gTrunks, gLimbs, gLeaves, seams, beads, shelves, mossCaps, floorGlow, stems, caps]) k.done();
+  }
   // the path's own walls of trees, close and tall
   for (let i = 0; i < 26000 && trunks.mesh.count < 2400; i++) {
     const x = 500 + rng() * (EAST_END + 60 - 500), z = (rng() - 0.5) * 300;
     const pd = pathDist(x, z);
     if (pd < 7.5 || pd > 140 || rng() > treeDensity(x, z)) continue;
-    if (Math.abs(x - BROOK_X(z)) < 5) continue;
+    if (Math.abs(x - BROOK_X(z)) < 5 || giants.some(gt => Math.hypot(gt.x - x, gt.z - z) < gt.R + 2.5)) continue;
     const s = 0.9 + rng() * 0.8;
     if (rng() < 0.82) pine(x, z, s, pd < 26); else broad(x, z, s * 0.9, pd < 26);
   }
@@ -598,7 +753,7 @@ export function buildProperty(scene) {
     const g = heightAt(x, z); if (g < WATER_LEVEL - 1) continue;
     const s = 0.5 + Math.pow(rng(), 3) * 3.4;
     rocks.put(x, g + s * 0.25, z, s * (1 + rng() * 0.5), s * 0.75, s, rng() * 3, rng() * 3, rng() * 3, pick(['#9a9284', '#8a8478', '#a8a090', '#b8a080']));
-    if (s > 1.2 && onLand(x, z)) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
+    if (s > 0.6 && onLand(x, z)) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
   }
 
   blocks.done(); trunks.done(); cones.done(); crowns.done(); crops.done(); rocks.done();
@@ -659,12 +814,13 @@ export function buildProperty(scene) {
     zones: ZONES.map(z => ({ ...z })), albaliSpots: [{ x: -880, z: 380 }, { x: 420, z: 300 }, { x: -60, z: -420 }], juFields: [{ x: 300, z: 260, r: 7 }],
     kuniPerch: { x: OUTCROP.x, z: OUTCROP.z, y: heightAt(OUTCROP.x, OUTCROP.z) },
     map: { cx: -300, cz: -20, span: 2000 },
-    path: PATH, crestPoint: new THREE.Vector3(CREST.x, heightAt(CREST.x, CREST.z), CREST.z), dockPoint: new THREE.Vector3(DOCK.x, WATER_LEVEL + 1, DOCK.z),
+    shadeAt, path: PATH, crestPoint: new THREE.Vector3(CREST.x, heightAt(CREST.x, CREST.z), CREST.z), dockPoint: new THREE.Vector3(DOCK.x, WATER_LEVEL + 1, DOCK.z),
     pathStart: new THREE.Vector3(1120, heightAt(1120, 32), 32),
     update(t, dt, particles, camPos, night = 0) {
       grass.material.userData.shader && (grass.material.userData.shader.uniforms.uTime.value = t);
       flowers.forEach(f => { if (f.ready) f.grp.rotation.y = t * 0.5; });
       fire.scale.setScalar(3 + Math.sin(t * 11) * 0.25);
+      for (let i = 0; i < halos.length; i += 1) halos[i].material.opacity = 0.28 + 0.14 * Math.sin(t * 0.9 + i * 1.7);
       // the bioluminescence comes up with the dark: toadstools, the lake, fireflies
       const n = night;
       if (Math.abs(n - t0.night) > 0.01) {
@@ -678,6 +834,8 @@ export function buildProperty(scene) {
         if (Math.random() < 0.6) particles.emit(hearth.x + (Math.random() - 0.5) * 0.8, heightAt(hearth.x, hearth.z) + 0.8, hearth.z + (Math.random() - 0.5) * 0.8, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 });
         if (Math.random() < 0.3) particles.emit(HOUSE.x - 4, TERRACE_H + 16.5, HOUSE.z + (Math.random() < 0.5 ? -8 : 8), { vx: 0.6, vy: 1.2, vz: 0.2, color: 0xd8d0c8, size: 1.2, life: 2.5, drag: 0.3 });
         if (camPos) {
+          const sh = shadeAt(camPos.x, camPos.z);   // spores drifting in the deepwood's own light
+          if (sh > 0.2 && Math.random() < sh * 1.6) particles.emit(camPos.x + (Math.random() - 0.5) * 36, camPos.y - 2 + Math.random() * 10, camPos.z + (Math.random() - 0.5) * 36, { vx: (Math.random() - 0.5) * 0.3, vy: 0.1 + Math.random() * 0.2, vz: (Math.random() - 0.5) * 0.3, color: [0x5af0ff, 0x8affb0, 0xb48aff, 0x3ae8c8][Math.floor(Math.random() * 4)], size: 0.14 + Math.random() * 0.14, life: 4 + Math.random() * 3, drag: 0 });
           if (Math.random() < 0.35) particles.emit(camPos.x + (Math.random() - 0.5) * 40, camPos.y + (Math.random() - 0.5) * 12, camPos.z + (Math.random() - 0.5) * 40, { vx: 0.4, vy: 0.15, vz: 0.1, color: 0xffe0a0, size: 0.12, life: 5, drag: 0 });
           if (n > 0.3 && Math.random() < n) particles.emit(camPos.x + (Math.random() - 0.5) * 50, camPos.y - 1 + Math.random() * 4, camPos.z + (Math.random() - 0.5) * 50, { vx: (Math.random() - 0.5) * 0.5, vy: 0.2, vz: (Math.random() - 0.5) * 0.5, color: Math.random() < 0.6 ? 0xc8ff6a : 0x6ae8ff, size: 0.22, life: 3, drag: 0 });
         }

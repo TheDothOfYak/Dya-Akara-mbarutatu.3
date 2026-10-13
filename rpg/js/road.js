@@ -21,7 +21,9 @@
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
 import { buildEikar } from './actors.js';
-import { buildWildPunk, buildKofi, buildRodak } from './esik_land.js';
+import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk } from './esik_land.js';
+import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
+import { createCine } from './cine.js';
 import { NPC_LOOKS } from './npcs.js';
 import { buildAngel, buildSniller } from './velki.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm } from './util.js';
@@ -60,7 +62,7 @@ export function createRoad(ctx) {
   const { camera, keys, touch, CAM, sfx } = ctx;
   const scene = new THREE.Scene();
   const rng = mulberry32(611);
-  const fog = new THREE.Fog(0xcfe0f0, 120, 700); scene.fog = fog;
+  const fog = new THREE.Fog(0xcfe0f0, 260, 3400); scene.fog = fog;
 
   /* ---------------- sky: Xikia by day, and dusk at the camps ---------------- */
   const skyU = { uTop: { value: new THREE.Color(0x4a8ad8) }, uLow: { value: new THREE.Color(0xd8ecff) }, uSun: { value: V3(0.3, 0.8, 0.2).normalize() }, uWarm: { value: 0 } };
@@ -73,6 +75,9 @@ export function createRoad(ctx) {
         if (vD.y < 0.0) c = uLow * 0.8; gl_FragColor = vec4(c, 1.0); }`,
   });
   const sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 32, 16), skyMat); scene.add(sky);
+  // stars, coming out as the day goes
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false });
+  { const pts = []; for (let i = 0; i < 900; i++) { const a = Math.random() * TAU, h = 0.08 + Math.random() * 0.92, r = 3600; pts.push(Math.cos(a) * Math.sqrt(1 - h * h) * r, h * r, Math.sin(a) * Math.sqrt(1 - h * h) * r); } const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); sky.add(new THREE.Points(sg, starMat)); }
   // Velki hangs in Xikia's sky — the boy's whole world, up there
   const velki = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 20), new THREE.MeshBasicMaterial({ color: 0x8fc4e8, fog: false }));
   scene.add(velki);
@@ -92,8 +97,9 @@ export function createRoad(ctx) {
     skyU.uLow.value.set(0xd8ecff).lerp(new THREE.Color(0xffa070), k);
     skyU.uWarm.value = k;
     SUN_DIR.set(lerp(0.3, -0.8, k), lerp(0.8, 0.12, k), lerp(0.2, -0.3, k)).normalize(); skyU.uSun.value.copy(SUN_DIR);
-    sun.color.set(0xfff0d8).lerp(new THREE.Color(0xff8a4a), k); sun.intensity = lerp(2.3, 1.2, k);
-    hemi.intensity = lerp(1.2, 0.7, k); fog.color.set(0xcfe0f0).lerp(new THREE.Color(0xc07a6a), k);
+    sun.color.set(0xfff0d8).lerp(new THREE.Color(0xff8a4a), k); sun.intensity = lerp(2.3, 0.5, Math.pow(k, 1.4));
+    hemi.intensity = lerp(1.2, 0.48, k);   // by the fire it is properly evening: the flames light the faces, the sky does the rest fog.color.set(0xcfe0f0).lerp(new THREE.Color(0xc07a6a), k);
+    starMat.opacity = smooth(0.55, 1, k);
   }
 
   /* ---------------- ground: one long strip from the city to the pass ---------------- */
@@ -162,53 +168,126 @@ export function createRoad(ctx) {
   }
 
   /* ---------------- Fyrsti'Vilag, on Xikia ---------------- */
-  const stone = [0xf0dcb4, 0xe8c89a, 0xf4e6c8, 0xdcc0a0], caps = [0x7a4a2a, 0x6a3a1c, 0x8a5a2a];
-  function house(x, z) {
-    const w = 5 + rng() * 3, d = 5 + rng() * 3, h = 4 + rng() * 2.5;
-    const g = new THREE.Group(); g.position.set(x, 0, z);
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(stone[Math.floor(rng() * 4)])); b.position.y = h / 2; g.add(b);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(Math.max(w, d) * 0.72, 16, 8, 0, TAU, 0, Math.PI / 2), toon(caps[Math.floor(rng() * 3)])); cap.scale.y = 0.75; cap.position.y = h; g.add(cap);
-    g.rotation.y = Math.round(Math.atan2(CITY.x - x, CITY.z - z) / (Math.PI / 2)) * (Math.PI / 2);
-    outlineAll(g, 0.035); g.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } }); scene.add(g);
-    const sw = Math.abs(Math.sin(g.rotation.y)) > 0.5;
-    box(x, z, (sw ? d : w) / 2, (sw ? w : d) / 2, -1, h + 2);
-  }
+  const kit = createCityKit(scene, { rng, heightAt, box, cyl, palette: 'xikia' });
+  const doors = [];
   for (let ring = 0; ring < 3; ring++) {
-    const R = 24 + ring * 10, n = 10 + ring * 4;
+    const Rr = 24 + ring * 10, n = 10 + ring * 4;
     for (let i = 0; i < n; i++) {
-      const a = i / n * TAU + ring * 0.3 + rng() * 0.1, x = CITY.x + Math.cos(a) * R, z = CITY.z + Math.sin(a) * R;
-      if (Math.abs(x) < 7 && z < CITY.z) continue;          // the street to the north gate
-      house(x, z);
+      const a = i / n * TAU + ring * 0.3 + rng() * 0.1, x = CITY.x + Math.cos(a) * Rr, z = CITY.z + Math.sin(a) * Rr;
+      if (Math.abs(x) < 7.5 && z < CITY.z) continue;          // the street to the north gate
+      doors.push(kit.house(x, z, Math.atan2(CITY.x - x, CITY.z - z)).door);
     }
   }
+  const XSTREETS = [19, 29, 39, 49];
+  for (const r of XSTREETS.slice(1)) { const n = Math.round(r / 5); for (let k = 0; k < n; k++) { const a = k / n * TAU + 0.3, x = CITY.x + Math.cos(a) * (r + 2.3), z = CITY.z + Math.sin(a) * (r + 2.3); if (Math.abs(x) < 8 && z < CITY.z) continue; kit.lampPost(x, z); } }
+  for (const r of XSTREETS.slice(1)) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + 0.8; kit.bunting(V3(CITY.x + Math.cos(a) * (r - 4.4), 6, CITY.z + Math.sin(a) * (r - 4.4)), V3(CITY.x + Math.cos(a + 0.1) * (r + 4.4), 6, CITY.z + Math.sin(a + 0.1) * (r + 4.4)), 1.2); }
+  for (let k = 0; k < 4; k++) kit.bunting(V3(-7, 7.2, 46 - k * 9), V3(7, 7.2, 42 - k * 9), 1.4);
+  // the square's own bunting, from the fountain out to the stalls
+  for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; kit.bunting(V3(SQUARE.x, 6.5, SQUARE.z + 4), V3(SQUARE.x + Math.cos(a) * 15, 4.2, SQUARE.z + 4 + Math.sin(a) * 15), 0.8); }
+  kit.paving(CITY.x, CITY.z, XSTREETS, 0xc8b08a); kit.paving(SQUARE.x, SQUARE.z + 4, [7, 10.5], 0xb8a07a);
   {
     const wm = toon(0xc8b08a), N = 64;
     for (let i = 0; i < N; i++) {
       const a = i / N * TAU, x = CITY.x + Math.cos(a) * CITY_R, z = CITY.z + Math.sin(a) * CITY_R;
       if (Math.abs(x) < 6 && z < CITY.z) continue;
       const seg = new THREE.Mesh(new THREE.BoxGeometry(2.6, 8, CITY_R * TAU / N + 0.3), wm); seg.position.set(x, 4, z); seg.rotation.y = -a; seg.castShadow = true; scene.add(seg);
+      if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.1, 1.1), wm); cr.position.set(x, 8.5, z); cr.rotation.y = -a; scene.add(cr); }
     }
-    for (const s of [-1, 1]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.7, 12, 12), wm); t.position.set(s * 7.5, 6, GATE_Z + 0.5); addOutline(t, 0.05); scene.add(t); cyl(s * 7.5, GATE_Z + 0.5, 2.5, -1, 14); }
+    for (const sd of [-1, 1]) {
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.7, 12, 12), wm); t.position.set(sd * 7.5, 6, GATE_Z + 0.5); addOutline(t, 0.05); scene.add(t); cyl(sd * 7.5, GATE_Z + 0.5, 2.5, -1, 14);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(3, 3.6, 12), toon(0x2f5a5a)); cap.position.set(sd * 7.5, 13.8, GATE_Z + 0.5); addOutline(cap, 0.04); scene.add(cap);
+      const ban = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 3.4), toon(0x2f6f8a, { side: THREE.DoubleSide })); ban.position.set(sd * 7.5, 7, GATE_Z - 2.3); scene.add(ban);
+      kit.lantern(sd * 4.6, 5.5, GATE_Z - 1.5, 0xffb060, 2);
+    }
+    const arch = new THREE.Mesh(new THREE.BoxGeometry(12, 2.2, 3), wm); arch.position.set(0, 10, GATE_Z + 0.5); addOutline(arch, 0.04); scene.add(arch);
   }
-  // the market: a fountain and a ring of stalls round the square
+  // the square: a ring of stalls round a Stryx mud fountain
+  const fountain = buildMudFountain(scene, SQUARE.x, SQUARE.z + 4, 0, { scale: 0.85, seed: 5, onSplat: wp => { if (Math.hypot(P.pos.x - wp.x, P.pos.z - wp.z) < 2.5) { const d = V3(P.pos.x - SQUARE.x, 0, P.pos.z - SQUARE.z - 4).normalize(); P.vel.addScaledVector(d, 9); P.vel.y = 5; ctx.bark('tanoc', 'Hey! — all right, all right, it’s your mud!', 2.5); } } });
+  cyl(SQUARE.x, SQUARE.z + 4, 4.1, -1, 0.9);
   const stalls = [];
   {
-    const pool = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.6, 0.8, 24), toon(0xcab088)); pool.position.set(SQUARE.x, 0.4, SQUARE.z + 4); addOutline(pool, 0.04); scene.add(pool); cyl(SQUARE.x, SQUARE.z + 4, 3.5, -1, 0.8);
-    const water = new THREE.Mesh(new THREE.CircleGeometry(3.1, 24), toon(0x4aa6c4, { emissive: 0x0e4a62, emissiveIntensity: 0.4 })); water.rotation.x = -Math.PI / 2; water.position.set(SQUARE.x, 0.82, SQUARE.z + 4); scene.add(water);
-    const awn = [0xc0392b, 0x2f6f8a, 0xd9a441, 0x5a8a3a, 0x8a3a6a];
     const spots = [[STALL.x, STALL.z], [-10, 62], [-13, 74], [-6, 84], [8, 84], [14, 74], [13, 62]];
     spots.forEach(([x, z], i) => {
-      const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = Math.atan2(SQUARE.x - x, SQUARE.z - z);
-      const table = new THREE.Mesh(new THREE.BoxGeometry(3, 1.05, 1.4), toon(0x8a5a36)); table.position.y = 0.52; g.add(table);
-      for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 5), toon(0x5a3a20)); p.position.set(s * 1.4, 1.3, -0.6); g.add(p); }
-      const aw = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 2.0), toon(awn[i % awn.length])); aw.position.set(0, 2.6, -0.1); aw.rotation.x = 0.2; g.add(aw);
-      if (i === 0) for (let k = 0; k < 3; k++) { const crate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.7), toon(0x9a6a40)); crate.position.set(-1 + k * 0.8, 1.35, 0); g.add(crate); }   // the Carpenter's wares
-      else for (let k = 0; k < 4; k++) { const good = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), toon([0xe08a3a, 0xd04a3a, 0xe8c84a, 0x6aa04a][k])); good.position.set(-1 + k * 0.65, 1.15, 0.1); g.add(good); }
-      outlineAll(g, 0.03); g.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; }); scene.add(g);
-      const sw = Math.abs(Math.sin(g.rotation.y)) > 0.7;
-      box(x, z, sw ? 0.7 : 1.5, sw ? 1.5 : 0.7, -1, 1.05);
-      stalls.push({ x, z, g });
+      const ry = Math.atan2(SQUARE.x - x, SQUARE.z - z);
+      const g = kit.stall(x, z, ry, i, i !== 0);
+      if (i === 0) {   // the Carpenter's own: carved boxes, a stool, a little chair, a cradle
+        for (let k = 0; k < 3; k++) { const crate = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), toon([0x9a6a40, 0xb8844e, 0x8a5a36][k])); crate.position.set(-1 + k * 0.85, 1.25, 0); addOutline(crate, 0.02); g.add(crate); }
+        const cradle = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 6, 0, TAU, Math.PI / 2, Math.PI / 2), toon(0xb8844e, { side: THREE.DoubleSide })); cradle.scale.set(1.4, 0.6, 0.8); cradle.position.set(-1.9, 0.5, 0.9); addOutline(cradle, 0.02); g.add(cradle);
+        const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 10), toon(0x8a5a36)); stool.position.set(1.9, 0.6, 0.8); g.add(stool);
+        for (const [lx, lz] of [[-0.2, -0.2], [0.2, -0.2], [0, 0.22]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 5), toon(0x6a4428)); leg.position.set(1.9 + lx, 0.3, 0.8 + lz); g.add(leg); }
+      }
+      stalls.push({ x, z, g, ry });
     });
+  }
+
+  /* ---------------- the Carpenter's cart, and the two Punks that pull it ----------------
+     It goes the whole way north with them: in the market by his stall, out of the
+     gate, along the road behind Buhkon, parked by every camp. */
+  const CART0 = { x: 13, z: 52.5 };
+  function buildCart() {
+    const g = new THREE.Group(), wood = toon(0x8a5a36), dark = toon(0x5a3a20), canvas = toon(0xe8dcc0, { side: THREE.DoubleSide });
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 4.2), wood); bed.position.y = 1.0; g.add(bed);
+    for (const sx of [-1, 1]) { const sd = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 4.2), dark); sd.position.set(sx * 1.2, 1.45, 0); g.add(sd); }
+    const backB = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.6, 0.12), dark); backB.position.set(0, 1.45, -2.1); g.add(backB);
+    const wheels = [];
+    for (const sx of [-1, 1]) for (const sz of [-1.3, 1.3]) {
+      const w = new THREE.Group(); w.position.set(sx * 1.32, 0.8, sz); g.add(w); wheels.push(w);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.08, 6, 16), dark); rim.rotation.y = Math.PI / 2; w.add(rim);
+      for (let k = 0; k < 4; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.4, 0.08), wood); sp.rotation.x = k * Math.PI / 4; w.add(sp); }
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.22, 8), dark); hub.rotation.z = Math.PI / 2; w.add(hub);
+    }
+    // the canvas cover over the back half, on three hoops
+    for (const z of [-1.8, -0.9, 0]) { const hoop = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.05, 5, 16, Math.PI), dark); hoop.position.set(0, 1.45, z); g.add(hoop); }
+    const cover = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.22, 2.1, 16, 1, true, -Math.PI / 2, Math.PI), canvas); cover.position.set(0, 1.45, -0.9);
+    cover.rotation.set(-Math.PI / 2, 0, 0); g.add(cover);
+    // wares: planks, a chair, a tool chest, a cradle
+    for (let k = 0; k < 4; k++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 3.6), toon([0xb8844e, 0xa87440][k % 2])); pl.position.set(-0.7 + k * 0.08, 1.2 + k * 0.08, -0.2); g.add(pl); }
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.6), toon(0x6a3a1c)); chest.position.set(0.55, 1.42, -1.4); g.add(chest);
+    const chair = new THREE.Group(); chair.position.set(0.5, 1.15, 0.9);
+    { const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 0.6), wood); seat.position.set(0, 0.45, 0); chair.add(seat); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.08), wood); bk.position.set(0, 0.8, -0.26); chair.add(bk); }
+    g.add(chair);
+    const load = new THREE.Group(); g.add(load);   // the crates Tanoc carries over
+    // the driver's bench, the shafts, the harness
+    const bench = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 0.6), wood); bench.position.set(0, 1.95, 1.75); g.add(bench);
+    const benchBack = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.1), wood); benchBack.position.set(0, 2.25, 1.45); g.add(benchBack);
+    for (const sx of [-1, 1]) { const sh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 3.8), dark); sh.position.set(sx * 0.55, 1.0, 3.9); g.add(sh); }
+    const yoke = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 0.12), dark); yoke.position.set(0, 1.25, 5.3); g.add(yoke);
+    outlineAll(g, 0.03); g.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
+    const punks = [-1, 1].map((sx, i) => { const pk = buildDomesticPunk({ saddle: false, blanket: i ? 0x2f6f8a : 0x8a3a2a, seed: 40 + i }); pk.root.scale.setScalar(0.62); pk.root.position.set(sx * 1.25, 0, 5.6); g.add(pk.root); return pk; });
+    for (const pk of punks) { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.2), toon(0x3a2414)); strap.position.set(pk.root.position.x * 0.7, 1.2, 4.9); g.add(strap); }
+    scene.add(g);
+    return { g, wheels, punks, load };
+  }
+  const CART = Object.assign(buildCart(), { pos: V3(CART0.x, 0, CART0.z), yaw: Math.PI, speed: 0, roll: 0, path: null, riders: false, follow: false });
+  CART.solid = box(CART.pos.x, CART.pos.z, 1.4, 3.2, -1, 2.4);
+  function placeCart(x, z, yaw) { CART.pos.set(x, groundAt(x, z, 60), z); CART.yaw = yaw; CART.speed = 0; }
+  placeCart(CART0.x, CART0.z, Math.PI);
+
+  /* ---------------- far country: mountains, cloud, and a town at the end of it ---------------- */
+  {
+    const base = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000, 1, 1), toon(0x6a8a4a)); base.rotation.x = -Math.PI / 2; base.position.set(0, -2.5, -600); base.receiveShadow = true; scene.add(base);
+    const rockM = toon(0x8a8a9a), rockD = toon(0x6e6e80), snowM = toon(0xf4f6fa), pineM = toon(0x3a5a3a);
+    const peak = (x, z, h, r, snow) => {
+      const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7 + Math.floor(rng() * 4)), rng() < 0.5 ? rockM : rockD); m.position.set(x, h / 2 - 3, z); m.rotation.y = rng() * 6; m.scale.z = 0.6 + rng() * 0.6; scene.add(m);
+      if (snow) { const c = new THREE.Mesh(new THREE.ConeGeometry(r * 0.32, h * 0.32, 7), snowM); c.position.set(x, h - 3 - h * 0.16 + 0.5, z); c.rotation.y = m.rotation.y; c.scale.z = m.scale.z; scene.add(c); }
+      const skirt = new THREE.Mesh(new THREE.ConeGeometry(r * 1.25, h * 0.28, 9), pineM); skirt.position.set(x, h * 0.14 - 3, z); scene.add(skirt);
+    };
+    for (const sd of [-1, 1]) for (let k = 0; k < 26; k++) { const z = 260 - k * 70 - rng() * 40, x = sd * (520 + rng() * 520); peak(x, z, 180 + rng() * 300, 120 + rng() * 120, rng() < 0.7); }
+    for (let k = 0; k < 18; k++) peak(-1600 + k * 190 + rng() * 60, -1900 - rng() * 400, 380 + rng() * 300, 180 + rng() * 140, true);
+    // a town far below at the end of the pass, chimney smoke going up
+    for (let k = 0; k < 34; k++) {
+      const a = rng() * TAU, r = rng() * 46, x = roadX(END) + 30 + Math.cos(a) * r, z = -1480 + Math.sin(a) * r * 0.7, h = 3 + rng() * 2;
+      const hb = new THREE.Mesh(new THREE.BoxGeometry(4, h, 4), toon(0xf0dcb4)); hb.position.set(x, -2.5 + h / 2, z); scene.add(hb);
+      const cp = new THREE.Mesh(new THREE.SphereGeometry(3, 10, 6, 0, TAU, 0, Math.PI / 2), toon(0x7a4a2a)); cp.scale.y = 0.75; cp.position.set(x, -2.5 + h, z); scene.add(cp);
+    }
+    var townSmoke = V3(roadX(END) + 30, 4, -1480);
+    // clouds, soft and slow
+    var clouds = [];
+    const cloudTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); for (let i = 0; i < 9; i++) { const x = 30 + Math.random() * 68, y = 40 + Math.random() * 48, r = 18 + Math.random() * 26, grd = g.createRadialGradient(x, y, 0, x, y, r); grd.addColorStop(0, 'rgba(255,255,255,0.9)'); grd.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = grd; g.fillRect(0, 0, 128, 128); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    for (let k = 0; k < 40; k++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false, fog: false }));
+      sp.position.set((rng() - 0.5) * 3000, 260 + rng() * 220, 300 - rng() * 2600); sp.scale.set(260 + rng() * 260, 110 + rng() * 80, 1); scene.add(sp); clouds.push(sp);
+    }
   }
 
   /* ---------------- the road: hedges, farms, forest, pass ---------------- */
@@ -237,7 +316,7 @@ export function createRoad(ctx) {
     for (let i = 0; i < 160; i++) {
       const z = PASS0 + 20 - rng() * (PASS0 - END), x = roadX(z) + (rng() - 0.5) * 70, s = 0.6 + Math.pow(rng(), 2) * 3;
       if (Math.abs(x - roadX(z)) < 5) continue;
-      rocks.push([x, heightAt(x, z) + s * 0.3, z, s]); if (s > 1.3) cyl(x, z, s * 0.8, heightAt(x, z) - 1, heightAt(x, z) + s);
+      rocks.push([x, heightAt(x, z) + s * 0.3, z, s]); if (s > 0.55) cyl(x, z, s * 1.05, heightAt(x, z) - 1, heightAt(x, z) + s * 0.95);
     }
     const inst = (geo, mat, list, put) => { const m = new THREE.InstancedMesh(geo, mat, list.length); const o = new THREE.Object3D(); list.forEach((v, i) => { put(o, v); o.updateMatrix(); m.setMatrixAt(i, o.matrix); }); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; };
     inst(trunkG, toon(0x6b4128), trunks, (o, [x, y, z, s, h]) => { o.position.set(x, y, z); o.scale.set(s, h, s); o.rotation.set(0, 0, 0); });
@@ -255,7 +334,17 @@ export function createRoad(ctx) {
   });
 
   /* ---------------- particles and post ---------------- */
-  const particles = new Particles(scene, 2500);
+  const particles = new Particles(scene, 4000);
+  const cine = createCine(camera);
+  const mists = [];
+  {
+    const mt = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64); grd.addColorStop(0, 'rgba(255,255,255,0.55)'); grd.addColorStop(0.6, 'rgba(255,255,255,0.18)'); grd.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = grd; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); return t; })();
+    for (let k = 0; k < 26; k++) {
+      const z = PASS0 - 10 - k * 12 - Math.random() * 8, x = roadX(z) + (Math.random() - 0.5) * 70;
+      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mt, color: 0xe8eef4, transparent: true, opacity: 0.35, depthWrite: false }));
+      m.position.set(x, heightAt(x, z) + 2 + Math.random() * 3, z); m.scale.set(34 + Math.random() * 24, 9 + Math.random() * 6, 1); m.visible = false; scene.add(m); mists.push(m);
+    }
+  }
   const composer = ctx.makeComposer(scene);
   function resize() { particles.setScale(innerHeight * Math.min(devicePixelRatio, 1.75) * 0.9); }
   resize();
@@ -343,68 +432,140 @@ export function createRoad(ctx) {
   function place(o, x, z, yaw = 0) { o.pos.set(x, groundAt(x, z, 60), z); o.yaw = yaw; }
 
   /* ===== the market, in Fyrsti'Vilag ===== */
+  let crowd = null;
+  function makeCrowd() {
+    const spots = [];
+    stalls.forEach((st, i) => { if (!i) return; for (let k = 0; k < 2; k++) { const f = 2.2, x = st.x + Math.sin(st.ry) * f + (k - 0.5) * 1.3 * Math.cos(st.ry), z = st.z + Math.cos(st.ry) * f - (k - 0.5) * 1.3 * Math.sin(st.ry); spots.push({ x, z, look: [st.x, st.z], kind: 'chat' }); } });
+    for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + 0.3; spots.push({ x: SQUARE.x + Math.cos(a) * 4.7, z: SQUARE.z + 4 + Math.sin(a) * 4.7, look: [SQUARE.x, SQUARE.z + 4], kind: 'sit' }); }
+    crowd = createCrowd({
+      scene, rng, groundAt, C: CITY,
+      resolve: q => { const y = q.y; q.y = 0.2; resolve(q, 0.4); q.y = y; },
+      streets: [{ r: 9.5 }, { r: 19 }, { r: 29 }, { r: 39 }, { r: 49 }], roads: [{ a: -Math.PI / 2 }], spots,
+      exits: doors.concat([V3(0, 0, GATE_Z - 6)]),
+    });
+    for (let i = 0; i < 30; i++) {
+      const r = [9.5, 19, 19, 29, 39][i % 5], a = rng() * TAU;
+      const p = crowd.spawn(FOLK_LOOKS[i % FOLK_LOOKS.length], V3(CITY.x + Math.cos(a) * r, 0, CITY.z + Math.sin(a) * r));
+      if (i < spots.length && i < 14) { const sp = spots[i]; p.pos.set(sp.x, 0, sp.z); p.spot = sp; p.wait = 3 + rng() * 9; p.look = V3(sp.look[0], 0, sp.look[1]); }
+    }
+    stalls.forEach((st, i) => { if (!i) return; const p = crowd.spawn(FOLK_LOOKS[(i * 3) % FOLK_LOOKS.length], V3(st.x - Math.sin(st.ry) * 1.3, 0, st.z - Math.cos(st.ry) * 1.3)); p.fixed = true; p.look = V3(SQUARE.x, 0, SQUARE.z); p.vendor = true; });
+  }
+  function cut(shots, done, opts) { ctx.cutscene(true); cine.play(shots, () => { ctx.cutscene(false); done && done(); }, opts); }
+  /* a held shot that runs as long as a conversation does */
+  function held(cam, opts = { bars: true }) { cine.play([{ dur: 9999, cam }], null, opts); }
+  function sayHeld(lines, cam, cb) { held(cam); ctx.say(lines, () => { cine.stop(); cb && cb(); }); }
+  const sqF = () => { const fx = SQUARE.x - STALL.x, fz = SQUARE.z - STALL.z, fd = Math.hypot(fx, fz); return { x: fx / fd, z: fz / fd }; };
   function startMarket() {
     stage = 'market'; sub = 'wake'; ctx.save('market');
     setDusk(0);
-    const fx = SQUARE.x - STALL.x, fz = SQUARE.z - STALL.z, fd = Math.hypot(fx, fz), f = { x: fx / fd, z: fz / fd };
-    place(P, STALL.x + f.x * 2.6, STALL.z + f.z * 2.6, Math.atan2(-f.x, -f.z));
-    place(B, STALL.x - f.x * 1.4, STALL.z - f.z * 1.4, Math.atan2(f.x, f.z)); B.stay = B.pos.clone();
+    const f = sqF(), side = { x: -f.z, z: f.x };
+    place(P, STALL.x + f.x * 2.4, STALL.z + f.z * 2.4, Math.atan2(-f.x, -f.z));
+    // Buhkon steps round the end of his stall to him: in plain sight, not hidden behind it
+    place(B, STALL.x + f.x * 1.6 + side.x * 2.3, STALL.z + f.z * 1.6 + side.z * 2.3, Math.atan2(P.pos.x - (STALL.x + side.x * 2.3), P.pos.z - (STALL.z + side.z * 2.3))); B.stay = B.pos.clone();
     CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0.22;
     tanoc.hat.visible = false; tanoc.weapon.visible = false;
-    MK = { n: 0, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, folk: [] };
-    for (let i = 0; i < 18; i++) {   // the market crowd
-      const a = rng() * TAU, r = 7 + rng() * 14, x = SQUARE.x + Math.cos(a) * r, z = SQUARE.z + Math.sin(a) * r;
-      if (solidAt(x, 0.5, z)) continue;
-      const looks = [{ skin: '#c89a6a', cap: '#6a3a1a', tunic: 0xd8b878 }, { skin: '#a8743e', cap: '#5a3018', tunic: 0x5a6a8a }, { skin: '#9a6a40', cap: '#3a2414', tunic: 0x8a4a3a }];
-      const a2 = buildEikar(Object.assign({ weapon: 'none', flasks: false, scale: 0.92 + rng() * 0.14 }, looks[i % 3])); scene.add(a2.root);
-      const p = { a: a2, pos: V3(x, 0, z), goal: null, wait: rng() * 3, ph: rng() * 9, panic: false }; MK.folk.push(p);
-    }
-    ctx.blur(7);
-    ctx.cards(PRO.cards, 3400, () => {
+    placeCart(CART0.x, CART0.z, Math.PI);
+    MK = { n: 0, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, loaded: 0, carrying: null, crates: [] };
+    makeCrowd();
+    ctx.blur(5);
+    // a whole Tatu away: up past Velki in the sky, and down into a market at midday
+    const tp = P.pos.clone(), two = () => ({ p: V3(tp.x + f.x * 4.2 - side.x * 2.6, 2.2, tp.z + f.z * 4.2 - side.z * 2.6), l: V3((tp.x + B.pos.x) / 2, 1.3, (tp.z + B.pos.z) / 2) });
+    cut([
+      { dur: 5.5, cam: (k, tt) => ({ p: V3(tp.x + 6, 3 + k * 2, tp.z + 8), l: V3(tp.x + 1700 * 0.2, 900 * 0.2 + 3 - k * 60, tp.z + 2300 * 0.2) }), caption: PRO.cards[0], onStart: () => ctx.blur(5) },
+      { dur: 6, from: { p: [SQUARE.x + 26, 30, SQUARE.z + 30], l: [SQUARE.x, 0, SQUARE.z] }, to: { p: [tp.x + f.x * 7, 4, tp.z + f.z * 7 + 2], l: [tp.x, 1.2, tp.z] }, caption: PRO.cards[1], onStart: () => ctx.blur(3) },
+    ], () => {
       ctx.play();
       ctx.location(...R.loc);
       const W = PRO.wake;
-      ctx.say(W.slice(0, 5), () => {
+      sayHeld(W.slice(0, 5), two, () => {
         tanoc.hat.visible = true; ctx.blur(0); sfx.heal();
-        ctx.say(W.slice(5).concat(PRO.focus.slice(0, 2), R.wakeExtra, PRO.focus.slice(2)), () => { sub = 'pack'; MK.t = 4; objective('Help the Carpenter pack his stall'); ctx.bark('buhkon', 'Crates first. Then the awning. Quick hands.', 3.5); });
+        sayHeld(W.slice(5).concat(PRO.focus.slice(0, 2), R.wakeExtra, PRO.focus.slice(2)), (k, tt) => {
+          const a = Math.atan2(f.x, f.z) + Math.sin(tt * 0.15) * 0.6;   // drifting round the two of them, Velki above
+          return { p: V3(tp.x + Math.sin(a) * 5.5, 2.4 + Math.sin(tt * 0.2) * 0.4, tp.z + Math.cos(a) * 5.5), l: V3((tp.x + B.pos.x) / 2, 1.6, (tp.z + B.pos.z) / 2) };
+        }, startPacking);
       });
     });
   }
+  /* pack the stall: three crates from the stall to the back of the cart */
+  function startPacking() {
+    sub = 'pack';
+    const st = stalls[0];
+    for (let k = 0; k < 3; k++) {
+      const off = (k - 1) * 0.9, x = st.x + Math.cos(st.ry) * off, z = st.z - Math.sin(st.ry) * off;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.52, 0.62), toon([0x9a6a40, 0xb8844e, 0x8a5a36][k])); addOutline(m, 0.02);
+      const it = addItem(V3(x, 1.28, z), 'Pick up a crate', null, m); it.act = () => takeCrate(it); MK.crates.push(it);
+    }
+    // the stall's own crates go (they're the ones you carry now)
+    st.g.children.filter(c => c.isMesh && c.geometry.type === 'BoxGeometry' && c.position.y > 1.2 && c.position.y < 1.4).forEach(c => { c.visible = false; });
+    packObjective();
+    ctx.bark('buhkon', 'Crates into the back of the cart. Then we’re gone. Quick hands.', 3.5);
+  }
+  function packObjective() { objective(MK.carrying ? 'Load the crate onto the back of the cart' : 'Help the Carpenter pack: carry his crates to the cart', `Crates loaded: ${MK.loaded}/3`, 3, MK.loaded); }
+  function cartBack() { return V3(CART.pos.x - Math.sin(CART.yaw) * 2.8, groundAt(CART.pos.x, CART.pos.z, 3), CART.pos.z - Math.cos(CART.yaw) * 2.8); }
+  function takeCrate(it) {
+    if (MK.carrying) return;
+    dropItem(it); MK.crates.splice(MK.crates.indexOf(it), 1);
+    MK.carrying = it.mesh; it.mesh.position.set(0, 2.05 / 0.86, 0.15); it.mesh.rotation.set(0, 0, 0); tanoc.root.add(it.mesh); sfx.ui();
+    const back = cartBack();
+    MK.loadItem = addItem(V3(back.x, back.y + 1, back.z), 'Load the crate onto the cart', () => loadCrate());
+    setGoal(back.x, back.y, back.z); packObjective();
+  }
+  function loadCrate() {
+    dropItem(MK.loadItem); MK.loadItem = null;
+    const m = MK.carrying; tanoc.root.remove(m); MK.carrying = null;
+    m.position.set(-0.5 + MK.loaded * 0.55, 1.42, -1.55 + (MK.loaded % 2) * 0.4); CART.load.add(m);
+    MK.loaded++; sfx.slam(); setGoal(); packObjective();
+    if (MK.loaded >= 3) { sub = 'packed'; ctx.bark('buhkon', 'Good lad. That’s the lot. Now — ', 2.5); setTimeout(() => { if (MK && sub === 'packed') marketMaterialize(); }, 1500); }
+  }
   function marketMaterialize() {
     sub = 'hat';
-    MK.angel = buildAngel(1.6); MK.angel.position.set(SQUARE.x - 7, 7, SQUARE.z - 2); scene.add(MK.angel);
-    MK.sniller = buildSniller(1.5); MK.sniller.position.set(SQUARE.x + 7, 6, SQUARE.z - 4); scene.add(MK.sniller);
-    for (const m of [MK.angel, MK.sniller]) { m.rotation.y = Math.atan2(P.pos.x - m.position.x, P.pos.z - m.position.z); particles.burst(m.position.x, m.position.y + 3, m.position.z, 50, { color: m === MK.angel ? 0xfff0c0 : 0x6af0e0, speed: 16, size: 0.9, life: 0.9 }); }
-    particles.ring(P.pos.x, P.pos.y + 0.4, P.pos.z, 48, 14, { color: 0xffffff, size: 0.6, life: 0.7 });
-    sfx.duat(); sfx.slam(); shake = 1;
+    MK.angel = buildAngel(1.7); MK.angel.position.set(SQUARE.x - 7, 7, SQUARE.z - 2); scene.add(MK.angel);
+    MK.sniller = buildSniller(1.6); MK.sniller.position.set(SQUARE.x + 7, 6, SQUARE.z - 4); scene.add(MK.sniller);
+    MK.angel.userData.setVis(1); MK.sniller.userData.setVis(1);   // up close, and whole: nobody has ever seen them like this
+    for (const m of [MK.angel, MK.sniller]) { m.userData.base = m.position.clone(); m.rotation.y = Math.atan2(P.pos.x - m.position.x, P.pos.z - m.position.z); particles.burst(m.position.x, m.position.y + 3, m.position.z, 80, { color: m === MK.angel ? 0xfff0c0 : 0x6af0e0, speed: 18, size: 1.1, life: 1.1 }); }
+    particles.ring(P.pos.x, P.pos.y + 0.4, P.pos.z, 64, 16, { color: 0xffffff, size: 0.7, life: 0.8 });
+    sfx.duat(); sfx.slam(); shake = 1.2;
     tanoc.hat.visible = false;
     const hat = tanoc.hat.clone(); const ws = V3(); tanoc.hat.getWorldScale(ws); hat.scale.copy(ws); hat.visible = true;
     const a = P.yaw + 2.3, hp = V3(P.pos.x + Math.sin(a) * 2.6, 0, P.pos.z + Math.cos(a) * 2.6); hp.y = groundAt(hp.x, hp.z, 3) + 0.05;
     hat.rotation.set(0.5, a, 0.3);
     MK.hat = addItem(hp, 'Put your hat back on', () => marketHatOn(), hat);
-    ctx.blur(6);
-    ctx.say(PRO.materialize.concat(PRO.freeze), () => objective(STORY.PRO_OBJ.hat, 'Walk to it and press E'));
+    ctx.blur(4);
+    MK.frozen = true;
+    // the frozen moment: low behind the boy up at the two of them, then the Sniller's one eye, then the Angel's burning face
+    const tp = P.pos.clone(), mid = () => V3((MK.angel.position.x + MK.sniller.position.x) / 2, 8, (MK.angel.position.z + MK.sniller.position.z) / 2);
+    sayHeld(PRO.materialize.concat(PRO.freeze), (k, tt) => {
+      const ph = Math.floor(tt / 5.5) % 3, sn = MK.sniller.position, an = MK.angel.position;
+      if (ph === 0) { const back = V3(tp.x - mid().x, 0, tp.z - mid().z).normalize(); return { p: V3(tp.x + back.x * 3.2, 1.1, tp.z + back.z * 3.2), l: mid() }; }
+      if (ph === 1) return { p: V3(sn.x + (tp.x - sn.x) * 0.3, sn.y + 5.4, sn.z + (tp.z - sn.z) * 0.3), l: V3(sn.x, sn.y + 6.4, sn.z) };
+      return { p: V3(an.x + (tp.x - an.x) * 0.3, an.y + 5.6, an.z + (tp.z - an.z) * 0.3 + 1), l: V3(an.x, an.y + 6.2, an.z) };
+    }, () => { ctx.blur(3); objective(STORY.PRO_OBJ.hat, 'Walk to it and press E'); });
   }
   function marketHatOn() {
     dropItem(MK.hat); MK.hat = null; tanoc.hat.visible = true; ctx.blur(0); sfx.heal();
-    const s = MK.sniller.position;
-    particles.burst(s.x, s.y + 3, s.z, 70, { color: 0x6af0e0, speed: 12, size: 0.8, life: 1.2, gravity: -4 });
-    scene.remove(MK.sniller); MK.sniller = null; sfx.core(); MK.leaving = 0.001;
-    // the rain of amulets
+    MK.frozen = false;
+    // the Angels curse the Snillers: this one comes apart into amulets, and they rain on the square
+    const s = MK.sniller.position.clone().add(V3(0, 4, 0));
+    MK.dying = 0.001; sfx.core(); MK.leaving = 0.001;
     const spots = [[-10, 62], [8, 84]];
-    for (let i = 0; spots.length < 8 && i < 40; i++) { const a = i * 2.39996 + 0.7, r = 6 + (i % 4) * 4.5, x = SQUARE.x + Math.cos(a) * r, z = SQUARE.z + Math.sin(a) * r; if (Math.hypot(x - STALL.x, z - STALL.z) < 4 || Math.hypot(x - SQUARE.x, z - SQUARE.z - 4) < 4.5 || solidAt(x, 0.5, z) || spots.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 5)) continue; spots.push([x, z]); }
-    for (const [x, z] of spots) {
+    for (let i = 0; spots.length < 8 && i < 40; i++) { const a = i * 2.39996 + 0.7, r = 6 + (i % 4) * 4.5, x = SQUARE.x + Math.cos(a) * r, z = SQUARE.z + Math.sin(a) * r; if (Math.hypot(x - STALL.x, z - STALL.z) < 4 || Math.hypot(x - SQUARE.x, z - SQUARE.z - 4) < 6.5 || Math.hypot(x - CART.pos.x, z - CART.pos.z) < 5 || solidAt(x, 0.5, z) || spots.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 5)) continue; spots.push([x, z]); }
+    spots.forEach(([x, z], i) => {
       const it = addItem(V3(x, groundAt(x, z, 2.4) + 0.9, z), 'Pick up the Sniller amulet', null, amuletMesh());
       it.act = () => marketAmulet(it); it.y0 = it.pos.y; MK.amulets.push(it);
-    }
-    MK.folk.forEach(p => { p.panic = true; });
+      it.fall = { from: s.clone(), t: -i * 0.12, dur: 1.4 + rng() * 0.6 };     // flung out of the storm, falling to where it lands
+      it.mesh.position.copy(s);
+    });
+    crowd.panic();
     sub = 'told';
-    ctx.say(PRO.hatBack, () => ctx.say(PRO.bag, () => {
-      sub = 'amulets'; tanoc.weapon.visible = true; marketObjective();
-      ctx.hint('Amulets glow cold teal. Some sit on stall tables — jump up for them.');
-    }));
+    const tp = P.pos.clone();
+    sayHeld(PRO.hatBack, (k, tt) => ({ p: V3(tp.x + 9 + Math.sin(tt * 0.2) * 3, 3 + tt * 0.6, tp.z + 10), l: MK.angel ? V3(MK.angel.position.x, MK.angel.position.y + 4, MK.angel.position.z) : V3(SQUARE.x, 20, SQUARE.z) }),
+      () => ctx.say(PRO.bag, () => {
+        sub = 'amulets'; tanoc.weapon.visible = true; marketObjective();
+        ctx.hint('Amulets glow cold teal. Some sit on stall tables — jump up for them.');
+      }));
   }
   function marketAmulet(it) {
+    if (it.fall) return;
     dropItem(it); MK.n++;
     particles.burst(it.pos.x, it.pos.y, it.pos.z, 24, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.8, gravity: 2 });
     sfx.core(); ctx.toast(`Sniller amulet (${Math.min(MK.n, 6)}/6) — into the Relic-bound bag`, 2.2);
@@ -424,19 +585,54 @@ export function createRoad(ctx) {
   function marketCheck() {
     if (sub !== 'amulets' || MK.n < 6 || !MK.calmed) return;
     sub = 'called';
-    ctx.say(PRO.called.slice(0, 2).concat([['buhkon', 'North. Home. Six days on foot, and I’ll tell you what I can on the way.']]), () => {
+    ctx.say(PRO.called.slice(0, 2).concat([['buhkon', 'North. Home. Six days on foot, and I’ll tell you what I can on the way. Up on the cart — go!']]), () => {
       ctx.amulets(MK.n);
-      ctx.cards(R.leave, 3800, () => startDay1());
+      leaveCity();
     });
+  }
+  /* out of the city: up on the cart, through the screaming streets, out of the north gate, and the road */
+  function leaveCity() {
+    const pts = [V3(CART.pos.x, 0, CART.pos.z), V3(6, 0, 46), V3(1.2, 0, 34), V3(0, 0, 22), V3(0, 0, GATE_Z - 2), V3(roadX(-14), 0, -14), V3(roadX(-46), 0, -46), V3(roadX(-80), 0, -80)];
+    const curve = new THREE.CatmullRomCurve3(pts);
+    CART.riders = true; CART.path = curve; CART.pathK = 0;
+    tanoc.weapon.visible = false;
+    const at = k => { const q = curve.getPointAt(Math.min(1, k)); q.y = groundAt(q.x, q.z, 3); return q; };
+    cut([
+      // (the camera keeps to the street itself — ahead of the cart, then trailing it high — so it never goes into a wall)
+      { dur: 4, cam: k => { const c = CART.pos, f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw)); return { p: V3(c.x + f.x * (7 - k * 1.5), 2.2 + k * 0.6, c.z + f.z * (7 - k * 1.5)), l: V3(c.x, 1.9, c.z) }; }, caption: R.leave[0], onTick: k => { CART.pathK = k * 0.08; } },
+      { dur: 5.5, cam: () => { const c = CART.pos, f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw)); return { p: V3(c.x - f.x * 8, 7.5, c.z - f.z * 8), l: V3(c.x + f.x * 10, 1.6, c.z + f.z * 10) }; }, onTick: k => { CART.pathK = 0.08 + k * 0.42; } },
+      { dur: 4, from: { p: [5, 1.0, GATE_Z - 9], l: [0, 3, GATE_Z + 6] }, to: { p: [5.5, 1.2, GATE_Z - 10], l: [0, 2.5, GATE_Z - 2] }, onTick: k => { CART.pathK = 0.5 + k * 0.25; } },
+      { dur: 6.5, cam: (k) => { const c = CART.pos; return { p: V3(c.x - 6 + k * 4, 6 + k * 26, c.z + 16 + k * 22), l: V3(c.x, 2, c.z - 30 - k * 40) }; }, caption: R.leave[1], onTick: k => { CART.pathK = 0.75 + k * 0.25; } },
+    ], () => { CART.riders = false; CART.path = null; startDay1(); });
   }
   function cleanMarket() {
     if (!MK) return;
     for (const it of MK.amulets) dropItem(it);
+    for (const it of MK.crates || []) dropItem(it);
+    if (MK.carrying) tanoc.root.remove(MK.carrying);
     if (MK.angel) scene.remove(MK.angel); if (MK.sniller) scene.remove(MK.sniller);
-    for (const p of MK.folk) scene.remove(p.a.root);
+    if (crowd) for (const p of crowd.people) p.a.root.visible = false;
     for (const f of foes) scene.remove(f.a.root); foes.length = 0;
     MK = null;
   }
+
+  /* a new day: a few shots of the land with its words over them, the three of them walking on under it */
+  function dayCine(cards, shots, done) {
+    shots.forEach((sh, i) => { if (!sh.caption && cards[i]) sh.caption = cards[i]; });
+    if (cards.length > shots.length) shots[shots.length - 1].caption = cards.slice(shots.length - 1);
+    P.auto = true;
+    cut(shots, () => { P.auto = false; done && done(); });
+  }
+  /* at the fire: round the flames, then up past them at the sky and the mountains, then wide over the camp */
+  function fireCam(c) {
+    return (k, tt) => {
+      const ph = Math.floor(tt / 7.5) % 3, a = tt * 0.1;
+      if (ph === 0) return { p: V3(c.x + Math.cos(a) * 6.5, c.y + 2.2, c.z + Math.sin(a) * 6.5), l: V3(c.x, c.y + 1.2, c.z) };
+      if (ph === 1) return { p: V3(c.x - 8, c.y + 1.0, c.z + 7), l: V3(c.x + 40, c.y + 34, c.z - 90) };
+      return { p: V3(c.x + 16, c.y + 11, c.z + 12), l: V3(c.x - 14, c.y + 6, c.z - 40) };
+    };
+  }
+  function fireSay(ci, lines, cb) { sayHeld(lines, fireCam(camps[ci]), cb); }
 
   /* ===== Day 1: the low country, and the fire-stone ===== */
   let D1 = null;
@@ -447,7 +643,11 @@ export function createRoad(ctx) {
     place(P, roadX(GATE_Z - 8), GATE_Z - 8, Math.PI); place(B, roadX(GATE_Z - 6) + 2, GATE_Z - 6, Math.PI); B.stay = null;
     CAM.yaw = 0; CAM.pitch = 0.2; setDusk(0.1);
     D1 = { said: 0, kofi: null, pebble: false, tried: {} };
-    ctx.cards(R.day1.cards, 3400, () => {
+    placeCart(roadX(GATE_Z + 2), GATE_Z + 2, Math.PI);
+    dayCine(R.day1.cards, [
+      { dur: 6.5, from: { p: [roadX(-160) + 80, 60, -230], l: [roadX(-60), 2, -50] }, to: { p: [roadX(-110) + 46, 34, -160], l: [roadX(-20), 2, -10] } },
+      { dur: 5.5, cam: () => ({ p: V3(P.pos.x + 3.2, P.pos.y + 1.6, P.pos.z - 9.5), l: V3(P.pos.x, P.pos.y + 1.4, P.pos.z) }) },
+    ], () => {
       ctx.play(); ctx.location('The Road North', 'Day one · the low country');
       ctx.say(R.day1.talk, () => { objective(R.obj.day1, 'Follow the road — the Carpenter keeps pace'); setGoal(camps[0].x, camps[0].y, camps[0].z); });
     });
@@ -478,7 +678,7 @@ export function createRoad(ctx) {
     }
     if (P.pos.distanceTo(V3(camps[0].x, camps[0].y, camps[0].z)) < 9) {
       sub = 'camp'; setGoal(); camps[0].on = true; B.stay = V3(camps[0].x + 2.2, 0, camps[0].z - 1.5);
-      ctx.say(R.day1.camp, () => {
+      fireSay(0, R.day1.camp, () => {
         sub = 'stone'; ctx.giveFireStone(false);
         for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4, x = camps[0].x + Math.cos(a) * 3.2, z = camps[0].z + Math.sin(a) * 3.2; const peb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), toon(0xb0a898)); const it = addItem(V3(x, heightAt(x, z) + 0.12, z), 'Pick up a pebble', null, peb); it.act = () => { for (const q of items.filter(q => q.label === 'Pick up a pebble')) dropItem(q); D1.pebble = true; sfx.ui(); ctx.toast('A smooth little pebble.', 2); stoneObjective(); }; }
         stoneObjective();
@@ -514,7 +714,7 @@ export function createRoad(ctx) {
         const from = V3(P.pos.x, P.pos.y + 1.3, P.pos.z), to = V3(camps[0].x + 9 - 2, camps[0].y + 2.5, camps[0].z - 3 + 1);
         for (let k = 0; k < 20; k++) { const q = from.clone().lerp(to, k / 20); particles.emit(q.x, q.y, q.z, { vx: 0, vy: 0.5, vz: 0, color: k % 2 ? 0xff8a2a : 0xffd060, size: 0.6, life: 0.7, drag: 1 }); }
         particles.burst(to.x, to.y, to.z, 30, { color: 0xff8a2a, speed: 6, size: 0.5, life: 0.8 }); sfx.flare();
-        ctx.say(S.trigger, () => { ctx.giveFireStone(true); hasStone = true; ctx.slotsHud && ctx.slotsHud(true); ctx.toast('Fire-stone Relic — its trigger found! It’s yours, and it’s on a quick slot.', 3.5); startDay2(); });
+        fireSay(0, S.trigger, () => { ctx.giveFireStone(true); hasStone = true; ctx.slotsHud && ctx.slotsHud(true); ctx.toast('Fire-stone Relic — its trigger found! It’s yours, and it’s on a quick slot.', 3.5); startDay2(); });
       } },
       { label: 'Put it away for now', act: null },
     ]);
@@ -526,9 +726,14 @@ export function createRoad(ctx) {
     stage = 'day2'; sub = 'walk'; ctx.save('day2');
     for (const it of items.slice()) dropItem(it);
     camps[0].on = false;
-    ctx.cards(R.day2.cards, 3400, () => {
-      place(P, roadX(CAMP1.z - 6), CAMP1.z - 6, Math.PI); place(B, roadX(CAMP1.z - 4) + 2, CAMP1.z - 4, Math.PI); B.stay = null;
-      CAM.yaw = 0; setDusk(0.05); D2 = { caught: false };
+    place(P, roadX(CAMP1.z - 6), CAMP1.z - 6, Math.PI); place(B, roadX(CAMP1.z - 4) + 2, CAMP1.z - 4, Math.PI); B.stay = null;
+    placeCart(roadX(CAMP1.z + 4), CAMP1.z + 4, Math.PI);
+    CAM.yaw = 0; setDusk(0.05); D2 = { caught: false };
+    dayCine(R.day2.cards, [
+      // down out of the sky, through the tops of the pines, to the two of them on the road
+      { dur: 7, ease: 'out', cam: k => ({ p: V3(P.pos.x + 26 - k * 20, P.pos.y + 34 - k * 30, P.pos.z - 34 + k * 22), l: V3(P.pos.x - 4 * (1 - k), P.pos.y + 1.2, P.pos.z - 10 * (1 - k)) }) },
+      { dur: 5, cam: () => ({ p: V3(P.pos.x + 7, P.pos.y + 2, P.pos.z + 2), l: V3(P.pos.x, P.pos.y + 1.4, P.pos.z - 3) }) },
+    ], () => {
       ctx.play(); ctx.location('The Road North', 'Day two · the forest');
       objective('Climb through the forest with the Carpenter', ''); setGoal(EV.log.x, heightAt(EV.log.x, EV.log.z) + 1, EV.log.z);
     });
@@ -552,10 +757,10 @@ export function createRoad(ctx) {
     }
     if (sub === 'walk' && F.crossed && P.pos.distanceTo(V3(camps[1].x, camps[1].y, camps[1].z)) < 10) {
       sub = 'send'; setGoal(); camps[1].on = true; B.stay = V3(camps[1].x + 2.2, 0, camps[1].z - 1.5);
-      ctx.say(R.day2.send, () => {
+      fireSay(1, R.day2.send, () => {
         sub = 'hunt';
         for (let k = 0; k < 5; k++) { const a = rng() * TAU, r = 22 + rng() * 26, x = camps[1].x + Math.cos(a) * r, z = camps[1].z + Math.sin(a) * r; addFoe('kofi', x, z); }
-        objective(R.obj.hunt, 'Kofi Galta run from everything — cut them off');
+        objective(R.obj.hunt, 'Q — set a pebble in the fire-stone and throw it. Kofi run from everything.');
       });
     }
     if (sub === 'hunt') {
@@ -580,7 +785,7 @@ export function createRoad(ctx) {
   function day2Back() {
     if (sub === 'back' && P.pos.distanceTo(V3(camps[1].x, camps[1].y, camps[1].z)) < 6) {
       sub = 'home'; setGoal();
-      ctx.say(R.day2.back, () => startDay3());
+      fireSay(1, R.day2.back, () => startDay3());
     }
   }
 
@@ -588,12 +793,18 @@ export function createRoad(ctx) {
   let D3 = null;
   function startDay3() {
     stage = 'day3'; sub = 'rain'; ctx.save('day3'); D3 = { rain: true };
-    ctx.cards(R.day3.cards, 3400, () => {
-      place(P, camps[1].x - 2, camps[1].z + 1.5, -Math.PI / 2); B.stay = V3(camps[1].x + 2.2, 0, camps[1].z - 1.5); place(B, B.stay.x, B.stay.z);
-      setDusk(0.75); camps[1].on = true; ctx.play();
-      ctx.say(R.day3.talk, () => {
+    place(P, camps[1].x - 2, camps[1].z + 1.5, -Math.PI / 2); B.stay = V3(camps[1].x + 2.2, 0, camps[1].z - 1.5); place(B, B.stay.x, B.stay.z);
+    placeCart(camps[1].x + 9, camps[1].z + 6, 0.4);
+    setDusk(0.75); camps[1].on = true;
+    // rain: the light goes grey and close, the sky low
+    D3.fog = [fog.near, fog.far]; fog.near = 30; fog.far = 420; fog.color.set(0x6a7078); sun.intensity *= 0.35; hemi.intensity *= 0.8;
+    skyU.uTop.value.set(0x4a5260); skyU.uLow.value.set(0x8a9098); skyU.uWarm.value = 0.15;
+    const c3 = camps[1];
+    cut([{ dur: 9, cam: (k, tt) => { const a = 0.6 + k * 1.6; return { p: V3(c3.x + Math.cos(a) * 12, c3.y + 4 - k * 1.5, c3.z + Math.sin(a) * 12), l: V3(c3.x, c3.y + 1, c3.z) }; }, caption: R.day3.cards }], () => {
+      ctx.play();
+      fireSay(1, R.day3.talk, () => {
         // night. The rain stops; the amulets hum; something pale waits in the trees
-        D3.rain = false; setDusk(1); sub = 'wisp';
+        D3.rain = false; setDusk(1); sub = 'wisp'; if (D3.fog) [fog.near, fog.far] = D3.fog;
         const a = -0.6, wx = camps[1].x + Math.cos(a) * 16, wz = camps[1].z + Math.sin(a) * 16;
         D3.w = buildSniller(0.75); fold(D3.w, 0.5); D3.w.position.set(wx, heightAt(wx, wz) + 1.2, wz); scene.add(D3.w);
         // the stone ring it leads him to, off the road in the trees
@@ -602,7 +813,8 @@ export function createRoad(ctx) {
         D3.ring.y = heightAt(D3.ring.x, D3.ring.z);
         for (const t of trees3(D3.ring)) solids.splice(solids.indexOf(t), 1);
         for (let k = 0; k < 7; k++) { const ang = k / 7 * TAU, sx = D3.ring.x + Math.cos(ang) * 4.2, sz = D3.ring.z + Math.sin(ang) * 4.2, st = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8 + Math.random(), 0.7), toon(0x6a7a62)); st.position.set(sx, heightAt(sx, sz) + 0.8, sz); st.rotation.y = -ang; addOutline(st, 0.04); scene.add(st); cyl(sx, sz, 0.5, heightAt(sx, sz) - 1, heightAt(sx, sz) + 1.8); }
-        ctx.say(R.day3.hum, () => { objective(R.obj.wisp, 'It keeps just ahead of you'); setGoal(D3.w.position.x, D3.w.position.y - 1, D3.w.position.z); });
+        const wv = D3.w.position;
+        sayHeld(R.day3.hum, (k, tt) => ({ p: V3(P.pos.x - (wv.x - P.pos.x) * 0.25, P.pos.y + 1.9, P.pos.z - (wv.z - P.pos.z) * 0.25), l: V3(wv.x, wv.y + 1.6, wv.z) }), () => { objective(R.obj.wisp, 'It keeps just ahead of you'); setGoal(D3.w.position.x, D3.w.position.y - 1, D3.w.position.z); });
       });
     });
   }
@@ -633,7 +845,7 @@ export function createRoad(ctx) {
         });
       }
     }
-    if (sub === 'back' && P.pos.distanceTo(V3(camps[1].x, P.pos.y, camps[1].z)) < 6) { sub = 'slept'; setGoal(); ctx.say(R.day3.back, () => startDay4()); }
+    if (sub === 'back' && P.pos.distanceTo(V3(camps[1].x, P.pos.y, camps[1].z)) < 6) { sub = 'slept'; setGoal(); fireSay(1, R.day3.back, () => startDay4()); }
   }
 
   /* ===== Day 4: the pass, and the Rodak ===== */
@@ -641,10 +853,15 @@ export function createRoad(ctx) {
   function startDay4() {
     stage = 'day4'; sub = 'walk'; ctx.save('day4');
     camps[1].on = false;
-    ctx.cards(R.day4.cards, 3400, () => {
-      place(P, roadX(PASS0 + 10), PASS0 + 10, Math.PI); place(B, roadX(PASS0 + 12) + 2, PASS0 + 12, Math.PI); B.stay = null;
-      if (K.on) place(K, roadX(PASS0 + 12) - 2, PASS0 + 12, Math.PI);
-      CAM.yaw = 0; setDusk(0.25); P.hp = 100; D4 = { left: 0, rocks: [], rockT: 1, alpha: null };
+    place(P, roadX(PASS0 + 10), PASS0 + 10, Math.PI); place(B, roadX(PASS0 + 12) + 2, PASS0 + 12, Math.PI); B.stay = null;
+    if (K.on) place(K, roadX(PASS0 + 12) - 2, PASS0 + 12, Math.PI);
+    placeCart(roadX(PASS0 + 20), PASS0 + 20, Math.PI);
+    CAM.yaw = 0; setDusk(0.25); P.hp = 100; D4 = { left: 0, rocks: [], rockT: 1, alpha: null };
+    fog.near = 120; fog.far = 1600;
+    dayCine(R.day4.cards, [
+      { dur: 7.5, cam: k => ({ p: V3(P.pos.x + 6 - k * 3, P.pos.y + 2 + k * 26, P.pos.z + 10 + k * 18), l: V3(P.pos.x, P.pos.y + 1.5 + k * 70, P.pos.z - 60 - k * 140) }) },
+      { dur: 4.5, cam: () => ({ p: V3(P.pos.x - 11, P.pos.y + 1.2, P.pos.z - 14), l: V3(P.pos.x, P.pos.y + 2.5, P.pos.z) }) },
+    ], () => {
       ctx.play(); ctx.location('The Mountain Pass', 'Day four');
       objective(R.obj.day4, ''); setGoal(roadX(AMBUSH), heightAt(roadX(AMBUSH), AMBUSH), AMBUSH);
     });
@@ -692,7 +909,14 @@ export function createRoad(ctx) {
       }
       if (left === 0) {
         sub = 'won';
-        ctx.say(R.day4.won, () => { ctx.save('day5'); ctx.cards(R.day5.cards, 3600, () => { done = true; ctx.onDone(); }); });
+        ctx.say(R.day4.won, () => {
+          ctx.save('day5');
+          const ez = END + 30, ex = roadX(ez), ey = heightAt(ex, ez);
+          setDusk(0.15);
+          cut([
+            { dur: 8, from: { p: [ex + 4, ey + 6, ez + 6], l: [townSmoke.x, townSmoke.y, townSmoke.z] }, to: { p: [ex - 6, ey + 22, ez - 30], l: [townSmoke.x, townSmoke.y - 4, townSmoke.z] }, caption: R.day5.cards },
+          ], () => { done = true; ctx.onDone(); });
+        });
       }
     }
   }
@@ -713,6 +937,11 @@ export function createRoad(ctx) {
     const d = V3(f.pos.x - from.x, 0, f.pos.z - from.z).normalize(); f.vel.addScaledVector(d, 6); f.stun = 0.35;
     particles.burst(f.pos.x, f.pos.y + 0.8, f.pos.z, 10, { color: f.kind === 'rodak' ? 0x9a9ab0 : 0xffb040, speed: 6, size: 0.3, life: 0.4, gravity: -10 });
     if (f.hp > 0) return;
+    if (f.kind === 'kofi' && !(from && from.bolt) && stage === 'day2') {   // far too quick for a hatchet
+      f.hp = f.max; f.vel.addScaledVector(d, 8);
+      if (!D2.toldStone) { D2.toldStone = true; ctx.bark('buhkon', 'You’ll never catch a Kofi with a hatchet. The stone, Tanoc — a pebble’s quicker than any Kofi. (Q)', 4.5); }
+      return;
+    }
     if (f.kind === 'kofi') { f.dead = true; scene.remove(f.a.root); kofiCaught(); return; }
     if (f.kind === 'wildpunk') {   // knock the fight out of it — it runs off instead of dying
       f.fled = true; f.state = 'flee'; f.timer = 3; MK.calmed = true; sfx.heal();
@@ -806,7 +1035,7 @@ export function createRoad(ctx) {
       const b = bolts[i], p = b.g.position; b.life -= dt; p.addScaledVector(b.vel, dt);
       particles.emit(p.x, p.y, p.z, { vx: 0, vy: 0.4, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.45, life: 0.35, drag: 1 });
       let hit = b.life <= 0 || solidAt(p.x, p.y, p.z);
-      for (const f of foes) { if (hit || f.dead || f.fled || f.pos.distanceTo(p) > 1.6) continue; hitFoe(f, f.kind === 'kofi' ? 1 : 22, P.pos); hit = true; }
+      for (const f of foes) { if (hit || f.dead || f.fled || f.pos.distanceTo(p) > 1.6) continue; hitFoe(f, f.kind === 'kofi' ? 1 : 22, { x: P.pos.x, z: P.pos.z, bolt: true }); hit = true; }
       if (hit) { particles.burst(p.x, p.y, p.z, 16, { color: 0xff8a2a, speed: 5, size: 0.4, life: 0.5 }); scene.remove(b.g); bolts.splice(i, 1); }
     }
   }
@@ -827,9 +1056,10 @@ export function createRoad(ctx) {
     const fx = -Math.sin(CAM.yaw), fz = -Math.cos(CAM.yaw), rx = -fz, rz = fx;
     let wx = 0, wz = 0;
     if (len > 0.08) { const k = Math.min(1, len) / len; wx = (fx * iz + rx * ix) * k; wz = (fz * iz + rz * ix) * k; }
+    if (P.auto) { const tz = P.pos.z - 8, tx = roadX(tz), dx = tx - P.pos.x, dz = tz - P.pos.z, dl = Math.hypot(dx, dz) || 1; wx = dx / dl * 0.7; wz = dz / dl * 0.7; }
     const run = keys.ShiftLeft || keys.ShiftRight, sp = (run ? 8.6 : 4.8) * (P.swing > 0 ? 0.35 : 1);
     P.vel.x = damp(P.vel.x, wx * sp, P.onGround ? 14 : 4, dt); P.vel.z = damp(P.vel.z, wz * sp, P.onGround ? 14 : 4, dt);
-    if (len > 0.08 && P.swing <= 0) P.yaw = dampAngle(P.yaw, Math.atan2(wx, wz), 12, dt);
+    if ((len > 0.08 || P.auto) && P.swing <= 0) P.yaw = dampAngle(P.yaw, Math.atan2(wx, wz), 12, dt);
     P.jumpBuf -= dt; P.coyote -= dt; P.iframes = Math.max(0, P.iframes - dt);
     if (P.jumpBuf > 0 && (P.onGround || P.coyote > 0) && playing) { P.vel.y = 9.2; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
     P.vel.y -= 26 * dt;
@@ -858,6 +1088,36 @@ export function createRoad(ctx) {
     if (P.onGround && speed > 1) { P.stepPh += dt * speed * 0.55; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); } }
     tanoc.root.position.copy(P.pos); tanoc.root.rotation.y = P.yaw;
     tanoc.animate(dt, { speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null });
+  }
+  /* the cart: parked, rolling along behind Buhkon, or driven out of the city with the two of them aboard */
+  function updateCart(dt) {
+    let sp = 0;
+    const was = CART.pos.clone();
+    if (CART.path) {
+      const k = clamp(CART.pathK || 0, 0, 1), q = CART.path.getPointAt(k), q2 = CART.path.getPointAt(Math.min(1, k + 0.01));
+      CART.pos.set(q.x, groundAt(q.x, q.z, 60), q.z); CART.yaw = Math.atan2(q2.x - q.x, q2.z - q.z);
+    } else if (stage !== 'market') {
+      // a few paces behind Buhkon, along the road
+      const back = V3(-Math.sin(B.yaw), 0, -Math.cos(B.yaw)), want = V3(B.pos.x + back.x * 7, 0, B.pos.z + back.z * 7);
+      const dx = want.x - CART.pos.x, dz = want.z - CART.pos.z, d = Math.hypot(dx, dz);
+      if (d > 60) { CART.pos.set(want.x, 0, want.z); }
+      else if (d > 2.5) { const v = Math.min(8, d * 1.2); CART.pos.x += dx / d * v * dt; CART.pos.z += dz / d * v * dt; CART.yaw = dampAngle(CART.yaw, Math.atan2(dx, dz), 3, dt); }
+      CART.pos.y = groundAt(CART.pos.x, CART.pos.z, CART.pos.y + 3);
+    }
+    sp = CART.pos.distanceTo(was) / Math.max(dt, 1e-4);
+    const f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw));
+    const pitch = Math.atan2(heightAt(CART.pos.x + f.x * 2, CART.pos.z + f.z * 2) - heightAt(CART.pos.x - f.x * 2, CART.pos.z - f.z * 2), 4);
+    CART.g.position.copy(CART.pos); CART.g.rotation.set(-pitch, CART.yaw, Math.sin(t * 6) * 0.01 * Math.min(1, sp));
+    CART.wheels.forEach(w => { w.rotation.x += sp * dt / 0.8; });
+    CART.punks.forEach((pk, i) => pk.animate(dt, { speed: sp * 1.4, t: t + i }));
+    CART.solid.x = CART.pos.x; CART.solid.z = CART.pos.z;
+    const ax = Math.abs(Math.sin(CART.yaw)) > 0.7; CART.solid.hw = ax ? 4.2 : 1.4; CART.solid.hd = ax ? 1.4 : 4.2; CART.solid.y0 = CART.riders ? -99 : CART.pos.y - 1; CART.solid.y1 = CART.riders ? -98 : CART.pos.y + 2.4;
+    if (CART.riders) {   // Buhkon on the bench with the reins, the boy in the back among the wares
+      const seat = V3(0, 2.0, 1.75).applyEuler(CART.g.rotation).add(CART.pos), backS = V3(0.3, 1.2, -1.1).applyEuler(CART.g.rotation).add(CART.pos);
+      B.pos.copy(seat); B.yaw = CART.yaw; buhkon.root.position.copy(seat); buhkon.root.rotation.y = CART.yaw;
+      P.pos.copy(backS); P.vel.set(0, 0, 0); P.yaw = CART.yaw + Math.PI * 0.5; tanoc.root.position.copy(backS); tanoc.root.rotation.y = P.yaw;
+      if (K.on || (MK && MK.calmed)) { punk.root.visible = false; }
+    }
   }
   function follow(o, actor, dt, side, dist, speedCap, fight) {
     let want = o.stay ? o.stay : null;
@@ -894,41 +1154,53 @@ export function createRoad(ctx) {
   /* ---------------- per frame ---------------- */
   function update(dt, playing) {
     t += dt;
-    updatePlayer(dt, playing);
-    follow(B, buhkon, dt, 1.8, 2.6, 9.5, stage === 'day4');
+    if (!CART.riders) { updatePlayer(dt, playing); follow(B, buhkon, dt, 1.8, 2.6, 9.5, stage === 'day4'); }
+    else { tanoc.animate(dt, { speed: 0, onGround: true, t }); buhkon.animate(dt, { speed: 0, onGround: true, t }); }
     if (K.on) follow(K, punk, dt, -1.8, 2.2, 11, stage === 'day4'); else punk.root.visible = false;
     if (K.on) punk.root.visible = true;
     updateFoes(dt, playing);
     // the market's own business
     if (MK) {
-      for (const m of [MK.angel, MK.sniller]) if (m && sub !== 'hat') m.userData.tick(t);
-      if (MK.leaving && MK.angel) { MK.leaving += dt; MK.angel.position.y += dt * (4 + MK.leaving * 10); if (MK.leaving > 4) { particles.burst(MK.angel.position.x, MK.angel.position.y + 3, MK.angel.position.z, 40, { color: 0xfff0c0, speed: 10, size: 1, life: 1 }); scene.remove(MK.angel); MK.angel = null; } }
-      for (const it of MK.amulets) if (it.mesh) { it.mesh.rotation.y = t * 1.5; it.mesh.position.y = it.y0 + Math.sin(t * 2 + it.pos.x) * 0.12; }
-      for (const p of MK.folk) {
-        let sp = 0;
-        if (p.panic || p.goal) {
-          if (!p.goal || p.pos.distanceTo(p.goal) < 0.8) { const a = rng() * TAU, r = 6 + rng() * 18; p.goal = V3(SQUARE.x + Math.cos(a) * r, 0, SQUARE.z + Math.sin(a) * r); if (!p.panic) { p.wait = 2 + rng() * 4; } }
-          if (p.wait > 0 && !p.panic) p.wait -= dt;
-          else { const dx = p.goal.x - p.pos.x, dz = p.goal.z - p.pos.z, d = Math.hypot(dx, dz) || 1; sp = p.panic ? 6 : 1.4; p.pos.x += dx / d * sp * dt; p.pos.z += dz / d * sp * dt; resolve(p.pos, 0.4); p.a.root.rotation.y = Math.atan2(dx, dz); }
-        } else { p.wait -= dt; if (p.wait <= 0) p.goal = V3(); }
-        if (sub === 'hat') sp = 0;      // everything stops and stares
-        if (sub === 'hat') p.a.root.rotation.y = dampAngle(p.a.root.rotation.y, Math.atan2(P.pos.x - p.pos.x, P.pos.z - p.pos.z), 4, dt);
-        p.pos.y = groundAt(p.pos.x, p.pos.z, 2); p.a.root.position.copy(p.pos);
-        p.a.animate(dt, { speed: sp, onGround: true, t: t + p.ph });
+      const slow = MK.frozen ? 0.25 : 1;
+      for (const m of [MK.angel, MK.sniller]) if (m) {
+        m.userData.tick(t * slow, slow);
+        if (m.userData.base && !(m === MK.angel && MK.leaving)) m.position.set(m.userData.base.x + Math.sin(t * 0.7 + (m === MK.angel ? 0 : 2)) * 0.6, m.userData.base.y + Math.sin(t * 1.1 + (m === MK.angel ? 1 : 0)) * 0.5, m.userData.base.z + Math.cos(t * 0.6) * 0.4);
       }
-      if (playing && sub === 'pack') { MK.t -= dt; if (MK.t <= 0) marketMaterialize(); }
+      if (MK.frozen && Math.random() < 0.5) { const m = Math.random() < 0.5 ? MK.angel : MK.sniller; if (m) particles.emit(m.position.x + (Math.random() - 0.5) * 4, m.position.y + 2 + Math.random() * 6, m.position.z + (Math.random() - 0.5) * 4, { vx: 0, vy: 0.2, vz: 0, color: m === MK.angel ? 0xffe8a8 : 0x6af0e0, size: 0.6, life: 2.5, drag: 2 }); }
+      if (MK.dying && MK.sniller) {   // the curse: the storm folds in on itself and bursts into amulets
+        MK.dying += dt; const k = MK.dying / 1.2, sn = MK.sniller;
+        sn.scale.setScalar(1.6 * Math.max(0.02, 1 - k * k)); sn.rotation.y += dt * (4 + k * 20); sn.userData.setVis(Math.max(0, 1 - k));
+        particles.emit(sn.position.x, sn.position.y + 3, sn.position.z, { vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.3) * 10, vz: (Math.random() - 0.5) * 12, color: 0x6af0e0, size: 0.9, life: 0.8, drag: 1 });
+        if (k >= 1) { particles.burst(sn.position.x, sn.position.y + 3, sn.position.z, 90, { color: 0x6af0e0, speed: 16, size: 1, life: 1.2, gravity: -4 }); sfx.core(); shake = 0.8; scene.remove(sn); MK.sniller = null; }
+      }
+      if (MK.leaving && MK.angel) { MK.leaving += dt; MK.angel.position.y += dt * (3 + MK.leaving * 9); MK.angel.rotation.y += dt * 0.5; if (MK.leaving > 4.5) { particles.burst(MK.angel.position.x, MK.angel.position.y + 3, MK.angel.position.z, 60, { color: 0xfff0c0, speed: 12, size: 1.2, life: 1.1 }); scene.remove(MK.angel); MK.angel = null; } }
+      for (const it of MK.amulets) if (it.mesh) {
+        it.mesh.rotation.y = t * 1.5;
+        if (it.fall) {   // flung out of the dying storm, arcing down to where it lands
+          it.fall.t += dt; const k = clamp(it.fall.t / it.fall.dur, 0, 1);
+          it.mesh.position.lerpVectors(it.fall.from, it.pos, k); it.mesh.position.y += Math.sin(k * Math.PI) * 6;
+          if (Math.random() < 0.4) particles.emit(it.mesh.position.x, it.mesh.position.y, it.mesh.position.z, { vx: 0, vy: 0.5, vz: 0, color: 0x6af0e0, size: 0.35, life: 0.5, drag: 1 });
+          if (k >= 1) { it.fall = null; particles.burst(it.pos.x, it.pos.y, it.pos.z, 12, { color: 0x6af0e0, speed: 3, size: 0.35, life: 0.5 }); }
+        } else it.mesh.position.y = it.y0 + Math.sin(t * 2 + it.pos.x) * 0.12;
+      }
     }
+    if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });
+    kit.update(t, dt, particles);
+    if (stage === 'market') fountain.update(dt, t, particles, [P.pos]);
+    updateCart(dt);
+    for (const c of clouds) c.position.x += dt * 2;
     if (playing) { if (stage === 'day1') day1Tick(); if (stage === 'day2') { day2Tick(); day2Back(); } if (stage === 'day3') day3Tick(dt); if (stage === 'day4') day4Tick(dt); }
     updateBolts(dt);
     if (D1 && D1.sn) { D1.snT += dt; D1.sn.userData.tick(t); D1.sn.position.x += dt * 3; if (D1.snT > 9) { particles.burst(D1.sn.position.x, D1.sn.position.y + 4, D1.sn.position.z, 40, { color: 0x6af0e0, speed: 8, size: 1, life: 1 }); scene.remove(D1.sn); D1.sn = null; } }
     if (D3 && D3.w) D3.w.userData.tick(t);
-    if (D3 && D3.rain) for (let k = 0; k < 6; k++) particles.emit(camPos.x + (Math.random() - 0.5) * 30, camPos.y + 8 + Math.random() * 4, camPos.z + (Math.random() - 0.5) * 30, { vx: 0.5, vy: -22, vz: 0, color: 0xc8d8e8, size: 0.18, life: 0.6, drag: 0 });
+    if (D3 && D3.rain) for (let k = 0; k < 16; k++) particles.emit(camPos.x + (Math.random() - 0.5) * 30, camPos.y + 8 + Math.random() * 4, camPos.z + (Math.random() - 0.5) * 30, { vx: 0.5, vy: -22, vz: 0, color: 0xc8d8e8, size: 0.18, life: 0.6, drag: 0 });
     // camps glow at night
-    for (const c of camps) { c.fire.visible = c.on; c.light.intensity = c.on ? 1.6 + Math.sin(t * 9) * 0.3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
-    if (stage === 'day4' && Math.random() < 0.3) particles.emit(camPos.x + (Math.random() - 0.5) * 40, camPos.y + (Math.random() - 0.3) * 6, camPos.z + (Math.random() - 0.5) * 40, { vx: 0.6, vy: 0, vz: 0, color: 0xe8eef4, size: 2.4, life: 3, drag: 0.2 });   // mist in the pass
+    for (const c of camps) { c.fire.visible = c.on; c.light.intensity = c.on ? 40 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
+    // mist in the pass: soft sheets of it drifting low over the stones (not those glowing orbs any more)
+    mists.forEach((m, i) => { m.visible = stage === 'day4'; if (m.visible) { m.position.x += dt * (0.8 + (i % 3) * 0.3); if (m.position.x > roadX(m.position.z) + 60) m.position.x = roadX(m.position.z) - 60; } });
     if (beacon.visible) beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
     particles.update(dt);
-    updateCamera(dt);
+    if (!cine.update(dt)) updateCamera(dt);
     // the sky follows: Velki low in the south-east, the sun and its shadows on the boy
     sky.position.copy(camera.position);
     velki.position.set(camera.position.x + 1700, camera.position.y + 900, camera.position.z + 2300); velkiGlow.position.copy(velki.position);
@@ -965,7 +1237,7 @@ export function createRoad(ctx) {
     composer.dispose && composer.dispose();
   }
   return {
-    start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot,
+    start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
     get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }

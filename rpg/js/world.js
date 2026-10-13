@@ -656,7 +656,7 @@ export function buildWorld(scene) {
     if (Math.hypot(x, z) > oldEdge(x, z) - 4 || Math.hypot(x - 21, z + 31) < 8 || roadDist(x, z) < 5 || Math.hypot(x - PLAZA.x, z - PLAZA.z) < 32 || CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
     const s = 0.4 + Math.pow(rng(), 3) * 2.6;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(['#a98a6a', '#9a7a5c', '#b8977a', '#8b6e55']));
-    if (s > 1.2) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
+    if (s > 0.6) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
   }
 
   /* ---------- the dock and its pier ---------- */
@@ -837,7 +837,7 @@ export function buildWorld(scene) {
     if (reserved.some(q => Math.hypot(x - q.x, z - q.z) < q.r)) continue;
     const s = 0.5 + Math.pow(rng2(), 2.5) * (d > -40 ? 4.5 : 2.6), g = heightAt(x, z);
     wRocks.put(x, g + s * 0.25, z, s * (1 + rng2() * 0.5), s * 0.75, s, rng2() * 3, rng2() * 3, rng2() * 3, pick2(['#8f8a84', '#7d7873', '#a39e97', '#6e6a66', '#9a8a74']));
-    if (s > 1.2 && d < -3) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
+    if (s > 0.6 && d < -3) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
   }
 
   /* the abandoned outskirts — houses where the city spilled past its walls */

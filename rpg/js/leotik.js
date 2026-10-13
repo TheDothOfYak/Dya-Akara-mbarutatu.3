@@ -540,7 +540,7 @@ export function buildLeotik(scene) {
     if (coastD(x, z) < 4 || roadDist(x, z) < 5 || CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
     const s = 0.5 + Math.pow(rng(), 3) * 3;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(STONE));
-    if (s > 1.2) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
+    if (s > 0.6) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
   }
 
   /* ---------- the new country: jungle valleys, palms, rocky shores ---------- */
