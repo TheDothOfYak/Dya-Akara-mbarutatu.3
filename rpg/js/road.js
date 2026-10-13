@@ -181,7 +181,7 @@ export function createRoad(ctx) {
     }
   }
   const XSTREETS = [19, 29, 39, 49];
-  for (const r of XSTREETS.slice(1)) { const n = Math.round(r / 5); for (let k = 0; k < n; k++) { const a = k / n * TAU + 0.3, x = CITY.x + Math.cos(a) * (r + 2.3), z = CITY.z + Math.sin(a) * (r + 2.3); if (Math.abs(x) < 8 && z < CITY.z) continue; if (x > -3 && x < 19 && z > 26 && z < 56) continue; kit.lampPost(x, z); }   // (none in the cart's way out) }
+  for (const r of XSTREETS.slice(1)) { const n = Math.round(r / 5); for (let k = 0; k < n; k++) { const a = k / n * TAU + 0.3, x = CITY.x + Math.cos(a) * (r + 2.3), z = CITY.z + Math.sin(a) * (r + 2.3); if (Math.abs(x) < 8 && z < CITY.z) continue; if (x > -3 && x < 19 && z > 26 && z < 56) continue; kit.lampPost(x, z); } }   // (none in the cart's way out)
   for (const r of XSTREETS.slice(1)) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + 0.8; kit.bunting(V3(CITY.x + Math.cos(a) * (r - 4.4), 6, CITY.z + Math.sin(a) * (r - 4.4)), V3(CITY.x + Math.cos(a + 0.1) * (r + 4.4), 6, CITY.z + Math.sin(a + 0.1) * (r + 4.4)), 1.2); }
   for (let k = 0; k < 4; k++) kit.bunting(V3(-7, 7.2, 46 - k * 9), V3(7, 7.2, 42 - k * 9), 1.4);
   // the square's own bunting, from the fountain out to the stalls
