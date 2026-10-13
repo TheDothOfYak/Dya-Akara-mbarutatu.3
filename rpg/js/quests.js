@@ -1,5 +1,5 @@
 /* ============================================================
-   Side quests from the folk of Xilia and the Leotik camp. Each has a goal the
+   Side quests from the folk of Beuhk and the Leotik camp. Each has a goal the
    game can check, words for offering / waiting / finishing, and
    a reward.
    goal types:
@@ -10,7 +10,7 @@
    ============================================================ */
 
 export const QUESTS = {
-  /* ---------------- Xilia ---------------- */
+  /* ---------------- Beuhk ---------------- */
   q_strays: {
     name: 'Strays', giver: 'ruut', region: 'xilia',
     desc: 'Three of Old Ruut’s domestic Punks wandered off past the fields. Find them and send them home.',
@@ -76,9 +76,9 @@ export const QUESTS = {
   },
   q_lamps: {
     name: 'The Lamplighter', giver: 'v3', region: 'xilia',
-    desc: 'Lirra wants every Nur Lantern around Xilia awake again — five in all. Only a Nur can wake them, and you have Phorus.',
+    desc: 'Lirra wants every Nur Lantern around Beuhk awake again — five in all. Only a Nur can wake them, and you have Phorus.',
     goal: { type: 'lit', prefix: 'x_', n: 5 },
-    offer: ['I light the lamps. But the old Nur Lanterns? Only a Nur can wake those, and ours left years ago.', 'There are five round Xilia — the docks, the square, the yard, the forest road, the grove road. Wake them all and the whole town sleeps safer.'],
+    offer: ['I light the lamps. But the old Nur Lanterns? Only a Nur can wake those, and ours left years ago.', 'There are five round Beuhk — the docks, the square, the yard, the forest road, the grove road. Wake them all and the whole town sleeps safer.'],
     wait: ['Five lanterns. The map in your book shows the ones you’ve found.'],
     done: ['Look at them! Every one. Here — my mother’s spare film vial. You’ll carry one more from now on.'],
     reward: { xp: 220, shards: 50, flag: 'flask_bonus' },

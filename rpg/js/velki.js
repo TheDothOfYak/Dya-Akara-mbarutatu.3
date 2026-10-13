@@ -4,7 +4,7 @@
    Angels and the Snillers fight, walks out of the north gate toward
    it, and is caught in it.
 
-   A small scene of its own, played before the Xilia page's world:
+   A small scene of its own, played before the Beuhk page's world:
    its own sky, ground, colliders and a light third-person walker.
    main.js hands it the renderer, the camera and the input, and
    takes the run back when the air tears open.
@@ -342,7 +342,7 @@ export function createVelki(ctx) {
   function topReached() {
     stage = 'top';
     // turn him to face the north gate and the battle beyond it
-    P.yaw = Math.PI; CAM.yaw = 0; CAM.pitch = 0.08;
+    P.pos.x = 0; P.pos.z = -2.6; P.yaw = Math.PI; CAM.yaw = 0; CAM.pitch = 0.08;   // round to the north rail, so nothing stands in the way
     ctx.say(STORY.PROLOGUE.top, startGateStage);
   }
 

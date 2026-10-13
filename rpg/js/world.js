@@ -136,7 +136,7 @@ function baseH(x, z) {
 for (const f of JU) FLATS.push({ x: f.x, z: f.z, r: f.r + 3, h: baseH(f.x, f.z) });
 for (const f of ALBALI) FLATS.push({ x: f.x, z: f.z, r: 9, h: baseH(f.x, f.z) });
 
-/* the Megla Pass (Megla: mist): the old road north — Fti — out of the Reach, the long way round to Xilia on foot */
+/* the Megla Pass (Megla: mist): the old road north — Fti — out of the Reach, the long way round to Beuhk on foot */
 const PASS_A = -2.1;
 export const PASS = makePass({ id: 'a_ashroad', name: 'The Megla Pass', dir: 'Fti', to: 'xilia', toPass: 'x_ashroad', a: PASS_A,
   r0: lut(LIM, PASS_A) - 75, r1: lut(LIM, PASS_A) + 28, w: 9, rise: 16 }, baseH);

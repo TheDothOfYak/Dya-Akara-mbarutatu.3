@@ -75,10 +75,10 @@ export function createRpgUI(api) {
       h += `<h3>Story</h3><p>${esc(api.mainObjective())}</p>`;
       h += `<h3>Side quests</h3>` + (act.length ? act.map(([id]) => {
         const q = QUESTS[id], p = questProgress(id, q, S, inv);
-        return `<div class="rquest"><b>${q.name}</b> <small>from ${esc(api.npcName(q.giver))} · ${q.region === 'leotik' ? 'Leotik' : q.region === 'xilia' ? 'Xilia' : 'Aakalay'}</small><p>${q.desc}</p>${goalText(id, q, S, inv)}<div class="xpbar"><i style="width:${p * 100}%"></i></div></div>`;
+        return `<div class="rquest"><b>${q.name}</b> <small>from ${esc(api.npcName(q.giver))} · ${q.region === 'leotik' ? 'Leotik' : q.region === 'xilia' ? 'Beuhk' : 'Aakalay'}</small><p>${q.desc}</p>${goalText(id, q, S, inv)}<div class="xpbar"><i style="width:${p * 100}%"></i></div></div>`;
       }).join('') : '<p class="rmuted">No side quests. Talk to people — anyone might need a hand.</p>');
       const b = api.bounty();
-      h += `<h3>Bounty</h3>` + (b ? `<div class="rquest"><b>Hunt ${b.n} ${esc(b.name)}</b> <small>posted by ${esc(b.from)} · ${b.shards} shards</small><p class="rgoal">${Math.min(b.got, b.n)} / ${b.n}${b.got >= b.n ? ' — claim it at any bounty board' : ''}</p><div class="xpbar"><i style="width:${Math.min(1, b.got / b.n) * 100}%"></i></div></div>` : '<p class="rmuted">No bounty taken. Boards in Xilia and the Leotik camp post hunts.</p>');
+      h += `<h3>Bounty</h3>` + (b ? `<div class="rquest"><b>Hunt ${b.n} ${esc(b.name)}</b> <small>posted by ${esc(b.from)} · ${b.shards} shards</small><p class="rgoal">${Math.min(b.got, b.n)} / ${b.n}${b.got >= b.n ? ' — claim it at any bounty board' : ''}</p><div class="xpbar"><i style="width:${Math.min(1, b.got / b.n) * 100}%"></i></div></div>` : '<p class="rmuted">No bounty taken. Boards in Beuhk and the Leotik camp post hunts.</p>');
       if (done.length) h += `<h3>Finished</h3><p class="rmuted">` + done.map(([id]) => QUESTS[id].name).join(' · ') + `</p>`;
     } else if (page === 'beasts') {
       const list = api.beasts();
@@ -89,7 +89,7 @@ export function createRpgUI(api) {
       const d = api.dya();
       if (!d) h += '<p class="rmuted">The Dya’Akara engine didn’t load.</p>';
       else {
-        h += `<h3>Dya’Akara <small>${d.record}</small></h3><p class="rmuted">Your pouch holds up to 25 tokens (${d.pouch.length}/25). Challenge Venkin, Sefa or Bosk in Xilia — or anyone at the Leotik camp who plays.</p>`;
+        h += `<h3>Dya’Akara <small>${d.record}</small></h3><p class="rmuted">Your pouch holds up to 25 tokens (${d.pouch.length}/25). Challenge Venkin, Sefa or Bosk in Beuhk — or anyone at the Leotik camp who plays.</p>`;
         h += `<div class="rgrid">` + d.tokens.map(t => {
           const inP = d.pouch.includes(t.id);
           const cost = Object.entries(t.cost).filter(([, v]) => v).map(([e, v]) => `<i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${d.ecol[e]};margin:0 2px 0 5px"></i>${v}`).join('');
@@ -97,7 +97,7 @@ export function createRpgUI(api) {
             <button class="btn small" data-a="pouch:${t.id}">${inP ? 'In pouch ✓' : 'Add to pouch'}</button></div>`;
         }).join('') + `</div>`;
         h += `<h3>Sing a token <small>${d.okid ? 'with your Okid’Relic' : 'Buhkon can show you how'}</small></h3>`;
-        h += d.okid ? `<p class="rmuted">A piece of a creature, a lump of stygian ore and ${d.singCost} shards. Big tokens are rare — most songs come out small.</p><div class="rgrid">` + d.singing.map(r => card(r.part, `Sing a ${esc(r.name)}`, r.ok ? `sing:${r.part}` : null, false, `${r.have} in pack · + 1 Stygian ore`)).join('') + `</div>` : '<p class="rmuted">Talk to Buhkon in Xilia about singing tokens.</p>';
+        h += d.okid ? `<p class="rmuted">A piece of a creature, a lump of stygian ore and ${d.singCost} shards. Big tokens are rare — most songs come out small.</p><div class="rgrid">` + d.singing.map(r => card(r.part, `Sing a ${esc(r.name)}`, r.ok ? `sing:${r.part}` : null, false, `${r.have} in pack · + 1 Stygian ore`)).join('') + `</div>` : '<p class="rmuted">Talk to Buhkon in Beuhk about singing tokens.</p>';
       }
     } else if (page === 'map') {
       h += `<p class="rmuted" style="text-align:center">Click a lit Nur Lantern to travel there. ◆ objective · ✦ quest · ◉ lantern · ▲ trial · ⌂ camp</p><div class="rmapwrap"><canvas id="rmap" width="620" height="620"></canvas></div>`;

@@ -1,6 +1,6 @@
 /* ============================================================
    Bounty boards: short, repeatable hunts posted by the folk of
-   Xilia and the Leotik camp. One bounty at a time; finish it at
+   Beuhk and the Leotik camp. One bounty at a time; finish it at
    any board for shards and experience, then take another.
    ============================================================ */
 
