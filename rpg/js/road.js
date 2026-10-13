@@ -747,6 +747,6 @@ export function createRoad(ctx) {
   }
   return {
     start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose,
-    get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, get MK() { return MK; } },
+    get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, get MK() { return MK; } },
   };
 }

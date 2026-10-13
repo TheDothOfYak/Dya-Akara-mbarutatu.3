@@ -3740,6 +3740,7 @@ function startRoad(at) {
     onDone: () => leaveRoad(),
   });
   VK.start(F_.roadAt);
+  fade(0, 1.4);   // out of the white, out of the dark
 }
 function leaveRoad() {
   F_.pro = 'beuhk'; F_.bk = 'rest'; persist();
