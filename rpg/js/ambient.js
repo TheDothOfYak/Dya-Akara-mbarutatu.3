@@ -61,8 +61,8 @@ export function createAmbient(ctx) {
       const k = Math.min(1, aero.t / 6) * Math.min(1, (aero.life - aero.t) / 6);
       aero.a.root.position.copy(aero.pos); aero.a.root.position.y += Math.sin(aero.t * 0.15) * 20;
       aero.a.root.rotation.y = Math.atan2(aero.dir.x, aero.dir.z);
-      aero.a.root.scale.setScalar(Math.max(0.001, k));
-      aero.a.animate(dt, { speed: aero.speed, t, airborne: true });
+      aero.a.root.visible = k > 0.01;
+      aero.a.animate(dt, { speed: aero.speed, t, airborne: true, reach: 0.15 });
       if (aero.a.glow) aero.a.glow(night);
       if (aero.t > aero.life) { scene.remove(aero.a.root); aero = null; }
     }
@@ -93,8 +93,7 @@ export function createAmbient(ctx) {
       if (vyr.a.root.visible) {
         vyr.a.root.position.set(sp.x, world.heightAt(sp.x, sp.z), sp.z);
         vyr.a.root.rotation.y = Math.atan2(focus.x - sp.x, focus.z - sp.z);
-        vyr.a.root.scale.setScalar(Math.max(0.001, vyr.fade));
-        vyr.a.animate(dt, { speed: 0, t });
+        vyr.a.animate(dt, { speed: 0, t, fade: 1 - vyr.fade });
         if (vyr.a.glow) vyr.a.glow(night);
         if (!seen.vyr && d < 220 && ctx.bark) { seen.vyr = true; ctx.persist && ctx.persist(); ctx.bark('tale', 'Across the trees, deep in: light and shadow in the shape of something old, watching. When you look straight at it, it is only the trunks.', 6); }
       }
