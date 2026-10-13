@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildVel, buildDummy } from './creatures.js';
+import { pivotNear, latchPoint } from './vines.js';
 import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
 import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
 import { buildHvaleia, buildSuNaga, buildHarkal, buildRafKrabbi, buildGrothyn } from './esik_sea.js';
@@ -406,20 +407,8 @@ export function createEnemies(ctx) {
      on it: round the trunk and off in a new direction, quicker than it could
      ever turn on its feet. */
   const SWINGERS = { punk: 1, punk_d: 1, malsti: 1 };
-  function findTrunk(e) {
-    const trees = ctx.world.trees; if (!trees) return null;
-    const vx = e.vel.x, vz = e.vel.z, v = Math.hypot(vx, vz);
-    let best = null, bd = 1e9;
-    for (const t of trees) {
-      const ox = t.x - e.pos.x, oz = t.z - e.pos.z;
-      if (Math.abs(ox) > 6.5 || Math.abs(oz) > 6.5) continue;
-      const d = Math.hypot(ox, oz);
-      if (d < e.T.rad + t.r + 0.4 || d > 6) continue;
-      if ((ox * vx + oz * vz) / (d * v) < -0.2) continue;   // only trunks beside or ahead of it
-      if (d < bd) { bd = d; best = t; }
-    }
-    return best;
-  }
+  // a trunk, a post, a pillar, a boulder, the corner of a wall — anything solid right beside it (vines.js)
+  function findTrunk(e) { return pivotNear(ctx.world, e.pos, e.vel, e.T.rad); }
   function startSwing(e, t) {
     const v = Math.max(Math.hypot(e.vel.x, e.vel.z), e.T.speed * 0.8);
     const ox = e.pos.x - t.x, oz = e.pos.z - t.z, r = Math.hypot(ox, oz);
@@ -429,10 +418,8 @@ export function createEnemies(ctx) {
     const head = Math.atan2(e.vel.x, e.vel.z), want = e.wantYaw != null ? e.wantYaw : head;
     let turn = Math.abs(Math.atan2(Math.sin(want - head), Math.cos(want - head)));
     const sweep = clamp(turn + 0.5, 0.9, 2.8);
-    const vine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(), V3()]), new THREE.LineBasicMaterial({ color: e.kind === 'malsti' ? 0x6a3aaa : 0x4a8a2a }));
-    vine.frustumCulled = false; ctx.scene.add(vine);
     const by = t.g + Math.min(t.h * 0.75, 6.5);
-    e.swing = { t, r, a: Math.atan2(oz, ox), dir, w: v / r, left: sweep, done: 0, g: e.pos.y, by, lift: clamp(by - e.pos.y - 1.6, 1.2, 3.6), v, vine };
+    e.swing = { t, r, a: Math.atan2(oz, ox), dir, w: v / r, left: sweep, done: 0, g: e.pos.y, by, lift: clamp(by - e.pos.y - 1.6, 1.2, 3.6), v, anchor: V3(t.x, by, t.z) };
   }
   function updateSwing(e, dt) {
     const S = e.swing, a = e.actor;
@@ -444,16 +431,14 @@ export function createEnemies(ctx) {
     // moving along the circle: the tangent
     const tx = -Math.sin(S.a) * S.dir, tz = Math.cos(S.a) * S.dir;
     e.vel.set(tx * S.v, 0, tz * S.v); e.yaw = Math.atan2(tx, tz);
-    const pos = S.vine.geometry.attributes.position;
-    pos.setXYZ(0, e.pos.x, e.pos.y + 1.2 * (a.root.scale.y || 1), e.pos.z); pos.setXYZ(1, S.t.x, S.by, S.t.z); pos.needsUpdate = true;
     a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
     a.root.rotation.z = -S.dir * 0.4 * Math.sin(k * Math.PI);                    // leaning in toward the trunk
-    if (a.root.visible) a.animate(dt, { speed: S.v * 1.4, t: ctx.G.t });
+    // the swing is one of its own leg-vines, shot out and wrapped round the trunk (or post, or rock)
+    if (a.root.visible) { a.root.updateMatrixWorld(true); a.animate(dt, { speed: 0, t: ctx.G.t, grab: { p: a.root.worldToLocal(S.anchor.clone()), k: Math.min(1, S.done * 5) }, air: Math.sin(k * Math.PI) }); }
     if (k >= 1 || e.dead || e.stun > 0) endSwing(e);
   }
   function endSwing(e) {
     if (!e.swing) return;
-    ctx.scene.remove(e.swing.vine); e.swing.vine.geometry.dispose(); e.swing.vine.material.dispose();
     e.swing = null; e.swingCd = 1.2 + Math.random() * 1.5; e.actor.root.rotation.z = 0;
   }
   const lerp0 = (a, b, k) => a + (b - a) * k;
@@ -468,6 +453,22 @@ export function createEnemies(ctx) {
         e.swingCd = 0.25;   // look again in a moment
         const t = findTrunk(e);
         if (t) { startSwing(e, t); updateSwing(e, dt); return; }
+      }
+    }
+    // a Stryx is slow on its roots — so it throws a vine onto something solid ahead (a rock, a trunk, a wall, the slope) and hauls itself to it
+    if (e.kind === 'stryx' && !e.dead) {
+      e.haulCd = (e.haulCd || 0) - dt;
+      const v = Math.hypot(e.vel.x, e.vel.z);
+      if (!e.haul && e.haulCd <= 0 && v > 0.4 && !e.windup && e.state !== 'attack') {
+        e.haulCd = 0.6;
+        const A = latchPoint(ctx.world, V3(e.pos.x, e.pos.y + 1.2, e.pos.z), V3(e.vel.x / v, 0, e.vel.z / v), { range: 11, near: 3, minUp: -1.5, cone: 0.7, far: 0.3 });
+        if (A) e.haul = { A, t: 0 };
+      }
+      if (e.haul) {
+        const H = e.haul; H.t += dt;
+        const hx = H.A.x - e.pos.x, hz = H.A.z - e.pos.z, hd = Math.hypot(hx, hz) || 1;
+        if (H.t > 0.25) { e.vel.x = hx / hd * 6.5; e.vel.z = hz / hd * 6.5; e.yaw = Math.atan2(hx, hz); }
+        if (H.t > 1.8 || hd < 2.6 || e.windup || e.stun > 0) { e.haul = null; e.haulCd = 1.2 + Math.random(); }
       }
     }
     if (T.ai !== 'flyer') {
@@ -492,7 +493,8 @@ export function createEnemies(ctx) {
     if (e.pos.y < -60) { e.hp = 0; kill(e); }
     a.root.position.copy(e.pos);
     a.root.rotation.y = e.yaw;
-    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, windup: e.windup, attack: e.attackA, diving: e.state === 'dive', airborne: T.ai === 'flyer' && e.alt > 0.6, tail: e.tailT || 0, tailUp: e.windup && e.act === 'tail' ? 1 : 0, thrown: e.state === 'cast' });
+    let grab = null; if (e.haul && a.root.visible) { a.root.updateMatrixWorld(true); grab = { p: a.root.worldToLocal(e.haul.A.clone()), k: Math.min(1, e.haul.t / 0.25) }; }
+    if (a.root.visible) a.animate(dt, { grab, speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, windup: e.windup, attack: e.attackA, diving: e.state === 'dive', airborne: T.ai === 'flyer' && e.alt > 0.6, tail: e.tailT || 0, tailUp: e.windup && e.act === 'tail' ? 1 : 0, thrown: e.state === 'cast' });
   }
 
   /* --------- Albali: circle high, dive, then hang low and vulnerable --------- */

@@ -11,6 +11,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
+import { latchPoint } from './vines.js';
 import { buildSky, SUN_DIR } from './sky.js';
 import { createDayNight } from './daynight.js';
 import { buildEldiShip } from './ship.js';
@@ -2642,26 +2643,39 @@ function toggleRide() {
    ground the vines slap down and vault you a little, and in the air she just
    reaches and misses — no more running about on thin air.
    Caps Lock (or Z): Brindle attacks — a lash of vines and a rind-first shove. */
-const SWING = { range: 36, hip: 1.35 };
-function swingAnchor(look) {
-  let best = null, bs = -1e9;
-  for (const t of world.trees || []) {
-    const dx = t.x - P.pos.x, dz = t.z - P.pos.z;
-    if (Math.abs(dx) > SWING.range || Math.abs(dz) > SWING.range) continue;
-    const d = Math.hypot(dx, dz); if (d < 4 || d > SWING.range) continue;
-    const ay = t.g + Math.min(t.h * 0.95, 28);
-    const up = ay - (P.pos.y + SWING.hip); if (up < (P.onGround ? 3.5 : 1.5)) continue;   // it has to be above you to swing from
-    const dot = (dx * look.x + dz * look.z) / d; if (dot < 0.3) continue;   // and ahead
-    const sc = dot * 2.2 - Math.abs(d - 16) / 16 + Math.min(up, 20) / 14;
-    if (sc > bs) { bs = sc; best = { x: t.x - dx / d * (t.r || 0.4), y: ay, z: t.z - dz / d * (t.r || 0.4) }; }
-  }
-  return best && V3(best.x, best.y, best.z);
+const SWING = { range: 38, hip: 1.35 };
+/* where the vine will go: anything solid in reach (vines.js), steered by the arrow keys —
+   ← / → swing the aim round to that side, ↑ reaches high and far, ↓ takes something near and low */
+function vineAimDir() {
+  const cf = camForward(), hv = Math.hypot(P.vel.x, P.vel.z);
+  const base = hv > 6 ? V3(P.vel.x / hv * 0.35 + cf.x * 0.65, 0, P.vel.z / hv * 0.35 + cf.z * 0.65).normalize() : cf.clone();
+  const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0);
+  if (turn) { const a = turn * 1.05, c = Math.cos(a), sn = Math.sin(a); base.set(base.x * c + base.z * sn, 0, -base.x * sn + base.z * c); }
+  return base;
+}
+function swingAnchor() {
+  const far = keys.ArrowUp ? 1 : keys.ArrowDown ? 0 : 0.5;
+  const from = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z);
+  return latchPoint(world, from, vineAimDir(), { range: SWING.range, near: keys.ArrowDown ? 3 : 5, minUp: P.onGround ? 3 : 1.5, far, cone: (keys.ArrowLeft || keys.ArrowRight) ? 0.55 : 0.3 });
+}
+/* a little seed of light where the vine would land, so you can see what ← → ↑ ↓ are choosing */
+const aimMark = new THREE.Group();
+{
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 6, 20), new THREE.MeshBasicMaterial({ color: 0xb8ff7a, transparent: true, opacity: 0.85, depthTest: false }));
+  aimMark.add(ring, glowSprite(0xb8ff7a, 2.2, 0.7)); ring.renderOrder = 10;
+  aimMark.visible = false; scene.add(aimMark);
+}
+let aimT = 0, aimAt = null;
+function updateVineAim(dt) {
+  if (!P.riding || G.mode !== 'play' || P.vine) { aimMark.visible = false; aimAt = null; return; }
+  if ((aimT -= dt) <= 0) { aimT = 0.08; aimAt = swingAnchor(); }
+  aimMark.visible = !!aimAt;
+  if (aimAt) { aimMark.position.copy(aimAt); aimMark.children[0].lookAt(camera.position); const s = 0.8 + 0.2 * Math.sin(G.t * 6); aimMark.scale.setScalar(s * Math.max(1, camera.position.distanceTo(aimAt) / 18)); }
 }
 function vineGrab() {
   if (!mount || !P.riding) return;
-  const cf = camForward(), hv = Math.hypot(P.vel.x, P.vel.z);
-  const look = hv > 6 ? V3(P.vel.x / hv * 0.4 + cf.x * 0.6, 0, P.vel.z / hv * 0.4 + cf.z * 0.6).normalize() : cf;
-  const A = swingAnchor(look);
+  const look = vineAimDir();
+  const A = swingAnchor();
   sfx.swing();
   if (!A) {
     if (P.onGround || P.coyote > 0) {   // nothing overhead: the vines slap the ground and vault you, once
@@ -2772,6 +2786,7 @@ function phorusDismount() {
   FR.mode = null;
 }
 function updateMount(dt) {
+  updateVineAim(dt);
   if (!mount) return;
   const m = mount;
   if (P.riding) {
@@ -3513,10 +3528,11 @@ function updatePlayer(dt) {
   const act = canAct();
   let ix = 0, iz = 0;
   if (act) {
-    if (keys.KeyW || keys.ArrowUp) iz += 1;
-    if (keys.KeyS || keys.ArrowDown) iz -= 1;
-    if (keys.KeyA || keys.ArrowLeft) ix -= 1;
-    if (keys.KeyD || keys.ArrowRight) ix += 1;
+    const arrows = !P.riding;   // on Brindle the arrow keys aim her vines instead (see vineAim)
+    if (keys.KeyW || (arrows && keys.ArrowUp)) iz += 1;
+    if (keys.KeyS || (arrows && keys.ArrowDown)) iz -= 1;
+    if (keys.KeyA || (arrows && keys.ArrowLeft)) ix -= 1;
+    if (keys.KeyD || (arrows && keys.ArrowRight)) ix += 1;
     if (touch.on) { ix += touch.move.x; iz += touch.move.y; }
     if (mouseL && !P.atk) pressAttack();
   }
@@ -4514,5 +4530,5 @@ window.__torcain = {
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, aimInfo: () => aimAt ? `${aimAt.kind} d=${Math.hypot(aimAt.x - P.pos.x, aimAt.z - P.pos.z).toFixed(1)} up=${(aimAt.y - P.pos.y).toFixed(1)} at ${aimAt.x.toFixed(0)},${aimAt.z.toFixed(0)}` : "none", startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

@@ -1476,6 +1476,15 @@ export function buildStryx(opts = {}) {
     body.rotation.z = Math.sin(t * 3) * 0.03 * clamp(sp, 0, 1);
     for (let i = 0; i < vines.length; i++) {
       const v = vines[i], ca = Math.cos(v.a), sa = Math.sin(v.a);
+      if (st.grab && i === 0) {   // a vine thrown out onto something solid, hauling the whole mesa after it
+        const k = clamp(st.grab.k, 0, 1), e = 1 - Math.pow(1 - k, 3), G = st.grab.p;
+        P3.copy(v.base).lerp(G, e);
+        P1.set(v.base.x * 1.1, v.base.y + 0.8, v.base.z * 1.1);
+        P2.copy(v.base).lerp(G, e * 0.7); P2.y += (1 - e) * 0.8 + 0.2;
+        v.rope.set(v.base, P1, P2, P3);
+        v.tip.position.copy(P3); orientCurl(v.tip, v.rope.dir, UP);
+        continue;
+      }
       const a = clamp(atk * 1.3 - i * 0.08, 0, 1);
       const w = Math.sin(t * 1.4 + v.ph);
       // idle: rising and swaying; wind-up: coiled back; attack: whipped forward
