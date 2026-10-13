@@ -207,6 +207,7 @@ export class DyaMatch3D {
     const duel = o.mode === 'duel';
     this.M = new D.match.Match({
       seed: this.seed, mode: duel ? 'duel' : 'standard', terrain: o.terrain || 'plains',
+      worldTerrain: o.world ? this.readWorld(o.world) : null,
       settings: { pulseInterval: 8, pulseAmount: 2 },
       teams: [
         { name: o.myName, controller: 'human', pouch: (duel ? o.myPouch.slice(0, 1) : o.myPouch).map(deep), color: '#d9b87a' },
@@ -223,10 +224,43 @@ export class DyaMatch3D {
     this.seenEv = new WeakSet();
   }
 
-  /* engine (x, y) → world, and back */
+  /* engine (x, y) → world, and back. Out in the world the field lies on the
+     real ground — up hills, down into hollows, across the top of the water. */
   toWorld(x, y, h = 0) {
     const dx = (x - 800) * this.m, dz = (y - 500) * this.m;
-    return V3(this.o.origin.x + this.fwd.x * dx + this.right.x * dz, this.o.planeY + h, this.o.origin.z + this.fwd.z * dx + this.right.z * dz);
+    const wx = this.o.origin.x + this.fwd.x * dx + this.right.x * dz, wz = this.o.origin.z + this.fwd.z * dx + this.right.z * dz;
+    return V3(wx, (this.o.world ? this.o.world.ground(wx, wz) : this.o.planeY) + h, wz);
+  }
+  /* what's really on the ground where the match is thrown: anything taller
+     than a step is cover the tokens have to go round; water is water */
+  readWorld(W) {
+    const m = this.m, obstacles = [], water = [];
+    const hoards = [[240, 474], [1360, 474], [240, 500], [1360, 500]];   // keep the hoards and their Relics reachable
+    const clearOf = (x, y, r) => x > 20 && x < 1580 && y > 20 && y < 980 && hoards.every(([hx, hy]) => Math.hypot(x - hx, y - hy) > 110 + r);
+    for (const c of W.colliders || []) {
+      const g = W.ground(c.x, c.z);
+      if (c.top - g < 1.0 || c.bot > g + 1.5) continue;           // a kerb, or something overhead
+      const e = this.toEngine({ x: c.x, z: c.z });
+      if (e.x < -200 || e.x > 1800 || e.y < -200 || e.y > 1200) continue;
+      const long = Math.max(c.hw, c.hd), short = Math.min(c.hw, c.hd);
+      const n = Math.max(1, Math.min(12, Math.round(long / Math.max(short, 0.4))));
+      // the long axis in world space, then laid out as a row of posts
+      const ax = c.hw >= c.hd ? { x: c.c, z: -c.s } : { x: c.s, z: c.c };
+      for (let k = 0; k < n; k++) {
+        const t = n === 1 ? 0 : (k / (n - 1) - 0.5) * 2 * (long - short);
+        const q = this.toEngine({ x: c.x + ax.x * t, z: c.z + ax.z * t });
+        const r = Math.max(short, 0.35) / m;
+        if (clearOf(q.x, q.y, r)) obstacles.push({ x: q.x, y: q.y, r, kind: short < 0.8 ? 'trees' : 'rocks' });
+      }
+    }
+    if (W.isWater) {
+      const step = 50;
+      for (let x = step / 2; x < 1600; x += step) for (let y = step / 2; y < 1000; y += step) {
+        const p = this.toWorld(x, y);
+        if (W.isWater(p.x, p.z)) water.push({ x, y, r: step * 0.75 });
+      }
+    }
+    return { obstacles, water };
   }
   toEngine(p) {
     const d = V3(p.x - this.o.origin.x, 0, p.z - this.o.origin.z);
@@ -240,10 +274,12 @@ export class DyaMatch3D {
     // the projected ground: a faint grid inside a glowing frame
     const grid = new THREE.GridHelper(1, 16, 0x9adfff, 0x9adfff);
     grid.material.transparent = true; grid.material.opacity = 0.12; grid.material.depthWrite = false;
-    grid.scale.set(W, 1, H); grid.rotation.y = yaw; grid.position.set(this.o.origin.x, this.o.planeY + 0.04, this.o.origin.z); g.add(grid);
+    grid.scale.set(W, 1, H); grid.rotation.y = yaw; grid.position.set(this.o.origin.x, this.o.planeY + 0.04, this.o.origin.z); if (!this.o.world) g.add(grid);
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ color: 0x6ab8ff, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide }));
-    plane.rotation.x = -Math.PI / 2; plane.rotation.z = yaw + Math.PI / 2; plane.position.set(this.o.origin.x, this.o.planeY + 0.03, this.o.origin.z); g.add(plane);
-    const frame = [[20, 20], [1580, 20], [1580, 980], [20, 980], [20, 20]].map(([x, y]) => this.toWorld(x, y, 0.08));
+    plane.rotation.x = -Math.PI / 2; plane.rotation.z = yaw + Math.PI / 2; plane.position.set(this.o.origin.x, this.o.planeY + 0.03, this.o.origin.z); if (!this.o.world) g.add(plane);
+    // the frame follows the ground: many points along each edge
+    const corners = [[20, 20], [1580, 20], [1580, 980], [20, 980], [20, 20]], frame = [];
+    for (let i = 0; i < 4; i++) for (let k = 0; k <= 40; k++) { const [x0, y0] = corners[i], [x1, y1] = corners[i + 1]; frame.push(this.toWorld(x0 + (x1 - x0) * k / 40, y0 + (y1 - y0) * k / 40, 0.12)); }
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(frame), new THREE.LineBasicMaterial({ color: 0xbfeaff, transparent: true, opacity: 0.8 })));
     // the tether: past 80% of the way to the edge, tokens begin to fade
     const teth = [];
@@ -265,7 +301,7 @@ export class DyaMatch3D {
     });
     // terrain props as holographic rocks and trees (they only dress the field)
     for (const p of this.M.props) {
-      if (p.kind === 'grass') continue;
+      if (p.kind === 'grass' || p.world) continue;   // the world's own trees and rocks are already there
       const s = p.s * 22 * this.m;
       let mesh;
       if (p.kind === 'trees' || p.kind === 'firetrees') { mesh = new THREE.Mesh(new THREE.ConeGeometry(s * 0.8, s * 3, 7), new THREE.MeshBasicMaterial({ color: 0x5aa86a, transparent: true, opacity: 0.25, depthWrite: false })); mesh.position.copy(this.toWorld(p.x, p.y, s * 1.5)); }
@@ -416,6 +452,7 @@ export class DyaMatch3D {
     // zones: fire patches, bogs, water, forest
     const zl = new Set();
     for (const z of M.zones) {
+      if (z.world) continue;   // a real pond needs no painted circle
       zl.add(z);
       let v = this.zoneViews.get(z);
       if (!v) {

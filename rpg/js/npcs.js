@@ -1,5 +1,5 @@
 /* ============================================================
-   Folk of Xilia and the Leotik camp. Eikar of every sort, a Kalo'Eik trader,
+   Folk of Beuhk and the Leotik camp. Eikar of every sort, a Kalo'Eik trader,
    KEILIA like Venkin and Orrin — taller than the Eikar, darker
    pinecone-wood skin, a single eye, and "hair" of overlapping
    pinecone scales growing from the head and falling thick over the
@@ -324,16 +324,16 @@ export const NPC_LOOKS = {
 export const NPCS = {
   /* Aakalay is abandoned — nobody lives there now */
   aakalay: [],
-  /* Xilia, the home town (positions are absolute here) */
+  /* Beuhk, the home town (positions are absolute here) */
   xilia: [
-    { id: 'buhkon', name: 'Buhkon Eldi', title: 'the Carpenter', look: 'buhkon', pos: [52, 98], roles: [], quests: [],
+    { id: 'buhkon', name: 'Buhkon Eldi', title: 'the Carpenter', look: 'buhkon', pos: [-188, 52], roles: [], quests: [],
       hello: ['Calm first, then quick. Calm first.', 'You wore that hat the day I found you. It still suits you, little one.'] },
     { id: 'hemla', name: 'Hemla', title: 'Kalo\u2019Eik trader', look: 'hemla', pos: [-8, 60], roles: ['shop'], quests: ['q_vel'],
       hello: ['Shards for goods, goods for shards. The Kalo keep fair books, little Stamijan.', 'You smell like Punk. That\u2019s not a complaint — it\u2019s a sales opportunity.'] },
     { id: 'duro', name: 'Duro', title: 'Eikar smith', look: 'duro', pos: [16, 44], roles: ['forge'], quests: ['q_ore'],
       hello: ['A smith keeps his cauldron on the fire tree\u2019s branch. Mine came with me in a sack.', 'Bring me ore and bark and I\u2019ll grow you a blade that bites.'] },
     { id: 'venkin', name: 'Venkin', title: 'Keilia builder', look: 'keilia', pos: [-16, 40], roles: ['cook'], quests: ['q_camp'],
-      hello: ['I build. Walls, roofs, bridges. Weapons? Passable, at best — ask Duro.', 'Half of Xilia\u2019s roofs are mine. The good half.'] },
+      hello: ['I build. Walls, roofs, bridges. Weapons? Passable, at best — ask Duro.', 'Half of Beuhk\u2019s roofs are mine. The good half.'] },
     { id: 'ruut', name: 'Old Ruut', title: 'Punk herder', look: 'ruut', pos: [-34, 98], roles: ['stable'], quests: ['q_strays'],
       hello: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Three of my herd wandered off into the countryside. Brainless, the lot of them. Bless them.'] },
     { id: 'sefa', name: 'Sefa', title: 'a young Eikar', look: 'sefa', pos: [4, 70], roles: [], quests: ['q_fennek'],

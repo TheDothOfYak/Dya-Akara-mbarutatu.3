@@ -34,7 +34,7 @@ export const UPGRADES = [
 export const upgradeCost = (u, rank) => u.base + u.step * rank;
 
 const BASE = 'torcain-save-v2';
-/* bump to reset every run (v3: the Xilia prologue — all earlier runs start over) */
+/* bump to reset every run (v3: the Beuhk prologue — all earlier runs start over) */
 export const SAVE_V = 3;
 /* each signed-in account keeps its own local copy; guests share one */
 export const saveKey = accountId => accountId ? BASE + ':' + accountId : BASE;

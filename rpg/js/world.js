@@ -136,7 +136,7 @@ function baseH(x, z) {
 for (const f of JU) FLATS.push({ x: f.x, z: f.z, r: f.r + 3, h: baseH(f.x, f.z) });
 for (const f of ALBALI) FLATS.push({ x: f.x, z: f.z, r: 9, h: baseH(f.x, f.z) });
 
-/* the Megla Pass (Megla: mist): the old road north — Fti — out of the Reach, the long way round to Xilia on foot */
+/* the Megla Pass (Megla: mist): the old road north — Fti — out of the Reach, the long way round to Beuhk on foot */
 const PASS_A = -2.1;
 export const PASS = makePass({ id: 'a_ashroad', name: 'The Megla Pass', dir: 'Fti', to: 'xilia', toPass: 'x_ashroad', a: PASS_A,
   r0: lut(LIM, PASS_A) - 75, r1: lut(LIM, PASS_A) + 28, w: 9, rise: 16 }, baseH);
@@ -197,6 +197,7 @@ export function buildWorld(scene) {
   const rng = mulberry32(1307);
   const pick = a => a[Math.floor(rng() * a.length)];
   const col = new Colliders(heightAt);
+  const trees = [];   // trunks a Punk can swing round
 
   /* places that matter */
   const SITES = {
@@ -632,6 +633,7 @@ export function buildWorld(scene) {
   const LEAF = ['#e0a33a', '#d98a2c', '#c9612a', '#e8c04a', '#b9a23a', '#a8b04a'];
   function tree(x, z, s) {
     const g = heightAt(x, z), h = 4 + s * 3.5;
+    trees.push({ x, z, g, h, r: 0.35 * s });
     trunks.put(x, g + h / 2 - 0.4, z, 0.35 * s, h, 0.35 * s, (rng() - 0.5) * 0.15, rng() * 6, (rng() - 0.5) * 0.15, '#6b4128');
     const lc = pick(LEAF);
     const n = 3 + Math.floor(rng() * 3);
@@ -800,6 +802,7 @@ export function buildWorld(scene) {
   }
   function pine(x, z, s) {
     const g = heightAt(x, z);
+    trees.push({ x, z, g, h: 8 * s, r: 0.3 * s });
     wTrunks.put(x, g + 1.2, z, 0.3 * s, 3, 0.3 * s, 0, 0, 0, '#4a3020');
     wCones.put(x, g + 2 + 4.5 * s, z, 2.2 * s, 9 * s, 2.2 * s, 0, rng2() * 3, 0, pick2(['#55602e', '#6a5a28', '#4a5530', '#7a6a2a']));
     col.add(x, z, 0.3 * s, 0.3 * s, 0, g - 1, g + 8 * s);
@@ -979,7 +982,7 @@ export function buildWorld(scene) {
 
   let time = 0;
   return {
-    name: 'aakalay', hazards: [], pillars: [], camp: null,
+    name: 'aakalay', hazards: [], pillars: [], camp: null, trees,
     skorthal: { x: -22, z: -136 },
     /* where Skor'Thal has rubbed its rind — only Nur'Hlyst shows them */
     scars: [

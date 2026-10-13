@@ -146,6 +146,11 @@
   #memory .mc{margin-top:14px;font-family:var(--display);font-size:11px;letter-spacing:.2em;color:var(--brass)}
 
   /* ---------------- overlays ---------------- */
+  /* the beginning: on Velki only the story shows; on Xikia Tanoc is a boy with a hatchet */
+  #hud.velki #compass,#hud.velki #vitals,#hud.velki #abilities,#hud.velki #spells,#hud.velki #crosshair,#hud.velki #qtrack,#hud.velki #levelup,#hud.velki #ehp,#hud.velki #lock,#hud.velki #boss{display:none}
+  #hud.velki.roadhp #vitals{display:flex}
+  #hud.velki.roadhp #xpline,#hud.velki.roadhp #stam,#hud.velki.roadhp #heat,#hud.velki.roadhp #belt{display:none}
+  #hud.young #abilities,#hud.young #spells,#hud.young #heat,#hud.young #qtrack{display:none}
   #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:30;transition:opacity .8s}
   #cards{position:fixed;inset:0;z-index:31;display:flex;align-items:center;justify-content:center;pointer-events:none}
   #cards p{max-width:760px;text-align:center;font-size:clamp(20px,2.4vw,28px);line-height:1.5;padding:0 30px;opacity:0;transition:opacity 1s;text-shadow:0 2px 8px #000}
