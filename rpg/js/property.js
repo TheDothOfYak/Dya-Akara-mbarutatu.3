@@ -380,6 +380,7 @@ export function buildProperty(scene) {
       const bark = new THREE.Color('#3e3228').offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.06).getStyle();
       gTrunks.put(x, g + h / 2, z, R, h, R, 0, rng() * 6, 0, bark);
       col.add(x, z, R * 0.85, R * 0.85, 0, g - 1, g + 30);
+      trees.push({ x, z, g, h, r: R });   // Brindle can swing from these
       // buttress roots fanning out over the ground
       const nr = 5 + Math.floor(rng() * 3);
       for (let k = 0; k < nr; k++) {

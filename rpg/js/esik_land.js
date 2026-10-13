@@ -505,6 +505,7 @@ function buildPunkKind(cfg, opts) {
   const P0 = new THREE.Vector3(), P1 = new THREE.Vector3(), P2 = new THREE.Vector3(), P3 = new THREE.Vector3();
   const tmp = new THREE.Vector3(), down = new THREE.Vector3(0, -1, 0);
   let ph = Math.random() * TAU, walkW = 0, t0 = Math.random() * 10;
+  let lastGrab = null;
   const Rf = R * cfg.footR, kneeH = cfg.kneeH;
   const stride0 = R * cfg.stride;
 
@@ -523,8 +524,48 @@ function buildPunkKind(cfg, opts) {
     const s = 1 + (wind * (1 - atk)) * 0.06;
     body.scale.set(s, 1 / s, s);
     body.updateMatrix();
+    // a leg-vine reaching out to grab something (st.grab = { p: point in root space, k: 0..1 how far it has shot out })
+    // — the leg on the side nearest the target is the one that goes; the rest tuck up while she's off the ground
+    const grab = st.grab, air = clamp(st.air || 0, 0, 1);
+    let gv = null;
+    if (grab) {
+      let bd = -9; tmp.set(grab.p.x, 0, grab.p.z).normalize();
+      for (const v of vines) if (!v.arm) { const d = v.radial.dot(tmp) - (v === lastGrab ? -0.25 : 0); if (d > bd) { bd = d; gv = v; } }
+      lastGrab = gv;
+    }
     for (const v of vines) {
       P0.copy(v.attach).applyMatrix4(body.matrix);
+      if (v === gv) {
+        const k = clamp(grab.k, 0, 1), e = 1 - Math.pow(1 - k, 3);
+        tmp.subVectors(grab.p, P0); const L = tmp.length() || 1;
+        P3.copy(P0).addScaledVector(tmp, e);
+        // while it is still flying out the vine whips in an S; once it holds it pulls nearly straight, sagging a touch
+        const wob = (1 - e) * L * 0.18 * Math.sin(t * 30);
+        P1.copy(v.radial).multiplyScalar(R * 0.9).add(P0); P1.y += R * 0.6;
+        P2.copy(P0).addScaledVector(tmp, e * 0.66); P2.x += v.radial.z * wob; P2.z -= v.radial.x * wob; P2.y -= (k >= 1 ? L * 0.04 : -wob * 0.5);
+        P1.lerp(tmp.copy(P0).addScaledVector(grab.p.clone().sub(P0), e * 0.33), 0.6);
+        v.rope.set(P0, P1, P2, P3);
+        v.tip.position.copy(P3); orientCurl(v.tip, v.rope.dir, v.curlTo);
+        v.tip.scale.setScalar(1 + k * 0.6);   // the curl clenches round what it caught
+        continue;
+      }
+      if (!v.arm && air > 0) {
+        // off the ground: legs trail and curl up under the rind
+        const sway = Math.sin(t * 5 + v.jitter * 6) * R * 0.15;
+        P3.copy(v.radial).multiplyScalar(R * (0.8 + 0.3 * (1 - air))); P3.y = bodyY * (0.25 + 0.35 * air) + sway; P3.z -= R * 0.6 * air;
+        P1.copy(v.radial).multiplyScalar(R * cfg.shoulder).add(P0); P1.y = P0.y + R * 0.2;
+        P2.copy(v.radial).multiplyScalar(R * 1.2); P2.y = P3.y - R * 0.3; P2.z -= R * 0.5 * air;
+        tmp.copy(P3);
+        // blend from the walking pose so landing isn't a snap
+        let u = ((ph + v.group * Math.PI) / TAU) % 1; if (u < 0) u += 1;
+        const wz = (u < 0.5 ? 1 - 4 * u : -1 + 2 * sstep((u - 0.5) * 2)) * walkW * stride * 0.5;
+        const W3 = new THREE.Vector3().copy(v.radial).multiplyScalar(Rf); W3.y = R * 0.03; W3.z += wz;
+        P3.lerpVectors(W3, tmp, air);
+        v.rope.set(P0, P1, P2, P3);
+        v.tip.position.copy(P3); orientCurl(v.tip, v.radial, v.curlTo); v.tip.scale.setScalar(1);
+        continue;
+      }
+      v.tip.scale.setScalar(v.arm ? v.tip.scale.x : 1);
       if (!v.arm) {
         // gait: stance slides back under the body, swing lifts forward
         let u = ((ph + v.group * Math.PI) / TAU) % 1; if (u < 0) u += 1;
