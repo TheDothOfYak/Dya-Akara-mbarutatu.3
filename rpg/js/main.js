@@ -273,7 +273,7 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mousedown', e => {
   if (G.mode !== 'title') initAudio();   // browsers only let sound start after a click
-  if (e.target.closest && e.target.closest('#d-choices, #rpg')) return;
+  if (e.target.closest && e.target.closest('#d-choices, #rpg, #pk-box')) return;
   if (G.mode === 'title' || overlayOpen()) return;
   if (G.mode === 'intro' || G.mode === 'trance') { skipCards(); return; }
   if (!locked && !touch.on) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
@@ -3699,13 +3699,14 @@ function youngHud() {
   document.querySelector('#vitals .name').innerHTML = `TANOC <small>Filugani</small><span id="lvl">${$('lvl') ? $('lvl').textContent : 'LV 1'}</span>`;
 }
 function askName(cb) {
+  G.mode = 'naming';   // not 'play': letting go of the mouse to type isn't a pause
   if (document.pointerLockElement) document.exitPointerLock();
   const box = document.createElement('div');
-  box.className = 'brass'; box.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:45;padding:22px 26px;text-align:center;min-width:280px';
+  box.id = 'pk-box'; box.className = 'brass'; box.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:45;padding:22px 26px;text-align:center;min-width:280px';
   box.innerHTML = '<div style="font-family:var(--display);letter-spacing:.12em;margin-bottom:10px">NAME YOUR PUNK</div><input id="pk-name" maxlength="18" style="font:inherit;font-size:18px;padding:6px 10px;width:220px" placeholder="Pip"><div style="margin-top:12px"><button class="btn" id="pk-ok">That’s its name</button></div>';
   document.body.appendChild(box);
   const inp = box.querySelector('#pk-name'); setTimeout(() => inp.focus(), 50);
-  const done = () => { const n = (inp.value || '').replace(/[<>&"]/g, '').trim() || 'Pip'; box.remove(); lockMouse(); cb(n); };
+  const done = () => { const n = (inp.value || '').replace(/[<>&"]/g, '').trim() || 'Pip'; box.remove(); G.mode = 'play'; lockMouse(); cb(n); };
   box.querySelector('#pk-ok').onclick = done;
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(); e.stopPropagation(); });
 }
