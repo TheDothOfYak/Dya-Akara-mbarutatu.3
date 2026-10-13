@@ -19,10 +19,10 @@ import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
-import { buildProperty } from './property.js';
+import { buildProperty, COLOSSI } from './property.js';
 import { createInteriors } from './interiors.js';
 import { buildTorcain, buildPhorus, buildCore } from './actors.js';
-import { buildDomesticPunk, buildMalstiPunk, buildSkorThal, buildGynge } from './esik_land.js';
+import { buildDomesticPunk, buildWildPunk, buildMalstiPunk, buildSkorThal, buildGynge } from './esik_land.js';
 import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
 import { createWilds } from './wilds.js';
@@ -31,8 +31,9 @@ import { createSunear } from './sunear.js';
 import { createVelki, buildAngel, buildSniller } from './velki.js';
 import { createRoad } from './road.js';
 import { createMegla } from './megla.js';
+import { buildCart } from './cart.js';
 import { createCine } from './cine.js';
-import { ITEMS, LOOT, add as invAdd, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
+import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
 import { QUESTS, questProgress } from './quests.js';
@@ -110,7 +111,17 @@ $('game').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = REGION === 'leotik' ? new THREE.Fog(0x4a5a58, 70, 650) : REGION === 'xilia' ? new THREE.Fog(0xf6c89a, 160, 1200) : REGION === 'property' ? new THREE.Fog(0xc8dcf0, 520, 4600) : new THREE.Fog(0xf2b88e, 140, 1100);
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 12000);
-const mainCine = createCine(camera);   // the moments you only watch, out in the regions themselves
+/* is this point inside the land or anything solid? (the films' cameras keep out of walls with it) */
+function camBlocked(x, y, z) {
+  if (!interiors.inside && y < world.heightAt(x, z) + 0.25) return true;
+  for (const o of world.col.near(x, z)) {
+    if (y < o.bot || y > o.top) continue;
+    const dx = x - o.x, dz = z - o.z, lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c;
+    if (Math.abs(lx) <= o.hw && Math.abs(lz) <= o.hd) return true;
+  }
+  return false;
+}
+const mainCine = createCine(camera, { blocked: (x, y, z) => camBlocked(x, y, z) });   // the moments you only watch, out in the regions themselves
 
 const hemi = REGION === 'leotik' ? new THREE.HemisphereLight(0x9ab8b0, 0x3a4a30, 1.35) : new THREE.HemisphereLight(0xb8d0ff, 0xc0804e, 1.25);
 scene.add(hemi);
@@ -371,7 +382,8 @@ function onKey(code) {
   if (VK) { if (G.mode === 'play' && !G.paused) { if (code === 'Space') VK.jump(); if (code === 'KeyE') VK.interact(); if (SLOT_KEYS.includes(code) && VK.useSlot) VK.useSlot(SAVE.slots[code]); } return; }
   if (code === 'Tab' && G.mode === 'play') { toggleJournal(); return; }
   if (G.mode !== 'play' || G.paused) return;
-  if (young() && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM', 'KeyK', 'KeyJ', 'KeyG', 'KeyR', 'KeyT', ...SLOT_KEYS].includes(code)) return;   // a boy of thirteen, with a hatchet, and whatever Relics he's learned to wake
+  if (PLACE && (code === 'KeyE' || code === 'Escape')) { if (code === 'KeyE') confirmStall(); else cancelStall(); return; }
+  if (young() && !['Space', 'KeyE', 'KeyC', 'KeyI', 'KeyM', 'KeyK', 'KeyJ', 'KeyG', 'KeyR', 'KeyT', 'KeyH', 'CapsLock', 'KeyZ', ...SLOT_KEYS].includes(code)) return;   // a boy of thirteen, with a hatchet, and whatever Relics he's learned to wake
   if (dyaMatch) {
     if (code === 'KeyV') { dyaOverview = !dyaOverview; return; }
     if (dyaMatch.key(code)) return;
@@ -1163,7 +1175,7 @@ function interactables() {
   else if (REGION === 'xilia') list.push({ pos: STRYX_SPOT, label: F_.xseed ? 'Give the Stryx the fire seed' : 'Hail the Stryx pilot', act: () => stryx() });
   if (REGION === 'aakalay' && F_.done && gate) list.push({ pos: V3(gate.position.x, gate.position.y, gate.position.z), label: 'Speak Kiet’s trigger at the Urverk', act: () => setSail(), far: 6 });
   if (REGION === 'leotik' && gate) list.push({ pos: V3(gate.position.x, gate.position.y, gate.position.z), label: 'Touch the closed Urverk', act: () => dialog([['phorus', 'Shut tight. Whatever trigger opens it from this side, Kiet never needed it. We’re stranded until the keep says otherwise.']]), far: 5 });
-  for (const l of lanterns) list.push({ pos: V3(l.x, l.y, l.z), label: lanternLit(l) ? 'Rest at the Nur Lantern' : 'Wake the Nur Lantern', act: () => useLantern(l), far: 2.8 });
+  for (const l of lanterns) list.push({ pos: V3(l.x, l.y, l.z), label: lanternLit(l) ? 'Rest at the Nur Lantern' : canWakeLantern() ? 'Wake the Nur Lantern' : 'A cold Nur Lantern', act: () => useLantern(l), far: 2.8 });
   for (const s of stones) list.push({ pos: V3(s.x, s.y, s.z), label: 'Read the carving', act: () => readStone(s), far: 2.6 });
   for (const n of npcs) if (!n.hidden) list.push({ pos: n.pos, label: `Talk to ${n.def.name} <small style="opacity:.7">${n.def.title}</small>`, act: () => npcTalk(n), far: 3.2 });
   if (REGION === 'xilia' && SAVE.quests.q_camp === 'done') list.push({ pos: V3(world.hearth.x, world.heightAt(world.hearth.x, world.hearth.z), world.hearth.z), label: 'Cook at the hearth', act: () => openBook('cook'), far: 3 });
@@ -1184,7 +1196,7 @@ function interactables() {
     else if (!e.petted) list.push({ pos: e.pos, label: e.kind === 'kipsu_f' ? 'Pet the Kipsu' : 'Pat the Punk', act: () => petCreature(e), far: 2.6 });
   }
   list.push(...wilds.interactables(P));
-  if (mount) list.push({ pos: mount.pos, label: P.riding ? 'Climb down from Brindle' : 'Ride Brindle', act: () => toggleRide(), far: P.riding ? 99 : 3 });
+  if (mount && (saddled() || !P.riding)) list.push({ pos: mount.pos, label: P.riding ? `Climb down from ${PN()}` : saddled() ? `Ride ${PN()}` : `Scratch ${PN()} behind the vines`, act: () => saddled() ? toggleRide() : (sfx.heal(), bark('punk', '…', 1.5)), far: P.riding ? 99 : 3 });
   for (const c of feats.chests) if (!c.open) list.push({ pos: V3(c.x, c.y, c.z), label: 'Open the chest', act: () => openChest(c), far: 2.6 });
   for (const n of feats.nodes) if (n.ready) list.push({ pos: V3(n.x, n.y, n.z), label: n.label, act: () => gather(n), far: 2.6 });
   for (const t of feats.trials) list.push({ pos: V3(t.x, t.y, t.z), label: t.done ? `${t.name} — passed` : `Begin the ${t.name}`, act: () => startTrial(t), far: 2.8 });
@@ -1236,7 +1248,17 @@ function readStone(s) {
   dialog(lines.map(l => ['stone', l]));
 }
 
+/* a Nur Lantern only wakes for someone carrying Nur: a Nur at your side (Phorus), or a Relic with a Hurst in it */
+function canWakeLantern() {
+  if (phorusWith()) return true;
+  return Object.keys(SAVE.inv.items).some(k => k.startsWith('r_') && SAVE.inv.items[k] > 0) || !!F_.ring;
+}
 function useLantern(l) {
+  if (!lanternLit(l) && !canWakeLantern()) {
+    sfx.ui();
+    bark(young() ? 'tale' : 'phorus', young() ? 'The lantern is cold. You cup your hands round it and nothing happens. It wants Nur — a Nur beside you, or a Relic with something alive in it.' : 'It won’t wake for us like this.', 4.5);
+    return;
+  }
   if (!lanternLit(l)) {
     SAVE.lit[l.id] = true; xp(25);
     l.flame.material.opacity = 1;
@@ -2449,7 +2471,7 @@ function npcTalk(n) {
     const ok = REGION !== 'xilia' || SAVE.quests.q_camp === 'done';
     opts.push({ label: ok ? 'Cook at the hearth' : 'Cook <small>(the hearth isn’t built yet)</small>', act: () => ok ? openBook('cook') : dialog([[who, 'Help me raise the storehouse and I’ll build a hearth worth cooking on.']], () => npcTalk(n)) });
   }
-  if (def.roles.includes('stable') && SAVE.flags.mount) opts.push({ label: 'Ask about Brindle', act: () => dialog([[who, 'Whistle (H) and she’ll come. Ride her with E. Don’t let her eat the Zahreh.']], () => npcTalk(n)) });
+  if (def.roles.includes('stable') && (SAVE.flags.mount || F_.saddle)) opts.push({ label: `Ask about ${PN()}`, act: () => dialog([[who, saddled() ? 'Whistle (H) and she’ll come. Ride her with E. Don’t let her eat the Zahreh.' : 'The saddle? Give it to the Carpenter. She wants a stall of her own before she’ll take it.']], () => npcTalk(n)) });
   opts.push({ label: 'Goodbye', act: null });
   ask(who, def.hello[Math.floor(Math.random() * def.hello.length)], opts);
 }
@@ -2611,26 +2633,59 @@ function flyKuni(dt, wish, moving, act) {
   updateAttack(dt);
 }
 
-/* ---------------- Brindle, your Punk ---------------- */
-let mount = null;
+/* ---------------- your Punk ----------------
+   Tanoc's Punk is the young mutt he saved in Fyrsti'Vilag, the one that followed
+   him north. She trots at his heels and grows as the seasons go (a few hours of
+   play). Old Ruut gives him a saddle; the Carpenter and he build her a stall
+   wherever you choose; the saddle is fitted, and she's a steed. Her saddlebags
+   carry materials, more as she grows. (Torcain, years later, rides Brindle.) */
+var mount = null;   // var: the pack check (invAdd) can run before this line does
+const PN = () => (young() || F_.punkName) && !(SAVE.flags.mount && !young()) ? (F_.punkName || 'your Punk') : 'Brindle';
+const ownPunk = () => young() || (!SAVE.flags.mount && !!F_.punkName);
+function punkGrowth() { return clamp(((SAVE.time || 0) - (F_.punkBorn ?? 0)) / (3 * 3600), 0, 1); }
+const punkScale = () => 0.72 + 0.48 * punkGrowth();
+const saddled = () => ownPunk() ? !!F_.saddled : true;
 function makeMount(nearPlayer) {
   if (mount) return;
-  const actor = buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 }); actor.root.scale.setScalar(0.8);   // Brindle: a horse-sized youngster
-  const p = nearPlayer ? P.pos.clone().add(V3(3, 0, 3)) : camp ? V3(camp.pen.x, 0, camp.pen.z) : world.pen ? V3(world.pen.x + 3, 0, world.pen.z) : P.pos.clone().add(V3(4, 0, 4));
+  let actor, seat, scale;
+  if (ownPunk()) {
+    if (F_.punkBorn == null) { F_.punkBorn = SAVE.time || 0; }
+    scale = punkScale();
+    actor = buildWildPunk({ seed: 31, saddle: !!F_.saddled, blanket: 0x8a5a2a }); actor.root.scale.setScalar(scale);
+    seat = scale * 1.85 - 0.3;
+  } else {
+    actor = buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 }); scale = 0.8; actor.root.scale.setScalar(scale);   // Brindle: a horse-sized youngster
+    seat = 1.35;
+  }
+  const st = F_.stall;
+  const p = nearPlayer ? P.pos.clone().add(V3(3, 0, 3)) : st && REGION === 'property' ? V3(st.x, 0, st.z) : camp ? V3(camp.pen.x, 0, camp.pen.z) : world.pen ? V3(world.pen.x + 3, 0, world.pen.z) : P.pos.clone().add(V3(4, 0, 4));
   p.y = world.col.ground(p.x, p.z, world.heightAt(p.x, p.z) + 1);
   actor.root.position.copy(p); scene.add(actor.root);
-  mount = { actor, pos: p, vel: V3(), yaw: 0, coming: false };
+  mount = { actor, pos: p, vel: V3(), yaw: 0, coming: false, seat, scale };
 }
-if (SAVE.flags.mount) makeMount(false);
+function remakeMount() { if (!mount) return; const p = mount.pos.clone(), y = mount.yaw; scene.remove(mount.actor.root); mount = null; makeMount(false); mount.pos.copy(p); mount.yaw = y; }
+if (SAVE.flags.mount || (ownPunk() && F_.punkName && REGION !== 'leotik' && REGION !== 'aakalay')) makeMount(false);
 function whistle() {
-  if (!mount) { toast('You whistle. Nothing comes. (Old Ruut might lend you a Punk.)', 2.5); return; }
+  if (!mount) { toast(young() ? 'You whistle. Nothing comes.' : 'You whistle. Nothing comes. (Old Ruut might lend you a Punk.)', 2.5); return; }
   sfx.blink();
   if (P.riding) return;
   if (mount.pos.distanceTo(P.pos) > 60) { mount.pos.copy(P.pos).add(V3(-6, 0, 6)); mount.pos.y = world.col.ground(mount.pos.x, mount.pos.z, P.pos.y + 3); }
-  mount.coming = true; toast('Brindle comes running.', 1.8);
+  mount.coming = true; toast(`${PN()} comes running.`, 1.8);
+}
+/* materials: what Tanoc can carry, and what her saddlebags can */
+var PACK = 40;
+function bagCap() { return mount && saddled() ? Math.round(20 + 60 * (ownPunk() ? punkGrowth() : 1)) : 0; }
+function matCount() { let n = 0; for (const [k, c] of Object.entries(SAVE.inv.items)) if (ITEMS[k] && ITEMS[k].kind === 'mat') n += c; return n; }
+function invAdd(inv, id, n = 1) {
+  if (inv === SAVE.inv && ITEMS[id] && ITEMS[id].kind === 'mat') {
+    const cap = PACK + bagCap(), room = cap - matCount();
+    if (room < n) { if (room > 0) invAddRaw(inv, id, room); toast(STORY.STEED.bagFull(cap, bagCap()), 3); return; }
+  }
+  invAddRaw(inv, id, n);
 }
 function toggleRide() {
   if (!mount) return;
+  if (!P.riding && !saddled()) { bark('tanoc', STORY.STEED.noSaddle(PN()), 3.5); return; }
   if (P.riding) {
     P.riding = false; P.vine = null; P.slap = null;
     P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
@@ -2799,12 +2854,18 @@ function updateMount(dt) {
   updateVineAim(dt);
   if (!mount) return;
   const m = mount;
+  // your own Punk grows, slowly; and until she's a steed she keeps to your heels (indoors, she waits by the door)
+  if (ownPunk()) {
+    if ((m.growT = (m.growT || 0) - dt) <= 0) { m.growT = 5; const sc = punkScale(); if (Math.abs(sc - m.scale) > 0.004) { m.scale = sc; m.actor.root.scale.setScalar(sc); m.seat = sc * 1.85 - 0.3; } }
+    if (!P.riding && !interiors.inside && G.mode === 'play' && P.pos.distanceTo(m.pos) > (saddled() ? 14 : 7)) m.coming = true;
+  }
   if (P.riding) {
     m.pos.copy(P.pos); m.yaw = P.yaw;
   } else if (m.coming) {
     const dx = P.pos.x - m.pos.x, dz = P.pos.z - m.pos.z, d = Math.hypot(dx, dz);
-    if (d < 3) m.coming = false;
-    else { m.vel.x = dx / d * 13; m.vel.z = dz / d * 13; m.yaw = Math.atan2(dx, dz); }
+    if (d > 90) { m.pos.set(P.pos.x - Math.sin(P.yaw) * 6, P.pos.y, P.pos.z - Math.cos(P.yaw) * 6); }
+    if (d < 3.5) m.coming = false;
+    else { const sp = Math.min(13, 3 + d * 0.9); m.vel.x = dx / d * sp; m.vel.z = dz / d * sp; m.yaw = Math.atan2(dx, dz); }
   } else { m.vel.x *= 0.85; m.vel.z *= 0.85; }
   if (!P.riding) {
     m.pos.x += m.vel.x * dt; m.pos.z += m.vel.z * dt;
@@ -2830,12 +2891,70 @@ function updateMount(dt) {
   // the grabbing vine: a real leg reaching out to where it caught (or slapped, or missed)
   let grab = null;
   R0.updateMatrixWorld(true);
-  if (P.riding && P.vine) grab = { p: R0.worldToLocal(P.vine.A.clone()), k: P.vine.k };
+  if (P.riding && P.climb) { const c = P.climb.c, [cx, cz] = c.at(P.pos.y + 2); grab = { p: R0.worldToLocal(V3(cx + Math.cos(P.climb.phi) * c.rad(P.pos.y + 2, P.climb.phi), P.pos.y + 2.4, cz + Math.sin(P.climb.phi) * c.rad(P.pos.y + 2, P.climb.phi))), k: 1 }; }
+  else   if (P.riding && P.vine) grab = { p: R0.worldToLocal(P.vine.A.clone()), k: P.vine.k };
   else if (P.riding && P.slap) {
     P.slap.t += dt; const k = P.slap.t / (P.slap.miss ? 0.45 : 0.3);
     if (k >= 1) P.slap = null; else grab = { p: R0.worldToLocal(P.slap.p.clone()), k: Math.sin(k * Math.PI) };
   }
   m.actor.animate(dt, { speed: P.riding ? (P.onGround ? hv : 0) : Math.hypot(m.vel.x, m.vel.z), t: G.t, attack: m.atk > 0 ? m.atk / 0.5 : 0, windup: 0, grab, air: P.riding ? m.air : 0 });
+}
+
+/* ---------------- climbing the great trees ----------------
+   Any trunk too big to put your arms round — the deepwood's giants, the colossi —
+   can be climbed: against it, Space takes hold; W / S up and down, A / D round it,
+   Space again to leap off (and hold it to glide down). On your Punk it goes three
+   times as fast, her leg-vines gripping the bark. */
+const climbables = [];
+{
+  for (const t of world.trees || []) if ((t.r || 0) >= 1.6 && (t.h || 0) >= 25) climbables.push({ x: t.x, z: t.z, g: t.g, top: t.g + t.h * 0.85, at: () => [t.x, t.z], rad: (y) => t.r * (1 - 0.28 * clamp((y - t.g) / t.h, 0, 1)) });
+  for (const W of world.colossi || []) {
+    const C = (COLOSSI || []).find(c => c.id === W.id);
+    if (!C || !C.trunkR) continue;
+    climbables.push({ x: W.x, z: W.z, g: W.g, top: W.g + W.H * 0.8, big: true, at: y => C.trunkAt(y), rad: (y, phi) => C.trunkR(clamp((y - W.g) / W.H, 0, 1), phi) });
+  }
+}
+function tryClimb(wish) {
+  if (P.flying || P.swimming || interiors.inside) return false;
+  const reach = P.riding ? 2.6 : 1.1;
+  for (const c of climbables) {
+    if (Math.abs(c.x - P.pos.x) > 120 || Math.abs(c.z - P.pos.z) > 120) continue;
+    const [cx, cz] = c.at(P.pos.y), dx = P.pos.x - cx, dz = P.pos.z - cz, d = Math.hypot(dx, dz), phi = Math.atan2(dz, dx);
+    if (d > c.rad(P.pos.y, phi) + reach + (c.big ? 2 : 0)) continue;
+    if (P.pos.y > c.top - 1) continue;
+    P.climb = { c, phi, y: Math.max(P.pos.y, c.g) + 0.3 };
+    P.vine = null; P.vel.set(0, 0, 0); P.onGround = false; sfx.jump();
+    if (!F_.climbTold) { F_.climbTold = true; persist(); hint('Climbing — W / S up and down, A / D round the trunk, Space to leap off.'); }
+    return true;
+  }
+  return false;
+}
+function climbTick(dt, act) {
+  const C = P.climb, c = C.c;
+  let up = 0, round = 0;
+  if (act) { if (keys.KeyW || keys.ArrowUp) up += 1; if (keys.KeyS || keys.ArrowDown) up -= 1; if (keys.KeyA || keys.ArrowLeft) round -= 1; if (keys.KeyD || keys.ArrowRight) round += 1; if (touch.on) { up += touch.move.y; round += touch.move.x; } }
+  const sp = P.riding ? 8 : 2.8;
+  const R0 = c.rad(C.y, C.phi) + (P.riding ? 1.4 : 0.55);
+  C.y = clamp(C.y + up * sp * dt, c.g - 2, c.top);
+  C.phi += round * (sp * 0.9) / Math.max(2, R0) * dt;
+  const [cx, cz] = c.at(C.y), R = c.rad(C.y, C.phi) + (P.riding ? 1.4 : 0.55);
+  P.pos.set(cx + Math.cos(C.phi) * R, C.y, cz + Math.sin(C.phi) * R);
+  P.vel.set(0, 0, 0);
+  P.yaw = Math.atan2(cx - P.pos.x, cz - P.pos.z);
+  C.moving = Math.abs(up) + Math.abs(round) > 0.1;
+  if (C.moving && Math.random() < 0.25) particles.emit(P.pos.x, P.pos.y + 0.5, P.pos.z, { color: 0x8a7a5a, size: 0.25, life: 0.5, speed: 1 });
+  // back to the ground at the foot of it; or leap off
+  const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 0.5);
+  if (up < 0 && P.pos.y <= g + 0.05) { P.climb = null; P.pos.y = g; P.onGround = true; return; }
+  torcain.root.position.copy(P.pos);
+  if (P.riding) torcain.root.position.y += mount ? mount.seat : 1.35;
+  torcain.root.rotation.y = P.yaw;
+  torcain.animate(dt, { speed: P.riding ? 0 : (C.moving ? 2.2 : 0), onGround: true, t: G.t, swing: null });
+  if (P.jumpBuf > 0) {
+    P.jumpBuf = 0; P.climb = null;
+    const out = V3(Math.cos(C.phi), 0, Math.sin(C.phi));
+    P.vel.set(out.x * 7, 6, out.z * 7); P.yaw = Math.atan2(out.x, out.z); P.onGround = false; P.airT = 0; sfx.jump();
+  }
 }
 
 /* ---------------- gliding: Torcain's coat spread like wings ---------------- */
@@ -3551,6 +3670,8 @@ function updatePlayer(dt) {
   const moving = wish.lengthSq() > 0.01;
   if (moving) wish.normalize();
   if (P.flying) { flyKuni(dt, wish, moving, act); return; }
+  if (P.climb) { climbTick(dt, act); return; }
+  if (P.jumpBuf > 0 && act && !P.vine && tryClimb(wish)) P.jumpBuf = 0;
   let sprint = (keys.ShiftLeft || keys.ShiftRight) && moving && !P.exhausted;
   if (sprint && D.stamina.sprint > 0) { P.stam -= D.stamina.sprint * dt; P.stamDelay = 0.5; if (P.stam <= 0) { P.stam = 0; P.exhausted = true; sprint = false; } }
   if (P.exhausted && P.stam > 25) P.exhausted = false;
@@ -3737,7 +3858,7 @@ function updatePlayer(dt) {
   updateAttack(dt);
 
   torcain.root.position.copy(P.pos);
-  if (P.riding) torcain.root.position.y += 1.35;
+  if (P.riding) torcain.root.position.y += mount ? mount.seat : 1.35;
   torcain.root.rotation.y = P.yaw;
   torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0 });
   if (P.roll) torcain.body.rotation.x = (P.roll.t / P.roll.dur) * Math.PI * 2;
@@ -4013,6 +4134,7 @@ function frame() {
       if (young() && F_.pro === 'beuhk') { if (REGION === 'property') pathTick(); else beuhkTick(); }
       else if (young()) youngTick();
       updateMalsti(dt);
+      updatePlace();
       if (REGION === 'xilia' || REGION === 'property') {
         if (F_.tut === 3 && REGION === 'property' && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
         if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
@@ -4256,6 +4378,103 @@ function leaveMegla() {
     });
   }, 450);
 }
+/* ---------------- a stall for your Punk: you choose where; then the saddle ---------------- */
+function nameplate(text) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#6a4428'; g.fillRect(0, 0, 256, 64); g.strokeStyle = '#3a2414'; g.lineWidth = 6; g.strokeRect(3, 3, 250, 58);
+  g.fillStyle = '#f2e2c0'; g.font = 'bold 34px Georgia'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 128, 34);
+  return new THREE.CanvasTexture(c);
+}
+function buildStall(ghost) {
+  const g = new THREE.Group();
+  const M = c => ghost ? new THREE.MeshBasicMaterial({ color: 0x8aff8a, transparent: true, opacity: 0.35, depthWrite: false }) : toon(c);
+  const box = (w, h, d, x, y, z, c, rx = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c)); m.position.set(x, y, z); m.rotation.x = rx; if (!ghost) { m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.03); } g.add(m); return m; };
+  box(6.4, 0.3, 5.2, 0, 0.15, 0, 0x8a6a4a);                                       // the boards
+  for (const [x, z] of [[-3, -2.4], [3, -2.4], [-3, 2.4], [3, 2.4]]) box(0.3, 3.6, 0.3, x, 1.8, z, 0x5a3a22);
+  box(6.4, 2.6, 0.25, 0, 1.45, -2.45, 0x7a5a3a);                                  // the back wall
+  box(0.25, 2.0, 5.0, -3.1, 1.1, 0, 0x7a5a3a); box(0.25, 2.0, 5.0, 3.1, 1.1, 0, 0x7a5a3a);
+  box(7.2, 0.25, 6.2, 0, 3.95, -0.2, 0x8a3a2a, -0.16);                            // the roof, falling to the back
+  if (!ghost) {
+    box(2.2, 0.8, 1.6, -1.8, 0.7, -1.4, 0xe0c060);                                // hay
+    box(1.6, 0.5, 0.6, 2.0, 0.55, -1.8, 0x6a4a2a); box(1.4, 0.1, 0.45, 2.0, 0.78, -1.8, 0x6ab0c8);   // the trough, with water in it
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.6), new THREE.MeshBasicMaterial({ map: nameplate(PN()) })); plate.position.set(0, 3.35, 2.52); g.add(plate);
+  }
+  g.userData.mats = []; g.traverse(o => { if (o.material) g.userData.mats.push(o.material); });
+  return g;
+}
+let stallG = null;
+function placeStall() {   // the built stall, wherever it was put
+  if (REGION !== 'property' || !F_.stall || stallG) return;
+  const st = F_.stall; stallG = buildStall(false); stallG.position.set(st.x, world.heightAt(st.x, st.z), st.z); stallG.rotation.y = st.yaw; scene.add(stallG);
+  const c = Math.cos(st.yaw), sn = Math.sin(st.yaw), y = stallG.position.y;
+  const at = (lx, lz) => [st.x + lx * c + lz * sn, st.z - lx * sn + lz * c];
+  { const [x, z] = at(0, -2.45); world.col.add(x, z, 3.2, 0.2, st.yaw, y - 1, y + 2.8); }
+  for (const s2 of [-1, 1]) { const [x, z] = at(s2 * 3.1, 0); world.col.add(x, z, 0.2, 2.5, st.yaw, y - 1, y + 2.2); }
+  world.trees && world.trees.push({ x: st.x, z: st.z, g: y, h: 4.2, r: 0.4 });
+}
+placeStall();
+let PLACE = null;
+/* the Carpenter's cart came the whole way home with them: parked by the hearth in Beuhk, then in the yard */
+let homeCart = null;
+function parkCart() {
+  if (homeCart) return;
+  let x, z, yaw;
+  if (REGION === 'property' && young()) { const Y = world.yard || world.PLAZA; x = Y.x + 16; z = Y.z + 18; yaw = -0.6; }
+  else if (REGION === 'xilia' && young() && world.hearth) { x = world.hearth.x + 9; z = world.hearth.z + 6; yaw = 0.9; }
+  else return;
+  // shuffle it clear of anything already standing there
+  for (let k = 0; k < 24 && [...world.col.nearAll(x, z, 6)].some(c => c.top - c.bot > 0.6 && Math.abs(c.x - x) < 3.5 + c.hw && Math.abs(c.z - z) < 3.5 + c.hd); k++) { x += Math.cos(k * 2.4) * 3; z += Math.sin(k * 2.4) * 3; }
+  const c = buildCart(); const y = world.heightAt(x, z);
+  c.g.position.set(x, y, z); c.g.rotation.y = yaw; scene.add(c.g);
+  world.col.add(x + Math.sin(yaw) * 0.8, z + Math.cos(yaw) * 0.8, 1.4, 3.6, yaw, y - 1, y + 2.4);
+  homeCart = c;
+}
+parkCart();
+function startStallPlace() {
+  PLACE = { g: buildStall(true), ok: false, why: 0, x: 0, z: 0, yaw: 0 }; scene.add(PLACE.g);
+  proObjective('Chapter I · the Carpenter’s', STORY.STEED.placeObj, STORY.STEED.placeHint);
+  hint(STORY.STEED.placeHint);
+}
+function updatePlace() {
+  if (!PLACE) return;
+  const f = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw)), x = P.pos.x + f.x * 7, z = P.pos.z + f.z * 7, y = world.heightAt(x, z);
+  let why = -1;
+  const hs = [[-3, -2.5], [3, -2.5], [-3, 2.5], [3, 2.5]].map(([a, b]) => world.heightAt(x + a, z + b));
+  if (Math.max(...hs) - Math.min(...hs) > 1.4) why = 0;
+  else if (world.water && (world.water.isWater(x, z) || world.water.depth(x, z) > 0.2)) why = 2;
+  else if (world.house && Math.hypot(x - world.house.x, z - world.house.z) < 26) why = 3;
+  else for (const c of world.col.nearAll(x, z, 6)) if (c.top - c.bot > 0.6 && c.top > y && Math.abs(c.x - x) < 4 + c.hw && Math.abs(c.z - z) < 3.6 + c.hd) { why = 1; break; }
+  if (world.inBounds && !world.inBounds(x, z)) why = 1;
+  PLACE.ok = why < 0; PLACE.why = why; PLACE.x = x; PLACE.z = z; PLACE.yaw = P.yaw + Math.PI;
+  PLACE.g.position.set(x, Math.max(...hs) - 0.05, z); PLACE.g.rotation.y = PLACE.yaw;
+  for (const m of PLACE.g.userData.mats) m.color.setHex(PLACE.ok ? 0x8aff8a : 0xff7a6a);
+}
+function confirmStall() {
+  if (!PLACE) return;
+  if (!PLACE.ok) { sfx.blink(); bark('buhkon', STORY.STEED.badSpot[PLACE.why] || 'Not there.', 2.5); return; }
+  const st = { x: PLACE.x, z: PLACE.z, yaw: PLACE.yaw };
+  scene.remove(PLACE.g); PLACE = null;
+  F_.stall = st; persist();
+  G.mode = 'intro'; fade(1, 0.8);
+  setTimeout(() => {
+    placeStall();
+    const c = V3(st.x, world.heightAt(st.x, st.z), st.z);
+    if (mount) { mount.pos.set(st.x + Math.sin(st.yaw) * 1.5, c.y, st.z + Math.cos(st.yaw) * 1.5); mount.yaw = st.yaw + Math.PI; mount.coming = false; }
+    P.pos.set(st.x + Math.sin(st.yaw) * 5, 0, st.z + Math.cos(st.yaw) * 5); P.pos.y = world.col.ground(P.pos.x, P.pos.z, c.y + 3); P.yaw = st.yaw + Math.PI;
+    fade(0, 1.2);
+    cineCards(STORY.STEED.built, 3400, c, () => {
+      dialog(STORY.STEED.fit(PN()), () => {
+        F_.saddled = true; if (SAVE.inv.items.saddle) delete SAVE.inv.items.saddle; persist();
+        remakeMount(); sfx.victory(); xp(80);
+        particles.burst(mount.pos.x, mount.pos.y + 1.5, mount.pos.z, 40, { color: 0xffd27a, speed: 4, size: 0.5, life: 1 });
+        toast(STORY.STEED.steed(PN()), 6);
+        enterPlay(); setObjective();
+      });
+    }, { r: 9, h: 3 });
+  }, 900);
+}
+function cancelStall() { if (!PLACE) return; scene.remove(PLACE.g); PLACE = null; setObjective(); toast('No stall yet. Talk to Buhkon when you’ve a spot in mind.', 2.5); }
+
 /* the first token: the chip in the Okid'Relic, the stygian poured, the Gynge's song sung */
 let TOK = null;
 function firstTokenLesson(n) {
@@ -4540,9 +4759,10 @@ function youngBuhkon(n) {
   n.talking = 4;
   if (F_.pro === 'beuhk') { dialog([['buhkon', F_.bk === 'rest' ? 'Go on, walk about. Ears open, hat on.' : 'Up the little road, west. I’ll have the kettle on.']]); return; }
   if (F_.pro === 'token') { firstTokenLesson(n); return; }
+  if (F_.saddle && !F_.stall && SAVE.inv.items.saddle) { dialog(STORY.STEED.askBuhkon(PN()), () => startStallPlace()); return; }
   if (q >= 5 && !F_.megla) {
     ask('buhkon', 'Something on your mind? You keep touching that amulet.', [
-      { label: 'It’s pulling. North. <em style="color:var(--brass2)">· Chapter II: the Megla Aagac</em>', act: () => meglaBegin() },
+      { label: 'It’s pulling. North. <em style="color:var(--brass2)">· Chapter II: the Megla Aagac</em>', act: () => saddled() ? meglaBegin() : dialog([['buhkon', `North, on foot? Not a chance. Get a saddle on ${PN()} first — Old Ruut in Beuhk has one he’d part with, if you help him with his strays.`]]) },
       { label: SAVE.inv.items.okid ? 'Sing a token' : 'Ask about tokens', act: () => buhkonTokens() },
       { label: 'Not yet', act: null },
     ]);
@@ -4569,7 +4789,7 @@ function youngGoal() {
   if (interiors.inside) return interiors.room(interiors.inside.id) ? interiors.room(interiors.inside.id).out : null;
   if (REGION === 'xilia') return q >= 5 ? null : world.westGoal;   // Buhkon's is out west, along the forest path
   if (q === 0) return RELIC_SPOT;
-  if (q === 1 || q === 4 || F_.pro === 'token' || (q >= 5 && !F_.megla)) return bk ? bk.pos : null;
+  if (q === 1 || q === 4 || F_.pro === 'token' || (q >= 5 && !F_.megla) || (F_.saddle && !F_.stall)) return bk ? bk.pos : null;
   if (q === 2) { const e = enemies.list.find(e => e.kind === 'dummy' && !e.dead); return e ? e.pos : null; }
   if (q === 3) return V3(world.tower.x, world.tower.y, world.tower.z);
   return null;
@@ -4584,6 +4804,8 @@ function youngObjective() {
   else if (q === 2) proObjective(head, O.dummies(n), 'Left-click to swing — keep clicking to combo', 3, n);
   else if (q === 3) proObjective(head, O.glide, 'Jump, then hold Space while falling');
   else if (q === 4) proObjective(head, O.back, '');
+  else if (PLACE) proObjective(head, STORY.STEED.placeObj, STORY.STEED.placeHint);
+  else if (F_.saddle && !F_.stall && SAVE.inv.items.saddle) proObjective(head, STORY.STEED.bring, 'He’s up at the house, or in the workshop');
   else if (F_.pro === 'token') proObjective('Chapter II · home again', STORY.FIRST_TOKEN.findObj, 'Show him the Gynge chip');
   else if (!F_.megla) proObjective(head, 'The Sniller amulet is tugging north — talk to Buhkon', 'When you’re ready: Chapter II, the Megla Aagac');
   else proObjective(F_.ch2 ? 'Chapter II · done' : head, O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');

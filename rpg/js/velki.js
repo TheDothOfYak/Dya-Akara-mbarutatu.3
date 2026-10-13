@@ -265,7 +265,7 @@ export function createVelki(ctx) {
   const particles = new Particles(scene, 4500);
   war = createSkyWar({ scene, particles, center: V3(BATTLE.x, 46, BATTLE.z), spread: [230, 44, 150], count: 12, size: [2.6, 4.2], vis: 0.1,
     onBlink: p => { if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 160) sfx.blink(); } });
-  const cine = createCine(camera);
+  const cine = createCine(camera, { blocked: (x, y, z) => solidAt(x, y, z) });
   const composer = ctx.makeComposer(scene);
   function resize() { particles.setScale(innerHeight * Math.min(devicePixelRatio, 1.75) * 0.9); }
   resize();

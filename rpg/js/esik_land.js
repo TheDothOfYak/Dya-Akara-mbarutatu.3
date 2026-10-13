@@ -386,7 +386,7 @@ function buildPunkKind(cfg, opts) {
   }
 
   // vines: n of them, evenly around the stem; the two nearest the front are arms
-  const n = cfg.nVines ?? (rnd ? 5 + Math.floor(rnd() * 5) : 7);
+  const n = Math.max(6, cfg.nVines ?? (rnd ? 6 + Math.floor(rnd() * 4) : 7));   // two arms and never fewer than four legs
   const vines = [], riders = [];
   const thornGeo = cfg.thorns ? hornGeo(cfg.vineR * 1.6, cfg.vineR * 0.55, 0.4, 4) : null;
   const curlG = curlGeo(cfg.vineR * 2.2, cfg.vineR * 0.55);
@@ -973,100 +973,42 @@ function kofiCore(opts, mode) {
   const baby = mode === 'baby', momma = mode === 'momma';
   const root = new THREE.Group();
   const hair = M(c), hairD = M(new THREE.Color(c).multiplyScalar(0.72).getHex()), horn = M(0xeee2c4), dark = M(0x2a1e16);
-  const bladeM = M(new THREE.Color(c).multiplyScalar(0.5).lerp(new THREE.Color(0x5a5866), 0.55).getHex());
-  const tuftM = M(new THREE.Color(c).multiplyScalar(0.26).getHex());
-  // bioluminescence: the tips of the long tail-whiskers glow like fibre-optic threads,
-  // and a bead of light sits at the root of every blade
+  // bioluminescence: the tips of the long back-hairs glow like fibre-optic threads
   const bio = bioKit();
   const glowC = opts.glowColor ?? (rnd ? hsl(0.45 + rnd() * 0.45, 0.85, 0.65).getHex() : 0x8ae8ff);
   const tipM = bio.mat(glowC, c, 0.35, 0.1, 2.0);
-  const fat = momma ? 1.18 : 1;
+  const R = 0.18;
   const body = new THREE.Group(); body.position.y = momma ? 0.2 : 0.19; root.add(body);
-  // the long crescent body: a furry tube bent along an arc, both ends curving up
-  // (tail end behind, head end in front); u = 0 at the tail, 1 at the head
-  const Rc = 0.27, th0 = -1.1, th1 = 1.1;
-  const arcPt = u => { const th = lerp(th0, th1, u); return new THREE.Vector3(0, Rc * (1 - Math.cos(th)), Rc * Math.sin(th)); };
-  const arcN = u => { const th = lerp(th0, th1, u); return new THREE.Vector3(0, Math.cos(th), -Math.sin(th)); };   // the inner (top) side
-  const rad = u => (0.022 + 0.098 * Math.pow(Math.sin(Math.PI * (0.08 + u * 0.86)), 0.6)) * fat;
-  const T = baby ? 16 : 26, RS = baby ? 7 : 10;
-  const path = new THREE.CatmullRomCurve3(Array.from({ length: 13 }, (_, i) => arcPt(i / 12)));
-  const tg = new THREE.TubeGeometry(path, T, 1, RS, false);
-  {
-    const p = tg.attributes.position, P = new THREE.Vector3(), v = new THREE.Vector3();
-    for (let i = 0; i <= T; i++) {
-      const u = i / T; path.getPointAt(u, P); const r = rad(u);
-      for (let j = 0; j <= RS; j++) {
-        const k = i * (RS + 1) + j; v.fromBufferAttribute(p, k).sub(P);
-        const n = noise3(v.x * 9 + 3, (P.y + v.y) * 9, (P.z + v.z) * 9 - 1);
-        const fur = 1 + (n - 0.5) * 0.3;
-        p.setXYZ(k, P.x + v.x * r * 0.86 * fur, P.y + v.y * r * fur, P.z + v.z * r * fur);
-      }
-    }
-    tg.computeVertexNormals();
-  }
-  const ball = mesh(tg, hair, body);
-  // the head: a round furry knob on the raised front end, two little horns, eyes, a dark nose
-  const hp = arcPt(1).add(new THREE.Vector3(0, 0.025, 0.035)), hr = 0.075 * (momma ? 1.08 : 1);
-  const head = mesh(displace(new THREE.IcosahedronGeometry(1, baby ? 1 : 2), 0.1, 6, 5, 0.6), hair, body, hp.x, hp.y, hp.z);
-  head.scale.set(hr * 0.95, hr * 0.9, hr * 1.1);
-  const hornG = hornGeo(0.1, 0.019, -0.8, 6);
+  // a shaggy ball of hair
+  const ball = mesh(displace(new THREE.IcosahedronGeometry(1, baby ? 2 : 3), 0.16, 5.5, 2, 0.6), hair, body);
+  ball.scale.set(R * (momma ? 1.12 : 1), R * (momma ? 1.08 : 0.95), R * (momma ? 1.18 : 1.08));
+  // two horns at the front
+  const hornG = hornGeo(0.13, 0.024, -0.9, 7);
   for (const s of [-1, 1]) {
-    const h = mesh(hornG, horn, body, hp.x + s * 0.035, hp.y + hr * 0.7, hp.z - 0.005); h.rotation.set(-0.35, 0, -s * 0.4);
-    eye(body, 0.014, hp.x + s * 0.04, hp.y + 0.012, hp.z + hr * 0.92);
+    const h = mesh(hornG, horn, body, s * 0.07, 0.11, 0.1); h.rotation.set(0.5, 0, -s * 0.45);
+    eye(body, 0.018, s * 0.055, 0.045, R * 1.0);
   }
-  mesh(new THREE.SphereGeometry(0.014, 6, 4), dark, body, hp.x, hp.y - 0.012, hp.z + hr * 1.08);
-  // a cap of fur closing the tail end, then the fluffy dark tuft
-  const tp = arcPt(0), tdir = new THREE.Vector3(0, -Math.sin(th0), -Math.cos(th0));   // pointing out of the tail end
-  mesh(new THREE.SphereGeometry(rad(0) * 1.1, 8, 6), hair, body, tp.x, tp.y, tp.z);
-  const tuft = [], tfr = mulberry32(7);
-  const nT = baby ? 4 : 7;
-  for (let i = 0; i < nT; i++) {
-    const a = i / nT * TAU, rr = i ? 0.035 : 0;
-    const q = tp.clone().addScaledVector(tdir, 0.035 + (i ? 0.02 : 0.05) + tfr() * 0.02);
-    q.x += Math.cos(a) * rr; q.y += Math.sin(a) * rr * 0.7; q.z += Math.sin(a) * rr * 0.4;
-    tuft.push(placed(displace(new THREE.IcosahedronGeometry(1, 1), 0.3, 4, i + 2, 0.5), q.x, q.y, q.z, 0, 0, 0, (0.05 + tfr() * 0.02) * (baby ? 0.9 : 1) * fat));
-  }
-  mesh(merge(tuft), tuftM, body);
-  // blade-like spines along the top of the crescent, each leaning back a little
-  const bladeSh = new THREE.Shape();
-  bladeSh.moveTo(-0.02, 0); bladeSh.quadraticCurveTo(-0.022, 0.55, -0.045, 1); bladeSh.quadraticCurveTo(0.006, 0.5, 0.02, 0); bladeSh.lineTo(-0.02, 0);
-  const bladeG = new THREE.ExtrudeGeometry(bladeSh, { depth: 0.006, bevelEnabled: false, curveSegments: 4 });
-  bladeG.translate(0, 0, -0.003); bladeG.rotateY(-Math.PI / 2);   // blade in the y-z plane, tip leaning to -z (back)
-  const blades = [], beads = [], nB = baby ? 4 : 7;
-  for (let i = 0; i < nB; i++) {
-    const u = lerp(0.16, 0.84, i / (nB - 1)), pt = arcPt(u), nn = arcN(u), r = rad(u);
-    const h = (0.085 + 0.075 * Math.sin(Math.PI * u)) * fat;
-    const at = pt.clone().addScaledVector(nn, r * 0.45); at.y += r * 0.5;
-    const th = lerp(th0, th1, u);
-    const g = bladeG.clone(); g.scale(1.2, h, fat);
-    blades.push(placed(g, at.x, at.y, at.z, -th * 0.3, 0, 0));
-    if (!baby) for (const s of [-1, 1]) beads.push([at.x + s * 0.006, at.y, at.z, s, 0.4, 0, 0.009, 0.6]);
-  }
-  mesh(merge(blades), bladeM, body);
-  if (!baby) bioMesh(bioDots(beads), tipM, body);
-  // lots of tiny legs underneath (wave gait), hung along the belly of the crescent
+  // lots of tiny legs underneath (wave gait)
   const legs = [], nL = baby ? 6 : (opts.legs || 10);
   const legG = merge([placed(new THREE.CylinderGeometry(0.007, 0.01, 0.08, 5), 0, -0.04, 0), placed(new THREE.SphereGeometry(0.013, 6, 4), 0, -0.08, 0.006, 0, 0, 0, 1, 0.6, 1.3)]);
   for (let i = 0; i < nL; i++) {
     const s = i % 2 ? 1 : -1, k = Math.floor(i / 2), n2 = nL / 2;
-    const u = lerp(0.7, 0.3, n2 > 1 ? k / (n2 - 1) : 0.5), pt = arcPt(u);
-    const hip = new THREE.Group(); hip.position.set(s * 0.05 * fat, pt.y - rad(u) * 0.55, pt.z); hip.rotation.z = s * 0.3; body.add(hip);
-    // legs reach to the same ground line wherever they hang from
-    const sc = (body.position.y + hip.position.y - 0.005) / (0.093 * Math.cos(0.3));
-    mesh(legG, dark, hip).scale.y = clamp(sc, 0.8, 1.8);
-    legs.push({ hip, k, s });
+    const z = lerp(0.1, -0.1, n2 > 1 ? k / (n2 - 1) : 0.5);
+    const hip = new THREE.Group(); hip.position.set(s * 0.1, -0.1, z); hip.rotation.z = s * 0.35; body.add(hip);
+    mesh(legG, dark, hip); legs.push({ hip, k, s });
   }
-  // long whisker-hairs streaming back out of the tail tuft
-  const strands = [], nS = baby ? 3 : 6, segs = baby ? 2 : 4;
+  // long whisker-hairs from the back third, flowing behind
+  const strands = [], nS = baby ? 4 : 9, segs = baby ? 2 : 4;
   for (let i = 0; i < nS; i++) {
-    const a = (i / (nS - 1) - 0.5) * 2.0;
-    const base = new THREE.Group(); body.add(base);
-    base.position.copy(tp).addScaledVector(tdir, 0.05); base.position.x += Math.sin(a) * 0.03; base.position.y += Math.cos(a) * 0.02;
-    base.rotation.set(-2.25 - Math.cos(a) * 0.2, 0, -Math.sin(a) * 0.5);
-    const ch = chain(base, segs, 0.075, 0.005, 0.0015, i % 2 ? hairD : tuftM, { radial: 4, noBalls: true });
+    const a = (i / (nS - 1) - 0.5) * 2.2;
+    const base = new THREE.Group(); base.position.set(Math.sin(a) * R * 0.8, Math.cos(a) * R * 0.75, -R * 0.55); body.add(base);
+    base.rotation.set(-1.75 - Math.cos(a) * 0.2, 0, -Math.sin(a) * 0.5);
+    const ch = chain(base, segs, 0.085, 0.006, 0.0015, i % 2 ? hairD : hair, { radial: 4, noBalls: true });
     const last = ch.joints[segs - 1].userData.seg; last.material = tipM; noOut(last);
     strands.push({ base, joints: ch.joints, ph: i * 0.9 });
   }
+  // and a few freckles of light between the horns
+  if (!baby) bioMesh(bioDots([-0.42, -0.14, 0.14, 0.42].map((x, i) => { const n = new THREE.Vector3(x, 0.7 + (i % 2) * 0.12, 0.62).normalize(); return [n.x * 1.12, n.y * 1.12, n.z * 1.12, n.x, n.y, n.z, 0.075, 0.5]; })), tipM, ball);
   bio.glow(0);
   return { root, body, ball, legs, strands, hair, nL, bio };
 }
@@ -1095,7 +1037,7 @@ export function buildBigMommaKofi(opts = {}) {
   const k = kofiCore(opts, 'momma'); k.y0 = k.body.position.y;
   // babies: two clinging to her back, one tagging along beside her
   const babies = [];
-  [[0.1, 0.17, -0.02, 0.32, 0.4], [-0.1, 0.155, -0.1, 0.3, -0.5], [0.3, 0, 0.05, 0.36, 0.2]].forEach(([x, y, z, s, ry], i) => {
+  [[0.075, 0.135, -0.03, 0.32, 0.4], [-0.08, 0.12, -0.1, 0.3, -0.5], [0.3, 0, 0.05, 0.36, 0.2]].forEach(([x, y, z, s, ry], i) => {
     const b = kofiCore({ color: opts.color, seed: opts.seed !== undefined ? opts.seed + i + 1 : undefined }, 'baby'); b.y0 = b.body.position.y;
     b.root.position.set(x, y, z); b.root.scale.setScalar(s); b.root.rotation.y = ry; k.body.add(b.root);
     if (i === 2) { k.root.add(b.root); b.root.position.set(x, 0, z); }

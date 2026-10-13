@@ -321,7 +321,7 @@ export function createMegla(ctx) {
 
   /* ---------------- particles, post, film ---------------- */
   const particles = new Particles(scene, 4000);
-  const cine = createCine(camera);
+  const cine = createCine(camera, { blocked: (x, y, z) => solidAt(x, y, z) });
   const composer = ctx.makeComposer(scene);
   function resize() { particles.setScale(innerHeight * Math.min(devicePixelRatio, 1.75) * 0.9); }
   resize();
@@ -336,7 +336,8 @@ export function createMegla(ctx) {
   // the amulet on his chest, where the Sniller rides
   const amulet = new THREE.Group();
   { const gem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), toon(0x6af0e0, { emissive: 0x2aa0a0, emissiveIntensity: 0.9 })); amulet.add(gem, glowSprite(0x6af0e0, 0.6, 0.4)); amulet.position.set(0, 1.25, 0.2); tanoc.root.add(amulet); }
-  const punk = buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 }); punk.root.scale.setScalar(0.85); scene.add(punk.root);
+  // his Punk: the mutt from Fyrsti'Vilag, two years grown, in Old Ruut's saddle
+  const punk = buildWildPunk({ seed: 31, saddle: true, blanket: 0x8a5a2a }); punk.root.scale.setScalar(1.15); scene.add(punk.root);
   const P = { pos: V3(), vel: V3(), yaw: Math.PI, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0, hp: 100, swing: 0, hitDone: false, iframes: 0, ride: false, slide: null, down: false };
   const K = { pos: V3(0, -50, 0), yaw: Math.PI, stay: null, on: true };            // the Punk
   const foes = [];
@@ -663,7 +664,7 @@ export function createMegla(ctx) {
       K.pos.copy(P.pos); K.yaw = P.yaw;
       punk.root.position.copy(P.pos); punk.root.rotation.y = P.yaw; punk.root.visible = true;
       punk.animate(dt, { speed, t, air: P.onGround ? 0 : 1 });
-      const seat = V3(0, 1.62, -0.1).applyAxisAngle(V3(0, 1, 0), P.yaw).add(P.pos);
+      const seat = V3(0, 1.15 * 1.85 - 0.3, -0.05).applyAxisAngle(V3(0, 1, 0), P.yaw).add(P.pos);
       tanoc.root.position.copy(seat); tanoc.root.rotation.y = P.yaw;
       tanoc.animate(dt, { speed: 0, onGround: true, t, swing: null });
       return;
@@ -1162,7 +1163,7 @@ export function createMegla(ctx) {
     // camps
     for (const c of fires) { c.fire.visible = c.on; c.light.intensity = c.on ? 40 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
     // spores and flickers in the forest; brighter in the dark
-    if (zz === 'forest' && Math.random() < 0.7) particles.emit(P.pos.x + (Math.random() - 0.5) * 40, P.pos.y + Math.random() * 10, P.pos.z + (Math.random() - 0.5) * 40, { vx: (Math.random() - 0.5) * 0.3, vy: 0.15, vz: (Math.random() - 0.5) * 0.3, color: [0x5af0ff, 0x8affb0, 0xb48aff][Math.floor(Math.random() * 3)], size: 0.16, life: 4, drag: 0 });
+    if (zz === 'forest' && Math.random() < 0.7) particles.emit(P.pos.x + (Math.random() - 0.5) * 40, P.pos.y + Math.random() * 10, P.pos.z + (Math.random() - 0.5) * 40, { vx: (Math.random() - 0.5) * 0.3, vy: 0.15, vz: (Math.random() - 0.5) * 0.3, color: 0xbfeee6, size: 0.16, life: 4, drag: 0 });
     for (const g of trail) if (g.material.opacity > 0) g.material.opacity = 0.4 + Math.sin(t * 3 + g.position.z) * 0.25;
     if (beacon.visible) beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
     particles.update(dt);
