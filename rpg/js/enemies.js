@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildVel, buildDummy } from './creatures.js';
+import { pivotNear, latchPoint } from './vines.js';
+import { buildApiButa, buildCyitor, buildXiwKatkan } from './creatures2.js';
 import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
 import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
 import { buildHvaleia, buildSuNaga, buildHarkal, buildRafKrabbi, buildGrothyn } from './esik_sea.js';
@@ -35,6 +37,8 @@ export const TYPES = {
   albali_t: { name: 'Villtur Albali', build: () => buildAlbaliByrd({ villtur: true, toxic: true, seed: seed() }), hp: 58, dmg: 11, speed: 9.5, rad: 0.7, range: 1.8, aggro: 22, shards: 12, ai: 'flyer', status: 'poison', color: 0x9aff5a },
   vel: { name: 'Duskareth Vel', build: buildVel, hp: 190, dmg: 17, speed: 6.2, rad: 0.5, range: 2.4, aggro: 22, windup: 0.5, shards: 60, ai: 'vel', stagger: 0.35, elite: true, color: 0xb070ff },
   tyndael: { name: 'Tyndael', build: () => buildTyndael({ seed: seed() }), hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
+  /* the far forest's own: territorial, and it means it — come too close and it charges, tusks and spiked tail */
+  sruvorn_w: { name: 'Sru Vorn', build: () => buildSruVorn({ seed: seed() }), hp: 520, dmg: 22, speed: 5.2, rad: 2.2, range: 4.2, aggro: 13, windup: 0.8, recover: 1.1, lunge: 10, shards: 70, ai: 'melee', stagger: 0.2, elite: true, color: 0x9ab04a },
   sruvorn: { name: 'Sru Vorn of the Bogs', build: () => buildSruVorn({ seed: seed() }), hp: 1100, dmg: 26, speed: 4.6, rad: 2.6, range: 5.5, aggro: 26, shards: 220, ai: 'sruvorn', stagger: 0, miniboss: true, color: 0xb0ff4a },
 
   /* ---------------- the wider wilds (spawned by wilds.js; most are rare) ----------------
@@ -42,6 +46,8 @@ export const TYPES = {
   big_momma_kofi: { name: 'Big Momma Kofi', build: () => buildBigMommaKofi({ seed: seed() }), hp: 20, dmg: 0, speed: 6.5, rad: 0.4, range: 0, aggro: 0, shards: 4, ai: 'melee', color: 0xb8a070, disp: 'critter' },
   mikolo_moko: { name: 'Mikolo Moko', build: () => buildMikoloMoko({ seed: seed() }), hp: 14, dmg: 0, speed: 9.5, rad: 0.3, range: 0, aggro: 0, shards: 3, ai: 'melee', color: 0x7ad04a, disp: 'critter' },
   uff: { name: 'Uff', build: () => { const u = buildUff({ seed: seed() }); u.root.scale.multiplyScalar(0.8 + Math.random() * 1.6); return u; }, hp: 10, dmg: 0, speed: 1.6, rad: 0.25, range: 0, aggro: 0, shards: 2, ai: 'melee', color: 0xff6a8a, disp: 'critter' },
+  /* the one that lives by the Carpenter's workshop, hauling timber about on its vines — it only fights if you do */
+  stryx_home: { name: 'The workshop Stryx', build: () => buildStryx({ seed: 5 }), hp: 600, dmg: 12, speed: 1.4, rad: 1.6, range: 4.2, aggro: 0, windup: 0.8, recover: 1.0, lunge: 3, shards: 0, ai: 'melee', stagger: 0.2, color: 0x8aa04a, disp: 'neutral' },
   stryx: { name: 'Wild Stryx', build: () => buildStryx({ seed: seed() }), hp: 420, dmg: 16, speed: 1.2, rad: 1.6, range: 4.2, aggro: 6, windup: 0.8, recover: 1.0, lunge: 3, shards: 40, ai: 'melee', stagger: 0.2, color: 0x8aa04a, disp: 'neutral' },
   tonguatjis: { name: 'Tonguatjis', build: buildTonguatjis, hp: 260, dmg: 15, speed: 3.2, rad: 1.0, range: 5.5, aggro: 10, windup: 0.7, recover: 1.0, lunge: 2, shards: 30, ai: 'melee', stagger: 0.4, color: 0xf08aa8, disp: 'neutral' },
   gynge: { name: 'Gynge', build: buildGynge, hp: 900, dmg: 26, speed: 3.4, rad: 2.4, range: 4.0, aggro: 9, windup: 1.0, recover: 1.3, lunge: 7, shards: 90, ai: 'melee', stagger: 0.15, elite: true, color: 0xe8c4b4, disp: 'neutral' },
@@ -56,6 +62,12 @@ export const TYPES = {
   raf_krabbi: { name: 'Raf Krabbi', build: () => buildRafKrabbi({ seed: seed() }), hp: 26, dmg: 6, speed: 4, rad: 0.25, range: 1.2, aggro: 5, windup: 0.4, recover: 0.6, lunge: 4, shards: 5, ai: 'swim', water: true, shallow: true, status: 'paralyze', color: 0x6ad8ff },
   su_grothyn: { name: 'Su Grothyn', build: () => buildGrothyn({ element: 'Su' }), hp: 120, dmg: 12, speed: 0.15, rad: 0.8, range: 5.5, aggro: 7, windup: 0.6, recover: 1.0, lunge: 0, shards: 14, ai: 'swim', water: true, shallow: true, color: 0x3a8aa8 },
   hvaleia: { name: 'Hvaleia', build: buildHvaleia, hp: 1800, dmg: 22, speed: 5, rad: 3.5, range: 4, aggro: 0, shards: 160, ai: 'airswim', water: true, fly: 9, elite: true, color: 0x6ab8ff, disp: 'neutral' },
+  /* the Blind Beast: a great flat manta of fire, gliding low over the high ground; leave it be and it leaves you be */
+  apibuta: { name: 'Api Buta', build: () => buildApiButa({ seed: seed() }), hp: 2200, dmg: 26, speed: 6, rad: 4, range: 5, aggro: 9, windup: 1.0, recover: 1.4, lunge: 6, shards: 220, ai: 'flyer', elite: true, color: 0xff7a2a, disp: 'neutral', altMul: 1.4, roam: 26 },
+  /* from Katkan: ghost-shapes with one eye and two blade arms — nobody knows what they want */
+  cyitor: { name: 'Cyitor', build: () => buildCyitor({ seed: seed() }), hp: 160, dmg: 18, speed: 5.8, rad: 0.7, range: 2.8, aggro: 18, windup: 0.6, recover: 0.8, lunge: 9, shards: 45, ai: 'melee', stagger: 0.3, color: 0xd8e0ff },
+  /* the Fuzzy Devil: round, fluffy, big-eyed, bat-winged, with a trident and a temper */
+  xiwkatkan: { name: 'Xiw’Katkan', build: () => buildXiwKatkan({ seed: seed() }), hp: 90, dmg: 14, speed: 8, rad: 0.5, range: 2.2, aggro: 20, windup: 0.5, recover: 0.7, lunge: 10, shards: 35, ai: 'flyer', color: 0xff4a6a },
   harkal: { name: 'Harkal', build: () => buildHarkal({ seed: seed() }), hp: 140, dmg: 14, speed: 9, rad: 1.0, range: 2.4, aggro: 16, windup: 0.5, recover: 0.7, lunge: 12, shards: 22, ai: 'airswim', water: true, fly: 2.2, color: 0x7aa0b8 },
 };
 
@@ -68,6 +80,7 @@ export function createEnemies(ctx) {
 
   function spawn(kind, x, z, group, extra = {}) {
     const T = TYPES[kind];
+    if (!T) return null;   // a creature whose model isn't loaded in this build
     const actor = T.build();
     ctx.scene.add(actor.root);
     const hp = Math.round(T.hp * (T.miniboss ? D().bossHp : D().enemyHp));
@@ -406,20 +419,8 @@ export function createEnemies(ctx) {
      on it: round the trunk and off in a new direction, quicker than it could
      ever turn on its feet. */
   const SWINGERS = { punk: 1, punk_d: 1, malsti: 1 };
-  function findTrunk(e) {
-    const trees = ctx.world.trees; if (!trees) return null;
-    const vx = e.vel.x, vz = e.vel.z, v = Math.hypot(vx, vz);
-    let best = null, bd = 1e9;
-    for (const t of trees) {
-      const ox = t.x - e.pos.x, oz = t.z - e.pos.z;
-      if (Math.abs(ox) > 6.5 || Math.abs(oz) > 6.5) continue;
-      const d = Math.hypot(ox, oz);
-      if (d < e.T.rad + t.r + 0.4 || d > 6) continue;
-      if ((ox * vx + oz * vz) / (d * v) < -0.2) continue;   // only trunks beside or ahead of it
-      if (d < bd) { bd = d; best = t; }
-    }
-    return best;
-  }
+  // a trunk, a post, a pillar, a boulder, the corner of a wall — anything solid right beside it (vines.js)
+  function findTrunk(e) { return pivotNear(ctx.world, e.pos, e.vel, e.T.rad); }
   function startSwing(e, t) {
     const v = Math.max(Math.hypot(e.vel.x, e.vel.z), e.T.speed * 0.8);
     const ox = e.pos.x - t.x, oz = e.pos.z - t.z, r = Math.hypot(ox, oz);
@@ -429,10 +430,8 @@ export function createEnemies(ctx) {
     const head = Math.atan2(e.vel.x, e.vel.z), want = e.wantYaw != null ? e.wantYaw : head;
     let turn = Math.abs(Math.atan2(Math.sin(want - head), Math.cos(want - head)));
     const sweep = clamp(turn + 0.5, 0.9, 2.8);
-    const vine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(), V3()]), new THREE.LineBasicMaterial({ color: e.kind === 'malsti' ? 0x6a3aaa : 0x4a8a2a }));
-    vine.frustumCulled = false; ctx.scene.add(vine);
     const by = t.g + Math.min(t.h * 0.75, 6.5);
-    e.swing = { t, r, a: Math.atan2(oz, ox), dir, w: v / r, left: sweep, done: 0, g: e.pos.y, by, lift: clamp(by - e.pos.y - 1.6, 1.2, 3.6), v, vine };
+    e.swing = { t, r, a: Math.atan2(oz, ox), dir, w: v / r, left: sweep, done: 0, g: e.pos.y, by, lift: clamp(by - e.pos.y - 1.6, 1.2, 3.6), v, anchor: V3(t.x, by, t.z) };
   }
   function updateSwing(e, dt) {
     const S = e.swing, a = e.actor;
@@ -444,16 +443,14 @@ export function createEnemies(ctx) {
     // moving along the circle: the tangent
     const tx = -Math.sin(S.a) * S.dir, tz = Math.cos(S.a) * S.dir;
     e.vel.set(tx * S.v, 0, tz * S.v); e.yaw = Math.atan2(tx, tz);
-    const pos = S.vine.geometry.attributes.position;
-    pos.setXYZ(0, e.pos.x, e.pos.y + 1.2 * (a.root.scale.y || 1), e.pos.z); pos.setXYZ(1, S.t.x, S.by, S.t.z); pos.needsUpdate = true;
     a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
     a.root.rotation.z = -S.dir * 0.4 * Math.sin(k * Math.PI);                    // leaning in toward the trunk
-    if (a.root.visible) a.animate(dt, { speed: S.v * 1.4, t: ctx.G.t });
+    // the swing is one of its own leg-vines, shot out and wrapped round the trunk (or post, or rock)
+    if (a.root.visible) { a.root.updateMatrixWorld(true); a.animate(dt, { speed: 0, t: ctx.G.t, grab: { p: a.root.worldToLocal(S.anchor.clone()), k: Math.min(1, S.done * 5) }, air: Math.sin(k * Math.PI) }); }
     if (k >= 1 || e.dead || e.stun > 0) endSwing(e);
   }
   function endSwing(e) {
     if (!e.swing) return;
-    ctx.scene.remove(e.swing.vine); e.swing.vine.geometry.dispose(); e.swing.vine.material.dispose();
     e.swing = null; e.swingCd = 1.2 + Math.random() * 1.5; e.actor.root.rotation.z = 0;
   }
   const lerp0 = (a, b, k) => a + (b - a) * k;
@@ -468,6 +465,22 @@ export function createEnemies(ctx) {
         e.swingCd = 0.25;   // look again in a moment
         const t = findTrunk(e);
         if (t) { startSwing(e, t); updateSwing(e, dt); return; }
+      }
+    }
+    // a Stryx is slow on its roots — so it throws a vine onto something solid ahead (a rock, a trunk, a wall, the slope) and hauls itself to it
+    if (e.kind === 'stryx' && !e.dead) {
+      e.haulCd = (e.haulCd || 0) - dt;
+      const v = Math.hypot(e.vel.x, e.vel.z);
+      if (!e.haul && e.haulCd <= 0 && v > 0.4 && !e.windup && e.state !== 'attack') {
+        e.haulCd = 0.6;
+        const A = latchPoint(ctx.world, V3(e.pos.x, e.pos.y + 1.2, e.pos.z), V3(e.vel.x / v, 0, e.vel.z / v), { range: 11, near: 3, minUp: -1.5, cone: 0.7, far: 0.3 });
+        if (A) e.haul = { A, t: 0 };
+      }
+      if (e.haul) {
+        const H = e.haul; H.t += dt;
+        const hx = H.A.x - e.pos.x, hz = H.A.z - e.pos.z, hd = Math.hypot(hx, hz) || 1;
+        if (H.t > 0.25) { e.vel.x = hx / hd * 6.5; e.vel.z = hz / hd * 6.5; e.yaw = Math.atan2(hx, hz); }
+        if (H.t > 1.8 || hd < 2.6 || e.windup || e.stun > 0) { e.haul = null; e.haulCd = 1.2 + Math.random(); }
       }
     }
     if (T.ai !== 'flyer') {
@@ -492,7 +505,8 @@ export function createEnemies(ctx) {
     if (e.pos.y < -60) { e.hp = 0; kill(e); }
     a.root.position.copy(e.pos);
     a.root.rotation.y = e.yaw;
-    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, windup: e.windup, attack: e.attackA, diving: e.state === 'dive', airborne: T.ai === 'flyer' && e.alt > 0.6, tail: e.tailT || 0, tailUp: e.windup && e.act === 'tail' ? 1 : 0, thrown: e.state === 'cast' });
+    let grab = null; if (e.haul && a.root.visible) { a.root.updateMatrixWorld(true); grab = { p: a.root.worldToLocal(e.haul.A.clone()), k: Math.min(1, e.haul.t / 0.25) }; }
+    if (a.root.visible) a.animate(dt, { grab, speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, windup: e.windup, attack: e.attackA, diving: e.state === 'dive', airborne: T.ai === 'flyer' && e.alt > 0.6, tail: e.tailT || 0, tailUp: e.windup && e.act === 'tail' ? 1 : 0, thrown: e.state === 'cast' });
   }
 
   /* --------- Albali: circle high, dive, then hang low and vulnerable --------- */

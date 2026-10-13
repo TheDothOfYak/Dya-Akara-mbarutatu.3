@@ -22,17 +22,21 @@
             glowing patterns anywhere, in a colour of its own.
    RODAK   — wolf-like scavenger: lean, tall, short oily dark fur,
             long thin tail, yellow slit eyes, head held low.
-   KOFI GALTA — a hairy ball with two horns and lots of tiny legs;
-            long whisker-hairs flow back from its back third.
+   KOFI GALTA — a long, crescent-shaped furry body (both ends curving
+            up), blade-like spines along the top, a fluffy dark tail
+            tuft trailing whisker-hairs, two little horns on the head
+            and lots of tiny legs.
    BIG MOMMA KOFI — a plumper Kofi with babies clinging on.
-   SRU VORN — a hairy, active komodo in an upright "high walk",
-            two tusks, a spiked mace tail and green acid drool.
+   SRU VORN — a hairy, active komodo: a long, low, heavy body under
+            matted fur armour, splayed legs, two tusks, a spiked
+            mace-ball tail and green acid drool.
    ULAR NAGA — a huge earth hydra: four sturdy legs, armoured body,
             long necks with rounded heads, tendrils where eyes would
             be, a sail behind each head, and a spike-club tail.
    GYNGE   — living rock with no eyes; a craggy dome whose cave-maw
             yawns open with stone teeth over a pale fleshy belly.
-   STRYX   — a stepped plateau of rock with whipping vines on top;
+   STRYX   — a wide, flat body of stepped stone armour with two huge
+            spiral horn-antennae and whipping vine weapons on top;
             rooted, eyeless.
    TONGUATJIS — a domed turtle with craggy alligator jaws, a neck as
             long as its shell, and a pink tongue twice its length.
@@ -969,42 +973,100 @@ function kofiCore(opts, mode) {
   const baby = mode === 'baby', momma = mode === 'momma';
   const root = new THREE.Group();
   const hair = M(c), hairD = M(new THREE.Color(c).multiplyScalar(0.72).getHex()), horn = M(0xeee2c4), dark = M(0x2a1e16);
-  // bioluminescence: the tips of the long back-hairs glow like fibre-optic threads
+  const bladeM = M(new THREE.Color(c).multiplyScalar(0.5).lerp(new THREE.Color(0x5a5866), 0.55).getHex());
+  const tuftM = M(new THREE.Color(c).multiplyScalar(0.26).getHex());
+  // bioluminescence: the tips of the long tail-whiskers glow like fibre-optic threads,
+  // and a bead of light sits at the root of every blade
   const bio = bioKit();
   const glowC = opts.glowColor ?? (rnd ? hsl(0.45 + rnd() * 0.45, 0.85, 0.65).getHex() : 0x8ae8ff);
   const tipM = bio.mat(glowC, c, 0.35, 0.1, 2.0);
-  const R = 0.18;
+  const fat = momma ? 1.18 : 1;
   const body = new THREE.Group(); body.position.y = momma ? 0.2 : 0.19; root.add(body);
-  // a shaggy ball of hair
-  const ball = mesh(displace(new THREE.IcosahedronGeometry(1, baby ? 2 : 3), 0.16, 5.5, 2, 0.6), hair, body);
-  ball.scale.set(R * (momma ? 1.12 : 1), R * (momma ? 1.08 : 0.95), R * (momma ? 1.18 : 1.08));
-  // two horns at the front
-  const hornG = hornGeo(0.13, 0.024, -0.9, 7);
-  for (const s of [-1, 1]) {
-    const h = mesh(hornG, horn, body, s * 0.07, 0.11, 0.1); h.rotation.set(0.5, 0, -s * 0.45);
-    eye(body, 0.018, s * 0.055, 0.045, R * 1.0);
+  // the long crescent body: a furry tube bent along an arc, both ends curving up
+  // (tail end behind, head end in front); u = 0 at the tail, 1 at the head
+  const Rc = 0.27, th0 = -1.1, th1 = 1.1;
+  const arcPt = u => { const th = lerp(th0, th1, u); return new THREE.Vector3(0, Rc * (1 - Math.cos(th)), Rc * Math.sin(th)); };
+  const arcN = u => { const th = lerp(th0, th1, u); return new THREE.Vector3(0, Math.cos(th), -Math.sin(th)); };   // the inner (top) side
+  const rad = u => (0.022 + 0.098 * Math.pow(Math.sin(Math.PI * (0.08 + u * 0.86)), 0.6)) * fat;
+  const T = baby ? 16 : 26, RS = baby ? 7 : 10;
+  const path = new THREE.CatmullRomCurve3(Array.from({ length: 13 }, (_, i) => arcPt(i / 12)));
+  const tg = new THREE.TubeGeometry(path, T, 1, RS, false);
+  {
+    const p = tg.attributes.position, P = new THREE.Vector3(), v = new THREE.Vector3();
+    for (let i = 0; i <= T; i++) {
+      const u = i / T; path.getPointAt(u, P); const r = rad(u);
+      for (let j = 0; j <= RS; j++) {
+        const k = i * (RS + 1) + j; v.fromBufferAttribute(p, k).sub(P);
+        const n = noise3(v.x * 9 + 3, (P.y + v.y) * 9, (P.z + v.z) * 9 - 1);
+        const fur = 1 + (n - 0.5) * 0.3;
+        p.setXYZ(k, P.x + v.x * r * 0.86 * fur, P.y + v.y * r * fur, P.z + v.z * r * fur);
+      }
+    }
+    tg.computeVertexNormals();
   }
-  // lots of tiny legs underneath (wave gait)
+  const ball = mesh(tg, hair, body);
+  // the head: a round furry knob on the raised front end, two little horns, eyes, a dark nose
+  const hp = arcPt(1).add(new THREE.Vector3(0, 0.025, 0.035)), hr = 0.075 * (momma ? 1.08 : 1);
+  const head = mesh(displace(new THREE.IcosahedronGeometry(1, baby ? 1 : 2), 0.1, 6, 5, 0.6), hair, body, hp.x, hp.y, hp.z);
+  head.scale.set(hr * 0.95, hr * 0.9, hr * 1.1);
+  const hornG = hornGeo(0.1, 0.019, -0.8, 6);
+  for (const s of [-1, 1]) {
+    const h = mesh(hornG, horn, body, hp.x + s * 0.035, hp.y + hr * 0.7, hp.z - 0.005); h.rotation.set(-0.35, 0, -s * 0.4);
+    eye(body, 0.014, hp.x + s * 0.04, hp.y + 0.012, hp.z + hr * 0.92);
+  }
+  mesh(new THREE.SphereGeometry(0.014, 6, 4), dark, body, hp.x, hp.y - 0.012, hp.z + hr * 1.08);
+  // a cap of fur closing the tail end, then the fluffy dark tuft
+  const tp = arcPt(0), tdir = new THREE.Vector3(0, -Math.sin(th0), -Math.cos(th0));   // pointing out of the tail end
+  mesh(new THREE.SphereGeometry(rad(0) * 1.1, 8, 6), hair, body, tp.x, tp.y, tp.z);
+  const tuft = [], tfr = mulberry32(7);
+  const nT = baby ? 4 : 7;
+  for (let i = 0; i < nT; i++) {
+    const a = i / nT * TAU, rr = i ? 0.035 : 0;
+    const q = tp.clone().addScaledVector(tdir, 0.035 + (i ? 0.02 : 0.05) + tfr() * 0.02);
+    q.x += Math.cos(a) * rr; q.y += Math.sin(a) * rr * 0.7; q.z += Math.sin(a) * rr * 0.4;
+    tuft.push(placed(displace(new THREE.IcosahedronGeometry(1, 1), 0.3, 4, i + 2, 0.5), q.x, q.y, q.z, 0, 0, 0, (0.05 + tfr() * 0.02) * (baby ? 0.9 : 1) * fat));
+  }
+  mesh(merge(tuft), tuftM, body);
+  // blade-like spines along the top of the crescent, each leaning back a little
+  const bladeSh = new THREE.Shape();
+  bladeSh.moveTo(-0.02, 0); bladeSh.quadraticCurveTo(-0.022, 0.55, -0.045, 1); bladeSh.quadraticCurveTo(0.006, 0.5, 0.02, 0); bladeSh.lineTo(-0.02, 0);
+  const bladeG = new THREE.ExtrudeGeometry(bladeSh, { depth: 0.006, bevelEnabled: false, curveSegments: 4 });
+  bladeG.translate(0, 0, -0.003); bladeG.rotateY(-Math.PI / 2);   // blade in the y-z plane, tip leaning to -z (back)
+  const blades = [], beads = [], nB = baby ? 4 : 7;
+  for (let i = 0; i < nB; i++) {
+    const u = lerp(0.16, 0.84, i / (nB - 1)), pt = arcPt(u), nn = arcN(u), r = rad(u);
+    const h = (0.085 + 0.075 * Math.sin(Math.PI * u)) * fat;
+    const at = pt.clone().addScaledVector(nn, r * 0.45); at.y += r * 0.5;
+    const th = lerp(th0, th1, u);
+    const g = bladeG.clone(); g.scale(1.2, h, fat);
+    blades.push(placed(g, at.x, at.y, at.z, -th * 0.3, 0, 0));
+    if (!baby) for (const s of [-1, 1]) beads.push([at.x + s * 0.006, at.y, at.z, s, 0.4, 0, 0.009, 0.6]);
+  }
+  mesh(merge(blades), bladeM, body);
+  if (!baby) bioMesh(bioDots(beads), tipM, body);
+  // lots of tiny legs underneath (wave gait), hung along the belly of the crescent
   const legs = [], nL = baby ? 6 : (opts.legs || 10);
   const legG = merge([placed(new THREE.CylinderGeometry(0.007, 0.01, 0.08, 5), 0, -0.04, 0), placed(new THREE.SphereGeometry(0.013, 6, 4), 0, -0.08, 0.006, 0, 0, 0, 1, 0.6, 1.3)]);
   for (let i = 0; i < nL; i++) {
     const s = i % 2 ? 1 : -1, k = Math.floor(i / 2), n2 = nL / 2;
-    const z = lerp(0.1, -0.1, n2 > 1 ? k / (n2 - 1) : 0.5);
-    const hip = new THREE.Group(); hip.position.set(s * 0.1, -0.1, z); hip.rotation.z = s * 0.35; body.add(hip);
-    mesh(legG, dark, hip); legs.push({ hip, k, s });
+    const u = lerp(0.7, 0.3, n2 > 1 ? k / (n2 - 1) : 0.5), pt = arcPt(u);
+    const hip = new THREE.Group(); hip.position.set(s * 0.05 * fat, pt.y - rad(u) * 0.55, pt.z); hip.rotation.z = s * 0.3; body.add(hip);
+    // legs reach to the same ground line wherever they hang from
+    const sc = (body.position.y + hip.position.y - 0.005) / (0.093 * Math.cos(0.3));
+    mesh(legG, dark, hip).scale.y = clamp(sc, 0.8, 1.8);
+    legs.push({ hip, k, s });
   }
-  // long whisker-hairs from the back third, flowing behind
-  const strands = [], nS = baby ? 4 : 9, segs = baby ? 2 : 4;
+  // long whisker-hairs streaming back out of the tail tuft
+  const strands = [], nS = baby ? 3 : 6, segs = baby ? 2 : 4;
   for (let i = 0; i < nS; i++) {
-    const a = (i / (nS - 1) - 0.5) * 2.2;
-    const base = new THREE.Group(); base.position.set(Math.sin(a) * R * 0.8, Math.cos(a) * R * 0.75, -R * 0.55); body.add(base);
-    base.rotation.set(-1.75 - Math.cos(a) * 0.2, 0, -Math.sin(a) * 0.5);
-    const ch = chain(base, segs, 0.085, 0.006, 0.0015, i % 2 ? hairD : hair, { radial: 4, noBalls: true });
+    const a = (i / (nS - 1) - 0.5) * 2.0;
+    const base = new THREE.Group(); body.add(base);
+    base.position.copy(tp).addScaledVector(tdir, 0.05); base.position.x += Math.sin(a) * 0.03; base.position.y += Math.cos(a) * 0.02;
+    base.rotation.set(-2.25 - Math.cos(a) * 0.2, 0, -Math.sin(a) * 0.5);
+    const ch = chain(base, segs, 0.075, 0.005, 0.0015, i % 2 ? hairD : tuftM, { radial: 4, noBalls: true });
     const last = ch.joints[segs - 1].userData.seg; last.material = tipM; noOut(last);
     strands.push({ base, joints: ch.joints, ph: i * 0.9 });
   }
-  // and a few freckles of light between the horns
-  if (!baby) bioMesh(bioDots([-0.42, -0.14, 0.14, 0.42].map((x, i) => { const n = new THREE.Vector3(x, 0.7 + (i % 2) * 0.12, 0.62).normalize(); return [n.x * 1.12, n.y * 1.12, n.z * 1.12, n.x, n.y, n.z, 0.075, 0.5]; })), tipM, ball);
   bio.glow(0);
   return { root, body, ball, legs, strands, hair, nL, bio };
 }
@@ -1033,7 +1095,7 @@ export function buildBigMommaKofi(opts = {}) {
   const k = kofiCore(opts, 'momma'); k.y0 = k.body.position.y;
   // babies: two clinging to her back, one tagging along beside her
   const babies = [];
-  [[0.075, 0.135, -0.03, 0.32, 0.4], [-0.08, 0.12, -0.1, 0.3, -0.5], [0.3, 0, 0.05, 0.36, 0.2]].forEach(([x, y, z, s, ry], i) => {
+  [[0.1, 0.17, -0.02, 0.32, 0.4], [-0.1, 0.155, -0.1, 0.3, -0.5], [0.3, 0, 0.05, 0.36, 0.2]].forEach(([x, y, z, s, ry], i) => {
     const b = kofiCore({ color: opts.color, seed: opts.seed !== undefined ? opts.seed + i + 1 : undefined }, 'baby'); b.y0 = b.body.position.y;
     b.root.position.set(x, y, z); b.root.scale.setScalar(s); b.root.rotation.y = ry; k.body.add(b.root);
     if (i === 2) { k.root.add(b.root); b.root.position.set(x, 0, z); }
@@ -1085,7 +1147,8 @@ export function buildSruVorn(opts = {}) {
   const skin = M(furC.clone().lerp(new THREE.Color(0x3a2a22), 0.5).getHex()), tusk = M(0xf0e4c8), claw = M(0x2a2018);
   const acid = basic(0x9cff3a);
   const root = new THREE.Group();
-  const body = new THREE.Group(); body.position.y = 1.32; root.add(body);
+  const BY = 1.08;   // long, low and heavy: the belly slung close to the ground
+  const body = new THREE.Group(); body.position.y = BY; root.add(body);
   // bioluminescence: two staggered rows of rosettes along each flank and a glowing mace
   const bio = bioKit();
   const SRU_GLOW = [0xc8ff4a, 0x5affd0, 0xffb44a, 0x9a8aff];
@@ -1137,17 +1200,20 @@ export function buildSruVorn(opts = {}) {
   });
   const drool = glowSprite(0x9cff3a, 0.9, 0.6); drool.position.set(0, -0.25, 0.55); jaw.add(drool);
 
-  // legs held upright under the body (a "high walk")
-  const legs = [], upG = new THREE.CylinderGeometry(0.15, 0.2, 0.62, 9), loG = new THREE.CylinderGeometry(0.12, 0.15, 0.6, 9);
+  // short, thick legs splayed out to the sides like a komodo's, elbows out, feet planted
+  const legs = [], upG = new THREE.CylinderGeometry(0.16, 0.21, 0.52, 9), loG = new THREE.CylinderGeometry(0.13, 0.16, 0.5, 9);
   const footG = merge([placed(new THREE.SphereGeometry(1, 10, 6), 0, 0, 0.06, 0, 0, 0, 0.18, 0.09, 0.25),
     ...[-0.1, 0, 0.1].map(x => placed(hornGeo(0.14, 0.035, 0.6, 5), x, 0, 0.26, 1.35, 0, 0))]);
   [[0.55, 0.7], [-0.55, 0.7], [0.55, -0.62], [-0.55, -0.62]].forEach(([x, z], i) => {
-    const hip = new THREE.Group(); hip.position.set(x, -0.12, z); body.add(hip);
-    mesh(upG, fur, hip, 0, -0.31, 0).geometry;
-    const knee = new THREE.Group(); knee.position.y = -0.6; hip.add(knee);
-    mesh(new THREE.SphereGeometry(0.15, 8, 6), fur, knee);
-    mesh(loG, skin, knee, 0, -0.3, 0);
-    const foot = mesh(footG, claw, knee, 0, -0.6, 0);
+    const sx = Math.sign(x);
+    const splay = new THREE.Group(); splay.position.set(x * 1.05, -0.14, z); splay.rotation.z = sx * 0.6; body.add(splay);
+    const hip = new THREE.Group(); splay.add(hip);
+    mesh(upG, fur, hip, 0, -0.26, 0);
+    const kneeS = new THREE.Group(); kneeS.position.y = -0.5; kneeS.rotation.z = -sx * 0.6; hip.add(kneeS);
+    const knee = new THREE.Group(); kneeS.add(knee);
+    mesh(new THREE.SphereGeometry(0.16, 8, 6), fur, knee);
+    mesh(loG, skin, knee, 0, -0.25, 0);
+    const foot = mesh(footG, claw, knee, 0, -0.5, 0);
     legs.push({ hip, knee, foot, i });
   });
 
@@ -1175,7 +1241,7 @@ export function buildSruVorn(opts = {}) {
         l.foot.rotation.x = -l.hip.rotation.x - l.knee.rotation.x;
       });
       // a body that rolls with each step; head swings low side to side
-      body.position.y = 1.32 + walkW * Math.abs(Math.sin(ph)) * 0.05 + Math.sin(t * 1.3) * 0.015 - wind * (1 - atk) * 0.12;
+      body.position.y = BY + walkW * Math.abs(Math.sin(ph)) * 0.05 + Math.sin(t * 1.3) * 0.015 - wind * (1 - atk) * 0.12;
       body.rotation.z = walkW * Math.sin(ph) * 0.04;
       body.rotation.y = walkW * Math.sin(ph) * 0.05;
       body.position.z = atk * 0.35;
@@ -1414,7 +1480,7 @@ export function buildGynge(opts = {}) {
 }
 
 /* ================================================================
-   STRYX — a stepped plateau of rock, vines on top
+   STRYX — wide, flat stone armour, two huge spiral horns, vines on top
    ================================================================ */
 export function buildStryx(opts = {}) {
   const rnd = seeded(opts) || mulberry32(5);
@@ -1427,8 +1493,10 @@ export function buildStryx(opts = {}) {
   const bioC = seeded(opts) ? STRYX_GLOW[Math.floor(rnd() * STRYX_GLOW.length)] : STRYX_GLOW[0];
   const seamM = bio.mat(bioC, 0x8a7a62, 0.3, 0.1, 1.9), tipM = bio.mat(bioC, 0x3d6a32, 0.3, 0.1, 1.9);
   const body = new THREE.Group(); root.add(body);
-  // three stepped tiers, slightly irregular; the top is flat (a mesa)
-  const tiers = [[1.02, 1.12, 0.4, 0], [0.9, 0.97, 0.36, 0.4], [0.8, 0.86, 0.32, 0.76]];
+  // a wide, flat body of stone armour: three low stepped tiers, slightly irregular,
+  // stretched side to side; the top is flat (a mesa)
+  const WX = 1.3, WZ = 0.92, FH = 0.72, TOP = 1.1 * FH;
+  const tiers = [[1.02, 1.12, 0.4 * FH, 0], [0.9, 0.97, 0.36 * FH, 0.4 * FH], [0.8, 0.86, 0.32 * FH, 0.76 * FH]];
   const tg = [];
   tiers.forEach(([rt, rb, h, y], i) => {
     const g = new THREE.CylinderGeometry(rt, rb, h, 9, 2);
@@ -1436,22 +1504,22 @@ export function buildStryx(opts = {}) {
     for (let k = 0; k < p.count; k++) {
       const x = p.getX(k), z = p.getZ(k), yy = p.getY(k), a = Math.atan2(z, x);
       const n = 1 + (noise3(Math.cos(a) * 2 + i, yy * 2, Math.sin(a) * 2) - 0.5) * 0.35;
-      p.setXYZ(k, x * n, yy, z * n * 0.85);
+      p.setXYZ(k, x * n * WX, yy, z * n * 0.85 * WZ);
     }
     g.translate(0, y + h / 2, 0); g.computeVertexNormals(); tg.push(g);
   });
   mesh(merge(tg.slice(0, 2)), rock, body);
   mesh(tg[2], rockD, body);
   { const all = merge(tg); bioMesh(bioDots(patchDots(all, rnd, 34, 0.05, 0.58, 2.2, (x, y, z, nx, ny) => Math.abs(ny) < 0.5 && y > 0.08)), seamM, body); }
-  const cap = mesh(new THREE.CylinderGeometry(0.74, 0.8, 0.06, 9), topM, body, 0, 1.08, 0); cap.scale.z = 0.85;
+  const cap = mesh(new THREE.CylinderGeometry(0.74, 0.8, 0.06, 9), topM, body, 0, TOP - 0.02, 0); cap.scale.set(WX, 1, 0.85 * WZ);
   // loose boulders and ledges
   const bl = [];
-  for (let i = 0; i < 5; i++) { const a = i * 1.3 + 0.4; bl.push(placed(rockGeo(1, 0.3, 2, i), Math.cos(a) * 1.05, 0.12, Math.sin(a) * 0.95, a, i, 0, 0.22 + (i % 2) * 0.1)); }
+  for (let i = 0; i < 5; i++) { const a = i * 1.3 + 0.4; bl.push(placed(rockGeo(1, 0.3, 2, i), Math.cos(a) * 1.05 * WX, 0.12, Math.sin(a) * 0.95 * WZ, a, i, 0, 0.22 + (i % 2) * 0.1)); }
   mesh(merge(bl), rockD, body);
   // roots running out over the ground and diving in
   const rootG = hornGeo(0.85, 0.09, 0.9, 5); rootG.rotateZ(-Math.PI / 2); rootG.rotateX(Math.PI / 2);
   const rg = [];
-  for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + 0.2; rg.push(placed(rootG, Math.cos(a) * 1.0, 0.18, Math.sin(a) * 0.88, 0, -a, 0, 0.8 + (i % 3) * 0.2)); }
+  for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + 0.2; rg.push(placed(rootG, Math.cos(a) * 1.0 * WX, 0.15, Math.sin(a) * 0.88 * WZ, 0, -a, 0, 0.8 + (i % 3) * 0.2)); }
   mesh(merge(rg), root2, body);
   // whipping vines on top: a Rope each, curled tips
   const n = 5, vines = [], curlG = curlGeo(0.08, 0.025);
@@ -1459,11 +1527,37 @@ export function buildStryx(opts = {}) {
     const a = i / n * TAU + 0.3;
     const rope = new Rope(root, 8, 0.07, 0.022, vineM);
     const tip = noOut(mesh(curlG, tipM, root));
-    vines.push({ rope, tip, a, base: new THREE.Vector3(Math.cos(a) * 0.4, 1.1, Math.sin(a) * 0.34), ph: rnd() * TAU, len: 1.0 + rnd() * 0.5 });
+    vines.push({ rope, tip, a, base: new THREE.Vector3(Math.cos(a) * 0.4 * WX, TOP, Math.sin(a) * 0.34 * WZ - 0.1), ph: rnd() * TAU, len: 1.0 + rnd() * 0.5 });
+  }
+  // two huge spiral horns (antennae) rising from the front corners of the mesa: ridged
+  // stone corkscrews that widen as they climb and sweep out to the sides
+  const hornM = M(0xa89a80), horns = new THREE.Group(); horns.position.set(0, TOP - 0.05, 0.22); body.add(horns);
+  {
+    const L = 1.9, turns = 1.75, NS = 80, RS = 7;
+    for (const s of [-1, 1]) {
+      const d = new THREE.Vector3(s * 0.7, 1, 0.2).normalize(), e1 = new THREE.Vector3(0, 0, 1).cross(d).normalize(), e2 = d.clone().cross(e1);
+      const at = u => { const ph = s * u * turns * TAU, rr = 0.05 + 0.34 * Math.pow(u, 0.9);
+        return new THREE.Vector3(s * 0.48, 0, 0).addScaledVector(d, L * u).addScaledVector(e1, Math.cos(ph) * rr - 0.03).addScaledVector(e2, Math.sin(ph) * rr); };
+      const pts = []; for (let i = 0; i <= 48; i++) pts.push(at(i / 48));
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const g = new THREE.TubeGeometry(curve, NS, 1, RS, false), p = g.attributes.position, P = new THREE.Vector3(), v = new THREE.Vector3();
+      for (let i = 0; i <= NS; i++) {
+        const u = i / NS; curve.getPointAt(u, P);
+        const r = (0.12 * Math.pow(1 - u, 0.8) + 0.008) * (1 + 0.16 * Math.max(0, Math.sin(u * 52)));   // ridged rings
+        for (let j = 0; j <= RS; j++) { const k = i * (RS + 1) + j; v.fromBufferAttribute(p, k).sub(P); p.setXYZ(k, P.x + v.x * r, P.y + v.y * r, P.z + v.z * r); }
+      }
+      g.computeVertexNormals();
+      mesh(g, hornM, horns);
+      mesh(new THREE.SphereGeometry(0.16, 8, 6), rockD, horns, s * 0.45, 0.02, -0.02).scale.set(1, 0.6, 1);   // the socket
+      // beads of light up the outside of each spiral
+      const B = [];
+      for (let i = 1; i < 9; i++) { const u = i / 9.5; curve.getPointAt(u, P); const q = at(u), n = q.clone().sub(new THREE.Vector3(s * 0.48, 0, 0).addScaledVector(d, L * u)).normalize(); const r = 0.12 * Math.pow(1 - u, 0.8) + 0.008; B.push([P.x + n.x * r, P.y + n.y * r, P.z + n.z * r, n.x, n.y, n.z, 0.035 * (1 - u * 0.6), 0.5]); }
+      bioMesh(bioDots(B), seamM, horns);
+    }
   }
   // a tuft of grass and a couple of leaves on the top
   const leaf = leafGeo(0.22, 0.12), lf = [];
-  for (let i = 0; i < 6; i++) { const a = i * 1.1; lf.push(placed(leaf, Math.cos(a) * 0.1, 1.1, Math.sin(a) * 0.1, Math.cos(a) * 0.6, a, Math.sin(a) * 0.6)); }
+  for (let i = 0; i < 6; i++) { const a = i * 1.1; lf.push(placed(leaf, Math.cos(a) * 0.1, TOP, Math.sin(a) * 0.1 - 0.15, Math.cos(a) * 0.6, a, Math.sin(a) * 0.6)); }
   mesh(merge(lf), vineM, body);
   finish(root, 0.025);
   const P1 = new THREE.Vector3(), P2 = new THREE.Vector3(), P3 = new THREE.Vector3(), tmp = new THREE.Vector3();
@@ -1474,15 +1568,25 @@ export function buildStryx(opts = {}) {
     // when it moves it heaves itself along on its vines
     body.position.y = Math.abs(Math.sin(t * 3)) * 0.05 * clamp(sp, 0, 1);
     body.rotation.z = Math.sin(t * 3) * 0.03 * clamp(sp, 0, 1);
+    // the horns lower like a ram's as it winds up, and toss on the strike
+    horns.rotation.x = Math.sin(t * 0.7) * 0.02 + wind * (1 - atk) * 0.25 - atk * 0.12;
     for (let i = 0; i < vines.length; i++) {
       const v = vines[i], ca = Math.cos(v.a), sa = Math.sin(v.a);
+      if (st.grab && i === 0) {   // a vine thrown out onto something solid, hauling the whole mesa after it
+        const k = clamp(st.grab.k, 0, 1), e = 1 - Math.pow(1 - k, 3), G = st.grab.p;
+        P3.copy(v.base).lerp(G, e);
+        P1.set(v.base.x * 1.1, v.base.y + 0.8, v.base.z * 1.1);
+        P2.copy(v.base).lerp(G, e * 0.7); P2.y += (1 - e) * 0.8 + 0.2;
+        v.rope.set(v.base, P1, P2, P3);
+        v.tip.position.copy(P3); orientCurl(v.tip, v.rope.dir, UP);
+        continue;
+      }
       const a = clamp(atk * 1.3 - i * 0.08, 0, 1);
       const w = Math.sin(t * 1.4 + v.ph);
       // idle: rising and swaying; wind-up: coiled back; attack: whipped forward
-      // idle: arching out like a fountain (the "horns"), swaying
-      P3.set(ca * (0.75 + v.len * 0.5) + Math.sin(t * 0.9 + v.ph) * 0.12, 1.1 + v.len * 0.45 + w * 0.12, sa * (0.65 + v.len * 0.45) + Math.cos(t * 0.8 + v.ph) * 0.12);
-      tmp.set(ca * 0.4, 1.1 + v.len * 1.1, -0.5 + sa * 0.3); P3.lerp(tmp, wind * (1 - a));
-      tmp.set(ca * 0.35, 0.5 + i * 0.12, 1.9 + v.len * 0.7); P3.lerp(tmp, a);
+      P3.set(ca * (0.75 + v.len * 0.5) * WX + Math.sin(t * 0.9 + v.ph) * 0.12, TOP + v.len * 0.45 + w * 0.12, sa * (0.65 + v.len * 0.45) + Math.cos(t * 0.8 + v.ph) * 0.12);
+      tmp.set(ca * 0.4 * WX, TOP + v.len * 1.1, -0.5 + sa * 0.3); P3.lerp(tmp, wind * (1 - a));
+      tmp.set(ca * 0.35 * WX, 0.4 + i * 0.12, 1.9 + v.len * 0.7); P3.lerp(tmp, a);
       if (sp > 0.2 && i % 2 === 0) { tmp.set(ca * 1.6, 0.05, sa * 1.2 + 0.8); P3.lerp(tmp, clamp(sp, 0, 1) * 0.8); }
       P1.set(v.base.x * 1.1, v.base.y + 0.55 + v.len * 0.3, v.base.z * 1.1);
       P2.set(P3.x * 0.85, P3.y + 0.5 - a * 0.45, P3.z * 0.85 - a * 0.6);

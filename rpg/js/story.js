@@ -906,3 +906,259 @@ export const ROAD = {
     meet: 'Find the Carpenter by the town hearth',
   },
 };
+
+/* ================================================================
+   CHAPTER II — THE MEGLA AAGAC
+   Two years on. A cooperative Sniller amulet out of Fyrsti'Vilag feels
+   its task pulling north, and Tanoc (fifteen now) rides after it into
+   the mist forest the folk of Beuhk don't name above a whisper. A Gynge
+   in the ruins; the Duskareth keep; a ring; a friend. And at home, the
+   Carpenter shows him how to keep a creature's truth.
+   ================================================================ */
+SPEAKERS.sniller = { name: 'The Sniller', color: '#6af0e0', sub: 'in the amulet' };
+SPEAKERS.vel = { name: 'Duskareth', color: '#b070ff', sub: 'a Vel of the keep' };
+SPEAKERS.master = { name: 'The Ver master', color: '#c890ff', sub: 'Duskareth, with the ring' };
+SPEAKERS.malsti = { name: 'The Malsti Punk', color: '#c88aff', sub: 'who was a Ver, a moment ago' };
+SPEAKERS.tanoc15 = { name: 'Tanoc', color: '#e0b080', sub: 'Tanoc Filugani · Eikar, fifteen' };
+
+export const MEGLA = {
+  // at home, before: the amulet starts to pull
+  pull: [
+    ['tale', 'Two summers go by on the Carpenter’s land. Tanoc grows a hand taller. The Punk grows a great deal more than that.'],
+    ['tale', 'Then one morning, one of the Sniller amulets out of Fyrsti’Vilag — the one that hums when he talks to it — begins to tug. North. Always north, like a dog on a lead.'],
+    ['buhkon', 'Let me see it. …Mm. It has a task, and the task has started pulling. They do that.'],
+    ['tanoc15', 'Where to?'],
+    ['buhkon', 'North, up the river, through the pass. There’s a forest past the mist the Beuhk folk call the Megla Aagac. Old trees. Older than old.'],
+    ['buhkon', 'Things live there that don’t live anywhere else. Don’t go off the path at night. Don’t pick a fight with anything you can’t see the edges of.'],
+    ['buhkon', 'And if the amulet asks you for something, Tanoc — think before you answer.'],
+    ['tanoc15', 'That’s all? That’s all you’re going to tell me?'],
+    ['buhkon', 'That’s all you need. Take the Punk. Take the fire-stone. Be back before the leaves turn.'],
+  ],
+  cards: ['Two years on.', 'The Megla Aagac'],
+  ride: [
+    ['tale', 'North, following the river up into the pass. The Punk is twice the size she was, and she takes the climb like it’s a game.'],
+  ],
+  rideBarks: [
+    ['tanoc15', 'Mist already. And it’s not even noon.'],
+    ['sniller', 'Further. It is further. I can feel it, little one — like a tooth that wants pulling.'],
+    ['tanoc15', 'You talk more every day, you know that?'],
+    ['tale', 'The mist thickens with every bend of the river. The sounds of the valley go soft, then go away.'],
+  ],
+  clearing: [
+    ['tale', 'The pass opens onto a long clearing, and at its far side, rising out of a wall of fog: trees. Massive, dark trees, whose tops he cannot see.'],
+    ['tanoc15', '…The Megla Aagac.'],
+    ['tale', 'In the treeline, something moves. Tall, lean, dark, oily — a pack of Rodak, standing quite still, watching him.'],
+    ['tanoc15', 'Easy. Easy, girl. They’re not coming. They’re just… looking.'],
+    ['sniller', 'They know something is going to happen. Rodak like to be there for what comes after.'],
+  ],
+  campObj: 'Make camp at the forest edge — the stones by the old firepit',
+  night1: [
+    ['tale', 'Behind him the mountains and the fields glow soft blue under Velki. In front of him, the forest is simply dark.'],
+    ['tale', 'Now and then, a flicker of light between the trunks — gone too fast to be sure of.'],
+    ['tanoc15', 'You can come closer to the fire, you know. You don’t have to sit on my feet.'],
+    ['punk', '…'],
+  ],
+  sounds: [
+    ['tale', 'Far off in the trees: a screech. Long, rising, like metal dragged on stone. A Lutut, maybe.'],
+    ['tale', 'A long silence. Then a bellow, low enough to feel in the ground. Api Buta.'],
+    ['tale', 'Silence again. Then something else — a scream, thin and high, that doesn’t sound like any animal he knows.'],
+    ['tanoc15', '…Just far enough apart to almost be okay. Almost.'],
+  ],
+  morning: [
+    ['tale', 'Morning. The fog has not lifted; it has only gone grey instead of black.'],
+    ['tanoc15', 'On foot, I think. Stay close.'],
+  ],
+  enterObj: 'Go into the Megla Aagac on foot',
+  thud: [
+    ['tale', 'Off the path — a thud. Something huge has hit the ground, close.'],
+  ],
+  grabbed: [
+    ['tale', 'Before he can turn, the Punk has him: two vines round his middle, and he’s in the saddle and they’re running, back the way they came, until the trees spit them out into the clearing.'],
+    ['tanoc15', 'Hey — hey! Stop. Stop! …I know. I know. I felt it too.'],
+    ['tanoc15', 'Listen. You stay here. Right here. Keep the fire going. I’ll go in alone and I’ll come back. Promise.'],
+    ['punk', '…'],
+    ['tale', 'She does not like it. But she stays.'],
+  ],
+  aloneObj: 'Go back in — alone. Find what made that sound',
+  animal: [
+    ['tale', 'A Sru Vorn — a big one, tusked and heavy — lies in the ferns, breathing. Out cold. Something hit it hard enough to drop it where it stood.'],
+    ['tale', 'And from it, a drag trail: a long furrow through the moss and the earth, leading deeper in. Something was going to take it. Something dropped it when he came.'],
+  ],
+  trailObj: 'Follow the drag trail deeper in',
+  rodak: [
+    ['tale', 'The Rodak come out of the fog on every side. They don’t close. They don’t block the way. They just walk with him, close enough to touch.'],
+    ['tanoc15', 'Hello again.'],
+  ],
+  line: [
+    ['tale', 'And then, all at once, they stop — every one of them, at the same invisible line in the moss — and sit, and watch him go on without them.'],
+    ['sniller', 'Even the Rodak won’t go past here. Remember that.'],
+  ],
+  ruins: [
+    ['tale', 'Ruins. Ancient worked stone, half-buried and furred with moss, walls standing at angles that suggest a building and then give up.'],
+    ['tanoc15', 'Somebody lived here. A long time ago.'],
+  ],
+  gatherObj: n => `Search the ruins for anything worth taking (${n}/3)`,
+  relicSeen: [
+    ['tale', 'In the one wall still standing straight, at the heart of the ruin: a purple Relic, set into the stone.'],
+    ['tale', 'And the stone around it is pristine — sharp-edged, clean, new as the day it was cut. The further from the Relic, the more ruined everything is.'],
+    ['tanoc15', 'Oh, you’re beautiful.'],
+  ],
+  erupt: [
+    ['tale', 'The ground under him heaves.'],
+  ],
+  gyngeIntro: [
+    ['tanoc15', 'A Gynge — it’s a Gynge! Living rock — and its belly’s still in the ground!'],
+    ['sniller', 'Its mouth, little one. The soft is in its mouth. Keep away from it and feed it fire.'],
+  ],
+  phase1: 'Keep your distance — when the maw gapes, put a burning stone in it (Q)',
+  amplify: [
+    ['tale', 'The purple Relic in the wall hums — he feels it in his teeth — and the fire-stone in his hand goes white-hot. The next stone he throws comes out burning twice as bright.'],
+    ['hurst', 'Ooh! Who’s THAT? I like them! Let’s throw something big!'],
+  ],
+  half: [
+    ['tale', 'With a grinding roar the Gynge tears itself up out of the earth — legs of rock, a pale soft underbelly — and comes for him.'],
+    ['sniller', 'Its belly! It hides its belly in the ground because the belly is soft! Get under it!'],
+  ],
+  phase2: 'When it rears up to crush you — Space to slide under it and drive the axe into its belly',
+  slid: ['Under it — the axe goes in!', 'Again — right into the soft!', 'Once more!'],
+  dead: [
+    ['tale', 'The Gynge shudders, sags, and is still — a hill of warm rock in the middle of the ruin, glowing faintly from the cracks.'],
+    ['tanoc15', '…I did that. I actually did that.'],
+    ['sniller', 'You did. Now take what it can give you. Nothing in this forest should go to waste.'],
+  ],
+  harvestObj: 'Harvest the Gynge — a chip of its living rock above all',
+  chip: [
+    ['tale', 'He works a chip of the Gynge’s rock loose — a palm-sized piece from just inside the maw, still warm, faintly singing.'],
+    ['tanoc15', 'Buhkon will want to see this. …No. I want to make something with this.'],
+  ],
+  relicObj: 'Examine the Relic in the wall',
+  relic: [
+    ['tale', 'The runes round the Relic are worn almost smooth. He can make out one of them — Akai Gek.'],
+    ['tale', 'He takes a rubbing on a page of his book with a stub of charcoal. Then, carefully, he touches the metal.'],
+    ['tale', 'A song burns into his mind. Not heard — known. All at once, as if he’d always had it.'],
+    ['tanoc15', 'Ah — !'],
+    ['tale', 'He marks the place on his map. He tries to work the Relic free; it will not move. It has been here longer than the wall, and it means to stay.'],
+  ],
+  campObj2: 'Make camp in the ruins — nothing will come near the Gynge',
+  night2: [
+    ['sniller', 'A good place to sleep. Nothing will come near something that killed a Gynge. Not tonight.'],
+    ['tanoc15', 'Is that a compliment?'],
+    ['sniller', 'It is a fact. Compliments come later, if you live.'],
+    ['tale', 'The sounds come again in the night — the screech, the bellow, the thin high screaming — each just far enough apart to almost be okay.'],
+    ['tanoc15', 'What was it like? Before. Before the Angels.'],
+    ['sniller', 'Loud. Bright. We were the storms between the mountains, and we were glad. …I do not remember all of it. The amulet keeps some of me and lets the rest go.'],
+    ['tanoc15', 'I’m sorry.'],
+    ['sniller', 'You are the first one who has ever said that. Go to sleep, little one.'],
+  ],
+  day2: ['Day two.', 'Deeper in.'],
+  day2Obj: 'Follow the amulet’s pull deeper in',
+  day2Barks: [
+    ['sniller', 'Stronger. It pulls stronger now. We are close.'],
+    ['tanoc15', 'Wild Punks — and they’re not in the mood to talk.'],
+  ],
+  eclipse: [
+    ['tale', 'In the middle of the day, the light goes. Velki slides across the face of the sun, and all of Xikia darkens at once.'],
+    ['tale', 'And in the dim, out of the forest ahead — the screaming. The dark screamers. Close now.'],
+    ['sniller', 'There. Go toward it. Quietly.'],
+  ],
+  hideoutObj: 'Follow the screaming — quietly',
+  hideout: [
+    ['tale', 'A keep. Small, camouflaged into the forest: four walls, an open courtyard, and at each corner a watchtower grown out of a living tree.'],
+    ['tale', 'Duskareth. Their markings burn purple even from here.'],
+    ['sniller', 'The ring is in there. It will not go through the Duat — so they hold it here, until they can carry it to their great house the long way.'],
+    ['tanoc15', 'Then I’ll carry it out the short way. Up a tree, over the wall.'],
+  ],
+  climbObj: 'Climb the watchtower tree on the south-west corner (in the mist)',
+  watcher: 'Knock out the watcher',
+  noticed: [
+    ['tale', 'He drops the watcher — and every marking in the keep flares at once. The Duskareth are all joined to one another; one of them goes dark, and all of them know.'],
+    ['vel', 'The tree. South-west. Take him.'],
+  ],
+  fumble: [
+    ['tale', 'He tries to go back the way he came. A spear thuds into the trunk by his hand; he lets go, and he falls — badly — into the courtyard.'],
+  ],
+  fightObj: 'Fight',
+  fightBarks: ['They’re too good — they’re all too good—', 'I can’t — I can’t get past them—', 'Ah—!'],
+  down: [
+    ['vel', 'An apprentice. A child. Bind him.'],
+    ['tanoc15', '…Sniller. Sniller, I know you can — please — shut up and HELP.'],
+  ],
+  emerge: [
+    ['tale', 'The amulet at his chest splits with light. Out of it comes the Sniller — not a wisp, not a whisper, but the storm itself: still tethered at the base to the little amulet, and above that, vast. Ancient. One of the greats.'],
+  ],
+  rout: [
+    ['tale', 'It moves through the courtyard like weather. It does not kill them. It puts every one of them down — gently, efficiently, utterly — and leaves them breathing.'],
+    ['tale', 'Then it turns back to him, and the wind of it is warm, and the bruises go out of him like a tide going out.'],
+    ['sniller', 'Up, little one. Your work isn’t done. Neither is mine.'],
+  ],
+  searchObj: 'Search the keep — the little church in the north wall',
+  master: [
+    ['tale', 'Inside the little church, alone: a Ver of the Duskareth, older, the ring on his finger.'],
+    ['master', 'You. A boy and a storm. Do you have the least idea what you’ve walked into?'],
+    ['tale', 'He strikes — and his blade dissolves in the Sniller’s wind like sugar in rain.'],
+    ['tale', 'He tears open the Duat to run — and the Sniller drinks it, the whole opening, the way you’d drink a cup of water.'],
+    ['master', 'No — no. Please. I only hold it. I’m only the one who holds it—'],
+    ['tale', 'And then his own Zikhron core turns on him. It knows what he has done; it remembers it all; and it will not carry him any more.'],
+    ['tale', 'Where he stood there is a Malsti Punk — small, dark, Duat-born, blinking — with the ring sitting on its stem like a crown.'],
+  ],
+  ringObj: 'Take the ring',
+  cantTouch: [
+    ['tale', 'The Sniller reaches for the ring. Its wind slides off it, like water off glass. It reaches again. And again.'],
+    ['sniller', 'I cannot — I cannot — it is MINE to carry and I cannot—'],
+  ],
+  ring: [
+    ['tale', 'Tanoc picks up the ring.'],
+    ['tale', 'A ripple goes out from his hand through the whole keep — and for one moment the Sniller is entirely solid: a great shape of vine and storm and something like a face, looking at him.'],
+    ['sniller', 'Carried. It is carried. …There is a law in this, little one. I must grant you one thing, and then my task is done. Ask.'],
+  ],
+  askText: 'Ask for one thing.',
+  askOpts: ['Cleanse this keep — and let no one in but those I allow', 'Let me think a moment…'],
+  thinking: [['sniller', 'Think, then. But I will be here, and so will this place.']],
+  cleanse: [
+    ['tale', 'The Sniller rises through the keep like a breath drawn in. The purple goes out of every stone. Moss comes back to the walls; the watchtower trees put out new leaves; the courtyard is suddenly full of the smell of rain.'],
+    ['sniller', 'It is yours. Only those you allow may enter here. The Megla Aagac will keep it for you.'],
+    ['tanoc15', 'Mine? A whole — mine?'],
+    ['sniller', 'Yours. And the ring links your Relics to you — five at once — wherever they are. You need never carry them again.'],
+  ],
+  ringGot: 'Relic ring — link up to five Relics to you, wherever they are',
+  churchNight: [
+    ['tale', 'That night he sleeps in the little church. The Malsti Punk watches him from the rafters for a long time.'],
+    ['tanoc15', 'You can come down, you know. Nobody’s going to hurt you. Not here. Not any more.'],
+    ['tale', 'By morning it is asleep on his chest, and it does not leave his side again.'],
+  ],
+  home: ['Home.', 'Down out of the mist, back along the river, back to the Carpenter’s land — with a ring on his finger, a Malsti Punk on his shoulder, and a chip of Gynge rock in his pocket.'],
+};
+
+/* home again: the Carpenter shows him how to make his first token, from the Gynge chip */
+export const FIRST_TOKEN = {
+  back: [
+    ['buhkon', 'There he is. And there’s — is that a Malsti Punk on your shoulder?'],
+    ['tanoc15', 'It’s a long story.'],
+    ['buhkon', 'They usually are. And a ring. And a look on your face like you’ve swallowed a Gynge.'],
+    ['tanoc15', '…Funny you should say that.'],
+  ],
+  findObj: 'Find Buhkon — he’s in the workshop',
+  ask: [
+    ['tanoc15', 'I brought you something. Well — I brought me something. A chip off a Gynge. From inside its mouth. I want to make a token from it. My own.'],
+    ['buhkon', '…Well. Let’s see if you can.'],
+    ['buhkon', 'A token is a creature’s truth — one creature, not the kind. Everything it ever was, its whole temper and life, kept in a piece of it.'],
+    ['buhkon', 'Three things. A piece of the creature. A little liquid stygian. And its song — sung while the stygian goes in. All of it inside an Okid’Relic, so there’s somewhere for the truth to live.'],
+    ['buhkon', 'Here’s my old Okid’Relic. No Hurst in it, no power — it only keeps what it’s given. Go on.'],
+  ],
+  stepChip: 'Set the Gynge chip in the Okid’Relic (E)',
+  chipIn: [['buhkon', 'Good. Settle it. Now the stygian — slowly. Hold it steady and pour.']],
+  stepPour: 'Pour the liquid stygian — hold E',
+  poured: [['buhkon', 'That’s enough. Now. Do you know its song?'], ['tanoc15', '…I think I do. I think I always have, since the wall.'], ['buhkon', 'Then sing.']],
+  stepSing: 'Sing the Gynge’s song — press each note as it reaches the line',
+  sang: [
+    ['tale', 'The stygian takes the song, and the chip takes the stygian, and inside the Okid’Relic something wakes.'],
+    ['tale', 'Light rises off it — and there, the size of his hand, turning slowly in the air: the Gynge. His Gynge. Grinding its great jaw, glaring at the workshop with no eyes at all.'],
+    ['buhkon', '…Well, now. Look at that temper. That’s a true one.'],
+    ['buhkon', 'Your first token, Tanoc. Made with your own hands, from a creature you met. Nobody else in the world has that one. Nobody else ever will.'],
+    ['tanoc15', 'Can I — can I play it? Against Venkin?'],
+    ['buhkon', 'You can try. He’ll cheat.'],
+  ],
+  missed: [['buhkon', 'Lost the thread. Start the song again — it’s still in you.']],
+  end: ['End of Chapter II.', 'Tanoc’s first token: the Gynge of the Megla Aagac.'],
+  tokenName: 'The Gynge of the Megla Aagac',
+};

@@ -23,11 +23,12 @@
                   into a whip tail ending in a spiked ball. Massive
                   bat wings (~12 m), four legs, grey-violet stony
                   skin carved with patterns that deepen with age.
-   RUBBERMCFLY  — a round fluffy baby chick (~10 cm) with a tiny
-                  golden beak and two pairs of butterfly wings
-                  running pink -> violet -> cyan. Hovers.
-   MAKARI       — 2-3 cm floaters: a teardrop with three petal
-                  bumps on each side and a long hair-thin stem.
+   RUBBERMCFLY  — a ball (~10 cm) of fluff with a beak, two pairs of
+                  big rounded butterfly wings running pink -> violet
+                  -> cyan, and two little legs. Hovers.
+   MAKARI       — 2-3 cm floaters: a spiky, flowery teardrop head
+                  (three pointed petals on each side and a crown of
+                  spikes) on a long hair-thin stem body. Toxic.
                   They drift in swarms of one or many colours.
 
    Contract: buildX(opts) -> { root, animate(dt, st), flash(v), mats }
@@ -343,9 +344,9 @@ export function buildAlbaliByrd(opts = {}) {
       const flap = flying ? (st.diving ? 0.15 + Math.sin(ph) * 0.1 : Math.sin(ph) * (hover ? 0.7 : 0.85) + 0.15) : wu * 0.7 + Math.sin(ph) * 0.06 * open;
       wings.forEach(w => {
         w.arm.rotation.x = lerp(-1.3, 0, open);
-        w.arm.rotation.y = lerp(1.4, st.diving ? 0.6 : 0.05, open);
+        w.arm.rotation.y = lerp(1.78, st.diving ? 0.6 : 0.05, open);   // folded: laid back and in against the ball
         w.arm.rotation.z = lerp(-0.35, flap, open);
-        w.arm.scale.setScalar(lerp(0.78, 1, open));
+        w.arm.scale.setScalar(lerp(0.72, 1, open));
         w.hand.rotation.y = lerp(2.85, st.diving ? 0.5 : -Math.sin(ph - 0.8) * 0.15 * fly, open);
         w.hand.rotation.z = flying ? Math.sin(ph - 0.6) * 0.35 : 0;
       });
@@ -867,7 +868,9 @@ export function buildRubberMcFly(opts = {}) {
     const e = noOut(new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), eyeM)); e.position.set(s * 0.018, 0.01, R * 0.88); body.add(e);
     const h = noOut(new THREE.Mesh(new THREE.SphereGeometry(0.0028, 5, 4), hiM)); h.position.set(s * 0.019 + 0.002, 0.013, R * 0.88 + 0.007); body.add(h);
   }
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.007, 0.016, 6), beakM); beak.rotation.x = Math.PI / 2; beak.position.set(0, -0.004, R + 0.004); body.add(beak);
+  // a proper little beak: upper and lower halves, standing out of the fluff (its memory lives here)
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.026, 7), beakM); beak.rotation.x = Math.PI / 2; beak.scale.set(1, 1, 0.62); beak.position.set(0, -0.002, R + 0.008); body.add(beak);
+  const beakLo = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.016, 7), beakM); beakLo.rotation.x = Math.PI / 2 + 0.25; beakLo.scale.set(1, 1, 0.5); beakLo.position.set(0, -0.009, R + 0.003); body.add(beakLo);
   // butterfly wings: pink -> violet -> cyan, two pairs
   const shift = opts.seed != null ? (rnd() - 0.5) * 0.08 : 0;
   const cA = new THREE.Color(0xff86c8).offsetHSL(shift, 0, 0), cB = new THREE.Color(0xa070ff).offsetHSL(shift, 0, 0), cC = new THREE.Color(0x58e6ff).offsetHSL(shift, 0, 0);
@@ -882,11 +885,14 @@ export function buildRubberMcFly(opts = {}) {
     return g;
   };
   const fore = new THREE.Shape();
-  fore.moveTo(0, 0.004); fore.bezierCurveTo(0.03, 0.05, 0.1, 0.07, 0.115, 0.035); fore.bezierCurveTo(0.125, 0.0, 0.08, -0.015, 0.0, -0.004); fore.lineTo(0, 0.004);
+  // broad, rounded butterfly forewing (leading edge forward, round apex, scalloped outer edge)
+  fore.moveTo(0, 0.006); fore.bezierCurveTo(0.012, 0.06, 0.07, 0.1, 0.105, 0.075); fore.bezierCurveTo(0.13, 0.055, 0.12, 0.02, 0.1, 0.008);
+  fore.quadraticCurveTo(0.085, -0.004, 0.07, 0.0); fore.quadraticCurveTo(0.04, -0.012, 0.0, -0.004); fore.lineTo(0, 0.006);
   const hind = new THREE.Shape();
-  hind.moveTo(0, -0.002); hind.bezierCurveTo(0.06, -0.01, 0.09, -0.04, 0.075, -0.07); hind.bezierCurveTo(0.06, -0.09, 0.02, -0.06, 0.0, -0.012); hind.lineTo(0, -0.002);
+  // rounded hindwing lobe behind it
+  hind.moveTo(0, -0.002); hind.bezierCurveTo(0.05, 0.0, 0.1, -0.025, 0.09, -0.062); hind.bezierCurveTo(0.08, -0.1, 0.03, -0.095, 0.012, -0.06); hind.quadraticCurveTo(0.0, -0.035, 0.0, -0.012); hind.lineTo(0, -0.002);
   const wingM = toon(0xffffff, { vertexColors: true, side: THREE.DoubleSide, emissive: 0x000000 });
-  const foreG = paint(slabGeo(fore, 0.0015, 12), 0.12), hindG = paint(slabGeo(hind, 0.0015, 12), 0.09);
+  const foreG = paint(slabGeo(fore, 0.0015, 12), 0.13), hindG = paint(slabGeo(hind, 0.0015, 12), 0.1);
   // bioluminescence: the wing eyespots glow cyan-violet at night, and a smaller spot
   // on each hind wing
   const bio = bioKit();
@@ -895,9 +901,9 @@ export function buildRubberMcFly(opts = {}) {
   for (const s of [-1, 1]) {
     const p = new THREE.Group(); p.position.set(s * 0.012, 0.025, -0.005); p.scale.x = s; body.add(p);
     const f = new THREE.Mesh(foreG, wingM); f.rotation.y = -0.15; p.add(f);
-    const spot = new THREE.Mesh(spotG, spotM); spot.position.set(0.075, 0.0012, 0.03); f.add(spot);
+    const spot = new THREE.Mesh(spotG, spotM); spot.position.set(0.08, 0.0012, 0.05); spot.scale.setScalar(1.4); f.add(spot);
     const h = new THREE.Mesh(hindG, wingM); h.rotation.y = 0.15; p.add(h);
-    const hs = new THREE.Mesh(spotG, spotM); hs.position.set(0.05, 0.0012, -0.045); hs.scale.setScalar(0.6); h.add(hs);
+    const hs = new THREE.Mesh(spotG, spotM); hs.position.set(0.055, 0.0012, -0.055); hs.scale.setScalar(0.9); h.add(hs);
     wings.push(p);
   }
   const legs = [];
@@ -921,7 +927,7 @@ export function buildRubberMcFly(opts = {}) {
       body.position.z = at * 0.06 - wu * 0.02;
       body.rotation.x = Math.min(sp, 4) * 0.08 + at * 0.4 - wu * 0.3;
       body.rotation.z = Math.sin(t * 1.7) * 0.12;
-      wings.forEach(w => { const k = w.scale.x; w.rotation.z = k * (0.4 + f * 0.65 + wu * 0.4); w.rotation.x = -0.15; });
+      wings.forEach(w => { const k = w.scale.x; w.rotation.z = k * (0.75 + f * 0.6 + wu * 0.3); w.rotation.x = -0.1; });
       legs.forEach((l, i) => { l.rotation.x = Math.sin(t * 4 + i * 2) * 0.35; });
     },
     flash(v) { fluff.emissive.setRGB(v, v * 0.9, v * 0.6); },
@@ -950,12 +956,17 @@ function makariGeo() {
   const drop = new THREE.LatheGeometry(pts, 12);
   drop.rotateX(Math.PI); drop.translate(0, 0.024, 0);   // flip: round end up, tip down at y=0
   const parts = [[drop, null]];
-  [0.016, 0.011, 0.006].forEach((y, i) => {
+  // a spiky, flowery head: three pointed petals on each side (angled up and out),
+  // and a little crown of spikes on top
+  const petal = new THREE.ConeGeometry(0.0026, 0.011, 5); petal.translate(0, 0.0055, 0);
+  [0.017, 0.012, 0.007].forEach((y, i) => {
     for (const s of [-1, 1]) {
-      // petal: a flattened, elongated bump angled up and out
-      parts.push([new THREE.SphereGeometry(0.0035, 7, 5), M4(s * (0.0085 - i * 0.0014), y, 0, 0, 0, s * (-1.0 + i * 0.3), 2.1, 0.75, 0.4)]);
+      parts.push([petal, M4(s * (0.0068 - i * 0.0012), y, 0, 0, 0, -s * (0.75 + i * 0.3), 1.2, 1 - i * 0.12, 0.55)]);
     }
   });
+  const spike = new THREE.ConeGeometry(0.0012, 0.008, 4); spike.translate(0, 0.004, 0);
+  for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; parts.push([spike, M4(Math.cos(a) * 0.0035, 0.0225, Math.sin(a) * 0.0035, Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5)]); }
+  parts.push([spike, M4(0, 0.023, 0)]);
   MAKARI_GEO = mergeGeos(parts);
   MAKARI_GEO.computeBoundingSphere();
   const sp = [];

@@ -19,7 +19,7 @@ const TAU = Math.PI * 2;
 /* how often a thing turns up: weight per spawn slot */
 const COMMON = 10, UNCOMMON = 4, RARE = 1.2, VERY_RARE = 0.35;
 
-/* [kind, weight, biomes (null = any land), group size [min,max], cap per region] */
+/* [kind, weight, biomes (null = any land), group size [min,max], cap per region, only these zone ids (optional)] */
 const LAND = {
   xilia: [
     ['kofi', UNCOMMON, null, [1, 2]], ['uff', COMMON, ['meadow', 'forest', 'hills'], [1, 3]], ['makari', COMMON, ['meadow', 'lake', 'shore', 'forest'], [1, 1]],
@@ -27,18 +27,24 @@ const LAND = {
     ['rubbermcfly', UNCOMMON, ['meadow', 'forest', 'lake'], [1, 2]], ['ular_grothyn', UNCOMMON, ['forest', 'hills'], [1, 1]], ['tonguatjis', UNCOMMON, ['lake', 'shore', 'meadow'], [1, 1]],
     ['rodak', RARE, ['forest', 'hills'], [2, 3]], ['stryx', RARE, ['hills', 'mountain'], [1, 1], 3], ['gynge', RARE, ['meadow', 'forest', 'hills'], [1, 1], 2],
     ['ular_naga', VERY_RARE, ['mountain', 'hills', 'forest'], [1, 1], 1], ['lutut', VERY_RARE, ['mountain', 'hills'], [1, 1], 1], ['kuni_wild', VERY_RARE, ['mountain'], [1, 1], 1],
+    ['kipsu_f', UNCOMMON, ['meadow', 'forest', 'hills'], [2, 4]], ['albali', RARE, ['meadow', 'forest'], [1, 1], 2], ['apibuta', VERY_RARE, ['mountain', 'hills'], [1, 1], 1],
   ],
   /* the Carpenter's land: gentle, mostly — the wilder things keep to the far forest */
   property: [
     ['kofi', COMMON, null, [1, 3]], ['uff', COMMON, ['meadow', 'forest', 'hills'], [1, 3]], ['makari', COMMON, ['meadow', 'shore', 'forest'], [1, 1]],
     ['mikolo_moko', UNCOMMON, ['forest', 'meadow'], [1, 2]], ['big_momma_kofi', UNCOMMON, ['meadow'], [1, 1]], ['kipsu_f', UNCOMMON, ['meadow', 'hills'], [2, 3]],
-    ['rubbermcfly', UNCOMMON, ['meadow', 'forest'], [1, 2]], ['tonguatjis', RARE, ['shore'], [1, 1], 1], ['punk', RARE, ['forest'], [2, 3]], ['rodak', RARE, ['forest'], [2, 3], 2],
+    ['rubbermcfly', UNCOMMON, ['meadow', 'forest'], [1, 2]], ['tonguatjis', RARE, ['shore'], [1, 1], 1], ['punk', UNCOMMON, ['meadow', 'forest', 'hills'], [2, 4]], ['rodak', RARE, ['forest'], [2, 3], 2, ['p_northwood']],
+    ['albali', UNCOMMON, ['meadow', 'forest', 'hills'], [1, 1], 3],
+    // across the lake: the dangerous, territorial Sru Vorn and the wilder Kipsu packs; north, toward the Megla Aagac: Lutut and Malsti Punks
+    ['sruvorn_w', UNCOMMON, ['forest'], [1, 1], 1, ['p_farwood']], ['kipsu', COMMON, ['forest'], [2, 4], 3, ['p_farwood', 'p_southwood']],
+    ['lutut', RARE, ['forest'], [1, 1], 1, ['p_northwood']], ['malsti', UNCOMMON, ['forest'], [1, 3], 3, ['p_northwood']],
   ],
   aakalay: [
     ['kofi', UNCOMMON, null, [1, 2]], ['uff', COMMON, ['forest', 'ruins', 'meadow'], [1, 2]], ['makari', COMMON, ['lake', 'forest', 'ruins'], [1, 1]],
     ['mikolo_moko', UNCOMMON, ['forest'], [1, 1]], ['rubbermcfly', UNCOMMON, ['forest', 'ruins'], [1, 1]], ['eldi_grothyn', UNCOMMON, ['ash', 'hills'], [1, 1]],
     ['ular_grothyn', UNCOMMON, ['forest'], [1, 1]], ['stryx', RARE, ['hills', 'mountain', 'ash'], [1, 1], 2], ['gynge', RARE, ['ash', 'hills'], [1, 1], 1],
     ['tonguatjis', RARE, ['lake', 'shore'], [1, 1], 2], ['lutut', VERY_RARE, ['mountain', 'ash'], [1, 1], 1],
+    ['apibuta', RARE, ['ash', 'mountain'], [1, 1], 1], ['xiwkatkan', VERY_RARE, ['ash', 'ruins'], [1, 2], 2], ['cyitor', VERY_RARE, ['ruins'], [2, 2], 2],
   ],
   leotik: [
     ['uff', COMMON, ['jungle', 'forest'], [1, 3]], ['makari', COMMON, ['jungle', 'shore', 'bog'], [1, 1]], ['mikolo_moko', COMMON, ['jungle', 'forest'], [1, 2]],
@@ -46,12 +52,14 @@ const LAND = {
     ['rubbermcfly', UNCOMMON, ['jungle'], [1, 2]], ['kofi', UNCOMMON, null, [1, 2]], ['big_momma_kofi', RARE, ['jungle'], [1, 1]],
     ['gynge', RARE, ['jungle', 'bog', 'hills'], [1, 1], 2], ['stryx', RARE, ['hills', 'mountain'], [1, 1], 2],
     ['ular_naga', RARE, ['jungle', 'mountain', 'bog'], [1, 1], 1], ['lutut', RARE, ['mountain', 'shore'], [1, 1], 1], ['kuni_wild', VERY_RARE, ['mountain', 'shore'], [1, 1], 1],
+    ['cyitor', RARE, ['ruins', 'jungle'], [2, 2], 2], ['xiwkatkan', RARE, ['jungle', 'ruins', 'mountain'], [1, 2], 2], ['apibuta', VERY_RARE, ['mountain', 'ash'], [1, 1], 1],
   ],
 };
 /* water folk: [kind, weight, minDepth, group, cap] */
 const WATER = {
   xilia: [['raf_krabbi', COMMON, 0.3, [1, 3]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', RARE, 3, [1, 2], 2], ['hvaleia', VERY_RARE, 8, [1, 1], 1], ['su_naga', VERY_RARE, 10, [1, 1], 1]],
-  property: [['raf_krabbi', COMMON, 0.3, [1, 3]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', VERY_RARE, 8, [1, 1], 1]],
+  // the lake and what's under it: Harkal sharks, Grothyn, and down deep, an ancient Su Naga
+  property: [['raf_krabbi', COMMON, 0.3, [1, 3]], ['su_grothyn', UNCOMMON, 0.5, [1, 2]], ['harkal', UNCOMMON, 5, [1, 2], 3], ['su_naga', RARE, 12, [1, 1], 1]],
   aakalay: [['raf_krabbi', COMMON, 0.3, [1, 2]], ['su_grothyn', UNCOMMON, 0.5, [1, 1]], ['harkal', RARE, 3, [1, 1], 1], ['hvaleia', VERY_RARE, 8, [1, 1], 1], ['su_naga', VERY_RARE, 10, [1, 1], 1]],
   leotik: [['raf_krabbi', COMMON, 0.3, [1, 2]], ['su_grothyn', UNCOMMON, 0.5, [1, 2]], ['harkal', UNCOMMON, 3, [1, 3], 4], ['hvaleia', RARE, 8, [1, 1], 2], ['su_naga', RARE, 10, [1, 1], 1]],
 };
@@ -86,7 +94,7 @@ export function createWilds(ctx) {
     for (const zn of zonesOrFallback()) {
       if (zn.biome === 'lake') continue;
       for (let s = 0; s < (SLOTS[region] || 2); s++) {
-        const r = pick(table, r => capOk(r) && (!r[2] || r[2].includes(zn.biome)));
+        const r = pick(table, r => capOk(r) && (!r[2] || r[2].includes(zn.biome)) && (!r[5] || r[5].includes(zn.id)));
         if (!r) continue;
         const n = r[3][0] + Math.floor(Math.random() * (r[3][1] - r[3][0] + 1));
         let cx = zn.x, cz = zn.z, ok = false;
@@ -276,7 +284,14 @@ export function createWilds(ctx) {
     return m;
   }
 
-  function respawn() { for (const k in counts) delete counts[k]; spawnLand(); spawnWater(); }
+  /* the ones that live in a particular place: the Stryx by the Carpenter's workshop */
+  function spawnFixed() {
+    if (region === 'property' && world.yard) {
+      const w = world.workshop || { x: world.yard.x - 22, z: world.yard.z + 10 };
+      enemies.spawn('stryx_home', w.x + 6, w.z + 8, 'home-stryx', { wild: true });
+    }
+  }
+  function respawn() { for (const k in counts) delete counts[k]; spawnLand(); spawnWater(); spawnFixed(); }
   respawn();
   return { respawn, update, interactables, markers, fields, trees, get nest() { return nest; }, counts };
 }
