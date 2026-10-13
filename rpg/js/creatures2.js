@@ -417,7 +417,7 @@ export function buildApiButa(opts = {}) {
           + Math.sin(ph * 0.5 - Z * 0.6) * 0.06;
       }
       bodyGeo.attributes.position.needsUpdate = true; bodyGeo.computeVertexNormals();
-      body.position.y = hov - Math.sin(ph) * beat * 0.35;
+      body.position.y = hov - Math.sin(ph) * beat * 0.35 + wu * 1.2;
       pitch = damp(pitch, -wu * 0.42 + at * 0.28 + Math.min(sp, 10) * 0.012, 6, dt);
       body.rotation.x = pitch + Math.sin(T * 0.4) * 0.03;
       body.rotation.z = Math.sin(T * 0.31) * 0.05;
@@ -429,10 +429,10 @@ export function buildApiButa(opts = {}) {
       throat.scale.setScalar(1.4 + at * 3.5);
       throat.position.z = 0.1 + at * 1.5;
       // heatwave armour shimmers, flares on a bellow
-      const hk = 0.06 + bio.v * 0.04 + wu * 0.12 + at * 0.18;
+      const hk = 0.06 + bio.v * 0.04 + wu * 0.05 + at * 0.1;
       heatM.opacity = hk * (0.8 + Math.sin(T * 9) * 0.2);
       heat2.material.opacity = hk * 0.35 * (0.8 + Math.sin(T * 6.3 + 1) * 0.2);
-      heat.scale.set(1.06 + Math.sin(T * 7) * 0.01, 1.9 + wu * 0.8, 1.05);
+      heat.scale.set(1.06 + Math.sin(T * 7) * 0.01, 1.9 + wu * 0.25, 1.05);
       // tentacles
       const fl = 0.9 + wu * 0.6 + at * 0.8;
       fireM.emissiveIntensity = fl * (0.9 + Math.sin(T * 17) * 0.08);
@@ -599,7 +599,7 @@ export function buildCyitor(opts = {}) {
       // blades: held level, drift; windup draws back, attack scissors forward
       for (const A of arms) {
         const k = A.s;
-        A.pivot.rotation.y = 0.05 + wu * 0.95 - at * 1.6 + Math.sin(T * 1.3 + k) * 0.04;
+        A.pivot.rotation.y = 0.05 + wu * 0.95 - at * 1.75 + Math.sin(T * 1.3 + k) * 0.04;
         A.pivot.rotation.z = Math.sin(T * 1.6 + k * 0.7) * 0.06 + wu * 0.12 - at * 0.05 + (k > 0 ? at * 0.08 : -at * 0.08);
         A.pivot.rotation.x = Math.sin(T * 0.8 + k) * 0.1;
       }
@@ -953,7 +953,7 @@ export function buildVyrenalur(opts = {}) {
         L.hip.rotation.x = s + (L.hind ? -0.08 : 0.04) + (L.hind ? wu * 0.25 : -wu * 0.15);
         L.knee.rotation.x = (L.hind ? -1 : 1) * Math.max(0, Math.cos(p)) * 0.55 * walk + (L.hind ? -0.12 : 0.1) + (L.hind ? -wu * 0.25 : wu * 0.3);
       }
-      body.position.y = 4.1 - Math.abs(Math.sin(gait)) * 0.08 * walk + Math.sin(T * 0.9) * 0.03 - wu * 0.35;
+      body.position.y = 4.1 - Math.abs(Math.sin(gait)) * 0.08 * walk + Math.sin(T * 0.9) * 0.03 - wu * 0.05;
       body.rotation.x = wu * 0.08 - at * 0.06;
       body.position.z = at * 1.6;
       // head: grazes and listens; lowers the crown to charge
@@ -1275,7 +1275,7 @@ export function buildNekhVorran(opts = {}) {
       wu = damp(wu, st.windup || 0, 4, dt); at = damp(at, st.attack || 0, 8, dt);
       wph += dt * (0.5 + Math.min(sp, 20) * 0.22);
       const amp = 1.6 + Math.min(sp, 20) * 0.04 - wu * 0.6, k = TAU / 15;
-      rear = damp(rear, 3.2 + wu * 9 - at * 8 + Math.sin(T * 0.4) * 0.6, 3, dt);
+      rear = damp(rear, Math.max(0.6, 3.2 + wu * 9 - at * 2.6 + Math.sin(T * 0.4) * 0.6), 3, dt);
       const P = tube.pts, n = P.length;
       // the spine: head forward, an S-wave travelling down the body, the fore-body reared
       let z = S_ORIGIN, prevX = 0, prevY = 0;
@@ -1295,7 +1295,7 @@ export function buildNekhVorran(opts = {}) {
       // head on the front of the spine, nosing down on a strike
       frameAt(0, head, 0);
       head.position.addScaledVector(tube.T[0], 0.3);
-      head.rotateX(-wu * 0.25 + at * 0.55 + Math.sin(T * 0.6) * 0.05);
+      head.rotateX(-wu * 0.25 + at * 0.3 + Math.sin(T * 0.6) * 0.05);
       head.rotateY(Math.sin(T * 0.35) * 0.12);
       for (const p of plates) frameAt(Math.round(p.s / L * (n - 1)), p.g, 0.82);
       if (saddle) frameAt(Math.round(5.5 / L * (n - 1)), saddle, 0.95);
