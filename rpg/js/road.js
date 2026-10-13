@@ -413,7 +413,7 @@ export function createRoad(ctx) {
       sub = 'camp'; setGoal(); camps[0].on = true; B.stay = V3(camps[0].x + 2.2, 0, camps[0].z - 1.5);
       ctx.say(R.day1.camp, () => {
         sub = 'stone'; ctx.giveFireStone(false);
-        for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4, x = camps[0].x + Math.cos(a) * 3.2, z = camps[0].z + Math.sin(a) * 3.2; const peb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), toon(0xb0a898)); const it = addItem(V3(x, heightAt(x, z) + 0.12, z), 'Pick up a pebble', null, peb); it.act = () => { dropItem(it); D1.pebble = true; sfx.ui(); ctx.toast('A smooth little pebble.', 2); stoneObjective(); }; }
+        for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4, x = camps[0].x + Math.cos(a) * 3.2, z = camps[0].z + Math.sin(a) * 3.2; const peb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), toon(0xb0a898)); const it = addItem(V3(x, heightAt(x, z) + 0.12, z), 'Pick up a pebble', null, peb); it.act = () => { for (const q of items.filter(q => q.label === 'Pick up a pebble')) dropItem(q); D1.pebble = true; sfx.ui(); ctx.toast('A smooth little pebble.', 2); stoneObjective(); }; }
         stoneObjective();
         ctx.hint('Press E anywhere to try the fire-stone.');
       });
