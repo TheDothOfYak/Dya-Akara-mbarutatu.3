@@ -1238,6 +1238,6 @@ export function createRoad(ctx) {
   }
   return {
     start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }
