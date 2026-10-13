@@ -4263,6 +4263,14 @@ function firstTokenLesson(n) {
   n.talking = 6;
   dialog(T.back.concat(T.ask), () => {
     G.mode = 'intro'; unlockMouse();
+    // into the workshop, at the bench: Tanoc on the stool, the Carpenter at his shoulder
+    const sp = interiors.spot && interiors.spot('tokenBench');
+    if (sp) {
+      if (!interiors.inside || interiors.room(interiors.inside.id) !== sp.room) enterRoom(sp.door, true);
+      P.pos.copy(sp.pos); P.yaw = sp.yaw; CAM.yaw = sp.yaw + Math.PI; P.vel.set(0, 0, 0);
+      torcain.root.position.copy(P.pos); torcain.root.rotation.y = P.yaw;
+      if (sp.buhkon) { n.pos.copy(sp.buhkon); n.actor.root.position.copy(sp.buhkon); n.actor.root.rotation.y = Math.atan2(P.pos.x - sp.buhkon.x, P.pos.z - sp.buhkon.z); n.talking = 99; }
+    }
     // the bench: the Okid'Relic, the chip, a crucible of stygian; the camera close over his shoulder
     const f = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw)), at = P.pos.clone().addScaledVector(f, 1.3).setY(P.pos.y + 1.05);
     const g = new THREE.Group(); g.position.copy(at); scene.add(g);

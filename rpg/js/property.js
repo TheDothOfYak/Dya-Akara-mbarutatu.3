@@ -574,8 +574,9 @@ export function buildProperty(scene) {
           });
           // walk-up colliders along the crest
           for (let k = 1; k < tops.length; k++) {
-            const [x0, z0, t0, ra0] = tops[k - 1], [x1, z1, t1] = tops[k], len2 = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0);
-            col.add((x0 + x1) / 2, (z0 + z1) / 2, ra0 * 0.78, len2 / 2 + 0.3, ang, Math.min(tops[k][5], tops[k - 1][5]) - 1, (t0 + t1) / 2);
+            const [x0, z0, t0, ra0] = tops[k - 1], [x1, z1, t1, ra1] = tops[k], len2 = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0);
+            const ns = Math.max(1, Math.ceil(len2 / 0.75)), bot = Math.min(tops[k][5], tops[k - 1][5]) - 1;   // short pieces, so each is a step you can take
+            for (let q = 0; q < ns; q++) { const f = (q + 0.5) / ns; col.add(lerp(x0, x1, f), lerp(z0, z1, f), lerp(ra0, ra1, f) * 0.78, len2 / ns / 2 + 0.15, ang, bot, lerp(t0, t1, f)); }
           }
           return tops;
         };
