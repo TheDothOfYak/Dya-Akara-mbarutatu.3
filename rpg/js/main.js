@@ -12,6 +12,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { latchPoint } from './vines.js';
+import { createAmbient } from './ambient.js';
 import { buildSky, SUN_DIR } from './sky.js';
 import { createDayNight } from './daynight.js';
 import { buildEldiShip } from './ship.js';
@@ -461,6 +462,13 @@ const wilds = createWilds({
   take: id => { SAVE.inv.items[id]--; if (SAVE.inv.items[id] <= 0) delete SAVE.inv.items[id]; },
   toast: (t, d) => toast(t, d), say: lines => dialog(lines), persist: () => persist(),
   kuniNest: n => kuniNest(n),
+});
+
+/* the great ones seen only from far off: the Aerolhorn in the sky, the Nekh'Vorran in the land, the Vyrenalur in the far forest */
+const ambient = createAmbient({
+  scene, world, region: REGION, particles, sfx,
+  seen: () => (SAVE.flags.ambientSeen = SAVE.flags.ambientSeen || {}), persist: () => persist(),
+  bark: (w, t, d) => bark(w, t, d), inside: () => !!interiors.inside,
 });
 
 /* ================================================================
@@ -3936,7 +3944,7 @@ function updateWorldBits(dt) {
     gate.userData.film.material.opacity = 0.45 + Math.sin(G.t * 2.4) * 0.12; gate.userData.film.rotation.z = G.t * 0.3;
     if (Math.random() < 0.3) particles.emit(gate.position.x + (Math.random() - 0.5) * 5, gate.position.y + 3.6 + (Math.random() - 0.5) * 5, gate.position.z, { vy: 0.5, color: 0xb48aff, size: 0.35, life: 1.2, speed: 0.6 });
   }
-  hlystTick(dt); skorTick(dt); wilds.update(dt, G.t); updateSprengju(dt); if (G.meglaTick) G.meglaTick(dt);
+  hlystTick(dt); skorTick(dt); wilds.update(dt, G.t); ambient.update(dt, G.t, P.pos, G.night || 0); updateSprengju(dt); if (G.meglaTick) G.meglaTick(dt);
   beastScan(dt);
   for (const c of cores) {
     if (c.got) continue;

@@ -33,6 +33,7 @@ import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles } from 
 import { buildEikar } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
+import { buildLutut } from './esik_sky.js';
 import { buildSniller } from './skyfolk.js';
 import { createCine } from './cine.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm } from './util.js';
@@ -716,6 +717,29 @@ export function createMegla(ctx) {
     }
   }
 
+  /* little lives about the place: things passing over, Malsti Punks in the ruins */
+  const critters = [];
+  function updateCritters(dt) {
+    for (let i = critters.length - 1; i >= 0; i--) { const c = critters[i]; c.t += dt; c.tick(c, dt); if (c.life && c.t > c.life) { scene.remove(c.a.root); critters.splice(i, 1); } }
+  }
+  function ruinMalsti() {
+    for (let i = 0; i < 4; i++) {
+      const m = buildMalstiPunk({ seed: 70 + i }); m.root.scale.setScalar(5); scene.add(m.root);
+      const home = V3(RUINS.x + Math.cos(i * 1.7) * 24, 0, RUINS.z + Math.sin(i * 1.7) * 24);
+      critters.push({ a: m, t: 0, life: 0, home, pos: home.clone(), tgt: home.clone(), blink: 0, tick(c, dt) {
+        // scamper about their bit of wall; if he comes close, blink away through the Duat to another
+        const d = Math.hypot(P.pos.x - c.pos.x, P.pos.z - c.pos.z);
+        if (d < 6 && c.blink <= 0) { particles.burst(c.pos.x, c.pos.y + 0.3, c.pos.z, 14, { color: 0xc88aff, speed: 3, size: 0.3, life: 0.5 }); c.pos.set(c.home.x + (Math.random() - 0.5) * 20, 0, c.home.z + (Math.random() - 0.5) * 20); c.blink = 2; sfx.blink(); }
+        c.blink -= dt;
+        if (c.pos.distanceTo(c.tgt) < 0.5) c.tgt.set(c.home.x + (Math.random() - 0.5) * 14, 0, c.home.z + (Math.random() - 0.5) * 14);
+        const dx = c.tgt.x - c.pos.x, dz = c.tgt.z - c.pos.z, dd = Math.hypot(dx, dz) || 1, sp = 3.5;
+        c.pos.x += dx / dd * sp * dt; c.pos.z += dz / dd * sp * dt; c.pos.y = ground(c.pos.x, c.pos.z);
+        c.a.root.position.copy(c.pos); c.a.root.rotation.y = Math.atan2(dx, dz); c.a.animate(dt, { speed: sp, t });
+      } });
+    }
+  }
+  ruinMalsti();
+
   /* ================================================================
      THE STORY
      ================================================================ */
@@ -762,6 +786,15 @@ export function createMegla(ctx) {
       // the night sounds — far apart, one at a time
       const play = i => {
         if (i >= M.sounds.length) { morning(); return; }
+        if (i === 0) {   // a Lutut, high over the treetops, a dark shape against the stars
+          const l = buildLutut({ seed: 5, age: 0.8 }); l.root.scale.setScalar(1.6); scene.add(l.root);
+          critters.push({ a: l, t: 0, life: 9, tick(c, dt) { const k = c.t / c.life; c.a.root.position.set(FIRE1.x - 160 + k * 320, fires[0].y + 70 + Math.sin(k * 3) * 6, FIRE1.z - 90 - k * 20); c.a.root.rotation.y = Math.PI / 2; c.a.animate(dt, { speed: 14, t, airborne: true }); } });
+        }
+        if (i === 1) import('./creatures2.js').then(C => {   // an Api Buta: the bellow, and a glow of fire moving deep among the trunks
+          if (!C.buildApiButa) return;
+          const a = C.buildApiButa({ seed: 9 }); scene.add(a.root);
+          critters.push({ a, t: 0, life: 12, tick(c, dt) { const k = c.t / c.life; c.a.root.position.set(FIRE1.x + 90 - k * 180, fires[0].y + 8, FIRE1.z - 120); c.a.root.rotation.y = -Math.PI / 2; c.a.animate(dt, { speed: 6, t, airborne: true }); c.a.glow && c.a.glow(1); } });
+        }).catch(() => {});
         [sfx.flare, sfx.roar, sfx.duat, () => {}][i]();
         setTimeout(() => sayHeld([M.sounds[i]], (k, tt) => ({ p: V3(c.x + 3, c.y + 1.6, c.z + 5), l: V3(c.x - 10 + i * 8, c.y + 6, c.z - 60) }), () => play(i + 1)), 900);
       };
@@ -1082,6 +1115,7 @@ export function createMegla(ctx) {
     updateFoes(dt, playing && !cine.active);
     updateGynge(dt, playing && !cine.active);
     updateBolts(dt);
+    updateCritters(dt);
     if (playing && !cine.active) {
       if (stage === 'ride') rideTick();
       else if (stage === 'enter') enterTick();

@@ -36,6 +36,8 @@ export const TYPES = {
   albali_t: { name: 'Villtur Albali', build: () => buildAlbaliByrd({ villtur: true, toxic: true, seed: seed() }), hp: 58, dmg: 11, speed: 9.5, rad: 0.7, range: 1.8, aggro: 22, shards: 12, ai: 'flyer', status: 'poison', color: 0x9aff5a },
   vel: { name: 'Duskareth Vel', build: buildVel, hp: 190, dmg: 17, speed: 6.2, rad: 0.5, range: 2.4, aggro: 22, windup: 0.5, shards: 60, ai: 'vel', stagger: 0.35, elite: true, color: 0xb070ff },
   tyndael: { name: 'Tyndael', build: () => buildTyndael({ seed: seed() }), hp: 55, dmg: 9, speed: 5.6, rad: 0.6, range: 1.8, aggro: 19, windup: 0.7, recover: 0.6, lunge: 7, shards: 9, ai: 'spitter', color: 0xff7a2a },
+  /* the far forest's own: territorial, and it means it — come too close and it charges, tusks and spiked tail */
+  sruvorn_w: { name: 'Sru Vorn', build: () => buildSruVorn({ seed: seed() }), hp: 520, dmg: 22, speed: 5.2, rad: 2.2, range: 4.2, aggro: 13, windup: 0.8, recover: 1.1, lunge: 10, shards: 70, ai: 'melee', stagger: 0.2, elite: true, color: 0x9ab04a },
   sruvorn: { name: 'Sru Vorn of the Bogs', build: () => buildSruVorn({ seed: seed() }), hp: 1100, dmg: 26, speed: 4.6, rad: 2.6, range: 5.5, aggro: 26, shards: 220, ai: 'sruvorn', stagger: 0, miniboss: true, color: 0xb0ff4a },
 
   /* ---------------- the wider wilds (spawned by wilds.js; most are rare) ----------------
@@ -43,6 +45,8 @@ export const TYPES = {
   big_momma_kofi: { name: 'Big Momma Kofi', build: () => buildBigMommaKofi({ seed: seed() }), hp: 20, dmg: 0, speed: 6.5, rad: 0.4, range: 0, aggro: 0, shards: 4, ai: 'melee', color: 0xb8a070, disp: 'critter' },
   mikolo_moko: { name: 'Mikolo Moko', build: () => buildMikoloMoko({ seed: seed() }), hp: 14, dmg: 0, speed: 9.5, rad: 0.3, range: 0, aggro: 0, shards: 3, ai: 'melee', color: 0x7ad04a, disp: 'critter' },
   uff: { name: 'Uff', build: () => { const u = buildUff({ seed: seed() }); u.root.scale.multiplyScalar(0.8 + Math.random() * 1.6); return u; }, hp: 10, dmg: 0, speed: 1.6, rad: 0.25, range: 0, aggro: 0, shards: 2, ai: 'melee', color: 0xff6a8a, disp: 'critter' },
+  /* the one that lives by the Carpenter's workshop, hauling timber about on its vines — it only fights if you do */
+  stryx_home: { name: 'The workshop Stryx', build: () => buildStryx({ seed: 5 }), hp: 600, dmg: 12, speed: 1.4, rad: 1.6, range: 4.2, aggro: 0, windup: 0.8, recover: 1.0, lunge: 3, shards: 0, ai: 'melee', stagger: 0.2, color: 0x8aa04a, disp: 'neutral' },
   stryx: { name: 'Wild Stryx', build: () => buildStryx({ seed: seed() }), hp: 420, dmg: 16, speed: 1.2, rad: 1.6, range: 4.2, aggro: 6, windup: 0.8, recover: 1.0, lunge: 3, shards: 40, ai: 'melee', stagger: 0.2, color: 0x8aa04a, disp: 'neutral' },
   tonguatjis: { name: 'Tonguatjis', build: buildTonguatjis, hp: 260, dmg: 15, speed: 3.2, rad: 1.0, range: 5.5, aggro: 10, windup: 0.7, recover: 1.0, lunge: 2, shards: 30, ai: 'melee', stagger: 0.4, color: 0xf08aa8, disp: 'neutral' },
   gynge: { name: 'Gynge', build: buildGynge, hp: 900, dmg: 26, speed: 3.4, rad: 2.4, range: 4.0, aggro: 9, windup: 1.0, recover: 1.3, lunge: 7, shards: 90, ai: 'melee', stagger: 0.15, elite: true, color: 0xe8c4b4, disp: 'neutral' },
@@ -69,6 +73,7 @@ export function createEnemies(ctx) {
 
   function spawn(kind, x, z, group, extra = {}) {
     const T = TYPES[kind];
+    if (!T) return null;   // a creature whose model isn't loaded in this build
     const actor = T.build();
     ctx.scene.add(actor.root);
     const hp = Math.round(T.hp * (T.miniboss ? D().bossHp : D().enemyHp));
