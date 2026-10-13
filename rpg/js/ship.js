@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
 import { mulberry32 } from './util.js';
+import { buildStryx } from './esik_land.js';
 
 function barkTextures() {
   const W = 256, H = 512;
@@ -134,18 +135,15 @@ export function buildEldiShip(opts = {}) {
   const seedRing = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.28, 8, 24), mastMat);
   seedRing.position.copy(seed.position); body.add(seedRing);
 
-  // pilot stump and the Stryx grown in it
-  const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 1.2, 9), toon(0x5b3220));
-  stump.position.set(0, 3.4, 8.2); body.add(stump);
-  const stryx = new THREE.Group();
-  const sBody = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.4, 7), toon(0x6e8a3a)); sBody.position.y = 0.7; stryx.add(sBody);
-  const sHead = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), toon(0x7d9c44)); sHead.position.y = 1.55; stryx.add(sHead);
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.6, 5), toon(0xd8b060)); beak.rotation.x = -Math.PI / 2; beak.position.set(0, 1.5, -0.5); stryx.add(beak);
-  for (const s of [-1, 1]) { const eye = glowSprite(0xbfffd0, 0.35); eye.position.set(s * 0.17, 1.62, -0.36); stryx.add(eye); }
-  stryx.position.set(0, 4, 8.2); body.add(stryx);
+  // the pilot stump, and the Stryx grown in it: a little stepped plateau of rock with its roots
+  // run down into the stump and its vines up and working — it flies the ship
+  const stump = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.35, 1.2, 10), toon(0x5b3220));
+  stump.position.set(0, 3.4, 9.0); body.add(stump);
+  const pilot = buildStryx({ seed: 77 });
+  const stryx = pilot.root; stryx.scale.setScalar(1.05); stryx.position.set(0, 3.95, 9.0); stryx.rotation.y = Math.PI;   // added after the outlines below (it brings its own)
   // ship's wheel
   const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.08, 6, 16), mastMat);
-  wheel.position.set(0, 4.2, 7.4); body.add(wheel);
+  wheel.position.set(0, 4.6, 7.2); body.add(wheel);
 
   // lanterns hanging along the rails
   const lanterns = [];
@@ -158,11 +156,12 @@ export function buildEldiShip(opts = {}) {
   [[-3.5, 16.5], [3.2, 13.5]].forEach(([z, top]) => {
     for (const s of [-1, 1]) { rig.push(0, top, z, s * 2.7, 2.4, z - 3, 0, top, z, s * 2.7, 2.4, z + 3); }
   });
-  rig.push(0, 16.5, -3.5, 0, 6.5, -15, 0, 16.5, -3.5, 0, 13.5, 3.2, 0, 13.5, 3.2, 0, 4, 9);
+  rig.push(0, 16.5, -3.5, 0, 6.5, -15, 0, 16.5, -3.5, 0, 13.5, 3.2, 0, 13.5, 3.2, 0, 5.2, 9);
   const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rig, 3));
   body.add(new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0x2a1408 })));
 
   outlineAll(body, 0.05);
+  body.add(stryx);
   body.traverse(o => { if (o.isMesh && o.name !== 'outline' && !o.userData.noOutline) { o.castShadow = true; o.receiveShadow = true; } });
   grp.scale.setScalar(S);
 
@@ -177,7 +176,7 @@ export function buildEldiShip(opts = {}) {
       seedGlow.scale.setScalar(9 * f); seed.scale.setScalar(0.95 + f * 0.05);
       sails.forEach((s, i) => { s.scale.z = s.userData.side ? 1 : 1 + Math.sin(t * 1.6 + i) * 0.12; });
       lanterns.forEach((l, i) => l.material.opacity = 0.75 + Math.sin(t * 5 + i * 1.7) * 0.2);
-      stryx.rotation.y = Math.sin(t * 0.6) * 0.5; sHead.rotation.z = Math.sin(t * 1.3) * 0.15;
+      stryx.rotation.y = Math.PI + Math.sin(t * 0.6) * 0.25; pilot.animate(dt || 0.016, { t, speed: 0, windup: 0.25 + Math.sin(t * 0.8) * 0.2 });   // steering with its vines
       if (particles && Math.random() < 0.7) {
         const wp = seed.getWorldPosition(new THREE.Vector3());
         const back = new THREE.Vector3(0, 0, 1).applyQuaternion(grp.quaternion);

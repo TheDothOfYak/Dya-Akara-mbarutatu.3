@@ -270,7 +270,13 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   onKey(e.code);
 });
-addEventListener('keyup', e => { keys[e.code] = false; });
+let capsDownT = -1e9;
+addEventListener('keyup', e => {
+  keys[e.code] = false;
+  // a Mac sends Caps Lock's keydown only when it turns on and its keyup only when it turns off: count that keyup as a press too
+  if (e.code === 'CapsLock' && performance.now() - capsDownT > 400 && !typing(e) && G.mode === 'play') onKey('CapsLock');
+});
+addEventListener('keydown', e => { if (e.code === 'CapsLock') capsDownT = performance.now(); }, true);
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = false; });
 const canvas = renderer.domElement;
 const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin', 'rpg'].some(id => !$(id).classList.contains('hidden'));
@@ -364,6 +370,7 @@ function onKey(code) {
   if (code === 'KeyH') whistle();
   if (code === 'KeyX') throwSprengju();
   if (code === 'KeyB') callKuni();
+  if (code === 'CapsLock' || code === 'KeyZ') punkAttack();
   if (code === 'KeyG') nurHlyst();
   if (SLOT_KEYS.includes(code)) useSlot(code);
 }
@@ -2577,7 +2584,7 @@ function whistle() {
 function toggleRide() {
   if (!mount) return;
   if (P.riding) {
-    P.riding = false;
+    P.riding = false; P.vine = null; vineLine.visible = false;
     P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
     P.pos.y = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 3);
     phorusDismount();
@@ -2586,6 +2593,80 @@ function toggleRide() {
     sfx.jump();
     phorusMount();
   }
+}
+
+/* ---------------- riding: Brindle's vines ----------------
+   Space: Brindle throws a vine round a tree ahead and swings you both round it
+   — hold Space to keep swinging, let go to fling off. No tree in reach, and the
+   vines slap the ground and vault you up and forward instead.
+   Caps Lock (or Z): Brindle attacks — a lash of vines and a rind-first shove. */
+const vineLine = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1, 6, 1, true), toon(0x5aa03a, { emissive: 0x1a3a0a, emissiveIntensity: 0.4 }));
+vineLine.geometry.translate(0, 0.5, 0); vineLine.geometry.rotateX(Math.PI / 2); vineLine.visible = false; vineLine.frustumCulled = false; scene.add(vineLine);
+function showVine(from, to) { vineLine.visible = true; vineLine.position.copy(from); vineLine.lookAt(to); vineLine.scale.set(1, 1, from.distanceTo(to)); }
+function vineGrab() {
+  if (!mount || !P.riding) return;
+  const f = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw)), cf = camForward();
+  const look = P.vel.lengthSq() > 4 ? V3(P.vel.x, 0, P.vel.z).normalize() : cf;
+  let best = null, bs = -1e9;
+  for (const t of world.trees || []) {
+    const dx = t.x - P.pos.x, dz = t.z - P.pos.z;
+    if (Math.abs(dx) > 20 || Math.abs(dz) > 20) continue;
+    const d = Math.hypot(dx, dz); if (d < 3 || d > 18) continue;
+    const dot = (dx * look.x + dz * look.z) / d; if (dot < 0.15) continue;
+    const sc = dot * 2 - d / 18; if (sc > bs) { bs = sc; best = t; }
+  }
+  sfx.swing();
+  if (!best) {   // nothing to grab: the vines slap the ground and throw you up and on
+    P.vel.y = 13.5; P.vel.x += f.x * 6; P.vel.z += f.z * 6; P.onGround = false; P.coyote = 0;
+    particles.burst(P.pos.x, P.pos.y + 0.2, P.pos.z, 18, { color: 0x6aa040, speed: 5, size: 0.4, life: 0.5 });
+    return;
+  }
+  const ox = P.pos.x - best.x, oz = P.pos.z - best.z, r = Math.max(3.2, Math.hypot(ox, oz));
+  const v = Math.max(13, Math.hypot(P.vel.x, P.vel.z));
+  const dir = (ox * look.z - oz * look.x) > 0 ? 1 : -1;
+  const top = best.g + Math.min(best.h * 0.8, 7.5);
+  P.vine = { t: best, r, a: Math.atan2(oz, ox), dir, w: v / r, v, done: 0, max: 3.4, g0: P.pos.y, lift: clamp(top - P.pos.y - 2.5, 2, 6), top };
+  P.onGround = false;
+}
+function vineSwing(dt, act) {
+  const S = P.vine;
+  const tx = -Math.sin(S.a) * S.dir, tz = Math.cos(S.a) * S.dir;
+  const release = () => {
+    const k = S.done / S.max;
+    P.vel.set(tx * S.v * 1.2, 6 + Math.cos(k * Math.PI) * 6, tz * S.v * 1.2);   // fling off along the swing, upward on the rising half
+    P.vine = null; vineLine.visible = false; P.onGround = false; P.coyote = 0; sfx.jump();
+  };
+  if (!P.riding || !act) { P.vine = null; vineLine.visible = false; return; }
+  if ((S.done > 0.35 && !keys.Space && !(touch.on && keys.Space)) || S.done >= S.max) { release(); return; }
+  const step = S.w * dt; S.a += S.dir * step; S.done += step;
+  const k = S.done / S.max;
+  const nx = S.t.x + Math.cos(S.a) * S.r, nz = S.t.z + Math.sin(S.a) * S.r;
+  const g = world.col.ground(nx, nz, P.pos.y + 3);
+  const ny = Math.max(g, lerp(S.g0, g, k) + Math.sin(k * Math.PI) * S.lift);
+  P.vel.set((nx - P.pos.x) / dt, (ny - P.pos.y) / dt, (nz - P.pos.z) / dt);   // the move below carries him exactly there
+  P.yaw = Math.atan2(tx, tz);
+  showVine(V3(P.pos.x, P.pos.y + 2.2, P.pos.z), V3(S.t.x, S.top, S.t.z));
+  if (Math.random() < 0.3) particles.emit(P.pos.x, P.pos.y + 0.6, P.pos.z, { color: 0x9ad86a, size: 0.3, life: 0.5, speed: 1 });
+}
+function punkAttack() {
+  if (!mount || !P.riding) { if (mount) toast('Climb up on Brindle first (E) — then Caps Lock to have her fight.', 2.5); return; }
+  if ((mount.atkCd || 0) > 0) return;
+  mount.atkCd = 0.85; mount.atk = 0.5;
+  const f = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw));
+  P.vel.x += f.x * 7; P.vel.z += f.z * 7;   // a lunge
+  sfx.swing(); setTimeout(() => sfx.hit(), 120);
+  const hx = P.pos.x + f.x * 2.2, hz = P.pos.z + f.z * 2.2;
+  particles.ring(hx, P.pos.y + 0.8, hz, 30, 3.2, { color: 0x6aa040, size: 0.5, life: 0.45 });
+  let hit = 0;
+  for (const e of enemies.list) {
+    if (e.dead) continue;
+    const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (d > 4.6 + e.T.rad || (dx * f.x + dz * f.z) / (d || 1) < 0.2 || Math.abs(e.pos.y - P.pos.y) > 4) continue;
+    if (e.T.disp && !e.hostile && e.T.disp !== 'training') continue;   // she won't go for the peaceable ones
+    enemies.damage(e, 30 * axeMul(), P.pos, 11, { stun: 0.7 }); hit++;
+  }
+  if (boss && !boss.dead && boss.pos && Math.hypot(boss.pos.x - P.pos.x, boss.pos.z - P.pos.z) < 6) { damageBoss(40); hit++; }
+  if (hit) { G.shake = Math.max(G.shake, 0.35); G.hitstop = 0.05; addHeat(6); }
 }
 
 /* Phorus rides too: some days he climbs up behind you on Brindle, some days he
@@ -2632,7 +2713,9 @@ function updateMount(dt) {
   }
   m.actor.root.position.copy(m.pos);
   m.actor.root.rotation.y = m.yaw;
-  m.actor.animate(dt, { speed: P.riding ? Math.hypot(P.vel.x, P.vel.z) : Math.hypot(m.vel.x, m.vel.z), t: G.t });
+  m.atkCd = Math.max(0, (m.atkCd || 0) - dt); m.atk = Math.max(0, (m.atk || 0) - dt);
+  m.actor.root.rotation.z = P.vine ? -P.vine.dir * 0.35 * Math.sin(P.vine.done / P.vine.max * Math.PI) : 0;
+  m.actor.animate(dt, { speed: P.riding ? Math.hypot(P.vel.x, P.vel.z) * (P.vine ? 1.5 : 1) : Math.hypot(m.vel.x, m.vel.z), t: G.t, attack: m.atk > 0 ? m.atk / 0.5 : 0, windup: 0 });
 }
 
 /* ---------------- gliding: Torcain's coat spread like wings ---------------- */
@@ -3388,8 +3471,10 @@ function updatePlayer(dt) {
   }
 
   P.coyote = P.onGround ? 0.12 : Math.max(0, P.coyote - dt);
-  if (P.jumpBuf > 0 && P.coyote > 0 && act && !P.steep && (P.riding || spend(D.stamina.jump))) { P.vel.y = P.swimming ? 9 : P.riding ? 12 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
+  if (P.riding && P.jumpBuf > 0 && act && !P.vine) { P.jumpBuf = 0; vineGrab(); }
+  else if (P.jumpBuf > 0 && P.coyote > 0 && act && !P.steep && !P.riding && spend(D.stamina.jump)) { P.vel.y = P.swimming ? 9 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
   P.vel.y -= 28 * dt;
+  if (P.vine) vineSwing(dt, act);
   // gliding: hold Space while falling and Torcain's coat catches the wind
   P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
   const glideOk = !!(act && !P.riding && keys.Space && !P.onGround && P.airT > 0.25 && P.vel.y < 0 && (P.stam > 0 || D.stamina.jump === 0 || perk('glider')));
@@ -4299,7 +4384,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 window.__torcain = {
   get vk() { return VK; }, F_: () => F_, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
-  G, P, F, CAM, camera, scene, renderer, interiors, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
+  G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
   get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, makeMount, toggleRide, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };
