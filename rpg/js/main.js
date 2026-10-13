@@ -4063,7 +4063,7 @@ function arcReturn(name) {
   G.mode = 'intro'; introT = 0; G.t = 0;
   fade(0, 1.4);
   const home = () => { enterPlay(); showLocation('The Carpenter’s hill', 'home'); setObjective(); };
-  if (name === 'caves') { F_.ch = 'megla'; persist(); dialog(STORY.ARC.caves.home, () => playCards(STORY.ARC.years.two, 3400, () => { setYear(2); arcDecor(); home(); })); enterPlay(); G.mode = 'dialog'; return; }
+  if (name === 'caves') { F_.ch = 'megla'; persist(); enterPlay(); dialog(STORY.ARC.caves.home, () => { G.mode = 'intro'; playCards(STORY.ARC.years.two, 3400, () => { setYear(2); arcDecor(); home(); }); }); return; }
   if (name === 'megla') { F_.ch = 'token'; persist(); arcDecor(); playCards(['Home, down the river pass.', `${F_.punkName || 'The Punk'} and ${F_.malstiName || 'the Malsti Punk'} race each other up the hill.`], 3400, home); return; }
   if (name === 'crater') { F_.ch = 'finale'; persist(); arcDecor(); playCards(['Home again, in a new hat.'].concat(STORY.ARC.years.four), 3400, () => { setYear(4); home(); }); return; }
   if (name === 'finale') { F_.ch = 'open'; persist(); playCards(['Home.', 'The amulets are quiet. The Carpenter has the kettle on.'], 3400, () => { home(); toast(STORY.ARC.obj.free, 5); }); return; }
