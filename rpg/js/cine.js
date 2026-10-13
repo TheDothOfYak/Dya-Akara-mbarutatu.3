@@ -45,7 +45,9 @@ function style() {
   const sk = document.createElement('div'); sk.className = 'cine-skip'; sk.textContent = 'SPACE / CLICK ▸▸'; document.body.appendChild(sk);
 }
 
-export function createCine(camera) {
+/* opts.blocked(x, y, z) -> true inside anything solid: the camera then never sits inside a wall or a hill;
+   it slides in along its line to what it's looking at until it's in the clear */
+export function createCine(camera, opts = {}) {
   style();
   const cap = document.getElementById('cine-cap');
   let shots = null, i = -1, t = 0, done = null, capI = -1, baseFov = camera.fov, lastT = 0;
@@ -93,7 +95,17 @@ export function createCine(camera) {
       else if (s._fp) { P.lerpVectors(s._fp, s._tp, e); L.lerpVectors(s._fl, s._tl, e); }
       // the first frame of a shot cuts; after that the camera glides
       if (t <= dt + 1e-6) { curP.copy(P); curL.copy(L); } else { const a = 1 - Math.exp(-10 * dt); curP.lerp(P, a); curL.lerp(L, a); }
-      camera.position.copy(curP); camera.lookAt(curL);
+      camera.position.copy(curP);
+      if (opts.blocked) {
+        const B = opts.blocked, d = camera.position.distanceTo(curL);
+        if (B(curP.x, curP.y, curP.z)) {
+          // walk from the subject out toward the camera; stop at the last clear step
+          let last = 0.4;
+          for (let s2 = 0.4; s2 < d; s2 += Math.max(0.25, d / 40)) { const k2 = s2 / d; if (B(curL.x + (curP.x - curL.x) * k2, curL.y + (curP.y - curL.y) * k2, curL.z + (curP.z - curL.z) * k2)) break; last = s2; }
+          camera.position.lerpVectors(curL, curP, last / d);
+        }
+      }
+      camera.lookAt(curL);
       if (s.fov) { camera.fov = s.fovTo ? s.fov + (s.fovTo - s.fov) * e : s.fov; camera.updateProjectionMatrix(); }
       const caps = s.caption ? (Array.isArray(s.caption) ? s.caption : [s.caption]) : [];
       const ci = caps.length ? Math.min(caps.length - 1, Math.floor(k * caps.length)) : -1;

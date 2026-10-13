@@ -64,6 +64,7 @@ export const ITEMS = {
   r_firestone: { name: 'Fire-stone', kind: 'key', icon: '🔥', value: 0, desc: 'A smooth skipping-stone with a thumb-dip. Its Hurst is a warm, chatty fire-rat. Set a pebble in the dip and it throws it in a streak of flame — and never burns the one it likes.' },
   r_longevity: { name: 'Humming stone', kind: 'key', icon: '🔵', value: 0, desc: 'A longevity Relic from the lakeshore. Its Hurst is settled and quiet; it keeps you a little less tired, a little less hungry.' },
   resin: { name: 'Black resin bead', kind: 'mat', icon: '⚫', value: 12, desc: 'Carved, very old, from the ruins in the Megla Aagac. Smells of smoke and rain.' },
+  saddle: { name: 'Old Ruut’s saddle', kind: 'key', icon: '🐎', value: 0, desc: 'Good leather, cut down small, with saddlebags. For your Punk — once she has a place of her own.' },
   gynge_chip: { name: 'Gynge chip', kind: 'key', icon: '🪨', value: 0, desc: 'A palm-sized piece of living rock from just inside a Gynge’s maw. Still warm. Still faintly singing.' },
   gynge_hide: { name: 'Gynge rock-hide', kind: 'mat', icon: '🟫', value: 18, desc: 'Plates of a Gynge’s rock skin. Hard enough to turn an axe.' },
   akai_rubbing: { name: 'Akai Gek rubbing', kind: 'key', icon: '📜', value: 0, desc: 'Charcoal rubbing of the runes round the purple Relic in the ruins. You can read one: Akai Gek. Its song is in your head now.' },

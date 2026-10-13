@@ -300,7 +300,7 @@ export const CODEX_MORE = [
   ['Venkin', 'A young Keilia from a family of builders in Beuhk, a few years younger than Torcain, and hopelessly obsessed with the token game.'],
   ['Keilia', 'Builders without equal. The Kalo make their hammers; a Keilia who takes a hammer to war is banished, so Keilia weapons are passable at best.'],
   ['Nur’Hlyst', 'Perception through the Hurst: a golden pulse that makes hidden things answer. Buhkon taught it to Torcain. (G)'],
-  ['Sniller amulets', 'A large round gem between two curved horns, cold teal. Snillers were cursed into them when the Angels left. They hum toward old memory vaults.'],
+  ['Sniller amulets', 'A large round gem between two curved horns, cold teal. Snillers were cursed into them when the Xwi left. They hum toward old memory vaults.'],
   ['Dya’Akara', 'The token game of the Mbaru Tatu. Each token holds the truth of one creature — one individual, not the kind — sung into stygian with an Okid’Relic. Thrown, it unfolds into that creature’s likeness, which can touch nothing living. Pulses bring Fti, Su, Eldi and Ular to ready your tokens; carry the rival’s Relic home to win.'],
   ['Kofi Galta', 'A crescent-shaped little thing with blade-like spines and a fluffy dark tail. Breeds like bunnies, found everywhere, eaten by basically everything — so it runs from basically everything.'],
   ['Nur Lantern', 'Phorus can wake a Nur-light in an old lantern. Rest beside one to heal, refill the Albali film, and spend zikhron shards to strengthen your Hurst. Resting wakes the wilds again.'],
@@ -502,13 +502,13 @@ export const CODEX_LORE = [
 /* ================================================================
    THE TRUE BEGINNING — Velki, year 307A, the last Skyfall.
    Tanoc Filugani is thirteen. He wants to be an Ahoac. He climbs a
-   spire in Fyrsti'Vilag to watch the Angels and the Snillers fight,
+   spire in Fyrsti'Vilag to watch the Xwi and the Snillers fight,
    walks out of the gate toward it of his own accord, and is caught
    in it — and wakes on Xikia, in front of the Carpenter's stall.
    ================================================================ */
 SPEAKERS.tanoc = { name: 'Tanoc', color: '#e0b080', sub: 'Tanoc Filugani · Eikar, thirteen' };
 SPEAKERS.tale = { name: 'Rokarvac', color: '#e8d8a8', sub: 'as it is written' };
-SPEAKERS.xwi = { name: 'Xwi', color: '#fff3c8', sub: 'an Angel' };
+SPEAKERS.xwi = { name: 'Xwi', color: '#fff3c8', sub: 'one of the Xwi' };
 SPEAKERS.guard = { name: 'Gate warden', color: '#d8c090', sub: 'Fyrsti’Vilag, Velki' };
 SPEAKERS.ahoac = { name: 'Ahoac', color: '#ffb46a', sub: 'a Firefall catcher' };
 
@@ -518,7 +518,7 @@ export const PROLOGUE = {
   cards: [
     'Before Torcain, there was Tanoc.',
     'Velki, in the year 307A. The sun is going down over Fyrsti’Vilag, and the sky is on fire for the last time.',
-    'Up there, the Xwi — the Angels — are at war with the Snillers. They have been at war through every Skyfall anyone can remember.',
+    'Up there, the Xwi are at war with the Snillers. They have been at war through every Skyfall anyone can remember.',
     'Tanoc Filugani is thirteen. He wants to be an Ahoac, one of the armoured acrobats who catch the Firefall before it lands.',
     'He is curious. He is reckless. And he is not going to watch the last Skyfall from the street.',
   ],
@@ -533,7 +533,7 @@ export const PROLOGUE = {
   ],
   top: [
     ['tale', 'From the top of the spire, the whole of Fyrsti’Vilag falls away, and the battle is right there past the north gate.'],
-    ['tale', 'It is mostly light. The Angels are streaks of white and gold; the Snillers are cold teal and storm-grey, wind turning on itself. You catch a shape for a heartbeat — wings of light, a spinning funnel, one eye — and then it is only colour again.'],
+    ['tale', 'It is mostly light. The Xwi are streaks of white and gold; the Snillers are cold teal and storm-grey, wind turning on itself. You catch a shape for a heartbeat — wings of light, a spinning funnel, one eye — and then it is only colour again.'],
     ['tale', 'Neither of them stays put. They blink in and out of the world — here, gone, there — and wherever they have been, the air keeps sparking.'],
     ['tanoc', 'The Ahoac are going out the north gate. They’re going to catch it. They’re actually going to catch it.'],
     ['tanoc', 'If I’m ever going to be one of them, I have to see it up close. Not from up here.'],
@@ -581,11 +581,11 @@ export const ARRIVAL = {
     ['buhkon', 'Help me pack the stall. Something followed you through, and I would like very much to be gone before it finds its feet.'],
   ],
   materialize: [
-    ['tale', 'The air over the square cracks like ice. An Angel and a Sniller come through together, still locked in their fight — and the shockwave knocks the hat clean off your head.'],
+    ['tale', 'The air over the square cracks like ice. A Xwi and a Sniller come through together, still locked in their fight — and the shockwave knocks the hat clean off your head.'],
   ],
   freeze: [
     ['tale', 'And everything stops.'],
-    ['tale', 'The Angel and the Sniller hang in the air, and the whole square holds its breath, and both of them are looking at you.'],
+    ['tale', 'The Xwi and the Sniller hang in the air, and the whole square holds its breath, and both of them are looking at you.'],
     ['tale', 'Up close, the Sniller is enormous. Nobody has ever seen one whole before — not like this, not standing still.'],
     ['buhkon', 'Tanoc. Your hat. Now.'],
   ],
@@ -594,7 +594,7 @@ export const ARRIVAL = {
     ['xwi', 'Then it is done. We must go, and we will not come again. No Skyfall will follow this one.'],
     ['xwi', 'And you — sleep in the stone, every one of you, until you are needed.'],
     ['tale', 'The Sniller folds in on itself with a sound like a bell under water, and is gone. Where it hung, something small and teal clatters onto the cobbles. Then another. Then a rain of them.'],
-    ['tale', 'Across the sky, one by one, the Angels go out like lamps.'],
+    ['tale', 'Across the sky, one by one, the Xwi go out like lamps.'],
     ['tale', 'And then the market screams.'],
   ],
   bag: [
@@ -673,7 +673,7 @@ export const YOUNG = {
   ],
   end: [
     ['buhkon', 'That’s enough for one day. You’ll stay — for as long as you want to. There’s a lot to learn, and I’d rather you learned it here than out there.'],
-    ['tanoc', 'Buhkon… the Angels. The Sniller. They all looked at me. Why?'],
+    ['tanoc', 'Buhkon… the Xwi. The Sniller. They all looked at me. Why?'],
     ['buhkon', 'Because of what you are. And that is a long story, and you have a long time to hear it.'],
     ['buhkon', 'For now: the land’s yours, all of it, and the town along the path. Meet people. Help where you can. Keep those amulets close — and keep your hat on.'],
   ],
@@ -746,14 +746,14 @@ export const ROAD = {
     wheelGot: 'A cart wheel, nearly as tall as you. You roll it back toward the road.',
     cartFixed: [
       ['tale', 'You and the Carpenter heave the wheel onto the axle. The cart rights itself with a groan.'],
-      ['family', 'Out of Fyrsti’Vilag the same as you, I’d guess. Did you see it? The sky just — stopped. They say the Angels are gone. Gone!'],
+      ['family', 'Out of Fyrsti’Vilag the same as you, I’d guess. Did you see it? The sky just — stopped. They say the Xwi are gone. Gone!'],
       ['family', 'Here — a bun, for the boy. Fresh this morning. Well. Fresh this morning in a city that was screaming.'],
       ['buhkon', 'Safe roads to you. Keep north of the river tonight — the low road floods.'],
     ],
     hedge: [['tanoc', 'Something’s humming in the hedge… another amulet! It must have blown all the way out here.']],
     sniller: [
       ['tanoc', 'Buhkon. Buhkon, out over the fields — is that one of THEM?'],
-      ['buhkon', 'Keep walking. It isn’t looking for us. They can’t stay solid long now — the Angels saw to that.'],
+      ['buhkon', 'Keep walking. It isn’t looking for us. They can’t stay solid long now — the Xwi saw to that.'],
     ],
     stoneMenu: 'The fire-stone sits warm in your palm. A thumb-shaped dip in the top. What do you try?',
     press: [['tale', 'You press your thumb into the dip. It’s warm. Nothing else happens. Somewhere in the stone, something snickers.']],
@@ -830,7 +830,7 @@ export const ROAD = {
       ['buhkon', 'Stygian is soul-iron. Relics are made of it, and memory cores, and your hat — the veins in an Aagac are stygian. That’s why you couldn’t think without one.'],
       ['buhkon', 'There are people who want stygian more than anything. The Duskareth, who walk the Duat. The SkarValorin, who forge. The Elsha’ryn, who keep memory.'],
       ['buhkon', 'The Skaar Uverkhron, all three of them. You’ll hear those names again. When you do — keep your hat on and your mouth shut.'],
-      ['tanoc', 'And the Angels? Why did they look at me?'],
+      ['tanoc', 'And the Xwi? Why did they look at me?'],
       ['buhkon', 'That piece I’ll give you when you’re older. It’s a heavy one.'],
     ],
   },
@@ -856,7 +856,7 @@ export const ROAD = {
       ['buhkon', 'Keep your hat on, keep your ears open. People talk, after a day like that one.'],
     ],
     whispers: [
-      ['folk', '…gone, all of them. The Angels. Not a Skyfall since, and they say there won’t ever be another.'],
+      ['folk', '…gone, all of them. The Xwi. Not a Skyfall since, and they say there won’t ever be another.'],
       ['folk', '…my cousin swears the amulets hum at night. Like they’re listening for something.'],
       ['folk', '…the old prophecy, the one about the boy who fell —'],
       ['folk', '…an Eikar child with no hat, right in front of a market stall, in Fyrsti’Vilag. Brown as an acorn, they said. Thirteen, maybe.'],
@@ -1045,7 +1045,7 @@ export const MEGLA = {
     ['tanoc15', 'Is that a compliment?'],
     ['sniller', 'It is a fact. Compliments come later, if you live.'],
     ['tale', 'The sounds come again in the night — the screech, the bellow, the thin high screaming — each just far enough apart to almost be okay.'],
-    ['tanoc15', 'What was it like? Before. Before the Angels.'],
+    ['tanoc15', 'What was it like? Before. Before the Xwi.'],
     ['sniller', 'Loud. Bright. We were the storms between the mountains, and we were glad. …I do not remember all of it. The amulet keeps some of me and lets the rest go.'],
     ['tanoc15', 'I’m sorry.'],
     ['sniller', 'You are the first one who has ever said that. Go to sleep, little one.'],
@@ -1161,4 +1161,27 @@ export const FIRST_TOKEN = {
   missed: [['buhkon', 'Lost the thread. Start the song again — it’s still in you.']],
   end: ['End of Chapter II.', 'Tanoc’s first token: the Gynge of the Megla Aagac.'],
   tokenName: 'The Gynge of the Megla Aagac',
+};
+
+/* ---------------- Tanoc's Punk: the saddle from Old Ruut, a stall of its own, and a steed ---------------- */
+export const STEED = {
+  ruutDone: ['All home! You’ve a way with Punks, boy. That young one that trails you about — the mutt from the city? She’ll carry you, one day soon.', 'Here. An old saddle of mine, good leather, cut down small. Take it to the Carpenter. A Punk wants a place of her own before she’ll wear one.'],
+  noSaddle: name => `Not without a saddle — ${name} would have me off in a heartbeat. Old Ruut in Beuhk might have one.`,
+  bring: 'Take the saddle home — talk to Buhkon about a place for your Punk',
+  askBuhkon: name => [
+    ['tanoc', `Old Ruut gave me a saddle. For ${name}.`],
+    ['buhkon', 'Did he now. That’s good leather. …A saddle’s the last thing, not the first. She’ll want a place that’s hers first: a stall, a roof, somewhere to sleep that smells of her.'],
+    ['buhkon', 'You choose where. It’s your Punk. Walk about, find a spot she’d like, and I’ll bring the timber.'],
+  ],
+  placeObj: 'Choose a spot for the stall — E to build it there, Esc to think again',
+  placeHint: 'Flat ground, clear of buildings and water. The frame turns green where it fits.',
+  badSpot: ['Too steep there.', 'Something’s in the way.', 'Not in the water!', 'Too close to the house — she’d have the door off.'],
+  built: ['Three days of sawing and pegging and arguing about the roof.', 'And then it is done: a stall with her name over it, hay in the corner, and water in the trough.'],
+  fit: name => [
+    ['buhkon', `Now the saddle. Easy — let ${name} smell it first. That’s it.`],
+    ['tale', `The saddle goes on. ${name} turns round twice to look at it, decides it is hers, and sits down in the straw looking very pleased with herself.`],
+    ['buhkon', 'Well. Up you get, then.'],
+  ],
+  steed: name => `${name} is your steed — E to ride, H to whistle her. She’ll carry materials in her saddlebags, and more as she grows.`,
+  bagFull: (cap, bag) => bag ? `You can’t carry any more — you and your Punk’s saddlebags are full (${cap}).` : `Your pack is full (${cap}). A saddle with saddlebags on your Punk would carry more.`,
 };

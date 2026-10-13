@@ -58,17 +58,17 @@ export const TYPES = {
   makari: { name: 'Makari swarm', build: () => buildMakariSwarm({ seed: seed(), moteScale: 2 }), hp: 8, dmg: 0, speed: 3, rad: 0.6, range: 0, aggro: 0, shards: 2, ai: 'flyer', color: 0x9aff6a, disp: 'neutral', altMul: 0.4, roam: 3 },
   lutut: { name: 'Lutut', build: () => buildLutut({ seed: seed(), age: Math.random() }), hp: 1300, dmg: 28, speed: 10, rad: 3.0, range: 3, aggro: 26, shards: 200, ai: 'flyer', elite: true, color: 0x9a7ac8, disp: 'neutral', altMul: 3, roam: 22 },
   kuni_wild: { name: 'Kuni Byrd', build: () => buildKuniByrd({ seed: seed() }), hp: 1600, dmg: 30, speed: 16, rad: 3.5, range: 3, aggro: 30, shards: 260, ai: 'flyer', elite: true, color: 0xd8c098, disp: 'neutral', altMul: 9, roam: 60 },
-  su_naga: { name: 'Su Naga', build: () => buildSuNaga({ heads: 3 }), hp: 3600, dmg: 34, speed: 5, rad: 6, range: 9, aggro: 16, windup: 1.0, recover: 1.2, lunge: 5, shards: 420, ai: 'swim', water: true, sink: 1.2, stagger: 0, elite: true, miniboss: true, color: 0x6ad8ff, disp: 'neutral' },
+  su_naga: { name: 'Su Naga', build: () => buildSuNaga({ heads: 3 }), hp: 3600, dmg: 34, speed: 5, rad: 6, range: 9, aggro: 16, windup: 1.0, recover: 1.2, lunge: 5, shards: 420, ai: 'swim', water: true, sink: 4.4, stagger: 0, elite: true, miniboss: true, color: 0x6ad8ff, disp: 'neutral' },
   raf_krabbi: { name: 'Raf Krabbi', build: () => buildRafKrabbi({ seed: seed() }), hp: 26, dmg: 6, speed: 4, rad: 0.25, range: 1.2, aggro: 5, windup: 0.4, recover: 0.6, lunge: 4, shards: 5, ai: 'swim', water: true, shallow: true, status: 'paralyze', color: 0x6ad8ff },
   su_grothyn: { name: 'Su Grothyn', build: () => buildGrothyn({ element: 'Su' }), hp: 120, dmg: 12, speed: 0.15, rad: 0.8, range: 5.5, aggro: 7, windup: 0.6, recover: 1.0, lunge: 0, shards: 14, ai: 'swim', water: true, shallow: true, color: 0x3a8aa8 },
-  hvaleia: { name: 'Hvaleia', build: buildHvaleia, hp: 1800, dmg: 22, speed: 5, rad: 3.5, range: 4, aggro: 0, shards: 160, ai: 'airswim', water: true, fly: 9, elite: true, color: 0x6ab8ff, disp: 'neutral' },
+  hvaleia: { name: 'Hvaleia', build: buildHvaleia, hp: 1800, dmg: 22, speed: 5, rad: 3.5, range: 4, aggro: 0, shards: 160, ai: 'swim', water: true, sink: 3.3, elite: true, color: 0x6ab8ff, disp: 'neutral' },
   /* the Blind Beast: a great flat manta of fire, gliding low over the high ground; leave it be and it leaves you be */
   apibuta: { name: 'Api Buta', build: () => buildApiButa({ seed: seed() }), hp: 2200, dmg: 26, speed: 6, rad: 4, range: 5, aggro: 9, windup: 1.0, recover: 1.4, lunge: 6, shards: 220, ai: 'flyer', elite: true, color: 0xff7a2a, disp: 'neutral', altMul: 1.4, roam: 26 },
   /* from Katkan: ghost-shapes with one eye and two blade arms — nobody knows what they want */
   cyitor: { name: 'Cyitor', build: () => buildCyitor({ seed: seed() }), hp: 160, dmg: 18, speed: 5.8, rad: 0.7, range: 2.8, aggro: 18, windup: 0.6, recover: 0.8, lunge: 9, shards: 45, ai: 'melee', stagger: 0.3, color: 0xd8e0ff },
   /* the Fuzzy Devil: round, fluffy, big-eyed, bat-winged, with a trident and a temper */
   xiwkatkan: { name: 'Xiw’Katkan', build: () => buildXiwKatkan({ seed: seed() }), hp: 90, dmg: 14, speed: 8, rad: 0.5, range: 2.2, aggro: 20, windup: 0.5, recover: 0.7, lunge: 10, shards: 35, ai: 'flyer', color: 0xff4a6a },
-  harkal: { name: 'Harkal', build: () => buildHarkal({ seed: seed() }), hp: 140, dmg: 14, speed: 9, rad: 1.0, range: 2.4, aggro: 16, windup: 0.5, recover: 0.7, lunge: 12, shards: 22, ai: 'airswim', water: true, fly: 2.2, color: 0x7aa0b8 },
+  harkal: { name: 'Harkal', build: () => buildHarkal({ seed: seed() }), hp: 140, dmg: 14, speed: 9, rad: 1.0, range: 2.4, aggro: 16, windup: 0.5, recover: 0.7, lunge: 12, shards: 22, ai: 'swim', water: true, sink: 1.85, color: 0x7aa0b8 },
 };
 
 export function createEnemies(ctx) {
@@ -201,9 +201,10 @@ export function createEnemies(ctx) {
   }
 
   /* --------- swimmers: under, at, or just above the water — and never anywhere else --------- */
-  function wet(x, z, shallow) {
+  function wet(x, z, shallow, deep = 0) {
     const W = ctx.world.water; if (!W) return false;
     if (!W.isWater(x, z)) return false;
+    if (deep && W.depth(x, z) < deep) return false;   // the big swimmers keep to water deep enough to hide them
     return !shallow || W.depth(x, z) < 3;
   }
   function updateSwimmer(e, dt, d, toP, playing, aggroR, wf) {
@@ -229,7 +230,7 @@ export function createEnemies(ctx) {
         e.timer = 4 + Math.random() * 6;
         for (let i = 0; i < 8; i++) {
           const x = e.home.x + (Math.random() - 0.5) * roam * 2, z = e.home.z + (Math.random() - 0.5) * roam * 2;
-          if (wet(x, z, T.shallow)) { e.wander.set(x, 0, z); break; }
+          if (wet(x, z, T.shallow, (T.sink || 0) * 0.8)) { e.wander.set(x, 0, z); break; }
         }
       }
       const wx = e.wander.x - e.pos.x, wz = e.wander.z - e.pos.z;
@@ -238,12 +239,12 @@ export function createEnemies(ctx) {
     }
     moveTo(e, wantYaw, wantV, dt);
     const nx = e.pos.x + e.vel.x * dt, nz = e.pos.z + e.vel.z * dt;
-    if (wet(nx, nz, T.shallow)) { e.pos.x = nx; e.pos.z = nz; }
+    if (wet(nx, nz, T.shallow, (T.sink || 0) * 0.8)) { e.pos.x = nx; e.pos.z = nz; }
     else { e.vel.x *= -0.3; e.vel.z *= -0.3; e.timer = 0; }
     const ground = ctx.world.heightAt(e.pos.x, e.pos.z);
     if (T.ai === 'airswim') e.pos.y = W.level + T.fly + Math.sin(G.t * 0.7 + e.home.x) * 0.5;
     else if (T.shallow) e.pos.y = Math.max(ground, W.level - 2.5);
-    else e.pos.y = Math.max(ground + 0.5, W.level - (T.sink || 0.4) + Math.sin(G.t * 0.5 + e.home.x) * 0.25);
+    else e.pos.y = Math.max(ground, W.level - (T.sink || 0.4) + Math.sin(G.t * 0.5 + e.home.x) * 0.25);   // in the water, not on it: the body under, a fin or a back breaking the surface
     a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
     if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: G.t, windup: e.windup, attack: e.attackA, onGround: true });
   }

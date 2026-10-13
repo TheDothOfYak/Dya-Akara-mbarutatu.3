@@ -17,8 +17,8 @@ export const QUESTS = {
     goal: { type: 'count', counter: 'strays', n: 3 },
     offer: ['Three of my herd got loose out past the fields — gentle things, saddle-blankets on. They’ll follow anyone who whistles.', 'Find them, tell them to go home. They know the way. Mostly.'],
     wait: ['Still missing some of my herd. Look for saddle-blankets out in the countryside.'],
-    done: ['All home! You’ve a way with Punks. Here — take Brindle. She likes you. Whistle (H) and she’ll come running.'],
-    reward: { xp: 150, shards: 40, flag: 'mount' },
+    done: ['All home! You’ve a way with Punks, boy. That young one that trails you about — the mutt from the city? She’ll carry you, one day soon.', 'Here. An old saddle of mine, good leather, cut down small. Take it to the Carpenter. A Punk wants a place of her own before she’ll wear one.'],
+    reward: { xp: 150, shards: 40, items: { saddle: 1 }, flag: 'saddle' },
   },
   q_fennek: {
     name: 'Where’s Fennek?', giver: 'sefa', region: 'xilia',

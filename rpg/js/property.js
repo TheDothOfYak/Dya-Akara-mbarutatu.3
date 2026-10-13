@@ -646,17 +646,10 @@ export function buildProperty(scene) {
         for (let q = 0; q < 3; q++) { const [mx, my, mz] = pts[Math.floor(n * (0.45 + q * 0.17))]; clump(mx + (R() - 0.5) * 20, my + 14 + R() * 8, mz + (R() - 0.5) * 20, 18 + R() * 12); }
       }
       { const [tx, tz] = trunkAt(g0 + H); for (let q = 0; q < 8; q++) { const a = q / 8 * Math.PI * 2, d = (q ? 35 + R() * 20 : 0) * SC; clump(tx + Math.cos(a) * d, g0 + H - 6 + R() * 12 - d * 0.2, tz + Math.sin(a) * d, 30 + R() * 14); } }
-      // specks of light under the leaves
-      for (const [x, y, z, r] of clumps) for (let b = 0; b < 9; b++) {
-        const u = R() * Math.PI * 2, v = Math.sqrt(R());
-        cBeads.put(x + Math.cos(u) * r * v * 0.95, y - r * 0.5 * Math.sqrt(1 - v * v) * 0.95 - 0.4, z + Math.sin(u) * r * v * 0.95, 0.9, 0.9, 0.9, 0, 0, 0, glowC());
-      }
       /* vines: curtains of them from the leaves, and long ropes off the lower limbs that Brindle can catch */
       for (const [x, y, z, r] of clumps) for (let b = 0; b < 3; b++) {
         const u = R() * Math.PI * 2, v = Math.sqrt(R()) * r * 0.8, hx = x + Math.cos(u) * v, hz = z + Math.sin(u) * v, top = y - r * 0.3, len = 18 + R() * 70;
         cVines.put(hx, top - len / 2, hz, 0.3, len, 0.3, 0, R() * 6, 0, new THREE.Color('#2a4a30').offsetHSL(0, 0, (R() - 0.5) * 0.06));
-        cBeads.put(hx, top - len, hz, 0.7, 1.0, 0.7, 0, 0, 0, glowC());
-        for (let q = 1; q < 4; q++) cBeads.put(hx, top - len * q / 4, hz, 0.45, 0.45, 0.45, 0, 0, 0, glowC());
       }
       let ropes = 0;
       for (const Lb of limbs) {
@@ -1622,7 +1615,7 @@ export function buildProperty(scene) {
         if (camPos) {
           if (Math.abs(camPos.x - HIVES.x) < 40 && Math.abs(camPos.z - HIVES.z) < 40 && Math.random() < 0.5) { const h = hivePts[Math.floor(Math.random() * hivePts.length)]; particles.emit(h[0] + (Math.random() - 0.5) * 3, h[1] + Math.random() * 1.5, h[2] + (Math.random() - 0.5) * 3, { vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 0.6, vz: (Math.random() - 0.5) * 2, color: 0xffd040, size: 0.08, life: 1.6, drag: 0.2 }); }
           const sh = shadeAt(camPos.x, camPos.z);   // spores drifting in the deepwood's own light
-          if (sh > 0.2 && Math.random() < sh * 1.6) particles.emit(camPos.x + (Math.random() - 0.5) * 36, camPos.y - 2 + Math.random() * 10, camPos.z + (Math.random() - 0.5) * 36, { vx: (Math.random() - 0.5) * 0.3, vy: 0.1 + Math.random() * 0.2, vz: (Math.random() - 0.5) * 0.3, color: [0x5af0ff, 0x8affb0, 0xb48aff, 0x3ae8c8][Math.floor(Math.random() * 4)], size: 0.14 + Math.random() * 0.14, life: 4 + Math.random() * 3, drag: 0 });
+          if (sh > 0.2 && Math.random() < sh * 1.6) particles.emit(camPos.x + (Math.random() - 0.5) * 36, camPos.y - 2 + Math.random() * 10, camPos.z + (Math.random() - 0.5) * 36, { vx: (Math.random() - 0.5) * 0.3, vy: 0.1 + Math.random() * 0.2, vz: (Math.random() - 0.5) * 0.3, color: 0xbfeee6, size: 0.14 + Math.random() * 0.14, life: 4 + Math.random() * 3, drag: 0 });
           if (Math.random() < 0.35) particles.emit(camPos.x + (Math.random() - 0.5) * 40, camPos.y + (Math.random() - 0.5) * 12, camPos.z + (Math.random() - 0.5) * 40, { vx: 0.4, vy: 0.15, vz: 0.1, color: 0xffe0a0, size: 0.12, life: 5, drag: 0 });
           if (n > 0.3 && Math.random() < n) particles.emit(camPos.x + (Math.random() - 0.5) * 50, camPos.y - 1 + Math.random() * 4, camPos.z + (Math.random() - 0.5) * 50, { vx: (Math.random() - 0.5) * 0.5, vy: 0.2, vz: (Math.random() - 0.5) * 0.5, color: Math.random() < 0.6 ? 0xc8ff6a : 0x6ae8ff, size: 0.22, life: 3, drag: 0 });
         }

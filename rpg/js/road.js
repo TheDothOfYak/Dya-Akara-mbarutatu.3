@@ -24,6 +24,7 @@ import { buildEikar } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk } from './esik_land.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
+import { buildCart as buildCartModel } from './cart.js';
 import { NPC_LOOKS } from './npcs.js';
 import { buildAngel, buildSniller } from './velki.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm } from './util.js';
@@ -130,9 +131,10 @@ export function createRoad(ctx) {
   const box = (x, z, hw, hd, y0, y1) => { const s = { kind: 'box', x, z, hw, hd, y0, y1 }; solids.push(s); return s; };
   const cyl = (x, z, r, y0, y1) => { const s = { kind: 'cyl', x, z, r, y0, y1 }; solids.push(s); return s; };
   const STEP = 0.65, PR = 0.4, PH = 1.5;
-  function groundAt(x, z, y) {
+  function groundAt(x, z, y, skip) {
     let g = heightAt(x, z);
     for (const s of solids) {
+      if (s === skip) continue;
       if (Math.abs(x - s.x) > 12 || Math.abs(z - s.z) > 12) continue;
       if (s.y1 > y + STEP || s.y1 <= g) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) g = s.y1;
@@ -179,7 +181,7 @@ export function createRoad(ctx) {
     }
   }
   const XSTREETS = [19, 29, 39, 49];
-  for (const r of XSTREETS.slice(1)) { const n = Math.round(r / 5); for (let k = 0; k < n; k++) { const a = k / n * TAU + 0.3, x = CITY.x + Math.cos(a) * (r + 2.3), z = CITY.z + Math.sin(a) * (r + 2.3); if (Math.abs(x) < 8 && z < CITY.z) continue; kit.lampPost(x, z); } }
+  for (const r of XSTREETS.slice(1)) { const n = Math.round(r / 5); for (let k = 0; k < n; k++) { const a = k / n * TAU + 0.3, x = CITY.x + Math.cos(a) * (r + 2.3), z = CITY.z + Math.sin(a) * (r + 2.3); if (Math.abs(x) < 8 && z < CITY.z) continue; if (x > -3 && x < 19 && z > 26 && z < 56) continue; kit.lampPost(x, z); } }   // (none in the cart's way out)
   for (const r of XSTREETS.slice(1)) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + 0.8; kit.bunting(V3(CITY.x + Math.cos(a) * (r - 4.4), 6, CITY.z + Math.sin(a) * (r - 4.4)), V3(CITY.x + Math.cos(a + 0.1) * (r + 4.4), 6, CITY.z + Math.sin(a + 0.1) * (r + 4.4)), 1.2); }
   for (let k = 0; k < 4; k++) kit.bunting(V3(-7, 7.2, 46 - k * 9), V3(7, 7.2, 42 - k * 9), 1.4);
   // the square's own bunting, from the fountain out to the stalls
@@ -224,43 +226,10 @@ export function createRoad(ctx) {
      It goes the whole way north with them: in the market by his stall, out of the
      gate, along the road behind Buhkon, parked by every camp. */
   const CART0 = { x: 13, z: 52.5 };
-  function buildCart() {
-    const g = new THREE.Group(), wood = toon(0x8a5a36), dark = toon(0x5a3a20), canvas = toon(0xe8dcc0, { side: THREE.DoubleSide });
-    const bed = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 4.2), wood); bed.position.y = 1.0; g.add(bed);
-    for (const sx of [-1, 1]) { const sd = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, 4.2), dark); sd.position.set(sx * 1.2, 1.45, 0); g.add(sd); }
-    const backB = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.6, 0.12), dark); backB.position.set(0, 1.45, -2.1); g.add(backB);
-    const wheels = [];
-    for (const sx of [-1, 1]) for (const sz of [-1.3, 1.3]) {
-      const w = new THREE.Group(); w.position.set(sx * 1.32, 0.8, sz); g.add(w); wheels.push(w);
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.08, 6, 16), dark); rim.rotation.y = Math.PI / 2; w.add(rim);
-      for (let k = 0; k < 4; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.4, 0.08), wood); sp.rotation.x = k * Math.PI / 4; w.add(sp); }
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.22, 8), dark); hub.rotation.z = Math.PI / 2; w.add(hub);
-    }
-    // the canvas cover over the back half, on three hoops
-    for (const z of [-1.8, -0.9, 0]) { const hoop = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.05, 5, 16, Math.PI), dark); hoop.position.set(0, 1.45, z); g.add(hoop); }
-    const cover = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.22, 2.1, 16, 1, true, -Math.PI / 2, Math.PI), canvas); cover.position.set(0, 1.45, -0.9);
-    cover.rotation.set(-Math.PI / 2, 0, 0); g.add(cover);
-    // wares: planks, a chair, a tool chest, a cradle
-    for (let k = 0; k < 4; k++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 3.6), toon([0xb8844e, 0xa87440][k % 2])); pl.position.set(-0.7 + k * 0.08, 1.2 + k * 0.08, -0.2); g.add(pl); }
-    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.6), toon(0x6a3a1c)); chest.position.set(0.55, 1.42, -1.4); g.add(chest);
-    const chair = new THREE.Group(); chair.position.set(0.5, 1.15, 0.9);
-    { const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 0.6), wood); seat.position.set(0, 0.45, 0); chair.add(seat); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.08), wood); bk.position.set(0, 0.8, -0.26); chair.add(bk); }
-    g.add(chair);
-    const load = new THREE.Group(); g.add(load);   // the crates Tanoc carries over
-    // the driver's bench, the shafts, the harness
-    const bench = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 0.6), wood); bench.position.set(0, 1.95, 1.75); g.add(bench);
-    const benchBack = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 0.1), wood); benchBack.position.set(0, 2.25, 1.45); g.add(benchBack);
-    for (const sx of [-1, 1]) { const sh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 3.8), dark); sh.position.set(sx * 0.55, 1.0, 3.9); g.add(sh); }
-    const yoke = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 0.12), dark); yoke.position.set(0, 1.25, 5.3); g.add(yoke);
-    outlineAll(g, 0.03); g.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
-    const punks = [-1, 1].map((sx, i) => { const pk = buildDomesticPunk({ saddle: false, blanket: i ? 0x2f6f8a : 0x8a3a2a, seed: 40 + i }); pk.root.scale.setScalar(0.62); pk.root.position.set(sx * 1.25, 0, 5.6); g.add(pk.root); return pk; });
-    for (const pk of punks) { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.2), toon(0x3a2414)); strap.position.set(pk.root.position.x * 0.7, 1.2, 4.9); g.add(strap); }
-    scene.add(g);
-    return { g, wheels, punks, load };
-  }
+  function buildCart() { const c = buildCartModel(); scene.add(c.g); return c; }
   const CART = Object.assign(buildCart(), { pos: V3(CART0.x, 0, CART0.z), yaw: Math.PI, speed: 0, roll: 0, path: null, riders: false, follow: false });
   CART.solid = box(CART.pos.x, CART.pos.z, 1.4, 3.2, -1, 2.4);
-  function placeCart(x, z, yaw) { CART.pos.set(x, groundAt(x, z, 60), z); CART.yaw = yaw; CART.speed = 0; }
+  function placeCart(x, z, yaw) { CART.pos.set(x, groundAt(x, z, 60, CART.solid), z); CART.yaw = yaw; CART.speed = 0; }
   placeCart(CART0.x, CART0.z, Math.PI);
 
   /* ---------------- far country: mountains, cloud, and a town at the end of it ---------------- */
@@ -335,7 +304,7 @@ export function createRoad(ctx) {
 
   /* ---------------- particles and post ---------------- */
   const particles = new Particles(scene, 4000);
-  const cine = createCine(camera);
+  const cine = createCine(camera, { blocked: (x, y, z) => solidAt(x, y, z) });
   const mists = [];
   {
     const mt = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64); grd.addColorStop(0, 'rgba(255,255,255,0.55)'); grd.addColorStop(0.6, 'rgba(255,255,255,0.18)'); grd.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = grd; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); return t; })();
@@ -592,7 +561,8 @@ export function createRoad(ctx) {
   }
   /* out of the city: up on the cart, through the screaming streets, out of the north gate, and the road */
   function leaveCity() {
-    const pts = [V3(CART.pos.x, 0, CART.pos.z), V3(6, 0, 46), V3(1.2, 0, 34), V3(0, 0, 22), V3(0, 0, GATE_Z - 2), V3(roadX(-14), 0, -14), V3(roadX(-46), 0, -46), V3(roadX(-80), 0, -80)];
+    // round the stall's crates and benches (not through them), then up the street to the gate
+    const pts = [V3(CART.pos.x, 0, CART.pos.z), V3(13.8, 0, 45), V3(9, 0, 37.5), V3(3, 0, 30), V3(0, 0, 22), V3(0, 0, GATE_Z - 2), V3(roadX(-14), 0, -14), V3(roadX(-46), 0, -46), V3(roadX(-80), 0, -80)];
     const curve = new THREE.CatmullRomCurve3(pts);
     CART.riders = true; CART.path = curve; CART.pathK = 0;
     tanoc.weapon.visible = false;
@@ -1089,20 +1059,30 @@ export function createRoad(ctx) {
     tanoc.root.position.copy(P.pos); tanoc.root.rotation.y = P.yaw;
     tanoc.animate(dt, { speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null });
   }
+  /* the cart is a solid thing too: it rolls round walls, houses and trees, never through them */
+  function resolveCart() {
+    const f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw)), r = V3(f.z, 0, -f.x);
+    for (let it = 0; it < 2; it++) for (const [a, b] of [[2.6, 0], [-2.6, 0], [0, 0], [1.4, 1], [1.4, -1], [-1.4, 1], [-1.4, -1]]) {
+      const p = V3(CART.pos.x + f.x * a + r.x * b * 1.2, CART.pos.y, CART.pos.z + f.z * a + r.z * b * 1.2), q = p.clone();
+      const keep = CART.solid.y1; CART.solid.y1 = -98; resolve(q, 0.9); CART.solid.y1 = keep;
+      CART.pos.x += q.x - p.x; CART.pos.z += q.z - p.z;
+    }
+  }
   /* the cart: parked, rolling along behind Buhkon, or driven out of the city with the two of them aboard */
   function updateCart(dt) {
     let sp = 0;
     const was = CART.pos.clone();
     if (CART.path) {
       const k = clamp(CART.pathK || 0, 0, 1), q = CART.path.getPointAt(k), q2 = CART.path.getPointAt(Math.min(1, k + 0.01));
-      CART.pos.set(q.x, groundAt(q.x, q.z, 60), q.z); CART.yaw = Math.atan2(q2.x - q.x, q2.z - q.z);
+      CART.pos.set(q.x, groundAt(q.x, q.z, 60, CART.solid), q.z); CART.yaw = Math.atan2(q2.x - q.x, q2.z - q.z);
     } else if (stage !== 'market') {
       // a few paces behind Buhkon, along the road
       const back = V3(-Math.sin(B.yaw), 0, -Math.cos(B.yaw)), want = V3(B.pos.x + back.x * 7, 0, B.pos.z + back.z * 7);
       const dx = want.x - CART.pos.x, dz = want.z - CART.pos.z, d = Math.hypot(dx, dz);
       if (d > 60) { CART.pos.set(want.x, 0, want.z); }
       else if (d > 2.5) { const v = Math.min(8, d * 1.2); CART.pos.x += dx / d * v * dt; CART.pos.z += dz / d * v * dt; CART.yaw = dampAngle(CART.yaw, Math.atan2(dx, dz), 3, dt); }
-      CART.pos.y = groundAt(CART.pos.x, CART.pos.z, CART.pos.y + 3);
+      resolveCart();
+      CART.pos.y = groundAt(CART.pos.x, CART.pos.z, CART.pos.y + 1, CART.solid);   // (never counting its own box — that's how it used to climb into the sky)
     }
     sp = CART.pos.distanceTo(was) / Math.max(dt, 1e-4);
     const f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw));
@@ -1238,6 +1218,6 @@ export function createRoad(ctx) {
   }
   return {
     start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, CART, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }
