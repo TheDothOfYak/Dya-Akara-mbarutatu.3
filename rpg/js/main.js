@@ -1067,6 +1067,40 @@ function lockPoint() {
   return V3(G.lock.pos.x, G.lock.pos.y + 1, G.lock.pos.z);
 }
 
+/* ---------------- the X: what it's pointing at ----------------
+   The look-ray through the middle of the screen, from level with Torcain (so nothing
+   between him and the camera counts) out until it meets a foe, a wall or the ground.
+   A foe a hair off the X still counts — more give the further off it is. */
+const aimRay = new THREE.Raycaster(), AIM_C = new THREE.Vector2(0, 0);
+function lookAim(maxD = 70) {
+  aimRay.setFromCamera(AIM_C, camera);
+  const o = aimRay.ray.origin, d = aimRay.ray.direction;
+  const t0 = Math.max(0, (P.pos.x - o.x) * d.x + (P.pos.y + 1 - o.y) * d.y + (P.pos.z - o.z) * d.z);
+  let end = t0 + maxD;
+  // walls, houses, boulders
+  const a = o.clone().addScaledVector(d, t0), b = o.clone().addScaledVector(d, end);
+  const wf = world.col.ray(a, b); if (wf < 1) end = t0 + maxD * wf;
+  // the ground: march out, then close in on where the ray goes under
+  let lo = t0, hit = false;
+  for (let t = t0; t <= end; t += 0.8) {
+    const x = o.x + d.x * t, z = o.z + d.z * t;
+    if (o.y + d.y * t < world.heightAt(x, z)) { hit = true; end = t; break; }
+    lo = t;
+  }
+  if (hit) for (let k = 0; k < 6; k++) { const m = (lo + end) / 2, x = o.x + d.x * m, z = o.z + d.z * m; if (o.y + d.y * m < world.heightAt(x, z)) end = m; else lo = m; }
+  // foes: the nearest one the ray passes through (or close enough to)
+  let foe = null;
+  for (const c of targetCandidates()) {
+    const vx = c.p.x - o.x, vy = c.p.y - o.y, vz = c.p.z - o.z, t = vx * d.x + vy * d.y + vz * d.z;
+    if (t < t0 - 1 || t > end + 1) continue;
+    const r = c.e === 'boss' ? 3 : c.e.sigil ? 1.2 : (c.e.T.rad || 0.6) + 0.5;
+    const off = Math.hypot(vx - d.x * t, vy - d.y * t, vz - d.z * t);
+    if (off < r + t * 0.035 && (!foe || t < foe.t)) foe = { c, t };
+  }
+  if (foe) return { p: foe.c.p.clone(), foe: foe.c.e };
+  return { p: o.clone().addScaledVector(d, end), foe: null, ground: hit || wf < 1 };
+}
+
 /* ---------------- getting hurt ---------------- */
 function hurtPlayer(dmg, from, kb = 7, opts = {}) {
   if (P.dead || G.mode !== 'play') return false;
@@ -2560,7 +2594,15 @@ function throwSprengju() {
   const core = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 6), toon(0xff8a2a, { emissive: 0xff6a10, emissiveIntensity: 0.8 })); core.rotation.x = Math.PI / 2; g.add(core);
   g.add(glowSprite(0xffa040, 1.6, 0.8));
   g.position.set(P.pos.x + f.x, P.pos.y + 1.6, P.pos.z + f.z); scene.add(g);
-  sprengjuShots.push({ g, vel: V3(f.x * 24, 4, f.z * 24), life: 3, wob: Math.random() * 6 });
+  // lobbed to land on the X (or the foe you're locked on to); at the sky, the old long throw
+  const A = lockPoint() || (() => { const a = lookAim(40); return a.foe || a.ground ? a.p : null; })();
+  let vel = V3(f.x * 24, 4, f.z * 24);
+  if (A) {
+    const dx = A.x - g.position.x, dz = A.z - g.position.z, h = Math.hypot(dx, dz);
+    if (h > 1) { const T = h / 24; vel = V3(dx / h * 24, clamp((A.y - g.position.y + 3 * T * T) / T, -6, 18), dz / h * 24); }   // falls 6·T²/2 on the way
+  }
+  P.yaw = Math.atan2(vel.x, vel.z);
+  sprengjuShots.push({ g, vel, life: 3, wob: Math.random() * 6 });
   sfx.jump();
 }
 function burstSprengju(p) {
@@ -3086,27 +3128,28 @@ function useSlot(code) {
 const bolts = [];
 function fireStone() {
   if (!canAct()) return false;
-  let dir = camForward();
-  const lp = lockPoint();
-  const tgt = lp ? lp : (() => { const b = bestTarget(30, 0.8); return b ? V3(b.p.x, b.p.y + (b.e === 'boss' ? 0 : 1), b.p.z) : null; })();
+  const dir = camForward();
+  const tgt = lockPoint() || lookAim().p;   // locked on: the foe; otherwise wherever the X is
   const from = V3(P.pos.x + dir.x * 0.6, P.pos.y + 1.4, P.pos.z + dir.z * 0.6);
-  const vel = tgt ? tgt.clone().sub(from).normalize().multiplyScalar(34) : V3(dir.x * 34, 1.2, dir.z * 34);
+  const vel = tgt.clone().sub(from).normalize().multiplyScalar(34);
   P.yaw = Math.atan2(vel.x, vel.z);
   const g = new THREE.Group();
   g.add(new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 0), toon(0xffd060, { emissive: 0xff7a20, emissiveIntensity: 1 })));
   g.add(glowSprite(0xff8a2a, 1.8, 0.9)); g.position.copy(from); scene.add(g);
-  bolts.push({ g, vel, life: 1.1 });
+  bolts.push({ g, vel, life: 2 });
   sfx.flare();
 }
 function updateBolts(dt) {
   for (let i = bolts.length - 1; i >= 0; i--) {
     const b = bolts[i]; b.life -= dt;
+    const prev = b.g.position.clone();
     b.g.position.addScaledVector(b.vel, dt);
     const p = b.g.position;
     particles.emit(p.x, p.y, p.z, { vx: 0, vy: 0.4, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.45, life: 0.35, drag: 1 });
     let hit = b.life <= 0 || p.y <= world.col.ground(p.x, p.z, p.y + 0.5) + 0.05;
+    if (!hit) { const f = world.col.ray(prev, p); if (f < 1) { p.lerpVectors(prev, p, f); hit = true; } }   // it stops at walls
     for (const e of enemies.list) {
-      if (hit || e.dead || e.pos.distanceTo(p) > e.T.rad + 1.1) continue;
+      if (hit || e.dead || Math.hypot(e.pos.x - p.x, e.pos.y + 0.8 - p.y, e.pos.z - p.z) > e.T.rad + 1) continue;
       enemies.damage(e, 22 * (young() ? 1 : axeMul()), P.pos, 4, { stun: 0.4, burn: true }); hit = true;
     }
     if (!hit && boss && !boss.dead && boss.pos && boss.pos.distanceTo(p) < 3) { damageBoss(30); hit = true; }
@@ -4077,6 +4120,8 @@ function updateHUD() {
   const ls = lp && toScreen(lp);
   if (ls) { lk.style.display = 'block'; lk.style.left = ls[0] + 'px'; lk.style.top = ls[1] + 'px'; } else lk.style.display = 'none';
   $('crosshair').classList.toggle('lock', !!G.lock);
+  // the X warms when there's a foe under it — that's where the fire-stone will go
+  if (!(G.t < G.aimT)) { G.aimT = G.t + 0.06; $('crosshair').classList.toggle('foe', !G.lock && G.mode === 'play' && !!lookAim(45).foe); }
   // the big bar: a boss, or a Sru Vorn on the hunt
   if (!boss) {
     const mb = enemies.list.find(e => e.T.miniboss && !e.dead && e.state !== 'idle' && e.state !== 'return');
