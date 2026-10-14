@@ -278,7 +278,6 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
   function token(g, x, y, z, c, s = 1, upright = false, ry = 0) {
     cyl(g, x, y, z, 0.16 * s, 0.16 * s, 0.05 * s, '#4a3a5a', false, 14, upright ? { rx: Math.PI / 2, ry, outline: false } : { outline: false });
     cyl(g, x + (upright ? Math.sin(ry) * 0.03 * s : 0), y + (upright ? 0 : 0.03 * s), z + (upright ? Math.cos(ry) * 0.03 * s : 0), 0.11 * s, 0.11 * s, 0.02 * s, c, false, 14, upright ? { rx: Math.PI / 2, ry, outline: false } : { outline: false });
-    BT.glow.add(OCTA, x + (upright ? Math.sin(ry) * 0.05 * s : 0), y + (upright ? 0 : 0.05 * s), z + (upright ? Math.cos(ry) * 0.05 * s : 0), 0, 0, 0, 0.035 * s, 0.035 * s, 0.035 * s, c);
   }
   // a glass case on legs: wood frame, a pane of glass (its own see-through mesh), what's inside is up to you
   const glassMat = new THREE.MeshToonMaterial({ color: 0xdff4ff, transparent: true, opacity: 0.22, depthWrite: false });
@@ -499,7 +498,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
 
       /* ---- the token room: cases of tokens, the house's long collection, one great token under its own light ---- */
       rug(g, 0, -9, 4, 16, 0x3a2a4a);
-      const TOK = ['#e85a3a', '#5ad0ff', '#8affb0', '#b48aff', '#f2d24a', '#ff8ac8', '#7a9aff', '#3ae8c8', '#ffb060', '#c8ff6a'];
+      const TOK = ['#7a5a8a'];   // all of a piece: stygian-set wood, no rainbow
       // wall cabinets of little tokens, row on row, each on its pin
       for (const s of [-1, 1]) for (let k = 0; k < 4; k++) {
         const z = -16.5 + k * 4.3, x = s * 9.55;

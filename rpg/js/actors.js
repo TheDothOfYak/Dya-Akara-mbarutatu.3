@@ -484,7 +484,7 @@ export function buildEikar(o = {}) {
   const synth = { kind: 1, p: 0 };
   const defKind = kind === 'spear' || kind === 'none' || kind === 'flask' ? 4 : kind === 'axe' ? 3 : 1;
   const s = W.s;                 // weapon-hand side (-1 right, +1 left)
-  let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0;
+  let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0;
   bio.glow(0);
 
   const A = {
@@ -562,6 +562,7 @@ export function buildEikar(o = {}) {
         }
       }
       if (glide > 0.01) { sT.set(-s * 0.17, 0.86, 0.06); fT.lerp(sT, glide); }
+      if (st.ride && !sw && !st.drink) { sT.set(-s * 0.12, -0.02, 0.3); fT.lerp(sT, 0.85); fD.set(0, 0.4, 1); fB.set(s, 0, 0); }
       if (air && !gliding && !sw) { fT.x += -s * 0.08; fT.y += 0.12; }
 
       // ---- torso, head, legs ----
@@ -575,6 +576,21 @@ export function buildEikar(o = {}) {
       hat.rotation.z = Math.sin(t * 1.7) * 0.02;
       strideLegs(legs, phase, moving ? k : 0, air, dt, sw && !moving ? b : 0);
       if (glide > 0.5) { legs[0].thigh.rotation.x = 0.25; legs[1].thigh.rotation.x = 0.4; legs[0].knee.rotation.x = 0.5; legs[1].knee.rotation.x = 0.7; }
+      // astride a mount: hips in the saddle, thighs forward and apart round its back, shins down its flanks;
+      // a little lean into the going, and the body gives with each stride instead of riding it stiff
+      rideK = lerp(rideK, st.ride ? 1 : 0, 1 - Math.exp(-12 * dt));
+      if (rideK > 0.01) {
+        const rs = st.rideSpeed || 0, gait = st.rideBob || 0;
+        legs.forEach(L => {
+          const side = Math.sign(L.thigh.position.x) || 1;
+          L.thigh.rotation.x = lerp(L.thigh.rotation.x, -1.3, rideK); L.knee.rotation.x = lerp(L.knee.rotation.x, 1.35, rideK);
+          L.thigh.rotation.z = side * 0.42 * rideK; L.ankle.rotation.x = lerp(L.ankle.rotation.x, -0.15, rideK);
+        });
+        body.position.y = lerp(body.position.y, HIP - gait * 0.05, rideK);
+        torso.rotation.x = lerp(torso.rotation.x, 0.1 + Math.min(rs / 20, 1) * 0.28 + gait * 0.06, rideK);
+        torso.rotation.z = lerp(torso.rotation.z, st.rideRoll || 0, rideK);
+        head.rotation.x = lerp(head.rotation.x, -torso.rotation.x * 0.6, rideK);
+      } else legs.forEach(L => { L.thigh.rotation.z = 0; });
 
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
