@@ -110,7 +110,7 @@ $('game').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.fog = REGION === 'leotik' ? new THREE.Fog(0x4a5a58, 70, 650) : REGION === 'xilia' ? new THREE.Fog(0xf6c89a, 160, 1200) : REGION === 'property' ? new THREE.Fog(0xc8dcf0, 520, 4600) : new THREE.Fog(0xf2b88e, 140, 1100);
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 12000);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.4, 12000);   // near 0.4, not 0.1: four times the depth precision, so far hills and roofs stop flickering through each other
 /* is this point inside the land or anything solid? (the films' cameras keep out of walls with it) */
 function camBlocked(x, y, z) {
   if (!interiors.inside && y < world.heightAt(x, z) + 0.25) return true;
@@ -129,7 +129,7 @@ const sun = new THREE.DirectionalLight(REGION === 'leotik' ? 0xc8d8c0 : 0xffd4a0
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 55, bottom: -55, near: 1, far: 260 });
-sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04;
+sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.06;
 scene.add(sun, sun.target);
 const rim = new THREE.DirectionalLight(0x9ab8ff, 0.55); rim.position.set(60, 40, -80); scene.add(rim);
 const hemiBase = hemi.intensity;
@@ -476,6 +476,13 @@ const wilds = createWilds({
   kuniNest: n => kuniNest(n),
 });
 
+const _sx = V3(), _sy = V3(), _sp = V3();
+function snapShadow(p) {
+  const texel = (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x;
+  _sx.set(0, 1, 0).cross(SUN_DIR).normalize(); _sy.copy(SUN_DIR).cross(_sx).normalize();
+  const a = Math.round(p.dot(_sx) / texel) * texel, b = Math.round(p.dot(_sy) / texel) * texel, c = p.dot(SUN_DIR);
+  return _sp.copy(_sx).multiplyScalar(a).addScaledVector(_sy, b).addScaledVector(SUN_DIR, c);
+}
 /* the great ones seen only from far off: the Aerolhorn in the sky, the Nekh'Vorran in the land, the Vyrenalur in the far forest */
 const ambient = createAmbient({
   scene, world, region: REGION, particles, sfx,
@@ -2734,7 +2741,7 @@ let aimT = 0, aimAt = null;
 function updateVineAim(dt) {
   if (!P.riding || G.mode !== 'play' || P.vine) { aimMark.visible = false; aimAt = null; return; }
   if ((aimT -= dt) <= 0) { aimT = 0.08; aimAt = swingAnchor(); }
-  aimMark.visible = !!aimAt;
+  aimMark.visible = false;   // (no marker: the vine just goes where you aim)
   if (aimAt) { aimMark.position.copy(aimAt); aimMark.children[0].lookAt(camera.position); const s = 0.8 + 0.2 * Math.sin(G.t * 6); aimMark.scale.setScalar(s * Math.max(1, camera.position.distanceTo(aimAt) / 18)); }
 }
 function vineGrab() {
@@ -4186,9 +4193,14 @@ function frame() {
   if ((G.hudT = (G.hudT || 0) - dt) <= 0) { G.hudT = 1; const qh = $('q-head'); if (qh && qh.dataset.base) qh.textContent = qh.dataset.base + ' · ' + dn.label(); }
   ship.update(tt, dt, particles);
   particles.update(frozen && G.mode !== 'title' ? 0 : dt);
-  const focus = G.mode === 'title' ? V3(0, 0, 0) : P.pos;
+  // the sun's shadow box follows you, snapped to its own texel grid so shadow edges don't crawl and shimmer as you move;
+  // and indoors there is no sun at all (it used to throw the yard's shadows across the rooms)
+  const focus = G.mode === 'title' ? V3(0, 0, 0) : snapShadow(P.pos);
   sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sun.target.position.copy(focus);
+  const indoors = !!interiors.inside;
+  if (sun.castShadow === indoors) sun.castShadow = !indoors && OPT.shadows;
+  if (indoors) sun.intensity *= 0.15;
   composer.render();
 }
 
@@ -4967,5 +4979,5 @@ window.__torcain = {
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
-  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, aimInfo: () => aimAt ? `${aimAt.kind} d=${Math.hypot(aimAt.x - P.pos.x, aimAt.z - P.pos.z).toFixed(1)} up=${(aimAt.y - P.pos.y).toFixed(1)} at ${aimAt.x.toFixed(0)},${aimAt.z.toFixed(0)}` : "none", startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
+  get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, enterRoom, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, aimInfo: () => aimAt ? `${aimAt.kind} d=${Math.hypot(aimAt.x - P.pos.x, aimAt.z - P.pos.z).toFixed(1)} up=${(aimAt.y - P.pos.y).toFixed(1)} at ${aimAt.x.toFixed(0)},${aimAt.z.toFixed(0)}` : "none", startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };
