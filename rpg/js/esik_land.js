@@ -509,7 +509,7 @@ function buildPunkKind(cfg, opts) {
   const P0 = new THREE.Vector3(), P1 = new THREE.Vector3(), P2 = new THREE.Vector3(), P3 = new THREE.Vector3();
   const tmp = new THREE.Vector3(), down = new THREE.Vector3(0, -1, 0);
   let ph = Math.random() * TAU, walkW = 0, t0 = Math.random() * 10;
-  let lastGrab = null;
+  const lastGrab = [];
   const Rf = R * cfg.footR, kneeH = cfg.kneeH;
   const stride0 = R * cfg.stride;
 
@@ -528,18 +528,19 @@ function buildPunkKind(cfg, opts) {
     const s = 1 + (wind * (1 - atk)) * 0.06;
     body.scale.set(s, 1 / s, s);
     body.updateMatrix();
-    // a leg-vine reaching out to grab something (st.grab = { p: point in root space, k: 0..1 how far it has shot out })
-    // — the leg on the side nearest the target is the one that goes; the rest tuck up while she's off the ground
-    const grab = st.grab, air = clamp(st.air || 0, 0, 1);
-    let gv = null;
-    if (grab) {
-      let bd = -9; tmp.set(grab.p.x, 0, grab.p.z).normalize();
-      for (const v of vines) if (!v.arm) { const d = v.radial.dot(tmp) - (v === lastGrab ? -0.25 : 0); if (d > bd) { bd = d; gv = v; } }
-      lastGrab = gv;
-    }
+    // leg-vines reaching out to grab something (st.grabs: up to two, one a side, each { p: point in root space, k: 0..1
+    // how far it has shot out }; st.grab for just one) — the leg nearest each target goes; the rest tuck up while she's off the ground
+    const grabs = st.grabs || (st.grab ? [st.grab] : []), air = clamp(st.air || 0, 0, 1);
+    const held = new Map();
+    grabs.forEach((g, i) => {
+      let bd = -9, gv = null; tmp.set(g.p.x, 0, g.p.z).normalize();
+      for (const v of vines) if (!v.arm && !held.has(v)) { const d = v.radial.dot(tmp) + (v === lastGrab[i] ? 0.25 : 0); if (d > bd) { bd = d; gv = v; } }
+      if (gv) { held.set(gv, g); lastGrab[i] = gv; }
+    });
     for (const v of vines) {
       P0.copy(v.attach).applyMatrix4(body.matrix);
-      if (v === gv) {
+      const grab = held.get(v);
+      if (grab) {
         const k = clamp(grab.k, 0, 1), e = 1 - Math.pow(1 - k, 3);
         tmp.subVectors(grab.p, P0); const L = tmp.length() || 1;
         P3.copy(P0).addScaledVector(tmp, e);

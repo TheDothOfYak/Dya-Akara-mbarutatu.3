@@ -16,14 +16,42 @@ export function latchPoint(world, from, dir, o = {}) {
   const range = o.range ?? 36, near = o.near ?? 4, minUp = o.minUp ?? 3, cone = o.cone ?? 0.3, far = o.far ?? 0.5;
   const ideal = 8 + far * 20;          // the reach it likes best
   let best = null, bs = -1e9;
-  const consider = (x, y, z, kind, bonus = 0) => {
+  eachCandidate(world, from, dir, range, o.terrain !== false, (x, y, z, kind, bonus) => {
     const dx = x - from.x, dz = z - from.z, d = Math.hypot(dx, dz);
     if (d < near || d > range) return;
     const up = y - from.y; if (up < minUp) return;
     const dot = (dx * dir.x + dz * dir.z) / d; if (dot < cone) return;
     const sc = dot * 3 - Math.abs(d - ideal) / 14 + Math.min(up, 22) / 16 * (0.5 + far) + bonus;
     if (sc > bs) { bs = sc; best = { x, y, z, kind }; }
-  };
+  });
+  return best ? Object.assign(new THREE.Vector3(best.x, best.y, best.z), { kind: best.kind }) : null;
+}
+
+/* the same, but steered by the look-ray through the X (eye: where the ray starts, look: its unit direction):
+   whatever sits closest to the X wins, and side ('L' or 'R') leans the pick a little that way, so the
+   left vine takes the tree left of the X and the right vine the one to its right */
+export function latchAlongRay(world, from, eye, look, side, o = {}) {
+  const range = o.range ?? 38, near = o.near ?? 3, minUp = o.minUp ?? 1.5, cone = o.cone ?? 0.86;
+  const hl = Math.hypot(look.x, look.z) || 1, dir = { x: look.x / hl, z: look.z / hl };
+  const rx = -dir.z, rz = dir.x, sgn = side === 'L' ? -1 : side === 'R' ? 1 : 0;
+  let best = null, bs = -1e9;
+  eachCandidate(world, from, dir, range, true, (x, y, z, kind, bonus) => {
+    const dx = x - from.x, dz = z - from.z, d = Math.hypot(dx, dz);
+    if (d < near || d > range) return;
+    const up = y - from.y; if (up < minUp) return;
+    const ex = x - eye.x, ey = y - eye.y, ez = z - eye.z, el = Math.hypot(ex, ey, ez) || 1;
+    const dot = (ex * look.x + ey * look.y + ez * look.z) / el; if (dot < cone) return;
+    const lat = (dx * rx + dz * rz) / d;                                 // -1 left of you … +1 right
+    const sc = dot * 12 + sgn * clampN(lat, -0.6, 0.6) * 1.2 - Math.abs(d - 16) / 40 + Math.min(up, 20) / 40 + bonus * 0.5;
+    if (sc > bs) { bs = sc; best = { x, y, z, kind }; }
+  });
+  return best ? Object.assign(new THREE.Vector3(best.x, best.y, best.z), { kind: best.kind }) : null;
+}
+const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* every point a vine could hold within range: under tree crowns, the top edges of solid boxes,
+   and (with terrain) the land rising ahead along dir */
+function eachCandidate(world, from, dir, range, terrain, consider) {
   // trees: just under the crown
   for (const t of world.trees || []) {
     if (Math.abs(t.x - from.x) > range || Math.abs(t.z - from.z) > range) continue;
@@ -38,11 +66,11 @@ export function latchPoint(world, from, dir, o = {}) {
       const lx = dx * c.c - dz * c.s, lz = dx * c.s + dz * c.c;          // into the box's own frame
       const cx = Math.max(-c.hw, Math.min(c.hw, lx)) * 0.9, cz = Math.max(-c.hd, Math.min(c.hd, lz)) * 0.9;
       const wx = c.x + cx * c.c + cz * c.s, wz = c.z - cx * c.s + cz * c.c; // back out to the world
-      consider(wx, c.top, wz, 'solid');
+      consider(wx, c.top, wz, 'solid', 0);
     }
   }
   // the land itself: a hillside or a cliff rising ahead
-  if (o.terrain !== false && world.heightAt) {
+  if (terrain && world.heightAt) {
     for (const a of [-0.45, -0.2, 0, 0.2, 0.45]) {
       const ca = Math.cos(a), sa = Math.sin(a), ax = dir.x * ca - dir.z * sa, az = dir.x * sa + dir.z * ca;
       for (let d = 10; d <= range; d += 4) {
@@ -52,7 +80,6 @@ export function latchPoint(world, from, dir, o = {}) {
       }
     }
   }
-  return best ? Object.assign(new THREE.Vector3(best.x, best.y, best.z), { kind: best.kind }) : null;
 }
 
 /* a pivot right beside a running creature, to whip round (trees, posts, corners of walls, boulders) */
