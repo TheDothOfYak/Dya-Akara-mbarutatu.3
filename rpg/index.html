@@ -62,7 +62,15 @@
   #crosshair::before,#crosshair::after{content:'';position:absolute;background:var(--brass2);box-shadow:0 0 4px #000}
   #crosshair::before{left:10px;top:3px;width:2px;height:16px;transform:rotate(45deg)}
   #crosshair::after{left:10px;top:3px;width:2px;height:16px;transform:rotate(-45deg)}
+  #crosshair.foe::before,#crosshair.foe::after{background:#ff8a3a;box-shadow:0 0 6px #ff6a10}
   #crosshair.lock::before,#crosshair.lock::after{background:var(--violet)}
+  #crosshair.vine::before,#crosshair.vine::after{background:#b8ff7a;box-shadow:0 0 6px #6aa040}
+  #vinepips{position:absolute;left:50%;top:calc(50% + 20px);transform:translateX(-50%);display:flex;gap:4px;pointer-events:none}
+  #vinepips i{width:6px;height:6px;border-radius:50%;background:#9ad86a;box-shadow:0 0 4px #000}
+  #vinepips i.spent{opacity:.2}
+  #vinepips i.last{background:#d8ff9a;box-shadow:0 0 8px #b8ff7a;animation:vlast .6s ease-in-out infinite alternate}
+  #vinepips.held i{outline:1px solid var(--brass2);outline-offset:1px}
+  @keyframes vlast{to{transform:scale(1.5)}}
 
   #compass{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:min(560px,70vw);height:34px;overflow:hidden;
     border-radius:999px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);
@@ -147,7 +155,7 @@
 
   /* ---------------- overlays ---------------- */
   /* the beginning: on Velki only the story shows; on Xikia Tanoc is a boy with a hatchet */
-  #hud.velki #compass,#hud.velki #vitals,#hud.velki #abilities,#hud.velki #spells,#hud.velki #crosshair,#hud.velki #qtrack,#hud.velki #levelup,#hud.velki #ehp,#hud.velki #lock,#hud.velki #boss{display:none}
+  #hud.velki #compass,#hud.velki #vitals,#hud.velki #abilities,#hud.velki #spells,#hud.velki #crosshair,#hud.velki #vinepips,#hud.velki #qtrack,#hud.velki #levelup,#hud.velki #ehp,#hud.velki #lock,#hud.velki #boss{display:none}
   #hud.velki.roadhp #vitals{display:flex}
   #hud.velki.roadhp #xpline,#hud.velki.roadhp #stam,#hud.velki.roadhp #heat,#hud.velki.roadhp #belt{display:none}
   #hud.young #abilities,#hud.young #heat,#hud.young #qtrack{display:none}
@@ -379,6 +387,7 @@
     <div class="bar"><div class="lag" id="boss-lag"></div><div class="fill" id="boss-fill"></div></div>
   </div>
   <div id="crosshair"></div>
+  <div id="vinepips" class="hidden"></div>
   <div id="ehp"></div>
   <div id="lock"></div>
   <div id="location"><div class="l1" id="loc1"></div><div class="rule"></div><div class="l2" id="loc2"></div></div>
@@ -438,6 +447,7 @@
       <b>R</b><span>Drink Albali film (heal) · <b>T</b> / middle-click lock on</span>
       <b>I · K · J · M</b><span>Gear &amp; pack · skills · quests · map (fast travel)</span>
       <b>1–4</b><span>Spells, once learned · <b>H</b> whistle for your Punk · hold <b>SPACE</b> in the air to glide</span>
+      <b>ON A PUNK</b><span><b>LMB</b> / <b>RMB</b> throw a vine at the X, hold to swing · <b>SPACE</b> pump · <b>SHIFT</b> / <b>C</b> reel in / let out · <b>X</b> hold the length · <b>CAPS</b> shove</span>
       <b>TAB</b><span>Rokarvac (journal) · <b>ESC</b> pause</span>
     </div>
     <div class="t-note" id="t-note">Best with a keyboard and mouse. Click the world to take the mouse; Esc gives it back.</div>
