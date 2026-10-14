@@ -16,6 +16,7 @@ import { clamp, damp, dampAngle, smooth, mulberry32 } from './util.js';
 import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
+import { buildHomeTree, buildForest } from './hometree.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -73,10 +74,52 @@ export function createVelki(ctx) {
 
   /* ---------------- ground ---------------- */
   const WALL_R = 62, GATE_A = -Math.PI / 2, GATE_W = 0.07;
-  function heightAt(x, z) {
+  /* the land round the city: the sea to the west where the sun goes down, the forest east and south,
+     the open plain north where the battle is — and the home trees. The city's own stands in the
+     north-east of the wall, half in and half out: the city was built round it, and it is the city's castle. */
+  const SEA_Y = -0.8, seaBits = {};
+  const SHORE = z => -140 + 18 * Math.sin(z * 0.011) + 10 * Math.sin(z * 0.031 + 1);
+  const HOME = { x: 66, z: -40, R: 24, H: 300 };
+  const HOMES_OUT = [{ x: 250, z: -30, R: 19, H: 260, seed: 3 }, { x: 205, z: 205, R: 20, H: 280, seed: 5 }, { x: 0, z: 285, R: 18, H: 245, seed: 9 }, { x: 400, z: 340, R: 19, H: 265, seed: 11 }];
+  function rawHeight(x, z) {
     const r = Math.hypot(x, z);
-    return smooth(WALL_R + 6, 130, r) * (2.2 * Math.sin(x * 0.021) + 1.8 * Math.cos(z * 0.017 + 1) + 1.2 * Math.sin((x + z) * 0.033) + 1.5);
+    let h = smooth(WALL_R + 6, 130, r) * (2.2 * Math.sin(x * 0.021) + 1.8 * Math.cos(z * 0.017 + 1) + 1.2 * Math.sin((x + z) * 0.033) + 1.5);
+    h = Math.max(h, -0.3);
+    const sd = x - SHORE(z);                          // the beach, then down under the sea
+    if (sd < 40) { const b = smooth(40, 6, sd); h = h * (1 - b) + 0.35 * b; }
+    if (sd < 8) h = 0.35 + (-7 - 0.35) * smooth(8, -45, sd);
+    return h;
   }
+  for (const T of HOMES_OUT) T.g = rawHeight(T.x, T.z);
+  function heightAt(x, z) {
+    let h = rawHeight(x, z);
+    for (const T of HOMES_OUT) { const d = Math.hypot(x - T.x, z - T.z), RB = T.R * 1.75; if (d < RB * 3) h += (T.g - h) * (1 - smooth(RB * 1.4, RB * 3, d)); }
+    return h;
+  }
+  function forestAt(x, z) {
+    const r = Math.hypot(x, z);
+    if (r < 92 || x - SHORE(z) < 75 || fieldAt(x, z)) return 0;
+    if (z < -55 && x < 150) return 0;                                  // the open plain north, where the battle is
+    const k = Math.max(smooth(80, 135, x), smooth(90, 145, z));
+    return k * (0.75 + 0.35 * Math.sin(x * 0.019 + 1) * Math.cos(z * 0.023));
+  }
+  const FIELDS = [];
+  {
+    const frng = mulberry32(41), C = [0xc8a84a, 0x8aa040, 0xb89a5a, 0x9a8ab8, 0x7a9a3a, 0xd8b860];
+    for (let i = 0; FIELDS.length < 16 && i < 400; i++) {
+      const a = frng() * TAU, r = 80 + frng() * 120, x = Math.cos(a) * r, z = Math.sin(a) * r, w = 14 + frng() * 16, d = 10 + frng() * 14, ry = frng() * Math.PI;
+      if (z < -50 && Math.abs(x) < 170) continue;                                       // not on the battle plain
+      if (x - SHORE(z) < 45 || Math.abs(z - 8) < 8 && x < 0) continue;                  // not on the beach or the harbour road
+      if (Math.hypot(x - HOME.x, z - HOME.z) < 70) continue;
+      if (FIELDS.some(f => Math.hypot(f.x - x, f.z - z) < (f.w + w) * 0.7)) continue;
+      FIELDS.push({ x, z, w, d, ry, c: C[i % C.length] });
+    }
+  }
+  function fieldAt(x, z) {
+    for (const f of FIELDS) { const dx = x - f.x, dz = z - f.z, c = Math.cos(f.ry), s2 = Math.sin(f.ry), lx = dx * c - dz * s2, lz = dx * s2 + dz * c; if (Math.abs(lx) < f.w && Math.abs(lz) < f.d) return f; }
+    return null;
+  }
+  const inHomeZone = (x, z, pad = 0) => Math.hypot(x - HOME.x, z - HOME.z) < HOME.R * 1.75 + 8 + pad;
   {
     const geo = new THREE.PlaneGeometry(1400, 1400, 180, 180); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3), c = new THREE.Color();
@@ -85,6 +128,12 @@ export function createVelki(ctx) {
       const x = pos.getX(i), z = pos.getZ(i), r = Math.hypot(x, z);
       pos.setY(i, heightAt(x, z));
       c.copy(grass).lerp(dry, (Math.sin(x * 0.05) * Math.cos(z * 0.04) + 1) * 0.3);
+      const sd = x - SHORE(z);
+      if (sd < 34) c.lerp(new THREE.Color(0xd8c09a), smooth(34, 12, sd));
+      if (x < -WALL_R && x > SHORE(z) && Math.abs(z - 8) < 3.6) c.lerp(road, 0.85);          // the road down to the harbour
+      if (fieldAt(x, z)) c.lerp(new THREE.Color(fieldAt(x, z).c), 0.75);
+      if (sd < 4) c.lerp(new THREE.Color(0x8a7a62), smooth(4, -20, sd));
+      if (forestAt(x, z) > 0.2) c.lerp(new THREE.Color(0x4a5a30), Math.min(1, forestAt(x, z)) * 0.7);
       if (r < WALL_R + 2) c.copy(pave);
       if (Math.abs(x) < 4.5 && z < 0 && z > -260) c.lerp(road, 0.8);
       cols.set([c.r, c.g, c.b], i * 3);
@@ -101,6 +150,7 @@ export function createVelki(ctx) {
   function groundAt(x, z, y) {
     let g = heightAt(x, z);
     for (const s of solids) {
+      if (Math.abs(x - s.x) > 30 || Math.abs(z - s.z) > 30) continue;
       if (!s.on || s.y1 > y + STEP || s.y1 <= g) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) g = s.y1;
     }
@@ -108,6 +158,7 @@ export function createVelki(ctx) {
   }
   function resolve(p) {
     for (const s of solids) {
+      if (Math.abs(p.x - s.x) > 30 || Math.abs(p.z - s.z) > 30) continue;
       if (!s.on || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (s.kind === 'box') {
         const dx = p.x - s.x, dz = p.z - s.z, ox = s.hw + PR - Math.abs(dx), oz = s.hd + PR - Math.abs(dz);
@@ -124,16 +175,105 @@ export function createVelki(ctx) {
       const to = r < WALL_R ? WALL_R - 1.5 - PR : WALL_R + 1.5 + PR;
       p.x *= to / r; p.z *= to / r;
     }
-    // the edge of the world we built
+    // the edge of the world we built, and the sea's
     if (r > 320) { p.x *= 320 / r; p.z *= 320 / r; }
+    if (p.x < SHORE(p.z) + 1) p.x = SHORE(p.z) + 1;
   }
   function solidAt(x, y, z) {
     for (const s of solids) {
+      if (Math.abs(x - s.x) > 30 || Math.abs(z - s.z) > 30) continue;
       if (!s.on || y < s.y0 || y > s.y1) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) return true;
     }
     return y < heightAt(x, z) + 0.2;
   }
+
+  /* ---------------- the sea, the far country, the forest, and the home trees ---------------- */
+  {
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(4200, 6400), new THREE.MeshToonMaterial({ color: 0x3a5a86, gradientMap: ramp() }));
+    sea.rotation.x = -Math.PI / 2; sea.position.set(-2190, SEA_Y, 0); sea.receiveShadow = true; scene.add(sea);
+    // the sun's road across the water, and a lip of surf along the beach
+    const glint = new THREE.Mesh(new THREE.PlaneGeometry(2600, 70), new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: 0.32, depthWrite: false }));
+    glint.rotation.x = -Math.PI / 2; glint.rotation.z = Math.atan2(SUN.z, SUN.x); glint.position.set(-1450, SEA_Y + 0.05, -650); scene.add(glint);
+    const surfPts = []; for (let z = -700; z <= 700; z += 10) surfPts.push(new THREE.Vector3(SHORE(z) + 2, SEA_Y + 0.08, z));
+    const surf = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(surfPts), 160, 0.6, 4), new THREE.MeshBasicMaterial({ color: 0xf4e8d8, transparent: true, opacity: 0.7 }));
+    surf.scale.y = 0.2; surf.position.y = SEA_Y * 0.8; scene.add(surf); seaBits.surf = surf;
+    const far = new THREE.Mesh(new THREE.PlaneGeometry(4100, 6400), toon(0x3e5a32)); far.rotation.x = -Math.PI / 2; far.position.set(1950, -1.6, 0); scene.add(far);
+  }
+  {
+    const frng = mulberry32(911), list = [];
+    for (let gx = -700; gx <= 900; gx += 10) for (let gz = -900; gz <= 900; gz += 10) {
+      const x = gx + (frng() - 0.5) * 9, z = gz + (frng() - 0.5) * 9, d = forestAt(x, z);
+      if (d <= 0 || frng() > d * 0.85) continue;
+      if (Math.hypot(x - HOME.x, z - HOME.z) < HOME.R * 4) continue;
+      if (HOMES_OUT.some(T => Math.hypot(x - T.x, z - T.z) < T.R * 4.2)) continue;
+      const sc = 0.8 + frng() * 0.9, pine = frng() < 0.55;
+      list.push([x, z, sc, pine]);
+      if (Math.hypot(x, z) < 340) cyl(x, z, 0.5 * sc, heightAt(x, z) - 1, heightAt(x, z) + 10 * sc);
+    }
+    buildForest(scene, list, { rng: frng, heightAt });
+  }
+  /* the harbour: two piers, boats at them and out on the water, fishing huts on the sand */
+  {
+    const wood = toon(0x7a5a3a), hullM = toon(0x8a4a2a), sailM = toon(0xf0e4cc, { side: THREE.DoubleSide });
+    for (const [pz, len] of [[-6, 46], [24, 34]]) {
+      const sx = SHORE(pz) + 6, deck = new THREE.Mesh(new THREE.BoxGeometry(len, 0.5, 4), wood); deck.position.set(sx - len / 2, 1.0, pz); deck.castShadow = deck.receiveShadow = true; addOutline(deck, 0.04); scene.add(deck);
+      box(sx - len / 2, pz, len / 2, 2, -3, 1.25);
+      for (let k = 0; k <= len; k += 6) for (const s2 of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 6, 6), wood); p.position.set(sx - k, -1.6, pz + s2 * 2); scene.add(p); }
+    }
+    const boat = (x, z, ry, s2 = 1, sail = false) => {
+      const g = new THREE.Group(); g.position.set(x, SEA_Y + 0.1, z); g.rotation.y = ry; g.scale.setScalar(s2); scene.add(g);
+      const hull = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 6, 0, TAU, Math.PI / 2, Math.PI / 2), hullM); hull.scale.set(1.5, 1.1, 4.2); hull.rotation.x = Math.PI; hull.position.y = 0.6; g.add(hull); addOutline(hull, 0.05);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.08, 4, 16), wood); rim.scale.set(1.5, 4.2, 1); rim.rotation.x = Math.PI / 2; rim.position.y = 0.6; g.add(rim);
+      if (sail) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 7, 5), wood); m.position.y = 4; g.add(m); const sl = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 5), sailM); sl.position.set(0, 4.4, 0.2); sl.rotation.y = Math.PI / 2; g.add(sl); }
+      seaBits.boats = seaBits.boats || []; seaBits.boats.push(g);
+    };
+    boat(SHORE(-10) - 14, -10.5, 0.1, 1, true); boat(SHORE(-2) - 26, -1.5, -0.2); boat(SHORE(28) - 18, 28.5, 0.3, 1, true); boat(SHORE(19) - 10, 19.5, 0);
+    boat(SHORE(-120) - 150, -120, 1.2, 1.4, true); boat(SHORE(90) - 240, 90, -0.8, 1.6, true); boat(SHORE(-260) - 90, -260, 0.4, 1.2, true);
+    const hutM = toon(0xc8a878), roofM = toon(0x5a6a7a);
+    for (const [z, k] of [[-30, 0], [-18, 1], [44, 2], [56, 3], [70, 4]]) {
+      const x = SHORE(z) + 22 + (k % 2) * 5, hb = new THREE.Mesh(new THREE.BoxGeometry(5, 3.4, 4.4), hutM); hb.position.set(x, heightAt(x, z) + 1.7, z); hb.castShadow = true; addOutline(hb, 0.04); scene.add(hb);
+      const rf = new THREE.Mesh(new THREE.ConeGeometry(4.2, 2.4, 4), roofM); rf.rotation.y = Math.PI / 4; rf.position.set(x, heightAt(x, z) + 4.6, z); addOutline(rf, 0.04); scene.add(rf);
+      box(x, z, 2.5, 2.2, heightAt(x, z) - 1, heightAt(x, z) + 3.4);
+      // nets drying on poles
+      const net = new THREE.Mesh(new THREE.PlaneGeometry(4, 2), toon(0x9a8a6a, { side: THREE.DoubleSide, transparent: true, opacity: 0.8 })); net.position.set(x - 5, heightAt(x, z) + 1.4, z + 2); net.rotation.y = 0.4; scene.add(net);
+    }
+  }
+  /* the countryside: crops in rows, hedges and odd trees, rocks, haystacks, a farmstead or two */
+  {
+    const crng = mulberry32(77), rows = [], stacks = [], scatter = [], rocks = [];
+    for (const f of FIELDS) {
+      const c = Math.cos(f.ry), s2 = Math.sin(f.ry);
+      for (let lz = -f.d + 1; lz < f.d; lz += 1.6) { const x = f.x + lz * s2, z = f.z + lz * c; rows.push([x, heightAt(x, z) + 0.35, z, f.w * 2 - 1, f.ry, f.c]); }
+      if (crng() < 0.6) for (let k = 0; k < 3; k++) { const x = f.x + (crng() - 0.5) * f.w, z = f.z + (crng() - 0.5) * f.d; stacks.push([x, heightAt(x, z), z]); }
+    }
+    for (let gx = -400; gx <= 420; gx += 14) for (let gz = -320; gz <= 420; gz += 14) {
+      const x = gx + (crng() - 0.5) * 12, z = gz + (crng() - 0.5) * 12, r = Math.hypot(x, z);
+      if (r < WALL_R + 10 || x - SHORE(z) < 10 || forestAt(x, z) > 0 || fieldAt(x, z) || Math.hypot(x - HOME.x, z - HOME.z) < HOME.R * 3) continue;
+      if (Math.abs(x) < 7 && z < 0) continue;
+      const north = z < -55 && Math.abs(x) < 150;
+      const q = crng();
+      if (!north && q < 0.07) scatter.push([x, z, 0.8 + crng() * 0.8, crng() < 0.3]);
+      else if (q < (north ? 0.05 : 0.1)) rocks.push([x, heightAt(x, z), z, 0.6 + Math.pow(crng(), 2) * 2.4]);
+    }
+    const inst = (geo, mat, arr, put) => { const m = new THREE.InstancedMesh(geo, mat, Math.max(1, arr.length)); m.count = arr.length; const o = new THREE.Object3D(); arr.forEach((v, i) => { put(o, v, m, i); o.updateMatrix(); m.setMatrixAt(i, o.matrix); }); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; };
+    const cc = new THREE.Color();
+    inst(new THREE.BoxGeometry(1, 0.7, 0.8), toon(0xffffff), rows, (o, [x, y, z, w, ry, c], m, i) => { o.position.set(x, y, z); o.rotation.set(0, ry, 0); o.scale.set(w, 1, 1); m.setColorAt(i, cc.set(c)); });
+    inst(new THREE.CylinderGeometry(1.1, 1.4, 1.8, 8), toon(0xd8b860), stacks, (o, [x, y, z]) => { o.position.set(x, y + 0.9, z); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); });
+    inst(new THREE.DodecahedronGeometry(1, 0), toon(0x9a8a7a), rocks, (o, [x, y, z, sc]) => { o.position.set(x, y + sc * 0.25, z); o.rotation.set(crng() * 3, crng() * 3, 0); o.scale.set(sc * 1.3, sc * 0.7, sc); });
+    buildForest(scene, scatter, { rng: crng, heightAt });
+    for (const [x, z, sc] of scatter) if (Math.hypot(x, z) < 330) cyl(x, z, 0.5 * sc, heightAt(x, z) - 1, heightAt(x, z) + 8 * sc);
+    for (const [x, y, z, sc] of rocks) if (sc > 1) cyl(x, z, sc, y - 1, y + sc * 0.6);
+  }
+  const homeTrees = [];
+  for (const T of HOMES_OUT) homeTrees.push(buildHomeTree(scene, T.x, T.z, T.g, { R: T.R, H: T.H, seed: T.seed, town: 0.8, doorAt: Math.atan2(-T.z, -T.x) }));
+  // the city's own: its roots never reach in over the streets, and its door faces the spire
+  const toCity = Math.atan2(-HOME.z, -HOME.x);
+  homeTrees.push(buildHomeTree(scene, HOME.x, HOME.z, 0, {
+    R: HOME.R, H: HOME.H, seed: 307, town: 1, decks: [0.07, 0.15, 0.24, 0.34, 0.45], doorAt: toCity,
+    banners: [0x8a2a3a, 0xd8a040], rootSkip: a => Math.abs(Math.atan2(Math.sin(a - toCity), Math.cos(a - toCity))) < 1.1,
+  }));
+  for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);
 
   /* ---------------- Fyrsti'Vilag ---------------- */
   const rng = mulberry32(307);
@@ -148,13 +288,20 @@ export function createVelki(ctx) {
       if (Math.abs(x) < 8.5 && z < 0) continue;              // the north road to the gate
       if (Math.abs(x) < 6.5 && z > 0) continue;              // and the south lane
       if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 13) continue;
+      if (inHomeZone(x, z, 6)) continue;                     // the home tree's roots
       kit.house(x, z, Math.atan2(-x, -z), ring === 0 && i % 3 === 0 ? 'tall' : null);
     }
   }
+  // farmsteads by the fields
+  for (const f of FIELDS.slice(0, 5)) {
+    const x = f.x + Math.cos(f.ry) * (f.w + 6), z = f.z - Math.sin(f.ry) * (f.w + 6);
+    if (forestAt(x, z) > 0 || x - SHORE(z) < 30) continue;
+    kit.house(x, z, Math.atan2(-x, -z));
+  }
   // street furniture: lamps round the ring streets, bunting across them, paving rings
   const STREETS = [12, 23.2, 33.8, 44.3, 56];
-  for (const r of STREETS.slice(1)) for (let k = 0; k < Math.round(r / 5); k++) { const a = k / Math.round(r / 5) * TAU + 0.2, x = Math.cos(a) * (r + 2.4), z = Math.sin(a) * (r + 2.4); if (Math.abs(x) < 9 && z < 0) continue; if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 7) continue; kit.lampPost(x, z); }
-  for (const r of [23.2, 33.8, 44.3]) for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + 0.5; kit.bunting(V3(Math.cos(a) * (r - 4.5), 6.2, Math.sin(a) * (r - 4.5)), V3(Math.cos(a + 0.12) * (r + 4.5), 6.2, Math.sin(a + 0.12) * (r + 4.5)), 1.2); }
+  for (const r of STREETS.slice(1)) for (let k = 0; k < Math.round(r / 5); k++) { const a = k / Math.round(r / 5) * TAU + 0.2, x = Math.cos(a) * (r + 2.4), z = Math.sin(a) * (r + 2.4); if (Math.abs(x) < 9 && z < 0) continue; if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 7) continue; if (inHomeZone(x, z, 3)) continue; kit.lampPost(x, z); }
+  for (const r of [23.2, 33.8, 44.3]) for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + 0.5; if (inHomeZone(Math.cos(a) * r, Math.sin(a) * r, 8)) continue; kit.bunting(V3(Math.cos(a) * (r - 4.5), 6.2, Math.sin(a) * (r - 4.5)), V3(Math.cos(a + 0.12) * (r + 4.5), 6.2, Math.sin(a + 0.12) * (r + 4.5)), 1.2); }
   for (let k = 0; k < 6; k++) kit.bunting(V3(-7, 7.5, -10 - k * 8), V3(7, 7.5, -14 - k * 8), 1.4);     // across the north road, to the gate
   kit.paving(0, 0, STREETS, 0xb8987a); kit.paving(PLAZA.x, PLAZA.z, [4.6, 8.8, 12.2], 0xa88868);
   // the fountain square: a Stryx mud fountain, three stalls, benches
@@ -198,6 +345,7 @@ export function createVelki(ctx) {
     for (let i = 0; i < N; i++) {
       const a = (i / N) * TAU, da = Math.atan2(Math.sin(a - GATE_A), Math.cos(a - GATE_A));
       if (Math.abs(da) < GATE_W + 0.02) continue;
+      if (Math.hypot(Math.cos(a) * WALL_R - HOME.x, Math.sin(a) * WALL_R - HOME.z) < HOME.R * 1.6) continue;   // the wall runs into the tree and stops
       const seg = new THREE.Mesh(new THREE.BoxGeometry(3, 9, WALL_R * TAU / N + 0.3), wm);
       seg.position.set(Math.cos(a) * WALL_R, 4.5, Math.sin(a) * WALL_R); seg.rotation.y = -a; seg.castShadow = seg.receiveShadow = true; scene.add(seg);
       if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 1.2), wm); cr.position.set(Math.cos(a) * WALL_R, 9.6, Math.sin(a) * WALL_R); cr.rotation.y = -a; scene.add(cr); }
@@ -234,16 +382,16 @@ export function createVelki(ctx) {
   /* the city's own folk, out to watch the sky: they keep to the streets, gather where they can see north, sit on the fountain, mind stalls */
   const BATTLE_LOOK = [0, -160];
   const spots = [];
-  for (const r of [44.3, 56]) for (let k = 0; k < 9; k++) { const a = -Math.PI / 2 + (k / 8 - 0.5) * 1.6; if (Math.abs(Math.cos(a) * r) < 9) continue; spots.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, look: BATTLE_LOOK, kind: 'watch' }); }
+  for (const r of [44.3, 56]) for (let k = 0; k < 9; k++) { const a = -Math.PI / 2 + (k / 8 - 0.5) * 1.6; if (Math.abs(Math.cos(a) * r) < 9 || inHomeZone(Math.cos(a) * r, Math.sin(a) * r, 4)) continue; spots.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, look: BATTLE_LOOK, kind: 'watch' }); }
   for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; spots.push({ x: PLAZA.x + Math.cos(a) * 4.8, z: PLAZA.z + Math.sin(a) * 4.8, look: [PLAZA.x, PLAZA.z], kind: 'sit' }); }
   for (const [x, z] of [[-6, 27], [7, 38], [-4, 44]]) for (let k = 0; k < 3; k++) { const a = k / 3 * TAU; spots.push({ x: x + Math.cos(a) * 0.9, z: z + Math.sin(a) * 0.9, look: [x, z], kind: 'chat' }); }
   const crowd = createCrowd({
     scene, rng, groundAt, C: { x: 0, z: 0 },
     resolve: q => { const y = q.y; q.y = 0.2; resolve(q); q.y = y; },
-    streets: STREETS.slice(1).map(r => ({ r })), roads: [{ a: -Math.PI / 2 }, { a: Math.PI / 2 }], spots,
+    streets: STREETS.slice(1, 3).map(r => ({ r })), roads: [{ a: -Math.PI / 2 }, { a: Math.PI / 2 }], spots,
   });
   for (let i = 0; i < 34; i++) {
-    const r = STREETS[1 + (i % 4)], a = rng() * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const r = STREETS[1 + (i % 2)], a = rng() * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
     const p = crowd.spawn(FOLK_LOOKS[i % FOLK_LOOKS.length], V3(x, 0, z));
     if (i < 12) { const sp = spots[i]; p.pos.set(sp.x, 0, sp.z); p.spot = sp; p.wait = 4 + rng() * 10; p.look = V3(sp.look[0], 0, sp.look[1]); }
   }
@@ -430,6 +578,7 @@ export function createVelki(ctx) {
     fountain.update(dt, t, particles, [P.pos]);
     updateBattle(dt);
     banners.forEach(b => { b.rotation.x = Math.sin(t * 2 + b.userData.ph) * 0.12; });
+    if (seaBits.boats) seaBits.boats.forEach((b, i) => { b.position.y = SEA_Y + 0.1 + Math.sin(t * 1.2 + i * 1.7) * 0.12; b.rotation.z = Math.sin(t * 0.9 + i) * 0.04; });
     lamps.forEach((l, i) => { l.material.opacity = 0.75 + Math.sin(t * 5 + i) * 0.12; });
     beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
     particles.update(dt);
@@ -487,5 +636,5 @@ export function createVelki(ctx) {
     composer.dispose && composer.dispose();
   }
 
-  return { intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught } };
+  return { intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught, cine, solidAt, heightAt } };
 }
