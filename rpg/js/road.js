@@ -470,7 +470,7 @@ export function createRoad(ctx) {
     ctx.bark('buhkon', 'Crates into the back of the cart. Then we’re gone. Quick hands.', 3.5);
   }
   function packObjective() { objective(MK.carrying ? 'Load the crate onto the back of the cart' : 'Help the Carpenter pack: carry his crates to the cart', `Crates loaded: ${MK.loaded}/3`, 3, MK.loaded); }
-  function cartBack() { return V3(CART.pos.x - Math.sin(CART.yaw) * 2.8, groundAt(CART.pos.x, CART.pos.z, 3), CART.pos.z - Math.cos(CART.yaw) * 2.8); }
+  function cartBack() { const x = CART.pos.x - Math.sin(CART.yaw) * 2.8, z = CART.pos.z - Math.cos(CART.yaw) * 2.8; return V3(x, groundAt(x, z, 3, CART.solid), z); }   // (the ground behind it, not the top of the cart's own box)
   function takeCrate(it) {
     if (MK.carrying) return;
     dropItem(it); MK.crates.splice(MK.crates.indexOf(it), 1);
@@ -541,7 +541,8 @@ export function createRoad(ctx) {
     const say = PRO.amuletSay(MK.n); if (say) ctx.bark('tanoc', say, 3);
     if (MK.n === 2 && !MK.punk) {
       const a = Math.atan2(SQUARE.x - P.pos.x, SQUARE.z - P.pos.z);
-      MK.punk = addFoe('wildpunk', P.pos.x + Math.sin(a) * 10, P.pos.z + Math.cos(a) * 10);
+      const sp = freeSpot(P.pos.x + Math.sin(a) * 10, P.pos.z + Math.cos(a) * 10, 2.4);
+      MK.punk = addFoe('wildpunk', sp.x, sp.z);
       ctx.say(PRO.punk, () => { marketObjective(); ctx.hint('Left-click to swing the hatchet.'); });
     }
     marketObjective(); marketCheck();
@@ -893,6 +894,18 @@ export function createRoad(ctx) {
   function d4Objective() { objective(D4.alpha && !D4.alpha.dead ? 'Bring down the pack’s leader' : R.obj.rodak(D4.left), D4.alpha ? 'Q — the fire-stone, if it’s on a quick slot · left-click to swing' : 'Left-click to swing — the Carpenter and your Punk fight beside you'); }
 
   /* ---------------- foes and critters ---------------- */
+  /* the nearest bit of open ground to (x, z): nothing solid within rad, inside the walls if it started there */
+  function freeSpot(x, z, rad) {
+    const inCity = Math.hypot(x - CITY.x, z - CITY.z) < CITY_R;
+    const clear = (qx, qz) => {
+      if (inCity && Math.hypot(qx - CITY.x, qz - CITY.z) > CITY_R - 3 - rad) return false;
+      for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; const ax = qx + Math.cos(a) * rad, az = qz + Math.sin(a) * rad; if (solidAt(ax, heightAt(ax, az) + 0.6, az)) return false; }
+      return !solidAt(qx, heightAt(qx, qz) + 0.6, qz);
+    };
+    if (clear(x, z)) return { x, z };
+    for (let r = 1.5; r < 30; r += 1.5) for (let k = 0; k < 16; k++) { const a = k / 16 * TAU, qx = x + Math.cos(a) * r, qz = z + Math.sin(a) * r; if (clear(qx, qz)) return { x: qx, z: qz }; }
+    return { x, z };
+  }
   function addFoe(kind, x, z) {
     const a = kind === 'kofi' ? buildKofi({ seed: Math.floor(rng() * 999) }) : kind === 'rodak' ? buildRodak({ seed: Math.floor(rng() * 999) }) : buildWildPunk({ seed: Math.floor(rng() * 999) });
     if (kind === 'wildpunk') a.root.scale.multiplyScalar(0.62);
@@ -963,7 +976,7 @@ export function createRoad(ctx) {
       f.yaw = dampAngle(f.yaw, wy, 8, dt);
       f.vel.x = damp(f.vel.x, Math.sin(f.yaw) * want, 8, dt); f.vel.z = damp(f.vel.z, Math.cos(f.yaw) * want, 8, dt);
       f.pos.x += f.vel.x * dt; f.pos.z += f.vel.z * dt;
-      resolve(f.pos, 0.6);
+      resolve(f.pos, f.kind === 'wildpunk' ? 1.3 : 0.6);   // a Punk's legs reach well out from its body: keep all of them out of the walls
       f.pos.y = groundAt(f.pos.x, f.pos.z, f.pos.y + 1);
       f.a.root.position.copy(f.pos); f.a.root.rotation.y = f.yaw;
       f.a.animate(dt, { speed: Math.hypot(f.vel.x, f.vel.z), t, windup: f.windup || 0, attack: f.attackA || 0 });
@@ -1108,10 +1121,11 @@ export function createRoad(ctx) {
     else if (!want) { const back = V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), right = V3(Math.cos(P.yaw), 0, -Math.sin(P.yaw)); want = P.pos.clone().addScaledVector(back, dist).addScaledVector(right, side); }
     const dx = want.x - o.pos.x, dz = want.z - o.pos.z, d = Math.hypot(dx, dz);
     const stop = foe ? 1.8 : 0.8, sp = d > stop ? Math.min(speedCap, d * 2.2) : 0;
-    if (d > 45 && !o.stay) { o.pos.set(want.x, 0, want.z); }
+    const rad = actor === punk ? 1.3 : 0.5;
+    if (d > 45 && !o.stay) { const q = freeSpot(want.x, want.z, rad + 0.6); o.pos.set(q.x, 0, q.z); }
     else if (sp > 0) { o.pos.x += dx / d * sp * dt; o.pos.z += dz / d * sp * dt; o.yaw = dampAngle(o.yaw, Math.atan2(dx, dz), 8, dt); }
     else if (foe || o.stay) o.yaw = dampAngle(o.yaw, foe ? Math.atan2(dx, dz) : Math.atan2(P.pos.x - o.pos.x, P.pos.z - o.pos.z), 4, dt);
-    resolve(o.pos, 0.5);
+    resolve(o.pos, rad);
     o.pos.y = groundAt(o.pos.x, o.pos.z, o.pos.y + 1);
     o.cd -= dt; o.swing = Math.max(0, o.swing - dt);
     if (foe && d < 2.4 && o.cd <= 0) { o.cd = 1.1; o.swing = 0.4; hitFoe(foe, actor === buhkon ? 20 : 12, o.pos); }
