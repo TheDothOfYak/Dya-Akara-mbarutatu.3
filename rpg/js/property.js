@@ -51,9 +51,9 @@ const SHORE_LANE = LANE;
    on the far shore of the lake, one rising out of the north woods. You see them from everywhere. */
 export const COLOSSI = [
   { id: 'elder', name: 'The Elder Tree', x: -1100, z: 120, H: 520, R: 34, seed: 71, mound: 10, lean: 0.6,
-    leaf: ['#2c6234', '#346e3a', '#3e7a3c', '#28562e', '#46823e'], tip: ['#5e9a44', '#6aa64a', '#7ab04e'], glow: ['#3ae8c8', '#5af0ff', '#8affb0', '#9ae0ff'] },
+    leaf: ['#2c6234', '#346e3a', '#3e7a3c', '#28562e', '#46823e'], tip: ['#5e9a44', '#6aa64a', '#7ab04e'], glow: ['#bfeee6'] },
   { id: 'warden', name: 'The North Warden', x: -560, z: -730, H: 452, R: 28, seed: 113, mound: 8, lean: -0.5,
-    leaf: ['#24543a', '#2c6040', '#346a48', '#204a34', '#3a7450'], tip: ['#5a9a6a', '#4e8e62', '#6aa878'], glow: ['#b48aff', '#5af0ff', '#8affd0', '#c8a0ff'] },
+    leaf: ['#24543a', '#2c6040', '#346a48', '#204a34', '#3a7450'], tip: ['#5a9a6a', '#4e8e62', '#6aa878'], glow: ['#bfeee6'] },
 ];
 const colossusNear = (x, z, pad = 0) => COLOSSI.some(C => Math.hypot(x - C.x, z - C.z) < C.R * 4.6 + pad);
 // the hush under their roofs: a little of the deepwood's dimness, out in the open land
@@ -334,7 +334,7 @@ export function buildProperty(scene) {
      specks among the leaves, moss glowing on the stones and toadstools in the litter. */
   const giants = [];
   const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: true });
-  const GLOWS = ['#3ae8c8', '#5af0ff', '#8affb0', '#b48aff', '#3ad0a0', '#9ae0ff'];
+  const GLOWS = ['#bfeee6'];   // one soft colour for everything that glows in here
   const ceilY = (x, z) => (heightAt(x, z) * 0.4 + (heightAt(x - 24, z) + heightAt(x + 24, z) + heightAt(x, z - 24) + heightAt(x, z + 24)) * 0.15) + 44;
   {
     // the roof: one sheet of leaf-dark over the whole corridor, sagging down into the walls at its edges
@@ -370,7 +370,7 @@ export function buildProperty(scene) {
   const stems = new Kit(scene, new THREE.CylinderGeometry(0.08, 0.11, 1, 5), toon(0xe8e0d0), 2400, false);
   const caps = new Kit(scene, new THREE.SphereGeometry(1, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2), glowMat, 2400, false);
   const halos = [];
-  const glowCol = () => new THREE.Color(pick(GLOWS)).multiplyScalar(0.75 + rng() * 0.35);
+  const glowCol = () => new THREE.Color(pick(GLOWS)).multiplyScalar(0.55 + rng() * 0.2);
   const V = new THREE.Vector3(), Q = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0);
   // a limb from (ax,ay,az) out to (bx,by,bz), for any cylinder-shaped kit
   const limb = (kit, ax, ay, az, bx, by, bz, r, col) => {
@@ -426,7 +426,6 @@ export function buildProperty(scene) {
       if (rng() < 0.7) {
         const a = rng() * Math.PI * 2, y0 = g + 1.5 + rng() * 5, n = 3 + Math.floor(rng() * 4), c = glowCol();
         for (let k = 0; k < n; k++) { const aa = a + (rng() - 0.5) * 0.6, yy = y0 + k * (0.7 + rng() * 0.5), rr = R * (1 - 0.28 * (yy - g) / h); shelves.put(x + Math.cos(aa) * rr, yy, z + Math.sin(aa) * rr, 0.5 + rng() * 0.5, 1, 0.5 + rng() * 0.5, 0, -aa + Math.PI / 2, 0, c); }
-        if (halos.length < 140) { const s = glowSprite(c.getHex(), 5, 0.35); s.position.set(x + Math.cos(a) * (R + 0.8), y0 + n * 0.5, z + Math.sin(a) * (R + 0.8)); scene.add(s); halos.push(s); }
       }
       // great limbs, out and up into the roof, with beads of light along them and leaf-clouds at the ends
       const nl = 3 + Math.floor(rng() * 3);
@@ -475,8 +474,6 @@ export function buildProperty(scene) {
         stems.put(sx, g + s * 0.3, sz, s, s * 0.6, s, 0, 0, 0, '#e0d8c8');
         caps.put(sx, g + s * 0.58, sz, s * 0.36, s * 0.26, s * 0.36, 0, 0, 0, c);
       }
-      if (rng() < 0.5) floorGlow.put(x, g + 0.06, z, 1.4 + rng() * 2.4, 1, 1.4 + rng() * 2.4, 0, 0, 0, c.clone().multiplyScalar(0.28));
-      if (halos.length < 260 && rng() < 0.12) { const sp = glowSprite(c.getHex(), 3.4, 0.4); sp.position.set(x, g + 0.6, z); scene.add(sp); halos.push(sp); }
     }
     for (const k of [gTrunks, gLimbs, gLeaves, seams, beads, shelves, mossCaps, floorGlow, stems, caps]) k.done();
   }
@@ -523,7 +520,7 @@ export function buildProperty(scene) {
       const R = mulberry32(C.seed), rp = a => a[Math.floor(R() * a.length)];
       const { x: cx, z: cz, H, R: TR } = C, g0 = heightAt(cx, cz);
       const M = { p: [], c: [], i: [] };
-      const glowC = () => new THREE.Color(rp(C.glow)).multiplyScalar(0.8 + R() * 0.3);
+      const glowC = () => new THREE.Color(rp(C.glow)).multiplyScalar(0.55 + R() * 0.2);
       const nRoots = 9, rootA = [];
       for (let k = 0; k < nRoots; k++) rootA.push(k / nRoots * Math.PI * 2 + (R() - 0.5) * 0.45);
       const lobe = phi => { let m = 0; for (const a of rootA) m = Math.max(m, Math.pow(Math.max(0, Math.cos(phi - a)), 5)); return 0.3 + 0.7 * m; };
@@ -692,8 +689,6 @@ export function buildProperty(scene) {
           const aa = a + (R() - 0.5) * 0.25, yy = y0 + q * (2.4 + R() * 1.6), rr = trunkR(yy / H, aa) - 0.3, [px, pz] = trunkAt(g0 + yy), s = 2.2 + R() * 2.6;
           cShelves.put(px + Math.cos(aa) * rr, g0 + yy, pz + Math.sin(aa) * rr, s, 2.2, s, 0, -aa + Math.PI / 2, 0, gc);
         }
-        const rr = trunkR((y0 + n) / H, a) + 3, [px, pz] = trunkAt(g0 + y0);
-        const sp = glowSprite(gc.getHex(), 18 + R() * 10, 0); sp.position.set(px + Math.cos(a) * rr, g0 + y0 + n * 1.6, pz + Math.sin(a) * rr); scene.add(sp); colHalos.push(sp);
       }
       // toadstools and glowing moss in the hollows between the roots
       for (let q = 0; q < 700 && cCaps.mesh.count < (colossi.length + 1) * 600; q++) {
@@ -705,8 +700,6 @@ export function buildProperty(scene) {
           cStems.put(sx, gd + s * 0.3, sz, s, s * 0.6, s, 0, 0, 0, '#e0d8c8');
           cCaps.put(sx, gd + s * 0.58, sz, s * 0.38, s * 0.26, s * 0.38, 0, 0, 0, gc);
         }
-        if (R() < 0.35) cPads.put(x, gd + 0.08, z, 2 + R() * 4, 1, 2 + R() * 4, 0, 0, 0, gc.clone().multiplyScalar(0.35));
-        if (R() < 0.06) { const sp = glowSprite(gc.getHex(), 7, 0); sp.position.set(x, gd + 1, z); scene.add(sp); colHalos.push(sp); }
       }
       /* bake it: high up, the bark takes on the blue of the air between */
       for (let i = 0; i < M.c.length; i += 3) { const k = clamp((M.p[i + 1] - g0) / H, 0, 1) * 0.3; M.c[i] += (airC.r - M.c[i]) * k; M.c[i + 1] += (airC.g - M.c[i + 1]) * k; M.c[i + 2] += (airC.b - M.c[i + 2]) * k; }

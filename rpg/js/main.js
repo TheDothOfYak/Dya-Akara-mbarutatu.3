@@ -2012,6 +2012,7 @@ function interact() {
   if (best) { sfx.ui(); best.act(); }
   else if (P.riding) toggleRide();
 }
+const useGlow = glowSprite(0xfff2d8, 1.5, 0); useGlow.userData.a = 0; useGlow.visible = false; useGlow.renderOrder = 3; scene.add(useGlow);
 function nearestPrompt() {
   let best = null, bd = 1e9;
   for (const it of interactables()) {
@@ -2650,7 +2651,7 @@ var mount = null;   // var: the pack check (invAdd) can run before this line doe
 const PN = () => (young() || F_.punkName) && !(SAVE.flags.mount && !young()) ? (F_.punkName || 'your Punk') : 'Brindle';
 const ownPunk = () => young() || (!SAVE.flags.mount && !!F_.punkName);
 function punkGrowth() { return clamp(((SAVE.time || 0) - (F_.punkBorn ?? 0)) / (3 * 3600), 0, 1); }
-const punkScale = () => 0.72 + 0.48 * punkGrowth();
+const punkScale = () => 0.84 + 0.48 * punkGrowth();   // a touch bigger from the start
 const saddled = () => ownPunk() ? !!F_.saddled : true;
 function makeMount(nearPlayer) {
   if (mount) return;
@@ -2905,7 +2906,19 @@ function updateMount(dt) {
     if (k >= 1) P.slap = null; else grab = { p: R0.worldToLocal(P.slap.p.clone()), k: Math.sin(k * Math.PI) };
   }
   m.actor.animate(dt, { speed: P.riding ? (P.onGround ? hv : 0) : Math.hypot(m.vel.x, m.vel.z), t: G.t, attack: m.atk > 0 ? m.atk / 0.5 : 0, windup: 0, grab, air: P.riding ? m.air : 0 });
+
+  // the rider sits in the saddle itself: carried by her body as it bobs and rolls, giving with it a little
+  if (P.riding && m.actor.body && m.actor.cfg) {
+    const cf = m.actor.cfg, b = m.actor.body, T = torcain.root;
+    b.updateMatrixWorld(true);
+    T.position.copy(b.localToWorld(_seatV.set(0, cf.R * cf.sq + cf.R * 0.07, -cf.R * 0.15)));
+    T.position.y -= RIDER_HIP * T.scale.y;
+    b.getWorldQuaternion(_seatQ); _yawQ.setFromAxisAngle(_UP, P.yaw); T.quaternion.copy(_yawQ).slerp(_seatQ, 0.65);
+    m.gait = clamp((b.position.y - cf.bodyY) / (cf.R * 0.08), 0, 1.2);
+  }
 }
+let turnRate = 0;
+const RIDER_HIP = 0.76, _seatV = V3(), _seatQ = new THREE.Quaternion(), _yawQ = new THREE.Quaternion(), _UP = V3(0, 1, 0);
 
 /* ---------------- climbing the great trees ----------------
    Any trunk too big to put your arms round — the deepwood's giants, the colossi —
@@ -2957,7 +2970,7 @@ function climbTick(dt, act) {
   torcain.root.position.copy(P.pos);
   if (P.riding) torcain.root.position.y += mount ? mount.seat : 1.35;
   torcain.root.rotation.y = P.yaw;
-  torcain.animate(dt, { speed: P.riding ? 0 : (C.moving ? 2.2 : 0), onGround: true, t: G.t, swing: null });
+  torcain.animate(dt, { speed: P.riding ? 0 : (C.moving ? 2.2 : 0), onGround: true, t: G.t, swing: null, ride: !!P.riding, rideBob: mount ? mount.gait || 0 : 0 });
   if (P.jumpBuf > 0) {
     P.jumpBuf = 0; P.climb = null;
     const out = V3(Math.cos(C.phi), 0, Math.sin(C.phi));
@@ -3867,8 +3880,10 @@ function updatePlayer(dt) {
 
   torcain.root.position.copy(P.pos);
   if (P.riding) torcain.root.position.y += mount ? mount.seat : 1.35;
-  torcain.root.rotation.y = P.yaw;
-  torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0 });
+  const dy = P.yaw - (P._ry ?? P.yaw); P._ry = P.yaw; turnRate = damp(turnRate, Math.atan2(Math.sin(dy), Math.cos(dy)) / Math.max(dt, 1e-3), 6, dt);
+  torcain.root.rotation.set(0, P.yaw, 0);
+  torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0,
+    ride: !!P.riding, rideSpeed: hs, rideBob: mount ? mount.gait || 0 : 0, rideRoll: P.riding ? clamp(-turnRate * 0.06, -0.22, 0.22) : 0 });
   if (P.roll) torcain.body.rotation.x = (P.roll.t / P.roll.dur) * Math.PI * 2;
 }
 
@@ -4050,6 +4065,13 @@ function updateHUD() {
   $('resume').classList.toggle('hidden', locked || touch.on || G.paused || G.mode !== 'play' || overlayOpen() || !!(DLG && DLG.choices));
   const pe = $('prompt'), pr = nearestPrompt();
   if (pr) { pe.innerHTML = `<kbd>E</kbd>${pr.label}`; pe.classList.remove('hidden'); } else pe.classList.add('hidden');
+  // a faint glow on the thing you could use, and nothing else
+  {
+    const on = pr && pr.far !== 99 && G.mode === 'play';
+    if (on) { const lift = pr.pos.y - world.col.ground(pr.pos.x, pr.pos.z, pr.pos.y + 0.5) < 0.4 ? 1 : 0; useGlow.position.set(pr.pos.x, pr.pos.y + lift, pr.pos.z); }
+    useGlow.userData.a += ((on ? 0.2 + Math.sin(G.t * 2.4) * 0.04 : 0) - useGlow.userData.a) * 0.15;
+    useGlow.material.opacity = useGlow.userData.a; useGlow.visible = useGlow.userData.a > 0.01;
+  }
   // the lock reticle
   const lp = lockPoint(), lk = $('lock');
   const ls = lp && toScreen(lp);
