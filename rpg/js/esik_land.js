@@ -258,6 +258,7 @@ class Rope {
       const m = new THREE.Mesh(g, mat); parent.add(m); this.segs.push(m);
     }
     this.dir = new THREE.Vector3(); this._d = new THREE.Vector3();
+    this.end = this.pts[n]; this.push = null;
   }
   set(p0, p1, p2, p3) {
     const n = this.n;
@@ -269,6 +270,7 @@ class Rope {
         a * p0.y + b * p1.y + c * p2.y + d * p3.y,
         a * p0.z + b * p1.z + c * p2.z + d * p3.z);
     }
+    if (this.push) for (let i = 1; i <= n; i++) this.push(this.pts[i]);   // e.g. keep out of the body it grows from
     for (let i = 0; i < n; i++) {
       const s = this.segs[i], A = this.pts[i], B = this.pts[i + 1];
       const d = this._d.subVectors(B, A); const len = d.length() || 1e-4;
@@ -409,6 +411,7 @@ function buildPunkKind(cfg, opts) {
       return merge(parts);
     } : null;
     const rope = new Rope(root, cfg.segs || 6, cfg.vineR, cfg.vineR * 0.55, vineM, segExtra);
+    rope.push = keepOut;
     const tip = noOut(mesh(arm ? curlG : footCurlG, tipM, root));
     const v = {
       arm, th, radial, rope, tip,
@@ -507,27 +510,44 @@ function buildPunkKind(cfg, opts) {
 
   // ------------ animation ------------
   const P0 = new THREE.Vector3(), P1 = new THREE.Vector3(), P2 = new THREE.Vector3(), P3 = new THREE.Vector3();
+  const bodyInv = new THREE.Matrix4(), kp = new THREE.Vector3();
   const tmp = new THREE.Vector3(), down = new THREE.Vector3(0, -1, 0);
   let ph = Math.random() * TAU, walkW = 0, t0 = Math.random() * 10;
   const lastGrab = [];
   const Rf = R * cfg.footR, kneeH = cfg.kneeH;
   const stride0 = R * cfg.stride;
 
+  /* the vines never pass through the pumpkin: any point of a vine that ends up inside the rind is pushed
+     back out along the body's own curve, so a leg reaching across the far side wraps round it */
+  const margin = 1.03 + cfg.vineR / R;
+  function keepOut(p) {
+    kp.copy(p).applyMatrix4(bodyInv).multiplyScalar(1 / R);
+    const r = Math.hypot(kp.x, kp.z); if (r >= 1) return;
+    const ytop = sq * Math.sqrt(1 - r * r) - 0.13 * Math.pow(1 - r, 3);   // the rind's height here (pumpkinGeo's shape)
+    if (Math.abs(kp.y) >= ytop + cfg.vineR / R) return;
+    const ey = kp.y / sq, l = Math.hypot(kp.x, ey, kp.z) || 1e-4;
+    const f = margin / l; kp.set(kp.x * f, ey * f * sq, kp.z * f);
+    p.copy(kp.multiplyScalar(R)).applyMatrix4(body.matrix);
+  }
+  let bodyLift = 0;
   function animate(dt, st) {
     const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = (st.t || 0) + t0;
     walkW += (clamp(sp / 0.5, 0, 1) - walkW) * Math.min(1, dt * 6);
-    const stride = stride0 * (0.6 + 0.4 * clamp(sp / cfg.runSpeed, 0, 1.4));
-    // feet stay planted: phase speed from ground speed and stride
-    ph += dt * TAU * Math.max(sp / (2 * stride), 0.0);
-    // body: bob twice a cycle, sway, breathe, squash on wind-up
-    const bob = walkW * Math.abs(Math.cos(ph)) * R * 0.08;
+    // strides lengthen as she speeds up and the step rate tops out: a lope at speed, not a buzz
+    const stride = Math.min(stride0 * (0.6 + 0.4 * sp / cfg.runSpeed), stride0 * 2.2);
+    // at a walk the feet stay planted (phase speed from ground speed and stride)
+    ph += dt * TAU * Math.min(sp / (2 * stride), 2.2);
+    // body: a soft rise and fall twice a cycle (smaller the faster she goes), a little sway, breathing, squash on wind-up
+    const fast = clamp((sp - cfg.runSpeed) / (cfg.runSpeed * 2), 0, 1);
+    const bob = walkW * (0.5 - 0.5 * Math.cos(2 * ph)) * R * 0.05 * (1 - 0.5 * fast);
+    bodyLift += (bob - bodyLift) * Math.min(1, dt * 14);
     const breathe = Math.sin(t * 1.6) * R * 0.015;
-    body.position.y = bodyY + bob + breathe - wind * R * 0.12 * (1 - atk);
-    body.rotation.z = walkW * Math.sin(ph) * 0.06;
+    body.position.y = bodyY + bodyLift + breathe - wind * R * 0.12 * (1 - atk);
+    body.rotation.z = walkW * Math.sin(ph) * 0.035;
     body.rotation.x = walkW * 0.06 - wind * 0.15 * (1 - atk) + atk * 0.12;
     const s = 1 + (wind * (1 - atk)) * 0.06;
     body.scale.set(s, 1 / s, s);
-    body.updateMatrix();
+    body.updateMatrix(); bodyInv.copy(body.matrix).invert();
     // leg-vines reaching out to grab something (st.grabs: up to two, one a side, each { p: point in root space, k: 0..1
     // how far it has shot out }; st.grab for just one) — the leg nearest each target goes; the rest tuck up while she's off the ground
     const grabs = st.grabs || (st.grab ? [st.grab] : []), air = clamp(st.air || 0, 0, 1);
@@ -550,7 +570,7 @@ function buildPunkKind(cfg, opts) {
         P2.copy(P0).addScaledVector(tmp, e * 0.66); P2.x += v.radial.z * wob; P2.z -= v.radial.x * wob; P2.y -= (k >= 1 ? L * 0.04 : -wob * 0.5);
         P1.lerp(tmp.copy(P0).addScaledVector(grab.p.clone().sub(P0), e * 0.33), 0.6);
         v.rope.set(P0, P1, P2, P3);
-        v.tip.position.copy(P3); orientCurl(v.tip, v.rope.dir, v.curlTo);
+        v.tip.position.copy(v.rope.end); orientCurl(v.tip, v.rope.dir, v.curlTo);
         v.tip.scale.setScalar(1 + k * 0.6);   // the curl clenches round what it caught
         continue;
       }
@@ -567,7 +587,7 @@ function buildPunkKind(cfg, opts) {
         const W3 = new THREE.Vector3().copy(v.radial).multiplyScalar(Rf); W3.y = R * 0.03; W3.z += wz;
         P3.lerpVectors(W3, tmp, air);
         v.rope.set(P0, P1, P2, P3);
-        v.tip.position.copy(P3); orientCurl(v.tip, v.radial, v.curlTo); v.tip.scale.setScalar(1);
+        v.tip.position.copy(v.rope.end); orientCurl(v.tip, v.radial, v.curlTo); v.tip.scale.setScalar(1);
         continue;
       }
       v.tip.scale.setScalar(v.arm ? v.tip.scale.x : 1);
@@ -582,7 +602,7 @@ function buildPunkKind(cfg, opts) {
         P1.copy(v.radial).multiplyScalar(R * cfg.shoulder).add(P0); P1.y = P0.y + R * (0.25 + kneeH);
         P2.copy(v.radial).multiplyScalar(-R * 0.25).add(P3); P2.y = P3.y + bodyY * 0.55 + R * kneeH;
         v.rope.set(P0, P1, P2, P3);
-        v.tip.position.copy(P3); orientCurl(v.tip, v.radial, v.curlTo);
+        v.tip.position.copy(v.rope.end); orientCurl(v.tip, v.radial, v.curlTo);
       } else {
         // arms: hang forward, cock up and back on wind-up, lash forward on attack
         const a = clamp(atk * 1.25 - (v.side > 0 ? 0 : 0.2), 0, 1);
@@ -593,7 +613,7 @@ function buildPunkKind(cfg, opts) {
         P1.copy(v.radial).multiplyScalar(R * 0.7).add(P0); P1.y = P0.y + R * 0.45;
         P2.set(P3.x * 0.8, P3.y + R * (0.5 - a * 0.4), P3.z - R * (0.4 + a * 0.6));
         v.rope.set(P0, P1, P2, P3);
-        v.tip.position.copy(P3); orientCurl(v.tip, v.rope.dir, UP);
+        v.tip.position.copy(v.rope.end); orientCurl(v.tip, v.rope.dir, UP);
         v.tip.scale.setScalar(1 - a * 0.5);
         if (v.mist) {
           v.mist.visible = a > 0.3;
