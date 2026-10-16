@@ -1387,7 +1387,7 @@ export function createMegla(ctx) {
   function updateLink(dt, playing) {
     if (stage !== 'ruins' || sub !== 'link') { if (beam) beam.visible = false; return; }
     const near = Math.hypot(P.pos.x - WALL.x, P.pos.z - (WALL.z + 1.6)) < 4;
-    const holding = playing && D.taught && near && (keys.KeyE || (touch && touch.on));
+    const holding = playing && near && (keys.KeyE || (touch && touch.on));
     D.link = holding ? D.link + dt : Math.max(0, D.link - dt * 0.6);
     if (!beam) { beam = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, 1, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xc890ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(beam); }
     const a = relic.position, b = V3(P.pos.x, P.pos.y + 0.95, P.pos.z), L = a.distanceTo(b);
