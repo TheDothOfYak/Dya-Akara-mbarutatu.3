@@ -1364,7 +1364,7 @@ export function createMegla(ctx) {
     if (D.esc && !D.line && P.pos.z < LINE_Z - 2) {
       D.line = true;
       rodak.forEach((r, i) => { r.mode = 'sit'; r.home = V3(P.pos.x + (i - 2.5) * 4, 0, LINE_Z + 1.5); });
-      setTimeout(() => sayHeld(L3.line, (k, tt) => ({ p: V3(P.pos.x - 4, P.pos.y + 2.4, P.pos.z - 6), l: V3(P.pos.x, P.pos.y + 1, LINE_Z + 2) }), () => ctx.play()), 1000);
+      setTimeout(() => stage === 'forest' && sayHeld(L3.line, (k, tt) => ({ p: V3(P.pos.x - 4, P.pos.y + 2.4, P.pos.z - 6), l: V3(P.pos.x, P.pos.y + 1, LINE_Z + 2) }), () => ctx.play()), 1000);
     }
     if (Math.hypot(P.pos.x - RUINS.x, P.pos.z - RUINS.z) < RUINS.r - 4) ruins3();
   }
