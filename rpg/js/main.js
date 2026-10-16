@@ -43,7 +43,7 @@ import { createEnemies, TYPES } from './enemies.js';
 import { hasBoard, offers as bountyOffers, bountyProgress } from './bounties.js';
 import * as DYA3 from './dya3d.js';
 import * as STORY from './story.js';
-import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime, saveKey, newer, SAVE_V, isOldSave } from './progress.js';
+import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime, saveKey, newer, MIN_SAVE_V, migrateSave, isOldSave, tickTime, CHAPTERS } from './progress.js';
 import * as CLOUD from './cloud.js';
 import { initAudio, sfx, setVolume } from './audio.js';
 
@@ -67,8 +67,8 @@ if (WHO) {
   cloudSave = await CLOUD.fetchSave(WHO.id);
 }
 /* runs from before the Beuhk prologue were reset; remember that there was one, to say so */
-const HAD_OLD = isOldSave(KEY) || isOldSave() || !!(cloudSave && cloudSave.v !== SAVE_V);
-if (cloudSave && cloudSave.v !== SAVE_V) cloudSave = null;
+const HAD_OLD = isOldSave(KEY) || isOldSave() || !!(cloudSave && cloudSave.v && cloudSave.v < MIN_SAVE_V);
+cloudSave = migrateSave(cloudSave);
 const SAVE_AT_LOAD = newer(localSave, cloudSave);
 let SAVE = SAVE_AT_LOAD || freshSave('easy');
 /* older saves grow the newer RPG fields */
@@ -77,6 +77,7 @@ function ensureSave(S) {
   S.skills = S.skills || freshSkills();
   for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
   if (!S.dya && DYA3.engineReady()) S.dya = DYA3.starterCollection(parseInt(String(S.runId || 'abc').replace(/[^0-9a-z]/g, '').slice(0, 6), 36) || 7);
+  S.chTime = S.chTime || {};
   S.seeds = S.seeds || 0; S.amulets = S.amulets || 0; S.bountiesDone = S.bountiesDone || 0; S.bounty = S.bounty || null;
   // Relic triggers you have worked out, and what sits on the quick slots (Q and 1–6)
   S.triggers = S.triggers || {};
@@ -2361,7 +2362,8 @@ function toggleJournal() {
       : `<div class="jentry locked"><b>Memory</b>A core still sings somewhere in Aakalay.</div>`).join('');
     const carv = Object.entries(STORY.STONES).filter(([k]) => SAVE.codex[k]).map(([k, l]) => `<div class="jentry"><b>Carving</b>${l.join(' ')}</div>`).join('');
     const stats = `<div class="jentry"><b>This Run</b>${D.label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls · ${SAVE.kills} foes · Hurst ranks ${Object.values(SAVE.ups).reduce((a, b) => a + b, 0)}</div>`;
-    $('j-mem').innerHTML = stats + mem + carv;
+    const chs = CHAPTERS.filter(([k]) => SAVE.chTime[k] >= 30).map(([k, n]) => `${n}: ${fmtTime(SAVE.chTime[k])}`).join(' · ');
+    $('j-mem').innerHTML = stats + (chs ? `<div class="jentry"><b>Time by chapter</b>${chs}</div>` : '') + mem + carv;
     const proph = (SAVE.prophecies || []).map(l => `<div class="jentry"><b>A true prophecy</b>“${l}”</div>`).join('');
     $('j-codex').innerHTML = proph + [...STORY.CODEX, ...STORY.CODEX_MORE, ...STORY.CODEX_LORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
     j.classList.remove('hidden'); G.paused = true;
@@ -4248,7 +4250,7 @@ function frame() {
   let dt = Math.min(clock.getDelta(), 1 / 20);
   const frozen = G.paused || G.mode === 'title';
   if (VK) {   // Velki: its own little world, until the air tears open
-    if (!G.paused) { G.t += dt; VK.update(dt, G.mode === 'play' && !overlayOpen()); updateDialog(dt); tickUi(dt); updateSlotHud(dt); }
+    if (!G.paused) { G.t += dt; if (G.mode !== 'title') tickTime(SAVE, dt); VK.update(dt, G.mode === 'play' && !overlayOpen()); updateDialog(dt); tickUi(dt); updateSlotHud(dt); }
     touch.update(dt);
     if (VK) {
       const pe = $('prompt'), pr = G.mode === 'play' ? VK.prompt() : null;
@@ -4260,8 +4262,8 @@ function frame() {
   if (G.hitstop > 0) { G.hitstop -= dt; dt *= 0.08; }
   if (!frozen) {
     G.t += dt;
+    if (G.mode !== 'end') tickTime(SAVE, dt);   // cutscenes and talk are part of the story's hours too
     if (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory' || G.mode === 'end') {
-      if (G.mode === 'play') SAVE.time += dt;
       updatePlayer(dt);
       updatePhorus(dt);
       enemies.update(dt);
