@@ -1452,14 +1452,14 @@ export function createMegla(ctx) {
   }
   /* ---- dusk: Nekhra at the door ---- */
   function dusk3() {
-    stage = 'keep'; sub = 'dusk'; ctx.save('duel'); setGoal(); setLook('dusk');
+    stage = 'keep'; sub = 'dusk'; ctx.save('duel'); setGoal(); setLook('dusk', true);
     const gz = KEEP.z + KEEP.h, gy = heightAt(KEEP.x, gz);
     place(P, KEEP.x, gz - 5, 0); place(B, KEEP.x - 3, gz - 7, 0); B.stay = B.pos.clone(); place(K, KEEP.x + 3.5, gz - 8, 0); K.stay = K.pos.clone();
     D.malstiAt = V3(KEEP.x - 1.2, 0, gz - 6.5);
     ringOfVel();
     makeNekhra(); NK.pos.set(KEEP.x, 0, ARENA.z + 16); NK.pos.y = ground(NK.pos.x, NK.pos.z); NK.yaw = Math.PI; NK.state = 'walkIn';
     cut([
-      { dur: 6, from: { p: [KEEP.x + 4, gy + 3, gz - 8], l: [KEEP.x, gy + 2, ARENA.z] }, to: { p: [KEEP.x + 2, gy + 2.6, gz - 4], l: [KEEP.x, gy + 2, ARENA.z + 4] }, caption: L3.dusk[0][1] },
+      { dur: 6, from: { p: [KEEP.x + 9, gy + 11, gz - 3], l: [ARENA.x, gy + 1, ARENA.z] }, to: { p: [KEEP.x + 5, gy + 9, gz + 1], l: [ARENA.x, gy + 1.5, ARENA.z + 4] }, caption: L3.dusk[0][1] },
       { dur: 6, cam: k => ({ p: V3(NK.pos.x + 5, NK.pos.y + 2.4, NK.pos.z - 7), l: V3(NK.pos.x, NK.pos.y + 1.7, NK.pos.z) }), caption: L3.dusk[1][1], onTick: k => { NK.pos.z = lerp(ARENA.z + 16, ARENA.z + 6, smooth(0, 1, k)); NK.walking = k < 0.95; } },
     ], () => {
       NK.walking = false; NK.state = 'idle';
