@@ -68,6 +68,7 @@ export const ITEMS = {
   gynge_chip: { name: 'Gynge chip', kind: 'key', icon: '🪨', value: 0, desc: 'A palm-sized piece of living rock from just inside a Gynge’s maw. Still warm. Still faintly singing.' },
   gynge_hide: { name: 'Gynge rock-hide', kind: 'mat', icon: '🟫', value: 18, desc: 'Plates of a Gynge’s rock skin. Hard enough to turn an axe.' },
   akai_rubbing: { name: 'Akai Gek rubbing', kind: 'key', icon: '📜', value: 0, desc: 'Charcoal rubbing of the runes round the purple Relic in the ruins. You can read one: Akai Gek. Its song is in your head now.' },
+  akai_link: { name: 'Akai Gek, linked', kind: 'key', icon: '🟣', value: 0, desc: 'The purple Relic still stands in its wall in the Megla Aagac ruins, but through the ring it is always on your finger. Your fire-stones burn twice as hot.' },
   relic_ring: { name: 'Relic ring', kind: 'key', icon: '💍', value: 0, desc: 'Taken from the Duskareth in the Megla Aagac. Links up to five Relics to you wherever they are — you need never carry them again.' },
   tok_gynge: { name: 'Gynge token', kind: 'key', icon: '🗿', value: 0, desc: 'Your first token, made with your own hands: the Gynge of the Megla Aagac, grinding its jaw and glaring with no eyes at all.' },
   amulet: { name: 'Sniller amulet', kind: 'key', icon: '🔹', value: 0, desc: 'A round gem between two curved horns, cold teal. It hums toward something far away.' },

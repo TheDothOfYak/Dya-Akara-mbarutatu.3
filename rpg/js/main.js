@@ -19,7 +19,7 @@ import { buildEldiShip } from './ship.js';
 import { buildWorld } from './world.js';
 import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
-import { buildProperty, COLOSSI } from './property.js';
+import { buildProperty, COLOSSI, LAKE } from './property.js';
 import { createInteriors } from './interiors.js';
 import { buildTorcain, buildPhorus, buildCore } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildMalstiPunk, buildSkorThal, buildGynge } from './esik_land.js';
@@ -3202,10 +3202,10 @@ function fireStone() {
   const from = V3(P.pos.x + dir.x * 0.6, P.pos.y + 1.4, P.pos.z + dir.z * 0.6);
   const vel = tgt.clone().sub(from).normalize().multiplyScalar(34);
   P.yaw = Math.atan2(vel.x, vel.z);
-  const g = new THREE.Group();
-  g.add(new THREE.Mesh(new THREE.DodecahedronGeometry(0.12, 0), toon(0xffd060, { emissive: 0xff7a20, emissiveIntensity: 1 })));
-  g.add(glowSprite(0xff8a2a, 1.8, 0.9)); g.position.copy(from); scene.add(g);
-  bolts.push({ g, vel, life: 2 });
+  const g = new THREE.Group(), hot = !!F_.akaiLink;   // linked to the Akai Gek: the stone comes out burning twice as hot
+  g.add(new THREE.Mesh(new THREE.DodecahedronGeometry(hot ? 0.2 : 0.12, 0), toon(0xffd060, { emissive: 0xff7a20, emissiveIntensity: 1 })));
+  g.add(glowSprite(hot ? 0xffe0a0 : 0xff8a2a, hot ? 3 : 1.8, 0.9)); g.position.copy(from); scene.add(g);
+  bolts.push({ g, vel, life: 2, hot });
   sfx.flare();
 }
 function updateBolts(dt) {
@@ -3219,10 +3219,10 @@ function updateBolts(dt) {
     if (!hit) { const f = world.col.ray(prev, p); if (f < 1) { p.lerpVectors(prev, p, f); hit = true; } }   // it stops at walls
     for (const e of enemies.list) {
       if (hit || e.dead || Math.hypot(e.pos.x - p.x, e.pos.y + 0.8 - p.y, e.pos.z - p.z) > e.T.rad + 1) continue;
-      enemies.damage(e, 22 * (young() ? 1 : axeMul()), P.pos, 4, { stun: 0.4, burn: true }); hit = true;
+      enemies.damage(e, 22 * (young() ? 1 : axeMul()) * (b.hot ? 2 : 1), P.pos, 4, { stun: 0.4, burn: true }); hit = true;
     }
-    if (!hit && boss && !boss.dead && boss.pos && boss.pos.distanceTo(p) < 3) { damageBoss(30); hit = true; }
-    if (hit) { particles.burst(p.x, p.y, p.z, 18, { color: 0xff8a2a, speed: 5, size: 0.4, life: 0.5 }); scene.remove(b.g); bolts.splice(i, 1); }
+    if (!hit && boss && !boss.dead && boss.pos && boss.pos.distanceTo(p) < 3) { damageBoss(b.hot ? 60 : 30); hit = true; }
+    if (hit) { particles.burst(p.x, p.y, p.z, b.hot ? 32 : 18, { color: 0xff8a2a, speed: b.hot ? 8 : 5, size: 0.4, life: 0.5 }); scene.remove(b.g); bolts.splice(i, 1); }
   }
 }
 /* the humming stone: a second wind */
@@ -4281,7 +4281,7 @@ function frame() {
       checkLocations();
       if (young() && F_.pro === 'beuhk') { if (REGION === 'property') pathTick(); else beuhkTick(); }
       else if (young()) youngTick();
-      updateMalsti(dt);
+      updateMalsti(dt); updateFarLights();
       updatePlace();
       if (REGION === 'xilia' || REGION === 'property') {
         if (F_.tut === 3 && REGION === 'property' && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
@@ -4530,6 +4530,76 @@ function leaveMegla() {
       hint('Buhkon is in the workshop.');
     });
   }, 450);
+}
+/* ================================================================
+   CHAPTER III — THE LONG WAY (megla.js, chapter 3): the ring taken
+   north to the keep, the Akai Gek linked, and the Right of Holding
+   ================================================================ */
+function longWayBegin() {
+  dialog(STORY.LONGWAY.pull(F_.malstiName || 'the Malsti Punk'), () => {
+    F_.lw = 'go'; persist();
+    G.mode = 'intro'; fade(1, 1.2);
+    setTimeout(() => startLongWay('ride'), 1300);
+  });
+}
+function startLongWay(at) {
+  F_.pro = 'longway'; F_.young = true; F_.lwAt = at || 'ride'; persist();
+  if (interiors.inside) interiors.leave && interiors.leave();
+  if (!SAVE.inv.items.r_firestone) invAdd(SAVE.inv, 'r_firestone', 1);
+  learnTrigger('r_firestone');
+  if (!SLOT_KEYS.some(k => SAVE.slots[k] === 'r_firestone')) SAVE.slots[SLOT_KEYS.find(k => !SAVE.slots[k]) || 'KeyQ'] = 'r_firestone';
+  G.mode = 'intro'; G.t = 0;
+  $('hud').classList.remove('hidden'); $('hud').classList.add('velki', 'roadhp');
+  youngHud();
+  STORY.SPEAKERS.punk.name = F_.punkName || 'Brindle'; STORY.SPEAKERS.punk.sub = 'your Punk, grown';
+  STORY.SPEAKERS.malsti.name = F_.malstiName || 'The Malsti Punk'; STORY.SPEAKERS.malsti.sub = 'who was a Ver, once';
+  VK = createMegla(Object.assign(vkCtx(), {
+    chapter: 3, linked: !!F_.akaiLink,
+    save: a => { F_.lwAt = a; persist(); },
+    askName: (title, ph, cb) => askName(cb, title, ph),
+    akaiLink: () => { F_.akaiLink = true; invAdd(SAVE.inv, 'akai_link', 1); persist(); },
+    fade: (v, sec) => fade(v, sec),
+    onDone: () => leaveLongWay(),
+  }));
+  VK.start(F_.lwAt);
+  fade(0, 1.4);
+  updateSlotHud && updateSlotHud(0);
+}
+function leaveLongWay() {
+  F_.pro = 'done'; F_.ch3 = true; F_.akaiLink = true; F_.lwAt = 'home'; persist();
+  fade(1, 0.4);
+  setTimeout(() => {
+    if (VK) VK.dispose();
+    VK = null; vkComposer = null; canvas.style.filter = '';
+    $('hud').classList.remove('velki', 'roadhp');
+    const Y = world.yard || world.PLAZA;
+    P.pos.set(Y.x + 14, 0, Y.z + 8); P.pos.y = world.col.ground(P.pos.x, P.pos.z, world.heightAt(P.pos.x, P.pos.z) + 3); P.yaw = -Math.PI / 2; CAM.yaw = Math.PI / 2;
+    P.vel.set(0, 0, 0); P.lastSafe.copy(P.pos);
+    dn.setHour(15.5);
+    fade(0, 1.4);
+    xp(260); G.shards += 60; persist();
+    cineCards(STORY.LONGWAY.end, 3600, P.pos, () => {
+      enterPlay(); showLocation('The Carpenter’s Yard', 'Chapter III · home again');
+      setObjective();
+      toast(STORY.LONGWAY.linkGot, 5);
+    });
+  }, 450);
+}
+/* until Chapter III: purple lights on the far shore after dark — the Duskareth, waiting at the edge of the house seals */
+let farLights = null;
+function updateFarLights() {
+  const on = REGION === 'property' && young() && F_.ch2 && !F_.ch3 && !VK;
+  if (!on) { if (farLights) farLights.visible = false; return; }
+  if (!farLights) {
+    farLights = new THREE.Group(); scene.add(farLights);
+    for (let i = 0; i < 9; i++) {
+      const x = LAKE.x - LAKE.rx - 30 - (i % 3) * 14, z = LAKE.z - 140 + i * 34, y = world.heightAt(x, z);
+      const g = glowSprite(0xa060ff, 7, 0); g.position.set(x, y + 2.5, z); g.userData.ph = i * 1.7; farLights.add(g);
+    }
+  }
+  farLights.visible = true;
+  const n = Math.max(0, Math.min(1, (G.night || 0) * 1.6 - 0.3));
+  for (const g of farLights.children) g.material.opacity = n * (0.55 + 0.35 * Math.sin(G.t * 0.7 + g.userData.ph));
 }
 /* ---------------- a stall for your Punk: you choose where; then the saddle ---------------- */
 function nameplate(text) {
@@ -4921,6 +4991,14 @@ function youngBuhkon(n) {
     ]);
     return;
   }
+  if (F_.ch2 && !F_.ch3 && F_.pro === 'done') {
+    ask('buhkon', 'You’ve seen them too, then. Across the lake, after dark.', [
+      { label: STORY.LONGWAY.ask, act: () => saddled() ? longWayBegin() : dialog([['buhkon', `Not on foot, and not without ${PN()}. Get her saddled.`]]) },
+      { label: SAVE.inv.items.okid ? 'Sing a token' : 'Ask about tokens', act: () => buhkonTokens() },
+      { label: 'Not yet', act: null },
+    ]);
+    return;
+  }
   if (q === 1) {
     dialog(Y.relicBuhkon, () => {
       F_.yHlyst = true; learnTrigger('r_longevity'); persist(); nurHlyst();
@@ -4942,7 +5020,7 @@ function youngGoal() {
   if (interiors.inside) return interiors.room(interiors.inside.id) ? interiors.room(interiors.inside.id).out : null;
   if (REGION === 'xilia') return q >= 5 ? null : world.westGoal;   // Buhkon's is out west, along the forest path
   if (q === 0) return RELIC_SPOT;
-  if (q === 1 || q === 4 || F_.pro === 'token' || (q >= 5 && !F_.megla) || (F_.saddle && !F_.stall)) return bk ? bk.pos : null;
+  if (q === 1 || q === 4 || F_.pro === 'token' || (q >= 5 && !F_.megla) || (F_.saddle && !F_.stall) || (F_.ch2 && !F_.ch3)) return bk ? bk.pos : null;
   if (q === 2) { const e = enemies.list.find(e => e.kind === 'dummy' && !e.dead); return e ? e.pos : null; }
   if (q === 3) return V3(world.tower.x, world.tower.y, world.tower.z);
   return null;
@@ -4961,7 +5039,8 @@ function youngObjective() {
   else if (F_.saddle && !F_.stall && SAVE.inv.items.saddle) proObjective(head, STORY.STEED.bring, 'He’s up at the house, or in the workshop');
   else if (F_.pro === 'token') proObjective('Chapter II · home again', STORY.FIRST_TOKEN.findObj, 'Show him the Gynge chip');
   else if (!F_.megla) proObjective(head, 'The Sniller amulet is tugging north — talk to Buhkon', 'When you’re ready: Chapter II, the Megla Aagac');
-  else proObjective(F_.ch2 ? 'Chapter II · done' : head, O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');
+  else if (F_.ch2 && !F_.ch3) proObjective('Chapter II · done', STORY.LONGWAY.objHome, STORY.LONGWAY.objHomeHint);
+  else proObjective(F_.ch3 ? 'Chapter III · done' : F_.ch2 ? 'Chapter II · done' : head, O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');
 }
 function youngTick() {
   if (relicMesh) { relicMesh.visible = relicOut(); if (relicMesh.visible) { relicMesh.rotation.y = G.t; relicMesh.children[1].material.opacity = 0.5 + Math.sin(G.t * 3) * 0.3; } }
@@ -5058,7 +5137,8 @@ $('d-real-p').textContent = DIFFICULTY.realistic.blurb;
 if (!SAVE_AT_LOAD && HAD_OLD) $('t-save').textContent = 'Torcain’s Run has a new beginning in Beuhk — every earlier run was reset. Begin anew!';
 if (SAVE_AT_LOAD) {
   const where = SAVE.region === 'leotik' ? 'Rokarvac II · Leotik' : SAVE.region === 'aakalay' ? 'Rokarvac I · Aakalay'
-    : IN_CH1 ? (SAVE.region === 'property' ? 'Chapter I · the Carpenter’s' : 'Chapter I · Beuhk') : SAVE.region === 'property' ? 'The Road North · the forest path' : FROM_TOP && F_.pro === 'beuhk' ? 'The Road North · Beuhk' : FROM_TOP && (F_.pro === 'road' || F_.pro === 'xikia') ? 'The Road North' : FROM_TOP && F_.pro ? 'The Beginning · Velki' : 'Prologue · Beuhk';
+    : IN_CH1 ? (F_.ch3 ? 'Chapter III · done' : F_.ch2 ? 'Chapter II · done' : SAVE.region === 'property' ? 'Chapter I · the Carpenter’s' : 'Chapter I · Beuhk')
+    : F_.pro === 'longway' ? 'Chapter III · the long way' : F_.pro === 'megla' ? 'Chapter II · the Megla Aagac' : F_.pro === 'token' ? 'Chapter II · home again' : SAVE.region === 'property' ? 'The Road North · the forest path' : FROM_TOP && F_.pro === 'beuhk' ? 'The Road North · Beuhk' : FROM_TOP && (F_.pro === 'road' || F_.pro === 'xikia') ? 'The Road North' : FROM_TOP && F_.pro ? 'The Beginning · Velki' : 'Prologue · Beuhk';
   $('t-save').textContent = `Saved run: ${where} · ${DIFFICULTY[SAVE.difficulty].label} · ${fmtTime(SAVE.time)} · ${SAVE.deaths} falls`;
   $('btn-continue').style.display = ''; $('btn-continue').disabled = false;
 }
@@ -5089,6 +5169,7 @@ $('si-form').onsubmit = async ev => {
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'On a phone or tablet: left thumb moves, drag on the right to look, and the buttons fight. Turn your phone sideways for the best view.';
 $('btn-continue').onclick = () => startFromTitle(() => {
   if (REGION === 'property' && F_.pro === 'megla') startMegla(F_.meglaAt);
+  else if (REGION === 'property' && F_.pro === 'longway') startLongWay(F_.lwAt);
   else if (young() && F_.pro === 'done') { if (F_.yq == null && REGION === 'property') startMorning(); else continueRun(); }
   else if (REGION === 'property' && F_.pro === 'beuhk') { arriveByExit({ exit: 'p_east' }); }
   else if (REGION === 'xilia' && F_.pro === 'beuhk') arriveBeuhk();
@@ -5115,7 +5196,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  get vk() { return VK; }, F_: () => F_, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
+  get vk() { return VK; }, F_: () => F_, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); }, startLongWay, longWayBegin,
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,

@@ -1185,3 +1185,189 @@ export const STEED = {
   steed: name => `${name} is your steed — E to ride, H to whistle her. She’ll carry materials in her saddlebags, and more as she grows.`,
   bagFull: (cap, bag) => bag ? `You can’t carry any more — you and your Punk’s saddlebags are full (${cap}).` : `Your pack is full (${cap}). A saddle with saddlebags on your Punk would carry more.`,
 };
+
+/* ---------------- Chapter III: the Long Way ----------------
+   The Duskareth want their ring back. They can step to the edge of the
+   Carpenter's land in a blink, but the ring won't go through the Duat, and
+   the old house seals won't let them onto the land. So they wait at the
+   treeline. Tanoc takes it north to the one place they can't walk into, the
+   keep the Sniller gave him, and the Carpenter comes too. On the way: the
+   Right of Holding, the Akai Gek linked to the ring, and a Thar Norvek at
+   his door. */
+SPEAKERS.thar = { name: 'Nekhra', color: '#d080ff', sub: 'a Thar Norvek of the Duskareth' };
+SPEAKERS.akai = { name: 'The Akai Gek', color: '#c890ff', sub: 'the Relic in the wall' };
+export const LONGWAY = {
+  head: 'Chapter III · the long way',
+  pull: mn => [
+    ['tale', 'Autumn comes to the Carpenter’s land. The pines on the far shore go copper at the tips, and the Punks grow their winter fuzz.'],
+    ['tale', `And every night, a little after dark, ${mn} climbs up onto the porch rail, stares north across the lake, and hisses.`],
+    ['tanoc15', 'Buhkon. The lights are back on the far shore. Purple ones.'],
+    ['buhkon', 'I know. Third night running. They stand at the treeline and they don’t come one step further.'],
+    ['buhkon', 'The house seals. My grandmother cut them, and her grandmother before her. Nothing that walks the Duat comes onto this land without being asked. They’re asking, in their way.'],
+    ['tanoc15', 'They want the ring.'],
+    ['buhkon', 'They want the ring. They can step to the edge of my land in a blink. But that ring won’t go through the Duat, so they can’t blink it home again. They want it out in the open, far from my seals, where they can take it and walk.'],
+    ['tanoc15', 'Then let’s go where they can’t walk. The keep. The Sniller made it so nobody gets in unless I let them.'],
+    ['buhkon', '…Hah. Out in the open, all the way there. They’ll come at us on the road.'],
+    ['tanoc15', 'I know.'],
+    ['buhkon', 'Good. So do I. I want to see who they send.'],
+    ['buhkon', 'And I’m coming with you.'],
+    ['tanoc15', 'You never come.'],
+    ['buhkon', 'I came all the way from Fyrsti’Vilag, didn’t I? Saddle her up. They have to go the long way with that ring, so we’ll go the long way too.'],
+  ],
+  cards: ['Autumn.', 'Chapter III', 'The Long Way'],
+  ride: [['tale', 'North again, up the river. This time there are two Punks on the road, and the Carpenter rides the old one from the barn, grumbling about his knees.']],
+  rideObj: 'Ride north up the river pass, with the Carpenter',
+  rideBarks: [
+    ['buhkon', 'Don’t look up. On the ridge, left side. Don’t look.'],
+    ['tanoc15', '…Three. Four. They’re keeping pace with us.'],
+    ['sniller', 'They are counting you, little one. They count everything.'],
+    ['buhkon', 'Let them count. Counting isn’t doing.'],
+  ],
+  clearing: [
+    ['tale', 'The clearing again. At the edge of the great trees, exactly where they were two years ago, the Rodak stand watching.'],
+    ['buhkon', 'Friends of yours?'],
+    ['tanoc15', 'Sort of. They like to be there for what comes after.'],
+    ['buhkon', 'Wonderful.'],
+  ],
+  campObj: 'Make camp at the old firepit',
+  night: [
+    ['tale', 'The fire. Velki rising blue over the mountains behind them. And out in the dark, the purple lights, not really hiding.'],
+    ['buhkon', 'Listen, because I’ll only say it once, and you’ll want it later.'],
+    ['buhkon', 'The Duskareth have a law older than any of their keeps. The Right of Holding. A thing that is held belongs to whoever holds it, until somebody takes it from them at their own door, in a fair fight, one against one.'],
+    ['tanoc15', 'Well, I took it.'],
+    ['buhkon', 'You picked it up off a Malsti Punk with a storm standing behind you. That isn’t their kind of fair. They’ll send someone to the door of your keep to say so. Win, and the ring is yours by their own law, and every one of them will know it in the same instant.'],
+    ['tanoc15', 'And if I lose?'],
+    ['buhkon', 'Then you lose the ring, and nothing else. That’s the other half of the law. They’re very particular about it.'],
+    ['tanoc15', 'How do you know all this?'],
+    ['buhkon', '…I was a guest of the Duskareth once. A long time ago. Eat your stew.'],
+    ['sniller', 'He is telling the truth, little one. All of it. It is the part he is not telling that is interesting.'],
+  ],
+  ambush: [
+    ['tale', 'The fire gutters. Every flame leans the same way, toward the dark, and they step out of the air.'],
+    ['vel', 'The ring, boy. Put it on the ground and walk away.'],
+    ['buhkon', 'That’s not the Right, and you know it. Tanoc, up. They’re not here to take it. They’re here to see what you are.'],
+  ],
+  ambushObj: 'Fight beside the Carpenter and drive the Vel off',
+  ambushHint: 'A purple ring on the ground is where a Vel will step out of the Duat · knives come from far off, so keep moving',
+  barks: {
+    blink: ['buhkon', 'The ring on the ground! That’s where it’ll come out!'],
+    knife: ['buhkon', 'Knives! Don’t stand still!'],
+    flee: ['buhkon', 'One down. They don’t die, they leave. Next!'],
+    toss: ['buhkon', 'Out of my way.'],
+  },
+  ambushEnd: [
+    ['tale', 'The last Vel staggers back into the dark and is gone, and the fire stands up straight again.'],
+    ['buhkon', '…Not bad. Your feet were all wrong, but not bad.'],
+    ['tanoc15', 'You threw one of them into a tree.'],
+    ['buhkon', 'He was in my way.'],
+    ['tale', 'At the treeline, the Rodak lie down one by one, as if something has been decided.'],
+  ],
+  morning: [
+    ['tale', 'A grey morning. The fog has come down again, thicker than before.'],
+    ['buhkon', 'The ruins first. You said there was a Relic set into a wall.'],
+    ['tanoc15', 'It won’t come out. I tried.'],
+    ['buhkon', 'It doesn’t have to come out. That’s what the ring is for.'],
+  ],
+  forestObj: 'Into the Megla Aagac, to the ruins',
+  thud: pn => [['tale', `At the place where the thud was, ${pn} stops and shivers all over. Then she keeps walking.`]],
+  line: [
+    ['tale', 'At the line in the moss the Rodak sit down again. This time the Carpenter stops too, and looks at it for a long while.'],
+    ['buhkon', 'That line is older than it looks.'],
+  ],
+  ruins: [
+    ['tale', 'The Gynge is still there: a hill of grey rock in the hollow, already furred with green.'],
+    ['buhkon', '…You did tell me. I thought you were exaggerating.'],
+    ['tanoc15', 'I never exaggerate.'],
+    ['buhkon', 'You told Old Ruut you’d ridden a Stryx.'],
+  ],
+  linkObj: 'Link the Relic in the wall to your ring',
+  linkHint: 'Hold E at the wall, and keep holding while the ring and the Relic find each other',
+  linkTeach: [
+    ['buhkon', 'Put your hand on it. Not to pull. Just to know it’s there. Then let the ring do the rest, the way you let the song come.'],
+  ],
+  linked: [
+    ['tale', 'A thread of violet light runs from the wall to the ring on his finger. Then the thread is gone, and somehow it is always there.'],
+    ['hurst', 'It’s HER! The big purple one from before! Is she coming with us? She’s coming with us!'],
+    ['tanoc15', 'It’s still in the wall.'],
+    ['buhkon', 'And it always will be. And wherever you go, it’s on your finger too. That’s a Link. Now throw something.'],
+  ],
+  linkGot: 'The Akai Gek is linked to your ring. Your fire-stones burn twice as hot, wherever you are.',
+  keepObj: 'North to the keep',
+  forestAmbush: [['vel', 'Holder. Holder. We see you, holder.']],
+  forestAmbushEnd: [['buhkon', 'They’re testing you. Every time, a little harder. Keep walking.']],
+  keepArrive: [
+    ['tale', 'The keep stands in the mist exactly as he left it: moss on the walls, new leaves on the watchtower trees, and the gate standing open, as if it had been waiting for him.'],
+    ['sniller', 'It knows you.'],
+  ],
+  allowText: 'The keep lets in only those you allow. Who comes in?',
+  allowOpts: ['Everyone who came with me', 'Everyone, and the Rodak too, if they want'],
+  allowed: rodak => [
+    ['tale', `He says their names at the gate out loud, feeling silly, and the keep lets them in.${rodak ? ' Then the Rodak too. They walk in last, sniff every corner, and lie down along the wall like they have always lived there.' : ''} The air in the gateway is warm and smells of rain.`],
+    ['buhkon', 'Well. That’s a strange feeling. Like being expected.'],
+  ],
+  inObj: 'Into the keep',
+  dusk: [
+    ['tale', 'At dusk they come. Not many: a dozen Vel, standing in a ring among the great trunks beyond the gate, with their markings burning purple.'],
+    ['tale', 'Then one more comes walking up the old path alone. She is taller than the rest, and her mouth is a seam of violet light.'],
+    ['thar', 'I am Nekhra, a Thar Norvek of the Duskareth. You are standing in our keep, child, wearing our ring.'],
+    ['tanoc15', 'It’s my keep now. And my ring.'],
+    ['thar', 'So you say. Then hold it. By the Right of Holding I name you at your own door. Come out and keep what is yours, or hand it through the gate, and we go.'],
+    ['buhkon', 'One against one. Nobody else lifts a hand, on either side. She knows it. Every one of them knows it.'],
+  ],
+  malstiSeen: mn => [
+    ['tale', `${mn} has crept round behind Tanoc’s boots. Nekhra looks at it for a long moment.`],
+    ['thar', 'And that was Ver Oskel, who held the ring before you. His own core would not carry him. Keep him, holder. He chose you.'],
+  ],
+  answerText: 'Answer her.',
+  answerOpts: ['“I’ll come out.”', 'Look back at Buhkon'],
+  buhkonLook: [
+    ['buhkon', 'Don’t look at me. It’s your ring.'],
+    ['buhkon', '…But you’ve had two years of my drills and a Gynge since that keep wall. Feet under you. Watch her mouth.'],
+  ],
+  accept: [
+    ['tanoc15', 'I’ll come out.'],
+    ['thar', 'Good. Then come.'],
+  ],
+  duelObj: 'Hold the ring: defeat Nekhra, one against one',
+  duelHint: 'Jump her scream (Space) · get off the purple mark when she vanishes · hit her when she’s winded · Q for fire-stones',
+  duelBarks: {
+    scream: ['sniller', 'Her scream rolls out in a ring. JUMP it!'],
+    blink: ['buhkon', 'She’s in the Duat. Off the mark!'],
+    winded: ['buhkon', 'She’s winded. NOW!'],
+    knives: ['sniller', 'Knives all round you. Out of the circle!'],
+  },
+  half: [
+    ['thar', 'Someone taught you. …Carpenter. I know your hands in his.'],
+    ['buhkon', 'Leave me out of this, Nekhra.'],
+    ['thar', 'Gladly. The child, then. All of it, child.'],
+  ],
+  phase2: 'Hold the ring: she brings the knives now. Get out of the circle when they hang over you',
+  down: [
+    ['buhkon', 'Up. UP. She hasn’t taken it. You’re still holding it. Get up!'],
+    ['thar', 'Again. I will not have it said I took it from a child who couldn’t stand.'],
+  ],
+  win: [
+    ['tale', 'Nekhra goes down on one knee in the moss, and the seam of her mouth goes dark.'],
+    ['tale', 'All round the keep, in the same instant, every Vel’s markings flicker once and go still. They all know.'],
+    ['thar', 'Held.'],
+    ['thar', 'By the Right of Holding, the ring is yours, Tanoc Filugani, and no Duskareth will come to your door for it again.'],
+    ['tanoc15', 'You know my name.'],
+    ['thar', 'We know everything that is ours. And now you are a little bit ours, holder. That is how the Right works. You will see.'],
+    ['thar', '…Eldi. You taught him well. You always did have a hand for the wrong students.'],
+    ['buhkon', 'Go home, Nekhra.'],
+    ['tale', 'Then they are gone, through a dozen doors in the air opening and closing, and the forest is just a forest again.'],
+  ],
+  church: mn => [
+    ['tale', `That night they sleep in the little church: the Carpenter, the boy, a Punk across the doorway, and ${mn} asleep on the boy’s chest.`],
+    ['tanoc15', 'Buhkon. “The wrong students.”'],
+    ['buhkon', 'Go to sleep.'],
+    ['tanoc15', 'You taught a Duskareth.'],
+    ['buhkon', '…One. A long time ago, before you. Go to sleep, Tanoc.'],
+    ['sniller', 'Ako, little one. Yes-and-no. Let him keep it a while longer.'],
+  ],
+  home: ['Home.', 'Back down out of the mist: the boy, the Carpenter and the two Punks. And the ring on his finger, held by right.'],
+  end: ['End of Chapter III.', 'The ring is his by the Right of Holding, and the Akai Gek burns on it wherever he goes.'],
+  ask: 'There are purple lights across the lake again. <em style="color:var(--brass2)">· Chapter III: the Long Way</em>',
+  objHome: 'Purple lights on the far shore at night. Talk to Buhkon',
+  objHomeHint: 'When you’re ready: Chapter III, the Long Way',
+};

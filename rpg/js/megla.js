@@ -27,10 +27,28 @@
 
    A scene of its own, like the road north. main.js lends it the
    renderer, camera, input, dialogue and cards.
+
+   CHAPTER III — THE LONG WAY runs in the same world (ctx.chapter === 3):
+   the keep already cleansed and his, the Gynge a mossy hill in the ruins.
+     Ride    up the pass at dusk with the Carpenter on the old barn Punk;
+             Vel keeping pace along the ridges
+     Night   the firepit, the Right of Holding — and the Vel step out of
+             the air: a fight beside Buhkon (they blink, they throw knives;
+             beaten, they leave through the Duat)
+     Morning into the trees together; the Rodak's line; the ruins, and the
+             Akai Gek linked to the ring (hold E) — fire-stones burn twice
+             as hot from now on; another test in the trees
+     The keep  who he lets in; at dusk a ring of Vel, and Nekhra, a Thar
+             Norvek, names him at his own door: the DUEL —
+               her scream rolls out in a ring (jump it), she steps into the
+               Duat and out under you (get off the mark), she is winded
+               after a scream (hit her); past half, Duat knives ring him
+             Held. A night in the little church, and home.
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles } from './gfx.js';
 import { buildEikar } from './actors.js';
+import { NPC_LOOKS } from './npcs.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
 import { buildLutut } from './esik_sky.js';
@@ -52,6 +70,7 @@ const PASS0 = -40, PASS1 = -540, CLEAR = { x: 0, z: -595 }, EDGE_Z = -658, END_Z
 const FIRE1 = { x: -10, z: -640 }, THUD_Z = -700, ANIMAL = { x: 18, z: -738 }, LINE_Z = -806;
 const RUINS = { x: -4, z: -868, r: 42 }, WALL = { x: -4, z: -896 }, GY = { x: -2, z: -864 }, FIRE2 = { x: -26, z: -850 };
 const KEEP = { x: 34, z: -1150, h: 30 }, CHURCH = { x: 34, z: -1172 }, TOWER_SW = { x: KEEP.x - 34, z: KEEP.z + 34 };
+const ARENA = { x: KEEP.x, z: KEEP.z + KEEP.h + 22, r: 21 };   // Chapter III: the moss before the gate, where the Right is fought
 const zoneOf = z => (z > PASS0 ? 'foot' : z > PASS1 ? 'pass' : z > EDGE_Z ? 'clear' : 'forest');
 function baseH(z) {
   if (z > PASS0) return 0;
@@ -76,6 +95,7 @@ export function createMegla(ctx) {
   const { camera, keys, touch, CAM, sfx } = ctx;
   const scene = new THREE.Scene();
   const rng = mulberry32(2207);
+  const CH3 = ctx.chapter === 3, L3 = STORY.LONGWAY;
   const fog = new THREE.Fog(0xb8c4c4, 200, 1400); scene.fog = fog;
 
   /* ---------------- sky: mist-grey day, Velki's eclipse, blue nights ---------------- */
@@ -210,7 +230,7 @@ export function createMegla(ctx) {
     if (lat < 24) cyl(x, z, 0.5 * s, g - 1, g + 8);
   }
   // the Megla Aagac: trees so big their tops are lost in the fog, and the light that lives among them
-  const clearOfWorks = (x, z, pad) => Math.hypot(x - RUINS.x, z - RUINS.z) < RUINS.r + pad || (Math.abs(x - KEEP.x) < KEEP.h + 14 + pad && Math.abs(z - KEEP.z) < KEEP.h + 14 + pad) || Math.hypot(x - FIRE1.x, z - FIRE1.z) < 14 + pad;
+  const clearOfWorks = (x, z, pad) => (CH3 && Math.hypot(x - ARENA.x, z - ARENA.z) < ARENA.r + 8 + pad) || Math.hypot(x - RUINS.x, z - RUINS.z) < RUINS.r + pad || (Math.abs(x - KEEP.x) < KEEP.h + 14 + pad && Math.abs(z - KEEP.z) < KEEP.h + 14 + pad) || Math.hypot(x - FIRE1.x, z - FIRE1.z) < 14 + pad;
   for (let i = 0; i < 20000 && trunks.count < 1300; i++) {
     const z = EDGE_Z + 6 - rng() * (EDGE_Z - END_Z), x = pathX(z) + (rng() - 0.5) * 170, lat = Math.abs(x - pathX(z));
     const R = 2.4 + rng() * 4.2;
@@ -280,15 +300,20 @@ export function createMegla(ctx) {
   {
     const { x, z, h } = KEEP, g = heightAt(x, z), H = 7;
     const mk = (geo, mat, px, py, pz) => { const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.04); scene.add(m); return m; };
-    for (const [wx, wz, hw, hd] of [[x, z - h, h, 0.9], [x, z + h, h, 0.9], [x - h, z, 0.9, h], [x + h, z, 0.9, h]]) {
+    // in Chapter III the gate stands open: the south wall is two lengths with the gateway between
+    const GW = 3.4, halfS = (h - GW) / 2;
+    const walls = CH3 ? [[x, z - h, h, 0.9], [x - GW - halfS, z + h, halfS, 0.9], [x + GW + halfS, z + h, halfS, 0.9], [x - h, z, 0.9, h], [x + h, z, 0.9, h]]
+      : [[x, z - h, h, 0.9], [x, z + h, h, 0.9], [x - h, z, 0.9, h], [x + h, z, 0.9, h]];
+    for (const [wx, wz, hw, hd] of walls) {
       mk(new THREE.BoxGeometry(hw * 2, H, hd * 2), keepMats.wall, wx, g + H / 2, wz);
       // a band of void-purple along the top: the Duskareth's own marks
       const band = mk(new THREE.BoxGeometry(hw * 2 + 0.1, 0.3, hd * 2 + 0.1), keepMats.trim, wx, g + H - 0.6, wz); keepGlows.push(band);
       box(wx, wz, hw, hd, g - 1, g + H);
       for (let k = -hw + 1.5; k < hw; k += 3) mk(new THREE.BoxGeometry(hd > 1 ? 1.8 : 1.2, 1, hd > 1 ? 1.2 : 1.8), keepMats.wall, wx + (hd > 1 ? 0 : k), g + H + 0.5, wz + (hd > 1 ? k : 0));
     }
-    // the gate, shut fast
-    mk(new THREE.BoxGeometry(6, 5.5, 0.5), toon(0x2a1a2a), x, g + 2.75, z + h + 0.95);
+    // the gate: shut fast — or, once the keep is his, standing open
+    if (!CH3) mk(new THREE.BoxGeometry(6, 5.5, 0.5), toon(0x2a1a2a), x, g + 2.75, z + h + 0.95);
+    else for (const sx of [-1, 1]) { const leaf = mk(new THREE.BoxGeometry(3.3, 5.5, 0.4), toon(0x4a3a2a), x + sx * (GW + 0.2), g + 2.75, z + h + 2.6); leaf.rotation.y = sx * 1.35; }
     // watchtower trees at each corner: a living trunk, and a platform up in it
     for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
       const tx = x + sx * (h + 4), tz = z + sz * (h + 4), tg = heightAt(tx, tz);
@@ -359,7 +384,7 @@ export function createMegla(ctx) {
   function sayHeld(lines, cam, cb) { held(cam); ctx.say(lines, () => { cine.stop(); cb && cb(); }); }
   const over = (o, side = 1, up = 1.8, back = 4.5) => (k, tt) => { const f = V3(Math.sin(o.yaw), 0, Math.cos(o.yaw)), r = V3(f.z, 0, -f.x); return { p: V3(o.pos.x - f.x * back + r.x * side * 1.4, o.pos.y + up, o.pos.z - f.z * back + r.z * side * 1.4), l: V3(o.pos.x + f.x * 6, o.pos.y + 1.4, o.pos.z + f.z * 6) }; };
   const orbit = (c, r = 8, h = 3, sp = 0.12, lookY = 1.2) => (k, tt) => ({ p: V3(c.x + Math.cos(tt * sp + 0.5) * r, c.y + h, c.z + Math.sin(tt * sp + 0.5) * r), l: V3(c.x, c.y + lookY, c.z) });
-  function objective(text, hint = '', pips = 0, on = 0) { ctx.objective('Chapter II · the Megla Aagac', text, hint, pips, on); }
+  function objective(text, hint = '', pips = 0, on = 0) { ctx.objective(CH3 ? L3.head : 'Chapter II · the Megla Aagac', text, hint, pips, on); }
 
   /* ---------------- a campfire ---------------- */
   const fires = [FIRE1, FIRE2].map(({ x, z }) => {
@@ -379,11 +404,11 @@ export function createMegla(ctx) {
 
   /* ---------------- foes: wild Punks (day two), Duskareth (the keep) ---------------- */
   function addFoe(kind, x, z) {
-    const a = kind === 'vel' ? buildVel() : buildWildPunk({ seed: Math.floor(rng() * 999) });
+    const a = kind === 'vel' || kind === 'vel3' ? buildVel() : buildWildPunk({ seed: Math.floor(rng() * 999) });
     if (kind === 'wildpunk') a.root.scale.multiplyScalar(0.7);
     scene.add(a.root);
-    const hp = kind === 'vel' ? 9999 : 34;
-    const f = { kind, a, pos: V3(x, ground(x, z), z), vel: V3(), yaw: rng() * TAU, hp, max: hp, state: 'chase', timer: 0, windup: 0, flash: 0, dead: false, cd: 0.5 + rng() * 1.5, out: 0 };
+    const hp = kind === 'vel' ? 9999 : kind === 'vel3' ? 40 : 34;
+    const f = { kind, a, pos: V3(x, ground(x, z), z), vel: V3(), yaw: rng() * TAU, hp, max: hp, state: 'chase', timer: 0, windup: 0, flash: 0, dead: false, cd: 0.5 + rng() * 1.5, out: 0, blinkCd: 3 + rng() * 4, knifeCd: 2 + rng() * 3 };
     a.root.position.copy(f.pos); foes.push(f); return f;
   }
   function hitFoe(f, dmg, from) {
@@ -396,6 +421,12 @@ export function createMegla(ctx) {
     }
     f.hp -= dmg; sfx.hit(); f.vel.addScaledVector(d, 6); f.stun = 0.35;
     particles.burst(f.pos.x, f.pos.y + 0.8, f.pos.z, 10, { color: 0xffb040, speed: 6, size: 0.3, life: 0.4, gravity: -10 });
+    if (f.kind === 'vel3' && f.hp <= 0) {   // beaten, a Vel doesn't die: it leaves, back through the Duat
+      f.dead = true; f.deadT = 0; f.state = 'gone'; sfx.duat(); if (f.mark) { scene.remove(f.mark); f.mark = null; }
+      particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 40, { color: 0x9a4aff, speed: 6, size: 0.55, life: 0.9, gravity: 1 });
+      if (CH3 && !D.toldFlee) { D.toldFlee = true; ctx.bark(...L3.barks.flee, 2.6); }
+      return;
+    }
     if (f.hp <= 0) { f.dead = true; f.deadT = 0; sfx.die(); particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 22, { color: 0xc88a3a, speed: 7, size: 0.45, life: 0.7, gravity: -6 }); }
   }
   function updateFoes(dt, playing) {
@@ -409,7 +440,33 @@ export function createMegla(ctx) {
       f.stun = Math.max(0, (f.stun || 0) - dt);
       const dx = P.pos.x - f.pos.x, dz = P.pos.z - f.pos.z, d = Math.hypot(dx, dz);
       let want = 0, wy = f.yaw;
-      const reach = f.kind === 'vel' ? 2.4 : 1.9, dmg = f.kind === 'vel' ? 11 : 7;
+      const reach = f.kind === 'wildpunk' ? 1.9 : 2.4, dmg = f.kind === 'vel' ? 11 : f.kind === 'vel3' ? 9 : 7;
+      if (playing && !P.down && f.kind === 'vel3' && f.state === 'blink') {   // gone into the Duat: out again on the mark
+        f.timer -= dt; f.a.root.visible = false;
+        if (f.timer <= 0) {
+          f.a.root.visible = true; f.pos.copy(f.to); sfx.duat(); if (f.mark) { scene.remove(f.mark); f.mark = null; }
+          particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 26, { color: 0x9a4aff, speed: 5, size: 0.45, life: 0.6 });
+          f.state = 'windup'; f.timer = 0.32; f.cd = 1.2 + rng();
+        } else if (f.mark) f.mark.material.opacity = 0.35 + 0.35 * Math.sin(f.timer * 22);
+        continue;
+      }
+      if (playing && !P.down && f.kind === 'vel3' && f.state === 'chase' && !f.stun) {
+        f.blinkCd -= dt; f.knifeCd -= dt;
+        if (f.blinkCd <= 0 && d > 4) {   // a ring of purple on the ground, and out of it, a moment later, the Vel
+          f.blinkCd = 5 + rng() * 4; f.state = 'blink'; f.timer = 0.85; sfx.blink();
+          particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 20, { color: 0x9a4aff, speed: 4, size: 0.4, life: 0.5 });
+          const a = rng() * TAU; f.to = V3(P.pos.x + Math.cos(a) * 1.8 + P.vel.x * 0.5, 0, P.pos.z + Math.sin(a) * 1.8 + P.vel.z * 0.5); f.to.y = ground(f.to.x, f.to.z);
+          f.mark = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.6, 24), new THREE.MeshBasicMaterial({ color: 0xb070ff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+          f.mark.rotation.x = -Math.PI / 2; f.mark.position.set(f.to.x, f.to.y + 0.08, f.to.z); scene.add(f.mark);
+          if (!D.toldBlink) { D.toldBlink = true; ctx.bark(...L3.barks.blink, 2.6); }
+          continue;
+        }
+        if (f.knifeCd <= 0 && d > 6 && d < 22) {   // a knife out of the Duat, thrown from far off
+          f.knifeCd = 3.5 + rng() * 3;
+          throwKnife(V3(f.pos.x, f.pos.y + 1.8, f.pos.z), P.pos.clone().addScaledVector(P.vel, 0.35), 8);
+          if (!D.toldKnife) { D.toldKnife = true; ctx.bark(...L3.barks.knife, 2.4); }
+        }
+      }
       if (playing && !P.down) {
         if (f.state === 'windup') {
           f.timer -= dt; wy = Math.atan2(dx, dz); f.windup = 1 - f.timer / 0.5;
@@ -436,6 +493,7 @@ export function createMegla(ctx) {
     P.hp -= dmg; P.iframes = 0.6; shake = Math.max(shake, 0.35); sfx.hurt();
     const d = V3(P.pos.x - from.x, 0, P.pos.z - from.z).normalize(); P.vel.addScaledVector(d, 6);
     if (stage === 'keep' && sub === 'fight') { if (P.hp <= 18) knockedDown(); }
+    else if (CH3 && stage === 'duel') { if (P.hp <= 0) duelDown(); }
     else if (P.hp <= 0) { P.hp = 60; P.iframes = 1.5; ctx.toast('The amulet goes warm against your chest. You’re up again.', 3); }
     ctx.hp(P.hp / 100);
   }
@@ -449,7 +507,8 @@ export function createMegla(ctx) {
     const from = V3(P.pos.x, P.pos.y + 1.4, P.pos.z);
     let to = null, bd = 34;
     if (GYN && GYN.alive) { const m = mawPoint(); const d = m.distanceTo(from); if (d < 40) { to = m; bd = d; } }
-    for (const f of foes) { if (f.dead || f.out) continue; const dx = f.pos.x - P.pos.x, dz = f.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < bd && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.6) { bd = d; to = V3(f.pos.x, f.pos.y + 0.8, f.pos.z); } }
+    for (const f of foes) { if (f.dead || f.out || f.state === 'blink') continue; const dx = f.pos.x - P.pos.x, dz = f.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < bd && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.6) { bd = d; to = V3(f.pos.x, f.pos.y + 0.8, f.pos.z); } }
+    if (NK && NK.hp > 0 && NK.state !== 'blinkOut') { const dx = NK.pos.x - P.pos.x, dz = NK.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < 40 && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.4) to = V3(NK.pos.x, NK.pos.y + 1.4, NK.pos.z); }
     const speed = 30, vel = to ? (() => { const dx = to.x - from.x, dz = to.z - from.z, hd = Math.hypot(dx, dz), tt = hd / speed; return V3(dx / tt, (to.y - from.y) / tt + 0.5 * 18 * tt, dz / tt); })() : V3(-Math.sin(CAM.yaw) * speed, 4, -Math.cos(CAM.yaw) * speed);
     P.yaw = Math.atan2(vel.x, vel.z);
     const g = new THREE.Group(); const big = amped ? 1.8 : 1;
@@ -465,7 +524,8 @@ export function createMegla(ctx) {
       if (GYN && GYN.alive && p.distanceTo(mawPoint()) < (GYN.phase === 1 ? 3.4 : 2.6)) { hit = true; gyngeStruck(); }
       else if (GYN && GYN.alive && p.distanceTo(GYN.pos.clone().setY(GYN.pos.y + 0.5 * GYN.s)) < 0.75 * GYN.s) { hit = true; gyngeBounce(p); }
       if (!hit) hit = b.life <= 0 || solidAt(p.x, p.y, p.z);
-      for (const f of foes) { if (hit || f.dead || f.out || f.pos.distanceTo(p) > 1.6) continue; hitFoe(f, 22, P.pos); hit = true; }
+      for (const f of foes) { if (hit || f.dead || f.out || f.state === 'blink' || f.pos.distanceTo(p) > 1.6) continue; hitFoe(f, amped ? 30 : 22, P.pos); hit = true; }
+      if (!hit && NK && NK.hp > 0 && NK.state !== 'blinkOut' && p.distanceTo(NK.pos.clone().setY(NK.pos.y + 1.3)) < 1.9) { hitNekhra(amped ? 4.5 : 3, p); hit = true; }
       if (hit) { particles.burst(p.x, p.y, p.z, amped ? 30 : 16, { color: 0xff8a2a, speed: amped ? 8 : 5, size: 0.45, life: 0.5 }); scene.remove(b.g); bolts.splice(i, 1); }
     }
   }
@@ -653,6 +713,7 @@ export function createMegla(ctx) {
           if (d < 2.7 && (dx * Math.sin(P.yaw) + dz * Math.cos(P.yaw)) / (d || 1) > 0.2) hitFoe(f, 14, P.pos);
         }
         if (GYN && GYN.alive && GYN.phase === 2 && Math.hypot(GYN.pos.x - P.pos.x, GYN.pos.z - P.pos.z) < 6) gyngeBounce(P.pos.clone().setY(P.pos.y + 1.2));
+        if (NK && NK.hp > 0 && NK.state !== 'blinkOut') { const dx = NK.pos.x - P.pos.x, dz = NK.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < 3.1 && (dx * Math.sin(P.yaw) + dz * Math.cos(P.yaw)) / (d || 1) > 0.1) hitNekhra(4, NK.pos.clone().setY(NK.pos.y + 1.2)); }
       }
     }
     const speed = Math.hypot(P.vel.x, P.vel.z);
@@ -1107,6 +1168,529 @@ export function createMegla(ctx) {
     });
   }
 
+  /* ================================================================
+     CHAPTER III — THE LONG WAY
+     ================================================================ */
+  // the Carpenter: up the pass on the old barn Punk, at Tanoc's shoulder on foot — and a hard man in a fight
+  let B = null;
+  function makeBuhkon() {
+    if (B) return;
+    const a = buildEikar(NPC_LOOKS.buhkon); scene.add(a.root);
+    const mount = buildWildPunk({ seed: 12, saddle: true, blanket: 0x2a4a7a }); mount.root.scale.setScalar(1.1); scene.add(mount.root);
+    B = { a, mount, pos: V3(), yaw: Math.PI, ride: false, stay: null, mountAt: null, cd: 1, swing: 0, on: true };
+  }
+  function updateBuhkon(dt, playing) {
+    if (!B) return;
+    const A = B.a;
+    if (!B.on) { A.root.visible = false; B.mount.root.visible = false; return; }
+    A.root.visible = true;
+    B.cd -= dt; B.swing = Math.max(0, B.swing - dt);
+    // in a fight he makes for the nearest Vel on its feet
+    let foe = null, fd = 30;
+    if (!B.ride && playing) for (const f of foes) { if (f.dead || f.out || f.state === 'blink') continue; const d = f.pos.distanceTo(B.pos); if (d < fd) { fd = d; foe = f; } }
+    let want = foe ? foe.pos : B.stay;
+    if (!want) { const back = V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), right = V3(Math.cos(P.yaw), 0, -Math.sin(P.yaw)); want = P.pos.clone().addScaledVector(back, B.ride ? 5 : 2.6).addScaledVector(right, B.ride ? 4 : 2.2); }
+    const dx = want.x - B.pos.x, dz = want.z - B.pos.z, d = Math.hypot(dx, dz);
+    const stopAt = foe ? 1.9 : 1.0, top = B.ride ? 18 : foe ? 7.5 : 9.5;
+    let sp = d > stopAt ? Math.min(top, (d - stopAt) * 2.4 + 1) : 0;
+    if (d > 60 && !foe && !B.stay) { B.pos.set(want.x, 0, want.z); sp = 0; }
+    else if (sp > 0) { B.pos.x += dx / d * sp * dt; B.pos.z += dz / d * sp * dt; B.yaw = dampAngle(B.yaw, Math.atan2(dx, dz), 8, dt); }
+    else B.yaw = dampAngle(B.yaw, foe ? Math.atan2(dx, dz) : Math.atan2(P.pos.x - B.pos.x, P.pos.z - B.pos.z), 4, dt);
+    resolve(B.pos, B.ride ? 0.9 : 0.5); B.pos.y = groundAt(B.pos.x, B.pos.z, B.pos.y + 1);
+    if (foe && fd < 2.6 && B.cd <= 0) {   // the Carpenter's axe, and the weight behind it
+      B.cd = 1.15 + rng() * 0.4; B.swing = 0.42; sfx.heavy();
+      hitFoe(foe, 15, B.pos); foe.vel.addScaledVector(V3(foe.pos.x - B.pos.x, 0, foe.pos.z - B.pos.z).normalize(), 8);
+      if (!D.toldToss && foe.hp > 0) { D.toldToss = true; ctx.bark(...L3.barks.toss, 2); }
+    }
+    if (B.ride) {
+      B.mount.root.visible = true; B.mount.root.position.copy(B.pos); B.mount.root.rotation.y = B.yaw;
+      B.mount.animate(dt, { speed: sp, t });
+      const seat = V3(0, 1.1 * 1.85 - 0.3, -0.05).applyAxisAngle(V3(0, 1, 0), B.yaw).add(B.pos);
+      A.root.position.copy(seat); A.root.rotation.y = B.yaw; A.animate(dt, { speed: 0, onGround: true, t, swing: null });
+      return;
+    }
+    if (B.mountAt) { B.mount.root.visible = true; B.mount.root.position.copy(B.mountAt); B.mount.animate(dt, { speed: 0, t }); } else B.mount.root.visible = false;
+    A.root.position.copy(B.pos); A.root.rotation.y = B.yaw;
+    A.animate(dt, { speed: sp, onGround: true, t, swing: B.swing > 0 ? { kind: 1, p: 1 - B.swing / 0.42 } : null });
+  }
+  // Duat knives: thrown out of thin air, from far off
+  const darts = [];
+  function throwKnife(from, to, dmg) {
+    const g = new THREE.Group(), m = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.6, 4), new THREE.MeshBasicMaterial({ color: 0xd8a8ff }));
+    m.rotation.x = Math.PI / 2; g.add(m, glowSprite(0x9a4aff, 1.2, 0.8)); g.position.copy(from); scene.add(g);
+    const v = to.clone().setY(to.y + 1).sub(from), tt = Math.max(0.45, v.length() / 20); v.divideScalar(tt);
+    darts.push({ g, vel: v, life: tt + 0.6, dmg }); sfx.swing();
+  }
+  function updateDarts(dt) {
+    for (let i = darts.length - 1; i >= 0; i--) {
+      const k = darts[i], p = k.g.position; k.life -= dt; p.addScaledVector(k.vel, dt); k.g.lookAt(p.clone().add(k.vel));
+      let hit = k.life <= 0 || p.y < heightAt(p.x, p.z);
+      if (!hit && P.iframes <= 0 && !P.down && Math.hypot(p.x - P.pos.x, p.z - P.pos.z) < 0.8 && p.y > P.pos.y && p.y < P.pos.y + 2.2) { hurtTanoc(k.dmg, p); hit = true; }
+      if (hit) { particles.burst(p.x, p.y, p.z, 8, { color: 0xb070ff, speed: 3, size: 0.3, life: 0.3 }); scene.remove(k.g); darts.splice(i, 1); }
+    }
+  }
+  const velOut = (f, quiet) => { if (!quiet) { sfx.duat(); particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 26, { color: 0x9a4aff, speed: 5, size: 0.45, life: 0.6 }); } };
+  function velWave(n, cx, cz, r) {
+    for (let i = 0; i < n; i++) { const a = i / n * TAU + rng() * 0.4, f = addFoe('vel3', cx + Math.cos(a) * r, cz + Math.sin(a) * r); f.yaw = Math.atan2(P.pos.x - f.pos.x, P.pos.z - f.pos.z); f.cd = 1 + rng() * 1.5; velOut(f); }
+  }
+  const velsLeft = () => foes.filter(f => f.kind === 'vel3' && !f.dead).length;
+  // the keep is already his: moss and leaves and the smell of rain, the gate open
+  function keepIsHis() {
+    keepMats.trim.color.setHex(0x5a7a3a); keepMats.trim.emissive.setHex(0x8affb0); keepMats.trim.emissiveIntensity = 0.5;
+    keepMats.wall.color.setHex(0x8a8a78); keepMats.leaf.color.setHex(0x4a8a3a); keepMats.roof.color.setHex(0x5a4a3a);
+    keepGlows.forEach(g => { if (g.isSprite) g.material.color.setHex(0x9affb0); });
+    for (let k = 0; k < 140; k++) { const x = KEEP.x + (rng() - 0.5) * KEEP.h * 2, z = KEEP.z + (rng() - 0.5) * KEEP.h * 2; put(ferns, x, heightAt(x, z) + 0.3, z, 0.6, 0.5, 0.6, 0, rng() * 6, 0, pick(['#4a8a3a', '#6aa848', '#e8d070', '#c890ff'])); }
+    ferns.instanceMatrix.needsUpdate = true; ferns.instanceColor.needsUpdate = true;
+  }
+  // the Gynge: a hill of grey rock in the hollow, furred green already
+  function gyngeHill() {
+    spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z) - 0.5; gyngeBar.style.display = 'none';
+    GYN.a.root.traverse(o => { if (o.material && o.material.color) { o.material = o.material.clone(); o.material.color.lerp(new THREE.Color(0x5a7a4a), 0.45); } });
+    const g = heightAt(GY.x, GY.z); cyl(GY.x, GY.z, 0.75 * GYN.s, g - 1, g + 2.6); indexSolids();
+  }
+  function makeMalsti() {
+    if (malsti) return;
+    malsti = buildMalstiPunk({ seed: 61 }); malsti.root.scale.setScalar(5.5); malsti.root.position.copy(P.pos); scene.add(malsti.root);
+  }
+  const PN = () => STORY.SPEAKERS.punk.name, MN = () => STORY.SPEAKERS.malsti.name;
+  // Vel along the ridge, keeping pace: left side, high up, never closer
+  const ridge = [];
+  function ridgeWatchers() {
+    for (let i = 0; i < 4; i++) { const a = buildVel(); a.glow && a.glow(1); scene.add(a.root); ridge.push({ a, lead: 26 + i * 11, side: -(36 + (i % 2) * 8) }); }
+  }
+  function updateRidge(dt) {
+    for (const r of ridge) {
+      const z = P.pos.z - r.lead, x = pathX(z) + r.side, g = heightAt(x, z);
+      r.a.root.position.set(x, g, z); r.a.root.rotation.y = Math.atan2(P.pos.x - x, P.pos.z - z);
+      r.a.animate(dt, { speed: Math.hypot(P.vel.x, P.vel.z) > 2 ? 6 : 0, t, onGround: true });
+    }
+  }
+  function ridgeGone() { for (const r of ridge) { particles.burst(r.a.root.position.x, r.a.root.position.y + 1, r.a.root.position.z, 20, { color: 0x9a4aff, speed: 4, size: 0.5, life: 0.6 }); scene.remove(r.a.root); } ridge.length = 0; }
+  // the ring of Vel that watch the Right being fought; they never lift a hand
+  const watchers = [];
+  function ringOfVel() {
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * TAU + 0.13, x = ARENA.x + Math.cos(a) * (ARENA.r + 3), z = ARENA.z + Math.sin(a) * (ARENA.r + 3);
+      if (z < KEEP.z + KEEP.h + 3) continue;   // not inside the walls; the keep won't have them
+      const v = buildVel(); v.glow && v.glow(1); scene.add(v.root); v.root.position.set(x, ground(x, z), z); v.root.rotation.y = Math.atan2(ARENA.x - x, ARENA.z - z);
+      particles.burst(x, v.root.position.y + 1, z, 16, { color: 0x9a4aff, speed: 4, size: 0.45, life: 0.6 });
+      watchers.push(v);
+    }
+    sfx.duat();
+  }
+  function updateWatchers(dt) { for (const v of watchers) v.animate(dt, { speed: 0, t, onGround: true }); }
+
+  /* ---- the ride: up the pass at the day's end, the Carpenter at his side ---- */
+  function startRide3() {
+    stage = 'ride'; sub = 'ride'; ctx.save('ride'); setLook('day', true);
+    P.ride = true; place(P, pathX(-6), -6, Math.PI); K.on = true;
+    B.ride = true; place(B, pathX(-6) + 4, -1, Math.PI);
+    D = { said: 0 }; ridgeWatchers();
+    cut([
+      { dur: 6.5, from: { p: [pathX(-300) + 70, 140, -340], l: [pathX(-120), 20, -120] }, to: { p: [pathX(-200) + 40, 80, -230], l: [pathX(-40), 6, -40] }, caption: L3.cards },
+      { dur: 6, cam: k => ({ p: V3(P.pos.x + 7 - k * 2, P.pos.y + 2.6, P.pos.z - 10 + k * 2), l: V3(P.pos.x + 2, P.pos.y + 1.6, P.pos.z) }), caption: L3.ride[0][1], onTick: () => { P.vel.set(0, 0, -6); } },
+    ], () => { ctx.location('The river pass', L3.head + ' · north again'); objective(L3.rideObj, 'Shift to gallop · follow the river'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); });
+  }
+  function ride3Tick() {
+    const prog = clamp(-P.pos.z / -PASS1, 0, 1);
+    const marks = [0.18, 0.38, 0.6, 0.8];
+    if (D.said < marks.length && prog > marks[D.said]) { const [w, l] = L3.rideBarks[D.said]; ctx.bark(w, l, 4.5); D.said++; }
+    if (prog > 0.5 && !D.dusk) { D.dusk = true; setLook('dusk'); }
+    if (P.pos.z < PASS1 - 20) arriveClearing3();
+  }
+  function arriveClearing3() {
+    stage = 'clearing'; sub = 'look'; setGoal(); ridgeGone();
+    P.vel.set(0, 0, 0);
+    rodakPack(6, pathX(EDGE_Z) + 6, EDGE_Z + 2);
+    cut([
+      { dur: 5.5, from: { p: [pathX(EDGE_Z) + 10, heightAt(0, EDGE_Z + 30) + 3, EDGE_Z + 30], l: [pathX(EDGE_Z) + 6, heightAt(0, EDGE_Z) + 2, EDGE_Z] }, to: { p: [pathX(EDGE_Z) + 8, heightAt(0, EDGE_Z + 22) + 2.2, EDGE_Z + 22], l: [pathX(EDGE_Z) + 6, heightAt(0, EDGE_Z) + 1.5, EDGE_Z] }, caption: L3.clearing[0][1] },
+    ], () => {
+      sayHeld(L3.clearing.slice(1), over(P, 1), () => {
+        objective(L3.campObj, 'Ride to the stones by the old firepit, and press E');
+        setGoal(FIRE1.x, fires[0].y, FIRE1.z);
+        D.camp = addItem(V3(FIRE1.x, fires[0].y + 0.5, FIRE1.z), 'Make camp for the night', () => { dropItem(D.camp); night3(); });
+        ctx.play();
+      });
+    });
+  }
+  /* ---- night: the Right of Holding, and the Vel step out of the air ---- */
+  function night3() {
+    stage = 'camp'; sub = 'talk'; ctx.save('camp');
+    setGoal(); P.ride = false; B.ride = false; fires[0].on = true; setLook('night');
+    place(P, FIRE1.x + 2.2, FIRE1.z + 1.2, -Math.PI * 0.6); place(K, FIRE1.x + 1.2, FIRE1.z + 3.4, -Math.PI * 0.8); K.stay = K.pos.clone();
+    place(B, FIRE1.x - 2.2, FIRE1.z + 0.6, Math.PI * 0.6); B.stay = B.pos.clone(); B.mountAt = V3(FIRE1.x - 3.4, ground(FIRE1.x - 3.4, FIRE1.z + 4), FIRE1.z + 4);
+    if (!rodak.length) rodakPack(6, pathX(EDGE_Z) + 6, EDGE_Z + 2);
+    for (const r of rodak) r.mode = 'watch';
+    const c = fires[0];
+    sayHeld(L3.night, fireCam(c), () => ambush3());
+  }
+  function ambush3() {
+    const c = fires[0];
+    sfx.duat(); shake = 0.5;
+    velWave(4, c.x, c.z, 11);
+    sayHeld(L3.ambush, (k, tt) => ({ p: V3(c.x + 7, c.y + 4, c.z + 8), l: V3(c.x, c.y + 1, c.z) }), () => {
+      sub = 'fight'; B.stay = null; D.total = 6; D.second = false;
+      objective(L3.ambushObj, L3.ambushHint, 6, 0); ctx.play();
+    });
+  }
+  function ambush3Tick() {
+    const gone = D.total - velsLeft() - (D.second ? 0 : 2);
+    if (gone !== D.shown) { D.shown = gone; objective(L3.ambushObj, L3.ambushHint, 6, gone); }
+    if (!D.second && velsLeft() <= 2) { D.second = true; velWave(2, P.pos.x, P.pos.z, 13); }
+    if (D.second && velsLeft() === 0 && !D.over) {
+      D.over = true; sub = 'after'; const c = fires[0];
+      for (const r of rodak) r.mode = 'watch';
+      setTimeout(() => sayHeld(L3.ambushEnd, fireCam(c), () => {
+        ctx.fade && ctx.fade(1, 1);
+        setTimeout(() => morning3(), 1100);
+      }), 900);
+    }
+  }
+  /* ---- morning: into the trees, all of them together ---- */
+  function morning3() {
+    stage = 'forest'; sub = 'walk'; ctx.save('forest'); setLook('grey', true); fires[0].on = false;
+    if (!B.mountAt) B.mountAt = V3(FIRE1.x - 3.4, ground(FIRE1.x - 3.4, FIRE1.z + 4), FIRE1.z + 4);
+    P.ride = false; B.ride = false; B.stay = null; K.on = true; K.stay = null;
+    place(P, FIRE1.x + 2, FIRE1.z - 1, Math.PI); place(B, FIRE1.x - 1, FIRE1.z, Math.PI); place(K, FIRE1.x + 1, FIRE1.z + 2.4, Math.PI);
+    if (!rodak.length) rodakPack(6, pathX(EDGE_Z) + 6, EDGE_Z + 2);
+    for (const r of rodak) { r.mode = 'watch'; r.a.root.visible = true; }
+    D = {};
+    ctx.fade && ctx.fade(0, 1.2);
+    say(L3.morning, () => { objective(L3.forestObj, 'The Carpenter and your Punk walk with you'); setGoal(RUINS.x, heightAt(RUINS.x, RUINS.z), RUINS.z + RUINS.r - 6); ctx.play(); });
+  }
+  function forest3Tick() {
+    if (!D.esc && P.pos.z < EDGE_Z - 6) { D.esc = true; rodak.forEach(r => { r.mode = 'escort'; }); }
+    if (!D.thud && P.pos.z < THUD_Z) { D.thud = true; ctx.bark('tale', L3.thud(PN())[0][1], 4.5); }
+    if (D.esc && !D.line && P.pos.z < LINE_Z - 2) {
+      D.line = true;
+      rodak.forEach((r, i) => { r.mode = 'sit'; r.home = V3(P.pos.x + (i - 2.5) * 4, 0, LINE_Z + 1.5); });
+      setTimeout(() => sayHeld(L3.line, (k, tt) => ({ p: V3(P.pos.x - 4, P.pos.y + 2.4, P.pos.z - 6), l: V3(P.pos.x, P.pos.y + 1, LINE_Z + 2) }), () => ctx.play()), 1000);
+    }
+    if (Math.hypot(P.pos.x - RUINS.x, P.pos.z - RUINS.z) < RUINS.r - 4) ruins3();
+  }
+  /* ---- the ruins: the Akai Gek, linked to the ring ---- */
+  function ruins3() {
+    stage = 'ruins'; sub = 'look'; ctx.save('ruins'); setGoal();
+    const g = heightAt(GY.x, GY.z);
+    sayHeld(L3.ruins, (k, tt) => ({ p: V3(GY.x + 14 + Math.sin(tt * 0.15) * 2, g + 6, GY.z + 14), l: V3(GY.x, g + 2, GY.z) }), () => linkSetup());
+  }
+  function linkSetup() {
+    sub = 'link'; D.link = 0;
+    objective(L3.linkObj, L3.linkHint); setGoal(WALL.x, heightAt(WALL.x, WALL.z), WALL.z + 2);
+    D.linkItem = addItem(V3(WALL.x, heightAt(WALL.x, WALL.z) + 0.5, WALL.z + 1.6), 'Hold E: link the Relic to your ring', () => {
+      if (D.taught) return;
+      D.taught = true; say(L3.linkTeach, () => ctx.play());
+    });
+    ctx.play();
+  }
+  let beam = null;
+  function updateLink(dt, playing) {
+    if (stage !== 'ruins' || sub !== 'link') { if (beam) beam.visible = false; return; }
+    const near = Math.hypot(P.pos.x - WALL.x, P.pos.z - (WALL.z + 1.6)) < 4;
+    const holding = playing && D.taught && near && (keys.KeyE || (touch && touch.on));
+    D.link = holding ? D.link + dt : Math.max(0, D.link - dt * 0.6);
+    if (!beam) { beam = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, 1, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xc890ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(beam); }
+    const a = relic.position, b = V3(P.pos.x, P.pos.y + 0.95, P.pos.z), L = a.distanceTo(b);
+    beam.visible = D.link > 0; beam.position.copy(a).lerp(b, 0.5); beam.scale.set(1, L, 1); beam.lookAt(b); beam.rotateX(Math.PI / 2);
+    beam.material.opacity = Math.min(0.9, D.link * 0.4) * (0.7 + Math.sin(t * 20) * 0.3);
+    relicPulse = Math.max(relicPulse, D.link * 0.5);
+    if (holding && Math.random() < 0.7) { const q = a.clone().lerp(b, Math.random()); particles.emit(q.x, q.y, q.z, { vx: 0, vy: 0.3, vz: 0, color: 0xc890ff, size: 0.3, life: 0.5, drag: 1 }); }
+    const n = Math.min(5, Math.floor(D.link / 0.6));
+    if (n !== D.pip) { D.pip = n; objective(L3.linkObj, L3.linkHint, 5, n); if (n > 0) sfx.core(); }
+    if (D.link >= 3) linkDone();
+  }
+  function linkDone() {
+    sub = 'linked'; dropItem(D.linkItem); setGoal(); beam.visible = false;
+    amped = true; ctx.akaiLink && ctx.akaiLink(); relicPulse = 2.5; sfx.victory(); shake = 0.4;
+    particles.ring(P.pos.x, P.pos.y + 1, P.pos.z, 60, 4, { color: 0xc890ff, size: 0.6, life: 0.8 });
+    sayHeld(L3.linked, (k, tt) => ({ p: V3(WALL.x + 3.4 + Math.sin(tt * 0.2), relic.position.y - 0.6, WALL.z + 7.5), l: relic.position.clone().setY(relic.position.y - 0.8) }), () => {
+      ctx.toast(L3.linkGot, 5);
+      toKeep();
+    });
+  }
+  /* ---- north to the keep; another test in the trees ---- */
+  function toKeep() {
+    stage = 'tokeep'; sub = 'walk'; ctx.save('keep');
+    objective(L3.keepObj, 'Q throws a fire-stone · north, then east, to the keep');
+    setGoal(KEEP.x, heightAt(KEEP.x, KEEP.z + KEEP.h + 20), KEEP.z + KEEP.h + 20);
+    ctx.play();
+  }
+  function tokeepTick() {
+    if (!D.amb2 && P.pos.z < -975) {
+      D.amb2 = true; sub = 'fight';
+      velWave(3, P.pos.x, P.pos.z - 4, 12);
+      ctx.say(L3.forestAmbush, () => { objective(L3.ambushObj, L3.ambushHint); ctx.play(); });
+    }
+    if (D.amb2 && !D.amb2done && velsLeft() === 0) {
+      D.amb2done = true; sub = 'walk';
+      ctx.bark(...L3.forestAmbushEnd[0], 4);
+      objective(L3.keepObj, 'North, then east, to the keep');
+    }
+    if (D.amb2done && Math.hypot(P.pos.x - KEEP.x, P.pos.z - (KEEP.z + KEEP.h)) < 42) keepArrive3();
+  }
+  /* ---- the keep: who he lets in ---- */
+  function keepArrive3() {
+    stage = 'keep'; sub = 'arrive'; setGoal(); setLook('grey');
+    const c = V3(KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z);
+    cut([{ dur: 6, from: { p: [KEEP.x - 50, c.y + 22, KEEP.z + KEEP.h + 50], l: [KEEP.x, c.y + 4, KEEP.z] }, to: { p: [KEEP.x - 26, c.y + 10, KEEP.z + KEEP.h + 30], l: [KEEP.x, c.y + 3, KEEP.z + KEEP.h] }, caption: L3.keepArrive[0][1] }], () => {
+      say([L3.keepArrive[1]], () => {
+        ctx.ask('tale', L3.allowText, L3.allowOpts.map((label, i) => ({ label, act: () => allowIn(i === 1) })));
+      });
+    });
+  }
+  function allowIn(withRodak) {
+    D.rodakIn = withRodak; sfx.heal();
+    particles.ring(KEEP.x, heightAt(KEEP.x, KEEP.z + KEEP.h) + 1, KEEP.z + KEEP.h, 60, 4, { color: 0x9affb0, size: 0.6, life: 1 });
+    if (withRodak) rodak.forEach((r, i) => { r.mode = 'sit'; r.a.root.visible = true; r.pos.set(KEEP.x - 12 + i * 5, 0, KEEP.z + KEEP.h + 30); r.home = V3(KEEP.x - KEEP.h + 4, 0, KEEP.z - 14 + i * 6); });
+    say(L3.allowed(withRodak), () => {
+      sub = 'in'; objective(L3.inObj, 'Through the gate'); setGoal(KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z + 6);
+      ctx.play();
+    });
+  }
+  function keep3Tick() {
+    if (sub === 'in' && Math.abs(P.pos.x - KEEP.x) < KEEP.h - 3 && Math.abs(P.pos.z - KEEP.z) < KEEP.h - 3) dusk3();
+  }
+  /* ---- dusk: Nekhra at the door ---- */
+  function dusk3() {
+    stage = 'keep'; sub = 'dusk'; ctx.save('duel'); setGoal(); setLook('dusk');
+    const gz = KEEP.z + KEEP.h, gy = heightAt(KEEP.x, gz);
+    place(P, KEEP.x, gz - 5, 0); place(B, KEEP.x - 3, gz - 7, 0); B.stay = B.pos.clone(); place(K, KEEP.x + 3.5, gz - 8, 0); K.stay = K.pos.clone();
+    D.malstiAt = V3(KEEP.x - 1.2, 0, gz - 6.5);
+    ringOfVel();
+    makeNekhra(); NK.pos.set(KEEP.x, 0, ARENA.z + 16); NK.pos.y = ground(NK.pos.x, NK.pos.z); NK.yaw = Math.PI; NK.state = 'walkIn';
+    cut([
+      { dur: 6, from: { p: [KEEP.x + 4, gy + 3, gz - 8], l: [KEEP.x, gy + 2, ARENA.z] }, to: { p: [KEEP.x + 2, gy + 2.6, gz - 4], l: [KEEP.x, gy + 2, ARENA.z + 4] }, caption: L3.dusk[0][1] },
+      { dur: 6, cam: k => ({ p: V3(NK.pos.x + 5, NK.pos.y + 2.4, NK.pos.z - 7), l: V3(NK.pos.x, NK.pos.y + 1.7, NK.pos.z) }), caption: L3.dusk[1][1], onTick: k => { NK.pos.z = lerp(ARENA.z + 16, ARENA.z + 6, smooth(0, 1, k)); NK.walking = k < 0.95; } },
+    ], () => {
+      NK.walking = false; NK.state = 'idle';
+      const cam = (k, tt) => ({ p: V3(KEEP.x + 3, gy + 2.4, gz - 6), l: V3(NK.pos.x, NK.pos.y + 1.6, NK.pos.z) });
+      sayHeld(L3.dusk.slice(2).concat(L3.malstiSeen(MN())), cam, () => answer());
+    });
+  }
+  function answer() {
+    ctx.ask('tale', L3.answerText, [
+      { label: L3.answerOpts[0], act: () => ctx.say(L3.accept, () => duelStart()) },
+      { label: L3.answerOpts[1], act: () => ctx.say(L3.buhkonLook, () => answer()) },
+    ]);
+  }
+
+  /* ---------------- NEKHRA, a Thar Norvek: the Right of Holding ---------------- */
+  let NK = null;
+  const nkBar = (() => {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:40%;top:4.5vh;transform:translateX(-50%);width:min(420px,52vw);z-index:22;display:none;font-family:var(--display,Georgia);letter-spacing:.2em;font-size:12px;color:#ecd8ff;text-align:center;text-shadow:0 1px 4px #000';
+    d.innerHTML = 'NEKHRA · THAR NORVEK<div style="height:9px;margin-top:6px;border:1px solid #b080e0;border-radius:5px;background:rgba(0,0,0,.45);overflow:hidden"><div class="fill" style="height:100%;width:100%;background:linear-gradient(90deg,#6a2ac8,#d8a0ff);transition:width .25s"></div></div>';
+    document.body.appendChild(d); return d;
+  })();
+  function makeNekhra() {
+    if (NK) return;
+    const a = buildVel(); a.root.scale.setScalar(1.3); a.glow && a.glow(1);
+    const seam = glowSprite(0xe0a0ff, 0.7, 0.9); seam.position.set(0, 1.42, 0.3); a.root.add(seam);   // her mouth: a seam of violet light
+    const aura = glowSprite(0x7a3aff, 5, 0.35); aura.position.y = 1.2; a.root.add(aura);
+    scene.add(a.root);
+    NK = { a, seam, aura, pos: V3(), vel: V3(), yaw: Math.PI, hp: 100, state: 'idle', timer: 0, phase: 1, flash: 0, waves: [], drops: [], mark: null, windup: 0, attackA: 0, walking: false, said: {} };
+  }
+  function setNkHp(v) { NK.hp = Math.max(0, v); nkBar.querySelector('.fill').style.width = NK.hp + '%'; }
+  function hitNekhra(dmg, at) {
+    if (!NK || NK.hp <= 0 || stage !== 'duel' || sub !== 'duel') return;
+    const mul = NK.state === 'winded' ? 1.9 : NK.state === 'recover' ? 1.3 : 1;
+    setNkHp(NK.hp - dmg * mul); NK.flash = 1; sfx.hit();
+    particles.burst(at.x, at.y, at.z, mul > 1.5 ? 26 : 12, { color: mul > 1.5 ? 0xffe0a0 : 0xc890ff, speed: 6, size: 0.4, life: 0.5 });
+    if (NK.phase === 1 && NK.hp <= 50) nekhraHalf();
+    else if (NK.hp <= 0) win3();
+  }
+  function nkScreamWave(delay = 0) {
+    const g = ground(NK.pos.x, NK.pos.z);
+    const m = new THREE.Mesh(new THREE.TorusGeometry(1, 0.12, 6, 48), new THREE.MeshBasicMaterial({ color: 0xd8a0ff, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.rotation.x = Math.PI / 2; m.position.set(NK.pos.x, g + 0.5, NK.pos.z); m.visible = false; scene.add(m);
+    NK.waves.push({ m, c: NK.pos.clone(), r: 1.2, t: -delay, hit: false });
+  }
+  function nkKnives() {   // knives out of the Duat, hanging in a ring over him — then down
+    const c = P.pos.clone(), g = ground(c.x, c.z);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(3.2, 3.7, 40), new THREE.MeshBasicMaterial({ color: 0xb070ff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(c.x, g + 0.08, c.z); scene.add(ring);
+    const ks = [];
+    for (let i = 0; i < 7; i++) { const a = i / 7 * TAU, k = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.8, 4), new THREE.MeshBasicMaterial({ color: 0xd8a8ff })); k.rotation.x = Math.PI; k.position.set(c.x + Math.cos(a) * 2.6, g + 4.5, c.z + Math.sin(a) * 2.6); scene.add(k); ks.push(k); }
+    NK.drops.push({ c, g, ring, ks, t: 0 }); sfx.duat();
+  }
+  function nkChoose(d) {
+    const r = rng();
+    if (d < 3.4) { NK.state = 'melee'; NK.timer = 0.55; return; }
+    if (NK.phase === 2 && r < 0.3) { NK.state = 'knivesUp'; NK.timer = 0.7; return; }
+    if (r < (NK.phase === 2 ? 0.62 : 0.5)) { NK.state = 'screamUp'; NK.timer = 1.0; sfx.duat(); if (!NK.said.scream) { NK.said.scream = 1; ctx.bark(...L3.duelBarks.scream, 3); } return; }
+    if (r < 0.82) {
+      NK.state = 'blinkOut'; NK.timer = 1.0; sfx.blink();
+      particles.burst(NK.pos.x, NK.pos.y + 1.2, NK.pos.z, 30, { color: 0x9a4aff, speed: 5, size: 0.5, life: 0.6 });
+      const to = P.pos.clone().addScaledVector(P.vel, 0.45); to.y = ground(to.x, to.z); NK.to = to;
+      NK.mark = new THREE.Mesh(new THREE.RingGeometry(1.2, 2.2, 32), new THREE.MeshBasicMaterial({ color: 0xb070ff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+      NK.mark.rotation.x = -Math.PI / 2; NK.mark.position.set(to.x, to.y + 0.08, to.z); scene.add(NK.mark);
+      if (!NK.said.blink) { NK.said.blink = 1; ctx.bark(...L3.duelBarks.blink, 2.4); }
+      return;
+    }
+    NK.state = 'close'; NK.timer = 2.4;
+  }
+  function updateNekhra(dt, playing) {
+    nkBar.style.display = NK && stage === 'duel' && NK.hp > 0 ? 'block' : 'none';
+    if (!NK) return;
+    if (NK.state === 'gone') { NK.a.root.visible = false; return; }
+    const a = NK.a; NK.flash = Math.max(0, NK.flash - dt * 4); a.flash && a.flash(NK.flash);
+    const dx = P.pos.x - NK.pos.x, dz = P.pos.z - NK.pos.z, d = Math.hypot(dx, dz);
+    let want = 0, wy = NK.yaw, windup = 0;
+    if (NK.state === 'walkIn') { want = 0; }
+    else if (NK.state === 'kneel') { a.root.position.y = damp(a.root.position.y, NK.pos.y - 0.45, 3, dt); a.animate(dt, { speed: 0, t, onGround: true }); NK.seam.material.opacity = damp(NK.seam.material.opacity, 0, 2, dt); return; }
+    else if (playing && stage === 'duel' && sub === 'duel' && !P.down) {
+      NK.timer -= dt; wy = Math.atan2(dx, dz);
+      if (NK.state === 'idle') { NK.state = 'circle'; NK.timer = 1.2; }
+      if (NK.state === 'circle') {   // round him, at her distance
+        const tang = Math.atan2(dx, dz) + Math.PI / 2 * (NK.dir || 1);
+        want = 4.2; wy = d > 9 ? Math.atan2(dx, dz) : d < 5 ? Math.atan2(-dx, -dz) : tang;
+        if (NK.timer <= 0) { NK.dir = rng() < 0.5 ? -1 : 1; nkChoose(d); }
+      } else if (NK.state === 'close') {
+        want = 8.5; if (d < 2.8) { NK.state = 'melee'; NK.timer = 0.5; } else if (NK.timer <= 0) { NK.state = 'circle'; NK.timer = 1; }
+      } else if (NK.state === 'melee') {
+        windup = 1 - NK.timer / 0.55;
+        if (NK.timer <= 0) { NK.state = 'recover'; NK.timer = 0.75; NK.attackA = 1; NK.vel.x += Math.sin(NK.yaw) * 9; NK.vel.z += Math.cos(NK.yaw) * 9; sfx.swing(); if (d < 3.2 && P.iframes <= 0) hurtTanoc(13, NK.pos); }
+      } else if (NK.state === 'recover') {
+        NK.attackA = Math.max(0, NK.attackA - dt * 3); if (NK.timer <= 0) { NK.state = 'circle'; NK.timer = 1 + rng() * 1.2; }
+      } else if (NK.state === 'screamUp') {   // she draws breath; the seam of her mouth burns wide
+        windup = 1 - NK.timer / 1.0;
+        if (NK.timer <= 0) { nkScreamWave(); if (NK.phase === 2) nkScreamWave(0.5); sfx.roar(); shake = Math.max(shake, 0.5); NK.state = 'winded'; NK.timer = NK.phase === 2 ? 1.7 : 2.1; NK.toldWind = false; }
+      } else if (NK.state === 'winded') {   // spent: bent over, breathing hard
+        if (!NK.said.winded && NK.timer < (NK.phase === 2 ? 1.2 : 1.6)) { NK.said.winded = 1; ctx.bark(...L3.duelBarks.winded, 2); }
+        if (NK.timer <= 0) { NK.state = 'circle'; NK.timer = 0.9 + rng(); }
+      } else if (NK.state === 'blinkOut') {
+        a.root.visible = false; if (NK.mark) NK.mark.material.opacity = 0.35 + 0.35 * Math.sin(NK.timer * 24);
+        if (NK.timer <= 0) {   // out of the Duat, right on the mark, blade first
+          a.root.visible = true; NK.pos.copy(NK.to); sfx.duat(); sfx.swing(); shake = Math.max(shake, 0.4);
+          if (NK.mark) { scene.remove(NK.mark); NK.mark = null; }
+          particles.burst(NK.pos.x, NK.pos.y + 1.2, NK.pos.z, 40, { color: 0x9a4aff, speed: 7, size: 0.55, life: 0.7 });
+          if (Math.hypot(P.pos.x - NK.pos.x, P.pos.z - NK.pos.z) < 2.3 && P.iframes <= 0) hurtTanoc(16, NK.pos);
+          NK.attackA = 1; NK.state = 'recover'; NK.timer = 1.0;
+        }
+      } else if (NK.state === 'knivesUp') {
+        windup = 1 - NK.timer / 0.7;
+        if (NK.timer <= 0) { nkKnives(); NK.state = 'circle'; NK.timer = 2.2; if (!NK.said.knives) { NK.said.knives = 1; ctx.bark(...L3.duelBarks.knives, 2.6); } }
+      }
+    }
+    if (NK.state !== 'blinkOut') a.root.visible = true;
+    NK.yaw = dampAngle(NK.yaw, wy, 7, dt);
+    NK.vel.x = damp(NK.vel.x, Math.sin(wy) * want, 7, dt); NK.vel.z = damp(NK.vel.z, Math.cos(wy) * want, 7, dt);
+    NK.pos.x += NK.vel.x * dt; NK.pos.z += NK.vel.z * dt;
+    if (stage === 'duel') { const ox = NK.pos.x - ARENA.x, oz = NK.pos.z - ARENA.z, od = Math.hypot(ox, oz); if (od > ARENA.r - 1) { NK.pos.x = ARENA.x + ox / od * (ARENA.r - 1); NK.pos.z = ARENA.z + oz / od * (ARENA.r - 1); } }
+    resolve(NK.pos, 0.6); NK.pos.y = groundAt(NK.pos.x, NK.pos.z, NK.pos.y + 1);
+    a.root.position.copy(NK.pos); a.root.rotation.y = NK.yaw;
+    const bent = NK.state === 'winded' ? 0.5 : 0;
+    a.root.rotation.x = damp(a.root.rotation.x, bent, 6, dt);
+    a.animate(dt, { speed: NK.state === 'walkIn' && NK.walking ? 2.2 : Math.hypot(NK.vel.x, NK.vel.z), t, windup: Math.max(windup, NK.state === 'screamUp' ? 1 : 0), attack: NK.attackA, onGround: true });
+    NK.seam.scale.setScalar(NK.state === 'screamUp' ? 0.7 + windup * 2.6 : NK.state === 'winded' ? 0.35 : 0.7);
+    NK.seam.material.opacity = NK.state === 'winded' ? 0.35 : 0.9;
+    NK.aura.material.opacity = 0.25 + windup * 0.5 + NK.flash * 0.3;
+    if (NK.state === 'screamUp' && Math.random() < 0.6) particles.emit(NK.pos.x, NK.pos.y + 1.8, NK.pos.z, { vx: (Math.random() - 0.5) * 2, vy: 1, vz: (Math.random() - 0.5) * 2, color: 0xd8a0ff, size: 0.4, life: 0.5, drag: 1 });
+    // the scream, rolling out across the moss: clear it with a jump
+    for (let i = NK.waves.length - 1; i >= 0; i--) {
+      const w = NK.waves[i]; w.t += dt; if (w.t < 0) continue;
+      if (!w.m.visible) { w.m.visible = true; w.c.copy(NK.pos); w.m.position.set(NK.pos.x, ground(NK.pos.x, NK.pos.z) + 0.5, NK.pos.z); }
+      w.r += 12 * dt; w.m.scale.set(w.r, w.r, 1); w.m.material.opacity = 0.85 * (1 - w.r / (ARENA.r + 8));
+      const pd = Math.hypot(P.pos.x - w.c.x, P.pos.z - w.c.z), air = P.pos.y - groundAt(P.pos.x, P.pos.z, P.pos.y + 0.5);
+      if (!w.hit && Math.abs(pd - w.r) < 0.9 && air < 0.6 && P.iframes <= 0 && !P.down) { w.hit = true; hurtTanoc(14, w.c); }
+      if (w.r > ARENA.r + 8) { scene.remove(w.m); NK.waves.splice(i, 1); }
+    }
+    for (let i = NK.drops.length - 1; i >= 0; i--) {
+      const k = NK.drops[i]; k.t += dt;
+      k.ring.material.opacity = 0.35 + 0.35 * Math.sin(k.t * 18);
+      if (k.t > 1.2) for (const m of k.ks) m.position.y = Math.max(k.g + 0.3, m.position.y - dt * 30);
+      if (k.t > 1.2 && !k.fired) {
+        k.fired = true; sfx.slam();
+        if (Math.hypot(P.pos.x - k.c.x, P.pos.z - k.c.z) < 3.7 && P.iframes <= 0 && !P.down) hurtTanoc(17, k.c);
+        particles.ring(k.c.x, k.g + 0.3, k.c.z, 40, 3, { color: 0xb070ff, size: 0.5, life: 0.5 });
+      }
+      if (k.t > 1.8) { scene.remove(k.ring); k.ks.forEach(m => scene.remove(m)); NK.drops.splice(i, 1); }
+    }
+  }
+  function clearNkAttacks() {
+    for (const w of NK.waves) scene.remove(w.m); NK.waves.length = 0;
+    for (const k of NK.drops) { scene.remove(k.ring); k.ks.forEach(m => scene.remove(m)); } NK.drops.length = 0;
+    if (NK.mark) { scene.remove(NK.mark); NK.mark = null; }
+    NK.a.root.visible = true;
+  }
+  function duelStart() {
+    stage = 'duel'; sub = 'duel';
+    place(P, ARENA.x, ARENA.z - 9, 0); P.hp = 100; P.iframes = 0; ctx.hp(1); CAM.yaw = Math.PI;
+    NK.pos.set(ARENA.x, 0, ARENA.z + 7); NK.pos.y = ground(NK.pos.x, NK.pos.z); NK.yaw = Math.PI; NK.state = 'idle'; NK.timer = 1.5;
+    setNkHp(NK.hp);
+    objective(NK.phase === 2 ? L3.phase2 : L3.duelObj, L3.duelHint);
+    ctx.play();
+  }
+  function nekhraHalf() {
+    NK.phase = 1.5; sub = 'half'; clearNkAttacks(); NK.state = 'idle';
+    sayHeld(L3.half, (k, tt) => ({ p: V3(NK.pos.x + 4, NK.pos.y + 2.2, NK.pos.z + 5), l: V3(NK.pos.x, NK.pos.y + 1.6, NK.pos.z) }), () => {
+      NK.phase = 2; sub = 'duel'; NK.timer = 1.2; objective(L3.phase2, L3.duelHint); ctx.play();
+    });
+  }
+  function duelDown() {
+    if (P.down) return;
+    P.down = true; P.hp = 0; sub = 'down'; clearNkAttacks(); NK.state = 'idle';
+    setTimeout(() => {
+      sayHeld(L3.down, (k, tt) => ({ p: V3(P.pos.x + 2.6, P.pos.y + 1.4, P.pos.z + 2.6), l: V3(P.pos.x, P.pos.y + 0.6, P.pos.z) }), () => {
+        P.down = false; setNkHp(Math.min(100, NK.hp + 10)); if (NK.phase === 2 && NK.hp > 50) setNkHp(50);
+        duelStart();
+      });
+    }, 1400);
+  }
+  function win3() {
+    sub = 'won'; clearNkAttacks(); NK.state = 'kneel'; setGoal(); sfx.victory(); shake = 0.6;
+    particles.burst(NK.pos.x, NK.pos.y + 1.4, NK.pos.z, 60, { color: 0xd8a0ff, speed: 6, size: 0.5, life: 1 });
+    const cam = (k, tt) => ({ p: V3(NK.pos.x + 5 + Math.sin(tt * 0.1), NK.pos.y + 2.6, NK.pos.z - 6), l: V3(NK.pos.x, NK.pos.y + 1.0, NK.pos.z) });
+    let i = 0;
+    const next = () => {
+      if (i >= L3.win.length) return night3End();
+      const line = L3.win[i++];
+      if (i === 2) watchers.forEach((v, j) => setTimeout(() => { if (v.glow) v.glow(0.1); particles.burst(v.root.position.x, v.root.position.y + 1.6, v.root.position.z, 8, { color: 0xd8a0ff, speed: 2, size: 0.3, life: 0.4 }); }, j * 40));
+      if (i === L3.win.length) {   // a dozen doors in the air, opening and closing
+        sfx.duat();
+        for (const v of watchers) { particles.burst(v.root.position.x, v.root.position.y + 1, v.root.position.z, 24, { color: 0x9a4aff, speed: 5, size: 0.5, life: 0.7 }); scene.remove(v.root); }
+        watchers.length = 0; particles.burst(NK.pos.x, NK.pos.y + 1, NK.pos.z, 40, { color: 0x9a4aff, speed: 6, size: 0.6, life: 0.8 }); NK.a.root.visible = false; NK.state = 'gone';
+      }
+      if (i === 1) held(cam);
+      ctx.say([line], next);
+    };
+    next();
+  }
+  function night3End() {
+    cine.stop(); setLook('night'); stage = 'night'; sub = 'church';
+    if (NK) { scene.remove(NK.a.root); }
+    const cg = heightAt(CHURCH.x, CHURCH.z);
+    place(P, CHURCH.x + 1, CHURCH.z + 1, Math.PI); place(B, CHURCH.x - 1.6, CHURCH.z + 0.4, Math.PI * 0.8); B.stay = B.pos.clone();
+    place(K, CHURCH.x, CHURCH.z + 5.6, Math.PI); K.stay = K.pos.clone(); D.malstiAt = V3(CHURCH.x + 1, 0, CHURCH.z + 1.6);
+    if (!D.churchLight) { D.churchLight = new THREE.PointLight(0xffc890, 26, 14); D.churchLight.position.set(CHURCH.x, cg + 4, CHURCH.z + 1); scene.add(D.churchLight); }
+    sayHeld(L3.church(MN()), (k, tt) => ({ p: V3(CHURCH.x + 3.2, cg + 2.6 + Math.sin(tt * 0.2) * 0.2, CHURCH.z + 4), l: V3(CHURCH.x, cg + 1, CHURCH.z) }), () => {
+      stage = 'home'; done = true; ctx.save('home');
+      cut([{ dur: 8, from: { p: [KEEP.x + 40, heightAt(KEEP.x, KEEP.z) + 30, KEEP.z + 60], l: [KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z] }, to: { p: [KEEP.x + 80, heightAt(KEEP.x, KEEP.z) + 90, KEEP.z + 140], l: [KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z] }, caption: L3.home }], () => ctx.onDone());
+    });
+  }
+  function tick3() {
+    if (stage === 'ride') ride3Tick();
+    else if (stage === 'camp' && sub === 'fight') ambush3Tick();
+    else if (stage === 'forest') forest3Tick();
+    else if (stage === 'tokeep') tokeepTick();
+    else if (stage === 'keep') keep3Tick();
+  }
+  /* resume Chapter III at a checkpoint */
+  function start3(at) {
+    if (ctx.slotsHud) ctx.slotsHud(true);
+    D = {};
+    makeBuhkon(); makeMalsti(); keepIsHis(); gyngeHill();
+    amped = !!ctx.linked;   // the Akai Gek, if it's already on his ring
+    const toClearing = () => { place(P, pathX(PASS1 - 30), PASS1 - 30, Math.PI); place(B, pathX(PASS1 - 30) + 3, PASS1 - 27, Math.PI); };
+    if (at === 'camp') { toClearing(); night3(); return; }
+    if (at === 'forest') { morning3(); return; }
+    if (at === 'ruins') { setLook('grey', true); K.on = true; B.mountAt = V3(FIRE1.x - 3.4, ground(FIRE1.x - 3.4, FIRE1.z + 4), FIRE1.z + 4); place(P, RUINS.x + 4, RUINS.z + RUINS.r - 8, Math.PI); place(B, RUINS.x + 1, RUINS.z + RUINS.r - 6, Math.PI); place(K, RUINS.x + 6, RUINS.z + RUINS.r - 5, Math.PI); ruins3(); return; }
+    if (at === 'keep') { setLook('grey', true); K.on = true; amped = true; place(P, WALL.x + 4, WALL.z + 8, Math.PI); place(B, WALL.x + 1, WALL.z + 10, Math.PI); place(K, WALL.x + 6, WALL.z + 11, Math.PI); D.amb2 = false; toKeep(); return; }
+    if (at === 'duel') { setLook('dusk', true); K.on = true; amped = true; if (!rodak.length) rodakPack(6, KEEP.x - 12, KEEP.z + KEEP.h + 30); rodak.forEach(r => { r.a.root.visible = false; r.pos.set(0, -80, 0); }); dusk3(); return; }
+    if (at === 'home') { done = true; ctx.onDone(); return; }
+    startRide3();
+  }
+
   /* ---------------- per frame ---------------- */
   function update(dt, playing) {
     t += dt;
@@ -1117,7 +1701,12 @@ export function createMegla(ctx) {
     updateGynge(dt, playing && !cine.active);
     updateBolts(dt);
     updateCritters(dt);
-    if (playing && !cine.active) {
+    if (CH3) {
+      updateBuhkon(dt, playing && !cine.active); updateDarts(dt); updateNekhra(dt, playing && !cine.active); updateWatchers(dt); updateLink(dt, playing && !cine.active);
+      if (stage === 'ride') updateRidge(dt);
+      if (stage === 'duel') { const ox = P.pos.x - ARENA.x, oz = P.pos.z - ARENA.z, od = Math.hypot(ox, oz); if (od > ARENA.r) { P.pos.x = ARENA.x + ox / od * ARENA.r; P.pos.z = ARENA.z + oz / od * ARENA.r; } }   // the ring of Vel: nobody leaves the Right half-fought
+      if (playing && !cine.active) tick3();
+    } else if (playing && !cine.active) {
       if (stage === 'ride') rideTick();
       else if (stage === 'enter') enterTick();
       else if (stage === 'alone') aloneTick();
@@ -1139,8 +1728,8 @@ export function createMegla(ctx) {
       }
     }
     amulet.children[1].material.opacity = 0.35 + Math.sin(t * 3) * 0.15 + (bigSn ? 0.4 : 0);
-    if (malsti && sub !== 'ring') {   // at his heels, or up on his shoulder
-      const tgt = V3(P.pos.x - Math.sin(P.yaw) * 1.2 + Math.cos(P.yaw) * 0.8, 0, P.pos.z - Math.cos(P.yaw) * 1.2 - Math.sin(P.yaw) * 0.8);
+    if (malsti && sub !== 'ring') {   // at his heels, or up on his shoulder (or kept back, out of a fight that isn't his)
+      const tgt = CH3 && D.malstiAt && (stage === 'keep' || stage === 'duel' || stage === 'night') ? D.malstiAt.clone() : V3(P.pos.x - Math.sin(P.yaw) * 1.2 + Math.cos(P.yaw) * 0.8, 0, P.pos.z - Math.cos(P.yaw) * 1.2 - Math.sin(P.yaw) * 0.8);
       malsti.root.position.lerp(tgt.setY(groundAt(tgt.x, tgt.z, P.pos.y + 1)), 1 - Math.exp(-6 * dt)); malsti.root.rotation.y = P.yaw;
       malsti.animate(dt, { speed: Math.hypot(P.vel.x, P.vel.z), t });
     } else if (malsti) malsti.animate(dt, { speed: 0, t });
@@ -1148,7 +1737,7 @@ export function createMegla(ctx) {
     if (D.watcher && D.watcher.root.rotation.z === 0) D.watcher.animate(dt, { speed: 0, t, onGround: true });
     // the fog: thin in the low valley, thick in the pass, a wall of it among the great trees
     const zz = zoneOf(P.pos.z), fNear = zz === 'foot' ? 220 : zz === 'pass' ? lerp(200, 50, clamp(-P.pos.z / -PASS1, 0, 1)) : zz === 'clear' ? 40 : 10;
-    const fFar = zz === 'foot' ? 1500 : zz === 'pass' ? lerp(1400, 320, clamp(-P.pos.z / -PASS1, 0, 1)) : zz === 'clear' ? 420 : (stage === 'keep' && sub === 'cleansed' ? 320 : 170);
+    const fFar = zz === 'foot' ? 1500 : zz === 'pass' ? lerp(1400, 320, clamp(-P.pos.z / -PASS1, 0, 1)) : zz === 'clear' ? 420 : (stage === 'keep' && sub === 'cleansed' ? 320 : CH3 && (stage === 'keep' || stage === 'duel' || stage === 'night') ? 260 : 170);
     fog.near = damp(fog.near, fNear, 1.5, dt); fog.far = damp(fog.far, fFar, 1.5, dt);
     updateLook(dt);
     // mist sheets drift round wherever he is, once he's up in the mist
@@ -1179,7 +1768,7 @@ export function createMegla(ctx) {
   }
   function updateCamera(dt) {
     camTgt.set(P.pos.x, P.pos.y + (P.ride ? 2.4 : 1.5), P.pos.z);
-    const want = P.ride ? 8.5 : (GYN && GYN.alive ? 9 : 6.4), cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
+    const want = P.ride ? 8.5 : (GYN && GYN.alive ? 9 : stage === 'duel' ? 8 : 6.4), cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
     let d = want;
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z) || (GYN && GYN.alive && q.distanceTo(GYN.pos.clone().setY(GYN.pos.y + 0.45 * GYN.s)) < 0.95 * GYN.s)) { d = Math.max(0.8, s - 0.4); break; } }
     camPos.lerp(camTgt.clone().addScaledVector(dir, d), 1 - Math.exp(-14 * dt));
@@ -1218,17 +1807,18 @@ export function createMegla(ctx) {
     if (at === 'home') { done = true; ctx.onDone(); return; }
     startRide();
   }
-  // the animal is there from the start; it's only noticed when he comes on it
-  buildAnimal(); trail.forEach(g => { g.material.opacity = 0; });
+  // the animal is there from the start; it's only noticed when he comes on it (Chapter II only)
+  if (!CH3) { buildAnimal(); trail.forEach(g => { g.material.opacity = 0; }); }
 
   function dispose() {
-    gyngeBar.remove();
+    gyngeBar.remove(); nkBar.remove();
     scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
     composer.dispose && composer.dispose();
   }
   return {
-    start, update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(),
+    start: at => (CH3 ? start3(at) : start(at)), update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(),
     get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items,
-    debug: { get GYN() { return GYN; }, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; } },
+    debug: { get GYN() { return GYN; }, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; },
+      get NK() { return NK; }, get B() { return B; }, night3, ambush3, morning3, ruins3, linkDone, toKeep, keepArrive3, dusk3, duelStart, win3, hitNekhra, nekhraHalf, velsLeft },
   };
 }
