@@ -10,7 +10,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
-import { buildEikar, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
+import { buildEikar, cartoon, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
 import { mulberry32, lerp, clamp } from './util.js';
 
 const TAU = Math.PI * 2;
@@ -370,8 +370,8 @@ export const NPCS = {
 };
 
 export function buildNpc(def) {
-  if (def.look === 'keilia') return buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a });
-  if (def.look === 'karnen') return buildKarnen({ seed: def.id ? def.id.length : 5 });
+  if (def.look === 'keilia') return cartoon(buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a }));
+  if (def.look === 'karnen') return cartoon(buildKarnen({ seed: def.id ? def.id.length : 5 }));
   return buildEikar(NPC_LOOKS[def.look] || {});
 }
 

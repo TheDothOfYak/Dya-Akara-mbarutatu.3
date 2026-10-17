@@ -528,6 +528,7 @@ export function buildEikar(o = {}) {
   bio.glow(0);
 
   const A = {
+    cartoon: true,   // squash & stretch is built into this rig
     root, body, torso, head, hat, weapon, wPivot, wHold, cape, relic, nur, mats, arms, legs,
     /* st: { speed, onGround, t, swing: null | { kind: 1|2|3|4, p: 0..1 } | number, windup, attack,
              heat, drink, talking, thrown, duat } */
@@ -725,6 +726,31 @@ export function buildCore() {
   const halo = glowSprite(0x8a5aff, 6, 0.3); g.add(halo);
   g.userData = { m, inner, halo };
   return g;
+}
+
+/* the film's cartoon timing for any creature or folk with its own animate(): the whole body
+   squashes when it lands, crouches into a wind-up (anticipation), stretches into the strike and
+   a little while rising — a damped spring, so it overshoots and settles. It scales the root
+   around whatever scale the game gave it, and leaves the creature's own motion untouched. */
+export function cartoon(a, amt = 1) {
+  if (!a || !a.animate || !a.root || a.cartoon) return a;
+  a.cartoon = true;
+  const inner = a.animate, root = a.root, base = new THREE.Vector3(), applied = new THREE.Vector3();
+  let sq = 0, v = 0, lastY = null, vyS = 0, has = false;
+  a.animate = function (dt, st = {}) {
+    const out = inner.call(this, dt, st);
+    if (!(dt > 0)) return out;
+    if (!has || !root.scale.equals(applied)) { base.copy(root.scale); has = true; }   // the game rescaled it: that's the new rest shape
+    const y = root.position.y, vy = lastY === null ? 0 : clamp((y - lastY) / dt, -30, 30); lastY = y;
+    const pv = vyS; vyS = lerp(vyS, vy, 1 - Math.exp(-12 * dt));
+    if (pv < -3 && (vyS - pv) / dt > 30) v -= clamp(-pv * 0.07, 0.3, 1.4);            // hit the ground
+    const target = clamp(vyS * 0.006, -0.03, 0.05) + (st.attack || 0) * 0.07 - (st.windup || 0) * 0.06;
+    v += ((target * amt - sq) * 120 - v * 12) * dt; sq = clamp(sq + v * dt, -0.15, 0.15);
+    root.scale.set(base.x * (1 - sq * 0.5), base.y * (1 + sq), base.z * (1 - sq * 0.5));
+    applied.copy(root.scale);
+    return out;
+  };
+  return a;
 }
 
 /* the body follows the walker's feet, but a stair step is eased instead of popped:
