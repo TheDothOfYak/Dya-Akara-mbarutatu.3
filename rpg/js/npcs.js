@@ -89,6 +89,7 @@ export function buildKeilia(o = {}) {
   // pinecone wood is darker than an Eikar's acorn; a passed skin colour only tints it
   const skinHex = new THREE.Color(o.skin != null ? o.skin : 0xffffff).lerp(new THREE.Color(0xffffff), 0.35);
   const skin = new THREE.MeshToonMaterial({ color: skinHex, map: pineTexture('#5a3a24'), gradientMap: ramp(), emissive: 0x000000 });
+  skin.userData.ink = new THREE.Color(skinHex).multiply(new THREE.Color('#5a3a24')).getHex();
   const hairA = o.hair || 0x5a3822, hairB = o.hair2 || 0x7a5232, moss = o.moss || 0x55663a;
   const scaleMat = new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: ramp(), emissive: 0x000000 });
   const cloth = toon(o.cloth || 0x4a5a34, { side: THREE.DoubleSide, emissive: 0x000000 });

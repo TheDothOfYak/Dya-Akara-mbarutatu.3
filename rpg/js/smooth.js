@@ -15,9 +15,9 @@
    ============================================================ */
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { ramp } from './gfx.js';
+import { ramp, STYLE } from './gfx.js';
 
-const ON = { value: 1 };
+const ON = STYLE.on;
 let installed = false, shapes = true;
 
 /* ---------------- soft cel ramp ---------------- */
