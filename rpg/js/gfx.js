@@ -59,7 +59,7 @@ export function outlineMaterial(thickness = 0.04, color = 0x1a1008, tint = null)
 function inkFor(mat, color) {
   if (Array.isArray(mat) || !mat || !mat.color) return null;
   const ink = mat.userData && mat.userData.ink;     // a textured material can name the colour its line should follow
-  if (ink == null && mat.map) return null;
+  if (ink == null && (mat.map || mat.vertexColors)) return null;   // its colour lives in a texture or the vertices
   const c = new THREE.Color(ink ?? mat.color), base = new THREE.Color(color ?? 0x1a1008);
   c.multiplyScalar(0.28).lerp(base, 0.35);
   return c.getHex();

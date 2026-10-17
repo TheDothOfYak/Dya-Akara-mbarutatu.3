@@ -728,6 +728,37 @@ export function buildCore() {
   return g;
 }
 
+/* a face that acts, for folk built outside the Eikar rig: blinks (now and then twice),
+   glances, brows that knit for a fight and lift in talk, a mouth that flaps in syllables.
+   f: { eyes: [meshes squashed shut to blink], pupils: [meshes that glance],
+        brows: [meshes], mouth: mesh, glance: how far the pupils move, lift: how far brows rise }
+   Returns update(dt, st); st is the same object passed to animate(). */
+export function faceActing(f) {
+  const eyes = (f.eyes || []).map(m => ({ m, y: m.scale.y })), pupils = (f.pupils || []).map(m => ({ m, p: m.position.clone() }));
+  const brows = (f.brows || []).map(m => ({ m, y: m.position.y, rz: m.rotation.z, s: Math.sign(m.position.x) || 1 }));
+  const mouth = f.mouth ? { m: f.mouth, y: f.mouth.scale.y } : null, G = f.glance ?? 0.006, LIFT = f.lift ?? 0.008;
+  let blinkT = 1 + Math.random() * 3, blink = 0, lx = 0, ly = 0, lt = 0.5, tx = 0, ty = 0, brK = 0, talkK = 0, t = Math.random() * 10;
+  return (dt, st = {}) => {
+    t += dt;
+    const fight = !!(st.attack || st.windup || st.swing);
+    blinkT -= dt;
+    if (blinkT <= 0) { blink = 1; blinkT = Math.random() < 0.2 ? 0.22 : 2 + Math.random() * 3.5; }
+    blink = Math.max(0, blink - dt * 7);
+    const lid = 1 - Math.sin(Math.min(1, blink) * Math.PI) * 0.92;
+    for (const e of eyes) e.m.scale.y = e.y * lid;
+    lt -= dt;
+    if (lt <= 0) { lt = 0.8 + Math.random() * 2.2; tx = fight ? 0 : (Math.random() - 0.5) * 2; ty = fight ? 0 : (Math.random() - 0.5) * 0.8; }
+    lx = lerp(lx, tx, 1 - Math.exp(-18 * dt)); ly = lerp(ly, ty, 1 - Math.exp(-18 * dt));
+    for (const p of pupils) p.m.position.set(p.p.x + lx * G, p.p.y + ly * G * 0.7, p.p.z);
+    brK = lerp(brK, fight ? -1 : st.talking ? 0.6 + Math.sin(t * 3.1) * 0.4 : 0, 1 - Math.exp(-10 * dt));
+    for (const b of brows) { b.m.position.y = b.y + brK * LIFT; b.m.rotation.z = b.rz - b.s * Math.max(0, -brK) * 0.25; }
+    if (mouth) {
+      talkK = lerp(talkK, st.talking ? 1 : 0, 1 - Math.exp(-12 * dt));
+      mouth.m.scale.y = mouth.y * (1 + Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK * 3.5);
+    }
+  };
+}
+
 /* the film's cartoon timing for any creature or folk with its own animate(): the whole body
    squashes when it lands, crouches into a wind-up (anticipation), stretches into the strike and
    a little while rising — a damped spring, so it overshoots and settles. It scales the root
