@@ -124,7 +124,7 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 
 **The creatures of the lore.** Every creature from the Mbaru Tatu notes is in the worlds, each built to match its description. A few examples:
 - The Kofi Galta: a crescent body with blade spines and a fluffy dark tail tuft.
-- The Stryx: a wide, flat stone body with two huge spiral horns.
+- The Stryx: a wide, flat stone body, rooted where it grew, with vines draped over it that rise to lash. No horns.
 - The RubberMcFly: a ball with a beak, butterfly wings and two little legs.
 - The Sru Vorn: long, low and heavy, with tusks and a spiked-ball tail.
 

@@ -35,9 +35,8 @@
             be, a sail behind each head, and a spike-club tail.
    GYNGE   — living rock with no eyes; a craggy dome whose cave-maw
             yawns open with stone teeth over a pale fleshy belly.
-   STRYX   — a wide, flat body of stepped stone armour with two huge
-            spiral horn-antennae and whipping vine weapons on top;
-            rooted, eyeless.
+   STRYX   — a wide, flat body of stepped stone armour with whipping
+            vine weapons draped over it; no horns; rooted, eyeless.
    TONGUATJIS — a domed turtle with craggy alligator jaws, a neck as
             long as its shell, and a pink tongue twice its length.
    MIKOLO MOKO — a long ferret with kangaroo hind legs, long squiggly
@@ -1480,16 +1479,17 @@ export function buildStryx(opts = {}) {
   for (let i = 0; i < 5; i++) { const a = i * 1.3 + 0.4; bl.push(placed(rockGeo(1, 0.3, 2, i), Math.cos(a) * 1.05 * WX, 0.12, Math.sin(a) * 0.95 * WZ, a, i, 0, 0.22 + (i % 2) * 0.1)); }
   mesh(merge(bl), rockD, body);
   // roots running out over the ground and diving in
-  const rootG = hornGeo(0.85, 0.09, 0.9, 5); rootG.rotateZ(-Math.PI / 2); rootG.rotateX(Math.PI / 2);
+  // (low and flat, hugging the ground, so they read as roots and never as horns or tusks)
+  const rootG = hornGeo(0.55, 0.13, 0.2, 6); rootG.rotateZ(-Math.PI / 2); rootG.rotateX(Math.PI / 2); rootG.scale(1, 0.4, 1);
   const rg = [];
-  for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + 0.2; rg.push(placed(rootG, Math.cos(a) * 1.0 * WX, 0.15, Math.sin(a) * 0.88 * WZ, 0, -a, 0, 0.8 + (i % 3) * 0.2)); }
+  for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + 0.2; rg.push(placed(rootG, Math.cos(a) * 1.05 * WX, 0.03, Math.sin(a) * 0.88 * WZ, 0, -a, 0, 0.8 + (i % 3) * 0.2)); }
   mesh(merge(rg), root2, body);
   // whipping vines on top: a Rope each, curled tips
-  const n = 5, vines = [], curlG = curlGeo(0.08, 0.025);
+  const n = 5, vines = [], budG = new THREE.SphereGeometry(0.05, 8, 6);
   for (let i = 0; i < n; i++) {
     const a = i / n * TAU + 0.3;
     const rope = new Rope(root, 8, 0.07, 0.022, vineM);
-    const tip = noOut(mesh(curlG, tipM, root));
+    const tip = noOut(mesh(budG, tipM, root));
     vines.push({ rope, tip, a, base: new THREE.Vector3(Math.cos(a) * 0.4 * WX, TOP, Math.sin(a) * 0.34 * WZ - 0.1), ph: rnd() * TAU, len: 1.0 + rnd() * 0.5 });
   }
   // (no horns: a Stryx is all stone, root and vine)
@@ -1515,17 +1515,19 @@ export function buildStryx(opts = {}) {
         P1.set(v.base.x * 1.1, v.base.y + 0.8, v.base.z * 1.1);
         P2.copy(v.base).lerp(G, e * 0.7); P2.y += (1 - e) * 0.8 + 0.2;
         v.rope.set(v.base, P1, P2, P3);
-        v.tip.position.copy(P3); orientCurl(v.tip, v.rope.dir, UP);
+        v.tip.position.copy(P3);
         continue;
       }
       const a = clamp(atk * 1.3 - i * 0.08, 0, 1);
       const w = Math.sin(t * 1.4 + v.ph);
-      // idle: rising and swaying; wind-up: coiled back; attack: whipped forward
-      P3.set(ca * (0.75 + v.len * 0.5) * WX + Math.sin(t * 0.9 + v.ph) * 0.12, TOP + v.len * 0.45 + w * 0.12, sa * (0.65 + v.len * 0.45) + Math.cos(t * 0.8 + v.ph) * 0.12);
+      // idle: draped low over the stone's flanks and trailing onto the ground (never standing up off the top);
+      // wind-up: lifted and drawn back; attack: whipped forward
+      P3.set(ca * (1.2 + v.len * 0.35) * WX + Math.sin(t * 0.9 + v.ph) * 0.06, 0.12 + Math.max(0, w) * 0.05, sa * (1.05 + v.len * 0.3) * WZ + Math.cos(t * 0.8 + v.ph) * 0.06);
       tmp.set(ca * 0.4 * WX, TOP + v.len * 1.1, -0.5 + sa * 0.3); P3.lerp(tmp, wind * (1 - a));
       tmp.set(ca * 0.35 * WX, 0.5 + i * 0.12, 2.6 + v.len * 1.1); P3.lerp(tmp, a);   // the lash reaches well out in front
-      P1.set(v.base.x * 1.1, v.base.y + 0.55 + v.len * 0.3, v.base.z * 1.1);
-      P2.set(P3.x * 0.85, P3.y + 0.5 - a * 0.45, P3.z * 0.85 - a * 0.6);
+      const up = Math.max(wind * (1 - a), a);   // how far the vine is lifted off the stone
+      P1.set(v.base.x * 1.6, v.base.y + 0.06 + up * (0.5 + v.len * 0.3), v.base.z * 1.6);
+      P2.set(P3.x * 0.85, lerp(TOP * 0.8, P3.y + 0.5 - a * 0.45, up), P3.z * 0.85 - a * 0.6);
       v.rope.set(v.base, P1, P2, P3);
       v.tip.position.copy(P3); orientCurl(v.tip, v.rope.dir, UP);
     }
