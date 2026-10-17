@@ -15,18 +15,30 @@ export function ramp() {
   return RAMP;
 }
 
+/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' */
+const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7 };
+export function paint(mat, kind) {
+  mat.defines = Object.assign({}, mat.defines, { FL_PAINT: PAINT_KINDS[kind] || 1 });
+  mat.needsUpdate = true;
+  return mat;
+}
+
 export function toon(color, opts = {}) {
   return new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: ramp() }, opts));
 }
 
-/* inverted-hull ink outline that respects fog */
+/* the film look's coloured ink lines are always on (1); kept as a uniform so a line can still blend */
+export const STYLE = { on: { value: 1 } };
+
+/* inverted-hull ink outline that respects fog. With the film style on, the line takes a deep
+   shade of the colour it rings (`tint`) instead of plain ink, the way coloured-line cel art does. */
 const outlineCache = new Map();
-export function outlineMaterial(thickness = 0.04, color = 0x1a1008) {
-  const key = thickness + ':' + color;
+export function outlineMaterial(thickness = 0.04, color = 0x1a1008, tint = null) {
+  const key = thickness + ':' + color + ':' + tint;
   if (outlineCache.has(key)) return outlineCache.get(key);
   const m = new THREE.ShaderMaterial({
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-      uColor: { value: new THREE.Color(color) }, uThick: { value: thickness },
+      uColor: { value: new THREE.Color(color) }, uThick: { value: thickness * 0.6 }, uTint: { value: new THREE.Color(tint ?? color) },   // a fine, painted line
     }]),
     vertexShader: `
       uniform float uThick;
@@ -38,20 +50,31 @@ export function outlineMaterial(thickness = 0.04, color = 0x1a1008) {
         #include <fog_vertex>
       }`,
     fragmentShader: `
-      uniform vec3 uColor;
+      uniform vec3 uColor; uniform vec3 uTint; uniform float uStyle;
       #include <fog_pars_fragment>
       void main() {
-        gl_FragColor = vec4(uColor, 1.0);
+        gl_FragColor = vec4(mix(uColor, uTint, uStyle), 1.0);
         #include <fog_fragment>
       }`,
     side: THREE.BackSide, fog: true,
   });
+  m.uniforms.uStyle = STYLE.on;
   outlineCache.set(key, m);
   return m;
 }
 
+/* the deep shade of a material's own colour, for its line (null when it has no plain colour) */
+function inkFor(mat, color) {
+  if (Array.isArray(mat) || !mat || !mat.color) return null;
+  const ink = mat.userData && mat.userData.ink;     // a textured material can name the colour its line should follow
+  if (ink == null && (mat.map || mat.vertexColors)) return null;   // its colour lives in a texture or the vertices
+  const c = new THREE.Color(ink ?? mat.color), base = new THREE.Color(color ?? 0x1a1008);
+  c.multiplyScalar(0.28).lerp(base, 0.35);
+  return c.getHex();
+}
+
 export function addOutline(mesh, thickness = 0.04, color) {
-  const o = new THREE.Mesh(mesh.geometry, outlineMaterial(thickness, color));
+  const o = new THREE.Mesh(mesh.geometry, outlineMaterial(thickness, color, inkFor(mesh.material, color)));
   o.name = 'outline';
   o.castShadow = false; o.receiveShadow = false;
   mesh.add(o);

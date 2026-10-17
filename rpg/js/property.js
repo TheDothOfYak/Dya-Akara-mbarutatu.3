@@ -16,7 +16,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
-import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline } from './gfx.js';
+import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 import { MANOR_SPOTS } from './interiors.js';
 export { STEP };
@@ -241,7 +241,7 @@ export function buildProperty(scene) {
     out.lerp(haze, smooth(2600, 5200, Math.hypot(x, z)) * 0.35);
     return out;
   };
-  const terrainMat = toon(0xffffff, { vertexColors: true });
+  const terrainMat = paint(toon(0xffffff, { vertexColors: true }), 'land');
   const finish = (g, fn = colorAt) => {
     g.computeVertexNormals();
     const P = g.attributes.position, N = g.attributes.normal, cc = new Float32Array(P.count * 3);

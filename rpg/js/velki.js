@@ -10,7 +10,7 @@
    takes the run back when the air tears open.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
+import { toon, ramp, addOutline, outlineAll, glowSprite, Particles, paint } from './gfx.js';
 import { buildEikar, placeWalker } from './actors.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32 } from './util.js';
 import * as STORY from './story.js';
@@ -139,7 +139,7 @@ export function createVelki(ctx) {
       cols.set([c.r, c.g, c.b], i * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
-    const ground = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ vertexColors: true })); ground.receiveShadow = true; scene.add(ground);
+    const ground = new THREE.Mesh(geo, paint(new THREE.MeshToonMaterial({ vertexColors: true }), 'land')); ground.receiveShadow = true; scene.add(ground);
   }
 
   /* ---------------- colliders: boxes and posts with a top and a bottom ---------------- */

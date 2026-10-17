@@ -9,8 +9,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { paintPass } from './paint.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
+import { installSmoothStyle } from './smooth.js';
 import { latchAlongRay } from './vines.js';
 import { createAmbient } from './ambient.js';
 import { buildSky, SUN_DIR } from './sky.js';
@@ -21,7 +24,7 @@ import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
 import { buildProperty, COLOSSI } from './property.js';
 import { createInteriors } from './interiors.js';
-import { buildTorcain, buildPhorus, buildCore, placeWalker } from './actors.js';
+import { buildTorcain, buildPhorus, buildCore, placeWalker, cartoon } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildMalstiPunk, buildSkorThal, buildGynge } from './esik_land.js';
 import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
@@ -54,6 +57,7 @@ const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, scale: 1 };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
+installSmoothStyle();   // the film look: painted light and brushwork on every toon material, softened shapes — before anything is drawn
 
 /* ---------------- the save, and which region this page is ---------------- */
 /* signed in with a Dya'Akara account? Then the run lives on the account. */
@@ -145,6 +149,7 @@ const composer = new EffectComposer(renderer, smoothTarget());
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 0.86);
 composer.addPass(bloom);
+composer.addPass(paintPass(ShaderPass));
 composer.addPass(new OutputPass());
 
 let particles = null;
@@ -1640,7 +1645,7 @@ function readScar(sc) {
 let skor = null;
 if (REGION === 'aakalay' && world.skorthal) {
   const sx = world.skorthal.x, sz = world.skorthal.z, y = world.heightAt(sx, sz);
-  const m = buildSkorThal({ seed: 4711 }); m.root.position.set(sx, y, sz); m.root.rotation.y = Math.PI * 0.85; scene.add(m.root);
+  const m = cartoon(buildSkorThal({ seed: 4711 })); m.root.position.set(sx, y, sz); m.root.rotation.y = Math.PI * 0.85; scene.add(m.root);
   skor = { m, pos: V3(sx, y, sz), t: 0 };
 }
 const skorShown = () => SAVE.quests.q_thorn === 'done' || SAVE.quests.q_skorthal;
@@ -2733,10 +2738,10 @@ function makeMount(nearPlayer) {
   if (ownPunk()) {
     if (F_.punkBorn == null) { F_.punkBorn = SAVE.time || 0; }
     scale = punkScale();
-    actor = buildWildPunk({ seed: 31, saddle: !!F_.saddled, blanket: 0x8a5a2a }); actor.root.scale.setScalar(scale);
+    actor = cartoon(buildWildPunk({ seed: 31, saddle: !!F_.saddled, blanket: 0x8a5a2a }), 0.6); actor.root.scale.setScalar(scale);
     seat = scale * 1.85 - 0.3;
   } else {
-    actor = buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 }); scale = 0.8; actor.root.scale.setScalar(scale);   // Brindle: a horse-sized youngster
+    actor = cartoon(buildDomesticPunk({ saddle: true, blanket: 0x8a2a3a, seed: 9 }), 0.6); scale = 0.8; actor.root.scale.setScalar(scale);   // Brindle: a horse-sized youngster
     seat = 1.35;
   }
   const st = F_.stall;
@@ -2980,7 +2985,7 @@ function phorusMount() {
   if (!phorus.root.visible || FR.mode) return;   // he's not about (on the Kuni, say)
   FR.mode = Math.random() < 0.5 ? 'pillion' : 'own';
   if (FR.mode === 'own') {
-    if (!FR.punk) { FR.punk = buildDomesticPunk({ saddle: true, blanket: 0x2a5a8a, seed: 23 }); FR.punk.root.scale.setScalar(0.72); scene.add(FR.punk.root); }
+    if (!FR.punk) { FR.punk = cartoon(buildDomesticPunk({ saddle: true, blanket: 0x2a5a8a, seed: 23 }), 0.6); FR.punk.root.scale.setScalar(0.72); scene.add(FR.punk.root); }
     // Lun trots over from wherever she was left, or out of the nearest bushes
     if (!FR.punk.root.visible || FR.pos.distanceTo(F.pos) > 20) { FR.pos.copy(F.pos).add(V3(1.2, 0, 1.2)); FR.pos.y = world.col.ground(FR.pos.x, FR.pos.z, F.pos.y + 2); }
     FR.punk.root.visible = true;
@@ -4420,6 +4425,7 @@ function startVelki() {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
       c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8));
+      c.addPass(paintPass(ShaderPass));
       c.addPass(new OutputPass());
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
@@ -4476,6 +4482,7 @@ function vkCtx() {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
       c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 0.86));
+      c.addPass(paintPass(ShaderPass));
       c.addPass(new OutputPass());
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;

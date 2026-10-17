@@ -10,7 +10,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
-import { buildEikar, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
+import { buildEikar, cartoon, faceActing, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
 import { mulberry32, lerp, clamp } from './util.js';
 
 const TAU = Math.PI * 2;
@@ -89,6 +89,7 @@ export function buildKeilia(o = {}) {
   // pinecone wood is darker than an Eikar's acorn; a passed skin colour only tints it
   const skinHex = new THREE.Color(o.skin != null ? o.skin : 0xffffff).lerp(new THREE.Color(0xffffff), 0.35);
   const skin = new THREE.MeshToonMaterial({ color: skinHex, map: pineTexture('#5a3a24'), gradientMap: ramp(), emissive: 0x000000 });
+  skin.userData.ink = new THREE.Color(skinHex).multiply(new THREE.Color('#5a3a24')).getHex();
   const hairA = o.hair || 0x5a3822, hairB = o.hair2 || 0x7a5232, moss = o.moss || 0x55663a;
   const scaleMat = new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: ramp(), emissive: 0x000000 });
   const cloth = toon(o.cloth || 0x4a5a34, { side: THREE.DoubleSide, emissive: 0x000000 });
@@ -188,6 +189,7 @@ export function buildKeilia(o = {}) {
   root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
   root.scale.setScalar(o.scale || 1);
   bio.glow(0);
+  const acting = faceActing({ eyes: [white, iris, pupil, glint], pupils: [iris, pupil, glint], brows: [brow], mouth, glance: 0.012, lift: 0.01 });
 
   const rT = new THREE.Vector3(), rD = new THREE.Vector3(), rB = new THREE.Vector3();
   const lT = new THREE.Vector3(), lD = new THREE.Vector3(), lB = new THREE.Vector3();
@@ -212,6 +214,7 @@ export function buildKeilia(o = {}) {
       else { lT.set(0.27, -0.18, 0.06 + sway); lD.set(0, 1, 0.2); lB.set(1, 0, 0); }
       poseArm(L, lT, lD, lB);
       cape.rotation.x = 0.02 + k * 0.12 + Math.sin(t * 1.2) * 0.015;
+      acting(dt, st);
       if (hammer) hammer.userData.glow.material.opacity = 0.45 + Math.sin(t * 2.3) * 0.15;
     },
     flash(v) { [skin, cloth, scaleMat].forEach(m => m.emissive.setRGB(v, v * 0.9, v * 0.8)); },
@@ -244,15 +247,16 @@ export function buildKarnen(o = {}) {
 
   // the angular head: a downward wedge, a ridge of a nose, triangular ears
   const head = new THREE.Group(); head.position.y = 0.37; torso.add(head);
+  const kEyes = [], kPupils = [], kBrows = [];
   const skull = new THREE.Mesh(new THREE.ConeGeometry(0.115, 0.25, 3), skin); skull.rotation.x = Math.PI; skull.position.y = 0.13; skull.scale.set(1, 1, 0.9); head.add(skull);
   const top = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.04, 3), skin); top.position.y = 0.27; top.scale.set(1, 1, 0.9); head.add(top);
   for (const s of [-1, 1]) {
     const ear = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.11, 3), skin); ear.rotation.z = -s * 1.25; ear.position.set(s * 0.12, 0.2, -0.04); head.add(ear);
     // triangular eyes on the two front faces
     const eye = new THREE.Mesh(new THREE.CircleGeometry(0.026, 3, Math.PI / 2 + (s > 0 ? 0.25 : -0.25)), new THREE.MeshBasicMaterial({ color: 0xf2e6c8 }));
-    eye.position.set(s * 0.043, 0.2, 0.082); eye.rotation.y = s * 0.55; eye.userData.noOutline = true; head.add(eye);
-    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.012, 3, Math.PI / 2), dark); pupil.position.set(s * 0.043, 0.195, 0.086); pupil.rotation.y = s * 0.55; pupil.userData.noOutline = true; head.add(pupil);
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.008), dark); brow.position.set(s * 0.045, 0.232, 0.08); brow.rotation.set(0, s * 0.55, s * 0.35); brow.userData.noOutline = true; head.add(brow);
+    eye.position.set(s * 0.043, 0.2, 0.082); eye.rotation.y = s * 0.55; eye.userData.noOutline = true; head.add(eye); kEyes.push(eye);
+    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.012, 3, Math.PI / 2), dark); pupil.position.set(s * 0.043, 0.195, 0.086); pupil.rotation.y = s * 0.55; pupil.userData.noOutline = true; head.add(pupil); kEyes.push(pupil); kPupils.push(pupil);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.008), dark); brow.position.set(s * 0.045, 0.232, 0.08); brow.rotation.set(0, s * 0.55, s * 0.35); brow.userData.noOutline = true; head.add(brow); kBrows.push(brow);
   }
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.08, 3), skin); nose.rotation.x = Math.PI / 2 + 0.35; nose.position.set(0, 0.16, 0.1); head.add(nose);
   { const brow = new THREE.Mesh(new THREE.CircleGeometry(0.017, 3, -Math.PI / 2), markM); brow.position.set(0, 0.245, 0.074); brow.rotation.x = -0.3; brow.userData.noOutline = true; head.add(brow);
@@ -280,6 +284,7 @@ export function buildKarnen(o = {}) {
   root.scale.setScalar(o.scale || 1);
   bio.glow(0);
 
+  const acting = faceActing({ eyes: kEyes, pupils: kPupils, brows: kBrows, mouth, glance: 0.006 });
   const T = new THREE.Vector3(), D = new THREE.Vector3(), B = new THREE.Vector3();
   let ph = rng() * 6, act = 0;
   return {
@@ -301,6 +306,7 @@ export function buildKarnen(o = {}) {
         D.set(0, 1, 0.3); B.set(-s, 0, 0);
         poseArm(a, T, D, B);
       });
+      acting(dt, st);
     },
     flash(v) { [skin, vest, hatMat].forEach(m => m.emissive.setRGB(v, v * 0.9, v * 0.8)); },
   };
@@ -369,8 +375,8 @@ export const NPCS = {
 };
 
 export function buildNpc(def) {
-  if (def.look === 'keilia') return buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a });
-  if (def.look === 'karnen') return buildKarnen({ seed: def.id ? def.id.length : 5 });
+  if (def.look === 'keilia') return cartoon(buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a }));
+  if (def.look === 'karnen') return cartoon(buildKarnen({ seed: def.id ? def.id.length : 5 }));
   return buildEikar(NPC_LOOKS[def.look] || {});
 }
 

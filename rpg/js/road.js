@@ -19,9 +19,9 @@
    the renderer, camera, input, dialogue and cards.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
+import { toon, addOutline, outlineAll, glowSprite, Particles, paint } from './gfx.js';
 import { buildHomeTree, buildForest } from './hometree.js';
-import { buildEikar, placeWalker } from './actors.js';
+import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
 import { buildVel } from './creatures.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
@@ -153,7 +153,7 @@ export function createRoad(ctx) {
       cols.set([c.r, c.g, c.b], i * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
-    const ground = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ vertexColors: true })); ground.receiveShadow = true; scene.add(ground);
+    const ground = new THREE.Mesh(geo, paint(new THREE.MeshToonMaterial({ vertexColors: true }), 'land')); ground.receiveShadow = true; scene.add(ground);
   }
 
   /* ---------------- colliders (boxes and posts with a top and bottom) ---------------- */
@@ -480,7 +480,7 @@ export function createRoad(ctx) {
   { const bl = tanoc.weapon.userData.blade; if (bl) { bl.material.color.setHex(0x9a9aa2); bl.material.emissiveIntensity = 0; } if (tanoc.weapon.userData.glow) tanoc.weapon.userData.glow.visible = false; }
   scene.add(tanoc.root);
   const buhkon = buildEikar(NPC_LOOKS.buhkon); scene.add(buhkon.root);
-  const punk = buildWildPunk({ seed: 31 }); punk.root.scale.multiplyScalar(0.6); scene.add(punk.root);
+  const punk = cartoon(buildWildPunk({ seed: 31 }), 0.6); punk.root.scale.multiplyScalar(0.6); scene.add(punk.root);
   const P = { pos: V3(), vel: V3(), yaw: 0, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0, hp: 100, swing: 0, hitDone: false, iframes: 0 };
   const B = { pos: V3(), yaw: 0, stay: null, cd: 0, swing: 0 };                     // the Carpenter
   const K = { pos: V3(0, -50, 0), yaw: 0, on: false, cd: 0, swing: 0 };            // the Punk, once it's with them

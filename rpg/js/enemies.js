@@ -8,6 +8,7 @@ import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildVel, buildDummy } from './creatures.js';
 import { pivotNear } from './vines.js';
+import { cartoon } from './actors.js';
 import { buildApiButa, buildCyitor, buildXiwKatkan } from './creatures2.js';
 import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
 import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
@@ -81,7 +82,7 @@ export function createEnemies(ctx) {
   function spawn(kind, x, z, group, extra = {}) {
     const T = TYPES[kind];
     if (!T) return null;   // a creature whose model isn't loaded in this build
-    const actor = T.build();
+    const actor = cartoon(T.build());
     ctx.scene.add(actor.root);
     const hp = Math.round(T.hp * (T.miniboss ? D().bossHp : D().enemyHp));
     const e = Object.assign({

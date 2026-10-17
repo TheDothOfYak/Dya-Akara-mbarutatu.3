@@ -15,7 +15,7 @@
    grows into — and in Aakalay, one grew from the city's lord.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, glowSprite, outlineAll, addOutline } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { lerp, clamp } from './util.js';
 
 const TAU = Math.PI * 2;
@@ -107,6 +107,23 @@ export function skinTexture(base, repeat = 2) {
   return t;
 }
 
+/* a limb segment hanging from y = 0 down to y = -L: rounded at both ends, tapering
+   from r0 to r1 with a soft muscle swell of `bulge` centred at fraction `at` —
+   organic, so arms and legs read as one drawn line instead of tubes and balls */
+const limbCache = new Map();
+export function limbGeo(L, r0, r1, bulge = 0, at = 0.35) {
+  const key = [L, r0, r1, bulge, at].map(v => v.toFixed(4)).join();
+  if (limbCache.has(key)) return limbCache.get(key);
+  const pts = [], M = 14, C = 5;
+  const rad = t => r0 + (r1 - r0) * t + bulge * Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, (t - at) / 0.95 + 0.5)))), 1.6);
+  for (let i = 0; i <= C; i++) { const a = (i / C) * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(1e-4, Math.sin(a) * rad(0)), Math.cos(a) * r0 * 0.7)); }
+  for (let i = 1; i < M; i++) { const t = i / M; pts.push(new THREE.Vector2(rad(t), -t * L)); }
+  for (let i = 0; i <= C; i++) { const a = (i / C) * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(1e-4, Math.cos(a) * rad(1)), -L - Math.sin(a) * r1 * 0.8)); }
+  const g = new THREE.LatheGeometry(pts.reverse(), 20);
+  limbCache.set(key, g);
+  return g;
+}
+
 /* ================================================================
    A small shared humanoid rig: two-bone arms solved toward a grip
    target (so hands really hold things), and stepping legs.
@@ -131,16 +148,16 @@ export function gripQuat(out, dir, blade) {
 export function rigArm(parent, s, S, o) {
   const L1 = o.L1, L2 = o.L2;
   const upper = new THREE.Group(); upper.position.copy(S); parent.add(upper);
-  const um = new THREE.Mesh(new THREE.CapsuleGeometry(o.ru, L1 - o.ru * 1.2, 3, 8), o.skin); um.position.y = -L1 / 2; upper.add(um);
+  const um = new THREE.Mesh(limbGeo(L1, o.ru * 1.02, o.rf * 1.02, o.ru * 0.16, 0.32), o.skin); upper.add(um);
   const fore = new THREE.Group(); fore.position.y = -L1; upper.add(fore);
-  const elbow = new THREE.Mesh(new THREE.SphereGeometry(o.rf * 1.05, 8, 6), o.skin); fore.add(elbow);
+  const elbow = new THREE.Mesh(new THREE.SphereGeometry(o.rf * 0.98, 16, 12), o.skin); elbow.userData.noOutline = true; fore.add(elbow);
   const fl = L2 - o.rh * 0.9;
-  const fm = new THREE.Mesh(new THREE.CapsuleGeometry(o.rf, fl - o.rf * 1.6, 3, 8), o.skin); fm.position.y = -fl / 2; fore.add(fm);
+  const fm = new THREE.Mesh(limbGeo(fl, o.rf * 1.0, o.rf * 0.72, o.rf * 0.2, 0.22), o.skin); fore.add(fm);
   if (o.cuff) {
     const cuff = new THREE.Mesh(new THREE.CylinderGeometry(o.rf * 1.28, o.rf * 1.12, fl * 0.42, 8), o.cuff); cuff.position.y = -fl * 0.62; fore.add(cuff);
   }
   const grip = new THREE.Group(); grip.position.y = -L2; fore.add(grip);
-  const fist = new THREE.Mesh(new THREE.SphereGeometry(o.rh, 10, 8), o.hand || o.skin); fist.scale.set(1.15, 1.0, 1.1); fist.position.set(0, 0, 0); grip.add(fist);
+  const fist = new THREE.Mesh(new THREE.SphereGeometry(o.rh, 20, 14), o.hand || o.skin); fist.scale.set(1.2, 1.05, 1.15); fist.position.set(0, 0, 0); grip.add(fist);
   const knuck = new THREE.Mesh(new THREE.CapsuleGeometry(o.rh * 0.42, o.rh * 1.1, 2, 6), o.hand || o.skin);
   knuck.position.set(0, 0, o.rh * 0.75); grip.add(knuck);
   const thumb = new THREE.Mesh(new THREE.SphereGeometry(o.rh * 0.45, 6, 5), o.hand || o.skin); thumb.scale.set(1, 1.5, 1); thumb.position.set(-s * o.rh * 0.25, o.rh * 0.75, o.rh * 0.45); grip.add(thumb);
@@ -170,9 +187,9 @@ export function poseArm(arm, T, dir, blade) {
 /* a leg from the hip: thigh → knee → ankle with a boot */
 export function rigLeg(parent, s, hip, o) {
   const thigh = new THREE.Group(); thigh.position.copy(hip); parent.add(thigh);
-  const tm = new THREE.Mesh(new THREE.CapsuleGeometry(o.rt, o.Lt - o.rt * 1.2, 3, 8), o.leg); tm.position.y = -o.Lt / 2; thigh.add(tm);
+  const tm = new THREE.Mesh(limbGeo(o.Lt, o.rt * 1.04, o.rs * 1.08, o.rt * 0.12, 0.28), o.leg); thigh.add(tm);
   const knee = new THREE.Group(); knee.position.y = -o.Lt; thigh.add(knee);
-  const sm = new THREE.Mesh(new THREE.CapsuleGeometry(o.rs, o.Ls - o.rs * 1.4, 3, 8), o.shin || o.leg); sm.position.y = -o.Ls / 2; knee.add(sm);
+  const sm = new THREE.Mesh(limbGeo(o.Ls, o.rs * 1.04, o.rs * 0.74, o.rs * 0.22, 0.26), o.shin || o.leg); knee.add(sm);
   const ankle = new THREE.Group(); ankle.position.y = -o.Ls; knee.add(ankle);
   if (o.bootTop) {
     const cuff = new THREE.Mesh(new THREE.CylinderGeometry(o.rs * 1.35, o.rs * 1.25, o.Ls * 0.4, 8), o.boot); cuff.position.y = o.Ls * 0.18; ankle.add(cuff);
@@ -300,8 +317,9 @@ export function buildEikar(o = {}) {
   const torso = new THREE.Group(); body.add(torso);                              // the spine: leans and twists
 
   const skinMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: skinTexture(o.skin || '#a8743e'), gradientMap: ramp(), emissive: 0x000000 });
-  const tunicMat = toon(o.tunic != null ? o.tunic : new THREE.Color(o.leg || 0x4a2c1a).lerp(new THREE.Color(o.beltColor || 0x5a3420), 0.6).multiplyScalar(1.25).getHex(), { side: THREE.DoubleSide, emissive: 0x000000 });
-  const legMat = toon(o.leg || 0x4a2c1a);
+  skinMat.userData.ink = o.skin || '#a8743e';
+  const tunicMat = paint(toon(o.tunic != null ? o.tunic : new THREE.Color(o.leg || 0x4a2c1a).lerp(new THREE.Color(o.beltColor || 0x5a3420), 0.6).multiplyScalar(1.25).getHex(), { side: THREE.DoubleSide, emissive: 0x000000 }), 'cloth');
+  const legMat = paint(toon(o.leg || 0x4a2c1a), 'cloth');
   const bootMat = toon(o.foot || 0x3a2212);
   const beltMat = toon(o.beltColor || 0x5a3420);
   const trimMat = toon(o.trim || 0xc8a050);
@@ -325,7 +343,7 @@ export function buildEikar(o = {}) {
   // shoulders
   const SH = 0.355, SX = 0.168 * bw;
   for (const s of [-1, 1]) {
-    const delt = new THREE.Mesh(new THREE.SphereGeometry(0.056, 10, 8), skinMat); delt.position.set(s * SX, SH, 0); torso.add(delt);
+    const delt = new THREE.Mesh(new THREE.SphereGeometry(0.052, 18, 14), skinMat); delt.scale.set(1, 0.85, 0.95); delt.position.set(s * SX, SH, 0); delt.userData.noOutline = true; torso.add(delt);
   }
 
   // the head
@@ -342,9 +360,9 @@ export function buildEikar(o = {}) {
   const duat = o.duat === true ? 1 : (o.duat || 0);
   const markGlowCol = duat ? 0x6a18d8 : (o.marking || 0xbfe8ff);
   const markMat = new THREE.MeshBasicMaterial({ color: duat ? 0x1a0628 : kalo ? new THREE.Color(o.marking || 0xbfe8ff).lerp(new THREE.Color(0x203040), 0.35) : (o.markColor || 0x2a140a) });
-  const eyeR = kalo ? 0.03 : 0.027, ex = kalo ? 0.046 : 0.043;
+  const eyeR = (kalo ? 0.03 : 0.027) * 1.18, ex = kalo ? 0.047 : 0.044;   // eyes a little larger: they carry the acting
   const zOn = (x, y, r) => Math.sqrt(Math.max(0, r * r - x * x - y * y));
-  const markGlows = [];
+  const markGlows = [], eyes = [], brows = [];
   // bioluminescence: every Eikar's under-eye markings glow at night (the Kalo's faintly
   // by day too), with a few grain-dots of the same light on the backs of the forearms
   const bio = bioKit();
@@ -352,14 +370,27 @@ export function buildEikar(o = {}) {
   bio.basic(markMat, 1, nightMark);
   for (const s of [-1, 1]) {
     const ez = zOn(ex, 0.005, HR) * (kalo ? 1.0 : 0.98);
-    const white = new THREE.Mesh(new THREE.SphereGeometry(eyeR, 10, 8), whiteMat);
-    white.position.set(s * ex, 0.008, ez - 0.006); white.scale.set(1, 1.3, 0.45); white.userData.noOutline = true; face.add(white);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(eyeR * 0.62, 8, 6), eyeMat);
-    eye.position.set(s * (ex - 0.002), 0.006, ez + 0.003); eye.scale.set(1, 1.35, 0.5); eye.userData.noOutline = true; face.add(eye);
-    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0055, 5, 4), glintMat);
-    glint.position.set(s * (ex - 0.002) + 0.007, 0.016, ez + 0.009); glint.userData.noOutline = true; face.add(glint);
-    // the brow — gives the face its set
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.008, 0.012), eyeMat); brow.position.set(s * ex, 0.05, ez - 0.004); brow.rotation.z = s * (kalo ? -0.05 : 0.18); brow.rotation.y = s * 0.4; brow.userData.noOutline = true; face.add(brow);
+    // each eye is its own group, so it can blink and glance
+    const eg = new THREE.Group(); eg.position.set(s * ex, 0.008, ez - 0.006); face.add(eg);
+    const white = new THREE.Mesh(new THREE.SphereGeometry(eyeR, 20, 14), whiteMat);
+    white.scale.set(1, 1.3, 0.45); white.userData.noOutline = true; eg.add(white);
+    const pupil = new THREE.Group(); eg.add(pupil);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(eyeR * 0.64, 16, 12), eyeMat);
+    eye.position.set(-s * 0.002, -0.002, 0.009); eye.scale.set(1, 1.35, 0.5); eye.userData.noOutline = true; pupil.add(eye);
+    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.0062, 10, 8), glintMat);
+    glint.position.set(-s * 0.002 + 0.008, 0.009, 0.015); glint.userData.noOutline = true; pupil.add(glint);
+    const glint2 = new THREE.Mesh(new THREE.SphereGeometry(0.0028, 8, 6), glintMat);
+    glint2.position.set(-s * 0.002 - 0.006, -0.009, 0.0145); glint2.userData.noOutline = true; pupil.add(glint2);
+    // a lash line over the eye: the drawn upper lid
+    const lid = new THREE.Mesh(new THREE.TorusGeometry(eyeR * 1.02, 0.0034, 6, 16, Math.PI * 0.82), eyeMat);
+    lid.rotation.z = Math.PI * 0.09; lid.scale.set(1, 1.28, 1); lid.position.z = 0.004; lid.userData.noOutline = true; eg.add(lid);
+    eyes.push({ g: eg, pupil, s });
+    // the brow — a curved stroke that rises, knits and falls with the mood
+    const bg2 = new THREE.Group(); bg2.position.set(s * ex, 0.052, ez - 0.004); bg2.rotation.y = s * 0.4; face.add(bg2);
+    const brow = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.0055, 6, 12, Math.PI * 0.6), eyeMat);
+    brow.rotation.z = Math.PI * 0.2; brow.position.y = -0.024; brow.userData.noOutline = true; bg2.add(brow);
+    const browSet = s * (kalo ? -0.05 : 0.18);
+    bg2.rotation.z = browSet; brows.push({ g: bg2, s, z0: browSet });
     // the markings beneath the eyes: small downward triangles
     const my = -0.036, mz = zOn(ex + 0.004, my, HR) + 0.004;
     const tri = new THREE.Mesh(new THREE.CircleGeometry(kalo ? 0.019 : 0.017, 3, -Math.PI / 2), markMat);
@@ -370,9 +401,13 @@ export function buildEikar(o = {}) {
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), skinMat); nose.scale.set(0.9, 1.25, 0.9); nose.position.set(0, -0.018, HR * 0.98); face.add(nose);
   const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.0035, 3, 8, Math.PI * 0.8), eyeMat);
   mouth.rotation.z = Math.PI * 1.1; mouth.position.set(0, -0.06, 0.104); mouth.userData.noOutline = true; face.add(mouth);
+  // the open mouth behind the smile line, shown only as they talk
+  const mouthIn = new THREE.Mesh(new THREE.SphereGeometry(0.016, 14, 10), new THREE.MeshBasicMaterial({ color: 0x3a1410 }));
+  mouthIn.scale.set(1.15, 0.05, 0.4); mouthIn.position.set(0, -0.064, 0.1); mouthIn.userData.noOutline = true; face.add(mouthIn);
 
   // the Aagac: acorn-cap hat that is part of them, with its stem and the kind-symbol on its brow
   const capMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: capTexture(o.cap || '#4a2a14'), gradientMap: ramp(), emissive: 0x000000 });
+  capMat.userData.ink = o.cap || '#4a2a14';
   mats.push(capMat, tunicMat);
   const hat = new THREE.Group(); hat.position.set(0, 0.155, -0.004); head.add(hat);
   const CR = kalo ? 0.13 : 0.124, ct = (o.capTall || 0.62) * (kalo ? 1.0 : 1.12);
@@ -418,7 +453,7 @@ export function buildEikar(o = {}) {
       pp.setX(i, fx); pp.setZ(i, -Math.pow(fx / (W * 0.6), 2) * 0.06 + Math.pow(x / (W / 2), 2) * 0.06 * (1 - tt));
     }
     cg.computeVertexNormals();
-    cape = new THREE.Mesh(cg, toon(o.cape, { side: THREE.DoubleSide }));
+    cape = new THREE.Mesh(cg, paint(toon(o.cape, { side: THREE.DoubleSide }), 'cloth'));
     cape.position.set(0, 0.39, -0.1); torso.add(cape);
     for (const s of [-1, 1]) {
       const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), toon(0xe6b84a)); clasp.position.set(s * 0.1, 0.375, 0.07); torso.add(clasp);
@@ -485,9 +520,15 @@ export function buildEikar(o = {}) {
   const defKind = kind === 'spear' || kind === 'none' || kind === 'flask' ? 4 : kind === 'axe' ? 3 : 1;
   const s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
+  // the hand-drawn acting: squash & stretch, follow-through, blinks, glances, brows, talk
+  let sq = 0, sqV = 0, lastY = null, wasAir = false, vyS = 0;
+  let headX = 0, headY = 0, headXV = 0, hatX = -0.12, hatXV = 0;
+  let blinkT = 1.5 + Math.random() * 3, blink = 0, lookX = 0, lookY = 0, lookT = 1, lookTX = 0, lookTY = 0, browK = 0, talkK = 0;
+  const seed = Math.random() * 100;
   bio.glow(0);
 
   const A = {
+    cartoon: true,   // squash & stretch is built into this rig
     root, body, torso, head, hat, weapon, wPivot, wHold, cape, relic, nur, mats, arms, legs,
     /* st: { speed, onGround, t, swing: null | { kind: 1|2|3|4, p: 0..1 } | number, windup, attack,
              heat, drink, talking, thrown, duat } */
@@ -503,6 +544,12 @@ export function buildEikar(o = {}) {
       let gliding = false;
       for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && !own.has(c)) { gliding = true; break; } }
       glide = lerp(glide, gliding ? 1 : 0, 1 - Math.exp(-10 * dt));
+      // vertical speed, read off the root, drives stretch going up and the squash on landing
+      const ry = root.position.y, vy = lastY === null || dt <= 0 ? 0 : clamp((ry - lastY) / dt, -30, 30); lastY = ry;
+      vyS = lerp(vyS, vy, 1 - Math.exp(-12 * dt));
+      if (wasAir && onGround && airK > 0.4) sqV -= clamp(0.9 + Math.abs(vyS) * 0.12, 0.9, 2.6);   // land: squash
+      if (!wasAir && air) sqV += 1.2;                                                                // take off: stretch
+      wasAir = air;
 
       // which swing (main passes {kind,p}; others pass windup/attack numbers)
       let sw = st.swing && typeof st.swing === 'object' ? st.swing : null;
@@ -513,7 +560,7 @@ export function buildEikar(o = {}) {
       const b = swingBlend;
 
       // ---- the weapon hand at rest ----
-      const sway = lerp(Math.sin(t * 1.6) * 0.008, Math.sin(phase) * 0.16 * k, walkK);
+      const sway = lerp(Math.sin(t * 1.6) * 0.008, Math.sin(phase) * 0.22 * k, walkK);   // arms swing against the legs
       if (kind === 'spear') { iT.set(s * 0.25, -0.06, 0.11 + sway * 0.5); iD.set(0, 1, 0.1); iB.set(1, 0, 0); }
       else if (kind === 'bow') { iT.set(s * 0.24, -0.12, 0.08 + sway); iD.set(0, 1, 0.5); iB.set(1, 0, 0); }
       else if (kind === 'sword') { iT.set(s * 0.24, -0.15, 0.1 + sway); iD.set(s * 0.12, -0.25, 1); iB.set(0, -1, 0); }
@@ -570,12 +617,46 @@ export function buildEikar(o = {}) {
       // ---- torso, head, legs ----
       twist = lerp(twist, tw * b, 1 - Math.exp(-20 * dt));
       lean = lerp(lean, ln * (sw ? b : 1) + glide * 0.25, 1 - Math.exp(-12 * dt));
-      torso.rotation.set(lean, twist, Math.sin(phase) * 0.04 * k * walkK);
+      // a real walk: the hips turn with each step and the shoulders turn against them
+      const hipYaw = Math.sin(phase) * 0.11 * k * walkK;
+      body.rotation.y = hipYaw;
+      torso.rotation.set(lean, twist - hipYaw * 1.9, Math.sin(phase) * 0.04 * k * walkK);
       body.rotation.x = 0;
+      body.rotation.z = -Math.sin(phase) * 0.045 * k * walkK + Math.sin(t * 0.7 + seed) * 0.012 * (1 - walkK);   // hips sway with the stride; idle weight shift
       const bob = lerp(Math.sin(t * 2.2) * 0.006, Math.abs(Math.cos(phase)) * 0.045 * k, walkK);
       body.position.y = HIP + bob - crouch - (sw ? 0.03 * b : 0);
-      head.rotation.set(st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * 0.5, -twist * 0.6 + Math.sin(t * 0.5) * 0.18 * (1 - walkK) * (1 - b), 0);
-      hat.rotation.z = Math.sin(t * 1.7) * 0.02;
+      // squash & stretch: a spring, kicked by landings and take-offs, held long while rising, volume kept
+      const sqTarget = air ? clamp(vyS * 0.012, -0.05, 0.08) : 0;
+      sqV += ((sqTarget - sq) * 140 - sqV * 13) * dt; sq += sqV * dt; sq = clamp(sq, -0.16, 0.14);
+      const breath = Math.sin(t * 2.3 + seed) * 0.012 * (1 - walkK * 0.6);
+      torso.scale.set(1 - sq * 0.5 - breath * 0.3, 1 + sq + breath, 1 - sq * 0.5 + breath * 0.4);
+      body.position.y -= Math.max(0, -sq) * 0.35;
+      // the head lags the body and overshoots it a little: follow-through
+      const hxT = (st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * 0.5) + Math.sin(phase * 2 - 0.9) * 0.05 * k * walkK + sq * 0.6;
+      const hyT = -twist * 0.6 + Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b) + lookX * 0.35;
+      headXV += ((hxT - headX) * 160 - headXV * 16) * dt; headX += headXV * dt;
+      headY = lerp(headY, hyT, 1 - Math.exp(-9 * dt));
+      head.rotation.set(headX, headY + hipYaw * 0.9, -body.rotation.z * 0.6);   // the head stays on the road ahead
+      // the cap rides on the head and trails its motion
+      hatXV += ((-0.12 - headXV * 0.035 + sqV * 0.04 - hatX) * 120 - hatXV * 9) * dt; hatX += hatXV * dt;
+      hat.rotation.x = clamp(hatX, -0.4, 0.2);
+      hat.rotation.z = Math.sin(t * 1.7) * 0.02 - body.rotation.z * 0.5;
+      // eyes: blink every few seconds (twice now and then), glance about, settle forward in a fight
+      blinkT -= dt;
+      if (blinkT <= 0) { blink = 1; blinkT = Math.random() < 0.2 ? 0.22 : 2 + Math.random() * 3.5; }
+      blink = Math.max(0, blink - dt * 7);
+      const lidK = 1 - Math.sin(Math.min(1, blink) * Math.PI) * 0.92;
+      lookT -= dt;
+      if (lookT <= 0) { lookT = 0.8 + Math.random() * 2.2; lookTX = sw ? 0 : (Math.random() - 0.5) * 1.4; lookTY = sw ? 0 : (Math.random() - 0.5) * 0.6; }
+      lookX = lerp(lookX, lookTX, 1 - Math.exp(-18 * dt)); lookY = lerp(lookY, lookTY, 1 - Math.exp(-18 * dt));
+      for (const E of eyes) { E.g.scale.y = lidK; E.pupil.position.set(lookX * 0.006, lookY * 0.005, 0); }
+      // brows: knit for a fight, lift as they talk
+      browK = lerp(browK, sw ? -1 : st.talking ? 0.6 + Math.sin(t * 3.1) * 0.4 : 0, 1 - Math.exp(-10 * dt));
+      for (const B of brows) { B.g.rotation.z = B.z0 + B.s * Math.max(0, -browK) * 0.28 - B.s * Math.max(0, browK) * 0.1; B.g.position.y = 0.052 + browK * 0.006; }
+      // talk: the jaw flaps in syllables
+      talkK = lerp(talkK, st.talking ? 1 : 0, 1 - Math.exp(-12 * dt));
+      const syl = Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK;
+      mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
       strideLegs(legs, phase, moving ? k : 0, air, dt, sw && !moving ? b : 0);
       if (glide > 0.01) {   // tucked for the glide, eased in with it
         const G2 = [[0.25, 0.5], [0.4, 0.7]];
@@ -648,6 +729,62 @@ export function buildCore() {
   const halo = glowSprite(0x8a5aff, 6, 0.3); g.add(halo);
   g.userData = { m, inner, halo };
   return g;
+}
+
+/* a face that acts, for folk built outside the Eikar rig: blinks (now and then twice),
+   glances, brows that knit for a fight and lift in talk, a mouth that flaps in syllables.
+   f: { eyes: [meshes squashed shut to blink], pupils: [meshes that glance],
+        brows: [meshes], mouth: mesh, glance: how far the pupils move, lift: how far brows rise }
+   Returns update(dt, st); st is the same object passed to animate(). */
+export function faceActing(f) {
+  const eyes = (f.eyes || []).map(m => ({ m, y: m.scale.y })), pupils = (f.pupils || []).map(m => ({ m, p: m.position.clone() }));
+  const brows = (f.brows || []).map(m => ({ m, y: m.position.y, rz: m.rotation.z, s: Math.sign(m.position.x) || 1 }));
+  const mouth = f.mouth ? { m: f.mouth, y: f.mouth.scale.y } : null, G = f.glance ?? 0.006, LIFT = f.lift ?? 0.008;
+  let blinkT = 1 + Math.random() * 3, blink = 0, lx = 0, ly = 0, lt = 0.5, tx = 0, ty = 0, brK = 0, talkK = 0, t = Math.random() * 10;
+  return (dt, st = {}) => {
+    t += dt;
+    const fight = !!(st.attack || st.windup || st.swing);
+    blinkT -= dt;
+    if (blinkT <= 0) { blink = 1; blinkT = Math.random() < 0.2 ? 0.22 : 2 + Math.random() * 3.5; }
+    blink = Math.max(0, blink - dt * 7);
+    const lid = 1 - Math.sin(Math.min(1, blink) * Math.PI) * 0.92;
+    for (const e of eyes) e.m.scale.y = e.y * lid;
+    lt -= dt;
+    if (lt <= 0) { lt = 0.8 + Math.random() * 2.2; tx = fight ? 0 : (Math.random() - 0.5) * 2; ty = fight ? 0 : (Math.random() - 0.5) * 0.8; }
+    lx = lerp(lx, tx, 1 - Math.exp(-18 * dt)); ly = lerp(ly, ty, 1 - Math.exp(-18 * dt));
+    for (const p of pupils) p.m.position.set(p.p.x + lx * G, p.p.y + ly * G * 0.7, p.p.z);
+    brK = lerp(brK, fight ? -1 : st.talking ? 0.6 + Math.sin(t * 3.1) * 0.4 : 0, 1 - Math.exp(-10 * dt));
+    for (const b of brows) { b.m.position.y = b.y + brK * LIFT; b.m.rotation.z = b.rz - b.s * Math.max(0, -brK) * 0.25; }
+    if (mouth) {
+      talkK = lerp(talkK, st.talking ? 1 : 0, 1 - Math.exp(-12 * dt));
+      mouth.m.scale.y = mouth.y * (1 + Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK * 3.5);
+    }
+  };
+}
+
+/* the film's cartoon timing for any creature or folk with its own animate(): the whole body
+   squashes when it lands, crouches into a wind-up (anticipation), stretches into the strike and
+   a little while rising — a damped spring, so it overshoots and settles. It scales the root
+   around whatever scale the game gave it, and leaves the creature's own motion untouched. */
+export function cartoon(a, amt = 1) {
+  if (!a || !a.animate || !a.root || a.cartoon) return a;
+  a.cartoon = true;
+  const inner = a.animate, root = a.root, base = new THREE.Vector3(), applied = new THREE.Vector3();
+  let sq = 0, v = 0, lastY = null, vyS = 0, has = false;
+  a.animate = function (dt, st = {}) {
+    const out = inner.call(this, dt, st);
+    if (!(dt > 0)) return out;
+    if (!has || !root.scale.equals(applied)) { base.copy(root.scale); has = true; }   // the game rescaled it: that's the new rest shape
+    const y = root.position.y, vy = lastY === null ? 0 : clamp((y - lastY) / dt, -30, 30); lastY = y;
+    const pv = vyS; vyS = lerp(vyS, vy, 1 - Math.exp(-12 * dt));
+    if (pv < -3 && (vyS - pv) / dt > 30) v -= clamp(-pv * 0.07, 0.3, 1.4);            // hit the ground
+    const target = clamp(vyS * 0.006, -0.03, 0.05) + (st.attack || 0) * 0.07 - (st.windup || 0) * 0.06;
+    v += ((target * amt - sq) * 120 - v * 12) * dt; sq = clamp(sq + v * dt, -0.15, 0.15);
+    root.scale.set(base.x * (1 - sq * 0.5), base.y * (1 + sq), base.z * (1 - sq * 0.5));
+    applied.copy(root.scale);
+    return out;
+  };
+  return a;
 }
 
 /* the body follows the walker's feet, but a stair step is eased instead of popped:

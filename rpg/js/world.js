@@ -10,7 +10,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
-import { toon, ramp, glowSprite, outlineAll, addOutline } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
@@ -278,7 +278,7 @@ export function buildWorld(scene) {
     };
     return [...grow(lo, -1).reverse(), ...a, ...grow(hi, 1)];
   }
-  const landMat = toon(0xffffff, { vertexColors: true });
+  const landMat = paint(toon(0xffffff, { vertexColors: true }), 'land');
   function gridMesh(xs, zs, skip, yAt) {
     const nx = xs.length, nz = zs.length, pos = new Float32Array(nx * nz * 3), idx = [];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
