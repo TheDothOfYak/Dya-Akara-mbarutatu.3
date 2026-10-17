@@ -11,8 +11,8 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
-import { buildEikar } from './actors.js';
-import { clamp, damp, dampAngle, smooth, mulberry32 } from './util.js';
+import { buildEikar, placeWalker } from './actors.js';
+import { clamp, damp, dampAngle, smooth, lerp, mulberry32 } from './util.js';
 import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
@@ -426,15 +426,61 @@ export function createVelki(ctx) {
   const camPos = V3(2.5, 4, 54), camTgt = V3();
 
   /* ---------------- the beat of it ---------------- */
-  let stage = 'spire', t = 0, outT = 0, said = 0, barkI = 0, shake = 0, done = false, caughtT = -1, tear = null;
+  /* the afternoon first (unless a reload already saw it): supper for the gate crew, and their drill */
+  let stage = ctx.at === 'spire' ? 'spire' : 'home', t = 0, outT = 0, said = 0, barkI = 0, shake = 0, done = false, caughtT = -1, tear = null;
+  const B4 = STORY.PROLOGUE.before;
   const beacon = glowSprite(0xffd27a, 3, 0.9); scene.add(beacon);
+  const captain = crew[1];
   function setBeacon() {
     if (stage === 'spire') beacon.position.set(0, SPIRE_TOP + 1.6, 0);
     else if (stage === 'gate') beacon.position.set(0, 3, -WALL_R - 6);
-    beacon.visible = stage === 'spire' || stage === 'gate';
+    else if (stage === 'home') beacon.position.set(captain.pos.x, captain.pos.y + 2.4, captain.pos.z);
+    beacon.visible = stage === 'spire' || stage === 'gate' || stage === 'home';
   }
   setBeacon();
-  ctx.objective(STORY.PRO_OBJ.spire, 'WASD to move · Shift to run · Space to jump');
+  if (stage === 'spire') ctx.objective(STORY.PRO_OBJ.spire, 'WASD to move · Shift to run · Space to jump');
+  else ctx.objective(B4.basketObj, 'WASD to move · Shift to run · Space to jump');
+  // his mother, by their door; and the basket he carries up to the gate
+  const mother = person(5.2, 49.5, { skin: '#9a6a40', cap: '#3a2414', tunic: 0x8a5a6a, trim: 0xd8b080 }, { scale: 1.0 });
+  mother.look = false; mother.a.root.rotation.y = Math.atan2(P.pos.x - 5.2, P.pos.z - 49.5);
+  const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 0.3, 10), toon(0xb8884a)); basket.position.set(0.32, 0.95, 0.22); addOutline(basket, 0.02);
+  if (stage === 'home') tanoc.root.add(basket);
+  /* the drill: practice sparks dropped from the gate tower, each landing where its shadow is */
+  const DR = { n: 0, thrown: 0, next: 1.2, sparks: [], told: 0 };
+  function startDrill() {
+    stage = 'drill'; setBeacon(); tanoc.root.remove(basket);
+    DR.n = 0; DR.thrown = 0; DR.next = 1.5;
+    ctx.objective(B4.drillObj(0), B4.drillHint);
+  }
+  function drillTick(dt) {
+    DR.next -= dt;
+    if (DR.next <= 0 && DR.thrown < 8) {
+      DR.next = 1.9; DR.thrown++;
+      const a = rng() * TAU, r = 2.5 + rng() * 4.5, x = clamp(P.pos.x + P.vel.x * 0.6 + Math.cos(a) * r, -7, 7), z = clamp(P.pos.z + P.vel.z * 0.6 + Math.sin(a) * r, -27, -12), g = groundAt(x, z, 5);
+      const ball = glowSprite(0xffc070, 1.6, 0.95); ball.position.set(x, g + 22, z); scene.add(ball);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.25, 20), new THREE.MeshBasicMaterial({ color: 0x1a0c08, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2; ring.position.set(x, g + 0.06, z); scene.add(ring);
+      DR.sparks.push({ ball, ring, x, z, g, t: 0, fall: 2.1 });
+    }
+    for (let i = DR.sparks.length - 1; i >= 0; i--) {
+      const sp = DR.sparks[i]; sp.t += dt; const k = Math.min(1, sp.t / sp.fall);
+      sp.ball.position.y = lerp(sp.g + 22, sp.g + 1.5, k * k); sp.ring.scale.setScalar(1.4 - k * 0.5); sp.ring.material.opacity = 0.25 + k * 0.5;
+      if (k >= 1) {
+        const got = Math.hypot(P.pos.x - sp.x, P.pos.z - sp.z) < 1.7;
+        if (got) { DR.n++; sfx.core(); particles.burst(sp.x, sp.g + 1.5, sp.z, 24, { color: 0xffd080, speed: 4, size: 0.4, life: 0.6 }); ctx.bark('tanoc', B4.caught[Math.min(4, DR.n - 1)], 1.8); }
+        else { sfx.slam(); particles.burst(sp.x, sp.g + 0.2, sp.z, 18, { color: 0xffa040, speed: 5, size: 0.35, life: 0.5, gravity: -8 }); ctx.bark('captain', B4.missed[DR.told++ % B4.missed.length], 2); }
+        scene.remove(sp.ball); scene.remove(sp.ring); DR.sparks.splice(i, 1);
+        ctx.objective(B4.drillObj(DR.n), B4.drillHint);
+        if (DR.n >= 5) {
+          for (const q of DR.sparks) { scene.remove(q.ball); scene.remove(q.ring); } DR.sparks.length = 0;
+          stage = 'drilled'; ctx.save && ctx.save('spire');
+          ctx.say(B4.done, () => { stage = 'spire'; said = 0; setBeacon(); ctx.objective(STORY.PRO_OBJ.spire, 'Shift to run · Space to jump'); });
+          return;
+        }
+      }
+    }
+    if (DR.thrown >= 8 && !DR.sparks.length && DR.n < 5) { DR.n = 0; DR.thrown = 0; DR.next = 2.5; ctx.say(B4.again, () => ctx.objective(B4.drillObj(0), B4.drillHint)); }
+  }
 
   function startGateStage() {
     stage = 'gate'; gateBar.on = false; setBeacon();
@@ -456,10 +502,14 @@ export function createVelki(ctx) {
   }
 
   function interact() {
+    if (stage === 'home' && captain.pos.distanceTo(P.pos) < 4) { ctx.say(B4.crew, () => startDrill()); return; }
+    if (mother.pos.distanceTo(P.pos) < 3) { ctx.say([['mother', stage === 'home' ? 'Straight there, straight back. Go on.' : 'Home before the first spark, Tanoc.']]); return; }
     if (warden.pos.distanceTo(P.pos) < 3.5) { ctx.say(STORY.PROLOGUE.guard); return; }
     for (const c of crew) if (!c.run && c.pos.distanceTo(P.pos) < 3.2) { ctx.say(STORY.PROLOGUE.ahoac); return; }
   }
   function prompt() {
+    if (stage === 'home' && captain.pos.distanceTo(P.pos) < 4) return B4.talkCrew;
+    if (mother.pos.distanceTo(P.pos) < 3) return 'Talk to your mother';
     if (warden.pos.distanceTo(P.pos) < 3.5) return 'Talk to the gate warden';
     for (const c of crew) if (!c.run && c.pos.distanceTo(P.pos) < 3.2) return 'Talk to the Ahoac';
     return null;
@@ -506,22 +556,27 @@ export function createVelki(ctx) {
     else P.onGround = false;
     const speed = Math.hypot(P.vel.x, P.vel.z);
     if (P.onGround && speed > 1) { P.stepPh += dt * speed * 0.55; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); } }
-    tanoc.root.position.copy(P.pos); tanoc.root.rotation.y = P.yaw;
+    placeWalker(tanoc.root, P, dt); tanoc.root.rotation.y = P.yaw;
     tanoc.animate(dt, { speed, onGround: P.onGround, t });
     return sp;
   }
 
+  const camWant = V3(); let camInit = false, camReach = null;
   function updateCamera(dt) {
     const onSpire = Math.hypot(P.pos.x, P.pos.z) < 8 && P.pos.y > 2;
     const want = onSpire ? 5.2 : 6.5;
-    camTgt.set(P.pos.x, P.pos.y + 1.5, P.pos.z);
+    camWant.set(P.pos.x, P.pos.y + 1.5, P.pos.z);
+    // follow quickly across the ground, more gently up and down (steps, stairs, landings), and snap back if far behind
+    if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
+    else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
     let d = want;
     const cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z)) { d = Math.max(0.8, s - 0.4); break; } }
+    camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
     const goal = camTgt.clone().addScaledVector(dir, d);
     camPos.lerp(goal, 1 - Math.exp(-14 * dt));
     camera.position.copy(camPos);
-    if (shake > 0) { camera.position.x += (Math.random() - 0.5) * shake; camera.position.y += (Math.random() - 0.5) * shake; shake = Math.max(0, shake - dt * 1.5); }
+    if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; shake = Math.max(0, shake - dt * 1.5); }
     camera.lookAt(camTgt);
   }
 
@@ -586,6 +641,9 @@ export function createVelki(ctx) {
     if (Math.random() < 0.4) particles.emit(camPos.x + (Math.random() - 0.5) * 40, camPos.y + (Math.random() - 0.5) * 12, camPos.z + (Math.random() - 0.5) * 40, { vx: 0.2, vy: 0.1, vz: -0.6, color: 0xffc890, size: 0.14, life: 5, drag: 0 });
 
     if (playing) {
+      if (stage === 'home' && said === 0) { said = -1; ctx.say(B4.mom, () => ctx.objective(B4.basketObj, B4.basketHint)); }
+      if (stage === 'home' && P.pos.z < -WALL_R + 5 && Math.abs(P.pos.x) < 6 && !G_warned) { G_warned = true; ctx.say([STORY.PROLOGUE.guard[0]]); }
+      if (stage === 'drill') drillTick(dt);
       if (stage === 'spire') {
         if (said === 0) { said = 1; ctx.say(STORY.PROLOGUE.start); }
         if (P.pos.y > 6 && barkI === 0) { barkI = 1; ctx.bark('tanoc', STORY.PROLOGUE.barks[0], 3.5); }
@@ -636,5 +694,5 @@ export function createVelki(ctx) {
     composer.dispose && composer.dispose();
   }
 
-  return { intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught, cine, solidAt, heightAt } };
+  return { intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught, cine, solidAt, heightAt, DR, captain } };
 }

@@ -1562,6 +1562,7 @@ export function buildProperty(scene) {
     water: { level: WATER_LEVEL, isWater: (x, z) => waterDepth(x, z) > DEEP, depth: waterDepth, lakes: [{ id: 'eldimere', x: LAKE.x, z: LAKE.z, rx: LAKE.rx, rz: LAKE.rz, maxDepth: LAKE.d }] },
     zones: ZONES.map(z => ({ ...z })), albaliSpots: [{ x: -880, z: 380 }, { x: 420, z: 300 }, { x: -60, z: -420 }], juFields: [{ x: 300, z: 260, r: 7 }],
     kuniPerch: { x: OUTCROP.x, z: OUTCROP.z, y: heightAt(OUTCROP.x, OUTCROP.z) },
+    cave: { x: SHALLOW_CAVE.x, z: SHALLOW_CAVE.z },
     map: { cx: -300, cz: -20, span: 2000 },
     shadeAt: (x, z) => Math.max(shadeAt(x, z), canopyShade(x, z)), path: PATH, colossi,
     // the token bench in the workshop wing (a room of the big house's interior): room-space coordinates, relative to the

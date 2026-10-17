@@ -30,12 +30,13 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles } from './gfx.js';
-import { buildEikar } from './actors.js';
+import { buildEikar, placeWalker } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
 import { buildLutut } from './esik_sky.js';
 import { buildSniller } from './skyfolk.js';
 import { createCine } from './cine.js';
+import { latchAlongRay } from './vines.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm } from './util.js';
 import * as STORY from './story.js';
 
@@ -53,6 +54,10 @@ const FIRE1 = { x: -10, z: -640 }, THUD_Z = -700, ANIMAL = { x: 18, z: -738 }, L
 const RUINS = { x: -4, z: -868, r: 42 }, WALL = { x: -4, z: -896 }, GY = { x: -2, z: -864 }, FIRE2 = { x: -26, z: -850 };
 const KEEP = { x: 34, z: -1150, h: 30 }, CHURCH = { x: 34, z: -1172 }, TOWER_SW = { x: KEEP.x - 34, z: KEEP.z + 34 };
 const zoneOf = z => (z > PASS0 ? 'foot' : z > PASS1 ? 'pass' : z > EDGE_Z ? 'clear' : 'forest');
+/* the rockfall across the pass, the mist above it and the walkers' cairns in it, and the patrols round the keep */
+const ROCK_Z = -230, MIST_Z0 = -370, MIST_Z1 = -532;
+const CAIRNS = [[-26, -392], [22, -432], [-18, -470], [30, -508]].map(([dx, z]) => [pathX(z) + dx, z]);
+const SNEAK0 = -1052;
 function baseH(z) {
   if (z > PASS0) return 0;
   if (z > PASS1) return lerp(0, 38, smooth(PASS0, PASS1, z));
@@ -229,7 +234,6 @@ export function createMegla(ctx) {
     if (Math.abs(x - pathX(z)) < 2.4 || clearOfWorks(x, z, -6)) continue;
     const g = heightAt(x, z), s = 0.4 + rng() * 1.1;
     put(ferns, x, g + s * 0.4, z, s * 1.2, s, s * 1.2, (rng() - 0.5) * 0.4, rng() * 6, (rng() - 0.5) * 0.4, pick(['#2f5a34', '#3a6a3a', '#28502e', '#4a7a40']));
-    if (rng() < 0.08) put(glowK, x, g + 0.2, z, 0.14, 0.14, 0.14, 0, 0, 0, pick(['#5af0ff', '#8affb0', '#b48aff']));
   }
   for (let i = 0; i < 2600 && rocks.count < 700; i++) {
     const z = 0 - rng() * 1240, x = pathX(z) + (rng() - 0.5) * 160, lat = Math.abs(x - pathX(z));
@@ -316,6 +320,43 @@ export function createMegla(ctx) {
   const mists = [];
   for (let k = 0; k < 34; k++) { const m = mistSprite(0xd0d8dc, 26 + rng() * 20, 7 + rng() * 6, 0.32); m.userData.off = V3((rng() - 0.5) * 120, 1 + rng() * 4, (rng() - 0.5) * 120); scene.add(m); mists.push(m); }
 
+  /* ---------------- the rockfall across the pass ---------------- */
+  const rockfall = [];
+  {
+    const z = ROCK_Z, px = pathX(z);
+    // four boulders across the road itself: her vines can shift these (the third is split, and wants fire)
+    [[-8.5, 3.1], [-2.8, 3.4], [3, 3.2], [8.6, 3.0]].forEach(([lx, r], i) => {
+      const x = px + lx, zz = z + (i % 2) * 1.6, g = heightAt(x, zz);
+      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), toon(i === 2 ? 0x7a6a5a : 0x8a8478)); m.scale.set(1, 0.8, 1); m.rotation.set(rng(), rng() * 3, rng());
+      m.position.set(x, g + r * 0.6, zz); m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.04); scene.add(m);
+      let crack = null;
+      if (i === 2) { crack = glowSprite(0xff8a3a, 2.4, 0.15); crack.position.set(x, g + r * 0.9, zz + r * 0.7); scene.add(crack); }
+      rockfall.push({ i, x, z: zz, g, r, m, crack, s: cyl(x, zz, r * 0.95, g - 1, g + r * 1.4), done: false, hits: 0 });
+    });
+    // and the heap either side, up the walls of the pass: too loose to climb
+    for (let k = 0; k < 40; k++) {
+      const side = k % 2 ? 1 : -1, lat = 13 + rng() * 45, x = px + side * lat, zz = z + (rng() - 0.5) * 10, g = heightAt(x, zz), sz = 1.2 + rng() * 2.6;
+      put(rocks, x, g + sz * 0.4, zz, sz * 1.2, sz * 0.9, sz, rng() * 3, rng() * 3, rng() * 3, pick(['#8a8478', '#7a766e', '#6a665e']));
+    }
+  }
+  /* the old walkers' cairns, up in the mist */
+  const cairns = CAIRNS.map(([x, z]) => {
+    const g = heightAt(x, z), grp = new THREE.Group();
+    for (let k = 0; k < 5; k++) { const sz = 0.75 - k * 0.12, m = new THREE.Mesh(new THREE.DodecahedronGeometry(sz, 0), toon(0x8a8478)); m.position.y = 0.4 + k * 0.48; m.rotation.y = k; m.scale.y = 0.6; addOutline(m, 0.03); grp.add(m); }
+    const glow = glowSprite(0x9fe8ff, 3.2, 0); glow.position.y = 3; grp.add(glow);
+    grp.position.set(x, g, z); scene.add(grp); cyl(x, z, 0.9, g - 1, g + 2.4);
+    return { x, z, g, grp, glow, lit: false, item: null };
+  });
+  /* the ruin's three carved stones, standing in the gaps of the ring */
+  const sealStones = [[1.65, 25], [3.15, 24], [6.05, 25]].map(([a, r], i) => {
+    const x = RUINS.x + Math.cos(a) * r, z = RUINS.z + Math.sin(a) * r, g = heightAt(x, z);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.4, 0.5), toon(0x9a9284)); m.position.set(x, g + 1.1, z); m.rotation.y = Math.atan2(RUINS.x - x, RUINS.z - z); m.rotation.z = (i - 1) * 0.08;
+    m.castShadow = true; addOutline(m, 0.04); scene.add(m);
+    const rune = glowSprite(0xc890ff, 1.3, 0.35); rune.position.set(x, g + 1.6, z); scene.add(rune);
+    box(x, z, 0.8, 0.4, g - 1, g + 2.3);
+    return { x, z, g, m, rune, read: false };
+  });
+
   for (const k of [trunks, cones, blobs, rocks, ferns, stones, glowK]) { k.instanceMatrix.needsUpdate = true; if (k.instanceColor) k.instanceColor.needsUpdate = true; k.computeBoundingSphere(); }
   indexSolids();
 
@@ -378,11 +419,17 @@ export function createMegla(ctx) {
   };
 
   /* ---------------- foes: wild Punks (day two), Duskareth (the keep) ---------------- */
+  const FOE = {
+    wildpunk: { hp: 34, reach: 1.9, dmg: 7, speed: 5.4, cd: 1.5, windup: 0.5, lunge: 7 },
+    vel: { hp: 9999, reach: 2.4, dmg: 11, speed: 6.5, cd: 1.0, windup: 0.5, lunge: 7 },
+    sru: { hp: 150, reach: 3.6, dmg: 14, speed: 4.6, cd: 2.0, windup: 0.85, lunge: 11 },
+  };
   function addFoe(kind, x, z) {
-    const a = kind === 'vel' ? buildVel() : buildWildPunk({ seed: Math.floor(rng() * 999) });
+    const a = kind === 'vel' ? buildVel() : kind === 'sru' ? buildSruVorn({ seed: 12 }) : buildWildPunk({ seed: Math.floor(rng() * 999) });
     if (kind === 'wildpunk') a.root.scale.multiplyScalar(0.7);
+    if (kind === 'sru') a.root.scale.setScalar(1.5);
     scene.add(a.root);
-    const hp = kind === 'vel' ? 9999 : 34;
+    const hp = FOE[kind].hp;
     const f = { kind, a, pos: V3(x, ground(x, z), z), vel: V3(), yaw: rng() * TAU, hp, max: hp, state: 'chase', timer: 0, windup: 0, flash: 0, dead: false, cd: 0.5 + rng() * 1.5, out: 0 };
     a.root.position.copy(f.pos); foes.push(f); return f;
   }
@@ -394,8 +441,9 @@ export function createMegla(ctx) {
       sfx.hit(); particles.burst(f.pos.x, f.pos.y + 1.2, f.pos.z, 8, { color: 0xb070ff, speed: 5, size: 0.3, life: 0.3 });
       P.vel.addScaledVector(d, -5); return;
     }
-    f.hp -= dmg; sfx.hit(); f.vel.addScaledVector(d, 6); f.stun = 0.35;
+    f.hp -= dmg; sfx.hit(); f.vel.addScaledVector(d, f.kind === 'sru' ? 1.5 : 6); f.stun = f.kind === 'sru' ? 0.12 : 0.35;
     particles.burst(f.pos.x, f.pos.y + 0.8, f.pos.z, 10, { color: 0xffb040, speed: 6, size: 0.3, life: 0.4, gravity: -10 });
+    if (f.kind === 'sru') { bossBar(Math.max(0, f.hp / f.max * 100)); if (f.hp <= 0) { sruBeaten(f); return; } }
     if (f.hp <= 0) { f.dead = true; f.deadT = 0; sfx.die(); particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 22, { color: 0xc88a3a, speed: 7, size: 0.45, life: 0.7, gravity: -6 }); }
   }
   function updateFoes(dt, playing) {
@@ -409,17 +457,17 @@ export function createMegla(ctx) {
       f.stun = Math.max(0, (f.stun || 0) - dt);
       const dx = P.pos.x - f.pos.x, dz = P.pos.z - f.pos.z, d = Math.hypot(dx, dz);
       let want = 0, wy = f.yaw;
-      const reach = f.kind === 'vel' ? 2.4 : 1.9, dmg = f.kind === 'vel' ? 11 : 7;
+      const S = FOE[f.kind], reach = S.reach, dmg = S.dmg;
       if (playing && !P.down) {
         if (f.state === 'windup') {
-          f.timer -= dt; wy = Math.atan2(dx, dz); f.windup = 1 - f.timer / 0.5;
-          if (f.timer <= 0) { f.state = 'recover'; f.timer = 0.6; f.windup = 0; f.attackA = 1; f.vel.x += Math.sin(f.yaw) * 7; f.vel.z += Math.cos(f.yaw) * 7; if (d < reach + 0.9 && P.iframes <= 0) hurtTanoc(dmg, f.pos); }
+          f.timer -= dt; wy = Math.atan2(dx, dz); f.windup = 1 - f.timer / S.windup;
+          if (f.timer <= 0) { f.state = 'recover'; f.timer = 0.6; f.windup = 0; f.attackA = 1; f.vel.x += Math.sin(f.yaw) * S.lunge; f.vel.z += Math.cos(f.yaw) * S.lunge; if (d < reach + 0.9 && P.iframes <= 0) hurtTanoc(dmg, f.pos); }
         } else if (f.state === 'recover') { f.timer -= dt; f.attackA = Math.max(0, (f.attackA || 0) - dt * 3); if (f.timer <= 0) f.state = 'chase'; }
         else {
           f.cd -= dt; wy = Math.atan2(dx, dz);
           if (d < 5 && f.cd > 0) { wy += Math.PI / 2 * (f.pos.x > P.pos.x ? 1 : -1); want = 3.5; }
-          else want = d > reach ? (f.kind === 'vel' ? 6.5 : 5.4) : 0;
-          if (d < reach + 0.4 && f.cd <= 0) { f.state = 'windup'; f.timer = 0.5; f.cd = (f.kind === 'vel' ? 1.0 : 1.5) + rng(); }
+          else want = d > reach ? S.speed : 0;
+          if (d < reach + 0.4 && f.cd <= 0) { f.state = 'windup'; f.timer = S.windup; f.cd = S.cd + rng(); }
         }
       }
       if (f.stun > 0) want = 0;
@@ -450,6 +498,8 @@ export function createMegla(ctx) {
     let to = null, bd = 34;
     if (GYN && GYN.alive) { const m = mawPoint(); const d = m.distanceTo(from); if (d < 40) { to = m; bd = d; } }
     for (const f of foes) { if (f.dead || f.out) continue; const dx = f.pos.x - P.pos.x, dz = f.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < bd && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.6) { bd = d; to = V3(f.pos.x, f.pos.y + 0.8, f.pos.z); } }
+    const cr = crackRock();
+    if (!to && cr) { const dx = cr.x - P.pos.x, dz = cr.z - P.pos.z, d = Math.hypot(dx, dz); if (d < 40 && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.5) to = V3(cr.x, cr.g + cr.r * 0.8, cr.z); }
     const speed = 30, vel = to ? (() => { const dx = to.x - from.x, dz = to.z - from.z, hd = Math.hypot(dx, dz), tt = hd / speed; return V3(dx / tt, (to.y - from.y) / tt + 0.5 * 18 * tt, dz / tt); })() : V3(-Math.sin(CAM.yaw) * speed, 4, -Math.cos(CAM.yaw) * speed);
     P.yaw = Math.atan2(vel.x, vel.z);
     const g = new THREE.Group(); const big = amped ? 1.8 : 1;
@@ -464,6 +514,8 @@ export function createMegla(ctx) {
       let hit = false;
       if (GYN && GYN.alive && p.distanceTo(mawPoint()) < (GYN.phase === 1 ? 3.4 : 2.6)) { hit = true; gyngeStruck(); }
       else if (GYN && GYN.alive && p.distanceTo(GYN.pos.clone().setY(GYN.pos.y + 0.5 * GYN.s)) < 0.75 * GYN.s) { hit = true; gyngeBounce(p); }
+      const cr = crackRock();
+      if (!hit && cr && Math.hypot(p.x - cr.x, p.z - cr.z) < cr.r + 0.8 && p.y < cr.g + cr.r * 1.6) { hit = true; crackHit(cr); }
       if (!hit) hit = b.life <= 0 || solidAt(p.x, p.y, p.z);
       for (const f of foes) { if (hit || f.dead || f.out || f.pos.distanceTo(p) > 1.6) continue; hitFoe(f, 22, P.pos); hit = true; }
       if (hit) { particles.burst(p.x, p.y, p.z, amped ? 30 : 16, { color: 0xff8a2a, speed: amped ? 8 : 5, size: 0.45, life: 0.5 }); scene.remove(b.g); bolts.splice(i, 1); }
@@ -475,7 +527,7 @@ export function createMegla(ctx) {
   const gyngeBar = (() => {
     const d = document.createElement('div'); d.id = 'gynge-bar';
     d.style.cssText = 'position:fixed;left:40%;top:4.5vh;transform:translateX(-50%);width:min(420px,52vw);z-index:22;display:none;font-family:var(--display,Georgia);letter-spacing:.2em;font-size:12px;color:#e8d8b8;text-align:center;text-shadow:0 1px 4px #000';
-    d.innerHTML = 'GYNGE · LIVING ROCK<div style="height:9px;margin-top:6px;border:1px solid #c8a060;border-radius:5px;background:rgba(0,0,0,.45);overflow:hidden"><div id="gynge-fill" style="height:100%;width:100%;background:linear-gradient(90deg,#c87a3a,#ffd27a);transition:width .25s"></div></div>';
+    d.innerHTML = '<span id="gynge-name">GYNGE · LIVING ROCK</span><div style="height:9px;margin-top:6px;border:1px solid #c8a060;border-radius:5px;background:rgba(0,0,0,.45);overflow:hidden"><div id="gynge-fill" style="height:100%;width:100%;background:linear-gradient(90deg,#c87a3a,#ffd27a);transition:width .25s"></div></div>';
     document.body.appendChild(d); return d;
   })();
   function mawPoint() { const f = V3(Math.sin(GYN.yaw), 0, Math.cos(GYN.yaw)); return V3(GYN.pos.x + f.x * 0.9 * GYN.s, GYN.pos.y + (GYN.phase === 1 ? 0.62 : 0.8) * GYN.s, GYN.pos.z + f.z * 0.9 * GYN.s); }
@@ -615,7 +667,96 @@ export function createMegla(ctx) {
   }
   function jump() {
     if (trySlide()) return;
+    if (P.ride && heldVines().length) { pumpSwing(); return; }
     P.jumpBuf = 0.15;
+  }
+  /* ---------------- her vines, as on the Carpenter's land: hand over hand through the trees ----------------
+     Left click throws her left vine at whatever is by the X, right click the right one; hold to hang on,
+     let go to fly off with all your speed. Space near the bottom of a swing pumps it higher. Shift
+     hauls the vine in, C lets it out, X keeps it the length it is. Five vines; they grow back when
+     her feet are on something. */
+  const SW = { range: 38, hip: 1.35, n: 5 };
+  const vines = { L: null, R: null }; let vineN = SW.n, vineGrow = 0;
+  const heldVines = () => [vines.L, vines.R].filter(v => v && v.hold);
+  const _seatQ = new THREE.Quaternion(), _yawQ = new THREE.Quaternion(), _UP = V3(0, 1, 0);
+  const aimRay = new THREE.Raycaster(), AIM_C = new THREE.Vector2(0, 0);
+  // what a vine can hold here: the trunks of the pass and of the Megla Aagac, the tops of walls, the land rising ahead
+  let vineWorld = null;
+  function vineLand() {
+    if (vineWorld) return vineWorld;
+    const trees = solids.filter(q => q.kind === 'cyl' && q.y1 - q.y0 > 7).map(q => ({ x: q.x, z: q.z, g: q.y0 + 1, h: Math.min(60, q.y1 - q.y0 - 1), r: q.r }));
+    const boxes = solids.filter(q => q.kind === 'box');
+    vineWorld = { heightAt, trees, col: { nearAll: (x, z, r) => boxes.filter(q => !q.off && Math.abs(q.x - x) < r + q.hw && Math.abs(q.z - z) < r + q.hd).map(q => ({ x: q.x, z: q.z, hw: q.hw, hd: q.hd, c: 1, s: 0, top: q.y1, bot: q.y0 })) } };
+    return vineWorld;
+  }
+  function vineShoot(side) {
+    if (!P.ride || P.down || cine.active || !RIDE_STAGES.includes(stage)) return false;
+    sfx.swing();
+    if (vineN <= 0) { if (t - (P.vineOutT ?? -9) > 3) { P.vineOutT = t; ctx.toast('She’s out of vines. They grow back once her feet touch something.', 2.4); } return true; }
+    const hip = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z);
+    aimRay.setFromCamera(AIM_C, camera);
+    const A = latchAlongRay(vineLand(), hip, aimRay.ray.origin, aimRay.ray.direction, side, { range: SW.range, minUp: P.onGround ? 2.5 : 1.2 });
+    if (!A) return true;
+    vines[side] = { A: A.clone(), L: hip.distanceTo(A), t: 0, k: 0, hold: false };
+    return true;
+  }
+  function vineLet(side) {
+    const S = vines[side]; if (!S) return;
+    vines[side] = null;
+    if (S.hold && !heldVines().length) {   // let go on the way up the far side of the arc and she flicks you on
+      P.onGround = false; P.coyote = 0;
+      const off = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z).sub(S.A), hv = Math.hypot(P.vel.x, P.vel.z), lead = hv > 1 ? (off.x * P.vel.x + off.z * P.vel.z) / hv : 0, ang = Math.atan2(Math.abs(lead), -off.y);
+      if (P.vel.y > 0 && lead > 0 && ang > 0.4 && ang < 1.35) { P.vel.y += 5; if (hv < 30) { P.vel.x *= 1.12; P.vel.z *= 1.12; } particles.ring(P.pos.x, P.pos.y + 1, P.pos.z, 16, 1.6, { color: 0xb8ff7a, size: 0.4, life: 0.4 }); sfx.jump(); }
+      else if (P.vel.y > 0) P.vel.y += 1.5;
+    }
+  }
+  function pumpSwing() {
+    if (t < (P.pumpT || 0)) return;
+    P.pumpT = t + 0.45;
+    const S = heldVines()[0], off = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z).sub(S.A), ol = off.length() || 1;
+    const good = clamp(1 - Math.acos(clamp(-off.y / ol, -1, 1)) / 0.6, 0, 1), spd = P.vel.length();
+    if (spd < 2) P.vel.add(V3(-Math.sin(CAM.yaw) * 5, 0, -Math.cos(CAM.yaw) * 5));
+    else if (good > 0 && spd < 40) P.vel.multiplyScalar(1 + (2 + 5 * good) / spd);
+    if (good > 0.5) particles.ring(P.pos.x, P.pos.y + 0.6, P.pos.z, 12, 1.2, { color: 0x9ad86a, size: 0.35, life: 0.35 });
+    sfx.swing();
+  }
+  function vineTick(dt, act) {
+    if (!P.ride || !act) { vines.L = vines.R = null; return; }
+    if (P.onGround && vineN < SW.n && (vineGrow += dt) > 0.3) { vineGrow = 0; vineN++; }
+    for (const side of ['L', 'R']) {
+      const S = vines[side]; if (!S || S.hold) continue;
+      S.t += dt; S.k = Math.min(1, S.t / (0.06 + S.L * 0.007));   // it takes a moment to reach, longer the further it goes
+      if (S.k < 1) continue;
+      vineN = Math.max(0, vineN - 1); S.hold = true;
+      sfx.hit(); particles.burst(S.A.x, S.A.y, S.A.z, 10, { color: 0x9ad86a, speed: 3, size: 0.35, life: 0.5 });
+      // she hauls: you leave the ground and go, even from a standstill
+      const fx = S.A.x - P.pos.x, fz = S.A.z - P.pos.z, fd = Math.hypot(fx, fz) || 1, hv = Math.hypot(P.vel.x, P.vel.z);
+      if (hv < 15 && !keys.KeyX) { P.vel.x += fx / fd * (15 - hv); P.vel.z += fz / fd * (15 - hv); }
+      if (P.onGround || P.pos.y - groundAt(P.pos.x, P.pos.z, P.pos.y) < 1.5) P.vel.y = Math.max(P.vel.y, 7);
+      P.onGround = false; P.coyote = 0;
+      S.L = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z).distanceTo(S.A);
+    }
+    const H = heldVines(); if (!H.length) return;
+    const hold = keys.KeyX, reelIn = keys.ShiftLeft || keys.ShiftRight, letOut = keys.KeyC;
+    for (const S of H) {
+      if (reelIn) S.L = Math.max(2.5, S.L - 7 * dt);
+      else if (letOut) S.L = Math.min(SW.range, S.L + 7 * dt);
+      else if (!hold) { const want = Math.max(4, S.A.y - (heightAt(S.A.x, S.A.z) + 2.5)); S.L = Math.max(4, S.L - Math.min(24, 1.5 + Math.max(0, S.L - want) * 3) * dt); }
+    }
+    // the rope: no vine lets you get further than its length from where it caught
+    const hip = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z), pred = hip.clone().addScaledVector(P.vel, dt);
+    for (let it = 0; it < (H.length > 1 ? 3 : 1); it++) for (const S of H) { const d = pred.clone().sub(S.A), len = d.length(); if (len > S.L) pred.copy(S.A).addScaledVector(d, S.L / len); }
+    P.vel.copy(pred.sub(hip)).multiplyScalar(1 / dt);
+    const spd = P.vel.length();
+    if (hold) P.vel.multiplyScalar(1 - 1.2 * dt);
+    else if (spd > 0.5 && spd < 38 && P.vel.y < 0) P.vel.multiplyScalar(1 + 0.12 * dt);
+    if (Math.random() < 0.35) particles.emit(P.pos.x, P.pos.y + 0.6, P.pos.z, { color: 0x9ad86a, size: 0.3, life: 0.5, speed: 1 });
+  }
+  /* the mouse, on her back: her two front vines */
+  function vineButton(button, down) {
+    const side = button === 0 ? 'L' : button === 2 ? 'R' : null; if (!side) return false;
+    if (!down) { vineLet(side); return P.ride; }
+    return P.ride ? vineShoot(side) : false;
   }
   function updatePlayer(dt, playing) {
     if (P.slide) { updateSlide(dt); poseTanoc(dt, 0); return; }
@@ -631,11 +772,14 @@ export function createMegla(ctx) {
     if (len > 0.08) { const k = Math.min(1, len) / len; wx = (fx * iz + rx * ix) * k; wz = (fz * iz + rz * ix) * k; }
     const run = keys.ShiftLeft || keys.ShiftRight;
     const sp = P.ride ? (run ? 17 : 10) : (run ? 8.6 : 4.8) * (P.swing > 0 ? 0.35 : 1);
-    P.vel.x = damp(P.vel.x, wx * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt); P.vel.z = damp(P.vel.z, wz * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt);
+    const swinging = P.ride && heldVines().length > 0, flying = P.ride && !P.onGround && Math.hypot(P.vel.x, P.vel.z) > sp + 1;
+    if (swinging || flying) { P.vel.x += wx * 7 * dt; P.vel.z += wz * 7 * dt; }   // on a vine, or flung off one: you keep your speed, and only lean it
+    else { P.vel.x = damp(P.vel.x, wx * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt); P.vel.z = damp(P.vel.z, wz * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt); }
     if (len > 0.08 && P.swing <= 0) P.yaw = dampAngle(P.yaw, Math.atan2(wx, wz), P.ride ? 6 : 12, dt);
     P.jumpBuf -= dt; P.coyote -= dt; P.iframes = Math.max(0, P.iframes - dt);
     if (P.jumpBuf > 0 && (P.onGround || P.coyote > 0) && playing && !P.down) { P.vel.y = P.ride ? 10 : 9.2; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
     P.vel.y -= 26 * dt;
+    vineTick(dt, playing && !P.down);
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos, P.ride ? 0.9 : PR);
     P.pos.y += P.vel.y * dt;
@@ -660,16 +804,35 @@ export function createMegla(ctx) {
     poseTanoc(dt, speed);
   }
   function poseTanoc(dt, speed) {
-    if (P.ride) {   // in the saddle: Brindle-grown Punk under him, vines going
+    if (P.ride) {   // in the saddle: his grown Punk under him, vines going
       K.pos.copy(P.pos); K.yaw = P.yaw;
-      punk.root.position.copy(P.pos); punk.root.rotation.y = P.yaw; punk.root.visible = true;
-      punk.animate(dt, { speed, t, air: P.onGround ? 0 : 1 });
-      const seat = V3(0, 1.15 * 1.85 - 0.3, -0.05).applyAxisAngle(V3(0, 1, 0), P.yaw).add(P.pos);
-      tanoc.root.position.copy(seat); tanoc.root.rotation.y = P.yaw;
-      tanoc.animate(dt, { speed: 0, onGround: true, t, swing: null });
+      const R0 = punk.root; R0.rotation.order = 'YXZ';
+      R0.position.copy(P.pos); R0.rotation.y = P.yaw; R0.visible = true;
+      // in the air she leans into the swing: nose along the way she's going, rolled toward the vine
+      const hv = Math.hypot(P.vel.x, P.vel.z), held = heldVines();
+      let pitch = 0, roll = 0;
+      if (!P.onGround) {
+        pitch = clamp(-Math.atan2(P.vel.y, Math.max(hv, 1)) * 0.6, -0.7, 0.7);
+        if (held.length) { const ax = held.reduce((q, v) => q + v.A.x, 0) / held.length - P.pos.x, az = held.reduce((q, v) => q + v.A.z, 0) / held.length - P.pos.z; roll = clamp(-(ax * Math.cos(P.yaw) - az * Math.sin(P.yaw)) * 0.04, -0.5, 0.5); }
+      }
+      R0.rotation.x = damp(R0.rotation.x, pitch, 8, dt); R0.rotation.z = damp(R0.rotation.z, roll, 8, dt);
+      R0.updateMatrixWorld(true);
+      const grabs = ['L', 'R'].map(k => vines[k]).filter(Boolean).map(v => ({ p: R0.worldToLocal(v.A.clone()), k: v.hold ? 1 : v.k }));
+      K.air = damp(K.air || 0, P.onGround ? 0 : 1, 8, dt);
+      punk.animate(dt, { speed: P.onGround ? speed : 0, t, air: K.air, grabs: grabs.length ? grabs : null });
+      // he sits in the saddle itself, carried by her body as it bobs and rolls
+      const T = tanoc.root, b = punk.body, cf = punk.cfg;
+      if (b && cf) {
+        b.updateMatrixWorld(true);
+        T.position.copy(b.localToWorld(V3(0, cf.R * cf.sq + cf.R * 0.07, -cf.R * 0.15)));
+        T.position.y -= 0.76 * T.scale.y;
+        b.getWorldQuaternion(_seatQ); _yawQ.setFromAxisAngle(_UP, P.yaw); T.quaternion.copy(_yawQ).slerp(_seatQ, 0.65);
+        K.gait = clamp((b.position.y - cf.bodyY) / (cf.R * 0.08), 0, 1.2);
+      } else { T.position.copy(P.pos).add(V3(0, 1.8, 0)); T.rotation.set(0, P.yaw, 0); }
+      tanoc.animate(dt, { speed: 0, onGround: true, t, swing: null, ride: true, rideSpeed: hv, rideBob: K.gait || 0, rideRoll: roll * 0.4 });
       return;
     }
-    tanoc.root.position.copy(P.pos); tanoc.root.rotation.y = P.yaw;
+    placeWalker(tanoc.root, P, dt); tanoc.root.rotation.x = 0; tanoc.root.rotation.y = P.yaw;
     if (P.down) { tanoc.root.rotation.z = damp(tanoc.root.rotation.z, 1.35, 5, dt); tanoc.root.position.y += 0.25; }
     else tanoc.root.rotation.z = damp(tanoc.root.rotation.z, 0, 8, dt);
     tanoc.animate(dt, { speed: P.down ? 0 : speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null });
@@ -755,13 +918,90 @@ export function createMegla(ctx) {
     cut([
       { dur: 6.5, from: { p: [pathX(-300) + 70, 140, -340], l: [pathX(-120), 20, -120] }, to: { p: [pathX(-200) + 40, 80, -230], l: [pathX(-40), 6, -40] }, caption: M.cards },
       { dur: 6, cam: k => ({ p: V3(P.pos.x + 6 - k * 2, P.pos.y + 2.4, P.pos.z - 9 + k * 2), l: V3(P.pos.x, P.pos.y + 1.6, P.pos.z) }), caption: M.ride[0][1], onTick: () => { P.vel.set(0, 0, -6); } },
-    ], () => { ctx.location('The river pass', 'Chapter II · north, into the mist'); objective('Ride north up the river pass', 'Shift to gallop — follow the river'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); });
+    ], () => { ctx.location('The river pass', 'Chapter II · north, into the mist'); objective('Ride north up the river pass', 'Shift to gallop · click to throw her vines at the pines — hold to swing, let go to fly'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); });
   }
   function rideTick() {
     const prog = clamp(-P.pos.z / -PASS1, 0, 1);
     const marks = [0.15, 0.4, 0.65, 0.85];
     if (D.said < marks.length && prog > marks[D.said]) { const [w, l] = M.rideBarks[D.said]; ctx.bark(w, l, 4.5); D.said++; }
+    if (!D.rocks && P.pos.z < ROCK_Z + 34) { startRocks(); return; }
+    if (D.rocks === 'done' && !D.mist && P.pos.z < MIST_Z0) { startMist(); return; }
     if (P.pos.z < PASS1 - 20) arriveClearing();
+  }
+  /* ---- the rockfall: her vines haul three boulders off the road; the split one wants fire ---- */
+  const crackRock = () => rockfall.find(r => r.i === 2 && !r.done && stage === 'rocks');
+  function clearRock(r) {
+    r.done = true; r.s.off = true;
+    if (r.crack) scene.remove(r.crack);
+    const left = rockfall.filter(q => !q.done).length;
+    objective(M.rockObj(4 - left), M.rockHint, 4, 4 - left);
+    if (!left) {
+      D.rocks = 'done'; stage = 'ride'; setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z);
+      setTimeout(() => say(M.rockDone, () => { objective('Ride north up the river pass', 'Shift to gallop — follow the river'); ctx.play(); }), 900);
+    }
+  }
+  function startRocks() {
+    stage = 'rocks'; D.rocks = 'on'; ctx.save('rocks'); setGoal();
+    for (const r of rockfall) {
+      if (r.done) continue;
+      const at = V3(r.x, ground(r.x, r.z + r.r + 2.4) + 0.4, r.z + r.r + 2.4);
+      r.item = addItem(at, r.i === 2 ? 'Look at the split boulder' : M.haul, () => {
+        if (r.i === 2) { ctx.bark('tanoc15', M.cracked, 3.5); return; }
+        dropItem(r.item); haulRock(r);
+      });
+    }
+    sayHeld(M.rockSee, (k, tt) => ({ p: V3(P.pos.x + 5, P.pos.y + 3.5, P.pos.z + 8), l: V3(pathX(ROCK_Z), heightAt(pathX(ROCK_Z), ROCK_Z) + 2, ROCK_Z) }), () => {
+      objective(M.rockObj(0), M.rockHint, 4, 0); ctx.play();
+    });
+  }
+  function haulRock(r) {
+    const from = r.m.position.clone(), side = r.x > pathX(r.z) ? 1 : -1, to = V3(r.x + side * 16, 0, r.z + 3); to.y = heightAt(to.x, to.z) + r.r * 0.5;
+    sfx.heavy(); shake = 0.5;
+    cut([{ dur: 2.6, cam: k => ({ p: V3(r.x - side * 6, r.g + 4, r.z + 10), l: V3(lerp(from.x, to.x, k), r.g + 1.5, r.z) }), caption: M.hauled[(rockfall.filter(q => q.done).length) % M.hauled.length],
+      onTick: k => { const e = smooth(0, 1, k); r.m.position.lerpVectors(from, to, e); r.m.rotation.z -= side * 0.05; if (Math.random() < 0.5) particles.emit(r.m.position.x, r.g + 0.3, r.m.position.z, { vx: 0, vy: 1, vz: 0, color: 0xa89a80, size: 0.6, life: 0.6, drag: 1 }); } }], () => { clearRock(r); ctx.play(); });
+  }
+  function crackHit(r) {
+    r.hits++; sfx.flare(); shake = 0.3;
+    if (r.crack) { r.crack.material.opacity = 0.15 + r.hits * 0.3; r.crack.scale.setScalar(2.4 + r.hits); }
+    if (r.hits < 3) { ctx.bark('tale', M.crackHit[r.hits - 1], 2.5); return; }
+    particles.burst(r.x, r.g + r.r * 0.7, r.z, 80, { color: 0xffa040, speed: 10, size: 0.6, life: 0.9, gravity: -8 });
+    particles.burst(r.x, r.g + r.r * 0.7, r.z, 40, { color: 0x8a8478, speed: 8, size: 0.8, life: 1.1, gravity: -12 });
+    sfx.slam(); shake = 1; r.m.visible = false; if (r.item) dropItem(r.item);
+    clearRock(r);
+  }
+  function rocksTick() {
+    if (P.pos.z < ROCK_Z + 6.5 && rockfall.some(r => !r.done)) {
+      P.pos.z = ROCK_Z + 6.5; P.vel.z = Math.max(0, P.vel.z);
+      if (t - (D.blockT ?? -9) > 6) { D.blockT = t; ctx.bark('tanoc15', M.rockBlock, 3.5); }
+    }
+  }
+  /* ---- the mist: find the walkers' cairns by the amulet's hum ---- */
+  function startMist() {
+    stage = 'mist'; D.mist = 'on'; D.lit = cairns.filter(c => c.lit).length; ctx.save('mist'); setGoal();
+    for (const c of cairns) if (!c.lit) c.item = addItem(V3(c.x, c.g + 0.6, c.z + 1.4), M.cairnUse, () => lightCairn(c));
+    say(M.mistIn, () => { objective(M.cairnObj(D.lit), M.cairnHint, 4, D.lit); ctx.play(); });
+  }
+  function lightCairn(c) {
+    dropItem(c.item); c.lit = true; D.lit++; sfx.core(); c.glow.material.opacity = 0.85;
+    particles.burst(c.x, c.g + 2.6, c.z, 24, { color: 0x9fe8ff, speed: 3, size: 0.4, life: 0.9 });
+    ctx.bark('tale', M.cairnLit[D.lit - 1], 4);
+    objective(M.cairnObj(D.lit), M.cairnHint, 4, D.lit);
+    if (D.lit >= cairns.length) {
+      D.mist = 'done'; stage = 'ride'; D.humK = 0;
+      setTimeout(() => say(M.mistOut, () => { objective('Ride on north, out of the mist', 'The clearing is at the top of the pass'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); ctx.play(); }), 1600);
+    }
+  }
+  function mistTick(dt) {
+    if (P.pos.z < MIST_Z1) {
+      P.pos.z = MIST_Z1; P.vel.z = Math.max(0, P.vel.z);
+      if (t - (D.blockT ?? -9) > 6) { D.blockT = t; ctx.bark('sniller', M.mistBlock, 3.5); }
+    }
+    // the amulet hums louder the nearer the next cairn
+    let best = 1e9; for (const c of cairns) if (!c.lit) best = Math.min(best, Math.hypot(c.x - P.pos.x, c.z - P.pos.z));
+    const band = best < 14 ? 'near' : best < 36 ? 'warm' : 'cold';
+    D.humK = band === 'near' ? 0.7 : band === 'warm' ? 0.35 : 0;
+    D.humT = (D.humT || 0) - dt;
+    if (band !== D.band && D.humT <= 0) { D.band = band; D.humT = 3; ctx.bark('sniller', M.hum[band], 2.5); }
   }
   function arriveClearing() {
     stage = 'clearing'; sub = 'look'; ctx.save('clearing'); setGoal();
@@ -772,9 +1012,22 @@ export function createMegla(ctx) {
       { dur: 5, from: { p: [pathX(EDGE_Z) + 10, heightAt(0, EDGE_Z + 30) + 3, EDGE_Z + 30], l: [pathX(EDGE_Z) + 6, heightAt(0, EDGE_Z) + 2, EDGE_Z] }, to: { p: [pathX(EDGE_Z) + 8, heightAt(0, EDGE_Z + 22) + 2.2, EDGE_Z + 22], l: [pathX(EDGE_Z) + 6, heightAt(0, EDGE_Z) + 1.5, EDGE_Z] }, caption: M.clearing[2][1] },
     ], () => {
       sayHeld([M.clearing[1], M.clearing[3], M.clearing[4]], over(P, 1), () => {
-        objective(M.campObj, 'Ride to the stones by the old firepit, and press E');
-        setGoal(FIRE1.x, fires[0].y, FIRE1.z);
-        D.camp = addItem(V3(FIRE1.x, fires[0].y + 0.5, FIRE1.z), 'Make camp for the night', () => { dropItem(D.camp); night1(); });
+        // deadwood first: four fallen branches round the edge of the clearing
+        D.wood = 0;
+        objective(M.woodObj(0), M.woodHint, 4, 0);
+        for (const [x, z] of [[-30, -606], [24, -598], [32, -632], [-34, -646]]) {
+          const g = new THREE.Group(); for (let k = 0; k < 3; k++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2 - k * 0.4, 5), toon(0x6a4a2e)); l.rotation.set(Math.PI / 2, 0, k * 0.7); l.position.y = 0.15 + k * 0.12; g.add(l); }
+          g.add(glowSprite(0xffd27a, 1.2, 0.35));
+          const it = addItem(V3(x, ground(x, z) + 0.3, z), M.woodTake, () => {
+            dropItem(it); D.wood++; sfx.ui(); objective(M.woodObj(D.wood), M.woodHint, 4, D.wood);
+            if (D.wood >= 4) {
+              objective(M.campObj, 'Ride to the stones by the old firepit, and press E');
+              setGoal(FIRE1.x, fires[0].y, FIRE1.z);
+              D.camp = addItem(V3(FIRE1.x, fires[0].y + 0.5, FIRE1.z), 'Make camp for the night', () => { dropItem(D.camp); night1(); });
+            }
+          }, g);
+        }
+        setGoal();
       });
     });
   }
@@ -872,9 +1125,21 @@ export function createMegla(ctx) {
       sub = 'gather'; ctx.save('ruins'); D.got = 0;
       trail.forEach(g => { g.material.opacity = 0; });
       say(M.ruins, () => {
-        objective(M.gatherObj(0), 'Things glint among the stones · E to take');
+        D.seals = 0;
+        const ruinObj = () => objective(M.sealObj(D.got, D.seals), 'Things glint among the stones, and three carved stones stand in the ring · E');
+        ruinObj();
         const spots = [[RUINS.x - 22, RUINS.z + 8, 'Old stygian ore, in a split block', 'ore'], [RUINS.x + 20, RUINS.z - 4, 'A knot of ember-moss', 'ember'], [RUINS.x + 6, RUINS.z + 22, 'A carved bead of black resin', 'resin']];
-        for (const [x, z, label, id] of spots) { const it = addItem(V3(x, ground(x, z) + 0.5, z), label, () => { dropItem(it); D.got++; ctx.give(id, 1); objective(M.gatherObj(D.got), 'Things glint among the stones · E to take', 3, D.got); }, glint()); }
+        for (const [x, z, label, id] of spots) { const it = addItem(V3(x, ground(x, z) + 0.5, z), label, () => { dropItem(it); D.got++; ctx.give(id, 1); ruinObj(); }, glint()); }
+        sealStones.forEach((st, i) => {
+          if (st.read) return;
+          const it = addItem(V3(st.x, st.g + 0.4, st.z) .add(V3(RUINS.x - st.x, 0, RUINS.z - st.z).normalize().multiplyScalar(1.4)), M.sealUse, () => {
+            dropItem(it); st.read = true; D.seals++; st.rune.material.opacity = 0.9; sfx.sense();
+            sayHeld(M.seals[D.seals - 1], (k, tt) => ({ p: V3(st.x + (RUINS.x - st.x) * 0.15 + 1.5, st.g + 2.2, st.z + (RUINS.z - st.z) * 0.15 + 1.5), l: V3(st.x, st.g + 1.2, st.z) }), () => {
+              ruinObj();
+              if (D.seals >= 3) say(M.sealsRead, () => ctx.play()); else ctx.play();
+            });
+          });
+        });
         setGoal(WALL.x, heightAt(WALL.x, WALL.z), WALL.z + 4);
         ctx.play();
       });
@@ -883,7 +1148,7 @@ export function createMegla(ctx) {
       D.saw = true;
       sayHeld(M.relicSeen, (k, tt) => ({ p: V3(WALL.x + 5, relic.position.y + 0.5, WALL.z + 9), l: relic.position }), () => ctx.play());
     }
-    if (sub === 'gather' && D.saw && Math.hypot(P.pos.x - WALL.x, P.pos.z - WALL.z) < 12 && !cine.active) erupt();
+    if (sub === 'gather' && D.saw && D.seals >= 3 && Math.hypot(P.pos.x - WALL.x, P.pos.z - WALL.z) < 12 && !cine.active) erupt();
   }
   /* ---- the Gynge ---- */
   function erupt() {
@@ -937,20 +1202,87 @@ export function createMegla(ctx) {
       objective(M.day2Obj, 'North, past the ruins'); setGoal(pathX(-960), heightAt(0, -960), -960); ctx.play();
     });
   }
-  function day2Tick() {
+  function day2Tick(dt) {
     if (D.waves === 0 && P.pos.z < -930) { D.waves = 1; for (let i = 0; i < 3; i++) addFoe('wildpunk', pathX(-960) + (i - 1) * 6, -965 - i * 2); ctx.bark(...M.day2Barks[1], 3); }
     if (D.waves === 1 && P.pos.z < -1010 && foes.every(f => f.dead || f.kind !== 'wildpunk')) { D.waves = 2; for (let i = 0; i < 4; i++) addFoe('wildpunk', pathX(-1040) + (i - 1.5) * 5, -1040 - i); ctx.bark(...M.day2Barks[0], 3); }
-    if (D.waves === 2 && P.pos.z < -1050 && !D.eclipse) {
+    if (D.waves === 2 && !D.sru && P.pos.z < -1030 && foes.every(f => f.dead || f.kind !== 'wildpunk')) {
+      D.sru = addFoe('sru', pathX(-1062) + 9, -1064); D.sru.yaw = 0; sfx.roar(); shake = 0.8;
+      sayHeld(M.sruWake, (k, tt) => ({ p: V3(P.pos.x - 3, P.pos.y + 2.4, P.pos.z + 5), l: V3(D.sru.pos.x, D.sru.pos.y + 1.6, D.sru.pos.z) }), () => { bossBar(100, M.sruName); objective('Fight off the Sru Vorn', 'Q — fire-stone · keep moving when it lowers its tusks'); ctx.play(); });
+    }
+    if (D.waves === 2 && D.sruDone && P.pos.z < -1050 && !D.eclipse) {
       D.eclipse = true; setLook('eclipse'); eclipseK = 0.001;
       setTimeout(() => sfx.duat(), 2500); setTimeout(() => sfx.duat(), 5200);
-      sayHeld(M.eclipse, (k, tt) => ({ p: V3(P.pos.x - 3, P.pos.y + 1.6, P.pos.z + 4), l: V3(P.pos.x + 30, P.pos.y + 60, P.pos.z - 120) }), () => {
-        objective(M.hideoutObj, 'North-east'); setGoal(KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z + KEEP.h + 14); ctx.play();
-      });
+      sayHeld(M.eclipse, (k, tt) => ({ p: V3(P.pos.x - 3, P.pos.y + 1.6, P.pos.z + 4), l: V3(P.pos.x + 30, P.pos.y + 60, P.pos.z - 120) }), () => startSneak());
     }
-    if (D.eclipse && !D.seen && Math.hypot(P.pos.x - KEEP.x, P.pos.z - KEEP.z) < KEEP.h + 40) {
+    if (D.sneak === 'on') sneakTick(dt);
+    if (D.eclipse && D.sneak === 'done' && !D.seen && Math.hypot(P.pos.x - KEEP.x, P.pos.z - KEEP.z) < KEEP.h + 40) {
       D.seen = true; stage = 'keep'; sub = 'climb'; ctx.save('keep');
       startKeep();
     }
+  }
+  function bossBar(pct, name) {
+    gyngeBar.style.display = pct == null ? 'none' : '';
+    if (name) document.getElementById('gynge-name').textContent = name;
+    if (pct != null) document.getElementById('gynge-fill').style.width = pct + '%';
+  }
+  function sruBeaten(f) {
+    f.out = 0.001; f.hp = 0; D.sruDone = true; sfx.die(); bossBar(null);
+    setTimeout(() => say(M.sruDown, () => { f.dead = true; f.out = 0; scene.remove(f.a.root); objective(M.day2Obj, 'North, past the ruins'); ctx.play(); }), 900);
+  }
+  /* ---- the patrols round the keep, in the eclipse dark: stay out of their sight ---- */
+  const patrols = [];
+  const coneMat = new THREE.MeshBasicMaterial({ color: 0xb070ff, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const SEE = { r: 13, rRun: 18, half: 0.55 };
+  function startSneak() {
+    D.sneak = 'on'; ctx.save('sneak');
+    for (const p of patrols) { scene.remove(p.a.root); scene.remove(p.cone); }
+    patrols.length = 0;
+    const routes = [
+      [[pathX(-1068) - 26, -1066], [pathX(-1068) + 28, -1070]],
+      [[pathX(-1084) + 30, -1082], [pathX(-1084) - 22, -1088]],
+      [[pathX(-1100) - 24, -1100], [pathX(-1100) + 32, -1098]],
+    ];
+    routes.forEach(([a, b], i) => {
+      const v = buildVel(); scene.add(v.root);
+      const cone = new THREE.Mesh(new THREE.CircleGeometry(SEE.r, 18, -SEE.half, SEE.half * 2), coneMat); cone.geometry.rotateX(-Math.PI / 2); scene.add(cone);
+      const pa = V3(a[0], 0, a[1]), pb = V3(b[0], 0, b[1]);
+      patrols.push({ a: v, cone, A: pa, B: pb, k: (i * 0.37) % 1, dir: i % 2 ? -1 : 1, pause: 0, look: 0, pos: pa.clone(), yaw: 0 });
+    });
+    place(P, pathX(SNEAK0), SNEAK0, Math.PI);
+    say(M.sneakIn, () => { objective(M.sneakObj, M.sneakHint); setGoal(towers[0].x, towers[0].g, towers[0].z); ctx.play(); });
+  }
+  function sneakTick(dt) {
+    const run = (keys.ShiftLeft || keys.ShiftRight) && Math.hypot(P.vel.x, P.vel.z) > 6;
+    for (const p of patrols) {
+      // walk the beat; at each end, stop and look about
+      if (p.pause > 0) { p.pause -= dt; p.look += dt; p.yaw = p.baseYaw + Math.sin(p.look * 1.4) * 1.1; }
+      else {
+        const L = p.A.distanceTo(p.B); p.k += p.dir * 2.4 * dt / L;
+        if (p.k >= 1 || p.k <= 0) { p.k = clamp(p.k, 0, 1); p.dir *= -1; p.pause = 2.2; p.look = 0; p.baseYaw = p.yaw; }
+        const dx = (p.B.x - p.A.x) * p.dir, dz = (p.B.z - p.A.z) * p.dir; p.yaw = dampAngle(p.yaw, Math.atan2(dx, dz), 5, dt);
+      }
+      p.pos.lerpVectors(p.A, p.B, p.k); p.pos.y = ground(p.pos.x, p.pos.z);
+      p.a.root.position.copy(p.pos); p.a.root.rotation.y = p.yaw;
+      p.a.animate(dt, { speed: p.pause > 0 ? 0 : 2.4, t, onGround: true });
+      p.cone.position.set(p.pos.x, p.pos.y + 0.25, p.pos.z); p.cone.rotation.y = p.yaw - Math.PI / 2;
+      // can it see him?
+      const dx = P.pos.x - p.pos.x, dz = P.pos.z - p.pos.z, d = Math.hypot(dx, dz);
+      const r = run ? SEE.rRun : SEE.r, off = Math.abs(((Math.atan2(dx, dz) - p.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      let seen = d < 2.6 || (d < r && off < SEE.half);
+      if (seen && d >= 2.6) for (let k = 1; k < 8; k++) { const q = k / 8; if (solidAt(lerp(p.pos.x, P.pos.x, q), p.pos.y + 1.4, lerp(p.pos.z, P.pos.z, q))) { seen = false; break; } }
+      if (seen) { spotted(); return; }
+    }
+    if (Math.hypot(P.pos.x - towers[0].x, P.pos.z - towers[0].z) < 16) {
+      D.sneak = 'done'; for (const p of patrols) { scene.remove(p.a.root); scene.remove(p.cone); }
+      say(M.sneakDone, () => ctx.play());
+    }
+  }
+  function spotted() {
+    D.caught = (D.caught || 0) + 1; sfx.duat(); shake = 0.6;
+    say(D.caught === 1 ? M.spotted : M.spottedAgain, () => {
+      ctx.fade && ctx.fade(1, 0.3);
+      setTimeout(() => { place(P, pathX(SNEAK0), SNEAK0, Math.PI); P.vel.set(0, 0, 0); for (const p of patrols) { p.k = Math.random(); p.pause = 0; } ctx.fade && ctx.fade(0, 0.6); ctx.play(); }, 350);
+    });
   }
   /* ---- the Duskareth keep ---- */
   let guards = [], master = null, malsti = null, bigSn = null;
@@ -1102,9 +1434,53 @@ export function createMegla(ctx) {
     const cg = heightAt(CHURCH.x, CHURCH.z);
     place(P, CHURCH.x + 1, CHURCH.z + 1, Math.PI);
     sayHeld(M.churchNight, (k, tt) => ({ p: V3(CHURCH.x + 3.2, cg + 2.6 + Math.sin(tt * 0.2) * 0.2, CHURCH.z + 4), l: V3(CHURCH.x, cg + 1, CHURCH.z) }), () => {
-      stage = 'home'; done = true; ctx.save('home');
-      cut([{ dur: 8, from: { p: [KEEP.x + 40, heightAt(KEEP.x, KEEP.z) + 30, KEEP.z + 60], l: [KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z] }, to: { p: [KEEP.x + 80, heightAt(KEEP.x, KEEP.z) + 90, KEEP.z + 140], l: [KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z] }, caption: M.home }], () => ctx.onDone());
+      ctx.fade && ctx.fade(1, 1);
+      setTimeout(() => startWayHome(), 1100);
     });
+  }
+  /* ---- day three: out of the keep, back past the line, to the Punk who waited ---- */
+  function startWayHome(resume) {
+    stage = 'way'; sub = 'line'; ctx.save('way'); setLook('day', true); eclipseK = 0;
+    K.on = false; P.ride = false;
+    if (!malsti) { malsti = buildMalstiPunk({ seed: 61 }); malsti.root.scale.setScalar(5.5); scene.add(malsti.root); }
+    place(P, KEEP.x - 8, KEEP.z + KEEP.h + 10, 0);
+    if (malsti) malsti.root.position.copy(P.pos);
+    if (!rodak.length) rodakPack(6, pathX(LINE_Z), LINE_Z + 4);
+    rodak.forEach((r, i) => { r.a.root.visible = true; r.mode = 'sit'; r.home = V3(pathX(LINE_Z) + (i - 2.5) * 4.5, 0, LINE_Z + 2.5); r.pos.copy(r.home); r.pos.y = ground(r.pos.x, r.pos.z); });
+    ctx.fade && ctx.fade(0, 1.2);
+    const go = () => say(M.home1, () => { objective(M.homeObj, 'South — back the way you came'); setGoal(pathX(LINE_Z), heightAt(pathX(LINE_Z), LINE_Z), LINE_Z); ctx.play(); });
+    if (resume) go();
+    else cut([{ dur: 6, from: { p: [KEEP.x + 40, heightAt(KEEP.x, KEEP.z) + 30, KEEP.z + 60], l: [KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z] }, to: { p: [KEEP.x + 20, heightAt(KEEP.x, KEEP.z) + 12, KEEP.z + 70], l: [KEEP.x - 8, heightAt(KEEP.x, KEEP.z) + 2, KEEP.z + KEEP.h + 10] }, caption: M.morning3 }], go);
+  }
+  function wayTick() {
+    if (sub === 'line' && P.pos.z > LINE_Z - 10) {
+      sub = 'clearing';
+      sayHeld(M.lineBack, (k, tt) => ({ p: V3(P.pos.x - 4, P.pos.y + 2.2, P.pos.z - 7), l: V3(pathX(LINE_Z), heightAt(pathX(LINE_Z), LINE_Z) + 1, LINE_Z + 2) }), () => {
+        rodak.forEach(r => { r.mode = 'watch'; });
+        setGoal(FIRE1.x, fires[0].y, FIRE1.z); ctx.play();
+      });
+    }
+    if (sub === 'clearing' && Math.hypot(P.pos.x - FIRE1.x, P.pos.z - FIRE1.z) < 22) {
+      sub = 'reunion'; setGoal();
+      K.on = true; place(K, FIRE1.x + 1.4, FIRE1.z + 1.6, Math.PI); K.stay = K.pos.clone();
+      const from = K.pos.clone();
+      cut([{ dur: 3, cam: k => ({ p: V3(FIRE1.x + 8, fires[0].y + 3, FIRE1.z + 10), l: V3(K.pos.x, K.pos.y + 1, K.pos.z) }), caption: M.reunion[0][1] },
+        { dur: 2.4, cam: k => ({ p: V3(P.pos.x + 5, P.pos.y + 2.5, P.pos.z + 5), l: V3(P.pos.x, P.pos.y + 1, P.pos.z) }), caption: M.reunion[1][1], onTick: k => { K.stay = null; K.pos.lerpVectors(from, P.pos, smooth(0, 1, k)); K.pos.y = ground(K.pos.x, K.pos.z); } }], () => {
+        say(M.reunion.slice(2), () => {
+          stage = 'downhill'; sub = 'ride'; ctx.save('downhill'); setLook('dusk');
+          D.said3 = 0;
+          objective(M.rideHomeObj, 'E to climb up on her'); setGoal(pathX(-40), heightAt(pathX(-40), -40), -40); ctx.play();
+        });
+      });
+    }
+  }
+  function downhillTick() {
+    const marks = [-480, -320, -160];
+    if (D.said3 < marks.length && P.pos.z > marks[D.said3]) { const [w, l] = M.rideHomeBarks[D.said3]; ctx.bark(w, l, 4.5); D.said3++; }
+    if (P.pos.z > -40 && !done) {
+      stage = 'home'; done = true; ctx.save('home'); setGoal();
+      cut([{ dur: 8, from: { p: [P.pos.x + 30, P.pos.y + 20, P.pos.z + 40], l: [P.pos.x, P.pos.y + 1, P.pos.z] }, to: { p: [P.pos.x + 60, P.pos.y + 60, P.pos.z + 120], l: [P.pos.x, P.pos.y, P.pos.z - 200] }, caption: M.home }], () => ctx.onDone());
+    }
   }
 
   /* ---------------- per frame ---------------- */
@@ -1121,7 +1497,11 @@ export function createMegla(ctx) {
       if (stage === 'ride') rideTick();
       else if (stage === 'enter') enterTick();
       else if (stage === 'alone') aloneTick();
-      else if (stage === 'day2') day2Tick();
+      else if (stage === 'day2') day2Tick(dt);
+      else if (stage === 'rocks') rocksTick();
+      else if (stage === 'mist') mistTick(dt);
+      else if (stage === 'way') wayTick();
+      else if (stage === 'downhill') downhillTick();
     }
     if (animal) { animal.root.position.y = heightAt(ANIMAL.x, ANIMAL.z) + 0.6 + Math.sin(t * 1.2) * 0.05; }   // breathing
     // the Relic in the wall: humming, and pulsing when it wakes
@@ -1138,7 +1518,7 @@ export function createMegla(ctx) {
         D.tether.material.opacity = 0.35 + Math.sin(t * 8) * 0.15;
       }
     }
-    amulet.children[1].material.opacity = 0.35 + Math.sin(t * 3) * 0.15 + (bigSn ? 0.4 : 0);
+    amulet.children[1].material.opacity = 0.35 + Math.sin(t * (3 + (D.humK || 0) * 10)) * 0.15 + (bigSn ? 0.4 : 0) + (D.humK || 0);
     if (malsti && sub !== 'ring') {   // at his heels, or up on his shoulder
       const tgt = V3(P.pos.x - Math.sin(P.yaw) * 1.2 + Math.cos(P.yaw) * 0.8, 0, P.pos.z - Math.cos(P.yaw) * 1.2 - Math.sin(P.yaw) * 0.8);
       malsti.root.position.lerp(tgt.setY(groundAt(tgt.x, tgt.z, P.pos.y + 1)), 1 - Math.exp(-6 * dt)); malsti.root.rotation.y = P.yaw;
@@ -1149,7 +1529,8 @@ export function createMegla(ctx) {
     // the fog: thin in the low valley, thick in the pass, a wall of it among the great trees
     const zz = zoneOf(P.pos.z), fNear = zz === 'foot' ? 220 : zz === 'pass' ? lerp(200, 50, clamp(-P.pos.z / -PASS1, 0, 1)) : zz === 'clear' ? 40 : 10;
     const fFar = zz === 'foot' ? 1500 : zz === 'pass' ? lerp(1400, 320, clamp(-P.pos.z / -PASS1, 0, 1)) : zz === 'clear' ? 420 : (stage === 'keep' && sub === 'cleansed' ? 320 : 170);
-    fog.near = damp(fog.near, fNear, 1.5, dt); fog.far = damp(fog.far, fFar, 1.5, dt);
+    const inMist = stage === 'mist' && D.mist === 'on';
+    fog.near = damp(fog.near, inMist ? 3 : fNear, 1.5, dt); fog.far = damp(fog.far, inMist ? 24 + (D.lit || 0) * 30 : fFar, 1.5, dt);
     updateLook(dt);
     // mist sheets drift round wherever he is, once he's up in the mist
     const mistOn = zz !== 'foot';
@@ -1162,8 +1543,6 @@ export function createMegla(ctx) {
     }
     // camps
     for (const c of fires) { c.fire.visible = c.on; c.light.intensity = c.on ? 40 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
-    // spores and flickers in the forest; brighter in the dark
-    if (zz === 'forest' && Math.random() < 0.7) particles.emit(P.pos.x + (Math.random() - 0.5) * 40, P.pos.y + Math.random() * 10, P.pos.z + (Math.random() - 0.5) * 40, { vx: (Math.random() - 0.5) * 0.3, vy: 0.15, vz: (Math.random() - 0.5) * 0.3, color: 0xbfeee6, size: 0.16, life: 4, drag: 0 });
     for (const g of trail) if (g.material.opacity > 0) g.material.opacity = 0.4 + Math.sin(t * 3 + g.position.z) * 0.25;
     if (beacon.visible) beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
     particles.update(dt);
@@ -1177,29 +1556,35 @@ export function createMegla(ctx) {
     if (shake > 0) shake = Math.max(0, shake - dt * 1.5);
     ctx.hp(P.hp / 100);
   }
+  const camWant = V3(); let camInit = false, camReach = null;
   function updateCamera(dt) {
-    camTgt.set(P.pos.x, P.pos.y + (P.ride ? 2.4 : 1.5), P.pos.z);
+    camWant.set(P.pos.x, P.pos.y + (P.ride ? 2.4 : 1.5), P.pos.z);
+    // follow quickly across the ground, more gently up and down (steps, stairs, landings), and snap back if far behind
+    if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
+    else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
     const want = P.ride ? 8.5 : (GYN && GYN.alive ? 9 : 6.4), cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
     let d = want;
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z) || (GYN && GYN.alive && q.distanceTo(GYN.pos.clone().setY(GYN.pos.y + 0.45 * GYN.s)) < 0.95 * GYN.s)) { d = Math.max(0.8, s - 0.4); break; } }
+    camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
     camPos.lerp(camTgt.clone().addScaledVector(dir, d), 1 - Math.exp(-14 * dt));
     camera.position.copy(camPos);
-    if (shake > 0) { camera.position.x += (Math.random() - 0.5) * shake; camera.position.y += (Math.random() - 0.5) * shake; }
+    if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; }
     camera.lookAt(camTgt);
   }
 
+  const RIDE_STAGES = ['ride', 'rocks', 'mist', 'clearing', 'downhill'];
   function interact() {
     let best = null, bd = 1e9;
     for (const it of items) { const d = Math.hypot(it.pos.x - P.pos.x, it.pos.z - P.pos.z); if (d < 3 && Math.abs(it.pos.y - P.pos.y) < 3.5 && d < bd) { bd = d; best = it; } }
     if (best) { sfx.ui(); best.act(); return; }
-    if (!P.ride && K.on && K.pos.distanceTo(P.pos) < 3 && !K.stay && (stage === 'ride' || stage === 'clearing')) { P.ride = true; sfx.jump(); return; }
-    if (P.ride && (stage === 'ride' || stage === 'clearing') && P.onGround) { P.ride = false; P.pos.addScaledVector(V3(Math.cos(P.yaw), 0, -Math.sin(P.yaw)), 1.8); sfx.land(); return; }
+    if (!P.ride && K.on && K.pos.distanceTo(P.pos) < 3 && !K.stay && RIDE_STAGES.includes(stage)) { P.ride = true; sfx.jump(); return; }
+    if (P.ride && RIDE_STAGES.includes(stage) && P.onGround) { P.ride = false; P.pos.addScaledVector(V3(Math.cos(P.yaw), 0, -Math.sin(P.yaw)), 1.8); sfx.land(); return; }
     if (K.stay && K.pos.distanceTo(P.pos) < 3) ctx.bark('punk', '…', 1.5);
   }
   function prompt() {
     for (const it of items) { const d = Math.hypot(it.pos.x - P.pos.x, it.pos.z - P.pos.z); if (d < 3 && Math.abs(it.pos.y - P.pos.y) < 3.5) return it.label; }
-    if (!P.ride && K.on && !K.stay && K.pos.distanceTo(P.pos) < 3 && (stage === 'ride' || stage === 'clearing')) return 'Climb up on your Punk';
-    if (P.ride && (stage === 'ride' || stage === 'clearing')) return null;
+    if (!P.ride && K.on && !K.stay && K.pos.distanceTo(P.pos) < 3 && RIDE_STAGES.includes(stage)) return 'Climb up on your Punk';
+    if (P.ride && RIDE_STAGES.includes(stage)) return null;
     return null;
   }
 
@@ -1208,13 +1593,27 @@ export function createMegla(ctx) {
     if (ctx.slotsHud) ctx.slotsHud(true);
     D = {};
     const toClearing = () => { place(P, pathX(PASS1 - 30), PASS1 - 30, Math.PI); rodakPack(6, pathX(EDGE_Z) + 6, EDGE_Z + 2); };
+    const rideFrom = z => { stage = 'ride'; sub = 'ride'; setLook('day', true); P.ride = true; K.on = true; place(P, pathX(z), z, Math.PI); D = { said: 2 }; objective('Ride north up the river pass', 'Shift to gallop — follow the river'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); ctx.play(); };
+    const rocksDone = () => { for (const r of rockfall) { r.done = true; r.s.off = true; r.m.visible = false; if (r.crack) scene.remove(r.crack); } };
+    const mistDone = () => { for (const c of cairns) { c.lit = true; c.glow.material.opacity = 0.85; } };
+    if (at === 'rocks') { rideFrom(ROCK_Z + 50); return; }
+    if (at === 'mist') { rocksDone(); rideFrom(MIST_Z0 + 30); D.rocks = 'done'; return; }
+    if (at === 'clearing' || at === 'enter' || at === 'alone' || at === 'ruins' || at === 'gynge' || at === 'harvest' || at === 'day2' || at === 'keep' || at === 'sneak' || at === 'way' || at === 'downhill') { rocksDone(); mistDone(); }
     if (at === 'clearing') { toClearing(); P.ride = true; arriveClearing(); return; }
     if (at === 'enter') { toClearing(); place(P, FIRE1.x + 2, FIRE1.z, Math.PI); place(K, FIRE1.x, FIRE1.z + 2, Math.PI); morning(); return; }
     if (at === 'alone' || at === 'ruins') { toClearing(); for (const r of rodak) { r.a.root.visible = false; r.pos.set(0, -80, 0); } place(P, FIRE1.x + 3, FIRE1.z - 4, Math.PI); place(K, FIRE1.x + 1, FIRE1.z + 2, Math.PI); K.stay = K.pos.clone(); buildAnimal(); stage = 'alone'; sub = 'animal'; setLook('grey', true); objective(M.aloneObj); setGoal(ANIMAL.x, heightAt(ANIMAL.x, ANIMAL.z), ANIMAL.z); ctx.play(); return; }
-    if (at === 'gynge') { K.on = false; setLook('grey', true); place(P, WALL.x + 2, WALL.z + 26, Math.PI); stage = 'alone'; sub = 'gather'; D.saw = true; ctx.play(); return; }
+    if (at === 'gynge') { K.on = false; setLook('grey', true); place(P, WALL.x + 2, WALL.z + 26, Math.PI); stage = 'alone'; sub = 'gather'; D.saw = true; D.seals = 3; D.got = 3; sealStones.forEach(st => { st.read = true; }); ctx.play(); return; }
     if (at === 'harvest') { K.on = false; setLook('grey', true); spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; place(P, GY.x + 6, GY.z + 8, Math.PI); harvest(); ctx.play(); return; }
     if (at === 'day2') { K.on = false; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; amped = true; startDay2(); return; }
-    if (at === 'keep') { K.on = false; amped = true; setLook('eclipse', true); place(P, KEEP.x - 20, KEEP.z + KEEP.h + 36, Math.PI); stage = 'keep'; sub = 'climb'; D.eclipse = true; startKeep(); return; }
+    if (at === 'sneak') { K.on = false; amped = true; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; setLook('eclipse', true); eclipseK = 1; stage = 'day2'; sub = 'walk'; D = { waves: 2, sru: true, sruDone: true, eclipse: true }; startSneak(); return; }
+    if (at === 'keep') { K.on = false; amped = true; setLook('eclipse', true); place(P, KEEP.x - 20, KEEP.z + KEEP.h + 36, Math.PI); stage = 'keep'; sub = 'climb'; D.eclipse = true; D.sneak = 'done'; startKeep(); return; }
+    if (at === 'way') { amped = true; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; startWayHome(true); return; }
+    if (at === 'downhill') {
+      amped = true; stage = 'downhill'; sub = 'ride'; setLook('dusk', true);
+      if (!malsti) { malsti = buildMalstiPunk({ seed: 61 }); malsti.root.scale.setScalar(5.5); scene.add(malsti.root); }
+      K.on = true; K.stay = null; place(P, FIRE1.x + 4, FIRE1.z + 6, 0); place(K, FIRE1.x + 2, FIRE1.z + 8, 0); malsti.root.position.copy(P.pos);
+      D.said3 = 0; objective(M.rideHomeObj, 'E to climb up on her'); setGoal(pathX(-40), heightAt(pathX(-40), -40), -40); ctx.play(); return;
+    }
     if (at === 'home') { done = true; ctx.onDone(); return; }
     startRide();
   }
@@ -1227,8 +1626,8 @@ export function createMegla(ctx) {
     composer.dispose && composer.dispose();
   }
   return {
-    start, update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(),
+    start, update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(), vine: vineButton,
     get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items,
-    debug: { get GYN() { return GYN; }, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; } },
+    debug: { get GYN() { return GYN; }, vines, get vineN() { return vineN; }, tanoc, punk, get boltCd() { return boltCd; }, get cineOn() { return cine.active; }, rockfall, bolts, cairns, patrols, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; } },
   };
 }

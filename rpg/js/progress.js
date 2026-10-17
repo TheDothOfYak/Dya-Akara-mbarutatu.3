@@ -34,24 +34,44 @@ export const UPGRADES = [
 export const upgradeCost = (u, rank) => u.base + u.step * rank;
 
 const BASE = 'torcain-save-v2';
-/* bump to reset every run (v3: the Beuhk prologue — all earlier runs start over) */
-export const SAVE_V = 3;
+/* the save's shape. Bumping it no longer resets anyone: add a step to
+   MIGRATIONS that carries a save from the old version to the new one,
+   so a run that's twenty hours in survives every update. */
+export const SAVE_V = 5;
+/* the oldest save this build still reads (v3: the Beuhk prologue — runs from
+   before it were reset, and stay that way) */
+export const MIN_SAVE_V = 3;
+/* MIGRATIONS[k] upgrades a save in place from version k to k + 1 */
+const MIGRATIONS = {
+  /* v4: Chapter I's two summers. A run already past them (into the Megla Aagac or
+     beyond) skips them; a run still in Chapter I picks them up from the start. */
+  3: s => { const f = s.flags = s.flags || {}; if (f.megla || f.ch2) f.ap = 9; },
+  /* v5: Venkin and the amulet research slot in between the two summers' steps, so they renumber
+     (a run already past a new step simply goes on without it) */
+  4: s => { const f = s.flags = s.flags || {}; if (f.ap != null) f.ap = [0, 2, 4, 5, 7, 8, 10, 11, 13, 14][f.ap] ?? f.ap; },
+};
+/* a save brought up to this build's version, or null if it can't be read */
+export function migrateSave(s) {
+  if (!s || !s.v || s.v < MIN_SAVE_V || s.v > SAVE_V) return null;
+  while (s.v < SAVE_V) { const step = MIGRATIONS[s.v]; if (!step) return null; step(s); s.v++; }
+  return s;
+}
 /* each signed-in account keeps its own local copy; guests share one */
 export const saveKey = accountId => accountId ? BASE + ':' + accountId : BASE;
 
 export function freshSave(difficulty) {
   return {
     v: SAVE_V, difficulty, region: 'xilia', shards: 0, ups: {}, lantern: null, lit: {},
-    flags: {}, cores: {}, codex: {}, lost: null, time: 0, deaths: 0, kills: 0, cleared: {}, savedAt: 0,
+    flags: {}, cores: {}, chTime: {}, codex: {}, lost: null, time: 0, deaths: 0, kills: 0, cleared: {}, savedAt: 0,
     runId: Math.random().toString(36).slice(2, 10),
   };
 }
 
 export function loadSave(key = BASE) {
-  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); return s && s.v === SAVE_V ? s : null; } catch (e) { return null; }
+  try { return migrateSave(JSON.parse(localStorage.getItem(key) || 'null')); } catch (e) { return null; }
 }
 export function isOldSave(key = BASE) {
-  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); return !!(s && s.v && s.v !== SAVE_V); } catch (e) { return false; }
+  try { const s = JSON.parse(localStorage.getItem(key) || 'null'); return !!(s && s.v && s.v < MIN_SAVE_V); } catch (e) { return false; }
 }
 export function writeSave(s, key = BASE) {
   s.savedAt = Date.now();
@@ -71,4 +91,36 @@ export function newer(a, b) {
 export function fmtTime(sec) {
   const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60;
   return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+/* ---------------- the hour mark ----------------
+   Young Tanoc's story, Velki to the final Sniller battle, is meant to run
+   about 27 hours (see rpg/ROADMAP.md). Every chapter keeps its own clock
+   in save.chTime so a playtest shows which parts run short or long. */
+export const CHAPTERS = [
+  ['velki', 'The Last Skyfall'],
+  ['road', 'The Road North'],
+  ['ch1', 'I · The Carpenter’s Apprentice'],
+  ['ch2', 'II · The Megla Aagac'],
+  ['token', 'The First Token'],
+  ['after2', 'After the Megla Aagac'],
+  ['torcain', 'Torcain’s Run (years later)'],
+];
+/* which chapter a run is in, read from its story flags */
+export function chapterOf(f) {
+  if (!f.young) return 'torcain';
+  switch (f.pro) {
+    case 'velki': return 'velki';
+    case 'road': return 'road';
+    case 'beuhk': return 'road';                    // days 5 and 6 of the road happen in Beuhk
+    case 'megla': return 'ch2';
+    case 'token': return 'token';
+    default: return f.ch2 ? 'after2' : 'ch1';       // 'done': the crest is behind him, Chapter I (or after II)
+  }
+}
+export function tickTime(s, dt) {
+  s.time += dt;
+  const ch = chapterOf(s.flags || {});
+  s.chTime = s.chTime || {};
+  s.chTime[ch] = (s.chTime[ch] || 0) + dt;
 }

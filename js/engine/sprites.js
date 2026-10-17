@@ -1068,7 +1068,7 @@
       }
     }
 
-    /* 3–4 vines sprouting from the crown */
+    /* vines from the crown, lying over the stone until they lash */
     const vineN = 4, reach = r * 1.2, topY = base - bh;
     for (let i = 0; i < vineN; i++) {
       const spread = i / (vineN - 1) - 0.5;               // -0.5..0.5
@@ -1084,16 +1084,15 @@
       } else if (dead) {
         ang = 0.95 + spread * 0.3; ext = 0.55;            // wilt
       } else {
-        ang = -Math.PI / 2 + spread * 1.3 + Math.sin(t * 2.2 + i * 1.7) * 0.22;   // reach up, sway
-        ext = 1;
+        ang = Math.PI / 2 - spread * 2.1 + Math.sin(t * 1.6 + i * 1.7) * 0.08;   // draped down over the stone, stirring (never up like horns)
+        ext = 0.85;
       }
       const tipX = ox + Math.cos(ang) * reach * ext, tipY = oy + Math.sin(ang) * reach * ext;
       const midX = ox + Math.cos(ang) * reach * 0.5 * ext - Math.sin(ang) * r * 0.16;
       const midY = oy + Math.sin(ang) * reach * 0.5 * ext;
       ctx.strokeStyle = shade(vine, (i % 2) ? 6 : -10); ctx.lineWidth = Math.max(1.5, r * 0.1); ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(ox, oy); ctx.quadraticCurveTo(midX, midY, tipX, tipY); ctx.stroke();
-      const curl = attack ? 1.1 : (dead ? 0.2 : 0.55 + Math.sin(t * 3 + i) * 0.2);
-      ctx.beginPath(); ctx.arc(tipX, tipY, r * 0.1, ang, ang + Math.PI * 1.5 * curl); ctx.stroke();
+      ctx.fillStyle = shade(vine, 4); ctx.beginPath(); ctx.arc(tipX, tipY, Math.max(1, r * 0.06), 0, TAU); ctx.fill();   // a bud, not a curl
       if (!dead) { ctx.fillStyle = shade(vine, -6); ctx.beginPath(); ctx.ellipse(midX, midY, r * 0.12, r * 0.06, ang, 0, TAU); ctx.fill(); }
     }
   }
