@@ -16,7 +16,7 @@
    ground functions; everything here is in that scene's terms.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, addOutline, outlineAll, glowSprite } from './gfx.js';
+import { toon, ramp, addOutline, outlineAll, glowSprite, paint } from './gfx.js';
 import { buildEikar } from './actors.js';
 import { buildStryx } from './esik_land.js';
 import { damp, dampAngle, clamp } from './util.js';
@@ -53,7 +53,7 @@ export function createCityKit(scene, o) {
   const pick = a => a[Math.floor(rng() * a.length)];
   const lamps = [], smokes = [], flags = [], windows = [];
   const winMat = new THREE.MeshBasicMaterial({ color: 0xffc878 });
-  const frameMat = toon(0x4a2a14), boxMat = toon(0x6a4428);
+  const frameMat = paint(toon(0x4a2a14), 'wood'), boxMat = paint(toon(0x6a4428), 'wood');
   const flowerMats = [0xe05a6a, 0xf0c040, 0xc060d0, 0xffffff, 0xe08a3a].map(c => toon(c));
   const leafMat = toon(0x4a8a3a);
   const roofMats = PAL.roofs.map(c => new THREE.MeshToonMaterial({ color: c, map: roofTex(), gradientMap: ramp() }));
@@ -80,12 +80,12 @@ export function createCityKit(scene, o) {
   function house(x, z, ry, kind) {
     kind = kind || (rng() < 0.42 ? 'cottage' : rng() < 0.7 ? 'tall' : rng() < 0.85 ? 'tower' : 'arcade');
     const g = heightAt(x, z), grp = new THREE.Group(); grp.position.set(x, g, z); grp.rotation.y = ry;
-    const wall = toon(pick(PAL.walls)), roof = pick(roofMats), trim = toon(PAL.trim);
+    const wall = paint(toon(pick(PAL.walls)), kind === 'tower' ? 'stone' : 'plaster'), roof = pick(roofMats), trim = paint(toon(PAL.trim), 'wood');
     let hw = 3, hd = 3, top = 6;
     const doorAt = (dz, h = 2.3) => {
-      const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, h, 0.2), toon(pick(PAL.door))); door.position.set(0, h / 2 + 0.1, dz); grp.add(door);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, h, 0.2), paint(toon(pick(PAL.door)), 'wood')); door.position.set(0, h / 2 + 0.1, dz); grp.add(door);
       const arch = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.1, 5, 12, Math.PI), trim); arch.position.set(0, h + 0.1, dz + 0.02); grp.add(arch);
-      const step = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.7), toon(0x9a8a78)); step.position.set(0, 0.1, dz + 0.4); grp.add(step);
+      const step = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.7), paint(toon(0x9a8a78), 'stone')); step.position.set(0, 0.1, dz + 0.4); grp.add(step);
       if (rng() < 0.7) { const wx = x + Math.sin(ry) * (dz + 0.3) + Math.cos(ry) * 1.1, wz = z + Math.cos(ry) * (dz + 0.3) - Math.sin(ry) * 1.1; lantern(wx, g + 2.3, wz); }
     };
     if (kind === 'cottage') {
@@ -104,7 +104,7 @@ export function createCityKit(scene, o) {
       const w = 5.5 + rng() * 2, d = 5.5 + rng() * 2, floors = 2 + (rng() < 0.4 ? 1 : 0), fh = 3.2; hw = w / 2 + 0.3; hd = d / 2 + 0.3;
       for (let f = 0; f < floors; f++) {
         const ow = w + (f ? 0.6 : 0), od = d + (f ? 0.6 : 0);
-        const b = new THREE.Mesh(new THREE.BoxGeometry(ow, fh, od), f % 2 ? toon(new THREE.Color(wall.color).offsetHSL(0, 0, -0.04).getHex()) : wall); b.position.y = fh * f + fh / 2; grp.add(b);
+        const b = new THREE.Mesh(new THREE.BoxGeometry(ow, fh, od), f % 2 ? paint(toon(new THREE.Color(wall.color).offsetHSL(0, 0, -0.04).getHex()), 'plaster') : f === 0 ? paint(toon(wall.color.getHex()), 'stone') : wall); b.position.y = fh * f + fh / 2; grp.add(b);
         const band = new THREE.Mesh(new THREE.BoxGeometry(ow + 0.2, 0.28, od + 0.2), trim); band.position.y = fh * (f + 1); grp.add(band);
         // timber framing on the upper floors
         if (f) for (const sx of [-1, -0.33, 0.33, 1]) { const beam = new THREE.Mesh(new THREE.BoxGeometry(0.16, fh, 0.12), trim); beam.position.set(sx * ow / 2, fh * f + fh / 2, od / 2 + 0.04); grp.add(beam); }
@@ -138,13 +138,13 @@ export function createCityKit(scene, o) {
       const roofS = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.35, d + 3), trim); roofS.position.set(0, h + 0.1, 0.3); grp.add(roofS);
       const cap = new THREE.Mesh(new THREE.ConeGeometry(w * 0.62, 2.4, 4), roof); cap.rotation.y = Math.PI / 4; cap.scale.z = 0.55; cap.position.set(0, h + 1.3, -0.4); grp.add(cap);
       for (let k = 0; k < 5; k++) { const col = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, h, 8), toon(0xf0e0c0)); col.position.set((k / 4 - 0.5) * (w - 0.6), h / 2, d / 2 + 0.8); grp.add(col); }
-      for (let k = 0; k < 3; k++) { const door = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.4, 0.2), toon(pick(PAL.door))); door.position.set((k - 1) * w * 0.3, 1.2, d / 2 - 0.95); grp.add(door); windowAt(grp, (k - 1) * w * 0.3, 3.8, d / 2 - 0.97, 0, 1, 1, false); }
+      for (let k = 0; k < 3; k++) { const door = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.4, 0.2), paint(toon(pick(PAL.door)), 'wood')); door.position.set((k - 1) * w * 0.3, 1.2, d / 2 - 0.95); grp.add(door); windowAt(grp, (k - 1) * w * 0.3, 3.8, d / 2 - 0.97, 0, 1, 1, false); }
       for (let k = 0; k < 3; k++) lantern(x + Math.sin(ry) * (d / 2 + 0.6) + Math.cos(ry) * (k - 1) * w * 0.3, g + 4.2, z + Math.cos(ry) * (d / 2 + 0.6) - Math.sin(ry) * (k - 1) * w * 0.3);
     }
     // barrels and crates by the door now and then
     if (rng() < 0.45) {
       const sx = (rng() < 0.5 ? -1 : 1) * (hw - 0.6), lz = hd + 0.7, px = x + Math.cos(ry) * sx + Math.sin(ry) * lz, pz = z - Math.sin(ry) * sx + Math.cos(ry) * lz;
-      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 1.0, 10), toon(0x7a4e2c)); br.position.set(px, g + 0.5, pz); addOutline(br, 0.025); br.castShadow = true; scene.add(br);
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 1.0, 10), paint(toon(0x7a4e2c), 'wood')); br.position.set(px, g + 0.5, pz); addOutline(br, 0.025); br.castShadow = true; scene.add(br);
       cyl(px, pz, 0.48, g - 1, g + 1.0);
     }
     finish(grp);
@@ -175,12 +175,12 @@ export function createCityKit(scene, o) {
     buntings.push(grp);
   }
   function paving(cx, cz, rings, color = 0xb89878) {
-    const m = toon(color);
+    const m = paint(toon(color), 'cobble');
     for (const r of rings) { const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.25, r + 0.25, 64), m); ring.rotation.x = -Math.PI / 2; ring.position.set(cx, heightAt(cx, cz) + 0.03, cz); ring.receiveShadow = true; scene.add(ring); }
   }
   function stall(x, z, ry, i, goods = true) {
     const g = heightAt(x, z), grp = new THREE.Group(); grp.position.set(x, g, z); grp.rotation.y = ry;
-    const table = new THREE.Mesh(new THREE.BoxGeometry(3, 1.0, 1.4), toon(0x8a5a36)); table.position.y = 0.5; grp.add(table);
+    const table = new THREE.Mesh(new THREE.BoxGeometry(3, 1.0, 1.4), paint(toon(0x8a5a36), 'wood')); table.position.y = 0.5; grp.add(table);
     for (const s of [-1, 1]) for (const zz of [-0.6, 0.6]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.7, 5), toon(0x5a3a20)); p.position.set(s * 1.4, 1.35, zz); grp.add(p); }
     const awn = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.1, 2.2), toon(PAL.awn[i % PAL.awn.length])); awn.position.set(0, 2.7, 0); awn.rotation.x = 0.18; grp.add(awn);
     for (let k = 0; k < 5; k++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.02, 2.22), toon(0xf4ead4)); st.position.set(-1.36 + k * 0.68, 2.76, 0); st.rotation.x = 0.18; grp.add(st); }

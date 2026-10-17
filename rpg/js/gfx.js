@@ -15,11 +15,19 @@ export function ramp() {
   return RAMP;
 }
 
+/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' */
+const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5 };
+export function paint(mat, kind) {
+  mat.defines = Object.assign({}, mat.defines, { FL_PAINT: PAINT_KINDS[kind] || 1 });
+  mat.needsUpdate = true;
+  return mat;
+}
+
 export function toon(color, opts = {}) {
   return new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: ramp() }, opts));
 }
 
-/* the smooth film style's live switch (see smooth.js), shared so outlines can follow it */
+/* the film look's coloured ink lines are always on (1); kept as a uniform so a line can still blend */
 export const STYLE = { on: { value: 1 } };
 
 /* inverted-hull ink outline that respects fog. With the film style on, the line takes a deep
@@ -30,7 +38,7 @@ export function outlineMaterial(thickness = 0.04, color = 0x1a1008, tint = null)
   if (outlineCache.has(key)) return outlineCache.get(key);
   const m = new THREE.ShaderMaterial({
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-      uColor: { value: new THREE.Color(color) }, uThick: { value: thickness }, uTint: { value: new THREE.Color(tint ?? color) },
+      uColor: { value: new THREE.Color(color) }, uThick: { value: thickness * 0.6 }, uTint: { value: new THREE.Color(tint ?? color) },   // a fine, painted line
     }]),
     vertexShader: `
       uniform float uThick;
