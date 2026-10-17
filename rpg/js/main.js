@@ -21,7 +21,7 @@ import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
 import { buildProperty, COLOSSI } from './property.js';
 import { createInteriors } from './interiors.js';
-import { buildTorcain, buildPhorus, buildCore } from './actors.js';
+import { buildTorcain, buildPhorus, buildCore, placeWalker } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildMalstiPunk, buildSkorThal, buildGynge } from './esik_land.js';
 import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
@@ -135,7 +135,13 @@ scene.add(sun, sun.target);
 const rim = new THREE.DirectionalLight(0x9ab8ff, 0.55); rim.position.set(60, 40, -80); scene.add(rim);
 const hemiBase = hemi.intensity;
 
-const composer = new EffectComposer(renderer);
+/* the post chain draws into a multisampled target: without it the renderer's own antialiasing is lost,
+   and every toon outline and roof edge crawls as the camera moves (fewer samples on a phone) */
+function smoothTarget() {
+  const sz = renderer.getDrawingBufferSize(new THREE.Vector2());
+  return new THREE.WebGLRenderTarget(Math.max(1, sz.x), Math.max(1, sz.y), { type: THREE.HalfFloatType, samples: matchMedia('(pointer: coarse)').matches ? 2 : 4 });
+}
+const composer = new EffectComposer(renderer, smoothTarget());
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 0.86);
 composer.addPass(bloom);
@@ -4014,7 +4020,7 @@ function updatePlayer(dt) {
 
   updateAttack(dt);
 
-  torcain.root.position.copy(P.pos);
+  placeWalker(torcain.root, P, dt);
   if (P.riding) torcain.root.position.y += mount ? mount.seat : 1.35;
   const dy = P.yaw - (P._ry ?? P.yaw); P._ry = P.yaw; turnRate = damp(turnRate, Math.atan2(Math.sin(dy), Math.cos(dy)) / Math.max(dt, 1e-3), 6, dt);
   torcain.root.rotation.set(0, P.yaw, 0);
@@ -4144,20 +4150,26 @@ function updateCamera(dt) {
     }
   }
   const tgt = V3(P.pos.x, P.pos.y + (P.flying ? 2.6 : P.riding ? 3.0 : 1.9), P.pos.z);
-  CAM.target.lerp(tgt, 1 - Math.exp(-18 * dt));
+  // follow quickly across the ground, a little more gently up and down, so steps, stairs and landings don't jolt the view
+  const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-(P.onGround || P.riding ? 9 : 14) * dt);
+  CAM.target.x += (tgt.x - CAM.target.x) * kxz; CAM.target.z += (tgt.z - CAM.target.z) * kxz; CAM.target.y += (tgt.y - CAM.target.y) * ky;
   if (CAM.target.distanceTo(tgt) > 8) CAM.target.copy(tgt);
   const r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
   const look = CAM.target.clone().addScaledVector(r, 0.55);
   const off = V3(Math.sin(CAM.yaw) * Math.cos(CAM.pitch), Math.sin(CAM.pitch), Math.cos(CAM.yaw) * Math.cos(CAM.pitch));
-  let want = look.clone().addScaledVector(off, CAM.dist);
-  const hit = world.col.ray(look, want);
-  if (hit < 1) want = look.clone().addScaledVector(off, Math.max(0.6, CAM.dist * hit - 0.3));
+  // something in the way: pull in at once (never look through a wall), but ease back out, so it doesn't flicker in and out at an edge
+  const hit = world.col.ray(look, look.clone().addScaledVector(off, CAM.dist));
+  const clear = hit < 1 ? Math.max(0.6, CAM.dist * hit - 0.3) : CAM.dist;
+  CAM.reach = Math.min(clear, damp(CAM.reach ?? clear, clear, 3.2, dt));
+  const want = look.clone().addScaledVector(off, CAM.reach);
   const gy = world.heightAt(want.x, want.z) + 0.5;
-  if (want.y < gy) want.y = gy;
+  CAM.floor = damp(CAM.floor ?? gy, gy, 10, dt);
+  if (want.y < Math.max(gy - 0.3, CAM.floor)) want.y = Math.max(gy - 0.3, CAM.floor);
   CAM.pos.copy(want);
+  // shake is a rumble, not static: smooth wobble on three unrelated waves
   G.shake = Math.max(0, G.shake - dt * 2.2);
-  const s = G.shake * G.shake * 0.5;
-  camera.position.set(CAM.pos.x + (Math.random() - 0.5) * s, CAM.pos.y + (Math.random() - 0.5) * s, CAM.pos.z + (Math.random() - 0.5) * s);
+  const s = G.shake * G.shake * 0.5, T = G.t * 31;
+  camera.position.set(CAM.pos.x + Math.sin(T * 1.13) * s * 0.5, CAM.pos.y + Math.sin(T * 1.71 + 1) * s * 0.5, CAM.pos.z + Math.sin(T * 0.93 + 2) * s * 0.5);
   camera.lookAt(look);
   if (dyaMatch && dyaOverview) {
     const c = dyaMatch.toWorld(800, 500), m = dyaMatch.m;
@@ -4268,9 +4280,14 @@ function updateWorldBits(dt) {
    LOOP
    ================================================================ */
 const clock = new THREE.Clock();
+let frameDt = 1 / 60;
 function frame() {
   requestAnimationFrame(frame);
-  let dt = Math.min(clock.getDelta(), 1 / 20);
+  // steady the clock: the browser's frames arrive a little unevenly, and stepping the world by each raw gap
+  // makes everything that moves shimmer. Small wobbles are smoothed out; a real hitch still counts in full.
+  const rawDt = Math.min(clock.getDelta(), 1 / 20);
+  frameDt = Math.abs(rawDt - frameDt) > 0.012 ? rawDt : lerp(frameDt, rawDt, 0.2);
+  let dt = frameDt;
   const frozen = G.paused || G.mode === 'title';
   if (VK) {   // Velki: its own little world, until the air tears open
     if (!G.paused) { G.t += dt; if (G.mode !== 'title') tickTime(SAVE, dt); VK.update(dt, G.mode === 'play' && !overlayOpen()); updateDialog(dt); tickUi(dt); updateSlotHud(dt); }
@@ -4400,7 +4417,7 @@ function startVelki() {
   VK = createVelki({
     camera, keys, touch, CAM, sfx,
     makeComposer(sc) {
-      const c = new EffectComposer(renderer);
+      const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
       c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8));
       c.addPass(new OutputPass());
@@ -4456,7 +4473,7 @@ function vkCtx() {
   return {
     camera, keys, touch, CAM, sfx,
     makeComposer(sc) {
-      const c = new EffectComposer(renderer);
+      const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
       c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 0.86));
       c.addPass(new OutputPass());

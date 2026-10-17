@@ -484,7 +484,7 @@ export function buildEikar(o = {}) {
   const synth = { kind: 1, p: 0 };
   const defKind = kind === 'spear' || kind === 'none' || kind === 'flask' ? 4 : kind === 'axe' ? 3 : 1;
   const s = W.s;                 // weapon-hand side (-1 right, +1 left)
-  let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0;
+  let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
   bio.glow(0);
 
   const A = {
@@ -495,9 +495,11 @@ export function buildEikar(o = {}) {
       const t = st.t || 0, spd = st.speed || 0;
       const onGround = st.onGround !== false;
       const air = !onGround;
-      const k = onGround ? clamp(spd / 7, 0, 1.3) : 0;
-      const moving = k > 0.07;
-      phase += dt * (moving ? 3 + spd * 0.95 : 0);
+      // the stride follows a smoothed speed, so starting, stopping and slowing blend instead of snapping between walk and idle
+      kS = lerp(kS, onGround ? clamp(spd / 7, 0, 1.3) : 0, 1 - Math.exp(-10 * dt));
+      airK = lerp(airK, air ? 1 : 0, 1 - Math.exp(-14 * dt));
+      const k = kS, moving = k > 0.035, walkK = clamp(k / 0.15, 0, 1);   // walkK: 0 standing .. 1 properly under way
+      phase += dt * (3 + Math.max(spd, k * 7) * 0.95) * walkK;
       let gliding = false;
       for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && !own.has(c)) { gliding = true; break; } }
       glide = lerp(glide, gliding ? 1 : 0, 1 - Math.exp(-10 * dt));
@@ -511,7 +513,7 @@ export function buildEikar(o = {}) {
       const b = swingBlend;
 
       // ---- the weapon hand at rest ----
-      const sway = moving ? Math.sin(phase) * 0.16 * k : Math.sin(t * 1.6) * 0.008;
+      const sway = lerp(Math.sin(t * 1.6) * 0.008, Math.sin(phase) * 0.16 * k, walkK);
       if (kind === 'spear') { iT.set(s * 0.25, -0.06, 0.11 + sway * 0.5); iD.set(0, 1, 0.1); iB.set(1, 0, 0); }
       else if (kind === 'bow') { iT.set(s * 0.24, -0.12, 0.08 + sway); iD.set(0, 1, 0.5); iB.set(1, 0, 0); }
       else if (kind === 'sword') { iT.set(s * 0.24, -0.15, 0.1 + sway); iD.set(s * 0.12, -0.25, 1); iB.set(0, -1, 0); }
@@ -563,19 +565,22 @@ export function buildEikar(o = {}) {
       }
       if (glide > 0.01) { sT.set(-s * 0.17, 0.86, 0.06); fT.lerp(sT, glide); }
       if (st.ride && !sw && !st.drink) { sT.set(-s * 0.12, -0.02, 0.3); fT.lerp(sT, 0.85); fD.set(0, 0.4, 1); fB.set(s, 0, 0); }
-      if (air && !gliding && !sw) { fT.x += -s * 0.08; fT.y += 0.12; }
+      if (!gliding && !sw && airK > 0.01) { fT.x += -s * 0.08 * airK; fT.y += 0.12 * airK; }
 
       // ---- torso, head, legs ----
       twist = lerp(twist, tw * b, 1 - Math.exp(-20 * dt));
       lean = lerp(lean, ln * (sw ? b : 1) + glide * 0.25, 1 - Math.exp(-12 * dt));
-      torso.rotation.set(lean, twist, moving ? Math.sin(phase) * 0.04 * k : 0);
+      torso.rotation.set(lean, twist, Math.sin(phase) * 0.04 * k * walkK);
       body.rotation.x = 0;
-      const bob = moving ? Math.abs(Math.cos(phase)) * 0.045 * k : Math.sin(t * 2.2) * 0.006;
+      const bob = lerp(Math.sin(t * 2.2) * 0.006, Math.abs(Math.cos(phase)) * 0.045 * k, walkK);
       body.position.y = HIP + bob - crouch - (sw ? 0.03 * b : 0);
-      head.rotation.set(st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * 0.5, -twist * 0.6 + (moving || sw ? 0 : Math.sin(t * 0.5) * 0.18), 0);
+      head.rotation.set(st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * 0.5, -twist * 0.6 + Math.sin(t * 0.5) * 0.18 * (1 - walkK) * (1 - b), 0);
       hat.rotation.z = Math.sin(t * 1.7) * 0.02;
       strideLegs(legs, phase, moving ? k : 0, air, dt, sw && !moving ? b : 0);
-      if (glide > 0.5) { legs[0].thigh.rotation.x = 0.25; legs[1].thigh.rotation.x = 0.4; legs[0].knee.rotation.x = 0.5; legs[1].knee.rotation.x = 0.7; }
+      if (glide > 0.01) {   // tucked for the glide, eased in with it
+        const G2 = [[0.25, 0.5], [0.4, 0.7]];
+        legs.forEach((L, i) => { L.thigh.rotation.x = lerp(L.thigh.rotation.x, G2[i][0], glide); L.knee.rotation.x = lerp(L.knee.rotation.x, G2[i][1], glide); });
+      }
       // astride a mount: hips in the saddle, thighs forward and apart round its back, shins down its flanks;
       // a little lean into the going, and the body gives with each stride instead of riding it stiff
       rideK = lerp(rideK, st.ride ? 1 : 0, 1 - Math.exp(-12 * dt));
@@ -595,7 +600,7 @@ export function buildEikar(o = {}) {
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
 
-      if (cape) cape.rotation.x = lerp(cape.rotation.x, 0.1 + k * 0.75 + (air ? 0.45 : 0) + glide * 0.4 - lean * 0.6 + Math.sin(t * 6) * 0.04 * (k + 0.3), 1 - Math.exp(-8 * dt));
+      if (cape) cape.rotation.x = lerp(cape.rotation.x, 0.1 + k * 0.75 + airK * 0.45 + glide * 0.4 - lean * 0.6 + Math.sin(t * 6) * 0.04 * (k + 0.3), 1 - Math.exp(-8 * dt));
       if (relic) { relic.rotation.y += dt * 3; relic.userData.glow.scale.setScalar(0.22 + (st.heat || 0) * 0.3 + Math.sin(t * 8) * 0.02); }
       if (nur) nur.position.set(0.55 + Math.sin(t * 1.3) * 0.12, 1.7 + Math.sin(t * 2.1) * 0.12, -0.2);
       if (weapon.userData.glow) weapon.userData.glow.material.opacity = 0.35 + b * 0.65;
@@ -643,4 +648,14 @@ export function buildCore() {
   const halo = glowSprite(0x8a5aff, 6, 0.3); g.add(halo);
   g.userData = { m, inner, halo };
   return g;
+}
+
+/* the body follows the walker's feet, but a stair step is eased instead of popped:
+   on the ground, a small jump in height is spread over a few frames; big jumps and air snap */
+export function placeWalker(root, P, dt) {
+  const y = P.pos.y, prev = P._visY ?? y;
+  let vy = y;
+  if (P.onGround && Math.abs(y - prev) < 0.9) vy = prev + (y - prev) * (1 - Math.exp(-18 * dt));
+  P._visY = vy;
+  root.position.set(P.pos.x, vy, P.pos.z);
 }

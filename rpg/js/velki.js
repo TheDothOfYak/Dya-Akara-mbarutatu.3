@@ -11,7 +11,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
-import { buildEikar } from './actors.js';
+import { buildEikar, placeWalker } from './actors.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32 } from './util.js';
 import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
@@ -556,22 +556,27 @@ export function createVelki(ctx) {
     else P.onGround = false;
     const speed = Math.hypot(P.vel.x, P.vel.z);
     if (P.onGround && speed > 1) { P.stepPh += dt * speed * 0.55; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); } }
-    tanoc.root.position.copy(P.pos); tanoc.root.rotation.y = P.yaw;
+    placeWalker(tanoc.root, P, dt); tanoc.root.rotation.y = P.yaw;
     tanoc.animate(dt, { speed, onGround: P.onGround, t });
     return sp;
   }
 
+  const camWant = V3(); let camInit = false, camReach = null;
   function updateCamera(dt) {
     const onSpire = Math.hypot(P.pos.x, P.pos.z) < 8 && P.pos.y > 2;
     const want = onSpire ? 5.2 : 6.5;
-    camTgt.set(P.pos.x, P.pos.y + 1.5, P.pos.z);
+    camWant.set(P.pos.x, P.pos.y + 1.5, P.pos.z);
+    // follow quickly across the ground, more gently up and down (steps, stairs, landings), and snap back if far behind
+    if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
+    else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
     let d = want;
     const cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z)) { d = Math.max(0.8, s - 0.4); break; } }
+    camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
     const goal = camTgt.clone().addScaledVector(dir, d);
     camPos.lerp(goal, 1 - Math.exp(-14 * dt));
     camera.position.copy(camPos);
-    if (shake > 0) { camera.position.x += (Math.random() - 0.5) * shake; camera.position.y += (Math.random() - 0.5) * shake; shake = Math.max(0, shake - dt * 1.5); }
+    if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; shake = Math.max(0, shake - dt * 1.5); }
     camera.lookAt(camTgt);
   }
 

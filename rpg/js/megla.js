@@ -30,7 +30,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles } from './gfx.js';
-import { buildEikar } from './actors.js';
+import { buildEikar, placeWalker } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
 import { buildLutut } from './esik_sky.js';
@@ -832,7 +832,7 @@ export function createMegla(ctx) {
       tanoc.animate(dt, { speed: 0, onGround: true, t, swing: null, ride: true, rideSpeed: hv, rideBob: K.gait || 0, rideRoll: roll * 0.4 });
       return;
     }
-    tanoc.root.position.copy(P.pos); tanoc.root.rotation.x = 0; tanoc.root.rotation.y = P.yaw;
+    placeWalker(tanoc.root, P, dt); tanoc.root.rotation.x = 0; tanoc.root.rotation.y = P.yaw;
     if (P.down) { tanoc.root.rotation.z = damp(tanoc.root.rotation.z, 1.35, 5, dt); tanoc.root.position.y += 0.25; }
     else tanoc.root.rotation.z = damp(tanoc.root.rotation.z, 0, 8, dt);
     tanoc.animate(dt, { speed: P.down ? 0 : speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null });
@@ -1556,14 +1556,19 @@ export function createMegla(ctx) {
     if (shake > 0) shake = Math.max(0, shake - dt * 1.5);
     ctx.hp(P.hp / 100);
   }
+  const camWant = V3(); let camInit = false, camReach = null;
   function updateCamera(dt) {
-    camTgt.set(P.pos.x, P.pos.y + (P.ride ? 2.4 : 1.5), P.pos.z);
+    camWant.set(P.pos.x, P.pos.y + (P.ride ? 2.4 : 1.5), P.pos.z);
+    // follow quickly across the ground, more gently up and down (steps, stairs, landings), and snap back if far behind
+    if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
+    else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
     const want = P.ride ? 8.5 : (GYN && GYN.alive ? 9 : 6.4), cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
     let d = want;
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z) || (GYN && GYN.alive && q.distanceTo(GYN.pos.clone().setY(GYN.pos.y + 0.45 * GYN.s)) < 0.95 * GYN.s)) { d = Math.max(0.8, s - 0.4); break; } }
+    camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
     camPos.lerp(camTgt.clone().addScaledVector(dir, d), 1 - Math.exp(-14 * dt));
     camera.position.copy(camPos);
-    if (shake > 0) { camera.position.x += (Math.random() - 0.5) * shake; camera.position.y += (Math.random() - 0.5) * shake; }
+    if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; }
     camera.lookAt(camTgt);
   }
 
