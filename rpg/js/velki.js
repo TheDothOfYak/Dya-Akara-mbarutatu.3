@@ -341,7 +341,7 @@ export function createVelki(ctx) {
   /* the wall, its gate, and the gate's towers */
   const gateBar = { on: true };   // the warden keeps you inside until you've seen it from the top
   {
-    const wm = toon(0xb8987a), N = 80;
+    const wm = paint(toon(0xb8987a), 'brick'), N = 80;   // the city wall is brick, crisp-cornered
     for (let i = 0; i < N; i++) {
       const a = (i / N) * TAU, da = Math.atan2(Math.sin(a - GATE_A), Math.cos(a - GATE_A));
       if (Math.abs(da) < GATE_W + 0.02) continue;
@@ -440,7 +440,7 @@ export function createVelki(ctx) {
   setBeacon();
   if (stage === 'spire') ctx.objective(STORY.PRO_OBJ.spire, 'WASD to move · Shift to run · Space to jump');
   else ctx.objective(B4.basketObj, 'WASD to move · Shift to run · Space to jump');
-  // his mother, by their door; and the basket he carries up to the gate
+  // Odda, who keeps the foundling house where he lives, by its door; and the basket he carries up to the gate
   const mother = person(5.2, 49.5, { skin: '#9a6a40', cap: '#3a2414', tunic: 0x8a5a6a, trim: 0xd8b080 }, { scale: 1.0 });
   mother.look = false; mother.a.root.rotation.y = Math.atan2(P.pos.x - 5.2, P.pos.z - 49.5);
   const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 0.3, 10), toon(0xb8884a)); basket.position.set(0.32, 0.95, 0.22); addOutline(basket, 0.02);
@@ -509,7 +509,7 @@ export function createVelki(ctx) {
   }
   function prompt() {
     if (stage === 'home' && captain.pos.distanceTo(P.pos) < 4) return B4.talkCrew;
-    if (mother.pos.distanceTo(P.pos) < 3) return 'Talk to your mother';
+    if (mother.pos.distanceTo(P.pos) < 3) return 'Talk to Odda';
     if (warden.pos.distanceTo(P.pos) < 3.5) return 'Talk to the gate warden';
     for (const c of crew) if (!c.run && c.pos.distanceTo(P.pos) < 3.2) return 'Talk to the Ahoac';
     return null;

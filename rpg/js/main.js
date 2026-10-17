@@ -311,9 +311,7 @@ const canvas = renderer.domElement;
 const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin', 'rpg'].some(id => !$(id).classList.contains('hidden'));
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  if (locked) return;
-  if (performance.now() - selfUnlockT < 2000 || watching()) return;   // we let go of it ourselves, or a scene is playing
-  if (!G.paused && (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory') && !overlayOpen() && !(DLG && DLG.choices)) openPause();
+  // Esc only frees the mouse (and leaves full screen); P is the pause. Click the world to take the mouse back.
 });
 document.addEventListener('mousemove', e => {
   if (!locked || G.paused) return;
@@ -378,6 +376,7 @@ const touch = initTouch({
 });
 
 function onKey(code) {
+  if (code === 'KeyP') { togglePause(); return; }
   if (TOK && !cardState && G.mode === 'intro') { tokKey(code); return; }   // the token lesson takes its own keys
   if (G.mode === 'intro' || G.mode === 'trance') { if (code === 'Space' || code === 'Enter' || code === 'Escape') skipCards(); return; }
   if (G.mode === 'dialog') {
@@ -1385,7 +1384,6 @@ function offerCores() {
       s.mat.emissiveIntensity = 1.4;
       dialog(STORY.DIALOG.tranceIn, () => {
         G.mode = 'trance';
-        unlockMouse();
         fade(0.85, 1.2);
         $('fade').style.background = 'radial-gradient(circle, #f6d6a0, #3a2a10)';
         playCards(STORY.DIALOG.tranceCards, 4200, () => {
@@ -1409,7 +1407,6 @@ function afterDuel() {
 
 function trance() {
   G.mode = 'trance';
-  unlockMouse();
   const cards = $('cards'); cards.classList.add('trance');
   fade(0.85, 1.5);
   $('fade').style.background = 'radial-gradient(circle, #3a1a6a, #0a0418)';
@@ -1508,7 +1505,6 @@ function takeSeed() {
 function sailToAakalay() {
   dialog(STORY.XILIA.setSail, () => {
     G.mode = 'trance';
-    unlockMouse();
     fade(0.9, 1.5);
     playCards(STORY.XILIA.sailCards, 4200, () => {
       delete SAVE.inv.items.k_seed; SAVE.region = 'aakalay'; SAVE.lantern = null; F_.xdone = true; persist(); CLOUD.flush();
@@ -1979,7 +1975,6 @@ function setSail() {
   dialog(STORY.DIALOG2.setSail, () => {
     G.mode = 'trance';
     $('endcard').classList.add('hidden');
-    unlockMouse();
     fade(0.9, 1.5);
     playCards(STORY.DIALOG2.urverkCards, 4200, () => {
       SAVE.region = 'leotik'; SAVE.lantern = null; persist(); CLOUD.flush();
@@ -2023,7 +2018,6 @@ function afterLord() {
     let t = 0; const hop = () => { t += 0.016; m.root.position.x = pz.x + Math.sin(t * 3) * 4 + t * 2; m.root.position.y = pz.y + Math.abs(Math.sin(t * 9)) * 0.6; m.animate(0.016, { speed: 3, t }); if (t < 6) requestAnimationFrame(hop); else scene.remove(m.root); }; hop(); }
   dialog(STORY.DIALOG2.lordDown, () => {
     G.mode = 'trance';
-    unlockMouse();
     fade(0.85, 1.5);
     playCards(STORY.ENDING2, 4600, () => {
       fade(0, 1.5);
@@ -2387,7 +2381,21 @@ function toggleJournal() {
   } else { j.classList.add('hidden'); G.paused = false; lockMouse(); }
 }
 $('btn-jclose').onclick = () => { toggleJournal(); };
-function openPause() { if (overlayOpen()) return; G.paused = true; $('pause').classList.remove('hidden'); $('btn-concede').style.display = dyaMatch ? '' : 'none'; }
+function openPause() { if (overlayOpen()) return; G.paused = true; unlockMouse(); $('pause').classList.remove('hidden'); $('btn-concede').style.display = dyaMatch ? '' : 'none'; syncFull(); }
+/* P pauses and unpauses, whenever there's a game running to pause */
+function togglePause() {
+  if (!$('pause').classList.contains('hidden')) { closePause(); return; }
+  if (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory') openPause();
+}
+/* full screen, from the pause menu (Esc leaves it too) */
+const syncFull = () => { $('opt-full').checked = !!document.fullscreenElement; };
+$('opt-full').onchange = () => {
+  try {
+    if ($('opt-full').checked && !document.fullscreenElement) { const p = document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(syncFull); }
+    else if (!$('opt-full').checked && document.fullscreenElement) document.exitFullscreen();
+  } catch (e) { syncFull(); }
+};
+document.addEventListener('fullscreenchange', syncFull);
 function closePause() { $('pause').classList.add('hidden'); G.paused = false; lockMouse(); }
 $('btn-resume').onclick = closePause;
 $('btn-concede').onclick = () => { if (dyaMatch) dyaMatch.concede(); closePause(); };
@@ -3660,7 +3668,6 @@ function checkExits(px0, pz0) {
 }
 function takeExit(ex) {
   G.mode = 'trance'; P.vel.set(0, 0, 0);
-  unlockMouse();
   fade(1, 0.7);
   SAVE.lanternBy = SAVE.lanternBy || {}; SAVE.lanternBy[REGION] = SAVE.lantern;
   SAVE.region = ex.to; SAVE.lantern = SAVE.lanternBy[ex.to] || null;
@@ -3671,7 +3678,6 @@ function takeExit(ex) {
 }
 function takePass(ps) {
   G.mode = 'trance'; P.vel.set(0, 0, 0);
-  unlockMouse();
   fade(0.18, 0.9);   // not a black card: the camera pulls away up the pass while the words come
   const cards = (PASS_CARDS[ps.to] || (() => [ps.name + '.']))(!!P.riding);
   SAVE.lanternBy = SAVE.lanternBy || {}; SAVE.lanternBy[REGION] = SAVE.lantern;   // each region remembers where you last rested
@@ -4491,7 +4497,7 @@ function vkCtx() {
     bark: (w, t, d) => bark(w, t, d), hint: t => hint(t), toast: (t, d) => toast(t, d),
     cards: (lines, ms, cb) => { G.mode = 'intro'; playCards(lines, ms, cb); },
     play: () => { G.mode = 'play'; lockMouse(); },
-    cutscene: on => { G.mode = on ? 'intro' : 'play'; if (!on) lockMouse(); else unlockMouse(); },
+    cutscene: on => { G.mode = on ? 'intro' : 'play'; if (!on) lockMouse(); },   // keep the mouse through a scene: no cursor banner each time
     location: (a, b) => showLocation(a, b),
     objective: (head, text, h, pips, on) => proObjective(head, text, h, pips, on),
     blur: px => { canvas.style.transition = px ? 'filter .4s' : 'filter 1.6s'; canvas.style.filter = `blur(${px}px)`; },
@@ -4689,7 +4695,7 @@ function firstTokenLesson(n) {
   const T = STORY.FIRST_TOKEN;
   n.talking = 6;
   dialog(T.back.concat(T.ask), () => {
-    G.mode = 'intro'; unlockMouse();
+    G.mode = 'intro';
     // into the workshop, at the bench: Tanoc on the stool, the Carpenter at his shoulder
     const sp = interiors.spot && interiors.spot('tokenBench');
     if (sp) {

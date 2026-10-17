@@ -105,6 +105,17 @@ float flStone(vec2 uv, vec2 sz) {
   float bevel = 1.0 + 0.12 * smoothstep(0.85, 1.0, f.y) - 0.14 * smoothstep(0.2, 0.0, f.y);
   return mix(0.62, tone * bevel * (0.94 + 0.12 * flF(uv * 4.0)), mortar);
 }
+/* small fired bricks in running bond: crisp courses, deep mortar, each brick its own shade */
+float flBrick(vec2 uv) {
+  vec2 sz = vec2(0.46, 0.2); vec2 q = uv / sz; float row = floor(q.y); q.x += mod(row, 2.0) * 0.5;
+  vec2 id = floor(q), f = fract(q);
+  float ex = min(f.x, 1.0 - f.x) * sz.x, ey = min(f.y, 1.0 - f.y) * sz.y, e = min(ex, ey);
+  float mortar = smoothstep(0.012, 0.026, e);
+  float tone = 0.8 + 0.3 * flH(id) + 0.08 * flN(uv * 6.0);
+  float lit = 1.0 + 0.1 * smoothstep(0.75, 1.0, f.y) - 0.12 * smoothstep(0.25, 0.0, f.y);
+  float chip = 1.0 - 0.18 * smoothstep(0.7, 0.9, flN(uv * 3.1 + id));
+  return mix(0.58, tone * lit * chip, mortar);
+}
 float flPlaster(vec2 uv, float y) {
   float b = 0.93 + 0.14 * flF(uv * 0.7);
   float bare = smoothstep(0.66, 0.72, flF(uv * 0.35 + 11.0));                   // plaster fallen away, stone showing
@@ -151,11 +162,13 @@ float flLand(vec3 W, vec3 N) {
 #endif
 `;
 const FRAG_ALBEDO = `#include <color_fragment>
+  #ifndef FL_CEL
   {
     vec3 tw = pow(abs(normalize(vFlN)), vec3(4.0)); tw /= dot(tw, vec3(1.0));
     float strokes = flTri(vFlP * 0.9, tw).r, blotch = flTri(vFlP * 0.08 + 0.31, tw).g;
     diffuseColor.rgb *= (0.9 + 0.2 * strokes) * (0.92 + 0.16 * blotch);
   }
+  #endif
   #ifdef FL_PAINT
   {
     // painted surface detail, laid out on whichever world plane the face looks along
@@ -174,6 +187,8 @@ const FRAG_ALBEDO = `#include <color_fragment>
       pm = flCobble(uv);
     #elif FL_PAINT == 6
       pm = flLand(vFlW, normalize(vFlWN));
+    #elif FL_PAINT == 8
+      pm = an.y > 0.7 ? flStone(uv, vec2(0.6, 0.6)) : flBrick(uv);
     #elif FL_PAINT == 7
       // cloth: soft folds hanging from the shoulders and belt, painted in light and shade
       float ang = atan(vFlP.z, vFlP.x);
@@ -184,6 +199,16 @@ const FRAG_ALBEDO = `#include <color_fragment>
   }
   #endif`;
 const FRAG_LIGHT = `
+  #ifdef FL_CEL
+  {
+    // the cast: a cool, violet-leaning shadow shape, and a crisp rim of light
+    float flLum = dot(outgoingLight, vec3(0.3, 0.59, 0.11)) / max(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)), 1e-3);
+    float flShade = 1.0 - smoothstep(0.55, 0.8, flLum);
+    outgoingLight *= mix(vec3(1.0), vec3(0.8, 0.84, 1.16), flShade * 0.85);
+    vec3 vdc = normalize(vViewPosition);
+    outgoingLight += diffuseColor.rgb * smoothstep(0.66, 0.7, 1.0 - max(dot(normal, vdc), 0.0)) * 0.28 * (1.0 - flShade * 0.5);
+  }
+  #else
   {
     vec3 vd = normalize(vViewPosition);
     float ndv = max(dot(normal, vd), 0.0);
@@ -196,8 +221,19 @@ const FRAG_LIGHT = `
       outgoingLight += directionalLights[0].color * flS * 0.09 * (0.4 + 0.6 * max(dot(normal, directionalLights[0].direction), 0.0));
     #endif
   }
+  #endif
   #include <opaque_fragment>`;
 /* toon materials without a ramp use three's built-in two-tone step: give them the painted falloff too */
+/* characters and creatures (FL_CEL) are drawn like the film's hand-animated cast instead: one crisp
+   shadow shape, no gradient — the bold, graphic shading of Atlantis and Treasure Planet */
+const CEL_GRADIENT = `#ifdef FL_CEL
+vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ) {
+  float d = dot( normal, lightDirection ) * 0.5 + 0.5;
+  float w = fwidth( d ) * 1.2 + 0.004;
+  return vec3( mix( 0.5, 1.0, smoothstep( 0.52 - w, 0.52 + w, d ) ) );
+}
+#else
+`;
 const HARD_STEP = 'return mix( vec3( 0.7 ), vec3( 1.0 ), smoothstep( 0.7 - fw.x, 0.7 + fw.x, coord.x ) );';
 const SOFT_STEP = 'float flT = smoothstep( 0.22, 0.84, coord.x ); return vec3( 0.55 + 0.45 * flT );';
 
@@ -206,15 +242,15 @@ const TAU = Math.PI * 2;
 const done = new WeakMap();          // original geometry → its smooth twin (or itself)
 const cache = new Map();             // param key → shared smooth geometry
 
-/* a box, sculpted the way a hand-painted film builds things: rounded edges, faces that swell
-   gently like plaster or packed earth, and (for anything building-sized) walls that lean in a
-   touch toward the top. Normals are worked out analytically so the bands stay smooth. */
+/* a box with a slim chamfered edge — the light catches it the way it does on cut stone and timber in
+   a painted background, but the shape stays crisp (no rounding: walls and brickwork stay square).
+   (The swell/lean terms are kept at zero; normals are analytic.) */
 function organicBox(w, h, d) {
   const size = [w, h, d], half = [w / 2, h / 2, d / 2], mn = Math.min(w, h, d);
-  const r = Math.min(mn * 0.2, 0.55), k = 3, m = mn > 0.5 ? 4 : 1, n = 2 * k + m;
+  const r = Math.min(mn * 0.06, 0.07), k = 2, m = 1, n = 2 * k + m;   // a slim chamfer that catches the light: masonry stays crisp
   const g = new THREE.BoxGeometry(w, h, d, n, n, n);
   if (r <= 1e-5) return g;
-  const bulge = mn > 0.5 ? mn * 0.035 : 0, taper = h > 1.8 && Math.min(w, d) > 1 ? 0.035 : 0;
+  const bulge = 0, taper = 0;
   const pos = g.attributes.position, nor = g.attributes.normal, p = [0, 0, 0], inner = [0, 0, 0], N = [0, 0, 0];
   for (let i = 0; i < pos.count; i++) {
     p[0] = pos.getX(i); p[1] = pos.getY(i); p[2] = pos.getZ(i);
@@ -388,7 +424,8 @@ export function installSmoothStyle() {
     sh.uniforms.uBrush = BRUSH;
     sh.vertexShader = VERT_PARS + sh.vertexShader.replace('#include <begin_vertex>', VERT);
     sh.fragmentShader = FRAG_PARS + sh.fragmentShader
-      .replace('#include <gradientmap_pars_fragment>', THREE.ShaderChunk.gradientmap_pars_fragment.replace(HARD_STEP, SOFT_STEP))
+      .replace('#include <gradientmap_pars_fragment>', THREE.ShaderChunk.gradientmap_pars_fragment.replace(HARD_STEP, SOFT_STEP)
+        .replace('vec3 getGradientIrradiance', CEL_GRADIENT + 'vec3 getGradientIrradiance') + '\n#endif\n')
       .replace('#include <color_fragment>', FRAG_ALBEDO)
       .replace('#include <opaque_fragment>', FRAG_LIGHT);
   };

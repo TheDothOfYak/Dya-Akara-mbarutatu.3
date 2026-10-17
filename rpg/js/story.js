@@ -1559,14 +1559,14 @@ Object.assign(MEGLA, {
    THE BEGINNING, GO ON — the afternoon before the last Skyfall: supper
    for the Ahoac gate crew, and their spark drill
    ================================================================ */
-SPEAKERS.mother = { name: 'Tanoc’s mother', color: '#e8c8a8', sub: 'Fyrsti’Vilag, Velki' };
+SPEAKERS.mother = { name: 'Odda', color: '#e8c8a8', sub: 'keeps the foundling house, Fyrsti’Vilag' };   // Tanoc is an orphan: Odda raised him with the other foundlings
 SPEAKERS.captain = { name: 'The Ahoac captain', color: '#ffb46a', sub: 'the north gate crew' };
 PROLOGUE.before = {
   mom: [
     ['mother', 'Tanoc! There you are. No — don’t tell me where you’ve been. You’ve soot on your nose. I know exactly where you’ve been.'],
-    ['mother', 'The Skyfall starts at dark, and the gate crew have been drilling since noon without a crumb. Take them this. Straight there, straight back.'],
+    ['mother', 'The Skyfall starts at dark, and the gate crew have been drilling since noon without a crumb. I’ve baked for them, same as every year. Take them this. Straight there, straight back.'],
     ['tanoc', 'The Ahoac? I can go to the Ahoac yard?'],
-    ['mother', 'You can carry a basket to the Ahoac yard. You can not do anything else at the Ahoac yard. And you’ll be home before the first spark. Promise me.'],
+    ['mother', 'You can carry a basket to the Ahoac yard. You can not do anything else at the Ahoac yard. And you’ll be back at the house before the first spark — the little ones will want you at the window. Promise me.'],
     ['tanoc', 'I promise.'],
     ['tale', 'He means it. Mostly.'],
   ],
@@ -1574,7 +1574,7 @@ PROLOGUE.before = {
   basketHint: 'North, up the main street toward the gate',
   talkCrew: 'Give the Ahoac their supper',
   crew: [
-    ['captain', 'Supper! Bless your mother, Filugani. Put it down, put it down — not on my boots.'],
+    ['captain', 'Supper! Bless Odda and her ovens, Filugani. Put it down, put it down — not on my boots.'],
     ['tanoc', 'Can I watch the drill? Just watch. I won’t touch anything.'],
     ['captain', 'Watch? Nobody ever learned to catch by watching.'],
     ['captain', 'Tell you what. Hosk up on the gate tower drops practice sparks — clay, dipped in glow. Catch five before they hit the cobbles and you can stand at the yard wall tonight, with the crew.'],

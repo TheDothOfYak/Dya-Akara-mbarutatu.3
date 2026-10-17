@@ -15,7 +15,7 @@
    grows into — and in Aakalay, one grew from the city's lord.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint, celAll } from './gfx.js';
 import { lerp, clamp } from './util.js';
 
 const TAU = Math.PI * 2;
@@ -506,6 +506,7 @@ export function buildEikar(o = {}) {
   if (o.nur) { nur = glowSprite(o.nur, 0.5, 0.95); nur.position.set(0.5, 1.7, -0.2); root.add(nur); }
 
   outlineAll(root, 0.012);
+  celAll(root);   // drawn like the film's cast: crisp two-tone shading
   root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
   const rootScale = o.scale || 1;
   root.scale.setScalar(rootScale);
@@ -769,6 +770,7 @@ export function faceActing(f) {
 export function cartoon(a, amt = 1) {
   if (!a || !a.animate || !a.root || a.cartoon) return a;
   a.cartoon = true;
+  celAll(a.root);
   const inner = a.animate, root = a.root, base = new THREE.Vector3(), applied = new THREE.Vector3();
   let sq = 0, v = 0, lastY = null, vyS = 0, has = false;
   a.animate = function (dt, st = {}) {

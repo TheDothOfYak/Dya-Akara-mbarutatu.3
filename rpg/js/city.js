@@ -71,6 +71,25 @@ export function createCityKit(scene, o) {
       for (let k = 0; k < 4; k++) { const fl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 5), pick(flowerMats)); const dx = (k / 3 - 0.5) * w; fl.position.set(x + Math.cos(ry) * dx + nx * 4, y - h / 2 + 0.03, z - Math.sin(ry) * dx + nz * 4); grp.add(fl); }
     }
   }
+  /* quoins: dressed corner stones, long and short in turn, standing a hand proud of the wall up
+     every corner — the way real masonry houses are finished (one instanced batch for the town) */
+  const quoins = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 9000);
+  quoins.count = 0; quoins.castShadow = quoins.receiveShadow = true; quoins.frustumCulled = false; scene.add(quoins);
+  const qm = new THREE.Matrix4(), qp = new THREE.Vector3(), qs = new THREE.Vector3(), qq = new THREE.Quaternion(), qc = new THREE.Color();
+  function addQuoins(grp, w, d, h, wallColor, cz = 0) {
+    grp.updateMatrix();
+    const base = new THREE.Color(wallColor).lerp(new THREE.Color(0xd8ccb4), 0.55);
+    for (let y = 0.24, k = 0; y < h - 0.15; y += 0.5, k++) for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      if (quoins.count >= 9000) return;
+      const longX = (k + (sx * sz > 0 ? 0 : 1)) % 2 === 0, lx = longX ? 0.9 : 0.46, lz = longX ? 0.46 : 0.9;
+      qp.set(sx * (w / 2 + 0.06 - lx / 2), y, cz + sz * (d / 2 + 0.06 - lz / 2)); qs.set(lx, 0.44, lz);
+      qm.compose(qp, qq, qs).premultiply(grp.matrix);
+      quoins.setMatrixAt(quoins.count, qm);
+      quoins.setColorAt(quoins.count, qc.copy(base).offsetHSL(0, 0, (rng() - 0.5) * 0.08));
+      quoins.count++;
+    }
+    quoins.instanceMatrix.needsUpdate = true; if (quoins.instanceColor) quoins.instanceColor.needsUpdate = true;
+  }
   function lantern(x, y, z, color = 0xffb060, size = 1.5) {
     const l = glowSprite(color, size, 0.85); l.position.set(x, y, z); scene.add(l); lamps.push(l);
     const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.36, 6), toon(0x3a2a1a)); cage.position.set(x, y + 0.05, z); scene.add(cage);
@@ -91,6 +110,7 @@ export function createCityKit(scene, o) {
     if (kind === 'cottage') {
       const w = 5 + rng() * 2.5, d = 5 + rng() * 2.5, h = 3.8 + rng() * 1.6; hw = w / 2; hd = d / 2; top = h + 2;
       const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wall); b.position.y = h / 2; grp.add(b);
+      addQuoins(grp, w, d, h, wall.color);
       const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.15, 0.25, d + 0.15), trim); band.position.y = h; grp.add(band);
       const cap = new THREE.Mesh(new THREE.SphereGeometry(Math.max(w, d) * 0.72, 18, 9, 0, TAU, 0, Math.PI / 2), roof); cap.scale.y = 0.72; cap.position.y = h; grp.add(cap);
       const rim = new THREE.Mesh(new THREE.TorusGeometry(Math.max(w, d) * 0.7, 0.2, 6, 22), roof); rim.rotation.x = Math.PI / 2; rim.position.y = h + 0.05; grp.add(rim);
@@ -108,7 +128,7 @@ export function createCityKit(scene, o) {
         const band = new THREE.Mesh(new THREE.BoxGeometry(ow + 0.2, 0.28, od + 0.2), trim); band.position.y = fh * (f + 1); grp.add(band);
         // timber framing on the upper floors
         if (f) for (const sx of [-1, -0.33, 0.33, 1]) { const beam = new THREE.Mesh(new THREE.BoxGeometry(0.16, fh, 0.12), trim); beam.position.set(sx * ow / 2, fh * f + fh / 2, od / 2 + 0.04); grp.add(beam); }
-        if (f === 0) doorAt(od / 2);
+        if (f === 0) { doorAt(od / 2); addQuoins(grp, ow, od, fh, wall.color); }
         else for (const sx of [-1, 1]) windowAt(grp, sx * ow * 0.25, fh * f + fh * 0.5, od / 2 + 0.03, 0);
         for (const sx of [-1, 1]) windowAt(grp, sx * (ow / 2 + 0.03), fh * f + fh * 0.5, 0, sx * Math.PI / 2, 0.9, 1.1, false);
       }
@@ -135,6 +155,7 @@ export function createCityKit(scene, o) {
     } else {   // an arcade: a long building with an open colonnade along its front
       const w = 9 + rng() * 3, d = 5, h = 5.2; hw = w / 2; hd = d / 2 + 1.3; top = h + 3;
       const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wall); b.position.set(0, h / 2, -1); grp.add(b);
+      addQuoins(grp, w, d, h, wall.color, -1);
       const roofS = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.35, d + 3), trim); roofS.position.set(0, h + 0.1, 0.3); grp.add(roofS);
       const cap = new THREE.Mesh(new THREE.ConeGeometry(w * 0.62, 2.4, 4), roof); cap.rotation.y = Math.PI / 4; cap.scale.z = 0.55; cap.position.set(0, h + 1.3, -0.4); grp.add(cap);
       for (let k = 0; k < 5; k++) { const col = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, h, 8), toon(0xf0e0c0)); col.position.set((k / 4 - 0.5) * (w - 0.6), h / 2, d / 2 + 0.8); grp.add(col); }

@@ -15,12 +15,23 @@ export function ramp() {
   return RAMP;
 }
 
-/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' */
-const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7 };
+/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' | 'brick' */
+const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7, brick: 8 };
 export function paint(mat, kind) {
   mat.defines = Object.assign({}, mat.defines, { FL_PAINT: PAINT_KINDS[kind] || 1 });
   mat.needsUpdate = true;
   return mat;
+}
+
+/* draw a whole model like the film's hand-animated cast: crisp two-tone shading (see smooth.js) */
+export function celAll(root) {
+  root.traverse(o => {
+    if (!o.isMesh || o.name === 'outline') return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (m && m.isMeshToonMaterial && !(m.defines && m.defines.FL_CEL)) { m.defines = Object.assign({}, m.defines, { FL_CEL: 1 }); m.needsUpdate = true; }
+    }
+  });
+  return root;
 }
 
 export function toon(color, opts = {}) {
