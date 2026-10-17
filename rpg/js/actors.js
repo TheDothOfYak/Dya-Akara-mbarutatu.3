@@ -15,7 +15,7 @@
    grows into — and in Aakalay, one grew from the city's lord.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, glowSprite, outlineAll, addOutline } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { lerp, clamp } from './util.js';
 
 const TAU = Math.PI * 2;
@@ -318,8 +318,8 @@ export function buildEikar(o = {}) {
 
   const skinMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: skinTexture(o.skin || '#a8743e'), gradientMap: ramp(), emissive: 0x000000 });
   skinMat.userData.ink = o.skin || '#a8743e';
-  const tunicMat = toon(o.tunic != null ? o.tunic : new THREE.Color(o.leg || 0x4a2c1a).lerp(new THREE.Color(o.beltColor || 0x5a3420), 0.6).multiplyScalar(1.25).getHex(), { side: THREE.DoubleSide, emissive: 0x000000 });
-  const legMat = toon(o.leg || 0x4a2c1a);
+  const tunicMat = paint(toon(o.tunic != null ? o.tunic : new THREE.Color(o.leg || 0x4a2c1a).lerp(new THREE.Color(o.beltColor || 0x5a3420), 0.6).multiplyScalar(1.25).getHex(), { side: THREE.DoubleSide, emissive: 0x000000 }), 'cloth');
+  const legMat = paint(toon(o.leg || 0x4a2c1a), 'cloth');
   const bootMat = toon(o.foot || 0x3a2212);
   const beltMat = toon(o.beltColor || 0x5a3420);
   const trimMat = toon(o.trim || 0xc8a050);
@@ -453,7 +453,7 @@ export function buildEikar(o = {}) {
       pp.setX(i, fx); pp.setZ(i, -Math.pow(fx / (W * 0.6), 2) * 0.06 + Math.pow(x / (W / 2), 2) * 0.06 * (1 - tt));
     }
     cg.computeVertexNormals();
-    cape = new THREE.Mesh(cg, toon(o.cape, { side: THREE.DoubleSide }));
+    cape = new THREE.Mesh(cg, paint(toon(o.cape, { side: THREE.DoubleSide }), 'cloth'));
     cape.position.set(0, 0.39, -0.1); torso.add(cape);
     for (const s of [-1, 1]) {
       const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), toon(0xe6b84a)); clasp.position.set(s * 0.1, 0.375, 0.07); torso.add(clasp);
@@ -560,7 +560,7 @@ export function buildEikar(o = {}) {
       const b = swingBlend;
 
       // ---- the weapon hand at rest ----
-      const sway = lerp(Math.sin(t * 1.6) * 0.008, Math.sin(phase) * 0.16 * k, walkK);
+      const sway = lerp(Math.sin(t * 1.6) * 0.008, Math.sin(phase) * 0.22 * k, walkK);   // arms swing against the legs
       if (kind === 'spear') { iT.set(s * 0.25, -0.06, 0.11 + sway * 0.5); iD.set(0, 1, 0.1); iB.set(1, 0, 0); }
       else if (kind === 'bow') { iT.set(s * 0.24, -0.12, 0.08 + sway); iD.set(0, 1, 0.5); iB.set(1, 0, 0); }
       else if (kind === 'sword') { iT.set(s * 0.24, -0.15, 0.1 + sway); iD.set(s * 0.12, -0.25, 1); iB.set(0, -1, 0); }
@@ -617,7 +617,10 @@ export function buildEikar(o = {}) {
       // ---- torso, head, legs ----
       twist = lerp(twist, tw * b, 1 - Math.exp(-20 * dt));
       lean = lerp(lean, ln * (sw ? b : 1) + glide * 0.25, 1 - Math.exp(-12 * dt));
-      torso.rotation.set(lean, twist, Math.sin(phase) * 0.04 * k * walkK);
+      // a real walk: the hips turn with each step and the shoulders turn against them
+      const hipYaw = Math.sin(phase) * 0.11 * k * walkK;
+      body.rotation.y = hipYaw;
+      torso.rotation.set(lean, twist - hipYaw * 1.9, Math.sin(phase) * 0.04 * k * walkK);
       body.rotation.x = 0;
       body.rotation.z = -Math.sin(phase) * 0.045 * k * walkK + Math.sin(t * 0.7 + seed) * 0.012 * (1 - walkK);   // hips sway with the stride; idle weight shift
       const bob = lerp(Math.sin(t * 2.2) * 0.006, Math.abs(Math.cos(phase)) * 0.045 * k, walkK);
@@ -633,7 +636,7 @@ export function buildEikar(o = {}) {
       const hyT = -twist * 0.6 + Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b) + lookX * 0.35;
       headXV += ((hxT - headX) * 160 - headXV * 16) * dt; headX += headXV * dt;
       headY = lerp(headY, hyT, 1 - Math.exp(-9 * dt));
-      head.rotation.set(headX, headY, -body.rotation.z * 0.6);
+      head.rotation.set(headX, headY + hipYaw * 0.9, -body.rotation.z * 0.6);   // the head stays on the road ahead
       // the cap rides on the head and trails its motion
       hatXV += ((-0.12 - headXV * 0.035 + sqV * 0.04 - hatX) * 120 - hatXV * 9) * dt; hatX += hatXV * dt;
       hat.rotation.x = clamp(hatX, -0.4, 0.2);

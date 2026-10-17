@@ -15,8 +15,8 @@ export function ramp() {
   return RAMP;
 }
 
-/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' */
-const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6 };
+/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' */
+const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7 };
 export function paint(mat, kind) {
   mat.defines = Object.assign({}, mat.defines, { FL_PAINT: PAINT_KINDS[kind] || 1 });
   mat.needsUpdate = true;

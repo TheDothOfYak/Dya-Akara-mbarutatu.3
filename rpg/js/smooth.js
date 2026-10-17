@@ -174,6 +174,11 @@ const FRAG_ALBEDO = `#include <color_fragment>
       pm = flCobble(uv);
     #elif FL_PAINT == 6
       pm = flLand(vFlW, normalize(vFlWN));
+    #elif FL_PAINT == 7
+      // cloth: soft folds hanging from the shoulders and belt, painted in light and shade
+      float ang = atan(vFlP.z, vFlP.x);
+      float fold = sin(ang * 7.0 + flN(vFlP.xy * 9.0) * 3.0 + vFlP.y * 3.0) + 0.5 * sin(ang * 13.0 - vFlP.y * 5.0);
+      pm = (0.86 + 0.16 * smoothstep(-0.9, 1.1, fold)) * (0.95 + 0.08 * flN(vFlP.xy * 20.0));
     #endif
     diffuseColor.rgb *= pm;
   }
