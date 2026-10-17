@@ -19,7 +19,7 @@
    the renderer, camera, input, dialogue and cards.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
+import { toon, addOutline, outlineAll, glowSprite, Particles, paint } from './gfx.js';
 import { buildHomeTree, buildForest } from './hometree.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
@@ -153,7 +153,7 @@ export function createRoad(ctx) {
       cols.set([c.r, c.g, c.b], i * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
-    const ground = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ vertexColors: true })); ground.receiveShadow = true; scene.add(ground);
+    const ground = new THREE.Mesh(geo, paint(new THREE.MeshToonMaterial({ vertexColors: true }), 'land')); ground.receiveShadow = true; scene.add(ground);
   }
 
   /* ---------------- colliders (boxes and posts with a top and bottom) ---------------- */

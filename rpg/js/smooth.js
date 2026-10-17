@@ -136,6 +136,18 @@ float flCobble(vec2 uv) {
   float gap = smoothstep(0.03, 0.12, d2 - d1);
   return mix(0.55, (0.82 + 0.3 * idv) * (1.08 - 0.25 * d1), gap);
 }
+/* painted land: broad sunlit and shaded patches, grass laid in with directional strokes,
+   and on the steep faces, layered rock strata the way painted cliffs are drawn */
+float flLand(vec3 W, vec3 N) {
+  float patches = 0.84 + 0.3 * flF(W.xz * 0.035);
+  float strokes = 0.92 + 0.16 * flN(vec2(W.x * 0.7 + W.z * 0.35, W.z * 2.6 - W.x * 0.9));
+  float dapple = 0.95 + 0.1 * flN(W.xz * 1.9 + 3.0);
+  float slope = 1.0 - clamp(N.y, 0.0, 1.0);
+  float warp = flN(W.xz * 0.15) * 5.0;
+  float strata = 0.8 + 0.22 * smoothstep(-0.2, 0.6, sin(W.y * 1.4 + warp)) + 0.08 * flN(vec2(W.x + W.z, W.y * 6.0));
+  float cliff = smoothstep(0.32, 0.62, slope);
+  return mix(patches * strokes * dapple, strata * (0.9 + 0.15 * patches), cliff);
+}
 #endif
 `;
 const FRAG_ALBEDO = `#include <color_fragment>
@@ -160,6 +172,8 @@ const FRAG_ALBEDO = `#include <color_fragment>
       pm = flShingle(uv);
     #elif FL_PAINT == 5
       pm = flCobble(uv);
+    #elif FL_PAINT == 6
+      pm = flLand(vFlW, normalize(vFlWN));
     #endif
     diffuseColor.rgb *= pm;
   }

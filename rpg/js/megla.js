@@ -29,7 +29,7 @@
    renderer, camera, input, dialogue and cards.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles } from './gfx.js';
+import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles, paint } from './gfx.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
@@ -185,7 +185,7 @@ export function createMegla(ctx) {
       cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true })); m.receiveShadow = true; scene.add(m);
+    const m = new THREE.Mesh(geo, paint(toon(0xffffff, { vertexColors: true }), 'land')); m.receiveShadow = true; scene.add(m);
     // the river: a ribbon of water down the pass
     const pts = [], idx = [], N = 220;
     for (let i = 0; i <= N; i++) { const z = 20 + (PASS1 - 40 - 20) * i / N, x = riverX(z), y = Math.min(heightAt(x - 4, z), heightAt(x + 4, z), heightAt(x, z) + 1.4) - 0.2; pts.push(x - 3.4, y, z, x + 3.4, y, z); if (i < N) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2); }

@@ -11,7 +11,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
-import { toon, ramp, glowSprite, outlineAll, addOutline } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
@@ -267,7 +267,7 @@ export function buildXilia(scene) {
     if (PASS.near(x, z, 6)) out.lerp(dirt, smooth(PASS.w - 1, PASS.w - 4, PASS.lat(x, z)) * smooth(PASS.r0 - 30, PASS.r0, PASS.along(x, z)) * smooth(3, 1, Math.abs(y - PASS.floor(PASS.along(x, z)))) * 0.85);   // the road
     return out;
   };
-  const terrainMat = toon(0xffffff, { vertexColors: true });
+  const terrainMat = paint(toon(0xffffff, { vertexColors: true }), 'land');
   const finish = (g, colorFn) => {
     g.computeVertexNormals();
     const P = g.attributes.position, N = g.attributes.normal, col = new Float32Array(P.count * 3);

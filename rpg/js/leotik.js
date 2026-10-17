@@ -15,7 +15,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
-import { toon, ramp, glowSprite, outlineAll, addOutline } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 export { STEP };
 
@@ -350,7 +350,7 @@ export function buildLeotik(scene) {
   }
   tg.setAttribute('color', new THREE.BufferAttribute(tcol, 3));
   tg.computeVertexNormals(); tg.computeBoundingSphere();
-  const terrain = new THREE.Mesh(tg, toon(0xffffff, { vertexColors: true }));
+  const terrain = new THREE.Mesh(tg, paint(toon(0xffffff, { vertexColors: true }), 'land'));
   terrain.receiveShadow = true; scene.add(terrain);
 
   /* ---------- the sea: one big plane, tinted by a baked depth map ---------- */
