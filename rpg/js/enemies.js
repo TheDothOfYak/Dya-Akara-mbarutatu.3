@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
 import { buildVel, buildDummy } from './creatures.js';
-import { pivotNear, latchPoint } from './vines.js';
+import { pivotNear } from './vines.js';
 import { buildApiButa, buildCyitor, buildXiwKatkan } from './creatures2.js';
 import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
 import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
@@ -47,8 +47,8 @@ export const TYPES = {
   mikolo_moko: { name: 'Mikolo Moko', build: () => buildMikoloMoko({ seed: seed() }), hp: 14, dmg: 0, speed: 9.5, rad: 0.3, range: 0, aggro: 0, shards: 3, ai: 'melee', color: 0x7ad04a, disp: 'critter' },
   uff: { name: 'Uff', build: () => { const u = buildUff({ seed: seed() }); u.root.scale.multiplyScalar(0.8 + Math.random() * 1.6); return u; }, hp: 10, dmg: 0, speed: 1.6, rad: 0.25, range: 0, aggro: 0, shards: 2, ai: 'melee', color: 0xff6a8a, disp: 'critter' },
   /* the one that lives by the Carpenter's workshop, hauling timber about on its vines — it only fights if you do */
-  stryx_home: { name: 'The workshop Stryx', build: () => buildStryx({ seed: 5 }), hp: 600, dmg: 12, speed: 1.4, rad: 1.6, range: 4.2, aggro: 0, windup: 0.8, recover: 1.0, lunge: 3, shards: 0, ai: 'melee', stagger: 0.2, color: 0x8aa04a, disp: 'neutral' },
-  stryx: { name: 'Wild Stryx', build: () => buildStryx({ seed: seed() }), hp: 420, dmg: 16, speed: 1.2, rad: 1.6, range: 4.2, aggro: 6, windup: 0.8, recover: 1.0, lunge: 3, shards: 40, ai: 'melee', stagger: 0.2, color: 0x8aa04a, disp: 'neutral' },
+  stryx_home: { name: 'The workshop Stryx', build: () => buildStryx({ seed: 5 }), hp: 600, dmg: 12, speed: 1.4, rad: 1.6, range: 6, aggro: 0, windup: 0.8, recover: 1.0, lunge: 0, shards: 0, ai: 'melee', stagger: 0, rooted: true, color: 0x8aa04a, disp: 'neutral' },
+  stryx: { name: 'Wild Stryx', build: () => buildStryx({ seed: seed() }), hp: 420, dmg: 16, speed: 1.2, rad: 1.6, range: 6, aggro: 6, windup: 0.8, recover: 1.0, lunge: 0, shards: 40, ai: 'melee', stagger: 0, rooted: true, color: 0x8aa04a, disp: 'neutral' },
   tonguatjis: { name: 'Tonguatjis', build: buildTonguatjis, hp: 260, dmg: 15, speed: 3.2, rad: 1.0, range: 5.5, aggro: 10, windup: 0.7, recover: 1.0, lunge: 2, shards: 30, ai: 'melee', stagger: 0.4, color: 0xf08aa8, disp: 'neutral' },
   gynge: { name: 'Gynge', build: buildGynge, hp: 900, dmg: 26, speed: 3.4, rad: 2.4, range: 4.0, aggro: 9, windup: 1.0, recover: 1.3, lunge: 7, shards: 90, ai: 'melee', stagger: 0.15, elite: true, color: 0xe8c4b4, disp: 'neutral' },
   ular_naga: { name: 'Ular Naga', build: () => buildUlarNaga({ heads: 3 + (Math.random() < 0.2 ? 2 : 0) }), hp: 2400, dmg: 30, speed: 4.2, rad: 3.2, range: 7, aggro: 18, windup: 0.9, recover: 1.1, lunge: 6, shards: 320, ai: 'melee', stagger: 0, elite: true, miniboss: true, color: 0x6a9a4a },
@@ -468,21 +468,11 @@ export function createEnemies(ctx) {
         if (t) { startSwing(e, t); updateSwing(e, dt); return; }
       }
     }
-    // a Stryx is slow on its roots — so it throws a vine onto something solid ahead (a rock, a trunk, a wall, the slope) and hauls itself to it
-    if (e.kind === 'stryx' && !e.dead) {
-      e.haulCd = (e.haulCd || 0) - dt;
-      const v = Math.hypot(e.vel.x, e.vel.z);
-      if (!e.haul && e.haulCd <= 0 && v > 0.4 && !e.windup && e.state !== 'attack') {
-        e.haulCd = 0.6;
-        const A = latchPoint(ctx.world, V3(e.pos.x, e.pos.y + 1.2, e.pos.z), V3(e.vel.x / v, 0, e.vel.z / v), { range: 11, near: 3, minUp: -1.5, cone: 0.7, far: 0.3 });
-        if (A) e.haul = { A, t: 0 };
-      }
-      if (e.haul) {
-        const H = e.haul; H.t += dt;
-        const hx = H.A.x - e.pos.x, hz = H.A.z - e.pos.z, hd = Math.hypot(hx, hz) || 1;
-        if (H.t > 0.25) { e.vel.x = hx / hd * 6.5; e.vel.z = hz / hd * 6.5; e.yaw = Math.atan2(hx, hz); }
-        if (H.t > 1.8 || hd < 2.6 || e.windup || e.stun > 0) { e.haul = null; e.haulCd = 1.2 + Math.random(); }
-      }
+    // a Stryx never moves: it is rooted where it grew. It turns on its roots to face what it's watching,
+    // and its vines do the reaching (its strike comes from as far as they go)
+    if (T.rooted && !e.dead) {
+      e.vel.x = 0; e.vel.z = 0;
+      if (e.hostile || e.state === 'windup' || e.state === 'attack') e.yaw = dampAngle(e.yaw, Math.atan2(P.pos.x - e.pos.x, P.pos.z - e.pos.z), 2.5, dt);
     }
     if (T.ai !== 'flyer') {
       e.vel.y -= 30 * dt;

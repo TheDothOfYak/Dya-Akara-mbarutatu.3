@@ -1632,3 +1632,84 @@ Object.assign(ROAD.day5, {
   errandBack: [['buhkon', 'Bread, a wick, and a bun you thought I wouldn’t notice. Good. Eat. Sleep. We go at first light.']],
   back: 'Back to the Carpenter at the town hearth',
 });
+
+/* ================================================================
+   THE ESCAPE FROM FYRSTI'VILAG — the first amulet he picks up blinks
+   him clean across the city. Buhkon takes the cart to the north gate
+   to wait. Tanoc has to cross the whole panicking city to reach him,
+   gathering amulets on the way: off the cobbles, out of a Kipsu's
+   mouth, out of a cracked wall, from a frightened mother, from a
+   looter's fist, out of the Stryx's mud fountain — past the city
+   guards and a Duskareth agent who wants them all.
+   ================================================================ */
+SPEAKERS.guardX = { name: 'City guard', color: '#d8c090', sub: 'Fyrsti’Vilag, Xikia' };
+SPEAKERS.looter = { name: 'Looter', color: '#c8a888', sub: 'with his pockets full' };
+SPEAKERS.mother2 = { name: 'A frightened mother', color: '#e8c8a8', sub: 'in the panic' };
+SPEAKERS.kid = { name: 'Her boy', color: '#e8d8b0', sub: 'hiding' };
+SPEAKERS.agent = { name: 'Duskareth agent', color: '#b070ff', sub: 'a Vel, in the crowd' };
+export const ESCAPE = {
+  need: 12,
+  plan: [
+    ['buhkon', 'I’ll take the cart round to the north gate before they shut it. Meet me there. Don’t dawdle, and don’t let anyone take that bag off you.'],
+  ],
+  blink: [
+    ['tale', 'His fingers close on the amulet — and it closes back. The world folds. White. Cobbles. A different street, and a different sky-line, and the whole city between him and the gate.'],
+    ['tanoc', 'What — where — that’s the south wall. That’s the WHOLE CITY away.'],
+    ['tale', 'The amulet in his fist hums, very pleased with itself. Up past the rooftops, far off to the north, he can just see the gate towers.'],
+    ['tanoc', '…Right. North. Get the amulets. Get to the gate. Don’t let anyone take the bag.'],
+  ],
+  obj: n => `Cross the city to Buhkon at the north gate — gather amulets on the way (${n}/12)`,
+  hint: 'North, toward the gate towers. Amulets glow cold teal — on the ground, in hands, in walls.',
+  kipsuSee: 'A Kipsu with something teal in its mouth — it’s got an amulet!',
+  kipsuDrop: 'It spits the amulet out and bolts.',
+  wall: 'Hack at the cracked wall (left-click)',
+  wallSee: 'An amulet, driven right into a garden wall by the blast. The stone round it is cracked.',
+  wallHits: ['Chips fly.', 'The crack runs wider —'],
+  wallBroke: 'The wall gives way, and the amulet drops out into your hand.',
+  mother: [
+    ['mother2', 'Please — my boy, he ran when the sky cracked. He had one of those — those things, and he ran. Please.'],
+    ['tanoc', 'I’ll find him. What does he look like?'],
+    ['mother2', 'Small. Green cap. He hides when he’s scared — in corners, behind things.'],
+  ],
+  motherAsk: 'Talk to the frightened mother',
+  kidFind: 'Find her boy — he hides in corners, behind things',
+  kidSee: 'Talk to the boy behind the barrels',
+  kidTalk: [
+    ['kid', 'Go away. It’s mine. It was in the road and it’s MINE.'],
+    ['tanoc', 'Your mum’s looking for you. She’s scared. Come on — I’ll walk you back.'],
+    ['kid', '…Can I hold your hand?'],
+  ],
+  kidBack: 'Walk the boy back to his mother',
+  kidHome: [
+    ['mother2', 'Oh — oh, there you are, there you are —'],
+    ['kid', 'He found me. He has a bag with lots of them in.'],
+    ['mother2', 'Then he can have this one too. I don’t want it in my house. Thank you. Go — go on, before the guards come.'],
+  ],
+  looterSee: 'Snatch the amulet from the looter',
+  snatched: [['looter', 'Oi! OI! That’s mine, you little — get him!']],
+  looterDown: ['He goes down hard, and decides it isn’t worth it.', 'That one scrambles off over a cart.', 'The last of them runs.'],
+  guardSeen: [['guardX', 'You! Boy — those are city property now. Hand it over.']],
+  guardTook: 'The guard takes one amulet off you and shoves you back the way you came.',
+  guardHint: 'City guards are taking the amulets — keep out of their sight (the gold light is where they look)',
+  fountainSee: 'An amulet, glinting in the Stryx’s mud fountain',
+  fountainGrab: [
+    ['tale', 'He steps over the lip of the basin — and the mud moves. The Stryx’s vines come up out of it and close round his legs, his waist, his arm.'],
+    ['tanoc', 'Let GO — I just want the — let go!'],
+  ],
+  fountainObj: n => `Cut yourself free of the Stryx’s vines — left-click (${n}/4)`,
+  fountainFree: 'The last vine parts. You stagger out of the basin with the amulet in your fist and mud to the knees.',
+  agentSee: [
+    ['tale', 'In the crowd ahead something does not move like the crowd. A tall shape in dark cloth, purple marks along its arms. It looks straight at the bag.'],
+    ['agent', 'Children shouldn’t carry what they can’t keep.'],
+    ['tanoc', '(Run.)'],
+  ],
+  agentHint: 'A Duskareth agent — too strong to fight. Outrun it (Shift) and keep moving.',
+  agentCaught: 'The Vel’s hand closes on the bag — one amulet is gone — and you tear free.',
+  agentLost: 'The Vel stops at the edge of the crowd near the gate, and simply isn’t there any more.',
+  short: n => `Buhkon: “${n} — that’s all? There are more out there, Tanoc. Twelve at least. Go — quick.”`,
+  gate: [
+    ['buhkon', 'There you are! I saw the flash from here — I thought — never mind what I thought. How many?'],
+    ['tanoc', 'Enough. Buhkon, the first one I touched threw me right across the city.'],
+    ['buhkon', '…Did it, now. Up on the cart. Tell me the rest on the road. North — home, six days. Go!'],
+  ],
+};

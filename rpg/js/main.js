@@ -320,7 +320,7 @@ document.addEventListener('mousedown', e => {
   if (G.mode === 'dialog') { if (DLG && DLG.choices) pickChoice(DLG.sel); else advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
   if (G.mode !== 'play' || G.paused) return;
-  if (VK) { if (e.button === 0 && VK.attack && !touch.on) VK.attack(); return; }
+  if (VK) { if (touch.on) return; if (VK.vine && VK.vine(e.button, true)) return; if (e.button === 0 && VK.attack) VK.attack(); return; }   // on her back in a scene of its own: her vines
   if (touch.on) return;   // on a touch screen the buttons do the fighting
   if (dyaMatch) { if (e.button === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
   if (P.riding && (e.button === 0 || e.button === 2)) { vineShoot(e.button === 0 ? 'L' : 'R'); return; }   // on her back: her vines, not the axe
@@ -328,7 +328,7 @@ document.addEventListener('mousedown', e => {
   if (e.button === 1) { e.preventDefault(); toggleLock(); }
   if (e.button === 2) duatStrike();
 });
-document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; if (e.button === 0 || e.button === 2) vineLet(e.button === 0 ? 'L' : 'R'); });
+document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; if (VK) { if (VK.vine) VK.vine(e.button, false); return; } if (e.button === 0 || e.button === 2) vineLet(e.button === 0 ? 'L' : 'R'); });
 document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });   // keep long-press paste in text fields
 addEventListener('wheel', e => { CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
 /* the game letting go of the mouse itself (a cutscene, a menu, a choice) is not you pressing Escape:
@@ -4592,8 +4592,12 @@ function parkCart() {
   else return;
   // shuffle it clear of anything already standing there
   for (let k = 0; k < 24 && [...world.col.nearAll(x, z, 6)].some(c => c.top - c.bot > 0.6 && Math.abs(c.x - x) < 3.5 + c.hw && Math.abs(c.z - z) < 3.5 + c.hd); k++) { x += Math.cos(k * 2.4) * 3; z += Math.sin(k * 2.4) * 3; }
-  const c = buildCart(); const y = world.heightAt(x, z);
-  c.g.position.set(x, y, z); c.g.rotation.y = yaw; scene.add(c.g);
+  const c = buildCart();
+  // resting on its four wheels, tipped to the lie of the ground
+  const f = V3(Math.sin(yaw), 0, Math.cos(yaw)), r = V3(f.z, 0, -f.x), wh = (a, b) => world.heightAt(x + f.x * a + r.x * b, z + f.z * a + r.z * b);
+  const fl = wh(1.3, -1.32), fr = wh(1.3, 1.32), bl = wh(-1.3, -1.32), br = wh(-1.3, 1.32), y = (fl + fr + bl + br) / 4;
+  c.g.rotation.order = 'YXZ';
+  c.g.position.set(x, y, z); c.g.rotation.set(-Math.atan2((fl + fr) / 2 - (bl + br) / 2, 2.6), yaw, Math.atan2((fr + br) / 2 - (fl + bl) / 2, 2.64)); scene.add(c.g);
   world.col.add(x + Math.sin(yaw) * 0.8, z + Math.cos(yaw) * 0.8, 1.4, 3.6, yaw, y - 1, y + 2.4);
   homeCart = c;
 }

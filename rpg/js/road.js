@@ -21,7 +21,8 @@
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
 import { buildEikar } from './actors.js';
-import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk } from './esik_land.js';
+import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
+import { buildVel } from './creatures.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
 import { buildCart as buildCartModel } from './cart.js';
@@ -516,8 +517,7 @@ export function createRoad(ctx) {
     // the Angels curse the Snillers: this one comes apart into amulets, and they rain on the square
     const s = MK.sniller.position.clone().add(V3(0, 4, 0));
     MK.dying = 0.001; sfx.core(); MK.leaving = 0.001;
-    const spots = [[-10, 62], [8, 84]];
-    for (let i = 0; spots.length < 8 && i < 40; i++) { const a = i * 2.39996 + 0.7, r = 6 + (i % 4) * 4.5, x = SQUARE.x + Math.cos(a) * r, z = SQUARE.z + Math.sin(a) * r; if (Math.hypot(x - STALL.x, z - STALL.z) < 4 || Math.hypot(x - SQUARE.x, z - SQUARE.z - 4) < 6.5 || Math.hypot(x - CART.pos.x, z - CART.pos.z) < 5 || solidAt(x, 0.5, z) || spots.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 5)) continue; spots.push([x, z]); }
+    const spots = squareSpots();
     spots.forEach(([x, z], i) => {
       const it = addItem(V3(x, groundAt(x, z, 2.4) + 0.9, z), 'Pick up the Sniller amulet', null, amuletMesh());
       it.act = () => marketAmulet(it); it.y0 = it.pos.y; MK.amulets.push(it);
@@ -528,14 +528,32 @@ export function createRoad(ctx) {
     sub = 'told';
     const tp = P.pos.clone();
     sayHeld(PRO.hatBack, (k, tt) => ({ p: V3(tp.x + 9 + Math.sin(tt * 0.2) * 3, 3 + tt * 0.6, tp.z + 10), l: MK.angel ? V3(MK.angel.position.x, MK.angel.position.y + 4, MK.angel.position.z) : V3(SQUARE.x, 20, SQUARE.z) }),
-      () => ctx.say(PRO.bag, () => {
+      () => ctx.say(PRO.bag.concat(STORY.ESCAPE.plan), () => {
         sub = 'amulets'; tanoc.weapon.visible = true; marketObjective();
         ctx.hint('Amulets glow cold teal. Some sit on stall tables — jump up for them.');
       }));
   }
+  /* where the cursed storm's amulets land round the square */
+  function squareSpots() {
+    const spots = [[-10, 62], [8, 84]];
+    for (let i = 0; spots.length < 8 && i < 40; i++) { const a = i * 2.39996 + 0.7, r = 6 + (i % 4) * 4.5, x = SQUARE.x + Math.cos(a) * r, z = SQUARE.z + Math.sin(a) * r; if (Math.hypot(x - STALL.x, z - STALL.z) < 4 || Math.hypot(x - SQUARE.x, z - SQUARE.z - 4) < 6.5 || Math.hypot(x - CART.pos.x, z - CART.pos.z) < 5 || solidAt(x, 0.5, z) || spots.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 5)) continue; spots.push([x, z]); }
+    return spots;
+  }
+  /* a reload mid-escape: back at the south wall, the rest of the square's amulets still lying where they fell */
+  function resumeEscape() {
+    stage = 'market'; sub = 'amulets'; setDusk(0);
+    MK = { n: 1, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, loaded: 3, carrying: null, crates: [] };
+    makeCrowd(); crowd.panic();
+    tanoc.hat.visible = true; tanoc.weapon.visible = true;
+    squareSpots().slice(1).forEach(([x, z]) => { const it = addItem(V3(x, groundAt(x, z, 2.4) + 0.9, z), 'Pick up the Sniller amulet', null, amuletMesh()); it.act = () => marketAmulet(it); it.y0 = it.pos.y; MK.amulets.push(it); });
+    ctx.play(); ctx.location(...R.loc);
+    escBlink();
+  }
   function marketAmulet(it) {
     if (it.fall) return;
-    dropItem(it); MK.n++;
+    if (MK.esc) { it.act = null; dropItem(it); MK.amulets.splice(MK.amulets.indexOf(it), 1); particles.burst(it.pos.x, it.pos.y, it.pos.z, 24, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.8, gravity: 2 }); escAdd(1); return; }
+    dropItem(it); MK.amulets.splice(MK.amulets.indexOf(it), 1); MK.n++;
+    if (MK.n === 1) { escBlink(); return; }
     particles.burst(it.pos.x, it.pos.y, it.pos.z, 24, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.8, gravity: 2 });
     sfx.core(); ctx.toast(`Sniller amulet (${Math.min(MK.n, 6)}/6) — into the Relic-bound bag`, 2.2);
     const say = PRO.amuletSay(MK.n); if (say) ctx.bark('tanoc', say, 3);
@@ -548,11 +566,13 @@ export function createRoad(ctx) {
     marketObjective(); marketCheck();
   }
   function marketObjective() {
+    if (MK.esc) { escObjective(); return; }
     const O = STORY.PRO_OBJ;
     if (MK.punk && !MK.calmed) objective(O.punk, `Amulets gathered: ${MK.n}/6`, 6, MK.n);
     else objective(O.amulets(Math.min(MK.n, 6)), MK.n >= 6 && !MK.calmed ? 'The little Punk is still loose somewhere' : '', 6, Math.min(MK.n, 6));
   }
   function marketCheck() {
+    if (MK.esc) return;   // the gate decides, now
     if (sub !== 'amulets' || MK.n < 6 || !MK.calmed) return;
     sub = 'called';
     ctx.say(PRO.called.slice(0, 2).concat([['buhkon', 'North. Home. Six days on foot, and I’ll tell you what I can on the way. Up on the cart — go!']]), () => {
@@ -563,7 +583,9 @@ export function createRoad(ctx) {
   /* out of the city: up on the cart, through the screaming streets, out of the north gate, and the road */
   function leaveCity() {
     // round the stall's crates and benches (not through them), then up the street to the gate
-    const pts = [V3(CART.pos.x, 0, CART.pos.z), V3(13.8, 0, 45), V3(9, 0, 37.5), V3(3, 0, 30), V3(0, 0, 22), V3(0, 0, GATE_Z - 2), V3(roadX(-14), 0, -14), V3(roadX(-46), 0, -46), V3(roadX(-80), 0, -80)];
+    const pts = CART.pos.z < 30
+      ? [V3(CART.pos.x, 0, CART.pos.z), V3(1.5, 0, GATE_Z + 6), V3(0, 0, GATE_Z + 1), V3(0, 0, GATE_Z - 4), V3(roadX(-14), 0, -14), V3(roadX(-30), 0, -30), V3(roadX(-46), 0, -46), V3(roadX(-62), 0, -62), V3(roadX(-80), 0, -80)]
+      : [V3(CART.pos.x, 0, CART.pos.z), V3(13.8, 0, 45), V3(9, 0, 37.5), V3(3, 0, 30), V3(0, 0, 22), V3(0, 0, GATE_Z - 2), V3(roadX(-14), 0, -14), V3(roadX(-46), 0, -46), V3(roadX(-80), 0, -80)];
     const curve = new THREE.CatmullRomCurve3(pts);
     CART.riders = true; CART.path = curve; CART.pathK = 0;
     tanoc.weapon.visible = false;
@@ -585,6 +607,193 @@ export function createRoad(ctx) {
     if (crowd) for (const p of crowd.people) p.a.root.visible = false;
     for (const f of foes) scene.remove(f.a.root); foes.length = 0;
     MK = null;
+  }
+
+  /* ===== the escape: blinked across the city, and the long way back to the north gate =====
+     The first amulet he touches throws him to the south wall. Buhkon waits with the cart at
+     the north gate. On the way: amulets on the cobbles, one in a Kipsu's mouth, one driven
+     into a garden wall, one a frightened mother gives him for finding her boy, one snatched
+     from a looter (and his friends after it), one in the Stryx's mud fountain — past city
+     guards taking them, and a Duskareth agent who wants the bag. */
+  const ESC = STORY.ESCAPE;
+  const ringAt = (r, a) => V3(CITY.x + Math.cos(a) * r, 0, CITY.z + Math.sin(a) * r);   // a = +π/2 is the south wall, −π/2 the gate
+  const GATE_SPOT = V3(0, 0, GATE_Z + 8);
+  function escAdd(n, why) { MK.n = Math.max(0, MK.n + n); if (n > 0) { sfx.core(); ctx.toast(`Sniller amulet (${MK.n}/${ESC.need}) — into the Relic-bound bag`, 2.2); } escObjective(); }
+  function escAmuletItem(p, label = 'Pick up the Sniller amulet') {
+    const q = freeSpot(p.x, p.z, 0.8), it = addItem(V3(q.x, groundAt(q.x, q.z, 2.4) + 0.9, q.z), label, null, amuletMesh());
+    it.y0 = it.pos.y; it.act = () => { dropItem(it); MK.amulets.splice(MK.amulets.indexOf(it), 1); particles.burst(it.pos.x, it.pos.y, it.pos.z, 24, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.8, gravity: 2 }); escAdd(1); };
+    MK.amulets.push(it); return it;
+  }
+  function escPerson(look, p, yaw, o = {}) {
+    const a = buildEikar(Object.assign({ weapon: 'none', flasks: false }, look, o)); const q = freeSpot(p.x, p.z, 0.8);
+    a.root.position.set(q.x, groundAt(q.x, q.z, 3), q.z); a.root.rotation.y = yaw ?? 0; scene.add(a.root);
+    return { a, pos: a.root.position };
+  }
+  function escGlow(parent, y = 1.2) { const g = new THREE.Group(); g.add(amuletMesh()); g.scale.setScalar(0.7); g.position.set(0.35, y, 0.25); parent.add(g); return g; }
+  function escBlink() {
+    const E = MK.esc = { stage: 'cross', guards: [], looters: [], held: null, cuts: 0, agent: null, warnT: 0, told: {} };
+    ctx.save('escape');
+    sfx.duat(); shake = 0.8; particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
+    ctx.whiteFlash && ctx.whiteFlash();
+    const to = freeSpot(0, CITY.z + 47, 1.5); place(P, to.x, to.z, Math.PI); P.vel.set(0, 0, 0); CAM.yaw = 0;
+    particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
+    // the cart's at the gate, and Buhkon with it
+    CART.path = null; placeCart(GATE_SPOT.x + 3, GATE_SPOT.z + 3, Math.PI); B.stay = V3(GATE_SPOT.x - 1.5, 0, GATE_SPOT.z); place(B, B.stay.x, B.stay.z, 0);
+    escSpawn();
+    sayHeld(ESC.blink, (k, tt) => ({ p: V3(P.pos.x + 4, P.pos.y + 2.2, P.pos.z + 5), l: V3(0, 12, GATE_Z) }), () => { escObjective(); ctx.hint(ESC.hint); });
+  }
+  function escSpawn() {
+    const E = MK.esc, S = Math.PI / 2;
+    // on the cobbles by the south wall
+    for (const a of [S + 0.35, S - 0.5, S + 0.95]) escAmuletItem(ringAt(49, a));
+    // a Kipsu with one in its mouth
+    { const p = freeSpot(ringAt(49, S - 1.05).x, ringAt(49, S - 1.05).z, 1); E.kipsu = addFoe('kipsu', p.x, p.z); E.kipsu.amulet = escGlow(E.kipsu.a.root, 0.6); }
+    // one blown right into a garden wall
+    {
+      const p = freeSpot(ringAt(41, S + 0.45).x, ringAt(41, S + 0.45).z, 2.4), g = heightAt(p.x, p.z), yaw = S + 0.45;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.2, 0.7), toon(0xb8a07a)); m.position.set(p.x, g + 1.1, p.z); m.rotation.y = -yaw + Math.PI / 2; m.castShadow = true; addOutline(m, 0.04); scene.add(m);
+      const crack = glowSprite(0x6af0e0, 1.6, 0.8); crack.position.set(p.x, g + 1.4, p.z); scene.add(crack);
+      const s = box(p.x, p.z, 1.6, 1.6, g - 1, g + 2.2);
+      E.wall = { m, crack, s, x: p.x, z: p.z, g, hits: 0, done: false };
+    }
+    // a frightened mother, and her boy hiding behind barrels two streets over
+    {
+      const mp = ringAt(39, S - 0.65); E.mother = escPerson({ skin: '#b07a48', cap: '#5a3018', tunic: 0x8a5a6a }, mp, 0, { scale: 0.98 });
+      const kp = ringAt(49, S - 1.6); E.kid = escPerson({ skin: '#a8743e', cap: '#3a7a3a', tunic: 0x6a7a4a }, kp, 0, { scale: 0.55 });
+      for (let k = 0; k < 3; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 10), toon(0x7a5a3a)); b.position.set(E.kid.pos.x + Math.cos(k * 2.1) * 1.1, E.kid.pos.y + 0.55, E.kid.pos.z + Math.sin(k * 2.1) * 1.1); addOutline(b, 0.03); scene.add(b); cyl(b.position.x, b.position.z, 0.45, E.kid.pos.y - 1, E.kid.pos.y + 1.1); }
+      E.kidState = 'lost';
+      E.motherItem = addItem(V3(E.mother.pos.x, E.mother.pos.y + 0.5, E.mother.pos.z), ESC.motherAsk, () => { dropItem(E.motherItem); ctx.say(ESC.mother, () => { E.kidState = 'search'; E.kidItem = addItem(V3(E.kid.pos.x, E.kid.pos.y + 0.4, E.kid.pos.z), ESC.kidSee, () => { dropItem(E.kidItem); ctx.say(ESC.kidTalk, () => { E.kidState = 'follow'; escObjective(); }); }); escObjective(); }); });
+    }
+    // a looter with one in his fist, and two friends
+    {
+      const lp = ringAt(29, S + 0.75); E.looter = escPerson({ skin: '#9a6a40', cap: '#2a2a2a', tunic: 0x4a4a3a }, lp, 0, { scale: 1.05, build: 1.15 });
+      E.looterGlow = escGlow(E.looter.a.root, 1.15);
+      E.looterItem = addItem(V3(E.looter.pos.x, E.looter.pos.y + 0.5, E.looter.pos.z), ESC.looterSee, () => {
+        dropItem(E.looterItem); E.looter.a.root.remove(E.looterGlow); escAdd(1);
+        ctx.say(ESC.snatched, () => {
+          const at = E.looter.pos.clone(); scene.remove(E.looter.a.root);
+          for (let k = 0; k < 3; k++) { const f = addFoe('looter', at.x + (k - 1) * 2.2, at.z + 1.5); f.state = 'chase'; }
+          ctx.hint('Knock them down — left-click — or run.');
+        });
+      });
+    }
+    // the city guards, at the mouth of the street into the middle, taking amulets off anyone who has them
+    for (const a of [S - 0.18, S + 0.22]) {
+      const gp = ringAt(30, a), gd = escPerson({ skin: '#9a6a40', cap: '#3a2a1a', tunic: 0x4a4a5a, trim: 0xb8a070 }, gp, a, { weapon: 'spear', build: 1.15, scale: 1.05 });
+      const cone = new THREE.Mesh(new THREE.CircleGeometry(11, 18, -0.6, 1.2), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+      cone.geometry.rotateX(-Math.PI / 2); scene.add(cone);
+      E.guards.push({ ...gd, cone, base: a, yaw: a, ph: Math.random() * 6 });
+    }
+    // the Stryx's fountain in the square has one in its mud
+    E.fountainItem = { taken: false, mesh: amuletMesh() };
+    E.fountainItem.mesh.position.set(SQUARE.x + 1.6, 0.9, SQUARE.z + 4 + 1.2); scene.add(E.fountainItem.mesh);
+    // the young Punk, frightened half wild, somewhere on the way
+    if (!MK.punk) { const a = S - 2.3, sp = freeSpot(ringAt(39, a).x, ringAt(39, a).z, 2.4); MK.punk = addFoe('wildpunk', sp.x, sp.z); MK.punk.waitT = 0; MK.punk.state = 'idle'; }
+  }
+  function escObjective() {
+    const E = MK.esc; if (!E) { marketObjective(); return; }
+    let hint = ESC.hint;
+    if (E.held) { objective(ESC.fountainObj(E.cuts), 'Left-click to hack at the vines', 4, E.cuts); return; }
+    if (E.kidState === 'search') hint = ESC.kidFind;
+    else if (E.kidState === 'follow') hint = ESC.kidBack;
+    else if (MK.punk && !MK.calmed && MK.punk.state !== 'idle') hint = STORY.PRO_OBJ.punk;
+    else if (E.agent && E.agent.on) hint = ESC.agentHint;
+    objective(ESC.obj(MK.n), hint, ESC.need, Math.min(MK.n, ESC.need));
+  }
+  function escGoal() {
+    const E = MK.esc; if (!E) return null;
+    if (E.kidState === 'search') return E.kid.pos;
+    if (E.kidState === 'follow') return E.mother.pos;
+    let best = null, bd = 1e9;
+    for (const it of MK.amulets) { if (it.fall) continue; const d = it.pos.distanceTo(P.pos); if (d < bd && d < 30) { bd = d; best = it.pos; } }
+    return best || GATE_SPOT;
+  }
+  function escTick(dt) {
+    const E = MK.esc; if (!E || E.stage !== 'cross') return;
+    const g = escGoal(); if (g) setGoal(g.x, groundAt(g.x, g.z, 3), g.z);
+    // the Kipsu: one bound away whenever you come close
+    if (E.kipsu && !E.kipsu.dead && !E.told.kipsu && E.kipsu.pos.distanceTo(P.pos) < 14) { E.told.kipsu = true; ctx.bark('tanoc', ESC.kipsuSee, 3); }
+    // the boy, once found, holds your hand and trots after you
+    if (E.kidState === 'follow') {
+      const k = E.kid, back = V3(P.pos.x - Math.sin(P.yaw) * 1.4, 0, P.pos.z - Math.cos(P.yaw) * 1.4), dx = back.x - k.pos.x, dz = back.z - k.pos.z, d = Math.hypot(dx, dz);
+      if (d > 0.5) { const v = Math.min(9, d * 3); k.pos.x += dx / d * v * dt; k.pos.z += dz / d * v * dt; k.a.root.rotation.y = Math.atan2(dx, dz); }
+      const q = k.pos.clone(); resolve(q, 0.3); k.pos.x = q.x; k.pos.z = q.z; k.pos.y = groundAt(k.pos.x, k.pos.z, k.pos.y + 1);
+      k.a.animate(dt, { speed: d > 0.5 ? Math.min(9, d * 3) : 0, onGround: true, t });
+      if (E.mother.pos.distanceTo(P.pos) < 4) { E.kidState = 'home'; ctx.say(ESC.kidHome, () => { escAdd(1); escObjective(); }); }
+    } else if (E.kid) E.kid.a.animate(dt, { speed: 0, onGround: true, t });
+    if (E.mother) { E.mother.a.root.rotation.y = Math.atan2(P.pos.x - E.mother.pos.x, P.pos.z - E.mother.pos.z); E.mother.a.animate(dt, { speed: 0, onGround: true, t, talking: E.kidState === 'lost' }); }
+    if (E.looter && E.looter.a.root.parent) E.looter.a.animate(dt, { speed: 0, onGround: true, t });
+    // the guards: they look up and down the street; if they see you, they take one and send you back
+    for (const gd of E.guards) {
+      gd.yaw = gd.base + Math.sin(t * 0.5 + gd.ph) * 0.9;
+      gd.a.root.rotation.y = gd.yaw; gd.a.animate(dt, { speed: 0, onGround: true, t });
+      gd.cone.position.set(gd.pos.x, gd.pos.y + 0.2, gd.pos.z); gd.cone.rotation.y = gd.yaw - Math.PI / 2;
+      const dx = P.pos.x - gd.pos.x, dz = P.pos.z - gd.pos.z, d = Math.hypot(dx, dz), off = Math.abs(((Math.atan2(dx, dz) - gd.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      let seen = MK.n > 0 && (d < 2.2 || (d < 11 && off < 0.6));
+      if (seen && d >= 2.2) for (let k = 1; k < 8; k++) { const q = k / 8; if (solidAt(lerp(gd.pos.x, P.pos.x, q), gd.pos.y + 1.4, lerp(gd.pos.z, P.pos.z, q))) { seen = false; break; } }
+      if (seen && t > (E.seenT || 0)) {
+        E.seenT = t + 4;
+        ctx.say(ESC.guardSeen, () => { escAdd(-1); ctx.toast(ESC.guardTook, 3); const away = V3(P.pos.x - gd.pos.x, 0, P.pos.z - gd.pos.z).normalize(); const q = freeSpot(gd.pos.x + away.x * 14, gd.pos.z + away.z * 14, 1); place(P, q.x, q.z, P.yaw); if (!E.told.guards) { E.told.guards = true; ctx.hint(ESC.guardHint); } });
+        return;
+      }
+    }
+    // the Stryx's fountain: step in after the amulet, and its vines have you
+    const F0 = V3(SQUARE.x, 0, SQUARE.z + 4), fd = Math.hypot(P.pos.x - F0.x, P.pos.z - F0.z);
+    if (!E.fountainItem.taken) {
+      E.fountainItem.mesh.rotation.y = t * 1.5;
+      if (!E.told.fountain && fd < 12) { E.told.fountain = true; ctx.bark('tanoc', ESC.fountainSee, 3); }
+      if (!E.held && fd < fountain.R - 0.6) {
+        E.held = { at: P.pos.clone() }; E.cuts = 0; P.vel.set(0, 0, 0); fountain.hold(P.pos);
+        ctx.say(ESC.fountainGrab, () => escObjective());
+      }
+    }
+    if (E.held) { fountain.hold(P.pos); P.vel.set(0, 0, 0); if (Math.random() < 0.3) particles.emit(P.pos.x, P.pos.y + 0.5, P.pos.z, { color: 0x6a8a3a, size: 0.35, life: 0.5, speed: 1.5 }); }
+    // the Duskareth agent, in the north street: too strong to fight — outrun it
+    if (!E.agent && P.pos.z < CITY.z - 6 && Math.abs(P.pos.x) < 10) {
+      const v = buildVel(); scene.add(v.root); const p = freeSpot(P.pos.x + 2, P.pos.z - 12, 1); v.root.position.set(p.x, groundAt(p.x, p.z, 3), p.z);
+      E.agent = { a: v, pos: v.root.position, on: true, yaw: 0, gone: false };
+      particles.burst(p.x, groundAt(p.x, p.z, 3) + 1, p.z, 40, { color: 0x9a4aff, speed: 6, size: 0.6, life: 0.8 }); sfx.duat();
+      ctx.say(ESC.agentSee, () => escObjective());
+    }
+    if (E.agent && E.agent.on) {
+      const A = E.agent, dx = P.pos.x - A.pos.x, dz = P.pos.z - A.pos.z, d = Math.hypot(dx, dz);
+      A.yaw = Math.atan2(dx, dz); const v = 7.6; A.pos.x += dx / d * v * dt; A.pos.z += dz / d * v * dt;
+      const q = A.pos.clone(); resolve(q, 0.5); A.pos.x = q.x; A.pos.z = q.z; A.pos.y = groundAt(A.pos.x, A.pos.z, A.pos.y + 1);
+      A.a.root.rotation.y = A.yaw; A.a.animate(dt, { speed: v, onGround: true, t });
+      if (d < 1.8 && t > (E.agentT || 0)) {
+        E.agentT = t + 3; escAdd(-1); hurtTanoc(8, A.pos); P.vel.addScaledVector(V3(dx / d, 0, dz / d), 10); ctx.toast(ESC.agentCaught, 3);
+        particles.burst(A.pos.x, A.pos.y + 1.2, A.pos.z, 30, { color: 0x9a4aff, speed: 6, size: 0.5, life: 0.7 });
+        const back = freeSpot(A.pos.x - dx / d * 8, A.pos.z - dz / d * 8, 1); A.pos.set(back.x, groundAt(back.x, back.z, 3), back.z);   // it blinks back a few paces, and comes again
+      }
+      if (P.pos.z < GATE_Z + 18) { A.on = false; scene.remove(A.a.root); particles.burst(A.pos.x, A.pos.y + 1, A.pos.z, 40, { color: 0x9a4aff, speed: 6, size: 0.6, life: 0.8 }); ctx.toast(ESC.agentLost, 3.5); }
+    }
+    // at the gate: Buhkon and the cart — but only with enough of them, and the little Punk seen to
+    if (P.pos.distanceTo(GATE_SPOT) < 7) {
+      if (MK.n >= ESC.need && MK.calmed) { E.stage = 'gate'; setGoal(); ctx.say(ESC.gate, () => { ctx.amulets(MK.n); leaveCity(); }); }
+      else if (t > E.warnT) { E.warnT = t + 6; ctx.bark('buhkon', MK.n < ESC.need ? ESC.short(MK.n) : 'The little Punk, Tanoc — it’s still loose and frightened somewhere back there. Calm it.', 4.5); }
+    }
+    if (P.pos.z < GATE_Z + 3) { P.pos.z = GATE_Z + 3; P.vel.z = Math.max(0, P.vel.z); }   // not out of the gate without the cart
+  }
+  /* hits that aren't at foes: the cracked wall, and the vines that hold you in the fountain */
+  function escSwing() {
+    const E = MK && MK.esc; if (!E) return;
+    if (E.held) {
+      E.cuts++; sfx.hit(); shake = 0.25; particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 14, { color: 0x6a9a3a, speed: 5, size: 0.4, life: 0.5, gravity: -6 });
+      if (E.cuts >= 4) {
+        E.held = null; fountain.hold(null); E.fountainItem.taken = true; scene.remove(E.fountainItem.mesh);
+        const away = V3(P.pos.x - SQUARE.x, 0, P.pos.z - SQUARE.z - 4).normalize(); P.vel.set(away.x * 9, 6, away.z * 9); P.onGround = false;
+        ctx.toast(ESC.fountainFree, 3.5); escAdd(1);
+      } else escObjective();
+      return;
+    }
+    const W = E.wall;
+    if (W && !W.done && Math.hypot(P.pos.x - W.x, P.pos.z - W.z) < 3.4) {
+      W.hits++; sfx.hit(); shake = 0.3; particles.burst(W.x, W.g + 1.4, W.z, 18, { color: 0xc8b08a, speed: 5, size: 0.4, life: 0.6, gravity: -8 });
+      if (W.hits < 3) { ctx.bark('tanoc', ESC.wallHits[W.hits - 1], 1.6); return; }
+      W.done = true; scene.remove(W.m); scene.remove(W.crack); solids.splice(solids.indexOf(W.s), 1); sfx.slam(); shake = 0.6;
+      particles.burst(W.x, W.g + 1.1, W.z, 40, { color: 0xb8a07a, speed: 8, size: 0.6, life: 0.9, gravity: -10 });
+      ctx.toast(ESC.wallBroke, 3); escAdd(1);
+    }
   }
 
   /* a new day: a few shots of the land with its words over them, the three of them walking on under it */
@@ -930,10 +1139,13 @@ export function createRoad(ctx) {
     return { x, z };
   }
   function addFoe(kind, x, z) {
-    const a = kind === 'kofi' ? buildKofi({ seed: Math.floor(rng() * 999) }) : kind === 'rodak' ? buildRodak({ seed: Math.floor(rng() * 999) }) : buildWildPunk({ seed: Math.floor(rng() * 999) });
+    const sd = Math.floor(rng() * 999);
+    const a = kind === 'kofi' ? buildKofi({ seed: sd }) : kind === 'rodak' ? buildRodak({ seed: sd }) : kind === 'kipsu' ? buildKipsu({ seed: sd })
+      : kind === 'looter' ? buildEikar({ skin: ['#9a6a40', '#b07a48', '#8a5a3a'][sd % 3], cap: '#2a2a2a', tunic: [0x4a4a3a, 0x5a3a2a, 0x3a4a4a][sd % 3], weapon: 'none', flasks: false, build: 1.1 }) : buildWildPunk({ seed: sd });
     if (kind === 'wildpunk') a.root.scale.multiplyScalar(0.62);
+    if (kind === 'kipsu') a.root.scale.multiplyScalar(1.3);
     scene.add(a.root);
-    const hp = { kofi: 1, rodak: 45, wildpunk: 40 }[kind];
+    const hp = { kofi: 1, rodak: 45, wildpunk: 40, kipsu: 1, looter: 24 }[kind];
     const f = { kind, a, pos: V3(x, groundAt(x, z, 60), z), vel: V3(), yaw: rng() * TAU, hp, max: hp, state: 'idle', timer: rng() * 2, windup: 0, flash: 0, dead: false, fled: false, cd: 1 + rng() };
     a.root.position.copy(f.pos); foes.push(f); return f;
   }
@@ -949,6 +1161,16 @@ export function createRoad(ctx) {
       return;
     }
     if (f.kind === 'kofi') { f.dead = true; scene.remove(f.a.root); kofiCaught(); return; }
+    if (f.kind === 'kipsu') {   // it spits out what it was carrying, and is off
+      f.fled = true; f.state = 'flee'; f.timer = 2.5; sfx.heal();
+      if (f.amulet) { f.a.root.remove(f.amulet); f.amulet = null; escAmuletItem(f.pos); ctx.bark('tale', STORY.ESCAPE.kipsuDrop, 2.5); }
+      return;
+    }
+    if (f.kind === 'looter') {   // knocked down, he decides it isn't worth it
+      f.fled = true; f.state = 'flee'; f.timer = 3;
+      const n = foes.filter(o => o.kind === 'looter' && o.fled).length; ctx.bark('tale', STORY.ESCAPE.looterDown[Math.min(2, n - 1)], 2.2);
+      return;
+    }
     if (f.kind === 'wildpunk') {   // knock the fight out of it — it runs off instead of dying
       f.fled = true; f.state = 'flee'; f.timer = 3; MK.calmed = true; sfx.heal();
       ctx.say(PRO.calmed, () => { marketObjective(); marketCheck(); }); return;
@@ -971,9 +1193,12 @@ export function createRoad(ctx) {
         // away from Tanoc, and gone
         wy = Math.atan2(-dx, -dz); want = f.kind === 'rodak' ? 9 : 7; f.timer -= dt;
         if (f.timer <= 0) { f.dead = true; scene.remove(f.a.root); continue; }
-      } else if (f.kind === 'kofi') {
-        if (d < 11 && playing) { wy = Math.atan2(-dx, -dz) + Math.sin(t * 3 + f.pos.x) * 0.6; want = 5.6; }
+      } else if (f.kind === 'kofi' || f.kind === 'kipsu') {
+        if (d < (f.kind === 'kipsu' ? 9 : 11) && playing) { wy = Math.atan2(-dx, -dz) + Math.sin(t * 3 + f.pos.x) * 0.6; want = f.kind === 'kipsu' ? 6.2 : 5.6; }
         else { f.timer -= dt; if (f.timer <= 0) { f.timer = 2 + rng() * 3; f.wy = rng() * TAU; } wy = f.wy || 0; want = 1; }
+      } else if (playing && f.waitT != null && !f.roused) {   // (the frightened young Punk in the escape: it waits, wild, until he comes near)
+        f.timer -= dt; if (f.timer <= 0) { f.timer = 0.8 + rng(); f.wy = rng() * TAU; } wy = f.wy || 0; want = 2.5;
+        if (d < 13) { f.roused = true; f.state = 'chase'; ctx.say(PRO.punk, () => { marketObjective(); ctx.hint('Left-click to swing the hatchet.'); }); }
       } else if (playing) {
         const reach = f.alpha ? 2.8 : f.kind === 'rodak' ? 2.2 : 1.9, dmg = f.alpha ? 13 : f.kind === 'rodak' ? 9 : 6;
         if (f.state === 'windup') {
@@ -1002,7 +1227,7 @@ export function createRoad(ctx) {
       resolve(f.pos, f.kind === 'wildpunk' ? 1.3 : 0.6);   // a Punk's legs reach well out from its body: keep all of them out of the walls
       f.pos.y = groundAt(f.pos.x, f.pos.z, f.pos.y + 1);
       f.a.root.position.copy(f.pos); f.a.root.rotation.y = f.yaw;
-      f.a.animate(dt, { speed: Math.hypot(f.vel.x, f.vel.z), t, windup: f.windup || 0, attack: f.attackA || 0 });
+      f.a.animate(dt, { speed: Math.hypot(f.vel.x, f.vel.z), t, windup: f.windup || 0, attack: f.attackA || 0, onGround: true, swing: f.kind === 'looter' && f.attackA > 0 ? { kind: 1, p: 1 - f.attackA } : null });
     }
   }
   function chopLog() {
@@ -1053,7 +1278,7 @@ export function createRoad(ctx) {
   }
   function updatePlayer(dt, playing) {
     let ix = 0, iz = 0;
-    if (playing) {
+    if (playing && !(MK && MK.esc && MK.esc.held)) {
       if (keys.KeyW || keys.ArrowUp) iz += 1; if (keys.KeyS || keys.ArrowDown) iz -= 1;
       if (keys.KeyA || keys.ArrowLeft) ix -= 1; if (keys.KeyD || keys.ArrowRight) ix += 1;
       if (touch && touch.on) { ix += touch.move.x; iz += touch.move.y; }
@@ -1088,6 +1313,7 @@ export function createRoad(ctx) {
         }
         const L = EV.log;
         if (L && !L.open && Math.abs(P.pos.x - L.x) < 4.2 && Math.abs(P.pos.z - L.z) < 2.8) chopLog();
+        escSwing();
       }
     }
     const speed = Math.hypot(P.vel.x, P.vel.z);
@@ -1118,12 +1344,19 @@ export function createRoad(ctx) {
       if (d > 60) { CART.pos.set(want.x, 0, want.z); }
       else if (d > 2.5) { const v = Math.min(8, d * 1.2); CART.pos.x += dx / d * v * dt; CART.pos.z += dz / d * v * dt; CART.yaw = dampAngle(CART.yaw, Math.atan2(dx, dz), 3, dt); }
       resolveCart();
-      CART.pos.y = groundAt(CART.pos.x, CART.pos.z, CART.pos.y + 1, CART.solid);   // (never counting its own box — that's how it used to climb into the sky)
     }
     sp = CART.pos.distanceTo(was) / Math.max(dt, 1e-4);
-    const f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw));
-    const pitch = Math.atan2(heightAt(CART.pos.x + f.x * 2, CART.pos.z + f.z * 2) - heightAt(CART.pos.x - f.x * 2, CART.pos.z - f.z * 2), 4);
-    CART.g.position.copy(CART.pos); CART.g.rotation.set(-pitch, CART.yaw, Math.sin(t * 6) * 0.01 * Math.min(1, sp));
+    // it sits on its four wheels: height from where they touch, nose up or down the slope, and a lean across it
+    // (never counting its own box — that's how it used to climb into the sky)
+    const f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw)), r = V3(f.z, 0, -f.x);
+    const wh = (a, b) => groundAt(CART.pos.x + f.x * a + r.x * b, CART.pos.z + f.z * a + r.z * b, CART.pos.y + 1.5, CART.solid);
+    const fl = wh(1.3, -1.32), fr = wh(1.3, 1.32), bl = wh(-1.3, -1.32), br = wh(-1.3, 1.32);
+    const gy = (fl + fr + bl + br) / 4;
+    CART.pos.y = CART.path ? gy : damp(CART.pos.y, gy, 12, dt);
+    const pitch = clamp(Math.atan2((fl + fr) / 2 - (bl + br) / 2, 2.6), -0.35, 0.35), roll = clamp(Math.atan2((fr + br) / 2 - (fl + bl) / 2, 2.64), -0.3, 0.3);
+    CART.pitch = damp(CART.pitch ?? pitch, pitch, 8, dt); CART.roll = damp(CART.roll ?? roll, roll, 8, dt);
+    CART.g.rotation.order = 'YXZ';   // turn first, then tip on its own axles
+    CART.g.position.copy(CART.pos); CART.g.rotation.set(-CART.pitch, CART.yaw, CART.roll + Math.sin(t * 6) * 0.01 * Math.min(1, sp));
     CART.wheels.forEach(w => { w.rotation.x += sp * dt / 0.8; });
     CART.punks.forEach((pk, i) => pk.animate(dt, { speed: sp * 1.4, t: t + i }));
     CART.solid.x = CART.pos.x; CART.solid.z = CART.pos.z;
@@ -1203,7 +1436,8 @@ export function createRoad(ctx) {
     }
     if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });
     kit.update(t, dt, particles);
-    if (stage === 'market') fountain.update(dt, t, particles, [P.pos]);
+    if (stage === 'market') fountain.update(dt, t, particles, MK && MK.esc ? [] : [P.pos]);
+    if (stage === 'market' && MK && MK.esc && playing) escTick(dt);
     updateCart(dt);
     for (const c of clouds) c.position.x += dt * 2;
     if (playing) { if (stage === 'day1') day1Tick(); if (stage === 'day2') { day2Tick(); day2Back(); } if (stage === 'day3') day3Tick(dt); if (stage === 'day4') day4Tick(dt); }
@@ -1247,6 +1481,7 @@ export function createRoad(ctx) {
       const L = EV.log, mid = L.logs[1]; L.open = true; scene.remove(mid.m); const i = solids.indexOf(mid.s); if (i >= 0) solids.splice(i, 1);
       EV.ford.crossed = true; EV.ford.told = true;
     }
+    if (at === 'escape') { resumeEscape(); return; }
     if (at === 'day1') startDay1(); else if (at === 'day2') { D1 = { pebble: true }; startDay2(); } else if (at === 'day3') { K.on = true; startDay3(); } else if (at === 'day4') { K.on = true; startDay4(); } else startMarket();
   }
   function dispose() {
@@ -1255,6 +1490,6 @@ export function createRoad(ctx) {
   }
   return {
     start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, CART, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }

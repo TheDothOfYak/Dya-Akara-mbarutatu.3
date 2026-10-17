@@ -36,6 +36,7 @@ import { buildVel } from './creatures.js';
 import { buildLutut } from './esik_sky.js';
 import { buildSniller } from './skyfolk.js';
 import { createCine } from './cine.js';
+import { latchAlongRay } from './vines.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm } from './util.js';
 import * as STORY from './story.js';
 
@@ -233,7 +234,6 @@ export function createMegla(ctx) {
     if (Math.abs(x - pathX(z)) < 2.4 || clearOfWorks(x, z, -6)) continue;
     const g = heightAt(x, z), s = 0.4 + rng() * 1.1;
     put(ferns, x, g + s * 0.4, z, s * 1.2, s, s * 1.2, (rng() - 0.5) * 0.4, rng() * 6, (rng() - 0.5) * 0.4, pick(['#2f5a34', '#3a6a3a', '#28502e', '#4a7a40']));
-    if (rng() < 0.08) put(glowK, x, g + 0.2, z, 0.14, 0.14, 0.14, 0, 0, 0, pick(['#5af0ff', '#8affb0', '#b48aff']));
   }
   for (let i = 0; i < 2600 && rocks.count < 700; i++) {
     const z = 0 - rng() * 1240, x = pathX(z) + (rng() - 0.5) * 160, lat = Math.abs(x - pathX(z));
@@ -667,7 +667,96 @@ export function createMegla(ctx) {
   }
   function jump() {
     if (trySlide()) return;
+    if (P.ride && heldVines().length) { pumpSwing(); return; }
     P.jumpBuf = 0.15;
+  }
+  /* ---------------- her vines, as on the Carpenter's land: hand over hand through the trees ----------------
+     Left click throws her left vine at whatever is by the X, right click the right one; hold to hang on,
+     let go to fly off with all your speed. Space near the bottom of a swing pumps it higher. Shift
+     hauls the vine in, C lets it out, X keeps it the length it is. Five vines; they grow back when
+     her feet are on something. */
+  const SW = { range: 38, hip: 1.35, n: 5 };
+  const vines = { L: null, R: null }; let vineN = SW.n, vineGrow = 0;
+  const heldVines = () => [vines.L, vines.R].filter(v => v && v.hold);
+  const _seatQ = new THREE.Quaternion(), _yawQ = new THREE.Quaternion(), _UP = V3(0, 1, 0);
+  const aimRay = new THREE.Raycaster(), AIM_C = new THREE.Vector2(0, 0);
+  // what a vine can hold here: the trunks of the pass and of the Megla Aagac, the tops of walls, the land rising ahead
+  let vineWorld = null;
+  function vineLand() {
+    if (vineWorld) return vineWorld;
+    const trees = solids.filter(q => q.kind === 'cyl' && q.y1 - q.y0 > 7).map(q => ({ x: q.x, z: q.z, g: q.y0 + 1, h: Math.min(60, q.y1 - q.y0 - 1), r: q.r }));
+    const boxes = solids.filter(q => q.kind === 'box');
+    vineWorld = { heightAt, trees, col: { nearAll: (x, z, r) => boxes.filter(q => !q.off && Math.abs(q.x - x) < r + q.hw && Math.abs(q.z - z) < r + q.hd).map(q => ({ x: q.x, z: q.z, hw: q.hw, hd: q.hd, c: 1, s: 0, top: q.y1, bot: q.y0 })) } };
+    return vineWorld;
+  }
+  function vineShoot(side) {
+    if (!P.ride || P.down || cine.active || !RIDE_STAGES.includes(stage)) return false;
+    sfx.swing();
+    if (vineN <= 0) { if (t - (P.vineOutT ?? -9) > 3) { P.vineOutT = t; ctx.toast('She’s out of vines. They grow back once her feet touch something.', 2.4); } return true; }
+    const hip = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z);
+    aimRay.setFromCamera(AIM_C, camera);
+    const A = latchAlongRay(vineLand(), hip, aimRay.ray.origin, aimRay.ray.direction, side, { range: SW.range, minUp: P.onGround ? 2.5 : 1.2 });
+    if (!A) return true;
+    vines[side] = { A: A.clone(), L: hip.distanceTo(A), t: 0, k: 0, hold: false };
+    return true;
+  }
+  function vineLet(side) {
+    const S = vines[side]; if (!S) return;
+    vines[side] = null;
+    if (S.hold && !heldVines().length) {   // let go on the way up the far side of the arc and she flicks you on
+      P.onGround = false; P.coyote = 0;
+      const off = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z).sub(S.A), hv = Math.hypot(P.vel.x, P.vel.z), lead = hv > 1 ? (off.x * P.vel.x + off.z * P.vel.z) / hv : 0, ang = Math.atan2(Math.abs(lead), -off.y);
+      if (P.vel.y > 0 && lead > 0 && ang > 0.4 && ang < 1.35) { P.vel.y += 5; if (hv < 30) { P.vel.x *= 1.12; P.vel.z *= 1.12; } particles.ring(P.pos.x, P.pos.y + 1, P.pos.z, 16, 1.6, { color: 0xb8ff7a, size: 0.4, life: 0.4 }); sfx.jump(); }
+      else if (P.vel.y > 0) P.vel.y += 1.5;
+    }
+  }
+  function pumpSwing() {
+    if (t < (P.pumpT || 0)) return;
+    P.pumpT = t + 0.45;
+    const S = heldVines()[0], off = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z).sub(S.A), ol = off.length() || 1;
+    const good = clamp(1 - Math.acos(clamp(-off.y / ol, -1, 1)) / 0.6, 0, 1), spd = P.vel.length();
+    if (spd < 2) P.vel.add(V3(-Math.sin(CAM.yaw) * 5, 0, -Math.cos(CAM.yaw) * 5));
+    else if (good > 0 && spd < 40) P.vel.multiplyScalar(1 + (2 + 5 * good) / spd);
+    if (good > 0.5) particles.ring(P.pos.x, P.pos.y + 0.6, P.pos.z, 12, 1.2, { color: 0x9ad86a, size: 0.35, life: 0.35 });
+    sfx.swing();
+  }
+  function vineTick(dt, act) {
+    if (!P.ride || !act) { vines.L = vines.R = null; return; }
+    if (P.onGround && vineN < SW.n && (vineGrow += dt) > 0.3) { vineGrow = 0; vineN++; }
+    for (const side of ['L', 'R']) {
+      const S = vines[side]; if (!S || S.hold) continue;
+      S.t += dt; S.k = Math.min(1, S.t / (0.06 + S.L * 0.007));   // it takes a moment to reach, longer the further it goes
+      if (S.k < 1) continue;
+      vineN = Math.max(0, vineN - 1); S.hold = true;
+      sfx.hit(); particles.burst(S.A.x, S.A.y, S.A.z, 10, { color: 0x9ad86a, speed: 3, size: 0.35, life: 0.5 });
+      // she hauls: you leave the ground and go, even from a standstill
+      const fx = S.A.x - P.pos.x, fz = S.A.z - P.pos.z, fd = Math.hypot(fx, fz) || 1, hv = Math.hypot(P.vel.x, P.vel.z);
+      if (hv < 15 && !keys.KeyX) { P.vel.x += fx / fd * (15 - hv); P.vel.z += fz / fd * (15 - hv); }
+      if (P.onGround || P.pos.y - groundAt(P.pos.x, P.pos.z, P.pos.y) < 1.5) P.vel.y = Math.max(P.vel.y, 7);
+      P.onGround = false; P.coyote = 0;
+      S.L = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z).distanceTo(S.A);
+    }
+    const H = heldVines(); if (!H.length) return;
+    const hold = keys.KeyX, reelIn = keys.ShiftLeft || keys.ShiftRight, letOut = keys.KeyC;
+    for (const S of H) {
+      if (reelIn) S.L = Math.max(2.5, S.L - 7 * dt);
+      else if (letOut) S.L = Math.min(SW.range, S.L + 7 * dt);
+      else if (!hold) { const want = Math.max(4, S.A.y - (heightAt(S.A.x, S.A.z) + 2.5)); S.L = Math.max(4, S.L - Math.min(24, 1.5 + Math.max(0, S.L - want) * 3) * dt); }
+    }
+    // the rope: no vine lets you get further than its length from where it caught
+    const hip = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z), pred = hip.clone().addScaledVector(P.vel, dt);
+    for (let it = 0; it < (H.length > 1 ? 3 : 1); it++) for (const S of H) { const d = pred.clone().sub(S.A), len = d.length(); if (len > S.L) pred.copy(S.A).addScaledVector(d, S.L / len); }
+    P.vel.copy(pred.sub(hip)).multiplyScalar(1 / dt);
+    const spd = P.vel.length();
+    if (hold) P.vel.multiplyScalar(1 - 1.2 * dt);
+    else if (spd > 0.5 && spd < 38 && P.vel.y < 0) P.vel.multiplyScalar(1 + 0.12 * dt);
+    if (Math.random() < 0.35) particles.emit(P.pos.x, P.pos.y + 0.6, P.pos.z, { color: 0x9ad86a, size: 0.3, life: 0.5, speed: 1 });
+  }
+  /* the mouse, on her back: her two front vines */
+  function vineButton(button, down) {
+    const side = button === 0 ? 'L' : button === 2 ? 'R' : null; if (!side) return false;
+    if (!down) { vineLet(side); return P.ride; }
+    return P.ride ? vineShoot(side) : false;
   }
   function updatePlayer(dt, playing) {
     if (P.slide) { updateSlide(dt); poseTanoc(dt, 0); return; }
@@ -683,11 +772,14 @@ export function createMegla(ctx) {
     if (len > 0.08) { const k = Math.min(1, len) / len; wx = (fx * iz + rx * ix) * k; wz = (fz * iz + rz * ix) * k; }
     const run = keys.ShiftLeft || keys.ShiftRight;
     const sp = P.ride ? (run ? 17 : 10) : (run ? 8.6 : 4.8) * (P.swing > 0 ? 0.35 : 1);
-    P.vel.x = damp(P.vel.x, wx * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt); P.vel.z = damp(P.vel.z, wz * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt);
+    const swinging = P.ride && heldVines().length > 0, flying = P.ride && !P.onGround && Math.hypot(P.vel.x, P.vel.z) > sp + 1;
+    if (swinging || flying) { P.vel.x += wx * 7 * dt; P.vel.z += wz * 7 * dt; }   // on a vine, or flung off one: you keep your speed, and only lean it
+    else { P.vel.x = damp(P.vel.x, wx * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt); P.vel.z = damp(P.vel.z, wz * sp, P.onGround ? (P.ride ? 6 : 14) : 4, dt); }
     if (len > 0.08 && P.swing <= 0) P.yaw = dampAngle(P.yaw, Math.atan2(wx, wz), P.ride ? 6 : 12, dt);
     P.jumpBuf -= dt; P.coyote -= dt; P.iframes = Math.max(0, P.iframes - dt);
     if (P.jumpBuf > 0 && (P.onGround || P.coyote > 0) && playing && !P.down) { P.vel.y = P.ride ? 10 : 9.2; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
     P.vel.y -= 26 * dt;
+    vineTick(dt, playing && !P.down);
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos, P.ride ? 0.9 : PR);
     P.pos.y += P.vel.y * dt;
@@ -712,16 +804,35 @@ export function createMegla(ctx) {
     poseTanoc(dt, speed);
   }
   function poseTanoc(dt, speed) {
-    if (P.ride) {   // in the saddle: Brindle-grown Punk under him, vines going
+    if (P.ride) {   // in the saddle: his grown Punk under him, vines going
       K.pos.copy(P.pos); K.yaw = P.yaw;
-      punk.root.position.copy(P.pos); punk.root.rotation.y = P.yaw; punk.root.visible = true;
-      punk.animate(dt, { speed, t, air: P.onGround ? 0 : 1 });
-      const seat = V3(0, 1.15 * 1.85 - 0.3, -0.05).applyAxisAngle(V3(0, 1, 0), P.yaw).add(P.pos);
-      tanoc.root.position.copy(seat); tanoc.root.rotation.y = P.yaw;
-      tanoc.animate(dt, { speed: 0, onGround: true, t, swing: null });
+      const R0 = punk.root; R0.rotation.order = 'YXZ';
+      R0.position.copy(P.pos); R0.rotation.y = P.yaw; R0.visible = true;
+      // in the air she leans into the swing: nose along the way she's going, rolled toward the vine
+      const hv = Math.hypot(P.vel.x, P.vel.z), held = heldVines();
+      let pitch = 0, roll = 0;
+      if (!P.onGround) {
+        pitch = clamp(-Math.atan2(P.vel.y, Math.max(hv, 1)) * 0.6, -0.7, 0.7);
+        if (held.length) { const ax = held.reduce((q, v) => q + v.A.x, 0) / held.length - P.pos.x, az = held.reduce((q, v) => q + v.A.z, 0) / held.length - P.pos.z; roll = clamp(-(ax * Math.cos(P.yaw) - az * Math.sin(P.yaw)) * 0.04, -0.5, 0.5); }
+      }
+      R0.rotation.x = damp(R0.rotation.x, pitch, 8, dt); R0.rotation.z = damp(R0.rotation.z, roll, 8, dt);
+      R0.updateMatrixWorld(true);
+      const grabs = ['L', 'R'].map(k => vines[k]).filter(Boolean).map(v => ({ p: R0.worldToLocal(v.A.clone()), k: v.hold ? 1 : v.k }));
+      K.air = damp(K.air || 0, P.onGround ? 0 : 1, 8, dt);
+      punk.animate(dt, { speed: P.onGround ? speed : 0, t, air: K.air, grabs: grabs.length ? grabs : null });
+      // he sits in the saddle itself, carried by her body as it bobs and rolls
+      const T = tanoc.root, b = punk.body, cf = punk.cfg;
+      if (b && cf) {
+        b.updateMatrixWorld(true);
+        T.position.copy(b.localToWorld(V3(0, cf.R * cf.sq + cf.R * 0.07, -cf.R * 0.15)));
+        T.position.y -= 0.76 * T.scale.y;
+        b.getWorldQuaternion(_seatQ); _yawQ.setFromAxisAngle(_UP, P.yaw); T.quaternion.copy(_yawQ).slerp(_seatQ, 0.65);
+        K.gait = clamp((b.position.y - cf.bodyY) / (cf.R * 0.08), 0, 1.2);
+      } else { T.position.copy(P.pos).add(V3(0, 1.8, 0)); T.rotation.set(0, P.yaw, 0); }
+      tanoc.animate(dt, { speed: 0, onGround: true, t, swing: null, ride: true, rideSpeed: hv, rideBob: K.gait || 0, rideRoll: roll * 0.4 });
       return;
     }
-    tanoc.root.position.copy(P.pos); tanoc.root.rotation.y = P.yaw;
+    tanoc.root.position.copy(P.pos); tanoc.root.rotation.x = 0; tanoc.root.rotation.y = P.yaw;
     if (P.down) { tanoc.root.rotation.z = damp(tanoc.root.rotation.z, 1.35, 5, dt); tanoc.root.position.y += 0.25; }
     else tanoc.root.rotation.z = damp(tanoc.root.rotation.z, 0, 8, dt);
     tanoc.animate(dt, { speed: P.down ? 0 : speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null });
@@ -807,7 +918,7 @@ export function createMegla(ctx) {
     cut([
       { dur: 6.5, from: { p: [pathX(-300) + 70, 140, -340], l: [pathX(-120), 20, -120] }, to: { p: [pathX(-200) + 40, 80, -230], l: [pathX(-40), 6, -40] }, caption: M.cards },
       { dur: 6, cam: k => ({ p: V3(P.pos.x + 6 - k * 2, P.pos.y + 2.4, P.pos.z - 9 + k * 2), l: V3(P.pos.x, P.pos.y + 1.6, P.pos.z) }), caption: M.ride[0][1], onTick: () => { P.vel.set(0, 0, -6); } },
-    ], () => { ctx.location('The river pass', 'Chapter II · north, into the mist'); objective('Ride north up the river pass', 'Shift to gallop — follow the river'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); });
+    ], () => { ctx.location('The river pass', 'Chapter II · north, into the mist'); objective('Ride north up the river pass', 'Shift to gallop · click to throw her vines at the pines — hold to swing, let go to fly'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); });
   }
   function rideTick() {
     const prog = clamp(-P.pos.z / -PASS1, 0, 1);
@@ -1432,8 +1543,6 @@ export function createMegla(ctx) {
     }
     // camps
     for (const c of fires) { c.fire.visible = c.on; c.light.intensity = c.on ? 40 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
-    // spores and flickers in the forest; brighter in the dark
-    if (zz === 'forest' && Math.random() < 0.7) particles.emit(P.pos.x + (Math.random() - 0.5) * 40, P.pos.y + Math.random() * 10, P.pos.z + (Math.random() - 0.5) * 40, { vx: (Math.random() - 0.5) * 0.3, vy: 0.15, vz: (Math.random() - 0.5) * 0.3, color: 0xbfeee6, size: 0.16, life: 4, drag: 0 });
     for (const g of trail) if (g.material.opacity > 0) g.material.opacity = 0.4 + Math.sin(t * 3 + g.position.z) * 0.25;
     if (beacon.visible) beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
     particles.update(dt);
@@ -1512,8 +1621,8 @@ export function createMegla(ctx) {
     composer.dispose && composer.dispose();
   }
   return {
-    start, update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(),
+    start, update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(), vine: vineButton,
     get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items,
-    debug: { get GYN() { return GYN; }, get boltCd() { return boltCd; }, get cineOn() { return cine.active; }, rockfall, bolts, cairns, patrols, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; } },
+    debug: { get GYN() { return GYN; }, vines, get vineN() { return vineN; }, tanoc, punk, get boltCd() { return boltCd; }, get cineOn() { return cine.active; }, rockfall, bolts, cairns, patrols, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; } },
   };
 }

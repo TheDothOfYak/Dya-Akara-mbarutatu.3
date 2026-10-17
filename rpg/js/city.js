@@ -257,8 +257,11 @@ export function buildMudFountain(scene, x, z, g, opts = {}) {
     m.position.copy(from); balls.push({ m, vel, c, t: 0, catchT: !hard && Math.random() < 0.3 ? flight * 0.82 : -1, hard });
     atk = 1;
   }
+  let held = null;   // a world point its vines are wrapped round (someone who stepped in after something)
   return {
     group: grp, R: R, center: V3(x, g, z), ring: R + 2.75 * S,
+    /* hold whoever's at p in its vines (null lets go) */
+    hold(p) { held = p ? p.clone() : null; },
     /* call every frame. who: [{pos}] — anyone standing in the basin gets a ball in the face */
     update(dt, t, particles, who) {
       if (Math.floor(t * 8) !== Math.floor((t - dt) * 8)) { for (const b of blobs) { b.x = (b.x + b.vx * 0.125 + 128) % 128; b.y = (b.y + b.vy * 0.125 + 128) % 128; } paintMud(t); }
@@ -269,7 +272,9 @@ export function buildMudFountain(scene, x, z, g, opts = {}) {
         if (Math.hypot(dx, dz) < R - 0.4) { poked = 1.4; throwBall(V3(dx, p.y - g + 1.2, dz), true); break; }
       }
       atk = Math.max(0, atk - dt * 2.5); wind = Math.max(0, Math.sin(t * 1.3) * 0.3);
-      stryx.animate(dt, { t, speed: 0, windup: wind * (1 - atk), attack: atk });
+      let grab = null;
+      if (held) { stryx.root.updateMatrixWorld(true); grab = { p: stryx.root.worldToLocal(held.clone().add(V3(0, 1, 0))), k: 1 }; throwT = Math.max(throwT, 0.5); }
+      stryx.animate(dt, { t, speed: 0, windup: held ? 0.4 : wind * (1 - atk), attack: held ? 0 : atk, grab });
       for (let i = balls.length - 1; i >= 0; i--) {
         const b = balls[i]; b.t += dt; b.vel.y -= 18 * dt; b.m.position.addScaledVector(b.vel, dt); b.m.rotation.x += dt * 4;
         if (Math.random() < 0.35 && particles) { const wp = b.m.getWorldPosition(V3()); particles.emit(wp.x, wp.y, wp.z, { vx: (Math.random() - 0.5) * 2, vy: 1, vz: (Math.random() - 0.5) * 2, color: b.c, size: 0.25, life: 0.5, drag: 1 }); }

@@ -1443,7 +1443,7 @@ export function buildGynge(opts = {}) {
 }
 
 /* ================================================================
-   STRYX — wide, flat stone armour, two huge spiral horns, vines on top
+   STRYX — wide, flat stone armour, rooted where it grew, vines on top
    ================================================================ */
 export function buildStryx(opts = {}) {
   const rnd = seeded(opts) || mulberry32(5);
@@ -1492,32 +1492,7 @@ export function buildStryx(opts = {}) {
     const tip = noOut(mesh(curlG, tipM, root));
     vines.push({ rope, tip, a, base: new THREE.Vector3(Math.cos(a) * 0.4 * WX, TOP, Math.sin(a) * 0.34 * WZ - 0.1), ph: rnd() * TAU, len: 1.0 + rnd() * 0.5 });
   }
-  // two huge spiral horns (antennae) rising from the front corners of the mesa: ridged
-  // stone corkscrews that widen as they climb and sweep out to the sides
-  const hornM = M(0xa89a80), horns = new THREE.Group(); horns.position.set(0, TOP - 0.05, 0.22); body.add(horns);
-  {
-    const L = 1.9, turns = 1.75, NS = 80, RS = 7;
-    for (const s of [-1, 1]) {
-      const d = new THREE.Vector3(s * 0.7, 1, 0.2).normalize(), e1 = new THREE.Vector3(0, 0, 1).cross(d).normalize(), e2 = d.clone().cross(e1);
-      const at = u => { const ph = s * u * turns * TAU, rr = 0.05 + 0.34 * Math.pow(u, 0.9);
-        return new THREE.Vector3(s * 0.48, 0, 0).addScaledVector(d, L * u).addScaledVector(e1, Math.cos(ph) * rr - 0.03).addScaledVector(e2, Math.sin(ph) * rr); };
-      const pts = []; for (let i = 0; i <= 48; i++) pts.push(at(i / 48));
-      const curve = new THREE.CatmullRomCurve3(pts);
-      const g = new THREE.TubeGeometry(curve, NS, 1, RS, false), p = g.attributes.position, P = new THREE.Vector3(), v = new THREE.Vector3();
-      for (let i = 0; i <= NS; i++) {
-        const u = i / NS; curve.getPointAt(u, P);
-        const r = (0.12 * Math.pow(1 - u, 0.8) + 0.008) * (1 + 0.16 * Math.max(0, Math.sin(u * 52)));   // ridged rings
-        for (let j = 0; j <= RS; j++) { const k = i * (RS + 1) + j; v.fromBufferAttribute(p, k).sub(P); p.setXYZ(k, P.x + v.x * r, P.y + v.y * r, P.z + v.z * r); }
-      }
-      g.computeVertexNormals();
-      mesh(g, hornM, horns);
-      mesh(new THREE.SphereGeometry(0.16, 8, 6), rockD, horns, s * 0.45, 0.02, -0.02).scale.set(1, 0.6, 1);   // the socket
-      // beads of light up the outside of each spiral
-      const B = [];
-      for (let i = 1; i < 9; i++) { const u = i / 9.5; curve.getPointAt(u, P); const q = at(u), n = q.clone().sub(new THREE.Vector3(s * 0.48, 0, 0).addScaledVector(d, L * u)).normalize(); const r = 0.12 * Math.pow(1 - u, 0.8) + 0.008; B.push([P.x + n.x * r, P.y + n.y * r, P.z + n.z * r, n.x, n.y, n.z, 0.035 * (1 - u * 0.6), 0.5]); }
-      bioMesh(bioDots(B), seamM, horns);
-    }
-  }
+  // (no horns: a Stryx is all stone, root and vine)
   // a tuft of grass and a couple of leaves on the top
   const leaf = leafGeo(0.22, 0.12), lf = [];
   for (let i = 0; i < 6; i++) { const a = i * 1.1; lf.push(placed(leaf, Math.cos(a) * 0.1, TOP, Math.sin(a) * 0.1 - 0.15, Math.cos(a) * 0.6, a, Math.sin(a) * 0.6)); }
@@ -1528,11 +1503,10 @@ export function buildStryx(opts = {}) {
   const flash = makeFlash([rock, rockD]);
   function animate(dt, st) {
     const sp = st.speed || 0, wind = st.windup || 0, atk = st.attack || 0, t = (st.t || 0) + t0;
-    // when it moves it heaves itself along on its vines
-    body.position.y = Math.abs(Math.sin(t * 3)) * 0.05 * clamp(sp, 0, 1);
-    body.rotation.z = Math.sin(t * 3) * 0.03 * clamp(sp, 0, 1);
-    // the horns lower like a ram's as it winds up, and toss on the strike
-    horns.rotation.x = Math.sin(t * 0.7) * 0.02 + wind * (1 - atk) * 0.25 - atk * 0.12;
+    // rooted where it grew: it never walks. It sways on its roots, rears back to wind up, and leans into the lash
+    body.rotation.z = Math.sin(t * 0.6) * 0.025;
+    body.rotation.x = -wind * (1 - atk) * 0.12 + atk * 0.1 + Math.sin(t * 0.45 + 1) * 0.015;
+    body.position.y = Math.sin(t * 0.8) * 0.015;
     for (let i = 0; i < vines.length; i++) {
       const v = vines[i], ca = Math.cos(v.a), sa = Math.sin(v.a);
       if (st.grab && i === 0) {   // a vine thrown out onto something solid, hauling the whole mesa after it
@@ -1549,8 +1523,7 @@ export function buildStryx(opts = {}) {
       // idle: rising and swaying; wind-up: coiled back; attack: whipped forward
       P3.set(ca * (0.75 + v.len * 0.5) * WX + Math.sin(t * 0.9 + v.ph) * 0.12, TOP + v.len * 0.45 + w * 0.12, sa * (0.65 + v.len * 0.45) + Math.cos(t * 0.8 + v.ph) * 0.12);
       tmp.set(ca * 0.4 * WX, TOP + v.len * 1.1, -0.5 + sa * 0.3); P3.lerp(tmp, wind * (1 - a));
-      tmp.set(ca * 0.35 * WX, 0.4 + i * 0.12, 1.9 + v.len * 0.7); P3.lerp(tmp, a);
-      if (sp > 0.2 && i % 2 === 0) { tmp.set(ca * 1.6, 0.05, sa * 1.2 + 0.8); P3.lerp(tmp, clamp(sp, 0, 1) * 0.8); }
+      tmp.set(ca * 0.35 * WX, 0.5 + i * 0.12, 2.6 + v.len * 1.1); P3.lerp(tmp, a);   // the lash reaches well out in front
       P1.set(v.base.x * 1.1, v.base.y + 0.55 + v.len * 0.3, v.base.z * 1.1);
       P2.set(P3.x * 0.85, P3.y + 0.5 - a * 0.45, P3.z * 0.85 - a * 0.6);
       v.rope.set(v.base, P1, P2, P3);
