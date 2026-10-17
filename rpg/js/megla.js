@@ -202,7 +202,7 @@ export function createMegla(ctx) {
   const blobs = kit(new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
   const rocks = kit(new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);
   const ferns = kit(new THREE.ConeGeometry(1, 1, 5), toon(0xffffff), 4000);
-  const stones = kit(new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 1400, true);
+  const stones = kit(new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 1400, true);
   const glowK = kit(new THREE.OctahedronGeometry(1, 0), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: true }), 3000);
   const pick = a => a[Math.floor(rng() * a.length)];
   // pines up the sides of the pass
