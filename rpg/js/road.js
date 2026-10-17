@@ -20,6 +20,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, Particles } from './gfx.js';
+import { buildHomeTree, buildForest } from './hometree.js';
 import { buildEikar, placeWalker } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
 import { buildVel } from './creatures.js';
@@ -35,8 +36,12 @@ const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
 
 /* ---------------- the lay of the land ---------------- */
-const CITY = { x: 0, z: 70 }, CITY_R = 56, GATE_Z = CITY.z - CITY_R;     // the north gate
+/* Fyrsti'Vilag is big: the old market quarter (CORE, the square at its heart) sits just inside the north gate,
+   and the city runs on south for the best part of a quarter-league, street after street, to the home tree */
+const GATE_Z = 14, CITY_R = 132, CITY = { x: 0, z: GATE_Z + CITY_R };   // the wall, and its north gate
+const CORE = { x: 0, z: 70 }, CORE_R = 52;                                // the market quarter
 const SQUARE = { x: 0, z: 70 }, STALL = { x: 6, z: 58 };
+const TREE = { x: -38, z: 212, R: 13, H: 230 };                           // the city's home tree, in the south-west
 const CAMP1 = { z: -250 }, CAMP2 = { z: -560 }, PASS0 = -650, AMBUSH = -800, END = -960;
 const CART_Z = -70, HEDGE_Z = -160, LOG_Z = -330, FORD_Z = -430, ROCK0 = -672, ROCK1 = -762;
 const roadX = z => (z > GATE_Z ? 0 : 16 * Math.sin((GATE_Z - z) * 0.009) + 8 * Math.sin((GATE_Z - z) * 0.023));
@@ -57,6 +62,30 @@ function heightAt(x, z) {
   if (z > GATE_Z - 30) h = lerp(h, 0, smooth(GATE_Z - 30, GATE_Z, z));
   h -= 2.6 * smooth(7, 3, Math.abs(z - FORD_Z));                                         // the ford's stream
   return h;
+}
+
+/* the ink outline for instanced meshes: each copy by its own matrix, pushed out after its scale so the line stays even */
+const outlineInstCache = {};
+function outlineInst(th) {
+  return outlineInstCache[th] || (outlineInstCache[th] = new THREE.ShaderMaterial({
+    side: THREE.BackSide, fog: true,
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uColor: { value: new THREE.Color(0x1a1008) }, uThick: { value: th } }]),
+    vertexShader: `uniform float uThick;
+      #include <fog_pars_vertex>
+      void main() {
+        vec4 ip = instanceMatrix * vec4(position, 1.0);
+        ip.xyz += normalize(mat3(instanceMatrix) * normal) * uThick;
+        vec4 mvPosition = modelViewMatrix * ip;
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `uniform vec3 uColor;
+      #include <fog_pars_fragment>
+      void main() {
+        gl_FragColor = vec4(uColor, 1.0);
+        #include <fog_fragment>
+      }`,
+  }));
 }
 
 /* ================================================================ */
@@ -106,7 +135,7 @@ export function createRoad(ctx) {
 
   /* ---------------- ground: one long strip from the city to the pass ---------------- */
   {
-    const W = 300, L = 1260, geo = new THREE.PlaneGeometry(W, L, 120, 504); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, 160 - L / 2);
+    const W = 330, L = 1420, geo = new THREE.PlaneGeometry(W, L, 132, 568); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, CITY.z + CITY_R + 20 - L / 2);
     const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3), c = new THREE.Color();
     const pave = new THREE.Color(0xd8c8a8), dirt = new THREE.Color(0xc9a06a), grass = new THREE.Color(0x8fbf52), grass2 = new THREE.Color(0xb8c45a),
       forest = new THREE.Color(0x4f7a3c), rock = new THREE.Color(0x8e8578), snow = new THREE.Color(0xf2f2f6), soil = new THREE.Color(0x7a5232);
@@ -132,8 +161,55 @@ export function createRoad(ctx) {
   const box = (x, z, hw, hd, y0, y1) => { const s = { kind: 'box', x, z, hw, hd, y0, y1 }; solids.push(s); return s; };
   const cyl = (x, z, r, y0, y1) => { const s = { kind: 'cyl', x, z, r, y0, y1 }; solids.push(s); return s; };
   const STEP = 0.65, PR = 0.4, PH = 1.5;
+  /* the home tree: its decks, and the great stair round the bark between them, are walkable.
+     Their shapes come from the tree itself (hometree.js); HT is filled in once it's built. */
+  let HT = null;
+  const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  const inWell = (d, a) => { const k = angDiff(a, d.well[0]), len = d.well[1] - d.well[0]; return k >= 0 && k <= len; };
+  function treeGround(x, z, y) {
+    if (!HT) return -1e9;
+    const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz);
+    if (r > HT.reach) return -1e9;
+    const a = Math.atan2(dz, dx), ly = y - HT.g; let best = -1e9;
+    for (const d of HT.decks) {
+      if (d.y > ly + STEP || r < d.r0 - 0.5 || r > d.ro + 0.2) continue;
+      if (r < d.r0 + 3.4 && inWell(d, a)) continue;          // the stairwell
+      best = Math.max(best, d.y);
+    }
+    const S = HT.stair, span = S.turns * TAU;
+    for (let k = 0; k <= Math.ceil(S.turns) + 1; k++) {
+      const t = (a - S.a0 + k * TAU) / span; if (t < 0 || t > 1) continue;
+      const ys = 0.5 + t * S.top + 0.17; if (ys > ly + STEP) continue;
+      const rb = HT.rAt(ys, a); if (r < rb - 0.3 || r > rb + 3.3) continue;
+      best = Math.max(best, ys);
+    }
+    return best > -1e9 ? HT.g + best : -1e9;
+  }
+  /* the bark is a wall all the way up; the decks have rails; off the decks, the stair has one too */
+  function treeResolve(p, rad) {
+    if (!HT) return;
+    const dx = p.x - HT.x, dz = p.z - HT.z, r = Math.hypot(dx, dz), ly = p.y - HT.g;
+    if (r > HT.reach + 2 || r < 1e-4 || ly > HT.H * 0.9) return;
+    const a = Math.atan2(dz, dx), rin = HT.rAt(Math.max(0, ly + 0.8), a) + rad;
+    let to = null;
+    if (r < rin) to = rin;
+    else if (ly > 2.2) {
+      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5);
+      const rmax = d ? d.ro - 0.5 : HT.rAt(ly, a) + 3.2;
+      if (r > rmax) to = rmax;
+    }
+    if (to != null) { p.x = HT.x + dx / r * to; p.z = HT.z + dz / r * to; }
+  }
+  function treeSolid(x, y, z) {
+    if (!HT) return false;
+    const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz), ly = y - HT.g;
+    if (r > HT.reach || ly < 0 || ly > HT.H * 0.9) return false;
+    if (r < HT.rAt(ly, Math.atan2(dz, dx))) return true;
+    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > d.r0 && r < d.ro) return true;
+    return false;
+  }
   function groundAt(x, z, y, skip) {
-    let g = heightAt(x, z);
+    let g = Math.max(heightAt(x, z), treeGround(x, z, y));
     for (const s of solids) {
       if (s === skip) continue;
       if (Math.abs(x - s.x) > 12 || Math.abs(z - s.z) > 12) continue;
@@ -154,6 +230,7 @@ export function createRoad(ctx) {
         if (d < m) { if (d < 1e-4) p.x += m; else { p.x = s.x + dx / d * m; p.z = s.z + dz / d * m; } }
       }
     }
+    treeResolve(p, rad);
     // the city wall, with its north gate; out on the road, the valley sides
     const dc = Math.hypot(p.x - CITY.x, p.z - CITY.z);
     if (dc > CITY_R - 2 && dc < CITY_R + 2 && !(Math.abs(p.x) < 5 && p.z < CITY.z)) { const to = dc < CITY_R ? CITY_R - 2 : CITY_R + 2; p.x = CITY.x + (p.x - CITY.x) * to / dc; p.z = CITY.z + (p.z - CITY.z) * to / dc; }
@@ -167,34 +244,37 @@ export function createRoad(ctx) {
       if (y < s.y0 || y > s.y1) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) return true;
     }
-    return y < heightAt(x, z) + 0.2;
+    return treeSolid(x, y, z) || y < heightAt(x, z) + 0.2;
   }
 
   /* ---------------- Fyrsti'Vilag, on Xikia ---------------- */
   const kit = createCityKit(scene, { rng, heightAt, box, cyl, palette: 'xikia' });
+  // the old market quarter, round the square: rings of houses with streets between
   const doors = [];
   for (let ring = 0; ring < 3; ring++) {
     const Rr = 24 + ring * 10, n = 10 + ring * 4;
     for (let i = 0; i < n; i++) {
-      const a = i / n * TAU + ring * 0.3 + rng() * 0.1, x = CITY.x + Math.cos(a) * Rr, z = CITY.z + Math.sin(a) * Rr;
-      if (Math.abs(x) < 7.5 && z < CITY.z) continue;          // the street to the north gate
-      doors.push(kit.house(x, z, Math.atan2(CITY.x - x, CITY.z - z)).door);
+      const a = i / n * TAU + ring * 0.3 + rng() * 0.1, x = CORE.x + Math.cos(a) * Rr, z = CORE.z + Math.sin(a) * Rr;
+      if (Math.abs(x) < 7.5 && z < CORE.z) continue;          // the street to the north gate
+      doors.push(kit.house(x, z, Math.atan2(CORE.x - x, CORE.z - z)).door);
     }
   }
   const XSTREETS = [19, 29, 39, 49];
-  for (const r of XSTREETS.slice(1)) { const n = Math.round(r / 5); for (let k = 0; k < n; k++) { const a = k / n * TAU + 0.3, x = CITY.x + Math.cos(a) * (r + 2.3), z = CITY.z + Math.sin(a) * (r + 2.3); if (Math.abs(x) < 8 && z < CITY.z) continue; if (x > -3 && x < 19 && z > 26 && z < 56) continue; kit.lampPost(x, z); } }   // (none in the cart's way out)
-  for (const r of XSTREETS.slice(1)) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + 0.8; kit.bunting(V3(CITY.x + Math.cos(a) * (r - 4.4), 6, CITY.z + Math.sin(a) * (r - 4.4)), V3(CITY.x + Math.cos(a + 0.1) * (r + 4.4), 6, CITY.z + Math.sin(a + 0.1) * (r + 4.4)), 1.2); }
+  for (const r of XSTREETS.slice(1)) { const n = Math.round(r / 5); for (let k = 0; k < n; k++) { const a = k / n * TAU + 0.3, x = CORE.x + Math.cos(a) * (r + 2.3), z = CORE.z + Math.sin(a) * (r + 2.3); if (Math.abs(x) < 8 && z < CORE.z) continue; if (x > -3 && x < 19 && z > 26 && z < 56) continue; kit.lampPost(x, z); } }   // (none in the cart's way out)
+  for (const r of XSTREETS.slice(1)) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + 0.8; kit.bunting(V3(CORE.x + Math.cos(a) * (r - 4.4), 6, CORE.z + Math.sin(a) * (r - 4.4)), V3(CORE.x + Math.cos(a + 0.1) * (r + 4.4), 6, CORE.z + Math.sin(a + 0.1) * (r + 4.4)), 1.2); }
   for (let k = 0; k < 4; k++) kit.bunting(V3(-7, 7.2, 46 - k * 9), V3(7, 7.2, 42 - k * 9), 1.4);
   // the square's own bunting, from the fountain out to the stalls
   for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; kit.bunting(V3(SQUARE.x, 6.5, SQUARE.z + 4), V3(SQUARE.x + Math.cos(a) * 15, 4.2, SQUARE.z + 4 + Math.sin(a) * 15), 0.8); }
-  kit.paving(CITY.x, CITY.z, XSTREETS, 0xc8b08a); kit.paving(SQUARE.x, SQUARE.z + 4, [7, 10.5], 0xb8a07a);
+  kit.paving(CORE.x, CORE.z, XSTREETS, 0xc8b08a); kit.paving(SQUARE.x, SQUARE.z + 4, [7, 10.5], 0xb8a07a);
+  // the city wall, all the way round, and the north gate's towers
   {
-    const wm = toon(0xc8b08a), N = 64;
+    const wm = toon(0xc8b08a), N = Math.round(CITY_R * TAU / 6.5);
     for (let i = 0; i < N; i++) {
       const a = i / N * TAU, x = CITY.x + Math.cos(a) * CITY_R, z = CITY.z + Math.sin(a) * CITY_R;
       if (Math.abs(x) < 6 && z < CITY.z) continue;
       const seg = new THREE.Mesh(new THREE.BoxGeometry(2.6, 8, CITY_R * TAU / N + 0.3), wm); seg.position.set(x, 4, z); seg.rotation.y = -a; seg.castShadow = true; scene.add(seg);
       if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.1, 1.1), wm); cr.position.set(x, 8.5, z); cr.rotation.y = -a; scene.add(cr); }
+      if (i % 24 === 12) { const tw = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.5, 11, 10), wm); tw.position.set(x, 5.5, z); addOutline(tw, 0.05); scene.add(tw); const tc = new THREE.Mesh(new THREE.ConeGeometry(2.8, 3.2, 10), toon(0x2f5a5a)); tc.position.set(x, 12.6, z); addOutline(tc, 0.04); scene.add(tc); }
     }
     for (const sd of [-1, 1]) {
       const t = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.7, 12, 12), wm); t.position.set(sd * 7.5, 6, GATE_Z + 0.5); addOutline(t, 0.05); scene.add(t); cyl(sd * 7.5, GATE_Z + 0.5, 2.5, -1, 14);
@@ -203,6 +283,79 @@ export function createRoad(ctx) {
       kit.lantern(sd * 4.6, 5.5, GATE_Z - 1.5, 0xffb060, 2);
     }
     const arch = new THREE.Mesh(new THREE.BoxGeometry(12, 2.2, 3), wm); arch.position.set(0, 10, GATE_Z + 0.5); addOutline(arch, 0.04); scene.add(arch);
+  }
+  // the home tree: the city grew up round it, in the south-west. Its roots keep clear of the stair's foot and of its great door
+  const toCore = Math.atan2(CORE.z - TREE.z, CORE.x - TREE.x);
+  {
+    const T = buildHomeTree(scene, TREE.x, TREE.z, 0, {
+      R: TREE.R, H: TREE.H, seed: 41, town: 1, decks: [0.05, 0.1, 0.16, 0.23], deckW: 12, roots: 8, rootReach: 1.75, doorAt: toCore,
+      banners: [0x2f6f8a, 0xd9a441], rootSkip: a => Math.abs(angDiff(a, 0.4)) < 0.55 || Math.abs(angDiff(a, toCore)) < 0.5,
+    });
+    T.colliders.slice(1).forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1));      // the roots (the trunk itself is treeResolve's)
+    for (const h of T.deckHouses) cyl(h.x, h.z, h.r, h.y - 0.5, h.y + h.h);
+    HT = Object.assign(T, { reach: Math.max(...T.decks.map(d => d.ro)) + 2 });
+  }
+  /* the rest of the city: block after block of houses on a grid of streets, from the market quarter
+     south to the wall and round the home tree — instanced, so a whole quarter costs a handful of draws */
+  const districtTrees = [];
+  {
+    const PAL = { walls: [0xf4e6c8, 0xf0dcb4, 0xe8d0a8, 0xfaf0dc, 0xe8dcc0, 0xd8c8b0], roofs: [0x7a4a2a, 0x2f5a5a, 0x6a3a1c, 0x3a6a5a, 0x8a5a3a], door: [0x2f6f8a, 0x8a3a3a, 0x4a7a3a] };
+    const homes = [];
+    const clearOf = (x, z) => Math.hypot(x - CORE.x, z - CORE.z) > CORE_R + 6 && Math.hypot(x - TREE.x, z - TREE.z) > TREE.R * 1.75 * 1.75 + 6
+      && Math.hypot(x - CITY.x, z - CITY.z) < CITY_R - 9 && !(Math.abs(x) < 10 && z < CORE.z);
+    const STREET = 22;
+    for (let gx = -6; gx < 6; gx++) for (let gz = 0; gz < 12; gz++) {
+      const x0 = gx * STREET, z0 = GATE_Z + 2 + gz * STREET;
+      for (const [ox, oz] of [[7.5, 7.5], [14.5, 7.5], [7.5, 14.5], [14.5, 14.5]]) {
+        const x = x0 + ox + (rng() - 0.5) * 0.8, z = z0 + oz + (rng() - 0.5) * 0.8;
+        if (!clearOf(x, z)) continue;
+        if (rng() < 0.12) { districtTrees.push([x, z, 0.8 + rng() * 0.5, false]); continue; }   // a yard with a tree in it
+        // face the nearer street
+        const faceX = rng() < 0.5, ry = faceX ? (ox < 11 ? -Math.PI / 2 : Math.PI / 2) : (oz < 11 ? Math.PI : 0);
+        const w = 5 + rng() * 1.6, d = 5 + rng() * 1.4, floors = rng() < 0.45 ? 2 : 1, h = floors * 3.3 + rng() * 0.6;
+        homes.push({ x, z, w, d, h, ry, roof: rng() < 0.5 ? 'cone' : 'dome', wall: PAL.walls[Math.floor(rng() * PAL.walls.length)], roofC: PAL.roofs[Math.floor(rng() * PAL.roofs.length)], door: PAL.door[Math.floor(rng() * PAL.door.length)], floors });
+      }
+    }
+    const inst = (geo, mat, n, outline) => { const m = new THREE.InstancedMesh(geo, mat, Math.max(1, n)); m.count = 0; m.castShadow = m.receiveShadow = true; scene.add(m); if (outline) { const o = new THREE.InstancedMesh(geo, outlineInst(0.07), Math.max(1, n)); o.count = 0; m.userData.o = o; scene.add(o); } return m; };
+    const body = inst(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), toon(0xffffff), homes.length, true);
+    const cone = inst(new THREE.ConeGeometry(0.78, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0), toon(0xffffff), homes.length, true);
+    const dome = inst(new THREE.SphereGeometry(0.72, 14, 7, 0, TAU, 0, Math.PI / 2), toon(0xffffff), homes.length, true);
+    const band = inst(new THREE.BoxGeometry(1, 1, 1), toon(0x6a4428), homes.length * 2, false);
+    const door = inst(new THREE.BoxGeometry(1.2, 2.3, 0.2).translate(0, 1.15, 0), toon(0xffffff), homes.length, false);
+    const win = inst(new THREE.PlaneGeometry(0.95, 1.2), new THREE.MeshBasicMaterial({ color: 0xffc878, side: THREE.DoubleSide }), homes.length * 8, false);
+    const o = new THREE.Object3D(), col = new THREE.Color();
+    const put = (m, x, y, z, sx, sy, sz, ry, c) => {
+      o.position.set(x, y, z); o.rotation.set(0, ry, 0); o.scale.set(sx, sy, sz); o.updateMatrix();
+      m.setMatrixAt(m.count, o.matrix); if (c != null) m.setColorAt(m.count, col.set(c)); m.count++;
+      const ol = m.userData.o; if (ol) { ol.setMatrixAt(ol.count, o.matrix); ol.count++; }
+    };
+    for (const hm of homes) {
+      const { x, z, w, d, h, ry } = hm, fx = Math.sin(ry), fz = Math.cos(ry), sx = Math.cos(ry), sz = -Math.sin(ry);
+      put(body, x, 0, z, w, h, d, ry, hm.wall);
+      put(band, x, h, z, w + 0.18, 0.26, d + 0.18, ry);
+      if (hm.floors > 1) put(band, x, 3.3, z, w + 0.14, 0.22, d + 0.14, ry);
+      if (hm.roof === 'cone') put(cone, x, h, z, Math.max(w, d) * 1.05, 2.6 + rng() * 0.8, Math.max(w, d) * 1.05, ry, hm.roofC);
+      else put(dome, x, h, z, Math.max(w, d), Math.max(w, d) * 0.72, Math.max(w, d), ry, hm.roofC);
+      put(door, x + fx * (d / 2 + 0.02), 0, z + fz * (d / 2 + 0.02), 1, 1, 1, ry, hm.door);
+      for (let f = 0; f < hm.floors; f++) for (const s of [-1, 1]) {
+        const wy = 1.9 + f * 3.3, side = f ? s * w * 0.27 : s * w * 0.3;
+        if (f || Math.abs(side) > 1.0) put(win, x + fx * (d / 2 + 0.04) + sx * side, wy, z + fz * (d / 2 + 0.04) + sz * side, 1, 1, 1, ry);
+        put(win, x + sx * s * (w / 2 + 0.04), wy, z + sz * s * (w / 2 + 0.04), 1, 1, 1, ry + Math.PI / 2);
+      }
+      const swap = Math.abs(Math.sin(ry)) > 0.5;
+      box(x, z, (swap ? d : w) / 2, (swap ? w : d) / 2, -1, h + 2.5);
+    }
+    for (const m of [body, cone, dome, band, door, win]) { for (const mm of [m, m.userData.o]) if (mm) { mm.instanceMatrix.needsUpdate = true; if (mm.instanceColor) mm.instanceColor.needsUpdate = true; mm.computeBoundingSphere(); } }
+    buildForest(scene, districtTrees, { rng, heightAt });
+    for (const [x, z, sc] of districtTrees) cyl(x, z, 0.5 * sc, -1, 8 * sc);
+    // lamps at some of the corners, and a few strings of bunting over the streets
+    for (let gx = -5; gx < 6; gx++) for (let gz = 1; gz < 12; gz++) {
+      const x = gx * STREET + 2.6, z = GATE_Z + 2 + gz * STREET + 2.6;
+      if ((gx + gz) % 2 || !clearOf(x, z)) continue;
+      kit.lampPost(x, z);
+      if ((gx * 7 + gz * 3) % 5 === 0) kit.bunting(V3(x - 1.6, 6, z - 2.6), V3(x - 1.6, 6, z + STREET - 5), 1.2);
+    }
+    kit.paving(CITY.x, CITY.z, [CITY_R - 4], 0xc8b08a);
   }
   // the square: a ring of stalls round a Stryx mud fountain
   const fountain = buildMudFountain(scene, SQUARE.x, SQUARE.z + 4, 0, { scale: 0.85, seed: 5, onSplat: wp => { if (Math.hypot(P.pos.x - wp.x, P.pos.z - wp.z) < 2.5) { const d = V3(P.pos.x - SQUARE.x, 0, P.pos.z - SQUARE.z - 4).normalize(); P.vel.addScaledVector(d, 9); P.vel.y = 5; ctx.bark('tanoc', 'Hey! — all right, all right, it’s your mud!', 2.5); } } });
@@ -408,14 +561,14 @@ export function createRoad(ctx) {
     stalls.forEach((st, i) => { if (!i) return; for (let k = 0; k < 2; k++) { const f = 2.2, x = st.x + Math.sin(st.ry) * f + (k - 0.5) * 1.3 * Math.cos(st.ry), z = st.z + Math.cos(st.ry) * f - (k - 0.5) * 1.3 * Math.sin(st.ry); spots.push({ x, z, look: [st.x, st.z], kind: 'chat' }); } });
     for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + 0.3; spots.push({ x: SQUARE.x + Math.cos(a) * 4.7, z: SQUARE.z + 4 + Math.sin(a) * 4.7, look: [SQUARE.x, SQUARE.z + 4], kind: 'sit' }); }
     crowd = createCrowd({
-      scene, rng, groundAt, C: CITY,
+      scene, rng, groundAt, C: CORE,
       resolve: q => { const y = q.y; q.y = 0.2; resolve(q, 0.4); q.y = y; },
       streets: [{ r: 9.5 }, { r: 19 }, { r: 29 }, { r: 39 }, { r: 49 }], roads: [{ a: -Math.PI / 2 }], spots,
       exits: doors.concat([V3(0, 0, GATE_Z - 6)]),
     });
     for (let i = 0; i < 30; i++) {
       const r = [9.5, 19, 19, 29, 39][i % 5], a = rng() * TAU;
-      const p = crowd.spawn(FOLK_LOOKS[i % FOLK_LOOKS.length], V3(CITY.x + Math.cos(a) * r, 0, CITY.z + Math.sin(a) * r));
+      const p = crowd.spawn(FOLK_LOOKS[i % FOLK_LOOKS.length], V3(CORE.x + Math.cos(a) * r, 0, CORE.z + Math.sin(a) * r));
       if (i < spots.length && i < 14) { const sp = spots[i]; p.pos.set(sp.x, 0, sp.z); p.spot = sp; p.wait = 3 + rng() * 9; p.look = V3(sp.look[0], 0, sp.look[1]); }
     }
     stalls.forEach((st, i) => { if (!i) return; const p = crowd.spawn(FOLK_LOOKS[(i * 3) % FOLK_LOOKS.length], V3(st.x - Math.sin(st.ry) * 1.3, 0, st.z - Math.cos(st.ry) * 1.3)); p.fixed = true; p.look = V3(SQUARE.x, 0, SQUARE.z); p.vendor = true; });
@@ -616,11 +769,11 @@ export function createRoad(ctx) {
      from a looter (and his friends after it), one in the Stryx's mud fountain — past city
      guards taking them, and a Duskareth agent who wants the bag. */
   const ESC = STORY.ESCAPE;
-  const ringAt = (r, a) => V3(CITY.x + Math.cos(a) * r, 0, CITY.z + Math.sin(a) * r);   // a = +π/2 is the south wall, −π/2 the gate
+  const ringAt = (r, a) => V3(CORE.x + Math.cos(a) * r, 0, CORE.z + Math.sin(a) * r);   // round the market quarter: a = +π/2 is its south side, −π/2 the gate
   const GATE_SPOT = V3(0, 0, GATE_Z + 8);
   function escAdd(n, why) { MK.n = Math.max(0, MK.n + n); if (n > 0) { sfx.core(); ctx.toast(`Sniller amulet (${MK.n}/${ESC.need}) — into the Relic-bound bag`, 2.2); } escObjective(); }
-  function escAmuletItem(p, label = 'Pick up the Sniller amulet') {
-    const q = freeSpot(p.x, p.z, 0.8), it = addItem(V3(q.x, groundAt(q.x, q.z, 2.4) + 0.9, q.z), label, null, amuletMesh());
+  function escAmuletItem(p, label = 'Pick up the Sniller amulet', onTree = false) {
+    const q = onTree ? p : freeSpot(p.x, p.z, 0.8), it = addItem(V3(q.x, (onTree ? p.y : groundAt(q.x, q.z, 2.4)) + 0.9, q.z), label, null, amuletMesh());
     it.y0 = it.pos.y; it.act = () => { dropItem(it); MK.amulets.splice(MK.amulets.indexOf(it), 1); particles.burst(it.pos.x, it.pos.y, it.pos.z, 24, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.8, gravity: 2 }); escAdd(1); };
     MK.amulets.push(it); return it;
   }
@@ -635,38 +788,82 @@ export function createRoad(ctx) {
     ctx.save('escape');
     sfx.duat(); shake = 0.8; particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
     ctx.whiteFlash && ctx.whiteFlash();
-    const to = freeSpot(0, CITY.z + 47, 1.5); place(P, to.x, to.z, Math.PI); P.vel.set(0, 0, 0); CAM.yaw = 0;
+    // ...onto the top deck of the home tree, the whole city between him and the gate
+    const top = HT.decks.length - 1, to = deckSpot(top, toCore, 8.5), dir = V3(Math.cos(toCore), 0, Math.sin(toCore));
+    place(P, to.x, to.z, Math.atan2(dir.x, dir.z)); P.vel.set(0, 0, 0); CAM.yaw = Math.atan2(-dir.x, -dir.z); CAM.pitch = 0.18;
     particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
     // the cart's at the gate, and Buhkon with it
     CART.path = null; placeCart(GATE_SPOT.x + 3, GATE_SPOT.z + 3, Math.PI); B.stay = V3(GATE_SPOT.x - 1.5, 0, GATE_SPOT.z); place(B, B.stay.x, B.stay.z, 0);
     escSpawn();
-    sayHeld(ESC.blink, (k, tt) => ({ p: V3(P.pos.x + 4, P.pos.y + 2.2, P.pos.z + 5), l: V3(0, 12, GATE_Z) }), () => { escObjective(); ctx.hint(ESC.hint); });
+    sayHeld(ESC.blink, (k, tt) => ({ p: V3(P.pos.x - dir.x * 3.5 + dir.z * 2.5, P.pos.y + 4.2, P.pos.z - dir.z * 3.5 - dir.x * 2.5), l: V3(0, 8, GATE_Z + 20) }), () => { escObjective(); ctx.hint(ESC.hint); });
+  }
+  /* a place on a deck of the home tree: round the deck by angle a, `off` out from the bark (clear of the stairwell) */
+  function deckSpot(i, a, off = 8.5) {
+    const d = HT.decks[i]; if (inWell(d, a) || Math.abs(angDiff(a, d.well[0])) < 0.4) a = d.well[1] + 0.6;
+    const r = d.r0 + off; return V3(HT.x + Math.cos(a) * r, HT.g + d.y, HT.z + Math.sin(a) * r);
+  }
+  /* a point on the great stair, at height y above the foot */
+  function stairPoint(y) {
+    const S = HT.stair, k = clamp((y - 0.5) / S.top, 0, 1), a = S.a0 + k * S.turns * TAU, r = HT.rAt(y, a) + 1.6;
+    return V3(HT.x + Math.cos(a) * r, HT.g + y + 0.2, HT.z + Math.sin(a) * r);
   }
   function escSpawn() {
-    const E = MK.esc, S = Math.PI / 2;
-    // on the cobbles by the south wall
-    for (const a of [S + 0.35, S - 0.5, S + 0.95]) escAmuletItem(ringAt(49, a));
-    // a Kipsu with one in its mouth
-    { const p = freeSpot(ringAt(49, S - 1.05).x, ringAt(49, S - 1.05).z, 1); E.kipsu = addFoe('kipsu', p.x, p.z); E.kipsu.amulet = escGlow(E.kipsu.a.root, 0.6); }
-    // one blown right into a garden wall
+    const E = MK.esc, S = Math.PI / 2, top = HT.decks.length - 1;
+    // round the home tree's decks, all the way down, and in among its roots
+    escAmuletItem(deckSpot(top, toCore + 1.9), 'Pick up the Sniller amulet', true);
+    escAmuletItem(deckSpot(top, toCore - 2.3, 9.5), 'Pick up the Sniller amulet', true);
+    escAmuletItem(deckSpot(2, toCore + 0.7), 'Pick up the Sniller amulet', true);
+    escAmuletItem(deckSpot(1, toCore - 1.1, 9), 'Pick up the Sniller amulet', true);
+    escAmuletItem(deckSpot(0, toCore + 2.7), 'Pick up the Sniller amulet', true);
+    { const a = HT.stair.a0 - 0.75, r = HT.RB + 5; escAmuletItem(V3(HT.x + Math.cos(a) * r, 0, HT.z + Math.sin(a) * r), ESC.rootsAmulet); }
+    // on the cobbles of the long streets north
+    for (const [x, z] of [[0, 196], [22, 160], [-22, 140]]) escAmuletItem(V3(x, 0, z));
+    // a market cart tipped over in the street, a well with its bucket left up, a garden bench
     {
-      const p = freeSpot(ringAt(41, S + 0.45).x, ringAt(41, S + 0.45).z, 2.4), g = heightAt(p.x, p.z), yaw = S + 0.45;
-      const m = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.2, 0.7), toon(0xb8a07a)); m.position.set(p.x, g + 1.1, p.z); m.rotation.y = -yaw + Math.PI / 2; m.castShadow = true; addOutline(m, 0.04); scene.add(m);
+      const c = V3(44, 0, 182), wood = toon(0x8a5a36);
+      const bed = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 3.6), wood); bed.position.set(c.x, 0.9, c.z); bed.rotation.z = 1.2; addOutline(bed, 0.03); scene.add(bed);
+      const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.2, 14), toon(0x5a3a20)); wh.position.set(c.x - 0.4, 1.9, c.z + 1.1); wh.rotation.z = -0.4; addOutline(wh, 0.03); scene.add(wh);
+      for (let k = 0; k < 5; k++) { const f = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), toon([0xe08a3a, 0xd04a3a, 0xe8c84a][k % 3])); f.position.set(c.x + 1.3 + (k % 3) * 0.4, 0.2, c.z - 1 + k * 0.5); scene.add(f); }
+      box(c.x, c.z, 1.1, 1.9, -1, 1.8);
+      escAmuletItem(V3(c.x + 2.6, 0, c.z + 0.4), ESC.cartAmulet);
+    }
+    {
+      const c = V3(-44, 0, 148), stone = toon(0xa89a88);
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.4, 1.0, 16, 1, true), stone); ring.position.set(c.x, 0.5, c.z); addOutline(ring, 0.03); scene.add(ring);
+      const water = new THREE.Mesh(new THREE.CircleGeometry(1.25, 16), toon(0x2a4a5a)); water.rotation.x = -Math.PI / 2; water.position.set(c.x, 0.6, c.z); scene.add(water);
+      for (const sd of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.4, 0.18), toon(0x5a3a20)); post.position.set(c.x + sd * 1.25, 1.2, c.z); scene.add(post); }
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(1.9, 0.9, 4), toon(0x7a4a2a)); roof.rotation.y = Math.PI / 4; roof.position.set(c.x, 2.75, c.z); addOutline(roof, 0.03); scene.add(roof);
+      cyl(c.x, c.z, 1.45, -1, 1.0);
+      const it = escAmuletItem(V3(c.x + 1.9, 0, c.z), ESC.wellAmulet); it.pos.y = 1.2; it.y0 = 1.2;
+    }
+    {
+      const c = V3(66, 0, 140), wood = toon(0x9a6a40);
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.12, 0.6), wood); seat.position.set(c.x, 0.55, c.z); addOutline(seat, 0.02); scene.add(seat);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 0.1), wood); back.position.set(c.x, 0.95, c.z - 0.3); scene.add(back);
+      box(c.x, c.z, 1.2, 0.35, -1, 0.6);
+      escAmuletItem(V3(c.x, 0, c.z + 1.1), ESC.benchAmulet);
+    }
+    // a Kipsu with one in its mouth
+    { const p = freeSpot(22, 202, 1); E.kipsu = addFoe('kipsu', p.x, p.z); E.kipsu.amulet = escGlow(E.kipsu.a.root, 0.6); }
+    // one blown right into a garden wall along the avenue
+    {
+      const p = { x: -2.6, z: 176 }, g = heightAt(p.x, p.z);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.2, 0.7), toon(0xb8a07a)); m.position.set(p.x, g + 1.1, p.z); m.rotation.y = Math.PI / 2; m.castShadow = true; addOutline(m, 0.04); scene.add(m);
       const crack = glowSprite(0x6af0e0, 1.6, 0.8); crack.position.set(p.x, g + 1.4, p.z); scene.add(crack);
-      const s = box(p.x, p.z, 1.6, 1.6, g - 1, g + 2.2);
+      const s = box(p.x, p.z, 0.4, 2.2, g - 1, g + 2.2);
       E.wall = { m, crack, s, x: p.x, z: p.z, g, hits: 0, done: false };
     }
     // a frightened mother, and her boy hiding behind barrels two streets over
     {
-      const mp = ringAt(39, S - 0.65); E.mother = escPerson({ skin: '#b07a48', cap: '#5a3018', tunic: 0x8a5a6a }, mp, 0, { scale: 0.98 });
-      const kp = ringAt(49, S - 1.6); E.kid = escPerson({ skin: '#a8743e', cap: '#3a7a3a', tunic: 0x6a7a4a }, kp, 0, { scale: 0.55 });
+      const mp = V3(22, 0, 150); E.mother = escPerson({ skin: '#b07a48', cap: '#5a3018', tunic: 0x8a5a6a }, mp, 0, { scale: 0.98 });
+      const kp = V3(66, 0, 192); E.kid = escPerson({ skin: '#a8743e', cap: '#3a7a3a', tunic: 0x6a7a4a }, kp, 0, { scale: 0.55 });
       for (let k = 0; k < 3; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 10), toon(0x7a5a3a)); b.position.set(E.kid.pos.x + Math.cos(k * 2.1) * 1.1, E.kid.pos.y + 0.55, E.kid.pos.z + Math.sin(k * 2.1) * 1.1); addOutline(b, 0.03); scene.add(b); cyl(b.position.x, b.position.z, 0.45, E.kid.pos.y - 1, E.kid.pos.y + 1.1); }
       E.kidState = 'lost';
       E.motherItem = addItem(V3(E.mother.pos.x, E.mother.pos.y + 0.5, E.mother.pos.z), ESC.motherAsk, () => { dropItem(E.motherItem); ctx.say(ESC.mother, () => { E.kidState = 'search'; E.kidItem = addItem(V3(E.kid.pos.x, E.kid.pos.y + 0.4, E.kid.pos.z), ESC.kidSee, () => { dropItem(E.kidItem); ctx.say(ESC.kidTalk, () => { E.kidState = 'follow'; escObjective(); }); }); escObjective(); }); });
     }
     // a looter with one in his fist, and two friends
     {
-      const lp = ringAt(29, S + 0.75); E.looter = escPerson({ skin: '#9a6a40', cap: '#2a2a2a', tunic: 0x4a4a3a }, lp, 0, { scale: 1.05, build: 1.15 });
+      const lp = V3(-20, 0, 124); E.looter = escPerson({ skin: '#9a6a40', cap: '#2a2a2a', tunic: 0x4a4a3a }, lp, 0, { scale: 1.05, build: 1.15 });
       E.looterGlow = escGlow(E.looter.a.root, 1.15);
       E.looterItem = addItem(V3(E.looter.pos.x, E.looter.pos.y + 0.5, E.looter.pos.z), ESC.looterSee, () => {
         dropItem(E.looterItem); E.looter.a.root.remove(E.looterGlow); escAdd(1);
@@ -705,8 +902,12 @@ export function createRoad(ctx) {
     if (E.kidState === 'search') return E.kid.pos;
     if (E.kidState === 'follow') return E.mother.pos;
     let best = null, bd = 1e9;
-    for (const it of MK.amulets) { if (it.fall) continue; const d = it.pos.distanceTo(P.pos); if (d < bd && d < 30) { bd = d; best = it.pos; } }
-    return best || GATE_SPOT;
+    for (const it of MK.amulets) { if (it.fall || Math.abs(it.pos.y - P.pos.y) > 4) continue; const d = it.pos.distanceTo(P.pos); if (d < bd && d < 30) { bd = d; best = it.pos; } }
+    if (best) return best;
+    // up the home tree with nothing left on this level: the way down is the stair, on down through the stairwell
+    const ly = P.pos.y - HT.g;
+    if (ly > 2 && Math.hypot(P.pos.x - HT.x, P.pos.z - HT.z) < HT.reach + 2) return stairPoint(Math.max(0.5, ly - 5));
+    return GATE_SPOT;
   }
   function escTick(dt) {
     const E = MK.esc; if (!E || E.stage !== 'cross') return;
@@ -749,7 +950,7 @@ export function createRoad(ctx) {
     }
     if (E.held) { fountain.hold(P.pos); P.vel.set(0, 0, 0); if (Math.random() < 0.3) particles.emit(P.pos.x, P.pos.y + 0.5, P.pos.z, { color: 0x6a8a3a, size: 0.35, life: 0.5, speed: 1.5 }); }
     // the Duskareth agent, in the north street: too strong to fight — outrun it
-    if (!E.agent && P.pos.z < CITY.z - 6 && Math.abs(P.pos.x) < 10) {
+    if (!E.agent && P.pos.z < CORE.z - 6 && Math.abs(P.pos.x) < 10) {
       const v = buildVel(); scene.add(v.root); const p = freeSpot(P.pos.x + 2, P.pos.z - 12, 1); v.root.position.set(p.x, groundAt(p.x, p.z, 3), p.z);
       E.agent = { a: v, pos: v.root.position, on: true, yaw: 0, gone: false };
       particles.burst(p.x, groundAt(p.x, p.z, 3) + 1, p.z, 40, { color: 0x9a4aff, speed: 6, size: 0.6, life: 0.8 }); sfx.duat();
@@ -761,11 +962,28 @@ export function createRoad(ctx) {
       const q = A.pos.clone(); resolve(q, 0.5); A.pos.x = q.x; A.pos.z = q.z; A.pos.y = groundAt(A.pos.x, A.pos.z, A.pos.y + 1);
       A.a.root.rotation.y = A.yaw; A.a.animate(dt, { speed: v, onGround: true, t });
       if (d < 1.8 && t > (E.agentT || 0)) {
-        E.agentT = t + 3; escAdd(-1); hurtTanoc(8, A.pos); P.vel.addScaledVector(V3(dx / d, 0, dz / d), 10); ctx.toast(ESC.agentCaught, 3);
+        E.agentT = t + 3; if (MK.n > 0) E.stolen = (E.stolen || 0) + 1; escAdd(-1); hurtTanoc(8, A.pos); P.vel.addScaledVector(V3(dx / d, 0, dz / d), 10); ctx.toast(ESC.agentCaught, 3);
         particles.burst(A.pos.x, A.pos.y + 1.2, A.pos.z, 30, { color: 0x9a4aff, speed: 6, size: 0.5, life: 0.7 });
         const back = freeSpot(A.pos.x - dx / d * 8, A.pos.z - dz / d * 8, 1); A.pos.set(back.x, groundAt(back.x, back.z, 3), back.z);   // it blinks back a few paces, and comes again
       }
-      if (P.pos.z < GATE_Z + 18) { A.on = false; scene.remove(A.a.root); particles.burst(A.pos.x, A.pos.y + 1, A.pos.z, 40, { color: 0x9a4aff, speed: 6, size: 0.6, life: 0.8 }); ctx.toast(ESC.agentLost, 3.5); }
+      if (P.pos.z < GATE_Z + 18) {
+        A.on = false; scene.remove(A.a.root); particles.burst(A.pos.x, A.pos.y + 1, A.pos.z, 40, { color: 0x9a4aff, speed: 6, size: 0.6, life: 0.8 });
+        // and what it took falls out of nothing as it goes, ringing on the cobbles
+        for (let k = 0; k < (E.stolen || 0); k++) { const a = k * 2.4; escAmuletItem(V3(A.pos.x + Math.cos(a) * 1.6, 0, A.pos.z + Math.sin(a) * 1.6)); }
+        ctx.toast(E.stolen ? ESC.agentDrop : ESC.agentLost, 3.5); E.stolen = 0;
+      }
+    }
+    // never stuck: if what's left in the city can't make up the count (guards, the Vel), another turns up near him
+    if (t > (E.netT || 0)) {
+      E.netT = t + 1.5;
+      const left = MK.amulets.length + (E.kipsu && E.kipsu.amulet ? 1 : 0) + (E.wall && !E.wall.done ? 1 : 0) + (E.kidState === 'home' ? 0 : 1)
+        + (E.looterItem && items.includes(E.looterItem) ? 1 : 0) + (E.fountainItem.taken ? 0 : 1) + (E.agent && E.agent.on ? E.stolen || 0 : 0);
+      if (MK.n + left < ESC.need) {
+        const up = P.pos.y - HT.g > 2 && Math.hypot(P.pos.x - HT.x, P.pos.z - HT.z) < HT.reach + 2;
+        const to = up ? stairPoint(0.5) : V3(P.pos.x + (GATE_SPOT.x - P.pos.x) * 0.1, 0, P.pos.z + (GATE_SPOT.z - P.pos.z) * 0.1);
+        const it = escAmuletItem(up ? V3(to.x + 4, 0, to.z) : to); particles.burst(it.pos.x, it.pos.y, it.pos.z, 20, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.7 });
+        ctx.bark('tanoc', ESC.stray, 3);
+      }
     }
     // at the gate: Buhkon and the cart — but only with enough of them, and the little Punk seen to
     if (P.pos.distanceTo(GATE_SPOT) < 7) {
@@ -1495,6 +1713,6 @@ export function createRoad(ctx) {
   }
   return {
     start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }
