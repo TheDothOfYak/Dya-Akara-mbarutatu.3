@@ -7,8 +7,10 @@
    windows, and a crown of leaf so high it is half in the cloud.
 
    buildHomeTree(scene, x, z, g, opts) adds one and hands back
-   { x, z, R, RB, H, colliders } — colliders are plain records
-   ({ kind:'cyl', x, z, r, y0, y1 }) for the caller's own physics.
+   { x, z, R, RB, H, colliders, rAt, decks, stair, deckHouses } —
+   colliders are plain records ({ kind:'cyl', x, z, r, y0, y1 }) for
+   the caller's own physics; the rest is enough to walk the decks
+   and the stair (road.js does).
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline } from './gfx.js';
@@ -138,10 +140,12 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
   }
 
   /* ---- the town on it ---- */
+  let decksOut = [], stair = null;
+  const deckHouses = [];
   if (town > 0) {
     const wood = 0x8a6040, plank = 0xa87a50, roofs = opts.roofs ?? [0x8a3a2a, 0x6a4a8a, 0x3a6a7a, 0xa8642a, 0x5a7a3a], walls = [0xe8d8b8, 0xd8c098, 0xf0e4c8, 0xc8b090];
     const deckB = batch(root, new THREE.CylinderGeometry(1, 1, 1, 48, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 20, { shadow: true });
-    const floorB = batch(root, new THREE.RingGeometry(0.0001, 1, 48, 1).rotateX(-Math.PI / 2), toon(0xffffff, { side: THREE.DoubleSide }), 20, { shadow: false });
+    const floorM = toon(plank, { side: THREE.DoubleSide });
     const houseB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 240);
     const roofB = batch(root, new THREE.ConeGeometry(0.75, 1, 4).rotateY(Math.PI / 4), toon(0xffffff), 240);
     const winB = batch(root, new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffd9a0, side: THREE.DoubleSide }), 700, { shadow: false });
@@ -152,9 +156,20 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     // decks: rings round the trunk, each wider than the bark there
     const deckYs = (opts.decks ?? [0.08, 0.17, 0.27, 0.38, 0.5]).map(f => H * f).slice(0, Math.max(1, Math.round(5 * town)));
     const decks = [];
+    // the great stair's turn (worked out first, so no house is built across its landings)
+    const stTop = deckYs[deckYs.length - 1], stTurns = Math.max(2, stTop / 28);
+    const stairA = y => (y - 0.5) / stTop * stTurns * TAU + 0.4;
+    // (a stairwell is left open in each deck just below where the stair comes through it, so it can go on down)
+    const WELL0 = -0.6, WELL1 = 0.05;
+    const offStair = (a, y) => { const d = Math.atan2(Math.sin(a - stairA(y)), Math.cos(a - stairA(y))); return d < WELL0 - 0.2 || d > WELL1 + 0.3; };
     for (const y of deckYs) {
-      const r0 = rAt(y, 0), w = Math.max(7, R * 0.9), ro = r0 + w;
-      floorB.put(0, y, 0, ro, 1, ro, 0, 0, 0, plank);
+      const r0 = rAt(y, 0), w = Math.max(7, opts.deckW ?? R * 0.9), ro = r0 + w;
+      {   // the floor: an outer ring all the way round, and the inner ring by the bark with the stairwell left out of it
+        // (RingGeometry runs its angle the other way round once it's laid flat, hence the minus signs)
+        const sa = stairA(y), rw = r0 + 3.4;
+        const outer = new THREE.Mesh(new THREE.RingGeometry(rw, ro, 64, 1).rotateX(-Math.PI / 2), floorM); outer.position.y = y; outer.receiveShadow = true; root.add(outer);
+        const inner = new THREE.Mesh(new THREE.RingGeometry(r0 * 0.9, rw, 64, 1, -(sa + WELL0 + TAU), TAU - (WELL1 - WELL0)).rotateX(-Math.PI / 2), floorM); inner.position.y = y; inner.receiveShadow = true; root.add(inner);
+      }
       deckB.put(0, y - 0.6, 0, ro, 1.2, ro, 0, 0, 0, wood);
       // the deck's struts down to the bark
       for (let k = 0; k < 14; k++) { const a = k / 14 * TAU; limbs.seg(V3(Math.cos(a) * ro * 0.92, y - 0.8, Math.sin(a) * ro * 0.92), V3(Math.cos(a) * r0 * 0.9, y - w * 0.9, Math.sin(a) * r0 * 0.9), 0.45, 0.45, wood); }
@@ -166,7 +181,9 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       for (let k = 0; k < nH; k++) {
         if (rnd() < 0.15) continue;
         const a = k / nH * TAU + rnd() * 0.15, hw = 3 + rnd() * 2.4, hh = 3.2 + rnd() * 2.6, hd = 3 + rnd() * 1.6, d = r0 + hd * 0.5 + 0.6;
+        if (!offStair(a, y)) continue;
         const hx = Math.cos(a) * d, hz = Math.sin(a) * d, ry = -a + Math.PI / 2;
+        deckHouses.push({ x: x + hx, z: z + hz, y: g + y, r: Math.max(hw, hd) * 0.62, h: hh + hw * 0.5 });
         houseB.put(hx, y + hh / 2, hz, hw, hh, hd, 0, ry, 0, walls[Math.floor(rnd() * walls.length)]);
         roofB.put(hx, y + hh + hw * 0.32, hz, hw * 1.35, hw * 0.64, hd * 1.35, 0, ry, 0, roofs[Math.floor(rnd() * roofs.length)]);
         // two lit windows and a door on the outward face
@@ -176,9 +193,11 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       }
       decks.push({ y, ro, r0 });
     }
+    decksOut = decks.map(d => Object.assign(d, { well: [stairA(d.y) + WELL0, stairA(d.y) + WELL1] }));
     // the great stair: round and round the bark from the roots to the top deck
     {
-      const top = deckYs[deckYs.length - 1], turns = Math.max(2, top / 28), n = Math.min(650, Math.round(turns * 64));
+      const top = stTop, turns = stTurns, n = Math.min(650, Math.round(turns * 64));
+      stair = { top, turns, a0: 0.4 };
       for (let i = 0; i < n; i++) {
         const t = i / n, a = t * turns * TAU + 0.4, y = 0.5 + t * top, r = rAt(y, a) + 1.6;
         stepB.put(Math.cos(a) * r, y, Math.sin(a) * r, 3.2, 0.35, 1.2, 0, -a, 0, plank);
@@ -216,10 +235,12 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       const arch = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.8, 6, 16, Math.PI), toon(0x8a6a4a)); arch.position.set(Math.cos(a) * (r + 0.2), 14, Math.sin(a) * (r + 0.2)); arch.rotation.y = -a + Math.PI / 2; root.add(arch);
       for (const s of [-1, 1]) { const sa = a + s * 6 / r; winB.put(Math.cos(sa) * (r + 0.3), 9, Math.sin(sa) * (r + 0.3), 1.1, 1.4, 1, 0, -sa + Math.PI / 2, 0); }
     }
-    for (const b of [deckB, floorB, houseB, roofB, winB, postB, stepB, ropeB]) b.done();
+    for (const b of [deckB, houseB, roofB, winB, postB, stepB, ropeB]) b.done();
   }
   limbs.done(); leafB.done();
-  return { x, z, g, R, RB, H, colliders, root, rAt };
+  // decks ({ y, r0, ro } above the foot), the stair ({ top, turns, a0 }: it climbs from a0 at the foot, anticlockwise) and the
+  // houses on the decks ({ x, z, y, r, h } in world terms) let a scene make the tree walkable
+  return { x, z, g, R, RB, H, colliders, root, rAt, decks: decksOut, stair, deckHouses };
 }
 
 /* ---------------- a plain forest: pines and broadleaf, instanced ---------------- */
