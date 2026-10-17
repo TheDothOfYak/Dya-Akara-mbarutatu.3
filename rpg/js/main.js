@@ -14,6 +14,7 @@ import { paintPass } from './paint.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { installSmoothStyle } from './smooth.js';
+import { installDetailCull } from './detail.js';
 import { latchAlongRay } from './vines.js';
 import { createAmbient } from './ambient.js';
 import { buildSky, SUN_DIR } from './sky.js';
@@ -57,6 +58,7 @@ const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, scale: 1 };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
+installDetailCull();    // parts smaller than a pixel are not drawn (they still cost a draw call each)
 installSmoothStyle();   // the film look: painted light and brushwork on every toon material, softened shapes — before anything is drawn
 
 /* ---------------- the save, and which region this page is ---------------- */
@@ -4292,10 +4294,10 @@ function updateWorldBits(dt) {
    ================================================================ */
 const clock = new THREE.Clock();
 let frameDt = 1 / 60;
-/* a frame cap: 60 a second in play, less on the title, while paused, or when the window is behind another.
-   High-refresh screens would otherwise push the whole bloom-and-shadow pipeline at 120–144 frames a second
-   for nothing anyone can see, and that is what runs a laptop hot. */
-let lastFrame = -Infinity;
+/* a frame cap: about 60 a second in play, less on the title, while paused, or when the window is behind another.
+   It draws every 2nd or 3rd refresh of the screen rather than on a clock, so the frames stay evenly spaced:
+   a strict 60 on a 144Hz screen would land 2, 3, 2, 3 refreshes apart, and that unevenness reads as judder. */
+let refreshMs = 1000 / 60, lastTick = 0, tickN = 0;
 function frameCap() {
   if (G.paused) return 10;
   if (G.mode === 'title' || !document.hasFocus()) return 30;
@@ -4303,9 +4305,11 @@ function frameCap() {
 }
 function frame(now) {
   requestAnimationFrame(frame);
-  const step = 1000 / frameCap(), gap = now - lastFrame;
-  if (gap < step - 1) return;
-  lastFrame = gap > step * 4 ? now : now - (gap % step);
+  const gap = now - lastTick; lastTick = now;
+  if (gap > 3 && gap < 40) refreshMs += (gap - refreshMs) * 0.05;   // learn the screen's refresh rate (ignoring hitches)
+  const every = Math.max(1, Math.floor(1000 / refreshMs / frameCap() + 0.25));
+  if (++tickN < every) return;
+  tickN = 0;
   // steady the clock: the browser's frames arrive a little unevenly, and stepping the world by each raw gap
   // makes everything that moves shimmer. Small wobbles are smoothed out; a real hitch still counts in full.
   const rawDt = Math.min(clock.getDelta(), 1 / 20);
