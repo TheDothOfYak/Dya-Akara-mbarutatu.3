@@ -427,6 +427,7 @@ const enemies = createEnemies({
   },
   onKill(e) {
     if (e.T.disp === 'training') { dummyBroken(e); return; }
+    if (e.tag === 'winter') apRaidKill(e);
     if (e.kind === 'rubbermcfly') { shurgrEdanCalled(e); return; }   // no shards for that. Nothing good comes of it.
     const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4) * FX.shards) + (e.stolen || 0);
     G.shards += n; SAVE.kills++;
@@ -1211,7 +1212,7 @@ function interactables() {
   if (G.mode !== 'play' || P.dead) return list;
   list.push(...interiors.interactables(P, { enter: d => enterRoom(d), exit: () => leaveRoom() }));
   if (interiors.inside) return list;   // inside, only the room's own things
-  if (young()) { if (relicOut() && RELIC_SPOT) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); }
+  if (young()) { if (relicOut() && RELIC_SPOT) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); list.push(...apInteractables()); }
   else if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
   else if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
   else list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => talkPhorus(), far: 2.6 });
@@ -1286,6 +1287,7 @@ function stryx() {
 }
 
 function readStone(s) {
+  if (apReadStone(s)) return;
   const lines = STORY.STONES[s.key] || ['The carving is too worn to read.'];
   if (!SAVE.codex[s.key]) xp(15);
   SAVE.codex[s.key] = true; persist();
@@ -1776,6 +1778,7 @@ function takeAmulet(a) {
   sfx.core(); xp(25);
   const tier = AMULET_TIERS.find(t => t.n === SAVE.amulets);
   toast(`Sniller amulet (${SAVE.amulets}/${AMULET_TOTAL})`, 2.5);
+  apTookAmulet();
   if (tier) {
     if (tier.items) for (const [k, c] of Object.entries(tier.items)) { invAdd(SAVE.inv, k, c); lootToast(k, c); }
     if (tier.points) SAVE.skills.points += tier.points;
@@ -1951,6 +1954,7 @@ function singToken(part) {
 }
 function buhkonTokens() {
   if (SAVE.inv.items.okid) { openBook('tokens'); return; }
+  if (young() && !F_.ch2) { dialog(STORY.APPRENTICE.festival.tokensAsk); return; }   // the Okid'Relic waits for something worth keeping
   dialog([
     ['buhkon', 'Tokens. I wondered when you’d ask. You’ve carried those since Velki — don’t look at me like that, I know a pocketful of tokens when I hear one.'],
     ['buhkon', 'A token is a creature’s truth. One creature — not the kind, the individual. Sing its song while you pour a little liquid stygian into a piece of it, inside an Okid’Relic, and the Relic keeps what it was.'],
@@ -2421,13 +2425,18 @@ const npcs = (NPCS[REGION] || []).filter(def => camp || def.pos).map(def => {
   if (!def.wander) world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);
   return { def, actor, pos, home: pos.clone(), goal: null, pause: Math.random() * 4, yaw, talking: 0 };
 });
+/* young Tanoc isn't Stamijan yet, and hasn't met Phorus: the folk of Beuhk talk to the Carpenter's boy */
+if (young()) {
+  for (const n of npcs) if (STORY.YOUNG_HELLO[n.def.id]) n.def.hello = STORY.YOUNG_HELLO[n.def.id];
+  for (const [id, o] of Object.entries(STORY.YOUNG_QUESTS)) if (QUESTS[id]) Object.assign(QUESTS[id], o);
+}
 const npcName = id => { if (id === 'phorus') return 'Phorus'; const n = Object.values(NPCS).flat().find(d => d.id === id); return n ? n.name : id; };
 const npcSpeaker = def => { if (!STORY.SPEAKERS[def.id]) STORY.SPEAKERS[def.id] = { name: def.name, color: def.look === 'keilia' ? '#e0b070' : '#e8d8a8', sub: def.title }; return def.id; };
 
 function updateNpcs(dt) {
   for (const n of npcs) {
     // in Beuhk the Carpenter is only about on the night they stop there; he lives out at his own place
-    n.hidden = REGION === 'xilia' && n.def.id === 'buhkon' && !(young() && F_.pro === 'beuhk' && F_.bk === 'rest') && !(!young() && (F_.tut || 0) >= 5);
+    n.hidden = REGION === 'xilia' && n.def.id === 'buhkon' && !(young() && F_.pro === 'beuhk' && F_.bk === 'rest') && !(!young() && (F_.tut || 0) >= 5) && !festival;
     n.actor.root.visible = !n.hidden;
     if (n.hidden) continue;
     const d = n.pos.distanceTo(P.pos);
@@ -2498,8 +2507,9 @@ function npcTalk(n) {
   const def = n.def, who = npcSpeaker(def);
   n.talking = 3;
   if (def.id === 'buhkon') { if (young()) youngBuhkon(n); else buhkonTalk(n); return; }
-  const opts = [];
+  const opts = apNpcOptions(n).concat(bkErrandOptions(n));
   for (const qid of def.quests) {
+    if (young() && qid === 'q_vel') continue;   // a Duat scroll is no use to him yet, and a Vel is no job for a boy
     const q = QUESTS[qid], st = SAVE.quests[qid];
     if (!st) opts.push({ label: `Ask about work <em style="color:var(--brass2)">· ${q.name}</em>`, act: () => offerQuest(n, qid) });
     else if (st === 'active') {
@@ -3716,6 +3726,7 @@ function arriveByExit(info) {
   enterPlay();
   if (REGION === 'property' && young() && F_.pro === 'beuhk') { pathWalk(); return; }
   showLocation(REGION_NAME[REGION], REGION === 'property' ? 'the forest path, west of Beuhk' : 'in from the forest path');
+  apArrive();
   persist();
 }
 
@@ -4283,6 +4294,7 @@ function frame() {
       checkLocations();
       if (young() && F_.pro === 'beuhk') { if (REGION === 'property') pathTick(); else beuhkTick(); }
       else if (young()) youngTick();
+      apTick(dt);
       updateMalsti(dt);
       updatePlace();
       if (REGION === 'xilia' || REGION === 'property') {
@@ -4385,6 +4397,7 @@ function startVelki() {
     },
     say: (lines, cb) => dialog(lines, cb), bark: (w, t, d) => bark(w, t, d), hint: t => hint(t), toast: (t, d) => toast(t, d),
     objective: (text, h) => proObjective('The Beginning · Velki', text, h),
+    at: F_.vkAt, save: k => { F_.vkAt = k; persist(); },
     whiteness: v => { whiteout.style.transition = ''; whiteout.style.opacity = v; },
     onCaught: () => leaveVelki(),
   });
@@ -4796,7 +4809,8 @@ function beuhkTick() {
     }
     if (BK.heard.size >= W.length && !BK.done && barkTimer <= 0) {
       BK.done = true;
-      dialog(STORY.ROAD.day5.heard, () => { F_.bk = 'climb'; persist(); G.mode = 'intro'; fade(1, 0.8); setTimeout(() => { arriveBeuhk(); }, 900); });
+      // then supper to fetch, before the night: a loaf from Ama, a wick from Hemla
+      dialog(STORY.ROAD.day5.heard.concat(STORY.ROAD.day5.errand), () => { BK.errand = {}; setObjective(); });
     }
   }
 }
@@ -4838,13 +4852,26 @@ function startDay6() {
     dialog([['buhkon', 'I’ll go ahead and open the house up. The little road west, over the bridge, and into the trees — the forest path. Follow it to the top. You can’t miss it.']], () => setObjective());
   });
 }
+/* day five's supper errand: talk to Ama and to Hemla, then back to the Carpenter at the hearth */
+function bkErrandOptions(n) {
+  if (!young() || F_.pro !== 'beuhk' || F_.bk !== 'rest' || !BK || !BK.errand) return [];
+  const R = STORY.ROAD.day5, id = n.def.id;
+  if ((id === 'v1' || id === 'hemla') && !BK.errand[id]) return [{ label: `<b style="color:#ffd27a">${id === 'v1' ? 'Ask for a loaf — for Buhkon Eldi' : 'Ask for a lamp-wick — for Buhkon Eldi'}</b>`, act: () => {
+    n.talking = 5;
+    dialog(id === 'v1' ? R.ama : R.hemla, () => { BK.errand[id] = true; if (id === 'v1') { invAdd(SAVE.inv, 'bun', 1); lootToast('bun', 1); } sfx.core(); setObjective(); });
+  } }];
+  return [];
+}
+function bkErrandDone() { return BK && BK.errand && BK.errand.v1 && BK.errand.hemla; }
 function beuhkObjective() {
   const R = STORY.ROAD;
+  if (F_.bk === 'rest' && BK && BK.errand) { const n = (BK.errand.v1 ? 1 : 0) + (BK.errand.hemla ? 1 : 0); if (n >= 2) proObjective('The Road North · Beuhk', R.day5.back, ''); else proObjective('The Road North · Beuhk', R.day5.errandObj(n), R.day5.errandHint, 2, n); return; }
   if (F_.bk === 'rest') proObjective('The Road North · Beuhk', R.obj.day5, `Overheard: ${BK ? BK.heard.size : 0}/4`, 4, BK ? BK.heard.size : 0);
   else proObjective('The Road North · Day six', R.day6.obj, REGION === 'property' ? 'Follow the path west, up through the trees' : 'West out of town, over the bridge, into the trees');
 }
 function beuhkGoal() {
   if (REGION === 'property') return world.crestPoint;
+  if (F_.bk === 'rest' && BK && BK.errand) { const want = bkErrandDone() ? 'buhkon' : !BK.errand.v1 ? 'v1' : 'hemla', n = npcs.find(q => q.def.id === want); return n ? n.pos : null; }
   if (F_.bk === 'rest') { let best = null, bd = 1e9; for (const n of npcs) { if (n.def.id === 'buhkon' || (BK && BK.heard.has(n.def.id))) continue; const d = n.pos.distanceTo(P.pos); if (d < bd) { bd = d; best = n; } } return best ? best.pos : null; }
   return world.westGoal || null;
 }
@@ -4912,9 +4939,11 @@ function youngTakeRelic() {
 function youngBuhkon(n) {
   const q = F_.yq || 0, Y = STORY.YOUNG;
   n.talking = 4;
-  if (F_.pro === 'beuhk') { dialog([['buhkon', F_.bk === 'rest' ? 'Go on, walk about. Ears open, hat on.' : 'Up the little road, west. I’ll have the kettle on.']]); return; }
+  if (F_.pro === 'beuhk' && F_.bk === 'rest' && bkErrandDone()) { dialog(STORY.ROAD.day5.errandBack, () => { F_.bk = 'climb'; persist(); G.mode = 'intro'; fade(1, 0.8); setTimeout(() => { arriveBeuhk(); }, 900); }); return; }
+  if (F_.pro === 'beuhk') { dialog([['buhkon', F_.bk === 'rest' ? (BK && BK.errand ? 'A loaf from Ama, a wick from Hemla. Go on.' : 'Go on, walk about. Ears open, hat on.') : 'Up the little road, west. I’ll have the kettle on.']]); return; }
   if (F_.pro === 'token') { firstTokenLesson(n); return; }
   if (F_.saddle && !F_.stall && SAVE.inv.items.saddle) { dialog(STORY.STEED.askBuhkon(PN()), () => startStallPlace()); return; }
+  if (apOn()) { apBuhkon(n); return; }
   if (q >= 5 && !F_.megla) {
     ask('buhkon', 'Something on your mind? You keep touching that amulet.', [
       { label: 'It’s pulling. North. <em style="color:var(--brass2)">· Chapter II: the Megla Aagac</em>', act: () => saddled() ? meglaBegin() : dialog([['buhkon', `North, on foot? Not a chance. Get a saddle on ${PN()} first — Old Ruut in Beuhk has one he’d part with, if you help him with his strays.`]]) },
@@ -4942,6 +4971,7 @@ function youngBuhkon(n) {
 function youngGoal() {
   const q = F_.yq || 0, bk = npcs.find(n => n.def.id === 'buhkon');
   if (interiors.inside) return interiors.room(interiors.inside.id) ? interiors.room(interiors.inside.id).out : null;
+  if (apOn() && !(F_.saddle && !F_.stall && SAVE.inv.items.saddle)) return apGoal();
   if (REGION === 'xilia') return q >= 5 ? null : world.westGoal;   // Buhkon's is out west, along the forest path
   if (q === 0) return RELIC_SPOT;
   if (q === 1 || q === 4 || F_.pro === 'token' || (q >= 5 && !F_.megla) || (F_.saddle && !F_.stall)) return bk ? bk.pos : null;
@@ -4962,6 +4992,7 @@ function youngObjective() {
   else if (PLACE) proObjective(head, STORY.STEED.placeObj, STORY.STEED.placeHint);
   else if (F_.saddle && !F_.stall && SAVE.inv.items.saddle) proObjective(head, STORY.STEED.bring, 'He’s up at the house, or in the workshop');
   else if (F_.pro === 'token') proObjective('Chapter II · home again', STORY.FIRST_TOKEN.findObj, 'Show him the Gynge chip');
+  else if (apOn()) apObjective();
   else if (!F_.megla) proObjective(head, 'The Sniller amulet is tugging north — talk to Buhkon', 'When you’re ready: Chapter II, the Megla Aagac');
   else proObjective(F_.ch2 ? 'Chapter II · done' : head, O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');
 }
@@ -4970,6 +5001,388 @@ function youngTick() {
   if (G.mode !== 'play') return;
   if (relicOut() && RELIC_SPOT && !G.relicSeen && P.pos.distanceTo(RELIC_SPOT) < 16) { G.relicSeen = true; bark('tale', STORY.YOUNG.relicSpot, 4); }
   if (F_.yq === 3 && REGION === 'property' && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) { youngSet(4); sfx.core(); toast('Gliding — learned!', 2.5); xp(40); bark('buhkon', STORY.YOUNG.glided[0][1], 4); }
+}
+
+/* ================================================================
+   CHAPTER I, GO ON — THE TWO SUMMERS (STORY.APPRENTICE)
+   After the first day, a season at a time on the Carpenter's land:
+   F_.ap counts the steps, F_.apGiven says Buhkon has set this one,
+   and anything a step needs to remember lives in F_.ap* too.
+   ================================================================ */
+const AP = { DELIVER: 0, AMULETS: 1, HARVEST: 2, FESTIVAL: 3, WINTER: 4, VOICE: 5, SPRING: 6, RIDE: 7, LOOKOUT: 8, DONE: 9 };
+const apStep = () => F_.ap ?? 0;
+const apOn = () => young() && (F_.yq || 0) >= 5 && !F_.megla && F_.pro === 'done' && apStep() < AP.DONE;
+const apWinter = () => young() && !F_.megla && (apStep() === AP.WINTER || apStep() === AP.VOICE);
+const APS = STORY.APPRENTICE;
+const RAID_N = 5;
+const apBuhkonNpc = () => npcs.find(n => n.def.id === 'buhkon');
+const apExitEast = () => (world.exits || []).find(e => e.to === 'xilia');
+const apStone = () => stones.find(s => s.key === 'p_path');
+const apHome = () => REGION === 'property' ? (apBuhkonNpc() || {}).pos : world.westGoal;
+/* move the run on to the next step; a season's cards wait until you're out on the land to see them */
+function apAdvance(to, cards) {
+  F_.ap = to; F_.apGiven = false;
+  if (cards) F_.apCards = cards;
+  persist(); setObjective();
+}
+/* the loft bed in the big house, for waking up in (and lying awake in) */
+function toLoftBed() {
+  const house = (world.doors || []).find(d => d.kind === 'manor');
+  if (!house) return false;
+  if (!interiors.inside) enterRoom(house, true);
+  const room = interiors.room(house.id), b = room && room.items.find(i => /loft/.test(i.label));
+  if (b) { P.pos.set(b.pos.x - 2.2, b.pos.y - 0.8, b.pos.z + 1.2); P.yaw = Math.PI; CAM.yaw = 0; }
+  P.vel.set(0, 0, 0);
+  return true;
+}
+
+/* ---------------- the harvest festival, in Beuhk's square ---------------- */
+const festival = REGION === 'xilia' && young() && !F_.megla && apStep() === AP.FESTIVAL ? (() => {
+  const g = new THREE.Group(), C = world.PLAZA, fx = C.x + 10, fz = C.z - 8, fy = world.heightAt(fx, fz);
+  for (let i = 0; i < 9; i++) {   // the bonfire: a cone of logs
+    const a = i / 9 * Math.PI * 2, log = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 4.2, 6), toon(0x5a3a20));
+    log.position.set(fx + Math.cos(a) * 0.9, fy + 1.7, fz + Math.sin(a) * 0.9); log.rotation.set(Math.sin(a) * 0.45, 0, -Math.cos(a) * 0.45); g.add(log);
+  }
+  const fire = glowSprite(0xff8a3a, 9, 0.95); fire.position.set(fx, fy + 2.4, fz); g.add(fire);
+  const lamps = [];
+  for (let k = 0; k < 4; k++) {   // strings of lanterns across the square, sagging between the roofs
+    const a = k / 4 * Math.PI + 0.3, x0 = C.x + Math.cos(a) * 24, z0 = C.z + Math.sin(a) * 24, x1 = C.x - Math.cos(a) * 24, z1 = C.z - Math.sin(a) * 24;
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10, x = lerp(x0, x1, t), z = lerp(z0, z1, t), y = world.heightAt(x, z) + 6.5 - Math.sin(t * Math.PI) * 1.6;
+      const l = glowSprite([0xffc070, 0xff8ac8, 0x9adfff, 0xffe08a][(i + k) % 4], 1.1, 0.9); l.position.set(x, y, z); g.add(l); lamps.push(l);
+    }
+  }
+  scene.add(g);
+  world.col.add(fx, fz, 1.4, 1.4, 0, fy - 1, fy + 3.5);
+  return { g, fire, lamps, x: fx, y: fy, z: fz };
+})() : null;
+
+/* ---------------- Eldi I: the Carpenter's first boat, on the far shore ---------------- */
+const oldBoat = REGION === 'property' && young() ? (() => {
+  let x = -1020;
+  for (; x > -1220; x -= 4) if (world.heightAt(x, 40) > (world.water ? world.water.level : 0) + 0.4) break;
+  x -= 5;
+  const z = 40, y = world.heightAt(x, z), g = new THREE.Group(), wood = toon(0x8a8274);
+  const keel = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 15), wood); keel.position.y = 0.2; g.add(keel);
+  for (let i = 0; i < 8; i++) {   // the ribs, grey and whole: fire-tree never burns, and it hardly rots
+    const r = 2.3 - Math.abs(i - 3.5) * 0.18, rib = new THREE.Mesh(new THREE.TorusGeometry(r, 0.16, 5, 10, Math.PI), wood);
+    rib.rotation.z = Math.PI; rib.position.set(0, r * 0.9, -6.3 + i * 1.8); g.add(rib);
+  }
+  for (const s of [-1, 1]) { const plank = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 9), wood); plank.position.set(s * 1.9, 1.2, -1); plank.rotation.z = s * 0.4; g.add(plank); }
+  const stem = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.4, 0.4), wood); stem.position.set(0, 1.6, 7.4); stem.rotation.x = 0.3; g.add(stem);
+  const parts = []; g.traverse(m => { if (m.isMesh) parts.push(m); });
+  for (const m of parts) { m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.03); }
+  g.position.set(x, y - 0.5, z); g.rotation.set(0, 0.4, 0.32);
+  scene.add(g);
+  world.col.add(x, z, 2.4, 7.5, 0.4, y - 1, y + 1.4);
+  return { g, pos: V3(x, y + 0.6, z) };
+})() : null;
+
+/* ---------------- talking to the Carpenter ---------------- */
+function apBuhkon(n) {
+  const s = apStep(), B = APS;
+  const say = (lines, then) => dialog(lines, () => { if (then) then(); setObjective(); });
+  if (REGION === 'xilia') {   // only at the festival is he in town
+    if (s !== AP.FESTIVAL) { say([['buhkon', 'Home, Tanoc. The forest path, west.']]); return; }
+    if (F_.apFest) { say([['buhkon', 'Home along the path. I’ll be right behind you — I want one more bun.']]); return; }
+    const played = !DYA3.engineReady() || (SAVE.dya && SAVE.dya.played > (F_.apPlayed0 || 0));
+    if (!played) {
+      ask('buhkon', 'Found Venkin yet? He’s by the bonfire, looking smug.', [
+        { label: 'Where do tokens come from?', act: () => say(B.festival.tokensAsk) },
+        { label: 'Going', act: null },
+      ]);
+      return;
+    }
+    say(B.festival.played, () => { F_.apFest = true; xp(150); invAdd(SAVE.inv, 'bun', 2); lootToast('bun', 2); persist(); });
+    return;
+  }
+  switch (s) {
+    case AP.DELIVER: {
+      if (!F_.apGiven) { say(B.deliver.give, () => { F_.apGiven = true; F_.apDel = {}; persist(); toast(B.deliver.got, 4); sfx.core(); }); return; }
+      if (Object.keys(B.deliver.parcels).every(k => F_.apDel && F_.apDel[k])) {
+        say(B.deliver.done, () => { G.shards += 40; xp(150); toast('Your first wage · +40 shards', 3); apAdvance(AP.AMULETS); });
+        return;
+      }
+      say([['buhkon', 'Still carrying? Into Beuhk with them — Ama, Teodr and Lirra. The forest path, east.']]);
+      return;
+    }
+    case AP.AMULETS: {
+      if (!F_.apGiven) {
+        say(B.amulets.give, () => {
+          F_.apGiven = true; F_.apAm0 = SAVE.amulets || 0; F_.apAmNeed = Math.min(3, amulets.filter(a => !a.got).length); persist();
+          hint(B.amulets.hint);
+          if (!F_.apAmNeed) apBuhkon(n);
+        });
+        return;
+      }
+      if ((SAVE.amulets || 0) - (F_.apAm0 || 0) >= (F_.apAmNeed ?? 3)) { say(B.amulets.done, () => { xp(120); apAdvance(AP.HARVEST, 'harvest'); }); return; }
+      say([['buhkon', 'Still missing some? G, and listen. One of them always climbs somewhere high.']]);
+      return;
+    }
+    case AP.HARVEST: {
+      if (!F_.apGiven) { say(B.harvest.give, () => { F_.apGiven = true; persist(); }); return; }
+      if ((SAVE.inv.items.ju || 0) >= 8) { takeAll(SAVE.inv, { ju: 8 }); say(B.harvest.done, () => { xp(120); G.shards += 20; apAdvance(AP.FESTIVAL); F_.apGiven = true; F_.apPlayed0 = (SAVE.dya && SAVE.dya.played) || 0; persist(); }); return; }
+      say([['buhkon', `Eight Ju. You’ve ${SAVE.inv.items.ju || 0}. The field’s southeast of the yard, below the orchard.`]]);
+      return;
+    }
+    case AP.FESTIVAL: {
+      if (F_.apFest) { apAdvance(AP.WINTER, 'winter'); apBuhkon(n); return; }
+      say([['buhkon', 'The festival’s in Beuhk, tonight. Go on ahead — I’ll be along. Down the forest path, east.']]);
+      return;
+    }
+    case AP.WINTER: {
+      if (G.apRaid) { say([['buhkon', 'The pasture, Tanoc! They’re at the fence!']]); return; }
+      const first = !F_.apGiven;
+      say(first ? B.winter.give : B.winter.retry, () => { F_.apGiven = true; persist(); apRaid(); });
+      return;
+    }
+    case AP.VOICE: {
+      if (!F_.apStoneRead) { say([['buhkon', 'Couldn’t sleep either? Go and walk it off. Mind the ice by the lake.']]); return; }
+      say(B.voice.back, () => { xp(100); apAdvance(AP.SPRING, 'spring'); });
+      return;
+    }
+    case AP.SPRING: {
+      if (saddled()) { say(B.spring.done(PN()), () => { xp(100); apAdvance(AP.RIDE); }); return; }
+      if (!F_.apGiven) { say(B.spring.give(PN()), () => { F_.apGiven = true; persist(); }); return; }
+      say([['buhkon', 'No saddle yet? Old Ruut, in Beuhk. Help him with his strays and ask him nicely.']]);
+      return;
+    }
+    case AP.RIDE: {
+      if (F_.apBoat) { say(B.ride.back, () => { xp(150); apAdvance(AP.LOOKOUT); }); return; }
+      say([['buhkon', 'All the way round the lake, west, to the far shore. Take her — it’s a long way on foot.']]);
+      return;
+    }
+    case AP.LOOKOUT: {
+      if (F_.apLook) {
+        say(B.lookout.back, () => {
+          xp(120); apAdvance(AP.DONE);
+          G.mode = 'intro';
+          cineCards(B.summer2.cards, 3600, P.pos, () => { enterPlay(); setObjective(); });
+        });
+        return;
+      }
+      say([['buhkon', 'The lookout rocks. North hill, past the pasture. Go and look.']]);
+      return;
+    }
+  }
+}
+
+/* ---------------- Beuhk folk: the Carpenter's parcels ---------------- */
+function apNpcOptions(n) {
+  const out = [];
+  if (!apOn() || REGION !== 'xilia') return out;
+  const P0 = APS.deliver.parcels[n.def.id];
+  if (apStep() === AP.DELIVER && F_.apGiven && P0 && !(F_.apDel && F_.apDel[n.def.id])) {
+    out.push({ label: `<b style="color:#ffd27a">${P0.label}</b>`, act: () => {
+      n.talking = 6;
+      dialog(P0.lines, () => {
+        F_.apDel = F_.apDel || {}; F_.apDel[n.def.id] = true; xp(30); sfx.core();
+        if (n.def.id === 'v1') { invAdd(SAVE.inv, 'bun', 2); lootToast('bun', 2); }
+        const left = Object.keys(APS.deliver.parcels).filter(k => !F_.apDel[k]).length;
+        toast(left ? `Delivered ${P0.item} · ${left} to go` : 'All three delivered — back to the Carpenter’s', 3);
+        persist(); setObjective();
+      });
+    } });
+  }
+  return out;
+}
+
+/* ---------------- winter: the Rodak at the pasture ---------------- */
+function apRaid() {
+  const left = RAID_N - (F_.apRaidK || 0);
+  if (left <= 0) { apRaidDone(); return; }
+  const pen = world.pen || world.PLAZA;
+  dn.setHour(21.5);
+  G.apRaid = [];
+  for (let i = 0; i < left; i++) {
+    const a = -Math.PI / 2 + (i - (left - 1) / 2) * 0.35, x = pen.x + Math.cos(a) * 62, z = pen.z + Math.sin(a) * 62;
+    const e = enemies.spawn('rodak', x, z, null, { state: 'chase', hostile: true, tag: 'winter' });
+    if (e) G.apRaid.push(e);
+  }
+  sfx.blink && sfx.blink();
+  hint(APS.winter.hint);
+  setObjective();
+}
+function apRaidKill() {
+  F_.apRaidK = (F_.apRaidK || 0) + 1; persist(); setObjective();
+  if (F_.apRaidK >= RAID_N) setTimeout(apRaidDone, 1200);
+}
+function apRaidDone() {
+  if (apStep() !== AP.WINTER) return;
+  for (const e of G.apRaid || []) if (!e.dead) { e.dead = true; e.hostile = false; if (e.actor) e.actor.root.visible = false; }
+  G.apRaid = null;
+  dialog(APS.winter.done, () => {
+    xp(200); G.shards += 60; toast('The herd is safe · +60 shards', 3);
+    apAdvance(AP.VOICE);
+    // that night, up in the loft
+    G.mode = 'intro'; fade(1, 0.9);
+    setTimeout(() => {
+      if (interiors.inside) leaveRoom(true);
+      toLoftBed(); dn.setHour(23.5);
+      fade(0, 1.2); enterPlay();
+      dialog(APS.voice.night, () => { setObjective(); hint(APS.voice.hint); });
+    }, 1000);
+  });
+}
+
+/* ---------------- the step's objective, and where the compass points ---------------- */
+function apObjective() {
+  const s = apStep(), B = APS, head = `Chapter I · ${B.seasons[s]}`, inBeuhk = REGION === 'xilia';
+  const toTown = 'Down the forest path, east, into Beuhk', toHome = 'Back along the forest path, west';
+  switch (s) {
+    case AP.DELIVER: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon — he has work for you', 'He’s in the yard, or the workshop'); return; }
+      const got = Object.keys(B.deliver.parcels).filter(k => F_.apDel && F_.apDel[k]).length;
+      if (got >= 3) { proObjective(head, 'Back to Buhkon — all three delivered', inBeuhk ? toHome : ''); return; }
+      proObjective(head, `Deliver the Carpenter’s work in Beuhk (${got}/3)`, inBeuhk ? 'Ama the baker, Teodr the farmer, Lirra the lamplighter' : toTown, 3, got);
+      return;
+    }
+    case AP.AMULETS: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
+      const got = Math.min(F_.apAmNeed ?? 3, (SAVE.amulets || 0) - (F_.apAm0 || 0)), need = F_.apAmNeed ?? 3;
+      if (got >= need) { proObjective(head, 'Bring the amulets home to Buhkon', ''); return; }
+      proObjective(head, `Find the amulets that walked off in the night (${got}/${need})`, 'G — Nur’Hlyst. Listen for cold teal.', need, got);
+      return;
+    }
+    case AP.HARVEST: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon — it’s harvest', ''); return; }
+      const n = Math.min(8, SAVE.inv.items.ju || 0);
+      if (n >= 8) proObjective(head, 'Carry the harvest to Buhkon', '');
+      else proObjective(head, B.harvest.obj(n), 'E to pull a Ju', 8, n);
+      return;
+    }
+    case AP.FESTIVAL: {
+      if (F_.apFest) { proObjective(head, B.festival.homeObj, inBeuhk ? toHome : 'Then talk to Buhkon'); return; }
+      if (!inBeuhk) { proObjective(head, B.festival.obj, toTown); return; }
+      const played = SAVE.dya && SAVE.dya.played > (F_.apPlayed0 || 0);
+      if (played) proObjective(head, 'Find Buhkon by the bonfire', '');
+      else proObjective(head, B.festival.obj, B.festival.hint);
+      return;
+    }
+    case AP.WINTER: {
+      if (inBeuhk) { proObjective(head, 'Home to the Carpenter’s — snow on the path', toHome); return; }
+      if (G.apRaid) { proObjective(head, B.winter.obj(RAID_N - (F_.apRaidK || 0)), B.winter.hint, RAID_N, F_.apRaidK || 0); return; }
+      proObjective(head, F_.apGiven ? B.winter.again : 'Talk to Buhkon', F_.apGiven ? 'Talk to Buhkon when you’re ready' : '');
+      return;
+    }
+    case AP.VOICE: {
+      if (F_.apStoneRead) proObjective(head, 'Back to the house — Buhkon is up early', '');
+      else proObjective(head, B.voice.obj, B.voice.hint);
+      return;
+    }
+    case AP.SPRING: {
+      if (!F_.apGiven && !saddled()) { proObjective(head, 'Talk to Buhkon', ''); return; }
+      if (saddled()) { proObjective(head, 'Show Buhkon your Punk, saddled', ''); return; }
+      if (SAVE.quests.q_strays === 'active' || (inBeuhk && !SAVE.quests.q_strays)) { proObjective(head, B.spring.ruutObj, inBeuhk ? 'Talk to Old Ruut — Nur’Hlyst finds his strays' : toTown); return; }
+      proObjective(head, B.spring.obj, inBeuhk ? 'Old Ruut, by the Punk pens' : toTown);
+      return;
+    }
+    case AP.RIDE: proObjective(head, F_.apBoat ? 'Ride home and tell Buhkon' : B.ride.obj, F_.apBoat ? '' : B.ride.hint); return;
+    case AP.LOOKOUT: proObjective(head, F_.apLook ? 'Home — tell Buhkon what you saw' : B.lookout.obj, F_.apLook ? '' : B.lookout.hint); return;
+  }
+}
+function apGoal() {
+  const s = apStep(), bk = apHome(), inBeuhk = REGION === 'xilia';
+  const ex = apExitEast(), toTown = ex ? V3(ex.x, world.heightAt(ex.x, ex.z), ex.z) : null;
+  const nearest = list => { let best = null, bd = 1e9; for (const p of list) { const d = Math.hypot(p.x - P.pos.x, p.z - P.pos.z); if (d < bd) { bd = d; best = p; } } return best; };
+  switch (s) {
+    case AP.DELIVER: {
+      if (!F_.apGiven) return bk;
+      const left = Object.keys(APS.deliver.parcels).filter(k => !(F_.apDel && F_.apDel[k]));
+      if (!left.length) return bk;
+      return inBeuhk ? nearest(npcs.filter(n => left.includes(n.def.id)).map(n => n.pos)) : toTown;
+    }
+    case AP.AMULETS: {
+      if (!F_.apGiven || (SAVE.amulets || 0) - (F_.apAm0 || 0) >= (F_.apAmNeed ?? 3)) return bk;
+      const a = nearest(amulets.filter(a => !a.got && a.revealed));
+      return a ? V3(a.x, a.y, a.z) : null;
+    }
+    case AP.HARVEST: {
+      const f = (world.juFields || [])[0];
+      return F_.apGiven && (SAVE.inv.items.ju || 0) < 8 && f ? V3(f.x, world.heightAt(f.x, f.z), f.z) : bk;
+    }
+    case AP.FESTIVAL: {
+      if (F_.apFest) return inBeuhk ? world.westGoal : bk;
+      if (!inBeuhk) return toTown;
+      const played = SAVE.dya && SAVE.dya.played > (F_.apPlayed0 || 0), v = npcs.find(n => n.def.id === (played ? 'buhkon' : 'venkin'));
+      return v ? v.pos : null;
+    }
+    case AP.WINTER: {
+      if (inBeuhk) return world.westGoal;
+      if (G.apRaid) { const e = nearest(G.apRaid.filter(e => !e.dead).map(e => e.pos)); return e || V3(world.pen.x, world.heightAt(world.pen.x, world.pen.z), world.pen.z); }
+      return bk;
+    }
+    case AP.VOICE: { const st = apStone(); return F_.apStoneRead || !st ? bk : V3(st.x, st.y, st.z); }
+    case AP.SPRING: {
+      if (saddled() || !F_.apGiven) return bk;
+      if (inBeuhk) { const r = npcs.find(n => n.def.id === 'ruut'); if (SAVE.quests.q_strays === 'active') { const e = nearest(enemies.list.filter(e => e.stray && !e.dead).map(e => e.pos)); if (e && (SAVE.counters.strays || 0) < 3) return e; } return r ? r.pos : null; }
+      return toTown;
+    }
+    case AP.RIDE: return F_.apBoat || !oldBoat ? bk : oldBoat.pos;
+    case AP.LOOKOUT: { const k = world.kuniPerch; return F_.apLook || !k ? bk : V3(k.x, k.y, k.z); }
+  }
+  return bk;
+}
+function apInteractables() {
+  const out = [];
+  if (!apOn()) return out;
+  if (apStep() === AP.RIDE && oldBoat && !F_.apBoat) out.push({ pos: oldBoat.pos, label: APS.ride.look, act: () => dialog(APS.ride.found, () => { F_.apBoat = true; xp(60); persist(); setObjective(); }), far: 9 });
+  return out;
+}
+/* reading the waystone with the amulet in hand */
+function apReadStone(s) {
+  if (!apOn() || apStep() !== AP.VOICE || s.key !== 'p_path' || F_.apStoneRead) return false;
+  dialog(APS.voice.stone, () => { F_.apStoneRead = true; SAVE.codex[s.key] = true; xp(80); persist(); setObjective(); });
+  return true;
+}
+function apTookAmulet() {
+  if (!apOn() || apStep() !== AP.AMULETS || !F_.apGiven) return;
+  const n = (SAVE.amulets || 0) - (F_.apAm0 || 0);
+  if (n >= 1 && n <= 3) setTimeout(() => bark('tanoc', APS.amulets.found(n), 3.5), 900);
+  setObjective();
+}
+/* arriving somewhere: the festival is at night; a season's cards play once you're out on the land */
+function apArrive() {
+  if (!apOn()) return;
+  if (REGION === 'xilia' && apStep() === AP.FESTIVAL && !F_.apFest) {
+    dn.setHour(20.5);
+    if (!F_.apFestSeen) { F_.apFestSeen = true; persist(); setTimeout(() => dialog(APS.festival.arrive, () => setObjective()), 600); }
+  }
+  if (REGION === 'property' && apWinter() && dn.hour > 6 && dn.hour < 17 && apStep() === AP.WINTER) dn.setHour(17);
+}
+let snowT = 0;
+function apTick(dt) {
+  if (!young()) return;
+  // snow, all winter, on the land and in town
+  if (apWinter() && !interiors.inside && (REGION === 'property' || REGION === 'xilia')) {
+    snowT += dt * 60;
+    for (; snowT >= 1; snowT--) {
+      const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 34;
+      particles.emit(P.pos.x + Math.cos(a) * r, P.pos.y + 14 + Math.random() * 8, P.pos.z + Math.sin(a) * r, { vx: 0.6 + Math.random() * 0.4, vy: -2.4 - Math.random(), vz: 0.3, color: 0xf4f8ff, size: 0.28, life: 7, drag: 0, gravity: 0 });
+    }
+  }
+  if (festival) {
+    festival.fire.scale.setScalar(9 + Math.sin(G.t * 9) * 0.7 + Math.sin(G.t * 5.3) * 0.5);
+    festival.lamps.forEach((l, i) => { l.material.opacity = 0.7 + Math.sin(G.t * 2 + i) * 0.2; });
+    if (Math.random() < 0.8) particles.emit(festival.x + (Math.random() - 0.5) * 1.6, festival.y + 3, festival.z + (Math.random() - 0.5) * 1.6, { vx: 0, vy: 4 + Math.random() * 2, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.5, life: 1.4, drag: 0.4 });
+  }
+  if (G.mode !== 'play' || !apOn()) return;
+  // a season's cards, once you're outside on the Carpenter's land
+  if (F_.apCards && REGION === 'property' && !interiors.inside) {
+    const lines = (APS[F_.apCards] || {}).cards; delete F_.apCards; persist();
+    if (lines) { if (apStep() === AP.WINTER) dn.setHour(18); cineCards(lines, 3400, P.pos, () => { enterPlay(); setObjective(); }); return; }
+  }
+  // the lookout: high on the north hill, looking north
+  const k = world.kuniPerch;
+  if (apStep() === AP.LOOKOUT && !F_.apLook && k && REGION === 'property' && Math.hypot(P.pos.x - k.x, P.pos.z - k.z) < 16 && P.pos.y > k.y - 4) {
+    F_.apLook = true; persist();
+    G.mode = 'intro'; P.vel.set(0, 0, 0);
+    const c = V3(P.pos.x, P.pos.y, P.pos.z);
+    mainCine.play([
+      { dur: 6, from: { p: [c.x + 4, c.y + 2.5, c.z + 6], l: [c.x, c.y + 1.6, c.z] }, to: { p: [c.x + 2, c.y + 3.5, c.z + 3], l: [c.x - 60, c.y - 20, c.z + 300] }, caption: APS.lookout.see[0] },
+      { dur: 7, ease: 'inout', from: { p: [c.x, c.y + 4, c.z + 2], l: [c.x, c.y + 10, c.z - 400] }, to: { p: [c.x, c.y + 6, c.z - 6], l: [c.x + 40, c.y + 40, c.z - 1600] }, caption: APS.lookout.see[1] },
+    ], () => { enterPlay(); dialog(APS.lookout.after, () => { xp(60); setObjective(); }); });
+  }
 }
 
 function tickUi(dt) {
@@ -5022,6 +5435,7 @@ function continueRun() {
   enterPlay();
   if (young()) setObjective();
   showLocation(REGION_NAME[REGION] || 'Leotik', `${D.label} · ${fmtTime(SAVE.time)}`);
+  apArrive();
 }
 
 function startFromTitle(fn) {
@@ -5117,7 +5531,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  get vk() { return VK; }, F_: () => F_, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
+  get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,

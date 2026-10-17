@@ -676,6 +676,7 @@ export const YOUNG = {
     ['tanoc', 'Buhkon… the Xwi. The Sniller. They all looked at me. Why?'],
     ['buhkon', 'Because of what you are. And that is a long story, and you have a long time to hear it.'],
     ['buhkon', 'For now: the land’s yours, all of it, and the town along the path. Meet people. Help where you can. Keep those amulets close — and keep your hat on.'],
+    ['buhkon', 'And tomorrow, you start earning your soup.'],
   ],
   stryx: [['stryx', 'An Eikar boy with somebody else’s hat. Not a passenger. Come back when you have a name of your own.']],
   buhkonIdle: [
@@ -685,7 +686,7 @@ export const YOUNG = {
     'Sniller amulets wander. Use your Nur’Hlyst — they glow cold teal.',
   ],
   pass: 'Rockfall across the Megla Pass — and Buhkon said three days of mist past it. Not today.',
-  chapterEnd: 'Chapter I ends here — more of Tanoc’s story is coming. Until then, the property and Beuhk are yours.',
+  chapterEnd: 'The first day is done. Two summers on the Carpenter’s land begin tomorrow — talk to Buhkon.',
 };
 export const YOUNG_OBJ = {
   explore: 'Step outside and look around',
@@ -924,7 +925,7 @@ SPEAKERS.tanoc15 = { name: 'Tanoc', color: '#e0b080', sub: 'Tanoc Filugani · Ei
 export const MEGLA = {
   // at home, before: the amulet starts to pull
   pull: [
-    ['tale', 'Two summers go by on the Carpenter’s land. Tanoc grows a hand taller. The Punk grows a great deal more than that.'],
+    ['tale', 'The second summer on the Carpenter’s land is getting old. Tanoc is a hand taller than the boy who came up the forest path. The Punk is a great deal more than that.'],
     ['tale', 'Then one morning, one of the Sniller amulets out of Fyrsti’Vilag — the one that hums when he talks to it — begins to tug. North. Always north, like a dog on a lead.'],
     ['buhkon', 'Let me see it. …Mm. It has a task, and the task has started pulling. They do that.'],
     ['tanoc15', 'Where to?'],
@@ -1185,3 +1186,449 @@ export const STEED = {
   steed: name => `${name} is your steed — E to ride, H to whistle her. She’ll carry materials in her saddlebags, and more as she grows.`,
   bagFull: (cap, bag) => bag ? `You can’t carry any more — you and your Punk’s saddlebags are full (${cap}).` : `Your pack is full (${cap}). A saddle with saddlebags on your Punk would carry more.`,
 };
+
+/* ================================================================
+   CHAPTER I, GO ON — THE TWO SUMMERS
+   The first day is the relic, the drills and the glide. Then two
+   summers on the Carpenter's land, a season at a time: the first
+   jobs in Beuhk, three amulets that walk off on their own, the
+   harvest and the festival, a winter night with Rodak at the
+   pasture, the amulet's first words, the Punk grown big enough to
+   ride, a long ride round the lake, and the lookout, where north
+   starts to pull. Then Chapter II.
+   ================================================================ */
+SPEAKERS.v1 = { name: 'Ama', color: '#e8d8a8', sub: 'a baker' };
+SPEAKERS.v2 = { name: 'Teodr', color: '#e8d8a8', sub: 'a farmer' };
+SPEAKERS.v3 = { name: 'Lirra', color: '#e8d8a8', sub: 'a lamplighter' };
+SPEAKERS.ruut = { name: 'Old Ruut', color: '#e8d8a8', sub: 'Punk herder' };
+
+export const APPRENTICE = {
+  /* each step: where it sits in the year, and what the HUD says */
+  seasons: ['The first summer', 'The first summer', 'Autumn', 'Autumn', 'Winter', 'Winter', 'Spring', 'Spring', 'Spring', 'The second summer'],
+
+  /* 0 — the first job: three of the Carpenter's pieces, into Beuhk */
+  deliver: {
+    give: [
+      ['buhkon', 'Morning, apprentice. Yes — apprentice. If you’re eating my soup, you’re learning my trade.'],
+      ['buhkon', 'First lesson: a carpenter’s work isn’t done when the last peg goes in. It’s done when it’s in the hands of whoever it’s for.'],
+      ['buhkon', 'Three pieces, all spoken for. A cradle for Ama the baker — her sister’s due any day. A new tiller handle for Teodr, out by the fields. And a brass lamp hook for Lirra, who lights the town.'],
+      ['buhkon', 'Down the forest path, east, into Beuhk. Hand them over yourself. Let them see who carried them.'],
+      ['tanoc', 'They’ll stare at me. Everyone stared at me in the market.'],
+      ['buhkon', 'They will. Let them. Hat on, chin up, and say “from Buhkon Eldi.” It opens more doors than you’d think.'],
+    ],
+    got: 'Buhkon’s three pieces — a cradle, a tiller handle and a lamp hook — for Beuhk',
+    parcels: {
+      v1: { label: 'Give Ama the cradle', item: 'the cradle', lines: [
+        ['tanoc', 'From Buhkon Eldi. It’s the cradle. For your sister.'],
+        ['v1', 'Oh! Oh, look at the rockers on it. He’s carved little Zahreh flowers into the ends — the old softy.'],
+        ['v1', 'And you’re the boy. The one from the market — no, don’t look like that, nobody minds. You’re thinner than they said. Here. A bun. Two buns.'],
+      ] },
+      v2: { label: 'Give Teodr the tiller handle', item: 'the tiller handle', lines: [
+        ['tanoc', 'From Buhkon Eldi. The new handle for your tiller.'],
+        ['v2', 'Ash. Good, straight ash, and he’s worn the grip in for me so it won’t blister. That man thinks of everything.'],
+        ['v2', 'You’re living up at his place now? Then you’ll know where the Rodak come down in winter. North wood. Mind it, boy, when the snow comes.'],
+      ] },
+      v3: { label: 'Give Lirra the lamp hook', item: 'the lamp hook', lines: [
+        ['tanoc', 'From Buhkon Eldi. Your lamp hook.'],
+        ['v3', 'At last! The old one bent in the storm and I’ve been climbing the posts like a Kipsu ever since.'],
+        ['v3', 'You know the Nur Lanterns round town? Old ones, cold as stones. They say they only wake for a Nur, or for someone carrying something alive in stygian. …You’re humming. Did you know you’re humming?'],
+      ] },
+    },
+    done: [
+      ['buhkon', 'All three? And nobody chased you out of town with a broom. Good.'],
+      ['tanoc', 'Ama gave me buns. Teodr said to mind the north wood in winter. Lirra said I was humming.'],
+      ['buhkon', 'You were. That stone of yours hums when you’re pleased. …Here. Your first wage. A carpenter’s apprentice gets paid in shards and soup, and the soup is better.'],
+    ],
+  },
+
+  /* 1 — three amulets walk off in the night */
+  amulets: {
+    give: [
+      ['tale', 'In the morning the bag of amulets is lighter. Not by much. By three.'],
+      ['tanoc', 'Buhkon. Buhkon, some of the amulets are gone. The bag was tied — I tied it myself —'],
+      ['buhkon', 'They walk. I did tell you. They hum toward something, and if nothing’s holding them they go and look for it.'],
+      ['buhkon', 'They won’t have gone far. Not off the land. Push your Nur’Hlyst, the way I showed you — G — and listen for that cold teal note. Three of them. Bring them home.'],
+    ],
+    hint: 'Press G to pulse Nur’Hlyst — the amulets answer in cold teal. One always climbs somewhere high.',
+    found: n => n === 1 ? 'One. Cold, and humming, and not at all sorry.' : n === 2 ? 'Two. This one was halfway into a molehill.' : 'Three. That’s all of them.',
+    done: [
+      ['buhkon', 'All three. Where was the last one?'],
+      ['tanoc', 'Somewhere it shouldn’t have been. They’re all humming the same note again. Like they’re pleased to be back.'],
+      ['buhkon', 'Or pleased they found something. …Keep them close, Tanoc. Closer than a bag.'],
+      ['tale', 'That summer goes by in sawdust. Planing, pegging, sweeping. Learning which wood splits and which wood bends, and which wood sings when you knock on it.'],
+    ],
+  },
+
+  /* 2 — autumn: the harvest */
+  harvest: {
+    cards: ['Autumn.', 'The leaves on the far shore go red first, then the ones by the house. The Ju is ready.'],
+    give: [
+      ['buhkon', 'Harvest. Every hand on the land pulls Ju — even carpenters, even apprentices who were going to catch the Firefall.'],
+      ['tanoc', 'How much Ju?'],
+      ['buhkon', 'Eight good ones, from the field below the orchard, southeast of the yard. Bring them to me. If any of them wake up and run off, let them. A Ju that wants to be a Sprengju that badly has earned it.'],
+    ],
+    obj: n => `Pull Ju from the field southeast of the yard (${n}/8)`,
+    done: [
+      ['buhkon', 'Eight. Good ones, too. Half for the cellar, half for the festival.'],
+      ['tanoc', 'What festival?'],
+      ['buhkon', 'Harvest night in Beuhk. Bonfire in the square, Ama’s buns, the whole town out under Velki. And tokens — everybody plays tokens on harvest night.'],
+      ['buhkon', 'Venkin will be there. He’s been asking about you. Says he’s never lost a match to a thirteen-year-old and he doesn’t mean to start.'],
+    ],
+  },
+
+  /* 3 — the harvest festival, and the first match */
+  festival: {
+    obj: 'The harvest festival in Beuhk — play a match of Dya’Akara in the square',
+    hint: 'Talk to Venkin in the square to play. Win or lose — just play.',
+    arrive: [
+      ['tale', 'Beuhk on harvest night. A bonfire in the market square tall as a house, lanterns strung from roof to roof, and Velki huge and blue over all of it.'],
+      ['tale', 'Somebody is playing a pipe. Somebody else is singing the wrong words to it, loudly. The whole square smells of Zahreh buns.'],
+    ],
+    buhkon: [
+      ['buhkon', 'There you are. Go on — find Venkin. He’s the tall one with the pinecone hair and the smug face.'],
+      ['buhkon', 'You’ve carried those tokens of yours since Velki. Tonight you get to throw them.'],
+    ],
+    tokensAsk: [
+      ['tanoc', 'Buhkon… where do tokens come from? Mine were just — mine. I’ve always had them.'],
+      ['buhkon', 'A token is a creature’s truth. One creature, the whole of it, kept in a piece of it. Somebody met each of yours, once, and sang it into being.'],
+      ['buhkon', 'One day you’ll meet something worth keeping, and you’ll make one of your own. Not yet. You’ll know when.'],
+    ],
+    played: [
+      ['buhkon', 'Well! Win or lose, you threw them like you meant it. That’s what tokens are for.'],
+      ['tanoc', 'Venkin cheated.'],
+      ['buhkon', 'Venkin always cheats. That’s why it’s a good game. …Come on. The bonfire’s still going, and Ama has saved you a bun the size of your head.'],
+      ['tale', 'They walk home late, along the forest path, under the glowing trees. The Punk follows a little way behind, chewing a stolen bun, and thinks she isn’t seen.'],
+    ],
+    homeObj: 'Walk home to the Carpenter’s along the forest path',
+  },
+
+  /* 4 — winter: the Rodak come down to the pasture */
+  winter: {
+    cards: ['Winter.', 'Snow on the land, ice at the edges of the lake. The north wood goes quiet — and then, one night, it doesn’t.'],
+    give: [
+      ['buhkon', 'Tanoc. Up. Boots on.'],
+      ['buhkon', 'Rodak. Out of the north wood, down to the pasture. The snow’s driven the Kofi off and they’re hungry enough to try the herd.'],
+      ['buhkon', 'I’ll take the barn side. You take the pasture fence. Fire-stone, hatchet, and stay on your feet — a Rodak only wants you if you’re bleeding.'],
+      ['tanoc', 'How many?'],
+      ['buhkon', 'Enough. Go.'],
+    ],
+    obj: n => `Drive the Rodak off the pasture (${n} left)`,
+    hint: 'The pasture is north-west of the house. Q throws the fire-stone.',
+    retry: [['buhkon', 'Back on your feet? Good. They’re still out there — the pasture, Tanoc. Go on.']],
+    again: 'Go back out to the pasture',
+    done: [
+      ['tale', 'The last of them goes yelping off into the dark, and the rest of the pack goes with it. Rodak never stay to bury their own.'],
+      ['buhkon', 'Hah! Not one of the herd lost. Not ONE. You held that fence like an old hand.'],
+      ['buhkon', 'Inside. You’re shaking. That’s the cold, and the fight going out of you — sit by the fire till it’s gone.'],
+    ],
+  },
+
+  /* 5 — that night: the amulet speaks */
+  voice: {
+    night: [
+      ['tale', 'That night, up in the loft, he can’t sleep. The amulet he wears round his neck — the one that hums when he talks to it — is humming now, and he hasn’t said a word.'],
+      ['tanoc', '…Are you awake? Can you be awake?'],
+      ['sniller', '…'],
+      ['tanoc', 'I held the fence. Did you see? I don’t know if you can see.'],
+      ['sniller', '…Saw.'],
+      ['tale', 'One word. Cold and clear, like a bell under water. He lies very still.'],
+      ['tanoc', 'You — you talked. You can talk.'],
+      ['sniller', 'Little. A little. Every day — a little more.'],
+      ['sniller', 'The stone. On the path. The old house’s stone. Take me.'],
+    ],
+    obj: 'Take the amulet to the old waystone on the forest path',
+    hint: 'The mossy waystone of the House of Eldi, beside the forest path east of the crest. Read it (E).',
+    stone: [
+      ['tale', 'He holds the amulet up to the mossy waystone. It goes cold in his hand — colder than the snow — and the carved letters under the moss glow, very faintly, teal.'],
+      ['sniller', 'Eldi. …I know this name. Old. Older than the Carpenter. Before the Skyfalls.'],
+      ['tanoc', 'You knew Buhkon’s family?'],
+      ['sniller', 'Knew a storm that knew them. It is… far away, in me. The amulet keeps some. Lets the rest go.'],
+      ['sniller', 'Do not tell him I speak. Not yet. He would worry. He worries well.'],
+      ['tanoc', '…All right. Our secret.'],
+    ],
+    back: [
+      ['buhkon', 'You’ve been out at the waystone in the snow. Don’t look surprised — your tracks go straight there and straight back.'],
+      ['tanoc', 'I just wanted to read it.'],
+      ['buhkon', 'Mm. “Leave the toadstools be — they light the way home.” My grandfather carved that. He was a terrible poet.'],
+      ['buhkon', 'Spring soon. Your Punk’s nearly as big as a calf. We should talk about that.'],
+    ],
+  },
+
+  /* 6 — spring: a saddle and a stall */
+  spring: {
+    cards: ['Spring.', 'The snow goes off the land in one wet week. The Punk has grown all winter, and she has started trying to carry things — firewood, buckets, the Carpenter.'],
+    give: name => [
+      ['buhkon', `Look at ${name}. She picked me up yesterday. Picked me UP, Tanoc, and carried me to the woodshed, because she thought that was where I was going.`],
+      ['buhkon', 'She’s big enough to carry you, and she wants to. That’s the whole of it, with Punks.'],
+      ['buhkon', 'Old Ruut in Beuhk has a saddle he might part with — his strays have been wandering again since the thaw. Help him and ask.'],
+    ],
+    obj: 'Get a saddle for your Punk — Old Ruut, in Beuhk, has one',
+    ruutObj: 'Help Old Ruut with his strays — he’s by the Punk pens in Beuhk',
+    done: name => [
+      ['buhkon', `There. ${name} has a stall of her own and a saddle that fits. Ride her about. Get the feel of her.`],
+      ['buhkon', 'And when you can stay on — a long ride. All the way round the lake to the far shore. There’s something there I’d like you to see.'],
+    ],
+  },
+
+  /* 7 — the long ride round the lake */
+  ride: {
+    obj: 'Ride round the lake to the far shore — something there Buhkon wants you to see',
+    hint: 'E to ride. The far shore is due west, past the end of the lake. Hold Shift to run.',
+    notRiding: 'It’s a long way round. Better on Punk-back.',
+    found: [
+      ['tale', 'On the far shore, half in the reeds, half in the forest: the bones of a boat. A big one. Ribs of fire-tree wood, grey with age, still not burned — fire-tree never burns.'],
+      ['tale', 'Carved in the keel, worn nearly smooth: “Eldi I. Built by B., his first. Sank by B., his first also.”'],
+      ['tanoc', 'His first boat. He sank his first boat.'],
+      ['sniller', 'Sank. And built another. And another. The ship in the sky — the Stryx flies his.'],
+      ['tanoc', 'He never said.'],
+      ['sniller', 'He shows. He does not say. You are like him in that.'],
+    ],
+    look: 'Look at the old boat',
+    back: [
+      ['buhkon', 'You found her. Eldi I. Prettiest boat on Xikia for nearly an afternoon.'],
+      ['tanoc', 'You sank your first boat!'],
+      ['buhkon', 'I did. And I learned more from that than from every boat since. That’s why I sent you — a first anything is supposed to go wrong. It’s how you find out what you’re made of.'],
+      ['buhkon', 'Now. Last thing before summer. Climb up to the lookout rocks on the north hill and tell me what you see.'],
+    ],
+  },
+
+  /* 8 — the lookout: north */
+  lookout: {
+    obj: 'Climb the lookout rocks on the north hill, and look north',
+    hint: 'The lookout is far up the north hill, past the pasture.',
+    see: [
+      'From the top of the lookout the whole land is below him: the house, the lake, the far shore, the forest going on and on.',
+      'And far to the north, past Beuhk, past the river, past the mountains — a grey shape on the sky that doesn’t move like cloud. Mist. A wall of it.',
+    ],
+    after: [
+      ['sniller', 'There.'],
+      ['tanoc', 'What’s there?'],
+      ['sniller', 'Something I am for. …Not yet. Soon. When the summer is old.'],
+      ['tale', 'The amulet is warm against his chest all the way home.'],
+    ],
+    back: [
+      ['buhkon', 'Well? What did you see?'],
+      ['tanoc', 'Everything. And mist, up north. A lot of it.'],
+      ['buhkon', '…Mm. The Megla. Don’t go borrowing trouble, Tanoc. It’ll come to you on its own soon enough.'],
+    ],
+  },
+
+  /* 9 — the second summer: the pull */
+  summer2: {
+    cards: ['The second summer.', 'Tanoc is fifteen now, a hand taller, and his hatchet swing has stopped being funny. Brindle can outrun anything on the land.', 'And then, as the summer gets old, one of the amulets begins to pull.'],
+  },
+};
+
+/* the Beuhk folk, the way they talk to a boy who isn't Stamijan yet and hasn't met Phorus */
+export const YOUNG_HELLO = {
+  hemla: ['Shards for goods, goods for shards. Even for the Carpenter’s boy. Especially for the Carpenter’s boy — he pays his debts.', 'You smell like Punk. That’s not a complaint — it’s a sales opportunity.'],
+  ruut: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'That mutt of yours from the city — she’ll be bigger than mine, one day. You mark me.'],
+  v1: ['Fresh Zahreh buns! Well. Fresh-ish.', 'You’re still too thin. Buhkon doesn’t feed you enough. Here.'],
+  v2: ['Rodak in the north wood again. They never bother you — till you’re bleeding.', 'Mind the crops, boy.'],
+  v3: ['The old Nur Lanterns only wake for a Nur — or for someone carrying something alive in stygian.', 'Glide off the Carpenter’s tower sometime. Everyone does it once. Most people only once.'],
+  v4: ['The Stryx won’t fly anyone it doesn’t like. It doesn’t like anyone.', 'Fire trees never burn. Their seeds, though — whoosh.'],
+  kw1: ['Mind the scaffold.', 'We build. The Kalo make our hammers. Never the other way round.'],
+};
+/* the Beuhk quests, told to young Tanoc: no Phorus, no Stamijan, no Duat */
+export const YOUNG_QUESTS = {
+  q_lamps: {
+    desc: 'Lirra wants every Nur Lantern around Beuhk awake again — five in all. They only wake for something with Nur in it, and your humming stone might be enough.',
+    offer: ['I light the lamps. But the old Nur Lanterns? They only wake for a Nur, or for something alive in stygian.', 'That stone you carry hums like it’s alive. There are five lanterns round Beuhk — the docks, the square, the yard, the forest road, the grove road. Try it on all of them.'],
+  },
+  q_crates: {
+    offer: ['Lost three crates off the barge in the storm. They’re caught on the rim somewhere — I can see the rope from the pier.', 'Fetch them back and there’s something in it for you. That golden pulse of the Carpenter’s might show you which way.'],
+  },
+  q_bake: { offer: ['The harvest festival is coming and I have no petals. NO petals, boy.', 'Four Zahreh petals — the pink flowers — and two tufts of Kipsu fluff. The friendly ones shed it if you give them a scratch.'] },
+  q_rodak: { wait: ['Still hearing them at night. Three Rodak, boy.'], done: ['Quiet nights again. My grandfather tied this knot for luck. It worked for him. Mostly.'] },
+  q_scaffold: { done: ['Up she goes. You’ve a builder’s patience, boy. The Carpenter’s teaching you right.'] },
+  q_ore: { done: ['Now THAT’S a fire. Take this one — first blade out of the new cauldron. A real axe, not a carpenter’s hatchet. Don’t tell Buhkon I said that.'] },
+};
+
+/* ================================================================
+   CHAPTER II, GO ON — more of the Megla Aagac: the rockfall and the
+   mist in the pass, wood for the first fire, the carved stones of the
+   ruin, the Sru Vorn awake, the patrols round the keep, and the long
+   way home to a Punk who waited.
+   ================================================================ */
+Object.assign(MEGLA, {
+  /* the rockfall across the pass — the one that kept him home all Chapter I */
+  rockSee: [
+    ['tale', 'Halfway up the pass the road simply stops — buried under a rockfall, boulders the size of carts heaped from one wall of the pass to the other.'],
+    ['tanoc15', 'The rockfall. It’s been across the pass since the spring before last. Buhkon said nobody’s shifted it.'],
+    ['sniller', 'Nobody had a Punk like yours. Ask her.'],
+  ],
+  rockObj: n => `Clear the rockfall off the road (${n}/4)`,
+  rockHint: 'E at a boulder — your Punk hauls it clear. The cracked one wants fire (Q).',
+  haul: 'Loop her vines round the boulder',
+  hauled: ['She digs her feet in and heaves — and the boulder grinds off the road.', 'Another one, rolled into the river with a splash she seems very proud of.', 'That one took three tries. She doesn’t want to talk about it.'],
+  cracked: 'Split already, right through. Something hot might finish it — the fire-stone (Q).',
+  crackHit: ['It hisses. The crack spreads.', 'Again — it’s glowing in the crack now.'],
+  rockDone: [
+    ['tale', 'The last boulder bursts apart in a shower of hot grit, and the road is clear.'],
+    ['tanoc15', 'Through! Good girl. Good, good, GOOD girl.'],
+    ['punk', '(She is unbearably pleased with herself.)'],
+  ],
+  rockBlock: 'The rockfall’s across the whole pass. You’d break a leg climbing it — clear the road.',
+  /* the mist in the upper pass, and the cairns of the old walkers */
+  mistIn: [
+    ['tale', 'Then the mist comes down, all at once, the way a door shuts. Ten steps, and the road is gone. Five more, and so is the river.'],
+    ['tanoc15', 'I can’t see. I can’t see anything.'],
+    ['sniller', 'The old walkers built stones to find the way through. Find the stones, and set one more on each. I will hum when you are close.'],
+  ],
+  cairnObj: n => `Find the old waymark cairns in the mist (${n}/4)`,
+  cairnHint: 'The amulet hums louder as you get close · E to set a stone on the cairn',
+  cairnUse: 'Set a stone on the cairn',
+  cairnLit: ['A stone on the cairn. The mist ahead thins — a little.', 'Another. The river again, somewhere to the right.', 'Three. You can see the shapes of the pass walls now.', 'Four — and the mist draws back like a curtain.'],
+  hum: { near: 'It sings — close. Very close.', warm: 'Louder… this way.', cold: '…quiet. Not this way.' },
+  mistBlock: 'The mist is too thick to go on blind. Find the cairns — listen to the amulet.',
+  mistOut: [
+    ['sniller', 'There. The walkers knew the way. They always did.'],
+    ['tanoc15', 'Who were they?'],
+    ['sniller', 'People who did not want to get lost. That is most people.'],
+  ],
+  /* wood for the first fire */
+  woodObj: n => `Gather deadwood for the fire (${n}/4)`,
+  woodHint: 'Fallen branches along the edge of the clearing · E',
+  woodTake: 'Take the deadwood',
+  /* the carved stones of the ruin */
+  sealObj: (g, s) => `Search the ruins (${g}/3) · read the carved stones (${s}/3)`,
+  sealUse: 'Read the carved stone',
+  seals: [
+    [['tale', 'Carved deep — the letters sharp-edged near the wall, worn nearly away out here:'], ['stone', '“Here the Akai Gek kept the song of the stone, and the stone kept them.”']],
+    [['tale', 'A second stone, split down the middle:'], ['stone', '“We gave the Relic our names so it would remember us. It remembers. We are gone.”']],
+    [['tale', 'The last, half-sunk in moss, scratched rather than carved, as if in a hurry:'], ['stone', '“Do not wake what sleeps under the hall. It is not cruel. It is only hungry. It is always only hungry.”']],
+  ],
+  sealsRead: [
+    ['tanoc15', '“What sleeps under the hall.” …The drag trail. The Sru Vorn. Something was taking it somewhere.'],
+    ['sniller', 'Quietly now, little one. Very quietly.'],
+  ],
+  /* day two: the Sru Vorn, awake */
+  sruWake: [
+    ['tale', 'Something big comes crashing through the ferns — the Sru Vorn from the drag trail, awake now, tusks down. It has decided who to blame.'],
+    ['sniller', 'It is frightened, and frightened things are the worst. Do not let it pin you — fire, and move!'],
+  ],
+  sruName: 'SRU VORN · FRIGHTENED',
+  sruDown: [
+    ['tale', 'The Sru Vorn staggers, snorts, and sags down into the moss — beaten, not dead, breathing hard.'],
+    ['tanoc15', 'It wasn’t me. I didn’t drag you. It really wasn’t me.'],
+    ['tale', 'When he looks back from the next rise, it has got up, and gone.'],
+  ],
+  /* the patrols round the keep, in the eclipse dark */
+  sneakIn: [
+    ['sniller', 'They walk the wood around the keep — three of them. If one sees you, they all will. Stay out of their sight. Go slowly. Running is loud.'],
+    ['tanoc15', '(Tree to tree. Quiet. Quiet.)'],
+  ],
+  sneakObj: 'Sneak past the Duskareth patrols to the keep',
+  sneakHint: 'The purple light ahead of each Vel is where it looks · walk — Shift is loud',
+  spotted: [
+    ['tale', 'A Vel turns. Its markings flare —'],
+    ['sniller', 'NO. Not yet.'],
+    ['tale', 'The amulet goes cold, and the world blinks, and you are back among the trunks where you started, unseen. Something in the dark is breathing very hard. It’s you.'],
+  ],
+  spottedAgain: [['sniller', 'Again. Slower. Wait for them to turn.']],
+  sneakDone: [['tanoc15', '(Made it. Made it. Don’t breathe.)']],
+  /* day three: the way home */
+  morning3: ['Morning.', 'The keep is quiet, and green, and his.'],
+  home1: [
+    ['tanoc15', 'Home, then. …Oh no. She’s been sitting by that fire for two days.'],
+    ['malsti', '(It chirps, from his shoulder. It sounds like a question.)'],
+    ['tanoc15', 'You’ll like her. She’s big, and she’ll sit on you, and you’ll like her.'],
+  ],
+  homeObj: 'Go back to the clearing — your Punk is waiting',
+  lineBack: [
+    ['tale', 'At the line in the moss the Rodak are waiting. They don’t get up this time. They watch him go by, one after another — and the biggest of them lowers its head.'],
+    ['sniller', 'They saw the storm come out of you. You are one of the things that comes after, now.'],
+  ],
+  reunion: [
+    ['tale', 'The fire at the clearing is long out, but she’s there — curled round the cold stones, exactly where he left her.'],
+    ['tale', 'She hears him, and she is up and across the clearing in three bounds, and he is flat on his back in the grass with a Punk on top of him.'],
+    ['tanoc15', 'Ow — I KNOW — I know, I’m sorry, I’m sorry. I’m back. I said I’d come back.'],
+    ['punk', '(She will forgive him in a day or two. Not before.)'],
+    ['tale', 'The Malsti Punk looks at her for a long moment, and then climbs up onto her saddle and goes to sleep.'],
+  ],
+  rideHomeObj: 'Ride home — south, down the pass',
+  rideHomeBarks: [
+    ['sniller', 'Lighter. The amulet is lighter. The task is done.'],
+    ['tanoc15', 'Will you still talk to me? Now it’s done?'],
+    ['sniller', 'Try and stop me, little one.'],
+  ],
+});
+
+/* ================================================================
+   THE BEGINNING, GO ON — the afternoon before the last Skyfall: supper
+   for the Ahoac gate crew, and their spark drill
+   ================================================================ */
+SPEAKERS.mother = { name: 'Tanoc’s mother', color: '#e8c8a8', sub: 'Fyrsti’Vilag, Velki' };
+SPEAKERS.captain = { name: 'The Ahoac captain', color: '#ffb46a', sub: 'the north gate crew' };
+PROLOGUE.before = {
+  mom: [
+    ['mother', 'Tanoc! There you are. No — don’t tell me where you’ve been. You’ve soot on your nose. I know exactly where you’ve been.'],
+    ['mother', 'The Skyfall starts at dark, and the gate crew have been drilling since noon without a crumb. Take them this. Straight there, straight back.'],
+    ['tanoc', 'The Ahoac? I can go to the Ahoac yard?'],
+    ['mother', 'You can carry a basket to the Ahoac yard. You can not do anything else at the Ahoac yard. And you’ll be home before the first spark. Promise me.'],
+    ['tanoc', 'I promise.'],
+    ['tale', 'He means it. Mostly.'],
+  ],
+  basketObj: 'Take the supper basket to the Ahoac crew at the gate yard',
+  basketHint: 'North, up the main street toward the gate',
+  talkCrew: 'Give the Ahoac their supper',
+  crew: [
+    ['captain', 'Supper! Bless your mother, Filugani. Put it down, put it down — not on my boots.'],
+    ['tanoc', 'Can I watch the drill? Just watch. I won’t touch anything.'],
+    ['captain', 'Watch? Nobody ever learned to catch by watching.'],
+    ['captain', 'Tell you what. Hosk up on the gate tower drops practice sparks — clay, dipped in glow. Catch five before they hit the cobbles and you can stand at the yard wall tonight, with the crew.'],
+    ['captain', 'Look for the shadow. A spark lands where its shadow is. Get under it, and keep your hands up.'],
+  ],
+  drillObj: n => `Catch the practice sparks before they land (${n}/5)`,
+  drillHint: 'Get under the shadow ring before the spark comes down',
+  caught: ['Got it!', 'Two!', 'Three — it stings!', 'Four!', 'FIVE!'],
+  missed: ['Too slow!', 'It smacks into the cobbles. The captain winces.', 'Look for the shadow, Filugani!'],
+  again: [['captain', 'Again! The Firefall won’t wait for you to find your feet.']],
+  done: [
+    ['captain', 'Five! Not bad. Not bad at all, for a boy in somebody else’s boots.'],
+    ['captain', 'But I lied, a little. Tonight nobody who isn’t crew stands at the yard wall. Not this Skyfall. The sky’s wrong tonight — even the old ones say so.'],
+    ['tanoc', 'That’s not fair!'],
+    ['captain', 'No. It isn’t. Go home, Filugani. Watch it from the street. Come back when you’re fifteen and we’ll see about real boots.'],
+    ['tale', 'Bells start ringing all across the city. The sun touches the sea.'],
+  ],
+};
+
+/* ================================================================
+   THE ROAD NORTH, GO ON — a mended axle in the rain on day three, and
+   supper to fetch in Beuhk on day five
+   ================================================================ */
+SPEAKERS.hemla = { name: 'Hemla', color: '#e8d8a8', sub: 'Kalo’Eik trader' };
+Object.assign(ROAD.day3, {
+  axle: [
+    ['tale', 'In the night the rain got into the cart’s old axle. In the morning one wheel is lying flat in the mud.'],
+    ['buhkon', 'Well. That’s the day decided. Three straight saplings, Tanoc — ash, the pale bark, about as thick as your thumb. I’ll show you how a carpenter mends a thing in the rain.'],
+  ],
+  axleObj: n => `Cut three straight saplings for the axle (${n}/3)`,
+  axleHint: 'Pale-barked ash saplings round the camp · E',
+  axleCut: 'Cut the ash sapling',
+  axleCuts: ['One. Straight as a spear.', 'Two. This one had a Kofi under it. It is not pleased.', 'Three — that’s enough.'],
+  axleBring: 'Bring the saplings to the Carpenter at the cart',
+  axleMend: [
+    ['tale', 'He shows you how: split, peg, bind — and bind again with wet Punk vine that tightens as it dries.'],
+    ['buhkon', 'There. It’ll hold to Beuhk. Most things will hold to Beuhk if you ask them nicely.'],
+    ['tale', 'Then the two of you sit under the cart’s oilcloth, out of the rain, and he talks.'],
+  ],
+});
+Object.assign(ROAD.day5, {
+  errand: [
+    ['buhkon', 'But a boy has to eat first. Supper: a loaf from Ama the baker, by the square — and ask Hemla, the Kalo trader, for a lamp-wick. We’ll want light on the hill.'],
+    ['buhkon', 'Hat on. Say “for Buhkon Eldi,” and nothing else.'],
+  ],
+  errandObj: n => `Fetch supper for the Carpenter (${n}/2)`,
+  errandHint: 'Ama the baker, and Hemla the Kalo trader',
+  ama: [
+    ['tanoc', 'A loaf, please. For Buhkon Eldi.'],
+    ['v1', 'For Buhkon! Then it’s two loaves, and a bun for you, and don’t argue. …You’re the — no. No, never mind. Here.'],
+  ],
+  hemla: [
+    ['tanoc', 'A lamp-wick. For Buhkon Eldi.'],
+    ['hemla', 'For Buhkon, the wick is free, and so is the advice: walk fast tomorrow, little one. This town has long tongues, and today they’re all wagging about a hatless boy.'],
+  ],
+  errandBack: [['buhkon', 'Bread, a wick, and a bun you thought I wouldn’t notice. Good. Eat. Sleep. We go at first light.']],
+  back: 'Back to the Carpenter at the town hearth',
+});

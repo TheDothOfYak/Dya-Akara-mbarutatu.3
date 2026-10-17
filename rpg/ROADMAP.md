@@ -8,23 +8,23 @@ Tanoc gathers six Sniller amulets in Fyrsti'Vilag. Each one pulls him somewhere 
 
 ## Hour budget
 
-| # | Part | Chapter clock key | Target | Status |
-|---|---|---|---|---|
-| — | The Last Skyfall (Velki) | `velki` | 0.5h | built |
-| — | The Road North (six days) | `road` | 2h | built |
-| I | The Carpenter's Apprentice | `ch1` | 2.5h | built |
-| II | The Megla Aagac (amulet 1) | `ch2` + `token` | 3h | built |
-| — | Home interlude | `after2` | 0.5h | partly built |
-| III | Amulet 2 | — | 3h | to design |
-| IV | Amulet 3 | — | 3h | to design |
-| V | Amulet 4 | — | 3h | to design |
-| VI | Amulet 5 | — | 3h | to design |
-| VII | Amulet 6 | — | 3h | to design |
-| — | Home interludes between III–VII | — | 2h | to design |
-| — | The final Sniller battle and its run-up | — | 2h | design later |
-| | **Total** | | **~27h** | |
+| # | Part | Chapter clock key | Target | Estimate now | Status |
+|---|---|---|---|---|---|
+| — | The Last Skyfall (Velki) | `velki` | 0.5h | ~0.3h | built: supper for the Ahoac crew, the spark drill, the spire, the gate |
+| — | The Road North (six days) | `road` | 2h | ~1.2h | built: + the mended axle (day 3), supper in Beuhk (day 5) |
+| I | The Carpenter's Apprentice | `ch1` | 2.5h | ~1.8h | built: the first day + the two summers (9 steps, 4 seasons) |
+| II | The Megla Aagac (amulet 1) | `ch2` + `token` | 3h | ~1.5h | built: + rockfall, mist cairns, deadwood, carved stones, Sru Vorn, patrols, day three home |
+| — | Home interlude | `after2` | 0.5h | — | partly built |
+| III | Amulet 2 | — | 3h | — | to design |
+| IV | Amulet 3 | — | 3h | — | to design |
+| V | Amulet 4 | — | 3h | — | to design |
+| VI | Amulet 5 | — | 3h | — | to design |
+| VII | Amulet 6 | — | 3h | — | to design |
+| — | Home interludes between III–VII | — | 2h | — | to design |
+| — | The final Sniller battle and its run-up | — | 2h | — | design later |
+| | **Total** | | **~27h** | | |
 
-The targets for the parts already built are guesses until they've been playtested. Update this table with real times.
+The estimates are first-time Easy play, guessed from the content (walking distances, dialogue, fights). They are not measured yet. Up to the first token, that adds up to roughly 4.5–5 hours against the 8-hour target, so the opening still needs about 3 more hours before Chapter III. A playtest with the chapter clocks will show where.
 
 ## Measuring
 

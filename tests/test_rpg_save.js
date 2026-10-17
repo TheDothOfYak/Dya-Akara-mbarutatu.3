@@ -38,6 +38,13 @@ global.localStorage = { getItem: k => (k in ls ? ls[k] : null), setItem: (k, v) 
     check(`a v${v} save migrates to v${P.SAVE_V}`, m && m.v === P.SAVE_V);
   }
 
+  const pastII = P.migrateSave({ v: 3, flags: { young: true, pro: 'done', yq: 5, megla: 'done', ch2: true } });
+  check('v3→v4: a run past Chapter II skips the two summers', pastII.flags.ap === 9);
+  const inI = P.migrateSave({ v: 3, flags: { young: true, pro: 'done', yq: 5 } });
+  check('v3→v4: a run still in Chapter I picks them up', inI.flags.ap === undefined);
+  const noFlags = P.migrateSave({ v: 3 });
+  check('v3→v4: a save with no flags still migrates', noFlags && noFlags.v === P.SAVE_V);
+
   console.log('Chapter clocks');
   const at = flags => P.chapterOf(flags);
   check('Velki', at({ young: true, pro: 'velki' }) === 'velki');

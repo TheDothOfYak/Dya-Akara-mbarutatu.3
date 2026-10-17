@@ -773,7 +773,7 @@ export function createRoad(ctx) {
     const c3 = camps[1];
     cut([{ dur: 9, cam: (k, tt) => { const a = 0.6 + k * 1.6; return { p: V3(c3.x + Math.cos(a) * 12, c3.y + 4 - k * 1.5, c3.z + Math.sin(a) * 12), l: V3(c3.x, c3.y + 1, c3.z) }; }, caption: R.day3.cards }], () => {
       ctx.play();
-      fireSay(1, R.day3.talk, () => {
+      ctx.say(R.day3.axle, () => axleJob(() => fireSay(1, R.day3.talk, () => {
         // night. The rain stops; the amulets hum; something pale waits in the trees
         D3.rain = false; setDusk(1); sub = 'wisp'; if (D3.fog) [fog.near, fog.far] = D3.fog;
         const a = -0.6, wx = camps[1].x + Math.cos(a) * 16, wz = camps[1].z + Math.sin(a) * 16;
@@ -786,8 +786,31 @@ export function createRoad(ctx) {
         for (let k = 0; k < 7; k++) { const ang = k / 7 * TAU, sx = D3.ring.x + Math.cos(ang) * 4.2, sz = D3.ring.z + Math.sin(ang) * 4.2, st = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8 + Math.random(), 0.7), toon(0x6a7a62)); st.position.set(sx, heightAt(sx, sz) + 0.8, sz); st.rotation.y = -ang; addOutline(st, 0.04); scene.add(st); cyl(sx, sz, 0.5, heightAt(sx, sz) - 1, heightAt(sx, sz) + 1.8); }
         const wv = D3.w.position;
         sayHeld(R.day3.hum, (k, tt) => ({ p: V3(P.pos.x - (wv.x - P.pos.x) * 0.25, P.pos.y + 1.9, P.pos.z - (wv.z - P.pos.z) * 0.25), l: V3(wv.x, wv.y + 1.6, wv.z) }), () => { objective(R.obj.wisp, 'It keeps just ahead of you'); setGoal(D3.w.position.x, D3.w.position.y - 1, D3.w.position.z); });
-      });
+      })));
     });
+  }
+  /* the cart's axle, mended in the rain: three straight ash saplings from round the camp */
+  function axleJob(then) {
+    const c = camps[1]; let n = 0;
+    objective(R.day3.axleObj(0), R.day3.axleHint, 3, 0);
+    for (let k = 0; k < 3; k++) {
+      const a = 0.9 + k * 2.1, r = 11 + k * 3, x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r, g = heightAt(x, z);
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.4, 6), toon(0xd8d0b8)); trunk.position.y = 1.7; tree.add(trunk);
+      const top = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), toon(0x6a9a4a)); top.position.y = 3.6; tree.add(top);
+      tree.add(glowSprite(0xffd27a, 1.2, 0.35));
+      const it = addItem(V3(x, g, z), R.day3.axleCut, () => {
+        dropItem(it); n++; sfx.swing(); setTimeout(() => sfx.hit(), 150);
+        particles.burst(x, g + 1, z, 14, { color: 0xd8c098, speed: 4, size: 0.35, life: 0.5, gravity: -8 });
+        ctx.bark('tanoc', R.day3.axleCuts[n - 1], 2.5);
+        if (n < 3) { objective(R.day3.axleObj(n), R.day3.axleHint, 3, n); return; }
+        objective(R.day3.axleBring, ''); setGoal(CART.pos.x, CART.pos.y, CART.pos.z);
+        const back = addItem(V3(CART.pos.x - 1.6, CART.pos.y + 0.4, CART.pos.z), 'Give the Carpenter the saplings', () => {
+          dropItem(back); setGoal(); sfx.slam();
+          ctx.say(R.day3.axleMend, () => { objective('Shelter from the rain', ''); then(); });
+        });
+      }, tree);
+    }
   }
   /* clear any tree trunks out of the stone ring so the boy can walk in */
   function trees3(c) { return solids.filter(t => t.kind === 'cyl' && Math.hypot(t.x - c.x, t.z - c.z) < 7 && t.r < 1.6); }
