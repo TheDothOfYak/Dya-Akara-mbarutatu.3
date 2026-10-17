@@ -30,7 +30,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles } from './gfx.js';
-import { buildEikar, placeWalker } from './actors.js';
+import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
 import { buildLutut } from './esik_sky.js';
@@ -378,7 +378,7 @@ export function createMegla(ctx) {
   const amulet = new THREE.Group();
   { const gem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), toon(0x6af0e0, { emissive: 0x2aa0a0, emissiveIntensity: 0.9 })); amulet.add(gem, glowSprite(0x6af0e0, 0.6, 0.4)); amulet.position.set(0, 1.25, 0.2); tanoc.root.add(amulet); }
   // his Punk: the mutt from Fyrsti'Vilag, two years grown, in Old Ruut's saddle
-  const punk = buildWildPunk({ seed: 31, saddle: true, blanket: 0x8a5a2a }); punk.root.scale.setScalar(1.15); scene.add(punk.root);
+  const punk = cartoon(buildWildPunk({ seed: 31, saddle: true, blanket: 0x8a5a2a }), 0.6); punk.root.scale.setScalar(1.15); scene.add(punk.root);
   const P = { pos: V3(), vel: V3(), yaw: Math.PI, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0, hp: 100, swing: 0, hitDone: false, iframes: 0, ride: false, slide: null, down: false };
   const K = { pos: V3(0, -50, 0), yaw: Math.PI, stay: null, on: true };            // the Punk
   const foes = [];
@@ -532,7 +532,7 @@ export function createMegla(ctx) {
   })();
   function mawPoint() { const f = V3(Math.sin(GYN.yaw), 0, Math.cos(GYN.yaw)); return V3(GYN.pos.x + f.x * 0.9 * GYN.s, GYN.pos.y + (GYN.phase === 1 ? 0.62 : 0.8) * GYN.s, GYN.pos.z + f.z * 0.9 * GYN.s); }
   function spawnGynge() {
-    const a = buildGynge({ seed: 77 }); const s = 4.2; a.root.scale.setScalar(s); scene.add(a.root);
+    const a = cartoon(buildGynge({ seed: 77 })); const s = 4.2; a.root.scale.setScalar(s); scene.add(a.root);
     const g = heightAt(GY.x, GY.z);
     GYN = { a, s, pos: V3(GY.x, g - 4, GY.z), yaw: Math.atan2(P.pos.x - GY.x, P.pos.z - GY.z), hp: 100, phase: 0, alive: true, t: 0, open: 0, cyc: 'rise', ct: 0, hits: 0, spikes: [], rocks: [], rear: 0, slam: 0, tired: 0, rise: 0 };
     gyngeBar.style.display = 'block';
