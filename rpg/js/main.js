@@ -4292,8 +4292,20 @@ function updateWorldBits(dt) {
    ================================================================ */
 const clock = new THREE.Clock();
 let frameDt = 1 / 60;
-function frame() {
+/* a frame cap: 60 a second in play, less on the title, while paused, or when the window is behind another.
+   High-refresh screens would otherwise push the whole bloom-and-shadow pipeline at 120–144 frames a second
+   for nothing anyone can see, and that is what runs a laptop hot. */
+let lastFrame = -Infinity;
+function frameCap() {
+  if (G.paused) return 10;
+  if (G.mode === 'title' || !document.hasFocus()) return 30;
+  return 60;
+}
+function frame(now) {
   requestAnimationFrame(frame);
+  const step = 1000 / frameCap(), gap = now - lastFrame;
+  if (gap < step - 1) return;
+  lastFrame = gap > step * 4 ? now : now - (gap % step);
   // steady the clock: the browser's frames arrive a little unevenly, and stepping the world by each raw gap
   // makes everything that moves shimmer. Small wobbles are smoothed out; a real hitch still counts in full.
   const rawDt = Math.min(clock.getDelta(), 1 / 20);
@@ -5699,7 +5711,7 @@ $('btn-ngback').onclick = () => $('newgame').classList.add('hidden');
 $('d-easy').onclick = () => newRun('easy');
 $('d-real').onclick = () => newRun('realistic');
 
-frame();
+frame(performance.now());
 
 if (BOOT === 'new' && SAVE_AT_LOAD) { $('title').classList.add('hidden'); startFromTitle(beginNew); }
 else if (BOOT === 'arrive' && REGION === 'leotik') { $('title').classList.add('hidden'); startFromTitle(arriveLeotik); }

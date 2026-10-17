@@ -55,6 +55,19 @@
   U.uid = (prefix) => (prefix || 'id') + '_' + Date.now().toString(36) + '_' + (idCounter++).toString(36) + '_' + Math.floor(Math.random() * 46656).toString(36);
 
   /* ---------- math ---------- */
+  /* frame cap for requestAnimationFrame loops: gate(now) is true at most `fps` times a second.
+     High-refresh screens (120/144Hz) otherwise redraw everything two or three times as often
+     as anyone can see, and that is what makes laptops run hot. */
+  U.fpsGate = function (fps) {
+    const step = 1000 / fps;
+    let prev = -Infinity;
+    return function (now) {
+      const gap = now - prev;
+      if (gap < step - 1) return false;
+      prev = gap > step * 4 ? now : now - (gap % step);
+      return true;
+    };
+  };
   U.clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
   U.lerp = (a, b, t) => a + (b - a) * t;
   U.dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);

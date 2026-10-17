@@ -1609,8 +1609,10 @@
     const ctx = cv.getContext('2d');
     let state = 'idle', stopped = false;
     const t0 = performance.now();
+    const gate = U.fpsGate(30);
     (function loop(now) {
       if (stopped) return;
+      if (!gate(now)) { requestAnimationFrame(loop); return; }
       const t = (now - t0) / 1000;
       ctx.clearRect(0, 0, cv.width, cv.height);
       ctx.save();

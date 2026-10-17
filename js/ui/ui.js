@@ -23,14 +23,16 @@
     document.body.appendChild(U.el('div', { id: 'toasts' }));
     /* global animation loop for card art */
     let last = performance.now();
+    const gate = U.fpsGate(30);
     function loop(now) {
+      requestAnimationFrame(loop);
+      if (!UI.animCards.size || !gate(now)) return;
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       UI._animT += dt;
       for (const c of UI.animCards) {
         if (!c.isConnected) { UI.animCards.delete(c); continue; }
         drawTokenArt(c, UI._animT);
       }
-      requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
     /* world sim heartbeat */
@@ -117,8 +119,10 @@
         pool = ['gynge', 'rubbermcfly', 'domestic_punk', 'su_naga'].map(id => SP.get(id));
       }
       let idx = 0, t0 = performance.now();
+      const gate = U.fpsGate(30);
       function spin(now) {
         if (!loadingEl) return;
+        if (!gate(now)) { loadingRAF = requestAnimationFrame(spin); return; }
         const t = (now - t0) / 1000;
         if (t > 2.6) { t0 = now; idx = (idx + 1) % pool.length; } // crossfade to next token
         ctx.clearRect(0, 0, 220, 220);
@@ -360,8 +364,10 @@
     back.onclick = () => opts.onBack && opts.onBack();
     left.appendChild(back);
     let raf, t0 = performance.now();
+    const gate = U.fpsGate(30);
     function turntable(now) {
       if (!cv.isConnected) { cancelAnimationFrame(raf); return; }
+      if (!gate(now)) { raf = requestAnimationFrame(turntable); return; }
       const t = (now - t0) / 1000;
       const ctx = cv.getContext('2d');
       ctx.clearRect(0, 0, 460, 460);

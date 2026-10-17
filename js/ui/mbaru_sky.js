@@ -346,8 +346,10 @@
     try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* ignore */ }
     const t0 = performance.now() - (opts.startAt || 14) * 1000;
     let raf = 0;
+    const gate = DYA.util.fpsGate(30);
     function tick(now) {
       if (!cv.isConnected) { cancelAnimationFrame(raf); return; }
+      if (!gate(now)) { raf = requestAnimationFrame(tick); return; }
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = cv.clientWidth, h = cv.clientHeight;
       if (w && h) {

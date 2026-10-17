@@ -258,9 +258,11 @@
         W = container.clientWidth || window.innerWidth; H = container.clientHeight || window.innerHeight;
         cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); rebuild();
       }
+      const gate = U.fpsGate(30);
       function frame(now) {
         if (!cv.isConnected) { cancelAnimationFrame(raf); return; }
-        const t = (now - t0) / 1000, dt = 1 / 60;
+        if (!gate(now)) { raf = requestAnimationFrame(frame); return; }
+        const t = (now - t0) / 1000, dt = 1 / 30;
         // sky
         const g = ctx.createLinearGradient(0, 0, 0, H);
         g.addColorStop(0, P.sky[0]); g.addColorStop(1, P.sky[1]);
