@@ -9,10 +9,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
-import { installTexturePack, setTexturePack, gradePass } from './texpack.js';
+import { installSmoothStyle, setSmoothStyle } from './smooth.js';
 import { latchAlongRay } from './vines.js';
 import { createAmbient } from './ambient.js';
 import { buildSky, SUN_DIR } from './sky.js';
@@ -53,10 +52,10 @@ const $ = id => document.getElementById(id);
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 /* ---------------- settings ---------------- */
-const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, scale: 1, pack: true };
+const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, scale: 1, smooth: true };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
-installTexturePack(OPT.pack);   // the Etherium texture pack: patches every toon material before anything is drawn
+installSmoothStyle(OPT.smooth);   // the smooth, rounded film look: patches toon shading and softens shapes before anything is drawn
 
 /* ---------------- the save, and which region this page is ---------------- */
 /* signed in with a Dya'Akara account? Then the run lives on the account. */
@@ -148,7 +147,6 @@ const composer = new EffectComposer(renderer, smoothTarget());
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 0.86);
 composer.addPass(bloom);
-composer.addPass(gradePass(ShaderPass));
 composer.addPass(new OutputPass());
 
 let particles = null;
@@ -2402,7 +2400,7 @@ bindOpt('opt-vol', 'vol', () => setVolume(OPT.vol));
 bindOpt('opt-bloom', 'bloom', () => { bloom.enabled = OPT.bloom; }, true);
 bindOpt('opt-shadows', 'shadows', () => { renderer.shadowMap.enabled = OPT.shadows; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }, true);
 bindOpt('opt-scale', 'scale', resize);
-bindOpt('opt-pack', 'pack', () => setTexturePack(OPT.pack), true);
+bindOpt('opt-smooth', 'smooth', () => setSmoothStyle(OPT.smooth), true);
 bloom.enabled = OPT.bloom;
 
 /* ================================================================
@@ -4425,7 +4423,6 @@ function startVelki() {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
       c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8));
-      c.addPass(gradePass(ShaderPass));
       c.addPass(new OutputPass());
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
@@ -4482,7 +4479,6 @@ function vkCtx() {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
       c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 0.86));
-      c.addPass(gradePass(ShaderPass));
       c.addPass(new OutputPass());
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
