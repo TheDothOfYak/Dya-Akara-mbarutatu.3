@@ -1697,6 +1697,7 @@ const canHlyst = () => young() ? !!F_.yHlyst : (REGION !== 'xilia' && REGION !==
 function nurHlyst() {
   if (!canHlyst()) { toast('You don’t know how yet. (Buhkon will teach you.)', 2); return; }
   if (hlyst.cd > 0 || G.mode !== 'play') return;
+  if (apHollowPulse()) return;
   const range = 55 * (FX.hlyst ? 1.6 : 1);
   hlyst.cd = 6; hlyst.t = 12;
   for (const m of hlyst.marks) scene.remove(m); hlyst.marks.length = 0;
@@ -2429,6 +2430,13 @@ const npcs = (NPCS[REGION] || []).filter(def => camp || def.pos).map(def => {
 if (young()) {
   for (const n of npcs) if (STORY.YOUNG_HELLO[n.def.id]) n.def.hello = STORY.YOUNG_HELLO[n.def.id];
   for (const [id, o] of Object.entries(STORY.YOUNG_QUESTS)) if (QUESTS[id]) Object.assign(QUESTS[id], o);
+  // Venkin is a boy about Tanoc's age, apprenticed to his father Orrin, the builder
+  Object.assign(QUESTS.q_camp, STORY.APPRENTICE.build.youngQuest);
+  STORY.SPEAKERS.venkin = Object.assign({}, STORY.SPEAKERS.venkinY);
+  for (const n of npcs) {
+    if (n.def.id === 'venkin') { n.actor.root.scale.multiplyScalar(0.74); n.def = Object.assign({}, n.def, { title: 'young Keilia, Orrin’s apprentice', hello: STORY.YOUNG_HELLO.venkin }); }
+    if (n.def.id === 'kw1') n.def = Object.assign({}, n.def, { title: 'Keilia builder, Venkin’s father' });
+  }
 }
 const npcName = id => { if (id === 'phorus') return 'Phorus'; const n = Object.values(NPCS).flat().find(d => d.id === id); return n ? n.name : id; };
 const npcSpeaker = def => { if (!STORY.SPEAKERS[def.id]) STORY.SPEAKERS[def.id] = { name: def.name, color: def.look === 'keilia' ? '#e0b070' : '#e8d8a8', sub: def.title }; return def.id; };
@@ -2559,7 +2567,11 @@ function turnIn(n, qid) {
   if (r.flag === 'mount') makeMount(true);
   persist();
   n.talking = 4;
-  dialog(q.done.map(l => [who, l]), () => { toast(`Quest complete: ${q.name}${r.shards ? ` · +${r.shards} shards` : ''}`, 3.5); xp(r.xp || 0); persist(); });
+  dialog(q.done.map(l => [who, l]), () => {
+    toast(`Quest complete: ${q.name}${r.shards ? ` · +${r.shards} shards` : ''}`, 3.5); xp(r.xp || 0); persist();
+    if (qid === 'q_camp' && apOn() && apStep() === AP.BUILD) dialog(STORY.APPRENTICE.build.raised, () => setObjective());   // the frame goes up, with Orrin calling the beams
+    else setObjective();
+  });
 }
 
 function learnSpell(id) {
@@ -5013,7 +5025,7 @@ function youngTick() {
    F_.ap counts the steps, F_.apGiven says Buhkon has set this one,
    and anything a step needs to remember lives in F_.ap* too.
    ================================================================ */
-const AP = { DELIVER: 0, AMULETS: 1, HARVEST: 2, FESTIVAL: 3, WINTER: 4, VOICE: 5, SPRING: 6, RIDE: 7, LOOKOUT: 8, DONE: 9 };
+const AP = { DELIVER: 0, BUILD: 1, AMULETS: 2, TESTS: 3, HARVEST: 4, FESTIVAL: 5, CAVE: 6, WINTER: 7, VOICE: 8, SOURCES: 9, SPRING: 10, RIDE: 11, HOLLOW: 12, LOOKOUT: 13, DONE: 14 };
 const apStep = () => F_.ap ?? 0;
 const apOn = () => young() && (F_.yq || 0) >= 5 && !F_.megla && F_.pro === 'done' && apStep() < AP.DONE;
 const apWinter = () => young() && !F_.megla && (apStep() === AP.WINTER || apStep() === AP.VOICE);
@@ -5082,6 +5094,38 @@ const oldBoat = REGION === 'property' && young() ? (() => {
   return { g, pos: V3(x, y + 0.6, z) };
 })() : null;
 
+/* ---------------- Venkin on the Carpenter's land: by the barn, then at Tanoc's heels ---------------- */
+let apV = null;
+function apVenkin(on) {
+  if (REGION !== 'property') return;
+  if (!on) { if (apV) { scene.remove(apV.a.root); apV = null; } return; }
+  if (apV) return;
+  const a = buildKeilia({ seed: 11, cloth: 0x4a5a34, eye: 0x7a8a2a }); a.root.scale.multiplyScalar(0.74);
+  const b = world.SITES && world.SITES.yard ? V3(150 + 6, 0, 82 + 8) : P.pos.clone();
+  const p = V3(b.x, world.col.ground(b.x, b.z, world.heightAt(b.x, b.z) + 2), b.z); a.root.position.copy(p); scene.add(a.root);
+  apV = { a, pos: a.root.position, follow: false };
+}
+function apVenkinTick(dt) {
+  if (!apV) return;
+  const v = apV;
+  let sp = 0;
+  if (v.follow) {
+    const want = V3(P.pos.x - Math.sin(P.yaw) * 2 - Math.cos(P.yaw) * 1.6, 0, P.pos.z - Math.cos(P.yaw) * 2 + Math.sin(P.yaw) * 1.6), dx = want.x - v.pos.x, dz = want.z - v.pos.z, d = Math.hypot(dx, dz);
+    if (d > 60) { v.pos.x = want.x; v.pos.z = want.z; }
+    else if (d > 0.8) { sp = Math.min(P.riding ? 18 : 10, d * 2.5); v.pos.x += dx / d * sp * dt; v.pos.z += dz / d * sp * dt; v.a.root.rotation.y = Math.atan2(dx, dz); }
+    world.col.resolve(v.pos, 0.5, 2);
+  } else v.a.root.rotation.y = dampAngle(v.a.root.rotation.y, Math.atan2(P.pos.x - v.pos.x, P.pos.z - v.pos.z), 3, dt);
+  v.pos.y = world.col.ground(v.pos.x, v.pos.z, v.pos.y + 1);
+  v.a.animate(dt, { speed: sp, onGround: true, t: G.t });
+}
+const apHollowNear = () => { const h = REGION === 'property' && world.SITES && world.SITES.hollow; return !!h && Math.hypot(P.pos.x - h.x, P.pos.z - h.z) < 22; };
+function apHollowPulse() {
+  if (!apOn() || apStep() !== AP.HOLLOW || !F_.apGiven || F_.apHollow || !apHollowNear()) return false;
+  F_.apHollow = true; persist(); hlyst.cd = 6; sfx.sense();
+  particles.ring(P.pos.x, P.pos.y + 0.6, P.pos.z, 120, 26, { color: 0x9fe8ff, size: 0.8, life: 1.6, drag: 0.2 });
+  dialog(APS.hollow.found.concat(APS.hollow.result), () => { xp(150); setObjective(); });
+  return true;
+}
 /* ---------------- talking to the Carpenter ---------------- */
 function apBuhkon(n) {
   const s = apStep(), B = APS;
@@ -5104,10 +5148,40 @@ function apBuhkon(n) {
     case AP.DELIVER: {
       if (!F_.apGiven) { say(B.deliver.give, () => { F_.apGiven = true; F_.apDel = {}; persist(); toast(B.deliver.got, 4); sfx.core(); }); return; }
       if (Object.keys(B.deliver.parcels).every(k => F_.apDel && F_.apDel[k])) {
-        say(B.deliver.done, () => { G.shards += 40; xp(150); toast('Your first wage · +40 shards', 3); apAdvance(AP.AMULETS); });
+        say(B.deliver.done, () => { G.shards += 40; xp(150); toast('Your first wage · +40 shards', 3); apAdvance(AP.BUILD); });
         return;
       }
       say([['buhkon', 'Still carrying? Into Beuhk with them — Ama, Teodr and Lirra. The forest path, east.']]);
+      return;
+    }
+    case AP.BUILD: {
+      if (!F_.apGiven) { say(B.build.give, () => { F_.apGiven = true; persist(); }); return; }
+      if (SAVE.quests.q_camp === 'done') { say(B.build.back, () => { xp(120); apAdvance(AP.AMULETS); }); return; }
+      say([['buhkon', 'Orrin’s storehouse, by the square in Beuhk. His boy will show you what’s wanted.']]);
+      return;
+    }
+    case AP.TESTS: {
+      if (!F_.apGiven) { say(B.tests.give, () => { F_.apGiven = true; F_.apTests = {}; persist(); apBuhkon(n); }); return; }
+      const T = B.tests, left = Object.keys(T.list).filter(k => !(F_.apTests || {})[k]);
+      if (!left.length) { say(T.done, () => { xp(120); apAdvance(AP.HARVEST, 'harvest'); }); return; }
+      ask('buhkon', T.menu, left.map(k => ({ label: T.list[k].label, act: () => say(T.list[k].lines, () => { F_.apTests = F_.apTests || {}; F_.apTests[k] = true; xp(25); sfx.sense(); persist(); if (Object.keys(F_.apTests).length >= 5) apBuhkon(n); }) })).concat([{ label: 'Later', act: null }]));
+      return;
+    }
+    case AP.CAVE: {
+      if (!F_.apGiven) { say(B.cave.give, () => { F_.apGiven = true; persist(); apVenkin(true); }); return; }
+      say([['buhkon', F_.apCaveGo ? 'Hm? Go to bed, Tanoc.' : 'Venkin’s by the barn. Whatever he’s planning, I don’t want to know.']]);
+      return;
+    }
+    case AP.SOURCES: {
+      if (!F_.apGiven) { say(B.sources.give, () => { F_.apGiven = true; F_.apSrc = {}; persist(); }); return; }
+      if (Object.keys(F_.apSrc || {}).length >= 3) { say(B.sources.back, () => { xp(150); apAdvance(AP.SPRING, 'spring'); }); return; }
+      say([['buhkon', 'Hemla and Lirra, in Beuhk. Ask them what they know about the amulets.']]);
+      return;
+    }
+    case AP.HOLLOW: {
+      if (!F_.apGiven) { say(B.hollow.give, () => { F_.apGiven = true; persist(); apVenkin(true); }); return; }
+      if (F_.apHollow) { say([['buhkon', 'Three, one, seven. I’ll be counting amulets in my sleep. …Now, the lookout rocks, on the north hill. Climb up and tell me what you see.']], () => { xp(100); apVenkin(false); apAdvance(AP.LOOKOUT); }); return; }
+      say([['buhkon', 'The forest hollow, north-west, where the woods start. Follow the amulet — Venkin swears he knows the way, so don’t follow Venkin.']]);
       return;
     }
     case AP.AMULETS: {
@@ -5119,7 +5193,7 @@ function apBuhkon(n) {
         });
         return;
       }
-      if ((SAVE.amulets || 0) - (F_.apAm0 || 0) >= (F_.apAmNeed ?? 3)) { say(B.amulets.done, () => { xp(120); apAdvance(AP.HARVEST, 'harvest'); }); return; }
+      if ((SAVE.amulets || 0) - (F_.apAm0 || 0) >= (F_.apAmNeed ?? 3)) { say(B.amulets.done.slice(0, 3), () => { xp(120); apAdvance(AP.TESTS); apBuhkon(n); }); return; }
       say([['buhkon', 'Still missing some? G, and listen. One of them always climbs somewhere high.']]);
       return;
     }
@@ -5130,7 +5204,7 @@ function apBuhkon(n) {
       return;
     }
     case AP.FESTIVAL: {
-      if (F_.apFest) { apAdvance(AP.WINTER, 'winter'); apBuhkon(n); return; }
+      if (F_.apFest) { apAdvance(AP.CAVE); apBuhkon(n); return; }
       say([['buhkon', 'The festival’s in Beuhk, tonight. Go on ahead — I’ll be along. Down the forest path, east.']]);
       return;
     }
@@ -5142,7 +5216,7 @@ function apBuhkon(n) {
     }
     case AP.VOICE: {
       if (!F_.apStoneRead) { say([['buhkon', 'Couldn’t sleep either? Go and walk it off. Mind the ice by the lake.']]); return; }
-      say(B.voice.back, () => { xp(100); apAdvance(AP.SPRING, 'spring'); });
+      say(B.voice.back.slice(0, 3), () => { xp(100); apAdvance(AP.SOURCES); apBuhkon(n); });
       return;
     }
     case AP.SPRING: {
@@ -5152,7 +5226,7 @@ function apBuhkon(n) {
       return;
     }
     case AP.RIDE: {
-      if (F_.apBoat) { say(B.ride.back, () => { xp(150); apAdvance(AP.LOOKOUT); }); return; }
+      if (F_.apBoat) { say(B.ride.back.slice(0, 3), () => { xp(150); apAdvance(AP.HOLLOW); apBuhkon(n); }); return; }
       say([['buhkon', 'All the way round the lake, west, to the far shore. Take her — it’s a long way on foot.']]);
       return;
     }
@@ -5175,6 +5249,10 @@ function apBuhkon(n) {
 function apNpcOptions(n) {
   const out = [];
   if (!apOn() || REGION !== 'xilia') return out;
+  if (apStep() === AP.BUILD && F_.apGiven && n.def.id === 'venkin' && !SAVE.quests.q_camp)
+    out.push({ label: `<b style="color:#ffd27a">${APS.build.meetLabel}</b>`, act: () => { n.talking = 6; dialog(APS.build.meet, () => { SAVE.quests.q_camp = 'active'; persist(); toast(`New quest: ${QUESTS.q_camp.name}`, 3); sfx.core(); setObjective(); }); } });
+  if (apStep() === AP.SOURCES && F_.apGiven && (n.def.id === 'hemla' || n.def.id === 'v3') && !(F_.apSrc || {})[n.def.id])
+    out.push({ label: `<b style="color:#ffd27a">${APS.sources.askLabel}</b>`, act: () => { n.talking = 8; dialog(APS.sources[n.def.id === 'hemla' ? 'hemla' : 'lirra'], () => { F_.apSrc = F_.apSrc || {}; F_.apSrc[n.def.id] = true; xp(40); sfx.sense(); persist(); setObjective(); }); } });
   const P0 = APS.deliver.parcels[n.def.id];
   if (apStep() === AP.DELIVER && F_.apGiven && P0 && !(F_.apDel && F_.apDel[n.def.id])) {
     out.push({ label: `<b style="color:#ffd27a">${P0.label}</b>`, act: () => {
@@ -5241,6 +5319,34 @@ function apObjective() {
       proObjective(head, `Deliver the Carpenter’s work in Beuhk (${got}/3)`, inBeuhk ? 'Ama the baker, Teodr the farmer, Lirra the lamplighter' : toTown, 3, got);
       return;
     }
+    case AP.BUILD: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
+      if (SAVE.quests.q_camp === 'done') { proObjective(head, 'Home — tell Buhkon the storehouse is up', inBeuhk ? toHome : ''); return; }
+      if (!SAVE.quests.q_camp) { proObjective(head, B.build.obj, inBeuhk ? 'Venkin is by the square' : toTown); return; }
+      { const q = QUESTS.q_camp, have = SAVE.inv.items; proObjective(head, `Raise the storehouse: cut stone ${Math.min(6, have.stone || 0)}/6 · fire-tree bark ${Math.min(4, have.bark || 0)}/4`, (have.stone || 0) >= 6 && (have.bark || 0) >= 4 ? 'Take it all to Venkin' : 'Quarry heaps for stone, the old fire-tree logs for bark · G shows them', 0, 0); }
+      return;
+    }
+    case AP.TESTS: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
+      const n = Object.keys(F_.apTests || {}).length; proObjective(head, B.tests.obj(n), 'Talk to Buhkon — he’s set up at the bench', 5, n); return;
+    }
+    case AP.CAVE: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
+      if (G.apCave) { const n = G.apCave.filter(e => !e.dead && !e.gone).length; proObjective(head, B.cave.fightObj(n), 'Left-click to swing — Q for the fire-stone'); return; }
+      if (F_.apCaveGo) { proObjective(head, B.cave.obj, B.cave.hint); return; }
+      proObjective(head, 'Talk to Venkin, by the barn', ''); return;
+    }
+    case AP.SOURCES: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
+      const n = Object.keys(F_.apSrc || {}).length;
+      if (n >= 3) { proObjective(head, 'Home — tell Buhkon what you learned', inBeuhk ? toHome : ''); return; }
+      proObjective(head, B.sources.obj(n), B.sources.hint, 3, n); return;
+    }
+    case AP.HOLLOW: {
+      if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
+      if (F_.apHollow) { proObjective(head, 'Home — tell Buhkon', ''); return; }
+      proObjective(head, B.hollow.obj, apHollowNear() ? B.hollow.pulse : B.hollow.hint); return;
+    }
     case AP.AMULETS: {
       if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
       const got = Math.min(F_.apAmNeed ?? 3, (SAVE.amulets || 0) - (F_.apAm0 || 0)), need = F_.apAmNeed ?? 3;
@@ -5296,6 +5402,21 @@ function apGoal() {
       if (!left.length) return bk;
       return inBeuhk ? nearest(npcs.filter(n => left.includes(n.def.id)).map(n => n.pos)) : toTown;
     }
+    case AP.BUILD: {
+      if (!F_.apGiven || SAVE.quests.q_camp === 'done') return bk;
+      if (!inBeuhk) return toTown;
+      const v = npcs.find(n => n.def.id === 'venkin'); return v ? v.pos : null;
+    }
+    case AP.TESTS: return bk;
+    case AP.CAVE: { if (!F_.apGiven) return bk; if (!F_.apCaveGo) return apV ? apV.pos : bk; const c = world.cave; return c ? V3(c.x, world.heightAt(c.x, c.z), c.z) : null; }
+    case AP.SOURCES: {
+      if (!F_.apGiven) return bk;
+      const S = F_.apSrc || {}; if (Object.keys(S).length >= 3) return bk;
+      if (inBeuhk) { const want = !S.hemla ? 'hemla' : !S.v3 ? 'v3' : null, n = want && npcs.find(q => q.def.id === want); return n ? n.pos : world.westGoal; }
+      if (!S.sniller) { const st = apStone(); return st ? V3(st.x, st.y, st.z) : null; }
+      return toTown;
+    }
+    case AP.HOLLOW: { if (!F_.apGiven || F_.apHollow) return bk; const h = world.SITES.hollow; return h ? V3(h.x, world.heightAt(h.x, h.z), h.z) : null; }
     case AP.AMULETS: {
       if (!F_.apGiven || (SAVE.amulets || 0) - (F_.apAm0 || 0) >= (F_.apAmNeed ?? 3)) return bk;
       const a = nearest(amulets.filter(a => !a.got && a.revealed));
@@ -5330,11 +5451,16 @@ function apGoal() {
 function apInteractables() {
   const out = [];
   if (!apOn()) return out;
+  if (apV && !apV.follow && apStep() === AP.CAVE && F_.apGiven && !F_.apCaveGo) out.push({ pos: apV.pos, label: APS.cave.meetLabel, act: () => dialog(APS.cave.meet, () => { F_.apCaveGo = true; persist(); apV.follow = true; dn.setHour(22); setObjective(); }), far: 3 });
   if (apStep() === AP.RIDE && oldBoat && !F_.apBoat) out.push({ pos: oldBoat.pos, label: APS.ride.look, act: () => dialog(APS.ride.found, () => { F_.apBoat = true; xp(60); persist(); setObjective(); }), far: 9 });
   return out;
 }
 /* reading the waystone with the amulet in hand */
 function apReadStone(s) {
+  if (apOn() && apStep() === AP.SOURCES && F_.apGiven && s.key === 'p_path' && !(F_.apSrc || {}).sniller) {
+    dialog(APS.sources.sniller, () => { F_.apSrc = F_.apSrc || {}; F_.apSrc.sniller = true; xp(60); persist(); setObjective(); });
+    return true;
+  }
   if (!apOn() || apStep() !== AP.VOICE || s.key !== 'p_path' || F_.apStoneRead) return false;
   dialog(APS.voice.stone, () => { F_.apStoneRead = true; SAVE.codex[s.key] = true; xp(80); persist(); setObjective(); });
   return true;
@@ -5370,7 +5496,24 @@ function apTick(dt) {
     festival.lamps.forEach((l, i) => { l.material.opacity = 0.7 + Math.sin(G.t * 2 + i) * 0.2; });
     if (Math.random() < 0.8) particles.emit(festival.x + (Math.random() - 0.5) * 1.6, festival.y + 3, festival.z + (Math.random() - 0.5) * 1.6, { vx: 0, vy: 4 + Math.random() * 2, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.5, life: 1.4, drag: 0.4 });
   }
+  apVenkinTick(dt);
   if (G.mode !== 'play' || !apOn()) return;
+  // Venkin is about the land in the cave and hollow steps (a reload puts him back)
+  if (REGION === 'property' && !apV && F_.apGiven && ((apStep() === AP.CAVE && !G.apCaveDone) || (apStep() === AP.HOLLOW && !F_.apHollow))) { apVenkin(true); apV.follow = apStep() === AP.HOLLOW || !!F_.apCaveGo; if (apStep() === AP.CAVE && F_.apCaveGo) dn.setHour(22); }
+  if (apV && apStep() === AP.HOLLOW && F_.apGiven && !apV.follow) apV.follow = true;
+  // the north-shore cave: the storm-glass, the den, the Kipsu
+  const cv = world.cave;
+  if (apStep() === AP.CAVE && F_.apCaveGo && cv && !G.apCave && !G.apCaveDone && Math.hypot(P.pos.x - cv.x, P.pos.z - cv.z) < 16) {
+    G.apCave = [];
+    dialog(APS.cave.inside, () => {
+      for (let i = 0; i < 4; i++) { const a = i * 1.6, e = enemies.spawn('kipsu', cv.x + Math.cos(a) * 6, cv.z + Math.sin(a) * 6, null, { state: 'chase', hostile: true, tag: 'cave' }); if (e) G.apCave.push(e); }
+      setObjective();
+    });
+  }
+  if (G.apCave && G.apCave.length && G.apCave.every(e => e.dead || e.gone)) {
+    G.apCave = null; G.apCaveDone = true;
+    dialog(APS.cave.caught, () => { xp(180); apVenkin(false); apAdvance(AP.WINTER, 'winter'); });
+  }
   // a season's cards, once you're outside on the Carpenter's land
   if (F_.apCards && REGION === 'property' && !interiors.inside) {
     const lines = (APS[F_.apCards] || {}).cards; delete F_.apCards; persist();
@@ -5535,7 +5678,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
+  get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,

@@ -39,7 +39,10 @@ global.localStorage = { getItem: k => (k in ls ? ls[k] : null), setItem: (k, v) 
   }
 
   const pastII = P.migrateSave({ v: 3, flags: { young: true, pro: 'done', yq: 5, megla: 'done', ch2: true } });
-  check('v3→v4: a run past Chapter II skips the two summers', pastII.flags.ap === 9);
+  check('v3→v5: a run past Chapter II skips the two summers', pastII.flags.ap === 14);
+  const mid = P.migrateSave({ v: 4, flags: { young: true, pro: 'done', yq: 5, ap: 4, apGiven: true } });
+  check('v4→v5: the winter step keeps its place in the renumbered steps', mid.flags.ap === 7);
+  check('v4→v5: the first step stays the first', P.migrateSave({ v: 4, flags: { ap: 0 } }).flags.ap === 0);
   const inI = P.migrateSave({ v: 3, flags: { young: true, pro: 'done', yq: 5 } });
   check('v3→v4: a run still in Chapter I picks them up', inI.flags.ap === undefined);
   const noFlags = P.migrateSave({ v: 3 });

@@ -1427,7 +1427,8 @@ export const YOUNG_HELLO = {
   v2: ['Rodak in the north wood again. They never bother you — till you’re bleeding.', 'Mind the crops, boy.'],
   v3: ['The old Nur Lanterns only wake for a Nur — or for someone carrying something alive in stygian.', 'Glide off the Carpenter’s tower sometime. Everyone does it once. Most people only once.'],
   v4: ['The Stryx won’t fly anyone it doesn’t like. It doesn’t like anyone.', 'Fire trees never burn. Their seeds, though — whoosh.'],
-  kw1: ['Mind the scaffold.', 'We build. The Kalo make our hammers. Never the other way round.'],
+  kw1: ['Mind the scaffold. And mind my boy — if he’s up there, he’s showing off.', 'We build. The Kalo make our hammers. Never the other way round.'],
+  venkin: ['Carpenter’s boy! Race you to the square.', 'Father says I’ll have my own hammer when I’m sixteen. Kalo-made. With the cyan in it.', 'Want to lose at tokens again? I’m bored.'],
 };
 /* the Beuhk quests, told to young Tanoc: no Phorus, no Stamijan, no Duat */
 export const YOUNG_QUESTS = {
@@ -1713,3 +1714,176 @@ export const ESCAPE = {
     ['buhkon', '…Did it, now. Up on the cart. Tell me the rest on the road. North — home, six days. Go!'],
   ],
 };
+
+/* ================================================================
+   THE TWO SUMMERS, GO ON — Venkin, and the amulet research.
+   Young Venkin is a Keilia about Tanoc's age, apprenticed to his
+   father Orrin, the builder. The two boys raise the storehouse in
+   Beuhk, sneak off to the north-shore cave, and join the Carpenter's
+   research into the amulets: tests at the bench, asking people who
+   know, talking to the Sniller, and a field trip to an old Sniller
+   site. What they learn: the Snillers are cursed; each has tasks it
+   cannot name, more than one; and there is a way to count how many
+   a Sniller has left. (The test results are inventions — change them
+   freely.)
+   ================================================================ */
+SPEAKERS.kw1 = { name: 'Orrin', color: '#e0b070', sub: 'Keilia builder, Venkin’s father' };
+SPEAKERS.venkinY = { name: 'Venkin', color: '#e0b070', sub: 'young Keilia, Orrin’s apprentice' };
+Object.assign(APPRENTICE, {
+  seasons: ['The first summer', 'The first summer', 'The first summer', 'The first summer', 'Autumn', 'Autumn', 'Autumn', 'Winter', 'Winter', 'Winter', 'Spring', 'Spring', 'Spring', 'Spring', 'The second summer'],
+  /* raising the storehouse, with Orrin and his boy */
+  build: {
+    give: [
+      ['buhkon', 'Orrin the builder is raising a storehouse by the square in Beuhk before the winter. I promised him a carpenter for the roof beams. That’s you.'],
+      ['buhkon', 'His boy Venkin is about your age. Keilia — taller than you already, and he’ll tell you so. Try not to fight. Or do, and then shake hands.'],
+    ],
+    obj: 'Help Orrin and Venkin raise the storehouse in Beuhk — find Venkin by the square',
+    meetLabel: 'Meet Orrin’s boy',
+    meet: [
+      ['venkinY', 'You’re the Carpenter’s boy. The one from the market. Everyone says you fell out of the sky.'],
+      ['tanoc', 'I didn’t fall. I was — it’s complicated.'],
+      ['venkinY', 'Everything’s complicated if you’re not a Keilia. Come on. Father wants six cut stones and four strips of fire-tree bark before we can raise the frame. I’ll race you for it.'],
+      ['kw1', 'And no racing near the quarry heaps. Venkin. VENKIN.'],
+    ],
+    raised: [
+      ['tale', 'Two days of hauling, one of pegging. Orrin calls the beams up one at a time, and two boys on the scaffold catch them, swear at them, and drop exactly one.'],
+      ['kw1', 'Up she goes! You’ve good hands, Carpenter’s boy. Better than his, and don’t tell him I said so.'],
+      ['venkinY', 'I heard that.'],
+      ['venkinY', 'Tanoc. Come back tomorrow? There’s a Kipsu den by the mill and I need someone to hold the sack.'],
+    ],
+    back: [
+      ['buhkon', 'Orrin says you didn’t fall off anything. High praise, from a Keilia.'],
+      ['tanoc', 'Venkin wants me to help him with a Kipsu den.'],
+      ['buhkon', 'Of course he does. Good. A boy needs someone to get into trouble with. Mind you come home with all your fingers.'],
+    ],
+    youngQuest: {
+      desc: 'Orrin and his son Venkin are raising a storehouse by the square for the winter Ju. Bring cut stone from the quarry heaps and fire-tree bark from the old logs.',
+      offer: ['Father wants six cut stones and four strips of fire-tree bark before we raise the frame.', 'The quarry heaps are free for the taking. The bark comes off the old fire-tree logs. Race you.'],
+      wait: ['Six stone, four bark. I’ve got two stones already. Hurry up.'],
+      done: ['That’s the lot! Father — FATHER — we can raise it!', 'Here. A stone I found in the quarry with a hole right through it. Breath stone, Father calls it. You can have it.'],
+    },
+  },
+  /* tests at the bench */
+  tests: {
+    give: [
+      ['buhkon', 'Now. Those amulets. They walk, they hum, they find their way back to you. I’d like to know why.'],
+      ['buhkon', 'Bring the bag to the bench. We’ll try them against everything we’ve got and write down what they do. That’s what research is: trying things, and writing it down.'],
+    ],
+    obj: n => `Test the amulets at the bench with Buhkon (${n}/5)`,
+    menu: 'Which test next?',
+    list: {
+      water: { label: 'Set one in a bowl of well water', lines: [
+        ['tale', 'He sets an amulet in a bowl of cold well water. Frost spreads out from it in a spiral, turning the way a storm turns, until the whole bowl is a little frozen whirlpool.'],
+        ['buhkon', 'Storm-stuff. Even sealed up in stone, it remembers being weather.'],
+      ] },
+      fire: { label: 'Hold the fire-stone up to one', lines: [
+        ['tale', 'He holds the fire-stone close to an amulet. The Hurst inside the stone goes absolutely silent. Then, very quietly:'],
+        ['hurst', '…don’t like it. It’s BIG in there. Much bigger than it looks. Put it away put it away put it away.'],
+      ] },
+      ore: { label: 'Touch one to stygian ore', lines: [
+        ['tale', 'He touches an amulet to a lump of stygian ore. The ore hums back a different note — and for one heartbeat Tanoc is somewhere else: a sky full of wings and light, and a voice he doesn’t know shouting a name he doesn’t know.'],
+        ['tanoc', 'I — I saw something. That wasn’t mine. That wasn’t my memory.'],
+        ['buhkon', 'Zikhron. The ore remembers what the amulet keeps. …Careful with that one, Tanoc.'],
+      ] },
+      hlyst: { label: 'Push Nur’Hlyst through the bag', lines: [
+        ['tale', 'He pushes Nur’Hlyst through the bag. Every amulet answers — but not together. One pulses three times. Another, only once. One of them pulses seven times, then won’t stop humming.'],
+        ['buhkon', 'Counting. They’re counting something. Write it down — three, one, seven.'],
+      ] },
+      pair: { label: 'Set two side by side', lines: [
+        ['tale', 'Two amulets laid side by side turn on the bench like compass needles — first toward each other, then slowly away, each toward a different wall.'],
+        ['buhkon', 'Different directions. Different… somethings. Each one of them wants to go somewhere of its own.'],
+      ] },
+    },
+    done: [
+      ['buhkon', 'Five tests, five answers, and not one of them a straight one. That’s amulets for you. We’ll keep at it — and we’ll want people who know more than we do.'],
+    ],
+  },
+  /* the north-shore cave, at night, with Venkin */
+  cave: {
+    give: [
+      ['buhkon', 'Venkin’s here. Came up the path asking for you, and he has the look of a boy with a bad idea. He’s by the barn.'],
+    ],
+    meetLabel: 'Talk to Venkin',
+    meet: [
+      ['venkinY', 'There’s a cave on the north shore of your lake. Everyone in Beuhk says something lives in it. Something that hums.'],
+      ['tanoc', 'Buhkon said not to go up the north shore after dark.'],
+      ['venkinY', 'Buhkon says a lot of things. Tonight, when he’s asleep. Bring your amulets. If they hum at it, we’ll know.'],
+      ['tale', 'That night, very quietly, two boys go down the lane past the dock, and along the north shore of the lake.'],
+    ],
+    obj: 'Sneak along the north shore with Venkin to the cave',
+    hint: 'The cave mouth is on the north shore of the lake, west of the pasture',
+    inside: [
+      ['tale', 'Inside the cave mouth the rock is wrong — melted and run together, shining like black glass. A ring of it, as if lightning had stood here for a whole night.'],
+      ['venkinY', 'Storm-glass. Father says it only happens when the sky comes right down to the ground.'],
+      ['tale', 'Every amulet in the bag is humming at once. And from the dark at the back of the cave, something hums back — and a lot of small eyes open.'],
+      ['venkinY', 'Kipsu! It’s a den — they’ve been sleeping on it — they’re — RUN — no, fight —'],
+    ],
+    fightObj: n => `Drive off the cave’s Kipsu (${n} left)`,
+    caught: [
+      ['tale', 'The last Kipsu bolts past them into the night. In the silence after, a lantern comes up the shore.'],
+      ['buhkon', 'Out. Both of you. Now.'],
+      ['venkinY', 'It was my idea, Carpenter. Not his.'],
+      ['buhkon', 'I know it was your idea, Venkin. I can tell your ideas by the smell.'],
+      ['tale', 'But he stops in the cave mouth, and holds the lantern up to the storm-glass for a long time, and says nothing. In the morning, a piece of it is on the workshop bench.'],
+    ],
+  },
+  /* asking people who know */
+  sources: {
+    give: [
+      ['buhkon', 'We’ve tried them against everything on the land. Time to ask people who know more than I do.'],
+      ['buhkon', 'Hemla, in Beuhk — the Kalo hear stories across three Tatu. And Lirra the lamplighter knows the old lantern lore better than anyone.'],
+      ['tanoc', '(…And there’s one more I can ask. One he doesn’t know about.)'],
+    ],
+    obj: n => `Ask people who know about the amulets (${n}/3)`,
+    hint: 'Hemla and Lirra, in Beuhk — and the amulet itself, at the old waystone',
+    askLabel: 'Ask about the Sniller amulets',
+    hemla: [
+      ['hemla', 'The Kalo have a word for those. “Sealed weather.” My grandmother’s ship once carried a crate of them across the Kalo sea.'],
+      ['hemla', 'Every night the crate hummed a little louder. On the last night it was quiet — and one of them was gone, and the crate still nailed shut.'],
+      ['hemla', 'The Kalo say the Xwi never killed the Snillers. They cursed them: sealed them into stone until they’re needed. Needed for what, nobody ever says.'],
+    ],
+    lirra: [
+      ['v3', 'The old Nur Lanterns? There’s a story they were first lit by Snillers, long before the war. A Sniller would light one to mark a place it meant to come back to.'],
+      ['v3', 'So if your amulets are Snillers… then each of them has places it means to go back to. Things to finish.'],
+    ],
+    sniller: [
+      ['sniller', 'Cursed. Yes. That is the word. The Xwi spoke it, and we became stone.'],
+      ['sniller', 'Each of us has tasks. Things we must do before we can be… finished.'],
+      ['tanoc', 'What tasks? What’s yours?'],
+      ['sniller', 'I do not know. I can feel one in front of me, the way you feel a stone in your boot. I cannot see it yet.'],
+      ['sniller', 'And more after it. Not one. More.'],
+    ],
+    snillerLabel: 'Hold the amulet to the waystone, and ask',
+    back: [
+      ['tanoc', 'Hemla says the Xwi cursed them, not killed them. Lirra says each one has places it means to go back to.'],
+      ['buhkon', 'Cursed, sealed, and waiting with somewhere to be. And each one more than one somewhere, if those counts mean what I think.'],
+      ['buhkon', 'Spring soon. Your Punk’s nearly as big as a calf. We should talk about that.'],
+    ],
+  },
+  /* the field trip: the storm-glass ring in the forest hollow */
+  hollow: {
+    give: [
+      ['buhkon', 'Your amulet’s been pulling toward the forest hollow all week — the one at the edge of the north woods. Let’s follow it a little way, the three of us, and see what’s there.'],
+      ['venkinY', 'Three of us? I’m coming? Father said I could? …Father said I could.'],
+    ],
+    obj: 'Follow the amulet’s pull to the forest hollow at the edge of the north woods',
+    hint: 'The hollow is far north-west of the house, where the woods begin',
+    pulse: 'Pulse Nur’Hlyst (G) in the middle of the ring',
+    found: [
+      ['tale', 'In the bottom of the hollow, under the moss, a ring of storm-glass — a big one, half buried, older than the trees around it.'],
+      ['venkinY', 'Another one. Like the cave. Only huge.'],
+      ['buhkon', 'A Sniller stood here once. A long time. Go on, Tanoc — your golden pulse, right in the middle of it.'],
+    ],
+    result: [
+      ['tale', 'The Nur’Hlyst goes out of him and comes back changed — rung like a bell by the storm-glass. Every amulet in the bag answers with its count of pulses, slow and clear, and this time he understands them.'],
+      ['sniller', '(very quietly, so only he hears) Tasks. That is how many are left.'],
+      ['tanoc', 'Buhkon — the pulses. It’s how many tasks each one has LEFT. That one has three. That one, one. That one, seven.'],
+      ['buhkon', '…Then we can count them. Every amulet, every task it has still to do. We can’t say what the tasks are. But we can say how many.'],
+      ['tale', 'The storm-glass is warm when they leave, and for a whole night afterwards the ring glows faintly through the moss.'],
+      ['venkinY', 'I’m telling Father I discovered it.'],
+    ],
+  },
+});
+/* the festival, now that Venkin's a friend */
+APPRENTICE.harvest.done[3] = ['buhkon', 'Venkin will be there — Orrin says the boy has been practising his throws all summer just to beat you. He’s never lost a match on harvest night, and he doesn’t mean to start.'];
+APPRENTICE.tests.done.push(APPRENTICE.amulets.done[3]);

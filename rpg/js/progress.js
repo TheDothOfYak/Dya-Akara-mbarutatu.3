@@ -37,7 +37,7 @@ const BASE = 'torcain-save-v2';
 /* the save's shape. Bumping it no longer resets anyone: add a step to
    MIGRATIONS that carries a save from the old version to the new one,
    so a run that's twenty hours in survives every update. */
-export const SAVE_V = 4;
+export const SAVE_V = 5;
 /* the oldest save this build still reads (v3: the Beuhk prologue — runs from
    before it were reset, and stay that way) */
 export const MIN_SAVE_V = 3;
@@ -46,6 +46,9 @@ const MIGRATIONS = {
   /* v4: Chapter I's two summers. A run already past them (into the Megla Aagac or
      beyond) skips them; a run still in Chapter I picks them up from the start. */
   3: s => { const f = s.flags = s.flags || {}; if (f.megla || f.ch2) f.ap = 9; },
+  /* v5: Venkin and the amulet research slot in between the two summers' steps, so they renumber
+     (a run already past a new step simply goes on without it) */
+  4: s => { const f = s.flags = s.flags || {}; if (f.ap != null) f.ap = [0, 2, 4, 5, 7, 8, 10, 11, 13, 14][f.ap] ?? f.ap; },
 };
 /* a save brought up to this build's version, or null if it can't be read */
 export function migrateSave(s) {
