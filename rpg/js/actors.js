@@ -217,24 +217,40 @@ export function strideLegs(legs, phase, k, air, dt, stance = 0) {
   });
 }
 
-/* a painted stripe laid on a skin: pts along it, nrm the skin's outward normal at each, w its half-width at each */
-function stripe(pts, nrm, w, mat) {
-  const pos = [], idx = [], t = new THREE.Vector3(), sd = new THREE.Vector3();
+/* a marking painted on a skin: not a thing stuck on, just the skin a different colour. pts run along it, nrm is the
+   skin's outward normal at each, w its half-width. With onto { parent, targets } each corner is dropped onto the skin
+   mesh itself (so it lies exactly in the surface) and takes that mesh's texture place (so the grain runs through it). */
+const _ray = new THREE.Raycaster(), _ro = new THREE.Vector3(), _rd = new THREE.Vector3(), _rv = new THREE.Vector3();
+function stripe(pts, nrm, w, mat, onto) {
+  const pos = [], uv = [], idx = [], t = new THREE.Vector3(), sd = new THREE.Vector3();
+  if (onto) onto.parent.updateWorldMatrix(true, false);
+  const lay = (v, n) => {
+    if (onto) {
+      _ro.copy(v).addScaledVector(n, 0.03); onto.parent.localToWorld(_ro);
+      _rd.copy(n).transformDirection(onto.parent.matrixWorld).negate();
+      _ray.set(_ro, _rd); _ray.far = 0.07;
+      for (const tg of onto.targets) tg.updateWorldMatrix(true, false);
+      const hit = _ray.intersectObjects(onto.targets, false)[0];
+      if (hit) { _rv.copy(hit.point).addScaledVector(_rd, -0.0002); onto.parent.worldToLocal(_rv); pos.push(_rv.x, _rv.y, _rv.z); uv.push(hit.uv ? hit.uv.x : 0, hit.uv ? hit.uv.y : 0); return; }
+    }
+    pos.push(v.x, v.y, v.z); uv.push(0, 0);
+  };
   for (let i = 0; i < pts.length; i++) {
     t.subVectors(pts[Math.min(i + 1, pts.length - 1)], pts[Math.max(i - 1, 0)]).normalize();
     sd.crossVectors(nrm[i], t).normalize().multiplyScalar(w[i]);
-    pos.push(pts[i].x + sd.x, pts[i].y + sd.y, pts[i].z + sd.z, pts[i].x - sd.x, pts[i].y - sd.y, pts[i].z - sd.z);
+    lay(_rv.copy(pts[i]).add(sd).clone(), nrm[i]); lay(pts[i].clone().sub(sd), nrm[i]);
     if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
   const m = new THREE.Mesh(g, mat); m.userData.noOutline = true;
+  if (onto) onto.parent.add(m);
   return m;
 }
-/* a smooth run through control points, sampled n times, each sample put on the skin by onSkin(p) → { p, n } */
-function stripeAlong(ctrl, n, onSkin, width, mat) {
+/* a smooth run through control points, sampled n times, each sample put near the skin by onSkin(p) → { p, n } */
+function stripeAlong(ctrl, n, onSkin, width, mat, onto) {
   const c = new THREE.CatmullRomCurve3(ctrl), pts = [], nrm = [], w = [];
   for (let i = 0; i <= n; i++) { const f = i / n, q = onSkin(c.getPoint(f)); pts.push(q.p); nrm.push(q.n); w.push(width(f)); }
-  return stripe(pts, nrm, w, mat);
+  return stripe(pts, nrm, w, mat, onto);
 }
 
 /* ---------------- weapons (grip at the origin, along +y) ---------------- */
@@ -543,8 +559,9 @@ export function buildEikar(o = {}) {
 
   // shoulders
   const SH = 0.355, SX = 0.168 * bw;
+  const delts = [];
   for (const s of [-1, 1]) {
-    const delt = new THREE.Mesh(new THREE.SphereGeometry(0.052, 18, 14), skinMat); delt.scale.set(1, 0.85, 0.95); delt.position.set(s * SX, SH, 0); delt.userData.noOutline = true; torso.add(delt);
+    const delt = new THREE.Mesh(new THREE.SphereGeometry(0.052, 18, 14), skinMat); delt.scale.set(1, 0.85, 0.95); delt.position.set(s * SX, SH, 0); delt.userData.noOutline = true; torso.add(delt); delts.push(delt);
   }
 
   // the head
@@ -561,7 +578,9 @@ export function buildEikar(o = {}) {
   const duat = o.duat === true ? 1 : (o.duat || 0);
   const markGlowCol = duat ? 0x6a18d8 : (o.marking || 0xbfe8ff);
   // the markings: very dark brown, painted into the skin and lit with it (the Kalo's cooler; the Duat-touched near black-purple)
-  const markMat = toon(duat ? 0x1e0a2c : kalo ? new THREE.Color(o.marking || 0xbfe8ff).lerp(new THREE.Color(0x203040), 0.5).getHex() : 0x3e2416, { side: THREE.DoubleSide, emissive: duat ? 0x6a18d8 : (o.marking || 0xffc46a) });
+  const markTo = new THREE.Color(duat ? 0x1e0a2c : kalo ? new THREE.Color(o.marking || 0xbfe8ff).lerp(new THREE.Color(0x203040), 0.5).getHex() : 0x3e2416), skinC = new THREE.Color(o.skin || '#a8743e');
+  const markTint = new THREE.Color(Math.min(1, markTo.r / Math.max(0.01, skinC.r)), Math.min(1, markTo.g / Math.max(0.01, skinC.g)), Math.min(1, markTo.b / Math.max(0.01, skinC.b)));
+  const markMat = toon(markTint, { map: skinMat.map, side: THREE.DoubleSide, emissive: duat ? 0x6a18d8 : (o.marking || 0xffc46a), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   const eyeR = (kalo ? 0.03 : 0.027) * 1.18, ex = kalo ? 0.047 : 0.044;   // eyes a little larger: they carry the acting
   const zOn = (x, y, r) => Math.sqrt(Math.max(0, r * r - x * x - y * y));
   const markGlows = [], eyes = [], brows = [];
@@ -617,9 +636,9 @@ export function buildEikar(o = {}) {
     };
     const W = kalo ? 1.12 : 1, V = (x, y) => new THREE.Vector3(x, y, 0);
     for (const s of [-1, 1]) {
-      face.add(stripeAlong([V(0, 0.024), V(s * 0.011, 0.002), V(s * 0.024, -0.03), V(s * ex, -0.045), V(s * (ex + 0.022), -0.043), V(s * 0.07, -0.062), V(s * 0.054, -0.088), V(s * 0.043, -0.104)], 30, onFace,
-        f => W * (f < 0.12 ? lerp(0.0009, 0.0024, f / 0.12) : f < 0.55 ? lerp(0.0024, 0.0031, (f - 0.12) / 0.43) : lerp(0.0031, 0.0024, (f - 0.55) / 0.45)), markMat));
-      torso.add(stripeAlong([V(s * 0.042, 0.452), V(s * 0.03, 0.432), V(s * 0.012, 0.418), V(-s * 0.006, 0.408), V(-s * 0.016, 0.401)], 14, onNeck, f => W * lerp(0.0026, 0.002, f), markMat));
+      stripeAlong([V(0, 0.024), V(s * 0.011, 0.002), V(s * 0.024, -0.03), V(s * ex, -0.045), V(s * (ex + 0.022), -0.043), V(s * 0.07, -0.062), V(s * 0.054, -0.088), V(s * 0.043, -0.104)], 22, onFace,
+        f => W * (f < 0.12 ? lerp(0.0009, 0.0024, f / 0.12) : f < 0.55 ? lerp(0.0024, 0.0031, (f - 0.12) / 0.43) : lerp(0.0031, 0.0024, (f - 0.55) / 0.45)), markMat, { parent: face, targets: [skull, jaw] });
+      stripeAlong([V(s * 0.042, 0.452), V(s * 0.03, 0.432), V(s * 0.012, 0.418), V(-s * 0.006, 0.408), V(-s * 0.016, 0.401)], 10, onNeck, f => W * lerp(0.0026, 0.002, f), markMat, { parent: torso, targets: [neck] });
     }
   }
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), skinMat); nose.scale.set(0.9, 1.25, 0.9); nose.position.set(0, -0.018, HR * 0.98); face.add(nose);
@@ -721,21 +740,21 @@ export function buildEikar(o = {}) {
     const delt = { x: 0.052, y: 0.052 * 0.85, z: 0.052 * 0.95 };
     const onDelt = q => { const n = new THREE.Vector3(Math.sin(q.x) * Math.cos(q.y), Math.sin(q.y), Math.cos(q.x) * Math.cos(q.y)); return { p: new THREE.Vector3(n.x * (delt.x + 0.0016), n.y * (delt.y + 0.0016), n.z * (delt.z + 0.0016)), n: n.clone() }; };   // q.x round, q.y up
     const V = (x, y) => new THREE.Vector3(x, y, 0);
-    const piece = (parent, onSkin, a0, y0, da, dy) => {   // one mark, in (angle, height) space
+    const piece = (parent, targets, onSkin, a0, y0, da, dy) => { const on = { parent, targets };   // one mark, in (angle, height) space
       const kind = Math.floor(rnd() * 5), sz = 0.6 + rnd() * 0.7, w0 = W * (0.0034 + rnd() * 0.0012), wd = f => w0 * Math.sin(Math.PI * (0.12 + 0.76 * f));
-      if (kind === 0) parent.add(stripeAlong([V(a0, y0), V(a0 + da * sz * 0.5, y0 + dy * sz * 0.5), V(a0 + da * sz, y0 + dy * sz)], 6, onSkin, wd, markMat));                     // a dash
-      else if (kind === 1) parent.add(stripeAlong([V(a0, y0), V(a0 + da * sz, y0 + dy * sz * 0.6), V(a0 + da * sz * 1.2, y0 + dy * sz * 1.2), V(a0 + da * sz * 0.6, y0 + dy * sz * 1.5)], 10, onSkin, wd, markMat));   // a hook
-      else if (kind === 2) { for (const k of [-1, 1]) parent.add(stripeAlong([V(a0, y0), V(a0 + k * da * sz * 0.8, y0 + Math.abs(dy) * sz * 0.9)], 4, onSkin, wd, markMat)); }   // a chevron
-      else if (kind === 3) { parent.add(stripeAlong([V(a0, y0), V(a0, y0 + dy * sz)], 5, onSkin, wd, markMat)); for (const k of [-1, 1]) parent.add(stripeAlong([V(a0, y0 + dy * sz), V(a0 + k * da * sz * 0.5, y0 + dy * sz * 1.5)], 4, onSkin, wd, markMat)); }   // a fork
-      else for (let k = 0; k < 2 + Math.floor(rnd() * 3); k++) { const a = a0 + da * k * 0.6, y = y0 + dy * k * 0.5; parent.add(stripeAlong([V(a, y), V(a + da * 0.1, y + dy * 0.14)], 2, onSkin, () => W * 0.0042, markMat)); }   // a run of dots
+      if (kind === 0) stripeAlong([V(a0, y0), V(a0 + da * sz * 0.5, y0 + dy * sz * 0.5), V(a0 + da * sz, y0 + dy * sz)], 6, onSkin, wd, markMat, on);                     // a dash
+      else if (kind === 1) stripeAlong([V(a0, y0), V(a0 + da * sz, y0 + dy * sz * 0.6), V(a0 + da * sz * 1.2, y0 + dy * sz * 1.2), V(a0 + da * sz * 0.6, y0 + dy * sz * 1.5)], 10, onSkin, wd, markMat, on);   // a hook
+      else if (kind === 2) { for (const k of [-1, 1]) stripeAlong([V(a0, y0), V(a0 + k * da * sz * 0.8, y0 + Math.abs(dy) * sz * 0.9)], 4, onSkin, wd, markMat, on); }   // a chevron
+      else if (kind === 3) { stripeAlong([V(a0, y0), V(a0, y0 + dy * sz)], 5, onSkin, wd, markMat, on); for (const k of [-1, 1]) stripeAlong([V(a0, y0 + dy * sz), V(a0 + k * da * sz * 0.5, y0 + dy * sz * 1.5)], 4, onSkin, wd, markMat, on); }   // a fork
+      else for (let k = 0; k < 2 + Math.floor(rnd() * 3); k++) { const a = a0 + da * k * 0.6, y = y0 + dy * k * 0.5; stripeAlong([V(a, y), V(a + da * 0.1, y + dy * 0.14)], 2, onSkin, () => W * 0.0042, markMat, on); }   // a run of dots
     };
     for (const a of arms) {
       const s = a.s, out = s * Math.PI / 2;   // the outside of the arm
       // on the shoulder cap
-      for (let k = 0; k < 1 + Math.floor(rnd() * 2); k++) { const g = new THREE.Group(); g.position.set(s * SX, SH, 0); torso.add(g); piece(g, onDelt, out * (0.4 + rnd() * 0.5), 0.2 + rnd() * 0.6, s * (0.25 + rnd() * 0.3), -(0.3 + rnd() * 0.4)); }
+      for (let k = 0; k < 1 + Math.floor(rnd() * 2); k++) { const g = new THREE.Group(); g.position.set(s * SX, SH, 0); torso.add(g); piece(g, [delts[s < 0 ? 0 : 1]], onDelt, out * (0.4 + rnd() * 0.5), 0.2 + rnd() * 0.6, s * (0.25 + rnd() * 0.3), -(0.3 + rnd() * 0.4)); }
       // down the upper arm and the forearm, broken up, different every time
-      for (let k = 0; k < 2 + Math.floor(rnd() * 3); k++) piece(a.upper, onLimb('u'), out * (0.4 + rnd() * 0.8), -0.03 - rnd() * 0.15, s * (0.5 + rnd() * 0.7), -(0.04 + rnd() * 0.05));
-      for (let k = 0; k < 1 + Math.floor(rnd() * 2); k++) piece(a.fore, onLimb('f'), out * (0.5 + rnd() * 0.7), -0.02 - rnd() * 0.04, s * (0.5 + rnd() * 0.6), -(0.03 + rnd() * 0.025));
+      for (let k = 0; k < 2 + Math.floor(rnd() * 3); k++) piece(a.upper, [a.upper.children[0]], onLimb('u'), out * (0.4 + rnd() * 0.8), -0.03 - rnd() * 0.15, s * (0.5 + rnd() * 0.7), -(0.04 + rnd() * 0.05));
+      for (let k = 0; k < 1 + Math.floor(rnd() * 2); k++) piece(a.fore, [a.fore.children[1]], onLimb('f'), out * (0.5 + rnd() * 0.7), -0.02 - rnd() * 0.04, s * (0.5 + rnd() * 0.6), -(0.03 + rnd() * 0.025));
     }
   }
   {
