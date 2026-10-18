@@ -33,8 +33,8 @@ function spots(world, rng, n, opts = {}) {
 const CHEST_LOOT = {
   aakalay: [['petal', 2], ['ore', 2], ['bark', 2], ['salad', 1], ['stew', 1], ['vine', 3], ['t_seed', 1], ['oil', 2]],
   xilia: [['petal', 2], ['vine', 2], ['bark', 2], ['salad', 1], ['ore', 1], ['stone', 2]],
-  property: [['petal', 2], ['vine', 2], ['bark', 3], ['bun', 1], ['ore', 1], ['fluff', 2], ['salad', 1]],
-  leotik: [['moss', 2], ['ore', 3], ['ember', 2], ['tea', 1], ['seed', 1], ['thorn', 1], ['skewer', 1], ['t_ring', 1]],
+  property: [['petal', 2], ['vine', 2], ['bark', 3], ['bun', 1], ['ore', 1], ['fluff', 2], ['salad', 1], ['w_wraps', 1], ['w_sandals', 1], ['w_ranger', 1]],
+  leotik: [['moss', 2], ['ore', 3], ['ember', 2], ['tea', 1], ['seed', 1], ['thorn', 1], ['skewer', 1], ['t_ring', 1], ['w_gauntlets', 1], ['w_greaves', 1], ['w_chain', 1]],
 };
 
 function chestMesh() {
@@ -65,6 +65,9 @@ export function buildFeatures(scene, world, region, save) {
     const a = loot[Math.floor(rng() * loot.length)], b = loot[Math.floor(rng() * loot.length)];
     const c = { id, x: p.x, y: p.y, z: p.z, mesh: m, open: !!picked[id], items: { [a[0]]: a[1] }, shards: 20 + Math.floor(rng() * 40), seed: i % 4 === 0 };
     if (b[0] !== a[0]) c.items[b[0]] = b[1];
+    // far from home, a few chests hold Relic armor (later in the tale)
+    const RELIC_CHESTS = { leotik: { 3: 'r_sniller_cloak', 7: 'r_hurst_mantle' }, aakalay: { 2: 'r_hurst_mantle', 6: 'r_sniller_cloak' } };
+    if (RELIC_CHESTS[region] && RELIC_CHESTS[region][i]) c.items[RELIC_CHESTS[region][i]] = 1;
     if (c.open) { m.userData.lid.rotation.x = -1.9; m.userData.glow.visible = false; }
     return c;
   });

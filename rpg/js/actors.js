@@ -550,6 +550,77 @@ export function buildEikar(o = {}) {
   const seed = Math.random() * 100;
   bio.glow(0);
 
+  /* ---- the wardrobe's pieces (see setOutfit) ---- */
+  const inkG = g => { g.traverse(m => { if (m.isMesh && m.name !== 'outline' && !m.userData.noOutline) { m.castShadow = true; addOutline(m, 0.012); } }); celAll(g); };
+  const seamMat = c => new THREE.MeshBasicMaterial({ color: c });
+  const DZW = 0.68 * (kalo ? 1.08 : 1);
+  function buildPiece(slot, look, glow, key) {
+    const m = paint(toon(0xffffff, glow != null ? { emissive: glow, emissiveIntensity: 0.22 } : {}), 'cloth'), metal = toon(0x9a9ca6), dark = toon(0x2a1a10), gs = [];
+    const seam = glow != null ? seamMat(glow) : null;
+    const glowLine = (g, geo, x, y, z, rx = 0, ry = 0, rz = 0) => { if (!seam) return; const q = new THREE.Mesh(geo, seam); q.position.set(x, y, z); q.rotation.set(rx, ry, rz); q.userData.noOutline = true; g.add(q); };
+    if (slot === 'body') {
+      const g = new THREE.Group();
+      const VP = look === 'robe' ? [[0.17, -0.2], [0.15, -0.05], [0.13, 0.09], [0.14, 0.18], [0.16, 0.26], [0.163, 0.32], [0.136, 0.37]] : [[0.166, -0.12], [0.14, -0.01], [0.126, 0.09], [0.138, 0.18], [0.16, 0.26], [0.162, 0.32], [0.136, 0.365]];
+      const vest = new THREE.Mesh(new THREE.LatheGeometry(VP.map(([r, y]) => new THREE.Vector2(r, y)), 18), m); vest.scale.set(bw * 1.04, 1, DZW * 1.08); g.add(vest);
+      const padR = look === 'plate' ? 0.09 : look === 'robe' ? 0 : 0.07;
+      for (const q of [-1, 1]) if (padR) { const pad = new THREE.Mesh(new THREE.SphereGeometry(padR, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), look === 'vest' ? m : m); pad.scale.set(1.15, look === 'plate' ? 0.8 : 0.6, 1.05); pad.position.set(q * SX, SH + 0.01, 0); pad.rotation.z = -q * 0.35; g.add(pad); }
+      if (look === 'chain') for (let k = 0; k < 6; k++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.152 - Math.abs(k - 3) * 0.004, 0.004, 4, 24), metal); ring.rotation.x = Math.PI / 2; ring.scale.set(bw * 1.06, DZW * 1.1, 1); ring.position.y = -0.06 + k * 0.065; ring.userData.noOutline = true; g.add(ring); }
+      if (look === 'plate') for (let row = 0; row < 4; row++) for (let k = -2; k <= 2; k++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.014), m); const a = k * 0.32; pl.position.set(Math.sin(a) * 0.15 * bw, 0.0 + row * 0.07, Math.cos(a) * 0.15 * DZW * 1.12); pl.rotation.y = a; pl.rotation.x = -0.15; g.add(pl); }
+      if (look === 'robe') { const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.17 * bw, 0.24 * bw, 0.5, 16, 1, true), m); skirt.material.side = THREE.DoubleSide; skirt.scale.z = DZW * 1.1; skirt.position.y = -0.42; g.add(skirt); gs.push(skirt); const sash = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.016, 5, 20), toon(0xd8b060)); sash.rotation.x = Math.PI / 2; sash.scale.set(bw * 1.05, DZW * 1.12, 1); sash.position.y = 0.0; g.add(sash); }
+      if (look === 'vest' || look === 'chain') for (let k = 0; k < 4; k++) { const lace = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.01), dark); lace.position.set(0, 0.02 + k * 0.07, 0.118 * DZW * 1.12 + 0.012); lace.rotation.z = (k % 2 ? 0.5 : -0.5); g.add(lace); }
+      glowLine(g, new THREE.BoxGeometry(0.012, 0.36, 0.012), 0, 0.12, 0.13 * DZW * 1.12 + 0.01);
+      glowLine(g, new THREE.TorusGeometry(0.14, 0.005, 4, 20), 0, 0.27, 0, Math.PI / 2);
+      inkG(g); torso.add(g); gs.unshift(g);
+      // the robe's skirt hangs from the hips, not the chest (the torso leans; the skirt should hang)
+      if (look === 'robe') { const sk = gs.pop(); g.remove(sk); const sg = new THREE.Group(); sg.add(sk); sk.position.y = -0.22; body.add(sg); gs.push(sg); }
+    } else if (slot === 'hands') {
+      for (const a of arms) {
+        const g = new THREE.Group(), fl = armOpts.L2 - armOpts.rh * 0.9, rf = armOpts.rf;
+        if (look === 'wrap') for (let k = 0; k < 6; k++) { const w = new THREE.Mesh(new THREE.TorusGeometry(rf * 1.18 - k * 0.002, 0.008, 4, 10), m); w.rotation.x = Math.PI / 2 + 0.2; w.position.y = -fl * (0.45 + k * 0.1); g.add(w); }
+        else {
+          const big = look === 'gauntlet' ? 1.12 : 1;
+          const br = new THREE.Mesh(new THREE.CylinderGeometry(rf * 1.38 * big, rf * 1.22 * big, fl * (look === 'gauntlet' ? 0.75 : 0.62), 10), m); br.position.y = -fl * (look === 'gauntlet' ? 0.6 : 0.55); g.add(br);
+          if (look === 'gauntlet') {
+            const cuffF = new THREE.Mesh(new THREE.CylinderGeometry(rf * 1.75, rf * 1.4, fl * 0.16, 10), m); cuffF.position.y = -fl * 0.24; g.add(cuffF);
+            const kn = new THREE.Mesh(new THREE.BoxGeometry(armOpts.rh * 2.3, armOpts.rh * 0.7, armOpts.rh * 1.2), m); kn.position.set(0, -armOpts.L2, armOpts.rh * 0.75); g.add(kn);
+          } else for (let k = 0; k < 3; k++) { const l = new THREE.Mesh(new THREE.TorusGeometry(rf * 1.36, 0.004, 4, 10), toon(0xd8c098)); l.rotation.x = Math.PI / 2; l.position.y = -fl * (0.34 + k * 0.2); g.add(l); }
+        }
+        glowLine(g, new THREE.TorusGeometry(rf * 1.42, 0.006, 4, 12), 0, -fl * 0.62, 0, Math.PI / 2);
+        inkG(g); a.fore.add(g); gs.push(g);
+      }
+    } else {
+      for (const L of legs) {
+        const g = new THREE.Group(), Ls = legOpts.Ls, rs = legOpts.rs;
+        if (look === 'sandal') {
+          for (let k = 0; k < 3; k++) { const st = new THREE.Mesh(new THREE.TorusGeometry(rs * 1.05, 0.006, 4, 10), m); st.rotation.x = Math.PI / 2; st.position.y = -Ls * (0.72 + k * 0.08); g.add(st); }
+          const sole = new THREE.Mesh(new THREE.BoxGeometry(legOpts.fw * 1.5, 0.018, legOpts.foot * 1.9), m); sole.position.set(0, -Ls - legOpts.ah + 0.006, legOpts.foot * 0.3); g.add(sole);
+        } else {
+          const shaft = new THREE.Mesh(new THREE.CylinderGeometry(rs * 1.42, rs * 1.3, Ls * 0.62, 10), m); shaft.position.y = -Ls * 0.62; g.add(shaft);
+          const toe = new THREE.Mesh(new THREE.CapsuleGeometry(legOpts.fh * 0.56, legOpts.foot * 1.05, 3, 8), m); toe.rotation.x = Math.PI / 2; toe.scale.set(legOpts.fw / legOpts.fh * 1.08, 1, 1.05); toe.position.set(0, -Ls - legOpts.ah + legOpts.fh * 0.5, legOpts.foot * 0.3); g.add(toe);
+          if (look === 'greave') {
+            const plate = new THREE.Mesh(new THREE.CylinderGeometry(rs * 1.62, rs * 1.48, Ls * 0.7, 10, 1, true, -1.1, 2.2), m); plate.material.side = THREE.DoubleSide; plate.position.y = -Ls * 0.5; g.add(plate);
+            const cop = new THREE.Mesh(new THREE.SphereGeometry(rs * 1.3, 10, 6), m); cop.scale.set(1, 0.8, 0.7); cop.position.set(0, 0, rs * 0.7); g.add(cop);
+          } else { const fold = new THREE.Mesh(new THREE.TorusGeometry(rs * 1.45, 0.012, 5, 12), m); fold.rotation.x = Math.PI / 2; fold.position.y = -Ls * 0.31; g.add(fold); }
+        }
+        glowLine(g, new THREE.BoxGeometry(0.008, Ls * 0.5, 0.008), 0, -Ls * 0.55, rs * 1.6);
+        inkG(g); L.knee.add(g); gs.push(g);
+      }
+    }
+    return { gs, m, key };
+  }
+  /* the cloak's own trim: a fur collar, rows of feathers, and a Relic's glow in the cloth */
+  let cloakTrim = null;
+  function setCloakLook(look, glow) {
+    if (cloakTrim) { capeG.remove(cloakTrim); cloakTrim = null; }
+    capeMat.emissive.set(glow ?? 0x000000); capeMat.emissiveIntensity = glow != null ? 0.3 : 0;
+    if (!look && glow == null) return;
+    cloakTrim = new THREE.Group();
+    if (look === 'fur') { const fur = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.05, 6, 16, Math.PI * 1.2), capeMat); fur.rotation.x = Math.PI / 2; fur.rotation.z = Math.PI * 0.9; fur.scale.set(bw * 1.2, 1, 0.9); fur.position.set(0, 0.395, -0.01); cloakTrim.add(fur); }
+    if (look === 'feather') for (let row = 0; row < 4; row++) for (let k = -2; k <= 2; k++) { const f = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 4), capeMat); f.rotation.x = Math.PI; f.position.set(k * 0.075 * (1 + row * 0.15), 0.3 - row * 0.17, -0.13 - row * 0.03); cloakTrim.add(f); }
+    if (glow != null) { const line = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.7, 0.01), seamMat(glow)); line.position.set(0, 0.03, -0.14); line.userData.noOutline = true; cloakTrim.add(line); }
+    inkG(cloakTrim); capeG.add(cloakTrim);
+  }
+
   const A = {
     cartoon: true,   // squash & stretch is built into this rig
     root, body, torso, head, hat, weapon, wPivot, wHold, relic, nur, mats, arms, legs,
@@ -561,48 +632,21 @@ export function buildEikar(o = {}) {
       capeMat.color.set(color); capeG.visible = true;
     },
     get hasCape() { return !!(capeG && capeG.visible); },
-    /* what else he wears, each shown only while it's on: { body: color|null (a jerkin over the tunic, with
-       shoulder pads), hands: color|null (laced bracers), feet: color|null (tall hide boots) } */
+    /* what else he wears, each shown only while it's on. Each slot takes null (nothing) or { c: colour, look, glow }:
+       body — 'vest' (a jerkin, pads), 'chain' (ringmail), 'plate' (scales/plates, big pauldrons), 'robe' (to the knee);
+       hands — 'bracer', 'gauntlet' (plated, with knuckle guards), 'wrap'; feet — 'boot', 'greave' (shin plates), 'sandal'.
+       glow: a Relic's Hurst in it — the piece glows faintly, with bright seams. */
     setOutfit(o2 = {}) {
-      const ink = g => { g.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; addOutline(m, 0.012); } }); celAll(g); };
-      if ('body' in o2) {
-        if (o2.body != null && !outfit.body) {
-          const g = new THREE.Group(), m = paint(toon(o2.body), 'cloth'), dark = toon(0x2a1a10);
-          const VP = [[0.166, -0.12], [0.14, -0.01], [0.126, 0.09], [0.138, 0.18], [0.16, 0.26], [0.162, 0.32], [0.136, 0.365]];
-          const vest = new THREE.Mesh(new THREE.LatheGeometry(VP.map(([r, y]) => new THREE.Vector2(r, y)), 18), m); vest.scale.set(bw * 1.04, 1, 0.68 * (kalo ? 1.08 : 1) * 1.08); g.add(vest);
-          for (const q of [-1, 1]) { const pad = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), m); pad.scale.set(1.15, 0.6, 1.05); pad.position.set(q * SX, SH + 0.01, 0); pad.rotation.z = -q * 0.35; g.add(pad); }
-          for (let k = 0; k < 4; k++) { const lace = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.01), dark); lace.position.set(0, 0.02 + k * 0.07, 0.118 * 0.68 * 1.12 * (kalo ? 1.08 : 1) + 0.012); lace.rotation.z = (k % 2 ? 0.5 : -0.5); g.add(lace); }
-          ink(g); torso.add(g); outfit.body = { g, m };
-        }
-        if (outfit.body) { outfit.body.g.visible = o2.body != null; if (o2.body != null) outfit.body.m.color.set(o2.body); }
+      for (const slot of ['body', 'hands', 'feet']) {
+        if (!(slot in o2)) continue;
+        let spec = o2[slot]; if (spec != null && typeof spec !== 'object') spec = { c: spec };
+        const cur = outfit[slot], look = spec ? spec.look || (slot === 'body' ? 'vest' : slot === 'hands' ? 'bracer' : 'boot') : null, key = spec ? look + ':' + (spec.glow ?? '') : null;
+        if (cur && cur.key !== key) { cur.gs.forEach(g => g.parent && g.parent.remove(g)); outfit[slot] = null; }
+        if (!spec) continue;
+        if (!outfit[slot]) outfit[slot] = buildPiece(slot, look, spec.glow, key);
+        outfit[slot].m.color.set(spec.c ?? 0x7a5a3a);
       }
-      if ('hands' in o2) {
-        if (o2.hands != null && !outfit.hands) {
-          const m = paint(toon(o2.hands), 'cloth'), laceM = toon(0xd8c098), gs = [];
-          for (const a of arms) {
-            const g = new THREE.Group(), fl = armOpts.L2 - armOpts.rh * 0.9;
-            const br = new THREE.Mesh(new THREE.CylinderGeometry(armOpts.rf * 1.38, armOpts.rf * 1.22, fl * 0.62, 10), m); br.position.y = -fl * 0.55; g.add(br);
-            for (let k = 0; k < 3; k++) { const l = new THREE.Mesh(new THREE.TorusGeometry(armOpts.rf * 1.36, 0.004, 4, 10), laceM); l.rotation.x = Math.PI / 2; l.position.y = -fl * (0.34 + k * 0.2); g.add(l); }
-            ink(g); a.fore.add(g); gs.push(g);
-          }
-          outfit.hands = { gs, m };
-        }
-        if (outfit.hands) { outfit.hands.gs.forEach(g => { g.visible = o2.hands != null; }); if (o2.hands != null) outfit.hands.m.color.set(o2.hands); }
-      }
-      if ('feet' in o2) {
-        if (o2.feet != null && !outfit.feet) {
-          const m = toon(o2.feet), gs = [];
-          for (const L of legs) {
-            const g = new THREE.Group();
-            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(legOpts.rs * 1.42, legOpts.rs * 1.3, legOpts.Ls * 0.62, 10), m); shaft.position.y = -legOpts.Ls * 0.62; g.add(shaft);
-            const fold = new THREE.Mesh(new THREE.TorusGeometry(legOpts.rs * 1.45, 0.012, 5, 12), m); fold.rotation.x = Math.PI / 2; fold.position.y = -legOpts.Ls * 0.31; g.add(fold);
-            const toe = new THREE.Mesh(new THREE.CapsuleGeometry(legOpts.fh * 0.56, legOpts.foot * 1.05, 3, 8), m); toe.rotation.x = Math.PI / 2; toe.scale.set(legOpts.fw / legOpts.fh * 1.08, 1, 1.05); toe.position.set(0, -legOpts.Ls - legOpts.ah + legOpts.fh * 0.5, legOpts.foot * 0.3); g.add(toe);
-            ink(g); L.knee.add(g); gs.push(g);
-          }
-          outfit.feet = { gs, m };
-        }
-        if (outfit.feet) { outfit.feet.gs.forEach(g => { g.visible = o2.feet != null; }); if (o2.feet != null) outfit.feet.m.color.set(o2.feet); }
-      }
+      if ('cloakLook' in o2 && capeG) setCloakLook(o2.cloakLook, o2.cloakGlow);
     },
     /* st: { speed, onGround, t, swing: null | { kind: 1|2|3|4, p: 0..1 } | number, windup, attack,
              heat, drink, talking, thrown, duat } */
@@ -756,7 +800,7 @@ export function buildEikar(o = {}) {
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
 
-      if (wing) { wing.visible = glide > 0.08; wing.scale.set(Math.max(0.01, glide), 1, 1); cape.visible = glide < 0.5; }
+      if (wing) { wing.visible = glide > 0.08; wing.scale.set(Math.max(0.01, glide), 1, 1); cape.visible = glide < 0.5; if (cloakTrim) cloakTrim.visible = cape.visible; }
       if (cape) cape.rotation.x = lerp(cape.rotation.x, 0.1 + k * 0.75 + airK * 0.45 + glide * 0.4 - lean * 0.6 + Math.sin(t * 6) * 0.04 * (k + 0.3), 1 - Math.exp(-8 * dt));
       if (relic) { relic.rotation.y += dt * 3; relic.userData.glow.scale.setScalar(0.22 + (st.heat || 0) * 0.3 + Math.sin(t * 8) * 0.02); }
       if (nur) nur.position.set(0.55 + Math.sin(t * 1.3) * 0.12, 1.7 + Math.sin(t * 2.1) * 0.12, -0.2);
