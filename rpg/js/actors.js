@@ -560,15 +560,15 @@ export function buildEikar(o = {}) {
   const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const duat = o.duat === true ? 1 : (o.duat || 0);
   const markGlowCol = duat ? 0x6a18d8 : (o.marking || 0xbfe8ff);
-  const markMat = new THREE.MeshBasicMaterial({ color: duat ? 0x1a0628 : kalo ? new THREE.Color(o.marking || 0xbfe8ff).lerp(new THREE.Color(0x203040), 0.35) : (o.markColor || 0x2a140a) , side: THREE.DoubleSide });
+  // the markings: very dark brown, painted into the skin and lit with it (the Kalo's cooler; the Duat-touched near black-purple)
+  const markMat = toon(duat ? 0x1e0a2c : kalo ? new THREE.Color(o.marking || 0xbfe8ff).lerp(new THREE.Color(0x203040), 0.5).getHex() : 0x3e2416, { side: THREE.DoubleSide, emissive: duat ? 0x6a18d8 : (o.marking || 0xffc46a) });
   const eyeR = (kalo ? 0.03 : 0.027) * 1.18, ex = kalo ? 0.047 : 0.044;   // eyes a little larger: they carry the acting
   const zOn = (x, y, r) => Math.sqrt(Math.max(0, r * r - x * x - y * y));
   const markGlows = [], eyes = [], brows = [];
   // bioluminescence: every Eikar's under-eye markings glow at night (the Kalo's faintly
   // by day too), with a few grain-dots of the same light on the backs of the forearms
   const bio = bioKit();
-  const nightMark = duat ? new THREE.Color(0x6a18d8) : new THREE.Color(markMat.color).lerp(new THREE.Color(o.marking || 0xffc46a), kalo ? 1 : 0.85);
-  bio.basic(markMat, 1, nightMark);
+  bio.reg(markMat, kalo ? 0.3 : 0, kalo ? 1.4 : 1.2);   // and they shine by night
   for (const s of [-1, 1]) {
     const ez = zOn(ex, 0.005, HR) * (kalo ? 1.0 : 0.98);
     // each eye is its own group, so it can blink and glance
@@ -617,9 +617,9 @@ export function buildEikar(o = {}) {
     };
     const W = kalo ? 1.12 : 1, V = (x, y) => new THREE.Vector3(x, y, 0);
     for (const s of [-1, 1]) {
-      face.add(stripeAlong([V(0, 0.024), V(s * 0.011, 0.002), V(s * 0.024, -0.03), V(s * ex, -0.045), V(s * (ex + 0.024), -0.042), V(s * 0.08, -0.06), V(s * 0.06, -0.088), V(s * 0.05, -0.105)], 30, onFace,
-        f => W * (f < 0.12 ? lerp(0.001, 0.003, f / 0.12) : f < 0.55 ? lerp(0.003, 0.004, (f - 0.12) / 0.43) : lerp(0.004, 0.003, (f - 0.55) / 0.45)), markMat));
-      torso.add(stripeAlong([V(s * 0.042, 0.452), V(s * 0.03, 0.432), V(s * 0.012, 0.418), V(-s * 0.006, 0.408), V(-s * 0.016, 0.401)], 14, onNeck, f => W * lerp(0.0034, 0.0026, f), markMat));
+      face.add(stripeAlong([V(0, 0.024), V(s * 0.011, 0.002), V(s * 0.024, -0.03), V(s * ex, -0.045), V(s * (ex + 0.022), -0.043), V(s * 0.07, -0.062), V(s * 0.054, -0.088), V(s * 0.043, -0.104)], 30, onFace,
+        f => W * (f < 0.12 ? lerp(0.0009, 0.0024, f / 0.12) : f < 0.55 ? lerp(0.0024, 0.0031, (f - 0.12) / 0.43) : lerp(0.0031, 0.0024, (f - 0.55) / 0.45)), markMat));
+      torso.add(stripeAlong([V(s * 0.042, 0.452), V(s * 0.03, 0.432), V(s * 0.012, 0.418), V(-s * 0.006, 0.408), V(-s * 0.016, 0.401)], 14, onNeck, f => W * lerp(0.0026, 0.002, f), markMat));
     }
   }
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), skinMat); nose.scale.set(0.9, 1.25, 0.9); nose.position.set(0, -0.018, HR * 0.98); face.add(nose);
