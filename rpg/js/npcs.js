@@ -184,6 +184,12 @@ export function buildKeilia(o = {}) {
   const R = arms[0], L = arms[1];
   let hammer = null;
   if (o.hammer !== false) { hammer = makeHammer(); R.grip.add(hammer); }
+  // Venkin: his whip, coiled on his belt at the left hip, never far from his hand
+  if (o.whip) {
+    const braid = toon(0x5a3a1a), wc = new THREE.Group(); wc.position.set(0.19, 0.0, 0.05); wc.rotation.set(0, Math.PI / 2 - 0.3, 0.15); torso.add(wc);
+    for (let i = 0; i < 3; i++) { const loop = new THREE.Mesh(new THREE.TorusGeometry(0.1 - i * 0.012, 0.012, 4, 14), braid); loop.position.set(0, -i * 0.02, i * 0.012); wc.add(loop); }
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.22, 6), toon(0xe8dcc0)); h.position.set(0.02, 0.1, 0.03); h.rotation.z = 0.5; wc.add(h);
+  }
 
   outlineAll(root, 0.015);
   root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
@@ -375,7 +381,7 @@ export const NPCS = {
 };
 
 export function buildNpc(def) {
-  if (def.look === 'keilia') return cartoon(buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a }));
+  if (def.look === 'keilia') return cartoon(buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a, whip: def.id === 'venkin' }));
   if (def.look === 'karnen') return cartoon(buildKarnen({ seed: def.id ? def.id.length : 5 }));
   return buildEikar(NPC_LOOKS[def.look] || {});
 }

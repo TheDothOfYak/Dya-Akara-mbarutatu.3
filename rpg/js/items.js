@@ -38,12 +38,46 @@ export const ITEMS = {
   ju: { name: 'Ju', kind: 'meal', icon: '🥕', value: 3, desc: 'It is a carrot. Heals 15.', heal: 15 },
   sprengju: { name: 'Sprengju', kind: 'meal', icon: '🧨', value: 30, desc: 'An awake Ju. Eat it: heals 30, +25% damage and stamina returns 30% faster for 90 seconds. Or throw it (X) — it bursts on impact.', buff: { dmg: 1.25, stamRegen: 1.3 }, dur: 90, heal: 30 },
 
+  /* ---- every other kind of weapon (see ARMS): each kind is learned on a quest, and its first piece comes with the lesson ---- */
+  wp_whip: { name: 'Venkin’s old whip', kind: 'weapon', arm: 'whip', icon: '〰', value: 0, dmg: 1.0, desc: 'Braided Punk-vine on a bone handle — the one Venkin learned on. It cracks loud enough to turn a Stryx.' },
+  wp_whip2: { name: 'Stryx-handler’s lash', kind: 'weapon', arm: 'whip', icon: '〰', value: 360, dmg: 1.3, stagger: 1.4, desc: '+30% damage. Rodak-oiled, stygian-tipped. The crack staggers.', color: 0x6af0e0 },
+  wp_bow: { name: 'Hunter’s bow', kind: 'weapon', arm: 'bow', icon: '🏹', value: 0, dmg: 1.0, desc: 'Fire-tree limbs, vine string.' },
+  wp_bow2: { name: 'Kalo longbow', kind: 'weapon', arm: 'bow', icon: '🏹', value: 380, dmg: 1.35, desc: '+35% damage. Its arrows leave a pale trail.', color: 0x9adfff },
+  wp_longsword: { name: 'Duro’s longsword', kind: 'weapon', arm: 'longsword', icon: '🗡', value: 0, dmg: 1.0, desc: 'Started years ago, finished at last with your ore. A long, plain, well-kept blade; Duro listed every nick in it on the scabbard.' },
+  wp_longsword2: { name: 'Stygian greatsword', kind: 'weapon', arm: 'longsword', icon: '🗡', value: 420, dmg: 1.4, duatCd: 1, desc: '+40% damage. The Duat answers it faster.', color: 0x9a5aff },
+  wp_dual: { name: 'Bosk’s twin knives', kind: 'weapon', arm: 'dual', icon: '⚔', value: 0, dmg: 1.0, desc: 'From the dock stores, in a double sheath. One for each hand.' },
+  wp_dual2: { name: 'Ember fangs', kind: 'weapon', arm: 'dual', icon: '⚔', value: 360, dmg: 1.3, burn: true, desc: '+30% damage. Every cut smoulders.', color: 0xff7a2a },
+  wp_swordshield: { name: 'Shipwreck sword and shield', kind: 'weapon', arm: 'swordshield', icon: '🛡', value: 0, dmg: 1.0, desc: 'Washed ashore in a crate, salt still in the grain of the shield.' },
+  wp_swordshield2: { name: 'Gynge-rock bulwark', kind: 'weapon', arm: 'swordshield', icon: '🛡', value: 420, dmg: 1.25, stagger: 1.3, desc: '+25% damage. The shield is a slab of Gynge hide.', color: 0xffa040 },
+  wp_battleaxe: { name: 'The Carpenter’s battle axe', kind: 'weapon', arm: 'battleaxe', icon: '🪓', value: 0, dmg: 1.0, desc: 'Two bits, long haft, and “TWO HANDS, TANOC” scratched into it.' },
+  wp_battleaxe2: { name: 'Tusk-bitted reaver', kind: 'weapon', arm: 'battleaxe', icon: '🪓', value: 460, dmg: 1.35, stagger: 1.5, desc: '+35% damage. Staggers even big things.', color: 0xb0ff4a },
+  wp_throwaxe: { name: 'Orrin’s hatchets', kind: 'weapon', arm: 'throwaxe', icon: '🪓', value: 0, dmg: 1.0, desc: 'A brace of little axes, balanced to throw. They come back to the hand — mostly.' },
+  wp_throwaxe2: { name: 'Kindled hatchets', kind: 'weapon', arm: 'throwaxe', icon: '🔥', value: 340, dmg: 1.3, burn: true, desc: '+30% damage. They land burning.', color: 0xff7a2a },
+  wp_axebuckler: { name: 'Builder’s axe and buckler', kind: 'weapon', arm: 'axebuckler', icon: '🛡', value: 0, dmg: 1.0, desc: 'Orrin’s spare: a short axe and a round little shield to turn falling timbers.' },
+  wp_axebuckler2: { name: 'Stygian hand-axe and boss', kind: 'weapon', arm: 'axebuckler', icon: '🛡', value: 380, dmg: 1.3, duatCd: 1, desc: '+30% damage. The Duat answers it faster.', color: 0x9a5aff },
+  wp_spear: { name: 'Ruut’s spear', kind: 'weapon', arm: 'spear', icon: '🔱', value: 0, dmg: 1.0, desc: 'For wild Punks at the far shore. Long enough to keep them off you.' },
+  wp_spear2: { name: 'Kalo glass-spear', kind: 'weapon', arm: 'spear', icon: '🔱', value: 360, dmg: 1.3, desc: '+30% damage. A blue-glass head that never dulls.', color: 0x2a9ad0 },
+  wp_lance: { name: 'Herder’s lance', kind: 'weapon', arm: 'lance', icon: '🔱', value: 0, dmg: 1.0, desc: 'Old Ruut’s, from when he rode. Hits hardest at a run — or from a Punk’s back.' },
+  wp_lance2: { name: 'Skyfall lance', kind: 'weapon', arm: 'lance', icon: '🔱', value: 440, dmg: 1.35, desc: '+35% damage. Hurst-glass from a fallen star in the vamplate.', color: 0xffd27a },
+  wp_doublespear: { name: 'Leotik twin-spear', kind: 'weapon', arm: 'doublespear', icon: '🔱', value: 0, dmg: 1.0, desc: 'A head at both ends. Kesh’s people spin it.' },
+  wp_doublespear2: { name: 'Acid-glass twin-spear', kind: 'weapon', arm: 'doublespear', icon: '🔱', value: 400, dmg: 1.3, stagger: 1.3, desc: '+30% damage. Both heads etched in Sru acid.', color: 0xb0ff4a },
+  wp_doublesword: { name: 'The Carpenter’s twin-blade', kind: 'weapon', arm: 'doublesword', icon: '⚔', value: 0, dmg: 1.0, desc: 'A blade at each end of one long hilt. Buhkon’s, a long time ago. “Spin it slowly at first.”' },
+  wp_doublesword2: { name: 'Duat twin-blade', kind: 'weapon', arm: 'doublesword', icon: '⚔', value: 480, dmg: 1.35, duatCd: 1.2, desc: '+35% damage. The Duat answers it faster.', color: 0x9a5aff },
+  wp_staff: { name: 'Lamplighter’s pole', kind: 'weapon', arm: 'staff', icon: '🦯', value: 0, dmg: 1.0, desc: 'Lirra’s old lamp-pole, iron-shod. Quick, and it knocks things flat.' },
+  wp_staff2: { name: 'Nur-lit staff', kind: 'weapon', arm: 'staff', icon: '🦯', value: 320, dmg: 1.3, stagger: 1.4, desc: '+30% damage. A little Nur-light lives in its head.', color: 0xbfeaff },
+  wp_scythe: { name: 'Ama’s reaping scythe', kind: 'weapon', arm: 'scythe', icon: '🌙', value: 0, dmg: 1.0, desc: 'Her late husband’s. For the Zahreh fields. It cuts other things too.' },
+  wp_scythe2: { name: 'Toxic-horn reaper', kind: 'weapon', arm: 'scythe', icon: '🌙', value: 420, dmg: 1.35, desc: '+35% damage. A Villtur horn for a blade.', color: 0x7aff6a },
+  wp_hammer: { name: 'Orrin’s maul', kind: 'weapon', arm: 'hammer', icon: '🔨', value: 0, dmg: 1.0, desc: 'For driving storehouse pegs. Slow, and it flattens things.' },
+  wp_hammer2: { name: 'Gynge-headed maul', kind: 'weapon', arm: 'hammer', icon: '🔨', value: 460, dmg: 1.35, stagger: 1.6, desc: '+35% damage. Nothing stays standing.', color: 0xffa040 },
+  wp_fists: { name: 'Sefa’s claw-wraps', kind: 'weapon', arm: 'fists', icon: '🥊', value: 0, dmg: 1.0, desc: 'Knuckle-wraps with Kipsu claws sewn in. “Fennek scratches like THIS.”' },
+  wp_fists2: { name: 'Stygian knuckles', kind: 'weapon', arm: 'fists', icon: '🥊', value: 300, dmg: 1.3, desc: '+30% damage. Cold to wear.', color: 0x9a5aff },
+
   /* ---- axes ---- */
-  axe_tanoc: { name: 'Tanoc’s axe', kind: 'axe', icon: '🪓', value: 0, dmg: 1.0, desc: 'The axe Torcain has always carried.' },
-  axe_smith: { name: 'Smith’s axe', kind: 'axe', icon: '🪓', value: 120, dmg: 1.18, desc: 'Fire-tree haft, honest steel. +18% damage.' },
-  axe_fire: { name: 'Kindled axe', kind: 'axe', icon: '🔥', value: 240, dmg: 1.28, burn: true, desc: '+28% damage. Strikes set foes smouldering.', color: 0xff7a2a },
-  axe_styg: { name: 'Stygian cleaver', kind: 'axe', icon: '⚔', value: 400, dmg: 1.42, duatCd: 1.2, desc: '+42% damage. The Duat answers it faster.', color: 0x9a5aff },
-  axe_tusk: { name: 'Tusk cleaver', kind: 'axe', icon: '🦷', value: 700, dmg: 1.65, stagger: 1.5, desc: '+65% damage. Staggers even big things.', color: 0xb0ff4a },
+  axe_tanoc: { name: 'Tanoc’s axe', kind: 'weapon', arm: 'axe', icon: '🪓', value: 0, dmg: 1.0, desc: 'The axe Torcain has always carried.' },
+  axe_smith: { name: 'Smith’s axe', kind: 'weapon', arm: 'axe', icon: '🪓', value: 120, dmg: 1.18, desc: 'Fire-tree haft, honest steel. +18% damage.' },
+  axe_fire: { name: 'Kindled axe', kind: 'weapon', arm: 'axe', icon: '🔥', value: 240, dmg: 1.28, burn: true, desc: '+28% damage. Strikes set foes smouldering.', color: 0xff7a2a },
+  axe_styg: { name: 'Stygian cleaver', kind: 'weapon', arm: 'axe', icon: '⚔', value: 400, dmg: 1.42, duatCd: 1.2, desc: '+42% damage. The Duat answers it faster.', color: 0x9a5aff },
+  axe_tusk: { name: 'Tusk cleaver', kind: 'weapon', arm: 'axe', icon: '🦷', value: 700, dmg: 1.65, stagger: 1.5, desc: '+65% damage. Staggers even big things.', color: 0xb0ff4a },
 
   /* ---- trinkets (wear two) ---- */
   t_kipsu: { name: 'Kipsu charm', kind: 'trinket', icon: '🐾', value: 80, desc: '+25% shards from every foe.', perk: { shards: 1.25 } },
@@ -115,16 +149,55 @@ export const RECIPES = [
   { out: 'tea', need: { moss: 2, thorn: 1 } },
 ];
 
-/* forging at the smith: shards + materials → axe */
+/* ---- the kinds of weapon. Any of them can be wielded — once it's been learned. Each is taught by a side job on the Carpenter's
+   job board (job: see JOBS in quests.js), any time at all, and the job hands over the first piece (starter). How it fights:
+   rng — reach (× the axe's), dmg, spd (swing speed), arc — how far round the front a blow reaches (−1 all round .. 1 dead ahead),
+   thrust — light blows are lunges, whirl — the heavy blow goes all round, block — share of a hit from the front a guard soaks,
+   charge — hits harder at speed, ranged — shoots ('arrow') or throws ('hatchet'), crack — the whip's report (stuns), two — two-handed ---- */
+export const ARMS = {
+  axe: { name: 'Axe', icon: '🪓', starter: 'axe_tanoc', rng: 1, dmg: 1, spd: 1, arc: 0.15, note: 'Balanced. The Duat carries it.' },
+  whip: { name: 'Whip', icon: '〰', starter: 'wp_whip', job: 'pj_whip', rng: 1.85, dmg: 0.8, spd: 1.1, arc: 0.55, crack: 1, note: 'Long reach down a narrow line. The crack stuns. Venkin’s weapon of choice.', teach: 'Venkin — Beuhk, or wherever he’s got to' },
+  bow: { name: 'Bow', icon: '🏹', starter: 'wp_bow', job: 'pj_bow', rng: 1, dmg: 1.05, spd: 0.85, arc: 0.15, ranged: 'arrow', note: 'Shoots where you look (or at your lock). Heavy: a full draw.' },
+  longsword: { name: 'Longsword', icon: '🗡', starter: 'wp_longsword', job: 'pj_longsword', rng: 1.25, dmg: 1.12, spd: 0.95, arc: 0, note: 'Long reach, wide cuts.' },
+  dual: { name: 'Dual blades', icon: '⚔', starter: 'wp_dual', job: 'pj_dual', rng: 0.85, dmg: 0.72, spd: 1.45, arc: 0.1, note: 'Fast. A blade in each hand.' },
+  swordshield: { name: 'Sword and shield', icon: '🛡', starter: 'wp_swordshield', job: 'pj_swordshield', rng: 1, dmg: 0.92, spd: 1.05, arc: 0.15, block: 0.55, note: 'The shield soaks half of any blow from the front.' },
+  battleaxe: { name: 'Battle axe', icon: '🪓', starter: 'wp_battleaxe', job: 'pj_battleaxe', rng: 1.15, dmg: 1.38, spd: 0.78, arc: 0, two: 1, stagger: 1.3, note: 'Slow, huge, two-handed.' },
+  throwaxe: { name: 'Throwing axes', icon: '🪓', starter: 'wp_throwaxe', job: 'pj_throwaxe', rng: 1, dmg: 0.95, spd: 1.05, arc: 0.15, ranged: 'hatchet', note: 'Thrown where you look. Heavy: three at once.' },
+  axebuckler: { name: 'Axe and buckler', icon: '🛡', starter: 'wp_axebuckler', job: 'pj_axebuckler', rng: 0.95, dmg: 0.96, spd: 1.12, arc: 0.15, block: 0.32, note: 'Quick axe; the buckler turns a third of a blow from the front.' },
+  spear: { name: 'Spear', icon: '🔱', starter: 'wp_spear', job: 'pj_spear', rng: 1.5, dmg: 1, spd: 1, arc: 0.55, thrust: 1, two: 1, note: 'Lunges. Keeps things at the end of it.' },
+  lance: { name: 'Lance', icon: '🔱', starter: 'wp_lance', job: 'pj_lance', rng: 1.9, dmg: 0.9, spd: 0.85, arc: 0.6, thrust: 1, charge: 1, note: 'Longest reach. Hits far harder at a run, or from a Punk’s back.' },
+  doublespear: { name: 'Double-ended spear', icon: '🔱', starter: 'wp_doublespear', job: 'pj_doublespear', rng: 1.4, dmg: 0.95, spd: 1.15, arc: 0.3, thrust: 1, whirl: 1, two: 1, note: 'Lunges; the heavy blow spins it all round.' },
+  doublesword: { name: 'Double-ended sword', icon: '⚔', starter: 'wp_doublesword', job: 'pj_doublesword', rng: 1.2, dmg: 1.05, spd: 1.15, arc: 0, whirl: 1, two: 1, note: 'Wide cuts; the heavy blow spins it all round.' },
+  staff: { name: 'Quarterstaff', icon: '🦯', starter: 'wp_staff', job: 'pj_staff', rng: 1.3, dmg: 0.82, spd: 1.3, arc: 0, two: 1, stagger: 1.4, note: 'Quick and it knocks things flat.' },
+  scythe: { name: 'Scythe', icon: '🌙', starter: 'wp_scythe', job: 'pj_scythe', rng: 1.45, dmg: 1.18, spd: 0.85, arc: -0.4, two: 1, note: 'The widest sweep of all.' },
+  hammer: { name: 'War maul', icon: '🔨', starter: 'wp_hammer', job: 'pj_hammer', rng: 1.05, dmg: 1.45, spd: 0.74, arc: 0, two: 1, stagger: 1.6, note: 'Slowest, heaviest. Flattens things.' },
+  fists: { name: 'Claws and fists', icon: '🥊', starter: 'wp_fists', job: 'pj_fists', rng: 0.7, dmg: 0.7, spd: 1.6, arc: 0.2, note: 'Fastest of all, and close.' },
+};
+export const armOf = id => ARMS[(ITEMS[id] || {}).arm] || ARMS.axe;
+export const armKey = id => (ITEMS[id] && ARMS[ITEMS[id].arm]) ? ITEMS[id].arm : 'axe';
+
+/* forging at the smith: shards + materials → a weapon (only of a kind you've learned) */
 export const FORGE = [
   { out: 'axe_smith', shards: 60, need: { bark: 3, ore: 2 } },
   { out: 'axe_fire', shards: 150, need: { bark: 4, seed: 1, ember: 2 } },
   { out: 'axe_styg', shards: 260, need: { ore: 6, knife: 2 } },
   { out: 'axe_tusk', shards: 400, need: { tusk: 1, ore: 4, oil: 3 } },
-  // armor, beaten out in the same cauldron
-  { out: 'w_greaves', shards: 90, need: { ore: 3, stone: 2 } },
-  { out: 'w_gauntlets', shards: 110, need: { ore: 4, oil: 1 } },
-  { out: 'w_chain', shards: 140, need: { ore: 6, bark: 2 } },
+  { out: 'wp_whip2', shards: 200, need: { vine: 4, oil: 2, ore: 2 } },
+  { out: 'wp_bow2', shards: 220, need: { bark: 4, vine: 3, horn: 1 } },
+  { out: 'wp_longsword2', shards: 280, need: { ore: 6, knife: 1 } },
+  { out: 'wp_dual2', shards: 220, need: { ore: 3, ember: 3, knife: 1 } },
+  { out: 'wp_swordshield2', shards: 260, need: { ore: 4, gynge_hide: 2 } },
+  { out: 'wp_battleaxe2', shards: 320, need: { tusk: 1, ore: 4, bark: 2 } },
+  { out: 'wp_throwaxe2', shards: 200, need: { ore: 3, ember: 2, bark: 2 } },
+  { out: 'wp_axebuckler2', shards: 240, need: { ore: 5, knife: 1, bark: 2 } },
+  { out: 'wp_spear2', shards: 220, need: { ore: 3, horn: 2, bark: 2 } },
+  { out: 'wp_lance2', shards: 300, need: { ore: 5, bark: 3, seed: 1 } },
+  { out: 'wp_doublespear2', shards: 260, need: { ore: 4, tusk: 1 } },
+  { out: 'wp_doublesword2', shards: 340, need: { ore: 6, knife: 2, stem: 1 } },
+  { out: 'wp_staff2', shards: 180, need: { bark: 4, ore: 2, horn: 1 } },
+  { out: 'wp_scythe2', shards: 280, need: { thorn: 3, ore: 4 } },
+  { out: 'wp_hammer2', shards: 320, need: { gynge_hide: 2, ore: 5 } },
+  { out: 'wp_fists2', shards: 160, need: { ore: 3, knife: 1 } },
   // Relic armor: a Hurst in the metal. Later in the tale (the smith won't try it until he's seen what a Gynge chip does)
   { out: 'r_gynge_greaves', shards: 220, need: { gynge_hide: 2, ore: 3 }, later: true },
   { out: 'r_gynge_plate', shards: 380, need: { gynge_hide: 4, gynge_chip: 1, ore: 4 }, later: true },
@@ -153,9 +226,9 @@ for (const base of Object.keys(ITEMS)) {
 
 /* what the trader keeps on her mat (price in shards) */
 export const SHOP = {
-  xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed', 'w_jerkin', 'w_bracers', 'w_boots', 'w_hood', 'w_wraps', 'w_sandals', 'w_kipsu', 'w_ranger', 'w_hide'],
+  xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed'],   // (plain armor comes from the jobs on the Carpenter's board)
   aakalay: [],
-  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 'ember', 't_ring', 'w_jerkin', 'w_bracers', 'w_boots', 'w_hide', 'w_chain', 'w_scale', 'w_robe', 'w_byrd', 'w_greaves'],
+  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 'ember', 't_ring'],
 };
 
 /* what each creature leaves behind: [item, chance, count] */
@@ -192,7 +265,7 @@ export function freshInventory() {
 export function effects(inv, now, wear = inv.wear) {
   const fx = { hlyst: 0, xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, regen: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
   const axe = ITEMS[inv.axe] || ITEMS.axe_tanoc;
-  fx.dmg *= axe.dmg || 1; if (axe.burn) fx.burn = true; fx.duatCd += axe.duatCd || 0; fx.stagger *= axe.stagger || 1;
+  fx.dmg *= axe.dmg || 1; if (axe.burn) fx.burn = true; fx.duatCd += axe.duatCd || 0; fx.stagger *= (axe.stagger || 1) * (armOf(inv.axe).stagger || 1);
   for (const t of inv.trinkets.concat(Object.values(wear || {}).filter(w => inv.items[w]))) {
     const p = (ITEMS[t] || {}).perk || {};
     for (const [k, v] of Object.entries(p)) {
