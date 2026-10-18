@@ -666,7 +666,7 @@ export const YOUNG = {
   ],
   dummies: [
     ['buhkon', 'Hah! Quick feet, heavy hands. Not bad at all.'],
-    ['buhkon', 'An Ahoac has to fall well, too. Climb the tower, jump, and HOLD Space as you fall. Arms out — let the wind take you.'],
+    ['buhkon', 'An Ahoac has to fall well, too — and that’s a real Ahoac cloak you’ve been carrying since Velki, isn’t it? Climb the tower, jump, and HOLD Space as you fall. Arms out — let the cloth take the wind.'],
   ],
   glided: [
     ['buhkon', 'Like a seed on the wind! Come back down and talk to me.'],

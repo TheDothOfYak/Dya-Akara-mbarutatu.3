@@ -122,7 +122,8 @@ export function buildFeatures(scene, world, region, save) {
        { id: 'l_chime', kind: 'chime', name: 'Trial of Echoes', at: [70, 50], reward: { seed: 1, xp: 260, shards: 120 } }];
   const stoneMat = toon(region === 'leotik' ? 0x6e6a5e : 0xcfb48a);
   const trials = TRIALS.map(T => {
-    const [x, z] = T.at, y = world.heightAt(x, z);
+    const gl = world.trialSpots && world.trialSpots[T.kind];   // (a land can tuck its trials away in glades of their own)
+    const [x, z] = gl ? [gl.x, gl.z] : T.at, y = world.heightAt(x, z);
     const done = !!(save.trials || {})[T.id];
     const g = new THREE.Group(); g.position.set(x, y, z); scene.add(g);
     // a ring of flagstones and a Kalo altar

@@ -20,7 +20,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire } from './gfx.js';
-import { buildHomeTree, buildForest } from './hometree.js';
+import { buildHomeTree, buildForest, buildTreeBridge } from './hometree.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
 import { buildVel } from './creatures.js';
@@ -42,6 +42,7 @@ const GATE_Z = 14, CITY_R = 132, CITY = { x: 0, z: GATE_Z + CITY_R };   // the w
 const CORE = { x: 0, z: 70 }, CORE_R = 52;                                // the market quarter
 const SQUARE = { x: 0, z: 70 }, STALL = { x: 6, z: 58 };
 const TREE = { x: -38, z: 212, R: 13, H: 230 };                           // the city's home tree, in the south-west
+const TREE2 = { x: 40, z: 214, R: 10, H: 175 };                           // and a younger one east of it, inside the walls too, a bridge between them
 const CAMP1 = { z: -250 }, CAMP2 = { z: -560 }, PASS0 = -650, AMBUSH = -800, END = -960;
 const CART_Z = -135, HEDGE_Z = -195, LOG_Z = -330, FORD_Z = -430, ROCK0 = -672, ROCK1 = -762;
 const roadX = z => (z > GATE_Z ? 0 : 16 * Math.sin((GATE_Z - z) * 0.009) + 8 * Math.sin((GATE_Z - z) * 0.023));
@@ -166,13 +167,15 @@ export function createRoad(ctx) {
   let HT = null;
   const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
   const inWell = (d, a) => { const k = angDiff(a, d.well[0]), len = d.well[1] - d.well[0]; return k >= 0 && k <= len; };
+  // the balconies are partial decks, from a0 round to a1
+  const inArc = (d, a, pad = 0) => (((a - d.a0 + pad) % TAU) + TAU) % TAU <= d.a1 - d.a0 + pad * 2;
   function treeGround(x, z, y) {
     if (!HT) return -1e9;
     const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz);
     if (r > HT.reach) return -1e9;
     const a = Math.atan2(dz, dx), ly = y - HT.g; let best = -1e9;
     for (const d of HT.decks) {
-      if (d.y > ly + STEP || r < d.r0 - 0.5 || r > d.ro + 0.2) continue;
+      if (d.y > ly + STEP || r < d.r0 - 0.5 || r > d.ro + 0.2 || !inArc(d, a)) continue;
       if (r < d.r0 + 3.4 && inWell(d, a)) continue;          // the stairwell
       best = Math.max(best, d.y);
     }
@@ -194,7 +197,7 @@ export function createRoad(ctx) {
     let to = null;
     if (r < rin) to = rin;
     else if (ly > 2.2) {
-      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5);
+      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5 && inArc(d, a));   // (off the end of a balcony, the stair's rail)
       const rmax = d ? d.ro - 0.5 : HT.rAt(ly, a) + 3.2;
       if (r > rmax) to = rmax;
     }
@@ -205,14 +208,14 @@ export function createRoad(ctx) {
     const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz), ly = y - HT.g;
     if (r > HT.reach || ly < 0 || ly > HT.H * 0.9) return false;
     if (r < HT.rAt(ly, Math.atan2(dz, dx))) return true;
-    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > d.r0 && r < d.ro) return true;
+    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > d.r0 && r < d.ro && inArc(d, Math.atan2(dz, dx))) return true;
     return false;
   }
   function groundAt(x, z, y, skip) {
     let g = Math.max(heightAt(x, z), treeGround(x, z, y));
     for (const s of solids) {
       if (s === skip) continue;
-      if (Math.abs(x - s.x) > 12 || Math.abs(z - s.z) > 12) continue;
+      if (Math.abs(x - s.x) > 12 + (s.r || 0) || Math.abs(z - s.z) > 12 + (s.r || 0)) continue;
       if (s.y1 > y + STEP || s.y1 <= g) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) g = s.y1;
     }
@@ -221,7 +224,7 @@ export function createRoad(ctx) {
   function resolve(p, rad = PR) {
     for (const s of solids) {
       if (p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
-      if (Math.abs(p.x - s.x) > 12 || Math.abs(p.z - s.z) > 12) continue;
+      if (Math.abs(p.x - s.x) > 12 + (s.r || 0) || Math.abs(p.z - s.z) > 12 + (s.r || 0)) continue;
       if (s.kind === 'box') {
         const dx = p.x - s.x, dz = p.z - s.z, ox = s.hw + rad - Math.abs(dx), oz = s.hd + rad - Math.abs(dz);
         if (ox > 0 && oz > 0) { if (ox < oz) p.x += Math.sign(dx || 1) * ox; else p.z += Math.sign(dz || 1) * oz; }
@@ -240,7 +243,7 @@ export function createRoad(ctx) {
   }
   function solidAt(x, y, z) {
     for (const s of solids) {
-      if (Math.abs(x - s.x) > 12 || Math.abs(z - s.z) > 12) continue;
+      if (Math.abs(x - s.x) > 12 + (s.r || 0) || Math.abs(z - s.z) > 12 + (s.r || 0)) continue;
       if (y < s.y0 || y > s.y1) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) return true;
     }
@@ -294,6 +297,10 @@ export function createRoad(ctx) {
     T.colliders.slice(1).forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1));      // the roots (the trunk itself is treeResolve's)
     for (const h of T.deckHouses) cyl(h.x, h.z, h.r, h.y - 0.5, h.y + h.h);
     HT = Object.assign(T, { reach: Math.max(...T.decks.map(d => d.ro)) + 2 });
+    // the younger tree: lived in too, but no stair you'd need today (its trunk and roots are solid all the same)
+    const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.07, 0.14, 0.22], deckW: 9, roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
+    T2.colliders.forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1));
+    buildTreeBridge(scene, T, T2, 0.42);
   }
   /* the rest of the city: block after block of houses on a grid of streets, from the market quarter
      south to the wall and round the home tree — instanced, so a whole quarter costs a handful of draws */
@@ -301,7 +308,7 @@ export function createRoad(ctx) {
   {
     const PAL = { walls: [0xf4e6c8, 0xf0dcb4, 0xe8d0a8, 0xfaf0dc, 0xe8dcc0, 0xd8c8b0], roofs: [0x7a4a2a, 0x2f5a5a, 0x6a3a1c, 0x3a6a5a, 0x8a5a3a], door: [0x2f6f8a, 0x8a3a3a, 0x4a7a3a] };
     const homes = [];
-    const clearOf = (x, z) => Math.hypot(x - CORE.x, z - CORE.z) > CORE_R + 6 && Math.hypot(x - TREE.x, z - TREE.z) > TREE.R * 1.75 * 1.75 + 6
+    const clearOf = (x, z) => Math.hypot(x - CORE.x, z - CORE.z) > CORE_R + 6 && Math.hypot(x - TREE.x, z - TREE.z) > TREE.R * 1.75 * 1.75 + 6 && Math.hypot(x - TREE2.x, z - TREE2.z) > TREE2.R * 1.75 * 1.6 + 6
       && Math.hypot(x - CITY.x, z - CITY.z) < CITY_R - 9 && !(Math.abs(x) < 10 && z < CORE.z);
     const STREET = 22;
     for (let gx = -6; gx < 6; gx++) for (let gz = 0; gz < 12; gz++) {
@@ -859,8 +866,10 @@ export function createRoad(ctx) {
   }
   /* a place on a deck of the home tree: round the deck by angle a, `off` out from the bark (clear of the stairwell) */
   function deckSpot(i, a, off = 8.5) {
-    const d = HT.decks[i]; if (inWell(d, a) || Math.abs(angDiff(a, d.well[0])) < 0.4) a = d.well[1] + 0.6;
-    const r = d.r0 + off; return V3(HT.x + Math.cos(a) * r, HT.g + d.y, HT.z + Math.sin(a) * r);
+    const d = HT.decks[i];
+    if (!inArc(d, a, -0.2)) { const m = (d.a0 + d.a1) / 2; a = angDiff(a, m) < 0 ? d.a0 + 0.25 : d.a1 - 0.25; }   // onto the balcony, wherever round it you asked
+    if (inWell(d, a) || Math.abs(angDiff(a, d.well[0])) < 0.4) a = d.well[1] + 0.6;
+    const r = d.r0 + Math.min(off, d.ro - d.r0 - 1.2); return V3(HT.x + Math.cos(a) * r, HT.g + d.y, HT.z + Math.sin(a) * r);
   }
   /* a point on the great stair, at height y above the foot */
   function stairPoint(y) {

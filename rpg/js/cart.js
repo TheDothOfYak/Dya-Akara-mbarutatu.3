@@ -37,8 +37,17 @@ export function buildCart() {
   const yoke = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 0.12), dark); yoke.position.set(0, 1.25, 5.3); g.add(yoke);
   outlineAll(g, 0.03); g.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
   const punks = [-1, 1].map((sx, i) => { const pk = buildDomesticPunk({ saddle: false, blanket: i ? 0x2f6f8a : 0x8a3a2a, seed: 40 + i }); pk.root.scale.setScalar(0.62); pk.root.position.set(sx * 1.25, 0, 5.6); g.add(pk.root); return pk; });
-  for (const pk of punks) { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.2), toon(0x3a2414)); strap.position.set(pk.root.position.x * 0.7, 1.2, 4.9); g.add(strap); }
-  return { g, wheels, punks, load };
+  const straps = punks.map(pk => { const strap = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.2), toon(0x3a2414)); strap.position.set(pk.root.position.x * 0.7, 1.2, 4.9); g.add(strap); return strap; });
+  /* home at last: the Punks out of the shafts and off to the herd, the shafts resting on a trestle */
+  function unhitch() {
+    for (const pk of punks) g.remove(pk.root);
+    for (const st of straps) g.remove(st);
+    const wood = toon(0x6a4428);
+    for (const sx of [-1, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.3, 0.1), wood); leg.position.set(sx * 0.55, 0.6, 5.0); leg.rotation.z = sx * 0.25; g.add(leg); }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.14), wood); bar.position.set(0, 1.18 - 0.12, 5.0); g.add(bar);
+    punks.length = 0;
+  }
+  return { g, wheels, punks, load, unhitch };
 }
 
 /* what comes off the back of the cart each night: an A-frame tent of oilcloth on two poles, and the little

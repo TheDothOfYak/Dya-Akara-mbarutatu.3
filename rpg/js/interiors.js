@@ -139,6 +139,8 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
   }
   const put = (geo, x, y, z, sx, sy, sz, color, opts = {}) => pick3(opts).add(geo, x, y, z, opts.rx || 0, opts.ry || 0, opts.rz || 0, sx, sy, sz, color);
   const glowPane = (x, y, z, w, h, d, color = '#fff0c8') => BT.glow.add(UNIT_BOX, x, y, z, 0, 0, 0, w, h, d, color);
+  // glass you can see out of: it shows the land round the real building (see refreshView)
+  const viewPane = (x, y, z, w, h, d) => BT.view.add(UNIT_BOX, x, y, z, 0, 0, 0, w, h, d, '#ffffff');
   function lamp(g, x, y, z, color = 0xffc070, power = 40, dist = 26) {
     const l = new THREE.PointLight(color, power * 0.38, dist, 1.6); l.position.set(x, y, z); g.add(l);
     const s = glowSprite(color, 1.3, 0.6); s.position.set(x, y, z); g.add(s);
@@ -165,15 +167,16 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
     let cur = a0;
     for (const [c, w, h] of gaps.slice().sort((p, q) => p[0] - q[0])) {
       seg(cur, c - w / 2, y0, y1); seg(c - w / 2, c + w / 2, y0 + h, y1);
-      trim(c - w / 2 - 0.1, y0 + h / 2, 0.2, h); trim(c + w / 2 + 0.1, y0 + h / 2, 0.2, h); trim(c, y0 + h + 0.1, w + 0.4, 0.2);
+      // (the frame stands a hair proud of the opening: sharing the wall's own faces, the two flickered through each other)
+      trim(c - w / 2 - 0.06, y0 + h / 2 - 0.02, 0.24, h - 0.04); trim(c + w / 2 + 0.06, y0 + h / 2 - 0.02, 0.24, h - 0.04); trim(c, y0 + h + 0.06, w + 0.48, 0.24);
       cur = c + w / 2;
     }
     seg(cur, a1, y0, y1);
   }
   // a window on the inside face of a wall: bright glass, a frame and cross-bars, a sill
   function win(g, axis, at, c, y, s, w = 1.4, h = 1.7) {
-    if (axis === 'x') { glowPane(c, y, at, w, h, 0.05); box(g, c, y, at + s * 0.04, 0.1, h, 0.08, TRIM, false, { shadow: false, outline: false }); box(g, c, y + h * 0.1, at + s * 0.04, w, 0.08, 0.08, TRIM, false, { shadow: false, outline: false }); box(g, c, y, at + s * 0.05, w + 0.3, h + 0.3, 0.06, '#6a4428', false, { shadow: false, outline: false }); box(g, c, y - h / 2 - 0.12, at + s * 0.16, w + 0.4, 0.12, 0.34, '#7a5232', false, { shadow: false }); }
-    else { glowPane(at, y, c, 0.05, h, w); box(g, at + s * 0.04, y, c, 0.08, h, 0.1, TRIM, false, { shadow: false, outline: false }); box(g, at + s * 0.04, y + h * 0.1, c, 0.08, 0.08, w, TRIM, false, { shadow: false, outline: false }); box(g, at + s * 0.05, y, c, 0.06, h + 0.3, w + 0.3, '#6a4428', false, { shadow: false, outline: false }); box(g, at + s * 0.16, y - h / 2 - 0.12, c, 0.34, 0.12, w + 0.4, '#7a5232', false, { shadow: false }); }
+    if (axis === 'x') { viewPane(c, y, at, w, h, 0.05); box(g, c, y, at + s * 0.04, 0.1, h, 0.08, TRIM, false, { shadow: false, outline: false }); box(g, c, y + h * 0.1, at + s * 0.04, w, 0.08, 0.08, TRIM, false, { shadow: false, outline: false }); box(g, c, y, at + s * 0.05, w + 0.3, h + 0.3, 0.06, '#6a4428', false, { shadow: false, outline: false }); box(g, c, y - h / 2 - 0.12, at + s * 0.16, w + 0.4, 0.12, 0.34, '#7a5232', false, { shadow: false }); }
+    else { viewPane(at, y, c, 0.05, h, w); box(g, at + s * 0.04, y, c, 0.08, h, 0.1, TRIM, false, { shadow: false, outline: false }); box(g, at + s * 0.04, y + h * 0.1, c, 0.08, 0.08, w, TRIM, false, { shadow: false, outline: false }); box(g, at + s * 0.05, y, c, 0.06, h + 0.3, w + 0.3, '#6a4428', false, { shadow: false, outline: false }); box(g, at + s * 0.16, y - h / 2 - 0.12, c, 0.34, 0.12, w + 0.4, '#7a5232', false, { shadow: false }); }
     // a little of the day comes in with it
     const sp = glowSprite(0xfff0d0, Math.max(w, h) * 1.6, 0.16); sp.position.set(axis === 'x' ? c : at + s * 0.6, y, axis === 'x' ? at + s * 0.6 : c); g.add(sp);
   }
@@ -397,7 +400,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       // the gallery balustrade
       for (let x = -7.6; x < 5.2; x += 0.5) box(g, x, H1 + 0.45, 7.05, 0.08, 0.9, 0.08, '#f4ead4', false, { outline: false });
       box(g, -1.2, H1 + 0.95, 7.1, 13.6, 0.14, 0.2, TRIM, false); world.col.add(g.position.x - 1.4, 7.1, 6.6, 0.12, 0, H1, H1 + 1.0);
-      box(g, 0, H1 - 0.2, 7.0, 16, 0.4, 0.3, TRIM, false, { shadow: false });
+      box(g, 0, H1 - 0.21, 7.05, 16.06, 0.46, 0.36, TRIM, false, { shadow: false });   // the gallery's edge beam wraps the floor's edge (it used to share its faces, and flickered)
       box(g, -7.4, 2.5, 7.1, 0.5, 5, 0.5, '#f4ead4', true);   // a pillar under the gallery
       chandelier(g, 0, 7.4, 13.5, 1.5, 60, 34);
       // portraits along the gallery wall, and an empty frame at the end
@@ -517,7 +520,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       token(g, 0, 1.6, -17.2, '#b48aff', 4.2, true, 0);
       const bigGlow = glowSprite(0xb48aff, 2.6, 0.6); bigGlow.position.set(0, 1.6, -16.9); g.add(bigGlow); flickers.push(bigGlow);
       const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.4, 16, 1, true), glassMat); bell.position.set(0, 1.95, -17.2); bell.renderOrder = 2; g.add(bell);
-      glowPane(0, HTK - 0.02, -10, 5, 0.04, 9, '#fff4d8');                                           // the lantern-roof: daylight
+      viewPane(0, HTK - 0.02, -10, 5, 0.04, 9);                                           // the lantern-roof: daylight
       for (let k = -2; k <= 2; k++) box(g, k * 1.2, HTK - 0.08, -10, 0.12, 0.12, 9.2, TRIM, false, { shadow: false, outline: false });
       const shaft = glowSprite(0xfff0d0, 7, 0.14); shaft.position.set(0, 4, -12); g.add(shaft);
       // banners between the cabinets, and a long bench
@@ -550,7 +553,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       const WS = { x0: 36, x1: 62, z0: -20, z1: 8 };
       // roof trusses
       for (let k = 0; k < 5; k++) { const z = -17 + k * 5.5; box(g, 49, 7.2, z, 26, 0.4, 0.4, '#5a3a22', false, { shadow: false }); for (const q of [-1, 1]) box(g, 49 + q * 6.5, 6.5, z, 13.4, 0.3, 0.3, '#5a3a22', false, { rz: q * 0.18, shadow: false }); box(g, 49, 6.4, z, 0.3, 1.6, 0.3, '#5a3a22', false, { shadow: false }); }
-      glowPane(49, 7.55, -6, 4, 0.04, 2.6, '#fff4d8'); const sky = glowSprite(0xfff0d0, 6, 0.14); sky.position.set(49, 5.5, -6); g.add(sky);
+      viewPane(49, 7.55, -6, 4, 0.04, 2.6); const sky = glowSprite(0xfff0d0, 6, 0.14); sky.position.set(49, 5.5, -6); g.add(sky);
       // two great benches with vises, tools and shavings
       for (const [x, z] of [[42.5, -9], [49.5, -9]]) {
         box(g, x, 0.92, z, 4.4, 0.22, 1.6, '#9a6a40', true);
@@ -779,7 +782,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       box(g, w / 4, LY + 1.2, d / 2 - 0.3, 3.6, 2.2, 0.4, '#6a4428', false);
       for (let k = 0; k < 3; k++) box(g, w / 4 - 1.4 + k * 1.4, LY + 0.5 + k * 0.3, d / 2 - 0.5, 0.3, 0.4, 0.3, BOOK[k], false);
       const pane = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.0), new THREE.MeshBasicMaterial({ color: 0xbfe0ff })); pane.position.set(w / 2 - 0.05, LY + 1.6, 2.75); pane.rotation.y = -Math.PI / 2; g.add(pane);
-      cyl(g, w / 2 - 0.9, LY + 1.2, 1.4, 0.06, 0.1, 1.0, '#c8a040', false, 8, { rz: 1.1 }); for (const q of [-1, 1]) box(g, w / 2 - 0.9 + q * 0.2, LY + 0.5, 1.4, 0.04, 1.0, 0.04, '#5a3a22', false, { rz: q * 0.3, outline: false });
+      cyl(g, w / 2 - 0.9, LY + 1.35, 1.4, 0.06, 0.1, 1.1, '#c8a040', false, 8, { rz: 0.55 });   // aimed up through the high window, at the sky for (const q of [-1, 1]) box(g, w / 2 - 0.9 + q * 0.2, LY + 0.5, 1.4, 0.04, 1.0, 0.04, '#5a3a22', false, { rz: q * 0.3, outline: false });
       // the ground room: a map table, a sea-chest, a coil of rope
       table(g, 0.6, -0.8, 2.2, 1.3); box(g, 0.6, 0.93, -0.8, 1.9, 0.01, 1.0, '#e8dcc0', false, { outline: false });
       crate(g, 2.6, 2.6, 0.7); cyl(g, -1.4, 0.15, 2.8, 0.45, 0.45, 0.3, '#c8b080', false, 14);
@@ -788,6 +791,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
         w, d, h, folk: [],
         items: [
           { pos: [w / 2 - 0.8, LY + 1, 2.75], label: 'Look out of the high window', lines: [['tale', 'The whole property below you: the house, the fields, the long slope down to the lake — and beyond it the Elder Tree, and away to the north the Warden, holding up the sky between them. The blue line of mountains, far off to the south.'], ['tanoc', 'Empty shelves. He said this tower will hold books one day.']] },
+          { pos: [w / 2 - 0.9, LY + 1, 1.4], label: 'Look through the telescope', scope: true },
           { pos: [0.6, 1.1, -0.8], label: 'Look at the map on the table', lines: [['tale', 'The property, drawn from up here: every field, every fence-post. The two great trees are drawn very small at the edges, as if whoever drew it was a little afraid of them.']] },
           { pos: [-1.0, MY + 0.9, -1.0], label: 'Sit a while on the reading platform', lines: [['tanoc', 'Halfway up. Too high to hear the yard, too low to see the lake. A good place to be nobody for a bit.']] },
         ],
@@ -868,7 +872,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
     const host = doors.find(d => d.id === key) || door;
     const g = new THREE.Group(); g.position.set(POCKET_X + (slot++) * ROOM_GAP, 0, 0); scene.add(g);
     const R = mulberry32(host.seed || (host.id.length * 7919 + 13));
-    BT = { furn: new Batch(), struct: new Batch(), flat: new Batch(), glow: new Batch() };
+    BT = { furn: new Batch(), struct: new Batch(), flat: new Batch(), glow: new Batch(), view: new Batch() };
     const info = (KINDS[host.kind] || KINDS.cottage)(g, R, host);
     if (info.extra) for (const it of info.extra) (info.items = info.items || []).push(it);
     if (info.upstairs) info.upstairs(info.items);
@@ -878,6 +882,8 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
     bake(BT.struct, toon(0xffffff, { vertexColors: true }), false, true);
     bake(BT.flat, toon(0xffffff, { vertexColors: true }), false, false);
     bake(BT.glow, new THREE.MeshBasicMaterial({ vertexColors: true }), false, false);
+    const viewMat = makeViewMat(host.yaw || 0);
+    bake(BT.view, viewMat, false, false);
     BT = null;
     const folk = (info.folk || []).map(f => {
       const a = buildEikar(Object.assign({ weapon: 'none', flasks: false }, f.look)); a.root.position.set(g.position.x + f.x, 0, f.z); a.root.rotation.y = Math.PI; scene.add(a.root);
@@ -887,11 +893,42 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
     const sp = info.spawn || [0, info.d / 2 - Math.min(4, info.d * 0.3)], ou = info.out || [sp[0], info.d / 2 - 0.4];
     const room = { door: host, g, info, folk, spawn: new THREE.Vector3(g.position.x + sp[0], 0, sp[1]), out: new THREE.Vector3(g.position.x + ou[0], 0, ou[1]),
       exits: (info.exits || []).map(e => ({ pos: new THREE.Vector3(g.position.x + e.x, 0, e.z), door: e.door })),
-      entries: info.entries || {}, flickers: flickers.splice(0),
+      entries: info.entries || {}, flickers: flickers.splice(0), viewMat,
       items: (info.items || []).map((it, i) => ({ ...it, id: host.id + ':' + i, pos: new THREE.Vector3(g.position.x + it.pos[0], it.pos[1], it.pos[2]) })) };
     g.visible = false; folk.forEach(f => { f.a.root.visible = false; });
     rooms.set(key, room); rooms.set(door.id, room);
     return room;
+  }
+
+  /* the windows: every pane in a room looks along your line of sight into a picture of the land taken from over the
+     real building (a cube of six views from above its roof, so its own walls never get in the way), turned so the
+     room's front is the building's front. Taken as you step in (during the fade), so it matches the hour outside. */
+  let R3 = null;
+  const FALLBACK = new THREE.Color('#fff0c8');
+  function makeViewMat(yaw) {
+    return new THREE.ShaderMaterial({
+      uniforms: { uView: { value: null }, uHave: { value: 0 }, uRot: { value: new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationY(yaw)) }, uFall: { value: FALLBACK } },
+      vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+      fragmentShader: `uniform samplerCube uView; uniform float uHave; uniform mat3 uRot; uniform vec3 uFall; varying vec3 vW;
+        void main(){ vec3 d = uRot * normalize(vW - cameraPosition); vec3 c = uHave > 0.5 ? textureCube(uView, d).rgb * 1.08 : uFall;
+          gl_FragColor = vec4(c, 1.0);
+          #include <colorspace_fragment>
+        }`,
+    });
+  }
+  function refreshView(room, force) {
+    if (!R3 || !room.viewMat) return;
+    const now = performance.now();
+    if (!force && room.viewAt && now - room.viewAt < 45000) return;   // (at most once in a while, however often it's asked)
+    room.viewAt = now;
+    const d = room.door;
+    if (!room.cube) { room.cubeRT = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType }); room.cube = new THREE.CubeCamera(6, 9000, room.cubeRT); }
+    const fx = Math.sin(d.yaw || 0), fz = Math.cos(d.yaw || 0), x = d.x - fx * 5, z = d.z - fz * 5;
+    room.cube.position.set(x, world.heightAt(d.x, d.z) + 20, z); room.cube.updateMatrixWorld();
+    const vis = room.g.visible, sh = R3.shadowMap.autoUpdate;
+    room.g.visible = false; R3.shadowMap.autoUpdate = false;
+    try { room.cube.update(R3, scene); } finally { room.g.visible = vis; R3.shadowMap.autoUpdate = sh; }
+    room.viewMat.uniforms.uView.value = room.cubeRT.texture; room.viewMat.uniforms.uHave.value = 1;
   }
 
   function show(room, on) { room.g.visible = on; room.folk.forEach(f => { f.a.root.visible = on; }); }
@@ -913,8 +950,11 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       return { pos: v(s.stand || s), yaw: s.yaw ?? Math.PI, top: v(s.top), buhkon: v(s.buhkon), room, door: (s.door && doors.find(d => d.id === s.door)) || door };
     },
     /* step in: returns where to stand and which way to face */
+    setRenderer(r) { R3 = r; },
+    tickView() {},   // (the view is taken on the way in; nothing to do per frame)
     enter(door) {
       const room = build(door);
+      refreshView(room, true);
       for (const r of new Set(rooms.values())) show(r, r === room);
       inside = door; exitVia = null;
       const e = door.entry && room.entries[door.entry];
@@ -950,6 +990,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       for (const it of room.items) {
         if (it.once && picked[it.id]) continue;
         list.push({ pos: it.pos, label: it.label, far: 2.4, act: () => {
+          if (it.scope && act.scope) { act.scope(host); return; }
           if (it.book) { const b = BOOKS[Math.floor(Math.random() * BOOKS.length)]; say([['tale', b[0] + ' ' + b[1]]]); return; }
           if (it.give) { picked[it.id] = true; give(it.give, 1); return; }
           if (it.lines) say(it.lines);
