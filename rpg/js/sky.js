@@ -65,7 +65,9 @@ function skyDome(pal) {
         col += vec3(0.78, 0.76, 0.92) * band * 0.22 * uBand * up;
         vec3 sp = floor(d * 380.0);
         float st = h3(sp);
-        float tw = 0.6 + 0.4 * sin(uTime * 2.0 + st * 60.0);
+        // each star twinkles on its own beat (the old phase came from the same hash that picks which cells are stars,
+        // so every star shared it — they all dimmed at once and the sky went out)
+        float tw = 0.72 + 0.28 * sin(uTime * (1.1 + 1.9 * h3(sp + 5.0)) + h3(sp + 11.0) * 6.2832);
         float thr = mix(0.9965, 0.9945, uNight) - band * 0.0015 * uBand;
         vec3 stCol = mix(vec3(1.0, 0.95, 0.85), mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.8, 0.7), h3(sp + 7.0)), uNight);
         float pd = length(fract(d * 380.0) - 0.5);
@@ -124,7 +126,7 @@ function planet(radius, tex, atmo, pos) {
         vec3 base = texture2D(uMap, vUv).rgb;
         float l = dot(normalize(vN), uSun);
         float band = l > 0.35 ? 1.0 : l > 0.05 ? 0.72 : l > -0.2 ? 0.42 : 0.24;
-        float rim = pow(1.0 - max(dot(normalize(vN), normalize(vV)), 0.0), 2.5);
+        float rim = pow(clamp(1.0 - dot(normalize(vN), normalize(vV)), 0.0, 1.0), 2.5);   // (clamped: a dot a hair over 1 made pow() NaN, and the bloom smeared it into black squares)
         vec3 col = base * (band + uLift) + uAtmo * rim * (0.9 + uLift);
         gl_FragColor = vec4(col, 1.0);
       }`,

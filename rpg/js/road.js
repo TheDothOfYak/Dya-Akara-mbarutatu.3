@@ -19,14 +19,14 @@
    the renderer, camera, input, dialogue and cards.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, Particles, paint } from './gfx.js';
-import { buildHomeTree, buildForest } from './hometree.js';
+import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire } from './gfx.js';
+import { buildHomeTree, buildForest, buildTreeBridge } from './hometree.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
 import { buildVel } from './creatures.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
-import { buildCart as buildCartModel } from './cart.js';
+import { buildCart as buildCartModel, buildCampKit } from './cart.js';
 import { NPC_LOOKS } from './npcs.js';
 import { buildAngel, buildSniller } from './velki.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm } from './util.js';
@@ -42,8 +42,9 @@ const GATE_Z = 14, CITY_R = 132, CITY = { x: 0, z: GATE_Z + CITY_R };   // the w
 const CORE = { x: 0, z: 70 }, CORE_R = 52;                                // the market quarter
 const SQUARE = { x: 0, z: 70 }, STALL = { x: 6, z: 58 };
 const TREE = { x: -38, z: 212, R: 13, H: 230 };                           // the city's home tree, in the south-west
+const TREE2 = { x: 40, z: 214, R: 10, H: 175 };                           // and a younger one east of it, inside the walls too, a bridge between them
 const CAMP1 = { z: -250 }, CAMP2 = { z: -560 }, PASS0 = -650, AMBUSH = -800, END = -960;
-const CART_Z = -70, HEDGE_Z = -160, LOG_Z = -330, FORD_Z = -430, ROCK0 = -672, ROCK1 = -762;
+const CART_Z = -135, HEDGE_Z = -195, LOG_Z = -330, FORD_Z = -430, ROCK0 = -672, ROCK1 = -762;
 const roadX = z => (z > GATE_Z ? 0 : 16 * Math.sin((GATE_Z - z) * 0.009) + 8 * Math.sin((GATE_Z - z) * 0.023));
 const zone = z => (z > GATE_Z ? 'city' : z > -300 ? 'low' : z > PASS0 ? 'forest' : 'pass');
 function baseH(z) {
@@ -166,13 +167,15 @@ export function createRoad(ctx) {
   let HT = null;
   const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
   const inWell = (d, a) => { const k = angDiff(a, d.well[0]), len = d.well[1] - d.well[0]; return k >= 0 && k <= len; };
+  // the balconies are partial decks, from a0 round to a1
+  const inArc = (d, a, pad = 0) => (((a - d.a0 + pad) % TAU) + TAU) % TAU <= d.a1 - d.a0 + pad * 2;
   function treeGround(x, z, y) {
     if (!HT) return -1e9;
     const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz);
     if (r > HT.reach) return -1e9;
     const a = Math.atan2(dz, dx), ly = y - HT.g; let best = -1e9;
     for (const d of HT.decks) {
-      if (d.y > ly + STEP || r < d.r0 - 0.5 || r > d.ro + 0.2) continue;
+      if (d.y > ly + STEP || r < d.r0 - 0.5 || r > d.ro + 0.2 || !inArc(d, a)) continue;
       if (r < d.r0 + 3.4 && inWell(d, a)) continue;          // the stairwell
       best = Math.max(best, d.y);
     }
@@ -194,7 +197,7 @@ export function createRoad(ctx) {
     let to = null;
     if (r < rin) to = rin;
     else if (ly > 2.2) {
-      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5);
+      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5 && inArc(d, a));   // (off the end of a balcony, the stair's rail)
       const rmax = d ? d.ro - 0.5 : HT.rAt(ly, a) + 3.2;
       if (r > rmax) to = rmax;
     }
@@ -205,14 +208,14 @@ export function createRoad(ctx) {
     const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz), ly = y - HT.g;
     if (r > HT.reach || ly < 0 || ly > HT.H * 0.9) return false;
     if (r < HT.rAt(ly, Math.atan2(dz, dx))) return true;
-    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > d.r0 && r < d.ro) return true;
+    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > d.r0 && r < d.ro && inArc(d, Math.atan2(dz, dx))) return true;
     return false;
   }
   function groundAt(x, z, y, skip) {
     let g = Math.max(heightAt(x, z), treeGround(x, z, y));
     for (const s of solids) {
       if (s === skip) continue;
-      if (Math.abs(x - s.x) > 12 || Math.abs(z - s.z) > 12) continue;
+      if (Math.abs(x - s.x) > 12 + (s.r || 0) || Math.abs(z - s.z) > 12 + (s.r || 0)) continue;
       if (s.y1 > y + STEP || s.y1 <= g) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) g = s.y1;
     }
@@ -221,7 +224,7 @@ export function createRoad(ctx) {
   function resolve(p, rad = PR) {
     for (const s of solids) {
       if (p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
-      if (Math.abs(p.x - s.x) > 12 || Math.abs(p.z - s.z) > 12) continue;
+      if (Math.abs(p.x - s.x) > 12 + (s.r || 0) || Math.abs(p.z - s.z) > 12 + (s.r || 0)) continue;
       if (s.kind === 'box') {
         const dx = p.x - s.x, dz = p.z - s.z, ox = s.hw + rad - Math.abs(dx), oz = s.hd + rad - Math.abs(dz);
         if (ox > 0 && oz > 0) { if (ox < oz) p.x += Math.sign(dx || 1) * ox; else p.z += Math.sign(dz || 1) * oz; }
@@ -240,7 +243,7 @@ export function createRoad(ctx) {
   }
   function solidAt(x, y, z) {
     for (const s of solids) {
-      if (Math.abs(x - s.x) > 12 || Math.abs(z - s.z) > 12) continue;
+      if (Math.abs(x - s.x) > 12 + (s.r || 0) || Math.abs(z - s.z) > 12 + (s.r || 0)) continue;
       if (y < s.y0 || y > s.y1) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) return true;
     }
@@ -294,6 +297,10 @@ export function createRoad(ctx) {
     T.colliders.slice(1).forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1));      // the roots (the trunk itself is treeResolve's)
     for (const h of T.deckHouses) cyl(h.x, h.z, h.r, h.y - 0.5, h.y + h.h);
     HT = Object.assign(T, { reach: Math.max(...T.decks.map(d => d.ro)) + 2 });
+    // the younger tree: lived in too, but no stair you'd need today (its trunk and roots are solid all the same)
+    const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.07, 0.14, 0.22], deckW: 9, roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
+    T2.colliders.forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1));
+    buildTreeBridge(scene, T, T2, 0.42);
   }
   /* the rest of the city: block after block of houses on a grid of streets, from the market quarter
      south to the wall and round the home tree — instanced, so a whole quarter costs a handful of draws */
@@ -301,7 +308,7 @@ export function createRoad(ctx) {
   {
     const PAL = { walls: [0xf4e6c8, 0xf0dcb4, 0xe8d0a8, 0xfaf0dc, 0xe8dcc0, 0xd8c8b0], roofs: [0x7a4a2a, 0x2f5a5a, 0x6a3a1c, 0x3a6a5a, 0x8a5a3a], door: [0x2f6f8a, 0x8a3a3a, 0x4a7a3a] };
     const homes = [];
-    const clearOf = (x, z) => Math.hypot(x - CORE.x, z - CORE.z) > CORE_R + 6 && Math.hypot(x - TREE.x, z - TREE.z) > TREE.R * 1.75 * 1.75 + 6
+    const clearOf = (x, z) => Math.hypot(x - CORE.x, z - CORE.z) > CORE_R + 6 && Math.hypot(x - TREE.x, z - TREE.z) > TREE.R * 1.75 * 1.75 + 6 && Math.hypot(x - TREE2.x, z - TREE2.z) > TREE2.R * 1.75 * 1.6 + 6
       && Math.hypot(x - CITY.x, z - CITY.z) < CITY_R - 9 && !(Math.abs(x) < 10 && z < CORE.z);
     const STREET = 22;
     for (let gx = -6; gx < 6; gx++) for (let gz = 0; gz < 12; gz++) {
@@ -381,19 +388,76 @@ export function createRoad(ctx) {
      gate, along the road behind Buhkon, parked by every camp. */
   const CART0 = { x: 13, z: 52.5 };
   function buildCart() { const c = buildCartModel(); scene.add(c.g); return c; }
-  const CART = Object.assign(buildCart(), { pos: V3(CART0.x, 0, CART0.z), yaw: Math.PI, speed: 0, roll: 0, path: null, riders: false, follow: false });
+  const CART = Object.assign(buildCart(), { pos: V3(CART0.x, 0, CART0.z), yaw: Math.PI, speed: 0, roll: 0, path: null, driver: false, loose: null });
+  CART.home = CART.punks.map(pk => ({ p: pk.root.position.clone(), s: pk.root.scale.clone() }));
   CART.solid = box(CART.pos.x, CART.pos.z, 1.4, 3.2, -1, 2.4);
   function placeCart(x, z, yaw) { CART.pos.set(x, groundAt(x, z, 60, CART.solid), z); CART.yaw = yaw; CART.speed = 0; }
   placeCart(CART0.x, CART0.z, Math.PI);
+  /* out on the road the cart drives itself — Buhkon on the bench with the reins — along the road and never off it.
+     It keeps pace with the boy when he walks (he can climb up into it any time: E) and halts at DRIVE.stopZ,
+     where onArrive fires once (a fallen pine, the ford, a family in the ditch, the night's camp) */
+  const DRIVE = { on: false, sp: 0, stopZ: null, onArrive: null, block: null };
+  const SEAT_B = V3(0, 1.25, 1.82), SEAT_P = V3(-1.22, 1.1, 0.9);   // the bench; the boy on the side-board, legs over the edge
+  function setStop(z, onArrive = null) { DRIVE.stopZ = z; DRIVE.onArrive = onArrive; }
+  function drive(on = true) { DRIVE.on = on; CART.driver = on; if (on) { DRIVE.sp = 0; B.stay = null; } }
+  function nearCart() { return Math.hypot(P.pos.x - CART.pos.x, P.pos.z - CART.pos.z) < 4.2 && Math.abs(P.pos.y - CART.pos.y) < 3; }
+  function boardCart() {
+    if (DRIVE.block) { ctx.bark('buhkon', DRIVE.block, 3); return; }
+    P.inCart = true; P.vel.set(0, 0, 0); P.swing = 0; sfx.jump();
+  }
+  function hopDown() {
+    if (!P.inCart) return;
+    P.inCart = false; CART.g.updateMatrixWorld();
+    const q = CART.g.localToWorld(V3(-2.7, 0, 0.6)), sp = freeSpot(q.x, q.z, 0.6);
+    place(P, sp.x, sp.z, CART.yaw - Math.PI / 2); P.vel.set(0, 0, 0); P.onGround = true; sfx.step();
+  }
+  /* the two cart Punks: let off the shafts at camp to graze, put back in harness in the morning */
+  function unhitch(c) {
+    if (CART.loose) return;
+    CART.g.updateMatrixWorld();
+    CART.loose = CART.punks.map((pk, i) => { scene.attach(pk.root); return { pk, pos: pk.root.position.clone(), yaw: CART.yaw, tgt: null, wait: 0.4 + i * 0.8, c }; });
+  }
+  function hitch() {
+    if (!CART.loose) return;
+    CART.punks.forEach((pk, i) => { CART.g.add(pk.root); pk.root.position.copy(CART.home[i].p); pk.root.rotation.set(0, 0, 0); pk.root.scale.copy(CART.home[i].s); });
+    CART.loose = null;
+  }
+  function grazeTick(dt) {
+    if (!CART.loose) return;
+    for (const L of CART.loose) {
+      const c = L.c; let sp = 0;
+      if (L.wait > 0) L.wait -= dt;
+      else {
+        if (!L.tgt) { const a = rng() * TAU, r = 2 + rng() * 6; L.tgt = V3(c.graze.x + Math.cos(a) * r, 0, c.graze.z + Math.sin(a) * r); }
+        const dx = L.tgt.x - L.pos.x, dz = L.tgt.z - L.pos.z, d = Math.hypot(dx, dz);
+        if (d < 0.4) { L.tgt = null; L.wait = 3 + rng() * 6; }
+        else { sp = Math.min(1.6, d); L.pos.x += dx / d * sp * dt; L.pos.z += dz / d * sp * dt; L.yaw = dampAngle(L.yaw, Math.atan2(dx, dz), 3, dt); }
+      }
+      resolve(L.pos, 1.0); L.pos.y = groundAt(L.pos.x, L.pos.z, L.pos.y + 1);
+      L.pk.root.position.copy(L.pos); L.pk.root.rotation.set(L.wait > 0 ? 0.14 + Math.sin(t * 1.3 + L.yaw) * 0.05 : 0, L.yaw, 0);   // nose down in the grass while it stands
+      L.pk.animate(dt, { speed: sp, t: t + L.yaw });
+    }
+  }
 
   /* ---------------- far country: mountains, cloud, and a town at the end of it ---------------- */
   {
     const base = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000, 1, 1), toon(0x6a8a4a)); base.rotation.x = -Math.PI / 2; base.position.set(0, -2.5, -600); base.receiveShadow = true; scene.add(base);
-    const rockM = toon(0x8a8a9a), rockD = toon(0x6e6e80), snowM = toon(0xf4f6fa), pineM = toon(0x3a5a3a);
+    const peakM = toon(0xffffff, { vertexColors: true }), pineM = toon(0x3a5a3a);
+    const rockC = [new THREE.Color(0x8a8a9a), new THREE.Color(0x6e6e80)], snowC = new THREE.Color(0xf4f6fa), cc = new THREE.Color();
+    /* one cone per mountain, its snow painted onto its own faces — a ragged cap down the top quarter or so,
+       reaching further down the gullies than the ridges — never a second, smaller mountain sat on top */
     const peak = (x, z, h, r, snow) => {
-      const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7 + Math.floor(rng() * 4)), rng() < 0.5 ? rockM : rockD); m.position.set(x, h / 2 - 3, z); m.rotation.y = rng() * 6; m.scale.z = 0.6 + rng() * 0.6; scene.add(m);
-      if (snow) { const c = new THREE.Mesh(new THREE.ConeGeometry(r * 0.32, h * 0.32, 7), snowM); c.position.set(x, h - 3 - h * 0.16 + 0.5, z); c.rotation.y = m.rotation.y; c.scale.z = m.scale.z; scene.add(c); }
-      const skirt = new THREE.Mesh(new THREE.ConeGeometry(r * 1.25, h * 0.28, 9), pineM); skirt.position.set(x, h * 0.14 - 3, z); scene.add(skirt);
+      const seg = 7 + Math.floor(rng() * 4), geo = new THREE.ConeGeometry(r, h, seg, 6).toNonIndexed(), pos = geo.attributes.position, cols = new Float32Array(pos.count * 3);
+      const rc = rockC[rng() < 0.5 ? 0 : 1], line = 0.7 + rng() * 0.08, ph = rng() * 6;
+      for (let i = 0; i < pos.count; i += 3) {   // face by face, so the cap has a crisp painted edge
+        let yy = 0, ax = 0, az = 0; for (let k = 0; k < 3; k++) { yy += pos.getY(i + k) / 3; ax += pos.getX(i + k) / 3; az += pos.getZ(i + k) / 3; }
+        const hk = yy / h + 0.5, a = Math.atan2(az, ax), edge = line + Math.sin(a * 3 + ph) * 0.06 + Math.sin(a * 7 + ph * 2) * 0.03;
+        cc.copy(snow && hk > edge ? snowC : rc);
+        for (let k = 0; k < 3; k++) cols.set([cc.r, cc.g, cc.b], (i + k) * 3);
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, peakM); m.position.set(x, h / 2 - 3, z); m.rotation.y = rng() * 6; m.scale.z = 0.6 + rng() * 0.6; scene.add(m);
+      const skirt = new THREE.Mesh(new THREE.ConeGeometry(r * 1.04, h * 0.2, seg), pineM); skirt.position.set(x, h * 0.1 - 3, z); skirt.rotation.y = m.rotation.y; skirt.scale.z = m.scale.z; scene.add(skirt);
     };
     for (const sd of [-1, 1]) for (let k = 0; k < 26; k++) { const z = 260 - k * 70 - rng() * 40, x = sd * (520 + rng() * 520); peak(x, z, 180 + rng() * 300, 120 + rng() * 120, rng() < 0.7); }
     for (let k = 0; k < 18; k++) peak(-1600 + k * 190 + rng() * 60, -1900 - rng() * 400, 380 + rng() * 300, 180 + rng() * 140, true);
@@ -447,13 +511,16 @@ export function createRoad(ctx) {
     inst(coneG, toon(0x2f6a3a), cones, (o, [x, y, z, r, h]) => { o.position.set(x, y, z); o.scale.set(r, h, r); o.rotation.set(0, rng() * 6, 0); });
     inst(new THREE.DodecahedronGeometry(1, 0), toon(0x9a9284), rocks, (o, [x, y, z, s]) => { o.position.set(x, y, z); o.scale.set(s * 1.2, s * 0.75, s); o.rotation.set(rng() * 3, rng() * 3, 0); });
   }
-  // campfires
+  /* the camps: a fire in a clearing by the road. The tent and the little workbench come off the cart each
+     night (see makeCamp); the cart itself stands on the road, a few paces short of the fire */
   const camps = [CAMP1, CAMP2].map(c => {
     const x = roadX(c.z) + 6, z = c.z, y = heightAt(x, z);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.22, 5, 10), toon(0x7a6a5a)); ring.rotation.x = -Math.PI / 2; ring.position.set(x, y + 0.1, z); scene.add(ring);
-    const fire = glowSprite(0xff8a3a, 2.6, 0.95); fire.position.set(x, y + 0.7, z); scene.add(fire);
+    const fire = buildCampfire(1.05); fire.position.set(x, y, z); fire.visible = false; scene.add(fire);
     const light = new THREE.PointLight(0xff8a3a, 0, 18); light.position.set(x, y + 1.2, z); scene.add(light);
-    return { x, z, y, fire, light, on: false };
+    const kit = buildCampKit(), at = (o, ox, oz) => { const q = V3(x + ox, 0, z + oz); q.y = heightAt(q.x, q.z); o.position.copy(q); o.rotation.y = Math.atan2(x - q.x, z - q.z); o.visible = false; scene.add(o); return q; };
+    const tentAt = at(kit.tent, 4.2, 4.6), benchAt = at(kit.bench, 1.2, -4.4);
+    kit.bench.rotation.y += Math.PI;   // (its vice faces the fire, the worker's back to the wood)
+    return { x, z, y, fire, light, on: false, kit, tentAt, benchAt, park: c.z + 7, graze: V3(roadX(c.z) - 13, 0, c.z + 3), solids: [] };
   });
 
   /* ---------------- particles and post ---------------- */
@@ -740,7 +807,7 @@ export function createRoad(ctx) {
       ? [V3(CART.pos.x, 0, CART.pos.z), V3(1.5, 0, GATE_Z + 6), V3(0, 0, GATE_Z + 1), V3(0, 0, GATE_Z - 4), V3(roadX(-14), 0, -14), V3(roadX(-30), 0, -30), V3(roadX(-46), 0, -46), V3(roadX(-62), 0, -62), V3(roadX(-80), 0, -80)]
       : [V3(CART.pos.x, 0, CART.pos.z), V3(13.8, 0, 45), V3(9, 0, 37.5), V3(3, 0, 30), V3(0, 0, 22), V3(0, 0, GATE_Z - 2), V3(roadX(-14), 0, -14), V3(roadX(-46), 0, -46), V3(roadX(-80), 0, -80)];
     const curve = new THREE.CatmullRomCurve3(pts);
-    CART.riders = true; CART.path = curve; CART.pathK = 0;
+    CART.driver = true; P.inCart = true; CART.path = curve; CART.pathK = 0;
     tanoc.weapon.visible = false;
     const at = k => { const q = curve.getPointAt(Math.min(1, k)); q.y = groundAt(q.x, q.z, 3); return q; };
     cut([
@@ -749,7 +816,7 @@ export function createRoad(ctx) {
       { dur: 5.5, cam: () => { const c = CART.pos, f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw)); return { p: V3(c.x - f.x * 8, 7.5, c.z - f.z * 8), l: V3(c.x + f.x * 10, 1.6, c.z + f.z * 10) }; }, onTick: k => { CART.pathK = 0.08 + k * 0.42; } },
       { dur: 4, from: { p: [5, 1.0, GATE_Z - 9], l: [0, 3, GATE_Z + 6] }, to: { p: [5.5, 1.2, GATE_Z - 10], l: [0, 2.5, GATE_Z - 2] }, onTick: k => { CART.pathK = 0.5 + k * 0.25; } },
       { dur: 6.5, cam: (k) => { const c = CART.pos; return { p: V3(c.x - 6 + k * 4, 6 + k * 26, c.z + 16 + k * 22), l: V3(c.x, 2, c.z - 30 - k * 40) }; }, caption: R.leave[1], onTick: k => { CART.pathK = 0.75 + k * 0.25; } },
-    ], () => { CART.riders = false; CART.path = null; startDay1(); });
+    ], () => { CART.path = null; startDay1(true); });   // (and on they roll: no jump back to the gate)
   }
   function cleanMarket() {
     if (!MK) return;
@@ -799,8 +866,10 @@ export function createRoad(ctx) {
   }
   /* a place on a deck of the home tree: round the deck by angle a, `off` out from the bark (clear of the stairwell) */
   function deckSpot(i, a, off = 8.5) {
-    const d = HT.decks[i]; if (inWell(d, a) || Math.abs(angDiff(a, d.well[0])) < 0.4) a = d.well[1] + 0.6;
-    const r = d.r0 + off; return V3(HT.x + Math.cos(a) * r, HT.g + d.y, HT.z + Math.sin(a) * r);
+    const d = HT.decks[i];
+    if (!inArc(d, a, -0.2)) { const m = (d.a0 + d.a1) / 2; a = angDiff(a, m) < 0 ? d.a0 + 0.25 : d.a1 - 0.25; }   // onto the balcony, wherever round it you asked
+    if (inWell(d, a) || Math.abs(angDiff(a, d.well[0])) < 0.4) a = d.well[1] + 0.6;
+    const r = d.r0 + Math.min(off, d.ro - d.r0 - 1.2); return V3(HT.x + Math.cos(a) * r, HT.g + d.y, HT.z + Math.sin(a) * r);
   }
   /* a point on the great stair, at height y above the foot */
   function stairPoint(y) {
@@ -1032,22 +1101,71 @@ export function createRoad(ctx) {
   }
   function fireSay(ci, lines, cb) { sayHeld(lines, fireCam(camps[ci]), cb); }
 
+  /* making camp, each night: the boy hops down, Buhkon climbs off the bench, lets the Punks out of the shafts to
+     graze, pitches the tent, sets out his little workbench, and lights the fire — then supper and talk */
+  let SET = null;
+  function pitch(c, what) {
+    const o = c.kit[what], at = what === 'tent' ? c.tentAt : c.benchAt;
+    o.visible = true;
+    if (!c.solids.some(q => q.what === what)) { const q = what === 'tent' ? cyl(at.x, at.z, 1.5, at.y - 1, at.y + 1.8) : cyl(at.x, at.z, 0.8, at.y - 1, at.y + 0.95); q.what = what; c.solids.push(q); }
+  }
+  function campUp(c) { pitch(c, 'tent'); pitch(c, 'bench'); c.kit.tent.scale.set(1, 1, 1); c.kit.bench.scale.set(1, 1, 1); c.on = true; unhitch(c); }
+  function campDown(c) {
+    c.kit.tent.visible = c.kit.bench.visible = false; c.on = false;
+    for (const q of c.solids) { const i = solids.indexOf(q); if (i >= 0) solids.splice(i, 1); }
+    c.solids.length = 0; hitch();
+  }
+  function makeCamp(ci, then) {
+    const c = camps[ci];
+    hopDown(); DRIVE.on = false; CART.driver = false; DRIVE.sp = 0;
+    CART.g.updateMatrixWorld(); const off = CART.g.localToWorld(V3(1.9, 0, 1.6)); place(B, off.x, off.z, CART.yaw);
+    B.stay = V3(off.x + 0.5, 0, off.z + 3.4);   // round to the Punks' heads first
+    SET = { c, then, step: 0, t: 0, pop: null };
+    objective('Make camp with the Carpenter', 'He lets the Punks graze, pitches the tent and sets out his bench — then the fire');
+    ctx.bark('buhkon', ci ? 'This’ll do. Punks out, tent up, fire going — and then we eat.' : 'Here’s our oak. Punks out, tent up, fire going.', 3.5);
+  }
+  function setTick(dt) {
+    if (!SET) return;
+    const S = SET, c = S.c, near = q => Math.hypot(B.pos.x - q.x, B.pos.z - q.z) < 1.9, by = (q, d) => { const dx = q.x - c.x, dz = q.z - c.z, l = Math.hypot(dx, dz) || 1; return V3(q.x - dx / l * d, 0, q.z - dz / l * d); };
+    S.t += dt;
+    if (S.pop) { S.pop.k = Math.min(1, S.pop.k + dt / 0.7); const k = S.pop.k, e = 1 - Math.pow(1 - k, 3); S.pop.o.scale.set(1, Math.max(0.02, e * (1 + Math.sin(k * Math.PI) * 0.12)), 1); if (k >= 1) S.pop = null; }
+    if (S.step === 0 && (near(B.stay) || S.t > 5)) {
+      S.step = 1; S.t = 0; unhitch(c); sfx.ui();
+      ctx.bark('buhkon', 'Off you go, the pair of you. Grass, not the boy’s hat.', 2.6);
+      B.stay = by(c.tentAt, 2.3);
+    } else if (S.step === 1 && (near(B.stay) || S.t > 9)) {
+      S.step = 2; S.t = 0; pitch(c, 'tent'); S.pop = { o: c.kit.tent, k: 0 }; sfx.slam();
+      particles.burst(c.tentAt.x, c.tentAt.y + 0.5, c.tentAt.z, 16, { color: 0xd8c8a0, speed: 3, size: 0.4, life: 0.5 });
+      B.stay = by(c.benchAt, 1.3);
+    } else if (S.step === 2 && !S.pop && (near(B.stay) || S.t > 9)) {
+      S.step = 3; S.t = 0; pitch(c, 'bench'); S.pop = { o: c.kit.bench, k: 0 }; sfx.slam();
+      B.stay = V3(c.x - 1.4, 0, c.z + 0.4);
+    } else if (S.step === 3 && !S.pop && (near(B.stay) || S.t > 9)) {
+      S.step = 4; S.t = 0; c.on = true; sfx.flare();
+      particles.burst(c.x, c.y + 0.6, c.z, 30, { color: 0xff8a2a, speed: 4, size: 0.5, life: 0.7, gravity: -3 });
+      B.stay = V3(c.x + 2.2, 0, c.z - 1.5);
+    } else if (S.step === 4 && S.t > 1.2) { SET = null; S.then(); }
+  }
+
   /* ===== Day 1: the low country, and the fire-stone ===== */
   let D1 = null;
-  function startDay1() {
+  function startDay1(rolling) {
     cleanMarket();
     stage = 'day1'; sub = 'walk'; ctx.save('day1'); ctx.blur(0);
     tanoc.hat.visible = true; tanoc.weapon.visible = true;
-    place(P, roadX(GATE_Z - 8), GATE_Z - 8, Math.PI); place(B, roadX(GATE_Z - 6) + 2, GATE_Z - 6, Math.PI); B.stay = null;
+    if (!rolling) {   // (a reload: the cart waits just outside the gate, Buhkon up on the bench)
+      P.inCart = false; placeCart(roadX(GATE_Z - 10), GATE_Z - 10, Math.PI);
+      place(P, roadX(GATE_Z - 7) - 2.6, GATE_Z - 7, Math.PI);
+    }
+    drive(); setStop(CART_Z + 12, () => familyAsk());
     CAM.yaw = 0; CAM.pitch = 0.2; setDusk(0.1);
     D1 = { said: 0, kofi: null, pebble: false, tried: {} };
-    placeCart(roadX(GATE_Z + 2), GATE_Z + 2, Math.PI);
     dayCine(R.day1.cards, [
       { dur: 6.5, from: { p: [roadX(-160) + 80, 60, -230], l: [roadX(-60), 2, -50] }, to: { p: [roadX(-110) + 46, 34, -160], l: [roadX(-20), 2, -10] } },
       { dur: 5.5, cam: () => ({ p: V3(P.pos.x + 3.2, P.pos.y + 1.6, P.pos.z - 9.5), l: V3(P.pos.x, P.pos.y + 1.4, P.pos.z) }) },
     ], () => {
       ctx.play(); ctx.location('The Road North', 'Day one · the low country');
-      ctx.say(R.day1.talk, () => { objective(R.obj.day1, 'Follow the road — the Carpenter keeps pace'); setGoal(camps[0].x, camps[0].y, camps[0].z); });
+      ctx.say(R.day1.talk, () => { objective(R.obj.day1, P.inCart ? 'Riding in the cart · E to hop down and walk' : 'Walk beside the cart, or climb up into it (E)'); setGoal(camps[0].x, camps[0].y, camps[0].z); });
     });
   }
   function day1Tick() {
@@ -1074,23 +1192,29 @@ export function createRoad(ctx) {
       D1.sn = buildSniller(2.6); fold(D1.sn, 0.55); D1.sn.position.set(roadX(P.pos.z) - 110, heightAt(roadX(P.pos.z) - 110, P.pos.z - 60) + 18, P.pos.z - 60); scene.add(D1.sn); D1.snT = 0;
       ctx.say(R.day1.sniller);
     }
-    if (P.pos.distanceTo(V3(camps[0].x, camps[0].y, camps[0].z)) < 9) {
-      sub = 'camp'; setGoal(); camps[0].on = true; B.stay = V3(camps[0].x + 2.2, 0, camps[0].z - 1.5);
-      fireSay(0, R.day1.camp, () => {
+    if (P.pos.distanceTo(V3(camps[0].x, camps[0].y, camps[0].z)) < 12 && Math.abs(CART.pos.z - camps[0].park) < 2) {
+      sub = 'camp'; setGoal();
+      makeCamp(0, () => fireSay(0, R.day1.camp, () => {
         sub = 'stone'; ctx.giveFireStone(false);
         for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4, x = camps[0].x + Math.cos(a) * 3.2, z = camps[0].z + Math.sin(a) * 3.2; const peb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.14, 0), toon(0xb0a898)); const it = addItem(V3(x, heightAt(x, z) + 0.12, z), 'Pick up a pebble', null, peb); it.act = () => { for (const q of items.filter(q => q.label === 'Pick up a pebble')) dropItem(q); D1.pebble = true; sfx.ui(); ctx.toast('A smooth little pebble.', 2); stoneObjective(); }; }
         stoneObjective();
         ctx.hint('Press E anywhere to try the fire-stone.');
-      });
+      }));
     }
   }
   function cartTick() {
     const C = EV.cart; if (!C || C.state === 'done') return;
     const d = Math.hypot(P.pos.x - C.x, P.pos.z - C.z);
-    if (C.state === 'idle' && d < 16) {
+    if (C.state === 'idle' && d < 16) familyAsk();
+  }
+  /* the family in the ditch: the cart pulls up, Buhkon sends the boy down to help, and won't drive on till the wheel's back on */
+  function familyAsk() {
+    const C = EV.cart; if (!C || C.state !== 'idle') return;
+    hopDown(); setStop(Math.min(CART.pos.z, CART_Z + 12)); DRIVE.block = R.day1.cartWait;
+    {
       C.state = 'ask'; ctx.say(R.day1.cartSee, () => {
-        C.state = 'find'; C.item = addItem(V3(C.wx, heightAt(C.wx, C.wz) + 0.8, C.wz), 'Take the cart wheel', () => { dropItem(C.item); C.state = 'carry'; ctx.toast(R.day1.wheelGot, 2.6); sfx.ui(); objective(R.obj.cartBack, 'Optional — the family will thank you'); setGoal(C.x, C.g, C.z); C.back = addItem(V3(C.x - 1.4, C.g + 0.6, C.z), 'Fit the wheel back on', () => fixCart()); }, C.wheel);
-        objective(R.obj.cart, 'Optional — out in the field, east of the road'); setGoal(C.wx, heightAt(C.wx, C.wz), C.wz);
+        C.state = 'find'; C.item = addItem(V3(C.wx, heightAt(C.wx, C.wz) + 0.8, C.wz), 'Take the cart wheel', () => { dropItem(C.item); C.state = 'carry'; ctx.toast(R.day1.wheelGot, 2.6); sfx.ui(); objective(R.obj.cartBack, 'The family will thank you'); setGoal(C.x, C.g, C.z); C.back = addItem(V3(C.x - 1.4, C.g + 0.6, C.z), 'Fit the wheel back on', () => fixCart()); }, C.wheel);
+        objective(R.obj.cart, 'Out in the field, east of the road'); setGoal(C.wx, heightAt(C.wx, C.wz), C.wz);
       });
     }
   }
@@ -1098,7 +1222,8 @@ export function createRoad(ctx) {
     const C = EV.cart; dropItem(C.back); C.state = 'done'; setGoal(camps[0].x, camps[0].y, camps[0].z);
     C.cart.rotation.set(0, 0.2, 0); C.cart.position.y = C.g + 0.9; C.wheelR.visible = true;
     particles.burst(C.x, C.g + 1, C.z, 20, { color: 0xd8c098, speed: 4, size: 0.5, life: 0.6 }); sfx.slam();
-    ctx.say(R.day1.cartFixed, () => { give('bun', 1); objective(R.obj.day1, 'Follow the road — the Carpenter keeps pace'); });
+    DRIVE.block = null; setStop(camps[0].park);
+    ctx.say(R.day1.cartFixed, () => { give('bun', 1); objective(R.obj.day1, 'Back up into the cart (E) — or walk alongside'); });
   }
   function stoneObjective() { objective(R.obj.stone, D1.pebble ? 'Try the stone again (E)' : 'Press E to try the stone · pebbles lie by the fire', 0, 0); }
   function tryStone() {
@@ -1123,9 +1248,9 @@ export function createRoad(ctx) {
   function startDay2() {
     stage = 'day2'; sub = 'walk'; ctx.save('day2');
     for (const it of items.slice()) dropItem(it);
-    camps[0].on = false;
-    place(P, roadX(CAMP1.z - 6), CAMP1.z - 6, Math.PI); place(B, roadX(CAMP1.z - 4) + 2, CAMP1.z - 4, Math.PI); B.stay = null;
-    placeCart(roadX(CAMP1.z + 4), CAMP1.z + 4, Math.PI);
+    campDown(camps[0]); P.inCart = false;
+    placeCart(roadX(camps[0].park - 4), camps[0].park - 4, Math.PI); drive(); setStop(LOG_Z + 10, () => hopDown());
+    place(P, roadX(CAMP1.z - 2) - 2.6, CAMP1.z - 2, Math.PI);
     CAM.yaw = 0; setDusk(0.05); D2 = { caught: false };
     dayCine(R.day2.cards, [
       // down out of the sky, through the tops of the pines, to the two of them on the road
@@ -1133,17 +1258,17 @@ export function createRoad(ctx) {
       { dur: 5, cam: () => ({ p: V3(P.pos.x + 7, P.pos.y + 2, P.pos.z + 2), l: V3(P.pos.x, P.pos.y + 1.4, P.pos.z - 3) }) },
     ], () => {
       ctx.play(); ctx.location('The Road North', 'Day two · the forest');
-      objective('Climb through the forest with the Carpenter', ''); setGoal(EV.log.x, heightAt(EV.log.x, EV.log.z) + 1, EV.log.z);
+      objective('Climb through the forest with the Carpenter', 'Ride in the cart (E), or walk alongside'); setGoal(EV.log.x, heightAt(EV.log.x, EV.log.z) + 1, EV.log.z);
     });
   }
   function day2Tick() {
     const L = EV.log, F = EV.ford;
     if (sub === 'walk' && !L.open && P.pos.z < LOG_Z + 14) {
-      sub = 'log'; setGoal(L.x, heightAt(L.x, L.z) + 1, L.z);
+      sub = 'log'; setGoal(L.x, heightAt(L.x, L.z) + 1, L.z); hopDown();
       ctx.say(R.day2.log, () => { objective(R.obj.log, 'Left-click to swing the hatchet at the middle of the trunk'); ctx.hint('Swing at the thin middle of the trunk.'); });
     }
-    if (sub === 'log' && L.open) { sub = 'walk'; objective('Climb through the forest with the Carpenter', ''); setGoal(roadX(FORD_Z), F.y, FORD_Z + 6); }
-    if (sub === 'walk' && L.open && !F.told && P.pos.z < FORD_Z + 16) { F.told = true; ctx.say(R.day2.stream, () => objective(R.obj.stream, 'Jump from stone to stone — Space')); }
+    if (sub === 'log' && L.open) { sub = 'walk'; objective('Climb through the forest with the Carpenter', ''); setGoal(roadX(FORD_Z), F.y, FORD_Z + 6); setStop(FORD_Z + 10, () => hopDown()); }
+    if (sub === 'walk' && L.open && !F.told && P.pos.z < FORD_Z + 16) { F.told = true; hopDown(); ctx.say(R.day2.stream, () => plankQuest()); }
     if (F.told && !F.crossed) {
       // in the water? Out, back to the near bank, and very cold
       if (Math.abs(P.pos.z - FORD_Z) < 4.4 && P.pos.y < F.y + 0.1 && P.onGround) {
@@ -1151,21 +1276,63 @@ export function createRoad(ctx) {
         ctx.bark('tanoc', R.day2.splash[(F.dunk = (F.dunk || 0) + 1) % R.day2.splash.length], 2.5);
         place(P, roadX(FORD_Z + 7), FORD_Z + 7, Math.PI); P.vel.set(0, 0, 0);
       }
-      if (P.pos.z < FORD_Z - 5) { F.crossed = true; ctx.say(R.day2.across, () => { objective('Climb through the forest with the Carpenter', ''); setGoal(camps[1].x, camps[1].y, camps[1].z); }); }
+      if (P.pos.z < FORD_Z - 5 && F.planks >= 2) { F.crossed = true; ctx.say(R.day2.across, () => { objective('Climb through the forest with the Carpenter', ''); setGoal(camps[1].x, camps[1].y, camps[1].z); }); }
     }
-    if (sub === 'walk' && F.crossed && P.pos.distanceTo(V3(camps[1].x, camps[1].y, camps[1].z)) < 10) {
-      sub = 'send'; setGoal(); camps[1].on = true; B.stay = V3(camps[1].x + 2.2, 0, camps[1].z - 1.5);
-      fireSay(1, R.day2.send, () => {
+    if (sub === 'walk' && F.crossed && P.pos.distanceTo(V3(camps[1].x, camps[1].y, camps[1].z)) < 12 && Math.abs(CART.pos.z - camps[1].park) < 2) {
+      sub = 'send'; setGoal();
+      makeCamp(1, () => fireSay(1, R.day2.send, () => {
         sub = 'hunt';
         for (let k = 0; k < 5; k++) { const a = rng() * TAU, r = 22 + rng() * 26, x = camps[1].x + Math.cos(a) * r, z = camps[1].z + Math.sin(a) * r; addFoe('kofi', x, z); }
         objective(R.obj.hunt, 'Q — set a pebble in the fire-stone and throw it. Kofi run from everything.');
-      });
+      }));
     }
     if (sub === 'hunt') {
       const near = foes.filter(f => f.kind === 'kofi' && !f.dead).sort((a, b) => a.pos.distanceTo(P.pos) - b.pos.distanceTo(P.pos))[0];
       if (near) setGoal(near.pos.x, near.pos.y, near.pos.z);
       if (P.pos.distanceTo(V3(camps[1].x, P.pos.y, camps[1].z)) > 75 && (D2.warnT = (D2.warnT || 0) - 1 / 60) <= 0) { D2.warnT = 5; ctx.bark('tanoc', 'I can barely see the smoke. Better turn back a bit.', 3); }
     }
+  }
+  /* the ford: stones for feet, but not for wheels. Two long planks off the old footbridge washed up on the near
+     bank, laid across the stream for the cart's wheels to run on */
+  function plankQuest() {
+    const F = EV.ford; F.planks = 0;
+    if (!F.pile) {
+      const sp = freeSpot(roadX(FORD_Z + 12) - 15, FORD_Z + 12, 3), g = heightAt(sp.x, sp.z);
+      F.pile = V3(sp.x, g, sp.z);
+      const wood = toon(0x7a5a3a), wet = toon(0x5a4630);
+      for (let k = 0; k < 3; k++) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 1.4, 6), wet); post.position.set(sp.x - 2 + k * 2, g + 0.3, sp.z + 2.2); post.rotation.z = (k - 1) * 0.4; addOutline(post, 0.03); scene.add(post); }
+      for (let k = 0; k < 3; k++) { const br = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.07, 1.6 + k * 0.5), wood); br.position.set(sp.x + 2.4, g + 0.05 + k * 0.08, sp.z - 1 + k * 0.4); br.rotation.set(0, 0.5 + k * 0.7, 0.06); addOutline(br, 0.02); scene.add(br); }
+      F.pileItems = [0, 1].map(k => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.09, 11), wood); addOutline(m, 0.025);
+        const it = addItem(V3(sp.x - 0.4 + k * 0.6, g + 0.06 + k * 0.1, sp.z), 'Pick up a long plank', null, m);
+        m.rotation.y = 0.15 - k * 0.1; it.act = () => takePlank(it); return it;
+      });
+    }
+    plankObjective();
+  }
+  function plankObjective() {
+    const F = EV.ford;
+    if (F.planks >= 2) { objective(R.obj.stream, 'Over the planks with the cart, or stone to stone — Space'); setGoal(roadX(FORD_Z - 6), heightAt(roadX(FORD_Z - 6), FORD_Z - 6), FORD_Z - 6); return; }
+    objective(R.obj.planks(F.planks), F.carry ? 'Lay it across the stream where the wheels will run' : 'The old footbridge, washed up on the bank to the left of the road', 2, F.planks);
+    if (F.carry) setGoal(roadX(FORD_Z + 6), heightAt(roadX(FORD_Z + 6), FORD_Z + 6), FORD_Z + 6); else setGoal(F.pile.x, F.pile.y, F.pile.z);
+  }
+  function takePlank(it) {
+    const F = EV.ford; if (F.carry) return;
+    dropItem(it); F.carry = it.mesh; it.mesh.position.set(0.22 / 0.86, 1.62 / 0.86, 0); it.mesh.rotation.set(0, 0, 0.08); it.mesh.scale.setScalar(1 / 0.86); tanoc.root.add(it.mesh); sfx.ui();
+    const lx = roadX(FORD_Z + 6.5);
+    F.layItem = addItem(V3(lx, heightAt(lx, FORD_Z + 6.5) + 0.5, FORD_Z + 6.5), 'Lay the plank across the stream', () => layPlank());
+    tanoc.weapon.visible = false; plankObjective();
+  }
+  function layPlank() {
+    const F = EV.ford; dropItem(F.layItem); F.layItem = null;
+    tanoc.root.remove(F.carry); F.carry = null; tanoc.weapon.visible = true;
+    const side = F.planks ? 1.32 : -1.32, top = baseH(FORD_Z) - 0.75, x = roadX(FORD_Z) + side;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.12, 11.2), toon(0x7a5a3a)); m.position.set(x, top - 0.06, FORD_Z);
+    m.rotation.y = Math.atan2(roadX(FORD_Z - 1) - roadX(FORD_Z + 1), -2) + Math.PI; addOutline(m, 0.025); m.castShadow = true; scene.add(m);
+    box(x, FORD_Z, 0.32, 5.6, top - 0.6, top);
+    F.planks++; sfx.slam(); particles.burst(x, top, FORD_Z + 4, 14, { color: 0xd8f4ff, speed: 3, size: 0.4, life: 0.5, gravity: 6 });
+    if (F.planks < 2) { ctx.bark('buhkon', 'One. Now its brother — same width apart as the wheels.', 3); plankObjective(); return; }
+    ctx.say(R.day2.planksDone, () => { setStop(camps[1].park); plankObjective(); });
   }
   function kofiCaught() {
     if (stage !== 'day2' || sub !== 'hunt') return;
@@ -1191,9 +1358,10 @@ export function createRoad(ctx) {
   let D3 = null;
   function startDay3() {
     stage = 'day3'; sub = 'rain'; ctx.save('day3'); D3 = { rain: true };
+    P.inCart = false; drive(false); setStop(null);
     place(P, camps[1].x - 2, camps[1].z + 1.5, -Math.PI / 2); B.stay = V3(camps[1].x + 2.2, 0, camps[1].z - 1.5); place(B, B.stay.x, B.stay.z);
-    placeCart(camps[1].x + 9, camps[1].z + 6, 0.4);
-    setDusk(0.75); camps[1].on = true;
+    placeCart(roadX(camps[1].park), camps[1].park, Math.PI);
+    setDusk(0.75); campUp(camps[1]);
     // rain: the light goes grey and close, the sky low
     D3.fog = [fog.near, fog.far]; fog.near = 30; fog.far = 420; fog.color.set(0x6a7078); sun.intensity *= 0.35; hemi.intensity *= 0.8;
     skyU.uTop.value.set(0x4a5260); skyU.uLow.value.set(0x8a9098); skyU.uWarm.value = 0.15;
@@ -1217,17 +1385,26 @@ export function createRoad(ctx) {
     });
   }
   /* the cart's axle, mended in the rain: three straight ash saplings from round the camp */
+  /* (cut with the hatchet: two good swings each, and down it goes) */
   function axleJob(then) {
     const c = camps[1]; let n = 0;
     objective(R.day3.axleObj(0), R.day3.axleHint, 3, 0);
+    D3.saps = [];
     for (let k = 0; k < 3; k++) {
-      const a = 0.9 + k * 2.1, r = 11 + k * 3, x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r, g = heightAt(x, z);
-      const tree = new THREE.Group();
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.4, 6), toon(0xd8d0b8)); trunk.position.y = 1.7; tree.add(trunk);
-      const top = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), toon(0x6a9a4a)); top.position.y = 3.6; tree.add(top);
-      tree.add(glowSprite(0xffd27a, 1.2, 0.35));
-      const it = addItem(V3(x, g, z), R.day3.axleCut, () => {
-        dropItem(it); n++; sfx.swing(); setTimeout(() => sfx.hit(), 150);
+      const a = 0.9 + k * 2.1, r = 11 + k * 3, sp = freeSpot(c.x + Math.cos(a) * r, c.z + Math.sin(a) * r, 1.2), x = sp.x, z = sp.z, g = heightAt(x, z);
+      const tree = new THREE.Group(); tree.position.set(x, g, z); scene.add(tree);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.4, 6), toon(0xd8d0b8)); trunk.position.y = 1.7; addOutline(trunk, 0.02); tree.add(trunk);
+      const top = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), toon(0x6a9a4a)); top.position.y = 3.6; addOutline(top, 0.03); tree.add(top);
+      const glow = glowSprite(0xffd27a, 1.2, 0.35); tree.add(glow);
+      const sap = { x, z, g, tree, hits: 0, cut: false, fall: null, it: null };
+      sap.it = addItem(V3(x, g, z), R.day3.axleCut, () => ctx.hint('Swing the hatchet at it — left-click.'));
+      D3.saps.push(sap);
+      sap.chop = () => {
+        sap.hits++; sfx.hit(); particles.burst(x, g + 0.8, z, 10, { color: 0xd8c098, speed: 4, size: 0.3, life: 0.4, gravity: -8 });
+        tree.rotation.z = 0.06 * (sap.hits % 2 ? 1 : -1);
+        if (sap.hits < 2) return;
+        sap.cut = true; dropItem(sap.it); glow.visible = false; n++;
+        sap.fall = { k: 0, a: Math.atan2(x - P.pos.x, z - P.pos.z) };   // it falls away from the boy
         particles.burst(x, g + 1, z, 14, { color: 0xd8c098, speed: 4, size: 0.35, life: 0.5, gravity: -8 });
         ctx.bark('tanoc', R.day3.axleCuts[n - 1], 2.5);
         if (n < 3) { objective(R.day3.axleObj(n), R.day3.axleHint, 3, n); return; }
@@ -1236,7 +1413,15 @@ export function createRoad(ctx) {
           dropItem(back); setGoal(); sfx.slam();
           ctx.say(R.day3.axleMend, () => { objective('Shelter from the rain', ''); then(); });
         });
-      }, tree);
+      };
+    }
+  }
+  function sapTick(dt) {
+    if (!D3 || !D3.saps) return;
+    for (const s of D3.saps) if (s.fall) {
+      s.fall.k = Math.min(1, s.fall.k + dt * 1.6); const e = s.fall.k * s.fall.k;
+      s.tree.rotation.set(Math.cos(s.fall.a) * e * 1.45, 0, -Math.sin(s.fall.a) * e * 1.45);
+      if (s.fall.k >= 1 && !s.fall.gone) { s.fall.gone = true; sfx.slam(); setTimeout(() => { s.tree.visible = false; }, 1600); }
     }
   }
   /* clear any tree trunks out of the stone ring so the boy can walk in */
@@ -1273,10 +1458,11 @@ export function createRoad(ctx) {
   let D4 = null;
   function startDay4() {
     stage = 'day4'; sub = 'walk'; ctx.save('day4');
-    camps[1].on = false;
-    place(P, roadX(PASS0 + 10), PASS0 + 10, Math.PI); place(B, roadX(PASS0 + 12) + 2, PASS0 + 12, Math.PI); B.stay = null;
-    if (K.on) place(K, roadX(PASS0 + 12) - 2, PASS0 + 12, Math.PI);
-    placeCart(roadX(PASS0 + 20), PASS0 + 20, Math.PI);
+    campDown(camps[1]); P.inCart = false; if (D3 && D3.saps) for (const s of D3.saps) s.tree.visible = false;
+    placeCart(roadX(PASS0 + 14), PASS0 + 14, Math.PI); drive();
+    setStop(ROCK0 + 14, () => { if (P.inCart) { hopDown(); ctx.bark('buhkon', R.day4.offCart, 3.5); } });
+    place(P, roadX(PASS0 + 10) - 2.6, PASS0 + 10, Math.PI);
+    if (K.on) place(K, roadX(PASS0 + 12) - 4, PASS0 + 12, Math.PI);
     CAM.yaw = 0; setDusk(0.25); P.hp = 100; D4 = { left: 0, rocks: [], rockT: 1, alpha: null };
     fog.near = 120; fog.far = 1600;
     dayCine(R.day4.cards, [
@@ -1309,13 +1495,14 @@ export function createRoad(ctx) {
       const sh = new THREE.Mesh(new THREE.CircleGeometry(sz + 0.6, 16), new THREE.MeshBasicMaterial({ color: 0x1a1008, transparent: true, opacity: 0.25, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.set(x, g + 0.08, z); scene.add(sh);
       D4.rocks.push({ m, sh, x, z, g, s: sz, y0: g + 26, t: 0, fall: 1.15 });
     }
-    if (P.pos.z < ROCK1) { sub = 'walk'; ctx.say(R.day4.rocksDone, () => objective(R.obj.day4, '')); }
+    if (P.pos.z < ROCK1) { sub = 'walk'; setStop(AMBUSH + 34, () => hopDown()); ctx.say(R.day4.rocksDone, () => objective(R.obj.day4, '')); }
   }
   function day4Tick(dt) {
     rockTick(dt);
-    if (sub === 'walk' && !D4.rocked && P.pos.z < ROCK0) { D4.rocked = true; sub = 'rocks'; ctx.say(R.day4.rocks, () => objective(R.obj.rocks, 'Keep moving — a shadow means a rock')); }
+    if (sub === 'walk' && !D4.rocked && P.pos.z < ROCK0) { D4.rocked = true; sub = 'rocks'; hopDown(); ctx.say(R.day4.rocks, () => objective(R.obj.rocks, 'Keep moving — a shadow means a rock')); }
     if (sub === 'walk' && D4.rocked && P.pos.z < AMBUSH + 25) {
-      sub = 'fight'; setGoal();
+      sub = 'fight'; setGoal(); hopDown();
+      if (CART.driver) { setStop(CART.pos.z); CART.driver = false; CART.g.updateMatrixWorld(); const off = CART.g.localToWorld(V3(2.2, 0, 1.6)); place(B, off.x, off.z, CART.yaw); B.stay = null; }   // down off the bench, hatchet out
       for (let k = 0; k < 4; k++) { const a = -0.9 + k * 0.6, x = P.pos.x + Math.sin(a) * 18 + (k % 2 ? 6 : -6), z = P.pos.z - Math.cos(a) * 16; addFoe('rodak', x, z); }
       ctx.say(R.day4.warn, () => d4Objective());
     }
@@ -1491,7 +1678,7 @@ export function createRoad(ctx) {
 
   /* ---------------- the walker, the Carpenter, the Punk ---------------- */
   function attack() {
-    if (!tanoc.weapon.visible || P.swing > 0) return;
+    if (P.inCart || !tanoc.weapon.visible || P.swing > 0) return;
     P.swing = 0.42; P.hitDone = false; sfx.swing();
   }
   function updatePlayer(dt, playing) {
@@ -1531,6 +1718,7 @@ export function createRoad(ctx) {
         }
         const L = EV.log;
         if (L && !L.open && Math.abs(P.pos.x - L.x) < 4.2 && Math.abs(P.pos.z - L.z) < 2.8) chopLog();
+        if (D3 && D3.saps) for (const s of D3.saps) { if (s.cut) continue; const dx = s.x - P.pos.x, dz = s.z - P.pos.z, d = Math.hypot(dx, dz); if (d < 2.3 && (dx * Math.sin(P.yaw) + dz * Math.cos(P.yaw)) / (d || 1) > 0.1) s.chop(); }
         escSwing();
       }
     }
@@ -1539,29 +1727,29 @@ export function createRoad(ctx) {
     placeWalker(tanoc.root, P, dt); tanoc.root.rotation.y = P.yaw;
     tanoc.animate(dt, { speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null });
   }
-  /* the cart is a solid thing too: it rolls round walls, houses and trees, never through them */
-  function resolveCart() {
-    const f = V3(Math.sin(CART.yaw), 0, Math.cos(CART.yaw)), r = V3(f.z, 0, -f.x);
-    for (let it = 0; it < 2; it++) for (const [a, b] of [[2.6, 0], [-2.6, 0], [0, 0], [1.4, 1], [1.4, -1], [-1.4, 1], [-1.4, -1]]) {
-      const p = V3(CART.pos.x + f.x * a + r.x * b * 1.2, CART.pos.y, CART.pos.z + f.z * a + r.z * b * 1.2), q = p.clone();
-      const keep = CART.solid.y1; CART.solid.y1 = -98; resolve(q, 0.9); CART.solid.y1 = keep;
-      CART.pos.x += q.x - p.x; CART.pos.z += q.z - p.z;
-    }
-  }
-  /* the cart: parked, rolling along behind Buhkon, or driven out of the city with the two of them aboard */
+  /* the cart: parked, driven along the road by Buhkon, or driven out of the city with the two of them aboard */
   function updateCart(dt) {
     let sp = 0;
     const was = CART.pos.clone();
     if (CART.path) {
       const k = clamp(CART.pathK || 0, 0, 1), q = CART.path.getPointAt(k), q2 = CART.path.getPointAt(Math.min(1, k + 0.01));
       CART.pos.set(q.x, groundAt(q.x, q.z, 60, CART.solid), q.z); CART.yaw = Math.atan2(q2.x - q.x, q2.z - q.z);
-    } else if (stage !== 'market') {
-      // a few paces behind Buhkon, along the road
-      const back = V3(-Math.sin(B.yaw), 0, -Math.cos(B.yaw)), want = V3(B.pos.x + back.x * 7, 0, B.pos.z + back.z * 7);
-      const dx = want.x - CART.pos.x, dz = want.z - CART.pos.z, d = Math.hypot(dx, dz);
-      if (d > 60) { CART.pos.set(want.x, 0, want.z); }
-      else if (d > 2.5) { const v = Math.min(8, d * 1.2); CART.pos.x += dx / d * v * dt; CART.pos.z += dz / d * v * dt; CART.yaw = dampAngle(CART.yaw, Math.atan2(dx, dz), 3, dt); }
-      resolveCart();
+    } else if (DRIVE.on && stage !== 'market') {
+      // Buhkon drives: down the middle of the road, keeping pace with the boy, and no further than the next stop
+      let want = 0;
+      if (CART.driver) {
+        if (P.inCart) want = 5.6;
+        else { const lead = CART.pos.z - P.pos.z;   // > 0: the boy is out ahead (north is -z)
+          want = lead > 4 ? Math.min(8.5, 3.6 + lead * 0.45) : lead > -9 ? 3.6 : lead > -17 ? 1.4 : 0; }
+        if (DRIVE.stopZ != null) want = Math.min(want, Math.max(0, CART.pos.z - DRIVE.stopZ) * 1.1 + (CART.pos.z > DRIVE.stopZ + 0.05 ? 0.3 : 0));
+      }
+      DRIVE.sp = damp(DRIVE.sp, want, 2.2, dt);
+      if (DRIVE.sp > 0.01 && (DRIVE.stopZ == null || CART.pos.z > DRIVE.stopZ)) {
+        let nz = CART.pos.z - DRIVE.sp * dt; if (DRIVE.stopZ != null) nz = Math.max(nz, DRIVE.stopZ);
+        CART.pos.x = roadX(nz); CART.pos.z = nz;
+      }
+      CART.yaw = dampAngle(CART.yaw, Math.atan2(roadX(CART.pos.z - 2) - roadX(CART.pos.z), -2), 5, dt);
+      if (DRIVE.onArrive && DRIVE.stopZ != null && CART.pos.z <= DRIVE.stopZ + 0.3) { const f = DRIVE.onArrive; DRIVE.onArrive = null; f(); }
     }
     sp = CART.pos.distanceTo(was) / Math.max(dt, 1e-4);
     // it sits on its four wheels: height from where they touch, nose up or down the slope, and a lean across it
@@ -1576,15 +1764,13 @@ export function createRoad(ctx) {
     CART.g.rotation.order = 'YXZ';   // turn first, then tip on its own axles
     CART.g.position.copy(CART.pos); CART.g.rotation.set(-CART.pitch, CART.yaw, CART.roll + Math.sin(t * 6) * 0.01 * Math.min(1, sp));
     CART.wheels.forEach(w => { w.rotation.x += sp * dt / 0.8; });
-    CART.punks.forEach((pk, i) => pk.animate(dt, { speed: sp * 1.4, t: t + i }));
+    if (!CART.loose) CART.punks.forEach((pk, i) => pk.animate(dt, { speed: sp * 1.4, t: t + i }));
     CART.solid.x = CART.pos.x; CART.solid.z = CART.pos.z;
-    const ax = Math.abs(Math.sin(CART.yaw)) > 0.7; CART.solid.hw = ax ? 4.2 : 1.4; CART.solid.hd = ax ? 1.4 : 4.2; CART.solid.y0 = CART.riders ? -99 : CART.pos.y - 1; CART.solid.y1 = CART.riders ? -98 : CART.pos.y + 2.4;
-    if (CART.riders) {   // Buhkon on the bench with the reins, the boy in the back among the wares
-      const seat = V3(0, 2.0, 1.75).applyEuler(CART.g.rotation).add(CART.pos), backS = V3(0.3, 1.2, -1.1).applyEuler(CART.g.rotation).add(CART.pos);
-      B.pos.copy(seat); B.yaw = CART.yaw; buhkon.root.position.copy(seat); buhkon.root.rotation.y = CART.yaw;
-      P.pos.copy(backS); P.vel.set(0, 0, 0); P.yaw = CART.yaw + Math.PI * 0.5; tanoc.root.position.copy(backS); tanoc.root.rotation.y = P.yaw;
-      if (K.on || (MK && MK.calmed)) { punk.root.visible = false; }
-    }
+    const ax = Math.abs(Math.sin(CART.yaw)) > 0.7, off = CART.path; CART.solid.hw = ax ? 4.2 : 1.4; CART.solid.hd = ax ? 1.4 : 4.2; CART.solid.y0 = off ? -99 : CART.pos.y - 1; CART.solid.y1 = off ? -98 : CART.pos.y + 2.4;
+    // Buhkon sat on the bench with the reins; the boy on the side-board among the wares, legs over the edge
+    if (CART.driver || P.inCart) CART.g.updateMatrixWorld();
+    if (CART.driver) { const seat = CART.g.localToWorld(SEAT_B.clone()); B.pos.copy(seat); B.yaw = CART.yaw; buhkon.root.position.copy(seat); buhkon.root.rotation.y = CART.yaw; }
+    if (P.inCart) { const seat = CART.g.localToWorld(SEAT_P.clone()); P.pos.copy(seat); P.vel.set(0, 0, 0); P.yaw = CART.yaw - Math.PI / 2; tanoc.root.position.copy(seat); tanoc.root.rotation.y = P.yaw; }
   }
   function follow(o, actor, dt, side, dist, speedCap, fight) {
     let want = o.stay ? o.stay : null;
@@ -1627,8 +1813,10 @@ export function createRoad(ctx) {
   /* ---------------- per frame ---------------- */
   function update(dt, playing) {
     t += dt;
-    if (!CART.riders) { updatePlayer(dt, playing); follow(B, buhkon, dt, 1.8, 2.6, 9.5, stage === 'day4'); }
-    else { tanoc.animate(dt, { speed: 0, onGround: true, t }); buhkon.animate(dt, { speed: 0, onGround: true, t }); }
+    if (P.inCart) { P.swing = 0; tanoc.animate(dt, { speed: 0, onGround: true, t, sit: true }); } else updatePlayer(dt, playing);
+    if (CART.driver) buhkon.animate(dt, { speed: 0, onGround: true, t, sit: true, reins: true, talking: false });
+    else follow(B, buhkon, dt, 1.8, 2.6, 9.5, stage === 'day4');
+    setTick(dt); grazeTick(dt); sapTick(dt);
     if (K.on) follow(K, punk, dt, -1.8, 2.2, 11, stage === 'day4'); else punk.root.visible = false;
     if (K.on) punk.root.visible = true;
     updateFoes(dt, playing);
@@ -1669,7 +1857,7 @@ export function createRoad(ctx) {
     if (D3 && D3.w) D3.w.userData.tick(t);
     if (D3 && D3.rain) for (let k = 0; k < 16; k++) particles.emit(camPos.x + (Math.random() - 0.5) * 30, camPos.y + 8 + Math.random() * 4, camPos.z + (Math.random() - 0.5) * 30, { vx: 0.5, vy: -22, vz: 0, color: 0xc8d8e8, size: 0.18, life: 0.6, drag: 0 });
     // camps glow at night
-    for (const c of camps) { c.fire.visible = c.on; c.light.intensity = c.on ? 40 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
+    for (const c of camps) { c.fire.visible = c.on; if (c.on) c.fire.userData.update(t); c.light.intensity = c.on ? 40 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
     // mist in the pass: soft sheets of it drifting low over the stones (not those glowing orbs any more)
     mists.forEach((m, i) => { m.visible = stage === 'day4'; if (m.visible) { m.position.x += dt * (0.8 + (i % 3) * 0.3); if (m.position.x > roadX(m.position.z) + 60) m.position.x = roadX(m.position.z) - 60; } });
     if (beacon.visible) beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
@@ -1684,15 +1872,19 @@ export function createRoad(ctx) {
   }
 
   function interact() {
+    if (P.inCart) { hopDown(); return; }
     let best = null, bd = 1e9;
     for (const it of items) { const d = Math.hypot(it.pos.x - P.pos.x, it.pos.z - P.pos.z); if (d < 2.6 && Math.abs(it.pos.y - P.pos.y) < 3 && d < bd) { bd = d; best = it; } }
     if (best) { sfx.ui(); best.act(); return; }
     if (stage === 'day1' && sub === 'stone') { tryStone(); return; }
+    if (DRIVE.on && CART.driver && nearCart()) { boardCart(); return; }
     if (B.pos.distanceTo(P.pos) < 3.2) ctx.say([['buhkon', stage === 'market' ? 'Crates, Tanoc. Questions after.' : stage === 'day2' && sub === 'hunt' ? 'Kofi. One. Off you go.' : 'Keep walking. I’m right behind you.']]);
   }
   function prompt() {
+    if (P.inCart) return 'Hop down from the cart';
     for (const it of items) { const d = Math.hypot(it.pos.x - P.pos.x, it.pos.z - P.pos.z); if (d < 2.6 && Math.abs(it.pos.y - P.pos.y) < 3) return it.label; }
     if (stage === 'day1' && sub === 'stone') return 'Try the fire-stone';
+    if (DRIVE.on && CART.driver && nearCart()) return 'Climb up into the cart';
     if (B.pos.distanceTo(P.pos) < 3.2) return 'Talk to Buhkon <small style="opacity:.7">the Carpenter</small>';
     return null;
   }
@@ -1712,7 +1904,7 @@ export function createRoad(ctx) {
     composer.dispose && composer.dispose();
   }
   return {
-    start, update, render: () => composer.render(), interact, prompt, jump: () => { P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
+    start, update, render: () => composer.render(), interact, prompt, jump: () => { if (P.inCart) hopDown(); else P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
     get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }

@@ -16,7 +16,7 @@ import { clamp, damp, dampAngle, smooth, lerp, mulberry32 } from './util.js';
 import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
-import { buildHomeTree, buildForest } from './hometree.js';
+import { buildHomeTree, buildForest, buildTreeBridge } from './hometree.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -80,7 +80,24 @@ export function createVelki(ctx) {
   const SEA_Y = -0.8, seaBits = {};
   const SHORE = z => -140 + 18 * Math.sin(z * 0.011) + 10 * Math.sin(z * 0.031 + 1);
   const HOME = { x: 66, z: -40, R: 24, H: 300 };
-  const HOMES_OUT = [{ x: 250, z: -30, R: 19, H: 260, seed: 3 }, { x: 205, z: 205, R: 20, H: 280, seed: 5 }, { x: 0, z: 285, R: 18, H: 245, seed: 9 }, { x: 400, z: 340, R: 19, H: 265, seed: 11 }];
+  // the other home trees, east and south of the old city: every one of them inside the walls, which bow out to take
+  // them in (the city grew round its trees), each near enough its neighbour for a long bridge between them
+  const HOMES_OUT = [{ x: 158, z: 44, R: 19, H: 260, seed: 3 }, { x: 104, z: 142, R: 20, H: 280, seed: 5 }, { x: -12, z: 156, R: 18, H: 245, seed: 9 }];
+  /* the wall: the old ring, bowed out round each home tree and its roots (the gate, in the north, stays where it was) */
+  const WALL_TREES = [{ x: HOME.x, z: HOME.z, rho: 66 }, ...HOMES_OUT.map(T => ({ x: T.x, z: T.z, rho: T.R * 1.75 * 1.6 + 7 }))];
+  const WALL_N = 720, wallTab = new Float32Array(WALL_N);
+  {
+    const raw = new Float32Array(WALL_N);
+    for (let i = 0; i < WALL_N; i++) {
+      const a = i / WALL_N * TAU, ux = Math.cos(a), uz = Math.sin(a);
+      let r = WALL_R;
+      for (const T of WALL_TREES) { const along = T.x * ux + T.z * uz, across = T.x * uz - T.z * ux, q = T.rho * T.rho - across * across; if (q > 0) r = Math.max(r, along + Math.sqrt(q)); }
+      raw[i] = r;
+    }
+    for (let i = 0; i < WALL_N; i++) { let m = 0; for (let k = -3; k <= 3; k++) m = Math.max(m, raw[(i + k + WALL_N) % WALL_N]); wallTab[i] = m; }   // a touch of give at the joins
+  }
+  const wallR = a => { const f = ((a / TAU) % 1 + 1) % 1 * WALL_N, i = Math.floor(f), k = f - i; return wallTab[i % WALL_N] * (1 - k) + wallTab[(i + 1) % WALL_N] * k; };
+  const inWalls = (x, z, pad = 0) => Math.hypot(x, z) < wallR(Math.atan2(z, x)) + pad;
   function rawHeight(x, z) {
     const r = Math.hypot(x, z);
     let h = smooth(WALL_R + 6, 130, r) * (2.2 * Math.sin(x * 0.021) + 1.8 * Math.cos(z * 0.017 + 1) + 1.2 * Math.sin((x + z) * 0.033) + 1.5);
@@ -98,7 +115,7 @@ export function createVelki(ctx) {
   }
   function forestAt(x, z) {
     const r = Math.hypot(x, z);
-    if (r < 92 || x - SHORE(z) < 75 || fieldAt(x, z)) return 0;
+    if (r < 92 || inWalls(x, z, 14) || x - SHORE(z) < 75 || fieldAt(x, z)) return 0;
     if (z < -55 && x < 150) return 0;                                  // the open plain north, where the battle is
     const k = Math.max(smooth(80, 135, x), smooth(90, 145, z));
     return k * (0.75 + 0.35 * Math.sin(x * 0.019 + 1) * Math.cos(z * 0.023));
@@ -110,7 +127,7 @@ export function createVelki(ctx) {
       const a = frng() * TAU, r = 80 + frng() * 120, x = Math.cos(a) * r, z = Math.sin(a) * r, w = 14 + frng() * 16, d = 10 + frng() * 14, ry = frng() * Math.PI;
       if (z < -50 && Math.abs(x) < 170) continue;                                       // not on the battle plain
       if (x - SHORE(z) < 45 || Math.abs(z - 8) < 8 && x < 0) continue;                  // not on the beach or the harbour road
-      if (Math.hypot(x - HOME.x, z - HOME.z) < 70) continue;
+      if (Math.hypot(x - HOME.x, z - HOME.z) < 70 || inWalls(x, z, w + 10)) continue;
       if (FIELDS.some(f => Math.hypot(f.x - x, f.z - z) < (f.w + w) * 0.7)) continue;
       FIELDS.push({ x, z, w, d, ry, c: C[i % C.length] });
     }
@@ -171,8 +188,9 @@ export function createVelki(ctx) {
     // the city wall, a ring with one gap
     const r = Math.hypot(p.x, p.z), a = Math.atan2(p.z, p.x);
     const inGap = Math.abs(Math.atan2(Math.sin(a - GATE_A), Math.cos(a - GATE_A))) < GATE_W && !(gateBar.on);
-    if (!inGap && p.y < 9 && r > WALL_R - 1.5 - PR && r < WALL_R + 1.5 + PR) {
-      const to = r < WALL_R ? WALL_R - 1.5 - PR : WALL_R + 1.5 + PR;
+    const WR = wallR(a);
+    if (!inGap && p.y < 9 && r > WR - 1.5 - PR && r < WR + 1.5 + PR) {
+      const to = r < WR ? WR - 1.5 - PR : WR + 1.5 + PR;
       p.x *= to / r; p.z *= to / r;
     }
     // the edge of the world we built, and the sea's
@@ -249,7 +267,7 @@ export function createVelki(ctx) {
     }
     for (let gx = -400; gx <= 420; gx += 14) for (let gz = -320; gz <= 420; gz += 14) {
       const x = gx + (crng() - 0.5) * 12, z = gz + (crng() - 0.5) * 12, r = Math.hypot(x, z);
-      if (r < WALL_R + 10 || x - SHORE(z) < 10 || forestAt(x, z) > 0 || fieldAt(x, z) || Math.hypot(x - HOME.x, z - HOME.z) < HOME.R * 3) continue;
+      if (r < WALL_R + 10 || inWalls(x, z, 6) || x - SHORE(z) < 10 || forestAt(x, z) > 0 || fieldAt(x, z) || Math.hypot(x - HOME.x, z - HOME.z) < HOME.R * 3) continue;
       if (Math.abs(x) < 7 && z < 0) continue;
       const north = z < -55 && Math.abs(x) < 150;
       const q = crng();
@@ -266,14 +284,16 @@ export function createVelki(ctx) {
     for (const [x, y, z, sc] of rocks) if (sc > 1) cyl(x, z, sc, y - 1, y + sc * 0.6);
   }
   const homeTrees = [];
-  for (const T of HOMES_OUT) homeTrees.push(buildHomeTree(scene, T.x, T.z, T.g, { R: T.R, H: T.H, seed: T.seed, town: 0.8, doorAt: Math.atan2(-T.z, -T.x) }));
+  for (const T of HOMES_OUT) homeTrees.push(buildHomeTree(scene, T.x, T.z, T.g, { R: T.R, H: T.H, seed: T.seed, town: 0.8, rootReach: 1.5, doorAt: Math.atan2(-T.z, -T.x) }));
   // the city's own: its roots never reach in over the streets, and its door faces the spire
   const toCity = Math.atan2(-HOME.z, -HOME.x);
   homeTrees.push(buildHomeTree(scene, HOME.x, HOME.z, 0, {
-    R: HOME.R, H: HOME.H, seed: 307, town: 1, decks: [0.07, 0.15, 0.24, 0.34, 0.45], doorAt: toCity,
+    R: HOME.R, H: HOME.H, seed: 307, town: 1, decks: [0.07, 0.15, 0.24, 0.34, 0.45], doorAt: toCity, rootReach: 1.35,
     banners: [0x8a2a3a, 0xd8a040], rootSkip: a => Math.abs(Math.atan2(Math.sin(a - toCity), Math.cos(a - toCity))) < 1.1,
   }));
   for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);
+  // long bridges between neighbouring trees, high in the air: the city's tree to the east one, round to the south
+  { const city = homeTrees[homeTrees.length - 1], [t1, t2, t3] = homeTrees; buildTreeBridge(scene, city, t1, 0.4); buildTreeBridge(scene, t1, t2, 0.44); buildTreeBridge(scene, t2, t3, 0.38); }
 
   /* ---------------- Fyrsti'Vilag ---------------- */
   const rng = mulberry32(307);
@@ -341,15 +361,19 @@ export function createVelki(ctx) {
   /* the wall, its gate, and the gate's towers */
   const gateBar = { on: true };   // the warden keeps you inside until you've seen it from the top
   {
-    const wm = paint(toon(0xb8987a), 'brick'), N = 80;   // the city wall is brick, crisp-cornered
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * TAU, da = Math.atan2(Math.sin(a - GATE_A), Math.cos(a - GATE_A));
-      if (Math.abs(da) < GATE_W + 0.02) continue;
-      if (Math.hypot(Math.cos(a) * WALL_R - HOME.x, Math.sin(a) * WALL_R - HOME.z) < HOME.R * 1.6) continue;   // the wall runs into the tree and stops
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(3, 9, WALL_R * TAU / N + 0.3), wm);
-      seg.position.set(Math.cos(a) * WALL_R, 4.5, Math.sin(a) * WALL_R); seg.rotation.y = -a; seg.castShadow = seg.receiveShadow = true; scene.add(seg);
-      if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 1.2), wm); cr.position.set(Math.cos(a) * WALL_R, 9.6, Math.sin(a) * WALL_R); cr.rotation.y = -a; scene.add(cr); }
-    }
+    const wm = paint(toon(0xb8987a), 'brick');   // the city wall is brick, crisp-cornered
+    // segment by segment round its whole bowed line, each sat on the ground where it stands
+    const pts = []; for (let a = 0; a < TAU - 1e-6;) { const r = wallR(a); pts.push(a); a += Math.min(0.08, 6.2 / r); }
+    pts.forEach((a, i) => {
+      const b = i + 1 < pts.length ? pts[i + 1] : TAU, m = (a + b) / 2, da = Math.atan2(Math.sin(m - GATE_A), Math.cos(m - GATE_A));
+      if (Math.abs(da) < GATE_W + 0.02) return;
+      const ra = wallR(a), rb = wallR(b), ax = Math.cos(a) * ra, az = Math.sin(a) * ra, bx = Math.cos(b) * rb, bz = Math.sin(b) * rb;
+      const cx = (ax + bx) / 2, cz = (az + bz) / 2, len = Math.hypot(bx - ax, bz - az), gy = Math.min(heightAt(ax, az), heightAt(bx, bz), heightAt(cx, cz));
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(3, 9 + 3, len + 0.4), wm);
+      seg.position.set(cx, gy + 4.5 - 1.5, cz); seg.rotation.y = Math.atan2(bx - ax, bz - az); seg.castShadow = seg.receiveShadow = true; scene.add(seg);
+      if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 1.2), wm); cr.position.set(cx, gy + 9.6, cz); cr.rotation.y = seg.rotation.y; scene.add(cr); }
+      if (i % 26 === 13) { const tw = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.7, 13, 12), wm); tw.position.set(cx, gy + 6.5, cz); addOutline(tw, 0.05); scene.add(tw); const tc = new THREE.Mesh(new THREE.ConeGeometry(3, 3.6, 12), toon(0x5a2a14)); tc.position.set(cx, gy + 14.8, cz); addOutline(tc, 0.04); scene.add(tc); }
+    });
     for (const s of [-1, 1]) {
       const a = GATE_A + s * (GATE_W + 0.045), x = Math.cos(a) * WALL_R, z = Math.sin(a) * WALL_R;
       const tw = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 14, 14), wm); tw.position.set(x, 7, z); tw.castShadow = true; addOutline(tw, 0.05); scene.add(tw);
@@ -421,6 +445,23 @@ export function createVelki(ctx) {
   /* ---------------- Tanoc ---------------- */
   const tanoc = buildYoungTanoc(); scene.add(tanoc.root);
   const P = { pos: V3(2.5, 0, 46), vel: V3(), yaw: Math.PI, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0 };
+  /* the Ahoac glide cloak, once the captain has given it: rolled on his back, and spread like wings while he glides
+     (a group under the root that the walker shows only while gliding — the actor reads that as its glide pose) */
+  let hasCloak = ctx.at === 'spire';
+  const CLOAK = 0x9a3a1a;
+  const cloakRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.34, 10), toon(CLOAK)); cloakRoll.rotation.z = Math.PI / 2; cloakRoll.position.set(0, 0.3, -0.16); addOutline(cloakRoll, 0.015);
+  tanoc.torso.add(cloakRoll);
+  const wings = new THREE.Group();
+  {
+    const gm = toon(CLOAK, { side: THREE.DoubleSide });
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(1.0, 0.45, 1.75, 0.08); sh.lineTo(1.35, -0.42); sh.quadraticCurveTo(0.7, -0.26, 0, -0.52); sh.lineTo(0, 0);
+      const w = new THREE.Mesh(new THREE.ShapeGeometry(sh), gm); w.scale.x = s; w.rotation.x = -Math.PI / 2 + 0.25; w.position.set(s * 0.25, 1.45, -0.18); w.userData.noOutline = true; wings.add(w);
+    }
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.035, 4, 10), toon(0xd9a441)); collar.position.y = 1.45; collar.rotation.x = Math.PI / 2; wings.add(collar);
+  }
+  wings.visible = false; tanoc.root.add(wings);
+  cloakRoll.visible = hasCloak;
   P.pos.y = groundAt(P.pos.x, P.pos.z, 5);
   CAM.yaw = 0; CAM.pitch = 0.18;
   const camPos = V3(2.5, 4, 54), camTgt = V3();
@@ -474,7 +515,7 @@ export function createVelki(ctx) {
         if (DR.n >= 5) {
           for (const q of DR.sparks) { scene.remove(q.ball); scene.remove(q.ring); } DR.sparks.length = 0;
           stage = 'drilled'; ctx.save && ctx.save('spire');
-          ctx.say(B4.done, () => { stage = 'spire'; said = 0; setBeacon(); ctx.objective(STORY.PRO_OBJ.spire, 'Shift to run · Space to jump'); });
+          ctx.say(B4.done, () => { hasCloak = true; cloakRoll.visible = true; ctx.give && ctx.give('ahoac_cloak', 1); ctx.hint && ctx.hint('The Ahoac cloak: jump, then hold Space while you fall.'); stage = 'spire'; said = 0; setBeacon(); ctx.objective(STORY.PRO_OBJ.spire, 'Shift to run · Space to jump'); });
           return;
         }
       }
@@ -545,6 +586,14 @@ export function createVelki(ctx) {
     P.jumpBuf -= dt; P.coyote -= dt;
     if (P.jumpBuf > 0 && (P.onGround || P.coyote > 0) && playing && stage !== 'caught') { P.vel.y = 9.2; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
     P.vel.y -= 26 * dt;
+    // the Ahoac cloak: hold Space on the way down and it takes the wind
+    const gliding = hasCloak && playing && stage !== 'caught' && keys.Space && !P.onGround && P.vel.y < 0;
+    if (gliding) {
+      P.vel.y = Math.max(P.vel.y, -2.3);
+      const gx = len > 0.08 ? wx : Math.sin(P.yaw), gz = len > 0.08 ? wz : Math.cos(P.yaw), gl = Math.hypot(gx, gz) || 1;
+      P.vel.x = damp(P.vel.x, gx / gl * 9.5, 3, dt); P.vel.z = damp(P.vel.z, gz / gl * 9.5, 3, dt);
+    }
+    wings.visible = gliding; cloakRoll.visible = hasCloak && !gliding;
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;

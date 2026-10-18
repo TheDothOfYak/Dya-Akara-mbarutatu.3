@@ -174,6 +174,7 @@ const interiors = createInteriors({
   say: lines => dialog(lines), toast: (t, d) => toast(t, d),
   give: (id, n) => { invAdd(SAVE.inv, id, n); lootToast(id, n); persist(); },
 });
+interiors.setRenderer(renderer);   // (the windows take their picture of the land outside with it)
 interiors.addDoors(world.doors || []);
 const sky = buildSky(scene, buildEldiShip, REGION === 'leotik' ? 'storm' : 'golden');
 /* day and night: the sun crosses the sky; at night the Esik glow */
@@ -316,6 +317,7 @@ document.addEventListener('pointerlockchange', () => {
   // Esc only frees the mouse (and leaves full screen); P is the pause. Click the world to take the mouse back.
 });
 document.addEventListener('mousemove', e => {
+  if (SCOPE && locked && !G.paused) { const k = 0.0023 * OPT.sens * SCOPE.fov / 60; SCOPE.yaw -= e.movementX * k; SCOPE.pitch = clamp(SCOPE.pitch - e.movementY * k * (OPT.invert ? -1 : 1), -0.1, 1.55); return; }
   if (!locked || G.paused) return;
   if (G.mode !== 'play' && G.mode !== 'dialog' && G.mode !== 'memory') return;
   const s = 0.0023 * OPT.sens;
@@ -334,6 +336,7 @@ document.addEventListener('mousedown', e => {
   if (VK) { if (touch.on) return; if (VK.vine && VK.vine(e.button, true)) return; if (e.button === 0 && VK.attack) VK.attack(); return; }   // on her back in a scene of its own: her vines
   if (touch.on) return;   // on a touch screen the buttons do the fighting
   if (dyaMatch) { if (e.button === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
+  if (P.climb && (e.button === 0 || e.button === 2)) { climbGrab(e.button === 0 ? 'L' : 'R'); return; }   // on a trunk: hand over hand (vine over vine, on her back)
   if (P.riding && (e.button === 0 || e.button === 2)) { vineShoot(e.button === 0 ? 'L' : 'R'); return; }   // on her back: her vines, not the axe
   if (e.button === 0) { mouseL = true; pressAttack(); }
   if (e.button === 1) { e.preventDefault(); toggleLock(); }
@@ -341,7 +344,7 @@ document.addEventListener('mousedown', e => {
 });
 document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; if (VK) { if (VK.vine) VK.vine(e.button, false); return; } if (e.button === 0 || e.button === 2) vineLet(e.button === 0 ? 'L' : 'R'); });
 document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });   // keep long-press paste in text fields
-addEventListener('wheel', e => { CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
+addEventListener('wheel', e => { if (SCOPE) { SCOPE.fov = clamp(SCOPE.fov * (e.deltaY > 0 ? 1.15 : 0.87), 4, 40); return; } CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
 /* the game letting go of the mouse itself (a cutscene, a menu, a choice) is not you pressing Escape:
    remember when we did it, so the pointer-lock change that follows doesn't open the pause menu */
 let selfUnlockT = -1e9;
@@ -378,6 +381,7 @@ const touch = initTouch({
 });
 
 function onKey(code) {
+  if (G.mode === 'scope') { if (code === 'KeyE' || code === 'Escape' || code === 'Space' || code === 'KeyP') endScope(); return; }
   if (code === 'KeyP') { togglePause(); return; }
   if (TOK && !cardState && G.mode === 'intro') { tokKey(code); return; }   // the token lesson takes its own keys
   if (G.mode === 'intro' || G.mode === 'trance') { if (code === 'Space' || code === 'Enter' || code === 'Escape') skipCards(); return; }
@@ -1222,7 +1226,7 @@ function wakePillarVisual(p) { p.woken = true; p.mat.emissiveIntensity = 0.9; p.
 function interactables() {
   const list = [];
   if (G.mode !== 'play' || P.dead) return list;
-  list.push(...interiors.interactables(P, { enter: d => enterRoom(d), exit: () => leaveRoom() }));
+  list.push(...interiors.interactables(P, { enter: d => enterRoom(d), exit: () => leaveRoom(), scope: d => startScope(d) }));
   if (interiors.inside) return list;   // inside, only the room's own things
   if (young()) { if (relicOut() && RELIC_SPOT) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); list.push(...apInteractables()); }
   else if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
@@ -2176,6 +2180,7 @@ function advanceDialog() {
     $('dialog').classList.add('hidden');
     if (G.mode === 'dialog') G.mode = 'play';
     if (cb) cb();
+    if (G.mode === 'play' && !locked && !overlayOpen()) lockMouse();   // straight back to walking: no dead moment waiting for a click
     return;
   }
   showLine();
@@ -2599,8 +2604,11 @@ function learnSpell(id) {
   if (SAVE.skills.spells[id]) return;
   SAVE.skills.spells[id] = true;
   const sp = SPELLS[id];
-  setTimeout(() => toast(`Spell learned: ${sp.icon} ${sp.name} — press ${sp.key}`, 4), 600);
-  renderSpellBar();
+  // onto the first empty quick slot, the same as a Relic whose trigger you've found
+  const free = SLOT_KEYS.find(k => !SAVE.slots[k]);
+  if (free && !Object.values(SAVE.slots).includes(id)) SAVE.slots[free] = id;
+  setTimeout(() => toast(free ? `Spell learned: ${sp.icon} ${sp.name} — it’s on ${slotLabel(free)}. Change your quick slots in the book (I → Gear).` : `Spell learned: ${sp.icon} ${sp.name} — put it on a quick slot in the book (I → Gear).`, 4.5), 600);
+  renderSpellBar(); persist();
 }
 
 /* ---------------- friendly creatures ---------------- */
@@ -2767,7 +2775,7 @@ function whistle() {
   sfx.blink();
   if (P.riding) return;
   if (mount.pos.distanceTo(P.pos) > 60) { mount.pos.copy(P.pos).add(V3(-6, 0, 6)); mount.pos.y = world.col.ground(mount.pos.x, mount.pos.z, P.pos.y + 3); }
-  mount.coming = true; toast(`${PN()} comes running.`, 1.8);
+  mount.coming = true; mount.called = true; toast(`${PN()} comes running.`, 1.8);
 }
 /* materials: what Tanoc can carry, and what her saddlebags can */
 var PACK = 40;
@@ -2784,7 +2792,7 @@ function toggleRide() {
   if (!mount) return;
   if (!P.riding && !saddled()) { bark('tanoc', STORY.STEED.noSaddle(PN()), 3.5); return; }
   if (P.riding) {
-    P.riding = false; dropVines(); P.slap = null;
+    P.riding = false; dropVines(); P.slap = null; mount.called = false;   // left where you climb down (and home in a while, if she has one)
     P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
     P.pos.y = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 3);
     phorusDismount();
@@ -3020,8 +3028,9 @@ function updateMount(dt) {
   // your own Punk grows, slowly; and until she's a steed she keeps to your heels (indoors, she waits by the door)
   if (ownPunk()) {
     if ((m.growT = (m.growT || 0) - dt) <= 0) { m.growT = 5; const sc = punkScale(); if (Math.abs(sc - m.scale) > 0.004) { m.scale = sc; m.actor.root.scale.setScalar(sc); m.seat = sc * 1.85 - 0.3; } }
-    if (!P.riding && !interiors.inside && G.mode === 'play' && P.pos.distanceTo(m.pos) > (saddled() ? 14 : 7)) m.coming = true;
+    if (!P.riding && !interiors.inside && G.mode === 'play' && (!pipHome() || m.called) && P.pos.distanceTo(m.pos) > (saddled() ? 14 : 7)) m.coming = true;
   }
+  if (interiors.inside) { m.coming = false; m.called = false; }   // never into the house after him: she stays outside (and goes home, once she has one)
   if (P.riding) {
     m.pos.copy(P.pos); m.yaw = P.yaw;
   } else if (m.coming) {
@@ -3029,13 +3038,15 @@ function updateMount(dt) {
     if (d > 90) { m.pos.set(P.pos.x - Math.sin(P.yaw) * 6, P.pos.y, P.pos.z - Math.cos(P.yaw) * 6); }
     if (d < 3.5) m.coming = false;
     else { const sp = Math.min(13, 3 + d * 0.9); m.vel.x = dx / d * sp; m.vel.z = dz / d * sp; m.yaw = Math.atan2(dx, dz); }
-  } else { m.vel.x *= 0.85; m.vel.z *= 0.85; }
+  } else if (pipHome() && !m.called) pipPlay(m, dt);
+  else { m.vel.x *= 0.85; m.vel.z *= 0.85; }
   if (!P.riding) {
     m.pos.x += m.vel.x * dt; m.pos.z += m.vel.z * dt;
     world.col.resolve(m.pos, 1.0, 2.2);
     m.pos.y = world.col.ground(m.pos.x, m.pos.z, m.pos.y + 1);
   }
   m.actor.root.position.copy(m.pos);
+  if (!P.riding && m.hop) m.actor.root.position.y += m.hop;
   m.actor.root.rotation.y = m.yaw;
   m.atkCd = Math.max(0, (m.atkCd || 0) - dt); m.atk = Math.max(0, (m.atk || 0) - dt);
   // in the air she leans into the swing: nose along the way she's going, rolled toward the vine
@@ -3055,7 +3066,11 @@ function updateMount(dt) {
   // the grabbing vine: a real leg reaching out to where it caught (or slapped, or missed)
   let grab = null;
   R0.updateMatrixWorld(true);
-  if (P.riding && P.climb) { const c = P.climb.c, [cx, cz] = c.at(P.pos.y + 2); grab = { p: R0.worldToLocal(V3(cx + Math.cos(P.climb.phi) * c.rad(P.pos.y + 2, P.climb.phi), P.pos.y + 2.4, cz + Math.sin(P.climb.phi) * c.rad(P.pos.y + 2, P.climb.phi))), k: 1 }; }
+  if (P.riding && P.climb) {
+    const C = P.climb, held = Object.values(C.grabs || {});
+    if (held.length) grab = held.map(p => ({ p: R0.worldToLocal(p.clone()), k: 1 }));   // her two vines, one over the other, where each caught
+    else { const c = C.c, [cx, cz] = c.at(P.pos.y + 2); grab = { p: R0.worldToLocal(V3(cx + Math.cos(C.phi) * c.rad(P.pos.y + 2, C.phi), P.pos.y + 2.4, cz + Math.sin(C.phi) * c.rad(P.pos.y + 2, C.phi))), k: 1 }; }
+  }
   else if (P.riding && vineOn()) grab = [P.vines.L, P.vines.R].filter(Boolean).map(v => ({ p: R0.worldToLocal(v.A.clone()), k: v.yank != null ? v.yank / 0.22 : v.k }));
   else if (P.riding && P.slap) {
     P.slap.t += dt; const k = P.slap.t / (P.slap.miss ? 0.45 : 0.3);
@@ -3073,14 +3088,43 @@ function updateMount(dt) {
     m.gait = clamp((b.position.y - cf.bodyY) / (cf.R * 0.08), 0, 1.2);
   }
 }
+/* once her shed is built, your own Punk lives there: she dozes in it or plays round about it — little runs, hops,
+   nosing about — until you whistle for her (H) or ride her off. Left somewhere else, she wanders home after a while. */
+function pipHome() { return REGION === 'property' && ownPunk() && F_.stall ? F_.stall : null; }
+function pipPlay(m, dt) {
+  const H = pipHome(), dx0 = H.x - m.pos.x, dz0 = H.z - m.pos.z, dHome = Math.hypot(dx0, dz0);
+  const S = m.play || (m.play = { tgt: null, wait: 2, away: 0 });
+  S.away = P.pos.distanceTo(m.pos) > 22 ? S.away + dt : 0;
+  let tgt = S.tgt, sp = 0;
+  if (dHome > 16 && S.away > 8) tgt = S.tgt = V3(H.x + Math.sin(H.yaw || 0) * 0.5, 0, H.z + Math.cos(H.yaw || 0) * 0.5);   // trotting home
+  if (dHome <= 16 || tgt) {
+    if (S.wait > 0) S.wait -= dt;
+    else if (!tgt) {
+      const r = Math.random();
+      if (r < 0.3) tgt = V3(H.x, 0, H.z);                                                     // back into the shed for a doze
+      else { const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * 9; tgt = V3(H.x + Math.cos(a) * d, 0, H.z + Math.sin(a) * d); }
+      S.tgt = tgt; S.run = Math.random() < 0.4;
+    }
+    if (tgt && S.wait <= 0) {
+      const dx = tgt.x - m.pos.x, dz = tgt.z - m.pos.z, d = Math.hypot(dx, dz);
+      if (d < 0.8) { S.tgt = null; S.wait = Math.hypot(tgt.x - H.x, tgt.z - H.z) < 1 ? 8 + Math.random() * 14 : 1.5 + Math.random() * 4; }
+      else { sp = S.run ? 6.5 : 2.4; m.yaw = dampAngle(m.yaw, Math.atan2(dx, dz), 6, dt); }
+    }
+  }
+  m.vel.x = damp(m.vel.x, Math.sin(m.yaw) * sp, 6, dt); m.vel.z = damp(m.vel.z, Math.cos(m.yaw) * sp, 6, dt);
+  // playing: little bounces as she runs
+  m.hop = S.run && sp > 0 ? Math.abs(Math.sin(G.t * 7)) * 0.35 * m.scale : 0;
+}
 let turnRate = 0;
 const RIDER_HIP = 0.76, _seatV = V3(), _seatQ = new THREE.Quaternion(), _yawQ = new THREE.Quaternion(), _UP = V3(0, 1, 0);
 
 /* ---------------- climbing the great trees ----------------
    Any trunk too big to put your arms round — the deepwood's giants, the colossi —
-   can be climbed: against it, Space takes hold; W / S up and down, A / D round it,
-   Space again to leap off (and hold it to glide down). On your Punk it goes three
-   times as fast, her leg-vines gripping the bark. */
+   can be climbed: against it, Space takes hold. Then it's hand over hand: left click,
+   right click, one over the other, each one a reach up the bark and a haul. On your
+   Punk it's vine over vine — she throws one up the trunk, catches, hauls, throws the
+   other — a long way each time. S slides back down, A / D work round it, Space leaps
+   off (hold it to glide down). Clicking the same side twice only half-reaches. */
 const climbables = [];
 {
   for (const t of world.trees || []) if ((t.r || 0) >= 1.6 && (t.h || 0) >= 25) climbables.push({ x: t.x, z: t.z, g: t.g, top: t.g + t.h * 0.85, at: () => [t.x, t.z], rad: (y) => t.r * (1 - 0.28 * clamp((y - t.g) / t.h, 0, 1)) });
@@ -3100,25 +3144,48 @@ function tryClimb(wish) {
     if (P.pos.y > c.top - 1) continue;
     P.climb = { c, phi, y: Math.max(P.pos.y, c.g) + 0.3 };
     dropVines(); P.vel.set(0, 0, 0); P.onGround = false; sfx.jump();
-    if (!F_.climbTold) { F_.climbTold = true; persist(); hint('Climbing — W / S up and down, A / D round the trunk, Space to leap off.'); }
+    P.climb.last = null; P.climb.grabs = {};
+    if (!F_.climbTold2) { F_.climbTold2 = true; persist(); hint(P.riding ? 'Climbing — left click, right click: vine over vine up the trunk · S slides down · A / D round it · Space to leap off.' : 'Climbing — left click, right click: hand over hand up the bark · S slides down · A / D round it · Space to leap off.'); }
     return true;
   }
   return false;
 }
+function climbGrab(side) {
+  const C = P.climb; if (!C || !canAct()) return;
+  if (C.pull && C.pull.t < C.pull.dur * 0.7) return;                       // still hauling on the last one
+  const c = C.c, alt = C.last !== side, rid = !!P.riding;
+  const step = (rid ? 3.4 : 1.25) * (alt ? 1 : 0.4);
+  C.last = side;
+  const y1 = Math.min(c.top, C.y + step), R = Math.max(2, c.rad(C.y, C.phi)), phi1 = C.phi + (side === 'L' ? -1 : 1) * (rid ? 0.55 : 0.3) / R;
+  C.pull = { y0: C.y, y1, p0: C.phi, p1: phi1, t: 0, dur: rid ? 0.34 : 0.4 };
+  // where it caught: up the bark, a little to that side
+  const gy = y1 + (rid ? 3.4 : 1.9), [gx, gz] = c.at(gy), gr = c.rad(gy, phi1) + 0.05;
+  C.grabs[side] = V3(gx + Math.cos(phi1) * gr, gy, gz + Math.sin(phi1) * gr);
+  sfx.swing(); if (rid) setTimeout(() => sfx.hit(), 90);
+  particles.burst(C.grabs[side].x, C.grabs[side].y, C.grabs[side].z, 6, { color: rid ? 0x9ad86a : 0x8a7a5a, speed: 2, size: 0.3, life: 0.4 });
+  if (!alt && !C.toldAlt) { C.toldAlt = true; hint(rid ? 'The other vine — left, right, left: one over the other.' : 'The other hand — left, right, left.'); }
+  if (y1 >= c.top - 0.01 && C.y >= c.top - 0.01) toast('As high as the bark goes — Space to leap off.', 2);
+}
 function climbTick(dt, act) {
   const C = P.climb, c = C.c;
   let up = 0, round = 0;
-  if (act) { if (keys.KeyW || keys.ArrowUp) up += 1; if (keys.KeyS || keys.ArrowDown) up -= 1; if (keys.KeyA || keys.ArrowLeft) round -= 1; if (keys.KeyD || keys.ArrowRight) round += 1; if (touch.on) { up += touch.move.y; round += touch.move.x; } }
+  if (act) { if (keys.KeyS || keys.ArrowDown) up -= 1; if (keys.KeyA || keys.ArrowLeft) round -= 1; if (keys.KeyD || keys.ArrowRight) round += 1; if (touch.on) { up += Math.min(0, touch.move.y); round += touch.move.x; } }
+  if (act && (keys.KeyW || keys.ArrowUp) && !C.toldW) { C.toldW = true; hint('Left click, right click to climb — one over the other.'); }
   const sp = P.riding ? 8 : 2.8;
   const R0 = c.rad(C.y, C.phi) + (P.riding ? 1.4 : 0.55);
-  C.y = clamp(C.y + up * sp * dt, c.g - 2, c.top);
+  if (C.pull) {   // the haul: up to where the hand (or vine) caught, quick at first and settling in
+    const Q = C.pull; Q.t += dt; const k = Math.min(1, Q.t / Q.dur), e = 1 - Math.pow(1 - k, 3);
+    C.y = lerp(Q.y0, Q.y1, e); C.phi = lerp(Q.p0, Q.p1, e);
+    if (k >= 1) C.pull = null;
+  } else C.y = clamp(C.y + up * sp * 1.4 * dt, c.g - 2, c.top);              // sliding back down
   C.phi += round * (sp * 0.9) / Math.max(2, R0) * dt;
   const [cx, cz] = c.at(C.y), R = c.rad(C.y, C.phi) + (P.riding ? 1.4 : 0.55);
   P.pos.set(cx + Math.cos(C.phi) * R, C.y, cz + Math.sin(C.phi) * R);
   P.vel.set(0, 0, 0);
   P.yaw = Math.atan2(cx - P.pos.x, cz - P.pos.z);
   CAM.yaw = dampAngle(CAM.yaw, Math.atan2(Math.cos(C.phi), Math.sin(C.phi)), 3, dt);   // the camera swings round outside the trunk, behind him
-  C.moving = Math.abs(up) + Math.abs(round) > 0.1;
+  C.moving = !!C.pull || Math.abs(up) + Math.abs(round) > 0.1;
+  for (const k in C.grabs) if (Math.abs(C.grabs[k].y - C.y) > 8) delete C.grabs[k];   // slid well below where it caught: let it go
   if (C.moving && Math.random() < 0.25) particles.emit(P.pos.x, P.pos.y + 0.5, P.pos.z, { color: 0x8a7a5a, size: 0.25, life: 0.5, speed: 1 });
   // back to the ground at the foot of it; or leap off
   const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 0.5);
@@ -3710,6 +3777,43 @@ function arriveByPass() {
   persist();
 }
 
+/* ---------------- the tower's telescope: the eye goes up past the roof into the open sky ----------------
+   Look round with the mouse (or the stick), the wheel zooms, E / Esc / Space to come away. Nothing of the tower
+   is in the way: the view is taken from above its roof, out where the real tower stands. */
+let SCOPE = null;
+function startScope(door) {
+  if (SCOPE || !door) return;
+  const g = world.heightAt(door.x, door.z), big = V3(-1500, 980, -2300);
+  SCOPE = { pos: V3(door.x - Math.sin(door.yaw) * 3, g + 26, door.z - Math.cos(door.yaw) * 3), yaw: Math.atan2(big.x, big.z), pitch: 0.42, fov: 16, fov0: camera.fov, mode: G.mode };
+  G.mode = 'scope'; P.vel.set(0, 0, 0);
+  let el = $('scope');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'scope';
+    el.style.cssText = 'position:fixed;inset:0;z-index:9;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0 38vmin,rgba(0,0,0,.55) 39vmin,#000 41vmin);transition:opacity .4s';
+    el.innerHTML = '<div style="position:absolute;left:50%;bottom:6vh;transform:translateX(-50%);font:14px var(--body);color:#e8dcc0;opacity:.8;letter-spacing:.06em">mouse to look · wheel to focus · E to come away</div>';
+    document.body.appendChild(el);
+  }
+  el.style.display = ''; $('hud').style.visibility = 'hidden'; $('prompt').classList.add('hidden');
+  sfx.ui(); fade(1, 0); setTimeout(() => fade(0, 0.6), 40);
+  if (!locked) lockMouse();
+}
+function updateScope(dt) {
+  if (!SCOPE) return;
+  if (touch.on) { SCOPE.yaw -= touch.move.x * dt * 0.6; SCOPE.pitch = clamp(SCOPE.pitch + touch.move.y * dt * 0.6, -0.1, 1.55); }
+  if (Math.abs(camera.fov - SCOPE.fov) > 0.01) { camera.fov = damp(camera.fov, SCOPE.fov, 6, dt); camera.updateProjectionMatrix(); }
+  const cp = Math.cos(SCOPE.pitch);
+  camera.position.copy(SCOPE.pos);
+  camera.lookAt(SCOPE.pos.x + Math.sin(SCOPE.yaw) * cp, SCOPE.pos.y + Math.sin(SCOPE.pitch), SCOPE.pos.z + Math.cos(SCOPE.yaw) * cp);
+}
+function endScope() {
+  if (!SCOPE) return;
+  camera.fov = SCOPE.fov0; camera.updateProjectionMatrix();
+  G.mode = 'play'; SCOPE = null;
+  const el = $('scope'); if (el) el.style.display = 'none';
+  $('hud').style.visibility = '';
+  sfx.ui(); fade(1, 0); setTimeout(() => fade(0, 0.5), 40);
+}
+
 /* ---------------- going indoors: a fade, and you're in the room; another, and you're back on the step ---------------- */
 let roomFade = false;
 function enterRoom(d, instant) {
@@ -3780,7 +3884,8 @@ book = createRpgUI({
   save: () => SAVE, shards: () => G.shards, fx: () => FX, player: () => P, perkDmg: () => (perk('heavy') ? 1.15 : 1) * (1 + 0.12 * rank('edge')),
   region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
   slots: () => ({ keys: SLOT_KEYS.map(k => ({ code: k, label: slotLabel(k), id: SAVE.slots[k] || '' })), choices: slotChoices(),
-    relics: ['r_firestone', 'r_longevity'].filter(hasItem).map(id => ({ id, known: knowsTrigger(id), name: SLOT_ACTIONS[id].name })) }),
+    relics: ['r_firestone', 'r_longevity'].filter(hasItem).map(id => ({ id, known: knowsTrigger(id), name: SLOT_ACTIONS[id].name })),
+    spells: SPELL_ORDER.filter(id => SLOT_ACTIONS[id].ok()).map(id => ({ id, name: SPELLS[id].name, icon: SPELLS[id].icon, desc: SPELLS[id].desc, cd: SPELLS[id].cd })) }),
   who: () => (young() ? 'Tanoc' : 'Torcain'),
   mainObjective: () => $('q-text').textContent,
   dya: () => dyaBookData(),
@@ -3905,6 +4010,7 @@ function updatePlayer(dt) {
   P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
   const glideOk = !!(act && !P.riding && keys.Space && !P.onGround && P.airT > 0.25 && P.vel.y < 0 && (P.stam > 0 || D.stamina.jump === 0 || perk('glider')));
   P.gliding = glideOk;
+  if (glideOk && !glider.visible) glider.children[0].material.color.setHex(young() ? 0x9a3a1a : 0x5e1f3e);   // young Tanoc glides on the Ahoac cloak the gate captain gave him
   glider.visible = glideOk;
   if (glideOk) {
     const fall = FX.glide ? -1.4 : -2.4;
@@ -4355,7 +4461,8 @@ function frame(now) {
         if (F_.tut === 3 && REGION === 'property' && P.gliding && P.pos.y - world.heightAt(P.pos.x, P.pos.z) > 2.5) tutStep(4);
         if (seedMesh && seedMesh.visible) { seedMesh.rotation.y = G.t * 1.5; seedMesh.position.y = world.seedSpot.y + 0.3 + Math.sin(G.t * 2) * 0.15; }
       }
-    } else if (G.mode === 'intro') {
+    } else if (G.mode === 'scope') updateScope(dt);
+    else if (G.mode === 'intro') {
       if (!mainCine.update(dt)) updateIntroCamera(dt);
       updateToken(dt);
       updatePhorus(dt);
@@ -4373,7 +4480,7 @@ function frame(now) {
   }
   const tt = G.mode === 'title' ? performance.now() / 1000 : G.t;
   world.update(tt, dt, particles, camera.position, G.night || 0);
-  interiors.update(dt, tt, P);
+  interiors.update(dt, tt, P); interiors.tickView();
   sky.update(tt, dt, camera.position);
   dn.update(frozen && G.mode !== 'title' ? 0 : dt);
   if (G.mode !== 'title') updateStorm(frozen ? 0 : dt);
@@ -4453,6 +4560,7 @@ function startVelki() {
     say: (lines, cb) => dialog(lines, cb), bark: (w, t, d) => bark(w, t, d), hint: t => hint(t), toast: (t, d) => toast(t, d),
     objective: (text, h) => proObjective('The Beginning · Velki', text, h),
     at: F_.vkAt, save: k => { F_.vkAt = k; persist(); },
+    give: (id, n) => { if (!SAVE.inv.items[id]) { invAdd(SAVE.inv, id, n); toast(`+ ${ITEMS[id].icon} ${ITEMS[id].name}`, 2.6); persist(); } },
     whiteness: v => { whiteout.style.transition = ''; whiteout.style.opacity = v; },
     onCaught: () => leaveVelki(),
   });
@@ -4649,6 +4757,7 @@ function parkCart() {
   // shuffle it clear of anything already standing there
   for (let k = 0; k < 24 && [...world.col.nearAll(x, z, 6)].some(c => c.top - c.bot > 0.6 && Math.abs(c.x - x) < 3.5 + c.hw && Math.abs(c.z - z) < 3.5 + c.hd); k++) { x += Math.cos(k * 2.4) * 3; z += Math.sin(k * 2.4) * 3; }
   const c = buildCart();
+  if (REGION === 'property') c.unhitch();   // its two Punks have gone back to the herd in the pasture
   // resting on its four wheels, tipped to the lie of the ground
   const f = V3(Math.sin(yaw), 0, Math.cos(yaw)), r = V3(f.z, 0, -f.x), wh = (a, b) => world.heightAt(x + f.x * a + r.x * b, z + f.z * a + r.z * b);
   const fl = wh(1.3, -1.32), fr = wh(1.3, 1.32), bl = wh(-1.3, -1.32), br = wh(-1.3, 1.32), y = (fl + fr + bl + br) / 4;
@@ -4917,7 +5026,7 @@ function bkErrandOptions(n) {
   if (!young() || F_.pro !== 'beuhk' || F_.bk !== 'rest' || !BK || !BK.errand) return [];
   const R = STORY.ROAD.day5, id = n.def.id;
   if ((id === 'v1' || id === 'hemla') && !BK.errand[id]) return [{ label: `<b style="color:#ffd27a">${id === 'v1' ? 'Ask for a loaf — for Buhkon Eldi' : 'Ask for a lamp-wick — for Buhkon Eldi'}</b>`, act: () => {
-    n.talking = 5;
+    n.talking = 1.5;
     dialog(id === 'v1' ? R.ama : R.hemla, () => { BK.errand[id] = true; if (id === 'v1') { invAdd(SAVE.inv, 'bun', 1); lootToast('bun', 1); } sfx.core(); setObjective(); });
   } }];
   return [];

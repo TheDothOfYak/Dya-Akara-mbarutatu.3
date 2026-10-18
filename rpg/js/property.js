@@ -39,6 +39,9 @@ const WOODSHED = { x: 300, z: -62 };
 const OUTCROP = { x: 330, z: -560 };                     // the rocky lookout on the north hill
 const HOLLOW = { x: -140, z: -560 };                     // the forest-edge hollow
 const PASTURE = { x: 30, z: -190, w: 110, d: 80 };
+/* the Kalo Trials keep to themselves: each in a glade of its own deep in the woods, well off every path and lane */
+const TRIAL_GLADES = { chime: { x: 64, z: -606, r: 16 }, duat: { x: -214, z: 704, r: 16 }, brazier: { x: 186, z: -664, r: 28 } };
+const inGlade = (x, z) => Object.values(TRIAL_GLADES).some(g => Math.hypot(x - g.x, z - g.z) < g.r);
 const FIELDS = [
   { x: 360, z: 130, w: 90, d: 60 }, { x: 230, z: 190, w: 80, d: 54 }, { x: 80, z: 170, w: 70, d: 50 }, { x: 380, z: -150, w: 70, d: 56 },
 ];
@@ -70,6 +73,14 @@ function segDist(x, z, pts) {
   return [best, bestAlong];
 }
 const pathDist = (x, z) => segDist(x, z, PATH)[0];
+/* the point on the path at a given x (the path runs east–west, one segment per x) */
+function pathPoint(x) {
+  for (let i = 0; i < PATH.length - 1; i++) {
+    const [ax, az] = PATH[i], [bx, bz] = PATH[i + 1];
+    if ((x - ax) * (x - bx) <= 0) return { x, z: az + (bz - az) * (x - ax) / (bx - ax) };
+  }
+  return { x, z: PATH[0][1] };
+}
 const laneDist = (x, z) => segDist(x, z, LANE)[0];
 // how deep under the deepwood's roof a point is: 0 out in the open, 1 in the heart of the wood
 const shadeAt = (x, z) => x < 560 || x > 1250 ? 0 : smooth(560, 640, x) * smooth(1250, 1215, x) * smooth(110, 70, pathDist(x, z));
@@ -311,7 +322,7 @@ export function buildProperty(scene) {
   /* ---------------- trees ---------------- */
   const PINE = ['#2f6a3a', '#3a7a40', '#2a5a34', '#467f44', '#356e3c', '#24502e'], BROAD = ['#6aa040', '#7ab04a', '#5a9a3a', '#8ab84a', '#c8a03a', '#4a8a3a'];
   const clearOf = (x, z) => pathDist(x, z) < 6.5 || laneDist(x, z) < 5 || nearBuildings(x, z) || !!inField(x, z) || (inPasture(x, z)) || Math.hypot(x - OUTCROP.x, z - OUTCROP.z) < 22
-    || Math.hypot(x - HOLLOW.x, z - HOLLOW.z) < 14 || Math.hypot(x - POND.x, z - POND.z) < POND.r + 7 || Math.hypot(x - HIVES.x, z - HIVES.z) < 9 || Math.abs(x - BROOK_X(z)) < 5 && Math.abs(z) < 420 || colossusNear(x, z);
+    || Math.hypot(x - HOLLOW.x, z - HOLLOW.z) < 14 || Math.hypot(x - POND.x, z - POND.z) < POND.r + 7 || Math.hypot(x - HIVES.x, z - HIVES.z) < 9 || Math.abs(x - BROOK_X(z)) < 5 && Math.abs(z) < 420 || colossusNear(x, z) || inGlade(x, z);
   function pine(x, z, s, walk) {
     const g = heightAt(x, z), h = (7 + rng() * 6) * s;
     trunks.put(x, g + h * 0.2, z, 0.5 * s, h * 0.45, 0.5 * s, 0, rng() * 6, 0, '#5a3a26');
@@ -490,7 +501,7 @@ export function buildProperty(scene) {
   {
     const barkMat = toon(0xffffff, { vertexColors: true });
     const cLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1100, false);
-    const cVines = new Kit(scene, new THREE.CylinderGeometry(1, 0.6, 1, 5, 1, true), toon(0xffffff), 2600, false);
+    const cVines = new Kit(scene, new THREE.CylinderGeometry(1, 0.6, 1, 5, 1, true), toon(0xffffff), 9000, false);
     const cSeams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), colGlowMat, 1800, false);
     const cBeads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), colGlowMat, 15000, false);
     const cShelves = new Kit(scene, shelfG, colGlowMat, 420, false);
@@ -514,10 +525,38 @@ export function buildProperty(scene) {
       }
       for (let k = 0; k < n - 1; k++) for (let s = 0; s < S; s++) { const i0 = base + k * (S + 1) + s, i1 = i0 + S + 1; M.i.push(i0, i1, i0 + 1, i0 + 1, i1, i1 + 1); }
     }
+    /* the limbs are solid: short boxes along each one's back, so you can land on a great bough and walk along it
+       (and a Punk's vine catches on their edges, so you can swing from bough to bough all the way up) */
+    function limbCols(pts, radAt, t0 = 0.06) {
+      const n = pts.length;
+      for (let k = 1; k < n; k++) {
+        const [x0, y0, z0] = pts[k - 1], [x1, y1, z1] = pts[k], L = Math.hypot(x1 - x0, z1 - z0), L3 = Math.hypot(L, y1 - y0), ang = Math.atan2(x1 - x0, z1 - z0);
+        const ns = Math.max(1, Math.ceil(L3 / 1.6));
+        for (let q = 0; q < ns; q++) {
+          const f = (q + 0.5) / ns, t = (k - 1 + f) / (n - 1), r = radAt(t);
+          if (t < t0 || r < 0.7) continue;
+          const y = lerp(y0, y1, f);
+          col.add(lerp(x0, x1, f), lerp(z0, z1, f), r * 0.78, L3 / ns / 2 + 0.12, ang, y - r * 0.9, y + r * 0.84);
+        }
+      }
+    }
+    /* a strand of vine from (x, top, z) hanging len metres: a few kinked lengths, not one rigid rod */
+    const VINE_C = ['#2a4a30', '#2e5236', '#34583a', '#263f2a'], vineCol = () => new THREE.Color(VINE_C[Math.floor(R0() * VINE_C.length)]).offsetHSL(0, 0, (R0() - 0.5) * 0.05);
+    let R0 = Math.random;
+    function strand(x, top, z, len, th, c) {
+      const segs = len > 30 ? 4 : len > 10 ? 3 : 2, sl = len / segs, ph = R0() * 6, sw = Math.min(2.2, len * 0.04);
+      let px = x, pz = z, py = top;
+      for (let q = 0; q < segs; q++) {
+        const nx = x + Math.sin(ph + q * 1.7) * sw * (q + 1) / segs, nz = z + Math.cos(ph * 1.3 + q * 1.9) * sw * (q + 1) / segs, ny = py - sl;
+        limb(cVines, px, py, pz, nx, ny - 0.15, nz, th * (1 - q * 0.12), c);
+        px = nx; pz = nz; py = ny;
+      }
+      return [px, py, pz];
+    }
     const airC = new THREE.Color('#9ab8cc');   // a little of the sky's own blue in them: they are a long way off, and very tall
     const barkA = new THREE.Color('#4e3e30'), barkB = new THREE.Color('#6e5a46'), barkD = new THREE.Color('#2e241c'), mossC = new THREE.Color('#4e7a36'), mossB = new THREE.Color('#6a8e40'), lichen = new THREE.Color('#8a9478');
     for (const C of COLOSSI) {
-      const R = mulberry32(C.seed), rp = a => a[Math.floor(R() * a.length)];
+      const R = mulberry32(C.seed), rp = a => a[Math.floor(R() * a.length)]; R0 = R;
       const { x: cx, z: cz, H, R: TR } = C, g0 = heightAt(cx, cz);
       const M = { p: [], c: [], i: [] };
       const glowC = () => new THREE.Color(rp(C.glow)).multiplyScalar(0.55 + R() * 0.2);
@@ -601,6 +640,7 @@ export function buildProperty(scene) {
           out.lerp(mossC, smooth(0.45, 0.95, sa) * 0.6);
         });
         limbs.push({ pts, phi, r0 });
+        limbCols(pts, t => r0 * (1 - 0.8 * Math.pow(t, 0.8)) + 0.5);
       }
       // the crown: the trunk's own top, splitting into a few leaders
       {
@@ -610,6 +650,7 @@ export function buildProperty(scene) {
           for (let q = 0; q < 12; q++) { const s = q / 11; pts.push([tx + Math.cos(a) * s * 60 * H / 380, y0 + s * (H * 0.2), tz + Math.sin(a) * s * 60 * H / 380]); }
           sweep(M, pts, 12, t => { const r = TR * 0.22 * (1 - 0.85 * t) + 0.4; return [r, r]; }, (t, an, x, y, z, sa, out) => out.copy(barkA).lerp(barkB, 0.4).lerp(mossC, smooth(0.5, 1, sa) * 0.5));
           limbs.push({ pts, phi: a, r0: TR * 0.22, crown: true });
+          limbCols(pts, t => TR * 0.22 * (1 - 0.85 * t) + 0.4, 0.1);
         }
       }
       const clumps = [];
@@ -632,6 +673,7 @@ export function buildProperty(scene) {
           const bp = []; for (let q = 0; q < 9; q++) { const s = q / 8; bp.push([ax + Math.cos(dir) * s * reach, ay + rise * (s * 1.4 - s * s * 0.4), az + Math.sin(dir) * s * reach]); }
           const rr = Lb.r0 * (1 - 0.8 * s0) * 0.55 + 0.4;
           sweep(M, bp, 8, t => { const r = rr * (1 - 0.8 * t) + 0.3; return [r, r]; }, (t, an, x, y, z, sa, out) => out.copy(barkA).lerp(barkB, 0.45).lerp(mossC, smooth(0.5, 1, sa) * 0.45));
+          limbCols(bp, t => rr * (1 - 0.8 * t) + 0.3, 0.12);
           const [ex, ey, ez] = bp[8];
           clump(ex, ey + 6, ez, 22 + R() * 14);
           for (let q = 0; q < 2; q++) clump(ex + (R() - 0.5) * 40, ey + (R() - 0.3) * 14, ez + (R() - 0.5) * 40, 15 + R() * 12);
@@ -643,25 +685,43 @@ export function buildProperty(scene) {
         for (let q = 0; q < 3; q++) { const [mx, my, mz] = pts[Math.floor(n * (0.45 + q * 0.17))]; clump(mx + (R() - 0.5) * 20, my + 14 + R() * 8, mz + (R() - 0.5) * 20, 18 + R() * 12); }
       }
       { const [tx, tz] = trunkAt(g0 + H); for (let q = 0; q < 8; q++) { const a = q / 8 * Math.PI * 2, d = (q ? 35 + R() * 20 : 0) * SC; clump(tx + Math.cos(a) * d, g0 + H - 6 + R() * 12 - d * 0.2, tz + Math.sin(a) * d, 30 + R() * 14); } }
-      /* vines: curtains of them from the leaves, and long ropes off the lower limbs that Brindle can catch */
-      for (const [x, y, z, r] of clumps) for (let b = 0; b < 3; b++) {
-        const u = R() * Math.PI * 2, v = Math.sqrt(R()) * r * 0.8, hx = x + Math.cos(u) * v, hz = z + Math.sin(u) * v, top = y - r * 0.3, len = 18 + R() * 70;
-        cVines.put(hx, top - len / 2, hz, 0.3, len, 0.3, 0, R() * 6, 0, new THREE.Color('#2a4a30').offsetHSL(0, 0, (R() - 0.5) * 0.06));
+      /* vines: curtains of them from the leaves — every length, from a short tassel to a rope that nearly reaches the
+         ground, thick and thin, each one kinked and leaning its own way — and long ropes off the limbs that Brindle can
+         catch, ending at every height from just over your head to high among the boughs, so there is always another
+         one to swing to on the way up. Between some of the boughs, lianas sag in loops. */
+      for (const [x, y, z, r] of clumps) {
+        const nb = 1 + Math.floor(R() * 5);
+        for (let b = 0; b < nb; b++) {
+          const u = R() * Math.PI * 2, v = Math.sqrt(R()) * r * 0.85, hx = x + Math.cos(u) * v, hz = z + Math.sin(u) * v, top = y - r * (0.2 + R() * 0.25);
+          const room = top - heightAt(hx, hz) - 3, len = Math.min(room, 3 + Math.pow(R(), 1.8) * 110);
+          if (len < 2) continue;
+          const [ex, ey, ez] = strand(hx, top, hz, len, 0.12 + R() * 0.38, vineCol());
+          if (R() < 0.3) cBeads.put(ex, ey - 0.3, ez, 0.35 + R() * 0.4, 0.5 + R() * 0.5, 0.35 + R() * 0.4, 0, R() * 6, 0, glowC());
+        }
       }
       let ropes = 0;
       for (const Lb of limbs) {
         if (Lb.crown) continue;
-        for (let k = 5; k < Lb.pts.length; k += 3) {
-          const [lx, ly, lz] = Lb.pts[k], hx = lx + (R() - 0.5) * 6, hz = lz + (R() - 0.5) * 6, gd = heightAt(hx, hz);
+        for (let k = 4 + Math.floor(R() * 2); k < Lb.pts.length; k += 2 + Math.floor(R() * 3)) {
+          const [lx, ly, lz] = Lb.pts[k], hx = lx + (R() - 0.5) * 8, hz = lz + (R() - 0.5) * 8, gd = heightAt(hx, hz);
           if (gd < WATER_LEVEL + 0.5) continue;
-          const end = gd + 23 + R() * 5, len = ly - end;
-          if (len < 20) continue;
-          cVines.put(hx, end + len / 2, hz, 0.55, len, 0.55, 0, R() * 6, 0, '#2e5236');
-          cVines.put(hx + 0.6, end + len / 2 + 6, hz + 0.4, 0.3, len - 12, 0.3, 0, R() * 6, 0, '#3a6040');
-          cBeads.put(hx, end - 0.6, hz, 1.1, 1.6, 1.1, 0, 0, 0, glowC());
-          for (let q = 1; q < 6; q++) cBeads.put(hx, end + len * q / 6, hz, 0.5, 0.5, 0.5, 0, 0, 0, glowC());
-          trees.push({ x: hx, z: hz, g: gd, h: (end - gd) / 0.95, r: 0 });   // Brindle swings from the ropes of the old trees
+          const above = ly - gd, end = gd + Math.min(above - 8, 4 + Math.pow(R(), 1.4) * Math.max(10, above * 0.8)), len = ly - end;
+          if (len < 6) continue;
+          const [ex, ey, ez] = strand(hx, ly - 1, hz, len, 0.4 + R() * 0.25, vineCol());
+          if (R() < 0.7) strand(hx + (R() - 0.5) * 1.4, ly - 1, hz + (R() - 0.5) * 1.4, len * (0.4 + R() * 0.5), 0.18 + R() * 0.15, vineCol());
+          cBeads.put(ex, ey - 0.6, ez, 0.8 + R() * 0.6, 1.2 + R() * 0.8, 0.8 + R() * 0.6, 0, R() * 6, 0, glowC());
+          for (let q = Math.floor(R() * 5); q > 0; q--) { const f = R(); cBeads.put(lerp(ex, hx, f), lerp(ey, ly, f), lerp(ez, hz, f), 0.3 + R() * 0.35, 0.3 + R() * 0.35, 0.3 + R() * 0.35, 0, 0, 0, glowC()); }
+          trees.push({ x: ex, z: ez, g: gd, h: (ey - gd) / 0.95, r: 0 });   // Brindle swings from the ropes of the old trees: catch the end…
+          if (len > 30) trees.push({ x: lerp(ex, hx, 0.5), z: lerp(ez, hz, 0.5), g: gd, h: (lerp(ey, ly, 0.5) - gd) / 0.95, r: 0 });   // …or higher up it
           ropes++;
+        }
+        // a liana sagging from this bough to the next one along
+        for (let k = 6; k + 5 < Lb.pts.length; k += 6 + Math.floor(R() * 4)) {
+          const a = Lb.pts[k], b = Lb.pts[k + 4 + Math.floor(R() * 2)], sag = 6 + R() * 16, th = 0.2 + R() * 0.2, c = vineCol(), N = 7;
+          let prev = a;
+          for (let q = 1; q <= N; q++) { const f = q / N, p = [lerp(a[0], b[0], f), lerp(a[1], b[1], f) - Math.sin(f * Math.PI) * sag - 1, lerp(a[2], b[2], f)]; limb(cVines, prev[0], prev[1], prev[2], p[0], p[1], p[2], th, c); prev = p; }
+          const mx = lerp(a[0], b[0], 0.5), mz = lerp(a[2], b[2], 0.5), my = lerp(a[1], b[1], 0.5) - sag - 1;
+          trees.push({ x: mx, z: mz, g: heightAt(mx, mz), h: (my - heightAt(mx, mz)) / 0.95, r: 0 });
         }
       }
       // and the bark itself: latch points round the trunk, a good way up
@@ -720,9 +780,10 @@ export function buildProperty(scene) {
     }
     for (const k of [cLeaves, cVines, cSeams, cBeads, cShelves, cCaps, cStems, cPads]) k.done();
   }
-  // the path's own walls of trees, close and tall
+  // the path's own walls of trees, close and tall — out past the deepwood only: under the giants' roof there are
+  // only giants (no little everyday pines and oaks among them)
   for (let i = 0; i < 26000 && trunks.mesh.count < 2400; i++) {
-    const x = 500 + rng() * (EAST_END + 60 - 500), z = (rng() - 0.5) * 300;
+    const x = 500 + rng() * 90, z = (rng() - 0.5) * 300;
     const pd = pathDist(x, z);
     if (pd < 7.5 || pd > 140 || rng() > treeDensity(x, z)) continue;
     if (Math.abs(x - BROOK_X(z)) < 5 || giants.some(gt => Math.hypot(gt.x - x, gt.z - z) < gt.R + 2.5)) continue;
@@ -1321,6 +1382,38 @@ export function buildProperty(scene) {
   };
   edge(LANE, 400, -320, 3.1); edge(PATH, 545, 250, 3.3);
   const lanePosts = [];
+  /* no lamp posts on the land: the paths are lit by glow-trees — old broadleaves along them, hung with strands of the
+     wood's own light at every length, that wake at dusk. Each leans a bough out over the path, and a Punk's vines catch
+     in those boughs: tree to tree is the quick way along. (nx, nz) points from the path to the tree. */
+  const glowPods = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), colGlowMat, 3000, false);
+  const glowStrands = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 4), toon(0xffffff), 3000, false);
+  const glowTree = (x, z, nx, nz) => {
+    const g = heightAt(x, z), h = 10 + rng() * 3.5, bark = new THREE.Color('#4a3a2c').offsetHSL(0, 0, (rng() - 0.5) * 0.05).getStyle();
+    const tx = x - nx * 1.2, tz = z - nz * 1.2, ty = g + h * 0.72;                                 // the trunk, leaning a little toward the path
+    limb(trunks, x, g - 0.4, z, tx, ty, tz, 0.48, bark);
+    const bx = x - nx * 6.2, bz = z - nz * 6.2, by = g + h * 0.84;                                 // the bough out over the path
+    limb(trunks, tx, ty - 0.6, tz, bx, by, bz, 0.26, bark);
+    limb(trunks, tx, ty, tz, x + nx * 2.5 + (rng() - 0.5) * 2, g + h * 0.9, z + nz * 2.5 + (rng() - 0.5) * 2, 0.22, bark);
+    const leaf = () => new THREE.Color(pick(['#2f6a4a', '#3a7a56', '#2a5e46', '#447e5a'])).offsetHSL((rng() - 0.5) * 0.02, 0, (rng() - 0.5) * 0.05);
+    const clumps = [[tx, ty + 2.2, tz, 3.4], [bx, by + 1.2, bz, 2.6], [(tx + bx) / 2, (ty + by) / 2 + 2, (tz + bz) / 2, 3.0], [x + nx * 2.5, g + h * 0.95, z + nz * 2.5, 2.8]];
+    for (const [cx, cy, cz, r] of clumps) { const rr = r * (0.85 + rng() * 0.3); crowns.put(cx + (rng() - 0.5), cy + (rng() - 0.5) * 0.6, cz + (rng() - 0.5), rr, rr * 0.7, rr, rng(), rng() * 6, rng(), leaf()); }
+    // strands of light, every length from a hand's breadth to nearly the ground, swaying a little apart
+    for (let k = 0; k < 16; k++) {
+      const [cx, cy, cz, r] = clumps[k % clumps.length], u = rng() * Math.PI * 2, v = Math.sqrt(rng()) * r * 0.85;
+      const sx = cx + Math.cos(u) * v, sz = cz + Math.sin(u) * v, top = cy - r * 0.45, len = 0.6 + Math.pow(rng(), 1.6) * Math.min(7.5, top - heightAt(sx, sz) - 1.8);
+      if (len < 0.4) continue;
+      glowStrands.put(sx, top - len / 2, sz, 0.025, len, 0.025, (rng() - 0.5) * 0.08, 0, (rng() - 0.5) * 0.08, '#22402e');
+      const ps = 0.14 + rng() * 0.16;
+      glowPods.put(sx, top - len - ps * 0.6, sz, ps, ps * 1.5, ps, 0, rng() * 6, 0, new THREE.Color('#bfeee6').multiplyScalar(0.7 + rng() * 0.3));
+      if (rng() < 0.5) glowPods.put(sx, top - len * (0.3 + rng() * 0.4), sz, ps * 0.45, ps * 0.6, ps * 0.45, 0, 0, 0, '#9fdcd0');
+    }
+    // the light it throws on the path
+    const s1 = glowSprite(0x9fe8d8, 11, 0); s1.position.set((tx + bx) / 2, g + h * 0.5, (tz + bz) / 2); scene.add(s1); lampGlows.push(s1);
+    col.add(x, z, 0.42, 0.42, 0, g - 1, g + h * 0.7);
+    trees.push({ x, z, g, h: h * 0.75, r: 0.45 });
+    trees.push({ x: bx, z: bz, g, h: (by - 0.3 - g) / 0.95, r: 0 });                                // the bough: swing from it
+    trees.push({ x: (tx + bx) / 2, z: (tz + bz) / 2, g, h: ((ty + by) / 2 - g) / 0.95, r: 0 });
+  };
   const postsAlong = (pts, from, to, every, off) => {
     let acc = every * 0.5, side = 1;
     for (let i = 0; i < pts.length - 1; i++) {
@@ -1332,17 +1425,12 @@ export function buildProperty(scene) {
         acc = 0; side = -side;
         const x = x0 + nx * off * side, z = z0 + nz * off * side, gg = heightAt(x, z);
         if (gg < WATER_LEVEL + 0.5 || nearBuildings(x, z, -66)) continue;
-        put2(pBox, x, gg + 1.7, z, 0.24, 3.4, 0.24, 0, 0, 0, '#4a3420');
-        put2(pBox, x, gg + 0.2, z, 0.5, 0.4, 0.5, 0, 0, 0, '#8a8478');
-        const ax2 = x - nx * side * 0.55, az2 = z - nz * side * 0.55;
-        put2(pBox, (x + ax2) / 2, gg + 3.3, (z + az2) / 2, Math.abs(nx) > 0.5 ? 1.1 : 0.12, 0.12, Math.abs(nx) > 0.5 ? 0.12 : 1.1, 0, 0, 0, '#4a3420');
-        lantern(ax2, gg + 2.85, az2, 0.85);
-        col.add(x, z, 0.2, 0.2, 0, gg - 1, gg + 3.4);
+        glowTree(x, z, nx * side, nz * side);
         lanePosts.push([x, z]);
       }
     }
   };
-  postsAlong(LANE, 210, -300, 30, 3.9); postsAlong(PATH, 536, 262, 30, 4.2);
+  postsAlong(LANE, 210, -300, 26, 6.2); postsAlong(PATH, 536, 262, 26, 6.4);
   // dry-stone walls: a curved ha-ha round the west of the house grounds, and old walls along the lane
   const wallSeg = (x0, z0, x1, z1) => {
     const L = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 0.85));
@@ -1503,7 +1591,7 @@ export function buildProperty(scene) {
   for (const C of colossi) for (let i = 0; i < 12; i++) birds.push({ cx: C.x, cz: C.z, r: 140 + rng() * 120, y: C.g + C.H * (0.55 + rng() * 0.4), sp: 0.05 + rng() * 0.04, ph: rng() * 6, s: 3.5 + rng() * 2, c: rng() < 0.5 ? '#2a2a34' : '#f0e8d8', dir: C.id === 'elder' ? 1 : -1 });
   birds.forEach((b, i) => { birdMesh.setColorAt(i * 2, C2.set(b.c)); birdMesh.setColorAt(i * 2 + 1, C2.set(b.c)); });
   birdMesh.count = birds.length * 2;
-  for (const k of [pBox, pCyl, pPyr, pCone, pPrism, pPane, pLamp, pGlass, pDome, pebbles, blooms, reeds, pads]) k.done();
+  for (const k of [pBox, pCyl, pPyr, pCone, pPrism, pPane, pLamp, pGlass, pDome, pebbles, blooms, reeds, pads, glowPods, glowStrands]) k.done();
 
   blocks.done(); trunks.done(); cones.done(); crowns.done(); tufts.done(); crops.done(); rocks.done();
   const grass = buildGrass(scene, rng, (x, z) => onLand(x, z) && heightAt(x, z) > WATER_LEVEL + 0.6 && pathDist(x, z) > 2.5 && laneDist(x, z) > 2 && Math.hypot(x - YARD.x, z - YARD.z) > 20 && !inField(x, z) && !nearBuildings(x, z, -60) && Math.hypot(x - POND.x, z - POND.z) > POND.r + 0.5,
@@ -1525,7 +1613,7 @@ export function buildProperty(scene) {
   /* where creatures live */
   const spawnGroups = [
     { at: [PASTURE.x - 20, PASTURE.z], kinds: ['punk_d', 'punk_d', 'punk_d', 'punk_d', 'punk_d'], tag: 'herd' },
-    { at: [PASTURE.x + 25, PASTURE.z + 10], kinds: ['punk_d', 'punk_d', 'punk_d'], tag: 'herd' },
+    { at: [PASTURE.x + 25, PASTURE.z + 10], kinds: ['punk_d', 'punk_d', 'punk_d', 'punk_d', 'punk_d'], tag: 'herd' },   // (two of them pulled the cart home from Fyrsti'Vilag)
     { at: [YARD.x - 4, YARD.z + 14], kinds: ['dummy', 'dummy', 'dummy'] },
     { at: [YARD.x + 14, YARD.z + 18], kinds: ['dummy_far'] },
     { at: [-80, -320], kinds: ['kipsu_f', 'kipsu_f', 'kipsu_f'] },
@@ -1550,14 +1638,14 @@ export function buildProperty(scene) {
     { key: 'p_lookout', x: OUTCROP.x + 4, z: OUTCROP.z + 4 },
   ];
   // the way back to Beuhk: walk on east along the path, out of the trees
-  const exits = [{ id: 'p_east', to: 'xilia', toExit: 'x_west', name: 'The Forest Path', dest: 'Beuhk', x: EAST_END, z: 30, nx: 1, nz: 0, w: 20, arrive: { x: 1120, z: 32 } }];
+  const exits = [{ id: 'p_east', to: 'xilia', toExit: 'x_west', name: 'The Forest Path', dest: 'Beuhk', x: EAST_END, z: 30, nx: 1, nz: 0, w: 20, arrive: pathPoint(1128) }];   // (on the path itself, not off in the trees)
 
   const t0 = { night: 0 };
   return {
     name: 'property', heightAt, col, SITES, trees, propShore, PLAZA: { x: YARD.x, z: YARD.z, y: heightAt(YARD.x, YARD.z) }, hazards: [], pillars: [], camp: null,
     hearth, pen: { x: PASTURE.x, z: PASTURE.z }, yard: YARD, house: HOUSE, crest: CREST, tower: { x: TOWER.x, z: TOWER.z, y: towerTop.y }, seedSpot: null, grove: null,
     pier: { y: WATER_LEVEL + 0.9, start: new THREE.Vector3(YARD.x, heightAt(YARD.x, YARD.z), YARD.z), end: DOCK.z, z0: DOCK.z },
-    edgeRadius, flowers, spawnGroups, lanterns, stones, falls: [], clear: [{ x: YARD.x, z: YARD.z, r: 30 }, { x: HOUSE.x, z: HOUSE.z, r: 30 }],
+    edgeRadius, flowers, spawnGroups, lanterns, stones, trialSpots: TRIAL_GLADES, falls: [], clear: [{ x: YARD.x, z: YARD.z, r: 30 }, { x: HOUSE.x, z: HOUSE.z, r: 30 }],
     inBounds, barrierLine, swimOk, passes: [], exits, doors, homeRadius: (x, z) => edgeRadius(x, z),
     water: { level: WATER_LEVEL, isWater: (x, z) => waterDepth(x, z) > DEEP, depth: waterDepth, lakes: [{ id: 'eldimere', x: LAKE.x, z: LAKE.z, rx: LAKE.rx, rz: LAKE.rz, maxDepth: LAKE.d }] },
     zones: ZONES.map(z => ({ ...z })), albaliSpots: [{ x: -880, z: 380 }, { x: 420, z: 300 }, { x: -60, z: -420 }], juFields: [{ x: 300, z: 260, r: 7 }],

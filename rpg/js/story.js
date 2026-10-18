@@ -666,7 +666,7 @@ export const YOUNG = {
   ],
   dummies: [
     ['buhkon', 'Hah! Quick feet, heavy hands. Not bad at all.'],
-    ['buhkon', 'An Ahoac has to fall well, too. Climb the tower, jump, and HOLD Space as you fall. Arms out — let the wind take you.'],
+    ['buhkon', 'An Ahoac has to fall well, too — and that’s a real Ahoac cloak you’ve been carrying since Velki, isn’t it? Climb the tower, jump, and HOLD Space as you fall. Arms out — let the cloth take the wind.'],
   ],
   glided: [
     ['buhkon', 'Like a seed on the wind! Come back down and talk to me.'],
@@ -742,9 +742,10 @@ export const ROAD = {
     ],
     cartSee: [
       ['family', 'Oh — oh, thank the Tatu, someone. Our wheel came off in the ditch and went rolling off into the field. With everything we own on this cart.'],
-      ['buhkon', 'Go on, Tanoc. Young legs. I’ll steady the axle.'],
+      ['buhkon', 'Whoa, whoa. Off you get, Tanoc — go and help them. Young legs. I’ll hold the Punks and steady their axle.'],
     ],
     wheelGot: 'A cart wheel, nearly as tall as you. You roll it back toward the road.',
+    cartWait: 'Not till that family’s on its wheels again, Tanoc. Go on.',
     cartFixed: [
       ['tale', 'You and the Carpenter heave the wheel onto the axle. The cart rights itself with a groan.'],
       ['family', 'Out of Fyrsti’Vilag the same as you, I’d guess. Did you see it? The sky just — stopped. They say the Xwi are gone. Gone!'],
@@ -782,9 +783,14 @@ export const ROAD = {
     stream: [
       ['buhkon', 'The ford. Mind the stones — the water’s snow-melt, and it bites.'],
       ['tanoc', 'Stepping stones. I can do stepping stones. I was going to catch the Firefall.'],
+      ['buhkon', 'You can. The cart can’t. See that old footbridge, washed up on the bank down to the left? Two of its long planks, one for each wheel — and lay them straight.'],
     ],
     splash: ['COLD! Cold cold cold —', 'Ahh! It’s like ice!', 'Buhkon is laughing. You can hear him laughing.'],
     across: [['buhkon', 'Dry feet. More or less. On to camp.']],
+    planksDone: [
+      ['tale', 'Two long planks, one for each wheel, bowing a little over the cold water.'],
+      ['buhkon', 'There. A road for the wheels. Walk on, you two — slow — slow — good Punks.'],
+    ],
     send: [
       ['buhkon', 'We’ll eat better if one of us hunts. Not me — I’m old and I’m comfortable.'],
       ['buhkon', 'There are Kofi Galta all through these woods. Bring one back. And don’t go further than you can still see the smoke.'],
@@ -838,6 +844,7 @@ export const ROAD = {
   day4: {
     cards: ['Day four.', 'The mountain pass. Thin air, loose stone, and too many shadows keeping pace on the ridge.'],
     rocks: [['buhkon', 'Rocks! Off the ridge — watch the shadows, and keep moving!']],
+    offCart: 'Down you get, and walk on ahead. That ridge is loose — I’ll bring the cart through behind you.',
     rocksDone: [['buhkon', 'Through. Breathe. And don’t look up there again — there’s worse waiting.']],
     alpha: [['buhkon', 'That’s the pack’s leader. Bigger, older, and hungry. Fire, Tanoc — if that stone of yours is willing!']],
     warn: [
@@ -894,10 +901,11 @@ export const ROAD = {
     hunt: 'Hunt a Kofi Galta with the fire-stone — stay in sight of the smoke',
     back: 'Bring it back to the camp',
     day4: 'Cross the mountain pass',
-    cart: 'Find the family’s cart wheel in the field',
+    cart: 'Help the family: find their cart wheel in the field',
     cartBack: 'Roll the wheel back to the cart',
     log: 'Chop through the fallen pine (three swings)',
-    stream: 'Cross the ford on the stepping stones',
+    stream: 'Cross the ford',
+    planks: n => `Fetch two planks so the cart can cross the stream (${n}/2)`,
     wisp: 'Follow the pale shape into the trees',
     wispAmulet: 'Pry loose the amulet in the stone ring',
     wispBack: 'Go back to the camp',
@@ -1590,6 +1598,13 @@ PROLOGUE.before = {
     ['captain', 'But I lied, a little. Tonight nobody who isn’t crew stands at the yard wall. Not this Skyfall. The sky’s wrong tonight — even the old ones say so.'],
     ['tanoc', 'That’s not fair!'],
     ['captain', 'No. It isn’t. Go home, Filugani. Watch it from the street. Come back when you’re fifteen and we’ll see about real boots.'],
+    ['tale', 'He turns to go. Behind him, somebody clears their throat.'],
+    ['captain', 'Filugani. Wait. …That was a rotten thing to do to you, and I did it anyway. Here.'],
+    ['tale', 'The captain pulls a rolled bundle off the rack by the yard door: rust-red cloth, brass at the collar, cord loops for the wrists.'],
+    ['captain', 'A glide cloak. Standard issue — every Ahoac gets one; it’s how we come down off the towers without breaking our legs. That one’s a spare. Call it an apology.'],
+    ['captain', 'Jump off something, spread your arms, and HOLD — let the cloth take the wind. Something low, Filugani. Low.'],
+    ['tanoc', '…A real Ahoac cloak.'],
+    ['captain', 'A real one. Now go home before I change my mind.'],
     ['tale', 'Bells start ringing all across the city. The sun touches the sea.'],
   ],
 };
@@ -1605,7 +1620,7 @@ Object.assign(ROAD.day3, {
     ['buhkon', 'Well. That’s the day decided. Three straight saplings, Tanoc — ash, the pale bark, about as thick as your thumb. I’ll show you how a carpenter mends a thing in the rain.'],
   ],
   axleObj: n => `Cut three straight saplings for the axle (${n}/3)`,
-  axleHint: 'Pale-barked ash saplings round the camp · E',
+  axleHint: 'Pale-barked ash saplings round the camp · swing the hatchet at them (left-click)',
   axleCut: 'Cut the ash sapling',
   axleCuts: ['One. Straight as a spear.', 'Two. This one had a Kofi under it. It is not pleased.', 'Three — that’s enough.'],
   axleBring: 'Bring the saplings to the Carpenter at the cart',

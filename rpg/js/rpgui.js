@@ -42,7 +42,11 @@ export function createRpgUI(api) {
       if (sl) {
         h += `<h3>Quick slots <small>press the key in play — Q and 1–6</small></h3><div class="rslots">` + sl.keys.map(k => `<label class="rslot"><kbd>${k.label}</kbd><select data-slot="${k.code}"><option value="">— empty —</option>` +
           sl.choices.map(c => `<option value="${c.id}"${c.id === k.id ? ' selected' : ''}>${c.icon} ${esc(c.name)} · ${c.kind}</option>`).join('') + `</select></label>`).join('') + `</div>`;
-        if (sl.relics.length) h += `<h3>Relics</h3><div class="rgrid">` + sl.relics.map(r => card(r.id, null, null, false, r.known ? 'Trigger found — put it on any quick slot: ' + sl.keys.map(k => `<button class="btn small" data-a="slot:${k.code}=${r.id}">${k.label}</button>`).join(' ') : 'Trigger not yet found. Listen to it.')).join('') + `</div>`;
+        // relics and spells go on the quick slots the same way: a card each, and a button for every slot
+        const slotBtns = id => sl.keys.map(k => `<button class="btn small${k.id === id ? ' on' : ''}" data-a="slot:${k.code}=${id}">${k.label}</button>`).join(' ');
+        const onSlot = id => { const k = sl.keys.find(q => q.id === id); return k ? ` · on <b>${k.label}</b>` : ''; };
+        if (sl.relics.length) h += `<h3>Relics</h3><div class="rgrid">` + sl.relics.map(r => card(r.id, null, null, !!onSlot(r.id), r.known ? 'Trigger found — put it on any quick slot' + onSlot(r.id) + ': ' + slotBtns(r.id) : 'Trigger not yet found. Listen to it.')).join('') + `</div>`;
+        if (sl.spells && sl.spells.length) h += `<h3>Spells</h3><div class="rgrid">` + sl.spells.map(sp => `<div class="rcard${onSlot(sp.id) ? ' on' : ''}"><div class="ri">${sp.icon}</div><div class="rt"><b>${esc(sp.name)}</b><small>${esc(sp.desc)} <span class="rmuted">(${sp.cd}s to recover)</span><br><em>Put it on any quick slot${onSlot(sp.id)}: ${slotBtns(sp.id)}</em></small></div></div>`).join('') + `</div>`;
       }
       h += `<h3>Axe</h3><div class="rgrid">` + axes.map(k => card(k, inv.axe === k ? 'Wielding' : 'Wield', inv.axe === k ? null : `equip:${k}`)).join('') + `</div>`;
       h += `<h3>Trinkets <small>(wear two)</small></h3><div class="rgrid">` + (trink.length ? trink.map(k => {
@@ -73,7 +77,7 @@ export function createRpgUI(api) {
       }
       h += `<h3>Spells</h3><div class="rperks">` + SPELL_ORDER.map(id => {
         const sp = SPELLS[id], have = sk.spells[id];
-        return `<div class="rperk${have ? ' have' : ''}"><b>${sp.icon} ${sp.name} <kbd>${sp.key}</kbd></b><small>${have ? sp.desc : 'Not yet learned. Quests and trials teach spells.'}</small></div>`;
+        return `<div class="rperk${have ? ' have' : ''}"><b>${sp.icon} ${sp.name}</b><small>${have ? sp.desc + ' <em>Put it on a quick slot under Gear, the same as a Relic.</em>' : 'Not yet learned. Quests and trials teach spells.'}</small></div>`;
       }).join('') + `</div>`;
     } else if (page === 'quests') {
       const act = Object.entries(S.quests || {}).filter(([, st]) => st === 'active');
