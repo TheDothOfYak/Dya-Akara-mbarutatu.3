@@ -1219,13 +1219,19 @@ export function createRoad(ctx) {
     hopDown(); setStop(Math.min(CART.pos.z, CART_Z + 12)); DRIVE.block = R.day1.cartWait;
     {
       C.state = 'ask'; ctx.say(R.day1.cartSee, () => {
-        C.state = 'find'; C.item = addItem(V3(C.wx, heightAt(C.wx, C.wz) + 0.8, C.wz), 'Take the cart wheel', () => { dropItem(C.item); C.state = 'carry'; ctx.toast(R.day1.wheelGot, 2.6); sfx.ui(); objective(R.obj.cartBack, 'The family will thank you'); setGoal(C.x, C.g, C.z); C.back = addItem(V3(C.x - 1.4, C.g + 0.6, C.z), 'Fit the wheel back on', () => fixCart()); }, C.wheel);
+        C.state = 'find'; C.item = addItem(V3(C.wx, heightAt(C.wx, C.wz) + 0.8, C.wz), 'Take the cart wheel', () => { dropItem(C.item); C.state = 'carry'; carryWheel(C); ctx.toast(R.day1.wheelGot, 2.6); sfx.ui(); objective(R.obj.cartBack, 'The family will thank you'); setGoal(C.x, C.g, C.z); C.back = addItem(V3(C.x - 1.4, C.g + 0.6, C.z), 'Fit the wheel back on', () => fixCart()); }, C.wheel);
+        if (!C.glow) { C.glow = glowSprite(0xffe0a0, 1.8, 0.55); C.wheel.add(C.glow); }   // (easy to spot out in the long grass)
         objective(R.obj.cart, 'Out in the field, east of the road'); setGoal(C.wx, heightAt(C.wx, C.wz), C.wz);
       });
     }
   }
+  /* he rolls it back beside him, a hand on the rim — it doesn't just vanish into his pockets */
+  function carryWheel(C) {
+    const w = C.wheel; if (C.glow) { w.remove(C.glow); C.glow = null; }
+    w.position.set(0.62 / 0.86, 0.6 / 0.86, 0.25 / 0.86); w.rotation.set(0, 0, Math.PI / 2); w.scale.setScalar(0.8 / 0.86); tanoc.root.add(w);
+  }
   function fixCart() {
-    const C = EV.cart; dropItem(C.back); C.state = 'done'; setGoal(camps[0].x, camps[0].y, camps[0].z);
+    const C = EV.cart; dropItem(C.back); if (C.wheel.parent) C.wheel.parent.remove(C.wheel); C.state = 'done'; setGoal(camps[0].x, camps[0].y, camps[0].z);
     C.cart.rotation.set(0, 0.2, 0); C.cart.position.y = C.g + 0.9; C.wheelR.visible = true;
     particles.burst(C.x, C.g + 1, C.z, 20, { color: 0xd8c098, speed: 4, size: 0.5, life: 0.6 }); sfx.slam();
     DRIVE.block = null; setStop(camps[0].park);
@@ -1851,6 +1857,7 @@ export function createRoad(ctx) {
         } else it.mesh.position.y = it.y0 + Math.sin(t * 2 + it.pos.x) * 0.12;
       }
     }
+    if (EV.cart && EV.cart.state === 'carry') EV.cart.wheel.rotation.x += Math.hypot(P.vel.x, P.vel.z) * dt / 0.6;   // turning as he rolls it
     // the hat: walking up to it is enough — no button to find in the blur
     if (MK && sub === 'hat' && MK.hat && playing && ((MK.hatT = (MK.hatT || 0) + dt) > 45 || Math.hypot(MK.hat.pos.x - P.pos.x, MK.hat.pos.z - P.pos.z) < 1.6)) { sfx.ui(); marketHatOn(); }   // (and if he never gets there, the moment passes anyway)
     if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });
