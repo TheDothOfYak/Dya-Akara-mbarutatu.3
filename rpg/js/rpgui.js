@@ -48,6 +48,13 @@ export function createRpgUI(api) {
         if (sl.relics.length) h += `<h3>Relics</h3><div class="rgrid">` + sl.relics.map(r => card(r.id, null, null, !!onSlot(r.id), r.known ? 'Trigger found — put it on any quick slot' + onSlot(r.id) + ': ' + slotBtns(r.id) : 'Trigger not yet found. Listen to it.')).join('') + `</div>`;
         if (sl.spells && sl.spells.length) h += `<h3>Spells</h3><div class="rgrid">` + sl.spells.map(sp => `<div class="rcard${onSlot(sp.id) ? ' on' : ''}"><div class="ri">${sp.icon}</div><div class="rt"><b>${esc(sp.name)}</b><small>${esc(sp.desc)} <span class="rmuted">(${sp.cd}s to recover)</span><br><em>Put it on any quick slot${onSlot(sp.id)}: ${slotBtns(sp.id)}</em></small></div></div>`).join('') + `</div>`;
       }
+      // what he wears: a cloak, the body, the hands, the feet
+      if (api.wear) {
+        const W = api.wear();
+        h += `<h3>Wearing <small>a cloak (the one you glide with), the body, the hands, the feet</small></h3><div class="rwear">` + W.map(w => `<div class="rslotw"><kbd>${w.label}</kbd> ${w.on ? `${ITEMS[w.on].icon} <b>${esc(ITEMS[w.on].name)}</b> <button class="btn small" data-a="unwear:${w.slot}">Take off</button>` : '<span class="rmuted">— nothing —</span>'}</div>`).join('') + `</div>`;
+        const spare = W.flatMap(w => w.have.filter(k => k !== w.on));
+        if (spare.length) h += `<div class="rgrid">` + spare.map(k => card(k, 'Wear', `wear:${k}`, false, `${ITEMS[k].slot[0].toUpperCase() + ITEMS[k].slot.slice(1)}`)).join('') + `</div>`;
+      }
       h += `<h3>Axe</h3><div class="rgrid">` + axes.map(k => card(k, inv.axe === k ? 'Wielding' : 'Wield', inv.axe === k ? null : `equip:${k}`)).join('') + `</div>`;
       h += `<h3>Trinkets <small>(wear two)</small></h3><div class="rgrid">` + (trink.length ? trink.map(k => {
         const on = inv.trinkets.includes(k);

@@ -441,9 +441,11 @@ export function buildEikar(o = {}) {
     const flap = new THREE.Mesh(new THREE.BoxGeometry(0.066, 0.05, 0.165), beltMat); flap.position.set(-0.155 * bw, 0.025, 0); torso.add(flap);
   }
 
-  // a cape from the shoulders, for the swagger
-  let cape = null;
-  if (o.cape) {
+  // a cape from the shoulders, for the swagger (it can be put on and taken off: setCape below)
+  let cape = null, capeG = null, capeMat = null, wing = null;
+  function makeCape(color) {
+    capeG = new THREE.Group(); torso.add(capeG);
+    capeMat = paint(toon(color, { side: THREE.DoubleSide }), 'cloth');
     const W = 0.36, LEN = 0.82;
     const cg = new THREE.PlaneGeometry(W, LEN, 4, 8); cg.translate(0, -LEN / 2, 0);
     const pp = cg.attributes.position;
@@ -453,13 +455,31 @@ export function buildEikar(o = {}) {
       pp.setX(i, fx); pp.setZ(i, -Math.pow(fx / (W * 0.6), 2) * 0.06 + Math.pow(x / (W / 2), 2) * 0.06 * (1 - tt));
     }
     cg.computeVertexNormals();
-    cape = new THREE.Mesh(cg, paint(toon(o.cape, { side: THREE.DoubleSide }), 'cloth'));
-    cape.position.set(0, 0.39, -0.1); torso.add(cape);
+    cape = new THREE.Mesh(cg, capeMat);
+    cape.position.set(0, 0.39, -0.1); capeG.add(cape);
     for (const s of [-1, 1]) {
-      const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), toon(0xe6b84a)); clasp.position.set(s * 0.1, 0.375, 0.07); torso.add(clasp);
+      const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), toon(0xe6b84a)); clasp.position.set(s * 0.1, 0.375, 0.07); capeG.add(clasp);
     }
-    const mantle = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.03, 5, 14, Math.PI), toon(o.cape)); mantle.rotation.x = Math.PI / 2; mantle.rotation.z = Math.PI; mantle.scale.set(bw * 1.15, 0.85, 1); mantle.position.set(0, 0.385, -0.0); torso.add(mantle);
+    const mantle = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.03, 5, 14, Math.PI), capeMat); mantle.rotation.x = Math.PI / 2; mantle.rotation.z = Math.PI; mantle.scale.set(bw * 1.15, 0.85, 1); mantle.position.set(0, 0.385, -0.0); capeG.add(mantle);
+    /* gliding, the cape becomes a wing: arms flung straight out, the cloth stretched from wrist to wrist across the
+       shoulders and down to the ankles, scalloped between — drawn in the torso's own space, so it moves with him */
+    const HX = SX + 0.5, sh = new THREE.Shape();
+    sh.moveTo(-HX - 0.03, SH + 0.01);
+    sh.lineTo(-0.12, SH + 0.05); sh.lineTo(0.12, SH + 0.05); sh.lineTo(HX + 0.03, SH + 0.01);
+    sh.quadraticCurveTo(HX - 0.06, SH - 0.2, HX - 0.24, SH - 0.32);       // the scallops of the trailing edge, wrist to ankle
+    sh.quadraticCurveTo(0.3, -0.12, 0.24, -0.42);
+    sh.quadraticCurveTo(0.17, -0.62, 0.1, -0.78); sh.lineTo(0, -0.72); sh.lineTo(-0.1, -0.78);
+    sh.quadraticCurveTo(-0.17, -0.62, -0.24, -0.42);
+    sh.quadraticCurveTo(-0.3, -0.12, -HX + 0.24, SH - 0.32);
+    sh.quadraticCurveTo(-HX + 0.06, SH - 0.2, -HX - 0.03, SH + 0.01);
+    const wg = new THREE.ShapeGeometry(sh, 10), wp = wg.attributes.position;
+    for (let i = 0; i < wp.count; i++) { const x = wp.getX(i), y = wp.getY(i); wp.setZ(i, -0.12 - 0.07 * Math.cos(x / HX * Math.PI * 0.5) * (1 - Math.abs(y - SH) * 0.3)); }   // filled with wind
+    wg.computeVertexNormals();
+    wing = new THREE.Mesh(wg, capeMat); wing.visible = false; capeG.add(wing);
+    if (built) { capeG.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; addOutline(m, 0.012); } }); celAll(capeG); }   // (put on later: inked and cel-drawn like the rest)
   }
+  let built = false;
+  if (o.cape) makeCape(o.cape);
 
   // arms and hands
   const armOpts = { L1: 0.25, L2: 0.27, ru: 0.043 * (kalo ? 1.08 : 1), rf: 0.036 * (kalo ? 1.08 : 1), rh: 0.04, skin: skinMat, cuff: beltMat };
@@ -511,6 +531,7 @@ export function buildEikar(o = {}) {
   const rootScale = o.scale || 1;
   root.scale.setScalar(rootScale);
   const own = new Set(root.children);
+  built = true;
 
   // pose scratch (no per-frame allocation)
   const wT = new THREE.Vector3(), wD = new THREE.Vector3(), wB = new THREE.Vector3();
@@ -530,7 +551,15 @@ export function buildEikar(o = {}) {
 
   const A = {
     cartoon: true,   // squash & stretch is built into this rig
-    root, body, torso, head, hat, weapon, wPivot, wHold, cape, relic, nur, mats, arms, legs,
+    root, body, torso, head, hat, weapon, wPivot, wHold, relic, nur, mats, arms, legs,
+    get cape() { return capeG; },
+    /* put a cape on (a colour) or take it off (null) */
+    setCape(color) {
+      if (color == null) { if (capeG) capeG.visible = false; return; }
+      if (!capeG) makeCape(color);
+      capeMat.color.set(color); capeG.visible = true;
+    },
+    get hasCape() { return !!(capeG && capeG.visible); },
     /* st: { speed, onGround, t, swing: null | { kind: 1|2|3|4, p: 0..1 } | number, windup, attack,
              heat, drink, talking, thrown, duat } */
     animate(dt, st) {
@@ -544,7 +573,8 @@ export function buildEikar(o = {}) {
       phase += dt * (3 + Math.max(spd, k * 7) * 0.95) * walkK;
       let gliding = false;
       for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && !own.has(c)) { gliding = true; break; } }
-      glide = lerp(glide, gliding ? 1 : 0, 1 - Math.exp(-10 * dt));
+      if (st.glide != null) gliding = !!st.glide;
+      glide = lerp(glide, gliding ? 1 : 0, 1 - Math.exp(-(gliding ? 7 : 10) * dt));
       // vertical speed, read off the root, drives stretch going up and the squash on landing
       const ry = root.position.y, vy = lastY === null || dt <= 0 ? 0 : clamp((ry - lastY) / dt, -30, 30); lastY = ry;
       vyS = lerp(vyS, vy, 1 - Math.exp(-12 * dt));
@@ -594,7 +624,7 @@ export function buildEikar(o = {}) {
         }
         wT.lerpVectors(iT, sT, b); wD.lerpVectors(iD, sD, b); wB.lerpVectors(iB, sB, b);
       } else { wT.copy(iT); wD.copy(iD); wB.copy(iB); }
-      if (glide > 0.01) { sT.set(s * 0.17, 0.86, 0.06); wT.lerp(sT, glide); sD.set(0, -0.4, -1); wD.lerp(sD, glide); }
+      if (glide > 0.01) { sT.set(s * (SX + 0.5), SH + 0.01, -0.03); wT.lerp(sT, glide); sD.set(s, 0, 0); wD.lerp(sD, glide); }   // arms flung straight out
 
       // ---- the free hand ----
       drinkFlask.visible = !!st.drink;
@@ -611,18 +641,18 @@ export function buildEikar(o = {}) {
           else { sT.set(-s * 0.26, 0.02, -0.12); fT.lerp(sT, b); }
         }
       }
-      if (glide > 0.01) { sT.set(-s * 0.17, 0.86, 0.06); fT.lerp(sT, glide); }
+      if (glide > 0.01) { sT.set(-s * (SX + 0.5), SH + 0.01, -0.03); fT.lerp(sT, glide); fD.lerp(sD.set(-s, 0, 0), glide); }
       if ((st.ride || st.reins) && !sw && !st.drink) { sT.set(-s * 0.12, -0.02, 0.3); fT.lerp(sT, 0.85); fD.set(0, 0.4, 1); fB.set(s, 0, 0); }
       if (!gliding && !sw && airK > 0.01) { fT.x += -s * 0.08 * airK; fT.y += 0.12 * airK; }
 
       // ---- torso, head, legs ----
       twist = lerp(twist, tw * b, 1 - Math.exp(-20 * dt));
-      lean = lerp(lean, ln * (sw ? b : 1) + glide * 0.25, 1 - Math.exp(-12 * dt));
+      lean = lerp(lean, ln * (sw ? b : 1) * (1 - glide), 1 - Math.exp(-12 * dt));
       // a real walk: the hips turn with each step and the shoulders turn against them
       const hipYaw = Math.sin(phase) * 0.11 * k * walkK;
       body.rotation.y = hipYaw;
       torso.rotation.set(lean, twist - hipYaw * 1.9, Math.sin(phase) * 0.04 * k * walkK);
-      body.rotation.x = 0;
+      body.rotation.x = glide * 1.42;   // gliding: laid out flat along the way he's flying, like a hero in the old songs
       body.rotation.z = -Math.sin(phase) * 0.045 * k * walkK + Math.sin(t * 0.7 + seed) * 0.012 * (1 - walkK);   // hips sway with the stride; idle weight shift
       const bob = lerp(Math.sin(t * 2.2) * 0.006, Math.abs(Math.cos(phase)) * 0.045 * k, walkK);
       body.position.y = HIP + bob - crouch - (sw ? 0.03 * b : 0);
@@ -637,7 +667,7 @@ export function buildEikar(o = {}) {
       const hyT = -twist * 0.6 + Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b) + lookX * 0.35;
       headXV += ((hxT - headX) * 160 - headXV * 16) * dt; headX += headXV * dt;
       headY = lerp(headY, hyT, 1 - Math.exp(-9 * dt));
-      head.rotation.set(headX, headY + hipYaw * 0.9, -body.rotation.z * 0.6);   // the head stays on the road ahead
+      head.rotation.set(headX - glide * 1.15, headY + hipYaw * 0.9, -body.rotation.z * 0.6);   // (flat out, he still looks ahead)   // the head stays on the road ahead
       // the cap rides on the head and trails its motion
       hatXV += ((-0.12 - headXV * 0.035 + sqV * 0.04 - hatX) * 120 - hatXV * 9) * dt; hatX += hatXV * dt;
       hat.rotation.x = clamp(hatX, -0.4, 0.2);
@@ -660,7 +690,7 @@ export function buildEikar(o = {}) {
       mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
       strideLegs(legs, phase, moving ? k : 0, air, dt, sw && !moving ? b : 0);
       if (glide > 0.01) {   // tucked for the glide, eased in with it
-        const G2 = [[0.25, 0.5], [0.4, 0.7]];
+        const G2 = [[0.04, 0.06], [0.1, 0.12]];   // legs straight out behind, together
         legs.forEach((L, i) => { L.thigh.rotation.x = lerp(L.thigh.rotation.x, G2[i][0], glide); L.knee.rotation.x = lerp(L.knee.rotation.x, G2[i][1], glide); });
       }
       // astride a mount: hips in the saddle, thighs forward and apart round its back, shins down its flanks;
@@ -682,6 +712,7 @@ export function buildEikar(o = {}) {
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
 
+      if (wing) { wing.visible = glide > 0.08; wing.scale.set(Math.max(0.01, glide), 1, 1); cape.visible = glide < 0.5; }
       if (cape) cape.rotation.x = lerp(cape.rotation.x, 0.1 + k * 0.75 + airK * 0.45 + glide * 0.4 - lean * 0.6 + Math.sin(t * 6) * 0.04 * (k + 0.3), 1 - Math.exp(-8 * dt));
       if (relic) { relic.rotation.y += dt * 3; relic.userData.glow.scale.setScalar(0.22 + (st.heat || 0) * 0.3 + Math.sin(t * 8) * 0.02); }
       if (nur) nur.position.set(0.55 + Math.sin(t * 1.3) * 0.12, 1.7 + Math.sin(t * 2.1) * 0.12, -0.2);

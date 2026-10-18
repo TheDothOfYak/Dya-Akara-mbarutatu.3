@@ -61,7 +61,12 @@ export const ITEMS = {
   k_scroll_pull: { name: 'Kalo scroll: Duat Pull', kind: 'key', icon: '📜', value: 0, read: true, desc: 'Stored willpower. Read it to learn the Duat Pull.' },
   okid: { name: 'Okid’Relic', kind: 'key', icon: '🔮', value: 0, desc: 'Buhkon’s gift. Sing a creature’s song into a piece of it with a little stygian, and the Relic catches its truth as a token.' },
   k_seed: { name: 'Warm fire seed', kind: 'key', icon: '🔥', value: 0, desc: 'From the young fire tree in the Ember Grove, for the Stryx’s ship. Hot to the touch.' },
-  ahoac_cloak: { name: 'Ahoac glide cloak', kind: 'key', icon: '🧥', value: 0, desc: 'Rust-red, brass at the collar, cord loops for the wrists. Standard issue for the Ahoac crews, given as an apology. Jump, then hold Space as you fall, and it catches the wind.' },
+  /* ---- things to wear: a cloak, the body, the hands, the feet (the Gear page). perk works as a trinket's does ---- */
+  ahoac_cloak: { name: 'Ahoac glide cloak', kind: 'wear', slot: 'cloak', color: 0x9a3a1a, icon: '🧥', value: 0, desc: 'Rust-red, brass at the collar, cord loops for the wrists. Standard issue for the Ahoac crews, given as an apology. Jump, then hold Space as you fall: arms out, and the cloak takes the wind.' },
+  w_jerkin: { name: 'Padded jerkin', kind: 'wear', slot: 'body', icon: '🦺', value: 90, desc: 'Quilted wool under boiled leather, the kind the Ahoac train in. Take 10% less damage.', perk: { armor: 0.9 } },
+  w_bracers: { name: 'Leather bracers', kind: 'wear', slot: 'hands', icon: '🧤', value: 70, desc: 'Laced from wrist to elbow. A steadier swing: +6% damage.', perk: { dmg: 1.06 } },
+  w_boots: { name: 'Kofi-hide boots', kind: 'wear', slot: 'feet', icon: '🥾', value: 60, desc: 'Soft, light, and very quiet. Stamina returns 12% faster.', perk: { stamRegen: 1.12 } },
+  w_hood: { name: 'Fisher’s oilcloak', kind: 'wear', slot: 'cloak', color: 0x2f5a5a, icon: '🧥', value: 120, desc: 'Waxed against the lake wind, cut full for a glider. Glide farther and slower.', perk: { glide: 1 } },
   r_firestone: { name: 'Fire-stone', kind: 'key', icon: '🔥', value: 0, desc: 'A smooth skipping-stone with a thumb-dip. Its Hurst is a warm, chatty fire-rat. Set a pebble in the dip and it throws it in a streak of flame — and never burns the one it likes.' },
   r_longevity: { name: 'Humming stone', kind: 'key', icon: '🔵', value: 0, desc: 'A longevity Relic from the lakeshore. Its Hurst is settled and quiet; it keeps you a little less tired, a little less hungry.' },
   resin: { name: 'Black resin bead', kind: 'mat', icon: '⚫', value: 12, desc: 'Carved, very old, from the ruins in the Megla Aagac. Smells of smoke and rain.' },
@@ -95,9 +100,9 @@ export const FORGE = [
 
 /* what the trader keeps on her mat (price in shards) */
 export const SHOP = {
-  xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed'],
+  xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed', 'w_jerkin', 'w_bracers', 'w_boots', 'w_hood'],
   aakalay: [],
-  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 'ember', 't_ring'],
+  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 'ember', 't_ring', 'w_jerkin', 'w_bracers', 'w_boots'],
 };
 
 /* what each creature leaves behind: [item, chance, count] */
@@ -127,7 +132,7 @@ export function takeAll(inv, need) { if (!hasAll(inv, need)) return false; for (
 export const needText = need => Object.entries(need).map(([k, n]) => `${n} ${ITEMS[k].name}`).join(', ');
 
 export function freshInventory() {
-  return { items: { axe_tanoc: 1, salad: 1 }, axe: 'axe_tanoc', trinkets: [], buffs: {} };
+  return { items: { axe_tanoc: 1, salad: 1 }, axe: 'axe_tanoc', trinkets: [], buffs: {}, wear: {} };
 }
 
 /* the combined effect of what you wear and what you've eaten */
@@ -135,7 +140,7 @@ export function effects(inv, now) {
   const fx = { hlyst: 0, xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
   const axe = ITEMS[inv.axe] || ITEMS.axe_tanoc;
   fx.dmg *= axe.dmg || 1; if (axe.burn) fx.burn = true; fx.duatCd += axe.duatCd || 0; fx.stagger *= axe.stagger || 1;
-  for (const t of inv.trinkets) {
+  for (const t of inv.trinkets.concat(Object.values(inv.wear || {}).filter(w => inv.items[w]))) {
     const p = (ITEMS[t] || {}).perk || {};
     for (const [k, v] of Object.entries(p)) {
       if (k === 'hp' || k === 'glide' || k === 'hlyst') fx[k] += v; else fx[k] *= v;

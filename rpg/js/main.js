@@ -79,7 +79,9 @@ const SAVE_AT_LOAD = newer(localSave, cloudSave);
 let SAVE = SAVE_AT_LOAD || freshSave('easy');
 /* older saves grow the newer RPG fields */
 function ensureSave(S) {
-  S.inv = S.inv || freshInventory(); S.inv.buffs = S.inv.buffs || {}; S.inv.trinkets = S.inv.trinkets || [];
+  S.inv = S.inv || freshInventory(); S.inv.buffs = S.inv.buffs || {}; S.inv.trinkets = S.inv.trinkets || []; S.inv.wear = S.inv.wear || {};
+  // runs from before the Ahoac cloak was a thing: anyone past the prologue has it, and is wearing it
+  if (S.flags && S.flags.young && S.flags.pro && S.flags.pro !== 'velki' && !S.inv.items.ahoac_cloak) { S.inv.items.ahoac_cloak = 1; S.inv.wear.cloak = S.inv.wear.cloak || 'ahoac_cloak'; }
   S.skills = S.skills || freshSkills();
   for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
   if (!S.dya && DYA3.engineReady()) S.dya = DYA3.starterCollection(parseInt(String(S.runId || 'abc').replace(/[^0-9a-z]/g, '').slice(0, 6), 36) || 7);
@@ -3201,18 +3203,21 @@ function climbTick(dt, act) {
   }
 }
 
-/* ---------------- gliding: Torcain's coat spread like wings ---------------- */
+/* ---------------- gliding: arms flung out, the cape stretched between them ----------------
+   The wing is the cape itself (actors.js): he lays out flat like a hero in the old songs and the cloth fills the
+   space from wrist to wrist and down to his ankles. This empty marker only tells the rig he's gliding. */
 const glider = new THREE.Group();
-{
-  const gm = new THREE.MeshToonMaterial({ color: 0x5e1f3e, side: THREE.DoubleSide });
-  for (const s of [-1, 1]) {
-    const shape = new THREE.Shape(); shape.moveTo(0, 0); shape.quadraticCurveTo(1.2, 0.5, 2.1, 0.1); shape.lineTo(1.6, -0.5); shape.quadraticCurveTo(0.8, -0.3, 0, -0.6); shape.lineTo(0, 0);
-    const w = new THREE.Mesh(new THREE.ShapeGeometry(shape), gm); w.scale.x = s; w.rotation.x = -Math.PI / 2 + 0.25; w.position.set(s * 0.3, 1.7, -0.2);
-    glider.add(w);
-  }
-  const trim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 4, 10), toon(0xe6b84a)); trim.position.y = 1.7; trim.rotation.x = Math.PI / 2; glider.add(trim);
-  glider.visible = false; torcain.root.add(glider);
+glider.visible = false; torcain.root.add(glider);
+/* what he wears: a cloak, something on the body, on the hands, on the feet (the Gear page). The cloak is what he
+   glides with — young Tanoc can't glide without one; Torcain always has his coat. */
+const WEAR_SLOTS = [['cloak', 'Cloak'], ['body', 'Body'], ['hands', 'Hands'], ['feet', 'Feet']];
+function wearing(slot) { const w = SAVE.inv.wear || {}; return w[slot] && SAVE.inv.items[w[slot]] ? w[slot] : null; }
+const canGlide = () => !young() || !!wearing('cloak');
+function applyWear() {
+  if (young()) { const c = wearing('cloak'); torcain.setCape(c ? (ITEMS[c].color ?? 0x9a3a1a) : null); }
+  else torcain.setCape(0x5e1f3e);
 }
+
 
 /* ---------------- spells ---------------- */
 P.spellCd = {}; P.ward = 0; P.wardT = 0;
@@ -3482,6 +3487,8 @@ function bookAct(act, arg) {
   if (act === 'equip') { inv.axe = arg; restyleAxe(); sfx.ui(); }
   else if (act === 'trinket') { if (inv.trinkets.length >= 2) inv.trinkets.shift(); inv.trinkets.push(arg); sfx.ui(); }
   else if (act === 'untrinket') { inv.trinkets = inv.trinkets.filter(t => t !== arg); }
+  else if (act === 'wear') { inv.wear = inv.wear || {}; inv.wear[ITEMS[arg].slot] = arg; applyWear(); sfx.ui(); }
+  else if (act === 'unwear') { inv.wear = inv.wear || {}; delete inv.wear[arg]; applyWear(); sfx.ui(); }
   else if (act === 'slot') { const [code, id] = arg.split('='); assignSlot(code, id || null); sfx.ui(); }
   else if (act === 'pouch') {
     const d = SAVE.dya; if (!d) return;
@@ -3883,6 +3890,7 @@ function travel(id) {
 book = createRpgUI({
   save: () => SAVE, shards: () => G.shards, fx: () => FX, player: () => P, perkDmg: () => (perk('heavy') ? 1.15 : 1) * (1 + 0.12 * rank('edge')),
   region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
+  wear: () => WEAR_SLOTS.map(([slot, label]) => ({ slot, label, on: wearing(slot), have: Object.keys(SAVE.inv.items).filter(k => ITEMS[k] && ITEMS[k].slot === slot) })),
   slots: () => ({ keys: SLOT_KEYS.map(k => ({ code: k, label: slotLabel(k), id: SAVE.slots[k] || '' })), choices: slotChoices(),
     relics: ['r_firestone', 'r_longevity'].filter(hasItem).map(id => ({ id, known: knowsTrigger(id), name: SLOT_ACTIONS[id].name })),
     spells: SPELL_ORDER.filter(id => SLOT_ACTIONS[id].ok()).map(id => ({ id, name: SPELLS[id].name, icon: SPELLS[id].icon, desc: SPELLS[id].desc, cd: SPELLS[id].cd })) }),
@@ -4008,9 +4016,8 @@ function updatePlayer(dt) {
   if (vineOn()) vineTick(dt, act);
   // gliding: hold Space while falling and Torcain's coat catches the wind
   P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
-  const glideOk = !!(act && !P.riding && keys.Space && !P.onGround && P.airT > 0.25 && P.vel.y < 0 && (P.stam > 0 || D.stamina.jump === 0 || perk('glider')));
+  const glideOk = !!(act && !P.riding && canGlide() && keys.Space && !P.onGround && P.airT > 0.25 && P.vel.y < 0 && (P.stam > 0 || D.stamina.jump === 0 || perk('glider')));
   P.gliding = glideOk;
-  if (glideOk && !glider.visible) glider.children[0].material.color.setHex(young() ? 0x9a3a1a : 0x5e1f3e);   // young Tanoc glides on the Ahoac cloak the gate captain gave him
   glider.visible = glideOk;
   if (glideOk) {
     const fall = FX.glide ? -1.4 : -2.4;
@@ -4560,7 +4567,7 @@ function startVelki() {
     say: (lines, cb) => dialog(lines, cb), bark: (w, t, d) => bark(w, t, d), hint: t => hint(t), toast: (t, d) => toast(t, d),
     objective: (text, h) => proObjective('The Beginning · Velki', text, h),
     at: F_.vkAt, save: k => { F_.vkAt = k; persist(); },
-    give: (id, n) => { if (!SAVE.inv.items[id]) { invAdd(SAVE.inv, id, n); toast(`+ ${ITEMS[id].icon} ${ITEMS[id].name}`, 2.6); persist(); } },
+    give: (id, n) => { if (!SAVE.inv.items[id]) { invAdd(SAVE.inv, id, n); if (ITEMS[id].slot && !SAVE.inv.wear[ITEMS[id].slot]) SAVE.inv.wear[ITEMS[id].slot] = id; toast(`+ ${ITEMS[id].icon} ${ITEMS[id].name} — and he puts it on`, 2.6); persist(); } },
     whiteness: v => { whiteout.style.transition = ''; whiteout.style.opacity = v; },
     onCaught: () => leaveVelki(),
   });
@@ -5046,7 +5053,7 @@ function beuhkGoal() {
 }
 
 /* the cape and the Tukang came later; the hatchet comes from the Carpenter */
-function youngGear(on) { for (const k of ['cape', 'relic', 'weapon']) if (torcain[k]) torcain[k].visible = on; }
+function youngGear(on) { for (const k of ['relic', 'weapon']) if (torcain[k]) torcain[k].visible = on; applyWear(); }
 /* ================================================================
    CHAPTER I — the Carpenter's apprentice: young Tanoc in Beuhk
    ================================================================ */
