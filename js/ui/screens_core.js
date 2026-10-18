@@ -149,8 +149,10 @@
     w.appendChild(U.el('div', {}, [cv]));
     const pctx = cv.getContext('2d');
     let raf = 0;
-    function frame() {
+    const gate = U.fpsGate(60);
+    function frame(now) {
       if (!document.body.contains(cv)) { cancelAnimationFrame(raf); return; }
+      if (!gate(now)) { raf = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, 220, 220);
       SPR.drawSeal(pctx, 110, 110, 102, curSeal());
       const tt = performance.now() / 1000;
@@ -226,7 +228,7 @@
 
     const m = UI.modal(w, { sticky: true });
     markMetal();
-    frame();
+    frame(performance.now());
     w.appendChild(U.el('button', {
       cls: 'btn primary mt', text: editing ? '⚒ Re-strike' : '⚒ Strike it', onclick: () => {
         me.seal = { avatarIdx: me.avatarIdx, metal, emblem, patterns: patterns.slice(), locked: true };

@@ -285,8 +285,8 @@ function organicBox(w, h, d) {
 
 /* a roof or spire: the straight cone swept into a concave curve that flares out at the eaves.
    A 4-sided roof stays 4-sided (it still fits its square house), just curved. */
-function sweptCone(q) {
-  const radial = q.radialSegments <= 6 ? q.radialSegments : 28;
+function sweptCone(q, sides = 28) {
+  const radial = q.radialSegments <= 6 ? q.radialSegments : sides;
   const g = new THREE.ConeGeometry(q.radius, q.height, radial, 10, q.openEnded, q.thetaStart, q.thetaLength);
   const pos = g.attributes.position, H = q.height;
   for (let i = 0; i < pos.count; i++) {
@@ -318,6 +318,31 @@ const RULES = {
   CircleGeometry: q => q.segments < 8 || q.segments >= 40 ? null
     : [null, null, () => new THREE.CircleGeometry(q.radius, 40, q.thetaStart, q.thetaLength)],
 };
+/* a lighter cut of each round shape, for the moments it is only a few pixels across on screen
+   (detail.js swaps it in then, and back as it comes near: at that size the two are identical) */
+const LOW = {
+  SphereGeometry: q => new THREE.SphereGeometry(q.radius, 16, 10, q.phiStart, q.phiLength, q.thetaStart, q.thetaLength),
+  CylinderGeometry: q => new THREE.CylinderGeometry(q.radiusTop, q.radiusBottom, q.height, 12, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength),
+  ConeGeometry: q => new THREE.ConeGeometry(q.radius, q.height, 12, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength),
+  CapsuleGeometry: q => new THREE.CapsuleGeometry(q.radius, q.length, 3, 12),
+  TorusGeometry: q => new THREE.TorusGeometry(q.radius, q.tube, 6, Math.max(8, Math.round(24 * q.arc / TAU)), q.arc),
+  Box: q => new THREE.BoxGeometry(q.width, q.height, q.depth),   // the chamfer is far under a pixel by then
+  Swept: q => sweptCone(q, 12),
+};
+const lowCache = new Map();
+export function lowTwin(geo) {
+  const L = geo.userData.low;
+  if (!L) return null;
+  let g = lowCache.get(L.key);
+  if (!g) {
+    g = LOW[L.type](L.q);
+    if (L.off[0] || L.off[1] || L.off[2]) g.translate(L.off[0], L.off[1], L.off[2]);
+    g.computeBoundingSphere();
+    lowCache.set(L.key, g);
+  }
+  return g;
+}
+
 /* leafy puffs (crowns, bushes, clumps) become soft cumulus clusters of rounded lobes — the
    painted cauliflower foliage of a hand-drawn film. The light wraps round the whole cluster, not
    each lobe, so it reads as one soft mass. Very large instanced fields (thousands) keep their
@@ -391,6 +416,9 @@ function smoothGeometry(geo) {
       if (!base) { base = plan[2](); cache.set(key, base); }
       if (off[0] || off[1] || off[2]) { out = base.clone(); out.translate(off[0], off[1], off[2]); }
       else out = base;
+      const q = geo.parameters, swept = geo.type === 'ConeGeometry' && q.radius >= 0.9 && q.height >= 0.9 && q.radialSegments >= 4;
+      const lowType = geo.type === 'BoxGeometry' ? 'Box' : swept ? (q.radialSegments > 6 ? 'Swept' : null) : LOW[geo.type] ? geo.type : null;
+      if (lowType) out.userData.low = { type: lowType, q, off, key: key + ':' + off.join(',') };
     }
   }
   done.set(geo, out);

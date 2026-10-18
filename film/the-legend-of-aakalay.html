@@ -1812,8 +1812,11 @@ const MUSIC_CUES = {
   split:'hush', streets:'hush', oath:'tragic', relic:'rising', reunion:'resolve'
 };
 
+let lastDraw=-Infinity;
 function frame(now){
   requestAnimationFrame(frame);
+  if(now-lastDraw < (playing?1000/60:1000/15)-1) return;
+  lastDraw=now;
   const dt=Math.min(0.05,(now-lastRAF)/1000||0); lastRAF=now;
   if(playing){ T+=dt; if(T>=total){ T=total; playing=false; Audio2.setPlaying(false); updatePlayBtn(); } }
   const idx=sceneAt(T);

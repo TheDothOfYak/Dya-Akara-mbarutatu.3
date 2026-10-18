@@ -1821,8 +1821,10 @@
       /* ---------- main loop ---------- */
       let last = performance.now(), raf, finished = false;
       let lastPulseIdx = 0, lastReadiedLen = -1, lastPouchLeft = -1;
+      const gate = U.fpsGate(60);
       function frame(now) {
         if (!canvas.isConnected) { cancelAnimationFrame(raf); document.removeEventListener('keydown', keyHandler); if (NET && NET.room) NET.room.leave(); return; }
+        if (!gate(now)) { raf = requestAnimationFrame(frame); return; }
         const dt = Math.min(0.1, (now - last) / 1000); last = now;
         if (NET) NET.step(dt); else M.step(dt);
         renderer.draw(dt);
@@ -3658,8 +3660,10 @@
       scr.appendChild(mmWrap);
 
       let last = performance.now(), raf;
+      const gate = U.fpsGate(60);
       function frame(now) {
         if (!canvas.isConnected) { cancelAnimationFrame(raf); return; }
+        if (!gate(now)) { raf = requestAnimationFrame(frame); return; }
         const dt = Math.min(0.1, (now - last) / 1000); last = now;
         for (let i = 0; i < mult; i++) M.step(dt);
         renderer.draw(dt);

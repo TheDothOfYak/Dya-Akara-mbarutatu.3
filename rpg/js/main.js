@@ -14,6 +14,7 @@ import { paintPass } from './paint.js';
 import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { installSmoothStyle } from './smooth.js';
+import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay } from './vines.js';
 import { createAmbient } from './ambient.js';
 import { buildSky, SUN_DIR } from './sky.js';
@@ -57,6 +58,7 @@ const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, scale: 1 };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
+installDetailCull();    // parts smaller than a pixel are not drawn (they still cost a draw call each)
 installSmoothStyle();   // the film look: painted light and brushwork on every toon material, softened shapes — before anything is drawn
 
 /* ---------------- the save, and which region this page is ---------------- */
@@ -4202,6 +4204,8 @@ function updateIntroCamera(dt) {
   camera.lookAt(lerp(0, P.pos.x, e), lerp(30, P.pos.y + 2, e), lerp(-40, P.pos.z, e));
 }
 
+/* the use prompt is rewritten only when it changes (rebuilding it every frame made the page redo its layout each time) */
+function setPrompt(pe, label) { if (pe._k !== label) { pe._k = label; pe.innerHTML = `<kbd>E</kbd>${label}`; } }
 function updateHUD() {
   $('hp-fill').style.transform = `scaleX(${Math.max(0, P.hp / P.maxHp)})`;
   $('hp-lag').style.transform = `scaleX(${Math.max(0, P.hp / P.maxHp)})`;
@@ -4223,7 +4227,7 @@ function updateHUD() {
   $('poisonfx').style.opacity = P.poison > 0 ? 0.8 : 0;
   $('resume').classList.toggle('hidden', locked || touch.on || G.paused || G.mode !== 'play' || overlayOpen() || !!(DLG && DLG.choices));
   const pe = $('prompt'), pr = nearestPrompt();
-  if (pr) { pe.innerHTML = `<kbd>E</kbd>${pr.label}`; pe.classList.remove('hidden'); } else pe.classList.add('hidden');
+  if (pr) { setPrompt(pe, pr.label); pe.classList.remove('hidden'); } else pe.classList.add('hidden');
   // a faint glow on the thing you could use, and nothing else
   {
     const on = pr && pr.far !== 99 && G.mode === 'play';
@@ -4292,8 +4296,18 @@ function updateWorldBits(dt) {
    ================================================================ */
 const clock = new THREE.Clock();
 let frameDt = 1 / 60;
-function frame() {
+/* a frame cap of about 60 a second. It draws every Nth refresh of the screen rather than going by a clock,
+   so frames stay evenly spaced: on a 60Hz screen every frame is drawn, and a 120/144Hz screen draws every
+   2nd refresh instead of pushing the whole bloom-and-shadow pipeline two or three times as often as anyone
+   can see (a strict 60 on 144Hz would land 2, 3, 2, 3 refreshes apart, and that unevenness reads as judder). */
+let refreshMs = 1000 / 60, lastTick = 0, tickN = 0;
+function frame(now) {
   requestAnimationFrame(frame);
+  const gap = now - lastTick; lastTick = now;
+  if (gap > 3 && gap < 40) refreshMs += (gap - refreshMs) * 0.05;   // learn the screen's refresh rate (ignoring hitches)
+  const every = Math.max(1, Math.floor(1000 / refreshMs / 60 + 0.25));
+  if (++tickN < every) return;
+  tickN = 0;
   // steady the clock: the browser's frames arrive a little unevenly, and stepping the world by each raw gap
   // makes everything that moves shimmer. Small wobbles are smoothed out; a real hitch still counts in full.
   const rawDt = Math.min(clock.getDelta(), 1 / 20);
@@ -4305,7 +4319,7 @@ function frame() {
     touch.update(dt);
     if (VK) {
       const pe = $('prompt'), pr = G.mode === 'play' ? VK.prompt() : null;
-      if (pr) { pe.innerHTML = `<kbd>E</kbd>${pr}`; pe.classList.remove('hidden'); } else pe.classList.add('hidden');
+      if (pr) { setPrompt(pe, pr); pe.classList.remove('hidden'); } else pe.classList.add('hidden');
       VK.render();
     }
     return;
@@ -5699,7 +5713,7 @@ $('btn-ngback').onclick = () => $('newgame').classList.add('hidden');
 $('d-easy').onclick = () => newRun('easy');
 $('d-real').onclick = () => newRun('realistic');
 
-frame();
+frame(performance.now());
 
 if (BOOT === 'new' && SAVE_AT_LOAD) { $('title').classList.add('hidden'); startFromTitle(beginNew); }
 else if (BOOT === 'arrive' && REGION === 'leotik') { $('title').classList.add('hidden'); startFromTitle(arriveLeotik); }
@@ -5710,6 +5724,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 window.__torcain = {
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
+  detailCull: setDetailCull,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
   get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, enterRoom, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, lookAim, vineTarget, vineShoot, vineLet, rideSpace, get vines() { return P.vines; }, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
