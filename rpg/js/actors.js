@@ -16,7 +16,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint, celAll } from './gfx.js';
-import { lerp, clamp } from './util.js';
+import { lerp, clamp, mulberry32 } from './util.js';
 
 const TAU = Math.PI * 2;
 
@@ -215,6 +215,26 @@ export function strideLegs(legs, phase, k, air, dt, stance = 0) {
     L.knee.rotation.x = lerp(L.knee.rotation.x, kn, a);
     L.ankle.rotation.x = -(L.thigh.rotation.x + L.knee.rotation.x) * (air ? 0.3 : 0.85);
   });
+}
+
+/* a painted stripe laid on a skin: pts along it, nrm the skin's outward normal at each, w its half-width at each */
+function stripe(pts, nrm, w, mat) {
+  const pos = [], idx = [], t = new THREE.Vector3(), sd = new THREE.Vector3();
+  for (let i = 0; i < pts.length; i++) {
+    t.subVectors(pts[Math.min(i + 1, pts.length - 1)], pts[Math.max(i - 1, 0)]).normalize();
+    sd.crossVectors(nrm[i], t).normalize().multiplyScalar(w[i]);
+    pos.push(pts[i].x + sd.x, pts[i].y + sd.y, pts[i].z + sd.z, pts[i].x - sd.x, pts[i].y - sd.y, pts[i].z - sd.z);
+    if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, mat); m.userData.noOutline = true;
+  return m;
+}
+/* a smooth run through control points, sampled n times, each sample put on the skin by onSkin(p) → { p, n } */
+function stripeAlong(ctrl, n, onSkin, width, mat) {
+  const c = new THREE.CatmullRomCurve3(ctrl), pts = [], nrm = [], w = [];
+  for (let i = 0; i <= n; i++) { const f = i / n, q = onSkin(c.getPoint(f)); pts.push(q.p); nrm.push(q.n); w.push(width(f)); }
+  return stripe(pts, nrm, w, mat);
 }
 
 /* ---------------- weapons (grip at the origin, along +y) ---------------- */
@@ -540,7 +560,7 @@ export function buildEikar(o = {}) {
   const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const duat = o.duat === true ? 1 : (o.duat || 0);
   const markGlowCol = duat ? 0x6a18d8 : (o.marking || 0xbfe8ff);
-  const markMat = new THREE.MeshBasicMaterial({ color: duat ? 0x1a0628 : kalo ? new THREE.Color(o.marking || 0xbfe8ff).lerp(new THREE.Color(0x203040), 0.35) : (o.markColor || 0x2a140a) });
+  const markMat = new THREE.MeshBasicMaterial({ color: duat ? 0x1a0628 : kalo ? new THREE.Color(o.marking || 0xbfe8ff).lerp(new THREE.Color(0x203040), 0.35) : (o.markColor || 0x2a140a) , side: THREE.DoubleSide });
   const eyeR = (kalo ? 0.03 : 0.027) * 1.18, ex = kalo ? 0.047 : 0.044;   // eyes a little larger: they carry the acting
   const zOn = (x, y, r) => Math.sqrt(Math.max(0, r * r - x * x - y * y));
   const markGlows = [], eyes = [], brows = [];
@@ -572,12 +592,35 @@ export function buildEikar(o = {}) {
     brow.rotation.z = Math.PI * 0.2; brow.position.y = -0.024; brow.userData.noOutline = true; bg2.add(brow);
     const browSet = s * (kalo ? -0.05 : 0.18);
     bg2.rotation.z = browSet; brows.push({ g: bg2, s, z0: browSet });
-    // the markings beneath the eyes: small downward triangles
-    const my = -0.036, mz = zOn(ex + 0.004, my, HR) + 0.004;
-    const tri = new THREE.Mesh(new THREE.CircleGeometry(kalo ? 0.019 : 0.017, 3, -Math.PI / 2), markMat);
-    tri.scale.set(0.85, 1.25, 1);
-    tri.position.set(s * (ex + 0.004), my, mz); tri.rotation.set(0.32, s * 0.42, 0); tri.userData.noOutline = true; face.add(tri);
+    // (the markings themselves are laid on below; this is their glow, on the cheekbone under the eye)
+    const my = -0.042, mz = zOn(ex + 0.004, my, HR) + 0.004;
     const gl = glowSprite(kalo || duat ? markGlowCol : (o.marking || 0xffc46a), duat ? 0.13 : 0.09, duat ? 0.6 : 0.4); gl.position.set(s * (ex + 0.004), my, mz + 0.008); face.add(gl); markGlows.push(gl);
+  }
+  /* the markings, the same on every Eikar to the base of the neck: they rise to a peak on the bridge of the nose,
+     run out under the eyes along the tops of the cheekbones, down the sides of the face, and cross at the base of
+     the neck. (Below the crossing every Eikar's are their own — see the arms.) */
+  {
+    const sk = { x: HR * skull.scale.x, y: HR * skull.scale.y, z: HR * skull.scale.z }, jw = { cy: -0.06, cz: 0.03, x: 0.075 * jaw.scale.x, y: 0.075 * jaw.scale.y, z: 0.075 * jaw.scale.z };
+    const v = new THREE.Vector3();
+    const onFace = q => {   // onto whichever is further out, the skull or the jaw
+      const a = 1 - (q.x / sk.x) ** 2 - (q.y / sk.y) ** 2, zs = a > 0 ? sk.z * Math.sqrt(a) : -1;
+      const b = 1 - (q.x / jw.x) ** 2 - ((q.y - jw.cy) / jw.y) ** 2, zj = b > 0 ? jw.cz + jw.z * Math.sqrt(b) : -1;
+      const p = new THREE.Vector3(q.x, q.y, Math.max(zs, zj, 0));
+      const n = zs >= zj ? v.set(p.x / sk.x ** 2, p.y / sk.y ** 2, p.z / sk.z ** 2) : v.set(p.x / jw.x ** 2, (p.y - jw.cy) / jw.y ** 2, (p.z - jw.cz) / jw.z ** 2);
+      n.normalize(); p.addScaledVector(n, 0.0016);
+      return { p, n: n.clone() };
+    };
+    const onNeck = q => {   // the neck: a tapering cylinder, 0.05 across at the collar to 0.042 under the jaw
+      const r = lerp(0.05, 0.042, clamp((q.y - 0.36) / 0.12, 0, 1)) + 0.0014, x = clamp(q.x, -r * 0.98, r * 0.98);
+      const n = new THREE.Vector3(x, 0, Math.sqrt(r * r - x * x)).normalize();
+      return { p: new THREE.Vector3(n.x * r, q.y, n.z * r), n };
+    };
+    const W = kalo ? 1.12 : 1, V = (x, y) => new THREE.Vector3(x, y, 0);
+    for (const s of [-1, 1]) {
+      face.add(stripeAlong([V(0, 0.024), V(s * 0.011, 0.002), V(s * 0.024, -0.03), V(s * ex, -0.045), V(s * (ex + 0.024), -0.042), V(s * 0.08, -0.06), V(s * 0.06, -0.088), V(s * 0.05, -0.105)], 30, onFace,
+        f => W * (f < 0.12 ? lerp(0.001, 0.003, f / 0.12) : f < 0.55 ? lerp(0.003, 0.004, (f - 0.12) / 0.43) : lerp(0.004, 0.003, (f - 0.55) / 0.45)), markMat));
+      torso.add(stripeAlong([V(s * 0.042, 0.452), V(s * 0.03, 0.432), V(s * 0.012, 0.418), V(-s * 0.006, 0.408), V(-s * 0.016, 0.401)], 14, onNeck, f => W * lerp(0.0034, 0.0026, f), markMat));
+    }
   }
   const nose = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), skinMat); nose.scale.set(0.9, 1.25, 0.9); nose.position.set(0, -0.018, HR * 0.98); face.add(nose);
   const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.0035, 3, 8, Math.PI * 0.8), eyeMat);
@@ -666,6 +709,35 @@ export function buildEikar(o = {}) {
   // arms and hands
   const armOpts = { L1: 0.25, L2: 0.27, ru: 0.043 * (kalo ? 1.08 : 1), rf: 0.036 * (kalo ? 1.08 : 1), rh: 0.04, skin: skinMat, cuff: beltMat };
   const arms = [-1, 1].map(s => rigArm(torso, s, new THREE.Vector3(s * SX, SH - 0.01, 0), armOpts));
+  /* below the crossing every Eikar's markings are their own: broken pieces — dashes, hooks, chevrons, forks, dots —
+     scattered over the shoulders and down the arms, never one line. Seeded by who they are, so the same each time. */
+  {
+    let h = 2166136261; for (const ch of `${o.seed ?? ''}|${o.skin}|${o.cap}|${o.marking}|${o.tunic}|${o.emblem}|${o.build}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    const rnd = mulberry32(h >>> 0), W = kalo ? 1.12 : 1;
+    const lr = (t, r0, r1, bulge, at) => r0 + (r1 - r0) * t + bulge * Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, (t - at) / 0.95 + 0.5)))), 1.6);   // (as limbGeo shapes them)
+    const fl = armOpts.L2 - armOpts.rh * 0.9;
+    const limbR = (seg, y) => (seg === 'u' ? lr(clamp(-y / armOpts.L1, 0, 1), armOpts.ru * 1.02, armOpts.rf * 1.02, armOpts.ru * 0.16, 0.32) : lr(clamp(-y / fl, 0, 1), armOpts.rf, armOpts.rf * 0.72, armOpts.rf * 0.2, 0.22)) + 0.0018;
+    const onLimb = seg => q => { const r = limbR(seg, q.y), n = new THREE.Vector3(Math.sin(q.x), 0, Math.cos(q.x)); return { p: new THREE.Vector3(n.x * r, q.y, n.z * r), n }; };   // q.x: the angle round the limb
+    const delt = { x: 0.052, y: 0.052 * 0.85, z: 0.052 * 0.95 };
+    const onDelt = q => { const n = new THREE.Vector3(Math.sin(q.x) * Math.cos(q.y), Math.sin(q.y), Math.cos(q.x) * Math.cos(q.y)); return { p: new THREE.Vector3(n.x * (delt.x + 0.0016), n.y * (delt.y + 0.0016), n.z * (delt.z + 0.0016)), n: n.clone() }; };   // q.x round, q.y up
+    const V = (x, y) => new THREE.Vector3(x, y, 0);
+    const piece = (parent, onSkin, a0, y0, da, dy) => {   // one mark, in (angle, height) space
+      const kind = Math.floor(rnd() * 5), sz = 0.6 + rnd() * 0.7, w0 = W * (0.0034 + rnd() * 0.0012), wd = f => w0 * Math.sin(Math.PI * (0.12 + 0.76 * f));
+      if (kind === 0) parent.add(stripeAlong([V(a0, y0), V(a0 + da * sz * 0.5, y0 + dy * sz * 0.5), V(a0 + da * sz, y0 + dy * sz)], 6, onSkin, wd, markMat));                     // a dash
+      else if (kind === 1) parent.add(stripeAlong([V(a0, y0), V(a0 + da * sz, y0 + dy * sz * 0.6), V(a0 + da * sz * 1.2, y0 + dy * sz * 1.2), V(a0 + da * sz * 0.6, y0 + dy * sz * 1.5)], 10, onSkin, wd, markMat));   // a hook
+      else if (kind === 2) { for (const k of [-1, 1]) parent.add(stripeAlong([V(a0, y0), V(a0 + k * da * sz * 0.8, y0 + Math.abs(dy) * sz * 0.9)], 4, onSkin, wd, markMat)); }   // a chevron
+      else if (kind === 3) { parent.add(stripeAlong([V(a0, y0), V(a0, y0 + dy * sz)], 5, onSkin, wd, markMat)); for (const k of [-1, 1]) parent.add(stripeAlong([V(a0, y0 + dy * sz), V(a0 + k * da * sz * 0.5, y0 + dy * sz * 1.5)], 4, onSkin, wd, markMat)); }   // a fork
+      else for (let k = 0; k < 2 + Math.floor(rnd() * 3); k++) { const a = a0 + da * k * 0.6, y = y0 + dy * k * 0.5; parent.add(stripeAlong([V(a, y), V(a + da * 0.1, y + dy * 0.14)], 2, onSkin, () => W * 0.0042, markMat)); }   // a run of dots
+    };
+    for (const a of arms) {
+      const s = a.s, out = s * Math.PI / 2;   // the outside of the arm
+      // on the shoulder cap
+      for (let k = 0; k < 1 + Math.floor(rnd() * 2); k++) { const g = new THREE.Group(); g.position.set(s * SX, SH, 0); torso.add(g); piece(g, onDelt, out * (0.4 + rnd() * 0.5), 0.2 + rnd() * 0.6, s * (0.25 + rnd() * 0.3), -(0.3 + rnd() * 0.4)); }
+      // down the upper arm and the forearm, broken up, different every time
+      for (let k = 0; k < 2 + Math.floor(rnd() * 3); k++) piece(a.upper, onLimb('u'), out * (0.4 + rnd() * 0.8), -0.03 - rnd() * 0.15, s * (0.5 + rnd() * 0.7), -(0.04 + rnd() * 0.05));
+      for (let k = 0; k < 1 + Math.floor(rnd() * 2); k++) piece(a.fore, onLimb('f'), out * (0.5 + rnd() * 0.7), -0.02 - rnd() * 0.04, s * (0.5 + rnd() * 0.6), -(0.03 + rnd() * 0.025));
+    }
+  }
   {
     const grainM = bio.mat(duat ? 0x9a5aff : (o.marking || 0xffc46a), new THREE.Color(o.skin || '#a8743e').getHex(), 0.2, 0.0, 1.8);
     for (const a of arms) {
