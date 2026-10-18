@@ -149,7 +149,7 @@
     w.appendChild(U.el('div', {}, [cv]));
     const pctx = cv.getContext('2d');
     let raf = 0;
-    const gate = U.fpsGate(30);
+    const gate = U.fpsGate(60);
     function frame(now) {
       if (!document.body.contains(cv)) { cancelAnimationFrame(raf); return; }
       if (!gate(now)) { raf = requestAnimationFrame(frame); return; }

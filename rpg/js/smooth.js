@@ -247,7 +247,7 @@ const cache = new Map();             // param key → shared smooth geometry
    (The swell/lean terms are kept at zero; normals are analytic.) */
 function organicBox(w, h, d) {
   const size = [w, h, d], half = [w / 2, h / 2, d / 2], mn = Math.min(w, h, d);
-  const r = Math.min(mn * 0.06, 0.07), k = 1, m = 1, n = 2 * k + m;   // a slim chamfer that catches the light: masonry stays crisp (one step: its normals round it off)
+  const r = Math.min(mn * 0.06, 0.07), k = 2, m = 1, n = 2 * k + m;   // a slim chamfer that catches the light: masonry stays crisp
   const g = new THREE.BoxGeometry(w, h, d, n, n, n);
   if (r <= 1e-5) return g;
   const bulge = 0, taper = 0;
@@ -285,9 +285,9 @@ function organicBox(w, h, d) {
 
 /* a roof or spire: the straight cone swept into a concave curve that flares out at the eaves.
    A 4-sided roof stays 4-sided (it still fits its square house), just curved. */
-function sweptCone(q, crowd) {
-  const radial = q.radialSegments <= 6 ? q.radialSegments : crowd ? 12 : 28;
-  const g = new THREE.ConeGeometry(q.radius, q.height, radial, crowd ? 5 : 10, q.openEnded, q.thetaStart, q.thetaLength);
+function sweptCone(q, sides = 28) {
+  const radial = q.radialSegments <= 6 ? q.radialSegments : sides;
+  const g = new THREE.ConeGeometry(q.radius, q.height, radial, 10, q.openEnded, q.thetaStart, q.thetaLength);
   const pos = g.attributes.position, H = q.height;
   for (let i = 0; i < pos.count; i++) {
     const t = Math.min(1, Math.max(0, (pos.getY(i) + H / 2) / H));
@@ -300,44 +300,49 @@ function sweptCone(q, crowd) {
 }
 
 /* what each kind becomes; null = leave it */
-/* how round a round thing needs to be depends on how big it is: a hut's dome wants 28 sides, an eye or a
-   knuckle a few centimetres across is perfectly round with 12, and there are thousands of those on the
-   crowds. (Full segments on every tiny part was most of the millions of triangles each frame.) */
-let crowd = false;   // shaping a forest of instances (hundreds of copies): each copy gets the lighter cut
-const segs = (r, big, mid, small) => crowd || r < 0.08 ? small : r < 0.3 ? mid : big;
 const RULES = {
   BoxGeometry: q => ['box', [q.width, q.height, q.depth], () => organicBox(q.width, q.height, q.depth)],
-  SphereGeometry: q => {
-    const w = Math.max(q.widthSegments, segs(q.radius, 28, 18, 12)), h = Math.max(q.heightSegments, segs(q.radius, 18, 12, 8));
-    return q.widthSegments < 5 || (w === q.widthSegments && h === q.heightSegments) ? null
-      : [null, null, () => new THREE.SphereGeometry(q.radius, w, h, q.phiStart, q.phiLength, q.thetaStart, q.thetaLength)];
-  },
-  CylinderGeometry: q => {
-    const n = segs(Math.max(q.radiusTop, q.radiusBottom), 28, 18, 12);
-    return q.radialSegments < 7 || q.radialSegments >= n ? null
-      : [null, null, () => new THREE.CylinderGeometry(q.radiusTop, q.radiusBottom, q.height, n, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength)];
-  },
-  ConeGeometry: q => {
-    if (q.radius >= 0.9 && q.height >= 0.9 && q.radialSegments >= 4) return [null, null, () => sweptCone(q, crowd)];   // roofs, spires, pines
-    const n = segs(q.radius, 28, 18, 12);
-    return q.radialSegments < 7 || q.radialSegments >= n ? null
-      : [null, null, () => new THREE.ConeGeometry(q.radius, q.height, n, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength)];
-  },
-  CapsuleGeometry: q => {
-    const rad = Math.max(q.radialSegments, segs(q.radius, 20, 14, 10)), cap = Math.max(q.capSegments, segs(q.radius, 6, 4, 3));
-    return q.radialSegments < 6 || (rad === q.radialSegments && cap === q.capSegments) ? null
-      : [null, null, () => new THREE.CapsuleGeometry(q.radius, q.length, cap, rad)];
-  },
+  SphereGeometry: q => q.widthSegments < 5 || (q.widthSegments >= 28 && q.heightSegments >= 18) ? null
+    : [null, null, () => new THREE.SphereGeometry(q.radius, Math.max(q.widthSegments, 28), Math.max(q.heightSegments, 18), q.phiStart, q.phiLength, q.thetaStart, q.thetaLength)],
+  CylinderGeometry: q => q.radialSegments < 7 || q.radialSegments >= 28 ? null
+    : [null, null, () => new THREE.CylinderGeometry(q.radiusTop, q.radiusBottom, q.height, 28, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength)],
+  ConeGeometry: q => q.radius >= 0.9 && q.height >= 0.9 && q.radialSegments >= 4 ? [null, null, () => sweptCone(q)]   // roofs, spires, pines
+    : q.radialSegments < 7 || q.radialSegments >= 28 ? null
+    : [null, null, () => new THREE.ConeGeometry(q.radius, q.height, 28, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength)],
+  CapsuleGeometry: q => q.radialSegments < 6 || (q.radialSegments >= 20 && q.capSegments >= 6) ? null
+    : [null, null, () => new THREE.CapsuleGeometry(q.radius, q.length, Math.max(q.capSegments, 6), Math.max(q.radialSegments, 20))],
   TorusGeometry: q => {
-    const small = crowd || q.radius < 0.15;
-    const tub = q.tubularSegments < 8 ? q.tubularSegments : Math.max(q.tubularSegments, Math.round((small ? 24 : 44) * q.arc / TAU) + (small ? 4 : 6)), rad = Math.max(q.radialSegments, q.tube < 0.05 ? 6 : 10);
+    const tub = q.tubularSegments < 8 ? q.tubularSegments : Math.max(q.tubularSegments, Math.round(44 * q.arc / TAU) + 6), rad = Math.max(q.radialSegments, 10);
     return tub === q.tubularSegments && rad === q.radialSegments ? null : [null, null, () => new THREE.TorusGeometry(q.radius, q.tube, rad, tub, q.arc)];
   },
-  CircleGeometry: q => {
-    const n = segs(q.radius, 40, 24, 16);
-    return q.segments < 8 || q.segments >= n ? null : [null, null, () => new THREE.CircleGeometry(q.radius, n, q.thetaStart, q.thetaLength)];
-  },
+  CircleGeometry: q => q.segments < 8 || q.segments >= 40 ? null
+    : [null, null, () => new THREE.CircleGeometry(q.radius, 40, q.thetaStart, q.thetaLength)],
 };
+/* a lighter cut of each round shape, for the moments it is only a few pixels across on screen
+   (detail.js swaps it in then, and back as it comes near: at that size the two are identical) */
+const LOW = {
+  SphereGeometry: q => new THREE.SphereGeometry(q.radius, 16, 10, q.phiStart, q.phiLength, q.thetaStart, q.thetaLength),
+  CylinderGeometry: q => new THREE.CylinderGeometry(q.radiusTop, q.radiusBottom, q.height, 12, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength),
+  ConeGeometry: q => new THREE.ConeGeometry(q.radius, q.height, 12, q.heightSegments, q.openEnded, q.thetaStart, q.thetaLength),
+  CapsuleGeometry: q => new THREE.CapsuleGeometry(q.radius, q.length, 3, 12),
+  TorusGeometry: q => new THREE.TorusGeometry(q.radius, q.tube, 6, Math.max(8, Math.round(24 * q.arc / TAU)), q.arc),
+  Box: q => new THREE.BoxGeometry(q.width, q.height, q.depth),   // the chamfer is far under a pixel by then
+  Swept: q => sweptCone(q, 12),
+};
+const lowCache = new Map();
+export function lowTwin(geo) {
+  const L = geo.userData.low;
+  if (!L) return null;
+  let g = lowCache.get(L.key);
+  if (!g) {
+    g = LOW[L.type](L.q);
+    if (L.off[0] || L.off[1] || L.off[2]) g.translate(L.off[0], L.off[1], L.off[2]);
+    g.computeBoundingSphere();
+    lowCache.set(L.key, g);
+  }
+  return g;
+}
+
 /* leafy puffs (crowns, bushes, clumps) become soft cumulus clusters of rounded lobes — the
    painted cauliflower foliage of a hand-drawn film. The light wraps round the whole cluster, not
    each lobe, so it reads as one soft mass. Very large instanced fields (thousands) keep their
@@ -398,26 +403,25 @@ function smoothPuff(geo, cluster) {
   return out;
 }
 
-const doneCrowd = new WeakMap();
-function smoothGeometry(geo, many = false) {
-  const seen = many ? doneCrowd : done;
-  if (seen.has(geo)) return seen.get(geo);
+function smoothGeometry(geo) {
+  if (done.has(geo)) return done.get(geo);
   let out = geo;
   const rule = RULES[geo.type];
-  crowd = many;
   const plan = rule && geo.parameters && rule(geo.parameters);
-  crowd = false;
   if (plan && !geo.userData.keepFacets && !geo.attributes.color && !geo.attributes.uv1) {
     const off = untouchedOffset(geo);
     if (off) {
-      const key = geo.type + (many ? ':crowd:' : ':') + JSON.stringify(geo.parameters);
+      const key = geo.type + ':' + JSON.stringify(geo.parameters);
       let base = cache.get(key);
-      if (!base) { crowd = many; base = plan[2](); crowd = false; cache.set(key, base); }
+      if (!base) { base = plan[2](); cache.set(key, base); }
       if (off[0] || off[1] || off[2]) { out = base.clone(); out.translate(off[0], off[1], off[2]); }
       else out = base;
+      const q = geo.parameters, swept = geo.type === 'ConeGeometry' && q.radius >= 0.9 && q.height >= 0.9 && q.radialSegments >= 4;
+      const lowType = geo.type === 'BoxGeometry' ? 'Box' : swept ? (q.radialSegments > 6 ? 'Swept' : null) : LOW[geo.type] ? geo.type : null;
+      if (lowType) out.userData.low = { type: lowType, q, off, key: key + ':' + off.join(',') };
     }
   }
-  seen.set(geo, out);
+  done.set(geo, out);
   return out;
 }
 
@@ -432,7 +436,7 @@ function flush() {
       const from = o.geometry;
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
-        : smoothGeometry(o.geometry, o.isInstancedMesh && o.instanceMatrix.count > 100);
+        : smoothGeometry(o.geometry);
       if (g !== o.geometry) { o.geometry = g; o.userData.smFrom = from; }
     }
   });

@@ -55,16 +55,17 @@
   U.uid = (prefix) => (prefix || 'id') + '_' + Date.now().toString(36) + '_' + (idCounter++).toString(36) + '_' + Math.floor(Math.random() * 46656).toString(36);
 
   /* ---------- math ---------- */
-  /* frame cap for requestAnimationFrame loops: gate(now) is true at most `fps` times a second.
-     High-refresh screens (120/144Hz) otherwise redraw everything two or three times as often
-     as anyone can see, and that is what makes laptops run hot. */
+  /* frame cap for requestAnimationFrame loops: gate(now) is true on about `fps` frames a second.
+     It passes every Nth refresh of the screen rather than going by a clock, so frames stay evenly
+     spaced: on a 60Hz screen every frame passes; a 120/144Hz screen draws every 2nd refresh
+     instead of redrawing two or three times as often as anyone can see. */
   U.fpsGate = function (fps) {
-    const step = 1000 / fps;
-    let prev = -Infinity;
+    let refresh = 1000 / 60, prev = 0, n = 0;
     return function (now) {
-      const gap = now - prev;
-      if (gap < step - 1) return false;
-      prev = gap > step * 4 ? now : now - (gap % step);
+      const gap = now - prev; prev = now;
+      if (gap > 3 && gap < 40) refresh += (gap - refresh) * 0.05;   // learn the screen's refresh rate (ignoring hitches)
+      if (++n < Math.max(1, Math.floor(1000 / refresh / fps + 0.25))) return false;
+      n = 0;
       return true;
     };
   };

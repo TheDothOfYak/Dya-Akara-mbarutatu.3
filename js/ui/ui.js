@@ -23,7 +23,7 @@
     document.body.appendChild(U.el('div', { id: 'toasts' }));
     /* global animation loop for card art */
     let last = performance.now();
-    const gate = U.fpsGate(30);
+    const gate = U.fpsGate(60);
     function loop(now) {
       requestAnimationFrame(loop);
       if (!UI.animCards.size || !gate(now)) return;
@@ -119,7 +119,7 @@
         pool = ['gynge', 'rubbermcfly', 'domestic_punk', 'su_naga'].map(id => SP.get(id));
       }
       let idx = 0, t0 = performance.now();
-      const gate = U.fpsGate(30);
+      const gate = U.fpsGate(60);
       function spin(now) {
         if (!loadingEl) return;
         if (!gate(now)) { loadingRAF = requestAnimationFrame(spin); return; }
@@ -364,7 +364,7 @@
     back.onclick = () => opts.onBack && opts.onBack();
     left.appendChild(back);
     let raf, t0 = performance.now();
-    const gate = U.fpsGate(30);
+    const gate = U.fpsGate(60);
     function turntable(now) {
       if (!cv.isConnected) { cancelAnimationFrame(raf); return; }
       if (!gate(now)) { raf = requestAnimationFrame(turntable); return; }
