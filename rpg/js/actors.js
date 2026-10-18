@@ -479,6 +479,7 @@ export function buildEikar(o = {}) {
     if (built) { capeG.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; addOutline(m, 0.012); } }); celAll(capeG); }   // (put on later: inked and cel-drawn like the rest)
   }
   let built = false;
+  const outfit = {};
   if (o.cape) makeCape(o.cape);
 
   // arms and hands
@@ -560,6 +561,49 @@ export function buildEikar(o = {}) {
       capeMat.color.set(color); capeG.visible = true;
     },
     get hasCape() { return !!(capeG && capeG.visible); },
+    /* what else he wears, each shown only while it's on: { body: color|null (a jerkin over the tunic, with
+       shoulder pads), hands: color|null (laced bracers), feet: color|null (tall hide boots) } */
+    setOutfit(o2 = {}) {
+      const ink = g => { g.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; addOutline(m, 0.012); } }); celAll(g); };
+      if ('body' in o2) {
+        if (o2.body != null && !outfit.body) {
+          const g = new THREE.Group(), m = paint(toon(o2.body), 'cloth'), dark = toon(0x2a1a10);
+          const VP = [[0.166, -0.12], [0.14, -0.01], [0.126, 0.09], [0.138, 0.18], [0.16, 0.26], [0.162, 0.32], [0.136, 0.365]];
+          const vest = new THREE.Mesh(new THREE.LatheGeometry(VP.map(([r, y]) => new THREE.Vector2(r, y)), 18), m); vest.scale.set(bw * 1.04, 1, 0.68 * (kalo ? 1.08 : 1) * 1.08); g.add(vest);
+          for (const q of [-1, 1]) { const pad = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), m); pad.scale.set(1.15, 0.6, 1.05); pad.position.set(q * SX, SH + 0.01, 0); pad.rotation.z = -q * 0.35; g.add(pad); }
+          for (let k = 0; k < 4; k++) { const lace = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.01), dark); lace.position.set(0, 0.02 + k * 0.07, 0.118 * 0.68 * 1.12 * (kalo ? 1.08 : 1) + 0.012); lace.rotation.z = (k % 2 ? 0.5 : -0.5); g.add(lace); }
+          ink(g); torso.add(g); outfit.body = { g, m };
+        }
+        if (outfit.body) { outfit.body.g.visible = o2.body != null; if (o2.body != null) outfit.body.m.color.set(o2.body); }
+      }
+      if ('hands' in o2) {
+        if (o2.hands != null && !outfit.hands) {
+          const m = paint(toon(o2.hands), 'cloth'), laceM = toon(0xd8c098), gs = [];
+          for (const a of arms) {
+            const g = new THREE.Group(), fl = armOpts.L2 - armOpts.rh * 0.9;
+            const br = new THREE.Mesh(new THREE.CylinderGeometry(armOpts.rf * 1.38, armOpts.rf * 1.22, fl * 0.62, 10), m); br.position.y = -fl * 0.55; g.add(br);
+            for (let k = 0; k < 3; k++) { const l = new THREE.Mesh(new THREE.TorusGeometry(armOpts.rf * 1.36, 0.004, 4, 10), laceM); l.rotation.x = Math.PI / 2; l.position.y = -fl * (0.34 + k * 0.2); g.add(l); }
+            ink(g); a.fore.add(g); gs.push(g);
+          }
+          outfit.hands = { gs, m };
+        }
+        if (outfit.hands) { outfit.hands.gs.forEach(g => { g.visible = o2.hands != null; }); if (o2.hands != null) outfit.hands.m.color.set(o2.hands); }
+      }
+      if ('feet' in o2) {
+        if (o2.feet != null && !outfit.feet) {
+          const m = toon(o2.feet), gs = [];
+          for (const L of legs) {
+            const g = new THREE.Group();
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(legOpts.rs * 1.42, legOpts.rs * 1.3, legOpts.Ls * 0.62, 10), m); shaft.position.y = -legOpts.Ls * 0.62; g.add(shaft);
+            const fold = new THREE.Mesh(new THREE.TorusGeometry(legOpts.rs * 1.45, 0.012, 5, 12), m); fold.rotation.x = Math.PI / 2; fold.position.y = -legOpts.Ls * 0.31; g.add(fold);
+            const toe = new THREE.Mesh(new THREE.CapsuleGeometry(legOpts.fh * 0.56, legOpts.foot * 1.05, 3, 8), m); toe.rotation.x = Math.PI / 2; toe.scale.set(legOpts.fw / legOpts.fh * 1.08, 1, 1.05); toe.position.set(0, -legOpts.Ls - legOpts.ah + legOpts.fh * 0.5, legOpts.foot * 0.3); g.add(toe);
+            ink(g); L.knee.add(g); gs.push(g);
+          }
+          outfit.feet = { gs, m };
+        }
+        if (outfit.feet) { outfit.feet.gs.forEach(g => { g.visible = o2.feet != null; }); if (o2.feet != null) outfit.feet.m.color.set(o2.feet); }
+      }
+    },
     /* st: { speed, onGround, t, swing: null | { kind: 1|2|3|4, p: 0..1 } | number, windup, attack,
              heat, drink, talking, thrown, duat } */
     animate(dt, st) {
