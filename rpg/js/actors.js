@@ -612,7 +612,7 @@ export function buildEikar(o = {}) {
         }
       }
       if (glide > 0.01) { sT.set(-s * 0.17, 0.86, 0.06); fT.lerp(sT, glide); }
-      if (st.ride && !sw && !st.drink) { sT.set(-s * 0.12, -0.02, 0.3); fT.lerp(sT, 0.85); fD.set(0, 0.4, 1); fB.set(s, 0, 0); }
+      if ((st.ride || st.reins) && !sw && !st.drink) { sT.set(-s * 0.12, -0.02, 0.3); fT.lerp(sT, 0.85); fD.set(0, 0.4, 1); fB.set(s, 0, 0); }
       if (!gliding && !sw && airK > 0.01) { fT.x += -s * 0.08 * airK; fT.y += 0.12 * airK; }
 
       // ---- torso, head, legs ----
@@ -665,13 +665,13 @@ export function buildEikar(o = {}) {
       }
       // astride a mount: hips in the saddle, thighs forward and apart round its back, shins down its flanks;
       // a little lean into the going, and the body gives with each stride instead of riding it stiff
-      rideK = lerp(rideK, st.ride ? 1 : 0, 1 - Math.exp(-12 * dt));
+      rideK = lerp(rideK, st.ride || st.sit ? 1 : 0, 1 - Math.exp(-12 * dt));   // (sat on a bench or a log: the same fold, knees together)
       if (rideK > 0.01) {
         const rs = st.rideSpeed || 0, gait = st.rideBob || 0;
         legs.forEach(L => {
           const side = Math.sign(L.thigh.position.x) || 1;
-          L.thigh.rotation.x = lerp(L.thigh.rotation.x, -1.3, rideK); L.knee.rotation.x = lerp(L.knee.rotation.x, 1.35, rideK);
-          L.thigh.rotation.z = side * 0.42 * rideK; L.ankle.rotation.x = lerp(L.ankle.rotation.x, -0.15, rideK);
+          L.thigh.rotation.x = lerp(L.thigh.rotation.x, st.sit ? -1.5 : -1.3, rideK); L.knee.rotation.x = lerp(L.knee.rotation.x, st.sit ? 1.5 : 1.35, rideK);
+          L.thigh.rotation.z = side * (st.sit ? 0.08 : 0.42) * rideK; L.ankle.rotation.x = lerp(L.ankle.rotation.x, -0.15, rideK);
         });
         body.position.y = lerp(body.position.y, HIP - gait * 0.05, rideK);
         torso.rotation.x = lerp(torso.rotation.x, 0.1 + Math.min(rs / 20, 1) * 0.28 + gait * 0.06, rideK);

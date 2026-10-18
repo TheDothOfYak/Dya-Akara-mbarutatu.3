@@ -243,3 +243,56 @@ export class Particles {
 
   setScale(px) { this.points.material.uniforms.uScale.value = px; }
 }
+
+/* a teardrop flame tongue: round base at y=0, pointed tip at y=h, the tip leaning along +x */
+function flameTongue(h, w, lean = 0, seg = 8) {
+  const pts = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12, r = Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 0.9) * Math.pow(1 - t, 0.35);
+    pts.push(new THREE.Vector2(Math.max(r * w * 1.2, 0.0001), t * h));
+  }
+  const g = new THREE.LatheGeometry(pts, seg), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const t = p.getY(i) / h; p.setX(i, p.getX(i) + lean * h * t * t); }
+  g.computeVertexNormals();
+  return g;
+}
+/* a real campfire: a ring of stones, a teepee of logs (charred where they meet), and flames that lick and
+   flicker — red outside, orange, a yellow-white heart — with a soft glow over it. update(t) makes it burn;
+   set the group's visible to put it out. */
+export function buildCampfire(scale = 1) {
+  const g = new THREE.Group(); g.scale.setScalar(scale);
+  const stone = toon(0x8a8278), stone2 = toon(0x6e675e), log = toon(0x5a3a22), ash = toon(0x2a1c14);
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2, s = new THREE.Mesh(new THREE.DodecahedronGeometry(0.19, 0), i % 3 ? stone : stone2);
+    s.position.set(Math.cos(a) * 0.78, 0.09, Math.sin(a) * 0.78); s.scale.set(1.25, 0.75, 1); s.rotation.set(i, i * 2.3, 0); g.add(s);
+  }
+  const bed = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.06, 14), ash); bed.position.y = 0.03; g.add(bed);
+  const top = new THREE.Vector3(0, 0.78, 0);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2 + 0.3, foot = new THREE.Vector3(Math.cos(a) * 0.5, 0.04, Math.sin(a) * 0.5), len = foot.distanceTo(top);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.075, len, 6).rotateX(Math.PI / 2), log);
+    m.position.copy(foot).lerp(top, 0.5); m.lookAt(top); g.add(m);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 4), ash); tip.position.copy(foot).lerp(top, 0.82); g.add(tip);
+  }
+  const flameM = (c, op, add) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending });
+  const outer = flameM(0xe8501a, 0.92), mid = flameM(0xff9a2a, 0.95), core = flameM(0xffe7a0, 0.9, true);
+  const tongues = [];
+  const tongue = (h, w, x, z, lean, ry, mat) => {
+    const m = new THREE.Mesh(flameTongue(h, w, lean), mat); m.position.set(x, 0.06, z); m.rotation.y = ry; m.renderOrder = 2; m.userData.noOutline = true; g.add(m);
+    tongues.push({ m, ph: Math.random() * 6.3, f: 7 + Math.random() * 7, h0: 1 }); return m;
+  };
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; tongue(0.75 + (i % 2) * 0.3, 0.2, Math.cos(a) * 0.16, Math.sin(a) * 0.16, 0.25, -a, outer); }
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.6; tongue(0.85 + (i % 2) * 0.25, 0.15, Math.cos(a) * 0.09, Math.sin(a) * 0.09, 0.18, -a, mid); }
+  tongue(1.25, 0.16, 0, 0, 0.05, 0, mid);
+  tongue(0.7, 0.1, 0, 0, 0.04, 0, core);
+  const glow = glowSprite(0xff8a3a, 3.2, 0.55); glow.position.y = 0.7; g.add(glow);
+  g.userData.update = t => {
+    for (const T of tongues) {
+      const s = 0.82 + Math.sin(t * T.f + T.ph) * 0.14 + Math.sin(t * T.f * 2.3 + T.ph * 1.7) * 0.08;
+      T.m.scale.set(1 + (1 - s) * 0.4, s, 1 + (1 - s) * 0.4);
+      T.m.rotation.z = Math.sin(t * 3.1 + T.ph) * 0.08; T.m.rotation.x = Math.sin(t * 2.7 + T.ph * 2) * 0.08;
+    }
+    glow.material.opacity = 0.45 + Math.sin(t * 9) * 0.06 + Math.sin(t * 23) * 0.04;
+  };
+  return g;
+}

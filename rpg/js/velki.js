@@ -421,6 +421,23 @@ export function createVelki(ctx) {
   /* ---------------- Tanoc ---------------- */
   const tanoc = buildYoungTanoc(); scene.add(tanoc.root);
   const P = { pos: V3(2.5, 0, 46), vel: V3(), yaw: Math.PI, onGround: true, coyote: 0, jumpBuf: 0, stepPh: 0 };
+  /* the Ahoac glide cloak, once the captain has given it: rolled on his back, and spread like wings while he glides
+     (a group under the root that the walker shows only while gliding — the actor reads that as its glide pose) */
+  let hasCloak = ctx.at === 'spire';
+  const CLOAK = 0x9a3a1a;
+  const cloakRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.34, 10), toon(CLOAK)); cloakRoll.rotation.z = Math.PI / 2; cloakRoll.position.set(0, 0.3, -0.16); addOutline(cloakRoll, 0.015);
+  tanoc.torso.add(cloakRoll);
+  const wings = new THREE.Group();
+  {
+    const gm = toon(CLOAK, { side: THREE.DoubleSide });
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(1.0, 0.45, 1.75, 0.08); sh.lineTo(1.35, -0.42); sh.quadraticCurveTo(0.7, -0.26, 0, -0.52); sh.lineTo(0, 0);
+      const w = new THREE.Mesh(new THREE.ShapeGeometry(sh), gm); w.scale.x = s; w.rotation.x = -Math.PI / 2 + 0.25; w.position.set(s * 0.25, 1.45, -0.18); w.userData.noOutline = true; wings.add(w);
+    }
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.035, 4, 10), toon(0xd9a441)); collar.position.y = 1.45; collar.rotation.x = Math.PI / 2; wings.add(collar);
+  }
+  wings.visible = false; tanoc.root.add(wings);
+  cloakRoll.visible = hasCloak;
   P.pos.y = groundAt(P.pos.x, P.pos.z, 5);
   CAM.yaw = 0; CAM.pitch = 0.18;
   const camPos = V3(2.5, 4, 54), camTgt = V3();
@@ -474,7 +491,7 @@ export function createVelki(ctx) {
         if (DR.n >= 5) {
           for (const q of DR.sparks) { scene.remove(q.ball); scene.remove(q.ring); } DR.sparks.length = 0;
           stage = 'drilled'; ctx.save && ctx.save('spire');
-          ctx.say(B4.done, () => { stage = 'spire'; said = 0; setBeacon(); ctx.objective(STORY.PRO_OBJ.spire, 'Shift to run · Space to jump'); });
+          ctx.say(B4.done, () => { hasCloak = true; cloakRoll.visible = true; ctx.give && ctx.give('ahoac_cloak', 1); ctx.hint && ctx.hint('The Ahoac cloak: jump, then hold Space while you fall.'); stage = 'spire'; said = 0; setBeacon(); ctx.objective(STORY.PRO_OBJ.spire, 'Shift to run · Space to jump'); });
           return;
         }
       }
@@ -545,6 +562,14 @@ export function createVelki(ctx) {
     P.jumpBuf -= dt; P.coyote -= dt;
     if (P.jumpBuf > 0 && (P.onGround || P.coyote > 0) && playing && stage !== 'caught') { P.vel.y = 9.2; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
     P.vel.y -= 26 * dt;
+    // the Ahoac cloak: hold Space on the way down and it takes the wind
+    const gliding = hasCloak && playing && stage !== 'caught' && keys.Space && !P.onGround && P.vel.y < 0;
+    if (gliding) {
+      P.vel.y = Math.max(P.vel.y, -2.3);
+      const gx = len > 0.08 ? wx : Math.sin(P.yaw), gz = len > 0.08 ? wz : Math.cos(P.yaw), gl = Math.hypot(gx, gz) || 1;
+      P.vel.x = damp(P.vel.x, gx / gl * 9.5, 3, dt); P.vel.z = damp(P.vel.z, gz / gl * 9.5, 3, dt);
+    }
+    wings.visible = gliding; cloakRoll.visible = hasCloak && !gliding;
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;

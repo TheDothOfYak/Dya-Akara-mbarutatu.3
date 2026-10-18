@@ -61,6 +61,7 @@ export const ITEMS = {
   k_scroll_pull: { name: 'Kalo scroll: Duat Pull', kind: 'key', icon: '📜', value: 0, read: true, desc: 'Stored willpower. Read it to learn the Duat Pull.' },
   okid: { name: 'Okid’Relic', kind: 'key', icon: '🔮', value: 0, desc: 'Buhkon’s gift. Sing a creature’s song into a piece of it with a little stygian, and the Relic catches its truth as a token.' },
   k_seed: { name: 'Warm fire seed', kind: 'key', icon: '🔥', value: 0, desc: 'From the young fire tree in the Ember Grove, for the Stryx’s ship. Hot to the touch.' },
+  ahoac_cloak: { name: 'Ahoac glide cloak', kind: 'key', icon: '🧥', value: 0, desc: 'Rust-red, brass at the collar, cord loops for the wrists. Standard issue for the Ahoac crews, given as an apology. Jump, then hold Space as you fall, and it catches the wind.' },
   r_firestone: { name: 'Fire-stone', kind: 'key', icon: '🔥', value: 0, desc: 'A smooth skipping-stone with a thumb-dip. Its Hurst is a warm, chatty fire-rat. Set a pebble in the dip and it throws it in a streak of flame — and never burns the one it likes.' },
   r_longevity: { name: 'Humming stone', kind: 'key', icon: '🔵', value: 0, desc: 'A longevity Relic from the lakeshore. Its Hurst is settled and quiet; it keeps you a little less tired, a little less hungry.' },
   resin: { name: 'Black resin bead', kind: 'mat', icon: '⚫', value: 12, desc: 'Carved, very old, from the ruins in the Megla Aagac. Smells of smoke and rain.' },
