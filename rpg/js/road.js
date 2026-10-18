@@ -717,9 +717,11 @@ export function createRoad(ctx) {
     sfx.duat(); sfx.slam(); shake = 1.2;
     tanoc.hat.visible = false;
     const hat = tanoc.hat.clone(); const ws = V3(); tanoc.hat.getWorldScale(ws); hat.scale.copy(ws); hat.visible = true;
-    const a = P.yaw + 2.3, hp = V3(P.pos.x + Math.sin(a) * 2.6, 0, P.pos.z + Math.cos(a) * 2.6); hp.y = groundAt(hp.x, hp.z, 3) + 0.05;
+    // knocked off onto open cobbles a few paces away — never up on the cart or a stall, where he couldn't reach it
+    const a = P.yaw + 2.3, sp = freeSpot(P.pos.x + Math.sin(a) * 2.6, P.pos.z + Math.cos(a) * 2.6, 1.2), hp = V3(sp.x, heightAt(sp.x, sp.z) + 0.05, sp.z);
     hat.rotation.set(0.5, a, 0.3);
     MK.hat = addItem(hp, 'Put your hat back on', () => marketHatOn(), hat);
+    { const gl = glowSprite(0xffe0a0, 1.6, 0.6); gl.position.set(0, 0.4 / Math.max(0.01, ws.y), 0); hat.add(gl); setGoal(hp.x, hp.y, hp.z); }   // (and easy to find in the blur)
     ctx.blur(4);
     MK.frozen = true;
     // the frozen moment: low behind the boy up at the two of them, then the Sniller's one eye, then the Angel's burning face
@@ -732,7 +734,7 @@ export function createRoad(ctx) {
     }, () => { ctx.blur(3); objective(STORY.PRO_OBJ.hat, 'Walk to it and press E'); });
   }
   function marketHatOn() {
-    dropItem(MK.hat); MK.hat = null; tanoc.hat.visible = true; ctx.blur(0); sfx.heal();
+    dropItem(MK.hat); MK.hat = null; setGoal(); tanoc.hat.visible = true; ctx.blur(0); sfx.heal();
     MK.frozen = false;
     // the Angels curse the Snillers: this one comes apart into amulets, and they rain on the square
     const s = MK.sniller.position.clone().add(V3(0, 4, 0));
