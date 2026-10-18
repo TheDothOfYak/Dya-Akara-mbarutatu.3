@@ -4655,7 +4655,8 @@ function vkCtx() {
     cutscene: on => { G.mode = on ? 'intro' : 'play'; if (!on) lockMouse(); },   // keep the mouse through a scene: no cursor banner each time
     location: (a, b) => showLocation(a, b),
     objective: (head, text, h, pips, on) => proObjective(head, text, h, pips, on),
-    blur: px => { canvas.style.transition = px ? 'filter .4s' : 'filter 1.6s'; canvas.style.filter = `blur(${px}px)`; },
+    blur: px => { if (touch.on) px = 0;   // a CSS blur on the game canvas can stop phone browsers from repainting it at all
+      canvas.style.transition = px ? 'filter .4s' : 'filter 1.6s'; canvas.style.filter = `blur(${px}px)`; },
     hp: v => { $('hp-fill').style.transform = $('hp-lag').style.transform = `scaleX(${Math.max(0, v)})`; },
     save: a => { F_.roadAt = a; persist(); },
     amulets: n => { invAdd(SAVE.inv, 'amulet', n); persist(); },

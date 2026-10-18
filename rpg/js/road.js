@@ -732,7 +732,7 @@ export function createRoad(ctx) {
       if (ph === 0) { const back = V3(tp.x - mid().x, 0, tp.z - mid().z).normalize(); return { p: V3(tp.x + back.x * 3.2, 1.1, tp.z + back.z * 3.2), l: mid() }; }
       if (ph === 1) return { p: V3(sn.x + (tp.x - sn.x) * 0.3, sn.y + 5.4, sn.z + (tp.z - sn.z) * 0.3), l: V3(sn.x, sn.y + 6.4, sn.z) };
       return { p: V3(an.x + (tp.x - an.x) * 0.3, an.y + 5.6, an.z + (tp.z - an.z) * 0.3 + 1), l: V3(an.x, an.y + 6.2, an.z) };
-    }, () => { ctx.blur(3); objective(STORY.PRO_OBJ.hat, 'Walk to it and press E'); });
+    }, () => { ctx.blur(3); objective(STORY.PRO_OBJ.hat, 'Walk over to it'); });
   }
   function marketHatOn() {
     dropItem(MK.hat); MK.hat = null; setGoal(); tanoc.hat.visible = true; ctx.blur(0); sfx.heal();
@@ -1851,6 +1851,8 @@ export function createRoad(ctx) {
         } else it.mesh.position.y = it.y0 + Math.sin(t * 2 + it.pos.x) * 0.12;
       }
     }
+    // the hat: walking up to it is enough — no button to find in the blur
+    if (MK && sub === 'hat' && MK.hat && playing && ((MK.hatT = (MK.hatT || 0) + dt) > 45 || Math.hypot(MK.hat.pos.x - P.pos.x, MK.hat.pos.z - P.pos.z) < 1.6)) { sfx.ui(); marketHatOn(); }   // (and if he never gets there, the moment passes anyway)
     if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });
     kit.update(t, dt, particles);
     if (stage === 'market') fountain.update(dt, t, particles, MK && MK.esc ? [] : [P.pos]);
