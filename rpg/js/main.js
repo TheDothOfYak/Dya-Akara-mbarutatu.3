@@ -82,6 +82,8 @@ function ensureSave(S) {
   S.inv = S.inv || freshInventory(); S.inv.buffs = S.inv.buffs || {}; S.inv.trinkets = S.inv.trinkets || []; S.inv.wear = S.inv.wear || {};
   // runs from before the Ahoac cloak was a thing: anyone past the prologue has it, and is wearing it
   if (S.flags && S.flags.young && S.flags.pro && S.flags.pro !== 'velki' && !S.inv.items.ahoac_cloak) { S.inv.items.ahoac_cloak = 1; S.inv.wear.cloak = S.inv.wear.cloak || 'ahoac_cloak'; }
+  // and Torcain, grown, dresses on his own (inv.wearT): his long coat, which is what he glides with
+  if (!S.inv.wearT) { S.inv.wearT = { cloak: 'w_coat' }; S.inv.items.w_coat = 1; }
   S.skills = S.skills || freshSkills();
   for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
   if (!S.dya && DYA3.engineReady()) S.dya = DYA3.starterCollection(parseInt(String(S.runId || 'abc').replace(/[^0-9a-z]/g, '').slice(0, 6), 36) || 7);
@@ -260,9 +262,9 @@ const P = {
 };
 function rank(id) { return SAVE.ups[id] || 0; }
 const perk = id => !!SAVE.skills.perks[id];
-let FX = effects(SAVE.inv, SAVE.time);
+let FX = effects(SAVE.inv, SAVE.time, wearSet());
 function applyUps(full) {
-  FX = effects(SAVE.inv, SAVE.time);
+  FX = effects(SAVE.inv, SAVE.time, wearSet());
   P.maxHp = 100 + 15 * rank('vigor') + 5 * (SAVE.skills.lvl - 1) + 10 * SAVE.seeds + FX.hp;
   P.stamMax = 100 + 18 * rank('breath') + 10 * SAVE.seeds;
   P.flasksMax = D.flasks + rank('film') + (SAVE.flags.flask_bonus ? 1 : 0);
@@ -3211,12 +3213,17 @@ glider.visible = false; torcain.root.add(glider);
 /* what he wears: a cloak, something on the body, on the hands, on the feet (the Gear page). The cloak is what he
    glides with — young Tanoc can't glide without one; Torcain always has his coat. */
 const WEAR_SLOTS = [['cloak', 'Cloak'], ['body', 'Body'], ['hands', 'Hands'], ['feet', 'Feet']];
-function wearing(slot) { const w = SAVE.inv.wear || {}; return w[slot] && SAVE.inv.items[w[slot]] ? w[slot] : null; }
-const canGlide = () => !young() || !!wearing('cloak');
+// young Tanoc and Torcain grown share a pack, but each dresses for himself
+function wearSet() { return young() ? (SAVE.inv.wear = SAVE.inv.wear || {}) : (SAVE.inv.wearT = SAVE.inv.wearT || {}); }
+function wearing(slot) { const w = wearSet(); return w[slot] && SAVE.inv.items[w[slot]] ? w[slot] : null; }
+const canGlide = () => !!wearing('cloak');
+/* what he has on is what you see: each slot shows on him while it's worn, and is gone when it's taken off */
 function applyWear() {
-  if (young()) { const c = wearing('cloak'); torcain.setCape(c ? (ITEMS[c].color ?? 0x9a3a1a) : null); }
-  else torcain.setCape(0x5e1f3e);
+  const col = slot => { const w = wearing(slot); return w ? (ITEMS[w].color ?? 0x7a5a3a) : null; };
+  torcain.setCape(col('cloak'));
+  torcain.setOutfit({ body: col('body'), hands: col('hands'), feet: col('feet') });
 }
+applyWear();
 
 
 /* ---------------- spells ---------------- */
@@ -3487,8 +3494,8 @@ function bookAct(act, arg) {
   if (act === 'equip') { inv.axe = arg; restyleAxe(); sfx.ui(); }
   else if (act === 'trinket') { if (inv.trinkets.length >= 2) inv.trinkets.shift(); inv.trinkets.push(arg); sfx.ui(); }
   else if (act === 'untrinket') { inv.trinkets = inv.trinkets.filter(t => t !== arg); }
-  else if (act === 'wear') { inv.wear = inv.wear || {}; inv.wear[ITEMS[arg].slot] = arg; applyWear(); sfx.ui(); }
-  else if (act === 'unwear') { inv.wear = inv.wear || {}; delete inv.wear[arg]; applyWear(); sfx.ui(); }
+  else if (act === 'wear') { wearSet()[ITEMS[arg].slot] = arg; applyWear(); sfx.ui(); }
+  else if (act === 'unwear') { delete wearSet()[arg]; applyWear(); sfx.ui(); }
   else if (act === 'slot') { const [code, id] = arg.split('='); assignSlot(code, id || null); sfx.ui(); }
   else if (act === 'pouch') {
     const d = SAVE.dya; if (!d) return;
@@ -3890,7 +3897,7 @@ function travel(id) {
 book = createRpgUI({
   save: () => SAVE, shards: () => G.shards, fx: () => FX, player: () => P, perkDmg: () => (perk('heavy') ? 1.15 : 1) * (1 + 0.12 * rank('edge')),
   region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
-  wear: () => WEAR_SLOTS.map(([slot, label]) => ({ slot, label, on: wearing(slot), have: Object.keys(SAVE.inv.items).filter(k => ITEMS[k] && ITEMS[k].slot === slot) })),
+  wear: () => WEAR_SLOTS.map(([slot, label]) => ({ slot, label, on: wearing(slot), have: Object.keys(SAVE.inv.items).filter(k => ITEMS[k] && ITEMS[k].slot === slot && !(k === 'w_coat' && young())) })),   // (the grown man's coat is no fit for the boy)
   slots: () => ({ keys: SLOT_KEYS.map(k => ({ code: k, label: slotLabel(k), id: SAVE.slots[k] || '' })), choices: slotChoices(),
     relics: ['r_firestone', 'r_longevity'].filter(hasItem).map(id => ({ id, known: knowsTrigger(id), name: SLOT_ACTIONS[id].name })),
     spells: SPELL_ORDER.filter(id => SLOT_ACTIONS[id].ok()).map(id => ({ id, name: SPELLS[id].name, icon: SPELLS[id].icon, desc: SPELLS[id].desc, cd: SPELLS[id].cd })) }),
@@ -3932,7 +3939,7 @@ function steepUp(x, z, y0, hd) {
 }
 
 function updatePlayer(dt) {
-  FX = effects(SAVE.inv, SAVE.time);
+  FX = effects(SAVE.inv, SAVE.time, wearSet());
   for (const k in P.spellCd) P.spellCd[k] = Math.max(0, P.spellCd[k] - dt);
   if (P.wardT > 0) { P.wardT -= dt; if (P.wardT <= 0) P.ward = 0; }
   wardSprite.material.opacity = P.ward > 0 ? 0.35 + Math.sin(G.t * 6) * 0.1 : 0;
@@ -5838,6 +5845,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
+  bookAct, applyWear,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   detailCull: setDetailCull,

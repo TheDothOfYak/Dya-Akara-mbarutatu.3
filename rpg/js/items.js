@@ -63,9 +63,10 @@ export const ITEMS = {
   k_seed: { name: 'Warm fire seed', kind: 'key', icon: '🔥', value: 0, desc: 'From the young fire tree in the Ember Grove, for the Stryx’s ship. Hot to the touch.' },
   /* ---- things to wear: a cloak, the body, the hands, the feet (the Gear page). perk works as a trinket's does ---- */
   ahoac_cloak: { name: 'Ahoac glide cloak', kind: 'wear', slot: 'cloak', color: 0x9a3a1a, icon: '🧥', value: 0, desc: 'Rust-red, brass at the collar, cord loops for the wrists. Standard issue for the Ahoac crews, given as an apology. Jump, then hold Space as you fall: arms out, and the cloak takes the wind.' },
-  w_jerkin: { name: 'Padded jerkin', kind: 'wear', slot: 'body', icon: '🦺', value: 90, desc: 'Quilted wool under boiled leather, the kind the Ahoac train in. Take 10% less damage.', perk: { armor: 0.9 } },
-  w_bracers: { name: 'Leather bracers', kind: 'wear', slot: 'hands', icon: '🧤', value: 70, desc: 'Laced from wrist to elbow. A steadier swing: +6% damage.', perk: { dmg: 1.06 } },
-  w_boots: { name: 'Kofi-hide boots', kind: 'wear', slot: 'feet', icon: '🥾', value: 60, desc: 'Soft, light, and very quiet. Stamina returns 12% faster.', perk: { stamRegen: 1.12 } },
+  w_coat: { name: 'Torcain’s coat', kind: 'wear', slot: 'cloak', color: 0x5e1f3e, icon: '🧥', value: 0, desc: 'Plum-dark and long, gold at the collar. It has carried him off more towers than he can count: arms out, and it takes the wind.' },
+  w_jerkin: { name: 'Padded jerkin', kind: 'wear', slot: 'body', color: 0x6a4428, icon: '🦺', value: 90, desc: 'Quilted wool under boiled leather, the kind the Ahoac train in. Take 10% less damage.', perk: { armor: 0.9 } },
+  w_bracers: { name: 'Leather bracers', kind: 'wear', slot: 'hands', color: 0x5a3a20, icon: '🧤', value: 70, desc: 'Laced from wrist to elbow. A steadier swing: +6% damage.', perk: { dmg: 1.06 } },
+  w_boots: { name: 'Kofi-hide boots', kind: 'wear', slot: 'feet', color: 0x9a7650, icon: '🥾', value: 60, desc: 'Soft, light, and very quiet. Stamina returns 12% faster.', perk: { stamRegen: 1.12 } },
   w_hood: { name: 'Fisher’s oilcloak', kind: 'wear', slot: 'cloak', color: 0x2f5a5a, icon: '🧥', value: 120, desc: 'Waxed against the lake wind, cut full for a glider. Glide farther and slower.', perk: { glide: 1 } },
   r_firestone: { name: 'Fire-stone', kind: 'key', icon: '🔥', value: 0, desc: 'A smooth skipping-stone with a thumb-dip. Its Hurst is a warm, chatty fire-rat. Set a pebble in the dip and it throws it in a streak of flame — and never burns the one it likes.' },
   r_longevity: { name: 'Humming stone', kind: 'key', icon: '🔵', value: 0, desc: 'A longevity Relic from the lakeshore. Its Hurst is settled and quiet; it keeps you a little less tired, a little less hungry.' },
@@ -136,11 +137,11 @@ export function freshInventory() {
 }
 
 /* the combined effect of what you wear and what you've eaten */
-export function effects(inv, now) {
+export function effects(inv, now, wear = inv.wear) {
   const fx = { hlyst: 0, xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
   const axe = ITEMS[inv.axe] || ITEMS.axe_tanoc;
   fx.dmg *= axe.dmg || 1; if (axe.burn) fx.burn = true; fx.duatCd += axe.duatCd || 0; fx.stagger *= axe.stagger || 1;
-  for (const t of inv.trinkets.concat(Object.values(inv.wear || {}).filter(w => inv.items[w]))) {
+  for (const t of inv.trinkets.concat(Object.values(wear || {}).filter(w => inv.items[w]))) {
     const p = (ITEMS[t] || {}).perk || {};
     for (const [k, v] of Object.entries(p)) {
       if (k === 'hp' || k === 'glide' || k === 'hlyst') fx[k] += v; else fx[k] *= v;
