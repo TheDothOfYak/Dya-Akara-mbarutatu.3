@@ -1727,6 +1727,7 @@ export const ESCAPE = {
   ],
   agentHint: 'A Duskareth agent — too strong to fight. Outrun it (Shift) and keep moving.',
   agentCaught: 'The Vel’s hand closes on the bag — one amulet is gone — and you tear free.',
+  agentMiss: 'The Vel’s hand closes on the bag again — and comes away empty. It has all it can carry. You tear free.',
   agentLost: 'The Vel stops at the edge of the crowd near the gate, and simply isn’t there any more.',
   short: n => `Buhkon: “${n} — that’s all? There are more out there, Tanoc. Twelve at least. Go — quick.”`,
   gate: [
