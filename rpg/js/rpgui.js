@@ -3,7 +3,7 @@
    map — plus the trader's mat, the smith's cauldron and the
    cookfire. One panel, many pages.
    ============================================================ */
-import { ITEMS, RECIPES, FORGE, SHOP, count, hasAll, needText } from './items.js';
+import { ITEMS, RECIPES, FORGE, SHOP, BINDABLE_RELICS, bindId, count, hasAll, needText } from './items.js';
 import { PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { QUESTS, questProgress } from './quests.js';
 
@@ -51,9 +51,10 @@ export function createRpgUI(api) {
       // what he wears: a cloak, the body, the hands, the feet
       if (api.wear) {
         const W = api.wear();
-        h += `<h3>Wearing <small>a cloak (the one you glide with), the body, the hands, the feet</small></h3><div class="rwear">` + W.map(w => `<div class="rslotw"><kbd>${w.label}</kbd> ${w.on ? `${ITEMS[w.on].icon} <b>${esc(ITEMS[w.on].name)}</b> <button class="btn small" data-a="unwear:${w.slot}">Take off</button>` : '<span class="rmuted">— nothing —</span>'}</div>`).join('') + `</div>`;
+        const relicTag = k => ITEMS[k].relicArmor ? ` <em class="rrelic" style="color:#${(ITEMS[k].glow ?? 0xc89aff).toString(16).padStart(6, '0')}">✦ Relic armor</em>` : '';
+        h += `<h3>Wearing <small>a cloak (the one you glide with), the body, the hands, the feet</small></h3><div class="rwear">` + W.map(w => `<div class="rslotw"><kbd>${w.label}</kbd> ${w.on ? `${ITEMS[w.on].icon} <b>${esc(ITEMS[w.on].name)}</b>${relicTag(w.on)} <button class="btn small" data-a="unwear:${w.slot}">Take off</button>` : '<span class="rmuted">— nothing —</span>'}</div>`).join('') + `</div>`;
         const spare = W.flatMap(w => w.have.filter(k => k !== w.on));
-        if (spare.length) h += `<div class="rgrid">` + spare.map(k => card(k, 'Wear', `wear:${k}`, false, `${ITEMS[k].slot[0].toUpperCase() + ITEMS[k].slot.slice(1)}`)).join('') + `</div>`;
+        if (spare.length) h += `<div class="rgrid">` + spare.map(k => card(k, 'Wear', `wear:${k}`, false, `${ITEMS[k].slot[0].toUpperCase() + ITEMS[k].slot.slice(1)}${ITEMS[k].relicArmor ? ' · ✦ Relic armor' : ''}`)).join('') + `</div>`;
       }
       h += `<h3>Axe</h3><div class="rgrid">` + axes.map(k => card(k, inv.axe === k ? 'Wielding' : 'Wield', inv.axe === k ? null : `equip:${k}`)).join('') + `</div>`;
       h += `<h3>Trinkets <small>(wear two)</small></h3><div class="rgrid">` + (trink.length ? trink.map(k => {
@@ -125,10 +126,22 @@ export function createRpgUI(api) {
       h += `<h3>Sell</h3><div class="rgrid">` + (sellable.length ? sellable.map(k => card(k, `Sell · ${Math.max(1, Math.round(ITEMS[k].value * 0.5))} ◆`, `sell:${k}`)).join('') : '<p class="rmuted">Nothing to sell.</p>') + `</div>`;
     } else if (page === 'forge') {
       h += `<h3>Duro’s cauldron <small>forge</small></h3><div class="rstats">${shards}</div><div class="rgrid">` + FORGE.map(r => {
-        const owned = count(inv, r.out) > 0, locked = r.out === 'axe_tusk' && !(S.flags || {}).forge_tusk;
+        const owned = count(inv, r.out) > 0, later = r.later && !(api.later && api.later()), locked = (r.out === 'axe_tusk' && !(S.flags || {}).forge_tusk) || later;
         const ok = !owned && !locked && hasAll(inv, r.need) && api.shards() >= r.shards;
-        return card(r.out, owned ? 'Owned' : locked ? 'Duro needs a tusk first' : `Forge · ${r.shards} ◆`, ok ? `forge:${r.out}` : null, false, `${needText(r.need)} + ${r.shards} shards`);
+        if (later) return `<div class="rcard"><div class="ri">✦</div><div class="rt"><b>Relic armor</b><small>“A Hurst in the metal? Not until you’ve seen what one can do, boy. Ask me again after the Megla.”</small></div></div>`;
+        return card(r.out, owned ? 'Owned' : locked ? 'Duro needs a tusk first' : `Forge · ${r.shards} ◆`, ok ? `forge:${r.out}` : null, false, `${needText(r.need)} + ${r.shards} shards${ITEMS[r.out].relicArmor ? ' · ✦ Relic armor' : ''}`);
       }).join('') + `</div>`;
+    } else if (page === 'bind') {
+      // the Carpenter's bench: a Relic's Hurst into something you wear
+      const relics = Object.keys(BINDABLE_RELICS).filter(id => count(inv, id) > 0 && (!api.relicReady || api.relicReady(id)));
+      const pieces = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === 'wear' && !ITEMS[k].relicArmor && k !== 'w_coat' && count(inv, k) > 0);
+      h += `<h3>Buhkon’s bench <small>bind a Relic into what you wear</small></h3><p class="rmuted">The Relic goes into the piece for good — its Hurst settles in the cloth or the metal, and anything it could do on a quick slot it still does, from there. One lump of Stygian ore to seat it. (You have ${count(inv, 'ore')}.)</p>`;
+      if (!relics.length) h += '<p class="rmuted">You’ve no Relic he can bind — one whose trigger you’ve found: the fire-stone, the humming stone, or a Gynge chip.</p>';
+      else if (!pieces.length) h += '<p class="rmuted">Nothing to bind it into: bring him a cloak, a jerkin, gloves or boots.</p>';
+      else for (const r of relics) {
+        const R = BINDABLE_RELICS[r];
+        h += `<h3>${ITEMS[r].icon} ${esc(ITEMS[r].name)} <small>— ${R.note}</small></h3><div class="rgrid">` + pieces.map(k => { const out = bindId(r, k); return ITEMS[out] ? card(out, 'Bind', count(inv, 'ore') > 0 ? `bind:${r}=${k}` : null, false, `Gives up: ${ITEMS[k].name} + ${ITEMS[r].name} + 1 Stygian ore`) : ''; }).join('') + `</div>`;
+      }
     } else if (page === 'cook') {
       h += `<h3>The cookfire <small>cook</small></h3><div class="rgrid">` + RECIPES.filter(r => (r.out !== 'tea' || (S.flags || {}).recipe_tea) && (r.out !== 'bun' || (S.flags || {}).recipe_bun)).map(r => {
         const ok = hasAll(inv, r.need);

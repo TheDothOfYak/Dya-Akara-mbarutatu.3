@@ -37,7 +37,7 @@ import { createRoad } from './road.js';
 import { createMegla } from './megla.js';
 import { buildCart } from './cart.js';
 import { createCine } from './cine.js';
-import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE } from './items.js';
+import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE, bindId } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
 import { QUESTS, questProgress } from './quests.js';
@@ -2559,7 +2559,7 @@ function npcTalk(n) {
   if (def.roles.includes('shop')) opts.push({ label: 'Trade', act: () => openBook('shop') });
   if (def.roles.includes('forge')) {
     const ok = REGION !== 'xilia' || SAVE.quests.q_ore === 'done';
-    opts.push({ label: ok ? 'Forge an axe' : 'Forge an axe <small>(his cauldron is cold)</small>', act: () => ok ? openBook('forge') : dialog([[who, 'No ore, no bark, no fire. Ask me about work.']], () => npcTalk(n)) });
+    opts.push({ label: ok ? 'Forge an axe or armor' : 'Forge an axe or armor <small>(his cauldron is cold)</small>', act: () => ok ? openBook('forge') : dialog([[who, 'No ore, no bark, no fire. Ask me about work.']], () => npcTalk(n)) });
   }
   if (def.roles.includes('cook')) {
     const ok = REGION !== 'xilia' || SAVE.quests.q_camp === 'done';
@@ -3217,11 +3217,16 @@ const WEAR_SLOTS = [['cloak', 'Cloak'], ['body', 'Body'], ['hands', 'Hands'], ['
 function wearSet() { return young() ? (SAVE.inv.wear = SAVE.inv.wear || {}) : (SAVE.inv.wearT = SAVE.inv.wearT || {}); }
 function wearing(slot) { const w = wearSet(); return w[slot] && SAVE.inv.items[w[slot]] ? w[slot] : null; }
 const canGlide = () => !!wearing('cloak');
+/* later in the tale: Torcain's own days, or young Tanoc home again after the Megla Aagac. Relic armor waits for it. */
+const laterGame = () => !young() || F_.megla === 'done';
+// a Relic you hold — in your hand, or bound into something you wear
+const relicHeld = id => hasItem(id) || Object.keys(SAVE.inv.items).some(k => ITEMS[k] && ITEMS[k].bound === id && SAVE.inv.items[k] > 0);
 /* what he has on is what you see: each slot shows on him while it's worn, and is gone when it's taken off */
 function applyWear() {
-  const col = slot => { const w = wearing(slot); return w ? (ITEMS[w].color ?? 0x7a5a3a) : null; };
-  torcain.setCape(col('cloak'));
-  torcain.setOutfit({ body: col('body'), hands: col('hands'), feet: col('feet') });
+  const spec = slot => { const w = wearing(slot); return w ? { c: ITEMS[w].color ?? 0x7a5a3a, look: ITEMS[w].look, glow: ITEMS[w].glow } : null; };
+  const cl = wearing('cloak');
+  torcain.setCape(cl ? ITEMS[cl].color ?? 0x9a3a1a : null);
+  torcain.setOutfit({ body: spec('body'), hands: spec('hands'), feet: spec('feet'), cloakLook: cl ? ITEMS[cl].look : null, cloakGlow: cl ? ITEMS[cl].glow : null });
 }
 applyWear();
 
@@ -3281,9 +3286,9 @@ const knowsTrigger = id => !!SAVE.triggers[id];
 P.slotCd = {};
 const SLOT_ACTIONS = {
   r_firestone: { name: 'Fire-stone', icon: '🔥', kind: 'Relic', cd: 1.6, desc: 'Set a pebble in the dip: it flies in a streak of flame.',
-    ok: () => hasItem('r_firestone') && knowsTrigger('r_firestone'), use: () => fireStone() },
+    ok: () => relicHeld('r_firestone') && knowsTrigger('r_firestone'), use: () => fireStone() },
   r_longevity: { name: 'Humming stone', icon: '🔵', kind: 'Relic', cd: 45, desc: 'Hold it to your chest and breathe slow: a second wind — stamina back, and a little health.',
-    ok: () => hasItem('r_longevity') && knowsTrigger('r_longevity'), use: () => secondWind() },
+    ok: () => relicHeld('r_longevity') && knowsTrigger('r_longevity'), use: () => secondWind() },
   tukang: { name: 'Tukang flare', icon: '☀', kind: 'Relic', desc: 'Torcain’s Relic of fire, speed and heat. Fight to build heat, then let it go.',
     ok: () => !young(), use: () => tukangFlare(), frac: () => 1 - P.heat / 100 },
   ...Object.fromEntries(SPELL_ORDER.map(id => [id, { name: SPELLS[id].name, icon: SPELLS[id].icon, kind: 'Spell', desc: SPELLS[id].desc,
@@ -3496,6 +3501,17 @@ function bookAct(act, arg) {
   else if (act === 'untrinket') { inv.trinkets = inv.trinkets.filter(t => t !== arg); }
   else if (act === 'wear') { wearSet()[ITEMS[arg].slot] = arg; applyWear(); sfx.ui(); }
   else if (act === 'unwear') { delete wearSet()[arg]; applyWear(); sfx.ui(); }
+  else if (act === 'bind') {   // the Carpenter binds a Relic into a piece you wear
+    const [relic, base] = arg.split('='), out = bindId(relic, base);
+    if (ITEMS[out] && (inv.items[relic] || 0) > 0 && (inv.items[base] || 0) > 0 && (inv.items.ore || 0) > 0) {
+      const W = wearSet(), wasOn = W[ITEMS[base].slot] === base;
+      for (const k of [relic, base, 'ore']) { inv.items[k]--; if (inv.items[k] <= 0) delete inv.items[k]; }
+      invAddRaw(inv, out, 1); if (wasOn) W[ITEMS[base].slot] = out;
+      for (const k of SLOT_KEYS) if (SAVE.slots[k] === relic && !SLOT_ACTIONS[relic].ok()) delete SAVE.slots[k];
+      applyWear(); renderSpellBar(); sfx.flare(); xp(80); persist();
+      dialog([['tale', `He works the ${ITEMS[relic].name} into the ${ITEMS[base].name} with a little stygian, humming the Hurst's own song under his breath, until it settles. When he hands it back, it is warm, and faintly lit from inside.`], ['buhkon', 'There. It’ll answer you the same as before — it just lives in that now. Treat it kindly.']]);
+    }
+  }
   else if (act === 'slot') { const [code, id] = arg.split('='); assignSlot(code, id || null); sfx.ui(); }
   else if (act === 'pouch') {
     const d = SAVE.dya; if (!d) return;
@@ -3521,7 +3537,7 @@ function bookAct(act, arg) {
     if (inv.items[arg] > 0) { inv.items[arg]--; if (inv.items[arg] <= 0) delete inv.items[arg]; G.shards += Math.max(1, Math.round(ITEMS[arg].value * 0.5)); sfx.ui(); }
   } else if (act === 'forge') {
     const r = FORGE.find(f => f.out === arg);
-    if (r && G.shards >= r.shards && takeAll(inv, r.need)) { G.shards -= r.shards; invAdd(inv, arg, 1); inv.axe = arg; restyleAxe(); sfx.flare(); xp(60); toast(`Forged: ${ITEMS[arg].name}`, 2.5); }
+    if (r && !(r.later && !laterGame()) && G.shards >= r.shards && takeAll(inv, r.need)) { G.shards -= r.shards; invAddRaw(inv, arg, 1); if (ITEMS[arg].kind === 'axe') { inv.axe = arg; restyleAxe(); } else if (ITEMS[arg].slot) { wearSet()[ITEMS[arg].slot] = arg; applyWear(); } sfx.flare(); xp(60); toast(`Forged: ${ITEMS[arg].name}${ITEMS[arg].relicArmor ? ' — Relic armor' : ''}`, 2.5); }
   } else if (act === 'cook') {
     const r = RECIPES.find(f => f.out === arg);
     if (r && takeAll(inv, r.need)) { invAdd(inv, arg, 1); sfx.heal(); xp(8); }
@@ -3897,9 +3913,11 @@ function travel(id) {
 book = createRpgUI({
   save: () => SAVE, shards: () => G.shards, fx: () => FX, player: () => P, perkDmg: () => (perk('heavy') ? 1.15 : 1) * (1 + 0.12 * rank('edge')),
   region: () => REGION, world: () => world, npcName, act: bookAct, mapMarkers, travel,
+  later: () => laterGame(),
+  relicReady: id => id === 'gynge_chip' || knowsTrigger(id),
   wear: () => WEAR_SLOTS.map(([slot, label]) => ({ slot, label, on: wearing(slot), have: Object.keys(SAVE.inv.items).filter(k => ITEMS[k] && ITEMS[k].slot === slot && !(k === 'w_coat' && young())) })),   // (the grown man's coat is no fit for the boy)
   slots: () => ({ keys: SLOT_KEYS.map(k => ({ code: k, label: slotLabel(k), id: SAVE.slots[k] || '' })), choices: slotChoices(),
-    relics: ['r_firestone', 'r_longevity'].filter(hasItem).map(id => ({ id, known: knowsTrigger(id), name: SLOT_ACTIONS[id].name })),
+    relics: ['r_firestone', 'r_longevity'].filter(relicHeld).map(id => ({ id, known: knowsTrigger(id), name: SLOT_ACTIONS[id].name })),
     spells: SPELL_ORDER.filter(id => SLOT_ACTIONS[id].ok()).map(id => ({ id, name: SPELLS[id].name, icon: SPELLS[id].icon, desc: SPELLS[id].desc, cd: SPELLS[id].cd })) }),
   who: () => (young() ? 'Tanoc' : 'Torcain'),
   mainObjective: () => $('q-text').textContent,
@@ -3940,6 +3958,7 @@ function steepUp(x, z, y0, hd) {
 
 function updatePlayer(dt) {
   FX = effects(SAVE.inv, SAVE.time, wearSet());
+  if (FX.regen && P.hp > 0 && P.hp < P.maxHp) P.hp = Math.min(P.maxHp, P.hp + FX.regen * dt);   // a hearth Hurst in what he wears: wounds close on their own
   for (const k in P.spellCd) P.spellCd[k] = Math.max(0, P.spellCd[k] - dt);
   if (P.wardT > 0) { P.wardT -= dt; if (P.wardT <= 0) P.ward = 0; }
   wardSprite.material.opacity = P.ward > 0 ? 0.35 + Math.sin(G.t * 6) * 0.1 : 0;
@@ -5147,9 +5166,15 @@ function youngBuhkon(n) {
   if (q === 2 || q === 3) { dialog(q === 2 ? Y.hlyst.slice(-1) : Y.dummies.slice(-1)); return; }
   ask('buhkon', Y.buhkonIdle[Math.floor(Math.random() * Y.buhkonIdle.length)], [
     { label: SAVE.inv.items.okid ? 'Sing a token' : 'Ask about tokens <em style="color:var(--brass2)">· Dya’Akara</em>', act: () => buhkonTokens() },
+    ...(laterGame() ? [{ label: 'Bind a Relic into something I wear <em style="color:var(--brass2)">· the Carpenter’s bench</em>', act: () => bindAsk() }] : []),
     { label: 'Run the dummy drills again', act: () => { enemies.list.filter(e => e.T.disp === 'training' && e.dead).forEach(e => respawnDummy(e, 0)); toast('Buhkon props the dummies back up.', 2); lockMouse(); } },
     { label: 'Goodbye', act: null },
   ]);
+}
+/* after the Megla, the Carpenter will bind a Relic's Hurst into armor */
+function bindAsk() {
+  if (!F_.bindTold) { F_.bindTold = true; persist(); dialog([['buhkon', 'Binding? Who told you about — the Gynge. Of course.'], ['buhkon', 'A Hurst can live in more than a stone, if it’s willing. Bring me the Relic and the thing you mean to wear, and a lump of stygian to seat it. It goes in for good, mind.']], () => openBook('bind')); return; }
+  openBook('bind');
 }
 function youngGoal() {
   const q = F_.yq || 0, bk = npcs.find(n => n.def.id === 'buhkon');
@@ -5845,7 +5870,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  bookAct, applyWear,
+  bookAct, applyWear, openBook,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   detailCull: setDetailCull,

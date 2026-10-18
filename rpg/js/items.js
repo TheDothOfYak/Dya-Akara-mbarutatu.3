@@ -68,6 +68,30 @@ export const ITEMS = {
   w_bracers: { name: 'Leather bracers', kind: 'wear', slot: 'hands', color: 0x5a3a20, icon: '🧤', value: 70, desc: 'Laced from wrist to elbow. A steadier swing: +6% damage.', perk: { dmg: 1.06 } },
   w_boots: { name: 'Kofi-hide boots', kind: 'wear', slot: 'feet', color: 0x9a7650, icon: '🥾', value: 60, desc: 'Soft, light, and very quiet. Stamina returns 12% faster.', perk: { stamRegen: 1.12 } },
   w_hood: { name: 'Fisher’s oilcloak', kind: 'wear', slot: 'cloak', color: 0x2f5a5a, icon: '🧥', value: 120, desc: 'Waxed against the lake wind, cut full for a glider. Glide farther and slower.', perk: { glide: 1 } },
+  // more cloaks — the cloak is what you glide with
+  w_kipsu: { name: 'Kipsu-fluff mantle', kind: 'wear', slot: 'cloak', color: 0xe8dcc8, look: 'fur', icon: '🧣', value: 140, desc: 'Short and impossibly soft, shed by a hundred Kipsu. Warm to the bone: +15 health.', perk: { hp: 15 } },
+  w_byrd: { name: 'Albali-feather cloak', kind: 'wear', slot: 'cloak', color: 0x6a8ab8, look: 'feather', icon: '🪶', value: 220, desc: 'Feathers sewn on in rows like roof tiles. Glide farther; stamina returns 10% faster.', perk: { glide: 1, stamRegen: 1.1 } },
+  w_ranger: { name: 'Pass-walker’s cloak', kind: 'wear', slot: 'cloak', color: 0x4a5a3a, icon: '🧥', value: 160, desc: 'Moss-green, hooded, patched at the hem. You are harder to see: take 5% less damage.', perk: { armor: 0.95 } },
+  // the body
+  w_hide: { name: 'Rodak-hide vest', kind: 'wear', slot: 'body', color: 0x4a3a30, icon: '🦺', value: 150, desc: 'Black fur turned inward, the hide stitched with sinew. Take 12% less damage, +3% damage.', perk: { armor: 0.88, dmg: 1.03 } },
+  w_chain: { name: 'Ringmail shirt', kind: 'wear', slot: 'body', color: 0x8a8c96, look: 'chain', icon: '⛓', value: 260, desc: 'Thousands of little riveted rings. Take 18% less damage — but it is heavy: stamina returns 5% slower.', perk: { armor: 0.82, stamRegen: 0.95 } },
+  w_scale: { name: 'Stryx-scale coat', kind: 'wear', slot: 'body', color: 0x5a7a3a, look: 'plate', icon: '🛡', value: 340, desc: 'Shed scales from the ship’s Stryx, overlapped on leather. Take 20% less damage.', perk: { armor: 0.8 } },
+  w_robe: { name: 'Kalo silk robe', kind: 'wear', slot: 'body', color: 0x3a4a7a, look: 'robe', icon: '👘', value: 200, desc: 'Blue-black, embroidered with stars nobody on Xikia can name. Spells recover 10% faster; +5% experience.', perk: { cd: 0.9, xp: 1.05 } },
+  // the hands
+  w_wraps: { name: 'Punk-vine wraps', kind: 'wear', slot: 'hands', color: 0x4a7a3a, look: 'wrap', icon: '🧤', value: 50, desc: 'Vine wound round the knuckles and wrists, tight as it dries. +3% damage; stamina returns 6% faster.', perk: { dmg: 1.03, stamRegen: 1.06 } },
+  w_gauntlets: { name: 'Iron gauntlets', kind: 'wear', slot: 'hands', color: 0x7a7c86, look: 'gauntlet', icon: '🧤', value: 240, desc: 'Jointed plates over a leather glove. +10% damage; take 5% less.', perk: { dmg: 1.1, armor: 0.95 } },
+  // the feet
+  w_sandals: { name: 'Runner’s sandals', kind: 'wear', slot: 'feet', color: 0xb8905a, look: 'sandal', icon: '🩴', value: 80, desc: 'Barely there. Stamina returns 20% faster.', perk: { stamRegen: 1.2 } },
+  w_greaves: { name: 'Plated greaves', kind: 'wear', slot: 'feet', color: 0x8a8c96, look: 'greave', icon: '🥾', value: 200, desc: 'Steel over the shins, hobnails under the heel. Take 8% less damage; harder to knock off your feet.', perk: { armor: 0.92, stagger: 0.8 } },
+
+  /* ---- Relic armor: a Hurst settled into the thing itself. Later in the tale: the smith won't touch it, and the chests
+     that hold it are a long way from home (see FORGE later:true, and the later regions' chests) ---- */
+  r_gynge_plate: { name: 'Gynge-heart breastplate', kind: 'wear', slot: 'body', relicArmor: true, color: 0x7a6a5a, glow: 0xffa040, look: 'plate', icon: '🛡', value: 0, desc: 'Rock-hide plates around a Gynge chip that still sings. Its Hurst holds the line: take 30% less damage, +30 health.', perk: { armor: 0.7, hp: 30 } },
+  r_ember_mail: { name: 'Ember-heart mail', kind: 'wear', slot: 'body', relicArmor: true, color: 0x6a3a2a, glow: 0xff6a2a, look: 'chain', icon: '🔥', value: 0, desc: 'Ringmail quenched in Tyndael embers, a fire Hurst in the links. Heat builds 30% faster; +8% damage; your blows burn.', perk: { heat: 1.3, dmg: 1.08, burn: 1 } },
+  r_stygian_grips: { name: 'Stygian grips', kind: 'wear', slot: 'hands', relicArmor: true, color: 0x2a2238, glow: 0xc89aff, look: 'gauntlet', icon: '🧤', value: 0, desc: 'Soul-iron over the knuckles. The Duat hums in them: +12% damage, spells recover 15% faster.', perk: { dmg: 1.12, cd: 0.85 } },
+  r_gynge_greaves: { name: 'Gynge-stone greaves', kind: 'wear', slot: 'feet', relicArmor: true, color: 0x6a5a4a, glow: 0xffa040, look: 'greave', icon: '🥾', value: 0, desc: 'Living rock at the shins. Nothing knocks you down: take 12% less damage, half the stagger.', perk: { armor: 0.88, stagger: 0.5 } },
+  r_sniller_cloak: { name: 'Sniller-glass cloak', kind: 'wear', slot: 'cloak', relicArmor: true, color: 0x3a6a78, glow: 0x6af0e0, look: 'feather', icon: '🧥', value: 0, desc: 'Woven with threads of a Sniller’s cold storm. It catches every wind: glide much farther, spells recover 15% faster.', perk: { glide: 2, cd: 0.85 } },
+  r_hurst_mantle: { name: 'Hearth-Hurst mantle', kind: 'wear', slot: 'cloak', relicArmor: true, color: 0x8a4a2a, glow: 0xffc070, look: 'fur', icon: '🧣', value: 0, desc: 'A sleepy hearth Hurst curled in the collar. Wounds close on their own; +20 health.', perk: { regen: 0.8, hp: 20 } },
   r_firestone: { name: 'Fire-stone', kind: 'key', icon: '🔥', value: 0, desc: 'A smooth skipping-stone with a thumb-dip. Its Hurst is a warm, chatty fire-rat. Set a pebble in the dip and it throws it in a streak of flame — and never burns the one it likes.' },
   r_longevity: { name: 'Humming stone', kind: 'key', icon: '🔵', value: 0, desc: 'A longevity Relic from the lakeshore. Its Hurst is settled and quiet; it keeps you a little less tired, a little less hungry.' },
   resin: { name: 'Black resin bead', kind: 'mat', icon: '⚫', value: 12, desc: 'Carved, very old, from the ruins in the Megla Aagac. Smells of smoke and rain.' },
@@ -97,13 +121,41 @@ export const FORGE = [
   { out: 'axe_fire', shards: 150, need: { bark: 4, seed: 1, ember: 2 } },
   { out: 'axe_styg', shards: 260, need: { ore: 6, knife: 2 } },
   { out: 'axe_tusk', shards: 400, need: { tusk: 1, ore: 4, oil: 3 } },
+  // armor, beaten out in the same cauldron
+  { out: 'w_greaves', shards: 90, need: { ore: 3, stone: 2 } },
+  { out: 'w_gauntlets', shards: 110, need: { ore: 4, oil: 1 } },
+  { out: 'w_chain', shards: 140, need: { ore: 6, bark: 2 } },
+  // Relic armor: a Hurst in the metal. Later in the tale (the smith won't try it until he's seen what a Gynge chip does)
+  { out: 'r_gynge_greaves', shards: 220, need: { gynge_hide: 2, ore: 3 }, later: true },
+  { out: 'r_gynge_plate', shards: 380, need: { gynge_hide: 4, gynge_chip: 1, ore: 4 }, later: true },
+  { out: 'r_ember_mail', shards: 340, need: { ember: 4, ore: 6, seed: 1 }, later: true },
+  { out: 'r_stygian_grips', shards: 320, need: { knife: 2, ore: 5, resin: 2 }, later: true },
 ];
+
+/* ---- the Carpenter's craft, later in the tale: bind a Relic's Hurst into a piece you wear. The Relic goes into the
+   armor (its quick-slot power comes with it), and the armor takes on something of the Hurst. Every combination is a
+   piece of its own: m_<relic>__<armor> ---- */
+export const BINDABLE_RELICS = {
+  r_firestone: { hurst: 'fire-rat', glow: 0xff8a2a, perk: { heat: 1.2, dmg: 1.05, burn: 1 }, note: 'the fire-rat in it: heat builds faster, blows burn' },
+  r_longevity: { hurst: 'humming', glow: 0x5aa0ff, perk: { regen: 0.6, stamRegen: 1.15 }, note: 'the humming Hurst in it: wounds close, breath comes back' },
+  gynge_chip: { hurst: 'Gynge', glow: 0xffa040, perk: { armor: 0.9, stagger: 0.6 }, note: 'the Gynge’s song in it: harder to hurt, hard to knock down' },
+};
+export const bindId = (relic, base) => `m_${relic}__${base}`;
+for (const base of Object.keys(ITEMS)) {
+  const B = ITEMS[base]; if (B.kind !== 'wear' || B.relicArmor || base === 'w_coat') continue;
+  for (const [relic, R] of Object.entries(BINDABLE_RELICS)) {
+    const perk = Object.assign({}, B.perk || {});
+    for (const [k, v] of Object.entries(R.perk)) perk[k] = k === 'hp' || k === 'glide' || k === 'regen' || k === 'burn' ? (perk[k] || 0) + v : (perk[k] ?? 1) * v;
+    ITEMS[bindId(relic, base)] = { name: `${B.name}, ${R.hurst}-bound`, kind: 'wear', slot: B.slot, color: B.color, look: B.look, glow: R.glow, relicArmor: true, bound: relic, base,
+      icon: B.icon, value: 0, desc: `${B.desc} Bound by the Carpenter with ${ITEMS[relic] ? ITEMS[relic].name : relic} — ${R.note}.`, perk };
+  }
+}
 
 /* what the trader keeps on her mat (price in shards) */
 export const SHOP = {
-  xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed', 'w_jerkin', 'w_bracers', 'w_boots', 'w_hood'],
+  xilia: ['salad', 'stew', 'petal', 'vine', 'fluff', 'bark', 'ore', 'stone', 't_breath', 't_seed', 'w_jerkin', 'w_bracers', 'w_boots', 'w_hood', 'w_wraps', 'w_sandals', 'w_kipsu', 'w_ranger', 'w_hide'],
   aakalay: [],
-  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 'ember', 't_ring', 'w_jerkin', 'w_bracers', 'w_boots'],
+  leotik: ['salad', 'stew', 'tea', 'moss', 'ore', 'seed', 'ember', 't_ring', 'w_jerkin', 'w_bracers', 'w_boots', 'w_hide', 'w_chain', 'w_scale', 'w_robe', 'w_byrd', 'w_greaves'],
 };
 
 /* what each creature leaves behind: [item, chance, count] */
@@ -138,13 +190,13 @@ export function freshInventory() {
 
 /* the combined effect of what you wear and what you've eaten */
 export function effects(inv, now, wear = inv.wear) {
-  const fx = { hlyst: 0, xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
+  const fx = { hlyst: 0, xp: 1, dmg: 1, heat: 1, stamRegen: 1, armor: 1, cd: 1, shards: 1, hp: 0, glide: 0, regen: 0, antidote: 0, burn: false, duatCd: 0, stagger: 1 };
   const axe = ITEMS[inv.axe] || ITEMS.axe_tanoc;
   fx.dmg *= axe.dmg || 1; if (axe.burn) fx.burn = true; fx.duatCd += axe.duatCd || 0; fx.stagger *= axe.stagger || 1;
   for (const t of inv.trinkets.concat(Object.values(wear || {}).filter(w => inv.items[w]))) {
     const p = (ITEMS[t] || {}).perk || {};
     for (const [k, v] of Object.entries(p)) {
-      if (k === 'hp' || k === 'glide' || k === 'hlyst') fx[k] += v; else fx[k] *= v;
+      if (k === 'burn') { if (v) fx.burn = true; } else if (k === 'hp' || k === 'glide' || k === 'hlyst' || k === 'regen') fx[k] = (fx[k] || 0) + v; else fx[k] *= v;
     }
   }
   for (const [id, until] of Object.entries(inv.buffs || {})) {
