@@ -545,6 +545,7 @@ export function createRoad(ctx) {
     weapon: 'axe', flasks: false, leg: 0x4a3420, foot: 0x2a1a0c, beltColor: 0x5a3a1c, tunic: 0x7a5a3a, trim: 0xc89a5a, scale: 0.86,
   });
   { const bl = tanoc.weapon.userData.blade; if (bl) { bl.material.color.setHex(0x9a9aa2); bl.material.emissiveIntensity = 0; } if (tanoc.weapon.userData.glow) tanoc.weapon.userData.glow.visible = false; }
+  tanoc.setCape(0x9a3a1a);   // the Ahoac cloak, from the gate captain on Velki
   scene.add(tanoc.root);
   const buhkon = buildEikar(NPC_LOOKS.buhkon); scene.add(buhkon.root);
   const punk = cartoon(buildWildPunk({ seed: 31 }), 0.6); punk.root.scale.multiplyScalar(0.6); scene.add(punk.root);
