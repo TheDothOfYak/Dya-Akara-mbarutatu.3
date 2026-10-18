@@ -248,9 +248,9 @@ function makeSpear() {
   return g;
 }
 
-function makeSword(short) {
+function makeSword(short, len) {
   const g = new THREE.Group();
-  const L = short ? 0.42 : 0.62;
+  const L = len || (short ? 0.42 : 0.62);
   const sh = new THREE.Shape();
   sh.moveTo(-0.022, 0); sh.lineTo(-0.026, L * 0.55); sh.quadraticCurveTo(-0.03, L * 0.8, 0, L); sh.quadraticCurveTo(0.03, L * 0.8, 0.026, L * 0.55); sh.lineTo(0.022, 0); sh.lineTo(-0.022, 0);
   const bg = new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: true, bevelSize: 0.004, bevelThickness: 0.004, bevelSegments: 1 });
@@ -297,6 +297,187 @@ function makeArrow() {
   const fl = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.07, 0.003), toon(0xe8e0d0)); fl.position.y = 0.04; g.add(fl);
   return g;
 }
+
+/* ---- the rest of the armoury (grip at the origin, along +y; +x toward the edge) ---- */
+const steel = (c = 0xc8ccd4) => new THREE.MeshToonMaterial({ color: c, emissive: 0x000000, emissiveIntensity: 0, gradientMap: ramp() });
+const rod = (r0, r1, L, y, col) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, L, 7), toon(col)); m.position.y = y; return m; };
+function axeBit(w, h, mat) {   // one crescent bit, edge toward +x
+  const sh = new THREE.Shape();
+  sh.moveTo(0, h * 0.3); sh.quadraticCurveTo(w * 0.55, h * 0.5, w, h); sh.quadraticCurveTo(w * 0.8, 0, w, -h); sh.quadraticCurveTo(w * 0.55, -h * 0.5, 0, -h * 0.3); sh.lineTo(0, h * 0.3);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.026, bevelEnabled: true, bevelSize: 0.008, bevelThickness: 0.008, bevelSegments: 1 }); g.translate(0, 0, -0.013);
+  return new THREE.Mesh(g, mat);
+}
+function makeBattleAxe() {
+  const g = new THREE.Group(), mat = steel(0x8a8c96);
+  g.add(rod(0.021, 0.025, 1.18, 0.33, 0x4a2a18));
+  const a = axeBit(0.3, 0.26, mat); a.position.set(0.02, 0.8, 0); g.add(a);
+  const b = axeBit(0.24, 0.2, mat); b.rotation.y = Math.PI; b.position.set(-0.02, 0.8, 0); g.add(b);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 5), toon(0x2a2236)); cap.position.y = 0.97; g.add(cap);
+  g.userData.blade = a; g.userData.len = 1.0; g.userData.butt = -0.26;
+  return g;
+}
+function makeHammer() {
+  const g = new THREE.Group();
+  g.add(rod(0.02, 0.024, 1.06, 0.28, 0x5a3a22));
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.16), steel(0x6a6c74)); head.position.y = 0.8; g.add(head);
+  const face = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.19, 0.19), toon(0x3a3a42)); face.position.set(0.18, 0.8, 0); g.add(face);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.18), toon(0x8a5a2a)); band.position.y = 0.8; g.add(band);
+  g.userData.blade = head; g.userData.len = 0.9; g.userData.butt = -0.24;
+  return g;
+}
+function makeHatchet() {
+  const g = new THREE.Group(), mat = steel(0x9a9ca6);
+  g.add(rod(0.014, 0.017, 0.46, 0.12, 0x6a4422));
+  const a = axeBit(0.15, 0.11, mat); a.position.set(0.008, 0.3, 0); g.add(a);
+  g.userData.blade = a; g.userData.len = 0.36; g.userData.butt = -0.1;
+  return g;
+}
+function makeShield(r, buckler) {   // the face looks along +x (posed forward when it guards)
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.96, buckler ? 0.03 : 0.04, buckler ? 14 : 18), paint(toon(buckler ? 0x6a4a2a : 0x7a3a2a), 'wood'));
+  disc.rotation.z = Math.PI / 2; disc.position.x = 0.05; g.add(disc);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(r, 0.014, 4, buckler ? 14 : 18), steel(0x8a8c96)); rim.rotation.y = Math.PI / 2; rim.position.x = 0.06; g.add(rim);
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(r * 0.28, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), steel(0xb8bcc6)); boss.rotation.z = -Math.PI / 2; boss.position.x = 0.075; g.add(boss);
+  if (!buckler) for (const a of [0, Math.PI / 2]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.01, r * 1.9, 0.03), steel(0x8a8c96)); st.rotation.x = a; st.position.x = 0.072; g.add(st); }
+  g.userData.blade = boss; g.userData.shield = true;
+  return g;
+}
+function makeLance() {
+  const g = new THREE.Group(), tipM = steel(0xd8dce4);
+  g.add(rod(0.018, 0.03, 2.3, 0.7, 0x7a5a32));
+  const vamp = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 10, 1, true), steel(0x9a9ca6)); vamp.position.y = 0.2; vamp.material.side = THREE.DoubleSide; g.add(vamp);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.3, 5), tipM); tip.position.y = 1.98; g.add(tip);
+  const pen = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.12), new THREE.MeshToonMaterial({ color: 0xc83a2a, side: THREE.DoubleSide, gradientMap: ramp() })); pen.position.set(0, 1.72, 0.09); pen.rotation.y = Math.PI / 2; pen.userData.noOutline = true; g.add(pen);
+  g.userData.blade = tip; g.userData.len = 2.1; g.userData.butt = -0.45;
+  return g;
+}
+function makeDoubleSpear() {
+  const g = new THREE.Group(), tipM = new THREE.MeshToonMaterial({ color: 0x9fd8ee, emissive: 0x2a9ad0, emissiveIntensity: 0.4, gradientMap: ramp() });
+  g.add(rod(0.017, 0.017, 1.8, 0, 0x6a4a2a));
+  for (const sd of [1, -1]) {
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.24, 4), tipM); tip.scale.z = 0.45; tip.position.y = sd * 1.0; if (sd < 0) tip.rotation.z = Math.PI; g.add(tip);
+    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.009, 4, 10), toon(0xe0c070)); tie.rotation.x = Math.PI / 2; tie.position.y = sd * 0.86; g.add(tie);
+  }
+  const wrap = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.3, 7), toon(0x2a1a10)); g.add(wrap);
+  g.userData.blade = g.children[1]; g.userData.len = 1.1; g.userData.butt = -1.1;
+  return g;
+}
+function makeDoubleSword() {
+  const g = new THREE.Group();
+  const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.5, 7), toon(0x3a2416)); g.add(hilt);
+  let first = null;
+  for (const sd of [1, -1]) {
+    const b = makeSword(false, 0.66); b.position.y = sd * 0.25; if (sd < 0) b.rotation.z = Math.PI; b.remove(b.children[2]); b.remove(b.children[2]);   // (no grip or pommel of its own)
+    if (b.userData.glow) b.remove(b.userData.glow);
+    g.add(b); if (!first) first = b.userData.blade;
+  }
+  g.userData.blade = first; g.userData.len = 1.0; g.userData.butt = -1.0;
+  return g;
+}
+function makeStaff() {
+  const g = new THREE.Group();
+  g.add(rod(0.02, 0.02, 1.8, 0.1, 0x6a4a2a));
+  for (const y of [1.0, -0.8]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.1, 7), steel(0x7a7c84)); c.position.y = y; g.add(c); }
+  const gl = glowSprite(0xbfeaff, 0.3, 0.4); gl.position.y = 1.02; g.add(gl);
+  g.userData.glow = gl; g.userData.blade = g.children[1]; g.userData.len = 1.0; g.userData.butt = -0.8;
+  return g;
+}
+function makeScythe() {
+  const g = new THREE.Group();
+  g.add(rod(0.018, 0.022, 1.7, 0.45, 0x5a3a22));
+  const sh = new THREE.Shape();
+  sh.moveTo(0, 0.04); sh.quadraticCurveTo(0.42, 0.12, 0.72, -0.18); sh.quadraticCurveTo(0.4, -0.02, 0, -0.04); sh.lineTo(0, 0.04);
+  const bg = new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: true, bevelSize: 0.005, bevelThickness: 0.005, bevelSegments: 1 }); bg.translate(0, 0, -0.006);
+  const blade = new THREE.Mesh(bg, steel(0xb8bcc6)); blade.position.set(0.01, 1.26, 0); g.add(blade);
+  const hand = rod(0.012, 0.012, 0.16, 0, 0x5a3a22); hand.rotation.z = Math.PI / 2; hand.position.set(-0.08, 0.55, 0); g.add(hand);
+  g.userData.blade = blade; g.userData.len = 1.3; g.userData.butt = -0.4;
+  return g;
+}
+function makeKnuckles() {
+  const g = new THREE.Group();
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.012, 5, 12), steel(0x7a7c84)); band.position.z = 0.02; band.rotation.y = Math.PI / 2; g.add(band);
+  for (let i = -1; i <= 1; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.07, 4), toon(0xe8e0d0)); c.rotation.x = Math.PI / 2; c.position.set(0, i * 0.022 + 0.01, 0.075); g.add(c); }
+  g.userData.blade = band; g.userData.len = 0.08; g.userData.butt = 0;
+  return g;
+}
+/* the whip: a bone handle and a long braided lash — a little rope of points, worked out in the world, that hangs and
+   piles on the ground under its own weight, trails behind a swing, and is thrown out straight when it cracks */
+function makeWhip() {
+  const g = new THREE.Group();
+  g.add(rod(0.018, 0.022, 0.26, 0.08, 0xe8dcc0));
+  const N = 16, segL = 0.15, braid = toon(0x5a3a1a), links = [];
+  for (let i = 0; i < N; i++) {
+    const r0 = 0.016 * (1 - i / N * 0.75), r1 = 0.016 * (1 - (i + 1) / N * 0.75);
+    const geo = new THREE.CylinderGeometry(r1, r0, segL * 1.06, 5); geo.translate(0, segL / 2, 0);
+    const m = new THREE.Mesh(geo, braid); g.add(m); links.push(m);
+  }
+  const tip = new THREE.Object3D(); g.add(tip);
+  const pts = [], old = [], loc = [];
+  for (let i = 0; i <= N; i++) { pts.push(new THREE.Vector3()); old.push(new THREE.Vector3()); loc.push(new THREE.Vector3()); }
+  const root = new THREE.Vector3(), axis = new THREE.Vector3(), q = new THREE.Quaternion(), d = new THREE.Vector3(), UPV = new THREE.Vector3(0, 1, 0), acc = new THREE.Vector3();
+  let started = false;
+  // p: the blow's progress (0..1) or -1 at rest; floor: the ground's height under him (the lash piles up on it)
+  g.userData.tick = (dt, p, floor) => {
+    dt = Math.min(dt, 1 / 30);
+    g.updateWorldMatrix(true, false);
+    root.set(0, 0.21, 0); g.localToWorld(root);
+    g.getWorldQuaternion(q); axis.set(0, 1, 0).applyQuaternion(q);
+    if (!started || pts[0].distanceToSquared(root) > 16) {   // first sight of it, or he's been carried somewhere: hang it straight down
+      started = true;
+      for (let i = 0; i <= N; i++) { pts[i].copy(root); pts[i].y -= i * segL; if (floor != null && pts[i].y < floor) pts[i].y = floor; old[i].copy(pts[i]); }
+    }
+    // the throw: early in the blow the lash trails, then a wave runs out along it from the hand and snaps it straight
+    const out = p < 0.3 ? 0 : p < 0.62 ? 90 : Math.max(0, 50 * (1 - (p - 0.62) * 4));
+    for (let i = 1; i <= N; i++) {
+      const f = i / N, P = pts[i];
+      acc.set(0, -9.8, 0);
+      if (out) acc.addScaledVector(axis, out * Math.min(1, Math.max(0, ((p - 0.3) / 0.32) * 1.6 - f * 0.6)));
+      d.copy(P).sub(old[i]).multiplyScalar(p > 0.62 ? 0.88 : 0.96); old[i].copy(P);   // (after the crack it goes slack)
+      P.add(d).addScaledVector(acc, dt * dt);
+    }
+    pts[0].copy(root);
+    if (p > 0.3 && p < 0.62) {   // the crack: a wave runs out from the hand and lays the lash out straight ahead, the tip last
+      const front = clamp((p - 0.3) / 0.24, 0, 1), dir = d.set(axis.x, Math.max(-0.1, Math.min(0.25, axis.y)) * 0.5, axis.z).normalize(), w = 0.45;
+      for (let i = 1; i <= N; i++) if (i / N <= front) { acc.copy(root).addScaledVector(dir, i * segL); pts[i].lerp(acc, w); }
+    }
+    for (let it = 0; it < 10; it++) {
+      for (let i = 0; i < N; i++) {
+        d.subVectors(pts[i + 1], pts[i]); const L = d.length() || 1e-4, k = (L - segL) / L;
+        if (i === 0) pts[1].addScaledVector(d, -k); else { pts[i].addScaledVector(d, k * 0.5); pts[i + 1].addScaledVector(d, -k * 0.5); }
+      }
+      if (floor != null) for (let i = 1; i <= N; i++) if (pts[i].y < floor + 0.015) { pts[i].y = floor + 0.015; old[i].x = lerp(old[i].x, pts[i].x, 0.3); old[i].z = lerp(old[i].z, pts[i].z, 0.3); }   // lying on the ground, it drags
+    }
+    for (let i = 0; i <= N; i++) { loc[i].copy(pts[i]); g.worldToLocal(loc[i]); }
+    for (let i = 0; i < N; i++) { d.subVectors(loc[i + 1], loc[i]); const L = d.length(); links[i].position.copy(loc[i]); if (L > 1e-5) links[i].quaternion.setFromUnitVectors(UPV, d.divideScalar(L)); links[i].scale.y = Math.max(0.2, L / segL); }
+    tip.position.copy(loc[N]);
+  };
+  g.userData.tip = tip; g.userData.blade = links[N - 1]; g.userData.len = 0.21 + N * segL; g.userData.butt = -0.05; g.userData.whip = true;
+  return g;
+}
+/* the weapon in the main hand, and what (if anything) goes in the other, for each kind (see ARMS in items.js) */
+export function armsKit(cls) {
+  switch (cls) {
+    case 'whip': return { main: makeWhip(), pose: 'whip' };
+    case 'bow': return { main: makeBow(), pose: 'bow' };
+    case 'longsword': return { main: makeSword(false, 0.95), pose: 'sword', two: true };
+    case 'dual': return { main: makeSword(true, 0.5), off: makeSword(true, 0.5), pose: 'sword', dual: true };
+    case 'swordshield': return { main: makeSword(false), off: makeShield(0.27, false), pose: 'sword', shield: true };
+    case 'battleaxe': return { main: makeBattleAxe(), pose: 'axe', two: true };
+    case 'throwaxe': return { main: makeHatchet(), off: makeHatchet(), pose: 'axe' };
+    case 'axebuckler': return { main: makeHatchet(), off: makeShield(0.16, true), pose: 'axe', shield: true };
+    case 'spear': return { main: makeSpear(), pose: 'spear', two: true };
+    case 'lance': return { main: makeLance(), pose: 'spear' };
+    case 'doublespear': return { main: makeDoubleSpear(), pose: 'staff', two: true };
+    case 'doublesword': return { main: makeDoubleSword(), pose: 'staff', two: true };
+    case 'staff': return { main: makeStaff(), pose: 'staff', two: true };
+    case 'scythe': return { main: makeScythe(), pose: 'spear', two: true };
+    case 'hammer': return { main: makeHammer(), pose: 'axe', two: true };
+    case 'fists': return { main: makeKnuckles(), off: makeKnuckles(), pose: 'none' };
+    default: return { main: makeAxe(), pose: 'axe' };
+  }
+}
+/* what a shot or a throw looks like in flight */
+export function armsShot(kind) { const m = kind === 'hatchet' ? makeHatchet() : makeArrow(); outlineAll(m, 0.01); return m; }
 
 /* ================================================================
    EIKAR
@@ -498,10 +679,11 @@ export function buildEikar(o = {}) {
   const legs = [-1, 1].map(s => rigLeg(body, s, new THREE.Vector3(s * 0.08 * bw, -0.02, 0), legOpts));
 
   // the weapon, in hand. The bow is held in the left hand; everything else in the right.
-  const kind = o.weapon || 'axe';
-  const W = kind === 'bow' ? arms[1] : arms[0], Fr = kind === 'bow' ? arms[0] : arms[1];
-  const weapon = kind === 'spear' ? makeSpear() : kind === 'sword' ? makeSword(!!o.short) : kind === 'bow' ? makeBow() : kind === 'flask' ? makeFlask(flaskCol) : kind === 'none' ? new THREE.Group() : makeAxe();
-  const wPivot = W.upper, wHold = W.grip;
+  let kind = o.weapon || 'axe';
+  let W = kind === 'bow' ? arms[1] : arms[0], Fr = kind === 'bow' ? arms[0] : arms[1];
+  let off = null, kit = {};   // what's in the other hand (a shield, a second blade), and how the weapon is held (see setArms)
+  let weapon = kind === 'spear' ? makeSpear() : kind === 'sword' ? makeSword(!!o.short) : kind === 'bow' ? makeBow() : kind === 'flask' ? makeFlask(flaskCol) : kind === 'none' ? new THREE.Group() : makeAxe();
+  let wPivot = W.upper, wHold = W.grip;
   wHold.add(weapon);
   if (kind === 'flask') weapon.position.y = -0.03;
   // a flask in the free hand, only while drinking
@@ -540,8 +722,8 @@ export function buildEikar(o = {}) {
   const iT = new THREE.Vector3(), iD = new THREE.Vector3(), iB = new THREE.Vector3();
   const sT = new THREE.Vector3(), sD = new THREE.Vector3(), sB = new THREE.Vector3();
   const synth = { kind: 1, p: 0 };
-  const defKind = kind === 'spear' || kind === 'none' || kind === 'flask' ? 4 : kind === 'axe' ? 3 : 1;
-  const s = W.s;                 // weapon-hand side (-1 right, +1 left)
+  let defKind = kind === 'spear' || kind === 'none' || kind === 'flask' ? 4 : kind === 'axe' ? 3 : 1;
+  let s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
   // the hand-drawn acting: squash & stretch, follow-through, blinks, glances, brows, talk
   let sq = 0, sqV = 0, lastY = null, wasAir = false, vyS = 0;
@@ -623,7 +805,24 @@ export function buildEikar(o = {}) {
 
   const A = {
     cartoon: true,   // squash & stretch is built into this rig
-    root, body, torso, head, hat, weapon, wPivot, wHold, relic, nur, mats, arms, legs,
+    root, body, torso, head, hat, relic, nur, mats, arms, legs,
+    get weapon() { return weapon; }, get wPivot() { return wPivot; }, get wHold() { return wHold; }, get offhand() { return off; },
+    /* take up another kind of weapon (see armsKit): the main hand's piece, the other hand's if any, and how it's held */
+    setArms(cls) {
+      const K = armsKit(cls);
+      const vis = weapon.visible;
+      wHold.remove(weapon); if (off) { off.parent && off.parent.remove(off); off = null; }
+      if (arrow) { arrow.parent && arrow.parent.remove(arrow); arrow = null; }
+      kind = K.pose; kit = K;
+      W = kind === 'bow' ? arms[1] : arms[0]; Fr = kind === 'bow' ? arms[0] : arms[1];
+      wPivot = W.upper; wHold = W.grip; s = W.s;
+      drinkFlask.parent && drinkFlask.parent.remove(drinkFlask); Fr.grip.add(drinkFlask);
+      weapon = K.main; weapon.visible = vis; inkG(weapon); wHold.add(weapon);
+      if (K.off) { off = K.off; inkG(off); Fr.grip.add(off); }
+      if (kind === 'bow') { arrow = makeArrow(); arrow.visible = false; inkG(arrow); Fr.grip.add(arrow); }
+      defKind = kind === 'spear' || kind === 'none' ? 4 : kind === 'axe' ? 3 : 1;
+      return weapon;
+    },
     get cape() { return capeG; },
     /* put a cape on (a colour) or take it off (null) */
     setCape(color) {
@@ -681,6 +880,8 @@ export function buildEikar(o = {}) {
       // ---- the weapon hand at rest ----
       const sway = lerp(Math.sin(t * 1.6) * 0.008, Math.sin(phase) * 0.22 * k, walkK);   // arms swing against the legs
       if (kind === 'spear') { iT.set(s * 0.25, -0.06, 0.11 + sway * 0.5); iD.set(0, 1, 0.1); iB.set(1, 0, 0); }
+      else if (kind === 'staff') { iT.set(s * 0.22, -0.02, 0.2 + sway * 0.4); iD.set(-s * 0.35, 1, 0.25); iB.set(0, 0, 1); }   // held across, both ends free
+      else if (kind === 'whip') { iT.set(s * 0.25, -0.13, 0.12 + sway); iD.set(0, 0.35, 1); iB.set(s, 0, 0); }                // handle forward, the lash hanging
       else if (kind === 'bow') { iT.set(s * 0.24, -0.12, 0.08 + sway); iD.set(0, 1, 0.5); iB.set(1, 0, 0); }
       else if (kind === 'sword') { iT.set(s * 0.24, -0.15, 0.1 + sway); iD.set(s * 0.12, -0.25, 1); iB.set(0, -1, 0); }
       else if (kind === 'axe') { iT.set(s * 0.2, 0.1 + sway * 0.2, 0.16); iD.set(s * 0.22, 0.72, -0.62); iB.set(s * 0.6, 0.4, 0.6); }
@@ -719,7 +920,13 @@ export function buildEikar(o = {}) {
       if (arrow) arrow.visible = !!sw && b > 0.5;
       if (st.drink) { fT.set(-s * 0.03, 0.5, 0.15); fD.set(0, 0.45, -1); fB.set(1, 0, 0); ln = -0.12; }
       else if (sw && kind === 'bow') { fT.set(-0.02, 0.43, 0.1); fD.set(0, 0, 1); fB.set(0, 1, 0); }
-      else if (sw && sw.kind === 3 && kind !== 'none' && kind !== 'flask') { fT.copy(wT).addScaledVector(fD.copy(wD).normalize(), -0.12); fD.copy(wD); fB.copy(wB); }
+      else if (sw && sw.kind === 3 && kind !== 'none' && kind !== 'flask' && !kit.dual && !kit.shield && kind !== 'whip') { fT.copy(wT).addScaledVector(fD.copy(wD).normalize(), -0.12); fD.copy(wD); fB.copy(wB); }
+      else if (kit.dual || kind === 'none' && off) {   // a blade (or a fist) in each hand: the other one mirrors this one, half a beat behind
+        const p2 = sw ? clamp(sw.p - 0.2, 0, 1) : 0;
+        fT.set(-wT.x, wT.y - (sw ? 0.04 * Math.sin(p2 * Math.PI) : 0), wT.z - (sw ? 0.1 * (1 - p2) : 0)); fD.set(-wD.x, wD.y, wD.z); fB.set(-wB.x, wB.y, wB.z);
+      }
+      else if (kit.shield) { fT.set(-s * 0.16, 0.22, 0.3 - (sw ? 0.08 * b : 0)); fD.set(0, 1, 0); fB.set(0, 0, 1); }   // the shield up, its face to the front
+      else if (kit.two && sw) { fT.copy(wT).addScaledVector(fD.copy(wD).normalize(), kind === 'staff' ? -0.36 : -0.24); fD.copy(wD); fB.copy(wB); }   // both hands on the haft
       else if (st.thrown) { fT.set(-s * 0.18, 0.8, 0.22); fD.set(0, 1, 0); fB.set(-s, 0, 0); }
       else if (st.talking) { fT.set(-s * 0.2, 0.08 + Math.sin(t * 4.3) * 0.05, 0.26 + Math.sin(t * 2.7) * 0.04); fD.set(-s * 0.2, 1, 0.4); fB.set(-s, 0, 0); }
       else {
@@ -805,6 +1012,8 @@ export function buildEikar(o = {}) {
       if (relic) { relic.rotation.y += dt * 3; relic.userData.glow.scale.setScalar(0.22 + (st.heat || 0) * 0.3 + Math.sin(t * 8) * 0.02); }
       if (nur) nur.position.set(0.55 + Math.sin(t * 1.3) * 0.12, 1.7 + Math.sin(t * 2.1) * 0.12, -0.2);
       if (weapon.userData.glow) weapon.userData.glow.material.opacity = 0.35 + b * 0.65;
+      if (weapon.userData.tick) { root.updateWorldMatrix(true, false); weapon.userData.tick(dt, sw ? clamp(sw.p, 0, 1) : -1, root.getWorldPosition(wB).y + (st.floor || 0)); }
+      if (off) off.visible = weapon.visible && !st.drink;
       // glowing markings: faint and slow for the Kalo; void-purple when the Duat moves
       // (every Eikar's marks also glow by night: plain Eikar only after dark, the Kalo
       // faintly by day and clearly at night, the Duat-touched whenever the Duat moves)

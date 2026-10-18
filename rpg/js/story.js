@@ -1909,3 +1909,38 @@ Object.assign(APPRENTICE, {
 /* the festival, now that Venkin's a friend */
 APPRENTICE.harvest.done[3] = ['buhkon', 'Venkin will be there — Orrin says the boy has been practising his throws all summer just to beat you. He’s never lost a match on harvest night, and he doesn’t mean to start.'];
 APPRENTICE.tests.done.push(APPRENTICE.amulets.done[3]);
+
+/* Venkin's whip: his weapon of choice, because what he really wants is to train Stryx */
+export const WHIP = {
+  askLabel: 'Ask Venkin about the whip on his belt',
+  ask: [
+    ['tanoc', 'Why do you always have that whip?'],
+    ['venkin', 'Because of Stryx. Obviously. Well — Stryx TRAINING. You don’t hit them. You never, ever hit them.'],
+    ['venkin', 'You crack it by their ear and they listen. They don’t care about words. They care about the snap. Every handler’s book Hemla ever sold says so, and I’ve read them all. Twice.'],
+    ['venkin', 'Dad says I’m obsessed. Dad is correct.'],
+    ['venkin', 'Here — my old one. I learned on it. I have a better one now, obviously.'],
+    ['venkin', 'I’ve put up posts. Pretend they’re Stryx. Big, grumpy, mud-dripping Stryx. Crack it at every one of them — and don’t swing it like an axe, Tanoc. Let it reach.'],
+  ],
+  again: [
+    ['venkin', 'Back for the posts? Good. Five Stryx, five cracks. Let it reach.'],
+  ],
+  hits: [
+    'Ha! Right by its ear. It’d have sat down for that.',
+    'Again! Don’t muscle it — flick it.',
+    'That one would’ve rolled over. Probably bitten you after, but rolled over first.',
+    'Last one. The big grumpy one. Make it LOUD.',
+  ],
+  done: [
+    ['venkin', '…Okay. That was actually good. Don’t tell anyone I said that.'],
+    ['venkin', 'Keep it. A whip’s long, and it’s narrow — it reaches where your axe can’t, but only straight ahead. Line things up.'],
+    ['venkin', 'And the crack makes things flinch. Stryx, Rodak, the Vel in the woods — everything flinches. Then you’ve got a heartbeat to do something clever.'],
+    ['tanoc', 'Like run.'],
+    ['venkin', 'Like run! See, you’re a natural handler.'],
+  ],
+  chat: [
+    [['venkin', 'A Stryx grown out of the mud in a bog can lift a cart. A Stryx that likes you can lift a cart FOR you. That’s the whole difference. That’s all training is.']],
+    [['venkin', 'Never crack it at their face. By the ear. The ear. If you crack it at their face they remember, and Stryx remember for a hundred years.']],
+    [['venkin', 'One day I’m going to ride one. Don’t laugh. Orrin laughed. Orrin is going to be so embarrassed.']],
+    [['venkin', 'Hemla says there was a Stryx handler on Velki once, before the Fall. I’ve asked everyone about her. Nobody remembers her name. I’m going to find out.']],
+  ],
+};

@@ -3,9 +3,9 @@
    map — plus the trader's mat, the smith's cauldron and the
    cookfire. One panel, many pages.
    ============================================================ */
-import { ITEMS, RECIPES, FORGE, SHOP, BINDABLE_RELICS, bindId, count, hasAll, needText } from './items.js';
+import { ITEMS, RECIPES, FORGE, SHOP, BINDABLE_RELICS, ARMS, bindId, count, hasAll, needText } from './items.js';
 import { PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
-import { QUESTS, questProgress } from './quests.js';
+import { QUESTS, JOBS, questProgress } from './quests.js';
 
 const esc = s => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
 
@@ -33,7 +33,7 @@ export function createRpgUI(api) {
     let h = '';
     if (page === 'gear') {
       const fx = api.fx();
-      const axes = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === 'axe');
+      const axes = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === 'weapon' && (S.arms || {})[ITEMS[k].arm || 'axe']);
       const trink = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === 'trinket');
       h += `<h3>${api.who ? api.who() : 'Torcain'} · level ${sk.lvl}</h3><div class="rstats">
         <span>Health <b>${Math.round(api.player().maxHp)}</b></span><span>Stamina <b>${Math.round(api.player().stamMax)}</b></span>
@@ -56,7 +56,11 @@ export function createRpgUI(api) {
         const spare = W.flatMap(w => w.have.filter(k => k !== w.on));
         if (spare.length) h += `<div class="rgrid">` + spare.map(k => card(k, 'Wear', `wear:${k}`, false, `${ITEMS[k].slot[0].toUpperCase() + ITEMS[k].slot.slice(1)}${ITEMS[k].relicArmor ? ' · ✦ Relic armor' : ''}`)).join('') + `</div>`;
       }
-      h += `<h3>Axe</h3><div class="rgrid">` + axes.map(k => card(k, inv.axe === k ? 'Wielding' : 'Wield', inv.axe === k ? null : `equip:${k}`)).join('') + `</div>`;
+      // every kind of weapon he's learned, and the kinds still to learn (each on a quest)
+      const learned = Object.keys(ARMS).filter(c => (S.arms || {})[c]);
+      h += `<h3>Weapons <small>${learned.length} of ${Object.keys(ARMS).length} kinds learned — wield whichever you like</small></h3><div class="rgrid">` + axes.map(k => card(k, inv.axe === k ? 'Wielding' : 'Wield', inv.axe === k ? null : `equip:${k}`, inv.axe === k, `${ARMS[ITEMS[k].arm || 'axe'].icon} ${ARMS[ITEMS[k].arm || 'axe'].name} · ${ARMS[ITEMS[k].arm || 'axe'].note}`)).join('') + `</div>`;
+      const unlearned = Object.keys(ARMS).filter(c => !(S.arms || {})[c]);
+      if (unlearned.length) h += `<p class="rmuted">Still to learn: ` + unlearned.map(c => { const a = ARMS[c], j = JOBS[a.job]; return `${a.icon} <b>${a.name}</b> <small>(${j ? `the Carpenter’s job board: “${esc(j.name)}”` : esc(a.teach || '')})</small>`; }).join(' · ') + `</p>`;
       h += `<h3>Trinkets <small>(wear two)</small></h3><div class="rgrid">` + (trink.length ? trink.map(k => {
         const on = inv.trinkets.includes(k);
         return card(k, on ? 'Take off' : 'Wear', on ? `untrinket:${k}` : `trinket:${k}`, on);
@@ -71,7 +75,7 @@ export function createRpgUI(api) {
         if (!ids.length) continue;
         h += `<h3>${label}</h3><div class="rgrid">` + ids.map(k => card(k, kind === 'meal' ? 'Eat' : ITEMS[k].read ? 'Read' : null, kind === 'meal' || ITEMS[k].read ? `use:${k}` : null)).join('') + `</div>`;
       }
-      if (!Object.keys(inv.items).some(k => ITEMS[k] && ITEMS[k].kind !== 'axe' && ITEMS[k].kind !== 'trinket')) h += '<p class="rmuted">Your pack is empty. Gather ore, bark and stone in the wilds; creatures drop all sorts.</p>';
+      if (!Object.keys(inv.items).some(k => ITEMS[k] && ITEMS[k].kind !== 'weapon' && ITEMS[k].kind !== 'trinket')) h += '<p class="rmuted">Your pack is empty. Gather ore, bark and stone in the wilds; creatures drop all sorts.</p>';
     } else if (page === 'skills') {
       const need = xpForLevel(sk.lvl);
       h += `<h3>Level ${sk.lvl} <small>${sk.xp} / ${need} xp · ${sk.points} perk point${sk.points === 1 ? '' : 's'} to spend</small></h3>
@@ -122,10 +126,12 @@ export function createRpgUI(api) {
     } else if (page === 'shop') {
       const stock = SHOP[api.region()];
       h += `<h3>Hemla’s mat <small>buy</small></h3><div class="rstats">${shards}</div><div class="rgrid">` + stock.map(k => card(k, `Buy · ${price(k)} ◆`, api.shards() >= price(k) ? `buy:${k}` : null)).join('') + `</div>`;
-      const sellable = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind !== 'key' && (ITEMS[k].kind === 'mat' || ITEMS[k].kind === 'meal' || (ITEMS[k].kind === 'trinket' && !inv.trinkets.includes(k)) || (ITEMS[k].kind === 'axe' && k !== inv.axe && k !== 'axe_tanoc')));
+      const sellable = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind !== 'key' && (ITEMS[k].kind === 'mat' || ITEMS[k].kind === 'meal' || (ITEMS[k].kind === 'trinket' && !inv.trinkets.includes(k)) || (ITEMS[k].kind === 'weapon' && k !== inv.axe && k !== 'axe_tanoc' && ITEMS[k].value > 0)));
       h += `<h3>Sell</h3><div class="rgrid">` + (sellable.length ? sellable.map(k => card(k, `Sell · ${Math.max(1, Math.round(ITEMS[k].value * 0.5))} ◆`, `sell:${k}`)).join('') : '<p class="rmuted">Nothing to sell.</p>') + `</div>`;
     } else if (page === 'forge') {
       h += `<h3>Duro’s cauldron <small>forge</small></h3><div class="rstats">${shards}</div><div class="rgrid">` + FORGE.map(r => {
+        const arm = ITEMS[r.out].kind === 'weapon' && ITEMS[r.out].arm;
+        if (arm && !(S.arms || {})[arm]) return '';   // (only weapons of a kind he's learned)
         const owned = count(inv, r.out) > 0, later = r.later && !(api.later && api.later()), locked = (r.out === 'axe_tusk' && !(S.flags || {}).forge_tusk) || later;
         const ok = !owned && !locked && hasAll(inv, r.need) && api.shards() >= r.shards;
         if (later) return `<div class="rcard"><div class="ri">✦</div><div class="rt"><b>Relic armor</b><small>“A Hurst in the metal? Not until you’ve seen what one can do, boy. Ask me again after the Megla.”</small></div></div>`;

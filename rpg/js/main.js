@@ -25,7 +25,7 @@ import { buildLeotik } from './leotik.js';
 import { buildXilia } from './xilia.js';
 import { buildProperty, COLOSSI } from './property.js';
 import { createInteriors } from './interiors.js';
-import { buildTorcain, buildPhorus, buildCore, placeWalker, cartoon } from './actors.js';
+import { buildTorcain, buildPhorus, buildCore, placeWalker, cartoon, armsShot } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildMalstiPunk, buildSkorThal, buildGynge } from './esik_land.js';
 import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
@@ -37,10 +37,10 @@ import { createRoad } from './road.js';
 import { createMegla } from './megla.js';
 import { buildCart } from './cart.js';
 import { createCine } from './cine.js';
-import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE, bindId } from './items.js';
+import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE, bindId, ARMS, armOf, armKey } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
-import { QUESTS, questProgress } from './quests.js';
+import { QUESTS, JOBS, questProgress, jobProgress } from './quests.js';
 import { buildFeatures, sigilMesh } from './features.js';
 import { createRpgUI } from './rpgui.js';
 import { createEnemies, TYPES } from './enemies.js';
@@ -85,6 +85,9 @@ function ensureSave(S) {
   // and Torcain, grown, dresses on his own (inv.wearT): his long coat, which is what he glides with
   if (!S.inv.wearT) { S.inv.wearT = { cloak: 'w_coat' }; S.inv.items.w_coat = 1; }
   S.skills = S.skills || freshSkills();
+  // the kinds of weapon he's learned (see ARMS): the axe from the start, the rest from the jobs on the Carpenter's board
+  S.arms = S.arms || { axe: true };
+  if (!ITEMS[S.inv.axe]) S.inv.axe = 'axe_tanoc';
   for (const k of ['quests', 'counters', 'killsBy', 'qstart', 'picked', 'trials', 'flags', 'cleared', 'codex', 'lit', 'ups']) S[k] = S[k] || {};
   if (!S.dya && DYA3.engineReady()) S.dya = DYA3.starterCollection(parseInt(String(S.runId || 'abc').replace(/[^0-9a-z]/g, '').slice(0, 6), 36) || 7);
   S.chTime = S.chTime || {};
@@ -821,6 +824,27 @@ function updateSpikes(dt) {
   }
 }
 
+const _AUP = V3(0, 1, 0), _apd = V3();
+/* the bow and the hatchets: a shot (or three) toward the lock, the best foe ahead, or wherever he's looking */
+function fireArms(arm, kind) {
+  const arrow = arm.ranged === 'arrow', heavy = kind === 3;
+  let target = null, aim = null;
+  if (G.lock) { const lp = lockPoint(); if (lp && lp.distanceTo(P.pos) < 40) { target = G.lock === 'boss' ? 'boss' : G.lock; aim = lp; } }
+  if (!aim) { const b = bestTarget(34, 0.82); if (b && !b.e.sigil) { target = b.e; aim = b.p; } }
+  const from = arrow ? V3(P.pos.x + Math.sin(P.yaw) * 0.5, P.pos.y + 1.45, P.pos.z + Math.cos(P.yaw) * 0.5) : torcain.weapon.getWorldPosition(V3());
+  if (!aim) { const f = camForward(); aim = from.clone().addScaledVector(f, 30); aim.y += Math.sin(-CAM.pitch || 0) * 10; }
+  const n = heavy && !arrow ? 3 : 1, speed = arrow ? (heavy ? 62 : 46) : 26;
+  const it = ITEMS[SAVE.inv.axe] || {}, col = it.color || (arrow ? 0xfff0c8 : 0xffd0a0);
+  const base = V3().subVectors(aim, from).normalize();
+  for (let i = 0; i < n; i++) {
+    const dir = base.clone().applyAxisAngle(_AUP, (i - (n - 1) / 2) * 0.16);
+    const m = armsShot(arm.ranged); m.position.copy(from); m.rotation.order = 'YXZ'; m.rotation.y = Math.atan2(dir.x, dir.z); scene.add(m);
+    projectiles.push({ sprite: m, pos: from.clone(), vel: dir.multiplyScalar(speed), speed, owner: 'player', kind: arm.ranged, life: arrow ? 2.4 : 1.6, grav: arrow ? 5 : 9, hit: new Set(),
+      dmg: (arrow ? 19 : 17) * (heavy && arrow ? 2.4 : 1) * axeMul() * arm.dmg, target: i === (n - 1) / 2 || n === 1 ? target : null, pierce: heavy && arrow, big: heavy, col });
+  }
+  arrow ? sfx.twang() : sfx.swing();
+}
+
 function updateProjectiles(dt) {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
@@ -836,6 +860,22 @@ function updateProjectiles(dt) {
         addHeat(4);
       }
       if (Math.random() < 0.6) particles.emit(p.pos.x, p.pos.y, p.pos.z, { color: 0x9a5aff, size: 0.6, life: 0.4, speed: 0.5 });
+    } else if (p.owner === 'player') {   // an arrow or a hatchet: a light pull toward its mark, a little drop, and whatever it meets
+      const tgt = p.target, alive = tgt && (tgt === 'boss' ? !!boss && !boss.dead : !tgt.dead);
+      if (alive) { const tp = tgt === 'boss' ? bossTargetPoint() : V3(tgt.pos.x, tgt.pos.y + 0.8, tgt.pos.z); p.vel.lerp(tp.sub(p.pos).normalize().multiplyScalar(p.speed), 1 - Math.exp(-3.5 * dt)); }
+      else p.vel.y -= p.grav * dt;
+      for (const e of enemies.list) {
+        if (e.dead || p.hit.has(e)) continue;
+        if (Math.hypot(e.pos.x - p.pos.x, e.pos.y + 0.8 - p.pos.y, e.pos.z - p.pos.z) > e.T.rad + 0.6) continue;
+        p.hit.add(e); enemies.damage(e, p.dmg * (0.9 + Math.random() * 0.2), P.pos, 3, { stun: 0.3 * FX.stagger, burn: FX.burn, big: p.big });
+        addHeat(5); G.hitstop = 0.03; particles.burst(p.pos.x, p.pos.y, p.pos.z, 10, { color: p.col, speed: 5, size: 0.35, life: 0.35 });
+        if (!p.pierce) { p.life = 0; break; }
+      }
+      if (p.life > 0 && boss && !boss.dead && !p.hit.has('boss') && p.pos.distanceTo(bossTargetPoint()) < bossReach()) { p.hit.add('boss'); damageBoss(p.dmg, { big: p.big }); if (!p.pierce) p.life = 0; }
+      if (p.life > 0 && armsDrill(p.pos)) p.life = 0;
+      if (p.pos.y < world.heightAt(p.pos.x, p.pos.z) - 0.2 || world.col.ground(p.pos.x, p.pos.z, p.pos.y + 0.3) > p.pos.y + 0.05) p.life = 0;
+      if (p.kind === 'hatchet') p.sprite.rotation.x += dt * 22;
+      else { _apd.copy(p.vel).normalize(); p.sprite.quaternion.setFromUnitVectors(_AUP, _apd); }
     } else {
       const tgt = p.target;
       const alive = tgt && (tgt.isBoss ? !!boss && !boss.dead : !tgt.dead);
@@ -886,11 +926,14 @@ function pressAttack() {
 
 function startAttack(kind) {
   if (!spend(kind === 3 ? D.stamina.heavy : D.stamina.attack)) { P.atk = null; return; }
-  P.atk = { kind, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur };
+  const arm = armOf(SAVE.inv.axe);
+  // how it looks: lunges for the spears (heavy too, for the lance), the bow always draws
+  const pose = arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
+  P.atk = { kind, pose, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur / (arm.spd || 1), arm };
   P.comboIdx = kind; P.queued = false;
   const f = lockDir() || camForward();
   P.yaw = Math.atan2(f.x, f.z);
-  P.vel.x += f.x * (kind === 3 ? 6 : 4); P.vel.z += f.z * (kind === 3 ? 6 : 4);
+  if (!arm.ranged) { P.vel.x += f.x * (kind === 3 ? 6 : 4); P.vel.z += f.z * (kind === 3 ? 6 : 4); }
   kind === 3 ? sfx.heavy() : sfx.swing();
 }
 
@@ -902,36 +945,47 @@ function lockDir() {
 
 function updateAttack(dt) {
   if (!P.atk) { P.comboReset = Math.max(0, P.comboReset - dt); return; }
-  const A = P.atk, def = ATK[A.kind];
+  const A = P.atk, def = ATK[A.kind], arm = A.arm || ARMS.axe;
   A.t += dt; A.p = A.t / A.dur;
-  if (A.p > 0.28 && A.p < 0.7) {
+  if (arm.ranged) {   // a bow or a brace of hatchets: no blow, a shot
+    if (A.p > 0.45 && !A.shot) { A.shot = true; fireArms(arm, A.kind); }
+  } else if (A.p > 0.28 && A.p < 0.7) {
     const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
-    const dmg = def.dmg * axeMul();
+    const range = def.range * arm.rng;
+    // a lance hits hardest at a run (or from a Punk's back); everything else as the weapon's weight says
+    const charge = arm.charge ? 1 + clamp(Math.hypot(P.vel.x, P.vel.z) / 9, 0, 0.9) + (P.riding ? 0.5 : 0) : 1;
+    const dmg = def.dmg * axeMul() * arm.dmg * charge;
+    if (arm.crack && A.p > 0.5 && !A.cracked) {   // the whip's report, out at the end of the lash
+      A.cracked = true; sfx.crack();
+      const tp = torcain.weapon.userData.tip ? torcain.weapon.userData.tip.getWorldPosition(V3()) : V3(P.pos.x + fx * range, P.pos.y + 1, P.pos.z + fz * range);
+      particles.burst(tp.x, tp.y, tp.z, 14, { color: 0xfff0c8, speed: 5, size: 0.35, life: 0.25 });
+      armsDrill(tp, range, fx, fz);
+    }
     for (const e of enemies.list) {
       if (e.dead || A.hit.has(e)) continue;
       const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
-      if (d > def.range + e.T.rad || Math.abs(e.pos.y - P.pos.y) > 2.2) continue;
-      const whirl = A.kind === 3 && perk('whirl');
-      if (!whirl && d > 0.8 + e.T.rad && (dx * fx + dz * fz) / d < 0.15) continue;
+      if (d > range + e.T.rad || Math.abs(e.pos.y - P.pos.y) > 2.2) continue;
+      const whirl = A.kind === 3 && (perk('whirl') || arm.whirl);
+      if (!whirl && d > 0.8 + e.T.rad && (dx * fx + dz * fz) / d < arm.arc) continue;
       A.hit.add(e);
       const exec = perk('exec') && e.stun > 0 ? 1.5 : 1;
-      enemies.damage(e, dmg * exec * (0.9 + Math.random() * 0.2), P.pos, def.kb, { big: A.kind === 3, stun: (A.kind === 3 ? 0.6 : 0.32) * FX.stagger, burn: FX.burn });
+      enemies.damage(e, dmg * exec * (0.9 + Math.random() * 0.2), P.pos, def.kb, { big: A.kind === 3, stun: (A.kind === 3 ? 0.6 : 0.32) * FX.stagger * (arm.crack ? 1.8 : 1), burn: FX.burn });
       addHeat(7);
       G.hitstop = A.kind === 3 ? 0.07 : 0.04;
       G.shake = Math.max(G.shake, A.kind === 3 ? 0.35 : 0.15);
     }
     if (boss && !boss.dead && !A.hit.has('boss')) {
       const d = Math.hypot(P.pos.x - boss.pos.x, P.pos.z - boss.pos.z);
-      if (d < def.range + bossReach()) {
+      if (d < range + bossReach()) {
         A.hit.add('boss'); damageBoss(dmg * (A.kind === 3 ? 1.2 : 1), { big: A.kind === 3 });
         addHeat(7); G.hitstop = 0.05; G.shake = Math.max(G.shake, 0.2);
       }
     }
-    if (!A.hit.has('trial')) { if (trialSwing(def.range)) A.hit.add('trial'); }
+    if (!A.hit.has('trial')) { if (trialSwing(range)) A.hit.add('trial'); }
     const wp = torcain.weapon.getWorldPosition(V3());
     particles.emit(wp.x, wp.y, wp.z, { color: FX.burn ? 0xff7a2a : A.kind === 3 ? 0xffa050 : 0xc8a0ff, size: 0.5, life: 0.25, speed: 0.3 });
   }
-  if (A.kind === 3 && A.p > 0.55 && !A.slammed) {
+  if (A.kind === 3 && A.p > 0.55 && !A.slammed && !arm.ranged) {
     A.slammed = true;
     const x = P.pos.x + Math.sin(P.yaw) * 2, z = P.pos.z + Math.cos(P.yaw) * 2;
     particles.ring(x, P.pos.y + 0.2, z, 24, 7, { color: 0xffb060, size: 0.5, life: 0.4 });
@@ -1133,6 +1187,15 @@ function hurtPlayer(dmg, from, kb = 7, opts = {}) {
     return false;
   }
   dmg *= FX.armor * (perk('shell') ? 0.9 : 1);
+  const guard = armOf(SAVE.inv.axe).block;
+  if (guard && !P.atk && from) {   // a shield up turns part of a blow from the front
+    const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), dx = from.x - P.pos.x, dz = from.z - P.pos.z, d = Math.hypot(dx, dz) || 1;
+    if ((dx * fx + dz * fz) / d > 0.2) {
+      dmg *= 1 - guard; kb *= 0.4;
+      const sp = torcain.offhand ? torcain.offhand.getWorldPosition(V3()) : V3(P.pos.x + fx * 0.5, P.pos.y + 1.2, P.pos.z + fz * 0.5);
+      particles.burst(sp.x, sp.y, sp.z, 10, { color: 0xffe0a0, speed: 5, size: 0.3, life: 0.3 }); sfx.clang();
+    }
+  }
   if (P.ward > 0) {
     const soak = Math.min(P.ward, dmg); P.ward -= soak; dmg -= soak;
     particles.burst(P.pos.x, P.pos.y + 1.2, P.pos.z, 14, { color: 0xbfeaff, speed: 5, size: 0.4, life: 0.4 });
@@ -1249,6 +1312,8 @@ function interactables() {
   for (const a of amulets) if (!a.got) list.push({ pos: V3(a.x, a.y, a.z), label: 'Pry loose the Sniller amulet', act: () => takeAmulet(a), far: 2.4 });
   if (storehouse) { /* scenery only */ }
   if (board) list.push({ pos: V3(board.x, board.y, board.z), label: 'Read the bounty board', act: () => boardTalk(), far: 3 });
+  if (jobBoard) list.push({ pos: V3(jobBoard.x, jobBoard.y + 1, jobBoard.z), label: 'Read the Carpenter’s job board', act: () => jobBoardTalk(), far: 3.2 });
+  if (apV && REGION === 'property' && !SAVE.arms.whip && !DRILL && jobState('pj_whip') === 'active') list.push({ pos: apV.pos, label: 'Talk to Venkin <small style="opacity:.7">about the whip</small>', act: () => { F_.whipAsked ? dialog(whoSays(STORY.WHIP.again), () => whipDrill(apV)) : dialog(whoSays(STORY.WHIP.ask), () => whipDrill(apV)); }, far: 3 });
   for (const c of crates) if (c.mesh.visible) list.push({ pos: V3(c.x, c.y, c.z), label: 'Haul up the crate', act: () => takeCrate(c), far: 3 });
   for (const pg of pages) if (pg.mesh.visible) list.push({ pos: V3(pg.x, pg.y, pg.z), label: 'Read the torn page', act: () => readPage(pg), far: 2.8 });
   if (SAVE.quests.q_thorn === 'active') for (const sc of scars) if (sc.revealed && !SAVE.cleared[sc.id]) list.push({ pos: V3(sc.x, sc.y + 1, sc.z), label: 'Read the rind-scar', act: () => readScar(sc), far: 3 });
@@ -1549,6 +1614,76 @@ const board = world.board && hasBoard(REGION) ? (() => {
   world.col.add(world.board.x, world.board.z, 1.2, 0.2, g.rotation.y, y - 1, y + 2.6);
   return { x: world.board.x, y, z: world.board.z, mesh: g };
 })() : null;
+
+/* ---------------- the Carpenter's job board: side jobs, any time, on his own land (see JOBS in quests.js) ---------------- */
+STORY.SPEAKERS.jobs = { name: 'The Carpenter’s job board', color: '#e8c890', sub: 'notices from Beuhk, and a box underneath' };
+const jobBoard = REGION === 'property' && world.SITES && world.SITES.yard ? (() => {
+  const v = V3(world.SITES.yard.x + 9, 0, world.SITES.yard.z - 9); v.y = world.heightAt(v.x, v.z); world.col.resolve(v, 2, 3);
+  const y = world.col.ground(v.x, v.z, world.heightAt(v.x, v.z) + 0.5);
+  const g = new THREE.Group();
+  for (const sd of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 2.6, 6), toon(0x5a3a20)); post.position.set(sd * 1.0, 1.3, 0); g.add(post); }
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.4, 0.12), toon(0x9a6a40)); plank.position.y = 1.7; g.add(plank);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.1, 0.6), toon(0x6a3a20)); roof.position.set(0, 2.55, 0.05); roof.rotation.x = 0.25; g.add(roof);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.6), toon(0x7a4a2a)); box.position.set(0, 0.25, 0.3); g.add(box);   // where they leave what they owe
+  [[-0.7, 1.95], [-0.15, 1.8], [0.45, 1.95], [-0.5, 1.4], [0.15, 1.35], [0.75, 1.45]].forEach(([x, yy], i) => {
+    const note = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.48), toon(i % 2 ? 0xf0e0c0 : 0xe8d0a0)); note.position.set(x, yy, 0.07); note.rotation.z = (i - 2) * 0.08; g.add(note);
+  });
+  const parts = []; g.traverse(m => { if (m.isMesh) parts.push(m); });
+  parts.forEach(m => { m.castShadow = true; addOutline(m, 0.03); });
+  g.position.set(v.x, y, v.z);
+  g.rotation.y = Math.atan2(world.SITES.yard.x - v.x, world.SITES.yard.z - v.z);
+  scene.add(g);
+  world.col.add(v.x, v.z, 1.3, 0.45, g.rotation.y, y - 1, y + 2.6);
+  return { x: v.x, y, z: v.z, mesh: g };
+})() : null;
+const jobState = id => SAVE.quests[id];
+const jobProg = id => jobProgress(id, JOBS[id], SAVE, SAVE.inv);
+function jobBoardTalk() {
+  const ids = Object.keys(JOBS), active = ids.filter(id => jobState(id) === 'active'), open = ids.filter(id => !jobState(id)).slice(0, 4);
+  const done = ids.filter(id => jobState(id) === 'done').length;
+  const opts = [];
+  for (const id of active) {
+    const J = JOBS[id], p = jobProg(id);
+    if (p >= 1) opts.push({ label: `<b style="color:#9affc0">Finish: ${J.name}</b> <small>— ${J.from}</small>`, act: () => finishJob(id) });
+    else opts.push({ label: `${J.name} <small>— ${J.from} · ${Math.round(p * 100)}%</small>`, act: () => dialog([['jobs', `${J.from}: ${J.desc}`]], () => jobBoardTalk()) });
+  }
+  for (const id of open) {
+    const J = JOBS[id];
+    opts.push({ label: `Take: ${J.name} <em style="color:var(--brass2)">· ${jobRewardText(J)}</em> <small>— ${J.from}</small>`, act: () => dialog([['jobs', `${J.from}: ${J.desc}`]], () => takeJob(id)) });
+  }
+  opts.push({ label: 'Not now', act: null });
+  ask('jobs', open.length || active.length ? `Notices from Beuhk, pinned up in a dozen hands — and a box underneath for what they owe. (${done} of ${ids.length} done.)` : 'Every notice on the board is done. The box is empty. Somebody has pinned up a drawing of you with a whip, a bow and nine other things.', opts);
+}
+function jobRewardText(J) {
+  const r = J.reward;
+  if (r.arms) return `learn the ${ARMS[r.arms].name.toLowerCase()}`;
+  return Object.keys(r.items || {}).map(k => ITEMS[k].name).join(' + ');
+}
+function takeJob(id) {
+  const J = JOBS[id];
+  SAVE.quests[id] = 'active';
+  if (J.goal.type === 'kills') SAVE.qstart[id] = SAVE.killsBy[J.goal.kind] || 0;
+  persist(); toast(`New job: ${J.name}`, 3); sfx.core(); lockMouse();
+  if (id === 'pj_whip') whipVenkin();
+}
+function finishJob(id) {
+  const J = JOBS[id], r = J.reward;
+  if (J.goal.type === 'items' && !takeAll(SAVE.inv, J.goal.need)) return;
+  SAVE.quests[id] = 'done';
+  if (r.items) for (const [k, c] of Object.entries(r.items)) { invAdd(SAVE.inv, k, c); lootToast(k, c); }
+  persist(); sfx.core();
+  dialog([['jobs', J.done]], () => {
+    toast(`Job done: ${J.name}`, 3); xp(r.xp || 0);
+    if (r.arms) learnArms(r.arms);
+    else hint('Put it on from the book (I → Gear → Wearing).');
+    persist();
+  });
+}
+/* for the whip job, Venkin turns up by the barn and waits there */
+function whipVenkin() {
+  if (REGION !== 'property' || SAVE.arms.whip || jobState('pj_whip') !== 'active') return;
+  if (!apV) apVenkin(true);
+}
 
 function boardTalk() {
   const b = SAVE.bounty;
@@ -2082,6 +2217,7 @@ function nearestPrompt() {
 
 /* ---------------- objective text ---------------- */
 function setObjective() {
+  if (DRILL) { drillObjective(); return; }
   if (young() && F_.pro === 'beuhk') { beuhkObjective(); return; }
   if (young()) { youngObjective(); return; }
   let txt, hintTxt = '', pips = 0, on = 0;
@@ -2336,6 +2472,7 @@ function updateCompass() {
 }
 function objectivePoint() {
   let p = null;
+  if (DRILL) { const q = DRILL.posts.find(o => !o.hit); if (q) return { p: q.pos, d: Math.round(Math.hypot(q.pos.x - P.pos.x, q.pos.z - P.pos.z)) }; }
   if (young()) { p = F_.pro === 'beuhk' ? beuhkGoal() : youngGoal(); return p ? { p, d: Math.round(Math.hypot(p.x - P.pos.x, p.z - P.pos.z)) } : null; }
   if (REGION === 'xilia' || REGION === 'property') {
     const g = xiliaGoal(); if (g) p = g.pos;
@@ -2545,7 +2682,7 @@ function npcTalk(n) {
   const def = n.def, who = npcSpeaker(def);
   n.talking = 3;
   if (def.id === 'buhkon') { if (young()) youngBuhkon(n); else buhkonTalk(n); return; }
-  const opts = apNpcOptions(n).concat(bkErrandOptions(n));
+  const opts = apNpcOptions(n).concat(bkErrandOptions(n), armsOptions(n));
   for (const qid of def.quests) {
     if (young() && qid === 'q_vel') continue;   // a Duat scroll is no use to him yet, and a Vel is no job for a boy
     const q = QUESTS[qid], st = SAVE.quests[qid];
@@ -2559,7 +2696,7 @@ function npcTalk(n) {
   if (def.roles.includes('shop')) opts.push({ label: 'Trade', act: () => openBook('shop') });
   if (def.roles.includes('forge')) {
     const ok = REGION !== 'xilia' || SAVE.quests.q_ore === 'done';
-    opts.push({ label: ok ? 'Forge an axe or armor' : 'Forge an axe or armor <small>(his cauldron is cold)</small>', act: () => ok ? openBook('forge') : dialog([[who, 'No ore, no bark, no fire. Ask me about work.']], () => npcTalk(n)) });
+    opts.push({ label: ok ? 'Forge a weapon or armor' : 'Forge a weapon or armor <small>(his cauldron is cold)</small>', act: () => ok ? openBook('forge') : dialog([[who, 'No ore, no bark, no fire. Ask me about work.']], () => npcTalk(n)) });
   }
   if (def.roles.includes('cook')) {
     const ok = REGION !== 'xilia' || SAVE.quests.q_camp === 'done';
@@ -3496,7 +3633,7 @@ function openBook(tab) {
 }
 function bookAct(act, arg) {
   const inv = SAVE.inv;
-  if (act === 'equip') { inv.axe = arg; restyleAxe(); sfx.ui(); }
+  if (act === 'equip' && ITEMS[arg] && SAVE.arms[armKey(arg)]) { inv.axe = arg; restyleAxe(); sfx.ui(); }
   else if (act === 'trinket') { if (inv.trinkets.length >= 2) inv.trinkets.shift(); inv.trinkets.push(arg); sfx.ui(); }
   else if (act === 'untrinket') { inv.trinkets = inv.trinkets.filter(t => t !== arg); }
   else if (act === 'wear') { wearSet()[ITEMS[arg].slot] = arg; applyWear(); sfx.ui(); }
@@ -3537,7 +3674,7 @@ function bookAct(act, arg) {
     if (inv.items[arg] > 0) { inv.items[arg]--; if (inv.items[arg] <= 0) delete inv.items[arg]; G.shards += Math.max(1, Math.round(ITEMS[arg].value * 0.5)); sfx.ui(); }
   } else if (act === 'forge') {
     const r = FORGE.find(f => f.out === arg);
-    if (r && !(r.later && !laterGame()) && G.shards >= r.shards && takeAll(inv, r.need)) { G.shards -= r.shards; invAddRaw(inv, arg, 1); if (ITEMS[arg].kind === 'axe') { inv.axe = arg; restyleAxe(); } else if (ITEMS[arg].slot) { wearSet()[ITEMS[arg].slot] = arg; applyWear(); } sfx.flare(); xp(60); toast(`Forged: ${ITEMS[arg].name}${ITEMS[arg].relicArmor ? ' — Relic armor' : ''}`, 2.5); }
+    if (r && !(r.later && !laterGame()) && !(ITEMS[arg].kind === 'weapon' && !SAVE.arms[armKey(arg)]) && G.shards >= r.shards && takeAll(inv, r.need)) { G.shards -= r.shards; invAddRaw(inv, arg, 1); if (ITEMS[arg].kind === 'weapon') { inv.axe = arg; restyleAxe(); } else if (ITEMS[arg].slot) { wearSet()[ITEMS[arg].slot] = arg; applyWear(); } sfx.flare(); xp(60); toast(`Forged: ${ITEMS[arg].name}${ITEMS[arg].relicArmor ? ' — Relic armor' : ''}`, 2.5); }
   } else if (act === 'cook') {
     const r = RECIPES.find(f => f.out === arg);
     if (r && takeAll(inv, r.need)) { invAdd(inv, arg, 1); sfx.heal(); xp(8); }
@@ -3548,11 +3685,14 @@ function bookAct(act, arg) {
   applyUps(false); persist();
 }
 /* the wielded axe's blade takes its colour */
+let armsHeld = 'axe';
 function restyleAxe() {
-  const it = ITEMS[SAVE.inv.axe];
+  const it = ITEMS[SAVE.inv.axe], cls = armKey(SAVE.inv.axe);
+  if (cls !== armsHeld) { armsHeld = cls; torcain.setArms(cls); }   // another kind of weapon in his hands
   const blade = torcain.weapon.userData.blade;
-  if (blade) { blade.material.emissive.setHex(it && it.color ? it.color : 0x6a2cff); blade.material.emissiveIntensity = it && it.color ? 0.55 : 0.25; }
-  if (blade && young() && !(it && it.color)) { blade.material.color.setHex(0x9a9aa2); blade.material.emissiveIntensity = 0; }   // the Carpenter's plain hatchet
+  const tint = b => { if (!b || !b.material.emissive) return; b.material.emissive.setHex(it && it.color ? it.color : cls === 'axe' ? 0x6a2cff : 0x000000); b.material.emissiveIntensity = it && it.color ? 0.55 : cls === 'axe' ? 0.25 : 0; };
+  tint(blade); if (torcain.offhand && !torcain.offhand.userData.shield) tint(torcain.offhand.userData.blade);
+  if (blade && cls === 'axe' && young() && !(it && it.color)) { blade.material.color.setHex(0x9a9aa2); blade.material.emissiveIntensity = 0; }   // the Carpenter's plain hatchet
   if (torcain.weapon.userData.glow) torcain.weapon.userData.glow.visible = !young();
   torcain.weapon.scale.setScalar(1 + ((it && it.dmg) || 1) * 0.1 - 0.1);
 }
@@ -4176,7 +4316,7 @@ function updatePlayer(dt) {
   if (P.riding) torcain.root.position.y += mount ? mount.seat : 1.35;
   const dy = P.yaw - (P._ry ?? P.yaw); P._ry = P.yaw; turnRate = damp(turnRate, Math.atan2(Math.sin(dy), Math.cos(dy)) / Math.max(dt, 1e-3), 6, dt);
   torcain.root.rotation.set(0, P.yaw, 0);
-  torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0,
+  torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.pose || P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0,
     ride: !!P.riding, rideSpeed: hs, rideBob: mount ? mount.gait || 0 : 0, rideRoll: P.riding ? clamp(-turnRate * 0.06, -0.22, 0.22) : 0 });
   if (P.roll) torcain.body.rotation.x = (P.roll.t / P.roll.dur) * Math.PI * 2;
 }
@@ -5287,13 +5427,100 @@ const oldBoat = REGION === 'property' && young() ? (() => {
   return { g, pos: V3(x, y + 0.6, z) };
 })() : null;
 
+/* ---------------- the kinds of weapon: each learned on a quest; Venkin teaches the whip himself ---------------- */
+function learnArms(cls) {
+  const a = ARMS[cls]; if (!a || SAVE.arms[cls]) return;
+  SAVE.arms[cls] = true;
+  if (!SAVE.inv.items[a.starter]) invAdd(SAVE.inv, a.starter, 1);
+  persist(); sfx.victory();
+  toast(`New weapon learned: ${a.icon} ${a.name} — ${ITEMS[a.starter].name}`, 4);
+  hint(`Wield it from the book (I → Gear → Weapons). ${a.note}`);
+}
+const whoSays = L => young() ? L : L.map(([w, t]) => [w === 'tanoc' ? 'torcain' : w, t]);   // (grown, he's Torcain)
+function armsOptions(n) {
+  const out = [];
+  if (n.def.id !== 'venkin') return out;
+  if (!SAVE.arms.whip && !DRILL) out.push({ label: `<b style="color:#ffd27a">${STORY.WHIP.askLabel}</b>`, act: () => { n.talking = 10; dialog(whoSays(STORY.WHIP[F_.whipAsked ? 'again' : 'ask']), () => whipDrill(n)); } });
+  else if (SAVE.arms.whip) out.push({ label: 'Ask about Stryx training', act: () => { n.talking = 6; dialog(STORY.WHIP.chat[Math.floor(Math.random() * STORY.WHIP.chat.length)], () => npcTalk(n)); } });
+  return out;
+}
+/* Venkin's posts: straw Stryx on poles in a ring round him. Crack the whip at each one */
+let DRILL = null;
+function whipDrill(n) {
+  F_.whipAsked = true;
+  if (!SAVE.inv.items.wp_whip) invAdd(SAVE.inv, 'wp_whip', 1);
+  DRILL = { n, posts: [] };
+  SAVE.inv.axe = 'wp_whip'; restyleAxe();
+  const c = n.pos, face = Math.atan2(P.pos.x - c.x, P.pos.z - c.z);
+  for (let i = 0; i < 5; i++) {
+    const a = face + (i - 2) * 0.55, r = 7 + (i % 2) * 2.5;
+    const v = V3(c.x + Math.sin(a) * r, 0, c.z + Math.cos(a) * r); v.y = world.heightAt(v.x, v.z); world.col.resolve(v, 0.9, 2);
+    const y = world.col.ground(v.x, v.z, world.heightAt(v.x, v.z) + 3);
+    const m = strawStryx(); m.position.set(v.x, y, v.z); m.rotation.y = Math.atan2(c.x - v.x, c.z - v.z); scene.add(m);
+    DRILL.posts.push({ pos: V3(v.x, y + 1.3, v.z), m, hit: false, wob: 0 });
+  }
+  toast('Venkin’s posts are up — five straw Stryx', 3); lockMouse(); setObjective();
+}
+function strawStryx() {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.6, 6), toon(0x6a4a2a)); pole.position.y = 0.8; g.add(pole);
+  const body = new THREE.Group(); body.position.y = 1.35; g.add(body);
+  const straw = new THREE.Mesh(new THREE.SphereGeometry(0.42, 9, 7), toon(0xd8b860)); straw.scale.set(1, 0.85, 1.25); body.add(straw);
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 7), toon(0xc8a850)); snout.rotation.x = Math.PI / 2; snout.position.set(0, 0.05, 0.55); body.add(snout);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), toon(0x9ad86a, { emissive: 0x4a8a2a, emissiveIntensity: 0.4 })); eye.position.set(0, 0.22, 0.38); body.add(eye);   // one big painted eye, the way Venkin draws them
+  for (const sd of [-1, 1]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.28, 5), toon(0xb89840)); ear.position.set(sd * 0.25, 0.38, -0.05); ear.rotation.z = -sd * 0.5; body.add(ear); }
+  const tie = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.025, 4, 12), toon(0x8a3a2a)); tie.rotation.x = Math.PI / 2; tie.position.y = -0.05; body.add(tie);
+  outlineAll(g, 0.02); g.userData.body = body;
+  return g;
+}
+/* the whip's crack (range, along fx/fz): did it reach one of the posts? (A shot at tp only stops on a post — Venkin wants the crack.) */
+function armsDrill(tp, range, fx, fz) {
+  if (!DRILL) return false;
+  if (range == null) return DRILL.posts.some(q => tp.distanceTo(q.pos) < 0.9);
+  let any = false;
+  for (const q of DRILL.posts) {
+    if (q.hit) continue;
+    const dx = q.pos.x - P.pos.x, dz = q.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (!(d < range + 0.8 && (d < 1.2 || (dx * fx + dz * fz) / d > 0.5))) continue;
+    q.hit = true; q.wob = 1; any = true;
+    particles.burst(q.pos.x, q.pos.y + 0.1, q.pos.z, 24, { color: 0xe8d070, speed: 6, size: 0.35, life: 0.6, gravity: 6 });
+    const left = DRILL.posts.filter(o => !o.hit).length;
+    if (left) { bark('venkin', STORY.WHIP.hits[(4 - left) % STORY.WHIP.hits.length], 2.2); setObjective(); }
+    else setTimeout(drillDone, 700);
+  }
+  return any;
+}
+function drillTick(dt) {
+  if (!DRILL) return;
+  for (const q of DRILL.posts) if (q.wob > 0) { q.wob = Math.max(0, q.wob - dt * 0.8); const b = q.m.userData.body; b.rotation.z = Math.sin(q.wob * 18) * 0.5 * q.wob; b.rotation.x = -0.45 + 0.25 * q.wob; }
+  if (Math.hypot(P.pos.x - DRILL.n.pos.x, P.pos.z - DRILL.n.pos.z) > 70) { endDrill(); toast('You wandered off from Venkin’s posts. Ask him again to set them up.', 3); setObjective(); }
+}
+function endDrill() { if (!DRILL) return; for (const q of DRILL.posts) scene.remove(q.m); DRILL = null; }
+function drillObjective() {
+  const hit = DRILL.posts.filter(o => o.hit).length;
+  $('q-text').textContent = `Crack the whip at Venkin’s straw Stryx (${hit}/5)`;
+  $('q-hint').textContent = 'Left-click — the whip reaches far, but only straight ahead';
+  const el = $('q-pips'); el.innerHTML = '';
+  for (let i = 0; i < 5; i++) { const d = document.createElement('div'); d.className = 'pip' + (i < hit ? ' on' : ''); el.appendChild(d); }
+}
+function drillDone() {
+  if (!DRILL) return;
+  const n = DRILL.n; endDrill();
+  n.talking = 8;
+  dialog(whoSays(STORY.WHIP.done), () => {
+    learnArms('whip'); xp(120); setObjective();
+    // back off home, unless the Carpenter's errands still need him about the place
+    if (n === apV && !(F_.apGiven && (apStep() === AP.CAVE || apStep() === AP.HOLLOW))) setTimeout(() => { if (apV && !DRILL) apVenkin(false); }, 9000);
+  });
+}
+
 /* ---------------- Venkin on the Carpenter's land: by the barn, then at Tanoc's heels ---------------- */
 let apV = null;
 function apVenkin(on) {
   if (REGION !== 'property') return;
   if (!on) { if (apV) { scene.remove(apV.a.root); apV = null; } return; }
   if (apV) return;
-  const a = buildKeilia({ seed: 11, cloth: 0x4a5a34, eye: 0x7a8a2a }); a.root.scale.multiplyScalar(0.74);
+  const a = buildKeilia({ seed: 11, cloth: 0x4a5a34, eye: 0x7a8a2a, whip: true }); a.root.scale.multiplyScalar(0.74);
   const b = world.SITES && world.SITES.yard ? V3(150 + 6, 0, 82 + 8) : P.pos.clone();
   const p = V3(b.x, world.col.ground(b.x, b.z, world.heightAt(b.x, b.z) + 2), b.z); a.root.position.copy(p); scene.add(a.root);
   apV = { a, pos: a.root.position, follow: false };
@@ -5689,7 +5916,8 @@ function apTick(dt) {
     festival.lamps.forEach((l, i) => { l.material.opacity = 0.7 + Math.sin(G.t * 2 + i) * 0.2; });
     if (Math.random() < 0.8) particles.emit(festival.x + (Math.random() - 0.5) * 1.6, festival.y + 3, festival.z + (Math.random() - 0.5) * 1.6, { vx: 0, vy: 4 + Math.random() * 2, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.5, life: 1.4, drag: 0.4 });
   }
-  apVenkinTick(dt);
+  apVenkinTick(dt); drillTick(dt);
+  if (REGION === 'property' && !apV && !SAVE.arms.whip && jobState('pj_whip') === 'active' && G.mode === 'play') whipVenkin();
   if (G.mode !== 'play' || !apOn()) return;
   // Venkin is about the land in the cave and hollow steps (a reload puts him back)
   if (REGION === 'property' && !apV && F_.apGiven && ((apStep() === AP.CAVE && !G.apCaveDone) || (apStep() === AP.HOLLOW && !F_.apHollow))) { apVenkin(true); apV.follow = apStep() === AP.HOLLOW || !!F_.apCaveGo; if (apStep() === AP.CAVE && F_.apCaveGo) dn.setHour(22); }
@@ -5871,7 +6099,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  bookAct, applyWear, openBook,
+  bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, torcain, projectiles, restyleAxe,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   detailCull: setDetailCull,
