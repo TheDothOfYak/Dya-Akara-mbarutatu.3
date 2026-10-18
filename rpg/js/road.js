@@ -1034,7 +1034,10 @@ export function createRoad(ctx) {
       const q = A.pos.clone(); resolve(q, 0.5); A.pos.x = q.x; A.pos.z = q.z; A.pos.y = groundAt(A.pos.x, A.pos.z, A.pos.y + 1);
       A.a.root.rotation.y = A.yaw; A.a.animate(dt, { speed: v, onGround: true, t });
       if (d < 1.8 && t > (E.agentT || 0)) {
-        E.agentT = t + 3; if (MK.n > 0) E.stolen = (E.stolen || 0) + 1; escAdd(-1); hurtTanoc(8, A.pos); P.vel.addScaledVector(V3(dx / d, 0, dz / d), 10); ctx.toast(ESC.agentCaught, 3);
+        // it can take two at the most: after that its hand closes on nothing, and it only shoves him off
+        const take = MK.n > 0 && (E.stolen || 0) < 2;
+        E.agentT = t + 3; if (take) { E.stolen = (E.stolen || 0) + 1; escAdd(-1); }
+        hurtTanoc(8, A.pos); P.vel.addScaledVector(V3(dx / d, 0, dz / d), 10); ctx.toast(take ? ESC.agentCaught : ESC.agentMiss, 3);
         particles.burst(A.pos.x, A.pos.y + 1.2, A.pos.z, 30, { color: 0x9a4aff, speed: 6, size: 0.5, life: 0.7 });
         const back = freeSpot(A.pos.x - dx / d * 8, A.pos.z - dz / d * 8, 1); A.pos.set(back.x, groundAt(back.x, back.z, 3), back.z);   // it blinks back a few paces, and comes again
       }
