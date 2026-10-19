@@ -459,6 +459,8 @@ function makeWhip() {
     g.updateWorldMatrix(true, false);
     root.set(0, 0.21, 0); g.localToWorld(root);
     g.getWorldQuaternion(q); axis.set(0, 1, 0).applyQuaternion(q);
+    const aim = g.userData.aim;   // a point in the world to throw the lash at (the X), if he has one
+    if (aim && p >= 0) { axis.subVectors(aim, root); const L = axis.length(); if (L > 0.3) axis.divideScalar(L); else axis.set(0, 1, 0).applyQuaternion(q); }
     if (!started || pts[0].distanceToSquared(root) > 16) {   // first sight of it, or he's been carried somewhere: hang it straight down
       started = true;
       for (let i = 0; i <= N; i++) { pts[i].copy(root); pts[i].y -= i * segL; if (floor != null && pts[i].y < floor) pts[i].y = floor; old[i].copy(pts[i]); }
@@ -474,7 +476,7 @@ function makeWhip() {
     }
     pts[0].copy(root);
     if (p > 0.3 && p < 0.62) {   // the crack: a wave runs out from the hand and lays the lash out straight ahead, the tip last
-      const front = clamp((p - 0.3) / 0.24, 0, 1), dir = d.set(axis.x, Math.max(-0.1, Math.min(0.25, axis.y)) * 0.5, axis.z).normalize(), w = 0.45;
+      const front = clamp((p - 0.3) / 0.24, 0, 1), dir = aim ? d.copy(axis) : d.set(axis.x, Math.max(-0.1, Math.min(0.25, axis.y)) * 0.5, axis.z).normalize(), w = 0.45;
       for (let i = 1; i <= N; i++) if (i / N <= front) { acc.copy(root).addScaledVector(dir, i * segL); pts[i].lerp(acc, w); }
     }
     for (let it = 0; it < 10; it++) {

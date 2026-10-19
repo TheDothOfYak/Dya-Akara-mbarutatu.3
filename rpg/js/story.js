@@ -80,7 +80,7 @@ export const XILIA = {
     'Go find Noka. And eat something — you look like a twig.',
     'The Ember Grove is north-east, past the forest road. Tyndaels nest there. Mind your eyebrows.',
     'That tower will hold books one day. Cores, too. A zikhron library of your own — when you’re ready for one.',
-    'Sniller amulets in the rafters again. They wander, those things. Use your Nur’Hlyst; they glow cold teal.',
+    'Malsti Punks have been at the Sniller amulets again — they drag them off into the rafters. Use your Nur’Hlyst; they glow cold teal.',
   ],
   stryxSeed: [
     ['stryx', 'Torcain. Four minutes later than I estimated. Your Carpenter talks.'],
@@ -683,7 +683,7 @@ export const YOUNG = {
     'Explore. Help folk. Keep your hat on.',
     'That tower will hold books one day. Yours, maybe.',
     'The Relic still humming? Good. Talk to it. They like that.',
-    'Sniller amulets wander. Use your Nur’Hlyst — they glow cold teal.',
+    'Sniller amulets draw the Malsti Punks, and the little thieves drop them all over. Use your Nur’Hlyst — they glow cold teal.',
   ],
   pass: 'Rockfall across the Megla Pass — and Buhkon said three days of mist past it. Not today.',
   chapterEnd: 'The first day is done. Two summers on the Carpenter’s land begin tomorrow — talk to Buhkon.',
@@ -1199,7 +1199,7 @@ export const STEED = {
    CHAPTER I, GO ON — THE TWO SUMMERS
    The first day is the relic, the drills and the glide. Then two
    summers on the Carpenter's land, a season at a time: the first
-   jobs in Beuhk, three amulets that walk off on their own, the
+   jobs in Beuhk, three amulets carried off by Malsti Punks, the
    harvest and the festival, a winter night with Rodak at the
    pasture, the amulet's first words, the Punk grown big enough to
    ride, a long ride round the lake, and the lookout, where north
@@ -1249,20 +1249,20 @@ export const APPRENTICE = {
     ],
   },
 
-  /* 1 — three amulets walk off in the night */
+  /* 1 — Malsti Punks carry three amulets off in the night */
   amulets: {
     give: [
-      ['tale', 'In the morning the bag of amulets is lighter. Not by much. By three.'],
+      ['tale', 'In the morning the bag of amulets is lighter. Not by much. By three. There’s a little hole chewed in the corner, and tiny prints in the dust round it.'],
       ['tanoc', 'Buhkon. Buhkon, some of the amulets are gone. The bag was tied — I tied it myself —'],
-      ['buhkon', 'They walk. I did tell you. They hum toward something, and if nothing’s holding them they go and look for it.'],
-      ['buhkon', 'They won’t have gone far. Not off the land. Push your Nur’Hlyst, the way I showed you — G — and listen for that cold teal note. Three of them. Bring them home.'],
+      ['buhkon', 'Malsti Punks. Look at those prints. The amulets draw them like honey draws Kipsu — they blink in through the Duat, take what hums, and blink out again.'],
+      ['buhkon', 'They can’t carry far, the little thieves, and they drop whatever they’re holding when something startles them. It’ll all be on the land somewhere. Push your Nur’Hlyst, the way I showed you — G — and listen for that cold teal note. Three of them. Bring them home.'],
     ],
-    hint: 'Press G to pulse Nur’Hlyst — the amulets answer in cold teal. One always climbs somewhere high.',
-    found: n => n === 1 ? 'One. Cold, and humming, and not at all sorry.' : n === 2 ? 'Two. This one was halfway into a molehill.' : 'Three. That’s all of them.',
+    hint: 'Press G to pulse Nur’Hlyst — the amulets answer in cold teal. Malsti Punks like to drop things somewhere high.',
+    found: n => n === 1 ? 'One. Cold, and humming, and a little bit chewed.' : n === 2 ? 'Two. Stuffed halfway into a molehill — a Malsti’s idea of a hiding place.' : 'Three. That’s all of them.',
     done: [
       ['buhkon', 'All three. Where was the last one?'],
-      ['tanoc', 'Somewhere it shouldn’t have been. They’re all humming the same note again. Like they’re pleased to be back.'],
-      ['buhkon', 'Or pleased they found something. …Keep them close, Tanoc. Closer than a bag.'],
+      ['tanoc', 'Somewhere a Malsti shouldn’t have been able to get it. They’re all humming the same note again. Like they’re pleased to be back.'],
+      ['buhkon', 'And anything with small hands that wants them will come for them again. …Keep them close, Tanoc. Closer than a bag.'],
       ['tale', 'That summer goes by in sawdust. Planing, pegging, sweeping. Learning which wood splits and which wood bends, and which wood sings when you knock on it.'],
     ],
   },
@@ -1788,7 +1788,7 @@ Object.assign(APPRENTICE, {
   /* tests at the bench */
   tests: {
     give: [
-      ['buhkon', 'Now. Those amulets. They walk, they hum, they find their way back to you. I’d like to know why.'],
+      ['buhkon', 'Now. Those amulets. They hum, they pull Malsti Punks in from the Duat, they find their way back to you. I’d like to know why.'],
       ['buhkon', 'Bring the bag to the bench. We’ll try them against everything we’ve got and write down what they do. That’s what research is: trying things, and writing it down.'],
     ],
     obj: n => `Test the amulets at the bench with Buhkon (${n}/5)`,

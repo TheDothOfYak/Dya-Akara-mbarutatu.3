@@ -62,6 +62,12 @@ export const MANOR_SPOTS = {
   tokenBench: { door: 'p_workshop', stand: { x: 56.5, y: 0, z: -17.3 }, yaw: Math.PI, top: { x: 56.5, y: 0.97, z: -18.6 }, buhkon: { x: 58.6, y: 0, z: -16.9 } },
   workshopDoor: { x: 49, y: 0, z: 5.2 },
   loftBed: { x: 24, y: 5.0, z: 3.7 },
+  // where the Carpenter is through the day indoors (routines.js): at the range, at the table, by the library fire, in bed
+  kitchen: { x: -19, y: 0, z: -17.2, yaw: Math.PI },
+  dining: { x: -23.2, y: 0, z: 11, yaw: Math.PI / 2, sit: true },
+  study: { x: 17, y: 0, z: 8.6, yaw: 0, sit: true },
+  buhkonBed: { x: -18, y: 5.62, z: 4.55, yaw: 0, lie: true },
+  workshopBench: { x: 58.6, y: 0, z: -16.9, yaw: Math.PI },
 };
 
 /* ---------------- merged geometry: a room's static furniture in a few draw calls ---------------- */
@@ -947,7 +953,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       const room = build(door), s = room.info.spots && room.info.spots[name];
       if (!s) return null;
       const ox = room.g.position.x, v = p => p && new THREE.Vector3(ox + p.x, p.y || 0, p.z);
-      return { pos: v(s.stand || s), yaw: s.yaw ?? Math.PI, top: v(s.top), buhkon: v(s.buhkon), room, door: (s.door && doors.find(d => d.id === s.door)) || door };
+      return { pos: v(s.stand || s), yaw: s.yaw ?? Math.PI, top: v(s.top), buhkon: v(s.buhkon), sit: !!s.sit, lie: !!s.lie, room, door: (s.door && doors.find(d => d.id === s.door)) || door };
     },
     /* step in: returns where to stand and which way to face */
     setRenderer(r) { R3 = r; },

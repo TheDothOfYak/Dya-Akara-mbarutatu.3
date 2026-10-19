@@ -70,6 +70,11 @@
   #vinepips i.spent{opacity:.2}
   #vinepips i.last{background:#d8ff9a;box-shadow:0 0 8px #b8ff7a;animation:vlast .6s ease-in-out infinite alternate}
   #vinepips.held i{outline:1px solid var(--brass2);outline-offset:1px}
+  #gait{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);display:flex;gap:10px;pointer-events:none;font:600 11px/1 Georgia,serif;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 1px 3px #000}
+  #gait span{color:#e8d8a8;opacity:.3;transition:opacity .2s,color .2s}
+  #gait span.past{opacity:.55}
+  #gait span.on{opacity:1;color:#b8ff7a}
+  #auto-swing{position:absolute;left:50%;top:calc(50% + 34px);transform:translateX(-50%);pointer-events:none;font:600 11px/1 Georgia,serif;letter-spacing:.1em;color:#b8ff7a;text-shadow:0 1px 3px #000;text-transform:uppercase}
   @keyframes vlast{to{transform:scale(1.5)}}
 
   #compass{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:min(560px,70vw);height:34px;overflow:hidden;
@@ -155,7 +160,7 @@
 
   /* ---------------- overlays ---------------- */
   /* the beginning: on Velki only the story shows; on Xikia Tanoc is a boy with a hatchet */
-  #hud.velki #compass,#hud.velki #vitals,#hud.velki #abilities,#hud.velki #spells,#hud.velki #crosshair,#hud.velki #vinepips,#hud.velki #qtrack,#hud.velki #levelup,#hud.velki #ehp,#hud.velki #lock,#hud.velki #boss{display:none}
+  #hud.velki #compass,#hud.velki #vitals,#hud.velki #abilities,#hud.velki #spells,#hud.velki #crosshair,#hud.velki #vinepips,#hud.velki #gait,#hud.velki #auto-swing,#hud.velki #qtrack,#hud.velki #levelup,#hud.velki #ehp,#hud.velki #lock,#hud.velki #boss{display:none}
   #hud.velki.roadhp #vitals{display:flex}
   #hud.velki.roadhp #xpline,#hud.velki.roadhp #stam,#hud.velki.roadhp #heat,#hud.velki.roadhp #belt{display:none}
   #hud.young #abilities,#hud.young #heat,#hud.young #qtrack{display:none}
@@ -392,6 +397,8 @@
   </div>
   <div id="crosshair"></div>
   <div id="vinepips" class="hidden"></div>
+  <div id="gait" class="hidden"></div>
+  <div id="auto-swing" class="hidden"></div>
   <div id="ehp"></div>
   <div id="lock"></div>
   <div id="location"><div class="l1" id="loc1"></div><div class="rule"></div><div class="l2" id="loc2"></div></div>
