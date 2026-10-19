@@ -35,8 +35,13 @@ const PaintShader = {
       quad(vec2( 1.0, -1.0), best, bestV, 0.0);
       quad(vec2(-1.0,  1.0), best, bestV, 0.0);
       quad(vec2( 1.0,  1.0), best, bestV, 0.0);
-      vec3 painted = best / max(vec3(1e-4), 1.0 - best);
-      gl_FragColor = vec4(painted, src.a);
+      // back out of the tamed range — but near white that sum divides by almost nothing, and on a phone's
+      // low-precision GPU the rounding turns into bright speckles of every colour (on clouds, snow, glows).
+      // So keep clear of it, and let the brightest pixels through unpainted.
+      vec3 b = min(best, vec3(0.9));
+      vec3 painted = b / (1.0 - b);
+      float hi = smoothstep(0.72, 0.88, max(best.r, max(best.g, best.b)));
+      gl_FragColor = vec4(mix(painted, src.rgb, hi), src.a);
     }`,
 };
 
