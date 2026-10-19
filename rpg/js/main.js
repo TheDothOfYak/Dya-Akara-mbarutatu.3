@@ -11,7 +11,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { paintPass } from './paint.js';
-import { clamp, lerp, damp, dampAngle, angleDiff } from './util.js';
+import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { installSmoothStyle } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
@@ -329,7 +329,7 @@ document.addEventListener('mousemove', e => {
   if (G.mode !== 'play' && G.mode !== 'dialog' && G.mode !== 'memory') return;
   const s = 0.0023 * OPT.sens;
   CAM.yaw -= e.movementX * s * (G.lock ? 0.25 : 1);
-  CAM.pitch = clamp(CAM.pitch + e.movementY * s * (OPT.invert ? -1 : 1), -0.45, 1.25);
+  CAM.pitch = clamp(CAM.pitch + e.movementY * s * (OPT.invert ? -1 : 1), PITCH_MIN, PITCH_MAX);
 });
 document.addEventListener('mousedown', e => {
   if (G.mode !== 'title') initAudio();   // browsers only let sound start after a click
@@ -377,7 +377,7 @@ const touch = initTouch({
     if (G.paused || (G.mode !== 'play' && G.mode !== 'dialog')) return;
     const s = 0.0055 * OPT.sens;
     CAM.yaw -= dx * s * (G.lock ? 0.25 : 1);
-    CAM.pitch = clamp(CAM.pitch + dy * s * (OPT.invert ? -1 : 1), -0.45, 1.25);
+    CAM.pitch = clamp(CAM.pitch + dy * s * (OPT.invert ? -1 : 1), PITCH_MIN, PITCH_MAX);
   },
   playing: () => G.mode === 'play' && !G.paused && !overlayOpen() && !(book && book.isOpen()),
   state: () => ({
@@ -4448,13 +4448,13 @@ function updateCamera(dt) {
   if (CAM.target.distanceTo(tgt) > 8) CAM.target.copy(tgt);
   const r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
   const look = CAM.target.clone().addScaledVector(r, 0.55);
-  const off = V3(Math.sin(CAM.yaw) * Math.cos(CAM.pitch), Math.sin(CAM.pitch), Math.cos(CAM.yaw) * Math.cos(CAM.pitch));
+  const op = orbitPitch(CAM.pitch), off = V3(Math.sin(CAM.yaw) * Math.cos(op), Math.sin(op), Math.cos(CAM.yaw) * Math.cos(op));
   // something in the way: pull in at once (never look through a wall), but ease back out, so it doesn't flicker in and out at an edge
   const hit = world.col.ray(look, look.clone().addScaledVector(off, CAM.dist));
   const clear = hit < 1 ? Math.max(0.6, CAM.dist * hit - 0.3) : CAM.dist;
   CAM.reach = Math.min(clear, damp(CAM.reach ?? clear, clear, 3.2, dt));
   const want = look.clone().addScaledVector(off, CAM.reach);
-  const gy = world.heightAt(want.x, want.z) + 0.5;
+  const gy = Math.max(world.heightAt(want.x, want.z), world.col.ground(want.x, want.z, CAM.target.y)) + 0.5;   // the ground, or a deck, pier or floor under him
   CAM.floor = damp(CAM.floor ?? gy, gy, 10, dt);
   if (want.y < Math.max(gy - 0.3, CAM.floor)) want.y = Math.max(gy - 0.3, CAM.floor);
   CAM.pos.copy(want);
@@ -4462,7 +4462,7 @@ function updateCamera(dt) {
   G.shake = Math.max(0, G.shake - dt * 2.2);
   const s = G.shake * G.shake * 0.5, T = G.t * 31;
   camera.position.set(CAM.pos.x + Math.sin(T * 1.13) * s * 0.5, CAM.pos.y + Math.sin(T * 1.71 + 1) * s * 0.5, CAM.pos.z + Math.sin(T * 0.93 + 2) * s * 0.5);
-  camera.lookAt(look);
+  camera.lookAt(look); tiltUp(camera, CAM.pitch);   // (looking up past where it can orbit: it turns its gaze instead)
   if (dyaMatch && dyaOverview) {
     const c = dyaMatch.toWorld(800, 500), m = dyaMatch.m;
     const back = dyaMatch.toWorld(80, 500);

@@ -37,7 +37,7 @@ import { buildLutut } from './esik_sky.js';
 import { buildSniller } from './skyfolk.js';
 import { createCine } from './cine.js';
 import { latchAlongRay } from './vines.js';
-import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm } from './util.js';
+import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -1562,14 +1562,15 @@ export function createMegla(ctx) {
     // follow quickly across the ground, more gently up and down (steps, stairs, landings), and snap back if far behind
     if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
     else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
-    const want = P.ride ? 8.5 : (GYN && GYN.alive ? 9 : 6.4), cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
+    const want = P.ride ? 8.5 : (GYN && GYN.alive ? 9 : 6.4), op = orbitPitch(CAM.pitch), cp = Math.cos(op), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(op), Math.cos(CAM.yaw) * cp);
     let d = want;
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z) || (GYN && GYN.alive && q.distanceTo(GYN.pos.clone().setY(GYN.pos.y + 0.45 * GYN.s)) < 0.95 * GYN.s)) { d = Math.max(0.8, s - 0.4); break; } }
     camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
     camPos.lerp(camTgt.clone().addScaledVector(dir, d), 1 - Math.exp(-14 * dt));
+    { const gy = heightAt(camPos.x, camPos.z) + 0.45; if (camPos.y < gy) camPos.y = gy; }   // never down in the ground
     camera.position.copy(camPos);
     if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; }
-    camera.lookAt(camTgt);
+    camera.lookAt(camTgt); tiltUp(camera, CAM.pitch);
   }
 
   const RIDE_STAGES = ['ride', 'rocks', 'mist', 'clearing', 'downhill'];

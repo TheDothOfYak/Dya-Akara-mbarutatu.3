@@ -46,3 +46,13 @@ export function angleDiff(a, b) {
 }
 export const dampAngle = (a, b, lambda, dt) => a + angleDiff(a, b) * (1 - Math.exp(-lambda * dt));
 export const dist2 = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
+
+/* looking up: the camera orbits down behind him only to ORBIT_MIN (any lower and it would be in the ground); past that
+   it stays where it is and turns its gaze upward instead, reaching straight up at PITCH_MIN. Call after camera.lookAt. */
+export const PITCH_MIN = -1.5, PITCH_MAX = 1.25, ORBIT_MIN = -0.32;
+export const orbitPitch = p => Math.max(p, ORBIT_MIN);
+export function tiltUp(camera, pitch) {
+  if (pitch >= ORBIT_MIN) return;
+  const q = camera.quaternion, e0 = Math.asin(clamp(-2 * (q.y * q.z - q.w * q.x), -1, 1));   // how far up it already looks
+  camera.rotateX(Math.max(0, (Math.PI / 2 - 0.02) - e0) * Math.min(1, (ORBIT_MIN - pitch) / (ORBIT_MIN - PITCH_MIN)));
+}
