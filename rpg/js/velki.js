@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { toon, ramp, addOutline, outlineAll, glowSprite, Particles, paint } from './gfx.js';
 import { buildEikar, placeWalker } from './actors.js';
-import { clamp, damp, dampAngle, smooth, lerp, mulberry32 } from './util.js';
+import { clamp, damp, dampAngle, smooth, lerp, mulberry32, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
@@ -607,14 +607,15 @@ export function createVelki(ctx) {
     if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
     else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
     let d = want;
-    const cp = Math.cos(CAM.pitch), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(CAM.pitch), Math.cos(CAM.yaw) * cp);
+    const op = orbitPitch(CAM.pitch), cp = Math.cos(op), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(op), Math.cos(CAM.yaw) * cp);
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z)) { d = Math.max(0.8, s - 0.4); break; } }
     camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
     const goal = camTgt.clone().addScaledVector(dir, d);
     camPos.lerp(goal, 1 - Math.exp(-14 * dt));
+    { const gy = heightAt(camPos.x, camPos.z) + 0.45; if (camPos.y < gy) camPos.y = gy; }   // never down in the ground
     camera.position.copy(camPos);
     if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; shake = Math.max(0, shake - dt * 1.5); }
-    camera.lookAt(camTgt);
+    camera.lookAt(camTgt); tiltUp(camera, CAM.pitch);
   }
 
   function updateBattle(dt) {
