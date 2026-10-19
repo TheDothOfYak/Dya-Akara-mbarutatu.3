@@ -3132,7 +3132,8 @@ function toggleRide() {
   if (!mount) return;
   if (!P.riding && !saddled()) { bark('tanoc', STORY.STEED.noSaddle(PN()), 3.5); return; }
   if (P.riding) {
-    P.riding = false; dropVines(); P.slap = null; mount.called = false;   // left where you climb down (and home in a while, if she has one)
+    P.riding = false; dropVines(); P.slap = null; mount.called = false; mount.coming = false; mount.play = null;
+    mount.followT = pipHome() ? 10 : 0;   // at your heels for a little while, then back home to the shed (H calls her again)
     P.pos.copy(mount.pos).add(V3(Math.cos(mount.yaw) * 1.8, 0, -Math.sin(mount.yaw) * 1.8));
     P.pos.y = world.col.ground(P.pos.x, P.pos.z, P.pos.y + 3);
     phorusDismount();
@@ -3530,6 +3531,17 @@ function updateMount(dt) {
     if (d > 90) { m.pos.set(P.pos.x - Math.sin(P.yaw) * 6, P.pos.y, P.pos.z - Math.cos(P.yaw) * 6); }
     if (d < 3.5) m.coming = false;
     else { const sp = Math.min(13, 3 + d * 0.9); m.vel.x = dx / d * sp; m.vel.z = dz / d * sp; m.yaw = Math.atan2(dx, dz); }
+  } else if (m.followT > 0 && pipHome()) {   // just climbed down: she keeps to your heels a while…
+    m.followT -= dt;
+    const dx = P.pos.x - m.pos.x, dz = P.pos.z - m.pos.z, d = Math.hypot(dx, dz);
+    if (d > 3.5) { const sp = Math.min(13, 3 + d * 0.9); m.vel.x = dx / d * sp; m.vel.z = dz / d * sp; m.yaw = Math.atan2(dx, dz); }
+    else { m.vel.x *= 0.85; m.vel.z *= 0.85; }
+    m.hop = 0;
+    if (m.followT <= 0 || interiors.inside) {   // …then she's home at the shed, out of sight of you (if you're right there, she just trots back)
+      m.followT = 0; m.play = null;
+      const H = pipHome();
+      if (Math.hypot(P.pos.x - H.x, P.pos.z - H.z) > 40 && !interiors.inside) { m.pos.set(H.x, world.col.ground(H.x, H.z, world.heightAt(H.x, H.z) + 3), H.z); m.vel.set(0, 0, 0); }
+    }
   } else if (pipHome() && !m.called) pipPlay(m, dt);
   else { m.vel.x *= 0.85; m.vel.z *= 0.85; }
   if (!P.riding) {
@@ -3610,7 +3622,7 @@ function pipPlay(m, dt) {
 /* her gaits on the ground: she sets off at a walk, breaks into a trot after a second of going, and after
    three is at a full gallop. Stop (or run into something) and she drops back to a walk. Shift urges her on:
    the seconds count twice as fast. */
-const GAITS = [{ name: 'Walk', at: 0, speed: 21 }, { name: 'Trot', at: 1, speed: 21 * 1.8 }, { name: 'Gallop', at: 3, speed: 21 * 2 }];   // walk at the old gallop; trot 80% faster; gallop twice the walk
+const GAITS = [{ name: 'Walk', at: 0, speed: 21 }, { name: 'Trot', at: 1, speed: 21 * 1.8 }, { name: 'Gallop', at: 3, speed: 72 }];   // walk at the old gallop; trot 80% faster; then flat out
 P.gaitT = 0; P.gait = 0; P.gaitIdle = 0;
 function rideGait(dt, moving, urge) {
   if (!P.onGround || vineOn()) return GAITS[P.gait].speed;            // in the air or on a vine, the gait waits for her feet
@@ -6479,7 +6491,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 
 /* debugging handle for the console */
 window.__torcain = {
-  bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, torcain, projectiles, restyleAxe,
+  bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, get mount() { return mount; }, toggleRide, makeMount, updateMount, torcain, projectiles, restyleAxe,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
   detailCull: setDetailCull,
