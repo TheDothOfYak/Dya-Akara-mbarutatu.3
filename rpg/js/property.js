@@ -15,7 +15,7 @@
    push through).
    ============================================================ */
 import * as THREE from 'three';
-import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
+import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 import { MANOR_SPOTS } from './interiors.js';
@@ -1128,14 +1128,20 @@ export function buildProperty(scene) {
     for (let i = 0; i < n; i++) path.push([x + side - i * (2 * side / n), z - side]);
     for (let i = 0; i < n; i++) path.push([x - side, z - side + i * (2 * side / n)]);
     for (let i = 0; i < n; i++) path.push([x - side + i * (2 * side / n), z + side]);
+    const edge = [];
     path.forEach(([bx, bz], i) => {
       const sy = Math.min(TOWER_H, (i + 1) * (TOWER_H / path.length));
       blocks.put(bx, g + sy - 0.2, bz, 1.5, 0.4, 1.5, 0, 0, 0, i % 2 ? '#9a6a40' : '#a8784a');
       blocks.put(bx, g + (sy - 0.4) / 2, bz, 0.3, Math.max(0.2, sy - 0.4), 0.3, 0, 0, 0, '#6a4428');
-      // a hand-rail on the outer edge
       const ox = Math.sign(bx - x) * (Math.abs(bx - x) > 4 ? 0.7 : 0), oz = Math.sign(bz - z) * (Math.abs(bz - z) > 4 ? 0.7 : 0);
-      put2(pBox, bx + ox, g + sy + 0.45, bz + oz, 0.08, 0.9, 0.08, 0, 0, 0, '#5a3a22');
+      edge.push([bx + ox, g + sy, bz + oz]);
       col.add(bx, bz, 0.75, 0.75, 0, g + sy - 0.5, g + sy);
+    });
+    // a hand-rail all the way up the outer edge
+    railing(edge, {
+      post: (px, py, pz, h) => put2(pBox, px, py + h / 2, pz, 0.1, h, 0.1, 0, 0, 0, '#5a3a22'),
+      bar: (px, py, pz, len, ry, rz) => put2(pBox, px, py, pz, len, 0.1, 0.12, 0, ry, rz, '#6a4428'),
+      col: (cx, cz, hw, hd, ang, y0, y1) => col.add(cx, cz, hw, hd, ang, y0, y1),
     });
     towerTop.set(x, g + TOWER_H, z);
     // ivy up the north face

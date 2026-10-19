@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { toon, ramp, addOutline, outlineAll, glowSprite, Particles, paint } from './gfx.js';
 import { buildEikar, placeWalker } from './actors.js';
-import { clamp, damp, dampAngle, smooth, lerp, mulberry32, orbitPitch, tiltUp } from './util.js';
+import { clamp, damp, dampAngle, smooth, lerp, mulberry32, orbitPitch, tiltUp, railing } from './util.js';
 import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
@@ -356,6 +356,21 @@ export function createVelki(ctx) {
       const a = Math.PI / 2 + i * 0.33, x = Math.cos(a) * STEP_R, z = Math.sin(a) * STEP_R, top = 0.6 + 0.55 * (i + 1);
       const st = new THREE.Mesh(stepGeo, dark); st.position.set(x, top - 0.25, z); st.rotation.y = -a; st.castShadow = st.receiveShadow = true; addOutline(st, 0.03); scene.add(st);
       box(x, z, 0.95, 0.95, top - 0.5, top);
+    }
+    // a hand-rail round the outside of the stair, all the way up: iron posts and a rail (posts closer than you are wide, to the colliders)
+    {
+      const RR = STEP_R + 0.85, pts = [];
+      for (let i = 0; i < NSTEPS; i++) { const a = Math.PI / 2 + i * 0.33; pts.push([Math.cos(a) * RR, 0.6 + 0.55 * (i + 1), Math.sin(a) * RR]); }
+      const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), dark, NSTEPS * 3), bars = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), dark, NSTEPS);
+      const o = new THREE.Object3D(); let np = 0, nb = 0;
+      const set = (m, i, x, y, z, sx, sy, sz, ry = 0, rz = 0) => { o.position.set(x, y, z); o.rotation.set(0, ry, rz); o.scale.set(sx, sy, sz); o.updateMatrix(); m.setMatrixAt(i, o.matrix); };
+      railing(pts, {
+        post: (x, y, z, h) => set(posts, np++, x, y + h / 2, z, 0.1, h, 0.1),
+        bar: (x, y, z, len, ry, rz) => set(bars, nb++, x, y, z, len, 0.1, 0.12, ry, rz),
+        col: (x, z, hw, hd, ang, y0, y1) => { for (const k of [-0.5, 0, 0.5]) cyl(x + Math.cos(ang) * hw * k * 2, z - Math.sin(ang) * hw * k * 2, 0.12, y0, y1); },
+      });
+      posts.count = np; bars.count = nb;
+      for (const m of [posts, bars]) { m.castShadow = true; scene.add(m); }
     }
   }
   /* the wall, its gate, and the gate's towers */
