@@ -6151,7 +6151,7 @@ function apObjective() {
       if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
       const got = Math.min(F_.apAmNeed ?? 3, (SAVE.amulets || 0) - (F_.apAm0 || 0)), need = F_.apAmNeed ?? 3;
       if (got >= need) { proObjective(head, 'Bring the amulets home to Buhkon', ''); return; }
-      proObjective(head, `Find the amulets that walked off in the night (${got}/${need})`, 'G — Nur’Hlyst. Listen for cold teal.', need, got);
+      proObjective(head, `Find the amulets the Malsti Punks carried off (${got}/${need})`, 'G — Nur’Hlyst. Listen for cold teal.', need, got);
       return;
     }
     case AP.HARVEST: {
