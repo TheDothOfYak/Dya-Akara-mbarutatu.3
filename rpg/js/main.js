@@ -15,7 +15,8 @@ import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPit
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { installSmoothStyle } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
-import { latchAlongRay } from './vines.js';
+import { latchAlongRay, trunkAt } from './vines.js';
+import { routineFor, isIndoor, INDOORS } from './routines.js';
 import { createAmbient } from './ambient.js';
 import { buildSky, SUN_DIR } from './sky.js';
 import { createDayNight } from './daynight.js';
@@ -299,6 +300,7 @@ function spawnPoint() {
 /* ---------------- input ---------------- */
 const keys = {};
 let mouseL = false, locked = false;
+const mouseBtn = { 0: false, 2: false };   // which buttons are down (U with both is the auto-swing)
 const typing = e => { const t = e.target; return !!(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))); };
 addEventListener('keydown', e => {
   if (typing(e)) return;   // typing in the sign-in box isn't playing the game
@@ -316,7 +318,7 @@ addEventListener('keyup', e => {
   if (e.code === 'CapsLock' && performance.now() - capsDownT > 400 && !typing(e) && G.mode === 'play') onKey('CapsLock');
 });
 addEventListener('keydown', e => { if (e.code === 'CapsLock') capsDownT = performance.now(); }, true);
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = false; if (P.vines) dropVines(); });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = false; mouseBtn[0] = mouseBtn[2] = false; if (P.vines) dropVines(); });
 const canvas = renderer.domElement;
 const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin', 'rpg'].some(id => !$(id).classList.contains('hidden'));
 document.addEventListener('pointerlockchange', () => {
@@ -332,6 +334,7 @@ document.addEventListener('mousemove', e => {
   CAM.pitch = clamp(CAM.pitch + e.movementY * s * (OPT.invert ? -1 : 1), PITCH_MIN, PITCH_MAX);
 });
 document.addEventListener('mousedown', e => {
+  if (e.button === 0 || e.button === 2) mouseBtn[e.button] = true;
   if (G.mode !== 'title') initAudio();   // browsers only let sound start after a click
   if (e.target.closest && e.target.closest('#d-choices, #rpg, #pk-box')) return;
   if (G.mode === 'title' || overlayOpen()) return;
@@ -344,12 +347,13 @@ document.addEventListener('mousedown', e => {
   if (touch.on) return;   // on a touch screen the buttons do the fighting
   if (dyaMatch) { if (e.button === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
   if (P.climb && (e.button === 0 || e.button === 2)) { climbGrab(e.button === 0 ? 'L' : 'R'); return; }   // on a trunk: hand over hand (vine over vine, on her back)
+  if (P.riding && (e.button === 0 || e.button === 2) && (keys.KeyU || P.auto)) return;   // U held: both buttons are the auto-swing, not a throw
   if (P.riding && (e.button === 0 || e.button === 2)) { vineShoot(e.button === 0 ? 'L' : 'R'); return; }   // on her back: her vines, not the axe
   if (e.button === 0) { mouseL = true; pressAttack(); }
   if (e.button === 1) { e.preventDefault(); toggleLock(); }
   if (e.button === 2) duatStrike();
 });
-document.addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; if (VK) { if (VK.vine) VK.vine(e.button, false); return; } if (e.button === 0 || e.button === 2) vineLet(e.button === 0 ? 'L' : 'R'); });
+document.addEventListener('mouseup', e => { if (e.button === 0 || e.button === 2) mouseBtn[e.button] = false; if (e.button === 0) mouseL = false; if (VK) { if (VK.vine) VK.vine(e.button, false); return; } if (P.auto) return; if (e.button === 0 || e.button === 2) vineLet(e.button === 0 ? 'L' : 'R'); });
 document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });   // keep long-press paste in text fields
 addEventListener('wheel', e => { if (SCOPE) { SCOPE.fov = clamp(SCOPE.fov * (e.deltaY > 0 ? 1.15 : 0.87), 4, 40); return; } CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
 /* the game letting go of the mouse itself (a cutscene, a menu, a choice) is not you pressing Escape:
@@ -931,7 +935,14 @@ function startAttack(kind) {
   const pose = arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
   P.atk = { kind, pose, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur / (arm.spd || 1), arm };
   P.comboIdx = kind; P.queued = false;
-  const f = lockDir() || camForward();
+  let f = lockDir() || camForward();
+  if (arm.crack) {   // the whip goes where the X is: he turns to it, and the lash is thrown out at it
+    const reach = ATK[kind].range * arm.rng + 1, lp = lockPoint();
+    const at = lp ? V3(lp.x, lp.y, lp.z) : lookAim(reach + 6).p, hip = V3(P.pos.x, P.pos.y + 1.2, P.pos.z), v = at.clone().sub(hip);
+    if (v.length() > reach) v.setLength(reach);
+    P.atk.aim = hip.add(v);
+    const h = Math.hypot(v.x, v.z); if (h > 0.3) f = V3(v.x / h, 0, v.z / h);
+  }
   P.yaw = Math.atan2(f.x, f.z);
   if (!arm.ranged) { P.vel.x += f.x * (kind === 3 ? 6 : 4); P.vel.z += f.z * (kind === 3 ? 6 : 4); }
   kind === 3 ? sfx.heavy() : sfx.swing();
@@ -944,6 +955,7 @@ function lockDir() {
 }
 
 function updateAttack(dt) {
+  if (torcain.weapon) torcain.weapon.userData.aim = P.atk && P.atk.aim ? P.atk.aim : null;   // the whip's lash goes out at the X
   if (!P.atk) { P.comboReset = Math.max(0, P.comboReset - dt); return; }
   const A = P.atk, def = ATK[A.kind], arm = A.arm || ARMS.axe;
   A.t += dt; A.p = A.t / A.dur;
@@ -1294,6 +1306,7 @@ function interactables() {
   const list = [];
   if (G.mode !== 'play' || P.dead) return list;
   list.push(...interiors.interactables(P, { enter: d => enterRoom(d), exit: () => leaveRoom(), scope: d => startScope(d) }));
+  routineInteractables(list);   // knocking on doors; the Carpenter about his house
   if (interiors.inside) return list;   // inside, only the room's own things
   if (young()) { if (relicOut() && RELIC_SPOT) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); list.push(...apInteractables()); }
   else if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
@@ -2590,7 +2603,7 @@ const npcs = (NPCS[REGION] || []).filter(def => camp || def.pos).map(def => {
   const yaw = camp ? Math.atan2(world.camp.x - x, world.camp.z - z) : Math.atan2(world.PLAZA.x - x, world.PLAZA.z - z);
   actor.root.rotation.y = yaw;
   scene.add(actor.root);
-  if (!def.wander) world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);
+  if (!def.wander && !routineFor(def.id, REGION, 12, 0)) world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);   // (folk who go about their day don't leave a post behind them)
   return { def, actor, pos, home: pos.clone(), goal: null, pause: Math.random() * 4, yaw, talking: 0 };
 });
 /* young Tanoc isn't Stamijan yet, and hasn't met Phorus: the folk of Beuhk talk to the Carpenter's boy */
@@ -2614,6 +2627,8 @@ function updateNpcs(dt) {
     n.hidden = REGION === 'xilia' && n.def.id === 'buhkon' && !(young() && F_.pro === 'beuhk' && F_.bk === 'rest') && !(!young() && (F_.tut || 0) >= 5) && !festival;
     n.actor.root.visible = !n.hidden;
     if (n.hidden) continue;
+    if (routineOn(n)) { dailyRound(n, dt); continue; }
+    if (n.rt) offRoutine(n);
     const d = n.pos.distanceTo(P.pos);
     let speed = 0;
     // townsfolk stroll about, and stop to look at you when you come close
@@ -2644,6 +2659,190 @@ function updateNpcs(dt) {
     n.actor.animate(dt, { speed, onGround: true, t: G.t + n.home.x, talking: n.talking > 0 });
   }
   if (camp) camp.update(G.t, particles);
+}
+
+/* ---------------- everyone's day ----------------
+   The Carpenter and the folk of Beuhk keep their own hours (routines.js): up for the garden or the ovens,
+   at their trades all day, round the fire in the evening, home to bed. They walk there and get on with it.
+   Indoors you can still find them: knock, and they come to the door; in the big house the Carpenter is
+   wherever his evening has got to (and asleep, you can wake him — he'll forgive you). */
+// the clock's day count: one more each time it passes midnight
+let lastHour = dn.hour;
+function tickDayCount() { const h = dn.hour; if (h < lastHour - 12) SAVE.dayN = (SAVE.dayN || 0) + 1; lastHour = h; }
+const doorFront = d => { const p = V3(d.x + Math.sin(d.yaw) * 1.6, 0, d.z + Math.cos(d.yaw) * 1.6); p.y = world.col.ground(p.x, p.z, world.heightAt(p.x, p.z) + 3); return p; };
+const manorDoor = () => (world.doors || interiors.doors || []).find(d => d.kind === 'manor');
+/* each townsperson's own front door: the nearest cottage to where they work, no two the same */
+const HOMES = new Map();
+if (REGION === 'xilia') {
+  const free = (world.doors || []).filter(d => d.kind === 'cottage');
+  for (const n of npcs) {
+    if (!routineFor(n.def.id, REGION, 12, 0) || !free.length) continue;
+    let bi = 0, bd = 1e9; free.forEach((d, i) => { const q = Math.hypot(d.x - n.home.x, d.z - n.home.z); if (q < bd) { bd = q; bi = i; } });
+    HOMES.set(n.def.id, free.splice(bi, 1)[0]);
+  }
+}
+/* does this one keep to their day just now? Not while the story has them somewhere (the prologues, the festival, a drill, a scene) */
+function routineOn(n) {
+  if (!routineFor(n.def.id, REGION, 12, 0)) return false;
+  if (young() && F_.pro !== 'done') return false;
+  if (REGION === 'property' && !young() && (F_.tut || 0) < 5) return false;
+  if (REGION === 'xilia' && (festival || (DRILL && DRILL.n === n))) return false;
+  return true;
+}
+/* back from their day to where the story wants them */
+function offRoutine(n) {
+  if (n.rt.inside || n.pos.distanceTo(n.home) > 3) { n.pos.copy(n.home); n.actor.root.position.copy(n.home); }
+  n.actor.root.rotation.x = 0; n.rt = null;
+}
+/* where a plan's place is: { x, z, r (wander about it) | w, d (an area) } outdoors, or { spot, door } indoors */
+function placeOf(n, place) {
+  if (REGION === 'property') {
+    if (INDOORS[place]) { const door = place === 'workshop' ? (world.doors || []).find(d => d.id === 'p_workshop') || manorDoor() : manorDoor(); return door ? { spot: INDOORS[place], door } : null; }
+    const q = world.places && world.places[place];
+    return q ? { x: q.x, z: q.z, w: q.w || 0, d: q.d || 0, r: q.w ? 0 : 1.2 } : null;
+  }
+  const i = npcs.indexOf(n);
+  switch (place) {
+    case 'home': { const d = HOMES.get(n.def.id); return d ? { door: d } : null; }
+    case 'post': case 'pier': return { x: n.home.x, z: n.home.z, r: place === 'pier' ? 4 : 1.5 };
+    case 'hearth': { const a = i * 2.39996, H = world.hearth; return { x: H.x + Math.cos(a) * 3.2, z: H.z + Math.sin(a) * 3.2, r: 0, face: H }; }
+    case 'square': return { x: world.PLAZA.x, z: world.PLAZA.z, r: 12 };
+    case 'lamps': return { x: world.PLAZA.x, z: world.PLAZA.z, r: 18 };
+    case 'pen': return world.pen ? { x: world.pen.x, z: world.pen.z, r: 9 } : null;
+    case 'field': { const f = (world.juFields || [])[0]; return f ? { x: f.x, z: f.z, r: f.r + 2 } : null; }
+    case 'scaffold': { const o = npcs.find(q => q.def.id === 'kw1'); return o ? { x: o.home.x + 2.5, z: o.home.z + 1.5, r: 2 } : null; }
+  }
+  return null;
+}
+/* a spot to stand at in a place: its middle, or anywhere in its area for the jobs that move about it */
+function pickSpot(Q, roam) {
+  if (Q.w) return V3(Q.x + (Math.random() - 0.5) * Q.w * (roam ? 0.8 : 0.3), 0, Q.z + (Math.random() - 0.5) * Q.d * (roam ? 0.8 : 0.3));
+  const a = Math.random() * Math.PI * 2, r = roam ? Math.random() * Q.r : 0;
+  return V3(Q.x + Math.cos(a) * r, 0, Q.z + Math.sin(a) * r);
+}
+const ROAMS = { stroll: 1, work: 1, garden: 1 };
+function dailyRound(n, dt) {
+  const R = n.rt || (n.rt = { key: '', stuck: 0, inside: false, out: false });
+  // knocked up or woken: they stay where you found them for a while, then go back to what they were doing
+  const called = (n.callT = Math.max(0, (n.callT || 0) - dt)) > 0;
+  const plan = routineFor(n.def.id, REGION, dn.hour, SAVE.dayN || 0);
+  const key = plan.place + '|' + plan.act + '|' + plan.from;
+  if (key !== R.key) {
+    R.key = key; R.plan = plan; R.Q = placeOf(n, plan.place); R.goal = null; R.arrived = false; R.barked = false; R.stuck = 0; R.wait = 0;
+    if (R.Q && !R.Q.door) R.goal = pickSpot(R.Q, false);
+  }
+  if (R.out && !called) { R.out = false; R.arrived = false; }        // back in to what they were at
+  const Q = R.Q, act = called ? 'stand' : plan.act, indoor = !!(Q && Q.door) && !R.out;
+  if (R.inside && !indoor) { R.inside = false; if (R.door) n.pos.copy(doorFront(R.door)); }   // out of the door they come
+  // indoors: walk to the door and in; after that you see them only from inside (the Carpenter's house) or not at all
+  if (R.inside) {
+    R.door = Q.door;
+    if (Q.spot && inManor()) { npcIndoors(n, Q.spot, act, called, dt); return; }
+    n.pos.copy(doorFront(Q.door)); n.hidden = true; n.actor.root.visible = false;
+    return;
+  }
+  n.actor.root.rotation.x = 0;
+  let speed = 0;
+  const goal = indoor ? doorFront(Q.door) : called ? null : R.goal;
+  if (goal && n.talking <= 0 && G.mode === 'play') {
+    const dx = goal.x - n.pos.x, dz = goal.z - n.pos.z, gd = Math.hypot(dx, dz);
+    const far = P.pos.distanceTo(n.pos) > 70 && P.pos.distanceTo(goal) > 70;
+    if (far && gd > 1) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); }   // out of sight: just be there
+    else if (gd > 1.1 && !(R.stuck > 1.5 && gd < 4)) {
+      const before = n.pos.clone(), sp = gd > 40 ? 3.4 : 2.4;
+      n.pos.x += dx / gd * sp * dt; n.pos.z += dz / gd * sp * dt;
+      world.col.resolve(n.pos, 0.45, 1.9);
+      n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6);
+      R.stuck = n.pos.distanceTo(before) < 0.4 * sp * dt ? R.stuck + dt : 0;
+      if (R.stuck > 5 && P.pos.distanceTo(n.pos) > 18) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); R.stuck = 0; }
+      n.yaw = Math.atan2(dx, dz); speed = sp;
+    } else if (indoor) { R.inside = true; R.door = Q.door; n.hidden = true; n.actor.root.visible = false; return; }
+    else {
+      R.arrived = true; R.goal = null; R.stuck = 0;
+      if (Q && Q.face) n.yaw = Math.atan2(Q.face.x - n.pos.x, Q.face.z - n.pos.z);
+      R.wait = ROAMS[act] ? (act === 'stroll' ? 2 + Math.random() * 5 : 6 + Math.random() * 7) : 1e9;
+    }
+  } else if (!goal && !called && R.arrived && Q && ROAMS[act] && (R.wait -= dt) <= 0 && n.talking <= 0) R.goal = pickSpot(Q, true);
+  const settled = (R.arrived || called) && speed === 0;
+  n.actor.root.position.copy(n.pos);
+  if (settled && (act === 'sit' || act === 'eat' || act === 'read')) n.actor.root.position.y -= 0.26 * n.actor.root.scale.y;
+  // what they say if you come by while they're at it
+  const d = n.pos.distanceTo(P.pos);
+  if (plan.line && R.arrived && !called && !R.barked && d < 6 && n.talking <= 0 && G.mode === 'play') { R.barked = true; bark(npcSpeaker(n.def), plan.line, 4); }
+  npcAct(n, act, settled, speed, d < 7, dt);
+}
+/* is the player in the Carpenter's house (any room of it)? */
+function inManor() {
+  if (REGION !== 'property' || !interiors.inside) return false;
+  const sp = interiors.spot('study');
+  return !!sp && interiors.room(interiors.inside.id) === sp.room;
+}
+/* playing the part: blows for work (slower, bent, in the garden), a stir at the pot, sitting to eat or read, chatting by the fire */
+function npcAct(n, act, at, speed, faceYou, dt) {
+  const t = G.t + n.home.x, still = at && speed === 0;
+  const pulse = (rate, sharp) => Math.pow(Math.max(0, Math.sin(t * rate)), sharp);
+  const st = { speed, onGround: true, t, talking: n.talking > 0 };
+  if (still) {
+    if (act === 'work') st.attack = pulse(2.6, 3);
+    else if (act === 'garden') st.attack = pulse(1.4, 2) * 0.7;
+    else if (act === 'cook') st.attack = pulse(3.2, 1) * 0.35;
+    else if (act === 'sit' || act === 'eat' || act === 'read') { st.sit = true; if (act === 'eat') st.drink = Math.sin(t * 0.7) > 0.7; }
+    else if (act === 'chat') st.talking = st.talking || Math.sin(t * 0.45 + n.home.z) > 0.2;
+    if ((act === 'work' || act === 'garden') && st.attack > 0.9 && Math.random() < 0.3) {
+      const f = V3(Math.sin(n.yaw), 0, Math.cos(n.yaw));
+      particles.emit(n.pos.x + f.x * 0.9, n.pos.y + 0.3, n.pos.z + f.z * 0.9, { vy: 2, speed: 1.5, color: act === 'garden' ? 0x6a4a2a : 0xd8b878, size: 0.18, life: 0.5, gravity: 6 });
+    }
+    if (act === 'cook' && Math.random() < 0.08) particles.emit(n.pos.x + Math.sin(n.yaw) * 0.8, n.pos.y + 1.2, n.pos.z + Math.cos(n.yaw) * 0.8, { vy: 1.2, speed: 0.3, color: 0xf0ece0, size: 0.5, life: 1.5, drag: 0.4 });
+  }
+  const want = faceYou && !st.sit ? Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z) : n.yaw;
+  n.actor.root.rotation.y = dampAngle(n.actor.root.rotation.y, want, 4, dt);
+  n.talking = Math.max(0, n.talking - dt);
+  n.actor.animate(dt, st);
+}
+/* the Carpenter in his house, seen from inside it: at the range, at the table, by the library fire, in bed */
+function npcIndoors(n, spotName, act, awake, dt) {
+  const sp = interiors.spot(spotName); if (!sp) return;
+  n.hidden = false; n.actor.root.visible = true;
+  const lie = sp.lie && !awake;
+  n.pos.copy(sp.pos);
+  if (awake && sp.lie) { n.pos.x += 1.7; n.pos.y = 5.0; }   // up, and standing by the bed
+  n.yaw = sp.yaw;
+  n.actor.root.position.copy(n.pos);
+  n.actor.root.rotation.order = 'YXZ';
+  n.actor.root.rotation.x = lie ? -Math.PI / 2 : 0;
+  if (sp.sit && !awake) n.actor.root.position.y -= 0.26 * n.actor.root.scale.y;
+  if (lie) {
+    n.actor.root.rotation.y = n.yaw;
+    if (Math.random() < 0.02) particles.emit(n.pos.x, n.pos.y + 0.9, n.pos.z - 1.2, { vy: 0.5, speed: 0.1, color: 0xbfeaff, size: 0.25, life: 2, drag: 0.5 });
+    n.actor.animate(dt, { speed: 0, onGround: true, t: G.t * 0.3 });
+    return;
+  }
+  const d = n.pos.distanceTo(P.pos), R = n.rt;
+  if (R && R.plan && R.plan.line && !R.barked && d < 5 && n.talking <= 0 && !awake) { R.barked = true; bark(npcSpeaker(n.def), R.plan.line, 4); }
+  npcAct(n, awake || act === 'sleep' ? 'stand' : act, true, 0, d < 6 && !sp.sit, dt);
+}
+/* E at someone's door when they're in, or at the Carpenter's bedside */
+function routineInteractables(list) {
+  for (const n of npcs) {
+    const R = n.rt; if (!R || !R.inside || !R.door || !R.plan) continue;
+    const asleep = R.plan.act === 'sleep' || (R.plan.place === 'home' && (dn.hour > 21 || dn.hour < 5.5));
+    if (!interiors.inside && n.hidden) {
+      const f = doorFront(R.door);
+      list.push({ pos: f.clone().addScaledVector(V3(Math.sin(R.door.yaw), 0, Math.cos(R.door.yaw)), 0.6).setY(f.y + 1), far: 1.6,
+        label: `Knock for ${n.def.name} <small style="opacity:.7">${asleep ? 'asleep, by the dark windows' : n.def.id === 'buhkon' ? 'somewhere inside' : 'at home'}</small>`, act: () => knockFor(n, asleep) });
+    } else if (interiors.inside && !n.hidden) {
+      const lying = R.plan.act === 'sleep' && !(n.callT > 0);
+      list.push({ pos: n.pos.clone().setY(n.pos.y + 0.6), far: lying ? 2.8 : 3.2, label: lying ? `Wake ${n.def.name} <small style="opacity:.7">snoring</small>` : `Talk to ${n.def.name} <small style="opacity:.7">${n.def.title}</small>`,
+        act: () => { if (lying) { n.callT = 90; bark(npcSpeaker(n.def), WAKE_LINES[Math.floor(Math.random() * WAKE_LINES.length)], 4); } else npcTalk(n); } });
+    }
+  }
+}
+const WAKE_LINES = ['Mm— what? Is the house on fire? …No? Then what is it, little one?', 'I was dreaming about a boat. A good boat. What is it?', 'Calm first, then quick… ugh. What time is it? Never mind. What do you need?'];
+const KNOCK_LINES = ['Mm? Oh — it’s you. What is it?', 'Coming, coming! …Oh. Hello.', 'At this hour? Well, you’d better have a good reason.'];
+function knockFor(n, asleep) {
+  sfx.hit();
+  const line = asleep ? 'Who’s that? …Oh. All right. I’m up.' : KNOCK_LINES[Math.floor(Math.random() * KNOCK_LINES.length)];
+  setTimeout(() => { if (!n.rt) return; n.callT = 75; n.rt.out = true; bark(npcSpeaker(n.def), line, 3.5); }, 700);   // they come to the door
 }
 
 /* ---------------- talking, with choices ---------------- */
@@ -2974,6 +3173,9 @@ function vineTarget(side) {
   const from = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z);
   const a = lookAim(SWING.range);
   if (a.foe && !a.foe.sigil && (a.foe === 'boss' || !peaceable(a.foe))) return { A: foePoint(a.foe), foe: a.foe };
+  // a trunk under the X (or right beside her, on the ground): the vine goes round it, and she swings about it like a pole
+  const tr = trunkAt(world, P.pos, aimRay.ray.origin, aimRay.ray.direction, side, { ground: P.onGround });
+  if (tr) return { A: trunkPoint(tr), trunk: tr };
   if (!a.foe && a.ground && a.p.y - from.y > 1.5 && a.p.distanceTo(from) < SWING.range) return { A: a.p };
   const r = aimRay.ray, A = latchAlongRay(world, from, r.origin, r.direction, side, { range: SWING.range, minUp: P.onGround ? 2.5 : 1.2 });
   return A ? { A } : null;
@@ -2990,14 +3192,27 @@ function vineShoot(side) {
   const T = vineTarget(side);
   if (!T) { P.slap = { p: V3(P.pos.x + f.x * 9, P.pos.y + 7, P.pos.z + f.z * 9), t: 0, miss: true }; return; }
   const hip = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z);
-  P.vines[side] = { A: T.A.clone(), foe: T.foe || null, L: hip.distanceTo(T.A), t: 0, k: 0, hold: false, side };
+  P.vines[side] = { A: T.A.clone(), foe: T.foe || null, trunk: T.trunk || null, L: hip.distanceTo(T.A), t: 0, k: 0, hold: false, side };
   P.slap = null;
+}
+/* where a vine round a trunk holds: on the bark, at her hip, on the side facing her */
+function trunkPoint(tr) {
+  const dx = P.pos.x - tr.x, dz = P.pos.z - tr.z, d = Math.hypot(dx, dz) || 1;
+  return V3(tr.x + dx / d * tr.r, P.pos.y + SWING.hip, tr.z + dz / d * tr.r);
 }
 function vineLet(side) {
   const S = P.vines[side]; if (!S) return;
   if (S.hold && P.sling > 0.2) { slingLaunch(); return; }
   P.vines[side] = null;
-  if (S.hold && !heldVines().length) releaseFlick(S);
+  if (S.hold && !heldVines().length) { if (S.trunk) trunkFling(S); else releaseFlick(S); }
+}
+/* let go of a trunk and she flies off the way she was whirling, with a hop and a little extra */
+function trunkFling(S) {
+  P.onGround = false; P.coyote = 0;
+  const hv = Math.hypot(P.vel.x, P.vel.z), k = hv < 34 ? 1.18 : 1;
+  P.vel.x *= k; P.vel.z *= k; P.vel.y = Math.max(P.vel.y, 4.5);
+  particles.ring(P.pos.x, P.pos.y + 0.8, P.pos.z, 16, 1.6, { color: 0xb8ff7a, size: 0.4, life: 0.4 });
+  sfx.jump();
 }
 /* let go on the way up the far side of the arc and she flicks you on; any other time you just keep your speed */
 function releaseFlick(S) {
@@ -3035,6 +3250,7 @@ function rideSpace() {
   }
   if (G.t < (P.pumpT || 0)) return;
   P.pumpT = G.t + 0.45;
+  if (H[0].trunk) { H[0].spd = Math.min(30, (H[0].spd || 12) + 4); mount.atk = 0.2; sfx.swing(); return; }   // round a trunk: a kick whirls her faster
   const S = H[0], off = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z).sub(S.A), ol = off.length() || 1;
   const fromBottom = Math.acos(clamp(-off.y / ol, -1, 1)), sp = P.vel.length();
   const good = clamp(1 - fromBottom / 0.6, 0, 1);   // within ~35° of the bottom of the arc
@@ -3064,6 +3280,14 @@ function vineTick(dt, act) {
       continue;
     }
     S.hold = true;
+    if (S.trunk) {   // round the trunk: the vine's length is how far out she whirls, and she goes round the way she was heading
+      const tr = S.trunk, dx = P.pos.x - tr.x, dz = P.pos.z - tr.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d;
+      const vt = P.vel.x * -uz + P.vel.z * ux, f = V3(Math.sin(P.yaw), 0, Math.cos(P.yaw));
+      S.dir = Math.abs(vt) > 1 ? Math.sign(vt) : Math.sign(f.x * -uz + f.z * ux) || (side === 'L' ? 1 : -1);
+      S.L = clamp(d, tr.r + 1.5, tr.r + 6); S.spd = Math.max(Math.abs(vt), 12);
+      if (!F_.trunkTold) { F_.trunkTold = true; persist(); hint('Round the trunk — hold to whirl, Space whirls faster, Shift / C in and out, let go to fling off.'); }
+      continue;
+    }
     // she hauls: you leave the ground and go, even from a standstill
     const fx = S.A.x - P.pos.x, fz = S.A.z - P.pos.z, fd = Math.hypot(fx, fz) || 1, hv = Math.hypot(P.vel.x, P.vel.z);
     if (hv < 15 && !vineHeld()) { P.vel.x += fx / fd * (15 - hv); P.vel.z += fz / fd * (15 - hv); }
@@ -3071,8 +3295,10 @@ function vineTick(dt, act) {
     P.onGround = false; P.coyote = 0;
     S.L = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z).distanceTo(S.A);
   }
-  const H = heldVines(); if (!H.length) { P.sling = 0; return; }
+  const HA = heldVines(); if (!HA.length) { P.sling = 0; return; }
   const hold = vineHeld(), reelIn = keys.ShiftLeft || keys.ShiftRight, letOut = keys.KeyC;
+  for (const S of HA) if (S.trunk) trunkSwing(S, dt, reelIn, letOut);
+  const H = HA.filter(S => !S.trunk); if (!H.length) { P.sling = 0; return; }
   for (const S of H) {
     if (reelIn) S.L = Math.max(2.5, S.L - 7 * dt);
     else if (letOut) S.L = Math.min(SWING.range, S.L + 7 * dt);
@@ -3095,6 +3321,130 @@ function vineTick(dt, act) {
   if (hold) P.vel.multiplyScalar(1 - 1.2 * dt);   // held fast: the swing dies away and you hang
   else if (sp > 0.5 && sp < 38 && P.vel.y < 0) P.vel.multiplyScalar(1 + 0.12 * dt);   // a little of her own pull on the downswing
   if (Math.random() < 0.35) particles.emit(P.pos.x, P.pos.y + 0.6, P.pos.z, { color: 0x9ad86a, size: 0.3, life: 0.5, speed: 1 });
+}
+/* whirling round a trunk: held at the vine's length from it, going round faster the longer she holds on;
+   the ground and gravity still have her, so it's a run round a pole, not a flight */
+function trunkSwing(S, dt, reelIn, letOut) {
+  const tr = S.trunk;
+  if (reelIn) S.L = Math.max(tr.r + 1.2, S.L - 4 * dt); else if (letOut) S.L = Math.min(tr.r + 8, S.L + 4 * dt);
+  S.spd = Math.min(26, Math.max(S.spd, 12) + 2.5 * dt);
+  const a = Math.atan2(P.pos.z - tr.z, P.pos.x - tr.x) + S.dir * S.spd / S.L * dt;
+  P.vel.x = (tr.x + Math.cos(a) * S.L - P.pos.x) / dt; P.vel.z = (tr.z + Math.sin(a) * S.L - P.pos.z) / dt;
+  S.A.copy(trunkPoint(tr));
+  if (Math.random() < 0.4 && P.onGround) particles.emit(P.pos.x, P.pos.y + 0.2, P.pos.z, { vx: -P.vel.x * 0.1, vy: 1, vz: -P.vel.z * 0.1, color: 0xd8c098, size: 0.4, life: 0.5 });
+}
+/* ---------------- the auto-swing: hold U and both vines ----------------
+   Hold U with both mouse buttons (or with ← and →, or A and D) and she does it all herself: vine after vine,
+   letting go near the top of each arc and catching the next tree on the way down, kicking at the bottom to keep
+   her speed up. Near one of the ways she knows (the forest path's giants, the lane down to the dock) she
+   follows it, whichever way along it you were facing; anywhere else she goes where you look. Let go of any
+   of the keys and you fly off with all the speed you had. */
+const AUTO = { near: 11, far: 34, look: 22 };
+const ROUTES = (world.swingRoutes || []).map(r => {
+  const cum = [0]; for (let i = 1; i < r.pts.length; i++) cum.push(cum[i - 1] + Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]));
+  return { ...r, cum, len: cum[cum.length - 1] };
+});
+P.auto = null;
+const autoChord = () => !!keys.KeyU && ((mouseBtn[0] && mouseBtn[2]) || (keys.ArrowLeft && keys.ArrowRight) || (keys.KeyA && keys.KeyD));
+/* the nearest point of a route: how far along it (s), how far off it (d), and the way it runs there */
+function routeNear(R, x, z) {
+  let best = { s: 0, d: 1e9, tx: 1, tz: 0 };
+  for (let i = 1; i < R.pts.length; i++) {
+    const [ax, az] = R.pts[i - 1], [bx, bz] = R.pts[i], ex = bx - ax, ez = bz - az, L = Math.hypot(ex, ez) || 1;
+    const k = clamp(((x - ax) * ex + (z - az) * ez) / (L * L), 0, 1), px = ax + ex * k, pz = az + ez * k, d = Math.hypot(x - px, z - pz);
+    if (d < best.d) best = { s: R.cum[i - 1] + k * L, d, tx: ex / L, tz: ez / L };
+  }
+  return best;
+}
+function routeAt(R, s) {
+  s = clamp(s, 0, R.len);
+  for (let i = 1; i < R.pts.length; i++) if (R.cum[i] >= s || i === R.pts.length - 1) {
+    const k = clamp((s - R.cum[i - 1]) / ((R.cum[i] - R.cum[i - 1]) || 1), 0, 1);
+    return { x: lerp(R.pts[i - 1][0], R.pts[i][0], k), z: lerp(R.pts[i - 1][1], R.pts[i][1], k) };
+  }
+  return { x: R.pts[0][0], z: R.pts[0][1] };
+}
+/* which way to go now: along the route (a little way ahead on it, so she drifts back onto it), or where you look */
+function autoDir(A) {
+  if (A.route) {
+    const R = A.route, n = routeNear(R, P.pos.x, P.pos.z), s1 = n.s + A.sgn * AUTO.look;
+    if (s1 < -4 || s1 > R.len + 4) { toast(`The end of ${R.name}.`, 2); A.route = null; }
+    else { const p = routeAt(R, s1), dx = p.x - P.pos.x, dz = p.z - P.pos.z, d = Math.hypot(dx, dz) || 1; A.dir.set(dx / d, 0, dz / d); return; }
+  }
+  const f = camForward(); A.dir.lerp(V3(f.x, 0, f.z), 0.5).normalize();
+}
+/* the next tree to catch: well ahead along the way, high enough to swing under, and (on a route) close to it */
+function autoAnchor(A) {
+  const hip = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z);
+  let best = null, bs = -1e9;
+  for (const t of world.trees || []) {
+    if (Math.abs(t.x - hip.x) > AUTO.far + 2 || Math.abs(t.z - hip.z) > AUTO.far + 2) continue;
+    const dx = t.x - hip.x, dz = t.z - hip.z, d = Math.hypot(dx, dz) || 1;
+    if (d < AUTO.near || d > AUTO.far) continue;
+    const y = t.g + Math.min(t.h * 0.95, hip.y - t.g + 30), up = y - hip.y;
+    if (up < 4) continue;
+    const dot = (dx * A.dir.x + dz * A.dir.z) / d; if (dot < 0.6) continue;
+    let sc = dot * 4 - Math.abs(d - 21) / 7 + Math.min(up, 18) / 9;
+    if (A.route) sc -= routeNear(A.route, t.x, t.z).d / 5;
+    if (sc > bs) { bs = sc; const r = t.r || 0; best = V3(t.x - dx / d * r, y, t.z - dz / d * r); }
+  }
+  return best;
+}
+function autoStart() {
+  const f = camForward(), A = { dir: V3(f.x, 0, f.z).normalize(), route: null, sgn: 1, wait: 0, side: 'L', told: false };
+  let rn = null;
+  for (const R of ROUTES) { const n = routeNear(R, P.pos.x, P.pos.z); if (n.d < 45 && (!rn || n.d < rn.n.d)) rn = { R, n }; }
+  if (rn) { A.route = rn.R; A.sgn = (rn.n.tx * f.x + rn.n.tz * f.z) >= 0 ? 1 : -1; }
+  P.auto = A; autoDir(A);
+  // a vine she already has hold of carries on as the first swing
+  for (const sd of ['L', 'R']) { const S = P.vines[sd]; if (S && S.trunk) P.vines[sd] = null; else if (S) S.auto = true; }
+  toast(A.route ? `${PN()} swings ${A.route.name} by herself — let go to fly off.` : `${PN()} swings by herself, where you look — let go to fly off.`, 2.6);
+  sfx.blink();
+}
+function autoStop() {
+  const H = heldVines();
+  dropVines();
+  if (H.length) releaseFlick(H[0]);
+  P.auto = null;
+}
+function autoTick(dt, act) {
+  const want = act && P.riding && !P.climb && !P.flying && !P.swimming && !interiors.inside && autoChord();
+  if (!want) { if (P.auto) autoStop(); return; }
+  if (!P.auto) autoStart();
+  const A = P.auto;
+  P.vineN = SWING.vines;                                             // on a swing she knows, she never runs out
+  autoDir(A);
+  const H = heldVines(), S = H[0];
+  if (S) {
+    // on the vine: a kick at the bottom of the arc; let go once she's swung up past the tree, on the way up
+    const off = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z).sub(S.A), lead = off.x * A.dir.x + off.z * A.dir.z;
+    const ang = Math.atan2(lead, -off.y), sp = P.vel.length();
+    if (Math.abs(ang) < 0.3 && sp < 26 && G.t > (P.pumpT || 0)) rideSpace();
+    P.vel.x += A.dir.x * 4 * dt; P.vel.z += A.dir.z * 4 * dt;           // she leans the way she's going
+    if ((lead > 0 && ang > 0.62 && P.vel.y > 0) || (lead > 0 && P.vel.y < -1 && S.t > 0.8) || S.t > 5) {
+      P.vines[S.side] = null; releaseFlick(S); A.wait = 0.08;
+    }
+    return;
+  }
+  if (vineOn()) return;                                              // one on its way out: wait for it to catch
+  if ((A.wait -= dt) > 0) return;
+  if (!P.onGround && P.vel.y > 2.5) return;                          // still rising off the last one: throw at the top
+  const a = autoAnchor(A);
+  if (!a) {
+    if (!A.told) { A.told = true; toast(P.onGround ? 'Nothing high enough to swing from that way.' : 'Nothing to catch ahead!', 2); }
+    A.wait = 0.4; return;
+  }
+  A.told = false;
+  const hip = V3(P.pos.x, P.pos.y + SWING.hip, P.pos.z);
+  A.side = A.side === 'L' ? 'R' : 'L';
+  P.vines[A.side] = { A: a, foe: null, trunk: null, L: hip.distanceTo(a), t: 0, k: 0, hold: false, side: A.side, auto: true };
+  sfx.swing();
+}
+function updateAutoHud() {
+  const el = $('auto-swing'); if (!el) return;
+  const txt = P.auto && G.mode === 'play' ? (P.auto.route ? 'Auto-swing · ' + P.auto.route.name : 'Auto-swing') : '';
+  if (el._k === txt) return;
+  el._k = txt; el.textContent = txt; el.classList.toggle('hidden', !txt);
 }
 /* X on her back: hold it and the vine keeps its length; a quick tap keeps it held until you let go of every vine */
 let xDownT = -1;
@@ -3163,7 +3513,8 @@ function phorusDismount() {
   FR.mode = null;
 }
 function updateMount(dt) {
-  updateVineHud(dt);
+  updateVineHud(dt); updateGaitHud(); updateAutoHud();
+  if (!P.riding) { P.gait = 0; P.gaitT = 0; }
   if (!mount) return;
   const m = mount;
   // your own Punk grows, slowly; and until she's a steed she keeps to your heels (indoors, she waits by the door)
@@ -3255,6 +3606,33 @@ function pipPlay(m, dt) {
   m.vel.x = damp(m.vel.x, Math.sin(m.yaw) * sp, 6, dt); m.vel.z = damp(m.vel.z, Math.cos(m.yaw) * sp, 6, dt);
   // playing: little bounces as she runs
   m.hop = S.run && sp > 0 ? Math.abs(Math.sin(G.t * 7)) * 0.35 * m.scale : 0;
+}
+/* her gaits on the ground: she sets off at a walk, breaks into a trot after a second of going, and after
+   three is at a full gallop. Stop (or run into something) and she drops back to a walk. Shift urges her on:
+   the seconds count twice as fast. */
+const GAITS = [{ name: 'Walk', at: 0, speed: 7 }, { name: 'Trot', at: 1, speed: 12.5 }, { name: 'Gallop', at: 3, speed: 21 }];
+P.gaitT = 0; P.gait = 0; P.gaitIdle = 0;
+function rideGait(dt, moving, urge) {
+  if (!P.onGround || vineOn()) return GAITS[P.gait].speed;            // in the air or on a vine, the gait waits for her feet
+  const hv = Math.hypot(P.vel.x, P.vel.z), g = GAITS[P.gait];
+  P.gaitIdle = moving && (P.gaitT < 0.4 || hv > g.speed * 0.45) ? 0 : P.gaitIdle + dt;   // stopped, or brought up short
+  if (P.gaitIdle > 0.25) P.gaitT = 0;
+  else if (moving) P.gaitT += dt * (urge ? 2 : 1);
+  let n = 0; for (let i = 0; i < GAITS.length; i++) if (P.gaitT >= GAITS[i].at) n = i;
+  if (n !== P.gait) {
+    if (n > P.gait) { sfx.step(); particles.burst(P.pos.x, P.pos.y + 0.2, P.pos.z, n === 2 ? 18 : 8, { color: 0xd8c098, speed: n === 2 ? 4 : 2.5, size: 0.45, life: 0.5 }); }
+    if (n === 2) G.shake = Math.max(G.shake, 0.12);
+    P.gait = n;
+  }
+  return GAITS[P.gait].speed;
+}
+function updateGaitHud() {
+  const el = $('gait'); if (!el) return;
+  const on = P.riding && G.mode === 'play' && !P.auto && !P.climb && (P.gait > 0 || Math.hypot(P.vel.x, P.vel.z) > 1);
+  const key = on ? P.gait + '' : '';
+  if (el._k === key) return;
+  el._k = key; el.classList.toggle('hidden', !on);
+  el.innerHTML = GAITS.map((g, i) => `<span class="${i === P.gait ? 'on' : i < P.gait ? 'past' : ''}">${g.name}</span>`).join('');
 }
 let turnRate = 0;
 const RIDER_HIP = 0.76, _seatV = V3(), _seatQ = new THREE.Quaternion(), _yawQ = new THREE.Quaternion(), _UP = V3(0, 1, 0);
@@ -4131,7 +4509,7 @@ function updatePlayer(dt) {
   if (sprint && D.stamina.sprint > 0) { P.stam -= D.stamina.sprint * dt; P.stamDelay = 0.5; if (P.stam <= 0) { P.stam = 0; P.exhausted = true; sprint = false; } }
   if (P.exhausted && P.stam > 25) P.exhausted = false;
   let speed = sprint ? 11.5 : 7;
-  if (P.riding) { speed = (keys.ShiftLeft || keys.ShiftRight) ? 19 : 10; sprint = false; }
+  if (P.riding) { speed = rideGait(dt, moving, keys.ShiftLeft || keys.ShiftRight); sprint = false; }
   if (P.atk) speed *= P.riding ? 0.7 : 0.25;
   if (P.drink > 0) speed *= 0.35;
   if (P.swimming) speed *= 0.6;
@@ -4179,6 +4557,7 @@ function updatePlayer(dt) {
   if (P.riding && P.jumpBuf > 0 && act) { P.jumpBuf = 0; if (touch.on && !vineOn()) vineShoot('L'); else rideSpace(); }
   else if (P.jumpBuf > 0 && P.coyote > 0 && act && !P.steep && !P.riding && spend(D.stamina.jump)) { P.vel.y = P.swimming ? 9 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
   P.vel.y -= 28 * dt;
+  autoTick(dt, act);
   if (vineOn()) vineTick(dt, act);
   // gliding: hold Space while falling and Torcain's coat catches the wind
   P.airT = P.onGround ? 0 : (P.airT || 0) + dt;
@@ -4606,7 +4985,8 @@ function frame(now) {
   if (G.hitstop > 0) { G.hitstop -= dt; dt *= 0.08; }
   if (!frozen) {
     G.t += dt;
-    if (G.mode !== 'end') tickTime(SAVE, dt);   // cutscenes and talk are part of the story's hours too
+    if (G.mode !== 'end') tickTime(SAVE, dt);
+    tickDayCount();   // cutscenes and talk are part of the story's hours too
     if (G.mode === 'play' || G.mode === 'dialog' || G.mode === 'memory' || G.mode === 'end') {
       updatePlayer(dt);
       updatePhorus(dt);

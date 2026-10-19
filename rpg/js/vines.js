@@ -103,3 +103,36 @@ export function pivotNear(world, pos, vel, rad, reach = 6) {
   }
   return best;
 }
+
+/* a trunk to throw a vine round and swing about, like a pole: the one the X is on (the look-ray passes
+   close by its bark, below the crown), or, on the ground, failing that, the nearest one right beside you
+   on that vine's side. eye / look: the look-ray; side: 'L' or 'R'. Returns { x, z, r } or null. */
+export function trunkAt(world, pos, eye, look, side, o = {}) {
+  const reach = o.reach ?? 10, beside = o.beside ?? 4.5;
+  const hl = Math.hypot(look.x, look.z) || 1, fx = look.x / hl, fz = look.z / hl, sgn = side === 'L' ? -1 : 1;
+  let best = null, bs = 1e9;
+  const take = (x, z, r, g, top) => {
+    if (r < 0.18 || top - g < 3) return;
+    const dx = x - pos.x, dz = z - pos.z, d = Math.hypot(dx, dz);
+    if (d > reach + r || d < r + 0.5 || Math.abs(g - pos.y) > 6) return;
+    // how close the X's ray passes the trunk (seen from above), and how high it is there
+    const ex = x - eye.x, ez = z - eye.z, s = ex * fx + ez * fz;
+    if (s > 0) {
+      const miss = Math.abs(ex * fz - ez * fx), y = eye.y + look.y / hl * s;
+      if (miss < r + 1.1 && y > g - 1 && y < g + (top - g) * 0.7 && miss < bs) { bs = miss; best = { x, z, r }; return; }
+    }
+    if (!o.ground || d > beside + r) return;
+    const lat = (dx * -fz + dz * fx) / d * sgn;                       // > 0: on this vine’s side of you
+    if (lat < 0.35 || (dx * fx + dz * fz) / d < -0.4) return;
+    if (10 + d < bs) { bs = 10 + d; best = { x, z, r }; }
+  };
+  for (const t of world.trees || []) {
+    if (Math.abs(t.x - pos.x) > reach + 2 || Math.abs(t.z - pos.z) > reach + 2) continue;
+    take(t.x, t.z, t.r || 0, t.g, t.g + t.h);
+  }
+  if (world.col && world.col.nearAll) for (const c of world.col.nearAll(pos.x, pos.z, reach)) {
+    if (c.top - c.bot < 3 || Math.max(c.hw, c.hd) > 1.3) continue;     // posts and pillars; not a wall or a house
+    take(c.x, c.z, Math.max(c.hw, c.hd), c.bot, c.top);
+  }
+  return best;
+}

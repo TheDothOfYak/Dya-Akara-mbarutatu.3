@@ -113,12 +113,21 @@ Noka has moved to a new mountain and left a riddle. You play **Torcain** (Tanoc,
 - **The steed:** the saddle is fitted, and she's yours to ride.
 - **Saddlebags:** Tanoc's pack holds 40 materials, and her saddlebags carry more as she grows.
 - **The cart:** the Carpenter's cart comes the whole way home with them. It's parked by the hearth in Beuhk, then in the yard.
+- **Her gaits:** on the ground she sets off at a walk, breaks into a trot after a second of moving, and is at a full gallop after three. Stop, or run into something, and she drops back to a walk. `Shift` urges her on, so the seconds count twice as fast. The gait shows at the bottom of the screen.
+- **Round the trunks:** throw a vine at a tree trunk (or a post), or at the one right beside her on that side when she's on the ground, and she whirls round it like a pole. Hold to keep going round (faster the longer you hold), `Space` to whirl faster, `Shift` / `C` to pull in or let out, and let go to fling off the way you're going.
+- **The auto-swing:** hold `U` with both mouse buttons (or with `←` and `→`, or `A` and `D`) and she swings by herself, vine after vine. She lets go near the top of each arc, catches the next tree on the way down, and kicks at the bottom to keep her speed. Near a way she knows (the forest path's giants, the lane down to the dock) she follows it in whichever direction you were facing. Anywhere else she goes where you look. Let go of any key and you fly off with all your speed.
 
 **Climbing the great trees.** The forest path's giants and the two colossi can be climbed.
 - Against the trunk, `Space` takes hold.
 - `W` and `S` climb up and down; `A` and `D` go round the trunk.
 - `Space` again leaps off, and holding it glides you down.
 - On your Punk it's three times as fast, her leg-vines gripping the bark.
+
+**Everyone's day.** Folk keep their own hours, and you can watch them do it.
+- **Buhkon** waters the beds at first light, then gardens at sunrise and works the greenhouse. He sees to the hives and splits timber in the yard, eats lunch by the firepit, prunes the orchard and stacks the winter wood. In the evening he cooks dinner in the kitchen, eats in the dining room, and reads in the library until bed. Every third night he stays up in the workshop until past one instead.
+- **In Beuhk**, Ama is at her ovens before dawn and Duro at his forge by six. Teodr works the Ju field, Ruut counts the herd, Bosk works the pier, Orrin builds, and Lirra puts the lamps out at dawn and lights them at dusk. In the evening most of them gather round the town fire, and at night everyone goes home.
+- **Finding them indoors:** knock at someone's door and they come out to talk. In the big house you'll find Buhkon in whatever room his evening has reached, and if he's asleep you can wake him.
+- **The story comes first:** in the prologues, the festival and Venkin's drills, everyone keeps to where the story needs them.
 
 **Nur Lanterns** only wake for someone carrying Nur: a Nur at your side, or a Relic with a Hurst in it.
 

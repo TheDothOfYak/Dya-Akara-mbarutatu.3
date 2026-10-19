@@ -1658,6 +1658,14 @@ export function buildProperty(scene) {
     tokenBench: { doorId: 'p_workshop', roomId: 'p_house', stand: { ...MANOR_SPOTS.tokenBench.stand }, top: { ...MANOR_SPOTS.tokenBench.top }, buhkon: { ...MANOR_SPOTS.tokenBench.buhkon }, yaw: MANOR_SPOTS.tokenBench.yaw },
     workshop: { x: WORKSHOP.x, z: WORKSHOP.z, door: { x: workDoor.x, z: workDoor.z } }, crestPoint: new THREE.Vector3(CREST.x, heightAt(CREST.x, CREST.z), CREST.z), dockPoint: new THREE.Vector3(DOCK.x, WATER_LEVEL + 1, DOCK.z),
     pathStart: new THREE.Vector3(1120, heightAt(1120, 32), 32),
+    /* where the Carpenter goes about his day (routines.js names them; main.js walks him there) */
+    places: {
+      well: { x: WELL.x + 1.8, z: WELL.z + 1.2 }, garden: { x: GARDEN.x, z: GARDEN.z, w: GARDEN.w, d: GARDEN.d }, greenhouse: { x: GREENHOUSE.x, z: GREENHOUSE.z, w: 4, d: 3 },
+      hives: { x: HIVES.x + 2.5, z: HIVES.z + 3 }, timber: { x: TIMBER.x - 3, z: TIMBER.z - 4, w: 8, d: 6 }, woodshed: { x: WOODSHED.x - 3, z: WOODSHED.z + 4 },
+      orchard: { x: HOUSE.x - 66, z: HOUSE.z - 16, w: 34, d: 24 }, hearth: { x: hearth.x + 2.2, z: hearth.z + 1.2 }, pond: { x: POND.x + POND.r + 2, z: POND.z }, barn: { x: BARN.x, z: BARN.z - 9 },
+    },
+    /* the ways Brindle knows by heart: hold U and both vines near one and she swings it by herself */
+    swingRoutes: [{ id: 'path', name: 'the forest path', pts: PATH }, { id: 'lane', name: 'the lane down to the dock', pts: LANE }],
     update(t, dt, particles, camPos, night = 0) {
       grass.material.userData.shader && (grass.material.userData.shader.uniforms.uTime.value = t);
       flowers.forEach(f => { if (f.ready) f.grp.rotation.y = t * 0.5; });
