@@ -3610,7 +3610,7 @@ function pipPlay(m, dt) {
 /* her gaits on the ground: she sets off at a walk, breaks into a trot after a second of going, and after
    three is at a full gallop. Stop (or run into something) and she drops back to a walk. Shift urges her on:
    the seconds count twice as fast. */
-const GAITS = [{ name: 'Walk', at: 0, speed: 7 }, { name: 'Trot', at: 1, speed: 12.5 }, { name: 'Gallop', at: 3, speed: 21 }];
+const GAITS = [{ name: 'Walk', at: 0, speed: 21 }, { name: 'Trot', at: 1, speed: 21 * 1.8 }, { name: 'Gallop', at: 3, speed: 21 * 2 }];   // walk at the old gallop; trot 80% faster; gallop twice the walk
 P.gaitT = 0; P.gait = 0; P.gaitIdle = 0;
 function rideGait(dt, moving, urge) {
   if (!P.onGround || vineOn()) return GAITS[P.gait].speed;            // in the air or on a vine, the gait waits for her feet
