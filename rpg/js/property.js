@@ -311,9 +311,9 @@ export function buildProperty(scene) {
 
   /* ---------------- kits ---------------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 15000);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), toon(0xffffff), 6200, false);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), toon(0xffffff), 9800, false);
   const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false);
-  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 9500, false);
+  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false);
   const tufts = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 4000, false);   // small leafy and flowery bits: boxes, ivy, moss, the garden
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 4200, false);
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1400, false);
@@ -324,19 +324,19 @@ export function buildProperty(scene) {
   const clearOf = (x, z) => pathDist(x, z) < 6.5 || laneDist(x, z) < 5 || nearBuildings(x, z) || !!inField(x, z) || (inPasture(x, z)) || Math.hypot(x - OUTCROP.x, z - OUTCROP.z) < 22
     || Math.hypot(x - HOLLOW.x, z - HOLLOW.z) < 14 || Math.hypot(x - POND.x, z - POND.z) < POND.r + 7 || Math.hypot(x - HIVES.x, z - HIVES.z) < 9 || Math.abs(x - BROOK_X(z)) < 5 && Math.abs(z) < 420 || colossusNear(x, z) || inGlade(x, z);
   function pine(x, z, s, walk) {
-    const g = heightAt(x, z), h = (7 + rng() * 6) * s;
-    trunks.put(x, g + h * 0.2, z, 0.5 * s, h * 0.45, 0.5 * s, 0, rng() * 6, 0, '#5a3a26');
+    const g = heightAt(x, z), h = (9.5 + rng() * 7) * s;
+    trunks.put(x, g + h * 0.2, z, 0.56 * s, h * 0.45, 0.56 * s, 0, rng() * 6, 0, '#5a3a26');
     const pc = pick(PINE);
-    cones.put(x, g + h * 0.5, z, 2.7 * s, h * 0.62, 2.7 * s, 0, rng() * 6, 0, pc);
-    cones.put(x, g + h * 0.82, z, 1.8 * s, h * 0.45, 1.8 * s, 0, rng() * 6, 0, pc);
-    if (walk) { col.add(x, z, 0.45 * s, 0.45 * s, 0, g - 1, g + 8); trees.push({ x, z, g, h, r: 0.45 * s }); }
+    cones.put(x, g + h * 0.5, z, 3.1 * s, h * 0.62, 3.1 * s, 0, rng() * 6, 0, pc);
+    cones.put(x, g + h * 0.82, z, 2.1 * s, h * 0.45, 2.1 * s, 0, rng() * 6, 0, pc);
+    if (walk) { col.add(x, z, 0.5 * s, 0.5 * s, 0, g - 1, g + h * 0.6); trees.push({ x, z, g, h, r: 0.5 * s }); }
   }
   function broad(x, z, s, walk, lc) {
-    const g = heightAt(x, z), h = (4.5 + rng() * 3) * s;
-    trunks.put(x, g + h / 2 - 0.4, z, 0.42 * s, h, 0.42 * s, 0, rng() * 6, 0, '#6b4128');
+    const g = heightAt(x, z), h = (6 + rng() * 4) * s;
+    trunks.put(x, g + h / 2 - 0.4, z, 0.48 * s, h, 0.48 * s, 0, rng() * 6, 0, '#6b4128');
     lc = lc || pick(BROAD);
-    for (let k = 0; k < 4; k++) { const rr = (1.8 + rng() * 1.3) * s; crowns.put(x + (rng() - 0.5) * 2.6 * s, g + h + (rng() - 0.2) * 1.8 * s, z + (rng() - 0.5) * 2.6 * s, rr, rr * 0.85, rr, rng(), rng(), rng(), new THREE.Color(lc).offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.08).getStyle()); }
-    if (walk) { col.add(x, z, 0.4 * s, 0.4 * s, 0, g - 1, g + h); trees.push({ x, z, g, h, r: 0.4 * s }); }
+    for (let k = 0; k < 4; k++) { const rr = (2.2 + rng() * 1.6) * s; crowns.put(x + (rng() - 0.5) * 3.2 * s, g + h + (rng() - 0.2) * 2.2 * s, z + (rng() - 0.5) * 3.2 * s, rr, rr * 0.85, rr, rng(), rng(), rng(), new THREE.Color(lc).offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.08).getStyle()); }
+    if (walk) { col.add(x, z, 0.46 * s, 0.46 * s, 0, g - 1, g + h); trees.push({ x, z, g, h, r: 0.46 * s }); }
   }
   /* ---------------- the deepwood: the forest path under the old giants ----------------
      Trunks wider than a cart is long, going up and up into one roof of leaves that
@@ -790,13 +790,50 @@ export function buildProperty(scene) {
     const s = 0.9 + rng() * 0.8;
     if (rng() < 0.82) pine(x, z, s, pd < 26); else broad(x, z, s * 0.9, pd < 26);
   }
+  /* swinging trees: big old oaks and firs, well short of the colossi, standing about the whole property every
+     thirty-odd paces — tall enough, and with limbs reaching out far enough, that a Punk can swing from one to the
+     next and cross the land without touching the ground */
+  {
+    const bark = '#5e3a22', placed = [];
+    const swingTree = (x, z) => {
+      const g = heightAt(x, z), fir = rng() < 0.35, h = (fir ? 22 : 17) + rng() * 7, R = 0.95 + rng() * 0.45;
+      trunks.put(x, g + h * 0.38, z, R, h * 0.8, R, 0, rng() * 6, 0, bark);
+      col.add(x, z, R * 0.8, R * 0.8, 0, g - 1, g + h * 0.75);
+      trees.push({ x, z, g, h, r: R });
+      if (fir) {
+        const pc = pick(PINE);
+        cones.put(x, g + h * 0.42, z, 6.2, h * 0.6, 6.2, 0, rng() * 6, 0, pc);
+        cones.put(x, g + h * 0.68, z, 4.6, h * 0.48, 4.6, 0, rng() * 6, 0, pc);
+        cones.put(x, g + h * 0.9, z, 2.8, h * 0.32, 2.8, 0, rng() * 6, 0, pc);
+      }
+      // limbs reaching out — each end a good place for a vine to hold
+      const nL = fir ? 3 : 3 + Math.floor(rng() * 2), a0 = rng() * Math.PI * 2;
+      for (let k = 0; k < nL; k++) {
+        const a = a0 + k / nL * Math.PI * 2 + (rng() - 0.5) * 0.6, out = (fir ? 4.5 : 6.5) + rng() * 4;
+        const ay = g + h * (fir ? 0.45 + k * 0.12 : 0.55 + rng() * 0.15), bx = x + Math.cos(a) * out, bz = z + Math.sin(a) * out, by = ay + 1.5 + rng() * 2.5;
+        limb(trunks, x, ay, z, bx, by, bz, R * 0.32, bark);
+        if (!fir) { const rr = 3.4 + rng() * 1.8; crowns.put(bx, by + rr * 0.45, bz, rr, rr * 0.75, rr, rng(), rng() * 6, rng(), new THREE.Color(pick(BROAD)).offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.08).getStyle()); }
+        trees.push({ x: bx, z: bz, g, h: (by - 0.4 - g) / 0.95, r: 0 });   // the limb's end: swing from it
+      }
+      if (!fir) for (let k = 0; k < 2; k++) { const rr = 4.6 + rng() * 2; crowns.put(x + (rng() - 0.5) * 4, g + h * 0.85 + rng() * 2, z + (rng() - 0.5) * 4, rr, rr * 0.8, rr, rng(), rng() * 6, rng(), pick(BROAD)); }
+    };
+    for (let i = 0; i < 30000 && placed.length < 520; i++) {   // about thirty paces apart over the land he roams — inside a vine's reach
+      const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * 600, x = YARD.x - 120 + Math.cos(a) * r, z = YARD.z + Math.sin(a) * r;
+      if (!onLand(x, z) || clearOf(x, z)) continue;
+      const g = heightAt(x, z);
+      if (g < WATER_LEVEL + 1.2 || g > 200) continue;
+      if (Math.hypot(x - YARD.x, z - YARD.z) < 45 || Math.hypot(x - HOUSE.x, z - HOUSE.z) < 40) continue;
+      if (placed.some(p => (p.x - x) ** 2 + (p.z - z) ** 2 < 27 * 27)) continue;
+      placed.push({ x, z }); swingTree(x, z);
+    }
+  }
   // everywhere else: the far forest, the north and south woods, stands across the slope
-  for (let i = 0; i < 90000 && trunks.mesh.count < 5900; i++) {
+  for (let i = 0; i < 90000 && trunks.mesh.count < 8300; i++) {
     const x = -1700 + rng() * 2300, z = -1250 + rng() * 2450;
     if (rng() > treeDensity(x, z) || clearOf(x, z)) continue;
     const g = heightAt(x, z);
     if (g < WATER_LEVEL + 0.8 || g > 260) continue;
-    const walk = onLand(x, z), s = 0.8 + rng() * 0.9, dense = treeDensity(x, z) > 0.4;
+    const walk = onLand(x, z), s = 0.95 + rng() * 0.9, dense = treeDensity(x, z) > 0.4;
     if (dense ? rng() < 0.75 : rng() < 0.3) pine(x, z, s, walk); else broad(x, z, s, walk);
   }
   // hedgerows of round bushes along the field fences
