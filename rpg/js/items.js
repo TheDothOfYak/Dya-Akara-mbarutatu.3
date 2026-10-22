@@ -24,6 +24,11 @@ export const ITEMS = {
   skor_rind: { name: 'Skor’Thal’s rind', kind: 'mat', icon: '🟤', value: 0, desc: 'A scarred curl of rind the great old Punk let fall beside you. Sing it in an Okid’Relic.' },
   shaving: { name: 'Punk shaving', kind: 'mat', icon: '🎃', value: 8, desc: 'A curl of rind from a sleeping domestic Punk. Calm and content.' },
   stem: { name: 'Malsti stem', kind: 'mat', icon: '🟣', value: 12, desc: 'A Malsti Punk’s stem. It flickers half into the Duat.' },
+  // the Carpenter's still: what alchemy wants that the land gives freely, and what you have to go and find
+  wellwater: { name: 'Flask of well water', kind: 'mat', icon: '💧', value: 1, desc: 'Cold, from the bottom of the Carpenter’s well. Every brew starts with it.' },
+  honey: { name: 'Honeycomb', kind: 'mat', icon: '🍯', value: 8, desc: 'From the hives by the house. Sweet, and it keeps anything you put in it.' },
+  glowcap: { name: 'Glowcap', kind: 'mat', icon: '🍄', value: 9, desc: 'A toadstool that shines on the lakeshore. Steeped, it makes the Nur in you quicker.' },
+  stormglass: { name: 'Storm-glass shard', kind: 'mat', icon: '🔷', value: 40, desc: 'Sand the sky came down on and melted. It crackles if you hold it too long.' },
   knife: { name: 'Duat knife', kind: 'mat', icon: '🗡', value: 20, desc: 'A Vel’s throwing knife. It shivers when you hold it.' },
 
   /* ---- meals (eat for a while-lasting boon) ---- */
@@ -34,6 +39,14 @@ export const ITEMS = {
   tea: { name: 'Antidote tea', kind: 'meal', icon: '🫖', value: 30, desc: 'No poison can touch you for 4 minutes.', buff: { antidote: 1 }, dur: 240, heal: 10 },
   bun: { name: 'Zahreh bun', kind: 'meal', icon: '🥯', value: 16, desc: 'Ama’s recipe. Heals 35; stamina returns 25% faster for 2 minutes.', buff: { stamRegen: 1.25 }, dur: 120, heal: 35 },
   roast: { name: 'Ember roast', kind: 'meal', icon: '🍖', value: 30, desc: 'Take 15% less damage for 3 minutes.', buff: { armor: 0.85 }, dur: 180, heal: 25 },
+
+  /* ---- potions, brewed at the Carpenter's still (drink them like a meal) ---- */
+  pt_heal: { name: 'Healing draught', kind: 'meal', potion: true, icon: '🧪', value: 24, desc: 'Zahreh steeped in well water. Heals 70 at once.', heal: 70 },
+  pt_swift: { name: 'Runner’s tonic', kind: 'meal', potion: true, icon: '🧪', value: 26, desc: 'Honey and water. Stamina returns 60% faster for 4 minutes.', buff: { stamRegen: 1.6 }, dur: 240, heal: 10 },
+  pt_iron: { name: 'Ironbark tincture', kind: 'meal', potion: true, icon: '⚗', value: 45, desc: 'Fire-tree bark and soul-iron. Take 22% less damage for 3 minutes.', buff: { armor: 0.78 }, dur: 180, heal: 10 },
+  pt_glow: { name: 'Glowcap tonic', kind: 'meal', potion: true, icon: '🧪', value: 40, desc: 'It glows in the flask. Spells, Relics and Nur’Hlyst come back 30% faster for 3 minutes.', buff: { cd: 0.7 }, dur: 180, heal: 10 },
+  pt_luck: { name: 'Fortune draught', kind: 'meal', potion: true, icon: '⚗', value: 60, desc: 'From a drowned herbalist’s notebook. +50% shards and +20% experience for 5 minutes.', buff: { shards: 1.5, xp: 1.2 }, dur: 300, heal: 10 },
+  pt_storm: { name: 'Storm in a bottle', kind: 'meal', potion: true, icon: '🌩', value: 120, desc: 'It hums against the glass. +30% damage, and every blow staggers half again as hard, for 2½ minutes.', buff: { dmg: 1.3, stagger: 1.5 }, dur: 150, heal: 20 },
 
   ju: { name: 'Ju', kind: 'meal', icon: '🥕', value: 3, desc: 'It is a carrot. Heals 15.', heal: 15 },
   sprengju: { name: 'Sprengju', kind: 'meal', icon: '🧨', value: 30, desc: 'An awake Ju. Eat it: heals 30, +25% damage and stamina returns 30% faster for 90 seconds. Or throw it (X) — it bursts on impact.', buff: { dmg: 1.25, stamRegen: 1.3 }, dur: 90, heal: 30 },
@@ -87,6 +100,11 @@ export const ITEMS = {
   t_ring: { name: 'Hurst ring', kind: 'trinket', icon: '💍', value: 140, desc: '+25 maximum health.', perk: { hp: 25 } },
   t_knot: { name: 'Farmer’s knot', kind: 'trinket', icon: '🪢', value: 110, desc: 'Teodr’s lucky knot. Take 8% less damage.', perk: { armor: 0.92 } },
   t_compass: { name: 'Bosk’s compass', kind: 'trinket', icon: '🧭', value: 120, desc: 'It never points north. +15% experience.', perk: { xp: 1.15 } },
+  // made at the Carpenter's bench
+  t_amber: { name: 'Honey-amber charm', kind: 'trinket', icon: '🟠', value: 70, desc: 'Honeycomb set hard round a chip of fire-tree. Wounds close slowly on their own.', perk: { regen: 0.6 } },
+  t_glowcap: { name: 'Glowcap lantern', kind: 'trinket', icon: '🏮', value: 110, desc: 'A little lantern of glowcaps on a cord. Spells, Relics and Nur’Hlyst come back 15% faster.', perk: { cd: 0.85 } },
+  t_storm: { name: 'Storm-glass pendant', kind: 'trinket', icon: '🔷', value: 260, desc: 'Three shards of storm-glass wired together. +12% damage; your blows stagger 25% harder.', perk: { dmg: 1.12, stagger: 1.25 } },
+  t_satchel: { name: 'Herbalist’s satchel', kind: 'trinket', icon: '👜', value: 150, desc: 'Dried out and mended. +15% shards and +10% experience.', perk: { shards: 1.15, xp: 1.1 } },
   t_oath: { name: 'Broken oath-ring', kind: 'trinket', icon: '⭕', value: 220, desc: 'The lord’s ring, grown into Skor’Thal’s vines and given freely. +10% damage, heat builds 20% faster.', perk: { dmg: 1.1, heat: 1.2 } },
   t_sniller: { name: 'Sniller’s eye', kind: 'trinket', icon: '🔷', value: 150, desc: 'A cold teal gem that hums. Nur’Hlyst reaches 60% farther; +10% shards.', perk: { hlyst: 1, shards: 1.1 } },
   t_ver: { name: 'Ver’s eye', kind: 'trinket', icon: '👁', value: 160, desc: 'Spells recover 20% faster.', perk: { cd: 0.8 } },
@@ -147,6 +165,21 @@ export const RECIPES = [
   { out: 'roast', need: { ember: 1, oil: 1 } },
   { out: 'broth', need: { seed: 1, petal: 1 } },
   { out: 'tea', need: { moss: 2, thorn: 1 } },
+];
+
+/* the Carpenter's still and bench: brews (potions) and crafts (charms). Each is learned before it can be made — in his
+   lessons, or from something found out on the land (flag: learn_<out>). hard: brewing it is a test of a steady hand
+   (0 — it just works, 1 — keep the still steady, 2 — and the still is lively) */
+export const BREWS = [
+  { out: 'pt_heal', need: { wellwater: 1, petal: 2 }, hard: 0 },
+  { out: 'pt_swift', need: { wellwater: 1, honey: 1 }, hard: 0 },
+  { out: 'pt_iron', need: { wellwater: 1, bark: 2, ore: 1 }, hard: 1 },
+  { out: 'pt_glow', need: { wellwater: 1, glowcap: 2 }, hard: 0 },
+  { out: 'pt_luck', need: { wellwater: 1, petal: 1, glowcap: 1, honey: 1 }, hard: 1 },
+  { out: 'pt_storm', need: { wellwater: 1, stormglass: 1, honey: 1, ore: 1 }, hard: 2 },
+  { out: 't_amber', need: { honey: 2, bark: 1 }, hard: 0, craft: true },
+  { out: 't_glowcap', need: { glowcap: 4, oil: 1, vine: 1 }, hard: 0, craft: true },
+  { out: 't_storm', need: { stormglass: 2, ore: 2, vine: 1 }, hard: 2, craft: true },
 ];
 
 /* ---- the kinds of weapon. Any of them can be wielded — once it's been learned. Each is taught by a side job on the Carpenter's

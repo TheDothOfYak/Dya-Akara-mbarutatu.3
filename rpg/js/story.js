@@ -1861,6 +1861,27 @@ Object.assign(APPRENTICE, {
       ],
       yes: ['That’s it. In it goes.', 'Good. Written.', 'Yes. Exactly that.'],
     },
+    /* and while the bench is set up: the still in the yard, and how to brew */
+    alch: {
+      intro: [
+        ['buhkon', 'Good. Now — since you’re at the bench, and since you’ve been eyeing my still in the yard all week.'],
+        ['buhkon', 'Brewing is the same as what we just did. Things answer each other. Zahreh closes wounds; steep it in cold water and it closes them faster. You find out which, and you write it down.'],
+        ['buhkon', 'An easy one first. A Healing draught: a flask of well water, two Zahreh petals. Fill a flask at the well, pick the petals — walk through the pink flowers anywhere — and brew it at the still.'],
+      ],
+      healObj: 'Brew a Healing draught at the still in the yard',
+      heal: [
+        ['buhkon', 'Let me see. …Clear, pink, and it smells of summer. That’s a draught. Keep it for when something bites you.'],
+        ['buhkon', 'Now a hard one. Ironbark tincture: well water, two strips of fire-tree bark, a lump of stygian ore. It makes your skin like bark for a while.'],
+        ['buhkon', 'The ore fights the bark the whole way. You’ll have to keep the still steady — stir it at just the right moment, three times, and don’t let it boil over. Bark’s on the fallen fire-tree logs; ore, out on the land, glowing purple.'],
+      ],
+      ironObj: 'Brew an Ironbark tincture at the still — the hard one',
+      iron: [
+        ['buhkon', 'You did it? First try? — Don’t answer that. It took me eleven.'],
+        ['buhkon', 'Two more for the book, then, and they’re easy. Runner’s tonic: well water and honey from the hives. And a charm — honeycomb set hard round a chip of bark. Wear it and small cuts close on their own.'],
+        ['buhkon', 'The rest you’ll have to find. Half of what I know, nobody taught me. I came across it — a jar in the reeds, a page in a tree, a place the sky came down. Keep your eyes open out there.'],
+      ],
+      ironBackObj: 'Back to Buhkon with the tincture',
+    },
     done: [
       ['buhkon', 'Five tests, five answers, and not one of them a straight one. That’s amulets for you. We’ll keep at it — and we’ll want people who know more than we do.'],
     ],

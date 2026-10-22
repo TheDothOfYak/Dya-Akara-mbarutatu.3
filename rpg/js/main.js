@@ -38,12 +38,13 @@ import { createRoad } from './road.js';
 import { createMegla } from './megla.js';
 import { buildCart } from './cart.js';
 import { createCine } from './cine.js';
-import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, FORGE, bindId, ARMS, armOf, armKey } from './items.js';
+import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, BREWS, FORGE, bindId, ARMS, armOf, armKey } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
 import { QUESTS, JOBS, questProgress, jobProgress } from './quests.js';
 import { buildFeatures, sigilMesh } from './features.js';
 import { createRpgUI } from './rpgui.js';
+import { createAlchemy } from './alchemy.js';
 import { createEnemies, TYPES } from './enemies.js';
 import { hasBoard, offers as bountyOffers, bountyProgress } from './bounties.js';
 import * as DYA3 from './dya3d.js';
@@ -1308,6 +1309,7 @@ function interactables() {
   list.push(...interiors.interactables(P, { enter: d => enterRoom(d), exit: () => leaveRoom(), scope: d => startScope(d) }));
   routineInteractables(list);   // knocking on doors; the Carpenter about his house
   if (interiors.inside) return list;   // inside, only the room's own things
+  if (alch) list.push(...alch.interactables(P));
   if (young()) { if (relicOut() && RELIC_SPOT) list.push({ pos: RELIC_SPOT, label: 'Pick up the glinting stone', act: () => youngTakeRelic(), far: 2.6 }); list.push(...apInteractables()); }
   else if (REGION === 'xilia' && !F_.xtalked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.xtalked = true; persist(); dialog(STORY.XILIA.intro, () => { setObjective(); hint('Follow the ◆ on your compass to the Carpenter’s yard.'); }); } });
   else if (REGION === 'aakalay' && !F_.talked) list.push({ pos: F.pos, label: 'Speak with Phorus', act: () => { F_.talked = true; persist(); dialog(STORY.DIALOG.arrive, () => { setObjective(); hint('Press F and Phorus will feel for the nearest singing core.'); }); } });
@@ -3906,6 +3908,25 @@ function updateSlotHud(dt) {
 
 /* ---------------- chests, gathering, trials ---------------- */
 const feats = buildFeatures(scene, world, REGION, SAVE);
+/* the Carpenter's still, and the side quests you come across out on his land (alchemy.js) */
+const alch = REGION === 'property' ? createAlchemy({
+  scene, world, SAVE, particles, sfx, invAdd, lootToast, xp, toast, bark, persist, setObjective, openBook,
+  dialog: (lines, cb) => dialog(lines, cb),
+  spawnFoe: (kind, x, z) => enemies.spawn(kind, x, z, null, { state: 'chase', hostile: true, tag: 'storm' }),
+  finishFound: qid => finishFound(qid),
+  onBrewed: out => apBrewed(out),
+}) : null;
+/* a side quest you found finishes where it ends: there's no one to go back to */
+function finishFound(qid) {
+  const q = QUESTS[qid]; if (SAVE.quests[qid] !== 'active') return;
+  SAVE.quests[qid] = 'done';
+  const r = q.reward;
+  if (r.shards) G.shards += r.shards;
+  if (r.items) for (const [k, c] of Object.entries(r.items)) { invAdd(SAVE.inv, k, c); lootToast(k, c); }
+  if (r.flag) { SAVE.flags[r.flag] = true; if (r.flag.startsWith('learn_')) { const it = ITEMS[r.flag.slice(6)]; if (it) setTimeout(() => toast(`Learned at the still: ${it.icon} ${it.name}`, 3.5), 1200); } }
+  persist();
+  setTimeout(() => dialog(q.done, () => { toast(`Side quest complete: ${q.name}${r.shards ? ` · +${r.shards} shards` : ''}`, 3.5); sfx.victory(); xp(r.xp || 0); persist(); setObjective(); }), 400);
+}
 const sigils = [];
 let activeTrial = null;
 
@@ -4065,6 +4086,8 @@ function bookAct(act, arg) {
   } else if (act === 'forge') {
     const r = FORGE.find(f => f.out === arg);
     if (r && !(r.later && !laterGame()) && !(ITEMS[arg].kind === 'weapon' && !SAVE.arms[armKey(arg)]) && G.shards >= r.shards && takeAll(inv, r.need)) { G.shards -= r.shards; invAddRaw(inv, arg, 1); if (ITEMS[arg].kind === 'weapon') { inv.axe = arg; restyleAxe(); } else if (ITEMS[arg].slot) { wearSet()[ITEMS[arg].slot] = arg; applyWear(); } sfx.flare(); xp(60); toast(`Forged: ${ITEMS[arg].name}${ITEMS[arg].relicArmor ? ' — Relic armor' : ''}`, 2.5); }
+  } else if (act === 'brew') {
+    if (alch) alch.brew(arg, () => { if (book.isOpen()) book.open('brew'); persist(); });
   } else if (act === 'cook') {
     const r = RECIPES.find(f => f.out === arg);
     if (r && takeAll(inv, r.need)) { invAdd(inv, arg, 1); sfx.heal(); xp(8); }
@@ -4108,6 +4131,7 @@ function mapMarkers() {
   for (const ex of world.exits || []) m.push({ x: ex.x, z: ex.z, ch: '➜', col: '#f3cf7a', size: 18, label: `${ex.name} → ${ex.dest || REGION_NAME[ex.to]}` });
   if (REGION === 'property') for (const k of ['house', 'yard', 'dock', 'outcrop']) { const st = world.SITES[k]; if (st) m.push({ x: st.x, z: st.z, ch: k === 'house' ? '⌂' : '·', col: '#ffd27a', size: k === 'house' ? 20 : 16, label: st.name }); }
   m.push(...wilds.markers());
+  if (alch) m.push(...alch.markers());
   return m;
 }
 /* ---------------- the ShurgrEdan: kill a RubberMcFly and it answers before the day is out ---------------- */
@@ -4466,7 +4490,7 @@ function updateRpgHud() {
   const act = Object.entries(SAVE.quests).filter(([, s]) => s === 'active').slice(0, 3);
   let html = act.map(([id]) => {
     const q = QUESTS[id], p = questProgress(id, q, SAVE, SAVE.inv);
-    return `<div>${p >= 1 ? '✔' : '•'} ${q.name} <b>${p >= 1 ? 'return to ' + npcName(q.giver) : Math.round(p * 100) + '%'}</b></div>`;
+    return `<div>${p >= 1 ? '✔' : '•'} ${q.name} <b>${p >= 1 ? (q.found ? 'done' : 'return to ' + npcName(q.giver)) : Math.round(p * 100) + '%'}</b></div>`;
   }).join('');
   if (SAVE.bounty) { const b = SAVE.bounty, n = bountyProgress(b, SAVE); html += `<div>${n >= b.n ? '✔' : '▤'} Bounty: ${beastName(b.kind)} <b>${n >= b.n ? 'claim at a board' : n + '/' + b.n}</b></div>`; }
   if ($('qtrack')._h !== html) { $('qtrack')._h = html; $('qtrack').innerHTML = html; }
@@ -4935,7 +4959,7 @@ function updateWorldBits(dt) {
     gate.userData.film.material.opacity = 0.45 + Math.sin(G.t * 2.4) * 0.12; gate.userData.film.rotation.z = G.t * 0.3;
     if (Math.random() < 0.3) particles.emit(gate.position.x + (Math.random() - 0.5) * 5, gate.position.y + 3.6 + (Math.random() - 0.5) * 5, gate.position.z, { vy: 0.5, color: 0xb48aff, size: 0.35, life: 1.2, speed: 0.6 });
   }
-  hlystTick(dt); skorTick(dt); wilds.update(dt, G.t); ambient.update(dt, G.t, P.pos, G.night || 0); updateSprengju(dt); if (G.meglaTick) G.meglaTick(dt);
+  hlystTick(dt); skorTick(dt); wilds.update(dt, G.t); if (alch) alch.update(dt, G.t, P, G.night || 0); ambient.update(dt, G.t, P.pos, G.night || 0); updateSprengju(dt); if (G.meglaTick) G.meglaTick(dt);
   beastScan(dt);
   for (const c of cores) {
     if (c.got) continue;
@@ -5755,6 +5779,8 @@ const apStep = () => F_.ap ?? 0;
 const apOn = () => young() && (F_.yq || 0) >= 5 && !F_.megla && F_.pro === 'done' && apStep() < AP.DONE;
 const apWinter = () => young() && !F_.megla && (apStep() === AP.WINTER || apStep() === AP.VOICE);
 const APS = STORY.APPRENTICE;
+// he's grown, or past the lessons: he knows the Carpenter's first brews already
+if ((!young() || apStep() > AP.TESTS) && !F_.learn_pt_heal) for (const k of ['pt_heal', 'pt_swift', 'pt_iron', 't_amber']) F_['learn_' + k] = true;
 const RAID_N = 5;
 const apBuhkonNpc = () => npcs.find(n => n.def.id === 'buhkon');
 const apExitEast = () => (world.exits || []).find(e => e.to === 'xilia');
@@ -5960,6 +5986,15 @@ function apPairTick() {
   F_.apPairPulled = true; persist();
   dialog(APS.tests.pairPull, () => setObjective());
 }
+// the brewing lessons: what the brew he's on still wants, and a bark when it's done
+const AP_BREW = { 1: 'pt_heal', 3: 'pt_iron' };
+const apBrewLesson = () => apTestsOn() && Object.keys(F_.apTests || {}).length >= 5 && F_.apNotes ? AP_BREW[F_.apAlch] : null;
+const apBrewMissing = out => Object.entries(BREWS.find(b => b.out === out).need).filter(([k, n]) => (SAVE.inv.items[k] || 0) < n).map(([k, n]) => [k, n - (SAVE.inv.items[k] || 0)]);
+function apBrewed(out) {
+  if (!apTestsOn() || AP_BREW[F_.apAlch] !== out) return;
+  F_.apAlch++; persist(); setObjective();
+  bark('tanoc', out === 'pt_heal' ? 'It worked! It’s pink. …Buhkon has to see this.' : 'It took. It actually took. Wait till he sees.', 3.5);
+}
 // writing it down: he says what each result means, and it goes in the book
 function apNotes(i, then) {
   const N = APS.tests.notes;
@@ -6012,7 +6047,19 @@ function apBuhkon(n) {
         say(T.pairBack, () => { tested('pair'); apBuhkon(n); }); return;
       }
       const left = Object.keys(T.list).filter(k => !done[k]);
-      if (!left.length) { if (F_.apNotes) say(T.done, () => { xp(120); apAdvance(AP.HARVEST, 'harvest'); }); else apNotes(0, () => apBuhkon(n)); return; }
+      if (!left.length) {
+        if (!F_.apNotes) { apNotes(0, () => apBuhkon(n)); return; }
+        // then the still: an easy brew, a hard one, and what the rest of it is (finding things out)
+        const A = T.alch, learn = (...ids) => { for (const k of ids) { F_['learn_' + k] = true; } toast('Learned at the still: ' + ids.map(k => ITEMS[k].icon + ' ' + ITEMS[k].name).join(', '), 3.5); };
+        switch (F_.apAlch || 0) {
+          case 0: say(A.intro, () => { F_.apAlch = 1; learn('pt_heal'); persist(); }); return;
+          case 1: say([['buhkon', 'Well water, two Zahreh petals, and the still in the yard. Go on.']]); return;
+          case 2: say(A.heal, () => { F_.apAlch = 3; learn('pt_iron'); persist(); }); return;
+          case 3: say([['buhkon', 'The tincture. Bark, ore, well water — and a steady hand. Don’t let it boil over.']]); return;
+          case 4: say(A.iron, () => { F_.apAlch = 5; learn('pt_swift', 't_amber'); xp(80); persist(); }); return;
+        }
+        say(T.done, () => { xp(120); apAdvance(AP.HARVEST, 'harvest'); }); return;
+      }
       ask('buhkon', T.menu, left.map(k => {
         const need = T.need[k];
         if (need && !got[k]) return { label: `${T.list[k].label} <small style="opacity:.6">— needs ${need.short}</small>`, act: () => say(need.ask) };
@@ -6186,7 +6233,12 @@ function apObjective() {
       const n = Object.keys(F_.apTests || {}).length, T = B.tests;
       if (G.apPulseWait) { proObjective(head, T.hlystObj, T.hlystHint, 5, n); return; }
       if (F_.apPairOut && !(F_.apTests || {}).pair) { proObjective(head, F_.apPairPulled ? T.pairBackObj : T.pairObj, '', 5, n); return; }
-      if (n >= 5) { proObjective(head, F_.apNotes ? 'Back to Buhkon' : T.notesObj, 'Talk to Buhkon', 5, n); return; }
+      if (n >= 5) {
+        if (!F_.apNotes) { proObjective(head, T.notesObj, 'Talk to Buhkon', 5, n); return; }
+        const lesson = apBrewLesson();
+        if (lesson) { const miss = apBrewMissing(lesson); proObjective(head, F_.apAlch === 1 ? T.alch.healObj : T.alch.ironObj, miss.length ? 'Still need: ' + miss.map(([k, c]) => `${c} ${ITEMS[k].name}`).join(' · ') + (miss.some(([k]) => k === 'wellwater') ? ' (fill flasks at the well)' : '') : 'Brew it at the still in the yard (E)'); return; }
+        proObjective(head, F_.apAlch === 2 ? 'Back to Buhkon with the Healing draught' : F_.apAlch === 4 ? T.alch.ironBackObj : 'Talk to Buhkon', ''); return;
+      }
       const fetch = apFetchLeft();
       proObjective(head, B.tests.obj(n), fetch.length ? 'Still to fetch: ' + fetch.map(k => T.need[k].short).join(' · ') : 'Talk to Buhkon — he’s set up at the bench', 5, n); return;
     }
@@ -6271,6 +6323,14 @@ function apGoal() {
       if (!F_.apGiven || G.apPulseWait || REGION !== 'property') return bk;
       if (F_.apPairOut && !F_.apPairPulled && world.yard) { const y = apPairFar(), h = world.SITES.hollow, d = h ? Math.hypot(h.x - y.x, h.z - y.z) : 0; return d ? V3(y.x + (h.x - y.x) / d * 50, 0, y.z + (h.z - y.z) / d * 50) : bk; }
       if (F_.apPairOut && !(F_.apTests || {}).pair) return bk;
+      const lesson = apBrewLesson();
+      if (lesson && alch) {
+        const miss = apBrewMissing(lesson).map(([k]) => k);
+        if (miss.includes('wellwater')) { const w = world.places.well; return V3(w.x, world.heightAt(w.x, w.z), w.z); }
+        if (miss.includes('petal')) { const f = nearest(world.flowers.filter(f => f.ready).map(f => V3(f.x, 0, f.z))); if (f) return f; }
+        for (const k of ['bark', 'ore']) if (miss.includes(k)) { const q = nearest(feats.nodes.filter(o => o.kind === k && o.ready).map(o => V3(o.x, o.y, o.z))); if (q) return q; }
+        return alch.still;
+      }
       const left = apFetchLeft().map(apTestSpot).filter(Boolean);
       return left.length ? nearest(left) : bk;
     }
@@ -6551,7 +6611,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 window.__torcain = {
   bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, get mount() { return mount; }, toggleRide, makeMount, updateMount, torcain, projectiles, restyleAxe,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
-  sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy,
+  sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy, alch, finishFound,
   detailCull: setDetailCull,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
