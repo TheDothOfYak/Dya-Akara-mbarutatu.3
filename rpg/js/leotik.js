@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 export { STEP };
 
@@ -387,7 +388,7 @@ export function buildLeotik(scene) {
         vec4 diffuseColor = vec4(wc, mix(0.62, 0.94, smoothstep(0.0, 0.2, dep)) + foam * 0.2);`)
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += uGlow * spark * 0.8 + uDeep * 0.15;');
   };
-  const sea = new THREE.Mesh(new THREE.CircleGeometry(9000, 64), seaMat);
+  const sea = noSolid(new THREE.Mesh(new THREE.CircleGeometry(9000, 64), seaMat));
   sea.rotation.x = -Math.PI / 2; sea.position.y = SEA; sea.renderOrder = 1; scene.add(sea);
 
   /* ---------- rivers: ribbons on their stepped surfaces ---------- */
@@ -424,7 +425,7 @@ export function buildLeotik(scene) {
     g.setIndex(idx); g.computeVertexNormals();
     // normals point down when the winding flips; force them up
     const nm = g.attributes.normal; for (let i = 0; i < nm.count; i++) nm.setXYZ(i, 0, 1, 0);
-    const m = new THREE.Mesh(g, riverMat); m.renderOrder = 2; scene.add(m);
+    const m = noSolid(new THREE.Mesh(g, riverMat)); m.renderOrder = 2; scene.add(m);
   }
 
   /* ---------- kits ---------- */

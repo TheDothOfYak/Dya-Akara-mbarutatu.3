@@ -39,6 +39,8 @@ import { createCine } from './cine.js';
 import { latchAlongRay } from './vines.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
+import { Colliders } from './terrain.js';
+import { createSolids, inColliders } from './solid.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -133,12 +135,14 @@ export function createMegla(ctx) {
   function indexSolids() { grid.clear(); for (const s of solids) { const R = s.kind === 'box' ? Math.hypot(s.hw, s.hd) : s.r; for (let cx = Math.floor((s.x - R) / CELL); cx <= Math.floor((s.x + R) / CELL); cx++) for (let cz = Math.floor((s.z - R) / CELL); cz <= Math.floor((s.z + R) / CELL); cz++) { const k = cx + ',' + cz; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(s); } } }
   const near = (x, z) => grid.get(Math.floor(x / CELL) + ',' + Math.floor(z / CELL)) || [];
   const inside = (s, x, z) => (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r);
+  const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
   function groundAt(x, z, y) {
     let g = heightAt(x, z);
     for (const s of near(x, z)) { if (s.off || s.y1 > y + STEP || s.y1 <= g) continue; if (inside(s, x, z)) g = s.y1; }
     return g;
   }
   function resolve(p, rad = PR) {
+    if (p === P.pos) auto.resolve(p, rad, PH);   // you, not the folk: they keep to the colliders placed by hand
     for (const s of near(p.x, p.z)) {
       if (s.off || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (s.kind === 'box') {
@@ -162,7 +166,7 @@ export function createMegla(ctx) {
   }
   function solidAt(x, y, z) {
     for (const s of near(x, z)) { if (s.off || y < s.y0 || y > s.y1) continue; if (inside(s, x, z)) return true; }
-    return y < heightAt(x, z) + 0.2;
+    return y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
   }
 
   /* ---------------- the ground ---------------- */
@@ -783,7 +787,7 @@ export function createMegla(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos, P.ride ? 0.9 : PR);
     P.pos.y += P.vel.y * dt;
-    const g = groundAt(P.pos.x, P.pos.z, P.pos.y);
+    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12; }
     else if (P.onGround && P.pos.y - g < 1.2 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; }
     else P.onGround = false;
@@ -1486,6 +1490,7 @@ export function createMegla(ctx) {
   /* ---------------- per frame ---------------- */
   function update(dt, playing) {
     t += dt;
+    allSolid.update(dt);
     updatePlayer(dt, playing && !cine.active);
     updatePunk(dt);
     updateRodak(dt);
@@ -1621,12 +1626,18 @@ export function createMegla(ctx) {
   // the animal is there from the start; it's only noticed when he comes on it
   buildAnimal(); trail.forEach(g => { g.material.opacity = 0; });
 
+  const allSolid = createSolids(scene, {
+    col: auto, heightAt, solidAt, focus: () => P.pos,
+    // where resolve lets you go: either side of the path, as far as the land's own walls
+    reach: (x, z) => { const zz = zoneOf(z), lim = zz === 'pass' || zz === 'foot' ? 26 : zz === 'clear' ? 80 : 74; return z < 15 && z > END_Z + 5 && Math.abs(x - pathX(z)) < lim + 3; },
+  });
+
   function dispose() {
     gyngeBar.remove();
     scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
     composer.dispose && composer.dispose();
   }
-  return {
+  return { solids: allSolid,
     start, update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(), vine: vineButton,
     get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items,
     debug: { get GYN() { return GYN; }, vines, get vineN() { return vineN; }, tanoc, punk, get boltCd() { return boltCd; }, get cineOn() { return cine.active; }, rockfall, bolts, cairns, patrols, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; } },

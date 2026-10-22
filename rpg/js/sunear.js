@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { smooth, damp, dampAngle } from './util.js';
 import { buildNpc } from './npcs.js';
+import { noSolid } from './solid.js';
 
 const RAMP_IN = 22, RAMP_OUT = 24;
 
@@ -74,10 +75,10 @@ function echoActor(look, seed) {
 export function createSunear({ scene, particles, world, region }) {
   const R = 760;
   const waves = new THREE.Mesh(new THREE.SphereGeometry(R, 48, 24), wavesMaterial());
-  waves.frustumCulled = false; waves.renderOrder = -1; waves.visible = false; scene.add(waves);
+  waves.frustumCulled = false; waves.renderOrder = -1; waves.visible = false; scene.add(noSolid(waves));   // the storm is light and memory: nothing in it to bump
 
   const EYE_R = 9;
-  const eye = new THREE.Group(); eye.visible = false; scene.add(eye);
+  const eye = noSolid(new THREE.Group()); eye.visible = false; scene.add(eye);
   const column = new THREE.Mesh(new THREE.CylinderGeometry(EYE_R, EYE_R * 1.6, 220, 40, 1, true), eyeMaterial());
   column.position.y = 110; column.frustumCulled = false; eye.add(column);
   const ring = new THREE.Mesh(new THREE.RingGeometry(EYE_R - 0.4, EYE_R, 48), new THREE.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));

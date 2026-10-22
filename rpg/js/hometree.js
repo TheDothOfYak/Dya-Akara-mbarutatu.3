@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { toon, addOutline } from './gfx.js';
 import { mulberry32 } from './util.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -81,7 +82,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
     const trunk = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true })); trunk.castShadow = trunk.receiveShadow = true;
-    root.add(trunk);
+    root.add(noSolid(trunk));   // the trunk has its own collider (below, and the road's treeResolve), true to its swell
     colliders.push({ kind: 'cyl', x, z, r: RB * 0.92, y0: g - 5, y1: g + H });
   }
 

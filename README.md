@@ -207,7 +207,7 @@ The great ones are only ever seen from far off. The Aerolhorn crosses the sky no
 | `I` `K` `J` `M` | Gear and pack / skills / quests / map |
 | `E` / `Tab` / `P` / `Esc` | Interact, talk or rest / Rokarvac journal / pause and settings (with a full-screen switch) / free the mouse and leave full screen |
 
-Code (`rpg/js/`): `xilia.js` (Beuhk), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades (bump `SAVE_V` to reset every run), `bounties.js` the bounty boards, `dya3d.js` Dya'Akara in 3D, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
+Code (`rpg/js/`): `xilia.js` (Beuhk), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `solid.js` makes everything you can see solid (all but the sky, water, grass and what's see-through or moving) on top of each region's hand-placed colliders, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades (bump `SAVE_V` to reset every run), `bounties.js` the bounty boards, `dya3d.js` Dya'Akara in 3D, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
 
 ## Match Controls
 

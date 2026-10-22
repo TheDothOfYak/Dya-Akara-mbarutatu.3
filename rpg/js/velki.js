@@ -24,6 +24,8 @@ const TAU = Math.PI * 2;
 /* the folk of the sky live in skyfolk.js now; these stay importable from here */
 export { buildAngel, buildSniller } from './skyfolk.js';
 import { createSkyWar } from './skyfolk.js';
+import { Colliders } from './terrain.js';
+import { createSolids, inColliders } from './solid.js';
 
 /* young Tanoc, thirteen, in his own first hat, with nothing in his hands */
 export function buildYoungTanoc() {
@@ -164,6 +166,7 @@ export function createVelki(ctx) {
   const box = (x, z, hw, hd, y0, y1) => { const s = { kind: 'box', x, z, hw, hd, y0, y1, on: true }; solids.push(s); return s; };
   const cyl = (x, z, r, y0, y1) => { const s = { kind: 'cyl', x, z, r, y0, y1, on: true }; solids.push(s); return s; };
   const STEP = 0.65, PR = 0.4, PH = 1.5;
+  const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once the town is built
   function groundAt(x, z, y) {
     let g = heightAt(x, z);
     for (const s of solids) {
@@ -174,6 +177,7 @@ export function createVelki(ctx) {
     return g;
   }
   function resolve(p) {
+    if (p === P.pos) auto.resolve(p, PR, PH);   // you, not the folk: they keep to the colliders placed by hand
     for (const s of solids) {
       if (Math.abs(p.x - s.x) > 30 || Math.abs(p.z - s.z) > 30) continue;
       if (!s.on || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
@@ -203,7 +207,7 @@ export function createVelki(ctx) {
       if (!s.on || y < s.y0 || y > s.y1) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) return true;
     }
-    return y < heightAt(x, z) + 0.2;
+    return y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
   }
 
   /* ---------------- the sea, the far country, the forest, and the home trees ---------------- */
@@ -465,7 +469,7 @@ export function createVelki(ctx) {
   let hasCloak = ctx.at === 'spire';
   const CLOAK = 0x9a3a1a;
   if (hasCloak) tanoc.setCape(CLOAK);
-  P.pos.y = groundAt(P.pos.x, P.pos.z, 5);
+  P.pos.y = Math.max(groundAt(P.pos.x, P.pos.z, 5), auto.ground(P.pos.x, P.pos.z, 5));
   CAM.yaw = 0; CAM.pitch = 0.18;
   const camPos = V3(2.5, 4, 54), camTgt = V3();
 
@@ -600,7 +604,7 @@ export function createVelki(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;
-    const g = groundAt(P.pos.x, P.pos.z, P.pos.y);
+    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) {
       if (!P.onGround && P.vel.y < -8) sfx.land();
       P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12;
@@ -678,6 +682,7 @@ export function createVelki(ctx) {
 
   function update(dt, playing) {
     t += dt;
+    allSolid.update(dt);
     skyMat.uniforms.uT.value = t;
     updatePlayer(dt, playing);
     updateFolk(dt);
@@ -742,10 +747,12 @@ export function createVelki(ctx) {
     ], () => { camPos.copy(camera.position); done && done(); });
   }
 
+  const allSolid = createSolids(scene, { col: auto, heightAt, solidAt, focus: () => P.pos, reach: (x, z) => Math.hypot(x, z) < 325 });   // (resolve keeps you inside 320)
+
   function dispose() {
     scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
     composer.dispose && composer.dispose();
   }
 
-  return { intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught, cine, solidAt, heightAt, DR, captain, tanoc, wearCloak: () => { hasCloak = true; tanoc.setCape(CLOAK); } } };
+  return { solids: allSolid, intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught, cine, solidAt, heightAt, DR, captain, tanoc, wearCloak: () => { hasCloak = true; tanoc.setCape(CLOAK); } } };
 }

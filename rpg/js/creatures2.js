@@ -41,6 +41,7 @@
 import * as THREE from 'three';
 import { toon, glowSprite, outlineAll } from './gfx.js';
 import { bioKit, bioDots, bioMesh } from './actors.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -271,7 +272,7 @@ function sparkPool(parent, n, colors, size) {
        attack = lunge and breathe a burst of fire.
    ================================================================= */
 export function buildApiButa(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = rngFor(opts, 5);
   const bio = bioKit();
   const hover0 = opts.hover ?? 3.0;
@@ -501,7 +502,7 @@ export function buildApiButa(opts = {}) {
        scissor forward across the front.
    ================================================================= */
 export function buildCyitor(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = rngFor(opts, 9);
   const bio = bioKit();
   const furC = new THREE.Color(opts.color ?? 0xd6d0ec);
@@ -627,7 +628,7 @@ export function buildCyitor(opts = {}) {
        thrust.
    ================================================================= */
 export function buildXiwKatkan(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = rngFor(opts, 13);
   const bio = bioKit();
   const furC = new THREE.Color(opts.color ?? 0xa3222e);
@@ -795,7 +796,7 @@ export function buildXiwKatkan(opts = {}) {
    antlers blaze; attack = lunge with a burst of light.
    ================================================================= */
 export function buildVyrenalur(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = rngFor(opts, 21);
   const bio = bioKit();
   const shadowC = new THREE.Color(opts.color ?? 0x1e1c34);
@@ -1001,7 +1002,7 @@ export function buildVyrenalur(opts = {}) {
    turn it to a silhouette. st.reach 0..1 = tendrils reach for the ground.
    ================================================================= */
 export function buildAerolhorn(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = rngFor(opts, 31);
   const bio = bioKit();
   const top = new THREE.Color(opts.color ?? 0x2c3654), belly = new THREE.Color(opts.belly ?? 0x6a7494);
@@ -1147,7 +1148,7 @@ export function buildAerolhorn(opts = {}) {
        mind-pits blaze; attack = strikes down with the maw wide open.
    ================================================================= */
 export function buildNekhVorran(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = rngFor(opts, 41);
   const bio = bioKit();
   const L = opts.length ?? 45, RMAX = 1.9, SEGL = 1.7;
