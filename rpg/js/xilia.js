@@ -10,7 +10,7 @@
    Most of the cottages can be gone into (interiors.js).
    ============================================================ */
 import * as THREE from 'three';
-import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
+import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
@@ -446,9 +446,15 @@ export function buildXilia(scene) {
   }
 
   /* ---------- Ruut's pen ---------- */
-  for (let i = 0; i < 22; i++) {
-    const a = i / 22 * Math.PI * 2; if (i === 5) continue;
-    blocks.put(PEN.x + Math.cos(a) * 11, heightAt(PEN.x + Math.cos(a) * 11, PEN.z + Math.sin(a) * 11) + 0.6, PEN.z + Math.sin(a) * 11, 0.2, 1.2, 0.2, 0, 0, 0, '#6a4428');
+  // a ring of posts with two rails round it, all but the gap at the gate
+  {
+    const ring = [];
+    for (let i = 6; i <= 22 + 4; i++) { const a = i / 22 * Math.PI * 2, x = PEN.x + Math.cos(a) * 11, z = PEN.z + Math.sin(a) * 11; ring.push([x, heightAt(x, z), z]); }
+    railing(ring, {
+      post: (x, y, z, h) => blocks.put(x, y + h / 2 - 0.2, z, 0.2, h + 0.4, 0.2, 0, 0, 0, '#6a4428'),
+      bar: (x, y, z, len, ry, rz) => blocks.put(x, y, z, len, 0.12, 0.08, 0, ry, rz, '#7a5232'),
+      col: (x, z, hw, hd, ang, y0, y1) => col.add(x, z, hw, 0.12, ang, y0 - 1, y1),
+    }, { h: 1.2, bars: [0.55, 1.0], gap: 4 });
   }
 
   /* ---------- fields of crops ---------- */

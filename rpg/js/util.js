@@ -61,14 +61,15 @@ export function tiltUp(camera, pitch) {
    between them, on a long span, so they're never more than `gap` apart), a bar
    over their tops, and a collider under each span so nobody walks off through it. The callers draw and block:
    `post(x, y, z, h)` stands a post of height h on (x, y, z); `bar(x, y, z, len, ry, rz)` is a bar centred on
-   (x, y, z) lying along its local x, tipped up by rz and turned by ry; `col(x, z, hw, hd, ang, y0, y1)` blocks */
-export function railing(pts, { post, bar, col }, { h = 0.95, gap = 1.2 } = {}) {
+   (x, y, z) lying along its local x, tipped up by rz and turned by ry; `col(x, z, hw, hd, ang, y0, y1)` blocks.
+   A fence is the same thing with taller posts further apart and more than one bar (`bars`: their heights) */
+export function railing(pts, { post, bar, col }, { h = 0.95, gap = 1.2, bars = [h] } = {}) {
   for (const [x, y, z] of pts) post(x, y, z, h);
   for (let i = 1; i < pts.length; i++) {
     const [ax, ay, az] = pts[i - 1], [bx, by, bz] = pts[i], dx = bx - ax, dz = bz - az, run = Math.hypot(dx, dz);
     if (run < 1e-3) continue;
     const ry = -Math.atan2(dz, dx), rz = Math.atan2(by - ay, run), mx = (ax + bx) / 2, mz = (az + bz) / 2;
-    bar(mx, (ay + by) / 2 + h, mz, Math.hypot(run, by - ay) + 0.08, ry, rz);
+    for (const hb of bars) bar(mx, (ay + by) / 2 + hb, mz, Math.hypot(run, by - ay) + 0.08, ry, rz);
     const n = Math.ceil(run / gap);
     for (let k = 1; k < n; k++) post(ax + dx * k / n, ay + (by - ay) * k / n, az + dz * k / n, h);
     if (col) col(mx, mz, run / 2, 0.1, ry, Math.min(ay, by), Math.max(ay, by) + h + 0.05);

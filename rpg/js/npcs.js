@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
 import { buildEikar, cartoon, faceActing, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
-import { mulberry32, lerp, clamp } from './util.js';
+import { mulberry32, lerp, clamp, railing } from './util.js';
 
 const TAU = Math.PI * 2;
 
@@ -415,9 +415,19 @@ export function buildCamp(scene, world, cx, cz, opts = {}) {
   }
   const mat = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), toon(0x8a2a3a)); mat.rotation.x = -Math.PI / 2; add(mat, -6, 6, 0.06);
   // a hutch for the rescued Kipsu pups
-  for (let i = 0; i < 14; i++) {
-    const a = i / 14 * TAU; if (i === 3) continue;
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.2, 5), toon(0x5a3a20)); add(post, 22 + Math.cos(a) * 7, 22 + Math.sin(a) * 7, 0.6);
+  {
+    const runs = [[]], postGeo = new THREE.CylinderGeometry(0.08, 0.1, 1, 5), barGeo = new THREE.BoxGeometry(1, 0.1, 0.07), wood = toon(0x5a3a20), railC = toon(0x7a5232);
+    // (the gap at the third post is its door; and it stops either side of the green tent rather than run through it)
+    for (let i = 4; i <= 14 + 2; i++) {
+      const a = i / 14 * TAU, x = 22 + Math.cos(a) * 7, z = 22 + Math.sin(a) * 7;
+      if (Math.hypot(x - 20, z - 14) < 3.4) { if (runs[runs.length - 1].length) runs.push([]); continue; }
+      runs[runs.length - 1].push([x, H(x, z), z]);
+    }
+    for (const ring of runs) railing(ring, {
+      post: (x, y, z, h) => { const m = new THREE.Mesh(postGeo, wood); m.scale.y = h + 0.3; add(m, x, z, h / 2 - 0.15); },
+      bar: (x, y, z, len, ry, rz) => { const m = new THREE.Mesh(barGeo, railC); m.scale.x = len; m.rotation.set(0, ry, rz); m.position.set(cx + x, y, cz + z); m.castShadow = true; g.add(m); },
+      col: (x, z, hw, hd, ang, y0, y1) => world.col.add(cx + x, cz + z, hw, 0.1, ang, y0 - 1, y1),
+    }, { h: 1.2, bars: [0.5, 0.95], gap: 4 });
   }
   // lanterns on poles
   const lamps = [];
