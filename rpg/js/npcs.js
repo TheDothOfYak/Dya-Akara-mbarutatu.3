@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
 import { buildEikar, cartoon, faceActing, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
 import { mulberry32, lerp, clamp, railing } from './util.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 
@@ -81,7 +82,7 @@ function makeHammer() {
 
 /* ---------------- a Keilia ---------------- */
 export function buildKeilia(o = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rng = mulberry32(o.seed || 11);
   const HIP = 0.98;
   const body = new THREE.Group(); body.position.y = HIP; root.add(body);
@@ -229,7 +230,7 @@ export function buildKeilia(o = {}) {
 
 /* ---------------- a Karnen ---------------- */
 export function buildKarnen(o = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rng = mulberry32(o.seed || 5);
   const HIP = 0.6;
   const body = new THREE.Group(); body.position.y = HIP; root.add(body);

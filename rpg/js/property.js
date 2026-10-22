@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 import { MANOR_SPOTS } from './interiors.js';
 export { STEP };
@@ -294,7 +295,7 @@ export function buildProperty(scene) {
   const lakeMat = new THREE.MeshToonMaterial({ color: 0x4aa6c4, emissive: 0x0e4a62, emissiveIntensity: 0.35, gradientMap: ramp(), transparent: true, opacity: 0.86 });
   {
     const wg = new THREE.CircleGeometry(620, 72); wg.rotateX(-Math.PI / 2);
-    const w = new THREE.Mesh(wg, lakeMat); w.position.set(LAKE.x, WATER_LEVEL, LAKE.z); w.receiveShadow = true; w.renderOrder = 1; scene.add(w);
+    const w = noSolid(new THREE.Mesh(wg, lakeMat)); w.position.set(LAKE.x, WATER_LEVEL, LAKE.z); w.receiveShadow = true; w.renderOrder = 1; scene.add(w);
   }
   {
     const pts = [], idx = [];
@@ -315,7 +316,7 @@ export function buildProperty(scene) {
   const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false);
   const tufts = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 4000, false);   // small leafy and flowery bits: boxes, ivy, moss, the garden
-  const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 4200, false);
+  const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 4200, false); noSolid(crops.mesh);   // you wade through it, like grass
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1400, false);
   const pick = a => a[Math.floor(rng() * a.length)];
 
@@ -1389,8 +1390,8 @@ export function buildProperty(scene) {
   /* ---------------- the grounds: flagstone walks, edged lanes and lanterns, dry-stone walls, the greenhouse,
      beehives, the pond, reeds and lilies on the shore, wildflowers, a swing, the outcrops, birds ---------------- */
   const pebbles = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 7000, false);
-  const blooms = new Kit(scene, new THREE.OctahedronGeometry(1, 0), toon(0xffffff), 12000, false);
-  const reeds = new Kit(scene, new THREE.ConeGeometry(0.12, 1, 4), toon(0xffffff), 9000, false);
+  const blooms = new Kit(scene, new THREE.OctahedronGeometry(1, 0), toon(0xffffff), 12000, false); noSolid(blooms.mesh);   // you wade through it, like grass
+  const reeds = new Kit(scene, new THREE.ConeGeometry(0.12, 1, 4), toon(0xffffff), 9000, false); noSolid(reeds.mesh);   // you wade through it, like grass
   const padG = new THREE.CircleGeometry(1, 12, 0.35, Math.PI * 2 - 0.7).rotateX(-Math.PI / 2);
   const pads = new Kit(scene, padG, toon(0xffffff, { side: THREE.DoubleSide }), 1600, false);
   const GREENHOUSE_DOOR = { x: GREENHOUSE.x, z: GREENHOUSE.z - 3 };
@@ -1426,7 +1427,7 @@ export function buildProperty(scene) {
      wood's own light at every length, that wake at dusk. Each leans a bough out over the path, and a Punk's vines catch
      in those boughs: tree to tree is the quick way along. (nx, nz) points from the path to the tree. */
   const glowPods = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), colGlowMat, 3000, false);
-  const glowStrands = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 4), toon(0xffffff), 3000, false);
+  const glowStrands = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 4), toon(0xffffff), 3000, false); noSolid(glowStrands.mesh);   // hanging strands: you brush through them
   const glowTree = (x, z, nx, nz) => {
     const g = heightAt(x, z), h = 10 + rng() * 3.5, bark = new THREE.Color('#4a3a2c').offsetHSL(0, 0, (rng() - 0.5) * 0.05).getStyle();
     const tx = x - nx * 1.2, tz = z - nz * 1.2, ty = g + h * 0.72;                                 // the trunk, leaning a little toward the path
@@ -1568,7 +1569,7 @@ export function buildProperty(scene) {
   // the pond: a dish of still water, lilies, reeds, stones round the rim, a bench to sit on
   {
     const wy = POND_H - 0.35;
-    const pw = new THREE.Mesh(new THREE.CircleGeometry(POND.r + 0.6, 40).rotateX(-Math.PI / 2), lakeMat); pw.position.set(POND.x, wy, POND.z); pw.renderOrder = 1; scene.add(pw);
+    const pw = noSolid(new THREE.Mesh(new THREE.CircleGeometry(POND.r + 0.6, 40).rotateX(-Math.PI / 2), lakeMat)); pw.position.set(POND.x, wy, POND.z); pw.renderOrder = 1; scene.add(pw);
     for (let k = 0; k < 46; k++) { const a = k / 46 * Math.PI * 2 + rng() * 0.1, r = POND.r + 0.8 + rng() * 1.4, x = POND.x + Math.cos(a) * r, z = POND.z + Math.sin(a) * r, s = 0.4 + rng() * 0.7; pebbles.put(x, heightAt(x, z) + s * 0.2, z, s * 1.3, s * 0.7, s, rng(), rng(), rng(), pick(['#9a9284', '#8a8478', '#b0a898'])); }
     for (let k = 0; k < 28; k++) { const a = rng() * Math.PI * 2, r = rng() * (POND.r - 2), x = POND.x + Math.cos(a) * r, z = POND.z + Math.sin(a) * r, s = 0.5 + rng() * 0.5; pads.put(x, wy + 0.04, z, s, 1, s, 0, rng() * 6, 0, pick(['#4a8a3a', '#5a9a44', '#3e7a34'])); if (rng() < 0.35) blooms.put(x, wy + 0.18, z, 0.2, 0.14, 0.2, 0, 0, 0, pick(['#ffd0e0', '#ffffff', '#ffb0c8'])); }
     for (let k = 0; k < 22; k++) { const a = rng() * Math.PI * 2, r = POND.r - 1 + rng() * 2.4, cx = POND.x + Math.cos(a) * r, cz = POND.z + Math.sin(a) * r; for (let b = 0; b < 7; b++) { const x = cx + (rng() - 0.5) * 1.4, z = cz + (rng() - 0.5) * 1.4, hh = 1.2 + rng() * 1.2; reeds.put(x, Math.max(wy, heightAt(x, z)) + hh / 2, z, 1, hh, 1, (rng() - 0.5) * 0.2, 0, (rng() - 0.5) * 0.2, pick(['#6a8a3a', '#7a9a44', '#5a7a34'])); if (rng() < 0.3) put2(pCyl, x, Math.max(wy, heightAt(x, z)) + hh, z, 0.07, 0.35, 0.07, 0, 0, 0, '#6a4428'); } }

@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint, celAll } from './gfx.js';
 import { lerp, clamp, mulberry32 } from './util.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 
@@ -529,7 +530,7 @@ export function armsShot(kind) { const m = kind === 'hatchet' ? makeHatchet() : 
       flasks (belt flask kit, default true), nur, scale
    ================================================================ */
 export function buildEikar(o = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const kalo = !!o.kalo;
   const bw = 1 + ((o.build || 1) - 1) * 0.55 + (kalo ? 0.06 : 0);    // girth
   const HIP = 0.76;

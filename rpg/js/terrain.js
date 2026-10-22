@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { fbm, clamp } from './util.js';
 import { ramp } from './gfx.js';
+import { noSolid } from './solid.js';
 
 export const STEP = 0.6;           // how high a step you can walk up
 
@@ -22,8 +23,13 @@ export class Colliders {
     return o;
   }
   remove(o) {
-    this.list = this.list.filter(c => c !== o);
-    for (const arr of this.grid.values()) { const i = arr.indexOf(o); if (i >= 0) arr.splice(i, 1); }
+    const i = this.list.indexOf(o); if (i >= 0) this.list.splice(i, 1);
+    const R = Math.hypot(o.hw, o.hd), C = this.cell;   // only the cells it was filed in
+    for (let cx = Math.floor((o.x - R) / C); cx <= Math.floor((o.x + R) / C); cx++)
+      for (let cz = Math.floor((o.z - R) / C); cz <= Math.floor((o.z + R) / C); cz++) {
+        const arr = this.grid.get(cx + ',' + cz); if (!arr) continue;
+        const j = arr.indexOf(o); if (j >= 0) arr.splice(j, 1);
+      }
   }
   near(x, z) { return this.grid.get(Math.floor(x / this.cell) + ',' + Math.floor(z / this.cell)) || []; }
   nearAll(x, z, rad) {
@@ -34,10 +40,12 @@ export class Colliders {
       }
     return out;
   }
-  ground(x, z, feetY) {
+  /* folk (townsfolk, companions, beasts, foes) pass hand = true: they keep to the colliders the regions
+     placed by hand, as they always have, and leave the rest (solid.js's: barrels, benches, boughs) to you */
+  ground(x, z, feetY, hand = false) {
     let g = this.heightAt(x, z);
     for (const o of this.near(x, z)) {
-      if (o.top > feetY + STEP || o.top <= g) continue;
+      if (o.top > feetY + STEP || o.top <= g || (hand && o.auto)) continue;
       const dx = x - o.x, dz = z - o.z;
       const lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c;
       if (Math.abs(lx) <= o.hw + 0.05 && Math.abs(lz) <= o.hd + 0.05) g = o.top;
@@ -45,9 +53,9 @@ export class Colliders {
     return g;
   }
   /* push a standing cylinder (feet at y, height hgt) out of anything too tall to step on */
-  resolve(p, rad, hgt = 1.8) {
+  resolve(p, rad, hgt = 1.8, hand = false) {
     for (const o of this.nearAll(p.x, p.z, rad + 1)) {
-      if (p.y >= o.top - STEP || p.y + hgt <= o.bot) continue;
+      if (p.y >= o.top - STEP || p.y + hgt <= o.bot || (hand && o.auto)) continue;
       const dx = p.x - o.x, dz = p.z - o.z;
       const lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c;
       const cx = clamp(lx, -o.hw, o.hw), cz = clamp(lz, -o.hd, o.hd);
@@ -139,7 +147,7 @@ export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84
     mesh.setMatrixAt(n, m); mesh.setColorAt(n, cc.set(tones[Math.floor(rng() * tones.length)]));
     n++;
   }
-  mesh.count = n; mesh.receiveShadow = true;
+  mesh.count = n; mesh.receiveShadow = true; noSolid(mesh);   // you walk through grass
   mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
   mesh.computeBoundingSphere();
   scene.add(mesh);

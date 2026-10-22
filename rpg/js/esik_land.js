@@ -47,6 +47,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 /* lateral-sequence walk phase offsets for legs [front L, front R, hind L, hind R] */
@@ -348,7 +349,7 @@ function rindLine(R, sq, pts, tube) {
 function buildPunkKind(cfg, opts) {
   const rnd = seeded(opts);
   const R = cfg.R, sq = cfg.sq, bodyY = cfg.bodyY;
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   // bioluminescence: glowing vine tips, and (most Punks) glowing rib stripes or spots
   const bio = bioKit();
   const bioPal = cfg.bioPal || [0xd8ff6a];
@@ -768,7 +769,7 @@ export function buildKipsu(opts = {}) {
     glowC = hsl(rnd(), 0.85, 0.62).getHex();
   }
   if (opts.color !== undefined) furC = opts.color;
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const fur = M(furC), belly = M(bellyC), dark = M(0x2a1a12), pink = M(0xe8a0a0);
   const bio = bioKit();
   const glowM = bio.mat(glowC, furC, 0.4, 0.15, 1.9);
@@ -875,7 +876,7 @@ export function buildKipsu(opts = {}) {
    ================================================================ */
 export function buildRodak(opts = {}) {
   const rnd = seeded(opts);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const oil = M(0x1d1c24, { emissive: 0x07060c }), sheen = M(0x2e3850, { emissive: 0x080c14 }), dark = M(0x0c0b10);
   const blackEyes = opts.eyes === 'black' || (rnd && rnd() < 0.25);
   const bio = bioKit();
@@ -991,7 +992,7 @@ function kofiCore(opts, mode) {
   let c = opts.color ?? 0xb08a5a;
   if (rnd && opts.color === undefined) c = hsl(0.05 + rnd() * 0.08, 0.25 + rnd() * 0.35, 0.3 + rnd() * 0.35).getHex();
   const baby = mode === 'baby', momma = mode === 'momma';
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const hair = M(c), hairD = M(new THREE.Color(c).multiplyScalar(0.72).getHex()), horn = M(0xeee2c4), dark = M(0x2a1e16);
   // bioluminescence: the tips of the long back-hairs glow like fibre-optic threads
   const bio = bioKit();
@@ -1108,7 +1109,7 @@ export function buildSruVorn(opts = {}) {
   const fur = M(c), furD = M(furC.clone().multiplyScalar(0.62).getHex());
   const skin = M(furC.clone().lerp(new THREE.Color(0x3a2a22), 0.5).getHex()), tusk = M(0xf0e4c8), claw = M(0x2a2018);
   const acid = basic(0x9cff3a);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const BY = 1.08;   // long, low and heavy: the belly slung close to the ground
   const body = new THREE.Group(); body.position.y = BY; root.add(body);
   // bioluminescence: two staggered rows of rosettes along each flank and a glowing mace
@@ -1240,7 +1241,7 @@ function scalesGeo(rx, ry, rz, rows, perRow, minLat, size, rnd) {
 export function buildUlarNaga(opts = {}) {
   const nHeads = clamp(Math.round(opts.heads ?? 3), 1, 5);
   const fr = mulberry32(31);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rig = new THREE.Group(); rig.scale.setScalar(0.72); root.add(rig); // modelled large, scaled to ~10 m
   const hide = M(0x4f6b34), plate = M(0x6b5a32), belly = M(0xb7a56a), dark = M(0x2a2418);
   const sailM = M(0xa8743a, { side: THREE.DoubleSide }), horn = M(0xd8caa0);
@@ -1370,7 +1371,7 @@ function rockGeo(detail, amp, freq, off) {
   return displace(new THREE.IcosahedronGeometry(1, detail), amp, freq, off, 0.8);
 }
 export function buildGynge(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rock = M(0x7a7066), rockD = M(0x5a524a), moss = M(0x5f6e3a);
   const flesh = M(0xe8c4b4), gum = M(0x8a3a40), tooth = M(0xcfc6b2);
   // bioluminescence: patches of glowing lichen on the dome, and an ember-red glow deep
@@ -1446,7 +1447,7 @@ export function buildGynge(opts = {}) {
    ================================================================ */
 export function buildStryx(opts = {}) {
   const rnd = seeded(opts) || mulberry32(5);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rock = M(0x8a7a62), rockD = M(0x6a5c4a), topM = M(0x7d8a4a);
   const vineM = M(0x3d6a32), root2 = M(0x4a3a28);
   // bioluminescence: mineral seams glowing in the tiers' flanks, and glowing vine tips
@@ -1542,7 +1543,7 @@ export function buildStryx(opts = {}) {
    ================================================================ */
 export function buildTonguatjis(opts = {}) {
   const fr = mulberry32(13);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const shellM = M(0x6e6a3a), scute = M(0x8a7a44), rim = M(0x4e4a2a);
   const skin = M(0x7a8058), skinD = M(0x5a6040), plast = M(0xd2c088), pink = M(0xf08aa8), tooth = M(0xeee4cc), dark = M(0x1e1a12);
   // bioluminescence: a ring of lamps round the shell's rim, a spot on each neck ring
@@ -1639,7 +1640,7 @@ export function buildMikoloMoko(opts = {}) {
   const glowC = new THREE.Color(hairC).offsetHSL(0, 0.25, 0.12).getHex();
   const hair = bio.reg(M(hairC, { emissive: glowC }), 0.05, 1.3), dark = M(0x1a1410);
   const spotM = bio.mat(glowC, c, 0.35, 0.12, 1.9);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const body = new THREE.Group(); body.position.y = 0.17; root.add(body);
   // a long ferret body, deep haunches at the back
   const torso = mesh(new THREE.CapsuleGeometry(0.06, 0.3, 4, 12), fur, body); torso.rotation.x = Math.PI / 2;
@@ -1728,7 +1729,7 @@ export function buildUff(opts = {}) {
   let pc = 0xd8486a;
   if (rnd) pc = hsl([0.97, 0.0, 0.9, 0.12, 0.8][Math.floor(rnd() * 5)] + (rnd() - 0.5) * 0.04, 0.6 + rnd() * 0.3, 0.55 + rnd() * 0.15).getHex();
   if (opts.color !== undefined) pc = opts.color;
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   // bioluminescence: a glowing heart in the bloom, glowing petal edges and thorn tips
   const bio = bioKit();
   const glowC = new THREE.Color(pc).offsetHSL(0.04, 0.2, 0.15).getHex();

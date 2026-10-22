@@ -16,6 +16,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite } from './gfx.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -75,7 +76,7 @@ function visKit() {
    A Xwi: a tall burning shape of white and gold
    ================================================================ */
 export function buildAngel(s = 1) {
-  const g = new THREE.Group(), vis = visKit();
+  const g = noSolid(new THREE.Group()), vis = visKit();
   const gold = 0xffe0a0, white = 0xfff6e4;
   // the robe: three veils of light, one inside the other, slowly turning
   const veils = [];
@@ -144,7 +145,7 @@ function tendril(points, r0, r1, mat) {
   return new THREE.Mesh(geo, mat);
 }
 export function buildSniller(s = 1) {
-  const g = new THREE.Group(), vis = visKit();
+  const g = noSolid(new THREE.Group()), vis = visKit();
   const teal = 0x6af0e0;
   const vine = vis.reg(toon(0x3a5a58, { emissive: 0x0a3a3a, emissiveIntensity: 0.55 }), 0.92);
   const vineFaint = vis.reg(add(0x2ad0c8, null, 0.22));

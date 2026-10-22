@@ -42,6 +42,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -301,7 +302,7 @@ function craggy(r, rnd, amt = 0.25, detail = 1) {
    HVALEIA — the sky whale (~8 m)
    ============================================================ */
 export function buildHvaleia(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const swim = new THREE.Group(); swim.position.y = 2.9; root.add(swim);
   const top = new THREE.Color(opts.color ?? 0x3f7fc4), belly = new THREE.Color(0xe2ebee);
   const bodyM = mat(0xffffff, { vertexColors: true });
@@ -399,7 +400,7 @@ export function buildHvaleia(opts = {}) {
    ============================================================ */
 export function buildHarkal(opts = {}) {
   const rnd = mulberry32(opts.seed ?? 7);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const swim = new THREE.Group(); swim.position.y = 1.6; root.add(swim);
   const top = new THREE.Color(opts.color ?? 0x5b7488), belly = new THREE.Color(0xd9dfe2);
   const bodyM = mat(0xffffff, { vertexColors: true });
@@ -499,7 +500,7 @@ export function buildHarkal(opts = {}) {
    SU NAGA — the biggest species (~21 m nose to flukes)
    ============================================================ */
 export function buildSuNaga(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const swim = new THREE.Group(); swim.position.y = 3.9; root.add(swim);
   const top = new THREE.Color(opts.color ?? 0x1d5468), belly = new THREE.Color(0x7fb4bd);
   const bodyM = mat(0xffffff, { vertexColors: true });
@@ -708,7 +709,7 @@ function krabbiColour(opts) {
 }
 export function buildRafKrabbi(opts = {}) {
   const rnd = mulberry32((opts.seed ?? 3) * 131 + 5);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const col = krabbiColour(opts), hsl = {}; col.getHSL(hsl);
   const shellM = mat(col), plateM = mat(col.clone().offsetHSL(0, 0, -0.1)), legM = mat(col.clone().offsetHSL(0, -0.05, -0.05));
   const bellyM = mat(col.clone().lerp(new THREE.Color(0xf2e6d0), 0.6)), tipM = mat(0x241c1c), eyeM = mat(0x111111);
@@ -852,7 +853,7 @@ const GROTHYN_EL = {
 };
 export function buildGrothyn(opts = {}) {
   const E = GROTHYN_EL[opts.element] || GROTHYN_EL.Ular;
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const shellM = mat(E.shell), petalM = mat(E.petal), vineM = mat(E.vine), innerM = mat(new THREE.Color(E.vine).multiplyScalar(0.45));
   const thornM = mat(0xe8dcc0);
   // bioluminescence: the petal veins glow, beads of light ring the cone's growth lines,
@@ -1001,7 +1002,7 @@ export function buildAlbaliAagac(opts = {}) {
 
 /* ALBALI BUD — small green bud (~0.15 m) */
 export function buildAlbaliBud(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const budM = mat(opts.color ?? 0x86b84a), sepM = mat(0x4f7f2f), stemM = mat(0x5a4a2a);
   const sway = new THREE.Group(); root.add(sway);
   add(sway, new THREE.CylinderGeometry(0.008, 0.012, 0.04, 6), stemM, 0, 0.02, 0);
@@ -1030,7 +1031,7 @@ export function buildAlbaliBud(opts = {}) {
 
 /* ALBALI FRUIT — round, reddish, a stem, two lines down from the top (~0.3 m) */
 export function buildAlbaliFruit(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const R = 0.15;
   const fruitM = mat(opts.color ?? 0xc8463c), stemM = mat(0x5a3e24), leafM = mat(0x5f9a3e);
   // faint glow: the two lines down from the top shine warm at night (a byrd stirring)
@@ -1100,7 +1101,7 @@ export function buildJuField(opts = {}) {
 
 /* SPRENGJU — a carrot woken by the Relic: hovers, spins, sparks, swells to burst */
 export function buildSprengju(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const carrotM = mat(0xec7a28), leafM = mat(0x55a83c), leafM2 = mat(0x3f8a2e);
   const crackM = new THREE.MeshBasicMaterial({ color: 0xffc84a });
   const hover = new THREE.Group(); hover.position.y = 1.0; root.add(hover);   // tilt toward the target
@@ -1187,7 +1188,7 @@ function runeTexture() {
   return RUNE_TEX;
 }
 export function buildSprengjuShaving(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const tex = runeTexture();
   const crysM = toon(0x75777d, { emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 1.0 });
   const float = new THREE.Group(); float.position.y = 0.8; root.add(float);
@@ -1223,7 +1224,7 @@ export function buildSprengjuShaving(opts = {}) {
 /* SKITH GRASS — tuft of green blades with white tips (~0.5 m) */
 export function buildSkithGrass(opts = {}) {
   const rnd = mulberry32(opts.seed ?? 13);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const bladeM = mat(0xffffff, { vertexColors: true });
   const g = new THREE.ConeGeometry(0.034, 0.5, 3, 6).translate(0, 0.25, 0).scale(1, 1, 0.35);
   { const p = g.attributes.position, cols = new Float32Array(p.count * 3), green = new THREE.Color(0x4f9a36), dark = new THREE.Color(0x2f6a28), white = new THREE.Color(0xf4f6ee), c = new THREE.Color();

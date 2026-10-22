@@ -31,6 +31,8 @@ import { NPC_LOOKS } from './npcs.js';
 import { buildAngel, buildSniller } from './velki.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
+import { Colliders } from './terrain.js';
+import { createSolids, inColliders, noSolid } from './solid.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -211,6 +213,7 @@ export function createRoad(ctx) {
     for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > d.r0 && r < d.ro && inArc(d, Math.atan2(dz, dx))) return true;
     return false;
   }
+  const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
   function groundAt(x, z, y, skip) {
     let g = Math.max(heightAt(x, z), treeGround(x, z, y));
     for (const s of solids) {
@@ -222,6 +225,7 @@ export function createRoad(ctx) {
     return g;
   }
   function resolve(p, rad = PR) {
+    if (p === P.pos) auto.resolve(p, rad, PH);   // you, not the folk: they keep to the colliders placed by hand
     for (const s of solids) {
       if (p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (Math.abs(p.x - s.x) > 12 + (s.r || 0) || Math.abs(p.z - s.z) > 12 + (s.r || 0)) continue;
@@ -247,7 +251,7 @@ export function createRoad(ctx) {
       if (y < s.y0 || y > s.y1) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) return true;
     }
-    return treeSolid(x, y, z) || y < heightAt(x, z) + 0.2;
+    return treeSolid(x, y, z) || y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
   }
 
   /* ---------------- Fyrsti'Vilag, on Xikia ---------------- */
@@ -387,7 +391,7 @@ export function createRoad(ctx) {
      It goes the whole way north with them: in the market by his stall, out of the
      gate, along the road behind Buhkon, parked by every camp. */
   const CART0 = { x: 13, z: 52.5 };
-  function buildCart() { const c = buildCartModel(); scene.add(c.g); return c; }
+  function buildCart() { const c = buildCartModel(); noSolid(c.g); scene.add(c.g); return c; }   // it rolls: CART.solid is its bulk
   const CART = Object.assign(buildCart(), { pos: V3(CART0.x, 0, CART0.z), yaw: Math.PI, speed: 0, roll: 0, path: null, driver: false, loose: null });
   CART.home = CART.punks.map(pk => ({ p: pk.root.position.clone(), s: pk.root.scale.clone() }));
   CART.solid = box(CART.pos.x, CART.pos.z, 1.4, 3.2, -1, 2.4);
@@ -1714,7 +1718,7 @@ export function createRoad(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;
-    const g = groundAt(P.pos.x, P.pos.z, P.pos.y);
+    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12; }
     else if (P.onGround && P.pos.y - g < 1.2 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; }
     else P.onGround = false;
@@ -1826,6 +1830,7 @@ export function createRoad(ctx) {
   /* ---------------- per frame ---------------- */
   function update(dt, playing) {
     t += dt;
+    allSolid.update(dt);
     if (P.inCart) { P.swing = 0; tanoc.animate(dt, { speed: 0, onGround: true, t, sit: true }); } else updatePlayer(dt, playing);
     if (CART.driver) buhkon.animate(dt, { speed: 0, onGround: true, t, sit: true, reins: true, talking: false });
     else follow(B, buhkon, dt, 1.8, 2.6, 9.5, stage === 'day4');
@@ -1915,11 +1920,17 @@ export function createRoad(ctx) {
     if (at === 'escape') { resumeEscape(); return; }
     if (at === 'day1') startDay1(); else if (at === 'day2') { D1 = { pebble: true }; startDay2(); } else if (at === 'day3') { K.on = true; startDay3(); } else if (at === 'day4') { K.on = true; startDay4(); } else startMarket();
   }
+  const allSolid = createSolids(scene, {
+    col: auto, heightAt, solidAt, focus: () => P.pos,
+    // where resolve lets you go: the city, then the valley either side of the road, as far as its end
+    reach: (x, z) => z > END + 5 && z < CITY.z + CITY_R + 2 && (z >= GATE_Z - 2 || Math.abs(x - roadX(z)) < (zone(z) === 'pass' ? 30 : 48) + 3),
+  });
+
   function dispose() {
     scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
     composer.dispose && composer.dispose();
   }
-  return {
+  return { solids: allSolid,
     start, update, render: () => composer.render(), interact, prompt, jump: () => { if (P.inCart) hopDown(); else P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
     get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };

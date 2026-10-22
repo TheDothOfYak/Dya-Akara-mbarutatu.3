@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { fbm, mulberry32 } from './util.js';
 import { glowSprite } from './gfx.js';
+import { noSolid } from './solid.js';
 
 /* SUN_DIR is the LIVE direction toward the shadow-casting light (sun by day, Velki-shine by
    night). daynight.js rewrites it every frame; main places the DirectionalLight along it.
@@ -173,6 +174,7 @@ export const SKY_PALETTES = {
 export function buildSky(scene, buildShip, palName = 'golden') {
   const pal = SKY_PALETTES[palName];
   const rng = mulberry32(77);
+  const before = new Set(scene.children);
   const dome = skyDome(pal); scene.add(dome);
 
   // the sister Tatu, hanging huge and close
@@ -229,6 +231,8 @@ export function buildSky(scene, buildShip, palName = 'golden') {
     farShip = buildShip({ scale: 2.2 });
     scene.add(farShip.group);
   }
+
+  for (const o of scene.children) if (!before.has(o)) noSolid(o);   // the sky: nothing up there to bump into
 
   let flash = 0, flashT = 3;
   const U = dome.material.uniforms;

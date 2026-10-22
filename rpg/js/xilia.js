@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
@@ -329,7 +330,7 @@ export function buildXilia(scene) {
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 2600);
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), toon(0xffffff), 320);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
-  const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false);
+  const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false); noSolid(crops.mesh);   // you wade through a field, like grass
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 300);
   const keepOut = (x, z, extra = 0) => CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r + extra) || roadDist(x, z) < 5 + extra || Math.hypot(x, z) > oldEdge(x, z) - 14 || !!inField(x, z);
 
@@ -371,7 +372,7 @@ export function buildXilia(scene) {
   const water = new THREE.MeshToonMaterial({ color: 0x5ac0d8, emissive: 0x1a6a80, emissiveIntensity: 0.5, gradientMap: ramp() });
   {
     const basin = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.5, 6, 24), toon(0xcab088)); basin.rotation.x = -Math.PI / 2; basin.position.set(SQUARE.x, SQ_H + 0.4, SQUARE.z - 6); addOutline(basin, 0.05); scene.add(basin);
-    const pool = new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), water); pool.rotation.x = -Math.PI / 2; pool.position.set(SQUARE.x, SQ_H + 0.45, SQUARE.z - 6); scene.add(pool);
+    const pool = noSolid(new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), water)); pool.rotation.x = -Math.PI / 2; pool.position.set(SQUARE.x, SQ_H + 0.45, SQUARE.z - 6); scene.add(pool);
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.6, 8), toon(0xcab088)); pillar.position.set(SQUARE.x, SQ_H + 1.3, SQUARE.z - 6); addOutline(pillar, 0.04); scene.add(pillar);
     // a little bronze acorn on top — Beuhk remembers the Eikar with no hat
     const acorn = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10), toon(0xc8902a)); acorn.position.set(SQUARE.x, SQ_H + 3.1, SQUARE.z - 6); acorn.scale.y = 1.2; addOutline(acorn, 0.04); scene.add(acorn);

@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
@@ -354,7 +355,7 @@ export function buildWorld(scene) {
     g.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
-    waterMesh = new THREE.Mesh(g, waterMat); waterMesh.receiveShadow = true; scene.add(waterMesh);
+    waterMesh = noSolid(new THREE.Mesh(g, waterMat)); waterMesh.receiveShadow = true; scene.add(waterMesh);
   }
 
   /* ---------- kits ---------- */
@@ -760,7 +761,7 @@ export function buildWorld(scene) {
     fg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     fg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     fg.setIndex(idx);
-    const f = new THREE.Mesh(fg, fallMat);
+    const f = noSolid(new THREE.Mesh(fg, fallMat));   // a waterfall: you walk into it, and through
     scene.add(f);
     falls.push({ x: tx - ca * 4, y: LEVEL + 1, z: tz - sa * 4, a: a + Math.PI, top });
   }
@@ -787,7 +788,7 @@ export function buildWorld(scene) {
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400);
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);
   const farTrees = new Kit(scene, new THREE.ConeGeometry(1, 1, 5), toon(0xffffff), 1600, false);
-  const reeds = new Kit(scene, new THREE.CylinderGeometry(0.035, 0.07, 1, 3), toon(0xffffff), 1000, false);
+  const reeds = new Kit(scene, new THREE.CylinderGeometry(0.035, 0.07, 1, 3), toon(0xffffff), 1000, false); noSolid(reeds.mesh);   // you wade through reeds, like grass
   const slopeAt = (x, z) => { const h = heightAt(x, z); return Math.max(Math.abs(heightAt(x + 1.5, z) - h), Math.abs(heightAt(x, z + 1.5) - h)) / 1.5; };
   const reserved = [...JU.map(f => ({ x: f.x, z: f.z, r: f.r + 4 })), ...ALBALI.map(a => ({ x: a.x, z: a.z, r: 10 })), { x: SPIRE.x, z: SPIRE.z, r: 24 }, { x: 21, z: -31, r: 8 }];
   const wildOk = (x, z, gap = 0) => {

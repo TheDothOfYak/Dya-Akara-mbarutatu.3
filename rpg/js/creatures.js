@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
 import { buildEikar } from './actors.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 const mat = (c, o = {}) => new THREE.MeshToonMaterial(Object.assign({ color: c, gradientMap: ramp(), emissive: 0x000000 }, o));
@@ -59,7 +60,7 @@ export function buildVel() {
 
 /* ---------------- a straw training dummy ---------------- */
 export function buildDummy() {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const sack = mat(0xc8a868), wood = mat(0x6a4428), rope = mat(0x8a6a3a);
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2.2, 6), wood); post.position.y = 1.1; root.add(post);
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 0.6, 4, 8), sack); body.position.y = 1.35; root.add(body);

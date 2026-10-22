@@ -37,6 +37,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
+import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -219,7 +220,7 @@ export function buildAlbaliByrd(opts = {}) {
   const rnd = mulberry32(opts.seed ?? 7);
   const base = new THREE.Color(opts.color ?? (feral ? 0x8e8170 : 0xf4ecd8));
   if (opts.seed != null) base.offsetHSL((rnd() - 0.5) * 0.03, (rnd() - 0.5) * 0.08, (rnd() - 0.5) * 0.08);
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const plume = mat(base);
   const bellyM = mat(base.clone().lerp(new THREE.Color(0xffffff), feral ? 0.18 : 0.45));
   const wingM = mat(base.clone().multiplyScalar(feral ? 0.85 : 0.93));
@@ -368,7 +369,7 @@ export function buildAlbaliByrd(opts = {}) {
        (optional) -> stands on its legs with wings half raised.
    ================================================================= */
 export function buildKuniByrd(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = mulberry32(opts.seed ?? 3);
   const bodyC = new THREE.Color(opts.color ?? 0x5c3d24);
   if (opts.seed != null) bodyC.offsetHSL((rnd() - 0.5) * 0.04, 0, (rnd() - 0.5) * 0.08);
@@ -517,7 +518,7 @@ export function buildKuniByrd(opts = {}) {
    opts: seed (flicker phases), scale.
    ================================================================= */
 export function buildTyndael(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = mulberry32(opts.seed ?? 11);
   const fm = c => mat(c, { emissive: c, emissiveIntensity: 0.85 });
   const white = fm(0xfff3b0), yellow = fm(0xffc83a), orange = fm(0xff8a1e), red = fm(0xf0441a), crimson = fm(0xd82a4a);
@@ -679,7 +680,7 @@ function carvingTexture(age, seed, glowCol) {
 export function buildLutut(opts = {}) {
   const age = clamp01(opts.age ?? 0.5);
   const seed = opts.seed ?? 5;
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const tex = carvingTexture(age, seed);
   const skinO = { };
   if (tex) { skinO.map = tex; skinO.bumpMap = tex; skinO.bumpScale = 1.5 + 4 * age; }
@@ -848,7 +849,7 @@ export function buildLutut(opts = {}) {
    opts: seed (wing hue shift), scale.
    ================================================================= */
 export function buildRubberMcFly(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = mulberry32(opts.seed ?? 2);
   const fluff = mat(opts.color ?? 0xffe27a), fluffL = mat(0xfff2b8), beakM = mat(0xe8a020, { emissive: 0x3a2000 }), legM = mat(0xf09a30);
   const eyeM = new THREE.MeshBasicMaterial({ color: 0x140c08 }), hiM = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -995,7 +996,7 @@ function makeMakari(m) {
 const MAKARI_MIX = [0xff7ab8, 0x6ae8ff, 0xffd84a, 0x9aff6a, 0xb486ff, 0xffffff, 0xff9a5a];
 
 export function buildMakari(opts = {}) {
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const rnd = mulberry32(opts.seed ?? 4);
   const color = opts.color ?? MAKARI_MIX[Math.floor(rnd() * MAKARI_MIX.length)];
   const m = makariMats(color);
@@ -1024,7 +1025,7 @@ export function buildMakariSwarm(opts = {}) {
   const rnd = mulberry32(opts.seed ?? 9);
   const palette = Array.isArray(opts.colors) ? opts.colors : opts.colors != null ? [opts.colors] : opts.color != null ? [opts.color] : MAKARI_MIX;
   const matCache = new Map();
-  const root = new THREE.Group();
+  const root = noSolid(new THREE.Group());   // it moves, and sees to its own bumps
   const cloud = new THREE.Group(); cloud.position.y = 1.25; root.add(cloud);
   const motes = [];
   for (let i = 0; i < count; i++) {
