@@ -1790,6 +1790,7 @@ Object.assign(APPRENTICE, {
     give: [
       ['buhkon', 'Now. Those amulets. They hum, they pull Malsti Punks in from the Duat, they find their way back to you. I’d like to know why.'],
       ['buhkon', 'Bring the bag to the bench. We’ll try them against everything we’ve got and write down what they do. That’s what research is: trying things, and writing it down.'],
+      ['buhkon', 'Some of it you’ll have to fetch. Cold water from the well. The fire-stone, warmed through in the yard fire. And a lump of stygian ore — there’s a seam of it in the old workshop footings, down in the timber yard. Dig it out.'],
     ],
     obj: n => `Test the amulets at the bench with Buhkon (${n}/5)`,
     menu: 'Which test next?',
@@ -1815,6 +1816,50 @@ Object.assign(APPRENTICE, {
         ['tale', 'Two amulets laid side by side turn on the bench like compass needles — first toward each other, then slowly away, each toward a different wall.'],
         ['buhkon', 'Different directions. Different… somethings. Each one of them wants to go somewhere of its own.'],
       ] },
+    },
+    /* what a test wants before it can be tried: fetched from about the land */
+    need: {
+      water: { place: 'well', label: 'Draw a bowl of cold water from the well', short: 'well water', got: [
+        ['tale', 'He winds the bucket up from a long way down. The water is so cold it aches, and it tastes of stone.'],
+      ], ask: [['buhkon', 'With what water? The well, Tanoc. Cold, from the bottom, not the barrel by the door.']] },
+      fire: { place: 'hearth', label: 'Warm the fire-stone in the yard fire', short: 'the fire-stone, warmed', got: [
+        ['tale', 'He sets the fire-stone down in the coals. It drinks the heat like a cat in the sun, glowing brighter, and from inside it comes something very like a purr.'],
+        ['hurst', 'Mmm. More. …Why? What are we doing? Is it a nice thing?'],
+      ], ask: [['buhkon', 'Not cold. Warm it in the yard fire first, or the Hurst inside will sulk and we’ll learn nothing.']] },
+      ore: { place: 'timber', label: 'Dig the stygian ore out of the old footings', short: 'stygian ore, from the timber yard', got: [
+        ['tale', 'Under the moss on the old workshop footings, a seam of black ore runs through the stone like a vein. He works a lump of it loose with the hatchet. It is heavier than it has any right to be, and faintly warm.'],
+      ], ask: [['buhkon', 'Ore first. The old footings in the timber yard — the black seam in the stone. Bring me a lump the size of your fist.']] },
+    },
+    /* the two tests that are done, not fetched */
+    hlystAsk: [['buhkon', 'Go on, then. Your pulse — right over the bag, the way I taught you. Let’s see what it does to them.']],
+    hlystObj: 'Pulse Nur’Hlyst over the amulet bag, by Buhkon',
+    hlystHint: 'G — stay close to the bench',
+    pairOut: [
+      ['buhkon', 'Each one pointing somewhere of its own. …Take one of them away from the others. Out past the yard, on its own, and see which way it pulls.'],
+    ],
+    pairObj: 'Carry one amulet out past the yard, on its own, and see which way it pulls',
+    pairPull: [
+      ['tale', 'Out past the yard the amulet tugs in his fist like a fish on a line — north-west, hard, toward the dark edge of the north woods. When he turns away from that, it turns him back.'],
+      ['tanoc', 'That way. It wants to go that way.'],
+    ],
+    pairBackObj: 'Back to Buhkon — tell him which way it pulled',
+    pairBack: [
+      ['tanoc', 'North-west. Toward the woods. It nearly pulled me off my feet.'],
+      ['buhkon', '…North-west. Write that down too. One day we’ll go and see what’s there.'],
+    ],
+    /* writing it down: Buhkon has him say what each result means before it goes in the book */
+    notesObj: 'Write the results up in the book with Buhkon',
+    notes: {
+      intro: [['buhkon', 'Five tests. Now the important part — writing it down. And not just what happened. What it means. You tell me; I’ll write.']],
+      qs: [
+        { q: 'The water froze in a spiral, like a storm turning. What goes in the book?', a: ['They’re made of storm — weather, sealed in stone', 'They’re very cold inside', 'They don’t like water'], right: 0,
+          no: [['buhkon', 'Think about the shape of it, not the cold. What turns like that?']] },
+        { q: 'Nur’Hlyst made each one pulse — three, one, seven. What goes in the book?', a: ['They’re all broken in different ways', 'They’re counting something, each its own number', 'The pulse was too strong'], right: 1,
+          no: [['buhkon', 'Three, one, seven. Not the same, and not random. What do you do with numbers like that?']] },
+        { q: 'Away from the others, it pulled north-west. What goes in the book?', a: ['They’re all trying to get back to the bag', 'North-west is where they were made', 'Each one wants to go somewhere of its own'], right: 2,
+          no: [['buhkon', 'Side by side they turned to different walls. One alone pulls its own way. So?']] },
+      ],
+      yes: ['That’s it. In it goes.', 'Good. Written.', 'Yes. Exactly that.'],
     },
     done: [
       ['buhkon', 'Five tests, five answers, and not one of them a straight one. That’s amulets for you. We’ll keep at it — and we’ll want people who know more than we do.'],

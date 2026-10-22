@@ -1862,7 +1862,7 @@ const canHlyst = () => young() ? !!F_.yHlyst : (REGION !== 'xilia' && REGION !==
 function nurHlyst() {
   if (!canHlyst()) { toast('You don’t know how yet. (Buhkon will teach you.)', 2); return; }
   if (hlyst.cd > 0 || G.mode !== 'play') return;
-  if (apHollowPulse()) return;
+  if (apHollowPulse() || apBenchPulse()) return;
   const range = 55 * (FX.hlyst ? 1.6 : 1);
   hlyst.cd = 6; hlyst.t = 12;
   for (const m of hlyst.marks) scene.remove(m); hlyst.marks.length = 0;
@@ -5938,6 +5938,36 @@ function apHollowPulse() {
   dialog(APS.hollow.found.concat(APS.hollow.result), () => { xp(150); setObjective(); });
   return true;
 }
+/* ---------------- the amulet tests: things to fetch, a pulse at the bench, one amulet carried off on its own, and the write-up ---------------- */
+const apTestSpot = k => { const q = (world.places || {})[APS.tests.need[k].place]; return q ? V3(q.x, world.heightAt(q.x, q.z), q.z) : null; };
+const apTestsOn = () => apOn() && apStep() === AP.TESTS && F_.apGiven && REGION === 'property';
+// the fetching still to do, for tests not yet tried
+const apFetchLeft = () => Object.keys(APS.tests.need).filter(k => !(F_.apTests || {})[k] && !(F_.apGot || {})[k]);
+function apBenchPulse() {
+  if (!G.apPulseWait || !apTestsOn()) return false;
+  const b = apBuhkonNpc();
+  if (!b || P.pos.distanceTo(b.pos) > 8) { toast('Closer to the bench — the bag’s with Buhkon', 2); return true; }
+  G.apPulseWait = false; hlyst.cd = 6; sfx.sense();
+  particles.ring(P.pos.x, P.pos.y + 0.6, P.pos.z, 90, 8, { color: 0xffd27a, size: 0.6, life: 1.2, drag: 0.2 });
+  dialog(APS.tests.list.hlyst.lines, () => { F_.apTests.hlyst = true; xp(25); persist(); setObjective(); if (Object.keys(F_.apTests).length >= 5) apBuhkon(b); });
+  return true;
+}
+// one amulet out on its own: out past the yard (well away from the bag), it pulls north-west
+const apPairFar = () => { const y = world.yard; return V3(y.x, 0, y.z); };
+function apPairTick() {
+  if (!apTestsOn() || !F_.apPairOut || F_.apPairPulled || G.mode !== 'play' || interiors.inside || !world.yard) return;
+  const y = apPairFar(); if (Math.hypot(P.pos.x - y.x, P.pos.z - y.z) < 60) return;
+  F_.apPairPulled = true; persist();
+  dialog(APS.tests.pairPull, () => setObjective());
+}
+// writing it down: he says what each result means, and it goes in the book
+function apNotes(i, then) {
+  const N = APS.tests.notes;
+  if (i === 0 && !G.apNotesOn) { G.apNotesOn = true; dialog(N.intro, () => apNotes(0, then)); return; }
+  if (i >= N.qs.length) { G.apNotesOn = false; F_.apNotes = true; xp(60); persist(); toast('Written in the Carpenter’s book', 2.5); then(); return; }
+  const q = N.qs[i];
+  ask('buhkon', q.q, q.a.map((label, j) => ({ label, act: () => j === q.right ? dialog([['buhkon', N.yes[i % N.yes.length]]], () => apNotes(i + 1, then)) : dialog(q.no, () => apNotes(i, then)) })));
+}
 /* ---------------- talking to the Carpenter ---------------- */
 function apBuhkon(n) {
   const s = apStep(), B = APS;
@@ -5973,10 +6003,23 @@ function apBuhkon(n) {
       return;
     }
     case AP.TESTS: {
-      if (!F_.apGiven) { say(B.tests.give, () => { F_.apGiven = true; F_.apTests = {}; persist(); apBuhkon(n); }); return; }
-      const T = B.tests, left = Object.keys(T.list).filter(k => !(F_.apTests || {})[k]);
-      if (!left.length) { say(T.done, () => { xp(120); apAdvance(AP.HARVEST, 'harvest'); }); return; }
-      ask('buhkon', T.menu, left.map(k => ({ label: T.list[k].label, act: () => say(T.list[k].lines, () => { F_.apTests = F_.apTests || {}; F_.apTests[k] = true; xp(25); sfx.sense(); persist(); if (Object.keys(F_.apTests).length >= 5) apBuhkon(n); }) })).concat([{ label: 'Later', act: null }]));
+      if (!F_.apGiven) { say(B.tests.give, () => { F_.apGiven = true; F_.apTests = {}; F_.apGot = {}; persist(); }); return; }
+      const T = B.tests, done = F_.apTests = F_.apTests || {}, got = F_.apGot = F_.apGot || {};
+      const tested = k => { done[k] = true; xp(25); sfx.sense(); persist(); };
+      if (G.apPulseWait) { say([['buhkon', 'Go on — the pulse. Right over the bag.']]); return; }
+      if (F_.apPairOut && !done.pair) {
+        if (!F_.apPairPulled) { say([['buhkon', 'Further than that. Out past the yard, on its own.']]); return; }
+        say(T.pairBack, () => { tested('pair'); apBuhkon(n); }); return;
+      }
+      const left = Object.keys(T.list).filter(k => !done[k]);
+      if (!left.length) { if (F_.apNotes) say(T.done, () => { xp(120); apAdvance(AP.HARVEST, 'harvest'); }); else apNotes(0, () => apBuhkon(n)); return; }
+      ask('buhkon', T.menu, left.map(k => {
+        const need = T.need[k];
+        if (need && !got[k]) return { label: `${T.list[k].label} <small style="opacity:.6">— needs ${need.short}</small>`, act: () => say(need.ask) };
+        if (k === 'hlyst') return { label: T.list[k].label, act: () => say(T.hlystAsk, () => { G.apPulseWait = true; }) };
+        if (k === 'pair') return { label: T.list[k].label, act: () => say(T.list[k].lines.concat(T.pairOut), () => { F_.apPairOut = true; persist(); }) };
+        return { label: T.list[k].label, act: () => say(T.list[k].lines, () => { tested(k); if (Object.keys(done).length >= 5) apBuhkon(n); }) };
+      }).concat([{ label: 'Later', act: null }]));
       return;
     }
     case AP.CAVE: {
@@ -6140,7 +6183,12 @@ function apObjective() {
     }
     case AP.TESTS: {
       if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
-      const n = Object.keys(F_.apTests || {}).length; proObjective(head, B.tests.obj(n), 'Talk to Buhkon — he’s set up at the bench', 5, n); return;
+      const n = Object.keys(F_.apTests || {}).length, T = B.tests;
+      if (G.apPulseWait) { proObjective(head, T.hlystObj, T.hlystHint, 5, n); return; }
+      if (F_.apPairOut && !(F_.apTests || {}).pair) { proObjective(head, F_.apPairPulled ? T.pairBackObj : T.pairObj, '', 5, n); return; }
+      if (n >= 5) { proObjective(head, F_.apNotes ? 'Back to Buhkon' : T.notesObj, 'Talk to Buhkon', 5, n); return; }
+      const fetch = apFetchLeft();
+      proObjective(head, B.tests.obj(n), fetch.length ? 'Still to fetch: ' + fetch.map(k => T.need[k].short).join(' · ') : 'Talk to Buhkon — he’s set up at the bench', 5, n); return;
     }
     case AP.CAVE: {
       if (!F_.apGiven) { proObjective(head, 'Talk to Buhkon', ''); return; }
@@ -6219,7 +6267,13 @@ function apGoal() {
       if (!inBeuhk) return toTown;
       const v = npcs.find(n => n.def.id === 'venkin'); return v ? v.pos : null;
     }
-    case AP.TESTS: return bk;
+    case AP.TESTS: {
+      if (!F_.apGiven || G.apPulseWait || REGION !== 'property') return bk;
+      if (F_.apPairOut && !F_.apPairPulled && world.yard) { const y = apPairFar(), h = world.SITES.hollow, d = h ? Math.hypot(h.x - y.x, h.z - y.z) : 0; return d ? V3(y.x + (h.x - y.x) / d * 50, 0, y.z + (h.z - y.z) / d * 50) : bk; }
+      if (F_.apPairOut && !(F_.apTests || {}).pair) return bk;
+      const left = apFetchLeft().map(apTestSpot).filter(Boolean);
+      return left.length ? nearest(left) : bk;
+    }
     case AP.CAVE: { if (!F_.apGiven) return bk; if (!F_.apCaveGo) return apV ? apV.pos : bk; const c = world.cave; return c ? V3(c.x, world.heightAt(c.x, c.z), c.z) : null; }
     case AP.SOURCES: {
       if (!F_.apGiven) return bk;
@@ -6264,6 +6318,10 @@ function apInteractables() {
   const out = [];
   if (!apOn()) return out;
   if (apV && !apV.follow && apStep() === AP.CAVE && F_.apGiven && !F_.apCaveGo) out.push({ pos: apV.pos, label: APS.cave.meetLabel, act: () => dialog(APS.cave.meet, () => { F_.apCaveGo = true; persist(); apV.follow = true; dn.setHour(22); setObjective(); }), far: 3 });
+  if (apTestsOn()) for (const k of apFetchLeft()) {
+    const at = apTestSpot(k), N = APS.tests.need[k];
+    if (at) out.push({ pos: at.clone().setY(at.y + 1), label: N.label, act: () => dialog(N.got, () => { (F_.apGot = F_.apGot || {})[k] = true; sfx.ui(); xp(15); persist(); setObjective(); }), far: 4 });
+  }
   if (apStep() === AP.RIDE && oldBoat && !F_.apBoat) out.push({ pos: oldBoat.pos, label: APS.ride.look, act: () => dialog(APS.ride.found, () => { F_.apBoat = true; xp(60); persist(); setObjective(); }), far: 9 });
   return out;
 }
@@ -6308,7 +6366,7 @@ function apTick(dt) {
     festival.lamps.forEach((l, i) => { l.material.opacity = 0.7 + Math.sin(G.t * 2 + i) * 0.2; });
     if (Math.random() < 0.8) particles.emit(festival.x + (Math.random() - 0.5) * 1.6, festival.y + 3, festival.z + (Math.random() - 0.5) * 1.6, { vx: 0, vy: 4 + Math.random() * 2, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.5, life: 1.4, drag: 0.4 });
   }
-  apVenkinTick(dt); drillTick(dt);
+  apVenkinTick(dt); drillTick(dt); apPairTick();
   if (REGION === 'property' && !apV && !SAVE.arms.whip && jobState('pj_whip') === 'active' && G.mode === 'play') whipVenkin();
   if (G.mode !== 'play' || !apOn()) return;
   // Venkin is about the land in the cave and hollow steps (a reload puts him back)
