@@ -15,7 +15,7 @@
    push through).
    ============================================================ */
 import * as THREE from 'three';
-import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
+import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 import { MANOR_SPOTS } from './interiors.js';
@@ -1128,14 +1128,20 @@ export function buildProperty(scene) {
     for (let i = 0; i < n; i++) path.push([x + side - i * (2 * side / n), z - side]);
     for (let i = 0; i < n; i++) path.push([x - side, z - side + i * (2 * side / n)]);
     for (let i = 0; i < n; i++) path.push([x - side + i * (2 * side / n), z + side]);
+    const edge = [];
     path.forEach(([bx, bz], i) => {
       const sy = Math.min(TOWER_H, (i + 1) * (TOWER_H / path.length));
       blocks.put(bx, g + sy - 0.2, bz, 1.5, 0.4, 1.5, 0, 0, 0, i % 2 ? '#9a6a40' : '#a8784a');
       blocks.put(bx, g + (sy - 0.4) / 2, bz, 0.3, Math.max(0.2, sy - 0.4), 0.3, 0, 0, 0, '#6a4428');
-      // a hand-rail on the outer edge
       const ox = Math.sign(bx - x) * (Math.abs(bx - x) > 4 ? 0.7 : 0), oz = Math.sign(bz - z) * (Math.abs(bz - z) > 4 ? 0.7 : 0);
-      put2(pBox, bx + ox, g + sy + 0.45, bz + oz, 0.08, 0.9, 0.08, 0, 0, 0, '#5a3a22');
+      edge.push([bx + ox, g + sy, bz + oz]);
       col.add(bx, bz, 0.75, 0.75, 0, g + sy - 0.5, g + sy);
+    });
+    // a hand-rail all the way up the outer edge
+    railing(edge, {
+      post: (px, py, pz, h) => put2(pBox, px, py + h / 2, pz, 0.1, h, 0.1, 0, 0, 0, '#5a3a22'),
+      bar: (px, py, pz, len, ry, rz) => put2(pBox, px, py, pz, len, 0.1, 0.12, 0, ry, rz, '#6a4428'),
+      col: (cx, cz, hw, hd, ang, y0, y1) => col.add(cx, cz, hw, hd, ang, y0, y1),
     });
     towerTop.set(x, g + TOWER_H, z);
     // ivy up the north face
@@ -1231,28 +1237,25 @@ export function buildProperty(scene) {
   }
 
   /* ---------------- fences: the fields, the pasture, a garden by the house ---------------- */
+  // round the rectangle, a post every ~3 m on the ground and two rails from post to post, up and down with the land (a gap for the gate)
   function fence(f, gate) {
-    const per = 2 * (f.w + f.d), n = Math.round(per / 3.2);
-    for (let i = 0; i < n; i++) {
-      const t = i / n * per;
-      let px, pz;
-      if (t < f.w) { px = f.x - f.w / 2 + t; pz = f.z - f.d / 2; } else if (t < f.w + f.d) { px = f.x + f.w / 2; pz = f.z - f.d / 2 + (t - f.w); }
-      else if (t < 2 * f.w + f.d) { px = f.x + f.w / 2 - (t - f.w - f.d); pz = f.z + f.d / 2; } else { px = f.x - f.w / 2; pz = f.z + f.d / 2 - (t - 2 * f.w - f.d); }
-      if (gate && Math.hypot(px - gate.x, pz - gate.z) < 3) continue;
-      const g = heightAt(px, pz);
-      blocks.put(px, g + 0.6, pz, 0.2, 1.2, 0.2, 0, 0, 0, '#6a4428');
-    }
-    const rails = [[f.x, f.z - f.d / 2, f.w, 0.12], [f.x + f.w / 2, f.z, 0.12, f.d], [f.x, f.z + f.d / 2, f.w, 0.12], [f.x - f.w / 2, f.z, 0.12, f.d]];
-    for (const [rx, rz, rw, rd] of rails) {
-      const segs = Math.ceil(Math.max(rw, rd) / 6);
-      for (let k = 0; k < segs; k++) {
-        const t0 = (k + 0.5) / segs - 0.5, sx = rx + (rw > 1 ? t0 * rw : 0), sz = rz + (rd > 1 ? t0 * rd : 0);
-        if (gate && Math.hypot(sx - gate.x, sz - gate.z) < 3.5) continue;
-        const g = heightAt(sx, sz);
-        for (const ry of [0.55, 1.0]) blocks.put(sx, g + ry, sz, rw > 1 ? rw / segs : 0.1, 0.1, rd > 1 ? rd / segs : 0.1, 0, 0, 0, '#7a5232');
-        col.add(sx, sz, rw > 1 ? rw / segs / 2 : 0.12, rd > 1 ? rd / segs / 2 : 0.12, 0, g - 1, g + 1.1);
+    const C = [[f.x - f.w / 2, f.z - f.d / 2], [f.x + f.w / 2, f.z - f.d / 2], [f.x + f.w / 2, f.z + f.d / 2], [f.x - f.w / 2, f.z + f.d / 2]];
+    const runs = [[]];
+    for (let s = 0; s < 4; s++) {
+      const [ax, az] = C[s], [bx, bz] = C[(s + 1) % 4], n = Math.ceil(Math.hypot(bx - ax, bz - az) / 3.2);
+      for (let k = 0; k < n; k++) {
+        const px = ax + (bx - ax) * k / n, pz = az + (bz - az) * k / n;
+        if (gate && Math.hypot(px - gate.x, pz - gate.z) < 2.5) { if (runs[runs.length - 1].length) runs.push([]); continue; }
+        runs[runs.length - 1].push([px, heightAt(px, pz), pz]);
       }
     }
+    // the last run goes on round the corner into the first (or, with no gate, closes the ring)
+    if (runs.length > 1) runs[runs.length - 1].push(...runs.shift()); else runs[0].push(runs[0][0]);
+    for (const run of runs) railing(run, {
+      post: (px, py, pz, h) => blocks.put(px, py + h / 2 - 0.2, pz, 0.2, h + 0.4, 0.2, 0, 0, 0, '#6a4428'),
+      bar: (px, py, pz, len, ry, rz) => blocks.put(px, py, pz, len, 0.12, 0.08, 0, ry, rz, '#7a5232'),
+      col: (cx, cz, hw, hd, ang, y0, y1) => col.add(cx, cz, hw, 0.12, ang, y0 - 1, y1),
+    }, { h: 1.2, bars: [0.55, 1.0], gap: 4 });
   }
   for (const f of FIELDS) {
     fence(f, { x: f.x, z: f.z - f.d / 2 });

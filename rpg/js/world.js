@@ -9,7 +9,7 @@
    still drift in the sky.
    ============================================================ */
 import * as THREE from 'three';
-import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
+import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
@@ -536,6 +536,17 @@ export function buildWorld(scene) {
     for (let i = 0; i < 9; i++) { sy += 0.5; block(x - 6, z + 5 - i * 1.2, 3, 1.2, sy, 0, null, { base }); }
     sy += 0.5; block(x - 6, z - 6.2, 3, 3, sy, 0, null, { base });
     for (let i = 0; i < 8; i++) { sy += 0.5; block(x - 3.3 + i * 1.2, z - 6.2, 1.2, 3, Math.min(sy, H), 0, null, { base }); }
+    // a timber hand-rail up the open side of both flights, round the landing, and across the end at the top
+    const edge = [];
+    for (let i = 0; i < 9; i++) edge.push([x - 7.4, base + (i + 1) * 0.5, z + 5 - i * 1.2]);
+    edge.push([x - 7.4, base + 5, z - 7.6]);
+    for (let i = 0; i < 8; i++) edge.push([x - 3.3 + i * 1.2, base + Math.min(5.5 + i * 0.5, H), z - 7.6]);
+    edge.push([x + 5.6, base + H, z - 7.6], [x + 5.6, base + H, z - 4.8]);
+    railing(edge, {
+      post: (px, py, pz, h) => blocks.put(px, py + h / 2, pz, 0.16, h, 0.16, 0, 0, 0, '#5a3a22'),
+      bar: (px, py, pz, len, ry, rz) => blocks.put(px, py, pz, len, 0.14, 0.16, 0, ry, rz, '#6a4428'),
+      col: (cx, cz, hw, hd, ang, y0, y1) => col.add(cx, cz, hw, hd, ang, y0, y1),
+    });
     SITES.tower.coreAt = new THREE.Vector3(x + 1, base + H + 1.6, z + 1);
     SITES.tower.top = base + H;
   }

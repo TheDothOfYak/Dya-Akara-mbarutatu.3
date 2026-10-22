@@ -129,6 +129,29 @@ export const QUESTS = {
     done: ['You sat with it. I don’t think anyone’s done that in a hundred years.', 'And it gave you the ring. The lord’s oath-ring, grown right into its vines. Wear it. Make it mean something better than it did.'],
     reward: { xp: 600, shards: 250, items: { t_oath: 1 } },
   },
+  /* ---------------- the Carpenter's land: no one gives you these — you find them (alchemy.js) ----------------
+     found: what you came across; there's no one to go back to: each finishes where it ends */
+  q_glow: {
+    name: 'Lights by the Water', found: 'an old jar of glowcaps in the reeds', region: 'property', easy: true,
+    desc: 'A jar of dried glowcaps in the reeds, labelled in Buhkon’s hand: “For the dark. Two caps to a flask.” Fresh ones grow on the lakeshore. Gather some and brew the tonic at the still in the yard.',
+    goal: { type: 'count', counter: 'q_glow', n: 1 },
+    done: [['tale', 'The tonic glows in the flask like a little captured dusk. When he drinks it, the Nur in him comes back quicker, and the dark at the edges of things isn’t quite so dark.'], ['tale', 'And there’s more in the old label, small, on the back: “Four caps, a drop of oil, a twist of vine — a lantern you can wear.”']],
+    reward: { xp: 120, shards: 30, flag: 'learn_t_glowcap' },
+  },
+  q_satchel: {
+    name: 'The Drowned Satchel', found: 'a waterlogged satchel snagged under the old dock', region: 'property',
+    desc: 'A herbalist’s satchel under the dock, and in it a notebook with three pages torn out. The last page left says where the others went: “one under the red stone on the far shore; one at the top of the lookout rocks, where I watched the storm; one in the south vale, in the old hollow ash.”',
+    goal: { type: 'count', counter: 'q_satchel', n: 3 },
+    done: [['tale', 'The last page slots in. The notebook is whole again — a travelling herbalist’s, years old, the ink run but readable. Most of it is brews he already knows. One he doesn’t: a Fortune draught, “for a long road and a light purse.”'], ['tale', 'The satchel dries out stiff, but it mends. It’s a good bag. Someone walked a long way with it.']],
+    reward: { xp: 260, shards: 80, items: { t_satchel: 1 }, flag: 'learn_pt_luck' },
+  },
+  q_storm: {
+    name: 'Storm in a Bottle', found: 'a lightning-struck tree on the High Meadow', region: 'property', hard: true,
+    desc: 'Storm-glass round the roots of a tree the sky came down on — still crackling. A scorch runs off from it, north-west, the way the storm went: there’ll be more where it came down again. Three shards, then the hardest brew there is, at the still.',
+    goal: { type: 'count', counter: 'q_storm', n: 4 },
+    done: [['tale', 'The flask hums. Inside it the water turns and turns, the way the well water turned round the amulet — a storm the size of his fist, sealed in glass.'], ['buhkon', '…You made that? On your own? — Don’t drink it near the house.']],
+    reward: { xp: 450, shards: 150, flag: 'learn_t_storm' },
+  },
   /* ---------------- Leotik ---------------- */
   q_pups: {
     name: 'Kipsu Pups', giver: 'venkin', region: 'leotik',

@@ -3,7 +3,7 @@
    map — plus the trader's mat, the smith's cauldron and the
    cookfire. One panel, many pages.
    ============================================================ */
-import { ITEMS, RECIPES, FORGE, SHOP, BINDABLE_RELICS, ARMS, bindId, count, hasAll, needText } from './items.js';
+import { ITEMS, RECIPES, BREWS, FORGE, SHOP, BINDABLE_RELICS, ARMS, bindId, count, hasAll, needText } from './items.js';
 import { PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { QUESTS, JOBS, questProgress } from './quests.js';
 
@@ -66,9 +66,9 @@ export function createRpgUI(api) {
         return card(k, on ? 'Take off' : 'Wear', on ? `untrinket:${k}` : `trinket:${k}`, on);
       }).join('') : '<p class="rmuted">No trinkets yet. Chests, quests and traders have them.</p>') + `</div>`;
       const buffs = Object.entries(inv.buffs || {}).filter(([, u]) => u > S.time);
-      if (buffs.length) h += `<h3>Meal boons</h3><p>` + buffs.map(([id, u]) => `${ITEMS[id].icon} ${ITEMS[id].name} — ${Math.ceil((u - S.time) / 60)} min`).join(' · ') + `</p>`;
+      if (buffs.length) h += `<h3>Meal and potion boons</h3><p>` + buffs.map(([id, u]) => `${ITEMS[id].icon} ${ITEMS[id].name} — ${Math.ceil((u - S.time) / 60)} min`).join(' · ') + `</p>`;
     } else if (page === 'pack') {
-      const groups = [['meal', 'Meals'], ['mat', 'Materials'], ['key', 'Other']];
+      const groups = [['meal', 'Meals and potions'], ['mat', 'Materials'], ['key', 'Other']];
       h += `<div class="rstats">${shards}</div>`;
       for (const [kind, label] of groups) {
         const ids = Object.keys(inv.items).filter(k => ITEMS[k] && ITEMS[k].kind === kind);
@@ -97,7 +97,8 @@ export function createRpgUI(api) {
       h += `<h3>Story</h3><p>${esc(api.mainObjective())}</p>`;
       h += `<h3>Side quests</h3>` + (act.length ? act.map(([id]) => {
         const q = QUESTS[id], p = questProgress(id, q, S, inv);
-        return `<div class="rquest"><b>${q.name}</b> <small>from ${esc(api.npcName(q.giver))} · ${q.region === 'leotik' ? 'Leotik' : q.region === 'xilia' ? 'Beuhk' : 'Aakalay'}</small><p>${q.desc}</p>${goalText(id, q, S, inv)}<div class="xpbar"><i style="width:${p * 100}%"></i></div></div>`;
+        const where = q.region === 'leotik' ? 'Leotik' : q.region === 'xilia' ? 'Beuhk' : q.region === 'property' ? 'the Carpenter’s land' : 'Aakalay';
+        return `<div class="rquest"><b>${q.name}</b>${q.hard ? ' <em class="rmuted">· hard</em>' : q.easy ? ' <em class="rmuted">· easy</em>' : ''} <small>${q.found ? `found: ${esc(q.found)}` : `from ${esc(api.npcName(q.giver))}`} · ${where}</small><p>${q.desc}</p>${goalText(id, q, S, inv)}<div class="xpbar"><i style="width:${p * 100}%"></i></div></div>`;
       }).join('') : '<p class="rmuted">No side quests. Talk to people — anyone might need a hand.</p>');
       const b = api.bounty();
       h += `<h3>Bounty</h3>` + (b ? `<div class="rquest"><b>Hunt ${b.n} ${esc(b.name)}</b> <small>posted by ${esc(b.from)} · ${b.shards} shards</small><p class="rgoal">${Math.min(b.got, b.n)} / ${b.n}${b.got >= b.n ? ' — claim it at any bounty board' : ''}</p><div class="xpbar"><i style="width:${Math.min(1, b.got / b.n) * 100}%"></i></div></div>` : '<p class="rmuted">No bounty taken. Boards in Beuhk and the Leotik camp post hunts.</p>');
@@ -148,6 +149,14 @@ export function createRpgUI(api) {
         const R = BINDABLE_RELICS[r];
         h += `<h3>${ITEMS[r].icon} ${esc(ITEMS[r].name)} <small>— ${R.note}</small></h3><div class="rgrid">` + pieces.map(k => { const out = bindId(r, k); return ITEMS[out] ? card(out, 'Bind', count(inv, 'ore') > 0 ? `bind:${r}=${k}` : null, false, `Gives up: ${ITEMS[k].name} + ${ITEMS[r].name} + 1 Stygian ore`) : ''; }).join('') + `</div>`;
       }
+    } else if (page === 'brew') {
+      // the Carpenter's still (potions) and his bench (charms): only what you've learned, hard ones marked
+      const known = BREWS.filter(r => (S.flags || {})['learn_' + r.out]);
+      const tag = r => r.hard === 2 ? '<b style="color:#ff9a6a">Hard</b> — a lively still: keep it steady · ' : r.hard ? '<b style="color:#f3cf7a">Tricky</b> — keep the still steady · ' : '';
+      const sect = (title, list) => list.length ? `<h3>${title}</h3><div class="rgrid">` + list.map(r => card(r.out, r.craft ? 'Make' : 'Brew', hasAll(inv, r.need) ? `brew:${r.out}` : null, false, tag(r) + needText(r.need))).join('') + `</div>` : '';
+      h += `<h3>The Carpenter’s still <small>alchemy, and a few things made at his bench</small></h3><p class="rmuted">Well water from the well, honey from the hives, Zahreh from anywhere. The rest you’ll have to find.</p>`;
+      h += sect('Potions', known.filter(r => !r.craft)) + sect('Made at the bench', known.filter(r => r.craft));
+      if (!known.length) h += '<p class="rmuted">You don’t know any brews yet.</p>';
     } else if (page === 'cook') {
       h += `<h3>The cookfire <small>cook</small></h3><div class="rgrid">` + RECIPES.filter(r => (r.out !== 'tea' || (S.flags || {}).recipe_tea) && (r.out !== 'bun' || (S.flags || {}).recipe_bun)).map(r => {
         const ok = hasAll(inv, r.need);

@@ -23,7 +23,7 @@
 import * as THREE from 'three';
 import { toon, addOutline, glowSprite } from './gfx.js';
 import { buildEikar } from './actors.js';
-import { mulberry32 } from './util.js';
+import { mulberry32, railing } from './util.js';
 
 export const POCKET_X = 40000;           // every room lives out here, a long way past the edge of any land
 const ROOM_GAP = 220;
@@ -267,6 +267,14 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
   function plant(g, x, z, y = 0, s = 1) { cyl(g, x, y + 0.3 * s, z, 0.35 * s, 0.28 * s, 0.6 * s, '#a8603a', true); put(CONE, x, y + 1.0 * s, z, 0.5 * s, 1.2 * s, 0.5 * s, '#4a8a3a'); put(SPHERE, x + 0.2 * s, y + 0.9 * s, z, 0.3 * s, 0.3 * s, 0.3 * s, '#5a9a40'); }
   function stairs(g, list, rise, y0 = 0) {   // [[x, z, w, d]] climbing by `rise` each step
     list.forEach(([x, z, w, d], i) => { const top = y0 + (i + 1) * rise; box(g, x, (y0 + top) / 2, z, w, top - y0 + 0.001, d, i % 2 ? '#9a6a40' : '#a8784a', true, { shadow: false }); box(g, x, top - 0.02, z, w + 0.06, 0.06, d + 0.04, '#6a4428', false, { outline: false, shadow: false }); });
+  }
+  // a hand-rail along points [x, y, z] (the treads or floor under it): posts, a bar over them, and a collider
+  function rails(g, pts, o) {
+    railing(pts, {
+      post: (x, y, z, h) => box(g, x, y + h / 2, z, 0.08, h, 0.08, '#6a4428', false, { outline: false }),
+      bar: (x, y, z, len, ry, rz) => box(g, x, y, z, len, 0.1, 0.12, TRIM, false, { ry, rz }),
+      col: (x, z, hw, hd, ang, y0, y1) => world.col.add(g.position.x + x, g.position.z + z, hw, hd, ang, y0, y1),
+    }, o);
   }
   function portrait(g, axis, at, c, y, s, w, h, tone) {
     if (axis === 'x') { box(g, c, y, at + s * 0.06, w, h, 0.12, '#c8a040', false); box(g, c, y, at + s * 0.12, w - 0.3, h - 0.3, 0.06, tone, false, { outline: false }); box(g, c, y + 0.1, at + s * 0.15, (w - 0.3) * 0.36, (h - 0.3) * 0.4, 0.04, '#c8a07a', false, { outline: false }); }
@@ -744,6 +752,8 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       box(g, -1.65, LY + 0.95, -0.9, 17.9, 0.12, 0.16, TRIM, false); world.col.add(g.position.x - 1.65, -0.9, 8.95, 0.12, 0, LY, LY + 1.0);
       const st = []; for (let i = 0; i < 11; i++) st.push([w / 2 - 3.6, d / 2 - 2.2 - i * 0.85, 1.6, 0.85]);
       stairs(g, st, 0.42);
+      for (const ex of [w / 2 - 4.35, w / 2 - 2.85]) rails(g, st.map(([sx, sz], i) => [ex, (i + 1) * 0.42, sz]));   // railed both sides
+      rails(g, [[w / 2 - 2.75, LY, -0.9], [w / 2 - 1.1, LY, -0.9]]);   // and the loft's edge on past the top of the stair
       for (let k = 0; k < 8; k++) box(g, -8 + k * 1.4, LY + 0.45 + (k % 3 === 0 ? 0.9 : 0), -d / 2 + 2, 1.2, 0.9, 0.9, '#d8b85a', true);
       for (let k = 0; k < 6; k++) box(g, -9 + k * 1.3, LY + 0.45, -d / 2 + 3, 1.2, 0.9, 0.9, '#e0c068', true);
       // the loft hideout: a blanket, a lantern, a little stash
@@ -772,9 +782,21 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       const st = [], rise = 0.42;
       let x = -w / 2 + 1.1, z = d / 2 - 2.6;
       const legs = [[0, -1, 5], [1, 0, 6], [0, 1, 6], [-1, 0, 6], [0, -1, 6], [1, 0, 6], [0, 1, 4]];
-      for (const [dx, dz, n] of legs) for (let k = 0; k < n; k++) { st.push([x, z]); x += dx * 1.0; z += dz * 1.0; }
+      const inner = [], outer = [];   // its rails: round the open middle, and along the walls
+      let pdx = 0, pdz = 0;
+      for (const [dx, dz, n] of legs) for (let k = 0; k < n; k++) {
+        // the open side is to the left of the way up; on the turn, the rail cuts the corner round inside it (and out round the wall)
+        const top = (st.length + 1) * rise, turn = !k && st.length;
+        const ix = -dz + (turn ? -pdz : 0), iz = dx + (turn ? pdx : 0);
+        inner.push([x + ix * 0.72, top, z + iz * 0.72]); outer.push([x - ix * 0.72, top, z - iz * 0.72]);
+        st.push([x, z]); x += dx * 1.0; z += dz * 1.0; pdx = dx; pdz = dz;
+      }
       st.forEach(([sx, sz], k) => { const top = (k + 1) * rise; box(g, sx, top - 0.15, sz, 1.6, 0.3, 1.6, k % 2 ? '#9a6a40' : '#a8784a', false); box(g, sx, top - 1.2, sz, 0.2, 2.0, 0.2, '#6a4428', false, { outline: false }); world.col.add(g.position.x + sx, sz, 0.8, 0.8, 0, top - 0.3, top); });
       const LY = st.length * rise, MY = 14 * rise;
+      // railed round the open middle (a gap where the reading platform opens off it) and along the walls, on to the lookout landing's edge
+      rails(g, inner.slice(0, 12)); rails(g, inner.slice(15).concat([[1.88, LY, 0.66]]));
+      rails(g, outer.concat([[3.32, LY, 0.66], [w / 2 - 0.1, LY, 0.66]]));
+      rails(g, [[0.06, LY, d / 2 - 0.1], [0.06, LY, 0.66], [1.75, LY, 0.66]]);
       // the reading platform, off the third flight: a chair, a lamp, shelves waiting for books
       box(g, -0.4, MY - 0.15, -0.45, 4.4, 0.3, 3.7, '#8a5a36', true);
       for (let q = -2.2; q <= 1.6; q += 0.5) box(g, q, MY + 0.45, 1.35, 0.07, 0.9, 0.07, '#6a4428', false, { outline: false });
@@ -840,8 +862,11 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       lamp(g, -4.5, 2.6, -3, 0xffc070, 14, 8);
       // the net loft, up a ladder
       box(g, 4.6, 3.6, 3.6, 4.6, 0.25, 8, '#7a5a3a', true, { shadow: false });
-      const ld = []; for (let i = 0; i < 8; i++) ld.push([6.4, -5.6 + i * 0.7, 1.0, 0.7]);
+      const ld = []; for (let i = 0; i < 8; i++) ld.push([6.3, -5.6 + i * 0.7, 1.4, 0.7]);
       stairs(g, ld, 3.725 / 8);
+      // a rail up its open side, and round the loft's open edges
+      rails(g, ld.map(([sx, sz], i) => [5.55, (i + 1) * 3.725 / 8, sz]).concat([[5.55, 3.725, -0.35]]));
+      rails(g, [[5.45, 3.725, -0.35], [2.35, 3.725, -0.35], [2.35, 3.725, 7.55]]);
       for (let k = 0; k < 4; k++) put(SPHERE, 3.4 + k * 0.7, 3.95, 5, 0.3, 0.25, 0.3, '#8a7a5a');
       lamp(g, 0, h - 0.8, 2, 0xffc070, 30, 20);
       return {
