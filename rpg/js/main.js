@@ -759,40 +759,44 @@ function updateBoss(dt) {
     b.summonT = (b.phase === 2 ? 15 : 20) * (D === DIFFICULTY.realistic ? 0.85 : 1.2);
     summonMinions(b.phase === 2 ? 3 : 2, b.phase === 2 ? ['rodak', 'tyndael'] : ['rodak']);
   }
+  // it reads you as it fights: how you keep your distance, whether you step out of its rings,
+  // when you stop to drink — and it fights accordingly
+  const R = bossRead(b, dt, dP);
+  if (P.drink > 0 && dP < 12 && b.next > 0.5 && !R.punished) { b.next = 0.45; R.punished = true; }   // stopping to drink, in reach? No.
+  if (P.drink <= 0) R.punished = false;
   if (b.next <= 0 && !b.blink) {
-    const roll = Math.random();
+    const move = bossChoose(b, dP, R);
+    // where you'll be, if it's learned you step out of its rings
+    const lead = R.outs > R.hits + 1 ? 0.55 : 0, tx = P.pos.x + P.vel.x * lead, tz = P.pos.z + P.vel.z * lead;
     if (b.kind === 'duel') {
       // Otlið fights with the Oath Stone's power: a ringing sweep, oath-rings that bind, chains from the ground, sworn light
-      if (dP < 6.5 && roll < 0.4) {
+      if (move === 'sweep') {
         b.next = 2.8 * fast;
         const m = ringMesh(6, 0xffd060); m.position.set(b.pos.x, pz.y + 0.15, b.pos.z);
-        telegraphs.push({ mesh: m, x: b.pos.x, z: b.pos.z, r: 6, t: 0, dur: 0.95 * fast + 0.15, dmg: 20, kind: 'sweep' });
+        telegraphs.push({ mesh: m, x: b.pos.x, z: b.pos.z, r: 6, t: 0, dur: 0.95 * fast + 0.15, dmg: 20, kind: 'sweep', boss: true });
         b.sweep = 1;
-      } else if (roll < 0.65) {
+      } else if (move === 'oath') {
         b.next = 2.8 * fast;
-        const x = P.pos.x, z = P.pos.z;
-        const m = ringMesh(3.6, 0xffd060); m.position.set(x, world.col.ground(x, z, P.pos.y + 1) + 0.15, z);
-        telegraphs.push({ mesh: m, x, z, r: 3.6, t: 0, dur: 1.4 * fast, dmg: 12, kind: 'oath' });
-      } else if (roll < 0.85) { b.next = 3.2 * fast; slamRings(b.phase === 2 ? 5 : 3, 0xffc040, 20); b.slam = 1; }
+        const m = ringMesh(3.6, 0xffd060); m.position.set(tx, world.col.ground(tx, tz, P.pos.y + 1) + 0.15, tz);
+        telegraphs.push({ mesh: m, x: tx, z: tz, r: 3.6, t: 0, dur: 1.4 * fast, dmg: 12, kind: 'oath', boss: true });
+      } else if (move === 'slam') { b.next = 3.2 * fast; slamRings(b.phase === 2 ? 5 : 3, 0xffc040, 20); b.slam = 1; }
       else { b.next = 3.0 * fast; bossOrbs(b.phase === 2 ? 6 : 4, b.phase === 2 ? 9 : 7.5); }
     } else {
-      if (roll < 0.25) {
+      if (move === 'blink') {
         b.next = 3.4 * fast;
-        const x = P.pos.x, z = P.pos.z;
-        const m = ringMesh(5.5, 0xff5aa0); m.position.set(x, world.col.ground(x, z, P.pos.y + 1) + 0.15, z);
-        telegraphs.push({ mesh: m, x, z, r: 5.5, t: 0, dur: 1.1 * fast, kind: 'visual' });
-        b.blink = { t: 0, dur: 1.1 * fast, x, z };
+        const m = ringMesh(5.5, 0xff5aa0); m.position.set(tx, world.col.ground(tx, tz, P.pos.y + 1) + 0.15, tz);
+        telegraphs.push({ mesh: m, x: tx, z: tz, r: 5.5, t: 0, dur: 1.1 * fast, kind: 'visual', boss: true });
+        b.blink = { t: 0, dur: 1.1 * fast, x: tx, z: tz };
         particles.burst(b.pos.x, pz.y + 4, b.pos.z, 40, { color: 0x9a4aff, speed: 8, size: 0.7, life: 0.7 });
         sfx.blink();
-      } else if (roll < 0.5) { b.next = 3.4 * fast; slamRings(b.phase === 2 ? 6 : 4, 0xb070ff, 24); b.slam = 1; }
-      else if (roll < 0.72) { b.next = 3.2 * fast; bossOrbs(b.phase === 2 ? 8 : 5, b.phase === 2 ? 9.5 : 8); }
+      } else if (move === 'slam') { b.next = 3.4 * fast; slamRings(b.phase === 2 ? 6 : 4, 0xb070ff, 24); b.slam = 1; }
+      else if (move === 'orbs') { b.next = 3.2 * fast; bossOrbs(b.phase === 2 ? 8 : 5, b.phase === 2 ? 9.5 : 8); }
       else {
         // the oath: a ring of gold closes on you — step out of it before it binds
         b.next = 3.0 * fast;
-        const x = P.pos.x, z = P.pos.z;
-        const m = ringMesh(3.6, 0xffd060); m.position.set(x, world.col.ground(x, z, P.pos.y + 1) + 0.15, z);
-        telegraphs.push({ mesh: m, x, z, r: 3.6, t: 0, dur: 1.5 * fast, dmg: 12, kind: 'oath' });
-        bark('phorus', 'Out of the ring — it’s an oath!', 1.6);
+        const m = ringMesh(3.6, 0xffd060); m.position.set(tx, world.col.ground(tx, tz, P.pos.y + 1) + 0.15, tz);
+        telegraphs.push({ mesh: m, x: tx, z: tz, r: 3.6, t: 0, dur: 1.5 * fast, dmg: 12, kind: 'oath', boss: true });
+        bark('phorus', lead ? 'It’s reading you — the ring’s where you’re going!' : 'Out of the ring — it’s an oath!', 1.6);
       }
     }
   }
@@ -800,6 +804,28 @@ function updateBoss(dt) {
   const hpPct = b.hp / b.maxHp;
   $('boss-fill').style.transform = `scaleX(${hpPct})`;
   $('boss-lag').style.transform = `scaleX(${hpPct})`;
+}
+
+/* what a boss has made of you so far: time spent far off and up close (fading), rings you got out of
+   and rings that caught you, and its last few moves (it won't use the same one three times running) */
+function bossRead(b, dt, dP) {
+  const R = b.read || (b.read = { far: 0, near: 0, outs: 0, hits: 0, last: [] });
+  const fade = Math.exp(-dt / 20);
+  R.far = R.far * fade + (dP > 9 ? dt : 0); R.near = R.near * fade + (dP < 5 ? dt : 0);
+  return R;
+}
+function bossChoose(b, dP, R) {
+  const keep = R.far > R.near * 1.5 && R.far > 2, hug = R.near > R.far * 1.5 && R.near > 2;
+  const W = b.kind === 'duel'
+    ? { sweep: dP < 6.5 ? (hug ? 0.6 : 0.4) : 0, oath: keep ? 0.4 : 0.25, slam: hug ? 0.3 : 0.2, orbs: keep ? 0.3 : 0.15 }
+    : { blink: keep ? 0.45 : 0.2, slam: hug ? 0.4 : 0.25, orbs: keep ? 0.3 : 0.22, oath: 0.28 };
+  // variety: not the same thing three times running
+  const L = R.last; if (L.length >= 2 && L[L.length - 1] === L[L.length - 2] && W[L[L.length - 1]]) W[L[L.length - 1]] *= 0.1;
+  let sum = 0; for (const k in W) sum += W[k];
+  let r = Math.random() * sum, move = Object.keys(W)[0];
+  for (const k in W) { if ((r -= W[k]) <= 0) { move = k; break; } }
+  L.push(move); if (L.length > 4) L.shift();
+  return move;
 }
 
 function updateTelegraphs(dt) {
@@ -812,6 +838,7 @@ function updateTelegraphs(dt) {
     tg.mesh.material.opacity = 0.5 + Math.sin(G.t * 20) * 0.2;
     if (tg.t >= tg.dur) {
       const d = Math.hypot(P.pos.x - tg.x, P.pos.z - tg.z);
+      if (tg.boss && boss && boss.read) { if (d < tg.r) boss.read.hits++; else boss.read.outs++; }   // it notices where you went
       const air = P.pos.y - world.col.ground(P.pos.x, P.pos.z, P.pos.y);
       if (tg.kind === 'root') {
         if (d < tg.r && air < 1.2) hurtPlayer(tg.dmg * D.enemyDmg, V3(tg.x, 0, tg.z), 10);
@@ -6947,7 +6974,7 @@ window.__torcain = {
   bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, get mount() { return mount; }, toggleRide, makeMount, updateMount, torcain, projectiles, restyleAxe,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, startMegla, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy, alch, finishFound,
-  detailCull: setDetailCull, get solids() { return solids; }, ears, nav, updateNpcs, calmFoe,
+  detailCull: setDetailCull, get solids() { return solids; }, ears, nav, updateNpcs, calmFoe, updateBoss, updateTelegraphs, get bossNow() { return boss; },
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
   get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, enterRoom, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, lookAim, vineTarget, vineShoot, vineLet, rideSpace, get vines() { return P.vines; }, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
