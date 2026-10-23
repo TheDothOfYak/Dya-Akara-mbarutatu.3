@@ -2010,3 +2010,51 @@ export const WHIP = {
     [['venkin', 'Hemla says there was a Stryx handler on Velki once, before the Fall. I’ve asked everyone about her. Nobody remembers her name. I’m going to find out.']],
   ],
 };
+
+/* ================================================================
+   TOWN TALK — what the folk of Beuhk say to each other, round the
+   hearth, when they meet out walking, and when one calls at
+   another's stall or forge. You hear it if you're near enough
+   (main.js picks: their own worries first, then the hour, then you).
+   {you} is Tanoc or Torcain; {x} is a thing you've done.
+   ================================================================ */
+export const TOWN_TALK = {
+  // each one's own concerns
+  by: {
+    hemla: ['Kalo glass is up two shards a pane. Two! I said, I’m not buying the furnace, just the window.', 'I had a man in today who wanted to trade a Kofi for a lantern. A live Kofi. It ate the lantern.', 'If the barge doesn’t come by the tenth I’m selling the good tea at bad-tea prices. I’ll weep, but I’ll do it.', 'Never trust anyone who haggles before they say hello.', 'Fyrsti’Vilag prices. In Beuhk. Can you imagine.'],
+    duro: ['The cauldron’s been sulking. Iron sulks, you know. Like a cat.', 'I could forge a better hinge than that in my sleep. I have, actually. Woke up holding it.', 'Ore from the north seam is cleaner. Costs more in sweat.', 'Fire’s the easy part. Patience is the trade.', 'My arm’s good for another twenty years. My back has other plans.'],
+    venkin: ['Father says the new roof will hold. Father says that about every roof.', 'If I get the beam up by myself, he has to let me use the big hammer. That’s the deal. I think that’s the deal.', 'Did you see the Stryx today? It looked right at me. I think it likes me.', 'I’m going to ride a Punk to Fyrsti’Vilag one day. Laugh all you like.'],
+    ruut: ['Count them twice, they say. I count them four times. Still one short. Always the brainless one.', 'Punks don’t like thunder. Neither do I, come to that.', 'The young ones get into the Zahreh beds. Ama’s going to have words.', 'A good herd’s a quiet herd. Mine is not a good herd.'],
+    sefa: ['Fennek was on the roof again. The ROOF.', 'Do you think Kipsu dream? Fennek kicks in his sleep like he’s chasing something.', 'When I’m older I’m going to see the Megla Aagac. All of it. Even the scary part.'],
+    v1: ['Up before the sun and the dough still beat me to it.', 'Three dozen buns by noon and not one of them for me.', 'Zahreh petals in the bread, that’s the secret. Don’t tell anyone. Well — everyone knows. But don’t say.', 'My feet have walked to Fyrsti’Vilag and back in this kitchen.'],
+    v2: ['Rain tomorrow. I feel it in the knee. The knee is never wrong. Well. The knee is usually not wrong.', 'Kofi in the beans again. Small, quick, and they never learn.', 'The soil’s good this year. Too good. Something’s bound to go wrong.', 'If the Rodak come down from the north wood again, I’m getting a bigger dog. A much bigger dog.'],
+    v3: ['Thirty-one lamps. I’ve named them all. Don’t laugh — the third one on the pier is called Doris and she’s temperamental.', 'The old Nur Lanterns hum when nobody’s near. I swear they do.', 'Dusk is the best hour. Everyone’s on the way somewhere, and I’m the one lighting the way.', 'Mind the ladder. Everyone forgets the ladder.'],
+    v4: ['Lost another crate off the barge. The river eats them, I swear.', 'The Stryx was in a mood again. Hot seed, cold temper.', 'My shoulders know every rope on that pier.', 'Fire-tree seeds in the hold. I sleep with one eye open on barge nights.'],
+    kw1: ['A wall a day. Half a wall, some days. A good half, though.', 'The boy wants the big hammer. The boy can have the big hammer when the boy can lift the big hammer.', 'Keilia build to last. Things we put up in my grandmother’s day are still standing. Most of them.', 'Venkin’s getting good. Don’t tell him I said so.'],
+  },
+  // what anyone says at that hour
+  dawn: ['Morning already? I’d swear I just shut my eyes.', 'Mist on the river. It’ll burn off by eight.', 'Quiet, isn’t it. I like it before everyone’s up.'],
+  morning: ['Busy day. Every day’s a busy day.', 'Did you hear the Punks in the night? Ruut was up chasing one at three.', 'Market’s slow. It’ll pick up.', 'Lovely morning for it.', 'The barge is late again.'],
+  noon: ['Hot. Too hot to argue, even.', 'Have you eaten? Go and eat.', 'Half the day gone and I’ve done a quarter of it.', 'They say the Sunear’s turning this way. They always say that.'],
+  evening: ['Long day.', 'There’s nothing like the hearth after a long day.', 'Did anyone see the sky this evening? Colours like a bruise.', 'I’ll sleep well tonight. If Ruut’s Punks let me.', 'Pass the bread. No — the other bread.', 'Tomorrow, I swear, I’m doing nothing at all.'],
+  night: ['Late now.', 'Listen to that. Frogs. Or Kipsu. Or frogs.', 'Bed soon. Bed very soon.'],
+  // when you're near, and they've noticed
+  aboutYou: ['That’s {you}, isn’t it? Getting tall.', 'There goes {you}. Always somewhere to be.', '{you}’s here. Say hello, then.', 'Don’t look now, but {you}’s listening.'],
+  // when there's news of you about
+  news: ['Did you hear? {you} {x}.', 'They’re saying {you} {x}. I didn’t believe it either.', 'Our {you} {x}! Can you imagine?', 'So {you} {x}. Good for {you}, I say.'],
+  // calling at someone's stall or work: what the caller says (by whose place it is)
+  visit: {
+    hemla: ['What’s good today, Hemla? And don’t say everything.', 'I’ll take the blue cloth if it’s still a shard a length.', 'Any word from the barge?'],
+    duro: ['Is the hinge done, Duro? No rush. Well — some rush.', 'How’s the cauldron? Still sulking?', 'Could you look at this knife? It’s gone blunt as a spoon.'],
+    v1: ['Two loaves, Ama, if there’s any left.', 'Something smells wonderful in there.', 'Are the Zahreh buns out yet?'],
+    venkin: ['How’s the beam coming, Venkin?', 'Don’t fall off that thing.', 'Supper soon? It smells nearly done.'],
+    kw1: ['Orrin! How’s the wall?', 'Is that scaffold meant to lean like that?', 'Need a hand? I’ve got two, more or less.'],
+    ruut: ['How many today, Ruut?', 'Has the brainless one turned up?', 'They look happy, at least.'],
+    v4: ['Anything for me off the barge, Bosk?', 'Heavy one today?'],
+    any: ['How are you keeping?', 'Busy?', 'Just passing. Thought I’d say hello.'],
+  },
+  // and what the one at work says back
+  reply: ['Same as ever.', 'Can’t complain. Well — I can, but I won’t.', 'Ask me tomorrow.', 'Busy, busy.', 'Not bad, not bad.', 'You’re a sight for sore eyes.'],
+  // you came by hurt
+  hurt: ['{you}! You’re bleeding — sit down a moment.', 'What happened to you? Go and see to that.', 'You look half dead. Is something out there?', 'Here — lean on the wall a minute. Breathe.'],
+};

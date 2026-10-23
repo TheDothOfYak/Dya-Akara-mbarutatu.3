@@ -2650,7 +2650,7 @@ const npcName = id => { if (id === 'phorus') return 'Phorus'; const n = Object.v
 const npcSpeaker = def => { if (!STORY.SPEAKERS[def.id]) STORY.SPEAKERS[def.id] = { name: def.name, color: def.look === 'keilia' ? '#e0b070' : '#e8d8a8', sub: def.title }; return def.id; };
 
 function updateNpcs(dt) {
-  greetQuiet = Math.max(0, greetQuiet - dt);
+  greetQuiet = Math.max(0, greetQuiet - dt); overhearQuiet = Math.max(0, overhearQuiet - dt);
   townAlarm(dt);
   hearthTalk(dt);
   chanceMeetings(dt);
@@ -2795,7 +2795,16 @@ function dailyRound(n, dt) {
       if (Q && Q.face) n.yaw = Math.atan2(Q.face.x - n.pos.x, Q.face.z - n.pos.z);
       R.wait = ROAMS[act] ? (act === 'stroll' ? 2 + Math.random() * 5 : 6 + Math.random() * 7) : 1e9;
     }
-  } else if (!goal && !called && R.arrived && Q && ROAMS[act] && (R.wait -= dt) <= 0 && n.talking <= 0) R.goal = pickSpot(Q, true);
+  } else if (!goal && !called && R.arrived && Q && ROAMS[act] && (R.wait -= dt) <= 0 && n.talking <= 0) {
+    const host = act === 'stroll' && Math.random() < 0.35 ? visitFor(n) : null;
+    if (host) { const ax = n.pos.x - host.pos.x, az = n.pos.z - host.pos.z, al = Math.hypot(ax, az) || 1; R.goal = V3(host.pos.x + ax / al * 1.5, 0, host.pos.z + az / al * 1.5); R.visit = host; }
+    else { R.goal = pickSpot(Q, true); R.visit = null; }
+  }
+  // there: a word with whoever they came to see
+  if (R.visit && !R.goal && R.arrived && !n.meet) {
+    const h = R.visit; R.visit = null;
+    if (!h.hidden && !h.meet && h.pos.distanceTo(n.pos) < 3.5) { metAt.set([n.def.id, h.def.id].sort().join('|'), G.t); startMeet(n, h, 8 + Math.random() * 6, true); }
+  }
   const settled = (R.arrived || called || n.meet) && speed === 0;
   n.actor.root.position.copy(n.pos);
   if (settled && (act === 'sit' || act === 'eat' || act === 'read')) n.actor.root.position.y -= 0.26 * n.actor.root.scale.y;
@@ -2956,7 +2965,8 @@ function notice(n, dt, d, still) {
     M.greetT = G.t; greetQuiet = 7;
     const news = NEWS.filter((w, i) => i >= (M.newsSeen || 0) && (w.who === n || G.t - w.t > 25));   // word takes a little while to get round
     let line;
-    if (news.length) { const w = news[news.length - 1]; M.newsSeen = NEWS.indexOf(w) + 1; line = w.who === n ? pick(THANKS) : pick(HEARD).replace('{x}', w.text); }
+    if (P.hp < P.maxHp * 0.35) line = pick(STORY.TOWN_TALK.hurt);   // you look terrible
+    else if (news.length) { const w = news[news.length - 1]; M.newsSeen = NEWS.indexOf(w) + 1; line = w.who === n ? pick(THANKS) : pick(HEARD).replace('{x}', w.text); }
     else line = pick(M.talkedDay === (SAVE.dayN || 0) ? GREET.again : GREET[partOfDay(dn.hour)]);
     bark(npcSpeaker(n.def), line.replace('{you}', youName()), 2.8);
   }
@@ -2994,8 +3004,7 @@ function chanceMeetings(dt) {
       const key = [n.def.id, o.def.id].sort().join('|');
       if (G.t - (metAt.get(key) ?? -1e9) < 150) continue;   // they've had their word
       metAt.set(key, G.t);
-      const until = G.t + 6 + Math.random() * 6;
-      n.meet = { with: o, until, lead: true }; o.meet = { with: n, until, lead: false };
+      startMeet(n, o, 6 + Math.random() * 6, false);
       break;
     }
   }
@@ -3003,13 +3012,48 @@ function chanceMeetings(dt) {
     if (!n.meet) continue;
     const o = n.meet.with;
     n.yaw = dampAngle(n.yaw, Math.atan2(o.pos.x - n.pos.x, o.pos.z - n.pos.z), 4, dt);
-    // a few words each, by turns
-    const lead = n.meet.lead ? n : o, turn = Math.floor((G.t - (n.meet.until - 12)) / 2.8) % 2 === 0;
+    // a few words each, by turns — and if you're near, you hear them
+    const lead = n.meet.lead ? n : o, k = Math.floor((G.t - n.meet.start) / 3.2), turn = k % 2 === 0;
     n.convo = { speaking: (n === lead) === turn, at: o.pos, nod: (n.nodT = (n.nodT || 0) - dt) > 0 ? 1 : 0 };
     if (!n.convo.speaking && n.nodT < -2 && Math.random() < dt * 0.5) n.nodT = 1;
+    if (n === lead && n.meet.k !== k) { n.meet.k = k; const sp = turn ? lead : o; overhear(sp, n.meet.visit ? (sp === lead ? 'visit' : 'reply') : 'meet'); }
   }
 }
 const metAt = new Map();
+function startMeet(n, o, dur, visit) {
+  const until = G.t + dur, start = G.t;
+  n.meet = { with: o, until, start, lead: true, visit, k: -1 }; o.meet = { with: n, until, start, lead: false, visit, k: -1 };
+}
+/* out for a stroll, they call on someone at their work — the stall, the forge, the ovens, the scaffold, the pen */
+const POSTS = { post: 1, scaffold: 1, pen: 1, pier: 1 };
+function visitFor(n) {
+  const hosts = npcs.filter(o => o !== n && !o.hidden && !o.meet && o.rt && o.rt.arrived && o.rt.plan && POSTS[o.rt.plan.place] && o.pos.distanceTo(n.pos) < 70 && G.t - (metAt.get([n.def.id, o.def.id].sort().join('|')) ?? -1e9) > 240);
+  return hosts.length ? pick(hosts) : null;
+}
+/* what's said: their own concerns, the hour, news of you, you yourself — and when calling on someone, the errand */
+let overhearQuiet = 0;
+const lately = [];   // what's been said just now (nobody says the same thing twice running)
+function fresh(pool, n) {
+  const own = n.def.name.replace(/^Old /, '');
+  const ok = pool.filter(l => !lately.includes(l) && !l.includes(own));   // (and nobody talks about themselves by name)
+  const l = pick(ok.length ? ok : pool);
+  lately.push(l); if (lately.length > 8) lately.shift();
+  return l;
+}
+function townLine(n, kind) {
+  const T = STORY.TOWN_TALK, r = Math.random(), w = NEWS[NEWS.length - 1];
+  if (kind === 'visit') return fresh(T.visit[n.meet && n.meet.with.def.id] || T.visit.any, n);
+  if (kind === 'reply') return fresh(T.reply, n);
+  if (w && G.t - w.t < 900 && G.t - w.t > 20 && r < 0.25) return fresh(T.news, n).replace('{x}', w.text);
+  if (P.pos.distanceTo(n.pos) < 6 && r < 0.35) return fresh(T.aboutYou, n);
+  if (r < 0.7 && T.by[n.def.id]) return fresh(T.by[n.def.id], n);
+  return fresh(T[partOfDay(dn.hour)], n);
+}
+function overhear(n, kind) {
+  if (overhearQuiet > 0 || G.mode !== 'play' || n.hidden || n.pos.distanceTo(P.pos) > 9) return;
+  overhearQuiet = 4.5; greetQuiet = Math.max(greetQuiet, 3);
+  bark(npcSpeaker(n.def), townLine(n, kind).split('{you}').join(youName()), 3.2);
+}
 
 /* round the hearth (or anywhere a few of them have settled to chat or eat together): one talks at a
    time, a few breaths each, and the rest look at them and nod along */
@@ -3028,6 +3072,7 @@ function hearthTalk(dt) {
     if (!c || !g.includes(c.speaker) || (c.t -= dt) <= 0) {
       const next = g.filter(n => !c || n !== c.speaker);
       c = { speaker: pick(next.length ? next : g), t: 2.5 + Math.random() * 4 }; convos.set(k, c);
+      overhear(c.speaker, 'hearth');
     }
     for (const n of g) {
       n.nodT = (n.nodT || 0) - dt; if (n !== c.speaker && n.nodT < -2 && Math.random() < dt * 0.5) n.nodT = 1.1;   // mm-hm
