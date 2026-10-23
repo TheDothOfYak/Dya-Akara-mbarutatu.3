@@ -1881,7 +1881,7 @@ export function createRoad(ctx) {
     if (EV.cart && EV.cart.state === 'carry') EV.cart.wheel.rotation.x += Math.hypot(P.vel.x, P.vel.z) * dt / 0.6;   // turning as he rolls it
     // the hat: walking up to it is enough — no button to find in the blur
     if (MK && sub === 'hat' && MK.hat && playing && ((MK.hatT = (MK.hatT || 0) + dt) > 45 || Math.hypot(MK.hat.pos.x - P.pos.x, MK.hat.pos.z - P.pos.z) < 1.6)) { sfx.ui(); marketHatOn(); }   // (and if he never gets there, the moment passes anyway)
-    if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos, player: P });
+    if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos, player: P, swing: P.swing > 0 });
     kit.update(t, dt, particles);
     if (stage === 'market') fountain.update(dt, t, particles, MK && MK.esc ? [] : [P.pos]);
     if (stage === 'market' && MK && MK.esc && playing) escTick(dt);

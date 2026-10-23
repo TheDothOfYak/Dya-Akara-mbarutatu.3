@@ -459,7 +459,10 @@ export function createVelki(ctx) {
   /* ---------------- particles and post ---------------- */
   const particles = new Particles(scene, 4500);
   war = createSkyWar({ scene, particles, center: V3(BATTLE.x, 46, BATTLE.z), spread: [230, 44, 150], count: 12, size: [2.6, 4.2], vis: 0.1,
-    onBlink: p => { if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 160) sfx.blink(); } });
+    onBlink: p => { if (Math.hypot(P.pos.x - p.x, P.pos.z - p.z) < 160) sfx.blink(); },
+    // a strike in the sky: the whole street stops and looks (not every one — and not more than every few seconds)
+    onStrike: p => { if (t - (lastStartle || -9) > 5) { lastStartle = t; crowd.startle(p, 320); } } });
+  let lastStartle = -9;
   const cine = createCine(camera, { blocked: (x, y, z) => solidAt(x, y, z) });
   const composer = ctx.makeComposer(scene);
   function resize() { particles.setScale(innerHeight * Math.min(devicePixelRatio, 1.75) * 0.9); }

@@ -782,13 +782,23 @@ export function createEnemies(ctx) {
       wantPos = V3(P.pos.x + Math.cos(e.orbit) * 8, 0, P.pos.z + Math.sin(e.orbit) * 8);
       wantAlt = 6.5 * Math.max(1, AM * 0.5);
       e.cd -= dt;
-      if (e.cd <= 0) { e.state = 'rise'; e.timer = 0.65 * D().windup; }
+      // ready: but one dive at a time, and from where you can't see it coming — it works round behind you first
+      const other = list.some(o => o !== e && !o.dead && o.T.ai === 'flyer' && (o.state === 'stalk' || o.state === 'rise' || o.state === 'dive') && o.pos.distanceTo(e.pos) < 30);
+      if (e.cd <= 0 && other) e.cd = 0.6 + Math.random() * 0.8;
+      else if (e.cd <= 0) { e.state = 'stalk'; e.timer = 3.5; }
       if (d > 50) e.state = 'return';
+    } else if (e.state === 'stalk') {
+      e.timer -= dt;
+      const back = (P.yaw || 0) + Math.PI, bx = P.pos.x + Math.sin(back) * 9, bz = P.pos.z + Math.cos(back) * 9;
+      wantPos = V3(bx, 0, bz); wantAlt = 7 * Math.max(1, AM * 0.5); sp = T.speed * 1.2;
+      if (Math.hypot(bx - e.pos.x, bz - e.pos.z) < 2.5 || e.timer <= 0) { e.state = 'rise'; e.timer = 0.65 * D().windup; }
     } else if (e.state === 'rise') {
       e.timer -= dt; e.windup = 1; wantAlt = 8.5; wantPos = e.pos.clone();
       if (e.timer <= 0) {
         e.state = 'dive'; e.timer = 1.0; e.hitDone = false;
-        const tgt = V3(P.pos.x, P.pos.y + 1, P.pos.z);
+        // where you'll be when it gets there, not where you are (it has watched how you move)
+        const lead = e.pos.distanceTo(P.pos) / 24 * 0.7;
+        const tgt = V3(P.pos.x + P.vel.x * lead, P.pos.y + 1, P.pos.z + P.vel.z * lead);
         const from = V3(e.pos.x, e.pos.y, e.pos.z);
         e.diveVel = tgt.sub(from).normalize().multiplyScalar(24);
       }

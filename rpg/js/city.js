@@ -489,8 +489,17 @@ export function createCrowd(o) {
   }
   const here = p => !p.plan.length && p.spot && p.pos.distanceTo(V3(p.spot.x, p.pos.y, p.spot.z)) < 2.5;
   const others = []; let you = null;
+  /* something happens (a flash in the sky, a crash): everyone out and about stops and looks — the nosy
+     longer — and a few gasp out loud */
+  function startle(at, range = 150) {
+    for (const p of people) {
+      if (p.gone || p.inside > 0 || p.run || p.pos.distanceTo(at) > range) continue;
+      if (rng() > 0.55 + p.me.curious * 0.45) continue;
+      p.startle = { at: at.clone ? at.clone() : V3(at.x, at.y || 0, at.z), t: 1.6 + p.me.curious * 2.5 + rng(), gasp: rng() < 0.4 };
+    }
+  }
   return {
-    people, spawn, panic, think, route,
+    people, spawn, panic, think, route, startle,
     update(dt, t, opts = {}) {
       you = opts.player ? { pos: opts.player.pos, vx: opts.player.vel ? opts.player.vel.x : 0, vz: opts.player.vel ? opts.player.vel.z : 0 } : null;
       // who's at a stall: the keeper turns to serve them
@@ -503,6 +512,23 @@ export function createCrowd(o) {
           if (opts.freeze) continue;
           p.inside -= dt;
           if (p.inside <= 0) { p.inside = 0; p.a.root.visible = true; p.wait = 0.5 + rng(); think(p); }
+          continue;
+        }
+        // you, doing something worth a look: tearing past at a run, or swinging that hatchet about
+        if (you && !p.run && !p.fixed && !p.startle && !opts.freeze && (p.eyedT = (p.eyedT || 0) - dt) <= 0) {
+          const yd = you.pos.distanceTo(p.pos), ys = Math.hypot(you.vx, you.vz);
+          if ((ys > 8 && yd < 3.5) || (opts.swing && yd < 4.5)) {
+            p.eyedT = 8; p.startle = { at: you.pos.clone(), t: 1.2 + p.me.curious * 1.5, gasp: !!opts.swing && rng() < 0.5 };
+            if (opts.swing) { const ax = p.pos.x - you.pos.x, az = p.pos.z - you.pos.z, al = Math.hypot(ax, az) || 1; stepAround(p.pos, ax / al * 0.6, az / al * 0.6, resolve, p); }   // and a step back
+          }
+        }
+        if (p.startle) {   // stopped dead, looking at it
+          const S = p.startle; S.t -= dt;
+          const rel = angDiff(p.yaw, Math.atan2(S.at.x - p.pos.x, S.at.z - p.pos.z));
+          if (Math.abs(rel) > 1.1) p.yaw = dampAngle(p.yaw, Math.atan2(S.at.x - p.pos.x, S.at.z - p.pos.z), 3, dt);
+          p.a.root.position.copy(p.pos); p.a.root.rotation.y = p.yaw;
+          p.a.animate(dt, { speed: 0, onGround: true, t: t + p.ph, talking: S.gasp && S.t > 1, gaze: clamp(rel, -1.1, 1.1), gazeUp: clamp(((S.at.y || 0) - p.pos.y) / Math.max(4, p.pos.distanceTo(S.at)) * 1.2, 0, 0.6) });
+          if (S.t <= 0) p.startle = null;
           continue;
         }
         if (!p.frozen && !opts.freeze && !p.run && p.errand === 'queue' && !p.plan.length) {
