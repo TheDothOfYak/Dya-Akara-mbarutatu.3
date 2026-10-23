@@ -146,20 +146,20 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
   /* ---- the town in it ----
      Folk live inside the tree: its rooms are hollowed out of the trunk and the great limbs, and all you see of them
      from outside is windows and doors set into the bark, lit at dusk. Round the outside the great stair winds up the
-     trunk; where it reaches a level, a balcony juts from the bark with doors in. Out where the branches are too thin
+     trunk; where it reaches a level, a great deck rings the bark, with houses on it and doors in. Out where the branches are too thin
      to live inside, cabins perch on them, and long plank bridges hang between those, high in the boughs. */
   let decksOut = [], stair = null;
   const deckHouses = [], perches = [];
   if (town > 0) {
     const wood = 0x8a6040, plank = 0xa87a50, roofs = opts.roofs ?? [0x8a3a2a, 0x6a4a8a, 0x3a6a7a, 0xa8642a, 0x5a7a3a], walls = [0xe8d8b8, 0xd8c098, 0xf0e4c8, 0xc8b090];
     const floorM = toon(plank, { side: THREE.DoubleSide }), fasciaM = toon(wood, { side: THREE.DoubleSide });
-    const houseB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 160);
-    const roofB = batch(root, new THREE.ConeGeometry(0.75, 1, 4).rotateY(Math.PI / 4), toon(0xffffff), 160);
+    const houseB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 260);
+    const roofB = batch(root, new THREE.ConeGeometry(0.75, 1, 4).rotateY(Math.PI / 4), toon(0xffffff), 260);
     const winB = batch(root, new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffd9a0, side: THREE.DoubleSide }), 900, { shadow: false });
-    const postB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 3600, { shadow: false });
+    const postB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 6400, { shadow: false });
     const stepB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 700, { shadow: true });
     const ropeB = batch(root, new THREE.CylinderGeometry(1, 1, 1, 5, 1).translate(0, 0.5, 0), toon(0x6a5a40), 1400, { shadow: false });
-    const archB = batch(root, new THREE.TorusGeometry(1, 0.16, 5, 12, Math.PI), toon(0x5a3a24), 220, { shadow: false });
+    const archB = batch(root, new THREE.TorusGeometry(1, 0.16, 5, 12, Math.PI), toon(0x5a3a24), 500, { shadow: false });
     // a door set into the bark, round-topped, with a frame; facing out along angle a, base at height y
     const barkDoor = (a, y, w = 2.0, h = 3.0) => {
       const r = rAt(y + h * 0.5, a) - 0.05, fx = Math.cos(a), fz = Math.sin(a), ry = -a + Math.PI / 2;
@@ -178,35 +178,66 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       if (rnd() < 0.35) postB.put(fx * (r + 0.3), y - h * 0.5 + 0.1, fz * (r + 0.3), w + 0.1, 0.3, 0.3, 0, ry + Math.PI / 2, 0, [0xd8604a, 0xe8c048, 0xc87ad8][Math.floor(rnd() * 3)]);
     };
 
-    // the levels the stair reaches, each with its balcony (a partial deck, on the side the stair arrives)
+    // the levels the stair reaches: each a great deck right round the trunk, wider than the bark there, with houses
+    // on it backed onto the bark and doors between them into the rooms inside
     const deckYs = (opts.decks ?? [0.08, 0.17, 0.27, 0.38, 0.5]).map(f => H * f).slice(0, Math.max(1, Math.round(5 * town)));
     const decks = [];
     const stTop = deckYs[deckYs.length - 1], stTurns = Math.max(2, stTop / 28);
     const stairA = y => (y - 0.5) / stTop * stTurns * TAU + 0.4;
-    // (the stair comes up through the inner edge of each balcony, so a slot is left open just behind where it arrives)
+    // the heights at which the stair passes round angle a (so nothing is built across it)
+    const stairYs = a => { const out = [], span = stTurns * TAU; for (let k = -1; k <= Math.ceil(stTurns) + 1; k++) { const t = (((a - 0.4) % TAU + TAU) % TAU + k * TAU) / span; if (t >= 0 && t <= 1) out.push(0.5 + t * stTop); } return out; };
+    const stairIn = (a, y0, y1) => stairYs(a).some(s => s > y0 && s < y1);
+    // (the stair comes up through the inner edge of each deck, so a slot is left open just behind where it arrives)
     const WELL0 = -0.6, WELL1 = 0.05;
-    const span = opts.balcony ?? 1.7;
+    const angDiff = (p, q) => Math.atan2(Math.sin(p - q), Math.cos(p - q));
     for (let di = 0; di < deckYs.length; di++) {
-      const y = deckYs[di], sa = stairA(y), r0 = rAt(y, sa), w = Math.max(6, (opts.deckW ?? R * 0.9) * (di === deckYs.length - 1 ? 0.85 : 0.6)), ro = r0 + w, rw = r0 + 3.4;
-      const A0 = sa - span * 0.42, A1 = sa + span * 0.58;
+      const y = deckYs[di], sa = stairA(y), r0 = rAt(y, sa), rw = r0 + 3.4;
+      let rMin = Infinity, rMax = 0;
+      for (let k = 0; k < 64; k++) { const q = rAt(y, k / 64 * TAU); rMin = Math.min(rMin, q); rMax = Math.max(rMax, q); }
+      const w = Math.max(7, opts.deckW ?? R * 0.9), ro = Math.max(r0, rMax) + w;
+      const A0 = sa - Math.PI, A1 = sa + Math.PI;
       const ring = (ri, rO, a0, a1) => { if (a1 - a0 < 0.01) return; const m = new THREE.Mesh(new THREE.RingGeometry(ri, rO, Math.max(6, Math.round((a1 - a0) * 20)), 1, -a1, a1 - a0).rotateX(-Math.PI / 2), floorM); m.position.y = y; m.receiveShadow = true; root.add(m); };
       ring(rw, ro, A0, A1);
-      ring(r0 * 0.9, rw, A0, sa + WELL0); ring(r0 * 0.9, rw, sa + WELL1, A1);
-      // its edge, its brackets down into the bark, its rail (round the front and down both ends)
-      { const f = new THREE.Mesh(new THREE.CylinderGeometry(ro, ro, 1.0, Math.max(8, Math.round(span * 16)), 1, true, Math.PI / 2 - A1, A1 - A0), fasciaM); f.position.y = y - 0.5; root.add(f); }
-      for (let k = 0; k <= 5; k++) { const a = A0 + (A1 - A0) * k / 5; limbs.seg(V3(Math.cos(a) * ro * 0.95, y - 0.8, Math.sin(a) * ro * 0.95), V3(Math.cos(a) * r0 * 0.92, y - w * 1.1, Math.sin(a) * r0 * 0.92), 0.4, 0.4, wood); }
-      const nP = Math.max(4, Math.round(ro * (A1 - A0) / 1.8));
-      for (let k = 0; k <= nP; k++) { const a = A0 + (A1 - A0) * k / nP; postB.put(Math.cos(a) * (ro - 0.3), y + 0.6, Math.sin(a) * (ro - 0.3), 0.18, 1.2, 0.18, 0, -a, 0, wood); }
-      for (const a of [A0, A1]) for (let q = rw; q < ro; q += 1.5) postB.put(Math.cos(a) * q, y + 0.6, Math.sin(a) * q, 0.18, 1.2, 0.18, 0, -a, 0, wood);
-      // a top rail along the front
-      for (let k = 0; k < nP; k++) { const a = A0 + (A1 - A0) * (k + 0.5) / nP; postB.put(Math.cos(a) * (ro - 0.3), y + 1.2, Math.sin(a) * (ro - 0.3), 0.14, 0.12, ro * (A1 - A0) / nP + 0.1, 0, -a, 0, wood); }
-      // doors into the rooms behind the bark, off the balcony (clear of where the stair comes up)
-      const nd = 2 + Math.floor(rnd() * 2);
-      for (let k = 0; k < nd; k++) { const a = sa + 0.35 + (A1 - sa - 0.5) * (k + 0.5) / nd; barkDoor(a, y + 0.02); postB.put(Math.cos(a + 0.12) * (rAt(y + 2.4, a) + 0.4), y + 2.8, Math.sin(a + 0.12) * (rAt(y + 2.4, a) + 0.4), 0.3, 0.4, 0.3, 0, 0, 0, 0xffc870); }
-      decks.push({ y, ro, r0, a0: A0, a1: A1 });
+      ring(rMin * 0.9, rw, A0, sa + WELL0); ring(rMin * 0.9, rw, sa + WELL1, A1);
+      // its edge, its struts down into the bark (none across the stair below), its rail all the way round
+      { const f = new THREE.Mesh(new THREE.CylinderGeometry(ro, ro, 1.0, 96, 1, true), fasciaM); f.position.y = y - 0.5; root.add(f); }
+      const drop = Math.min(w * 0.9, 7);
+      for (let k = 0; k < 18; k++) {
+        const a = k / 18 * TAU; if (stairIn(a, y - drop - 2.6, y + 0.5)) continue;
+        limbs.seg(V3(Math.cos(a) * ro * 0.95, y - 0.8, Math.sin(a) * ro * 0.95), V3(Math.cos(a) * rAt(y - drop, a) * 0.95, y - drop, Math.sin(a) * rAt(y - drop, a) * 0.95), 0.4, 0.4, wood);
+      }
+      const nP = Math.round(ro * TAU / 1.8);
+      for (let k = 0; k < nP; k++) {
+        const a = k / nP * TAU;
+        postB.put(Math.cos(a) * (ro - 0.3), y + 0.6, Math.sin(a) * (ro - 0.3), 0.18, 1.2, 0.18, 0, -a, 0, wood);
+        const b = (k + 0.5) / nP * TAU;
+        postB.put(Math.cos(b) * (ro - 0.3), y + 1.2, Math.sin(b) * (ro - 0.3), 0.14, 0.12, ro * TAU / nP + 0.1, 0, -b, 0, wood);
+      }
+      // round the deck against the bark: houses, and doors into the rooms behind it, clear of the stair
+      const nH = Math.max(6, Math.round(rMax * TAU / 9));
+      for (let k = 0; k < nH; k++) {
+        const a = (k + 0.5) / nH * TAU + sa + (rnd() - 0.5) * 0.1, rb = rAt(y + 1, a);
+        const hw = Math.min(3 + rnd() * 2.4, rb * TAU / nH - 1.2), hh = 3.2 + rnd() * 2.4, hd = 3 + rnd() * 1.4, top = hh + hw * 0.64;
+        const half = (Math.max(hw, hd) * 0.62 + 1.2) / rb, nearArrival = angDiff(a, sa) > WELL0 - 0.4 - half && angDiff(a, sa) < 0.7 + half;
+        const clear = (y0, y1) => !nearArrival && [-half, 0, half].every(q => !stairIn(a + q, y0, y1));
+        if (hw > 2.4 && rnd() < 0.7 && clear(y - 2.6, y + top + 0.8)) {
+          const d = rb + hd * 0.5 - 0.3, hx = Math.cos(a) * d, hz = Math.sin(a) * d, ry = -a + Math.PI / 2;
+          deckHouses.push({ x: x + hx, z: z + hz, y: g + y, r: Math.max(hw, hd) * 0.62, h: top });
+          houseB.put(hx, y + hh / 2, hz, hw, hh, hd, 0, ry, 0, walls[Math.floor(rnd() * walls.length)]);
+          roofB.put(hx, y + hh + hw * 0.32, hz, hw * 1.35, hw * 0.64, hd * 1.35, 0, ry, 0, roofs[Math.floor(rnd() * roofs.length)]);
+          // two lit windows and a door on the outward face
+          const fx = Math.cos(a), fz = Math.sin(a), sx = -Math.sin(a), sz = Math.cos(a), fo = hd * 0.5 + 0.02;
+          for (const s of [-1, 1]) winB.put(hx + fx * fo + sx * s * hw * 0.28, y + hh * 0.62, hz + fz * fo + sz * s * hw * 0.28, 0.7, 0.8, 1, 0, ry + Math.PI / 2, 0);
+          postB.put(hx + fx * fo, y + 0.9, hz + fz * fo, 0.9, 1.8, 0.08, 0, ry + Math.PI / 2, 0, 0x5a3a24);
+        } else if (clear(y - 2.6, y + 3.6)) {
+          barkDoor(a, y + 0.02);
+          postB.put(Math.cos(a + 0.12) * (rAt(y + 2.4, a) + 0.4), y + 2.8, Math.sin(a + 0.12) * (rAt(y + 2.4, a) + 0.4), 0.3, 0.4, 0.3, 0, 0, 0, 0xffc870);
+        }
+      }
+      decks.push({ y, ro, r0, rin: rMin, a0: A0, a1: A1 });
     }
     decksOut = decks.map(d => Object.assign(d, { well: [stairA(d.y) + WELL0, stairA(d.y) + WELL1] }));
-    // the rooms inside the trunk: windows all the way up it, in loose storeys, avoiding the stair and the balconies
+    // the rooms inside the trunk: windows all the way up it, in loose storeys, avoiding the stair and the decks
     {
       const topW = Math.min(H * 0.62, stTop + H * 0.22);
       for (let y = 5; y < topW; y += (3.6 + rnd() * 1.4) * Math.max(1, R / 14)) {
@@ -216,7 +247,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
           const a = k / n * TAU + rnd() * 0.25 + y * 0.07;
           const sd = Math.atan2(Math.sin(a - stairA(Math.min(y, stTop))), Math.cos(a - stairA(Math.min(y, stTop))));
           if (y < stTop + 3 && Math.abs(sd) < 0.35) continue;                                   // the stair runs past here
-          if (decks.some(d => y > d.y - 1 && y < d.y + 3.6 && Math.atan2(Math.sin(a - (d.a0 + d.a1) / 2), Math.cos(a - (d.a0 + d.a1) / 2)) * 2 < (d.a1 - d.a0) + 0.2 && Math.abs(Math.atan2(Math.sin(a - (d.a0 + d.a1) / 2), Math.cos(a - (d.a0 + d.a1) / 2))) * 2 < (d.a1 - d.a0) + 0.2)) continue;
+          if (decks.some(d => y > d.y - 1 && y < d.y + 9.5)) continue;                         // a deck, and the houses on it
           barkWindow(a, y + 1.8, (1.3 + rnd() * 0.7) * Math.max(1, R / 14), (1.8 + rnd() * 0.8) * Math.max(1, R / 14));
         }
       }
@@ -246,6 +277,15 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         }
         // brackets under it into the bark, now and then
         if (i % 12 === 6) limbs.seg(V3(Math.cos(a) * (r + 1.2), y - 0.2, Math.sin(a) * (r + 1.2)), V3(Math.cos(a) * (r - 1.8), y - 3, Math.sin(a) * (r - 1.8)), 0.22, 0.22, wood);
+      }
+      // where the stair runs over a root, the root's collider stays under its steps
+      for (const c of colliders.slice(1)) {
+        const lx = c.x - x, lz = c.z - z, dist = Math.hypot(lx, lz), ca = Math.atan2(lz, lx), da = Math.min(1, c.r / dist);
+        for (const q of [-da, 0, da]) for (const ys of stairYs(ca + q)) {
+          if (ys < c.y0 - g || ys > c.y1 - g + 2) continue;
+          const rb = rAt(ys, ca + q); if (dist + c.r < rb || dist - c.r > rb + 3.2) continue;
+          c.y1 = Math.min(c.y1, g + ys - 0.3);
+        }
       }
     }
     // out on the thin ends of the limbs, too thin to live inside: cabins perched on platforms
@@ -280,16 +320,18 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       const d = A.p.distanceTo(B.p); if (d < 8 || d > H * 0.9) continue;
       bridge(V3(A.p.x, A.p.y + 0.2, A.p.z), V3(B.p.x, B.p.y + 0.2, B.p.z));
     }
-    // rope lifts hanging from the limbs, with a basket on its way up
+    // rope lifts hanging from the limbs, with a basket on its way up (out past the decks' rails)
+    const deckEdge = Math.max(...decks.map(d => d.ro));
     for (let k = 0; k < 6; k++) {
-      const a = rnd() * TAU, d = rAt(H * 0.3, a) + R * (1 + rnd()), top = H * (0.45 + rnd() * 0.15);
+      const a = rnd() * TAU, d = Math.max(rAt(H * 0.3, a) + R * (1 + rnd()), deckEdge + 1.5 + rnd() * R * 0.5), top = H * (0.45 + rnd() * 0.15);
       ropeB.seg(V3(Math.cos(a) * d, 0, Math.sin(a) * d), V3(Math.cos(a) * d, top, Math.sin(a) * d), 0.12, 0.12);
       postB.put(Math.cos(a) * d, H * (0.1 + rnd() * 0.25), Math.sin(a) * d, 2, 1.4, 2, 0, a, 0, wood);
     }
-    // banners down the bark
+    // banners hung from the rims of the decks, well clear of the deck below
     if (opts.banners) for (let k = 0; k < opts.banners.length * 2; k++) {
-      const a = k / (opts.banners.length * 2) * TAU + 0.2, y = H * 0.12 + (k % 2) * H * 0.1, r = rAt(y, a) + 0.4;
-      const b = new THREE.Mesh(new THREE.PlaneGeometry(4, 14), toon(opts.banners[k % opts.banners.length], { side: THREE.DoubleSide }));
+      const di = Math.min(decks.length - 1, 1 + (k % 2)), D = decks[di], top = D.y - 0.9, L = Math.min(12, (D.y - (di ? decks[di - 1].y : 0)) * 0.55);
+      const a = k / (opts.banners.length * 2) * TAU + 0.2, y = top - L / 2, r = D.ro + 0.08;
+      const b = new THREE.Mesh(new THREE.PlaneGeometry(4, L), toon(opts.banners[k % opts.banners.length], { side: THREE.DoubleSide }));
       b.position.set(Math.cos(a) * r, y, Math.sin(a) * r); b.rotation.y = -a + Math.PI / 2; root.add(b);
     }
     // a great door in the foot of the trunk, facing where the folk come from
@@ -302,7 +344,8 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     for (const b of [houseB, roofB, winB, postB, stepB, ropeB, archB]) b.done();
   }
   limbs.done(); leafB.done();
-  // decks: the balconies ({ y, r0, ro, a0, a1, well } above the foot — each a partial deck from a0 to a1, anticlockwise),
+  // decks: the great decks ({ y, r0, rin, ro, a0, a1, well } above the foot — right round, a0 to a1 anticlockwise, the bark
+  // r0 where the stair arrives and rin at its narrowest),
   // the stair ({ top, turns, a0 }: it climbs from a0 at the foot, anticlockwise), the houses perched in the branches
   // ({ x, z, y, r, h } in world terms), and the perches themselves (local), so a scene can walk the lower tree and
   // string bridges to the next tree along (see buildTreeBridge)
@@ -326,18 +369,24 @@ function plankBridge(postB, ropeB, a, b, sagK, wd, plank, wood) {
   }
 }
 
-/* a long bridge between two home trees, high up, from a landing jutting off one trunk to a landing on the other.
-   f: how far up the shorter tree (0..1). Returns the two landings in world terms. */
+/* a long bridge between two home trees, high up, from a landing jutting off one trunk (or the edge of a deck, if one
+   is near that height) to the other. f: how far up the shorter tree (0..1). Returns the two ends in world terms. */
 export function buildTreeBridge(scene, A, B, f = 0.4) {
   const g = new THREE.Group(); scene.add(g);
   const postB = batch(g, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 900, { shadow: false });
   const ropeB = batch(g, new THREE.CylinderGeometry(1, 1, 1, 5, 1).translate(0, 0.5, 0), toon(0x6a5a40), 400, { shadow: false });
   const strut = batch(g, new THREE.CylinderGeometry(0.7, 1, 1, 7, 1).translate(0, 0.5, 0), toon(0x8a6040), 40);
   const y = Math.min(A.H, B.H) * f, dx = B.x - A.x, dz = B.z - A.z, aA = Math.atan2(dz, dx), aB = aA + Math.PI;
-  const end = (T, a) => { const r = T.rAt(y, a); return { p: V3(T.x + Math.cos(a) * (r + 5.5), T.g + y, T.z + Math.sin(a) * (r + 5.5)), r, T, a }; };
+  // each end: off the edge of a deck if one is near that height (the deck is the landing), or else off a landing of its own
+  const end = (T, a) => {
+    const d = (T.decks || []).find(d => Math.abs(d.y - y) < 10);
+    if (d) return { p: V3(T.x + Math.cos(a) * (d.ro + 0.4), T.g + d.y, T.z + Math.sin(a) * (d.ro + 0.4)), deck: true };
+    const r = T.rAt(y, a); return { p: V3(T.x + Math.cos(a) * (r + 5.5), T.g + y, T.z + Math.sin(a) * (r + 5.5)), r, T, a };
+  };
   const EA = end(A, aA), EB = end(B, aB);
   // a landing off each trunk, with a door into it
   for (const E of [EA, EB]) {
+    if (E.deck) continue;
     const { T, a, r } = E, ly = T.g + y;
     const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.92, r + 6.5, 12, 1, -(a + 0.32), 0.64).rotateX(-Math.PI / 2), toon(0xa87a50, { side: THREE.DoubleSide }));
     ring.position.set(T.x, ly, T.z); ring.receiveShadow = true; g.add(ring);
