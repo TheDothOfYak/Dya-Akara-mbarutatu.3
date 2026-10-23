@@ -151,6 +151,7 @@ export function createEnemies(ctx) {
     e.hp -= dmg; e.flash = 1; e.lastHit = ctx.G.t;
     e.aware = 1; e.lastSeen = { x: from.x, z: from.z }; e.lostT = 0;   // it knows where that came from
     if (ctx.ears) ctx.ears.emit(e.pos.x, e.pos.z, 22, 'fight', e);       // and anything near hears the fight
+    if (ctx.ears && e.T.mind && e.T.mind.pack && !e.howled && e.hp < e.maxHp * 0.5 && e.hp > 0) { e.howled = true; ctx.ears.emit(e.pos.x, e.pos.z, 45, 'cry', e); }   // hurt: it calls the pack
     const st = e.T.stagger ?? 1;
     const dir = V3(e.pos.x - from.x, 0, e.pos.z - from.z).normalize();
     e.vel.addScaledVector(dir, kb * st * (e.kind === 'malsti' || e.kind === 'kipsu' ? 1.4 : 1));
@@ -572,7 +573,9 @@ export function createEnemies(ctx) {
       if (P.hp < P.maxHp * 0.4) { e.hostile = true; e.state = 'chase'; aggroGroup(e); ctx.onAggro(e, 'scent'); }
       if (d > aggroR * 2.2) e.state = 'return';
     } else if (e.state === 'flee') {
-      wantYaw = Math.atan2(-dx, -dz); wantV = T.speed * 1.1;
+      // away — and for something to put between you: a wall, a rock, a rise in the ground
+      if (!e.cover || G.t > e.coverT || Math.hypot(e.cover.x - e.pos.x, e.cover.z - e.pos.z) < 1.5) { e.cover = findCover(e); e.coverT = G.t + 2.5; }
+      wantYaw = e.cover ? steer(e, e.cover, dt) : Math.atan2(-dx, -dz); wantV = T.speed * 1.1;
       e.timer -= dt;
       if (d > 55 || e.timer <= 0) { endSwing(e); ctx.scene.remove(a.root); e.gone = true; e.escaped = true; ctx.onEscape(e); return; }
     } else if (T.ai === 'flyer') {
@@ -700,6 +703,20 @@ export function createEnemies(ctx) {
   }
   const lerp0 = (a, b, k) => a + (b - a) * k;
 
+  /* somewhere to run to that you can't see: away from you, open to stand in, and out of your line of sight
+     if there's such a place (a point a little further off if not) */
+  function findCover(e) {
+    const P = ctx.P, away = Math.atan2(e.pos.x - P.pos.x, e.pos.z - P.pos.z), eye = { x: P.pos.x, y: P.pos.y + 1.5, z: P.pos.z };
+    let best = null, bs = -1;
+    for (let k = 0; k < 12; k++) {
+      const a = away + (k / 11 - 0.5) * 3.2, r = 9 + (k % 3) * 5, x = e.pos.x + Math.sin(a) * r, z = e.pos.z + Math.cos(a) * r;
+      if (ctx.nav && ctx.nav.blocked(x, z)) continue;
+      const hidden = !sees(eye, { x, y: ctx.world.heightAt(x, z) + 0.6, z }, { yaw: 0, fov: 7, range: 300, ray: RAY, land: ctx.world.heightAt });
+      const score = (hidden ? 30 : 0) + Math.hypot(x - P.pos.x, z - P.pos.z);
+      if (score > bs) { bs = score; best = { x, z }; }
+    }
+    return best;
+  }
   /* a campfire near here, after dark (wild things don't care for one) */
   function fireNear(p, r) {
     if (!ctx.fires || (ctx.night ? ctx.night() : 0) <= 0.5) return null;

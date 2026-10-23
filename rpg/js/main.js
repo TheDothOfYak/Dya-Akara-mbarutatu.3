@@ -2901,6 +2901,7 @@ const GREET = {
 const DANGER_LINES = ['Run! Get inside!', 'Esik — in the town! Inside, everyone!', 'Doors! Shut the doors!'];
 const FLINCH_LINES = ['Hey! Watch where you swing that!', 'Mind the axe!', 'Careful, you’ll have someone’s eye out!'];
 const YIELD_LINES = ['Oh — pardon me.', 'After you.', 'Sorry, sorry.', 'Mind yourself.'];
+const RIDE_LINES = ['Look at you up there, {you}!', 'Mind my beans with that Punk!', 'She’s grown, your Punk. Grown a lot.', 'Not through the square at a gallop, please!', 'Ooh — can I pat her? No? Fair.'];
 const BUMP_LINES = ['Oi! Watch it!', 'Whoa — slow down!', 'Where’s the fire?', 'Hey! Some of us are walking here.'];
 const HEARD = ['Heard you {x}!', 'They’re saying you {x}. Is it true?', 'Word is you {x}. Well done, {you}.', 'So you {x}! The whole town’s talking.'];
 const THANKS = ['Thank you again, {you}. Really.', 'Still can’t believe you did it. Thank you.', 'I owe you one, {you}.'];
@@ -2993,6 +2994,7 @@ function notice(n, dt, d, still) {
     const news = NEWS.filter((w, i) => i >= (M.newsSeen || 0) && (w.who === n || G.t - w.t > 25));   // word takes a little while to get round
     let line;
     if (P.hp < P.maxHp * 0.35) line = pick(STORY.TOWN_TALK.hurt);   // you look terrible
+    else if (P.riding) line = pick(RIDE_LINES);                       // up on Brindle: that gets noticed
     else if (news.length) { const w = news[news.length - 1]; M.newsSeen = NEWS.indexOf(w) + 1; line = w.who === n ? pick(THANKS) : pick(HEARD).replace('{x}', w.text); }
     else line = pick(M.talkedDay === (SAVE.dayN || 0) ? GREET.again : GREET[partOfDay(dn.hour)]);
     bark(npcSpeaker(n.def), line.replace('{you}', youName()), 2.8);
