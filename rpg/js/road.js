@@ -215,7 +215,7 @@ export function createRoad(ctx) {
   }
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
   function groundAt(x, z, y, skip) {
-    let g = Math.max(heightAt(x, z), treeGround(x, z, y));
+    let g = Math.max(auto.ground(x, z, y), treeGround(x, z, y));
     for (const s of solids) {
       if (s === skip) continue;
       if (Math.abs(x - s.x) > 12 + (s.r || 0) || Math.abs(z - s.z) > 12 + (s.r || 0)) continue;
@@ -225,7 +225,7 @@ export function createRoad(ctx) {
     return g;
   }
   function resolve(p, rad = PR) {
-    if (p === P.pos) auto.resolve(p, rad, PH);   // you, not the folk: they keep to the colliders placed by hand
+    auto.resolve(p, rad, PH);
     for (const s of solids) {
       if (p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (Math.abs(p.x - s.x) > 12 + (s.r || 0) || Math.abs(p.z - s.z) > 12 + (s.r || 0)) continue;
@@ -630,20 +630,24 @@ export function createRoad(ctx) {
   let crowd = null;
   function makeCrowd() {
     const spots = [];
-    stalls.forEach((st, i) => { if (!i) return; for (let k = 0; k < 2; k++) { const f = 2.2, x = st.x + Math.sin(st.ry) * f + (k - 0.5) * 1.3 * Math.cos(st.ry), z = st.z + Math.cos(st.ry) * f - (k - 0.5) * 1.3 * Math.sin(st.ry); spots.push({ x, z, look: [st.x, st.z], kind: 'chat' }); } });
+    const shopAt = [];   // two customers' places in front of each stall (the Carpenter's, the first, is Buhkon's own)
+    stalls.forEach((st, i) => { if (!i) return; for (let k = 0; k < 2; k++) { const f = 2.2, x = st.x + Math.sin(st.ry) * f + (k - 0.5) * 1.3 * Math.cos(st.ry), z = st.z + Math.cos(st.ry) * f - (k - 0.5) * 1.3 * Math.sin(st.ry); const s = { x, z, look: [st.x, st.z], kind: 'shop', stall: i }; spots.push(s); shopAt.push(s); } });
+    // and places to meet a friend: a ring of three round a point in each street
+    for (const r of [19, 29, 39]) for (const a of [0.9, 2.6, 4.4]) { const cx = CORE.x + Math.cos(a + r * 0.05) * r, cz = CORE.z + Math.sin(a + r * 0.05) * r; for (let k = 0; k < 3; k++) { const b = k / 3 * TAU; spots.push({ x: cx + Math.cos(b) * 0.9, z: cz + Math.sin(b) * 0.9, look: [cx, cz], kind: 'chat' }); } }
     for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + 0.3; spots.push({ x: SQUARE.x + Math.cos(a) * 4.7, z: SQUARE.z + 4 + Math.sin(a) * 4.7, look: [SQUARE.x, SQUARE.z + 4], kind: 'sit' }); }
     crowd = createCrowd({
       scene, rng, groundAt, C: CORE,
       resolve: q => { const y = q.y; q.y = 0.2; resolve(q, 0.4); q.y = y; },
       streets: [{ r: 9.5 }, { r: 19 }, { r: 29 }, { r: 39 }, { r: 49 }], roads: [{ a: -Math.PI / 2 }], spots,
-      exits: doors.concat([V3(0, 0, GATE_Z - 6)]),
+      exits: doors.concat([V3(0, 0, GATE_Z - 6)]), homes: doors,
+      blocked: (x, z) => { const g = heightAt(x, z); return solidAt(x, g + 0.5, z) || solidAt(x, g + 1.2, z); },   // knee or chest high
     });
     for (let i = 0; i < 30; i++) {
       const r = [9.5, 19, 19, 29, 39][i % 5], a = rng() * TAU;
       const p = crowd.spawn(FOLK_LOOKS[i % FOLK_LOOKS.length], V3(CORE.x + Math.cos(a) * r, 0, CORE.z + Math.sin(a) * r));
       if (i < spots.length && i < 14) { const sp = spots[i]; p.pos.set(sp.x, 0, sp.z); p.spot = sp; p.wait = 3 + rng() * 9; p.look = V3(sp.look[0], 0, sp.look[1]); }
     }
-    stalls.forEach((st, i) => { if (!i) return; const p = crowd.spawn(FOLK_LOOKS[(i * 3) % FOLK_LOOKS.length], V3(st.x - Math.sin(st.ry) * 1.3, 0, st.z - Math.cos(st.ry) * 1.3)); p.fixed = true; p.look = V3(SQUARE.x, 0, SQUARE.z); p.vendor = true; });
+    stalls.forEach((st, i) => { if (!i) return; const p = crowd.spawn(FOLK_LOOKS[(i * 3) % FOLK_LOOKS.length], V3(st.x - Math.sin(st.ry) * 1.3, 0, st.z - Math.cos(st.ry) * 1.3)); p.fixed = true; p.look = V3(SQUARE.x, 0, SQUARE.z); p.vendor = true; shopAt.filter(s => s.stall === i).forEach(s => { s.vendor = p; }); });
   }
   function cut(shots, done, opts) { ctx.cutscene(true); cine.play(shots, () => { ctx.cutscene(false); done && done(); }, opts); }
   /* a held shot that runs as long as a conversation does */
@@ -1718,7 +1722,7 @@ export function createRoad(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;
-    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
+    const g = groundAt(P.pos.x, P.pos.z, P.pos.y);
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12; }
     else if (P.onGround && P.pos.y - g < 1.2 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; }
     else P.onGround = false;
@@ -1932,6 +1936,6 @@ export function createRoad(ctx) {
   }
   return { solids: allSolid,
     start, update, render: () => composer.render(), interact, prompt, jump: () => { if (P.inCart) hopDown(); else P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { get crowd() { return crowd; }, solidAt, groundAt, get HT() { return HT; }, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }

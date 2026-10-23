@@ -168,7 +168,7 @@ export function createVelki(ctx) {
   const STEP = 0.65, PR = 0.4, PH = 1.5;
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once the town is built
   function groundAt(x, z, y) {
-    let g = heightAt(x, z);
+    let g = auto.ground(x, z, y);
     for (const s of solids) {
       if (Math.abs(x - s.x) > 30 || Math.abs(z - s.z) > 30) continue;
       if (!s.on || s.y1 > y + STEP || s.y1 <= g) continue;
@@ -177,7 +177,7 @@ export function createVelki(ctx) {
     return g;
   }
   function resolve(p) {
-    if (p === P.pos) auto.resolve(p, PR, PH);   // you, not the folk: they keep to the colliders placed by hand
+    auto.resolve(p, PR, PH);
     for (const s of solids) {
       if (Math.abs(p.x - s.x) > 30 || Math.abs(p.z - s.z) > 30) continue;
       if (!s.on || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
@@ -305,6 +305,7 @@ export function createVelki(ctx) {
   const PLAZA = { x: 0, z: 34 };                      // the little fountain square in the south of the city, where Tanoc starts
   const kit = createCityKit(scene, { rng, heightAt, box, cyl, palette: 'velki' });
   const RINGS = [18, 28.5, 39, 49.5];
+  const homes = [];   // the city's front doors: where the crowd goes home to
   for (let ring = 0; ring < RINGS.length; ring++) {
     const R = RINGS[ring], n = 9 + ring * 4;
     for (let i = 0; i < n; i++) {
@@ -313,7 +314,7 @@ export function createVelki(ctx) {
       if (Math.abs(x) < 6.5 && z > 0) continue;              // and the south lane
       if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 13) continue;
       if (inHomeZone(x, z, 6)) continue;                     // the home tree's roots
-      kit.house(x, z, Math.atan2(-x, -z), ring === 0 && i % 3 === 0 ? 'tall' : null);
+      homes.push(kit.house(x, z, Math.atan2(-x, -z), ring === 0 && i % 3 === 0 ? 'tall' : null).door);
     }
   }
   // farmsteads by the fields
@@ -428,10 +429,13 @@ export function createVelki(ctx) {
   for (const r of [44.3, 56]) for (let k = 0; k < 9; k++) { const a = -Math.PI / 2 + (k / 8 - 0.5) * 1.6; if (Math.abs(Math.cos(a) * r) < 9 || inHomeZone(Math.cos(a) * r, Math.sin(a) * r, 4)) continue; spots.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, look: BATTLE_LOOK, kind: 'watch' }); }
   for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; spots.push({ x: PLAZA.x + Math.cos(a) * 4.8, z: PLAZA.z + Math.sin(a) * 4.8, look: [PLAZA.x, PLAZA.z], kind: 'sit' }); }
   for (const [x, z] of [[-6, 27], [7, 38], [-4, 44]]) for (let k = 0; k < 3; k++) { const a = k / 3 * TAU; spots.push({ x: x + Math.cos(a) * 0.9, z: z + Math.sin(a) * 0.9, look: [x, z], kind: 'chat' }); }
+  const STALLS = [[-9.5, 30, 1.2], [9.5, 31, -1.3], [-7, 42.5, 2.5]];
+  const shopAt = STALLS.map(([x, z, ry]) => { const s = { x: x + Math.sin(ry) * 2.2, z: z + Math.cos(ry) * 2.2, look: [x, z], kind: 'shop' }; spots.push(s); return s; });   // in front of each stall
   const crowd = createCrowd({
     scene, rng, groundAt, C: { x: 0, z: 0 },
     resolve: q => { const y = q.y; q.y = 0.2; resolve(q); q.y = y; },
-    streets: STREETS.slice(1, 3).map(r => ({ r })), roads: [{ a: -Math.PI / 2 }, { a: Math.PI / 2 }], spots,
+    streets: STREETS.slice(1, 3).map(r => ({ r })), roads: [{ a: -Math.PI / 2 }, { a: Math.PI / 2 }], spots, homes,
+    blocked: (x, z) => { const g = heightAt(x, z); return solidAt(x, g + 0.5, z) || solidAt(x, g + 1.2, z); },   // knee or chest high
   });
   for (let i = 0; i < 34; i++) {
     const r = STREETS[1 + (i % 2)], a = rng() * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -439,7 +443,7 @@ export function createVelki(ctx) {
     if (i < 12) { const sp = spots[i]; p.pos.set(sp.x, 0, sp.z); p.spot = sp; p.wait = 4 + rng() * 10; p.look = V3(sp.look[0], 0, sp.look[1]); }
   }
   // stallkeepers
-  for (const [x, z, ry] of [[-9.5, 30, 1.2], [9.5, 31, -1.3], [-7, 42.5, 2.5]]) { const p = crowd.spawn(FOLK_LOOKS[(x * 7 | 0) & 7], V3(x - Math.sin(ry) * 1.3, 0, z - Math.cos(ry) * 1.3)); p.fixed = true; p.look = V3(PLAZA.x, 0, PLAZA.z); }
+  STALLS.forEach(([x, z, ry], i) => { const p = crowd.spawn(FOLK_LOOKS[(x * 7 | 0) & 7], V3(x - Math.sin(ry) * 1.3, 0, z - Math.cos(ry) * 1.3)); p.fixed = true; p.look = V3(PLAZA.x, 0, PLAZA.z); shopAt[i].vendor = p; });
   const warden = person(6.5, -54, { skin: '#9a6a40', cap: '#3a2a1a', tunic: 0x4a4a5a, trim: 0xb8a070 }, { weapon: 'spear', build: 1.15, scale: 1.05 });
   warden.look = false;
   const crew = [-2.5, 0, 2.5].map((x, i) => {
@@ -469,7 +473,7 @@ export function createVelki(ctx) {
   let hasCloak = ctx.at === 'spire';
   const CLOAK = 0x9a3a1a;
   if (hasCloak) tanoc.setCape(CLOAK);
-  P.pos.y = Math.max(groundAt(P.pos.x, P.pos.z, 5), auto.ground(P.pos.x, P.pos.z, 5));
+  P.pos.y = groundAt(P.pos.x, P.pos.z, 5);
   CAM.yaw = 0; CAM.pitch = 0.18;
   const camPos = V3(2.5, 4, 54), camTgt = V3();
 
@@ -604,7 +608,7 @@ export function createVelki(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;
-    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
+    const g = groundAt(P.pos.x, P.pos.z, P.pos.y);
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) {
       if (!P.onGround && P.vel.y < -8) sfx.land();
       P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12;
@@ -754,5 +758,5 @@ export function createVelki(ctx) {
     composer.dispose && composer.dispose();
   }
 
-  return { solids: allSolid, intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { topReached, startGateStage, caught, cine, solidAt, heightAt, DR, captain, tanoc, wearCloak: () => { hasCloak = true; tanoc.setCape(CLOAK); } } };
+  return { solids: allSolid, intro, skip: () => cine.skip(), get cinematic() { return cine.active; }, scene, update, render, interact, prompt, jump, resize, dispose, get stage() { return stage; }, P, debug: { crowd, topReached, startGateStage, caught, cine, solidAt, heightAt, DR, captain, tanoc, wearCloak: () => { hasCloak = true; tanoc.setCape(CLOAK); } } };
 }

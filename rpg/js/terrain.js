@@ -40,12 +40,10 @@ export class Colliders {
       }
     return out;
   }
-  /* folk (townsfolk, companions, beasts, foes) pass hand = true: they keep to the colliders the regions
-     placed by hand, as they always have, and leave the rest (solid.js's: barrels, benches, boughs) to you */
-  ground(x, z, feetY, hand = false) {
+  ground(x, z, feetY) {
     let g = this.heightAt(x, z);
     for (const o of this.near(x, z)) {
-      if (o.top > feetY + STEP || o.top <= g || (hand && o.auto)) continue;
+      if (o.top > feetY + STEP || o.top <= g) continue;
       const dx = x - o.x, dz = z - o.z;
       const lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c;
       if (Math.abs(lx) <= o.hw + 0.05 && Math.abs(lz) <= o.hd + 0.05) g = o.top;
@@ -53,9 +51,9 @@ export class Colliders {
     return g;
   }
   /* push a standing cylinder (feet at y, height hgt) out of anything too tall to step on */
-  resolve(p, rad, hgt = 1.8, hand = false) {
+  resolve(p, rad, hgt = 1.8) {
     for (const o of this.nearAll(p.x, p.z, rad + 1)) {
-      if (p.y >= o.top - STEP || p.y + hgt <= o.bot || (hand && o.auto)) continue;
+      if (p.y >= o.top - STEP || p.y + hgt <= o.bot) continue;
       const dx = p.x - o.x, dz = p.z - o.z;
       const lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c;
       const cx = clamp(lx, -o.hw, o.hw), cz = clamp(lz, -o.hd, o.hd);
@@ -70,6 +68,8 @@ export class Colliders {
       p.x += px * o.c + pz * o.s; p.z += -px * o.s + pz * o.c;
     }
   }
+  /* walk a standing cylinder by (dx, dz), feeling its way round whatever's in the way (stepAround) */
+  walk(p, dx, dz, rad, hgt = 1.8, mem) { stepAround(p, dx, dz, q => this.resolve(q, rad, hgt), mem); }
   /* first hit along a segment, as a 0..1 fraction (camera collision) */
   ray(a, b) {
     let best = 1;
@@ -79,6 +79,36 @@ export class Colliders {
     }
     return best;
   }
+}
+
+/* move p by (dx, dz), then out of anything solid (resolve(q) pushes q clear). Straight on is
+   tried first; if that gets less than half the way (a barrel, a corner, a stall in the road),
+   it feels round: turning a little either way, then more, and takes whichever gets furthest
+   along the way it wanted to go. mem (any object: the walker) remembers which way round worked,
+   so it keeps going round the same side instead of dithering. */
+const _q = { x: 0, y: 0, z: 0 };
+const TURNS = [0.6, 1.2, 1.8];
+export function stepAround(p, dx, dz, resolve, mem) {
+  const L = Math.hypot(dx, dz); if (L < 1e-6) return;
+  const ux = dx / L, uz = dz / L, x0 = p.x, z0 = p.z;
+  const go = a => {
+    const c = Math.cos(a), s = Math.sin(a);
+    _q.x = x0 + (ux * c - uz * s) * L; _q.z = z0 + (ux * s + uz * c) * L; _q.y = p.y; resolve(_q);
+    return (_q.x - x0) * ux + (_q.z - z0) * uz;
+  };
+  let best = go(0), bx = _q.x, bz = _q.z, side = 0;
+  if (best < L * 0.5) {
+    const first = mem && mem._side ? mem._side : 1;
+    for (const a of TURNS) {
+      for (const sd of [first, -first]) {
+        const g = go(a * sd);
+        if (g > best + 1e-4) { best = g; bx = _q.x; bz = _q.z; side = sd; }
+      }
+      if (best >= L * 0.5) break;
+    }
+  }
+  if (mem) mem._side = side || (best >= L * 0.5 ? 0 : mem._side);
+  p.x = bx; p.z = bz;
 }
 
 function slab(o, a, b) {

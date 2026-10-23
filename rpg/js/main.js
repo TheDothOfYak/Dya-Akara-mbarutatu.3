@@ -2648,9 +2648,8 @@ function updateNpcs(dt) {
         if (gd < 0.6) { n.goal = null; n.pause = 2 + Math.random() * 5; }
         else {
           const before = n.pos.clone();
-          n.pos.x += dx / gd * 1.6 * dt; n.pos.z += dz / gd * 1.6 * dt;
-          world.col.resolve(n.pos, 0.45, 1.9, true);
-          n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6, true);
+          world.col.walk(n.pos, dx / gd * 1.6 * dt, dz / gd * 1.6 * dt, 0.45, 1.9, n);   // round the barrels, not through them
+          n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6);
           if (n.pos.distanceTo(before) < 0.5 * dt) { n.goal = null; n.pause = 1; }
           n.yaw = Math.atan2(dx, dz); speed = 1.6;
         }
@@ -2751,14 +2750,13 @@ function dailyRound(n, dt) {
   if (goal && n.talking <= 0 && G.mode === 'play') {
     const dx = goal.x - n.pos.x, dz = goal.z - n.pos.z, gd = Math.hypot(dx, dz);
     const far = P.pos.distanceTo(n.pos) > 70 && P.pos.distanceTo(goal) > 70;
-    if (far && gd > 1) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2, true), goal.z); }   // out of sight: just be there
+    if (far && gd > 1) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); }   // out of sight: just be there
     else if (gd > 1.1 && !(R.stuck > 1.5 && gd < 4)) {
       const before = n.pos.clone(), sp = gd > 40 ? 3.4 : 2.4;
-      n.pos.x += dx / gd * sp * dt; n.pos.z += dz / gd * sp * dt;
-      world.col.resolve(n.pos, 0.45, 1.9, true);
-      n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6, true);
+      world.col.walk(n.pos, dx / gd * sp * dt, dz / gd * sp * dt, 0.45, 1.9, R);   // round the barrels, not through them
+      n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6);
       R.stuck = n.pos.distanceTo(before) < 0.4 * sp * dt ? R.stuck + dt : 0;
-      if (R.stuck > 5 && P.pos.distanceTo(n.pos) > 18) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2, true), goal.z); R.stuck = 0; }
+      if (R.stuck > 5 && P.pos.distanceTo(n.pos) > 18) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); R.stuck = 0; }
       n.yaw = Math.atan2(dx, dz); speed = sp;
     } else if (indoor) { R.inside = true; R.door = Q.door; n.hidden = true; n.actor.root.visible = false; return; }
     else {
@@ -3501,7 +3499,7 @@ function phorusMount() {
   if (FR.mode === 'own') {
     if (!FR.punk) { FR.punk = cartoon(buildDomesticPunk({ saddle: true, blanket: 0x2a5a8a, seed: 23 }), 0.6); FR.punk.root.scale.setScalar(0.72); scene.add(FR.punk.root); }
     // Lun trots over from wherever she was left, or out of the nearest bushes
-    if (!FR.punk.root.visible || FR.pos.distanceTo(F.pos) > 20) { FR.pos.copy(F.pos).add(V3(1.2, 0, 1.2)); FR.pos.y = world.col.ground(FR.pos.x, FR.pos.z, F.pos.y + 2, true); }
+    if (!FR.punk.root.visible || FR.pos.distanceTo(F.pos) > 20) { FR.pos.copy(F.pos).add(V3(1.2, 0, 1.2)); FR.pos.y = world.col.ground(FR.pos.x, FR.pos.z, F.pos.y + 2); }
     FR.punk.root.visible = true;
     F.pos.copy(FR.pos); F.vel.set(0, 0, 0);
     particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 12, { color: 0xd8c098, speed: 3, size: 0.5, life: 0.5 });
@@ -3514,7 +3512,7 @@ function phorusDismount() {
     FR.pos.copy(F.pos); FR.yaw = F.yaw;
     F.pos.add(V3(Math.cos(F.yaw) * 1.5, 0, -Math.sin(F.yaw) * 1.5));
   } else F.pos.copy(P.pos).add(V3(-Math.sin(P.yaw) * 2.2, 0, -Math.cos(P.yaw) * 2.2));   // slides off Brindle's back
-  F.pos.y = world.col.ground(F.pos.x, F.pos.z, F.pos.y + 3, true); F.vel.set(0, 0, 0);
+  F.pos.y = world.col.ground(F.pos.x, F.pos.z, F.pos.y + 3); F.vel.set(0, 0, 0);
   FR.mode = null;
 }
 function updateMount(dt) {
@@ -3550,8 +3548,8 @@ function updateMount(dt) {
   else { m.vel.x *= 0.85; m.vel.z *= 0.85; }
   if (!P.riding) {
     m.pos.x += m.vel.x * dt; m.pos.z += m.vel.z * dt;
-    world.col.resolve(m.pos, 1.0, 2.2, true);
-    m.pos.y = world.col.ground(m.pos.x, m.pos.z, m.pos.y + 1, true);
+    world.col.resolve(m.pos, 1.0, 2.2);
+    m.pos.y = world.col.ground(m.pos.x, m.pos.z, m.pos.y + 1);
   }
   m.actor.root.position.copy(m.pos);
   if (!P.riding && m.hop) m.actor.root.position.y += m.hop;
@@ -4808,7 +4806,7 @@ function updatePhorus(dt) {
   const dx = want.x - F.pos.x, dz = want.z - F.pos.z, d = Math.hypot(dx, dz);
   const pd = F.pos.distanceTo(P.pos);
   if (!withP) {   // he makes his own way back to where he waits
-    if (F.pos.distanceTo(want) > 40 && pd > 30) { F.pos.copy(want); F.pos.y = world.col.ground(want.x, want.z, world.heightAt(want.x, want.z) + 2, true); F.vel.set(0, 0, 0); }
+    if (F.pos.distanceTo(want) > 40 && pd > 30) { F.pos.copy(want); F.pos.y = world.col.ground(want.x, want.z, world.heightAt(want.x, want.z) + 2); F.vel.set(0, 0, 0); }
   } else if (pd > 34 || (pd > 18 && G.mode !== 'play')) {
     particles.burst(F.pos.x, F.pos.y + 1, F.pos.z, 16, { color: 0x7ad8ff, speed: 4, size: 0.4, life: 0.5 });
     F.pos.copy(P.pos).addScaledVector(V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), 2.5);
@@ -4819,9 +4817,9 @@ function updatePhorus(dt) {
   F.vel.z = damp(F.vel.z, d > 0.01 ? dz / d * sp : 0, 8, dt);
   F.vel.y -= 28 * dt;
   F.pos.addScaledVector(F.vel, dt);
-  world.col.resolve(F.pos, 0.45, 1.9, true);
+  world.col.resolve(F.pos, 0.45, 1.9);
   if (G.bossActive) arenaClamp(F.pos, G.arena - 1);
-  const g = world.col.ground(F.pos.x, F.pos.z, F.pos.y, true);
+  const g = world.col.ground(F.pos.x, F.pos.z, F.pos.y);
   if (F.pos.y <= g || F.pos.y - g < 0.4) { F.pos.y = g; F.vel.y = 0; F.onGround = true; } else F.onGround = false;
   if (world.water && g < world.water.level - SWIM_DEPTH && F.pos.y <= world.water.level - SWIM_DEPTH && world.water.depth(F.pos.x, F.pos.z) > SWIM_DEPTH) {   // he swims after you
     F.pos.y = world.water.level - SWIM_DEPTH; F.vel.y = Math.max(0, F.vel.y); F.onGround = true;
@@ -4872,7 +4870,7 @@ function updateCamera(dt) {
   const clear = hit < 1 ? Math.max(0.6, CAM.dist * hit - 0.3) : CAM.dist;
   CAM.reach = Math.min(clear, damp(CAM.reach ?? clear, clear, 3.2, dt));
   const want = look.clone().addScaledVector(off, CAM.reach);
-  const gy = Math.max(world.heightAt(want.x, want.z), world.col.ground(want.x, want.z, CAM.target.y, true)) + 0.5;   // the ground, or a deck, pier or floor under him
+  const gy = Math.max(world.heightAt(want.x, want.z), world.col.ground(want.x, want.z, CAM.target.y)) + 0.5;   // the ground, or a deck, pier or floor under him
   CAM.floor = damp(CAM.floor ?? gy, gy, 10, dt);
   if (want.y < Math.max(gy - 0.3, CAM.floor)) want.y = Math.max(gy - 0.3, CAM.floor);
   CAM.pos.copy(want);
@@ -5955,9 +5953,9 @@ function apVenkinTick(dt) {
     const want = V3(P.pos.x - Math.sin(P.yaw) * 2 - Math.cos(P.yaw) * 1.6, 0, P.pos.z - Math.cos(P.yaw) * 2 + Math.sin(P.yaw) * 1.6), dx = want.x - v.pos.x, dz = want.z - v.pos.z, d = Math.hypot(dx, dz);
     if (d > 60) { v.pos.x = want.x; v.pos.z = want.z; }
     else if (d > 0.8) { sp = Math.min(P.riding ? 18 : 10, d * 2.5); v.pos.x += dx / d * sp * dt; v.pos.z += dz / d * sp * dt; v.a.root.rotation.y = Math.atan2(dx, dz); }
-    world.col.resolve(v.pos, 0.5, 2, true);
+    world.col.resolve(v.pos, 0.5, 2);
   } else v.a.root.rotation.y = dampAngle(v.a.root.rotation.y, Math.atan2(P.pos.x - v.pos.x, P.pos.z - v.pos.z), 3, dt);
-  v.pos.y = world.col.ground(v.pos.x, v.pos.z, v.pos.y + 1, true);
+  v.pos.y = world.col.ground(v.pos.x, v.pos.z, v.pos.y + 1);
   v.a.animate(dt, { speed: sp, onGround: true, t: G.t });
 }
 const apHollowNear = () => { const h = REGION === 'property' && world.SITES && world.SITES.hollow; return !!h && Math.hypot(P.pos.x - h.x, P.pos.z - h.z) < 22; };

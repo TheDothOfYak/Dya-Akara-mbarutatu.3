@@ -24,9 +24,8 @@
    things lying on the ground, and anything that moves — folk,
    beasts, boats, carts, pickups — which look after their own
    collisions. Anything marked noSolid(o) (and all under it) is left
-   out too. The boxes are marked .auto, and folk keep to the hand-
-   placed colliders as they always have (Colliders' `hand` flag), so
-   these are for you: no townsfolk route jams on a new barrel.
+   out too. Folk bump into all of it just as you do; they feel their
+   way round (terrain.js stepAround) instead of walking through.
 
    It keeps watching: a thing that turns up later (a room furnished
    the first time you step in, a tent pitched) is made solid once it
@@ -258,7 +257,7 @@ export function createSolids(scene, opts) {
     if (!e.handles) { e.handles = []; e.next = 0; }
     for (; e.next < n; e.next++) {
       if (performance.now() > until) return false;
-      for (const w of boxesOf(o, o.isInstancedMesh ? e.next : null)) { const h = col.add(w.x, w.z, w.hw, w.hd, w.ang, w.bot, w.top); h.auto = true; e.handles.push(h); }
+      for (const w of boxesOf(o, o.isInstancedMesh ? e.next : null)) e.handles.push(col.add(w.x, w.z, w.hw, w.hd, w.ang, w.bot, w.top));
     }
     e.ready = true; e.off = false;
     return true;

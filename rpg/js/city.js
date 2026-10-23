@@ -6,11 +6,12 @@
    crates; paving rings — and a Stryx mud fountain.
 
    And the people: a crowd that keeps to the streets. Everyone
-   has something to do — walking a ring street from one place to
-   another, stopping to talk, minding a stall, sitting on the
-   fountain's rim, gathering to stare at the sky — and when the
-   city panics they run for the roads and the doorways instead of
-   into the walls.
+   has somewhere to be — a stall to buy at (and the stallkeeper
+   serves them), a friend to fetch and talk with, home for a
+   while, the fountain's rim, a place to stare at the sky from —
+   and walks there by the streets, round whatever's in the way.
+   When the city panics they run for the roads and the doorways
+   instead of into the walls.
 
    A scene hands it its own collision (box/cyl), height and
    ground functions; everything here is in that scene's terms.
@@ -20,6 +21,7 @@ import { toon, ramp, addOutline, outlineAll, glowSprite, paint } from './gfx.js'
 import { buildEikar } from './actors.js';
 import { buildStryx } from './esik_land.js';
 import { damp, dampAngle, clamp } from './util.js';
+import { stepAround } from './terrain.js';
 
 const TAU = Math.PI * 2;
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -315,106 +317,200 @@ export function buildMudFountain(scene, x, z, g, opts = {}) {
 }
 
 /* ================================================================
-   THE CROWD — folk who keep to the streets.
+   THE CROWD — folk who keep to the streets, each on an errand.
    streets: [{ r }] ring streets round a centre (radius), and
    roads: [{ a }] radial roads (angle) you can cross between rings on.
-   spots: named places folk go and stand: { x, z, look: [x,z], kind: 'watch'|'stall'|'sit'|'chat' }
+   spots: named places folk go and stand: { x, z, look: [x,z], kind }
+     'shop'  — in front of a stall: the stallkeeper (spot.vendor, set
+               once the keepers are spawned) turns and serves them;
+     'chat'  — a ring of spots round one point: whoever goes there
+               fetches a friend, and they talk once both have come;
+     'sit'   — the fountain's rim: a rest, watching the water;
+     'watch' — somewhere to see the sky from.
+   homes: the doors folk live behind: they go in a while, and come out.
    exits: places to run to when the city panics (doorways, the gate).
+   blocked(x, z): is that spot taken up by something solid?
+   likes: how much the town goes in for each errand ({ shop: 3, … }).
+   Nobody wanders: every walk is to somewhere, for something.
    ================================================================ */
+const LIKES = { shop: 3, chat: 2.5, watch: 3, sit: 1.5, home: 2 };
 export function createCrowd(o) {
   const { scene, rng, groundAt, resolve, C } = o;
   const people = [];
-  const streets = o.streets, roads = o.roads || [];
+  const streets = o.streets, roads = o.roads || [], spots = o.spots || [], homes = o.homes || [];
+  const likes = Object.assign({}, LIKES, o.likes || {});
   const toPolar = (x, z) => [Math.hypot(x - C.x, z - C.z), Math.atan2(z - C.z, x - C.x)];
   const atPolar = (r, a) => V3(C.x + Math.cos(a) * r, 0, C.z + Math.sin(a) * r);
   const nearestRoad = a => roads.reduce((b, rd) => Math.abs(Math.atan2(Math.sin(rd.a - a), Math.cos(rd.a - a))) < Math.abs(Math.atan2(Math.sin(b.a - a), Math.cos(b.a - a))) ? rd : b, roads[0]);
   const spotsTaken = new Set();
+  // the chat spots come in rings round a point: those are the meeting places
+  const circles = new Map();
+  for (const s of spots) if (s.kind === 'chat') { const k = s.look[0] + ',' + s.look[1]; if (!circles.has(k)) circles.set(k, []); circles.get(k).push(s); s.circle = circles.get(k); }
 
   function spawn(look, at, behaviour) {
     const a = buildEikar(Object.assign({ weapon: 'none', flasks: false, scale: 0.9 + rng() * 0.16 }, look)); scene.add(a.root);
-    const p = { a, pos: at.clone(), yaw: rng() * TAU, plan: [], state: 'idle', wait: rng() * 3, ph: rng() * 9, speed: 1.3 + rng() * 0.5, lane: (rng() - 0.5) * 2.4, b: behaviour || 'stroll', spot: null, run: false, gone: false, look: null };
+    const p = { a, pos: at.clone(), yaw: rng() * TAU, plan: [], state: 'idle', wait: rng() * 3, ph: rng() * 9, speed: 1.3 + rng() * 0.5, lane: (rng() - 0.5) * 2.4, b: behaviour || 'stroll', spot: null, run: false, gone: false, look: null,
+      errand: null, last: null, home: homes.length ? homes[Math.floor(rng() * homes.length)] : null, inside: 0 };
     p.pos.y = groundAt(p.pos.x, p.pos.z, 3); a.root.position.copy(p.pos); people.push(p);
     return p;
   }
-  /* a route from where you are to (r1, a1): round your ring to a road, along the road, round the new ring */
+  /* nothing solid along the way from a to b? (looked at every 0.6 m: a fountain's rim is narrow) */
+  const clear = (ax, az, bx, bz) => {
+    if (!o.blocked) return false;
+    const L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 0.6);
+    for (let i = 1; i < n; i++) if (o.blocked(ax + (bx - ax) * i / n, az + (bz - az) * i / n)) return false;
+    return true;
+  };
+  /* a route from where you are to (r1, a1): straight there if the way is clear; else round your ring
+     to a road, along the road, round the new ring — with every corner cut that can be cut */
   function route(p, r1, a1) {
-    const [r0, a0] = toPolar(p.pos.x, p.pos.z), plan = [];
+    const [r0, a0] = toPolar(p.pos.x, p.pos.z), plan = [], end = atPolar(r1, a1);
+    p.best = null; p.stuck = 0;
+    if (clear(p.pos.x, p.pos.z, end.x, end.z)) { p.plan = [end]; return; }
     const ring0 = streets.reduce((b, s) => Math.abs(s.r - r0) < Math.abs(b.r - r0) ? s : b, streets[0]).r;
+    const ring1 = streets.reduce((b, s) => Math.abs(s.r - r1) < Math.abs(b.r - r1) ? s : b, streets[0]).r;
     const arc = (r, from, to) => { let d = Math.atan2(Math.sin(to - from), Math.cos(to - from)); const n = Math.max(1, Math.ceil(Math.abs(d * r) / 5)); for (let i = 1; i <= n; i++) plan.push(atPolar(r + p.lane * 0.5, from + d * i / n)); };
-    if (Math.abs(ring0 - r1) < 3 || !roads.length) { arc(ring0, a0, a1); plan.push(atPolar(r1, a1)); }
+    if (Math.abs(ring0 - ring1) < 3 || !roads.length) { arc(ring0, a0, a1); plan.push(end); }
     else {
-      const rd = nearestRoad((a0 + a1) / 2);
+      const rd = nearestRoad(Math.atan2(Math.sin(a0) + Math.sin(a1), Math.cos(a0) + Math.cos(a1)));   // (the way between them, not the far side round)
       arc(ring0, a0, rd.a);
-      const n = Math.ceil(Math.abs(r1 - ring0) / 5); for (let i = 1; i <= n; i++) plan.push(atPolar(ring0 + (r1 - ring0) * i / n, rd.a + p.lane * 0.012));
-      arc(r1, rd.a, a1);
+      const n = Math.ceil(Math.abs(ring1 - ring0) / 5); for (let i = 1; i <= n; i++) plan.push(atPolar(ring0 + (ring1 - ring0) * i / n, rd.a + p.lane * 0.012));
+      arc(ring1, rd.a, a1); plan.push(end);
     }
-    p.plan = plan;
+    // cut the corners: from each point, on to the furthest one it can see
+    const out = []; let from = p.pos;
+    for (let i = 0; i < plan.length;) {
+      let j = plan.length - 1;
+      while (j > i && !clear(from.x, from.z, plan[j].x, plan[j].z)) j--;
+      out.push(plan[j]); from = plan[j]; i = j + 1;
+    }
+    p.plan = out;
   }
-  function freeSpot(kind) {
-    const list = (o.spots || []).filter(s => (!kind || s.kind === kind) && !spotsTaken.has(s));
-    return list.length ? list[Math.floor(rng() * list.length)] : null;
+  const goTo = (p, x, z) => { const [r, a] = toPolar(x, z); route(p, r, a); p.plan.push(V3(x, 0, z)); };
+  const open = s => !spotsTaken.has(s) && !(o.blocked && o.blocked(s.x, s.z));
+  function take(p, s, errand) {
+    if (p.spot) spotsTaken.delete(p.spot);
+    p.spot = s; spotsTaken.add(s); p.errand = errand; goTo(p, s.x, s.z);
   }
+  /* someone free to be fetched: not busy, not minding a stall, not indoors, not far */
+  function freeNear(p, max) {
+    let best = null, bd = max;
+    for (const q of people) {
+      if (q === p || q.gone || q.fixed || q.run || q.inside > 0 || q.frozen || (q.errand && q.errand !== 'idle')) continue;
+      const d = q.pos.distanceTo(p.pos); if (d < bd) { bd = d; best = q; }
+    }
+    return best;
+  }
+  const pickOf = list => list[Math.floor(rng() * list.length)];
   function think(p) {
     if (p.spot) { spotsTaken.delete(p.spot); p.spot = null; }
-    const roll = rng();
-    if (p.b === 'stroll' && roll < 0.45 && (o.spots || []).length) {
-      const s = freeSpot(); if (s) { p.spot = s; spotsTaken.add(s); const [r, a] = toPolar(s.x, s.z); route(p, r, a); p.plan.push(V3(s.x, 0, s.z)); return; }
+    p.look = null;
+    const kinds = [];
+    const offer = (k, ok) => { if (ok && likes[k] > 0 && k !== p.last) kinds.push([k, likes[k]]); };
+    offer('shop', spots.some(s => s.kind === 'shop' && open(s)));
+    offer('chat', [...circles.values()].some(c => c.filter(open).length >= 2));
+    offer('sit', spots.some(s => s.kind === 'sit' && open(s)));
+    offer('watch', spots.some(s => s.kind === 'watch' && open(s)));
+    offer('home', !!p.home);
+    if (!kinds.length) { p.errand = 'idle'; p.wait = 2 + rng() * 3; return; }   // everything's taken: wait a moment where you are
+    let roll = rng() * kinds.reduce((t, k) => t + k[1], 0), kind = kinds[0][0];
+    for (const [k, w] of kinds) { if ((roll -= w) <= 0) { kind = k; break; } }
+    p.last = kind;
+    if (kind === 'home') { p.errand = 'home'; goTo(p, p.home.x, p.home.z); return; }
+    if (kind === 'chat') {
+      const c = pickOf([...circles.values()].filter(c => c.filter(open).length >= 2)), free = c.filter(open);
+      take(p, free[0], 'chat');
+      const q = freeNear(p, 40);   // and fetch a friend to talk to
+      if (q) { take(q, free[1], 'chat'); q.wait = rng() * 0.6; }
+      return;
     }
-    const s = streets[Math.floor(rng() * streets.length)];
-    route(p, s.r, rng() * TAU);
+    take(p, pickOf(spots.filter(s => s.kind === kind && open(s))), kind);
   }
   /* panic: everyone makes for a way out and vanishes through it */
   function panic() {
     for (const p of people) {
       if (p.gone || p.fixed) continue;
+      if (p.inside > 0) { p.inside = 0; p.gone = true; p.a.root.visible = false; continue; }   // indoors already: they stay there
       p.run = true; p.state = 'go'; p.speed = 5 + rng() * 2; p.wait = rng() * 0.8;
       const ex = (o.exits || []).slice().sort((a, b) => a.distanceTo(p.pos) - b.distanceTo(p.pos))[Math.floor(rng() * 2)] || (o.exits || [])[0];
       if (!ex) continue;
       const [r, a] = toPolar(ex.x, ex.z); route(p, Math.max(streets[0].r, Math.min(streets[streets.length - 1].r, r)), a); p.plan.push(ex.clone()); p.exit = ex;
     }
   }
-  const tmp = V3();
+  /* there: what they do on arriving, and for how long */
+  function arrive(p) {
+    const s = p.spot;
+    if (p.errand === 'home') { p.inside = 15 + rng() * 30; p.a.root.visible = false; p.errand = null; return; }   // in at the door
+    p.look = s && s.look ? V3(s.look[0], 0, s.look[1]) : null; p.hold = 0;
+    if (p.errand === 'shop') { p.wait = 6 + rng() * 8; if (s.vendor) p.look = s.vendor.pos.clone(); }
+    else if (p.errand === 'chat') p.wait = 10 + rng() * 14;
+    else if (p.errand === 'watch') p.wait = 12 + rng() * 14;
+    else p.wait = 6 + rng() * 10;
+  }
+  const here = p => !p.plan.length && p.spot && p.pos.distanceTo(V3(p.spot.x, p.pos.y, p.spot.z)) < 2.5;
   return {
     people, spawn, panic, think, route,
     update(dt, t, opts = {}) {
+      // who's at a stall: the keeper turns to serve them
+      for (const p of people) { if (p.fixed) p.customer = null; if (p.spot && !p.gone) { spotsTaken.add(p.spot); if (!p.errand) p.errand = p.spot.kind; } }   // (those set down at a spot to begin with)
+      for (const p of people) if (!p.gone && p.errand === 'shop' && p.spot && p.spot.vendor && here(p)) p.spot.vendor.customer = p;
       for (const p of people) {
         if (p.gone) continue;
-        let sp = 0;
+        let sp = 0, talking = false;
+        if (p.inside > 0) {             // at home a while, then out of the door again on the next errand
+          if (opts.freeze) continue;
+          p.inside -= dt;
+          if (p.inside <= 0) { p.inside = 0; p.a.root.visible = true; p.wait = 0.5 + rng(); think(p); }
+          continue;
+        }
         if (p.frozen || opts.freeze) {   // everyone stops and stares
           if (opts.stare) p.yaw = dampAngle(p.yaw, Math.atan2(opts.stare.x - p.pos.x, opts.stare.z - p.pos.z), 5, dt);
         } else if (p.fixed) {          // a vendor behind a stall, a guard at a post
-          if (p.look) p.yaw = dampAngle(p.yaw, Math.atan2(p.look.x - p.pos.x, p.look.z - p.pos.z), 3, dt);
+          const c = p.customer, at = c ? c.pos : p.look;
+          if (at) p.yaw = dampAngle(p.yaw, Math.atan2(at.x - p.pos.x, at.z - p.pos.z), c ? 5 : 3, dt);
+          if (c) talking = Math.sin(t * 0.9 + p.ph) > 0;   // the price, the weather, the sky
         } else if (p.plan.length) {
           if (p.wait > 0) p.wait -= dt;
           else {
             const g = p.plan[0], dx = g.x - p.pos.x, dz = g.z - p.pos.z, d = Math.hypot(dx, dz);
             if (d < (p.run ? 1.2 : 0.8)) {
-              p.plan.shift();
+              p.plan.shift(); p.best = null; p.stuck = 0;
               if (!p.plan.length) {
                 if (p.run && p.exit) { p.gone = true; p.a.root.visible = false; continue; }   // in through a door, or out of the gate
-                p.wait = p.spot ? 5 + rng() * 9 : 1 + rng() * 4;
-                p.look = p.spot && p.spot.look ? V3(p.spot.look[0], 0, p.spot.look[1]) : null;
+                arrive(p);
               }
             } else {
-              sp = p.speed * (p.run ? 1 : 1);
-              tmp.copy(p.pos);
-              p.pos.x += dx / d * sp * dt; p.pos.z += dz / d * sp * dt;
+              sp = p.speed;
+              stepAround(p.pos, dx / d * sp * dt, dz / d * sp * dt, resolve, p);   // round the barrels and the stalls, not through them
               // don't walk through other folk
-              for (const q of people) { if (q === p || q.gone) continue; const ox = p.pos.x - q.pos.x, oz = p.pos.z - q.pos.z, od = Math.hypot(ox, oz); if (od < 0.7 && od > 1e-3) { p.pos.x += ox / od * (0.7 - od) * 0.5; p.pos.z += oz / od * (0.7 - od) * 0.5; } }
+              for (const q of people) { if (q === p || q.gone || q.inside > 0) continue; const ox = p.pos.x - q.pos.x, oz = p.pos.z - q.pos.z, od = Math.hypot(ox, oz); if (od < 0.7 && od > 1e-3) { p.pos.x += ox / od * (0.7 - od) * 0.5; p.pos.z += oz / od * (0.7 - od) * 0.5; } }
               resolve(p.pos);
-              if (tmp.distanceTo(p.pos) < sp * dt * 0.25) { p.stuck = (p.stuck || 0) + dt; if (p.stuck > 1.2) { p.plan.shift(); p.stuck = 0; } } else p.stuck = 0;
+              // getting no nearer (pinned, or shuffling on the spot): give up on this corner and make for the next
+              const nd = Math.hypot(g.x - p.pos.x, g.z - p.pos.z);
+              if (p.best == null || nd < p.best - 0.3) { p.best = nd; p.stuck = 0; } else p.stuck = (p.stuck || 0) + dt;
+              if (p.stuck > 1.5) {
+                p.plan.shift(); p.stuck = 0; p.best = null;
+                if (!p.plan.length && !p.run) { if (p.spot && Math.hypot(p.spot.x - p.pos.x, p.spot.z - p.pos.z) > 2.5) { p.wait = 1 + rng() * 2; think(p); } else arrive(p); }   // can't get there: something else to do
+              }
               p.yaw = dampAngle(p.yaw, Math.atan2(dx, dz), 8, dt);
             }
           }
         } else {
+          // at the errand: serve, be served, talk, rest, watch
+          if (p.errand === 'shop' && p.spot && p.spot.vendor) { p.look = p.spot.vendor.pos; talking = Math.sin(t * 0.9 + p.spot.vendor.ph) < 0; }
+          if (p.errand === 'chat' && p.spot) {
+            const friend = people.find(q => q !== p && !q.gone && q.inside <= 0 && q.spot && q.spot.circle === p.spot.circle);
+            if (friend && here(friend)) talking = Math.sin(t * 0.7 + p.ph * 3) > 0.1;
+            else if (friend && (p.hold = (p.hold || 0) + dt) < 25) p.wait = Math.max(p.wait, 1);   // the friend's on the way: wait for them
+          }
           if (p.look) p.yaw = dampAngle(p.yaw, Math.atan2(p.look.x - p.pos.x, p.look.z - p.pos.z), 3, dt);
           p.wait -= dt; if (p.wait <= 0 && !p.run) think(p);
         }
         // the sky draws every eye now and then
-        if (opts.sky && !p.run && !sp && rng() < 0.002) p.look = opts.sky;
+        if (opts.sky && !p.run && !sp && !talking && rng() < 0.002) p.look = opts.sky;
         p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 1);
         p.a.root.position.copy(p.pos); p.a.root.rotation.y = p.yaw;
-        p.a.animate(dt, { speed: sp, onGround: true, t: t + p.ph, talking: !sp && p.spot && p.spot.kind === 'chat' });
+        p.a.animate(dt, { speed: sp, onGround: true, t: t + p.ph, talking });
       }
     },
   };

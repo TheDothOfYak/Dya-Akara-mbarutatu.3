@@ -137,12 +137,12 @@ export function createMegla(ctx) {
   const inside = (s, x, z) => (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r);
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
   function groundAt(x, z, y) {
-    let g = heightAt(x, z);
+    let g = auto.ground(x, z, y);
     for (const s of near(x, z)) { if (s.off || s.y1 > y + STEP || s.y1 <= g) continue; if (inside(s, x, z)) g = s.y1; }
     return g;
   }
   function resolve(p, rad = PR) {
-    if (p === P.pos) auto.resolve(p, rad, PH);   // you, not the folk: they keep to the colliders placed by hand
+    auto.resolve(p, rad, PH);
     for (const s of near(p.x, p.z)) {
       if (s.off || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (s.kind === 'box') {
@@ -787,7 +787,7 @@ export function createMegla(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos, P.ride ? 0.9 : PR);
     P.pos.y += P.vel.y * dt;
-    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
+    const g = groundAt(P.pos.x, P.pos.z, P.pos.y);
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12; }
     else if (P.onGround && P.pos.y - g < 1.2 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; }
     else P.onGround = false;

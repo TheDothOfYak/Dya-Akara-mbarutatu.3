@@ -381,7 +381,7 @@ export function createEnemies(ctx) {
             const ang = Math.random() * Math.PI * 2, r = 2.5 + Math.random() * 2;
             ctx.particles.burst(e.pos.x, e.pos.y + 0.5, e.pos.z, 14, { color: 0x9a4aff, speed: 4, size: 0.4, life: 0.5 });
             e.pos.x = P.pos.x + Math.cos(ang) * r; e.pos.z = P.pos.z + Math.sin(ang) * r;
-            e.pos.y = ctx.world.col.ground(e.pos.x, e.pos.z, P.pos.y + 2, true);
+            e.pos.y = ctx.world.col.ground(e.pos.x, e.pos.z, P.pos.y + 2);
             ctx.particles.burst(e.pos.x, e.pos.y + 0.5, e.pos.z, 14, { color: 0xc08aff, speed: 4, size: 0.4, life: 0.5 });
             e.blinkGlow = 1;
             ctx.sfx.blink();
@@ -440,7 +440,7 @@ export function createEnemies(ctx) {
     const step = S.w * dt; S.a += S.dir * step; S.done += step;
     const k = Math.min(1, S.done / S.left);
     e.pos.x = S.t.x + Math.cos(S.a) * S.r; e.pos.z = S.t.z + Math.sin(S.a) * S.r;
-    const g = ctx.world.col.ground(e.pos.x, e.pos.z, S.g + 3, true);
+    const g = ctx.world.col.ground(e.pos.x, e.pos.z, S.g + 3);
     e.pos.y = Math.max(g, lerp0(S.g, g, k) + Math.sin(k * Math.PI) * S.lift);   // up off the ground on the vine, and down again
     // moving along the circle: the tangent
     const tx = -Math.sin(S.a) * S.dir, tz = Math.cos(S.a) * S.dir;
@@ -463,7 +463,7 @@ export function createEnemies(ctx) {
       if (e.swing) { updateSwing(e, dt); return; }
       e.swingCd = (e.swingCd || 0) - dt;
       const v = Math.hypot(e.vel.x, e.vel.z);
-      if (e.swingCd <= 0 && (v > T.speed * 0.6 || (v > 0.6 && Math.random() < 0.04)) && !e.windup && e.state !== 'windup' && e.state !== 'attack' && ctx.world.col.ground(e.pos.x, e.pos.z, e.pos.y + 0.5, true) <= e.pos.y + 0.1) {
+      if (e.swingCd <= 0 && (v > T.speed * 0.6 || (v > 0.6 && Math.random() < 0.04)) && !e.windup && e.state !== 'windup' && e.state !== 'attack' && ctx.world.col.ground(e.pos.x, e.pos.z, e.pos.y + 0.5) <= e.pos.y + 0.1) {
         e.swingCd = 0.25;   // look again in a moment
         const t = findTrunk(e);
         if (t) { startSwing(e, t); updateSwing(e, dt); return; }
@@ -489,9 +489,9 @@ export function createEnemies(ctx) {
     }
     if (T.ai !== 'flyer' && d < T.rad + 0.45 && d > 1e-3) { e.pos.x -= dx / d * (T.rad + 0.45 - d); e.pos.z -= dz / d * (T.rad + 0.45 - d); }
     if (T.ai !== 'flyer') {
-      ctx.world.col.resolve(e.pos, T.rad, 1.6, true);
+      ctx.world.col.resolve(e.pos, T.rad, 1.6);
       if (ctx.G.arena) ctx.arenaClamp(e.pos, ctx.G.arena - 1);
-      const g = ctx.world.col.ground(e.pos.x, e.pos.z, e.pos.y, true);
+      const g = ctx.world.col.ground(e.pos.x, e.pos.z, e.pos.y);
       if (e.pos.y <= g) { e.pos.y = g; e.vel.y = 0; }
     }
     if (e.pos.y < -60) { e.hp = 0; kill(e); }
@@ -597,7 +597,7 @@ export function createEnemies(ctx) {
     const ang = Math.random() * Math.PI * 2;
     e.pos.x = P.pos.x + Math.cos(ang) * r; e.pos.z = P.pos.z + Math.sin(ang) * r;
     if (ctx.G.arena) ctx.arenaClamp(e.pos, ctx.G.arena - 2);
-    e.pos.y = ctx.world.col.ground(e.pos.x, e.pos.z, ctx.world.heightAt(e.pos.x, e.pos.z) + 1, true);
+    e.pos.y = ctx.world.col.ground(e.pos.x, e.pos.z, ctx.world.heightAt(e.pos.x, e.pos.z) + 1);
     ctx.particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 20, { color: 0xc08aff, speed: 5, size: 0.45, life: 0.5 });
     ctx.sfx.blink();
   }
