@@ -22,6 +22,7 @@ import { buildEikar } from './actors.js';
 import { buildStryx } from './esik_land.js';
 import { damp, dampAngle, clamp } from './util.js';
 import { stepAround } from './terrain.js';
+import { avoid, angDiff } from './ai.js';
 
 const TAU = Math.PI * 2;
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -332,8 +333,19 @@ export function buildMudFountain(scene, x, z, g, opts = {}) {
    blocked(x, z): is that spot taken up by something solid?
    likes: how much the town goes in for each errand ({ shop: 3, … }).
    Nobody wanders: every walk is to somewhere, for something.
+
+   And each of them is somebody: quick or slow on their feet, chatty
+   or not, nosy or not, patient or not — it shows in what they choose
+   to do and how long they'll wait. A stall with a customer at it gets
+   a little queue behind (the impatient give up and go); friends who
+   have had their talk sometimes go on together, side by side; in a
+   chat one speaks at a time while the others look at them and nod;
+   walkers pass each other on the right and wait for someone crossing;
+   and everyone glances at you as you go by (and the stallkeepers try
+   to catch your eye). opts.player = { pos, vel } in update.
    ================================================================ */
 const LIKES = { shop: 3, chat: 2.5, watch: 3, sit: 1.5, home: 2 };
+const QUEUE = 2;   // how many wait behind a stall's customer
 export function createCrowd(o) {
   const { scene, rng, groundAt, resolve, C } = o;
   const people = [];
@@ -349,8 +361,10 @@ export function createCrowd(o) {
 
   function spawn(look, at, behaviour) {
     const a = buildEikar(Object.assign({ weapon: 'none', flasks: false, scale: 0.9 + rng() * 0.16 }, look)); scene.add(a.root);
-    const p = { a, pos: at.clone(), yaw: rng() * TAU, plan: [], state: 'idle', wait: rng() * 3, ph: rng() * 9, speed: 1.3 + rng() * 0.5, lane: (rng() - 0.5) * 2.4, b: behaviour || 'stroll', spot: null, run: false, gone: false, look: null,
-      errand: null, last: null, home: homes.length ? homes[Math.floor(rng() * homes.length)] : null, inside: 0 };
+    // who they are: quick or slow, chatty or quiet, nosy or not, patient or not
+    const me = { pace: 0.8 + rng() * 0.45, social: rng(), curious: rng(), patient: rng() };
+    const p = { a, pos: at.clone(), yaw: rng() * TAU, plan: [], state: 'idle', wait: rng() * 3, ph: rng() * 9, speed: (1.2 + rng() * 0.3) * me.pace, lane: (rng() - 0.5) * 2.4, b: behaviour || 'stroll', spot: null, run: false, gone: false, look: null,
+      errand: null, last: null, home: homes.length ? homes[Math.floor(rng() * homes.length)] : null, inside: 0, me, vx: 0, vz: 0, glanceT: 0, nodT: 0 };
     p.pos.y = groundAt(p.pos.x, p.pos.z, 3); a.root.position.copy(p.pos); people.push(p);
     return p;
   }
@@ -404,10 +418,13 @@ export function createCrowd(o) {
   const pickOf = list => list[Math.floor(rng() * list.length)];
   function think(p) {
     if (p.spot) { spotsTaken.delete(p.spot); p.spot = null; }
-    p.look = null;
+    if (p.queueAt) leaveQueue(p);
+    p.leader = null; p.look = null;
     const kinds = [];
-    const offer = (k, ok) => { if (ok && likes[k] > 0 && k !== p.last) kinds.push([k, likes[k]]); };
-    offer('shop', spots.some(s => s.kind === 'shop' && open(s)));
+    const me = p.me || { social: 0.5, curious: 0.5, patient: 0.5 };
+    const taste = { chat: 0.4 + me.social * 1.4, watch: 0.4 + me.curious * 1.4, shop: 0.7 + me.curious * 0.6, sit: 1.4 - me.social * 0.6, home: 1.3 - me.social * 0.5 };
+    const offer = (k, ok) => { if (ok && likes[k] > 0 && k !== p.last) kinds.push([k, likes[k] * (taste[k] || 1)]); };
+    offer('shop', spots.some(s => s.kind === 'shop' && (open(s) || (s.queue || []).length < QUEUE)));
     offer('chat', [...circles.values()].some(c => c.filter(open).length >= 2));
     offer('sit', spots.some(s => s.kind === 'sit' && open(s)));
     offer('watch', spots.some(s => s.kind === 'watch' && open(s)));
@@ -424,7 +441,30 @@ export function createCrowd(o) {
       if (q) { take(q, free[1], 'chat'); q.wait = rng() * 0.6; }
       return;
     }
+    if (kind === 'shop') {
+      const free = spots.filter(s => s.kind === 'shop' && open(s));
+      if (free.length) { take(p, pickOf(free), 'shop'); return; }
+      // every stall busy: wait your turn behind one
+      const s = pickOf(spots.filter(s => s.kind === 'shop' && (s.queue || []).length < QUEUE));
+      (s.queue || (s.queue = [])).push(p); p.queueAt = s; p.errand = 'queue'; p.patience = 8 + p.me.patient * 30;
+      const q = queueSpot(s, s.queue.length - 1); goTo(p, q.x, q.z);
+      return;
+    }
     take(p, pickOf(spots.filter(s => s.kind === kind && open(s))), kind);
+  }
+  /* the place in a stall's queue: back from the customer's spot, away from the stall */
+  function queueSpot(s, i) {
+    const bx = s.x - s.look[0], bz = s.z - s.look[1], L = Math.hypot(bx, bz) || 1;
+    return V3(s.x + bx / L * 1.1 * (i + 1) + (i % 2 ? 0.25 : -0.25), 0, s.z + bz / L * 1.1 * (i + 1));
+  }
+  function leaveQueue(p) { const s = p.queueAt; if (s && s.queue) { const i = s.queue.indexOf(p); if (i >= 0) s.queue.splice(i, 1); } p.queueAt = null; }
+  /* two friends done talking, sometimes off on together: one leads, the other walks alongside */
+  function goTogether(p, q) {
+    think(p);
+    if (p.errand === 'home' || p.errand === 'idle' || p.errand === 'queue') return false;
+    if (q.spot) { spotsTaken.delete(q.spot); q.spot = null; }
+    q.errand = 'with'; q.leader = p; q.plan = []; q.side = rng() < 0.5 ? 1 : -1; q.wait = 0;
+    return true;
   }
   /* panic: everyone makes for a way out and vanishes through it */
   function panic() {
@@ -448,9 +488,11 @@ export function createCrowd(o) {
     else p.wait = 6 + rng() * 10;
   }
   const here = p => !p.plan.length && p.spot && p.pos.distanceTo(V3(p.spot.x, p.pos.y, p.spot.z)) < 2.5;
+  const others = []; let you = null;
   return {
     people, spawn, panic, think, route,
     update(dt, t, opts = {}) {
+      you = opts.player ? { pos: opts.player.pos, vx: opts.player.vel ? opts.player.vel.x : 0, vz: opts.player.vel ? opts.player.vel.z : 0 } : null;
       // who's at a stall: the keeper turns to serve them
       for (const p of people) { if (p.fixed) p.customer = null; if (p.spot && !p.gone) { spotsTaken.add(p.spot); if (!p.errand) p.errand = p.spot.kind; } }   // (those set down at a spot to begin with)
       for (const p of people) if (!p.gone && p.errand === 'shop' && p.spot && p.spot.vendor && here(p)) p.spot.vendor.customer = p;
@@ -463,25 +505,58 @@ export function createCrowd(o) {
           if (p.inside <= 0) { p.inside = 0; p.a.root.visible = true; p.wait = 0.5 + rng(); think(p); }
           continue;
         }
+        if (!p.frozen && !opts.freeze && !p.run && p.errand === 'queue' && !p.plan.length) {
+          // waiting in line: shuffle up as it moves, give up if it takes too long
+          const s = p.queueAt, i = s && s.queue ? s.queue.indexOf(p) : -1;
+          p.patience -= dt;
+          if (!s || i < 0 || p.patience <= 0) { p.wait = 0.5; think(p); }
+          else if (i === 0 && open(s)) { leaveQueue(p); take(p, s, 'shop'); }
+          else { const q = queueSpot(s, i); if (Math.hypot(q.x - p.pos.x, q.z - p.pos.z) > 0.5) p.plan = [q]; p.look = V3(s.look[0], 0, s.look[1]); }
+        }
+        if (!p.frozen && !opts.freeze && !p.run && p.errand === 'with') {
+          // walking alongside a friend; when they stop, stop by them and keep talking; when they go in, find your own way
+          const L = p.leader;
+          if (!L || L.gone || L.inside > 0 || L.errand === 'home' || L.errand === 'with') { p.leader = null; think(p); }
+          else {
+            const ly = L.yaw, sx = Math.cos(ly) * p.side * 0.9, sz = -Math.sin(ly) * p.side * 0.9;
+            const tx = L.pos.x + sx - Math.sin(ly) * 0.3, tz = L.pos.z + sz - Math.cos(ly) * 0.3;
+            p.plan = Math.hypot(tx - p.pos.x, tz - p.pos.z) > 0.6 ? [V3(tx, 0, tz)] : [];
+            p.speed = Math.max(p.speed, L.speed * 1.15);
+            if (!L.plan.length) { p.look = L.pos; p.withT = (p.withT || 0) + dt; if (p.withT > 6 + rng() * 6) { p.withT = 0; p.leader = null; p.speed = (1.2 + rng() * 0.3) * p.me.pace; think(p); } }
+          }
+        }
         if (p.frozen || opts.freeze) {   // everyone stops and stares
           if (opts.stare) p.yaw = dampAngle(p.yaw, Math.atan2(opts.stare.x - p.pos.x, opts.stare.z - p.pos.z), 5, dt);
         } else if (p.fixed) {          // a vendor behind a stall, a guard at a post
           const c = p.customer, at = c ? c.pos : p.look;
           if (at) p.yaw = dampAngle(p.yaw, Math.atan2(at.x - p.pos.x, at.z - p.pos.z), c ? 5 : 3, dt);
           if (c) talking = Math.sin(t * 0.9 + p.ph) > 0;   // the price, the weather, the sky
+          else {   // nobody buying: an eye on whoever's passing, and a word to catch them
+            let near = null, nd = 6;
+            for (const q of people) { if (q === p || q.gone || q.fixed || q.inside > 0) continue; const d2 = q.pos.distanceTo(p.pos); if (d2 < nd) { nd = d2; near = q; } }
+            if (you && you.pos.distanceTo(p.pos) < 7) near = you;
+            if (near) { p.gazeAt = near.pos; talking = Math.sin(t * 1.3 + p.ph) > 0.75; }
+          }
         } else if (p.plan.length) {
           if (p.wait > 0) p.wait -= dt;
           else {
             const g = p.plan[0], dx = g.x - p.pos.x, dz = g.z - p.pos.z, d = Math.hypot(dx, dz);
             if (d < (p.run ? 1.2 : 0.8)) {
-              p.plan.shift(); p.best = null; p.stuck = 0;
+              p.plan.shift(); p.best = null; p.stuck = 0; p.vx = p.vz = 0; p.fails = 0;
+              if (!p.plan.length && (p.errand === 'queue' || p.errand === 'with')) continue;   // in line / beside a friend: nothing more to it
               if (!p.plan.length) {
                 if (p.run && p.exit) { p.gone = true; p.a.root.visible = false; continue; }   // in through a door, or out of the gate
                 arrive(p);
               }
             } else {
-              sp = p.speed;
-              stepAround(p.pos, dx / d * sp * dt, dz / d * sp * dt, resolve, p);   // round the barrels and the stalls, not through them
+              sp = p.speed * (p.errand === 'with' && d < 1.2 ? 0.6 : 1);
+              // make way: pass oncoming folk on the right, ease off for someone crossing (and for you)
+              others.length = 0;
+              for (const q of people) if (q !== p && !q.gone && q.inside <= 0 && q !== p.leader && q.leader !== p && Math.abs(q.pos.x - p.pos.x) < 6 && Math.abs(q.pos.z - p.pos.z) < 6) others.push(q);
+              if (you) others.push(you);
+              const av = p.run ? { k: 1, vx: dx / d * sp, vz: dz / d * sp } : avoid({ pos: p.pos, vx: dx / d * sp, vz: dz / d * sp }, others, 0.8);
+              p.vx = av.vx * av.k; p.vz = av.vz * av.k; sp *= av.k;
+              stepAround(p.pos, p.vx * dt, p.vz * dt, resolve, p);   // round the barrels and the stalls, not through them
               // don't walk through other folk
               for (const q of people) { if (q === p || q.gone || q.inside > 0) continue; const ox = p.pos.x - q.pos.x, oz = p.pos.z - q.pos.z, od = Math.hypot(ox, oz); if (od < 0.7 && od > 1e-3) { p.pos.x += ox / od * (0.7 - od) * 0.5; p.pos.z += oz / od * (0.7 - od) * 0.5; } }
               resolve(p.pos);
@@ -490,9 +565,18 @@ export function createCrowd(o) {
               if (p.best == null || nd < p.best - 0.3) { p.best = nd; p.stuck = 0; } else p.stuck = (p.stuck || 0) + dt;
               if (p.stuck > 1.5) {
                 p.plan.shift(); p.stuck = 0; p.best = null;
-                if (!p.plan.length && !p.run) { if (p.spot && Math.hypot(p.spot.x - p.pos.x, p.spot.z - p.pos.z) > 2.5) { p.wait = 1 + rng() * 2; think(p); } else arrive(p); }   // can't get there: something else to do
+                // boxed into a corner, over and over: back out the way that's open — and if even that fails
+                // with nobody looking, they're simply back out on the street
+                p.fails = (p.fails || 0) + 1;
+                if (p.fails >= 3) {
+                  let out = null;
+                  for (let k = 0; k < 12 && !out; k++) { const a = k / 12 * TAU + p.ph, r = 1.2 + (k % 3) * 0.8, q = V3(p.pos.x + Math.sin(a) * r, 0, p.pos.z + Math.cos(a) * r); if (!o.blocked || !o.blocked(q.x, q.z)) out = q; }
+                  if (out && p.fails < 6) p.plan.unshift(out);
+                  else if (!you || you.pos.distanceTo(p.pos) > 25) { const [r, a] = toPolar(p.pos.x, p.pos.z), ring = streets.reduce((b, st) => Math.abs(st.r - r) < Math.abs(b.r - r) ? st : b, streets[0]).r; p.pos.copy(atPolar(ring, a)); p.fails = 0; }
+                }
+                if (!p.plan.length && !p.run && p.errand !== 'queue' && p.errand !== 'with') { if (p.spot && Math.hypot(p.spot.x - p.pos.x, p.spot.z - p.pos.z) > 2.5) { p.wait = 1 + rng() * 2; think(p); } else arrive(p); }   // can't get there: something else to do
               }
-              p.yaw = dampAngle(p.yaw, Math.atan2(dx, dz), 8, dt);
+              p.yaw = dampAngle(p.yaw, Math.atan2(p.vx || dx, p.vz || dz), 8, dt);
             }
           }
         } else {
@@ -500,17 +584,39 @@ export function createCrowd(o) {
           if (p.errand === 'shop' && p.spot && p.spot.vendor) { p.look = p.spot.vendor.pos; talking = Math.sin(t * 0.9 + p.spot.vendor.ph) < 0; }
           if (p.errand === 'chat' && p.spot) {
             const friend = people.find(q => q !== p && !q.gone && q.inside <= 0 && q.spot && q.spot.circle === p.spot.circle);
-            if (friend && here(friend)) talking = Math.sin(t * 0.7 + p.ph * 3) > 0.1;
+            if (friend && here(friend)) {
+              // one speaks at a time: the circle passes the talk round every few breaths
+              const c = p.spot.circle, sp_ = c.talker;
+              if (!sp_ || sp_.gone || !sp_.spot || sp_.spot.circle !== c || (c.talkT -= dt / Math.max(1, c.n || 1)) <= 0) {
+                const mates = people.filter(q => !q.gone && q.spot && q.spot.circle === c && here(q));
+                c.n = mates.length; c.talker = mates.filter(q => q !== sp_)[Math.floor(rng() * Math.max(1, mates.length - 1))] || p;
+                c.talkT = 2 + rng() * 3.5 * (0.5 + c.talker.me.social);
+              }
+              talking = c.talker === p;
+              if (!talking) { p.look = c.talker.pos; if ((p.nodT -= dt) < -2 && rng() < dt * 0.6) p.nodT = 1; }
+            }
             else if (friend && (p.hold = (p.hold || 0) + dt) < 25) p.wait = Math.max(p.wait, 1);   // the friend's on the way: wait for them
           }
+          if (p.errand === 'with' && p.leader) talking = Math.sin(t * 0.6 + p.ph) > 0.3;   // the talk goes on
           if (p.look) p.yaw = dampAngle(p.yaw, Math.atan2(p.look.x - p.pos.x, p.look.z - p.pos.z), 3, dt);
-          p.wait -= dt; if (p.wait <= 0 && !p.run) think(p);
+          p.wait -= dt;
+          if (p.wait <= 0 && !p.run) {
+            const mate = p.errand === 'chat' && p.spot ? people.find(q => q !== p && !q.gone && q.spot && q.spot.circle === p.spot.circle && here(q) && !q.leader) : null;
+            if (mate && rng() < 0.25 + (p.me.social + mate.me.social) * 0.2 && goTogether(p, mate)) { /* off together */ }
+            else think(p);
+          }
         }
         // the sky draws every eye now and then
         if (opts.sky && !p.run && !sp && !talking && rng() < 0.002) p.look = opts.sky;
+        // glances: at you as you go by (the nosy longer), at whoever's speaking, at the stallkeeper's passer-by
+        let gaze = null;
+        const g = p.gazeAt || (you && !p.run && you.pos.distanceTo(p.pos) < 4 + p.me.curious * 6 ? you.pos : null);
+        if (g) { const rel = angDiff(p.yaw, Math.atan2(g.x - p.pos.x, g.z - p.pos.z)); if (Math.abs(rel) < 1.9) gaze = rel; }
+        else if (p.look && !sp) gaze = angDiff(p.yaw, Math.atan2(p.look.x - p.pos.x, p.look.z - p.pos.z));
+        p.gazeAt = null;
         p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 1);
         p.a.root.position.copy(p.pos); p.a.root.rotation.y = p.yaw;
-        p.a.animate(dt, { speed: sp, onGround: true, t: t + p.ph, talking });
+        p.a.animate(dt, { speed: sp, onGround: true, t: t + p.ph, talking, gaze, nod: p.nodT > 0 ? 1 : 0 });
       }
     },
   };

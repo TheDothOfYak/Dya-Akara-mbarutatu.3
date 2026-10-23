@@ -31,7 +31,8 @@ import { NPC_LOOKS } from './npcs.js';
 import { buildAngel, buildSniller } from './velki.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
-import { Colliders } from './terrain.js';
+import { Colliders, stepAround } from './terrain.js';
+import { packRing } from './ai.js';
 import { createSolids, inColliders, noSolid } from './solid.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -1607,7 +1608,12 @@ export function createRoad(ctx) {
     const rodakDown = foes.filter(o => o.kind === 'rodak' && o.dead && !o.alpha).length;
     if (rodakDown >= 2 && !f.alpha) for (const o of foes) if (o.kind === 'rodak' && !o.dead && !o.fled && !o.alpha) { o.fled = true; o.state = 'flee'; o.timer = 4; }
   }
+  const PACKS = { rodak: 1, wildpunk: 1, looter: 1 };   // the ones that hunt together, and take turns
   function updateFoes(dt, playing) {
+    // a pack round the boy: one goes in at a time, the rest wait round him (ai.js packRing)
+    const hunters = foes.filter(f => !f.dead && !f.fled && f.state !== 'flee' && PACKS[f.kind] && (f.waitT == null || f.roused) && f.pos.distanceTo(P.pos) < 20);
+    for (const f of hunters) f.attacking = f.state === 'windup' || f.state === 'recover';
+    packRing(hunters, P.pos, P.yaw, 1);
     for (const f of foes) {
       if (f.dead) { if (f.deadT != null) { f.deadT += dt; f.a.root.scale.multiplyScalar(Math.max(0.001, 1 - dt * 2)); if (f.deadT > 0.7) { scene.remove(f.a.root); f.deadT = null; } } continue; }
       f.flash = Math.max(0, f.flash - dt * 5); f.a.flash && f.a.flash(f.flash);
@@ -1640,16 +1646,21 @@ export function createRoad(ctx) {
         else {
           f.cd -= dt;
           wy = Math.atan2(dx, dz);
-          if (f.kind === 'rodak' && d < 6 && f.cd > 0) { wy += Math.PI / 2; want = 4; }     // circling, waiting for an opening
+          if (hunters.length > 1 && !f.mayGo && d < reach + 7) {
+            // not its turn: round to its place in the ring, facing him, waiting for an opening
+            const r = reach + 2.6, gx = P.pos.x + Math.sin(f.slot) * r, gz = P.pos.z + Math.cos(f.slot) * r, gd = Math.hypot(gx - f.pos.x, gz - f.pos.z);
+            if (gd > 0.8) { wy = Math.atan2(gx - f.pos.x, gz - f.pos.z); want = Math.min(4.5, gd * 2.5); }
+          }
+          else if (f.kind === 'rodak' && d < 6 && f.cd > 0) { wy += Math.PI / 2; want = 4; }     // circling, waiting for an opening
           else want = d > reach ? (f.kind === 'rodak' ? 7 : 5.4) : 0;
-          if (d < reach + 0.4 && f.cd <= 0) { f.state = 'windup'; f.timer = 0.55; f.cd = 1.4 + rng(); }
+          if (d < reach + 0.4 && f.cd <= 0 && (f.mayGo || hunters.length < 2)) { f.state = 'windup'; f.timer = 0.55; f.cd = 1.4 + rng(); }
         }
       }
       if (f.stun > 0) want = 0;
       f.yaw = dampAngle(f.yaw, wy, 8, dt);
       f.vel.x = damp(f.vel.x, Math.sin(f.yaw) * want, 8, dt); f.vel.z = damp(f.vel.z, Math.cos(f.yaw) * want, 8, dt);
-      f.pos.x += f.vel.x * dt; f.pos.z += f.vel.z * dt;
-      resolve(f.pos, f.kind === 'wildpunk' ? 1.3 : 0.6);   // a Punk's legs reach well out from its body: keep all of them out of the walls
+      const fr = f.kind === 'wildpunk' ? 1.3 : 0.6;   // a Punk's legs reach well out from its body: keep all of them out of the walls
+      stepAround(f.pos, f.vel.x * dt, f.vel.z * dt, q => resolve(q, fr), f);   // round what's in the way, not stuck on it
       f.pos.y = groundAt(f.pos.x, f.pos.z, f.pos.y + 1);
       f.a.root.position.copy(f.pos); f.a.root.rotation.y = f.yaw;
       f.a.animate(dt, { speed: Math.hypot(f.vel.x, f.vel.z), t, windup: f.windup || 0, attack: f.attackA || 0, onGround: true, swing: f.kind === 'looter' && f.attackA > 0 ? { kind: 1, p: 1 - f.attackA } : null });
@@ -1870,7 +1881,7 @@ export function createRoad(ctx) {
     if (EV.cart && EV.cart.state === 'carry') EV.cart.wheel.rotation.x += Math.hypot(P.vel.x, P.vel.z) * dt / 0.6;   // turning as he rolls it
     // the hat: walking up to it is enough — no button to find in the blur
     if (MK && sub === 'hat' && MK.hat && playing && ((MK.hatT = (MK.hatT || 0) + dt) > 45 || Math.hypot(MK.hat.pos.x - P.pos.x, MK.hat.pos.z - P.pos.z) < 1.6)) { sfx.ui(); marketHatOn(); }   // (and if he never gets there, the moment passes anyway)
-    if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });
+    if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos, player: P });
     kit.update(t, dt, particles);
     if (stage === 'market') fountain.update(dt, t, particles, MK && MK.esc ? [] : [P.pos]);
     if (stage === 'market' && MK && MK.esc && playing) escTick(dt);

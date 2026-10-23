@@ -176,6 +176,7 @@ export function createEnemies(ctx) {
   function kill(e) {
     endSwing(e);
     e.dead = true; e.state = 'dead'; e.timer = 0;
+    fallen.push({ x: e.pos.x, z: e.pos.z, kind: e.kind, group: e.group, t: ctx.G.t }); if (fallen.length > 20) fallen.shift();
     ctx.sfx.die();
     ctx.particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 30, { color: e.T.color, speed: 9, size: 0.5, life: 0.9, gravity: -6 });
     // Rodak travel in threes: fell one, and the whole pack is gone
@@ -296,6 +297,7 @@ export function createEnemies(ctx) {
      the longer and nearer it sees you; a sound makes it turn and come to see. Close enough, and it
      knows you're there whichever way it faces. */
   const RAY = (a, b) => ctx.world.col.ray(a, b);
+  const fallen = [];   // where its kind have fallen lately: come across one and it's wary, and looks about
   function perceive(e, dt, d, aggroR, playing) {
     const P = ctx.P, T = e.T, m = T.mind || {};
     if (!playing) { e.seen = false; e.aware = Math.max(0, e.aware - dt * 0.5); return; }
@@ -316,6 +318,12 @@ export function createEnemies(ctx) {
       // out of sight, it grows less sure — slowly while it's still looking for you
       const hunting = e.state === 'chase' || e.state === 'circle' || e.state === 'windup' || e.state === 'attack' || e.state === 'recover';
       if (!hunting) e.aware = Math.max(0, e.aware - dt * (e.state === 'idle' ? 0.08 : 0.15));
+    }
+    if (e.state === 'idle' && !T.disp) for (const f of fallen) {
+      if (ctx.G.t - f.t > 90 || (e.knows && e.knows.has(f)) || (f.kind !== e.kind && f.group !== e.group)) continue;
+      if (Math.hypot(f.x - e.pos.x, f.z - e.pos.z) > 16) continue;
+      (e.knows || (e.knows = new Set())).add(f);
+      e.aware = Math.min(1, e.aware + 0.45); e.heard = { x: f.x, z: f.z, t: ctx.G.t, what: 'fallen' };
     }
     const s = ctx.ears && ctx.ears.heard(e.pos.x, e.pos.z, m.ears || 1, ctx.G.t - 0.4, e);
     if (s && (!e.heard || ctx.G.t - e.heard.t > 0.3)) {
@@ -345,6 +353,23 @@ export function createEnemies(ctx) {
     ring.sort((a, b) => Math.atan2(a.pos.x - P.pos.x, a.pos.z - P.pos.z) - Math.atan2(b.pos.x - P.pos.x, b.pos.z - P.pos.z));
     const back = (P.yaw || 0) + Math.PI;
     ring.forEach((o, i) => { o.slot = back + (i - (ring.length - 1) / 2) * Math.min(1.1, (Math.PI * 2) / Math.max(1, ring.length)); });
+  }
+  /* the herds: who's in each, its middle, who leads, and whether it's running from something */
+  const herds = new Map();
+  function surveyHerds(dt) {
+    for (const H of herds.values()) { H.n = 0; H.fleeT -= dt; }
+    for (const o of list) {
+      if (o.dead || o.hostile || !o.T.disp || o.T.ai === 'flyer' || o.group == null || o.follow) continue;
+      let H = herds.get(o.group);
+      if (!H) herds.set(o.group, H = { n: 0, lead: o, fleeT: 0, from: null, dir: null });
+      if (H.n === 0 && (H.lead.dead || H.lead.hostile || H.lead.gone || !list.includes(H.lead))) H.lead = o;
+      o.herdI = H.lead === o ? 0 : H.n + 1; H.n++;
+    }
+  }
+  /* one of them takes fright: the whole herd goes, the same way */
+  function spook(e, H, from) {
+    if (H) { if (H.fleeT <= 0) { H.from = { x: from.x, z: from.z }; H.dir = Math.atan2(e.pos.x - from.x, e.pos.z - from.z); } H.fleeT = 4 + Math.random() * 2; }
+    else { e.fleeT = 4 + Math.random() * 2; e.from = { x: from.x, z: from.z }; }
   }
   const mayGoIn = e => e.T.elite || e.T.miniboss || e.boss || turns < (D().packAttackers || 1) || e.state === 'windup' || e.state === 'attack';
   /* a swing it sees coming: the quick ones step aside */
@@ -411,16 +436,73 @@ export function createEnemies(ctx) {
       return;
     }
 
-    /* friendly and neutral creatures go about their lives until someone starts a fight */
+    /* friendly and neutral creatures go about their lives until someone starts a fight — as herds:
+       they keep together and follow a leader from one patch to the next, graze and rest there, and
+       spook as one. What spooks them is what they see and hear of you: walk up slowly and you can get
+       near; come running and they're off long before. The friendly ones come to see what you are when
+       you stand still; the big neutral ones warn you off when you crowd them (and leave it at that). */
     if (T.disp && !e.hostile) {
       if (T.ai === 'flyer') { e.state = 'idle'; updateFlyer(e, dt, d, toP); return finishMove(e, dt, d, dx, dz); }
-      e.timer -= dt;
-      if (e.timer <= 0) { e.timer = 3 + Math.random() * 5; e.wander.set(e.home.x + (Math.random() - 0.5) * 16, 0, e.home.z + (Math.random() - 0.5) * 16); }
-      const wx = e.wander.x - e.pos.x, wz = e.wander.z - e.pos.z;
-      if (T.disp === 'critter' && d < 8 && playing) { wantYaw = Math.atan2(-dx, -dz) + Math.sin(G.t * 3 + e.home.x) * 0.5; wantV = T.speed; e.wander.set(e.pos.x - dx, 0, e.pos.z - dz); }
-      else if (e.follow && d > 3.5) { wantYaw = toP; wantV = Math.min(T.speed, d * 1.5); }
-      else if (Math.hypot(wx, wz) > 1.2 && !(d < 3 && T.disp === 'friendly')) { wantV = T.speed * 0.25; wantYaw = Math.atan2(wx, wz); }
-      else if (d < 6) wantYaw = toP;     // curious: turn to look at you
+      if (e.follow) {   // someone's pet: it keeps up with you
+        if (d > 3.5) { wantYaw = steer(e, P.pos, dt); wantV = Math.min(T.speed, d * 1.5); } else if (d < 6) wantYaw = toP;
+        moveTo(e, wantYaw, wantV, dt);
+        return finishMove(e, dt, d, dx, dz);
+      }
+      const H = e.group != null ? herds.get(e.group) : null, pv = Math.hypot(P.vel.x, P.vel.z);
+      e.look -= dt;
+      if (e.look <= 0) { e.look = 0.2 + Math.random() * 0.15; e.seen = playing && d < 30 && sees({ x: e.pos.x, y: e.pos.y + 0.4 + T.rad, z: e.pos.z }, { x: P.pos.x, y: P.pos.y + 1, z: P.pos.z }, { yaw: e.yaw, fov: (T.mind && T.mind.fov) || 4.2, range: 30, near: 2, ray: RAY }); }
+      // spooked: seen coming (the faster you come, the further off), or a fight, a blow, running feet close by
+      if (T.disp === 'critter' && playing) {
+        const spookR = pv > 9 ? 15 : pv > 4 ? 9 : 4.5;
+        const s = ctx.ears && ctx.ears.heard(e.pos.x, e.pos.z, 1.2, G.t - 0.3);
+        if ((e.seen && d < spookR) || d < 2.2 || (s && s.what !== 'steps') || (s && s.what === 'steps' && pv > 9)) spook(e, H, P.pos);
+      }
+      const fleeing = (H ? H.fleeT : e.fleeT || 0) > 0, fire = fireNear(e.pos, 10);
+      if (fleeing) {
+        // away, all together: the herd's line, each with a little swerve of its own
+        const from = H ? H.from : e.from, ax = e.pos.x - from.x, az = e.pos.z - from.z;
+        wantYaw = (H && H.dir != null ? H.dir : Math.atan2(ax, az)) + Math.sin(G.t * 3 + e.home.x) * 0.35;
+        wantV = T.speed * (Math.hypot(ax, az) < 20 ? 1 : 0.55);
+        if (!H) e.fleeT -= dt;
+      } else if (fire) {
+        // a fire in the dark: it keeps its distance, edging off and looking at the flames
+        wantYaw = Math.atan2(e.pos.x - fire.x, e.pos.z - fire.z); wantV = T.speed * 0.35;
+      } else if (T.disp === 'friendly' && playing && pv < 0.6 && d < 12 && d > 2.6 && (e.seen || d < 5)) {
+        // curious: you've gone still, so it comes to see — slowly, and stops a little way off
+        e.sniff = (e.sniff || 0) + dt;
+        if (e.sniff > 2) { wantYaw = steer(e, P.pos, dt); wantV = T.speed * 0.22; } else wantYaw = toP;
+      } else if (T.disp === 'friendly' && playing && pv > 6 && d < 4) {
+        e.sniff = 0; wantYaw = Math.atan2(-dx, -dz); wantV = T.speed * 0.5;   // too sudden: it backs off
+      } else if (T.disp === 'neutral' && playing && d < 4.5 + T.rad && !T.rooted) {
+        // crowded: it turns on you and makes itself big — a warning, nothing more
+        wantYaw = toP; e.windup = Math.max(e.windup, 0.55 + Math.sin(G.t * 5) * 0.2);
+        if (d < 2.5 + T.rad) { wantYaw = toP; wantV = -T.speed * 0.15; }
+      } else {
+        e.sniff = 0;
+        // the herd's day: the leader picks the next patch, the rest come along; there they graze and rest
+        const lead = H ? H.lead : e;
+        if (lead === e) {
+          e.timer -= dt;
+          const night = ctx.night ? ctx.night() : 0;
+          if (night > 0.6 && e.activity !== 'rest') e.timer = 0;   // dusk: time to settle
+          if (e.timer <= 0) {
+            e.activity = night > 0.6 ? 'rest' : Math.random() < 0.55 ? 'graze' : Math.random() < 0.5 ? 'rest' : 'roam';
+            e.timer = e.activity === 'roam' ? 6 + Math.random() * 6 : 8 + Math.random() * 12;
+            if (e.activity === 'roam') {
+              for (let k = 0; k < 6; k++) { const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 14; const x = e.home.x + Math.cos(a) * r, z = e.home.z + Math.sin(a) * r; if (!ctx.nav || !ctx.nav.blocked(x, z)) { e.wander.set(x, 0, z); break; } }
+            } else e.wander.copy(e.pos);
+          }
+        }
+        const goal = lead === e ? e.wander : lead.wander;
+        // each keeps its own place round the leader's patch, and a little room from the rest
+        const huddle = lead.activity === 'rest' ? 0.55 : 1;   // bedded down, they lie close
+        const off = lead === e ? 0 : (e.herdI || 0), oa = off * 2.4, orad = off ? (1.6 + T.rad * 2 + (off % 3) * 0.8) * huddle : 0;
+        const gx = goal.x + Math.cos(oa) * orad, gz = goal.z + Math.sin(oa) * orad, gd = Math.hypot(gx - e.pos.x, gz - e.pos.z);
+        const lag = lead !== e && Math.hypot(lead.pos.x - e.pos.x, lead.pos.z - e.pos.z) > 10;
+        if (gd > 1.2) { wantV = T.speed * (lag ? 0.55 : 0.25); wantYaw = steer(e, { x: gx, z: gz }, dt); }
+        else if (lead.activity === 'graze') { wantYaw = e.yaw + Math.sin(G.t * 0.7 + e.home.x * 3) * 0.6; wantV = Math.sin(G.t * 0.5 + e.home.z) > 0.85 ? T.speed * 0.12 : 0; }   // nose down, a step now and then
+        else if (d < 6 && e.seen) wantYaw = toP;     // curious: turns to look at you
+      }
       moveTo(e, wantYaw, wantV, dt);
       return finishMove(e, dt, d, dx, dz);
     }
@@ -519,8 +601,9 @@ export function createEnemies(ctx) {
         if (T.ai === 'spitter') {
           e.cd -= dt;
           if (d < 8) { wantYaw = toP + Math.PI; wantV = T.speed * 0.8; }
+          else if (!e.seen && d < 22) { wantYaw = toP + (e.home.x > 0 ? 1.3 : -1.3); wantV = T.speed * 0.7; }   // no clear line: work round for one
           else if (d < 15) wantV = 0;
-          if (e.cd <= 0 && d < 20 && d > 3) { e.state = 'spitwind'; e.timer = 0.7 * wf; }
+          if (e.cd <= 0 && d < 20 && d > 3 && e.seen) { e.state = 'spitwind'; e.timer = 0.7 * wf; }
         }
         if (T.ai === 'scavenger' && d < 7 && d > T.range) {
           // circle before darting in
@@ -617,6 +700,19 @@ export function createEnemies(ctx) {
   }
   const lerp0 = (a, b, k) => a + (b - a) * k;
 
+  /* a campfire near here, after dark (wild things don't care for one) */
+  function fireNear(p, r) {
+    if (!ctx.fires || (ctx.night ? ctx.night() : 0) <= 0.5) return null;
+    for (const f of ctx.fires()) if (Math.hypot(p.x - f.x, p.z - f.z) < r) return f;
+    return null;
+  }
+  /* the acid pools of the land, and the burning puddles left by spitters */
+  function hazardsNear(p) {
+    const out = [];
+    for (const h of ctx.world.hazards || []) if (Math.abs(h.x - p.x) < h.r + 4 && Math.abs(h.z - p.z) < h.r + 4) out.push(h);
+    for (const h of puddles) if (Math.abs(h.x - p.x) < h.r + 4 && Math.abs(h.z - p.z) < h.r + 4) out.push(h);
+    return out;
+  }
   function finishMove(e, dt, d, dx, dz) {
     const P = ctx.P, a = e.actor, T = e.T;
     if (SWINGERS[e.kind] && !e.dead) {
@@ -634,6 +730,19 @@ export function createEnemies(ctx) {
     if (T.rooted && !e.dead) {
       e.vel.x = 0; e.vel.z = 0;
       if (e.hostile || e.state === 'windup' || e.state === 'attack') e.yaw = dampAngle(e.yaw, Math.atan2(P.pos.x - e.pos.x, P.pos.z - e.pos.z), 2.5, dt);
+    }
+    if (T.ai !== 'flyer' && !T.rooted) {
+      // keep out of acid and fire (its own kind's puddles too): a push back out from the edge; and after dark
+      // the wild things keep well back from a campfire
+      const fires = ctx.fires && (ctx.night ? ctx.night() : 0) > 0.5 && !T.elite && !T.miniboss ? ctx.fires() : [];
+      for (const f of fires) {
+        const fx = e.pos.x - f.x, fz = e.pos.z - f.z, fd = Math.hypot(fx, fz) || 1;
+        if (fd < 9 && (e.vel.x * fx + e.vel.z * fz) < 0.5) { const k = (9 - fd) / 9; e.vel.x += fx / fd * 120 * k * dt; e.vel.z += fz / fd * 120 * k * dt; }
+      }
+      for (const h of hazardsNear(e.pos)) {
+        const hx = e.pos.x - h.x, hz = e.pos.z - h.z, hd = Math.hypot(hx, hz) || 1, edge = h.r + T.rad + 0.6;
+        if (hd < edge && (e.vel.x * hx + e.vel.z * hz) < 0) { const k = (edge - hd) / edge; e.vel.x += hx / hd * 18 * k * dt * 10; e.vel.z += hz / hd * 18 * k * dt * 10; }
+      }
     }
     if (T.ai !== 'flyer') {
       e.vel.y -= 30 * dt;
@@ -856,7 +965,7 @@ export function createEnemies(ctx) {
   return {
     list, puddles, spawn, spawnAll, clear, damage, kill,
     update(dt) {
-      survey();
+      survey(); surveyHerds(dt);
       for (const e of list) updateOne(e, dt);
       for (let i = list.length - 1; i >= 0; i--) if (list[i].gone) list.splice(i, 1);
       updateMissiles(dt);

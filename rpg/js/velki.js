@@ -690,7 +690,7 @@ export function createVelki(ctx) {
     skyMat.uniforms.uT.value = t;
     updatePlayer(dt, playing);
     updateFolk(dt);
-    crowd.update(dt, t, { sky: V3(BATTLE.x, 40, BATTLE.z) });
+    crowd.update(dt, t, { sky: V3(BATTLE.x, 40, BATTLE.z), player: P });
     kit.update(t, dt, particles);
     fountain.update(dt, t, particles, [P.pos]);
     updateBattle(dt);

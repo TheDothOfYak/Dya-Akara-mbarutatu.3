@@ -39,7 +39,8 @@ import { createCine } from './cine.js';
 import { latchAlongRay } from './vines.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
-import { Colliders } from './terrain.js';
+import { Colliders, stepAround } from './terrain.js';
+import { packRing } from './ai.js';
 import { createSolids, inColliders } from './solid.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -451,6 +452,10 @@ export function createMegla(ctx) {
     if (f.hp <= 0) { f.dead = true; f.deadT = 0; sfx.die(); particles.burst(f.pos.x, f.pos.y + 1, f.pos.z, 22, { color: 0xc88a3a, speed: 7, size: 0.45, life: 0.7, gravity: -6 }); }
   }
   function updateFoes(dt, playing) {
+    // those hunting him take turns: one goes in, the rest wait round him (ai.js packRing)
+    const hunters = foes.filter(f => !f.dead && !f.out && f.pos.distanceTo(P.pos) < 20);
+    for (const f of hunters) f.attacking = f.state === 'windup' || f.state === 'recover';
+    packRing(hunters, P.pos, P.yaw, 1);
     for (const f of foes) {
       if (f.dead) { if (f.deadT != null) { f.deadT += dt; f.a.root.scale.multiplyScalar(Math.max(0.001, 1 - dt * 2)); if (f.deadT > 0.7) { scene.remove(f.a.root); f.deadT = null; } } continue; }
       if (f.out) {   // put down by the Sniller: lying still, breathing
@@ -469,16 +474,19 @@ export function createMegla(ctx) {
         } else if (f.state === 'recover') { f.timer -= dt; f.attackA = Math.max(0, (f.attackA || 0) - dt * 3); if (f.timer <= 0) f.state = 'chase'; }
         else {
           f.cd -= dt; wy = Math.atan2(dx, dz);
-          if (d < 5 && f.cd > 0) { wy += Math.PI / 2 * (f.pos.x > P.pos.x ? 1 : -1); want = 3.5; }
+          if (hunters.length > 1 && !f.mayGo && d < reach + 7) {
+            const r = reach + 2.6, gx = P.pos.x + Math.sin(f.slot) * r, gz = P.pos.z + Math.cos(f.slot) * r, gd = Math.hypot(gx - f.pos.x, gz - f.pos.z);
+            if (gd > 0.8) { wy = Math.atan2(gx - f.pos.x, gz - f.pos.z); want = Math.min(S.speed * 0.7, gd * 2.5); }
+          }
+          else if (d < 5 && f.cd > 0) { wy += Math.PI / 2 * (f.pos.x > P.pos.x ? 1 : -1); want = 3.5; }
           else want = d > reach ? S.speed : 0;
-          if (d < reach + 0.4 && f.cd <= 0) { f.state = 'windup'; f.timer = S.windup; f.cd = S.cd + rng(); }
+          if (d < reach + 0.4 && f.cd <= 0 && (f.mayGo || hunters.length < 2)) { f.state = 'windup'; f.timer = S.windup; f.cd = S.cd + rng(); }
         }
       }
       if (f.stun > 0) want = 0;
       f.yaw = dampAngle(f.yaw, wy, 8, dt);
       f.vel.x = damp(f.vel.x, Math.sin(f.yaw) * want, 8, dt); f.vel.z = damp(f.vel.z, Math.cos(f.yaw) * want, 8, dt);
-      f.pos.x += f.vel.x * dt; f.pos.z += f.vel.z * dt;
-      resolve(f.pos, 0.6);
+      stepAround(f.pos, f.vel.x * dt, f.vel.z * dt, q => resolve(q, 0.6), f);   // round what's in the way, not stuck on it
       f.pos.y = groundAt(f.pos.x, f.pos.z, f.pos.y + 1);
       f.a.root.position.copy(f.pos); f.a.root.rotation.y = f.yaw;
       f.a.animate(dt, { speed: Math.hypot(f.vel.x, f.vel.z), t, windup: f.windup || 0, attack: f.attackA || 0, onGround: true });

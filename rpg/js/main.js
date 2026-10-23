@@ -39,7 +39,7 @@ import { createMegla } from './megla.js';
 import { buildCart } from './cart.js';
 import { createCine } from './cine.js';
 import { createSolids, inColliders } from './solid.js';
-import { createNav, createEars, headFor, forgetRoute, avoid, angDiff as aDiff } from './ai.js';
+import { createNav, createEars, headFor, forgetRoute, avoid, sees, angDiff as aDiff } from './ai.js';
 import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, BREWS, FORGE, bindId, ARMS, armOf, armKey } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -465,6 +465,7 @@ const nav = createNav({
 const calmFoe = e => e.state === 'idle' || e.state === 'return' || e.state === 'alert' || e.state === 'search';
 const enemies = createEnemies({
   scene, world, particles, P, F, G, sfx, nav, ears, night: () => G.night || 0, storm: () => (sunear ? sunear.k : 0),
+  fires: () => [world.camp, world.hearth].filter(Boolean),   // what wild things keep away from after dark
   get D() { return D; },
   hurtPlayer: (d, from, kb, o) => hurtPlayer(d, from, kb, o),
   dmgNumber: (...a) => dmgNumber(...a),
@@ -481,6 +482,7 @@ const enemies = createEnemies({
     if (e.kind === 'rubbermcfly') { shurgrEdanCalled(e); return; }   // no shards for that. Nothing good comes of it.
     const n = Math.round(e.T.shards * (0.8 + Math.random() * 0.4) * FX.shards) + (e.stolen || 0);
     G.shards += n; SAVE.kills++;
+    if (e.T.elite || e.T.miniboss) tellTown(`saw off ${/^[AEIOU]/.test(e.T.name) ? 'an' : 'a'} ${e.T.name}`);   // that gets talked about
     const bk = beastKey(e.kind);
     SAVE.killsBy[bk] = (SAVE.killsBy[bk] || 0) + 1;
     if (SAVE.killsBy[bk] === studyAt(bk) && STORY.BEASTS[bk]) setTimeout(() => toast(`Studied: ${STORY.BEASTS[bk][0]} — +15% damage against them`, 3.5), 700);
@@ -2651,6 +2653,7 @@ function updateNpcs(dt) {
   greetQuiet = Math.max(0, greetQuiet - dt);
   townAlarm(dt);
   hearthTalk(dt);
+  chanceMeetings(dt);
   for (const n of npcs) {
     // in Beuhk the Carpenter is only about on the night they stop there; he lives out at his own place
     n.hidden = REGION === 'xilia' && n.def.id === 'buhkon' && !(young() && F_.pro === 'beuhk' && F_.bk === 'rest') && !(!young() && (F_.tut || 0) >= 5) && !festival;
@@ -2762,7 +2765,7 @@ function dailyRound(n, dt) {
   }
   if (R.out && !called) { R.out = false; R.arrived = false; }        // back in to what they were at
   // foes in the town: they drop what they're doing and get indoors, and stay there till it's quiet
-  const M = mindOf(n), scared = M.fearT > 0 && !called, refuge = scared ? homeDoorOf(n) : null;
+  const M = mindOf(n), scared = (M.fearT > 0 || M.shelterT > 0) && !called, refuge = scared ? homeDoorOf(n) : null;
   if (M.wasScared && !scared) { R.key = ''; M.wasScared = false; }   // all clear: back to the day
   if (scared && refuge) M.wasScared = true;
   const Q = scared && refuge ? { door: refuge } : R.Q, act = called ? 'stand' : scared && refuge ? 'home' : plan.act, indoor = !!(Q && Q.door) && !R.out;
@@ -2776,13 +2779,13 @@ function dailyRound(n, dt) {
   }
   n.actor.root.rotation.x = 0;
   let speed = 0;
-  const goal = indoor ? doorFront(Q.door) : called ? null : R.goal;
+  const goal = indoor ? doorFront(Q.door) : called || n.meet ? null : R.goal;
   if (goal && n.talking <= 0 && G.mode === 'play') {
     const dx = goal.x - n.pos.x, dz = goal.z - n.pos.z, gd = Math.hypot(dx, dz);
     const far = P.pos.distanceTo(n.pos) > 70 && P.pos.distanceTo(goal) > 70;
     if (far && gd > 1) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); forgetRoute(n); }   // out of sight: just be there
     else if (gd > 1.1 && !(R.stuck > 1.5 && gd < 4)) {
-      const before = n.pos.clone(), sp = scared ? 4.6 : gd > 40 ? 3.4 : 2.4;
+      const before = n.pos.clone(), sp = M.fearT > 0 ? 4.6 : scared ? 3.2 : gd > 40 ? 3.4 : 2.4;
       speed = folkStep(n, goal, sp, dt, R);
       R.stuck = n.pos.distanceTo(before) < 0.4 * sp * dt * (n.yielding ? 0 : 1) ? R.stuck + dt : 0;
       if (R.stuck > 5 && P.pos.distanceTo(n.pos) > 18) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); R.stuck = 0; forgetRoute(n); }
@@ -2793,7 +2796,7 @@ function dailyRound(n, dt) {
       R.wait = ROAMS[act] ? (act === 'stroll' ? 2 + Math.random() * 5 : 6 + Math.random() * 7) : 1e9;
     }
   } else if (!goal && !called && R.arrived && Q && ROAMS[act] && (R.wait -= dt) <= 0 && n.talking <= 0) R.goal = pickSpot(Q, true);
-  const settled = (R.arrived || called) && speed === 0;
+  const settled = (R.arrived || called || n.meet) && speed === 0;
   n.actor.root.position.copy(n.pos);
   if (settled && (act === 'sit' || act === 'eat' || act === 'read')) n.actor.root.position.y -= 0.26 * n.actor.root.scale.y;
   // what they say if you come by while they're at it
@@ -2814,7 +2817,10 @@ function npcAct(n, act, at, speed, faceYou, dt) {
   const pulse = (rate, sharp) => Math.pow(Math.max(0, Math.sin(t * rate)), sharp);
   const st = { speed, onGround: true, t, talking: n.talking > 0, gaze: faceYou ? 0 : n.gaze, gazeUp: n.gazeUp || 0 };
   if (n.convo && still) { st.talking = st.talking || n.convo.speaking; if (!n.convo.speaking) st.nod = n.convo.nod; }   // a turn to talk, or to listen
-  if (still) {
+  // nobody works without stopping: every so often a breather — straighten up, look round, then back to it
+  const breather = (act === 'work' || act === 'garden') && ((t * 0.7 + n.home.z * 3.1) % 24) > 20.5;
+  if (still && breather && st.gaze == null) st.gaze = Math.sin(t * 0.9) * 0.9, st.gazeUp = 0.15;
+  if (still && !breather) {
     if (act === 'work') st.attack = pulse(2.6, 3);
     else if (act === 'garden') st.attack = pulse(1.4, 2) * 0.7;
     else if (act === 'cook') st.attack = pulse(3.2, 1) * 0.35;
@@ -2859,6 +2865,12 @@ const GREET = {
 const DANGER_LINES = ['Run! Get inside!', 'Esik — in the town! Inside, everyone!', 'Doors! Shut the doors!'];
 const FLINCH_LINES = ['Hey! Watch where you swing that!', 'Mind the axe!', 'Careful, you’ll have someone’s eye out!'];
 const YIELD_LINES = ['Oh — pardon me.', 'After you.', 'Sorry, sorry.', 'Mind yourself.'];
+const BUMP_LINES = ['Oi! Watch it!', 'Whoa — slow down!', 'Where’s the fire?', 'Hey! Some of us are walking here.'];
+const HEARD = ['Heard you {x}!', 'They’re saying you {x}. Is it true?', 'Word is you {x}. Well done, {you}.', 'So you {x}! The whole town’s talking.'];
+const THANKS = ['Thank you again, {you}. Really.', 'Still can’t believe you did it. Thank you.', 'I owe you one, {you}.'];
+/* what the town knows of you: things worth talking about, as they happen (and who it was for) */
+const NEWS = [];
+const tellTown = (text, who = null) => { NEWS.push({ text, who, t: G.t }); if (NEWS.length > 30) NEWS.shift(); };
 const pick = a => a[Math.floor(Math.random() * a.length)];
 let greetQuiet = 0, alarmT = 0;   // one greeting at a time town-wide, and one alarm
 const youName = () => (young() ? 'Tanoc' : 'Torcain');
@@ -2873,10 +2885,18 @@ function threatNear(pos, r = 18) {
 /* where someone goes to get out of harm's way: their own door, or the Carpenter's */
 const homeDoorOf = n => HOMES.get(n.def.id) || (REGION === 'property' ? manorDoor() : null);
 /* foes near the folk: the alarm goes up, and everyone near enough to hear it is afraid a while */
+let stormSaid = false;
 function townAlarm(dt) {
   alarmT = Math.max(0, alarmT - dt);
+  // the Sunear'Zikhron rolling in: everyone gets indoors (calmly), and somebody says so
+  const storm = typeof sunear !== 'undefined' && sunear && sunear.k > 0.45;
+  if (!storm && stormSaid && (!sunear || sunear.k < 0.2)) stormSaid = false;
   for (const n of npcs) {
-    const M = mindOf(n); M.fearT = Math.max(0, M.fearT - dt);
+    const M = mindOf(n); M.fearT = Math.max(0, M.fearT - dt); M.shelterT = Math.max(0, (M.shelterT || 0) - dt);
+    if (storm) {
+      M.shelterT = 8;
+      if (!stormSaid && !n.hidden && n.pos.distanceTo(P.pos) < 30) { stormSaid = true; bark(npcSpeaker(n.def), pick(['The storm’s coming — get inside!', 'Look at that sky. Indoors, quick.', 'Memory-light! Shutters, everyone!']), 3); }
+    }
     if (n.hidden && !(n.rt && n.rt.inside)) continue;
     const th = threatNear(n.pos);
     if (!th) continue;
@@ -2931,11 +2951,22 @@ function notice(n, dt, d, still) {
     M.glance = o.length && Math.random() < 0.6 ? { x: pick(o).pos.x, z: pick(o).pos.z } : { x: n.pos.x + Math.sin(yaw + (Math.random() - 0.5) * 2) * 10, z: n.pos.z + Math.cos(yaw + (Math.random() - 0.5) * 2) * 10, up: Math.random() < 0.4 ? 0.45 : 0 };
     M.glanceT = 1.2 + Math.random() * 1.8;
   }
-  // hello, the first time you come by in a while
+  // hello, the first time you come by in a while — and if there's news of you about town, they've heard it
   if (inView && d < 5.5 && n.talking <= 0 && G.t - M.greetT > 160 && greetQuiet <= 0 && !(M.fearT > 0) && !n.convo) {
     M.greetT = G.t; greetQuiet = 7;
-    const line = pick(M.talkedDay === (SAVE.dayN || 0) ? GREET.again : GREET[partOfDay(dn.hour)]).replace('{you}', youName());
-    bark(npcSpeaker(n.def), line, 2.6);
+    const news = NEWS.filter((w, i) => i >= (M.newsSeen || 0) && (w.who === n || G.t - w.t > 25));   // word takes a little while to get round
+    let line;
+    if (news.length) { const w = news[news.length - 1]; M.newsSeen = NEWS.indexOf(w) + 1; line = w.who === n ? pick(THANKS) : pick(HEARD).replace('{x}', w.text); }
+    else line = pick(M.talkedDay === (SAVE.dayN || 0) ? GREET.again : GREET[partOfDay(dn.hour)]);
+    bark(npcSpeaker(n.def), line.replace('{you}', youName()), 2.8);
+  }
+  // barged into at a run
+  M.bumpT = (M.bumpT || 0) - dt;
+  if (d < 1.0 && Math.hypot(P.vel.x, P.vel.z) > 6 && M.bumpT <= 0 && G.mode === 'play' && !n.hidden) {
+    M.bumpT = 12;
+    const away = V3(n.pos.x - P.pos.x, 0, n.pos.z - P.pos.z).normalize();
+    world.col.walk(n.pos, away.x * 0.7, away.z * 0.7, 0.45, 1.9); n.actor.root.position.copy(n.pos);
+    if (greetQuiet <= 0) { greetQuiet = 3; bark(npcSpeaker(n.def), pick(BUMP_LINES), 2.2); }
   }
   // an axe swung under their nose
   if (P.atk && P.atk.t < 0.2 && d < 2.8 && M.flinchT <= 0 && G.mode === 'play') {
@@ -2949,13 +2980,44 @@ function notice(n, dt, d, still) {
     }
   }
 }
+/* two folk who pass each other while they're out and about with time on their hands stop for a
+   word: they turn to each other and talk a while, by turns, and then go on their way */
+const MEET_ACTS = { stroll: 1, stand: 1 };
+function chanceMeetings(dt) {
+  for (const n of npcs) {
+    if (n.meet && (G.t > n.meet.until || n.hidden || mindOf(n).fearT > 0 || n.talking > 0)) { n.meet = null; n.convo = null; }
+  }
+  for (const n of npcs) {
+    if (n.meet || n.hidden || !n.rt || !MEET_ACTS[n.rt.plan && n.rt.plan.act] || mindOf(n).fearT > 0 || mindOf(n).shelterT > 0) continue;
+    for (const o of npcs) {
+      if (o === n || o.meet || o.hidden || !o.rt || !MEET_ACTS[o.rt.plan && o.rt.plan.act] || n.pos.distanceTo(o.pos) > 2.6) continue;
+      const key = [n.def.id, o.def.id].sort().join('|');
+      if (G.t - (metAt.get(key) ?? -1e9) < 150) continue;   // they've had their word
+      metAt.set(key, G.t);
+      const until = G.t + 6 + Math.random() * 6;
+      n.meet = { with: o, until, lead: true }; o.meet = { with: n, until, lead: false };
+      break;
+    }
+  }
+  for (const n of npcs) {
+    if (!n.meet) continue;
+    const o = n.meet.with;
+    n.yaw = dampAngle(n.yaw, Math.atan2(o.pos.x - n.pos.x, o.pos.z - n.pos.z), 4, dt);
+    // a few words each, by turns
+    const lead = n.meet.lead ? n : o, turn = Math.floor((G.t - (n.meet.until - 12)) / 2.8) % 2 === 0;
+    n.convo = { speaking: (n === lead) === turn, at: o.pos, nod: (n.nodT = (n.nodT || 0) - dt) > 0 ? 1 : 0 };
+    if (!n.convo.speaking && n.nodT < -2 && Math.random() < dt * 0.5) n.nodT = 1;
+  }
+}
+const metAt = new Map();
+
 /* round the hearth (or anywhere a few of them have settled to chat or eat together): one talks at a
    time, a few breaths each, and the rest look at them and nod along */
 const convos = new Map();
 function hearthTalk(dt) {
   const groups = new Map();
   for (const n of npcs) {
-    n.convo = null;
+    if (!n.meet) n.convo = null;
     const R = n.rt;
     if (!R || !R.arrived || R.inside || n.hidden || !R.plan || (R.plan.act !== 'chat' && R.plan.act !== 'eat') || mindOf(n).fearT > 0) continue;
     const k = R.plan.place; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n);
@@ -3100,6 +3162,7 @@ function turnIn(n, qid) {
   const q = QUESTS[qid], who = npcSpeaker(n.def);
   if (q.goal.type === 'items' && !takeAll(SAVE.inv, q.goal.need)) return;
   SAVE.quests[qid] = 'done';
+  tellTown(`sorted out “${q.name}” for ${n.def.name}`, n);
   const r = q.reward;
   if (r.shards) G.shards += r.shards;
   if (r.items) for (const [k, c] of Object.entries(r.items)) { invAdd(SAVE.inv, k, c); lootToast(k, c); }
@@ -4953,9 +5016,12 @@ function updatePhorus(dt) {
     const tp = tgt.pos;
     const away = V3(P.pos.x - tp.x, 0, P.pos.z - tp.z); if (away.lengthSq() < 0.01) away.set(0, 0, 1); away.normalize();
     const side = V3(-away.z, 0, away.x);
-    want = V3(tp.x, 0, tp.z).addScaledVector(away, tgt.isBoss ? 13 : 7).addScaledVector(side, 3);
+    // a shot needs a clear line: if something's in the way, he goes round to the other side
+    F.shotT = (F.shotT || 0) - dt;
+    if (F.shotT <= 0) { F.shotT = 0.4; F.clearShot = sees({ x: F.pos.x, y: F.pos.y + 1.4, z: F.pos.z }, { x: tgt.pos.x, y: tgt.pos.y + 0.8, z: tgt.pos.z }, { yaw: 0, fov: 7, range: 40, ray: (a, b) => world.col.ray(a, b) }); if (!F.clearShot) F.side = -(F.side || 1); }
+    want = V3(tp.x, 0, tp.z).addScaledVector(away, tgt.isBoss ? 13 : 7).addScaledVector(side, 3 * (F.side || 1));
     const aim = tgt.isBoss ? bossTargetPoint() : V3(tgt.pos.x, tgt.pos.y + 0.8, tgt.pos.z);
-    if (F.cd <= 0 && F.pos.distanceTo(aim) < 28) {
+    if (F.cd <= 0 && F.pos.distanceTo(aim) < 28 && F.clearShot !== false) {
       F.cd = (D === DIFFICULTY.realistic ? 1.8 : 1.3) * (perk('bond') ? 0.75 : 1); F.cast = 0.35;
       const start = phorus.weapon.getWorldPosition(V3());
       const sp = glowSprite(0x7ad8ff, 1.1, 1); sp.position.copy(start); scene.add(sp);
@@ -4970,6 +5036,31 @@ function updatePhorus(dt) {
     const back = V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), right = V3(-Math.cos(P.yaw), 0, Math.sin(P.yaw));
     want = FR.mode === 'own' ? P.pos.clone().addScaledVector(back, 3.5).addScaledVector(right, 3.2)   // Lun keeps clear of Brindle
       : P.pos.clone().addScaledVector(back, 2.4).addScaledVector(right, 1.8);
+    // you've stopped: so does he, where he is, and after a while he finds himself somewhere to be
+    const still = Math.hypot(P.vel.x, P.vel.z) < 0.4 && G.mode === 'play' && !FR.mode;
+    F.idleT = still ? (F.idleT || 0) + dt : 0;
+    if (F.idleT > 1.5 && F.pos.distanceTo(P.pos) < 7) want = F.idleAt || (F.idleAt = F.pos.clone());
+    if (F.idleT > 9) {
+      if (!F.idleSpot || F.idleSpot.t < G.t) {
+        for (let k = 0; k < 6; k++) { const a = Math.random() * Math.PI * 2, r = 2.5 + Math.random() * 3, q = V3(P.pos.x + Math.cos(a) * r, 0, P.pos.z + Math.sin(a) * r); if (!nav.blocked(q.x, q.z)) { F.idleSpot = q; break; } }
+        if (F.idleSpot) F.idleSpot.t = G.t + 12 + Math.random() * 10;
+      }
+      if (F.idleSpot) want = F.idleSpot;
+    }
+    if (!still) { F.idleAt = null; F.idleSpot = null; }
+  }
+  // something coming at you from behind that he can see and you can't: he says so
+  F.warnT = (F.warnT || 0) - dt;
+  if (withP && F.warnT <= 0 && G.mode === 'play' && !young()) {
+    const fwd = camForward();
+    for (const e of enemies.list) {
+      if (e.dead || !e.hostile || calmFoe(e) || e.T.disp || e.state === 'retreat') continue;
+      const ex = e.pos.x - P.pos.x, ez = e.pos.z - P.pos.z, ed = Math.hypot(ex, ez);
+      if (ed > 12 || ed < 2) continue;
+      if ((ex * fwd.x + ez * fwd.z) / ed > -0.35) continue;             // you can see that one
+      if (!sees({ x: F.pos.x, y: F.pos.y + 1.4, z: F.pos.z }, { x: e.pos.x, y: e.pos.y + 0.8, z: e.pos.z }, { yaw: 0, fov: 7, range: 30, ray: (a, b) => world.col.ray(a, b) })) continue;
+      F.warnT = 25; bark('phorus', pick(['Behind you!', 'Torcain — behind!', 'On your back!', 'Turn round!']), 1.8); break;
+    }
   }
   if (FR.mode && !P.riding) phorusDismount();
   if (FR.punk && FR.mode !== 'own') { FR.punk.root.position.copy(FR.pos); FR.punk.root.rotation.y = FR.yaw; if (FR.punk.root.visible) FR.punk.animate(dt, { speed: 0, t: G.t }); }
@@ -4982,7 +5073,10 @@ function updatePhorus(dt) {
   }
   // Phorus will not wade into acid
   for (const h of world.hazards) { const dx = want.x - h.x, dz = want.z - h.z, d = Math.hypot(dx, dz); if (d < h.r + 1.5) { want.x = h.x + dx / (d || 1) * (h.r + 1.5); want.z = h.z + dz / (d || 1) * (h.r + 1.5); } }
-  const dx = want.x - F.pos.x, dz = want.z - F.pos.z, d = Math.hypot(dx, dz);
+  // the way there: round the houses and the fences, not into them
+  const head = withP || F.pos.distanceTo(want) < 60 ? headFor(nav, F, want, dt, { maxNodes: 2000, slack: 2.5 }) : want;
+  const dd = Math.hypot(want.x - F.pos.x, want.z - F.pos.z), hx = head.x - F.pos.x, hz = head.z - F.pos.z, hl = Math.hypot(hx, hz) || 1;
+  const dx = hx / hl * dd, dz = hz / hl * dd, d = G.mode === 'dialog' && dd < 7 ? 0 : dd;   // (and while you're talking to someone, he waits)
   const pd = F.pos.distanceTo(P.pos);
   if (!withP) {   // he makes his own way back to where he waits
     if (F.pos.distanceTo(want) > 40 && pd > 30) { F.pos.copy(want); F.pos.y = world.col.ground(want.x, want.z, world.heightAt(want.x, want.z) + 2); F.vel.set(0, 0, 0); }
@@ -5018,7 +5112,15 @@ function updatePhorus(dt) {
     phorus.animate(dt, { speed: 0, onGround: true, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
     return;
   }
-  phorus.animate(dt, { speed: hs, onGround: F.onGround, t: G.t, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
+  // stood about a while, he takes a drink now and then; and he looks where you're looking, or about him
+  const swig = !tgt && (F.idleT || 0) > 14 && hs < 0.3 && ((F.idleT % 22) > 19);
+  let gaze = null;
+  if (!tgt && hs < 0.6 && G.mode === 'play') {
+    const fwd = camForward(), look = Math.atan2(fwd.x, fwd.z) + Math.sin(G.t * 0.23) * 0.5;
+    gaze = aDiff(F.yaw, look);
+    if (Math.abs(gaze) > 1.2) F.yaw = dampAngle(F.yaw, look, 1.2, dt);   // turn round to it, slowly
+  }
+  phorus.animate(dt, { speed: hs, onGround: F.onGround, t: G.t, drink: swig, gaze, swing: F.cast > 0 ? { kind: 4, p: 1 - F.cast / 0.35 } : null });
 }
 
 function updateCamera(dt) {

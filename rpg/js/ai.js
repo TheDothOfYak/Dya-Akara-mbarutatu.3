@@ -229,5 +229,21 @@ export function avoid(self, others, room = 0.9, look = 1.5) {
   return { k: Math.max(0.15, k), vx, vz };
 }
 
+/* ---------------- a pack round its quarry ----------------
+   members: [{ pos, attacking }] all after the same quarry (a point) that faces `facing`. Only `max`
+   go in at once (those already at it keep their turn); each member gets .mayGo, and .slot: an angle
+   round the quarry to wait at, spread evenly and starting from behind it, so they don't all come
+   at it from the same side. */
+export function packRing(members, quarry, facing = 0, max = 1) {
+  let going = members.filter(m => m.attacking).length;
+  const ring = members.slice().sort((a, b) => Math.atan2(a.pos.x - quarry.x, a.pos.z - quarry.z) - Math.atan2(b.pos.x - quarry.x, b.pos.z - quarry.z));
+  const back = facing + Math.PI, gap = Math.min(1.1, (Math.PI * 2) / Math.max(1, ring.length));
+  ring.forEach((m, i) => { m.slot = back + (i - (ring.length - 1) / 2) * gap; });
+  // the nearest of those waiting get the free turns
+  const waiting = members.filter(m => !m.attacking).sort((a, b) => Math.hypot(a.pos.x - quarry.x, a.pos.z - quarry.z) - Math.hypot(b.pos.x - quarry.x, b.pos.z - quarry.z));
+  for (const m of members) m.mayGo = m.attacking;
+  for (const m of waiting) if (going < max) { m.mayGo = true; going++; }
+}
+
 /* how far round from a to b (signed, -π..π) */
 export const angDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
