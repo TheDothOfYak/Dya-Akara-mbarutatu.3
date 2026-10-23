@@ -13,6 +13,7 @@ import { buildApiButa, buildCyitor, buildXiwKatkan } from './creatures2.js';
 import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
 import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
 import { buildHvaleia, buildSuNaga, buildHarkal, buildRafKrabbi, buildGrothyn } from './esik_sea.js';
+import { sees, headFor, forgetRoute, angDiff } from './ai.js';
 
 const seed = () => (Math.random() * 1e9) >>> 0;
 /* a Kipsu can be anything from a lapful to a big dog */
@@ -72,6 +73,25 @@ export const TYPES = {
   harkal: { name: 'Harkal', build: () => buildHarkal({ seed: seed() }), hp: 140, dmg: 14, speed: 9, rad: 1.0, range: 2.4, aggro: 16, windup: 0.5, recover: 0.7, lunge: 12, shards: 22, ai: 'swim', water: true, sink: 1.85, color: 0x7aa0b8 },
 };
 
+/* how each kind fights, beyond its numbers (the rest keep the plain defaults):
+   dodge — how often it sidesteps a swing it sees coming; pack — it hunts with others of its kind,
+   spreading round you and taking turns to go in; brave — how long it stands before it runs;
+   fov — how wide it looks (eyes on the sides of the head see nearly all round); ears — how well it hears */
+const MINDS = {
+  punk: { dodge: 0.25, pack: true },
+  rodak: { dodge: 0.35, pack: true, brave: 0.3, ears: 1.4 },
+  kipsu: { dodge: 0.3, pack: true, brave: 0.35, fov: 3.6, ears: 1.3 },
+  malsti: { dodge: 0.2, brave: 0.2 },
+  cyitor: { dodge: 0.4, pack: true, brave: 0.9, fov: 2.6 },
+  xiwkatkan: { dodge: 0.35, brave: 0.6 },
+  vel: { dodge: 0.3, brave: 1, fov: 2.8, ears: 1.5 },
+  tyndael: { pack: true, brave: 0.5 },
+  punk_d: { brave: 0.7 }, kipsu_f: { brave: 0.4 },
+  sruvorn_w: { brave: 1, fov: 2.0 }, sruvorn: { brave: 1 }, gynge: { brave: 1, fov: 1.6, ears: 0.7 },
+  tonguatjis: { brave: 0.8, fov: 1.8 }, ular_naga: { brave: 1, fov: 3.4 },
+};
+for (const [k, m] of Object.entries(MINDS)) if (TYPES[k]) TYPES[k].mind = m;
+
 export function createEnemies(ctx) {
   const list = [];
   const knives = [];    // { mesh, pos, delay, vel, dmg, life }
@@ -90,6 +110,9 @@ export function createEnemies(ctx) {
       hp, maxHp: hp, state: 'idle', timer: Math.random() * 2, home: V3(x, 0, z), wander: V3(x, 0, z), flash: 0, stun: 0, dead: false,
       blinkCd: 2 + Math.random() * 2, windup: 0, attackA: 0, alt: T.ai === 'flyer' ? 3 : 0, hostile: T.ai !== 'scavenger' && !T.disp, stolen: 0,
       cd: 1 + Math.random() * 2, lastHit: -99, act: null,
+      // what it knows of you: how sure it is something's there (0..1), where it last saw or heard you
+      aware: 0, seen: false, lastSeen: null, lostT: 0, heard: null, look: 0, dodgeCd: 0,
+      brave: (T.mind && T.mind.brave != null ? T.mind.brave : T.elite || T.miniboss ? 1 : 0.55) * (0.8 + Math.random() * 0.4),
     }, extra);
     list.push(e);
     return e;
@@ -126,6 +149,8 @@ export function createEnemies(ctx) {
     dmg *= opts.raw ? 1 : D().playerDmg;
     if (ctx.studyMul) dmg *= ctx.studyMul(e);
     e.hp -= dmg; e.flash = 1; e.lastHit = ctx.G.t;
+    e.aware = 1; e.lastSeen = { x: from.x, z: from.z }; e.lostT = 0;   // it knows where that came from
+    if (ctx.ears) ctx.ears.emit(e.pos.x, e.pos.z, 22, 'fight', e);       // and anything near hears the fight
     const st = e.T.stagger ?? 1;
     const dir = V3(e.pos.x - from.x, 0, e.pos.z - from.z).normalize();
     e.vel.addScaledVector(dir, kb * st * (e.kind === 'malsti' || e.kind === 'kipsu' ? 1.4 : 1));
@@ -155,6 +180,12 @@ export function createEnemies(ctx) {
     ctx.particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 30, { color: e.T.color, speed: 9, size: 0.5, life: 0.9, gravity: -6 });
     // Rodak travel in threes: fell one, and the whole pack is gone
     if (e.kind === 'rodak' && e.group != null) for (const o of list) if (o !== e && !o.dead && o.kind === 'rodak' && o.group === e.group) { o.state = 'flee'; o.timer = 6; o.hostile = false; }
+    // the rest of a pack takes it hard: the timid break and run, the leader's fall most of all
+    else if (e.group != null) for (const o of list) {
+      if (o === e || o.dead || o.group !== e.group || o.T.elite || o.T.miniboss || o.boss) continue;
+      o.brave -= e.T.elite || e.unique ? 0.5 : 0.22;
+      if (o.brave < 0.12 && o.hostile && o.T.ai !== 'flyer' && o.state !== 'flee' && o.state !== 'retreat') startRetreat(o, 10);
+    }
     ctx.onKill(e);
   }
 
@@ -259,6 +290,83 @@ export function createEnemies(ctx) {
     e.vel.z = damp(e.vel.z, e.stun > 0 ? 0 : Math.cos(e.yaw) * wantV, k, dt);
   }
 
+  /* ---------------- what it can tell of you ----------------
+     Eyes: in front of it (its own width of view), near enough, nothing solid or a hill in between —
+     looked at a few times a second. Ears: a blow, a cry, running feet (ctx.ears). It grows sure of you
+     the longer and nearer it sees you; a sound makes it turn and come to see. Close enough, and it
+     knows you're there whichever way it faces. */
+  const RAY = (a, b) => ctx.world.col.ray(a, b);
+  function perceive(e, dt, d, aggroR, playing) {
+    const P = ctx.P, T = e.T, m = T.mind || {};
+    if (!playing) { e.seen = false; e.aware = Math.max(0, e.aware - dt * 0.5); return; }
+    const night = ctx.night ? ctx.night() : 0, sharp = (D().sight || 1) * (1 - night * 0.3);
+    const range = aggroR * 1.35 * sharp, near = 2.5 + T.rad * 1.5;
+    e.look -= dt;
+    if (e.look <= 0) {
+      e.look = 0.12 + Math.random() * 0.1;
+      e.seen = d < range && sees({ x: e.pos.x, y: e.pos.y + 0.5 + T.rad * 0.8, z: e.pos.z }, { x: P.pos.x, y: P.pos.y + 1.1, z: P.pos.z },
+        { yaw: e.yaw, fov: m.fov || 2.4, range, near, ray: RAY, land: ctx.world.heightAt });
+    }
+    if (e.seen) {
+      e.aware = Math.min(1, e.aware + dt * (0.9 + 5 * Math.max(0, 1 - d / range)) * sharp);   // the nearer, the quicker sure
+      if (d < near) e.aware = 1;
+      if (e.aware > 0.5) { e.lastSeen = { x: P.pos.x, z: P.pos.z }; e.lostT = 0; }
+    } else {
+      e.lostT += dt;
+      // out of sight, it grows less sure — slowly while it's still looking for you
+      const hunting = e.state === 'chase' || e.state === 'circle' || e.state === 'windup' || e.state === 'attack' || e.state === 'recover';
+      if (!hunting) e.aware = Math.max(0, e.aware - dt * (e.state === 'idle' ? 0.08 : 0.15));
+    }
+    const s = ctx.ears && ctx.ears.heard(e.pos.x, e.pos.z, m.ears || 1, ctx.G.t - 0.4, e);
+    if (s && (!e.heard || ctx.G.t - e.heard.t > 0.3)) {
+      e.heard = { x: s.x, z: s.z, t: ctx.G.t, what: s.what };
+      e.aware = Math.min(1, e.aware + (s.what === 'fight' || s.what === 'cry' ? 0.5 : s.what === 'blow' ? 0.35 : 0.2));
+    }
+  }
+  /* sure enough to act on it? (the hunt is on) */
+  function engage(e) {
+    if (e.T.ai === 'scavenger' && !e.hostile) { e.state = 'shadow'; return; }
+    e.state = 'chase'; aggroGroup(e); ctx.onAggro(e); forgetRoute(e);
+    if (ctx.ears) ctx.ears.emit(e.pos.x, e.pos.z, 18, 'cry', e);   // the call goes up
+  }
+  /* badly hurt: back off out of reach, lick the wound, and come again if it heals — or go home */
+  function startRetreat(e, t = 8 + Math.random() * 4) { e.state = 'retreat'; e.timer = t; e.windup = 0; forgetRoute(e); }
+  /* ---------------- the pack ----------------
+     Of those hunting you, only so many go in at once (more on Realistic); the rest keep a ring
+     round you, spread out and working round behind, waiting their turn. */
+  let pack = [], turns = 0;
+  function survey() {
+    const P = ctx.P;
+    pack = list.filter(o => !o.dead && o.hostile && !o.T.disp && o.T.ai !== 'flyer' && o.T.ai !== 'swim' && o.T.ai !== 'airswim' && o.T.ai !== 'static' && !o.T.rooted
+      && (o.state === 'chase' || o.state === 'windup' || o.state === 'attack' || o.state === 'recover' || o.state === 'circle') && o.pos.distanceTo(P.pos) < 24);
+    turns = pack.filter(o => o.state === 'windup' || o.state === 'attack').length;
+    // slots round you: spread evenly, starting from behind you
+    const ring = pack.filter(o => !(o.T.elite || o.T.miniboss || o.boss));
+    ring.sort((a, b) => Math.atan2(a.pos.x - P.pos.x, a.pos.z - P.pos.z) - Math.atan2(b.pos.x - P.pos.x, b.pos.z - P.pos.z));
+    const back = (P.yaw || 0) + Math.PI;
+    ring.forEach((o, i) => { o.slot = back + (i - (ring.length - 1) / 2) * Math.min(1.1, (Math.PI * 2) / Math.max(1, ring.length)); });
+  }
+  const mayGoIn = e => e.T.elite || e.T.miniboss || e.boss || turns < (D().packAttackers || 1) || e.state === 'windup' || e.state === 'attack';
+  /* a swing it sees coming: the quick ones step aside */
+  function dodge(e, d) {
+    const P = ctx.P, m = e.T.mind;
+    if (!m || !m.dodge || !P.atk || P.atk.t > 0.12 || e.dodgeCd > 0 || e.stun > 0 || d > 4.5) return false;
+    if (e.state !== 'chase' && e.state !== 'circle' && e.state !== 'recover') return false;
+    const facing = Math.abs(angDiff(P.yaw || 0, Math.atan2(e.pos.x - P.pos.x, e.pos.z - P.pos.z)));
+    if (facing > 0.9) return false;                 // not swung at it
+    e.dodgeCd = 1.6 + Math.random() * 1.6;
+    if (Math.random() > m.dodge * (D().dodge || 1)) return false;
+    const away = Math.atan2(e.pos.x - P.pos.x, e.pos.z - P.pos.z), side = Math.random() < 0.5 ? 1 : -1, a = away + side * 1.2;
+    e.vel.x += Math.sin(a) * 10; e.vel.z += Math.cos(a) * 10;
+    ctx.particles.burst(e.pos.x, e.pos.y + 0.2, e.pos.z, 8, { color: 0xd8c098, speed: 3, size: 0.4, life: 0.4 });
+    return true;
+  }
+  /* where it's heading, round whatever's in the way (ai.js headFor) */
+  function steer(e, goal, dt) {
+    const h = ctx.nav ? headFor(ctx.nav, e, goal, dt, { patience: 1, maxNodes: 1500 }) : goal;
+    return Math.atan2(h.x - e.pos.x, h.z - e.pos.z);
+  }
+
   function updateOne(e, dt) {
     const P = ctx.P, G = ctx.G, a = e.actor, T = e.T;
     if (e.dead) {
@@ -317,24 +425,60 @@ export function createEnemies(ctx) {
       return finishMove(e, dt, d, dx, dz);
     }
 
+    e.dodgeCd = Math.max(0, e.dodgeCd - dt);
+    if (e.state !== 'flee') perceive(e, dt, d, aggroR, playing);
+    if (playing && !e.T.disp && e.state !== 'flee' && e.state !== 'retreat' && T.ai !== 'flyer' && dodge(e, d)) { /* stepped aside */ }
+    // badly hurt, and not one to fight to the end: it backs off
+    if (playing && e.hostile && T.ai !== 'flyer' && e.hp < e.maxHp * 0.22 * (1.6 - e.brave) && e.brave < 0.95 && !T.elite && !T.miniboss && !e.boss && !e.unique && !e.retreated
+      && (e.state === 'chase' || e.state === 'recover' || e.state === 'circle')) { e.retreated = true; startRetreat(e); }
+
     if (e.stun > 0) {
       // reeling
-    } else if (e.state === 'idle' || e.state === 'return') {
+    } else if (e.state === 'idle' || e.state === 'return' || e.state === 'alert' || e.state === 'search') {
+      // the hunt starts on a sighting: sure of you and seeing you now (a sound only makes it come and look)
+      const sure = playing && e.seen && (e.aware >= 0.97 || (e.hostile && d < aggroR * 0.45));
       if (e.state === 'idle') {
         e.timer -= dt;
         if (e.timer <= 0) { e.timer = 2 + Math.random() * 3; e.wander.set(e.home.x + (Math.random() - 0.5) * 12, 0, e.home.z + (Math.random() - 0.5) * 12); }
         const wx = e.wander.x - e.pos.x, wz = e.wander.z - e.pos.z;
         if (Math.hypot(wx, wz) > 1) { wantV = T.speed * 0.3; wantYaw = Math.atan2(wx, wz); }
-        if (d < aggroR && playing) {
-          if (T.ai === 'scavenger' && !e.hostile) e.state = 'shadow';
-          else { e.state = 'chase'; aggroGroup(e); ctx.onAggro(e); }
-        }
+        if (sure) engage(e);
+        // something's not right: a glimpse, a sound — it stops, turns, and goes to look
+        else if (playing && e.aware > 0.3 && (e.heard || e.lastSeen)) { e.state = 'alert'; e.timer = 5 + Math.random() * 3; e.focus = e.heard && (!e.lastSeen || e.heard.t > ctx.G.t - 1) ? { x: e.heard.x, z: e.heard.z } : e.lastSeen; forgetRoute(e); }
+      } else if (e.state === 'alert') {
+        // ears up, looking where the sound came from, creeping a few steps towards it
+        e.timer -= dt;
+        const f = e.focus, fx = f.x - e.pos.x, fz = f.z - e.pos.z, fd = Math.hypot(fx, fz);
+        wantYaw = Math.atan2(fx, fz) + Math.sin(ctx.G.t * 1.7 + e.home.z) * (fd < 3 ? 1.2 : 0.25);   // and casting about when it's there
+        wantV = fd > 2.5 ? T.speed * 0.4 : 0;
+        if (wantV) wantYaw = steer(e, f, dt);
+        if (sure) engage(e);
+        else if (e.timer <= 0 || Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) > 40) { e.state = 'return'; e.heard = null; e.aware *= 0.5; }
+      } else if (e.state === 'search') {
+        // lost you: it goes to where it saw you last, and looks about
+        e.timer -= dt;
+        const f = e.lastSeen || e.home, fx = f.x - e.pos.x, fz = f.z - e.pos.z, fd = Math.hypot(fx, fz);
+        if (fd > 1.5) { wantV = T.speed * 0.6; wantYaw = steer(e, f, dt); }
+        else wantYaw = e.yaw + dt * 2.2 * Math.sign(Math.sin(e.home.x + ctx.G.t * 0.4));   // turning, looking
+        if (e.seen && playing) { e.aware = 1; engage(e); }
+        else if (e.heard && ctx.G.t - e.heard.t < 0.5) e.lastSeen = { x: e.heard.x, z: e.heard.z };   // that way!
+        if (e.timer <= 0) { e.state = 'return'; e.aware = 0.2; }
       } else {
-        const hx = e.home.x - e.pos.x, hz = e.home.z - e.pos.z;
-        wantYaw = Math.atan2(hx, hz); wantV = T.speed;
+        wantYaw = steer(e, e.home, dt); wantV = T.speed * 0.8;
         e.hp = Math.min(e.maxHp, e.hp + dt * e.maxHp * 0.15);
-        if (Math.hypot(hx, hz) < 2) { e.state = 'idle'; e.timer = 1; }
-        if (playing && d < aggroR * 0.6 && e.hostile) e.state = 'chase';
+        if (Math.hypot(e.home.x - e.pos.x, e.home.z - e.pos.z) < 2) { e.state = 'idle'; e.timer = 1; e.retreated = false; e.brave = Math.max(e.brave, 0.4); }
+        if (sure && e.hostile) engage(e);
+      }
+    } else if (e.state === 'retreat') {
+      // out of reach, and keeping it that way; it watches you while it gets its breath back
+      e.timer -= dt;
+      const away = Math.atan2(-dx, -dz), want = 18 + T.rad * 3;
+      if (d < want) { wantYaw = steer(e, { x: e.pos.x + Math.sin(away) * 6, z: e.pos.z + Math.cos(away) * 6 }, dt); wantV = T.speed * 0.95; }
+      else { wantYaw = toP; wantV = 0; }
+      e.hp = Math.min(e.maxHp, e.hp + dt * e.maxHp * (e.seen ? 0.01 : 0.03));
+      if (e.timer <= 0) {
+        if (e.hp > e.maxHp * 0.5 && e.brave > 0.25 && playing) { e.state = 'chase'; e.retreated = false; forgetRoute(e); }   // it comes again
+        else { e.state = 'return'; e.hostile = e.hostile && e.brave > 0.3; }
       }
     } else if (T.ai === 'scavenger' && e.state === 'shadow') {
       // keep a curious distance — waiting for the aftermath
@@ -358,8 +502,20 @@ export function createEnemies(ctx) {
       ({ wantV, wantYaw } = updateSru(e, dt, d, toP, wf));
     } else {
       // melee, scavenger and thief chase-and-lunge; the spitter keeps its distance
-      if (e.state === 'chase') {
-        wantYaw = toP; wantV = T.speed;
+      if (e.state === 'chase' || e.state === 'circle') {
+        wantYaw = steer(e, P.pos, dt); wantV = T.speed;
+        // out of sight a while: it's lost you, and goes looking
+        if (!e.seen && e.lostT > 3.5 && d > 6 && !e.boss) { e.state = 'search'; e.timer = 8 + Math.random() * 4; forgetRoute(e); }
+        // a pack hunter with no turn yet keeps its place in the ring round you
+        const ringed = (T.mind && T.mind.pack) && pack.length > 1 && !mayGoIn(e) && T.ai !== 'spitter';
+        if (ringed && d < T.range + 9) {
+          e.state = 'circle';
+          const r = T.range + 3 + T.rad, a = e.slot != null ? e.slot : toP + Math.PI;
+          const gx = P.pos.x + Math.sin(a) * r, gz = P.pos.z + Math.cos(a) * r, gd = Math.hypot(gx - e.pos.x, gz - e.pos.z);
+          wantV = gd > 1 ? Math.min(T.speed * 0.75, gd * 2) : 0;
+          wantYaw = gd > 1 ? steer(e, { x: gx, z: gz }, dt) : toP;
+          if (gd < 3) e.faceP = true;   // sidling round, eyes on you
+        } else if (e.state === 'circle') e.state = 'chase';
         if (T.ai === 'spitter') {
           e.cd -= dt;
           if (d < 8) { wantYaw = toP + Math.PI; wantV = T.speed * 0.8; }
@@ -369,11 +525,12 @@ export function createEnemies(ctx) {
         if (T.ai === 'scavenger' && d < 7 && d > T.range) {
           // circle before darting in
           wantYaw = toP + (e.home.x > 0 ? 1.2 : -1.2); wantV = T.speed * 0.7;
-          e.cd -= dt; if (e.cd > 0) wantV = T.speed * 0.7; else { e.cd = 1.2 + Math.random() * 1.5; e.state = 'windup'; e.timer = T.windup * wf; }
+          e.cd -= dt; if (e.cd > 0 || !mayGoIn(e)) wantV = T.speed * 0.7; else { e.cd = 1.2 + Math.random() * 1.5; e.state = 'windup'; e.timer = T.windup * wf; turns++; }
         }
-        if (d < T.range && (T.ai !== 'spitter' || d < 2.5)) { e.state = 'windup'; e.timer = T.windup * wf; }
+        if (d < T.range && (T.ai !== 'spitter' || d < 2.5) && mayGoIn(e)) { e.state = 'windup'; e.timer = T.windup * wf; turns++; }
         const homeD = Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z);
-        if ((homeD > 60 || d > 45) && !e.boss) e.state = 'return';
+        if (homeD > 60 && !e.boss) { e.state = 'return'; forgetRoute(e); }                                       // too far from its ground
+        else if (d > 45 && !e.boss && e.state === 'chase') { e.state = 'search'; e.timer = 8 + Math.random() * 4; forgetRoute(e); }   // got away: look where it last saw you
         if (T.blink) {
           e.blinkCd -= dt;
           if (e.blinkCd <= 0 && d > 4) {
@@ -412,7 +569,10 @@ export function createEnemies(ctx) {
         e.timer -= dt; if (e.timer <= 0) e.state = 'chase';
       }
     }
-    moveTo(e, wantYaw, wantV, dt);
+    if (e.faceP) {   // sidling: moving one way, looking at you
+      e.faceP = false; e.wantYaw = toP; e.yaw = dampAngle(e.yaw, toP, 6, dt);
+      e.vel.x = damp(e.vel.x, e.stun > 0 ? 0 : Math.sin(wantYaw) * wantV, 8, dt); e.vel.z = damp(e.vel.z, e.stun > 0 ? 0 : Math.cos(wantYaw) * wantV, 8, dt);
+    } else moveTo(e, wantYaw, wantV, dt);
     finishMove(e, dt, d, dx, dz);
   }
 
@@ -696,6 +856,7 @@ export function createEnemies(ctx) {
   return {
     list, puddles, spawn, spawnAll, clear, damage, kill,
     update(dt) {
+      survey();
       for (const e of list) updateOne(e, dt);
       for (let i = list.length - 1; i >= 0; i--) if (list[i].gone) list.splice(i, 1);
       updateMissiles(dt);

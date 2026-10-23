@@ -12,6 +12,9 @@ export const DIFFICULTY = {
     regen: 5, flasks: 5, flaskHeal: 60, flowerHeal: 40, flowerRegrow: 40,
     stamina: { attack: 0, heavy: 0, dodge: 18, sprint: 0, jump: 0 },
     dropShards: false, poisonDps: 2, respawnOnDeath: false, heatGain: 1.3,
+    // how the wilds fight (enemies.js): how many of a pack come at you at once, how often the quick ones
+    // sidestep a swing, and how sharp their eyes are
+    packAttackers: 1, dodge: 0.5, sight: 0.85,
   },
   realistic: {
     label: 'Realistic', blurb: 'Pretty brutal. Every swing costs breath, nothing heals on its own, death drops your shards where you fell, and the wilds come back when you rest.',
@@ -19,6 +22,7 @@ export const DIFFICULTY = {
     regen: 0, flasks: 3, flaskHeal: 45, flowerHeal: 20, flowerRegrow: 0,
     stamina: { attack: 15, heavy: 24, dodge: 26, sprint: 16, jump: 10 },
     dropShards: true, poisonDps: 4.5, respawnOnDeath: true, heatGain: 0.85,
+    packAttackers: 2, dodge: 1, sight: 1.15,
   },
 };
 

@@ -39,6 +39,7 @@ import { createMegla } from './megla.js';
 import { buildCart } from './cart.js';
 import { createCine } from './cine.js';
 import { createSolids, inColliders } from './solid.js';
+import { createNav, createEars, headFor, forgetRoute, avoid, angDiff as aDiff } from './ai.js';
 import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, BREWS, FORGE, bindId, ARMS, armOf, armKey } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -443,8 +444,27 @@ function onKey(code) {
 /* ================================================================
    ENEMIES
    ================================================================ */
+/* ---------------- the AI's senses and sense of direction (ai.js) ----------------
+   a walking map of the region (anything a person can't stand in: off the land's edge, or something solid
+   about knee to head high — looked at round a walker's width, so a thin fence still counts), and the
+   sounds that carry: blows, cries, spells, running feet */
+const ears = createEars(() => G.t);
+const NAV_PROBE = [[0, 0], [0.4, 0], [-0.4, 0], [0, 0.4], [0, -0.4]];
+const nav = createNav({
+  version: () => world.col.list.length,
+  blocked: (x, z) => {
+    if (world.inBounds && !world.inBounds(x, z)) return true;
+    for (const [ox, oz] of NAV_PROBE) {
+      const px = x + ox, pz = z + oz, g = world.col.ground(px, pz, world.heightAt(px, pz) + 0.6);
+      if (inColliders(world.col, px, g + 0.8, pz) || inColliders(world.col, px, g + 1.5, pz)) return true;
+    }
+    return false;
+  },
+});
+/* not (or no longer) after you: going about its business, going home, or only wondering what that noise was */
+const calmFoe = e => e.state === 'idle' || e.state === 'return' || e.state === 'alert' || e.state === 'search';
 const enemies = createEnemies({
-  scene, world, particles, P, F, G, sfx, night: () => G.night || 0, storm: () => (sunear ? sunear.k : 0),
+  scene, world, particles, P, F, G, sfx, nav, ears, night: () => G.night || 0, storm: () => (sunear ? sunear.k : 0),
   get D() { return D; },
   hurtPlayer: (d, from, kb, o) => hurtPlayer(d, from, kb, o),
   dmgNumber: (...a) => dmgNumber(...a),
@@ -937,6 +957,7 @@ function startAttack(kind) {
   // how it looks: lunges for the spears (heavy too, for the lance), the bow always draws
   const pose = arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
   P.atk = { kind, pose, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur / (arm.spd || 1), arm };
+  ears.emit(P.pos.x, P.pos.z, kind === 3 ? 16 : 12, 'blow');   // the whoosh of it carries
   P.comboIdx = kind; P.queued = false;
   let f = lockDir() || camForward();
   if (arm.crack) {   // the whip goes where the X is: he turns to it, and the lash is thrown out at it
@@ -1202,6 +1223,7 @@ function hurtPlayer(dmg, from, kb = 7, opts = {}) {
     return false;
   }
   dmg *= FX.armor * (perk('shell') ? 0.9 : 1);
+  ears.emit(P.pos.x, P.pos.z, 15, 'cry');
   const guard = armOf(SAVE.inv.axe).block;
   if (guard && !P.atk && from) {   // a shield up turns part of a blow from the front
     const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), dx = from.x - P.pos.x, dz = from.z - P.pos.z, d = Math.hypot(dx, dz) || 1;
@@ -2438,7 +2460,7 @@ function updateBars() {
   const keep = new Set();
   for (const e of enemies.list) {
     if (e.dead || e.T.miniboss) continue;
-    const show = (G.t - e.lastHit < 6) || (e.T.elite && e.state !== 'idle' && e.state !== 'return') || G.lock === e;
+    const show = (G.t - e.lastHit < 6) || (e.T.elite && !calmFoe(e)) || G.lock === e;
     if (!show || e.pos.distanceTo(P.pos) > 45) continue;
     const s = toScreen(V3(e.pos.x, e.pos.y + (e.T.ai === 'flyer' ? 1.4 : e.T.rad * 2 + 1.6), e.pos.z));
     if (!s) continue;
@@ -2626,6 +2648,9 @@ const npcName = id => { if (id === 'phorus') return 'Phorus'; const n = Object.v
 const npcSpeaker = def => { if (!STORY.SPEAKERS[def.id]) STORY.SPEAKERS[def.id] = { name: def.name, color: def.look === 'keilia' ? '#e0b070' : '#e8d8a8', sub: def.title }; return def.id; };
 
 function updateNpcs(dt) {
+  greetQuiet = Math.max(0, greetQuiet - dt);
+  townAlarm(dt);
+  hearthTalk(dt);
   for (const n of npcs) {
     // in Beuhk the Carpenter is only about on the night they stop there; he lives out at his own place
     n.hidden = REGION === 'xilia' && n.def.id === 'buhkon' && !(young() && F_.pro === 'beuhk' && F_.bk === 'rest') && !(!young() && (F_.tut || 0) >= 5) && !festival;
@@ -2636,30 +2661,31 @@ function updateNpcs(dt) {
     const d = n.pos.distanceTo(P.pos);
     let speed = 0;
     // townsfolk stroll about, and stop to look at you when you come close
-    if (n.def.wander && d > 5 && n.talking <= 0) {
+    const M = mindOf(n);
+    if (n.def.wander && M.fearT > 0) {   // foes about: away from them, back towards home
+      const th = threatNear(n.pos, 30), away = th ? V3(n.pos.x - th.pos.x, 0, n.pos.z - th.pos.z).normalize() : null;
+      n.goal = away ? V3(n.pos.x + away.x * 8, 0, n.pos.z + away.z * 8) : n.home.clone();
+    }
+    if (n.def.wander && (d > 5 || M.fearT > 0) && n.talking <= 0) {
       if (!n.goal) {
         n.pause -= dt;
-        if (n.pause <= 0) {
-          const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 12;
-          n.goal = V3(n.home.x + Math.cos(a) * r, 0, n.home.z + Math.sin(a) * r);
-        }
+        if (n.pause <= 0) n.goal = wanderGoal(n);
       } else {
-        const dx = n.goal.x - n.pos.x, dz = n.goal.z - n.pos.z, gd = Math.hypot(dx, dz);
-        if (gd < 0.6) { n.goal = null; n.pause = 2 + Math.random() * 5; }
+        const gd = Math.hypot(n.goal.x - n.pos.x, n.goal.z - n.pos.z);
+        if (gd < 0.6) { n.goal = null; n.pause = 3 + Math.random() * 7; n.look = Math.random() < 0.5 ? null : n.goal; }
         else {
           const before = n.pos.clone();
-          world.col.walk(n.pos, dx / gd * 1.6 * dt, dz / gd * 1.6 * dt, 0.45, 1.9, n);   // round the barrels, not through them
-          n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6);
-          if (n.pos.distanceTo(before) < 0.5 * dt) { n.goal = null; n.pause = 1; }
-          n.yaw = Math.atan2(dx, dz); speed = 1.6;
+          speed = folkStep(n, n.goal, M.fearT > 0 ? 4.4 : n.pace || (n.pace = 1.3 + Math.random() * 0.6), dt, n);
+          if (n.pos.distanceTo(before) < 0.3 * dt && !n.yielding) { n.stuckT = (n.stuckT || 0) + dt; if (n.stuckT > 1.5) { n.goal = null; n.pause = 1; n.stuckT = 0; forgetRoute(n); } } else n.stuckT = 0;
         }
       }
       n.actor.root.position.copy(n.pos);
     }
-    const want = d < 7 ? Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z) : n.yaw;
+    notice(n, dt, d, speed === 0);
+    const want = (d < 3.5 && speed === 0) || n.talking > 0 ? Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z) : n.yaw;
     n.actor.root.rotation.y = dampAngle(n.actor.root.rotation.y, want, 4, dt);
     n.talking = Math.max(0, n.talking - dt);
-    n.actor.animate(dt, { speed, onGround: true, t: G.t + n.home.x, talking: n.talking > 0 });
+    n.actor.animate(dt, { speed, onGround: true, t: G.t + n.home.x, talking: n.talking > 0, gaze: want === n.yaw ? n.gaze : 0, gazeUp: n.gazeUp || 0 });
   }
   if (camp) camp.update(G.t, particles);
 }
@@ -2735,7 +2761,11 @@ function dailyRound(n, dt) {
     if (R.Q && !R.Q.door) R.goal = pickSpot(R.Q, false);
   }
   if (R.out && !called) { R.out = false; R.arrived = false; }        // back in to what they were at
-  const Q = R.Q, act = called ? 'stand' : plan.act, indoor = !!(Q && Q.door) && !R.out;
+  // foes in the town: they drop what they're doing and get indoors, and stay there till it's quiet
+  const M = mindOf(n), scared = M.fearT > 0 && !called, refuge = scared ? homeDoorOf(n) : null;
+  if (M.wasScared && !scared) { R.key = ''; M.wasScared = false; }   // all clear: back to the day
+  if (scared && refuge) M.wasScared = true;
+  const Q = scared && refuge ? { door: refuge } : R.Q, act = called ? 'stand' : scared && refuge ? 'home' : plan.act, indoor = !!(Q && Q.door) && !R.out;
   if (R.inside && !indoor) { R.inside = false; if (R.door) n.pos.copy(doorFront(R.door)); }   // out of the door they come
   // indoors: walk to the door and in; after that you see them only from inside (the Carpenter's house) or not at all
   if (R.inside) {
@@ -2750,15 +2780,13 @@ function dailyRound(n, dt) {
   if (goal && n.talking <= 0 && G.mode === 'play') {
     const dx = goal.x - n.pos.x, dz = goal.z - n.pos.z, gd = Math.hypot(dx, dz);
     const far = P.pos.distanceTo(n.pos) > 70 && P.pos.distanceTo(goal) > 70;
-    if (far && gd > 1) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); }   // out of sight: just be there
+    if (far && gd > 1) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); forgetRoute(n); }   // out of sight: just be there
     else if (gd > 1.1 && !(R.stuck > 1.5 && gd < 4)) {
-      const before = n.pos.clone(), sp = gd > 40 ? 3.4 : 2.4;
-      world.col.walk(n.pos, dx / gd * sp * dt, dz / gd * sp * dt, 0.45, 1.9, R);   // round the barrels, not through them
-      n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6);
-      R.stuck = n.pos.distanceTo(before) < 0.4 * sp * dt ? R.stuck + dt : 0;
-      if (R.stuck > 5 && P.pos.distanceTo(n.pos) > 18) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); R.stuck = 0; }
-      n.yaw = Math.atan2(dx, dz); speed = sp;
-    } else if (indoor) { R.inside = true; R.door = Q.door; n.hidden = true; n.actor.root.visible = false; return; }
+      const before = n.pos.clone(), sp = scared ? 4.6 : gd > 40 ? 3.4 : 2.4;
+      speed = folkStep(n, goal, sp, dt, R);
+      R.stuck = n.pos.distanceTo(before) < 0.4 * sp * dt * (n.yielding ? 0 : 1) ? R.stuck + dt : 0;
+      if (R.stuck > 5 && P.pos.distanceTo(n.pos) > 18) { n.pos.set(goal.x, world.col.ground(goal.x, goal.z, world.heightAt(goal.x, goal.z) + 2), goal.z); R.stuck = 0; forgetRoute(n); }
+    } else if (indoor) { R.inside = true; R.door = Q.door; n.hidden = true; n.actor.root.visible = false; forgetRoute(n); return; }
     else {
       R.arrived = true; R.goal = null; R.stuck = 0;
       if (Q && Q.face) n.yaw = Math.atan2(Q.face.x - n.pos.x, Q.face.z - n.pos.z);
@@ -2770,8 +2798,9 @@ function dailyRound(n, dt) {
   if (settled && (act === 'sit' || act === 'eat' || act === 'read')) n.actor.root.position.y -= 0.26 * n.actor.root.scale.y;
   // what they say if you come by while they're at it
   const d = n.pos.distanceTo(P.pos);
-  if (plan.line && R.arrived && !called && !R.barked && d < 6 && n.talking <= 0 && G.mode === 'play') { R.barked = true; bark(npcSpeaker(n.def), plan.line, 4); }
-  npcAct(n, act, settled, speed, d < 7, dt);
+  if (plan.line && R.arrived && !called && !R.barked && d < 6 && n.talking <= 0 && G.mode === 'play' && !scared) { R.barked = true; M.greetT = G.t; bark(npcSpeaker(n.def), plan.line, 4); }
+  notice(n, dt, d, settled);
+  npcAct(n, act, settled, speed, (d < 3.2 && settled) || n.talking > 0, dt);
 }
 /* is the player in the Carpenter's house (any room of it)? */
 function inManor() {
@@ -2783,13 +2812,14 @@ function inManor() {
 function npcAct(n, act, at, speed, faceYou, dt) {
   const t = G.t + n.home.x, still = at && speed === 0;
   const pulse = (rate, sharp) => Math.pow(Math.max(0, Math.sin(t * rate)), sharp);
-  const st = { speed, onGround: true, t, talking: n.talking > 0 };
+  const st = { speed, onGround: true, t, talking: n.talking > 0, gaze: faceYou ? 0 : n.gaze, gazeUp: n.gazeUp || 0 };
+  if (n.convo && still) { st.talking = st.talking || n.convo.speaking; if (!n.convo.speaking) st.nod = n.convo.nod; }   // a turn to talk, or to listen
   if (still) {
     if (act === 'work') st.attack = pulse(2.6, 3);
     else if (act === 'garden') st.attack = pulse(1.4, 2) * 0.7;
     else if (act === 'cook') st.attack = pulse(3.2, 1) * 0.35;
     else if (act === 'sit' || act === 'eat' || act === 'read') { st.sit = true; if (act === 'eat') st.drink = Math.sin(t * 0.7) > 0.7; }
-    else if (act === 'chat') st.talking = st.talking || Math.sin(t * 0.45 + n.home.z) > 0.2;
+    else if (act === 'chat' && !n.convo) st.talking = st.talking || Math.sin(t * 0.45 + n.home.z) > 0.2;
     if ((act === 'work' || act === 'garden') && st.attack > 0.9 && Math.random() < 0.3) {
       const f = V3(Math.sin(n.yaw), 0, Math.cos(n.yaw));
       particles.emit(n.pos.x + f.x * 0.9, n.pos.y + 0.3, n.pos.z + f.z * 0.9, { vy: 2, speed: 1.5, color: act === 'garden' ? 0x6a4a2a : 0xd8b878, size: 0.18, life: 0.5, gravity: 6 });
@@ -2801,6 +2831,152 @@ function npcAct(n, act, at, speed, faceYou, dt) {
   n.talking = Math.max(0, n.talking - dt);
   n.actor.animate(dt, st);
 }
+/* ================================================================
+   WHAT TOWNSFOLK NOTICE, AND HOW THEY GET ABOUT (ai.js)
+   · they walk by the walking map, round the houses rather than into
+     them, and make way for each other and for you (passing on the
+     right, waiting for someone crossing; "pardon me");
+   · you come into view and they glance at you — turn their head,
+     not their whole body, unless you're close and they're free; the
+     first time in a while they say hello, as suits the hour (and
+     "back again?" if you've talked already today);
+   · when they've nothing to look at they look about: at a neighbour,
+     up at the sky, back to their work;
+   · swing an axe under someone's nose and they flinch and tell you;
+   · foes in the town: a shout goes up and everyone runs indoors, and
+     stays in till it's been quiet a while;
+   · round the hearth of an evening they talk in turns, the others
+     looking at whoever's speaking, nodding along.
+   ================================================================ */
+const GREET = {
+  dawn: ['Up early, {you}.', 'Morning. The dew’s still on everything.', 'Shh — half the town’s still asleep.'],
+  morning: ['Morning, {you}!', 'Good morning.', 'Fine day for it.', 'Morning! Busy, busy.'],
+  noon: ['Afternoon, {you}.', 'Warm one today.', 'Hello there.', 'Afternoon. Eaten yet?'],
+  evening: ['Evening, {you}.', 'Getting on for supper.', 'Evening. Mind how you go.', 'There’s a chill coming in.'],
+  night: ['You’re out late, {you}.', 'Shouldn’t you be in bed?', 'Quiet night.', 'Mind the dark, now.'],
+  again: ['Back again?', 'You again! Twice in a day.', 'Forgot something?', 'Hello again, {you}.'],
+};
+const DANGER_LINES = ['Run! Get inside!', 'Esik — in the town! Inside, everyone!', 'Doors! Shut the doors!'];
+const FLINCH_LINES = ['Hey! Watch where you swing that!', 'Mind the axe!', 'Careful, you’ll have someone’s eye out!'];
+const YIELD_LINES = ['Oh — pardon me.', 'After you.', 'Sorry, sorry.', 'Mind yourself.'];
+const pick = a => a[Math.floor(Math.random() * a.length)];
+let greetQuiet = 0, alarmT = 0;   // one greeting at a time town-wide, and one alarm
+const youName = () => (young() ? 'Tanoc' : 'Torcain');
+const partOfDay = h => (h < 7 ? 'dawn' : h < 12 ? 'morning' : h < 17 ? 'noon' : h < 21.5 ? 'evening' : 'night');
+function mindOf(n) { return n.mind || (n.mind = { greetT: -1e9, fearT: 0, flinchT: 0, glanceT: 0, glance: null, yieldT: 0, talkedDay: -1 }); }
+/* the nearest foe that's after someone, near here */
+function threatNear(pos, r = 18) {
+  let best = null, bd = r;
+  for (const e of enemies.list) { if (e.dead || !e.hostile || calmFoe(e) || e.T.disp || e.state === 'shadow') continue; const q = e.pos.distanceTo(pos); if (q < bd) { bd = q; best = e; } }
+  return best;
+}
+/* where someone goes to get out of harm's way: their own door, or the Carpenter's */
+const homeDoorOf = n => HOMES.get(n.def.id) || (REGION === 'property' ? manorDoor() : null);
+/* foes near the folk: the alarm goes up, and everyone near enough to hear it is afraid a while */
+function townAlarm(dt) {
+  alarmT = Math.max(0, alarmT - dt);
+  for (const n of npcs) {
+    const M = mindOf(n); M.fearT = Math.max(0, M.fearT - dt);
+    if (n.hidden && !(n.rt && n.rt.inside)) continue;
+    const th = threatNear(n.pos);
+    if (!th) continue;
+    if (M.fearT <= 0 && !alarmT && n.pos.distanceTo(P.pos) < 40) { alarmT = 20; bark(npcSpeaker(n.def), pick(DANGER_LINES), 3); }
+    for (const o of npcs) if (o.pos.distanceTo(n.pos) < 35) mindOf(o).fearT = 30;   // the shout carries
+  }
+}
+/* somewhere to amble to, near home: not into a wall, not out of the town */
+function wanderGoal(n) {
+  for (let k = 0; k < 8; k++) {
+    const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 12, g = V3(n.home.x + Math.cos(a) * r, 0, n.home.z + Math.sin(a) * r);
+    if (!nav.blocked(g.x, g.z)) return g;
+  }
+  return n.home.clone();
+}
+/* a step towards goal at speed sp: by the walking map, round whoever's in the way; hands back the speed */
+const _others = [];
+function folkStep(n, goal, sp, dt, mem) {
+  const h = headFor(nav, n, goal, dt, { maxNodes: 2500 });
+  let hx = h.x - n.pos.x, hz = h.z - n.pos.z; const hd = Math.hypot(hx, hz) || 1; hx /= hd; hz /= hd;
+  _others.length = 0;
+  for (const o of npcs) if (o !== n && !o.hidden && o.pos.distanceTo(n.pos) < 6) _others.push({ pos: o.pos, vx: o.vx || 0, vz: o.vz || 0 });
+  const you = { pos: P.pos, vx: P.vel.x, vz: P.vel.z }; if (P.pos.distanceTo(n.pos) < 6 && !P.dead) _others.push(you);
+  const av = avoid({ pos: n.pos, vx: hx * sp, vz: hz * sp }, _others, 0.95);
+  const M = mindOf(n);
+  n.yielding = av.k < 0.5;
+  if (n.yielding && P.pos.distanceTo(n.pos) < 2.2 && M.yieldT <= 0 && greetQuiet <= 0 && G.mode === 'play') { M.yieldT = 40; greetQuiet = 3; bark(npcSpeaker(n.def), pick(YIELD_LINES), 2.2); }
+  const vx = av.vx * av.k, vz = av.vz * av.k;
+  world.col.walk(n.pos, vx * dt, vz * dt, 0.45, 1.9, mem);   // round the barrels, not through them
+  n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6);
+  n.vx = vx; n.vz = vz;
+  if (Math.hypot(vx, vz) > 0.2) n.yaw = Math.atan2(vx, vz);
+  return Math.hypot(vx, vz);
+}
+/* what they see of you, and what they make of it */
+function notice(n, dt, d, still) {
+  const M = mindOf(n);
+  M.glanceT -= dt; M.flinchT -= dt; M.yieldT -= dt;
+  if (!still) { n.vx = n.vx || 0; } else { n.vx = 0; n.vz = 0; }
+  const yaw = n.actor.root.rotation.y, rel = aDiff(yaw, Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z));
+  const inView = G.mode === 'play' && !P.dead && d < 11 && Math.abs(rel) < 1.9 && !n.hidden;
+  n.gaze = null; n.gazeUp = 0;
+  if (n.convo && !n.convo.speaking && n.convo.at) {             // listening: eyes on whoever's speaking
+    n.gaze = aDiff(yaw, Math.atan2(n.convo.at.x - n.pos.x, n.convo.at.z - n.pos.z));
+  } else if (inView && (d < 7 || M.glanceT > 0)) {                // you: a look
+    n.gaze = rel; n.gazeUp = clamp((P.pos.y - n.pos.y) * 0.06, -0.3, 0.4);
+    if (M.glanceT <= 0) M.glanceT = 2 + Math.random() * 2;
+  } else if (M.glance && M.glanceT > 0) {                          // something else that caught their eye
+    const g = M.glance; n.gaze = aDiff(yaw, Math.atan2(g.x - n.pos.x, g.z - n.pos.z)); n.gazeUp = g.up || 0;
+  } else if (M.glanceT < -2 && Math.random() < dt * 0.35) {        // idly, now and then: a neighbour, the sky, the road
+    const o = npcs.filter(q => q !== n && !q.hidden && q.pos.distanceTo(n.pos) < 9);
+    M.glance = o.length && Math.random() < 0.6 ? { x: pick(o).pos.x, z: pick(o).pos.z } : { x: n.pos.x + Math.sin(yaw + (Math.random() - 0.5) * 2) * 10, z: n.pos.z + Math.cos(yaw + (Math.random() - 0.5) * 2) * 10, up: Math.random() < 0.4 ? 0.45 : 0 };
+    M.glanceT = 1.2 + Math.random() * 1.8;
+  }
+  // hello, the first time you come by in a while
+  if (inView && d < 5.5 && n.talking <= 0 && G.t - M.greetT > 160 && greetQuiet <= 0 && !(M.fearT > 0) && !n.convo) {
+    M.greetT = G.t; greetQuiet = 7;
+    const line = pick(M.talkedDay === (SAVE.dayN || 0) ? GREET.again : GREET[partOfDay(dn.hour)]).replace('{you}', youName());
+    bark(npcSpeaker(n.def), line, 2.6);
+  }
+  // an axe swung under their nose
+  if (P.atk && P.atk.t < 0.2 && d < 2.8 && M.flinchT <= 0 && G.mode === 'play') {
+    const facing = Math.abs(aDiff(P.yaw, Math.atan2(n.pos.x - P.pos.x, n.pos.z - P.pos.z)));
+    if (facing < 1.1) {
+      M.flinchT = 8;
+      const away = V3(n.pos.x - P.pos.x, 0, n.pos.z - P.pos.z).normalize();
+      world.col.walk(n.pos, away.x * 0.6, away.z * 0.6, 0.45, 1.9);
+      n.actor.root.position.copy(n.pos);
+      if (greetQuiet <= 0) { greetQuiet = 3; bark(npcSpeaker(n.def), pick(FLINCH_LINES), 2.4); }
+    }
+  }
+}
+/* round the hearth (or anywhere a few of them have settled to chat or eat together): one talks at a
+   time, a few breaths each, and the rest look at them and nod along */
+const convos = new Map();
+function hearthTalk(dt) {
+  const groups = new Map();
+  for (const n of npcs) {
+    n.convo = null;
+    const R = n.rt;
+    if (!R || !R.arrived || R.inside || n.hidden || !R.plan || (R.plan.act !== 'chat' && R.plan.act !== 'eat') || mindOf(n).fearT > 0) continue;
+    const k = R.plan.place; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n);
+  }
+  for (const [k, g] of groups) {
+    if (g.length < 2) { convos.delete(k); continue; }
+    let c = convos.get(k);
+    if (!c || !g.includes(c.speaker) || (c.t -= dt) <= 0) {
+      const next = g.filter(n => !c || n !== c.speaker);
+      c = { speaker: pick(next.length ? next : g), t: 2.5 + Math.random() * 4 }; convos.set(k, c);
+    }
+    for (const n of g) {
+      n.nodT = (n.nodT || 0) - dt; if (n !== c.speaker && n.nodT < -2 && Math.random() < dt * 0.5) n.nodT = 1.1;   // mm-hm
+      n.convo = { speaking: n === c.speaker && n.talking <= 0, at: c.speaker.pos, nod: n.nodT > 0 ? 1 : 0 };
+    }
+    // the speaker turns a little towards the others
+    const cx = g.reduce((a, n) => a + n.pos.x, 0) / g.length, cz = g.reduce((a, n) => a + n.pos.z, 0) / g.length;
+    c.speaker.yaw = dampAngle(c.speaker.yaw, Math.atan2(cx - c.speaker.pos.x, cz - c.speaker.pos.z), 1.5, dt);
+  }
+}
+
 /* the Carpenter in his house, seen from inside it: at the range, at the table, by the library fire, in bed */
 function npcIndoors(n, spotName, act, awake, dt) {
   const sp = interiors.spot(spotName); if (!sp) return;
@@ -2881,7 +3057,7 @@ function pickChoice(i) {
 
 function npcTalk(n) {
   const def = n.def, who = npcSpeaker(def);
-  n.talking = 3;
+  n.talking = 3; mindOf(n).talkedDay = SAVE.dayN || 0; mindOf(n).greetT = G.t;
   if (def.id === 'buhkon') { if (young()) youngBuhkon(n); else buhkonTalk(n); return; }
   const opts = apNpcOptions(n).concat(bkErrandOptions(n), armsOptions(n));
   for (const qid of def.quests) {
@@ -3768,6 +3944,7 @@ function castSpell(id) {
   if (!SAVE.skills.spells[id]) { toast('You haven’t learned that spell yet. Quests and trials teach them.', 2); return; }
   if ((P.spellCd[id] || 0) > 0) return;
   const sp = SPELLS[id];
+  ears.emit(P.pos.x, P.pos.z, 26, 'spell');
   if (id === 'pull') {
     let tgt = G.lock && G.lock !== 'boss' ? G.lock : null;
     if (!tgt) { const b = bestTarget(26, 0.75); tgt = b && b.e !== 'boss' && !b.e.sigil ? b.e : null; if (b && b.e === 'boss') { damageBoss(40, { big: true }); P.spellCd[id] = sp.cd * cdMul(); sfx.duat(); return; } }
@@ -4454,7 +4631,7 @@ function travel(id) {
   const l = lanternById(id); if (!l) return;
   if (G.bossActive) { toast('Not in the middle of a fight like this.', 2); return; }
   if (interiors.inside) leaveRoom(true);
-  if (enemies.list.some(e => !e.dead && e.hostile && e.state !== 'idle' && e.state !== 'return' && e.pos.distanceTo(P.pos) < 25)) { toast('You can’t travel with foes on your heels.', 2.5); return; }
+  if (enemies.list.some(e => !e.dead && e.hostile && !calmFoe(e) && e.pos.distanceTo(P.pos) < 25)) { toast('You can’t travel with foes on your heels.', 2.5); return; }
   book.close();
   fade(1, 0.4);
   setTimeout(() => {
@@ -4550,6 +4727,8 @@ function updatePlayer(dt) {
   if (P.atk) speed *= P.riding ? 0.7 : 0.25;
   if (P.drink > 0) speed *= 0.35;
   if (P.swimming) speed *= 0.6;
+  // footsteps carry: a walk a few metres, a run further, Brindle's gallop further still
+  if (moving && (P.onGround || P.riding) && (P.stepNoise = (P.stepNoise || 0) - dt) <= 0) { P.stepNoise = 0.4; ears.emit(P.pos.x, P.pos.z, P.riding ? 11 : sprint ? 8 : 3.5, 'steps'); }
   const accel = P.onGround ? 14 : 4;
 
   if (P.roll) {
@@ -4762,7 +4941,7 @@ function updatePhorus(dt) {
   let tgt = null, bd = 1e9;
   if (G.mode === 'play' && !P.dead && withP) {
     for (const e of enemies.list) {
-      if (e.dead || !e.hostile || e.state === 'idle' || e.state === 'return' || e.state === 'shadow' || e.kind === 'rubbermcfly') continue;
+      if (e.dead || !e.hostile || calmFoe(e) || e.state === 'shadow' || e.kind === 'rubbermcfly') continue;
       const d = e.pos.distanceTo(P.pos);
       if (d < 18 && d < bd) { bd = d; tgt = e; }
     }
@@ -4944,7 +5123,7 @@ function updateHUD() {
   }
   // the big bar: a boss, or a Sru Vorn on the hunt
   if (!boss) {
-    const mb = enemies.list.find(e => e.T.miniboss && !e.dead && e.state !== 'idle' && e.state !== 'return');
+    const mb = enemies.list.find(e => e.T.miniboss && !e.dead && !calmFoe(e));
     if (mb) {
       $('boss-name').textContent = mb.T.name.toUpperCase(); $('boss-sub').textContent = 'a Vakarborac of Leotik';
       $('boss').classList.remove('hidden');
@@ -6621,7 +6800,7 @@ window.__torcain = {
   bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, get mount() { return mount; }, toggleRide, makeMount, updateMount, torcain, projectiles, restyleAxe,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, startMegla, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy, alch, finishFound,
-  detailCull: setDetailCull, get solids() { return solids; },
+  detailCull: setDetailCull, get solids() { return solids; }, ears, nav, updateNpcs, calmFoe,
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
   get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, enterRoom, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, lookAim, vineTarget, vineShoot, vineLet, rideSpace, get vines() { return P.vines; }, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,

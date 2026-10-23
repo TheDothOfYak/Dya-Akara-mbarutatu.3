@@ -1053,8 +1053,10 @@ export function buildEikar(o = {}) {
       torso.scale.set(1 - sq * 0.5 - breath * 0.3, 1 + sq + breath, 1 - sq * 0.5 + breath * 0.4);
       body.position.y -= Math.max(0, -sq) * 0.35;
       // the head lags the body and overshoots it a little: follow-through
-      const hxT = (st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * 0.5) + Math.sin(phase * 2 - 0.9) * 0.05 * k * walkK + sq * 0.6;
-      const hyT = -twist * 0.6 + Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b) + lookX * 0.35;
+      const hxT = (st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * 0.5) + Math.sin(phase * 2 - 0.9) * 0.05 * k * walkK + sq * 0.6 - clamp(st.gazeUp || 0, -0.5, 0.6) + (st.nod ? Math.max(0, Math.sin(t * 7)) * 0.12 * st.nod : 0);
+      // st.gaze: a glance — the head turned to something (radians off the way the body faces), st.gazeUp tipped up to it
+      const gz = st.gaze != null ? clamp(st.gaze, -1.15, 1.15) : null;
+      const hyT = -twist * 0.6 + (gz != null ? gz : Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b)) + lookX * 0.35;
       headXV += ((hxT - headX) * 160 - headXV * 16) * dt; headX += headXV * dt;
       headY = lerp(headY, hyT, 1 - Math.exp(-9 * dt));
       head.rotation.set(headX - glide * 1.15, headY + hipYaw * 0.9, -body.rotation.z * 0.6);   // (flat out, he still looks ahead)   // the head stays on the road ahead
