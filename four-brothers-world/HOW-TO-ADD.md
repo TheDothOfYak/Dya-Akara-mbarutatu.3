@@ -1,4 +1,4 @@
-# Rock World: how to add things
+# 4 Brothers World: how to add things
 
 Everything lives on one global object, `RW`. Data files only call `RW.register.*`, so new content never needs engine changes.
 
@@ -49,3 +49,16 @@ Shared data per world: `chunks_<world>` (Rock World keeps `rockchunks`), boss st
 - **The final boss** copies everyone in the Duat (plus any of the four heroes nobody brought), then fuses them into Apophis, a small World Feeder. Each player gets their species' legendary weapon (`RW.LEGENDARY`).
 - **Beyond the Mirror**: the sixth world is a locked teaser card in the travel menu once Apophis falls.
 - Possessed art for any hero: `RW.art.possessedSprites(species, look)`. Recolor any monster with `art.tint`, `art.tintA` and `art.scale`.
+
+## Keeping players' progress when you update
+- Saves live in the browser under keys starting with `rw_` (`rw_save_rock` is the hero; `rw_edits_<world>` are the blocks people changed). Never rename them.
+- World edits are saved by tile **number**, so only ever add new tiles at the **end** of `js/data/tiles.js`. Never reorder or remove one.
+- A new field in the save needs a default when it's missing (see `G.load` in `js/engine/main.js`), so older saves still load.
+- Bump `RW.VERSION` (and `#version`) with every update. The first time a new version runs it copies the old save to `rw_save_backup_<old version>`.
+
+## Controls
+Every control is an action in `RW.ACTIONS` (`js/core.js`) with up to two keys. Read them with `RW.input.act('jump')` (held) or `RW.input.actHit('jump')` (pressed this frame), never a raw key, so players can change them in Settings.
+
+## Torches and Stryx
+- Torch: item `torch` (`kind: 'torch'`). `P.toggleTorch()` puts one in the other hand; `P.torchFx()` lights it.
+- Stryx: species `stryx`, behavior `E.behaviors.stryx`, drawing `D.stryx`. `platform: true` on a species lets players stand on its back; `lashR` / `lashY` set how far its vines reach and from how high.

@@ -40,9 +40,9 @@ Create an account (email/password — cross-device when online is configured, ot
 
 **The Admin Panel** lives at `admin.html` on either hosting domain — outside the game UI, as specified. First visit on a given domain sets that domain's admin password (the password, the local Dya'kukull AI population, and local market/tournament flavor are stored per-browser-origin, so github.io and web.app each get their own — but real player accounts, the shared market, and admin's game-content edits are cloud-based via Supabase and identical on both). You are the admin.
 
-## The 4 Brothers Worlds (2D pixel platformer)
+## 4 Brothers World (2D pixel platformer)
 
-A separate game by four brothers lives in **`four-brothers-worlds/`** — open `four-brothers-worlds/index.html` (or pick **🌍 The 4 Brothers Worlds** on the main menu, just under Torcain’s Run). See `four-brothers-worlds/README.md` for how to play.
+A separate game by four brothers lives in **`four-brothers-world/`** — open `four-brothers-world/index.html` (or pick **🌍 4 Brothers World** on the main menu, just under Torcain’s Run). See `four-brothers-world/README.md` for how to play.
 
 ## Torcain's Run (3D single-player RPG)
 
