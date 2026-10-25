@@ -316,6 +316,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <button class="btn" id="b-help2" type="button">Controls</button>
         <button class="btn" id="b-opts2" type="button">Settings</button>
         <button class="btn b-full" type="button">Full screen</button>
+        <button class="btn" id="b-home2" type="button">Back to Dya'Akara</button>
       </div>
       <div id="mp" class="stone" hidden>
         <div class="label">Play together</div>
@@ -323,7 +324,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div id="mp-msg">One player hosts and keeps the world. Everyone else joins with the room code.</div>
       </div>
       <div id="netstatus" class="stone">Connecting…</div>
-      <div id="version">v1.5</div>
+      <div id="version">v1.6</div>
     </div>
   </div>
   <div id="creator" class="hidden-ui">
@@ -406,7 +407,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 // Everything lives on the single global `RW` so files can be added in any session.
 window.RW = window.RW || {};
 (function (RW) {
-  RW.VERSION = '1.5'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
+  RW.VERSION = '1.6'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
   // Updates must keep players' progress: never rename the rw_ save keys, and only ever add tiles at the END of tiles.js
   // (world edits are saved by tile number). New save fields need a default when they're missing (see G.load).
   RW.TILE = 16;
@@ -679,6 +680,38 @@ window.RW = window.RW || {};
   // ---------- added in v1.3 (always add new blocks at the END: saved worlds remember blocks by number) ----------
   add({ key: 'torchwall', name: 'Torch', hard: 0, time: 0.1, drop: 'torch', decor: 'torch', light: [1.0, 0.62, 0.28] });
 
+  // ---------- added in v1.6: Acorn World's giant trees, the Keilia keep, the Elsha'ryn grove, the Duskareth camp ----------
+  // toggle: pressing R beside it swaps it for that block (trapdoors open and shut, levers flip). Puzzles live in entities4.js.
+  add({ key: 'bark', name: 'Giant Bark', solid: true, hard: 2, time: 1.1, drop: ['wood', 1, 2], colors: ['#6a4a30', '#86603e', '#4a3020'], tex: 'bark' });
+  add({ key: 'heartplank', name: 'Heartwood Floor', solid: true, hard: 1, time: 0.6, drop: 'planks', colors: ['#9a6a40', '#b8844e', '#6e4a2a'], tex: 'plank' });
+  add({ key: 'ladder', name: 'Ladder', hard: 1, time: 0.3, drop: 'ladder', climb: true, decor: 'ladder' });
+  add({ key: 'trapdoor', name: 'Trapdoor', solid: true, hard: 1, time: 0.4, drop: 'trapdoor', decor: 'trapdoor', toggle: 'trapdoor_open' });
+  add({ key: 'trapdoor_open', name: 'Open Trapdoor', hard: 1, time: 0.4, drop: 'trapdoor', climb: true, decor: 'trapdoor_open', toggle: 'trapdoor' });
+  add({ key: 'ropebridge', name: 'Rope Bridge', platform: true, hard: 1, time: 0.25, drop: 'rope_bridge', decor: 'ropebridge' });
+  add({ key: 'rope', name: 'Climbing Rope', hard: 0, time: 0.2, drop: 'rope', climb: true, decor: 'rope' });
+  add({ key: 'lever', name: 'Lever', hard: 99, decor: 'lever', toggle: 'lever_on', lockedMsg: 'A lever. Stand next to it and press R to pull it.' });
+  add({ key: 'lever_on', name: 'Lever', hard: 99, decor: 'lever', on: true, toggle: 'lever', lockedMsg: 'A lever. Stand next to it and press R to pull it.' });
+  add({ key: 'keepgate', name: 'Keep Gate', solid: true, hard: 99, decor: 'gate', lockedMsg: 'Iron-bound oak, far too strong to break. Something somewhere opens it.' });
+  add({ key: 'runestone', name: 'Rune Stone', solid: true, hard: 99, decor: 'rune', lockedMsg: 'A carved rune. Stand next to it and press R to touch it.' });
+  add({ key: 'runestone_lit', name: 'Rune Stone', solid: true, hard: 99, decor: 'rune', lit: true, light: [0.25, 0.55, 0.6], lockedMsg: 'The rune glows.' });
+  add({ key: 'bookshelf', name: 'Bookshelf', solid: true, hard: 1, time: 0.6, drop: 'planks', colors: ['#5a3c26', '#7a5434', '#3a2618'], tex: 'books' });
+  add({ key: 'fakeshelf', name: 'Bookshelf', solid: true, hard: 1, time: 0.3, colors: ['#5a3c26', '#7a5434', '#3a2618'], tex: 'books', fake: true });
+  add({ key: 'keepchest', name: 'Keilia Chest', solid: true, hard: 1, time: 1.0, decor: 'chest', chest: 'keep', loot: 'keep' });
+  add({ key: 'vaultchest', name: 'Vault Chest', solid: true, hard: 2, time: 1.4, decor: 'chest', chest: 'vault', loot: 'vault', light: [0.35, 0.3, 0.12] });
+  add({ key: 'campchest', name: 'Raider Chest', solid: true, hard: 1, time: 0.9, decor: 'chest', chest: 'camp', loot: 'camp' });
+  add({ key: 'grovechest', name: 'Grown Chest', solid: true, hard: 1, time: 0.9, decor: 'chest', chest: 'grove', loot: 'grove' });
+  add({ key: 'livingwood', name: 'Living Wood', solid: true, hard: 2, time: 0.9, drop: 'wood', colors: ['#5a5a32', '#74763e', '#3e4022'], tex: 'bark', top: '#5a9a3a' });
+  add({ key: 'memorystone', name: 'Memory Core', solid: true, hard: 99, decor: 'memory', read: true, light: [0.35, 0.55, 0.85], lockedMsg: 'A memory core. Press R to listen to it.' });
+  add({ key: 'banner_f', name: 'Fuzzy Banner', hard: 0, time: 0.2, decor: 'banner', color: '#d88a3a' });
+  add({ key: 'banner_r', name: 'Rock Banner', hard: 0, time: 0.2, decor: 'banner', color: '#8a8690' });
+  add({ key: 'banner_a', name: 'Acorn Banner', hard: 0, time: 0.2, decor: 'banner', color: '#6a8a3a' });
+  add({ key: 'banner_g', name: 'Ghost Banner', hard: 0, time: 0.2, decor: 'banner', color: '#a8a0e0' });
+  add({ key: 'hide', name: 'Hide Tent', solid: true, hard: 1, time: 0.4, drop: 'warthog_hide', colors: ['#8a6a4a', '#a08060', '#6a4e34'], tex: 'hide' });
+  add({ key: 'palisade', name: 'Palisade', solid: true, hard: 1, time: 0.8, drop: ['wood', 1, 2], colors: ['#7a5a3a', '#94704a', '#56402a'], tex: 'stake' });
+  add({ key: 'keepbrick', name: 'Keilia Stone', solid: true, hard: 3, time: 1.0, drop: 'stone_brick', colors: ['#7a7468', '#8e887a', '#5e5a50'], tex: 'brick', top: '#6a8a4a' });
+  add({ key: 'window', name: 'Window', hard: 1, time: 0.2, decor: 'window' });
+  add({ key: 'stairplank', name: 'Wood Stairs', platform: true, stair: true, hard: 1, time: 0.3, drop: 'wood_stairs', decor: 'stair' });
+
   RW.TILES = T;
   RW.T = {}; T.forEach((t) => (RW.T[t.key] = t.id));
 
@@ -698,6 +731,11 @@ window.RW = window.RW || {};
     { key: 'pale', colors: ['#4a4860', '#56546c', '#3e3c52'], brick: true },
     { key: 'sandw', colors: ['#6a5640', '#76624a', '#5a4836'] },
     { key: 'duat', colors: ['#2a1014', '#341418', '#200a0e'] },
+    // v1.6 (add new walls at the end too)
+    { key: 'heart', colors: ['#6e4a2c', '#82593a', '#583a22'], plank: true },
+    { key: 'living', colors: ['#3e4228', '#4a5030', '#32361e'] },
+    { key: 'tent', colors: ['#5e4a36', '#6e5840', '#4e3c2c'] },
+    { key: 'keep', colors: ['#45423e', '#504c47', '#3a3834'], brick: true },
   ];
   RW.W = {}; RW.WALLS.forEach((w, i) => w && (RW.W[w.key] = i));
 })(window.RW);
@@ -995,6 +1033,48 @@ window.RW = window.RW || {};
     { out: 'mirrorblade', in: { mirror_shard: 4, soulsteel_bar: 6, king_tusk: 1 }, at: 'forge' },
   ]);
   RW.LOOT.chest = [['wood', 4, 10, 1], ['iron_bar', 1, 4, 0.6], ['berry', 2, 5, 0.7], ['bat_wing', 1, 3, 0.4], ['crystal_red', 1, 1, 0.12], ['crystal_blue', 1, 1, 0.12]];
+
+  // ---------- Acorn World (v1.6): building pieces, the creatures of the Mbaru Tatu, and what the keep, grove and camp keep ----------
+  R.items([
+    { id: 'ladder', name: 'Ladder', kind: 'place', place: 'ladder', icon: { s: 'ladder', a: '#a07a52', b: '#6a4a2e' }, desc: 'Climb it with W and S.' },
+    { id: 'trapdoor', name: 'Trapdoor', kind: 'place', place: 'trapdoor', icon: { s: 'trapdoor', a: '#a07a52', b: '#4a3a2a' }, desc: 'A floor you can open. Press R beside it to open or shut it.' },
+    { id: 'rope_bridge', name: 'Rope Bridge', kind: 'place', place: 'ropebridge', icon: { s: 'bridge', a: '#a88a5a', b: '#d8c090' }, desc: 'Planks on rope. Stand on it, or drop through with S.' },
+    { id: 'rope', name: 'Climbing Rope', kind: 'place', place: 'rope', icon: { s: 'rope', a: '#d8c090', b: '#a88a5a' } },
+    { id: 'wood_stairs', name: 'Wood Stairs', kind: 'place', place: 'stairplank', icon: { s: 'stairs', a: '#a07a52', b: '#6a4a2e' }, desc: 'Lay them in a diagonal and walk up them. S drops through.' },
+    { id: 'kofi_hair', name: 'Kofi Hair', kind: 'material', icon: { s: 'fur', a: '#b08a5a', b: '#8ae8ff' }, desc: 'Long, soft, and the tips still glow a little. Kofi shed it when frightened.' },
+    { id: 'albali_dust', name: 'Albali Dust', kind: 'material', icon: { s: 'dust', a: '#fff0b0', b: '#f4ecd8' }, desc: 'What an Albali horn turns into when it breaks off. Chemists pay well for it.' },
+    { id: 'kipsu_fur', name: 'Kipsu Fur', kind: 'material', icon: { s: 'fur', a: '#6a8a9a', b: '#6af0e0' }, desc: 'Thick pack fur. The glowing pattern fades once it is off the Kipsu.' },
+    { id: 'uff_petal', name: 'Uff Petal', kind: 'food', heal: 8, icon: { s: 'petal', a: '#ff6a8a', b: '#ffd0e0' }, desc: 'A petal from an Uff. Sweet, a little peppery.' },
+    { id: 'scute', name: 'Tonguatjis Scute', kind: 'material', icon: { s: 'scale', a: '#c8a070', b: '#6a4a30' }, desc: 'A plate off a Tonguatjis shell. Light and very hard.' },
+    { id: 'lutut_tooth', name: 'Lutut Tooth', kind: 'material', icon: { s: 'fang', a: '#eee6d4', b: '#5a4c6c' }, desc: 'One of the hundreds of teeth ringing a Lutut\'s mouth.' },
+    { id: 'hvaleia_oil', name: 'Hvaleia Oil', kind: 'material', icon: { s: 'gland', a: '#8af0ff', b: '#3f7fc4' }, desc: 'It glows faintly blue. Burns for a very long time.' },
+    { id: 'albali_salve', name: 'Albali Salve', kind: 'food', heal: 50, icon: { s: 'gland', a: '#fff6e0', b: '#e8a846' }, desc: 'Albali dust worked into berry paste. It stings, then it heals.' },
+    { id: 'keilia_tablet', name: 'Keilia Plan', kind: 'material', icon: { s: 'slab', a: '#c8b890', b: '#6a5a40' }, desc: 'A builder\'s plan scratched on slate. The Keilia would like it back.' },
+  ]);
+  const AR = (o) => R.item(Object.assign({ kind: 'armor', stack: 1 }, o));
+  AR({ id: 'kipsu_hood', name: 'Kipsu Hood', slot: 'head', def: 2, tint: '#6a8a9a', icon: { s: 'helm', a: '#6a8a9a', b: '#3a4a54' } });
+  AR({ id: 'scute_mail', name: 'Scute Mail', slot: 'body', def: 6, tint: '#c8a070', icon: { s: 'chest', a: '#c8a070', b: '#6a4a30' } });
+  AR({ id: 'keilia_helm', name: 'Keilia Guard Helm', slot: 'head', def: 4, tint: '#6a8a4a', icon: { s: 'helm', a: '#7a9a5a', b: '#3e4e2a' }, desc: 'Found in the keep. Pinecone scales over iron.' });
+  W({ id: 'lutut_lance', name: 'Lutut Lance', tier: 'platinum', power: 1, dmg: 36, spd: 0.38, knock: 4, reach: 50, fx: 'poison', icon: { s: 'spear', a: '#eee6d4', b: '#5a4c6c' }, desc: 'A ring of Lutut teeth bound round a platinum shaft.' });
+  W({ id: 'raider_knife', name: 'Raider Knife', tier: 'iron', power: 1, dmg: 15, spd: 0.24, knock: 2, icon: { s: 'sword', a: '#8a8690', b: '#3e3030' }, desc: 'Short, quick and nasty. The Duskareth raiders carry them.' });
+  W({ id: 'hvaleia_bow', name: 'Hvaleia Bow', tier: 'bronze', power: 1, dmg: 26, spd: 0.44, knock: 3, fx: 'lightning', ranged: { kind: 'arrow', spd: 480, grav: 190 }, icon: { s: 'bow', a: '#3f7fc4', b: '#8af0ff' }, desc: 'Strung with oiled Hvaleia sinew. The arrows crackle.' });
+  R.recipes([
+    { out: 'ladder', n: 4, in: { wood: 2 } },
+    { out: 'wood_stairs', n: 4, in: { wood: 2 } },
+    { out: 'trapdoor', n: 2, in: { planks: 3 }, at: 'knap' },
+    { out: 'rope_bridge', n: 6, in: { wood: 2, living_vine: 1 }, at: 'knap' },
+    { out: 'rope', n: 6, in: { living_vine: 1 } },
+    { out: 'albali_salve', in: { albali_dust: 1, berry: 2 }, at: 'knap' },
+    { out: 'kipsu_hood', in: { kipsu_fur: 6 }, at: 'knap' },
+    { out: 'scute_mail', in: { scute: 6, iron_bar: 4 }, at: 'forge' },
+    { out: 'lutut_lance', in: { lutut_tooth: 6, platinum_bar: 8 }, at: 'forge' },
+    { out: 'hvaleia_bow', in: { hvaleia_oil: 3, bronze_bar: 8, kofi_hair: 4 }, at: 'forge' },
+  ]);
+  // keep: Keilia stores. vault: behind the keep's puzzles. camp: Duskareth plunder. grove: Elsha'ryn gifts.
+  RW.LOOT.keep = [['planks', 4, 10, 0.8], ['iron_bar', 2, 5, 0.7], ['bronze_bar', 1, 3, 0.4], ['torch', 3, 6, 0.5], ['berry', 2, 5, 0.5], ['ladder', 2, 4, 0.4], ['keilia_tablet', 1, 1, 0.25], ['crystal_green', 1, 1, 0.15]];
+  RW.LOOT.vault = [['platinum_bar', 2, 5, 0.8], ['bronze_bar', 3, 6, 0.8], ['crystal_gold', 1, 1, 0.5], ['crystal_purple', 1, 2, 0.5], ['crystal_red', 1, 2, 0.5], ['keilia_helm', 1, 1, 0.3], ['stygian_bar', 1, 2, 0.15]];
+  RW.LOOT.camp = [['iron_bar', 1, 4, 0.7], ['raider_knife', 1, 1, 0.3], ['warthog_hide', 2, 4, 0.6], ['torch', 2, 5, 0.5], ['kipsu_fur', 1, 3, 0.4], ['albali_dust', 1, 1, 0.25], ['crystal_blue', 1, 1, 0.15]];
+  RW.LOOT.grove = [['uff_petal', 2, 5, 0.8], ['albali_salve', 1, 2, 0.5], ['living_vine', 2, 4, 0.6], ['kofi_hair', 1, 3, 0.4], ['crystal_green', 1, 2, 0.4], ['heartwood', 1, 1, 0.12]];
 })(window.RW);
 
 </script>
@@ -1132,7 +1212,7 @@ window.RW = window.RW || {};
     burr: { lines: ['Swords for speed, spears for reach, bows for cowards. Kidding! I love bows.', 'Bring me tusks! Ten warthog tusks on a platinum spear and it\'ll throw lightning.', 'Living vines from grabbing trees make a bowstring that bites back.', 'Eater fangs are still hot when you pull them out. Perfect for a Sunfire Sword.'], actions: ['forge', 'chat'] },
     wedgeworth: { lines: 'wedgeworth', actions: ['chat'] },
     cubert: { lines: 'cubert', actions: ['trade', 'chat'] },
-    capwell: { tips: 'ACORN_TIPS', idle: ['Up here in the canopy we stay out of the Warthog King\'s way.', 'Acorns float. Rocks sink. Fuzzies have opinions about both.'], lines: ['Welcome to Capstead! Up here in the canopy we stay out of the Warthog King\'s way.', 'Every traveler gets a buddy. It\'s tradition. Also, they insist.', 'The King charges across the eastern clearing. When he falls, the rift to Rock World will open.'], actions: ['guide', 'sidekick', 'recipes'] },
+    capwell: { tips: 'ACORN_TIPS', idle: ['Up here in the home trees we stay out of the Warthog King\'s way.', 'Acorns float. Rocks sink. Fuzzies have opinions about both.', 'Take the stairs inside the trunk, or the ladders outside. The bridges are for the brave.', 'The Elsha\'ryn hide in the thickest part of the jungle. Be polite if you find them.'], lines: ['Welcome to Capstead! Up here in the home trees we stay out of the Warthog King\'s way.', 'Every traveler gets a buddy. It\'s tradition. Also, they insist.', 'The King charges across the eastern clearing. When he falls, the rift to Rock World will open.'], actions: ['guide', 'sidekick', 'recipes'] },
     vexa: { tips: 'GHOST_TIPS', idle: ['Stygian ore only breaks for platinum or better.', 'Do not mind my scythes. They are ceremonial. Mostly.'], lines: ['Halt. You may pass. The Empire welcomes the living, so long as they behave.', 'Stygian ore only breaks for platinum or better. Our forge will turn it into bars.', 'The Hollow Wraith waits in the eastern hollows. Defeat her, and the dead of this world will rest.', 'Do not mind my scythes. They are ceremonial. Mostly.'], actions: ['guide', 'forge', 'chat'] },
     cyator: { lines: ['...', 'The Commander is inside.', 'Long live the Empire.'], actions: ['chat'] },
   };
@@ -1145,19 +1225,62 @@ window.RW = window.RW || {};
     { t: (p) => !RW.state.bosses.ghost, say: 'The Hollow Wraith waits in the eastern Hollows. She does not spare ghosts. Go only when you are strong.' },
     { t: (p) => true, say: 'The dead of this world rest easier now. The Empire thanks you, small one.' },
   ];
-  RW.ACORN_TIPS = [
-    { t: (p) => !p.has('wood', 1), say: 'Welcome home, little cap! Punch a tree for wood. Acorns are small, but you can jump twice. Use that second jump well.' },
-    { t: (p) => !p.flag('placed_knap') && !p.has('workbench', 1), say: 'Ten wood makes a Workbench. There\'s one at the foot of our tree too. Slime gel and wood make slingshot ammo... well, you never run out anyway!' },
-    { t: (p) => !p.hasAny(['flint_pick', 'stone_pick', 'iron_pick', 'bronze_pick', 'platinum_pick', 'stygian_pick']), say: 'Find flint in the root caves and make a Flint Pick. Three flint, two rubble.' },
-    { t: (p) => !p.flags.buddy, say: 'Every acorn deserves a buddy, even an acorn! Take one, they insist.' },
-    { t: (p) => !RW.state.bosses.acorn, say: 'The Warthog King rules the clearing to the east. Topple him and the Duat opens to Rock World. If you need gentler ground first, the altar goes to Fuzzy World.' },
-    { t: (p) => true, say: 'The King has fallen! Capstead sings your name, little cap.' },
-  ];
 
   RW.CARVINGS_FUZZY = [
     { title: 'The First Grove', text: 'Before the mountains rose, the Giant Vine Tree was a seed. Now its roots hold the eastern jungle together. Whoever fells it will open a door.' },
     { title: 'Of Fuzzies', text: 'We are fur and courage. We float when we swim and we never stop being curious. That is the whole of it.' },
   ];
+
+  // =================== ACORN WORLD (v1.6): Capstead, the Keilia keep, the Elsha'ryn grove ===================
+  // Carvings and memory cores share one list (def.carvings). Index numbers are used by acornworld.js.
+  RW.CARVINGS_ACORN = [
+    { title: 'Capstead', text: 'Two home trees, one village. The west tree was planted by the first acorns. The east tree grew to keep it company. Nobody remembers which was lonelier.' },
+    { title: 'Of the Aagac', text: 'An acorn\'s hat is part of its very being. Folk know the hat before they know the face. The mark on your Aagac tells the world what kind of Eikar you are.' },
+    { title: 'The Hall of Hammers', text: 'Four banners, four peoples. The fur and the cap stand tall. The stone and the sheet bow low. Set them so, and the Treasury will open for those who were never meant to enter.' },
+    { title: 'The Order of Things', text: 'First the Keilia raised the hammer. Then they opened their one eye. They grew the cone upon their heads. Last of all, the acorns came. Touch the runes as it happened.' },
+    { title: 'The Deep Vault', text: 'This door answers only to the light at the top of the tallest tower. Climb, and pull, and come back down. The Keilia built it so that thieves would get tired.' },
+    { title: 'Keilia Law', text: 'A Keilia builds. Our hammers are made for us by the Kalo, and a Keilia who takes a hammer into battle is banished. So we build walls instead, and we build them very well.' },
+    { title: 'The Great War', text: 'The Keilia ran the world first. The Great War is where it passed from the Keilia to the Eikar. The Keilia were not happy about it. Then they got over it and built this keep.' },
+    { title: 'Memory: The Grove', text: 'You hear a voice that is not here. "We grow what we need. A wall, a bowl, a bridge. Grow-forged wood keeps the nature of the tree it came from. When the tree dies, the gift fades back into the earth."' },
+    { title: 'Memory: Phorus', text: 'A Kalo\'Eik voice, laughing. "The Inventor and I hiked three days to the ruins of Aakalay, then rode wild Punks for two more. He fell into a trance for a fortnight and some change. I put him in water. That was a mistake."' },
+    { title: 'Memory: The Byrds', text: 'An Albali\'s horn carries a healing film. Whatever it strikes heals fast, but the film stings the whole time, so the struck one cannot move. If the Byrd dies, every drop of its film turns to plain water.' },
+    { title: 'Memory: The Duskareth', text: 'Not all who wear the dark Aagac can touch the Duat. The ones in the caves below cannot. They only wish they could. They steal, and they are angry about everything.' },
+    { title: 'Memory: The Most Perfect Creature', text: 'Never harm a RubberMcFly. It carries its memory in its beak, and something very old watches over it. Those who kill one meet the ShurgrEdan, and the sky itself reaches down.' },
+    { title: 'Of Stryx', text: 'A Stryx is exactly as clever as it is raised to be. The ones in the World Arena only know how to stab. In Capstead we grew one into a fountain and taught it to juggle mud.' },
+  ];
+
+  RW.ACORN_TIPS = [
+    { t: (p) => !p.has('wood', 1), say: 'Welcome home, little cap! Punch a tree for wood. Not our home trees, please, the little ones. Acorns are small, but you can jump twice. Use that second jump well.' },
+    { t: (p) => !p.flag('placed_knap') && !p.has('workbench', 1), say: 'Ten wood makes a Workbench. There\'s one at the foot of the west tree. Two wood makes four ladders, if you want to climb like us.' },
+    { t: (p) => !p.hasAny(['flint_pick', 'stone_pick', 'iron_pick', 'bronze_pick', 'platinum_pick', 'stygian_pick']), say: 'Find flint in the root caves and make a Flint Pick. Three flint, two rubble.' },
+    { t: (p) => !p.flags.buddy, say: 'Every acorn deserves a buddy, even an acorn! Take one, they insist.' },
+    { t: (p) => !p.flag('seen_keep'), say: 'West of here stands the Keilia keep, with trees for towers. The Keilia are friends, but they don\'t like visitors where visitors shouldn\'t be. If you go poking about, don\'t get caught.' },
+    { t: (p) => !RW.state.bosses.acorn, say: 'The Warthog King rules the clearing far to the east, past the Elsha\'ryn grove. Topple him and the Duat opens to Rock World. If you need gentler ground first, the altar goes to Fuzzy World.' },
+    { t: (p) => true, say: 'The King has fallen! Capstead sings your name, little cap.' },
+  ];
+
+  RW.KEEP_TRADES = [
+    { give: { keilia_tablet: 1 }, get: ['iron_bar', 4], note: 'Return a stolen plan' },
+    { give: { keilia_tablet: 3 }, get: ['bronze_bar', 5] },
+    { give: { stone_brick: 20 }, get: ['ladder', 8] },
+  ];
+  RW.GROVE_TRADES = [
+    { give: { kofi_hair: 4 }, get: ['living_vine', 3] },
+    { give: { uff_petal: 6 }, get: ['albali_salve', 1] },
+    { give: { albali_dust: 2 }, get: ['crystal_green', 1] },
+    { give: { hvaleia_oil: 2 }, get: ['heartwood', 1] },
+  ];
+  Object.assign(RW.NPCS, {
+    ruut: { lines: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Wild Punks have no eyes and no mouths, and they still find you. Mine are the friendly sort. Mostly.', 'Three of my herd wandered off again. Brainless, the lot of them. Bless them.', 'A Punk walks on the vines that grow out of its top. Do not ask me how. I have been asking for forty years.'], actions: ['chat'] },
+    orrin: { lines: ['I built every bridge between the two trees. Mind the ones at the top, they bounce.', 'Ladders up, trapdoors shut. That\'s the rule in Capstead. Keeps the Kofi out of the bedrooms.', 'A Keilia builds. That is all we are for, and it\'s plenty.', 'My cousin keeps the keep to the west. She is very strict. She would not like to see you in the Treasury.'], actions: ['chat'] },
+    brannoc: { lines: ['That\'s Pebble, our fountain. She\'s a Stryx. We grew her that way. She juggles mud for the children.', 'Don\'t stand on Pebble. She\'s friendly, but nobody likes being stood on.', 'Stryx out in the wild are less friendly. Stand on one of those and the vines come up.'], actions: ['chat'] },
+    brakka: { lines: ['Welcome to the keep, little cap. You may walk the courtyard and the hall. The rest is Keilia business.', 'Have you seen a builder\'s plan lying about? Some keep vanishing. Bring them back and I\'ll pay in good iron.', 'Four peoples, four banners in the Hall of Hammers. A reminder that the world is bigger than the keep.', 'The guards are kind, but they will march you straight out of anywhere you are not meant to be.'], actions: ['trade', 'chat'], trades: 'KEEP_TRADES', tradeSay: 'Master Brakka: "Good. That one goes back on the shelf."' },
+    dunvarr: { lines: ['I am one of the few Keilia who smith. The rest only build. Use my forge if you like.', 'The Kalo make our hammers. I make everything else.'], actions: ['forge', 'chat'] },
+    ferrow: { lines: ['Captain Ferrow, keep guard. The courtyard is open. The towers, the archive and the Treasury are not.', 'If one of my guards sees you somewhere you shouldn\'t be, you go out the front gate. Every time.', 'They say the deep vault opens from the top of the tallest tower. They say a lot of things.'], actions: ['chat'] },
+    lethra: { lines: ['You found the grove. Most walk past it. The trees here like to hide us.', 'We are the Elsha\'ryn. We keep memory, and we grow what we need instead of cutting it.', 'Touch a memory core and listen. Some of these voices are older than the keep.', 'Trade with us if you like. We have more salve than we need.'], actions: ['trade', 'chat'], trades: 'GROVE_TRADES', tradeSay: 'Lethra: "Grown, not made. Take care of it."' },
+    keepguard: { lines: ['Courtyard\'s open. The rest is Keilia business.', 'Lovely day for standing very still.', 'If I see you in the Treasury, it\'s straight out the gate. Nothing personal.', 'The Master is in the great hall, if you want her.'], actions: ['chat'] },
+    phorus: { lines: ['Phorus, a Kalo\'Eik. I\'m only visiting. The Elsha\'ryn keep the best library in the world, and they let me read it.', 'I once put a friend in water during a trance. Do not put your friends in water during a trance.', 'If you meet a RubberMcFly, leave it be. Trust me.'], actions: ['chat'] },
+  });
 
   // =================== ACORN & GHOST HEROES ===================
   RW.ACORN_NAMES = ['Nutkin', 'Cap', 'Hazel', 'Pip', 'Oakley', 'Burl', 'Twig', 'Chestnut', 'Bramble', 'Sprout', 'Kernel', 'Pecan', 'Filbert', 'Acre', 'Bud', 'Shelly', 'Knot', 'Rooty', 'Sapling', 'Cupule',
@@ -1371,9 +1494,9 @@ window.RW = window.RW || {};
   // Stryx (from the Mbaru Tatu): a wide, flat body of stepped stone armour, rooted where it grew, vines draped
   // over it. Eyeless, no horns. Chill, until someone stands on it; then its vines come up and lash.
   // platform: you can stand on its back. lashR / lashY: how far its vines reach, and from how high.
-  S({ id: 'stryx', type: 'monsters', name: 'Stryx', world: 'fuzzy', role: 'enemy', status: 'active', art: { draw: 'stryx' },
+  S({ id: 'stryx', type: 'monsters', name: 'Stryx', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'stryx' },
     w: 40, h: 18, hp: 150, dmg: 12, speed: 0, behavior: 'stryx', platform: true, lashR: 84, lashY: 3,
-    spawn: { worlds: ['fuzzy', 'acorn'], medium: 'surface', zones: ['forest', 'mountains', 'jungle', 'canopy'], weight: 3 },
+    spawn: { worlds: ['acorn'], medium: 'surface', zones: ['jungle', 'canopy', 'deepwood'], weight: 3 },
     drops: [['stone', 1, 3, 6], ['living_vine', 0.6, 1, 2], ['crystal_green', 0.08, 1, 1]],
     blurb: 'A wide, flat slab of stepped stone, rooted where it grew, with vines draped over its back. Pretty chill. Stand on it, or hit it, and the vines come up lashing until it calms down.' });
   S({ id: 'giant_vine_tree', type: 'monsters', name: 'Gnarlroot, the Giant Vine Tree', world: 'fuzzy', role: 'boss', status: 'active', art: { draw: 'gianttree' },
@@ -1384,6 +1507,131 @@ window.RW = window.RW || {};
     w: 96, h: 58, hp: 2600, dmg: 22, speed: 230, behavior: 'hogking',
     drops: [['king_tusk', 1, 2, 3], ['kingtusk_blade', 1, 1, 1], ['crystal_gold', 1, 1, 2], ['warthog_hide', 1, 8, 12]],
     blurb: 'Boss of Acorn World. Crowned, enormous, and always charging.' });
+})(window.RW);
+
+</script>
+<script>/* js/data/species/mbarutatu.js */
+// CREATURES AND FOLK OF THE MBARU TATU (v1.6) — the creatures from Torcain's Run, living only in Acorn World,
+// plus the Keilia, the Eikar of Capstead, the Elsha'ryn and the Duskareth raiders.
+// temper: 'critter' never hurts you; 'neutral' leaves you alone until you hit it; anything else attacks.
+// Drawings are in engine/art4.js (D.<art.draw>), behaviors in engine/entities4.js (E.behaviors.<behavior>).
+(function (RW) {
+  const T = RW.register.type, S = RW.register.species;
+  T({ id: 'esik', name: 'Creatures of the Mbaru Tatu', creator: 'Shared', color: '#d8a84a', blurb: 'The beasts of the three Tatu: Punks, Kofi, Byrds and stranger things. In 4 Brothers World they live only in Acorn World.' });
+  T({ id: 'keilia', name: 'Keilia', creator: 'Shared', color: '#5a3a24', blurb: 'Taller than the Eikar, with dark pinecone-wood skin, one eye and a cape of pinecone scales. Builders, never fighters.' });
+  T({ id: 'eikar', name: 'Eikar', creator: 'Shared', color: '#c88a4a', blurb: 'The folk of the Mbaru Tatu. They started as acorns, and every one wears an Aagac, an acorn hat that is part of them.' });
+  const ACORN = ['acorn'];
+
+  // ---- Punks: pumpkin bodies walking on the vines that grow from their tops. No eyes, no mouths. ----
+  S({ id: 'wild_punk', type: 'esik', name: 'Wild Punk', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'punk', v: 'wild' },
+    w: 18, h: 18, hp: 40, dmg: 11, speed: 100, behavior: 'punk',
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'canopy', 'deepwood'], weight: 5 },
+    drops: [['living_vine', 0.6, 1, 2], ['berry', 0.3, 1, 3]],
+    blurb: 'Eyeless, mouthless, and it still finds you. Runs on its vines and lashes with them.' });
+  S({ id: 'domestic_punk', type: 'esik', name: 'Domestic Punk', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'punk', v: 'domestic' },
+    w: 24, h: 22, hp: 70, dmg: 9, speed: 50, behavior: 'grazer', temper: 'neutral',
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['village'], weight: 6 },
+    drops: [['living_vine', 0.5, 1, 2]],
+    blurb: 'Old Ruut\'s herd. Gentle as sheep, if sheep had vines. Hit one and it hits back.' });
+  S({ id: 'malsti_punk', type: 'esik', name: 'Malsti Punk', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'punk', v: 'malsti' },
+    w: 8, h: 8, hp: 12, dmg: 0, speed: 120, behavior: 'malsti', temper: 'critter',
+    spawn: { worlds: ACORN, medium: 'ground', zones: ['forest', 'jungle', 'canopy', 'deepwood', 'caves'], weight: 1.5, caveOrNight: true },
+    drops: [['crystal_purple', 0.08, 1, 1]],
+    blurb: 'A Punk the size of a fist, cracked with Duat light. It blinks up, steals something from your bag and blinks away. Catch it to get it back.' });
+
+  // ---- critters ----
+  S({ id: 'kofi', type: 'esik', name: 'Kofi Galta', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'kofi' },
+    w: 12, h: 9, hp: 10, dmg: 0, speed: 90, behavior: 'critter', temper: 'critter',
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'canopy', 'deepwood', 'village', 'keep'], weight: 6 },
+    drops: [['kofi_hair', 0.8, 1, 2]],
+    blurb: 'A shaggy ball of hair on lots of tiny legs, with two little horns. The tips of its long back-hairs glow. Scurries off if you get close.' });
+  S({ id: 'big_momma_kofi', type: 'esik', name: 'Big Momma Kofi', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'kofi', v: 'momma' },
+    w: 18, h: 13, hp: 20, dmg: 0, speed: 70, behavior: 'critter', temper: 'critter',
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'deepwood'], weight: 2 },
+    drops: [['kofi_hair', 1, 2, 4]],
+    blurb: 'A big Kofi with two babies clinging to her back.' });
+  S({ id: 'rubbermcfly', type: 'esik', name: 'RubberMcFly', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'mcfly' },
+    w: 8, h: 8, hp: 6, dmg: 0, speed: 30, behavior: 'mcfly', temper: 'critter',
+    spawn: { worlds: ACORN, medium: 'air', zones: ['forest', 'jungle', 'canopy', 'deepwood', 'village', 'elsharyn', 'keep'], weight: 4 },
+    drops: [],
+    blurb: 'A ball of yellow fluff with a beak, butterfly wings and two little legs. The most perfect creature. Do not hurt it.' });
+  S({ id: 'uff', type: 'esik', name: 'Uff', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'uff' },
+    w: 10, h: 16, hp: 10, dmg: 0, speed: 12, behavior: 'critter', temper: 'critter', slow: true,
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'deepwood', 'elsharyn'], weight: 3 },
+    drops: [['uff_petal', 0.9, 1, 3]],
+    blurb: 'A thorny walking flower with a glowing heart. It wanders about very, very slowly.' });
+  S({ id: 'mikolo_moko', type: 'esik', name: 'Mikolo Moko', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'mikolo' },
+    w: 10, h: 12, hp: 14, dmg: 0, speed: 100, behavior: 'critter', temper: 'critter', hops: true,
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'deepwood'], weight: 3 },
+    drops: [['berry', 0.6, 1, 2]],
+    blurb: 'Its name means "weird leg". Two sets of eyes and a very fun hairdo that glows at night. Hops away from you.' });
+  S({ id: 'makari', type: 'esik', name: 'Makari Swarm', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'makari' },
+    w: 14, h: 12, hp: 8, dmg: 0, speed: 20, behavior: 'makari', temper: 'critter',
+    spawn: { worlds: ACORN, medium: 'air', zones: ['jungle', 'canopy', 'deepwood', 'elsharyn', 'village'], weight: 3, caveOrNight: true },
+    drops: [],
+    blurb: 'A drifting cloud of tiny green lights.' });
+
+  // ---- neutral until you hit them ----
+  S({ id: 'albali', type: 'esik', name: 'Albali Byrd', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'albali' },
+    w: 16, h: 14, hp: 48, dmg: 10, speed: 95, behavior: 'albali', temper: 'neutral',
+    spawn: { worlds: ACORN, medium: 'air', zones: ['forest', 'jungle', 'canopy', 'deepwood'], weight: 3 },
+    drops: [['albali_dust', 0.5, 1, 1]],
+    blurb: 'A round white Byrd with a collar of horns. Hit it and it dives at you: the horn\'s healing film paralyzes you, then heals the wound.' });
+  S({ id: 'villtur_albali', type: 'esik', name: 'Villtur Albali', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'albali', v: 'villtur' },
+    w: 16, h: 14, hp: 58, dmg: 11, speed: 100, behavior: 'albali', toxic: true,
+    spawn: { worlds: ACORN, medium: 'air', zones: ['canopy', 'deepwood'], weight: 1.2 },
+    drops: [['albali_dust', 0.7, 1, 2]],
+    blurb: 'A wild Albali whose film has turned toxic. It hunts, and its horns poison instead of heal.' });
+  S({ id: 'hvaleia', type: 'esik', name: 'Hvaleia', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'hvaleia' },
+    w: 64, h: 26, hp: 600, dmg: 20, speed: 40, behavior: 'hvaleia', temper: 'neutral',
+    spawn: { worlds: ACORN, medium: 'air', zones: ['ocean'], weight: 3 },
+    drops: [['hvaleia_oil', 1, 2, 4]],
+    blurb: 'A great blue whale that swims through the air above the Green Sea, blowholes glowing. Gentle, unless you start it.' });
+  S({ id: 'tonguatjis', type: 'esik', name: 'Tonguatjis', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'tonguatjis' },
+    w: 30, h: 18, hp: 260, dmg: 15, speed: 20, behavior: 'tonguatjis', temper: 'neutral',
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['jungle', 'ocean', 'deepwood'], weight: 1.5 },
+    drops: [['scute', 1, 1, 3]],
+    blurb: 'A domed shell with a ring of lamps, a long ringed neck and a tongue with a glowing lure on the end. Its tongue reaches a long way.' });
+
+  // ---- hunters ----
+  S({ id: 'kipsu', type: 'esik', name: 'Kipsu', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'kipsu' },
+    w: 18, h: 12, hp: 32, dmg: 7, speed: 130, behavior: 'kipsu',
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'canopy'], weight: 4 },
+    drops: [['kipsu_fur', 0.7, 1, 2]],
+    blurb: 'Pack hunters with big paws and very fluffy tails. Every Kipsu\'s glowing pattern is its own. They bite and run.' });
+  S({ id: 'lutut', type: 'esik', name: 'Lutut', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'lutut' },
+    w: 40, h: 34, hp: 900, dmg: 26, speed: 70, behavior: 'lutut',
+    spawn: { worlds: ACORN, medium: 'air', zones: ['canopy', 'deepwood', 'jungle'], weight: 0.5, caveOrNight: true },
+    drops: [['lutut_tooth', 1, 2, 4], ['crystal_purple', 0.2, 1, 1]],
+    blurb: 'A great drop of carved stone with membrane wings and a lamprey mouth. The carvings glow at night. You hear its screech long before you see it.' });
+
+  // ---- the Duskareth raiders (they wear the dark Aagac but cannot touch the Duat) ----
+  const DUSK = { shell: 'dark', hue: 0, tone: -0.08, cap: 'spiky', eyes: 'fierce', mouth: 'grin', extra: 'scarf' };
+  S({ id: 'dusk_raider', type: 'eikar', name: 'Duskareth Raider', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'duskfolk', look: DUSK },
+    w: 12, h: 22, hp: 70, dmg: 14, speed: 82, behavior: 'raider',
+    spawn: { worlds: ACORN, medium: 'ground', zones: ['camp'], weight: 6 },
+    drops: [['iron_bar', 0.3, 1, 2], ['raider_knife', 0.06, 1, 1], ['keilia_tablet', 0.1, 1, 1]],
+    blurb: 'An angry Eikar of the Duskareth camp. Wants your things. Has a knife about it.' });
+  S({ id: 'dusk_slinger', type: 'eikar', name: 'Duskareth Slinger', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'duskfolk', look: Object.assign({}, DUSK, { cap: 'tall', extra: 'stick' }) },
+    w: 12, h: 22, hp: 50, dmg: 10, speed: 70, behavior: 'raider', ranged: true,
+    spawn: { worlds: ACORN, medium: 'ground', zones: ['camp'], weight: 3 },
+    drops: [['iron_bar', 0.2, 1, 2], ['albali_dust', 0.1, 1, 1]],
+    blurb: 'Keeps its distance and throws knives.' });
+
+  // ---- folk (NPCs) ----
+  const E = (id, name, look, blurb) => S({ id, type: 'eikar', name, world: 'acorn', role: 'npc', status: 'active', art: { draw: 'acornfolk', look }, blurb });
+  E('ruut', 'Old Ruut', { shell: 'pale', hue: 0, tone: 0.06, cap: 'smooth', eyes: 'sleepy', mouth: 'smile', extra: 'stick' }, 'Capstead\'s Punk herder. Has been asking how Punks walk for forty years.');
+  E('brannoc', 'Brannoc', { shell: 'golden', hue: 0, tone: 0, cap: 'classic', eyes: 'happy', mouth: 'grin', extra: 'none' }, 'Keeper of Pebble, Capstead\'s Stryx fountain.');
+  E('ferrow', 'Captain Ferrow', { shell: 'red', hue: 0, tone: -0.04, cap: 'spiky', eyes: 'fierce', mouth: 'none', extra: 'scarf' }, 'Captain of the keep guard. Fair, firm, and has marched a lot of acorns out of the gate.');
+  E('lethra', 'Lethra of the Elsha\'ryn', { shell: 'green', hue: 0, tone: 0.04, cap: 'tall', eyes: 'sleepy', mouth: 'smile', extra: 'leaf' }, 'An elder of the Elsha\'ryn, keepers of memory, who grow what they need.');
+  E('phorus', 'Phorus', { shell: 'pale', hue: 6, tone: 0.1, cap: 'tall', eyes: 'big', mouth: 'open', extra: 'scarf' }, 'A Kalo\'Eik visiting the grove\'s library. Old friend of the Inventor.');
+  E('keepguard', 'Keep Guard', { shell: 'brown', hue: 0, tone: -0.02, cap: 'spiky', eyes: 'fierce', mouth: 'none', extra: 'none' }, 'An Eikar of the keep guard. Friendly, but will march you out of anywhere you shouldn\'t be.');
+  const K = (id, name, o, blurb) => S({ id, type: 'keilia', name, world: 'acorn', role: 'npc', status: 'active', art: Object.assign({ draw: 'keilia' }, o), blurb });
+  K('orrin', 'Orrin', { cloth: '#5a4a2a', eye: '#8a6a2a' }, 'A Keilia builder. Built every bridge in Capstead.');
+  K('brakka', 'Master Brakka', { cloth: '#3e5a4a', eye: '#7a8a2a', hammer: true }, 'Master builder of the Keilia keep. Strict. Wants her missing plans back.');
+  K('dunvarr', 'Dunvarr', { cloth: '#5a3a2a', eye: '#a85a2a', apron: true }, 'One of the few Keilia smiths.');
+  S({ id: 'pebble', type: 'esik', name: 'Pebble', world: 'acorn', role: 'npc', status: 'active', still: true, art: { draw: 'stryxcalm' },
+    blurb: 'Capstead\'s fountain: a Stryx grown round a pool of bog mud. She juggles mud balls for the children.' });
 })(window.RW);
 
 </script>
@@ -2291,72 +2539,412 @@ window.RW = window.RW || {};
 
 </script>
 <script>/* js/data/worlds/acornworld.js */
-// ACORN WORLD — super green and dense. Giant oaks everywhere; Capstead is built up in the biggest one.
-// The Warthog King charges around the eastern clearing.
+// ACORN WORLD — super green and dense. West to east:
+// the Green Sea · the Keepwood and the Keilia keep (its towers are trees, joined by stone walls) · the Green Deep with
+// Capstead (two giant home trees joined by rope bridges) · the Tangle, where the Elsha'ryn hide · the Canopy and the
+// King's Clearing (the Warthog King) · the sea. Down in the root caves under the Green Deep, the Duskareth raiders camp.
+// Since v1.6 the surface sits lower, so the home trees have room to be enormous.
 (function (RW) {
-  const W = 560, H = 260, SEA = 112;
-  const VIL = { x: 120, y: 100 };
-  const ARENA = { x0: 420, x1: 520, y: 102 };
+  const W = 1100, H = 330, SEA = 166, GY = 158;
+  const KEEP = { x0: 36, x1: 232, out: 230 };
+  const VIL = { x0: 266, x1: 494, ta: 316, tb: 410, plaza: 372 };   // ta / tb: first inside column of each home tree
+  const GROVE = { x0: 698, x1: 784 };
+  const CAMP = { x0: 520, x1: 604, y: 226 };
+  const ARENA = { x0: 980, x1: 1062 };
+  const TF = 10, TFLOORS = 7;                                        // home trees: a floor every 10 blocks, 7 floors up
   let C = null;
+  const inR = (r, x, y) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
+  const VILR = { x0: VIL.x0, x1: VIL.x1, y0: GY - 104, y1: GY + 8 };
+  const KEEPR = { x0: KEEP.x0, x1: KEEP.x1, y0: GY - 96, y1: GY + 14 };
+  const GROVER = { x0: GROVE.x0 - 4, x1: GROVE.x1 + 4, y0: GY - 60, y1: GY + 4 };
+  const CAMPR = { x0: CAMP.x0, x1: CAMP.x1, y0: CAMP.y - 22, y1: CAMP.y + 4 };
   const def = {
     id: 'acorn', name: 'Acorn World', status: 'active', size: [W, H], sea: SEA, order: 1, sky: 'normal', unlockedBy: 'fuzzy',
-    blurb: 'A world drowned in green. Home of the acorns.',
-    spawn: { x: VIL.x, y: VIL.y - 1 }, titleCam: { x: VIL.x, y: VIL.y - 12 }, carvings: 'CARVINGS_FUZZY',
-    boss: { species: 'warthog_king', arena: { x0: ARENA.x0, x1: ARENA.x1, y0: 40, y1: ARENA.y + 2 }, at: { x: (ARENA.x0 + ARENA.x1) / 2, y: ARENA.y }, wake: 50 },
+    store: 'acorn2',   // block changes are kept under this name: v1.6 rebuilt the world, so older changes are set aside
+    blurb: 'A world drowned in green. Home of the acorns, the Keilia keep and the Elsha\'ryn.',
+    spawn: { x: VIL.plaza, y: GY - 1 }, titleCam: { x: VIL.plaza, y: GY - 40 }, carvings: 'CARVINGS_ACORN',
+    boss: { species: 'warthog_king', arena: { x0: ARENA.x0, x1: ARENA.x1, y0: GY - 62, y1: GY + 2 }, at: { x: (ARENA.x0 + ARENA.x1) / 2, y: GY }, wake: 50 },
     zones: {
-      canopy: { name: 'The Canopy', music: 'jungle' }, jungle: { name: 'The Green Deep', music: 'jungle' }, village: { name: 'Capstead', music: 'village' },
-      arena: { name: "The King's Clearing", music: 'core' }, caves: { name: 'Root Caves', music: 'caves' }, deep: { name: 'The Root Deep', music: 'tubes' }, ocean: { name: 'The Green Sea', music: 'sea' },
+      forest: { name: 'The Keepwood', music: 'forest' }, keep: { name: 'The Keilia Keep', music: 'village' },
+      jungle: { name: 'The Green Deep', music: 'jungle' }, village: { name: 'Capstead', music: 'village' },
+      deepwood: { name: 'The Tangle', music: 'jungle' }, elsharyn: { name: 'The Memory Grove', music: 'village' },
+      canopy: { name: 'The Canopy', music: 'jungle' }, arena: { name: "The King's Clearing", music: 'core' },
+      camp: { name: 'The Duskareth Camp', music: 'caves' }, caves: { name: 'Root Caves', music: 'caves' }, deep: { name: 'The Root Deep', music: 'tubes' }, ocean: { name: 'The Green Sea', music: 'sea' },
     },
     zoneAt(x, y) { return C ? C.zone(x, y) : 'jungle'; },
-    ambientAt(x, y) { if (Math.abs(x - VIL.x) < 14 && y < VIL.y + 2 && y > VIL.y - 34) return 0.36; return y > 200 ? 0.12 : 0.18; },
+    ambientAt(x, y) {
+      if (inR(VILR, x, y) || inR(KEEPR, x, y)) return 0.38;
+      if (inR(GROVER, x, y)) return 0.32;
+      if (inR(CAMPR, x, y)) return 0.24;
+      return y > 270 ? 0.12 : 0.18;
+    },
     generate,
   };
   RW.register.world(def);
 
   function generate(seed) {
-    const c = RW.surface.ctx(W, H, seed + 202); C = c; const T = c.T, N = c.N;
+    const c = RW.surface.ctx(W, H, seed + 202); C = c; const T = c.T, N = c.N, WL = c.WL;
+    Object.assign(c.meta, { runes: {}, puzzles: [], restricted: [], guards: [] });
     RW.surface.terrain(c, [
-      { key: 'ocean', x0: 0, x1: 22, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
-      { key: 'jungle', x0: 22, x1: 270, height: (x) => 102 + (N(x / 28, 1.1, 3, 3) - 0.5) * 22, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'bigoak', density: 0.22, spacing: 14 }, decor: [['tallgrass', 0.55], ['berrybush', 0.12], ['flower', 0.08]] },
-      { key: 'canopy', x0: 270, x1: 540, height: (x) => 100 + (N(x / 34, 2.2, 5, 3) - 0.5) * 26, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.7, spacing: 3 }, decor: [['tallgrass', 0.6], ['berrybush', 0.08]] },
-      { key: 'ocean', x0: 540, x1: W, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
-    ], SEA, { deep: 205 });
-    RW.surface.caves(c, { worms: 26, mouths: [70, 240, 360], pools: 40 });
+      { key: 'ocean', x0: 0, x1: 26, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
+      { key: 'forest', x0: 26, x1: 256, height: (x) => GY + (N(x / 30, 1.3, 3, 3) - 0.5) * 14, top: 'grass', fill: 'dirt', wall: 'dirt', trees: { kind: 'oak', density: 0.42, spacing: 4 }, decor: [['tallgrass', 0.45], ['flower', 0.12], ['berrybush', 0.08]] },
+      { key: 'jungle', x0: 256, x1: 640, height: (x) => GY + (N(x / 28, 1.1, 3, 3) - 0.5) * 20, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'bigoak', density: 0.6, spacing: 8 }, decor: [['tallgrass', 0.55], ['berrybush', 0.12], ['flower', 0.08]] },
+      { key: 'deepwood', x0: 640, x1: 864, height: (x) => GY + (N(x / 24, 3.1, 4, 3) - 0.5) * 16, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.92, spacing: 2 }, decor: [['tallgrass', 0.7], ['berrybush', 0.1]] },
+      { key: 'canopy', x0: 864, x1: 1074, height: (x) => GY - 2 + (N(x / 34, 2.2, 5, 3) - 0.5) * 24, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.7, spacing: 3 }, decor: [['tallgrass', 0.6], ['berrybush', 0.08]] },
+      { key: 'ocean', x0: 1074, x1: W, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
+    ], SEA, { deep: 285 });
+    RW.surface.caves(c, { worms: 40, mouths: [300 - 40, 640, 870], pools: 50 });
     RW.surface.ores(c, [
-      ['gravel', 0, 200, 0.2, [1.2, 1.4], ['stone', 'mud']], ['flint', 0, 200, 0.18, [0.8, 0.8], ['stone', 'mud', 'dirt']],
-      ['iron', 108, 250, 0.26, [1, 1.3], ['stone', 'deepstone']], ['bronze', 150, 250, 0.18, [0.9, 1.2], ['stone', 'deepstone']],
-      ['platinum', 200, 252, 0.08, [0.8, 1], ['deepstone']],
-    ], 2600);
+      ['gravel', 0, 260, 0.2, [1.2, 1.4], ['stone', 'mud']], ['flint', 0, 260, 0.18, [0.8, 0.8], ['stone', 'mud', 'dirt']],
+      ['iron', 168, 318, 0.26, [1, 1.3], ['stone', 'deepstone']], ['bronze', 210, 320, 0.18, [0.9, 1.2], ['stone', 'deepstone']],
+      ['platinum', 270, 322, 0.08, [0.8, 1], ['deepstone']],
+    ], 4200);
     RW.surface.decorate(c);
-    // Capstead: houses on platforms high in a giant oak
-    RW.surface.flatten(c, VIL.x - 12, VIL.x + 12, VIL.y, 'jgrass');
-    for (let y = VIL.y - 1; y > VIL.y - 36; y--) for (let dx = -2; dx <= 2; dx++) c.set(VIL.x + dx, y, T.trunk);
-    c.disc(VIL.x, VIL.y - 40, 11, T.oakleaves, (t) => t === T.air); c.disc(VIL.x - 11, VIL.y - 34, 6, T.oakleaves, (t) => t === T.air); c.disc(VIL.x + 11, VIL.y - 34, 6, T.oakleaves, (t) => t === T.air);
-    [VIL.y - 12, VIL.y - 22, VIL.y - 31].forEach((py, i) => {
-      const side = i % 2 ? 1 : -1;
-      for (let k = -10; k <= 10; k++) c.set(VIL.x + k, py, T.woodplat);
-      const hx = VIL.x + side * 6 - 4;
-      if (i < 2) { const h = RW.surface.house(c, hx, py - 1, 9, 5, { roof: 'planks' }); for (let x = h.x0; x <= h.x1; x++) c.set(x, py, T.woodplat); c.set(hx + 4, h.roof + 1, T.lantern); }
-      for (let y = py + 1; y < (i === 0 ? VIL.y : [VIL.y - 12, VIL.y - 22][i - 1]); y++) c.set(VIL.x + side * 9, y, T.chain);
-    });
-    c.set(VIL.x - 7, VIL.y - 1, T.altar); c.set(VIL.x - 7, VIL.y, T.stone);
-    c.set(VIL.x + 7, VIL.y - 1, T.workbench); c.set(VIL.x + 9, VIL.y - 1, T.campfire);
-    c.meta.npcs.capwell = { x: VIL.x - 2, y: VIL.y - 13 };
-    c.meta.npcs.cubert = { x: VIL.x + 4, y: VIL.y - 1 };
-    RW.surface.starterFlint(c, VIL.x - 40, VIL.x - 14, 3); RW.surface.starterFlint(c, VIL.x + 14, VIL.x + 40, 3);
-    def.spawn = { x: VIL.x - 4, y: VIL.y - 1 }; def.titleCam = { x: VIL.x, y: VIL.y - 14 };
-    // The King's Clearing
-    RW.surface.flatten(c, ARENA.x0, ARENA.x1, ARENA.y, 'jgrass');
-    c.meta.arena = def.boss.arena; c.meta.riftAt = { x: Math.round((ARENA.x0 + ARENA.x1) / 2), y: ARENA.y - 3 };
-    // a couple of chests
-    [60, 200, 320].forEach((x) => { const s = c.surf[x]; c.set(x, s - 1, T.woodchest); });
+    // the Green Deep: smaller oaks crowd in between the big ones
+    for (let x = 262; x < 636; x += 3) if (RW.hash2(x, 41, seed) < 0.45) RW.surface.tree(c, x, 'oak');
+    // the Tangle is choked with hanging moss; mushrooms and moss underground
+    for (let x = 642; x < 862; x++) for (let y = GY - 40; y < GY; y++) if (c.get(x, y) === T.air && c.get(x, y - 1) === T.leaves && RW.hash2(x, y, seed) < 0.3) for (let k = 0; k < 2 + (x % 4); k++) if (c.get(x, y + k) === T.air) c.set(x, y + k, T.vines);
+    for (let y = 0; y < H - 8; y++) for (let x = 3; x < W - 3; x++) {
+      if (y < c.surf[x] + 10) continue; const h = RW.hash2(x, y, seed + 3);
+      if (c.get(x, y) === T.air && c.solid(x, y + 1) && h > 0.976) c.set(x, y, T.wildmush);
+      else if (c.get(x, y) === T.air && c.solid(x, y - 1) && h < 0.022) c.set(x, y, T.vines);
+    }
+    for (let i = 0; i < 180; i++) { const x = 4 + Math.floor(c.rng() * (W - 8)), y = 240 + Math.floor(c.rng() * 80); if (c.get(x, y) === T.air && c.solid(x, y + 1)) { const r = c.rng(); c.set(x, y, r < 0.04 ? T.c_gold : r < 0.3 ? T.c_red : r < 0.55 ? T.c_blue : r < 0.8 ? T.c_green : T.c_purple); } }
+    // a pond in the Green Deep (the Tonguatjis like it)
+    { const L = GY + 1; for (let x = 600; x < 628; x++) { const d = Math.round(Math.sin((x - 600) / 28 * Math.PI) * 6) + 1; for (let y = GY - 12; y < L; y++) { c.set(x, y, T.air); c.setb(x, y, 0); } for (let y = L; y < L + d; y++) c.set(x, y, T.water); c.set(x, L + d, T.sand); c.surf[x] = L; } }
+
+    const H2 = { c, T, WL };
+    buildCapstead(H2, seed);
+    buildKeep(H2, seed);
+    buildGrove(H2, seed);
+    buildCamp(H2, seed);
+
+    // the King's Clearing
+    RW.surface.flatten(c, ARENA.x0, ARENA.x1, GY, 'jgrass');
+    for (let x = ARENA.x0 - 6; x < ARENA.x0; x++) for (let y = 0; y < GY; y++) { const t = c.get(x, y); if (t === T.leaves || t === T.trunk || t === T.vines) c.set(x, y, T.air); }
+    c.meta.arena = def.boss.arena; c.meta.riftAt = { x: Math.round((ARENA.x0 + ARENA.x1) / 2), y: GY - 3 };
+
+    // chests everywhere: on the surface, and down in the caves (a few hold a gold crystal)
+    [252, 512, 548, 590, 646, 676, 806, 846, 892, 936, 966].forEach((x) => { const s = c.surfAt(x, 40); if (s < SEA && (c.get(x, s - 1) === T.air || RW.TILES[c.get(x, s - 1)].decor)) c.set(x, s - 1, T.woodchest); });
+    for (let n = 0, k = 0; n < 26 && k < 4000; k++) {
+      const x = 8 + Math.floor(c.rng() * (W - 16)), y = c.surf[x] + 16 + Math.floor(c.rng() * (H - c.surf[x] - 30));
+      if (inR(CAMPR, x, y) || inR(KEEPR, x, y)) continue;
+      if (c.get(x, y) !== T.air || !c.solid(x, y + 1) || c.get(x, y - 1) !== T.air || c.get(x, y + 1) === T.bedrock) continue;
+      c.set(x, y, T.woodchest); if (n % 5 === 0) c.meta.special[x + ',' + y] = 'gold'; n++;
+    }
+    RW.surface.starterFlint(c, VIL.x0 - 36, VIL.x0 - 4, 3); RW.surface.starterFlint(c, VIL.x1 + 4, VIL.x1 + 40, 3);
+
     c.zone = RW.surface.zoneFn(c, (x, y) => {
-      if (Math.abs(x - VIL.x) < 14 && y <= VIL.y + 2 && y > VIL.y - 44) return 'village';
-      if (x >= ARENA.x0 && x <= ARENA.x1 && y <= ARENA.y + 2 && y > 30) return 'arena';
+      if (inR(VILR, x, y)) return 'village';
+      if (inR(KEEPR, x, y)) return 'keep';
+      if (inR(GROVER, x, y)) return 'elsharyn';
+      if (inR(CAMPR, x, y)) return 'camp';
+      if (x >= ARENA.x0 && x <= ARENA.x1 && y <= GY + 2 && y > GY - 70) return 'arena';
       return null;
     });
     c.meta.surf = c.surf;
     return { W, H, fg: c.fg, bg: c.bg, meta: c.meta };
+  }
+
+  // ---------------------------------------------------------------- helpers
+  const fill = (c, x0, y0, x1, y1, t, w) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { if (t != null) c.set(x, y, t); if (w != null) c.setb(x, y, w); } };
+  const ladder = (c, x, yTop, yBot) => { for (let y = yTop; y <= yBot; y++) c.set(x, y, c.T.ladder); };
+  // a staircase of one-way steps (you walk up them; S drops through). dir +1 climbs to the right.
+  const stairs = (c, x, yFloor, n, dir) => { for (let i = 0; i < n; i++) c.set(x + dir * i, yFloor - 1 - i, c.T.stairplank); };
+  // a little house with plank walls, a low roof, doorways on both sides and a lantern
+  function cottage(c, x0, fy, w, opt) {
+    const { T, WL } = c; opt = opt || {}; const h = opt.h || 4, wall = T[opt.wall || 'planks'], roof = T[opt.roof || 'planks'];
+    for (let y = fy - h; y <= fy; y++) for (let x = x0; x < x0 + w; x++) { const e = x === x0 || x === x0 + w - 1 || y === fy - h || y === fy; c.set(x, y, e ? wall : T.air); c.setb(x, y, WL[opt.bg || 'plank']); }
+    for (let y = fy - 3; y < fy; y++) { if (opt.doors !== 'right') c.set(x0, y, T.air); if (opt.doors !== 'left') c.set(x0 + w - 1, y, T.air); }
+    for (let x = x0 - 1; x <= x0 + w; x++) c.set(x, fy - h - 1, roof);
+    for (let x = x0 + 1; x < x0 + w - 1; x++) c.set(x, fy - h - 2, roof);
+    if (w > 6) c.set(x0 + (w >> 1), fy - h + 1, T.lantern);
+    return { x0, x1: x0 + w - 1, fy, top: fy - h - 2 };
+  }
+
+  // ---------------------------------------------------------------- Capstead
+  // A home tree is one tree: a 20-block trunk of solid bark (one continuous grain), hollow inside, with a floor every
+  // ten blocks joined by staircases, doors out onto branch houses, a crown of thick branches and a huge canopy.
+  function homeTree(c, ix0, gy, o) {
+    const { T, WL } = c; const ix1 = ix0 + 15, wl = ix0 - 2, wr = ix1 + 2, cx = ix0 + 7.5, top = gy - TF * TFLOORS - 8;
+    const fy = (k) => gy - TF * k;
+    // canopy first, so everything built afterwards cuts through it cleanly
+    const leaf = (x, y, r) => c.disc(x, y, r, T.oakleaves, (t) => t === T.air || t === T.leaves || t === T.vines || t === T.trunk);
+    leaf(cx, top - 10, 24); leaf(cx - 22, top + 2, 13); leaf(cx + 22, top + 2, 13); leaf(cx - 30, top + 14, 9); leaf(cx + 30, top + 14, 9); leaf(cx, top - 26, 14);
+    // crown: thick branches climbing out into the canopy
+    [[-1, 22, 8], [1, 22, 8], [-1, 14, 18], [1, 14, 18]].forEach(([dir, reach, rise]) => {
+      for (let i = 0; i <= reach; i++) { const x = Math.round(cx + dir * i), y = Math.round(top + 2 - i * rise / reach); for (let t = 0; t < (i < reach * 0.6 ? 3 : 2); t++) c.set(x, y + t, T.bark); }
+    });
+    for (let i = 0; i < 12; i++) for (let x = Math.round(cx) - (i < 6 ? 1 : 0); x <= Math.round(cx) + (i < 6 ? 1 : 0); x++) c.set(x, top - i, T.bark);
+    // trunk with a flared base, tapering crown
+    for (let y = top; y < gy; y++) {
+      const d = gy - 1 - y; const flare = d < 7 ? [7, 5, 4, 3, 2, 1, 1][d] : 0; const taper = y < top + 8 ? Math.round((top + 8 - y) * 0.9) : 0;
+      for (let x = wl - flare + taper; x <= wr + flare - taper; x++) { c.set(x, y, T.bark); c.setb(x, y, WL.heart); }
+    }
+    // roots into the ground, and humps of root at the surface
+    [-1, 1].forEach((s) => [0, 1, 2].forEach((k) => {
+      let x = s < 0 ? wl - 6 + k * 2 : wr + 6 - k * 2, y = gy; const len = 8 + k * 3;
+      for (let i = 0; i < len; i++) { for (let t = 0; t < 2; t++) if (c.solid(x, y + t)) c.set(x, y + t, T.bark); x += s * (i % 3 === 2 ? 0 : 1); y += 1; }
+    }));
+    [-1, 1].forEach((s) => { for (let i = 0; i < 6; i++) { const x = s < 0 ? wl - 8 - i : wr + 8 + i; if (i < 4) c.set(x, gy - 1, T.bark); } });
+    // hollow inside, floors, staircases between them
+    fill(c, ix0, top + 3, ix1, gy - 1, T.air, WL.heart);
+    for (let x = ix0; x <= ix1; x++) c.set(x, gy, T.heartplank);
+    for (let k = 1; k <= TFLOORS; k++) for (let x = ix0; x <= ix1; x++) c.set(x, fy(k), T.heartplank);
+    for (let k = 0; k < TFLOORS; k++) {
+      const dir = k % 2 ? -1 : 1, x0 = dir > 0 ? ix0 : ix1;
+      stairs(c, x0, fy(k), 9, dir);
+      for (let i = 6; i <= 8; i++) c.set(x0 + dir * i, fy(k + 1), T.air);        // the hole in the floor above
+    }
+    // doors through the bark: ground floor both sides, then any floor that opens onto a house or a bridge
+    const door = (k, side) => { const y0 = fy(k); for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 8 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 8); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if (x < wl || x > wr) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
+    door(0, -1); door(0, 1);
+    // furnish each floor: a lantern, and something on it
+    for (let k = 0; k <= TFLOORS; k++) {
+      const y = fy(k); c.set(Math.round(cx), y - 7, T.lantern);
+      const spot = k % 2 ? ix0 + 2 : ix1 - 2;
+      const what = [null, 'keepchest', 'bookshelf', 'woodchest', 'banner_a', 'bookshelf', 'woodchest', 'keepchest'][k];
+      if (what && k) { if (what === 'banner_a') c.set(spot, y - 4, T.banner_a); else if (what === 'bookshelf') { c.set(spot, y - 1, T.bookshelf); c.set(spot, y - 2, T.bookshelf); } else c.set(spot, y - 1, T[what === 'keepchest' ? 'woodchest' : what]); }
+      if (k > 0 && k < TFLOORS) { c.set(wl, y - 5, T.window); c.set(wr, y - 5, T.window); }
+    }
+    return { ix0, ix1, wl, wr, cx, fy, door, top };
+  }
+  // a house on a branch beside the trunk, opening onto the floor inside; the branch underneath holds it up
+  function branchHouse(c, tree, k, side, w) {
+    const { T } = c; const y = tree.fy(k); tree.door(k, side);
+    const x0 = side < 0 ? tree.wl - w : tree.wr + 1, x1 = x0 + w - 1;
+    for (let i = 0; i < w + 2; i++) {
+      const x = side < 0 ? tree.wl - 1 - i : tree.wr + 1 + i; const th = i < w * 0.4 ? 3 : i < w * 0.8 ? 2 : 1;
+      for (let t = 1; t <= th; t++) c.set(x, y + t, T.bark);
+    }
+    c.disc(side < 0 ? x0 - 3 : x1 + 3, y - 2, 4.5, T.oakleaves, (t) => t === T.air);
+    return cottage(c, x0, y, w, { doors: 'both', h: 5 });
+  }
+  function buildCapstead(H2, seed) {
+    const { c, T, WL } = H2; const S = RW.surface;
+    S.flatten(c, VIL.x0, VIL.x1, GY, 'jgrass');
+    for (let x = VIL.x0 - 6; x <= VIL.x1 + 6; x++) for (let y = 0; y < GY; y++) { const t = c.get(x, y); if (t === T.leaves || t === T.trunk || t === T.vines || t === T.oakleaves) c.set(x, y, T.air); }
+    const A = homeTree(c, VIL.ta, GY, {}), B = homeTree(c, VIL.tb, GY, {});
+    // houses on branches: the outer sides every other floor (joined by ladders and trapdoors), a few on the inner sides
+    const outerA = [1, 3, 5, 7].map((k) => branchHouse(c, A, k, -1, 11));
+    const outerB = [2, 4, 6].map((k) => branchHouse(c, B, k, 1, 11));
+    [2, 5].forEach((k) => branchHouse(c, A, k, 1, 10));
+    [1, 4].forEach((k) => branchHouse(c, B, k, -1, 10));
+    // porches with trapdoors, and the ladders running up past them
+    const porch = (h, side, ladTopK) => { const px0 = side < 0 ? h.x0 - 3 : h.x1 + 1; for (let x = px0; x < px0 + 3; x++) c.set(x, h.fy, T.heartplank); return side < 0 ? h.x0 - 2 : h.x1 + 2; };
+    const lA = outerA.map((h) => porch(h, -1))[0], lB = outerB.map((h) => porch(h, 1))[0];
+    [[lA, outerA], [lB, outerB]].forEach(([lx, hs]) => {
+      ladder(c, lx, hs[hs.length - 1].fy + 1, GY - 1);
+      hs.forEach((h) => c.set(lx, h.fy, T.trapdoor));
+      for (let y = hs[hs.length - 1].fy - 1; y > hs[hs.length - 1].fy - 4; y--) if (c.get(lx, y) !== T.air) c.set(lx, y, T.air);
+    });
+    // rope bridges between the two trees, a climbing rope down from the low one, a lookout on the high one
+    [3, 6].forEach((k) => { A.door(k, 1); B.door(k, -1); for (let x = A.wr + 1; x <= B.wl - 1; x++) { c.set(x, A.fy(k), T.ropebridge); for (let y = A.fy(k) - 3; y < A.fy(k); y++) if (c.solid(x, y)) c.set(x, y, T.air); } });
+    for (let y = A.fy(3) + 1; y < GY; y++) c.set(VIL.plaza - 4, y, T.rope);
+    const mid = Math.round((A.wr + B.wl) / 2); c.set(mid, A.fy(6) - 1, T.woodchest); c.set(mid - 6, A.fy(6) - 1, T.torchwall); c.set(mid + 6, A.fy(6) - 1, T.torchwall);
+    // a root cellar under the west tree, down a ladder through a trapdoor
+    fill(c, A.ix0 + 1, GY + 1, A.ix1 - 1, GY + 7, T.bark, WL.heart); fill(c, A.ix0 + 2, GY + 2, A.ix1 - 2, GY + 6, T.air, WL.heart);
+    ladder(c, A.ix1 - 2, GY + 1, GY + 6); c.set(A.ix1 - 2, GY, T.trapdoor);
+    c.set(A.ix0 + 3, GY + 6, T.woodchest); c.set(A.ix0 + 5, GY + 6, T.woodchest); c.meta.special[(A.ix0 + 5) + ',' + (GY + 6)] = 'gold'; c.set(A.ix0 + 8, GY + 5, T.lantern);
+    // the plaza between the trees: altar, workbench, campfire, Pebble the Stryx fountain
+    const P = VIL.plaza;
+    c.set(P - 12, GY - 1, T.altar); c.set(P - 12, GY, T.stone);
+    c.set(P + 10, GY - 1, T.workbench); c.set(P + 6, GY - 1, T.campfire);
+    for (let x = P - 2; x <= P + 3; x++) { c.set(x, GY, T.keepbrick); } c.set(P - 3, GY - 1, T.keepbrick); c.set(P + 4, GY - 1, T.keepbrick);
+    c.set(P - 16, GY - 2, T.tablet); c.meta.carvings[(P - 16) + ',' + (GY - 2)] = 0; c.set(P - 16, GY - 1, T.stone);
+    c.set(P + 14, GY - 2, T.tablet); c.meta.carvings[(P + 14) + ',' + (GY - 2)] = 12; c.set(P + 14, GY - 1, T.stone);
+    // west of the west tree: Old Ruut's Punk shed and pen
+    const shed = cottage(c, 272, GY, 9, { doors: 'right' });
+    for (let x = shed.x1 + 1; x <= 298; x++) if (x % 3 === 0) { c.set(x, GY - 1, T.palisade); } c.set(298, GY - 2, T.palisade);
+    c.set(shed.x0 + 2, GY - 1, T.woodchest);
+    // east of the east tree: Orrin's stone cottage (Keilia built) and a little house
+    const ork = cottage(c, 448, GY, 12, { wall: 'keepbrick', roof: 'planks', bg: 'keep' }); c.set(ork.x0 + 3, GY - 1, T.workbench); c.set(ork.x0 + 8, GY - 1, T.woodchest); c.set(ork.x1 - 1, GY - 7, T.keepbrick); c.set(ork.x1 - 1, GY - 8, T.keepbrick);
+    const hut = cottage(c, 470, GY, 9, {}); c.set(hut.x0 + 4, GY - 1, T.woodchest);
+    // townsfolk
+    c.meta.npcs.capwell = { x: A.ix0 + 12, y: A.fy(1) - 1 };
+    c.meta.npcs.cubert = { x: P - 8, y: GY - 1 };
+    c.meta.npcs.ruut = { x: shed.x1 + 4, y: GY - 1 };
+    c.meta.npcs.orrin = { x: ork.x0 + 6, y: GY - 1 };
+    c.meta.npcs.brannoc = { x: P - 6, y: GY - 1 };
+    c.meta.npcs.pebble = { x: P - 1, y: GY - 1 };
+    def.spawn = { x: P - 9, y: GY - 1 }; def.titleCam = { x: P, y: GY - 42 };
+  }
+
+  // ---------------------------------------------------------------- the Keilia keep
+  // Four towers, each one a tree, joined by Keilia stone. Visitors may use the courtyard, the barracks, the hall and
+  // the great hall. The Archive, the Treasury, the Master's quarters, the walls, the tower tops and the Undercroft are
+  // off limits: guards walk them, and anyone they spot is marched out of the gate. Three puzzles open the vaults.
+  function towerTree(c, ix0, gy, floors, o) {
+    const { T, WL } = c; o = o || {}; const ix1 = ix0 + 7, wl = ix0 - 2, wr = ix1 + 2, cx = ix0 + 3.5, FH = 8, top = gy - FH * floors - 8;
+    c.disc(cx, top - 6, 11, T.oakleaves, (t) => t === T.air || t === T.leaves || t === T.trunk); c.disc(cx - 9, top + 2, 6, T.oakleaves, (t) => t === T.air); c.disc(cx + 9, top + 2, 6, T.oakleaves, (t) => t === T.air);
+    for (let y = top; y < gy; y++) { const d = gy - 1 - y, flare = d < 4 ? [3, 2, 1, 1][d] : 0; for (let x = wl - flare; x <= wr + flare; x++) { c.set(x, y, T.bark); c.setb(x, y, WL.heart); } }
+    [[-1, 0], [1, 0]].forEach(([s]) => { for (let i = 0; i < 9; i++) for (let t = 0; t < 2; t++) c.set(Math.round(cx + s * (4 + i)), top - i + t, T.bark); });
+    // side branches with leaf clumps up the trunk, so a tower still reads as a tree
+    for (let k = 3; k < floors; k += 2) { const s = (k + ix0) % 4 < 2 ? -1 : 1, y0 = gy - FH * k - 3, bx = s < 0 ? wl - 1 : wr + 1; for (let i = 0; i < 5; i++) { c.set(bx + s * i, y0 - (i >> 1), T.bark); c.set(bx + s * i, y0 - (i >> 1) + 1, T.bark); } c.disc(bx + s * 6, y0 - 3, 4, T.oakleaves, (t) => t === T.air); }
+    fill(c, ix0, top + 2, ix1, gy - 1, T.air, WL.heart);
+    for (let x = ix0; x <= ix1; x++) c.set(x, gy, T.heartplank);
+    for (let k = 1; k <= floors; k++) { const y = gy - FH * k; for (let x = ix0; x <= ix1; x++) c.set(x, y, T.heartplank); c.set(ix0 + 1, y, T.trapdoor); c.set(Math.round(cx) + 1, y - 5, T.lantern); }
+    ladder(c, ix0 + 1, gy - FH * floors + 1, gy - 1);
+    for (let k = 1; k <= floors; k++) ladder(c, ix0 + 1, gy - FH * k + 1, gy - FH * (k - 1) - 1);
+    const door = (k, side) => { const y0 = gy - FH * k; for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 3 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 3); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if (x < wl || x > wr) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
+    return { ix0, ix1, wl, wr, cx, top, door, fy: (k) => gy - FH * k, floors };
+  }
+  function buildKeep(H2, seed) {
+    const { c, T, WL } = H2; const S = RW.surface; const gy = GY, M = c.meta;
+    S.flatten(c, KEEP.x0 - 4, KEEP.x1 + 6, gy, 'grass');
+    for (let x = KEEP.x0 - 6; x <= KEEP.x1 + 8; x++) for (let y = 0; y < gy; y++) { const t = c.get(x, y); if (t === T.leaves || t === T.trunk || t === T.vines) c.set(x, y, T.air); }
+    for (let x = KEEP.x0; x <= KEEP.x1; x++) for (let y = gy + 1; y < gy + 16; y++) if (!c.solid(x, y) || c.get(x, y) === T.water) c.set(x, y, T.stone);
+    const T1 = towerTree(c, 42, gy, 6), T2 = towerTree(c, 100, gy, 7), T3 = towerTree(c, 160, gy, 10), T4 = towerTree(c, 216, gy, 6);
+    const RAMP = gy - 16, MID = gy - 8;                // the wall walk, and the floor between the lower and upper rooms
+    // curtain walls between the towers: a stone wall walk with merlons on top, rooms underneath
+    const curtain = (x0, x1, roofed) => {
+      fill(c, x0, RAMP + 1, x1, gy - 1, T.air, WL.keep);
+      if (roofed) { for (let x = x0; x <= x1; x++) { c.set(x, RAMP, T.keepbrick); c.set(x, RAMP + 1, T.keepbrick); c.set(x, MID, T.keepbrick); } }
+      else for (let x = x0; x <= x1; x++) { c.set(x, RAMP, T.woodplat); c.setb(x, RAMP + 1, 0); }
+      for (let x = x0; x <= x1; x += 2) c.set(x, RAMP - 1, T.keepbrick);
+      for (let y = RAMP - 1; y < RAMP; y++) for (let x = x0 + 1; x <= x1; x += 2) c.set(x, y, T.air);
+    };
+    curtain(T1.wr + 1, T2.wl - 1, true); curtain(T2.wr + 1, T3.wl - 1, false); curtain(T3.wr + 1, T4.wl - 1, true);
+    [T1, T2, T3, T4].forEach((t, i) => { t.door(2, -1); t.door(2, 1); t.door(1, -1); t.door(1, 1); if (i > 0) t.door(0, -1); t.door(0, 1); });   // no way in from the west
+    // the gate: the gate tower's east door, with a banner either side
+    c.set(T4.wr + 2, gy - 6, T.banner_a); c.set(T4.wr + 2, gy - 1, T.torchwall);
+    M.keepOut = { x: KEEP.out + 3, y: gy - 1 };
+    const tab = (x, y, i) => { c.set(x, y, T.tablet); M.carvings[x + ',' + y] = i; };
+    const W1 = { x0: T1.wr + 1, x1: T2.wl - 1 }, W2 = { x0: T2.wr + 1, x1: T3.wl - 1 }, W3 = { x0: T3.wr + 1, x1: T4.wl - 1 };
+
+    // ---- W1, ground: the barracks and the Hall of Hammers; upstairs: the Archive ----
+    const hallX = W1.x0 + 20;
+    for (let y = MID + 1; y < gy - 3; y++) c.set(hallX, y, T.keepbrick);
+    c.set(W1.x0 + 2, gy - 1, T.keepchest); c.set(W1.x0 + 9, gy - 1, T.keepchest); c.set(W1.x0 + 13, gy - 5, T.lantern);
+    stairs(c, W1.x0 + 3, gy, 7, 1); for (let i = 5; i <= 6; i++) c.set(W1.x0 + 3 + i, MID, T.air);
+    const bannerTiles = [T.banner_f, T.banner_r, T.banner_a, T.banner_g], levers = [];
+    for (let i = 0; i < 4; i++) { const x = hallX + 5 + i * 5; c.set(x, gy - 6, bannerTiles[i]); c.set(x, gy - 1, T.lever); levers.push([x, gy - 1]); }
+    tab(hallX + 2, gy - 1, 2); c.set(hallX + 12, MID + 2, T.lantern);
+    // the Archive: four rune stones out of order, a vault behind a gate, and a bookcase that isn't one
+    const arch = { x0: W1.x0, x1: W1.x1 };
+    const order = [2, 3, 0, 1], runes = [];
+    order.forEach((g, i) => { const x = arch.x0 + 12 + i * 7; c.set(x, MID - 1, T.runestone); M.runes[x + ',' + (MID - 1)] = g; runes.push([x, MID - 1, g]); });
+    tab(arch.x0 + 9, MID - 1, 3);
+    fill(c, arch.x0, MID - 7, arch.x0 + 4, MID - 1, null, WL.keep);
+    for (let y = MID - 7; y <= MID - 4; y++) c.set(arch.x0 + 5, y, T.keepbrick);
+    const archGate = []; for (let y = MID - 3; y <= MID - 1; y++) { c.set(arch.x0 + 5, y, T.keepgate); archGate.push([arch.x0 + 5, y]); }
+    c.set(arch.x0 + 1, MID - 1, T.vaultchest); c.set(arch.x0 + 3, MID - 1, T.vaultchest); c.set(arch.x0 + 2, MID - 5, T.lantern);
+    for (let y = MID - 6; y <= MID - 1; y++) for (let x = arch.x1 - 7; x <= arch.x1; x++) c.set(x, y, T.bookshelf);
+    for (let y = MID - 3; y <= MID - 1; y++) { c.set(arch.x1 - 7, y, T.fakeshelf); c.set(arch.x1 - 6, y, T.fakeshelf); }
+    fill(c, arch.x1 - 5, MID - 4, arch.x1 - 1, MID - 1, T.air, WL.keep);
+    c.set(arch.x1 - 2, MID - 1, T.keepchest); tab(arch.x1 - 4, MID - 1, 5); c.set(arch.x1 - 3, MID - 4, T.lantern);
+    M.secrets.push({ x: arch.x1 - 3, y: MID - 1, kind: 'room' });
+    c.set(arch.x0 + 26, MID - 6, T.lantern); c.set(arch.x0 + 40, MID - 6, T.lantern);
+
+    // ---- W2: the courtyard, open to the sky; the way down into the Undercroft ----
+    c.set(W2.x0 + 6, gy - 1, T.forge); c.set(W2.x0 + 10, gy - 1, T.workbench); c.set(W2.x0 + 20, gy - 1, T.campfire);
+    c.set(W2.x0 + 2, gy - 1, T.keepchest); c.set(W2.x0 + 26, gy - 1, T.woodchest);
+    for (let x = W2.x0; x <= W2.x1; x++) c.set(x, gy, T.keepbrick);
+    const hatchX = W2.x1 - 6;
+    // the Undercroft: a corridor under the courtyard and the great hall, cells, and the Deep Vault behind a gate
+    const UF = gy + 13, U = { x0: W2.x0 + 2, x1: W3.x1 - 2 };
+    fill(c, U.x0 - 1, gy + 1, U.x1 + 1, UF + 1, T.keepbrick, WL.keep);
+    fill(c, U.x0, UF - 4, U.x1, UF - 1, T.air, WL.keep);
+    fill(c, hatchX - 1, gy + 1, hatchX + 1, UF - 1, T.keepbrick, WL.keep); fill(c, hatchX, gy + 1, hatchX, UF - 1, T.air, WL.keep);
+    ladder(c, hatchX, gy + 1, UF - 1); c.set(hatchX, gy, T.trapdoor);
+    for (let k = 0; k < 3; k++) { const x = U.x0 + 3 + k * 9; fill(c, x, UF - 8, x + 5, UF - 6, T.air, WL.keep); ladder(c, x, UF - 6, UF - 1); c.set(x + 3, UF - 6, T.keepchest); c.set(x + 2, UF - 8, T.lantern); }
+    for (let x = U.x0 + 8; x < U.x1; x += 12) c.set(x, UF - 4, T.lantern);
+    const dv = { x0: U.x1 - 10, x1: U.x1 };
+    fill(c, dv.x0, UF - 7, dv.x1, UF - 1, T.air, WL.keep);
+    for (let y = UF - 7; y <= UF - 4; y++) c.set(dv.x0 - 1, y, T.keepbrick);
+    const vaultGate = []; for (let y = UF - 3; y <= UF - 1; y++) { c.set(dv.x0 - 1, y, T.keepgate); vaultGate.push([dv.x0 - 1, y]); }
+    tab(dv.x0 - 3, UF - 1, 4);
+    [2, 5, 8].forEach((d) => c.set(dv.x0 + d, UF - 1, T.vaultchest)); c.set(dv.x0 + 4, UF - 6, T.lantern); c.set(dv.x1 - 1, UF - 1, T.c_gold);
+    M.special[(dv.x0 + 5) + ',' + (UF - 1)] = 'gold';
+
+    // ---- W3, ground: the great hall and the Treasury; upstairs: the Master's quarters ----
+    const trX = W3.x0 + 28;
+    for (let y = MID + 1; y <= gy - 4; y++) c.set(trX, y, T.keepbrick);
+    const trGate = []; for (let y = gy - 3; y <= gy - 1; y++) { c.set(trX, y, T.keepgate); trGate.push([trX, y]); }
+    tab(W3.x0 + 12, gy - 1, 6); c.set(W3.x0 + 8, gy - 5, T.banner_a); c.set(W3.x0 + 18, gy - 5, T.banner_a); c.set(W3.x0 + 13, MID + 2, T.lantern);
+    c.set(W3.x0 + 22, gy - 1, T.keepchest);
+    [2, 5, 8, 11].forEach((d, i) => c.set(trX + d, gy - 1, i % 2 ? T.keepchest : T.vaultchest)); c.set(trX + 7, MID + 2, T.lantern);
+    stairs(c, W3.x0 + 2, gy, 7, 1); for (let i = 5; i <= 6; i++) c.set(W3.x0 + 2 + i, MID, T.air);
+    c.set(W3.x0 + 14, MID - 1, T.keepchest); c.set(W3.x0 + 24, MID - 1, T.keepchest); c.set(W3.x0 + 30, MID - 1, T.bookshelf); c.set(W3.x0 + 30, MID - 2, T.bookshelf); c.set(W3.x0 + 19, MID - 6, T.lantern);
+    tab(T4.ix0 + 4, gy - 1, 1);
+
+    // ---- the towers: storerooms below, lookouts above; the beacon lever at the very top of the tallest ----
+    [T1, T2, T3, T4].forEach((t, i) => { for (let k = 3; k <= t.floors; k++) c.set(t.ix1 - 1, t.fy(k) - 1, k % 2 ? T.keepchest : T.woodchest); c.set(t.ix1 - 1, t.fy(0) - 1, i === 3 ? T.lantern : T.keepchest); });
+    const beacon = [Math.round(T3.cx), T3.top - 1];
+    for (let x = T3.ix0; x <= T3.ix1; x++) { c.set(x, T3.top, T.heartplank); for (let y = T3.top - 4; y < T3.top; y++) c.set(x, y, T.air); }
+    ladder(c, T3.ix0 + 1, T3.top + 1, T3.fy(T3.floors) - 1); c.set(T3.ix0 + 1, T3.top, T.trapdoor);
+    c.set(beacon[0], beacon[1], T.lever); c.set(beacon[0] + 2, beacon[1], T.torchwall); c.set(T3.ix1, T3.top - 1, T.vaultchest);
+
+    M.puzzles.push({ id: 'treasury', kind: 'levers', levers, want: [1, 0, 1, 0], gate: trGate, done: 'Somewhere in the keep, a heavy gate grinds open.' });
+    M.puzzles.push({ id: 'archive', kind: 'runes', runes, order: [0, 1, 2, 3], gate: archGate, done: 'The runes blaze together, and the vault gate rises.', fail: 'The runes go dark. That was not the order.' });
+    M.puzzles.push({ id: 'beacon', kind: 'lever', lever: beacon, gate: vaultGate, done: 'Far below the keep, something heavy grinds open.' });
+    // where you may not go, and the guards who walk there
+    const R = (name, x0, x1, y0, y1) => M.restricted.push({ name, x0, x1, y0, y1 });
+    R('the Archive', W1.x0, W1.x1, MID - 7, MID - 1);
+    R('the Treasury', trX, W3.x1, MID + 1, gy - 1);
+    R('the Master\'s quarters', W3.x0, W3.x1, MID - 7, MID - 1);
+    R('the Undercroft', U.x0 - 1, U.x1 + 1, gy + 1, UF);
+    R('the walls', KEEP.x0, KEEP.x1, 0, RAMP);
+    [T1, T2, T3, T4].forEach((t) => R('the tower', t.wl, t.wr, 0, t.fy(1) - 1));
+    const G = (x0, x1, floor) => M.guards.push({ x0, x1, y: floor });
+    G(W1.x0 + 3, W1.x1 - 9, MID); G(trX + 1, W3.x1 - 1, gy); G(W3.x0 + 10, W3.x1 - 2, MID); G(U.x0 + 2, dv.x0 - 4, UF); G(W2.x0 + 1, W2.x1 - 1, RAMP); G(W1.x0 + 1, W1.x1 - 1, RAMP); G(W3.x0 + 1, W3.x1 - 1, RAMP);
+    c.meta.npcs.brakka = { x: W3.x0 + 16, y: gy - 1 };
+    c.meta.npcs.dunvarr = { x: W2.x0 + 8, y: gy - 1 };
+    c.meta.npcs.ferrow = { x: T4.ix0 + 2, y: gy - 1 };
+  }
+
+  // ---------------------------------------------------------------- the Memory Grove of the Elsha'ryn
+  function buildGrove(H2, seed) {
+    const { c, T, WL } = H2; const S = RW.surface; const gy = GY;
+    S.flatten(c, GROVE.x0, GROVE.x1, gy, 'jgrass');
+    for (let x = GROVE.x0 - 4; x <= GROVE.x1 + 4; x++) for (let y = gy - 70; y < gy; y++) { const t = c.get(x, y); if (t === T.trunk || t === T.vines || t === T.leaves) c.set(x, y, T.air); }
+    // a roof of leaves so thick the grove is hard to see from outside
+    for (let k = 0; k < 7; k++) c.disc(GROVE.x0 + 6 + k * 13, gy - 32 - (k % 2) * 4, 12, T.leaves, (t) => t === T.air);
+    for (let x = GROVE.x0; x <= GROVE.x1; x++) if (RW.hash2(x, 1, seed) < 0.4) for (let y = gy - 22; y < gy - 22 + 3 + (x % 5); y++) if (c.get(x, y) === T.air) c.set(x, y, T.vines);
+    // grown dome houses of living wood
+    const dome = (cx, r) => {
+      for (let y = gy - r; y < gy; y++) for (let x = cx - r; x <= cx + r; x++) { const d = Math.hypot(x - cx, (y - gy) * 1.15); if (d <= r) { c.set(x, y, d > r - 1.4 ? T.livingwood : T.air); c.setb(x, y, WL.living); } }
+      for (let y = gy - 3; y < gy; y++) { c.set(cx - r, y, T.air); c.set(cx + r, y, T.air); c.set(cx - r + 1, y, T.air); c.set(cx + r - 1, y, T.air); }
+      c.set(cx, gy - r + 3, T.lantern);
+    };
+    dome(GROVE.x0 + 9, 8); dome(GROVE.x1 - 9, 8);
+    c.set(GROVE.x0 + 7, gy - 1, T.grovechest); c.set(GROVE.x1 - 11, gy - 1, T.grovechest);
+    // the library tree: living wood, three floors of shelves and memory cores, ladders and trapdoors
+    const L = { x0: 734, x1: 747 }, top = gy - 36;
+    c.disc((L.x0 + L.x1) / 2, top - 6, 13, T.leaves, (t) => t === T.air || t === T.vines);
+    for (let y = top; y < gy; y++) for (let x = L.x0 - (gy - y < 3 ? 2 : 0); x <= L.x1 + (gy - y < 3 ? 2 : 0); x++) { c.set(x, y, T.livingwood); c.setb(x, y, WL.living); }
+    fill(c, L.x0 + 2, top + 2, L.x1 - 2, gy - 1, T.air, WL.living);
+    for (let y = gy - 3; y < gy; y++) for (let x = L.x0 - 2; x <= L.x0 + 1; x++) c.set(x, y, T.air);
+    for (let y = gy - 3; y < gy; y++) for (let x = L.x1 - 1; x <= L.x1 + 2; x++) c.set(x, y, T.air);
+    for (let k = 1; k <= 3; k++) { const y = gy - 10 * k; for (let x = L.x0 + 2; x <= L.x1 - 2; x++) c.set(x, y, T.heartplank); c.set(L.x0 + 3, y, T.trapdoor); ladder(c, L.x0 + 3, y + 1, y + 9); c.set(L.x1 - 4, y - 6, T.lantern); }
+    c.set(L.x1 - 3, gy - 1, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 1)] = 7;
+    c.set(L.x1 - 3, gy - 11, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 11)] = 8;
+    c.set(L.x1 - 3, gy - 21, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 21)] = 9;
+    c.set(L.x1 - 3, gy - 31, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 31)] = 11;
+    [gy - 10, gy - 20].forEach((y) => { c.set(L.x0 + 5, y - 1, T.bookshelf); c.set(L.x0 + 5, y - 2, T.bookshelf); c.set(L.x0 + 6, y - 1, T.bookshelf); });
+    c.set(L.x0 + 6, gy - 31, T.grovechest);
+    c.set(GROVE.x0 + 22, gy - 1, T.memorystone); c.meta.carvings[(GROVE.x0 + 22) + ',' + (gy - 1)] = 10;
+    c.set(GROVE.x0 + 28, gy - 1, T.campfire);
+    c.meta.npcs.lethra = { x: GROVE.x0 + 9, y: gy - 1 };
+    c.meta.npcs.phorus = { x: L.x0 + 7, y: gy - 1 };
+  }
+
+  // ---------------------------------------------------------------- the Duskareth camp, in the root caves
+  function buildCamp(H2, seed) {
+    const { c, T, WL } = H2; const cy = CAMP.y, x0 = CAMP.x0 + 6, x1 = CAMP.x1 - 6;
+    for (let x = x0 - 4; x <= x1 + 4; x++) for (let y = cy - 18; y <= cy + 2; y++) { const dx = (x - (x0 + x1) / 2) / ((x1 - x0) / 2 + 4), dy = (y - (cy - 7)) / 12; if (dx * dx + dy * dy <= 1) { c.set(x, y, T.air); c.setb(x, y, WL.cave); } }
+    for (let x = x0 - 4; x <= x1 + 4; x++) { c.set(x, cy, T.dirt); c.set(x, cy + 1, T.stone); for (let y = cy - 1; y > cy - 4; y--) if (c.get(x, y) === T.water) c.set(x, y, T.air); }
+    // a tunnel down from the surface
+    let tx = CAMP.x0 - 8, ty = c.surf[tx] - 1; while (ty < cy - 2) { c.disc(tx, ty, 2.2, T.air, (t) => t !== T.bedrock); if (c.get(tx, ty + 3) === T.water) c.set(tx, ty + 3, T.stone); tx += ty % 3 === 0 ? 1 : 0; ty += 1; }
+    for (let x = tx - 3; x <= x0; x++) for (let y = cy - 3; y < cy; y++) c.set(x, y, T.air);
+    // low palisades, hide tents, fires, torches, plunder
+    [x0 + 2, x1 - 2].forEach((x) => { c.set(x, cy - 1, T.palisade); c.set(x + 1, cy - 1, T.palisade); c.set(x, cy - 2, T.palisade); });
+    const tent = (cx, r) => { for (let k = 0; k <= r; k++) { const y = cy - 1 - r + k; c.set(cx - k, y, T.hide); c.set(cx + k, y, T.hide); for (let x = cx - k + 1; x < cx + k; x++) { c.set(x, y, T.air); c.setb(x, y, WL.tent); } } for (let y = cy - 3; y < cy; y++) c.set(cx + r, y, T.air), c.set(cx + r - 1, y, T.air); };
+    tent(x0 + 12, 5); tent((x0 + x1) >> 1, 7); tent(x1 - 12, 5);
+    c.set(x0 + 11, cy - 1, T.campchest); c.set(((x0 + x1) >> 1) - 2, cy - 1, T.campchest); c.set(((x0 + x1) >> 1) + 1, cy - 1, T.campchest); c.set(x1 - 13, cy - 1, T.campchest);
+    c.meta.special[(((x0 + x1) >> 1) - 2) + ',' + (cy - 1)] = 'gold';
+    c.set(x0 + 20, cy - 1, T.campfire); c.set(x1 - 20, cy - 1, T.campfire);
+    for (let x = x0 + 4; x <= x1; x += 9) if (c.get(x, cy - 1) === T.air) c.set(x, cy - 1, T.torchwall);
   }
 })(window.RW);
 
@@ -2715,8 +3303,11 @@ window.RW = window.RW || {};
         break;
       }
       case 'chest': {
-        rect(g, x + 1, y + 5, 14, 11, '#6d5640'); rect(g, x + 1, y + 5, 14, 4, '#8a6e50'); rect(g, x + 1, y + 9, 14, 1, '#3a2c20');
-        rect(g, x + 7, y + 8, 2, 3, '#c8c0a0'); rect(g, x + 1, y + 5, 1, 11, '#c8c0a0'); rect(g, x + 14, y + 5, 1, 11, '#c8c0a0');
+        // chest styles: plain, keep (green-banded), vault (gold), camp (dark hide), grove (grown wood)
+        const cs = { keep: ['#5a4a32', '#76603e', '#8ab05a'], vault: ['#4a3a4e', '#6a5470', '#f2c94c'], camp: ['#3e3030', '#584444', '#a85a4a'], grove: ['#4e5a30', '#6a7a40', '#a8e070'] }[t.chest] || ['#6d5640', '#8a6e50', '#c8c0a0'];
+        rect(g, x + 1, y + 5, 14, 11, cs[0]); rect(g, x + 1, y + 5, 14, 4, cs[1]); rect(g, x + 1, y + 9, 14, 1, '#2a2018');
+        rect(g, x + 7, y + 8, 2, 3, cs[2]); rect(g, x + 1, y + 5, 1, 11, cs[2]); rect(g, x + 14, y + 5, 1, 11, cs[2]);
+        if (t.chest === 'vault' && Math.sin(time * 3 + h * 7) > 0.8) px(g, x + 8, y + 9, '#ffffff');
         break;
       }
       case 'kelp': {
@@ -3515,7 +4106,11 @@ window.RW = window.RW || {};
     // where the trunk runs up through the canopy, leaves fill in round it
     if (!t.pale) { const tt = RW.TILES[RW.world.get(wx - 1, wy)], tr = RW.TILES[RW.world.get(wx + 1, wy)]; const k = [tt, tr].find((q) => q.decor === 'leaves' || q.decor === 'oakleaves'); if (k) g.drawImage(leafTile(k.decor, wx, wy), x, y); }
     const bark = t.pale ? ['#c8c4b8', '#a8a498', '#e0dcd0'] : ['#6a4a30', '#4a3020', '#8a6440'];
-    rect(g, x + 4, y, 8, 16, bark[0]); rect(g, x + 4, y, 1, 16, bark[1]); rect(g, x + 11, y, 1, 16, bark[1]);
+    // trunk blocks side by side join into one wide trunk instead of a row of thin ones
+    const isT = (a) => RW.TILES[RW.world.get(a, wy)].decor === 'trunk';
+    const jl = isT(wx - 1), jr = isT(wx + 1), x0 = jl ? 0 : 4, x1 = jr ? 16 : 12;
+    rect(g, x + x0, y, x1 - x0, 16, bark[0]); if (!jl) rect(g, x + 4, y, 1, 16, bark[1]); if (!jr) rect(g, x + 11, y, 1, 16, bark[1]);
+    if (jl || jr) for (let k = 0; k < 16; k += 5) rect(g, x + ((k + wx * 3) % 16), y, 1, 16, bark[1]);
     for (let k = 0; k < 3; k++) { const yy = y + ((wy * 5 + k * 6) % 16); rect(g, x + 6 + (k % 2) * 2, yy, 2, 2, bark[k === 1 ? 2 : 1]); }
   };
   // Leaves: puffy pixel clumps that join into one canopy. Each clump is lit from above (light on top,
@@ -3846,6 +4441,354 @@ window.RW = window.RW || {};
 })(window.RW);
 
 </script>
+<script>/* js/engine/art4.js */
+// ART (part 4, v1.6) — Acorn World: giant bark, ladders, trapdoors, rope bridges, levers, gates, rune stones,
+// memory cores and banners; the creatures of the Mbaru Tatu (Punks, Kofi, RubberMcFly, Albali Byrds, Hvaleia
+// and the rest); the Keilia; the Duskareth raiders.
+(function (RW) {
+  const A = RW.art, D = A.drawers; const { px, rect, line, ell } = A; const mk = A.canvas;
+  const H = (a, b, k) => RW.hash2(a, b, k || 0);
+
+  // ======================= BLOCK TEXTURES =======================
+  // giant bark: deep vertical grain, so a trunk twenty blocks wide reads as one tree, not a row of thin ones
+  A.texExtra.bark = function (g, t, s) {
+    const [base, hi, lo] = t.colors; const off = Math.floor(H(s, 1, 3) * 5);
+    for (let x = 0; x < 16; x++) {
+      const r = (x + off) % 5;
+      for (let y = 0; y < 16; y++) {
+        const n = RW.noise2(x / 2, y / 7, s);
+        if (r === 0) px(g, x, y, n > 0.7 ? base : lo);
+        else if (r === 2 && n > 0.45) px(g, x, y, hi);
+        else if (n < 0.22) px(g, x, y, lo);
+      }
+    }
+    if (H(s, 2, 4) > 0.75) { const kx = 3 + Math.floor(H(s, 3) * 9), ky = 3 + Math.floor(H(s, 4) * 9); ell(g, kx, ky, 2, 2, lo); px(g, kx, ky, hi); }
+  };
+  A.texExtra.books = function (g, t, s) {
+    const [base, hi, lo] = t.colors; const cols = ['#8a3a3a', '#3a5a8a', '#4a7a3a', '#a8883a', '#6a3a7a', '#c8b890', '#3a6a6a'];
+    rect(g, 0, 0, 16, 16, lo);
+    for (let row = 0; row < 2; row++) {
+      let x = 1; const y0 = row * 8;
+      while (x < 15) { const w = 1 + (H(x, row, s) > 0.6 ? 1 : 0), h = 5 + Math.floor(H(x, row + 3, s) * 2); rect(g, x, y0 + 7 - h, w, h, cols[Math.floor(H(x, row + 7, s) * cols.length)]); px(g, x, y0 + 7 - h, hi); x += w + (H(x, row + 9, s) > 0.85 ? 1 : 0); }
+      rect(g, 0, y0 + 7, 16, 1, base);
+    }
+    rect(g, 0, 0, 1, 16, base); rect(g, 15, 0, 1, 16, base);
+  };
+  A.texExtra.hide = function (g, t, s) {
+    const [base, hi, lo] = t.colors;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const n = RW.noise2(x / 4, y / 4, s); if (n > 0.68) px(g, x, y, hi); else if (n < 0.3) px(g, x, y, lo); }
+    for (let k = 0; k < 16; k += 3) { px(g, k, 7, '#3a2a1a'); px(g, k + 1, 8, '#3a2a1a'); }
+  };
+  A.texExtra.stake = function (g, t) {
+    const [base, hi, lo] = t.colors;
+    for (let k = 0; k < 4; k++) { rect(g, k * 4, 0, 1, 16, lo); px(g, k * 4 + 1, 3 + k * 3, hi); line(g, k * 4 + 2, 0, k * 4 + 2, 15, hi); }
+  };
+
+  // ======================= DECOR =======================
+  const X = A.decorExtra;
+  X.ladder = (g, t, x, y) => {
+    rect(g, x + 3, y, 2, 16, '#8a6440'); rect(g, x + 11, y, 2, 16, '#8a6440'); rect(g, x + 3, y, 1, 16, '#a88058'); rect(g, x + 12, y, 1, 16, '#5a3a24');
+    for (let k = 2; k < 16; k += 5) { rect(g, x + 5, y + k, 6, 2, '#a07a52'); rect(g, x + 5, y + k + 1, 6, 1, '#6a4a2e'); }
+  };
+  const hatch = (g, x, y, w, h) => {
+    rect(g, x, y, w, h, '#8a6440'); for (let k = 3; k < w; k += 4) rect(g, x + k, y, 1, h, '#5a3a24');
+    rect(g, x, y + 2, w, 2, '#4a4a52'); rect(g, x, y + h - 4, w, 2, '#4a4a52'); rect(g, x, y, w, 1, '#a88058');
+  };
+  X.trapdoor = (g, t, x, y) => { hatch(g, x, y, 16, 16); ell(g, x + 8, y + 9, 2, 2, '#6a6a72'); px(g, x + 8, y + 9, '#8a6440'); };
+  X.trapdoor_open = (g, t, x, y, time, h, wx, wy) => {
+    const W = RW.world, T = RW.T; const below = W.get(wx, wy + 1); if (below === T.ladder || below === T.trapdoor_open) X.ladder(g, t, x, y);
+    hatch(g, x - 2, y - 14, 4, 16); rect(g, x - 2, y + 1, 4, 1, '#3a3a42');
+  };
+  X.ropebridge = (g, t, x, y, time, h, wx) => {
+    const sag = (k) => Math.round(Math.sin(((wx * 16 + k) / 48) * Math.PI) * 1.2);
+    for (let k = 0; k < 16; k += 4) { rect(g, x + k, y, 3, 3, '#a88a5a'); px(g, x + k, y, '#c8a878'); rect(g, x + k, y + 3, 3, 1, '#5a4430'); }
+    rect(g, x, y + 1, 16, 1, '#d8c090');
+    for (let k = 0; k < 16; k++) px(g, x + k, y - 8 + sag(k), '#d8c090');
+    [1, 9].forEach((k) => line(g, x + k, y - 8 + sag(k), x + k, y, '#b89868'));
+  };
+  // a stair step: a thick tread, with the stringer running down to the next step
+  X.stair = (g, t, x, y, time, h, wx, wy) => {
+    const W = RW.world, st = (a, b) => RW.TILES[W.get(a, b)].stair; const dl = st(wx - 1, wy + 1), dr = st(wx + 1, wy + 1);
+    rect(g, x, y, 16, 4, '#a07a52'); rect(g, x, y, 16, 1, '#c09a6a'); rect(g, x, y + 4, 16, 1, '#5a3a24');
+    if (dl) line(g, x, y + 15, x + 15, y + 5, '#6a4a2e'); if (dr) line(g, x + 15, y + 15, x, y + 5, '#6a4a2e');
+    if (!dl && !dr) { rect(g, x + 2, y + 5, 2, 11, '#6a4a2e'); rect(g, x + 12, y + 5, 2, 11, '#6a4a2e'); }
+  };
+  X.rope = (g, t, x, y, time, h, wx, wy) => { const tied = RW.world.get(wx, wy - 1) !== RW.T.rope && !RW.TILES[RW.world.get(wx, wy - 1)].solid && RW.world.get(wx, wy - 1) !== RW.T.air; for (let k = tied ? -12 : 0; k < 16; k++) { const xx = x + 8 + Math.round(Math.sin((wy * 16 + k) * 0.4 + time) * 0.6); px(g, xx, y + k, k % 4 === 0 ? '#a88a5a' : '#d8c090'); px(g, xx + 1, y + k, '#a88a5a'); } };
+  X.lever = (g, t, x, y) => {
+    rect(g, x + 3, y + 12, 10, 4, '#5d5a60'); rect(g, x + 3, y + 12, 10, 1, '#8a868c'); px(g, x + 8, y + 12, '#2a282e');
+    const ex = t.on ? x + 13 : x + 3; line(g, x + 8, y + 12, ex, y + 3, '#7a5634'); line(g, x + 8, y + 11, ex + (t.on ? -1 : 1), y + 3, '#5a3e26');
+    ell(g, ex, y + 3, 2, 2, t.on ? '#5fd98a' : '#e0525a'); px(g, ex - 1, y + 2, '#ffffff');
+  };
+  X.gate = (g, t, x, y) => {
+    rect(g, x, y, 16, 16, '#3a2a1c'); for (let k = 1; k < 16; k += 4) { rect(g, x + k, y, 2, 16, '#6a6a74'); px(g, x + k, y, '#9a9aa4'); }
+    rect(g, x, y + 3, 16, 2, '#5a4030'); rect(g, x, y + 11, 16, 2, '#5a4030'); px(g, x + 2, y + 4, '#c8c0a0'); px(g, x + 13, y + 12, '#c8c0a0');
+  };
+  // rune glyphs: 0 hammer, 1 eye, 2 pinecone, 3 acorn
+  const GLYPH = [
+    (g, x, y, c) => { rect(g, x + 5, y + 4, 6, 3, c); rect(g, x + 7, y + 7, 2, 6, c); },
+    (g, x, y, c) => { ell(g, x + 8, y + 8, 4, 2, c); px(g, x + 8, y + 8, '#1a1820'); px(g, x + 7, y + 8, '#1a1820'); },
+    (g, x, y, c) => { for (let k = 0; k < 4; k++) rect(g, x + 8 - k, y + 4 + k * 2, k * 2 + 1, 1, c); rect(g, x + 7, y + 12, 3, 1, c); },
+    (g, x, y, c) => { rect(g, x + 5, y + 4, 7, 3, c); ell(g, x + 8, y + 9, 3, 3, c); px(g, x + 8, y + 13, c); },
+  ];
+  X.rune = (g, t, x, y, time, h, wx, wy) => {
+    rect(g, x, y, 16, 16, '#4e4a56'); rect(g, x, y, 16, 1, '#6e6a76'); rect(g, x, y + 15, 16, 1, '#2e2a36'); rect(g, x + 2, y + 2, 12, 12, '#3e3a46');
+    const k = (RW.world.meta.runes || {})[wx + ',' + wy] || 0;
+    const p = 0.5 + 0.5 * Math.sin(time * 3 + h * 5);
+    GLYPH[k % 4](g, x, y, t.lit ? (p > 0.5 ? '#bff8ff' : '#6ae0f0') : '#7a7688');
+  };
+  X.memory = (g, t, x, y, time, h) => {
+    rect(g, x + 3, y + 12, 10, 4, '#4a4552'); rect(g, x + 3, y + 12, 10, 1, '#6a6472');
+    const p = 0.5 + 0.5 * Math.sin(time * 1.8 + h * 6), c = p > 0.6 ? '#bfe0ff' : '#6aa8f0';
+    for (let k = 0; k < 5; k++) line(g, x + 6 + k, y + 12, x + 7 + Math.round(k / 2), y + 3 + Math.abs(k - 2), k < 2 ? '#3a5aa0' : k > 2 ? c : '#8ac0ff');
+    if (p > 0.9) px(g, x + 8, y + 2, '#ffffff');
+  };
+  X.banner = (g, t, x, y, time, h, wx) => {
+    rect(g, x + 1, y, 14, 2, '#5a3a24'); const c = t.color, d = RW.shade(c, -0.3), sw = Math.round(Math.sin(time * 1.4 + wx) * 0.6);
+    for (let k = 0; k < 13; k++) { const xx = x + 3 + (k > 9 ? sw : 0); rect(g, xx, y + 2 + k, 10, 1, k % 4 === 3 ? d : c); }
+    ell(g, x + 8, y + 7, 2, 2, RW.shade(c, 0.45));
+  };
+  X.window = (g, t, x, y, time) => {
+    rect(g, x + 2, y + 2, 12, 12, '#5a3a24'); rect(g, x + 3, y + 3, 10, 10, RW.game && RW.game.skyNow && RW.game.skyNow.night ? '#ffd27a' : '#9ad0e8');
+    rect(g, x + 7, y + 3, 2, 10, '#5a3a24'); rect(g, x + 3, y + 7, 10, 2, '#5a3a24'); px(g, x + 4, y + 4, '#ffffff');
+  };
+
+  // ======================= ICONS =======================
+  const I = A.iconExtra;
+  I.ladder = (g, a, b) => { rect(g, 4, 1, 2, 14, a); rect(g, 10, 1, 2, 14, a); for (let k = 3; k < 15; k += 4) rect(g, 6, k, 4, 1, b); };
+  I.trapdoor = (g, a, b) => { rect(g, 2, 3, 12, 10, a); rect(g, 2, 5, 12, 1, b); rect(g, 2, 10, 12, 1, b); ell(g, 8, 8, 1, 1, '#8a8690'); };
+  I.bridge = (g, a, b) => { for (let k = 1; k < 15; k += 3) rect(g, k, 10, 2, 2, a); line(g, 1, 5, 15, 5, b); line(g, 1, 11, 15, 11, b); line(g, 2, 5, 2, 11, b); line(g, 13, 5, 13, 11, b); };
+  I.stairs = (g, a, b) => { for (let k = 0; k < 4; k++) { rect(g, 1 + k * 3, 12 - k * 3, 4, 2, a); rect(g, 1 + k * 3, 14 - k * 3, 4, 1, b); } };
+  I.rope = (g, a, b) => { for (let k = 1; k < 15; k++) px(g, 8 + Math.round(Math.sin(k * 0.8) * 2), k, k % 3 ? a : b); };
+  I.fur = (g, a, b) => { ell(g, 8, 9, 5, 4, a); for (let k = 0; k < 6; k++) line(g, 4 + k * 2, 6, 3 + k * 2, 2 + (k % 2), a); px(g, 3, 2, b); px(g, 11, 2, b); };
+  I.petal = (g, a, b) => { ell(g, 8, 8, 4, 5, a); ell(g, 8, 7, 2, 3, b); line(g, 8, 13, 8, 15, '#4a8a3a'); };
+
+  // ======================= CREATURES =======================
+  const quad = (x0, y0, cx, cy, x1, y1, n, f) => { for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; f(Math.round(u * u * x0 + 2 * u * t * cx + t * t * x1), Math.round(u * u * y0 + 2 * u * t * cy + t * t * y1), t); } };
+
+  // Punks: a pumpkin body held up by the vines that grow from its top (they arc out and down to be its legs)
+  D.punk = function (o) {
+    const v = (o && o.v) || 'wild';
+    const cfg = {
+      wild: { W: 28, Hh: 24, rx: 7, ry: 5, by: 9, rind: '#c8701f', dk: '#8a4612', lt: '#e8963a', vine: '#2e5c2a', glow: '#9aff5a', legs: 4, spread: 12 },
+      domestic: { W: 34, Hh: 28, rx: 10, ry: 7, by: 12, rind: '#e08a34', dk: '#a05a1e', lt: '#f8b060', vine: '#3f7d3a', glow: '#ffe27a', legs: 4, spread: 13 },
+      malsti: { W: 14, Hh: 12, rx: 3, ry: 3, by: 5, rind: '#8a7a8e', dk: '#5a4a62', lt: '#b8a8c0', vine: '#4a5a3a', glow: '#c08aff', legs: 2, spread: 5 },
+    }[v];
+    const frames = [];
+    for (let f = 0; f < 4; f++) {
+      const c = mk(cfg.W, cfg.Hh), g = c.ctx; const cx = cfg.W / 2 | 0, cy = cfg.by, base = cfg.Hh - 1, top = cy - cfg.ry;
+      // leg-vines, behind the body: from the stem, up and out, then down to the ground
+      for (let k = 0; k < cfg.legs; k++) {
+        const side = k % 2 ? 1 : -1, n = Math.floor(k / 2), stride = (f % 2 === (k % 2) ? 2 : -2) * (v === 'malsti' ? 0.5 : 1);
+        const fx = cx + side * (cfg.spread - n * 4) + stride;
+        quad(cx + side, top - 1, cx + side * (cfg.rx + 4), top - 4 - n * 2, fx, base, 14, (x, y) => { px(g, x, y, cfg.vine); });
+        px(g, fx, base, cfg.glow); px(g, fx + side, base, cfg.vine);
+      }
+      // the pumpkin
+      ell(g, cx, cy, cfg.rx, cfg.ry, cfg.rind);
+      for (let k = -2; k <= 2; k++) { if (!k) continue; for (let y = cy - cfg.ry + 1; y < cy + cfg.ry; y++) { const t = (y - cy) / cfg.ry; px(g, cx + Math.round(k * cfg.rx / 2.6 * Math.sqrt(Math.max(0, 1 - t * t))), y, cfg.dk); } }
+      for (let y = cy - cfg.ry + 1; y < cy; y++) px(g, cx - Math.round(cfg.rx * 0.55), y, cfg.lt);
+      if (v !== 'malsti') for (let k = -1; k <= 1; k += 2) px(g, cx + k * Math.round(cfg.rx / 2.6), cy + (f % 2), cfg.glow);
+      else { line(g, cx - 2, cy - 2, cx, cy + 1, cfg.glow); line(g, cx + 1, cy - 1, cx + 2, cy + 2, cfg.glow); }
+      // curved stem and a leaf
+      line(g, cx, top, cx + 1, top - 2, '#5c6b2a'); px(g, cx + 2, top - 3, '#5c6b2a');
+      if (v !== 'malsti') { px(g, cx - 1, top - 1, '#4f8f3e'); px(g, cx - 2, top - 2, '#4f8f3e'); }
+      A.outline(c, '#1a1208'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Kofi Galta: a shaggy ball of hair, two horns at the front, lots of tiny legs, long back-hairs with glowing tips
+  const kofiDraw = (g, ox, oy, s, f, col) => {
+    const rx = Math.round(6 * s), ry = Math.round(4 * s); const cx = ox + rx + Math.round(4 * s), cy = oy + ry + 1;
+    for (let k = 0; k < 4; k++) quad(cx - rx + 1, cy - 1 + k, cx - rx - 3 * s, cy - 3 + k * 2 + (f % 2), cx - rx - 5 * s, cy + k * 2 - 1, 6, (x, y, t) => px(g, x, y, t > 0.85 ? '#8ae8ff' : RW.shade(col, -0.2)));
+    for (let k = 0; k < 5; k++) { const lx = cx - rx + 2 + k * Math.max(2, Math.round(2.3 * s)); line(g, lx, cy + ry - 1, lx + ((f + k) % 2 ? 1 : -1), cy + ry + 1, '#2a1e16'); }
+    ell(g, cx, cy, rx, ry, col);
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; px(g, cx + Math.round(Math.cos(a) * (rx + 1)), cy + Math.round(Math.sin(a) * (ry + 1)) - (k % 2), col); }
+    px(g, cx - 2, cy - ry + 1, RW.shade(col, 0.3)); px(g, cx - 3, cy - ry + 2, RW.shade(col, 0.3));
+    line(g, cx + rx - 2, cy - ry + 1, cx + rx, cy - ry - 2, '#eee2c4'); line(g, cx + rx, cy - ry + 1, cx + rx + 2, cy - ry - 1, '#eee2c4');
+    px(g, cx + rx - 1, cy - 1, '#1a1008'); px(g, cx + rx - 3, cy - 1, '#1a1008');
+  };
+  D.kofi = function (o) {
+    const momma = o && o.v === 'momma'; const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(momma ? 28 : 20, momma ? 18 : 12), g = c.ctx;
+      if (momma) { kofiDraw(g, 4, 6, 1.5, f, '#9a7448'); kofiDraw(g, 6, 1, 0.5, f + 1, '#b08a5a'); kofiDraw(g, 13, 2, 0.5, f, '#a07a4e'); }
+      else kofiDraw(g, 3, 2, 1, f, '#b08a5a');
+      A.outline(c, '#1a120a'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // RubberMcFly: a yellow fluffball with a beak, butterfly wings (pink to violet to cyan) and two little legs
+  D.mcfly = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(14, 13), g = c.ctx; const up = f === 0;
+      ell(g, 4, up ? 3 : 6, 3, up ? 3 : 2, '#ff86c8'); ell(g, 4, up ? 3 : 6, 1, 1, '#a070ff');
+      ell(g, 4, up ? 7 : 9, 2, 2, '#58e6ff'); px(g, 3, up ? 7 : 9, '#a070ff');
+      ell(g, 7, 7, 3, 3, '#ffe27a'); ell(g, 8, 8, 2, 1, '#fff2b8'); px(g, 7, 3, '#ffe27a'); px(g, 6, 3, '#ffe27a');
+      px(g, 11, 7, '#e8a020'); px(g, 10, 7, '#e8a020'); px(g, 11, 8, '#c88010');
+      px(g, 9, 6, '#140c08');
+      line(g, 6, 10, 6, 12, '#f09a30'); line(g, 8, 10, 8, 12, '#f09a30');
+      A.outline(c, '#2a1a10'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Uff: a thorny walking flower with a glowing heart
+  D.uff = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(14, 20), g = c.ctx; const sw = f ? 1 : -1;
+      for (let y = 7; y < 18; y++) { const x = 7 + Math.round(Math.sin(y * 0.5) * 1.2) + (y < 11 ? sw : 0); px(g, x, y, '#3a6a2a'); if (y % 3 === 0) px(g, x + (y % 2 ? 1 : -1), y, '#8a9a5a'); }
+      line(g, 7, 18, 5, 19, '#3a6a2a'); line(g, 7, 18, 9, 19, '#3a6a2a');
+      const bx = 7 + sw, by = 5;
+      [[0, -3], [3, -1], [2, 3], [-2, 3], [-3, -1]].forEach(([dx, dy]) => ell(g, bx + dx, by + dy, 2, 2, '#ff6a8a'));
+      ell(g, bx, by, 2, 2, '#ffd84a'); px(g, bx, by, '#ffffff');
+      A.outline(c, '#1a1010'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Mikolo Moko: two sets of eyes, a fun hairdo, and one weird leg it hops on
+  D.mikolo = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(14, 16), g = c.ctx; const by = f ? 6 : 4;
+      if (f) { line(g, 7, by + 4, 9, 11, '#5a8a3a'); line(g, 9, 11, 6, 15, '#5a8a3a'); } else { line(g, 7, by + 4, 7, 15, '#5a8a3a'); }
+      px(g, 5, 15, '#3a5a2a'); px(g, 8, 15, '#3a5a2a');
+      ell(g, 7, by + 2, 4, 3, '#7ad04a'); px(g, 5, by + 1, '#a8f07a');
+      for (let k = 0; k < 5; k++) line(g, 4 + k * 1.5, by - 1, 3 + k * 2, by - 4 - (k % 2) * 2, ['#ff6ab0', '#ffd84a', '#6ae0ff'][k % 3]);
+      [[8, by + 1], [10, by + 1], [8, by + 3], [10, by + 3]].forEach(([x, y]) => px(g, x, y, '#140c08'));
+      A.outline(c, '#122008'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Makari: a swarm of tiny green lights
+  D.makari = function () {
+    const frames = [];
+    for (let f = 0; f < 3; f++) {
+      const c = mk(16, 14), g = c.ctx;
+      for (let k = 0; k < 9; k++) { const x = 2 + Math.floor(H(k, f, 81) * 12), y = 2 + Math.floor(H(k, f, 82) * 10); px(g, x, y, k % 3 ? '#9aff6a' : '#e8ffb0'); if (k % 4 === 0) px(g, x + 1, y, '#5ad04a'); }
+      frames.push(c);
+    }
+    return frames;
+  };
+
+  // Albali Byrd: a round white Byrd with a collar of five horns, an orange beak and big wings
+  D.albali = function (o) {
+    const feral = o && o.v === 'villtur';
+    const col = feral ? '#8e8170' : '#f4ecd8', belly = feral ? '#aaa090' : '#fffaf0', wing = feral ? '#776a5a' : '#e0d6c0', horn = feral ? '#d8e8b0' : '#f8f3e6', film = feral ? '#7dff3a' : '#fff6e0';
+    const frames = [];
+    for (let f = 0; f < 3; f++) {
+      const c = mk(24, 20), g = c.ctx; const cx = 11, cy = 10;
+      if (f === 0) { quad(cx - 3, cy - 2, cx - 8, cy - 9, cx - 11, cy - 7, 8, (x, y) => { line(g, x, y, x + 3, y + 4, wing); }); }
+      else if (f === 1) { quad(cx - 3, cy, cx - 9, cy + 3, cx - 12, cy + 6, 8, (x, y) => { line(g, x, y, x + 3, y - 3, wing); }); }
+      ell(g, cx, cy, 6, 6, col); ell(g, cx + 2, cy + 2, 4, 3, belly);
+      px(g, cx - 5, cy + 1, col); px(g, cx - 1, cy - 7, col); px(g, cx, cy - 8, col);
+      [[4, -5, 7, -8], [6, -3, 10, -5], [6, -1, 10, 0], [3, -6, 4, -10], [1, -6, 0, -9]].forEach(([a, b, c2, d]) => { line(g, cx + a, cy + b, cx + c2, cy + d, horn); px(g, cx + c2, cy + d, film); });
+      line(g, cx + 6, cy + 1, cx + 9, cy + 2, '#eaa846'); px(g, cx + 6, cy + 2, '#c88a30');
+      px(g, cx + 3, cy - 1, '#1a1210'); px(g, cx + 4, cy - 2, '#ffffff');
+      if (f !== 2) { line(g, cx - 1, cy + 6, cx - 1, cy + 8, '#e39a3c'); line(g, cx + 2, cy + 6, cx + 2, cy + 8, '#e39a3c'); }
+      if (f === 2) { line(g, cx - 4, cy - 3, cx - 9, cy - 1, wing); line(g, cx - 4, cy - 1, cx - 9, cy + 1, wing); }
+      A.outline(c, '#2a2018'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Hvaleia: a great blue whale of the sky, countershaded, a hump of glowing blowholes and a knobbly club tail
+  D.hvaleia = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const W2 = 76, H2 = 34, c = mk(W2, H2), g = c.ctx; const tail = f ? -3 : 3;
+      for (let x = 2; x < W2 - 2; x++) {
+        const t = x / W2; const half = t < 0.25 ? 2 + t * 22 : 2 + Math.sin(Math.min(1, (t - 0.1) / 0.9) * Math.PI) * 11 + 3;
+        const mid = 17 + (t < 0.3 ? Math.round((0.3 - t) / 0.3 * tail) : 0);
+        for (let y = Math.round(mid - half); y <= Math.round(mid + half); y++) { const rel = (y - (mid - half)) / (half * 2); px(g, x, y, rel < 0.55 ? (rel < 0.12 ? '#5a9ad8' : '#3f7fc4') : rel < 0.62 ? '#a8c8e0' : '#e2ebee'); }
+        if (x % 6 === 3 && t > 0.3 && t < 0.9) { px(g, x, Math.round(mid + 1), '#8af0ff'); px(g, x + 2, Math.round(mid + 4), '#8af0ff'); }
+      }
+      ell(g, 3, 17 + tail, 3, 3, '#2f6aa8'); px(g, 1, 15 + tail, '#5a9ad8'); px(g, 4, 20 + tail, '#5a9ad8');
+      ell(g, 46, 8, 9, 5, '#3f7fc4'); for (let k = 0; k < 4; k++) { px(g, 40 + k * 4, 4 + (k === 1 || k === 2 ? -1 : 0), '#b9d4ea'); px(g, 40 + k * 4, 5, '#8af0ff'); }
+      line(g, 50, 25, 44, 31 - (f ? 2 : 0), '#2f6aa8'); line(g, 51, 25, 46, 31 - (f ? 2 : 0), '#2f6aa8');
+      px(g, 66, 15, '#f4f0e2'); px(g, 67, 15, '#0c0c14'); line(g, 62, 21, 72, 20, '#14202c');
+      A.outline(c, '#0c1420'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Tonguatjis: a domed shell with lamps round its rim, a long ringed neck, and a tongue with a glowing lure
+  D.tonguatjis = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const W2 = 50, H2 = 24, c = mk(W2, H2), g = c.ctx; const out = f === 1;
+      const nx = out ? 42 : 30, ny = out ? 11 : 15;
+      quad(24, 17, 30, 10, nx, ny, 10, (x, y, t) => { ell(g, x, y, 2, 2, '#c8a070'); if (Math.round(t * 10) % 3 === 0) px(g, x, y - 2, '#ffcf6a'); });
+      ell(g, nx + 1, ny - 1, 3, 2, '#c8a070'); px(g, nx + 2, ny - 2, '#1a1008');
+      if (out) { line(g, nx + 3, ny, W2 - 3, ny + 2, '#f08aa8'); ell(g, W2 - 3, ny + 2, 2, 2, '#ff9ad0'); px(g, W2 - 3, ny + 1, '#ffffff'); }
+      for (let x = 2; x < 30; x++) { const t = (x - 2) / 28, h = Math.round(Math.sin(t * Math.PI) * 13); for (let y = 21 - h; y <= 21; y++) px(g, x, y, y === 21 - h ? '#8a6a4a' : ((x + y) % 6 === 0 ? '#5a3e2a' : '#7a5a3e')); }
+      rect(g, 2, 21, 28, 2, '#d8c8a0'); for (let k = 0; k < 6; k++) px(g, 4 + k * 5, 20, k % 2 ? '#ffcf6a' : '#ffe8a0');
+      line(g, 6, 23, 6, 23, '#5a3e2a'); line(g, 24, 23, 24, 23, '#5a3e2a');
+      A.outline(c, '#1a1008'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Kipsu: a pack hunter with big paws, a very fluffy tail and its own glowing pattern
+  D.kipsu = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(26, 16), g = c.ctx; const fur = '#5a7a8a', dk = '#3a4e5a', glow = '#6af0e0';
+      ell(g, 4, 6 + f, 4, 3, '#7a96a4'); px(g, 2, 4 + f, '#a8c0cc');
+      ell(g, 12, 9, 7, 3, fur); ell(g, 19, 7, 4, 3, fur); line(g, 22, 8, 24, 9, fur); px(g, 24, 9, '#1a1418');
+      px(g, 18, 3, fur); px(g, 18, 4, fur); px(g, 20, 3, dk); px(g, 20, 6, '#1a1418');
+      const st = f ? 2 : -2; [[7, st], [10, -st], [15, st], [18, -st]].forEach(([x, d]) => { line(g, x, 11, x + d / 2, 14, dk); rect(g, x + d / 2 - 1, 14, 3, 1, dk); });
+      [[9, 8], [12, 7], [15, 8], [11, 10], [19, 6]].forEach(([x, y]) => px(g, x, y, glow));
+      A.outline(c, '#101418'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Lutut: a great drop of carved stone with membrane wings and a lamprey mouth at the front
+  D.lutut = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const W2 = 46, H2 = 40, c = mk(W2, H2), g = c.ctx; const up = f === 0;
+      quad(22, 16, 14, up ? 0 : 30, 2, up ? 4 : 36, 12, (x, y) => line(g, x, y, 22, 18, '#5a4c6c'));
+      for (let x = 4; x < 40; x++) { const t = (x - 4) / 36, half = Math.round(2 + Math.pow(t, 0.7) * 11); for (let y = 22 - half; y <= 22 + half; y++) px(g, x, y, y < 22 - half + 2 ? '#a89cba' : '#8a7f9c'); }
+      for (let k = 0; k < 5; k++) { const x = 12 + k * 5; line(g, x, 16, x + 2, 28, '#c8a6ff'); }
+      ell(g, 39, 22, 5, 7, '#6e6582'); ell(g, 41, 22, 3, 5, '#3a0e1c');
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; px(g, 41 + Math.round(Math.cos(a) * 3), 22 + Math.round(Math.sin(a) * 4), '#eee6d4'); }
+      px(g, 35, 15, '#ffc040'); px(g, 35, 29, '#ffc040');
+      A.outline(c, '#140e1c'); frames.push(c);
+    }
+    return frames;
+  };
+
+  // Duskareth raiders: Eikar of the dark Aagac, drawn from the acorn hero in shadowy colours
+  D.duskfolk = (o) => A.acornSprites(o.look || A.DEFAULT_ACORN).map((p) => A.tint(p[0], '#2a1636', 0.32));
+
+  // Keilia: tall, dark pinecone-wood skin, one eye, a cape of pinecone scales from the head to the calves
+  D.keilia = function (o) {
+    o = o || {}; const frames = []; const cloth = o.cloth || '#4a5a34', eye = o.eye || '#7a8a2a';
+    for (let f = 0; f < 3; f++) {
+      const c = mk(20, 34), g = c.ctx; const st = f === 1 ? 2 : f === 2 ? -2 : 0;
+      rect(g, 8 + st / 2, 26, 3, 7, '#4a3a28'); rect(g, 11 - st / 2, 26, 3, 7, '#3e3020'); rect(g, 7 + st / 2, 32, 4, 2, '#2a1a10'); rect(g, 11 - st / 2, 32, 4, 2, '#2a1a10');
+      for (let y = 8; y < 30; y++) for (let x = 3; x < 9; x++) { if (y > 26 && x < 5) continue; const sc = ((y >> 1) + (x >> 1)) % 2; px(g, x, y, (x + y) % 7 === 0 ? '#55663a' : sc ? '#5a3822' : '#7a5232'); }
+      rect(g, 7, 13, 8, 13, cloth); rect(g, 7, 20, 8, 1, '#3a2414'); px(g, 10, 20, '#8a7a5a'); if (o.apron) rect(g, 9, 15, 5, 10, '#6a5a4a');
+      ell(g, 11, 7, 4, 5, '#5a3a24'); px(g, 9, 4, '#7a5232'); for (let k = 0; k < 6; k++) px(g, 6 + k, 2 + (k % 2), k % 2 ? '#5a3822' : '#7a5232');
+      ell(g, 12, 7, 2, 1, '#f6eedc'); px(g, 12, 7, eye); px(g, 13, 7, '#120a04'); line(g, 10, 5, 14, 5, '#4a2e1c');
+      line(g, 11, 10, 13, 10, '#1a0e06');
+      rect(g, 15, 14, 2, 7, '#5a3a24'); px(g, 15, 21, '#5a3a24');
+      if (o.hammer) { line(g, 16, 21, 16, 27, '#7a5634'); rect(g, 14, 26, 5, 3, '#6a6a74'); px(g, 16, 27, '#6ae0ff'); }
+      A.outline(c, '#120a06'); frames.push(c);
+    }
+    return frames;
+  };
+  D.stryxcalm = () => D.stryx().slice(0, 2);
+})(window.RW);
+
+</script>
 <script>/* js/engine/world.js */
 // WORLD — tile storage, edits (shared through net.js), lighting, and tile rendering.
 (function (RW) {
@@ -3865,7 +4808,7 @@ window.RW = window.RW || {};
     WD.plant = new Map(); WD.light.w = 0; WD.wActive = new Set();
     Object.assign(WD, { def, W: gen.W, H: gen.H, fg: gen.fg, bg: gen.bg, meta: gen.meta });
     WD.explored = new Uint8Array(WD.W * WD.H);
-    const ex = RW.store.get('explored_' + worldId, null);
+    const ex = RW.store.get('explored_' + (def.store || worldId), null);
     if (ex) try { rleDecode(ex, WD.explored); } catch (e) { }
     WD.skyTop = new Int16Array(WD.W);
     WD.recalcSky();
@@ -3991,7 +4934,7 @@ window.RW = window.RW || {};
   WD.markExplored = function (cx, cy, r) {
     for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) if (WD.inb(x, y) && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) WD.explored[y * WD.W + x] = 1;
   };
-  WD.saveExplored = function () { RW.store.set('explored_' + WD.def.id, rleEncode(WD.explored)); };
+  WD.saveExplored = function () { RW.store.set('explored_' + (WD.def.store || WD.def.id), rleEncode(WD.explored)); };
   function rleEncode(arr) { const out = []; let v = arr[0], n = 0; for (let i = 0; i < arr.length; i++) { if (arr[i] === v && n < 60000) n++; else { out.push(v ? n : -n); v = arr[i]; n = 1; } } out.push(v ? n : -n); return out; }
   function rleDecode(runs, arr) { let i = 0; runs.forEach((r) => { const v = r > 0 ? 1 : 0, n = Math.abs(r); arr.fill(v, i, i + n); i += n; }); }
 
@@ -4502,6 +5445,11 @@ window.RW = window.RW || {};
       }
     }
     o.x = nx;
+    // stairs: walking into a step (a one-way platform marked stair) at your feet lifts you onto it
+    if (opts && opts.step && opts.grounded && !opts.drop && o.vx && o.vy >= 0) {
+      const fx = Math.floor((o.vx > 0 ? o.x + o.w + 1 : o.x - 1) / TS), fr = Math.floor((o.y + o.h - 1) / TS);
+      if (RW.TILES[W.get(fx, fr)].stair && !solid(fx, fr - 1) && !solid(fx, fr - 2)) { o.y = fr * TS - o.h - 0.01; o.vy = 0; }
+    }
     // Y
     let ny = o.y + o.vy * dt;
     const tx0 = Math.floor(o.x / TS), tx1 = Math.floor((o.x + o.w - 0.01) / TS);
@@ -4606,6 +5554,7 @@ window.RW = window.RW || {};
     if (onChain && (up || down)) { P.vy = up ? -80 : 80; P.climbing = true; }
     else if (onChain && P.climbing) { P.vy = 0; }
     else {
+      if (P.climbing && up) P.vy = Math.min(P.vy, -250); // hop off the top of a ladder onto the floor
       P.climbing = false;
       if (P.water && fz) {
         // fuzzies, acorns and ghosts float and swim
@@ -5554,18 +6503,18 @@ window.RW = window.RW || {};
   E.trySpawn = function (dt) {
     E.spawnT -= dt; if (E.spawnT > 0 || P.dead) return; E.spawnT = 0.8;
     const W = RW.world; const wid = W.def.id; const ptx = Math.floor((P.x + 6) / TS), pty = Math.floor((P.y + 14) / TS);
-    const safe = (z) => z === 'village' || z === 'sky' || z === 'keep' || z === 'gate';
-    if (safe(W.zoneAt(ptx, pty))) return;
+    const safe = (z) => z === 'village' || z === 'sky' || z === 'keep' || z === 'gate' || z === 'elsharyn';
+    const safeHere = safe(W.zoneAt(ptx, pty)); // in a safe place only gentle creatures (critters, neutral ones) turn up
     const nightNow = RW.game.skyNow && RW.game.skyNow.night;
     const near = E.enemies.filter((e) => RW.dist(e.x, e.y, P.x, P.y) < 50 * TS).length;
     const cap = (W.zoneAt(ptx, pty) === 'tubes' || W.zoneAt(ptx, pty) === 'core' || wid === 'duat' ? 7 : 5) + (nightNow && wid !== 'rock' ? 2 : 0);
     if (near >= cap) return;
-    const pool = Object.values(RW.SPECIES).filter((s) => s.status === 'active' && s.spawn && (s.spawn.worlds || [s.world]).includes(wid));
+    const pool = Object.values(RW.SPECIES).filter((s) => s.status === 'active' && s.spawn && (s.spawn.worlds || [s.world]).includes(wid) && (!safeHere || s.temper));
     for (let tries = 0; tries < 14; tries++) {
       const a = Math.random() * Math.PI * 2, d = 24 + Math.random() * 16;
       const tx = Math.round(ptx + Math.cos(a) * d), ty = Math.round(pty + Math.sin(a) * d * 0.6);
       if (!W.inb(tx, ty)) continue;
-      const z = W.zoneAt(tx, ty); if (safe(z)) continue;
+      const z = W.zoneAt(tx, ty); // safe zones only get the species that list them (Kofi in Capstead, and so on)
       const T = RW.T, g = (x, y) => W.get(x, y);
       const wet = g(tx, ty) === T.water && g(tx, ty + 1) === T.water && g(tx + 1, ty) === T.water;
       const open = !RW.TILES[g(tx, ty)].solid && g(tx, ty) !== T.water && !RW.TILES[g(tx, ty - 1)].solid && g(tx, ty - 1) !== T.water && !RW.TILES[g(tx + 1, ty)].solid;
@@ -5588,7 +6537,7 @@ window.RW = window.RW || {};
   };
 
   // ====================== NPCs (any world) ======================
-  const NPC_SIZE = { rockfolk: [12, 26], fuzzyfolk: [16, 24], acornfolk: [12, 22], ghostfolk: [14, 24], cultist: [12, 26], triangle: [14, 26], square: [16, 26], acorn: [12, 22], cyator: [18, 30] };
+  const NPC_SIZE = { keilia: [16, 32], stryxcalm: [40, 18], rockfolk: [12, 26], fuzzyfolk: [16, 24], acornfolk: [12, 22], ghostfolk: [14, 24], cultist: [12, 26], triangle: [14, 26], square: [16, 26], acorn: [12, 22], cyator: [18, 30] };
   E.initNpcs = function () {
     E.npcs.length = 0;
     const meta = RW.world.meta.npcs;
@@ -5864,7 +6813,10 @@ window.RW = window.RW || {};
       RW.world.applyRemote(i, fields[k], p != null && p >= 0 ? p : null);
     }
   };
-  const colOf = (id) => (id === 'rock' ? 'rockchunks' : 'chunks_' + id);
+  // where a world's block changes are kept. A world rebuilt from scratch gets a new name (def.store), so changes made
+  // to the old layout are set aside instead of landing in the wrong places (Acorn World, v1.6)
+  N.sk = (id) => (RW.WORLDS[id] && RW.WORLDS[id].store) || id;
+  const colOf = (id) => (id === 'rock' ? 'rockchunks' : 'chunks_' + N.sk(id));
   const stateOf = (id) => (id === 'rock' ? 'rockstate/main' : 'wstate/' + id);
   N.watchStates = function () {
     if (N.stateSubs || !N.db) return; N.stateSubs = [];
@@ -5910,7 +6862,7 @@ window.RW = window.RW || {};
     });
   };
   N.loadLocal = function () {
-    const ed = RW.store.get(N.key('edits_' + N.wid), {});
+    const ed = RW.store.get(N.key('edits_' + N.sk(N.wid)), {});
     for (const id in ed) { N.known[id] = ed[id]; N.applyDoc(ed[id]); }
   };
   N.queueEdit = function (i, t, p) {
@@ -5924,13 +6876,13 @@ window.RW = window.RW || {};
     const ids = Object.keys(N.pending); if (!ids.length) return;
     if (N.transport === 'p2p') {
       const docs = {}; ids.forEach((id) => { docs[id] = N.pending[id]; N.known[id] = Object.assign(N.known[id] || {}, N.pending[id]); delete N.pending[id]; });
-      if (N.isHost) RW.store.set(N.key('edits_' + N.wid), N.known);
+      if (N.isHost) RW.store.set(N.key('edits_' + N.sk(N.wid)), N.known);
       N.send({ k: 'ed', w: N.wid, docs });
       return;
     }
     if (N.mode !== 'shared') {
       ids.forEach((id) => { N.known[id] = Object.assign(N.known[id] || {}, N.pending[id]); delete N.pending[id]; });
-      RW.store.set('edits_' + N.wid, N.known);
+      RW.store.set('edits_' + N.sk(N.wid), N.known);
       return;
     }
     ids.forEach(async (id) => {
@@ -5955,7 +6907,7 @@ window.RW = window.RW || {};
       RW.ui && RW.ui.banner('Building locally', 'You can look at the shared world, but your changes stay on this device. To build with everyone, the owner needs to invite you as an Editor.');
     }
     N.known[id] = Object.assign(N.known[id] || {}, fields);
-    RW.store.set('edits_' + N.wid + '_mine', N.known);
+    RW.store.set('edits_' + N.sk(N.wid) + '_mine', N.known);
   };
   N.setBossDead = function (wid) {
     wid = wid || N.wid;
@@ -5969,7 +6921,7 @@ window.RW = window.RW || {};
   N.on('ed', (m) => {
     if (typeof m.w !== 'string' || !m.docs || typeof m.docs !== 'object') return;
     if (N.isHost) { // the host keeps every world
-      const key = N.key('edits_' + m.w); const all = m.w === N.wid ? N.known : RW.store.get(key, {});
+      const key = N.key('edits_' + N.sk(m.w)); const all = m.w === N.wid ? N.known : RW.store.get(key, {});
       for (const id in m.docs) all[id] = Object.assign(all[id] || {}, m.docs[id]);
       RW.store.set(key, all);
     } else if (m.w === N.wid) for (const id in m.docs) N.known[id] = Object.assign(N.known[id] || {}, m.docs[id]);
@@ -5977,7 +6929,7 @@ window.RW = window.RW || {};
   });
   N.on('getw', (m) => {
     if (!N.isHost || typeof m.w !== 'string' || !RW.WORLDS[m.w]) return;
-    const docs = m.w === N.wid ? N.known : RW.store.get(N.key('edits_' + m.w), {});
+    const docs = m.w === N.wid ? N.known : RW.store.get(N.key('edits_' + N.sk(m.w)), {});
     N.send({ k: 'world', to: m.f, w: m.w, docs, bosses: Object.keys(RW.state.bosses).filter((id) => RW.state.bosses[id]), duat: RW.duatState || {} });
   });
   N.on('world', (m) => {
@@ -6774,6 +7726,7 @@ window.RW = window.RW || {};
   $('#p-help').onclick = () => U.openModal('help');
   $('#p-title').onclick = () => U.toTitle();
   $('#p-home').onclick = () => { if (RW.game.playing) RW.game.saveNow(); location.href = '../index.html'; };
+  $('#b-home2').onclick = () => { location.href = '../index.html'; };
   $('#m-travel').onclick = () => U.travel('anywhere');
   U.paused = () => U.open === 'pause' && !(RW.net && RW.net.transport);
   U.toTitle = function () {
@@ -8022,6 +8975,334 @@ window.RW = window.RW || {};
 })(window.RW);
 
 </script>
+<script>/* js/engine/entities4.js */
+// ENTITIES (part 4, v1.6) — Acorn World: how the creatures of the Mbaru Tatu behave, the Keilia keep's guards (stay
+// out of sight in restricted places or get marched out of the gate), its puzzles, trapdoors and levers (R), the
+// Albali film (paralysis, then healing), and the ShurgrEdan, which answers anyone who kills a RubberMcFly.
+(function (RW) {
+  const TS = RW.TILE; const E = RW.ent, P = RW.player, B = E.behaviors; const ec = E.center, overlap = E.overlap;
+  const onScreen = (e) => { const c = RW.cam, v = RW.view; return e.x + e.w > c.x - 24 && e.x < c.x + v.w + 24 && e.y + e.h > c.y - 24 && e.y < c.y + v.h + 24; };
+  const night = () => RW.game.skyNow && RW.game.skyNow.night;
+  const W = () => RW.world;
+  const dist = (e) => { const pc = P.center(), c = ec(e); return RW.dist(pc.x, pc.y, c.x, c.y); };
+  const gravity = (e, dt) => { const wet = W().isWaterAt(e.x + e.w / 2, e.y + e.h / 2); e.vy += (wet ? 250 : 900) * dt; if (wet) e.vy = Math.min(e.vy, 80); };
+  const walk = (e, dt) => { const r = E.move(e, dt, { step: true, grounded: e.ground }); e.ground = r.ground; return r; };
+  // neutral creatures stay harmless until hit; e.provoked is set by any damage
+  const calm = (e, sp) => sp.temper === 'critter' || (sp.temper === 'neutral' && !(e.angryT > 0));
+  const anger = (e, sp, t) => { if (e.provoked && sp.temper === 'neutral') { e.angryT = t; e.provoked = false; } e.angryT = Math.max(0, (e.angryT || 0) - (e._dt || 0)); };
+
+  // ====================== THE PLAYER: paralysis, healing film, poison ======================
+  P.stunT = 0; P.filmHeal = 0; P.poisonT = 0;
+  const baseMoveMul = P.moveMul; P.moveMul = (t) => (P.stunT > 0 ? 0 : baseMoveMul ? baseMoveMul(t) : 1);
+  const baseTire = P.tire; P.tire = (c, cont) => (P.stunT > 0 ? false : baseTire(c, cont));
+  P.paralyze = function (secs, heal, toxic) {
+    P.stunT = Math.max(P.stunT, secs);
+    if (toxic) { P.poisonT = 6; RW.ui.toast('The Villtur film burns. You can\'t move!'); }
+    else { P.filmHeal += heal; RW.ui.toast('The Albali film stings. You can\'t move... but it\'s healing you.'); }
+  };
+  function updatePlayer4(dt) {
+    if (P.dead) { P.stunT = 0; P.poisonT = 0; P.filmHeal = 0; return; }
+    const pc = P.center();
+    if (P.stunT > 0) { P.stunT -= dt; P.vx *= 0.6; if (Math.random() < dt * 14) RW.fx.spawn({ x: pc.x + RW.rand(-8, 8), y: pc.y + RW.rand(-12, 10), vy: -20, life: 0.5, color: P.poisonT > 0 ? '#9aff5a' : '#fff6c8', add: true, kind: 'glow' }); }
+    else if (P.filmHeal > 0) { const h = Math.min(P.filmHeal, 14 * dt); P.filmHeal -= h; P.hp = Math.min(P.maxHp(), P.hp + h); if (Math.random() < dt * 6) RW.fx.spawn({ x: pc.x + RW.rand(-6, 6), y: pc.y, vy: -30, life: 0.6, color: '#fff0b0', add: true, kind: 'glow' }); }
+    if (P.poisonT > 0) { P.poisonT -= dt; if ((P.poisonTick = (P.poisonTick || 0) - dt) <= 0) { P.poisonTick = 0.7; P.hp -= 2; RW.fx.text(pc.x, P.y - 4, '-2', '#8be04a'); if (P.hp <= 0) P.die(); } }
+  }
+
+  // ====================== THE SHURGREDAN ======================
+  E.shurgr = null;
+  const baseKill = E.kill;
+  E.kill = function (e) {
+    const wasMine = e.lastHitBy !== 'buddy';
+    baseKill(e);
+    if (e.sp === 'rubbermcfly' && wasMine && W().def.id === 'acorn' && !E.shurgr) { E.shurgr = { t: 1.2 }; RW.ui.toast('The air goes very still...'); }
+    if (e.loot) E.dropItem(e.loot.id, e.loot.n, ec(e).x, ec(e).y);
+  };
+  function updateShurgr(dt) {
+    const s = E.shurgr; if (!s) return; s.t -= dt;
+    if (s.t > 0) { if (Math.random() < dt * 20) RW.fx.spawn({ x: P.center().x + RW.rand(-30, 30), y: RW.cam.y + RW.rand(0, 40), vy: 60, life: 0.8, color: '#fff6e8', add: true, kind: 'glow' }); return; }
+    E.shurgr = null; if (P.dead) return;
+    const pc = P.center();
+    for (let k = -1; k <= 1; k++) RW.fx.bolt(pc.x + k * 10, RW.cam.y - 10, pc.x + k * 3, pc.y);
+    RW.fx.flash('#fffaf0', 0.5); RW.fx.shake(8, 0.6); RW.audio.sfx('lightning');
+    const d = Math.round(P.maxHp() * 0.7); P.hp -= d; RW.fx.text(pc.x, P.y - 8, '-' + d, '#fff6c8', true);
+    RW.ui.banner('The ShurgrEdan', 'Something very old watches over the RubberMcFly.');
+    if (P.hp <= 0) P.die();
+  }
+
+  // ====================== BEHAVIORS ======================
+  // Wild Punk: runs at you on its leg-vines and lashes; hops over anything in the way
+  B.punk = function (e, dt, sp) {
+    const pc = P.center(), c = ec(e); const d = dist(e); const chase = !P.dead && d < 18 * TS && (sp.temper !== 'neutral' || e.angryT > 0);
+    gravity(e, dt);
+    const dir = chase ? Math.sign(pc.x - c.x) || 1 : (e.wd = e.wd || (Math.random() < 0.5 ? -1 : 1));
+    e.vx = RW.lerp(e.vx, dir * sp.speed * (chase ? 1 : 0.3), dt * 5);
+    const r = walk(e, dt);
+    if (e.ground && (r.wallL || r.wallR)) { e.vy = -320; if (!chase) e.wd = -dir; }
+    if (chase && e.ground && d < 60 && (e.leapT = (e.leapT || 0) - dt) <= 0) { e.leapT = 1.3; e.vy = -240; e.vx = dir * sp.speed * 1.8; for (let k = 0; k < 6; k++) RW.fx.spawn({ x: c.x + dir * k * 4, y: c.y - k, life: 0.3, color: '#4f8f3e', kind: 'dot' }); RW.audio.sfx('swing'); }
+    if (!chase && Math.random() < dt * 0.3) e.wd = -(e.wd || 1);
+    e.face = dir; e.fr = Math.abs(e.vx) > 8 ? Math.floor(e.t * (chase ? 12 : 6)) % 4 : 0;
+    e.harmless = !chase;
+  };
+  // Domestic Punk: grazes about the village; hit one and it fights back for a while
+  B.grazer = function (e, dt, sp) { anger(e, sp, 8); if (e.angryT > 0) return B.punk(e, dt, sp); gravity(e, dt); if ((e.wt = (e.wt || 0) - dt) <= 0) { e.wt = 2 + Math.random() * 4; e.wd = Math.random() < 0.4 ? 0 : Math.random() < 0.5 ? -1 : 1; } e.vx = RW.lerp(e.vx, (e.wd || 0) * sp.speed * 0.4, dt * 3); const r = walk(e, dt); if (r.wallL || r.wallR) e.wd = -(e.wd || 1); if (e.wd) e.face = e.wd; e.fr = e.wd ? Math.floor(e.t * 5) % 4 : 0; e.harmless = true; };
+  // critters: wander, and run from you when you get close (Mikolo Moko hops, the Uff barely moves)
+  B.critter = function (e, dt, sp) {
+    gravity(e, dt); const pc = P.center(), c = ec(e); const near = !P.dead && dist(e) < 6 * TS && !sp.slow;
+    if (near) e.wd = c.x < pc.x ? -1 : 1;
+    else if ((e.wt = (e.wt || 0) - dt) <= 0) { e.wt = 1.5 + Math.random() * 3; e.wd = Math.random() < 0.35 ? 0 : Math.random() < 0.5 ? -1 : 1; }
+    const spd = sp.speed * (near ? 1 : 0.35);
+    if (sp.hops) { if (e.ground && e.wd && (e.hopT = (e.hopT || 0) - dt) <= 0) { e.hopT = near ? 0.35 : 1; e.vy = near ? -260 : -170; e.vx = e.wd * spd; } if (e.ground) e.vx *= 0.8; }
+    else e.vx = RW.lerp(e.vx, (e.wd || 0) * spd, dt * 6);
+    const r = walk(e, dt); if (e.ground && (r.wallL || r.wallR)) { e.vy = -260; }
+    if (e.wd) e.face = e.wd; e.fr = sp.hops ? (e.ground ? 0 : 1) : (e.wd ? Math.floor(e.t * (near ? 12 : 5)) % 2 : 0);
+    e.harmless = true;
+    if (sp.id === 'mikolo_moko' && night()) RW.fx.light(c.x, c.y - 4, 0.3, 0.25, 0.35);
+    if (sp.id === 'uff') RW.fx.light(c.x, e.y + 2, 0.35, 0.3, 0.12);
+    if (sp.id === 'kofi' || sp.id === 'big_momma_kofi') { if (night()) RW.fx.light(c.x - e.face * 6, c.y, 0.15, 0.4, 0.45); }
+  };
+  // RubberMcFly: flutters about one spot
+  B.mcfly = function (e, dt, sp) {
+    e.hx = e.hx == null ? e.x : e.hx; e.hy = e.hy == null ? e.y : e.hy;
+    const tx = e.hx + Math.sin(e.t * 0.7) * 30, ty = e.hy + Math.sin(e.t * 1.3) * 12 - 6;
+    e.vx = RW.lerp(e.vx, (tx - e.x) * 1.5, dt * 2); e.vy = RW.lerp(e.vy, (ty - e.y) * 1.5 + Math.sin(e.t * 9) * 20, dt * 3);
+    E.move(e, dt); e.face = e.vx >= 0 ? 1 : -1; e.fr = Math.floor(e.t * 12) % 2; e.harmless = true;
+    if (night()) RW.fx.light(e.x + 4, e.y + 4, 0.45, 0.4, 0.25);
+  };
+  B.makari = function (e, dt) {
+    e.hx = e.hx == null ? e.x : e.hx; e.hy = e.hy == null ? e.y : e.hy;
+    e.x = e.hx + Math.sin(e.t * 0.4) * 24; e.y = e.hy + Math.sin(e.t * 0.9) * 8; e.fr = Math.floor(e.t * 5) % 3; e.harmless = true;
+    RW.fx.light(e.x + 8, e.y + 6, 0.3, 0.55, 0.2);
+  };
+  // Albali Byrd: drifts high and leaves you be. Hit it (or meet a Villtur one) and it circles, dives and strikes
+  B.albali = function (e, dt, sp) {
+    e._dt = dt; anger(e, sp, 14); const pc = P.center(), c = ec(e);
+    const hunting = !P.dead && (e.angryT > 0 || (sp.toxic && dist(e) < 14 * TS));
+    e.harmless = true; e.st = e.st || 'circle'; e.stT = (e.stT == null ? 2 : e.stT) - dt;
+    let tx, ty, s = sp.speed;
+    if (!hunting) { e.hx = e.hx == null ? e.x : e.hx; e.hy = e.hy == null ? e.y - 30 : e.hy; e.wa = (e.wa || Math.random() * 6) + dt * 0.6; tx = e.hx + Math.cos(e.wa) * 60; ty = e.hy + Math.sin(e.wa * 1.7) * 14; s *= 0.5; e.st = 'circle'; }
+    else if (e.st === 'circle') { tx = pc.x + Math.cos(e.t * 2) * 50; ty = pc.y - 80; if (e.stT <= 0) { e.st = 'dive'; e.stT = 1.2; e.da = Math.atan2(pc.y - c.y, pc.x - c.x); RW.audio.sfx('swing'); } }
+    else if (e.st === 'dive') {
+      e.vx = Math.cos(e.da) * s * 3.2; e.vy = Math.sin(e.da) * s * 3.2;
+      if (overlap(e, P) && P.invulnT <= 0) { P.hurt(sp.dmg, Math.sign(e.vx) || 1, 'albali'); P.paralyze(1.6, sp.dmg, !!sp.toxic); e.st = 'rest'; e.stT = 1.6; }
+      const r = E.move(e, dt); if (e.stT <= 0 || r.wallL || r.wallR || r.ground || r.ceil) { e.st = 'rest'; e.stT = 1.6; }
+      e.face = e.vx >= 0 ? 1 : -1; e.fr = 2; return;
+    } else { tx = c.x; ty = c.y; s *= 0.2; if (e.stT <= 0) { e.st = 'circle'; e.stT = 2 + Math.random(); } }
+    const a = Math.atan2(ty - c.y, tx - c.x), dd = Math.hypot(tx - c.x, ty - c.y);
+    e.vx = RW.lerp(e.vx, Math.cos(a) * s * Math.min(1, dd / 30), dt * 3); e.vy = RW.lerp(e.vy, Math.sin(a) * s * Math.min(1, dd / 30), dt * 3);
+    E.move(e, dt); e.face = e.vx >= 0 ? 1 : -1; e.fr = Math.floor(e.t * (hunting ? 10 : 6)) % 2;
+    if (night()) RW.fx.light(c.x, c.y, sp.toxic ? 0.2 : 0.35, sp.toxic ? 0.45 : 0.32, sp.toxic ? 0.1 : 0.2);
+  };
+  // Hvaleia: swims slowly through the air above the Green Sea. Start it and it rams you
+  B.hvaleia = function (e, dt, sp) {
+    e._dt = dt; anger(e, sp, 10); const pc = P.center(), c = ec(e); const Wd = W();
+    const band = (Wd.def.sea - 7) * TS + Math.sin(e.t * 0.5) * 20;
+    if (e.angryT > 0 && !P.dead) { const a = Math.atan2(pc.y - c.y, pc.x - c.x); e.vx = RW.lerp(e.vx, Math.cos(a) * sp.speed * 2.2, dt * 1.5); e.vy = RW.lerp(e.vy, Math.sin(a) * sp.speed * 2.2, dt * 1.5); e.harmless = false; }
+    else {
+      e.wd = e.wd || (Math.random() < 0.5 ? -1 : 1);
+      const ahead = Math.floor((c.x + e.wd * 60) / TS); if (ahead < 2 || ahead > Wd.W - 3 || Wd.zoneAt(ahead, Math.floor(c.y / TS)) !== 'ocean') e.wd = -e.wd;
+      e.vx = RW.lerp(e.vx, e.wd * sp.speed, dt); e.vy = RW.lerp(e.vy, (band - e.y) * 0.6, dt); e.harmless = true;
+    }
+    e.x += e.vx * dt; e.y += e.vy * dt; e.face = e.vx >= 0 ? 1 : -1; e.fr = Math.floor(e.t * 2) % 2;
+    if (Math.random() < dt * 0.4) for (let k = 0; k < 10; k++) RW.fx.spawn({ x: e.x + e.w * (e.face > 0 ? 0.6 : 0.4), y: e.y + 2, vx: RW.rand(-20, 20), vy: -RW.rand(60, 120), life: 0.8, color: '#bfeaff', grav: 160 });
+    if (night()) RW.fx.light(c.x, c.y, 0.2, 0.45, 0.6);
+  };
+  // Tonguatjis: barely moves. Start it and its tongue whips out a long way, dragging you in
+  B.tonguatjis = function (e, dt, sp) {
+    e._dt = dt; anger(e, sp, 12); gravity(e, dt); const pc = P.center(), c = ec(e); e.harmless = true;
+    if ((e.wt = (e.wt || 0) - dt) <= 0) { e.wt = 3 + Math.random() * 4; e.wd = Math.random() < 0.6 ? 0 : Math.random() < 0.5 ? -1 : 1; }
+    e.vx = e.angryT > 0 ? 0 : (e.wd || 0) * sp.speed; walk(e, dt); if (e.wd) e.face = e.wd;
+    e.lt = (e.lt == null ? 1 : e.lt) - dt;
+    if (e.angryT > 0 && !P.dead) {
+      e.face = pc.x > c.x ? 1 : -1;
+      if (!e.lash && e.lt <= 0 && dist(e) < 5.5 * TS) { e.lash = { t: 0 }; e.lt = 2.2; }
+      if (e.lash) { e.lash.t += dt; if (e.lash.t > 0.6 && !e.lash.hit) { e.lash.hit = true; if (dist(e) < 6 * TS) { P.hurt(sp.dmg, -e.face, 'tongue'); P.vx = -e.face * 200; P.vy = -100; } for (let k = 0; k < 10; k++) RW.fx.spawn({ x: c.x + (pc.x - c.x) * k / 10, y: c.y - 4 + (pc.y - c.y) * k / 10, life: 0.3, color: '#f08aa8', kind: 'dot' }); RW.audio.sfx('swing'); } if (e.lash.t > 1) e.lash = null; }
+    }
+    e.fr = e.lash || e.angryT > 0 ? 1 : 0;
+    RW.fx.light(c.x, c.y + 4, 0.3, 0.22, 0.08);
+  };
+  // Kipsu: hunt in packs, bite and run off, then come round again
+  B.kipsu = function (e, dt, sp) {
+    if (!e.pack) { e.pack = true; if (!e.joined) for (let k = 0; k < 1 + Math.floor(Math.random() * 2); k++) { const o = E.spawnEnemy('kipsu', e.x + (k + 1) * 20 * (Math.random() < 0.5 ? -1 : 1), e.y); o.pack = true; o.joined = true; if (W().solid(Math.floor((o.x + o.w / 2) / TS), Math.floor((o.y + 2) / TS))) { o.x = e.x; } } }
+    gravity(e, dt); const pc = P.center(), c = ec(e); const d = dist(e); const chase = !P.dead && d < 20 * TS;
+    e.runT = Math.max(0, (e.runT || 0) - dt);
+    if (overlap(e, P) && !e.runT) e.runT = 1.4;
+    let dir = chase ? Math.sign(pc.x - c.x) || 1 : (e.wd = e.wd || 1); if (e.runT) dir = -(Math.sign(pc.x - c.x) || 1);
+    e.vx = RW.lerp(e.vx, dir * sp.speed * (chase ? 1 : 0.3), dt * 6);
+    const r = walk(e, dt); if (e.ground && (r.wallL || r.wallR)) e.vy = -300;
+    if (chase && !e.runT && e.ground && d < 70 && (e.leapT = (e.leapT || 0) - dt) <= 0) { e.leapT = 1.1; e.vy = -220; e.vx = dir * sp.speed * 1.6; }
+    e.face = dir; e.fr = Math.floor(e.t * 12) % 2; e.harmless = !!e.runT || !chase;
+    if (night()) RW.fx.light(c.x, c.y, 0.15, 0.45, 0.42);
+  };
+  // Malsti Punk: blinks up to you through the Duat, steals something from your bag, and blinks away
+  const blinkNear = (e, px, py, r0, r1) => { for (let k = 0; k < 20; k++) { const a = Math.random() * 6.28, d = r0 + Math.random() * (r1 - r0); const x = px + Math.cos(a) * d, y = py + Math.sin(a) * d * 0.5; const tx = Math.floor(x / TS), ty = Math.floor(y / TS); if (!W().solid(tx, ty) && !W().solid(tx, ty - 1) && !W().isWaterAt(x, y)) { RW.fx.burst(ec(e).x, ec(e).y, ['#c08aff', '#5a3a8a'], 10, 60, { add: true, kind: 'glow' }); e.x = x - e.w / 2; e.y = y - e.h; e.vx = e.vy = 0; RW.fx.burst(x, y - 4, ['#c08aff', '#e8d8ff'], 10, 60, { add: true, kind: 'glow' }); return true; } } return false; };
+  B.malsti = function (e, dt, sp) {
+    gravity(e, dt); const pc = P.center(), c = ec(e); e.harmless = true; walk(e, dt); e.vx *= 0.9;
+    e.bt = (e.bt == null ? 2 : e.bt) - dt;
+    if (e.loot) { e.goneT = (e.goneT || 12) - dt; if (e.bt <= 0) { e.bt = 1.8; blinkNear(e, c.x, c.y, 60, 140); } if (e.goneT <= 0) { RW.fx.burst(c.x, c.y, ['#c08aff', '#5a3a8a'], 14, 70, { add: true, kind: 'glow' }); RW.ui.toast('The Malsti Punk slipped into the Duat with your ' + RW.ITEMS[e.loot.id].name + '.'); e.dead = true; } }
+    else if (!P.dead && dist(e) < 12 * TS && e.bt <= 0) { e.bt = 2.5; blinkNear(e, pc.x, pc.y + 10, 14, 26); }
+    if (!e.loot && overlap(e, P) && !P.dead) {
+      const slots = P.inv.map((s, i) => (s && i !== P.sel && RW.ITEMS[s.id] ? i : -1)).filter((i) => i >= 0);
+      if (slots.length) { const i = RW.pick(slots), s = P.inv[i], n = Math.min(s.n, RW.randi(1, 3)); s.n -= n; if (s.n <= 0) P.inv[i] = null; e.loot = { id: s.id, n }; RW.ui.dirty && RW.ui.dirty(); RW.ui.toast('A Malsti Punk stole ' + n + ' ' + RW.ITEMS[e.loot.id].name + '! Catch it!'); RW.audio.sfx('pickup'); e.bt = 0.3; }
+    }
+    e.face = pc.x > c.x ? -1 : 1; e.fr = Math.floor(e.t * 8) % 4;
+    RW.fx.light(c.x, c.y, 0.3, 0.15, 0.45);
+  };
+  // Lutut: a great flying hunter. You hear its screech first
+  B.lutut = function (e, dt, sp) {
+    const pc = P.center(), c = ec(e); const d = dist(e); const chase = !P.dead && d < 30 * TS;
+    if (chase && !e.screech) { e.screech = true; RW.audio.sfx('roar'); RW.fx.shake(3, 0.5); RW.ui.toast('A Lutut screeches somewhere above you!'); }
+    let tx = pc.x, ty = pc.y - 20; if (!chase) { e.wa = (e.wa || 0) + dt * 0.4; tx = c.x + Math.cos(e.wa) * 80; ty = c.y + Math.sin(e.wa) * 20; }
+    e.sw = (e.sw || 0) - dt; if (chase && e.sw <= 0 && d < 140) { e.sw = 3; e.swoop = 0.8; }
+    const s = sp.speed * (e.swoop > 0 ? 2.4 : 1); e.swoop = (e.swoop || 0) - dt;
+    const a = Math.atan2(ty - c.y, tx - c.x); e.vx = RW.lerp(e.vx, Math.cos(a) * s, dt * 2); e.vy = RW.lerp(e.vy, Math.sin(a) * s, dt * 2);
+    E.move(e, dt); e.face = e.vx >= 0 ? 1 : -1; e.fr = Math.floor(e.t * 4) % 2; e.harmless = !chase;
+    if (night()) RW.fx.light(c.x, c.y, 0.4, 0.25, 0.6);
+  };
+  // Duskareth raiders: rush you with knives; slingers keep back and throw them
+  B.raider = function (e, dt, sp) {
+    gravity(e, dt); const pc = P.center(), c = ec(e); const d = dist(e); const chase = !P.dead && d < 22 * TS;
+    let dir = chase ? Math.sign(pc.x - c.x) || 1 : (e.wd = e.wd || 1);
+    let want = chase ? 1 : 0.3;
+    if (sp.ranged && chase) { if (d < 6 * TS) { dir = -dir; want = 0.8; } else if (d < 10 * TS) want = 0; }
+    if (!chase && (e.wt = (e.wt || 0) - dt) <= 0) { e.wt = 2 + Math.random() * 3; e.wd = -(e.wd || 1); }
+    e.vx = RW.lerp(e.vx, dir * sp.speed * want, dt * 6);
+    const r = walk(e, dt); if (e.ground && (r.wallL || r.wallR)) e.vy = -320;
+    e.face = chase ? Math.sign(pc.x - c.x) || 1 : dir;
+    if (sp.ranged && chase && (e.st = (e.st == null ? 1.5 : e.st) - dt) <= 0 && W().los(c.x, c.y - 6, pc.x, pc.y)) {
+      e.st = 1.8; const a = Math.atan2(pc.y - c.y - 20, pc.x - c.x); e.atkT = 0.3;
+      E.shots.push({ x: c.x, y: c.y - 6, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, grav: 300, life: 2, owner: 'e', dmg: sp.dmg, kind: 'arrow', color: '#c8c0d0' }); RW.audio.sfx('swing');
+    }
+    e.atkT = (e.atkT || 0) - dt; if (!sp.ranged && chase && d < 26) e.atkT = 0.2;
+    e.fr = e.atkT > 0 ? 6 : !e.ground ? 5 : Math.abs(e.vx) > 8 ? 1 + Math.floor(e.t * 9) % 4 : 0;
+    e.harmless = sp.ranged || !chase;
+  };
+
+  // ====================== SPAWNS: pass dt to behaviors, keep the status effects running ======================
+  const baseUpdateEnemies = E.updateEnemies;
+  E.updateEnemies = function (dt) {
+    E.enemies.forEach((e) => { e._dt = dt; });
+    baseUpdateEnemies(dt);
+    updatePlayer4(dt); updateShurgr(dt); updateGuards(dt);
+  };
+  // the buddy's hits shouldn't call down the ShurgrEdan on you... but yours do
+  const baseDamage = E.damage;
+  E.damage = function (e, d, dir, knock, crit, color) { e.lastHitBy = color === '#e8c88a' ? 'buddy' : 'p'; return baseDamage(e, d, dir, knock, crit, color); };
+
+  // ====================== NPCs: still ones (Pebble), and the keep guards ======================
+  const baseInitNpcs = E.initNpcs;
+  E.initNpcs = function () {
+    baseInitNpcs();
+    (RW.world.meta.guards || []).forEach((g, i) => {
+      const h = 22; E.npcs.push({ id: 'keepguard', guard: g, x: ((g.x0 + g.x1) / 2) * TS, y: g.y * TS - h, w: 12, h, home: g.x0 * TS, face: i % 2 ? 1 : -1, t: Math.random() * 4, vx: 0, vy: 0, sus: 0 });
+    });
+  };
+  const baseUpdateNpcs = E.updateNpcs;
+  E.updateNpcs = function (dt) {
+    const keep = E.npcs.filter((n) => !n.guard && !(RW.SPECIES[n.id] || {}).still);
+    const all = E.npcs.slice(); E.npcs.length = 0; keep.forEach((n) => E.npcs.push(n));
+    baseUpdateNpcs(dt);
+    E.npcs.length = 0; all.forEach((n) => E.npcs.push(n));
+    const pc = P.center();
+    E.npcs.forEach((n) => { if (n.guard || !(RW.SPECIES[n.id] || {}).still) return; n.t += dt; n.vx = 0; n.vy += 900 * dt; const r = E.move(n, dt); n.near = RW.dist(n.x + n.w / 2, n.y + n.h / 2, pc.x, pc.y) < 60; n.face = 1; });
+  };
+  const restrictedAt = (tx, ty) => (RW.world.meta.restricted || []).find((r) => tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1);
+  E.restrictedAt = restrictedAt;
+  let lastRestricted = null, caughtT = 0;
+  function updateGuards(dt) {
+    const Wd = W(); if (!Wd.meta.guards || !Wd.meta.guards.length) return;
+    const pc = P.center(), ptx = Math.floor(pc.x / TS), pty = Math.floor(pc.y / TS);
+    const here = P.dead ? null : restrictedAt(ptx, pty);
+    if (here && here !== lastRestricted) RW.ui.toast('You\'re sneaking into ' + here.name + '. Don\'t let a guard see you.');
+    if (here) P.flags.seen_keep = 1;
+    lastRestricted = here; caughtT -= dt;
+    const range = (night() ? 6 : 9) * TS;
+    E.npcs.forEach((n) => {
+      if (!n.guard) return; const g = n.guard; n.t += dt;
+      // patrol: walk the beat, pause and look round at each end, never walk off an edge
+      n.pauseT = (n.pauseT || 0) - dt;
+      if (n.sus > 0.25 && here) { n.vx = 0; n.face = pc.x > n.x ? 1 : -1; }
+      else if (n.pauseT > 0) { n.vx = 0; if (Math.random() < dt * 0.8) n.face = -n.face; }
+      else {
+        n.vx = n.face * 24;
+        const nx = n.x + n.w / 2 + n.face * 10, foot = Math.floor((n.y + n.h + 2) / TS), col = Math.floor(nx / TS);
+        const under = RW.TILES[Wd.get(col, foot)]; const edge = !under.solid && !under.platform;
+        if ((n.face > 0 && n.x > g.x1 * TS) || (n.face < 0 && n.x < g.x0 * TS) || edge) { n.face = -n.face; n.pauseT = 1.2 + Math.random() * 1.5; n.vx = 0; }
+      }
+      n.vy += 900 * dt; const r = E.move(n, dt, { step: true, grounded: n.ground }); n.ground = r.ground; if (r.wallL || r.wallR) { n.face = -n.face; n.pauseT = 0.6; }
+      n.near = RW.dist(n.x + n.w / 2, n.y + n.h / 2, pc.x, pc.y) < 44 && !here;
+      // can it see you? only matters where you're not allowed
+      const gx = n.x + n.w / 2, gy = n.y + 6, dx = pc.x - gx, dy = pc.y - gy;
+      const sees = here && caughtT <= 0 && Math.abs(dx) < range && dx * n.face > -6 && Math.abs(dy) < 3.2 * TS && Wd.los(gx, gy, pc.x, pc.y);
+      if (sees) n.sus = Math.min(1, n.sus + dt * (Math.abs(dx) < range * 0.45 ? 2.2 : 1.1)); else n.sus = Math.max(0, n.sus - dt * 0.5);
+      if (n.sus >= 1) caught(n);
+    });
+  }
+  const CAUGHT = ['Hey! You can\'t be in here. Out you go.', 'Visitors stay in the courtyard. Come along now.', 'Nice try, little cap. Out.', 'The Master will hear about this. Out!'];
+  function caught(n) {
+    const M = RW.world.meta; caughtT = 3; E.npcs.forEach((g) => { if (g.guard) g.sus = 0; });
+    RW.fx.flash('#000000', 0.5); RW.audio.sfx('deny');
+    if (M.keepOut) { P.spawnAt(M.keepOut.x, M.keepOut.y); P.vx = P.vy = 0; }
+    P.flags.caught = (P.flags.caught || 0) + 1;
+    RW.ui.banner('Caught!', RW.pick(CAUGHT));
+  }
+
+  // ====================== DRAWING: guard sight, suspicion marks ======================
+  const baseDraw = E.draw;
+  E.draw = function (g, cam, time) {
+    baseDraw(g, cam, time);
+    if (!lastRestricted) return;
+    const ox = -Math.round(cam.x), oy = -Math.round(cam.y), range = (night() ? 6 : 9) * TS;
+    E.npcs.forEach((n) => {
+      if (!n.guard) return; const gx = n.x + n.w / 2 + ox, gy = n.y + 6 + oy;
+      g.fillStyle = n.sus > 0.3 ? 'rgba(255,90,70,0.16)' : 'rgba(255,230,140,0.10)';
+      g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + n.face * range, gy - 3.2 * TS); g.lineTo(gx + n.face * range, gy + 3.2 * TS); g.closePath(); g.fill();
+      if (n.sus > 0.15) { g.font = '14px VT323, monospace'; g.textAlign = 'center'; g.fillStyle = '#0c0a10'; g.fillText(n.sus > 0.7 ? '!' : '?', gx + 1, gy - 15); g.fillStyle = n.sus > 0.7 ? '#ff5a4a' : '#ffe9b0'; g.fillText(n.sus > 0.7 ? '!' : '?', gx, gy - 16); g.textAlign = 'left'; }
+    });
+  };
+
+  // ====================== R: trapdoors, levers, rune stones, and the puzzles they solve ======================
+  const baseInteract = P.interact;
+  P.interact = function () {
+    const pc = P.center(); const Wd = W();
+    if (E.npcs.some((n) => n.near && RW.dist(n.x + n.w / 2, n.y + n.h / 2, pc.x, pc.y) < 44)) return baseInteract();
+    const tx = Math.floor(pc.x / TS), ty = Math.floor(pc.y / TS); let best = null, bd = 99;
+    for (let y = ty - 2; y <= ty + 2; y++) for (let x = tx - 2; x <= tx + 2; x++) {
+      const t = Wd.tile(x, y); if (!t.toggle && t.key !== 'runestone' && t.key !== 'runestone_lit') continue;
+      const d = Math.abs(x - tx) + Math.abs(y - ty) * 1.2; if (d < bd) { bd = d; best = [x, y, t]; }
+    }
+    if (!best) return baseInteract();
+    const [x, y, t] = best, T = RW.T;
+    if (t.key === 'runestone_lit') { RW.ui.toast('The rune is already glowing.'); return; }
+    if (t.key === 'runestone') { Wd.setTile(x, y, T.runestone_lit); RW.audio.sfx('crystal'); runeTouched(x, y); return; }
+    Wd.setTile(x, y, T[t.toggle]); RW.audio.sfx(t.decor === 'lever' ? 'place' : 'swing');
+    if (t.decor === 'lever') leverPulled(x, y);
+  };
+  const gateOpen = (p) => p.gate.every(([x, y]) => W().get(x, y) !== RW.T.keepgate);
+  function openGate(p) {
+    if (gateOpen(p)) return;
+    p.gate.forEach(([x, y]) => { W().setTile(x, y, RW.T.air); RW.fx.debris(x * TS + 8, y * TS + 8, ['#6a6a74', '#5a4030'], 8); });
+    RW.fx.shake(4, 0.6); RW.audio.sfx('slam'); RW.ui.banner('A gate opens', p.done); P.flags['puzzle_' + p.id] = 1; RW.game.saveSoon && RW.game.saveSoon();
+  }
+  function leverPulled(x, y) {
+    (W().meta.puzzles || []).forEach((p) => {
+      if (p.kind === 'lever' && p.lever[0] === x && p.lever[1] === y) openGate(p);
+      if (p.kind === 'levers' && p.levers.some(([lx, ly]) => lx === x && ly === y)) {
+        const state = p.levers.map(([lx, ly]) => (W().get(lx, ly) === RW.T.lever_on ? 1 : 0));
+        if (state.every((v, i) => v === p.want[i])) openGate(p);
+      }
+    });
+  }
+  function runeTouched(x, y) {
+    (W().meta.puzzles || []).forEach((p) => {
+      if (p.kind !== 'runes') return; const me = p.runes.find(([rx, ry]) => rx === x && ry === y); if (!me) return;
+      const lit = p.runes.filter(([rx, ry]) => W().get(rx, ry) === RW.T.runestone_lit).length;
+      if (me[2] !== p.order[lit - 1]) { setTimeout(() => { p.runes.forEach(([rx, ry]) => { if (W().get(rx, ry) === RW.T.runestone_lit) W().setTile(rx, ry, RW.T.runestone); }); RW.ui.toast(p.fail); RW.audio.sfx('deny'); }, 450); return; }
+      if (lit === p.runes.length) openGate(p);
+    });
+  }
+})(window.RW);
+
+</script>
 <script>/* js/engine/main.js */
 // MAIN — boot, game loop, camera, sky (day/night + the ghost moon), saving.
 (function (RW) {
@@ -8068,7 +9349,7 @@ window.RW = window.RW || {};
 
   // ---------------- saving ----------------
   G.snapshot = () => {
-    const pos = Object.assign({}, P.pos || {}); if (RW.world.def) pos[RW.world.def.id] = { x: Math.round(P.x), y: Math.round(P.y) };
+    const pos = Object.assign({}, P.pos || {}); if (RW.world.def) pos[RW.world.def.store || RW.world.def.id] = { x: Math.round(P.x), y: Math.round(P.y) };
     return {
       v: 2, name: P.name, look: P.look, species: P.species, world: RW.world.def ? RW.world.def.id : P.startWorld, startWorld: P.startWorld, pos, visited: P.visited,
       inv: P.inv.map((s) => (s ? { id: s.id, n: s.n } : null)), sel: P.sel,
@@ -8122,7 +9403,7 @@ window.RW = window.RW || {};
     if (G.travelling) return; G.travelling = true;
     RW.fx.flash('#1a0a2a', 1); RW.audio.sfx('rift');
     const here = RW.world.def.id;
-    P.pos = P.pos || {}; P.pos[here] = { x: Math.round(P.x), y: Math.round(P.y) };
+    P.pos = P.pos || {}; P.pos[(RW.WORLDS[here] && RW.WORLDS[here].store) || here] = { x: Math.round(P.x), y: Math.round(P.y) };
     E.allPouches = (E.allPouches || []).filter((p) => p.w !== here).concat(E.pouches.map((p) => Object.assign(p, { w: here })));
     RW.world.saveExplored();
     await RW.net.flushNow();
@@ -8143,7 +9424,8 @@ window.RW = window.RW || {};
     document.getElementById('hud').classList.remove('hidden-ui');
     RW.ui.closeModal();
     const sp = RW.world.def.spawn;
-    P.savedPos = P.pos && P.pos[RW.world.def.id] ? P.pos[RW.world.def.id] : null;
+    const posKey = RW.world.def.store || RW.world.def.id; // a rebuilt world keeps positions under its new name
+    P.savedPos = P.pos && P.pos[posKey] ? P.pos[posKey] : null;
     if (G.fresh) P.savedPos = null;
     if (P.savedPos && !RW.world.solid(Math.floor((P.savedPos.x + 6) / TS), Math.floor((P.savedPos.y + 14) / TS))) { P.x = P.savedPos.x; P.y = P.savedPos.y; }
     else P.spawnAt(sp.x, sp.y);

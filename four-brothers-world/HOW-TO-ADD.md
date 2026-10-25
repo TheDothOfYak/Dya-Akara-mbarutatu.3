@@ -31,7 +31,7 @@ Players must be invited by email as **Editors** to build in the shared world.
 | World | Hero / people | Boss (its fall opens the next world) | File |
 |---|---|---|---|
 | Fuzzy World | Fuzzies: Old Tuft, Burr | Gnarlroot, the Giant Vine Tree | `fuzzyworld.js` |
-| Acorn World | Elder Capwell (gives the acorn buddy) | The Warthog King | `acornworld.js` |
+| Acorn World | Elder Capwell (gives the acorn buddy), the Keilia keep, the Elsha'ryn | The Warthog King | `acornworld.js` |
 | Rock World | Rocks: Gneiss, Slagg, Wedgeworth | The Gemscale Leviathan | `rockworld.js` |
 | Ghost World | Cyators: Commander Vexa | The Hollow Wraith | `ghostworld.js` |
 
@@ -82,3 +82,11 @@ Since v1.5 you don't need to do anything: when two computers can't link up direc
 To try it on one computer first, without editing the file, open the game, press F12, choose Console, and run (with your own link):
 `localStorage.setItem('rw_relay', JSON.stringify({ api: 'https://YOURAPP.metered.live/api/v1/turn/credentials?apiKey=YOURKEY' }))`
 then refresh. Relay traffic counts against the service's free monthly allowance. A key in `index.html` is visible to anyone who opens the page, which is normal for these services, but pick one with a usage cap.
+
+## Acorn World pieces (v1.6)
+- **Big trees:** `homeTree()` and `towerTree()` in `acornworld.js` build a hollow tree of `bark` with floors, stairs (`stairplank`, a one-way step you walk up), ladders and trapdoors. `branchHouse()` hangs a house off a floor.
+- **Toggles:** any block with `toggle: '<other block>'` swaps when you press R beside it (`trapdoor` / `trapdoor_open`, `lever` / `lever_on`). See `P.interact` in `engine/entities4.js`.
+- **Puzzles:** a world's `meta.puzzles` list. Kinds: `levers` (levers set to `want` open `gate`), `runes` (touch rune stones in `order`), `lever` (one lever opens `gate`). Gates are `keepgate` blocks; opening one turns them to air, which saves and syncs like any block change.
+- **Sneaking:** `meta.restricted` (named rectangles) and `meta.guards` (`{ x0, x1, y }` patrol beats). A guard who sees you inside a restricted rectangle sends you to `meta.keepOut`.
+- **Creatures of the Mbaru Tatu:** `js/data/species/mbarutatu.js`. `temper: 'critter'` never hurts you, `'neutral'` only after you hit it. Drawings in `engine/art4.js`, behaviors in `engine/entities4.js`.
+- **Rebuilding a world from scratch:** give it a new `store` name in its definition (Acorn World uses `store: 'acorn2'`). Block changes, the explored map and saved positions are kept under that name, so old changes don't land in the wrong places.
