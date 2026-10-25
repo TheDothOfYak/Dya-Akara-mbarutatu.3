@@ -1249,6 +1249,10 @@ window.RW = window.RW || {};
     { title: 'Memory: The Duskareth', text: 'Not all who wear the dark Aagac can touch the Duat. The ones in the caves below cannot. They only wish they could. They steal, and they are angry about everything.' },
     { title: 'Memory: The Most Perfect Creature', text: 'Never harm a RubberMcFly. It carries its memory in its beak, and something very old watches over it. Those who kill one meet the ShurgrEdan, and the sky itself reaches down.' },
     { title: 'Of Stryx', text: 'A Stryx is exactly as clever as it is raised to be. The ones in the World Arena only know how to stab. In Capstead we grew one into a fountain and taught it to juggle mud.' },
+    { title: 'Waystone: the Broken Hills', text: 'Capstead lies far to the east, past the Gorge and the Megla Wood. The keep lies west. Rest here, traveller. The hills do not get any flatter.' },
+    { title: 'Waystone: the Gorge', text: 'The Keilia built this bridge. The Gorge has been trying to take it back ever since. Mind the gaps. If you fall, the river is kind to acorns: they float.' },
+    { title: 'Memory: the Megla Wood', text: 'A voice in the mist: "Duat Seedlings most often grow into Megla Aagac. We built this shrine to keep watch over them. Then the mist came, and we stopped coming back."' },
+    { title: 'Waystone: the Green Deep', text: 'East: the Tangle, and somewhere in it the Elsha\'ryn. Further east: the Canopy, and the King\'s Clearing at the very end of the world. It is a long way. Bring berries.' },
   ];
 
   RW.ACORN_TIPS = [
@@ -1675,6 +1679,8 @@ window.RW = window.RW || {};
   K('orrin', 'Orrin', { cloth: '#5a4a2a', eye: '#8a6a2a' }, 'A Keilia builder. Built every bridge in Capstead.');
   K('brakka', 'Master Brakka', { cloth: '#3e5a4a', eye: '#7a8a2a', hammer: true }, 'Master builder of the Keilia keep. Strict. Wants her missing plans back.');
   K('dunvarr', 'Dunvarr', { cloth: '#5a3a2a', eye: '#a85a2a', apron: true }, 'One of the few Keilia smiths.');
+  // the long road west: whatever lives in the Keepwood also roams the Broken Hills and the Megla Wood
+  Object.values(RW.SPECIES).forEach((sp) => { const z = sp.spawn && sp.spawn.zones; if (z && (sp.spawn.worlds || []).includes('acorn') && z.includes('forest')) z.push('hills', 'mistwood'); });
   S({ id: 'pebble', type: 'esik', name: 'Pebble', world: 'acorn', role: 'npc', status: 'active', still: true, art: { draw: 'stryxcalm' },
     blurb: 'Capstead\'s fountain: a Stryx grown round a pool of bog mud. She juggles mud balls for the children.' });
 })(window.RW);
@@ -2584,18 +2590,20 @@ window.RW = window.RW || {};
 
 </script>
 <script>/* js/data/worlds/acornworld.js */
-// ACORN WORLD — super green and dense. West to east:
-// the Green Sea · the Keepwood and the Keilia keep (its towers are trees, joined by stone walls) · the Green Deep with
+// ACORN WORLD — super green, dense, and big enough to be a journey. West to east:
+// the Green Sea · the Keepwood and the Keilia keep (its towers are trees, joined by stone walls) · the Broken Hills
+// (a traveller's hut) · the Gorge and its river (an old rope bridge) · the Megla Wood (old ruins) · the Green Deep with
 // Capstead (two giant home trees joined by rope bridges) · the Tangle, where the Elsha'ryn hide · the Canopy and the
 // King's Clearing (the Warthog King) · the sea. Down in the root caves under the Green Deep, the Duskareth raiders camp.
 // Since v1.6 the surface sits lower, so the home trees have room to be enormous.
 (function (RW) {
-  const W = 1100, H = 330, SEA = 166, GY = 158;
+  const W = 3300, H = 330, SEA = 166, GY = 158;
   const KEEP = { x0: 36, x1: 232, out: 230 };
-  const VIL = { x0: 266, x1: 494, ta: 316, tb: 410, plaza: 372 };   // ta / tb: first inside column of each home tree
-  const GROVE = { x0: 698, x1: 784 };
-  const CAMP = { x0: 520, x1: 604, y: 226 };
-  const ARENA = { x0: 980, x1: 1062 };
+  const VIL = { x0: 1526, x1: 1754, ta: 1576, tb: 1670, plaza: 1632 };   // ta / tb: first inside column of each home tree
+  const GROVE = { x0: 2440, x1: 2526 };
+  const CAMP = { x0: 1900, x1: 1984, y: 226 };
+  const ARENA = { x0: 3110, x1: 3192 };
+  const GORGE = { x0: 780, x1: 880 }, HUT = 540, RUINS = 1150;
   const TF = 10, TFLOORS = 7;                                        // home trees: a floor every 10 blocks, 7 floors up
   let C = null;
   const inR = (r, x, y) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
@@ -2605,12 +2613,12 @@ window.RW = window.RW || {};
   const CAMPR = { x0: CAMP.x0, x1: CAMP.x1, y0: CAMP.y - 22, y1: CAMP.y + 4 };
   const def = {
     id: 'acorn', name: 'Acorn World', status: 'active', size: [W, H], sea: SEA, order: 1, sky: 'normal', unlockedBy: 'fuzzy',
-    store: 'acorn2',   // block changes are kept under this name: v1.6 rebuilt the world, so older changes are set aside
+    store: 'acorn3',   // block changes are kept under this name: v1.6 rebuilt the world, so older changes are set aside
     blurb: 'A world drowned in green. Home of the acorns, the Keilia keep and the Elsha\'ryn.',
     spawn: { x: VIL.plaza, y: GY - 1 }, titleCam: { x: VIL.plaza, y: GY - 40 }, carvings: 'CARVINGS_ACORN',
     boss: { species: 'warthog_king', arena: { x0: ARENA.x0, x1: ARENA.x1, y0: GY - 62, y1: GY + 2 }, at: { x: (ARENA.x0 + ARENA.x1) / 2, y: GY }, wake: 50 },
     zones: {
-      forest: { name: 'The Keepwood', music: 'forest' }, keep: { name: 'The Keilia Keep', music: 'village' },
+      forest: { name: 'The Keepwood', music: 'forest' }, hills: { name: 'The Broken Hills', music: 'peaks' }, gorge: { name: 'The Gorge', music: 'sea' }, mistwood: { name: 'The Megla Wood', music: 'caves' }, keep: { name: 'The Keilia Keep', music: 'village' },
       jungle: { name: 'The Green Deep', music: 'jungle' }, village: { name: 'Capstead', music: 'village' },
       deepwood: { name: 'The Tangle', music: 'jungle' }, elsharyn: { name: 'The Memory Grove', music: 'village' },
       canopy: { name: 'The Canopy', music: 'jungle' }, arena: { name: "The King's Clearing", music: 'core' },
@@ -2632,37 +2640,45 @@ window.RW = window.RW || {};
     Object.assign(c.meta, { runes: {}, puzzles: [], restricted: [], guards: [] });
     RW.surface.terrain(c, [
       { key: 'ocean', x0: 0, x1: 26, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
-      { key: 'forest', x0: 26, x1: 256, height: (x) => GY + (N(x / 30, 1.3, 3, 3) - 0.5) * 14, top: 'grass', fill: 'dirt', wall: 'dirt', trees: { kind: 'oak', density: 0.42, spacing: 4 }, decor: [['tallgrass', 0.45], ['flower', 0.12], ['berrybush', 0.08]] },
-      { key: 'jungle', x0: 256, x1: 640, height: (x) => GY + (N(x / 28, 1.1, 3, 3) - 0.5) * 20, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'bigoak', density: 0.6, spacing: 8 }, decor: [['tallgrass', 0.55], ['berrybush', 0.12], ['flower', 0.08]] },
-      { key: 'deepwood', x0: 640, x1: 864, height: (x) => GY + (N(x / 24, 3.1, 4, 3) - 0.5) * 16, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.92, spacing: 2 }, decor: [['tallgrass', 0.7], ['berrybush', 0.1]] },
-      { key: 'canopy', x0: 864, x1: 1074, height: (x) => GY - 2 + (N(x / 34, 2.2, 5, 3) - 0.5) * 24, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.7, spacing: 3 }, decor: [['tallgrass', 0.6], ['berrybush', 0.08]] },
-      { key: 'ocean', x0: 1074, x1: W, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
+      { key: 'forest', x0: 26, x1: 300, height: (x) => GY + (N(x / 30, 1.3, 3, 3) - 0.5) * 14, top: 'grass', fill: 'dirt', wall: 'dirt', trees: { kind: 'oak', density: 0.42, spacing: 4 }, decor: [['tallgrass', 0.45], ['flower', 0.12], ['berrybush', 0.08]] },
+      // steep ridges and sudden drops: slow going on foot
+      { key: 'hills', x0: 300, x1: GORGE.x0, height: (x) => { const r = N(x / 22, 4.4, 6, 3), ridge = 1 - Math.abs(2 * N(x / 60, 7.1, 8, 2) - 1); return GY - 6 - ridge * 34 + (r - 0.5) * 18 + (N(x / 7, 1.9, 9, 2) > 0.62 ? -5 : 0); }, top: 'grass', fill: 'dirt', fillDepth: 4, wall: 'dirt', trees: { kind: 'pine', density: 0.35, spacing: 5 }, decor: [['tallgrass', 0.3], ['flower', 0.06], ['berrybush', 0.05]] },
+      // the gorge: sheer walls dropping to a river below sea level
+      { key: 'gorge', x0: GORGE.x0, x1: GORGE.x1, height: (x) => { const t = (x - GORGE.x0) / (GORGE.x1 - GORGE.x0), wall = Math.min(1, Math.min(t, 1 - t) * 7); return GY + wall * 48 + (N(x / 9, 2.2, 3, 2) - 0.5) * 6; }, top: 'grass', fill: 'dirt', fillDepth: 3, stone: 'stone', wall: 'dirt', decor: [['tallgrass', 0.2]] },
+      // the Megla Wood: dark, crowded and quiet
+      { key: 'mistwood', x0: GORGE.x1, x1: 1310, height: (x) => GY - 4 + (N(x / 26, 5.5, 7, 3) - 0.5) * 22, top: 'grass', fill: 'dirt', wall: 'dirt', trees: { kind: 'pine', density: 0.8, spacing: 3 }, decor: [['tallgrass', 0.5], ['berrybush', 0.04], ['wildmush', 0.05]] },
+      { key: 'jungle', x0: 1310, x1: 2250, height: (x) => GY + (N(x / 28, 1.1, 3, 3) - 0.5) * 20, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'bigoak', density: 0.6, spacing: 8 }, decor: [['tallgrass', 0.55], ['berrybush', 0.12], ['flower', 0.08]] },
+      { key: 'deepwood', x0: 2250, x1: 2760, height: (x) => GY + (N(x / 24, 3.1, 4, 3) - 0.5) * 16, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.92, spacing: 2 }, decor: [['tallgrass', 0.7], ['berrybush', 0.1]] },
+      { key: 'canopy', x0: 2760, x1: 3220, height: (x) => GY - 2 + (N(x / 34, 2.2, 5, 3) - 0.5) * 24, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.7, spacing: 3 }, decor: [['tallgrass', 0.6], ['berrybush', 0.08]] },
+      { key: 'ocean', x0: 3220, x1: W, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
     ], SEA, { deep: 285 });
-    RW.surface.caves(c, { worms: 40, mouths: [300 - 40, 640, 870], pools: 50 });
+    RW.surface.caves(c, { worms: 120, mouths: [420, 1240, 1500, 2280, 2900], pools: 150 });
     RW.surface.ores(c, [
       ['gravel', 0, 260, 0.2, [1.2, 1.4], ['stone', 'mud']], ['flint', 0, 260, 0.18, [0.8, 0.8], ['stone', 'mud', 'dirt']],
       ['iron', 168, 318, 0.26, [1, 1.3], ['stone', 'deepstone']], ['bronze', 210, 320, 0.18, [0.9, 1.2], ['stone', 'deepstone']],
       ['platinum', 270, 322, 0.08, [0.8, 1], ['deepstone']],
-    ], 4200);
+    ], 12600);
     RW.surface.decorate(c);
     // the Green Deep: smaller oaks crowd in between the big ones
-    for (let x = 262; x < 636; x += 3) if (RW.hash2(x, 41, seed) < 0.45) RW.surface.tree(c, x, 'oak');
+    for (let x = 1312; x < 2246; x += 3) if (RW.hash2(x, 41, seed) < 0.45) RW.surface.tree(c, x, 'oak');
+    for (let x = GORGE.x1 + 2; x < 1308; x += 2) if (RW.hash2(x, 43, seed) < 0.5) RW.surface.tree(c, x, 'pine');
     // the Tangle is choked with hanging moss; mushrooms and moss underground
-    for (let x = 642; x < 862; x++) for (let y = GY - 40; y < GY; y++) if (c.get(x, y) === T.air && c.get(x, y - 1) === T.leaves && RW.hash2(x, y, seed) < 0.3) for (let k = 0; k < 2 + (x % 4); k++) if (c.get(x, y + k) === T.air) c.set(x, y + k, T.vines);
+    for (let x = 2252; x < 2758; x++) for (let y = GY - 40; y < GY; y++) if (c.get(x, y) === T.air && c.get(x, y - 1) === T.leaves && RW.hash2(x, y, seed) < 0.3) for (let k = 0; k < 2 + (x % 4); k++) if (c.get(x, y + k) === T.air) c.set(x, y + k, T.vines);
     for (let y = 0; y < H - 8; y++) for (let x = 3; x < W - 3; x++) {
       if (y < c.surf[x] + 10) continue; const h = RW.hash2(x, y, seed + 3);
       if (c.get(x, y) === T.air && c.solid(x, y + 1) && h > 0.976) c.set(x, y, T.wildmush);
       else if (c.get(x, y) === T.air && c.solid(x, y - 1) && h < 0.022) c.set(x, y, T.vines);
     }
-    for (let i = 0; i < 180; i++) { const x = 4 + Math.floor(c.rng() * (W - 8)), y = 240 + Math.floor(c.rng() * 80); if (c.get(x, y) === T.air && c.solid(x, y + 1)) { const r = c.rng(); c.set(x, y, r < 0.04 ? T.c_gold : r < 0.3 ? T.c_red : r < 0.55 ? T.c_blue : r < 0.8 ? T.c_green : T.c_purple); } }
+    for (let i = 0; i < 540; i++) { const x = 4 + Math.floor(c.rng() * (W - 8)), y = 240 + Math.floor(c.rng() * 80); if (c.get(x, y) === T.air && c.solid(x, y + 1)) { const r = c.rng(); c.set(x, y, r < 0.04 ? T.c_gold : r < 0.3 ? T.c_red : r < 0.55 ? T.c_blue : r < 0.8 ? T.c_green : T.c_purple); } }
     // a pond in the Green Deep (the Tonguatjis like it)
-    { const L = GY + 1; for (let x = 600; x < 628; x++) { const d = Math.round(Math.sin((x - 600) / 28 * Math.PI) * 6) + 1; for (let y = GY - 12; y < L; y++) { c.set(x, y, T.air); c.setb(x, y, 0); } for (let y = L; y < L + d; y++) c.set(x, y, T.water); c.set(x, L + d, T.sand); c.surf[x] = L; } }
+    { const L = GY + 1; for (let x = 2140; x < 2168; x++) { const d = Math.round(Math.sin((x - 2140) / 28 * Math.PI) * 6) + 1; for (let y = GY - 12; y < L; y++) { c.set(x, y, T.air); c.setb(x, y, 0); } for (let y = L; y < L + d; y++) c.set(x, y, T.water); c.set(x, L + d, T.sand); c.surf[x] = L; } }
 
     const H2 = { c, T, WL };
     buildCapstead(H2, seed);
     buildKeep(H2, seed);
     buildGrove(H2, seed);
     buildCamp(H2, seed);
+    buildWilds(H2, seed);
 
     // the King's Clearing
     RW.surface.flatten(c, ARENA.x0, ARENA.x1, GY, 'jgrass');
@@ -2670,8 +2686,8 @@ window.RW = window.RW || {};
     c.meta.arena = def.boss.arena; c.meta.riftAt = { x: Math.round((ARENA.x0 + ARENA.x1) / 2), y: GY - 3 };
 
     // chests everywhere: on the surface, and down in the caves (a few hold a gold crystal)
-    [252, 512, 548, 590, 646, 676, 806, 846, 892, 936, 966].forEach((x) => { const s = c.surfAt(x, 40); if (s < SEA && (c.get(x, s - 1) === T.air || RW.TILES[c.get(x, s - 1)].decor)) c.set(x, s - 1, T.woodchest); });
-    for (let n = 0, k = 0; n < 26 && k < 4000; k++) {
+    [262, 410, 470, 640, 700, 930, 1010, 1080, 1240, 1380, 1460, 1800, 2010, 2100, 2200, 2300, 2380, 2600, 2700, 2820, 2900, 2980, 3060].forEach((x) => { const s = c.surfAt(x, 40); if (s < SEA && (c.get(x, s - 1) === T.air || RW.TILES[c.get(x, s - 1)].decor)) c.set(x, s - 1, T.woodchest); });
+    for (let n = 0, k = 0; n < 72 && k < 12000; k++) {
       const x = 8 + Math.floor(c.rng() * (W - 16)), y = c.surf[x] + 16 + Math.floor(c.rng() * (H - c.surf[x] - 30));
       if (inR(CAMPR, x, y) || inR(KEEPR, x, y)) continue;
       if (c.get(x, y) !== T.air || !c.solid(x, y + 1) || c.get(x, y - 1) !== T.air || c.get(x, y + 1) === T.bedrock) continue;
@@ -2799,12 +2815,12 @@ window.RW = window.RW || {};
     c.set(P - 16, GY - 2, T.tablet); c.meta.carvings[(P - 16) + ',' + (GY - 2)] = 0; c.set(P - 16, GY - 1, T.stone);
     c.set(P + 14, GY - 2, T.tablet); c.meta.carvings[(P + 14) + ',' + (GY - 2)] = 12; c.set(P + 14, GY - 1, T.stone);
     // west of the west tree: Old Ruut's Punk shed and pen
-    const shed = cottage(c, 272, GY, 9, { doors: 'right' });
-    for (let x = shed.x1 + 1; x <= 298; x++) if (x % 3 === 0) { c.set(x, GY - 1, T.palisade); } c.set(298, GY - 2, T.palisade);
+    const shed = cottage(c, VIL.x0 + 6, GY, 9, { doors: 'right' });
+    for (let x = shed.x1 + 1; x <= VIL.x0 + 32; x++) if (x % 3 === 0) { c.set(x, GY - 1, T.palisade); } c.set(VIL.x0 + 32, GY - 2, T.palisade);
     c.set(shed.x0 + 2, GY - 1, T.woodchest);
     // east of the east tree: Orrin's stone cottage (Keilia built) and a little house
-    const ork = cottage(c, 448, GY, 12, { wall: 'keepbrick', roof: 'planks', bg: 'keep' }); c.set(ork.x0 + 3, GY - 1, T.workbench); c.set(ork.x0 + 8, GY - 1, T.woodchest); c.set(ork.x1 - 1, GY - 7, T.keepbrick); c.set(ork.x1 - 1, GY - 8, T.keepbrick);
-    const hut = cottage(c, 470, GY, 9, {}); c.set(hut.x0 + 4, GY - 1, T.woodchest);
+    const ork = cottage(c, VIL.x0 + 182, GY, 12, { wall: 'keepbrick', roof: 'planks', bg: 'keep' }); c.set(ork.x0 + 3, GY - 1, T.workbench); c.set(ork.x0 + 8, GY - 1, T.woodchest); c.set(ork.x1 - 1, GY - 7, T.keepbrick); c.set(ork.x1 - 1, GY - 8, T.keepbrick);
+    const hut = cottage(c, VIL.x0 + 204, GY, 9, {}); c.set(hut.x0 + 4, GY - 1, T.woodchest);
     // townsfolk
     c.meta.npcs.capwell = { x: A.ix0 + 12, y: A.fy(1) - 1 };
     c.meta.npcs.cubert = { x: P - 8, y: GY - 1 };
@@ -2958,7 +2974,7 @@ window.RW = window.RW || {};
     dome(GROVE.x0 + 9, 8); dome(GROVE.x1 - 9, 8);
     c.set(GROVE.x0 + 7, gy - 1, T.grovechest); c.set(GROVE.x1 - 11, gy - 1, T.grovechest);
     // the library tree: living wood, three floors of shelves and memory cores, ladders and trapdoors
-    const L = { x0: 734, x1: 747 }, top = gy - 36;
+    const L = { x0: GROVE.x0 + 36, x1: GROVE.x0 + 49 }, top = gy - 36;
     c.disc((L.x0 + L.x1) / 2, top - 6, 13, T.leaves, (t) => t === T.air || t === T.vines);
     for (let y = top; y < gy; y++) for (let x = L.x0 - (gy - y < 3 ? 2 : 0); x <= L.x1 + (gy - y < 3 ? 2 : 0); x++) { c.set(x, y, T.livingwood); c.setb(x, y, WL.living); }
     fill(c, L.x0 + 2, top + 2, L.x1 - 2, gy - 1, T.air, WL.living);
@@ -2975,6 +2991,43 @@ window.RW = window.RW || {};
     c.set(GROVE.x0 + 28, gy - 1, T.campfire);
     c.meta.npcs.lethra = { x: GROVE.x0 + 9, y: gy - 1 };
     c.meta.npcs.phorus = { x: L.x0 + 7, y: gy - 1 };
+  }
+
+  // ---------------------------------------------------------------- the long road west
+  // A traveller's hut in the Broken Hills, an old rope bridge over the Gorge (with a gap: jump it, or swim the river
+  // and climb out), and the ruins of a shrine in the Megla Wood. Carvings on the way tell you how far you've come.
+  function buildWilds(H2, seed) {
+    const { c, T, WL } = H2; const S = RW.surface; const tab = (x, y, i) => { c.set(x, y, T.tablet); c.meta.carvings[x + ',' + y] = i; };
+    // a ladder down any drop of more than a couple of blocks beside a levelled spot, so every hero can get back up
+    const edgeLadders = (x0, x1, y) => [x0 - 1, x1 + 1].forEach((x) => { const g = c.surfAt(x, y); if (g > y + 2) for (let yy = y; yy < g; yy++) c.set(x, yy, T.ladder); });
+    // the traveller's hut
+    const hy = c.surfAt(HUT, 40); S.flatten(c, HUT - 8, HUT + 10, hy, 'grass');
+    const hut = cottage(c, HUT - 4, hy, 9, {}); c.set(hut.x0 + 2, hy - 1, T.woodchest); c.set(hut.x0 + 6, hy - 1, T.campfire); edgeLadders(HUT - 8, HUT + 10, hy);
+    tab(HUT + 8, hy - 1, 13);
+    // the Gorge bridge: posts on each rim, planks between, a broken gap in the middle
+    const yl = c.surfAt(GORGE.x0 - 2, 40), yr = c.surfAt(GORGE.x1 + 2, 40), by = Math.min(yl, yr) - 1;
+    // a level landing on each rim, filled down to the ground so it never floats
+    const landing = (x) => { const g = c.surfAt(x, 40); S.flatten(c, x, x, by + 1, 'grass'); for (let y = by + 2; y < g + 2; y++) if (!c.solid(x, y)) c.set(x, y, T.dirt); };
+    for (let x = GORGE.x0 - 6; x <= GORGE.x0; x++) landing(x);
+    for (let x = GORGE.x1; x <= GORGE.x1 + 10; x++) landing(x);
+    edgeLadders(GORGE.x0 - 6, GORGE.x1 + 10, by + 1);
+    const mid = (GORGE.x0 + GORGE.x1) >> 1;
+    for (let x = GORGE.x0 + 1; x < GORGE.x1; x++) { if (Math.abs(x - mid) <= 2 || Math.abs(x - mid - 21) <= 1) continue; c.set(x, by + 1, T.ropebridge); for (let y = by - 2; y <= by; y++) if (c.solid(x, y)) c.set(x, y, T.air); }
+    for (let y = by - 2; y <= by; y++) { c.set(GORGE.x0 - 1, y, T.palisade); c.set(GORGE.x1 + 1, y, T.palisade); }
+    tab(GORGE.x0 - 4, by, 14);
+    // ladders up the far wall for anyone who fell in
+    [GORGE.x0 + 9, GORGE.x1 - 9].forEach((lx) => { let y = c.surfAt(lx, by + 2); for (let yy = by + 2; yy < y; yy++) if (!c.solid(lx, yy)) c.set(lx, yy, T.rope); });
+    // the ruined shrine in the Megla Wood
+    const ry = c.surfAt(RUINS, 40); S.flatten(c, RUINS - 14, RUINS + 14, ry, 'grass');
+    for (let x = RUINS - 12; x <= RUINS + 12; x++) { c.set(x, ry, T.mossstone); if (RW.hash2(x, 3, seed) < 0.75) c.setb(x, ry - 1, WL.brick); }
+    [-12, -6, 6, 12].forEach((d, i) => { const h = [6, 10, 10, 4][i]; for (let y = ry - h; y < ry; y++) c.set(RUINS + d, y, T.mossstone); });
+    for (let x = RUINS - 6; x <= RUINS + 6; x++) if (x - RUINS !== 3 && x - RUINS !== -2) c.set(x, ry - 11, T.mossstone);
+    for (let x = RUINS - 5; x <= RUINS + 5; x++) for (let y = ry - 10; y < ry; y++) c.setb(x, y, WL.brick);
+    edgeLadders(RUINS - 14, RUINS + 14, ry);
+    c.set(RUINS - 2, ry - 1, T.woodchest); c.meta.special[(RUINS - 2) + ',' + (ry - 1)] = 'gold'; c.set(RUINS + 2, ry - 1, T.memorystone); c.meta.carvings[(RUINS + 2) + ',' + (ry - 1)] = 15;
+    c.set(RUINS + 9, ry - 1, T.woodchest);
+    // waystones along the road east of Capstead too
+    tab(2040, c.surfAt(2040, 40) - 1, 16);
   }
 
   // ---------------------------------------------------------------- the Duskareth camp, in the root caves
