@@ -169,7 +169,7 @@ export function createRoad(ctx) {
   let HT = null;
   const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
   const inWell = (d, a) => { const k = angDiff(a, d.well[0]), len = d.well[1] - d.well[0]; return k >= 0 && k <= len; };
-  // the balconies are partial decks, from a0 round to a1
+  // each deck runs from a0 round to a1 (right round the trunk)
   const inArc = (d, a, pad = 0) => (((a - d.a0 + pad) % TAU) + TAU) % TAU <= d.a1 - d.a0 + pad * 2;
   function treeGround(x, z, y) {
     if (!HT) return -1e9;
@@ -177,7 +177,7 @@ export function createRoad(ctx) {
     if (r > HT.reach) return -1e9;
     const a = Math.atan2(dz, dx), ly = y - HT.g; let best = -1e9;
     for (const d of HT.decks) {
-      if (d.y > ly + STEP || r < d.r0 - 0.5 || r > d.ro + 0.2 || !inArc(d, a)) continue;
+      if (d.y > ly + STEP || r < (d.rin ?? d.r0) - 0.5 || r > d.ro + 0.2 || !inArc(d, a)) continue;
       if (r < d.r0 + 3.4 && inWell(d, a)) continue;          // the stairwell
       best = Math.max(best, d.y);
     }
@@ -199,7 +199,7 @@ export function createRoad(ctx) {
     let to = null;
     if (r < rin) to = rin;
     else if (ly > 2.2) {
-      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5 && inArc(d, a));   // (off the end of a balcony, the stair's rail)
+      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5 && inArc(d, a));   // (off the decks, the stair's rail)
       const rmax = d ? d.ro - 0.5 : HT.rAt(ly, a) + 3.2;
       if (r > rmax) to = rmax;
     }
@@ -210,7 +210,7 @@ export function createRoad(ctx) {
     const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz), ly = y - HT.g;
     if (r > HT.reach || ly < 0 || ly > HT.H * 0.9) return false;
     if (r < HT.rAt(ly, Math.atan2(dz, dx))) return true;
-    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > d.r0 && r < d.ro && inArc(d, Math.atan2(dz, dx))) return true;
+    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > (d.rin ?? d.r0) && r < d.ro && inArc(d, Math.atan2(dz, dx)) && !(r < d.r0 + 3.4 && inWell(d, Math.atan2(dz, dx)))) return true;
     return false;
   }
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
@@ -863,7 +863,7 @@ export function createRoad(ctx) {
     sfx.duat(); shake = 0.8; particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
     ctx.whiteFlash && ctx.whiteFlash();
     // ...onto the top deck of the home tree, the whole city between him and the gate
-    const top = HT.decks.length - 1, to = deckSpot(top, toCore, 8.5), dir = V3(Math.cos(toCore), 0, Math.sin(toCore));
+    const top = HT.decks.length - 1, to = deckSpot(top, toCore, 10), dir = V3(Math.cos(toCore), 0, Math.sin(toCore));
     place(P, to.x, to.z, Math.atan2(dir.x, dir.z)); P.vel.set(0, 0, 0); CAM.yaw = Math.atan2(-dir.x, -dir.z); CAM.pitch = 0.18;
     particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
     // the cart's at the gate, and Buhkon with it
@@ -874,7 +874,7 @@ export function createRoad(ctx) {
   /* a place on a deck of the home tree: round the deck by angle a, `off` out from the bark (clear of the stairwell) */
   function deckSpot(i, a, off = 8.5) {
     const d = HT.decks[i];
-    if (!inArc(d, a, -0.2)) { const m = (d.a0 + d.a1) / 2; a = angDiff(a, m) < 0 ? d.a0 + 0.25 : d.a1 - 0.25; }   // onto the balcony, wherever round it you asked
+    if (!inArc(d, a, -0.2)) { const m = (d.a0 + d.a1) / 2; a = angDiff(a, m) < 0 ? d.a0 + 0.25 : d.a1 - 0.25; }   // onto the deck, wherever round it you asked
     if (inWell(d, a) || Math.abs(angDiff(a, d.well[0])) < 0.4) a = d.well[1] + 0.6;
     const r = d.r0 + Math.min(off, d.ro - d.r0 - 1.2); return V3(HT.x + Math.cos(a) * r, HT.g + d.y, HT.z + Math.sin(a) * r);
   }
