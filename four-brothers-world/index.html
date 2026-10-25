@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="The 4 Brothers Worlds: a 2D pixel open-world platformer. Four worlds, four heroes, one Duat. Play solo or together with a room code.">
+<meta name="description" content="4 Brothers World: a 2D pixel open-world platformer. Four worlds, four heroes, one Duat. Play solo or together with a room code.">
 </head>
 <body>
-<title>The 4 Brothers Worlds</title>
+<title>4 Brothers World</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -206,7 +206,18 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 .worlds b { display: block; margin-top: 6px; }
 .worlds span { font-size: 12px; color: var(--muted); }
 .keys { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
-.keys kbd { font-family: var(--small); font-size: 10px; background: #0f0d14; border: 2px solid var(--edge); padding: 2px 6px; white-space: nowrap; }
+.keys kbd { font-family: var(--small); font-size: 10px; background: #0f0d14; border: 2px solid var(--edge); padding: 2px 6px; white-space: nowrap; align-self: start; }
+/* settings */
+.opt-h { margin: 14px 0 6px; color: var(--crystal); }
+.opt-h:first-child { margin-top: 0; }
+.opt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; padding: 4px 0; }
+.opt-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--crystal); }
+.opt-p { font-size: 13px; color: var(--muted); margin: 0 0 6px; line-height: 1.45; max-width: 62ch; }
+.binds { display: grid; grid-template-columns: minmax(0, 1fr) 112px 112px; gap: 4px 6px; align-items: center; font-size: 13px; }
+.binds .bind { width: 100%; font-family: var(--small); font-size: 10px; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.binds .bind.empty { color: var(--muted); }
+.binds .bind.wait { border-color: var(--ember); color: var(--ember); }
+@media (max-width: 520px) { .binds { grid-template-columns: minmax(0, 1fr) 84px 84px; } }
 @media (prefers-reduced-motion: reduce) { #feed div { animation: none; } }
 
 @media (max-width: 1100px) {
@@ -230,7 +241,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 @media (max-width: 700px) { #topright { max-width: 46vw; } #bars { width: 180px; } }
 </style>
 
-<canvas id="game" aria-label="The 4 Brothers Worlds game view"></canvas>
+<canvas id="game" aria-label="4 Brothers World game view"></canvas>
 <div id="souldrain"></div>
 <div id="ui">
   <div id="hud" class="hidden-ui">
@@ -255,6 +266,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
       <button class="btn small" id="b-map" type="button">Map (M)</button>
       <button class="btn small" id="b-guide" type="button">Field Guide (G)</button>
       <button class="btn small" id="b-help" type="button">Controls (H)</button>
+      <button class="btn small" id="b-opts" type="button">Settings (O)</button>
     </div>
     <div id="chatlog"></div>
     <input id="chatin" type="text" maxlength="160" placeholder="Say something, Enter to send" class="hidden-ui" aria-label="Chat message">
@@ -265,13 +277,14 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
   <div id="death" class="hidden-ui"><div><b>You crumbled</b><span>Waking up in your cave… some of your things are lying where you fell.</span></div></div>
   <div id="title">
     <div class="wrap">
-      <div id="logo"><small>THE 4 BROTHERS</small><br><span>WORLDS</span></div>
+      <div id="logo"><small>4 BROTHERS</small><br><span>WORLD</span></div>
       <div class="sub">Four worlds joined by the Duat. Play as a fuzzy, a rock, an acorn or a ghost, beat your home world, then go into the Duat together.</div>
       <div class="row">
         <button class="btn primary" id="b-play" type="button">Play</button>
         <button class="btn" id="b-new" type="button">New Rock</button>
         <button class="btn" id="b-guide2" type="button">Field Guide</button>
         <button class="btn" id="b-help2" type="button">Controls</button>
+        <button class="btn" id="b-opts2" type="button">Settings</button>
         <button class="btn b-full" type="button">Full screen</button>
       </div>
       <div id="mp" class="stone" hidden>
@@ -280,7 +293,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div id="mp-msg">One player hosts and keeps the world. Everyone else joins with the room code.</div>
       </div>
       <div id="netstatus" class="stone">Connecting…</div>
-      <div id="version">v1.2</div>
+      <div id="version">v1.2.1</div>
     </div>
   </div>
   <div id="creator" class="hidden-ui">
@@ -334,6 +347,8 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     <div class="worlds" id="worlds"></div>
     <p style="color:var(--muted);font-size:14px;max-width:62ch">Each boss that falls opens the way to the next world: Fuzzy World, then Acorn World, then Rock World, then the Ghost World. When a fuzzy, a rock, an acorn and a ghost have each beaten their home world, the Duat opens for everyone. Any Duat Altar takes you to worlds you have opened.</p>
     <button class="btn" data-close type="button">Step back</button></div></div>
+  <div id="opts" class="modal hidden-ui"><div class="panel stone" style="width:min(620px,100%)"><div class="phead"><h3>Settings</h3><button class="btn small" data-close type="button">Close (Esc)</button></div><div id="optbody"></div></div></div>
+  <input type="file" id="importfile" accept=".json,application/json" hidden>
   <div id="tooltip" class="hidden-ui"></div>
   <canvas id="held" class="hidden-ui" width="16" height="16"></canvas>
 </div>
@@ -344,7 +359,9 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 // Everything lives on the single global `RW` so files can be added in any session.
 window.RW = window.RW || {};
 (function (RW) {
-  RW.VERSION = '1.2'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md
+  RW.VERSION = '1.2.1'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
+  // Updates must keep players' progress: never rename the rw_ save keys, and only ever add tiles at the END of tiles.js
+  // (world edits are saved by tile number). New save fields need a default when they're missing (see G.load).
   RW.TILE = 16;
 
   // ---------- math ----------
@@ -443,22 +460,69 @@ window.RW = window.RW || {};
   };
 
   // ---------- input ----------
+  // Every control is an action with up to two keys (or mouse buttons). Players can change any of them in
+  // Settings; they are saved in this browser. Keys are stored by their place on the keyboard (e.code),
+  // mouse buttons as 'Mouse0' (left), 'Mouse1' (middle) and 'Mouse2' (right).
+  RW.ACTIONS = [
+    ['left', 'Walk left', ['KeyA', 'ArrowLeft']],
+    ['right', 'Walk right', ['KeyD', 'ArrowRight']],
+    ['up', 'Jump · climb up · swim up', ['KeyW', 'ArrowUp']],
+    ['jump', 'Jump', ['Space']],
+    ['down', 'Drop through walkways · climb down · dive', ['KeyS', 'ArrowDown']],
+    ['sprint', 'Run (uses stamina)', ['ShiftLeft', 'ShiftRight']],
+    ['attack', 'Swing, shoot, mine, chop, place blocks', ['Mouse0']],
+    ['use', 'Eat or consume the held item, otherwise cast', ['Mouse2']],
+    ['torch', 'Torch in your other hand: light it or put it away', ['KeyT']],
+    ['cast', 'Cast spell', ['KeyF']],
+    ['spell', 'Switch spell', ['KeyQ']],
+    ['interact', 'Talk, read carvings, use rifts and altars', ['KeyR']],
+    ['bag', 'Bag and crafting', ['KeyE', 'Tab']],
+    ['map', 'Map', ['KeyM']],
+    ['guide', 'Field Guide', ['KeyG']],
+    ['help', 'Controls', ['KeyH']],
+    ['settings', 'Settings', ['KeyO']],
+    ['chat', 'Chat with other players', ['Enter']],
+  ];
+  for (let i = 1; i <= 10; i++) RW.ACTIONS.push(['slot' + i, 'Hotbar slot ' + (i % 10), ['Digit' + (i % 10)]]);
+  RW.defaultBinds = () => { const b = {}; RW.ACTIONS.forEach(([id, , keys]) => (b[id] = keys.slice())); return b; };
+  RW.binds = Object.assign(RW.defaultBinds(), RW.store.get('binds', {}));
+  RW.saveBinds = () => RW.store.set('binds', RW.binds);
+  RW.settings = Object.assign({ invertWheel: false }, RW.store.get('settings', {}));
+  RW.saveSettings = () => RW.store.set('settings', { invertWheel: !!RW.settings.invertWheel });
+  // a readable name for a key code
+  RW.keyName = function (c) {
+    if (!c) return '—';
+    const fixed = { Space: 'Space', ShiftLeft: 'Left Shift', ShiftRight: 'Right Shift', ControlLeft: 'Left Ctrl', ControlRight: 'Right Ctrl', AltLeft: 'Left Alt', AltRight: 'Right Alt', MetaLeft: 'Left Meta', MetaRight: 'Right Meta', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Enter: 'Enter', Tab: 'Tab', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', CapsLock: 'Caps Lock', Mouse0: 'Left mouse', Mouse1: 'Middle mouse', Mouse2: 'Right mouse', Mouse3: 'Mouse back', Mouse4: 'Mouse forward' };
+    if (fixed[c]) return fixed[c];
+    if (/^Key[A-Z]$/.test(c)) return c.slice(3);
+    if (/^Digit\d$/.test(c)) return c.slice(5);
+    if (/^Numpad/.test(c)) return 'Num ' + c.slice(6);
+    return c;
+  };
   RW.input = {
-    keys: {}, pressed: {}, mouse: { x: 0, y: 0, l: false, r: false, lp: false, rp: false, wheel: 0 },
+    keys: {}, pressed: {}, codes: {}, codesHit: {}, capturing: false, mouse: { x: 0, y: 0, l: false, r: false, lp: false, rp: false, wheel: 0 },
     down(k) { return !!this.keys[k]; },
     hit(k) { return !!this.pressed[k]; },
-    endFrame() { this.pressed = {}; this.mouse.lp = false; this.mouse.rp = false; this.mouse.wheel = 0; },
+    // actions: is any key bound to it held / pressed this frame?
+    act(id) { const b = RW.binds[id]; return !!b && b.some((c) => this.codes[c]); },
+    actHit(id) { const b = RW.binds[id]; return !!b && b.some((c) => this.codesHit[c]); },
+    is(code, id) { const b = RW.binds[id]; return !!b && b.includes(code); },
+    press(code) { if (!this.codes[code]) this.codesHit[code] = true; this.codes[code] = true; },
+    release(code) { this.codes[code] = false; },
+    endFrame() { this.pressed = {}; this.codesHit = {}; this.mouse.lp = false; this.mouse.rp = false; this.mouse.wheel = 0; },
   };
-  RW.typing = () => { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'); };
+  // only a box you type text into holds the keys (not a checkbox or a slider)
+  RW.typing = () => { const a = document.activeElement; return !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !['checkbox', 'range', 'button', 'file', 'radio'].includes(a.type))); };
   window.addEventListener('keydown', (e) => {
-    if (RW.typing()) return;
+    if (RW.typing() || RW.input.capturing) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (!RW.input.keys[k]) RW.input.pressed[k] = true;
     RW.input.keys[k] = true;
-    if ([' ', 'ArrowUp', 'ArrowDown', 'Tab'].includes(e.key)) e.preventDefault();
+    RW.input.press(e.code);
+    if ([' ', 'ArrowUp', 'ArrowDown', 'Tab'].includes(e.key) || (RW.game && RW.game.playing && Object.values(RW.binds).some((b) => b.includes(e.code)) && !e.ctrlKey && !e.metaKey && e.code !== 'F11')) e.preventDefault();
   });
-  window.addEventListener('keyup', (e) => { const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; RW.input.keys[k] = false; });
-  window.addEventListener('blur', () => { RW.input.keys = {}; RW.input.mouse.l = RW.input.mouse.r = false; });
+  window.addEventListener('keyup', (e) => { const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; RW.input.keys[k] = false; RW.input.release(e.code); });
+  window.addEventListener('blur', () => { RW.input.keys = {}; RW.input.codes = {}; RW.input.mouse.l = RW.input.mouse.r = false; });
 })(window.RW);
 
 </script>
@@ -630,6 +694,12 @@ window.RW = window.RW || {};
     { id: 'forge', name: 'Forge', kind: 'place', place: 'forge', icon: { s: 'forge', a: '#ff9a3a', b: '#4d4a52' }, desc: 'Smelts ore into bars and forges heavy weapons.' },
   ]);
 
+  // ---------------- light ----------------
+  // kind 'torch': held in the hand like anything else, or in your other hand with T while you hold something else
+  R.items([
+    { id: 'torch', name: 'Torch', kind: 'torch', stack: 99, icon: { s: 'torch', a: '#ffb347', b: '#7a5634' }, desc: 'Lights the way. Press T to hold one in your other hand while you use anything else.' },
+  ]);
+
   // ---------------- food & farming (plant: tile it grows into on farm soil) ----------------
   R.items([
     { id: 'glow_mushroom', name: 'Glow Mushroom', kind: 'food', heal: 12, plant: 'crop_mush', icon: { s: 'mushroom', a: '#6fe8e0', b: '#d8f0e8' }, desc: 'Eat to heal a little. Plant on farm soil.' },
@@ -642,11 +712,11 @@ window.RW = window.RW || {};
   // ---------------- crystals (eat to grow stronger) ----------------
   // stat: which player stat it raises. max: how many of that color count.
   R.items([
-    { id: 'crystal_red', name: 'Red Crystal', kind: 'crystal', stat: 'str', max: 20, icon: { s: 'crystal', a: '#e0525a', b: '#ff9aa0' }, desc: 'Consume: +5% damage.' },
-    { id: 'crystal_blue', name: 'Blue Crystal', kind: 'crystal', stat: 'hp', max: 20, icon: { s: 'crystal', a: '#4fa8f0', b: '#a8d8ff' }, desc: 'Consume: +10 max health.' },
-    { id: 'crystal_green', name: 'Green Crystal', kind: 'crystal', stat: 'spd', max: 10, icon: { s: 'crystal', a: '#5fd98a', b: '#b0f0c8' }, desc: 'Consume: +3% speed.' },
-    { id: 'crystal_purple', name: 'Purple Crystal', kind: 'crystal', stat: 'mine', max: 15, icon: { s: 'crystal', a: '#a86ef0', b: '#d8b8ff' }, desc: 'Consume: +8% mining speed.' },
-    { id: 'crystal_gold', name: 'Gold Crystal', kind: 'crystal', stat: 'size', max: 8, icon: { s: 'crystal', a: '#f2c94c', b: '#fff0a8' }, desc: 'Rare. Consume: your rock body grows bigger and tougher.' },
+    { id: 'crystal_red', name: 'Red Crystal', kind: 'crystal', stat: 'str', max: 20, icon: { s: 'crystal', a: '#e0525a', b: '#ff9aa0' }, desc: 'Consume: +5% damage and +2 max stamina.' },
+    { id: 'crystal_blue', name: 'Blue Crystal', kind: 'crystal', stat: 'hp', max: 20, icon: { s: 'crystal', a: '#4fa8f0', b: '#a8d8ff' }, desc: 'Consume: +10 max health and +2 max stamina.' },
+    { id: 'crystal_green', name: 'Green Crystal', kind: 'crystal', stat: 'spd', max: 10, icon: { s: 'crystal', a: '#5fd98a', b: '#b0f0c8' }, desc: 'Consume: +3% speed and +2 max stamina.' },
+    { id: 'crystal_purple', name: 'Purple Crystal', kind: 'crystal', stat: 'mine', max: 15, icon: { s: 'crystal', a: '#a86ef0', b: '#d8b8ff' }, desc: 'Consume: +8% mining speed and +2 max stamina.' },
+    { id: 'crystal_gold', name: 'Gold Crystal', kind: 'crystal', stat: 'size', max: 8, icon: { s: 'crystal', a: '#f2c94c', b: '#fff0a8' }, desc: 'Rare. Consume: you grow bigger and tougher, with +5 max stamina.' },
     { id: 'crystal_fire', name: 'Fire Crystal', kind: 'crystal', spell: 'fire', icon: { s: 'bigcrystal', a: '#ff7a2e', b: '#ffd08a' }, desc: 'Consume to learn Fire magic.' },
     { id: 'crystal_poison', name: 'Poison Crystal', kind: 'crystal', spell: 'poison', icon: { s: 'bigcrystal', a: '#8be04a', b: '#d8ff9a' }, desc: 'Consume to learn Poison magic.' },
     { id: 'crystal_lightning', name: 'Lightning Crystal', kind: 'crystal', spell: 'lightning', icon: { s: 'bigcrystal', a: '#7fe3ff', b: '#ffffff' }, desc: 'Consume to learn Lightning magic.' },
@@ -800,6 +870,9 @@ window.RW = window.RW || {};
     { out: 'wood_platform', n: 4, in: { wood: 1 } },
     { out: 'wood_sword', in: { wood: 7 } },
     { out: 'campfire', in: { wood: 5, flint: 1 } },
+    { out: 'torch', n: 4, in: { wood: 1, flint: 1 } },
+    { out: 'torch', n: 4, in: { ship_plank: 1, flint: 1 } },
+    { out: 'torch', n: 2, in: { cave_moss: 2, flint: 1 } },
     { out: 'wood_spear', in: { wood: 8, flint: 1 }, at: 'knap' },
     { out: 'slingshot', in: { wood: 6, slime_gel: 4 }, at: 'knap' },
     { out: 'wood_bow', in: { wood: 10, bat_wing: 3 }, at: 'knap' },
@@ -1219,6 +1292,14 @@ window.RW = window.RW || {};
     spawn: { worlds: ['fuzzy', 'acorn'], medium: 'surface', zones: ['forest', 'jungle', 'canopy'], weight: 2 },
     drops: [['living_vine', 0.9, 1, 3], ['wood', 1, 3, 6]],
     blurb: 'A tree whose vines snatch you and drag you in close.' });
+  // Stryx (from the Mbaru Tatu): a wide, flat body of stepped stone armour, rooted where it grew, vines draped
+  // over it. Eyeless, no horns. Chill, until someone stands on it; then its vines come up and lash.
+  // platform: you can stand on its back. lashR / lashY: how far its vines reach, and from how high.
+  S({ id: 'stryx', type: 'monsters', name: 'Stryx', world: 'fuzzy', role: 'enemy', status: 'active', art: { draw: 'stryx' },
+    w: 40, h: 18, hp: 150, dmg: 12, speed: 0, behavior: 'stryx', platform: true, lashR: 84, lashY: 3,
+    spawn: { worlds: ['fuzzy', 'acorn'], medium: 'surface', zones: ['forest', 'mountains', 'jungle', 'canopy'], weight: 3 },
+    drops: [['stone', 1, 3, 6], ['living_vine', 0.6, 1, 2], ['crystal_green', 0.08, 1, 1]],
+    blurb: 'A wide, flat slab of stepped stone, rooted where it grew, with vines draped over its back. Pretty chill. Stand on it, or hit it, and the vines come up lashing until it calms down.' });
   S({ id: 'giant_vine_tree', type: 'monsters', name: 'Gnarlroot, the Giant Vine Tree', world: 'fuzzy', role: 'boss', status: 'active', art: { draw: 'gianttree' },
     w: 110, h: 150, hp: 1400, dmg: 16, speed: 0, behavior: 'gnarlroot',
     drops: [['heartwood', 1, 6, 9], ['gnarl_staff', 1, 1, 1], ['crystal_gold', 1, 1, 1], ['living_vine', 1, 8, 12]],
@@ -3173,6 +3254,50 @@ window.RW = window.RW || {};
     }
     return frames;
   };
+  // Stryx: three low stepped tiers of stone armour, a mossy flat top, roots gripping the ground, glowing
+  // mineral seams, vines draped over the sides. Frames 0-1 calm (vines stir), 2-3 cross (vines up and lashing).
+  D.stryx = function () {
+    const frames = []; const W2 = 48, H2 = 30;
+    const stone = ['#8a7a62', '#6a5c4a', '#a8987c', '#4e4436'], moss = ['#7d8a4a', '#5f6e36', '#9aa860'], vine = ['#3d6a32', '#2a4a22', '#5a8a44'], glow = '#b8ff7a';
+    for (let f = 0; f < 4; f++) {
+      const c = mk(W2, H2), g = c.ctx; const angry = f >= 2; const base = H2 - 1;
+      // roots running out over the ground
+      [[-1, 3], [1, 4], [-1, 9], [1, 10]].forEach(([dir, k]) => { const x0 = dir < 0 ? 4 + k % 3 : W2 - 5 - k % 3; line(g, x0, base - 1, x0 + dir * 4, base, '#4a3a28'); px(g, x0 + dir * 5, base, '#4a3a28'); });
+      // three stepped tiers (wide, flat, slightly lumpy)
+      const tiers = [[3, W2 - 4, base - 6, 7], [7, W2 - 8, base - 12, 6], [11, W2 - 12, base - 17, 5]];
+      tiers.forEach(([x0, x1, y0, h], i) => {
+        for (let x = x0; x <= x1; x++) {
+          const bump = RW.hash2(x, i, 41) > 0.8 ? 1 : 0; const top = y0 - bump;
+          for (let y = top; y < y0 + h; y++) {
+            let col = stone[0];
+            if (y === top) col = stone[2]; else if (y >= y0 + h - 2) col = stone[1];
+            if (x === x0 || x === x1) col = stone[3];
+            if (RW.hash2(x, y, 42 + i) > 0.9 && y > top) col = stone[1];
+            px(g, x, y, col);
+          }
+        }
+        // cracks and a glowing seam along each tier's flank
+        for (let k = 0; k < 3; k++) { const cx = x0 + 3 + Math.floor(RW.hash2(k, i, 43) * (x1 - x0 - 6)); line(g, cx, y0 + 1, cx + 1, y0 + h - 2, stone[3]); }
+        for (let k = 0; k < 4; k++) { const sx = x0 + 2 + Math.floor(RW.hash2(k, i, 44) * (x1 - x0 - 4)); px(g, sx, y0 + 2 + (k % 2), (f + k) % 3 === 0 || angry ? glow : '#7ac850'); }
+      });
+      // a mossy flat top (a mesa) with a tuft of leaves
+      const ty = base - 18; rect(g, 12, ty, W2 - 24, 2, moss[0]); for (let x = 12; x < W2 - 12; x++) if (RW.hash2(x, 5, 45) > 0.6) px(g, x, ty - 1, moss[2]);
+      for (let x = 13; x < W2 - 13; x += 3) px(g, x, ty + 1, moss[1]);
+      [[22, -3], [24, -4], [26, -3], [25, -2]].forEach(([x, dy]) => px(g, x, ty + dy, vine[2]));
+      // vines: draped over the tiers while it's calm, reared up and swinging when it's cross
+      const anchors = [15, 20, 28, 33];
+      anchors.forEach((ax, k) => {
+        const side = ax < W2 / 2 ? -1 : 1; const ph = f * 1.7 + k * 1.3;
+        let pts = [];
+        if (!angry) { const len = 9 + (k % 2) * 4; for (let j = 0; j <= len; j++) { const t = j / len; pts.push([ax + side * (t * (8 + (k % 2) * 6) + Math.sin(ph + t * 4) * 0.7), ty + t * (10 + (k % 2) * 5)]); } }
+        else { const up = (f === 2) === (k % 2 === 0); for (let j = 0; j <= 9; j++) { const t = j / 9; pts.push([ax + side * (t * (up ? 4 : 12)) + Math.sin(ph + t * 5) * 1.5, ty - t * (up ? 12 : 7) + (up ? 0 : t * t * 4)]); } }
+        pts.forEach(([x, y], j) => { px(g, x, y, j % 3 ? vine[0] : vine[1]); px(g, x, y - 1, vine[angry ? 0 : 2]); if (j > 0 && j % 4 === 2) { px(g, x + side, y - 1, vine[2]); px(g, x + side * 2, y - 2, vine[0]); } });
+        const [tx, tyy] = pts[pts.length - 1]; px(g, tx, tyy, angry ? glow : vine[2]);
+      });
+      A.outline(c, '#1a140e'); frames.push(c);
+    }
+    return frames;
+  };
   D.gianttree = function () {
     const frames = [];
     for (let f = 0; f < 2; f++) {
@@ -3251,29 +3376,84 @@ window.RW = window.RW || {};
   // ======================= DECOR =======================
   const X = A.decorExtra;
   X.trunk = function (g, t, x, y, time, h, wx, wy) {
+    // where the trunk runs up through the canopy, leaves fill in round it
+    if (!t.pale) { const tt = RW.TILES[RW.world.get(wx - 1, wy)], tr = RW.TILES[RW.world.get(wx + 1, wy)]; const k = [tt, tr].find((q) => q.decor === 'leaves' || q.decor === 'oakleaves'); if (k) g.drawImage(leafTile(k.decor, wx, wy), x, y); }
     const bark = t.pale ? ['#c8c4b8', '#a8a498', '#e0dcd0'] : ['#6a4a30', '#4a3020', '#8a6440'];
     rect(g, x + 4, y, 8, 16, bark[0]); rect(g, x + 4, y, 1, 16, bark[1]); rect(g, x + 11, y, 1, 16, bark[1]);
     for (let k = 0; k < 3; k++) { const yy = y + ((wy * 5 + k * 6) % 16); rect(g, x + 6 + (k % 2) * 2, yy, 2, 2, bark[k === 1 ? 2 : 1]); }
   };
-  const leafy = (g, x, y, wx, wy, cols, time) => {
-    for (let k = 0; k < 22; k++) { const lx = (RW.hash2(wx * 3 + k, wy, 1) * 16) | 0, ly = (RW.hash2(wy * 3 + k, wx, 2) * 16) | 0; const sw = Math.round(Math.sin(time * 1.4 + wx * 0.7) * 0.6); rect(g, x + lx + sw, y + ly, 3, 2, cols[k % cols.length]); }
+  // Leaves: puffy pixel clumps that join into one canopy. Each clump is lit from above (light on top,
+  // shade underneath, dark creases between clumps), and an open edge follows the clumps, so a tree's
+  // outline is round and bumpy instead of square. Tiles are drawn once and cached: the pattern repeats
+  // every 4 tiles, and the look of a tile only depends on which of its 8 neighbours are leaves.
+  const LEAF_PAL = {
+    leaves: ['#173d16', '#255f22', '#357f2c', '#4f9e3a', '#7cc452', '#a8e070'],
+    oakleaves: ['#10300f', '#1c4c1a', '#296424', '#3b7e30', '#5c9e40', '#86c05a'],
   };
-  // leaf blocks join into one canopy; open sides get a ragged, darker edge
-  const canopy = (g, x, y, wx, wy, base, cols, rim, time) => {
-    const W = RW.world, isLeaf = (a, b) => { const tt = RW.TILES[W.get(a, b)]; return tt.decor === 'leaves' || tt.decor === 'oakleaves'; };
-    const up = isLeaf(wx, wy - 1), dn = isLeaf(wx, wy + 1), lf = isLeaf(wx - 1, wy), rt = isLeaf(wx + 1, wy);
-    rect(g, x, y, 16, 16, base);
-    leafy(g, x, y, wx, wy, cols, time);
-    for (let k = 0; k < 16; k++) {
-      const r1 = RW.hash2(wx * 16 + k, wy, 4) * 3 | 0;
-      if (!up) { g.clearRect(x + k, y, 1, r1); px(g, x + k, y + r1, cols[3]); }
-      if (!dn) { g.clearRect(x + k, y + 16 - r1, 1, r1); px(g, x + k, y + 15 - r1, rim); }
-      if (!lf) { g.clearRect(x, y + k, r1, 1); px(g, x + r1, y + k, rim); }
-      if (!rt) { g.clearRect(x + 16 - r1, y + k, r1, 1); px(g, x + 15 - r1, y + k, rim); }
+  const leafCache = {};
+  const leafAt = (a, b) => { const tt = RW.TILES[RW.world.get(a, b)]; return tt.decor === 'leaves' || tt.decor === 'oakleaves'; };
+  // a trunk inside the canopy counts as canopy, so the leaves don't cut a gap round it
+  const leafish = (a, b) => { if (leafAt(a, b)) return true; const tt = RW.TILES[RW.world.get(a, b)]; return tt.decor === 'trunk' && (leafAt(a - 1, b) || leafAt(a + 1, b)); };
+  const LC = 8, LP = 64; // clump cell size, pattern period (px)
+  const clump = (X, Y) => { // nearest and second-nearest clump centre to world pixel X,Y
+    const cx0 = Math.floor(X / LC), cy0 = Math.floor(Y / LC); let d1 = 1e9, d2 = 1e9, bx = 0, by = 0;
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const cx = cx0 + i, cy = cy0 + j; const hx = ((cx % 8) + 8) % 8, hy = ((cy % 8) + 8) % 8;
+      const px2 = cx * LC + 1 + RW.hash2(hx, hy, 71) * (LC - 2), py2 = cy * LC + 1 + RW.hash2(hx, hy, 72) * (LC - 2);
+      const d = Math.hypot(X - px2, Y - py2);
+      if (d < d1) { d2 = d1; d1 = d; bx = px2; by = py2; } else if (d < d2) d2 = d;
     }
+    return { d1, d2, bx, by };
   };
-  X.leaves = (g, t, x, y, time, h, wx, wy) => canopy(g, x, y, wx, wy, '#2f6a2a', ['#3f8a32', '#4a9a3a', '#2a5a22', '#6aba4a'], '#1e4a1a', time);
-  X.oakleaves = (g, t, x, y, time, h, wx, wy) => canopy(g, x, y, wx, wy, '#24561f', ['#2f6a2a', '#3a7a2e', '#1e4a1a', '#5a9a3a'], '#163a14', time);
+  function leafTile(kind, wx, wy) {
+    const n = []; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) n.push(i === 0 && j === 0 ? 1 : leafish(wx + i, wy + j) ? 1 : 0);
+    const dUp = leafAt(wx, wy - 1) ? (leafAt(wx, wy - 2) ? 2 : 1) : 0;
+    const key = kind + n.join('') + (wx & 3) + (wy & 3) + dUp;
+    if (leafCache[key]) return leafCache[key];
+    const c = RW.art.canvas(16, 16), g = c.ctx; const pal = LEAF_PAL[kind]; const ox = (wx & 3) * 16, oy = (wy & 3) * 16;
+    // is this pattern pixel (relative to the tile, may be outside it) covered by leaves?
+    const inside = (lx, ly) => {
+      const X = ox + lx + LP, Y = oy + ly + LP; const k = clump(X, Y);
+      const tx = Math.floor((k.bx - LP - ox) / 16) + 1, ty = Math.floor((k.by - LP - oy) / 16) + 1; // clump centre's tile, -1..1 → 0..2
+      const ok = (a, b) => a >= 0 && a <= 2 && b >= 0 && b <= 2 && n[b * 3 + a];
+      if (!ok(tx, ty)) return null;
+      // the pixel's own tile must be canopy too
+      const sx = Math.floor(lx / 16) + 1, sy = Math.floor(ly / 16) + 1; if (!ok(sx, sy)) return null;
+      if (sx !== 1 || sy !== 1) return k;
+      // near an open side the canopy is only the round clumps themselves, and outer corners are rounded off
+      const L = !n[3], Rt = !n[5], U = !n[1], D = !n[7];
+      let d = 99;
+      if (L) d = Math.min(d, lx); if (Rt) d = Math.min(d, 15 - lx); if (U) d = Math.min(d, ly); if (D) d = Math.min(d, 15 - ly);
+      const corner = (cx, cy) => 13 - Math.hypot(Math.max(0, Math.abs(lx - cx) - 2), Math.max(0, Math.abs(ly - cy) - 2));
+      if (U && L) d = Math.min(d, corner(15, 15)); if (U && Rt) d = Math.min(d, corner(0, 15));
+      if (D && L) d = Math.min(d, corner(15, 0)); if (D && Rt) d = Math.min(d, corner(0, 0));
+      if (d < 0) return null;
+      if (d < 6 && k.d1 > 3.2 + RW.hash2(Math.round(k.bx), Math.round(k.by), 74) * 2.2) return null;
+      return k;
+    };
+    for (let ly = 0; ly < 16; ly++) for (let lx = 0; lx < 16; lx++) {
+      const k = inside(lx, ly); if (!k) continue;
+      const wX = ox + lx + LP, wY = oy + ly + LP;
+      // outline where the canopy ends
+      if (!inside(lx - 1, ly) || !inside(lx + 1, ly) || !inside(lx, ly - 1) || !inside(lx, ly + 1)) { px(g, lx, ly, pal[0]); continue; }
+      const rx = (wX - k.bx) / 4, ry = (wY - k.by) / 4;
+      let lv = 2;
+      if (ry < -0.35) lv = 3;
+      if (ry < -0.7 && rx < 0.2) lv = 4;
+      if (ry < -0.95 && rx < -0.1 && rx > -0.8) lv = 5;
+      if (ry > 0.45) lv = 1;
+      if (k.d2 - k.d1 < 1.2 && ry > -0.2) lv = Math.min(lv, 1); // crease where a clump tucks under the next
+      if (dUp === 2) lv -= 1;                                 // deep inside the canopy
+      if (dUp === 0 && ly < 6 && lv >= 2) lv += 1;            // sunlit crown
+      if (!n[7] && ly > 9) lv -= 1;                           // shaded underside
+      if (RW.hash2(wX, wY, 73) > 0.94) lv += 1;               // a few glints
+      px(g, lx, ly, pal[RW.clamp(lv, 1, 5)]);
+    }
+    return (leafCache[key] = c);
+  }
+  RW.art.clearLeafCache = () => { for (const k in leafCache) delete leafCache[k]; };
+  X.leaves = (g, t, x, y, time, h, wx, wy) => g.drawImage(leafTile('leaves', wx, wy), x, y);
+  X.oakleaves = (g, t, x, y, time, h, wx, wy) => g.drawImage(leafTile('oakleaves', wx, wy), x, y);
   X.cactus = (g, t, x, y, time, h, wx) => { rect(g, x + 5, y, 6, 16, '#4a8a3a'); rect(g, x + 5, y, 1, 16, '#6ab84a'); rect(g, x + 10, y, 1, 16, '#2a5a22'); if (wx % 2) { rect(g, x + 1, y + 6, 4, 2, '#4a8a3a'); rect(g, x + 1, y + 3, 2, 4, '#4a8a3a'); } for (let k = 0; k < 4; k++) px(g, x + 4 + (k % 2) * 8, y + 2 + k * 4, '#e8e0c0'); };
   X.tallgrass = (g, t, x, y, time, h, wx) => { for (let k = 0; k < 5; k++) { const bx = x + 2 + k * 3, hh = 4 + ((wx + k * 3) % 5); const sw = Math.round(Math.sin(time * 2 + wx + k) * 1); line(g, bx, y + 15, bx + sw, y + 15 - hh, k % 2 ? '#5f9a3a' : '#86c050'); } };
   X.flower = (g, t, x, y, time, h, wx) => { const col = ['#f0a0c0', '#ffe36a', '#a8c8ff', '#ffffff', '#ff8a5a'][wx % 5]; line(g, x + 8, y + 15, x + 8, y + 8, '#4a8a3a'); px(g, x + 7, y + 11, '#4a8a3a'); ell(g, x + 8, y + 7, 2, 2, col); px(g, x + 8, y + 7, '#ffe36a'); };
@@ -3295,6 +3475,7 @@ window.RW = window.RW || {};
 
   // ======================= ICONS =======================
   const I = A.iconExtra;
+  I.torch = (g, a, b) => { line(g, 5, 15, 10, 6, b); line(g, 6, 15, 11, 6, RW.shade(b, -0.25)); rect(g, 9, 5, 3, 2, '#4a3a2a'); ell(g, 11, 3, 2, 3, a); ell(g, 11, 3, 1, 2, '#ffe08a'); px(g, 11, 1, '#ff7a2e'); px(g, 12, 0, '#ff9a3a'); };
   I.log = (g, a, b) => { rect(g, 2, 6, 12, 6, a); rect(g, 2, 6, 12, 1, RW.shade(a, 0.3)); ell(g, 13, 9, 2, 3, '#d8b080'); px(g, 13, 9, b); line(g, 4, 9, 10, 9, b); };
   I.bench = (g, a, b) => { rect(g, 1, 6, 14, 3, a); rect(g, 2, 9, 2, 6, b); rect(g, 12, 9, 2, 6, b); rect(g, 5, 3, 4, 3, '#8a858c'); };
   I.fire = (g, a, b) => { line(g, 2, 14, 13, 11, b); line(g, 2, 11, 13, 14, b); ell(g, 8, 8, 3, 4, a); ell(g, 8, 9, 1, 2, '#ffe08a'); };
@@ -3805,7 +3986,6 @@ window.RW = window.RW || {};
   };
 
   FX.update = function (dt) {
-    FX.lights.length = 0;
     for (let i = FX.parts.length - 1; i >= 0; i--) {
       const p = FX.parts[i];
       p.life -= dt; if (p.life <= 0) { FX.parts.splice(i, 1); continue; }
@@ -4075,9 +4255,9 @@ window.RW = window.RW || {};
     const I = RW.input, W = RW.world;
     if (P.dead) { P.deadT -= dt; if (P.deadT <= 0) P.respawn(); return; }
     const typing = RW.ui && RW.ui.blocking();
-    const left = !typing && (I.down('a') || I.down('ArrowLeft')), right = !typing && (I.down('d') || I.down('ArrowRight'));
-    const up = !typing && (I.down('w') || I.down('ArrowUp')), down = !typing && (I.down('s') || I.down('ArrowDown'));
-    const jump = !typing && (I.down(' ') || up);
+    const left = !typing && I.act('left'), right = !typing && I.act('right');
+    const up = !typing && I.act('up'), down = !typing && I.act('down');
+    const jump = !typing && (I.act('jump') || up);
     P.water = inWater(P);
     const ct = W.tile(Math.floor((P.x + P.w / 2) / TS), Math.floor((P.y + P.h / 2) / TS));
     const onChain = ct.climb;
@@ -4099,26 +4279,32 @@ window.RW = window.RW || {};
       } else if (P.water) {
         P.vy += 260 * dt; P.vy = Math.min(P.vy, 110);                      // rocks sink...
         if (jump) P.vy = Math.max(P.vy - 620 * dt, -105);                    // ...but can climb the water slowly
-        if (P.ground && I.hit(' ')) P.vy = -170;
+        if (P.ground && I.actHit('jump') && !typing) P.vy = -170;
         if (!P.wasWater && P.vy > 60) { RW.fx.burst(P.x + P.w / 2, P.y + 4, ['#bfeaff', '#7ab8d8'], 14, 90, { grav: 300 }); RW.audio.sfx('splash'); }
       } else {
         P.vy += 900 * dt; P.vy = Math.min(P.vy, 520);
-        const jumpHit = (I.hit(' ') || I.hit('w') || I.hit('ArrowUp')) && !typing;
+        const jumpHit = (I.actHit('jump') || I.actHit('up')) && !typing;
         if (P.ground) P.airJumps = SS.doubleJump ? 1 : 0;
-        if (P.ground && jumpHit && P.tire(5)) { P.vy = SS.jump; P.ground = false; }
-        else if (!P.ground && jumpHit && P.airJumps > 0 && !P.wasWater && P.tire(6)) { P.airJumps--; P.vy = SS.jump * 0.88; RW.fx.burst(P.x + P.w / 2, P.y + P.h, ['#e8d8b0', '#c8b890'], 10, 60, { kind: 'smoke', size: 2, life: 0.4 }); RW.audio.sfx('swing'); }
+        if (P.ground && jumpHit && P.tire(2)) { P.vy = SS.jump; P.ground = false; }
+        else if (!P.ground && jumpHit && P.airJumps > 0 && !P.wasWater && P.tire(3)) { P.airJumps--; P.vy = SS.jump * 0.88; RW.fx.burst(P.x + P.w / 2, P.y + P.h, ['#e8d8b0', '#c8b890'], 10, 60, { kind: 'smoke', size: 2, life: 0.4 }); RW.audio.sfx('swing'); }
         if (SS.hover && !P.ground && jump && P.vy > 40 && P.tire(10 * dt, true)) { P.vy = 40; if (Math.random() < 0.3) RW.fx.spawn({ x: P.x + P.w / 2 + RW.rand(-6, 6), y: P.y + P.h, vy: 20, life: 0.6, color: '#c8ccf0', add: true, kind: 'glow' }); }
         if (P.wasWater && jump && P.vy < 0) P.vy = Math.min(P.vy, -300); // hop out of water at the surface
       }
     }
     P.wasWater = P.water;
     if (!onChain) P.climbing = false;
+    const feet0 = P.y + P.h;
     const r = E.move(P, dt, { step: true, grounded: P.ground, drop: down });
+    // monsters with a flat back you can stand on (a Stryx): land on top when falling onto it
+    if (!down && P.vy >= 0 && !P.climbing) E.enemies.forEach((e) => {
+      const sp = RW.SPECIES[e.sp]; if (!sp || !sp.platform || e.dead) return;
+      if (P.x + P.w > e.x + 6 && P.x < e.x + e.w - 6 && feet0 <= e.y + 3 && P.y + P.h >= e.y - 1) { P.y = e.y - P.h; P.vy = 0; r.ground = true; }
+    });
     if (r.ground && P.vy === 0 && P.fallV > 430 && !P.water && !SS.noFall) { const d = Math.round((P.fallV - 430) / 8); if (d > 2) P.hurt(d, 0, 'fall'); RW.fx.debris(P.x + P.w / 2, P.y + P.h, ['#8b847c', '#5f5953'], 8); RW.audio.sfx('slam'); }
     P.fallV = P.vy; P.ground = r.ground;
     // facing follows the mouse while swinging, otherwise movement
     const m = RW.mouseWorld();
-    if (P.swingT > 0 || I.mouse.l || I.mouse.lp) P.face = m.x > P.x + P.w / 2 ? 1 : -1; else if (target) P.face = target;
+    if (P.swingT > 0 || I.act('attack')) P.face = m.x > P.x + P.w / 2 ? 1 : -1; else if (target) P.face = target;
     // animation
     P.animT += dt;
     if (P.swingT > 0) P.anim = 6; else if (P.water && !P.ground) P.anim = 7; else if (!P.ground && !P.climbing) P.anim = 5; else if (Math.abs(P.vx) > 8) P.anim = 1 + (Math.floor(P.animT * 10) % 4); else P.anim = 0;
@@ -4130,6 +4316,7 @@ window.RW = window.RW || {};
       else P.breath = Math.min(P.maxBreath, P.breath + dt * 4);
     }
     P.mana = Math.min(P.maxMana(), P.mana + dt * 7);
+    if (P.offTorch && !P.has('torch')) P.offTorch = false;
     if (performance.now() / 1000 - P.lastHurt > 5) { P.regenT += dt; if (P.regenT > 1) { P.regenT = 0; P.hp = Math.min(P.maxHp(), P.hp + 1 + P.stats.blue * 0.1); } }
     // actions
     if (!typing && !RW.ui.pointerOverUI) P.actions(dt, m);
@@ -4147,28 +4334,29 @@ window.RW = window.RW || {};
     const I = RW.input, W = RW.world, held = P.held();
     const pc = P.center();
     // hotbar keys & wheel
-    for (let k = 1; k <= 9; k++) if (I.hit(String(k))) { P.sel = k - 1; RW.ui.dirty(); }
-    if (I.hit('0')) { P.sel = 9; RW.ui.dirty(); }
+    for (let k = 1; k <= 10; k++) if (I.actHit('slot' + k)) { P.sel = k - 1; RW.ui.dirty(); }
     if (I.mouse.wheel) { P.sel = (P.sel + (I.mouse.wheel > 0 ? 1 : 9)) % 10; RW.ui.dirty(); }
     // LEFT: swing / mine / place
     const tx = Math.floor(m.x / TS), ty = Math.floor(m.y / TS);
     const reach = RW.dist(pc.x, pc.y, tx * TS + 8, ty * TS + 8) <= 5.2 * TS * P.scale();
-    if (I.mouse.l || I.mouse.lp) {
-      if (held && held.kind === 'place' && I.mouse.lp) P.tryPlace(tx, ty, held, reach);
-      else if (held && held.plant && W.get(tx, ty) === T().air && W.get(tx, ty + 1) === T().soil && reach && I.mouse.lp) P.tryPlant(tx, ty, held);
+    const atk = I.act('attack'), atkHit = I.actHit('attack');
+    if (atk || atkHit) {
+      if (held && held.kind === 'place' && atkHit) P.tryPlace(tx, ty, held, reach);
+      else if (held && held.plant && W.get(tx, ty) === T().air && W.get(tx, ty + 1) === T().soil && reach && atkHit) P.tryPlant(tx, ty, held);
       else {
         if (P.swingT <= 0) P.startSwing();
         if (reach && !P.exhausted) P.mineTile(tx, ty, dt); else P.mine = null;
       }
     } else P.mine = null;
     // RIGHT: use (eat, consume crystal) or cast
-    if (I.mouse.rp) {
+    if (I.actHit('use')) {
       if (held && (held.kind === 'food' || held.kind === 'crystal')) P.useItem(held);
       else if (P.spells.length) P.cast(m);
     }
-    if (I.hit('f') && P.spells.length) P.cast(m);
-    if (I.hit('q') && P.spells.length) { P.spell = (P.spell + 1) % P.spells.length; RW.ui.toast('Spell: ' + RW.SPELLS[P.spells[P.spell]].name); RW.ui.dirty(); }
-    if (I.hit('r')) P.interact();
+    if (I.actHit('cast') && P.spells.length) P.cast(m);
+    if (I.actHit('torch')) P.toggleTorch();
+    if (I.actHit('spell') && P.spells.length) { P.spell = (P.spell + 1) % P.spells.length; RW.ui.toast('Spell: ' + RW.SPELLS[P.spells[P.spell]].name); RW.ui.dirty(); }
+    if (I.actHit('interact')) P.interact();
   };
 
   P.startSwing = function () {
@@ -4259,15 +4447,37 @@ window.RW = window.RW || {};
     if (t.element) { /* elemental crystals drop via t.drop */ }
     W.setTile(tx, ty, T().air);
     W.settleWater(tx, ty);
-    // chop a trunk and the tree above it comes down
+    // chop a trunk and the tree above it comes down: only this one tree, never its neighbours
     if (t.tree && t.decor === 'trunk') {
-      const seen = new Set(), q = [[tx, ty - 1], [tx - 1, ty], [tx + 1, ty]]; let n = 0, wood = 0;
-      while (q.length && n < 400) {
-        const [x, y] = q.shift(); const k = x + ',' + y; if (seen.has(k) || y > ty) continue; seen.add(k);
-        const tt = RW.TILES[W.get(x, y)]; if (!tt.tree && tt.key !== 'vines') continue;
-        if (tt.decor === 'trunk') wood++;
-        if (n % 3 === 0) RW.fx.debris(x * TS + 8, y * TS + 8, tt.decor === 'trunk' ? ['#6a4a30', '#8a6440'] : ['#3f8a32', '#5aaa42', '#2a5a22'], 3);
+      const isTrunk = (x, y) => { const q = RW.TILES[W.get(x, y)]; return q.tree && q.decor === 'trunk'; };
+      const isCanopy = (x, y) => { const q = RW.TILES[W.get(x, y)]; return (q.tree && q.decor !== 'trunk') || q.key === 'vines'; };
+      // 1. this tree's trunk: trunk blocks joined to the cut, at or above it
+      const mine = new Set(), cols = new Set(), tq = [[tx, ty - 1], [tx - 1, ty], [tx + 1, ty]];
+      while (tq.length && mine.size < 200) {
+        const [x, y] = tq.shift(); const k = x + ',' + y; if (mine.has(k) || y > ty || !isTrunk(x, y)) continue;
+        mine.add(k); cols.add(x); tq.push([x, y - 1], [x - 1, y], [x + 1, y]);
+      }
+      // 2. its leaves: canopy joined to that trunk that is nearer this trunk than any other tree's
+      const ownsLeaf = (x, y) => {
+        let dMine = 99, dOther = 99;
+        cols.forEach((c) => (dMine = Math.min(dMine, Math.abs(x - c))));
+        for (let dx = -12; dx <= 12; dx++) {
+          const cx = x + dx; if (cols.has(cx)) continue;
+          for (let dy = -2; dy <= 16; dy++) if (isTrunk(cx, y + dy)) { dOther = Math.min(dOther, Math.abs(dx)); break; }
+        }
+        return dMine <= dOther;
+      };
+      const seen = new Set(), q = []; let n = 0, wood = 0;
+      mine.forEach((k) => { const [x, y] = k.split(',').map(Number); q.push([x, y]); });
+      const fell = (x, y, trunk) => {
+        if (n % 3 === 0) RW.fx.debris(x * TS + 8, y * TS + 8, trunk ? ['#6a4a30', '#8a6440'] : ['#3f8a32', '#5aaa42', '#2a5a22'], 3);
         W.setTile(x, y, T().air); n++;
+      };
+      while (q.length && n < 500) {
+        const [x, y] = q.shift(); const k = x + ',' + y; if (seen.has(k)) continue; seen.add(k);
+        if (mine.has(k)) { wood++; fell(x, y, true); }
+        else if (isCanopy(x, y) && ownsLeaf(x, y)) fell(x, y, false);
+        else continue;
         q.push([x, y - 1], [x - 1, y], [x + 1, y], [x, y + 1]);
       }
       if (wood) E.dropItem('wood', wood + RW.randi(0, 2), cx, cy - 20);
@@ -4321,11 +4531,32 @@ window.RW = window.RW || {};
     }
     RW.ui.dirty(); RW.game.saveSoon();
   };
+  // ---- torches: one in your hand, or one in your other hand (T) next to whatever you hold ----
+  P.offTorch = false;
+  P.torchLit = () => !P.dead && ((P.offTorch && P.has('torch')) || (P.held() && P.held().kind === 'torch'));
+  P.toggleTorch = function () {
+    if (P.offTorch) { P.offTorch = false; RW.ui.toast('You put the torch away.'); RW.audio.sfx('ui'); }
+    else if (P.has('torch')) { P.offTorch = true; RW.ui.toast('Torch in your other hand. Press ' + RW.keyName((RW.binds.torch || [])[0]) + ' to put it away.'); RW.audio.sfx('place'); }
+    else { RW.ui.toast('You have no torch. Make 4 from 1 wood and 1 flint in your bag.'); RW.audio.sfx('deny'); }
+    RW.game.saveSoon();
+  };
+  // the light and the flicker, every frame
+  P.torchFx = function (time) {
+    if (!P.torchLit()) return null;
+    const off = !(P.held() && P.held().kind === 'torch');
+    const sc = P.scale(); const fx = P.x + P.w / 2 + (off ? -P.face * 6 : P.face * 9) * sc, fy = P.y + (off ? 9 : 4) * sc;
+    const fl = 0.9 + 0.1 * Math.sin(time * 13) * Math.sin(time * 7.3 + 1);
+    RW.fx.light(fx, fy, 2.0 * fl, 1.38 * fl, 0.62 * fl);
+    if (Math.random() < 0.18) RW.fx.spawn({ x: fx + RW.rand(-1, 1), y: fy - 4, vx: RW.rand(-6, 6), vy: -RW.rand(18, 36), life: 0.6, color: RW.pick(['#ff8a2a', '#ffe08a', '#ffb347']), add: true, kind: 'ember' });
+    if (P.water && P.species !== 'ghost' && RW.world.isWaterAt(fx, fy)) { P.offTorch = false; RW.ui.toast('Your torch hissed out in the water.'); RW.audio.sfx('splash'); }
+    return { x: fx, y: fy };
+  };
   P.addStat = function (st, itemId, small) {
     P.stats[st] = (P.stats[st] || 0) + (small ? 0.25 : 1);
     const it = RW.ITEMS[itemId]; RW.audio.sfx('crystal');
     const msg = { red: '+5% damage', blue: '+10 max health', green: '+3% speed', purple: '+8% mining speed', gold: 'You grow bigger and stronger' }[st];
     RW.fx.text(P.x + P.w / 2, P.y - 8, small ? 'tiny ' + it.name : msg, it.icon.a, true);
+    if (!small) setTimeout(() => RW.fx.text(P.x + P.w / 2, P.y - 18, '+' + (st === 'gold' ? 5 : 2) + ' max stamina', '#f4f0a0', true), 450);
     if (st === 'blue' || st === 'gold') P.hp = Math.min(P.maxHp(), P.hp + 10);
   };
 
@@ -4781,6 +5012,11 @@ window.RW = window.RW || {};
       else { g.fillRect(s.x + ox - 2, s.y + oy - 1, 4, 2); g.fillRect(s.x + ox - 1, s.y + oy - 2, 2, 4); }
     });
   };
+  // a flame stays bright in the dark: glowing sparks drawn over the lighting, at a world position
+  function flameGlow(x, y, sc) {
+    RW.fx.spawn({ x: x + RW.rand(-0.6, 0.6), y: y + RW.rand(-0.6, 0.6), life: 0.05, color: '#ffe08a', add: true, kind: 'glow', size: Math.max(1, Math.round(sc)), grav: 0, drag: 1 });
+    RW.fx.spawn({ x: x + RW.rand(-1.5, 1.5), y: y - 1 + RW.rand(-1.5, 1), life: 0.05, color: '#ff8a2a', add: true, kind: 'glow', size: Math.max(1, Math.round(sc)), grav: 0, drag: 1 });
+  }
   E.drawPlayer = function (g, cam, p, look, opts) {
     const A = RW.art; const frames = A.heroSprites(opts.species || 'rock', look);
     const fr = frames[p.anim || 0][(p.face || 1) > 0 ? 0 : 1];
@@ -4789,6 +5025,19 @@ window.RW = window.RW || {};
     const dx = Math.round(p.x + ox + 6 - w / 2), dy = Math.round(p.y + oy + 28 - h + ({ fuzzy: 2, acorn: 2, ghost: 3 }[opts.species] || 1));
     if (opts.species === 'ghost') g.globalAlpha = 0.88;
     const blink = opts.invuln > 0 && Math.floor(opts.invuln * 12) % 2;
+    // a torch in the other hand: held up on the back side of the body, its flame flickering
+    if (opts.torch && !blink) {
+      const f = p.face || 1; const hand = frames[p.anim || 0][0].hand || { x: fr.width / 2 + 7, y: fr.height / 2 };
+      const bx = f > 0 ? dx + (fr.width - hand.x - 2) * sc : dx + (hand.x + 1) * sc, by = dy + (hand.y - 1) * sc;
+      const tm = opts.time || 0; g.save(); g.translate(Math.round(bx), Math.round(by)); g.scale(sc, sc);
+      g.fillStyle = '#5a3e26'; g.fillRect(-1, -6, 2, 10); g.fillStyle = '#7a5634'; g.fillRect(-1, -6, 1, 10);
+      g.fillStyle = '#3a2a1c'; g.fillRect(-2, -7, 4, 2);
+      const fh = 4 + Math.round(Math.sin(tm * 14) + Math.sin(tm * 9.1)); 
+      g.fillStyle = '#ff7a2e'; g.fillRect(-2, -7 - fh, 4, fh); g.fillStyle = '#ffb347'; g.fillRect(-1, -7 - fh + 1, 2, fh - 1); g.fillStyle = '#ffe08a'; g.fillRect(-1, -8, 1, 2);
+      if (Math.sin(tm * 11) > 0.3) { g.fillStyle = '#ff9a3a'; g.fillRect(Math.sin(tm * 5) > 0 ? 1 : -2, -8 - fh, 1, 1); }
+      g.restore();
+      flameGlow(bx - ox, by - oy - (8 + fh / 2) * sc, sc);
+    }
     if (!blink) g.drawImage(fr, dx, dy, Math.round(w), Math.round(h));
     g.globalAlpha = 1;
     // held item
@@ -4801,6 +5050,7 @@ window.RW = window.RW || {};
       const hx = f > 0 ? dx + (hand.x + 0.5) * sc : dx + (fr.width - hand.x - 0.5) * sc, hy = dy + (hand.y + 0.5) * sc;
       g.save(); g.translate(Math.round(hx), Math.round(hy)); g.scale(f * sc, sc); g.rotate(ang + 0.785);
       g.drawImage(ic, -3, -13, 16, 16); g.restore();
+      if (opts.item === 'torch') { const a = ang + 0.785, lx = 8, ly = -10; flameGlow(hx - ox + f * sc * (lx * Math.cos(a) - ly * Math.sin(a)), hy - oy + sc * (lx * Math.sin(a) + ly * Math.cos(a)), sc); }
       if (opts.swing > 0 && prog > 0.2 && prog < 0.8) { g.globalAlpha = 0.35; g.strokeStyle = '#ffffff'; g.beginPath(); g.arc(hx, hy, 15 * sc, f > 0 ? -1.6 : Math.PI - 1.5 + 0.1, f > 0 ? 1.5 : Math.PI + 1.6); g.stroke(); g.globalAlpha = 1; }
     }
     if (opts.name) {
@@ -4888,6 +5138,33 @@ window.RW = window.RW || {};
     }
     e.face = 1; e.fr = Math.floor(e.t * 3) % 2;
   };
+  // Stryx: rooted, never touches you on its own. Stand on its back (or hit it) and it gets cross: its vines
+  // lash at you for a while, then it settles down again.
+  B.stryx = function (e, dt, sp) {
+    const pc = P.center(), c = ec(e);
+    e.vy += 900 * dt; E.move(e, dt); e.vx = 0; e.face = 1; e.harmless = true;
+    const onTop = !P.dead && P.x + P.w > e.x + 6 && P.x < e.x + e.w - 6 && Math.abs(P.y + P.h - e.y) < 4 && P.vy >= -1;
+    const hurt = e.lastHp != null && e.hp < e.lastHp; e.lastHp = e.hp;
+    if (onTop || hurt || e.provoked) {
+      if (!(e.angry > 0)) { e.gt = 0.35; RW.fx.debris(c.x, e.y, ['#8a7a62', '#7d8a4a'], 6); RW.audio.sfx('roar'); if (onScreen(e)) RW.fx.text(c.x, e.y - 14, onTop ? 'Off!' : 'Grrr', '#b8ff7a'); }
+      e.angry = onTop ? 7 : 5; e.provoked = false;
+    }
+    e.angry = Math.max(0, (e.angry || 0) - dt);
+    e.gt = (e.gt == null ? 1 : e.gt) - dt;
+    const R = sp.lashR || 84, ly = e.y + (sp.lashY || 0);
+    if (e.angry > 0 && !e.lash && e.gt <= 0 && !P.dead && RW.dist(pc.x, pc.y, c.x, ly) < R) { e.lash = { t: 0, warn: 0.4 }; e.gt = 1.1; }
+    if (e.lash) {
+      const L = e.lash; L.t += dt;
+      if (L.t > L.warn && !L.hit) {
+        L.hit = true; L.tx = pc.x; L.ty = pc.y;
+        if (RW.dist(pc.x, pc.y, c.x, ly) < R + 6) { P.hurt(sp.dmg, Math.sign(pc.x - c.x) || 1, 'stryx'); P.vx = (Math.sign(pc.x - c.x) || 1) * 220; P.vy = -200; }
+        RW.audio.sfx('swing');
+      }
+      if (L.t > L.warn + 0.3) e.lash = null;
+    }
+    if (e.angry > 0 && Math.random() < dt * 4) RW.fx.spawn({ x: e.x + 8 + Math.random() * (e.w - 16), y: e.y + 4, vy: -20, life: 0.6, color: '#b8ff7a', add: true, kind: 'glow' });
+    e.fr = e.angry > 0 ? 2 + (Math.floor(e.t * 7) % 2) : Math.floor(e.t * 1.2) % 2;
+  };
   B.phaser = function (e, dt, sp) {
     const pc = P.center(), c = ec(e);
     const a = Math.atan2(pc.y - c.y, pc.x - c.x); const chase = RW.dist(pc.x, pc.y, c.x, c.y) < 40 * TS && !P.dead && !e.friendly;
@@ -4957,14 +5234,21 @@ window.RW = window.RW || {};
     if (!E.buddy) E.spawnBuddy();
     const b = E.buddy; b.t += dt; b.atk -= dt;
     const pc = P.center(); const bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
-    if (RW.dist(pc.x, pc.y, bc.x, bc.y) > 320 || P.dead) { b.x = P.x - P.face * 18; b.y = P.y + 8; b.vx = b.vy = 0; }
+    b.farT = RW.dist(pc.x, pc.y, bc.x, bc.y) > 200 ? (b.farT || 0) + dt : 0;
+    if (RW.dist(pc.x, pc.y, bc.x, bc.y) > 320 || b.farT > 2.5 || P.dead) { b.x = P.x - P.face * 18; b.y = P.y + 8; b.vx = b.vy = 0; b.farT = 0; if (!P.dead) RW.fx.burst(b.x + b.w / 2, b.y + b.h / 2, ['#e8c88a', '#c88a4a'], 8, 50, { kind: 'smoke', size: 2, life: 0.4 }); }
     const foe = E.enemies.concat(E.boss ? [E.boss] : []).find((e) => !e.dead && !e.harmless && RW.dist(ec(e).x, ec(e).y, bc.x, bc.y) < 90);
     const tx = foe ? ec(foe).x : pc.x - P.face * 22;
     const dx = tx - bc.x; const wet = RW.world.isWaterAt(bc.x, bc.y);
     b.vx = RW.lerp(b.vx, Math.abs(dx) > 10 ? Math.sign(dx) * (foe ? 120 : 105) : 0, dt * 8);
     b.vy += (wet ? -60 : 900) * dt; if (wet) { b.vy = RW.clamp(b.vy, -70, 70); if (pc.y < bc.y - 10) b.vy -= 300 * dt; }
     const r = E.move(b, dt, { step: true, grounded: b.ground }); b.ground = r.ground;
+    if (b.ground) b.airJumps = 1;
     if (b.ground && ((r.wallL || r.wallR) || pc.y < bc.y - 30 || (foe && Math.abs(dx) < 30 && b.atk <= 0))) { b.vy = -330; }
+    // acorns double jump, just like an acorn hero: a second hop at the top of the first when you're still above it or a wall is in the way
+    else if (!b.ground && !wet && b.airJumps > 0 && b.vy > -60 && (pc.y < bc.y - 24 || r.wallL || r.wallR)) {
+      b.airJumps--; b.vy = -310;
+      RW.fx.burst(bc.x, b.y + b.h, ['#e8d8b0', '#c8b890'], 6, 40, { kind: 'smoke', size: 2, life: 0.35 });
+    }
     if (foe && b.atk <= 0 && overlap({ x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }, foe.hitbox ? foe.hitbox() : foe)) { b.atk = 0.7; E.damage(foe, Math.round(4 + P.dmgMul() * 3), Math.sign(dx) || 1, 3, false, '#e8c88a'); RW.fx.burst(bc.x, bc.y, ['#c88a4a', '#e8c88a'], 6, 60); }
     if (Math.abs(b.vx) > 5) b.face = Math.sign(b.vx);
   };
@@ -5014,26 +5298,32 @@ window.RW = window.RW || {};
   const segDist = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay; const t = RW.clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1); return Math.hypot(px - (ax + dx * t), py - (ay + dy * t)); };
 
   // ---- Gnarlroot, the Giant Vine Tree (stationary) ----
+  // It only reaches so far: vines, roots and thorns stop at GNARL_REACH from its trunk. Step back out of
+  // range and it waits, rustling, until you come close again.
+  const GNARL_REACH = 22 * TS;
   E.bossAI.gnarlroot = function (b, dt, sp) {
     const pc = P.center(); const fast = b.phase === 2 ? 1.5 : 1; const ground = b.y + b.h;
     b.st -= dt * fast;
     RW.fx.light(b.x + b.w / 2, b.y + 82, 0.4, 0.8, 0.2);
     if (Math.random() < dt * 6) RW.fx.spawn({ x: b.x + 10 + Math.random() * (b.w - 20), y: b.y + 20 + Math.random() * 30, vy: 20, vx: RW.rand(-10, 10), life: 2, color: RW.pick(['#4a8a3a', '#6ab84a']), kind: 'dot', grav: 30 });
     if (b.st > 0) return;
-    const r = Math.random(); const tx0 = b.x + b.w / 2;
-    if (r < 0.4) { // vine lashes from the canopy toward you
+    const tx0 = b.x + b.w / 2;
+    if (Math.abs(pc.x - tx0) > GNARL_REACH || Math.abs(pc.y - (b.y + b.h / 2)) > GNARL_REACH) { b.st = 0.5; return; } // out of reach: wait
+    const r = Math.random();
+    if (r < 0.4) { // vine lashes from the canopy toward you, as far as a vine can stretch
       const n = b.phase === 2 ? 4 : 3;
       for (let k = 0; k < n; k++) {
-        const ax = b.x + 20 + k * (b.w - 40) / (n - 1), ay = b.y + 50; const bx = pc.x + RW.rand(-28, 28), by = pc.y + RW.rand(-18, 18);
+        const ax = b.x + 20 + k * (b.w - 40) / (n - 1), ay = b.y + 50; let bx = pc.x + RW.rand(-28, 28), by = pc.y + RW.rand(-18, 18);
+        const len = Math.hypot(bx - ax, by - ay), maxLen = GNARL_REACH * 0.9; if (len > maxLen) { bx = ax + (bx - ax) * maxLen / len; by = ay + (by - ay) * maxLen / len; }
         b.fx.push({ type: 'vine', ax, ay, bx, by, t: -k * 0.12, warn: 0.75, hit: (f) => { if (segDist(pc.x, pc.y, f.ax, f.ay, f.bx, f.by) < 14 || segDist(P.x + 6, P.y + 14, f.ax, f.ay, f.bx, f.by) < 14) { P.hurt(sp.dmg, Math.sign(P.x - f.ax) || 1, 'vine'); P.vx += Math.sign(f.ax - P.x) * 200; } RW.audio.sfx('swing'); } });
       }
       b.st = 2.4;
     } else if (r < 0.72) { // roots erupt under you
       const n = b.phase === 2 ? 5 : 3;
-      for (let k = 0; k < n; k++) { const x = pc.x + (k - (n - 1) / 2) * 34; b.fx.push({ type: 'root', x, y: ground, t: -k * 0.1, warn: 0.8, stay: 0.5, hit: (f) => { if (Math.abs(P.x + 6 - f.x) < 14 && P.y + P.h > f.y - 40) { P.hurt(sp.dmg + 4, Math.sign(P.x - f.x) || 1, 'root'); P.vy = -380; } RW.fx.debris(f.x, f.y, ['#5a3a24', '#4a8a3a'], 10); RW.fx.shake(2, 0.15); } }); }
+      for (let k = 0; k < n; k++) { const x = pc.x + (k - (n - 1) / 2) * 34; if (Math.abs(x - tx0) > GNARL_REACH) continue; b.fx.push({ type: 'root', x, y: ground, t: -k * 0.1, warn: 0.8, stay: 0.5, hit: (f) => { if (Math.abs(P.x + 6 - f.x) < 14 && P.y + P.h > f.y - 40) { P.hurt(sp.dmg + 4, Math.sign(P.x - f.x) || 1, 'root'); P.vy = -380; } RW.fx.debris(f.x, f.y, ['#5a3a24', '#4a8a3a'], 10); RW.fx.shake(2, 0.15); } }); }
       RW.audio.sfx('slam'); b.st = 2.6;
     } else if (r < 0.9) { // thorn volley
-      for (let k = 0; k < (b.phase === 2 ? 9 : 6); k++) { const sx = b.x + 20 + Math.random() * (b.w - 40), sy = b.y + 30; const a = Math.atan2(pc.y - sy, pc.x - sx) + RW.rand(-0.25, 0.25); E.shots.push({ x: sx, y: sy, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230 - 60, grav: 180, life: 3, owner: 'e', dmg: 10, kind: 'thorn', color: '#8be04a' }); }
+      for (let k = 0; k < (b.phase === 2 ? 9 : 6); k++) { const sx = b.x + 20 + Math.random() * (b.w - 40), sy = b.y + 30; const a = Math.atan2(pc.y - sy, pc.x - sx) + RW.rand(-0.25, 0.25); E.shots.push({ x: sx, y: sy, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230 - 60, grav: 180, life: GNARL_REACH * 1.3 / 230, owner: 'e', dmg: 10, kind: 'thorn', color: '#8be04a' }); }
       RW.audio.sfx('swing'); b.st = 2;
     } else { // wakes the forest
       for (let k = 0; k < 2; k++) { const e = E.spawnEnemy(k ? 'slime' : 'jungle_slime', tx0 + (k ? 60 : -60), ground - 20); RW.fx.burst(e.x, e.y, '#6ab84a', 10, 60); }
@@ -5114,8 +5404,8 @@ window.RW = window.RW || {};
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
     // grabbing trees
     E.enemies.forEach((e) => {
-      if (!e.lash) return; const c = { x: e.x + e.w / 2, y: e.y + 10 }; const L = e.lash;
-      if (L.t < L.warn) { g.globalAlpha = 0.5; g.strokeStyle = '#ff6a5a'; g.setLineDash([2, 3]); g.beginPath(); g.arc(c.x + ox, c.y + oy, 96, 0, 6.29); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+      if (!e.lash) return; const sp = RW.SPECIES[e.sp] || {}; const c = { x: e.x + e.w / 2, y: e.y + (sp.lashY != null ? sp.lashY : 10) }; const L = e.lash;
+      if (L.t < L.warn) { g.globalAlpha = 0.5; g.strokeStyle = '#ff6a5a'; g.setLineDash([2, 3]); g.beginPath(); g.arc(c.x + ox, c.y + oy, sp.lashR || 96, 0, 6.29); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
       else vineLine(g, c.x + ox, c.y + oy, L.tx + ox, L.ty + oy, time);
     });
     // boss attack effects
@@ -5427,7 +5717,7 @@ window.RW = window.RW || {};
     if (!N.transport) return;
     N.presT -= dt; N.presBeat -= dt; if (N.presT > 0) return; N.presT = 1 / 15;
     const P = RW.player; const h = P.held();
-    const pres = { x: Math.round(P.x), y: Math.round(P.y), f: P.face, a: P.anim, s: Math.round(Math.max(0, P.swingT) * 100) / 100, sd: P.swingDur, it: h ? h.id : '', n: P.name, lk: packLook(P.look, P.species), sp: P.species, w: RW.world.def.id, sz: Math.round(P.scale() * 100) / 100, dead: P.dead ? 1 : 0, pid: N.pid, g: P.ground ? 1 : 0 };
+    const pres = { x: Math.round(P.x), y: Math.round(P.y), f: P.face, a: P.anim, s: Math.round(Math.max(0, P.swingT) * 100) / 100, sd: P.swingDur, it: h ? h.id : '', n: P.name, lk: packLook(P.look, P.species), sp: P.species, w: RW.world.def.id, sz: Math.round(P.scale() * 100) / 100, dead: P.dead ? 1 : 0, pid: N.pid, g: P.ground ? 1 : 0, ot: P.offTorch && P.has('torch') ? 1 : 0 };
     const key = JSON.stringify(pres);
     if (key === N.lastPres && N.presBeat > 0) return;
     N.lastPres = key; N.presBeat = 1;
@@ -5453,8 +5743,8 @@ window.RW = window.RW || {};
       const t = p.target; if (!t || t.dead || t.w !== RW.world.def.id) return;
       const sp = RW.HEROES[t.sp] ? t.sp : 'rock';
       const look = unpackLook(t.lk, sp);
-      RW.ent.drawPlayer(g, cam, { x: p.x, y: p.y, face: t.f, anim: t.a }, look, { species: sp, scale: t.sz || 1, item: t.it && RW.ITEMS[t.it] ? t.it : null, swing: t.s, swingDur: t.sd, name: String(t.n || 'Player').slice(0, 20), nameColor: '#9ad8ff' });
-      RW.fx.light(p.x + 6, p.y + 6, 0.35, 0.3, 0.2);
+      RW.ent.drawPlayer(g, cam, { x: p.x, y: p.y, face: t.f, anim: t.a }, look, { species: sp, scale: t.sz || 1, item: t.it && RW.ITEMS[t.it] ? t.it : null, swing: t.s, swingDur: t.sd, name: String(t.n || 'Player').slice(0, 20), nameColor: '#9ad8ff', torch: !!t.ot, time: RW.game.time });
+      if (t.ot || t.it === 'torch') RW.fx.light(p.x + 6, p.y + 4, 1.8, 1.25, 0.55); else RW.fx.light(p.x + 6, p.y + 6, 0.35, 0.3, 0.2);
     });
   };
   N.count = () => N.peers.size + 1;
@@ -5500,16 +5790,19 @@ window.RW = window.RW || {};
 
   // ---------------- modals ----------------
   U.openModal = function (id) {
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm'].forEach((m) => show('#' + m, m === id));
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts'].forEach((m) => show('#' + m, m === id));
     U.open = id; RW.audio.sfx('ui');
+    if (id === 'help') U.renderHelp();
+    if (id === 'opts') U.renderOpts();
     if (id === 'inv') { U.renderInv(); U.renderCraft(); }
     if (id === 'guide') U.renderGuide();
     if (id === 'map') U.renderMap();
   };
   U.closeModal = function () {
     if (U.cursor) { P().add(U.cursor.id, U.cursor.n); U.cursor = null; show('#held', false); }
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm'].forEach((m) => show('#' + m, false));
-    U.open = null; show('#tooltip', false);
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts'].forEach((m) => show('#' + m, false));
+    U.open = null; U.stopCapture && U.stopCapture();
+    const ae = document.activeElement; if (ae && ae !== document.body && ae.id !== 'chatin' && ae.blur) ae.blur(); show('#tooltip', false);
   };
   document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', U.closeModal));
   document.querySelectorAll('.modal').forEach((m) => m.addEventListener('mousedown', (e) => { if (e.target === m) U.closeModal(); }));
@@ -5538,7 +5831,8 @@ window.RW = window.RW || {};
       U.attachTip(s, () => P().inv[i]);
       hb.append(s); U.hotbarSlots.push(s);
     }
-    $('#b-inv').onclick = () => U.toggle('inv'); $('#b-map').onclick = () => U.toggle('map'); $('#b-guide').onclick = () => U.toggle('guide'); $('#b-help').onclick = () => U.toggle('help');
+    $('#b-inv').onclick = () => U.toggle('inv'); $('#b-map').onclick = () => U.toggle('map'); $('#b-guide').onclick = () => U.toggle('guide'); $('#b-help').onclick = () => U.toggle('help'); $('#b-opts').onclick = () => U.toggle('opts');
+    U.hudKeys();
     const mb = $('#b-mute'); const upd = () => (mb.textContent = RW.audio.muted ? 'Sound off' : 'Sound on');
     mb.onclick = () => { RW.audio.start(); RW.audio.setMuted(!RW.audio.muted); upd(); }; upd();
   };
@@ -5619,6 +5913,7 @@ window.RW = window.RW || {};
     [['Strength', '+' + Math.round(st.red * 5) + '% damage', '#e0525a', st.red, 20], ['Toughness', '+' + Math.round(st.blue * 10) + ' health', '#4fa8f0', st.blue, 20], ['Speed', '+' + Math.round(st.green * 3) + '%', '#5fd98a', st.green, 10], ['Mining', '+' + Math.round(st.purple * 8) + '%', '#a86ef0', st.purple, 15], ['Size', '+' + Math.round(st.gold * 4) + '% bigger', '#f2c94c', st.gold, 8]].forEach(([n, v, c, cnt, max]) => {
       const d = el('div'); d.style.setProperty('--c', c); d.append(el('b', null, n + ' '), document.createTextNode(v + ' (' + (Math.round(cnt * 4) / 4) + '/' + max + ')')); sb.append(d);
     });
+    if (p.staminaBonus && p.staminaBonus()) { const d = el('div'); d.style.setProperty('--c', '#f4f0a0'); d.append(el('b', null, 'Stamina '), document.createTextNode('+' + p.staminaBonus() + ' from crystals (' + p.maxStamina() + ' max)')); sb.append(d); }
     if (p.spells.length) { const d = el('div'); d.style.setProperty('--c', '#c8a6ff'); d.textContent = 'Magic: ' + p.spells.map((s) => RW.SPELLS[s].name).join(', '); sb.append(d); }
   };
   U.craftFilter = 'can';
@@ -5798,14 +6093,123 @@ window.RW = window.RW || {};
 
   // ---------------- keys for panels ----------------
   window.addEventListener('keydown', (e) => {
-    if (RW.typing() || !RW.game.playing) return;
-    const k = e.key.toLowerCase();
-    if (k === 'escape') { U.closeModal(); return; }
-    if (k === 'e' || k === 'i' || e.key === 'Tab') { e.preventDefault(); U.toggle('inv'); }
-    else if (k === 'm') U.toggle('map');
-    else if (k === 'g') U.toggle('guide');
-    else if (k === 'h') U.toggle('help');
-    else if (e.key === 'Enter') { show('#chatin', true); chatin.focus(); e.preventDefault(); }
+    if (RW.typing() || RW.input.capturing) return;
+    if (e.key === 'Escape') { U.closeModal(); return; }
+    const I = RW.input, c = e.code;
+    if (!RW.game.playing) { if (I.is(c, 'settings')) U.toggle('opts'); return; }
+    if (I.is(c, 'bag')) { e.preventDefault(); U.toggle('inv'); }
+    else if (I.is(c, 'map')) U.toggle('map');
+    else if (I.is(c, 'guide')) U.toggle('guide');
+    else if (I.is(c, 'help')) U.toggle('help');
+    else if (I.is(c, 'settings')) U.toggle('opts');
+    else if (I.is(c, 'chat')) { show('#chatin', true); chatin.focus(); e.preventDefault(); }
+  });
+
+  // ======================= CONTROLS & SETTINGS =======================
+  const K = (id) => (RW.binds[id] || []).filter(Boolean).map(RW.keyName).join(' / ') || 'not set';
+  // the little key hints on the HUD buttons follow your controls
+  U.hudKeys = function () {
+    const lab = { 'b-inv': ['Bag', 'bag'], 'b-map': ['Map', 'map'], 'b-guide': ['Field Guide', 'guide'], 'b-help': ['Controls', 'help'], 'b-opts': ['Settings', 'settings'] };
+    Object.entries(lab).forEach(([b, [n, id]]) => { const el2 = document.getElementById(b); if (el2) el2.textContent = n + ' (' + RW.keyName((RW.binds[id] || [])[0]) + ')'; });
+    document.querySelectorAll('#hotbar .slot .k').forEach((k, i) => (k.textContent = RW.keyName((RW.binds['slot' + (i + 1)] || [])[0]).replace('—', '')));
+  };
+  U.renderHelp = function () {
+    const box = $('#help .keys'); box.innerHTML = '';
+    const row = (k, t) => { box.append(el('kbd', null, k), el('span', null, t)); };
+    row(K('left') + ' · ' + K('right'), 'Walk. Hold ' + K('sprint') + ' to run (uses stamina)');
+    row(K('jump') + ' · ' + K('up'), 'Jump. Acorns jump again in the air, ghosts hold it to hover. In water, hold to swim up. Rocks sink but never drown; fuzzies float but need air');
+    row(K('down'), 'Drop through walkways · climb down chains');
+    row(K('attack'), 'Swing, shoot bows, mine, chop trees, place blocks, plant on farm soil');
+    row(K('use'), 'Eat or consume the held item · otherwise cast your spell');
+    row(K('torch'), 'Hold a torch in your other hand, whatever else you are holding. Craft torches from wood and flint');
+    row('1–0 · wheel', 'Choose hotbar slot' + (RW.settings.invertWheel ? ' (wheel turned round in Settings)' : ''));
+    row(K('interact'), 'Talk, read carvings, use a rift or Duat Altar to travel');
+    row(K('cast') + ' · ' + K('spell'), 'Cast spell · switch spell');
+    row(K('bag'), 'Bag and crafting');
+    row(K('map') + ' · ' + K('guide') + ' · ' + K('help'), 'Map · Field Guide · Controls');
+    row(K('settings'), 'Settings: full screen, scroll wheel, change any control, save your progress to a file');
+    row(K('chat'), 'Chat with other players');
+    box.append(el('span'), el('span', 'label', 'Change any of these in Settings.'));
+  };
+  let capture = null; // { id, slot, btn, t }
+  U.stopCapture = function () { if (!capture) return; capture = null; RW.input.capturing = false; if (U.open === 'opts') U.renderOpts(); };
+  function setBind(id, slot, code) {
+    const B = RW.binds; let moved = '';
+    if (code) RW.ACTIONS.forEach(([aid, name]) => { if (aid === id) return; const i = (B[aid] || []).indexOf(code); if (i >= 0) { B[aid][i] = null; moved = name; } });
+    B[id] = (B[id] || []).slice(); B[id][slot] = code || null;
+    RW.saveBinds(); U.hudKeys();
+    if (moved) U.toast(RW.keyName(code) + ' was on "' + moved + '". It does this now instead.');
+  }
+  window.addEventListener('keydown', (e) => {
+    if (!capture) return; e.preventDefault(); e.stopImmediatePropagation();
+    if (e.code === 'Escape') { U.stopCapture(); return; }
+    const { id, slot } = capture; capture = null; RW.input.capturing = false;
+    setBind(id, slot, e.code === 'Backspace' || e.code === 'Delete' ? null : e.code); U.renderOpts();
+  }, true);
+  // to put a mouse button on a control, click the waiting button with that mouse button; clicking anywhere else cancels
+  window.addEventListener('mousedown', (e) => {
+    if (!capture || performance.now() - capture.t < 200) return;
+    if (!(e.target.classList && e.target.classList.contains('wait'))) { capture = null; RW.input.capturing = false; return; }
+    e.preventDefault(); e.stopImmediatePropagation();
+    const { id, slot } = capture; capture = null; setTimeout(() => (RW.input.capturing = false), 0);
+    setBind(id, slot, 'Mouse' + e.button); U.renderOpts();
+  }, true);
+  window.addEventListener('contextmenu', (e) => { if (U.open === 'opts') e.preventDefault(); });
+  U.renderOpts = function () {
+    const box = $('#optbody'); box.innerHTML = '';
+    const sec = (t) => box.append(el('div', 'label opt-h', t));
+    sec('Screen');
+    const fs = el('button', 'btn small b-full', (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit full screen' : 'Full screen'); fs.type = 'button';
+    fs.onclick = () => { RW.game.toggleFullscreen(); fs.blur(); };
+    box.append(el('div', 'opt-row', null)); box.lastChild.append(el('span', null, 'Fill the whole screen with the game'), fs);
+    sec('Mouse');
+    const inv = el('label', 'opt-row'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = !!RW.settings.invertWheel;
+    cb.onchange = () => { RW.settings.invertWheel = cb.checked; RW.saveSettings(); U.toast(cb.checked ? 'Scroll wheel turned round.' : 'Scroll wheel back to normal.'); };
+    inv.append(el('span', null, 'Invert the scroll wheel (scrolling down moves the hotbar left)'), cb); box.append(inv);
+    sec('Controls');
+    box.append(el('p', 'opt-p', 'Click a key, then press the new key. For a mouse button, click the waiting button again with that mouse button. Esc cancels, Backspace clears.'));
+    const tbl = el('div', 'binds');
+    RW.ACTIONS.forEach(([id, name]) => {
+      tbl.append(el('span', null, name));
+      for (let slot = 0; slot < 2; slot++) {
+        const code = (RW.binds[id] || [])[slot];
+        const waiting = capture && capture.id === id && capture.slot === slot;
+        const b = el('button', 'btn small bind' + (waiting ? ' wait' : '') + (code ? '' : ' empty'), waiting ? 'Press a key…' : code ? RW.keyName(code) : '+'); b.type = 'button';
+        b.onclick = (e) => { e.stopPropagation(); capture = { id, slot, t: performance.now() }; RW.input.capturing = true; RW.input.codes = {}; U.renderOpts(); };
+        tbl.append(b);
+      }
+    });
+    box.append(tbl);
+    const rs = el('button', 'btn small', 'Put every control back to normal'); rs.type = 'button';
+    rs.onclick = () => { RW.binds = RW.defaultBinds(); RW.saveBinds(); U.hudKeys(); U.renderOpts(); U.toast('Controls are back to normal.'); };
+    box.append(el('div', 'opt-row', null)); box.lastChild.append(el('span'), rs);
+    sec('Your progress');
+    box.append(el('p', 'opt-p', 'Your hero, bag and world save in this browser by themselves every few seconds, and new versions of the game keep them. To move your progress to another computer or keep a spare copy, save it to a file.'));
+    const ex = el('button', 'btn small', 'Save progress to a file'); ex.type = 'button'; ex.onclick = U.exportSave;
+    const im = el('button', 'btn small', 'Load progress from a file'); im.type = 'button'; im.onclick = () => $('#importfile').click();
+    const r2 = el('div', 'opt-row'); r2.append(ex, im); box.append(r2);
+  };
+  // ---- save to a file / load from a file (every rw_ key in this browser) ----
+  U.exportSave = function () {
+    if (RW.game.playing) RW.game.saveNow();
+    const data = {}; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('rw_')) data[k] = localStorage.getItem(k); } } catch (e) { }
+    const blob = new Blob([JSON.stringify({ game: '4 Brothers World', version: RW.VERSION, savedAt: new Date().toISOString(), data })], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '4-brothers-world-' + (RW.player.name || 'save').replace(/[^\w-]+/g, '_') + '.json';
+    document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    U.toast('Progress saved to a file.');
+  };
+  $('#importfile').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      if (!j || !j.data || typeof j.data !== 'object' || !Object.keys(j.data).some((k) => k.startsWith('rw_save'))) throw new Error('not a save');
+      if (!confirm('Load the progress in "' + f.name + '"? It replaces the hero and world saved in this browser.')) return;
+      RW.game.playing = false; // don't let the running game save over it
+      Object.keys(localStorage).filter((k) => k.startsWith('rw_') && k !== 'rw_binds' && k !== 'rw_settings').forEach((k) => localStorage.removeItem(k));
+      Object.entries(j.data).forEach(([k, v]) => { if (k.startsWith('rw_') && typeof v === 'string') localStorage.setItem(k, v); });
+      const sv = JSON.parse(localStorage.getItem('rw_save_rock') || 'null'); if (sv) { sv.savedAt = Date.now(); localStorage.setItem('rw_save_rock', JSON.stringify(sv)); }
+      location.reload();
+    } catch (err) { U.toast('That file is not a 4 Brothers World save.'); }
   });
 
   // ======================= TITLE & CREATOR =======================
@@ -5825,6 +6229,7 @@ window.RW = window.RW || {};
     $('#b-new').textContent = 'New Hero';
     $('#b-guide2').onclick = () => U.openModal('guide');
     $('#b-help2').onclick = () => U.openModal('help');
+    $('#b-opts2').onclick = () => U.openModal('opts');
     U.netStatus();
   };
   // creator: pick a species, then customize
@@ -5979,7 +6384,9 @@ window.RW = window.RW || {};
   };
 
   // ====================== STAMINA ======================
-  P.maxStamina = () => 120;
+  // every crystal you've eaten adds a little stamina (gold ones more), so old saves get it too
+  P.staminaBonus = () => { const s = P.stats || {}; return Math.round(((s.red || 0) + (s.blue || 0) + (s.green || 0) + (s.purple || 0)) * 2 + (s.gold || 0) * 5); };
+  P.maxStamina = () => 120 + P.staminaBonus();
   P.stamina = 120; P.stamT = 0; P.exhausted = false; P._dt = 1 / 60;
   const stamMul = () => (RW.world.def && RW.world.def.staminaMul) || 1;
   let puffT = 0;
@@ -6000,7 +6407,10 @@ window.RW = window.RW || {};
     P.sprinting = false;
     if (P.exhausted) return 0.62;
     const blocked = U.blocking && U.blocking();
-    if (!blocked && target && RW.input.down('Shift') && P.ground && !P.water && P.tire(16 * P._dt, true)) { P.sprinting = true; if (Math.random() < 0.3) RW.fx.spawn({ x: P.x + P.w / 2 - target * 6, y: P.y + P.h - 1, vx: -target * 30, vy: -10, life: 0.35, color: '#a89880', size: 2, kind: 'smoke' }); return 1.45; }
+    // running is a real run: nearly twice walking speed, kicking up dust (keeps its speed through a jump)
+    const runKey = !blocked && target && RW.input.act('sprint') && !P.water;
+    if (runKey && (P.ground || P.sprinting2) && P.tire(16 * P._dt, true)) { P.sprinting = true; P.sprinting2 = true; if (P.ground && Math.random() < 0.6) RW.fx.spawn({ x: P.x + P.w / 2 - target * 6, y: P.y + P.h - 1, vx: -target * 50, vy: -14, life: 0.4, color: '#a89880', size: 2, kind: 'smoke' }); return 1.9; }
+    P.sprinting2 = false;
     return 1;
   };
   function tickStamina(dt) {
@@ -6505,7 +6915,7 @@ window.RW = window.RW || {};
   U.updateHud = function () {
     baseHud();
     const b = document.getElementById('stbar');
-    if (b) { b.querySelector('i').style.width = (100 * P.stamina / P.maxStamina()) + '%'; b.classList.toggle('tired', P.exhausted); b.querySelector('span').textContent = P.exhausted ? 'Exhausted' : inDuat() ? 'Stamina (the Duat costs 3x)' : P.sprinting ? 'Sprinting' : 'Stamina'; }
+    if (b) { b.querySelector('i').style.width = (100 * P.stamina / P.maxStamina()) + '%'; b.classList.toggle('tired', P.exhausted); b.querySelector('span').textContent = P.exhausted ? 'Exhausted' : inDuat() ? 'Stamina (the Duat costs 3x)' : P.sprinting ? 'Running' : 'Stamina ' + Math.floor(P.stamina) + ' / ' + P.maxStamina(); }
     const sd = document.getElementById('souldrain'); if (sd) sd.style.opacity = P.drainOn ? '1' : '0';
   };
   const baseUpdate = P.update;
@@ -6878,7 +7288,7 @@ window.RW = window.RW || {};
   RW.state = { bosses: {} };
   // bossDead = the boss of the world you're standing on
   Object.defineProperty(RW.state, 'bossDead', { get() { return !!(RW.world.def && RW.state.bosses[RW.world.def.id]); }, set(v) { if (RW.world.def) RW.state.bosses[RW.world.def.id] = !!v; } });
-  RW.settings = { reduceMotion: window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches };
+  RW.settings.reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   RW.cam = { x: 0, y: 0 }; RW.view = { w: 480, h: 270, scale: 3 };
   const G = (RW.game = { playing: false, time: 0, hasSave: false, moonText: '' });
   const cv = document.getElementById('game'); const g = cv.getContext('2d');
@@ -6909,10 +7319,11 @@ window.RW = window.RW || {};
   const M = RW.input.mouse;
   cv.addEventListener('mousemove', (e) => { M.x = e.clientX; M.y = e.clientY; });
   window.addEventListener('mousemove', (e) => { M.x = e.clientX; M.y = e.clientY; });
-  cv.addEventListener('mousedown', (e) => { RW.audio.start(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (e.button === 0) { M.l = true; M.lp = true; } if (e.button === 2) { M.r = true; M.rp = true; } });
-  window.addEventListener('mouseup', (e) => { if (e.button === 0) M.l = false; if (e.button === 2) M.r = false; });
+  cv.addEventListener('mousedown', (e) => { RW.audio.start(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (e.button === 0) { M.l = true; M.lp = true; } if (e.button === 2) { M.r = true; M.rp = true; } if (e.button === 1) e.preventDefault(); RW.input.press('Mouse' + e.button); });
+  window.addEventListener('mouseup', (e) => { if (e.button === 0) M.l = false; if (e.button === 2) M.r = false; RW.input.release('Mouse' + e.button); });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
-  cv.addEventListener('wheel', (e) => { M.wheel = Math.sign(e.deltaY); e.preventDefault(); }, { passive: false });
+  // the scroll wheel flips through the hotbar; Settings can turn its direction round
+  cv.addEventListener('wheel', (e) => { M.wheel = Math.sign(e.deltaY) * (RW.settings.invertWheel ? -1 : 1); e.preventDefault(); }, { passive: false });
 
   // ---------------- saving ----------------
   G.snapshot = () => {
@@ -6921,14 +7332,14 @@ window.RW = window.RW || {};
       v: 2, name: P.name, look: P.look, species: P.species, world: RW.world.def ? RW.world.def.id : P.startWorld, startWorld: P.startWorld, pos, visited: P.visited,
       inv: P.inv.map((s) => (s ? { id: s.id, n: s.n } : null)), sel: P.sel,
       stats: P.stats, spells: P.spells, hp: Math.max(1, Math.round(P.hp)), mana: Math.round(P.mana), x: Math.round(P.x), y: Math.round(P.y),
-      flags: P.flags, seen: P.seen, pouches: (E.allPouches || []).filter((p) => !RW.world.def || p.w !== RW.world.def.id).concat(E.pouches.map((p) => Object.assign({ w: p.w || (RW.world.def && RW.world.def.id) }, p))),
+      offTorch: !!P.offTorch, flags: P.flags, seen: P.seen, pouches: (E.allPouches || []).filter((p) => !RW.world.def || p.w !== RW.world.def.id).concat(E.pouches.map((p) => Object.assign({ w: p.w || (RW.world.def && RW.world.def.id) }, p))),
     };
   };
   G.load = function (s) {
     P.name = s.name || 'Cobble'; P.look = s.look || RW.art.DEFAULT_LOOK;
     P.inv = new Array(P.SLOTS).fill(null); (s.inv || []).forEach((it, i) => { if (it && RW.ITEMS[it.id] && i < P.SLOTS) P.inv[i] = { id: it.id, n: it.n }; });
     P.sel = s.sel || 0; P.stats = Object.assign({ red: 0, blue: 0, green: 0, purple: 0, gold: 0 }, s.stats || {});
-    P.spells = (s.spells || []).filter((x) => RW.SPELLS[x]); P.flags = s.flags || {}; P.seen = s.seen || {};
+    P.spells = (s.spells || []).filter((x) => RW.SPELLS[x]); P.flags = s.flags || {}; P.seen = s.seen || {}; P.offTorch = !!s.offTorch;
     P.hp = s.hp || P.maxHp(); P.mana = s.mana || 0; P.savedPos = s.x != null ? { x: s.x, y: s.y } : null;
     E.allPouches = (s.pouches || []).filter((p) => p && Array.isArray(p.items)).map((p) => Object.assign({ w: 'rock' }, p));
     P.species = RW.HEROES[s.species] ? s.species : 'rock';
@@ -6941,7 +7352,7 @@ window.RW = window.RW || {};
   };
   G.newCharacter = function () {
     P.inv = new Array(P.SLOTS).fill(null); P.sel = 0; P.stats = { red: 0, blue: 0, green: 0, purple: 0, gold: 0 };
-    P.spells = []; P.flags = {}; P.seen = {}; P.mana = 0; P.savedPos = null; E.pouches = []; E.allPouches = [];
+    P.spells = []; P.flags = {}; P.seen = {}; P.mana = 0; P.savedPos = null; E.pouches = []; E.allPouches = []; P.offTorch = false;
     P.startWorld = RW.HEROES[P.species].start; P.world = P.startWorld; P.pos = {}; P.visited = {}; P.visited[P.startWorld] = 1;
     if (P.species === 'fuzzy') { P.add('wood_sword', 1); P.add('berry', 3); P.spells = ['spark', 'mend']; P.mana = 40; }
     if (P.species === 'acorn') { P.add('wood_spear', 1); P.add('slingshot', 1); P.add('berry', 5); }
@@ -7154,6 +7565,7 @@ window.RW = window.RW || {};
       // player glow: eye light + cube lantern
       const glow = RW.hexToRgb(P.species === 'rock' ? (RW.GLOWS[P.look.glow] || '#ffb347') : P.species === 'ghost' ? '#b8c8ff' : '#ffe8c0'); const lan = (P.has('cube_lantern') ? 1.6 : 0.95) * (P.species === 'ghost' ? 1.1 : P.species === 'rock' ? 1 : 0.8);
       RW.fx.light(P.x + 6, P.y + 6, glow[0] / 255 * lan + 0.25, glow[1] / 255 * lan + 0.25, glow[2] / 255 * lan + 0.25);
+      P.torchFx(time);
       RW.world.ambBoost = 0;
     } else {
       // title camera drifts over Stalagmere
@@ -7176,9 +7588,10 @@ window.RW = window.RW || {};
     E.draw(g, rc, time);
     RW.net.drawPeers(g, rc);
     E.drawExtra(g, rc, time);
-    if (G.playing && !P.dead) RW.ent.drawPlayer(g, rc, P, P.look, { species: P.species, scale: P.scale(), item: P.held() ? P.held().id : null, swing: P.swingT, swingDur: P.swingDur, invuln: P.invulnT });
+    if (G.playing && !P.dead) RW.ent.drawPlayer(g, rc, P, P.look, { species: P.species, scale: P.scale(), item: P.held() ? P.held().id : null, swing: P.swingT, swingDur: P.swingDur, invuln: P.invulnT, torch: P.offTorch && P.has('torch'), time });
     W.drawWater(g, rc, v.w, v.h, time);
-    const extra = RW.fx.lights.slice();
+    // every light pushed this frame (player, torches, monsters, spells, waterfalls), then start fresh
+    const extra = RW.fx.lights.slice(); RW.fx.lights.length = 0;
     W.computeLight(Math.floor(rc.x / TS), Math.floor(rc.y / TS), Math.ceil(v.w / TS) + 1, Math.ceil(v.h / TS) + 1, extra, sk.light);
     W.drawLight(g, rc);
     drawRift(time);
@@ -7198,7 +7611,16 @@ window.RW = window.RW || {};
   }
 
   // ---------------- boot ----------------
+  // the first time a new version runs, keep a spare copy of the save from the version before (rw_save_backup_<version>)
+  function backupOnUpdate() {
+    const last = RW.store.get('version', null);
+    if (last === RW.VERSION) return;
+    const sv = RW.store.get('save_rock', null);
+    if (sv) RW.store.set('save_backup_' + (last || 'before-' + RW.VERSION), sv);
+    RW.store.set('version', RW.VERSION);
+  }
   async function boot() {
+    backupOnUpdate();
     RW.audio.muted = RW.store.get('muted', false);
     RW.art.buildTiles();
     await RW.art.loadSpeciesImages();

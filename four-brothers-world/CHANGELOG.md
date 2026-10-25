@@ -1,4 +1,18 @@
-# The 4 Brothers Worlds: versions
+# 4 Brothers World: versions
+
+## v1.2.1
+- The game is now called **4 Brothers World**.
+- **Torches.** Make 4 from 1 wood and 1 flint (or a ship plank and flint, or 2 cave moss and flint). Hold one like anything else, or press **T** to carry one in your other hand while you use your sword, pick or bow. Water puts it out.
+- **Stryx** live in the forests, mountains and jungles of Fuzzy World and Acorn World: wide, flat slabs of stepped stone with vines draped over their backs. They're chill, but stand on one (or hit it) and its vines come up lashing until it calms down.
+- **Settings** (O, or the button on the title screen): full screen, turn the scroll wheel round, change any control (every key and mouse button, two keys each), and save your progress to a file or load it back.
+- Gnarlroot only reaches about 22 blocks from its trunk now. Back off further and it waits.
+- Chopping a tree only fells that tree, not the ones whose leaves touch it.
+- The acorn buddy double jumps, so it keeps up when you climb, and pops back to you if it ever gets stuck far behind.
+- Leaves look like leaves: puffy pixel clumps, lit from above, with round, bumpy edges.
+- Jumping costs less stamina (2, double jump 3). Every crystal you eat adds 2 max stamina (gold adds 5), counting the ones you've already eaten.
+- Running is a real run now, nearly twice as fast as walking, and keeps its speed through a jump.
+- Your own glow and the cube lantern light up caves again (lights were being dropped every frame).
+- Updates keep your progress: the first time a new version runs it also keeps a spare copy of your old save.
 
 ## v1.2
 - **E** opens your bag. **R** now talks to people, reads carvings and uses altars and rifts.
