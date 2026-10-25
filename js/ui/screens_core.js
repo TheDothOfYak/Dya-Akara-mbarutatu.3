@@ -273,6 +273,8 @@
           try { sessionStorage.setItem('torcain-identity', JSON.stringify({ id: G.me.id, email: G.me.email, name: G.me.displayName })); } catch (e) { /* ignore */ }
           location.href = 'rpg/index.html';
         }],
+        /* The 4 Brothers Worlds — the brothers' 2D pixel platformer, its own page under four-brothers-worlds/ */
+        ['🌍 The 4 Brothers Worlds', () => { location.href = 'four-brothers-worlds/index.html'; }],
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['🪐 The Mbaru Tatu', () => UI.show('world')],
