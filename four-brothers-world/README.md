@@ -12,7 +12,7 @@ Open `four-brothers-world/index.html` in a browser, or pick **🌍 4 Brothers Wo
 
 Everyone needs the same version of the game: open the same link and refresh if the game says the versions don't match.
 
-The host's browser keeps the shared world, so the host keeps their tab open while you play. Each player's character saves on their own device. Room codes connect players directly (peer to peer) through the free PeerJS service. A few school or work networks block that; if joining fails, try another network.
+The host's browser keeps the shared world, so the host keeps their tab open while you play. Each player's character saves on their own device. Room codes connect players directly (peer to peer) through the free PeerJS service. If your networks won't link up directly, the game switches to a relay through the Dya'Akara site's online service by itself, so play from the website link rather than a downloaded copy.
 
 ## Controls and settings
 Press **Esc** for the pause menu (travel back to worlds you've visited, the home screen), **H** for the controls and **O** for Settings. In Settings you can go full screen, turn the scroll wheel round, change any key or mouse button, and save your progress to a file (or load it back on another computer).

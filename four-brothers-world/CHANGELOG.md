@@ -1,5 +1,9 @@
 # 4 Brothers World: versions
 
+## v1.5
+- **Joining works on any network.** When two computers can't link up directly (school or work wifi, phone data, strict routers), the game now connects through a relay automatically: the same Supabase realtime service Dya'Akara's online rooms use. A direct link is always tried first; if it hasn't come up after about 4 seconds the relay takes over, and the status line says "Connected through the relay". Nothing to set up. (The relay needs the Dya'Akara site's settings, so it works when you play from the website, not from a downloaded copy of the game.)
+- **Victory!** Beat Apophis, then use the rift that opens where it fell: a celebration screen with fireworks, a fanfare, all four heroes, everyone who beat the Duat with you, and your legendary reward. From there you can travel on to any world.
+
 ## v1.4
 - **Drop and destroy items.** Press **Z** to drop what you're holding on the ground (hold Shift for the whole stack). In the bag, Shift-click a slot to drop its whole stack, or pick an item up and press **Drop** (on the ground) or **Destroy** (gone for good; it asks twice). A dropped item waits about a second before you can pick it up again, so walk away from it if you want to leave it. Dropped items are only on your own screen, so to hand something to a brother use **X**.
 - **Relay for networks that can't link up.** If a brother's wifi, phone data or router won't let two computers connect directly, the game can now pass the connection through a relay server, but only when the direct route fails. The relay is off until you add one: see "Relay for tricky networks" in HOW-TO-ADD.md. Nothing changes for players whose networks already work.

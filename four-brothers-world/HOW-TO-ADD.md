@@ -70,9 +70,9 @@ Every control is an action in `RW.ACTIONS` (`js/core.js`) with up to two keys. R
 ## Multiplayer
 Everyone in a room must run the same `RW.VERSION`: a joining game says hello with its version and the host turns away a different one with a clear message. So bump the version with every update.
 
-## Relay for tricky networks (v1.4)
+## Relay for tricky networks
 
-Players connect straight from computer to computer. On some networks (school or work wifi, phone data, strict routers) that is blocked, and joining fails with "your two networks won't let the computers link up directly". A relay (a TURN server) fixes this by passing the game along when the direct route fails. It is off until you add one.
+Since v1.5 you don't need to do anything: when two computers can't link up directly, the game relays the connection through the Dya'Akara site's Supabase project (its settings come from `../js/config.js`). The steps below are optional. They add a TURN relay, which makes the *direct* link work on more networks, so fewer games need the Supabase relay.
 
 1. Make a free account with a TURN relay service. Metered (metered.ca) has a free plan. The game can't make the account for you.
 2. In your account, create an app and copy its **credentials link**. It looks like `https://YOURAPP.metered.live/api/v1/turn/credentials?apiKey=YOURKEY`.
