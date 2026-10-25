@@ -1,6 +1,6 @@
 # 4 Brothers World
 
-A 2D pixel open-world platformer by four brothers. Four worlds (Fuzzy, Acorn, Rock and Ghost), four heroes, and the Duat, where all four fight together.
+A 2D pixel open-world platformer by four brothers. Four worlds (Fuzzy, Acorn, Rock and Ghost), four heroes, and the Duat, where all four fight together. Acorn World also has Capstead's giant home trees, the Keilia keep (don't get caught where you shouldn't be), the Elsha'ryn grove, the Duskareth camp and the creatures of Torcain's Run.
 
 ## Play
 Open `four-brothers-world/index.html` in a browser, or pick **🌍 4 Brothers World** on the Dya'Akara main menu. `The 4 Brothers Worlds v1.1.html` is an older version, from before the game was renamed.
