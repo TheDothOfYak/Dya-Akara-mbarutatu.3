@@ -62,3 +62,10 @@ Every control is an action in `RW.ACTIONS` (`js/core.js`) with up to two keys. R
 ## Torches and Stryx
 - Torch: item `torch` (`kind: 'torch'`). `P.toggleTorch()` puts one in the other hand; `P.torchFx()` lights it.
 - Stryx: species `stryx`, behavior `E.behaviors.stryx`, drawing `D.stryx`. `platform: true` on a species lets players stand on its back; `lashR` / `lashY` set how far its vines reach and from how high.
+
+## Armor, hats and capes
+- Armor is an item with `kind: 'armor'`, `slot: 'head'` or `'body'`, `def` (how much it soaks up) and `tint` (its colour on the hero); see `js/data/items.js`. `RW.art.dressed()` draws armor, hats and capes over any hero.
+- Hats: add a name to `RW.HATS` and a few lines for it in `RW.art.dressed`. Capes: add a colour to `RW.CAPES`.
+
+## Multiplayer
+Everyone in a room must run the same `RW.VERSION`: a joining game says hello with its version and the host turns away a different one with a clear message. So bump the version with every update.

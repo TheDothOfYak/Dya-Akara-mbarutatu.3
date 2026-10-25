@@ -10,7 +10,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen&display=swap" rel="stylesheet">
+<!-- VT323 for everything you read (every letter easy to tell apart), Press Start 2P for the big arcade titles -->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
 /* Layout: full-screen pixel canvas; DOM overlay panels styled like carved stone with crystal accents. */
 :root {
@@ -27,11 +28,12 @@
   --danger: #ff6a5a;
   --good: #8dff8a;
   --mana: #6aa8ff;
-  --display: "Pixelify Sans", "Silkscreen", ui-monospace, monospace;
-  --small: "Silkscreen", "Pixelify Sans", ui-monospace, monospace;
+  --display: "VT323", ui-monospace, monospace;
+  --small: "VT323", ui-monospace, monospace;
+  --title: "Press Start 2P", "VT323", ui-monospace, monospace;
 }
 html, body { height: 100%; }
-body { background: var(--bg); color: var(--text); font-family: var(--display); font-size: 15px; overflow: hidden; user-select: none; -webkit-user-select: none; }
+body { background: var(--bg); color: var(--text); font-family: var(--display); font-size: 20px; overflow: hidden; user-select: none; -webkit-user-select: none; }
 #game { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; display: block; }
 #ui { position: fixed; inset: 0; pointer-events: none; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #ui > * { pointer-events: auto; }
@@ -40,31 +42,31 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--crystal); outline-offset: 2px; }
 
 .stone { background: var(--panel); border: 2px solid var(--edge); box-shadow: inset 0 2px 0 var(--edge-hi), inset 0 -3px 0 #0e0c13, 0 6px 0 rgba(0,0,0,.35); }
-.btn { background: var(--panel-2); color: var(--text); border: 2px solid var(--edge); box-shadow: inset 0 2px 0 var(--edge-hi), inset 0 -2px 0 #0e0c13; padding: 8px 14px; font-size: 15px; letter-spacing: .02em; }
+.btn { background: var(--panel-2); color: var(--text); border: 2px solid var(--edge); box-shadow: inset 0 2px 0 var(--edge-hi), inset 0 -2px 0 #0e0c13; padding: 8px 14px; font-size: 20px; letter-spacing: .02em; }
 .btn:hover { border-color: var(--crystal); color: #fff; }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: #23404a; border-color: #4a8ea0; }
 .btn.primary:hover { background: #2b505c; }
-.btn.small { padding: 4px 9px; font-size: 13px; }
+.btn.small { padding: 4px 9px; font-size: 17px; }
 .btn[disabled] { opacity: .45; cursor: not-allowed; }
-.label { font-family: var(--small); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.label { font-family: var(--small); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .hidden-ui { display: none !important; }
 
 /* ---------- title ---------- */
 #title { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, rgba(13,11,18,.15), rgba(13,11,18,.75)); }
 #title .wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px; max-width: 560px; text-align: center; }
-#logo { font-size: clamp(44px, 9vw, 92px); font-weight: 700; line-height: .9; letter-spacing: .04em; color: #c9c0b2; text-shadow: 0 2px 0 #f1eadf, 0 4px 0 #6b6470, 0 6px 0 #3a3440, 0 10px 18px rgba(0,0,0,.6); text-wrap: balance; }
+#logo { font-family: var(--title); font-size: clamp(30px, 6.5vw, 64px); font-weight: 400; line-height: .9; letter-spacing: .04em; color: #c9c0b2; text-shadow: 0 2px 0 #f1eadf, 0 4px 0 #6b6470, 0 6px 0 #3a3440, 0 10px 18px rgba(0,0,0,.6); text-wrap: balance; }
 #logo span { color: var(--crystal); text-shadow: 0 2px 0 #d8fbff, 0 4px 0 #2f6f80, 0 6px 0 #1a3a44, 0 0 24px rgba(127,227,255,.45); }
-#title .sub { color: var(--muted); font-size: 16px; max-width: 42ch; }
+#title .sub { color: var(--muted); font-size: 21px; max-width: 42ch; }
 #title .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-#logo small { font-size: .42em; letter-spacing: .08em; }
-#mp { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 12px; font-size: 13px; color: var(--muted); max-width: 52ch; }
+#logo small { font-size: .42em; letter-spacing: .08em; line-height: 2.2; }
+#mp { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 12px; font-size: 17px; color: var(--muted); max-width: 52ch; }
 #mp[hidden] { display: none; }
-#mp input { width: 9ch; text-transform: uppercase; font: inherit; font-size: 15px; letter-spacing: .12em; text-align: center; padding: 6px 8px; background: #0e0c13; color: var(--text); border: 2px solid var(--edge); }
-#mp .code { font-size: 20px; letter-spacing: .14em; color: var(--crystal); user-select: all; }
+#mp input { width: 11ch; text-transform: uppercase; font: inherit; font-size: 20px; letter-spacing: .12em; text-align: center; padding: 6px 8px; background: #0e0c13; color: var(--text); border: 2px solid var(--edge); }
+#mp .code { font-size: 26px; letter-spacing: .14em; color: var(--crystal); user-select: all; }
 #mp.live { border-color: var(--good); }
-#version { font-size: 12px; color: var(--muted); letter-spacing: .06em; opacity: .8; }
-#netstatus { font-size: 13px; color: var(--muted); max-width: 52ch; line-height: 1.45; padding: 10px 12px; }
+#version { font-size: 16px; color: var(--muted); letter-spacing: .06em; opacity: .8; }
+#netstatus { font-size: 17px; color: var(--muted); max-width: 52ch; line-height: 1.45; padding: 10px 12px; }
 #netstatus b { color: var(--text); font-weight: 600; }
 #netstatus .dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--muted); }
 #netstatus .dot.on { background: var(--good); box-shadow: 0 0 8px var(--good); }
@@ -72,17 +74,17 @@ button { cursor: pointer; }
 /* ---------- character creator ---------- */
 #creator { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(9,8,13,.86); overflow: auto; padding-block: 16px; }
 #creator .card { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 18px; padding: 18px; width: min(860px, 100%); }
-#creator h2 { margin: 0 0 4px; font-size: 26px; font-weight: 600; }
+#creator h2 { margin: 0 0 8px; font-family: var(--title); font-weight: 400; font-size: 20px; }
 #preview { width: 100%; aspect-ratio: 7 / 9; max-width: 100%; background: linear-gradient(#1a2230, #12101a 70%); border: 2px solid var(--edge); image-rendering: pixelated; }
 .opts { display: grid; gap: 10px; min-width: 0; }
 .opt { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: center; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.chip { background: var(--panel-2); color: var(--text); border: 2px solid var(--edge); padding: 3px 8px; font-size: 13px; }
+.chip { background: var(--panel-2); color: var(--text); border: 2px solid var(--edge); padding: 3px 8px; font-size: 17px; }
 .chip[aria-pressed="true"] { border-color: var(--crystal); background: #1f3640; color: #fff; }
 .swatch { width: 22px; height: 22px; border: 2px solid var(--edge); padding: 0; }
 .swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 8px currentColor; }
 input[type=range] { width: 100%; accent-color: var(--crystal); }
-input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid var(--edge); padding: 7px 9px; font-size: 16px; min-width: 0; width: 100%; }
+input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid var(--edge); padding: 7px 9px; font-size: 21px; min-width: 0; width: 100%; }
 .namerow { display: flex; gap: 6px; }
 @media (max-width: 640px) { #creator .card { grid-template-columns: 1fr; } .opt { grid-template-columns: 1fr; gap: 4px; } }
 
@@ -97,55 +99,55 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 .bar.stam { height: 11px; }
 .bar.stam i { background: linear-gradient(#f4f0a0, #b8a830); }
 .bar.stam.tired i { background: linear-gradient(#ff9a7a, #a83a2a); }
-.bar.stam span { font-size: 8px; }
+.bar.stam span { font-size: 10px; }
 #souldrain { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(160,10,30,0.55); opacity: 0; transition: opacity .6s; }
-.bar span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--small); font-size: 9px; color: #fff; text-shadow: 0 1px 0 #000; }
-#stats { display: flex; gap: 8px; font-family: var(--small); font-size: 9px; color: var(--muted); flex-wrap: wrap; }
+.bar span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--small); font-size: 12px; color: #fff; text-shadow: 0 1px 0 #000; }
+#stats { display: flex; gap: 8px; font-family: var(--small); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 #stats b { font-weight: 400; }
-#zone { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; font-size: 13px; color: var(--muted); text-shadow: 0 1px 0 #000; white-space: nowrap; }
-#zone b { display: block; color: var(--text); font-size: 17px; font-weight: 600; }
+#zone { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; font-size: 17px; color: var(--muted); text-shadow: 0 1px 0 #000; white-space: nowrap; }
+#zone b { display: block; color: var(--text); font-size: 22px; font-weight: 600; }
 #topright { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 48vw; }
-#online { font-size: 12px; padding: 6px 9px; color: var(--muted); }
+#online { font-size: 16px; padding: 6px 9px; color: var(--muted); }
 #online b { color: var(--good); font-weight: 600; }
 #hotbar { position: absolute; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); display: flex; gap: 3px; padding: 5px; }
 .slot { position: relative; width: 40px; height: 40px; background: #12101a; border: 2px solid var(--edge); display: grid; place-items: center; }
 .slot canvas { width: 32px; height: 32px; image-rendering: pixelated; }
-.slot .n { position: absolute; right: 2px; bottom: 0; font-family: var(--small); font-size: 9px; color: #fff; text-shadow: 0 1px 0 #000, 1px 0 0 #000; }
-.slot .k { position: absolute; left: 3px; top: 1px; font-family: var(--small); font-size: 8px; color: var(--muted); }
+.slot .n { position: absolute; right: 2px; bottom: 0; font-family: var(--small); font-size: 12px; color: #fff; text-shadow: 0 1px 0 #000, 1px 0 0 #000; }
+.slot .k { position: absolute; left: 3px; top: 1px; font-family: var(--small); font-size: 10px; color: var(--muted); }
 .slot.sel { border-color: var(--ember); box-shadow: 0 0 0 1px var(--ember), inset 0 0 10px rgba(255,179,71,.25); }
 .slot.hot { background: #17141f; }
 .slot:hover { border-color: var(--crystal); }
-#spellchip { position: absolute; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); font-size: 12px; padding: 4px 10px; white-space: nowrap; }
+#spellchip { position: absolute; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); font-size: 16px; padding: 4px 10px; white-space: nowrap; }
 #helpbtns { position: absolute; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; max-width: 30vw; }
 #feed { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: 30%; display: grid; gap: 3px; justify-items: end; pointer-events: none; }
-#feed div { font-size: 13px; background: rgba(13,11,18,.75); padding: 3px 8px; border-left: 3px solid var(--ember); animation: feed 2.4s forwards; display: flex; gap: 6px; align-items: center; }
+#feed div { font-size: 17px; background: rgba(13,11,18,.75); padding: 3px 8px; border-left: 3px solid var(--ember); animation: feed 2.4s forwards; display: flex; gap: 6px; align-items: center; }
 #feed canvas { width: 16px; height: 16px; image-rendering: pixelated; }
 @keyframes feed { 0% { opacity: 0; transform: translateX(8px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
-#toast { position: absolute; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); font-size: 14px; padding: 6px 12px; background: rgba(13,11,18,.85); border: 2px solid var(--edge); pointer-events: none; opacity: 0; transition: opacity .2s; max-width: min(560px, 90vw); text-align: center; }
+#toast { position: absolute; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); font-size: 18px; padding: 6px 12px; background: rgba(13,11,18,.85); border: 2px solid var(--edge); pointer-events: none; opacity: 0; transition: opacity .2s; max-width: min(560px, 90vw); text-align: center; }
 #toast.on { opacity: 1; }
 #banner { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; opacity: 0; transition: opacity .4s; width: min(640px, 90vw); }
 #banner.on { opacity: 1; }
-#banner b { display: block; font-size: clamp(26px, 4vw, 40px); font-weight: 700; color: #f2ead8; text-shadow: 0 3px 0 #3a3440, 0 0 24px rgba(200,166,255,.5); text-wrap: balance; }
-#banner span { display: block; margin-top: 6px; font-size: 15px; color: #d8d0e4; text-shadow: 0 1px 0 #000; text-wrap: balance; }
+#banner b { display: block; font-family: var(--title); font-size: clamp(18px, 2.8vw, 28px); font-weight: 400; line-height: 1.3; color: #f2ead8; text-shadow: 0 3px 0 #3a3440, 0 0 24px rgba(200,166,255,.5); text-wrap: balance; }
+#banner span { display: block; margin-top: 6px; font-size: 20px; color: #d8d0e4; text-shadow: 0 1px 0 #000; text-wrap: balance; }
 #bossbar { position: absolute; top: calc(58px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); width: min(520px, 80vw); text-align: center; }
-#bossbar .label { color: #e8e0ff; margin-bottom: 4px; font-size: 11px; }
+#bossbar .label { color: #e8e0ff; margin-bottom: 4px; font-size: 14px; }
 #bossbar .bar { height: 12px; border-color: #5a4a78; }
 #bossbar .bar i { background: linear-gradient(90deg, #a86ef0, #5ad0e8, #f2c94c); }
 #death { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(40,10,14,.55); pointer-events: none; }
-#death b { font-size: 44px; color: #f2d8d0; text-shadow: 0 3px 0 #3a1010; }
+#death b { font-size: 57px; color: #f2d8d0; text-shadow: 0 3px 0 #3a1010; }
 #death span { display: block; color: #e8c8c0; text-align: center; }
 
 /* ---------- panels ---------- */
 .modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(9,8,13,.6); padding: 16px; }
 .panel { width: min(880px, 100%); max-height: min(86vh, 100%); overflow: auto; padding: 14px 16px; }
-.panel h3 { margin: 0; font-size: 22px; font-weight: 600; }
+.panel h3 { margin: 0; font-family: var(--title); font-weight: 400; font-size: 17px; line-height: 1.4; }
 .phead { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
 #inv .cols { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 16px; }
 @media (max-width: 760px) { #inv .cols { grid-template-columns: 1fr; } }
 .grid { display: grid; grid-template-columns: repeat(10, 40px); gap: 3px; }
 @media (max-width: 480px) { .grid { grid-template-columns: repeat(5, 40px); } }
-#stash .hint { font-size: 12px; color: var(--muted); margin-top: 8px; max-width: 46ch; }
-#statsbox { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; font-size: 13px; }
+#stash .hint { font-size: 16px; color: var(--muted); margin-top: 8px; max-width: 46ch; }
+#statsbox { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; font-size: 17px; }
 #statsbox div { background: var(--panel-2); padding: 5px 8px; border-left: 3px solid var(--c, var(--edge)); }
 #craft { min-width: 0; }
 #craft .filter { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -153,48 +155,48 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 .recipe { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; background: var(--panel-2); padding: 5px 7px; border: 2px solid transparent; }
 .recipe.can { border-color: #2f5a3a; }
 .recipe canvas { width: 32px; height: 32px; image-rendering: pixelated; }
-.recipe .nm { font-size: 14px; }
-.recipe .ing { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 3px 10px; }
+.recipe .nm { font-size: 18px; }
+.recipe .ing { font-size: 16px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 3px 10px; }
 .recipe .ing .ok { color: var(--good); }
 .recipe .ing .no { color: #e8a098; }
-.recipe .at { font-family: var(--small); font-size: 9px; color: var(--ember); }
-.recipe .lock { font-size: 12px; color: #c8a6ff; }
+.recipe .at { font-family: var(--small); font-size: 12px; color: var(--ember); }
+.recipe .lock { font-size: 16px; color: #c8a6ff; }
 #held { position: fixed; pointer-events: none; width: 32px; height: 32px; image-rendering: pixelated; z-index: 50; }
-#tooltip { position: fixed; pointer-events: none; z-index: 60; background: #0f0d14; border: 2px solid var(--edge); padding: 6px 9px; font-size: 13px; max-width: 260px; }
-#tooltip b { display: block; font-size: 14px; }
+#tooltip { position: fixed; pointer-events: none; z-index: 60; background: #0f0d14; border: 2px solid var(--edge); padding: 6px 9px; font-size: 17px; max-width: 260px; }
+#tooltip b { display: block; font-size: 18px; }
 #tooltip i { font-style: normal; color: var(--muted); display: block; margin-top: 2px; }
 
 /* dialogue */
 #talk .panel { width: min(640px, 100%); display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; }
 #talk canvas { width: 96px; height: 120px; image-rendering: pixelated; background: #12101a; border: 2px solid var(--edge); }
-#talk .who { font-size: 20px; font-weight: 600; }
-#talk .says { font-size: 16px; line-height: 1.5; margin: 6px 0 12px; max-width: 60ch; min-height: 3em; }
+#talk .who { font-size: 26px; font-weight: 600; }
+#talk .says { font-size: 21px; line-height: 1.5; margin: 6px 0 12px; max-width: 60ch; min-height: 3em; }
 #talk .acts { display: flex; gap: 6px; flex-wrap: wrap; }
-.trade { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; background: var(--panel-2); padding: 6px 8px; margin-top: 5px; font-size: 13px; }
+.trade { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; background: var(--panel-2); padding: 6px 8px; margin-top: 5px; font-size: 17px; }
 @media (max-width: 520px) { #talk .panel { grid-template-columns: 1fr; } }
 
 /* carving */
 #carve .panel { width: min(520px, 100%); background: #2a2730; border-color: #4a4552; text-align: center; padding: 22px; }
 #carve h3 { color: #b8e8ff; text-shadow: 0 0 12px rgba(127,227,255,.4); }
-#carve p { font-size: 17px; line-height: 1.6; color: #ddd6ca; max-width: 46ch; margin: 12px auto 16px; }
+#carve p { font-size: 22px; line-height: 1.6; color: #ddd6ca; max-width: 46ch; margin: 12px auto 16px; }
 
 /* guide */
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .card2 { background: var(--panel-2); padding: 10px; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: start; border-left: 3px solid var(--c, var(--edge)); }
 .card2 canvas { width: 64px; height: 64px; image-rendering: pixelated; background: #12101a; }
-.card2 .nm { font-size: 15px; font-weight: 600; }
-.card2 .st { font-family: var(--small); font-size: 9px; color: var(--muted); margin: 2px 0 4px; }
+.card2 .nm { font-size: 20px; font-weight: 600; }
+.card2 .st { font-family: var(--small); font-size: 12px; color: var(--muted); margin: 2px 0 4px; }
 .card2 .st.on { color: var(--good); }
-.card2 p { margin: 0; font-size: 12px; color: #cfc6d8; line-height: 1.4; }
-.typeblurb { font-size: 13px; color: var(--muted); margin: -4px 0 10px; max-width: 70ch; }
+.card2 p { margin: 0; font-size: 16px; color: #cfc6d8; line-height: 1.4; }
+.typeblurb { font-size: 17px; color: var(--muted); margin: -4px 0 10px; max-width: 70ch; }
 
 /* map */
 #mapc { width: 100%; max-width: 100%; image-rendering: pixelated; background: #08070b; border: 2px solid var(--edge); }
 
 /* chat */
 #chatlog { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); width: min(360px, 60vw); display: grid; gap: 2px; pointer-events: none; }
-#chatlog div { font-size: 13px; background: rgba(13,11,18,.7); padding: 2px 7px; }
+#chatlog div { font-size: 17px; background: rgba(13,11,18,.7); padding: 2px 7px; }
 #chatlog div b { color: #9ad8ff; font-weight: 500; }
 #chatlog div.me b { color: var(--ember); }
 #chatin { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: min(360px, 70vw); }
@@ -204,17 +206,24 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 .worlds div { background: var(--panel-2); padding: 10px; text-align: center; }
 .worlds canvas { width: 72px; height: 72px; image-rendering: pixelated; }
 .worlds b { display: block; margin-top: 6px; }
-.worlds span { font-size: 12px; color: var(--muted); }
-.keys { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; font-size: 14px; }
-.keys kbd { font-family: var(--small); font-size: 10px; background: #0f0d14; border: 2px solid var(--edge); padding: 2px 6px; white-space: nowrap; align-self: start; }
+.worlds span { font-size: 16px; color: var(--muted); }
+.keys { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; font-size: 18px; }
+.keys kbd { font-family: var(--small); font-size: 13px; background: #0f0d14; border: 2px solid var(--edge); padding: 2px 6px; white-space: nowrap; align-self: start; }
+/* armor slots in the bag */
+#statsbox .wearing { display: flex; align-items: center; gap: 6px; grid-column: 1 / -1; }
+.armorslot { width: 36px; height: 36px; cursor: pointer; }
+.armorslot .k { top: auto; bottom: 1px; left: 2px; }
+/* pause */
+.pausebox { width: min(380px, 100%); display: grid; gap: 8px; text-align: center; }
+.pausebox h3 { margin-bottom: 4px; }
 /* settings */
 .opt-h { margin: 14px 0 6px; color: var(--crystal); }
 .opt-h:first-child { margin-top: 0; }
-.opt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; padding: 4px 0; }
+.opt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 18px; padding: 4px 0; }
 .opt-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--crystal); }
-.opt-p { font-size: 13px; color: var(--muted); margin: 0 0 6px; line-height: 1.45; max-width: 62ch; }
-.binds { display: grid; grid-template-columns: minmax(0, 1fr) 112px 112px; gap: 4px 6px; align-items: center; font-size: 13px; }
-.binds .bind { width: 100%; font-family: var(--small); font-size: 10px; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opt-p { font-size: 17px; color: var(--muted); margin: 0 0 6px; line-height: 1.45; max-width: 62ch; }
+.binds { display: grid; grid-template-columns: minmax(0, 1fr) 112px 112px; gap: 4px 6px; align-items: center; font-size: 17px; }
+.binds .bind { width: 100%; font-family: var(--small); font-size: 13px; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .binds .bind.empty { color: var(--muted); }
 .binds .bind.wait { border-color: var(--ember); color: var(--ember); }
 @media (max-width: 520px) { .binds { grid-template-columns: minmax(0, 1fr) 84px 84px; } }
@@ -257,6 +266,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
       <div id="online" class="stone"></div>
       <button class="btn small b-full" type="button">Full screen</button>
       <button class="btn small" id="b-mute" type="button">Sound on</button>
+      <button class="btn small" id="b-pause" type="button">Menu (Esc)</button>
     </div>
     <div id="feed"></div>
     <div id="spellchip" class="stone hidden-ui"></div>
@@ -274,14 +284,14 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     <div id="banner"><b></b><span></span></div>
     <div id="bossbar" class="hidden-ui"><div class="label">The Gemscale Leviathan</div><div class="bar"><i></i></div></div>
   </div>
-  <div id="death" class="hidden-ui"><div><b>You crumbled</b><span>Waking up in your cave… some of your things are lying where you fell.</span></div></div>
+  <div id="death" class="hidden-ui"><div><b>You fell</b><span>Waking up at home… some of your things are lying where you fell.</span></div></div>
   <div id="title">
     <div class="wrap">
       <div id="logo"><small>4 BROTHERS</small><br><span>WORLD</span></div>
       <div class="sub">Four worlds joined by the Duat. Play as a fuzzy, a rock, an acorn or a ghost, beat your home world, then go into the Duat together.</div>
       <div class="row">
         <button class="btn primary" id="b-play" type="button">Play</button>
-        <button class="btn" id="b-new" type="button">New Rock</button>
+        <button class="btn" id="b-new" type="button" style="display:none">New Hero</button>
         <button class="btn" id="b-guide2" type="button">Field Guide</button>
         <button class="btn" id="b-help2" type="button">Controls</button>
         <button class="btn" id="b-opts2" type="button">Settings</button>
@@ -293,14 +303,14 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div id="mp-msg">One player hosts and keeps the world. Everyone else joins with the room code.</div>
       </div>
       <div id="netstatus" class="stone">Connecting…</div>
-      <div id="version">v1.2.1</div>
+      <div id="version">v1.3</div>
     </div>
   </div>
   <div id="creator" class="hidden-ui">
     <div class="card stone">
-      <div><canvas id="preview" width="140" height="180"></canvas><div class="label" style="margin-top:6px">Your rock, walking in Stalagmere</div></div>
+      <div><canvas id="preview" width="140" height="180"></canvas><div class="label" style="margin-top:6px">Your hero</div></div>
       <div class="opts">
-        <div><h2>Make your rock</h2><div class="label">Stone Folk · Rocks type</div></div>
+        <div><h2>Make your hero</h2><div class="label">Pick a fuzzy, a rock, an acorn or a ghost</div></div>
         <div class="opt"><span class="label">Name</span><div class="namerow"><input type="text" id="c-name" maxlength="20" aria-label="Name"><button class="btn small" id="c-dice" type="button" title="Random name">Random</button></div></div>
         <div class="opt"><span class="label">Rock</span><div class="chips" id="c-rock"></div></div>
         <div class="opt"><span class="label">Color shift</span><input type="range" id="c-hue" min="-30" max="30" step="1" aria-label="Color shift"></div>
@@ -311,7 +321,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div class="opt"><span class="label">Eyes</span><div class="chips" id="c-eyes"></div></div>
         <div class="opt"><span class="label">Eye glow</span><div class="chips" id="c-glow"></div></div>
         <div class="opt"><span class="label">Mouth</span><div class="chips" id="c-mouth"></div></div>
-        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="c-rand" type="button">Randomize everything</button><button class="btn primary" id="c-go" type="button">Wake up in your cave</button></div>
+        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="c-rand" type="button">Randomize everything</button><button class="btn primary" id="c-go" type="button">Start your adventure</button></div>
       </div>
     </div>
   </div>
@@ -327,7 +337,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
   <div id="talk" class="modal hidden-ui"><div class="panel stone"><canvas width="48" height="60"></canvas><div><div class="who"></div><div class="says"></div><div class="acts"></div><div class="extra"></div></div></div></div>
   <div id="carve" class="modal hidden-ui"><div class="panel stone"><div class="label">Ancient carving</div><h3></h3><p></p><button class="btn" data-close type="button">Step back</button></div></div>
   <div id="guide" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Field Guide</h3><button class="btn small" data-close type="button">Close (G)</button></div><div class="tabs" id="gtabs"></div><div class="typeblurb" id="gblurb"></div><div class="cards" id="gcards"></div></div></div>
-  <div id="map" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Map</h3><button class="btn small" data-close type="button">Close (M)</button></div><canvas id="mapc"></canvas><div class="label" style="margin-top:6px">Only places you have explored are shown. Orange: you. Blue: other players.</div></div></div>
+  <div id="map" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Map</h3><button class="btn small" data-close type="button">Close (M)</button></div><canvas id="mapc"></canvas><div class="label" style="margin-top:6px">Only places you have explored are shown. Orange: you. Blue: other players.</div><button class="btn small" id="m-travel" type="button" style="margin-top:8px">Travel to a world you've visited</button></div></div>
   <div id="help" class="modal hidden-ui"><div class="panel stone" style="width:min(560px,100%)"><div class="phead"><h3>Controls</h3><button class="btn small" data-close type="button">Close (H)</button></div>
     <div class="keys">
       <kbd>A / D</kbd><span>Walk</span>
@@ -347,19 +357,28 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     <div class="worlds" id="worlds"></div>
     <p style="color:var(--muted);font-size:14px;max-width:62ch">Each boss that falls opens the way to the next world: Fuzzy World, then Acorn World, then Rock World, then the Ghost World. When a fuzzy, a rock, an acorn and a ghost have each beaten their home world, the Duat opens for everyone. Any Duat Altar takes you to worlds you have opened.</p>
     <button class="btn" data-close type="button">Step back</button></div></div>
+  <div id="pause" class="modal hidden-ui"><div class="panel stone pausebox"><h3>Paused</h3>
+    <button class="btn primary" id="p-resume" type="button">Back to the game</button>
+    <button class="btn" id="p-travel" type="button">Travel to a world you've visited</button>
+    <button class="btn" id="p-opts" type="button">Settings</button>
+    <button class="btn" id="p-help" type="button">Controls</button>
+    <button class="btn" id="p-title" type="button">4 Brothers World home screen</button>
+    <button class="btn" id="p-home" type="button">Back to Dya'Akara</button>
+    <div class="label">Your progress saves by itself.</div></div></div>
   <div id="opts" class="modal hidden-ui"><div class="panel stone" style="width:min(620px,100%)"><div class="phead"><h3>Settings</h3><button class="btn small" data-close type="button">Close (Esc)</button></div><div id="optbody"></div></div></div>
   <input type="file" id="importfile" accept=".json,application/json" hidden>
   <div id="tooltip" class="hidden-ui"></div>
   <canvas id="held" class="hidden-ui" width="16" height="16"></canvas>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<!-- multiplayer (room codes): if the first download fails, try a second source -->
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';s.onerror=function(){window.__peerFailed=true};document.head.appendChild(s);"></script>
 <script>/* js/core.js */
 // ROCK WORLD — core helpers shared by every other file.
 // Everything lives on the single global `RW` so files can be added in any session.
 window.RW = window.RW || {};
 (function (RW) {
-  RW.VERSION = '1.2.1'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
+  RW.VERSION = '1.3'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
   // Updates must keep players' progress: never rename the rw_ save keys, and only ever add tiles at the END of tiles.js
   // (world edits are saved by tile number). New save fields need a default when they're missing (see G.load).
   RW.TILE = 16;
@@ -473,6 +492,7 @@ window.RW = window.RW || {};
     ['attack', 'Swing, shoot, mine, chop, place blocks', ['Mouse0']],
     ['use', 'Eat or consume the held item, otherwise cast', ['Mouse2']],
     ['torch', 'Torch in your other hand: light it or put it away', ['KeyT']],
+    ['give', 'Give what you hold to the player next to you', ['KeyX']],
     ['cast', 'Cast spell', ['KeyF']],
     ['spell', 'Switch spell', ['KeyQ']],
     ['interact', 'Talk, read carvings, use rifts and altars', ['KeyR']],
@@ -627,6 +647,9 @@ window.RW = window.RW || {};
   add({ key: 'soulcrystal', name: 'Soul Crystal', hard: 2, time: 0.8, drop: 'soul_shard', crystal: '#ff3a4a', light: [0.9, 0.15, 0.2], decor: 'crystal' });
   add({ key: 'mirror', name: 'Mirror Floor', solid: true, hard: 99, colors: ['#1a1220', '#3a2a44', '#0e0a12'], tex: 'facet', light: [0.15, 0.05, 0.1], lockedMsg: 'The mirror shows your face, but the eyes are wrong.' });
 
+  // ---------- added in v1.3 (always add new blocks at the END: saved worlds remember blocks by number) ----------
+  add({ key: 'torchwall', name: 'Torch', hard: 0, time: 0.1, drop: 'torch', decor: 'torch', light: [1.0, 0.62, 0.28] });
+
   RW.TILES = T;
   RW.T = {}; T.forEach((t) => (RW.T[t.key] = t.id));
 
@@ -697,7 +720,31 @@ window.RW = window.RW || {};
   // ---------------- light ----------------
   // kind 'torch': held in the hand like anything else, or in your other hand with T while you hold something else
   R.items([
-    { id: 'torch', name: 'Torch', kind: 'torch', stack: 99, icon: { s: 'torch', a: '#ffb347', b: '#7a5634' }, desc: 'Lights the way. Press T to hold one in your other hand while you use anything else.' },
+    { id: 'torch', name: 'Torch', kind: 'torch', place: 'torchwall', stack: 99, icon: { s: 'torch', a: '#ffb347', b: '#7a5634' }, desc: 'Lights the way. Click to set one on the ground or a wall. Press T to hold one in your other hand while you use anything else.' },
+  ]);
+
+  // ---------------- armor ----------------
+  // slot: head or body. def: how much it soaks up (each point takes away a little of every hit). Right-click to put it on.
+  const AR = (o) => R.item(Object.assign({ kind: 'armor', stack: 1 }, o));
+  AR({ id: 'hide_cap', name: 'Hide Cap', slot: 'head', def: 1, tint: '#9a6a44', icon: { s: 'helm', a: '#9a6a44', b: '#6a4a2e' } });
+  AR({ id: 'hide_vest', name: 'Hide Vest', slot: 'body', def: 2, tint: '#9a6a44', icon: { s: 'chest', a: '#9a6a44', b: '#6a4a2e' } });
+  AR({ id: 'scale_helm', name: 'Scale Helm', slot: 'head', def: 1, tint: '#7aa0ae', icon: { s: 'helm', a: '#8fb0bd', b: '#4c6575' } });
+  AR({ id: 'scale_mail', name: 'Scale Mail', slot: 'body', def: 2, tint: '#7aa0ae', icon: { s: 'chest', a: '#8fb0bd', b: '#4c6575' } });
+  AR({ id: 'iron_helm', name: 'Iron Helm', slot: 'head', def: 2, tint: '#9aa3ad', icon: { s: 'helm', a: '#9aa3ad', b: '#5d6570' } });
+  AR({ id: 'iron_mail', name: 'Iron Mail', slot: 'body', def: 4, tint: '#9aa3ad', icon: { s: 'chest', a: '#9aa3ad', b: '#5d6570' } });
+  AR({ id: 'bronze_helm', name: 'Bronze Helm', slot: 'head', def: 3, tint: '#d8964a', icon: { s: 'helm', a: '#d8964a', b: '#8a5a2a' } });
+  AR({ id: 'bronze_mail', name: 'Bronze Mail', slot: 'body', def: 5, tint: '#d8964a', icon: { s: 'chest', a: '#d8964a', b: '#8a5a2a' } });
+  AR({ id: 'platinum_helm', name: 'Platinum Helm', slot: 'head', def: 4, tint: '#e8eef4', icon: { s: 'helm', a: '#eef4fa', b: '#9aa8b8' } });
+  AR({ id: 'platinum_mail', name: 'Platinum Mail', slot: 'body', def: 7, tint: '#e8eef4', icon: { s: 'chest', a: '#eef4fa', b: '#9aa8b8' } });
+  AR({ id: 'stygian_helm', name: 'Stygian Helm', slot: 'head', def: 6, tint: '#7a50d0', glow: '#c8a6ff', icon: { s: 'helm', a: '#9b6cff', b: '#2c2438' } });
+  AR({ id: 'stygian_mail', name: 'Stygian Mail', slot: 'body', def: 9, tint: '#7a50d0', glow: '#c8a6ff', icon: { s: 'chest', a: '#9b6cff', b: '#2c2438' } });
+  R.recipes([
+    { out: 'hide_cap', in: { warthog_hide: 3 }, at: 'knap' }, { out: 'hide_vest', in: { warthog_hide: 5 }, at: 'knap' },
+    { out: 'scale_helm', in: { fish_scale: 6 }, at: 'knap' }, { out: 'scale_mail', in: { fish_scale: 10 }, at: 'knap' },
+    { out: 'iron_helm', in: { iron_bar: 5 }, at: 'forge' }, { out: 'iron_mail', in: { iron_bar: 8 }, at: 'forge' },
+    { out: 'bronze_helm', in: { bronze_bar: 6 }, at: 'forge' }, { out: 'bronze_mail', in: { bronze_bar: 10 }, at: 'forge' },
+    { out: 'platinum_helm', in: { platinum_bar: 7 }, at: 'forge' }, { out: 'platinum_mail', in: { platinum_bar: 12 }, at: 'forge' },
+    { out: 'stygian_helm', in: { stygian_bar: 7, ectoplasm: 4 }, at: 'forge' }, { out: 'stygian_mail', in: { stygian_bar: 12, ectoplasm: 6 }, at: 'forge' },
   ]);
 
   // ---------------- food & farming (plant: tile it grows into on farm soil) ----------------
@@ -716,7 +763,7 @@ window.RW = window.RW || {};
     { id: 'crystal_blue', name: 'Blue Crystal', kind: 'crystal', stat: 'hp', max: 20, icon: { s: 'crystal', a: '#4fa8f0', b: '#a8d8ff' }, desc: 'Consume: +10 max health and +2 max stamina.' },
     { id: 'crystal_green', name: 'Green Crystal', kind: 'crystal', stat: 'spd', max: 10, icon: { s: 'crystal', a: '#5fd98a', b: '#b0f0c8' }, desc: 'Consume: +3% speed and +2 max stamina.' },
     { id: 'crystal_purple', name: 'Purple Crystal', kind: 'crystal', stat: 'mine', max: 15, icon: { s: 'crystal', a: '#a86ef0', b: '#d8b8ff' }, desc: 'Consume: +8% mining speed and +2 max stamina.' },
-    { id: 'crystal_gold', name: 'Gold Crystal', kind: 'crystal', stat: 'size', max: 8, icon: { s: 'crystal', a: '#f2c94c', b: '#fff0a8' }, desc: 'Rare. Consume: you grow bigger and tougher, with +5 max stamina.' },
+    { id: 'crystal_gold', name: 'Gold Crystal', kind: 'crystal', stat: 'size', max: 8, icon: { s: 'crystal', a: '#f2c94c', b: '#fff0a8' }, desc: 'Rare and magic. Consume: teaches you a new elemental spell (fire, lightning, poison, then more), makes all your magic stronger and your mana bigger, and you grow bigger and tougher, with +5 max stamina.' },
     { id: 'crystal_fire', name: 'Fire Crystal', kind: 'crystal', spell: 'fire', icon: { s: 'bigcrystal', a: '#ff7a2e', b: '#ffd08a' }, desc: 'Consume to learn Fire magic.' },
     { id: 'crystal_poison', name: 'Poison Crystal', kind: 'crystal', spell: 'poison', icon: { s: 'bigcrystal', a: '#8be04a', b: '#d8ff9a' }, desc: 'Consume to learn Poison magic.' },
     { id: 'crystal_lightning', name: 'Lightning Crystal', kind: 'crystal', spell: 'lightning', icon: { s: 'bigcrystal', a: '#7fe3ff', b: '#ffffff' }, desc: 'Consume to learn Lightning magic.' },
@@ -1445,7 +1492,8 @@ window.RW = window.RW || {};
 <script>/* js/data/worlds/rockworld.js */
 // ROCK WORLD — the hollow stone planet. Layers, top to bottom:
 //   sky -> open sea -> sea floor -> middle caves (partly flooded: Stalagmere, Crystal Forest)
-//   -> the water tubes -> the Heart Chamber (Gemscale Leviathan + elemental crystals) -> shell core.
+//   -> the water tubes, wrapped round the flooded Heart Chamber (Gemscale Leviathan + elemental crystals)
+//   -> deep veins -> shell core.
 // The generator is seeded, so every player builds the exact same world; only edits are shared.
 (function (RW) {
   const W = 640, H = 420;
@@ -1454,7 +1502,7 @@ window.RW = window.RW || {};
   const MID0 = 122, MID1 = 250, TUBE0 = 254, TUBE1 = 336;
   const VIL = { cx: 370, cy: 186, rx: 84, ry: 52 };     // Stalagmere cavern
   const CRY = { cx: 545, cy: 188, rx: 78, ry: 50 };     // Crystal Forest cavern
-  const CORE = { cx: 320, cy: 372, rx: 132, ry: 36 };   // Heart Chamber
+  const CORE = { cx: 320, cy: 300, rx: 118, ry: 30 };   // Heart Chamber: the middle of the planet's inner layer, under water
   const HOME = { x0: 262, x1: 282, y0: 214, y1: 222 };  // your cave
 
   RW.register.world({
@@ -1592,11 +1640,23 @@ window.RW = window.RW || {};
         if (x < 8 || x > W - 8) { ang = Math.PI - ang; x = RW.clamp(x, 8, W - 8); }
       }
     };
-    for (let i = 0; i < 6; i++) tube(20 + rng() * 600, TUBE0 + 10 + i * 12, rng() < 0.5 ? 0 : Math.PI, 260 + rng() * 200, 2.6 + rng() * 1.2);
-    // vertical drains: middle caves -> tubes, tubes -> heart chamber
+    for (let i = 0; i < 12; i++) tube(20 + rng() * 600, TUBE0 + 6 + i * 6.5, rng() < 0.5 ? 0 : Math.PI, 240 + rng() * 220, 2.2 + rng() * 1.4);
+    // vertical drains: middle caves -> tubes
     const shaft = (x, y0, y1, r, tile) => { for (let y = y0; y <= y1; y++) { const xx = x + Math.round(Math.sin(y * 0.15) * 2); for (let k = -r; k <= r; k++) { set(xx + k, y, tile); setb(xx + k, y, WL.deep); } } };
     [70, 175, 455, 610].forEach((x) => shaft(x, MID1 - 30, TUBE0 + 12, 2, T.water));
-    [225, 320, 412].forEach((x) => shaft(x, TUBE1 - 20, CORE.cy - CORE.ry + 4, 2, T.water));
+    // deep veins: thinner water channels winding through the rock under the tubes
+    const vein = (x, y, ang, len, r) => {
+      for (let i = 0; i < len; i++) {
+        disc(x, y, r, T.water, (t) => t !== T.bedrock);
+        for (let k = -r - 1; k <= r + 1; k++) setb(Math.round(x), Math.round(y + k), WL.deep);
+        ang += (rng() - 0.5) * 0.3; x += Math.cos(ang); y += Math.sin(ang) * 0.5;
+        if (y < TUBE1 + 4) { y = TUBE1 + 4; ang = Math.abs(ang) * 0.5; }
+        if (y > H - 18) { y = H - 18; ang = -Math.abs(ang) * 0.5; }
+        if (x < 8 || x > W - 8) { ang = Math.PI - ang; x = RW.clamp(x, 8, W - 8); }
+      }
+    };
+    for (let i = 0; i < 9; i++) vein(20 + rng() * 600, TUBE1 + 8 + rng() * 55, rng() * Math.PI * 2, 160 + rng() * 160, 1.3 + rng() * 0.9);
+    [150, 300, 480].forEach((x) => shaft(x, TUBE1 - 6, TUBE1 + 16, 1, T.water)); // tubes -> deep veins
     // dry pockets above the tubes (ember crawler nests)
     for (let i = 0; i < 9; i++) {
       const px = 30 + rng() * 580, py = TUBE0 + 4 + rng() * 60;
@@ -1611,7 +1671,7 @@ window.RW = window.RW || {};
     // ---------- 7. Heart Chamber ----------
     for (let y = CORE.cy - CORE.ry - 4; y <= CORE.cy + CORE.ry + 4; y++) for (let x = CORE.cx - CORE.rx - 4; x <= CORE.cx + CORE.rx + 4; x++) {
       const dx = (x - CORE.cx) / CORE.rx, dy = (y - CORE.cy) / CORE.ry;
-      if (dx * dx + dy * dy < 1 + (N(x / 9, y / 6, 51, 2) - 0.5) * 0.12) { set(x, y, y >= CORE.cy + 22 ? T.water : T.air); setb(x, y, WL.deep); }
+      if (dx * dx + dy * dy < 1 + (N(x / 9, y / 6, 51, 2) - 0.5) * 0.12) { set(x, y, T.water); setb(x, y, WL.deep); } // flooded to the roof
     }
     // shell core below
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -1642,7 +1702,7 @@ window.RW = window.RW || {};
     // magic crystals around the chamber walls
     for (let a = 0; a < 140; a++) {
       const ang = rng() * Math.PI * 2, x = Math.round(CORE.cx + Math.cos(ang) * (CORE.rx - 1)), y = Math.round(CORE.cy + Math.sin(ang) * (CORE.ry - 1));
-      if (get(x, y) === T.air && y < CORE.cy + 21) {
+      if (get(x, y) === T.water && y < CORE.cy + 21) {
         const r = rng();
         set(x, y, r < 0.05 ? T.c_gold : r < 0.3 ? T.c_red : r < 0.55 ? T.c_blue : r < 0.78 ? T.c_purple : T.c_green);
       }
@@ -1666,6 +1726,13 @@ window.RW = window.RW || {};
     // starter flint and gravel right around your cave
     [[HOME.x0 - 1, 217], [HOME.x0 + 4, HOME.y0 - 1], [HOME.x1 + 1, 216], [HOME.x0 + 10, HOME.y0 - 1], [HOME.x0 - 6, 216], [HOME.x0 - 12, 221]].forEach(([x, y]) => blob(x, y, 1.1, T.flint, [T.stone, T.gravel]));
     [[HOME.x0 + 2, HOME.y1 + 1], [HOME.x1 - 3, HOME.y1 + 1], [HOME.x0 - 8, 221], [HOME.x0 - 15, 216]].forEach(([x, y]) => blob(x, y, 1.6, T.gravel, [T.stone]));
+
+    // crystals grow here and there along the floors of the water veins and tubes
+    for (let y = TUBE0; y < H - 10; y++) for (let x = 4; x < W - 4; x++) {
+      if (get(x, y) !== T.water || !RW.TILES[get(x, y + 1)].solid || get(x, y + 1) === T.bedrock || inEll(x, y, CORE, 1.02)) continue;
+      const h = RW.hash2(x, y, 977 + seed);
+      if (h < 0.055) { const r = RW.hash2(y, x, 978 + seed); set(x, y, r < 0.05 ? T.c_gold : r < 0.3 ? T.c_blue : r < 0.55 ? T.c_green : r < 0.78 ? T.c_purple : T.c_red); }
+    }
 
     // ---------- 9. flood the low middle caves ----------
     for (let y = FLOOD; y < MID1 + 4; y++) for (let x = 2; x < W - 2; x++) if (get(x, y) === T.air) set(x, y, T.water);
@@ -1892,18 +1959,21 @@ window.RW = window.RW || {};
   // biomes: [{key, x0, x1, height(x)->y, top, fill, fillDepth, stone, wall, trees, decor}]
   S.terrain = function (c, biomes, sea, opt) {
     const { W, H, T } = c; opt = opt || {};
-    const surf = new Int16Array(W), biomeOf = new Array(W);
+    const surf = new Float32Array(W), biomeOf = new Array(W);
     const bAt = (x) => biomes.find((b) => x >= b.x0 && x < b.x1) || biomes[biomes.length - 1];
     for (let x = 0; x < W; x++) {
       const b = bAt(x); biomeOf[x] = b;
       let h = b.height(x);
-      // blend 18 tiles into neighbouring biomes so borders are smooth
-      const blend = 18;
+      // blend into the neighbouring biome across each border (both sides meet halfway, so no spike or cliff at the seam)
+      const blend = 18, sm = (t) => t * t * (3 - 2 * t);
       const prev = biomes[biomes.indexOf(b) - 1], next = biomes[biomes.indexOf(b) + 1];
-      if (prev && x - b.x0 < blend) { const t = (x - b.x0) / blend; h = RW.lerp(prev.height(x), h, t * t * (3 - 2 * t)); }
-      if (next && b.x1 - x < blend) { const t = (b.x1 - x) / blend; h = RW.lerp(next.height(x), h, t * t * (3 - 2 * t)); }
-      surf[x] = Math.round(h);
+      if (prev && x - b.x0 < blend) { const t = 0.5 + (x - b.x0) / (2 * blend); h = RW.lerp(prev.height(x), h, sm(t)); }
+      if (next && b.x1 - x <= blend) { const t = 0.5 + (b.x1 - x - 1) / (2 * blend); h = RW.lerp(next.height(x), h, sm(t)); }
+      surf[x] = h;
     }
+    // smooth the skyline a little so hills and mountains are rounded, never one-tile needles
+    for (let pass = 0; pass < 2; pass++) { const c2 = Float32Array.from(surf); for (let x = 2; x < W - 2; x++) surf[x] = (c2[x - 2] + c2[x - 1] * 2 + c2[x] * 3 + c2[x + 1] * 2 + c2[x + 2]) / 9; }
+    for (let x = 0; x < W; x++) surf[x] = Math.round(surf[x]);
     const deep = opt.deep || H - 70;
     for (let x = 0; x < W; x++) {
       const b = biomeOf[x]; const s = surf[x];
@@ -1927,14 +1997,17 @@ window.RW = window.RW || {};
     c.surf = surf; c.biomeOf = biomeOf; c.sea = sea; c.deep = deep;
   };
 
+  // Caves are proper caverns: big rounded chambers, wider the deeper you go, joined by a few winding
+  // tunnels, with water veins and pools in the deep rock. (Not a sponge of little holes.)
   S.caves = function (c, opt) {
     const { W, H, T, rng } = c; opt = opt || {};
     const top = (x) => c.surf[x] + (opt.crust || 9);
     for (let y = 0; y < H - 7; y++) for (let x = 2; x < W - 2; x++) {
       if (y < top(x)) continue;
       const d = (y - top(x)) / (H - top(x));
-      const n = c.N(x / 24, y / 13, 11, 4), n2 = c.N(x / 9, y / 8, 21, 2);
-      if (n > 0.62 - d * 0.05 || (n > 0.56 && n2 > 0.66)) c.set(x, y, T.air);
+      const n = c.N(x / 46, y / 17, 11, 3);
+      const edge = (c.N(x / 7, y / 6, 23, 2) - 0.5) * 0.05; // a little roughness on the cavern walls
+      if (n + edge > 0.665 - d * 0.06) c.set(x, y, T.air);
     }
     const worm = (x, y, ang, len, r) => {
       for (let i = 0; i < len; i++) {
@@ -1943,7 +2016,21 @@ window.RW = window.RW || {};
         x = RW.clamp(x, 4, W - 5); y = RW.clamp(y, 8, H - 9);
       }
     };
-    for (let i = 0; i < (opt.worms || 30); i++) { const x = 6 + rng() * (W - 12); worm(x, c.surf[Math.floor(x)] + 14 + rng() * (H - c.surf[Math.floor(x)] - 30), rng() * 6.28, 50 + rng() * 120, 1.4 + rng() * 1.4); }
+    for (let i = 0; i < Math.round((opt.worms || 30) * 0.45); i++) { const x = 6 + rng() * (W - 12); worm(x, c.surf[Math.floor(x)] + 14 + rng() * (H - c.surf[Math.floor(x)] - 30), rng() < 0.5 ? 0.15 : Math.PI - 0.15, 70 + rng() * 130, 2.1 + rng() * 1.2); }
+    // water veins: narrow water-filled channels through the deep rock, crystals growing along their floors
+    const crystals = [T.c_blue, T.c_green, T.c_purple, T.c_red];
+    for (let i = 0; i < (opt.veins || Math.round(W / 70)); i++) {
+      let x = 6 + rng() * (W - 12), y = c.surf[Math.floor(x)] + 30 + rng() * (H - c.surf[Math.floor(x)] - 46), ang = rng() * 6.28; const len = 90 + rng() * 140, r = 1.1 + rng() * 0.8;
+      for (let k = 0; k < len; k++) {
+        c.disc(x, y, r, T.water, (t, xx, yy) => t !== T.bedrock && yy > c.surf[RW.clamp(xx, 0, W - 1)] + 20);
+        ang += (rng() - 0.5) * 0.35; x += Math.cos(ang); y += Math.sin(ang) * 0.45;
+        x = RW.clamp(x, 4, W - 5); y = RW.clamp(y, c.surf[Math.floor(x)] + 24, H - 10);
+      }
+    }
+    for (let y = 20; y < H - 8; y++) for (let x = 3; x < W - 3; x++) {
+      if (c.get(x, y) !== T.water || !c.solid(x, y + 1) || c.get(x, y + 1) === T.bedrock || y < c.surf[x] + 20) continue;
+      const h = RW.hash2(x, y, 951 + c.seed); if (h < 0.06) c.set(x, y, RW.hash2(y, x, 952 + c.seed) < 0.06 ? T.c_gold : crystals[Math.floor(RW.hash2(x, y, 953 + c.seed) * 4)]);
+    }
     // a few cave mouths: tunnels from the surface down
     (opt.mouths || []).forEach((mx) => { let ang = Math.PI / 2 + (rng() - 0.5) * 0.6; let x = mx, y = c.surf[mx] - 1; for (let i = 0; i < 46; i++) { c.disc(x, y, 1.8, T.air, (t) => t !== T.bedrock && t !== T.water); ang += (rng() - 0.5) * 0.3; x += Math.cos(ang) * 0.6; y += Math.max(0.5, Math.sin(ang)); } });
     // little underground pools
@@ -1992,7 +2079,7 @@ window.RW = window.RW || {};
   S.decorate = function (c) {
     const { W, T } = c;
     for (let x = 3; x < W - 3; x++) {
-      const b = c.biomeOf[x]; const s = c.surf[x]; if (s >= c.sea) continue;
+      const b = c.biomeOf[x]; const s = c.surf[x]; if (s >= c.sea || c.get(x, s) === T.water) continue;
       const h = RW.hash2(x, 99, c.seed);
       if (b.trees && h < b.trees.density && x % (b.trees.spacing || 3) === 0) { S.tree(c, x, b.trees.kind); continue; }
       if (c.get(x, s - 1) !== T.air) continue;
@@ -2095,13 +2182,16 @@ window.RW = window.RW || {};
       { key: 'ocean', x0: 0, x1: 34, height: () => SEA + 14, top: 'sand', fill: 'sand', stone: 'sandstone', wall: 'sandw' },
       { key: 'desert', x0: 34, x1: 228, height: (x) => 104 + Math.sin(x * 0.055) * 4 + (N(x / 26, 0.3, 5, 3) - 0.5) * 12, top: 'sand', fill: 'sand', fillDepth: 9, stone: 'sandstone', wall: 'sandw', trees: { kind: 'cactus', density: 0.55, spacing: 5 }, decor: [['tallgrass', 0.03]] },
       { key: 'forest', x0: 228, x1: 410, height: (x) => 96 + (N(x / 46, 2.1, 7, 3) - 0.5) * 50 + (N(x / 13, 4.4, 9, 2) - 0.5) * 10, top: 'grass', fill: 'dirt', stone: 'stone', wall: 'dirt', trees: { kind: 'oak', density: 0.45, spacing: 4 }, decor: [['tallgrass', 0.4], ['flower', 0.12], ['berrybush', 0.08]] },
-      { key: 'mountains', x0: 410, x1: 548, height: (x) => 98 - Math.pow(ridge(x), 1.6) * 74 - (N(x / 11, 6.1, 13, 2) - 0.5) * 10, top: 'grass', fill: 'dirt', fillDepth: 3, stone: 'stone', wall: 'dirt', snowAbove: 54, trees: { kind: 'pine', density: 0.35, spacing: 4 }, decor: [['tallgrass', 0.25], ['flower', 0.05]] },
+      { key: 'mountains', x0: 410, x1: 548, height: (x) => { const t = RW.clamp((x - 410) / 138, 0, 1), mass = Math.pow(Math.sin(Math.PI * t), 1.2); return 98 - mass * 56 - (N(x / 24, 6.1, 13, 3) - 0.5) * 26 * mass - (N(x / 9, 2.3, 17, 2) - 0.5) * 4; }, top: 'grass', fill: 'dirt', fillDepth: 3, stone: 'stone', wall: 'dirt', snowAbove: 54, trees: { kind: 'pine', density: 0.35, spacing: 4 }, decor: [['tallgrass', 0.25], ['flower', 0.05]] },
       { key: 'jungle', x0: 548, x1: 764, height: (x) => 108 + (N(x / 30, 8.2, 17, 3) - 0.5) * 18, top: 'jgrass', fill: 'mud', fillDepth: 8, stone: 'stone', wall: 'mud', trees: { kind: 'jungle', density: 0.62, spacing: 3 }, decor: [['tallgrass', 0.5], ['berrybush', 0.1], ['flower', 0.05]] },
       { key: 'ocean', x0: 764, x1: W, height: () => SEA + 14, top: 'sand', fill: 'sand', stone: 'sandstone', wall: 'sandw' },
     ];
     RW.surface.terrain(c, biomes, SEA, { deep: 250 });
     // a forest lake
-    for (let x = 372; x < 396; x++) { const d = Math.round(Math.sin((x - 372) / 24 * Math.PI) * 7); const s0 = c.surf[x]; for (let y = s0; y < s0 + d; y++) c.set(x, y, T.water); for (let y = s0 + d; y < s0 + d + 2; y++) c.set(x, y, T.sand); }
+    { // one flat water level, just under the lower of its two banks
+      const L = Math.max(c.surf[370], c.surf[397]) + 1;
+      for (let x = 372; x < 396; x++) { const d = Math.round(Math.sin((x - 372) / 24 * Math.PI) * 8) + 1; const bot = Math.max(L + 1, c.surf[x]) + d; for (let y = c.surf[x] - 3; y < L; y++) { c.set(x, y, T.air); c.setb(x, y, 0); } for (let y = L; y < L + 1; y++) c.setb(x, y, 0); for (let y = L; y < bot; y++) c.set(x, y, T.water); for (let y = bot; y < bot + 2; y++) c.set(x, y, T.sand); c.surf[x] = L; }
+    }
     RW.surface.caves(c, { worms: 46, mouths: [150, 262, 384 - 20, 470, 600, 712 - 80], pools: 60 });
     RW.surface.ores(c, [
       ['gravel', 0, 260, 0.22, [1.2, 1.5], ['stone', 'dirt', 'sandstone']],
@@ -2427,7 +2517,7 @@ window.RW = window.RW || {};
     RW.TILES.forEach((t, id) => {
       A.tiles[id] = [];
       if (!t.colors) return;
-      for (let v = 0; v < 4; v++) A.tiles[id][v] = texture(t, seedOf(id, v));
+      for (let v = 0; v < 8; v++) { A.tiles[id][v] = texture(t, seedOf(id, v)); detail(A.tiles[id][v].ctx, t, seedOf(id, v), v); }
     });
     RW.WALLS.forEach((w, id) => {
       A.walls[id] = [];
@@ -2436,6 +2526,23 @@ window.RW = window.RW || {};
     });
     A.cracks = [0, 1, 2, 3].map(crackTex);
   };
+  // little things in the ground, so neighbouring blocks don't look stamped out of one mould
+  function detail(g, t, s, v) {
+    const H = (a, b, k) => RW.hash2(a, b, s + 300 + (k || 0)); const [base, hi, lo] = t.colors; const tex = t.tex;
+    const dark = RW.shade(lo, -0.25), light = RW.shade(hi, 0.18);
+    if (tex === 'rough' || tex === 'layer') {
+      if (v % 3 === 0) { const x = 2 + H(1, 1) * 10, y = 2 + H(2, 1) * 10; ell(g, x, y, 2, 1, light); px(g, x - 1, y - 1, RW.shade(light, 0.2)); px(g, x + 1, y + 1, lo); ell(g, x + 4, y + 2, 1, 1, hi); }
+      if (v % 4 === 1) { let x = 3 + H(3, 1) * 8, y = 2; for (let k = 0; k < 7; k++) { px(g, x, y, dark); x += H(k, 9) > 0.5 ? 1 : -1; y += 1 + (H(k, 8) > 0.6 ? 1 : 0); } }
+      if (v === 7) { const cx = 8, cy = 8; for (let a = 0; a < 14; a++) { const r = 0.6 + a * 0.28, an = a * 0.75; px(g, cx + Math.cos(an) * r, cy + Math.sin(an) * r, a % 2 ? light : RW.shade(base, 0.12)); } } // a fossil
+    } else if (tex === 'soil2') {
+      if (v % 2 === 0) { let x = 1 + H(1, 2) * 12, y = 0; for (let k = 0; k < 9; k++) { px(g, x, y, '#3a2416'); if (k % 3 === 2) px(g, x + 1, y, '#4a3020'); x += H(k, 5) > 0.5 ? 1 : 0; y += 1; } } // a root
+      for (let k = 0; k < 2 + (v % 3); k++) { const x = H(k, 3) * 14, y = H(k, 4) * 14; ell(g, x, y, 1, 1, '#8a8078'); px(g, x - 1, y - 1, '#a8a098'); }
+    } else if (tex === 'sand') {
+      if (v % 3 === 1) { const x = 3 + H(1, 3) * 9, y = 4 + H(2, 3) * 8; px(g, x, y, '#f4ead4'); px(g, x + 1, y - 1, '#f4ead4'); px(g, x + 2, y, '#e8d8b8'); px(g, x + 1, y, '#c8a880'); } // a little shell
+      for (let x = 0; x < TS; x++) if (H(x, 7) > 0.8) px(g, x, 10 + Math.round(Math.sin(x * 0.5 + v) * 1.5), lo);
+    }
+    if (t.key === 'snow') for (let k = 0; k < 3; k++) px(g, H(k, 11) * 15, H(k, 12) * 15, k % 2 ? '#ffffff' : '#bfe0ff');
+  }
   function texture(t, s) {
     const c = mk(TS, TS), g = c.ctx; const [base, hi, lo] = t.colors;
     const H = (x, y, k) => RW.hash2(x, y, s + (k || 0));
@@ -3090,7 +3197,7 @@ window.RW = window.RW || {};
     const foot = (x, lift) => { rect(g, x - 2, 28 - lift, 5, 2, C.dark); rect(g, x - 1, 27 - lift, 3, 1, mid); px(g, x - 1, 29 - lift, deep); px(g, x + 1, 29 - lift, deep); };
     if (frame === 5) { foot(cx - 4, 1); foot(cx + 4, 1); } else { foot(cx - 4, Math.max(0, walk)); foot(cx + 4, Math.max(0, -walk)); }
     // ears sit behind the fur
-    const ears = look.ears || 'none';
+    const ears = 'none'; // fuzzies don't have ears
     if (ears === 'round') [-1, 1].forEach((s2) => { ell(g, cx + s2 * 6, cy - 9, 3, 3, C.base); ell(g, cx + s2 * 6, cy - 9, 1, 1, '#e8a0a0'); px(g, cx + s2 * 6 - 1, cy - 11, C.light); });
     else if (ears === 'pointy') [-1, 1].forEach((s2) => { for (let k = 0; k < 6; k++) line(g, cx + s2 * (4 + k * 0.5), cy - 8, cx + s2 * 7, cy - 14 + Math.round(k * 0.4), k < 3 ? C.base : mid); px(g, cx + s2 * 6, cy - 10, '#e8a0a0'); px(g, cx + s2 * 6, cy - 11, '#e8a0a0'); });
     // body
@@ -3150,7 +3257,7 @@ window.RW = window.RW || {};
   };
   A.heroSprites = (species, look) => (species === 'fuzzy' ? A.fuzzySprites(look) : A.rockSprites(look));
   A.DEFAULT_FUZZY = { fur: 'brown', hue: 0, tone: 0, fluff: 'round', ears: 'none', eyes: 'big', mouth: 'smile', extra: 'none' };
-  A.randomFuzzy = () => ({ fur: RW.pick(Object.keys(RW.FUR_TYPES)), hue: RW.randi(-14, 14), tone: Math.round(RW.rand(-0.06, 0.06) * 100) / 100, fluff: RW.pick(Object.keys(RW.FLUFFS)), ears: RW.pick(Object.keys(RW.EARS)), eyes: RW.pick(['big', 'big', 'happy', 'sleepy', 'tiny']), mouth: RW.pick(Object.keys(RW.FMOUTHS)), extra: RW.pick(Object.keys(RW.EXTRAS)) });
+  A.randomFuzzy = () => ({ fur: RW.pick(Object.keys(RW.FUR_TYPES)), hue: RW.randi(-14, 14), tone: Math.round(RW.rand(-0.06, 0.06) * 100) / 100, fluff: RW.pick(Object.keys(RW.FLUFFS)), ears: 'none', eyes: RW.pick(['big', 'big', 'happy', 'sleepy', 'tiny']), mouth: RW.pick(Object.keys(RW.FMOUTHS)), extra: RW.pick(Object.keys(RW.EXTRAS)) });
   D.fuzzyfolk = (o) => A.fuzzySprites(o.look || A.DEFAULT_FUZZY).map((p) => p[0]);
   D.fuzzy = () => [A.fuzzyFrame(A.DEFAULT_FUZZY, 0)];
 
@@ -3454,6 +3561,18 @@ window.RW = window.RW || {};
   RW.art.clearLeafCache = () => { for (const k in leafCache) delete leafCache[k]; };
   X.leaves = (g, t, x, y, time, h, wx, wy) => g.drawImage(leafTile('leaves', wx, wy), x, y);
   X.oakleaves = (g, t, x, y, time, h, wx, wy) => g.drawImage(leafTile('oakleaves', wx, wy), x, y);
+  // a torch set on the ground, or in a bracket on the wall beside it
+  X.torch = (g, t, x, y, time, h, wx, wy) => {
+    const W = RW.world, sol = (a, b) => RW.TILES[W.get(a, b)].solid;
+    const side = !sol(wx, wy + 1) && sol(wx - 1, wy) ? -1 : !sol(wx, wy + 1) && sol(wx + 1, wy) ? 1 : 0;
+    const bx = x + 8 + side * 4, by = y + 15;
+    if (side) { line(g, bx - side * 3, by - 7, bx, by - 9, '#4a4a52'); line(g, bx - side * 3, by - 6, bx - side, by - 7, '#4a4a52'); }
+    const lean = side ? -side : 0;
+    line(g, bx, by - (side ? 6 : 0), bx + lean, by - 9 - (side ? 2 : 0), '#7a5634'); line(g, bx + 1, by - (side ? 6 : 0), bx + 1 + lean, by - 9 - (side ? 2 : 0), '#5a3e26');
+    const top = by - 11 - (side ? 2 : 0), f = Math.sin(time * 12 + h * 9) + Math.sin(time * 7.7 + h * 3), fh = 3 + Math.round(f * 0.7);
+    rect(g, bx + lean - 1, top - fh + 1, 3, fh + 1, '#ff7a2e'); rect(g, bx + lean, top - fh + 2, 1, fh, '#ffd27a'); px(g, bx + lean, top + 1, '#3a2a1c');
+    if (f > 0.8) px(g, bx + lean + (f > 1.3 ? 1 : -1), top - fh, '#ffb347');
+  };
   X.cactus = (g, t, x, y, time, h, wx) => { rect(g, x + 5, y, 6, 16, '#4a8a3a'); rect(g, x + 5, y, 1, 16, '#6ab84a'); rect(g, x + 10, y, 1, 16, '#2a5a22'); if (wx % 2) { rect(g, x + 1, y + 6, 4, 2, '#4a8a3a'); rect(g, x + 1, y + 3, 2, 4, '#4a8a3a'); } for (let k = 0; k < 4; k++) px(g, x + 4 + (k % 2) * 8, y + 2 + k * 4, '#e8e0c0'); };
   X.tallgrass = (g, t, x, y, time, h, wx) => { for (let k = 0; k < 5; k++) { const bx = x + 2 + k * 3, hh = 4 + ((wx + k * 3) % 5); const sw = Math.round(Math.sin(time * 2 + wx + k) * 1); line(g, bx, y + 15, bx + sw, y + 15 - hh, k % 2 ? '#5f9a3a' : '#86c050'); } };
   X.flower = (g, t, x, y, time, h, wx) => { const col = ['#f0a0c0', '#ffe36a', '#a8c8ff', '#ffffff', '#ff8a5a'][wx % 5]; line(g, x + 8, y + 15, x + 8, y + 8, '#4a8a3a'); px(g, x + 7, y + 11, '#4a8a3a'); ell(g, x + 8, y + 7, 2, 2, col); px(g, x + 8, y + 7, '#ffe36a'); };
@@ -3475,6 +3594,8 @@ window.RW = window.RW || {};
 
   // ======================= ICONS =======================
   const I = A.iconExtra;
+  I.helm = (g, a, b) => { ell(g, 8, 8, 6, 5, a); rect(g, 2, 8, 13, 4, a); rect(g, 2, 11, 13, 2, b); rect(g, 7, 3, 2, 9, RW.shade(a, 0.3)); rect(g, 4, 9, 3, 2, b); rect(g, 10, 9, 3, 2, b); };
+  I.chest = (g, a, b) => { rect(g, 3, 3, 10, 11, a); rect(g, 1, 3, 3, 5, a); rect(g, 12, 3, 3, 5, a); rect(g, 6, 3, 4, 2, b); line(g, 8, 5, 8, 13, b); [[5, 7], [10, 7], [5, 11], [10, 11]].forEach(([x, y]) => px(g, x, y, RW.shade(a, 0.4))); };
   I.torch = (g, a, b) => { line(g, 5, 15, 10, 6, b); line(g, 6, 15, 11, 6, RW.shade(b, -0.25)); rect(g, 9, 5, 3, 2, '#4a3a2a'); ell(g, 11, 3, 2, 3, a); ell(g, 11, 3, 1, 2, '#ffe08a'); px(g, 11, 1, '#ff7a2e'); px(g, 12, 0, '#ff9a3a'); };
   I.log = (g, a, b) => { rect(g, 2, 6, 12, 6, a); rect(g, 2, 6, 12, 1, RW.shade(a, 0.3)); ell(g, 13, 9, 2, 3, '#d8b080'); px(g, 13, 9, b); line(g, 4, 9, 10, 9, b); };
   I.bench = (g, a, b) => { rect(g, 1, 6, 14, 3, a); rect(g, 2, 9, 2, 6, b); rect(g, 12, 9, 2, 6, b); rect(g, 5, 3, 4, 3, '#8a858c'); };
@@ -3639,6 +3760,59 @@ window.RW = window.RW || {};
     return A.rockSprites(look || A.DEFAULT_LOOK);
   };
   A.defaultLook = (sp) => ({ fuzzy: A.DEFAULT_FUZZY, acorn: A.DEFAULT_ACORN, ghost: A.DEFAULT_GHOST }[sp] || A.DEFAULT_LOOK);
+  { const baseRandom = A.randomHero; A.randomHero = (sp) => Object.assign(baseRandom(sp), { hat: Math.random() < 0.35 ? RW.pick(Object.keys(RW.HATS).slice(1)) : 'none', cape: Math.random() < 0.3 ? RW.pick(Object.keys(RW.CAPES).slice(1)) : 'none' }); }
+  // ---- dressing up any hero: a hat or a cape (from the creator) and the armor you wear, drawn over the body ----
+  RW.HATS = { none: 'None', cap: 'Cap', crown: 'Crown', flowers: 'Flower crown', wizard: 'Wizard hat', bandana: 'Bandana', bow: 'Bow' };
+  RW.CAPES = { none: 'None', red: '#c83a3a', blue: '#3a6ad0', green: '#3a9a4a', purple: '#8a4ad0', gold: '#e0b030', black: '#2a2630' };
+  const dressCache = {};
+  A.dressed = function (species, look, armor) {
+    const base = A.heroSprites(species, look); look = look || {};
+    const head = armor && RW.ITEMS[armor[0]], body = armor && RW.ITEMS[armor[1]];
+    const hat = !head && RW.HATS[look.hat] && look.hat !== 'none' ? look.hat : null, cape = RW.CAPES[look.cape] && look.cape !== 'none' ? RW.CAPES[look.cape] : null;
+    if (!hat && !cape && !head && !body) return base;
+    const key = species + '|' + JSON.stringify(look) + '|' + (armor || []).join(',');
+    if (dressCache[key]) return dressCache[key];
+    const PADX = 4, PADT = 8;
+    const out = base.map((pair) => {
+      const f = pair[0], W2 = f.width + PADX * 2, H2 = f.height + PADT;
+      // the body's outline on this frame
+      const id = f.getContext('2d').getImageData(0, 0, f.width, f.height).data; let t0 = f.height, b0 = 0, l0 = f.width, r0 = 0;
+      for (let y = 0; y < f.height; y++) for (let x = 0; x < f.width; x++) if (id[(y * f.width + x) * 4 + 3] > 40) { t0 = Math.min(t0, y); b0 = Math.max(b0, y); l0 = Math.min(l0, x); r0 = Math.max(r0, x); }
+      const h = b0 - t0 + 1, cx = PADX + Math.round((l0 + r0) / 2), top = PADT + t0;
+      const c = mk(W2, H2), g = c.ctx;
+      if (cape) { // a cape hangs behind, on the back side (frames face right, so the back is on the left)
+        const y0 = top + Math.round(h * 0.3), y1 = PADT + b0 - 1;
+        for (let y = y0; y <= y1 + 1; y++) { const k = (y - y0) / (y1 - y0 + 1), w = 4 + Math.round(k * 5), sway = Math.round(k * k * 2); const x0 = PADX + l0 - w + 4 - sway; rect(g, x0, y, w, 1, y >= y1 ? RW.shade(cape, -0.35) : (x0 + y) % 5 === 0 ? RW.shade(cape, 0.18) : cape); px(g, x0, y, RW.shade(cape, -0.45)); }
+        rect(g, PADX + l0 + 1, y0 - 1, Math.max(3, Math.round((r0 - l0) * 0.35)), 2, RW.shade(cape, -0.2)); // the collar over the shoulders
+      }
+      g.drawImage(f, PADX, PADT);
+      // armor: tint the body under its own outline
+      // armor: tint the body under its own outline, only inside the band the piece covers
+      const tint = (it, ya, yb, alpha) => { ya = Math.max(0, ya); const l = mk(W2, H2), lg = l.ctx; lg.drawImage(f, PADX, PADT); lg.globalCompositeOperation = 'source-atop'; lg.globalAlpha = alpha; lg.fillStyle = it.tint; lg.fillRect(0, ya, W2, yb - ya); lg.globalAlpha = 1; lg.fillStyle = RW.shade(it.tint, -0.45); lg.fillRect(0, yb - 1, W2, 1); lg.fillStyle = RW.shade(it.tint, 0.35); lg.fillRect(0, ya, W2, 1); if (it.glow) { lg.fillStyle = it.glow; for (let x = 0; x < W2; x += 3) lg.fillRect(x, ya + 2, 1, 1); } g.drawImage(l, 0, ya, W2, yb - ya, 0, ya, W2, yb - ya); };
+      if (body) { const ya = top + Math.round(h * 0.46), yb = top + Math.round(h * 0.86); tint(body, ya, yb, 0.62); for (let x = PADX + l0 + 2; x < PADX + r0; x += 4) px(g, x, ya + 2, RW.shade(body.tint, 0.5)); }
+      if (head) { // a rounded metal dome over the top of the head, a rim, and a nose guard
+        const yb = top + Math.max(4, Math.round(h * 0.26));
+        let hl = f.width, hr = 0; for (let y = t0; y < t0 + Math.max(3, Math.round(h * 0.12)); y++) for (let x = 0; x < f.width; x++) if (id[(y * f.width + x) * 4 + 3] > 40) { hl = Math.min(hl, x); hr = Math.max(hr, x); }
+        const w = hr - hl + 1;
+        tint(head, top, yb, 0.82);
+        for (let k = 0; k < Math.round(w * 0.8); k++) { const x = PADX + hl + Math.round(w * 0.1) + k, lift = Math.round(Math.sin(k / (w * 0.8) * Math.PI) * 2); if (lift) { rect(g, x, top - lift, 1, lift, head.tint); px(g, x, top - lift, RW.shade(head.tint, 0.3)); } }
+        rect(g, cx + 2, yb - 1, 1, 3, RW.shade(head.tint, -0.1)); // nose guard
+        if (head.glow) { px(g, cx, top - 2, head.glow); px(g, cx - 3, top - 1, head.glow); px(g, cx + 3, top - 1, head.glow); }
+      }
+      if (hat) {
+        const w = Math.max(6, Math.round((r0 - l0) * 0.6)), x0 = cx - Math.floor(w / 2), y = top;
+        if (hat === 'cap') { rect(g, x0, y - 3, w, 3, '#c83a3a'); rect(g, x0 + 1, y - 4, w - 2, 1, '#c83a3a'); rect(g, cx, y - 1, Math.round(w * 0.8), 1, '#8a2020'); px(g, cx, y - 5, '#ffffff'); }
+        else if (hat === 'crown') { rect(g, x0, y - 2, w, 2, '#f2c94c'); for (let k = 0; k < w; k += 2) px(g, x0 + k, y - 3 - (k % 4 === 0 ? 1 : 0), '#f2c94c'); px(g, cx, y - 2, '#e0525a'); px(g, x0 + 1, y - 1, '#4fa8f0'); }
+        else if (hat === 'flowers') { for (let k = 0; k < w + 2; k += 2) { px(g, x0 - 1 + k, y - 1, ['#f0a0c0', '#ffe36a', '#a8c8ff', '#ffffff'][k % 4]); px(g, x0 + k, y - 1, '#4a8a3a'); } }
+        else if (hat === 'wizard') { for (let k = 0; k < 9; k++) { const ww = Math.max(1, Math.round(w * (1 - k / 9))); rect(g, cx - Math.floor(ww / 2) + Math.round(k / 3), y - 1 - k, ww, 1, k % 3 === 1 ? '#5a3a9a' : '#4a2a8a'); } rect(g, x0 - 2, y - 1, w + 4, 1, '#3a2070'); px(g, cx + 1, y - 5, '#ffe36a'); px(g, cx + 3, y - 9, '#ffe36a'); }
+        else if (hat === 'bandana') { rect(g, x0 - 1, y, w + 2, 2, '#3a6ad0'); px(g, x0 - 2, y + 2, '#3a6ad0'); px(g, x0 - 3, y + 3, '#3a6ad0'); px(g, x0, y, '#ffffff'); px(g, x0 + 3, y + 1, '#ffffff'); }
+        else if (hat === 'bow') { rect(g, cx - 3, y - 2, 2, 3, '#f06a9a'); rect(g, cx + 1, y - 2, 2, 3, '#f06a9a'); px(g, cx - 1, y - 1, '#c83a6a'); px(g, cx, y - 1, '#c83a6a'); }
+      }
+      if (f.hand) c.hand = { x: f.hand.x + PADX, y: f.hand.y + PADT };
+      return [c, A.flip(c)];
+    });
+    return (dressCache[key] = out);
+  };
   A.randomHero = (sp) => sp === 'fuzzy' ? Object.assign(A.randomFuzzy(), { eyes: 'big' }) : sp === 'acorn' ? A.randomAcorn() : sp === 'ghost' ? A.randomGhost() : Object.assign(A.randomLook(), { topper: 'mushroom', cracks: 'bolt' });
 })(window.RW);
 
@@ -3698,7 +3872,7 @@ window.RW = window.RW || {};
   };
   // Remote edit from another player (or from the saved world)
   WD.applyRemote = function (i, t, p) {
-    if (i < 0 || i >= WD.fg.length) return;
+    if (i < 0 || i >= WD.fg.length || !RW.TILES[t]) return; // a block this version doesn't know: skip it rather than crash
     WD.fg[i] = t;
     if (p != null) WD.plant.set(i, p); else WD.plant.delete(i);
     WD.dirtySky = true;
@@ -3711,6 +3885,43 @@ window.RW = window.RW || {};
     const age = Date.now() / 1000 - p;
     return RW.clamp(Math.floor(age / t.grow * 3), 0, 3);
   };
+
+  // ---- plants need ground under them ----
+  const GROUND_PLANTS = new Set(['tallgrass', 'flower', 'berry', 'crop', 'wildmush', 'soulshroom', 'cactus']);
+  WD.needsGround = (t) => !!t && GROUND_PLANTS.has(t.decor);
+  // clear any plant left hanging in the air (from older saves, or after the ground under it went); everyone
+  // runs the same tidy-up locally, so it needs no shared edits
+  WD.dropFloatingPlants = function () {
+    const T = RW.T, TL = RW.TILES; let n = 0;
+    for (let y = WD.H - 2; y >= 0; y--) for (let x = 0; x < WD.W; x++) {
+      const i = y * WD.W + x, t = TL[WD.fg[i]]; if (!WD.needsGround(t)) continue;
+      const below = TL[WD.fg[i + WD.W]]; if (below.solid || (t.decor === 'cactus' && below.decor === 'cactus')) continue;
+      WD.fg[i] = T.air; WD.plant.delete(i); n++;
+    }
+    if (n) WD.dirtySky = true;
+  };
+
+  // ---- loose water: a small pocket of water with nothing under it falls and spreads ----
+  // (seas, lakes and the big flooded caves are huge bodies, so they stay put as they were made)
+  const looseSeen = new Set(); let looseT = 0;
+  WD.looseWater = function (dt, cam, v) {
+    looseT -= dt; if (looseT > 0) return; looseT = 0.5;
+    if (RW.net && RW.net.transport && RW.sync && !RW.sync.auth) return;
+    const T = RW.T, Wd = WD.W; const tx0 = Math.max(1, Math.floor(cam.x / TS) - 8), ty0 = Math.max(1, Math.floor(cam.y / TS) - 8);
+    const tx1 = Math.min(Wd - 2, tx0 + Math.ceil(v.w / TS) + 16), ty1 = Math.min(WD.H - 2, ty0 + Math.ceil(v.h / TS) + 16);
+    const at = (x, y) => WD.fg[y * Wd + x];
+    for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
+      const i = y * Wd + x; if (at(x, y) !== T.water || looseSeen.has(i)) continue;
+      const open = at(x, y + 1) === T.air || (at(x - 1, y) === T.air && at(x - 1, y + 1) === T.air) || (at(x + 1, y) === T.air && at(x + 1, y + 1) === T.air);
+      if (!open) continue;
+      // measure the body of water this belongs to (stop counting at 90)
+      const body = [], seen = new Set([i]), q = [i];
+      while (q.length && body.length < 90) { const k = q.pop(); body.push(k); const kx = k % Wd, ky = (k / Wd) | 0; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const n = (ky + dy) * Wd + kx + dx; if (!seen.has(n) && WD.inb(kx + dx, ky + dy) && WD.fg[n] === T.water) { seen.add(n); q.push(n); } }); }
+      if (body.length >= 90) { seen.forEach((k) => looseSeen.add(k)); continue; } // a sea or a lake: leave it be
+      body.forEach((k) => WD.wActive.add(k));
+    }
+  };
+  WD.forgetLooseWater = () => looseSeen.clear();
 
   // ---- flowing water ----
   // Water that something disturbed (mining, building, other water moving) falls into empty space below it,
@@ -3857,14 +4068,14 @@ window.RW = window.RW || {};
     for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
       if (!WD.inb(x, y)) continue;
       const w = WD.bg[y * WD.W + x]; const t = WD.fg[y * WD.W + x];
-      if (!w || TL[t].solid) continue;
+      if (!w || (TL[t].solid && !openBeside(x, y))) continue; // behind edge blocks too, so their rounded corners show wall
       const tex = A.walls[w][(x * 7 + y * 3) % 3];
       g.drawImage(tex, x * TS + ox, y * TS + oy);
     }
     g.fillStyle = 'rgba(6,5,10,0.3)';
     for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
       if (!WD.inb(x, y)) continue;
-      const w = WD.bg[y * WD.W + x]; if (w && !TL[WD.fg[y * WD.W + x]].solid) g.fillRect(x * TS + ox, y * TS + oy, TS, TS);
+      const w = WD.bg[y * WD.W + x]; if (w && (!TL[WD.fg[y * WD.W + x]].solid || openBeside(x, y))) g.fillRect(x * TS + ox, y * TS + oy, TS, TS);
     }
     // foreground tiles
     for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
@@ -3873,41 +4084,113 @@ window.RW = window.RW || {};
       if (t.decor && t.decor !== 'tablet') { A.drawDecor(g, t, sx, sy, time, t.crop ? WD.cropStage(x, y) : 0, x, y); continue; }
       if (t.decor === 'tablet') { A.drawDecor(g, t, sx, sy, time, 0, x, y); continue; }
       const v = A.tiles[id]; if (!v || !v.length) continue;
-      g.drawImage(v[(x * 13 + y * 7) & 3], sx, sy);
-      // edges: darker rim where the tile meets open space, colored tops for moss/lichen
-      const up = TL[WD.get(x, y - 1)], dn = TL[WD.get(x, y + 1)], lf = TL[WD.get(x - 1, y)], rt = TL[WD.get(x + 1, y)];
-      g.fillStyle = 'rgba(8,6,12,0.55)';
-      if (!up.solid) { g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(sx, sy, TS, 1); g.fillStyle = 'rgba(8,6,12,0.55)'; }
-      if (!dn.solid) g.fillRect(sx, sy + TS - 2, TS, 2);
-      if (!lf.solid) g.fillRect(sx, sy, 1, TS);
-      if (!rt.solid) g.fillRect(sx + TS - 1, sy, 1, TS);
-      if (t.top && !up.solid) { g.fillStyle = t.top; for (let k = 0; k < TS; k++) g.fillRect(sx + k, sy - (k % 3 === 0 ? 1 : 0), 1, 2 + ((k * 7 + x) % 3 === 0 ? 1 : 0)); }
+      const S = (a, b) => TL[WD.get(a, b)].solid;
+      const up = S(x, y - 1), dn = S(x, y + 1), lf = S(x - 1, y), rt = S(x + 1, y);
+      if ((up && dn && lf && rt) || BUILT[t.tex]) {
+        g.drawImage(v[(x * 13 + y * 7) & 7], sx, sy);
+        if (BUILT[t.tex]) { g.fillStyle = 'rgba(8,6,12,0.55)'; if (!dn) g.fillRect(sx, sy + TS - 2, TS, 2); if (!lf) g.fillRect(sx, sy, 1, TS); if (!rt) g.fillRect(sx + TS - 1, sy, 1, TS); if (!up) { g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(sx, sy, TS, 1); } }
+        continue;
+      }
+      const mask = (up ? 1 : 0) | (dn ? 2 : 0) | (lf ? 4 : 0) | (rt ? 8 : 0) | (S(x - 1, y - 1) ? 16 : 0) | (S(x + 1, y - 1) ? 32 : 0) | (S(x - 1, y + 1) ? 64 : 0) | (S(x + 1, y + 1) ? 128 : 0);
+      g.drawImage(edgeTile(id, (x * 13 + y * 7) & 7, mask), sx, sy);
+      if (t.top && !up) drawTuft(g, t, sx, sy, x, time, !lf, !rt);
     }
   };
+  // A block next to open space: its outer corners are rounded off, its open sides get a slightly uneven edge
+  // with a dark outline (and a light rim on top), so the ground reads as land rather than a grid of squares.
+  const edgeCache = {};
+  const BUILT = { brick: 1, plank: 1, plate: 1 }; // made by hand: these keep straight edges
+  const openBeside = (x, y) => { const TL = RW.TILES; return !TL[WD.get(x, y - 1)].solid || !TL[WD.get(x, y + 1)].solid || !TL[WD.get(x - 1, y)].solid || !TL[WD.get(x + 1, y)].solid; };
+  function edgeTile(id, v, mask) {
+    const key = id + '_' + v + '_' + mask; if (edgeCache[key]) return edgeCache[key];
+    const src = RW.art.tiles[id][v]; const c = RW.art.canvas(TS, TS), g = c.ctx; g.drawImage(src, 0, 0);
+    const up = mask & 1, dn = mask & 2, lf = mask & 4, rt = mask & 8;
+    const H = (k, s) => RW.hash2(k, v * 7 + id, s);
+    const keep = new Uint8Array(TS * TS).fill(1);
+    const R = 4.5; // corner radius
+    for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+      let out = false;
+      const cx = (ax, ay) => Math.hypot(x + 0.5 - ax, y + 0.5 - ay) > R;
+      if (!up && !lf && x < R && y < R && cx(R, R)) out = true;
+      if (!up && !rt && x >= TS - R && y < R && cx(TS - R, R)) out = true;
+      if (!dn && !lf && x < R && y >= TS - R && cx(R, TS - R)) out = true;
+      if (!dn && !rt && x >= TS - R && y >= TS - R && cx(TS - R, TS - R)) out = true;
+      // a little unevenness along open sides
+      if (!up && y === 0 && H(x, 1) > 0.62) out = true;
+      if (!dn && y === TS - 1 && H(x, 2) > 0.5) out = true;
+      if (!lf && x === 0 && H(y, 3) > 0.6) out = true;
+      if (!rt && x === TS - 1 && H(y, 4) > 0.6) out = true;
+      if (out) keep[y * TS + x] = 0;
+    }
+    const d = g.getImageData(0, 0, TS, TS), a = d.data;
+    const k = (x, y) => x >= 0 && y >= 0 && x < TS && y < TS ? keep[y * TS + x] : ((y < 0 && up) || (y >= TS && dn) || (x < 0 && lf) || (x >= TS && rt) ? 1 : 0);
+    for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+      const o = (y * TS + x) * 4;
+      if (!keep[y * TS + x]) { a[o + 3] = 0; continue; }
+      const edge = !k(x - 1, y) || !k(x + 1, y) || !k(x, y - 1) || !k(x, y + 1);
+      if (edge) { a[o] *= 0.35; a[o + 1] *= 0.33; a[o + 2] *= 0.4; }                               // outline
+      else if (!k(x, y - 2)) { a[o] = Math.min(255, a[o] * 1.22 + 10); a[o + 1] = Math.min(255, a[o + 1] * 1.22 + 10); a[o + 2] = Math.min(255, a[o + 2] * 1.2 + 10); } // lit rim
+      else if (!k(x, y + 2) && !dn) { a[o] *= 0.72; a[o + 1] *= 0.7; a[o + 2] *= 0.76; }        // shaded underside
+    }
+    g.putImageData(d, 0, 0);
+    return (edgeCache[key] = c);
+  }
+  // grass, moss and lichen on top: blades of different heights, drooping over open edges, stirring in the wind
+  function drawTuft(g, t, sx, sy, x, time, openL, openR) {
+    const top = t.top, hi = t.topHi || RW.shade(t.top, 0.25), lo = RW.shade(t.top, -0.3);
+    g.fillStyle = lo; g.fillRect(sx + (openL ? 2 : 0), sy, TS - (openL ? 2 : 0) - (openR ? 2 : 0), 2);
+    g.fillStyle = top; g.fillRect(sx + (openL ? 1 : 0), sy - 1, TS - (openL ? 1 : 0) - (openR ? 1 : 0), 2);
+    for (let k = 0; k < TS; k += 2) {
+      const h = RW.hash2(x * 16 + k, 3, 61); if ((openL && k < 2) || (openR && k > TS - 3)) continue;
+      const hh = 1 + Math.floor(h * 3), sw = h > 0.7 ? Math.round(Math.sin(time * 2.2 + x * 0.9 + k * 0.3)) : 0;
+      g.fillStyle = h > 0.5 ? hi : top; g.fillRect(sx + k + sw, sy - 1 - hh, 1, hh); if (h > 0.8) g.fillRect(sx + k + 1 + sw, sy - 2 - hh, 1, 1);
+    }
+    if (openL) { g.fillStyle = top; g.fillRect(sx + 1, sy, 1, 3); g.fillRect(sx + 2, sy + 2, 1, 2); }
+    if (openR) { g.fillStyle = top; g.fillRect(sx + TS - 2, sy, 1, 3); g.fillRect(sx + TS - 3, sy + 2, 1, 2); }
+  }
 
+  // Water is drawn as one body, not a grid of squares: the colour deepens with depth below the surface, the
+  // surface is a moving wave that runs smoothly across blocks, water spilling over an edge is drawn as a
+  // falling stream, and plants or crystals sitting in water are drawn under it.
   WD.drawWater = function (g, cam, vw, vh, time) {
-    const T = RW.T;
+    const T = RW.T, TL = RW.TILES;
     const tx0 = Math.floor(cam.x / TS), ty0 = Math.floor(cam.y / TS);
     const tx1 = Math.ceil((cam.x + vw) / TS), ty1 = Math.ceil((cam.y + vh) / TS);
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
+    const wc = WD.def.waterColor || [26, 92, 140];
+    const hi = WD.def.waterColor ? '255,150,160' : '170,228,245';
+    const isW = (x, y) => WD.get(x, y) === T.water;
+    const wetDecor = (x, y) => { const t = TL[WD.get(x, y)]; return !!t.decor && !t.solid && t.key !== 'air' && (isW(x, y - 1) || (isW(x - 1, y) && isW(x + 1, y))); };
+    const wave = (X) => 2 + Math.sin(X * 0.31 + time * 2.3) * 1.1 + Math.sin(X * 0.11 - time * 1.4) * 0.9;
     for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
-      if (WD.get(x, y) !== T.water) continue;
+      const w = isW(x, y); if (!w && !wetDecor(x, y)) continue;
       const sx = x * TS + ox, sy = y * TS + oy;
-      const deep = y > 250 ? 0.6 : 0.5;
-      const wc = WD.def.waterColor; g.fillStyle = wc ? `rgba(${wc[0]},${wc[1]},${wc[2]},0.62)` : y < 120 ? `rgba(30,95,130,${deep - 0.08})` : `rgba(28,80,120,${deep})`;
-      g.fillRect(sx, sy, TS, TS);
-      const above = WD.get(x, y - 1);
-      if (above !== T.water && !RW.TILES[above].solid) {
-        const w = Math.sin(time * 2 + x * 0.8) * 1.2;
-        const wcs = WD.def.waterColor ? '255,120,130' : '150,215,235';
-        g.fillStyle = `rgba(${wcs},0.55)`; g.fillRect(sx, sy + Math.round(w) + 1, TS, 1);
-        g.fillStyle = `rgba(${wcs},0.18)`; g.fillRect(sx, sy + Math.round(w) + 2, TS, 2);
+      // how far below the surface (0 = top layer), counted a few blocks up
+      let d = 0; while (d < 6 && (isW(x, y - d - 1) || wetDecor(x, y - d - 1))) d++;
+      const above = WD.get(x, y - 1), openTop = d === 0 && !TL[above].solid;
+      const falling = w && WD.get(x, y + 1) === T.air && !isW(x - 1, y) && !isW(x + 1, y);
+      const a0 = 0.34 + Math.min(d, 6) * 0.045;
+      if (falling) { // a stream pouring down: narrower, streaky
+        for (let k = 0; k < 4; k++) { const sxk = sx + 3 + k * 3, ph = (time * 90 + k * 5 + x * 7) % 16; g.fillStyle = `rgba(${wc[0] + 30},${wc[1] + 50},${wc[2] + 50},0.5)`; g.fillRect(sxk, sy, 2, TS); g.fillStyle = `rgba(${hi},0.5)`; g.fillRect(sxk, sy + ph, 1, 3); }
+        continue;
       }
-      // caustic shimmer
-      if (((x * 5 + y * 3 + Math.floor(time * 3)) % 23) === 0) { g.fillStyle = 'rgba(170,230,250,0.16)'; g.fillRect(sx + 3, sy + 5, 6, 1); }
+      if (openTop) {
+        // the surface: water starts at a moving wave a few pixels down, with a bright crest and a softer band
+        for (let i = 0; i < TS; i++) {
+          const h = Math.round(wave(x * TS + i));
+          g.fillStyle = `rgba(${wc[0]},${wc[1]},${wc[2]},${a0.toFixed(3)})`; g.fillRect(sx + i, sy + h, 1, TS - h);
+          g.fillStyle = `rgba(${hi},0.62)`; g.fillRect(sx + i, sy + h, 1, 1);
+          g.fillStyle = `rgba(${hi},0.2)`; g.fillRect(sx + i, sy + h + 1, 1, 2);
+        }
+      } else for (let b = 0; b < 4; b++) { g.fillStyle = `rgba(${wc[0]},${wc[1]},${wc[2]},${(a0 + b * 0.012).toFixed(3)})`; g.fillRect(sx, sy + b * 4, TS, 4); } // deeper with every band
+      // soft light ripples near the top
+      if (d < 3) {
+        const n = (Math.sin(x * 1.7 + y * 2.3) + 1) * 0.5;
+        const rx = sx + ((Math.floor(time * 6 + n * 16) + x * 5) % 14), ry = sy + 5 + Math.round(Math.sin(time * 1.5 + x) * 2) + Math.round(n * 6);
+        g.fillStyle = `rgba(${hi},${(0.16 - d * 0.04).toFixed(2)})`; g.fillRect(rx, ry, 3, 1); g.fillRect(rx + 1, ry + 1, 2, 1);
+      }
     }
   };
-
   WD.drawLight = function (g, cam) {
     if (!L.cv) return;
     g.save();
@@ -4049,7 +4332,7 @@ window.RW = window.RW || {};
     // floating text
     for (const t of FX.texts) {
       g.globalAlpha = Math.min(1, t.life / t.max * 2);
-      g.font = (t.big ? '12px' : '8px') + ' "Pixelify Sans", monospace'; g.textAlign = 'center';
+      g.font = (t.big ? '14px' : '10px') + ' VT323, monospace'; g.textAlign = 'center';
       g.fillStyle = '#0c0a10'; g.fillText(t.txt, Math.round(t.x - cam.x) + 1, Math.round(t.y - cam.y) + 1);
       g.fillStyle = t.color; g.fillText(t.txt, Math.round(t.x - cam.x), Math.round(t.y - cam.y));
     }
@@ -4223,12 +4506,23 @@ window.RW = window.RW || {};
   P.hero = P.sst;
   P.maxHp = () => P.sst().hp + P.stats.blue * 10 + P.stats.gold * 5;
   P.maxBreath = 10;
-  P.maxMana = () => 40 + P.spells.length * 30;
+  P.maxMana = () => 40 + P.spells.length * 30 + Math.round(P.stats.gold * 15);
   P.dmgMul = () => 1 + P.stats.red * 0.05 + P.stats.gold * 0.03;
   P.spdMul = () => 1 + P.stats.green * 0.03;
   P.mineMul = () => 1 + P.stats.purple * 0.08;
   P.scale = () => 1 + P.stats.gold * 0.04;
   P.held = () => P.inv[P.sel] ? RW.ITEMS[P.inv[P.sel].id] : null;
+  // armor you're wearing: { head, body } item ids
+  P.armor = {};
+  P.defense = () => ['head', 'body'].reduce((d, k) => d + ((RW.ITEMS[P.armor[k]] || {}).def || 0), 0);
+  P.wear = function (it) {
+    const slot = it.slot; const old = P.armor[slot];
+    P.remove(it.id, 1); P.armor[slot] = it.id; if (old) P.add(old, 1);
+    RW.audio.sfx('craft'); RW.ui.toast('You put on the ' + it.name + '. Armor ' + P.defense() + '.'); RW.ui.dirty(); RW.game.saveSoon();
+  };
+  P.unwear = function (slot) { const id = P.armor[slot]; if (!id) return; if (P.add(id, 1) > 0) { RW.ui.toast('Your bag is full.'); return; } P.armor[slot] = null; RW.audio.sfx('ui'); RW.ui.dirty(); RW.game.saveSoon(); };
+  // gold crystals are magic: each one makes spells stronger
+  P.magicMul = () => 1 + P.stats.gold * 0.12;
   P.power = () => { const h = P.held(); return h && h.power ? h.power : 1; };
   P.count = (id) => P.inv.reduce((s, it) => s + (it && it.id === id ? it.n : 0), 0);
   P.has = (id, n) => P.count(id) >= (n || 1);
@@ -4341,7 +4635,7 @@ window.RW = window.RW || {};
     const reach = RW.dist(pc.x, pc.y, tx * TS + 8, ty * TS + 8) <= 5.2 * TS * P.scale();
     const atk = I.act('attack'), atkHit = I.actHit('attack');
     if (atk || atkHit) {
-      if (held && held.kind === 'place' && atkHit) P.tryPlace(tx, ty, held, reach);
+      if (held && (held.kind === 'place' || held.kind === 'torch') && atkHit) P.tryPlace(tx, ty, held, reach);
       else if (held && held.plant && W.get(tx, ty) === T().air && W.get(tx, ty + 1) === T().soil && reach && atkHit) P.tryPlant(tx, ty, held);
       else {
         if (P.swingT <= 0) P.startSwing();
@@ -4351,10 +4645,12 @@ window.RW = window.RW || {};
     // RIGHT: use (eat, consume crystal) or cast
     if (I.actHit('use')) {
       if (held && (held.kind === 'food' || held.kind === 'crystal')) P.useItem(held);
+      else if (held && held.kind === 'armor') P.wear(held);
       else if (P.spells.length) P.cast(m);
     }
     if (I.actHit('cast') && P.spells.length) P.cast(m);
     if (I.actHit('torch')) P.toggleTorch();
+    if (I.actHit('give')) RW.net.give();
     if (I.actHit('spell') && P.spells.length) { P.spell = (P.spell + 1) % P.spells.length; RW.ui.toast('Spell: ' + RW.SPELLS[P.spells[P.spell]].name); RW.ui.dirty(); }
     if (I.actHit('interact')) P.interact();
   };
@@ -4367,6 +4663,7 @@ window.RW = window.RW || {};
     if (h && h.ranged) {
       const pc = P.center(); const m = RW.mouseWorld(); const a = Math.atan2(m.y - pc.y, m.x - pc.x); const r = h.ranged;
       E.shots.push({ x: pc.x, y: pc.y - 4, vx: Math.cos(a) * r.spd, vy: Math.sin(a) * r.spd, grav: r.grav, life: 2, owner: 'p', dmg: h.dmg * P.dmgMul(), kind: r.kind, fx: h.fx, color: r.kind === 'thorn' ? '#8be04a' : '#e8e0d0' });
+      RW.net.sendShot && RW.net.sendShot(E.shots[E.shots.length - 1]);
       RW.audio.sfx(r.kind === 'arrow' ? 'bow' : 'swing');
       return;
     }
@@ -4483,14 +4780,15 @@ window.RW = window.RW || {};
       if (wood) E.dropItem('wood', wood + RW.randi(0, 2), cx, cy - 20);
       if (n > 4) { RW.audio.sfx('break'); RW.fx.shake(1.5, 0.2); }
     }
-    // things resting on top fall too (crops, mushrooms, crystals)
+    // things resting on top fall too (crops, mushrooms, crystals); grass and flowers never float
     const above = RW.TILES[W.get(tx, ty - 1)];
-    if (above.decor && !above.solid && above.decor !== 'chain' && above.decor !== 'walkway' && above.decor !== 'cleaf') { if (above.crop || above.drop) P.breakTile(tx, ty - 1); }
+    if (above.decor && !above.solid && above.decor !== 'chain' && above.decor !== 'walkway' && above.decor !== 'cleaf') { if (above.crop || above.drop) P.breakTile(tx, ty - 1); else if (W.needsGround(above)) W.setTile(tx, ty - 1, T().air); }
   };
   P.tryPlace = function (tx, ty, item, reach) {
     const W = RW.world; const cur = W.get(tx, ty);
     if (!reach) return;
     if (cur !== T().air && cur !== T().water) return;
+    if (item.kind === 'torch' && cur === T().water) { RW.ui.toast('A torch won\'t stay lit underwater.'); return; }
     const tile = RW.TILES[T()[item.place]];
     if (tile.solid && overlap({ x: tx * TS, y: ty * TS, w: TS, h: TS }, P)) return;
     const n = [[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => { const t = W.get(tx + dx, ty + dy); return t !== T().air && t !== T().water; }) || W.getBg(tx, ty);
@@ -4526,6 +4824,7 @@ window.RW = window.RW || {};
         if (P.stats[st] >= it.max) { RW.ui.toast('Your body can\'t take any more ' + it.name + 's.'); return; }
         P.remove(it.id, 1); P.addStat(st, it.id);
         RW.fx.element.crystal(pc.x, pc.y, color);
+        if (st === 'gold') P.goldMagic();
       }
       P.flags.ate_crystal = 1;
     }
@@ -4551,10 +4850,23 @@ window.RW = window.RW || {};
     if (P.water && P.species !== 'ghost' && RW.world.isWaterAt(fx, fy)) { P.offTorch = false; RW.ui.toast('Your torch hissed out in the water.'); RW.audio.sfx('splash'); }
     return { x: fx, y: fy };
   };
+  // a gold crystal teaches the next elemental spell you don't know yet, then just makes magic stronger
+  P.goldMagic = function () {
+    const order = ['fire', 'lightning', 'poison', 'spark', 'mend', 'phase'].filter((k) => RW.SPELLS[k]);
+    const next = order.find((k) => !P.spells.includes(k)); const pc = P.center();
+    if (next) {
+      P.spells.push(next); P.spell = P.spells.length - 1;
+      RW.fx.element[next] && RW.fx.element[next](pc.x, pc.y, 2);
+      setTimeout(() => RW.ui.banner('Gold magic', 'You learned ' + RW.SPELLS[next].name + '. ' + K_cast() + ' to cast, ' + K_spell() + ' to switch.'), 600);
+    } else setTimeout(() => RW.ui.banner('Gold magic', 'Your spells grow stronger: +' + Math.round(P.stats.gold * 12) + '% magic.'), 600);
+    P.mana = P.maxMana(); RW.ui.dirty();
+  };
+  const K_cast = () => RW.keyName((RW.binds.cast || [])[0]) + ' or ' + RW.keyName((RW.binds.use || [])[0]);
+  const K_spell = () => RW.keyName((RW.binds.spell || [])[0]);
   P.addStat = function (st, itemId, small) {
     P.stats[st] = (P.stats[st] || 0) + (small ? 0.25 : 1);
     const it = RW.ITEMS[itemId]; RW.audio.sfx('crystal');
-    const msg = { red: '+5% damage', blue: '+10 max health', green: '+3% speed', purple: '+8% mining speed', gold: 'You grow bigger and stronger' }[st];
+    const msg = { red: '+5% damage', blue: '+10 max health', green: '+3% speed', purple: '+8% mining speed', gold: 'Gold magic! You grow bigger and stronger' }[st];
     RW.fx.text(P.x + P.w / 2, P.y - 8, small ? 'tiny ' + it.name : msg, it.icon.a, true);
     if (!small) setTimeout(() => RW.fx.text(P.x + P.w / 2, P.y - 18, '+' + (st === 'gold' ? 5 : 2) + ' max stamina', '#f4f0a0', true), 450);
     if (st === 'blue' || st === 'gold') P.hp = Math.min(P.maxHp(), P.hp + 10);
@@ -4566,7 +4878,7 @@ window.RW = window.RW || {};
     if (P.mana < sp.mana) { RW.ui.toast('Not enough mana.'); RW.audio.sfx('deny'); return; }
     if (!P.tire(8)) return;
     P.mana -= sp.mana; P.spellCd = sp.cd;
-    const pc = P.center(); const a = Math.atan2(m.y - pc.y, m.x - pc.x); const pw = P.dmgMul();
+    const pc = P.center(); const a = Math.atan2(m.y - pc.y, m.x - pc.x); const pw = P.dmgMul() * P.magicMul();
     P.swingT = 0.2; P.swingDur = 0.2; P.swingHit = new Set();
     if (id === 'phase') {
       const d = 88; const dx = Math.cos(a), dy = Math.sin(a); let k = 0;
@@ -4628,7 +4940,7 @@ window.RW = window.RW || {};
 
   P.hurt = function (d, dir, src) {
     if (P.dead || P.invulnT > 0) return;
-    const armor = 1 - Math.min(0.4, P.stats.gold * 0.03);
+    const armor = (1 - Math.min(0.4, P.stats.gold * 0.03)) * (100 / (100 + P.defense() * 8));
     d = Math.max(1, Math.round(d * armor));
     P.hp -= d; P.invulnT = 0.6; P.lastHurt = performance.now() / 1000; P.regenT = 0;
     P.vx += dir * 160; P.vy = Math.min(P.vy, -140);
@@ -4826,7 +5138,7 @@ window.RW = window.RW || {};
     const dx = (tx - C.cx) / C.rx, dy = (ty - C.cy) / C.ry;
     if (dx * dx + dy * dy > 0.85) return;
     const sp = RW.SPECIES.gemscale_leviathan;
-    const b = { sp: sp.id, isBoss: true, x: C.cx * TS - sp.w / 2, y: (C.cy + 26) * TS, w: sp.w, h: sp.h, vx: 0, vy: 0, hp: sp.hp, maxhp: sp.hp, face: -1, state: 'emerge', st: 2.2, t: 0, frame: 0, hitT: 0, phase: 1 };
+    const b = { sp: sp.id, isBoss: true, x: C.cx * TS - sp.w / 2, y: (C.cy + C.ry - 10) * TS, w: sp.w, h: sp.h, vx: 0, vy: 0, hp: sp.hp, maxhp: sp.hp, face: -1, state: 'emerge', st: 2.2, t: 0, frame: 0, hitT: 0, phase: 1 };
     b.hitbox = () => ({ x: b.x + 10, y: b.y + 14, w: b.w - 20, h: b.h - 26 });
     E.boss = b;
     RW.audio.sfx('roar'); RW.fx.shake(6, 1.4);
@@ -4837,7 +5149,8 @@ window.RW = window.RW || {};
     const b = E.boss; if (!b) return;
     if (b.dead) return;
     const C = RW.world.meta.arena; const pc = P.center(); const sp = RW.SPECIES[b.sp];
-    const poolTop = (C.cy + 22) * TS, poolBot = (C.cy + C.ry - 1) * TS, left = (C.cx - C.rx + 8) * TS, right = (C.cx + C.rx - 8) * TS;
+    // the whole Heart Chamber is flooded: the Leviathan swims anywhere inside it
+    const poolTop = (C.cy - C.ry + 4) * TS, poolBot = (C.cy + C.ry - 1) * TS, left = (C.cx - C.rx + 8) * TS, right = (C.cx + C.rx - 8) * TS;
     b.t += dt; b.frame = Math.floor(b.t * 5) % 2; b.st -= dt; b.hitT -= dt;
     if (b.hp < b.maxhp * 0.5 && b.phase === 1) { b.phase = 2; RW.audio.sfx('roar'); RW.fx.shake(6, 0.8); RW.ui.toast('The Leviathan\'s crystals blaze!'); RW.fx.flash('#c8a6ff', 0.25); }
     const fast = b.phase === 2 ? 1.35 : 1;
@@ -4851,22 +5164,23 @@ window.RW = window.RW || {};
         b.vy = -40; b.vx = 0; if (b.st <= 0) { b.state = 'swim'; b.st = 2.5; }
         break;
       case 'swim': {
-        const ty = poolTop + 30 + Math.sin(b.t * 1.5) * 20;
+        const ty = RW.clamp(pc.y, poolTop + 30, poolBot - 30) + Math.sin(b.t * 1.5) * 20;
         b.vx = RW.lerp(b.vx, toward * sp.speed * 0.7 * fast, dt * 1.5); b.vy = RW.lerp(b.vy, (ty - (b.y + b.h / 2)) * 2, dt * 3);
         if (b.st <= 0) { const r = Math.random(); b.state = r < 0.38 ? 'leap' : r < 0.68 ? 'shards' : r < 0.84 ? 'summon' : (b.phase === 2 ? 'rain' : 'shards'); b.st = 0; b.did = false; }
         break;
       }
-      case 'leap':
-        if (!b.did) { b.did = true; b.vy = -560; b.vx = toward * 230 * fast; RW.audio.sfx('roar'); RW.fx.burst(bc.x, poolTop, ['#bfeaff', '#7ab8d8', '#ffffff'], 40, 220, { grav: 500 }); RW.audio.sfx('splash'); }
-        b.vy += 700 * dt;
-        if (b.vy > 0 && b.y + b.h * 0.6 > poolTop) {
-          b.state = 'swim'; b.st = 2 + Math.random() * 1.5; b.vy = 80;
-          RW.fx.burst(bc.x, poolTop, ['#bfeaff', '#7ab8d8', '#ffffff'], 50, 260, { grav: 500 }); RW.fx.ring(bc.x, poolTop, '#bfeaff', 120, 0.6, 3); RW.fx.shake(7, 0.5); RW.audio.sfx('slam');
-          if (Math.abs(pc.x - bc.x) < 130 && Math.abs(pc.y - poolTop) < 70) P.hurt(sp.dmg * 0.8, toward, 'wave');
+      case 'leap': // a lunge through the water straight at you, trailing bubbles, ending in a shockwave
+        if (!b.did) { b.did = true; const a = Math.atan2(pc.y - bc.y, pc.x - bc.x); b.vx = Math.cos(a) * 330 * fast; b.vy = Math.sin(a) * 330 * fast; b.lt = 0; RW.audio.sfx('roar'); }
+        b.lt += dt; b.vx *= Math.pow(0.4, dt); b.vy *= Math.pow(0.4, dt);
+        if (Math.random() < dt * 30) RW.fx.spawn({ x: bc.x - b.face * 40 + RW.rand(-8, 8), y: bc.y + RW.rand(-10, 10), vy: -30, life: 0.9, color: '#e8faff', kind: 'bubble', add: true });
+        if (b.lt > 1.1) {
+          b.state = 'swim'; b.st = 2 + Math.random() * 1.5;
+          RW.fx.ring(bc.x, bc.y, '#bfeaff', 110, 0.6, 3); RW.fx.shake(6, 0.4); RW.audio.sfx('slam');
+          if (RW.dist(pc.x, pc.y, bc.x, bc.y) < 110) P.hurt(sp.dmg * 0.8, toward, 'wave');
         }
         break;
       case 'shards':
-        b.vy = RW.lerp(b.vy, (poolTop - b.h * 0.35 - b.y) * 3, dt * 4); b.vx *= 0.9;
+        b.vy = RW.lerp(b.vy, 0, dt * 4); b.vx *= 0.9;
         b.st += dt;
         if (b.st > 0.6 && !b.did) {
           b.did = true; const n = b.phase === 2 ? 11 : 7; const a0 = Math.atan2(pc.y - bc.y, pc.x - bc.x);
@@ -4876,7 +5190,7 @@ window.RW = window.RW || {};
         if (b.st > 1.6) { b.state = 'swim'; b.st = 2 + Math.random(); }
         break;
       case 'summon':
-        if (!b.did) { b.did = true; for (let k = 0; k < (b.phase === 2 ? 4 : 3); k++) { const e = E.spawnEnemy(k % 2 ? 'spiky_fish' : 'creepy_fish', bc.x + RW.rand(-60, 60), poolTop + 40); RW.fx.burst(e.x, e.y, '#a86ef0', 12, 80, { add: true, kind: 'glow' }); } RW.audio.sfx('roar'); }
+        if (!b.did) { b.did = true; for (let k = 0; k < (b.phase === 2 ? 4 : 3); k++) { const e = E.spawnEnemy(k % 2 ? 'spiky_fish' : 'creepy_fish', bc.x + RW.rand(-60, 60), bc.y + RW.rand(-30, 30)); RW.fx.burst(e.x, e.y, '#a86ef0', 12, 80, { add: true, kind: 'glow' }); } RW.audio.sfx('roar'); }
         b.st += dt; if (b.st > 1) { b.state = 'swim'; b.st = 2.5; }
         break;
       case 'rain':
@@ -4891,7 +5205,7 @@ window.RW = window.RW || {};
     b.face = b.vx >= 0 ? 1 : -1;
     b.x += b.vx * dt; b.y += b.vy * dt;
     b.x = RW.clamp(b.x, left - b.w / 2, right - b.w / 2);
-    if (b.state !== 'leap') b.y = RW.clamp(b.y, poolTop - b.h * 0.7, poolBot - b.h);
+    b.y = RW.clamp(b.y, poolTop - b.h * 0.3, poolBot - b.h);
     // contact
     if (overlap(b.hitbox(), P)) P.hurt(sp.dmg, toward * -1 || 1, 'leviathan');
   };
@@ -4937,6 +5251,8 @@ window.RW = window.RW || {};
       if (s.owner === 'p') {
         const hit = E.enemies.concat(E.boss ? [E.boss] : []).find((e) => !e.dead && overlap({ x: s.x - 3, y: s.y - 3, w: 6, h: 6 }, e.hitbox ? e.hitbox() : e));
         if (hit) { dead = true; E.damage(hit, Math.round(s.dmg), Math.sign(s.vx) || 1, 3); if (s.kind === 'fire') hit.burn = 3; if (s.fx) E.applyFx(hit, s.fx, s.dmg); }
+      } else if (s.owner === 'r') { // another player's shot: just for show, it lands on whatever it touches
+        if (E.enemies.concat(E.boss ? [E.boss] : []).some((e) => !e.dead && overlap({ x: s.x - 3, y: s.y - 3, w: 6, h: 6 }, e.hitbox ? e.hitbox() : e))) dead = true;
       } else if (overlap({ x: s.x - 3, y: s.y - 3, w: 6, h: 6 }, P)) { dead = true; P.hurt(s.dmg, Math.sign(s.vx) || 1, 'shard'); }
       if (dead) {
         if (s.kind === 'fire') {
@@ -4975,7 +5291,7 @@ window.RW = window.RW || {};
       const sp = RW.SPECIES[n.id]; let fr;
       if (['rockfolk', 'fuzzyfolk', 'acornfolk', 'ghostfolk'].includes(sp.art.draw)) { const s = A.heroSprites({ fuzzyfolk: 'fuzzy', acornfolk: 'acorn', ghostfolk: 'ghost' }[sp.art.draw] || 'rock', sp.art.look); fr = s[Math.abs(n.vx) > 1 ? 1 + Math.floor(n.t * 8) % 4 : 0][n.face > 0 ? 0 : 1]; g.drawImage(fr, Math.round(n.x + ox + n.w / 2 - fr.width / 2), Math.round(n.y + oy + n.h - fr.height + 1)); }
       else { const s = A.species(n.id); fr = s[Math.floor(n.t * 2) % s.length][n.face > 0 ? 0 : 1]; g.drawImage(fr, Math.round(n.x + ox + n.w / 2 - fr.width / 2), Math.round(n.y + oy + n.h - fr.height)); }
-      if (n.near) { g.font = '8px "Pixelify Sans", monospace'; g.textAlign = 'center'; g.fillStyle = '#0c0a10'; g.fillText('R: Talk', n.x + ox + n.w / 2 + 1, n.y + oy - 13); g.fillStyle = '#ffe9b0'; g.fillText('R: Talk', n.x + ox + n.w / 2, n.y + oy - 14); g.textAlign = 'left'; }
+      if (n.near) { g.font = '10px VT323, monospace'; g.textAlign = 'center'; g.fillStyle = '#0c0a10'; g.fillText('R: Talk', n.x + ox + n.w / 2 + 1, n.y + oy - 13); g.fillStyle = '#ffe9b0'; g.fillText('R: Talk', n.x + ox + n.w / 2, n.y + oy - 14); g.textAlign = 'left'; }
     });
     // enemies
     E.enemies.forEach((e) => {
@@ -5012,13 +5328,25 @@ window.RW = window.RW || {};
       else { g.fillRect(s.x + ox - 2, s.y + oy - 1, 4, 2); g.fillRect(s.x + ox - 1, s.y + oy - 2, 2, 4); }
     });
   };
+  // fancy weapons show what they are: fire, poison, lightning, crystal shards, or the gold of a legendary
+  // weapon, glowing along the blade (everyone sees it, since other players are drawn the same way)
+  const LEGEND = () => Object.values(RW.LEGENDARY || {});
+  function weaponAura(id, hx, hy, a, f, sc, swinging) {
+    const it = RW.ITEMS[id]; if (!it || it.kind !== 'weapon') return;
+    const legend = LEGEND().includes(id), fx = it.fx; if (!fx && !legend && it.tier !== 'secret' && it.tier !== 'stygian') return;
+    const t = 4 + Math.random() * 9, x = hx + f * sc * (t * Math.cos(a) + 4 * Math.sin(a)), y = hy + sc * (t * Math.sin(a) - 4 * Math.cos(a) - 2);
+    const rate = swinging ? 0.9 : 0.35; if (Math.random() > rate) return;
+    const kind = { fire: ['#ff7a2e', '#ffb347', '#ffe08a'], poison: ['#8be04a', '#c8ff8a'], lightning: ['#7fe3ff', '#ffffff'], shards: ['#e0525a', '#4fa8f0', '#5fd98a', '#a86ef0', '#f2c94c'] }[fx] || (legend ? ['#ffe08a', '#f2c94c', '#ffffff'] : ['#c8a6ff', '#9b6cff']);
+    RW.fx.spawn({ x, y, vx: RW.rand(-8, 8), vy: fx === 'fire' ? -RW.rand(15, 35) : RW.rand(-12, 6), life: 0.4 + Math.random() * 0.3, color: RW.pick(kind), add: true, kind: fx === 'fire' ? 'ember' : fx === 'poison' ? 'bubble' : fx === 'lightning' ? 'spark' : 'glow' });
+    RW.fx.light(x, y, ...({ fire: [0.7, 0.35, 0.1], poison: [0.25, 0.6, 0.1], lightning: [0.35, 0.65, 0.9], shards: [0.5, 0.4, 0.6] }[fx] || (legend ? [0.7, 0.6, 0.2] : [0.4, 0.25, 0.6])));
+  }
   // a flame stays bright in the dark: glowing sparks drawn over the lighting, at a world position
   function flameGlow(x, y, sc) {
     RW.fx.spawn({ x: x + RW.rand(-0.6, 0.6), y: y + RW.rand(-0.6, 0.6), life: 0.05, color: '#ffe08a', add: true, kind: 'glow', size: Math.max(1, Math.round(sc)), grav: 0, drag: 1 });
     RW.fx.spawn({ x: x + RW.rand(-1.5, 1.5), y: y - 1 + RW.rand(-1.5, 1), life: 0.05, color: '#ff8a2a', add: true, kind: 'glow', size: Math.max(1, Math.round(sc)), grav: 0, drag: 1 });
   }
   E.drawPlayer = function (g, cam, p, look, opts) {
-    const A = RW.art; const frames = A.heroSprites(opts.species || 'rock', look);
+    const A = RW.art; const frames = A.dressed(opts.species || 'rock', look, opts.armor);
     const fr = frames[p.anim || 0][(p.face || 1) > 0 ? 0 : 1];
     const sc = opts.scale || 1; const ox = -cam.x, oy = -cam.y;
     const w = fr.width * sc, h = fr.height * sc;
@@ -5050,11 +5378,12 @@ window.RW = window.RW || {};
       const hx = f > 0 ? dx + (hand.x + 0.5) * sc : dx + (fr.width - hand.x - 0.5) * sc, hy = dy + (hand.y + 0.5) * sc;
       g.save(); g.translate(Math.round(hx), Math.round(hy)); g.scale(f * sc, sc); g.rotate(ang + 0.785);
       g.drawImage(ic, -3, -13, 16, 16); g.restore();
+      weaponAura(opts.item, hx - ox, hy - oy, ang + 0.785, f, sc, opts.swing > 0);
       if (opts.item === 'torch') { const a = ang + 0.785, lx = 8, ly = -10; flameGlow(hx - ox + f * sc * (lx * Math.cos(a) - ly * Math.sin(a)), hy - oy + sc * (lx * Math.sin(a) + ly * Math.cos(a)), sc); }
       if (opts.swing > 0 && prog > 0.2 && prog < 0.8) { g.globalAlpha = 0.35; g.strokeStyle = '#ffffff'; g.beginPath(); g.arc(hx, hy, 15 * sc, f > 0 ? -1.6 : Math.PI - 1.5 + 0.1, f > 0 ? 1.5 : Math.PI + 1.6); g.stroke(); g.globalAlpha = 1; }
     }
     if (opts.name) {
-      g.font = '8px "Pixelify Sans", monospace'; g.textAlign = 'center';
+      g.font = '10px VT323, monospace'; g.textAlign = 'center';
       g.fillStyle = '#0c0a10'; g.fillText(opts.name, Math.round(p.x + ox + 6) + 1, Math.round(dy - 2) + 1);
       g.fillStyle = opts.nameColor || '#ffe9b0'; g.fillText(opts.name, Math.round(p.x + ox + 6), Math.round(dy - 2)); g.textAlign = 'left';
     }
@@ -5668,23 +5997,44 @@ window.RW = window.RW || {};
 
   // ---------------- room codes (peer to peer, outside claude.ai) ----------------
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  // several STUN servers, so more home and school networks can find a direct route between the computers
+  const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun2.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }, { urls: 'stun:global.stun.twilio.com:3478' }];
   const peerOpts = () => {
-    const q = new URLSearchParams(location.search).get('peerhost'); const o = { debug: 0 };
+    const q = new URLSearchParams(location.search).get('peerhost'); const o = { debug: 0, config: { iceServers: ICE } };
     if (q) { const [h, p] = q.split(':'); o.host = h; o.port = +p || 9000; o.path = '/'; o.secure = false; }
     return o;
   };
   const roomId = (code) => 'fourbrothersworlds-' + code.toUpperCase();
   N.p2pAvailable = false;
-  N.hostGame = function () {
+  // Everyone in a room must run the same version (an older game can't read newer blocks and monsters).
+  // A joining game says hello with its version first; the host answers, or turns it away with the reason.
+  N.hostGame = function (tries) {
+    tries = tries || 0;
     return new Promise((resolve, reject) => {
       if (!window.Peer) return reject(new Error('Multiplayer could not load. Check your internet connection.'));
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       const peer = new window.Peer(roomId(code), peerOpts()); N.peer = peer;
       peer.on('open', () => { N.transport = 'p2p'; N.isHost = true; N.code = code; N.mode = 'p2p'; resolve(code); });
-      peer.on('error', (e) => { if (!N.transport) reject(e); else RW.ui && RW.ui.toast('Connection problem: ' + (e.type || e.message)); });
+      peer.on('error', (e) => {
+        if (!N.transport && e.type === 'unavailable-id' && tries < 3) { try { peer.destroy(); } catch (x) { } N.hostGame(tries + 1).then(resolve, reject); return; } // code taken: pick another
+        if (!N.transport) reject(new Error(e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' ? 'Could not reach the room server. Check your internet connection, or try another network.' : 'Could not open a room (' + (e.type || e.message) + ').'));
+        else RW.ui && RW.ui.toast('Connection problem: ' + (e.type || e.message));
+      });
+      // lost touch with the room server (sleep, wifi blip): get back on so new players can still join
+      peer.on('disconnected', () => { setTimeout(() => { try { if (!peer.destroyed) peer.reconnect(); } catch (x) { } }, 1500); });
       peer.on('connection', (c) => {
-        c.on('open', () => { N.conns.push(c); RW.ui && RW.ui.toast('A player joined your room.'); RW.ui && RW.ui.dirty(); });
-        c.on('data', (m) => { if (m && typeof m === 'object') { c.pid = c.pid || m.f; N.recv(m, c); } });
+        c.on('open', () => { c.helloT = setTimeout(() => { if (!c.ok) { RW.ui && RW.ui.toast('A player with an older version of the game tried to join. They need to refresh their page.'); try { c.send({ k: 'badver', v: RW.VERSION }); } catch (x) { } setTimeout(() => c.close(), 400); } }, 5000); });
+        c.on('data', (m) => {
+          if (!m || typeof m !== 'object') return;
+          if (!c.ok) {
+            if (m.k !== 'hello') return;
+            clearTimeout(c.helloT);
+            if (m.v !== RW.VERSION) { try { c.send({ k: 'badver', v: RW.VERSION }); } catch (x) { } RW.ui && RW.ui.toast('A player on version ' + String(m.v).slice(0, 12) + ' tried to join. You are on ' + RW.VERSION + '. Both of you: open the same link and refresh.'); setTimeout(() => c.close(), 400); return; }
+            c.ok = true; c.pid = m.f; N.conns.push(c); c.send({ k: 'hello', v: RW.VERSION, f: N.pid });
+            RW.ui && RW.ui.toast('A player joined your room.'); RW.ui && RW.ui.dirty(); return;
+          }
+          c.pid = c.pid || m.f; N.recv(m, c);
+        });
         c.on('close', () => { N.conns = N.conns.filter((x) => x !== c); if (c.pid) { N.peers.delete(c.pid); N.recv({ k: 'left', f: '#host', pid: c.pid }); } RW.ui && RW.ui.dirty(); });
       });
     });
@@ -5693,19 +6043,56 @@ window.RW = window.RW || {};
     return new Promise((resolve, reject) => {
       if (!window.Peer) return reject(new Error('Multiplayer could not load. Check your internet connection.'));
       code = String(code || '').trim().toUpperCase(); if (code.length < 4) return reject(new Error('Type the room code your host sees.'));
-      const peer = new window.Peer(undefined, peerOpts()); N.peer = peer; let ok = false;
+      const peer = new window.Peer(undefined, peerOpts()); N.peer = peer; let ok = false, stage = 'server';
       const fail = (msg) => { if (!ok) { ok = true; reject(new Error(msg)); try { peer.destroy(); } catch (e) { } } };
-      setTimeout(() => fail('No room with code ' + code + '. Check the code, and that your host is still on the title screen or playing.'), 12000);
-      peer.on('error', (e) => fail(e.type === 'peer-unavailable' ? 'No room with code ' + code + '.' : 'Could not connect (' + (e.type || e.message) + ').'));
+      const blocked = 'Found room ' + code + ', but your two networks won\'t let the computers link up directly. Try both computers on the same wifi, or a phone hotspot. School and work networks often block this.';
+      setTimeout(() => fail(stage === 'server' ? 'Could not reach the room server. Check your internet connection.' : stage === 'link' ? blocked : stage === 'hello' ? 'Room ' + code + ' answered, but the host\'s game did not. Your host may be on an older version: both of you open the same link and refresh.' : 'No room with code ' + code + '. Check the code, and that your host is still on the title screen or playing.'), 15000);
+      peer.on('error', (e) => fail(e.type === 'peer-unavailable' ? 'No room with code ' + code + '. Check the code, and that your host is still in the game.' : e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' ? 'Could not reach the room server. Check your internet connection.' : 'Could not connect (' + (e.type || e.message) + ').'));
+      peer.on('disconnected', () => { if (ok) setTimeout(() => { try { if (!peer.destroyed) peer.reconnect(); } catch (x) { } }, 1500); });
       peer.on('open', () => {
+        stage = 'room';
         const c = peer.connect(roomId(code), { reliable: true });
-        c.on('open', () => { if (ok) return; ok = true; N.hostConn = c; N.transport = 'p2p'; N.isHost = false; N.code = code; N.mode = 'p2p'; resolve(); });
-        c.on('data', (m) => N.recv(m, c));
-        c.on('close', () => { N.peers.clear(); N.transport = null; N.mode = 'local'; RW.ui && RW.ui.banner('The host left', 'The room has closed. You can keep exploring on your own; nothing new will be shared.'); });
+        c.on('iceStateChanged', (st) => { if (st === 'checking') stage = 'link'; if (st === 'failed') fail(blocked); });
+        c.on('open', () => { if (ok) return; stage = 'hello'; c.send({ k: 'hello', v: RW.VERSION, f: N.pid }); });
+        c.on('data', (m) => {
+          if (!m || typeof m !== 'object') return;
+          if (m.k === 'badver') { fail('The host is on version ' + String(m.v).slice(0, 12) + ' and you are on ' + RW.VERSION + '. Both of you: open the same link and refresh the page.'); return; }
+          if (m.k === 'hello') { if (ok) return; ok = true; N.hostConn = c; N.transport = 'p2p'; N.isHost = false; N.code = code; N.mode = 'p2p'; resolve(); return; }
+          if (N.hostConn === c) N.recv(m, c);
+        });
+        c.on('close', () => { if (N.hostConn !== c) return; N.peers.clear(); N.transport = null; N.mode = 'local'; RW.ui && RW.ui.banner('The host left', 'The room has closed. You can keep exploring on your own; nothing new will be shared.'); });
       });
     });
   };
   N.on('pres', (m) => { if (m.p && typeof m.p.x === 'number') N.gotPresence(m.f, m.p, false); });
+  // your arrows, slingshot stones and thorns, shown to the others
+  N.sendShot = (sh) => { if (N.transport) N.send({ k: 'psh', w: RW.world.def.id, s: [Math.round(sh.x), Math.round(sh.y), Math.round(sh.vx), Math.round(sh.vy), sh.grav || 0, String(sh.kind).slice(0, 10), String(sh.color || '').slice(0, 9)] }); };
+  N.on('psh', (m) => {
+    if (m.w !== RW.world.def.id || !Array.isArray(m.s)) return; const a = m.s;
+    RW.ent.shots.push({ x: +a[0], y: +a[1], vx: RW.clamp(+a[2], -900, 900), vy: RW.clamp(+a[3], -900, 900), grav: RW.clamp(+a[4] || 0, 0, 2000), life: 2, owner: 'r', dmg: 0, kind: String(a[5]), color: typeof a[6] === 'string' ? a[6] : '#e8e0d0' });
+  });
+  // giving: hand what you're holding to the nearest player
+  N.nearestPlayer = function (range) {
+    const P = RW.player; let best = null, bd = range;
+    N.peers.forEach((p, key) => { const t = p.target; if (!t || t.dead || t.w !== RW.world.def.id) return; const d = RW.dist(p.x, p.y, P.x, P.y); if (d < bd) { bd = d; best = { key, pid: t.pid || key, name: String(t.n || 'Player').slice(0, 20) }; } });
+    return best;
+  };
+  N.give = function () {
+    const P = RW.player, U = RW.ui; const slot = P.inv[P.sel];
+    if (!N.transport) { U.toast('Giving works when you play together with a room code.'); return; }
+    if (!slot) { U.toast('Hold the thing you want to give in your hand first.'); return; }
+    const to = N.nearestPlayer(5 * 16); if (!to) { U.toast('Stand next to the player you want to give it to.'); return; }
+    const it = RW.ITEMS[slot.id], n = slot.n; P.inv[P.sel] = null; U.dirty();
+    N.send({ k: 'give', to: to.pid, id: slot.id, n, from: P.name });
+    U.toast('You gave ' + (n > 1 ? n + ' ' : 'your ') + it.name + ' to ' + to.name + '.'); RW.audio.sfx('pickup'); RW.game.saveSoon();
+    RW.fx.burst(P.x + 6, P.y + 6, ['#ffe08a', '#ffffff'], 8, 60, { add: true, kind: 'glow' });
+  };
+  N.on('give', (m) => {
+    if (m.to !== N.pid || !RW.ITEMS[m.id]) return;
+    const n = RW.clamp(Math.floor(+m.n) || 0, 1, 999); const P = RW.player;
+    const left = P.add(m.id, n); if (left > 0) RW.ent.dropItem(m.id, left, P.x + 6, P.y);
+    RW.ui.toast((typeof m.from === 'string' ? m.from.slice(0, 20) : 'A player') + ' gave you ' + (n > 1 ? n + ' ' : 'a ') + RW.ITEMS[m.id].name + '.'); RW.audio.sfx('pickup'); RW.game.saveSoon();
+  });
   N.on('left', (m) => { N.peers.delete(m.pid); RW.ui && RW.ui.dirty(); });
   N.on('chat', (m) => N.gotChat(m.n, m.m, false));
   N.on('fx', (m) => N.playRemoteFx(m));
@@ -5717,7 +6104,7 @@ window.RW = window.RW || {};
     if (!N.transport) return;
     N.presT -= dt; N.presBeat -= dt; if (N.presT > 0) return; N.presT = 1 / 15;
     const P = RW.player; const h = P.held();
-    const pres = { x: Math.round(P.x), y: Math.round(P.y), f: P.face, a: P.anim, s: Math.round(Math.max(0, P.swingT) * 100) / 100, sd: P.swingDur, it: h ? h.id : '', n: P.name, lk: packLook(P.look, P.species), sp: P.species, w: RW.world.def.id, sz: Math.round(P.scale() * 100) / 100, dead: P.dead ? 1 : 0, pid: N.pid, g: P.ground ? 1 : 0, ot: P.offTorch && P.has('torch') ? 1 : 0 };
+    const pres = { x: Math.round(P.x), y: Math.round(P.y), f: P.face, a: P.anim, s: Math.round(Math.max(0, P.swingT) * 100) / 100, sd: P.swingDur, it: h ? h.id : '', n: P.name, lk: packLook(P.look, P.species), sp: P.species, w: RW.world.def.id, sz: Math.round(P.scale() * 100) / 100, dead: P.dead ? 1 : 0, pid: N.pid, g: P.ground ? 1 : 0, ot: P.offTorch && P.has('torch') ? 1 : 0, ar: [P.armor.head || '', P.armor.body || ''], bd: RW.ent.buddy && P.flags.buddy ? [Math.round(RW.ent.buddy.x), Math.round(RW.ent.buddy.y), RW.ent.buddy.face > 0 ? 1 : -1, Math.abs(RW.ent.buddy.vx) > 5 ? 1 : 0] : 0 };
     const key = JSON.stringify(pres);
     if (key === N.lastPres && N.presBeat > 0) return;
     N.lastPres = key; N.presBeat = 1;
@@ -5743,8 +6130,14 @@ window.RW = window.RW || {};
       const t = p.target; if (!t || t.dead || t.w !== RW.world.def.id) return;
       const sp = RW.HEROES[t.sp] ? t.sp : 'rock';
       const look = unpackLook(t.lk, sp);
-      RW.ent.drawPlayer(g, cam, { x: p.x, y: p.y, face: t.f, anim: t.a }, look, { species: sp, scale: t.sz || 1, item: t.it && RW.ITEMS[t.it] ? t.it : null, swing: t.s, swingDur: t.sd, name: String(t.n || 'Player').slice(0, 20), nameColor: '#9ad8ff', torch: !!t.ot, time: RW.game.time });
+      RW.ent.drawPlayer(g, cam, { x: p.x, y: p.y, face: t.f, anim: t.a }, look, { species: sp, scale: t.sz || 1, item: t.it && RW.ITEMS[t.it] ? t.it : null, swing: t.s, swingDur: t.sd, name: String(t.n || 'Player').slice(0, 20), nameColor: '#9ad8ff', torch: !!t.ot, time: RW.game.time, armor: Array.isArray(t.ar) ? t.ar.map((a) => (RW.ITEMS[a] && RW.ITEMS[a].kind === 'armor' ? a : '')) : null });
       if (t.ot || t.it === 'torch') RW.fx.light(p.x + 6, p.y + 4, 1.8, 1.25, 0.55); else RW.fx.light(p.x + 6, p.y + 6, 0.35, 0.3, 0.2);
+      // their acorn buddy, trotting along after them
+      if (Array.isArray(t.bd) && typeof t.bd[0] === 'number') {
+        const b = p.bud = p.bud || { x: t.bd[0], y: t.bd[1] }; b.x = RW.lerp(b.x, t.bd[0], 0.3); b.y = RW.lerp(b.y, t.bd[1], 0.3);
+        const fr = RW.art.species('acorn'), f = t.bd[3] ? 1 + Math.floor(RW.game.time * 8) % 2 : 0, img = fr[f % fr.length][t.bd[2] > 0 ? 0 : 1];
+        g.drawImage(img, Math.round(b.x - cam.x + 5 - img.width / 2), Math.round(b.y - cam.y + 20 - img.height));
+      }
     });
   };
   N.count = () => N.peers.size + 1;
@@ -5756,12 +6149,13 @@ window.RW = window.RW || {};
   const AK = ['shell', 'cap', 'eyes', 'mouth', 'extra'], GK = ['sheet', 'shape', 'eyes', 'mouth', 'extra'];
   const KEYS = { rock: LK, fuzzy: FK, acorn: AK, ghost: GK };
   const OPTS = { acorn: { shell: 'SHELLS', cap: 'CAPS', eyes: 'AEYES', mouth: 'AMOUTHS', extra: 'AEXTRAS' }, ghost: { sheet: 'SHEETS', shape: 'GSHAPES', eyes: 'GEYES', mouth: 'GMOUTHS', extra: 'GEXTRAS' } };
-  function packLook(l, sp) { if (!l) return ''; const keys = KEYS[sp] || LK; return keys.map((k) => l[k]).join('|') + '|' + l.hue + '|' + l.tone; }
+  function packLook(l, sp) { if (!l) return ''; const keys = KEYS[sp] || LK; return keys.map((k) => l[k]).join('|') + '|' + l.hue + '|' + l.tone + '|' + (l.hat || 'none') + '|' + (l.cape || 'none'); }
   function unpackLook(s, sp) {
     const fz = sp === 'fuzzy';
     if (typeof s !== 'string' || !s) return RW.art.defaultLook(sp);
     const keys = KEYS[sp] || LK; const a = s.split('|'); const o = {}; keys.forEach((k, i) => (o[k] = a[i]));
     o.hue = RW.clamp(+a[keys.length] || 0, -30, 30); o.tone = RW.clamp(+a[keys.length + 1] || 0, -0.15, 0.15);
+    o.hat = RW.HATS[a[keys.length + 2]] ? a[keys.length + 2] : 'none'; o.cape = RW.CAPES[a[keys.length + 3]] ? a[keys.length + 3] : 'none';
     if (OPTS[sp]) { const def = RW.art.defaultLook(sp); Object.entries(OPTS[sp]).forEach(([k, m]) => { if (!RW[m][o[k]]) o[k] = def[k]; }); }
     else if (fz) {
       if (!RW.FUR_TYPES[o.fur]) o.fur = 'brown'; if (!RW.FLUFFS[o.fluff]) o.fluff = 'round'; if (!RW.EARS[o.ears]) o.ears = 'none';
@@ -5790,7 +6184,7 @@ window.RW = window.RW || {};
 
   // ---------------- modals ----------------
   U.openModal = function (id) {
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts'].forEach((m) => show('#' + m, m === id));
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause'].forEach((m) => show('#' + m, m === id));
     U.open = id; RW.audio.sfx('ui');
     if (id === 'help') U.renderHelp();
     if (id === 'opts') U.renderOpts();
@@ -5800,7 +6194,7 @@ window.RW = window.RW || {};
   };
   U.closeModal = function () {
     if (U.cursor) { P().add(U.cursor.id, U.cursor.n); U.cursor = null; show('#held', false); }
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts'].forEach((m) => show('#' + m, false));
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause'].forEach((m) => show('#' + m, false));
     U.open = null; U.stopCapture && U.stopCapture();
     const ae = document.activeElement; if (ae && ae !== document.body && ae.id !== 'chatin' && ae.blur) ae.blur(); show('#tooltip', false);
   };
@@ -5818,7 +6212,10 @@ window.RW = window.RW || {};
     setTimeout(() => d.remove(), 2500); while (f.children.length > 6) f.firstChild.remove();
   };
   U.bossBar = (on, name) => { show('#bossbar', on); if (name) $('#bossbar .label').textContent = name; };
-  U.deathScreen = () => show('#death', true);
+  U.deathScreen = () => {
+    const sp = RW.player.species; const t = { rock: ['You crumbled', 'Waking up in your cave'], fuzzy: ['You fainted', 'Waking up in Tuftwood'], acorn: ['You got cracked', 'Waking up in Capstead'], ghost: ['You faded', 'Drifting back to the Pale Keep'] }[sp] || ['You fell', 'Waking up at home'];
+    $('#death b').textContent = t[0]; $('#death span').textContent = t[1] + '… some of your things are lying where you fell.'; show('#death', true);
+  };
   U.hideDeath = () => show('#death', false);
 
   // ---------------- HUD ----------------
@@ -5831,6 +6228,7 @@ window.RW = window.RW || {};
       U.attachTip(s, () => P().inv[i]);
       hb.append(s); U.hotbarSlots.push(s);
     }
+    $('#b-pause').onclick = () => U.toggle('pause');
     $('#b-inv').onclick = () => U.toggle('inv'); $('#b-map').onclick = () => U.toggle('map'); $('#b-guide').onclick = () => U.toggle('guide'); $('#b-help').onclick = () => U.toggle('help'); $('#b-opts').onclick = () => U.toggle('opts');
     U.hudKeys();
     const mb = $('#b-mute'); const upd = () => (mb.textContent = RW.audio.muted ? 'Sound off' : 'Sound on');
@@ -5878,6 +6276,7 @@ window.RW = window.RW || {};
     if (it.fx) lines.push({ poison: 'Poisons', fire: 'Burns', lightning: 'Chain lightning', shards: 'Throws crystal shards' }[it.fx]);
     if (it.heal) lines.push('Heals ' + it.heal + (it.plant ? ' · plant on farm soil' : ''));
     if (it.kind === 'place') lines.push('Placeable');
+    if (it.kind === 'armor') lines.push((it.slot === 'head' ? 'Helmet' : 'Body armor') + ' · armor ' + it.def + ' · right-click to wear');
     if (it.desc) lines.push(it.desc);
     lines.forEach((l) => t.append(el('i', null, l)));
   };
@@ -5894,7 +6293,7 @@ window.RW = window.RW || {};
       s.append(c, el('span', 'n', p.inv[i] && p.inv[i].n > 1 ? p.inv[i].n : ''));
       s.addEventListener('mousedown', (e) => {
         e.preventDefault(); e.stopPropagation();
-        if (e.button === 2) { const it = p.inv[i]; if (it) { const def = RW.ITEMS[it.id]; if (def.kind === 'food' || def.kind === 'crystal') p.useItem(def); } return; }
+        if (e.button === 2) { const it = p.inv[i]; if (it) { const def = RW.ITEMS[it.id]; if (def.kind === 'food' || def.kind === 'crystal') p.useItem(def); else if (def.kind === 'armor') { p.wear(def); U.renderInv(); } } return; }
         const cur = U.cursor, slot = p.inv[i];
         if (!cur && slot) { U.cursor = slot; p.inv[i] = null; }
         else if (cur && !slot) { p.inv[i] = cur; U.cursor = null; }
@@ -5910,6 +6309,17 @@ window.RW = window.RW || {};
       g.append(s);
     }
     const sb = $('#statsbox'); sb.innerHTML = ''; const st = p.stats;
+    // what you're wearing: click a piece to take it off; right-click armor in your bag to put it on
+    const wear = el('div', 'wearing'); wear.style.setProperty('--c', '#9aa3ad');
+    wear.append(el('b', null, 'Armor ' + p.defense() + ' '));
+    [['head', 'Head'], ['body', 'Body']].forEach(([k, n]) => {
+      const it = RW.ITEMS[p.armor[k]]; const slot = el('div', 'slot armorslot'); const c = el('canvas'); c.width = c.height = 16; paint(c, it && it.id); slot.append(c, el('span', 'k', n));
+      slot.title = it ? it.name + ' (click to take off)' : 'No ' + n.toLowerCase() + ' armor. Right-click armor in your bag to wear it.';
+      slot.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); if (it) { p.unwear(k); U.renderInv(); } });
+      if (it) U.attachTip(slot, () => ({ id: it.id }));
+      wear.append(slot);
+    });
+    sb.append(wear);
     [['Strength', '+' + Math.round(st.red * 5) + '% damage', '#e0525a', st.red, 20], ['Toughness', '+' + Math.round(st.blue * 10) + ' health', '#4fa8f0', st.blue, 20], ['Speed', '+' + Math.round(st.green * 3) + '%', '#5fd98a', st.green, 10], ['Mining', '+' + Math.round(st.purple * 8) + '%', '#a86ef0', st.purple, 15], ['Size', '+' + Math.round(st.gold * 4) + '% bigger', '#f2c94c', st.gold, 8]].forEach(([n, v, c, cnt, max]) => {
       const d = el('div'); d.style.setProperty('--c', c); d.append(el('b', null, n + ' '), document.createTextNode(v + ' (' + (Math.round(cnt * 4) / 4) + '/' + max + ')')); sb.append(d);
     });
@@ -6014,14 +6424,19 @@ window.RW = window.RW || {};
     const by = RW.WORLDS[w.unlockedBy];
     return { ok: false, why: by ? 'Opens when ' + RW.SPECIES[by.boss.species].name + ' falls on ' + by.name : 'Locked' };
   };
+  // atRift: true at a rift, false at an altar, 'anywhere' from the pause menu or map (only worlds you've already been to)
   U.travel = function (atRift) {
     const worlds = Object.values(RW.WORLDS).sort((a, b) => a.order - b.order);
-    const any = worlds.some((w) => U.worldStatus(w).ok);
+    const anywhere = atRift === 'anywhere';
+    const baseSt = U.worldStatus;
+    const status = (w) => { const st = baseSt(w); if (!anywhere || !st.ok || w.id === RW.world.def.id) return st; return P().visited[w.id] ? st : { ok: false, why: 'Reach it through a rift or altar first' }; };
+    if (anywhere && !worlds.some((w) => status(w).ok)) { U.toast('You have only been to ' + RW.world.def.name + ' so far. Worlds you visit can be reached from here afterwards.'); RW.audio.sfx('deny'); return; }
+    const any = worlds.some((w) => status(w).ok);
     if (!any) { U.toast('The altar is cold. A great soul must fall into the Duat before it will open.'); RW.audio.sfx('deny'); return; }
     U.openModal('riftm'); const box = $('#worlds'); box.innerHTML = '';
-    $('#riftm h3').textContent = atRift ? 'The rift tears open onto other worlds' : 'The Duat Altar hums';
+    $('#riftm h3').textContent = anywhere ? 'Go back to a world you have visited' : atRift ? 'The rift tears open onto other worlds' : 'The Duat Altar hums';
     worlds.forEach((w) => {
-      const st = U.worldStatus(w); const card = el('div');
+      const st = status(w); const card = el('div');
       const c = el('canvas'); c.width = c.height = 36; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
       const hero = { fuzzy: 'fuzzy', acorn: 'acorn', rock: 'stonefolk', ghost: 'ghost' }[w.id] || 'lost_soul';
       const fr = hero === 'stonefolk' ? RW.art.rockSprites(RW.art.DEFAULT_LOOK)[0][0] : RW.art.species(hero)[0][0];
@@ -6074,7 +6489,7 @@ window.RW = window.RW || {};
     g.fillStyle = '#9ad8ff'; RW.net.peers.forEach((q) => g.fillRect(Math.floor(q.x / 16) - 2, Math.floor(q.y / 16) - 2, 4, 4));
     if (p.has('square_compass')) { g.strokeStyle = '#f2c94c'; W.meta.secrets.forEach((s) => { if (RW.dist(s.x, s.y, p.x / 16, p.y / 16) < 90) { g.strokeRect(s.x - 3, s.y - 3, 7, 7); } }); }
     // label the village
-    const v = W.def.id === 'rock' ? W.def.village : null; g.font = '10px "Pixelify Sans", monospace'; g.fillStyle = '#ece4d6';
+    const v = W.def.id === 'rock' ? W.def.village : null; g.font = '12px VT323, monospace'; g.fillStyle = '#ece4d6';
     if (v && W.explored[v.cy * W.W + v.cx]) g.fillText('Stalagmere', v.cx - 26, v.cy - v.ry + 12);
   };
 
@@ -6094,7 +6509,7 @@ window.RW = window.RW || {};
   // ---------------- keys for panels ----------------
   window.addEventListener('keydown', (e) => {
     if (RW.typing() || RW.input.capturing) return;
-    if (e.key === 'Escape') { U.closeModal(); return; }
+    if (e.key === 'Escape') { if (U.open) U.closeModal(); else if (RW.game.playing) U.openModal('pause'); return; }
     const I = RW.input, c = e.code;
     if (!RW.game.playing) { if (I.is(c, 'settings')) U.toggle('opts'); return; }
     if (I.is(c, 'bag')) { e.preventDefault(); U.toggle('inv'); }
@@ -6104,6 +6519,22 @@ window.RW = window.RW || {};
     else if (I.is(c, 'settings')) U.toggle('opts');
     else if (I.is(c, 'chat')) { show('#chatin', true); chatin.focus(); e.preventDefault(); }
   });
+
+  // ======================= PAUSE MENU =======================
+  // Esc (or the Menu button). On your own the world stops while it's open; in a room it keeps going for the others.
+  $('#p-resume').onclick = () => U.closeModal();
+  $('#p-travel').onclick = () => U.travel('anywhere');
+  $('#p-opts').onclick = () => U.openModal('opts');
+  $('#p-help').onclick = () => U.openModal('help');
+  $('#p-title').onclick = () => U.toTitle();
+  $('#p-home').onclick = () => { if (RW.game.playing) RW.game.saveNow(); location.href = '../index.html'; };
+  $('#m-travel').onclick = () => U.travel('anywhere');
+  U.paused = () => U.open === 'pause' && !(RW.net && RW.net.transport);
+  U.toTitle = function () {
+    const G = RW.game; G.saveNow(); RW.world.saveExplored();
+    G.playing = false; U.closeModal(); U.bossBar(false); RW.ent.boss = null; RW.ent.enemies.length = 0; RW.ent.shots.length = 0;
+    G.hasSave = true; U.showTitle(true);
+  };
 
   // ======================= CONTROLS & SETTINGS =======================
   const K = (id) => (RW.binds[id] || []).filter(Boolean).map(RW.keyName).join(' / ') || 'not set';
@@ -6124,6 +6555,8 @@ window.RW = window.RW || {};
     row(K('torch'), 'Hold a torch in your other hand, whatever else you are holding. Craft torches from wood and flint');
     row('1–0 · wheel', 'Choose hotbar slot' + (RW.settings.invertWheel ? ' (wheel turned round in Settings)' : ''));
     row(K('interact'), 'Talk, read carvings, use a rift or Duat Altar to travel');
+    row(K('give'), 'Give what you are holding to the player standing next to you (when you play together)');
+    row('Esc', 'Pause menu: travel back to worlds you have visited, settings, the home screen');
     row(K('cast') + ' · ' + K('spell'), 'Cast spell · switch spell');
     row(K('bag'), 'Bag and crafting');
     row(K('map') + ' · ' + K('guide') + ' · ' + K('help'), 'Map · Field Guide · Controls');
@@ -6270,11 +6703,12 @@ window.RW = window.RW || {};
         row('Shape', (b) => chips(b, RW.GSHAPES, 'shape')); row('Eyes', (b) => chips(b, RW.GEYES, 'eyes')); row('Mouth', (b) => chips(b, RW.GMOUTHS, 'mouth')); row('Extra', (b) => chips(b, RW.GEXTRAS, 'extra'));
       } else if (species === 'fuzzy') {
         row('Fur', (b) => chips(b, RW.FUR_TYPES, 'fur')); dyn.append(slider('Color shift', 'hue', -20, 20, 1)); dyn.append(slider('Shade', 'tone', -0.1, 0.1, 0.01));
-        row('Fluff', (b) => chips(b, RW.FLUFFS, 'fluff')); row('Ears', (b) => chips(b, RW.EARS, 'ears')); row('Eyes', (b) => chips(b, RW.FEYES, 'eyes')); row('Mouth', (b) => chips(b, RW.FMOUTHS, 'mouth')); row('Extra', (b) => chips(b, RW.EXTRAS, 'extra'));
+        row('Fluff', (b) => chips(b, RW.FLUFFS, 'fluff')); row('Eyes', (b) => chips(b, RW.FEYES, 'eyes')); row('Mouth', (b) => chips(b, RW.FMOUTHS, 'mouth')); row('Extra', (b) => chips(b, RW.EXTRAS, 'extra'));
       } else {
         row('Rock', (b) => chips(b, RW.ROCK_TYPES, 'rock')); dyn.append(slider('Color shift', 'hue', -30, 30, 1)); dyn.append(slider('Shade', 'tone', -0.12, 0.12, 0.01));
         row('Head', (b) => chips(b, RW.TOPPERS, 'topper')); row('Body', (b) => chips(b, RW.SHAPES, 'shape')); row('Cracks', (b) => chips(b, RW.CRACKS, 'cracks')); row('Eyes', (b) => chips(b, RW.EYES, 'eyes')); row('Eye glow', (b) => chips(b, RW.GLOWS, 'glow', true)); row('Mouth', (b) => chips(b, RW.MOUTHS, 'mouth'));
       }
+      row('Hat', (b) => chips(b, RW.HATS, 'hat')); row('Cape', (b) => chips(b, Object.fromEntries(Object.entries(RW.CAPES).map(([k, v]) => [k, k === 'none' ? 'None' : k[0].toUpperCase() + k.slice(1)])), 'cape'));
       dyn.append(el('div', 'label', RW.HEROES[species].blurb));
     };
     const slider = (label, key, min, max, step) => { const r = el('div', 'opt dyn'); r.append(el('span', 'label', label)); const i = el('input'); i.type = 'range'; i.min = min; i.max = max; i.step = step; i.value = look[key] || 0; i.setAttribute('aria-label', label); i.oninput = () => (look[key] = +i.value); r.append(i); return r; };
@@ -6297,7 +6731,7 @@ window.RW = window.RW || {};
     cancelAnimationFrame(pv);
     const loop = () => {
       if ($('#creator').classList.contains('hidden-ui')) return;
-      t += 1 / 60; const fr = RW.art.heroSprites(species, look); const f = 1 + Math.floor(t * 7) % 4; const s = 4;
+      t += 1 / 60; const fr = RW.art.dressed(species, look); const f = 1 + Math.floor(t * 7) % 4; const s = 4;
       g.clearRect(0, 0, cv.width, cv.height);
       const gc = { fuzzy: ['#2a3a24', '#4a7a32'], acorn: ['#22341e', '#3f8a3a'], ghost: ['#24223a', '#9ab8c8'] }[species] || ['#2a2730', '#3a3640']; g.fillStyle = gc[0]; g.fillRect(0, cv.height - 20, cv.width, 20); g.fillStyle = gc[1]; g.fillRect(0, cv.height - 20, cv.width, 2);
       const img = fr[Math.floor(t / 2.5) % 2 ? 0 : f][Math.floor(t / 5) % 2 ? 1 : 0];
@@ -6878,7 +7312,7 @@ window.RW = window.RW || {};
     if (e.hero === 'ghost') g.globalAlpha = 0.85;
     g.drawImage(fr, dx, dy); g.globalAlpha = 1;
     if (e.swingT > 0) { g.globalAlpha = 0.6; g.strokeStyle = '#ff3a4a'; g.lineWidth = 2; g.beginPath(); g.arc(e.x + ox + 6 + e.face * 6, e.y + oy + 14, 16, e.face > 0 ? -1.4 : Math.PI - 1.4, e.face > 0 ? 1.4 : Math.PI + 1.4); g.stroke(); g.globalAlpha = 1; g.lineWidth = 1; }
-    g.font = '8px "Pixelify Sans", monospace'; g.textAlign = 'center';
+    g.font = '10px VT323, monospace'; g.textAlign = 'center';
     g.fillStyle = '#0c0a10'; g.fillText(e.nm, Math.round(e.x + ox + 6) + 1, dy - 5); g.fillStyle = '#ff5a6a'; g.fillText(e.nm, Math.round(e.x + ox + 6), dy - 6); g.textAlign = 'left';
     g.fillStyle = '#0c0a10'; g.fillRect(e.x + ox - 4, dy - 3, 20, 3); g.fillStyle = '#ff3a4a'; g.fillRect(e.x + ox - 4, dy - 3, 20 * Math.max(0, e.hp / e.maxhp), 3);
   }
@@ -7243,9 +7677,17 @@ window.RW = window.RW || {};
   // ---------------- title screen: host or join with a room code ----------------
   S.setupTitle = function () {
     const box = document.getElementById('mp'); if (!box) return;
-    const canP2P = !window.claude && !!window.Peer;
-    box.hidden = !canP2P || !!N.transport; if (box.hidden) return;
+    box.hidden = !!window.claude || !!N.transport; if (box.hidden) return;
     const msg = document.getElementById('mp-msg'), code = document.getElementById('mp-code');
+    // the multiplayer add-on downloads separately; say so instead of hiding the box if it hasn't arrived
+    if (!window.Peer) {
+      document.getElementById('mp-row').hidden = true;
+      msg.textContent = window.__peerFailed ? 'Multiplayer could not download on this computer (an ad blocker or a strict network can stop it). Check the internet connection and refresh the page.' : 'Loading multiplayer…';
+      if (!window.__peerFailed) setTimeout(() => S.setupTitle(), 800);
+      return;
+    }
+    document.getElementById('mp-row').hidden = false;
+    if (!msg.dataset.set) { msg.dataset.set = 1; msg.textContent = 'One player hosts and keeps the world. Everyone else joins with the room code. Everyone needs the same version (v' + RW.VERSION + ').'; }
     const busy = (on) => { ['b-host', 'b-join'].forEach((id) => (document.getElementById(id).disabled = on)); };
     document.getElementById('b-host').onclick = async () => {
       busy(true); msg.textContent = 'Opening a room…';
@@ -7332,14 +7774,14 @@ window.RW = window.RW || {};
       v: 2, name: P.name, look: P.look, species: P.species, world: RW.world.def ? RW.world.def.id : P.startWorld, startWorld: P.startWorld, pos, visited: P.visited,
       inv: P.inv.map((s) => (s ? { id: s.id, n: s.n } : null)), sel: P.sel,
       stats: P.stats, spells: P.spells, hp: Math.max(1, Math.round(P.hp)), mana: Math.round(P.mana), x: Math.round(P.x), y: Math.round(P.y),
-      offTorch: !!P.offTorch, flags: P.flags, seen: P.seen, pouches: (E.allPouches || []).filter((p) => !RW.world.def || p.w !== RW.world.def.id).concat(E.pouches.map((p) => Object.assign({ w: p.w || (RW.world.def && RW.world.def.id) }, p))),
+      offTorch: !!P.offTorch, armor: P.armor, flags: P.flags, seen: P.seen, pouches: (E.allPouches || []).filter((p) => !RW.world.def || p.w !== RW.world.def.id).concat(E.pouches.map((p) => Object.assign({ w: p.w || (RW.world.def && RW.world.def.id) }, p))),
     };
   };
   G.load = function (s) {
     P.name = s.name || 'Cobble'; P.look = s.look || RW.art.DEFAULT_LOOK;
     P.inv = new Array(P.SLOTS).fill(null); (s.inv || []).forEach((it, i) => { if (it && RW.ITEMS[it.id] && i < P.SLOTS) P.inv[i] = { id: it.id, n: it.n }; });
     P.sel = s.sel || 0; P.stats = Object.assign({ red: 0, blue: 0, green: 0, purple: 0, gold: 0 }, s.stats || {});
-    P.spells = (s.spells || []).filter((x) => RW.SPELLS[x]); P.flags = s.flags || {}; P.seen = s.seen || {}; P.offTorch = !!s.offTorch;
+    P.spells = (s.spells || []).filter((x) => RW.SPELLS[x]); P.flags = s.flags || {}; P.seen = s.seen || {}; P.offTorch = !!s.offTorch; P.armor = {}; Object.entries(s.armor || {}).forEach(([k, v]) => { if (RW.ITEMS[v] && RW.ITEMS[v].slot === k) P.armor[k] = v; });
     P.hp = s.hp || P.maxHp(); P.mana = s.mana || 0; P.savedPos = s.x != null ? { x: s.x, y: s.y } : null;
     E.allPouches = (s.pouches || []).filter((p) => p && Array.isArray(p.items)).map((p) => Object.assign({ w: 'rock' }, p));
     P.species = RW.HEROES[s.species] ? s.species : 'rock';
@@ -7352,7 +7794,7 @@ window.RW = window.RW || {};
   };
   G.newCharacter = function () {
     P.inv = new Array(P.SLOTS).fill(null); P.sel = 0; P.stats = { red: 0, blue: 0, green: 0, purple: 0, gold: 0 };
-    P.spells = []; P.flags = {}; P.seen = {}; P.mana = 0; P.savedPos = null; E.pouches = []; E.allPouches = []; P.offTorch = false;
+    P.spells = []; P.flags = {}; P.seen = {}; P.mana = 0; P.savedPos = null; E.pouches = []; E.allPouches = []; P.offTorch = false; P.armor = {};
     P.startWorld = RW.HEROES[P.species].start; P.world = P.startWorld; P.pos = {}; P.visited = {}; P.visited[P.startWorld] = 1;
     if (P.species === 'fuzzy') { P.add('wood_sword', 1); P.add('berry', 3); P.spells = ['spark', 'mend']; P.mana = 40; }
     if (P.species === 'acorn') { P.add('wood_spear', 1); P.add('slingshot', 1); P.add('berry', 5); }
@@ -7372,6 +7814,7 @@ window.RW = window.RW || {};
     RW.world.init(id);
     RW.ent.initNpcs();
     await RW.net.loadWorld(id);
+    RW.world.dropFloatingPlants(); RW.world.forgetLooseWater();
     if (RW.state.bossDead) { const W = RW.world; (W.meta.ward || []).forEach(([x, y]) => { if (W.get(x, y) === RW.T.ward) W.applyRemote(W.idx(x, y), RW.T.air, null); }); if (W.meta.riftAt && W.get(W.meta.riftAt.x, W.meta.riftAt.y) !== RW.T.rift) W.applyRemote(W.idx(W.meta.riftAt.x, W.meta.riftAt.y), RW.T.rift, null); }
     E.pouches = (E.allPouches || []).filter((p) => p.w === id);
     P.world = id; P.visited[id] = 1;
@@ -7522,6 +7965,7 @@ window.RW = window.RW || {};
     // campfires & altars
     for (let y = ty0; y < ty0 + v.h / TS + 1; y++) for (let x = tx0; x < tx0 + v.w / TS + 1; x++) {
       const t = W.get(x, y);
+      if (t === RW.T.torchwall) { if (Math.random() < 0.12) RW.fx.spawn({ x: x * TS + 8 + RW.rand(-1, 1), y: y * TS + 2, vy: -RW.rand(15, 30), vx: RW.rand(-5, 5), life: 0.6, color: RW.pick(['#ff8a2a', '#ffe08a']), add: true, kind: 'ember' }); if (Math.random() < 0.5) RW.fx.spawn({ x: x * TS + 8 + RW.rand(-0.5, 0.5), y: y * TS + 2, life: 0.06, color: '#ffd27a', add: true, kind: 'glow', grav: 0, drag: 1 }); }
       if (t === RW.T.campfire && Math.random() < 0.3) RW.fx.spawn({ x: x * TS + 8 + RW.rand(-3, 3), y: y * TS + 6, vy: -RW.rand(20, 50), vx: RW.rand(-8, 8), life: 0.9, color: RW.pick(['#ff8a2a', '#ffe08a']), add: true, kind: 'ember' });
       if (t === RW.T.altar && Math.random() < 0.15) RW.fx.spawn({ x: x * TS + 8 + RW.rand(-5, 5), y: y * TS + 4, vy: -20, life: 1, color: RW.pick(['#c8a6ff', '#9b6cff']), add: true, kind: 'glow' });
     }
@@ -7540,7 +7984,7 @@ window.RW = window.RW || {};
     for (let k = 0; k < 5; k++) { g.rotate(time * (0.6 + k * 0.2)); g.strokeStyle = ['#c8a6ff', '#7a5ab8', '#5ad0e8', '#e8e0ff', '#a86ef0'][k]; g.globalAlpha = 0.6; g.lineWidth = 1; g.beginPath(); g.ellipse(0, 0, 10 + k * 4, 22 + k * 3, 0, 0.2 + k, 4 + k); g.stroke(); }
     g.globalAlpha = 1; g.fillStyle = '#05020a'; g.beginPath(); g.ellipse(0, 0, 7, 16, 0, 0, 6.29); g.fill();
     g.restore();
-    if (RW.dist(P.x + 6, P.y + 14, r.x * TS + 8, r.y * TS + 8) < 40) { g.font = '8px "Pixelify Sans", monospace'; g.textAlign = 'center'; g.fillStyle = '#e8e0ff'; g.fillText('R: Look through the rift', x, y - 30); g.textAlign = 'left'; }
+    if (RW.dist(P.x + 6, P.y + 14, r.x * TS + 8, r.y * TS + 8) < 40) { g.font = '10px VT323, monospace'; g.textAlign = 'center'; g.fillStyle = '#e8e0ff'; g.fillText('R: Look through the rift', x, y - 30); g.textAlign = 'left'; }
   }
 
   // ---------------- loop ----------------
@@ -7551,9 +7995,11 @@ window.RW = window.RW || {};
     if (!W.fg) { requestAnimationFrame(frame); return; }
     const sk = G.sky();
     if (G.playing) {
-      P.update(dt);
-      RW.world.flowWater(dt);
-      E.updateNpcs(dt); E.trySpawn(dt); E.updateEnemies(dt); E.maybeSpawnBoss(); E.updateBoss(dt); E.updateShots(dt); E.updateDrops(dt); E.updateBuddy(dt);
+      if (!RW.ui.paused()) {
+        P.update(dt);
+        RW.world.flowWater(dt); RW.world.looseWater && RW.world.looseWater(dt, cam, v);
+        E.updateNpcs(dt); E.trySpawn(dt); E.updateEnemies(dt); E.maybeSpawnBoss(); E.updateBoss(dt); E.updateShots(dt); E.updateDrops(dt); E.updateBuddy(dt);
+      }
       RW.net.tick(dt); RW.net.flush(dt);
       // camera follows the player smoothly (no mouse lead, so the block under the cursor stays put while mining)
       const tx = P.x + 6 - v.w / 2, ty = P.y + 14 - v.h / 2;
@@ -7588,7 +8034,7 @@ window.RW = window.RW || {};
     E.draw(g, rc, time);
     RW.net.drawPeers(g, rc);
     E.drawExtra(g, rc, time);
-    if (G.playing && !P.dead) RW.ent.drawPlayer(g, rc, P, P.look, { species: P.species, scale: P.scale(), item: P.held() ? P.held().id : null, swing: P.swingT, swingDur: P.swingDur, invuln: P.invulnT, torch: P.offTorch && P.has('torch'), time });
+    if (G.playing && !P.dead) RW.ent.drawPlayer(g, rc, P, P.look, { species: P.species, scale: P.scale(), item: P.held() ? P.held().id : null, swing: P.swingT, swingDur: P.swingDur, invuln: P.invulnT, torch: P.offTorch && P.has('torch'), time, armor: [P.armor.head, P.armor.body] });
     W.drawWater(g, rc, v.w, v.h, time);
     // every light pushed this frame (player, torches, monsters, spells, waterfalls), then start fresh
     const extra = RW.fx.lights.slice(); RW.fx.lights.length = 0;

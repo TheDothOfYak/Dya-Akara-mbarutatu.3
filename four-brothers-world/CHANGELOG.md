@@ -1,5 +1,20 @@
 # 4 Brothers World: versions
 
+## v1.3
+- **Multiplayer fixes.** Everyone in a room must be on the same version, and the game now says so plainly instead of breaking ("The host is on version 1.2.1 and you are on 1.3: both of you open the same link and refresh"). Joining tells you whether the room code was wrong, the room server couldn't be reached, or your two networks won't link up. The host reconnects by itself after a sleep or wifi blip, more connection helpers are used, the multiplayer add-on has a backup download, and a block or monster from a newer version is skipped instead of crashing the game.
+- **Worlds.** Fuzzy World's Tall Peaks are one broad range of rounded mountains, not spikes, and the seams between areas no longer leave spikes or cliffs. Underground there are real caves: big rounded caverns joined by wide tunnels, instead of a sponge of little holes. More water veins everywhere, with crystals growing along their floors. In Rock World the Heart Chamber (the Gemscale Leviathan) is now in the middle of the planet's inner layer, wrapped in water tubes, and flooded to the roof; the Leviathan swims and lunges through it. The worlds are made fresh from this version, so blocks you changed before stay changed but the ground around them may be different.
+- **Torches** can be placed on the ground or on a wall (click while holding one).
+- **Water** looks like water: a moving, wavy surface, deeper colour the deeper it goes, falling streams, and crystals and plants that sit under it. A small pocket of water with nothing under it now falls and spreads (seas and lakes stay put).
+- **Less blocky.** Ground has rounded corners and uneven edges, grass has real blades that droop over edges, and blocks have more detail (pebbles, cracks, roots, shells, the odd fossil) and twice the variety. Grass and flowers never float: they go when the ground under them does.
+- **Pause menu** (Esc or the Menu button): back to the game, travel, settings, controls, the 4 Brothers World home screen, or back to Dya'Akara. On your own the world stops while it's open.
+- **Travel back** to any world you've already been to, from anywhere (pause menu or map). New worlds still need a rift or an altar.
+- **Armor.** Helmets and body armor from hide, fish scales, iron, bronze, platinum and stygian. Right-click to wear it; your armor shows on your hero and to other players, and soaks up part of every hit.
+- **Gold crystals are magic.** Each one teaches you a new elemental spell (fire, then lightning, then poison, then more), makes all your magic stronger and gives you more mana, as well as making you bigger.
+- **More customizing.** Every hero can wear a hat (cap, crown, flower crown, wizard hat, bandana, bow) and a cape. Fuzzies don't have ears.
+- **Playing together:** other players see your armor, your hat and cape, your acorn buddy, your arrows and stones in flight, and your fancy weapons (fire, poison, lightning, crystal and legendary weapons glow). Press **X** to give what you're holding to the player next to you.
+- **New font** that's easier to read (VT323), with arcade titles (Press Start 2P).
+- The title screen no longer says "New Rock", and the creator and death screens match the hero you picked.
+
 ## v1.2.1
 - The game is now called **4 Brothers World**.
 - **Torches.** Make 4 from 1 wood and 1 flint (or a ship plank and flint, or 2 cave moss and flint). Hold one like anything else, or press **T** to carry one in your other hand while you use your sword, pick or bow. Water puts it out.
