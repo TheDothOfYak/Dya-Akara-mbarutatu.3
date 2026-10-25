@@ -10,6 +10,9 @@
 - **Stryx live only in Acorn World** now.
 - **New blocks:** ladders, trapdoors (R opens and shuts them), rope bridges, climbing ropes and wood stairs you can walk up, all craftable, plus new gear from the new creatures (Albali Salve, Kipsu Hood, Scute Mail, Lutut Lance, Hvaleia Bow).
 - Trees whose trunks are several blocks wide now look like one tree, not a row of thin ones.
+- **Doors that work.** Houses, the home trees, the keep's towers and the Hall of Hammers have real doors. Walk into one and it opens; it shuts behind you once you're clear (never on anyone standing in it). Press R or right-click to open or shut one yourself and leave it that way. Make your own: 4 planks make 3 door blocks (stack three).
+- **Trapdoors open by themselves** when you climb a ladder up into one, or stand on one and hold S, and shut again once you've gone. R and right-click work on them, on levers and on rune stones too.
+- **Guards can't see through things.** Walls, shut doors and trapdoors, chests, shelves and any other solid block hide you, and the sight cone on screen stops where their view does.
 - **Back to Dya'Akara** button on the title screen.
 - **Jobs in Capstead.** The village's Eikar give you little quests: Old Ruut, Brannoc, and three new villagers, Nutmeg the cook (east tree), Pip (west tree) and Hazel the lookout (top of the west tree). Each has a short chain: bring things, chase off creatures, go and see something, or visit a place, and one of Hazel's only opens after the Warthog King falls. A yellow ! marks someone with a new job, a green ? one ready to hand in, and your current jobs show under your health bars.
 

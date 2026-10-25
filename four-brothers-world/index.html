@@ -712,6 +712,8 @@ window.RW = window.RW || {};
   add({ key: 'palisade', name: 'Palisade', solid: true, hard: 1, time: 0.8, drop: ['wood', 1, 2], colors: ['#7a5a3a', '#94704a', '#56402a'], tex: 'stake' });
   add({ key: 'keepbrick', name: 'Keilia Stone', solid: true, hard: 3, time: 1.0, drop: 'stone_brick', colors: ['#7a7468', '#8e887a', '#5e5a50'], tex: 'brick', top: '#6a8a4a' });
   add({ key: 'window', name: 'Window', hard: 1, time: 0.2, decor: 'window' });
+  add({ key: 'door', name: 'Door', solid: true, hard: 1, time: 0.5, drop: 'door', decor: 'door', toggle: 'door_open', door: true });
+  add({ key: 'door_open', name: 'Open Door', hard: 1, time: 0.5, drop: 'door', decor: 'door', open: true, toggle: 'door', door: true });
   add({ key: 'stairplank', name: 'Wood Stairs', platform: true, stair: true, hard: 1, time: 0.3, drop: 'wood_stairs', decor: 'stair' });
 
   RW.TILES = T;
@@ -1042,6 +1044,7 @@ window.RW = window.RW || {};
     { id: 'trapdoor', name: 'Trapdoor', kind: 'place', place: 'trapdoor', icon: { s: 'trapdoor', a: '#a07a52', b: '#4a3a2a' }, desc: 'A floor you can open. Press R beside it to open or shut it.' },
     { id: 'rope_bridge', name: 'Rope Bridge', kind: 'place', place: 'ropebridge', icon: { s: 'bridge', a: '#a88a5a', b: '#d8c090' }, desc: 'Planks on rope. Stand on it, or drop through with S.' },
     { id: 'rope', name: 'Climbing Rope', kind: 'place', place: 'rope', icon: { s: 'rope', a: '#d8c090', b: '#a88a5a' } },
+    { id: 'door', name: 'Door', kind: 'place', place: 'door', icon: { s: 'door', a: '#8a6440', b: '#4a4a52' }, desc: 'Stack three for a doorway. Walk into it, press R or right-click to open it; it shuts behind you.' },
     { id: 'wood_stairs', name: 'Wood Stairs', kind: 'place', place: 'stairplank', icon: { s: 'stairs', a: '#a07a52', b: '#6a4a2e' }, desc: 'Lay them in a diagonal and walk up them. S drops through.' },
     { id: 'kofi_hair', name: 'Kofi Hair', kind: 'material', icon: { s: 'fur', a: '#b08a5a', b: '#8ae8ff' }, desc: 'Long, soft, and the tips still glow a little. Kofi shed it when frightened.' },
     { id: 'albali_dust', name: 'Albali Dust', kind: 'material', icon: { s: 'dust', a: '#fff0b0', b: '#f4ecd8' }, desc: 'What an Albali horn turns into when it breaks off. Chemists pay well for it.' },
@@ -1063,6 +1066,7 @@ window.RW = window.RW || {};
   R.recipes([
     { out: 'ladder', n: 4, in: { wood: 2 } },
     { out: 'wood_stairs', n: 4, in: { wood: 2 } },
+    { out: 'door', n: 3, in: { planks: 4 }, at: 'knap' },
     { out: 'trapdoor', n: 2, in: { planks: 3 }, at: 'knap' },
     { out: 'rope_bridge', n: 6, in: { wood: 2, living_vine: 1 }, at: 'knap' },
     { out: 'rope', n: 6, in: { living_vine: 1 } },
@@ -2716,7 +2720,7 @@ window.RW = window.RW || {};
   function cottage(c, x0, fy, w, opt) {
     const { T, WL } = c; opt = opt || {}; const h = opt.h || 4, wall = T[opt.wall || 'planks'], roof = T[opt.roof || 'planks'];
     for (let y = fy - h; y <= fy; y++) for (let x = x0; x < x0 + w; x++) { const e = x === x0 || x === x0 + w - 1 || y === fy - h || y === fy; c.set(x, y, e ? wall : T.air); c.setb(x, y, WL[opt.bg || 'plank']); }
-    for (let y = fy - 3; y < fy; y++) { if (opt.doors !== 'right') c.set(x0, y, T.air); if (opt.doors !== 'left') c.set(x0 + w - 1, y, T.air); }
+    for (let y = fy - 3; y < fy; y++) { if (opt.doors !== 'right') c.set(x0, y, T.door); if (opt.doors !== 'left') c.set(x0 + w - 1, y, T.door); }
     for (let x = x0 - 1; x <= x0 + w; x++) c.set(x, fy - h - 1, roof);
     for (let x = x0 + 1; x < x0 + w - 1; x++) c.set(x, fy - h - 2, roof);
     if (w > 6) c.set(x0 + (w >> 1), fy - h + 1, T.lantern);
@@ -2758,8 +2762,10 @@ window.RW = window.RW || {};
       for (let i = 6; i <= 8; i++) c.set(x0 + dir * i, fy(k + 1), T.air);        // the hole in the floor above
     }
     // doors through the bark: ground floor both sides, then any floor that opens onto a house or a bridge
-    const door = (k, side) => { const y0 = fy(k); for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 8 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 8); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if (x < wl || x > wr) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
+    const door = (k, side) => { const y0 = fy(k); for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 8 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 8); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if ((x < wl || x > wr) && c.bg[c.I(x, y)] === WL.heart) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
     door(0, -1); door(0, 1);
+    const hang = (k, side) => { for (let y = fy(k) - 3; y < fy(k); y++) c.set(side < 0 ? ix0 - 1 : ix1 + 1, y, T.door); };
+    hang(0, -1); hang(0, 1);
     // furnish each floor: a lantern, and something on it
     for (let k = 0; k <= TFLOORS; k++) {
       const y = fy(k); c.set(Math.round(cx), y - 7, T.lantern);
@@ -2768,7 +2774,7 @@ window.RW = window.RW || {};
       if (what && k) { if (what === 'banner_a') c.set(spot, y - 4, T.banner_a); else if (what === 'bookshelf') { c.set(spot, y - 1, T.bookshelf); c.set(spot, y - 2, T.bookshelf); } else c.set(spot, y - 1, T[what === 'keepchest' ? 'woodchest' : what]); }
       if (k > 0 && k < TFLOORS) { c.set(wl, y - 5, T.window); c.set(wr, y - 5, T.window); }
     }
-    return { ix0, ix1, wl, wr, cx, fy, door, top };
+    return { ix0, ix1, wl, wr, cx, fy, door, top, hang };
   }
   // a house on a branch beside the trunk, opening onto the floor inside; the branch underneath holds it up
   function branchHouse(c, tree, k, side, w) {
@@ -2800,7 +2806,7 @@ window.RW = window.RW || {};
       for (let y = hs[hs.length - 1].fy - 1; y > hs[hs.length - 1].fy - 4; y--) if (c.get(lx, y) !== T.air) c.set(lx, y, T.air);
     });
     // rope bridges between the two trees, a climbing rope down from the low one, a lookout on the high one
-    [3, 6].forEach((k) => { A.door(k, 1); B.door(k, -1); for (let x = A.wr + 1; x <= B.wl - 1; x++) { c.set(x, A.fy(k), T.ropebridge); for (let y = A.fy(k) - 3; y < A.fy(k); y++) if (c.solid(x, y)) c.set(x, y, T.air); } });
+    [3, 6].forEach((k) => { A.door(k, 1); B.door(k, -1); A.hang(k, 1); B.hang(k, -1); for (let x = A.wr + 1; x <= B.wl - 1; x++) { c.set(x, A.fy(k), T.ropebridge); for (let y = A.fy(k) - 3; y < A.fy(k); y++) if (c.solid(x, y)) c.set(x, y, T.air); } });
     for (let y = A.fy(3) + 1; y < GY; y++) c.set(VIL.plaza - 4, y, T.rope);
     const mid = Math.round((A.wr + B.wl) / 2); c.set(mid, A.fy(6) - 1, T.woodchest); c.set(mid - 6, A.fy(6) - 1, T.torchwall); c.set(mid + 6, A.fy(6) - 1, T.torchwall);
     // a root cellar under the west tree, down a ladder through a trapdoor
@@ -2850,7 +2856,7 @@ window.RW = window.RW || {};
     for (let k = 1; k <= floors; k++) { const y = gy - FH * k; for (let x = ix0; x <= ix1; x++) c.set(x, y, T.heartplank); c.set(ix0 + 1, y, T.trapdoor); c.set(Math.round(cx) + 1, y - 5, T.lantern); }
     ladder(c, ix0 + 1, gy - FH * floors + 1, gy - 1);
     for (let k = 1; k <= floors; k++) ladder(c, ix0 + 1, gy - FH * k + 1, gy - FH * (k - 1) - 1);
-    const door = (k, side) => { const y0 = gy - FH * k; for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 3 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 3); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if (x < wl || x > wr) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
+    const door = (k, side) => { const y0 = gy - FH * k; for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 3 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 3); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if ((x < wl || x > wr) && c.bg[c.I(x, y)] === WL.heart) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
     return { ix0, ix1, wl, wr, cx, top, door, fy: (k) => gy - FH * k, floors };
   }
   function buildKeep(H2, seed) {
@@ -2869,7 +2875,7 @@ window.RW = window.RW || {};
       for (let y = RAMP - 1; y < RAMP; y++) for (let x = x0 + 1; x <= x1; x += 2) c.set(x, y, T.air);
     };
     curtain(T1.wr + 1, T2.wl - 1, true); curtain(T2.wr + 1, T3.wl - 1, false); curtain(T3.wr + 1, T4.wl - 1, true);
-    [T1, T2, T3, T4].forEach((t, i) => { t.door(2, -1); t.door(2, 1); t.door(1, -1); t.door(1, 1); if (i > 0) t.door(0, -1); t.door(0, 1); });   // no way in from the west
+    [T1, T2, T3, T4].forEach((t, i) => { t.door(2, -1); t.door(2, 1); t.door(1, -1); t.door(1, 1); if (i > 0) t.door(0, -1); t.door(0, 1); for (let y = gy - 3; y < gy; y++) { if (i > 0) c.set(t.ix0 - 1, y, T.door); c.set(t.ix1 + 1, y, T.door); } });   // no way in from the west
     // the gate: the gate tower's east door, with a banner either side
     c.set(T4.wr + 2, gy - 6, T.banner_a); c.set(T4.wr + 2, gy - 1, T.torchwall);
     M.keepOut = { x: KEEP.out + 3, y: gy - 1 };
@@ -2879,6 +2885,7 @@ window.RW = window.RW || {};
     // ---- W1, ground: the barracks and the Hall of Hammers; upstairs: the Archive ----
     const hallX = W1.x0 + 20;
     for (let y = MID + 1; y < gy - 3; y++) c.set(hallX, y, T.keepbrick);
+    for (let y = gy - 3; y < gy; y++) c.set(hallX, y, T.door);
     c.set(W1.x0 + 2, gy - 1, T.keepchest); c.set(W1.x0 + 9, gy - 1, T.keepchest); c.set(W1.x0 + 13, gy - 5, T.lantern);
     stairs(c, W1.x0 + 3, gy, 7, 1); for (let i = 5; i <= 6; i++) c.set(W1.x0 + 3 + i, MID, T.air);
     const bannerTiles = [T.banner_f, T.banner_r, T.banner_a, T.banner_g], levers = [];
@@ -4614,6 +4621,15 @@ window.RW = window.RW || {};
     if (dl) line(g, x, y + 15, x + 15, y + 5, '#6a4a2e'); if (dr) line(g, x + 15, y + 15, x, y + 5, '#6a4a2e');
     if (!dl && !dr) { rect(g, x + 2, y + 5, 2, 11, '#6a4a2e'); rect(g, x + 12, y + 5, 2, 11, '#6a4a2e'); }
   };
+  // a door is three blocks tall: planks and iron bands, a handle on the middle block; open, it swings flat to the side
+  X.door = (g, t, x, y, time, h, wx, wy) => {
+    const W = RW.world, isD = (b) => RW.TILES[W.get(wx, b)].door, top = !isD(wy - 1), bot = !isD(wy + 1);
+    if (t.open) { rect(g, x + 1, y, 3, 16, '#6a4a2e'); rect(g, x + 1, y, 1, 16, '#8a6440'); if (top) rect(g, x, y, 16, 2, '#5a3a24'); return; }
+    rect(g, x + 2, y, 12, 16, '#8a6440'); for (let k = 5; k < 14; k += 3) rect(g, x + k, y, 1, 16, '#5a3a24');
+    rect(g, x + 2, y + 7, 12, 2, '#4a4a52'); rect(g, x + 1, y, 1, 16, '#3a2a1a'); rect(g, x + 14, y, 1, 16, '#3a2a1a');
+    if (top) rect(g, x, y, 16, 2, '#5a3a24');
+    if (!top && !bot) { ell(g, x + 11, y + 9, 1, 1, '#c8c0a0'); }
+  };
   X.rope = (g, t, x, y, time, h, wx, wy) => { const tied = RW.world.get(wx, wy - 1) !== RW.T.rope && !RW.TILES[RW.world.get(wx, wy - 1)].solid && RW.world.get(wx, wy - 1) !== RW.T.air; for (let k = tied ? -12 : 0; k < 16; k++) { const xx = x + 8 + Math.round(Math.sin((wy * 16 + k) * 0.4 + time) * 0.6); px(g, xx, y + k, k % 4 === 0 ? '#a88a5a' : '#d8c090'); px(g, xx + 1, y + k, '#a88a5a'); } };
   X.lever = (g, t, x, y) => {
     rect(g, x + 3, y + 12, 10, 4, '#5d5a60'); rect(g, x + 3, y + 12, 10, 1, '#8a868c'); px(g, x + 8, y + 12, '#2a282e');
@@ -4658,6 +4674,7 @@ window.RW = window.RW || {};
   I.ladder = (g, a, b) => { rect(g, 4, 1, 2, 14, a); rect(g, 10, 1, 2, 14, a); for (let k = 3; k < 15; k += 4) rect(g, 6, k, 4, 1, b); };
   I.trapdoor = (g, a, b) => { rect(g, 2, 3, 12, 10, a); rect(g, 2, 5, 12, 1, b); rect(g, 2, 10, 12, 1, b); ell(g, 8, 8, 1, 1, '#8a8690'); };
   I.bridge = (g, a, b) => { for (let k = 1; k < 15; k += 3) rect(g, k, 10, 2, 2, a); line(g, 1, 5, 15, 5, b); line(g, 1, 11, 15, 11, b); line(g, 2, 5, 2, 11, b); line(g, 13, 5, 13, 11, b); };
+  I.door = (g, a, b) => { rect(g, 4, 1, 8, 14, a); for (let k = 6; k < 12; k += 2) rect(g, k, 1, 1, 14, RW.shade(a, -0.3)); rect(g, 4, 7, 8, 1, b); px(g, 10, 8, '#c8c0a0'); };
   I.stairs = (g, a, b) => { for (let k = 0; k < 4; k++) { rect(g, 1 + k * 3, 12 - k * 3, 4, 2, a); rect(g, 1 + k * 3, 14 - k * 3, 4, 1, b); } };
   I.rope = (g, a, b) => { for (let k = 1; k < 15; k++) px(g, 8 + Math.round(Math.sin(k * 0.8) * 2), k, k % 3 ? a : b); };
   I.fur = (g, a, b) => { ell(g, 8, 9, 5, 4, a); for (let k = 0; k < 6; k++) line(g, 4 + k * 2, 6, 3 + k * 2, 2 + (k % 2), a); px(g, 3, 2, b); px(g, 11, 2, b); };
@@ -5736,7 +5753,7 @@ window.RW = window.RW || {};
       }
     } else P.mine = null;
     // RIGHT: use (eat, consume crystal) or cast
-    if (I.actHit('use')) {
+    if (I.actHit('use') && !(reach && P.useTile && P.useTile(tx, ty))) {
       if (held && (held.kind === 'food' || held.kind === 'crystal')) P.useItem(held);
       else if (held && held.kind === 'armor') P.wear(held);
       else if (P.spells.length) P.cast(m);
@@ -9283,7 +9300,7 @@ window.RW = window.RW || {};
   E.updateEnemies = function (dt) {
     E.enemies.forEach((e) => { e._dt = dt; });
     baseUpdateEnemies(dt);
-    updatePlayer4(dt); updateShurgr(dt); updateGuards(dt);
+    updatePlayer4(dt); updateShurgr(dt); updateGuards(dt); updateDoors(dt);
   };
   // the buddy's hits shouldn't call down the ShurgrEdan on you... but yours do
   const baseDamage = E.damage;
@@ -9333,11 +9350,21 @@ window.RW = window.RW || {};
       n.near = RW.dist(n.x + n.w / 2, n.y + n.h / 2, pc.x, pc.y) < 44 && !here;
       // can it see you? only matters where you're not allowed
       const gx = n.x + n.w / 2, gy = n.y + 6, dx = pc.x - gx, dy = pc.y - gy;
-      const sees = here && caughtT <= 0 && Math.abs(dx) < range && dx * n.face > -6 && Math.abs(dy) < 3.2 * TS && Wd.los(gx, gy, pc.x, pc.y);
+      // it has to see some part of you (head or middle) along a clear line: solid blocks, shut doors and trapdoors hide you
+      const clear = (ty) => sightLine(gx, gy, pc.x, ty);
+      const sees = here && caughtT <= 0 && Math.abs(dx) < range && dx * n.face > -6 && Math.abs(dy) < 3.2 * TS && (clear(pc.y) || clear(P.y + 4));
       if (sees) n.sus = Math.min(1, n.sus + dt * (Math.abs(dx) < range * 0.45 ? 2.2 : 1.1)); else n.sus = Math.max(0, n.sus - dt * 0.5);
       if (n.sus >= 1) caught(n);
     });
   }
+  // a line of sight, checked every 4 pixels; anything solid (or a shut door) in the way blocks it
+  function sightLine(ax, ay, bx, by) {
+    const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / 4);
+    for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n; if (W().solid(Math.floor(x / TS), Math.floor(y / TS))) return false; }
+    return true;
+  }
+  // how far the guard can see along one direction before something blocks it
+  function sightRay(ax, ay, a, max) { const c = Math.cos(a), s = Math.sin(a); for (let d = 4; d < max; d += 4) { const x = ax + c * d, y = ay + s * d; if (W().solid(Math.floor(x / TS), Math.floor(y / TS))) return d; } return max; }
   const CAUGHT = ['Hey! You can\'t be in here. Out you go.', 'Visitors stay in the courtyard. Come along now.', 'Nice try, little cap. Out.', 'The Master will hear about this. Out!'];
   function caught(n) {
     const M = RW.world.meta; caughtT = 3; E.npcs.forEach((g) => { if (g.guard) g.sus = 0; });
@@ -9355,8 +9382,15 @@ window.RW = window.RW || {};
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y), range = (night() ? 6 : 9) * TS;
     E.npcs.forEach((n) => {
       if (!n.guard) return; const gx = n.x + n.w / 2 + ox, gy = n.y + 6 + oy;
+      // the sight cone, cut off wherever a wall or shut door blocks the view
       g.fillStyle = n.sus > 0.3 ? 'rgba(255,90,70,0.16)' : 'rgba(255,230,140,0.10)';
-      g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + n.face * range, gy - 3.2 * TS); g.lineTo(gx + n.face * range, gy + 3.2 * TS); g.closePath(); g.fill();
+      const wx = n.x + n.w / 2, wy = n.y + 6, spread = Math.atan2(3.2 * TS, range);
+      g.beginPath(); g.moveTo(gx, gy);
+      for (let k = 0; k <= 28; k++) {
+        const t = -spread + (2 * spread * k) / 28, a = n.face > 0 ? t : Math.PI - t, max = Math.min(range / Math.cos(t), 3.2 * TS / Math.max(0.01, Math.abs(Math.sin(t))));
+        const d = sightRay(wx, wy, a, max); g.lineTo(gx + Math.cos(a) * d, gy + Math.sin(a) * d);
+      }
+      g.closePath(); g.fill();
       if (n.sus > 0.15) { g.font = '14px VT323, monospace'; g.textAlign = 'center'; g.fillStyle = '#0c0a10'; g.fillText(n.sus > 0.7 ? '!' : '?', gx + 1, gy - 15); g.fillStyle = n.sus > 0.7 ? '#ff5a4a' : '#ffe9b0'; g.fillText(n.sus > 0.7 ? '!' : '?', gx, gy - 16); g.textAlign = 'left'; }
     });
   };
@@ -9372,12 +9406,44 @@ window.RW = window.RW || {};
       const d = Math.abs(x - tx) + Math.abs(y - ty) * 1.2; if (d < bd) { bd = d; best = [x, y, t]; }
     }
     if (!best) return baseInteract();
-    const [x, y, t] = best, T = RW.T;
+    useBlock(best[0], best[1], best[2]);
+  };
+  // right-click on a door, trapdoor, lever or rune within reach does the same as R
+  P.useTile = function (x, y) { const t = W().tile(x, y); if (!t.toggle && t.key !== 'runestone' && t.key !== 'runestone_lit') return false; useBlock(x, y, t); return true; };
+  // a door is a stack of door blocks: open or shut the whole stack together
+  const doorStack = (x, y) => { const Wd = W(), out = []; let y0 = y; while (RW.TILES[Wd.get(x, y0 - 1)].door) y0--; for (let yy = y0; RW.TILES[Wd.get(x, yy)].door; yy++) out.push(yy); return out; };
+  const setDoor = (x, y, open) => { doorStack(x, y).forEach((yy) => W().setTile(x, yy, open ? RW.T.door_open : RW.T.door)); };
+  // something standing in the doorway keeps it from shutting on them
+  const blocked = (x, ys) => { const box = { x: x * TS, y: ys[0] * TS, w: TS, h: ys.length * TS }; return overlap(box, P) || E.npcs.some((n) => overlap(box, n)) || (E.buddy && overlap(box, E.buddy)) || E.enemies.some((e) => !e.dead && overlap(box, e)); };
+  function useBlock(x, y, t) {
+    const Wd = W(), T = RW.T;
     if (t.key === 'runestone_lit') { RW.ui.toast('The rune is already glowing.'); return; }
     if (t.key === 'runestone') { Wd.setTile(x, y, T.runestone_lit); RW.audio.sfx('crystal'); runeTouched(x, y); return; }
+    if (t.door) { const ys = doorStack(x, y); if (!t.open || !blocked(x, ys)) { setDoor(x, y, !t.open); RW.audio.sfx('swing'); autoShut.delete(x + ',' + ys[0]); } return; }
+    if (t.key === 'trapdoor_open' && blocked(x, [y])) return;
     Wd.setTile(x, y, T[t.toggle]); RW.audio.sfx(t.decor === 'lever' ? 'place' : 'swing');
     if (t.decor === 'lever') leverPulled(x, y);
-  };
+    if (t.key === 'trapdoor' || t.key === 'trapdoor_open') autoShut.delete(x + ',' + y);
+  }
+  // doors open when you walk into them and trapdoors when you climb into them, and both shut again once you're clear
+  const autoShut = new Map();
+  function updateDoors(dt) {
+    const Wd = W(), T = RW.T; if (P.dead) return;
+    const I = RW.input, typing = RW.ui.blocking && RW.ui.blocking();
+    const left = !typing && I.act('left'), right = !typing && I.act('right'), up = !typing && I.act('up'), down = !typing && I.act('down');
+    const dir = (right ? 1 : 0) - (left ? 1 : 0);
+    if (dir) { const x = Math.floor((dir > 0 ? P.x + P.w + 2 : P.x - 2) / TS); for (let y = Math.floor(P.y / TS); y <= Math.floor((P.y + P.h - 1) / TS); y++) if (Wd.get(x, y) === T.door) { const ys = doorStack(x, y); setDoor(x, y, true); RW.audio.sfx('swing'); autoShut.set(x + ',' + ys[0], { x, y: ys[0], kind: 'door' }); break; } }
+    const cx = Math.floor((P.x + P.w / 2) / TS);
+    if (P.climbing && up) { const y = Math.floor((P.y - 2) / TS); if (Wd.get(cx, y) === T.trapdoor) { Wd.setTile(cx, y, T.trapdoor_open); RW.audio.sfx('swing'); autoShut.set(cx + ',' + y, { x: cx, y, kind: 'trap' }); } }
+    if (down && P.ground) { const y = Math.floor((P.y + P.h + 2) / TS); if (Wd.get(cx, y) === T.trapdoor && RW.TILES[Wd.get(cx, y + 1)].climb) { Wd.setTile(cx, y, T.trapdoor_open); RW.audio.sfx('swing'); autoShut.set(cx + ',' + y, { x: cx, y, kind: 'trap' }); } }
+    const pc = P.center();
+    autoShut.forEach((d, k) => {
+      if (RW.dist(pc.x, pc.y, d.x * TS + 8, d.y * TS + 8) < 2.6 * TS) return;
+      if (d.kind === 'door') { const ys = doorStack(d.x, d.y); if (ys.length && Wd.get(d.x, ys[0]) === T.door_open && !blocked(d.x, ys)) setDoor(d.x, d.y, false); }
+      else if (Wd.get(d.x, d.y) === T.trapdoor_open && !blocked(d.x, [d.y])) Wd.setTile(d.x, d.y, T.trapdoor);
+      autoShut.delete(k);
+    });
+  }
   const gateOpen = (p) => p.gate.every(([x, y]) => W().get(x, y) !== RW.T.keepgate);
   function openGate(p) {
     if (gateOpen(p)) return;
