@@ -11,6 +11,7 @@
 - **New blocks:** ladders, trapdoors (R opens and shuts them), rope bridges, climbing ropes and wood stairs you can walk up, all craftable, plus new gear from the new creatures (Albali Salve, Kipsu Hood, Scute Mail, Lutut Lance, Hvaleia Bow).
 - Trees whose trunks are several blocks wide now look like one tree, not a row of thin ones.
 - **Back to Dya'Akara** button on the title screen.
+- **Jobs in Capstead.** The village's Eikar give you little quests: Old Ruut, Brannoc, and three new villagers, Nutmeg the cook (east tree), Pip (west tree) and Hazel the lookout (top of the west tree). Each has a short chain: bring things, chase off creatures, go and see something, or visit a place, and one of Hazel's only opens after the Warthog King falls. A yellow ! marks someone with a new job, a green ? one ready to hand in, and your current jobs show under your health bars.
 
 ## v1.5
 - **Joining works on any network.** When two computers can't link up directly (school or work wifi, phone data, strict routers), the game now connects through a relay automatically: the same Supabase realtime service Dya'Akara's online rooms use. A direct link is always tried first; if it hasn't come up after about 4 seconds the relay takes over, and the status line says "Connected through the relay". Nothing to set up. (The relay needs the Dya'Akara site's settings, so it works when you play from the website, not from a downloaded copy of the game.)

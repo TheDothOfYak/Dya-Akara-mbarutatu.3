@@ -121,6 +121,8 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 #souldrain { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(160,10,30,0.55); opacity: 0; transition: opacity .6s; }
 .bar span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--small); font-size: 12px; color: #fff; text-shadow: 0 1px 0 #000; }
 #stats { display: flex; gap: 8px; font-family: var(--small); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+#quests { display: grid; gap: 2px; font-family: var(--small); font-size: 12px; color: var(--muted); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }
+#quests .ready { color: #8dff8a; }
 #stats b { font-weight: 400; }
 #zone { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; font-size: 17px; color: var(--muted); text-shadow: 0 1px 0 #000; white-space: nowrap; }
 #zone b { display: block; color: var(--text); font-size: 22px; font-weight: 600; }
@@ -1270,10 +1272,50 @@ window.RW = window.RW || {};
     { give: { albali_dust: 2 }, get: ['crystal_green', 1] },
     { give: { hvaleia_oil: 2 }, get: ['heartwood', 1] },
   ];
+  // =================== CAPSTEAD QUESTS (v1.6) ===================
+  // Each villager has a chain; the next one opens when the last is handed in (and req() allows it).
+  // kind: bring (items, taken when you hand in) · kill (n of a species) · meet (get close to one) · visit (a zone of this world)
+  RW.QUESTS = {
+    ruut_vines: { npc: 'ruut', title: 'Vines for the herd', kind: 'bring', item: 'living_vine', n: 4, reward: [['wood_stairs', 8], ['berry', 5]],
+      ask: 'My Punks chew on fresh vine when they\'re poorly. Bring me four Living Vines? Grabbing trees and Wild Punks both have them.', done: 'Lovely and twitchy. The herd thanks you. So do I.' },
+    ruut_wild: { npc: 'ruut', title: 'Wild Punks', kind: 'kill', sp: 'wild_punk', n: 3, reward: [['iron_bar', 3]],
+      ask: 'Wild Punks keep sneaking up to the pen and spooking my lot. Chase off three of them. Permanently, if you follow me.', done: 'Quiet as a pumpkin patch. Here, I\'ve no use for this iron.' },
+    ruut_malsti: { npc: 'ruut', title: 'The stolen bell', kind: 'kill', sp: 'malsti_punk', n: 1, reward: [['albali_salve', 2], ['crystal_purple', 1]],
+      ask: 'One of those Malsti Punks blinked in and pinched my herding bell. Catch one. Any one. They\'re all in it together.', done: 'No bell, but I feel better. Take these, you\'ve earned them.' },
+    brannoc_mud: { npc: 'brannoc', title: 'Mud for Pebble', kind: 'bring', item: 'mud', n: 10, reward: [['torch', 6], ['berry', 4]],
+      ask: 'Pebble\'s pool is running low. She needs good jungle mud to juggle. Ten blocks of it, if you can dig that much.', done: 'Look at her go! Three balls at once. Thank you.' },
+    brannoc_stryx: { npc: 'brannoc', title: 'A wild Stryx', kind: 'meet', sp: 'stryx', reward: [['rope', 6], ['iron_bar', 2]],
+      ask: 'I\'ve only ever known Pebble. Go and find a wild Stryx out in the jungle and get a good look at it. Do NOT stand on it.', done: 'As wide as that? And it didn\'t juggle? Poor thing. Here, for your trouble.' },
+    brannoc_stone: { npc: 'brannoc', title: 'A bigger basin', kind: 'bring', item: 'stone', n: 20, reward: [['crystal_green', 1], ['wood_stairs', 6]],
+      ask: 'Pebble\'s grown. I want to build her a bigger basin. Twenty stone from the root caves would do it.', done: 'She\'ll love it. This green crystal turned up in her mud. It\'s yours.' },
+    nutmeg_berries: { npc: 'nutmeg', title: 'Berry stew', kind: 'bring', item: 'berry', n: 8, reward: [['iron_bar', 2], ['ladder', 6]],
+      ask: 'Stew for the whole east tree and not a berry in the house! Eight berries from the bushes, please, quick as you can.', done: 'Perfect! Come back at supper. Actually, take this now, supper\'s ages away.' },
+    nutmeg_petals: { npc: 'nutmeg', title: 'Something peppery', kind: 'bring', item: 'uff_petal', n: 5, reward: [['albali_salve', 2]],
+      ask: 'The stew wants something peppery. Uff petals! The walking flowers. They\'re slow, you\'ll catch one. Five petals.', done: 'Mmm. Hot. Here, a little salve, in case you ate any raw.' },
+    nutmeg_oil: { npc: 'nutmeg', title: 'Lamp oil', kind: 'bring', item: 'hvaleia_oil', n: 1, reward: [['platinum_bar', 2]],
+      ask: 'My lamp\'s nearly out. Hvaleia oil burns for months. The great whales swim in the air above the Green Sea, west past the keep or east past the King. Don\'t make one angry.', done: 'It glows! I\'ll never have to cook in the dark again. Take these, I found them in the flour.' },
+    pip_mcfly: { npc: 'pip', title: 'The most perfect creature', kind: 'meet', sp: 'rubbermcfly', reward: [['crystal_blue', 1]],
+      ask: 'Have you ever seen a RubberMcFly? I haven\'t! Go and find one and look at it really close. But DON\'T hurt it. Everyone says so.', done: 'Butterfly wings AND a beak? I knew it! Here, my best crystal.' },
+    pip_kofi: { npc: 'pip', title: 'A Kofi pillow', kind: 'bring', item: 'kofi_hair', n: 3, reward: [['torch', 4], ['rope', 4]],
+      ask: 'Kofi hair glows at the tips! If I had a pillow full of it I wouldn\'t be scared at night. Three bunches, please?', done: 'It glows! It really glows! You can have my torches now. I won\'t need them.' },
+    pip_grove: { npc: 'pip', title: 'Find the Elsha\'ryn', kind: 'visit', zone: 'elsharyn', reward: [['crystal_green', 1], ['albali_salve', 1]],
+      ask: 'Hazel says the Elsha\'ryn hide somewhere in the Tangle, east of here, where the trees are thickest. Nobody believes her. Go and see!', done: 'They\'re REAL? Under the leaves? I\'m telling everyone. Here, this is for being brave.' },
+    hazel_keep: { npc: 'hazel', title: 'A closer look', kind: 'visit', zone: 'keep', reward: [['ladder', 8], ['torch', 4]],
+      ask: 'From up here the Keilia keep is just four trees and a wall. Go west and tell me what it\'s like inside. Stay in the courtyard. Probably.', done: 'Guards and levers and a Treasury? I knew it was more than a wall. Thanks. Take some ladders, they\'re how I get anywhere.' },
+    hazel_hvaleia: { npc: 'hazel', title: 'Whale watching', kind: 'meet', sp: 'hvaleia', reward: [['bronze_bar', 3]],
+      ask: 'On clear days I see something huge swimming in the air above the sea. Go to the shore and find out what it is.', done: 'A Hvaleia! I\'ll write it in my book. Here, for the long walk.' },
+    hazel_camp: { npc: 'hazel', title: 'Smoke in the roots', kind: 'kill', sp: 'dusk_raider', n: 4, reward: [['bronze_bar', 3], ['crystal_red', 1]],
+      ask: 'There\'s smoke coming out of a hole in the Green Deep, east of town. Duskareth, I\'d bet. Go down and teach four of their raiders some manners.', done: 'The smoke\'s thinner already. Well done. Mind the slingers.' },
+    hazel_lutut: { npc: 'hazel', title: 'The screech at night', kind: 'kill', sp: 'lutut', n: 1, reward: [['crystal_gold', 1]], req: () => RW.state.bosses.acorn,
+      ask: 'Now the King\'s gone, something else has started screeching over the Canopy at night. A Lutut. Bring it down, if you dare.', done: 'It\'s quiet. Properly quiet. That\'s a gold crystal: I\'ve been saving it for someone who deserved it.' },
+  };
   Object.assign(RW.NPCS, {
-    ruut: { lines: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Wild Punks have no eyes and no mouths, and they still find you. Mine are the friendly sort. Mostly.', 'Three of my herd wandered off again. Brainless, the lot of them. Bless them.', 'A Punk walks on the vines that grow out of its top. Do not ask me how. I have been asking for forty years.'], actions: ['chat'] },
+    nutmeg: { lines: ['Mind the stew! Everyone minds the stew.', 'I cook for the whole east tree. Thirty acorns, one pot.', 'Eat something. You look like an acorn who forgot to eat.'], actions: ['chat'], quests: ['nutmeg_berries', 'nutmeg_petals', 'nutmeg_oil'] },
+    pip: { lines: ['Is it true you can jump twice? I can only jump once and a bit.', 'When I grow up I\'m going to see the whole world. Even the bits with Lutut.', 'Orrin says I can help build the next bridge if I\'m good.'], actions: ['chat'], quests: ['pip_mcfly', 'pip_kofi', 'pip_grove'] },
+    hazel: { lines: ['From up here you can see the keep, the sea and half the Tangle.', 'I\'m the lookout. I look out. Somebody has to.', 'Climbing all those stairs every morning is why I never come down.'], actions: ['chat'], quests: ['hazel_keep', 'hazel_hvaleia', 'hazel_camp', 'hazel_lutut'] },
+    ruut: { quests: ['ruut_vines', 'ruut_wild', 'ruut_malsti'], lines: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Wild Punks have no eyes and no mouths, and they still find you. Mine are the friendly sort. Mostly.', 'Three of my herd wandered off again. Brainless, the lot of them. Bless them.', 'A Punk walks on the vines that grow out of its top. Do not ask me how. I have been asking for forty years.'], actions: ['chat'] },
     orrin: { lines: ['I built every bridge between the two trees. Mind the ones at the top, they bounce.', 'Ladders up, trapdoors shut. That\'s the rule in Capstead. Keeps the Kofi out of the bedrooms.', 'A Keilia builds. That is all we are for, and it\'s plenty.', 'My cousin keeps the keep to the west. She is very strict. She would not like to see you in the Treasury.'], actions: ['chat'] },
-    brannoc: { lines: ['That\'s Pebble, our fountain. She\'s a Stryx. We grew her that way. She juggles mud for the children.', 'Don\'t stand on Pebble. She\'s friendly, but nobody likes being stood on.', 'Stryx out in the wild are less friendly. Stand on one of those and the vines come up.'], actions: ['chat'] },
+    brannoc: { quests: ['brannoc_mud', 'brannoc_stryx', 'brannoc_stone'], lines: ['That\'s Pebble, our fountain. She\'s a Stryx. We grew her that way. She juggles mud for the children.', 'Don\'t stand on Pebble. She\'s friendly, but nobody likes being stood on.', 'Stryx out in the wild are less friendly. Stand on one of those and the vines come up.'], actions: ['chat'] },
     brakka: { lines: ['Welcome to the keep, little cap. You may walk the courtyard and the hall. The rest is Keilia business.', 'Have you seen a builder\'s plan lying about? Some keep vanishing. Bring them back and I\'ll pay in good iron.', 'Four peoples, four banners in the Hall of Hammers. A reminder that the world is bigger than the keep.', 'The guards are kind, but they will march you straight out of anywhere you are not meant to be.'], actions: ['trade', 'chat'], trades: 'KEEP_TRADES', tradeSay: 'Master Brakka: "Good. That one goes back on the shelf."' },
     dunvarr: { lines: ['I am one of the few Keilia who smith. The rest only build. Use my forge if you like.', 'The Kalo make our hammers. I make everything else.'], actions: ['forge', 'chat'] },
     ferrow: { lines: ['Captain Ferrow, keep guard. The courtyard is open. The towers, the archive and the Treasury are not.', 'If one of my guards sees you somewhere you shouldn\'t be, you go out the front gate. Every time.', 'They say the deep vault opens from the top of the tallest tower. They say a lot of things.'], actions: ['chat'] },
@@ -1625,6 +1667,9 @@ window.RW = window.RW || {};
   E('ferrow', 'Captain Ferrow', { shell: 'red', hue: 0, tone: -0.04, cap: 'spiky', eyes: 'fierce', mouth: 'none', extra: 'scarf' }, 'Captain of the keep guard. Fair, firm, and has marched a lot of acorns out of the gate.');
   E('lethra', 'Lethra of the Elsha\'ryn', { shell: 'green', hue: 0, tone: 0.04, cap: 'tall', eyes: 'sleepy', mouth: 'smile', extra: 'leaf' }, 'An elder of the Elsha\'ryn, keepers of memory, who grow what they need.');
   E('phorus', 'Phorus', { shell: 'pale', hue: 6, tone: 0.1, cap: 'tall', eyes: 'big', mouth: 'open', extra: 'scarf' }, 'A Kalo\'Eik visiting the grove\'s library. Old friend of the Inventor.');
+  E('nutmeg', 'Nutmeg', { shell: 'golden', hue: 4, tone: 0.04, cap: 'smooth', eyes: 'happy', mouth: 'open', extra: 'scarf' }, 'Capstead\'s cook. Feeds the whole east tree from one little branch kitchen.');
+  E('pip', 'Pip', { shell: 'green', hue: 0, tone: 0.06, cap: 'classic', eyes: 'big', mouth: 'grin', extra: 'leaf' }, 'A very young acorn who has never been further than the plaza and wants to know about everything.');
+  E('hazel', 'Hazel', { shell: 'red', hue: 0, tone: 0, cap: 'tall', eyes: 'sleepy', mouth: 'smile', extra: 'stick' }, 'Capstead\'s lookout, up on the top floor of the west tree. Sees everything. Goes nowhere.');
   E('keepguard', 'Keep Guard', { shell: 'brown', hue: 0, tone: -0.02, cap: 'spiky', eyes: 'fierce', mouth: 'none', extra: 'none' }, 'An Eikar of the keep guard. Friendly, but will march you out of anywhere you shouldn\'t be.');
   const K = (id, name, o, blurb) => S({ id, type: 'keilia', name, world: 'acorn', role: 'npc', status: 'active', art: Object.assign({ draw: 'keilia' }, o), blurb });
   K('orrin', 'Orrin', { cloth: '#5a4a2a', eye: '#8a6a2a' }, 'A Keilia builder. Built every bridge in Capstead.');
@@ -2767,6 +2812,9 @@ window.RW = window.RW || {};
     c.meta.npcs.orrin = { x: ork.x0 + 6, y: GY - 1 };
     c.meta.npcs.brannoc = { x: P - 6, y: GY - 1 };
     c.meta.npcs.pebble = { x: P - 1, y: GY - 1 };
+    c.meta.npcs.pip = { x: A.wr + 5, y: A.fy(2) - 1 };
+    c.meta.npcs.nutmeg = { x: B.wr + 5, y: B.fy(2) - 1 };
+    c.meta.npcs.hazel = { x: A.ix0 + 12, y: A.fy(TFLOORS) - 1 };
     def.spawn = { x: P - 9, y: GY - 1 }; def.titleCam = { x: P, y: GY - 42 };
   }
 
@@ -9300,6 +9348,117 @@ window.RW = window.RW || {};
       if (lit === p.runes.length) openGate(p);
     });
   }
+})(window.RW);
+
+</script>
+<script>/* js/engine/quests.js */
+// QUESTS (v1.6) — little jobs from the folk of Capstead (data: RW.QUESTS and RW.NPCS[id].quests in lore.js).
+// State lives in the hero's flags, so it saves with them: q_<id> is 1 while you're on it and 2 once it's handed in;
+// qs_<id> remembers how many of a creature you'd already beaten when you took a kill quest.
+(function (RW) {
+  const P = RW.player, E = RW.ent, U = RW.ui, TS = RW.TILE;
+  const Q = (RW.quests = {});
+  const st = (id) => P.flags['q_' + id] || 0;
+  // the job this person has for you right now: the first one not handed in, if the one before it is done and req() allows
+  Q.current = function (npc) {
+    const list = (RW.NPCS[npc] || {}).quests || [];
+    for (let i = 0; i < list.length; i++) {
+      const id = list[i], q = RW.QUESTS[id]; if (!q || st(id) === 2) continue;
+      if (st(id) === 0 && q.req && !q.req({ has: P.has, hasAny: P.hasAny, flag: P.flag })) return null;
+      return id;
+    }
+    return null;
+  };
+  Q.progress = function (id) {
+    const q = RW.QUESTS[id];
+    if (q.kind === 'bring') return [Math.min(q.n, P.count(q.item)), q.n];
+    if (q.kind === 'kill') return [Math.min(q.n, (P.seen[q.sp] || 0) - (P.flags['qs_' + id] || 0)), q.n];
+    if (q.kind === 'meet') return [P.flags['met_' + q.sp] ? 1 : 0, 1];
+    if (q.kind === 'visit') return [P.flags['zone_acorn_' + q.zone] ? 1 : 0, 1];
+    return [0, 1];
+  };
+  Q.ready = (id) => { const [a, b] = Q.progress(id); return a >= b; };
+  Q.goal = function (id) {
+    const q = RW.QUESTS[id], [a, b] = Q.progress(id);
+    if (q.kind === 'bring') return RW.ITEMS[q.item].name + ' ' + a + '/' + b;
+    if (q.kind === 'kill') return RW.SPECIES[q.sp].name + ' ' + a + '/' + b;
+    if (q.kind === 'meet') return a ? 'Seen a ' + RW.SPECIES[q.sp].name : 'Find a ' + RW.SPECIES[q.sp].name;
+    return a ? 'Found it' : 'Go to ' + ((RW.WORLDS.acorn.zones[q.zone] || {}).name || q.zone);
+  };
+  Q.accept = function (id) {
+    const q = RW.QUESTS[id]; P.flags['q_' + id] = 1;
+    if (q.kind === 'kill') P.flags['qs_' + id] = P.seen[q.sp] || 0;
+    if (q.kind === 'meet') delete P.flags['met_' + q.sp];   // go and see one now, not one you passed long ago
+    RW.audio.sfx('ui'); U.toast('New job from ' + RW.SPECIES[q.npc].name + ': ' + q.title + '.'); RW.game.saveSoon(); Q.refresh(true);
+  };
+  Q.handIn = function (id) {
+    const q = RW.QUESTS[id]; if (!Q.ready(id)) return false;
+    if (q.kind === 'bring') P.remove(q.item, q.n);
+    q.reward.forEach(([item, n]) => { const left = P.add(item, n); if (left > 0) E.dropItem(item, left, P.x + P.w / 2, P.y); });
+    P.flags['q_' + id] = 2; RW.audio.sfx('craft');
+    U.banner('Job done', q.title + ': ' + q.reward.map(([item, n]) => n + ' ' + RW.ITEMS[item].name).join(', '));
+    RW.game.saveSoon(); Q.refresh(true); return true;
+  };
+  Q.active = () => Object.keys(RW.QUESTS).filter((id) => st(id) === 1);
+
+  // ---- talking: the job sits beside the other buttons in the talk box ----
+  const baseTalk = U.talk;
+  U.talk = function (npc) {
+    baseTalk(npc);
+    const cfg = RW.NPCS[npc.id]; if (!cfg || !cfg.quests) return;
+    const says = document.querySelector('#talk .says'), acts = document.querySelector('#talk .acts');
+    const btn = (label, f, primary) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = f; acts.insertBefore(b, acts.lastChild); return b; };
+    const id = Q.current(npc.id);
+    if (!id) { const all = cfg.quests.every((q) => st(q) === 2); btn('Any more work?', () => { says.textContent = all ? 'Not today. You\'ve done plenty. Capstead owes you one.' : 'Not right now. Come back another time, there might be something.'; }); return; }
+    const q = RW.QUESTS[id];
+    if (st(id) === 0) {
+      says.textContent = q.ask + ' (Reward: ' + q.reward.map(([item, n]) => n + ' ' + RW.ITEMS[item].name).join(', ') + ')';
+      const take = btn('I\'ll do it', () => { Q.accept(id); says.textContent = 'Thank you! Come back when it\'s done.'; take.remove(); }, true);
+    } else if (Q.ready(id)) {
+      says.textContent = q.kind === 'bring' ? 'Is that ' + q.n + ' ' + RW.ITEMS[q.item].name + ' I see?' : 'Well? How did it go?';
+      const give = btn(q.kind === 'bring' ? 'Hand them over' : 'It\'s done', () => { if (Q.handIn(id)) { says.textContent = q.done; give.remove(); } }, true);
+    } else btn('About that job...', () => { says.textContent = q.title + ': ' + Q.goal(id) + '. ' + q.ask; });
+  };
+  // a mark over anyone with a job for you: ! for a new one, ? when one is ready to hand in
+  const baseDraw = E.draw;
+  E.draw = function (g, cam, time) {
+    baseDraw(g, cam, time);
+    const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
+    E.npcs.forEach((n) => {
+      if (n.guard || !(RW.NPCS[n.id] || {}).quests) return; const id = Q.current(n.id); if (!id) return;
+      const mark = st(id) === 0 ? '!' : Q.ready(id) ? '?' : null; if (!mark) return;
+      const x = n.x + ox + n.w / 2, y = n.y + oy - (n.near ? 26 : 10) + Math.sin(time * 4) * 2;
+      g.font = '16px VT323, monospace'; g.textAlign = 'center'; g.fillStyle = '#0c0a10'; g.fillText(mark, x + 1, y + 1); g.fillStyle = mark === '!' ? '#ffd84a' : '#8dff8a'; g.fillText(mark, x, y); g.textAlign = 'left';
+    });
+  };
+
+  // ---- noticing things: creatures you got close to, places you've been ----
+  const baseUpd = E.updateEnemies;
+  E.updateEnemies = function (dt) {
+    baseUpd(dt);
+    if (RW.world.def.id !== 'acorn' || P.dead) return;
+    const pc = P.center();
+    E.enemies.forEach((e) => { if (!e.dead && RW.dist(e.x + e.w / 2, e.y + e.h / 2, pc.x, pc.y) < 7 * TS) P.flags['met_' + e.sp] = 1; });
+    const z = RW.world.zoneAt(Math.floor(pc.x / TS), Math.floor(pc.y / TS)); P.flags['zone_acorn_' + z] = 1;
+  };
+
+  // ---- the job list under your health bars ----
+  let box = null, lastT = 0, wasReady = {};
+  Q.refresh = function (force) {
+    const now = performance.now(); if (!force && now - lastT < 400) return; lastT = now;
+    if (!box) { const bars = document.getElementById('bars'); if (!bars) return; box = document.createElement('div'); box.id = 'quests'; bars.append(box); }
+    const act = Q.active(); box.innerHTML = '';
+    act.slice(0, 4).forEach((id) => {
+      const q = RW.QUESTS[id], ready = Q.ready(id), row = document.createElement('div');
+      row.textContent = (ready ? '✓ ' : '• ') + q.title + ': ' + (ready ? 'back to ' + RW.SPECIES[q.npc].name : Q.goal(id));
+      if (ready) row.className = 'ready'; box.append(row);
+      if (ready && !wasReady[id]) U.toast(q.title + ' done. Go back to ' + RW.SPECIES[q.npc].name + ' in Capstead.');
+      wasReady[id] = ready;
+    });
+    box.style.display = act.length ? '' : 'none';
+  };
+  const baseHud = U.updateHud;
+  U.updateHud = function () { baseHud.apply(this, arguments); if (RW.game.playing) Q.refresh(); };
 })(window.RW);
 
 </script>
