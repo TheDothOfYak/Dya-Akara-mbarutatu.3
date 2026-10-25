@@ -8,7 +8,7 @@ Open `four-brothers-world/index.html` in a browser, or pick **🌍 4 Brothers Wo
 ## Play together
 1. One player clicks **Host a game** on the title screen and reads out the room code.
 2. Everyone else types the code and clicks **Join**.
-3. Press Play. Everyone in the same world sees the same monsters and fights the same bosses. Press X to give what you're holding to the player next to you.
+3. Press Play. Everyone in the same world sees the same monsters and fights the same bosses. Press X to give what you're holding to the player next to you. Press Z to drop what you're holding (hold Shift for the whole stack).
 
 Everyone needs the same version of the game: open the same link and refresh if the game says the versions don't match.
 

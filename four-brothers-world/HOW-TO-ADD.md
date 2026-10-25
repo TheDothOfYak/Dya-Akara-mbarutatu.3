@@ -69,3 +69,16 @@ Every control is an action in `RW.ACTIONS` (`js/core.js`) with up to two keys. R
 
 ## Multiplayer
 Everyone in a room must run the same `RW.VERSION`: a joining game says hello with its version and the host turns away a different one with a clear message. So bump the version with every update.
+
+## Relay for tricky networks (v1.4)
+
+Players connect straight from computer to computer. On some networks (school or work wifi, phone data, strict routers) that is blocked, and joining fails with "your two networks won't let the computers link up directly". A relay (a TURN server) fixes this by passing the game along when the direct route fails. It is off until you add one.
+
+1. Make a free account with a TURN relay service. Metered (metered.ca) has a free plan. The game can't make the account for you.
+2. In your account, create an app and copy its **credentials link**. It looks like `https://YOURAPP.metered.live/api/v1/turn/credentials?apiKey=YOURKEY`.
+3. In `index.html`, find `RW.RELAY = RW.RELAY || { api: '', servers: [] };` and put the link between the quotes after `api:`.
+4. Upload `index.html` to GitHub as usual. Everyone refreshes. Only the host and the joiner need the new version.
+
+To try it on one computer first, without editing the file, open the game, press F12, choose Console, and run (with your own link):
+`localStorage.setItem('rw_relay', JSON.stringify({ api: 'https://YOURAPP.metered.live/api/v1/turn/credentials?apiKey=YOURKEY' }))`
+then refresh. Relay traffic counts against the service's free monthly allowance. A key in `index.html` is visible to anyone who opens the page, which is normal for these services, but pick one with a usage cap.

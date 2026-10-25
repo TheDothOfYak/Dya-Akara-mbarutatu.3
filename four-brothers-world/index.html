@@ -147,6 +147,8 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 .grid { display: grid; grid-template-columns: repeat(10, 40px); gap: 3px; }
 @media (max-width: 480px) { .grid { grid-template-columns: repeat(5, 40px); } }
 #stash .hint { font-size: 16px; color: var(--muted); margin-top: 8px; max-width: 46ch; }
+#invtools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+#invtools .btn:disabled { opacity: 0.45; cursor: default; }
 #statsbox { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; font-size: 17px; }
 #statsbox div { background: var(--panel-2); padding: 5px 8px; border-left: 3px solid var(--c, var(--edge)); }
 #craft { min-width: 0; }
@@ -303,7 +305,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div id="mp-msg">One player hosts and keeps the world. Everyone else joins with the room code.</div>
       </div>
       <div id="netstatus" class="stone">Connecting…</div>
-      <div id="version">v1.3</div>
+      <div id="version">v1.4</div>
     </div>
   </div>
   <div id="creator" class="hidden-ui">
@@ -329,7 +331,8 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     <div class="phead"><h3>Bag &amp; Crafting</h3><button class="btn small" data-close type="button">Close (E)</button></div>
     <div class="cols">
       <div id="stash"><div class="label" style="margin-bottom:5px">Top row is your hotbar (keys 1–0)</div><div class="grid" id="invgrid"></div>
-        <div class="hint">Click to pick up and move. Right-click to eat food or consume a crystal. Stand near a Knapping Stone or Forge to craft more.</div>
+        <div class="hint">Click to pick up and move. Right-click to eat food or consume a crystal. Shift-click drops a whole stack on the ground. Stand near a Knapping Stone or Forge to craft more.</div>
+        <div id="invtools"><button class="btn small" id="b-drop" type="button">Drop</button><button class="btn small" id="b-destroy" type="button">Destroy</button><span class="label" id="invtoolhint"></span></div>
         <div id="statsbox"></div></div>
       <div id="craft"><div class="filter" id="cfilter"></div><div class="recipes" id="rlist"></div></div>
     </div>
@@ -378,7 +381,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 // Everything lives on the single global `RW` so files can be added in any session.
 window.RW = window.RW || {};
 (function (RW) {
-  RW.VERSION = '1.3'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
+  RW.VERSION = '1.4'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
   // Updates must keep players' progress: never rename the rw_ save keys, and only ever add tiles at the END of tiles.js
   // (world edits are saved by tile number). New save fields need a default when they're missing (see G.load).
   RW.TILE = 16;
@@ -493,6 +496,7 @@ window.RW = window.RW || {};
     ['use', 'Eat or consume the held item, otherwise cast', ['Mouse2']],
     ['torch', 'Torch in your other hand: light it or put it away', ['KeyT']],
     ['give', 'Give what you hold to the player next to you', ['KeyX']],
+    ['drop', 'Drop what you hold on the ground (hold Shift for the whole stack)', ['KeyZ']],
     ['cast', 'Cast spell', ['KeyF']],
     ['spell', 'Switch spell', ['KeyQ']],
     ['interact', 'Talk, read carvings, use rifts and altars', ['KeyR']],
@@ -4541,6 +4545,19 @@ window.RW = window.RW || {};
     for (let i = P.SLOTS - 1; i >= 0 && n > 0; i--) { const s = P.inv[i]; if (s && s.id === id) { const k = Math.min(n, s.n); s.n -= k; n -= k; if (s.n <= 0) P.inv[i] = null; } }
     RW.ui && RW.ui.dirty();
   };
+  // put something from your bag on the ground in front of you. It can't be picked up again for a moment, so it doesn't jump straight back.
+  P.throwItem = function (id, n) {
+    if (!RW.ITEMS[id] || n <= 0) return;
+    RW.ent.dropItem(id, n, P.x + P.w / 2 + P.face * 12, P.y + 6, { vx: P.face * 110, vy: -90, hold: 1.1 });
+  };
+  P.dropHeld = function (all) {
+    const s = P.inv[P.sel]; if (!s || P.dead) { RW.ui && RW.ui.toast('Hold something to drop it.'); return; }
+    const n = all ? s.n : 1, it = RW.ITEMS[s.id];
+    s.n -= n; if (s.n <= 0) P.inv[P.sel] = null;
+    P.throwItem(s.id, n); RW.audio.sfx('ui');
+    if (RW.ui) { RW.ui.toast('Dropped ' + (n > 1 ? n + ' ' : '') + it.name + '.'); RW.ui.dirty(); }
+    RW.game.saveSoon();
+  };
   P.center = () => ({ x: P.x + P.w / 2, y: P.y + P.h / 2 });
 
   P.spawnAt = function (tx, ty) { P.x = tx * TS + 2; P.y = (ty + 1) * TS - P.h - 0.1; P.vx = P.vy = 0; };
@@ -4651,6 +4668,7 @@ window.RW = window.RW || {};
     if (I.actHit('cast') && P.spells.length) P.cast(m);
     if (I.actHit('torch')) P.toggleTorch();
     if (I.actHit('give')) RW.net.give();
+    if (I.actHit('drop')) P.dropHeld(I.down('Shift'));
     if (I.actHit('spell') && P.spells.length) { P.spell = (P.spell + 1) % P.spells.length; RW.ui.toast('Spell: ' + RW.SPELLS[P.spells[P.spell]].name); RW.ui.dirty(); }
     if (I.actHit('interact')) P.interact();
   };
@@ -4998,9 +5016,9 @@ window.RW = window.RW || {};
   };
 
   // ====================== DROPPED ITEMS ======================
-  E.dropItem = function (id, n, x, y) {
+  E.dropItem = function (id, n, x, y, o) {
     if (!RW.ITEMS[id] || n <= 0) return;
-    E.drops.push({ id, n, x, y, vx: RW.rand(-50, 50), vy: RW.rand(-140, -60), t: 0, w: 8, h: 8 });
+    E.drops.push({ id, n, x, y, vx: o && o.vx != null ? o.vx : RW.rand(-50, 50), vy: o && o.vy != null ? o.vy : RW.rand(-140, -60), t: 0, hold: (o && o.hold) || 0, w: 8, h: 8 });
   };
   E.updateDrops = function (dt) {
     for (let i = E.drops.length - 1; i >= 0; i--) {
@@ -5008,10 +5026,10 @@ window.RW = window.RW || {};
       const o = { x: d.x - 4, y: d.y - 4, w: 8, h: 8, vx: d.vx, vy: d.vy };
       const wet = RW.world.isWaterAt(d.x, d.y);
       o.vy += (wet ? 120 : 600) * dt; o.vx *= 0.92; if (wet) o.vy = Math.min(o.vy, 50);
-      const near = RW.dist(d.x, d.y, P.x + P.w / 2, P.y + P.h / 2) < 52 && d.t > 0.35;
+      const near = RW.dist(d.x, d.y, P.x + P.w / 2, P.y + P.h / 2) < 52 && d.t > Math.max(0.35, d.hold || 0);
       if (near) { d.x += d.vx * dt; d.y += d.vy * dt; d.vx *= 0.85; d.vy *= 0.85; }
       else { E.move(o, dt); d.x = o.x + 4; d.y = o.y + 4; d.vx = o.vx; d.vy = o.vy; }
-      if (RW.dist(d.x, d.y, P.x + P.w / 2, P.y + P.h / 2) < 12 && !P.dead) {
+      if (RW.dist(d.x, d.y, P.x + P.w / 2, P.y + P.h / 2) < 12 && !P.dead && d.t >= (d.hold || 0)) {
         const left = P.add(d.id, d.n);
         if (left < d.n) { RW.audio.sfx('pickup'); RW.ui.pickup(d.id, d.n - left); }
         if (left <= 0) E.drops.splice(i, 1); else d.n = left;
@@ -5999,8 +6017,22 @@ window.RW = window.RW || {};
   const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   // several STUN servers, so more home and school networks can find a direct route between the computers
   const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun2.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }, { urls: 'stun:global.stun.twilio.com:3478' }];
+  // A relay (TURN server) passes the game between two computers that can't reach each other directly (school or work wifi, phone data,
+  // strict home routers). It is only used when the direct route fails. Fill in RW.RELAY below, or set it in one browser (see HOW-TO-ADD.md).
+  //   api:     a credentials link from your relay account, e.g. https://YOURAPP.metered.live/api/v1/turn/credentials?apiKey=YOURKEY
+  //   servers: or a list like [{ urls: 'turn:relay.example.com:443', username: 'u', credential: 'p' }]
+  RW.RELAY = RW.RELAY || { api: '', servers: [] };
+  N.relayServers = [];
+  (function () {
+    const mine = RW.store.get('relay', null), cfg = Object.assign({}, RW.RELAY, mine && typeof mine === 'object' ? mine : {});
+    const ok = (x) => x && (typeof x.urls === 'string' || Array.isArray(x.urls));
+    N.relayServers = (Array.isArray(cfg.servers) ? cfg.servers : []).filter(ok);
+    if (typeof cfg.api === 'string' && cfg.api.indexOf('https://') === 0) {
+      fetch(cfg.api).then((r) => r.json()).then((l) => { if (Array.isArray(l)) N.relayServers = N.relayServers.concat(l.filter(ok)); }).catch(() => { });
+    }
+  })();
   const peerOpts = () => {
-    const q = new URLSearchParams(location.search).get('peerhost'); const o = { debug: 0, config: { iceServers: ICE } };
+    const q = new URLSearchParams(location.search).get('peerhost'); const o = { debug: 0, config: { iceServers: ICE.concat(N.relayServers) } };
     if (q) { const [h, p] = q.split(':'); o.host = h; o.port = +p || 9000; o.path = '/'; o.secure = false; }
     return o;
   };
@@ -6293,6 +6325,10 @@ window.RW = window.RW || {};
       s.append(c, el('span', 'n', p.inv[i] && p.inv[i].n > 1 ? p.inv[i].n : ''));
       s.addEventListener('mousedown', (e) => {
         e.preventDefault(); e.stopPropagation();
+        if (e.shiftKey && e.button === 0 && !U.cursor && p.inv[i]) { // Shift-click: drop the whole stack on the ground
+          const s0 = p.inv[i]; p.inv[i] = null; p.throwItem(s0.id, s0.n);
+          U.toast('Dropped ' + (s0.n > 1 ? s0.n + ' ' : '') + RW.ITEMS[s0.id].name + '.'); RW.audio.sfx('ui'); U.dirty(); RW.game.saveSoon(); return;
+        }
         if (e.button === 2) { const it = p.inv[i]; if (it) { const def = RW.ITEMS[it.id]; if (def.kind === 'food' || def.kind === 'crystal') p.useItem(def); else if (def.kind === 'armor') { p.wear(def); U.renderInv(); } } return; }
         const cur = U.cursor, slot = p.inv[i];
         if (!cur && slot) { U.cursor = slot; p.inv[i] = null; }
@@ -6308,6 +6344,19 @@ window.RW = window.RW || {};
       U.attachTip(s, () => p.inv[i]);
       g.append(s);
     }
+    // Drop / Destroy: act on the item you have picked up. Destroy asks twice, so one slip never loses something.
+    const bd = $('#b-drop'), bx = $('#b-destroy'), th = $('#invtoolhint'), cur0 = U.cursor;
+    const nm = cur0 ? (cur0.n > 1 ? cur0.n + ' ' : '') + RW.ITEMS[cur0.id].name : '';
+    const armed = !!cur0 && U._armFor === cur0.id + ':' + cur0.n && U._armUntil > performance.now();
+    bd.disabled = bx.disabled = !cur0; bx.textContent = armed ? 'Really destroy?' : 'Destroy';
+    th.textContent = cur0 ? (armed ? 'Click Destroy again to throw away ' + nm + ' for good.' : 'Holding ' + nm + '.') : 'Pick an item up to drop or destroy it.';
+    const done = () => { show('#held', false); RW.audio.sfx('ui'); U.dirty(); RW.game.saveSoon(); U.renderInv(); };
+    bd.onclick = () => { const c = U.cursor; if (!c) return; U.cursor = null; p.throwItem(c.id, c.n); U.toast('Dropped ' + nm + '.'); done(); };
+    bx.onclick = () => {
+      const c = U.cursor; if (!c) return; const key = c.id + ':' + c.n;
+      if (!(U._armFor === key && U._armUntil > performance.now())) { U._armFor = key; U._armUntil = performance.now() + 3000; setTimeout(() => { if (U.open === 'inv') U.renderInv(); }, 3100); U.renderInv(); return; }
+      U._armFor = null; U.cursor = null; U.toast('Destroyed ' + nm + '.'); done();
+    };
     const sb = $('#statsbox'); sb.innerHTML = ''; const st = p.stats;
     // what you're wearing: click a piece to take it off; right-click armor in your bag to put it on
     const wear = el('div', 'wearing'); wear.style.setProperty('--c', '#9aa3ad');
@@ -6556,6 +6605,7 @@ window.RW = window.RW || {};
     row('1–0 · wheel', 'Choose hotbar slot' + (RW.settings.invertWheel ? ' (wheel turned round in Settings)' : ''));
     row(K('interact'), 'Talk, read carvings, use a rift or Duat Altar to travel');
     row(K('give'), 'Give what you are holding to the player standing next to you (when you play together)');
+    row(K('drop'), 'Drop what you are holding on the ground (hold Shift for the whole stack). In the bag: Shift-click drops a stack, and Destroy throws an item away for good');
     row('Esc', 'Pause menu: travel back to worlds you have visited, settings, the home screen');
     row(K('cast') + ' · ' + K('spell'), 'Cast spell · switch spell');
     row(K('bag'), 'Bag and crafting');
