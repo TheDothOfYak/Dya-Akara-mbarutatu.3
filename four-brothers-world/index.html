@@ -235,6 +235,8 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 #statsbox .wearing { display: flex; align-items: center; gap: 6px; grid-column: 1 / -1; }
 .armorslot { width: 36px; height: 36px; cursor: pointer; }
 .armorslot .k { top: auto; bottom: 1px; left: 2px; }
+#statsbox .armorlook { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; grid-column: 1 / -1; font-size: 15px; }
+#statsbox .armorlook select { font: inherit; font-size: 14px; background: #0f0d14; color: var(--text); border: 2px solid var(--edge); padding: 1px 4px; }
 /* pause */
 .pausebox { width: min(380px, 100%); display: grid; gap: 8px; text-align: center; }
 .pausebox h3 { margin-bottom: 4px; }
@@ -4498,6 +4500,10 @@ window.RW = window.RW || {};
   { const baseRandom = A.randomHero; A.randomHero = (sp) => Object.assign(baseRandom(sp), { hat: Math.random() < 0.35 ? RW.pick(Object.keys(RW.HATS).slice(1)) : 'none', cape: Math.random() < 0.3 ? RW.pick(Object.keys(RW.CAPES).slice(1)) : 'none' }); }
   // ---- dressing up any hero: a hat or a cape (from the creator) and the armor you wear, drawn over the body ----
   RW.HATS = { none: 'None', cap: 'Cap', crown: 'Crown', flowers: 'Flower crown', wizard: 'Wizard hat', bandana: 'Bandana', bow: 'Bow' };
+  // cosmetic looks for the armor you wear (picked under your armor in the bag; they change nothing but the look)
+  RW.HELM_STYLES = { auto: 'Usual', plume: 'Plume', crest: 'Crest', horns: 'Horns', wings: 'Wings', spike: 'Spike', bare: 'Plain' };
+  RW.BODY_STYLES = { auto: 'Usual', plate: 'Plates', scale: 'Scales', studded: 'Studded', sash: 'Sash', fur: 'Fur trim' };
+  RW.ACCENTS = { auto: 'Usual', red: '#c83a3a', blue: '#3a6ad0', gold: '#e0b030', white: '#f0f0f0', green: '#3a9a4a', purple: '#8a4ad0', black: '#2a2630' };
   RW.CAPES = { none: 'None', red: '#c83a3a', blue: '#3a6ad0', green: '#3a9a4a', purple: '#8a4ad0', gold: '#e0b030', black: '#2a2630' };
   const dressCache = {};
   A.dressed = function (species, look, armor) {
@@ -4524,7 +4530,7 @@ window.RW = window.RW || {};
       // armor: tint the body under its own outline
       // armor: tint the body under its own outline, only inside the band the piece covers
       const tint = (it, ya, yb, alpha) => { ya = Math.max(0, ya); const l = mk(W2, H2), lg = l.ctx; lg.drawImage(f, PADX, PADT); lg.globalCompositeOperation = 'source-atop'; lg.globalAlpha = alpha; lg.fillStyle = it.tint; lg.fillRect(0, ya, W2, yb - ya); lg.globalAlpha = 1; lg.fillStyle = RW.shade(it.tint, -0.45); lg.fillRect(0, yb - 1, W2, 1); lg.fillStyle = RW.shade(it.tint, 0.35); lg.fillRect(0, ya, W2, 1); if (it.glow) { lg.fillStyle = it.glow; for (let x = 0; x < W2; x += 3) lg.fillRect(x, ya + 2, 1, 1); } g.drawImage(l, 0, ya, W2, yb - ya, 0, ya, W2, yb - ya); };
-      if (body) { const ya = top + Math.round(h * 0.46), yb = top + Math.round(h * 0.86); tint(body, ya, yb, 0.62); for (let x = PADX + l0 + 2; x < PADX + r0; x += 4) px(g, x, ya + 2, RW.shade(body.tint, 0.5)); }
+      if (body) { const ya = top + Math.round(h * 0.46), yb = top + Math.round(h * 0.86); tint(look.ac && look.ac !== 'auto' && look.bs === 'sash' ? Object.assign({}, body, { tint: RW.ACCENTS[look.ac] }) : body, ya, yb, 0.62); for (let x = PADX + l0 + 2; x < PADX + r0; x += 4) px(g, x, ya + 2, RW.shade(body.tint, 0.5)); }
       if (head) { // a rounded metal dome over the top of the head, a rim, and a nose guard
         const yb = top + Math.max(4, Math.round(h * 0.26));
         let hl = f.width, hr = 0; for (let y = t0; y < t0 + Math.max(3, Math.round(h * 0.12)); y++) for (let x = 0; x < f.width; x++) if (id[(y * f.width + x) * 4 + 3] > 40) { hl = Math.min(hl, x); hr = Math.max(hr, x); }
@@ -4533,6 +4539,12 @@ window.RW = window.RW || {};
         for (let k = 0; k < Math.round(w * 0.8); k++) { const x = PADX + hl + Math.round(w * 0.1) + k, lift = Math.round(Math.sin(k / (w * 0.8) * Math.PI) * 2); if (lift) { rect(g, x, top - lift, 1, lift, head.tint); px(g, x, top - lift, RW.shade(head.tint, 0.3)); } }
         rect(g, cx + 2, yb - 1, 1, 3, RW.shade(head.tint, -0.1)); // nose guard
         if (head.glow) { px(g, cx, top - 2, head.glow); px(g, cx - 3, top - 1, head.glow); px(g, cx + 3, top - 1, head.glow); }
+        const hs = look.hs, ac = look.ac && look.ac !== 'auto' ? RW.ACCENTS[look.ac] : null, t2 = top - 2;
+        if (hs === 'plume') for (let k = 0; k < 7; k++) { px(g, cx + 1 - k, t2 - Math.round(Math.sin(k / 6 * Math.PI) * 3) + (k > 4 ? k - 4 : 0), ac || '#c83a3a'); }
+        else if (hs === 'crest') for (let k = 0; k < 8; k++) px(g, cx + 3 - k, t2 - (k > 1 && k < 6 ? 1 : 0), ac || '#c83a3a');
+        else if (hs === 'horns') [-1, 1].forEach((sd) => line(g, cx + sd * 4, t2 + 2, cx + sd * 7, t2 - 2, ac || '#e8e0c8'));
+        else if (hs === 'wings') [-1, 1].forEach((sd) => { for (let k = 0; k < 3; k++) line(g, cx + sd * 6, t2 + 3, cx + sd * (8 + k), t2 - k, ac || '#f0f0f0'); });
+        else if (hs === 'spike') rect(g, cx, t2 - 4, 1, 5, ac || RW.shade(head.tint, 0.3));
       }
       if (hat) {
         const w = Math.max(6, Math.round((r0 - l0) * 0.6)), x0 = cx - Math.floor(w / 2), y = top;
@@ -4938,18 +4950,27 @@ window.RW = window.RW || {};
     const { cx, ty, by, hgt, frame, ay } = o;
     const body = gear.b && RW.ITEMS[gear.b], head = gear.h && RW.ITEMS[gear.h];
     if (gear.c && RW.CAPES[gear.c]) { const col = RW.CAPES[gear.c]; rect(g, cx - 8, by + 5, 3, 3, col); px(g, cx - 8, by + 5, RW.shade(col, 0.2)); px(g, cx - 6, by + 7, '#f2c94c'); px(g, cx - 5, by + 6, RW.shade(col, -0.3)); }
+    const accent = gear.ac && gear.ac !== 'auto' ? RW.ACCENTS[gear.ac] : null;
     if (body) {
-      const m = matOf(gear.b), c0 = body.tint, hi = RW.shade(c0, 0.35), lo = RW.shade(c0, -0.3), tr = m.trim;
+      const m0 = matOf(gear.b), bs = gear.bs && gear.bs !== 'auto' ? gear.bs : null;
+      const m = Object.assign({}, m0, bs ? { style: { plate: 'plate', scale: 'scale', studded: 'leather', sash: m0.style, fur: 'fur' }[bs] } : {});
+      const c0 = body.tint, hi = RW.shade(c0, 0.35), lo = RW.shade(c0, -0.3), tr = accent || m.trim;
       // tassets over the point of the nut, a belt, a collar band under the mouth
       for (let y = by + 11; y <= by + 14; y++) { const hw = Math.max(1, 6 - (y - by - 11) * 2); for (let x = -hw; x <= hw; x++) { let c2 = x < -hw / 2 ? hi : x > hw / 2 ? lo : c0; if (m.style === 'scale' && (x + y) % 2 === 0) c2 = lo; if (m.style === 'plate' && x === 0) c2 = lo; if (m.style === 'leather' && (x + y) % 3 === 0) c2 = tr; if (m.style === 'fur' && (x * 7 + y) % 3 === 0) c2 = hi; px(g, cx + x, y, c2); } }
       for (let x = -6; x <= 6; x++) px(g, cx + x, by + 11, tr); rect(g, cx + 2, by + 11, 2, 1, m.style === 'plate' ? '#f2e2a0' : '#c8b890');
+      if (bs === 'sash') for (let k = 0; k < 5; k++) { px(g, cx - 3 + k, by + 10 + k * 0.8, accent || '#c83a3a'); px(g, cx - 2 + k, by + 10 + k * 0.8, accent || '#c83a3a'); }
+      if (bs === 'studded') for (let x = -4; x <= 4; x += 2) px(g, cx + x, by + 12 + (x % 4 === 0 ? 1 : 0), '#e8e0c0');
+      if (bs === 'fur') for (let x = -7; x <= 7; x++) px(g, cx + x, by + 10 + ((x + 9) % 2), x % 3 ? '#e8dcc0' : '#c8b898');
       // round shoulder plates over the arms
       [-1, 1].forEach((sd) => { const x = cx + sd * 7; ell(g, x, ay, 2, 2, c0); px(g, x - 1, ay - 1, hi); px(g, x + sd, ay + 1, lo); px(g, x, ay + 2, tr); if (m.style === 'plate') { px(g, x, ay - 1, hi); px(g, x + sd * 2, ay, tr); } if (m.glow) px(g, x, ay, m.glow); });
       if (o.hand) rect(g, Math.round(o.hand.x) - 1, Math.round(o.hand.y) - 1, 2, 2, lo);   // gauntlet
       if (m.glow) { px(g, cx - 2, by + 12, m.glow); px(g, cx + 2, by + 12, m.glow); px(g, cx, by + 14, m.glow); }
     }
     if (head) {
-      const m = matOf(gear.h), c0 = head.tint, hi = RW.shade(c0, 0.38), lo = RW.shade(c0, -0.32), tr = m.trim;
+      const m0 = matOf(gear.h), hs = gear.hs && gear.hs !== 'auto' ? gear.hs : null;
+      // a chosen helmet look replaces the material's own topping (plume, horns, ears or point)
+      const m = hs ? Object.assign({}, m0, { plume: hs === 'plume' ? (accent || m0.plume || '#c83a3a') : null, horns: hs === 'horns', style: m0.style === 'fur' || m0.style === 'cone' ? 'plate' : m0.style }) : Object.assign({}, m0, accent && m0.plume ? { plume: accent } : {});
+      const c0 = head.tint, hi = RW.shade(c0, 0.38), lo = RW.shade(c0, -0.32), tr = accent && !m.plume ? accent : m.trim;
       // a shell over the cap, one block bigger all round
       for (let r = 0; r <= hgt + 1; r++) {
         const hw = Math.round(10.4 * Math.sqrt(Math.max(0, 1 - Math.pow((r - 0.5) / (hgt + 1.8), 2))));
@@ -4969,8 +4990,12 @@ window.RW = window.RW || {};
       px(g, cx + 9, ty + 3, c0); px(g, cx + 9, ty + 4, lo);
       const top = ty - hgt - 1;
       if (m.style === 'fur') { [-6, 4].forEach((d) => { px(g, cx + d, top - 1, c0); px(g, cx + d + 1, top - 1, c0); px(g, cx + d, top - 2, lo); }); }
-      else if (m.horns) { [-1, 1].forEach((sd) => { line(g, cx + sd * 6, top + 2, cx + sd * 9, top - 2, '#2c2438'); px(g, cx + sd * 10, top - 3, m.glow); }); px(g, cx, top + 3, m.glow); px(g, cx + 3, top + 4, m.glow); }
+      else if (m.horns && hs !== 'horns') { [-1, 1].forEach((sd) => { line(g, cx + sd * 6, top + 2, cx + sd * 9, top - 2, '#2c2438'); px(g, cx + sd * 10, top - 3, m.glow); }); px(g, cx, top + 3, m.glow); px(g, cx + 3, top + 4, m.glow); }
       else if (m.style === 'cone') { line(g, cx, top, cx + 1, top - 3, lo); px(g, cx + 1, top - 4, hi); }
+      if (hs === 'crest') for (let k = 0; k < 9; k++) { const x = cx + 3 - k; px(g, x, top - 1 - (k > 1 && k < 7 ? 1 : 0), accent || '#c83a3a'); px(g, x, top, RW.shade(accent || '#c83a3a', -0.3)); }
+      if (hs === 'wings') [-1, 1].forEach((sd) => { const wx = cx + sd * 9; for (let k = 0; k < 4; k++) { line(g, wx, top + 4, wx + sd * (2 + k), top + 1 - k * 1.2, k % 2 ? (accent || '#f0f0f0') : RW.shade(accent || '#f0f0f0', -0.15)); } });
+      if (hs === 'spike') { for (let k = 0; k < 5; k++) rect(g, cx - (k < 2 ? 1 : 0), top - k, k < 2 ? 3 : 1, 1, k > 3 ? (accent || hi) : hi); }
+      if (m.horns && hs === 'horns') { [-1, 1].forEach((sd) => { line(g, cx + sd * 6, top + 2, cx + sd * 9, top - 2, accent ? RW.shade(accent, -0.2) : '#e8e0c8'); px(g, cx + sd * 10, top - 3, accent || '#ffffff'); }); }
       if (m.plume && m.style !== 'cone') { const pl = m.plume; for (let k = 0; k < 7; k++) { const x = cx + 1 - k, y = top - 1 - Math.round(Math.sin(k / 6 * Math.PI) * 3) + (k > 4 ? k - 4 : 0) + (frame >= 1 && frame <= 4 ? frame % 2 : 0); px(g, x, y, k % 2 ? pl : RW.shade(pl, -0.25)); px(g, x, y + 1, RW.shade(pl, -0.25)); } }
     }
   };
@@ -4982,7 +5007,7 @@ window.RW = window.RW || {};
     const h = armor && armor[0] && RW.ITEMS[armor[0]] ? armor[0] : null, b = armor && armor[1] && RW.ITEMS[armor[1]] ? armor[1] : null;
     const cape = RW.CAPES[look.cape] && look.cape !== 'none' ? look.cape : null;
     if (!h && !b && !cape) return baseDressed(species, look, null);
-    return baseDressed(species, Object.assign({}, look, { cape: 'none', hat: h ? 'none' : look.hat, _gear: { h, b, c: cape } }), null);
+    return baseDressed(species, Object.assign({}, look, { cape: 'none', hat: h ? 'none' : look.hat, _gear: { h, b, c: cape, hs: look.hs || 'auto', bs: look.bs || 'auto', ac: look.ac || 'auto' } }), null);
   };
 })(window.RW);
 
@@ -7528,13 +7553,14 @@ window.RW = window.RW || {};
   const AK = ['shell', 'cap', 'eyes', 'mouth', 'extra'], GK = ['sheet', 'shape', 'eyes', 'mouth', 'extra'];
   const KEYS = { rock: LK, fuzzy: FK, acorn: AK, ghost: GK };
   const OPTS = { acorn: { shell: 'SHELLS', cap: 'CAPS', eyes: 'AEYES', mouth: 'AMOUTHS', extra: 'AEXTRAS' }, ghost: { sheet: 'SHEETS', shape: 'GSHAPES', eyes: 'GEYES', mouth: 'GMOUTHS', extra: 'GEXTRAS' } };
-  function packLook(l, sp) { if (!l) return ''; const keys = KEYS[sp] || LK; return keys.map((k) => l[k]).join('|') + '|' + l.hue + '|' + l.tone + '|' + (l.hat || 'none') + '|' + (l.cape || 'none'); }
+  function packLook(l, sp) { if (!l) return ''; const keys = KEYS[sp] || LK; return keys.map((k) => l[k]).join('|') + '|' + l.hue + '|' + l.tone + '|' + (l.hat || 'none') + '|' + (l.cape || 'none') + '|' + (l.hs || 'auto') + '|' + (l.bs || 'auto') + '|' + (l.ac || 'auto'); }
   function unpackLook(s, sp) {
     const fz = sp === 'fuzzy';
     if (typeof s !== 'string' || !s) return RW.art.defaultLook(sp);
     const keys = KEYS[sp] || LK; const a = s.split('|'); const o = {}; keys.forEach((k, i) => (o[k] = a[i]));
     o.hue = RW.clamp(+a[keys.length] || 0, -30, 30); o.tone = RW.clamp(+a[keys.length + 1] || 0, -0.15, 0.15);
     o.hat = RW.HATS[a[keys.length + 2]] ? a[keys.length + 2] : 'none'; o.cape = RW.CAPES[a[keys.length + 3]] ? a[keys.length + 3] : 'none';
+    o.hs = RW.HELM_STYLES[a[keys.length + 4]] ? a[keys.length + 4] : 'auto'; o.bs = RW.BODY_STYLES[a[keys.length + 5]] ? a[keys.length + 5] : 'auto'; o.ac = RW.ACCENTS[a[keys.length + 6]] ? a[keys.length + 6] : 'auto';
     if (OPTS[sp]) { const def = RW.art.defaultLook(sp); Object.entries(OPTS[sp]).forEach(([k, m]) => { if (!RW[m][o[k]]) o[k] = def[k]; }); }
     else if (fz) {
       if (!RW.FUR_TYPES[o.fur]) o.fur = 'brown'; if (!RW.FLUFFS[o.fluff]) o.fluff = 'round'; if (!RW.EARS[o.ears]) o.ears = 'none';
@@ -7716,6 +7742,14 @@ window.RW = window.RW || {};
       wear.append(slot);
     });
     sb.append(wear);
+    // purely cosmetic: how your armor looks
+    if (p.armor.head || p.armor.body) {
+      const box = el('div', 'armorlook'); box.append(el('b', null, 'Armor look'));
+      const pick = (label, key, opts, show) => { if (!show) return; const lab = el('label', null, label + ' '); const sel = el('select'); Object.entries(opts).forEach(([v, n]) => { const o = el('option', null, n); o.value = v; if ((p.look[key] || 'auto') === v) o.selected = true; sel.append(o); }); sel.onchange = () => { p.look[key] = sel.value; RW.audio.sfx('ui'); RW.game.saveSoon(); U.dirty(); }; sel.addEventListener('mousedown', (e) => e.stopPropagation()); lab.append(sel); box.append(lab); };
+      pick('Helmet', 'hs', RW.HELM_STYLES, !!p.armor.head); pick('Armor', 'bs', RW.BODY_STYLES, !!p.armor.body);
+      pick('Colour', 'ac', Object.fromEntries(Object.keys(RW.ACCENTS).map((k) => [k, k === 'auto' ? 'Usual' : k[0].toUpperCase() + k.slice(1)])), true);
+      sb.append(box);
+    }
     [['Strength', '+' + Math.round(st.red * 5) + '% damage', '#e0525a', st.red, 20], ['Toughness', '+' + Math.round(st.blue * 10) + ' health', '#4fa8f0', st.blue, 20], ['Speed', '+' + Math.round(st.green * 3) + '%', '#5fd98a', st.green, 10], ['Mining', '+' + Math.round(st.purple * 8) + '%', '#a86ef0', st.purple, 15], ['Size', '+' + Math.round(st.gold * 4) + '% bigger', '#f2c94c', st.gold, 8]].forEach(([n, v, c, cnt, max]) => {
       const d = el('div'); d.style.setProperty('--c', c); d.append(el('b', null, n + ' '), document.createTextNode(v + ' (' + (Math.round(cnt * 4) / 4) + '/' + max + ')')); sb.append(d);
     });
