@@ -333,7 +333,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div id="mp-msg">One player hosts and keeps the world. Everyone else joins with the room code.</div>
       </div>
       <div id="netstatus" class="stone">Connecting…</div>
-      <div id="version">v1.7</div>
+      <div id="version">v1.8</div>
     </div>
   </div>
   <div id="creator" class="hidden-ui">
@@ -399,6 +399,9 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     <div class="worlds" id="worlds"></div>
     <p style="color:var(--muted);font-size:14px;max-width:62ch">Each boss that falls opens the way to the next world: Fuzzy World, then Acorn World, then Rock World, then the Ghost World. When a fuzzy, a rock, an acorn and a ghost have each beaten their home world, the Duat opens for everyone. Any Duat Altar takes you to worlds you have opened.</p>
     <button class="btn" data-close type="button">Step back</button></div></div>
+  <div id="pick" class="modal hidden-ui"><div class="panel stone" style="width:min(520px,100%)"><div class="label" id="pick-label">Waystones</div><h3 id="pick-title">Where to?</h3>
+    <div id="picklist" style="display:flex;flex-direction:column;gap:6px;margin:10px 0;max-height:52vh;overflow:auto"></div>
+    <button class="btn" data-close type="button">Stay here</button></div></div>
   <div id="pause" class="modal hidden-ui"><div class="panel stone pausebox"><h3>Paused</h3>
     <button class="btn primary" id="p-resume" type="button">Back to the game</button>
     <button class="btn" id="p-travel" type="button">Travel to a world you've visited</button>
@@ -421,7 +424,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 // Everything lives on the single global `RW` so files can be added in any session.
 window.RW = window.RW || {};
 (function (RW) {
-  RW.VERSION = '1.7'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
+  RW.VERSION = '1.8'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
   // Updates must keep players' progress: never rename the rw_ save keys, and only ever add tiles at the END of tiles.js
   // (world edits are saved by tile number). New save fields need a default when they're missing (see G.load).
   RW.TILE = 16;
@@ -668,7 +671,7 @@ window.RW = window.RW || {};
   add({ key: 'planks', name: 'Planks', solid: true, hard: 1, time: 0.5, drop: 'planks', colors: ['#8a6440', '#a07a52', '#6a4a2e'], tex: 'plank' });
   add({ key: 'woodplat', name: 'Wood Platform', platform: true, hard: 1, time: 0.2, drop: 'wood_platform', decor: 'woodplat' });
   add({ key: 'workbench', name: 'Workbench', solid: true, hard: 1, time: 0.6, drop: 'workbench', decor: 'bench', station: 'knap' });
-  add({ key: 'campfire', name: 'Campfire', hard: 1, time: 0.4, drop: 'wood', decor: 'campfire', light: [1.0, 0.6, 0.25] });
+  add({ key: 'campfire', name: 'Campfire', hard: 1, time: 0.4, drop: 'wood', decor: 'campfire', use: 'rest', light: [1.0, 0.6, 0.25] });
   add({ key: 'ghoststone', name: 'Ghost Stone', solid: true, hard: 2, time: 0.8, drop: 'stone', colors: ['#5a5670', '#6c6884', '#48445c'], tex: 'rough' });
   add({ key: 'ghostgrass', name: 'Pale Turf', solid: true, hard: 1, time: 0.4, drop: 'dirt', colors: ['#3e3a50', '#4a4660', '#322e42'], tex: 'soil2', top: '#9ab8c8', topHi: '#c8e4f0' });
   add({ key: 'soulshroom', name: 'Soulshroom', hard: 0, time: 0.15, drop: 'soulshroom', decor: 'soulshroom', light: [0.35, 0.4, 0.8] });
@@ -732,8 +735,23 @@ window.RW = window.RW || {};
   add({ key: 'eldicannon', name: 'Eldi Cannon', solid: true, hard: 99, decor: 'cannon', use: 'cannon', light: [0.5, 0.25, 0.08], lockedMsg: 'The ship\'s cannon. Only an Eldi seed will fire it. Press R beside it.' });
   add({ key: 'growaltar', name: 'Growing Altar', solid: true, hard: 99, decor: 'growaltar', station: 'grow', light: [0.25, 0.55, 0.2], lockedMsg: 'An Elsha\'ryn growing altar. Stand near it to grow-forge.' });
   add({ key: 'storagechest', name: 'Storage Chest', solid: true, hard: 1, time: 0.6, decor: 'chest', chest: 'storage', storage: true, drop: 'storage_chest' });
+  add({ key: 'bed', name: 'Bed', hard: 1, time: 0.5, drop: 'bed', decor: 'bed', use: 'bed' });
+  add({ key: 'waystone', name: 'Waystone', solid: true, hard: 99, decor: 'waystone', use: 'waystone', light: [0.3, 0.45, 0.6], lockedMsg: 'A waystone. Press R beside it to wake it and travel between waystones.' });
+  add({ key: 'crop_berry', name: 'Berry Crop', hard: 0, time: 0.2, crop: 'berry', decor: 'crop2', grow: 180 });
+  add({ key: 'crop_uff', name: 'Uff Crop', hard: 0, time: 0.2, crop: 'uff_petal', decor: 'crop2', grow: 200, light: [0.15, 0.1, 0.05] });
+  add({ key: 'crop_kofigrass', name: 'Kofi Grass Crop', hard: 0, time: 0.2, crop: 'kofi_grass', decor: 'crop2', grow: 120 });
+  add({ key: 'housedoor', name: 'Locked Door', solid: true, hard: 99, decor: 'door', locked: true, door: true, use: 'housedoor', lockedMsg: 'Orrin\'s spare house. It\'s locked. Ask Orrin about it.' });
+  add({ key: 'stall', name: 'Market Awning', hard: 1, time: 0.3, drop: 'planks', decor: 'stall' });
+  add({ key: 'albalileaves', name: 'Albali Leaves', hard: 0, time: 0.1, decor: 'albalileaves', tree: true });
+  add({ key: 'stake', name: 'Plot Stake', hard: 99, decor: 'stake', lockedMsg: 'A stake marking Orrin\'s building plot.' });
   add({ key: 'stairplank', name: 'Wood Stairs', platform: true, stair: true, hard: 1, time: 0.3, drop: 'wood_stairs', decor: 'stair' });
 
+  // chests and crafting stations are furniture: you walk in front of them (they still hide you from guards: cover)
+  T.forEach((t) => { if (t.loot || t.storage || t.station) { t.solid = false; t.cover = true; } });
+  // firelight flickers
+  ['lantern', 'torchwall', 'campfire', 'forge'].forEach((k) => { const t = T.find((x) => x.key === k); if (t) t.flicker = true; });
+  // leaves, trunks, grass and moss sit in the background: you can build right over them
+  T.forEach((t) => { if (!t.solid && (t.tree || ['tallgrass', 'flower', 'vines', 'kelp', 'coral', 'cleaf'].includes(t.key))) t.soft = true; });
   RW.TILES = T;
   RW.T = {}; T.forEach((t) => (RW.T[t.key] = t.id));
 
@@ -1062,6 +1080,17 @@ window.RW = window.RW || {};
     { id: 'trapdoor', name: 'Trapdoor', kind: 'place', place: 'trapdoor', icon: { s: 'trapdoor', a: '#a07a52', b: '#4a3a2a' }, desc: 'A floor you can open. Press R beside it to open or shut it.' },
     { id: 'rope_bridge', name: 'Rope Bridge', kind: 'place', place: 'ropebridge', icon: { s: 'bridge', a: '#a88a5a', b: '#d8c090' }, desc: 'Planks on rope. Stand on it, or drop through with S.' },
     { id: 'rope', name: 'Climbing Rope', kind: 'place', place: 'rope', icon: { s: 'rope', a: '#d8c090', b: '#a88a5a' } },
+    { id: 'bed', name: 'Bed', kind: 'place', place: 'bed', icon: { s: 'bed', a: '#c83a3a', b: '#8a6440' }, desc: 'Press R by it to sleep: you\'ll wake up here after a fall.' },
+    { id: 'fishing_rod', name: 'Fishing Rod', kind: 'rod', stack: 1, icon: { s: 'rod', a: '#8a6440', b: '#e8e0d0' }, desc: 'Hold it and right-click water to cast. When the float dips, right-click to reel in.' },
+    { id: 'sea_perch', name: 'Sea Perch', kind: 'food', heal: 14, icon: { s: 'fish', a: '#6a9ab8', b: '#c8dce8' }, desc: 'From the Green Sea.' },
+    { id: 'glowfin', name: 'Glowfin', kind: 'food', heal: 26, icon: { s: 'fish', a: '#4ad8c8', b: '#bffff8' }, desc: 'A rare sea fish that glows. Very good for you.' },
+    { id: 'river_trout', name: 'Gorge Trout', kind: 'food', heal: 16, icon: { s: 'fish', a: '#8a9a6a', b: '#e8c88a' }, desc: 'From the river at the bottom of the Gorge.' },
+    { id: 'pond_carp', name: 'Pond Carp', kind: 'food', heal: 12, icon: { s: 'fish', a: '#c8883a', b: '#f0d8a0' }, desc: 'Fat and lazy. Nutmeg cooks a lovely carp.' },
+    { id: 'old_boot', name: 'Old Boot', kind: 'material', icon: { s: 'boot', a: '#5a4632', b: '#2a1e14' }, desc: 'Somebody lost this. Somebody else might buy it.' },
+    { id: 'pearl', name: 'Sea Pearl', kind: 'material', icon: { s: 'gland', a: '#f4f0f8', b: '#c8c0d8' }, desc: 'Traders on market day pay well for pearls.' },
+    { id: 'albali_fruit', name: 'Albali Fruit', kind: 'food', heal: 25, icon: { s: 'berry', a: '#fff0b0', b: '#e8a846' }, desc: 'Fruit of an Albali Aagac. Leave it on the ground and it hatches into a Byrd.' },
+    { id: 'kofi_grass', name: 'Kofi Grass', kind: 'food', heal: 3, plant: 'crop_kofigrass', icon: { s: 'moss', a: '#9ac85a', b: '#5a8a3a' }, desc: 'Kofi love it. Plant it on farm soil.' },
+    { id: 'naga_scale', name: 'Naga Scale', kind: 'material', icon: { s: 'scale', a: '#3d78b8', b: '#bfe8ff' }, desc: 'A scale off a Su Naga, big as your hand.' },
     { id: 'storage_chest', name: 'Storage Chest', kind: 'place', place: 'storagechest', icon: { s: 'chest', a: '#a07a52', b: '#5a5a62' }, desc: 'Put it down, then press R or right-click it to keep your things in it. Break it and everything inside falls out.' },
     { id: 'door', name: 'Door', kind: 'place', place: 'door', icon: { s: 'door', a: '#8a6440', b: '#4a4a52' }, desc: 'Stack three for a doorway. Walk into it, press R or right-click to open it; it shuts behind you.' },
     { id: 'wood_stairs', name: 'Wood Stairs', kind: 'place', place: 'stairplank', icon: { s: 'stairs', a: '#a07a52', b: '#6a4a2e' }, desc: 'Lay them in a diagonal and walk up them. S drops through.' },
@@ -1104,12 +1133,17 @@ window.RW = window.RW || {};
     { out: 'shockshell_club', in: { krabbi_shell: 4, wood: 6, living_vine: 2 }, at: 'grow' },
     { out: 'livingwood_mail', in: { living_vine: 10, heartwood: 1, scute: 2 }, at: 'grow' },
   ]);
+  W({ id: 'naga_trident', name: 'Naga Trident', tier: 'platinum', power: 1, dmg: 44, spd: 0.4, knock: 6, reach: 52, fx: 'poison', icon: { s: 'spear', a: '#3d78b8', b: '#bfe8ff' }, desc: 'Made from the first head\'s fang. It drips with Naga gas.' });
+  RW.ITEMS.berry.plant = 'crop_berry'; RW.ITEMS.uff_petal.plant = 'crop_uff';   // plant them on farm soil
   RW.LOOT.eldi = [['eldi_wood', 2, 5, 0.9], ['eldi_seed', 1, 1, 0.35], ['bronze_bar', 1, 3, 0.5], ['torch', 2, 5, 0.5], ['crystal_red', 1, 1, 0.25], ['hvaleia_oil', 1, 1, 0.15]];
   R.recipes([
     { out: 'ladder', n: 4, in: { wood: 2 } },
     { out: 'wood_stairs', n: 4, in: { wood: 2 } },
     { out: 'door', n: 3, in: { planks: 4 }, at: 'knap' },
     { out: 'storage_chest', in: { planks: 6, iron_bar: 1 }, at: 'knap' },
+    { out: 'bed', in: { planks: 4, kofi_hair: 3 }, at: 'knap' },
+    { out: 'fishing_rod', in: { wood: 4, living_vine: 2 }, at: 'knap' },
+    { out: 'farm_soil', n: 2, in: { dirt: 2, berry: 1 } },
     { out: 'trapdoor', n: 2, in: { planks: 3 }, at: 'knap' },
     { out: 'rope_bridge', n: 6, in: { wood: 2, living_vine: 1 }, at: 'knap' },
     { out: 'rope', n: 6, in: { living_vine: 1 } },
@@ -1310,6 +1344,7 @@ window.RW = window.RW || {};
     { title: 'Memory 8 of 8: The Cores', text: 'The memories of Aakalay sank into stygian, and the stygian scattered. Long after, a Kalo\'Eik named Phorus and the Inventor gathered the cores for a month. The Inventor fell into the trance and saw all of it.' },
     { title: 'The Fall of Aakalay', text: 'Every memory, together at last. Kiet and Kireo\'Nik rode to Aakalay to free its people from Otli\u00f0. They won the duel and lost the city: freed of its master, Aakalay had no one to hold it up, and it fell to ruin. The Megla Aagac still stands where Otli\u00f0 fell. The Elsha\'ryn keep the story so no one forgets that winning and saving are not the same thing.' },
     { title: 'Ship\'s Log: the Ember', text: 'Last entry. Struck by Sniller fire over the Canopy. Pilot says we can land it. Pilot is a Stryx and has never been wrong. Pilot has also never been on fire before. Bracing.' },
+    { title: 'Orrin\'s Plot', text: 'Build anything you like between the two stakes: a house, a tower, a bridge to nowhere. When you are proud of it, find Orrin in his stone cottage in Capstead and ask him to judge it. Keilia judge by size, and by how many different things you used. Orrin gives prizes.' },
   ];
 
   RW.ACORN_TIPS = [
@@ -1393,6 +1428,10 @@ window.RW = window.RW || {};
       ask: 'Eight memory cores from the fall of Aakalay are scattered across this world: in the hills, the Gorge, the Megla Wood, the camp, the keep, a shipwreck, the caves and the Canopy. Find them and listen to each one. Then come back to me.', done: 'You heard them all. Then you deserve to hear them together.' },
     phorus_listen: { npc: 'phorus', title: 'A good listener', kind: 'read', from: 7, n: 3, reward: [['crystal_blue', 1], ['grothyn_petal', 3]],
       ask: 'The library tree has memory cores on every floor. Listen to three of them. Climb, it\'s good for you.', done: 'Strange, aren\'t they? Hearing someone else remember. Here.' },
+    orrin_house: { npc: 'orrin', title: 'A house of your own', kind: 'bring', item: 'planks', n: 30, reward: [['bed', 1], ['farm_soil', 6]],
+      ask: 'There\'s a little house at the very top of the east tree that nobody lives in. I built it for my cousin, and she never visits. Bring me thirty planks so I can fix the floor, and it\'s yours.', done: 'There. The doors at the top of the east tree will open for you now. Bed\'s made, the chest is empty, and there\'s soil by the window for growing things.' },
+    nutmeg_fish: { npc: 'nutmeg', title: 'Carp supper', kind: 'bring', item: 'pond_carp', n: 3, reward: [['fishing_rod', 1], ['glowfin', 1]],
+      ask: 'Carp supper tonight! Three pond carp. There\'s a pond in the Green Deep east of town, and pools down in the root caves. Make a fishing rod: wood and a living vine.', done: 'Fat ones! Here, take my old rod as well, and a glowfin I was saving.' },
     pilot_seeds: { npc: 'pilot', title: 'Seeds for the cannon', kind: 'bring', item: 'eldi_seed', n: 3, reward: [['eldi_wood', 8], ['crystal_red', 1]],
       ask: 'The Stryx\'s seams flicker in a pattern, and somehow you understand it: the crew are gone, the cannon is cold, and Eldi seeds were scattered in the crash. Three seeds, please. The Stryx would like to fire one last salute.', done: 'The seams blaze orange. The Stryx is very pleased.' },
     pilot_salute: { npc: 'pilot', title: 'One last salute', kind: 'flag', flag: 'cannon_fired', reward: [['emberwood_bow', 1]],
@@ -1400,11 +1439,11 @@ window.RW = window.RW || {};
   });
   Object.assign(RW.NPCS, {
     pilot: { lines: ['The Stryx\'s seams flicker: it has been waiting for orders for a very long time.', 'The seams glow in slow pulses. You get the feeling it is doing sums.', 'It turns toward the Canopy, toward where the ship was going. It still wants to get there.'], actions: ['chat'], quests: ['pilot_seeds', 'pilot_salute'] },
-    nutmeg: { lines: ['Mind the stew! Everyone minds the stew.', 'I cook for the whole east tree. Thirty acorns, one pot.', 'Eat something. You look like an acorn who forgot to eat.'], actions: ['chat'], quests: ['nutmeg_berries', 'nutmeg_petals', 'nutmeg_oil'] },
+    nutmeg: { lines: ['Mind the stew! Everyone minds the stew.', 'I cook for the whole east tree. Thirty acorns, one pot.', 'Eat something. You look like an acorn who forgot to eat.'], actions: ['chat'], quests: ['nutmeg_berries', 'nutmeg_petals', 'nutmeg_oil', 'nutmeg_fish'] },
     pip: { lines: ['Is it true you can jump twice? I can only jump once and a bit.', 'When I grow up I\'m going to see the whole world. Even the bits with Lutut.', 'Orrin says I can help build the next bridge if I\'m good.'], actions: ['chat'], quests: ['pip_mcfly', 'pip_kofi', 'pip_grove'] },
     hazel: { lines: ['From up here you can see the keep, the sea and half the Tangle.', 'I\'m the lookout. I look out. Somebody has to.', 'Climbing all those stairs every morning is why I never come down.'], actions: ['chat'], quests: ['hazel_keep', 'hazel_hvaleia', 'hazel_camp', 'hazel_lutut'] },
     ruut: { quests: ['ruut_vines', 'ruut_wild', 'ruut_malsti'], lines: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Wild Punks have no eyes and no mouths, and they still find you. Mine are the friendly sort. Mostly.', 'Three of my herd wandered off again. Brainless, the lot of them. Bless them.', 'A Punk walks on the vines that grow out of its top. Do not ask me how. I have been asking for forty years.'], actions: ['chat'] },
-    orrin: { lines: ['I built every bridge between the two trees. Mind the ones at the top, they bounce.', 'Ladders up, trapdoors shut. That\'s the rule in Capstead. Keeps the Kofi out of the bedrooms.', 'A Keilia builds. That is all we are for, and it\'s plenty.', 'My cousin keeps the keep to the west. She is very strict. She would not like to see you in the Treasury.'], actions: ['chat'] },
+    orrin: { lines: ['I built every bridge between the two trees. Mind the ones at the top, they bounce.', 'Ladders up, trapdoors shut. That\'s the rule in Capstead. Keeps the Kofi out of the bedrooms.', 'A Keilia builds. That is all we are for, and it\'s plenty.', 'My cousin keeps the keep to the west. She is very strict. She would not like to see you in the Treasury.', 'See the stakes east of town? That\'s my plot. Build something there and I\'ll judge it.'], actions: ['chat'], quests: ['orrin_house'], judge: true },
     brannoc: { mudgame: true, quests: ['brannoc_mud', 'brannoc_stryx', 'brannoc_stone'], lines: ['That\'s Pebble, our fountain. She\'s a Stryx. We grew her that way. She juggles mud for the children.', 'Don\'t stand on Pebble. She\'s friendly, but nobody likes being stood on.', 'Stryx out in the wild are less friendly. Stand on one of those and the vines come up.'], actions: ['chat'] },
     brakka: { quests: ['brakka_tablets', 'brakka_plan', 'brakka_locks'], lines: ['Welcome to the keep, little cap. You may walk the courtyard and the hall. The rest is Keilia business.', 'Have you seen a builder\'s plan lying about? Some keep vanishing. Bring them back and I\'ll pay in good iron.', 'Four peoples, four banners in the Hall of Hammers. A reminder that the world is bigger than the keep.', 'The guards are kind, but they will march you straight out of anywhere you are not meant to be.'], actions: ['trade', 'chat'], trades: 'KEEP_TRADES', tradeSay: 'Master Brakka: "Good. That one goes back on the shelf."' },
     dunvarr: { quests: ['dunvarr_ore', 'dunvarr_scute', 'dunvarr_tooth'], lines: ['I am one of the few Keilia who smith. The rest only build. Use my forge if you like.', 'The Kalo make our hammers. I make everything else.'], actions: ['forge', 'chat'] },
@@ -1412,6 +1451,19 @@ window.RW = window.RW || {};
     lethra: { quests: ['lethra_cores'], lines: ['You found the grove. Most walk past it. The trees here like to hide us.', 'We are the Elsha\'ryn. We keep memory, and we grow what we need instead of cutting it.', 'Touch a memory core and listen. Some of these voices are older than the keep.', 'Trade with us if you like. We have more salve than we need.'], actions: ['trade', 'chat'], trades: 'GROVE_TRADES', tradeSay: 'Lethra: "Grown, not made. Take care of it."' },
     keepguard: { lines: ['Courtyard\'s open. The rest is Keilia business.', 'Lovely day for standing very still.', 'If I see you in the Treasury, it\'s straight out the gate. Nothing personal.', 'The Master is in the great hall, if you want her.'], actions: ['chat'] },
     phorus: { quests: ['phorus_listen'], lines: ['Phorus, a Kalo\'Eik. I\'m only visiting. The Elsha\'ryn keep the best library in the world, and they let me read it.', 'I once put a friend in water during a trance. Do not put your friends in water during a trance.', 'If you meet a RubberMcFly, leave it be. Trust me.'], actions: ['chat'] },
+  });
+
+  // =================== v1.8: market day, the den, the storm ===================
+  // The Kalo trader sets up a stall in the Capstead plaza every third day; what she sells turns over each market.
+  RW.MARKET = [
+    [{ give: { pearl: 1 }, get: ['crystal_blue', 1] }, { give: { old_boot: 2 }, get: ['iron_bar', 2], note: 'She collects boots' }, { give: { sea_perch: 3 }, get: ['torch', 8] }, { give: { kofi_hair: 6 }, get: ['bed', 1] }, { give: { berry: 10 }, get: ['kofi_grass', 4] }],
+    [{ give: { pearl: 2 }, get: ['crystal_gold', 1] }, { give: { old_boot: 1 }, get: ['rope', 6] }, { give: { glowfin: 1 }, get: ['bronze_bar', 3] }, { give: { living_vine: 4 }, get: ['fishing_rod', 1] }, { give: { uff_petal: 6 }, get: ['farm_soil', 6] }],
+    [{ give: { pearl: 1 }, get: ['platinum_bar', 2] }, { give: { old_boot: 3 }, get: ['albali_salve', 2] }, { give: { river_trout: 3 }, get: ['ladder', 10] }, { give: { naga_scale: 2 }, get: ['crystal_purple', 1] }, { give: { kipsu_fur: 4 }, get: ['storage_chest', 1] }],
+  ];
+  RW.STORM_SAYINGS = ['"The one who rode the worm will ride again, and the city will remember him."', '"A tree of mist stands where a master fell. Its roots are listening."', '"Eight cores, one memory. What was scattered wants to be whole."', '"The Keilia built the walls. The acorns will open the doors."', '"Not every dark Aagac touches the Duat. Watch the ones who wish they could."', '"Something old watches over the most perfect creature. It is watching you too."'];
+  Object.assign(RW.NPCS, {
+    kalo_trader: { lines: ['Market day! Everything from the far side of the sea. Mostly boots.', 'Pearls, little cap. Find me pearls. The sea floor is full of them, if you have a rod and patience.', 'I come every third day. The Keilia keep their walls, I keep my stall.'], actions: ['trade', 'chat'], trades: 'MARKET_TODAY', tradeSay: 'Senna: "Pleasure doing business."' },
+    kipsu_pup: { lines: ['The pup looks up at you and wags its very fluffy tail. Its pattern glows a soft blue.', 'It sniffs your hand. It seems to have been on its own for a while.', 'The pup yips once and rolls over.'], actions: ['chat'] },
   });
 
   // =================== ACORN & GHOST HEROES ===================
@@ -1745,7 +1797,7 @@ window.RW = window.RW || {};
   // ---- hunters ----
   S({ id: 'kipsu', type: 'esik', name: 'Kipsu', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'kipsu' },
     w: 18, h: 12, hp: 32, dmg: 7, speed: 130, behavior: 'kipsu',
-    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'canopy'], weight: 4 },
+    spawn: { worlds: ACORN, medium: 'surface', zones: ['forest', 'jungle', 'canopy', 'den'], weight: 4 },
     drops: [['kipsu_fur', 0.7, 1, 2]],
     blurb: 'Pack hunters with big paws and very fluffy tails. Every Kipsu\'s glowing pattern is its own. They bite and run.' });
   S({ id: 'lutut', type: 'esik', name: 'Lutut', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'lutut' },
@@ -1784,6 +1836,14 @@ window.RW = window.RW || {};
   K('dunvarr', 'Dunvarr', { cloth: '#5a3a2a', eye: '#a85a2a', apron: true }, 'One of the few Keilia smiths.');
   // the long road west: whatever lives in the Keepwood also roams the Broken Hills and the Megla Wood
   Object.values(RW.SPECIES).forEach((sp) => { const z = sp.spawn && sp.spawn.zones; if (z && (sp.spawn.worlds || []).includes('acorn') && z.includes('forest')) z.push('hills', 'mistwood'); });
+  // ---- v1.8 ----
+  S({ id: 'su_naga', type: 'esik', name: 'Su Naga', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'naga' },
+    w: 80, h: 34, hp: 1400, dmg: 24, speed: 60, behavior: 'naga',
+    drops: [['naga_scale', 1, 3, 5], ['crystal_gold', 1, 1, 1], ['naga_trident', 0.5, 1, 1]],
+    blurb: 'A three-headed sea serpent of the deep Green Sea. Each head spits gas. Take two heads and the last one turns nearly unbreakable: it is the first head, and the oldest.' });
+  S({ id: 'kipsu_pup', type: 'esik', name: 'Kipsu Pup', world: 'acorn', role: 'npc', status: 'active', still: true, art: { draw: 'kipsupup' },
+    blurb: 'A Kipsu pup, left behind in the den. Its glowing pattern is still coming in.' });
+  E('kalo_trader', 'Senna the Kalo Trader', { shell: 'pale', hue: 8, tone: 0.12, cap: 'tall', eyes: 'happy', mouth: 'smile', extra: 'scarf' }, 'A Kalo trader who sets up a stall in Capstead every third day.');
   S({ id: 'pilot', type: 'esik', name: 'The Pilot Stryx', world: 'acorn', role: 'npc', status: 'active', still: true, art: { draw: 'stryxcalm', tint: '#ff8a3a', tintA: 0.28 },
     blurb: 'Grown in the pilot stump of an Eldi ship, and smarter than anyone aboard ever was. The ship crashed. The Stryx is still waiting for orders.' });
   S({ id: 'pebble', type: 'esik', name: 'Pebble', world: 'acorn', role: 'npc', status: 'active', still: true, art: { draw: 'stryxcalm' },
@@ -2727,12 +2787,12 @@ window.RW = window.RW || {};
       jungle: { name: 'The Green Deep', music: 'jungle' }, village: { name: 'Capstead', music: 'village' },
       deepwood: { name: 'The Tangle', music: 'jungle' }, elsharyn: { name: 'The Memory Grove', music: 'village' },
       canopy: { name: 'The Canopy', music: 'jungle' }, arena: { name: "The King's Clearing", music: 'core' },
-      camp: { name: 'The Duskareth Camp', music: 'caves' }, caves: { name: 'Root Caves', music: 'caves' }, deep: { name: 'The Root Deep', music: 'tubes' }, ocean: { name: 'The Green Sea', music: 'sea' },
+      camp: { name: 'The Duskareth Camp', music: 'caves' }, den: { name: 'Kipsu Den', music: 'caves' }, caves: { name: 'Root Caves', music: 'caves' }, deep: { name: 'The Root Deep', music: 'tubes' }, ocean: { name: 'The Green Sea', music: 'sea' },
     },
     zoneAt(x, y) { return C ? C.zone(x, y) : 'jungle'; },
     ambientAt(x, y) {
-      if (inR(VILR, x, y) || inR(KEEPR, x, y)) return 0.38;
-      if (inR(GROVER, x, y)) return 0.32;
+      if (inR(VILR, x, y) || inR(KEEPR, x, y)) return 0.46;
+      if (inR(GROVER, x, y)) return 0.4;
       if (inR(CAMPR, x, y)) return 0.24;
       return y > 270 ? 0.12 : 0.18;
     },
@@ -2791,6 +2851,7 @@ window.RW = window.RW || {};
     RW.surface.flatten(c, ARENA.x0, ARENA.x1, GY, 'jgrass');
     for (let x = ARENA.x0 - 6; x < ARENA.x0; x++) for (let y = 0; y < GY; y++) { const t = c.get(x, y); if (t === T.leaves || t === T.trunk || t === T.vines) c.set(x, y, T.air); }
     c.meta.arena = def.boss.arena; c.meta.riftAt = { x: Math.round((ARENA.x0 + ARENA.x1) / 2), y: GY - 3 };
+    buildLife(H2, seed);
 
     // chests everywhere: on the surface, and down in the caves (a few hold a gold crystal)
     [262, 410, 470, 640, 700, 930, 1010, 1080, 1240, 1380, 1460, 1800, 2010, 2100, 2200, 2300, 2380, 2600, 2700, 2820, 2900, 2980, 3060].forEach((x) => { const s = c.surfAt(x, 40); if (s < SEA && (c.get(x, s - 1) === T.air || RW.TILES[c.get(x, s - 1)].decor)) c.set(x, s - 1, T.woodchest); });
@@ -2804,7 +2865,7 @@ window.RW = window.RW || {};
 
     // names on the map (each shows once you've explored that spot)
     const lab = (name, x, minZ) => ({ name, x, y: c.surfAt(x, 40) - 4, minZ });
-    c.meta.labels = [lab('Keilia Keep', (KEEP.x0 + KEEP.x1) >> 1, 0), lab('Broken Hills', 420, 1), lab('Traveller\'s Hut', HUT, 2), lab('The Gorge', (GORGE.x0 + GORGE.x1) >> 1, 0), lab('Megla Wood', 1000, 1), lab('Old Shrine', RUINS, 2),
+    c.meta.labels = [lab('Keilia Keep', (KEEP.x0 + KEEP.x1) >> 1, 0), lab('Broken Hills', 420, 1), lab('Traveller\'s Hut', HUT, 2), lab('Kipsu Den', 666, 2), lab('Orrin\'s Plot', VIL.x1 + 19, 2), lab('The Gorge', (GORGE.x0 + GORGE.x1) >> 1, 0), lab('Megla Wood', 1000, 1), lab('Old Shrine', RUINS, 2),
       lab('Capstead', VIL.plaza, 0), lab('Green Deep', 1880, 1), { name: 'Duskareth Camp', x: (CAMP.x0 + CAMP.x1) >> 1, y: CAMP.y - 3, minZ: 1 }, lab('The Tangle', 2330, 1), lab('Memory Grove', (GROVE.x0 + GROVE.x1) >> 1, 0),
       lab('Wreck of the Ember', WRECK, 0), lab('The Canopy', 2820, 1), lab('King\'s Clearing', (ARENA.x0 + ARENA.x1) >> 1, 0), lab('Green Sea', 12, 1), lab('Green Sea', 3260, 1)];
     c.zone = RW.surface.zoneFn(c, (x, y) => {
@@ -2812,6 +2873,7 @@ window.RW = window.RW || {};
       if (inR(KEEPR, x, y)) return 'keep';
       if (inR(GROVER, x, y)) return 'elsharyn';
       if (inR(CAMPR, x, y)) return 'camp';
+      if (c.meta.den && inR(c.meta.den, x, y)) return 'den';
       if (x >= ARENA.x0 && x <= ARENA.x1 && y <= GY + 2 && y > GY - 70) return 'arena';
       return null;
     });
@@ -2876,7 +2938,7 @@ window.RW = window.RW || {};
     hang(0, -1); hang(0, 1);
     // furnish each floor: a lantern, and something on it
     for (let k = 0; k <= TFLOORS; k++) {
-      const y = fy(k); c.set(Math.round(cx), y - 7, T.lantern);
+      const y = fy(k); c.set(Math.round(cx), y - 7, T.lantern); c.set(ix0, y - 4, T.torchwall); c.set(ix1, y - 4, T.torchwall);
       const spot = k % 2 ? ix0 + 2 : ix1 - 2;
       const what = [null, 'keepchest', 'bookshelf', 'woodchest', 'banner_a', 'bookshelf', 'woodchest', 'keepchest'][k];
       if (what && k) { if (what === 'banner_a') c.set(spot, y - 4, T.banner_a); else if (what === 'bookshelf') { c.set(spot, y - 1, T.bookshelf); c.set(spot, y - 2, T.bookshelf); } else c.set(spot, y - 1, T[what === 'keepchest' ? 'woodchest' : what]); }
@@ -2945,6 +3007,19 @@ window.RW = window.RW || {};
     c.meta.npcs.pip = { x: A.wr + 5, y: A.fy(2) - 1 };
     c.meta.npcs.nutmeg = { x: B.wr + 5, y: B.fy(2) - 1 };
     c.meta.npcs.hazel = { x: A.ix0 + 12, y: A.fy(TFLOORS) - 1 };
+    // v1.8: beds in the branch houses, your own house at the top of the east tree, a market stall, night homes
+    [outerA[0], outerA[2], outerB[1]].forEach((h) => c.set(h.x0 + 3, h.fy - 1, T.bed));
+    c.set(hut.x0 + 2, GY - 1, T.bed);
+    { const h = branchHouse(c, B, TFLOORS, 1, 12);
+      [h.x0, h.x1].forEach((x) => { for (let y = h.fy - 3; y < h.fy; y++) c.set(x, y, T.housedoor); });
+      c.set(h.x0 + 2, h.fy - 1, T.bed); c.set(h.x0 + 4, h.fy - 1, T.storagechest); c.set(h.x0 + 3, h.fy - 4, T.banner_g);
+      for (let x = h.x0 + 7; x <= h.x0 + 9; x++) c.set(x, h.fy, T.soil);
+      c.meta.house = { x0: h.x0, x1: h.x1, y: h.fy }; }
+    const st0 = P - 26; for (let x = st0; x <= st0 + 6; x++) c.set(x, GY - 3, T.stall); c.set(st0, GY - 1, T.woodchest); c.set(st0 + 6, GY - 1, T.workbench);
+    c.meta.npcs.kalo_trader = { x: st0 + 3, y: GY - 1 };
+    c.meta.stall = { x: st0 + 3, y: GY - 1 };
+    c.meta.nightHomes = { ruut: { x: shed.x0 + 4, y: GY - 1 }, brannoc: { x: hut.x0 + 5, y: GY - 1 }, cubert: { x: ork.x0 + 9, y: GY - 1 } };
+    c.meta.crowns = [A, B].map((t) => ({ x: Math.round(t.cx), y: t.top - 8 }));
     def.spawn = { x: P - 9, y: GY - 1 }; def.titleCam = { x: P, y: GY - 42 };
   }
 
@@ -2961,7 +3036,7 @@ window.RW = window.RW || {};
     for (let k = 3; k < floors; k += 2) { const s = (k + ix0) % 4 < 2 ? -1 : 1, y0 = gy - FH * k - 3, bx = s < 0 ? wl - 1 : wr + 1; for (let i = 0; i < 5; i++) { c.set(bx + s * i, y0 - (i >> 1), T.bark); c.set(bx + s * i, y0 - (i >> 1) + 1, T.bark); } c.disc(bx + s * 6, y0 - 3, 4, T.oakleaves, (t) => t === T.air); }
     fill(c, ix0, top + 2, ix1, gy - 1, T.air, WL.heart);
     for (let x = ix0; x <= ix1; x++) c.set(x, gy, T.heartplank);
-    for (let k = 1; k <= floors; k++) { const y = gy - FH * k; for (let x = ix0; x <= ix1; x++) c.set(x, y, T.heartplank); c.set(ix0 + 1, y, T.trapdoor); c.set(Math.round(cx) + 1, y - 5, T.lantern); }
+    for (let k = 1; k <= floors; k++) { const y = gy - FH * k; for (let x = ix0; x <= ix1; x++) c.set(x, y, T.heartplank); c.set(ix0 + 1, y, T.trapdoor); c.set(Math.round(cx) + 1, y - 5, T.lantern); c.set(ix1, y - 3, T.torchwall); }
     ladder(c, ix0 + 1, gy - FH * floors + 1, gy - 1);
     for (let k = 1; k <= floors; k++) ladder(c, ix0 + 1, gy - FH * k + 1, gy - FH * (k - 1) - 1);
     const door = (k, side) => { const y0 = gy - FH * k; for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 3 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 3); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if ((x < wl || x > wr) && c.bg[c.I(x, y)] === WL.heart) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
@@ -3096,7 +3171,7 @@ window.RW = window.RW || {};
     fill(c, L.x0 + 2, top + 2, L.x1 - 2, gy - 1, T.air, WL.living);
     for (let y = gy - 3; y < gy; y++) for (let x = L.x0 - 2; x <= L.x0 + 1; x++) c.set(x, y, T.air);
     for (let y = gy - 3; y < gy; y++) for (let x = L.x1 - 1; x <= L.x1 + 2; x++) c.set(x, y, T.air);
-    for (let k = 1; k <= 3; k++) { const y = gy - 10 * k; for (let x = L.x0 + 2; x <= L.x1 - 2; x++) c.set(x, y, T.heartplank); c.set(L.x0 + 3, y, T.trapdoor); ladder(c, L.x0 + 3, y + 1, y + 9); c.set(L.x1 - 4, y - 6, T.lantern); }
+    for (let k = 1; k <= 3; k++) { const y = gy - 10 * k; for (let x = L.x0 + 2; x <= L.x1 - 2; x++) c.set(x, y, T.heartplank); c.set(L.x0 + 3, y, T.trapdoor); ladder(c, L.x0 + 3, y + 1, y + 9); c.set(L.x1 - 4, y - 6, T.lantern); c.set(L.x0 + 2, y - 4, T.torchwall); }
     c.set(L.x1 - 3, gy - 1, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 1)] = 7;
     c.set(L.x1 - 3, gy - 11, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 11)] = 8;
     c.set(L.x1 - 3, gy - 21, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 21)] = 9;
@@ -3209,6 +3284,46 @@ window.RW = window.RW || {};
     { const bx = 3250; let y = SEA; while (y < H - 8 && !c.solid(bx, y)) y++; for (let k = -5; k <= 5; k++) { c.set(bx + k, y - 1, T.shipplank); if (Math.abs(k) === 5) c.set(bx + k, y - 2, T.shipplank); } }
     // a deep cave pocket in the east holds memory core 7
     for (let k = 0; k < 3000; k++) { const x = 2560 + (k * 37) % 160, y = 236 + (k * 13) % 60; if (c.get(x, y) === T.air && c.solid(x, y + 1) && c.get(x, y - 1) === T.air && c.get(x, y + 1) !== T.bedrock) { core(c, x, y, 6); break; } }
+  }
+
+  // ---------------------------------------------------------------- life on the road (v1.8)
+  // Waystones to travel between, Albali Aagac trees in the Green Deep, the Kipsu den in the Broken Hills and
+  // Orrin's building plot east of Capstead.
+  function buildLife(H2, seed) {
+    const { c, T, WL } = H2; const S = RW.surface, M = c.meta;
+    const clearAbove = (x0, x1, y0, y1) => { for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) { const t = c.get(x, y); if (t === T.leaves || t === T.trunk || t === T.vines || t === T.oakleaves || t === T.tallgrass || t === T.flower || t === T.berrybush) c.set(x, y, T.air); } };
+    // ---- waystones ----
+    M.waystones = [];
+    const way = (name, x) => { const s = c.surfAt(x, 40); clearAbove(x - 1, x + 1, s - 4, s - 1); c.set(x, s - 1, T.waystone); M.waystones.push({ name, x, y: s - 1 }); };
+    way('The Keilia Keep', KEEP.x1 + 5); way('Traveller\'s Hut', HUT - 7); way('The Gorge', GORGE.x0 - 6); way('The Old Shrine', RUINS + 13);
+    way('Capstead', VIL.plaza + 18); way('The Green Deep', 2044); way('The Memory Grove', GROVE.x0 + 31); way('Wreck of the Ember', WRECK - 42); way('King\'s Clearing', ARENA.x0 - 4);
+    // ---- Albali Aagac trees: their fruit falls, and if nobody picks it up it hatches into a Byrd ----
+    M.albaliTrees = [];
+    [1430, 1820, 2090].forEach((x) => {
+      const s = c.surfAt(x, 40); clearAbove(x - 10, x + 11, s - 32, s - 1);
+      const top = s - 15; for (let y = top; y < s; y++) { c.set(x, y, T.trunk); c.set(x + 1, y, T.trunk); }
+      [[-1, top + 5], [1, top + 3]].forEach(([d, y]) => { for (let i = 1; i < 5; i++) c.set(x + (d < 0 ? 0 : 1) + d * i, y - (i >> 1), T.trunk); });
+      const leaf = (t) => t === T.air;
+      c.disc(x + 0.5, top - 2, 7, T.albalileaves, leaf); c.disc(x - 5, top + 2, 4, T.albalileaves, leaf); c.disc(x + 6, top + 1, 4, T.albalileaves, leaf);
+      M.albaliTrees.push({ x: x + 0.5, y: top + 2, r: 8 });
+    });
+    // ---- the Kipsu den: a shaft down from the hills into a warm hollow, where a pup has been left behind ----
+    { const dx = 652, s = c.surfAt(dx, 40), cy = s + 20, cx = dx + 14;
+      for (let x = cx - 16; x <= cx + 16; x++) for (let y = cy - 7; y <= cy + 6; y++) { const ex = (x - cx) / 15, ey = (y - cy) / 6; if (ex * ex + ey * ey <= 1) { c.set(x, y, T.air); c.setb(x, y, WL.cave); } }
+      const floor = cy + 4; for (let x = cx - 16; x <= cx + 16; x++) { if (c.get(x, floor + 1) === T.air || c.get(x, floor + 1) === T.water) c.set(x, floor + 1, T.dirt); for (let y = floor + 1; y > cy - 7; y--) if (c.get(x, y) === T.water) c.set(x, y, T.air); }
+      for (let x = cx - 14; x <= cx + 14; x++) if (c.get(x, floor) === T.air && !c.solid(x, floor + 1)) c.set(x, floor + 1, T.dirt);
+      for (let y = s - 1; y < cy; y++) for (let x = dx - 1; x <= dx + 1; x++) { c.set(x, y, T.air); c.setb(x, y, WL.cave); }
+      ladder(c, dx, s - 1, floor);
+      [cx - 8, cx + 4, cx + 11].forEach((x, i) => { if (c.get(x, floor) === T.air) c.set(x, floor, i === 1 ? T.woodchest : T.wildmush); });
+      c.set(cx + 6, floor, T.hide); c.set(cx + 7, floor, T.hide);
+      M.npcs.kipsu_pup = { x: cx + 1, y: floor };
+      M.den = { x0: cx - 16, x1: cx + 16, y0: cy - 7, y1: floor + 1, at: { x: cx, y: floor } };
+    }
+    // ---- Orrin's building plot, east of Capstead: build anything inside the stakes, then ask Orrin to judge it ----
+    { const x0 = VIL.x1 + 8, x1 = x0 + 22; S.flatten(c, x0 - 2, x1 + 2, GY, 'jgrass'); clearAbove(x0 - 2, x1 + 2, GY - 40, GY - 1);
+      c.set(x0 - 1, GY - 1, T.stake); c.set(x1 + 1, GY - 1, T.stake); c.set(x0 - 2, GY - 2, T.tablet); M.carvings[(x0 - 2) + ',' + (GY - 2)] = 27; c.set(x0 - 2, GY - 1, T.stone);
+      M.plot = { x0, x1, y0: GY - 30, y1: GY - 1 }; }
+    M.gorge = { x0: GORGE.x0 + 1, x1: GORGE.x1 - 1 };
   }
 
   // ---------------------------------------------------------------- the Duskareth camp, in the root caves
@@ -4403,9 +4518,10 @@ window.RW = window.RW || {};
   const LEAF_PAL = {
     leaves: ['#173d16', '#255f22', '#357f2c', '#4f9e3a', '#7cc452', '#a8e070'],
     oakleaves: ['#10300f', '#1c4c1a', '#296424', '#3b7e30', '#5c9e40', '#86c05a'],
+    albalileaves: ['#4a3a2a', '#8a7a4a', '#c8b06a', '#e8d898', '#f4ecc8', '#fffaf0'],
   };
   const leafCache = {};
-  const leafAt = (a, b) => { const tt = RW.TILES[RW.world.get(a, b)]; return tt.decor === 'leaves' || tt.decor === 'oakleaves'; };
+  const leafAt = (a, b) => { const tt = RW.TILES[RW.world.get(a, b)]; return tt.decor === 'leaves' || tt.decor === 'oakleaves' || tt.decor === 'albalileaves'; };
   // a trunk inside the canopy counts as canopy, so the leaves don't cut a gap round it
   const leafish = (a, b) => { if (leafAt(a, b)) return true; const tt = RW.TILES[RW.world.get(a, b)]; return tt.decor === 'trunk' && (leafAt(a - 1, b) || leafAt(a + 1, b)); };
   const LC = 8, LP = 64; // clump cell size, pattern period (px)
@@ -4465,6 +4581,7 @@ window.RW = window.RW || {};
     }
     return (leafCache[key] = c);
   }
+  A.leafTileOf = (kind, wx, wy) => leafTile(kind, wx, wy);
   RW.art.clearLeafCache = () => { for (const k in leafCache) delete leafCache[k]; };
   X.leaves = (g, t, x, y, time, h, wx, wy) => g.drawImage(leafTile('leaves', wx, wy), x, y);
   X.oakleaves = (g, t, x, y, time, h, wx, wy) => g.drawImage(leafTile('oakleaves', wx, wy), x, y);
@@ -4816,12 +4933,35 @@ window.RW = window.RW || {};
     rect(g, x + 2, y, 12, 16, '#8a6440'); for (let k = 5; k < 14; k += 3) rect(g, x + k, y, 1, 16, '#5a3a24');
     rect(g, x + 2, y + 7, 12, 2, '#4a4a52'); rect(g, x + 1, y, 1, 16, '#3a2a1a'); rect(g, x + 14, y, 1, 16, '#3a2a1a');
     if (top) rect(g, x, y, 16, 2, '#5a3a24');
-    if (!top && !bot) { ell(g, x + 11, y + 9, 1, 1, '#c8c0a0'); }
+    if (!top && !bot) { ell(g, x + 11, y + 9, 1, 1, '#c8c0a0'); if (t.locked) { rect(g, x + 6, y + 6, 4, 4, '#c8a040'); px(g, x + 7, y + 8, '#2a1e14'); } }
   };
   // the Eldi ship's cannon: a cauldron-mouthed barrel of fire-tree wood, embers glowing inside
   X.cannon = (g, t, x, y, time, h) => { rect(g, x + 1, y + 9, 14, 7, '#5a2416'); rect(g, x + 2, y + 4, 12, 7, '#8a3a22'); rect(g, x + 10, y + 3, 6, 5, '#6a2a18'); ell(g, x + 14, y + 5, 2, 2, '#1a0a06'); px(g, x + 14, y + 5, Math.sin(time * 6 + h * 5) > 0 ? '#ff8a2a' : '#ffb04a'); rect(g, x + 2, y + 6, 12, 1, '#b0542e'); };
   // a growing altar: a living stump with a bowl of light, shoots curling up from it
   X.growaltar = (g, t, x, y, time, h) => { rect(g, x + 2, y + 6, 12, 10, '#5a5a32'); rect(g, x + 2, y + 6, 12, 1, '#74763e'); ell(g, x + 8, y + 6, 5, 2, '#3e4022'); const p = 0.5 + 0.5 * Math.sin(time * 2 + h * 5); ell(g, x + 8, y + 5, 3, 1, p > 0.5 ? '#a8e070' : '#6ab84a'); line(g, x + 3, y + 6, x + 1, y + 1, '#5a9a3a'); line(g, x + 13, y + 6, x + 15, y + 2, '#5a9a3a'); px(g, x + 1, y + 1, '#a8e070'); px(g, x + 15, y + 2, '#a8e070'); };
+  X.bed = (g, t, x, y) => { rect(g, x, y + 9, 16, 4, '#c83a3a'); rect(g, x, y + 8, 16, 1, '#e05a5a'); rect(g, x + 1, y + 6, 5, 3, '#f0f0f0'); rect(g, x, y + 13, 2, 3, '#6a4a2e'); rect(g, x + 14, y + 13, 2, 3, '#6a4a2e'); rect(g, x, y + 4, 2, 9, '#8a6440'); };
+  X.waystone = (g, t, x, y, time, h, wx, wy) => {
+    rect(g, x + 3, y + 1, 10, 15, '#6a6a78'); rect(g, x + 3, y + 1, 10, 1, '#8a8a98'); rect(g, x + 2, y + 13, 12, 3, '#4e4e5a');
+    const woke = RW.player && RW.player.flags && RW.player.flags['way_' + RW.world.def.id + '_' + wx + '_' + wy];
+    const p = 0.5 + 0.5 * Math.sin(time * 2 + h * 5), c = woke ? (p > 0.5 ? '#bfe0ff' : '#6aa8f0') : '#4a4a58';
+    rect(g, x + 7, y + 3, 2, 8, c); rect(g, x + 5, y + 5, 6, 2, c); px(g, x + 6, y + 10, c); px(g, x + 9, y + 10, c);
+  };
+  X.crop2 = (g, t, x, y, time, h, wx, wy) => {
+    const s = RW.world.cropStage(wx, wy), k = t.key;
+    if (k === 'crop_berry') { const r = 2 + s * 2; ell(g, x + 8, y + 15 - r, r + 1, r, '#3f7a32'); if (s >= 3) [[5, 10], [10, 9], [8, 12], [11, 12]].forEach(([a, b]) => px(g, x + a, y + b, '#e85a7a')); }
+    else if (k === 'crop_uff') { const hh = 3 + s * 3; line(g, x + 8, y + 15, x + 8, y + 15 - hh, '#3a6a2a'); if (s > 0) ell(g, x + 8, y + 15 - hh, 1 + s, 1 + Math.min(1, s - 1), s >= 3 ? '#ff6a8a' : '#ffb0c0'); if (s >= 3) px(g, x + 8, y + 15 - hh, '#ffd84a'); }
+    else { for (let k2 = 0; k2 < 3 + s * 2; k2++) { const xx = x + 2 + ((k2 * 5) % 12); line(g, xx, y + 15, xx + (k2 % 2), y + 13 - s * 2 - (k2 % 3), k2 % 2 ? '#9ac85a' : '#6a9a3a'); } }
+    if (s >= 3 && Math.sin(time * 3 + h * 9) > 0.92) px(g, x + 8, y + 3, '#ffffff');
+  };
+  X.stall = (g, t, x, y, time, h, wx, wy) => {
+    for (let k = 0; k < 16; k++) rect(g, x + k, y + 2, 1, 5, ((wx * 16 + k) >> 2) % 2 ? '#f0e8d8' : '#c83a3a'); rect(g, x, y + 7, 16, 1, '#8a2a2a'); for (let k = 0; k < 16; k += 4) px(g, x + k + 1, y + 8, '#c83a3a');
+    // a pole down to the ground under each end of the awning
+    const W = RW.world; if (!W || wy == null) return;
+    if (W.tile(wx - 1, wy).key !== 'stall') { rect(g, x + 1, y + 8, 2, 40, '#6a4a2e'); rect(g, x + 1, y + 8, 1, 40, '#8a6440'); }
+    if (W.tile(wx + 1, wy).key !== 'stall') { rect(g, x + 13, y + 8, 2, 40, '#6a4a2e'); rect(g, x + 13, y + 8, 1, 40, '#8a6440'); }
+  };
+  X.stake = (g, t, x, y) => { rect(g, x + 7, y + 4, 2, 12, '#8a6440'); rect(g, x + 6, y + 3, 4, 2, '#c8a060'); px(g, x + 7, y + 2, '#e0525a'); };
+  X.albalileaves = (g, t, x, y, time, h, wx, wy) => g.drawImage(A.leafTileOf ? A.leafTileOf('albalileaves', wx, wy) : A.canvas(16, 16), x, y);
   X.rope = (g, t, x, y, time, h, wx, wy) => { const tied = RW.world.get(wx, wy - 1) !== RW.T.rope && !RW.TILES[RW.world.get(wx, wy - 1)].solid && RW.world.get(wx, wy - 1) !== RW.T.air; for (let k = tied ? -12 : 0; k < 16; k++) { const xx = x + 8 + Math.round(Math.sin((wy * 16 + k) * 0.4 + time) * 0.6); px(g, xx, y + k, k % 4 === 0 ? '#a88a5a' : '#d8c090'); px(g, xx + 1, y + k, '#a88a5a'); } };
   X.lever = (g, t, x, y) => {
     rect(g, x + 3, y + 12, 10, 4, '#5d5a60'); rect(g, x + 3, y + 12, 10, 1, '#8a868c'); px(g, x + 8, y + 12, '#2a282e');
@@ -4868,6 +5008,10 @@ window.RW = window.RW || {};
   I.bridge = (g, a, b) => { for (let k = 1; k < 15; k += 3) rect(g, k, 10, 2, 2, a); line(g, 1, 5, 15, 5, b); line(g, 1, 11, 15, 11, b); line(g, 2, 5, 2, 11, b); line(g, 13, 5, 13, 11, b); };
   I.door = (g, a, b) => { rect(g, 4, 1, 8, 14, a); for (let k = 6; k < 12; k += 2) rect(g, k, 1, 1, 14, RW.shade(a, -0.3)); rect(g, 4, 7, 8, 1, b); px(g, 10, 8, '#c8c0a0'); };
   I.seed = (g, a, b) => { ell(g, 8, 9, 4, 5, a); ell(g, 7, 8, 2, 3, b); px(g, 6, 6, '#ffffff'); line(g, 8, 4, 10, 1, '#6a2a18'); };
+  I.bed = (g, a, b) => { rect(g, 1, 8, 14, 4, a); rect(g, 1, 6, 4, 3, '#f0f0f0'); rect(g, 1, 12, 2, 3, b); rect(g, 13, 12, 2, 3, b); };
+  I.rod = (g, a, b) => { line(g, 2, 15, 13, 2, a); line(g, 13, 2, 14, 10, b); px(g, 14, 11, '#e0525a'); };
+  I.fish = (g, a, b) => { ell(g, 8, 8, 5, 3, a); line(g, 3, 8, 1, 5, a); line(g, 3, 8, 1, 11, a); ell(g, 9, 9, 3, 1, b); px(g, 11, 7, '#14080a'); };
+  I.boot = (g, a, b) => { rect(g, 5, 2, 5, 9, a); rect(g, 5, 10, 9, 4, a); rect(g, 5, 13, 9, 1, b); };
   I.stairs = (g, a, b) => { for (let k = 0; k < 4; k++) { rect(g, 1 + k * 3, 12 - k * 3, 4, 2, a); rect(g, 1 + k * 3, 14 - k * 3, 4, 1, b); } };
   I.rope = (g, a, b) => { for (let k = 1; k < 15; k++) px(g, 8 + Math.round(Math.sin(k * 0.8) * 2), k, k % 3 ? a : b); };
   I.fur = (g, a, b) => { ell(g, 8, 9, 5, 4, a); for (let k = 0; k < 6; k++) line(g, 4 + k * 2, 6, 3 + k * 2, 2 + (k % 2), a); px(g, 3, 2, b); px(g, 11, 2, b); };
@@ -5142,6 +5286,41 @@ window.RW = window.RW || {};
     return frames;
   };
 
+  // Su Naga (v1.8): a sea serpent with three heads on long necks. Frames go 3 heads, 2 heads, 1 head (two each).
+  D.naga = function () {
+    const frames = [];
+    for (let n = 3; n >= 1; n--) for (let f = 0; f < 2; f++) {
+      const W2 = 96, H2 = 48, c = mk(W2, H2), g = c.ctx; const ph = f * 1.4;
+      // the body: a long wave of scales, belly lighter, glowing spots along the back
+      for (let x = 2; x < 66; x++) { const t = x / 66, half = 2 + Math.sin(Math.min(1, t * 1.25) * Math.PI * 0.9) * 6, mid = 38 + Math.sin(t * 7 + ph) * 3;
+        for (let y = Math.round(mid - half); y <= Math.round(mid + half); y++) { const rel = (y - (mid - half)) / (half * 2); px(g, x, y, rel < 0.2 ? '#5aa0d8' : rel < 0.62 ? ((x + y) % 4 === 0 ? '#2a5a90' : '#3d78b8') : '#bfe0e8'); }
+        if (x % 5 === 2 && t > 0.15) px(g, x, Math.round(mid - half + 1), '#8af0ff');
+        if (x % 7 === 3 && t > 0.2 && t < 0.9) { px(g, x, Math.round(mid - half - 1), '#3d78b8'); px(g, x, Math.round(mid - half - 2), '#8af0ff'); } }
+      line(g, 2, 38 + Math.sin(ph) * 3, 0, 32, '#2a5a90'); line(g, 2, 38 + Math.sin(ph) * 3, 0, 44, '#2a5a90');
+      // three necks rise from the shoulders; the middle head (the first head, the oldest) is the biggest and falls last
+      const heads = [[70, 6, 1.25, 'mid'], [50, 12, 1, 'back'], [84, 18, 1, 'front']].filter((h, i) => i < n);
+      heads.slice().reverse().forEach(([hx, hy, k], i) => {
+        const sw = Math.sin(ph + i * 2.1) * 2, x1 = hx + sw, y1 = hy, bx = 58 + i * 3;
+        quad(bx, 34, (bx + x1) / 2 - 4, (34 + y1) / 2 - 4, x1 - 2, y1 + 4, 16, (x, y, t) => { const r = t < 0.7 ? 3 : 2; ell(g, x, y, r, r, '#3d78b8'); px(g, x - 1, y - 1, '#5aa0d8'); if (Math.round(t * 16) % 4 === 0) px(g, x + 1, y + r - 1, '#bfe0e8'); });
+        const hw = Math.round(6 * k), hh = Math.round(4 * k);
+        ell(g, x1, y1 + 2, hw, hh, '#3d78b8'); ell(g, x1 - 1, y1 + 1, hw - 2, hh - 2, '#4a8ac8');
+        rect(g, x1 + 2, y1 + 3, hw + 2, 2, '#2a5a90');                               // the snout
+        line(g, x1 + 2, y1 + 5 + f, x1 + hw + 3, y1 + 6 + f * 2, '#bfe0e8');          // the jaw opens
+        px(g, x1 + hw + 2, y1 + 5 + f, '#f4f0e0');
+        ell(g, x1 + 1, y1, 1, 1, '#ffe86a'); px(g, x1 + 2, y1, '#14080a');            // eye
+        line(g, x1 - 3, y1 - 1, x1 - 7, y1 - 5, '#8af0ff'); line(g, x1 - 1, y1 - 2, x1 - 3, y1 - 7, '#8af0ff');   // frills
+        if (k > 1) { px(g, x1 - 5, y1 - 7, '#ffe86a'); px(g, x1 - 8, y1 - 5, '#ffe86a'); }
+        if (f) { px(g, x1 + hw + 5, y1 + 6, '#9aff5a'); px(g, x1 + hw + 7, y1 + 5, '#9aff5a'); }
+      });
+      A.outline(c, '#0a1626'); frames.push(c);
+    }
+    return frames;
+  };
+  // the Kipsu pup: a small, round Kipsu with a huge tail and a pattern still coming in
+  D.kipsupup = function () {
+    return D.kipsu().map((f0, i) => { const c = mk(18, 12), g = c.ctx; g.imageSmoothingEnabled = false; g.drawImage(f0, 0, 0, 26, 16, 0, 1, 18, 11); px(g, 13, 3 + (i % 2), '#6af0e0'); return c; });
+  };
+
   // ======================= ACORN GEAR =======================
   // Armor and capes drawn for the acorn's own shape, never over its face: a helmet that fits over the cap (with a
   // plume, crest or horns), shoulder plates, a collar, a belt and tassets, and a cape that hangs from the shoulders
@@ -5395,7 +5574,7 @@ window.RW = window.RW || {};
     L.x0 = x0; L.y0 = y0;
     if (WD.dirtySky) WD.recalcSky();
     const T = RW.T, TL = RW.TILES; const sea = WD.def.sea;
-    const amb = 0.035;
+    const amb = 0.035, now = performance.now() / 1000;
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
       const x = x0 + i, y = y0 + j, k = j * w + i;
       let r = 0, g = 0, b = 0, d = 0.88;
@@ -5410,7 +5589,7 @@ window.RW = window.RW || {};
         const a = (WD.def.ambientAt ? WD.def.ambientAt(x, y) : amb) + WD.ambBoost;
         if (WD.bg[y * WD.W + x] || tt.solid) { const ac = WD.def.ambientColor; if (ac) { r = a * ac[0]; g = a * ac[1]; b = a * ac[2]; } else { r = a * 0.95; g = a * 0.92; b = a * 1.1; } }
       }
-      if (tt.light) { const l = tt.light; r = Math.max(r, l[0]); g = Math.max(g, l[1]); b = Math.max(b, l[2]); }
+      if (tt.light) { const l = tt.light, f = tt.flicker ? 0.82 + 0.12 * Math.sin(now * 9 + x * 1.7 + y * 3.1) + 0.06 * Math.sin(now * 23 + x * 5.3 + y * 0.7) : 1; r = Math.max(r, l[0] * f); g = Math.max(g, l[1] * f); b = Math.max(b, l[2] * f); }
       L.r[k] = r; L.g[k] = g; L.b[k] = b; L.dec[k] = d;
     }
     // dynamic lights (player glow, spells, sparks)
@@ -6227,7 +6406,7 @@ window.RW = window.RW || {};
   P.tryPlace = function (tx, ty, item, reach) {
     const W = RW.world; const cur = W.get(tx, ty);
     if (!reach) return;
-    if (cur !== T().air && cur !== T().water) return;
+    if (cur !== T().air && cur !== T().water && !RW.TILES[cur].soft) return;
     if (item.kind === 'torch' && cur === T().water) { RW.ui.toast('A torch won\'t stay lit underwater.'); return; }
     const tile = RW.TILES[T()[item.place]];
     if (tile.solid && overlap({ x: tx * TS, y: ty * TS, w: TS, h: TS }, P)) return;
@@ -7013,13 +7192,13 @@ window.RW = window.RW || {};
     b.farT = RW.dist(pc.x, pc.y, bc.x, bc.y) > 200 ? (b.farT || 0) + dt : 0;
     if (RW.dist(pc.x, pc.y, bc.x, bc.y) > 320 || b.farT > 2.5 || P.dead) { b.x = P.x - P.face * 18; b.y = P.y + 8; b.vx = b.vy = 0; b.farT = 0; if (!P.dead) RW.fx.burst(b.x + b.w / 2, b.y + b.h / 2, ['#e8c88a', '#c88a4a'], 8, 50, { kind: 'smoke', size: 2, life: 0.4 }); }
     const foe = E.enemies.concat(E.boss ? [E.boss] : []).find((e) => !e.dead && !e.harmless && RW.dist(ec(e).x, ec(e).y, bc.x, bc.y) < 90);
-    const tx = foe ? ec(foe).x : pc.x - P.face * 22;
+    const tx = foe ? ec(foe).x : b.fetch ? b.fetch.x : pc.x - P.face * 22;   // b.fetch: something on the ground it's off to pick up (entities5.js)
     const dx = tx - bc.x; const wet = RW.world.isWaterAt(bc.x, bc.y);
     b.vx = RW.lerp(b.vx, Math.abs(dx) > 10 ? Math.sign(dx) * (foe ? 120 : 105) : 0, dt * 8);
     b.vy += (wet ? -60 : 900) * dt; if (wet) { b.vy = RW.clamp(b.vy, -70, 70); if (pc.y < bc.y - 10) b.vy -= 300 * dt; }
     const r = E.move(b, dt, { step: true, grounded: b.ground }); b.ground = r.ground;
     if (b.ground) b.airJumps = 1;
-    if (b.ground && ((r.wallL || r.wallR) || pc.y < bc.y - 30 || (foe && Math.abs(dx) < 30 && b.atk <= 0))) { b.vy = -330; }
+    if (b.ground && ((r.wallL || r.wallR) || (b.fetch ? b.fetch.y < bc.y - 24 : pc.y < bc.y - 30) || (foe && Math.abs(dx) < 30 && b.atk <= 0))) { b.vy = -330; }
     // acorns double jump, just like an acorn hero: a second hop at the top of the first when you're still above it or a wall is in the way
     else if (!b.ground && !wet && b.airJumps > 0 && b.vy > -60 && (pc.y < bc.y - 24 || r.wallL || r.wallR)) {
       b.airJumps--; b.vy = -310;
@@ -7820,7 +7999,7 @@ window.RW = window.RW || {};
 
   // ---------------- modals ----------------
   U.openModal = function (id) {
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory', 'chest'].forEach((m) => show('#' + m, m === id));
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory', 'chest', 'pick'].forEach((m) => show('#' + m, m === id));
     U.open = id; RW.audio.sfx('ui');
     if (id === 'help') U.renderHelp();
     if (id === 'opts') U.renderOpts();
@@ -7830,7 +8009,7 @@ window.RW = window.RW || {};
   };
   U.closeModal = function () {
     if (U.cursor) { P().add(U.cursor.id, U.cursor.n); U.cursor = null; show('#held', false); }
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory', 'chest'].forEach((m) => show('#' + m, false));
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory', 'chest', 'pick'].forEach((m) => show('#' + m, false));
     U.open = null; U.stopCapture && U.stopCapture();
     const ae = document.activeElement; if (ae && ae !== document.body && ae.id !== 'chatin' && ae.blur) ae.blur(); show('#tooltip', false);
   };
@@ -7992,9 +8171,10 @@ window.RW = window.RW || {};
     const f = $('#cfilter'); f.innerHTML = '';
     [['can', 'Can make'], ['all', 'All recipes']].forEach(([k, n]) => { const b = el('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', U.craftFilter === k); b.onclick = () => { U.craftFilter = k; U.renderCraft(); }; f.append(b); });
     const near = { knap: P().nearStation('knap'), forge: P().nearStation('forge'), grow: P().nearStation('grow') };
-    f.append(el('span', 'label', ' Near: hands' + (near.knap ? ', knapping stone' : '') + (near.forge ? ', forge' : '') + (near.grow ? ', growing altar' : '')));
+    const boxes = RW.chests.nearby();
+    f.append(el('span', 'label', ' Near: hands' + (near.knap ? ', knapping stone' : '') + (near.forge ? ', forge' : '') + (near.grow ? ', growing altar' : '') + (boxes.length ? ', ' + boxes.length + (boxes.length > 1 ? ' chests' : ' chest') : '')));
     const list = $('#rlist'); list.innerHTML = '';
-    const p = P();
+    const p = Object.assign({}, P(), { count: (id) => P().count(id) + RW.chests.nearCount(id, boxes) });   // what's in nearby chests counts too
     const rows = RW.RECIPES.map((r) => {
       const haveAll = Object.entries(r.in).every(([id, n]) => p.count(id) >= n);
       const station = !r.at || near[r.at];
@@ -8018,9 +8198,10 @@ window.RW = window.RW || {};
     });
   };
   U.craft = function (r) {
-    const p = P();
-    if (!Object.entries(r.in).every(([id, n]) => p.count(id) >= n)) return;
-    Object.entries(r.in).forEach(([id, n]) => p.remove(id, n));
+    const p = P(), boxes = RW.chests.nearby();
+    if (!Object.entries(r.in).every(([id, n]) => p.count(id) + RW.chests.nearCount(id, boxes) >= n)) return;
+    // take from your bag first, then from the chests around you
+    Object.entries(r.in).forEach(([id, n]) => { const fromBag = Math.min(n, p.count(id)); p.remove(id, fromBag); if (n > fromBag) RW.chests.takeNear(id, n - fromBag, boxes); });
     p.add(r.out, r.n || 1); RW.audio.sfx('craft');
     if (r.at === 'forge') p.flags.used_forge = 1;
     const c = p.center(); RW.fx.burst(c.x, c.y - 10, r.at === 'forge' ? ['#ff9a3a', '#ffe08a'] : ['#c8c0b4', '#ffffff'], 14, 70, { add: true, kind: r.at === 'forge' ? 'ember' : 'glow', grav: -30 });
@@ -8195,10 +8376,12 @@ window.RW = window.RW || {};
   const chKey = () => 'chests_' + (RW.world.def.store || RW.world.def.id);
   CH.all = () => { const k = chKey(); if (CH._k !== k) { CH._k = k; CH._d = RW.store.get(k, {}) || {}; } return CH._d; };
   CH.save = () => RW.store.set(chKey(), CH.all());
-  CH.size = (t) => (t.storage ? 20 : 10);
+  CH.virt = {};   // chests that aren't blocks (a pet Punk's saddlebags): CH.virt[key] = { name, size }
+  CH.tileOf = (x, y) => (typeof x === 'string' ? Object.assign({ storage: true }, CH.virt[x]) : RW.world.tile(x, y));
+  CH.size = (t) => t.size || (t.storage ? 20 : 10);
   CH.ensure = function (x, y) {
-    const all = CH.all(), key = x + ',' + y; if (all[key]) return all[key];
-    const t = RW.world.tile(x, y); const box = new Array(CH.size(t)).fill(null);
+    const all = CH.all(), key = typeof x === 'string' ? x : x + ',' + y; if (all[key]) return all[key];
+    const t = CH.tileOf(x, y); const box = new Array(CH.size(t)).fill(null);
     const put = (id, n) => { if (!RW.ITEMS[id] || n <= 0) return; const max = RW.ITEMS[id].stack || 999; for (const s of box) if (s && s.id === id && s.n < max) { const k = Math.min(n, max - s.n); s.n += k; n -= k; } for (let i = 0; i < box.length && n > 0; i++) if (!box[i]) { const k = Math.min(n, max); box[i] = { id, n: k }; n -= k; } };
     if (t.loot && RW.LOOT[t.loot]) {
       const sp = RW.world.meta.special[key];
@@ -8208,12 +8391,27 @@ window.RW = window.RW || {};
     }
     all[key] = box; CH.save(); return box;
   };
+  // chests within reach of where you stand (ones that have been opened, so treasure isn't rolled by crafting), plus a pet's saddlebags
+  CH.nearby = function () {
+    const p = P(), all = CH.all(), TS = RW.TILE, tx = Math.floor((p.x + p.w / 2) / TS), ty = Math.floor((p.y + p.h / 2) / TS), out = [];
+    Object.keys(all).forEach((k) => {
+      if (k === 'pet_bags') { const pet = RW.ent.pet; if (pet && pet.sp === 'domestic_punk' && Math.abs(pet.x / TS - tx) <= 6 && Math.abs(pet.y / TS - ty) <= 4) out.push(k); return; }
+      const [x, y] = k.split(',').map(Number); const t = RW.world.tile(x, y);
+      if ((t.loot || t.storage) && Math.abs(x - tx) <= 6 && Math.abs(y - ty) <= 4) out.push(k);
+    });
+    return out;
+  };
+  CH.nearCount = (id, keys) => (keys || CH.nearby()).reduce((s, k) => s + CH.all()[k].reduce((a, it) => a + (it && it.id === id ? it.n : 0), 0), 0);
+  CH.takeNear = function (id, n, keys) {
+    (keys || CH.nearby()).forEach((k) => { const box = CH.all()[k]; box.forEach((it, i) => { if (n <= 0 || !it || it.id !== id) return; const t = Math.min(n, it.n); it.n -= t; n -= t; if (it.n <= 0) box[i] = null; }); });
+    CH.save();
+  };
   CH.take = (x, y) => { const all = CH.all(), key = x + ',' + y, box = all[key]; if (!box) return null; delete all[key]; CH.save(); return box; };
   U.openChest = function (x, y) {
     CH.ensure(x, y); U.chestAt = { x, y }; U.openModal('chest'); RW.audio.sfx('place'); U.renderChest();
   };
   U.renderChest = function () {
-    const at = U.chestAt; if (!at) return; const box = CH.ensure(at.x, at.y), p = P(), t = RW.world.tile(at.x, at.y);
+    const at = U.chestAt; if (!at) return; const box = CH.ensure(at.x, at.y), p = P(), t = CH.tileOf(at.x, at.y);
     $('#chest h3').textContent = t.name;
     const slot = (s, onClick) => { const d = el('div', 'slot'); const c = el('canvas'); c.width = c.height = 16; paint(c, s && s.id); d.append(c); if (s && s.n > 1) d.append(el('span', 'n', s.n)); if (s) U.attachTip(d, () => ({ id: s.id })); d.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); }); return d; };
     const cs = $('#chestslots'); cs.innerHTML = '';
@@ -9822,11 +10020,12 @@ window.RW = window.RW || {};
   // a line of sight, checked every 4 pixels; anything solid (or a shut door) in the way blocks it
   function sightLine(ax, ay, bx, by) {
     const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / 4);
-    for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n; if (W().solid(Math.floor(x / TS), Math.floor(y / TS))) return false; }
+    for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n; if (blocksSight(Math.floor(x / TS), Math.floor(y / TS))) return false; }
     return true;
   }
   // how far the guard can see along one direction before something blocks it
-  function sightRay(ax, ay, a, max) { const c = Math.cos(a), s = Math.sin(a); for (let d = 4; d < max; d += 4) { const x = ax + c * d, y = ay + s * d; if (W().solid(Math.floor(x / TS), Math.floor(y / TS))) return d; } return max; }
+  function sightRay(ax, ay, a, max) { const c = Math.cos(a), s = Math.sin(a); for (let d = 4; d < max; d += 4) { const x = ax + c * d, y = ay + s * d; if (blocksSight(Math.floor(x / TS), Math.floor(y / TS))) return d; } return max; }
+  function blocksSight(tx, ty) { const t = W().tile(tx, ty); return !!(t.solid || t.cover); }
   const CAUGHT = ['Hey! You can\'t be in here. Out you go.', 'Visitors stay in the courtyard. Come along now.', 'Nice try, little cap. Out.', 'The Master will hear about this. Out!'];
   function caught(n) {
     const M = RW.world.meta; caughtT = 3; E.npcs.forEach((g) => { if (g.guard) g.sus = 0; });
@@ -9880,9 +10079,11 @@ window.RW = window.RW || {};
   const doorStack = (x, y) => { const Wd = W(), out = []; let y0 = y; while (RW.TILES[Wd.get(x, y0 - 1)].door) y0--; for (let yy = y0; RW.TILES[Wd.get(x, yy)].door; yy++) out.push(yy); return out; };
   const setDoor = (x, y, open) => { doorStack(x, y).forEach((yy) => W().setTile(x, yy, open ? RW.T.door_open : RW.T.door)); };
   // something standing in the doorway keeps it from shutting on them
+  E.useHandlers = E.useHandlers || {};
   const blocked = (x, ys) => { const box = { x: x * TS, y: ys[0] * TS, w: TS, h: ys.length * TS }; return overlap(box, P) || E.npcs.some((n) => overlap(box, n)) || (E.buddy && overlap(box, E.buddy)) || E.enemies.some((e) => !e.dead && overlap(box, e)); };
   function useBlock(x, y, t) {
     const Wd = W(), T = RW.T;
+    if (t.use && E.useHandlers[t.use]) { E.useHandlers[t.use](x, y, t); return; }   // beds, waystones, campfires... (entities5.js)
     if (t.key === 'runestone_lit') { RW.ui.toast('The rune is already glowing.'); return; }
     if (t.key === 'runestone') { Wd.setTile(x, y, T.runestone_lit); RW.audio.sfx('crystal'); runeTouched(x, y); return; }
     if (t.loot || t.storage) { RW.ui.openChest(x, y); return; }
@@ -10107,6 +10308,539 @@ window.RW = window.RW || {};
   };
   const baseHud = U.updateHud;
   U.updateHud = function () { baseHud.apply(this, arguments); if (RW.game.playing) Q.refresh(); };
+})(window.RW);
+
+</script>
+<script>/* js/engine/entities5.js */
+// ENTITIES (part 5, v1.8) — life in Acorn World: the buddy fetches things, waystones, beds and campsites, your own
+// house at the top of the east tree, Albali fruit, market day, night in Capstead, the Sunear'Zikhron, rain and fog
+// (and the Gorge river rising), the Kipsu den, the Su Naga, pets, fishing and Orrin's building contest.
+// Places come from the world's meta (worlds/acornworld.js: buildLife); data from lore.js (RW.MARKET, RW.STORM_SAYINGS).
+(function (RW) {
+  const TS = RW.TILE; const E = RW.ent, P = RW.player, U = RW.ui; const ec = E.center, overlap = E.overlap;
+  const $ = (s) => document.querySelector(s);
+  const W = () => RW.world;
+  const acorn = () => W().def && W().def.id === 'acorn';
+  const DAY = 480;   // the same real-time day as the sky (main.js), so everyone shares market days and storms
+  const clock = () => { const now = Date.now() / 1000; return { day: Math.floor(now / DAY), t: (now % DAY) / DAY }; };
+  const night = () => RW.game.skyNow && RW.game.skyNow.night;
+  const pcen = () => P.center();
+  const ptile = () => { const c = pcen(); return { x: Math.floor(c.x / TS), y: Math.floor(c.y / TS) }; };
+  // above the ground (canopies and roofs don't count as indoors; caves do)
+  const outside = () => { const t = ptile(), s = W().meta.surf; return s ? t.y <= s[t.x] + 2 : W().skyTop && t.y <= W().skyTop[t.x] + 1; };
+  const onScreen = (o) => { const c = RW.cam, v = RW.view; return o.x + (o.w || 0) > c.x - 24 && o.x < c.x + v.w + 24 && o.y + (o.h || 0) > c.y - 24 && o.y < c.y + v.h + 24; };
+  const zoneHere = () => { const t = ptile(); return W().zoneAt(t.x, t.y); };
+  const give = (id, n) => { const left = P.add(id, n); if (left > 0) E.dropItem(id, left, P.x + P.w / 2, P.y); else U.pickup && U.pickup(id, n); U.dirty(); };
+  const hearts = (x, y, n) => { for (let k = 0; k < (n || 6); k++) RW.fx.spawn({ x: x + RW.rand(-6, 6), y: y + RW.rand(-4, 4), vx: RW.rand(-15, 15), vy: RW.rand(-50, -25), life: 0.9, color: RW.pick(['#ff6a8a', '#ffb0c0']), add: true, kind: 'glow' }); };
+  // somewhere to stand beside block (x, y): the nearest column with two open blocks
+  const standNear = (x, y) => {
+    const Wd = W(); for (const dx of [1, -1, 2, -2, 0]) { const tx = x + dx; if (!Wd.solid(tx, y) && !Wd.solid(tx, y - 1)) { P.spawnAt(tx, y); return; } }
+    P.spawnAt(x, y - 1);
+  };
+  const snapCompanions = () => {
+    if (E.buddy) { E.buddy.x = P.x - 16; E.buddy.y = P.y; E.buddy.vx = E.buddy.vy = 0; }
+    if (E.pet) { E.pet.x = P.x + 14; E.pet.y = P.y + P.h - E.pet.h; E.pet.vx = E.pet.vy = 0; }
+    const v = RW.view; RW.cam.x = P.x + 6 - v.w / 2; RW.cam.y = P.y + 14 - v.h / 2;
+  };
+
+  // ====================== THE BUDDY FETCHES THINGS ======================
+  // With nothing to fight, your acorn buddy runs over to anything lying on the ground nearby and brings it to you.
+  let fetchToastT = 0;
+  const baseBuddy = E.updateBuddy;
+  E.updateBuddy = function (dt) {
+    const b = E.buddy; fetchToastT -= dt;
+    if (b && P.flags.buddy && !P.dead) {
+      const bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 }, pc = pcen();
+      const foe = E.enemies.some((e) => !e.dead && !e.harmless && RW.dist(ec(e).x, ec(e).y, bc.x, bc.y) < 90);
+      let best = null, bd = 150;
+      if (!foe) {
+        const look = (o, kind) => { const d = RW.dist(o.x, o.y, bc.x, bc.y), dp = RW.dist(o.x, o.y, pc.x, pc.y); if (d < bd && dp < 220 && dp > 34) { bd = d; best = { o, kind, x: o.x, y: o.y }; } };
+        E.drops.forEach((d) => { if (d.t > 0.6 && !d.hold && !d.noFetch) look(d, 'drop'); });   // not the things you threw away on purpose
+        fruits.forEach((f) => look({ x: f.x + 3, y: f.y + 3, f }, 'fruit'));
+      }
+      b.fetch = best;
+    } else if (b) b.fetch = null;
+    baseBuddy(dt);
+    const f = b && b.fetch; if (!f || !E.buddy) return;
+    const bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    if (RW.dist(f.x, f.y, bc.x, bc.y) > 16) return;
+    let id, n;
+    if (f.kind === 'fruit') { const i = fruits.indexOf(f.o.f); if (i < 0) return; if (P.add('albali_fruit', 1) > 0) return; fruits.splice(i, 1); id = 'albali_fruit'; n = 1; }
+    else { const d = f.o, i = E.drops.indexOf(d); if (i < 0) return; const left = P.add(d.id, d.n); if (left >= d.n) { d.noFetch = true; return; } id = d.id; n = d.n - left; if (left > 0) { d.n = left; d.noFetch = true; } else E.drops.splice(i, 1); }
+    RW.audio.sfx('pickup'); U.pickup && U.pickup(id, n); U.dirty(); b.fetch = null;
+    RW.fx.burst(bc.x, bc.y, ['#ffe9b0', '#e8c88a'], 6, 50, { kind: 'glow', add: true, life: 0.4 });
+    if (fetchToastT <= 0) { fetchToastT = 12; U.toast('Your buddy picked up ' + RW.ITEMS[id].name + ' for you.'); }
+  };
+
+  // ====================== WAYSTONES ======================
+  // R on a waystone wakes it. R on a woken one shows every waystone you've woken in this world; pick one to travel.
+  const wayKey = (x, y) => 'way_' + W().def.id + '_' + x + '_' + y;   // the waystone drawing glows when this is set
+  E.useHandlers.waystone = function (x, y) {
+    const list = W().meta.waystones || [], me = list.find((w) => w.x === x && w.y === y);
+    if (!P.flags[wayKey(x, y)]) {
+      P.flags[wayKey(x, y)] = 1; RW.audio.sfx('crystal'); RW.fx.ring(x * TS + 8, y * TS + 8, '#8ad8ff', 60, 0.7, 2);
+      U.banner('Waystone woken', (me ? me.name : 'A waystone') + '. Wake others and travel between them.'); RW.game.saveSoon(); return;
+    }
+    U.openModal('pick'); $('#pick-label').textContent = 'Waystones'; $('#pick-title').textContent = 'Travel to a waystone you have woken';
+    const box = $('#picklist'); box.innerHTML = '';
+    list.forEach((w) => {
+      const on = P.flags[wayKey(w.x, w.y)], here = w.x === x && w.y === y;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small' + (on && !here ? ' primary' : '');
+      b.textContent = w.name + (here ? ' (you are here)' : on ? '' : ' (not woken yet)'); b.disabled = !on || here;
+      b.onclick = () => { U.closeModal(); travel(w); }; box.append(b);
+    });
+  };
+  function travel(w) {
+    RW.audio.sfx('rift'); RW.fx.flash('#bfe8ff', 0.45);
+    standNear(w.x, w.y); P.vx = P.vy = 0; P.invulnT = Math.max(P.invulnT || 0, 1); E.fish = null; snapCompanions();
+    RW.fx.ring(P.x + P.w / 2, P.y + P.h / 2, '#8ad8ff', 50, 0.6, 2); U.toast('You step out beside the waystone at ' + w.name + '.');
+  }
+
+  // ====================== BEDS & CAMPSITES ======================
+  // Sleep in a bed (or rest by a campfire) to heal and to wake up there after you fall, in that world.
+  const rest = (x, y, kind) => {
+    P.flags.bed = { w: W().def.id, x, y }; P.hp = P.maxHp(); P.mana = P.maxMana(); P.poisonT = 0;
+    RW.audio.sfx('craft'); hearts(x * TS + 8, y * TS, 4);
+    for (let k = 0; k < 3; k++) RW.fx.text(x * TS + 8 + k * 5, y * TS - 4 - k * 7, 'z', '#e8e0ff');
+    U.toast(kind === 'bed' ? (night() ? 'You sleep soundly. You\'ll wake up here if you fall.' : 'A little nap. You\'ll wake up in this bed if you fall.') : 'You rest by the fire. You\'ll come back to this campsite if you fall.');
+    RW.game.saveSoon();
+  };
+  E.useHandlers.bed = (x, y) => rest(x, y, 'bed');
+  E.useHandlers.rest = (x, y) => rest(x, y, 'camp');
+  const baseRespawn = P.respawn;
+  P.respawn = function () {
+    baseRespawn();
+    const b = P.flags.bed; if (!b || b.w !== W().def.id) return;
+    const t = W().tile(b.x, b.y);
+    if (t.use !== 'bed' && t.use !== 'rest') { delete P.flags.bed; U.toast('Your bed is gone, so you woke up back at the start.'); return; }
+    standNear(b.x, b.y); snapCompanions();
+  };
+
+  // ====================== YOUR HOUSE ======================
+  // The little house at the top of the east tree: Orrin hands it over once his job is done (q_orrin_house = 2).
+  const houseOpen = () => P.flags.q_orrin_house === 2;
+  function unlockHouse() {
+    const h = W().meta.house; if (!h) return false; let any = false;
+    [h.x0, h.x1].forEach((x) => { for (let y = h.y - 3; y < h.y; y++) if (W().get(x, y) === RW.T.housedoor) { W().setTile(x, y, RW.T.door); any = true; } });
+    return any;
+  }
+  E.useHandlers.housedoor = function (x, y, t) {
+    if (!houseOpen()) { U.toast(t.lockedMsg); RW.audio.sfx('deny'); return; }
+    if (unlockHouse()) { RW.audio.sfx('swing'); U.toast('Home sweet home.'); }
+  };
+
+  // ====================== ALBALI AAGAC TREES ======================
+  // Fruit drops from the trees in the Green Deep. Pick it up (or let your buddy) for Albali Fruit; leave it on the
+  // ground long enough and it hatches into an Albali Byrd.
+  const fruits = []; E.fruits = fruits;
+  function updateFruit(dt) {
+    const trees = W().meta.albaliTrees; if (!acorn() || !trees) { fruits.length = 0; return; }
+    const pc = pcen();
+    trees.forEach((tr) => {
+      if (Math.abs(tr.x * TS - pc.x) > 50 * TS) return;
+      tr.ft = (tr.ft == null ? RW.rand(3, 10) : tr.ft) - dt; if (tr.ft > 0) return;
+      tr.ft = RW.rand(16, 28); if (fruits.filter((f) => f.tree === tr).length >= 3) return;
+      const x = (tr.x + RW.rand(-tr.r + 1.5, tr.r - 1.5)) * TS; if (W().solid(Math.floor(x / TS), tr.y + 2)) return;
+      fruits.push({ tree: tr, x, y: (tr.y + 2) * TS, w: 6, h: 6, vx: 0, vy: 0, t: 0, landT: 0 });
+    });
+    for (let i = fruits.length - 1; i >= 0; i--) {
+      const f = fruits[i]; f.t += dt; f.vy += 520 * dt; f.vx *= 0.9;
+      const r = E.move(f, dt); if (r.ground) f.landT += dt;
+      if (Math.abs(f.x - pc.x) > 80 * TS) { fruits.splice(i, 1); continue; }
+      if (!P.dead && overlap(f, P) && P.add('albali_fruit', 1) === 0) { RW.audio.sfx('pickup'); U.pickup && U.pickup('albali_fruit', 1); U.dirty(); fruits.splice(i, 1); continue; }
+      if (f.landT > 20) {
+        const e = E.spawnEnemy('albali', f.x - 5, f.y - 12); e.vy = -120;
+        RW.fx.burst(f.x + 3, f.y, ['#fff0b0', '#ffffff', '#e8a846'], 12, 70); RW.audio.sfx('pickup');
+        if (onScreen(f)) U.toast('The fruit cracks open, and an Albali Byrd shakes itself out!');
+        fruits.splice(i, 1);
+      }
+    }
+  }
+
+  // ====================== MARKET DAY ======================
+  // Every third day Senna the Kalo trader sets up her stall in the plaza. Her goods change each market.
+  const marketDay = () => clock().day % 3 === 1;
+  const todayMarket = () => RW.MARKET[Math.floor(clock().day / 3) % RW.MARKET.length];
+  RW.MARKET_TODAY = todayMarket();
+  const npcAt = (id, x, y, w, h) => { const n = { id, x: x * TS + 2, y: (y + 1) * TS - h, w, h, home: x * TS, face: -1, t: Math.random() * 4, vx: 0, vy: 0 }; E.npcs.push(n); return n; };
+  function updateMarket() {
+    const M = W().meta; if (!acorn() || !M.stall) return;
+    const i = E.npcs.findIndex((n) => n.id === 'kalo_trader'), on = marketDay();
+    if (on && i < 0) npcAt('kalo_trader', M.stall.x, M.stall.y, 12, 22);
+    if (!on && i >= 0 && !onScreen(E.npcs[i])) E.npcs.splice(i, 1);
+    RW.MARKET_TODAY = todayMarket();
+    const d = clock().day;
+    if (on && P.flags.market_seen !== d && zoneHere() === 'village') { P.flags.market_seen = d; U.toast('It\'s market day in Capstead! Senna the Kalo trader has set up by the west tree.'); }
+  }
+
+  // ====================== NIGHT IN CAPSTEAD ======================
+  // Folk go indoors at night (they move while you aren't looking), and RubberMcFly glow round the tree crowns.
+  let mcT = 0;
+  const spawnMcfly = (cx, cy, rx, ry) => {
+    for (let k = 0; k < 8; k++) { const x = Math.round(cx + RW.rand(-rx, rx)), y = Math.round(cy + RW.rand(-ry, ry)); if (W().get(x, y) === RW.T.air && W().get(x + 1, y) === RW.T.air) { const e = E.spawnEnemy('rubbermcfly', x * TS, y * TS); e.glow = true; return e; } }
+    return null;
+  };
+  function updateNight(dt) {
+    const M = W().meta; if (!acorn()) return;
+    const dark = !!night();
+    if (M.nightHomes) E.npcs.forEach((n) => {
+      const h = M.nightHomes[n.id], d = M.npcs[n.id]; if (!h || !d || n.atNight === dark || onScreen(n)) return;
+      const to = dark ? h : d; n.x = to.x * TS + 2; n.y = (to.y + 1) * TS - n.h; n.home = to.x * TS; n.vx = n.vy = 0; n.atNight = dark;
+    });
+    const glowing = E.enemies.filter((e) => e.sp === 'rubbermcfly' && !e.dead);
+    mcT -= dt;
+    if (dark && M.crowns && zoneHere() === 'village' && mcT <= 0) { mcT = 1.2; if (glowing.length < 8) spawnMcfly(RW.pick(M.crowns).x, RW.pick(M.crowns).y, 22, 12); }
+    if (dark || ST.on) glowing.forEach((e) => { const c = ec(e); RW.fx.light(c.x, c.y, 0.55, 0.5, 0.15); if (Math.random() < 0.02) RW.fx.spawn({ x: c.x, y: c.y, vy: 10, life: 0.6, color: '#ffe86a', add: true, kind: 'glow' }); });
+  }
+
+  // ====================== THE SUNEAR'ZIKHRON ======================
+  // The Waves of Memory: on some days, late in the afternoon, the sky turns violet, light falls in bands, echoes of
+  // old acorns walk past, and an eye of pale light drifts across the land. Stand in the eye long enough to hear a memory.
+  const ST = { on: false, eye: null, figs: [], inEye: 0, a: 0 };
+  const stormDay = (d) => RW.hash2(d, 77, 4242) < 0.25;
+  const stormNow = () => { const c = clock(); return acorn() && stormDay(c.day) && c.t > 0.55 && c.t < 0.8 ? c : null; };
+  E.storm = ST;
+  const groundBelow = (tx, ty) => { for (let y = ty - 12; y < ty + 16; y++) if (W().solid(tx, y + 1) && !W().solid(tx, y) && !W().solid(tx, y - 1)) return y; return null; };
+  function updateStorm(dt) {
+    const c = stormNow(); const pc = pcen(), out = outside();
+    ST.a = RW.clamp(ST.a + ((c && out) ? dt : -dt) * 0.6, 0, 1);
+    if (!c) { ST.on = false; ST.figs.length = 0; ST.eye = null; return; }
+    if (!ST.on) {
+      ST.on = true; ST.day = c.day; ST.inEye = 0; ST.eye = { x: pc.x + RW.pick([-1, 1]) * RW.rand(14, 28) * TS, home: pc.x, dir: RW.pick([-1, 1]) };
+      U.banner('The Sunear\'Zikhron', 'The Waves of Memory roll over the Mbaru Tatu. Old echoes walk. Find the eye of the storm.'); RW.audio.sfx('rift');
+    }
+    const e = ST.eye; e.x += e.dir * 0.8 * TS * dt;
+    if (Math.abs(e.x - e.home) > 40 * TS) e.dir = -Math.sign(e.x - e.home);
+    if (Math.abs(e.x - pc.x) > 90 * TS) { e.home = pc.x; e.x = pc.x + e.dir * 24 * TS; }   // travelled far: the storm comes too
+    if (Math.random() < dt * 6) RW.fx.spawn({ x: e.x + RW.rand(-20, 20), y: RW.cam.y + RW.rand(0, RW.view.h), vy: RW.rand(-30, 30), life: 1, color: '#efe6ff', add: true, kind: 'glow' });
+    // echoes: translucent acorns walking somewhere they once walked
+    for (let i = ST.figs.length - 1; i >= 0; i--) { const f = ST.figs[i]; f.t += dt; f.x += f.face * 14 * dt; if (f.t > f.life) ST.figs.splice(i, 1); }
+    if (out && ST.figs.length < 4 && Math.random() < dt * 0.5) {
+      const x = pc.x + RW.rand(-18, 18) * TS, y = groundBelow(Math.floor(x / TS), ptile().y);
+      if (y != null) ST.figs.push({ x, y: (y + 1) * TS - 22, face: RW.pick([-1, 1]), t: 0, life: RW.rand(8, 14), look: RW.pick(['brown', 'golden', 'red', 'pale', 'green']) });
+    }
+    if (out && Math.random() < dt * 0.6 && E.enemies.filter((m) => m.sp === 'rubbermcfly').length < 6) spawnMcfly(pc.x / TS, pc.y / TS - 6, 18, 5);
+    // the eye
+    if (out && !P.dead && Math.abs(pc.x - e.x) < 2.2 * TS) {
+      ST.inEye += dt; if (Math.random() < dt * 10) RW.fx.spawn({ x: pc.x + RW.rand(-8, 8), y: pc.y + 10, vy: -40, life: 0.8, color: '#efe6ff', add: true, kind: 'glow' });
+      if (ST.inEye >= 20 && !P.flags['storm_' + c.day]) {
+        P.flags['storm_' + c.day] = 1; RW.audio.sfx('crystal'); RW.fx.flash('#efe6ff', 0.4);
+        U.banner('A memory speaks', RW.pick(RW.STORM_SAYINGS));
+        const prize = Math.random() < 0.3 ? 'crystal_gold' : 'crystal_purple'; give(prize, 1); RW.game.saveSoon();
+      }
+    }
+  }
+
+  // ====================== RAIN & FOG ======================
+  // Rain on some mornings over the Green Deep, the Tangle and the Canopy; then the Gorge river rises three blocks.
+  // Fog always hangs in the Megla Wood.
+  const RAINY = { jungle: 1, village: 1, deepwood: 1, elsharyn: 1, canopy: 1, arena: 1 };
+  const rainNow = () => { const c = clock(); return acorn() && RW.hash2(c.day, 13, 99) < 0.45 && c.t > 0.15 && c.t < 0.42; };
+  const WX = { rain: 0, fog: 0, drops: [] };
+  for (let i = 0; i < 140; i++) WX.drops.push({ x: Math.random(), y: Math.random(), s: RW.rand(0.8, 1.3) });
+  const rise = { on: false, cells: [], fg: null };
+  function updateWeather(dt) {
+    const z = zoneHere(), out = outside();
+    WX.rain = RW.clamp(WX.rain + ((rainNow() && RAINY[z] && out) ? dt : -dt) * 0.7, 0, 1);
+    WX.fog = RW.clamp(WX.fog + ((acorn() && z === 'mistwood') ? dt : -dt) * 0.5, 0, 1);
+    // the Gorge river: blocks of water set straight into the world (not saved, not sent), taken out again after
+    const Wd = W(), M = Wd.meta, T = RW.T;
+    if (rise.fg && rise.fg !== Wd.fg) { rise.on = false; rise.cells = []; rise.fg = null; }   // a different world (or a fresh one)
+    const want = rainNow() && !!M.gorge;
+    if (want && !rise.on) {
+      rise.on = true; rise.fg = Wd.fg; rise.cells = [];
+      for (let x = M.gorge.x0; x <= M.gorge.x1; x++) {
+        let y = Wd.def.sea - 8; while (y < Wd.def.sea + 60 && !(Wd.get(x, y) === T.water && Wd.get(x, y - 1) === T.air)) y++;
+        if (y >= Wd.def.sea + 60) continue;
+        for (let k = 1; k <= 3; k++) { const i = Wd.idx(x, y - k); if (Wd.fg[i] !== T.air) break; Wd.fg[i] = T.water; rise.cells.push(i); }
+      }
+      if (z === 'gorge') U.toast('Rain pours into the Gorge. The river is rising.');
+    } else if (!want && rise.on) {
+      rise.cells.forEach((i) => { if (Wd.fg[i] === T.water) Wd.fg[i] = T.air; }); rise.cells = []; rise.on = false;
+      if (z === 'gorge') U.toast('The rain stops, and the river sinks back down.');
+    }
+    for (const d of WX.drops) { d.y += dt * 1.6 * d.s; d.x -= dt * 0.25 * d.s; if (d.y > 1) { d.y -= 1; d.x = Math.random() * 1.2; } if (d.x < 0) d.x += 1.2; }
+  }
+
+  // ====================== THE KIPSU DEN ======================
+  let denWas = false, denLast = -1e9;
+  function updateDen() {
+    const D = W().meta.den; if (!acorn() || !D) return;
+    const t = ptile(), inDen = t.x >= D.x0 && t.x <= D.x1 && t.y >= D.y0 && t.y <= D.y1;
+    if (inDen && !denWas) {
+      if (!P.flags.pup) U.toast('A Kipsu den. Somewhere in the dark, something small is whimpering.');
+      const now = performance.now();
+      if (now - denLast > 90000) { denLast = now; [-12, 12].forEach((dx) => { const e = E.spawnEnemy('kipsu', (D.at.x + dx) * TS, (D.at.y + 1) * TS - 12); e.pack = true; e.joined = true; }); }
+    }
+    denWas = inDen;
+  }
+
+  // ====================== THE SU NAGA ======================
+  // Deep in the Green Sea, rarely, one at a time: three heads that spit gas. Once two heads are down the last one
+  // (the first head) takes a quarter of the damage.
+  let nagaCd = 30;
+  function updateNaga(dt) {
+    nagaCd -= dt; if (!acorn() || P.dead) return;
+    E.shots.forEach((s) => { if (s.naga && overlap({ x: s.x - 3, y: s.y - 3, w: 6, h: 6 }, P)) P.poisonT = Math.max(P.poisonT || 0, 4); });
+    if (nagaCd > 0 || E.enemies.some((e) => e.sp === 'su_naga' && !e.dead)) return;
+    const t = ptile(), Wd = W();
+    if (Wd.zoneAt(t.x, t.y) !== 'ocean' || t.y - Wd.def.sea < 6 || Wd.get(t.x, t.y) !== RW.T.water) return;
+    nagaCd = 4; if (Math.random() > 0.06) return;
+    for (let k = 0; k < 24; k++) {
+      const tx = t.x + RW.pick([-1, 1]) * Math.round(RW.rand(10, 20)), ty = t.y + Math.round(RW.rand(-2, 6));
+      let ok = true; for (let y = ty; y < ty + 3 && ok; y++) for (let x = tx; x < tx + 5; x++) if (Wd.get(x, y) !== RW.T.water) { ok = false; break; }
+      if (!ok) continue;
+      const e = E.spawnEnemy('su_naga', tx * TS, ty * TS); e.heads = 3; e.st = 2.5; nagaCd = 240;
+      RW.audio.sfx('roar'); RW.fx.shake(6, 1); U.banner('Su Naga', 'Three heads rise out of the deep.'); return;
+    }
+  }
+  E.behaviors.naga = function (e, dt, sp) {
+    const c = ec(e), pc = pcen(), Wd = W(); e.st = (e.st == null ? 2 : e.st) - dt;
+    const heads = e.hp > e.maxhp * 0.66 ? 3 : e.hp > e.maxhp * 0.3 ? 2 : 1;
+    if (heads !== e.heads) {
+      if (e.heads) { RW.audio.sfx('roar'); RW.fx.shake(5, 0.5); RW.fx.burst(c.x + e.face * 20, e.y + 8, ['#3d78b8', '#9aff5a', '#bfe0e8'], 18, 110); U.toast(heads === 1 ? 'Two heads down! The last one, the first head, glows. It will be very hard to hurt.' : 'One of the heads goes limp!'); }
+      e.heads = heads;
+    }
+    e.fr = (3 - heads) * 2 + (Math.floor(e.t * 4) % 2);
+    const wet = Wd.isWaterAt(c.x, c.y);
+    if (!wet) { e.vy += 700 * dt; e.vx *= 0.95; E.move(e, dt); return; }
+    const dx = pc.x - c.x, dy = pc.y - c.y, d = Math.hypot(dx, dy), chase = !P.dead && d < 30 * TS, a = Math.atan2(dy, dx);
+    if (e.lunge > 0) e.lunge -= dt;
+    else if (chase) {
+      e.vx = RW.lerp(e.vx, Math.cos(a) * sp.speed, dt * 2); e.vy = RW.lerp(e.vy, Math.sin(a) * sp.speed, dt * 2);
+      if (e.st <= 0) {
+        if (d < 9 * TS && Math.random() < 0.5) { e.lunge = 0.6; e.vx = Math.cos(a) * 260; e.vy = Math.sin(a) * 260; RW.audio.sfx('roar'); e.st = 2.6; }
+        else {
+          for (let k = 0; k < heads; k++) { const aa = a + (k - (heads - 1) / 2) * 0.22; E.shots.push({ x: c.x + e.face * 26, y: e.y + 6 + k * 4, vx: Math.cos(aa) * 170, vy: Math.sin(aa) * 170, life: 3, owner: 'e', dmg: 12, kind: 'thorn', color: '#9aff5a', naga: true }); }
+          RW.audio.sfx('poison'); e.st = 2.2 - (3 - heads) * 0.3;
+        }
+      }
+    } else { e.vx = RW.lerp(e.vx, Math.sin(e.t * 0.5) * 30, dt); e.vy = RW.lerp(e.vy, Math.cos(e.t * 0.7) * 12, dt); }
+    // it never leaves the water
+    const ax = c.x + Math.sign(e.vx || 1) * e.w * 0.45 + e.vx * 0.1, ay = c.y + e.vy * 0.25 + Math.sign(e.vy) * e.h * 0.4;
+    if (!Wd.isWaterAt(ax, c.y)) { e.vx *= -0.5; e.lunge = 0; }
+    if (!Wd.isWaterAt(c.x, ay)) { e.vy = e.vy < 0 ? Math.abs(e.vy) * 0.5 + 20 : -Math.abs(e.vy) * 0.5 - 20; e.lunge = 0; }
+    e.face = e.vx >= 0 ? 1 : -1; E.move(e, dt);
+    RW.fx.light(c.x, c.y, 0.2, 0.45, 0.6);
+    if (Math.random() < dt * 3) RW.fx.spawn({ x: c.x + e.face * 30, y: e.y + 4, vy: -25, life: 1, color: '#bfeaff', kind: 'bubble', add: true, size: 0 });
+  };
+  const baseDamage = E.damage;
+  E.damage = function (e, d, dir, knock, crit, color) {
+    if (e.sp === 'su_naga') { if (e.hp < e.maxhp * 0.3) d = Math.max(1, Math.round(d * 0.25)); knock = Math.min(knock, 1); }
+    return baseDamage(e, d, dir, knock, crit, color);
+  };
+  const baseKill = E.kill;
+  E.kill = function (e) {
+    baseKill(e);
+    if (e.sp === 'su_naga') { P.flags.naga_dead = (P.flags.naga_dead || 0) + 1; U.banner('The Su Naga sinks', 'The first head falls last. The Green Sea goes quiet.'); RW.audio.sfx('victory'); }
+  };
+
+  // ====================== PETS & TAMING ======================
+  // Hold a creature's favourite food and right-click it. It might take a few tries. One pet at a time; a pet Punk
+  // carries saddlebags (right-click it). Pets live in Acorn World, like the creatures they are.
+  const TAME = { kofi: 'berry', big_momma_kofi: 'kofi_grass', mikolo_moko: 'uff_petal', domestic_punk: 'living_vine' };
+  const PET_SIZE = { kofi: [12, 9], big_momma_kofi: [18, 13], mikolo_moko: [10, 12], domestic_punk: [24, 22], kipsu_pup: [16, 11] };
+  RW.TAME_FOODS = TAME;
+  E.pet = null;
+  const makePet = (sp, x, y) => { const [w, h] = PET_SIZE[sp] || [12, 10]; return { sp, x, y: y - h, w, h, vx: 0, vy: 0, face: 1, t: 0, ground: false }; };
+  const release = () => {
+    const id = P.flags.pet; if (!id) return;
+    U.toast((RW.SPECIES[id] || {}).name + (id === 'kipsu_pup' ? ' trots back to its den.' : ' wanders back to the wild.'));
+    if (id === 'kipsu_pup') delete P.flags.pup;
+    delete P.flags.pet; E.pet = null;
+  };
+  function tame(e, it) {
+    const sp = RW.SPECIES[e.sp], c = ec(e);
+    P.remove(it.id, 1); U.dirty(); RW.audio.sfx('eat'); hearts(c.x, e.y, 3);
+    e.tries = (e.tries || 0) + 1;
+    if (Math.random() > (e.sp === 'big_momma_kofi' ? 0.22 : 0.38) + e.tries * 0.08) { U.toast('The ' + sp.name + ' eats the ' + it.name + ' and looks at you. Maybe one more?'); return; }
+    if (P.flags.pet) release();
+    e.dead = true; P.flags.pet = e.sp; E.pet = makePet(e.sp, e.x, e.y + e.h); hearts(c.x, e.y, 12);
+    RW.audio.sfx('craft'); U.banner('A new friend', sp.name + ' will follow you now.' + (e.sp === 'domestic_punk' ? ' Right-click it for its saddlebags.' : ''));
+    RW.game.saveSoon();
+  }
+  function updatePet(dt) {
+    const id = P.flags.pet; if (!id || !acorn() || !RW.SPECIES[id]) { E.pet = null; return; }
+    if (!E.pet || E.pet.sp !== id) E.pet = makePet(id, P.x + 14, P.y + P.h);
+    const p = E.pet, pc = pcen(); p.t += dt; const c = { x: p.x + p.w / 2, y: p.y + p.h / 2 };
+    if (RW.dist(pc.x, pc.y, c.x, c.y) > 300 || P.dead) { p.x = P.x - P.face * 24; p.y = P.y + P.h - p.h; p.vx = p.vy = 0; if (!P.dead) RW.fx.burst(p.x + p.w / 2, p.y + p.h / 2, ['#e8d8b0'], 6, 40, { kind: 'smoke', size: 2, life: 0.4 }); }
+    const tx = pc.x - P.face * 30 + (id === 'kipsu_pup' ? Math.sin(p.t * 1.3) * 14 : 0), dx = tx - c.x;
+    const spd = id === 'domestic_punk' ? 95 : id === 'big_momma_kofi' ? 100 : 125;
+    p.vx = RW.lerp(p.vx, Math.abs(dx) > 14 ? Math.sign(dx) * spd * (Math.abs(dx) > 100 ? 1.6 : 1) : 0, dt * 6);
+    const wet = W().isWaterAt(c.x, c.y); p.vy += (wet ? -80 : 900) * dt; if (wet) p.vy = RW.clamp(p.vy, -60, 60);
+    const r = E.move(p, dt, { step: true, grounded: p.ground }); p.ground = r.ground;
+    if (p.ground && (((r.wallL || r.wallR) && Math.abs(dx) > 14) || pc.y < c.y - 30)) p.vy = id === 'domestic_punk' ? -300 : -340;
+    if (Math.abs(p.vx) > 5) p.face = Math.sign(p.vx);
+    if (night() && id !== 'domestic_punk') RW.fx.light(c.x, c.y, 0.2, 0.4, 0.4);
+  }
+  RW.chests.virt.pet_bags = { name: 'Punk Saddlebags', size: 15 };
+  function petClicked() {
+    const p = E.pet, sp = RW.SPECIES[p.sp]; hearts(p.x + p.w / 2, p.y, 5); if (p.ground) p.vy = -220;
+    if (p.sp === 'domestic_punk') { U.openChest('pet_bags'); return; }
+    U.toast(RW.pick(['Your ' + sp.name + ' is very happy to see you.', 'Your ' + sp.name + ' wiggles.', 'Your ' + sp.name + ' leans on your foot.']));
+  }
+
+  // ====================== FISHING ======================
+  // Hold a fishing rod and right-click water to cast. When the bobber dips (!), right-click again to reel it in.
+  E.fish = null;
+  const CATCH = {
+    ocean: [['sea_perch', 50], ['glowfin', 10], ['old_boot', 14], ['pearl', 9], ['krabbi_shell', 7]],
+    gorge: [['river_trout', 60], ['glowfin', 6], ['old_boot', 16], ['pearl', 3], ['harkal_tooth', 2]],
+    other: [['pond_carp', 64], ['old_boot', 18], ['river_trout', 10], ['pearl', 2]],
+  };
+  RW.FISH_CATCH = CATCH;
+  function fishUse(x, y) {
+    const f = E.fish;
+    if (f) {
+      if (f.bite > 0) {
+        const list = CATCH[f.z] || CATCH.other; let r = Math.random() * list.reduce((s, [, w]) => s + w, 0), id = list[0][0];
+        for (const [iid, w] of list) { r -= w; if (r <= 0) { id = iid; break; } }
+        give(id, 1); RW.audio.sfx('splash'); RW.fx.burst(f.x, f.y, ['#bfeaff', '#ffffff'], 10, 80);
+        P.flags.fish_caught = (P.flags.fish_caught || 0) + 1;
+        U.toast(id === 'old_boot' ? 'An old boot. The Kalo trader collects these, apparently.' : id === 'pearl' ? 'A pearl! The Kalo trader will want that.' : 'You caught a ' + RW.ITEMS[id].name + '!');
+        RW.game.saveSoon();
+      } else U.toast('You reel in. Nothing yet.');
+      E.fish = null; RW.audio.sfx('swing'); return true;
+    }
+    const Wd = W(); if (Wd.get(x, y) !== RW.T.water) return false;
+    let sy = y; while (sy > 0 && Wd.get(x, sy - 1) === RW.T.water) sy--;
+    E.fish = { x: x * TS + 8, y: sy * TS + 3, wait: RW.rand(2, 7), bite: 0, z: Wd.zoneAt(x, sy), t: 0 };
+    RW.audio.sfx('swing'); RW.fx.burst(x * TS + 8, sy * TS + 2, ['#bfeaff'], 5, 40); return true;
+  }
+  function updateFish(dt) {
+    const f = E.fish; if (!f) return; const h = P.held(), pc = pcen();
+    if (!h || h.id !== 'fishing_rod' || P.dead || RW.dist(pc.x, pc.y, f.x, f.y) > 9 * TS || W().get(Math.floor(f.x / TS), Math.floor(f.y / TS)) !== RW.T.water) { E.fish = null; return; }
+    f.t += dt;
+    if (f.bite > 0) { f.bite -= dt; if (f.bite <= 0) { U.toast('It got away. Wait for the next bite.'); f.wait = RW.rand(2, 6); f.bite = 0; } }
+    else { f.wait -= dt; if (f.wait <= 0) { f.bite = 1.2; RW.audio.sfx('splash'); RW.fx.text(f.x, f.y - 12, '!', '#ffe36a', true); RW.fx.burst(f.x, f.y, ['#bfeaff', '#ffffff'], 6, 50); } }
+  }
+
+  // ====================== RIGHT-CLICK: rod, taming food, your pet ======================
+  const baseUseTile = P.useTile;
+  P.useTile = function (x, y) {
+    const h = P.held();
+    if (h && h.id === 'fishing_rod' && fishUse(x, y)) return true;
+    const m = RW.mouseWorld();
+    if (E.pet && m.x >= E.pet.x - 4 && m.x <= E.pet.x + E.pet.w + 4 && m.y >= E.pet.y - 6 && m.y <= E.pet.y + E.pet.h + 4) { petClicked(); return true; }
+    if (h && acorn()) {
+      const e = E.enemies.find((o) => !o.dead && m.x >= o.x - 6 && m.x <= o.x + o.w + 6 && m.y >= o.y - 6 && m.y <= o.y + o.h + 6);
+      if (e && e.sp === 'rubbermcfly' && h.kind === 'food') { U.toast('The RubberMcFly looks at the ' + h.name + ', then at you. It belongs to nobody.'); return true; }
+      if (e && TAME[e.sp] === h.id) { tame(e, h); return true; }
+    }
+    return baseUseTile ? baseUseTile(x, y) : false;
+  };
+
+  // ====================== TALKING: adopt the pup, Orrin judges your build, the market ======================
+  const baseTalk = U.talk;
+  U.talk = function (npc) {
+    if (npc.id === 'kalo_trader') RW.MARKET_TODAY = todayMarket();
+    baseTalk(npc);
+    const cfg = RW.NPCS[npc.id] || {}, says = $('#talk .says'), acts = $('#talk .acts');
+    const btn = (label, f, primary) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = f; acts.insertBefore(b, acts.lastChild); return b; };
+    if (npc.id === 'kipsu_pup') btn('Take it home', () => {
+      if (P.flags.pet && P.flags.pet !== 'kipsu_pup') release();
+      P.flags.pet = 'kipsu_pup'; P.flags.pup = 1; const i = E.npcs.indexOf(npc); if (i >= 0) E.npcs.splice(i, 1);
+      E.pet = makePet('kipsu_pup', npc.x, npc.y + npc.h); hearts(npc.x + 8, npc.y, 12); RW.audio.sfx('craft');
+      U.closeModal(); U.banner('A new friend', 'The Kipsu pup follows you out of the den.'); RW.game.saveSoon();
+    }, true);
+    if (cfg.judge) btn('Judge my build', () => { says.textContent = judge(); });
+  };
+  const TIERS = [[40, 'bronze', [['iron_bar', 4], ['torch', 8]]], [150, 'silver', [['platinum_bar', 3], ['crystal_blue', 1]]], [350, 'gold', [['crystal_gold', 1], ['heartwood', 2]]]];
+  function judge() {
+    const pl = W().meta.plot; if (!pl) return 'Build something on my plot east of Capstead, then ask me again.';
+    const mine = new Set(Object.values(RW.ITEMS).filter((i) => i.place && RW.T[i.place] != null).map((i) => RW.T[i.place]));
+    let n = 0; const kinds = new Set();
+    for (let y = pl.y0; y <= pl.y1; y++) for (let x = pl.x0; x <= pl.x1; x++) { const t = W().get(x, y); if (t !== RW.T.air && mine.has(t)) { n++; kinds.add(t); } }
+    if (!n) return 'The plot is empty! Build something between the two stakes east of town, then come back.';
+    const score = n + kinds.size * 10, won = [];
+    TIERS.forEach(([need, name, prize]) => { if (score >= need && !P.flags['plot_' + name]) { P.flags['plot_' + name] = 1; prize.forEach(([id, k]) => give(id, k)); won.push('the ' + name + ' prize (' + prize.map(([id, k]) => k + ' ' + RW.ITEMS[id].name).join(', ') + ')'); } });
+    let msg = n + ' blocks, ' + kinds.size + ' different kinds: that scores ' + score + '. ';
+    msg += won.length ? 'You win ' + won.join(' and ') + '!' : score < 40 ? 'Hmm. A Keilia would call that a doorstep. Bigger!' : 'Good, solid work.';
+    const next = TIERS.find(([, name]) => !P.flags['plot_' + name]);
+    msg += next ? ' Score ' + next[0] + ' for the ' + next[1] + ' prize.' : ' You\'ve won every prize I have. Build for the joy of it now.';
+    if (won.length) { RW.audio.sfx('craft'); RW.game.saveSoon(); }
+    return msg;
+  }
+
+  // ====================== WORLD LOAD ======================
+  const baseInit = E.initNpcs;
+  E.initNpcs = function () {
+    baseInit();
+    for (let i = E.npcs.length - 1; i >= 0; i--) { const id = E.npcs[i].id; if ((id === 'kalo_trader' && !marketDay()) || (id === 'kipsu_pup' && P.flags.pup)) E.npcs.splice(i, 1); }
+    fruits.length = 0; E.fish = null; ST.on = false; ST.figs.length = 0; ST.a = 0; WX.rain = 0; WX.fog = 0; denWas = false; houseChecked = false;
+    if (E.pet) { E.pet.x = P.x + 14; E.pet.y = P.y; }
+  };
+
+  // ====================== EVERY FRAME ======================
+  let slowT = 0, houseChecked = false;
+  const baseUpd = E.updateEnemies;
+  E.updateEnemies = function (dt) {
+    baseUpd(dt);
+    updateWeather(dt);
+    if (!acorn()) { E.pet = null; return; }
+    updateFruit(dt); updateNight(dt); updateStorm(dt); updateNaga(dt); updatePet(dt); updateFish(dt);
+    slowT -= dt; if (slowT > 0) return; slowT = 1;
+    updateMarket(); updateDen();
+    if (!houseChecked && houseOpen()) { houseChecked = true; unlockHouse(); }
+  };
+
+  // ====================== DRAWING ======================
+  const A = RW.art;
+  const baseExtra = E.drawExtra;
+  E.drawExtra = function (g, cam, time) {
+    baseExtra(g, cam, time);
+    const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
+    fruits.forEach((f) => { const ic = A.icon('albali_fruit'), wob = f.landT > 14 ? Math.sin(time * 30) * 1.2 : 0; g.drawImage(ic, Math.round(f.x + ox - 2 + wob), Math.round(f.y + oy - 4), 10, 10); });
+    if (E.pet) {
+      const p = E.pet, fr = A.species(p.sp), k = Math.abs(p.vx) > 5 ? Math.floor(p.t * 6) % fr.length : 0, img = fr[k][p.face > 0 ? 0 : 1];
+      g.drawImage(img, Math.round(p.x + ox + p.w / 2 - img.width / 2), Math.round(p.y + oy + p.h - img.height));
+    }
+    const f = E.fish;
+    if (f && !P.dead) {
+      const hx = P.x + P.w / 2 + P.face * 12 + ox, hy = P.y + 2 + oy, bx = f.x + ox, by = f.y + oy + (f.bite > 0 ? 3 : Math.sin(f.t * 3));
+      g.strokeStyle = 'rgba(240,240,230,0.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(hx, hy); g.quadraticCurveTo((hx + bx) / 2, Math.max(hy, by) + 10, bx, by - 2); g.stroke();
+      g.fillStyle = '#e0525a'; g.fillRect(Math.round(bx) - 2, Math.round(by) - 3, 4, 2); g.fillStyle = '#ffffff'; g.fillRect(Math.round(bx) - 2, Math.round(by) - 1, 4, 2);
+    }
+  };
+  let fogImg = null; const echoes = {};
+  const fogBlob = () => { if (fogImg) return fogImg; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const gr = x.createRadialGradient(64, 64, 4, 64, 64, 64); gr.addColorStop(0, 'rgba(220,226,232,0.55)'); gr.addColorStop(1, 'rgba(220,226,232,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); return (fogImg = c); };
+  const baseOver = RW.fx.drawOver;
+  RW.fx.drawOver = function (g, cam, time) {
+    baseOver(g, cam, time);
+    if (!RW.game.playing) return;
+    const vw = RW.view.w, vh = RW.view.h;
+    if (WX.fog > 0) {
+      g.fillStyle = 'rgba(196,204,212,' + (0.2 * WX.fog) + ')'; g.fillRect(0, 0, vw, vh);
+      const fb = fogBlob(); g.globalAlpha = 0.5 * WX.fog;
+      for (let k = 0; k < 7; k++) { const x = ((k * 197 - cam.x * 0.3 + time * 8 * (1 + k % 3)) % (vw + 400) + vw + 400) % (vw + 400) - 200, y = vh * 0.35 + ((k * 89) % (vh * 0.6)) - cam.y * 0.05 % 40; g.drawImage(fb, x, y, 320, 140); }
+      g.globalAlpha = 1;
+    }
+    if (WX.rain > 0) {
+      g.fillStyle = 'rgba(24,34,48,' + (0.16 * WX.rain) + ')'; g.fillRect(0, 0, vw, vh);
+      g.strokeStyle = 'rgba(190,210,235,' + (0.45 * WX.rain) + ')'; g.lineWidth = 1; g.beginPath();
+      for (const d of WX.drops) { const x = d.x * vw, y = d.y * vh; g.moveTo(x, y); g.lineTo(x - 3, y + 10 * d.s); }
+      g.stroke();
+    }
+    if (ST.a > 0) {
+      g.fillStyle = 'rgba(110,60,190,' + (0.16 * ST.a) + ')'; g.fillRect(0, 0, vw, vh);
+      g.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 5; k++) {
+        const x = ((k * 260 + time * 30) % (vw + 500)) - 250; g.fillStyle = 'rgba(170,130,255,' + (0.06 * ST.a) + ')';
+        g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 70, 0); g.lineTo(x - 90, vh); g.lineTo(x - 160, vh); g.closePath(); g.fill();
+      }
+      if (ST.eye) { const ex = ST.eye.x - cam.x, gr = g.createLinearGradient(ex - 36, 0, ex + 36, 0); gr.addColorStop(0, 'rgba(235,225,255,0)'); gr.addColorStop(0.5, 'rgba(235,225,255,' + (0.28 * ST.a) + ')'); gr.addColorStop(1, 'rgba(235,225,255,0)'); g.fillStyle = gr; g.fillRect(ex - 36, 0, 72, vh); }
+      ST.figs.forEach((f) => {
+        const fr = echoes[f.look] || (echoes[f.look] = A.acornSprites ? A.acornSprites(Object.assign({}, A.DEFAULT_ACORN || {}, { shell: f.look })) : A.species('acorn'));
+        const img = fr[1 + Math.floor(f.t * 4) % 2] ? fr[1 + Math.floor(f.t * 4) % 2][f.face > 0 ? 0 : 1] : fr[0][0];
+        g.globalAlpha = RW.clamp(Math.min(f.t, f.life - f.t), 0, 1) * 0.45 * ST.a;
+        g.drawImage(img, Math.round(f.x - cam.x - img.width / 2), Math.round(f.y - cam.y + 22 - img.height));
+      });
+      g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+      if (ST.inEye > 0 && ST.inEye < 20 && ST.eye && Math.abs(pcen().x - ST.eye.x) < 2.2 * TS && !P.flags['storm_' + ST.day]) {
+        g.fillStyle = 'rgba(239,230,255,0.85)'; g.fillRect(Math.round(P.x - cam.x - 4), Math.round(P.y - cam.y - 10), Math.round(20 * ST.inEye / 20), 2);
+      }
+    }
+  };
 })(window.RW);
 
 </script>
@@ -10381,7 +11115,7 @@ window.RW = window.RW || {};
     const dt = Math.min(0.05, (now - last) / 1000); last = now; G.time += dt;
     const time = G.time; const v = RW.view, cam = RW.cam, W = RW.world;
     if (!W.fg) { requestAnimationFrame(frame); return; }
-    const sk = G.sky();
+    const sk = G.sky(); G.skyNow = sk;   // night-only creatures, guards and lights read this
     if (G.playing) {
       if (!RW.ui.paused()) {
         P.update(dt);

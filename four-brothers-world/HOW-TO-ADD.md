@@ -94,3 +94,14 @@ then refresh. Relay traffic counts against the service's free monthly allowance.
 - **Grow-forging:** recipes with `at: 'grow'` are made beside a `growaltar` block (the Elsha'ryn's, in the Memory Grove).
 - **Memory cores:** `core(c, x, y, i)` in `acornworld.js` places core `i` (carving 17 + i). Lethra's job counts them through the `read_acorn<index>` flags that reading sets.
 - **Chests:** any block with `loot` (a `RW.LOOT` table) or `storage: true` opens with R or right-click (`RW.chests` and `U.openChest` in `engine/ui.js`). Contents are saved per world under `chests_<store>` in the browser.
+
+## Acorn World life (v1.8)
+Places come from `buildLife()` in `acornworld.js` (it fills `meta.waystones`, `meta.albaliTrees`, `meta.den`, `meta.plot`, `meta.gorge`); Capstead adds `meta.house`, `meta.stall`, `meta.nightHomes` and `meta.crowns`. The engine is `engine/entities5.js`.
+- **Using a block:** a block with `use: '<name>'` runs `E.useHandlers[<name>](x, y, tile)` when you press R beside it or right-click it. Built in: `bed` and `rest` (campfire) set where you wake up (`P.flags.bed`), `waystone` wakes and travels, `housedoor` opens your house once `q_orrin_house` is done, `cannon` fires the Ember's cannon.
+- **Waystones:** put a `waystone` block in a world and add `{ name, x, y }` to its `meta.waystones`. Waking one sets the flag `way_<world>_<x>_<y>`.
+- **Market:** `RW.MARKET` in `lore.js` is a list of trade lists; each market day uses the next one. Same format as other trades (`give`, `get`, optional `note`).
+- **Pets:** `TAME` in `entities5.js` maps a creature to its favourite food. Add a size to `PET_SIZE` too. The pet is `P.flags.pet`.
+- **Fishing:** `CATCH` in `entities5.js` has a weighted list per water zone (`ocean`, `gorge`, and `other`).
+- **Crops:** give an item `plant: '<crop block>'` and make a block with `crop: '<item>'`, `decor: 'crop2'` and `grow` (seconds). It grows on farm soil.
+- **Weather:** the storm (`stormDay`), rain (`rainNow`) and market day all come from the shared real-time clock (480 seconds a day), so everyone sees the same weather.
+- **New carvings** for Acorn World go at the end of `CARVINGS_ACORN` (27 is Orrin's Plot sign).

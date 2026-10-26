@@ -1,5 +1,28 @@
 # 4 Brothers World: versions
 
+## v1.8
+Everything here is in Acorn World.
+- **Your buddy picks things up.** When there's nothing to fight, your acorn buddy runs over to anything lying on the ground nearby (and to fallen Albali fruit) and brings it to you. It leaves alone anything you threw down yourself.
+- **Waystones.** Nine waystones along the road: the keep, the traveller's hut, the Gorge, the old shrine, Capstead, the Green Deep, the Memory Grove, the wreck and the King's Clearing. Press R on one to wake it; press R on a woken one to travel to any other you've woken.
+- **Beds and campsites.** Sleep in a bed or rest by a campfire (R or right-click) to heal, and you'll wake up there instead of at the start after you fall. Beds are in some of the branch houses and the traveller's hut, and you can make your own (4 planks, 3 Kofi hair).
+- **A house of your own.** Bring Orrin 30 planks and the little house at the very top of the east tree is yours: a bed, a storage chest, a banner and farm soil by the window.
+- **Albali Aagac trees** in the Green Deep, with pale leaves. Their fruit drops now and then: pick it up to eat, or leave it on the ground and it hatches into an Albali Byrd.
+- **Market day.** Every third day Senna the Kalo trader sets up a stall in the plaza by the west tree. What she sells changes every market. She wants pearls, and for some reason old boots.
+- **Night in Capstead.** Old Ruut, Brannoc and Cubert go indoors at night, and glowing RubberMcFly drift round the crowns of the home trees.
+- **The Sunear'Zikhron.** On some days, late in the afternoon, the Waves of Memory roll in: the sky turns violet, light falls in bands, echoes of acorns long gone walk past, and a pale eye drifts across the land. Stand in the eye for 20 seconds to hear a memory (and get a crystal), once per storm.
+- **Rain and fog.** Some mornings it rains over the Green Deep, the Tangle and the Canopy, and the Gorge river rises three blocks until it stops. The Megla Wood is always foggy now.
+- **The Kipsu den.** A shaft in the Broken Hills drops into a warm hollow where a Kipsu pup has been left behind. Its pack may be home. Talk to the pup and take it home.
+- **The Su Naga.** Rarely, deep in the Green Sea, a three-headed sea serpent rises. Each head spits gas that poisons you. Take two heads and the last one (the first head, the oldest) takes only a quarter of the damage. It drops Naga scales, a gold crystal, and sometimes the Naga Trident.
+- **Pets.** Hold a creature's favourite food and right-click it, and after a try or two it's yours: Kofi Galta love berries, Big Momma Kofi love Kofi grass, Mikolo Moko love Uff petals and Domestic Punks love living vines. One pet at a time; it follows you everywhere in Acorn World. Right-click your pet to say hello; a pet Punk carries saddlebags (15 slots). RubberMcFly belong to nobody.
+- **Fishing.** Make a fishing rod (4 wood, 2 living vines), hold it and right-click water to cast. When the bobber dips and you see a "!", right-click to reel in. Sea Perch, Glowfin, pearls and Krabbi shells in the sea, river trout in the Gorge, carp in ponds and cave pools, and old boots everywhere. Nutmeg has a new job: three carp for supper.
+- **Farming.** Berries, Uff petals and Kofi grass can be planted on farm soil and grow back when you harvest them. Farm soil can now be made from 2 dirt and a berry.
+- **Orrin's building contest.** Build anything between the stakes east of Capstead, then ask Orrin to judge it. He scores size and how many different blocks you used, with bronze, silver and gold prizes.
+- **Build over leaves.** Leaves, tree trunks, tall grass, flowers and hanging moss are background: place a block right over them.
+- **Walk in front of chests and workbenches** (and every crafting station). They're furniture now, not walls. Guards still can't see through a chest, so they still hide you in the keep.
+- **Brighter trees, flickering light.** The home trees, the keep's tower trees and the library tree have wall torches on every floor, Capstead, the keep and the grove are lit a little brighter, and lanterns, torches, campfires and forges flicker.
+- **Craft from nearby chests.** Anything in a chest within a few blocks of you (one you've opened before) counts when you craft, and so does a pet Punk's saddlebags. Your bag is used first, then the chests. The crafting panel says how many chests are in reach.
+- Fixed: night never actually came for the creatures. Things that only come out at night (Malsti Punks, Makari, the Lutut), bigger night spawns and the guards' shorter sight at night now really happen at night.
+
 ## v1.7
 - **The wreck of the Ember.** An Eldi fire-tree ship lies crashed nose-first in the Canopy, east of the Tangle. Climb the rope over its side or up through the breach in its belly: a hold full of cargo, the captain's cabin with the ship's log, and the cannon on deck. The Pilot Stryx still sits in its stump at the bow, waiting for orders. Find three Eldi seeds for it, then load one into the cannon (R) and fire a last salute.
 - **More life in the water.** The Green Sea is much deeper, with kelp and stone coral on the sea floor and on the floor of the Gorge river, sunken chests and a sunken rowboat. New creatures: Raf Krabbi (armoured crabs that walk the sea floor and shock you if you bother them), Su Grothyn (glowing cone shells that whip their vine at anything that pokes them) and Harkal (lantern sharks that hunt).
