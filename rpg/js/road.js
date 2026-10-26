@@ -45,7 +45,7 @@ const CORE = { x: 0, z: 70 }, CORE_R = 52;                                // the
 const SQUARE = { x: 0, z: 70 }, STALL = { x: 6, z: 58 };
 const TREE = { x: -38, z: 212, R: 13, H: 230 };                           // the city's home tree, in the south-west
 const TREE2 = { x: 40, z: 214, R: 10, H: 175 };                           // and a younger one east of it, inside the walls too, a bridge between them
-const CAMP1 = { z: -250 }, CAMP2 = { z: -560 }, PASS0 = -650, AMBUSH = -800, END = -960;
+const CAMP1 = { z: -250 }, CAMP2 = { z: -560 }, CAMP3 = { z: -770 }, PASS0 = -650, AMBUSH = -800, END = -960;
 const CART_Z = -135, HEDGE_Z = -195, LOG_Z = -330, FORD_Z = -430, ROCK0 = -672, ROCK1 = -762;
 const roadX = z => (z > GATE_Z ? 0 : 16 * Math.sin((GATE_Z - z) * 0.009) + 8 * Math.sin((GATE_Z - z) * 0.023));
 const zone = z => (z > GATE_Z ? 'city' : z > -300 ? 'low' : z > PASS0 ? 'forest' : 'pass');
@@ -429,6 +429,7 @@ export function createRoad(ctx) {
   function grazeTick(dt) {
     if (!CART.loose) return;
     for (const L of CART.loose) {
+      if (L.hold) { holdTick(L, dt); continue; }
       const c = L.c; let sp = 0;
       if (L.wait > 0) L.wait -= dt;
       else {
@@ -485,12 +486,13 @@ export function createRoad(ctx) {
   {
     const trunkG = new THREE.CylinderGeometry(0.35, 0.5, 1, 6), crownG = new THREE.IcosahedronGeometry(1, 0), coneG = new THREE.ConeGeometry(1, 1, 7);
     const trunks = [], crowns = [], cones = [], rocks = [];
+    const camp3 = (x, z) => Math.hypot(x - roadX(CAMP3.z) - 6, z - CAMP3.z) < 12;   // the ledge for the night camp in the pass
     const tree = (x, z, s, pine) => {
-      const g = heightAt(x, z), h = (pine ? 7 : 4.5) * s;
-      trunks.push([x, g + h * 0.5 - 0.3, z, s, h]);
-      if (pine) { cones.push([x, g + h * 0.75, z, 2.4 * s, h * 0.9]); cones.push([x, g + h * 1.05, z, 1.6 * s, h * 0.6]); }
-      else for (let k = 0; k < 3; k++) crowns.push([x + (rng() - 0.5) * 2 * s, g + h + (rng() - 0.3) * 1.4 * s, z + (rng() - 0.5) * 2 * s, (1.6 + rng()) * s]);
-      cyl(x, z, 0.45 * s, g - 1, g + h);
+      const g = heightAt(x, z), h = (pine ? 7 : 4.5) * s, skip = camp3(x, z);
+      if (!skip) trunks.push([x, g + h * 0.5 - 0.3, z, s, h]);
+      if (pine) { if (!skip) { cones.push([x, g + h * 0.75, z, 2.4 * s, h * 0.9]); cones.push([x, g + h * 1.05, z, 1.6 * s, h * 0.6]); } }
+      else for (let k = 0; k < 3; k++) { const cr = [x + (rng() - 0.5) * 2 * s, g + h + (rng() - 0.3) * 1.4 * s, z + (rng() - 0.5) * 2 * s, (1.6 + rng()) * s]; if (!skip) crowns.push(cr); }
+      if (!skip) cyl(x, z, 0.45 * s, g - 1, g + h);
     };
     for (let i = 0; i < 2600; i++) {
       const z = GATE_Z - 20 - rng() * (GATE_Z - END + 20), zz = zone(z), rx = roadX(z), side = rng() < 0.5 ? -1 : 1;
@@ -506,7 +508,7 @@ export function createRoad(ctx) {
     tree(roadX(CAMP1.z) + 9, CAMP1.z - 3, 2.2, false);
     for (let i = 0; i < 160; i++) {
       const z = PASS0 + 20 - rng() * (PASS0 - END), x = roadX(z) + (rng() - 0.5) * 70, s = 0.6 + Math.pow(rng(), 2) * 3;
-      if (Math.abs(x - roadX(z)) < 5) continue;
+      if (Math.abs(x - roadX(z)) < 5 || camp3(x, z)) continue;
       rocks.push([x, heightAt(x, z) + s * 0.3, z, s]); if (s > 0.55) cyl(x, z, s * 1.05, heightAt(x, z) - 1, heightAt(x, z) + s * 0.95);
     }
     const inst = (geo, mat, list, put) => { const m = new THREE.InstancedMesh(geo, mat, list.length); const o = new THREE.Object3D(); list.forEach((v, i) => { put(o, v); o.updateMatrix(); m.setMatrixAt(i, o.matrix); }); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; };
@@ -517,7 +519,7 @@ export function createRoad(ctx) {
   }
   /* the camps: a fire in a clearing by the road. The tent and the little workbench come off the cart each
      night (see makeCamp); the cart itself stands on the road, a few paces short of the fire */
-  const camps = [CAMP1, CAMP2].map(c => {
+  const camps = [CAMP1, CAMP2, CAMP3].map(c => {
     const x = roadX(c.z) + 6, z = c.z, y = heightAt(x, z);
     const fire = buildCampfire(1.05); fire.position.set(x, y, z); fire.visible = false; scene.add(fire);
     const light = new THREE.PointLight(0xff8a3a, 0, 18); light.position.set(x, y + 1.2, z); scene.add(light);
@@ -1512,10 +1514,16 @@ export function createRoad(ctx) {
       const sh = new THREE.Mesh(new THREE.CircleGeometry(sz + 0.6, 16), new THREE.MeshBasicMaterial({ color: 0x1a1008, transparent: true, opacity: 0.25, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.set(x, g + 0.08, z); scene.add(sh);
       D4.rocks.push({ m, sh, x, z, g, s: sz, y0: g + 26, t: 0, fall: 1.15 });
     }
-    if (P.pos.z < ROCK1) { sub = 'walk'; setStop(AMBUSH + 34, () => hopDown()); ctx.say(R.day4.rocksDone, () => objective(R.obj.day4, '')); }
+    if (P.pos.z < ROCK1) { sub = 'toCamp'; setStop(camps[2].park); setDusk(0.6); ctx.say(R.day4.rocksDone.concat(R.day4.campStop), () => { objective(R.obj.toCamp, ''); setGoal(camps[2].x, camps[2].y, camps[2].z); }); }
   }
   function day4Tick(dt) {
     rockTick(dt);
+    if (sub === 'toCamp' && P.pos.distanceTo(V3(camps[2].x, camps[2].y, camps[2].z)) < 12 && Math.abs(CART.pos.z - camps[2].park) < 2) {
+      sub = 'camp'; setGoal(); setDusk(0.85);
+      makeCamp(2, () => fireSay(2, R.day4.camp, () => startWatch()));
+    }
+    if (sub === 'watch') watchTick(dt);
+    if (sub === 'track' || sub === 'lead') trackTick(dt);
     if (sub === 'walk' && !D4.rocked && P.pos.z < ROCK0) { D4.rocked = true; sub = 'rocks'; hopDown(); ctx.say(R.day4.rocks, () => objective(R.obj.rocks, 'Keep moving — a shadow means a rock')); }
     if (sub === 'walk' && D4.rocked && P.pos.z < AMBUSH + 25) {
       sub = 'fight'; setGoal(); hopDown();
@@ -1544,6 +1552,150 @@ export function createRoad(ctx) {
         });
       }
     }
+  }
+  /* ---- the first watch: the fire high, and the Rodak's eyes out past the light ---- */
+  let W = null;
+  function eyePair() {
+    const g = new THREE.Group();
+    for (const s of [-1, 1]) { const e = glowSprite(0xe8ff7a, 0.45, 0.95); e.position.set(s * 0.2, 0, 0); g.add(e); }
+    scene.add(g); return g;
+  }
+  function startWatch() {
+    const c = camps[2];
+    sub = 'watch'; ctx.save('watch'); setDusk(1);
+    B.stay = V3(c.tentAt.x - 1.2, 0, c.tentAt.z - 1.2);   // asleep by the tent. Mostly
+    W = { t: 0, len: 110, fuel: 1, carry: 0, eyes: [], spawnT: 5, wood: [], told: {}, fireIt: null };
+    W.fireIt = addItem(V3(c.x, c.y + 0.6, c.z), R.day4.feed(0), () => {
+      if (!W.carry) { ctx.bark('tanoc', R.day4.needWood, 2.5); return; }
+      W.fuel = Math.min(1, W.fuel + 0.42 * W.carry); W.carry = 0; W.told.low = W.told.out = false;
+      particles.burst(c.x, c.y + 0.8, c.z, 30, { color: 0xff8a2a, speed: 5, size: 0.5, life: 0.7, gravity: -4 }); sfx.flare();
+    });
+    woodUp(); watchObjective(); ctx.play();
+  }
+  function woodUp() {
+    const c = camps[2];
+    while (W.wood.length < 5) {
+      const a = rng() * TAU, r = 9 + rng() * 12, q = freeSpot(c.x + Math.cos(a) * r, c.z + Math.sin(a) * r, 0.8);
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.3, 5), toon(0x6a4a2a)); m.rotation.set(Math.PI / 2, rng() * TAU, 0.3); addOutline(m, 0.03);
+      const it = addItem(V3(q.x, groundAt(q.x, q.z, 60) + 0.12, q.z), R.day4.woodTake, null, m);
+      it.act = () => { if (W.carry >= 2) { ctx.bark('tanoc', 'Arms full. To the fire first.', 2); return; } dropItem(it); W.wood.splice(W.wood.indexOf(it), 1); W.carry++; sfx.ui(); };
+      W.wood.push(it);
+    }
+  }
+  function watchObjective() { objective(R.obj.watch, R.obj.watchHint, 5, Math.min(5, Math.floor(W.t / W.len * 5))); }
+  function scareEye(e) {
+    particles.burst(e.g.position.x, e.g.position.y, e.g.position.z, 22, { color: 0xff8a2a, speed: 6, size: 0.45, life: 0.6 }); sfx.hit();
+    scene.remove(e.g); W.eyes.splice(W.eyes.indexOf(e), 1);
+    ctx.bark('tanoc', R.day4.scared[Math.floor(rng() * R.day4.scared.length)], 2.2);
+  }
+  function watchTick(dt) {
+    const c = camps[2];
+    W.t += dt; W.fuel = Math.max(W.help ? 0.6 : 0, W.fuel - dt / 45);   // once he's up, the Carpenter keeps it fed himself
+    if (W.fuel < 0.3 && !W.told.low) { W.told.low = true; ctx.bark('tanoc', R.day4.fireLow, 3); }
+    if (W.fuel < 0.08 && !W.told.out) { W.told.out = true; ctx.bark('tanoc', R.day4.fireOut, 3); }
+    W.fireIt.label = R.day4.feed(W.carry);
+    if (W.wood.length < 3) woodUp();
+    // eyes come out of the dark, a pair at a time, and creep in as the fire sinks
+    if ((W.spawnT -= dt) <= 0 && W.eyes.length < 4) {
+      W.spawnT = 6 + rng() * 5;
+      const e = { a: rng() * TAU, r: 27, g: eyePair(), pos: V3() };
+      W.eyes.push(e);
+      if (!W.told.eyes) { W.told.eyes = true; ctx.bark('tanoc', R.day4.eyesSeen, 3); }
+    }
+    for (const e of W.eyes.slice()) {
+      e.a += Math.sin(t * 0.7 + e.r) * dt * 0.05;
+      const x = c.x + Math.cos(e.a) * e.r, z = c.z + Math.sin(e.a) * e.r;
+      if (Math.hypot(P.pos.x - x, P.pos.z - z) < 6) e.r = Math.min(30, e.r + dt * 2.4);   // they give way to a boy who walks at them — and come back
+      else e.r -= dt * (0.45 + (1 - W.fuel) * 1.7);
+      e.pos.set(x, groundAt(x, z, 60) + 0.75, z); e.g.position.copy(e.pos); e.g.lookAt(c.x, e.pos.y, c.z);
+      e.g.visible = Math.sin(t * 2.3 + e.a * 9) > -0.93;   // a blink, now and then
+      if (e.r < 7) {   // in past the stones
+        scene.remove(e.g); W.eyes.splice(W.eyes.indexOf(e), 1);
+        if (!W.help) W.t = Math.max(0, W.t - 15);
+        sfx.hurt(); shake = Math.max(shake, 0.3);
+        particles.burst(c.x + Math.cos(e.a) * 5, c.y + 0.6, c.z + Math.sin(e.a) * 5, 18, { color: 0x6a6a7a, speed: 5, size: 0.4, life: 0.5 });
+        ctx.bark('tale', R.day4.gotIn[(W.got = (W.got || 0) + 1) % R.day4.gotIn.length], 3.5);
+        // never a night without end: after the fourth, Buhkon is up and at the fire beside him
+        if (W.got >= 4 && !W.help) { W.help = true; B.stay = V3(c.x + 2.2, 0, c.z - 1.5); setTimeout(() => ctx.bark('buhkon', R.day4.helpWake, 4), 3800); }
+      }
+    }
+    watchObjective();
+    if (W.t >= W.len) endWatch();
+  }
+  function endWatch() {
+    for (const e of W.eyes) scene.remove(e.g);
+    for (const it of W.wood) dropItem(it);
+    dropItem(W.fireIt); W = null;
+    sub = 'dawned'; setGoal();
+    fireSay(2, R.day4.dawn, () => startTrack());
+  }
+
+  /* ---- at first light: a cart Punk bolted in the night ---- */
+  function gullySpot() { const gz = CAMP3.z - 26; return freeSpot(roadX(gz) - 25, gz, 1.8); }
+  function startTrack() {
+    const c = camps[2];
+    sub = 'track'; ctx.save('dawn'); setDusk(0.12);
+    if (!CART.loose) unhitch(c);
+    const L = CART.loose[1], gs = gullySpot();
+    L.hold = 'gully'; L.pos.set(gs.x, groundAt(gs.x, gs.z, 60), gs.z); L.yaw = rng() * TAU;
+    // her tracks: scuffs in the moss from the graze down by the road, up to the gully
+    D4.tracks = [];
+    const from = V3(c.graze.x, 0, c.graze.z), n = Math.floor(from.distanceTo(V3(gs.x, 0, gs.z)) / 3);
+    for (let k = 1; k < n; k++) {
+      const x = lerp(from.x, gs.x, k / n) + Math.sin(k * 1.7) * 1.2, z = lerp(from.z, gs.z, k / n);
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.32, 8), new THREE.MeshBasicMaterial({ color: 0x2a2014, transparent: true, opacity: 0.55, depthWrite: false }));
+      m.rotation.x = -Math.PI / 2; m.scale.set(0.7, 1.3, 1); m.position.set(x, heightAt(x, z) + 0.06, z); scene.add(m); D4.tracks.push(m);
+    }
+    D4.gully = gs; D4.gFoe = null; D4.freed = false;
+    ctx.say(R.day4.bolted, () => { objective(R.obj.track, R.obj.trackHint); setGoal(gs.x, heightAt(gs.x, gs.z), gs.z); ctx.play(); });
+  }
+  function holdTick(L, dt) {
+    let sp = 0;
+    if (L.hold === 'gully') L.pk.root.rotation.set(0, L.yaw + Math.sin(t * 40) * 0.03, 0);   // shaking
+    else if (L.hold === 'lead') {
+      const dx = P.pos.x - L.pos.x, dz = P.pos.z - L.pos.z, d = Math.hypot(dx, dz);
+      if (d > 3) { sp = Math.min(6, (d - 3) * 2); L.pos.x += dx / d * sp * dt; L.pos.z += dz / d * sp * dt; L.yaw = dampAngle(L.yaw, Math.atan2(dx, dz), 5, dt); }
+      L.pk.root.rotation.set(0, L.yaw, 0);
+    }
+    resolve(L.pos, 1.0); L.pos.y = groundAt(L.pos.x, L.pos.z, L.pos.y + 1);
+    L.pk.root.position.copy(L.pos); L.pk.animate(dt, { speed: sp, t: t + L.yaw });
+  }
+  function trackTick() {
+    const L = CART.loose && CART.loose[1], gs = D4.gully;
+    if (!L) return;
+    if (sub === 'track' && !D4.gFoe && Math.hypot(P.pos.x - gs.x, P.pos.z - gs.z) < 30) {
+      ctx.bark('tanoc', R.day4.gullySee, 3.5); objective(R.obj.gully, 'Left-click to swing · Q, the fire-stone');
+      const q = freeSpot(gs.x + 5, gs.z - 4, 1); D4.gFoe = addFoe('rodak', q.x, q.z);
+    }
+    if (sub === 'track' && D4.gFoe && (D4.gFoe.dead || D4.gFoe.fled) && !D4.freeIt) {
+      D4.freeIt = addItem(V3(L.pos.x, L.pos.y + 0.8, L.pos.z), R.day4.freeLabel, () => {
+        dropItem(D4.freeIt); sfx.heal();
+        ctx.say(R.day4.untangled, () => { L.hold = 'lead'; sub = 'lead'; objective(R.obj.lead, 'She follows you — slowly'); setGoal(camps[2].x, camps[2].y, camps[2].z); ctx.play(); });
+      });
+      setGoal(L.pos.x, L.pos.y, L.pos.z);
+    }
+    if (sub === 'lead' && Math.hypot(L.pos.x - camps[2].x, L.pos.z - camps[2].z) < 9) {
+      sub = 'back'; L.hold = null; setGoal();
+      for (const m of D4.tracks) scene.remove(m);
+      ctx.say(R.day4.punkBack, () => leaveCamp3());
+    }
+  }
+  /* a reload at the night camp: the cart parked, the tent up, and the night (or the morning) to go on with */
+  function resumeCamp3(at) {
+    const c = camps[2];
+    stage = 'day4'; sub = 'camp'; D4 = { left: 0, rocks: [], rockT: 1, alpha: null, rocked: true };
+    fog.near = 120; fog.far = 1600; P.hp = 100; P.inCart = false;
+    placeCart(roadX(c.park), c.park, Math.PI); drive(false); setStop(null); campUp(c);
+    place(P, c.x - 2, c.z + 1.5, -Math.PI / 2); B.stay = V3(c.x + 2.2, 0, c.z - 1.5); place(B, B.stay.x, B.stay.z); place(K, c.x - 3, c.z + 3);
+    ctx.location('The Mountain Pass', at === 'dawn' ? 'Day five · first light' : 'Day four · night');
+    if (at === 'dawn') startTrack(); else startWatch();
+  }
+  /* harness up, and on: the pack's patience has run out (the ambush, just up the road) */
+  function leaveCamp3() {
+    campDown(camps[2]); setDusk(0.2);
+    drive(); setStop(AMBUSH + 34, () => hopDown());
+    sub = 'walk'; D4.rocked = true;
+    objective(R.obj.day4, ''); setGoal(roadX(AMBUSH), heightAt(roadX(AMBUSH), AMBUSH), AMBUSH); ctx.play();
   }
   function d4Objective() { objective(D4.alpha && !D4.alpha.dead ? 'Bring down the pack’s leader' : R.obj.rodak(D4.left), D4.alpha ? 'Q — the fire-stone, if it’s on a quick slot · left-click to swing' : 'Left-click to swing — the Carpenter and your Punk fight beside you'); }
 
@@ -1680,7 +1832,7 @@ export function createRoad(ctx) {
     if (id !== 'r_firestone' || !hasStone || boltCd > 0 || stage === 'market') return;
     boltCd = 1.4;
     let tgt = null, bd = 30;
-    for (const f of foes) { if (f.dead || f.fled) continue; const dx = f.pos.x - P.pos.x, dz = f.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < bd && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.6) { bd = d; tgt = f; } }
+    for (const f of foes.concat(W ? W.eyes : [])) { if (f.dead || f.fled) continue; const dx = f.pos.x - P.pos.x, dz = f.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < bd && (dx * -Math.sin(CAM.yaw) + dz * -Math.cos(CAM.yaw)) / (d || 1) > 0.6) { bd = d; tgt = f; } }
     const from = V3(P.pos.x, P.pos.y + 1.3, P.pos.z);
     const vel = tgt ? V3(tgt.pos.x, tgt.pos.y + 0.8, tgt.pos.z).sub(from).normalize().multiplyScalar(32) : V3(-Math.sin(CAM.yaw) * 32, 1, -Math.cos(CAM.yaw) * 32);
     P.yaw = Math.atan2(vel.x, vel.z);
@@ -1694,6 +1846,7 @@ export function createRoad(ctx) {
       particles.emit(p.x, p.y, p.z, { vx: 0, vy: 0.4, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.45, life: 0.35, drag: 1 });
       let hit = b.life <= 0 || solidAt(p.x, p.y, p.z);
       for (const f of foes) { if (hit || f.dead || f.fled || f.pos.distanceTo(p) > 1.6) continue; hitFoe(f, f.kind === 'kofi' ? 1 : 22, { x: P.pos.x, z: P.pos.z, bolt: true }); hit = true; }
+      if (W) for (const e of W.eyes.slice()) { if (hit || e.pos.distanceTo(p) > 1.9) continue; scareEye(e); hit = true; }
       if (hit) { particles.burst(p.x, p.y, p.z, 16, { color: 0xff8a2a, speed: 5, size: 0.4, life: 0.5 }); scene.remove(b.g); bolts.splice(i, 1); }
     }
   }
@@ -1885,6 +2038,7 @@ export function createRoad(ctx) {
     if (D3 && D3.rain) for (let k = 0; k < 16; k++) particles.emit(camPos.x + (Math.random() - 0.5) * 30, camPos.y + 8 + Math.random() * 4, camPos.z + (Math.random() - 0.5) * 30, { vx: 0.5, vy: -22, vz: 0, color: 0xc8d8e8, size: 0.18, life: 0.6, drag: 0 });
     // camps glow at night
     for (const c of camps) { c.fire.visible = c.on; if (c.on) c.fire.userData.update(t); c.light.intensity = c.on ? 40 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3 : 0; if (c.on && Math.random() < 0.5) particles.emit(c.x + (Math.random() - 0.5) * 0.6, c.y + 0.6, c.z + (Math.random() - 0.5) * 0.6, { vx: 0, vy: 2 + Math.random(), vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffd060, size: 0.35, life: 0.9, drag: 0.5 }); }
+    if (W) { const c = camps[2], k = 0.3 + W.fuel * 0.75; c.fire.scale.setScalar(k); c.light.intensity *= 0.25 + W.fuel * 0.85; } else camps[2].fire.scale.setScalar(1);
     // mist in the pass: soft sheets of it drifting low over the stones (not those glowing orbs any more)
     mists.forEach((m, i) => { m.visible = stage === 'day4'; if (m.visible) { m.position.x += dt * (0.8 + (i % 3) * 0.3); if (m.position.x > roadX(m.position.z) + 60) m.position.x = roadX(m.position.z) - 60; } });
     if (beacon.visible) beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
@@ -1917,14 +2071,15 @@ export function createRoad(ctx) {
   }
 
   function start(at) {
-    hasStone = at === 'day2' || at === 'day3' || at === 'day4' || at === 'day5';
+    hasStone = at === 'day2' || at === 'day3' || at === 'day4' || at === 'watch' || at === 'dawn' || at === 'day5';
     if (ctx.slotsHud) ctx.slotsHud(hasStone);
-    if (at === 'day3' || at === 'day4') {   // the road behind is already cleared
+    if (at === 'day3' || at === 'day4' || at === 'watch' || at === 'dawn') {   // the road behind is already cleared
       const L = EV.log, mid = L.logs[1]; L.open = true; scene.remove(mid.m); const i = solids.indexOf(mid.s); if (i >= 0) solids.splice(i, 1);
       EV.ford.crossed = true; EV.ford.told = true;
     }
     if (at === 'escape') { resumeEscape(); return; }
     if (at === 'day5') { done = true; ctx.onDone(); return; }   // the Rodak are beaten: on into Beuhk
+    if (at === 'watch' || at === 'dawn') { K.on = true; resumeCamp3(at); return; }
     if (at === 'day1') startDay1(); else if (at === 'day2') { D1 = { pebble: true }; startDay2(); } else if (at === 'day3') { K.on = true; startDay3(); } else if (at === 'day4') { K.on = true; startDay4(); } else startMarket();
   }
   const allSolid = createSolids(scene, {
@@ -1939,6 +2094,6 @@ export function createRoad(ctx) {
   }
   return { solids: allSolid,
     start, update, render: () => composer.render(), interact, prompt, jump: () => { if (P.inCart) hopDown(); else P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, get W() { return W; }, get D4() { return D4; }, get CART() { return CART; }, camps, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }

@@ -1653,6 +1653,65 @@ Object.assign(ROAD.day5, {
   errandBack: [['buhkon', 'Bread, a wick, and a bun you thought I wouldn’t notice. Good. Eat. Sleep. We go at first light.']],
   back: 'Back to the Carpenter at the town hearth',
 });
+/* ================================================================
+   THE ROAD NORTH, DAY FOUR GO ON — a night camp high in the pass, the
+   first watch with the Rodak circling the fire, and at first light a
+   cart Punk that bolted in the dark and has to be found
+   ================================================================ */
+Object.assign(ROAD.day4, {
+  campStop: [
+    ['buhkon', 'We stop here. I don’t like it, but the cart won’t go another mile in the dark, and neither will I.'],
+  ],
+  camp: [
+    ['tale', 'A ledge above the road, out of the wind. The fire throws their shadows up the rock, huge.'],
+    ['buhkon', 'Rodak. They’ve kept pace with us since the treeline — up there on the ridge, the grey ones. You’ve seen them.'],
+    ['tanoc', 'I thought they were rocks.'],
+    ['buhkon', 'They want you to. They won’t come at a fire, not while it’s high. So it stays high.'],
+    ['buhkon', 'First watch is yours. There’s deadwood all over this slope — keep the fire fed. If eyes come in closer than the stones, throw something hot at them.'],
+    ['tanoc', 'And you?'],
+    ['buhkon', 'I’ll be asleep. Mostly.'],
+  ],
+  eyesSeen: 'Eyes. Out past the firelight — two of them. No. Four.',
+  fireLow: 'The fire’s getting low. Wood — I need wood.',
+  fireOut: 'It’s nearly out — they’re coming in!',
+  needWood: 'Nothing to feed it with. The deadwood’s out on the slope.',
+  scared: ['A yelp, and the eyes are gone.', 'Go on! GO!', 'That one won’t be back tonight.', 'Hah! Not so brave with your tail on fire.'],
+  helpWake: 'Enough of that. Shift over — two of us can keep one fire.',
+  gotIn: ['Something grey, in and out of the light — the supper sack! It took the supper sack!', 'Teeth, right at the edge of the fire. A Punk screams. The night just got longer.', 'It was in — and gone again, with the last of the bread.'],
+  woodTake: 'Take the deadwood',
+  feed: n => `Feed the fire (${n})`,
+  dawn: [
+    ['tale', 'The moon goes down behind the ridge, and the eyes go with it, one pair at a time.'],
+    ['tale', 'Grey light. Frost on the cart. The Carpenter sits up as if he had only blinked.'],
+    ['buhkon', 'You kept it. All night — well. Most of the night. I had the last of it.'],
+    ['tanoc', 'You were awake.'],
+    ['buhkon', 'I told you. Always.'],
+  ],
+  bolted: [
+    ['tale', 'One of the cart Punks is gone. Her tether is chewed clean through, and her tracks run off the road, scrambling, uphill.'],
+    ['buhkon', 'The Rodak spooked her in the night. She’ll have run uphill — they always do. Find her before they do.'],
+    ['buhkon', 'Follow the scuffs in the moss. I’ll have the other one in harness by the time you’re back.'],
+  ],
+  gullySee: 'There — wedged in a gully, vines tangled in thorn. And a Rodak, nosing closer.',
+  freeLabel: 'Untangle her vines',
+  untangled: [
+    ['tale', 'You work her vines loose from the thorn one at a time. She is shaking so hard the boulders rattle.'],
+    ['tanoc', 'Shh. Shh. It’s gone. I’ve got you. Come on — down, back to the cart. Slowly.'],
+  ],
+  punkBack: [
+    ['buhkon', 'There’s my girl. Not a scratch on her — more than I can say for you.'],
+    ['buhkon', 'Into the shafts with you. And Tanoc — don’t put that stone away. They’ll not have liked last night.'],
+  ],
+});
+Object.assign(ROAD.obj, {
+  toCamp: 'Find a place to camp, up ahead in the pass',
+  watch: 'Keep the first watch — keep the fire high till the moon sets',
+  watchHint: 'E: deadwood, then feed the fire · Q throws the fire-stone at eyes in the dark',
+  track: 'Follow the bolted cart Punk’s tracks up the slope',
+  trackHint: 'Scuffed moss and broken twigs, off the road to the west',
+  gully: 'Drive the Rodak off — and free the Punk',
+  lead: 'Lead the cart Punk back down to the camp',
+});
 
 /* ================================================================
    THE ESCAPE FROM FYRSTI'VILAG — the first amulet he picks up blinks
