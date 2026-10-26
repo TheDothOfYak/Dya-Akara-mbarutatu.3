@@ -7,6 +7,8 @@
 - **The memory core hunt.** Lethra asks you to find eight memory cores scattered across Acorn World (the hills, the bottom of the Gorge, the Megla Wood, the Duskareth camp, the keep, the wreck, a deep cave and the Canopy). Each tells part of the fall of Aakalay; bring them all home and she shows you the whole story, and gives you the Memory Circlet. Phorus has a smaller job in the library tree.
 - **Grow-forging.** The Elsha'ryn have a growing altar in the Memory Grove. Stand by it to grow weapons and armour that keep the nature of what they grew from: the Thornroot Spear (poison), the Emberwood Bow (fire), the Stormbark Staff (lightning), the Shockshell Club and Livingwood Mail.
 - **Catch with Pebble.** Ask Brannoc to play: Pebble flings mud balls for 30 seconds and you catch as many as you can. Better scores win better prizes, and there's a gold crystal for a really good one.
+- **Gold crystals never go to waste.** Once you've eaten the most your body can hold (8), each extra gold crystal melts into pure stamina: +10 max stamina and a full refill, up to 25 more crystals (+250 stamina). On every world.
+- **A map you can zoom.** Scroll or use + and − to zoom (it zooms toward your cursor), drag to look around, "Me" to jump back to yourself and "Whole map" to see everything. It opens zoomed in on where you are, and places you've explored are labelled.
 - Pressing R now uses whatever is nearest: a carving or memory core right next to a door no longer opens the door instead.
 
 ## v1.6

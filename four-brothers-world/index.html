@@ -214,7 +214,9 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 .typeblurb { font-size: 17px; color: var(--muted); margin: -4px 0 10px; max-width: 70ch; }
 
 /* map */
-#mapc { width: 100%; max-width: 100%; image-rendering: pixelated; background: #08070b; border: 2px solid var(--edge); }
+#mapc { width: 100%; max-width: 100%; image-rendering: pixelated; background: #08070b; border: 2px solid var(--edge); cursor: grab; touch-action: none; }
+#mapc:active { cursor: grabbing; }
+.maptools { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
 
 /* chat */
 #chatlog { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); width: min(360px, 60vw); display: grid; gap: 2px; pointer-events: none; }
@@ -363,7 +365,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
   <div id="talk" class="modal hidden-ui"><div class="panel stone"><canvas width="48" height="60"></canvas><div><div class="who"></div><div class="says"></div><div class="acts"></div><div class="extra"></div></div></div></div>
   <div id="carve" class="modal hidden-ui"><div class="panel stone"><div class="label">Ancient carving</div><h3></h3><p></p><button class="btn" data-close type="button">Step back</button></div></div>
   <div id="guide" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Field Guide</h3><button class="btn small" data-close type="button">Close (G)</button></div><div class="tabs" id="gtabs"></div><div class="typeblurb" id="gblurb"></div><div class="cards" id="gcards"></div></div></div>
-  <div id="map" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Map</h3><button class="btn small" data-close type="button">Close (M)</button></div><canvas id="mapc"></canvas><div class="label" style="margin-top:6px">Only places you have explored are shown. Orange: you. Blue: other players.</div><button class="btn small" id="m-travel" type="button" style="margin-top:8px">Travel to a world you've visited</button></div></div>
+  <div id="map" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Map</h3><button class="btn small" data-close type="button">Close (M)</button></div><div class="maptools"><button class="btn small" id="m-in" type="button" aria-label="Zoom in">+</button><button class="btn small" id="m-out" type="button" aria-label="Zoom out">−</button><button class="btn small" id="m-me" type="button">Me</button><button class="btn small" id="m-all" type="button">Whole map</button></div><canvas id="mapc" width="960" height="540"></canvas><div class="label" style="margin-top:6px">Scroll or +/− to zoom, drag to look around. Only places you have explored are shown. Orange: you. Blue: other players.</div><button class="btn small" id="m-travel" type="button" style="margin-top:8px">Travel to a world you've visited</button></div></div>
   <div id="help" class="modal hidden-ui"><div class="panel stone" style="width:min(560px,100%)"><div class="phead"><h3>Controls</h3><button class="btn small" data-close type="button">Close (H)</button></div>
     <div class="keys">
       <kbd>A / D</kbd><span>Walk</span>
@@ -2789,6 +2791,11 @@ window.RW = window.RW || {};
     }
     RW.surface.starterFlint(c, VIL.x0 - 36, VIL.x0 - 4, 3); RW.surface.starterFlint(c, VIL.x1 + 4, VIL.x1 + 40, 3);
 
+    // names on the map (each shows once you've explored that spot)
+    const lab = (name, x, minZ) => ({ name, x, y: c.surfAt(x, 40) - 4, minZ });
+    c.meta.labels = [lab('Keilia Keep', (KEEP.x0 + KEEP.x1) >> 1, 0), lab('Broken Hills', 420, 1), lab('Traveller\'s Hut', HUT, 2), lab('The Gorge', (GORGE.x0 + GORGE.x1) >> 1, 0), lab('Megla Wood', 1000, 1), lab('Old Shrine', RUINS, 2),
+      lab('Capstead', VIL.plaza, 0), lab('Green Deep', 1880, 1), { name: 'Duskareth Camp', x: (CAMP.x0 + CAMP.x1) >> 1, y: CAMP.y - 3, minZ: 1 }, lab('The Tangle', 2330, 1), lab('Memory Grove', (GROVE.x0 + GROVE.x1) >> 1, 0),
+      lab('Wreck of the Ember', WRECK, 0), lab('The Canopy', 2820, 1), lab('King\'s Clearing', (ARENA.x0 + ARENA.x1) >> 1, 0), lab('Green Sea', 12, 1), lab('Green Sea', 3260, 1)];
     c.zone = RW.surface.zoneFn(c, (x, y) => {
       if (inR(VILR, x, y)) return 'village';
       if (inR(KEEPR, x, y)) return 'keep';
@@ -6241,6 +6248,13 @@ window.RW = window.RW || {};
         RW.audio.sfx('crystal'); RW.ui.banner('New magic', RW.SPELLS[it.spell].name + '. Right-click or F to cast. Q switches spells.');
       } else {
         const color = it.icon.a; const st = it.id.replace('crystal_', '');
+        // past the most your body can hold, a gold crystal melts into pure stamina instead
+        if (st === 'gold' && P.stats.gold >= it.max) {
+          if ((P.flags.goldStam || 0) >= 25) { RW.ui.toast('Even your stamina can\'t hold any more gold.'); return; }
+          P.remove(it.id, 1); P.flags.goldStam = (P.flags.goldStam || 0) + 1; P.stamina = P.maxStamina(); P.exhausted = false;
+          RW.fx.element.crystal(pc.x, pc.y, color); RW.fx.text(pc.x, P.y - 8, '+10 stamina', '#f4f0a0', true); RW.audio.sfx('crystal');
+          RW.ui.toast('The gold melts into pure stamina: ' + P.maxStamina() + ' max.'); P.flags.ate_crystal = 1; RW.ui.dirty(); RW.game.saveSoon(); return;
+        }
         if (P.stats[st] >= it.max) { RW.ui.toast('Your body can\'t take any more ' + it.name + 's.'); return; }
         P.remove(it.id, 1); P.addStat(st, it.id);
         RW.fx.element.crystal(pc.x, pc.y, color);
@@ -8107,25 +8121,59 @@ window.RW = window.RW || {};
   };
 
   // ---------------- map ----------------
+  // The map: the explored world drawn once at one pixel per block, then shown through a view you can zoom and drag.
+  const MV = (U.mapView = { z: 0, cx: 0, cy: 0, img: null });
   U.renderMap = function () {
-    const W = RW.world, c = $('#mapc'); c.width = W.W; c.height = W.H; const g = c.getContext('2d');
-    const img = g.createImageData(W.W, W.H); const d = img.data; const TL = RW.TILES, T = RW.T;
+    const W = RW.world; const img = RW.art.canvas(W.W, W.H), g = img.ctx;
+    const id = g.createImageData(W.W, W.H); const d = id.data; const TL = RW.TILES, T = RW.T;
     const col = {}; TL.forEach((t, i) => { col[i] = t.colors ? RW.hexToRgb(t.colors[0]) : t.crystal ? RW.hexToRgb(t.crystal) : null; });
     col[T.water] = [40, 100, 140]; col[T.walkway] = [140, 135, 140]; col[T.chain] = [120, 128, 136]; col[T.lantern] = [140, 240, 210];
+    ['leaves', 'oakleaves'].forEach((k) => { if (T[k] != null) col[T[k]] = [52, 110, 44]; }); if (T.trunk != null) col[T.trunk] = [106, 74, 48];
+    ['ladder', 'ropebridge', 'stairplank', 'woodplat', 'rope'].forEach((k) => { if (T[k] != null) col[T[k]] = [168, 128, 82]; });
     for (let i = 0; i < W.fg.length; i++) {
       const o = i * 4; if (!W.explored[i]) { d[o] = 8; d[o + 1] = 7; d[o + 2] = 11; d[o + 3] = 255; continue; }
       const t = W.fg[i]; let c3 = col[t];
       if (!c3) c3 = W.bg[i] ? [34, 31, 40] : ((i / W.W) < W.def.sea ? [60, 80, 110] : [20, 18, 26]);
       d[o] = c3[0]; d[o + 1] = c3[1]; d[o + 2] = c3[2]; d[o + 3] = 255;
     }
-    g.putImageData(img, 0, 0);
-    const p = P(); g.fillStyle = '#ffb347'; g.fillRect(Math.floor(p.x / 16) - 2, Math.floor(p.y / 16) - 2, 5, 5);
-    g.fillStyle = '#9ad8ff'; RW.net.peers.forEach((q) => g.fillRect(Math.floor(q.x / 16) - 2, Math.floor(q.y / 16) - 2, 4, 4));
-    if (p.has('square_compass')) { g.strokeStyle = '#f2c94c'; W.meta.secrets.forEach((s) => { if (RW.dist(s.x, s.y, p.x / 16, p.y / 16) < 90) { g.strokeRect(s.x - 3, s.y - 3, 7, 7); } }); }
-    // label the village
-    const v = W.def.id === 'rock' ? W.def.village : null; g.font = '12px VT323, monospace'; g.fillStyle = '#ece4d6';
-    if (v && W.explored[v.cy * W.W + v.cx]) g.fillText('Stalagmere', v.cx - 26, v.cy - v.ry + 12);
+    g.putImageData(id, 0, 0); MV.img = img;
+    const p = P(), c = $('#mapc');
+    if (MV.world !== W.def.id || !MV.z) { MV.world = W.def.id; MV.z = Math.max(fitZ(), Math.min(4, c.height / 90)); MV.cx = p.x / 16; MV.cy = p.y / 16; }
+    U.drawMap();
   };
+  const fitZ = () => { const c = $('#mapc'), W = RW.world; return Math.min(c.width / W.W, c.height / W.H); };
+  const clampView = () => { const W = RW.world; MV.z = RW.clamp(MV.z, fitZ(), 24); MV.cx = RW.clamp(MV.cx, 0, W.W); MV.cy = RW.clamp(MV.cy, 0, W.H); };
+  U.drawMap = function () {
+    const c = $('#mapc'), g = c.getContext('2d'), W = RW.world; if (!MV.img) return; clampView();
+    const z = MV.z, vw = c.width / z, vh = c.height / z, sx = MV.cx - vw / 2, sy = MV.cy - vh / 2;
+    g.imageSmoothingEnabled = false; g.fillStyle = '#08070b'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(MV.img, 0, 0, W.W, W.H, -sx * z, -sy * z, W.W * z, W.H * z);
+    const at = (x, y) => [(x - sx) * z, (y - sy) * z];
+    const p = P(); const [px, py] = at(p.x / 16 + 0.4, p.y / 16 + 0.9), r = Math.max(3, z * 1.2);
+    g.fillStyle = '#ffb347'; g.strokeStyle = '#1a0e08'; g.lineWidth = 2; g.beginPath(); g.arc(px, py, r, 0, 6.29); g.fill(); g.stroke();
+    g.fillStyle = '#9ad8ff'; RW.net.peers.forEach((q) => { const [x, y] = at(q.x / 16, q.y / 16); g.beginPath(); g.arc(x, y, Math.max(2.5, z), 0, 6.29); g.fill(); });
+    if (p.has('square_compass')) { g.strokeStyle = '#f2c94c'; W.meta.secrets.forEach((s) => { if (RW.dist(s.x, s.y, p.x / 16, p.y / 16) < 90) { const [x, y] = at(s.x, s.y); g.strokeRect(x - 3.5 * z, y - 3.5 * z, 7 * z, 7 * z); } }); }
+    // place names, once you've been there
+    g.font = Math.round(RW.clamp(10 + z * 1.5, 12, 22)) + 'px VT323, monospace'; g.textAlign = 'center';
+    const label = (txt, x, y) => { if (!W.explored[Math.floor(y) * W.W + Math.floor(x)]) return; const [lx, ly] = at(x, y); if (lx < -60 || ly < -20 || lx > c.width + 60 || ly > c.height + 20) return; g.fillStyle = '#0c0a10'; g.fillText(txt, lx + 1, ly + 1); g.fillStyle = '#ece4d6'; g.fillText(txt, lx, ly); };
+    const v = W.def.id === 'rock' ? W.def.village : null; if (v) label('Stalagmere', v.cx, v.cy - v.ry + 6);
+    (W.meta.labels || []).forEach((l) => { if (z >= (l.minZ || 0)) label(l.name, l.x, l.y); });
+    g.textAlign = 'left';
+  };
+  const zoomAt = (f, mx, my) => { const c = $('#mapc'); const z0 = MV.z; const wx = MV.cx + (mx - c.width / 2) / z0, wy = MV.cy + (my - c.height / 2) / z0; MV.z = RW.clamp(z0 * f, fitZ(), 24); MV.cx = wx - (mx - c.width / 2) / MV.z; MV.cy = wy - (my - c.height / 2) / MV.z; U.drawMap(); };
+  {
+    const c = $('#mapc'); const toCanvas = (e) => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+    c.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); const [mx, my] = toCanvas(e); zoomAt(e.deltaY < 0 ? 1.25 : 0.8, mx, my); }, { passive: false });
+    let drag = null;
+    c.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); drag = { x: e.clientX, y: e.clientY, cx: MV.cx, cy: MV.cy }; c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointermove', (e) => { if (!drag) return; const r = c.getBoundingClientRect(), k = c.width / r.width / MV.z; MV.cx = drag.cx - (e.clientX - drag.x) * k; MV.cy = drag.cy - (e.clientY - drag.y) * k; U.drawMap(); });
+    c.addEventListener('pointerup', () => { drag = null; }); c.addEventListener('pointercancel', () => { drag = null; });
+    c.addEventListener('dblclick', (e) => { const [mx, my] = toCanvas(e); zoomAt(2, mx, my); });
+    $('#m-in').onclick = () => zoomAt(1.5, c.width / 2, c.height / 2);
+    $('#m-out').onclick = () => zoomAt(1 / 1.5, c.width / 2, c.height / 2);
+    $('#m-me').onclick = () => { const p = P(); MV.cx = p.x / 16; MV.cy = p.y / 16; if (MV.z < 3) MV.z = 4; U.drawMap(); };
+    $('#m-all').onclick = () => { const W = RW.world; MV.z = fitZ(); MV.cx = W.W / 2; MV.cy = W.H / 2; U.drawMap(); };
+  }
 
   // ---------------- chat ----------------
   U.renderChat = function () {
@@ -8455,7 +8503,7 @@ window.RW = window.RW || {};
 
   // ====================== STAMINA ======================
   // every crystal you've eaten adds a little stamina (gold ones more), so old saves get it too
-  P.staminaBonus = () => { const s = P.stats || {}; return Math.round(((s.red || 0) + (s.blue || 0) + (s.green || 0) + (s.purple || 0)) * 2 + (s.gold || 0) * 5); };
+  P.staminaBonus = () => { const s = P.stats || {}; return Math.round(((s.red || 0) + (s.blue || 0) + (s.green || 0) + (s.purple || 0)) * 2 + (s.gold || 0) * 5 + ((P.flags && P.flags.goldStam) || 0) * 10); };
   P.maxStamina = () => 120 + P.staminaBonus();
   P.stamina = 120; P.stamT = 0; P.exhausted = false; P._dt = 1 / 60;
   const stamMul = () => (RW.world.def && RW.world.def.staminaMul) || 1;
