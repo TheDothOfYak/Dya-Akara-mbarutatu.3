@@ -214,7 +214,12 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 .typeblurb { font-size: 17px; color: var(--muted); margin: -4px 0 10px; max-width: 70ch; }
 
 /* map */
-#mapc { width: 100%; max-width: 100%; image-rendering: pixelated; background: #08070b; border: 2px solid var(--edge); }
+#mapc { width: 100%; max-width: 100%; image-rendering: pixelated; background: #08070b; border: 2px solid var(--edge); cursor: grab; touch-action: none; }
+#mapc:active { cursor: grabbing; }
+.maptools { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.chestgrid { display: grid; grid-template-columns: repeat(10, 40px); gap: 4px; margin: 6px 0; justify-content: start; }
+.chestgrid .slot { cursor: pointer; }
+@media (max-width: 520px) { .chestgrid { grid-template-columns: repeat(6, 40px); } }
 
 /* chat */
 #chatlog { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); width: min(360px, 60vw); display: grid; gap: 2px; pointer-events: none; }
@@ -328,7 +333,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div id="mp-msg">One player hosts and keeps the world. Everyone else joins with the room code.</div>
       </div>
       <div id="netstatus" class="stone">Connecting…</div>
-      <div id="version">v1.6</div>
+      <div id="version">v1.7</div>
     </div>
   </div>
   <div id="creator" class="hidden-ui">
@@ -361,9 +366,14 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     </div>
   </div></div>
   <div id="talk" class="modal hidden-ui"><div class="panel stone"><canvas width="48" height="60"></canvas><div><div class="who"></div><div class="says"></div><div class="acts"></div><div class="extra"></div></div></div></div>
+  <div id="chest" class="modal hidden-ui"><div class="panel stone" style="width:min(560px,100%)"><div class="phead"><h3>Chest</h3><button class="btn small" data-close type="button">Close (R)</button></div>
+    <div class="label">Click something in the chest to take it, or something in your bag to put it in.</div>
+    <div class="chestgrid" id="chestslots"></div>
+    <div class="row" style="margin:8px 0"><button class="btn small primary" id="c-take" type="button">Take everything</button></div>
+    <div class="label">Your bag</div><div class="chestgrid bag" id="chestbag"></div></div></div>
   <div id="carve" class="modal hidden-ui"><div class="panel stone"><div class="label">Ancient carving</div><h3></h3><p></p><button class="btn" data-close type="button">Step back</button></div></div>
   <div id="guide" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Field Guide</h3><button class="btn small" data-close type="button">Close (G)</button></div><div class="tabs" id="gtabs"></div><div class="typeblurb" id="gblurb"></div><div class="cards" id="gcards"></div></div></div>
-  <div id="map" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Map</h3><button class="btn small" data-close type="button">Close (M)</button></div><canvas id="mapc"></canvas><div class="label" style="margin-top:6px">Only places you have explored are shown. Orange: you. Blue: other players.</div><button class="btn small" id="m-travel" type="button" style="margin-top:8px">Travel to a world you've visited</button></div></div>
+  <div id="map" class="modal hidden-ui"><div class="panel stone"><div class="phead"><h3>Map</h3><button class="btn small" data-close type="button">Close (M)</button></div><div class="maptools"><button class="btn small" id="m-in" type="button" aria-label="Zoom in">+</button><button class="btn small" id="m-out" type="button" aria-label="Zoom out">−</button><button class="btn small" id="m-me" type="button">Me</button><button class="btn small" id="m-all" type="button">Whole map</button></div><canvas id="mapc" width="960" height="540"></canvas><div class="label" style="margin-top:6px">Scroll or +/− to zoom, drag to look around. Only places you have explored are shown. Orange: you. Blue: other players.</div><button class="btn small" id="m-travel" type="button" style="margin-top:8px">Travel to a world you've visited</button></div></div>
   <div id="help" class="modal hidden-ui"><div class="panel stone" style="width:min(560px,100%)"><div class="phead"><h3>Controls</h3><button class="btn small" data-close type="button">Close (H)</button></div>
     <div class="keys">
       <kbd>A / D</kbd><span>Walk</span>
@@ -411,7 +421,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 // Everything lives on the single global `RW` so files can be added in any session.
 window.RW = window.RW || {};
 (function (RW) {
-  RW.VERSION = '1.6'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
+  RW.VERSION = '1.7'; // bump with every update; also change #version in index.html and add a line to CHANGELOG.md.
   // Updates must keep players' progress: never rename the rw_ save keys, and only ever add tiles at the END of tiles.js
   // (world edits are saved by tile number). New save fields need a default when they're missing (see G.load).
   RW.TILE = 16;
@@ -716,6 +726,12 @@ window.RW = window.RW || {};
   add({ key: 'window', name: 'Window', hard: 1, time: 0.2, decor: 'window' });
   add({ key: 'door', name: 'Door', solid: true, hard: 1, time: 0.5, drop: 'door', decor: 'door', toggle: 'door_open', door: true });
   add({ key: 'door_open', name: 'Open Door', hard: 1, time: 0.5, drop: 'door', decor: 'door', open: true, toggle: 'door', door: true });
+  add({ key: 'eldiwood', name: 'Eldi Wood', solid: true, hard: 2, time: 1.0, drop: ['eldi_wood', 1, 2], colors: ['#8a3a22', '#b0542e', '#5a2416'], tex: 'bark' });
+  add({ key: 'eldiplank', name: 'Eldi Deck', solid: true, hard: 1, time: 0.6, drop: 'eldi_wood', colors: ['#9a4a2a', '#b8603a', '#6a2a18'], tex: 'plank' });
+  add({ key: 'eldichest', name: 'Eldi Ship Chest', solid: true, hard: 1, time: 1.0, decor: 'chest', chest: 'eldi', loot: 'eldi' });
+  add({ key: 'eldicannon', name: 'Eldi Cannon', solid: true, hard: 99, decor: 'cannon', use: 'cannon', light: [0.5, 0.25, 0.08], lockedMsg: 'The ship\'s cannon. Only an Eldi seed will fire it. Press R beside it.' });
+  add({ key: 'growaltar', name: 'Growing Altar', solid: true, hard: 99, decor: 'growaltar', station: 'grow', light: [0.25, 0.55, 0.2], lockedMsg: 'An Elsha\'ryn growing altar. Stand near it to grow-forge.' });
+  add({ key: 'storagechest', name: 'Storage Chest', solid: true, hard: 1, time: 0.6, decor: 'chest', chest: 'storage', storage: true, drop: 'storage_chest' });
   add({ key: 'stairplank', name: 'Wood Stairs', platform: true, stair: true, hard: 1, time: 0.3, drop: 'wood_stairs', decor: 'stair' });
 
   RW.TILES = T;
@@ -1046,6 +1062,7 @@ window.RW = window.RW || {};
     { id: 'trapdoor', name: 'Trapdoor', kind: 'place', place: 'trapdoor', icon: { s: 'trapdoor', a: '#a07a52', b: '#4a3a2a' }, desc: 'A floor you can open. Press R beside it to open or shut it.' },
     { id: 'rope_bridge', name: 'Rope Bridge', kind: 'place', place: 'ropebridge', icon: { s: 'bridge', a: '#a88a5a', b: '#d8c090' }, desc: 'Planks on rope. Stand on it, or drop through with S.' },
     { id: 'rope', name: 'Climbing Rope', kind: 'place', place: 'rope', icon: { s: 'rope', a: '#d8c090', b: '#a88a5a' } },
+    { id: 'storage_chest', name: 'Storage Chest', kind: 'place', place: 'storagechest', icon: { s: 'chest', a: '#a07a52', b: '#5a5a62' }, desc: 'Put it down, then press R or right-click it to keep your things in it. Break it and everything inside falls out.' },
     { id: 'door', name: 'Door', kind: 'place', place: 'door', icon: { s: 'door', a: '#8a6440', b: '#4a4a52' }, desc: 'Stack three for a doorway. Walk into it, press R or right-click to open it; it shuts behind you.' },
     { id: 'wood_stairs', name: 'Wood Stairs', kind: 'place', place: 'stairplank', icon: { s: 'stairs', a: '#a07a52', b: '#6a4a2e' }, desc: 'Lay them in a diagonal and walk up them. S drops through.' },
     { id: 'kofi_hair', name: 'Kofi Hair', kind: 'material', icon: { s: 'fur', a: '#b08a5a', b: '#8ae8ff' }, desc: 'Long, soft, and the tips still glow a little. Kofi shed it when frightened.' },
@@ -1065,10 +1082,34 @@ window.RW = window.RW || {};
   W({ id: 'lutut_lance', name: 'Lutut Lance', tier: 'platinum', power: 1, dmg: 36, spd: 0.38, knock: 4, reach: 50, fx: 'poison', icon: { s: 'spear', a: '#eee6d4', b: '#5a4c6c' }, desc: 'A ring of Lutut teeth bound round a platinum shaft.' });
   W({ id: 'raider_knife', name: 'Raider Knife', tier: 'iron', power: 1, dmg: 15, spd: 0.24, knock: 2, icon: { s: 'sword', a: '#8a8690', b: '#3e3030' }, desc: 'Short, quick and nasty. The Duskareth raiders carry them.' });
   W({ id: 'hvaleia_bow', name: 'Hvaleia Bow', tier: 'bronze', power: 1, dmg: 26, spd: 0.44, knock: 3, fx: 'lightning', ranged: { kind: 'arrow', spd: 480, grav: 190 }, icon: { s: 'bow', a: '#3f7fc4', b: '#8af0ff' }, desc: 'Strung with oiled Hvaleia sinew. The arrows crackle.' });
+  R.items([
+    { id: 'eldi_wood', name: 'Eldi Wood', kind: 'material', icon: { s: 'log', a: '#b0542e', b: '#5a2416' }, desc: 'Wood of a fire tree. It never burns.' },
+    { id: 'eldi_seed', name: 'Eldi Seed', kind: 'material', icon: { s: 'seed', a: '#ff8a2a', b: '#ffe08a' }, desc: 'A fire tree\'s seed, warm in your hand. Only a seed will fire an Eldi cannon.' },
+    { id: 'krabbi_shell', name: 'Krabbi Shell', kind: 'material', icon: { s: 'scale', a: '#c87a4a', b: '#6ae0ff' }, desc: 'Armour plate off a Raf Krabbi. It still tingles.' },
+    { id: 'harkal_tooth', name: 'Harkal Tooth', kind: 'material', icon: { s: 'fang', a: '#f4ecd6', b: '#7ab8ff' }, desc: 'THE tooth. Every Harkal has one, and it glows at the tip.' },
+    { id: 'grothyn_petal', name: 'Grothyn Petal', kind: 'food', heal: 18, icon: { s: 'petal', a: '#6fb0e8', b: '#c8f0ff' }, desc: 'A glowing sea petal. Salty, cool, good for you.' },
+    { id: 'brakka_plan', name: 'Archive Plan', kind: 'material', icon: { s: 'slab', a: '#d8c8a0', b: '#5a4a30' }, desc: 'Master Brakka wants it back on the Archive shelf. Without anyone seeing you.' },
+  ]);
+  // grow-forged at the Elsha'ryn growing altar: grown, not made, and they keep the nature of what they grew from
+  W({ id: 'thornroot_spear', name: 'Thornroot Spear', tier: 'iron', power: 1, dmg: 21, spd: 0.4, knock: 3, reach: 46, fx: 'poison', icon: { s: 'spear', a: '#5a9a3a', b: '#a8e070' }, desc: 'Grown from living vine. Its thorns still grow, and they poison.' });
+  W({ id: 'emberwood_bow', name: 'Emberwood Bow', tier: 'bronze', power: 1, dmg: 25, spd: 0.44, knock: 2, fx: 'fire', ranged: { kind: 'arrow', spd: 470, grav: 200 }, icon: { s: 'bow', a: '#b0542e', b: '#ffb04a' }, desc: 'Grown from fire-tree wood around a seed. Its arrows catch fire.' });
+  W({ id: 'stormbark_staff', name: 'Stormbark Staff', tier: 'platinum', power: 1, dmg: 30, spd: 0.48, knock: 3, fx: 'lightning', ranged: { kind: 'thorn', spd: 380, grav: 0 }, icon: { s: 'staff', a: '#6a5a3a', b: '#7fe3ff' }, desc: 'Heartwood grown round Hvaleia oil. Its thorns carry lightning.' });
+  W({ id: 'shockshell_club', name: 'Shockshell Club', tier: 'iron', power: 1, dmg: 23, spd: 0.4, knock: 6, fx: 'lightning', icon: { s: 'mace', a: '#c87a4a', b: '#6ae0ff' }, desc: 'Krabbi shells grown into a living club. It still shocks.' });
+  AR({ id: 'livingwood_mail', name: 'Livingwood Mail', slot: 'body', def: 5, tint: '#6a7a40', icon: { s: 'chest', a: '#6a7a40', b: '#3e4022' }, desc: 'Grown, not made. It mends its own scratches.' });
+  AR({ id: 'memory_circlet', name: 'Memory Circlet', slot: 'head', def: 4, tint: '#9ab8e8', glow: '#bfe0ff', icon: { s: 'helm', a: '#9ab8e8', b: '#3a5aa0' }, desc: 'The Elsha\'ryn grew it for the one who brought every memory home.' });
+  R.recipes([
+    { out: 'thornroot_spear', in: { living_vine: 8, wood: 10, uff_petal: 4 }, at: 'grow' },
+    { out: 'emberwood_bow', in: { eldi_wood: 6, living_vine: 4, eldi_seed: 1 }, at: 'grow' },
+    { out: 'stormbark_staff', in: { heartwood: 2, hvaleia_oil: 2, living_vine: 6 }, at: 'grow' },
+    { out: 'shockshell_club', in: { krabbi_shell: 4, wood: 6, living_vine: 2 }, at: 'grow' },
+    { out: 'livingwood_mail', in: { living_vine: 10, heartwood: 1, scute: 2 }, at: 'grow' },
+  ]);
+  RW.LOOT.eldi = [['eldi_wood', 2, 5, 0.9], ['eldi_seed', 1, 1, 0.35], ['bronze_bar', 1, 3, 0.5], ['torch', 2, 5, 0.5], ['crystal_red', 1, 1, 0.25], ['hvaleia_oil', 1, 1, 0.15]];
   R.recipes([
     { out: 'ladder', n: 4, in: { wood: 2 } },
     { out: 'wood_stairs', n: 4, in: { wood: 2 } },
     { out: 'door', n: 3, in: { planks: 4 }, at: 'knap' },
+    { out: 'storage_chest', in: { planks: 6, iron_bar: 1 }, at: 'knap' },
     { out: 'trapdoor', n: 2, in: { planks: 3 }, at: 'knap' },
     { out: 'rope_bridge', n: 6, in: { wood: 2, living_vine: 1 }, at: 'knap' },
     { out: 'rope', n: 6, in: { living_vine: 1 } },
@@ -1259,6 +1300,16 @@ window.RW = window.RW || {};
     { title: 'Waystone: the Gorge', text: 'The Keilia built this bridge. The Gorge has been trying to take it back ever since. Mind the gaps. If you fall, the river is kind to acorns: they float.' },
     { title: 'Memory: the Megla Wood', text: 'A voice in the mist: "Duat Seedlings most often grow into Megla Aagac. We built this shrine to keep watch over them. Then the mist came, and we stopped coming back."' },
     { title: 'Waystone: the Green Deep', text: 'East: the Tangle, and somewhere in it the Elsha\'ryn. Further east: the Canopy, and the King\'s Clearing at the very end of the world. It is a long way. Bring berries.' },
+    { title: 'Memory 1 of 8: Kiet', text: 'A young Eikar named Kiet rides a Great Nekh\'Vorran called Kireo\'Nik toward the shining city of Aakalay. The air is full of the Sunear\'Zikhron, the Waves of Memory. Kireo\'Nik says the city smells of greed.' },
+    { title: 'Memory 2 of 8: The Vakar\'Eik', text: 'The nekhic Vakar\'Eik walk into cities and duel their leaders. When they win, they clear the people\'s debts and give half the treasury to the poor. Then they leave, and chaos follows them. Kiet is one of them.' },
+    { title: 'Memory 3 of 8: Otli\u00f0', text: 'Aakalay is ruled by Otli\u00f0, a Keilia Master of the Keep. He hoards the food. He does not pay his builders. He has started killing the triangles who work his walls.' },
+    { title: 'Memory 4 of 8: The Posse', text: 'Kiet\'s friends are told not to interfere. They watch the keep. Then they see a girl dragged inside, and they go in after her anyway.' },
+    { title: 'Memory 5 of 8: The Kahizecvar', text: 'Kiet challenges Otli\u00f0 in the great square. The duel is called the Kahizecvar, and it is less a fight than a dance with two partners, Eikar and Nekh\'Vorran moving as one.' },
+    { title: 'Memory 6 of 8: The Fall', text: 'Otli\u00f0 falls. Kiet opens the treasury to the people, as the Vakar\'Eik always do. But Aakalay has no one left who knows how to rule it, and the city begins to crumble.' },
+    { title: 'Memory 7 of 8: The Megla Aagac', text: 'Where Otli\u00f0 fell, a Duat Seedling took root, and it grew into a Megla Aagac: a great dark tree in the mist. Nothing else ever grew in that square again.' },
+    { title: 'Memory 8 of 8: The Cores', text: 'The memories of Aakalay sank into stygian, and the stygian scattered. Long after, a Kalo\'Eik named Phorus and the Inventor gathered the cores for a month. The Inventor fell into the trance and saw all of it.' },
+    { title: 'The Fall of Aakalay', text: 'Every memory, together at last. Kiet and Kireo\'Nik rode to Aakalay to free its people from Otli\u00f0. They won the duel and lost the city: freed of its master, Aakalay had no one to hold it up, and it fell to ruin. The Megla Aagac still stands where Otli\u00f0 fell. The Elsha\'ryn keep the story so no one forgets that winning and saving are not the same thing.' },
+    { title: 'Ship\'s Log: the Ember', text: 'Last entry. Struck by Sniller fire over the Canopy. Pilot says we can land it. Pilot is a Stryx and has never been wrong. Pilot has also never been on fire before. Bracing.' },
   ];
 
   RW.ACORN_TIPS = [
@@ -1319,19 +1370,48 @@ window.RW = window.RW || {};
     hazel_lutut: { npc: 'hazel', title: 'The screech at night', kind: 'kill', sp: 'lutut', n: 1, reward: [['crystal_gold', 1]], req: () => RW.state.bosses.acorn,
       ask: 'Now the King\'s gone, something else has started screeching over the Canopy at night. A Lutut. Bring it down, if you dare.', done: 'It\'s quiet. Properly quiet. That\'s a gold crystal: I\'ve been saving it for someone who deserved it.' },
   };
+  Object.assign(RW.QUESTS, {
+    brakka_tablets: { npc: 'brakka', title: 'Missing plans', kind: 'bring', item: 'keilia_tablet', n: 3, reward: [['bronze_bar', 4], ['ladder', 8]],
+      ask: 'Builder\'s plans keep vanishing from the keep. The Duskareth sell them, I\'m sure of it. Find three and bring them back to me.', done: 'All three! I\'ll have them chained to the shelf this time.' },
+    brakka_plan: { npc: 'brakka', title: 'Back on the shelf', kind: 'sneak', target: 'planShelf', give: 'brakka_plan', reward: [['keilia_helm', 1]],
+      ask: 'Here is a plan I borrowed from the Archive. I would rather nobody knew I borrowed it. Put it back on the Archive shelf, in the bookcase at the east end. Do not let the guards see you. Not even once.', done: 'Back where it belongs, and nobody the wiser. Take this helm. Guards have been known to lose them.', fail: 'A guard saw you. Brakka will want you to try that again.' },
+    brakka_locks: { npc: 'brakka', title: 'Test the locks', kind: 'flag', flag: 'puzzle_treasury', reward: [['platinum_bar', 3]],
+      ask: 'I want to know if a thief could get into our Treasury. The Hall of Hammers is supposed to keep it shut. Try. Then tell me how you did it, so I can change it.', done: 'The banners? Of course it was the banners. I\'ll have them changed. Here, for your honesty.' },
+    ferrow_slingers: { npc: 'ferrow', title: 'Knife throwers', kind: 'kill', sp: 'dusk_slinger', n: 3, reward: [['iron_bar', 4], ['albali_salve', 1]],
+      ask: 'Duskareth slingers have been throwing knives at my patrols on the road. Find their camp in the root caves east of Capstead and deal with three of them.', done: 'Three fewer knives in the air. Good work.' },
+    ferrow_tower: { npc: 'ferrow', title: 'Top of the tower', kind: 'sneak', target: 'beacon', reward: [['bronze_bar', 4], ['crystal_blue', 1]],
+      ask: 'My guards say nobody could reach the top of the tallest tower without being seen. Prove them wrong. Get to the beacon lever up there and don\'t get caught.', done: 'Not one of them saw you? I\'m doubling the night watch. Here.', fail: 'Caught! Ferrow will be smug about that. Ask him to try again.' },
+    ferrow_vault: { npc: 'ferrow', title: 'The Deep Vault', kind: 'flag', flag: 'puzzle_beacon', reward: [['crystal_gold', 1]],
+      ask: 'They say the Deep Vault under the keep opens from the top of that tower. I\'ve never seen it open. Have you?', done: 'So it\'s true. Keep it to yourself, eh? This is for keeping quiet.' },
+    dunvarr_ore: { npc: 'dunvarr', title: 'Ore for the forge', kind: 'bring', item: 'iron_ore', n: 12, reward: [['iron_bar', 3], ['iron_helm', 1]],
+      ask: 'My forge is hungry. Twelve iron ore from the root caves, and I\'ll make it worth your while.', done: 'Good ore. Here, a helm I made with the last batch.' },
+    dunvarr_scute: { npc: 'dunvarr', title: 'Tonguatjis plates', kind: 'bring', item: 'scute', n: 4, reward: [['scute_mail', 1]],
+      ask: 'Tonguatjis shell plates make the best armour on this world. Four of them, and I\'ll make you a coat.', done: 'There. Light, hard, and it suits you.' },
+    dunvarr_tooth: { npc: 'dunvarr', title: 'The Harkal\'s tooth', kind: 'bring', item: 'harkal_tooth', n: 2, reward: [['platinum_bar', 4]],
+      ask: 'A Harkal tooth holds an edge like nothing else. Two of them. They live in the sea and in the Gorge river. They bite.', done: 'Look at that glow. I\'ll make something wonderful. Here, platinum for your trouble.' },
+    lethra_cores: { npc: 'lethra', title: 'Scattered memories', kind: 'read', from: 17, n: 8, reward: [['memory_circlet', 1], ['crystal_gold', 1]], finale: 25,
+      ask: 'Eight memory cores from the fall of Aakalay are scattered across this world: in the hills, the Gorge, the Megla Wood, the camp, the keep, a shipwreck, the caves and the Canopy. Find them and listen to each one. Then come back to me.', done: 'You heard them all. Then you deserve to hear them together.' },
+    phorus_listen: { npc: 'phorus', title: 'A good listener', kind: 'read', from: 7, n: 3, reward: [['crystal_blue', 1], ['grothyn_petal', 3]],
+      ask: 'The library tree has memory cores on every floor. Listen to three of them. Climb, it\'s good for you.', done: 'Strange, aren\'t they? Hearing someone else remember. Here.' },
+    pilot_seeds: { npc: 'pilot', title: 'Seeds for the cannon', kind: 'bring', item: 'eldi_seed', n: 3, reward: [['eldi_wood', 8], ['crystal_red', 1]],
+      ask: 'The Stryx\'s seams flicker in a pattern, and somehow you understand it: the crew are gone, the cannon is cold, and Eldi seeds were scattered in the crash. Three seeds, please. The Stryx would like to fire one last salute.', done: 'The seams blaze orange. The Stryx is very pleased.' },
+    pilot_salute: { npc: 'pilot', title: 'One last salute', kind: 'flag', flag: 'cannon_fired', reward: [['emberwood_bow', 1]],
+      ask: 'The seams pulse toward the deck. Load a seed into the ship\'s cannon (stand by it and press R) and fire it, for the crew.', done: 'The Stryx goes still and warm. You get the feeling the crew would have liked that.' },
+  });
   Object.assign(RW.NPCS, {
+    pilot: { lines: ['The Stryx\'s seams flicker: it has been waiting for orders for a very long time.', 'The seams glow in slow pulses. You get the feeling it is doing sums.', 'It turns toward the Canopy, toward where the ship was going. It still wants to get there.'], actions: ['chat'], quests: ['pilot_seeds', 'pilot_salute'] },
     nutmeg: { lines: ['Mind the stew! Everyone minds the stew.', 'I cook for the whole east tree. Thirty acorns, one pot.', 'Eat something. You look like an acorn who forgot to eat.'], actions: ['chat'], quests: ['nutmeg_berries', 'nutmeg_petals', 'nutmeg_oil'] },
     pip: { lines: ['Is it true you can jump twice? I can only jump once and a bit.', 'When I grow up I\'m going to see the whole world. Even the bits with Lutut.', 'Orrin says I can help build the next bridge if I\'m good.'], actions: ['chat'], quests: ['pip_mcfly', 'pip_kofi', 'pip_grove'] },
     hazel: { lines: ['From up here you can see the keep, the sea and half the Tangle.', 'I\'m the lookout. I look out. Somebody has to.', 'Climbing all those stairs every morning is why I never come down.'], actions: ['chat'], quests: ['hazel_keep', 'hazel_hvaleia', 'hazel_camp', 'hazel_lutut'] },
     ruut: { quests: ['ruut_vines', 'ruut_wild', 'ruut_malsti'], lines: ['Domestic Punks. Gentle as sheep, if sheep had vines.', 'Wild Punks have no eyes and no mouths, and they still find you. Mine are the friendly sort. Mostly.', 'Three of my herd wandered off again. Brainless, the lot of them. Bless them.', 'A Punk walks on the vines that grow out of its top. Do not ask me how. I have been asking for forty years.'], actions: ['chat'] },
     orrin: { lines: ['I built every bridge between the two trees. Mind the ones at the top, they bounce.', 'Ladders up, trapdoors shut. That\'s the rule in Capstead. Keeps the Kofi out of the bedrooms.', 'A Keilia builds. That is all we are for, and it\'s plenty.', 'My cousin keeps the keep to the west. She is very strict. She would not like to see you in the Treasury.'], actions: ['chat'] },
-    brannoc: { quests: ['brannoc_mud', 'brannoc_stryx', 'brannoc_stone'], lines: ['That\'s Pebble, our fountain. She\'s a Stryx. We grew her that way. She juggles mud for the children.', 'Don\'t stand on Pebble. She\'s friendly, but nobody likes being stood on.', 'Stryx out in the wild are less friendly. Stand on one of those and the vines come up.'], actions: ['chat'] },
-    brakka: { lines: ['Welcome to the keep, little cap. You may walk the courtyard and the hall. The rest is Keilia business.', 'Have you seen a builder\'s plan lying about? Some keep vanishing. Bring them back and I\'ll pay in good iron.', 'Four peoples, four banners in the Hall of Hammers. A reminder that the world is bigger than the keep.', 'The guards are kind, but they will march you straight out of anywhere you are not meant to be.'], actions: ['trade', 'chat'], trades: 'KEEP_TRADES', tradeSay: 'Master Brakka: "Good. That one goes back on the shelf."' },
-    dunvarr: { lines: ['I am one of the few Keilia who smith. The rest only build. Use my forge if you like.', 'The Kalo make our hammers. I make everything else.'], actions: ['forge', 'chat'] },
-    ferrow: { lines: ['Captain Ferrow, keep guard. The courtyard is open. The towers, the archive and the Treasury are not.', 'If one of my guards sees you somewhere you shouldn\'t be, you go out the front gate. Every time.', 'They say the deep vault opens from the top of the tallest tower. They say a lot of things.'], actions: ['chat'] },
-    lethra: { lines: ['You found the grove. Most walk past it. The trees here like to hide us.', 'We are the Elsha\'ryn. We keep memory, and we grow what we need instead of cutting it.', 'Touch a memory core and listen. Some of these voices are older than the keep.', 'Trade with us if you like. We have more salve than we need.'], actions: ['trade', 'chat'], trades: 'GROVE_TRADES', tradeSay: 'Lethra: "Grown, not made. Take care of it."' },
+    brannoc: { mudgame: true, quests: ['brannoc_mud', 'brannoc_stryx', 'brannoc_stone'], lines: ['That\'s Pebble, our fountain. She\'s a Stryx. We grew her that way. She juggles mud for the children.', 'Don\'t stand on Pebble. She\'s friendly, but nobody likes being stood on.', 'Stryx out in the wild are less friendly. Stand on one of those and the vines come up.'], actions: ['chat'] },
+    brakka: { quests: ['brakka_tablets', 'brakka_plan', 'brakka_locks'], lines: ['Welcome to the keep, little cap. You may walk the courtyard and the hall. The rest is Keilia business.', 'Have you seen a builder\'s plan lying about? Some keep vanishing. Bring them back and I\'ll pay in good iron.', 'Four peoples, four banners in the Hall of Hammers. A reminder that the world is bigger than the keep.', 'The guards are kind, but they will march you straight out of anywhere you are not meant to be.'], actions: ['trade', 'chat'], trades: 'KEEP_TRADES', tradeSay: 'Master Brakka: "Good. That one goes back on the shelf."' },
+    dunvarr: { quests: ['dunvarr_ore', 'dunvarr_scute', 'dunvarr_tooth'], lines: ['I am one of the few Keilia who smith. The rest only build. Use my forge if you like.', 'The Kalo make our hammers. I make everything else.'], actions: ['forge', 'chat'] },
+    ferrow: { quests: ['ferrow_slingers', 'ferrow_tower', 'ferrow_vault'], lines: ['Captain Ferrow, keep guard. The courtyard is open. The towers, the archive and the Treasury are not.', 'If one of my guards sees you somewhere you shouldn\'t be, you go out the front gate. Every time.', 'They say the deep vault opens from the top of the tallest tower. They say a lot of things.'], actions: ['chat'] },
+    lethra: { quests: ['lethra_cores'], lines: ['You found the grove. Most walk past it. The trees here like to hide us.', 'We are the Elsha\'ryn. We keep memory, and we grow what we need instead of cutting it.', 'Touch a memory core and listen. Some of these voices are older than the keep.', 'Trade with us if you like. We have more salve than we need.'], actions: ['trade', 'chat'], trades: 'GROVE_TRADES', tradeSay: 'Lethra: "Grown, not made. Take care of it."' },
     keepguard: { lines: ['Courtyard\'s open. The rest is Keilia business.', 'Lovely day for standing very still.', 'If I see you in the Treasury, it\'s straight out the gate. Nothing personal.', 'The Master is in the great hall, if you want her.'], actions: ['chat'] },
-    phorus: { lines: ['Phorus, a Kalo\'Eik. I\'m only visiting. The Elsha\'ryn keep the best library in the world, and they let me read it.', 'I once put a friend in water during a trance. Do not put your friends in water during a trance.', 'If you meet a RubberMcFly, leave it be. Trust me.'], actions: ['chat'] },
+    phorus: { quests: ['phorus_listen'], lines: ['Phorus, a Kalo\'Eik. I\'m only visiting. The Elsha\'ryn keep the best library in the world, and they let me read it.', 'I once put a friend in water during a trance. Do not put your friends in water during a trance.', 'If you meet a RubberMcFly, leave it be. Trust me.'], actions: ['chat'] },
   });
 
   // =================== ACORN & GHOST HEROES ===================
@@ -1645,6 +1725,23 @@ window.RW = window.RW || {};
     drops: [['scute', 1, 1, 3]],
     blurb: 'A domed shell with a ring of lamps, a long ringed neck and a tongue with a glowing lure on the end. Its tongue reaches a long way.' });
 
+  // ---- water life: only ever in water ----
+  S({ id: 'raf_krabbi', type: 'esik', name: 'Raf Krabbi', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'krabbi' },
+    w: 22, h: 12, hp: 70, dmg: 13, speed: 40, behavior: 'krabbi', temper: 'neutral',
+    spawn: { worlds: ACORN, medium: 'water', zones: ['ocean', 'gorge'], weight: 5 },
+    drops: [['krabbi_shell', 0.9, 1, 2]],
+    blurb: 'An armoured crab that walks the sea floor, lamps glowing round its shell. Leave it alone: it carries a charge, and it shocks whatever bothers it.' });
+  S({ id: 'su_grothyn', type: 'esik', name: 'Su Grothyn', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'grothyn' },
+    w: 14, h: 18, hp: 40, dmg: 9, speed: 0, behavior: 'grothyn', temper: 'neutral',
+    spawn: { worlds: ACORN, medium: 'water', zones: ['ocean', 'gorge'], weight: 4 },
+    drops: [['grothyn_petal', 0.9, 1, 3]],
+    blurb: 'A cone shell rooted to the sea floor, glowing blue petals opening at the top and a vine it whips at anything that pokes it.' });
+  S({ id: 'harkal', type: 'esik', name: 'Harkal', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'harkal' },
+    w: 36, h: 14, hp: 90, dmg: 18, speed: 85, behavior: 'dasher',
+    spawn: { worlds: ACORN, medium: 'water', zones: ['ocean', 'gorge'], weight: 2, minDepth: 4 },
+    drops: [['harkal_tooth', 0.6, 1, 1]],
+    blurb: 'A scarred lantern shark with one great tooth that glows at the tip. It hunts anything in its water.' });
+
   // ---- hunters ----
   S({ id: 'kipsu', type: 'esik', name: 'Kipsu', world: 'acorn', role: 'enemy', status: 'active', art: { draw: 'kipsu' },
     w: 18, h: 12, hp: 32, dmg: 7, speed: 130, behavior: 'kipsu',
@@ -1687,6 +1784,8 @@ window.RW = window.RW || {};
   K('dunvarr', 'Dunvarr', { cloth: '#5a3a2a', eye: '#a85a2a', apron: true }, 'One of the few Keilia smiths.');
   // the long road west: whatever lives in the Keepwood also roams the Broken Hills and the Megla Wood
   Object.values(RW.SPECIES).forEach((sp) => { const z = sp.spawn && sp.spawn.zones; if (z && (sp.spawn.worlds || []).includes('acorn') && z.includes('forest')) z.push('hills', 'mistwood'); });
+  S({ id: 'pilot', type: 'esik', name: 'The Pilot Stryx', world: 'acorn', role: 'npc', status: 'active', still: true, art: { draw: 'stryxcalm', tint: '#ff8a3a', tintA: 0.28 },
+    blurb: 'Grown in the pilot stump of an Eldi ship, and smarter than anyone aboard ever was. The ship crashed. The Stryx is still waiting for orders.' });
   S({ id: 'pebble', type: 'esik', name: 'Pebble', world: 'acorn', role: 'npc', status: 'active', still: true, art: { draw: 'stryxcalm' },
     blurb: 'Capstead\'s fountain: a Stryx grown round a pool of bog mud. She juggles mud balls for the children.' });
 })(window.RW);
@@ -2609,7 +2708,7 @@ window.RW = window.RW || {};
   const GROVE = { x0: 2440, x1: 2526 };
   const CAMP = { x0: 1900, x1: 1984, y: 226 };
   const ARENA = { x0: 3110, x1: 3192 };
-  const GORGE = { x0: 780, x1: 880 }, HUT = 540, RUINS = 1150;
+  const GORGE = { x0: 780, x1: 880 }, HUT = 540, RUINS = 1150, WRECK = 2930;
   const TF = 10, TFLOORS = 7;                                        // home trees: a floor every 10 blocks, 7 floors up
   let C = null;
   const inR = (r, x, y) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
@@ -2645,7 +2744,7 @@ window.RW = window.RW || {};
     const c = RW.surface.ctx(W, H, seed + 202); C = c; const T = c.T, N = c.N, WL = c.WL;
     Object.assign(c.meta, { runes: {}, puzzles: [], restricted: [], guards: [] });
     RW.surface.terrain(c, [
-      { key: 'ocean', x0: 0, x1: 26, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
+      { key: 'ocean', x0: 0, x1: 26, height: () => SEA + 34, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
       { key: 'forest', x0: 26, x1: 300, height: (x) => GY + (N(x / 30, 1.3, 3, 3) - 0.5) * 14, top: 'grass', fill: 'dirt', wall: 'dirt', trees: { kind: 'oak', density: 0.42, spacing: 4 }, decor: [['tallgrass', 0.45], ['flower', 0.12], ['berrybush', 0.08]] },
       // steep ridges and sudden drops: slow going on foot
       { key: 'hills', x0: 300, x1: GORGE.x0, height: (x) => { const r = N(x / 22, 4.4, 6, 3), ridge = 1 - Math.abs(2 * N(x / 60, 7.1, 8, 2) - 1); return GY - 6 - ridge * 34 + (r - 0.5) * 18 + (N(x / 7, 1.9, 9, 2) > 0.62 ? -5 : 0); }, top: 'grass', fill: 'dirt', fillDepth: 4, wall: 'dirt', trees: { kind: 'pine', density: 0.35, spacing: 5 }, decor: [['tallgrass', 0.3], ['flower', 0.06], ['berrybush', 0.05]] },
@@ -2656,7 +2755,7 @@ window.RW = window.RW || {};
       { key: 'jungle', x0: 1310, x1: 2250, height: (x) => GY + (N(x / 28, 1.1, 3, 3) - 0.5) * 20, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'bigoak', density: 0.6, spacing: 8 }, decor: [['tallgrass', 0.55], ['berrybush', 0.12], ['flower', 0.08]] },
       { key: 'deepwood', x0: 2250, x1: 2760, height: (x) => GY + (N(x / 24, 3.1, 4, 3) - 0.5) * 16, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.92, spacing: 2 }, decor: [['tallgrass', 0.7], ['berrybush', 0.1]] },
       { key: 'canopy', x0: 2760, x1: 3220, height: (x) => GY - 2 + (N(x / 34, 2.2, 5, 3) - 0.5) * 24, top: 'jgrass', fill: 'mud', fillDepth: 9, wall: 'mud', trees: { kind: 'jungle', density: 0.7, spacing: 3 }, decor: [['tallgrass', 0.6], ['berrybush', 0.08]] },
-      { key: 'ocean', x0: 3220, x1: W, height: () => SEA + 12, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
+      { key: 'ocean', x0: 3220, x1: W, height: () => SEA + 34, top: 'sand', fill: 'sand', stone: 'stone', wall: 'mud' },
     ], SEA, { deep: 285 });
     RW.surface.caves(c, { worms: 120, mouths: [420, 1240, 1500, 2280, 2900], pools: 150 });
     RW.surface.ores(c, [
@@ -2685,6 +2784,8 @@ window.RW = window.RW || {};
     buildGrove(H2, seed);
     buildCamp(H2, seed);
     buildWilds(H2, seed);
+    buildWreck(H2, seed);
+    buildSeaLife(H2, seed);
 
     // the King's Clearing
     RW.surface.flatten(c, ARENA.x0, ARENA.x1, GY, 'jgrass');
@@ -2701,6 +2802,11 @@ window.RW = window.RW || {};
     }
     RW.surface.starterFlint(c, VIL.x0 - 36, VIL.x0 - 4, 3); RW.surface.starterFlint(c, VIL.x1 + 4, VIL.x1 + 40, 3);
 
+    // names on the map (each shows once you've explored that spot)
+    const lab = (name, x, minZ) => ({ name, x, y: c.surfAt(x, 40) - 4, minZ });
+    c.meta.labels = [lab('Keilia Keep', (KEEP.x0 + KEEP.x1) >> 1, 0), lab('Broken Hills', 420, 1), lab('Traveller\'s Hut', HUT, 2), lab('The Gorge', (GORGE.x0 + GORGE.x1) >> 1, 0), lab('Megla Wood', 1000, 1), lab('Old Shrine', RUINS, 2),
+      lab('Capstead', VIL.plaza, 0), lab('Green Deep', 1880, 1), { name: 'Duskareth Camp', x: (CAMP.x0 + CAMP.x1) >> 1, y: CAMP.y - 3, minZ: 1 }, lab('The Tangle', 2330, 1), lab('Memory Grove', (GROVE.x0 + GROVE.x1) >> 1, 0),
+      lab('Wreck of the Ember', WRECK, 0), lab('The Canopy', 2820, 1), lab('King\'s Clearing', (ARENA.x0 + ARENA.x1) >> 1, 0), lab('Green Sea', 12, 1), lab('Green Sea', 3260, 1)];
     c.zone = RW.surface.zoneFn(c, (x, y) => {
       if (inR(VILR, x, y)) return 'village';
       if (inR(KEEPR, x, y)) return 'keep';
@@ -2905,7 +3011,8 @@ window.RW = window.RW || {};
     for (let y = MID - 6; y <= MID - 1; y++) for (let x = arch.x1 - 7; x <= arch.x1; x++) c.set(x, y, T.bookshelf);
     for (let y = MID - 3; y <= MID - 1; y++) { c.set(arch.x1 - 7, y, T.fakeshelf); c.set(arch.x1 - 6, y, T.fakeshelf); }
     fill(c, arch.x1 - 5, MID - 4, arch.x1 - 1, MID - 1, T.air, WL.keep);
-    c.set(arch.x1 - 2, MID - 1, T.keepchest); tab(arch.x1 - 4, MID - 1, 5); c.set(arch.x1 - 3, MID - 4, T.lantern);
+    c.set(arch.x1 - 1, MID - 1, T.keepchest); tab(arch.x1 - 5, MID - 1, 5); c.set(arch.x1 - 3, MID - 4, T.lantern); core(c, arch.x1 - 3, MID - 1, 4);
+    M.planShelf = { x: arch.x1 - 9, y: MID - 1 };
     M.secrets.push({ x: arch.x1 - 3, y: MID - 1, kind: 'room' });
     c.set(arch.x0 + 26, MID - 6, T.lantern); c.set(arch.x0 + 40, MID - 6, T.lantern);
 
@@ -2946,7 +3053,7 @@ window.RW = window.RW || {};
     const beacon = [Math.round(T3.cx), T3.top - 1];
     for (let x = T3.ix0; x <= T3.ix1; x++) { c.set(x, T3.top, T.heartplank); for (let y = T3.top - 4; y < T3.top; y++) c.set(x, y, T.air); }
     ladder(c, T3.ix0 + 1, T3.top + 1, T3.fy(T3.floors) - 1); c.set(T3.ix0 + 1, T3.top, T.trapdoor);
-    c.set(beacon[0], beacon[1], T.lever); c.set(beacon[0] + 2, beacon[1], T.torchwall); c.set(T3.ix1, T3.top - 1, T.vaultchest);
+    c.set(beacon[0], beacon[1], T.lever); M.beacon = { x: beacon[0], y: beacon[1] }; c.set(beacon[0] + 2, beacon[1], T.torchwall); c.set(T3.ix1, T3.top - 1, T.vaultchest);
 
     M.puzzles.push({ id: 'treasury', kind: 'levers', levers, want: [1, 0, 1, 0], gate: trGate, done: 'Somewhere in the keep, a heavy gate grinds open.' });
     M.puzzles.push({ id: 'archive', kind: 'runes', runes, order: [0, 1, 2, 3], gate: archGate, done: 'The runes blaze together, and the vault gate rises.', fail: 'The runes go dark. That was not the order.' });
@@ -2997,10 +3104,13 @@ window.RW = window.RW || {};
     [gy - 10, gy - 20].forEach((y) => { c.set(L.x0 + 5, y - 1, T.bookshelf); c.set(L.x0 + 5, y - 2, T.bookshelf); c.set(L.x0 + 6, y - 1, T.bookshelf); });
     c.set(L.x0 + 6, gy - 31, T.grovechest);
     c.set(GROVE.x0 + 22, gy - 1, T.memorystone); c.meta.carvings[(GROVE.x0 + 22) + ',' + (gy - 1)] = 10;
-    c.set(GROVE.x0 + 28, gy - 1, T.campfire);
+    c.set(GROVE.x0 + 28, gy - 1, T.campfire); c.set(GROVE.x0 + 25, gy - 1, T.growaltar);
     c.meta.npcs.lethra = { x: GROVE.x0 + 9, y: gy - 1 };
     c.meta.npcs.phorus = { x: L.x0 + 7, y: gy - 1 };
   }
+
+  // one of the eight scattered memory cores of Aakalay (carvings 17-24): Lethra's hunt
+  const core = (c, x, y, i) => { c.set(x, y, c.T.memorystone); c.meta.carvings[x + ',' + y] = 17 + i; c.meta.cores = c.meta.cores || []; c.meta.cores.push({ x, y, i }); };
 
   // ---------------------------------------------------------------- the long road west
   // A traveller's hut in the Broken Hills, an old rope bridge over the Gorge (with a gap: jump it, or swim the river
@@ -3012,7 +3122,7 @@ window.RW = window.RW || {};
     // the traveller's hut
     const hy = c.surfAt(HUT, 40); S.flatten(c, HUT - 8, HUT + 10, hy, 'grass');
     const hut = cottage(c, HUT - 4, hy, 9, {}); c.set(hut.x0 + 2, hy - 1, T.woodchest); c.set(hut.x0 + 6, hy - 1, T.campfire); edgeLadders(HUT - 8, HUT + 10, hy);
-    tab(HUT + 8, hy - 1, 13);
+    tab(HUT + 8, hy - 1, 13); core(c, hut.x0 + 4, hy - 1, 0);
     // the Gorge bridge: posts on each rim, planks between, a broken gap in the middle
     const yl = c.surfAt(GORGE.x0 - 2, 40), yr = c.surfAt(GORGE.x1 + 2, 40), by = Math.min(yl, yr) - 1;
     // a level landing on each rim, filled down to the ground so it never floats
@@ -3024,6 +3134,7 @@ window.RW = window.RW || {};
     for (let x = GORGE.x0 + 1; x < GORGE.x1; x++) { if (Math.abs(x - mid) <= 2 || Math.abs(x - mid - 21) <= 1) continue; c.set(x, by + 1, T.ropebridge); for (let y = by - 2; y <= by; y++) if (c.solid(x, y)) c.set(x, y, T.air); }
     for (let y = by - 2; y <= by; y++) { c.set(GORGE.x0 - 1, y, T.palisade); c.set(GORGE.x1 + 1, y, T.palisade); }
     tab(GORGE.x0 - 4, by, 14);
+    { const cx = mid + 14; let fy = SEA; while (fy < H - 8 && !c.solid(cx, fy)) fy++; core(c, cx, fy - 1, 1); }   // on the river floor
     // ladders up the far wall for anyone who fell in
     [GORGE.x0 + 9, GORGE.x1 - 9].forEach((lx) => { let y = c.surfAt(lx, by + 2); for (let yy = by + 2; yy < y; yy++) if (!c.solid(lx, yy)) c.set(lx, yy, T.rope); });
     // the ruined shrine in the Megla Wood
@@ -3034,9 +3145,70 @@ window.RW = window.RW || {};
     for (let x = RUINS - 5; x <= RUINS + 5; x++) for (let y = ry - 10; y < ry; y++) c.setb(x, y, WL.brick);
     edgeLadders(RUINS - 14, RUINS + 14, ry);
     c.set(RUINS - 2, ry - 1, T.woodchest); c.meta.special[(RUINS - 2) + ',' + (ry - 1)] = 'gold'; c.set(RUINS + 2, ry - 1, T.memorystone); c.meta.carvings[(RUINS + 2) + ',' + (ry - 1)] = 15;
-    c.set(RUINS + 9, ry - 1, T.woodchest);
+    c.set(RUINS + 9, ry - 1, T.woodchest); core(c, RUINS - 8, ry - 1, 2);
     // waystones along the road east of Capstead too
     tab(2040, c.surfAt(2040, 40) - 1, 16);
+  }
+
+  // ---------------------------------------------------------------- the wreck of the Ember, an Eldi ship
+  // A fire-tree ship that came down in the Canopy, nose first. A breach in the stern leads into the hold; ladders and
+  // trapdoors climb to the cabin and the deck. The Pilot Stryx still sits in its stump at the bow, by the cannon.
+  function buildWreck(H2, seed) {
+    const { c, T, WL } = H2; const S = RW.surface; const x0 = WRECK - 36, x1 = WRECK + 36;
+    const s = c.surfAt(WRECK, 40); S.flatten(c, x0 - 8, x1 + 8, s, 'jgrass');
+    for (let x = x0 - 12; x <= x1 + 12; x++) for (let y = 0; y < s; y++) { const t = c.get(x, y); if (t === T.leaves || t === T.trunk || t === T.vines) c.set(x, y, T.air); }
+    const deck = (x) => s - 12 + Math.round(((x - x0) / (x1 - x0)) * 3);           // nose down: the deck tilts toward the bow
+    // the hull curves up toward the bow and stern; its belly rests in a furrow it ploughed when it came down
+    const belly = (x) => { const t = (x - x0) / (x1 - x0); return s + 1 - Math.round(Math.pow(1 - Math.sin(t * Math.PI), 1.6) * 7); };
+    for (let x = x0; x <= x1; x++) {
+      const dy = deck(x), by = belly(x), end = x <= x0 + 1 || x >= x1 - 1;
+      for (let y = dy; y <= by; y++) { const shell = end || y >= by - 1 || y === dy; c.set(x, y, y === dy ? T.eldiplank : shell ? T.eldiwood : T.air); c.setb(x, y, WL.plank); }
+      for (let y = by + 1; y < s + 2; y++) if (!c.solid(x, y)) c.set(x, y, T.air);   // daylight under the curve of the hull
+      const cf = s - 6 + Math.round(((x - x0) / (x1 - x0)) * 3); if (cf < by - 1) c.set(x, cf, T.eldiplank);   // the cabin floor
+      if (x % 6 === 0) for (let y = dy + 2; y < by - 1; y += 4) if (c.get(x, y) === T.air) c.setb(x, y, WL.ship);
+    }
+    for (let x = x0 - 2; x <= x1 + 2; x++) for (let y = s; y < s + 3; y++) if (c.get(x, y) === T.air && y >= belly(RW.clamp(x, x0, x1)) + 1) c.set(x, y, T.dirt);
+    // the bow and stern rise into points, a broken mast, a torn sail
+    for (let k = 0; k < 5; k++) { c.set(x1 + k, deck(x1) - k - 1, T.eldiwood); c.set(x1 + k - 1, deck(x1) - k - 1, T.eldiwood); c.set(x0 - k, deck(x0) - k - 1, T.eldiwood); }
+    for (let k = 0; k < 16; k++) { c.set(WRECK - 4 + (k >> 2), deck(WRECK) - 1 - k, T.eldiwood); if (k > 5 && k < 12) for (let w = 1; w < 5 - (k % 3); w++) c.set(WRECK - 4 + (k >> 2) - w, deck(WRECK) - 1 - k, T.hide); }
+    // a climbing rope over the side at the stern, and a breach in the belly you can climb up through
+    for (let y = deck(x0 + 4) + 1; y < s; y++) if (c.get(x0 + 4, y) === T.air) c.set(x0 + 4, y, T.rope);
+    { const bx = x0 + 26, by = belly(bx); for (let y = by - 1; y <= by; y++) for (let x = bx; x <= bx + 2; x++) c.set(x, y, T.air); for (let y = by - 1; y < s; y++) if (!c.solid(bx + 1, y)) c.set(bx + 1, y, T.rope); }
+    // ladders and trapdoors: hold to cabin, cabin to deck
+    const lx = x0 + 32, lcf = s - 6 + Math.round((32 / 72) * 3); ladder(c, lx, lcf + 1, belly(lx) - 2); c.set(lx, lcf, T.trapdoor);
+    const ly = deck(lx + 30); ladder(c, lx + 30, ly + 1, s - 7 + Math.round((42 / 72) * 3)); c.set(lx + 30, ly, T.trapdoor);
+    // the hold: cargo and seeds; the cabin: the captain's chest, the log and a memory core
+    [x0 + 20, x0 + 34, x0 + 50].forEach((x, i) => { const y = belly(x) - 2; c.set(x, y, T.eldichest); if (i < 2) c.meta.special[x + ',' + y] = 'eldi_seed'; });
+    c.set(x0 + 28, s - 4, T.lantern); c.set(x0 + 46, s - 4, T.lantern);
+    const cab = (x) => s - 7 + Math.round(((x - x0) / (x1 - x0)) * 3);
+    c.set(x0 + 24, cab(x0 + 24), T.eldichest); c.set(x0 + 38, cab(x0 + 38), T.tablet); c.meta.carvings[(x0 + 38) + ',' + cab(x0 + 38)] = 26;
+    core(c, x0 + 56, cab(x0 + 56), 5); c.set(x0 + 30, cab(x0 + 30) - 3, T.lantern);
+    // on deck: the cannon and the pilot's stump at the bow
+    c.set(x0 + 18, deck(x0 + 18) - 1, T.eldicannon);
+    const px0 = x1 - 9; c.set(px0 - 2, deck(px0 - 2) - 1, T.eldiwood); c.set(px0 + 4, deck(px0 + 4) - 1, T.eldiwood);
+    c.meta.npcs.pilot = { x: px0 - 1, y: deck(px0) - 1 };
+    // the third seed fell further east, and a chest of cargo landed in the treetops' shade
+    const sx = WRECK + 70, sy = c.surfAt(sx, 40); c.set(sx, sy - 1, T.eldichest); c.meta.special[sx + ',' + (sy - 1)] = 'eldi_seed';
+    // and memory core 8, on a plinth out in the Canopy
+    const kx = 3050, ky = c.surfAt(kx, 40); c.set(kx, ky - 1, T.mossstone); c.set(kx + 1, ky - 1, T.mossstone); core(c, kx, ky - 2, 7);
+  }
+
+  // ---------------------------------------------------------------- life in the water
+  // Kelp and stone coral on the floors of the Green Sea and the Gorge river, and sunken chests to dive for.
+  function buildSeaLife(H2, seed) {
+    const { c, T } = H2;
+    const wet = [[2, 30], [GORGE.x0, GORGE.x1], [3222, W - 2]];
+    wet.forEach(([a, b]) => { for (let x = a; x < b; x++) {
+      let y = SEA; while (y < H - 8 && c.get(x, y) === T.water) y++; if (y <= SEA + 1 || !c.solid(x, y)) continue;
+      const h = RW.hash2(x, 17, seed);
+      if (h < 0.3) { const n = 1 + Math.floor(RW.hash2(x, 18, seed) * 3); for (let k = 1; k <= n && c.get(x, y - k) === T.water && y - k > SEA + 1; k++) c.set(x, y - k, T.kelp); }
+      else if (h < 0.55) c.set(x, y - 1, T.coral);
+    } });
+    [[12, 0], [GORGE.x0 + 30, 1], [3238, 2], [3268, 3]].forEach(([x, i]) => { let y = SEA; while (y < H - 8 && !c.solid(x, y)) y++; c.set(x, y - 1, T.shipchest); if (i === 2) c.meta.special[x + ',' + (y - 1)] = 'gold'; });
+    // a sunken rowboat in the eastern sea
+    { const bx = 3250; let y = SEA; while (y < H - 8 && !c.solid(bx, y)) y++; for (let k = -5; k <= 5; k++) { c.set(bx + k, y - 1, T.shipplank); if (Math.abs(k) === 5) c.set(bx + k, y - 2, T.shipplank); } }
+    // a deep cave pocket in the east holds memory core 7
+    for (let k = 0; k < 3000; k++) { const x = 2560 + (k * 37) % 160, y = 236 + (k * 13) % 60; if (c.get(x, y) === T.air && c.solid(x, y + 1) && c.get(x, y - 1) === T.air && c.get(x, y + 1) !== T.bedrock) { core(c, x, y, 6); break; } }
   }
 
   // ---------------------------------------------------------------- the Duskareth camp, in the root caves
@@ -3053,6 +3225,7 @@ window.RW = window.RW || {};
     tent(x0 + 12, 5); tent((x0 + x1) >> 1, 7); tent(x1 - 12, 5);
     c.set(x0 + 11, cy - 1, T.campchest); c.set(((x0 + x1) >> 1) - 2, cy - 1, T.campchest); c.set(((x0 + x1) >> 1) + 1, cy - 1, T.campchest); c.set(x1 - 13, cy - 1, T.campchest);
     c.meta.special[(((x0 + x1) >> 1) - 2) + ',' + (cy - 1)] = 'gold';
+    core(c, ((x0 + x1) >> 1) - 4, cy - 1, 3);
     c.set(x0 + 20, cy - 1, T.campfire); c.set(x1 - 20, cy - 1, T.campfire);
     for (let x = x0 + 4; x <= x1; x += 9) if (c.get(x, cy - 1) === T.air) c.set(x, cy - 1, T.torchwall);
   }
@@ -3414,7 +3587,7 @@ window.RW = window.RW || {};
       }
       case 'chest': {
         // chest styles: plain, keep (green-banded), vault (gold), camp (dark hide), grove (grown wood)
-        const cs = { keep: ['#5a4a32', '#76603e', '#8ab05a'], vault: ['#4a3a4e', '#6a5470', '#f2c94c'], camp: ['#3e3030', '#584444', '#a85a4a'], grove: ['#4e5a30', '#6a7a40', '#a8e070'] }[t.chest] || ['#6d5640', '#8a6e50', '#c8c0a0'];
+        const cs = { keep: ['#5a4a32', '#76603e', '#8ab05a'], vault: ['#4a3a4e', '#6a5470', '#f2c94c'], eldi: ['#7a3020', '#a04a2a', '#ffb04a'], storage: ['#8a6440', '#a88058', '#9aa3ad'], camp: ['#3e3030', '#584444', '#a85a4a'], grove: ['#4e5a30', '#6a7a40', '#a8e070'] }[t.chest] || ['#6d5640', '#8a6e50', '#c8c0a0'];
         rect(g, x + 1, y + 5, 14, 11, cs[0]); rect(g, x + 1, y + 5, 14, 4, cs[1]); rect(g, x + 1, y + 9, 14, 1, '#2a2018');
         rect(g, x + 7, y + 8, 2, 3, cs[2]); rect(g, x + 1, y + 5, 1, 11, cs[2]); rect(g, x + 14, y + 5, 1, 11, cs[2]);
         if (t.chest === 'vault' && Math.sin(time * 3 + h * 7) > 0.8) px(g, x + 8, y + 9, '#ffffff');
@@ -4645,6 +4818,10 @@ window.RW = window.RW || {};
     if (top) rect(g, x, y, 16, 2, '#5a3a24');
     if (!top && !bot) { ell(g, x + 11, y + 9, 1, 1, '#c8c0a0'); }
   };
+  // the Eldi ship's cannon: a cauldron-mouthed barrel of fire-tree wood, embers glowing inside
+  X.cannon = (g, t, x, y, time, h) => { rect(g, x + 1, y + 9, 14, 7, '#5a2416'); rect(g, x + 2, y + 4, 12, 7, '#8a3a22'); rect(g, x + 10, y + 3, 6, 5, '#6a2a18'); ell(g, x + 14, y + 5, 2, 2, '#1a0a06'); px(g, x + 14, y + 5, Math.sin(time * 6 + h * 5) > 0 ? '#ff8a2a' : '#ffb04a'); rect(g, x + 2, y + 6, 12, 1, '#b0542e'); };
+  // a growing altar: a living stump with a bowl of light, shoots curling up from it
+  X.growaltar = (g, t, x, y, time, h) => { rect(g, x + 2, y + 6, 12, 10, '#5a5a32'); rect(g, x + 2, y + 6, 12, 1, '#74763e'); ell(g, x + 8, y + 6, 5, 2, '#3e4022'); const p = 0.5 + 0.5 * Math.sin(time * 2 + h * 5); ell(g, x + 8, y + 5, 3, 1, p > 0.5 ? '#a8e070' : '#6ab84a'); line(g, x + 3, y + 6, x + 1, y + 1, '#5a9a3a'); line(g, x + 13, y + 6, x + 15, y + 2, '#5a9a3a'); px(g, x + 1, y + 1, '#a8e070'); px(g, x + 15, y + 2, '#a8e070'); };
   X.rope = (g, t, x, y, time, h, wx, wy) => { const tied = RW.world.get(wx, wy - 1) !== RW.T.rope && !RW.TILES[RW.world.get(wx, wy - 1)].solid && RW.world.get(wx, wy - 1) !== RW.T.air; for (let k = tied ? -12 : 0; k < 16; k++) { const xx = x + 8 + Math.round(Math.sin((wy * 16 + k) * 0.4 + time) * 0.6); px(g, xx, y + k, k % 4 === 0 ? '#a88a5a' : '#d8c090'); px(g, xx + 1, y + k, '#a88a5a'); } };
   X.lever = (g, t, x, y) => {
     rect(g, x + 3, y + 12, 10, 4, '#5d5a60'); rect(g, x + 3, y + 12, 10, 1, '#8a868c'); px(g, x + 8, y + 12, '#2a282e');
@@ -4690,6 +4867,7 @@ window.RW = window.RW || {};
   I.trapdoor = (g, a, b) => { rect(g, 2, 3, 12, 10, a); rect(g, 2, 5, 12, 1, b); rect(g, 2, 10, 12, 1, b); ell(g, 8, 8, 1, 1, '#8a8690'); };
   I.bridge = (g, a, b) => { for (let k = 1; k < 15; k += 3) rect(g, k, 10, 2, 2, a); line(g, 1, 5, 15, 5, b); line(g, 1, 11, 15, 11, b); line(g, 2, 5, 2, 11, b); line(g, 13, 5, 13, 11, b); };
   I.door = (g, a, b) => { rect(g, 4, 1, 8, 14, a); for (let k = 6; k < 12; k += 2) rect(g, k, 1, 1, 14, RW.shade(a, -0.3)); rect(g, 4, 7, 8, 1, b); px(g, 10, 8, '#c8c0a0'); };
+  I.seed = (g, a, b) => { ell(g, 8, 9, 4, 5, a); ell(g, 7, 8, 2, 3, b); px(g, 6, 6, '#ffffff'); line(g, 8, 4, 10, 1, '#6a2a18'); };
   I.stairs = (g, a, b) => { for (let k = 0; k < 4; k++) { rect(g, 1 + k * 3, 12 - k * 3, 4, 2, a); rect(g, 1 + k * 3, 14 - k * 3, 4, 1, b); } };
   I.rope = (g, a, b) => { for (let k = 1; k < 15; k++) px(g, 8 + Math.round(Math.sin(k * 0.8) * 2), k, k % 3 ? a : b); };
   I.fur = (g, a, b) => { ell(g, 8, 9, 5, 4, a); for (let k = 0; k < 6; k++) line(g, 4 + k * 2, 6, 3 + k * 2, 2 + (k % 2), a); px(g, 3, 2, b); px(g, 11, 2, b); };
@@ -4919,6 +5097,50 @@ window.RW = window.RW || {};
     return frames;
   };
   D.stryxcalm = () => D.stryx().slice(0, 2);
+
+  // Raf Krabbi: a plated crab with lamps round its shell rim and glowing eye-stalks; it crackles when cross
+  D.krabbi = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(28, 16), g = c.ctx; const shell = '#c87a4a', dk = '#7a4426', lt = '#e8a06a', lamp = '#6ae0ff';
+      for (let k = 0; k < 3; k++) [-1, 1].forEach((sd) => { const x = 14 + sd * (4 + k * 3), lift = (f + k) % 2; line(g, x, 11, x + sd * 3, 15 - lift, '#5a3018'); });
+      ell(g, 14, 9, 9, 4, shell); for (let x = 6; x <= 22; x++) px(g, x, 6, lt); rect(g, 8, 8, 12, 1, dk); px(g, 14, 7, lt);
+      for (let k = 0; k < 6; k++) px(g, 7 + k * 3, 12, k % 2 ? lamp : '#bff8ff');
+      [-1, 1].forEach((sd) => { const x = 14 + sd * 10; ell(g, x + sd * 2, 7 - f, 3, 2, shell); px(g, x + sd * 4, 6 - f, dk); px(g, x + sd * 4, 8 - f, dk); });
+      line(g, 17, 5, 18, 2, dk); line(g, 19, 5, 21, 2, dk); px(g, 18, 1, lamp); px(g, 21, 1, lamp);
+      A.outline(c, '#1a0e08'); frames.push(c);
+    }
+    return frames;
+  };
+  // Su Grothyn: a ridged cone shell on the sea floor, blue petals glowing at the top, a vine curling out
+  D.grothyn = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(18, 22), g = c.ctx;
+      for (let y = 8; y < 22; y++) { const hw = Math.round(2 + (y - 8) * 0.42); for (let x = -hw; x <= hw; x++) px(g, 9 + x, y, (x + y) % 4 === 0 ? '#2a5a8a' : x < 0 ? '#5a9ad8' : '#3d78b8'); }
+      for (let k = 10; k < 22; k += 3) px(g, 9 - Math.round(2 + (k - 8) * 0.42), k, '#6ae0ff');
+      [[-4, -2], [-2, -5], [2, -5], [4, -2], [0, -6]].forEach(([dx, dy]) => ell(g, 9 + dx + (f ? (dx > 0 ? 1 : -1) : 0), 8 + dy, 2, 2, '#6fb0e8'));
+      ell(g, 9, 6, 1, 1, '#c8f0ff');
+      for (let k = 0; k < 8; k++) px(g, 9 + Math.round(Math.sin(k * 0.8 + f) * 2) + (k > 4 ? k - 4 : 0), 6 - k, k % 2 ? '#1f4f7a' : '#2a6a9a');
+      A.outline(c, '#0a1a2a'); frames.push(c);
+    }
+    return frames;
+  };
+  // Harkal: a scarred lantern shark, a line of lights down its flank and one great tooth glowing at the tip
+  D.harkal = function () {
+    const frames = [];
+    for (let f = 0; f < 2; f++) {
+      const c = mk(42, 18), g = c.ctx; const tail = f ? 2 : -2;
+      for (let x = 2; x < 40; x++) { const t = x / 40, half = t < 0.2 ? 1 + t * 15 : 1 + Math.sin(Math.min(1, (t - 0.05) / 0.95) * Math.PI) * 5 + 2; const mid = 9 + (t < 0.25 ? Math.round((0.25 - t) * 4 * tail) : 0); for (let y = Math.round(mid - half); y <= Math.round(mid + half); y++) px(g, x, y, (y - (mid - half)) / (half * 2) < 0.58 ? '#5b7488' : '#d9dfe2'); if (x % 4 === 1 && t > 0.3 && t < 0.85) px(g, x, mid, '#7ab8ff'); }
+      line(g, 2, 9 + tail, 0, 3 + tail, '#4a6070'); line(g, 2, 9 + tail, 0, 15 + tail, '#4a6070');
+      line(g, 20, 4, 24, 0, '#4a6070'); line(g, 21, 4, 26, 1, '#4a6070'); line(g, 22, 14, 18, 17, '#4a6070');
+      line(g, 14, 7, 18, 6, '#d8c4bc'); line(g, 26, 8, 28, 10, '#d8c4bc');
+      line(g, 33, 12, 40, 11, '#2a1418'); px(g, 37, 12, '#f4ecd6'); px(g, 37, 13, '#f4ecd6'); px(g, 37, 14, '#bfe0ff');
+      px(g, 35, 7, '#ffffff'); px(g, 36, 7, '#14080a');
+      A.outline(c, '#0e161e'); frames.push(c);
+    }
+    return frames;
+  };
 
   // ======================= ACORN GEAR =======================
   // Armor and capes drawn for the acorn's own shape, never over its face: a helmet that fits over the cap (with a
@@ -5946,7 +6168,9 @@ window.RW = window.RW || {};
       return;
     }
     // loot containers
-    if (t.loot) {
+    const stored = (t.loot || t.storage) && RW.chests ? RW.chests.take(tx, ty) : null;
+    if (stored) { stored.forEach((s) => { if (s) E.dropItem(s.id, s.n, cx, cy); }); if (t.storage) E.dropItem(t.drop, 1, cx, cy); }
+    else if (t.loot) {
       const key = tx + ',' + ty; const sp = W.meta.special[key];
       if (sp === 'gold') E.dropItem('crystal_gold', 2, cx, cy);
       else if (sp && RW.ITEMS[sp]) { E.dropItem(sp, 1, cx, cy); RW.ui.banner('Secret found', RW.ITEMS[sp].name); RW.fx.element.shards(cx, cy, 2); RW.audio.sfx('crystal'); }
@@ -6037,6 +6261,13 @@ window.RW = window.RW || {};
         RW.audio.sfx('crystal'); RW.ui.banner('New magic', RW.SPELLS[it.spell].name + '. Right-click or F to cast. Q switches spells.');
       } else {
         const color = it.icon.a; const st = it.id.replace('crystal_', '');
+        // past the most your body can hold, a gold crystal melts into pure stamina instead
+        if (st === 'gold' && P.stats.gold >= it.max) {
+          if ((P.flags.goldStam || 0) >= 25) { RW.ui.toast('Even your stamina can\'t hold any more gold.'); return; }
+          P.remove(it.id, 1); P.flags.goldStam = (P.flags.goldStam || 0) + 1; P.stamina = P.maxStamina(); P.exhausted = false;
+          RW.fx.element.crystal(pc.x, pc.y, color); RW.fx.text(pc.x, P.y - 8, '+10 stamina', '#f4f0a0', true); RW.audio.sfx('crystal');
+          RW.ui.toast('The gold melts into pure stamina: ' + P.maxStamina() + ' max.'); P.flags.ate_crystal = 1; RW.ui.dirty(); RW.game.saveSoon(); return;
+        }
         if (P.stats[st] >= it.max) { RW.ui.toast('Your body can\'t take any more ' + it.name + 's.'); return; }
         P.remove(it.id, 1); P.addStat(st, it.id);
         RW.fx.element.crystal(pc.x, pc.y, color);
@@ -7589,7 +7820,7 @@ window.RW = window.RW || {};
 
   // ---------------- modals ----------------
   U.openModal = function (id) {
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory'].forEach((m) => show('#' + m, m === id));
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory', 'chest'].forEach((m) => show('#' + m, m === id));
     U.open = id; RW.audio.sfx('ui');
     if (id === 'help') U.renderHelp();
     if (id === 'opts') U.renderOpts();
@@ -7599,7 +7830,7 @@ window.RW = window.RW || {};
   };
   U.closeModal = function () {
     if (U.cursor) { P().add(U.cursor.id, U.cursor.n); U.cursor = null; show('#held', false); }
-    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory'].forEach((m) => show('#' + m, false));
+    ['inv', 'talk', 'carve', 'guide', 'map', 'help', 'riftm', 'opts', 'pause', 'victory', 'chest'].forEach((m) => show('#' + m, false));
     U.open = null; U.stopCapture && U.stopCapture();
     const ae = document.activeElement; if (ae && ae !== document.body && ae.id !== 'chatin' && ae.blur) ae.blur(); show('#tooltip', false);
   };
@@ -7760,8 +7991,8 @@ window.RW = window.RW || {};
   U.renderCraft = function (forceAll) {
     const f = $('#cfilter'); f.innerHTML = '';
     [['can', 'Can make'], ['all', 'All recipes']].forEach(([k, n]) => { const b = el('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', U.craftFilter === k); b.onclick = () => { U.craftFilter = k; U.renderCraft(); }; f.append(b); });
-    const near = { knap: P().nearStation('knap'), forge: P().nearStation('forge') };
-    f.append(el('span', 'label', ' Near: hands' + (near.knap ? ', knapping stone' : '') + (near.forge ? ', forge' : '')));
+    const near = { knap: P().nearStation('knap'), forge: P().nearStation('forge'), grow: P().nearStation('grow') };
+    f.append(el('span', 'label', ' Near: hands' + (near.knap ? ', knapping stone' : '') + (near.forge ? ', forge' : '') + (near.grow ? ', growing altar' : '')));
     const list = $('#rlist'); list.innerHTML = '';
     const p = P();
     const rows = RW.RECIPES.map((r) => {
@@ -7778,7 +8009,7 @@ window.RW = window.RW || {};
       const ing = el('div', 'ing');
       Object.entries(r.in).forEach(([id, n]) => { const have = p.count(id); ing.append(el('span', have >= n ? 'ok' : 'no', RW.ITEMS[id].name + ' ' + Math.min(have, n) + '/' + n)); });
       mid.append(nm, ing);
-      if (r.at) mid.append(el('div', 'at', (r.at === 'forge' ? 'At a forge' : 'At a knapping stone') + (station ? '' : ' (not nearby)')));
+      if (r.at) mid.append(el('div', 'at', (r.at === 'forge' ? 'At a forge' : r.at === 'grow' ? 'Grown at an Elsha\'ryn growing altar' : 'At a knapping stone') + (station ? '' : ' (not nearby)')));
       if (r.locked) mid.append(el('div', 'lock', r.locked));
       const b = el('button', 'btn small', 'Craft'); b.type = 'button'; b.disabled = !ok;
       b.onclick = () => U.craft(r);
@@ -7903,25 +8134,101 @@ window.RW = window.RW || {};
   };
 
   // ---------------- map ----------------
+  // The map: the explored world drawn once at one pixel per block, then shown through a view you can zoom and drag.
+  const MV = (U.mapView = { z: 0, cx: 0, cy: 0, img: null });
   U.renderMap = function () {
-    const W = RW.world, c = $('#mapc'); c.width = W.W; c.height = W.H; const g = c.getContext('2d');
-    const img = g.createImageData(W.W, W.H); const d = img.data; const TL = RW.TILES, T = RW.T;
+    const W = RW.world; const img = RW.art.canvas(W.W, W.H), g = img.ctx;
+    const id = g.createImageData(W.W, W.H); const d = id.data; const TL = RW.TILES, T = RW.T;
     const col = {}; TL.forEach((t, i) => { col[i] = t.colors ? RW.hexToRgb(t.colors[0]) : t.crystal ? RW.hexToRgb(t.crystal) : null; });
     col[T.water] = [40, 100, 140]; col[T.walkway] = [140, 135, 140]; col[T.chain] = [120, 128, 136]; col[T.lantern] = [140, 240, 210];
+    ['leaves', 'oakleaves'].forEach((k) => { if (T[k] != null) col[T[k]] = [52, 110, 44]; }); if (T.trunk != null) col[T.trunk] = [106, 74, 48];
+    ['ladder', 'ropebridge', 'stairplank', 'woodplat', 'rope'].forEach((k) => { if (T[k] != null) col[T[k]] = [168, 128, 82]; });
     for (let i = 0; i < W.fg.length; i++) {
       const o = i * 4; if (!W.explored[i]) { d[o] = 8; d[o + 1] = 7; d[o + 2] = 11; d[o + 3] = 255; continue; }
       const t = W.fg[i]; let c3 = col[t];
       if (!c3) c3 = W.bg[i] ? [34, 31, 40] : ((i / W.W) < W.def.sea ? [60, 80, 110] : [20, 18, 26]);
       d[o] = c3[0]; d[o + 1] = c3[1]; d[o + 2] = c3[2]; d[o + 3] = 255;
     }
-    g.putImageData(img, 0, 0);
-    const p = P(); g.fillStyle = '#ffb347'; g.fillRect(Math.floor(p.x / 16) - 2, Math.floor(p.y / 16) - 2, 5, 5);
-    g.fillStyle = '#9ad8ff'; RW.net.peers.forEach((q) => g.fillRect(Math.floor(q.x / 16) - 2, Math.floor(q.y / 16) - 2, 4, 4));
-    if (p.has('square_compass')) { g.strokeStyle = '#f2c94c'; W.meta.secrets.forEach((s) => { if (RW.dist(s.x, s.y, p.x / 16, p.y / 16) < 90) { g.strokeRect(s.x - 3, s.y - 3, 7, 7); } }); }
-    // label the village
-    const v = W.def.id === 'rock' ? W.def.village : null; g.font = '12px VT323, monospace'; g.fillStyle = '#ece4d6';
-    if (v && W.explored[v.cy * W.W + v.cx]) g.fillText('Stalagmere', v.cx - 26, v.cy - v.ry + 12);
+    g.putImageData(id, 0, 0); MV.img = img;
+    const p = P(), c = $('#mapc');
+    if (MV.world !== W.def.id || !MV.z) { MV.world = W.def.id; MV.z = Math.max(fitZ(), Math.min(4, c.height / 90)); MV.cx = p.x / 16; MV.cy = p.y / 16; }
+    U.drawMap();
   };
+  const fitZ = () => { const c = $('#mapc'), W = RW.world; return Math.min(c.width / W.W, c.height / W.H); };
+  const clampView = () => { const W = RW.world; MV.z = RW.clamp(MV.z, fitZ(), 24); MV.cx = RW.clamp(MV.cx, 0, W.W); MV.cy = RW.clamp(MV.cy, 0, W.H); };
+  U.drawMap = function () {
+    const c = $('#mapc'), g = c.getContext('2d'), W = RW.world; if (!MV.img) return; clampView();
+    const z = MV.z, vw = c.width / z, vh = c.height / z, sx = MV.cx - vw / 2, sy = MV.cy - vh / 2;
+    g.imageSmoothingEnabled = false; g.fillStyle = '#08070b'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(MV.img, 0, 0, W.W, W.H, -sx * z, -sy * z, W.W * z, W.H * z);
+    const at = (x, y) => [(x - sx) * z, (y - sy) * z];
+    const p = P(); const [px, py] = at(p.x / 16 + 0.4, p.y / 16 + 0.9), r = Math.max(3, z * 1.2);
+    g.fillStyle = '#ffb347'; g.strokeStyle = '#1a0e08'; g.lineWidth = 2; g.beginPath(); g.arc(px, py, r, 0, 6.29); g.fill(); g.stroke();
+    g.fillStyle = '#9ad8ff'; RW.net.peers.forEach((q) => { const [x, y] = at(q.x / 16, q.y / 16); g.beginPath(); g.arc(x, y, Math.max(2.5, z), 0, 6.29); g.fill(); });
+    if (p.has('square_compass')) { g.strokeStyle = '#f2c94c'; W.meta.secrets.forEach((s) => { if (RW.dist(s.x, s.y, p.x / 16, p.y / 16) < 90) { const [x, y] = at(s.x, s.y); g.strokeRect(x - 3.5 * z, y - 3.5 * z, 7 * z, 7 * z); } }); }
+    // place names, once you've been there
+    g.font = Math.round(RW.clamp(10 + z * 1.5, 12, 22)) + 'px VT323, monospace'; g.textAlign = 'center';
+    const label = (txt, x, y) => { if (!W.explored[Math.floor(y) * W.W + Math.floor(x)]) return; const [lx, ly] = at(x, y); if (lx < -60 || ly < -20 || lx > c.width + 60 || ly > c.height + 20) return; g.fillStyle = '#0c0a10'; g.fillText(txt, lx + 1, ly + 1); g.fillStyle = '#ece4d6'; g.fillText(txt, lx, ly); };
+    const v = W.def.id === 'rock' ? W.def.village : null; if (v) label('Stalagmere', v.cx, v.cy - v.ry + 6);
+    (W.meta.labels || []).forEach((l) => { if (z >= (l.minZ || 0)) label(l.name, l.x, l.y); });
+    g.textAlign = 'left';
+  };
+  const zoomAt = (f, mx, my) => { const c = $('#mapc'); const z0 = MV.z; const wx = MV.cx + (mx - c.width / 2) / z0, wy = MV.cy + (my - c.height / 2) / z0; MV.z = RW.clamp(z0 * f, fitZ(), 24); MV.cx = wx - (mx - c.width / 2) / MV.z; MV.cy = wy - (my - c.height / 2) / MV.z; U.drawMap(); };
+  {
+    const c = $('#mapc'); const toCanvas = (e) => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+    c.addEventListener('wheel', (e) => { e.preventDefault(); e.stopPropagation(); const [mx, my] = toCanvas(e); zoomAt(e.deltaY < 0 ? 1.25 : 0.8, mx, my); }, { passive: false });
+    let drag = null;
+    c.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); drag = { x: e.clientX, y: e.clientY, cx: MV.cx, cy: MV.cy }; c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointermove', (e) => { if (!drag) return; const r = c.getBoundingClientRect(), k = c.width / r.width / MV.z; MV.cx = drag.cx - (e.clientX - drag.x) * k; MV.cy = drag.cy - (e.clientY - drag.y) * k; U.drawMap(); });
+    c.addEventListener('pointerup', () => { drag = null; }); c.addEventListener('pointercancel', () => { drag = null; });
+    c.addEventListener('dblclick', (e) => { const [mx, my] = toCanvas(e); zoomAt(2, mx, my); });
+    $('#m-in').onclick = () => zoomAt(1.5, c.width / 2, c.height / 2);
+    $('#m-out').onclick = () => zoomAt(1 / 1.5, c.width / 2, c.height / 2);
+    $('#m-me').onclick = () => { const p = P(); MV.cx = p.x / 16; MV.cy = p.y / 16; if (MV.z < 3) MV.z = 4; U.drawMap(); };
+    $('#m-all').onclick = () => { const W = RW.world; MV.z = fitZ(); MV.cx = W.W / 2; MV.cy = W.H / 2; U.drawMap(); };
+  }
+
+  // ---------------- chests ----------------
+  // Every chest opens (R or right-click). A treasure chest fills with its loot the first time anyone opens it; a
+  // storage chest starts empty. What's inside is kept in this browser, per world, so each player has their own.
+  const CH = (RW.chests = {});
+  const chKey = () => 'chests_' + (RW.world.def.store || RW.world.def.id);
+  CH.all = () => { const k = chKey(); if (CH._k !== k) { CH._k = k; CH._d = RW.store.get(k, {}) || {}; } return CH._d; };
+  CH.save = () => RW.store.set(chKey(), CH.all());
+  CH.size = (t) => (t.storage ? 20 : 10);
+  CH.ensure = function (x, y) {
+    const all = CH.all(), key = x + ',' + y; if (all[key]) return all[key];
+    const t = RW.world.tile(x, y); const box = new Array(CH.size(t)).fill(null);
+    const put = (id, n) => { if (!RW.ITEMS[id] || n <= 0) return; const max = RW.ITEMS[id].stack || 999; for (const s of box) if (s && s.id === id && s.n < max) { const k = Math.min(n, max - s.n); s.n += k; n -= k; } for (let i = 0; i < box.length && n > 0; i++) if (!box[i]) { const k = Math.min(n, max); box[i] = { id, n: k }; n -= k; } };
+    if (t.loot && RW.LOOT[t.loot]) {
+      const sp = RW.world.meta.special[key];
+      if (sp === 'gold') put('crystal_gold', 2); else if (sp && RW.ITEMS[sp]) { put(sp, 1); setTimeout(() => RW.ui.banner('Secret found', RW.ITEMS[sp].name), 200); }
+      RW.LOOT[t.loot].forEach(([iid, a, b, ch]) => { if (Math.random() < ch) put(iid, RW.randi(a, b)); });
+      P().flags['found_' + key] = 1;
+    }
+    all[key] = box; CH.save(); return box;
+  };
+  CH.take = (x, y) => { const all = CH.all(), key = x + ',' + y, box = all[key]; if (!box) return null; delete all[key]; CH.save(); return box; };
+  U.openChest = function (x, y) {
+    CH.ensure(x, y); U.chestAt = { x, y }; U.openModal('chest'); RW.audio.sfx('place'); U.renderChest();
+  };
+  U.renderChest = function () {
+    const at = U.chestAt; if (!at) return; const box = CH.ensure(at.x, at.y), p = P(), t = RW.world.tile(at.x, at.y);
+    $('#chest h3').textContent = t.name;
+    const slot = (s, onClick) => { const d = el('div', 'slot'); const c = el('canvas'); c.width = c.height = 16; paint(c, s && s.id); d.append(c); if (s && s.n > 1) d.append(el('span', 'n', s.n)); if (s) U.attachTip(d, () => ({ id: s.id })); d.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); }); return d; };
+    const cs = $('#chestslots'); cs.innerHTML = '';
+    box.forEach((s, i) => cs.append(slot(s, () => { if (!s) return; const left = p.add(s.id, s.n); if (left === s.n) { U.toast('Your bag is full.'); return; } if (left > 0) s.n = left; else box[i] = null; RW.audio.sfx('pickup'); done(); })));
+    const bg = $('#chestbag'); bg.innerHTML = '';
+    p.inv.forEach((s, i) => bg.append(slot(s, () => {
+      if (!s) return; const max = RW.ITEMS[s.id].stack || 999; let n = s.n;
+      for (const b of box) if (b && b.id === s.id && b.n < max) { const k = Math.min(n, max - b.n); b.n += k; n -= k; }
+      for (let j = 0; j < box.length && n > 0; j++) if (!box[j]) { const k = Math.min(n, max); box[j] = { id: s.id, n: k }; n -= k; }
+      if (n === s.n) { U.toast('The chest is full.'); return; }
+      if (n > 0) s.n = n; else p.inv[i] = null; RW.audio.sfx('place'); done();
+    })));
+    function done() { CH.save(); U.dirty(); RW.game.saveSoon(); U.renderChest(); }
+  };
+  $('#c-take').onclick = () => { const at = U.chestAt; if (!at) return; const box = CH.ensure(at.x, at.y), p = P(); let any = false, full = false; box.forEach((s, i) => { if (!s) return; const left = p.add(s.id, s.n); if (left < s.n) any = true; if (left > 0) { s.n = left; full = true; } else box[i] = null; }); if (any) RW.audio.sfx('pickup'); if (full) U.toast('Your bag is full.'); CH.save(); U.dirty(); RW.game.saveSoon(); U.renderChest(); };
 
   // ---------------- chat ----------------
   U.renderChat = function () {
@@ -7942,6 +8249,7 @@ window.RW = window.RW || {};
     if (e.key === 'Escape') { if (U.open) U.closeModal(); else if (RW.game.playing) U.openModal('pause'); return; }
     const I = RW.input, c = e.code;
     if (!RW.game.playing) { if (I.is(c, 'settings')) U.toggle('opts'); return; }
+    if (U.open === 'chest' && (I.is(c, 'interact') || I.is(c, 'bag'))) { e.preventDefault(); U.closeModal(); U._shutAt = performance.now(); return; }   // R or E shuts a chest
     if (I.is(c, 'bag')) { e.preventDefault(); U.toggle('inv'); }
     else if (I.is(c, 'map')) U.toggle('map');
     else if (I.is(c, 'guide')) U.toggle('guide');
@@ -8251,7 +8559,7 @@ window.RW = window.RW || {};
 
   // ====================== STAMINA ======================
   // every crystal you've eaten adds a little stamina (gold ones more), so old saves get it too
-  P.staminaBonus = () => { const s = P.stats || {}; return Math.round(((s.red || 0) + (s.blue || 0) + (s.green || 0) + (s.purple || 0)) * 2 + (s.gold || 0) * 5); };
+  P.staminaBonus = () => { const s = P.stats || {}; return Math.round(((s.red || 0) + (s.blue || 0) + (s.green || 0) + (s.purple || 0)) * 2 + (s.gold || 0) * 5 + ((P.flags && P.flags.goldStam) || 0) * 10); };
   P.maxStamina = () => 120 + P.staminaBonus();
   P.stamina = 120; P.stamT = 0; P.exhausted = false; P._dt = 1 / 60;
   const stamMul = () => (RW.world.def && RW.world.def.staminaMul) || 1;
@@ -9368,6 +9676,30 @@ window.RW = window.RW || {};
     e.fr = e.lash || e.angryT > 0 ? 1 : 0;
     RW.fx.light(c.x, c.y + 4, 0.3, 0.22, 0.08);
   };
+  // Raf Krabbi: walks the sea floor; start it and it scuttles at you, crackling, and shocks on contact
+  B.krabbi = function (e, dt, sp) {
+    e._dt = dt; anger(e, sp, 10); const pc = P.center(), c = ec(e); const wet = W().isWaterAt(c.x, c.y);
+    e.vy += (wet ? 160 : 900) * dt; if (wet) e.vy = Math.min(e.vy, 60);
+    const chase = e.angryT > 0 && !P.dead && dist(e) < 14 * TS;
+    if ((e.wt = (e.wt || 0) - dt) <= 0) { e.wt = 2 + Math.random() * 3; e.wd = Math.random() < 0.3 ? 0 : Math.random() < 0.5 ? -1 : 1; }
+    const dir = chase ? Math.sign(pc.x - c.x) || 1 : e.wd || 0;
+    e.vx = RW.lerp(e.vx, dir * sp.speed * (chase ? 1.6 : 0.5), dt * 4);
+    const r = walk(e, dt); if (r.wallL || r.wallR) e.wd = -(e.wd || 1);
+    if (!W().isWaterAt(c.x + dir * 14, c.y)) e.wd = -(e.wd || 1);
+    if (dir) e.face = dir; e.fr = dir ? Math.floor(e.t * 8) % 2 : 0; e.harmless = !chase;
+    if (chase && Math.random() < dt * 6) RW.fx.spawn({ x: c.x + RW.rand(-10, 10), y: e.y + RW.rand(0, 6), life: 0.2, color: RW.pick(['#bff8ff', '#6ae0ff']), add: true, kind: 'spark' });
+    if (chase && overlap(e, P) && P.invulnT <= 0) RW.fx.bolt(c.x, c.y, pc.x, pc.y);
+    RW.fx.light(c.x, c.y, 0.15, 0.4, 0.5);
+  };
+  // Su Grothyn: rooted to the floor. Poke it (or swim right up to it) and its vine whips you
+  B.grothyn = function (e, dt, sp) {
+    e._dt = dt; anger(e, sp, 8); const pc = P.center(), c = ec(e);
+    e.vy += 400 * dt; E.move(e, dt); e.vx = 0; e.harmless = true; e.face = 1;
+    e.gt = (e.gt == null ? 1 : e.gt) - dt;
+    const close = !P.dead && dist(e) < 3.5 * TS, cross = e.angryT > 0 || (close && dist(e) < 1.6 * TS);
+    if (cross && close && e.gt <= 0) { e.gt = 1.4; P.hurt(sp.dmg, Math.sign(pc.x - c.x) || 1, 'grothyn'); for (let k = 0; k < 8; k++) RW.fx.spawn({ x: c.x + (pc.x - c.x) * k / 8, y: e.y + (pc.y - e.y) * k / 8, life: 0.3, color: '#2a6a9a', kind: 'dot' }); RW.audio.sfx('swing'); }
+    e.fr = Math.floor(e.t * 1.5) % 2; RW.fx.light(c.x, e.y + 4, 0.15, 0.35, 0.6);
+  };
   // Kipsu: hunt in packs, bite and run off, then come round again
   B.kipsu = function (e, dt, sp) {
     if (!e.pack) { e.pack = true; if (!e.joined) for (let k = 0; k < 1 + Math.floor(Math.random() * 2); k++) { const o = E.spawnEnemy('kipsu', e.x + (k + 1) * 20 * (Math.random() < 0.5 ? -1 : 1), e.y); o.pack = true; o.joined = true; if (W().solid(Math.floor((o.x + o.w / 2) / TS), Math.floor((o.y + 2) / TS))) { o.x = e.x; } } }
@@ -9528,18 +9860,22 @@ window.RW = window.RW || {};
   // ====================== R: trapdoors, levers, rune stones, and the puzzles they solve ======================
   const baseInteract = P.interact;
   P.interact = function () {
+    if (RW.ui.open === 'chest') { RW.ui.closeModal(); return; }   // R shuts an open chest
+    if (performance.now() - (RW.ui._shutAt || 0) < 300) return;      // ...and that same press doesn't open it again
     const pc = P.center(); const Wd = W();
     if (E.npcs.some((n) => n.near && RW.dist(n.x + n.w / 2, n.y + n.h / 2, pc.x, pc.y) < 44)) return baseInteract();
     const tx = Math.floor(pc.x / TS), ty = Math.floor(pc.y / TS); let best = null, bd = 99;
     for (let y = ty - 2; y <= ty + 2; y++) for (let x = tx - 2; x <= tx + 2; x++) {
-      const t = Wd.tile(x, y); if (!t.toggle && t.key !== 'runestone' && t.key !== 'runestone_lit') continue;
-      const d = Math.abs(x - tx) + Math.abs(y - ty) * 1.2; if (d < bd) { bd = d; best = [x, y, t]; }
+      const t = Wd.tile(x, y); const mine = t.toggle || t.use || t.loot || t.storage || t.key === 'runestone' || t.key === 'runestone_lit';
+      if (!mine && !t.read && !t.altar && t.decor !== 'rift') continue;
+      const d = Math.abs(x - tx) + Math.abs(y - ty) * 1.2; if (d < bd) { bd = d; best = [x, y, t, mine]; }
     }
-    if (!best) return baseInteract();
+    if (best && !best[3] && best[2].read) { const idx = Wd.meta.carvings[best[0] + ',' + best[1]]; RW.ui.carving(idx == null ? 0 : idx); P.flags['read_' + Wd.def.id + idx] = 1; return; }   // the nearest carving or memory core
+    if (!best || !best[3]) return baseInteract();   // an altar or a rift
     useBlock(best[0], best[1], best[2]);
   };
   // right-click on a door, trapdoor, lever or rune within reach does the same as R
-  P.useTile = function (x, y) { const t = W().tile(x, y); if (!t.toggle && t.key !== 'runestone' && t.key !== 'runestone_lit') return false; useBlock(x, y, t); return true; };
+  P.useTile = function (x, y) { const t = W().tile(x, y); if (!t.toggle && !t.use && !t.loot && !t.storage && t.key !== 'runestone' && t.key !== 'runestone_lit') return false; useBlock(x, y, t); return true; };
   // a door is a stack of door blocks: open or shut the whole stack together
   const doorStack = (x, y) => { const Wd = W(), out = []; let y0 = y; while (RW.TILES[Wd.get(x, y0 - 1)].door) y0--; for (let yy = y0; RW.TILES[Wd.get(x, yy)].door; yy++) out.push(yy); return out; };
   const setDoor = (x, y, open) => { doorStack(x, y).forEach((yy) => W().setTile(x, yy, open ? RW.T.door_open : RW.T.door)); };
@@ -9549,6 +9885,15 @@ window.RW = window.RW || {};
     const Wd = W(), T = RW.T;
     if (t.key === 'runestone_lit') { RW.ui.toast('The rune is already glowing.'); return; }
     if (t.key === 'runestone') { Wd.setTile(x, y, T.runestone_lit); RW.audio.sfx('crystal'); runeTouched(x, y); return; }
+    if (t.loot || t.storage) { RW.ui.openChest(x, y); return; }
+    if (t.use === 'cannon') {
+      if (!P.has('eldi_seed', 1)) { RW.ui.toast('The cannon is cold. Only an Eldi seed will fire it.'); RW.audio.sfx('deny'); return; }
+      P.remove('eldi_seed', 1); RW.ui.dirty();
+      const cx = x * TS + 14, cy = y * TS + 5; RW.audio.sfx('fire'); RW.fx.shake(6, 0.6); RW.fx.flash('#ffb04a', 0.35);
+      for (let k = 0; k < 40; k++) RW.fx.spawn({ x: cx, y: cy, vx: RW.rand(40, 260), vy: RW.rand(-220, -40), life: 1.2, color: RW.pick(['#ff7a2e', '#ffb347', '#ffe08a']), add: true, kind: 'ember', grav: 120 });
+      E.shots.push({ x: cx, y: cy, vx: 420, vy: -260, grav: 160, life: 4, owner: 'p', dmg: 120, kind: 'fire' });
+      P.flags.cannon_fired = 1; RW.ui.banner('BOOM', 'The Ember fires one last salute.'); RW.game.saveSoon(); return;
+    }
     if (t.door) { const ys = doorStack(x, y); if (!t.open || !blocked(x, ys)) { setDoor(x, y, !t.open); RW.audio.sfx('swing'); autoShut.delete(x + ',' + ys[0]); } return; }
     if (t.key === 'trapdoor_open' && blocked(x, [y])) return;
     Wd.setTile(x, y, T[t.toggle]); RW.audio.sfx(t.decor === 'lever' ? 'place' : 'swing');
@@ -9624,6 +9969,9 @@ window.RW = window.RW || {};
     if (q.kind === 'kill') return [Math.min(q.n, (P.seen[q.sp] || 0) - (P.flags['qs_' + id] || 0)), q.n];
     if (q.kind === 'meet') return [P.flags['met_' + q.sp] ? 1 : 0, 1];
     if (q.kind === 'visit') return [P.flags['zone_acorn_' + q.zone] ? 1 : 0, 1];
+    if (q.kind === 'flag') return [P.flags[q.flag] ? 1 : 0, 1];
+    if (q.kind === 'sneak') return [P.flags['qr_' + id] ? 1 : 0, 1];
+    if (q.kind === 'read') { let k = 0; for (let i = 0; i < q.n; i++) if (P.flags['read_acorn' + (q.from + i)]) k++; return [k, q.n]; }
     return [0, 1];
   };
   Q.ready = (id) => { const [a, b] = Q.progress(id); return a >= b; };
@@ -9632,12 +9980,16 @@ window.RW = window.RW || {};
     if (q.kind === 'bring') return RW.ITEMS[q.item].name + ' ' + a + '/' + b;
     if (q.kind === 'kill') return RW.SPECIES[q.sp].name + ' ' + a + '/' + b;
     if (q.kind === 'meet') return a ? 'Seen a ' + RW.SPECIES[q.sp].name : 'Find a ' + RW.SPECIES[q.sp].name;
+    if (q.kind === 'flag') return a ? 'Done' : 'Not yet';
+    if (q.kind === 'sneak') return a ? 'Done, unseen' : 'Get there unseen';
+    if (q.kind === 'read') return 'Memories heard ' + a + '/' + b;
     return a ? 'Found it' : 'Go to ' + ((RW.WORLDS.acorn.zones[q.zone] || {}).name || q.zone);
   };
   Q.accept = function (id) {
     const q = RW.QUESTS[id]; P.flags['q_' + id] = 1;
     if (q.kind === 'kill') P.flags['qs_' + id] = P.seen[q.sp] || 0;
     if (q.kind === 'meet') delete P.flags['met_' + q.sp];   // go and see one now, not one you passed long ago
+    if (q.kind === 'sneak') { P.flags['qc_' + id] = P.flags.caught || 0; delete P.flags['qr_' + id]; if (q.give && !P.has(q.give, 1)) P.add(q.give, 1); }
     RW.audio.sfx('ui'); U.toast('New job from ' + RW.SPECIES[q.npc].name + ': ' + q.title + '.'); RW.game.saveSoon(); Q.refresh(true);
   };
   Q.handIn = function (id) {
@@ -9646,8 +9998,48 @@ window.RW = window.RW || {};
     q.reward.forEach(([item, n]) => { const left = P.add(item, n); if (left > 0) E.dropItem(item, left, P.x + P.w / 2, P.y); });
     P.flags['q_' + id] = 2; RW.audio.sfx('craft');
     U.banner('Job done', q.title + ': ' + q.reward.map(([item, n]) => n + ' ' + RW.ITEMS[item].name).join(', '));
-    RW.game.saveSoon(); Q.refresh(true); return true;
+    RW.game.saveSoon(); Q.refresh(true);
+    if (q.finale != null) setTimeout(() => { U.closeModal(); U.carving(q.finale); }, 1600);   // the whole story, together
+    return true;
   };
+  // sneaking jobs: get to the spot without a guard catching you; get caught and the job is off until you ask again
+  function updateSneaks() {
+    if (RW.world.def.id !== 'acorn') return; const M = RW.world.meta, pc = P.center();
+    Q.active().forEach((id) => {
+      const q = RW.QUESTS[id]; if (q.kind !== 'sneak' || P.flags['qr_' + id]) return;
+      if ((P.flags.caught || 0) > (P.flags['qc_' + id] || 0)) { P.flags['q_' + id] = 0; U.toast(q.fail || 'Caught! The job is off. Ask again to have another go.'); Q.refresh(true); return; }
+      const t = M[q.target]; if (!t) return;
+      if (RW.dist(pc.x, pc.y, t.x * TS + 8, t.y * TS + 8) < 2.2 * TS) { P.flags['qr_' + id] = 1; if (q.give) { P.remove(q.give, 1); U.dirty(); U.toast('You slip the plan back onto the shelf.'); } else U.toast('Made it, and nobody saw.'); RW.audio.sfx('pickup'); Q.refresh(true); }
+    });
+  }
+
+  // ---- Pebble's game: she flings mud balls, you catch as many as you can in 30 seconds ----
+  const MG = (Q.mud = { on: false });
+  Q.startMud = function () {
+    const peb = E.npcs.find((n) => n.id === 'pebble'); if (!peb) return;
+    Object.assign(MG, { on: true, t: 30, score: 0, balls: [], next: 0.6, peb });
+    U.closeModal(); U.banner('Catch!', 'Pebble is throwing mud. Catch it before it lands.'); RW.audio.sfx('ui');
+  };
+  function updateMud(dt) {
+    if (!MG.on) return; const pc = P.center(), peb = MG.peb;
+    MG.t -= dt; MG.next -= dt;
+    if (MG.next <= 0 && MG.t > 1) { MG.next = Math.max(0.45, 0.95 - (30 - MG.t) * 0.015); MG.balls.push({ x: peb.x + peb.w / 2, y: peb.y - 4, vx: (Math.random() < 0.5 ? -1 : 1) * RW.rand(50, 175), vy: -RW.rand(290, 380) }); RW.audio.sfx('swing'); }
+    for (let i = MG.balls.length - 1; i >= 0; i--) {
+      const b = MG.balls[i]; b.vy += 520 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+      if (RW.dist(b.x, b.y, pc.x, pc.y) < 13) { MG.score++; RW.fx.text(b.x, b.y - 6, '+1', '#e8c88a'); RW.audio.sfx('pickup'); MG.balls.splice(i, 1); continue; }
+      if (b.vy > 0 && RW.world.solid(Math.floor(b.x / TS), Math.floor((b.y + 3) / TS))) { RW.fx.debris(b.x, b.y, ['#5a4632', '#7a5e42'], 6); MG.balls.splice(i, 1); }
+    }
+    if (MG.t <= 0 || RW.dist(pc.x, pc.y, peb.x, peb.y) > 30 * TS || P.dead) endMud();
+  }
+  function endMud() {
+    MG.on = false; MG.balls = []; const n = MG.score; const prize = [];
+    if (n >= 4) prize.push(['berry', 4]); if (n >= 8) prize.push(['torch', 4], ['uff_petal', 2]); if (n >= 12) prize.push(['crystal_green', 1]);
+    if (n >= 16 && !P.flags.mud_gold) { prize.push(['crystal_gold', 1]); P.flags.mud_gold = 1; }
+    prize.forEach(([id, k]) => { const left = P.add(id, k); if (left > 0) E.dropItem(id, left, P.x, P.y); });
+    const best = P.flags.mud_best || 0; if (n > best) P.flags.mud_best = n;
+    U.banner(n + ' caught!', (n > best ? 'A new best! ' : 'Best: ' + Math.max(best, n) + '. ') + (prize.length ? 'Brannoc gives you ' + prize.map(([id, k]) => k + ' ' + RW.ITEMS[id].name).join(', ') + '.' : 'Pebble wants a rematch.'));
+    RW.game.saveSoon(); U.dirty();
+  }
   Q.active = () => Object.keys(RW.QUESTS).filter((id) => st(id) === 1);
 
   // ---- talking: the job sits beside the other buttons in the talk box ----
@@ -9657,6 +10049,7 @@ window.RW = window.RW || {};
     const cfg = RW.NPCS[npc.id]; if (!cfg || !cfg.quests) return;
     const says = document.querySelector('#talk .says'), acts = document.querySelector('#talk .acts');
     const btn = (label, f, primary) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small' + (primary ? ' primary' : ''); b.textContent = label; b.onclick = f; acts.insertBefore(b, acts.lastChild); return b; };
+    if (cfg.mudgame) btn(MG.on ? 'Pebble is busy' : 'Play catch with Pebble', () => { if (!MG.on) Q.startMud(); });
     const id = Q.current(npc.id);
     if (!id) { const all = cfg.quests.every((q) => st(q) === 2); btn('Any more work?', () => { says.textContent = all ? 'Not today. You\'ve done plenty. Capstead owes you one.' : 'Not right now. Come back another time, there might be something.'; }); return; }
     const q = RW.QUESTS[id];
@@ -9679,6 +10072,11 @@ window.RW = window.RW || {};
       const x = n.x + ox + n.w / 2, y = n.y + oy - (n.near ? 26 : 10) + Math.sin(time * 4) * 2;
       g.font = '16px VT323, monospace'; g.textAlign = 'center'; g.fillStyle = '#0c0a10'; g.fillText(mark, x + 1, y + 1); g.fillStyle = mark === '!' ? '#ffd84a' : '#8dff8a'; g.fillText(mark, x, y); g.textAlign = 'left';
     });
+    if (MG.on) {
+      MG.balls.forEach((b) => { g.fillStyle = '#5a4632'; g.beginPath(); g.arc(b.x + ox, b.y + oy, 3, 0, 6.29); g.fill(); g.fillStyle = '#8a6e50'; g.fillRect(Math.round(b.x + ox - 1), Math.round(b.y + oy - 2), 1, 1); });
+      const p = MG.peb, tx = p.x + ox + p.w / 2, ty = p.y + oy - 22;
+      g.font = '14px VT323, monospace'; g.textAlign = 'center'; g.fillStyle = '#0c0a10'; g.fillText('Caught ' + MG.score + '   ' + Math.ceil(MG.t) + 's', tx + 1, ty + 1); g.fillStyle = '#ffe9b0'; g.fillText('Caught ' + MG.score + '   ' + Math.ceil(MG.t) + 's', tx, ty); g.textAlign = 'left';
+    }
   };
 
   // ---- noticing things: creatures you got close to, places you've been ----
@@ -9689,6 +10087,7 @@ window.RW = window.RW || {};
     const pc = P.center();
     E.enemies.forEach((e) => { if (!e.dead && RW.dist(e.x + e.w / 2, e.y + e.h / 2, pc.x, pc.y) < 7 * TS) P.flags['met_' + e.sp] = 1; });
     const z = RW.world.zoneAt(Math.floor(pc.x / TS), Math.floor(pc.y / TS)); P.flags['zone_acorn_' + z] = 1;
+    updateSneaks(); updateMud(dt);
   };
 
   // ---- the job list under your health bars ----
