@@ -17,6 +17,9 @@ Everything here is in Acorn World.
 - **Fishing.** Make a fishing rod (4 wood, 2 living vines), hold it and right-click water to cast. When the bobber dips and you see a "!", right-click to reel in. Sea Perch, Glowfin, pearls and Krabbi shells in the sea, river trout in the Gorge, carp in ponds and cave pools, and old boots everywhere. Nutmeg has a new job: three carp for supper.
 - **Farming.** Berries, Uff petals and Kofi grass can be planted on farm soil and grow back when you harvest them. Farm soil can now be made from 2 dirt and a berry.
 - **Orrin's building contest.** Build anything between the stakes east of Capstead, then ask Orrin to judge it. He scores size and how many different blocks you used, with bronze, silver and gold prizes.
+- **Build over leaves.** Leaves, tree trunks, tall grass, flowers and hanging moss are background: place a block right over them.
+- **Walk in front of chests and workbenches** (and every crafting station). They're furniture now, not walls. Guards still can't see through a chest, so they still hide you in the keep.
+- **Brighter trees, flickering light.** The home trees, the keep's tower trees and the library tree have wall torches on every floor, Capstead, the keep and the grove are lit a little brighter, and lanterns, torches, campfires and forges flicker.
 - Fixed: night never actually came for the creatures. Things that only come out at night (Malsti Punks, Makari, the Lutut), bigger night spawns and the guards' shorter sight at night now really happen at night.
 
 ## v1.7

@@ -746,6 +746,12 @@ window.RW = window.RW || {};
   add({ key: 'stake', name: 'Plot Stake', hard: 99, decor: 'stake', lockedMsg: 'A stake marking Orrin\'s building plot.' });
   add({ key: 'stairplank', name: 'Wood Stairs', platform: true, stair: true, hard: 1, time: 0.3, drop: 'wood_stairs', decor: 'stair' });
 
+  // chests and crafting stations are furniture: you walk in front of them (they still hide you from guards: cover)
+  T.forEach((t) => { if (t.loot || t.storage || t.station) { t.solid = false; t.cover = true; } });
+  // firelight flickers
+  ['lantern', 'torchwall', 'campfire', 'forge'].forEach((k) => { const t = T.find((x) => x.key === k); if (t) t.flicker = true; });
+  // leaves, trunks, grass and moss sit in the background: you can build right over them
+  T.forEach((t) => { if (!t.solid && (t.tree || ['tallgrass', 'flower', 'vines', 'kelp', 'coral', 'cleaf'].includes(t.key))) t.soft = true; });
   RW.TILES = T;
   RW.T = {}; T.forEach((t) => (RW.T[t.key] = t.id));
 
@@ -2785,8 +2791,8 @@ window.RW = window.RW || {};
     },
     zoneAt(x, y) { return C ? C.zone(x, y) : 'jungle'; },
     ambientAt(x, y) {
-      if (inR(VILR, x, y) || inR(KEEPR, x, y)) return 0.38;
-      if (inR(GROVER, x, y)) return 0.32;
+      if (inR(VILR, x, y) || inR(KEEPR, x, y)) return 0.46;
+      if (inR(GROVER, x, y)) return 0.4;
       if (inR(CAMPR, x, y)) return 0.24;
       return y > 270 ? 0.12 : 0.18;
     },
@@ -2932,7 +2938,7 @@ window.RW = window.RW || {};
     hang(0, -1); hang(0, 1);
     // furnish each floor: a lantern, and something on it
     for (let k = 0; k <= TFLOORS; k++) {
-      const y = fy(k); c.set(Math.round(cx), y - 7, T.lantern);
+      const y = fy(k); c.set(Math.round(cx), y - 7, T.lantern); c.set(ix0, y - 4, T.torchwall); c.set(ix1, y - 4, T.torchwall);
       const spot = k % 2 ? ix0 + 2 : ix1 - 2;
       const what = [null, 'keepchest', 'bookshelf', 'woodchest', 'banner_a', 'bookshelf', 'woodchest', 'keepchest'][k];
       if (what && k) { if (what === 'banner_a') c.set(spot, y - 4, T.banner_a); else if (what === 'bookshelf') { c.set(spot, y - 1, T.bookshelf); c.set(spot, y - 2, T.bookshelf); } else c.set(spot, y - 1, T[what === 'keepchest' ? 'woodchest' : what]); }
@@ -3030,7 +3036,7 @@ window.RW = window.RW || {};
     for (let k = 3; k < floors; k += 2) { const s = (k + ix0) % 4 < 2 ? -1 : 1, y0 = gy - FH * k - 3, bx = s < 0 ? wl - 1 : wr + 1; for (let i = 0; i < 5; i++) { c.set(bx + s * i, y0 - (i >> 1), T.bark); c.set(bx + s * i, y0 - (i >> 1) + 1, T.bark); } c.disc(bx + s * 6, y0 - 3, 4, T.oakleaves, (t) => t === T.air); }
     fill(c, ix0, top + 2, ix1, gy - 1, T.air, WL.heart);
     for (let x = ix0; x <= ix1; x++) c.set(x, gy, T.heartplank);
-    for (let k = 1; k <= floors; k++) { const y = gy - FH * k; for (let x = ix0; x <= ix1; x++) c.set(x, y, T.heartplank); c.set(ix0 + 1, y, T.trapdoor); c.set(Math.round(cx) + 1, y - 5, T.lantern); }
+    for (let k = 1; k <= floors; k++) { const y = gy - FH * k; for (let x = ix0; x <= ix1; x++) c.set(x, y, T.heartplank); c.set(ix0 + 1, y, T.trapdoor); c.set(Math.round(cx) + 1, y - 5, T.lantern); c.set(ix1, y - 3, T.torchwall); }
     ladder(c, ix0 + 1, gy - FH * floors + 1, gy - 1);
     for (let k = 1; k <= floors; k++) ladder(c, ix0 + 1, gy - FH * k + 1, gy - FH * (k - 1) - 1);
     const door = (k, side) => { const y0 = gy - FH * k; for (let y = y0 - 3; y < y0; y++) for (let x = side < 0 ? wl - 3 : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr + 3); x++) { if (c.get(x, y) === T.bark) c.set(x, y, T.air); if ((x < wl || x > wr) && c.bg[c.I(x, y)] === WL.heart) c.setb(x, y, 0); } for (let x = side < 0 ? wl : ix1 + 1; x <= (side < 0 ? ix0 - 1 : wr); x++) c.set(x, y0, T.heartplank); };
@@ -3165,7 +3171,7 @@ window.RW = window.RW || {};
     fill(c, L.x0 + 2, top + 2, L.x1 - 2, gy - 1, T.air, WL.living);
     for (let y = gy - 3; y < gy; y++) for (let x = L.x0 - 2; x <= L.x0 + 1; x++) c.set(x, y, T.air);
     for (let y = gy - 3; y < gy; y++) for (let x = L.x1 - 1; x <= L.x1 + 2; x++) c.set(x, y, T.air);
-    for (let k = 1; k <= 3; k++) { const y = gy - 10 * k; for (let x = L.x0 + 2; x <= L.x1 - 2; x++) c.set(x, y, T.heartplank); c.set(L.x0 + 3, y, T.trapdoor); ladder(c, L.x0 + 3, y + 1, y + 9); c.set(L.x1 - 4, y - 6, T.lantern); }
+    for (let k = 1; k <= 3; k++) { const y = gy - 10 * k; for (let x = L.x0 + 2; x <= L.x1 - 2; x++) c.set(x, y, T.heartplank); c.set(L.x0 + 3, y, T.trapdoor); ladder(c, L.x0 + 3, y + 1, y + 9); c.set(L.x1 - 4, y - 6, T.lantern); c.set(L.x0 + 2, y - 4, T.torchwall); }
     c.set(L.x1 - 3, gy - 1, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 1)] = 7;
     c.set(L.x1 - 3, gy - 11, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 11)] = 8;
     c.set(L.x1 - 3, gy - 21, T.memorystone); c.meta.carvings[(L.x1 - 3) + ',' + (gy - 21)] = 9;
@@ -5568,7 +5574,7 @@ window.RW = window.RW || {};
     L.x0 = x0; L.y0 = y0;
     if (WD.dirtySky) WD.recalcSky();
     const T = RW.T, TL = RW.TILES; const sea = WD.def.sea;
-    const amb = 0.035;
+    const amb = 0.035, now = performance.now() / 1000;
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
       const x = x0 + i, y = y0 + j, k = j * w + i;
       let r = 0, g = 0, b = 0, d = 0.88;
@@ -5583,7 +5589,7 @@ window.RW = window.RW || {};
         const a = (WD.def.ambientAt ? WD.def.ambientAt(x, y) : amb) + WD.ambBoost;
         if (WD.bg[y * WD.W + x] || tt.solid) { const ac = WD.def.ambientColor; if (ac) { r = a * ac[0]; g = a * ac[1]; b = a * ac[2]; } else { r = a * 0.95; g = a * 0.92; b = a * 1.1; } }
       }
-      if (tt.light) { const l = tt.light; r = Math.max(r, l[0]); g = Math.max(g, l[1]); b = Math.max(b, l[2]); }
+      if (tt.light) { const l = tt.light, f = tt.flicker ? 0.82 + 0.12 * Math.sin(now * 9 + x * 1.7 + y * 3.1) + 0.06 * Math.sin(now * 23 + x * 5.3 + y * 0.7) : 1; r = Math.max(r, l[0] * f); g = Math.max(g, l[1] * f); b = Math.max(b, l[2] * f); }
       L.r[k] = r; L.g[k] = g; L.b[k] = b; L.dec[k] = d;
     }
     // dynamic lights (player glow, spells, sparks)
@@ -6400,7 +6406,7 @@ window.RW = window.RW || {};
   P.tryPlace = function (tx, ty, item, reach) {
     const W = RW.world; const cur = W.get(tx, ty);
     if (!reach) return;
-    if (cur !== T().air && cur !== T().water) return;
+    if (cur !== T().air && cur !== T().water && !RW.TILES[cur].soft) return;
     if (item.kind === 'torch' && cur === T().water) { RW.ui.toast('A torch won\'t stay lit underwater.'); return; }
     const tile = RW.TILES[T()[item.place]];
     if (tile.solid && overlap({ x: tx * TS, y: ty * TS, w: TS, h: TS }, P)) return;
@@ -9997,11 +10003,12 @@ window.RW = window.RW || {};
   // a line of sight, checked every 4 pixels; anything solid (or a shut door) in the way blocks it
   function sightLine(ax, ay, bx, by) {
     const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / 4);
-    for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n; if (W().solid(Math.floor(x / TS), Math.floor(y / TS))) return false; }
+    for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n; if (blocksSight(Math.floor(x / TS), Math.floor(y / TS))) return false; }
     return true;
   }
   // how far the guard can see along one direction before something blocks it
-  function sightRay(ax, ay, a, max) { const c = Math.cos(a), s = Math.sin(a); for (let d = 4; d < max; d += 4) { const x = ax + c * d, y = ay + s * d; if (W().solid(Math.floor(x / TS), Math.floor(y / TS))) return d; } return max; }
+  function sightRay(ax, ay, a, max) { const c = Math.cos(a), s = Math.sin(a); for (let d = 4; d < max; d += 4) { const x = ax + c * d, y = ay + s * d; if (blocksSight(Math.floor(x / TS), Math.floor(y / TS))) return d; } return max; }
+  function blocksSight(tx, ty) { const t = W().tile(tx, ty); return !!(t.solid || t.cover); }
   const CAUGHT = ['Hey! You can\'t be in here. Out you go.', 'Visitors stay in the courtyard. Come along now.', 'Nice try, little cap. Out.', 'The Master will hear about this. Out!'];
   function caught(n) {
     const M = RW.world.meta; caughtT = 3; E.npcs.forEach((g) => { if (g.guard) g.sus = 0; });
