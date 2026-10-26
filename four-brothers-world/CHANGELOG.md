@@ -20,6 +20,7 @@ Everything here is in Acorn World.
 - **Build over leaves.** Leaves, tree trunks, tall grass, flowers and hanging moss are background: place a block right over them.
 - **Walk in front of chests and workbenches** (and every crafting station). They're furniture now, not walls. Guards still can't see through a chest, so they still hide you in the keep.
 - **Brighter trees, flickering light.** The home trees, the keep's tower trees and the library tree have wall torches on every floor, Capstead, the keep and the grove are lit a little brighter, and lanterns, torches, campfires and forges flicker.
+- **Craft from nearby chests.** Anything in a chest within a few blocks of you (one you've opened before) counts when you craft, and so does a pet Punk's saddlebags. Your bag is used first, then the chests. The crafting panel says how many chests are in reach.
 - Fixed: night never actually came for the creatures. Things that only come out at night (Malsti Punks, Makari, the Lutut), bigger night spawns and the guards' shorter sight at night now really happen at night.
 
 ## v1.7

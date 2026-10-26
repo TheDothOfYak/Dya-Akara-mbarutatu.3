@@ -8171,9 +8171,10 @@ window.RW = window.RW || {};
     const f = $('#cfilter'); f.innerHTML = '';
     [['can', 'Can make'], ['all', 'All recipes']].forEach(([k, n]) => { const b = el('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', U.craftFilter === k); b.onclick = () => { U.craftFilter = k; U.renderCraft(); }; f.append(b); });
     const near = { knap: P().nearStation('knap'), forge: P().nearStation('forge'), grow: P().nearStation('grow') };
-    f.append(el('span', 'label', ' Near: hands' + (near.knap ? ', knapping stone' : '') + (near.forge ? ', forge' : '') + (near.grow ? ', growing altar' : '')));
+    const boxes = RW.chests.nearby();
+    f.append(el('span', 'label', ' Near: hands' + (near.knap ? ', knapping stone' : '') + (near.forge ? ', forge' : '') + (near.grow ? ', growing altar' : '') + (boxes.length ? ', ' + boxes.length + (boxes.length > 1 ? ' chests' : ' chest') : '')));
     const list = $('#rlist'); list.innerHTML = '';
-    const p = P();
+    const p = Object.assign({}, P(), { count: (id) => P().count(id) + RW.chests.nearCount(id, boxes) });   // what's in nearby chests counts too
     const rows = RW.RECIPES.map((r) => {
       const haveAll = Object.entries(r.in).every(([id, n]) => p.count(id) >= n);
       const station = !r.at || near[r.at];
@@ -8197,9 +8198,10 @@ window.RW = window.RW || {};
     });
   };
   U.craft = function (r) {
-    const p = P();
-    if (!Object.entries(r.in).every(([id, n]) => p.count(id) >= n)) return;
-    Object.entries(r.in).forEach(([id, n]) => p.remove(id, n));
+    const p = P(), boxes = RW.chests.nearby();
+    if (!Object.entries(r.in).every(([id, n]) => p.count(id) + RW.chests.nearCount(id, boxes) >= n)) return;
+    // take from your bag first, then from the chests around you
+    Object.entries(r.in).forEach(([id, n]) => { const fromBag = Math.min(n, p.count(id)); p.remove(id, fromBag); if (n > fromBag) RW.chests.takeNear(id, n - fromBag, boxes); });
     p.add(r.out, r.n || 1); RW.audio.sfx('craft');
     if (r.at === 'forge') p.flags.used_forge = 1;
     const c = p.center(); RW.fx.burst(c.x, c.y - 10, r.at === 'forge' ? ['#ff9a3a', '#ffe08a'] : ['#c8c0b4', '#ffffff'], 14, 70, { add: true, kind: r.at === 'forge' ? 'ember' : 'glow', grav: -30 });
@@ -8388,6 +8390,21 @@ window.RW = window.RW || {};
       P().flags['found_' + key] = 1;
     }
     all[key] = box; CH.save(); return box;
+  };
+  // chests within reach of where you stand (ones that have been opened, so treasure isn't rolled by crafting), plus a pet's saddlebags
+  CH.nearby = function () {
+    const p = P(), all = CH.all(), TS = RW.TILE, tx = Math.floor((p.x + p.w / 2) / TS), ty = Math.floor((p.y + p.h / 2) / TS), out = [];
+    Object.keys(all).forEach((k) => {
+      if (k === 'pet_bags') { const pet = RW.ent.pet; if (pet && pet.sp === 'domestic_punk' && Math.abs(pet.x / TS - tx) <= 6 && Math.abs(pet.y / TS - ty) <= 4) out.push(k); return; }
+      const [x, y] = k.split(',').map(Number); const t = RW.world.tile(x, y);
+      if ((t.loot || t.storage) && Math.abs(x - tx) <= 6 && Math.abs(y - ty) <= 4) out.push(k);
+    });
+    return out;
+  };
+  CH.nearCount = (id, keys) => (keys || CH.nearby()).reduce((s, k) => s + CH.all()[k].reduce((a, it) => a + (it && it.id === id ? it.n : 0), 0), 0);
+  CH.takeNear = function (id, n, keys) {
+    (keys || CH.nearby()).forEach((k) => { const box = CH.all()[k]; box.forEach((it, i) => { if (n <= 0 || !it || it.id !== id) return; const t = Math.min(n, it.n); it.n -= t; n -= t; if (it.n <= 0) box[i] = null; }); });
+    CH.save();
   };
   CH.take = (x, y) => { const all = CH.all(), key = x + ',' + y, box = all[key]; if (!box) return null; delete all[key]; CH.save(); return box; };
   U.openChest = function (x, y) {
