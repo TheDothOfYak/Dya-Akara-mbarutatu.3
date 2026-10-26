@@ -105,3 +105,14 @@ Places come from `buildLife()` in `acornworld.js` (it fills `meta.waystones`, `m
 - **Crops:** give an item `plant: '<crop block>'` and make a block with `crop: '<item>'`, `decor: 'crop2'` and `grow` (seconds). It grows on farm soil.
 - **Weather:** the storm (`stormDay`), rain (`rainNow`) and market day all come from the shared real-time clock (480 seconds a day), so everyone sees the same weather.
 - **New carvings** for Acorn World go at the end of `CARVINGS_ACORN` (27 is Orrin's Plot sign).
+
+## Acorn World lore pieces (v1.9)
+Places come from `buildHighStep()`, `buildBog()` and `buildStatues()` in `acornworld.js` (they fill `meta.lift`, `meta.songs`, `meta.bog`, `meta.statues`, `meta.hammerRack`). The engine is `engine/entities6.js`; drawings are in `engine/art5.js`.
+- **Things you use from the bag:** give an item `kind: 'use'` and `use: '<name>'`, then add `E.itemUse[<name>] = (item) => {...}` in `entities6.js` (return `false` to keep the item). Right-click uses it. Scrolls are `use: 'scroll'` with `scroll: '<effect>'`; the effects are in `SCROLLS`.
+- **Song puzzles:** a `meta.puzzles` entry with `kind: 'song'`, `stones` (`[x, y, note]`), `order` (the notes in order) and `gate`. Song Stones are `songstone` blocks; their note is `meta.songs['x,y']`.
+- **Moving platforms:** put an object `{ mover: true, platform: true, x, y, w, h }` in `E.movers` and the player can stand on it (the High Step lift car is one).
+- **Statues:** add `{ x, y }` to `meta.statues`. No hunter spawns within 16 blocks of one, and nearby hunters back away.
+- **Disguises:** `E.guardMul(guard, dx, range)` scales how fast a guard grows suspicious (0 = doesn't notice). The guard's Aagac uses it.
+- **Quests:** any job can now hand you an item when you take it (`give`), and sneaking jobs can say what you put back (`slip`).
+- **Pets:** add a creature and its favourite food to `RW.TAME_FOODS` (Alstera Naga eat pond carp).
+- New carvings for Acorn World go at the end of `CARVINGS_ACORN` (28 to 36 are v1.9's).

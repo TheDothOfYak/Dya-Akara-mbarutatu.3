@@ -1,5 +1,20 @@
 # 4 Brothers World: versions
 
+## v1.9
+Everything here is in Acorn World, taken from the Mbaru Tatu lore.
+- **The High Step.** A plateau in the Broken Hills, west of the Kipsu den: a sheer cliff on its west side and a long, gentle slope down its east side. A counterweight lift runs up the cliff. Ring the bell (R) at either end: if the car is at the other end it comes to you for free; if it's here, one iron bar sends you up or down. Hoist the Stryx hauls the ropes; Gurt, the Keilia whose house built it, keeps them. Bring Gurt 12 climbing ropes for a Lift Token and ride free. The slope is the long way round.
+- **The Akai hall.** Four verses are cut into stones across the top of the High Step. A trapdoor near its east edge drops into a Keilia great hall with five Song Stones (R to make one sing). Sing the four verses in order and the hall sings back and opens a gate to the Akai Relic and a chest.
+- **The Awvadhi Bog**, in the Tangle east of the Memory Grove. Its mud changes colour and throws sparks, it's slow going, and digging it sometimes pops. Awvadhi (little bog diggers) live there and drop Relic Shavings. Brannoc wants six blocks of real bog mud for Pebble.
+- **The old statues.** Six old stone figures stand in the hills, the Megla Wood, the Tangle and the Canopy. No hunter turns up within 16 blocks of one, and any that wanders close backs away. At night their heads are turned toward you.
+- **New creatures.** The **Sru Vorn** (Tangle, Megla Wood, bog) growls once when you come onto its ground, then charges, spits acid and swings its spiked tail at anything behind it. The **Ular Naga** (Broken Hills, Canopy) loses a head for every fifth of its health, and seven seconds later the stump grows a new one (up to five) unless the stump is burning, so bring fire. **Alstera Naga** graze in little herds; tame one with a pond carp.
+- **Hobb's hammer.** Hobb, Brakka's young apprentice, is hiding in Capstead next to Orrin's cottage. He hit a Kipsu with his master hammer, and a Keilia who takes a hammer into a fight is banished. Phorus at the Memory Grove reshapes the hammer; then you sneak it back onto Brakka's hammer rack in the Master's quarters without a guard seeing you.
+- **Scrolls.** Single use: right-click to read one. Senna sells licensed ones on market day (Lamplight, Quick Feet, Homecoming and the Sneezes prank). At night Grisk the Fence stands at the old shrine in the Megla Wood and trades Black Scrolls (Fireball, Weather, Telekinesis) for Relic Shavings and other things.
+- **The guard's Aagac.** Make one at a workbench (3 Kofi hair, 2 planks, 1 iron bar) and wear it. In the keep, guards know each other by the hat, so they barely notice you; only one standing right next to you gets suspicious, and slowly. If a guard catches you in it, every guard knows that hat until the next day.
+- **Albali film.** Lethra trades it for 3 Albali dust. It heals you completely, but you can't move for 4 seconds. Mix it with a Naga scale at a workbench for Numbed Film: half the healing, and you can still move.
+- **Raising a Stryx.** Get a Stryx seedling from Brannoc's bog mud job, Lethra (4 bog mud) or Senna. Plant it on the ground and press R to tend it every so often (bog mud counts extra); hitting it counts against it. After five minutes it grows up: well tended, it guards the ground around it and lashes hunters; half tended, it dozes; neglected, it's a wild Stryx that only knows how to stab.
+- New gear: Vorn Fur Mantle, Tusk Maul and Ular Scale Mail.
+- The terrain under the new places is new, so any blocks you changed on that stretch of the Broken Hills, in the bog, or where a statue now stands may look odd there.
+
 ## v1.8
 Everything here is in Acorn World.
 - **Your buddy picks things up.** When there's nothing to fight, your acorn buddy runs over to anything lying on the ground nearby (and to fallen Albali fruit) and brings it to you. It leaves alone anything you threw down yourself.
