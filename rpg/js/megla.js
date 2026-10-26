@@ -1444,8 +1444,9 @@ export function createMegla(ctx) {
     });
   }
   /* ---- day three: out of the keep, back past the line, to the Punk who waited ---- */
-  function startWayHome(resume) {
-    stage = 'way'; sub = 'line'; ctx.save('way'); setLook('day', true); eclipseK = 0;
+  function startWayHome(resume, from) {
+    stage = 'way'; sub = 'ward'; ctx.save(from || 'way'); setLook('day', true); eclipseK = 0;
+    spawnSleeper(from === 'line');
     K.on = false; P.ride = false;
     if (!malsti) { malsti = buildMalstiPunk({ seed: 61 }); malsti.root.scale.setScalar(5.5); scene.add(malsti.root); }
     place(P, KEEP.x - 8, KEEP.z + KEEP.h + 10, 0);
@@ -1453,11 +1454,127 @@ export function createMegla(ctx) {
     if (!rodak.length) rodakPack(6, pathX(LINE_Z), LINE_Z + 4);
     rodak.forEach((r, i) => { r.a.root.visible = true; r.mode = 'sit'; r.home = V3(pathX(LINE_Z) + (i - 2.5) * 4.5, 0, LINE_Z + 2.5); r.pos.copy(r.home); r.pos.y = ground(r.pos.x, r.pos.z); });
     ctx.fade && ctx.fade(0, 1.2);
-    const go = () => say(M.home1, () => { objective(M.homeObj, 'South — back the way you came'); setGoal(pathX(LINE_Z), heightAt(pathX(LINE_Z), LINE_Z), LINE_Z); ctx.play(); });
+    const go = () => say(M.home1, () => keepWard());
+    if (from === 'hall') { place(P, RUINS.x - 4, RUINS.z - RUINS.r - 6, 0); malsti.root.position.copy(P.pos); startHall(); return; }
+    if (from === 'line') { place(P, RUINS.x - 6, RUINS.z + RUINS.r + 4, 0); malsti.root.position.copy(P.pos); if (GYN) GYN.a.root.visible = false; headSouth(); return; }
     if (resume) go();
     else cut([{ dur: 6, from: { p: [KEEP.x + 40, heightAt(KEEP.x, KEEP.z) + 30, KEEP.z + 60], l: [KEEP.x, heightAt(KEEP.x, KEEP.z), KEEP.z] }, to: { p: [KEEP.x + 20, heightAt(KEEP.x, KEEP.z) + 12, KEEP.z + 70], l: [KEEP.x - 8, heightAt(KEEP.x, KEEP.z) + 2, KEEP.z + KEEP.h + 10] }, caption: M.morning3 }], go);
   }
+  /* the keep asks who it should let in (main.js keeps the answer for later chapters) */
+  function keepWard() {
+    say(M.ward, () => ctx.ask('sniller', M.wardText, M.wardOpts.map((label, i) => ({ label, act: () => {
+      ctx.setFlag && ctx.setFlag('keepWard', i); sfx.sense();
+      say(M.wardSet, () => { sub = 'south'; objective(M.homeObj, 'South — back the way you came, through the ruins'); setGoal(RUINS.x, heightAt(RUINS.x, RUINS.z), RUINS.z); ctx.play(); });
+    } }))));
+  }
+  function headSouth() { sub = 'line'; objective(M.homeObj, 'South — back the way you came'); setGoal(pathX(LINE_Z), heightAt(pathX(LINE_Z), LINE_Z), LINE_Z); ctx.play(); }
+
+  /* ---- what sleeps under the hall: a great Gynge, the little one's own, fed by it on what it dragged home ---- */
+  const SLEEP = { x: RUINS.x + 14, z: RUINS.z };
+  let SLP = null;
+  function spawnSleeper(settled) {
+    if (SLP) return;
+    const a = cartoon(buildGynge({ seed: 211 })), s = 8, g = heightAt(SLEEP.x, SLEEP.z);
+    a.root.scale.setScalar(s); scene.add(a.root);
+    SLP = { a, s, g, yaw: -Math.PI / 2, ph: 'out', pt: 0, cycle: 0, stirs: 0, stirred: false, lines: 0, sung: -1, sink: settled ? 1 : 0, sinkTo: settled ? 1 : 0 };   // facing west, into the hall
+    a.root.rotation.y = SLP.yaw;
+    cyl(SLEEP.x, SLEEP.z, s * 0.62, g - 1, g + 4); indexSolids();
+  }
+  const mawSpot = () => V3(SLEEP.x + Math.sin(SLP.yaw) * SLP.s * 0.95, 0, SLEEP.z + Math.cos(SLP.yaw) * SLP.s * 0.95);
+  const hallAwake = () => stage === 'way' && (sub === 'creep' || sub === 'sing');
+  function sleeperTick(dt) {
+    const L = SLP;
+    L.pt += dt;
+    if (hallAwake()) {
+      if (L.ph === 'out' && L.pt > 3.4) { L.ph = 'in'; L.pt = 0; L.stirred = false; hallObjective(); sfx.sense(); }
+      else if (L.ph === 'in' && L.pt > 2.1) {
+        L.ph = 'out'; L.pt = 0; L.cycle++; hallObjective();
+        const m = mawSpot(); particles.burst(m.x, L.g + 1.2, m.z, 26, { color: 0xd8d0c0, speed: 4, size: 0.7, life: 1.1, gravity: -1 });   // a long warm breath out
+      }
+    } else { L.ph = 'out'; L.pt = Math.min(L.pt, 3); }
+    const swell = L.ph === 'in' ? smooth(0, 2.1, L.pt) : 1 - smooth(0, 1.4, L.pt);
+    L.sink = damp(L.sink, L.sinkTo, 0.5, dt);
+    L.a.root.position.set(SLEEP.x, L.g - lerp(0.45, 0.85, L.sink) * L.s + swell * 0.3, SLEEP.z);
+    L.a.animate(dt, { speed: 0, t, windup: 0, attack: hallAwake() && L.ph === 'in' ? 0.12 * swell : 0 });
+    if (hallAwake() && L.ph === 'in' && Math.random() < 0.6) {   // dust drawn in toward the mouth
+      const m = mawSpot(), a = Math.random() * TAU, r = 5 + Math.random() * 6;
+      particles.emit(m.x + Math.cos(a) * r, L.g + 0.4 + Math.random() * 2, m.z + Math.sin(a) * r, { vx: -Math.cos(a) * r * 0.5, vy: 0.1, vz: -Math.sin(a) * r * 0.5, color: 0xb8b0a0, size: 0.35, life: 1.6, drag: 0.5 });
+    }
+  }
+  function hallObjective() {
+    if (sub === 'creep') objective(M.creepObj(SLP.stirs), SLP.ph === 'in' ? M.breatheIn : M.breatheOut, 3, SLP.stirs);
+    else if (sub === 'sing') objective(M.singObj(SLP.lines), SLP.ph === 'in' ? M.breatheIn : M.breatheOut, 3, SLP.lines);
+  }
+  function startHall() {
+    sub = 'chase'; ctx.save('hall'); setGoal();
+    const R = RUINS;
+    D.blinks = [V3(R.x + 12, 0, R.z - 22), V3(R.x - 16, 0, R.z + 6), V3(R.x + 2, 0, R.z + 12)];   // round the end of the old wall, across the hall, to the south side
+    D.blinkI = 0; D.malstiAt = D.blinks[0].clone(); D.malstiAt.y = ground(D.malstiAt.x, D.malstiAt.z);
+    say(M.snatch, () => { objective(M.chaseObj, M.chaseHint); blinkFx(D.malstiAt); setGoal(D.malstiAt.x, D.malstiAt.y, D.malstiAt.z); ctx.play(); });
+  }
+  function blinkFx(p) { particles.burst(p.x, p.y + 0.5, p.z, 30, { color: 0xb070ff, speed: 5, size: 0.5, life: 0.6 }); sfx.sense(); }
+  function hallTick() {
+    const L = SLP;
+    if (sub === 'south' && P.pos.z > RUINS.z - RUINS.r - 4) startHall();
+    if (sub === 'chase' && Math.hypot(P.pos.x - D.malstiAt.x, P.pos.z - D.malstiAt.z) < 6) {
+      blinkFx(D.malstiAt);
+      D.blinkI++;
+      if (D.blinkI < D.blinks.length) {
+        D.malstiAt.copy(D.blinks[D.blinkI]); D.malstiAt.y = ground(D.malstiAt.x, D.malstiAt.z); blinkFx(D.malstiAt);
+        ctx.bark('tanoc15', M.blinkBarks[D.blinkI - 1], 2.6); setGoal(D.malstiAt.x, D.malstiAt.y, D.malstiAt.z);
+      } else {   // the last blink: to the lip of what sleeps under the hall
+        const m = mawSpot(); D.malstiAt.set(m.x, ground(m.x, m.z), m.z); blinkFx(D.malstiAt);
+        ctx.bark('tanoc15', M.blinkBarks[2], 3);
+        sub = 'seen'; setGoal();
+        D.creepFrom = V3(RUINS.x - 18, 0, RUINS.z - 4);
+        sayHeld(M.sleeperSee, (k, tt) => ({ p: V3(SLEEP.x - 22, L.g + 6, SLEEP.z + 14), l: V3(SLEEP.x - 4, L.g + 1.5, SLEEP.z) }), () => {
+          place(P, D.creepFrom.x, D.creepFrom.z, Math.PI / 2);
+          sub = 'creep'; L.ph = 'out'; L.pt = 0; L.stirs = 0; hallObjective();
+          D.pick = addItem(V3(D.malstiAt.x, D.malstiAt.y + 0.4, D.malstiAt.z), M.malstiLabel, () => {
+            if (L.ph === 'in') { stir(); return; }
+            dropItem(D.pick); D.malstiAt = null; sfx.ui();
+            ctx.say(M.gotMalsti, () => {
+              sub = 'sing'; L.lines = 0; hallObjective();
+              const m = mawSpot();
+              D.singIt = addItem(V3(m.x, ground(m.x, m.z) + 0.4, m.z), M.singLabel, () => singLine());
+              ctx.play();
+            });
+          });
+          ctx.play();
+        });
+      }
+    }
+    if (sub === 'creep' && L.ph === 'in' && !L.stirred && Math.hypot(P.vel.x, P.vel.z) > 1.2 && Math.hypot(P.pos.x - SLEEP.x, P.pos.z - SLEEP.z) < 34) stir();
+  }
+  function stir() {
+    const L = SLP; L.stirred = true; L.stirs++; shake = Math.max(shake, 0.25); sfx.slam();
+    if (sub === 'sing') { ctx.bark('sniller', M.singWrong, 2.6); hallObjective(); return; }
+    if (L.stirs < 3) { ctx.bark('tale', M.stirs[L.stirs - 1], 2.8); hallObjective(); return; }
+    // it snorts, and the hot breath of it throws him back across the hall
+    sub = 'woken'; shake = 1; sfx.roar();
+    const m = mawSpot(); particles.burst(m.x, L.g + 1.2, m.z, 60, { color: 0xd8c0a0, speed: 12, size: 0.8, life: 1, gravity: -2 });
+    P.vel.set(-10, 6, 0);
+    ctx.say(M.woke, () => { place(P, D.creepFrom.x, D.creepFrom.z, Math.PI / 2); sub = 'creep'; L.stirs = 0; L.ph = 'out'; L.pt = 0; hallObjective(); ctx.play(); });
+  }
+  function singLine() {
+    const L = SLP;
+    if (L.ph === 'in') { stir(); return; }
+    if (L.sung === L.cycle) { ctx.bark('sniller', 'One line to a breath. Wait for the next.', 2.4); return; }
+    L.sung = L.cycle; L.lines++; sfx.heal(); relicPulse = 0.6;
+    const m = mawSpot(); particles.ring(m.x, L.g + 1.4, m.z, 30, 3, { color: 0xc890ff, size: 0.5, life: 1 });
+    ctx.bark('tale', M.sungLines[L.lines - 1], 3.2); hallObjective();
+    if (L.lines >= 3) settle();
+  }
+  function settle() {
+    const L = SLP; sub = 'settled'; dropItem(D.singIt); setGoal(); L.sinkTo = 1;
+    cut([{ dur: 6, cam: (k, tt) => ({ p: V3(SLEEP.x - 20 + k * 4, L.g + 7 - k * 2, SLEEP.z + 16 - k * 4), l: V3(SLEEP.x - 3, L.g + 1, SLEEP.z) }), caption: M.settled[0][1],
+      onTick: k => { if (GYN && GYN.a.root.visible) { GYN.pos.y = lerp(heightAt(GY.x, GY.z) - 1.4, heightAt(GY.x, GY.z) - 7, smooth(0.3, 1, k)); if (k > 0.97) GYN.a.root.visible = false; } } }], () => {
+      say(M.settled.slice(1), () => { ctx.save('line'); headSouth(); });
+    });
+  }
+
   function wayTick() {
+    hallTick();
     if (sub === 'line' && P.pos.z > LINE_Z - 10) {
       sub = 'clearing';
       sayHeld(M.lineBack, (k, tt) => ({ p: V3(P.pos.x - 4, P.pos.y + 2.2, P.pos.z - 7), l: V3(pathX(LINE_Z), heightAt(pathX(LINE_Z), LINE_Z) + 1, LINE_Z + 2) }), () => {
@@ -1509,6 +1626,7 @@ export function createMegla(ctx) {
       else if (stage === 'way') wayTick();
       else if (stage === 'downhill') downhillTick();
     }
+    if (SLP) sleeperTick(dt);
     if (animal) { animal.root.position.y = heightAt(ANIMAL.x, ANIMAL.z) + 0.6 + Math.sin(t * 1.2) * 0.05; }   // breathing
     // the Relic in the wall: humming, and pulsing when it wakes
     relicPulse = Math.max(0, relicPulse - dt * 0.6);
@@ -1525,7 +1643,8 @@ export function createMegla(ctx) {
       }
     }
     amulet.children[1].material.opacity = 0.35 + Math.sin(t * (3 + (D.humK || 0) * 10)) * 0.15 + (bigSn ? 0.4 : 0) + (D.humK || 0);
-    if (malsti && sub !== 'ring') {   // at his heels, or up on his shoulder
+    if (malsti && D.malstiAt) { malsti.root.position.copy(D.malstiAt); malsti.root.rotation.y = Math.sin(t * 3) * 0.3; malsti.animate(dt, { speed: 0, t }); }   // off through the Duat, waiting where it landed
+    else if (malsti && sub !== 'ring') {   // at his heels, or up on his shoulder
       const tgt = V3(P.pos.x - Math.sin(P.yaw) * 1.2 + Math.cos(P.yaw) * 0.8, 0, P.pos.z - Math.cos(P.yaw) * 1.2 - Math.sin(P.yaw) * 0.8);
       malsti.root.position.lerp(tgt.setY(groundAt(tgt.x, tgt.z, P.pos.y + 1)), 1 - Math.exp(-6 * dt)); malsti.root.rotation.y = P.yaw;
       malsti.animate(dt, { speed: Math.hypot(P.vel.x, P.vel.z), t });
@@ -1605,7 +1724,7 @@ export function createMegla(ctx) {
     const mistDone = () => { for (const c of cairns) { c.lit = true; c.glow.material.opacity = 0.85; } };
     if (at === 'rocks') { rideFrom(ROCK_Z + 50); return; }
     if (at === 'mist') { rocksDone(); rideFrom(MIST_Z0 + 30); D.rocks = 'done'; return; }
-    if (at === 'clearing' || at === 'enter' || at === 'alone' || at === 'ruins' || at === 'gynge' || at === 'harvest' || at === 'day2' || at === 'keep' || at === 'sneak' || at === 'way' || at === 'downhill') { rocksDone(); mistDone(); }
+    if (at === 'clearing' || at === 'enter' || at === 'alone' || at === 'ruins' || at === 'gynge' || at === 'harvest' || at === 'day2' || at === 'keep' || at === 'sneak' || at === 'way' || at === 'hall' || at === 'line' || at === 'downhill') { rocksDone(); mistDone(); }
     if (at === 'clearing') { toClearing(); P.ride = true; arriveClearing(); return; }
     if (at === 'enter') { toClearing(); place(P, FIRE1.x + 2, FIRE1.z, Math.PI); place(K, FIRE1.x, FIRE1.z + 2, Math.PI); morning(); return; }
     if (at === 'alone' || at === 'ruins') { toClearing(); for (const r of rodak) { r.a.root.visible = false; r.pos.set(0, -80, 0); } place(P, FIRE1.x + 3, FIRE1.z - 4, Math.PI); place(K, FIRE1.x + 1, FIRE1.z + 2, Math.PI); K.stay = K.pos.clone(); buildAnimal(); stage = 'alone'; sub = 'animal'; setLook('grey', true); objective(M.aloneObj); setGoal(ANIMAL.x, heightAt(ANIMAL.x, ANIMAL.z), ANIMAL.z); ctx.play(); return; }
@@ -1614,6 +1733,7 @@ export function createMegla(ctx) {
     if (at === 'day2') { K.on = false; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; amped = true; startDay2(); return; }
     if (at === 'sneak') { K.on = false; amped = true; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; setLook('eclipse', true); eclipseK = 1; stage = 'day2'; sub = 'walk'; D = { waves: 2, sru: true, sruDone: true, eclipse: true }; startSneak(); return; }
     if (at === 'keep') { K.on = false; amped = true; setLook('eclipse', true); place(P, KEEP.x - 20, KEEP.z + KEEP.h + 36, Math.PI); stage = 'keep'; sub = 'climb'; D.eclipse = true; D.sneak = 'done'; startKeep(); return; }
+    if (at === 'hall' || at === 'line') { amped = true; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; startWayHome(true, at); return; }
     if (at === 'way') { amped = true; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; startWayHome(true); return; }
     if (at === 'downhill') {
       amped = true; stage = 'downhill'; sub = 'ride'; setLook('dusk', true);
@@ -1641,6 +1761,6 @@ export function createMegla(ctx) {
   return { solids: allSolid,
     start, update, render: () => composer.render(), interact, prompt, jump, attack, resize, dispose, useSlot, skip: () => cine.skip(), vine: vineButton,
     get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items,
-    debug: { get GYN() { return GYN; }, vines, get vineN() { return vineN; }, tanoc, punk, get boltCd() { return boltCd; }, get cineOn() { return cine.active; }, rockfall, bolts, cairns, patrols, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; } },
+    debug: { get GYN() { return GYN; }, vines, get vineN() { return vineN; }, tanoc, punk, get boltCd() { return boltCd; }, get cineOn() { return cine.active; }, rockfall, bolts, cairns, patrols, erupt, gyngeHalf, gyngeDie, harvest, startDay2, startKeep, knockedDown, emerge, church, cleanse, arriveClearing, thud, get D() { return D; }, get SLP() { return SLP; }, SLEEP, RUINS, mawSpot: () => SLP && mawSpot(), stir: () => stir() },
   };
 }

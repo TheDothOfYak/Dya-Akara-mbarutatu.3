@@ -5278,6 +5278,7 @@ function startMegla(at) {
     askName: (title, ph, cb) => askName(cb, title, ph),
     ring: () => { invAdd(SAVE.inv, 'relic_ring', 1); F_.ring = true; persist(); },
     malstiName: n => { F_.malstiName = n; persist(); },
+    setFlag: (k, v) => { F_[k] = v; persist(); },   // the chapter's own choices (who the keep lets in), kept for later chapters
     fade: (v, sec) => fade(v, sec),
     onDone: () => leaveMegla(),
   }));

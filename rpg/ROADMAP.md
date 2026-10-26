@@ -11,9 +11,9 @@ Tanoc gathers six Sniller amulets in Fyrsti'Vilag. Each one pulls him somewhere 
 | # | Part | Chapter clock key | Target | Estimate now | Status |
 |---|---|---|---|---|---|
 | — | The Last Skyfall (Velki) | `velki` | 0.5h | ~0.3h | built: supper for the Ahoac crew, the spark drill, the spire, the gate |
-| — | The Road North (six days) | `road` | 2h | ~1.5h | built: + the escape across a much bigger Fyrsti'Vilag, from the top of the home tree to the north gate (12 amulets of ~18), the mended axle (day 3), supper in Beuhk (day 5) |
+| — | The Road North (six days) | `road` | 2h | ~1.7h | built: + the escape across a much bigger Fyrsti'Vilag, from the top of the home tree to the north gate (12 amulets of ~18), the mended axle (day 3), a night camp in the pass with the first watch and a bolted cart Punk at dawn (day 4), supper in Beuhk (day 5) |
 | I | The Carpenter's Apprentice | `ch1` | 2.5h | ~2.6h | built: the first day + the two summers (14 steps, 4 seasons): Venkin and Orrin, the amulet research |
-| II | The Megla Aagac (amulet 1) | `ch2` + `token` | 3h | ~1.5h | built: + rockfall, mist cairns, deadwood, carved stones, Sru Vorn, patrols, day three home |
+| II | The Megla Aagac (amulet 1) | `ch2` + `token` | 3h | ~1.7h | built: + rockfall, mist cairns, deadwood, carved stones, Sru Vorn, patrols, day three: the keep's ward, the Malsti's chase, and the great Gynge under the hall, sung back to sleep |
 | — | Home interlude | `after2` | 0.5h | — | partly built |
 | III | Amulet 2 | — | 3h | — | to design |
 | IV | Amulet 3 | — | 3h | — | to design |
