@@ -795,6 +795,7 @@ export function createRoad(ctx) {
   function marketObjective() {
     if (MK.esc) { escObjective(); return; }
     const O = STORY.PRO_OBJ;
+    if (!MK.n) { objective(O.firstAmulet, 'Amulets glow cold teal'); return; }   // the first one blinks him off; the count starts after
     if (MK.punk && !MK.calmed) objective(O.punk, `Amulets gathered: ${MK.n}/6`, 6, MK.n);
     else objective(O.amulets(Math.min(MK.n, 6)), MK.n >= 6 && !MK.calmed ? 'The little Punk is still loose somewhere' : '', 6, Math.min(MK.n, 6));
   }
@@ -1661,9 +1662,14 @@ export function createRoad(ctx) {
     ctx.say(R.day2.logDone);
   }
   function hurtTanoc(dmg, from) {
-    P.hp -= dmg; P.iframes = 0.6; shake = Math.max(shake, 0.35); sfx.hurt();
+    const DF = ctx.diff ? ctx.diff() : null;
+    P.hp -= dmg * (DF ? DF.enemyDmg : 1); P.iframes = 0.6; shake = Math.max(shake, 0.35); sfx.hurt();
     const d = V3(P.pos.x - from.x, 0, P.pos.z - from.z).normalize(); P.vel.addScaledVector(d, 6);
-    if (P.hp <= 0) { P.hp = 60; P.iframes = 1.5; ctx.toast('Buhkon hauls you up by the collar. “Up. Again.”', 3); }
+    if (P.hp <= 0) {
+      P.hp = DF && DF.respawnOnDeath ? 30 : 60; P.iframes = 1.5;
+      // Buhkon is waiting at the north gate all through the escape: nobody hauls you up but you
+      ctx.toast(stage === 'market' && MK && MK.esc ? 'You drag yourself up off the cobbles. The gate. Keep going.' : 'Buhkon hauls you up by the collar. “Up. Again.”', 3);
+    }
     ctx.hp(P.hp / 100);
   }
 
@@ -1918,6 +1924,7 @@ export function createRoad(ctx) {
       EV.ford.crossed = true; EV.ford.told = true;
     }
     if (at === 'escape') { resumeEscape(); return; }
+    if (at === 'day5') { done = true; ctx.onDone(); return; }   // the Rodak are beaten: on into Beuhk
     if (at === 'day1') startDay1(); else if (at === 'day2') { D1 = { pebble: true }; startDay2(); } else if (at === 'day3') { K.on = true; startDay3(); } else if (at === 'day4') { K.on = true; startDay4(); } else startMarket();
   }
   const allSolid = createSolids(scene, {

@@ -5219,6 +5219,7 @@ function vkCtx() {
       canvas.style.transition = px ? 'filter .4s' : 'filter 1.6s'; canvas.style.filter = `blur(${px}px)`; },
     hp: v => { $('hp-fill').style.transform = $('hp-lag').style.transform = `scaleX(${Math.max(0, v)})`; },
     save: a => { F_.roadAt = a; persist(); },
+    diff: () => D,   // the run's difficulty: the road and the Megla scale what hurts by it
     amulets: n => { invAdd(SAVE.inv, 'amulet', n); persist(); },
     give: (id, n) => { invAdd(SAVE.inv, id, n); toast(`+ ${ITEMS[id].icon} ${ITEMS[id].name}`, 2.2); persist(); },
     giveFireStone: found => { if (found) { invAdd(SAVE.inv, 'r_firestone', 1); learnTrigger('r_firestone'); persist(); } },
@@ -5763,7 +5764,7 @@ function youngObjective() {
   else if (F_.pro === 'token') proObjective('Chapter II · home again', STORY.FIRST_TOKEN.findObj, 'Show him the Gynge chip');
   else if (apOn()) apObjective();
   else if (!F_.megla) proObjective(head, 'The Sniller amulet is tugging north — talk to Buhkon', 'When you’re ready: Chapter II, the Megla Aagac');
-  else proObjective(F_.ch2 ? 'Chapter II · done' : head, O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');
+  else proObjective(F_.ch2 ? 'Chapter II · done' : head, F_.ch2 ? O.free2 : O.free, 'Explore the property, or walk the forest path back to Beuhk · G for Nur’Hlyst');
 }
 function youngTick() {
   if (relicMesh) { relicMesh.visible = relicOut(); if (relicMesh.visible) { relicMesh.rotation.y = G.t; relicMesh.children[1].material.opacity = 0.5 + Math.sin(G.t * 3) * 0.3; } }
@@ -6141,7 +6142,7 @@ function apBuhkon(n) {
         say(B.lookout.back, () => {
           xp(120); apAdvance(AP.DONE);
           G.mode = 'intro';
-          cineCards(B.summer2.cards, 3600, P.pos, () => { enterPlay(); setObjective(); });
+          cineCards(B.summer2.cards(PN()), 3600, P.pos, () => { enterPlay(); setObjective(); });
         });
         return;
       }

@@ -630,6 +630,7 @@ export const PRO_OBJ = {
   gate: 'Go out the north gate, toward the battle',
   hat: 'Put your hat back on',
   amulets: n => `Gather the fallen Sniller amulets (${n}/6)`,
+  firstAmulet: 'Pick up a fallen Sniller amulet — before anyone else does',
   punk: 'Calm the frightened Punk — don’t kill it',
   back: 'Run back to the Carpenter’s stall',
 };
@@ -696,6 +697,7 @@ export const YOUNG_OBJ = {
   glide: 'Climb the tower, jump, and hold Space to glide',
   back: 'Return to Buhkon',
   free: 'Chapter I — the property and Beuhk are yours. More of Tanoc’s story is coming.',
+  free2: 'Chapter II is done — the property, Beuhk and your keep in the Megla Aagac are yours. More of Tanoc’s story is coming.',
 };
 
 /* ================================================================
@@ -1423,7 +1425,7 @@ export const APPRENTICE = {
 
   /* 9 — the second summer: the pull */
   summer2: {
-    cards: ['The second summer.', 'Tanoc is fifteen now, a hand taller, and his hatchet swing has stopped being funny. Brindle can outrun anything on the land.', 'And then, as the summer gets old, one of the amulets begins to pull.'],
+    cards: name => ['The second summer.', `Tanoc is fifteen now, a hand taller, and his hatchet swing has stopped being funny. ${name} can outrun anything on the land.`, 'And then, as the summer gets old, one of the amulets begins to pull.'],
   },
 };
 
@@ -1467,6 +1469,9 @@ Object.assign(MEGLA, {
     ['sniller', 'Nobody had a Punk like yours. Ask her.'],
   ],
   rockObj: n => `Clear the rockfall off the road (${n}/4)`,
+  /* back at the ruin after a reload mid-fight: the Gynge is still down there */
+  gyngeBack: 'Go back to the purple Relic in the ruin wall',
+  gyngeBackHint: 'The ground by the wall didn’t feel right — be ready to move',
   rockHint: 'E at a boulder — your Punk hauls it clear. The cracked one wants fire (Q).',
   haul: 'Loop her vines round the boulder',
   hauled: ['She digs her feet in and heaves — and the boulder grinds off the road.', 'Another one, rolled into the river with a splash she seems very proud of.', 'That one took three tries. She doesn’t want to talk about it.'],

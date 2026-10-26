@@ -485,10 +485,11 @@ export function createMegla(ctx) {
     }
   }
   function hurtTanoc(dmg, from) {
-    P.hp -= dmg; P.iframes = 0.6; shake = Math.max(shake, 0.35); sfx.hurt();
+    const DF = ctx.diff ? ctx.diff() : null;
+    P.hp -= dmg * (DF ? DF.enemyDmg : 1); P.iframes = 0.6; shake = Math.max(shake, 0.35); sfx.hurt();
     const d = V3(P.pos.x - from.x, 0, P.pos.z - from.z).normalize(); P.vel.addScaledVector(d, 6);
     if (stage === 'keep' && sub === 'fight') { if (P.hp <= 18) knockedDown(); }
-    else if (P.hp <= 0) { P.hp = 60; P.iframes = 1.5; ctx.toast('The amulet goes warm against your chest. You’re up again.', 3); }
+    else if (P.hp <= 0) { P.hp = DF && DF.respawnOnDeath ? 30 : 60; P.iframes = 1.5; ctx.toast('The amulet goes warm against your chest. You’re up again.', 3); }
     ctx.hp(P.hp / 100);
   }
 
@@ -1608,7 +1609,7 @@ export function createMegla(ctx) {
     if (at === 'clearing') { toClearing(); P.ride = true; arriveClearing(); return; }
     if (at === 'enter') { toClearing(); place(P, FIRE1.x + 2, FIRE1.z, Math.PI); place(K, FIRE1.x, FIRE1.z + 2, Math.PI); morning(); return; }
     if (at === 'alone' || at === 'ruins') { toClearing(); for (const r of rodak) { r.a.root.visible = false; r.pos.set(0, -80, 0); } place(P, FIRE1.x + 3, FIRE1.z - 4, Math.PI); place(K, FIRE1.x + 1, FIRE1.z + 2, Math.PI); K.stay = K.pos.clone(); buildAnimal(); stage = 'alone'; sub = 'animal'; setLook('grey', true); objective(M.aloneObj); setGoal(ANIMAL.x, heightAt(ANIMAL.x, ANIMAL.z), ANIMAL.z); ctx.play(); return; }
-    if (at === 'gynge') { K.on = false; setLook('grey', true); place(P, WALL.x + 2, WALL.z + 26, Math.PI); stage = 'alone'; sub = 'gather'; D.saw = true; D.seals = 3; D.got = 3; sealStones.forEach(st => { st.read = true; }); ctx.play(); return; }
+    if (at === 'gynge') { K.on = false; setLook('grey', true); place(P, WALL.x + 2, WALL.z + 26, Math.PI); stage = 'alone'; sub = 'gather'; D.saw = true; D.seals = 3; D.got = 3; sealStones.forEach(st => { st.read = true; }); objective(M.gyngeBack, M.gyngeBackHint); setGoal(WALL.x, heightAt(WALL.x, WALL.z), WALL.z + 4); ctx.play(); return; }
     if (at === 'harvest') { K.on = false; setLook('grey', true); spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; place(P, GY.x + 6, GY.z + 8, Math.PI); harvest(); ctx.play(); return; }
     if (at === 'day2') { K.on = false; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; amped = true; startDay2(); return; }
     if (at === 'sneak') { K.on = false; amped = true; spawnGynge(); GYN.alive = false; GYN.pos.y = heightAt(GY.x, GY.z); gyngeBar.style.display = 'none'; setLook('eclipse', true); eclipseK = 1; stage = 'day2'; sub = 'walk'; D = { waves: 2, sru: true, sruDone: true, eclipse: true }; startSneak(); return; }
