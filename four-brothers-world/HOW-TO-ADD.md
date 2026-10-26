@@ -116,3 +116,11 @@ Places come from `buildHighStep()`, `buildBog()` and `buildStatues()` in `acornw
 - **Quests:** any job can now hand you an item when you take it (`give`), and sneaking jobs can say what you put back (`slip`).
 - **Pets:** add a creature and its favourite food to `RW.TAME_FOODS` (Alstera Naga eat pond carp).
 - New carvings for Acorn World go at the end of `CARVINGS_ACORN` (28 to 36 are v1.9's).
+
+## Everyone sees the same thing
+In a shared game anything players can see must look the same to everyone standing there. Pick one of these for anything new:
+- **A block.** Block changes (and the number kept on a block, like a crop's planting time) are saved and sent to everyone. A raised Stryx is a block for this reason.
+- **The shared clock.** `Date.now()` is the same everywhere; dice are not. Townsfolk (`E.npcSpot`), guards (`guardSpot`), Albali fruit, storm echoes and bog sparks are worked out from it.
+- **A message.** `RW.net.send({ k: 'mykind', w: worldId, ... })` and `RW.net.on('mykind', fn)`. For a one-off effect at a spot, `E.shareFx(kind, x, y, data)` plays it here and on every screen near (x, y); add the effect to `FX` in `entities6.js`.
+- **The runner.** One player runs the monsters (`RW.sync.auth`). On anyone else's game `E.spawnEnemy` asks the runner to spawn it. A behavior that shows something should use `E.shareFx`, or set bits in `e.nfx` (sent with the monster) and draw them in `showEnemies`.
+- **Your presence.** Things that follow you (pet, fishing line, glow) go in `E.presExtra()` and are drawn in the `N.drawPeers` wrapper.

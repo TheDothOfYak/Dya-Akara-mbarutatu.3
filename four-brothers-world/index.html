@@ -754,6 +754,10 @@ window.RW = window.RW || {};
   add({ key: 'hammerrack', name: 'Hammer Rack', hard: 99, decor: 'hammerrack', lockedMsg: 'Master Brakka\'s hammer rack. Every master hammer of the keep hangs here.' });
   add({ key: 'stryxsprout', name: 'Stryx Sprout', hard: 99, decor: 'stryxsprout', use: 'sprout', light: [0.08, 0.2, 0.06], lockedMsg: 'Your Stryx sprout. Press R to tend it. Hitting it teaches it to stab.' });
   add({ key: 'akaichest', name: 'Akai Chest', solid: true, hard: 2, time: 1.4, decor: 'chest', chest: 'vault', loot: 'akai', light: [0.3, 0.2, 0.45] });
+  // a raised Stryx lives in the world as a block, so everyone sees it (and it stays when its owner is away)
+  add({ key: 'stryxsprout_sad', name: 'Stryx Sprout', hard: 99, decor: 'stryxsprout', sad: true, use: 'sprout', light: [0.08, 0.12, 0.04], lockedMsg: 'A Stryx sprout. It has been hit. It droops.' });
+  add({ key: 'gardenstryx', name: 'Raised Stryx', hard: 99, decor: 'raisedstryx', use: 'mystryx', kind2: 'garden_stryx', light: [0.1, 0.25, 0.08], lockedMsg: 'A Stryx somebody raised kindly. It guards this ground.' });
+  add({ key: 'dozystryx', name: 'Dozy Stryx', hard: 99, decor: 'raisedstryx', use: 'mystryx', kind2: 'dozy_stryx', lockedMsg: 'A half-raised Stryx, fast asleep.' });
 
   // chests and crafting stations are furniture: you walk in front of them (they still hide you from guards: cover)
   T.forEach((t) => { if (t.loot || t.storage || t.station) { t.solid = false; t.cover = true; } });
@@ -5673,10 +5677,12 @@ window.RW = window.RW || {};
     line(g, x + 3, y + 2, x + 5, y + 5, '#3a3630'); line(g, x + 12, y + 13, x + 14, y + 15, '#3a3630');
   };
   // the old statues: three blocks tall, drawn from the bottom one. Too-long arms, no cap, two hollow eyes, and the
-  // head always turned a little more toward you than it should be
+  // head always turned a little toward the nearest player (the same one for everyone watching)
   X.statue = (g, t, x, y, time, h, wx, wy) => {
     const W = RW.world; if (W.get(wx, wy + 1) === RW.T.statue) return;
-    const pl = RW.player, look = pl ? RW.clamp(Math.round(((pl.x + 6) - (wx * 16 + 8)) / 40), -2, 2) : 0;
+    const sx = wx * 16 + 8, pls = RW.sync && RW.sync.players ? RW.sync.players() : (RW.player ? [RW.player] : []);
+    let pl = null, bd = 1e9; pls.forEach((q) => { const d = Math.abs(q.x + 6 - sx) + Math.abs(q.y + 14 - wy * 16); if (d < bd) { bd = d; pl = q; } });
+    const look = pl ? RW.clamp(Math.round(((pl.x + 6) - sx) / 40), -2, 2) : 0;
     const top = y - 32, st = '#7a7680', dk = '#56525c', lt = '#9a96a0', sh = '#646068';
     rect(g, x, y + 12, 16, 4, dk); rect(g, x, y + 12, 16, 1, lt);                                                // plinth
     // a narrow robe of stone from the shoulders down, lit from the left
@@ -5697,19 +5703,25 @@ window.RW = window.RW || {};
     rect(g, x + 7, y + 3, 2, 13, '#6a4a2e'); rect(g, x + 3, y + 1, 10, 2, '#8a6440'); rect(g, x + 3, y + 15, 10, 1, '#4a3a2a');
     const sw = Math.round(Math.sin(time * 1.3 + h * 5) * 0.6); ell(g, x + 8 + sw, y + 7, 3, 3, '#c8903a'); rect(g, x + 5 + sw, y + 8, 7, 2, '#c8903a'); px(g, x + 7 + sw, y + 6, '#f0d080'); px(g, x + 8 + sw, y + 10, '#5a3a1a');
   };
-  // Brakka's hammer rack: pegs on a board, every hammer hanging; one peg is empty until Hobb's comes home
+  // Brakka's hammer rack: pegs on a board, a master hammer on each
   X.hammerrack = (g, t, x, y) => {
     rect(g, x, y + 2, 16, 3, '#6a4a2e'); rect(g, x, y + 2, 16, 1, '#8a6440');
-    const home = RW.player && RW.player.flags && (RW.player.flags.q_hobb_return === 2 || RW.player.flags.qr_hobb_return);
-    [2, 6, 10, 14].forEach((k, i) => { px(g, x + k, y + 5, '#3a2a1a'); if (i === 2 && !home) return; line(g, x + k, y + 6, x + k, y + 13, '#7a5634'); rect(g, x + k - 2, y + 12, 5, 3, '#6a6a74'); px(g, x + k - 2, y + 12, '#9aa0b0'); });
+    [2, 6, 10, 14].forEach((k) => { px(g, x + k, y + 5, '#3a2a1a'); line(g, x + k, y + 6, x + k, y + 13, '#7a5634'); rect(g, x + k - 2, y + 12, 5, 3, '#6a6a74'); px(g, x + k - 2, y + 12, '#9aa0b0'); });
   };
   // a Stryx sprout: two tiny spiral horns on a pad of stone, bigger as it grows; it droops if it's been hit
   X.stryxsprout = (g, t, x, y, time, h, wx, wy) => {
-    const s = RW.ent && RW.ent.sproutLook ? RW.ent.sproutLook(wx, wy) : { k: 0, sad: false };
+    const s = RW.ent && RW.ent.sproutLook ? RW.ent.sproutLook(wx, wy, t) : { k: 0, sad: !!t.sad };
     const r = 2 + Math.round(s.k * 3); ell(g, x + 8, y + 15, r + 2, 2, '#7a7062'); ell(g, x + 8, y + 14, r + 1, 1, '#8a8072');
     const c = s.sad ? '#6a7a4a' : '#7d9a4a', tip = s.sad ? '#c86a4a' : '#b8ff7a';
     [-1, 1].forEach((d) => { const bx = x + 8 + d * 2; line(g, bx, y + 13, bx + d * (1 + r / 2), y + 13 - r - 2, c); px(g, bx + d * (1 + r / 2), y + 12 - r - 2, tip); if (s.k > 0.5) px(g, bx + d * (2 + r / 2), y + 13 - r, c); });
     if (!s.sad && Math.sin(time * 2 + h * 5) > 0.6) px(g, x + 8, y + 12 - r, '#e8ffd0');
+  };
+
+  // a Stryx somebody raised: drawn from the block it lives in, so everyone sees it
+  X.raisedstryx = (g, t, x, y, time, h) => {
+    const fr = A.species(t.kind2); const k = t.kind2 === 'dozy_stryx' ? 0 : Math.floor(time * 2 + h * 3) % fr.length, img = fr[k][h > 0.5 ? 0 : 1];
+    g.drawImage(img, Math.round(x + 8 - img.width / 2), Math.round(y + 16 - img.height));
+    if (t.kind2 === 'dozy_stryx' && Math.sin(time * 1.5 + h * 6) > 0.7) px(g, x + 14, y - 6 - Math.round((time * 4) % 4), '#e8e0ff');
   };
 
   // ======================= ICONS =======================
@@ -7126,14 +7138,30 @@ window.RW = window.RW || {};
     const add = (id, art, w, h) => { const p = meta[id]; if (!p) return; E.npcs.push({ id, x: p.x * TS, y: (p.y + 1) * TS - h, w, h, home: p.x * TS, face: -1, t: Math.random() * 4, vx: 0, vy: 0, look: art }); };
     add('gneiss', null, 12, 26); add('slagg', null, 12, 26); add('wedgeworth', null, 14, 26); add('cubert', null, 16, 26);
   };
+  // Folk wander about their home spot on a schedule worked out from the shared real-time clock (not dice), so every
+  // player sees them in the same place. Anyone standing next to one (you or another player) makes them stop and look.
+  const npcHash = (id) => { let h = 7; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 100003; return h; };
+  E.npcSpot = function (n, now) {
+    const SL = 4, k = Math.floor(now / SL), f = now / SL - k, id = npcHash(n.id) + (n.home | 0);
+    const tgt = (j) => (RW.hash2(id, j, 911) < 0.35 ? 0 : Math.round((RW.hash2(id, j, 913) - 0.5) * 72));
+    const a = tgt(k - 1), b = tgt(k), d = b - a, run = Math.min(1, (f * SL * 18) / Math.max(1, Math.abs(d)));
+    return { x: n.home + a + d * run, face: d ? Math.sign(d) : RW.hash2(id, k, 917) < 0.5 ? -1 : 1, moving: run < 1 && d !== 0 };
+  };
   E.updateNpcs = function (dt) {
-    const pc = P.center();
+    const pc = P.center(), now = Date.now() / 1000;
+    const pls = RW.sync && RW.sync.players ? RW.sync.players() : [{ x: P.x, y: P.y }];
     E.npcs.forEach((n) => {
       n.t += dt;
-      const near = RW.dist(n.x + n.w / 2, n.y + n.h / 2, pc.x, pc.y) < 60;
-      if (near) { n.vx = 0; n.face = pc.x > n.x ? 1 : -1; }
-      else { if ((n.wt = (n.wt || 0) - dt) <= 0) { n.wt = 2 + Math.random() * 4; n.vx = Math.random() < 0.4 ? 0 : (Math.random() < 0.5 ? -18 : 18); } if (Math.abs(n.x - n.home) > 40) n.vx = Math.sign(n.home - n.x) * 18; if (n.vx) n.face = Math.sign(n.vx); }
-      n.vy += 900 * dt; const r = E.move(n, dt, { step: true, grounded: n.ground }); n.ground = r.ground; if (r.wallL || r.wallR) n.vx = -n.vx;
+      const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+      const near = RW.dist(cx, cy, pc.x, pc.y) < 60;
+      let who = null, bd = 60; pls.forEach((q) => { const d = RW.dist(cx, cy, q.x + 6, q.y + 14); if (d < bd && !q.dead) { bd = d; who = q; } });
+      if (who) { n.vx = 0; n.face = who.x + 6 > n.x ? 1 : -1; }
+      else {
+        const sp = E.npcSpot(n, now), dx = sp.x - n.x;
+        if (Math.abs(dx) > 1) { const tx = Math.floor((n.x + (dx > 0 ? n.w + 1 : -1)) / TS), ty = Math.floor((n.y + n.h / 2) / TS); if (!RW.world.solid(tx, ty)) n.x += RW.clamp(dx, -60 * dt, 60 * dt); }
+        n.vx = sp.moving ? sp.face * 18 : 0; n.face = sp.face;
+      }
+      n.vy += 900 * dt; const vx = n.vx; n.vx = 0; const r = E.move(n, dt, { step: true, grounded: n.ground }); n.ground = r.ground; n.vx = vx;
       n.near = near;
     });
   };
@@ -8300,7 +8328,7 @@ window.RW = window.RW || {};
     if (!N.transport) return;
     N.presT -= dt; N.presBeat -= dt; if (N.presT > 0) return; N.presT = 1 / 15;
     const P = RW.player; const h = P.held();
-    const pres = { x: Math.round(P.x), y: Math.round(P.y), f: P.face, a: P.anim, s: Math.round(Math.max(0, P.swingT) * 100) / 100, sd: P.swingDur, it: h ? h.id : '', n: P.name, lk: packLook(P.look, P.species), sp: P.species, w: RW.world.def.id, sz: Math.round(P.scale() * 100) / 100, dead: P.dead ? 1 : 0, pid: N.pid, g: P.ground ? 1 : 0, ot: P.offTorch && P.has('torch') ? 1 : 0, ar: [P.armor.head || '', P.armor.body || ''], bd: RW.ent.buddy && P.flags.buddy ? [Math.round(RW.ent.buddy.x), Math.round(RW.ent.buddy.y), RW.ent.buddy.face > 0 ? 1 : -1, Math.abs(RW.ent.buddy.vx) > 5 ? 1 : 0] : 0 };
+    const pres = { x: Math.round(P.x), y: Math.round(P.y), f: P.face, a: P.anim, s: Math.round(Math.max(0, P.swingT) * 100) / 100, sd: P.swingDur, it: h ? h.id : '', n: P.name, lk: packLook(P.look, P.species), sp: P.species, w: RW.world.def.id, sz: Math.round(P.scale() * 100) / 100, dead: P.dead ? 1 : 0, pid: N.pid, g: P.ground ? 1 : 0, ot: P.offTorch && P.has('torch') ? 1 : 0, ar: [P.armor.head || '', P.armor.body || ''], bd: RW.ent.buddy && P.flags.buddy ? [Math.round(RW.ent.buddy.x), Math.round(RW.ent.buddy.y), RW.ent.buddy.face > 0 ? 1 : -1, Math.abs(RW.ent.buddy.vx) > 5 ? 1 : 0] : 0, ex: RW.ent.presExtra ? RW.ent.presExtra() : 0 };
     const key = JSON.stringify(pres);
     if (key === N.lastPres && N.presBeat > 0) return;
     N.lastPres = key; N.presBeat = 1;
@@ -9779,7 +9807,9 @@ window.RW = window.RW || {};
       const now = performance.now(); if ((S.cool[pl.pid] || 0) > now) return; S.cool[pl.pid] = now + 450;
       N.send({ k: 'hurt', w: wid(), to: pl.pid, d: R(d), dir: dir || 0, src: String(src || '').slice(0, 30) });
     };
+    S.as = pl;
     try { return fn(); } finally {
+      S.as = null;
       P.x = sv.x; P.y = sv.y; P.vx = sv.vx; P.vy = sv.vy; P.face = sv.face; P.ground = sv.ground; P.dead = sv.dead; P.invulnT = sv.inv; P.hurt = sv.hurt; RW.cam.x = sv.cx; RW.cam.y = sv.cy;
     }
   }
@@ -9869,6 +9899,7 @@ window.RW = window.RW || {};
     if (e.segs) o.g = R(e.ang * 100);
     if (e.hero) { o.he = e.hero; o.lk = N.packLook(e.look, e.hero); o.nm = e.nm; if (e.swingT > 0) o.sw = 1; }
     if (e.lash) o.ls = [R(e.lash.t * 100), R(e.lash.warn * 100), R(e.lash.tx || 0), R(e.lash.ty || 0)];
+    if (e.nfx) o.nx = e.nfx;   // what it's doing that shows (digging, a bubbling stump...): entities6.js draws it for everyone
     return o;
   }
   function packBoss(b) {
@@ -9928,6 +9959,7 @@ window.RW = window.RW || {};
       if (o.g != null) e.tang = o.g / 100;
       if (o.he) { e.hero = o.he; if (e.lkS !== o.lk) { e.lkS = o.lk; e.look = N.unpackLook(o.lk, o.he); } e.nm = String(o.nm || '').slice(0, 40); e.swingT = o.sw ? 0.2 : 0; e.showBar = 999; }
       e.lash = Array.isArray(o.ls) ? { t: o.ls[0] / 100, warn: o.ls[1] / 100, tx: o.ls[2], ty: o.ls[3] } : null;
+      e.nfx = +o.nx || 0;
     });
     for (let i = E.enemies.length - 1; i >= 0; i--) if (!keep.has(E.enemies[i].nid)) E.enemies.splice(i, 1);
     applyBoss(m.b); applyGF(m.gf, m.gw);
@@ -10353,7 +10385,7 @@ window.RW = window.RW || {};
   E.initNpcs = function () {
     baseInitNpcs();
     (RW.world.meta.guards || []).forEach((g, i) => {
-      const h = 22; E.npcs.push({ id: 'keepguard', guard: g, x: ((g.x0 + g.x1) / 2) * TS, y: g.y * TS - h, w: 12, h, home: g.x0 * TS, face: i % 2 ? 1 : -1, t: Math.random() * 4, vx: 0, vy: 0, sus: 0 });
+      const h = 22; E.npcs.push({ id: 'keepguard', guard: g, gi: i, x: ((g.x0 + g.x1) / 2) * TS, y: g.y * TS - h, w: 12, h, home: g.x0 * TS, face: i % 2 ? 1 : -1, t: Math.random() * 4, vx: 0, vy: 0, sus: 0 });
     });
   };
   const baseUpdateNpcs = E.updateNpcs;
@@ -10378,17 +10410,12 @@ window.RW = window.RW || {};
     const range = (night() ? 6 : 9) * TS;
     E.npcs.forEach((n) => {
       if (!n.guard) return; const g = n.guard; n.t += dt;
-      // patrol: walk the beat, pause and look round at each end, never walk off an edge
-      n.pauseT = (n.pauseT || 0) - dt;
-      if (n.sus > 0.25 && here) { n.vx = 0; n.face = pc.x > n.x ? 1 : -1; }
-      else if (n.pauseT > 0) { n.vx = 0; if (Math.random() < dt * 0.8) n.face = -n.face; }
-      else {
-        n.vx = n.face * 24;
-        const nx = n.x + n.w / 2 + n.face * 10, foot = Math.floor((n.y + n.h + 2) / TS), col = Math.floor(nx / TS);
-        const under = RW.TILES[Wd.get(col, foot)]; const edge = !under.solid && !under.platform;
-        if ((n.face > 0 && n.x > g.x1 * TS) || (n.face < 0 && n.x < g.x0 * TS) || edge) { n.face = -n.face; n.pauseT = 1.2 + Math.random() * 1.5; n.vx = 0; }
-      }
-      n.vy += 900 * dt; const r = E.move(n, dt, { step: true, grounded: n.ground }); n.ground = r.ground; if (r.wallL || r.wallR) { n.face = -n.face; n.pauseT = 0.6; }
+      // patrol: walk the beat and look round at each end, on a schedule from the shared clock so every player sees each
+      // guard in the same place. A guard who has noticed someone stops and stares at them (for everyone: see 'gsus').
+      if (n.sus > 0.25 && here) { n.vx = 0; n.face = pc.x > n.x ? 1 : -1; if ((n.susSent = (n.susSent || 0) - dt) <= 0 && RW.net.transport) { n.susSent = 0.4; RW.net.send({ k: 'gsus', w: Wd.def.id, i: n.gi, x: Math.round(pc.x) }); } }
+      else if (n.holdT > 0) { n.holdT -= dt; n.vx = 0; n.face = n.holdX > n.x + n.w / 2 ? 1 : -1; }
+      else { const sp = guardSpot(g, n.gi || 0, Date.now() / 1000); n.vx = sp.walk ? sp.face * 24 : 0; n.face = sp.face; n.x = RW.lerp(n.x, sp.x, Math.min(1, dt * 8)); }
+      n.vy += 900 * dt; const vx0 = n.vx; n.vx = 0; const r = E.move(n, dt, { step: true, grounded: n.ground }); n.ground = r.ground; n.vx = vx0;
       n.near = RW.dist(n.x + n.w / 2, n.y + n.h / 2, pc.x, pc.y) < 44 && !here;
       // can it see you? only matters where you're not allowed
       const gx = n.x + n.w / 2, gy = n.y + 6, dx = pc.x - gx, dy = pc.y - gy;
@@ -10400,6 +10427,15 @@ window.RW = window.RW || {};
       if (n.sus >= 1) caught(n);
     });
   }
+  // where a guard is on its beat right now: there and back at walking pace, looking round for two seconds at each end
+  function guardSpot(g, i, now) {
+    const L = Math.max(TS, (g.x1 - g.x0) * TS), w = L / 24, T = 2 * (w + 2), t = (now + RW.hash2(i, 5, 77) * T) % T, x0 = g.x0 * TS;
+    if (t < w) return { x: x0 + t * 24, face: 1, walk: 1 };
+    if (t < w + 2) return { x: x0 + L, face: Math.floor((t - w) / 0.8) % 2 ? -1 : 1, walk: 0 };
+    if (t < 2 * w + 2) return { x: x0 + L - (t - w - 2) * 24, face: -1, walk: 1 };
+    return { x: x0, face: Math.floor((t - 2 * w - 2) / 0.8) % 2 ? 1 : -1, walk: 0 };
+  }
+  RW.net.on('gsus', (m) => { if (!RW.world.def || m.w !== RW.world.def.id) return; const n = E.npcs.find((q) => q.guard && q.gi === m.i); if (n) { n.holdT = 0.6; n.holdX = +m.x || 0; } });
   // a line of sight, checked every 4 pixels; anything solid (or a shut door) in the way blocks it
   function sightLine(ax, ay, bx, by) {
     const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / 4);
@@ -10475,7 +10511,8 @@ window.RW = window.RW || {};
       P.remove('eldi_seed', 1); RW.ui.dirty();
       const cx = x * TS + 14, cy = y * TS + 5; RW.audio.sfx('fire'); RW.fx.shake(6, 0.6); RW.fx.flash('#ffb04a', 0.35);
       for (let k = 0; k < 40; k++) RW.fx.spawn({ x: cx, y: cy, vx: RW.rand(40, 260), vy: RW.rand(-220, -40), life: 1.2, color: RW.pick(['#ff7a2e', '#ffb347', '#ffe08a']), add: true, kind: 'ember', grav: 120 });
-      E.shots.push({ x: cx, y: cy, vx: 420, vy: -260, grav: 160, life: 4, owner: 'p', dmg: 120, kind: 'fire' });
+      const shot = { x: cx, y: cy, vx: 420, vy: -260, grav: 160, life: 4, owner: 'p', dmg: 120, kind: 'fire' }; E.shots.push(shot); if (RW.net.sendShot) RW.net.sendShot(shot);
+      if (RW.ent.shareFx) RW.ent.shareFx('cannon', cx, cy);
       P.flags.cannon_fired = 1; RW.ui.banner('BOOM', 'The Ember fires one last salute.'); RW.game.saveSoon(); return;
     }
     if (t.door) { const ys = doorStack(x, y); if (!t.open || !blocked(x, ys)) { setDoor(x, y, !t.open); RW.audio.sfx('swing'); autoShut.delete(x + ',' + ys[0]); } return; }
@@ -10608,10 +10645,10 @@ window.RW = window.RW || {};
   function updateMud(dt) {
     if (!MG.on) return; const pc = P.center(), peb = MG.peb;
     MG.t -= dt; MG.next -= dt;
-    if (MG.next <= 0 && MG.t > 1) { MG.next = Math.max(0.45, 0.95 - (30 - MG.t) * 0.015); MG.balls.push({ x: peb.x + peb.w / 2, y: peb.y - 4, vx: (Math.random() < 0.5 ? -1 : 1) * RW.rand(50, 175), vy: -RW.rand(290, 380) }); RW.audio.sfx('swing'); }
+    if (MG.next <= 0 && MG.t > 1) { MG.next = Math.max(0.45, 0.95 - (30 - MG.t) * 0.015); const ball = { x: peb.x + peb.w / 2, y: peb.y - 4, vx: (Math.random() < 0.5 ? -1 : 1) * RW.rand(50, 175), vy: -RW.rand(290, 380) }; MG.balls.push(ball); RW.audio.sfx('swing'); if (RW.net.transport) RW.net.send({ k: 'mudb', w: 'acorn', x: Math.round(ball.x), y: Math.round(ball.y), vx: Math.round(ball.vx), vy: Math.round(ball.vy) }); }
     for (let i = MG.balls.length - 1; i >= 0; i--) {
       const b = MG.balls[i]; b.vy += 520 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
-      if (RW.dist(b.x, b.y, pc.x, pc.y) < 13) { MG.score++; RW.fx.text(b.x, b.y - 6, '+1', '#e8c88a'); RW.audio.sfx('pickup'); MG.balls.splice(i, 1); continue; }
+      if (RW.dist(b.x, b.y, pc.x, pc.y) < 13) { MG.score++; RW.fx.text(b.x, b.y - 6, '+1', '#e8c88a'); RW.audio.sfx('pickup'); MG.balls.splice(i, 1); if (RW.net.transport) RW.net.send({ k: 'mudc', w: 'acorn', x: Math.round(b.x), y: Math.round(b.y) }); continue; }
       if (b.vy > 0 && RW.world.solid(Math.floor(b.x / TS), Math.floor((b.y + 3) / TS))) { RW.fx.debris(b.x, b.y, ['#5a4632', '#7a5e42'], 6); MG.balls.splice(i, 1); }
     }
     if (MG.t <= 0 || RW.dist(pc.x, pc.y, peb.x, peb.y) > 30 * TS || P.dead) endMud();
@@ -10714,6 +10751,11 @@ window.RW = window.RW || {};
   const outside = () => { const t = ptile(), s = W().meta.surf; return s ? t.y <= s[t.x] + 2 : W().skyTop && t.y <= W().skyTop[t.x] + 1; };
   const onScreen = (o) => { const c = RW.cam, v = RW.view; return o.x + (o.w || 0) > c.x - 24 && o.x < c.x + v.w + 24 && o.y + (o.h || 0) > c.y - 24 && o.y < c.y + v.h + 24; };
   const zoneHere = () => { const t = ptile(); return W().zoneAt(t.x, t.y); };
+  // shared things change only where no player (you or anyone else here) is watching, so everyone sees the same
+  const players = () => (RW.sync && RW.sync.players ? RW.sync.players() : [{ x: P.x, y: P.y }]);
+  const watched = (o) => players().some((q) => Math.abs(q.x - o.x) < 34 * TS && Math.abs(q.y - o.y) < 22 * TS);
+  // monsters are run by one player (sync.js); things everyone sees happen at once are spawned by that player only
+  const runner = () => !RW.net.transport || RW.sync.auth;
   const give = (id, n) => { const left = P.add(id, n); if (left > 0) E.dropItem(id, left, P.x + P.w / 2, P.y); else U.pickup && U.pickup(id, n); U.dirty(); };
   const hearts = (x, y, n) => { for (let k = 0; k < (n || 6); k++) RW.fx.spawn({ x: x + RW.rand(-6, 6), y: y + RW.rand(-4, 4), vx: RW.rand(-15, 15), vy: RW.rand(-50, -25), life: 0.9, color: RW.pick(['#ff6a8a', '#ffb0c0']), add: true, kind: 'glow' }); };
   // somewhere to stand beside block (x, y): the nearest column with two open blocks
@@ -10749,7 +10791,7 @@ window.RW = window.RW || {};
     const bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
     if (RW.dist(f.x, f.y, bc.x, bc.y) > 16) return;
     let id, n;
-    if (f.kind === 'fruit') { const i = fruits.indexOf(f.o.f); if (i < 0) return; if (P.add('albali_fruit', 1) > 0) return; fruits.splice(i, 1); id = 'albali_fruit'; n = 1; }
+    if (f.kind === 'fruit') { const i = fruits.indexOf(f.o.f); if (i < 0) return; if (P.add('albali_fruit', 1) > 0) return; takeFruit(f.o.f); id = 'albali_fruit'; n = 1; }
     else { const d = f.o, i = E.drops.indexOf(d); if (i < 0) return; const left = P.add(d.id, d.n); if (left >= d.n) { d.noFetch = true; return; } id = d.id; n = d.n - left; if (left > 0) { d.n = left; d.noFetch = true; } else E.drops.splice(i, 1); }
     RW.audio.sfx('pickup'); U.pickup && U.pickup(id, n); U.dirty(); b.fetch = null;
     RW.fx.burst(bc.x, bc.y, ['#ffe9b0', '#e8c88a'], 6, 50, { kind: 'glow', add: true, life: 0.4 });
@@ -10816,24 +10858,32 @@ window.RW = window.RW || {};
   // ====================== ALBALI AAGAC TREES ======================
   // Fruit drops from the trees in the Green Deep. Pick it up (or let your buddy) for Albali Fruit; leave it on the
   // ground long enough and it hatches into an Albali Byrd.
-  const fruits = []; E.fruits = fruits;
+  // Every 22 seconds each tree may drop one fruit; when and where come from the shared clock, so every player sees
+  // the same fruit fall. Picking one up tells everyone it's gone.
+  const fruits = []; E.fruits = fruits; const FSLOT = 22, fruitGone = new Set();
+  E.fruitGone = (id) => { fruitGone.add(id); const i = fruits.findIndex((f) => f.id === id); if (i >= 0) fruits.splice(i, 1); };
+  const takeFruit = (f) => { E.fruitGone(f.id); if (RW.net.transport) RW.net.send({ k: 'fruit', w: 'acorn', id: f.id }); };
+  RW.net.on('fruit', (m) => { if (acorn() && m.w === 'acorn' && typeof m.id === 'string') E.fruitGone(m.id); });
   function updateFruit(dt) {
     const trees = W().meta.albaliTrees; if (!acorn() || !trees) { fruits.length = 0; return; }
-    const pc = pcen();
-    trees.forEach((tr) => {
+    const pc = pcen(), now = Date.now() / 1000;
+    trees.forEach((tr, ti) => {
       if (Math.abs(tr.x * TS - pc.x) > 50 * TS) return;
-      tr.ft = (tr.ft == null ? RW.rand(3, 10) : tr.ft) - dt; if (tr.ft > 0) return;
-      tr.ft = RW.rand(16, 28); if (fruits.filter((f) => f.tree === tr).length >= 3) return;
-      const x = (tr.x + RW.rand(-tr.r + 1.5, tr.r - 1.5)) * TS; if (W().solid(Math.floor(x / TS), tr.y + 2)) return;
-      fruits.push({ tree: tr, x, y: (tr.y + 2) * TS, w: 6, h: 6, vx: 0, vy: 0, t: 0, landT: 0 });
+      for (let k = Math.floor(now / FSLOT) - 2; k <= Math.floor(now / FSLOT); k++) {
+        const id = ti + ':' + k, at = k * FSLOT + RW.hash2(ti, k, 31) * 8; if (RW.hash2(ti, k, 37) > 0.7 || now < at || fruitGone.has(id) || fruits.some((f) => f.id === id)) continue;
+        if (now - at > 23) { fruitGone.add(id); continue; }   // long gone: hatched before you got here
+        const x = (tr.x + (RW.hash2(ti, k, 41) * 2 - 1) * (tr.r - 1.5)) * TS; if (W().solid(Math.floor(x / TS), tr.y + 2)) { fruitGone.add(id); continue; }
+        fruits.push({ id, tree: tr, x, y: (tr.y + 2) * TS, w: 6, h: 6, vx: 0, vy: 0, t: 0, landT: 0, born: at });
+      }
     });
     for (let i = fruits.length - 1; i >= 0; i--) {
       const f = fruits[i]; f.t += dt; f.vy += 520 * dt; f.vx *= 0.9;
       const r = E.move(f, dt); if (r.ground) f.landT += dt;
       if (Math.abs(f.x - pc.x) > 80 * TS) { fruits.splice(i, 1); continue; }
-      if (!P.dead && overlap(f, P) && P.add('albali_fruit', 1) === 0) { RW.audio.sfx('pickup'); U.pickup && U.pickup('albali_fruit', 1); U.dirty(); fruits.splice(i, 1); continue; }
-      if (f.landT > 20) {
-        const e = E.spawnEnemy('albali', f.x - 5, f.y - 12); e.vy = -120;
+      if (!P.dead && overlap(f, P) && P.add('albali_fruit', 1) === 0) { RW.audio.sfx('pickup'); U.pickup && U.pickup('albali_fruit', 1); U.dirty(); takeFruit(f); continue; }
+      if (Date.now() / 1000 - f.born > 24) {
+        fruitGone.add(f.id);
+        if (runner()) { const e = E.spawnEnemy('albali', f.x - 5, f.y - 12); e.vy = -120; }
         RW.fx.burst(f.x + 3, f.y, ['#fff0b0', '#ffffff', '#e8a846'], 12, 70); RW.audio.sfx('pickup');
         if (onScreen(f)) U.toast('The fruit cracks open, and an Albali Byrd shakes itself out!');
         fruits.splice(i, 1);
@@ -10851,7 +10901,7 @@ window.RW = window.RW || {};
     const M = W().meta; if (!acorn() || !M.stall) return;
     const i = E.npcs.findIndex((n) => n.id === 'kalo_trader'), on = marketDay();
     if (on && i < 0) npcAt('kalo_trader', M.stall.x, M.stall.y, 12, 22);
-    if (!on && i >= 0 && !onScreen(E.npcs[i])) E.npcs.splice(i, 1);
+    if (!on && i >= 0 && !watched(E.npcs[i])) E.npcs.splice(i, 1);
     RW.MARKET_TODAY = todayMarket();
     const d = clock().day;
     if (on && P.flags.market_seen !== d && zoneHere() === 'village') { P.flags.market_seen = d; U.toast('It\'s market day in Capstead! Senna the Kalo trader has set up by the west tree.'); }
@@ -10868,19 +10918,22 @@ window.RW = window.RW || {};
     const M = W().meta; if (!acorn()) return;
     const dark = !!night();
     if (M.nightHomes) E.npcs.forEach((n) => {
-      const h = M.nightHomes[n.id], d = M.npcs[n.id]; if (!h || !d || n.atNight === dark || onScreen(n)) return;
-      const to = dark ? h : d; n.x = to.x * TS + 2; n.y = (to.y + 1) * TS - n.h; n.home = to.x * TS; n.vx = n.vy = 0; n.atNight = dark;
+      const h = M.nightHomes[n.id], d = M.npcs[n.id]; if (!h || !d || n.atNight === dark || watched(n)) return;
+      const to = dark ? h : d; if (watched({ x: to.x * TS, y: to.y * TS })) return; n.x = to.x * TS + 2; n.y = (to.y + 1) * TS - n.h; n.home = to.x * TS; n.vx = n.vy = 0; n.atNight = dark;
     });
     const glowing = E.enemies.filter((e) => e.sp === 'rubbermcfly' && !e.dead);
     mcT -= dt;
-    if (dark && M.crowns && zoneHere() === 'village' && mcT <= 0) { mcT = 1.2; if (glowing.length < 8) spawnMcfly(RW.pick(M.crowns).x, RW.pick(M.crowns).y, 22, 12); }
+    if (dark && M.crowns && runner() && players().some((q) => W().zoneAt(Math.floor((q.x + 6) / TS), Math.floor((q.y + 14) / TS)) === 'village') && mcT <= 0) { mcT = 1.2; if (glowing.length < 8) spawnMcfly(RW.pick(M.crowns).x, RW.pick(M.crowns).y, 22, 12); }
     if (dark || ST.on) glowing.forEach((e) => { const c = ec(e); RW.fx.light(c.x, c.y, 0.55, 0.5, 0.15); if (Math.random() < 0.02) RW.fx.spawn({ x: c.x, y: c.y, vy: 10, life: 0.6, color: '#ffe86a', add: true, kind: 'glow' }); });
   }
 
   // ====================== THE SUNEAR'ZIKHRON ======================
   // The Waves of Memory: on some days, late in the afternoon, the sky turns violet, light falls in bands, echoes of
   // old acorns walk past, and an eye of pale light drifts across the land. Stand in the eye long enough to hear a memory.
-  const ST = { on: false, eye: null, figs: [], inEye: 0, a: 0 };
+  // Players near each other share one eye: each one says where its eye is, and takes the eye of the nearby player with
+  // the lowest id. Echoes walk where the shared clock says, so everyone sees the same ones.
+  const ST = { on: false, eye: null, figs: [], inEye: 0, a: 0, peers: new Map(), sendT: 0 };
+  RW.net.on('eye', (m) => { if (acorn() && m.w === 'acorn' && typeof m.x === 'number') ST.peers.set(m.f, { x: m.x, home: +m.home || m.x, dir: m.dir > 0 ? 1 : -1, at: performance.now() }); });
   const stormDay = (d) => RW.hash2(d, 77, 4242) < 0.25;
   const stormNow = () => { const c = clock(); return acorn() && stormDay(c.day) && c.t > 0.55 && c.t < 0.8 ? c : null; };
   E.storm = ST;
@@ -10895,15 +10948,22 @@ window.RW = window.RW || {};
     }
     const e = ST.eye; e.x += e.dir * 0.8 * TS * dt;
     if (Math.abs(e.x - e.home) > 40 * TS) e.dir = -Math.sign(e.x - e.home);
-    if (Math.abs(e.x - pc.x) > 90 * TS) { e.home = pc.x; e.x = pc.x + e.dir * 24 * TS; }   // travelled far: the storm comes too
+    let lead = null; ST.peers.forEach((q, pid) => { if (performance.now() - q.at < 5000 && pid < RW.net.pid && Math.abs(q.x - pc.x) < 90 * TS && (!lead || pid < lead.pid)) lead = Object.assign({ pid }, q); });
+    if (lead) { e.x = Math.abs(e.x - lead.x) > 3 * TS ? lead.x : RW.lerp(e.x, lead.x, Math.min(1, dt * 4)); e.home = lead.home; e.dir = lead.dir; }
+    else if (Math.abs(e.x - pc.x) > 90 * TS) { e.home = pc.x; e.x = pc.x + e.dir * 24 * TS; }   // travelled far: the storm comes too
+    if (RW.net.transport && (ST.sendT -= dt) <= 0) { ST.sendT = 1.5; RW.net.send({ k: 'eye', w: 'acorn', x: Math.round(e.x), home: Math.round(e.home), dir: e.dir }); }
     if (Math.random() < dt * 6) RW.fx.spawn({ x: e.x + RW.rand(-20, 20), y: RW.cam.y + RW.rand(0, RW.view.h), vy: RW.rand(-30, 30), life: 1, color: '#efe6ff', add: true, kind: 'glow' });
-    // echoes: translucent acorns walking somewhere they once walked
-    for (let i = ST.figs.length - 1; i >= 0; i--) { const f = ST.figs[i]; f.t += dt; f.x += f.face * 14 * dt; if (f.t > f.life) ST.figs.splice(i, 1); }
-    if (out && ST.figs.length < 4 && Math.random() < dt * 0.5) {
-      const x = pc.x + RW.rand(-18, 18) * TS, y = groundBelow(Math.floor(x / TS), ptile().y);
-      if (y != null) ST.figs.push({ x, y: (y + 1) * TS - 22, face: RW.pick([-1, 1]), t: 0, life: RW.rand(8, 14), look: RW.pick(['brown', 'golden', 'red', 'pale', 'green']) });
+    // echoes: translucent acorns walking somewhere they once walked. Every 3 seconds each 24-block stretch of ground
+    // may get one; where it starts, which way it walks and how it looks all come from the shared clock.
+    ST.figs.length = 0;
+    const now = Date.now() / 1000, surf = W().meta.surf, LOOKS = ['brown', 'golden', 'red', 'pale', 'green'];
+    if (out && surf) for (let seg = Math.floor(pc.x / TS / 24) - 2; seg <= Math.floor(pc.x / TS / 24) + 2; seg++) for (let k = Math.floor(now / 3) - 4; k <= Math.floor(now / 3); k++) {
+      if (RW.hash2(seg, k, 501) > 0.18) continue; const t = now - k * 3, life = 8 + RW.hash2(seg, k, 503) * 6; if (t < 0 || t > life) continue;
+      const face = RW.hash2(seg, k, 505) < 0.5 ? -1 : 1, x = (seg * 24 + RW.hash2(seg, k, 507) * 24) * TS + face * 14 * t, tx = Math.floor(x / TS);
+      if (tx < 0 || tx >= W().W) continue;
+      ST.figs.push({ x, y: surf[tx] * TS - 22, face, t, life, look: LOOKS[Math.floor(RW.hash2(seg, k, 509) * 5)] });
     }
-    if (out && Math.random() < dt * 0.6 && E.enemies.filter((m) => m.sp === 'rubbermcfly').length < 6) spawnMcfly(pc.x / TS, pc.y / TS - 6, 18, 5);
+    if (out && runner() && Math.random() < dt * 0.6 && E.enemies.filter((m) => m.sp === 'rubbermcfly').length < 6) spawnMcfly(pc.x / TS, pc.y / TS - 6, 18, 5);
     // the eye
     if (out && !P.dead && Math.abs(pc.x - e.x) < 2.2 * TS) {
       ST.inEye += dt; if (Math.random() < dt * 10) RW.fx.spawn({ x: pc.x + RW.rand(-8, 8), y: pc.y + 10, vy: -40, life: 0.8, color: '#efe6ff', add: true, kind: 'glow' });
@@ -11041,6 +11101,7 @@ window.RW = window.RW || {};
     if (Math.random() > (e.sp === 'big_momma_kofi' ? 0.22 : 0.38) + e.tries * 0.08) { U.toast('The ' + sp.name + ' eats the ' + it.name + ' and looks at you. Maybe one more?'); return; }
     if (P.flags.pet) release();
     e.dead = true; P.flags.pet = e.sp; E.pet = makePet(e.sp, e.x, e.y + e.h); hearts(c.x, e.y, 12);
+    if (e.mirror && e.nid && RW.net.transport) RW.net.send({ k: 'gone', w: W().def.id, i: e.nid });   // it left the wild for everyone
     RW.audio.sfx('craft'); U.banner('A new friend', sp.name + ' will follow you now.' + (e.sp === 'domestic_punk' ? ' Right-click it for its saddlebags.' : ''));
     RW.game.saveSoon();
   }
@@ -11175,7 +11236,7 @@ window.RW = window.RW || {};
   E.drawExtra = function (g, cam, time) {
     baseExtra(g, cam, time);
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
-    fruits.forEach((f) => { const ic = A.icon('albali_fruit'), wob = f.landT > 14 ? Math.sin(time * 30) * 1.2 : 0; g.drawImage(ic, Math.round(f.x + ox - 2 + wob), Math.round(f.y + oy - 4), 10, 10); });
+    fruits.forEach((f) => { const ic = A.icon('albali_fruit'), wob = Date.now() / 1000 - f.born > 18 ? Math.sin(time * 30) * 1.2 : 0; g.drawImage(ic, Math.round(f.x + ox - 2 + wob), Math.round(f.y + oy - 4), 10, 10); });
     if (E.pet) {
       const p = E.pet, fr = A.species(p.sp), k = Math.abs(p.vx) > 5 ? Math.floor(p.t * 6) % fr.length : 0, img = fr[k][p.face > 0 ? 0 : 1];
       g.drawImage(img, Math.round(p.x + ox + p.w / 2 - img.width / 2), Math.round(p.y + oy + p.h - img.height));
@@ -11235,8 +11296,13 @@ window.RW = window.RW || {};
 // (slow, sparking mud); the Song Stones of the Akai hall; things you use from the bag (scrolls, Albali film); the
 // guard's Aagac (the keep guards know the hat, not the face); Hobb's hammer; raising a Stryx from a seedling.
 // Places come from the world's meta (worlds/acornworld.js: buildHighStep, buildBog, buildStatues).
+//
+// Everyone in the same place sees the same thing. Monsters are run by one player (sync.js), so what they do that shows
+// is either sent with them (e.nfx) or shared with E.shareFx. The lift, the weather, the Song Stones, scroll effects,
+// pets, fishing lines and Pebble's mud balls are all sent to the other players; a raised Stryx lives in the world as a
+// block; anything else comes from the shared real-time clock.
 (function (RW) {
-  const TS = RW.TILE; const E = RW.ent, P = RW.player, U = RW.ui, B = E.behaviors; const ec = E.center, overlap = E.overlap;
+  const TS = RW.TILE; const E = RW.ent, P = RW.player, U = RW.ui, B = E.behaviors, N = RW.net; const ec = E.center, overlap = E.overlap;
   const $ = (s) => document.querySelector(s);
   const W = () => RW.world;
   const acorn = () => W().def && W().def.id === 'acorn';
@@ -11251,6 +11317,70 @@ window.RW = window.RW || {};
   const snap = () => { if (E.buddy) { E.buddy.x = P.x - 16; E.buddy.y = P.y; E.buddy.vx = E.buddy.vy = 0; } if (E.pet) { E.pet.x = P.x + 14; E.pet.y = P.y + P.h - E.pet.h; E.pet.vx = E.pet.vy = 0; } const v = RW.view; RW.cam.x = P.x + 6 - v.w / 2; RW.cam.y = P.y + 14 - v.h / 2; };
   const toastOnce = (k, msg) => { if (P.flags[k]) return; P.flags[k] = 1; U.toast(msg); };
   const BUFF = { light: 0, swift: 0 };   // from scrolls: seconds of lamplight and of quick feet
+  const live = () => !!N.transport;
+  const runner = () => !N.transport || RW.sync.auth;    // the player who runs the monsters (or you, playing alone)
+  const players = () => (RW.sync && RW.sync.players ? RW.sync.players() : [{ me: true, x: P.x, y: P.y }]);
+  const nearMe = (x, y, r) => { const pc = pcen(); return RW.dist(x, y, pc.x, pc.y) < r * TS; };
+
+  // ====================== SHARED EFFECTS ======================
+  // E.shareFx(kind, x, y, data): plays here and for every other player in this world near (x, y). It plays here a moment
+  // later, so a monster acting for another player (sync.js runs it "as" them) doesn't show their toast on your screen.
+  const FX = {};
+  E.shareFx = function (kind, x, y, d) {
+    d = d || {}; queueMicrotask(() => { if (FX[kind]) FX[kind](x, y, d, true); });
+    if (live()) N.send({ k: 'sfx', w: W().def.id, kind, x: Math.round(x), y: Math.round(y), d });
+  };
+  N.on('sfx', (m) => {
+    if (!W().def || m.w !== W().def.id || !FX[m.kind] || typeof m.x !== 'number' || typeof m.y !== 'number' || !nearMe(m.x, m.y, 60)) return;
+    FX[m.kind](m.x, m.y, m.d && typeof m.d === 'object' ? m.d : {}, false);
+  });
+  Object.assign(FX, {
+    growl(x, y) { RW.audio.sfx('roar'); RW.fx.text(x, y - 10, 'Grrr', '#c8b878'); if (nearMe(x, y, 9)) toastOnce('seen_vorn', 'A Sru Vorn growls. This is its ground. Back off, or it charges.'); },
+    tail(x, y) { RW.audio.sfx('slam'); RW.fx.debris(x, y, ['#5a5a62', '#c8c8d0'], 6); },
+    headoff(x, y) { RW.audio.sfx('roar'); RW.fx.burst(x, y, ['#6a8a3a', '#c8d090', '#e0525a'], 14, 90); if (nearMe(x, y, 20)) toastOnce('seen_ular_stump', 'A head falls... and the stump is already bubbling. Burn it before it grows back!'); },
+    headgrow(x, y, d) { RW.audio.sfx('roar'); RW.fx.burst(x, y, ['#6a8a3a', '#d8e070'], 12, 70); if (nearMe(x, y, 20)) U.toast(d.n >= 4 ? 'Another head! It has ' + d.n + ' now.' : 'A new head grows out of the stump.'); },
+    seal(x, y) { RW.fx.element.fire(x, y, 0.8); if (nearMe(x, y, 20)) U.toast('The fire seals the stump. That head is gone for good.'); },
+    pop(x, y) { RW.fx.burst(x, y, ['#c08aff', '#ffe86a', '#6af0e0'], 14, 120, { add: true, kind: 'spark' }); RW.audio.sfx('lightning'); if (nearMe(x, y, 1.6)) { P.hurt(3, 0, 'bog'); U.toast('Pop! Bog mud does that.'); } },
+    lash(x, y, d) { for (let k = 0; k <= 10; k++) RW.fx.spawn({ x: x + (d.tx - x) * k / 10, y: y + (d.ty - y) * k / 10 - Math.sin(k / 10 * Math.PI) * 10, life: 0.3, color: '#6ab84a', kind: 'dot' }); RW.audio.sfx('swing'); },
+    sneeze(x, y) { E.enemies.forEach((e) => { const c = ec(e); if (!e.dead && RW.dist(c.x, c.y, x, y) < 10 * TS) RW.fx.text(c.x, e.y - 6, 'Achoo!', '#ffd0e0'); }); },
+    tk(x, y) { RW.fx.flash('#c08aff', 0.25); RW.audio.sfx('crystal'); },
+    scroll(x, y, d) { RW.audio.sfx('crystal'); RW.fx.burst(x, y - 4, [typeof d.c === 'string' ? d.c : '#ffffff', '#ffffff'], 14, 70, { add: true, kind: 'glow' }); },
+    cannon(x, y, d, mine) { if (mine) return; RW.audio.sfx('fire'); RW.fx.shake(6, 0.6); RW.fx.flash('#ffb04a', 0.35); for (let k = 0; k < 30; k++) RW.fx.spawn({ x, y, vx: RW.rand(40, 260), vy: RW.rand(-220, -40), life: 1.2, color: RW.pick(['#ff7a2e', '#ffb347', '#ffe08a']), add: true, kind: 'ember', grav: 120 }); },
+    hatch(x, y) { RW.audio.sfx('craft'); RW.fx.burst(x, y, ['#7d9a4a', '#b8ff7a', '#8a7a62'], 18, 90); },
+    tend(x, y) { for (let k = 0; k < 6; k++) RW.fx.spawn({ x: x + RW.rand(-5, 5), y, vy: -40, life: 0.8, color: '#b8ff7a', add: true, kind: 'glow' }); },
+    weather() { RW.audio.sfx('lightning'); RW.fx.flash('#c8d8ff', 0.3); },
+  });
+
+  // ====================== MONSTERS: asking the runner, and what shows ======================
+  // Only the runner's monsters exist for everyone (sync.js). If anyone else needs one to appear (the Su Naga rising
+  // under them, the Kipsu in the den, a wild Stryx hatching), they ask the runner to spawn it.
+  const SPAWN_KEYS = ['pack', 'joined', 'heads', 'st', 'vx', 'vy', 'glow', 'angry', 'herd'];
+  const baseSpawn0 = E.spawnEnemy;
+  E.spawnEnemy = function (id, x, y) {
+    if (!live() || RW.sync.auth || !acorn()) return baseSpawn0(id, x, y);
+    const sp = RW.SPECIES[id], fake = { sp: id, x, y, w: sp.w, h: sp.h, vx: 0, vy: 0, hp: sp.hp, maxhp: sp.hp, face: 1, t: 0 };
+    queueMicrotask(() => { const o = {}; SPAWN_KEYS.forEach((k) => { if (fake[k] != null && typeof fake[k] !== 'object') o[k] = fake[k]; }); N.send({ k: 'spawnreq', w: 'acorn', sp: id, x: Math.round(x), y: Math.round(y), o }); });
+    return fake;
+  };
+  const askT = {};
+  N.on('spawnreq', (m) => {
+    if (!RW.sync.auth || !acorn() || m.w !== 'acorn' || typeof m.x !== 'number' || typeof m.y !== 'number') return;
+    const sp = RW.SPECIES[m.sp]; if (!sp || sp.role === 'boss' || sp.role === 'npc' || (sp.world && sp.world !== 'acorn')) return;
+    const now = performance.now(); askT[m.f] = (askT[m.f] || []).filter((t) => now - t < 10000); if (askT[m.f].length >= 20) return; askT[m.f].push(now);
+    if (!players().some((q) => RW.dist(q.x, q.y, m.x, m.y) < 80 * TS)) return;
+    const e = baseSpawn0(m.sp, m.x, m.y); const o = m.o && typeof m.o === 'object' ? m.o : {};
+    SPAWN_KEYS.forEach((k) => { if (typeof o[k] === 'number' || typeof o[k] === 'boolean') e[k] = o[k]; });
+  });
+  // monsters the runner sends you don't run their own code here, so their glow and what they're doing come from here
+  const GLOW = { mikolo_moko: [0.3, 0.25, 0.35, 1], uff: [0.35, 0.3, 0.12], kofi: [0.15, 0.4, 0.45, 1], big_momma_kofi: [0.15, 0.4, 0.45, 1], rubbermcfly: [0.45, 0.4, 0.25, 1], makari: [0.3, 0.55, 0.2], albali: [0.35, 0.32, 0.2, 1], villtur_albali: [0.2, 0.45, 0.1, 1], hvaleia: [0.2, 0.45, 0.6, 1], tonguatjis: [0.3, 0.22, 0.08], raf_krabbi: [0.15, 0.4, 0.5], su_grothyn: [0.15, 0.35, 0.6], kipsu: [0.15, 0.45, 0.42, 1], malsti_punk: [0.3, 0.15, 0.45], lutut: [0.4, 0.25, 0.6, 1], su_naga: [0.2, 0.45, 0.6], awvadhi: [0.25, 0.12, 0.35] };
+  function showEnemies(dt) {
+    E.enemies.forEach((e) => {
+      if (e.dead) return; const c = ec(e);
+      if (e.mirror) { const gl = GLOW[e.sp]; if (gl && (!gl[3] || night())) RW.fx.light(c.x, c.y, gl[0], gl[1], gl[2]); }
+      if (e.nfx & 1 && Math.random() < dt * 6) RW.fx.spawn({ x: c.x + e.face * 14, y: e.y + 2, vy: -30, life: 0.5, color: '#c8d090', kind: 'bubble', add: true });   // a bubbling stump
+      if (e.nfx & 2 && Math.random() < dt * 14) RW.fx.spawn({ x: e.x + (e.face > 0 ? e.w : 0), y: e.y + e.h, vx: RW.rand(-40, 40), vy: RW.rand(-90, -40), life: 0.5, color: RW.pick(['#4a4058', '#c08aff', '#ffe86a']), grav: 300, kind: 'dot' });   // digging
+    });
+  }
 
   // ====================== SRU VORN ======================
   // It owns the ground round where it turned up. Come within reach and it growls once; stay, or hit it, and it charges,
@@ -11260,7 +11390,7 @@ window.RW = window.RW || {};
     e.hx = e.hx == null ? c.x : e.hx; e.angryT = Math.max(0, (e.angryT || 0) - dt);
     if (e.provoked) { e.provoked = false; e.angryT = 12; e.warnT = 0; }
     const onGround = !P.dead && Math.abs(pc.x - e.hx) < 12 * TS && Math.abs(pc.y - c.y) < 5 * TS;
-    if (!e.angryT && !P.dead && d < 7 * TS && !(e.warnT > 0)) { e.warnT = 1.6; RW.audio.sfx('roar'); RW.fx.text(c.x, e.y - 10, 'Grrr', '#c8b878'); toastOnce('seen_vorn', 'A Sru Vorn growls. This is its ground. Back off, or it charges.'); }
+    if (!e.angryT && !P.dead && d < 7 * TS && !(e.warnT > 0)) { e.warnT = 1.6; E.shareFx('growl', c.x, e.y); }
     if (e.warnT > 0) { e.warnT -= dt; e.vx = RW.lerp(e.vx, 0, dt * 8); e.face = Math.sign(pc.x - c.x) || e.face; e.fr = 2; walk(e, dt); if (e.warnT <= 0 && d < 6 * TS) e.angryT = 10; else if (e.warnT <= 0) e.warnT = -4; e.harmless = true; return; }
     if (e.warnT < 0) e.warnT = Math.min(0, e.warnT + dt);
     const chase = e.angryT > 0 && onGround;
@@ -11276,7 +11406,7 @@ window.RW = window.RW || {};
       E.shots.push({ x: c.x + e.face * 22, y: e.y + 4, vx: Math.cos(a) * 230, vy: Math.sin(a) * 230, grav: 260, life: 2.5, owner: 'e', dmg: 9, kind: 'thorn', color: '#9aff5a', acid: true }); RW.audio.sfx('poison');
     }
     if (chase && e.tt <= 0 && d < 3 * TS && Math.sign(pc.x - c.x) === -e.face) {   // behind it: the tail
-      e.tt = 1.6; P.hurt(Math.round(sp.dmg * 0.8), -e.face, 'sru_vorn'); P.vx = -e.face * 240; P.vy = -180; RW.audio.sfx('slam'); RW.fx.debris(c.x - e.face * 20, c.y, ['#5a5a62', '#c8c8d0'], 6);
+      e.tt = 1.6; P.hurt(Math.round(sp.dmg * 0.8), -e.face, 'sru_vorn'); P.vx = -e.face * 240; P.vy = -180; E.shareFx('tail', c.x - e.face * 20, c.y);
     }
     e.spitT = (e.spitT || 0) - dt;
     e.fr = e.spitT > 0 ? 3 : Math.abs(e.vx) > 8 ? Math.floor(e.t * (chase ? 10 : 5)) % 2 : 0;
@@ -11292,12 +11422,12 @@ window.RW = window.RW || {};
     gravity(e, dt); const pc = pcen(), c = ec(e), d = dist(e);
     if (e.heads == null) { e.heads = 3; e.lost = 0; e.stumps = []; }
     const lost = Math.floor((e.maxhp - e.hp) / (e.maxhp * HEAD));
-    while (lost > e.lost) { e.lost++; if (e.heads > 1) { e.heads--; e.stumps.push(7); RW.audio.sfx('roar'); RW.fx.burst(c.x + e.face * 12, e.y + 4, ['#6a8a3a', '#c8d090', '#e0525a'], 14, 90); if (!P.flags.seen_ular_stump) { P.flags.seen_ular_stump = 1; U.toast('A head falls... and the stump is already bubbling. Burn it before it grows back!'); } } }
+    while (lost > e.lost) { e.lost++; if (e.heads > 1) { e.heads--; e.stumps.push(7); E.shareFx('headoff', c.x + e.face * 12, e.y + 4); } }
     for (let i = e.stumps.length - 1; i >= 0; i--) {
       e.stumps[i] -= dt; if (e.stumps[i] > 0) continue; e.stumps.splice(i, 1);
-      if (e.burn > 0) { RW.fx.element.fire(c.x + e.face * 12, e.y + 4, 0.8); U.toast('The fire seals the stump. That head is gone for good.'); continue; }
+      if (e.burn > 0) { E.shareFx('seal', c.x + e.face * 12, e.y + 4); continue; }
       e.heads = Math.min(5, e.heads + 1); e.hp = Math.min(e.maxhp, e.hp + e.maxhp * 0.12); e.lost = Math.floor((e.maxhp - e.hp) / (e.maxhp * HEAD));
-      RW.audio.sfx('roar'); RW.fx.burst(c.x + e.face * 14, e.y, ['#6a8a3a', '#d8e070'], 12, 70); if (dist(e) < 20 * TS) U.toast(e.heads >= 4 ? 'Another head! It has ' + e.heads + ' now.' : 'A new head grows out of the stump.');
+      E.shareFx('headgrow', c.x + e.face * 14, e.y, { n: e.heads });
     }
     const chase = !P.dead && d < 18 * TS;
     const dir = chase ? Math.sign(pc.x - c.x) || 1 : (e.wd = e.wd || (Math.random() < 0.5 ? -1 : 1));
@@ -11305,12 +11435,12 @@ window.RW = window.RW || {};
     const r = walk(e, dt); if (e.ground && (r.wallL || r.wallR)) { e.vy = -300; if (!chase) e.wd = -dir; }
     if (!chase && Math.random() < dt * 0.2) e.wd = -(e.wd || 1);
     e.face = dir; e.tt = (e.tt || 0) - dt;
-    if (chase && e.tt <= 0 && d < 3.2 * TS && Math.sign(pc.x - c.x) === -e.face) { e.tt = 1.8; P.hurt(sp.dmg, -e.face, 'ular_naga'); P.vx = -e.face * 260; P.vy = -200; RW.audio.sfx('slam'); }
+    if (chase && e.tt <= 0 && d < 3.2 * TS && Math.sign(pc.x - c.x) === -e.face) { e.tt = 1.8; P.hurt(sp.dmg, -e.face, 'ular_naga'); P.vx = -e.face * 260; P.vy = -200; E.shareFx('tail', c.x - e.face * 20, c.y); }
     e.bt = (e.bt || 0) - dt;   // every head bites
     if (chase && e.bt <= 0 && d < 3 * TS && Math.sign(pc.x - c.x) === e.face && P.invulnT <= 0) { e.bt = Math.max(0.5, 1.6 - e.heads * 0.2); P.hurt(Math.round(sp.dmg * 0.6), e.face, 'ular_naga'); RW.audio.sfx('hit'); }
     e.fr = (e.heads - 1) * 2 + (Math.abs(e.vx) > 6 ? Math.floor(e.t * 6) % 2 : 0);
     e.harmless = true;
-    e.stumps.forEach(() => { if (Math.random() < dt * 6) RW.fx.spawn({ x: c.x + e.face * 14, y: e.y + 2, vy: -30, life: 0.5, color: '#c8d090', kind: 'bubble', add: true }); });
+    e.nfx = e.stumps.length ? 1 : 0;
   };
 
   // ====================== ALSTERA (herds) & AWVADHI ======================
@@ -11321,19 +11451,24 @@ window.RW = window.RW || {};
   B.awvadhi = function (e, dt, sp) {
     e.dig = (e.dig == null ? 3 : e.dig) - dt;
     if (e.dig < 0 && e.dig > -1.5 && dist(e) > 5 * TS) {   // stops to dig, flinging mud and glints of stygian
-      gravity(e, dt); e.vx *= 0.8; walk(e, dt); e.fr = Math.floor(e.t * 10) % 2; e.harmless = true;
-      if (Math.random() < dt * 14) RW.fx.spawn({ x: e.x + (e.face > 0 ? e.w : 0), y: e.y + e.h, vx: RW.rand(-40, 40), vy: RW.rand(-90, -40), life: 0.5, color: RW.pick(['#4a4058', '#c08aff', '#ffe86a']), grav: 300, kind: 'dot' });
+      gravity(e, dt); e.vx *= 0.8; walk(e, dt); e.fr = Math.floor(e.t * 10) % 2; e.harmless = true; e.nfx = 2;
       return;
     }
+    e.nfx = 0;
     if (e.dig <= -1.5) e.dig = 2 + Math.random() * 4;
     B.critter(e, dt, sp);
-    if (Math.random() < dt * 2) RW.fx.light(ec(e).x, ec(e).y, 0.25, 0.12, 0.35);
+    RW.fx.light(ec(e).x, ec(e).y, 0.25, 0.12, 0.35);
   };
 
-  // acid from a Sru Vorn: burns for a while after it hits
+  // acid from a Sru Vorn (or gas from a Naga's head): burns for a while after it hits. Shots the runner sends you
+  // don't carry that, so a green thorn counts too.
   function updateAcid() {
     if (P.dead) return;
-    E.shots.forEach((s) => { if (s.acid && !s.hitP && overlap({ x: s.x - 3, y: s.y - 3, w: 6, h: 6 }, P)) { s.hitP = true; P.poisonT = Math.max(P.poisonT || 0, 3.5); U.toast('Sru Vorn acid! It burns.'); } });
+    E.shots.forEach((s) => {
+      if (s.hitP || !(s.acid || (s.net && s.owner === 'e' && s.kind === 'thorn' && s.color === '#9aff5a')) || !overlap({ x: s.x - 3, y: s.y - 3, w: 6, h: 6 }, P)) return;
+      s.hitP = true; P.poisonT = Math.max(P.poisonT || 0, 3.5);
+      if (s.acid || E.enemies.some((e) => e.sp === 'sru_vorn' && dist(e) < 14 * TS)) U.toast('Sru Vorn acid! It burns.');
+    });
   }
 
   // ====================== THE OLD STATUES ======================
@@ -11352,8 +11487,8 @@ window.RW = window.RW || {};
   let statueToastT = 0;
   function updateStatues(dt) {
     const S = W().meta.statues; if (!S || !S.length) return;
-    E.enemies.forEach((e) => {
-      if (!hostile(e)) return; const c = ec(e), s = nearStatue(c.x, c.y, 9); if (!s) return;
+    if (runner()) E.enemies.forEach((e) => {
+      if (e.mirror || !hostile(e)) return; const c = ec(e), s = nearStatue(c.x, c.y, 9); if (!s) return;
       const away = Math.sign(c.x - (s.x * TS + 8)) || 1, nx = e.x + away * 70 * dt;
       if (!W().solid(Math.floor((away > 0 ? nx + e.w : nx) / TS), Math.floor((e.y + e.h / 2) / TS))) e.x = nx;
       e.vx = away * Math.abs(e.vx || 20); e.face = away;
@@ -11365,21 +11500,31 @@ window.RW = window.RW || {};
   // ====================== THE HIGH STEP LIFT ======================
   // The car is a moving platform (E.movers: the player stands on movers like on a Stryx's back). Ring a bell: if the
   // car is at the other end it comes to you for nothing; if it's here, pay the toll and it carries you to the other end.
+  // A bell tells everyone in the world, and the runner says where the car is now and then, so it's the same car for all.
   E.movers = [];
-  const LIFT = { car: null, dir: 0, at: 'bot', creak: 0 };
+  const LIFT = { car: null, dir: 0, at: 'bot', to: 'bot', creak: 0, beaconT: 0, quietT: 0 };
   E.lift = LIFT;
   const SPEED = 62;
   function initLift() {
     const L = W().meta.lift; E.movers.length = 0; LIFT.car = null; LIFT.dir = 0;
     if (!L) return;
-    LIFT.car = { mover: true, platform: true, x: L.x * TS, y: L.bot * TS, w: L.w * TS, h: 8 }; LIFT.at = 'bot';
+    LIFT.car = { mover: true, platform: true, x: L.x * TS, y: L.bot * TS, w: L.w * TS, h: 8 }; LIFT.at = LIFT.to = 'bot';
     E.movers.push(LIFT.car);
   }
   const onCar = () => { const c = LIFT.car; return c && !P.dead && P.x + P.w > c.x + 2 && P.x < c.x + c.w - 2 && Math.abs(P.y + P.h - c.y) < 3; };
-  function sendLift(to) {
-    const L = W().meta.lift; LIFT.dir = to === 'top' ? -1 : 1; LIFT.at = null; LIFT.to = to;
+  function startLift(to, y) {
+    const L = W().meta.lift; if (!L || !LIFT.car) return;
+    if (typeof y === 'number' && y >= L.top * TS && y <= L.bot * TS) LIFT.car.y = y;
+    LIFT.dir = to === 'top' ? -1 : 1; LIFT.at = null; LIFT.to = to; LIFT.quietT = 2;
     RW.audio.sfx('swing'); RW.fx.debris(L.x * TS + 24, L.beam * TS + 8, ['#a88a5a', '#d8c090'], 4);
   }
+  function sendLift(to) { startLift(to); if (live()) N.send({ k: 'lift', w: 'acorn', to, y: Math.round(LIFT.car.y) }); }
+  N.on('lift', (m) => { if (acorn() && m.w === 'acorn' && LIFT.car) startLift(m.to === 'top' ? 'top' : 'bot', +m.y); });
+  N.on('liftst', (m) => {
+    if (!acorn() || m.w !== 'acorn' || !LIFT.car || RW.sync.auth || LIFT.quietT > 0 || typeof m.y !== 'number') return;
+    const L = W().meta.lift, to = m.to === 'top' ? 'top' : 'bot';
+    if (Math.abs(LIFT.car.y - m.y) > 20 || LIFT.dir !== (m.d | 0)) { LIFT.car.y = RW.clamp(m.y, L.top * TS, L.bot * TS); LIFT.dir = m.d | 0; LIFT.to = to; LIFT.at = LIFT.dir ? null : to; }
+  });
   E.useHandlers.lift = function (x, y) {
     const L = W().meta.lift; if (!L || !LIFT.car) return; const bell = L.bells.find((b) => b.x === x && b.y === y) || L.bells[0];
     RW.audio.sfx('pickup'); RW.fx.ring(x * TS + 8, y * TS + 6, '#f0d080', 30, 0.5, 1);
@@ -11391,28 +11536,37 @@ window.RW = window.RW || {};
     sendLift(bell.end === 'top' ? 'bot' : 'top');
   };
   function updateLift(dt) {
-    const L = W().meta.lift, car = LIFT.car; if (!L || !car || !LIFT.dir) return;
+    const L = W().meta.lift, car = LIFT.car; if (!L || !car) return;
+    LIFT.quietT -= dt;
+    if (live() && RW.sync.auth && (LIFT.beaconT -= dt) <= 0) { LIFT.beaconT = 1.5; N.send({ k: 'liftst', w: 'acorn', y: Math.round(car.y), d: LIFT.dir, to: LIFT.to || LIFT.at }); }
+    if (!LIFT.dir) return;
     const riding = onCar();
     car.y += LIFT.dir * SPEED * dt;
     const yt = L.top * TS, yb = L.bot * TS;
     if (car.y <= yt || car.y >= yb) { car.y = RW.clamp(car.y, yt, yb); LIFT.at = LIFT.to; LIFT.dir = 0; RW.audio.sfx('place'); RW.fx.shake(1.5, 0.2); if (riding) U.toast(LIFT.at === 'top' ? 'The car bumps to a stop at the top of the High Step.' : 'The car settles at the foot of the cliff.'); }
-    if (riding) { P.y = car.y - P.h; P.vy = Math.max(0, P.vy); P.ground = true; if (RW.dist(pcen().x, pcen().y, car.x + car.w / 2, car.y) < 30 * TS) toastOnce('rode_lift', 'Hold on! Hoist is hauling you up the cliff.'); }
+    if (riding) { P.y = car.y - P.h; P.vy = Math.max(0, P.vy); P.ground = true; toastOnce('rode_lift', 'Hold on! Hoist is hauling you up the cliff.'); }
     if ((LIFT.creak -= dt) <= 0) { LIFT.creak = 0.8; if (Math.abs(pcen().x - car.x) < 30 * TS) RW.audio.sfx('swing'); }
   }
 
   // ====================== THE AWVADHI BOG ======================
-  // Bog mud is slow going, it sparks and changes colour, and digging it sometimes pops.
+  // Bog mud is slow going, it sparks and changes colour, and digging it sometimes pops. The sparks and colours come
+  // from the shared clock, so everyone at the bog sees the same ones.
   const baseMoveMul = P.moveMul;
   const onBog = () => { const t = W().tile(Math.floor((P.x + P.w / 2) / TS), Math.floor((P.y + P.h + 2) / TS)); return t && t.key === 'bogmud'; };
   P.moveMul = (t) => (baseMoveMul ? baseMoveMul(t) : 1) * (P.ground && onBog() ? 0.62 : 1) * (BUFF.swift > 0 ? 1.45 : 1);
+  const SPARKS = ['#c08aff', '#ffe86a', '#6af0e0', '#ff6a8a', '#8dff8a'];
+  let bogSlot = 0;
   function updateBog(dt) {
     const bg = W().meta.bog; if (!bg) return; const pc = pcen();
     if (Math.abs(pc.x - (bg.x0 + bg.x1) * TS / 2) > 70 * TS) return;
-    for (let k = 0; k < 6; k++) { const x = bg.x0 + ((k * 13 + Math.floor(RW.game.time * 0.5)) % (bg.x1 - bg.x0)), h = RW.game.time * 0.6 + x * 0.3; RW.fx.light(x * TS + 8, bg.y * TS, 0.2 + 0.15 * Math.sin(h), 0.08, 0.25 + 0.15 * Math.cos(h)); }
-    if (Math.random() < dt * 5) {
-      const x = bg.x0 + Math.floor(Math.random() * (bg.x1 - bg.x0)); if (W().get(x, bg.y) !== RW.T.bogmud || W().get(x, bg.y - 1) !== RW.T.air) return;
-      const col = RW.pick(['#c08aff', '#ffe86a', '#6af0e0', '#ff6a8a', '#8dff8a']);
-      for (let k = 0; k < 6; k++) RW.fx.spawn({ x: x * TS + RW.rand(2, 14), y: bg.y * TS, vx: RW.rand(-40, 40), vy: RW.rand(-120, -50), life: 0.5, color: col, add: true, kind: 'spark', grav: 200 });
+    const now = Date.now() / 1000, wd = bg.x1 - bg.x0;
+    for (let k = 0; k < 6; k++) { const x = bg.x0 + ((k * 13 + Math.floor(now * 0.5)) % wd), h = now * 0.6 + x * 0.3; RW.fx.light(x * TS + 8, bg.y * TS, 0.2 + 0.15 * Math.sin(h), 0.08, 0.25 + 0.15 * Math.cos(h)); }
+    const slot = Math.floor(now * 5); if (!bogSlot || slot - bogSlot > 5) bogSlot = slot - 1;
+    for (; bogSlot < slot; bogSlot++) {
+      if (RW.hash2(bogSlot, 1, 777) > 0.2) continue;
+      const x = bg.x0 + Math.floor(RW.hash2(bogSlot, 2, 777) * wd); if (W().get(x, bg.y) !== RW.T.bogmud || W().get(x, bg.y - 1) !== RW.T.air) continue;
+      const col = SPARKS[Math.floor(RW.hash2(bogSlot, 3, 777) * SPARKS.length)];
+      for (let k = 0; k < 6; k++) RW.fx.spawn({ x: x * TS + 2 + k * 2, y: bg.y * TS, vx: (k - 2.5) * 14, vy: -60 - (k % 3) * 25, life: 0.5, color: col, add: true, kind: 'spark', grav: 200 });
     }
     if (zoneIs('bog')) toastOnce('seen_bog', 'The Awvadhi Bog. The mud here glitters and pops. It\'s slow going.');
   }
@@ -11420,36 +11574,35 @@ window.RW = window.RW || {};
   const baseBreak = P.breakTile;
   P.breakTile = function (tx, ty) {
     const t = W().tile(tx, ty); baseBreak(tx, ty);
-    if (t && t.key === 'bogmud' && Math.random() < 0.25) {
-      RW.fx.burst(tx * TS + 8, ty * TS + 8, ['#c08aff', '#ffe86a', '#6af0e0'], 14, 120, { add: true, kind: 'spark' }); RW.audio.sfx('lightning');
-      const pc = pcen(); if (RW.dist(pc.x, pc.y, tx * TS + 8, ty * TS + 8) < 1.6 * TS) { P.hurt(3, 0, 'bog'); U.toast('Pop! Bog mud does that.'); }
-    }
+    if (t && t.key === 'bogmud' && Math.random() < 0.25) E.shareFx('pop', tx * TS + 8, ty * TS + 8);
   };
 
   // ====================== THE SONG STONES ======================
   // Each stone sings one note of a five-note scale. Sing the four verses in order and the hall answers: the gate opens.
+  // Everyone in the world hears every note, and the hall listens to all the singers together.
   const NOTES = [0, 2, 4, 7, 9].map((st) => 262 * Math.pow(2, st / 12));
   E.songLit = {}; let songSeq = [];
-  E.useHandlers.song = function (x, y) {
+  function sing(x, y, mine) {
     const M = W().meta, i = (M.songs || {})[x + ',' + y]; if (i == null) return;
-    if (RW.audio.note) RW.audio.note(NOTES[i], 0.9);
+    if (nearMe(x * TS, y * TS, 40)) { if (RW.audio.note) RW.audio.note(NOTES[i], 0.9); RW.fx.ring(x * TS + 8, y * TS + 4, '#8ad8ff', 26 + i * 6, 0.7, 1); RW.fx.text(x * TS + 8, y * TS - 6, '♪', '#bfe0ff'); }
     E.songLit[x + ',' + y] = RW.game.time + 0.7;
-    RW.fx.ring(x * TS + 8, y * TS + 4, '#8ad8ff', 26 + i * 6, 0.7, 1); RW.fx.text(x * TS + 8, y * TS - 6, '♪', '#bfe0ff');
     songSeq.push(i); if (songSeq.length > 8) songSeq.shift();
     (M.puzzles || []).forEach((p) => {
       if (p.kind !== 'song' || !p.stones.some(([sx, sy]) => sx === x && sy === y)) return;
       const tail = songSeq.slice(-p.order.length);
-      if (tail.length === p.order.length && tail.every((v, k) => v === p.order[k])) { songSeq = []; solveSong(p); }
+      if (tail.length === p.order.length && tail.every((v, k) => v === p.order[k])) { songSeq = []; solveSong(p, mine); }
     });
-  };
-  function solveSong(p) {
-    const open = p.gate.every(([gx, gy]) => W().get(gx, gy) !== RW.T.keepgate);
-    p.order.forEach((n, k) => setTimeout(() => { if (RW.audio.note) RW.audio.note(NOTES[n] * 2, 1.2); p.stones.filter((s) => s[2] === n).forEach(([sx, sy]) => { E.songLit[sx + ',' + sy] = RW.game.time + 0.8; RW.fx.ring(sx * TS + 8, sy * TS + 4, '#d8b8ff', 60, 0.9, 2); }); }, 500 + k * 450));
+  }
+  E.useHandlers.song = function (x, y) { sing(x, y, true); if (live()) N.send({ k: 'song', w: 'acorn', x, y }); };
+  N.on('song', (m) => { if (acorn() && m.w === 'acorn' && typeof m.x === 'number' && typeof m.y === 'number') sing(m.x, m.y, false); });
+  function solveSong(p, mine) {
+    const shut = p.gate.some(([gx, gy]) => W().get(gx, gy) === RW.T.keepgate), here = nearMe(p.stones[0][0] * TS, p.stones[0][1] * TS, 40);
+    p.order.forEach((n, k) => setTimeout(() => { if (here && RW.audio.note) RW.audio.note(NOTES[n] * 2, 1.2); p.stones.filter((s) => s[2] === n).forEach(([sx, sy]) => { E.songLit[sx + ',' + sy] = RW.game.time + 0.8; RW.fx.ring(sx * TS + 8, sy * TS + 4, '#d8b8ff', 60, 0.9, 2); }); }, 500 + k * 450));
     setTimeout(() => {
-      RW.fx.flash('#c8a8ff', 0.4);
-      if (open) { U.toast('The hall hums the song back to you.'); return; }
-      p.gate.forEach(([gx, gy]) => { W().setTile(gx, gy, RW.T.air); RW.fx.debris(gx * TS + 8, gy * TS + 8, ['#6a6a74', '#5a4030'], 8); });
-      RW.fx.shake(4, 0.6); RW.audio.sfx('slam'); U.banner('The hall answers', p.done); P.flags['puzzle_' + p.id] = 1; RW.game.saveSoon();
+      if (here) RW.fx.flash('#c8a8ff', 0.4);
+      if (!shut) { if (here) U.toast('The hall hums the song back to you.'); return; }
+      if (mine) p.gate.forEach(([gx, gy]) => { W().setTile(gx, gy, RW.T.air); RW.fx.debris(gx * TS + 8, gy * TS + 8, ['#6a6a74', '#5a4030'], 8); });
+      if (here) { RW.fx.shake(4, 0.6); RW.audio.sfx('slam'); U.banner('The hall answers', p.done); P.flags['puzzle_' + p.id] = 1; RW.game.saveSoon(); }
     }, 500 + p.order.length * 450 + 300);
   }
   // the Akai Relic: the song stays with you
@@ -11469,10 +11622,24 @@ window.RW = window.RW || {};
       P.filmHeal += Math.round(P.maxHp() * 0.5); RW.audio.sfx('eat'); U.toast('The numbed film soaks in. It doesn\'t sting at all.'); return true;
     },
     scroll(it) {
-      const pc = pcen(); RW.audio.sfx('crystal'); RW.fx.burst(pc.x, pc.y - 4, [it.icon.b, '#ffffff'], 14, 70, { add: true, kind: 'glow' });
-      return (SCROLLS[it.scroll] || (() => true))(it, pc) !== false;
+      const pc = pcen(); if (SCROLLS[it.scroll] && SCROLLS[it.scroll](it, pc) === false) return false;
+      E.shareFx('scroll', pc.x, pc.y, { c: it.icon.b }); return true;
     },
   };
+  // the sneeze and telekinesis move monsters, so the runner does it (you ask, if that's not you)
+  function push(kind, x, y) {
+    E.enemies.forEach((e) => {
+      const c = ec(e); if (e.dead || RW.dist(c.x, c.y, x, y) > (kind === 'tk' ? 12 : 10) * TS) return;
+      if (kind === 'sneeze') { const d = Math.sign(c.x - x) || 1; e.vx = d * 240; e.vy = -200; return; }
+      e.vy = -560; e.vx = RW.rand(-60, 60); E.damage(e, 15, 0, 0, false, '#c08aff');
+      setTimeout(() => { if (!e.dead) { E.damage(e, 40, 0, 2, false, '#c08aff'); RW.fx.debris(ec(e).x, e.y + e.h, ['#8b847c', '#5f5953'], 6); } }, 1200);
+    });
+  }
+  // a creature someone tamed leaves the wild for everyone (no loot: it isn't dead)
+  N.on('gone', (m) => { if (!RW.sync.auth || !W().def || m.w !== W().def.id) return; const i = E.enemies.findIndex((e) => e.nid === m.i); if (i >= 0) E.enemies.splice(i, 1); });
+  N.on('push', (m) => { if (RW.sync.auth && acorn() && m.w === 'acorn' && (m.kind === 'sneeze' || m.kind === 'tk') && typeof m.x === 'number' && typeof m.y === 'number') push(m.kind, m.x, m.y); });
+  const askPush = (kind, pc) => { if (runner()) push(kind, pc.x, pc.y); else N.send({ k: 'push', w: 'acorn', kind, x: Math.round(pc.x), y: Math.round(pc.y) }); };
+  const near = (pc, r) => E.enemies.filter((e) => !e.dead && RW.dist(ec(e).x, ec(e).y, pc.x, pc.y) < r * TS).length;
   const SCROLLS = {
     light() { BUFF.light = 60; U.toast('Light pours out of the runes and follows you about.'); },
     swift() { BUFF.swift = 30; U.toast('Your feet feel very quick.'); },
@@ -11484,27 +11651,35 @@ window.RW = window.RW || {};
       U.toast(b && b.w === here ? 'The scroll folds you up and puts you down beside your bed.' : 'The scroll puts you down back where this world starts.');
     },
     sneeze(it, pc) {
-      let n = 0;
-      E.enemies.forEach((e) => { if (e.dead || dist(e) > 10 * TS) return; const c = ec(e), d = Math.sign(c.x - pc.x) || 1; e.vx = d * 240; e.vy = -200; RW.fx.text(c.x, e.y - 6, 'Achoo!', '#ffd0e0'); n++; });
+      if (!acorn()) { U.toast('You sneeze. The runes were written for Acorn World.'); return; }
+      const n = near(pc, 10); askPush('sneeze', pc); E.shareFx('sneeze', pc.x, pc.y);
       U.toast(n ? 'Everything nearby sneezes and falls over.' : 'You sneeze. Nobody else is here to.');
     },
     fire(it, pc) {
       const m = RW.mouseWorld(), a = Math.atan2(m.y - pc.y, m.x - pc.x);
-      E.shots.push({ x: pc.x, y: pc.y - 4, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380, grav: 50, life: 3, owner: 'p', dmg: 110, kind: 'fire' });
+      const shot = { x: pc.x, y: pc.y - 4, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380, grav: 50, life: 3, owner: 'p', dmg: 110, kind: 'fire' };
+      E.shots.push(shot); if (N.sendShot) N.sendShot(shot);
       RW.audio.sfx('fire'); RW.fx.shake(3, 0.3);
     },
     weather() {
       if (!acorn()) { U.toast('The runes look at the sky and refuse. This scroll was written for Acorn World.'); return false; }
-      const raining = RW.rainNow ? RW.rainNow() : false; RW.weatherOverride = { until: Date.now() / 1000 + 120, rain: !raining };
-      RW.audio.sfx('lightning'); RW.fx.flash('#c8d8ff', 0.3);
+      const raining = RW.rainNow ? RW.rainNow() : false; setWeather(120, !raining, true); E.shareFx('weather', pcen().x, pcen().y);
       U.toast(raining ? 'The clouds tear open and the rain stops.' : 'The sky goes dark. Here comes the rain.');
     },
     lift(it, pc) {
-      let n = 0;
-      E.enemies.forEach((e) => { if (e.dead || dist(e) > 12 * TS) return; e.vy = -560; e.vx = RW.rand(-60, 60); E.damage(e, 15, 0, 0, false, '#c08aff'); n++; const tgt = e; setTimeout(() => { if (!tgt.dead) { E.damage(tgt, 40, 0, 2, false, '#c08aff'); RW.fx.debris(ec(tgt).x, tgt.y + tgt.h, ['#8b847c', '#5f5953'], 6); } }, 1200); });
-      RW.fx.flash('#c08aff', 0.25); U.toast(n ? 'Everything near you flies up into the air!' : 'Nothing near you to throw.');
+      if (!acorn()) { U.toast('The runes were written for Acorn World. Nothing moves.'); return false; }
+      const n = near(pc, 12); askPush('tk', pc); E.shareFx('tk', pc.x, pc.y);
+      U.toast(n ? 'Everything near you flies up into the air!' : 'Nothing near you to throw.');
     },
   };
+  // the weather scroll turns the weather round for the whole world: everyone in it, and anyone who arrives in time
+  let wxT = 0;
+  function setWeather(secs, rain, send) { RW.weatherOverride = { until: Date.now() / 1000 + secs, rain: !!rain }; if (send && live()) N.send({ k: 'wx', w: 'acorn', rem: Math.round(secs), rain: rain ? 1 : 0 }); }
+  N.on('wx', (m) => { if (m.w === 'acorn' && typeof m.rem === 'number') setWeather(RW.clamp(m.rem, 0, 120), !!m.rain, false); });
+  function updateWeatherShare(dt) {
+    const o = RW.weatherOverride; if (!o || !live() || !RW.sync.auth || (wxT -= dt) > 0) return; wxT = 6;
+    const rem = o.until - Date.now() / 1000; if (rem > 1) N.send({ k: 'wx', w: 'acorn', rem: Math.round(rem), rain: o.rain ? 1 : 0 });
+  }
   const baseUseItem = P.useItem;
   P.useItem = function (it) {
     if (it.kind !== 'use') return baseUseItem(it);
@@ -11514,8 +11689,51 @@ window.RW = window.RW || {};
   };
   function updateBuffs(dt) {
     const pc = pcen();
-    if (BUFF.light > 0) { BUFF.light -= dt; [[0, 0], [-40, -10], [40, -10], [0, -40], [-70, 10], [70, 10]].forEach(([dx, dy]) => RW.fx.light(pc.x + dx, pc.y + dy, 0.6, 0.55, 0.35)); if (BUFF.light <= 0) U.toast('The lamplight fades.'); }
+    if (BUFF.light > 0) { BUFF.light -= dt; lampLight(pc.x, pc.y); if (BUFF.light <= 0) U.toast('The lamplight fades.'); }
     if (BUFF.swift > 0) { BUFF.swift -= dt; if (P.ground && Math.abs(P.vx) > 20 && Math.random() < dt * 12) RW.fx.spawn({ x: pc.x, y: P.y + P.h, vy: -10, life: 0.4, color: '#8ad8ff', add: true, kind: 'glow' }); if (BUFF.swift <= 0) U.toast('Your feet feel ordinary again.'); }
+  }
+  const lampLight = (x, y) => [[0, 0], [-40, -10], [40, -10], [0, -40], [-70, 10], [70, 10]].forEach(([dx, dy]) => RW.fx.light(x + dx, y + dy, 0.6, 0.55, 0.35));
+
+  // ====================== WHAT OTHER PLAYERS SEE OF YOU ======================
+  // Your pet, your fishing line, your lamplight and quick feet, and being stuck in Albali film travel with your position
+  // (net.js presence: ex), and are drawn on the other players' screens.
+  E.presExtra = function () {
+    const o = {}, pet = E.pet, f = E.fish;
+    if (pet && acorn()) o.pt = [pet.sp, Math.round(pet.x), Math.round(pet.y), pet.face > 0 ? 1 : -1, Math.abs(pet.vx) > 5 ? 1 : 0];
+    if (f) o.fs = [Math.round(f.x), Math.round(f.y), f.bite > 0 ? 1 : 0];
+    const bf = (BUFF.light > 0 ? 1 : 0) | (BUFF.swift > 0 ? 2 : 0) | (P.stunT > 0 ? 4 : 0) | (P.filmHeal > 0 ? 8 : 0);
+    if (bf) o.bf = bf;
+    return Object.keys(o).length ? o : 0;
+  };
+  const baseDrawPeers = N.drawPeers;
+  N.drawPeers = function (g, cam) {
+    baseDrawPeers(g, cam);
+    const A = RW.art, time = RW.game.time;
+    N.peers.forEach((p) => {
+      const t = p.target, ex = t && t.ex; if (!t || t.dead || t.w !== RW.world.def.id || !ex || typeof ex !== 'object') return;
+      if (Array.isArray(ex.pt) && RW.SPECIES[ex.pt[0]]) {
+        const pe = p.pet = p.pet || { x: ex.pt[1], y: ex.pt[2] }; pe.x = RW.lerp(pe.x, +ex.pt[1] || 0, 0.3); pe.y = RW.lerp(pe.y, +ex.pt[2] || 0, 0.3);
+        const fr = A.species(ex.pt[0]), sz = RW.SPECIES[ex.pt[0]], k = ex.pt[4] ? Math.floor(time * 6) % fr.length : 0, img = fr[k][ex.pt[3] > 0 ? 0 : 1];
+        g.drawImage(img, Math.round(pe.x - cam.x + (sz.w || 12) / 2 - img.width / 2), Math.round(pe.y - cam.y + (sz.h || 10) - img.height));
+      }
+      if (Array.isArray(ex.fs)) {
+        const hx = p.x + 6 + (t.f > 0 ? 12 : -12) - cam.x, hy = p.y + 2 - cam.y, bx = (+ex.fs[0] || 0) - cam.x, by = (+ex.fs[1] || 0) - cam.y + (ex.fs[2] ? 3 : Math.sin(time * 3));
+        g.strokeStyle = 'rgba(240,240,230,0.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(hx, hy); g.quadraticCurveTo((hx + bx) / 2, Math.max(hy, by) + 10, bx, by - 2); g.stroke();
+        g.fillStyle = '#e0525a'; g.fillRect(Math.round(bx) - 2, Math.round(by) - 3, 4, 2); g.fillStyle = '#ffffff'; g.fillRect(Math.round(bx) - 2, Math.round(by) - 1, 4, 2);
+      }
+      const bf = ex.bf | 0, cx = p.x + 6, cy = p.y + 14;
+      if (bf & 1) lampLight(cx, cy);
+      if (bf & 2 && Math.random() < 0.2) RW.fx.spawn({ x: cx, y: p.y + 28, vy: -10, life: 0.4, color: '#8ad8ff', add: true, kind: 'glow' });
+      if (bf & 12 && Math.random() < 0.3) RW.fx.spawn({ x: cx + RW.rand(-8, 8), y: cy + RW.rand(-12, 10), vy: -20, life: 0.5, color: '#fff6c8', add: true, kind: 'glow' });
+    });
+  };
+
+  // ====================== PEBBLE'S MUD BALLS, for whoever's watching ======================
+  const mud = [];
+  N.on('mudb', (m) => { if (acorn() && m.w === 'acorn' && typeof m.x === 'number' && nearMe(m.x, m.y, 50) && mud.length < 40) mud.push({ x: m.x, y: m.y, vx: +m.vx || 0, vy: +m.vy || 0 }); });
+  N.on('mudc', (m) => { if (!acorn() || typeof m.x !== 'number') return; RW.fx.text(m.x, m.y - 6, '+1', '#e8c88a'); let bi = -1, bd = 30; mud.forEach((b, i) => { const d = RW.dist(b.x, b.y, m.x, m.y); if (d < bd) { bd = d; bi = i; } }); if (bi >= 0) mud.splice(bi, 1); });
+  function updateMud(dt) {
+    for (let i = mud.length - 1; i >= 0; i--) { const b = mud[i]; b.vy += 520 * dt; b.x += b.vx * dt; b.y += b.vy * dt; if (b.vy > 0 && W().solid(Math.floor(b.x / TS), Math.floor((b.y + 3) / TS))) { RW.fx.debris(b.x, b.y, ['#5a4632', '#7a5e42'], 6); mud.splice(i, 1); } }
   }
 
   // ====================== THE GUARD'S AAGAC ======================
@@ -11525,7 +11743,7 @@ window.RW = window.RW || {};
   E.guardMul = (n, dx, range) => (disguised() ? (dx < range * 0.35 ? 0.3 : 0) : 1);
   E.onCaught = () => { if (acorn() && P.armor.head === 'aagac_guard') { P.flags.aagac_known = today(); setTimeout(() => U.toast('They know that Aagac now. Every guard will, until tomorrow.'), 900); } };
 
-  // ====================== HOBB'S HAMMER: Phorus reshapes it ======================
+  // ====================== TALKING: Phorus and Hobb's hammer, your Stryx ======================
   const baseTalk = U.talk;
   U.talk = function (npc) {
     baseTalk(npc);
@@ -11537,17 +11755,26 @@ window.RW = window.RW || {};
         says.textContent = 'Phorus turns the hammer over in his hands and says nothing at all. He holds it a while, and the chip in the head fills back in like water. "This is a tool," he says. "It has always been a tool. Take it back to him."'; b.remove();
       }, true);
     }
-    if ((npc.id === 'garden_stryx' || npc.id === 'dozy_stryx') && P.flags.stryx && P.flags.stryx.stage === 'done') btn('Let it go wild', () => { const i = E.npcs.indexOf(npc); if (i >= 0) E.npcs.splice(i, 1); delete P.flags.stryx; U.closeModal(); U.toast('Your Stryx settles into the ground. You could raise another.'); RW.game.saveSoon(); });
+    const s = P.flags.stryx;
+    if (npc.at && s && s.stage === 'done' && s.x === npc.at[0] && s.y === npc.at[1]) btn('Let it go wild', () => { W().setTile(s.x, s.y, RW.T.air); delete P.flags.stryx; U.closeModal(); U.toast('Your Stryx settles into the ground and is gone. You could raise another.'); RW.game.saveSoon(); });
+    else if (npc.at && (npc.id === 'garden_stryx' || npc.id === 'dozy_stryx')) says.textContent = RW.pick(RW.NPCS[npc.id].lines) + (s && s.x === npc.at[0] && s.y === npc.at[1] ? '' : ' Somebody else raised this one.');
   };
+  // R on a raised Stryx talks to it, like talking to anyone else
+  E.useHandlers.mystryx = function (x, y, t) { U.talk({ id: t.kind2, at: [x, y], x: x * TS - 12, y: (y + 1) * TS - 18, w: 40, h: 18, t: 0 }); };
 
   // ====================== RAISING A STRYX ======================
   // Plant a seedling (Acorn World only, one at a time). Tend it (R) every so often while it grows; hitting it counts
   // against it. When it's grown: well raised, it guards the ground round it; half raised, it dozes; badly raised, it's a
-  // wild Stryx that only knows how to stab.
+  // wild Stryx that only knows how to stab. The sprout and the grown Stryx are blocks, so everyone sees them; when it
+  // was planted is kept on the block too (like a crop's), so everyone sees it the same size.
   const GROW = 300;   // seconds of real time
   const S0 = () => P.flags.stryx;
-  const sproutProgress = () => { const s = S0(); return s && s.t0 ? RW.clamp((Date.now() / 1000 - s.t0) / GROW, 0, 1) : 0; };
-  E.sproutLook = (x, y) => { const s = S0(); if (!s || s.x !== x || s.y !== y) return { k: 0.4, sad: false }; return { k: sproutProgress(), sad: s.harsh > s.care }; };
+  const plantedAt = (x, y) => W().plant.get(W().idx(x, y));
+  const progress = (x, y) => { const t0 = plantedAt(x, y); return t0 ? RW.clamp((Date.now() / 1000 - t0) / GROW, 0, 1) : 0; };
+  const isSprout = (x, y) => { const k = W().get(x, y); return k === RW.T.stryxsprout || k === RW.T.stryxsprout_sad; };
+  E.sproutLook = (x, y, t) => ({ k: progress(x, y), sad: !!(t && t.sad) });
+  const mine = (x, y) => { const s = S0(); return s && s.x === x && s.y === y; };
+  function sproutMood() { const s = S0(); if (!s || !isSprout(s.x, s.y)) return; const want = s.harsh > s.care ? RW.T.stryxsprout_sad : RW.T.stryxsprout; if (W().get(s.x, s.y) !== want) W().setTile(s.x, s.y, want, { plant: plantedAt(s.x, s.y) }); }
   const basePlace = P.tryPlace;
   P.tryPlace = function (tx, ty, item, reach) {
     if (item.id !== 'stryx_seedling') return basePlace(tx, ty, item, reach);
@@ -11555,85 +11782,95 @@ window.RW = window.RW || {};
     if (S0()) { U.toast(S0().stage === 'done' ? 'You already have a Stryx. One is plenty.' : 'You already have a Stryx growing.'); return; }
     if (!reach || !W().solid(tx, ty + 1)) { if (reach) U.toast('Plant it on solid ground.'); return; }
     basePlace(tx, ty, item, reach);
-    if (W().get(tx, ty) === RW.T.stryxsprout) { P.flags.stryx = { x: tx, y: ty, t0: Date.now() / 1000, care: 0, harsh: 0, last: 0 }; U.toast('Planted. Tend it (R) every little while as it grows. It will grow up to be whatever you raise it to be.'); RW.game.saveSoon(); }
+    if (W().get(tx, ty) !== RW.T.stryxsprout) return;
+    W().setTile(tx, ty, RW.T.stryxsprout, { plant: Math.floor(Date.now() / 1000) });
+    P.flags.stryx = { x: tx, y: ty, care: 0, harsh: 0, last: 0 };
+    U.toast('Planted. Tend it (R) every little while as it grows. It will grow up to be whatever you raise it to be.'); RW.game.saveSoon();
   };
   E.useHandlers.sprout = function (x, y) {
-    const s = S0(); if (!s || s.x !== x || s.y !== y) { U.toast('Somebody else\'s Stryx sprout. It eyes you.'); return; }
-    if (sproutProgress() >= 1) { hatch(); return; }
+    if (!mine(x, y)) { U.toast('Somebody else\'s Stryx sprout. It eyes you.'); return; }
+    const s = S0(); if (progress(x, y) >= 1) { hatch(); return; }
     const now = Date.now() / 1000; if (now - s.last < 20) { U.toast('It\'s content for now. Come back in a little while.'); return; }
     s.last = now; const h = P.held(); let gift = 1;
     if (h && (h.id === 'bog_mud' || h.id === 'mud')) { P.remove(h.id, 1); U.dirty(); gift = h.id === 'bog_mud' ? 3 : 2; }
-    s.care += gift; RW.audio.sfx('eat'); for (let k = 0; k < 6; k++) RW.fx.spawn({ x: x * TS + 8 + RW.rand(-5, 5), y: y * TS + 6, vy: -40, life: 0.8, color: '#b8ff7a', add: true, kind: 'glow' });
+    s.care += gift; RW.audio.sfx('eat'); E.shareFx('tend', x * TS + 8, y * TS + 6); sproutMood();
     U.toast(gift === 3 ? 'It drinks the bog mud and its horns flicker. It loves you.' : gift === 2 ? 'It drinks the mud happily.' : RW.pick(['You talk to it for a while. It leans toward your voice.', 'You tidy the stones round it. It wriggles.', 'You show it how to count Kofi. It seems to follow.']));
     RW.game.saveSoon();
   };
   const baseMine = P.mineTile;
   P.mineTile = function (tx, ty, dt) {
-    const t = W().tile(tx, ty), s = S0();
-    if (t && t.key === 'stryxsprout' && s && s.x === tx && s.y === ty && (!P.mine || P.mine.tx !== tx || P.mine.ty !== ty)) { s.harsh++; RW.audio.sfx('hit'); U.toast('The sprout flinches. It will remember that.'); }
+    if (isSprout(tx, ty) && mine(tx, ty) && (!P.mine || P.mine.tx !== tx || P.mine.ty !== ty)) { S0().harsh++; RW.audio.sfx('hit'); U.toast('The sprout flinches. It will remember that.'); sproutMood(); }
     return baseMine(tx, ty, dt);
   };
   function hatch() {
     const s = S0(); const score = s.care - s.harsh * 2;
-    W().setTile(s.x, s.y, RW.T.air); RW.audio.sfx('craft'); RW.fx.burst(s.x * TS + 8, s.y * TS + 8, ['#7d9a4a', '#b8ff7a', '#8a7a62'], 18, 90);
-    if (score >= 5) { s.stage = 'done'; s.kind = 'garden_stryx'; addStryx(); U.banner('Your Stryx', 'You raised it kindly, and it grew up clever. It will guard the ground round it.'); }
-    else if (score >= 2) { s.stage = 'done'; s.kind = 'dozy_stryx'; addStryx(); U.banner('A dozy Stryx', 'Half raised: friendly, but mostly asleep. Tend the next one more often.'); }
-    else { delete P.flags.stryx; const e = E.spawnEnemy('stryx', s.x * TS - 12, (s.y + 1) * TS - 18); e.angry = 6; U.banner('A wild Stryx', 'Nobody raised it, so it only knows one thing: stab.'); }
+    E.shareFx('hatch', s.x * TS + 8, s.y * TS + 8);
+    if (score >= 5) { s.stage = 'done'; s.kind = 'garden_stryx'; W().setTile(s.x, s.y, RW.T.gardenstryx); U.banner('Your Stryx', 'You raised it kindly, and it grew up clever. It will guard the ground round it.'); }
+    else if (score >= 2) { s.stage = 'done'; s.kind = 'dozy_stryx'; W().setTile(s.x, s.y, RW.T.dozystryx); U.banner('A dozy Stryx', 'Half raised: friendly, but mostly asleep. Tend the next one more often.'); }
+    else { W().setTile(s.x, s.y, RW.T.air); delete P.flags.stryx; const e = E.spawnEnemy('stryx', s.x * TS - 12, (s.y + 1) * TS - 18); e.angry = 6; U.banner('A wild Stryx', 'Nobody raised it, so it only knows one thing: stab.'); }
     RW.game.saveSoon();
   }
-  function addStryx() { const s = S0(); if (!s || s.stage !== 'done' || E.npcs.some((n) => n.mine)) return; E.npcs.push({ id: s.kind, mine: true, x: s.x * TS - 12, y: (s.y + 1) * TS - 18, w: 40, h: 18, home: s.x * TS, face: 1, t: 0, vx: 0, vy: 0 }); }
-  let sproutT = 0;
+  // raised Stryx guard the ground round them: the runner looks near every player for one with a hunter in reach
+  let stryxT = 0, guardT = 0; const lashed = {};
   function updateStryx(dt) {
-    const s = S0(); if (!s) return;
-    if (s.stage !== 'done') {
-      if ((sproutT -= dt) > 0) return; sproutT = 1;
-      if (W().get(s.x, s.y) !== RW.T.stryxsprout) { delete P.flags.stryx; return; }   // the sprout is gone (a fresh world)
-      if (sproutProgress() >= 1 && RW.dist(pcen().x, pcen().y, s.x * TS, s.y * TS) < 18 * TS) hatch();
-      return;
+    const s = S0();
+    if (s && (stryxT -= dt) <= 0) {
+      stryxT = 1;
+      const k = W().get(s.x, s.y), here = s.stage === 'done' ? k === RW.T.gardenstryx || k === RW.T.dozystryx : isSprout(s.x, s.y);
+      if (!here && RW.game.playing && !RW.game.travelling) { if ((s.missing = (s.missing || 0) + 1) > 10) delete P.flags.stryx; }   // gone (a fresh world): give it a few seconds for the world to load
+      else s.missing = 0;
+      if (here && s.stage !== 'done' && progress(s.x, s.y) >= 1 && RW.dist(pcen().x, pcen().y, s.x * TS, s.y * TS) < 18 * TS) hatch();
     }
-    const n = E.npcs.find((o) => o.mine); if (!n || s.kind !== 'garden_stryx') return;
-    n.lt = (n.lt || 0) - dt; if (n.lt > 0) return;
-    const nc = { x: n.x + n.w / 2, y: n.y + 4 };
-    const foe = E.enemies.find((e) => !e.dead && !e.harmless && hostile(e) && RW.dist(ec(e).x, ec(e).y, nc.x, nc.y) < 6 * TS);
-    if (!foe) return; n.lt = 1.1; const fc = ec(foe);
-    for (let k = 0; k <= 10; k++) RW.fx.spawn({ x: nc.x + (fc.x - nc.x) * k / 10, y: nc.y + (fc.y - nc.y) * k / 10 - Math.sin(k / 10 * Math.PI) * 10, life: 0.3, color: '#6ab84a', kind: 'dot' });
-    E.damage(foe, 28, Math.sign(fc.x - nc.x) || 1, 4, false, '#b8ff7a'); RW.audio.sfx('swing');
+    if (!runner() || (guardT -= dt) > 0) return; guardT = 0.25;
+    const now = performance.now();
+    players().forEach((q) => {
+      const qx = Math.floor((q.x + 6) / TS), qy = Math.floor((q.y + 14) / TS);
+      for (let y = qy - 8; y <= qy + 8; y++) for (let x = qx - 14; x <= qx + 14; x++) {
+        if (W().get(x, y) !== RW.T.gardenstryx || now - (lashed[x + ',' + y] || 0) < 1100) continue;
+        const nc = { x: x * TS + 8, y: y * TS + 4 };
+        const foe = E.enemies.find((e) => !e.dead && !e.harmless && hostile(e) && RW.dist(ec(e).x, ec(e).y, nc.x, nc.y) < 6 * TS); if (!foe) continue;
+        lashed[x + ',' + y] = now; const fc = ec(foe);
+        E.damage(foe, 28, Math.sign(fc.x - nc.x) || 1, 4, false, '#b8ff7a'); E.shareFx('lash', nc.x, nc.y, { tx: Math.round(fc.x), ty: Math.round(fc.y) });
+      }
+    });
   }
 
   // ====================== GRISK THE FENCE: only at the old shrine, only at night ======================
   let fenceT = 0;
-  const onScreen = (o) => { const c = RW.cam, v = RW.view; return o.x + o.w > c.x - 24 && o.x < c.x + v.w + 24 && o.y + o.h > c.y - 24 && o.y < c.y + v.h + 24; };
+  const watched = (o) => players().some((q) => Math.abs(q.x - o.x) < 34 * TS && Math.abs(q.y - o.y) < 22 * TS);
   function updateFence(dt) {
     if ((fenceT -= dt) > 0) return; fenceT = 1;
     const at = W().meta.npcs && W().meta.npcs.fence; if (!at) return;
     const i = E.npcs.findIndex((n) => n.id === 'fence'), dark = !!night();
-    if (dark && i < 0) E.npcs.push({ id: 'fence', x: at.x * TS + 2, y: (at.y + 1) * TS - 22, w: 12, h: 22, home: at.x * TS, face: -1, t: 0, vx: 0, vy: 0 });
-    if (!dark && i >= 0 && !onScreen(E.npcs[i])) E.npcs.splice(i, 1);
+    if (dark && i < 0 && !watched({ x: at.x * TS, y: at.y * TS })) E.npcs.push({ id: 'fence', x: at.x * TS + 2, y: (at.y + 1) * TS - 22, w: 12, h: 22, home: at.x * TS, face: -1, t: 0, vx: 0, vy: 0 });
+    if (!dark && i >= 0 && !watched(E.npcs[i])) E.npcs.splice(i, 1);
   }
   if (RW.TAME_FOODS) RW.TAME_FOODS.alstera = 'pond_carp';   // Alstera Naga eat fish
 
   // ====================== WORLD LOAD & EVERY FRAME ======================
   const baseInit = E.initNpcs;
   E.initNpcs = function () {
-    baseInit(); initLift(); songSeq = []; fenceT = 0;
+    baseInit(); initLift(); songSeq = []; fenceT = 0; mud.length = 0;
     if (!acorn()) return;
     if (!night()) { const i = E.npcs.findIndex((n) => n.id === 'fence'); if (i >= 0) E.npcs.splice(i, 1); }
-    addStryx();
   };
   const baseUpd = E.updateEnemies;
   E.updateEnemies = function (dt) {
     baseUpd(dt);
     updateBuffs(dt);
     if (!acorn()) return;
-    updateAcid(); updateStatues(dt); updateLift(dt); updateBog(dt); updateStryx(dt); updateFence(dt);
+    showEnemies(dt); updateAcid(); updateStatues(dt); updateLift(dt); updateBog(dt); updateStryx(dt); updateFence(dt); updateMud(dt); updateWeatherShare(dt);
   };
 
-  // ====================== DRAWING: the lift car, its ropes and the counterweight ======================
+  // ====================== DRAWING: the lift car, its ropes and the counterweight; Pebble's mud for watchers ======================
   const baseExtra = E.drawExtra;
   E.drawExtra = function (g, cam, time) {
     baseExtra(g, cam, time);
-    const L = W().meta.lift, car = LIFT.car; if (!L || !car || !acorn()) return;
-    const ox = -Math.round(cam.x), oy = -Math.round(cam.y), beam = L.beam * TS + 8;
+    if (!acorn()) return;
+    const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
+    mud.forEach((b) => { g.fillStyle = '#5a4632'; g.beginPath(); g.arc(b.x + ox, b.y + oy, 3, 0, 6.29); g.fill(); g.fillStyle = '#8a6e50'; g.fillRect(Math.round(b.x + ox - 1), Math.round(b.y + oy - 2), 1, 1); });
+    const L = W().meta.lift, car = LIFT.car; if (!L || !car) return;
+    const beam = L.beam * TS + 8;
     if (car.x + ox > RW.view.w + 40 || car.x + car.w + ox < -80) return;
     // the counterweight goes down as the car goes up
     const cwy = L.bot * TS - (car.y - L.top * TS) - 30, cx = L.cw * TS + 2;
