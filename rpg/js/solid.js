@@ -196,7 +196,8 @@ export function createSolids(scene, opts) {
 
   /* the turned boxes this mesh (or one copy of an instanced mesh) stands for, in the world */
   function boxesOf(o, inst) {
-    const g = o.userData.smFrom || o.geometry;   // smooth.js's softened copy keeps the shape it was made from
+    // smooth.js's softened copy keeps the shape it was made from (but a .clone() turns that into plain JSON — the knocked-off hat)
+    const g = o.userData.smFrom && o.userData.smFrom.isBufferGeometry ? o.userData.smFrom : o.geometry;
     if (!g.boundingBox) g.computeBoundingBox();
     M.copy(o.matrixWorld);
     if (inst != null) { o.getMatrixAt(inst, IM); M.multiply(IM); }
