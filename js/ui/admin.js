@@ -28,7 +28,7 @@
 (function () {
   'use strict';
   const U = DYA.util, G = DYA.state, SP = DYA.species, EC = DYA.economy, L = DYA.lore, TK = DYA.token, M = DYA.mods;
-  let root, view = 'Overview', huntTab = 'Available';
+  let root, view = 'Overview', huntTab = 'Available', everyGroup = 'economy', bwDoc = 'HOW-TO-ADD.md';
 
   /* this IS the admin session — world mutations here publish the shared AI
      world so every player's device picks up the curation (see G.saveNow) */
@@ -350,7 +350,7 @@
   }
 
   /* ---------- main panel ---------- */
-  const NAV = ['Overview', 'Creatures', 'Hunts', 'Guild Market', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Crafting Station', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'God Mode'];
+  const NAV = ['Overview', 'Creatures', 'Hunts', 'Guild Market', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Crafting Station', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'Edit Everything', '4 Brothers World', 'God Mode'];
   function panel() {
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap' });
@@ -1432,20 +1432,292 @@
       });
     },
 
-    /* ================= ANNOUNCEMENTS ================= */
+    /* ================= ANNOUNCEMENTS / LIVE BROADCAST =================
+       Everything here goes out LIVE (js/core/broadcast.js): open copies of
+       the card game, 4 Brothers World, Torcain's Run and the film page pick
+       it up within a second over Supabase Realtime, or within 20 seconds by
+       polling. */
     Announcements(body) {
-      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Broadcast to the main landing page and every player’s notifications.' }));
+      const LV = DYA.live;
+      const on = LV && LV.configured();
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Publish straight to every open copy of the web app. Announcements land in the Announcements section of the homepage AND pop up on screen; the banner, maintenance screen and refresh button are extra tools on top.' }));
+      if (!on) { body.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Online isn’t configured (js/config.js), so nothing can be broadcast live. Announcements still save on this device.' })); }
+      const st = (LV && LV.state) || {};
+      const status = U.el('p', { cls: 'small ' + (st.error ? '' : 'muted'), style: st.error ? 'color:var(--red)' : '', text: !on ? '' : st.error ? '⚠ Live channel problem: ' + st.error + (/(relation|table)/i.test(st.error) ? ' — run supabase/schema.sql to add the dya_config table.' : '') : '📡 Live channel ready' + (st.lastPush ? ' · last broadcast ' + U.timeAgo(st.lastPush) : '') + '.' });
+      body.appendChild(status);
+      const doc = () => (LV && LV.doc) || (LV ? LV.emptyDoc() : { items: [], banner: {}, maintenance: {}, reload: {} });
+      const targetSel = (v) => selectEl((LV ? LV.TARGETS : [['all', 'Everywhere']]), v || 'all');
+      const done = (r, what) => {
+        if (!r) return;
+        if (r.err) alert('Saved locally, but the live broadcast failed: ' + r.err);
+        flashSaved(body, r.err ? 'Live broadcast failed.' : (what || 'Broadcast') + (r.instant ? ' — delivered live.' : ' — every page picks it up within 20s.'));
+        setTimeout(rerender, 900);
+      };
+
+      /* ---- announcement: homepage feed + pop-up + notifications ---- */
+      const abox = U.el('div', { cls: 'panel mb' });
+      abox.appendChild(U.el('h3', { cls: 'gold mb', text: '📣 Announcement' }));
+      abox.appendChild(U.el('p', { cls: 'small muted mb', text: 'Goes into the Announcements section of the homepage, pops up for everyone who has the app open, and is added to every real player’s notifications.' }));
       const title = U.el('input', { cls: 'txt', placeholder: 'Title' });
       const txt = U.el('textarea', { cls: 'txt mt', rows: 3, placeholder: 'Body' });
-      body.appendChild(title); body.appendChild(txt);
-      body.appendChild(U.el('button', { cls: 'btn primary mt', text: '📣 Broadcast', onclick: () => { if (!title.value) return; G.admin.announce(title.value, txt.value); title.value = ''; txt.value = ''; rerender(); } }));
-      body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Publish to the Avizu’Vac' }));
-      const at = U.el('input', { cls: 'txt', placeholder: 'Avizu title' });
+      abox.appendChild(title); abox.appendChild(txt);
+      const arow = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:8px;align-items:center' });
+      const aTarget = targetSel('all');
+      const aIcon = U.el('input', { cls: 'txt', value: '📣', style: 'max-width:60px', title: 'Icon' });
+      const popWrap = U.el('label', { cls: 'small', style: 'display:flex;gap:6px;align-items:center' });
+      const pop = U.el('input', { type: 'checkbox' }); pop.checked = true;
+      popWrap.appendChild(pop); popWrap.appendChild(document.createTextNode('also pop up on screen'));
+      arow.appendChild(U.el('span', { cls: 'small muted', text: 'Send to' })); arow.appendChild(aTarget); arow.appendChild(aIcon); arow.appendChild(popWrap);
+      abox.appendChild(arow);
+      abox.appendChild(U.el('button', {
+        cls: 'btn primary mt', text: '📣 Broadcast announcement', onclick: () => {
+          if (!title.value.trim()) { alert('Give it a title.'); return; }
+          G.admin.announce(title.value.trim(), txt.value, 'mass', { target: aTarget.value, icon: aIcon.value || '📣', popup: pop.checked, onPublished: r => done(r, 'Announcement sent') });
+          title.value = ''; txt.value = '';
+          if (!on) rerender();
+        },
+      }));
+      body.appendChild(abox);
+
+      /* ---- Avizu'Vac + pop-up-only ---- */
+      const vbox = U.el('div', { cls: 'panel mb' });
+      vbox.appendChild(U.el('h3', { cls: 'gold mb', text: 'Publish to the Avizu’Vac / quick pop-up' }));
+      const at = U.el('input', { cls: 'txt', placeholder: 'Title' });
       const ab = U.el('textarea', { cls: 'txt mt', rows: 2, placeholder: 'Body' });
-      body.appendChild(at); body.appendChild(ab);
-      body.appendChild(U.el('button', { cls: 'btn mt', text: 'Publish', onclick: () => { if (!at.value) return; G.world.avizu.unshift({ id: U.uid('av'), at: Date.now(), title: at.value, body: ab.value }); G.saveNow(); at.value = ''; ab.value = ''; rerender(); } }));
-      body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Recent announcements' }));
-      G.world.announcements.slice(0, 8).forEach(a => body.appendChild(U.el('div', { cls: 'news-card' }, [U.el('div', { cls: 'nc-title', text: a.title }), U.el('div', { cls: 'nc-body', text: a.body })])));
+      vbox.appendChild(at); vbox.appendChild(ab);
+      const vrow = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:8px' });
+      const vTarget = targetSel('all');
+      vrow.appendChild(vTarget);
+      vrow.appendChild(U.el('button', {
+        cls: 'btn', text: '📰 Publish to the Avizu’Vac', onclick: () => {
+          if (!at.value.trim()) return;
+          const id = U.uid('av');
+          G.world.avizu.unshift({ id: 'live_' + id, at: Date.now(), title: at.value.trim(), body: ab.value }); G.saveNow();
+          if (on) LV.update(d => { d.items.unshift({ id, at: Date.now(), kind: 'avizu', title: at.value.trim(), body: ab.value, icon: '📰', target: vTarget.value }); }).then(r => done(r, 'Avizu’Vac post published'));
+          else rerender();
+        },
+      }));
+      vrow.appendChild(U.el('button', {
+        cls: 'btn', text: '💬 Pop-up only (not saved in the feed)', ...(on ? {} : { disabled: true }), onclick: () => {
+          if (!at.value.trim()) return;
+          LV.update(d => { d.items.unshift({ id: U.uid('tst'), at: Date.now(), kind: 'toast', title: at.value.trim(), body: ab.value, icon: '💬', target: vTarget.value, expires: Date.now() + 15 * 60e3 }); }).then(r => done(r, 'Pop-up sent'));
+        },
+      }));
+      vbox.appendChild(vrow);
+      body.appendChild(vbox);
+
+      /* ---- banner ---- */
+      const bn = Object.assign({ on: false, text: '', tone: 'gold', link: '', target: 'all' }, doc().banner || {});
+      const bbox = U.el('div', { cls: 'panel mb' });
+      bbox.appendChild(U.el('h3', { cls: 'gold mb', text: '🎗 Top-of-screen banner' + (bn.on ? ' — LIVE' : '') }));
+      const bText = U.el('input', { cls: 'txt', value: bn.text || '', placeholder: 'e.g. Double gold weekend! · Server maintenance at 8pm' });
+      bbox.appendChild(bText);
+      const brow = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:8px' });
+      const bTone = selectEl([['gold', 'Gold'], ['info', 'Blue'], ['good', 'Green'], ['alert', 'Red']], bn.tone);
+      const bLink = U.el('input', { cls: 'txt', value: bn.link || '', placeholder: 'Link (optional, https://…)', style: 'max-width:260px' });
+      const bTarget = targetSel(bn.target);
+      const bHours = numIn('', { placeholder: 'Hide after (hours)', style: 'max-width:150px' });
+      [bTone, bLink, bTarget, bHours].forEach(x => brow.appendChild(x));
+      bbox.appendChild(brow);
+      const bacts = U.el('div', { cls: 'flex mt', style: 'gap:8px' });
+      bacts.appendChild(U.el('button', {
+        cls: 'btn primary', text: bn.on ? 'Update banner' : 'Show banner', ...(on ? {} : { disabled: true }), onclick: () => {
+          if (!bText.value.trim()) return;
+          const h = parseFloat(bHours.value);
+          LV.update(d => { d.banner = { on: true, at: Date.now(), text: bText.value.trim(), tone: bTone.value, link: bLink.value.trim(), target: bTarget.value, expires: h > 0 ? Date.now() + h * 3600e3 : 0 }; }).then(r => done(r, 'Banner live'));
+        },
+      }));
+      if (bn.on) bacts.appendChild(U.el('button', { cls: 'btn', text: 'Take banner down', onclick: () => LV.update(d => { d.banner = Object.assign({}, d.banner, { on: false }); }).then(r => done(r, 'Banner removed')) }));
+      bbox.appendChild(bacts);
+      body.appendChild(bbox);
+
+      /* ---- maintenance + refresh ---- */
+      const mt = Object.assign({ on: false, title: '', text: '', target: 'all' }, doc().maintenance || {});
+      const mbox = U.el('div', { cls: 'panel mb' });
+      mbox.appendChild(U.el('h3', { cls: 'gold mb', text: '🛠 Maintenance screen & refresh' + (mt.on ? ' — LOCKED' : '') }));
+      mbox.appendChild(U.el('p', { cls: 'small muted mb', text: 'Maintenance covers the chosen app with a “back soon” screen until you lift it (this admin panel is never locked). “Refresh everyone” reloads every open page once, so players get a new version you just deployed.' }));
+      const mTitle = U.el('input', { cls: 'txt', value: mt.title || '', placeholder: 'Back soon' });
+      const mText = U.el('textarea', { cls: 'txt mt', rows: 2, placeholder: 'The Dya Guild is updating things…' }); mText.value = mt.text || '';
+      mbox.appendChild(mTitle); mbox.appendChild(mText);
+      const mrow = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:8px' });
+      const mTarget = targetSel(mt.target);
+      mrow.appendChild(mTarget);
+      mrow.appendChild(U.el('button', {
+        cls: 'btn ' + (mt.on ? '' : 'danger'), text: mt.on ? '✅ Lift maintenance' : '🛠 Turn maintenance on', ...(on ? {} : { disabled: true }), onclick: () => {
+          if (!mt.on && !confirm('Cover ' + mTarget.options[mTarget.selectedIndex].text + ' with the maintenance screen for everyone?')) return;
+          LV.update(d => { d.maintenance = { on: !mt.on, title: mTitle.value.trim(), text: mText.value.trim(), target: mTarget.value }; }).then(r => done(r, mt.on ? 'Maintenance lifted' : 'Maintenance on'));
+        },
+      }));
+      const rTarget = targetSel('all');
+      mrow.appendChild(U.el('span', { cls: 'small muted', style: 'align-self:center;margin-left:12px', text: 'Refresh:' }));
+      mrow.appendChild(rTarget);
+      mrow.appendChild(U.el('button', {
+        cls: 'btn', text: '🔄 Refresh everyone', ...(on ? {} : { disabled: true }), onclick: () => {
+          if (!confirm('Reload every open page of ' + rTarget.options[rTarget.selectedIndex].text + '? Unsaved progress in a match may be lost.')) return;
+          LV.update(d => { d.reload = { at: Date.now(), target: rTarget.value }; }).then(r => done(r, 'Refresh sent'));
+        },
+      }));
+      mbox.appendChild(mrow);
+      body.appendChild(mbox);
+
+      /* ---- what's live ---- */
+      body.appendChild(U.el('h3', { cls: 'gold mb mt', text: 'Live posts' }));
+      const items = (doc().items || []).filter(it => !it.deleted);
+      if (!items.length) body.appendChild(U.el('p', { cls: 'muted small', text: on ? 'Nothing broadcast yet.' : 'Online is off.' }));
+      else {
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['When', 'Kind', 'To', 'Title', ''].map(h => U.el('th', { text: h }))));
+        const tname = t => ((LV.TARGETS.find(x => x[0] === (t || 'all')) || [0, t])[1]);
+        items.forEach(it => {
+          const tr = U.el('tr', {}, [U.el('td', { text: U.timeAgo(it.at) }), U.el('td', { text: it.kind }), U.el('td', { text: tname(it.target) }), U.el('td', { text: (it.icon ? it.icon + ' ' : '') + it.title })]);
+          const td = U.el('td', {});
+          if (it.kind !== 'toast') td.appendChild(U.el('button', {
+            cls: 'btn small ghost', text: 'Edit', onclick: () => {
+              const nt = prompt('Title', it.title); if (nt == null) return;
+              const nb = prompt('Body', it.body || ''); if (nb == null) return;
+              const list = it.kind === 'avizu' ? G.world.avizu : G.world.announcements;
+              const loc = list.find(x => x.id === 'live_' + it.id); if (loc) { loc.title = nt; loc.body = nb; G.saveNow(); }
+              LV.update(d => { const x = d.items.find(y => y.id === it.id); if (x) { x.title = nt; x.body = nb; } }).then(r => done(r, 'Post updated'));
+            },
+          }));
+          td.appendChild(U.el('button', {
+            cls: 'btn small danger', text: 'Delete', onclick: () => {
+              if (!confirm('Remove “' + it.title + '” from every homepage?')) return;
+              ['announcements', 'avizu'].forEach(k => { G.world[k] = G.world[k].filter(x => x.id !== 'live_' + it.id); });
+              G.saveNow();
+              LV.update(d => { const x = d.items.find(y => y.id === it.id); if (x) x.deleted = true; }).then(r => done(r, 'Post removed'));
+            },
+          }));
+          tr.appendChild(td); tbl.appendChild(tr);
+        });
+        body.appendChild(tbl);
+      }
+      if (on) body.appendChild(U.el('button', { cls: 'btn small ghost mt', text: '⟳ Reload from online', onclick: () => LV.fetch().then(rerender) }));
+    },
+
+    /* ================= EDIT EVERYTHING =================
+       Raw JSON editors for every data table the game ships with, including
+       the ones the friendlier tabs don't cover (achievements, titles, regions,
+       circuit rewards, narrators, arenas, the encyclopedia, element colours,
+       traits, starters…), every species, and the whole overrides document.
+       Saves go through DYA.mods like any other edit, so they reach every
+       player online. */
+    'Edit Everything'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Every data table in the game as editable JSON. Save applies it at once (and pushes to every player online); Reset puts the shipped value back. Gold-edged boxes are edited.' }));
+      body.appendChild(syncLine());
+      const bar = U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap;gap:8px' });
+      const search = U.el('input', { cls: 'txt', style: 'max-width:260px', placeholder: '🔎 Filter (e.g. TITLES, REGIONS, ruut)…' });
+      const groupSel = selectEl([['economy', 'Economy & progression (' + Object.keys(M.base.economy).length + ')'], ['lore', 'Lore & text (' + Object.keys(M.base.lore).length + ')'], ['balance', 'Balance tables (' + Object.keys(M.base.balance).length + ')'], ['tables', 'Species data tables (' + Object.keys(M.base.tables || {}).length + ')'], ['species', 'Every species (' + Object.keys(SP.all).length + ')'], ['raw', 'The whole overrides document']], everyGroup);
+      bar.appendChild(groupSel); bar.appendChild(search);
+      body.appendChild(bar);
+      const list = U.el('div', {});
+      body.appendChild(list);
+      const LIVE_OBJ = { economy: EC, lore: L, balance: SP, tables: SP };
+
+      function jsonBox(name, current, edited, onSave, onReset, rows) {
+        const box = U.el('div', { cls: 'panel mb', style: edited ? 'border-left:3px solid var(--gold)' : '' });
+        const head = U.el('div', { cls: 'flex', style: 'align-items:center;gap:8px;cursor:pointer' });
+        head.appendChild(U.el('b', { cls: 'gold', text: name }));
+        head.appendChild(U.el('span', { cls: 'small muted', text: Array.isArray(current) ? current.length + ' entries' : (current && typeof current === 'object') ? Object.keys(current).length + ' keys' : typeof current }));
+        if (edited) head.appendChild(U.el('span', { cls: 'pill', text: 'edited' }));
+        box.appendChild(head);
+        const inner = U.el('div', { style: 'display:none' });
+        box.appendChild(inner);
+        head.onclick = () => {
+          if (inner.style.display === 'none' && !inner.childNodes.length) {
+            const ta = U.el('textarea', { cls: 'txt mt', rows: rows || Math.min(24, Math.max(4, JSON.stringify(current, null, 2).split('\n').length)), style: 'width:100%;font:12px/1.4 ui-monospace,monospace' });
+            ta.value = JSON.stringify(current, null, 2);
+            inner.appendChild(ta);
+            const err = U.el('div', { cls: 'small', style: 'color:var(--red);min-height:14px' });
+            const acts = U.el('div', { cls: 'flex mt', style: 'gap:8px' });
+            acts.appendChild(U.el('button', {
+              cls: 'btn small primary', text: 'Save', onclick: () => {
+                let v; try { v = JSON.parse(ta.value); } catch (e) { err.textContent = 'Not valid JSON: ' + e.message; return; }
+                if (current != null && typeof current === 'object' && (Array.isArray(current) !== Array.isArray(v))) { err.textContent = 'Keep the same shape: this must be ' + (Array.isArray(current) ? 'a list [ … ]' : 'an object { … }') + '.'; return; }
+                err.textContent = '';
+                try { onSave(v); } catch (e) { err.textContent = 'Could not apply: ' + e.message; return; }
+                flashSaved(acts);
+                setTimeout(rerender, 700);
+              },
+            }));
+            if (onReset) acts.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Reset to shipped', onclick: () => { if (confirm('Put ' + name + ' back the way the game ships it?')) { onReset(); rerender(); } } }));
+            acts.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Format', onclick: () => { try { ta.value = JSON.stringify(JSON.parse(ta.value), null, 2); err.textContent = ''; } catch (e) { err.textContent = e.message; } } }));
+            inner.appendChild(acts); inner.appendChild(err);
+          }
+          inner.style.display = inner.style.display === 'none' ? '' : 'none';
+        };
+        return box;
+      }
+
+      function paint() {
+        list.innerHTML = '';
+        everyGroup = groupSel.value;
+        const q = search.value.trim().toLowerCase();
+        const g = groupSel.value;
+        if (g === 'raw') {
+          list.appendChild(U.el('p', { cls: 'small muted mb', text: 'The full overrides document (creatures, text, balance, AI, hunts, guild stall, reserve, level chests, season). Careful: saving replaces all of it.' }));
+          list.appendChild(jsonBox('Overrides document (rev ' + M.data.rev + ')', M.data, true, v => M.import(JSON.stringify(v)), null, 30));
+          return;
+        }
+        if (g === 'species') {
+          Object.keys(SP.all).sort().filter(id => !q || id.toLowerCase().includes(q) || String(SP.all[id].name || '').toLowerCase().includes(q)).forEach(id => {
+            const sp = SP.all[id];
+            const custom = M.isCustom(id);
+            list.appendChild(jsonBox((sp.name || id) + ' · ' + id + (custom ? ' (custom)' : '') + (sp.retired ? ' (retired)' : ''), sp, M.isEdited(id) || custom, v => {
+              v.id = id;
+              if (custom) { M.data.customSpecies[id] = v; M.save(); }
+              else {
+                const base = M.base.species[id], patch = {};
+                Object.keys(v).forEach(k => { if (JSON.stringify(v[k]) !== JSON.stringify(base[k])) patch[k] = v[k]; });
+                Object.keys(base).forEach(k => { if (!(k in v)) patch[k] = null; });
+                delete patch.id;
+                if (Object.keys(patch).length) M.data.species[id] = patch; else delete M.data.species[id];
+                M.save();
+              }
+            }, custom ? null : () => M.resetSpecies(id)));
+          });
+          return;
+        }
+        const base = M.base[g] || {};
+        Object.keys(base).sort().filter(k => !q || k.toLowerCase().includes(q) || JSON.stringify(LIVE_OBJ[g][k]).toLowerCase().includes(q)).forEach(k => {
+          const edited = !!(M.data[g] && k in M.data[g]);
+          list.appendChild(jsonBox(k, LIVE_OBJ[g][k], edited, v => M.set(g, k, v), () => M.set(g, k, null)));
+        });
+      }
+      groupSel.onchange = paint;
+      search.oninput = paint;
+      paint();
+    },
+
+    /* ================= 4 BROTHERS WORLD =================
+       The 4 Brothers World guides (HOW-TO-ADD.md, README.md, CHANGELOG.md),
+       read live from the site and shown formatted, plus quick links and the
+       live tools aimed at that game. */
+    '4 Brothers World'(body) {
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'The four brothers’ platformer. Its how-to-add guide is below, read straight from four-brothers-world/ on this site, so it is always the version that is deployed.' }));
+      const links = U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap;gap:8px' });
+      links.appendChild(U.el('button', { cls: 'btn primary', text: '▶ Open 4 Brothers World', onclick: () => window.open('four-brothers-world/index.html', '_blank') }));
+      links.appendChild(U.el('button', { cls: 'btn', text: '📣 Announce to 4 Brothers World players', onclick: () => { view = 'Announcements'; panel(); } }));
+      body.appendChild(links);
+      const tabs = U.el('div', { cls: 'flex mb', style: 'gap:6px' });
+      const holder = U.el('div', { cls: 'panel md-doc' });
+      const DOCS = [['HOW-TO-ADD.md', 'How to add things'], ['README.md', 'About & how to play'], ['CHANGELOG.md', 'Changelog']];
+      DOCS.forEach(([file, label]) => {
+        tabs.appendChild(U.el('button', { cls: 'btn small' + (bwDoc === file ? ' primary' : ''), text: label, onclick: () => { bwDoc = file; panel(); } }));
+      });
+      body.appendChild(tabs);
+      body.appendChild(holder);
+      holder.appendChild(U.el('p', { cls: 'muted', text: 'Loading ' + bwDoc + '…' }));
+      fetch('four-brothers-world/' + encodeURIComponent(bwDoc), { cache: 'no-cache' })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(md => {
+          holder.innerHTML = renderMarkdown(md);
+          const dl = U.el('button', { cls: 'btn small ghost mt', text: '⬇ Download ' + bwDoc, onclick: () => {
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' })); a.download = bwDoc; a.click();
+          } });
+          holder.appendChild(dl);
+        })
+        .catch(e => { holder.innerHTML = ''; holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: 'Could not load four-brothers-world/' + bwDoc + ' (' + e.message + '). Open the admin panel from the website (or a local server), not as a file.' })); });
     },
 
     /* ================= GOD MODE ================= */
@@ -1590,6 +1862,55 @@
       body.appendChild(U.el('p', { cls: 'small muted', text: 'World created ' + U.fmtClock(G.world.createdAt) + ' · storage backend: ' + DYA.store.backend + ' · edits stored as overrides in this browser' + (M.configured() ? ' and in Supabase (dya_config)' : '') + '.' }));
     },
   };
+
+  /* ================= MARKDOWN (for the 4 Brothers World guides) =================
+     A small renderer for the subset those files use: headings, lists, tables,
+     code, bold/italic, links. Everything is escaped first. */
+  function mdInline(t) {
+    return U.esc(t)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>')
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, txt, href) => /^(https?:|#|[\w./-]+$)/i.test(href) ? '<a href="' + href + '" target="_blank" rel="noopener">' + txt + '</a>' : txt);
+  }
+  function renderMarkdown(md) {
+    const lines = md.replace(/\r/g, '').split('\n');
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      const ln = lines[i];
+      if (/^```/.test(ln)) {
+        const buf = []; i++;
+        while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
+        i++; out.push('<pre><code>' + U.esc(buf.join('\n')) + '</code></pre>'); continue;
+      }
+      const h = /^(#{1,6})\s+(.*)$/.exec(ln);
+      if (h) { const n = Math.min(4, h[1].length + 1); out.push('<h' + n + ' class="gold">' + mdInline(h[2]) + '</h' + n + '>'); i++; continue; }
+      if (/^\s*\|/.test(ln)) {
+        const rows = [];
+        while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+        const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+        let html = '<table class="adm" style="white-space:normal">';
+        rows.forEach((r, ri) => {
+          if (/^\s*\|?\s*:?-{2,}/.test(r)) return;
+          const tag = ri === 0 ? 'th' : 'td';
+          html += '<tr>' + cells(r).map(c => '<' + tag + ' style="white-space:normal">' + mdInline(c) + '</' + tag + '>').join('') + '</tr>';
+        });
+        out.push(html + '</table>'); continue;
+      }
+      if (/^\s*([-*]|\d+\.)\s+/.test(ln)) {
+        const ordered = /^\s*\d+\./.test(ln);
+        const items = [];
+        while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, ''));
+        out.push('<' + (ordered ? 'ol' : 'ul') + '>' + items.map(t => '<li>' + mdInline(t) + '</li>').join('') + '</' + (ordered ? 'ol' : 'ul') + '>'); continue;
+      }
+      if (!ln.trim()) { i++; continue; }
+      const para = [];
+      while (i < lines.length && lines[i].trim() && !/^(#|```|\s*\||\s*([-*]|\d+\.)\s)/.test(lines[i])) para.push(lines[i++]);
+      out.push('<p>' + mdInline(para.join(' ')) + '</p>');
+    }
+    return out.join('\n');
+  }
 
   /* ================= SPRITE PREVIEW ================= */
   const previewLoops = [];

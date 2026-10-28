@@ -38,6 +38,14 @@
     table.adm th, table.adm td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
     table.adm th { color: var(--gold-dim); font-weight: normal; letter-spacing: .08em; font-size: 11px; text-transform: uppercase; }
     table.adm tr:hover td { background: #2a221633; }
+    /* the 4 Brothers World guides, rendered from markdown */
+    .md-doc { line-height: 1.55; max-width: 980px; }
+    .md-doc h2, .md-doc h3, .md-doc h4 { margin: 18px 0 8px; }
+    .md-doc code { background: #2a2216; padding: 1px 5px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+    .md-doc pre { background: #1a140c; padding: 10px; border-radius: 6px; overflow-x: auto; }
+    .md-doc ul, .md-doc ol { padding-left: 22px; }
+    .md-doc li { margin: 3px 0; }
+    .md-doc a { color: var(--gold); }
 
     /* ============================================================
        MOBILE / NARROW SCREENS
@@ -83,6 +91,7 @@
   <script src="js/core/audio.js"></script>
   <script src="js/config.js"></script>
   <script src="js/core/supabase.js"></script>
+  <script src="js/core/broadcast.js"></script>
   <script src="js/data/species.js"></script>
   <script src="js/data/economy.js"></script>
   <script src="js/data/lore.js"></script>
