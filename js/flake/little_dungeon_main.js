@@ -3,10 +3,14 @@
    Boot for Little Dungeon (mini-games/little-dungeon/), the mini
    game that used to sit inside Dya'Akara as Legends of Pia'don.
 
-   It shares Dya'Akara's engine and account code, so the player's
-   Flake Games account (and the gold a won run pays out) is the
-   same everywhere. The differences: it opens straight into the
-   dungeon, and every "main menu" leads to the Flake Games home.
+   It shares Dya'Akara's engine and account code, so a signed-in
+   player's Flake Games account (and the gold a won run pays out) is
+   the same everywhere. It opens straight into the dungeon, and every
+   "main menu" leads to the Flake Games home.
+
+   Mini games need no account: with nobody signed in it plays as a
+   guest (a run in progress is kept in this browser, and a win pays no
+   gold), with a "Sign in to save" button in the top bar.
    ============================================================ */
 (function () {
   'use strict';
@@ -15,7 +19,7 @@
   window.addEventListener('DOMContentLoaded', () => {
     G.init();
     UI.init();
-    UI.brand = { logo: 'LITTLE DUNGEON', chips: false };
+    UI.brand = { logo: 'LITTLE DUNGEON', chips: false, signIn: () => F.toSignIn() };
 
     /* the dungeon's "menu" is the Flake Games home page */
     UI.register('menu', { enter() { G.saveNow(); F.toHub(); } });
@@ -34,6 +38,9 @@
         UI.show('pia');
       });
     }
+    /* a guest goes straight in: no account, and solo play needs no connection
+       (co-op asks to connect when it is chosen) */
+    if (!F.session()) { UI.show('pia'); return; }
     if (DYA.onlineGate) DYA.onlineGate.requireOnline(proceed);
     else proceed();
   });

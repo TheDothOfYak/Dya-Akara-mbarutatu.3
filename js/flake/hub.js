@@ -159,11 +159,13 @@
     toast('Welcome, ' + session.name + '.');
   });
 
-  /* play a game: signed in → straight there; otherwise sign in first */
+  /* play a game: signed in → straight there; otherwise sign in first.
+     Mini games need no account: a guest goes straight in. */
+  const isMini = game => F.MINI.indexOf(game) >= 0;
   function play(game) {
     const b = banOn(game.id === 'game' ? null : game.id);
     if (b) { toast(F.banText(b)); return; }
-    if (!session) { openAuth('in', game.href); return; }
+    if (!session && !isMini(game)) { openAuth('in', game.href); return; }
     location.href = game.href;
   }
 

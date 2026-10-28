@@ -12,9 +12,10 @@
    hash the account row already stores — never the password), and
    every game reads it:
 
-     FLAKE.gate(gameId)   on a game page: no session → off to the
-                          home page to sign in, then straight back;
+     FLAKE.gate(gameId)   on a main game's page: no session → off to
+                          the home page to sign in, then straight back;
                           banned from this game → a blocking notice.
+                          (Mini games let a guest play without one.)
 
    Bans come in two kinds (both shown on the Admin Panel):
      • Dya'Akara's own ban (dya_bans) — scope 'game', as before.
