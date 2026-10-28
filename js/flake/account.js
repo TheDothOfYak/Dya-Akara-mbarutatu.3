@@ -218,10 +218,40 @@
   /* ================= the home page's editable text ================= */
   function cachedHub() { try { return JSON.parse(localStorage.getItem(HUB_CACHE_KEY) || 'null'); } catch (e) { return null; } }
   FLAKE.hubConfig = function () { return normHub(cachedHub()); };
+  /* { studio, games: { id: { name, tagline, hidden, preview } },
+       order: { main: [ids], mini: [ids] }, soon: [{ id, name, tagline, blurb, kind, preview }] } */
   function normHub(v) {
     v = v && typeof v === 'object' ? v : {};
-    return { studio: (v.studio || '').trim() || FLAKE.DEFAULT_STUDIO, games: v.games && typeof v.games === 'object' ? v.games : {} };
+    return {
+      studio: (v.studio || '').trim() || FLAKE.DEFAULT_STUDIO,
+      games: v.games && typeof v.games === 'object' ? v.games : {},
+      order: v.order && typeof v.order === 'object' ? v.order : {},
+      soon: Array.isArray(v.soon) ? v.soon : [],
+    };
   }
+  /* the games of one kind ('main' or 'mini') in the admin's order; any game
+     the order doesn't name yet goes at the end */
+  FLAKE.orderOf = function (hub, kind) {
+    const all = (kind === 'mini' ? MINI : GAMES).map(g => g.id);
+    const set = ((hub && hub.order && hub.order[kind]) || []).filter(id => all.indexOf(id) >= 0);
+    return set.concat(all.filter(id => set.indexOf(id) < 0));
+  };
+  /* what the home page shows: the visible games in order, then coming-soon slots */
+  FLAKE.shown = function (hub, kind) {
+    hub = hub || FLAKE.hubConfig();
+    const all = kind === 'mini' ? MINI : GAMES;
+    const games = FLAKE.orderOf(hub, kind).map(id => all.find(g => g.id === id)).filter(g => !(hub.games[g.id] || {}).hidden);
+    const soon = (hub.soon || []).filter(s => (s.kind || 'main') === kind).map(s => Object.assign({ soon: true, href: null }, s));
+    return games.concat(soon);
+  };
+
+  /* preview images uploaded in the Admin Panel (dya_config 'flake_preview:<id>') */
+  FLAKE.fetchPreview = async function (id) {
+    const rows = await rest('GET', 'dya_config?key=eq.' + encodeURIComponent('flake_preview:' + id) + '&select=value');
+    return (rows && rows[0] && rows[0].value && rows[0].value.data) || null;
+  };
+  FLAKE.savePreview = function (id, data) { return rest('POST', 'dya_config?on_conflict=key', { key: 'flake_preview:' + id, value: { data, at: Date.now() }, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates'); };
+  FLAKE.removePreview = function (id) { return rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('flake_preview:' + id)); };
   FLAKE.fetchHubConfig = async function () {
     if (!cfg()) return FLAKE.hubConfig();
     try {
@@ -237,8 +267,149 @@
   };
   /* a game's text with the admin's edits laid over the defaults */
   FLAKE.gameText = function (game, hub) {
+    if (game.soon) return { name: game.name || 'Coming soon', tagline: game.tagline || 'Coming soon' };
     const o = ((hub || FLAKE.hubConfig()).games || {})[game.id] || {};
     return { name: (o.name || '').trim() || game.name, tagline: (o.tagline || '').trim() || game.tagline };
+  };
+
+  /* ================= your own account (the home page's Account dialog) ================= */
+  /* the account row, checked against a password — the same check as signing in */
+  async function ownRow(pass) {
+    const s = FLAKE.session();
+    if (!s) return { err: 'Sign in first.' };
+    let rows;
+    try { rows = await rest('GET', 'dya_accounts?id=eq.' + encodeURIComponent(s.id) + '&select=id,email,pass_hash,data'); }
+    catch (e) { return { err: 'Could not reach the account service: ' + e.message }; }
+    const r = rows && rows[0];
+    if (!r) return { err: 'This account no longer exists.' };
+    if (pass != null && r.pass_hash !== FLAKE.hashPass(pass)) return { err: 'That password is not right.' };
+    return { s, row: r };
+  }
+  /* write identity fields into the row; savedAt moves on so the games take
+     this copy over an older one they still hold in the browser */
+  async function patchAccount(row, fields) {
+    const data = Object.assign({}, row.data || {}, fields.data || {}, { savedAt: Date.now() });
+    const body = { data, updated_at: new Date().toISOString() };
+    if (fields.passHash) { body.pass_hash = fields.passHash; data.passHash = fields.passHash; }
+    await rest('PATCH', 'dya_accounts?id=eq.' + encodeURIComponent(row.id), body);
+  }
+  function checkName(name) {
+    name = String(name || '').trim();
+    if (name.length < 2 || name.length > 20) return { err: 'Display name must be 2–20 characters.' };
+    if (!nameOk(name)) return { err: 'That name is not permitted.' };
+    return { name };
+  }
+  FLAKE.rename = async function (name) {
+    const n = checkName(name); if (n.err) return n;
+    const o = await ownRow(null); if (o.err) return o;
+    try { await patchAccount(o.row, { data: { displayName: n.name } }); } catch (e) { return { err: e.message }; }
+    return { who: setSession(Object.assign({}, o.s, { name: n.name })) };
+  };
+  FLAKE.changePassword = async function (current, next) {
+    if (String(next || '').length < 4) return { err: 'The new password must be at least 4 characters.' };
+    const o = await ownRow(current); if (o.err) return o;
+    const passHash = FLAKE.hashPass(next);
+    try { await patchAccount(o.row, { passHash }); } catch (e) { return { err: e.message }; }
+    return { who: setSession(Object.assign({}, o.s, { passHash })) };
+  };
+  /* everything every game keeps for an account, besides the account row */
+  FLAKE.wipeGameData = async function (accId) {
+    const id = encodeURIComponent(accId);
+    await Promise.all([
+      rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('rpg_save:' + accId)),
+      rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('fbw:' + accId + ':*')),
+      rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('ban:' + accId)),
+      rest('DELETE', 'dya_bans?account_id=eq.' + id),
+    ].map(p => p.catch(() => null)));
+  };
+  FLAKE.deleteAccount = async function (pass) {
+    const o = await ownRow(pass); if (o.err) return o;
+    try {
+      await FLAKE.wipeGameData(o.row.id);
+      await rest('DELETE', 'dya_accounts?id=eq.' + encodeURIComponent(o.row.id));
+    } catch (e) { return { err: e.message }; }
+    FLAKE.signOut();
+    return { ok: true };
+  };
+
+  /* Forgot your password? There is no email service, so the request goes to
+     the Admin Panel (General → Players), where an admin sets a new one and
+     tells you. One request per email; asking again just updates it. */
+  FLAKE.requestReset = async function (email, note) {
+    email = String(email || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+$/.test(email)) return { err: 'Enter the email you signed up with.' };
+    try {
+      await rest('POST', 'dya_config?on_conflict=key', { key: 'pwreset:' + email, value: { email, note: String(note || '').slice(0, 300), at: Date.now() }, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates');
+    } catch (e) { return { err: 'Could not send the request: ' + e.message }; }
+    return { ok: true };
+  };
+  FLAKE.fetchResetRequests = async function () {
+    const rows = await rest('GET', 'dya_config?key=like.' + encodeURIComponent('pwreset:*') + '&select=key,value');
+    return (rows || []).map(r => r.value || { email: r.key.slice(8) }).sort((a, b) => (b.at || 0) - (a.at || 0));
+  };
+  FLAKE.clearResetRequest = function (email) { return rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('pwreset:' + email)); };
+
+  /* ================= the Admin Panel's tools for any account ================= */
+  async function rowById(accId) {
+    const rows = await rest('GET', 'dya_accounts?id=eq.' + encodeURIComponent(accId) + '&select=id,email,pass_hash,data');
+    if (!rows || !rows[0]) throw new Error('No such account.');
+    return rows[0];
+  }
+  FLAKE.adminSetPassword = async function (accId, next) {
+    if (String(next || '').length < 4) throw new Error('At least 4 characters.');
+    const row = await rowById(accId);
+    await patchAccount(row, { passHash: FLAKE.hashPass(next) });
+    await FLAKE.clearResetRequest(row.email).catch(() => null);
+  };
+  FLAKE.adminRename = async function (accId, name) {
+    const n = checkName(name); if (n.err) throw new Error(n.err);
+    await patchAccount(await rowById(accId), { data: { displayName: n.name } });
+  };
+
+  /* ================= the Admin Panel's own password =================
+     Kept online (dya_config 'admin_auth'), so it works from any device,
+     as a slow salted hash (PBKDF2-SHA-256) rather than anything that
+     could be read back. There is no built-in password any more: the
+     first time, the panel is set up with the old admin password (the one
+     that used to be built in, or a custom one this browser kept). */
+  const ADMIN_KEY = 'admin_auth';
+  const LEGACY_ADMIN_HASH = '1831298627';   // the old built-in password, hashed the old way
+  const hex = buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  async function pbkdf2(pass, saltHex, iter) {
+    const enc = new TextEncoder();
+    const salt = new Uint8Array(saltHex.match(/../g).map(h => parseInt(h, 16)));
+    const key = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveBits']);
+    return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, key, 256));
+  }
+  async function makeAuth(pass) {
+    const salt = hex(crypto.getRandomValues(new Uint8Array(16))), iter = 150000;
+    return { salt, iter, hash: await pbkdf2(pass, salt, iter), at: Date.now() };
+  }
+  FLAKE.admin = {
+    MIN: 8,
+    /* the stored record, or null when the panel has not been set up yet */
+    async fetch() {
+      const rows = await rest('GET', 'dya_config?key=eq.' + ADMIN_KEY + '&select=value');
+      return (rows && rows[0] && rows[0].value) || null;
+    },
+    async check(pass) {
+      const a = await FLAKE.admin.fetch();
+      return !!(a && a.hash && (await pbkdf2(String(pass || ''), a.salt, a.iter)) === a.hash);
+    },
+    /* first time only. oldOk: the browser's own check of a custom password it kept (state.js) */
+    async setup(oldPass, next, oldOk) {
+      if (await FLAKE.admin.fetch()) throw new Error('The admin password is already set. Sign in with it.');
+      if (FLAKE.hashPass(oldPass) !== LEGACY_ADMIN_HASH && !oldOk) throw new Error('That is not the old admin password.');
+      if (String(next || '').length < FLAKE.admin.MIN) throw new Error('The new password must be at least ' + FLAKE.admin.MIN + ' characters.');
+      if (next === oldPass) throw new Error('Choose a new password, not the old one.');
+      /* a plain insert: if someone else got there a moment ago, this fails rather than overwriting */
+      await rest('POST', 'dya_config', { key: ADMIN_KEY, value: await makeAuth(next), updated_at: new Date().toISOString() });
+    },
+    async change(current, next) {
+      if (!(await FLAKE.admin.check(current))) throw new Error('The current password is not right.');
+      if (String(next || '').length < FLAKE.admin.MIN) throw new Error('The new password must be at least ' + FLAKE.admin.MIN + ' characters.');
+      await rest('PATCH', 'dya_config?key=eq.' + ADMIN_KEY, { value: await makeAuth(next), updated_at: new Date().toISOString() });
+    },
   };
 
   /* ================= the gate every game page passes through ================= */

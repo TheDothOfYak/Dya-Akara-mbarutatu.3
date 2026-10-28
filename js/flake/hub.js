@@ -95,6 +95,17 @@
     const d = Math.round(h / 24); return d === 1 ? 'yesterday' : d < 30 ? d + ' days ago' : new Date(ms).toLocaleDateString();
   }
   const allGames = () => F.GAMES.concat(F.MINI);
+  const slides = () => { const l = F.shown(hub, 'main'); return l.length ? l : F.GAMES.slice(0, 1); };
+  /* a game's preview: the image uploaded in the Admin Panel, else the built-in one */
+  const previewCache = {};
+  function previewSrc(g, cb) {
+    const custom = g.soon ? g.preview : (hub.games[g.id] || {}).preview;
+    if (!custom) { cb(g.soon ? null : 'img/previews/' + g.id + '.jpg'); return; }
+    const k = g.id + ':' + custom;
+    if (previewCache[k]) { cb(previewCache[k]); return; }
+    F.fetchPreview(g.id).then(d => { if (d) previewCache[k] = d; cb(d || (g.soon ? null : 'img/previews/' + g.id + '.jpg')); })
+      .catch(() => cb(g.soon ? null : 'img/previews/' + g.id + '.jpg'));
+  }
 
   /* ---------- the studio name ---------- */
   function paintStudio() {
@@ -106,7 +117,7 @@
   function paintAccount() {
     const box = $('acct'); box.innerHTML = '';
     if (session) {
-      box.appendChild(el('span', { cls: 'who' }, [el('span', { cls: 'dot' }), document.createTextNode('Signed in as '), el('b', { text: session.name })]));
+      box.appendChild(el('button', { cls: 'who-btn', type: 'button', title: 'Your account', onclick: openMe }, [el('span', { cls: 'dot' }), document.createTextNode('Signed in as '), el('b', { text: session.name })]));
       box.appendChild(el('button', { cls: 'btn ghost', type: 'button', text: 'Sign out', onclick: () => { F.signOut(); session = null; bans = {}; paintAccount(); paintSlide(0); toast('Signed out.'); } }));
     } else {
       box.appendChild(el('button', { cls: 'btn ghost', type: 'button', text: 'Create account', onclick: () => openAuth('up') }));
@@ -119,15 +130,22 @@
   function setAuthMode(mode) {
     authMode = mode;
     document.querySelectorAll('#auth .tab').forEach(t => t.classList.toggle('on', t.dataset.mode === mode));
-    $('auth-h').textContent = mode === 'up' ? 'Create your account' : 'Sign in';
+    $('auth-h').textContent = mode === 'up' ? 'Create your account' : mode === 'forgot' ? 'Forgot your password?' : 'Sign in';
     $('auth-lead').textContent = mode === 'up'
       ? 'One account for every ' + hub.studio + ' game, and your progress follows you to any device.'
-      : 'One account for every game. Already played Dya’Akara or Torcain’s Run? Use that same email and password.';
+      : mode === 'forgot'
+        ? 'Send a request to the admin, who will set a new password and let you know.'
+        : 'One account for every game. Already played Dya’Akara or Torcain’s Run? Use that same email and password.';
     $('a-name-row').classList.toggle('hidden', mode !== 'up');
+    $('a-pass-row').classList.toggle('hidden', mode === 'forgot');
+    $('a-note-row').classList.toggle('hidden', mode !== 'forgot');
+    $('a-forgot-row').classList.toggle('hidden', mode !== 'in');
+    $('a-pass').required = mode !== 'forgot';
     $('a-pass').setAttribute('autocomplete', mode === 'up' ? 'new-password' : 'current-password');
-    $('a-go').textContent = mode === 'up' ? 'Create account' : 'Sign in';
+    $('a-go').textContent = mode === 'up' ? 'Create account' : mode === 'forgot' ? 'Send request' : 'Sign in';
     $('a-err').textContent = '';
   }
+  $('a-forgot').addEventListener('click', () => { setAuthMode('forgot'); $('a-email').focus(); });
   function openAuth(mode, href) {
     pendingHref = href || null;
     setAuthMode(mode || 'in');
@@ -142,6 +160,14 @@
   $('auth-form').addEventListener('submit', async e => {
     e.preventDefault();
     $('a-err').textContent = ''; $('a-go').disabled = true;
+    if (authMode === 'forgot') {
+      const q = await F.requestReset($('a-email').value, $('a-note').value);
+      $('a-go').disabled = false;
+      if (q.err) { $('a-err').textContent = q.err; return; }
+      $('a-note').value = '';
+      closeAuth(); toast('Request sent. The admin will set a new password and let you know.');
+      return;
+    }
     const r = authMode === 'up'
       ? await F.createAccount($('a-email').value, $('a-pass').value, $('a-name').value)
       : await F.signIn($('a-email').value, $('a-pass').value);
@@ -159,10 +185,43 @@
     toast('Welcome, ' + session.name + '.');
   });
 
+  /* ---------- your account: name, password, delete ---------- */
+  function openMe() {
+    if (!session) return;
+    $('me-email').textContent = session.email;
+    $('me-name').value = session.name;
+    ['me-cur', 'me-new', 'me-del'].forEach(id => { $(id).value = ''; });
+    $('me-err').textContent = '';
+    $('me').classList.remove('hidden');
+    stopCycle();
+  }
+  function closeMe() { $('me').classList.add('hidden'); startCycle(); }
+  const meErr = (t) => { $('me-err').textContent = t || ''; };
+  $('me-close').addEventListener('click', closeMe);
+  $('me').addEventListener('click', e => { if (e.target === $('me')) closeMe(); });
+  $('me-name-go').addEventListener('click', async () => {
+    meErr(); const r = await F.rename($('me-name').value);
+    if (r.err) { meErr(r.err); return; }
+    session = r.who; paintAccount(); toast('Display name saved.');
+  });
+  $('me-pw-go').addEventListener('click', async () => {
+    meErr(); const r = await F.changePassword($('me-cur').value, $('me-new').value);
+    if (r.err) { meErr(r.err); return; }
+    session = r.who; $('me-cur').value = $('me-new').value = ''; toast('Password changed.');
+  });
+  $('me-del-go').addEventListener('click', async () => {
+    meErr();
+    if (!confirm('Delete your account and everything every game saved on it? This can’t be undone.')) return;
+    const r = await F.deleteAccount($('me-del').value);
+    if (r.err) { meErr(r.err); return; }
+    session = null; bans = {}; closeMe(); paintAccount(); paintSlide(0); toast('Your account was deleted.');
+  });
+
   /* play a game: signed in → straight there; otherwise sign in first.
      Mini games need no account: a guest goes straight in. */
   const isMini = game => F.MINI.indexOf(game) >= 0;
   function play(game) {
+    if (game.soon) return;
     const b = banOn(game.id === 'game' ? null : game.id);
     if (b) { toast(F.banText(b)); return; }
     if (!session && !isMini(game)) { openAuth('in', game.href); return; }
@@ -171,26 +230,30 @@
 
   /* ---------- the carousel ---------- */
   function paintSlide(dir) {
-    const g = F.GAMES[idx], look = LOOK[g.id] || {}, txt = F.gameText(g, hub);
+    const list = slides();
+    if (idx >= list.length) idx = 0;
+    const g = list[idx], txt = F.gameText(g, hub);
+    const look = LOOK[g.id] || { kicker: 'Coming soon', vibe: g.blurb || '', feats: [], a: '#b9a8e8', sky: LOOK.game.sky, skyNarrow: LOOK.game.skyNarrow };
     const show = $('show');
-    show.dataset.game = g.id;
+    show.dataset.game = g.soon ? 'soon' : g.id;
     document.documentElement.style.setProperty('--a', look.a || '#d9b87a');
-    $('count').innerHTML = '<b>' + String(idx + 1).padStart(2, '0') + '</b> / ' + String(F.GAMES.length).padStart(2, '0');
+    $('count').innerHTML = '<b>' + String(idx + 1).padStart(2, '0') + '</b> / ' + String(list.length).padStart(2, '0');
     const slide = $('slide');
     slide.innerHTML = '';
     slide.style.setProperty('--from', (dir < 0 ? -28 : 28) + 'px');
     slide.classList.remove('slide-in'); void slide.offsetWidth; if (dir) slide.classList.add('slide-in');
 
     const pv = el('div', { cls: 'preview' });
-    const img = el('img', { src: 'img/previews/' + g.id + '.jpg', alt: txt.name + ' preview' });
+    const img = el('img', { alt: txt.name + ' preview' });
     img.addEventListener('error', () => img.remove());
+    previewSrc(g, src => { if (src) img.src = src; else img.remove(); });
     pv.appendChild(img);
     pv.appendChild(el('span', { cls: 'pv-chip', text: look.kicker || '' }));
 
     const b = banOn(g.id === 'game' ? null : g.id);
-    const playBtn = el('button', { cls: 'play', type: 'button', text: 'Play', onclick: () => play(g) });
-    if (b) playBtn.disabled = true;
-    const note = el('span', { cls: 'g-note' + (b ? ' bad' : ''), text: b ? F.banText(b) : session ? '' : 'Sign in to play — one account for every game.' });
+    const playBtn = el('button', { cls: 'play' + (g.soon ? ' soon' : ''), type: 'button', text: g.soon ? 'Coming soon' : 'Play', onclick: () => play(g) });
+    if (b || g.soon) playBtn.disabled = true;
+    const note = el('span', { cls: 'g-note' + (b ? ' bad' : ''), text: g.soon ? '' : b ? F.banText(b) : session ? '' : 'Sign in to play — one account for every game.' });
 
     slide.appendChild(el('div', { cls: 'g-kicker', text: txt.tagline }));
     slide.appendChild(el('h1', { cls: 'g-name', text: txt.name }));
@@ -198,10 +261,10 @@
     slide.appendChild(el('p', { cls: 'g-vibe', text: look.vibe || '' }));
     slide.appendChild(el('ul', { cls: 'g-feats' }, (look.feats || []).map(f => el('li', { text: f }))));
     slide.appendChild(el('div', { cls: 'g-actions' }, [playBtn, note]));
-    slide.setAttribute('aria-label', (idx + 1) + ' of ' + F.GAMES.length + ': ' + txt.name);
+    slide.setAttribute('aria-label', (idx + 1) + ' of ' + list.length + ': ' + txt.name);
 
     const dots = $('dots'); dots.innerHTML = '';
-    F.GAMES.forEach((x, i) => dots.appendChild(el('button', {
+    list.forEach((x, i) => dots.appendChild(el('button', {
       type: 'button', role: 'tab', 'aria-selected': String(i === idx), 'aria-label': F.gameText(x, hub).name,
       cls: i === idx ? 'on' : '', onclick: () => go(i),
     })));
@@ -209,7 +272,7 @@
     skyTarget = Object.assign({}, look[narrow() ? 'skyNarrow' : 'sky']);
   }
   function go(i, dir) {
-    const n = F.GAMES.length;
+    const n = slides().length;
     const next = ((i % n) + n) % n;
     if (dir == null) dir = next > idx ? 1 : -1;
     idx = next;
@@ -217,8 +280,8 @@
     restartCycle();
   }
   function startCycle() {
-    if (timer || paused || !$('auth').classList.contains('hidden')) return;
-    timer = setInterval(() => { idx = (idx + 1) % F.GAMES.length; paintSlide(1); }, CYCLE_MS);
+    if (timer || paused || !$('auth').classList.contains('hidden') || !$('me').classList.contains('hidden')) return;
+    timer = setInterval(() => { idx = (idx + 1) % slides().length; paintSlide(1); }, CYCLE_MS);
     $('show').classList.remove('paused');
   }
   function stopCycle() { clearInterval(timer); timer = null; $('show').classList.add('paused'); }
@@ -234,6 +297,7 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) stopCycle(); else startCycle(); });
   document.addEventListener('keydown', e => {
     if (!$('auth').classList.contains('hidden')) { if (e.key === 'Escape') closeAuth(); return; }
+    if (!$('me').classList.contains('hidden')) { if (e.key === 'Escape') closeMe(); return; }
     if (/INPUT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) return;
     if (e.key === 'ArrowLeft') go(idx - 1, -1);
     else if (e.key === 'ArrowRight') go(idx + 1, 1);
@@ -251,14 +315,19 @@
   /* ---------- the Mini Games corner ---------- */
   function paintMini() {
     const box = $('mini'); box.innerHTML = '';
-    F.MINI.forEach(g => {
+    const list = F.shown(hub, 'mini');
+    $('mini').closest('.mini').classList.toggle('hidden', !list.length);
+    list.forEach(g => {
       const txt = F.gameText(g, hub);
       const art = el('div', { cls: 'mini-art', text: MINI_ICON[g.id] || '★' });
-      const img = el('img', { src: 'img/previews/' + g.id + '.jpg', alt: '' });
+      const img = el('img', { alt: '' });
       img.addEventListener('load', () => { art.textContent = ''; art.appendChild(img); });
-      box.appendChild(el('button', { cls: 'mini-game', type: 'button', onclick: () => play(g) }, [
-        art, el('div', {}, [el('div', { cls: 'mini-name', text: txt.name }), el('div', { cls: 'mini-tag', text: txt.tagline })]),
-      ]));
+      previewSrc(g, src => { if (src) img.src = src; });
+      const card = el('button', { cls: 'mini-game', type: 'button', onclick: () => play(g) }, [
+        art, el('div', {}, [el('div', { cls: 'mini-name', text: txt.name }), el('div', { cls: 'mini-tag', text: g.soon ? 'Coming soon' : txt.tagline })]),
+      ]);
+      if (g.soon) card.disabled = true;
+      box.appendChild(card);
     });
   }
 
@@ -308,5 +377,5 @@
     const next = q.get('next');
     openAuth('in', next && /^\/[^/]/.test(next) ? next : null);
   }
-  window.addEventListener('resize', () => { skyTarget = Object.assign({}, LOOK[F.GAMES[idx].id][narrow() ? 'skyNarrow' : 'sky']); });
+  window.addEventListener('resize', () => { const g = slides()[idx] || {}; const l = LOOK[g.id] || LOOK.game; skyTarget = Object.assign({}, l[narrow() ? 'skyNarrow' : 'sky']); });
 })();

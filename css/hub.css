@@ -69,6 +69,11 @@ button { cursor: pointer; }
 .btn.primary { background: linear-gradient(180deg, #6d5528, #4a3a1c); border-color: var(--gold); color: #ffedc4; }
 .btn.ghost { background: transparent; color: var(--ink-dim); }
 .btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
+.btn.danger { color: #f0a0a0; border-color: rgba(224, 122, 122, .45); }
+.btn.danger:hover, .btn.danger:focus-visible { border-color: var(--red); box-shadow: 0 0 14px rgba(224, 122, 122, .25); }
+.link { background: none; border: 0; padding: 0; color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+.acct .who-btn { background: none; border: 0; padding: 0; color: var(--ink-dim); }
+.acct .who-btn b { color: var(--ink); font-weight: normal; text-decoration: underline; text-decoration-color: rgba(217, 184, 122, .4); text-underline-offset: 3px; }
 
 /* ---------- main layout ---------- */
 .hub-main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: 28px; align-items: start; }
@@ -174,6 +179,12 @@ button { cursor: pointer; }
 .modal-box input:focus { outline: none; border-color: var(--gold); }
 .modal-box .row { display: flex; gap: 10px; margin-top: 10px; }
 .modal-box .row .btn.primary { flex: 1; }
+.modal-box .row input { flex: 1; min-width: 0; }
+.modal-box .row:has(input) { margin-top: 0; }
+.modal-box h3 { font-size: 15px; font-weight: normal; color: var(--gold); margin: 18px 0 0; padding-top: 12px; border-top: 1px solid rgba(217, 184, 122, .14); }
+#a-forgot-row { margin-top: 12px; }
+#me .modal-box { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.play.soon { background: rgba(255, 255, 255, .08); color: var(--ink-dim); box-shadow: none; cursor: default; }
 .err { color: var(--red); font-size: 13.5px; min-height: 20px; margin-top: 8px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px -4px 8px; }
 .tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; color: var(--ink-dim); }
