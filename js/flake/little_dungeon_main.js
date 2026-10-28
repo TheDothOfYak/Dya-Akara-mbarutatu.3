@@ -10,7 +10,7 @@
 
    Mini games need no account: with nobody signed in it plays as a
    guest (a run in progress is kept in this browser, and a win pays no
-   gold), with a "Sign in to save" button in the top bar.
+   gold).
    ============================================================ */
 (function () {
   'use strict';
@@ -19,7 +19,7 @@
   window.addEventListener('DOMContentLoaded', () => {
     G.init();
     UI.init();
-    UI.brand = { logo: 'LITTLE DUNGEON', chips: false, signIn: () => F.toSignIn() };
+    UI.brand = { logo: 'LITTLE DUNGEON', chips: false };
 
     /* the dungeon's "menu" is the Flake Games home page */
     UI.register('menu', { enter() { G.saveNow(); F.toHub(); } });

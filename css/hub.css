@@ -153,7 +153,6 @@ button { cursor: pointer; }
 .pill { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--gold); margin-right: 6px; }
 #news { max-height: 42vh; overflow-y: auto; }
 
-.mini-note { font-size: 12.5px; color: var(--ink-dim); margin: -4px 0 10px; }
 .mini-game {
   display: flex; gap: 12px; align-items: center; width: 100%; text-align: left;
   border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: rgba(10, 9, 8, .55);
