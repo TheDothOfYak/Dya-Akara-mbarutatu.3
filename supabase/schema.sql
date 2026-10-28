@@ -265,3 +265,5 @@ create index if not exists dya_messages_from   on public.dya_messages (from_id, 
 
 -- Torcain's Run (rpg/) keeps each account's story save in dya_config
 -- under the key 'rpg_save:<account id>' — no extra table needed.
+-- 4 Brothers World keeps each account's hero and world in dya_config too,
+-- one row per save key under 'fbw:<account id>:<key>' plus 'fbw:<account id>:~stamp'.

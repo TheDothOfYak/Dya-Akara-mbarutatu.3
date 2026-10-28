@@ -88,6 +88,17 @@ button { cursor: pointer; }
 #netstatus b { color: var(--text); font-weight: 600; }
 #netstatus .dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--muted); }
 #netstatus .dot.on { background: var(--good); box-shadow: 0 0 8px var(--good); }
+#cloudstatus { font-size: 17px; color: var(--muted); }
+#cloudstatus b { color: var(--text); font-weight: 600; }
+#cloudstatus a { color: var(--crystal); }
+#cloud { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(9,8,13,.9); overflow: auto; }
+#cloud .card { display: flex; flex-direction: column; gap: 12px; padding: 18px; width: min(440px, 100%); text-align: center; }
+#cloud h2 { margin: 0; font-family: var(--title); font-weight: 400; font-size: 18px; line-height: 1.4; }
+#cloud p { margin: 0; color: var(--muted); font-size: 19px; line-height: 1.35; }
+#cloud .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#cloud .msg { min-height: 1.3em; color: #ffb3a8; }
+#cloudstatus[hidden], #cloud[hidden], #cloud .card[hidden], #cloudbadge[hidden] { display: none; }
+#cloudbadge { position: fixed; right: 12px; bottom: 12px; z-index: 40; padding: 6px 10px; font-size: 17px; color: #ffd27a; pointer-events: none; }
 
 /* ---------- character creator ---------- */
 #creator { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(9,8,13,.86); overflow: auto; padding-block: 16px; }
@@ -333,9 +344,40 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <div id="mp-msg">One player hosts and keeps the world. Everyone else joins with the room code.</div>
       </div>
       <div id="netstatus" class="stone">Connecting…</div>
+      <div id="cloudstatus" hidden></div>
       <div id="version">v1.8</div>
     </div>
   </div>
+  <div id="cloud" hidden>
+    <div class="card stone" id="cloud-login" hidden>
+      <h2>Sign in to play</h2>
+      <p>Your hero is saved to your Flake Games account, so you can play the same hero on any computer. Sign in on the Flake Games home page, then pick The 4 Brothers Worlds.</p>
+      <div class="row"><button class="btn primary cl-home" type="button">Go to Flake Games</button></div>
+    </div>
+    <div class="card stone" id="cloud-loading" hidden>
+      <h2>Fetching your hero…</h2>
+      <p>Getting your hero and world from your account.</p>
+    </div>
+    <div class="card stone" id="cloud-error" hidden>
+      <h2>Can't reach the Dya Guild</h2>
+      <p>Your hero is saved online, so the game needs a connection to start. Check your internet and try again.</p>
+      <p class="msg" id="cloud-err"></p>
+      <div class="row"><button class="btn primary" id="cl-retry" type="button">Try again</button><button class="btn cl-home" type="button">Back to Flake Games</button></div>
+    </div>
+    <div class="card stone" id="cloud-choose" hidden>
+      <h2>Which hero?</h2>
+      <p>This computer has a hero saved from before it was tied to your account, and your account already has a different one. Pick the one to keep: from now on it's the hero you play on every computer.</p>
+      <div class="row"><button class="btn primary" id="cl-acct" type="button">Play the account's hero</button><button class="btn" id="cl-here" type="button">Keep this computer's hero</button></div>
+      <p>Not sure? Save this computer's hero to a file first. You can load it back any time in Settings.</p>
+      <div class="row"><button class="btn small" id="cl-file" type="button">Save this computer's hero to a file</button></div>
+    </div>
+    <div class="card stone" id="cloud-conflict" hidden>
+      <h2>Played somewhere else</h2>
+      <p>This hero was played on another computer after you opened it here. Load the newer save to carry on from there.</p>
+      <div class="row"><button class="btn primary" id="cl-reload" type="button">Load the newer save</button></div>
+    </div>
+  </div>
+  <div id="cloudbadge" class="stone" hidden>Not saved online yet. Trying again…</div>
   <div id="creator" class="hidden-ui">
     <div class="card stone">
       <div><canvas id="preview" width="140" height="180"></canvas><div class="label" style="margin-top:6px">Your hero</div></div>
@@ -420,8 +462,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';s.onerror=function(){window.__peerFailed=true};document.head.appendChild(s);"></script>
 <script src="../js/config.js"></script><!-- Dya'Akara's Supabase settings, read only for the multiplayer relay; missing when the game is opened on its own -->
 <script src="../js/core/broadcast.js"></script><!-- live messages from the Dya'Akara Admin Panel; does nothing when the game is opened on its own -->
-<script src="../js/flake/account.js"></script><!-- one Flake Games account for every game (signed in on the home page) -->
-<script src="../js/flake/fbw_cloud.js"></script><!-- saves this game to that account -->
+<script src="../js/flake/account.js"></script><!-- the one Flake Games account, signed in on the home page -->
 <script>/* js/core.js */
 // ROCK WORLD — core helpers shared by every other file.
 // Everything lives on the single global `RW` so files can be added in any session.
@@ -511,7 +552,7 @@ window.RW = window.RW || {};
   // ---------- safe storage ----------
   RW.store = {
     get(k, d) { try { const v = localStorage.getItem('rw_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('rw_' + k, JSON.stringify(v)); } catch (e) { } if (RW.cloud) RW.cloud.touch(); },
+    set(k, v) { try { localStorage.setItem('rw_' + k, JSON.stringify(v)); } catch (e) { } },
   };
 
   // ---------- registries (plug-and-play) ----------
@@ -595,6 +636,232 @@ window.RW = window.RW || {};
   window.addEventListener('blur', () => { RW.input.keys = {}; RW.input.codes = {}; RW.input.mouse.l = RW.input.mouse.r = false; });
 })(window.RW);
 
+</script>
+<script>/* js/cloud.js */
+// Your hero and world, saved to your Flake Games account (the Dya'Akara account), so the same hero plays on any computer.
+// Every rw_ save key (except this computer's own controls and settings) is kept in the site's Supabase dya_config
+// table, one row per key under "fbw:<account id>:<key>", plus a "~stamp" row that changes with every save.
+// Torcain's Run keeps its save in the same table. There is no sign-in here: the Flake Games login from the home page is
+// used (js/flake/account.js), which also sends a signed-out player there to sign in and stops a banned one.
+// A downloaded copy of the game (no ../js/config.js) saves in the browser only.
+// Which copy wins: the cloud copy, unless this computer was the last to save it (same stamp), then this computer's
+// unsent changes go up. A computer that finds the stamp changed under it (another computer played) stops saving
+// online and asks to load the newer hero, so an old tab left open never writes over today's progress.
+(function (RW) {
+  const C = (RW.cloud = {});
+  const META = 'fbw-cloud', STAMP = '~stamp';
+  // kept on this computer only: controls, settings, sound, the relay, which version last ran and spare copies
+  const LOCAL_ONLY = /^rw_(binds|settings|muted|relay|version|save_backup_.*)$/;
+  C.synced = (k) => typeof k === 'string' && k.startsWith('rw_') && !LOCAL_ONLY.test(k);
+  const cfg = () => (window.DYA_CONFIG && window.DYA_CONFIG.supabase) || {};
+  C.configured = () => { const c = cfg(); return !!(c.url && c.anonKey); };
+  // mode: 'off' (browser only), 'login', 'loading', 'error', 'choose', 'on', 'conflict'
+  C.state = { mode: 'off', error: null, lastPush: 0 };
+  C.who = null;
+
+  async function rest(method, path, body, prefer, keepalive) {
+    const c = cfg();
+    const res = await fetch(c.url + '/rest/v1/' + path, {
+      method, keepalive: !!keepalive,
+      headers: Object.assign({ apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey, 'Content-Type': 'application/json' }, prefer ? { Prefer: prefer } : {}),
+      body: body != null ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+    });
+    if (res.status === 204 || res.status === 201) return null;
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { const e = new Error((data && (data.message || data.hint)) || 'HTTP ' + res.status); e.status = res.status; throw e; }
+    return data;
+  }
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))]);
+
+  // ---------- who is playing: the Flake Games login, remembered in this browser by the home page ----------
+  C.identity = function () {
+    const s = window.FLAKE && window.FLAKE.session();
+    return s ? { id: s.id, email: s.email, name: s.name } : null;
+  };
+  // ---------- this computer's notes: whose hero is in this browser, the stamp it last saw, what hasn't gone up ----------
+  // (sent: the stamp of a save that went out as the tab closed, which may or may not have arrived)
+  function meta() { try { const m = JSON.parse(localStorage.getItem(META) || 'null'); if (m && typeof m === 'object') return Object.assign({ acct: null, stamp: null, sent: null, dirty: {} }, m); } catch (e) { } return { acct: null, stamp: null, sent: null, dirty: {} }; }
+  let M = meta();
+  const saveMeta = () => { try { localStorage.setItem(META, JSON.stringify(M)); } catch (e) { } };
+  const prefix = () => 'fbw:' + C.who.id + ':';
+  const localKeys = () => { const out = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (C.synced(k)) out.push(k); } } catch (e) { } return out; };
+  const newStamp = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+
+  // every save goes through RW.store.set: note the key, and send it up a moment later
+  const set0 = RW.store.set;
+  RW.store.set = function (k, v) { set0(k, v); C.touch('rw_' + k); };
+  C.touch = function (key) {
+    if (C.state.mode !== 'on' || !C.synced(key)) return;
+    M.dirty[key] = ++tick; saveMeta();
+    schedule(3000);
+  };
+  // after the save file is loaded in from a file: every key (old and new) goes up
+  C.touchAll = function (keys) { (keys || []).concat(localKeys()).forEach(C.touch); };
+
+  let timer = null, busy = false, again = false, tick = Date.now();
+  function schedule(ms) { clearTimeout(timer); timer = setTimeout(() => C.push(), ms); }
+
+  // send what changed. Before writing, check nobody else saved this hero since we last did.
+  C.push = async function (keepalive) {
+    if (C.state.mode !== 'on') return;
+    if (busy) { again = true; return; }
+    const keys = Object.keys(M.dirty);
+    if (!keys.length) return;
+    busy = true;
+    try {
+      if (!keepalive) {
+        const rows = await withTimeout(rest('GET', 'dya_config?key=eq.' + encodeURIComponent(prefix() + STAMP) + '&select=value'), 10000);
+        const now = rows && rows[0] ? rows[0].value : null;
+        if (now !== M.stamp) { conflict(); return; }
+      }
+      const stamp = newStamp(), at = new Date().toISOString();
+      const up = [], gone = [];
+      keys.forEach((k) => { let v = null; try { v = localStorage.getItem(k); } catch (e) { } if (v == null) gone.push(k); else up.push({ key: prefix() + k, value: v, updated_at: at }); });
+      up.push({ key: prefix() + STAMP, value: stamp, updated_at: at });
+      const sending = {}; keys.forEach((k) => (sending[k] = M.dirty[k]));
+      const body = JSON.stringify(up);
+      // the tab may be gone before the answer comes: note this stamp as ours either way
+      if (keepalive) { M.sent = stamp; saveMeta(); }
+      // a closing tab can only send ~64 KB; bigger saves go the normal way and usually still make it
+      if (gone.length) await rest('DELETE', 'dya_config?key=in.(' + gone.map((k) => '"' + prefix() + k + '"').join(',') + ')', null, null, keepalive);
+      await rest('POST', 'dya_config?on_conflict=key', body, 'resolution=merge-duplicates', keepalive && body.length < 60000);
+      // sent: forget those changes, unless the key changed again while this was on its way
+      keys.forEach((k) => { if (M.dirty[k] === sending[k]) delete M.dirty[k]; });
+      M.stamp = stamp; M.sent = null; saveMeta();
+      C.state.lastPush = Date.now(); C.state.error = null;
+    } catch (e) {
+      C.state.error = e.message || String(e);
+      if (!keepalive) schedule(10000);   // try again; the changes are still in this browser
+    } finally {
+      busy = false; C.badge();
+      if (again) { again = false; schedule(500); }
+    }
+  };
+  // the tab is closing or hidden: send what's waiting straight away
+  C.flush = function () { clearTimeout(timer); if (C.state.mode === 'on' && Object.keys(M.dirty).length) C.push(true); };
+  addEventListener('pagehide', () => { if (RW.game && RW.game.playing) RW.game.saveNow(); C.flush(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { if (RW.game && RW.game.playing) RW.game.saveNow(); C.flush(); } });
+
+  function conflict() {
+    C.state.mode = 'conflict'; clearTimeout(timer);
+    if (RW.game) RW.game.playing = false;   // don't keep playing a hero that's out of date
+    C.show('conflict');
+  }
+
+  // ---------- at startup: bring this browser into line with the account ----------
+  // Resolves false when the game can carry on loading, true when the browser now holds a different hero (reload),
+  // or { choose } when this browser has a hero from before accounts and the account has a different one.
+  C.reconcile = async function (pick) {
+    const rows = await withTimeout(rest('GET', 'dya_config?key=like.' + encodeURIComponent(prefix()) + '*&select=key,value'), 12000);
+    const cloud = {};
+    (rows || []).forEach((r) => { if (r && typeof r.key === 'string' && r.key.startsWith(prefix())) cloud[r.key.slice(prefix().length)] = r.value; });
+    const stamp = cloud[STAMP] != null ? cloud[STAMP] : null;
+    delete cloud[STAMP];
+    const mine = M.acct === C.who.id;
+    if (stamp == null) {
+      // nothing saved on the account yet: this browser's hero becomes the account's, unless it's somebody else's
+      if (M.acct && !mine) wipeLocal();
+      M = { acct: C.who.id, stamp: null, sent: null, dirty: {} };
+      localKeys().forEach((k) => (M.dirty[k] = ++tick)); saveMeta();
+      C.state.mode = 'on';
+      await C.push();
+      if (C.state.error) throw new Error(C.state.error);
+      return false;
+    }
+    if (mine && (M.stamp === stamp || M.sent === stamp)) {
+      // this computer saved it last: send anything that didn't make it up
+      M.stamp = stamp; M.sent = null; saveMeta();
+      C.state.mode = 'on';
+      if (Object.keys(M.dirty).length) C.push();
+      return false;
+    }
+    let here = null; try { here = localStorage.getItem('rw_save_rock'); } catch (e) { }
+    if (!M.acct && here && here !== cloud.rw_save_rock) {
+      // a hero this browser had before accounts, and a different one on the account: the player picks
+      if (!pick) return { choose: { here: heroOf(here), account: heroOf(cloud.rw_save_rock) } };
+      if (pick === 'here') {
+        // keep this browser's hero: it replaces the account's (keys only the account had are removed)
+        M = { acct: C.who.id, stamp, sent: null, dirty: {} };
+        Object.keys(cloud).concat(localKeys()).forEach((k) => { if (C.synced(k)) M.dirty[k] = ++tick; }); saveMeta();
+        C.state.mode = 'on';
+        await C.push();
+        if (C.state.error) throw new Error(C.state.error);
+        return false;
+      }
+    }
+    // the account's hero is the one to play. A hero this browser had from before accounts is kept as a spare.
+    if (!M.acct && here) { try { localStorage.setItem('rw_save_backup_before-account', here); } catch (e) { } }
+    wipeLocal();
+    try { Object.keys(cloud).forEach((k) => { if (C.synced(k) && typeof cloud[k] === 'string') localStorage.setItem(k, cloud[k]); }); }
+    catch (e) { throw new Error('this browser is out of storage space'); }
+    M = { acct: C.who.id, stamp, sent: null, dirty: {} }; saveMeta();
+    return true;
+  };
+  function heroOf(raw) {
+    try { const sv = JSON.parse(raw); if (!sv || !sv.look) return null; const h = (RW.HEROES && RW.HEROES[sv.species]) || null; return { name: sv.name || 'Your hero', kind: h ? h.name : sv.species || '' }; } catch (e) { return null; }
+  }
+  function wipeLocal() { localKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) { } }); }
+
+  // ---------- the sign-in / loading screen ----------
+  // Resolves once the game may load its save. The game won't start until the account's hero is in this browser.
+  C.gate = function () {
+    if (!C.configured()) { C.state.mode = 'off'; return Promise.resolve(); }
+    return new Promise((resolve) => {
+      const go = async (pick) => {
+        if (window.FLAKE) await window.FLAKE.gate('4bw');   // signed out → the home page to sign in; banned → stops here
+        C.who = C.identity();
+        if (!C.who) { C.state.mode = 'login'; C.show('login'); return; }
+        C.state.mode = 'loading'; C.show('loading');
+        try {
+          const r = await C.reconcile(pick);
+          if (r && r.choose) { C.state.mode = 'choose'; askWhich(r.choose); return; }
+          if (r) { location.reload(); return; }
+          C.show(null); C.badge(); resolve();
+        } catch (e) { C.state.mode = 'error'; C.state.error = e.message || String(e); C.show('error'); }
+      };
+      C._go = go;
+      go();
+    });
+  };
+
+  const $c = (id) => document.getElementById(id);
+  const label = (h) => (h ? h.name + (h.kind ? ' (' + h.kind + ')' : '') : 'a new hero');
+  function askWhich(c) {
+    $c('cl-here').textContent = 'Keep ' + label(c.here) + ' from this computer';
+    $c('cl-acct').textContent = 'Play ' + label(c.account) + ' from your account';
+    C.show('choose');
+  }
+  C.show = function (what) {
+    const box = $c('cloud'); if (!box) return;
+    box.hidden = !what;
+    ['login', 'loading', 'error', 'conflict', 'choose'].forEach((s) => { const p = $c('cloud-' + s); if (p) p.hidden = s !== what; });
+    if (what === 'error') $c('cloud-err').textContent = C.state.error || '';
+  };
+  // the line on the title screen and the little warning while playing
+  C.badge = function () {
+    const t = $c('cloudstatus');
+    if (t) {
+      t.hidden = !C.who || C.state.mode === 'off';
+      if (C.who) { t.textContent = ''; t.append('Saved to your account: ', Object.assign(document.createElement('b'), { textContent: C.who.name })); }
+    }
+    const b = $c('cloudbadge');
+    if (b) b.hidden = !(C.state.mode === 'on' && C.state.error);
+  };
+  C.describe = function () {
+    if (C.state.mode === 'off') return 'Your hero, bag and world save in this browser by themselves every few seconds, and new versions of the game keep them. To move your progress to another computer or keep a spare copy, save it to a file.';
+    return 'Your hero, bag and world save to your Flake Games account (' + (C.who ? C.who.name : '') + ') every few seconds. Sign in on any computer to carry on with the same hero. You can also keep a spare copy in a file.';
+  };
+  function wire() {
+    if (!$c('cloud')) return;
+    $c('cl-retry').onclick = () => C._go && C._go();
+    $c('cl-reload').onclick = () => location.reload();
+    $c('cl-here').onclick = () => C._go && C._go('here');
+    $c('cl-acct').onclick = () => C._go && C._go('account');
+    $c('cl-file').onclick = () => RW.ui && RW.ui.exportSave();
+    document.querySelectorAll('#cloud .cl-home').forEach((b) => (b.onclick = () => { location.href = '../index.html'; }));
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire();
+})(window.RW);
 </script>
 <script>/* js/data/tiles.js */
 // TILES — every block in the world. To add a block: add a line to the list.
@@ -8466,7 +8733,7 @@ window.RW = window.RW || {};
   $('#p-opts').onclick = () => U.openModal('opts');
   $('#p-help').onclick = () => U.openModal('help');
   $('#p-title').onclick = () => U.toTitle();
-  $('#p-home').onclick = async () => { if (RW.game.playing) RW.game.saveNow(); if (RW.cloud) await RW.cloud.pushNow(); location.href = '../index.html'; };
+  $('#p-home').onclick = () => { if (RW.game.playing) RW.game.saveNow(); location.href = '../index.html'; };
   $('#b-home2').onclick = () => { location.href = '../index.html'; };
   $('#m-travel').onclick = () => U.travel('anywhere');
   U.paused = () => U.open === 'pause' && !(RW.net && RW.net.transport);
@@ -8558,7 +8825,7 @@ window.RW = window.RW || {};
     rs.onclick = () => { RW.binds = RW.defaultBinds(); RW.saveBinds(); U.hudKeys(); U.renderOpts(); U.toast('Controls are back to normal.'); };
     box.append(el('div', 'opt-row', null)); box.lastChild.append(el('span'), rs);
     sec('Your progress');
-    box.append(el('p', 'opt-p', 'Your hero, bag and world save by themselves every few seconds, to your Flake Games account, so they follow you to any device you sign in on. New versions of the game keep them. To keep a spare copy, save it to a file.'));
+    box.append(el('p', 'opt-p', RW.cloud.describe()));
     const ex = el('button', 'btn small', 'Save progress to a file'); ex.type = 'button'; ex.onclick = U.exportSave;
     const im = el('button', 'btn small', 'Load progress from a file'); im.type = 'button'; im.onclick = () => $('#importfile').click();
     const r2 = el('div', 'opt-row'); r2.append(ex, im); box.append(r2);
@@ -8579,10 +8846,11 @@ window.RW = window.RW || {};
       if (!j || !j.data || typeof j.data !== 'object' || !Object.keys(j.data).some((k) => k.startsWith('rw_save'))) throw new Error('not a save');
       if (!confirm('Load the progress in "' + f.name + '"? It replaces the hero and world saved in this browser.')) return;
       RW.game.playing = false; // don't let the running game save over it
-      Object.keys(localStorage).filter((k) => k.startsWith('rw_') && k !== 'rw_binds' && k !== 'rw_settings').forEach((k) => localStorage.removeItem(k));
+      const old = Object.keys(localStorage).filter((k) => k.startsWith('rw_') && k !== 'rw_binds' && k !== 'rw_settings');
+      old.forEach((k) => localStorage.removeItem(k));
       Object.entries(j.data).forEach(([k, v]) => { if (k.startsWith('rw_') && typeof v === 'string') localStorage.setItem(k, v); });
       const sv = JSON.parse(localStorage.getItem('rw_save_rock') || 'null'); if (sv) { sv.savedAt = Date.now(); localStorage.setItem('rw_save_rock', JSON.stringify(sv)); }
-      if (RW.cloud) { RW.cloud.touch(); await RW.cloud.pushNow(); } // the loaded file becomes this account's progress
+      RW.cloud.touchAll(old); RW.cloud.flush(); // the loaded save goes to your account too
       location.reload();
     } catch (err) { U.toast('That file is not a 4 Brothers World save.'); }
   });
@@ -8593,7 +8861,7 @@ window.RW = window.RW || {};
     const dot = el('span', 'dot' + (n.mode === 'shared' ? ' on' : ''));
     if (n.mode === 'shared') { box.append(dot, el('b', null, 'Shared world connected. '), document.createTextNode('Everything you mine and build is saved for every player invited to this page. Invite your brothers by email as Editors so they can build too.')); }
     else if (n.mode === 'readonly') { box.append(dot, el('b', null, 'Viewing the shared world. '), document.createTextNode('You can explore, but your building stays on this device. Ask the owner to invite you by email as an Editor to build with everyone.')); }
-    else { box.append(dot, el('b', null, 'Solo world. '), document.createTextNode(window.claude ? 'Saved in this browser. For multiplayer, open the game on claude.ai and invite players by email as Editors.' : 'Saved in this browser. To play together, one of you hosts a room and the others join with its code.')); }
+    else { box.append(dot, el('b', null, 'Solo world. '), document.createTextNode(window.claude ? 'Saved in this browser. For multiplayer, open the game on claude.ai and invite players by email as Editors.' : (RW.cloud.state.mode === 'on' ? 'Saved to your Dya\u2019Akara account. ' : 'Saved in this browser. ') + 'To play together, one of you hosts a room and the others join with its code.')); }
   };
   U.showTitle = function (hasSave) {
     show('#title', true); show('#hud', false); show('#creator', false);
@@ -11191,22 +11459,8 @@ window.RW = window.RW || {};
     if (sv) RW.store.set('save_backup_' + (last || 'before-' + RW.VERSION), sv);
     RW.store.set('version', RW.VERSION);
   }
-  // the save lives on the player's Flake Games account (js/flake/fbw_cloud.js): sign in first, bring the
-  // account's progress into this browser, and only then read it. Skipped when the game is opened on its own.
-  async function cloudSync() {
-    if (!window.FLAKE || !window.FBW_CLOUD) return;
-    const who = await window.FLAKE.gate('4bw');
-    RW.cloud = window.FBW_CLOUD.create(localStorage, window.FLAKE.rest);
-    const r = await RW.cloud.sync(who);
-    if (r.offline && !r.mine) { window.FLAKE.notice('Could not reach your account', 'Your progress could not be loaded. Check your connection and try again.'); throw new Error('account unreachable'); }
-    RW.binds = Object.assign(RW.defaultBinds(), RW.store.get('binds', {}));
-    RW.settings = Object.assign({ invertWheel: false }, RW.store.get('settings', {}));
-    const flush = () => { if (RW.cloud.pending()) RW.cloud.pushNow(); };
-    window.addEventListener('pagehide', flush);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
-  }
   async function boot() {
-    await cloudSync();
+    await RW.cloud.gate(); // signed in and this browser holds the account's hero (or a downloaded copy: browser only)
     backupOnUpdate();
     RW.audio.muted = RW.store.get('muted', false);
     RW.art.buildTiles();

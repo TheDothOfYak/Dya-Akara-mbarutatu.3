@@ -23,7 +23,7 @@ For hand-colored sprites, add a draw function in `js/engine/art.js` (`D.myCreatu
 ## Multiplayer
 - World edits: shared db collection `rockchunks` (one document per 32×32 tile chunk, fields `t<index>` and `p<index>`).
 - Boss state: `rockstate/main`.
-- Each player's save: `data/users/<id>/save` (private).
+- Each player's save: every `rw_` key (except controls, settings, sound and spare copies) in Supabase `dya_config`, one row per key under `fbw:<Dya'Akara account id>:<key>`, plus a `~stamp` row (`js/cloud.js`). Any save made with `RW.store.set` goes up by itself.
 - Live: room presence (positions) + topics `fx` (spells) and `chat`.
 Players must be invited by email as **Editors** to build in the shared world.
 

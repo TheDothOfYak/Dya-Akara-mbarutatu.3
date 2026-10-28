@@ -1,8 +1,8 @@
 /* Headless test for the one Flake Games account (js/flake/account.js):
    signing in on the home page with an existing Dya'Akara account,
    making a new account there that Dya'Akara then fills in, bans for one
-   game or every game, the home page's editable text, and the 4 Brothers
-   Worlds save travelling with the account (js/flake/fbw_cloud.js). */
+   game or every game, and the home page's editable text. (The 4 Brothers
+   Worlds save on the account is tests/test_fbw_cloud.js.) */
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..');
 
@@ -90,7 +90,6 @@ for (const f of files) {
   try { eval(fs.readFileSync(path.join(ROOT, f), 'utf8') + '\n//# sourceURL=' + f); }
   catch (e) { console.error('LOAD FAIL', f, e.message); process.exit(1); }
 }
-const FBW_CLOUD = require(path.join(ROOT, 'js/flake/fbw_cloud.js'));
 const F = window.FLAKE, G = DYA.state, EC = DYA.economy;
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -193,50 +192,6 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   check('a game’s tagline can be changed', F.gameText(rpg, hub).tagline === 'Sail on');
   check('…and its name keeps the default', F.gameText(rpg, hub).name === rpg.name);
   check('a blank studio name falls back to Flake Games', (await F.saveHubConfig({ studio: '  ' }), F.hubConfig().studio === 'Flake Games'));
-
-  /* the 4 Brothers Worlds save follows the account */
-  console.log('== THE 4 BROTHERS WORLDS: saved to the account ==');
-  const lsA = makeStorage(), lsB = makeStorage();
-  const alice = { id: 'acc_alice' }, bob = { id: 'acc_bob' };
-  lsA.setItem('rw_save_rock', '{"name":"Rocky"}'); lsA.setItem('rw_binds', '{}'); lsA.setItem('rw_save_backup_1.7', '{"old":1}');
-  let A = FBW_CLOUD.create(lsA, F.rest);
-  let res = await A.sync(alice);
-  check('progress from before accounts becomes this account’s', res.pushed && lsA.getItem('rw__owner') === 'acc_alice');
-  let cloud = db.dya_config.find(x => x.key === 'fbw_save:acc_alice');
-  check('…and reaches the cloud', cloud && cloud.value.data.rw_save_rock === '{"name":"Rocky"}');
-  check('…without the per-version spare copies', cloud && !('rw_save_backup_1.7' in cloud.value.data));
-
-  let B = FBW_CLOUD.create(lsB, F.rest);
-  res = await B.sync(alice);
-  check('a fresh device gets the account’s progress', res.installed && lsB.getItem('rw_save_rock') === '{"name":"Rocky"}');
-
-  await wait(5);
-  lsB.setItem('rw_save_rock', '{"name":"Rocky","lvl":2}'); B.touch();
-  check('a change schedules a push', B.pending());
-  await B.pushNow();
-  A = FBW_CLOUD.create(lsA, F.rest);
-  res = await A.sync(alice);
-  check('…and the first device picks it up next time', res.installed && lsA.getItem('rw_save_rock') === '{"name":"Rocky","lvl":2}');
-
-  /* Bob plays on Alice's browser */
-  lsA.setItem('rw_save_rock', '{"name":"Rocky","lvl":3}'); lsA.setItem('rw__savedAt', String(Date.now() + 1000)); // Alice's newest progress, not pushed yet
-  const Bob = FBW_CLOUD.create(lsA, F.rest);
-  res = await Bob.sync(bob);
-  cloud = db.dya_config.find(x => x.key === 'fbw_save:acc_alice');
-  check('another account’s unsent progress is saved to THAT account first', cloud.value.data.rw_save_rock === '{"name":"Rocky","lvl":3}');
-  check('…then the browser is cleared for the new player', res.empty && lsA.getItem('rw_save_rock') === null && lsA.getItem('rw__owner') === 'acc_bob');
-
-  /* the cloud can't be reached */
-  const realFetch = global.fetch;
-  global.fetch = async () => { throw new Error('offline'); };
-  const C = FBW_CLOUD.create(lsB, F.rest);
-  res = await C.sync(alice);
-  check('offline, your own progress still plays', res.offline && res.mine);
-  lsB.setItem('rw_x', '1'); C.touch();
-  check('…and nothing is pushed blind', !C.pending());
-  const D = FBW_CLOUD.create(lsB, F.rest);
-  check('offline, someone else’s browser does not open as yours', (await D.sync(bob)).mine === false);
-  global.fetch = realFetch;
 
   console.log(failures ? '\n' + failures + ' FAILED' : '\nall passed');
   process.exit(failures ? 1 : 0);

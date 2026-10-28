@@ -16,7 +16,7 @@ Every game in this repo, behind one home page and one account. Zero dependencies
 
 **One account for everything.** You sign in (or create an account) once, on the home page; every game picks that up, and every game has a way back to the home page. The account *is* the old Dya'Akara account (the same `dya_accounts` row, email and password), so nobody had to make a new one. Opening a game while signed out sends you to the home page to sign in, then straight back. Code: `js/flake/account.js`.
 
-- **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` `fbw_save:<id>` (`js/flake/fbw_cloud.js` copies the game's `rw_` keys up and down).
+- **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` under `fbw:<id>:<key>`, one row per save key (its `js/cloud.js` section).
 - **A new account** made on the home page starts with just email, password and display name. The first time it opens Dya'Akara, the game asks for an appearance and home region, gives the starting resources, and runs the tutorial.
 - **Bans** can be for one game or for every game (Admin Panel → General → Players & Bans, or each game's own Bans page). An every-game ban stops the account at the home page too.
 

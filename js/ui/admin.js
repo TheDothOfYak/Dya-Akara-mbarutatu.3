@@ -463,24 +463,31 @@
     }).catch(e => { holder.innerHTML = ''; holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Could not load bans: ' + e.message })); });
   }
 
-  /* every account's save for one game (dya_config '<prefix><account id>') */
-  function savesPanel(body, prefix, gameName) {
+  /* every account's save for one game. Torcain's Run keeps one dya_config row
+     per account ('rpg_save:<id>'); the 4 Brothers Worlds one row per save key
+     ('fbw:<id>:<key>') plus a '~stamp' row, which stands for the whole save. */
+  const SAVE_ROWS = {
+    rpg: { list: 'rpg_save:*', id: k => k.slice('rpg_save:'.length), wipe: id => 'key=eq.' + encodeURIComponent('rpg_save:' + id) },
+    '4bw': { list: 'fbw:*:~stamp', id: k => k.slice(4, k.lastIndexOf(':')), wipe: id => 'key=like.' + encodeURIComponent('fbw:' + id + ':*') },
+  };
+  function savesPanel(body, game, gameName) {
+    const rowsOf = SAVE_ROWS[game];
     if (onlineNote(body)) return;
     body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Each player’s ' + gameName + ' progress, saved on their Flake Games account. Resetting a save starts that player over the next time they open the game.' }));
     const holder = U.el('div', { cls: 'panel' }, [U.el('p', { cls: 'muted small', text: 'Loading…' })]);
     body.appendChild(holder);
-    F.rest('GET', 'dya_config?key=like.' + encodeURIComponent(prefix) + '*&select=key,updated_at&order=updated_at.desc').then(rows => {
+    F.rest('GET', 'dya_config?key=like.' + encodeURIComponent(rowsOf.list) + '&select=key,updated_at&order=updated_at.desc').then(rows => {
       holder.innerHTML = '';
       if (!rows || !rows.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'No saves yet.' })); return; }
       const tbl = U.el('table', { cls: 'adm' });
       tbl.appendChild(U.el('tr', {}, ['Player', 'Last saved', ''].map(h => U.el('th', { text: h }))));
       rows.forEach(r => {
-        const id = r.key.slice(prefix.length);
+        const id = rowsOf.id(r.key);
         const td = U.el('td', {});
         td.appendChild(U.el('button', {
           cls: 'btn small danger', text: 'Reset save', onclick: async () => {
             if (!confirm('Reset ' + playerName(id) + '’s ' + gameName + ' save? This cannot be undone.')) return;
-            try { await F.rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent(r.key)); rerender(); }
+            try { await F.rest('DELETE', 'dya_config?' + rowsOf.wipe(id)); rerender(); }
             catch (e) { alert('Could not reset it: ' + e.message); }
           },
         }));
@@ -548,8 +555,8 @@
     /* ================= PER GAME ================= */
     'Bans'(body) { bansPanel(body, section); },
     'Saves'(body) {
-      if (section === 'rpg') savesPanel(body, 'rpg_save:', 'Torcain’s Run');
-      else savesPanel(body, 'fbw_save:', 'The 4 Brothers Worlds');
+      if (section === 'rpg') savesPanel(body, 'rpg', 'Torcain’s Run');
+      else savesPanel(body, '4bw', 'The 4 Brothers Worlds');
     },
     'Torcain’s Run'(body) {
       gameLinks(body, 'rpg', 'The 3D adventure, under rpg/. Story progress saves to each player’s account at every Nur Lantern and story beat (see Saves). Its roadmap is rpg/ROADMAP.md.');
