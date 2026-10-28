@@ -1,7 +1,9 @@
 # 4 Brothers World: versions
 
 ## v1.8
-Everything here is in Acorn World.
+- **Your hero is saved to your Dya'Akara account.** Play the same hero on any computer: log in to Dya'Akara and pick 4 Brothers World on the menu. There's no separate sign-in. Your hero, bag, world changes, chests, map and boss kills all travel with the account; controls and settings stay on each computer. The game waits until it has your hero from the account before it starts. If the hero was played on another computer since you opened it, the game stops and asks to load the newer save instead of saving over it. The first time you play where a hero from before already lives, you choose which hero to keep.
+
+Everything below is in Acorn World.
 - **Your buddy picks things up.** When there's nothing to fight, your acorn buddy runs over to anything lying on the ground nearby (and to fallen Albali fruit) and brings it to you. It leaves alone anything you threw down yourself.
 - **Waystones.** Nine waystones along the road: the keep, the traveller's hut, the Gorge, the old shrine, Capstead, the Green Deep, the Memory Grove, the wreck and the King's Clearing. Press R on one to wake it; press R on a woken one to travel to any other you've woken.
 - **Beds and campsites.** Sleep in a bed or rest by a campfire (R or right-click) to heal, and you'll wake up there instead of at the start after you fall. Beds are in some of the branch houses and the traveller's hut, and you can make your own (4 planks, 3 Kofi hair).

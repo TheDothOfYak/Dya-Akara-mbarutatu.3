@@ -858,6 +858,7 @@
   G.logout = function () {
     if (DYA.sessionGuard) DYA.sessionGuard.release();   // give up this account's single-session slot
     G.me = null;
+    try { localStorage.removeItem('fbw-identity'); } catch (e) { /* 4 Brothers World then plays as whoever logs in next */ }
     /* a tutorial spotlight is a fixed element parented to <body>, outside
        the normal screen container — it survives UI.show() transitions and
        must be torn down explicitly, or it sits on top of (and swallows
