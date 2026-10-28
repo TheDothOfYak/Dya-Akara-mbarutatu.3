@@ -114,8 +114,8 @@
   };
 
   /* ---- shared helper: a weapon that floats beside its bearer ----
-     The creator draws the Eikar without hands — their weapons and
-     tools simply float. Used by the Eikar and Keilia redesigns.
+     For species redesigns drawn without hands — their weapons and
+     tools simply float.
      (x, y) is where the weapon hovers; s = size unit; swing 0..1. */
   const TAU = Math.PI * 2;
   function shadeOf(hex, amt) { return DYA.sprites && DYA.sprites.shade ? DYA.sprites.shade(hex, amt) : hex; }
