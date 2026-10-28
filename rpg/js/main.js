@@ -65,7 +65,11 @@ installDetailCull();    // parts smaller than a pixel are not drawn (they still 
 installSmoothStyle();   // the film look: painted light and brushwork on every toon material, softened shapes — before anything is drawn
 
 /* ---------------- the save, and which region this page is ---------------- */
-/* signed in with a Dya'Akara account? Then the run lives on the account. */
+/* the run lives on your Flake Games account (the same one as Dya'Akara),
+   signed in on the home page — no session sends you there first, and a ban
+   from this game (or every game) stops here */
+$('loading').textContent = 'CHECKING YOUR ACCOUNT…';
+await window.FLAKE.gate('rpg');
 const WHO = CLOUD.identity();
 const KEY = saveKey(WHO && WHO.id);
 let localSave = loadSave(KEY);
@@ -323,7 +327,7 @@ addEventListener('keyup', e => {
 addEventListener('keydown', e => { if (e.code === 'CapsLock') capsDownT = performance.now(); }, true);
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = false; mouseBtn[0] = mouseBtn[2] = false; if (P.vines) dropVines(); });
 const canvas = renderer.domElement;
-const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'signin', 'rpg'].some(id => !$(id).classList.contains('hidden'));
+const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'rpg'].some(id => !$(id).classList.contains('hidden'));
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
   // Esc only frees the mouse (and leaves full screen); P is the pause. Click the world to take the mouse back.
@@ -6562,27 +6566,13 @@ if (SAVE_AT_LOAD) {
 }
 function renderAccount() {
   const el = $('t-acct');
-  if (WHO) {
-    const where = !CLOUD.configured() ? 'saving in this browser only'
-      : !CLOUD.state.available ? 'couldn’t reach the Dya Guild — this session saves in this browser only (reload to try again)'
-      : 'your run saves to your Dya’Akara account';
-    el.innerHTML = `Signed in as <b>${WHO.name.replace(/[<>&]/g, '')}</b> · ${where} · <a href="#" id="t-signout">Sign out</a>`;
-    $('t-signout').onclick = ev => { ev.preventDefault(); CLOUD.flush(); CLOUD.signOut(); location.reload(); };
-  } else if (CLOUD.configured()) {
-    el.innerHTML = 'Playing as a guest — progress stays in this browser. <a href="#" id="t-signin">Sign in with your Dya’Akara account</a> to save it to your account.';
-    $('t-signin').onclick = ev => { ev.preventDefault(); $('signin').classList.remove('hidden'); $('si-email').focus(); };
-  } else el.textContent = 'Progress is saved in this browser.';
+  if (!WHO) { el.textContent = 'Progress is saved in this browser.'; return; }
+  const where = !CLOUD.configured() ? 'saving in this browser only'
+    : !CLOUD.state.available ? 'couldn’t reach your account — this session saves in this browser only (reload to try again)'
+    : 'your run saves to your account';
+  el.innerHTML = `Signed in as <b>${WHO.name.replace(/[<>&]/g, '')}</b> · ${where}`;
 }
 renderAccount();
-$('si-cancel').onclick = () => $('signin').classList.add('hidden');
-$('si-form').onsubmit = async ev => {
-  ev.preventDefault();
-  $('si-err').textContent = ''; $('si-go').disabled = true;
-  const r = await CLOUD.signIn($('si-email').value, $('si-pass').value);
-  $('si-go').disabled = false;
-  if (r.err) { $('si-err').textContent = r.err; return; }
-  location.reload();
-};
 
 if (matchMedia('(pointer: coarse)').matches) $('t-note').textContent = 'On a phone or tablet: left thumb moves, drag on the right to look, and the buttons fight. Turn your phone sideways for the best view.';
 $('btn-continue').onclick = () => startFromTitle(() => {

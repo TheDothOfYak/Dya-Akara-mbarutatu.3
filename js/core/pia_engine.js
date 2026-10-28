@@ -1,6 +1,6 @@
 /* ============================================================
-   DYA'AKARA — core/pia_engine.js
-   LEGENDS OF PIA'DON — the turn-based battle engine.
+   FLAKE GAMES — core/pia_engine.js
+   LITTLE DUNGEON — the turn-based battle engine.
 
    A small, pure-ish reducer over a `battle` state: Guardians play
    energy-cost cards, summon allied creatures, and trade blows with

@@ -5,7 +5,7 @@
    Every visual improvement to the match lives in its OWN file in
    js/engine/fx/ and registers itself here. To remove one:
      1. delete its file from js/engine/fx/
-     2. delete its <script> line from index.html
+     2. delete its <script> line from dya-akara.html (and mini-games/little-dungeon/index.html)
    Nothing else refers to it. Each one can also be switched off
    per player in Settings → Display → Match visuals.
 

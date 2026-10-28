@@ -1,6 +1,6 @@
 /* ============================================================
-   DYA'AKARA — data/pia_run.js
-   LEGENDS OF PIA'DON — a turn-based roguelike card game.
+   FLAKE GAMES — data/pia_run.js
+   LITTLE DUNGEON — a turn-based roguelike card game.
 
    This is the "Card Guardians"-style deckbuilder skinned in the
    Mbaru Tatu: a Guardian climbs a string of map nodes, plays

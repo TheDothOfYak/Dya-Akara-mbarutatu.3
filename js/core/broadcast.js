@@ -14,7 +14,7 @@
        maintenance: { on, title, text, target },
        reload: { at, target },   // "refresh everyone" button
      }
-   target: 'all' | 'game' | '4bw' | 'rpg' | 'film'
+   target: 'all' | 'hub' | 'game' | '4bw' | 'rpg' | 'ld' | 'film'
 
    Delivery: the admin writes the row AND sends it on the Supabase
    Realtime channel 'dya-live', so open pages update within a second.
@@ -33,16 +33,20 @@
   const RELOAD_KEY = 'dyaakara_live_reloaded';
   const SB_URLS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js', 'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
   const path = (window.location && window.location.pathname) || '';
-  const APP = /admin/i.test(path) ? 'admin'
+  /* a page can say which app it is (window.DYA_APP) before loading this file */
+  const APP = window.DYA_APP ? window.DYA_APP
+    : /admin/i.test(path) ? 'admin'
     : /four-brothers-world/i.test(path) ? '4bw'
     : /\/rpg\//i.test(path) ? 'rpg'
     : /\/film\//i.test(path) ? 'film'
-    : 'game';
+    : /little-dungeon/i.test(path) ? 'ld'
+    : /dya-akara\.html/i.test(path) ? 'game'
+    : 'hub';
   const LOADED_AT = Date.now();
 
   const LIVE = {
     APP, KEY, CHANNEL,
-    TARGETS: [['all', 'Everywhere'], ['game', 'Card game (main site)'], ['4bw', '4 Brothers World'], ['rpg', "Torcain's Run"], ['film', 'The film page']],
+    TARGETS: [['all', 'Everywhere'], ['hub', 'Flake Games home page'], ['game', "Dya'Akara"], ['rpg', "Torcain's Run"], ['4bw', 'The 4 Brothers Worlds'], ['ld', 'Little Dungeon'], ['film', 'The film page']],
     doc: null,
     state: { lastFetch: 0, lastPush: 0, error: null, realtime: 'off' },
     /* the card game swaps this for its own styled toast */

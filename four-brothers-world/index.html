@@ -325,7 +325,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <button class="btn" id="b-help2" type="button">Controls</button>
         <button class="btn" id="b-opts2" type="button">Settings</button>
         <button class="btn b-full" type="button">Full screen</button>
-        <button class="btn" id="b-home2" type="button">Back to Dya'Akara</button>
+        <button class="btn" id="b-home2" type="button">Back to Flake Games</button>
       </div>
       <div id="mp" class="stone" hidden>
         <div class="label">Play together</div>
@@ -408,7 +408,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     <button class="btn" id="p-opts" type="button">Settings</button>
     <button class="btn" id="p-help" type="button">Controls</button>
     <button class="btn" id="p-title" type="button">4 Brothers World home screen</button>
-    <button class="btn" id="p-home" type="button">Back to Dya'Akara</button>
+    <button class="btn" id="p-home" type="button">Back to Flake Games</button>
     <div class="label">Your progress saves by itself.</div></div></div>
   <div id="opts" class="modal hidden-ui"><div class="panel stone" style="width:min(620px,100%)"><div class="phead"><h3>Settings</h3><button class="btn small" data-close type="button">Close (Esc)</button></div><div id="optbody"></div></div></div>
   <input type="file" id="importfile" accept=".json,application/json" hidden>
@@ -420,6 +420,8 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';s.onerror=function(){window.__peerFailed=true};document.head.appendChild(s);"></script>
 <script src="../js/config.js"></script><!-- Dya'Akara's Supabase settings, read only for the multiplayer relay; missing when the game is opened on its own -->
 <script src="../js/core/broadcast.js"></script><!-- live messages from the Dya'Akara Admin Panel; does nothing when the game is opened on its own -->
+<script src="../js/flake/account.js"></script><!-- one Flake Games account for every game (signed in on the home page) -->
+<script src="../js/flake/fbw_cloud.js"></script><!-- saves this game to that account -->
 <script>/* js/core.js */
 // ROCK WORLD — core helpers shared by every other file.
 // Everything lives on the single global `RW` so files can be added in any session.
@@ -509,7 +511,7 @@ window.RW = window.RW || {};
   // ---------- safe storage ----------
   RW.store = {
     get(k, d) { try { const v = localStorage.getItem('rw_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('rw_' + k, JSON.stringify(v)); } catch (e) { } },
+    set(k, v) { try { localStorage.setItem('rw_' + k, JSON.stringify(v)); } catch (e) { } if (RW.cloud) RW.cloud.touch(); },
   };
 
   // ---------- registries (plug-and-play) ----------
@@ -8464,7 +8466,7 @@ window.RW = window.RW || {};
   $('#p-opts').onclick = () => U.openModal('opts');
   $('#p-help').onclick = () => U.openModal('help');
   $('#p-title').onclick = () => U.toTitle();
-  $('#p-home').onclick = () => { if (RW.game.playing) RW.game.saveNow(); location.href = '../index.html'; };
+  $('#p-home').onclick = async () => { if (RW.game.playing) RW.game.saveNow(); if (RW.cloud) await RW.cloud.pushNow(); location.href = '../index.html'; };
   $('#b-home2').onclick = () => { location.href = '../index.html'; };
   $('#m-travel').onclick = () => U.travel('anywhere');
   U.paused = () => U.open === 'pause' && !(RW.net && RW.net.transport);
@@ -8556,7 +8558,7 @@ window.RW = window.RW || {};
     rs.onclick = () => { RW.binds = RW.defaultBinds(); RW.saveBinds(); U.hudKeys(); U.renderOpts(); U.toast('Controls are back to normal.'); };
     box.append(el('div', 'opt-row', null)); box.lastChild.append(el('span'), rs);
     sec('Your progress');
-    box.append(el('p', 'opt-p', 'Your hero, bag and world save in this browser by themselves every few seconds, and new versions of the game keep them. To move your progress to another computer or keep a spare copy, save it to a file.'));
+    box.append(el('p', 'opt-p', 'Your hero, bag and world save by themselves every few seconds, to your Flake Games account, so they follow you to any device you sign in on. New versions of the game keep them. To keep a spare copy, save it to a file.'));
     const ex = el('button', 'btn small', 'Save progress to a file'); ex.type = 'button'; ex.onclick = U.exportSave;
     const im = el('button', 'btn small', 'Load progress from a file'); im.type = 'button'; im.onclick = () => $('#importfile').click();
     const r2 = el('div', 'opt-row'); r2.append(ex, im); box.append(r2);
@@ -8580,6 +8582,7 @@ window.RW = window.RW || {};
       Object.keys(localStorage).filter((k) => k.startsWith('rw_') && k !== 'rw_binds' && k !== 'rw_settings').forEach((k) => localStorage.removeItem(k));
       Object.entries(j.data).forEach(([k, v]) => { if (k.startsWith('rw_') && typeof v === 'string') localStorage.setItem(k, v); });
       const sv = JSON.parse(localStorage.getItem('rw_save_rock') || 'null'); if (sv) { sv.savedAt = Date.now(); localStorage.setItem('rw_save_rock', JSON.stringify(sv)); }
+      if (RW.cloud) { RW.cloud.touch(); await RW.cloud.pushNow(); } // the loaded file becomes this account's progress
       location.reload();
     } catch (err) { U.toast('That file is not a 4 Brothers World save.'); }
   });
@@ -11188,7 +11191,22 @@ window.RW = window.RW || {};
     if (sv) RW.store.set('save_backup_' + (last || 'before-' + RW.VERSION), sv);
     RW.store.set('version', RW.VERSION);
   }
+  // the save lives on the player's Flake Games account (js/flake/fbw_cloud.js): sign in first, bring the
+  // account's progress into this browser, and only then read it. Skipped when the game is opened on its own.
+  async function cloudSync() {
+    if (!window.FLAKE || !window.FBW_CLOUD) return;
+    const who = await window.FLAKE.gate('4bw');
+    RW.cloud = window.FBW_CLOUD.create(localStorage, window.FLAKE.rest);
+    const r = await RW.cloud.sync(who);
+    if (r.offline && !r.mine) { window.FLAKE.notice('Could not reach your account', 'Your progress could not be loaded. Check your connection and try again.'); throw new Error('account unreachable'); }
+    RW.binds = Object.assign(RW.defaultBinds(), RW.store.get('binds', {}));
+    RW.settings = Object.assign({ invertWheel: false }, RW.store.get('settings', {}));
+    const flush = () => { if (RW.cloud.pending()) RW.cloud.pushNow(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+  }
   async function boot() {
+    await cloudSync();
     backupOnUpdate();
     RW.audio.muted = RW.store.get('muted', false);
     RW.art.buildTiles();

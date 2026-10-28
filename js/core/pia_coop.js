@@ -1,6 +1,6 @@
 /* ============================================================
-   DYA'AKARA — core/pia_coop.js
-   LEGENDS OF PIA'DON — session + co-op layer.
+   FLAKE GAMES — core/pia_coop.js
+   LITTLE DUNGEON — session + co-op layer.
 
    Two pieces:
 

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#14100b">
+  <!-- lets the game run chrome-free when added to a phone home screen -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dya'Akara">
+  <title>Dya'Akara — Token Game of the Mbaru Tatu</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- match HUD polish — remove this line to restore the original HUD -->
+  <link rel="stylesheet" href="css/match_hud.css">
+  <!-- rarity frames on token cards — remove this line for plain cards -->
+  <link rel="stylesheet" href="css/card_frames.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%238a6f42'/><circle cx='50' cy='50' r='38' fill='%233a2f1d'/><circle cx='50' cy='50' r='14' fill='%2368e0e8'/></svg>">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- core -->
+  <script src="js/core/util.js"></script>
+  <script src="js/core/audio.js"></script>
+  <script src="js/config.js"></script>
+  <!-- one Flake Games account for every game: the session from the home page -->
+  <script src="js/flake/account.js"></script>
+  <script src="js/core/supabase.js"></script>
+  <!-- live broadcasts from the Admin Panel (banner, pop-ups, maintenance, refresh) -->
+  <script src="js/core/broadcast.js"></script>
+  <!-- data -->
+  <script src="js/data/species.js"></script>
+  <script src="js/data/economy.js"></script>
+  <script src="js/data/lore.js"></script>
+  <script src="js/data/abilities.js"></script>
+  <!-- The Hunt (run-based summoner) static data: Vaelk, hunters, grounds -->
+  <script src="js/data/hunt_run.js"></script>
+  <!-- pure pre-match vote / launch-info helpers (shared by setup screen + netplay) -->
+  <script src="js/core/matchvote.js"></script>
+  <!-- admin live-edit overrides: applied over the data files -->
+  <script src="js/core/mods.js"></script>
+  <!-- cross-device accounts: a player's save travels to any device -->
+  <script src="js/core/account_cloud.js"></script>
+  <!-- online-first gate: the game requires a reachable cloud to be played -->
+  <script src="js/core/online_gate.js"></script>
+  <!-- single active session per account: one tab, one device -->
+  <script src="js/core/session_guard.js"></script>
+  <!-- state -->
+  <script src="js/core/token.js"></script>
+  <script src="js/core/state.js"></script>
+  <!-- online: cross-device friends, private matches & the shared market -->
+  <script src="js/core/online.js"></script>
+  <script src="js/core/market_online.js"></script>
+  <script src="js/core/tournaments_online.js"></script>
+  <script src="js/core/season.js"></script>
+  <script src="js/core/duel_online.js"></script>
+  <script src="js/core/netplay.js"></script>
+  <!-- The Hunt run engine (depends on token/state; combat delegates to the match engine) -->
+  <script src="js/core/hunt_run.js"></script>
+  <!-- engine -->
+  <script src="js/engine/sprites.js"></script>
+  <script src="js/engine/parts.js"></script>
+  <script src="js/engine/behaviors.js"></script>
+  <script src="js/engine/match.js"></script>
+  <script src="js/engine/render.js"></script>
+  <!-- match visuals: each fx/ file is independent — delete a file and its line to remove it -->
+  <script src="js/engine/match_fx.js"></script>
+  <script src="js/engine/fx/ground_detail.js"></script>
+  <script src="js/engine/fx/arena_frame.js"></script>
+  <script src="js/engine/fx/contact_shadows.js"></script>
+  <script src="js/engine/fx/pulse_ripple.js"></script>
+  <script src="js/engine/fx/relic_beacon.js"></script>
+  <script src="js/engine/fx/hit_sparks.js"></script>
+  <script src="js/engine/fx/damage_numbers.js"></script>
+  <script src="js/engine/fx/ambient_motes.js"></script>
+  <script src="js/engine/fx/lighting.js"></script>
+  <script src="js/engine/fx/camera_shake.js"></script>
+  <!-- character looks: each looks/ file is independent — delete a file and its line to remove it -->
+  <script src="js/engine/char_looks.js"></script>
+  <script src="js/engine/looks/kofi_galta.js"></script>
+  <script src="js/engine/looks/living_motion.js"></script>
+  <script src="js/engine/looks/volume_shading.js"></script>
+  <script src="js/engine/looks/hit_flash.js"></script>
+  <script src="js/engine/looks/ink_outline.js"></script>
+  <!-- ui -->
+  <script src="js/ui/ui.js"></script>
+  <!-- the sky over the Mbaru Tatu (login, main menu, world codex) -->
+  <script src="js/ui/mbaru_sky.js"></script>
+  <script src="js/ui/screens_core.js"></script>
+  <script src="js/ui/screens_econ.js"></script>
+  <script src="js/ui/screens_play.js"></script>
+  <script src="js/ui/screens_meta.js"></script>
+  <script src="js/ui/screens_hunt_run.js"></script>
+  <script src="js/ui/screens_compendium.js"></script>
+  <!-- The Rokarvac of the Mbaru Tatu: world codex -->
+  <script src="js/ui/screens_world.js"></script>
+  <!-- boot -->
+  <script src="js/main.js"></script>
+</body>
+</html>

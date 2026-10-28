@@ -6,7 +6,7 @@
    Every character improvement lives in its OWN file in
    js/engine/looks/ and registers itself here. To remove one:
      1. delete its file from js/engine/looks/
-     2. delete its <script> line from index.html
+     2. delete its <script> line from dya-akara.html (and mini-games/little-dungeon/index.html)
    A species redesign that is removed falls back to the original
    drawing. Each one can also be switched off per player in
    Settings → Display → Character looks.

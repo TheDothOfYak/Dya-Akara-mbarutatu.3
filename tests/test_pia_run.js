@@ -1,5 +1,5 @@
 /* ============================================================
-   tests/test_pia_run.js — LEGENDS OF PIA'DON
+   tests/test_pia_run.js — LITTLE DUNGEON
    Headless checks: data integrity, the battle engine (cards,
    summons, statuses, enemy turns), co-op scaling, map generation,
    and a full run to the Quarry driven by a trivial auto-player.

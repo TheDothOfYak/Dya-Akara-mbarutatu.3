@@ -143,14 +143,17 @@
   };
 
   /* ================= topbar ================= */
+  /* the top bar's name and whether it shows Dya'Akara's purse; another game
+     built on these screens (Little Dungeon) swaps them before showing a screen */
+  UI.brand = { logo: "DYA'AKARA", chips: true };
   UI.topbar = function (opts) {
     opts = opts || {};
     const me = G.me;
     const bar = U.el('div', { cls: 'topbar' });
-    bar.appendChild(U.el('div', { cls: 'logo', text: "DYA'AKARA", onclick: () => UI.show('menu') }));
+    bar.appendChild(U.el('div', { cls: 'logo', text: UI.brand.logo, onclick: () => UI.show('menu') }));
     if (opts.title) bar.appendChild(U.el('div', { cls: 'muted', text: '— ' + opts.title }));
     bar.appendChild(U.el('div', { cls: 'spacer' }));
-    if (me) {
+    if (me && UI.brand.chips) {
       const okidTotal = me.okid.reduce((a, b) => a + b, 0);
       bar.appendChild(U.el('span', { cls: 'res-chip', html: '🪙 <b>' + U.fmt(me.gold) + '</b> gold' }));
       bar.appendChild(U.el('span', { cls: 'res-chip', html: '⬡ <b>' + okidTotal + '</b> Okid' }));

@@ -172,6 +172,7 @@
        we already hold so the account stays logged in and cloud-linked */
     if (prev) { remote.email = remote.email || prev.email; remote.passHash = remote.passHash || prev.passHash; }
     remote.cloudAccount = true;
+    G.completeAccount(remote);
     installAccount(remote, remote.email);
     if (isMe) G.me = remote;
     store.save(G.world);
@@ -706,6 +707,26 @@
     };
   }
 
+  /* An account made on the Flake Games home page (js/flake/account.js)
+     starts as a bare row: email, password, display name. The first time
+     Dya'Akara sees it, every field it needs is filled in from the
+     template, it gets the new-player starting resources once, and it is
+     marked so the game asks for an appearance and home region before the
+     tutorial. Accounts that are already complete are left untouched. */
+  G.completeAccount = function (acc) {
+    if (!acc || acc.ai) return acc;
+    const base = baseAccount({ id: acc.id, email: acc.email, passHash: acc.passHash, displayName: acc.displayName });
+    Object.keys(base).forEach(k => { if (acc[k] === undefined) acc[k] = base[k]; });
+    if (acc.flakeNew) {
+      acc.gold = EC.START.gold;
+      acc.okid[0] = EC.START.okid;
+      acc.ngakara = EC.START.ngakara;
+      acc.dyaSetupPending = true;
+      delete acc.flakeNew;
+    }
+    return acc;
+  };
+
   /* ================== ACCOUNTS ================== */
   /* Cross-device accounts (see js/core/account_cloud.js): when online
      is configured, an account's email is the key to the SAME save on
@@ -797,6 +818,12 @@
       return { acc, auth: res };
     }
 
+    return G.loginHash(email, hashPass(pass));
+  };
+  /* sign in with the password hash the Flake Games home page remembered
+     (js/flake/account.js) — the same checks as typing the password */
+  G.loginHash = async function (email, passHash) {
+    const gate = requireCloudOrOffline(); if (gate) return { err: gate };
     email = String(email || '').trim().toLowerCase();
     const AC = DYA.accountCloud;
     if (AC && AC.configured()) {
@@ -804,8 +831,8 @@
       try { remote = await AC.fetchByEmail(email); }
       catch (e) { return { err: 'Could not reach the account service: ' + e.message }; }
       if (remote) {
-        if (remote.pass_hash !== hashPass(pass)) return { err: 'Incorrect password.' };
-        const cloudAcc = remote.data;
+        if (remote.pass_hash !== passHash) return { err: 'Incorrect password.' };
+        const cloudAcc = G.completeAccount(remote.data);
         cloudAcc.id = remote.id; cloudAcc.email = email; cloudAcc.passHash = remote.pass_hash;
         /* last-writer-wins reconciliation. If THIS device already holds a
            newer local copy of the same account than the cloud does, keep
@@ -835,7 +862,7 @@
          copy becomes the canonical cloud record from now on. */
       const localAcc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
       if (!localAcc) return { err: 'No account found with that email.' };
-      if (localAcc.passHash !== hashPass(pass)) return { err: 'Incorrect password.' };
+      if (localAcc.passHash !== passHash) return { err: 'Incorrect password.' };
       const r = await AC.insert(localAcc);
       if (r.err && !/already exists/i.test(r.err)) return { err: r.err };
       localAcc.lastLogin = Date.now();
@@ -848,7 +875,7 @@
     /* offline fallback: fully local, exactly as before */
     const acc = Object.values(G.world.accounts).find(a => !a.ai && a.email === email);
     if (!acc) return { err: 'No account found with that email.' };
-    if (acc.passHash !== hashPass(pass)) return { err: 'Incorrect password.' };
+    if (acc.passHash !== passHash) return { err: 'Incorrect password.' };
     acc.lastLogin = Date.now();
     G.me = acc;
     G.save();

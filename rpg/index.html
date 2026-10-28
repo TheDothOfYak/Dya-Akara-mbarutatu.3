@@ -445,7 +445,7 @@
     <div class="btn-row">
       <button class="btn" id="btn-continue" disabled style="display:none">Continue</button>
       <button class="btn" id="btn-begin" disabled>New Run</button>
-      <a class="btn ghost" href="../index.html">Back to Dya'Akara</a>
+      <a class="btn ghost" href="../index.html">Back to Flake Games</a>
     </div>
     <div class="controls">
       <b>WASD</b><span>Move · <b>SHIFT</b> sprint · <b>SPACE</b> jump</span>
@@ -500,17 +500,6 @@
   </div>
 </div>
 
-<div id="signin" class="hidden">
-  <form class="panel brass" id="si-form" style="width:min(440px,92vw)">
-    <h2>Sign in</h2>
-    <p style="color:var(--ink-dim);font-size:15px;margin:-6px 0 14px;text-align:center">Use the same email and password as your Dya'Akara account. Your run will follow you to any device.</p>
-    <label for="si-email">EMAIL</label><input id="si-email" type="email" autocomplete="username" required>
-    <label for="si-pass">PASSWORD</label><input id="si-pass" type="password" autocomplete="current-password" required>
-    <p id="si-err" style="color:#ff9a8a;font-size:14px;min-height:18px"></p>
-    <div class="btn-row"><button class="btn" id="si-go" type="submit">Sign in</button><button class="btn ghost" id="si-cancel" type="button">Cancel</button></div>
-  </form>
-</div>
-
 <div id="newgame" class="hidden">
   <div class="panel brass" style="width:min(640px,94vw)">
     <h2>Choose your Run</h2>
@@ -540,12 +529,14 @@
     <p style="color:var(--ink-dim);font-style:italic" id="e-lead">Noka's next riddle, found at the edge of the trance:</p>
     <div class="riddle" id="e-riddle"></div>
     <p style="color:var(--ink-dim);font-size:15px;margin-bottom:20px" id="e-stats">Torcain's Run continues…</p>
-    <div class="btn-row"><button class="btn" id="btn-sail">Step through the Urverk</button><button class="btn ghost" id="btn-explore">Keep exploring</button><a class="btn ghost" href="../index.html">Back to Dya'Akara</a></div>
+    <div class="btn-row"><button class="btn" id="btn-sail">Step through the Urverk</button><button class="btn ghost" id="btn-explore">Keep exploring</button><a class="btn ghost" href="../index.html">Back to Flake Games</a></div>
   </div>
 </div>
 
 <!-- the main game's online settings (Supabase url + public key) -->
 <script src="../js/config.js"></script>
+<!-- one Flake Games account for every game (signed in on the home page) -->
+<script src="../js/flake/account.js"></script>
 <script src="../js/core/broadcast.js"></script>
 <!-- the Dya'Akara match engine, shared with the 2D game -->
 <script>window.DYA = window.DYA || {}; window.DYA.audio = window.DYA.audio || { play() {}, stop() {} };</script>

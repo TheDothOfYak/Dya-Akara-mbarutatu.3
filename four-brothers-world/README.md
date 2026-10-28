@@ -3,7 +3,7 @@
 A 2D pixel open-world platformer by four brothers. Four worlds (Fuzzy, Acorn, Rock and Ghost), four heroes, and the Duat, where all four fight together. Acorn World also has Capstead's giant home trees, the Keilia keep (don't get caught where you shouldn't be), the Elsha'ryn grove, the Duskareth camp and the creatures of Torcain's Run, plus waystones, pets, fishing, farming, a house of your own, market days, rain, fog and the Sunear'Zikhron storm.
 
 ## Play
-Open `four-brothers-world/index.html` in a browser, or pick **🌍 4 Brothers World** on the Dya'Akara main menu. `The 4 Brothers Worlds v1.1.html` is an older version, from before the game was renamed.
+Pick **The 4 Brothers Worlds** on the Flake Games home page (the site's `index.html`), or open `four-brothers-world/index.html`. You sign in once on the home page, and your hero, bag and worlds save to that account, so they follow you to any device. `The 4 Brothers Worlds v1.1.html` is an older version, from before the game was renamed.
 
 ## Play together
 1. One player clicks **Host a game** on the title screen and reads out the room code.
