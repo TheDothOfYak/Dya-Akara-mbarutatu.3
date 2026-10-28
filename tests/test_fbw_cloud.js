@@ -1,11 +1,11 @@
-/* 4 Brothers World: the hero and world saved to the Dya'Akara account.
+/* 4 Brothers World: the hero and world saved to the Flake Games account (the Dya'Akara account).
    Runs the game's own core.js + cloud.js (pulled out of four-brothers-world/index.html)
    on several simulated computers that share one mocked Supabase dya_config table:
    - the first computer's hero goes up to the account; a second computer gets it
    - a computer's saves go up; an old tab elsewhere stops instead of writing over them
    - a browser hero from before accounts asks which hero to keep
    - another account's hero in the browser is never uploaded to yours
-   - nobody logged in to Dya'Akara: the game waits (there is no sign-in of its own)
+   - nobody signed in on the Flake Games home page: the game waits (there is no sign-in of its own)
    - this computer's controls/settings stay on this computer */
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
@@ -59,11 +59,18 @@ function storage(init) {
     _m: m,
   };
 }
-/* one computer: its own browser storage, the shared Supabase. reload() just counts. */
-function computer(local, handoff) {
-  const ls = local || storage(), ss = storage(handoff ? { 'fbw-identity': JSON.stringify(handoff) } : {});
+/* one computer: its own browser storage, the shared Supabase. reload() just counts.
+   `signIn` is who signed in on the home page: js/flake/account.js keeps that session in
+   localStorage ('flake-session'); FLAKE here is a stand-in that reads it. */
+function computer(local, signIn) {
+  const ls = local || storage();
+  if (signIn) ls.setItem('flake-session', JSON.stringify(signIn));
+  const FLAKE = {
+    session: () => { const v = JSON.parse(ls.getItem('flake-session') || 'null'); return v && v.id ? v : null; },
+    gate: async () => FLAKE.session(),
+  };
   const ctx = {
-    localStorage: ls, sessionStorage: ss, fetch: fetchMock, console,
+    localStorage: ls, sessionStorage: storage(), fetch: fetchMock, console, FLAKE,
     setTimeout: () => 0, clearTimeout: () => {},          // pushes are driven by the test, not timers
     addEventListener: () => {}, location: { reloads: 0, reload() { this.reloads++; }, href: '' },
     document: { readyState: 'complete', getElementById: () => null, querySelectorAll: () => [], addEventListener: () => {} },
@@ -87,19 +94,18 @@ const KO = { id: 'acc_ko_1', email: 'ko@example.com', name: 'Ko' };
 (async () => {
   console.log('4 Brothers World cloud save');
 
-  /* ---- nobody logged in to Dya'Akara: no sign-in here, just a way back to the Dya'Akara login ---- */
+  /* ---- nobody signed in: no sign-in here, just a way back to the home page ---- */
   const loneLS = storage({ rw_save_rock: hero('Nobody', 'rock') });
   const lone = computer(loneLS);
   let started = false; lone.RW.cloud.gate().then(() => (started = true)); await ticks();
-  check('with nobody logged in to Dya\u2019Akara the game doesn\u2019t start', !started && lone.RW.cloud.state.mode === 'login');
+  check('with nobody signed in the game doesn\u2019t start', !started && lone.RW.cloud.state.mode === 'login');
   check('…and nothing is sent anywhere', !db.dya_config.length);
 
-  /* ---- home computer: a hero from before accounts, opened from the Dya'Akara menu ---- */
+  /* ---- home computer: a hero from before accounts, opened after signing in on the home page ---- */
   const homeLS = storage({ rw_save_rock: hero('Bramble', 'acorn'), rw_edits_acorn: '{"a":1}', rw_binds: '{"left":["KeyJ"]}', rw_settings: '{}', rw_version: '"1.8"' });
   let home = computer(homeLS, KO);
   await gate(home);
-  check('the Dya\u2019Akara login is handed over by its menu', home.RW.cloud.who && home.RW.cloud.who.id === 'acc_ko_1');
-  check('…and remembered on this computer', JSON.parse(homeLS.getItem('fbw-identity')).id === 'acc_ko_1');
+  check('the game plays as whoever signed in on the home page', home.RW.cloud.who && home.RW.cloud.who.id === 'acc_ko_1');
   check('an empty account takes this computer\u2019s hero', cloudVal('fbw:acc_ko_1:rw_save_rock') === hero('Bramble', 'acorn'));
   check('…and its world edits', cloudVal('fbw:acc_ko_1:rw_edits_acorn') === '{"a":1}');
   check('controls, settings and version stay on this computer', !cloudKeys().some((k) => /rw_(binds|settings|version)$/.test(k)), cloudKeys().join(' '));

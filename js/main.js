@@ -41,8 +41,10 @@
       DYA.sessionGuard.onKicked = (reason) => {
         if (!G.me) return;
         G.logout();
-        UI.show('login');
-        UI.alert('Signed out', reason);
+        /* not straight back to sign-in: the remembered session would just
+           take the slot back from the other tab or device */
+        if (window.FLAKE) FLAKE.notice('Signed out', reason);
+        else UI.alert('Signed out', reason);
       };
     }
 

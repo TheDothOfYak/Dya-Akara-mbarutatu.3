@@ -336,7 +336,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
         <button class="btn" id="b-help2" type="button">Controls</button>
         <button class="btn" id="b-opts2" type="button">Settings</button>
         <button class="btn b-full" type="button">Full screen</button>
-        <button class="btn" id="b-home2" type="button">Back to Dya'Akara</button>
+        <button class="btn" id="b-home2" type="button">Back to Flake Games</button>
       </div>
       <div id="mp" class="stone" hidden>
         <div class="label">Play together</div>
@@ -350,23 +350,23 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
   </div>
   <div id="cloud" hidden>
     <div class="card stone" id="cloud-login" hidden>
-      <h2>Log in to Dya'Akara</h2>
-      <p>Your hero is saved to your Dya'Akara account, so you can play the same hero on any computer. Log in to Dya'Akara, then pick 4 Brothers World on the menu.</p>
-      <div class="row"><button class="btn primary cl-home" type="button">Go to Dya'Akara</button></div>
+      <h2>Sign in to play</h2>
+      <p>Your hero is saved to your Flake Games account, so you can play the same hero on any computer. Sign in on the Flake Games home page, then pick The 4 Brothers Worlds.</p>
+      <div class="row"><button class="btn primary cl-home" type="button">Go to Flake Games</button></div>
     </div>
     <div class="card stone" id="cloud-loading" hidden>
       <h2>Fetching your hero…</h2>
-      <p>Getting your hero and world from your Dya'Akara account.</p>
+      <p>Getting your hero and world from your account.</p>
     </div>
     <div class="card stone" id="cloud-error" hidden>
       <h2>Can't reach the Dya Guild</h2>
       <p>Your hero is saved online, so the game needs a connection to start. Check your internet and try again.</p>
       <p class="msg" id="cloud-err"></p>
-      <div class="row"><button class="btn primary" id="cl-retry" type="button">Try again</button><button class="btn cl-home" type="button">Back to Dya'Akara</button></div>
+      <div class="row"><button class="btn primary" id="cl-retry" type="button">Try again</button><button class="btn cl-home" type="button">Back to Flake Games</button></div>
     </div>
     <div class="card stone" id="cloud-choose" hidden>
       <h2>Which hero?</h2>
-      <p>This computer has a hero saved from before it was tied to your account, and your Dya'Akara account already has a different one. Pick the one to keep: from now on it's the hero you play on every computer.</p>
+      <p>This computer has a hero saved from before it was tied to your account, and your account already has a different one. Pick the one to keep: from now on it's the hero you play on every computer.</p>
       <div class="row"><button class="btn primary" id="cl-acct" type="button">Play the account's hero</button><button class="btn" id="cl-here" type="button">Keep this computer's hero</button></div>
       <p>Not sure? Save this computer's hero to a file first. You can load it back any time in Settings.</p>
       <div class="row"><button class="btn small" id="cl-file" type="button">Save this computer's hero to a file</button></div>
@@ -450,7 +450,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
     <button class="btn" id="p-opts" type="button">Settings</button>
     <button class="btn" id="p-help" type="button">Controls</button>
     <button class="btn" id="p-title" type="button">4 Brothers World home screen</button>
-    <button class="btn" id="p-home" type="button">Back to Dya'Akara</button>
+    <button class="btn" id="p-home" type="button">Back to Flake Games</button>
     <div class="label">Your progress saves by itself.</div></div></div>
   <div id="opts" class="modal hidden-ui"><div class="panel stone" style="width:min(620px,100%)"><div class="phead"><h3>Settings</h3><button class="btn small" data-close type="button">Close (Esc)</button></div><div id="optbody"></div></div></div>
   <input type="file" id="importfile" accept=".json,application/json" hidden>
@@ -462,6 +462,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';s.onerror=function(){window.__peerFailed=true};document.head.appendChild(s);"></script>
 <script src="../js/config.js"></script><!-- Dya'Akara's Supabase settings, read only for the multiplayer relay; missing when the game is opened on its own -->
 <script src="../js/core/broadcast.js"></script><!-- live messages from the Dya'Akara Admin Panel; does nothing when the game is opened on its own -->
+<script src="../js/flake/account.js"></script><!-- the one Flake Games account, signed in on the home page -->
 <script>/* js/core.js */
 // ROCK WORLD — core helpers shared by every other file.
 // Everything lives on the single global `RW` so files can be added in any session.
@@ -637,18 +638,18 @@ window.RW = window.RW || {};
 
 </script>
 <script>/* js/cloud.js */
-// Your hero and world, saved to your Dya'Akara account, so the same hero plays on any computer you log in on.
+// Your hero and world, saved to your Flake Games account (the Dya'Akara account), so the same hero plays on any computer.
 // Every rw_ save key (except this computer's own controls and settings) is kept in the site's Supabase dya_config
 // table, one row per key under "fbw:<account id>:<key>", plus a "~stamp" row that changes with every save.
-// Torcain's Run keeps its save in the same table. There is no sign-in here: the Dya'Akara login is used. The Dya'Akara
-// menu hands over who is logged in, and this browser remembers it until they log out of Dya'Akara (js/core/state.js).
+// Torcain's Run keeps its save in the same table. There is no sign-in here: the Flake Games login from the home page is
+// used (js/flake/account.js), which also sends a signed-out player there to sign in and stops a banned one.
 // A downloaded copy of the game (no ../js/config.js) saves in the browser only.
 // Which copy wins: the cloud copy, unless this computer was the last to save it (same stamp), then this computer's
 // unsent changes go up. A computer that finds the stamp changed under it (another computer played) stops saving
 // online and asks to load the newer hero, so an old tab left open never writes over today's progress.
 (function (RW) {
   const C = (RW.cloud = {});
-  const IDENT = 'fbw-identity', META = 'fbw-cloud', STAMP = '~stamp';
+  const META = 'fbw-cloud', STAMP = '~stamp';
   // kept on this computer only: controls, settings, sound, the relay, which version last ran and spare copies
   const LOCAL_ONLY = /^rw_(binds|settings|muted|relay|version|save_backup_.*)$/;
   C.synced = (k) => typeof k === 'string' && k.startsWith('rw_') && !LOCAL_ONLY.test(k);
@@ -672,14 +673,10 @@ window.RW = window.RW || {};
   }
   const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms))]);
 
-  // ---------- who is playing: the Dya'Akara login, handed over by its menu and remembered in this browser ----------
+  // ---------- who is playing: the Flake Games login, remembered in this browser by the home page ----------
   C.identity = function () {
-    try {
-      const hand = sessionStorage.getItem(IDENT);   // handed over by the Dya'Akara menu
-      if (hand) { localStorage.setItem(IDENT, hand); sessionStorage.removeItem(IDENT); }
-      const v = JSON.parse(localStorage.getItem(IDENT) || 'null');
-      return v && v.id ? v : null;
-    } catch (e) { return null; }
+    const s = window.FLAKE && window.FLAKE.session();
+    return s ? { id: s.id, email: s.email, name: s.name } : null;
   };
   // ---------- this computer's notes: whose hero is in this browser, the stamp it last saw, what hasn't gone up ----------
   // (sent: the stamp of a save that went out as the tab closed, which may or may not have arrived)
@@ -811,6 +808,7 @@ window.RW = window.RW || {};
     if (!C.configured()) { C.state.mode = 'off'; return Promise.resolve(); }
     return new Promise((resolve) => {
       const go = async (pick) => {
+        if (window.FLAKE) await window.FLAKE.gate('4bw');   // signed out → the home page to sign in; banned → stops here
         C.who = C.identity();
         if (!C.who) { C.state.mode = 'login'; C.show('login'); return; }
         C.state.mode = 'loading'; C.show('loading');
@@ -844,14 +842,14 @@ window.RW = window.RW || {};
     const t = $c('cloudstatus');
     if (t) {
       t.hidden = !C.who || C.state.mode === 'off';
-      if (C.who) { t.textContent = ''; t.append('Saved to your Dya’Akara account: ', Object.assign(document.createElement('b'), { textContent: C.who.name })); }
+      if (C.who) { t.textContent = ''; t.append('Saved to your account: ', Object.assign(document.createElement('b'), { textContent: C.who.name })); }
     }
     const b = $c('cloudbadge');
     if (b) b.hidden = !(C.state.mode === 'on' && C.state.error);
   };
   C.describe = function () {
     if (C.state.mode === 'off') return 'Your hero, bag and world save in this browser by themselves every few seconds, and new versions of the game keep them. To move your progress to another computer or keep a spare copy, save it to a file.';
-    return 'Your hero, bag and world save to your Dya’Akara account (' + (C.who ? C.who.name : '') + ') every few seconds. Log in to Dya’Akara on any computer to carry on with the same hero. You can also keep a spare copy in a file.';
+    return 'Your hero, bag and world save to your Flake Games account (' + (C.who ? C.who.name : '') + ') every few seconds. Sign in on any computer to carry on with the same hero. You can also keep a spare copy in a file.';
   };
   function wire() {
     if (!$c('cloud')) return;

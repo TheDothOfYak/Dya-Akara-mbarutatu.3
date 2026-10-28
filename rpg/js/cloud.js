@@ -1,24 +1,13 @@
 /* ============================================================
-   Torcain's Run, saved to your Dya'Akara account.
-   Signs in with the same email + password as the main game
-   (checked against dya_accounts the same way the game does),
-   then keeps the run in the shared dya_config key/value table
-   under "rpg_save:<account id>", so it follows you to any device. Without an account the run stays
-   in this browser only.
+   Torcain's Run, saved to your Flake Games account (the same
+   account as Dya'Akara, signed in once on the home page — see
+   js/flake/account.js), which keeps the run in the shared dya_config key/value table
+   under "rpg_save:<account id>",
+   so it follows you to any device.
    ============================================================ */
-
-const IDENT_KEY = 'torcain-identity';
 
 function cfg() { return (window.DYA_CONFIG && window.DYA_CONFIG.supabase) || {}; }
 export const configured = () => { const c = cfg(); return !!(c.url && c.anonKey); };
-
-/* the same password hash as js/core/state.js (FNV-1a over a salted string) */
-function hashStr(s) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
-const hashPass = p => String(hashStr('dya!' + p + '!akara'));
 
 async function rest(method, path, body, prefer, keepalive) {
   const c = cfg();
@@ -33,31 +22,11 @@ async function rest(method, path, body, prefer, keepalive) {
   return data;
 }
 
-/* who is playing — remembered in this browser (no password is ever stored) */
+/* who is playing: the Flake Games session (js/flake/account.js) */
 export function identity() {
-  try {
-    const hand = sessionStorage.getItem(IDENT_KEY);   // handed over by the main game's menu
-    if (hand) { localStorage.setItem(IDENT_KEY, hand); sessionStorage.removeItem(IDENT_KEY); }
-    const v = JSON.parse(localStorage.getItem(IDENT_KEY) || 'null');
-    return v && v.id ? v : null;
-  } catch (e) { return null; }
+  const s = window.FLAKE && window.FLAKE.session();
+  return s ? { id: s.id, email: s.email, name: s.name } : null;
 }
-export function signOut() { try { localStorage.removeItem(IDENT_KEY); } catch (e) { /* ignore */ } }
-
-export async function signIn(email, pass) {
-  if (!configured()) return { err: 'Online accounts are not set up for this site.' };
-  email = String(email || '').trim().toLowerCase();
-  let rows;
-  try { rows = await rest('GET', 'dya_accounts?email=eq.' + encodeURIComponent(email) + '&select=id,email,pass_hash,name:data->>displayName'); }
-  catch (e) { return { err: 'Could not reach the Dya Guild: ' + e.message }; }
-  const r = rows && rows[0];
-  if (!r) return { err: 'No Dya’Akara account with that email.' };
-  if (r.pass_hash !== hashPass(pass)) return { err: 'Incorrect password.' };
-  const who = { id: r.id, email: r.email, name: r.name || r.email.split('@')[0] };
-  try { localStorage.setItem(IDENT_KEY, JSON.stringify(who)); } catch (e) { /* ignore */ }
-  return { who };
-}
-
 const rowKey = accountId => 'rpg_save:' + accountId;
 
 export const state = { available: true, error: null, lastPush: 0 };

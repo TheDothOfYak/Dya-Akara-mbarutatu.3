@@ -3,7 +3,7 @@
 A 2D pixel open-world platformer by four brothers. Four worlds (Fuzzy, Acorn, Rock and Ghost), four heroes, and the Duat, where all four fight together. Acorn World also has Capstead's giant home trees, the Keilia keep (don't get caught where you shouldn't be), the Elsha'ryn grove, the Duskareth camp and the creatures of Torcain's Run, plus waystones, pets, fishing, farming, a house of your own, market days, rain, fog and the Sunear'Zikhron storm.
 
 ## Play
-Open `four-brothers-world/index.html` in a browser, or pick **🌍 4 Brothers World** on the Dya'Akara main menu. `The 4 Brothers Worlds v1.1.html` is an older version, from before the game was renamed.
+Pick **The 4 Brothers Worlds** on the Flake Games home page (the site's `index.html`), or open `four-brothers-world/index.html`. You sign in once on the home page, and your hero, bag and worlds save to that account, so they follow you to any device. `The 4 Brothers Worlds v1.1.html` is an older version, from before the game was renamed.
 
 ## Play together
 1. One player clicks **Host a game** on the title screen and reads out the room code.
@@ -12,13 +12,13 @@ Open `four-brothers-world/index.html` in a browser, or pick **🌍 4 Brothers Wo
 
 Everyone needs the same version of the game: open the same link and refresh if the game says the versions don't match.
 
-The host's browser keeps the shared world, so the host keeps their tab open while you play. Each player's hero saves to their own Dya'Akara account. Room codes connect players directly (peer to peer) through the free PeerJS service. If your networks won't link up directly, the game switches to a relay through the Dya'Akara site's online service by itself, so play from the website link rather than a downloaded copy.
+The host's browser keeps the shared world, so the host keeps their tab open while you play. Each player's hero saves to their own Flake Games account. Room codes connect players directly (peer to peer) through the free PeerJS service. If your networks won't link up directly, the game switches to a relay through the Dya'Akara site's online service by itself, so play from the website link rather than a downloaded copy.
 
 ## Controls and settings
 Press **Esc** for the pause menu (travel back to worlds you've visited, the home screen), **H** for the controls and **O** for Settings. In Settings you can go full screen, turn the scroll wheel round, change any key or mouse button, and save your progress to a file (or load it back on another computer).
 
 ## Your hero is saved online
-Your hero, bag and world are saved to your Dya'Akara account, so you can play the same hero on any computer: at home, on a laptop, at work. It uses your Dya'Akara login: log in to Dya'Akara and pick 4 Brothers World on the menu. After that, the game's link works on that computer by itself until you log out of Dya'Akara. The game won't start until it has your hero from the account, so you never play an old copy.
+Your hero, bag and world are saved to your Flake Games account (the same account as Dya'Akara), so you can play the same hero on any computer: at home, on a laptop, at work. Sign in on the Flake Games home page and pick The 4 Brothers Worlds. After that, the game's link works on that computer by itself until you sign out on the home page. The game won't start until it has your hero from the account, so you never play an old copy.
 
 If the same hero is open on two computers, the one you played last wins: the other one stops and asks to load the newer save. Controls and settings stay on each computer. The first time you play on a computer that already had a hero from before, the game asks which hero to keep (and can save the other to a file first).
 

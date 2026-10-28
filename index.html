@@ -3,104 +3,92 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#14100b">
-  <!-- lets the game run chrome-free when added to a phone home screen -->
+  <meta name="theme-color" content="#07070d">
+  <!-- lets the site run chrome-free when added to a phone home screen -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Dya'Akara">
-  <title>Dya'Akara — Token Game of the Mbaru Tatu</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/pia.css">
-  <!-- match HUD polish — remove this line to restore the original HUD -->
-  <link rel="stylesheet" href="css/match_hud.css">
-  <!-- rarity frames on token cards — remove this line for plain cards -->
-  <link rel="stylesheet" href="css/card_frames.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%238a6f42'/><circle cx='50' cy='50' r='38' fill='%233a2f1d'/><circle cx='50' cy='50' r='14' fill='%2368e0e8'/></svg>">
+  <meta name="apple-mobile-web-app-title" content="Flake Games">
+  <meta name="application-name" content="Flake Games">
+  <title>Flake Games</title>
+  <link rel="stylesheet" href="css/hub.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%2307070d'/><circle cx='50' cy='50' r='12' fill='%23ffe39a'/><ellipse cx='50' cy='50' rx='38' ry='14' fill='none' stroke='%23d9b87a' stroke-width='4' transform='rotate(-18 50 50)'/><circle cx='83' cy='39' r='6' fill='%2368e0e8'/></svg>">
+  <!-- tells the live broadcasts (js/core/broadcast.js) this is the home page -->
+  <script>window.DYA_APP = 'hub';</script>
 </head>
 <body>
-  <div id="app"></div>
+  <!-- the whole Pia'don system turning behind everything (js/ui/mbaru_sky.js) -->
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <div class="hub-tint" id="tint" aria-hidden="true"></div>
 
-  <!-- core -->
-  <script src="js/core/util.js"></script>
-  <script src="js/core/audio.js"></script>
+  <div class="hub">
+    <header class="hub-head">
+      <div class="brand">
+        <div class="brand-name" id="studio">Flake Games</div>
+        <div class="brand-sub">Worlds of the Pia’don system</div>
+      </div>
+      <div class="acct" id="acct"></div>
+    </header>
+
+    <main class="hub-main">
+      <section class="show" id="show" aria-roledescription="carousel" aria-label="Games">
+        <div class="show-top">
+          <span class="show-count" id="count"></span>
+          <div class="show-nav">
+            <button class="arrow" id="prev" type="button" aria-label="Previous game">‹</button>
+            <button class="arrow" id="next" type="button" aria-label="Next game">›</button>
+          </div>
+        </div>
+        <div class="slide" id="slide" aria-live="polite"></div>
+        <div class="dots" id="dots" role="tablist" aria-label="Choose a game"></div>
+      </section>
+
+      <aside class="side">
+        <section class="panel news">
+          <h2>Announcements</h2>
+          <div id="news"><p class="muted">Loading…</p></div>
+        </section>
+        <section class="panel mini" aria-labelledby="mini-h">
+          <h2 id="mini-h">Mini Games</h2>
+          <div id="mini"></div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <!-- sign in / create account -->
+  <div class="modal hidden" id="auth" role="dialog" aria-modal="true" aria-labelledby="auth-h">
+    <form class="panel modal-box" id="auth-form" novalidate>
+      <div class="tabs">
+        <button type="button" class="tab on" data-mode="in">Sign in</button>
+        <button type="button" class="tab" data-mode="up">Create account</button>
+      </div>
+      <h2 id="auth-h">Sign in</h2>
+      <p class="muted small" id="auth-lead">One account for every game. Already played Dya’Akara or Torcain’s Run? Use that same email and password.</p>
+      <label for="a-email">Email</label>
+      <input id="a-email" type="email" autocomplete="username" placeholder="you@example.com" required>
+      <label for="a-pass">Password</label>
+      <input id="a-pass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+      <div id="a-name-row" class="hidden">
+        <label for="a-name">Display name</label>
+        <input id="a-name" maxlength="20" autocomplete="nickname" placeholder="2–20 characters">
+      </div>
+      <p class="err" id="a-err" role="alert"></p>
+      <div class="row">
+        <button class="btn primary" id="a-go" type="submit">Sign in</button>
+        <button class="btn ghost" id="a-cancel" type="button">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast hidden" id="toast" role="status"></div>
+
   <script src="js/config.js"></script>
-  <script src="js/core/supabase.js"></script>
-  <!-- live broadcasts from the Admin Panel (banner, pop-ups, maintenance, refresh) -->
-  <script src="js/core/broadcast.js"></script>
-  <!-- data -->
-  <script src="js/data/species.js"></script>
-  <script src="js/data/economy.js"></script>
-  <script src="js/data/lore.js"></script>
-  <script src="js/data/abilities.js"></script>
-  <!-- The Hunt (run-based summoner) static data: Vaelk, hunters, grounds -->
-  <script src="js/data/hunt_run.js"></script>
-  <!-- pure pre-match vote / launch-info helpers (shared by setup screen + netplay) -->
-  <script src="js/core/matchvote.js"></script>
-  <!-- admin live-edit overrides: applied over the data files -->
-  <script src="js/core/mods.js"></script>
-  <!-- cross-device accounts: a player's save travels to any device -->
-  <script src="js/core/account_cloud.js"></script>
-  <!-- online-first gate: the game requires a reachable cloud to be played -->
-  <script src="js/core/online_gate.js"></script>
-  <!-- single active session per account: one tab, one device -->
-  <script src="js/core/session_guard.js"></script>
-  <!-- state -->
-  <script src="js/core/token.js"></script>
-  <script src="js/core/state.js"></script>
-  <!-- online: cross-device friends, private matches & the shared market -->
-  <script src="js/core/online.js"></script>
-  <script src="js/core/market_online.js"></script>
-  <script src="js/core/tournaments_online.js"></script>
-  <script src="js/core/season.js"></script>
-  <script src="js/core/duel_online.js"></script>
-  <script src="js/core/netplay.js"></script>
-  <!-- The Hunt run engine (depends on token/state; combat delegates to the match engine) -->
-  <script src="js/core/hunt_run.js"></script>
-  <!-- engine -->
-  <script src="js/engine/sprites.js"></script>
-  <script src="js/engine/parts.js"></script>
-  <script src="js/engine/behaviors.js"></script>
-  <script src="js/engine/match.js"></script>
-  <script src="js/engine/render.js"></script>
-  <!-- match visuals: each fx/ file is independent — delete a file and its line to remove it -->
-  <script src="js/engine/match_fx.js"></script>
-  <script src="js/engine/fx/ground_detail.js"></script>
-  <script src="js/engine/fx/arena_frame.js"></script>
-  <script src="js/engine/fx/contact_shadows.js"></script>
-  <script src="js/engine/fx/pulse_ripple.js"></script>
-  <script src="js/engine/fx/relic_beacon.js"></script>
-  <script src="js/engine/fx/hit_sparks.js"></script>
-  <script src="js/engine/fx/damage_numbers.js"></script>
-  <script src="js/engine/fx/ambient_motes.js"></script>
-  <script src="js/engine/fx/lighting.js"></script>
-  <script src="js/engine/fx/camera_shake.js"></script>
-  <!-- character looks: each looks/ file is independent — delete a file and its line to remove it -->
-  <script src="js/engine/char_looks.js"></script>
-  <script src="js/engine/looks/kofi_galta.js"></script>
-  <script src="js/engine/looks/living_motion.js"></script>
-  <script src="js/engine/looks/volume_shading.js"></script>
-  <script src="js/engine/looks/hit_flash.js"></script>
-  <script src="js/engine/looks/ink_outline.js"></script>
-  <!-- ui -->
-  <script src="js/ui/ui.js"></script>
-  <!-- the sky over the Mbaru Tatu (login, main menu, world codex) -->
+  <script src="js/flake/account.js"></script>
+  <script src="js/core/util.js"></script>
   <script src="js/ui/mbaru_sky.js"></script>
-  <script src="js/ui/screens_core.js"></script>
-  <script src="js/ui/screens_econ.js"></script>
-  <script src="js/ui/screens_play.js"></script>
-  <script src="js/ui/screens_meta.js"></script>
-  <script src="js/ui/screens_hunt_run.js"></script>
-  <script src="js/ui/screens_compendium.js"></script>
-  <!-- The Rokarvac of the Mbaru Tatu: world codex -->
-  <script src="js/ui/screens_world.js"></script>
-  <!-- Legends of Pia'don: a turn-based roguelike deckbuilder (solo + co-op) -->
-  <script src="js/data/pia_run.js"></script>
-  <script src="js/core/pia_engine.js"></script>
-  <script src="js/core/pia_run.js"></script>
-  <script src="js/core/pia_coop.js"></script>
-  <script src="js/ui/screens_pia.js"></script>
-  <!-- boot -->
-  <script src="js/main.js"></script>
+  <!-- announcements and pop-ups from the Admin Panel -->
+  <script src="js/core/broadcast.js"></script>
+  <script src="js/flake/hub.js"></script>
 </body>
 </html>

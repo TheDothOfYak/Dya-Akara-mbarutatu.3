@@ -1,9 +1,26 @@
-# DYA'AKARA
-### Token Game of the Mbaru Tatu
+# FLAKE GAMES
+### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Little Dungeon
 
-The full playable build of Dya'Akara, implemented from the **Master Design Document (Sessions 1–14)**. Zero dependencies, no build step — pure HTML/CSS/JavaScript.
+Every game in this repo, behind one home page and one account. Zero dependencies, no build step — pure HTML/CSS/JavaScript.
 
----
+## The home page and the one account
+
+`index.html` is the **Flake Games** home page: the whole Pia'don system turning behind a carousel of the games (each slide has a real screenshot from the game in `img/previews/`, and the sky drifts to that game's corner of the system), the Admin Panel's announcements, and a **Mini Games** corner. From there:
+
+| Game | Page |
+|---|---|
+| Dya'Akara (the token game) | `dya-akara.html` |
+| Torcain's Run (3D RPG) | `rpg/index.html` |
+| The 4 Brothers Worlds (2D platformer) | `four-brothers-world/index.html` |
+| Little Dungeon (mini game, once Legends of Pia'don) | `mini-games/little-dungeon/index.html` |
+
+**One account for everything.** You sign in (or create an account) once, on the home page; every game picks that up, and every game has a way back to the home page. The account *is* the old Dya'Akara account (the same `dya_accounts` row, email and password), so nobody had to make a new one. Opening a game while signed out sends you to the home page to sign in, then straight back. Code: `js/flake/account.js`.
+
+- **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` under `fbw:<id>:<key>`, one row per save key (its `js/cloud.js` section).
+- **A new account** made on the home page starts with just email, password and display name. The first time it opens Dya'Akara, the game asks for an appearance and home region, gives the starting resources, and runs the tutorial.
+- **Bans** can be for one game or for every game (Admin Panel → General → Players & Bans, or each game's own Bans page). An every-game ban stops the account at the home page too.
+
+**The Admin Panel** (`admin.html`) opens on **General** (the home page's studio name and each game's name and tagline, announcements, players and bans across every game), with one button per game for that game's whole admin panel. The studio name is "Flake Games" until you change it there.
 
 ## How to Play
 
@@ -36,17 +53,17 @@ Uses a service account key rather than `firebase login:ci` — the CI-token logi
 4. Push anything to `main` (or re-run the "Deploy Dya'Akara to Firebase Hosting" workflow from the Actions tab) — it deploys to the Firebase project ID named in `.firebaserc`. Note: a Firebase project's actual ID (what goes in `.firebaserc`, `firebase.json`'s `site`, and the workflow's `projectId`) is not always the same as the friendly name shown in the console — Firebase appends a random suffix if your preferred name was already taken globally. Check the exact `project_id` field in your service account JSON key if the deploy fails with a 403 permission error.
 </details>
 
-Create an account (email/password — cross-device when online is configured, otherwise stored locally on your device), and the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
+Create an account on the Flake Games home page and open Dya'Akara; after you choose an appearance and home region, the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
 
 **The Admin Panel** lives at `admin.html` on either hosting domain — outside the game UI, as specified. First visit on a given domain sets that domain's admin password (the password, the local Dya'kukull AI population, and local market/tournament flavor are stored per-browser-origin, so github.io and web.app each get their own — but real player accounts, the shared market, and admin's game-content edits are cloud-based via Supabase and identical on both). You are the admin.
 
 ## 4 Brothers World (2D pixel platformer)
 
-A separate game by four brothers lives in **`four-brothers-world/`** — open `four-brothers-world/index.html` (or pick **🌍 4 Brothers World** on the main menu, just under Torcain’s Run). See `four-brothers-world/README.md` for how to play.
+A separate game by four brothers lives in **`four-brothers-world/`** — open `four-brothers-world/index.html` (or pick **The 4 Brothers Worlds** on the Flake Games home page). See `four-brothers-world/README.md` for how to play.
 
 ## Torcain's Run (3D single-player RPG)
 
-A separate, semi-3D action RPG lives in **`rpg/`** — open `rpg/index.html` (or pick **⛵ Torcain’s Run** on the main menu). It runs on a vendored copy of three.js (`rpg/vendor/`), so it still needs no build step and works offline.
+A separate, semi-3D action RPG lives in **`rpg/`** — open `rpg/index.html` (or pick **Torcain’s Run** on the Flake Games home page). It runs on a vendored copy of three.js (`rpg/vendor/`), so it still needs no build step and works offline.
 
 The true beginning, a prologue and two chapters so far, following the lore of the Mbaru Tatu. Your run is saved in the browser at every Nur Lantern and story beat; use **Continue** on the title screen to pick it back up.
 
@@ -192,7 +209,7 @@ The great ones are only ever seen from far off. The Aerolhorn crosses the sky no
 - **Items and crafting**: an inventory of materials, meals, axes and trinkets. Forge axes at Duro's cauldron and cook at a hearth or camp fire.
 - **The world**: loot chests, gathering spots (ore, bark, stone, moss), and eight **Kalo Trials** (puzzles) that reward spells and Hurst seeds.
 - **A world map** (`M`) with fast travel between lit lanterns.
-- **Cloud saves**: progress saves to your Dya'Akara account when you're signed in, either from the title screen or by launching from the main menu while signed in.
+- **Cloud saves**: progress saves to your Flake Games account (the same account as Dya'Akara), signed in on the home page.
 
 **Nur Lanterns** are the checkpoints. Resting at one heals you, refills your Albali film, respawns enemies, and lets you spend zikhron shards on Vigor, Edge, Breath, Duat mastery, extra film vials and Tukang.
 
@@ -254,7 +271,7 @@ Everything in the design document that can exist without a live backend or final
 
 ## Match Visuals (each one removable on its own)
 
-Every visual layer on the match field is a separate plug-in file in `js/engine/fx/`, loaded by one `<script>` line in `index.html`. They only *draw* — none of them touches the simulation — so replays, lockstep netplay, and the tests are unaffected. Players can switch each one off under **Settings → Display → Match visuals**. To remove one for everybody, delete its file and its `<script>` line; nothing else refers to it.
+Every visual layer on the match field is a separate plug-in file in `js/engine/fx/`, loaded by one `<script>` line in `dya-akara.html`. They only *draw* — none of them touches the simulation — so replays, lockstep netplay, and the tests are unaffected. Players can switch each one off under **Settings → Display → Match visuals**. To remove one for everybody, delete its file and its `<script>` line; nothing else refers to it.
 
 | File | What it adds |
 |---|---|
@@ -325,6 +342,7 @@ node tests/test_engine.js         # headless: determinism, replay exactness, due
 node tests/test_netplay.js        # lockstep netplay: two simulated machines must stay tick-identical
 node tests/test_mods_market.js    # admin live-edit overrides + shared market: atomic buys, no token duplicates
 node tests/test_cloud_accounts.js # cross-device accounts: same login from a fresh "device", bans travel, offline fallback intact
+node tests/test_flake_accounts.js # one Flake Games account: home-page sign-in, new accounts filled in by Dya'Akara, per-game and every-game bans, the 4 Brothers save on the account
 node tests/test_hunt_run.js       # The Hunt: hunter/form/ground data, element-filtered draft pool, single-flavor Vaelk economy, the Quarry boss + its exact-stats piece reward, run progression
 ```
 

@@ -1,62 +1,50 @@
 /* ============================================================
    DYA'AKARA — ui/screens_core.js
-   Login (Pia'don establishing shot), Main Menu, Settings,
+   Sign-in (Pia'don establishing shot), Main Menu, Settings,
    Profile, Friends, Avatar Editor.
    ============================================================ */
 (function () {
   'use strict';
   const U = DYA.util, G = DYA.state, UI = DYA.ui, SP = DYA.species, SPR = DYA.sprites, EC = DYA.economy;
 
-  /* ================= LOGIN ================= */
+  /* ================= SIGN-IN =================
+     One account for every game: you sign in on the Flake Games home page
+     (index.html, js/flake/account.js), and this screen picks that session
+     up behind the Pia'don establishing shot. No session → back to the home
+     page to sign in, then straight back here. */
   UI.register('login', {
     enter(root) {
       const scr = U.el('div', { cls: 'screen', id: 'loginScreen' });
       const cv = U.el('canvas', { id: 'loginCanvas' });
       scr.appendChild(cv);
-
       const box = U.el('div', { cls: 'login-box' });
       box.appendChild(U.el('h1', { text: "DYA'AKARA" }));
       box.appendChild(U.el('div', { cls: 'sub', text: 'TOKEN GAME OF THE MBARU TATU' }));
-      const panel = U.el('div', { cls: 'panel' });
-      const email = U.el('input', { cls: 'txt', type: 'email', autocomplete: 'username', placeholder: 'you@example.com' });
-      const pass = U.el('input', { cls: 'txt', type: 'password', autocomplete: 'current-password', placeholder: '••••••••' });
-      const err = U.el('div', { cls: 'small', style: 'color:var(--red);min-height:18px;margin-top:8px' });
-      panel.appendChild(U.el('label', { cls: 'lbl', text: 'Email' })); panel.appendChild(email);
-      panel.appendChild(U.el('label', { cls: 'lbl', text: 'Password' })); panel.appendChild(pass);
-      panel.appendChild(err);
-      const row = U.el('div', { cls: 'flex mt' });
-      const loginBtn = U.el('button', { cls: 'btn primary flex1', text: 'Enter the Arena' });
-      row.appendChild(loginBtn);
-      panel.appendChild(row);
-      const gBtn = U.el('button', { cls: 'btn ghost mt', style: 'width:100%', html: '𝐆&nbsp; Sign in with Google' });
-      gBtn.onclick = () => { err.textContent = 'Google sign-in arrives with the Firebase backend — use email for the local build.'; };
-      panel.appendChild(gBtn);
-      const links = U.el('div', { cls: 'flex mt', style: 'justify-content:space-between' });
-      const forgot = U.el('span', { cls: 'small muted', style: 'cursor:pointer', text: 'Forgot password?' });
-      const create = U.el('span', { cls: 'small gold', style: 'cursor:pointer', text: 'Create account' });
-      links.appendChild(forgot); links.appendChild(create);
-      panel.appendChild(links);
+      const panel = U.el('div', { cls: 'panel center' });
+      const msg = U.el('p', { cls: 'muted', text: 'Signing you in…' });
+      panel.appendChild(msg);
+      const back = U.el('a', { cls: 'btn ghost mt', style: 'display:none;text-decoration:none', href: window.FLAKE ? FLAKE.hubUrl() : 'index.html', text: '← Back to ' + (window.FLAKE ? FLAKE.hubConfig().studio : 'Flake Games') });
+      panel.appendChild(back);
       box.appendChild(panel);
       scr.appendChild(box);
       root.appendChild(scr);
 
-      async function doLogin() {
-        const r = await G.login(email.value.trim().toLowerCase(), pass.value);
-        if (r.err) { err.textContent = r.err; DYA.audio.play('deny'); return; }
-        afterLogin();
-      }
-      loginBtn.onclick = doLogin;
-      pass.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-      email.addEventListener('keydown', e => { if (e.key === 'Enter') pass.focus(); });
-      forgot.onclick = () => UI.alert('Forgot Password', 'The local build stores accounts on this device only. When the Firebase backend is connected, a reset email flow appears here. For now: make a new account, or remember harder.');
-      create.onclick = () => showCreateFlow();
-
-      /* Pia'don establishing shot: Velki at the heart of the cluster, Xikia
-         and Leotik swinging around it, each with its Kalo, and the
-         Sunear'Zikhron passing from world to world (ui/mbaru_sky.js).
-         On a narrow screen the cluster rises above the login panel. */
       const narrow = window.innerWidth < 760;
       DYA.mbaruSky.mount(cv, narrow ? { cx: 0.5, cy: 0.13, labels: true, maxR: 30 } : { cx: 0.25, cy: 0.52, labels: true, maxR: 58 });
+
+      const F = window.FLAKE;
+      const s = F && F.session();
+      if (!s) { if (F) F.toSignIn(); return; }
+      F.fetchBans(s.id).then(bans => {
+        const all = F.banFor(bans, null);   // banned from every game; Dya'Akara's own ban is handled below (view-only)
+        if (all) { msg.textContent = F.banText(all); back.style.display = ''; return; }
+        return G.loginHash(s.email, s.passHash).then(r => {
+          if (!r.err) { afterLogin(); return; }
+          if (/Incorrect password|No account/.test(r.err)) { F.signOut(); F.toSignIn(); return; }
+          msg.textContent = r.err; back.style.display = '';
+          DYA.audio.play('deny');
+        });
+      });
     },
   });
 
@@ -67,23 +55,20 @@
       UI.alert('Account Restricted', 'The Dya Guild has issued a ban on this account: "' + ban.reason + '". ' + (ban.permanent ? 'This ban is permanent.' : 'Until: ' + U.fmtClock(ban.until)) + ' You may view your collection only. Appeals may be submitted through the Guild page.');
       G.me.flags.bannedView = true;
     }
-    if (!G.me.tutorial.done && G.me.tutorial.step <= 1) {
+    if (G.me.dyaSetupPending) showSetupFlow();
+    else if (!G.me.tutorial.done && G.me.tutorial.step <= 1) {
       DYA.tutorial.start();
     } else {
       UI.showWithLoading('menu', {}, 1100);
     }
   }
 
-  /* create account flow — name, appearance, home region (tutorial steps 1–2) */
-  function showCreateFlow() {
+  /* first visit to Dya'Akara with an account made on the home page —
+     appearance and home region (tutorial steps 1–2), then the tutorial */
+  function showSetupFlow() {
     const wrap = U.el('div', {});
     wrap.appendChild(U.el('h3', { cls: 'gold', text: 'Join the Dya Guild Rolls' }));
-    const email = U.el('input', { cls: 'txt', type: 'email', placeholder: 'you@example.com' });
-    const pass = U.el('input', { cls: 'txt', type: 'password', placeholder: 'Choose a password' });
-    const name = U.el('input', { cls: 'txt', maxlength: 20, placeholder: '2–20 characters. Dearcineon marks (á æ ø ð т) welcome.' });
-    wrap.appendChild(U.el('label', { cls: 'lbl', text: 'Email' })); wrap.appendChild(email);
-    wrap.appendChild(U.el('label', { cls: 'lbl', text: 'Password' })); wrap.appendChild(pass);
-    wrap.appendChild(U.el('label', { cls: 'lbl', text: 'Display name' })); wrap.appendChild(name);
+    wrap.appendChild(U.el('p', { cls: 'small muted', text: 'Welcome, ' + G.me.displayName + '. Before your first token, the Guild needs two things.' }));
     /* appearance */
     wrap.appendChild(U.el('label', { cls: 'lbl', text: 'Your appearance' }));
     const avRow = U.el('div', { cls: 'avatar-grid' });
@@ -104,25 +89,17 @@
     const regBlurb = U.el('div', { cls: 'small muted mt', text: EC.REGIONS[0].blurb });
     regSel.onchange = () => { regBlurb.textContent = EC.REGIONS.find(r => r.id === regSel.value).blurb; };
     wrap.appendChild(regSel); wrap.appendChild(regBlurb);
-    const err = U.el('div', { cls: 'small mt', style: 'color:var(--red);min-height:16px' });
-    wrap.appendChild(err);
     const m = UI.modal(wrap, { sticky: true });
-    const row = U.el('div', { cls: 'flex mt' });
-    row.appendChild(U.el('button', {
-      cls: 'btn primary flex1', text: 'Begin', onclick: async () => {
-        if (!email.value.includes('@')) { err.textContent = 'A real-looking email, please.'; return; }
-        if (pass.value.length < 4) { err.textContent = 'Password must be at least 4 characters.'; return; }
-        const r = await G.createAccount(email.value.trim().toLowerCase(), pass.value, name.value.trim());
-        if (r.err) { err.textContent = r.err; return; }
+    wrap.appendChild(U.el('button', {
+      cls: 'btn primary mt', style: 'width:100%', text: 'Begin', onclick: () => {
         G.me.avatarIdx = chosenAv;
         G.me.region = regSel.value;
+        delete G.me.dyaSetupPending;
         G.save();
         m.close();
         DYA.tutorial.start();
       },
     }));
-    row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: () => m.close() }));
-    wrap.appendChild(row);
   }
 
   /* ================= SEAL DESIGNER (§3) =================
@@ -266,19 +243,8 @@
         ['🛒 Market', () => UI.requireOnline(() => UI.show('market'))],
         ['⚗ Crafting', () => UI.show('crafting')],
         ['🏹 Hunt', () => UI.show('huntRun')],
-        ['🃏 Legends of Pia’don', () => UI.show('pia')],
-        /* Torcain's Run — the 3D single-player RPG, its own page under rpg/ */
-        ['⛵ Torcain’s Run', () => {
-          /* hand the signed-in account to the RPG so its story progress saves to this account */
-          try { sessionStorage.setItem('torcain-identity', JSON.stringify({ id: G.me.id, email: G.me.email, name: G.me.displayName })); } catch (e) { /* ignore */ }
-          location.href = 'rpg/index.html';
-        }],
-        /* 4 Brothers World — the brothers' 2D pixel platformer, its own page under four-brothers-world/ */
-        ['🌍 4 Brothers World', () => {
-          /* hand the signed-in account over too: the hero and world save to this account, on any computer */
-          try { sessionStorage.setItem('fbw-identity', JSON.stringify({ id: G.me.id, email: G.me.email, name: G.me.displayName })); } catch (e) { /* ignore */ }
-          location.href = 'four-brothers-world/index.html';
-        }],
+        /* the other games (Torcain's Run, the 4 Brothers Worlds, Little Dungeon)
+           live on the Flake Games home page now, one door each */
         ['🏛 Dya Guild', () => UI.show('guild')],
         ['📖 Vakarborac', () => UI.show('compendium')],
         ['🪐 The Mbaru Tatu', () => UI.show('world')],
@@ -292,8 +258,10 @@
         b.onclick = () => { DYA.audio.play('click'); fn(); };
         nav.appendChild(b);
       });
-      const out = U.el('button', { cls: 'btn ghost', text: '⏻ Log out' });
-      out.onclick = () => { G.logout(); UI.show('login'); };
+      /* back to the Flake Games home page (signing out lives there now: one
+         account, every game) */
+      const out = U.el('button', { cls: 'btn ghost', text: '← ' + (window.FLAKE ? FLAKE.hubConfig().studio : 'Flake Games') });
+      out.onclick = () => { G.saveNow(); if (window.FLAKE) FLAKE.toHub(); };
       nav.appendChild(out);
       left.appendChild(nav);
       wrap.appendChild(left);
@@ -661,7 +629,7 @@
             cls: 'btn danger small', text: 'Delete forever', onclick: () => {
               UI.confirm('Delete account?', 'Your collection, gold, and history will be gone. The Guild does not restore deleted accounts. Ever.', () => {
                 delete G.world.accounts[me.id];
-                G.saveNow(); G.logout(); UI.show('login');
+                G.saveNow(); G.logout(); if (window.FLAKE) { FLAKE.signOut(); FLAKE.toHub(); }
               }, 'Delete everything');
             },
           }));

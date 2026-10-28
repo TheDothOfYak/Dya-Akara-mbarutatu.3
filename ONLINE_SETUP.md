@@ -85,10 +85,10 @@ If you already had a local-only account from before this existed, just log in as
 whichever device you use most — that device's copy becomes the cloud original from then on,
 and every other device you log into afterward will get it.
 
-**4 Brothers World rides the same login.** Your 4 Brothers World hero, bag and world are saved
-to your Dya'Akara account too (in `dya_config`, under `fbw:<account id>:…`), so the same hero
-plays on every computer you log in on. It uses the Dya'Akara login (pick 🌍 4 Brothers World on
-the menu); the game has no sign-in of its own. No extra setup: it uses this same Supabase project.
+**Every game rides the same login.** The account is shared by every game on the Flake Games
+home page (`index.html`, where you sign in once). Your 4 Brothers World hero, bag and world are
+saved to it too (in `dya_config`, under `fbw:<account id>:…`), so the same hero plays on every
+computer you sign in on; the game has no sign-in of its own. No extra setup: it uses this same Supabase project.
 
 **The Admin Panel can also manage accounts it's never locally seen** — Overview has a
 "🔎 Look up & load" box: type a player's email and their whole account loads in for editing,

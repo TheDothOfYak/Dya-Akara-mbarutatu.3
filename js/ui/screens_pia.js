@@ -1,6 +1,6 @@
 /* ============================================================
-   DYA'AKARA — ui/screens_pia.js
-   LEGENDS OF PIA'DON — the deckbuilder's screens.
+   FLAKE GAMES — ui/screens_pia.js
+   LITTLE DUNGEON — the deckbuilder's screens.
 
    Home / Guardian select, the co-op lobby, and one umbrella run
    screen that repaints itself for each phase (map, battle, reward,
@@ -442,13 +442,13 @@
       targeting = null;
       const scr = U.el('div', { cls: 'screen pia-home' });
       startBg(scr, 'cosmos');
-      const bar = UI.topbar({ title: "Legends of Pia'don" });
+      const bar = UI.topbar({ title: 'Mini Games' });
       scr.appendChild(bar);
       const back = U.el('div', { cls: 'back-arrow', text: '‹', style: 'position:absolute;top:70px;left:18px;font-size:30px;z-index:3', onclick: () => UI.show('menu') });
       scr.appendChild(back);
 
       const wrap = U.el('div', { cls: 'pia-home-wrap' });
-      wrap.appendChild(U.el('div', { cls: 'pia-title', text: "LEGENDS OF PIA'DON" }));
+      wrap.appendChild(U.el('div', { cls: 'pia-title', text: 'LITTLE DUNGEON' }));
       wrap.appendChild(U.el('div', { cls: 'pia-sub muted', text: 'A card-and-Vaelk gauntlet across the three sister worlds. Draft a deck, call creatures to your side, and run a planet’s great Quarry to ground — alone, or with up to three Guardians.' }));
 
       /* resume a solo run in progress */
@@ -721,7 +721,7 @@
 
   function runHeader(run, title) {
     const bar = U.el('div', { cls: 'pia-hud' });
-    bar.appendChild(U.el('div', { cls: 'logo', text: "PIA'DON", onclick: () => leaveRun() }));
+    bar.appendChild(U.el('div', { cls: 'logo', text: 'LITTLE DUNGEON', onclick: () => leaveRun() }));
     bar.appendChild(U.el('div', { cls: 'muted', text: '— ' + (title || '') }));
     bar.appendChild(U.el('div', { cls: 'spacer' }));
     const me = R.player(run, S.myId) || run.players[0];
@@ -1225,7 +1225,7 @@
     }
     const acts = U.el('div', { cls: 'flex mt' });
     acts.appendChild(U.el('button', { cls: 'btn', text: '↺ New run', onclick: () => { if (run.mode === 'coop') C.leave(); UI.show('pia'); } }));
-    acts.appendChild(U.el('button', { cls: 'btn ghost', text: '☰ Main menu', onclick: () => { if (run.mode === 'coop') C.leave(); UI.show('menu'); } }));
+    acts.appendChild(U.el('button', { cls: 'btn ghost', text: '⌂ Home', onclick: () => { if (run.mode === 'coop') C.leave(); UI.show('menu'); } }));
     body.appendChild(acts);
     wrap.appendChild(body);
     return wrap;

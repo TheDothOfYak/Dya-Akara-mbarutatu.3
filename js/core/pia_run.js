@@ -1,6 +1,6 @@
 /* ============================================================
-   DYA'AKARA — core/pia_run.js
-   LEGENDS OF PIA'DON — the run / map manager.
+   FLAKE GAMES — core/pia_run.js
+   LITTLE DUNGEON — the run / map manager.
 
    Owns a `run`: the branching node map, each Guardian's deck,
    relics, HP and gold, and the phase machine that moves the party
@@ -365,16 +365,32 @@
   }
   /* warm_hoard special (goldMul stored, warm start handled at create) */
 
-  /* ================= PERSISTENCE (solo) ================= */
+  /* ================= PERSISTENCE (solo) =================
+     A signed-in player's run in progress rides on their account (so it
+     follows them to any device, like every other Flake Games save); a
+     run from before that, kept only in this browser, is picked up once. */
   R.saveKey = function () { const me = DYA.state && DYA.state.me; return 'pia_run_' + (me ? me.id : 'guest'); };
+  function account() { const G = DYA.state, me = G && G.me; return me && !me.ai ? me : null; }
   R.saveSolo = function (run) {
     if (!run || run.mode !== 'solo') return;
+    const me = account();
+    if (me) { me.ldRun = stripForSave(run); DYA.state.save(); try { localStorage.removeItem(R.saveKey()); } catch (e) { } return; }
     try { localStorage.setItem(R.saveKey(), JSON.stringify(stripForSave(run))); } catch (e) { }
   };
   R.loadSolo = function () {
-    try { const s = localStorage.getItem(R.saveKey()); if (!s) return null; const run = JSON.parse(s); if (run.battle) EN.attachRng(run.battle); return run; } catch (e) { return null; }
+    try {
+      const me = account();
+      let run = me && me.ldRun ? JSON.parse(JSON.stringify(me.ldRun)) : null;
+      if (!run) { const s = localStorage.getItem(R.saveKey()); if (!s) return null; run = JSON.parse(s); }
+      if (run.battle) EN.attachRng(run.battle);
+      return run;
+    } catch (e) { return null; }
   };
-  R.clearSolo = function () { try { localStorage.removeItem(R.saveKey()); } catch (e) { } };
+  R.clearSolo = function () {
+    const me = account();
+    if (me && me.ldRun) { delete me.ldRun; DYA.state.save(); }
+    try { localStorage.removeItem(R.saveKey()); } catch (e) { }
+  };
   function stripForSave(run) {
     const c = JSON.parse(JSON.stringify(run, (k, v) => k === '_rng' ? undefined : v));
     return c;
