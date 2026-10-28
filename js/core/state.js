@@ -2306,8 +2306,21 @@
       G.saveNow();
       if (DYA.accountCloud && DYA.accountCloud.configured()) DYA.accountCloud.clearBan(accId);
     },
-    announce(title, body, type) {
-      G.world.announcements.unshift({ id: U.uid('ann'), at: Date.now(), title, body, type: type || 'mass' });
+    /* opts.target ('all' | 'game' | '4bw' | 'rpg' | 'film'), opts.popup (default true).
+       From the Admin Panel this also goes out LIVE (js/core/broadcast.js): it lands
+       in the Announcements section of every open homepage within seconds and pops
+       up as a toast, besides the per-player notifications below. */
+    announce(title, body, type, opts) {
+      opts = opts || {};
+      const liveId = U.uid('ann');
+      const forGame = !opts.target || opts.target === 'all' || opts.target === 'game';
+      if (forGame) G.world.announcements.unshift({ id: 'live_' + liveId, at: Date.now(), title, body, type: type || 'mass' });
+      if (G.isAdminSession && DYA.live && DYA.live.configured()) {
+        DYA.live.update(doc => {
+          doc.items.unshift({ id: liveId, at: Date.now(), kind: 'announcement', title, body, icon: opts.icon || '📣', target: opts.target || 'all', popup: opts.popup !== false });
+        }).then(r => { if (opts.onPublished) opts.onPublished(r); });
+      } else if (opts.onPublished) opts.onPublished({ err: 'Online is not configured.' });
+      if (!forGame) { G.saveNow(); return; }
       Object.values(G.world.accounts).forEach(a => {
         if (!a.ai) { a.notifications.push({ id: U.uid('ntf'), at: Date.now(), type: 'announcement', title, body, icon: '📣' }); pushAccountToCloud(a); }
       });
