@@ -235,3 +235,14 @@ Supabase Auth (real login sessions) with a row-level policy scoped to `auth.uid(
 of the open policy — a bigger change than anything here. The scaffolding for Supabase
 email/password login already exists behind `useAuth: true` in `js/config.js`, unused by
 default.
+
+## Live broadcasts from the Admin Panel
+
+Admin Panel → **Announcements** publishes live to every open copy of the site: the card game, 4 Brothers World, Torcain's Run and the film page. No extra setup is needed beyond the `dya_config` table that `supabase/schema.sql` already creates.
+
+- **Announcement**: goes into the Announcements section of the homepage, pops up on screen, and is added to every real player's notifications.
+- **Avizu'Vac post** or **pop-up only**.
+- **Banner** across the top of the screen, with an optional link and auto-hide time.
+- **Maintenance screen** that covers an app until you lift it, and **Refresh everyone** to reload open pages after a deploy.
+
+Each one can go everywhere or to a single app. It is stored in `dya_config` under the key `live` and sent on the Supabase Realtime channel `dya-live`, so open pages update within a second; pages also re-check every 20 seconds in case realtime is blocked. The code is `js/core/broadcast.js`.

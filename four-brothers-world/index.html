@@ -461,6 +461,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
 <!-- multiplayer (room codes): if the first download fails, try a second source -->
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';s.onerror=function(){window.__peerFailed=true};document.head.appendChild(s);"></script>
 <script src="../js/config.js"></script><!-- Dya'Akara's Supabase settings, read only for the multiplayer relay; missing when the game is opened on its own -->
+<script src="../js/core/broadcast.js"></script><!-- live messages from the Dya'Akara Admin Panel; does nothing when the game is opened on its own -->
 <script>/* js/core.js */
 // ROCK WORLD — core helpers shared by every other file.
 // Everything lives on the single global `RW` so files can be added in any session.

@@ -9,6 +9,31 @@
     G.init();
     UI.init();
 
+    /* live broadcasts from the Admin Panel (js/core/broadcast.js): pop-ups use
+       the game's own toasts, and announcements / Avizu'Vac posts land in the
+       main menu's news feed as soon as they're published */
+    if (DYA.live) {
+      DYA.live.toast = (it) => UI.toast({ title: it.title, body: it.body, icon: it.icon || '📣' });
+      DYA.live.onUpdate((doc) => {
+        const w = G.world; if (!w) return;
+        let changed = false;
+        (doc.items || []).forEach((it) => {
+          const list = it.kind === 'announcement' ? w.announcements : it.kind === 'avizu' ? w.avizu : null;
+          if (!list || !DYA.live.forMe(it.target)) return;
+          const id = 'live_' + it.id;
+          const i = list.findIndex((x) => x.id === id);
+          if (it.deleted) { if (i >= 0) { list.splice(i, 1); changed = true; } return; }
+          const entry = { id, at: it.at, title: it.title, body: it.body, type: 'mass' };
+          if (i < 0) { list.unshift(entry); changed = true; }
+          else if (list[i].title !== it.title || list[i].body !== it.body) { list[i] = entry; changed = true; }
+        });
+        if (!changed) return;
+        w.announcements.sort((a, b) => (b.at || 0) - (a.at || 0));
+        w.avizu.sort((a, b) => (b.at || 0) - (a.at || 0));
+        if (UI.currentName === 'menu' && UI.refreshCurrent) UI.refreshCurrent();
+      });
+    }
+
     /* one account = one active session (one tab, one device). When a newer
        sign-in elsewhere claims the slot, this tab is signed out and dropped
        back at the login screen with an explanation. */

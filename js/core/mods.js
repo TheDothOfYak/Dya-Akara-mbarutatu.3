@@ -73,6 +73,22 @@
       STORY_MATERIAL: L.STORY_MATERIAL.slice(),
     },
   };
+  /* "Edit everything": every other plain-data table in the economy and lore
+     files joins the editable set too (achievements, titles, regions, circuit
+     rewards, narrators, arenas, the world encyclopedia…). Functions are
+     skipped; the species file's identifier lists and derived rosters are
+     left alone because the engine keys off them. */
+  function plainData(v) {
+    if (typeof v === 'function') return false;
+    let ok = true;
+    try { JSON.stringify(v, (k, x) => { if (typeof x === 'function') ok = false; return x; }); } catch (e) { ok = false; }
+    return ok;
+  }
+  Object.keys(EC).forEach(k => { if (!(k in BASE.economy) && plainData(EC[k])) BASE.economy[k] = U.deepCopy(EC[k]); });
+  Object.keys(L).forEach(k => { if (!(k in BASE.lore) && plainData(L[k])) BASE.lore[k] = U.deepCopy(L[k]); });
+  BASE.tables = {};
+  ['ELEMENT_COLORS', 'ELEMENT_NAMES', 'DIAMONDS', 'EIKAR_TRAITS', 'KEILIA_TRAITS', 'starters', 'starterChoices']
+    .forEach(k => { if (SP[k] != null && plainData(SP[k])) BASE.tables[k] = U.deepCopy(SP[k]); });
   M.base = BASE;
 
   /* ---------- AI tuning defaults (the Dya'kukull dials) ---------- */
@@ -99,6 +115,7 @@
       lore: {},           // key -> replacement array (TIPS, QUICK_CHAT, …)
       balance: {},        // key -> replacement array (RARITY_COST, SIZE_HP, …)
       economy: {},        // key -> replacement value
+      tables: {},         // species-file data tables (ELEMENT_COLORS, traits…) -> replacement
       ai: {},             // AI tuning knobs (see AI_DEFAULTS)
       hunts: {},          // id -> admin-authored individual Hunt (see Hunts tab)
       guild: {            // the Dya Guild's own market stall (see Guild Market tab)
@@ -138,6 +155,17 @@
     replacement.forEach(v => target.push(U.deepCopy(v)));
   }
 
+  /* replace target[k] with a copy of src, in place for arrays/objects so
+     modules that captured a reference see the new value */
+  function applyValue(target, k, src) {
+    const cur = target[k];
+    if (Array.isArray(cur) && Array.isArray(src)) applyInPlaceArray(cur, src);
+    else if (cur && typeof cur === 'object' && !Array.isArray(cur) && src && typeof src === 'object' && !Array.isArray(src)) {
+      for (const kk in cur) delete cur[kk];
+      Object.assign(cur, U.deepCopy(src));
+    } else target[k] = U.deepCopy(src);
+  }
+
   M.apply = function () {
     /* ---- species (base roster) ---- */
     for (const id in BASE.species) applySpecies(id, SP.all[id]);
@@ -169,21 +197,13 @@
     }
 
     /* ---- economy ---- */
-    for (const k in BASE.economy) {
-      const src = (M.data.economy && k in M.data.economy) ? M.data.economy[k] : BASE.economy[k];
-      const cur = EC[k];
-      if (Array.isArray(cur)) applyInPlaceArray(cur, src);
-      else if (cur && typeof cur === 'object') {
-        for (const kk in cur) delete cur[kk];
-        Object.assign(cur, U.deepCopy(src));
-      } else EC[k] = src;
-    }
+    for (const k in BASE.economy) applyValue(EC, k, (M.data.economy && k in M.data.economy) ? M.data.economy[k] : BASE.economy[k]);
 
-    /* ---- lore text pools ---- */
-    for (const k in BASE.lore) {
-      const src = (M.data.lore && M.data.lore[k]) || BASE.lore[k];
-      applyInPlaceArray(L[k], src);
-    }
+    /* ---- lore text pools + every other lore table ---- */
+    for (const k in BASE.lore) applyValue(L, k, (M.data.lore && k in M.data.lore) ? M.data.lore[k] : BASE.lore[k]);
+
+    /* ---- species-file data tables (colors, element names, traits…) ---- */
+    for (const k in BASE.tables) applyValue(SP, k, (M.data.tables && k in M.data.tables) ? M.data.tables[k] : BASE.tables[k]);
 
     if (DYA.ui && DYA.ui.onModsApplied) DYA.ui.onModsApplied();
   };
@@ -435,7 +455,7 @@
   M.isCustom = function (id) { return !!M.data.customSpecies[id]; };
 
   M.set = function (section, key, value) {
-    /* section: 'lore' | 'balance' | 'economy' | 'ai' | 'text' */
+    /* section: 'lore' | 'balance' | 'economy' | 'tables' | 'ai' | 'text' */
     M.data[section] = M.data[section] || {};
     if (value === undefined || value === null) delete M.data[section][key];
     else {
@@ -464,7 +484,7 @@
       customSpecies: Object.keys(d.customSpecies || {}).length,
       text: Object.keys(d.text || {}).length,
       lore: Object.keys(d.lore || {}).length,
-      balance: Object.keys(d.balance || {}).length + Object.keys(d.economy || {}).length,
+      balance: Object.keys(d.balance || {}).length + Object.keys(d.economy || {}).length + Object.keys(d.tables || {}).length,
       ai: Object.keys(d.ai || {}).length,
       hunts: Object.keys(d.hunts || {}).length,
       huntsAvailable: Object.values(d.hunts || {}).filter(h => !h.hunted).length,

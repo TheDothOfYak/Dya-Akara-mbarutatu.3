@@ -277,8 +277,6 @@ How creatures and people are drawn — on the field, on cards, in the Vakarborac
 
 | File | What it does |
 |---|---|
-| `looks/eikar_canon.js` | Eikar as the creator draws them: acorn-textured triangular bodies, markings under the eyes, a scaled Aagac with a symbol for their kind (sword, spear, bow, flask), and no hands — weapons float beside them. |
-| `looks/keilia_canon.js` | Broad Keilia with overlapping hair growing thickest from the shoulders and falling to the calf like a cape; floating tools. |
 | `looks/kofi_galta.js` | The Kofi (and Big Momma Kofi) as the Kofi Galta: crescent body, blade-like spines, dark tail tuft. |
 | `looks/living_motion.js` | Breathing at rest, leaning into a run, stretching into strikes. |
 | `looks/volume_shading.js` | Light from the upper left and shade below, painted only on each body. Off on Low quality. |
