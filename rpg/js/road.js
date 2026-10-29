@@ -164,55 +164,15 @@ export function createRoad(ctx) {
   const box = (x, z, hw, hd, y0, y1) => { const s = { kind: 'box', x, z, hw, hd, y0, y1 }; solids.push(s); return s; };
   const cyl = (x, z, r, y0, y1) => { const s = { kind: 'cyl', x, z, r, y0, y1 }; solids.push(s); return s; };
   const STEP = 0.65, PR = 0.4, PH = 1.5;
-  /* the home tree: its decks, and the great stair round the bark between them, are walkable.
-     Their shapes come from the tree itself (hometree.js); HT is filled in once it's built. */
+  /* the home trees are walkable inside: in at the great door, round the hall and the floors, up the great stair round the
+     inside of the wall. Their shapes and their walking rules come from the trees themselves (hometree.js); TREES is filled
+     once they're built, and HT is the city's own. */
   let HT = null;
+  const TREES = [];
   const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
-  const inWell = (d, a) => { const k = angDiff(a, d.well[0]), len = d.well[1] - d.well[0]; return k >= 0 && k <= len; };
-  // each deck runs from a0 round to a1 (right round the trunk)
-  const inArc = (d, a, pad = 0) => (((a - d.a0 + pad) % TAU) + TAU) % TAU <= d.a1 - d.a0 + pad * 2;
-  function treeGround(x, z, y) {
-    if (!HT) return -1e9;
-    const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz);
-    if (r > HT.reach) return -1e9;
-    const a = Math.atan2(dz, dx), ly = y - HT.g; let best = -1e9;
-    for (const d of HT.decks) {
-      if (d.y > ly + STEP || r < (d.rin ?? d.r0) - 0.5 || r > d.ro + 0.2 || !inArc(d, a)) continue;
-      if (r < d.r0 + 3.4 && inWell(d, a)) continue;          // the stairwell
-      best = Math.max(best, d.y);
-    }
-    const S = HT.stair, span = S.turns * TAU;
-    for (let k = 0; k <= Math.ceil(S.turns) + 1; k++) {
-      const t = (a - S.a0 + k * TAU) / span; if (t < 0 || t > 1) continue;
-      const ys = 0.5 + t * S.top + 0.17; if (ys > ly + STEP) continue;
-      const rb = HT.rAt(ys, a); if (r < rb - 0.3 || r > rb + 3.3) continue;
-      best = Math.max(best, ys);
-    }
-    return best > -1e9 ? HT.g + best : -1e9;
-  }
-  /* the bark is a wall all the way up; the decks have rails; off the decks, the stair has one too */
-  function treeResolve(p, rad) {
-    if (!HT) return;
-    const dx = p.x - HT.x, dz = p.z - HT.z, r = Math.hypot(dx, dz), ly = p.y - HT.g;
-    if (r > HT.reach + 2 || r < 1e-4 || ly > HT.H * 0.9) return;
-    const a = Math.atan2(dz, dx), rin = HT.rAt(Math.max(0, ly + 0.8), a) + rad;
-    let to = null;
-    if (r < rin) to = rin;
-    else if (ly > 2.2) {
-      const d = HT.decks.find(d => ly >= d.y - 0.4 && ly < d.y + 3.5 && inArc(d, a));   // (off the decks, the stair's rail)
-      const rmax = d ? d.ro - 0.5 : HT.rAt(ly, a) + 3.2;
-      if (r > rmax) to = rmax;
-    }
-    if (to != null) { p.x = HT.x + dx / r * to; p.z = HT.z + dz / r * to; }
-  }
-  function treeSolid(x, y, z) {
-    if (!HT) return false;
-    const dx = x - HT.x, dz = z - HT.z, r = Math.hypot(dx, dz), ly = y - HT.g;
-    if (r > HT.reach || ly < 0 || ly > HT.H * 0.9) return false;
-    if (r < HT.rAt(ly, Math.atan2(dz, dx))) return true;
-    for (const d of HT.decks) if (ly < d.y && ly > d.y - 0.5 && r > (d.rin ?? d.r0) && r < d.ro && inArc(d, Math.atan2(dz, dx)) && !(r < d.r0 + 3.4 && inWell(d, Math.atan2(dz, dx)))) return true;
-    return false;
-  }
+  function treeGround(x, z, y) { let best = -1e9; for (const T of TREES) best = Math.max(best, T.ground(x, z, y)); return best; }
+  function treeResolve(p, rad) { for (const T of TREES) T.resolve(p, rad); }
+  function treeSolid(x, y, z) { return TREES.some(T => T.solid(x, y, z)); }
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
   function groundAt(x, z, y, skip) {
     let g = Math.max(heightAt(x, z), treeGround(x, z, y));
@@ -291,19 +251,16 @@ export function createRoad(ctx) {
     }
     const arch = new THREE.Mesh(new THREE.BoxGeometry(12, 2.2, 3), wm); arch.position.set(0, 10, GATE_Z + 0.5); addOutline(arch, 0.04); scene.add(arch);
   }
-  // the home tree: the city grew up round it, in the south-west. Its roots keep clear of the stair's foot and of its great door
+  // the home tree: the city grew up round it, in the south-west, and lives in it. Its great door faces the market
   const toCore = Math.atan2(CORE.z - TREE.z, CORE.x - TREE.x);
   {
     const T = buildHomeTree(scene, TREE.x, TREE.z, 0, {
-      R: TREE.R, H: TREE.H, seed: 41, town: 1, decks: [0.05, 0.1, 0.16, 0.23], deckW: 12, roots: 8, rootReach: 1.75, doorAt: toCore,
-      banners: [0x2f6f8a, 0xd9a441], rootSkip: a => Math.abs(angDiff(a, 0.4)) < 0.55 || Math.abs(angDiff(a, toCore)) < 0.5,
+      R: TREE.R, H: TREE.H, seed: 41, town: 1, decks: [0.05, 0.1, 0.16, 0.23], roots: 8, rootReach: 1.75, doorAt: toCore, banners: [0x2f6f8a, 0xd9a441],
     });
-    T.colliders.slice(1).forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1));      // the roots (the trunk itself is treeResolve's)
-    for (const h of T.deckHouses) cyl(h.x, h.z, h.r, h.y - 0.5, h.y + h.h);
-    HT = Object.assign(T, { reach: Math.max(...T.decks.map(d => d.ro)) + 2 });
-    // the younger tree: lived in too, but no stair you'd need today (its trunk and roots are solid all the same)
-    const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.07, 0.14, 0.22], deckW: 9, roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
-    T2.colliders.forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1));
+    // the younger tree, lived in too: in at its door and up its own stair
+    const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.07, 0.14, 0.22], roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
+    for (const t of [T, T2]) { t.colliders.forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1)); TREES.push(t); }   // the roots, the hearth (the walls are the tree's own)
+    HT = T;
     buildTreeBridge(scene, T, T2, 0.42);
   }
   /* the rest of the city: block after block of houses on a grid of streets, from the market quarter
@@ -862,36 +819,27 @@ export function createRoad(ctx) {
     ctx.save('escape');
     sfx.duat(); shake = 0.8; particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
     ctx.whiteFlash && ctx.whiteFlash();
-    // ...onto the top deck of the home tree, the whole city between him and the gate
-    const top = HT.decks.length - 1, to = deckSpot(top, toCore, 10), dir = V3(Math.cos(toCore), 0, Math.sin(toCore));
-    place(P, to.x, to.z, Math.atan2(dir.x, dir.z)); P.vel.set(0, 0, 0); CAM.yaw = Math.atan2(-dir.x, -dir.z); CAM.pitch = 0.18;
+    // ...onto the top floor inside the home tree, facing out of the opening there that looks over the city to the gate
+    const top = HT.levels.length - 1, looks = HT.levels[top].looks;
+    const look = looks.length ? looks.reduce((b, q) => Math.abs(angDiff(q, toCore)) < Math.abs(angDiff(b, toCore)) ? q : b) : toCore;
+    const to = HT.levelSpot(top, look, 0.75), dir = V3(Math.cos(look), 0, Math.sin(look));
+    P.pos.set(to.x, to.y, to.z); P.yaw = Math.atan2(dir.x, dir.z); P.vel.set(0, 0, 0); CAM.yaw = Math.atan2(-dir.x, -dir.z); CAM.pitch = 0.1;
     particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 60, { color: 0x6af0e0, speed: 10, size: 0.7, life: 0.8 });
     // the cart's at the gate, and Buhkon with it
     CART.path = null; placeCart(GATE_SPOT.x + 3, GATE_SPOT.z + 3, Math.PI); B.stay = V3(GATE_SPOT.x - 1.5, 0, GATE_SPOT.z); place(B, B.stay.x, B.stay.z, 0);
     escSpawn();
-    sayHeld(ESC.blink, (k, tt) => ({ p: V3(P.pos.x - dir.x * 3.5 + dir.z * 2.5, P.pos.y + 4.2, P.pos.z - dir.z * 3.5 - dir.x * 2.5), l: V3(0, 8, GATE_Z + 20) }), () => { escObjective(); ctx.hint(ESC.hint); });
-  }
-  /* a place on a deck of the home tree: round the deck by angle a, `off` out from the bark (clear of the stairwell) */
-  function deckSpot(i, a, off = 8.5) {
-    const d = HT.decks[i];
-    if (!inArc(d, a, -0.2)) { const m = (d.a0 + d.a1) / 2; a = angDiff(a, m) < 0 ? d.a0 + 0.25 : d.a1 - 0.25; }   // onto the deck, wherever round it you asked
-    if (inWell(d, a) || Math.abs(angDiff(a, d.well[0])) < 0.4) a = d.well[1] + 0.6;
-    const r = d.r0 + Math.min(off, d.ro - d.r0 - 1.2); return V3(HT.x + Math.cos(a) * r, HT.g + d.y, HT.z + Math.sin(a) * r);
-  }
-  /* a point on the great stair, at height y above the foot */
-  function stairPoint(y) {
-    const S = HT.stair, k = clamp((y - 0.5) / S.top, 0, 1), a = S.a0 + k * S.turns * TAU, r = HT.rAt(y, a) + 1.6;
-    return V3(HT.x + Math.cos(a) * r, HT.g + y + 0.2, HT.z + Math.sin(a) * r);
+    sayHeld(ESC.blink, (k, tt) => ({ p: V3(P.pos.x - dir.x * 2.6 + dir.z * 0.9, P.pos.y + 2.1, P.pos.z - dir.z * 2.6 - dir.x * 0.9), l: V3(P.pos.x + dir.x * 60, P.pos.y - 8, P.pos.z + dir.z * 60) }), () => { escObjective(); ctx.hint(ESC.hint); });
   }
   function escSpawn() {
-    const E = MK.esc, S = Math.PI / 2, top = HT.decks.length - 1;
-    // round the home tree's decks, all the way down, and in among its roots
-    escAmuletItem(deckSpot(top, toCore + 1.9), 'Pick up the Sniller amulet', true);
-    escAmuletItem(deckSpot(top, toCore - 2.3, 9.5), 'Pick up the Sniller amulet', true);
-    escAmuletItem(deckSpot(2, toCore + 0.7), 'Pick up the Sniller amulet', true);
-    escAmuletItem(deckSpot(1, toCore - 1.1, 9), 'Pick up the Sniller amulet', true);
-    escAmuletItem(deckSpot(0, toCore + 2.7), 'Pick up the Sniller amulet', true);
-    { const a = HT.stair.a0 - 0.75, r = HT.RB + 5; escAmuletItem(V3(HT.x + Math.cos(a) * r, 0, HT.z + Math.sin(a) * r), ESC.rootsAmulet); }
+    const E = MK.esc, S = Math.PI / 2, top = HT.levels.length - 1;
+    // round the home tree's floors inside, all the way down to the hall, and out in among its roots
+    escAmuletItem(HT.levelSpot(top, toCore + 1.9), 'Pick up the Sniller amulet', true);
+    escAmuletItem(HT.levelSpot(top, toCore - 2.3, 0.85), 'Pick up the Sniller amulet', true);
+    escAmuletItem(HT.levelSpot(2, toCore + 0.7), 'Pick up the Sniller amulet', true);
+    escAmuletItem(HT.levelSpot(1, toCore - 1.1, 0.85), 'Pick up the Sniller amulet', true);
+    escAmuletItem(HT.levelSpot(0, toCore + 2.7), 'Pick up the Sniller amulet', true);
+    escAmuletItem(HT.levelSpot(-1, toCore + 1.5, 0.55), 'Pick up the Sniller amulet', true);
+    { const ra = HT.roots.reduce((b, q) => Math.abs(angDiff(q, toCore + 1.2)) < Math.abs(angDiff(b, toCore + 1.2)) ? q : b), a = ra + 0.3, r = HT.RB * 1.25; escAmuletItem(V3(HT.x + Math.cos(a) * r, 0, HT.z + Math.sin(a) * r), ESC.rootsAmulet); }
     // on the cobbles of the long streets north
     for (const [x, z] of [[0, 196], [22, 160], [-22, 140]]) escAmuletItem(V3(x, 0, z));
     // a market cart tipped over in the street, a well with its bucket left up, a garden bench
@@ -980,9 +928,8 @@ export function createRoad(ctx) {
     let best = null, bd = 1e9;
     for (const it of MK.amulets) { if (it.fall || Math.abs(it.pos.y - P.pos.y) > 4) continue; const d = it.pos.distanceTo(P.pos); if (d < bd && d < 30) { bd = d; best = it.pos; } }
     if (best) return best;
-    // up the home tree with nothing left on this level: the way down is the stair, on down through the stairwell
-    const ly = P.pos.y - HT.g;
-    if (ly > 2 && Math.hypot(P.pos.x - HT.x, P.pos.z - HT.z) < HT.reach + 2) return stairPoint(Math.max(0.5, ly - 5));
+    // inside the home tree with nothing left on this floor: the way down is the great stair, then out of the great door
+    if (HT.inside(P.pos.x, P.pos.z, P.pos.y)) { const ly = P.pos.y - HT.g; return ly > 2 ? HT.stairPoint(ly - 5) : HT.doorPoint(4); }
     return GATE_SPOT;
   }
   function escTick(dt) {
@@ -1058,9 +1005,9 @@ export function createRoad(ctx) {
       const left = MK.amulets.length + (E.kipsu && E.kipsu.amulet ? 1 : 0) + (E.wall && !E.wall.done ? 1 : 0) + (E.kidState === 'home' ? 0 : 1)
         + (E.looterItem && items.includes(E.looterItem) ? 1 : 0) + (E.fountainItem.taken ? 0 : 1) + (E.agent && E.agent.on ? E.stolen || 0 : 0);
       if (MK.n + left < ESC.need) {
-        const up = P.pos.y - HT.g > 2 && Math.hypot(P.pos.x - HT.x, P.pos.z - HT.z) < HT.reach + 2;
-        const to = up ? stairPoint(0.5) : V3(P.pos.x + (GATE_SPOT.x - P.pos.x) * 0.1, 0, P.pos.z + (GATE_SPOT.z - P.pos.z) * 0.1);
-        const it = escAmuletItem(up ? V3(to.x + 4, 0, to.z) : to); particles.burst(it.pos.x, it.pos.y, it.pos.z, 20, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.7 });
+        const up = HT.inside(P.pos.x, P.pos.z, P.pos.y);   // (still in the tree: one turns up in the hall, on the way out)
+        const to = up ? HT.levelSpot(-1, HT.door.a + 0.7, 0.6) : V3(P.pos.x + (GATE_SPOT.x - P.pos.x) * 0.1, 0, P.pos.z + (GATE_SPOT.z - P.pos.z) * 0.1);
+        const it = escAmuletItem(to); particles.burst(it.pos.x, it.pos.y, it.pos.z, 20, { color: 0x6af0e0, speed: 4, size: 0.4, life: 0.7 });
         ctx.bark('tanoc', ESC.stray, 3);
       }
     }
@@ -1932,6 +1879,6 @@ export function createRoad(ctx) {
   }
   return { solids: allSolid,
     start, update, render: () => composer.render(), interact, prompt, jump: () => { if (P.inCart) hopDown(); else P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, deckSpot, stairPoint, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }
