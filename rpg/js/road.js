@@ -679,6 +679,9 @@ export function createRoad(ctx) {
     sfx.duat(); sfx.slam(); shake = 1.2;
     tanoc.hat.visible = false;
     const hat = tanoc.hat.clone(); const ws = V3(); tanoc.hat.getWorldScale(ws); hat.scale.copy(ws); hat.visible = true;
+    // (a clone copies userData as plain JSON, so smooth.js's and detail.js's notes on each part are no longer geometry:
+    // give every part its full-detail shape and forget the notes)
+    { const src = []; tanoc.hat.traverse(o => src.push(o)); let i = 0; hat.traverse(o => { const s = src[i++], u = s && s.userData; if (o.isMesh && u && u._hi && u._hi.isBufferGeometry) o.geometry = u._hi; delete o.userData._hi; delete o.userData._lo; delete o.userData.smFrom; o.layers.mask = 1; }); }
     // knocked off onto open cobbles a few paces away — never up on the cart or a stall, where he couldn't reach it
     const a = P.yaw + 2.3, sp = freeSpot(P.pos.x + Math.sin(a) * 2.6, P.pos.z + Math.cos(a) * 2.6, 1.2), hp = V3(sp.x, heightAt(sp.x, sp.z) + 0.05, sp.z);
     hat.rotation.set(0.5, a, 0.3);
@@ -1879,6 +1882,6 @@ export function createRoad(ctx) {
   }
   return { solids: allSolid,
     start, update, render: () => composer.render(), interact, prompt, jump: () => { if (P.inCart) hopDown(); else P.jumpBuf = 0.15; }, attack, resize, dispose, useSlot, skip: () => cine.skip(),
-    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
+    get cinematic() { return cine.active; }, get stage() { return stage; }, get sub() { return sub; }, get done() { return done; }, P, foes, items, B, camps, debug: { solidAt, groundAt, get HT() { return HT; }, marketMaterialize, CART, hitFoe, escSwing, get fountain() { return fountain; }, kofiCaught, startDay2, startDay3, startDay4, marketHatOn, chopLog, fixCart, get MK() { return MK; }, get EV() { return EV; }, get D3() { return D3; }, get D4() { return D4; } },
   };
 }

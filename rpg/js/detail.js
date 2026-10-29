@@ -57,6 +57,8 @@ function scan(st, scene) {
         && !Object.values(o.geometry.attributes).some(a => a.isInstancedBufferAttribute) && !o.morphTexture) { o.userData._dc = id; fields.push(o); return; }
     if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.frustumCulled || !o.geometry) return;
     if (o.layers.mask !== DRAWN && o.layers.mask !== PARKED) return;   // someone else's layers: leave them be
+    // a .clone() of a lightened part copies its userData as plain JSON: what was the full cut is no geometry any more
+    if (o.userData._hi && !o.userData._hi.isBufferGeometry) o.userData._hi = o.userData._lo = null;
     if (o.name !== 'outline') {
       const g = o.userData._hi || o.geometry;
       if (!g.boundingSphere) g.computeBoundingSphere();
