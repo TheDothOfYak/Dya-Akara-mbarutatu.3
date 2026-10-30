@@ -10,8 +10,22 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 
 ## Swimming
 - No more "hold jump to rise". Each jump press is a **stroke** in the direction you hold (up by default), then you glide against the water's drag. A stroke at the surface leaps you out. S dives.
-- **Fuzzies** drift up toward the surface (and still need air). **Acorns** float and bob on top. **Ghosts** hang neutral where you stop.
+- **Fuzzies** drift up toward the surface. **Acorns** float and bob on top. **Ghosts** hang neutral where you stop.
+- **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
+
+## Living trees
+- **Shake the leaves:** hit a tree's leaves (not the trunk) and nuts fall out, sometimes a Fuzzberry. The leaves stay. A patch of canopy gives again after a minute and a half. Acorns shake loose an extra nut. Tree Nuts heal a little.
+- **Timber!** Chop a trunk and the tree falls away from you, slowly at first, and hurts any monster it lands on. It hurts you too if you stand where it falls.
+- **Logs:** a felled tree lands as solid logs. Walk along them, or fell a tree across a gap, a pit or a stream and it is a bridge. Chop a log up for wood. Logs the tree doesn't have room to land on become loose wood.
+- **Stumps grow back:** the stump you leave grows a sapling after a couple of minutes, and then a whole new tree (as long as there's room). It keeps its timer in the save the way crops do. Chop the stump to clear it.
+- Giant trees and the village tree trunks still come down the old way, so the towns built in them stay safe.
+
+## The rock and building
+- Fixed: the rock smashed whatever he aimed at, including blocks he had just placed, because holding the mouse after placing a block counted as a swing. Now he never smashes with a block, torch or seed in his hand.
+- A smash has to wind up on the block first (about a sixth of a second), so a quick click does nothing.
+- He only smashes dirt, sand and stone in a line. Anything built (planks, bricks, doors, benches, chests, logs) is broken one block at a time, the normal way, and his run-up charge doesn't smash it either.
+- Right-clicking a door or a chest no longer slams the ground by accident.
 
 ## Hero magic (V)
 - **Ghost:** turn invisible for 6 s. Monsters lose track of you, and your first hit from hiding lands twice as hard.
@@ -37,4 +51,4 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - Rare elites that take some thinking: Ghost Tank and Lütut (Ghost World and the Duat), Thornback (Fuzzy World), Canopy Stalker (Acorn World) and Geode Golem (Rock World).
 - Cyitors, the Empire's elite peacekeepers.
 - Fuzzy World's mountains are broad slopes, with long joined-up caves and lava underneath.
-- The fuzzy is half again as big, keeps his old look, and turns side-on to run.
+- The fuzzy is back to his original main-game sprite and size (the 1.5x side-on one is gone).
