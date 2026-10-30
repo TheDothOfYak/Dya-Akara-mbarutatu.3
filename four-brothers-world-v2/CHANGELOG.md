@@ -14,6 +14,11 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## The Warthog King
+- The cliff on the west side of King's Clearing is now a gentle slope, and the slope counts as part of his arena, so he charges up it. There's no ledge left where he can't reach you.
+- If you get above him (a ledge, a tree, a tower you built), he leaps up at you and lands with a stomp.
+- The King's Clearing waystone moved back a little onto flat ground. If you had already woken it, it stays woken.
+
 ## Running sideways
 - The fuzzy, rock, acorn and ghost now run (and jump) in a full side view: one eye at the front, only the near arm showing, and legs that really stride. Same sizes as before.
 - Idle, swing and swim frames are the original drawings. Hats, capes and armor still fit, since they follow each frame's outline.
