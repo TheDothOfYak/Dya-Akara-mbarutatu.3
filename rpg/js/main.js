@@ -302,6 +302,12 @@ const F = { pos: P.pos.clone().add(V3(-2, 0, -3)), vel: V3(), yaw: Math.PI, cd: 
 
 /* ---------------- camera rig ---------------- */
 const CAM = { yaw: 0, pitch: 0.28, dist: 6.5, wantDist: 6.5, pos: V3(), target: V3() };
+/* he has just been put somewhere new (a door, a lantern, waking up): the camera starts there afresh, instead of
+   easing out from how close a wall held it, or how high the ground was, back where he came from */
+function camSnap() {
+  CAM.target.set(P.pos.x, P.pos.y + 1.9, P.pos.z);
+  CAM.reach = undefined; CAM.floor = undefined; CAM.dist = CAM.wantDist;
+}
 
 /* where to stand when the run (re)starts */
 function spawnPoint() {
@@ -368,7 +374,9 @@ document.addEventListener('mousedown', e => {
 });
 document.addEventListener('mouseup', e => { if (e.button === 0 || e.button === 2) mouseBtn[e.button] = false; if (e.button === 0) mouseL = false; if (VK) { if (VK.vine) VK.vine(e.button, false); return; } if (P.auto) return; if (e.button === 0 || e.button === 2) vineLet(e.button === 0 ? 'L' : 'R'); });
 document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });   // keep long-press paste in text fields
-addEventListener('wheel', e => { if (SCOPE) { SCOPE.fov = clamp(SCOPE.fov * (e.deltaY > 0 ? 1.15 : 0.87), 4, 40); return; } CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
+addEventListener('wheel', e => {
+  if (G.paused || overlayOpen() || (book && book.isOpen()) || (e.target.closest && e.target.closest('#journal, #rpg, #pause, #d-choices, #pk-box'))) return;   // scrolling a menu isn't zooming
+  if (SCOPE) { SCOPE.fov = clamp(SCOPE.fov * (e.deltaY > 0 ? 1.15 : 0.87), 4, 40); return; } CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
 /* the game letting go of the mouse itself (a cutscene, a menu, a choice) is not you pressing Escape:
    remember when we did it, so the pointer-lock change that follows doesn't open the pause menu */
 let selfUnlockT = -1e9;
@@ -391,6 +399,7 @@ const touch = initTouch({
   dyaThrow() { if (dyaMatch && G.mode === 'play' && !G.paused) dyaMatch.throwAt(dyaAimPoint()); },
   tap() { if (dyaMatch && G.mode === 'play' && !G.paused) dyaMatch.throwAt(dyaAimPoint()); },
   look(dx, dy) {
+    if (SCOPE && G.mode === 'scope' && !G.paused) { const k = 0.0055 * OPT.sens * SCOPE.fov / 60; SCOPE.yaw -= dx * k; SCOPE.pitch = clamp(SCOPE.pitch - dy * k * (OPT.invert ? -1 : 1), -0.1, 1.55); return; }   // the telescope: drag to look round
     if (G.paused || (G.mode !== 'play' && G.mode !== 'dialog')) return;
     const s = 0.0055 * OPT.sens;
     CAM.yaw -= dx * s * (G.lock ? 0.25 : 1);
@@ -1265,7 +1274,7 @@ function playerDown() {
     telegraphs.forEach(t => scene.remove(t.mesh)); telegraphs.length = 0;
     persist();
     $('death').classList.remove('show');
-    CAM.target.set(P.pos.x, P.pos.y + 1.9, P.pos.z);
+    camSnap();
   }, 2600);
 }
 
@@ -1999,7 +2008,7 @@ const storehouse = REGION === 'xilia' ? (() => {
 /* ================================================================
    DYA'AKARA — the token game, played on the ground
    ================================================================ */
-let dyaMatch = null, dyaOverview = false, dyaRival = null;
+let dyaMatch = null, dyaOverview = false, dyaRival = null, dyaCamWas = null;
 const dyaCam = V3();
 const SPN = id => (window.DYA && DYA.species.get(id) || {}).name || id;
 function dyaRecord(id) { const r = SAVE.dya && SAVE.dya.record[REGION + ':' + id]; return r ? `${r.w}–${r.l}` : 'never played'; }
@@ -2067,6 +2076,7 @@ function startDya(n, mode, sc, duelTok) {
   spot.y = world.col.ground(spot.x, spot.z, planeY + 3);
   n.pos.copy(spot); n.actor.root.position.copy(spot); n.actor.root.rotation.y = yaw + Math.PI;
   G.truce = true; G.lock = null; document.body.classList.add('dya-on');
+  dyaCamWas = dyaCamWas || { wantDist: CAM.wantDist, pitch: CAM.pitch };   // the view to give back when the match is over
   CAM.yaw = Math.atan2(-fwd.x, -fwd.z); CAM.wantDist = clamp(6 + 160 * m, 6, 22); CAM.pitch = 0.42;
   dyaOverview = false;
   dyaMatch = new DYA3.DyaMatch3D({
@@ -2081,6 +2091,7 @@ function startDya(n, mode, sc, duelTok) {
 function endDya(result, mm, n, R, mode) {
   if (dyaMatch !== mm) return;
   mm.dispose(); dyaMatch = null; dyaOverview = false;
+  if (dyaCamWas) { CAM.wantDist = clamp(dyaCamWas.wantDist, 3.2, 11); CAM.pitch = dyaCamWas.pitch; dyaCamWas = null; }   // back in close, not left hanging high over the field
   G.truce = false; document.body.classList.remove('dya-on');
   if (dyaRival) { n.pos.copy(dyaRival.home); n.actor.root.position.copy(dyaRival.home); n.actor.root.rotation.y = dyaRival.yaw; dyaRival = null; }
   const who = npcSpeaker(n.def), d = SAVE.dya, key = REGION + ':' + n.def.id;
@@ -4404,7 +4415,7 @@ function updateScope(dt) {
 function endScope() {
   if (!SCOPE) return;
   camera.fov = SCOPE.fov0; camera.updateProjectionMatrix();
-  G.mode = 'play'; SCOPE = null;
+  G.mode = SCOPE.mode === 'dialog' ? 'dialog' : 'play'; SCOPE = null;
   const el = $('scope'); if (el) el.style.display = 'none';
   $('hud').style.visibility = '';
   sfx.ui(); fade(1, 0); setTimeout(() => fade(0, 0.5), 40);
@@ -4420,7 +4431,7 @@ function enterRoom(d, instant) {
     if (solids) solids.scan();   // a room furnished just now is solid from the first step in
     G.outside = { pos: P.pos.clone(), wantDist: CAM.wantDist };
     P.pos.copy(r.pos); P.vel.set(0, 0, 0); P.yaw = r.yaw; CAM.yaw = r.yaw + Math.PI; CAM.pitch = 0.2;
-    CAM.wantDist = Math.min(CAM.wantDist, 5); CAM.target.set(P.pos.x, P.pos.y + 1.9, P.pos.z);
+    CAM.wantDist = Math.min(CAM.wantDist, 5); camSnap();
     if (phorusWith() && !young()) F.pos.copy(P.pos).add(V3(1.5, 0, -1.5));
     G.lock = null;
     showLocation(d.name, REGION_NAME[REGION]);
@@ -4435,7 +4446,7 @@ function leaveRoom(instant) {
     const r = interiors.exit();
     P.pos.copy(r.pos); P.vel.set(0, 0, 0); P.yaw = r.yaw; CAM.yaw = r.yaw + Math.PI;
     if (G.outside) CAM.wantDist = G.outside.wantDist;
-    CAM.target.set(P.pos.x, P.pos.y + 1.9, P.pos.z); P.lastSafe.copy(P.pos);
+    camSnap(); P.lastSafe.copy(P.pos);
     if (phorusWith() && !young()) F.pos.copy(P.pos).add(V3(-1.5, 0, 1.5));
     if (mount) { const md = mount.pos.distanceTo(P.pos); if (md > 60) { mount.pos.copy(P.pos).add(V3(3, 0, 2)); mount.pos.y = world.col.ground(mount.pos.x, mount.pos.z, P.pos.y + 2); } }
   };
@@ -4473,7 +4484,7 @@ function travel(id) {
     P.pos.set(l.x + 1.6, l.y, l.z + 1.6); P.vel.set(0, 0, 0); P.riding = false;
     F.pos.copy(P.pos).add(V3(-2, 0, 2));
     if (mount) { mount.pos.copy(P.pos).add(V3(3, 0, -2)); mount.pos.y = world.col.ground(mount.pos.x, mount.pos.z, P.pos.y + 2); }
-    CAM.target.set(P.pos.x, P.pos.y + 1.9, P.pos.z);
+    camSnap();
     fade(0, 0.8); showLocation(l.name, 'Nur Lantern');
   }, 450);
 }
@@ -4863,7 +4874,7 @@ function updateCamera(dt) {
   if (G.lock && !lp) G.lock = null;
   if (lp) {
     if (lp.distanceTo(P.pos) > 34) G.lock = null;
-    else {
+    else if (Math.hypot(lp.x - P.pos.x, lp.z - P.pos.z) > 1.2 && !P.climb) {   // (right on top of him there's no direction to turn to; on a trunk the climb holds the view)
       const want = Math.atan2(-(lp.x - P.pos.x), -(lp.z - P.pos.z));
       CAM.yaw = dampAngle(CAM.yaw, want, 7, dt);
       CAM.pitch = damp(CAM.pitch, 0.22, 3, dt);
@@ -4873,12 +4884,19 @@ function updateCamera(dt) {
   // follow quickly across the ground, a little more gently up and down, so steps, stairs and landings don't jolt the view
   const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-(P.onGround || P.riding ? 9 : 14) * dt);
   CAM.target.x += (tgt.x - CAM.target.x) * kxz; CAM.target.z += (tgt.z - CAM.target.z) * kxz; CAM.target.y += (tgt.y - CAM.target.y) * ky;
-  if (CAM.target.distanceTo(tgt) > 8) CAM.target.copy(tgt);
+  if (CAM.target.distanceTo(tgt) > 8) { CAM.target.copy(tgt); CAM.reach = undefined; CAM.floor = undefined; }   // a jump, not a walk: start afresh
   const r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
   const look = CAM.target.clone().addScaledVector(r, 0.55);
   const op = orbitPitch(CAM.pitch), off = V3(Math.sin(CAM.yaw) * Math.cos(op), Math.sin(op), Math.cos(CAM.yaw) * Math.cos(op));
   // something in the way: pull in at once (never look through a wall), but ease back out, so it doesn't flicker in and out at an edge
-  const hit = world.col.ray(look, look.clone().addScaledVector(off, CAM.dist));
+  let hit = world.col.ray(look, look.clone().addScaledVector(off, CAM.dist));
+  if (!interiors.inside) {   // and the land itself: a ridge or a bank between him and where the camera would sit (lifted clear of the ground there)
+    const ex = look.x + off.x * CAM.dist, ez = look.z + off.z * CAM.dist, ey = Math.max(look.y + off.y * CAM.dist, world.heightAt(ex, ez) + 0.2);
+    for (let i = 1; i < 8; i++) {
+      const f = i / 8, x = lerp(look.x, ex, f), z = lerp(look.z, ez, f);
+      if (lerp(look.y, ey, f) < world.heightAt(x, z)) { hit = Math.min(hit, (i - 1) / 8); break; }
+    }
+  }
   const clear = hit < 1 ? Math.max(0.6, CAM.dist * hit - 0.3) : CAM.dist;
   CAM.reach = Math.min(clear, damp(CAM.reach ?? clear, clear, 3.2, dt));
   const want = look.clone().addScaledVector(off, CAM.reach);
@@ -4905,10 +4923,21 @@ function updateIntroCamera(dt) {
   introT += dt;
   const k = clamp(introT / 16, 0, 1), e = k * k * (3 - 2 * k);
   const a = lerp(2.4, 0.15, e);
-  const R = lerp(150, 14, e);
-  const c = V3(0, 0, world.pier.end - 10);
-  camera.position.set(c.x + Math.sin(a) * R, lerp(70, 6, e), c.z + Math.cos(a) * R);
-  camera.lookAt(lerp(0, P.pos.x, e), lerp(30, P.pos.y + 2, e), lerp(-40, P.pos.z, e));
+  // down out of the sky to the end of the pier, where the old runs land; anywhere else (Beuhk, the Carpenter's land,
+  // a room) the same fall comes down around him instead, so it never ends looking at him from across the map
+  const pc = world.pier && REGION !== 'property' ? V3(world.pier.start.x, 0, world.pier.end - 10) : null;   // (the Carpenter's land has a dock, not the sea-pier)
+  const atPier = pc && !interiors.inside && Math.hypot(P.pos.x - pc.x, P.pos.z - pc.z) < 90;
+  const c = atPier ? pc : P.pos, base = atPier ? 0 : P.pos.y;
+  const R = interiors.inside ? lerp(5, 3.2, e) : lerp(150, 14, e), up = interiors.inside ? lerp(2.4, 1.2, e) : lerp(70, 6, e);
+  const lk = V3(lerp(c.x, P.pos.x, e), lerp(base + 30 * (interiors.inside ? 0 : 1), P.pos.y + 2, e), lerp(atPier ? -40 : c.z, P.pos.z, e));
+  camera.position.set(c.x + Math.sin(a) * R, base + up, c.z + Math.cos(a) * R);
+  if (camBlocked(camera.position.x, camera.position.y, camera.position.z)) {   // never end the fall inside a hill or a wall
+    const from = lk.clone(), to = camera.position.clone(), d = from.distanceTo(to);
+    let last = 0.4;
+    for (let s = 0.4; s < d; s += Math.max(0.25, d / 40)) { const p = from.clone().lerp(to, s / d); if (camBlocked(p.x, p.y, p.z)) break; last = s; }
+    camera.position.lerpVectors(from, to, last / d);
+  }
+  camera.lookAt(lk);
 }
 
 /* the use prompt is rewritten only when it changes (rebuilding it every frame made the page redo its layout each time) */
@@ -5052,7 +5081,7 @@ function frame(now) {
       updateShurgrEdan(dt);
       updateTrials(dt);
       updateDialog(dt);
-      updateCamera(dt);
+      if (!mainCine.update(dt)) updateCamera(dt);   // a film still running through talk (the bench, the first token) keeps its shot
       if (dyaMatch) { dyaMatch.update(dt, G.t); dyaMatch.updateAim(dyaAimPoint()); dyaMatch.placeBars(camera); }
       checkLocations();
       if (young() && F_.pro === 'beuhk') { if (REGION === 'property') pathTick(); else beuhkTick(); }
@@ -5128,7 +5157,8 @@ function frame(now) {
 function enterPlay() {
   $('hud').classList.remove('hidden');
   G.mode = 'play';
-  CAM.target.set(P.pos.x, P.pos.y + 1.9, P.pos.z);
+  if (mainCine.active && !TOK) mainCine.stop();   // a film left running would hold the camera from you
+  camSnap();
   setObjective();
   lockMouse();
 }

@@ -64,6 +64,8 @@ export function createCine(camera, opts = {}) {
   function startShot() {
     const s = shots[i]; t = 0; capI = -1;
     if (s.from) { s._fp = V(s.from.p); s._fl = V(s.from.l); s._tp = V((s.to || s.from).p); s._tl = V((s.to || s.from).l); }
+    // a shot with no lens of its own goes back to the one the film started with (not the last shot's zoom)
+    if (!s.fov && camera.fov !== baseFov) { camera.fov = baseFov; camera.updateProjectionMatrix(); }
     if (s.onStart) s.onStart();
   }
   function next() {
@@ -80,7 +82,8 @@ export function createCine(camera, opts = {}) {
   }
   return {
     get active() { return !!shots; },
-    play(list, cb, opts = {}) { baseFov = camera.fov; lastT = 0; shots = list; i = -1; done = cb; bars(opts.bars !== false); next(); },
+    // (a film started over another keeps the first one's lens to go back to)
+    play(list, cb, opts = {}) { if (!shots) baseFov = camera.fov; lastT = 0; shots = list; i = -1; done = cb; bars(opts.bars !== false); next(); },
     skip() { if (shots) next(); },
     stop,
     bars, caption,
@@ -98,7 +101,7 @@ export function createCine(camera, opts = {}) {
       camera.position.copy(curP);
       if (opts.blocked) {
         const B = opts.blocked, d = camera.position.distanceTo(curL);
-        if (B(curP.x, curP.y, curP.z)) {
+        if (d > 0.5 && B(curP.x, curP.y, curP.z)) {
           // walk from the subject out toward the camera; stop at the last clear step
           let last = 0.4;
           for (let s2 = 0.4; s2 < d; s2 += Math.max(0.25, d / 40)) { const k2 = s2 / d; if (B(curL.x + (curP.x - curL.x) * k2, curL.y + (curP.y - curL.y) * k2, curL.z + (curP.z - curL.z) * k2)) break; last = s2; }

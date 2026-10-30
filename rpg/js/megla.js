@@ -1551,7 +1551,7 @@ export function createMegla(ctx) {
     for (const g of trail) if (g.material.opacity > 0) g.material.opacity = 0.4 + Math.sin(t * 3 + g.position.z) * 0.25;
     if (beacon.visible) beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
     particles.update(dt);
-    if (!cine.update(dt)) updateCamera(dt);
+    if (cine.update(dt)) camInit = false; else updateCamera(dt);   // after a film the follow camera starts again behind him, not gliding over from where it was before it
     sky.position.copy(camera.position);
     // Velki: high in the south-east — and in the eclipse, slid across the face of the sun
     if (look === LOOKS.eclipse) eclipseK = Math.min(1, eclipseK + dt * 0.25); else eclipseK = Math.max(0, eclipseK - dt * 0.25);
@@ -1565,13 +1565,16 @@ export function createMegla(ctx) {
   function updateCamera(dt) {
     camWant.set(P.pos.x, P.pos.y + (P.ride ? 2.4 : 1.5), P.pos.z);
     // follow quickly across the ground, more gently up and down (steps, stairs, landings), and snap back if far behind
-    if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
+    const snap = !camInit || camTgt.distanceTo(camWant) > 8;
+    if (snap) { camTgt.copy(camWant); camInit = true; camReach = null; }
     else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
-    const want = P.ride ? 8.5 : (GYN && GYN.alive ? 9 : 6.4), op = orbitPitch(CAM.pitch), cp = Math.cos(op), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(op), Math.cos(CAM.yaw) * cp);
+    const want = (P.ride ? 8.5 : (GYN && GYN.alive ? 9 : 6.4)) * clamp((CAM.wantDist || 6.5) / 6.5, 0.5, 1.7), op = orbitPitch(CAM.pitch), cp = Math.cos(op), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(op), Math.cos(CAM.yaw) * cp);
     let d = want;
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z) || (GYN && GYN.alive && q.distanceTo(GYN.pos.clone().setY(GYN.pos.y + 0.45 * GYN.s)) < 0.95 * GYN.s)) { d = Math.max(0.8, s - 0.4); break; } }
     camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
-    camPos.lerp(camTgt.clone().addScaledVector(dir, d), 1 - Math.exp(-14 * dt));
+    const camGoal = camTgt.clone().addScaledVector(dir, d);
+    if (snap) camPos.copy(camGoal); else camPos.lerp(camGoal, 1 - Math.exp(-14 * dt));
+    { const o = camPos.clone().sub(camTgt); if (o.length() > d) camPos.copy(camTgt).add(o.setLength(d)); }   // the glide never carries it past what's clear (into a wall)
     { const gy = heightAt(camPos.x, camPos.z) + 0.45; if (camPos.y < gy) camPos.y = gy; }   // never down in the ground
     camera.position.copy(camPos);
     if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; }

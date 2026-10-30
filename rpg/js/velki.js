@@ -620,20 +620,22 @@ export function createVelki(ctx) {
   const camWant = V3(); let camInit = false, camReach = null;
   function updateCamera(dt) {
     const onSpire = Math.hypot(P.pos.x, P.pos.z) < 8 && P.pos.y > 2;
-    const want = onSpire ? 5.2 : 6.5;
+    const want = (onSpire ? 5.2 : 6.5) * clamp((CAM.wantDist || 6.5) / 6.5, 0.5, 1.7);   // (the mouse wheel zooms here too)
     camWant.set(P.pos.x, P.pos.y + 1.5, P.pos.z);
     // follow quickly across the ground, more gently up and down (steps, stairs, landings), and snap back if far behind
-    if (!camInit || camTgt.distanceTo(camWant) > 8) { camTgt.copy(camWant); camInit = true; }
+    const snap = !camInit || camTgt.distanceTo(camWant) > 8;
+    if (snap) { camTgt.copy(camWant); camInit = true; camReach = null; }
     else { const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-9 * dt); camTgt.x += (camWant.x - camTgt.x) * kxz; camTgt.z += (camWant.z - camTgt.z) * kxz; camTgt.y += (camWant.y - camTgt.y) * ky; }
     let d = want;
     const op = orbitPitch(CAM.pitch), cp = Math.cos(op), dir = V3(Math.sin(CAM.yaw) * cp, Math.sin(op), Math.cos(CAM.yaw) * cp);
     for (let s = 0.6; s <= want; s += 0.3) { const q = camTgt.clone().addScaledVector(dir, s); if (solidAt(q.x, q.y, q.z)) { d = Math.max(0.8, s - 0.4); break; } }
     camReach = Math.min(d, damp(camReach ?? d, d, 3.2, dt)); d = camReach;   // pull in at once, ease back out
-    const goal = camTgt.clone().addScaledVector(dir, d);
-    camPos.lerp(goal, 1 - Math.exp(-14 * dt));
+    const camGoal = camTgt.clone().addScaledVector(dir, d);
+    if (snap) camPos.copy(camGoal); else camPos.lerp(camGoal, 1 - Math.exp(-14 * dt));
+    { const o = camPos.clone().sub(camTgt); if (o.length() > d) camPos.copy(camTgt).add(o.setLength(d)); }   // the glide never carries it past what's clear (into a wall)
     { const gy = heightAt(camPos.x, camPos.z) + 0.45; if (camPos.y < gy) camPos.y = gy; }   // never down in the ground
     camera.position.copy(camPos);
-    if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; shake = Math.max(0, shake - dt * 1.5); }
+    if (shake > 0) { const T = t * 31; camera.position.x += Math.sin(T * 1.13) * shake * 0.5; camera.position.y += Math.sin(T * 1.71 + 1) * shake * 0.5; }
     camera.lookAt(camTgt); tiltUp(camera, CAM.pitch);
   }
 
@@ -729,7 +731,8 @@ export function createVelki(ctx) {
       ctx.whiteness(clamp((caughtT - 0.6) / 1.4, 0, 1));
       if (caughtT > 2.4 && !done) { done = true; ctx.onCaught(); }
     }
-    if (!cine.update(dt)) updateCamera(dt);
+    if (cine.update(dt)) camInit = false; else updateCamera(dt);
+    if (shake > 0) shake = Math.max(0, shake - dt * 1.5);   // (it dies away during a film too, not saved up for after)   // after a film the follow camera starts again behind him, not gliding over from where it was before it
     // the sun follows the boy around for its shadows
     sun.position.copy(P.pos).addScaledVector(SUN, 140); sun.target.position.copy(P.pos);
   }
