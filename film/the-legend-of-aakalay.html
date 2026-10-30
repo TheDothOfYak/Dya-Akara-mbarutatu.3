@@ -75,6 +75,38 @@
   #scenelabel{flex:1;text-align:center;color:var(--gold-dim);font-style:italic;letter-spacing:.14em;font-size:12.5px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #time{font-variant-numeric:tabular-nums;color:var(--ink-dim);min-width:96px;text-align:right}
   #restart{font-size:15px !important}
+
+  /* ---------- phones and tablets (touch screens only; a computer never matches) ---------- */
+  @media (pointer:coarse) and (max-width:820px), (pointer:coarse) and (max-height:520px){
+    #veil{justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;
+      padding:calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+    #veil > :first-child{margin-top:auto}
+    #veil > :last-child{margin-bottom:auto}
+    #veil .kicker{letter-spacing:.22em;font-size:11px;margin-bottom:14px}
+    #veil h1 .sub{letter-spacing:.2em;margin-top:10px}
+    #veil .rule{margin:20px 0}
+    #veil p.blurb{font-size:14px;line-height:1.6;padding:0}
+    #begin{margin-top:26px}
+    #veil .hint{letter-spacing:.08em;margin-top:16px}
+    #bar{padding:10px calc(14px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left))}
+    #track{height:30px;touch-action:none}
+    #chapters{top:7px}
+    #knob{width:18px;height:18px;top:6px}
+    #ctrls{gap:6px}
+    #ctrls button{font-size:22px;min-width:40px;min-height:40px;padding:6px}
+    #restart{font-size:18px !important}
+    #time{min-width:0;font-size:12px}
+  }
+  @media (pointer:coarse) and (max-height:520px){
+    #veil h1{font-size:clamp(26px,5vw,44px)}
+    #veil .kicker{margin-bottom:8px}
+    #veil .rule{margin:12px 0}
+    #begin{margin-top:16px;padding:10px 32px}
+  }
+  @media (pointer:coarse) and (max-width:480px){
+    #scenelabel{display:none}
+    #ctrls{justify-content:space-between}
+  }
 </style>
 </head>
 <body>
@@ -1902,6 +1934,11 @@ window.addEventListener('keydown',e=>{
 });
 
 /* ---- Begin ---- */
+/* on a phone or tablet: no keyboard hints, and no full-screen button where the browser can't do it */
+if (matchMedia('(pointer: coarse)').matches) {
+  document.querySelector('#veil .hint').textContent = 'Best in a dark room · headphones recommended · tap the screen for the controls';
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) document.getElementById('full').style.display = 'none';
+}
 document.getElementById('runtimeLabel').textContent = `running time · ${fmt(total)}`;
 document.getElementById('begin').onclick=()=>{
   Audio2.init(); Audio2.resume();

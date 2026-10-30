@@ -155,6 +155,13 @@
 .pia-party-pending .pill.done { border-color: var(--gold-dim); color: var(--gold); }
 .pia-end.win h1 { text-shadow: 0 0 24px #d9b87a55; }
 
+/* phones and tablets (touch only): the floating back arrow gets its own row
+   instead of sitting on the intro text */
+@media (pointer: coarse) and (max-width: 720px) {
+  .pia-home > .back-arrow { top: 48px !important; left: 6px !important; }
+  .pia-home > .pia-home-wrap { padding-top: 40px; }
+}
+
 @media (max-width: 720px) {
   .pia-home-cols { grid-template-columns: 1fr; }
   .pia-planet-row { grid-template-columns: 1fr; }
@@ -546,6 +553,27 @@
   .pia-card { flex: 0 0 auto; width: 108px; }
   .pia-log { display: none; }
   .pia-ctrl { margin-bottom: 4px; min-height: 26px; }
+}
+
+/* ---- phones on their side (touch only): one-line HUD, the two sides of the
+   fight face each other across the screen, and a shorter hand ---- */
+@media (pointer: coarse) and (max-height: 500px) and (orientation: landscape) {
+  .pia-hud { flex-wrap: nowrap; gap: 6px; padding-top: 4px; padding-bottom: 4px; overflow-x: auto; scrollbar-width: none; }
+  .pia-hud::-webkit-scrollbar { display: none; }
+  .pia-hud .logo { font-size: 13px; white-space: nowrap; }
+  .pia-hud > .muted { display: none; }
+  .pia-hud .res-chip, .pia-hud .pia-relic-chip { flex: 0 0 auto; padding: 3px 9px; font-size: 13px; white-space: nowrap; }
+  .pia-hud .btn { flex: 0 0 auto; padding: 4px 12px; min-height: 0; }
+  .pia-battle .pia-arena { flex-direction: row-reverse; align-items: center; justify-content: space-around; padding: 4px 12px; }
+  .pia-foot { padding: 4px 8px calc(4px + env(safe-area-inset-bottom)); }
+  .pia-ctrl { margin-bottom: 2px; min-height: 0; }
+  .pia-ctrl .btn, .pia-foot .btn { min-height: 34px; padding: 4px 16px; }
+  .pia-card { min-height: 96px; width: 100px; padding: 10px 5px 5px; }
+  .pia-card canvas { width: 34px !important; height: 34px !important; }
+  .pia-card-name { font-size: 11.5px; margin: 2px 0; }
+  .pia-card-text { font-size: 10px; line-height: 1.25; }
+  .pia-card-cost { transform: scale(.78); transform-origin: top left; }
+  .pia-card-type { padding-left: 18px; }
 }
 
 /* respect reduced-motion: keep the game readable, drop the flourishes */

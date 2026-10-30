@@ -2,6 +2,9 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## Phones and tablets
+- **Play on a phone or tablet.** On a touch screen the game shows its own controls: a joystick on the left (push it all the way to run), Jump, Hit, Use, Cast, Spell, Talk, Torch, Drop and Power (hero magic) on the right, and touch and hold anywhere in the world to swing, mine, chop or place a block right there. In the bag, tap to pick up and put down, and hold an item to eat or wear it. The HUD gets smaller and Chat gets a button. With a mouse and keyboard nothing changes. Code: `js/flake/fbw_touch.js`.
+
 ## Hero magic (V)
 - **Ghost:** turn invisible for 6 s. Monsters lose track of you, and your first hit from hiding lands twice as hard.
 - **Rock:** eat fire, lightning or poison crystals and they grow on you. Your punches carry the element, F slams the ground, and your hits smash stone 3 to 5 blocks deep.

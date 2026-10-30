@@ -42,7 +42,7 @@ function style() {
   document.head.appendChild(s);
   for (const c of ['top', 'bot']) { const d = document.createElement('div'); d.className = 'cine-bar ' + c; document.body.appendChild(d); }
   const cap = document.createElement('div'); cap.className = 'cine-cap'; cap.id = 'cine-cap'; document.body.appendChild(cap);
-  const sk = document.createElement('div'); sk.className = 'cine-skip'; sk.textContent = 'SPACE / CLICK ▸▸'; document.body.appendChild(sk);
+  const sk = document.createElement('div'); sk.className = 'cine-skip'; sk.textContent = matchMedia('(pointer: coarse)').matches ? 'TAP ▸▸' : 'SPACE / CLICK ▸▸'; document.body.appendChild(sk);
 }
 
 /* opts.blocked(x, y, z) -> true inside anything solid: the camera then never sits inside a wall or a hill;
