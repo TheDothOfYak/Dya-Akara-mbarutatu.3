@@ -419,7 +419,7 @@ input[type=text] { background: #0f0d14; color: var(--text); border: 2px solid va
   <div id="help" class="modal hidden-ui"><div class="panel stone" style="width:min(560px,100%)"><div class="phead"><h3>Controls</h3><button class="btn small" data-close type="button">Close (H)</button></div>
     <div class="keys">
       <kbd>A / D</kbd><span>Walk</span>
-      <kbd>Space / W</kbd><span>Jump. In water, tap to stroke in the direction you hold (S dives). Rocks can't swim: they sink and walk the bottom. Fuzzies float up but need air</span>
+      <kbd>Space / W</kbd><span>Jump. In water, tap to stroke in the direction you hold (S dives). Rocks can't swim: they sink and walk the bottom. Everyone else needs air underwater</span>
       <kbd>S</kbd><span>Drop through walkways · climb down chains</span>
       <kbd>Left mouse</kbd><span>Swing, shoot bows, mine, chop trees, place blocks, plant on farm soil</span>
       <kbd>Right mouse</kbd><span>Eat or consume the held item · otherwise cast your spell</span>
@@ -8784,7 +8784,7 @@ window.RW = window.RW || {};
     const box = $('#help .keys'); box.innerHTML = '';
     const row = (k, t) => { box.append(el('kbd', null, k), el('span', null, t)); };
     row(K('left') + ' · ' + K('right'), 'Walk. Hold ' + K('sprint') + ' to run (uses stamina)');
-    row(K('jump') + ' · ' + K('up'), 'Jump. Acorns jump twice, cling to walls and glide; ghosts hold it to hover; fuzzies bounce when they land and puff up to float. In water, tap to stroke the way you hold. Rocks can\'t swim: they sink and crawl up walls');
+    row(K('jump') + ' · ' + K('up'), 'Jump. Acorns jump twice, cling to walls and glide; ghosts hold it to hover; fuzzies bounce when they land and puff up to float. In water, tap to stroke the way you hold. Rocks can\'t swim: they sink and crawl up walls. Everyone else needs air');
     row(K('down'), 'Drop through walkways · climb down chains');
     row(K('attack'), 'Swing, shoot bows, mine, chop trees, place blocks, plant on farm soil');
     row(K('use'), 'Eat or consume the held item · otherwise cast your spell');
@@ -11147,10 +11147,11 @@ window.RW = window.RW || {};
 })(window.RW);
 
 </script>
-<script src="v2.js?v=038789a708"></script>
+<script src="v2.js?v=a1c855bacc"></script>
 <script src="v2s2.js?v=b358d08891"></script>
 <script src="v2s3.js?v=2b9d2c9953"></script>
-<script src="v2s4.js?v=f415e28dd9"></script>
+<script src="v2s4.js?v=be117a13b4"></script>
+<script src="v2s5.js?v=fdc2066be4"></script>
 <script>/* js/engine/main.js */
 // MAIN — boot, game loop, camera, sky (day/night + the ghost moon), saving.
 (function (RW) {
