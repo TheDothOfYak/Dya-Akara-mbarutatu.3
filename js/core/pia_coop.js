@@ -49,7 +49,10 @@
 
   S.resumeSolo = function (run) {
     S.run = run; S.mode = 'solo'; S.isHost = true; S._broadcast = null; S._sendToHost = null;
-    const me = DYA.state && DYA.state.me; S.myId = me ? me.id : 'solo';
+    /* a solo run has one Guardian: play as it, even when the run was started
+       as a guest ('solo') and resumed after signing in */
+    const me = DYA.state && DYA.state.me;
+    S.myId = (run.players && run.players[0] && run.players[0].id) || (me ? me.id : 'solo');
     if (run.battle) EN.attachRng(run.battle);
     return run;
   };

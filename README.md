@@ -14,13 +14,25 @@ Every game in this repo, behind one home page and one account. Zero dependencies
 | The 4 Brothers Worlds (2D platformer) | `four-brothers-world/index.html` |
 | Little Dungeon (mini game, once Legends of Pia'don) | `mini-games/little-dungeon/index.html` |
 
-**One account for everything.** You sign in (or create an account) once, on the home page; every game picks that up, and every game has a way back to the home page. The account *is* the old Dya'Akara account (the same `dya_accounts` row, email and password), so nobody had to make a new one. Opening a game while signed out sends you to the home page to sign in, then straight back. Code: `js/flake/account.js`.
+**One account for everything.** You sign in (or create an account) once, on the home page; every main game picks that up, and every game has a way back to the home page. **Mini games need no account:** a guest plays straight away (Little Dungeon keeps a guest's run in the browser and pays no gold); a guest who signs in later carries their run in progress onto the account. The account *is* the old Dya'Akara account (the same `dya_accounts` row, email and password), so nobody had to make a new one. Opening a main game while signed out sends you to the home page to sign in, then straight back. Code: `js/flake/account.js`.
 
 - **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` under `fbw:<id>:<key>`, one row per save key (its `js/cloud.js` section).
 - **A new account** made on the home page starts with just email, password and display name. The first time it opens Dya'Akara, the game asks for an appearance and home region, gives the starting resources, and runs the tutorial.
-- **Bans** can be for one game or for every game (Admin Panel → General → Players & Bans, or each game's own Bans page). An every-game ban stops the account at the home page too.
+- **Bans** can be for one game or for every game (Admin Panel → General → Bans, or each game's own Bans page). An every-game ban stops the account at the home page too.
+- **Your account** (click your name on the home page): change your display name or password, or delete the account and everything every game saved on it.
+- **Forgot your password?** on the sign-in box sends a request to the Admin Panel (General → Players), where an admin sets a new password and tells the player. The site sends no emails.
+- **Install it:** `manifest.webmanifest` and the icons in `img/` make "Add to Home Screen" a full-screen Flake Games app.
 
-**The Admin Panel** (`admin.html`) opens on **General** (the home page's studio name and each game's name and tagline, announcements, players and bans across every game), with one button per game for that game's whole admin panel. The studio name is "Flake Games" until you change it there.
+**The Admin Panel** (`admin.html`) opens on **General**:
+- **Home Page:** the studio name, and each game's name, tagline and preview image (upload one to replace the built-in screenshot).
+- **Games:** the order of the games, hiding one, and "coming soon" slots.
+- **Announcements:** pop-ups, the news feed, the banner, the maintenance screen and "refresh everyone", for everyone or one game.
+- **Players:** every account in every game, password reset requests, set a new password, rename, ban, Dya'Akara's own account editor, delete.
+- **Bans** and **Admin Password**.
+
+Then one button per game. Dya'Akara's is its original full panel (plus its own Announcements). Torcain's Run, the 4 Brothers Worlds and Little Dungeon each have an **Overview**, **Players** (every save: view and edit it as JSON, reset it, ban the player), **Announcements** aimed at that game, and **Bans**; the 4 Brothers also keep their **Guide**. A reset leaves a marker the game honours, so the copy in the player's browser doesn't come back.
+
+**The admin password** is one password for every device, kept online as a slow salted hash (PBKDF2, in `dya_config` `admin_auth`). There is no built-in password any more. The first time `admin.html` opens after this change, it asks for the old admin password once and a new one (at least 8 characters). Change it any time under General → Admin Password. It guards the panel; it is not database security — the Supabase tables still accept writes from anyone holding the site's public key (see `supabase/schema.sql`).
 
 ## How to Play
 
@@ -55,7 +67,7 @@ Uses a service account key rather than `firebase login:ci` — the CI-token logi
 
 Create an account on the Flake Games home page and open Dya'Akara; after you choose an appearance and home region, the 14-step tutorial takes it from there: your first token is *you*, sung true as an Eikar. You'll finish the tutorial with exactly **13 tokens and 1,000 gold**, as designed.
 
-**The Admin Panel** lives at `admin.html` on either hosting domain — outside the game UI, as specified. First visit on a given domain sets that domain's admin password (the password, the local Dya'kukull AI population, and local market/tournament flavor are stored per-browser-origin, so github.io and web.app each get their own — but real player accounts, the shared market, and admin's game-content edits are cloud-based via Supabase and identical on both). You are the admin.
+**The Admin Panel** lives at `admin.html` on either hosting domain — outside the game UI, as specified. Its password is the same on both (see above). The local Dya'kukull AI population and local market/tournament flavor are stored per-browser-origin, so github.io and web.app each get their own — but real player accounts, the shared market, and admin's game-content edits are cloud-based via Supabase and identical on both. You are the admin.
 
 ## 4 Brothers World (2D pixel platformer)
 

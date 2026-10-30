@@ -193,6 +193,83 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   check('…and its name keeps the default', F.gameText(rpg, hub).name === rpg.name);
   check('a blank studio name falls back to Flake Games', (await F.saveHubConfig({ studio: '  ' }), F.hubConfig().studio === 'Flake Games'));
 
+  /* which games show, in what order, and coming-soon slots */
+  const ids = list => list.map(g => g.id).join(',');
+  check('games show in their built-in order by default', ids(F.shown(F.hubConfig(), 'main')) === 'game,rpg,4bw');
+  const hub2 = { studio: '', games: { rpg: { hidden: true } }, order: { main: ['4bw', 'game'] }, soon: [{ id: 'soon_x', name: 'Next', kind: 'main' }, { id: 'soon_m', name: 'Tiny', kind: 'mini' }] };
+  await F.saveHubConfig(hub2);
+  check('the admin’s order is used, unnamed games go last', F.orderOf(F.hubConfig(), 'main').join(',') === '4bw,game,rpg');
+  check('a hidden game is left out, coming-soon goes after', ids(F.shown(F.hubConfig(), 'main')) === '4bw,game,soon_x');
+  check('a coming-soon mini game shows with the mini games', ids(F.shown(F.hubConfig(), 'mini')) === 'ld,soon_m');
+  check('a coming-soon slot has no link to play', F.shown(F.hubConfig(), 'main')[2].soon === true && !F.shown(F.hubConfig(), 'main')[2].href);
+  await F.savePreview('rpg', 'data:image/jpeg;base64,AAAA');
+  check('an uploaded preview reads back', (await F.fetchPreview('rpg')) === 'data:image/jpeg;base64,AAAA');
+  await F.removePreview('rpg');
+  check('…and can be removed', (await F.fetchPreview('rpg')) === null);
+  await F.saveHubConfig({ studio: '' });
+
+  /* your own account, from the home page */
+  console.log('== YOUR ACCOUNT ==');
+  await F.signIn('new@example.com', 'newpass');
+  check('a bad name is refused', !!(await F.rename('x')).err);
+  const rn = await F.rename('Newer Name');
+  check('you can change your display name', !rn.err && F.session().name === 'Newer Name', rn.err);
+  check('…on the account itself', db.dya_accounts.find(x => x.email === 'new@example.com').data.displayName === 'Newer Name');
+  check('a password change needs the current password', !!(await F.changePassword('wrong', 'brandnew')).err);
+  const cp = await F.changePassword('newpass', 'brandnew');
+  check('you can change your password', !cp.err && (await F.verify()).ok, cp.err);
+  check('…the old one stops working', !!(await F.signIn('new@example.com', 'newpass')).err);
+  check('…the new one works', !!(await F.signIn('new@example.com', 'brandnew')).who);
+  G.init();
+  const relog = await G.loginHash('new@example.com', F.session().passHash);
+  check('Dya’Akara takes the new name and password', !relog.err && G.me.displayName === 'Newer Name', relog.err);
+  G.logout();
+
+  /* forgot password → the admin sets one */
+  check('a reset request needs an email', !!(await F.requestReset('nope')).err);
+  await F.requestReset('new@example.com', 'text me');
+  let reqs = await F.fetchResetRequests();
+  check('a reset request reaches the admin', reqs.length === 1 && reqs[0].email === 'new@example.com' && reqs[0].note === 'text me');
+  const newId = db.dya_accounts.find(x => x.email === 'new@example.com').id;
+  await F.adminSetPassword(newId, 'fromadmin');
+  check('the admin can set a new password', !!(await F.signIn('new@example.com', 'fromadmin')).who);
+  check('…which clears the request', (await F.fetchResetRequests()).length === 0);
+  await F.adminRename(newId, 'Renamed');
+  check('the admin can rename a player', db.dya_accounts.find(x => x.id === newId).data.displayName === 'Renamed');
+
+  /* delete: the account and every game's saves go */
+  db.dya_config.push({ key: 'rpg_save:' + newId, value: { v: 5 } }, { key: 'fbw:' + newId + ':rw_save_rock', value: '{}' }, { key: 'fbw:' + newId + ':~stamp', value: 'x' }, { key: 'rpg_save:someone_else', value: {} });
+  check('deleting needs your password', !!(await F.deleteAccount('wrong')).err && db.dya_accounts.some(x => x.id === newId));
+  const del = await F.deleteAccount('fromadmin');
+  check('you can delete your account', del.ok && !db.dya_accounts.some(x => x.id === newId));
+  check('…with every game’s saves', !db.dya_config.some(x => x.key.indexOf(newId) >= 0));
+  check('…and nobody else’s', db.dya_config.some(x => x.key === 'rpg_save:someone_else'));
+  check('…and you are signed out', F.session() === null);
+
+  /* the Admin Panel's own password */
+  console.log('== ADMIN PASSWORD ==');
+  check('no admin password to start', (await F.admin.fetch()) === null);
+  let threw = null;
+  try { await F.admin.setup('guess', 'longenough1'); } catch (e) { threw = e.message; }
+  check('setting it up needs the old admin password', /old admin password/.test(threw || ''), threw);
+  threw = null;
+  try { await F.admin.setup('anything', 'short', true); } catch (e) { threw = e.message; }
+  check('the new one must be long enough', /at least/.test(threw || ''), threw);
+  await F.admin.setup('my-old-custom', 'correct horse battery', true);   // a custom password this browser kept
+  const rec = await F.admin.fetch();
+  check('it is stored as a salted hash, not the password', rec && rec.salt && rec.hash && rec.iter >= 100000 && JSON.stringify(rec).indexOf('horse') < 0);
+  check('the right password gets in', await F.admin.check('correct horse battery'));
+  check('a wrong one does not', !(await F.admin.check('correct horse')));
+  threw = null;
+  try { await F.admin.setup('my-old-custom', 'another password', true); } catch (e) { threw = e.message; }
+  check('it can’t be set up a second time', /already set/.test(threw || ''), threw);
+  threw = null;
+  try { await F.admin.change('wrong', 'new admin pass'); } catch (e) { threw = e.message; }
+  check('changing it needs the current one', /not right/.test(threw || ''), threw);
+  await F.admin.change('correct horse battery', 'new admin pass');
+  check('it can be changed', (await F.admin.check('new admin pass')) && !(await F.admin.check('correct horse battery')));
+  check('there is no built-in admin password in the code', !/rEsali/.test(fs.readFileSync(path.join(ROOT, 'js/core/state.js'), 'utf8') + fs.readFileSync(path.join(ROOT, 'js/flake/account.js'), 'utf8')));
+
   console.log(failures ? '\n' + failures + ' FAILED' : '\nall passed');
   process.exit(failures ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

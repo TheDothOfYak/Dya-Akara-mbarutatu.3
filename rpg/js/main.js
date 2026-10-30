@@ -50,7 +50,7 @@ import { createEnemies, TYPES } from './enemies.js';
 import { hasBoard, offers as bountyOffers, bountyProgress } from './bounties.js';
 import * as DYA3 from './dya3d.js';
 import * as STORY from './story.js';
-import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, fmtTime, saveKey, newer, MIN_SAVE_V, migrateSave, isOldSave, tickTime, CHAPTERS } from './progress.js';
+import { DIFFICULTY, UPGRADES, upgradeCost, freshSave, loadSave, writeSave, clearSave, fmtTime, saveKey, newer, MIN_SAVE_V, migrateSave, isOldSave, tickTime, CHAPTERS } from './progress.js';
 import * as CLOUD from './cloud.js';
 import { initAudio, sfx, setVolume } from './audio.js';
 
@@ -78,6 +78,12 @@ let cloudSave = null;
 if (WHO) {
   $('loading').textContent = 'FETCHING YOUR RUN FROM THE DYA GUILD…';
   cloudSave = await CLOUD.fetchSave(WHO.id);
+}
+/* the Admin Panel reset this account's run: any copy in this browser from before the reset goes too
+   (a run played after it, not yet sent up, is kept) */
+if (cloudSave && cloudSave.adminReset) {
+  if (localSave && (localSave.savedAt || 0) < cloudSave.adminReset) { localSave = null; clearSave(KEY); clearSave(); }
+  cloudSave = null;
 }
 /* runs from before the Beuhk prologue were reset; remember that there was one, to say so */
 const HAD_OLD = isOldSave(KEY) || isOldSave() || !!(cloudSave && cloudSave.v && cloudSave.v < MIN_SAVE_V);

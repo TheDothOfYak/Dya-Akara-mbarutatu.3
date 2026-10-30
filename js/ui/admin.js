@@ -33,6 +33,7 @@
   /* this IS the admin session — world mutations here publish the shared AI
      world so every player's device picks up the curation (see G.saveNow) */
   G.isAdminSession = true;
+  const F = window.FLAKE;   // the one Flake Games account and the admin password (js/flake/account.js)
 
   window.addEventListener('DOMContentLoaded', () => {
     G.init();
@@ -70,41 +71,70 @@
     if (G.fetchAdminWorld) { try { await G.fetchAdminWorld(); } catch (e) { /* offline is fine */ } }
   }
 
-  /* ---------- access gate: you are the admin ---------- */
+  /* ---------- access gate: you are the admin ----------
+     The password is checked against the slow salted hash kept online
+     (js/flake/account.js FLAKE.admin), so it is the same on every device and
+     never sits in the page's code. The very first time, the panel is set up
+     with the old admin password and a new one is chosen. A tab that already
+     got in stays in until it is closed. */
+  const ADMIN_TAB_KEY = 'flake-admin-ok';
+  async function enter() { await loadCloudAccounts(); await pullSharedWorld(); panel(); }
   function gate() {
     root.innerHTML = '';
     const wrap = U.el('div', { cls: 'admin-wrap', style: 'max-width:420px;margin-top:12vh' });
     wrap.appendChild(U.el('h1', { cls: 'gold center', text: studio().toUpperCase() + ' — ADMIN' }));
-    const hasPass = G.admin.hasPass();
-    wrap.appendChild(U.el('p', { cls: 'muted center small mt', text: hasPass ? 'Enter the admin password.' : 'First access — set the admin password. You are the admin.' }));
-    const pass = U.el('input', { cls: 'txt mt', type: 'password', placeholder: 'Admin password' });
-    wrap.appendChild(pass);
+    const msg = U.el('p', { cls: 'muted center small mt', text: 'Checking…' });
+    wrap.appendChild(msg);
+    root.appendChild(wrap);
+    if (!(window.FLAKE && F.configured())) { msg.textContent = 'Online isn’t configured (js/config.js), so the Admin Panel can’t check its password.'; return; }
+    F.admin.fetch().then(rec => {
+      if (rec) {
+        let ok = null; try { ok = sessionStorage.getItem(ADMIN_TAB_KEY); } catch (e) { /* ignore */ }
+        if (ok && ok === rec.hash) { enter(); return; }
+        signInForm(wrap, msg, rec);
+      } else setupForm(wrap, msg);
+    }).catch(e => {
+      msg.textContent = 'Could not reach the server: ' + e.message;
+      wrap.appendChild(U.el('button', { cls: 'btn mt', style: 'width:100%', text: 'Try again', onclick: gate }));
+    });
+  }
+  function field(wrap, ph) { const i = U.el('input', { cls: 'txt mt', type: 'password', placeholder: ph }); wrap.appendChild(i); return i; }
+  function signInForm(wrap, msg, rec) {
+    msg.textContent = 'Enter the admin password.';
+    const pass = field(wrap, 'Admin password');
     const err = U.el('div', { cls: 'small center mt', style: 'color:var(--red);min-height:16px' });
-    wrap.appendChild(err);
-    const btn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: hasPass ? 'Enter' : 'Set password & enter' });
+    const btn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: 'Enter' });
     btn.onclick = async () => {
-      if (pass.value.length < 4) { err.textContent = 'At least 4 characters.'; return; }
-      if (!G.admin.hasPass()) { G.admin.setPass(pass.value); await loadCloudAccounts(); await pullSharedWorld(); panel(); return; }
-      if (G.admin.checkPass(pass.value)) { await loadCloudAccounts(); await pullSharedWorld(); panel(); }
-      else err.textContent = 'Wrong password. The Guild is watching. Cordially.';
+      btn.disabled = true; err.textContent = '';
+      const ok = await F.admin.check(pass.value).catch(() => false);
+      btn.disabled = false;
+      if (!ok) { err.textContent = 'Wrong password.'; return; }
+      try { sessionStorage.setItem(ADMIN_TAB_KEY, rec.hash); } catch (e) { /* ignore */ }
+      enter();
     };
     pass.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
-    wrap.appendChild(btn);
-
-    /* Locked out? The admin gate is a local convenience lock, not real
-       security (the panel is client-side and edits already ride the public
-       key), so a self-serve reset is fine — and it rescues anyone whose
-       stored hash got into a bad state. Clears it and returns to first-access. */
-    if (hasPass) {
-      const reset = U.el('button', { cls: 'btn ghost small mt', style: 'width:100%', text: 'Reset to default password' });
-      reset.onclick = () => {
-        if (!confirm('Clear any custom admin password and go back to the built-in default? (This does not touch any game data.)')) return;
-        G.admin.clearPass();
-        gate();
-      };
-      wrap.appendChild(reset);
-    }
-    root.appendChild(wrap);
+    wrap.appendChild(err); wrap.appendChild(btn);
+    pass.focus();
+  }
+  function setupForm(wrap, msg) {
+    msg.textContent = 'Set up the admin password. This happens once: from now on it is the password on every device. Enter the old admin password, then choose a new one (at least ' + F.admin.MIN + ' characters).';
+    const old = field(wrap, 'Old admin password');
+    const next = field(wrap, 'New admin password');
+    const again = field(wrap, 'New password again');
+    const err = U.el('div', { cls: 'small center mt', style: 'color:var(--red);min-height:16px' });
+    const btn = U.el('button', { cls: 'btn primary mt', style: 'width:100%', text: 'Set password & enter' });
+    btn.onclick = async () => {
+      err.textContent = '';
+      if (next.value !== again.value) { err.textContent = 'The two new passwords don’t match.'; return; }
+      btn.disabled = true;
+      try { await F.admin.setup(old.value, next.value, G.admin.checkPass(old.value)); }
+      catch (e) { btn.disabled = false; err.textContent = e.message; return; }
+      G.admin.clearPass();   // the old browser-only password is retired
+      gate();
+    };
+    again.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+    wrap.appendChild(err); wrap.appendChild(btn);
+    old.focus();
   }
 
   /* ---------- shared helpers ---------- */
@@ -351,17 +381,22 @@
   }
 
   /* ---------- main panel ----------
-     General (the Flake Games home page, announcements, players and bans
-     across every game) on top, then one button per game that opens that
-     game's whole admin panel. */
-  const DYA_NAV = ['Overview', 'Creatures', 'Hunts', 'Guild Market', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Crafting Station', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Edit Everything', 'God Mode'];
+     General (the Flake Games home page and its game list, announcements,
+     every player and every ban, the admin password) on top, then one button
+     per game for that game's whole admin panel. Dya'Akara's is the original
+     full panel; the others have the same kinds of pages where they apply:
+     an overview, their players' saves (look, edit, reset), announcements
+     aimed at them, and bans. */
+  const DYA_NAV = ['Overview', 'Creatures', 'Hunts', 'Guild Market', 'Text & Lore', 'Balance & Economy', "Dya'kukull (AI Players)", 'Market Monitor', 'Spawn Tokens', 'Crafting Station', 'All Tokens', 'Tournaments', 'Bans & Appeals', 'Flagged Tokens', 'Announcements', 'Edit Everything', 'God Mode'];
   const SECTIONS = [
-    { id: 'general', label: '⚙ General', nav: ['Home Page', 'Announcements', 'Players & Bans'] },
+    { id: 'general', label: '⚙ General', nav: ['Home Page', 'Games', 'Announcements', 'Players', 'Bans', 'Admin Password'] },
     { id: 'game', label: '🎴 Dya’Akara', nav: DYA_NAV },
-    { id: 'rpg', label: '⛵ Torcain’s Run', nav: ['Torcain’s Run', 'Saves', 'Bans'] },
-    { id: '4bw', label: '🌍 The 4 Brothers Worlds', nav: ['4 Brothers World', 'Saves', 'Bans'] },
-    { id: 'ld', label: '🃏 Little Dungeon', nav: ['Little Dungeon', 'Bans'] },
+    { id: 'rpg', label: '⛵ Torcain’s Run', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
+    { id: '4bw', label: '🌍 The 4 Brothers Worlds', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans', 'Guide'] },
+    { id: 'ld', label: '🃏 Little Dungeon', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
   ];
+  /* which live-broadcast target each section's Announcements page starts on */
+  const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld' };
   const sectionOf = id => SECTIONS.find(x => x.id === id) || SECTIONS[0];
   function goto(sec, v) { section = sec; view = v || sectionOf(sec).nav[0]; panel(); }
   function studio() { return window.FLAKE ? FLAKE.hubConfig().studio : 'Flake Games'; }
@@ -380,7 +415,7 @@
     const nav = U.el('div', { cls: 'admin-nav' });
     const body = U.el('div', { cls: 'admin-body' });
     sec.nav.forEach(v => {
-      const b = U.el('button', { cls: 'btn' + (view === v ? ' primary' : ''), text: v });
+      const b = U.el('button', { cls: 'btn' + (view === v ? ' primary' : ''), text: v.replace(/^Game /, '') });
       b.onclick = () => { view = v; panel(); };
       nav.appendChild(b);
     });
@@ -394,7 +429,6 @@
   function rerender() { panel(); }
 
   /* ---------- shared by the General and per-game views ---------- */
-  const F = window.FLAKE;
   function onlineNote(body) {
     if (F && F.configured()) return false;
     body.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Online isn’t configured (js/config.js), so this can’t be read or changed.' }));
@@ -403,6 +437,30 @@
   function playerName(id) { const a = G.world.accounts[id]; return a ? a.displayName : id; }
   function realPlayers() { return Object.values(G.world.accounts).filter(a => !a.ai).sort((a, b) => String(a.displayName).localeCompare(String(b.displayName))); }
   function openGame(id) { const g = F.GAMES.concat(F.MINI).find(x => x.id === id); if (g) window.open(g.href, '_blank'); }
+  function errLine(holder, what, e) { holder.innerHTML = ''; holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Could not load ' + what + ': ' + e.message })); }
+  function loading() { return U.el('p', { cls: 'muted small', text: 'Loading…' }); }
+  function tiles(list) {
+    const t = U.el('div', { cls: 'grid mb', style: 'grid-template-columns:repeat(auto-fill,minmax(160px,1fr))' });
+    list.forEach(([l, v]) => t.appendChild(U.el('div', { cls: 'stat-tile' }, [U.el('div', { cls: 'st-num', text: v }), U.el('div', { cls: 'st-lbl', text: l })])));
+    return t;
+  }
+  /* every live ban, by scope: [{ id, sc, b }] (Dya'Akara's own as 'game') */
+  async function liveBans() {
+    const all = await F.fetchAllBans();
+    const rows = [];
+    Object.keys(all).forEach(id => Object.keys(all[id] || {}).forEach(sc => { if (F.banLive(all[id][sc])) rows.push({ id, sc, b: all[id][sc] }); }));
+    Object.keys(G.world.bans || {}).forEach(id => { const b = G.world.bans[id]; if (b && (b.permanent || b.until > Date.now())) rows.push({ id, sc: 'game', b }); });
+    return rows;
+  }
+  /* ban one player, from a prompt; scope fixed or chosen */
+  async function banPrompt(accId, scope) {
+    const reason = prompt('Ban ' + playerName(accId) + ' from ' + F.scopeName(scope) + '. Reason (the player sees it):');
+    if (!reason || !reason.trim()) return;
+    const d = parseInt(prompt('For how many days? (leave blank for permanent)') || '', 10) || null;
+    if (scope === 'game') { G.admin.ban(accId, reason.trim(), d); rerender(); return; }
+    try { await F.setBan(accId, scope, { reason: reason.trim(), permanent: !d, until: d ? Date.now() + d * 864e5 : null, at: Date.now() }); rerender(); }
+    catch (e) { alert('Could not save the ban: ' + e.message); }
+  }
 
   /* Ban someone from one game or from every game. Dya'Akara's own ban is the
      original one (view-only in Dya'Akara, see Bans & Appeals); every other
@@ -433,19 +491,18 @@
       },
     }));
     form.appendChild(row);
-    form.appendChild(U.el('p', { cls: 'small muted mt', text: '“Every game” stops the account at the Flake Games home page and in every game. A Dya’Akara ban works as it always has: the player can still look at their collection there.' }));
+    form.appendChild(U.el('p', { cls: 'small muted mt', text: fixedScope === 'ld'
+      ? 'Little Dungeon needs no account, so a ban here only stops the player while they are signed in.'
+      : '“Every game” stops the account at the Flake Games home page and in every game. A Dya’Akara ban works as it always has: the player can still look at their collection there.' }));
     body.appendChild(form);
 
     const list = U.el('div', { cls: 'panel' });
     list.appendChild(U.el('h3', { cls: 'gold mb', text: 'Active bans' }));
-    const holder = U.el('div', {}, [U.el('p', { cls: 'muted small', text: 'Loading…' })]);
+    const holder = U.el('div', {}, [loading()]);
     list.appendChild(holder);
     body.appendChild(list);
-    F.fetchAllBans().then(all => {
+    liveBans().then(rows => {
       holder.innerHTML = '';
-      const rows = [];
-      Object.keys(all).forEach(id => Object.keys(all[id] || {}).forEach(sc => { if (F.banLive(all[id][sc])) rows.push({ id, sc, b: all[id][sc] }); }));
-      Object.keys(G.world.bans || {}).forEach(id => { const b = G.world.bans[id]; if (b && (b.permanent || b.until > Date.now())) rows.push({ id, sc: 'game', b }); });
       const shown = rows.filter(r => !fixedScope || r.sc === fixedScope || r.sc === 'all');
       if (!shown.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'Nobody is banned' + (fixedScope ? ' from ' + F.scopeName(fixedScope) : '') + '.' })); return; }
       shown.forEach(r => {
@@ -460,59 +517,191 @@
         }));
         holder.appendChild(line);
       });
-    }).catch(e => { holder.innerHTML = ''; holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Could not load bans: ' + e.message })); });
+    }).catch(e => errLine(holder, 'bans', e));
   }
 
-  /* every account's save for one game. Torcain's Run keeps one dya_config row
-     per account ('rpg_save:<id>'); the 4 Brothers Worlds one row per save key
-     ('fbw:<id>:<key>') plus a '~stamp' row, which stands for the whole save. */
-  const SAVE_ROWS = {
-    rpg: { list: 'rpg_save:*', id: k => k.slice('rpg_save:'.length), wipe: id => 'key=eq.' + encodeURIComponent('rpg_save:' + id) },
-    '4bw': { list: 'fbw:*:~stamp', id: k => k.slice(4, k.lastIndexOf(':')), wipe: id => 'key=like.' + encodeURIComponent('fbw:' + id + ':*') },
+  /* ---------- each game's saves ----------
+     Torcain's Run: one dya_config row per account ('rpg_save:<id>').
+     The 4 Brothers Worlds: one row per save key ('fbw:<id>:<key>') plus a
+       '~stamp' row; a new stamp is what tells the game a save changed.
+     Little Dungeon: the run in progress, on the account row (ldRun).
+     A reset leaves a marker the game honours, so a copy still in the
+     player's browser doesn't come straight back. */
+  const fbwStamp = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  const upsert = (key, value) => F.rest('POST', 'dya_config?on_conflict=key', { key, value, updated_at: new Date().toISOString() }, 'resolution=merge-duplicates');
+  const SAVES = {
+    rpg: {
+      name: 'Torcain’s Run',
+      async list() {
+        const rows = await F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('rpg_save:*') + '&select=key,updated_at,reset:value->>adminReset,region:value->>region,diff:value->>difficulty,time:value->>time,deaths:value->>deaths&order=updated_at.desc');
+        return (rows || []).map(r => ({ id: r.key.slice(9), at: Date.parse(r.updated_at), reset: !!r.reset,
+          about: r.reset ? 'reset by an admin' : [r.region, r.diff, r.time ? Math.round(r.time / 60) + ' min played' : '', r.deaths != null ? r.deaths + ' falls' : ''].filter(Boolean).join(' · ') }));
+      },
+      async get(id) { const r = await F.rest('GET', 'dya_config?key=eq.' + encodeURIComponent('rpg_save:' + id) + '&select=value'); return { save: (r && r[0] && r[0].value) || null }; },
+      async put(id, parts) { const v = parts.save; v.savedAt = Date.now(); await upsert('rpg_save:' + id, v); },
+      async reset(id) { await upsert('rpg_save:' + id, { adminReset: Date.now() }); },
+    },
+    '4bw': {
+      name: 'The 4 Brothers Worlds',
+      async list() {
+        const rows = await F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('fbw:*:~stamp') + '&select=key,updated_at&order=updated_at.desc');
+        return (rows || []).map(r => ({ id: r.key.slice(4, r.key.lastIndexOf(':')), at: Date.parse(r.updated_at), about: '' }));
+      },
+      async get(id) {
+        const rows = await F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('fbw:' + id + ':*') + '&select=key,value');
+        const out = {};
+        (rows || []).forEach(r => { const k = r.key.slice(('fbw:' + id + ':').length); if (k !== '~stamp') out[k] = r.value; });
+        return out;
+      },
+      async put(id, parts) {
+        await Promise.all(Object.keys(parts).map(k => upsert('fbw:' + id + ':' + k, parts[k])));
+        await upsert('fbw:' + id + ':~stamp', fbwStamp());   // tells an open game, and the next one to start, that the save changed
+      },
+      async reset(id) {
+        await F.rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('fbw:' + id + ':*'));
+        await upsert('fbw:' + id + ':~stamp', fbwStamp());   // an empty save with a new stamp: the game starts a new hero
+      },
+    },
+    ld: {
+      name: 'Little Dungeon',
+      async list() {
+        return realPlayers().filter(a => a.ldRun).map(a => {
+          const r = a.ldRun, p = (r.players || [])[0] || {};
+          return { id: a.id, at: a.savedAt > 1e11 ? a.savedAt : 0, about: [p.guardianId, r.planet, r.floor != null ? 'floor ' + (r.floor + 1) : '', r.phase].filter(Boolean).join(' · ') };
+        });
+      },
+      async get(id) { const a = G.world.accounts[id]; return { run: (a && a.ldRun) || null }; },
+      async put(id, parts) { const a = G.world.accounts[id]; a.ldRun = parts.run; a.ldRunAdminAt = Date.now(); G.pushAccountToCloud(a); },
+      async reset(id) { const a = G.world.accounts[id]; delete a.ldRun; a.ldRunAdminAt = Date.now(); G.pushAccountToCloud(a); },
+    },
   };
-  function savesPanel(body, game, gameName) {
-    const rowsOf = SAVE_ROWS[game];
-    if (onlineNote(body)) return;
-    body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Each player’s ' + gameName + ' progress, saved on their Flake Games account. Resetting a save starts that player over the next time they open the game.' }));
-    const holder = U.el('div', { cls: 'panel' }, [U.el('p', { cls: 'muted small', text: 'Loading…' })]);
-    body.appendChild(holder);
-    F.rest('GET', 'dya_config?key=like.' + encodeURIComponent(rowsOf.list) + '&select=key,updated_at&order=updated_at.desc').then(rows => {
-      holder.innerHTML = '';
-      if (!rows || !rows.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'No saves yet.' })); return; }
-      const tbl = U.el('table', { cls: 'adm' });
-      tbl.appendChild(U.el('tr', {}, ['Player', 'Last saved', ''].map(h => U.el('th', { text: h }))));
-      rows.forEach(r => {
-        const id = rowsOf.id(r.key);
-        const td = U.el('td', {});
-        td.appendChild(U.el('button', {
-          cls: 'btn small danger', text: 'Reset save', onclick: async () => {
-            if (!confirm('Reset ' + playerName(id) + '’s ' + gameName + ' save? This cannot be undone.')) return;
-            try { await F.rest('DELETE', 'dya_config?' + rowsOf.wipe(id)); rerender(); }
-            catch (e) { alert('Could not reset it: ' + e.message); }
-          },
-        }));
-        tbl.appendChild(U.el('tr', {}, [U.el('td', { text: playerName(id) }), U.el('td', { text: r.updated_at ? U.timeAgo(Date.parse(r.updated_at)) : '—' }), td]));
-      });
-      holder.appendChild(tbl);
-    }).catch(e => { holder.innerHTML = ''; holder.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ Could not load saves: ' + e.message })); });
+
+  /* look at and edit one player's save, as JSON */
+  async function editSave(game, id) {
+    const S = SAVES[game];
+    const { w, close } = modal('5% 14%');
+    w.appendChild(U.el('h3', { cls: 'gold', text: S.name + ' — ' + playerName(id) }));
+    w.appendChild(U.el('p', { cls: 'small muted', text: 'Edit carefully: this is the save exactly as the game keeps it. Best done while the player isn’t playing; the game picks the change up the next time it starts.' }));
+    const holder = U.el('div', {}, [loading()]);
+    w.appendChild(holder);
+    let parts;
+    try { parts = await S.get(id); } catch (e) { errLine(holder, 'the save', e); return; }
+    holder.innerHTML = '';
+    const boxes = {};
+    const keys = Object.keys(parts);
+    if (!keys.length || keys.every(k => parts[k] == null)) { holder.appendChild(U.el('p', { cls: 'muted', text: 'No save.' })); return; }
+    keys.forEach(k => {
+      const isStr = typeof parts[k] === 'string';
+      let shown = parts[k];
+      if (isStr) { try { shown = JSON.parse(parts[k]); } catch (e) { /* plain text */ } }
+      holder.appendChild(U.el('label', { cls: 'lbl', text: k }));
+      const ta = U.el('textarea', { cls: 'txt', rows: Math.min(18, Math.max(3, JSON.stringify(shown, null, 2).split('\n').length)), style: 'font-family:monospace;font-size:12px' });
+      ta.value = typeof shown === 'string' ? shown : JSON.stringify(shown, null, 2);
+      holder.appendChild(ta);
+      boxes[k] = { ta, isStr, before: ta.value };
+    });
+    const row = U.el('div', { cls: 'flex mt', style: 'gap:8px' });
+    row.appendChild(U.el('button', {
+      cls: 'btn primary', text: 'Save changes', onclick: async () => {
+        const out = {};
+        try {
+          Object.keys(boxes).forEach(k => {
+            const b = boxes[k];
+            if (b.ta.value === b.before) return;
+            if (b.isStr) { try { out[k] = JSON.stringify(JSON.parse(b.ta.value)); } catch (e) { out[k] = b.ta.value; } }
+            else out[k] = JSON.parse(b.ta.value);
+          });
+        } catch (e) { alert('That isn’t valid JSON: ' + e.message); return; }
+        if (!Object.keys(out).length) { close(); return; }
+        try { await S.put(id, out); close(); rerender(); } catch (e) { alert('Could not save: ' + e.message); }
+      },
+    }));
+    row.appendChild(U.el('button', { cls: 'btn ghost', text: 'Cancel', onclick: close }));
+    w.appendChild(row);
+  }
+  async function resetSave(game, id) {
+    if (!confirm('Reset ' + playerName(id) + '’s ' + SAVES[game].name + ' save? They start over the next time they open it. This cannot be undone.')) return;
+    try { await SAVES[game].reset(id); rerender(); } catch (e) { alert('Could not reset it: ' + e.message); }
   }
 
-  function gameLinks(body, id, blurb) {
-    body.appendChild(U.el('p', { cls: 'muted small mb', text: blurb }));
+  const BLURB = {
+    rpg: 'The 3D adventure, under rpg/. Story progress saves to each player’s account at every Nur Lantern and story beat. Its roadmap is rpg/ROADMAP.md.',
+    '4bw': 'The four brothers’ pixel platformer, under four-brothers-world/. Each player’s hero, bag and world save to their account, a row per save key. Its guides are under Guide.',
+    ld: 'The mini game (once Legends of Pia’don, inside Dya’Akara), under mini-games/little-dungeon/. No account needed; signed-in players keep a run in progress on their account and a won solo run pays gold.',
+  };
+  function gameIntro(body, id) {
+    body.appendChild(U.el('p', { cls: 'muted small mb', text: BLURB[id] }));
     body.appendChild(U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap;gap:8px' }, [
       U.el('button', { cls: 'btn primary', text: '▶ Open ' + F.scopeName(id), onclick: () => openGame(id) }),
-      U.el('button', { cls: 'btn', text: '📣 Announce to its players', onclick: () => goto('general', 'Announcements') }),
+      U.el('button', { cls: 'btn', text: '📣 Announce to its players', onclick: () => goto(id, 'Announcements') }),
+      U.el('button', { cls: 'btn', text: '🛠 Maintenance screen / banner', onclick: () => goto(id, 'Announcements') }),
     ]));
+  }
+  /* the save list for one game, with the actions on each */
+  function savesTable(holder, game, rows, limit) {
+    holder.innerHTML = '';
+    if (!rows.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'No saves yet.' })); return; }
+    const tbl = U.el('table', { cls: 'adm' });
+    tbl.appendChild(U.el('tr', {}, ['Player', 'Email', 'Last saved', 'Save', ''].map(h => U.el('th', { text: h }))));
+    rows.slice(0, limit || rows.length).forEach(r => {
+      const a = G.world.accounts[r.id];
+      const td = U.el('td', { style: 'white-space:normal' });
+      if (!r.reset) td.appendChild(U.el('button', { cls: 'btn small', text: 'View / edit', onclick: () => editSave(game, r.id) }));
+      if (!r.reset) td.appendChild(U.el('button', { cls: 'btn small danger', text: 'Reset', onclick: () => resetSave(game, r.id) }));
+      td.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Ban', onclick: () => banPrompt(r.id, game) }));
+      tbl.appendChild(U.el('tr', {}, [U.el('td', { text: playerName(r.id) }), U.el('td', { text: (a && a.email) || '—' }),
+        U.el('td', { text: r.at ? U.timeAgo(r.at) : '—' }), U.el('td', { text: r.about || '' }), td]));
+    });
+    holder.appendChild(tbl);
+  }
+
+  /* ---------- the Flake Games home page: images ----------
+     A preview is stored as a JPEG data URL in dya_config 'flake_preview:<id>',
+     and the home page config notes when it changed (games[id].preview), so
+     the page knows to use it instead of the built-in img/previews file. */
+  function toJpeg(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const W = 1280, H = 720, c = document.createElement('canvas'); c.width = W; c.height = H;
+        const s = Math.max(W / img.width, H / img.height), w = img.width * s, h = img.height * s;
+        c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+        URL.revokeObjectURL(img.src);
+        resolve(c.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => reject(new Error('That file isn’t an image the browser can read.'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  function previewPicker(hub, id, onChange) {
+    const wrap = U.el('div', { cls: 'flex mt', style: 'gap:10px;align-items:center;flex-wrap:wrap' });
+    const thumb = U.el('img', { alt: '', style: 'width:160px;height:90px;object-fit:cover;border:1px dashed var(--line);border-radius:4px;background:#000' });
+    const soon = (hub.soon || []).find(x => x.id === id);
+    const custom = !!(soon ? soon.preview : hub.games[id] && hub.games[id].preview);
+    if (custom) F.fetchPreview(id).then(d => { if (d) thumb.src = d; });
+    else if (!soon) thumb.src = 'img/previews/' + id + '.jpg';   // the built-in screenshot
+    thumb.onerror = () => thumb.removeAttribute('src');
+    const file = U.el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
+    file.onchange = async () => {
+      const f = file.files && file.files[0]; if (!f) return;
+      try { const data = await toJpeg(f); await F.savePreview(id, data); thumb.src = data; onChange(Date.now()); }
+      catch (e) { alert('Could not use that image: ' + e.message); }
+    };
+    wrap.appendChild(thumb);
+    wrap.appendChild(U.el('button', { cls: 'btn small', text: '🖼 Upload image', onclick: () => file.click() }));
+    if (custom) wrap.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Use the built-in image', onclick: async () => { await F.removePreview(id).catch(() => null); onChange(0); } }));
+    wrap.appendChild(file);
+    return wrap;
   }
 
   const VIEWS = {
     /* ================= GENERAL: the Flake Games home page =================
-       The studio name and each game's name and tagline on the home page
+       The studio name, each game's name, tagline and preview image
        (dya_config 'flake_hub'). Blank keeps the default. */
     'Home Page'(body) {
       if (onlineNote(body)) return;
-      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'What the Flake Games home page shows. Changes reach everyone the next time they open it. Leave a box blank to keep the default.' }));
-      const box = U.el('div', { cls: 'panel' }, [U.el('p', { cls: 'muted small', text: 'Loading…' })]);
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'What the Flake Games home page shows. Changes reach everyone the next time they open it. Leave a box blank to keep the default. Images are cropped to 16:9.' }));
+      const box = U.el('div', { cls: 'panel' }, [loading()]);
       body.appendChild(box);
       F.fetchHubConfig().then(hub => {
         box.innerHTML = '';
@@ -520,6 +709,18 @@
         const studioIn = U.el('input', { cls: 'txt', style: 'max-width:360px', value: hub.studio === F.DEFAULT_STUDIO ? '' : hub.studio, placeholder: F.DEFAULT_STUDIO });
         box.appendChild(studioIn);
         const fields = {};
+        const save = async (silent) => {
+          hub.studio = studioIn.value.trim();
+          Object.keys(fields).forEach(id => {
+            const n = fields[id].name.value.trim(), t = fields[id].tag.value.trim();
+            const g = Object.assign({}, hub.games[id] || {});
+            if (n) g.name = n; else delete g.name;
+            if (t) g.tagline = t; else delete g.tagline;
+            hub.games[id] = g;
+          });
+          try { await F.saveHubConfig(hub); if (!silent) flashSaved(actions, 'Saved — live on the home page.'); }
+          catch (e) { alert('Could not save: ' + e.message); }
+        };
         F.GAMES.concat(F.MINI).forEach(g => {
           const o = hub.games[g.id] || {};
           box.appendChild(U.el('h3', { cls: 'gold mt mb', text: g.name + (F.MINI.indexOf(g) >= 0 ? ' (mini game)' : '') }));
@@ -527,42 +728,192 @@
           const tag = U.el('input', { cls: 'txt mt', style: 'max-width:520px', value: o.tagline || '', placeholder: g.tagline });
           box.appendChild(U.el('label', { cls: 'lbl', text: 'Name' })); box.appendChild(name);
           box.appendChild(U.el('label', { cls: 'lbl', text: 'Tagline' })); box.appendChild(tag);
+          box.appendChild(U.el('label', { cls: 'lbl', text: 'Preview image' }));
+          box.appendChild(previewPicker(hub, g.id, at => { hub.games[g.id] = Object.assign({}, hub.games[g.id] || {}, { preview: at || undefined }); save(true).then(rerender); }));
           fields[g.id] = { name, tag };
         });
         const actions = U.el('div', { cls: 'flex mt', style: 'gap:8px;align-items:center' });
-        actions.appendChild(U.el('button', {
-          cls: 'btn primary', text: 'Save', onclick: async () => {
-            const games = {};
-            Object.keys(fields).forEach(id => {
-              const n = fields[id].name.value.trim(), t = fields[id].tag.value.trim();
-              if (n || t) games[id] = Object.assign(n ? { name: n } : {}, t ? { tagline: t } : {});
-            });
-            try { await F.saveHubConfig({ studio: studioIn.value.trim(), games }); flashSaved(actions, 'Saved — live on the home page.'); }
-            catch (e) { alert('Could not save: ' + e.message); }
-          },
-        }));
+        actions.appendChild(U.el('button', { cls: 'btn primary', text: 'Save', onclick: () => save(false) }));
         actions.appendChild(U.el('button', { cls: 'btn ghost', text: 'Open the home page', onclick: () => window.open(F.hubUrl(), '_blank') }));
         box.appendChild(actions);
       });
     },
 
-    /* ================= GENERAL: players & bans across every game ================= */
-    'Players & Bans'(body) {
-      body.appendChild(cloudAccountsLine());
-      bansPanel(body, null);
+    /* ================= GENERAL: which games, in what order, and what's coming ================= */
+    Games(body) {
+      if (onlineNote(body)) return;
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'The order of the games on the home page, which ones show, and “coming soon” slots to tease a game before it is ready. A hidden game’s page still works for anyone who has the link.' }));
+      const box = U.el('div', { cls: 'panel' }, [loading()]);
+      body.appendChild(box);
+      F.fetchHubConfig().then(hub => {
+        box.innerHTML = '';
+        const save = async () => { try { await F.saveHubConfig(hub); rerender(); } catch (e) { alert('Could not save: ' + e.message); } };
+        const list = (kind, ids, all) => {
+          box.appendChild(U.el('h3', { cls: 'gold mb' + (kind === 'mini' ? ' mt' : ''), text: kind === 'mini' ? 'Mini games' : 'Main games (the carousel)' }));
+          ids.forEach((id, i) => {
+            const g = all.find(x => x.id === id), o = hub.games[id] || {};
+            const row = U.el('div', { cls: 'flex', style: 'gap:8px;align-items:center;margin:4px 0' });
+            row.appendChild(U.el('button', { cls: 'btn small', text: '↑', disabled: i === 0 ? 'disabled' : null, onclick: () => { ids.splice(i - 1, 0, ids.splice(i, 1)[0]); hub.order[kind] = ids; save(); } }));
+            row.appendChild(U.el('button', { cls: 'btn small', text: '↓', disabled: i === ids.length - 1 ? 'disabled' : null, onclick: () => { ids.splice(i + 1, 0, ids.splice(i, 1)[0]); hub.order[kind] = ids; save(); } }));
+            row.appendChild(U.el('span', { cls: 'flex1', html: '<b>' + U.esc(F.gameText(g, hub).name) + '</b>' + (o.hidden ? ' <span class="small muted">(hidden)</span>' : '') }));
+            row.appendChild(U.el('button', { cls: 'btn small' + (o.hidden ? ' primary' : ' ghost'), text: o.hidden ? 'Show' : 'Hide', onclick: () => { hub.games[id] = Object.assign({}, o, { hidden: !o.hidden }); save(); } }));
+            box.appendChild(row);
+          });
+        };
+        list('main', F.orderOf(hub, 'main'), F.GAMES);
+        list('mini', F.orderOf(hub, 'mini'), F.MINI);
+
+        box.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Coming soon' }));
+        box.appendChild(U.el('p', { cls: 'small muted mb', text: 'Shown after the main games in the carousel, or in the Mini Games corner, with no Play button.' }));
+        (hub.soon || []).forEach((s, i) => {
+          const card = U.el('div', { cls: 'panel mb' });
+          const name = U.el('input', { cls: 'txt', style: 'max-width:360px', value: s.name || '', placeholder: 'Name' });
+          const tag = U.el('input', { cls: 'txt mt', style: 'max-width:520px', value: s.tagline || '', placeholder: 'Tagline' });
+          const blurb = U.el('textarea', { cls: 'txt mt', rows: 2, placeholder: 'A line or two about it (optional)' }); blurb.value = s.blurb || '';
+          const kind = selectEl([['main', 'In the carousel'], ['mini', 'In Mini Games']], s.kind || 'main'); kind.style.maxWidth = '220px';
+          card.appendChild(name); card.appendChild(tag); card.appendChild(blurb); card.appendChild(kind);
+          card.appendChild(previewPicker(hub, s.id, at => { s.preview = at || undefined; save(); }));
+          card.appendChild(U.el('div', { cls: 'flex mt', style: 'gap:8px' }, [
+            U.el('button', { cls: 'btn primary small', text: 'Save', onclick: () => { Object.assign(s, { name: name.value.trim(), tagline: tag.value.trim(), blurb: blurb.value.trim(), kind: kind.value }); save(); } }),
+            U.el('button', { cls: 'btn small danger', text: 'Remove', onclick: async () => { if (!confirm('Remove this coming-soon slot?')) return; hub.soon.splice(i, 1); await F.removePreview(s.id).catch(() => null); save(); } }),
+          ]));
+          box.appendChild(card);
+        });
+        box.appendChild(U.el('button', { cls: 'btn', text: '+ Add a coming-soon game', onclick: () => {
+          hub.soon = hub.soon || [];
+          hub.soon.push({ id: 'soon_' + Date.now().toString(36), name: 'A new game', tagline: 'Coming soon', kind: 'main' });
+          save();
+        } }));
+      });
     },
 
-    /* ================= PER GAME ================= */
-    'Bans'(body) { bansPanel(body, section); },
-    'Saves'(body) {
-      if (section === 'rpg') savesPanel(body, 'rpg', 'Torcain’s Run');
-      else savesPanel(body, '4bw', 'The 4 Brothers Worlds');
+    /* ================= GENERAL: every player, in every game =================
+       Password reset requests from the home page come first. Each account:
+       set a new password, rename, ban from a game or all of them, Dya'Akara's
+       own account editor, or delete the account and everything it saved. */
+    Players(body) {
+      if (onlineNote(body)) return;
+      body.appendChild(cloudAccountsLine());
+      const reqBox = U.el('div', { cls: 'panel mb' }, [U.el('h3', { cls: 'gold mb', text: '🔑 Password reset requests' }), loading()]);
+      body.appendChild(reqBox);
+      const setPw = async (accId) => {
+        const pw = prompt('New password for ' + playerName(accId) + ' (at least 4 characters). Tell them yourself — the site sends no emails.');
+        if (!pw) return;
+        try { await F.adminSetPassword(accId, pw); const a = G.world.accounts[accId]; if (a) a.passHash = F.hashPass(pw); alert('Done. ' + playerName(accId) + ' can now sign in with the new password.'); rerender(); }
+        catch (e) { alert('Could not set it: ' + e.message); }
+      };
+      F.fetchResetRequests().then(reqs => {
+        reqBox.lastChild.remove();
+        if (!reqs.length) { reqBox.appendChild(U.el('p', { cls: 'muted small', text: 'None.' })); return; }
+        reqs.forEach(q => {
+          const a = realPlayers().find(x => x.email === q.email);
+          const line = U.el('div', { cls: 'banlist-row flex' });
+          line.appendChild(U.el('div', { cls: 'flex1', html: '<b>' + U.esc(q.email) + '</b>' + (a ? ' · ' + U.esc(a.displayName) : ' <span class="small" style="color:var(--red)">(no account with this email)</span>') + (q.note ? ' — <i>' + U.esc(q.note) + '</i>' : '') + ' <span class="small muted">' + (q.at ? U.timeAgo(q.at) : '') + '</span>' }));
+          if (a) line.appendChild(U.el('button', { cls: 'btn small primary', text: 'Set new password', onclick: () => setPw(a.id) }));
+          line.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Dismiss', onclick: async () => { await F.clearResetRequest(q.email).catch(() => null); rerender(); } }));
+          reqBox.appendChild(line);
+        });
+      }).catch(e => { reqBox.lastChild.remove(); reqBox.appendChild(U.el('p', { cls: 'small', style: 'color:var(--red)', text: '⚠ ' + e.message })); });
+
+      const box = U.el('div', { cls: 'panel' }, [loading()]);
+      body.appendChild(box);
+      Promise.all([SAVES.rpg.list().catch(() => []), SAVES['4bw'].list().catch(() => []), liveBans().catch(() => [])]).then(([rpg, fbw, bans]) => {
+        box.innerHTML = '';
+        const has = (list, id) => list.some(r => r.id === id && !r.reset);
+        const search = U.el('input', { cls: 'txt mb', style: 'max-width:320px', placeholder: 'Filter by name or email' });
+        box.appendChild(search);
+        const tbl = U.el('table', { cls: 'adm' });
+        box.appendChild(tbl);
+        const paint = () => {
+          tbl.innerHTML = '';
+          tbl.appendChild(U.el('tr', {}, ['Name', 'Email', 'Joined', 'Dya’Akara', 'Torcain’s Run', '4 Brothers', 'Little Dungeon', 'Bans', ''].map(h => U.el('th', { text: h }))));
+          const q = search.value.trim().toLowerCase();
+          realPlayers().filter(a => !q || String(a.displayName).toLowerCase().includes(q) || String(a.email || '').toLowerCase().includes(q)).forEach(a => {
+            const myBans = bans.filter(b => b.id === a.id).map(b => F.scopeName(b.sc));
+            const td = U.el('td', { style: 'white-space:normal;min-width:260px' });
+            td.appendChild(U.el('button', { cls: 'btn small', text: 'Set password', onclick: () => setPw(a.id) }));
+            td.appendChild(U.el('button', { cls: 'btn small', text: 'Rename', onclick: async () => {
+              const n = prompt('New display name for ' + a.displayName + ':', a.displayName); if (!n) return;
+              try { await F.adminRename(a.id, n); a.displayName = n.trim(); rerender(); } catch (e) { alert(e.message); }
+            } }));
+            td.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Ban…', onclick: () => {
+              const sc = prompt('Ban from which game? Type one of: ' + F.SCOPES.map(s => s[0] + ' (' + s[1] + ')').join(', '), 'all');
+              if (sc && F.SCOPES.some(s => s[0] === sc)) banPrompt(a.id, sc);
+            } }));
+            td.appendChild(U.el('button', { cls: 'btn small ghost', text: 'Dya’Akara details', onclick: () => editAccount(a) }));
+            td.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: async () => {
+              if (!confirm('Delete ' + a.displayName + ' (' + a.email + ') and everything they saved in every game? This cannot be undone.')) return;
+              try { await F.wipeGameData(a.id); await deleteAccount(a); rerender(); } catch (e) { alert('Could not delete: ' + e.message); }
+            } }));
+            tbl.appendChild(U.el('tr', {}, [
+              U.el('td', { text: a.displayName }), U.el('td', { text: a.email || '—' }),
+              U.el('td', { text: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—' }),
+              U.el('td', { text: a.tutorial && a.tutorial.done ? 'Lv ' + (a.level || 0) : (a.dyaSetupPending || a.flakeNew ? 'not yet' : 'tutorial') }),
+              U.el('td', { text: has(rpg, a.id) ? '✓' : '' }), U.el('td', { text: has(fbw, a.id) ? '✓' : '' }),
+              U.el('td', { text: a.ldRun ? 'run in progress' : '' }),
+              U.el('td', { html: myBans.length ? '<span style="color:var(--red)">' + U.esc(myBans.join(', ')) + '</span>' : '' }), td,
+            ]));
+          });
+        };
+        search.oninput = paint;
+        paint();
+      });
     },
-    'Torcain’s Run'(body) {
-      gameLinks(body, 'rpg', 'The 3D adventure, under rpg/. Story progress saves to each player’s account at every Nur Lantern and story beat (see Saves). Its roadmap is rpg/ROADMAP.md.');
+
+    'Bans'(body) { bansPanel(body, section === 'general' ? null : section); },
+
+    /* ================= GENERAL: the Admin Panel's own password ================= */
+    'Admin Password'(body) {
+      if (onlineNote(body)) return;
+      const box = U.el('div', { cls: 'panel', style: 'max-width:440px' });
+      box.appendChild(U.el('p', { cls: 'small muted mb', text: 'One password for the Admin Panel on every device, kept online as a slow salted hash (it can’t be read back). At least ' + F.admin.MIN + ' characters.' }));
+      const cur = U.el('input', { cls: 'txt', type: 'password', placeholder: 'Current password' });
+      const next = U.el('input', { cls: 'txt mt', type: 'password', placeholder: 'New password' });
+      const again = U.el('input', { cls: 'txt mt', type: 'password', placeholder: 'New password again' });
+      box.appendChild(cur); box.appendChild(next); box.appendChild(again);
+      const btn = U.el('button', { cls: 'btn primary mt', text: 'Change password', onclick: async () => {
+        if (next.value !== again.value) { alert('The two new passwords don’t match.'); return; }
+        btn.disabled = true;
+        try { await F.admin.change(cur.value, next.value); const rec = await F.admin.fetch(); try { sessionStorage.setItem(ADMIN_TAB_KEY, rec.hash); } catch (e) { /* ignore */ } flashSaved(box, 'Changed.'); cur.value = next.value = again.value = ''; }
+        catch (e) { alert(e.message); }
+        btn.disabled = false;
+      } });
+      box.appendChild(btn);
+      body.appendChild(box);
     },
-    'Little Dungeon'(body) {
-      gameLinks(body, 'ld', 'The mini game (once Legends of Pia’don, inside Dya’Akara), now its own page under mini-games/little-dungeon/. It uses Dya’Akara’s creatures, and a won solo run pays gold into the player’s account. A run in progress is saved on the account.');
+
+    /* ================= PER GAME (Torcain's Run, the 4 Brothers, Little Dungeon) ================= */
+    'Game Overview'(body) {
+      if (onlineNote(body)) return;
+      gameIntro(body, section);
+      const game = section;
+      const holder = U.el('div', {}, [loading()]);
+      body.appendChild(holder);
+      Promise.all([SAVES[game].list(), liveBans()]).then(([rows, bans]) => {
+        holder.innerHTML = '';
+        const live = rows.filter(r => !r.reset);
+        const week = Date.now() - 7 * 864e5;
+        const banned = bans.filter(b => b.sc === game || b.sc === 'all').length;
+        holder.appendChild(tiles([
+          [game === 'ld' ? 'Runs in progress' : 'Players with a save', live.length],
+          ['Saved this week', live.filter(r => r.at > week).length],
+          ['Banned here', banned],
+        ]));
+        holder.appendChild(U.el('h3', { cls: 'gold mb', text: 'Played most recently' }));
+        const t = U.el('div', {});
+        holder.appendChild(t);
+        savesTable(t, game, live.sort((a, b) => b.at - a.at), 10);
+      }).catch(e => errLine(holder, 'the overview', e));
+    },
+    'Game Players'(body) {
+      if (onlineNote(body)) return;
+      const game = section;
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: game === 'ld'
+        ? 'Runs in progress kept on players’ accounts (guests keep theirs in their own browser). Clearing one ends that run.'
+        : 'Every player’s save. View / edit shows it exactly as the game keeps it; Reset starts them over the next time they open the game.' }));
+      const holder = U.el('div', { cls: 'panel' }, [loading()]);
+      body.appendChild(holder);
+      SAVES[game].list().then(rows => savesTable(holder, game, rows)).catch(e => errLine(holder, 'saves', e));
     },
 
     /* ================= OVERVIEW ================= */
@@ -1637,7 +1988,8 @@
       const status = U.el('p', { cls: 'small ' + (st.error ? '' : 'muted'), style: st.error ? 'color:var(--red)' : '', text: !on ? '' : st.error ? '⚠ Live channel problem: ' + st.error + (/(relation|table)/i.test(st.error) ? ' — run supabase/schema.sql to add the dya_config table.' : '') : '📡 Live channel ready' + (st.lastPush ? ' · last broadcast ' + U.timeAgo(st.lastPush) : '') + '.' });
       body.appendChild(status);
       const doc = () => (LV && LV.doc) || (LV ? LV.emptyDoc() : { items: [], banner: {}, maintenance: {}, reload: {} });
-      const targetSel = (v) => selectEl((LV ? LV.TARGETS : [['all', 'Everywhere']]), v || 'all');
+      const here = LIVE_TARGET[section] || 'all';   // a game's own Announcements page starts aimed at that game
+      const targetSel = (v) => selectEl((LV ? LV.TARGETS : [['all', 'Everywhere']]), v || here);
       const done = (r, what) => {
         if (!r) return;
         if (r.err) alert('Saved locally, but the live broadcast failed: ' + r.err);
@@ -1653,7 +2005,7 @@
       const txt = U.el('textarea', { cls: 'txt mt', rows: 3, placeholder: 'Body' });
       abox.appendChild(title); abox.appendChild(txt);
       const arow = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:8px;align-items:center' });
-      const aTarget = targetSel('all');
+      const aTarget = targetSel(here);
       const aIcon = U.el('input', { cls: 'txt', value: '📣', style: 'max-width:60px', title: 'Icon' });
       const popWrap = U.el('label', { cls: 'small', style: 'display:flex;gap:6px;align-items:center' });
       const pop = U.el('input', { type: 'checkbox' }); pop.checked = true;
@@ -1677,7 +2029,7 @@
       const ab = U.el('textarea', { cls: 'txt mt', rows: 2, placeholder: 'Body' });
       vbox.appendChild(at); vbox.appendChild(ab);
       const vrow = U.el('div', { cls: 'flex mt', style: 'flex-wrap:wrap;gap:8px' });
-      const vTarget = targetSel('all');
+      const vTarget = targetSel(here);
       vrow.appendChild(vTarget);
       vrow.appendChild(U.el('button', {
         cls: 'btn', text: '📰 Publish to the Avizu’Vac', onclick: () => {
@@ -1739,7 +2091,7 @@
           LV.update(d => { d.maintenance = { on: !mt.on, title: mTitle.value.trim(), text: mText.value.trim(), target: mTarget.value }; }).then(r => done(r, mt.on ? 'Maintenance lifted' : 'Maintenance on'));
         },
       }));
-      const rTarget = targetSel('all');
+      const rTarget = targetSel(here);
       mrow.appendChild(U.el('span', { cls: 'small muted', style: 'align-self:center;margin-left:12px', text: 'Refresh:' }));
       mrow.appendChild(rTarget);
       mrow.appendChild(U.el('button', {
@@ -1884,11 +2236,11 @@
        The 4 Brothers World guides (HOW-TO-ADD.md, README.md, CHANGELOG.md),
        read live from the site and shown formatted, plus quick links and the
        live tools aimed at that game. */
-    '4 Brothers World'(body) {
+    Guide(body) {
       body.appendChild(U.el('p', { cls: 'muted small mb', text: 'The four brothers’ platformer. Its how-to-add guide is below, read straight from four-brothers-world/ on this site, so it is always the version that is deployed.' }));
       const links = U.el('div', { cls: 'flex mb', style: 'flex-wrap:wrap;gap:8px' });
       links.appendChild(U.el('button', { cls: 'btn primary', text: '▶ Open 4 Brothers World', onclick: () => window.open('four-brothers-world/index.html', '_blank') }));
-      links.appendChild(U.el('button', { cls: 'btn', text: '📣 Announce to 4 Brothers World players', onclick: () => goto('general', 'Announcements') }));
+      links.appendChild(U.el('button', { cls: 'btn', text: '📣 Announce to 4 Brothers World players', onclick: () => goto('4bw', 'Announcements') }));
       body.appendChild(links);
       const tabs = U.el('div', { cls: 'flex mb', style: 'gap:6px' });
       const holder = U.el('div', { cls: 'panel md-doc' });

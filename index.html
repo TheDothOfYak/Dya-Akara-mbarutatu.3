@@ -11,6 +11,8 @@
   <meta name="apple-mobile-web-app-title" content="Flake Games">
   <meta name="application-name" content="Flake Games">
   <title>Flake Games</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="img/icon-180.png">
   <link rel="stylesheet" href="css/hub.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%2307070d'/><circle cx='50' cy='50' r='12' fill='%23ffe39a'/><ellipse cx='50' cy='50' rx='38' ry='14' fill='none' stroke='%23d9b87a' stroke-width='4' transform='rotate(-18 50 50)'/><circle cx='83' cy='39' r='6' fill='%2368e0e8'/></svg>">
   <!-- tells the live broadcasts (js/core/broadcast.js) this is the home page -->
@@ -67,18 +69,46 @@
       <p class="muted small" id="auth-lead">One account for every game. Already played Dya’Akara or Torcain’s Run? Use that same email and password.</p>
       <label for="a-email">Email</label>
       <input id="a-email" type="email" autocomplete="username" placeholder="you@example.com" required>
-      <label for="a-pass">Password</label>
-      <input id="a-pass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+      <div id="a-pass-row">
+        <label for="a-pass">Password</label>
+        <input id="a-pass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+      </div>
       <div id="a-name-row" class="hidden">
         <label for="a-name">Display name</label>
         <input id="a-name" maxlength="20" autocomplete="nickname" placeholder="2–20 characters">
+      </div>
+      <div id="a-note-row" class="hidden">
+        <label for="a-note">Anything the admin should know (optional)</label>
+        <input id="a-note" maxlength="300" placeholder="e.g. how to reach you">
       </div>
       <p class="err" id="a-err" role="alert"></p>
       <div class="row">
         <button class="btn primary" id="a-go" type="submit">Sign in</button>
         <button class="btn ghost" id="a-cancel" type="button">Cancel</button>
       </div>
+      <p class="small" id="a-forgot-row"><button type="button" class="link" id="a-forgot">Forgot your password?</button></p>
     </form>
+  </div>
+
+  <!-- your account: name, password, delete -->
+  <div class="modal hidden" id="me" role="dialog" aria-modal="true" aria-labelledby="me-h">
+    <div class="panel modal-box">
+      <h2 id="me-h">Your account</h2>
+      <p class="muted small" id="me-email"></p>
+      <label for="me-name">Display name</label>
+      <div class="row"><input id="me-name" maxlength="20" autocomplete="nickname"><button class="btn" id="me-name-go" type="button">Save</button></div>
+      <h3>Change password</h3>
+      <label for="me-cur">Current password</label>
+      <input id="me-cur" type="password" autocomplete="current-password">
+      <label for="me-new">New password</label>
+      <div class="row"><input id="me-new" type="password" autocomplete="new-password"><button class="btn" id="me-pw-go" type="button">Change</button></div>
+      <h3>Delete account</h3>
+      <p class="muted small">Deletes your account and everything every game saved on it. This can’t be undone.</p>
+      <label for="me-del">Your password</label>
+      <div class="row"><input id="me-del" type="password" autocomplete="current-password"><button class="btn danger" id="me-del-go" type="button">Delete</button></div>
+      <p class="err" id="me-err" role="alert"></p>
+      <div class="row"><button class="btn ghost" id="me-close" type="button">Close</button></div>
+    </div>
   </div>
 
   <div class="toast hidden" id="toast" role="status"></div>
