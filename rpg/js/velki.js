@@ -290,11 +290,11 @@ export function createVelki(ctx) {
     for (const [x, z, sc] of scatter) if (Math.hypot(x, z) < 330) cyl(x, z, 0.5 * sc, heightAt(x, z) - 1, heightAt(x, z) + 8 * sc);
     for (const [x, y, z, sc] of rocks) if (sc > 1) cyl(x, z, sc, y - 1, y + sc * 0.6);
   }
-  for (const T of HOMES_OUT) homeTrees.push(buildHomeTree(scene, T.x, T.z, T.g, { R: T.R, H: T.H, seed: T.seed, town: 0.8, rootReach: 1.5, doorAt: Math.atan2(-T.z, -T.x) }));
+  for (const T of HOMES_OUT) homeTrees.push(buildHomeTree(scene, T.x, T.z, T.g, { R: T.R, H: T.H, seed: T.seed, town: 0.8, decks: [0.06, 0.1, 0.14, 0.18, 0.22, 0.26, 0.3], rootReach: 1.5, doorAt: Math.atan2(-T.z, -T.x) }));
   // the city's own: its roots never reach in over the streets, and its door faces the spire
   const toCity = Math.atan2(-HOME.z, -HOME.x);
   homeTrees.push(buildHomeTree(scene, HOME.x, HOME.z, 0, {
-    R: HOME.R, H: HOME.H, seed: 307, town: 1, decks: [0.07, 0.15, 0.24, 0.34, 0.45], doorAt: toCity, rootReach: 1.35,
+    R: HOME.R, H: HOME.H, seed: 307, town: 1, decks: [0.05, 0.085, 0.12, 0.155, 0.19, 0.225, 0.26, 0.295, 0.33], doorAt: toCity, rootReach: 1.35,
     banners: [0x8a2a3a, 0xd8a040], rootSkip: a => Math.abs(Math.atan2(Math.sin(a - toCity), Math.cos(a - toCity))) < 1.1,
   }));
   for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);   // the roots and the hearth (the walls are the tree's own)

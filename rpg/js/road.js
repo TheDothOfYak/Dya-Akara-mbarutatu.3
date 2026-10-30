@@ -255,10 +255,10 @@ export function createRoad(ctx) {
   const toCore = Math.atan2(CORE.z - TREE.z, CORE.x - TREE.x);
   {
     const T = buildHomeTree(scene, TREE.x, TREE.z, 0, {
-      R: TREE.R, H: TREE.H, seed: 41, town: 1, decks: [0.05, 0.1, 0.16, 0.23], roots: 8, rootReach: 1.75, doorAt: toCore, banners: [0x2f6f8a, 0xd9a441],
+      R: TREE.R, H: TREE.H, seed: 41, town: 1, decks: [0.045, 0.085, 0.125, 0.165, 0.205, 0.245], roots: 8, rootReach: 1.75, doorAt: toCore, banners: [0x2f6f8a, 0xd9a441],
     });
     // the younger tree, lived in too: in at its door and up its own stair
-    const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.07, 0.14, 0.22], roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
+    const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.06, 0.11, 0.16, 0.21], roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
     for (const t of [T, T2]) { t.colliders.forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1)); TREES.push(t); }   // the roots, the hearth (the walls are the tree's own)
     HT = T;
   }
