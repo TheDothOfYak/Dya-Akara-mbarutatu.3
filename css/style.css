@@ -775,8 +775,11 @@ body { -webkit-tap-highlight-color: transparent; }
   .hud-minimap canvas { width: 92px !important; height: 92px !important; }
   /* readied board: narrower, tucked to the top-right under the resources */
   .hud-readied {
-    width: 84px; right: 10px; top: 92px; padding: 6px 5px; gap: 5px;
+    width: 84px; right: 10px; top: 108px; padding: 6px 5px; gap: 5px;
+    max-height: calc(100vh - 210px); overflow-y: auto;
   }
+  /* the match chat button steps left so a full readied column never covers it */
+  #matchScreen > .btn.ghost[style*="bottom:130px"], #matchScreen > .btn.ghost[style*="bottom: 130px"] { bottom: 100px !important; right: 102px !important; padding: 6px 10px; }
   .hud-readied::before { font-size: 8px; letter-spacing: .14em; }
   .readied-slot { padding: 4px; }
   .readied-slot canvas { width: 42px !important; height: 42px !important; }

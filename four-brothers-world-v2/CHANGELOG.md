@@ -4,6 +4,7 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 
 ## Phones and tablets
 - **Play on a phone or tablet.** On a touch screen the game shows its own controls: a joystick on the left (push it all the way to run), Jump, Hit, Use, Cast, Spell, Talk, Torch, Drop and Power (hero magic) on the right, and touch and hold anywhere in the world to swing, mine, chop or place a block right there. In the bag, tap to pick up and put down, and hold an item to eat or wear it. The HUD gets smaller and Chat gets a button. With a mouse and keyboard nothing changes. Code: `js/flake/fbw_touch.js`.
+- **More for phones.** Double-tap a spot to use or cast on it (the right-click: fishing, pets, chests, beds). Settings has a Touch controls section: button size, see-through buttons, left-handed (joystick on the right) and a buzz on each press. Hints say which button to tap instead of which key to press, Controls lists the touch controls, the screen stays on while you play, and the game can go full screen from a phone's home screen.
 
 ## Hero magic (V)
 - **Ghost:** turn invisible for 6 s. Monsters lose track of you, and your first hit from hiding lands twice as hard.

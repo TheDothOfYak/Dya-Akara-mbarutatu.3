@@ -6,13 +6,20 @@
      Left thumb:  a joystick. Left/right walks, up jumps and climbs,
                   down drops and dives. Push past the rim to run.
      The world:   touch and hold anywhere on the game to swing, mine,
-                  chop or place a block right there (the mouse's job).
+                  chop or place a block right there (the left mouse);
+                  double-tap a spot to use or cast on it (the right).
      Buttons:     Jump, Hit (swings at what's in front of you), Use
                   (eat / cast), Cast, Spell, Talk, Torch, Drop, and
                   the hero ability in v2. Bag, Map, Guide and Chat sit
                   with the Menu button.
      The bag:     tap to pick up and put down; hold a slot to eat or
                   wear what's in it (the right-click).
+     Settings:    a Touch controls section: button size, see-through
+                  buttons, left-handed (joystick on the right) and a
+                  little buzz on each press. Kept in this browser.
+     Words:       hints that name keys ("Press R", "F to cast") name
+                  the buttons instead, and Controls lists the touch
+                  controls.
 
    Turns itself on only on a touch screen (a coarse pointer, or the
    first touch), so mouse-and-keyboard players never see any of it
@@ -51,6 +58,19 @@
   const release = (id) => { if (held[id] && LEGACY) legacy(id, false); held[id] = false; };
 
   let on = false, root = null, cv = null;
+
+  /* ---------- touch settings, kept in this browser ---------- */
+  const OPT_KEY = 'fbw-touch-opts';
+  const TO = Object.assign({ size: 'normal', faint: false, lefty: false, buzz: true }, (() => { try { return JSON.parse(localStorage.getItem(OPT_KEY) || '{}'); } catch (e) { return {}; } })());
+  const saveOpts = () => { try { localStorage.setItem(OPT_KEY, JSON.stringify(TO)); } catch (e) { /* private mode */ } };
+  function applyOpts() {
+    if (!root) return;
+    root.classList.toggle('sz-s', TO.size === 'small');
+    root.classList.toggle('sz-l', TO.size === 'large');
+    root.classList.toggle('faint', !!TO.faint);
+    document.body.classList.toggle('fbw-lefty', !!TO.lefty);
+  }
+  const buzz = () => { if (TO.buzz && navigator.vibrate) try { navigator.vibrate(8); } catch (e) { /* ignore */ } };
   const $ = (s) => document.querySelector(s);
   const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const playing = () => !!(RW.game && RW.game.playing);
@@ -99,7 +119,8 @@
   function setHeld(id, v) { if (v) press(id); else release(id); }
 
   /* ---------- touching the world: the left mouse button, right there ---------- */
-  let worldId = null;
+  // a quick second tap on the same spot is the right mouse button there: eat, cast, fish, open, pet
+  let worldId = null, worldUse = false, downAt = null, lastTap = { t: 0, x: 0, y: 0 };
   function worldDown(e) {
     if (!on || e.pointerType === 'mouse' || !playing()) return;
     if (worldId !== null) return;
@@ -107,10 +128,25 @@
     worldId = e.pointerId;
     RW.audio && RW.audio.start && RW.audio.start();
     const ae = document.activeElement; if (ae && ae !== document.body && ae.blur) ae.blur();
-    aimAtClient(e.clientX, e.clientY); press('attack');
+    aimAtClient(e.clientX, e.clientY);
+    const now = performance.now();
+    if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 36) {
+      worldUse = true; lastTap.t = 0;
+      press('use'); setTimeout(() => release('use'), 60);
+      return;
+    }
+    downAt = { t: now, x: e.clientX, y: e.clientY };
+    press('attack');
   }
   function worldMove(e) { if (e.pointerId === worldId) aimAtClient(e.clientX, e.clientY); }
-  function worldUp(e) { if (e.pointerId === worldId) { worldId = null; release('attack'); } }
+  function worldUp(e) {
+    if (e.pointerId !== worldId) return;
+    worldId = null;
+    if (worldUse) { worldUse = false; return; }
+    release('attack');
+    const now = performance.now();
+    if (downAt && now - downAt.t < 250 && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 14) lastTap = { t: now, x: e.clientX, y: e.clientY };
+  }
 
   /* ---------- buttons ---------- */
   // [id, label, action, hold?, size]
@@ -138,6 +174,7 @@
       b.classList.add('down');
       try { b.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       RW.audio && RW.audio.start && RW.audio.start();
+      buzz();
       if (action === 'attack' || action === 'use' || action === 'cast') { aimAhead(); if (action === 'attack' && !aheadT) aheadT = requestAnimationFrame(aheadLoop); }
       press(action);
       if (!hold) setTimeout(() => release(action), 60);
@@ -158,6 +195,102 @@
     });
   }
 
+  /* ---------- words: name the buttons, not the keys ---------- */
+  const LABEL = { left: 'Joystick', right: 'Joystick', up: 'Joystick up', down: 'Joystick down', jump: 'Jump', sprint: 'Joystick (push all the way)', attack: 'Hit', use: 'Use', cast: 'Cast', spell: 'Spell', interact: 'Talk', torch: 'Torch', drop: 'Drop', give: 'Give', ability: 'Power', bag: 'Bag', map: 'Map', guide: 'Guide', help: 'Controls', settings: 'Settings', chat: 'Chat' };
+  let realKeys = 0;   // > 0 while the Settings key table or the HUD key hints draw: those want the real keys
+  const kn0 = RW.keyName;
+  if (kn0) RW.keyName = function (c) {
+    if (on && !realKeys && c && RW.binds) {
+      for (const id in LABEL) if ((RW.binds[id] || []).includes(c)) return LABEL[id];
+    }
+    return kn0.apply(this, arguments);
+  };
+  const realKeysDuring = (fn) => function () { realKeys++; try { return fn.apply(this, arguments); } finally { realKeys--; } };
+  // hard-written hints in the game's text, said the touch way
+  const WORDS = [
+    [/Hold left mouse on /g, 'Touch and hold '], [/hold left mouse on /g, 'touch and hold '],
+    [/Right-click or F to cast\. Q switches spells\./g, 'Tap Cast (or double-tap where you aim) to cast. Spell switches spells.'],
+    [/F or right-click slams/g, 'Cast slams'],
+    [/Right-click casts (\w+), Q switches to/g, 'Use casts $1, Spell switches to'],
+    [/F casts (\w+), Q switches to/g, 'Cast casts $1, Spell switches to'],
+    [/\(R or right-click\)/g, '(Talk, or double-tap it)'], [/R or right-click/g, 'Talk, or double-tap it,'],
+    [/ \(R\)/g, ' (Talk)'],
+    [/Press H for controls\./g, 'Menu → Controls shows the buttons.'],
+    [/\bPress R\b/g, 'Tap Talk'], [/\bpress R\b/g, 'tap Talk'], [/\bPress T\b/g, 'Tap Torch'],
+    [/ · right-click to wear/g, ' · hold it in the bag to wear'],
+    [/Right-click armor in your bag/g, 'Hold armor in your bag'],
+    [/\bRight-click\b/g, 'Double-tap'], [/\bright-click\b/g, 'double-tap'],
+    [/ · F to cast · Q to switch/g, ' · tap Cast · Spell switches'],
+    [/\bCast to cast\b/g, 'tap Cast'], [/\bSpell to switch\b/g, 'Spell switches'],
+  ];
+  function sayTouch(node) {
+    if (!on || !node) return;
+    const walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+      let v = t.nodeValue, w = v;
+      for (const [re, to] of WORDS) w = w.replace(re, to);
+      if (w !== v) t.nodeValue = w;
+    }
+  }
+  function watchWords() {
+    ['#toast', '#banner', '#spellchip', '#feed', '#talk', '#carve', '#tooltip', '#pick', '#riftm', '#chest'].forEach((sel) => {
+      const n = $(sel); if (!n) return;
+      sayTouch(n);
+      new MutationObserver(() => sayTouch(n)).observe(n, { childList: true, characterData: true, subtree: true });
+    });
+    // the "R: Talk" drawn over a person's head
+    const g = cv && cv.getContext && cv.getContext('2d');
+    if (g && !g._touchText) {
+      const ft = g.fillText;
+      g.fillText = function (t) { if (t === 'R: Talk') arguments[0] = 'Talk'; return ft.apply(this, arguments); };
+      g._touchText = true;
+    }
+  }
+
+  /* Controls: the touch controls (the keyboard still works, and says so) */
+  const HELP = [
+    ['Joystick', 'Walk. Push up to jump or climb, down to drop through walkways or dive. Push all the way to run (uses stamina).'],
+    ['Jump', 'Jump. In water, hold to swim up. Rocks sink but never drown; fuzzies float but need air'],
+    ['Touch & hold', 'anywhere in the world: swing, shoot bows, mine, chop trees, place blocks, plant on farm soil, right there'],
+    ['Double-tap', 'a spot: use, cast or open what is there: fish, feed a pet, open a chest, sleep in a bed'],
+    ['Hit', 'Swing at whatever is in front of you'],
+    ['Use', 'Eat or consume what you hold, otherwise cast your spell ahead of you'],
+    ['Cast · Spell', 'Cast your spell · switch spell'],
+    ['Talk', 'Talk, read carvings, open chests, use waystones, rifts and Duat Altars'],
+    ['Torch · Drop', 'Light your torch or put it away · drop what you hold'],
+    ['Power', 'Your hero magic (V2)'],
+    ['Hotbar', 'Tap a slot to hold it. Hold a slot to eat or wear what is in it'],
+    ['Bag · Map · Guide', 'Top right. In the bag, tap to pick up and put down, hold to eat or wear'],
+    ['Chat', 'Talk with the other players in your world'],
+    ['Menu', 'Pause, travel, Settings (bigger or see-through buttons, left-handed), save'],
+  ];
+  function touchHelp() {
+    const box = $('#help .keys'); if (!box) return;
+    box.innerHTML = '';
+    HELP.forEach(([k, t]) => { if (k === 'Power' && !(RW.binds && RW.binds.ability)) return; const a = mk('kbd', null, k), b = mk('span', null, t); box.append(a, b); });
+    const n = mk('span', 'label', 'Got a keyboard and mouse too? They still work.'); box.append(mk('span'), n);
+  }
+
+  /* Settings: a Touch controls section at the top */
+  function touchOpts() {
+    const box = $('#optbody'); if (!box) return;
+    const frag = document.createDocumentFragment();
+    frag.append(mk('div', 'label opt-h', 'Touch controls'));
+    const row = (label, ctl) => { const r = mk('label', 'opt-row'); r.append(mk('span', null, label), ctl); frag.append(r); };
+    const sizes = mk('span', 'chips');
+    [['small', 'Small'], ['normal', 'Normal'], ['large', 'Large']].forEach(([v, n]) => {
+      const c = mk('button', 'chip', n); c.type = 'button'; c.setAttribute('aria-pressed', String(TO.size === v));
+      c.onclick = (e) => { e.preventDefault(); TO.size = v; saveOpts(); applyOpts(); sizes.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x === c))); };
+      sizes.append(c);
+    });
+    row('Button size', sizes);
+    const check = (label, key) => { const cb = mk('input'); cb.type = 'checkbox'; cb.checked = !!TO[key]; cb.onchange = () => { TO[key] = cb.checked; saveOpts(); applyOpts(); if (key === 'buzz' && cb.checked) buzz(); }; row(label, cb); };
+    check('See-through buttons', 'faint');
+    check('Left-handed (joystick on the right)', 'lefty');
+    check('Buzz on each press', 'buzz');
+    box.insertBefore(frag, box.firstChild);
+  }
+
   function build() {
     root = mk('div'); root.id = 'fbtouch';
     stick = mk('div', 'fbstick'); knob = mk('div', 'fbknob'); stick.appendChild(knob);
@@ -171,6 +304,7 @@
     setTimeout(() => rot.classList.add('gone'), 12000);
     root.append(stick, pad, rot);
     document.body.appendChild(root);
+    applyOpts();
 
     // Chat joins Bag, Map and Guide
     const hb = $('#helpbtns');
@@ -219,8 +353,12 @@
 
     // keep the key hints off the buttons when the game redraws them
     const U = RW.ui;
-    if (U && U.hudKeys && !U.hudKeys._touch) { const h0 = U.hudKeys; U.hudKeys = function () { const r = h0.apply(this, arguments); stripKeys(); return r; }; U.hudKeys._touch = true; }
+    if (U && U.hudKeys && !U.hudKeys._touch) { const h0 = realKeysDuring(U.hudKeys); U.hudKeys = function () { const r = h0.apply(this, arguments); stripKeys(); return r; }; U.hudKeys._touch = true; }
+    if (U && U.renderOpts && !U.renderOpts._touch) { const o0 = realKeysDuring(U.renderOpts); U.renderOpts = function () { const r = o0.apply(this, arguments); touchOpts(); return r; }; U.renderOpts._touch = true; }
+    if (U && U.renderHelp && !U.renderHelp._touch) { const h1 = U.renderHelp; U.renderHelp = function () { const r = h1.apply(this, arguments); touchHelp(); return r; }; U.renderHelp._touch = true; }
+    touchHelp();
     stripKeys();
+    watchWords();
     new MutationObserver(() => stripKeys()).observe($('#ui') || document.body, { childList: true, subtree: true });
   }
 
@@ -272,6 +410,19 @@ body.fbw-touch button, body.fbw-touch .slot, body.fbw-touch .chip { touch-action
 .fbt.sm { width: 40px; height: 40px; font-size: 12px; letter-spacing: -.02em; }
 .fbt.down { background: rgba(127,227,255,.35); border-color: var(--crystal); }
 #fbt-attack { background: rgba(120,40,34,.6); }
+#fbtouch.sz-s .fbpad { transform: scale(.85); transform-origin: bottom right; }
+#fbtouch.sz-s .fbstick { transform: scale(.85); transform-origin: bottom left; }
+#fbtouch.sz-l .fbpad { transform: scale(1.2); transform-origin: bottom right; }
+#fbtouch.sz-l .fbstick { transform: scale(1.2); transform-origin: bottom left; }
+#fbtouch.faint .fbt, #fbtouch.faint .fbstick { opacity: .42; }
+#fbtouch.faint .fbt.down, #fbtouch.faint .fbstick:active { opacity: .9; }
+body.fbw-lefty .fbstick { left: auto; right: calc(18px + env(safe-area-inset-right, 0px)); }
+body.fbw-lefty .fbpad { right: auto; left: calc(14px + env(safe-area-inset-left, 0px)); justify-content: flex-start; }
+body.fbw-lefty #fbtouch.sz-s .fbpad, body.fbw-lefty #fbtouch.sz-l .fbpad { transform-origin: bottom left; }
+body.fbw-lefty #fbtouch.sz-s .fbstick, body.fbw-lefty #fbtouch.sz-l .fbstick { transform-origin: bottom right; }
+body.fbw-touch.fbw-lefty #hotbar, body.fbw-touch.fbw-lefty #spellchip, body.fbw-touch.fbw-lefty #toast { left: calc(50% + 32px); }
+body.fbw-touch #optbody .chips .chip { min-height: 34px; }
+body.fbw-touch #optbody input[type=checkbox] { width: 22px; height: 22px; flex: 0 0 auto; }
 #fbt-jump { background: rgba(35,64,74,.72); }
 .fbrot { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); display: none; pointer-events: auto; background: rgba(13,11,18,.85); border: 2px solid var(--edge); padding: 6px 12px; font-size: 16px; color: var(--muted); text-align: center; width: max-content; max-width: calc(100vw - 48px); }
 #fbtouch.portrait:not(.off) .fbrot:not(.gone) { display: block; }
@@ -304,9 +455,9 @@ body.fbw-touch #v2coins { left: max(16px, env(safe-area-inset-left, 0px)) !impor
   body.fbw-touch #zone { top: calc(150px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); text-align: center; }
   body.fbw-touch #v2coins { top: calc(76px + env(safe-area-inset-top, 0px)) !important; }
   body.fbw-touch #banner { top: 30%; }
-  body.fbw-touch #hotbar { bottom: calc(184px + env(safe-area-inset-bottom, 0px)); left: 50%; }
-  body.fbw-touch #spellchip { bottom: calc(220px + env(safe-area-inset-bottom, 0px)); left: 50%; max-width: calc(100vw - 32px); }
-  body.fbw-touch #toast { bottom: calc(256px + env(safe-area-inset-bottom, 0px)); left: 50%; max-width: calc(100vw - 32px); }
+  body.fbw-touch #hotbar, body.fbw-touch.fbw-lefty #hotbar { bottom: calc(184px + env(safe-area-inset-bottom, 0px)); left: 50%; }
+  body.fbw-touch #spellchip, body.fbw-touch.fbw-lefty #spellchip { bottom: calc(220px + env(safe-area-inset-bottom, 0px)); left: 50%; max-width: calc(100vw - 32px); }
+  body.fbw-touch #toast, body.fbw-touch.fbw-lefty #toast { bottom: calc(256px + env(safe-area-inset-bottom, 0px)); left: 50%; max-width: calc(100vw - 32px); }
   body.fbw-touch #chatlog { bottom: calc(290px + env(safe-area-inset-bottom, 0px)); }
 }
 
