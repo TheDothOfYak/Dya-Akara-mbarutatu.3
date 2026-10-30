@@ -2,9 +2,10 @@
    HOME TREES — the great trees of the Tatu that folk live in.
    Each is a town on its own, and the town is INSIDE it: the
    trunk is hollow, wider than a city square at the foot, and
-   folk live in the heartwood. Nothing is built on the outside
-   but the great door at the roots, lit windows, openings that
-   look out over the country, and ropes hanging from the limbs.
+   folk live in the heartwood. Nothing is built on the outside:
+   no platforms, ledges, bridges or lifts. All the bark shows is
+   the great door at the roots, lit windows set flush in it, and
+   openings cut through it that look out over the country.
 
    Inside: a great hall on the ground with a hearth in the middle
    and the rooms' doors all round its wall; above it floor after
@@ -254,15 +255,13 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     const winB = batch(root, new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffd9a0, side: THREE.DoubleSide }), 900, { shadow: false });
     const postB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 2600, { shadow: false });
     const archB = batch(root, new THREE.TorusGeometry(1, 0.16, 5, 12, Math.PI), toon(0x5a3a24), 500, { shadow: false });
-    const ropeB = batch(root, new THREE.CylinderGeometry(1, 1, 1, 5, 1).translate(0, 0.5, 0), toon(0x6a5a40), 60, { shadow: false });
-    // a lit window in the bark (a room in the heartwood behind it), with a frame and a sill, and sometimes a box of flowers
+    // a lit window in the bark (a room in the heartwood behind it), its frame set flush in the bark: nothing sticks out
     const barkWindow = (a, y, w = 1.0, h = 1.3) => {
       const r = rAt(y, a) + 0.04, fx = Math.cos(a), fz = Math.sin(a), sx = -Math.sin(a), sz = Math.cos(a), ry = faceRy(a);
       winB.put(fx * r, y, fz * r, w, h, 1, 0, ry, 0);
-      archB.put(fx * (r + 0.05), y + h * 0.5, fz * (r + 0.05), w * 0.5, w * 0.5, 0.6, 0, ry, 0);
-      for (const q of [-1, 1]) postB.put(fx * (r + 0.05) + sx * q * w * 0.5, y, fz * (r + 0.05) + sz * q * w * 0.5, 0.12, h, 0.14, 0, ry, 0, frameC);
-      postB.put(fx * (r + 0.12), y - h * 0.5 - 0.05, fz * (r + 0.12), w + 0.3, 0.12, 0.35, 0, ry, 0, 0x6a4428);
-      if (rnd() < 0.35) postB.put(fx * (r + 0.3), y - h * 0.5 + 0.1, fz * (r + 0.3), w + 0.1, 0.3, 0.3, 0, ry, 0, [0xd8604a, 0xe8c048, 0xc87ad8][Math.floor(rnd() * 3)]);
+      archB.put(fx * (r + 0.03), y + h * 0.5, fz * (r + 0.03), w * 0.5, w * 0.5, 0.3, 0, ry, 0);
+      for (const q of [-1, 1]) postB.put(fx * (r + 0.02) + sx * q * w * 0.5, y, fz * (r + 0.02) + sz * q * w * 0.5, 0.12, h, 0.08, 0, ry, 0, frameC);
+      postB.put(fx * (r + 0.02), y - h * 0.5, fz * (r + 0.02), w + 0.12, 0.1, 0.08, 0, ry, 0, frameC);
     };
     // the rooms in the heartwood show as windows all the way up the trunk, in loose storeys, clear of the openings
     const topW = Math.min(H * 0.62, ceilY + H * 0.08), k1 = Math.max(1, R / 14);
@@ -284,13 +283,6 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       winB.put(q.x, q.y, q.z, 0.8, 1.0, 1, 0, Math.atan2(nrm.x, nrm.z), 0);
       archB.put(q.x + nrm.x * 0.05, q.y + 0.5, q.z + nrm.z * 0.05, 0.4, 0.4, 0.6, 0, Math.atan2(nrm.x, nrm.z), 0);
     }
-    // a carved sill under each opening, and a lintel over it
-    for (const o of openings) {
-      if (o.kind === 'door') continue;
-      const ro = rAt(o.y0, o.a), fx = Math.cos(o.a), fz = Math.sin(o.a), w = 2 * o.hw * ro;
-      postB.put(fx * (ro + 0.15), o.y0 - 0.1, fz * (ro + 0.15), w + 0.8, 0.3, 0.7, 0, faceRy(o.a), 0, 0x6a4428);
-      const rt = rAt(o.y1, o.a); postB.put(fx * (rt + 0.1), o.y1 + 0.15, fz * (rt + 0.1), 2 * o.hw * rt + 1, 0.4, 0.5, 0, faceRy(o.a), 0, frameC);
-    }
     // the great door: an opening as tall as a house in the foot of the trunk, framed, its two leaves standing open against the bark
     {
       const a = door.a, ro = rAt(doorH * 0.5, a), fx = Math.cos(a), fz = Math.sin(a), tx = -Math.sin(a), tz = Math.cos(a), hwM = door.hw * ro;
@@ -306,14 +298,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         const na = a + s * (door.hw + (hwM * 1.1 + 1.4) / ro), nr = rAt(doorH * 0.62, na) + 0.2;
         winB.put(Math.cos(na) * nr, doorH * 0.62, Math.sin(na) * nr, 0.5, 0.7, 1, 0, faceRy(na), 0);   // a lantern either side
       }
-      postB.put(fx * (rAt(doorH, a) + 0.3), doorH + 0.3, fz * (rAt(doorH, a) + 0.3), 2 * hwM + 2.6, 0.9, 1.1, 0, faceRy(a), 0, 0x4a2c18);
-      archB.put(fx * (rAt(doorH, a) + 0.5), doorH + 0.8, fz * (rAt(doorH, a) + 0.5), hwM + 0.8, hwM * 0.5 + 0.6, 1.4, 0, faceRy(a), 0);
-    }
-    // rope lifts hanging from the limbs, with a basket on its way up
-    for (let k = 0; k < 6; k++) {
-      const a = rnd() * TAU, d = rAt(H * 0.3, a) + R * (1 + rnd()), top = H * (0.45 + rnd() * 0.15);
-      ropeB.seg(V3(Math.cos(a) * d, 0, Math.sin(a) * d), V3(Math.cos(a) * d, top, Math.sin(a) * d), 0.12, 0.12);
-      postB.put(Math.cos(a) * d, H * (0.1 + rnd() * 0.25), Math.sin(a) * d, 2, 1.4, 2, 0, a, 0, wood);
+      archB.put(fx * (rAt(doorH, a) + 0.1), doorH + 0.2, fz * (rAt(doorH, a) + 0.1), hwM + 0.8, hwM * 0.5 + 0.6, 0.5, 0, faceRy(a), 0);
     }
     // banners hung down the bark under the openings of the lower floors
     if (opts.banners) {
@@ -326,7 +311,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         b.position.set(Math.cos(o.a) * r, top - L / 2, Math.sin(o.a) * r); b.rotation.y = faceRy(o.a); root.add(b);
       });
     }
-    for (const b of [winB, postB, archB, ropeB]) b.done();
+    for (const b of [winB, postB, archB]) b.done();
   }
 
   /* ---- the town inside ---- */
@@ -555,46 +540,6 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     ground, resolve, solid, inside, levelSpot, stairPoint, doorPoint,
   };
 }
-
-/* a plank bridge from a to b (local points), sagging in the middle, rope rails either side on posts */
-function plankBridge(postB, ropeB, a, b, sagK, wd, plank, wood) {
-  const len = a.distanceTo(b), n = Math.max(4, Math.round(len / 1.1)), sag = len * sagK, ang = Math.atan2(b.x - a.x, b.z - a.z);
-  const side = V3(Math.cos(ang), 0, -Math.sin(ang));
-  let prevL = null, prevR = null;
-  for (let k = 0; k <= n; k++) {
-    const t = k / n, q = a.clone().lerp(b, t); q.y -= Math.sin(t * Math.PI) * sag;
-    if (k < n) { const t2 = (k + 0.5) / n, q2 = a.clone().lerp(b, t2); q2.y -= Math.sin(t2 * Math.PI) * sag; postB.put(q2.x, q2.y, q2.z, wd * 2, 0.12, len / n * 0.82, 0, ang, 0, plank); }
-    if (k % 3 === 0 || k === n) {
-      const L = q.clone().addScaledVector(side, wd).add(V3(0, 1.1, 0)), Rr = q.clone().addScaledVector(side, -wd).add(V3(0, 1.1, 0));
-      postB.put(L.x, q.y + 0.55, L.z, 0.1, 1.1, 0.1, 0, ang, 0, wood); postB.put(Rr.x, q.y + 0.55, Rr.z, 0.1, 1.1, 0.1, 0, ang, 0, wood);
-      if (prevL) { ropeB.seg(prevL, L, 0.05, 0.05); ropeB.seg(prevR, Rr, 0.05, 0.05); }
-      prevL = L; prevR = Rr;
-    }
-  }
-}
-
-/* a long bridge between two home trees, high up, from a door in one trunk's bark straight to a door in the other's
-   (no landings: it runs right into the tree). f: how far up the shorter tree (0..1). Returns the two ends in world terms. */
-export function buildTreeBridge(scene, A, B, f = 0.4) {
-  const g = new THREE.Group(); scene.add(g);
-  const postB = batch(g, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 900, { shadow: false });
-  const ropeB = batch(g, new THREE.CylinderGeometry(1, 1, 1, 5, 1).translate(0, 0.5, 0), toon(0x6a5a40), 400, { shadow: false });
-  const glow = batch(g, new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffc27a, side: THREE.DoubleSide }), 4, { shadow: false });
-  const y = Math.min(A.H, B.H) * f, dx = B.x - A.x, dz = B.z - A.z, aA = Math.atan2(dz, dx), aB = aA + Math.PI;
-  const end = (T, a) => { const r = T.rAt(y, a); return { p: V3(T.x + Math.cos(a) * (r + 0.3), T.g + y, T.z + Math.sin(a) * (r + 0.3)), T, a }; };
-  const EA = end(A, aA), EB = end(B, aB);
-  // a door in the bark at each end, lit from inside, framed in dark wood
-  for (const { T, a } of [EA, EB]) {
-    const ly = T.g + y, ry = Math.PI / 2 - a, rd = T.rAt(y + 1.5, a), fx = Math.cos(a), fz = Math.sin(a), tx = -Math.sin(a), tz = Math.cos(a);
-    glow.put(T.x + fx * (rd + 0.05), ly + 1.5, T.z + fz * (rd + 0.05), 2.4, 3, 1, 0, ry, 0);
-    for (const s of [-1, 1]) postB.put(T.x + fx * (rd + 0.2) + tx * s * 1.4, ly + 1.6, T.z + fz * (rd + 0.2) + tz * s * 1.4, 0.4, 3.4, 0.5, 0, ry, 0, 0x4a2c18);
-    postB.put(T.x + fx * (rd + 0.2), ly + 3.4, T.z + fz * (rd + 0.2), 3.4, 0.4, 0.6, 0, ry, 0, 0x4a2c18);
-  }
-  plankBridge(postB, ropeB, EA.p, EB.p, 0.035, 1.6, 0xa87a50, 0x8a6040);
-  postB.done(); ropeB.done(); glow.done();
-  return { a: EA.p, b: EB.p, y };
-}
-
 
 /* ---------------- a plain forest: pines and broadleaf, instanced ---------------- */
 export function buildForest(scene, list, { rng, heightAt }) {

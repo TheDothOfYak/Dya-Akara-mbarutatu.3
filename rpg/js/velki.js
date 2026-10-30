@@ -16,7 +16,7 @@ import { clamp, damp, dampAngle, smooth, lerp, mulberry32, orbitPitch, tiltUp, r
 import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
-import { buildHomeTree, buildForest, buildTreeBridge } from './hometree.js';
+import { buildHomeTree, buildForest } from './hometree.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -83,7 +83,7 @@ export function createVelki(ctx) {
   const SHORE = z => -140 + 18 * Math.sin(z * 0.011) + 10 * Math.sin(z * 0.031 + 1);
   const HOME = { x: 66, z: -40, R: 24, H: 300 };
   // the other home trees, east and south of the old city: every one of them inside the walls, which bow out to take
-  // them in (the city grew round its trees), each near enough its neighbour for a long bridge between them
+  // them in (the city grew round its trees), each a town of its own inside its trunk
   const HOMES_OUT = [{ x: 158, z: 44, R: 19, H: 260, seed: 3 }, { x: 104, z: 142, R: 20, H: 280, seed: 5 }, { x: -12, z: 156, R: 18, H: 245, seed: 9 }];
   /* the wall: the old ring, bowed out round each home tree and its roots (the gate, in the north, stays where it was) */
   const WALL_TREES = [{ x: HOME.x, z: HOME.z, rho: 66 }, ...HOMES_OUT.map(T => ({ x: T.x, z: T.z, rho: T.R * 1.75 * 1.6 + 7 }))];
@@ -298,8 +298,6 @@ export function createVelki(ctx) {
     banners: [0x8a2a3a, 0xd8a040], rootSkip: a => Math.abs(Math.atan2(Math.sin(a - toCity), Math.cos(a - toCity))) < 1.1,
   }));
   for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);   // the roots and the hearth (the walls are the tree's own)
-  // long bridges between neighbouring trees, high in the air: the city's tree to the east one, round to the south
-  { const city = homeTrees[homeTrees.length - 1], [t1, t2, t3] = homeTrees; buildTreeBridge(scene, city, t1, 0.4); buildTreeBridge(scene, t1, t2, 0.44); buildTreeBridge(scene, t2, t3, 0.38); }
 
   /* ---------------- Fyrsti'Vilag ---------------- */
   const rng = mulberry32(307);
