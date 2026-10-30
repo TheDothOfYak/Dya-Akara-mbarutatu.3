@@ -260,7 +260,10 @@
     slide.appendChild(pv);
     slide.appendChild(el('p', { cls: 'g-vibe', text: look.vibe || '' }));
     slide.appendChild(el('ul', { cls: 'g-feats' }, (look.feats || []).map(f => el('li', { text: f }))));
-    slide.appendChild(el('div', { cls: 'g-actions' }, [playBtn, note]));
+    /* the 4 Brothers' big redesign, V2, plays from its own button next to the main game */
+    const extraBtns = g.id === '4bw' && !g.soon ? [el('button', { cls: 'play', type: 'button', text: 'Play V2', title: 'The V2 preview: new hero magic, legendary chests and more', style: 'margin-left:10px', onclick: () => play(Object.assign({}, g, { href: 'four-brothers-world-v2/index.html' })) })] : [];
+    if (b) extraBtns.forEach(x => { x.disabled = true; });
+    slide.appendChild(el('div', { cls: 'g-actions' }, [playBtn].concat(extraBtns, [note])));
     slide.setAttribute('aria-label', (idx + 1) + ' of ' + list.length + ': ' + txt.name);
 
     const dots = $('dots'); dots.innerHTML = '';
