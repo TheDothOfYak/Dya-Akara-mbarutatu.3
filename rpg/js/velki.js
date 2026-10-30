@@ -17,6 +17,7 @@ import * as STORY from './story.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
 import { buildHomeTree, buildForest } from './hometree.js';
+import { createTreeFolk } from './treefolk.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -297,7 +298,8 @@ export function createVelki(ctx) {
     R: HOME.R, H: HOME.H, seed: 307, town: 1, decks: [0.05, 0.085, 0.12, 0.155, 0.19, 0.225, 0.26, 0.295, 0.33], doorAt: toCity, rootReach: 1.35,
     banners: [0x8a2a3a, 0xd8a040], rootSkip: a => Math.abs(Math.atan2(Math.sin(a - toCity), Math.cos(a - toCity))) < 1.1,
   }));
-  for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);   // the roots and the hearth (the walls are the tree's own)
+  for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);
+  const treeFolk = homeTrees.map((T, i) => createTreeFolk(scene, T, { seed: 300 + i }));   // the folk who live in them   // the roots and the hearth (the walls are the tree's own)
 
   /* ---------------- Fyrsti'Vilag ---------------- */
   const rng = mulberry32(307);
@@ -687,6 +689,7 @@ export function createVelki(ctx) {
     updatePlayer(dt, playing);
     updateFolk(dt);
     crowd.update(dt, t, { sky: V3(BATTLE.x, 40, BATTLE.z) });
+    for (const f of treeFolk) f.update(dt, t, P.pos);
     kit.update(t, dt, particles);
     fountain.update(dt, t, particles, [P.pos]);
     updateBattle(dt);

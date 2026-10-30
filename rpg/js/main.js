@@ -2645,24 +2645,29 @@ function updateNpcs(dt) {
     if (n.rt) offRoutine(n);
     const d = n.pos.distanceTo(P.pos);
     let speed = 0;
-    // townsfolk stroll about, and stop to look at you when you come close
+    // townsfolk go about the town — somewhere they can see their way to, never into a wall — stop to talk to each other,
+    // look about them when they get there, and turn to look at you when you come close
     if (n.def.wander && d > 5 && n.talking <= 0) {
-      if (!n.goal) {
+      if (n.chat) {   // talking with a neighbour: face them, and take turns
+        n.chat.t -= dt; n.yaw = dampAngle(n.yaw, Math.atan2(n.chat.with.pos.x - n.pos.x, n.chat.with.pos.z - n.pos.z), 4, dt);
+        if (n.chat.t <= 0 || n.chat.with.chat?.with !== n) { n.chat = null; n.pause = 1 + Math.random() * 3; }
+      } else if (!n.goal) {
         n.pause -= dt;
-        if (n.pause <= 0) {
-          const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 12;
-          n.goal = V3(n.home.x + Math.cos(a) * r, 0, n.home.z + Math.sin(a) * r);
-        }
+        if (n.lookT == null || (n.lookT -= dt) <= 0) { n.lookT = 2 + Math.random() * 3; n.lookYaw = n.yaw + (Math.random() - 0.5) * 2.2; }   // a look about
+        n.yaw = dampAngle(n.yaw, n.lookYaw ?? n.yaw, 1.5, dt);
+        if (n.pause <= 0) wanderGoal(n);
       } else {
-        const dx = n.goal.x - n.pos.x, dz = n.goal.z - n.pos.z, gd = Math.hypot(dx, dz);
-        if (gd < 0.6) { n.goal = null; n.pause = 2 + Math.random() * 5; }
-        else {
+        const dx = n.goal.x - n.pos.x, dz = n.goal.z - n.pos.z, gd = Math.hypot(dx, dz), meet = n.goal.meet;
+        if (gd < (meet ? 1.3 : 0.6)) {
+          n.goal = null; n.pause = 3 + Math.random() * 6;
+          if (meet && !meet.chat && !meet.goal && meet.talking <= 0) { const t = 6 + Math.random() * 8; n.chat = { with: meet, t }; meet.chat = { with: n, t }; }
+        } else {
           const before = n.pos.clone();
-          n.pos.x += dx / gd * 1.6 * dt; n.pos.z += dz / gd * 1.6 * dt;
+          n.pos.x += dx / gd * 1.5 * dt; n.pos.z += dz / gd * 1.5 * dt;
           world.col.resolve(n.pos, 0.45, 1.9, true);
           n.pos.y = world.col.ground(n.pos.x, n.pos.z, n.pos.y + 0.6, true);
-          if (n.pos.distanceTo(before) < 0.5 * dt) { n.goal = null; n.pause = 1; }
-          n.yaw = Math.atan2(dx, dz); speed = 1.6;
+          if (n.pos.distanceTo(before) < 0.5 * dt) { n.goal = null; n.pause = 0.4; }   // (something in the way after all: think again)
+          n.yaw = dampAngle(n.yaw, Math.atan2(dx, dz), 8, dt); speed = 1.5;
         }
       }
       n.actor.root.position.copy(n.pos);
@@ -2670,9 +2675,28 @@ function updateNpcs(dt) {
     const want = d < 7 ? Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z) : n.yaw;
     n.actor.root.rotation.y = dampAngle(n.actor.root.rotation.y, want, 4, dt);
     n.talking = Math.max(0, n.talking - dt);
-    n.actor.animate(dt, { speed, onGround: true, t: G.t + n.home.x, talking: n.talking > 0 });
+    n.actor.animate(dt, { speed, onGround: true, t: G.t + n.home.x, talking: n.talking > 0 || (n.chat && Math.floor((G.t + (npcs.indexOf(n) < npcs.indexOf(n.chat.with) ? 0 : 2.4)) / 2.4) % 2 === 0) });
   }
   if (camp) camp.update(G.t, particles);
+}
+/* where a townsperson goes next: now and then over to a neighbour standing about, to talk; otherwise somewhere near their
+   own patch they can see a clear way to (a few tries, then they stay put and look about a bit longer) */
+function wanderGoal(n) {
+  const clear = (x, z) => {
+    const g = world.col.ground(x, z, world.heightAt(x, z) + 0.6, true);
+    if (Math.abs(g - n.pos.y) > 1.2) return false;
+    const a = V3(n.pos.x, n.pos.y + 0.7, n.pos.z), b = V3(x, g + 0.7, z);
+    return world.col.ray(a, b) >= 1;
+  };
+  if (Math.random() < 0.3) {
+    const q = npcs.find(o => o !== n && o.def.wander && !o.hidden && !o.goal && !o.chat && o.pos.distanceTo(n.pos) < 14 && o.pos.distanceTo(n.pos) > 2);
+    if (q) { const a = Math.atan2(n.pos.z - q.pos.z, n.pos.x - q.pos.x), x = q.pos.x + Math.cos(a) * 1.2, z = q.pos.z + Math.sin(a) * 1.2; if (clear(x, z)) { n.goal = V3(x, 0, z); n.goal.meet = q; return; } }
+  }
+  for (let k = 0; k < 8; k++) {
+    const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 12, x = n.home.x + Math.cos(a) * r, z = n.home.z + Math.sin(a) * r;
+    if (clear(x, z)) { n.goal = V3(x, 0, z); return; }
+  }
+  n.pause = 2 + Math.random() * 3;
 }
 
 /* ---------------- everyone's day ----------------
@@ -6617,7 +6641,7 @@ else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); s
 /* debugging handle for the console */
 window.__torcain = {
   bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, get mount() { return mount; }, toggleRide, makeMount, updateMount, torcain, projectiles, restyleAxe,
-  get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, startMegla, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
+  get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, startMegla, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); }, startVelki,
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy, alch, finishFound,
   detailCull: setDetailCull, get solids() { return solids; },
   G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,

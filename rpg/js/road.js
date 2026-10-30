@@ -21,6 +21,7 @@
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire } from './gfx.js';
 import { buildHomeTree, buildForest } from './hometree.js';
+import { createTreeFolk } from './treefolk.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
 import { buildVel } from './creatures.js';
@@ -168,7 +169,7 @@ export function createRoad(ctx) {
      inside of the wall. Their shapes and their walking rules come from the trees themselves (hometree.js); TREES is filled
      once they're built, and HT is the city's own. */
   let HT = null;
-  const TREES = [];
+  const TREES = [], TREE_FOLK = [];
   const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
   function treeGround(x, z, y) { let best = -1e9; for (const T of TREES) best = Math.max(best, T.ground(x, z, y)); return best; }
   function treeResolve(p, rad) { for (const T of TREES) T.resolve(p, rad); }
@@ -260,6 +261,7 @@ export function createRoad(ctx) {
     // the younger tree, lived in too: in at its door and up its own stair
     const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.06, 0.11, 0.16, 0.21], roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
     for (const t of [T, T2]) { t.colliders.forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1)); TREES.push(t); }   // the roots, the hearth (the walls are the tree's own)
+    TREE_FOLK.push(createTreeFolk(scene, T, { seed: 41 }), createTreeFolk(scene, T2, { seed: 77 }));   // and the folk who live in them
     HT = T;
   }
   /* the rest of the city: block after block of houses on a grid of streets, from the market quarter
@@ -714,7 +716,7 @@ export function createRoad(ctx) {
       it.fall = { from: s.clone(), t: -i * 0.12, dur: 1.4 + rng() * 0.6 };     // flung out of the storm, falling to where it lands
       it.mesh.position.copy(s);
     });
-    crowd.panic();
+    crowd.panic(); for (const f of TREE_FOLK) f.panic(true);
     sub = 'told';
     const tp = P.pos.clone();
     sayHeld(PRO.hatBack, (k, tt) => ({ p: V3(tp.x + 9 + Math.sin(tt * 0.2) * 3, 3 + tt * 0.6, tp.z + 10), l: MK.angel ? V3(MK.angel.position.x, MK.angel.position.y + 4, MK.angel.position.z) : V3(SQUARE.x, 20, SQUARE.z) }),
@@ -733,7 +735,7 @@ export function createRoad(ctx) {
   function resumeEscape() {
     stage = 'market'; sub = 'amulets'; setDusk(0);
     MK = { n: 1, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, loaded: 3, carrying: null, crates: [] };
-    makeCrowd(); crowd.panic();
+    makeCrowd(); crowd.panic(); for (const f of TREE_FOLK) f.panic(true);
     tanoc.hat.visible = true; tanoc.weapon.visible = true;
     squareSpots().slice(1).forEach(([x, z]) => { const it = addItem(V3(x, groundAt(x, z, 2.4) + 0.9, z), 'Pick up the Sniller amulet', null, amuletMesh()); it.act = () => marketAmulet(it); it.y0 = it.pos.y; MK.amulets.push(it); });
     ctx.play(); ctx.location(...R.loc);
@@ -1818,6 +1820,7 @@ export function createRoad(ctx) {
     }
     if (EV.cart && EV.cart.state === 'carry') EV.cart.wheel.rotation.x += Math.hypot(P.vel.x, P.vel.z) * dt / 0.6;   // turning as he rolls it
     if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });
+    for (const f of TREE_FOLK) f.update(dt, t, P.pos);
     kit.update(t, dt, particles);
     if (stage === 'market') fountain.update(dt, t, particles, MK && MK.esc ? [] : [P.pos]);
     if (stage === 'market' && MK && MK.esc && playing) escTick(dt);

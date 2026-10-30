@@ -105,11 +105,12 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
   const doorHw = doorW * 0.5 / rAt(doorH * 0.5, doorA), a0 = doorA + doorHw + 0.55;
   const stairA = y => a0 + (y - S0) / (topY - S0) * span;
   // the heights at which the stair passes round angle a
-  const stairYs = a => { const out = [], b = ((a - a0) % TAU + TAU) % TAU; for (let k = 0; k <= Math.ceil(turns) + 1; k++) { const t = (b + k * TAU) / span; if (t <= 1) out.push(S0 + t * (topY - S0)); } return out; };
+  const stairYs = a => { const out = [], b = ((a - a0) % TAU + TAU) % TAU; for (let k = 0; k <= Math.ceil(turns) + 1; k++) { const t = (b + k * TAU) / span; if (t <= 1 + 1e-6) out.push(S0 + Math.min(1, t) * (topY - S0)); } return out; };   // (the very top step too)
   const stairIn = (a, y0, y1) => stairYs(a).some(s => s > y0 && s < y1);
   // where the stair comes up through a floor, a slot is left open behind it, long enough to pass under the floor upright
   const WELL0 = -Math.max(0.5, 2.7 / risePerRad), WELL1 = 0.08;
-  const levels = levelYs.map((y, i) => { const ri = rIn(y), sa = stairA(y); return { i, y, ri, rWell: Math.max(2.4, ri * 0.34), slot: [sa + WELL0, sa + WELL1], next: levelYs[i + 1] ?? ceilY, looks: [], bA: doorA + 0.6 + i * 1.9, bw: 0.9 }; });
+  const levels = levelYs.map((y, i) => { const ri = rIn(y), sa = stairA(y); return { i, y, ri, rWell: Math.max(2.4, ri * 0.34), slot: [sa + WELL0, sa + (i === levelYs.length - 1 ? 0 : WELL1)],   // (the stair ends at the top floor: no gap past its last step)
+      next: levelYs[i + 1] ?? ceilY, looks: [], rooms: [], pots: [], bA: doorA + 0.6 + i * 1.9, bw: 0.9 }; });
   // how far (x, z) (local) is to the side of floor L's bridge across the well
   const across = (L, lx, lz) => -lx * Math.sin(L.bA) + lz * Math.cos(L.bA);
   const inSlot = (L, a) => { const k = angDiff(a, L.slot[0]); return k >= 0 && k <= L.slot[1] - L.slot[0]; };
@@ -283,30 +284,62 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     winB.done();
   }
 
-  /* ---- up in the crown: plank bridges from limb to limb, high in the leaves, and hammocks slung under the limbs ---- */
+  /* ---- up in the crown: plank bridges from limb to limb in two rings, rope ladders between them, strings of lamps, hammocks
+     slung under the limbs and woven sleeping pods hanging from them ---- */
   {
-    const postB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 2400, { shadow: false });
-    const ropeB = batch(root, new THREE.CylinderGeometry(1, 1, 1, 5, 1).translate(0, 0.5, 0), toon(0x6a5a40), 900, { shadow: false });
-    const hamB = batch(root, new THREE.CylinderGeometry(1, 1, 1, 12, 1, true, Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), toon(0xffffff, { side: THREE.DoubleSide }), 60, { shadow: false });
-    const lampB = batch(root, new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffd59a }), 200, { shadow: false });
+    const postB = batch(root, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 4200, { shadow: false });
+    const ropeB = batch(root, new THREE.CylinderGeometry(1, 1, 1, 5, 1).translate(0, 0.5, 0), toon(0x6a5a40), 1800, { shadow: false });
+    const hamB = batch(root, new THREE.CylinderGeometry(1, 1, 1, 12, 1, true, Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), toon(0xffffff, { side: THREE.DoubleSide }), 80, { shadow: false });
+    const lampB = batch(root, new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffd59a }), 400, { shadow: false });
     const CL = [0xb8402e, 0x2f6f8a, 0xd9a441, 0x5a7a3a, 0x8a4a8a, 0xe8d8b8];
     const byA = limbPaths.slice().sort((p, q) => p.a - q.a);
-    // each limb to the next one round, from the joints of the two nearest level with each other (in under the leaves)
-    for (let k = 0; k < byA.length; k++) {
-      const A = byA[k], B = byA[(k + 1) % byA.length];
+    // two rings of bridges: each limb to the next one round, low in under the leaves (from the two joints nearest level with
+    // each other), and higher up, each to the one after next; and a rope ladder down from each high end to the low one
+    const ends = new Map();   // limb → where its bridges start
+    const link = (A, B, js, maxDy) => {
       let best = null;
-      for (const ja of [1, 2, 3]) for (const jb of [1, 2, 3]) {
+      for (const ja of js) for (const jb of js) {
         const pa = A.path[ja].p, pb = B.path[jb].p, dy = Math.abs(pa.y - pb.y), d = pa.distanceTo(pb), cost = dy + d * 0.15;
-        if (dy < 12 && d > 6 && d < H * 0.4 && (!best || cost < best.cost)) best = { ja, jb, cost };
+        if (dy < maxDy && d > 6 && d < H * 0.4 && (!best || cost < best.cost)) best = { ja, jb, cost };
       }
-      if (!best) continue;
+      if (!best) return;
       const pa = A.path[best.ja].p.clone(), pb = B.path[best.jb].p.clone(); pa.y += A.path[best.ja].r * 0.9; pb.y += B.path[best.jb].r * 0.9;
       const d = pa.distanceTo(pb);
       plankBridge(postB, ropeB, pa, pb, 0.06, 1.0, 0xa87a50, 0x8a6040);
       for (const t of [0.25, 0.5, 0.75]) { const q = pa.clone().lerp(pb, t); lampB.put(q.x, q.y - Math.sin(t * Math.PI) * d * 0.06 + 1.5, q.z, 0.22, 0.28, 0.22); }
+      for (const [L, p] of [[A, pa], [B, pb]]) { if (!ends.has(L)) ends.set(L, []); ends.get(L).push(p); }
+    };
+    for (let k = 0; k < byA.length; k++) link(byA[k], byA[(k + 1) % byA.length], [1, 2, 3], 12);
+    for (let k = 0; k < byA.length; k += 2) link(byA[k], byA[(k + 2) % byA.length], [3, 4], 14);
+    for (const es of ends.values()) {
+      if (es.length < 2) continue;
+      es.sort((p, q) => p.y - q.y);
+      const lo = es[0], hi = es[es.length - 1]; if (hi.y - lo.y < 3) continue;
+      // two ropes and the rungs between them, hanging from the high end down beside the low one
+      const side = V3(-(hi.z - lo.z), 0, hi.x - lo.x).normalize().multiplyScalar(0.35), foot = V3(hi.x, lo.y, hi.z).lerp(lo, 0.5);
+      for (const s2 of [-1, 1]) ropeB.seg(foot.clone().addScaledVector(side, s2), hi.clone().addScaledVector(side, s2), 0.04, 0.04);
+      const n = Math.floor((hi.y - lo.y) * 2.5), ry = Math.atan2(side.x, side.z) + Math.PI / 2;
+      for (let k = 1; k < n; k++) { const q = foot.clone().lerp(hi, k / n); postB.put(q.x, q.y, q.z, 0.07, 0.07, 0.8, 0, ry, 0, 0x8a6040); }
     }
-    for (const L of limbPaths) for (const j of [1, 2, 3]) {
+    // strings of lamps, limb to limb, under the low bridges
+    for (let k = 0; k < byA.length; k += 3) {
+      const A = byA[k].path[2].p, B = byA[(k + 1) % byA.length].path[2].p, d = A.distanceTo(B); if (d > H * 0.35) continue;
+      let prev = A;
+      for (let i = 1; i <= 8; i++) { const q = A.clone().lerp(B, i / 8); q.y -= Math.sin(i / 8 * Math.PI) * d * 0.12 + 1; ropeB.seg(prev, q, 0.03, 0.03); prev = q; if (i < 8) lampB.put(q.x, q.y - 0.3, q.z, 0.2, 0.26, 0.2); }
+    }
+    // woven sleeping pods hung from the limbs on ropes, a lamp glowing in the mouth of each
+    const podB = batch(root, new THREE.SphereGeometry(1, 12, 9), toon(0xffffff), 60, { shadow: false });
+    for (const L of limbPaths) {
       if (rnd() < 0.4) continue;
+      const J = L.path[3 + Math.floor(rnd() * 2)], top = J.p.clone(); top.y -= J.r * 0.8;
+      const s2 = 1.1 + rnd() * 0.5, c = top.clone(); c.y -= 2.4 + s2;
+      ropeB.seg(V3(c.x, c.y + s2 * 1.3, c.z), top, 0.05, 0.05);
+      podB.put(c.x, c.y, c.z, s2, s2 * 1.4, s2, 0, 0, 0, [0x9a7448, 0x8a6a3a, 0xa8845a][Math.floor(rnd() * 3)]);
+      const la = Math.atan2(c.z, c.x); lampB.put(c.x + Math.cos(la) * s2 * 0.85, c.y - 0.2, c.z + Math.sin(la) * s2 * 0.85, 0.25, 0.32, 0.25);
+    }
+    podB.done();
+    for (const L of limbPaths) for (const j of [1, 2, 3, 4]) {
+      if (rnd() < 0.35) continue;
       const A = L.path[j], B = L.path[j + 1], dir = B.p.clone().sub(A.p); dir.y = 0;
       const len = Math.min(4, dir.length() * 0.55), c = A.p.clone().lerp(B.p, 0.5); c.y -= (A.r + B.r) * 0.5 + 1.6;
       const yaw = Math.atan2(dir.x, dir.z), t = dir.normalize();
@@ -315,6 +348,8 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     }
     for (const b of [postB, ropeB, hamB, lampB]) b.done();
   }
+
+  const hall = {};   // the hall's layout, for the folk who live here (filled in below)
 
   /* ---- the town inside ---- */
   {
@@ -335,6 +370,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     const inLeaf = batch(inner, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 300, IN);
     const CLOTH = [0xb8402e, 0x2f6f8a, 0xd9a441, 0x5a7a3a, 0x8a4a8a, 0xe8d8b8], WARM = [0xffc27a, 0xffb060, 0xffd59a], GREEN = [0x4a7a3a, 0x5a8a40, 0x3e6a34];
     const BANNER = opts.banners ?? [0xb8402e, 0xd9a441];
+    Object.assign(hall, { rh: rIn(0), rs: 0, stalls: [], benches: [], hearths: [], props: [], rooms: [] });
     const P = (a, r, y) => V3(Math.cos(a) * r, y, Math.sin(a) * r);
     const prop = (lx, lz, ly, r, h) => colliders.push({ kind: 'cyl', x: x + lx, z: z + lz, r, y0: g + ly - 0.5, y1: g + ly + h });
     const ring = (ri, rO, a0, a1, y) => { if (a1 - a0 < 0.01) return; const m = new THREE.Mesh(new THREE.RingGeometry(ri, rO, Math.max(6, Math.round((a1 - a0) * 24)), 1, -a1, a1 - a0).rotateX(-Math.PI / 2), floorM); m.position.y = y; inner.add(m); };
@@ -362,6 +398,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         if (L && Math.abs(angDiff(a, (L.slot[0] + L.slot[1]) / 2)) < (L.slot[1] - L.slot[0]) / 2 + half + 0.1) continue;
         if (!L && Math.abs(angDiff(a, door.a)) < door.hw * 2.2 + half) continue;                 // (the door's leaves, swung back inside)
         innerRoom(a, y + 0.02, w, h);
+        (L ? L.rooms : hall.rooms).push({ a, w });   // (for the folk: somewhere to go in and out of)
       }
     };
 
@@ -397,6 +434,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       const nB = 6;
       for (let k = 0; k < nB; k++) {
         const a = (k + 0.5) / nB * TAU, p = P(a, Math.min(5.4, rh * 0.32), 0);
+        hall.benches.push({ a, r: Math.min(5.4, rh * 0.32) }); hall.hearths.push({ a: k / nB * TAU, r: 3.2 });
         inBox.put(p.x, 0.32, p.z, 2.6, 0.18, 0.8, 0, faceRy(a), 0, 0x7a5232);
         for (const q of [-1, 1]) inBox.put(p.x - Math.sin(a) * q * 1.0, 0.14, p.z + Math.cos(a) * q * 1.0, 0.2, 0.28, 0.6, 0, faceRy(a), 0, 0x5a3a24);
         prop(p.x, p.z, 0, 0.9, 0.42);
@@ -406,6 +444,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         const a = door.a + (k + 0.5) / 14 * TAU, rr = rh - 3.6;
         if (Math.abs(angDiff(a, door.a)) < door.hw + 0.35 || stairIn(a, -1, 3.5) || stairIn(a + 0.15, -1, 3.5) || stairIn(a - 0.15, -1, 3.5)) continue;
         const p = P(a, rr, 0), kind = k % 3;
+        hall.props.push({ a, kind });
         if (kind === 0) { inBox.put(p.x, 0.9, p.z, 3.2, 0.14, 1.2, 0, faceRy(a), 0, 0x8a6040); inBox.put(p.x, 0.42, p.z, 0.5, 0.84, 0.5, 0, 0, 0, 0x5a3a24); inPot.put(p.x + 0.6, 0.97, p.z, 0.18, 0.3, 0.18, 0, 0, 0, 0xc8a070); inLamp.put(p.x - 0.7, 1.12, p.z, 0.16, 0.2, 0.16, 0, 0, 0, 0xffd27a); prop(p.x, p.z, 0, 1.4, 1); }
         else if (kind === 1) { for (let q = 0; q < 3; q++) { const qp = P(a + (q - 1) * 0.07, rr + 1.5, 0); inPot.put(qp.x, 0, qp.z, 0.55 + q * 0.1, 0.8 + q * 0.2, 0.55 + q * 0.1, 0, 0, 0, [0xb08850, 0x9a6a3a, 0xc89a60][q]); } prop(P(a, rr + 1.5, 0).x, P(a, rr + 1.5, 0).z, 0, 1.1, 1.2); }
         else { inBox.put(p.x, 1.1, p.z, 0.2, 2.2, 0.2, 0, faceRy(a), 0, 0x5a3a24); inCloth.put(p.x - Math.cos(a) * 0.05, 1.3, p.z - Math.sin(a) * 0.05, 1.8, 1.4, 1, 0, faceRy(a), 0, CLOTH[k % CLOTH.length]); inRug.put(p.x, 0.06, p.z, 1.4, 1, 1.4, 0, 0, 0, CLOTH[(k + 2) % CLOTH.length]); }
@@ -413,8 +452,10 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       // a little market round the hall, between the hearth and the wall, clear of the way in from the door
       {
         const rs = Math.min(rh - 6, Math.max(8.4, rh * 0.56)), nS = Math.max(4, Math.min(9, Math.round(rs * TAU / 9)));
+        hall.rs = rs;
         for (let k = 0; k < nS; k++) {
-          const a = door.a + (k + 0.5) / nS * TAU; if (Math.abs(angDiff(a, door.a)) < 0.55) continue;
+          const a = door.a + (k + 0.5) / nS * TAU; if (Math.abs(angDiff(a, door.a)) < 0.55 || Math.abs(angDiff(a, a0)) < 0.45) continue;   // (clear of the way in, and the way up)
+          hall.stalls.push(a);
           const p = P(a, rs, 0), ry = faceRy(a), tx = -Math.sin(a), tz = Math.cos(a), c1 = CLOTH[k % CLOTH.length], c2 = 0xf0e4c8;
           inBox.put(p.x, 0.5, p.z, 2.6, 1.0, 0.9, 0, ry, 0, 0x8a6040);                                    // the counter, facing the hearth
           for (const q of [-1, 1]) inBox.put(p.x + tx * q * 1.25 + Math.cos(a) * 0.35, 1.25, p.z + tz * q * 1.25 + Math.sin(a) * 0.35, 0.14, 2.5, 0.14, 0, ry, 0, 0x5a3a24);
@@ -505,7 +546,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         if (k % 2) inRug.put(p.x, y + 0.03, p.z, Math.min(1.4, (r1 - r0) * 0.5), 1, Math.min(1.4, (r1 - r0) * 0.5), 0, 0, 0, CLOTH[Math.floor(rnd() * CLOTH.length)]);
         else {
           const q = P(a, L.rWell + 0.75, y); if (Math.abs(across(L, q.x, q.z)) < L.bw + 0.8) continue;
-          inPot.put(q.x, y, q.z, 0.4, 0.7, 0.4, 0, 0, 0, 0xa87a4a); prop(q.x, q.z, y, 0.45, 0.7);
+          inPot.put(q.x, y, q.z, 0.4, 0.7, 0.4, 0, 0, 0, 0xa87a4a); prop(q.x, q.z, y, 0.45, 0.7); L.pots.push(a);
           inLeaf.put(q.x, y + 1.15, q.z, 0.75, 0.65, 0.75, rnd(), rnd() * 6, 0, GREEN[Math.floor(rnd() * GREEN.length)]);   // something growing in it
         }
       }
@@ -527,6 +568,39 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         }
         // brackets under it into the wall, now and then
         if (i % 12 === 6) inRib.seg(P(a, r - 1.2, y - 0.2), P(a, rIn(y - 3) + 0.1, y - 3), 0.22, 0.22, wood);
+      }
+    }
+
+    /* the roof of the hollow, over the top floor: rafters of heartwood running in to the middle, a great ring of lamps hung
+       over the well, a rope net strung across the top of the well, and vines and roots hanging down out of the dark */
+    {
+      const yr = ceilY - 0.5, top = levels[levels.length - 1], rr = rIn(yr), rw = top.rWell;
+      for (let k = 0; k < 10; k++) {
+        const a = (k + 0.25) / 10 * TAU;
+        inRib.seg(P(a, rr - 0.1, yr - 1.6), P(a, rw * 0.35, yr), 0.32, 0.32, 0x6a4228);
+        if (k % 2 === 0) inRib.seg(P(a, rr - 0.1, yr - 3.2), P(a, rr * 0.62, yr - 0.4), 0.22, 0.22, 0x6a4228);
+      }
+      // the lamp ring: a hoop of wood on four ropes, lamps all round it
+      const yc = Math.max(top.y + 4.2, ceilY - 4.5), rc = rw * 0.6, nC = Math.max(10, Math.round(rc * TAU / 1.1)), every = Math.max(1, Math.round(nC / 4));
+      for (let k = 0; k < nC; k++) {
+        const a = k / nC * TAU, b = (k + 1) / nC * TAU;
+        inRib.seg(P(a, rc, yc), P(b, rc, yc), 0.12, 0.12, 0x5a3a24);
+        inLamp.put(Math.cos(a) * rc, yc - 0.35, Math.sin(a) * rc, 0.2, 0.26, 0.2, 0, 0, 0, WARM[k % WARM.length]);
+        if (k % every === 0) inRope.seg(P(a, rc, yc), P(a, rc * 0.4, yr), 0.035, 0.035);
+      }
+      // the net over the well, a little under the roof
+      const yn = ceilY - 1.6;
+      for (let k = -3; k <= 3; k++) for (const ang of [0.3, 0.3 + Math.PI / 2]) {
+        const off = k / 3.5 * rw, half = Math.sqrt(Math.max(0, rw * rw - off * off)); if (half < 0.4) continue;
+        const ux = Math.cos(ang), uz = Math.sin(ang), vx = -uz, vz = ux;
+        inRope.seg(V3(vx * off - ux * half, yn, vz * off - uz * half), V3(vx * off + ux * half, yn, vz * off + uz * half), 0.03, 0.03);
+      }
+      // vines and roots hanging down from the roof, between the well and the wall, with leaves on the ends of them
+      for (let k = 0; k < 18 + levels.length; k++) {
+        const a = rnd() * TAU, r = rw + 0.6 + rnd() * Math.max(0.5, rr - rw - 1.2), len = 1.5 + rnd() * Math.max(1, ceilY - top.y - 5.5);
+        const y1 = ceilY - 0.2 - len; if (y1 < top.y + 2.6) continue;
+        inRope.seg(P(a, r, y1), P(a, r, ceilY - 0.1), 0.045, 0.045);
+        inLeaf.put(Math.cos(a) * r, y1, Math.sin(a) * r, 0.35, 0.5, 0.35, rnd(), rnd() * 6, 0, GREEN[Math.floor(rnd() * GREEN.length)]);
       }
     }
 
@@ -559,7 +633,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     }
     for (const ys of stairYs(a)) {
       const s = ys + 0.17; if (s > ly + STEP || s <= best) continue;
-      const rb = rIn(ys); if (r < rb - 3.25 || r > rb + 0.1) continue;
+      const rb = rIn(ys); if (r < rb - 3.45 || r > rb + 0.1) continue;   // (its inner edge reaches the floor where it arrives: no gap to step over)
       best = s;
     }
     return best > -1e9 ? g + best : -1e9;
@@ -624,7 +698,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
 
   return {
     x, z, g, R, RB, H, root, rAt, rIn, levels, ceilY, openings, door: { a: door.a, hw: door.hw, h: doorH },
-    stair: { a0, top: topY, turns }, roots: rootAs, reach: rOutMax + 1, colliders,
+    stair: { a0, top: topY, turns, S0 }, hall, roots: rootAs, reach: rOutMax + 1, colliders,
     ground, resolve, solid, inside, levelSpot, stairPoint, doorPoint,
   };
 }
