@@ -14,6 +14,10 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## Running sideways
+- The fuzzy, rock, acorn and ghost now run (and jump) in a full side view: one eye at the front, only the near arm showing, and legs that really stride. Same sizes as before.
+- Idle, swing and swim frames are the original drawings. Hats, capes and armor still fit, since they follow each frame's outline.
+
 ## Living trees
 - **Shake the leaves:** hit a tree's leaves (not the trunk) and nuts fall out, sometimes a Fuzzberry. The leaves stay. A patch of canopy gives again after a minute and a half. Acorns shake loose an extra nut. Tree Nuts heal a little.
 - **Timber!** Chop a trunk and the tree falls away from you, slowly at first, and hurts any monster it lands on. It hurts you too if you stand where it falls.
