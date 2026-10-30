@@ -17,9 +17,9 @@
   // ---- hero data (the blurbs and the "can't fall-damage" flags live in RW.HEROES) ----
   const H = RW.HEROES;
   if (H.rock) { H.rock.noFall = true; H.rock.blurb = 'Rocks start in their cave on Rock World with bare fists. They are heavy: slow to start, hard to stop, and a run-up smashes through dirt. They cannot swim. They sink, but never drown.'; }
-  if (H.ghost) { H.ghost.jump = -250; H.ghost.blurb = 'Ghosts start in the Pale Keep on the Ghost World. They float and drift, never drown, take no fall damage, and other ghosts leave them alone until provoked.'; }
+  if (H.ghost) { H.ghost.breath = true; H.ghost.jump = -250; H.ghost.blurb = 'Ghosts start in the Pale Keep on the Ghost World. They float and drift, take no fall damage, and other ghosts leave them alone until provoked. They need air underwater.'; }
   if (H.fuzzy) { H.fuzzy.noFall = true; H.fuzzy.blurb = 'Fuzzies start in Tuftwood on Fuzzy World with a little wood sword and two spells. They bounce when they land, puff up with air to float down, and swim in strokes, but need air.'; }
-  if (H.acorn) H.acorn.blurb = 'Acorns start in Capstead on Acorn World with a spear and a slingshot. They jump twice, cling to and climb walls, glide on a leaf, and float like wood.';
+  if (H.acorn) { H.acorn.breath = true; H.acorn.blurb = 'Acorns start in Capstead on Acorn World with a spear and a slingshot. They jump twice, cling to and climb walls, glide on a leaf, and float like wood, but they need air if they dive.'; }
 
   // ---- how heavy or light each hero is on land ----
   // g: gravity multiplier, fall: fastest fall. up/brake/turn: seconds to reach top speed / to stop / to turn round on the ground.
@@ -141,7 +141,7 @@
   };
 
   // rock: smash through soft blocks at a run
-  const smashable = (id) => { const t = RW.TILES[id]; return !!t && t.solid && (t.hard == null ? 0 : t.hard) <= 1 && !t.element && !t.tree && !t.crop && !t.loot && !t.storage && !t.toggle && !t.lockedMsg; };
+  const smashable = (id) => { const t = RW.TILES[id]; return !!t && t.solid && (t.hard == null ? 0 : t.hard) <= 1 && !(RW.v2Built && RW.v2Built(id)) && !t.element && !t.tree && !t.crop && !t.loot && !t.storage && !t.toggle && !t.lockedMsg; };
   function ram(o, dir, vxPre) {
     const w = W(), tx = Math.floor((dir > 0 ? o.x + o.w + 1 : o.x - 1) / TS), y1 = Math.floor((o.y + 2) / TS), y2 = Math.floor((o.y + o.h - 1) / TS);
     let blocked = false, n = 0;
