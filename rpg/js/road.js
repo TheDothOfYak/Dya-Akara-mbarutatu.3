@@ -20,7 +20,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire } from './gfx.js';
-import { buildHomeTree, buildForest, buildTreeBridge } from './hometree.js';
+import { buildHomeTree, buildForest } from './hometree.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
 import { buildVel } from './creatures.js';
@@ -44,7 +44,7 @@ const GATE_Z = 14, CITY_R = 132, CITY = { x: 0, z: GATE_Z + CITY_R };   // the w
 const CORE = { x: 0, z: 70 }, CORE_R = 52;                                // the market quarter
 const SQUARE = { x: 0, z: 70 }, STALL = { x: 6, z: 58 };
 const TREE = { x: -38, z: 212, R: 13, H: 230 };                           // the city's home tree, in the south-west
-const TREE2 = { x: 40, z: 214, R: 10, H: 175 };                           // and a younger one east of it, inside the walls too, a bridge between them
+const TREE2 = { x: 40, z: 214, R: 10, H: 175 };                           // and a younger one east of it, inside the walls too
 const CAMP1 = { z: -250 }, CAMP2 = { z: -560 }, PASS0 = -650, AMBUSH = -800, END = -960;
 const CART_Z = -135, HEDGE_Z = -195, LOG_Z = -330, FORD_Z = -430, ROCK0 = -672, ROCK1 = -762;
 const roadX = z => (z > GATE_Z ? 0 : 16 * Math.sin((GATE_Z - z) * 0.009) + 8 * Math.sin((GATE_Z - z) * 0.023));
@@ -261,7 +261,6 @@ export function createRoad(ctx) {
     const T2 = buildHomeTree(scene, TREE2.x, TREE2.z, 0, { R: TREE2.R, H: TREE2.H, seed: 77, town: 0.6, decks: [0.07, 0.14, 0.22], roots: 7, rootReach: 1.5, doorAt: Math.atan2(CORE.z - TREE2.z, CORE.x - TREE2.x), banners: [0xd9a441] });
     for (const t of [T, T2]) { t.colliders.forEach(c => cyl(c.x, c.z, c.r, c.y0, c.y1)); TREES.push(t); }   // the roots, the hearth (the walls are the tree's own)
     HT = T;
-    buildTreeBridge(scene, T, T2, 0.42);
   }
   /* the rest of the city: block after block of houses on a grid of streets, from the market quarter
      south to the wall and round the home tree — instanced, so a whole quarter costs a handful of draws */
