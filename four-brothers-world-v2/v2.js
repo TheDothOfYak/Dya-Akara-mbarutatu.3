@@ -7,7 +7,6 @@
 //  * Rare elites that need a trick to beat: Ghost Tank, Lütut, Thornback, Canopy Stalker, Geode Golem.
 //  * Cyitors, the Empire's elite peacekeepers, drawn from the brothers' sketch.
 //  * Lava blocks (Fuzzy World's mountains).
-//  * The fuzzy is drawn half again as big, and turns to run in profile.
 (function (RW) {
   const A = RW.art, E = RW.ent, U = RW.ui, N = RW.net, P = RW.player, TS = RW.TILE;
   const { px, rect, ell, line } = A; const mk = A.canvas;
@@ -297,12 +296,18 @@
   };
   // a rock's hits smash dirt and stone, the block hit and a couple behind it
   const SMASH_MAX_HARD = 3;
+  // things people build (planks, bricks, doors, benches...) are never smashed in a line: only dirt, sand and stone are
+  let builtIds = null;
+  RW.v2Built = (i) => {
+    if (!builtIds) { builtIds = new Set(); RW.RECIPES.forEach((r) => { const it = RW.ITEMS[r.out]; if (it && it.kind === 'place' && it.place && !['dirt', 'stone', 'sand', 'mud'].includes(it.place) && RW.T[it.place] != null) builtIds.add(RW.T[it.place]); }); ['log', 'stump'].forEach((k) => { if (RW.T[k] != null) builtIds.add(RW.T[k]); }); }
+    return builtIds.has(i) || (RW.T.log != null && i === RW.T.log);
+  };
   let smashCd = 0;
   const baseMine = P.mineTile;
   P.mineTile = function (tx, ty, dt) {
     if (P.species !== 'rock') return baseMine.apply(this, arguments);
     const W = RW.world, id = W.get(tx, ty), t = RW.TILES[id];
-    const smashable = (i) => { const tt = RW.TILES[i]; return tt && tt.solid && (tt.hard == null ? 0 : tt.hard) <= SMASH_MAX_HARD && !tt.element; };
+    const smashable = (i) => { const tt = RW.TILES[i]; return tt && tt.solid && (tt.hard == null ? 0 : tt.hard) <= SMASH_MAX_HARD && !tt.element && !RW.v2Built(i); };
     if (!smashable(id)) return baseMine.apply(this, arguments);
     P.mine = null;
     if (smashCd > 0) return; smashCd = 0.32;
@@ -669,7 +674,7 @@
   const vexa = RW.SPECIES.vexa; if (vexa) vexa.blurb = 'Commander of the Pale Keep and of its Cyitors, the Empire\'s elite peacekeepers. Will forge stygian for you.';
   const ty = RW.TYPES && RW.TYPES.cyators; if (ty) { ty.name = 'Cyitors'; ty.blurb = 'The Empire\'s elite peacekeepers. One eye and two blade arms. They keep the peace on the Ghost World.'; }
   A._rockCache = {}; // rebuild any cached sprites so the new drawings are used
-  // ====================== FUZZY HERO: the medium-size fuzzy (1.5x), who turns to run sideways ======================
+  // ====================== (unused) the old medium-size fuzzy (1.5x), who turned to run sideways ======================
   // The medium fuzzy (42x45, 1.5x today's sprite), drawn the way the in-game fuzzy always looked:
   // his own fur palette, dithered 4-tone shading, a scalloped fur edge, a lighter muzzle, fur curls, a sheen on top,
   // rosy cheeks and a little smile. Kept from the newer requests: the round eye with the red rim, feet on the ground row,
@@ -757,11 +762,6 @@
     A.outline(c, '#1a100a');
     return c;
   };
-  // frames: 0 idle (turned three-quarters toward where he's facing), 1-4 run in profile, 5 jump, 6 swing, 7 swim
-  const fzCache = {};
-  A.fuzzySprites = (look) => {
-    look = look || A.DEFAULT_FUZZY; const key = JSON.stringify(look); if (fzCache[key]) return fzCache[key];
-    const out = []; for (let f = 0; f < 8; f++) { const r = A.fuzzyMed(look, f === 0 ? 'three' : 'side', f); const l = A.flip(r); l.hand = r.hand; out.push([r, l]); }
-    return (fzCache[key] = out);
-  };
+  // The fuzzy hero is the original main-game sprite again (same size, same look). A.fuzzyMed above is the old 1.5x
+  // version, kept here unused in case it comes back; nothing installs it into A.fuzzySprites any more.
 })(window.RW);
