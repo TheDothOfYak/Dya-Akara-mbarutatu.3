@@ -167,8 +167,10 @@ export function createVelki(ctx) {
   const cyl = (x, z, r, y0, y1) => { const s = { kind: 'cyl', x, z, r, y0, y1, on: true }; solids.push(s); return s; };
   const STEP = 0.65, PR = 0.4, PH = 1.5;
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once the town is built
+  const homeTrees = [];                   // (hollow, and lived in: each one walkable inside by its own rules, hometree.js)
   function groundAt(x, z, y) {
     let g = heightAt(x, z);
+    for (const T of homeTrees) g = Math.max(g, T.ground(x, z, y));
     for (const s of solids) {
       if (Math.abs(x - s.x) > 30 || Math.abs(z - s.z) > 30) continue;
       if (!s.on || s.y1 > y + STEP || s.y1 <= g) continue;
@@ -189,6 +191,7 @@ export function createVelki(ctx) {
         if (d < m) { const k = d > 1e-4 ? m / d : 0; p.x = s.x + (d > 1e-4 ? dx * k : m); p.z = s.z + dz * k; }
       }
     }
+    for (const T of homeTrees) T.resolve(p, PR);
     // the city wall, a ring with one gap
     const r = Math.hypot(p.x, p.z), a = Math.atan2(p.z, p.x);
     const inGap = Math.abs(Math.atan2(Math.sin(a - GATE_A), Math.cos(a - GATE_A))) < GATE_W && !(gateBar.on);
@@ -207,7 +210,7 @@ export function createVelki(ctx) {
       if (!s.on || y < s.y0 || y > s.y1) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) return true;
     }
-    return y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
+    return y < heightAt(x, z) + 0.2 || homeTrees.some(T => T.solid(x, y, z)) || inColliders(auto, x, y, z);
   }
 
   /* ---------------- the sea, the far country, the forest, and the home trees ---------------- */
@@ -287,7 +290,6 @@ export function createVelki(ctx) {
     for (const [x, z, sc] of scatter) if (Math.hypot(x, z) < 330) cyl(x, z, 0.5 * sc, heightAt(x, z) - 1, heightAt(x, z) + 8 * sc);
     for (const [x, y, z, sc] of rocks) if (sc > 1) cyl(x, z, sc, y - 1, y + sc * 0.6);
   }
-  const homeTrees = [];
   for (const T of HOMES_OUT) homeTrees.push(buildHomeTree(scene, T.x, T.z, T.g, { R: T.R, H: T.H, seed: T.seed, town: 0.8, rootReach: 1.5, doorAt: Math.atan2(-T.z, -T.x) }));
   // the city's own: its roots never reach in over the streets, and its door faces the spire
   const toCity = Math.atan2(-HOME.z, -HOME.x);
@@ -295,7 +297,7 @@ export function createVelki(ctx) {
     R: HOME.R, H: HOME.H, seed: 307, town: 1, decks: [0.07, 0.15, 0.24, 0.34, 0.45], doorAt: toCity, rootReach: 1.35,
     banners: [0x8a2a3a, 0xd8a040], rootSkip: a => Math.abs(Math.atan2(Math.sin(a - toCity), Math.cos(a - toCity))) < 1.1,
   }));
-  for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);
+  for (const T of homeTrees) for (const c of T.colliders) cyl(c.x, c.z, c.r, c.y0, c.y1);   // the roots and the hearth (the walls are the tree's own)
   // long bridges between neighbouring trees, high in the air: the city's tree to the east one, round to the south
   { const city = homeTrees[homeTrees.length - 1], [t1, t2, t3] = homeTrees; buildTreeBridge(scene, city, t1, 0.4); buildTreeBridge(scene, t1, t2, 0.44); buildTreeBridge(scene, t2, t3, 0.38); }
 
