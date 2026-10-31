@@ -16,7 +16,7 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 
 ## A bigger Ghost World
 - The Ghost World is now 800x320 blocks (it was 520x240), about the size of Fuzzy World and Rock World. West to east: the Pale Hills and the Pale Keep, the Bonewood (a thick dead forest, with the Hanging Hollow), the Soulmire (black pools, boardwalks and a shrine island), Barrowtown (ruined houses, a graveyard, and the Barrow, a crypt underneath with a hidden room), the Mistspires (tall peaks with a Cyitor watchtower), and the Hollows.
-- Six new creatures with their own drawings: the Pale Hound, Grave Crawler, Mire Slime, Bone Grasper, Mire Eel and Mist Bat.
+- Six new creatures with their own drawings: the Pale Hound, Grave Crawler, Mire Slime, Bone Grasper, Mire Eel and Mist Bat. They're in the Field Guide under a new Ghost World Wildlife tab.
 - Barrow Chests in the ruins hold ectoplasm, coins, Stygian and platinum ore, and sometimes key fragments or recipe squares.
 - It's a rebuilt world, so it's saved under a new name: blocks you changed in the old Ghost World don't carry over. Your bag and gear do, and you start again at the Pale Keep.
 
