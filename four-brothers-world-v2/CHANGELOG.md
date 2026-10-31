@@ -14,6 +14,19 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## Elites, the Duat Stone and coins
+- **Something is amiss in the Duat.** Elites (Ghost Tank, Lütut, Thornback, Canopy Stalker, Geode Golem) are souls climbing back out of the Duat, and they grow as your gear does. None come until you carry an iron-strength weapon, and never in your first three minutes. With iron they're at 60% health and damage, with bronze 80%, with platinum full strength, with stygian or soulsteel 130% (Duat-touched) and with a legendary weapon 160% (Duat-crowned).
+- **Stronger elites carry better things.** Iron-level ones drop what they always did (30–60 coins, a key fragment, sometimes a Star Ember or Recipe Square). Higher up they drop more coins (up to 180–260), more key fragments, Star Embers every time, Recipe Squares more often, and metal bars from bronze up to soulsteel. The strongest also drop soul shards and sometimes a Mirror Shard.
+- **The Duat Stone** stands a few steps from where you arrive in every world. Read it (R) to see how restless the Duat is right now. A banner tells you each time it gets worse.
+- **Coins:** ordinary monsters drop coins more often (8 in 10 instead of 6 or 7 in 10) and a little more of them. Tumble's prices: Recipe Square 45 (was 60), Star Ember 40 (was 50). Weapon upgrades cost 30, 60 and 90 coins (were 40, 80, 120), plus a Star Ember each as before.
+
+## Fewer recipes to start with
+- You start knowing only the basics: wood, flint, stone and iron gear, building blocks, workbenches and forges, metal bars, torches and food. That's 61 recipes instead of 102.
+- The other 40 come in eight sets, and each **Recipe Square** you read teaches the next one: bronze gear, the first monster weapons, platinum gear, more monster weapons, stygian gear, storm weapons, soulsteel weapons, and the old secrets (Mirrorblade, Gnarlroot Staff).
+- The crafting list only shows recipes you know, and says how many are left. Squares are in chests (a little more often now), dropped by elites and bosses, in legendary chests, and Tumble sells them.
+- The Stone Club recipe is gone (the Stone Hammer and Stone Sword do its job). Any you already have still work.
+- Old saves: squares you already read still count, and if you'd already moved past a metal, or have a monster weapon in your bag, you keep those monster-weapon recipes.
+
 ## How each hero mines
 - Every hero mines in his own way now, instead of swinging a tool. **Fuzzy** sucks the block in hard: bits of it stream into his mouth and he puffs up with each pull. **Acorn** headbutts it. **Rock** punches it with his stone fist. **Ghost** turns his arm see-through, slides it into the block, then makes it solid inside it to crack the block.
 - Only the look changed: how long each block takes, what you can mine, and what it drops are all the same as before.
