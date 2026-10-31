@@ -14,6 +14,9 @@
   const mining = () => !!(P.mine && !P.mine.locked && RW.input.act('attack') && !P.dead && !(P.vine && P.vine.state === 'on'));
   const PERIOD = { fuzzy: 0.5, acorn: 0.32, rock: 0.32, ghost: 0.64 };
   const ease = (k) => 1 - Math.pow(1 - k, 3);
+  // each hero's rune (v2s15) shows in the mining move: the fuzzy's air, the acorn's sparks, the rock's fist, the ghost's arm
+  const rune = () => (RW.v2runes ? RW.v2runes.tier() : 0);
+  const runeCol = () => (RW.v2runes ? RW.v2runes.color() : '#fff6e0');
   const blockCols = () => { const t = RW.world.tile(P.mine.tx, P.mine.ty); return t.colors || [t.crystal || '#a0a0a0']; };
 
   // a spout of bits pulled out of the block into the fuzzy's mouth
@@ -53,15 +56,15 @@
       const px = Math.round(q.x + P.w / 2 - cam.x), py = Math.round(q.y + P.h - cam.y);
       g.save(); g.translate(px, py); g.rotate(face * 0.45 * lunge * (dy < -0.6 ? -0.5 : 1)); g.translate(-px, -py);
       let out; try { out = baseDraw.call(this, g, cam, q, look, o); } finally { g.restore(); }
-      if (k > 0.33 && k < 0.45) { g.fillStyle = 'rgba(255,240,200,0.8)'; const ix = Math.round(bx - dx * 8 - cam.x), iy = Math.round(by - dy * 8 - 2 - cam.y); [[-3, 0], [3, 0], [0, -3], [0, 3]].forEach(([a, b]) => g.fillRect(ix + a, iy + b, 1, 1)); }
+      if (k > 0.33 && k < 0.45) { g.fillStyle = rune() ? runeCol() : 'rgba(255,240,200,0.8)'; const ix = Math.round(bx - dx * 8 - cam.x), iy = Math.round(by - dy * 8 - 2 - cam.y); [[-3, 0], [3, 0], [0, -3], [0, 3]].forEach(([a, b]) => g.fillRect(ix + a, iy + b, 1, 1)); }
       return out;
     }
     if (sp === 'fuzzy') {
       // sucking hard: he swells a little on each pull, and a funnel of air runs from the block to his mouth
       o.scale = (opts.scale || 1) * (1 + 0.1 * Math.sin(k * Math.PI));
-      const out = baseDraw.call(this, g, cam, q, look, o);
+      const out = baseDraw.call(this, g, cam, q, Object.assign({}, look || A.DEFAULT_LOOK, { mouth: 'open' }), o); // mouth wide open while he sucks
       const mx = cx + face * 6, my = P.y + 16;
-      g.save(); g.globalAlpha = 0.45; g.strokeStyle = '#fff6e0'; g.lineWidth = 1;
+      g.save(); g.globalAlpha = rune() ? 0.6 : 0.45; g.strokeStyle = runeCol(); g.lineWidth = rune() >= 5 ? 2 : 1;
       for (let i = 0; i < 3; i++) {
         const ph = (k + i / 3) % 1; g.beginPath();
         for (let s = 0; s <= 10; s++) { const f = s / 10, w = (1 - f) * 6 * Math.sin(f * 9 + ph * 6.28 + i * 2); const x = bx + (mx - bx) * f - dy * w, y = by + (my - by) * f + dx * w; if (s) g.lineTo(x - cam.x, y - cam.y); else g.moveTo(x - cam.x, y - cam.y); }
@@ -73,7 +76,8 @@
     if (sp === 'rock') {
       // a punch: the stone fist shoots out to the block and pulls back
       const out = baseDraw.call(this, g, cam, q, look, o);
-      const C = A.rockColors ? A.rockColors(look || A.DEFAULT_LOOK) : { base: '#8a8478', dark: '#5a544c', light: '#aaa498' };
+      let C = A.rockColors ? A.rockColors(look || A.DEFAULT_LOOK) : { base: '#8a8478', dark: '#5a544c', light: '#aaa498' };
+      if (rune()) { const rc = runeCol(); C = { base: rc, dark: RW.shade(rc, -0.35), light: RW.shade(rc, 0.3) }; } // the fist takes on its rune's material
       const sx = cx + face * 6, sy = P.y + 14, punch = k < 0.3 ? ease(k / 0.3) : k < 0.45 ? 1 : 1 - (k - 0.45) / 0.55;
       const reach = Math.max(4, d - 6) * punch, fx = sx + dx * reach, fy = sy + dy * reach;
       g.strokeStyle = C.dark; g.lineWidth = 5; g.beginPath(); g.moveTo(sx - cam.x, sy - cam.y); g.lineTo(fx - cam.x, fy - cam.y); g.stroke();
@@ -91,7 +95,8 @@
       const slide = k < 0.55 ? ease(k / 0.55) : 1, solid = k >= 0.55 && k < 0.85;
       const sx = cx + face * 7, sy = P.y + 15, len = (d - 2) * slide;
       g.save(); g.globalAlpha = solid ? 1 : 0.32;
-      for (let s = 0; s <= len; s += 3) { const x = sx + dx * s, y = sy + dy * s, r = s > len - 4 ? 3 : 2; g.fillStyle = RW.shade(sheet, s > len - 4 ? 0.1 : -0.05); g.beginPath(); g.arc(x - cam.x, y - cam.y, r, 0, 6.28); g.fill(); }
+      const armCol = solid && rune() ? runeCol() : sheet; // a stronger permanence shows in the solid arm
+      for (let s = 0; s <= len; s += 3) { const x = sx + dx * s, y = sy + dy * s, r = s > len - 4 ? 3 : 2; g.fillStyle = RW.shade(armCol, s > len - 4 ? 0.1 : -0.05); g.beginPath(); g.arc(x - cam.x, y - cam.y, r, 0, 6.28); g.fill(); }
       g.restore();
       if (solid && k < 0.62) { g.fillStyle = 'rgba(220,230,255,0.9)'; [[-6, 0], [6, 0], [0, -6], [0, 6], [-4, -4], [4, 4]].forEach(([a, b]) => g.fillRect(Math.round(bx - cam.x) + a, Math.round(by - cam.y) + b, 1, 1)); }
       return out;
