@@ -4,7 +4,7 @@
 //   the Soulmire (a marsh of black pools and boardwalks, with a shrine island) · Barrowtown (a ruined town, a graveyard,
 //   and the Barrow, a crypt underneath with a hidden room) · the Mistspires (tall pale peaks with a Cyitor watchtower) ·
 //   the Hollows (the Hollow Wraith) · the Still Sea.
-// Six new Ghost World monsters (pale cousins of ones you know) and Barrow Chests with Ghost World treasure.
+// Six new Ghost World creatures with their own drawings (bone, ash and cold light) and Barrow Chests with Ghost World treasure.
 // It's a rebuilt world, so it is saved under a new name ('ghost2'): blocks changed in the old, smaller Ghost World
 // stay with the old one, and you arrive at the Pale Keep.
 // The generator plugs in underneath the legendary-chest and town-portal steps through a hook at the end of v2.js.
@@ -304,7 +304,7 @@
     w: 30, h: 20, hp: 150, dmg: 24, speed: 170, behavior: 'charger',
     spawn: { worlds: ['ghost'], medium: 'ground', zones: ['bonewood', 'crypt', 'mist'], weight: 9 },
     drops: [['ectoplasm', 0.6, 1, 2], ['warthog_tusk', 0.5, 1, 2], ['soulshroom', 0.2, 1, 1]],
-    blurb: 'A warthog that wandered into the mist and never left. Pale as bone now, and it still charges.' });
+    blurb: 'A hound that starved in the mist and kept on walking. Hide stretched over bone, one cold eye, and it still charges.' });
   mob({ id: 'grave_crawler', name: 'Grave Crawler', art: { draw: 'grave_crawler' },
     w: 22, h: 11, hp: 110, dmg: 22, speed: 70, behavior: 'crawler',
     spawn: { worlds: ['ghost'], medium: 'ground', zones: ['caves', 'deep', 'barrow'], weight: 8 },
@@ -314,7 +314,7 @@
     w: 22, h: 16, hp: 130, dmg: 22, speed: 110, behavior: 'hopper',
     spawn: { worlds: ['ghost'], medium: 'ground', zones: ['marsh'], weight: 12 },
     drops: [['slime_gel', 1, 1, 3], ['ectoplasm', 0.4, 1, 1]],
-    blurb: 'Soulmire mud that learned to hop. Leaves a cold, wet print.' });
+    blurb: 'Black sludge from the Soulmire with a drowned skull sunk inside it, and far too many eyes. It hops.' });
   mob({ id: 'bone_grasper', name: 'Bone Grasper', art: { draw: 'bone_grasper' },
     w: 24, h: 34, hp: 220, dmg: 24, speed: 0, behavior: 'grabber',
     spawn: { worlds: ['ghost'], medium: 'ground', zones: ['bonewood'], weight: 5 },
