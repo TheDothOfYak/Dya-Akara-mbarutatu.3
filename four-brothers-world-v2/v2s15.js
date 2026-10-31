@@ -16,6 +16,7 @@
   // ====================== the runes ======================
   const POWER = [1, 2, 3, 4, 5, 6, 7, 8, 10];   // mining power with 0..8 runes (same numbers the picks had)
   const COLOR = ['#fff6e0', '#5a5560', '#8a8478', '#a0a6ae', '#c8873a', '#d8e4ec', '#7a5ac8', '#5ad0e8', '#f2c94c'];
+  const FUZZY_COLOR = { 3: '#7d98c4' };   // the fuzzy's iron-rune air is a grey blue, so it doesn't look like plain air
   const PARTS = ['slime_gel', 'bat_wing', 'warthog_hide', 'fish_scale', 'fish_spine', 'ectoplasm', 'crawler_shard', 'scorpion_stinger', 'kofi_hair', 'kipsu_fur', 'krabbi_shell', 'scute'];
   const RARE = ['ember_gland', 'fish_eye', 'eater_fang', 'warthog_tusk', 'living_vine', 'wraith_essence', 'lutut_tooth', 'harkal_tooth', 'hvaleia_oil', 'naga_scale', 'soul_shard', 'leviathan_scale'];
   const COST = [null,
@@ -42,7 +43,7 @@
   const hero = () => HERO[P.species] || HERO.rock;
   const tier = () => Math.max(0, Math.min(8, (P.flags && P.flags.rune) | 0));
   const runeName = (t) => (t > 0 ? MAT[t] + ' rune: ' : '') + hero().names[t];
-  RW.v2runes = { tier, power: () => POWER[tier()], color: (t) => COLOR[t == null ? tier() : t], name: runeName,
+  RW.v2runes = { tier, power: () => POWER[tier()], color: (t, who) => { const n = t == null ? tier() : t; return ((who || P.species) === 'fuzzy' && FUZZY_COLOR[n]) || COLOR[n]; }, name: runeName,
     puffs: () => 1 + (tier() >= 3 ? 1 : 0) + (tier() >= 5 ? 1 : 0), cloud: () => tier() >= 8 };
 
   // mining strength comes from the runes only (anything you hold, pick or hammer, is just a weapon now)
