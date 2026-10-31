@@ -14,6 +14,27 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## Runes instead of picks: the Ancient Rune Keeper
+- **Picks are gone.** How hard a block you can break comes only from your runes, and each hero's runes are their own: the **acorn** gets a harder cap (it changes colour to the rune's material), the **fuzzy** stronger suction (the air he pulls glows), the **rock** a heavier fist (made of the rune's material), and the **ghost** a stronger permanence (his arm turns the rune's colour when it goes solid).
+- **The Ancient Rune Keeper** stands near where you arrive in Fuzzy, Acorn, Rock and Ghost World. Bring him materials, monster parts and coins, and he carves your next rune. 1 Flint (breaks stone): 3 flint, 6 rubble, 3 monster parts, 15 coins. 2 Stone (iron ore): 20 stone, 4 flint, 5 parts, 30 coins. 3 Iron (bronze ore): iron bars. 4 Bronze (platinum). 5 Platinum (stygian). 6 Stygian, 7 Soulsteel and 8 the Duat rune each dig faster.
+- Without a rune you can only break soft things (dirt, sand, wood, gravel, flint). Old saves start with no runes; old picks are only weapons now. Pick recipes are gone, so a new hero starts with 58 recipes and 37 to learn.
+- The rock can only smash what his fist rune can break.
+
+## The fuzzy
+- **One puff jump.** A normal jump, then one puff in the air (and he can still hold jump to float down). His 3rd rune gives a second puff, his 5th a third.
+- **Cloud ride:** with the Duat rune, press jump again once your puffs are used up and he rides a cloud for about five seconds (hold jump to stay on). It refills on the ground.
+- He opens his mouth wide while he sucks up a block.
+
+## Building in shapes, pouring sand, cracks that stay
+- **Shapes:** press **B** to switch between one block (the default), a row of 3, a column of 3, a 2x2 square, or steps. A faint outline shows where they'll go. Each block uses one from your stack.
+- **Sand, snow and soul ash pour** when you dig out what holds them up, sliding off edges into a pile. Gravel drops straight down. Falling grains hurt monsters they land on, and wait on your head rather than fall into you. Only blocks near where you dig or build move.
+- **Cracks stay:** stop mining a block halfway and its cracks stay for 30 seconds, so you can come back to it.
+
+## Caves, chests and falling
+- **Fuzzy World's caves** have more than bats now: slimes, crystal crawlers and scorpions in the caves; ember crawlers, crystal crawlers, jungle slimes and spiky fish in the deep. Most bats down there give way to them.
+- **More chests:** 20 more Old Chests in Fuzzy World's caves, 12 in Rock World, 8 in the Ghost World.
+- **Every hero takes fall damage** (the rock, fuzzy and ghost used to take none). Up to 7 blocks is safe; past that it hurts a little more each block, and more again past 20 and 40 blocks (about 15 damage from 20 blocks, 33 from 30, 75 from 50). Floating down is always safe: the fuzzy's float, the acorn's leaf, the ghost's hover, a vine or a cloud.
+
 ## Elites, the Duat Stone and coins
 - **Something is amiss in the Duat.** Elites (Ghost Tank, Lütut, Thornback, Canopy Stalker, Geode Golem) are souls climbing back out of the Duat, and they grow as your gear does. None come until you carry an iron-strength weapon, and never in your first three minutes. With iron they're at 60% health and damage, with bronze 80%, with platinum full strength, with stygian or soulsteel 130% (Duat-touched) and with a legendary weapon 160% (Duat-crowned).
 - **Stronger elites carry better things.** Iron-level ones drop what they always did (30–60 coins, a key fragment, sometimes a Star Ember or Recipe Square). Higher up they drop more coins (up to 180–260), more key fragments, Star Embers every time, Recipe Squares more often, and metal bars from bronze up to soulsteel. The strongest also drop soul shards and sometimes a Mirror Shard.
