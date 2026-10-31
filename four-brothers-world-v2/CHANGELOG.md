@@ -18,7 +18,8 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Picks are gone.** How hard a block you can break comes only from your runes, and each hero's runes are their own: the **acorn** gets a harder cap (it changes colour to the rune's material), the **fuzzy** stronger suction (the air he pulls glows), the **rock** a heavier fist (made of the rune's material), and the **ghost** a stronger permanence (his arm turns the rune's colour when it goes solid).
 - **The Ancient Rune Keeper** stands near where you arrive in Fuzzy, Acorn, Rock and Ghost World. Bring him materials, monster parts and coins, and he carves your next rune. 1 Flint (breaks stone): 3 flint, 6 rubble, 3 monster parts, 15 coins. 2 Stone (iron ore): 20 stone, 4 flint, 5 parts, 30 coins. 3 Iron (bronze ore): iron bars. 4 Bronze (platinum). 5 Platinum (stygian). 6 Stygian, 7 Soulsteel and 8 the Duat rune each dig faster.
 - Without a rune you can only break soft things (dirt, sand, wood, gravel, flint). Old saves start with no runes; old picks are only weapons now. Pick recipes are gone, so a new hero starts with 58 recipes and 37 to learn.
-- The rock can only smash what his fist rune can break.
+- The rock can only smash what his fist rune can break, and you see his fist punch each block he smashes (out of reach he just swings).
+- The fuzzy's iron-rune air is grey blue, so it stands out from his stone rune.
 
 ## The fuzzy
 - **One puff jump.** A normal jump, then one puff in the air (and he can still hold jump to float down). His 3rd rune gives a second puff, his 5th a third.
