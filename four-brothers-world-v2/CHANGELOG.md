@@ -14,6 +14,12 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## A bigger Ghost World
+- The Ghost World is now 800x320 blocks (it was 520x240), about the size of Fuzzy World and Rock World. West to east: the Pale Hills and the Pale Keep, the Bonewood (a thick dead forest, with the Hanging Hollow), the Soulmire (black pools, boardwalks and a shrine island), Barrowtown (ruined houses, a graveyard, and the Barrow, a crypt underneath with a hidden room), the Mistspires (tall peaks with a Cyitor watchtower), and the Hollows.
+- Six new creatures with their own drawings: the Pale Hound, Grave Crawler, Mire Slime, Bone Grasper, Mire Eel and Mist Bat.
+- Barrow Chests in the ruins hold ectoplasm, coins, Stygian and platinum ore, and sometimes key fragments or recipe squares.
+- It's a rebuilt world, so it's saved under a new name: blocks you changed in the old Ghost World don't carry over. Your bag and gear do, and you start again at the Pale Keep.
+
 ## The Warthog King
 - The cliff on the west side of King's Clearing is now a gentle slope, and the slope counts as part of his arena, so he charges up it. There's no ledge left where he can't reach you.
 - If you get above him (a ledge, a tree, a tower you built), he leaps up at you and lands with a stomp.
