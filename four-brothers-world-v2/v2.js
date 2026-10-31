@@ -762,6 +762,9 @@
     A.outline(c, '#1a100a');
     return c;
   };
+  // The Ghost World's bigger generator (v2s8.js) plugs in here, underneath the legendary-chest and town-portal steps
+  // that v2s2.js and v2s3.js wrap around every world's generator.
+  { const gd = RW.WORLDS.ghost; if (gd && gd.generate) { const g0 = gd.generate; gd.generate = function () { return (RW.v2GhostGen || g0).apply(this, arguments); }; } }
   // The fuzzy hero is the original main-game sprite again (same size, same look). A.fuzzyMed above is the old 1.5x
   // version, kept here unused in case it comes back; nothing installs it into A.fuzzySprites any more.
 })(window.RW);
