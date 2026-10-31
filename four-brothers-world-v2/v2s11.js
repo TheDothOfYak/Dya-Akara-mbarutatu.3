@@ -36,11 +36,25 @@
     return out;
   };
 
+  // the rock smashes most blocks in one go instead of mining them, so he punches whatever solid block he's hitting
+  // within reach (and follows through for a moment after it breaks); out of reach he just swings
+  let lastRock = null;
+  function rockTarget() {
+    if (P.species !== 'rock' || P.dead || !RW.input.act('attack') || (P.vine && P.vine.state === 'on') || !RW.mouseWorld) return null;
+    const h = P.held && P.held();
+    if (h && (h.kind === 'place' || h.kind === 'torch' || h.plant)) return null;
+    const m = RW.mouseWorld(), tx = Math.floor(m.x / TS), ty = Math.floor(m.y / TS), pc = P.center();
+    const reach = Math.hypot(pc.x - (tx * TS + 8), pc.y - (ty * TS + 8)) <= 5.2 * TS * (P.scale ? P.scale() : 1);
+    if (reach && RW.world.solid(tx, ty)) { lastRock = { tx, ty, t: now() }; return lastRock; }
+    if (reach && lastRock && now() - lastRock.t < 0.3) return lastRock;
+    return null;
+  }
   const baseDraw = E.drawPlayer;
   E.drawPlayer = function (g, cam, p, look, opts) {
-    if (p !== P || !opts || !mining()) return baseDraw.apply(this, arguments);
+    const tgt = p === P && opts ? (mining() ? P.mine : opts.species === 'rock' ? rockTarget() : null) : null;
+    if (!tgt) return baseDraw.apply(this, arguments);
     const sp = opts.species, per = PERIOD[sp]; if (!per) return baseDraw.apply(this, arguments);
-    const k = (now() % per) / per, bx = P.mine.tx * TS + 8, by = P.mine.ty * TS + 8;
+    const k = (now() % per) / per, bx = tgt.tx * TS + 8, by = tgt.ty * TS + 8;
     const cx = P.x + P.w / 2, cy = P.y + P.h / 2; let dx = bx - cx, dy = by - cy; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
     const face = bx >= cx ? 1 : -1;
     // the hero faces the block, holds no tool, and isn't in the swing pose
