@@ -14,6 +14,15 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## The acorn's vine
+- Press **C** (you can change it in Settings) to shoot a vine toward the mouse. It sticks to any block or tree up to 15 blocks away, and you swing from it.
+- Left and right pump the swing, **W** climbs up the vine, **S** lets out more, **Space** lets go with a hop (your double jump is still there afterwards), and **C** lets go too. Letting go mid-swing keeps your speed, so you can fling yourself across gaps.
+- It costs a little stamina to shoot, and lets go on its own if you hit water or the block it's holding breaks.
+
+## Puff jumps and solid-looking trees
+- **Fuzzy puff jumps.** After a normal jump, press jump in the air to suck in air and jump again, higher. You get two of these, each higher than the last (a normal jump is about 5 blocks; with both puffs about 16). They come back when you land or touch water, and each costs a little stamina. The fuzzy swells up while he's puffed, and holding jump while falling still floats him down.
+- **Trees** look the same standing as they do when they fall: leaves fill the whole block with a blotchy texture, and the trunk is a solid column. Albali trees stay gold and Ghost World trees stay pale.
+
 ## A bigger Ghost World
 - The Ghost World is now 800x320 blocks (it was 520x240), about the size of Fuzzy World and Rock World. West to east: the Pale Hills and the Pale Keep, the Bonewood (a thick dead forest, with the Hanging Hollow), the Soulmire (black pools, boardwalks and a shrine island), Barrowtown (ruined houses, a graveyard, and the Barrow, a crypt underneath with a hidden room), the Mistspires (tall peaks with a Cyitor watchtower), and the Hollows.
 - Six new creatures with their own drawings: the Pale Hound, Grave Crawler, Mire Slime, Bone Grasper, Mire Eel and Mist Bat. They're in the Field Guide under a new Ghost World Wildlife tab.
