@@ -1,7 +1,7 @@
 // 4 Brothers World V2 — part 9: the fuzzy's puff jumps, and trees drawn the way they look while they fall.
-// 1. Fuzzy: a normal jump, then in the air he sucks in air and jumps again, higher, up to two more times
-//    (each puff jump is higher than the one before). They come back when he lands or swims. While he's puffed up
-//    he swells, and holding jump while falling still lets him float down.
+// 1. Fuzzy: a normal jump, then in the air he sucks in air and jumps once more, higher. His runes (v2s15) add a
+//    second and a third puff later. They come back when he lands or swims. While he's puffed up he swells, and
+//    holding jump while falling still lets him float down.
 // 2. Trees: standing trunks and leaves use the same full-square, blotchy look as a tree that's falling.
 (function (RW) {
   'use strict';
@@ -9,8 +9,9 @@
   if (!P || !E || !A) return;
 
   // ====================== FUZZY PUFF JUMPS ======================
-  const PUFFS = [-390, -430];          // the two air jumps (the ground jump is -360)
-  const F = (P.puff = { left: 2, t: 0, size: 0 });
+  const PUFFS = [-400, -420, -440];    // the air jumps, each higher (the ground jump is -360); how many you get comes from your runes
+  const nPuffs = () => Math.min(PUFFS.length, RW.v2runes ? RW.v2runes.puffs() : 1);
+  const F = (P.puff = { left: 1, t: 0, size: 0 });
   const blocked = () => !!(U && U.blocking && U.blocking());
   const hitJump = () => { const i = RW.input; return !blocked() && (i.actHit('jump') || i.actHit('up')); };
   const holdJump = () => { const i = RW.input; return !blocked() && (i.act('jump') || i.act('up')); };
@@ -22,11 +23,11 @@
   const baseUpdate = P.update;
   P.update = function (dt) {
     if (P.species === 'fuzzy' && !P.dead) {
-      if (P.ground || P.water || P.climbing) F.left = PUFFS.length;
+      if (P.ground || P.water || P.climbing) F.left = nPuffs();
       else if (hitJump() && F.left > 0 && !P.wasWater && P.tire(5)) {
-        P.vy = PUFFS[PUFFS.length - F.left]; F.left--; F.t = 0.35;
+        P.vy = PUFFS[nPuffs() - F.left] || PUFFS[0]; F.left--; F.t = 0.35;
         inhale(); RW.audio.sfx('swing');
-        if (!P.flags.tipPuff) { P.flags.tipPuff = 1; U && U.toast && U.toast('Puff jump: press jump in the air to suck in air and jump higher. Twice!'); }
+        if (!P.flags.tipPuff) { P.flags.tipPuff = 1; U && U.toast && U.toast('Puff jump: press jump in the air to suck in air and jump higher. Hold jump while falling to float down.'); }
       }
       // how puffed up he looks: a quick swell on each puff jump, and fully round while floating down
       const floating = !P.ground && !P.water && holdJump() && P.vy > 0 && P.vy <= 60;
@@ -45,7 +46,7 @@
     return baseDraw.apply(this, arguments);
   };
   const H = RW.HEROES && RW.HEROES.fuzzy;
-  if (H) H.blurb = 'Fuzzies start in Tuftwood on Fuzzy World with a little wood sword and two spells. After a jump they can suck in air and jump twice more, higher each time. They bounce when they land, puff up to float down, and swim in strokes, but need air.';
+  if (H) H.blurb = 'Fuzzies start in Tuftwood on Fuzzy World with a little wood sword and two spells. After a jump they can suck in air and jump once more, higher (stronger runes give more puffs). They bounce when they land, puff up to float down, and swim in strokes, but need air.';
 
   // ====================== TREES ======================
   // the same drawing the falling tree uses, so a tree looks the same standing, shaken and falling
