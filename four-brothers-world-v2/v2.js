@@ -91,7 +91,16 @@
 
   // ---- rare elites: at most one at a time, and a long gap between them ----
   const ELITES = new Set(['ghost_tank', 'lutut', 'thornback', 'canopy_stalker', 'geode_golem']);
-  const ELITE_GAP = 100; let lastElite = -1e9;
+  const ELITE_GAP = 100; let lastElite = -1e9; const firstSeen = now();
+  // how strong your best weapon is (upgrades not counted): elites are weaker until you've got good gear
+  const bestDmg = () => (P.inv || []).reduce((m, s) => { const it = s && RW.ITEMS[s.id]; return it && it.kind === 'weapon' && it.dmg ? Math.max(m, it.dmg) : m; }, 0);
+  // the stronger your gear, the stronger the elites that climb out of the Duat (and the more they carry)
+  //   tier 0: no elites yet; 1: iron; 2: bronze/platinum; 3: platinum/stygian; 4: stygian/soulsteel; 5: legendary
+  const eliteTier = () => { const d = bestDmg(); return d < 15 ? 0 : d < 25 ? 1 : d < 40 ? 2 : d < 60 ? 3 : d < 100 ? 4 : 5; };
+  const SCALE = [0.6, 0.6, 0.8, 1, 1.3, 1.6];
+  const eliteScale = () => SCALE[eliteTier()];
+  RW.v2elite = { tier: eliteTier, scale: eliteScale, bestDmg };
+  { const baseHurt = P.hurt; P.hurt = function (d, dir, src) { if (ELITES.has(src)) d = Math.round(d * eliteScale()); return baseHurt.call(this, d, dir, src); }; }
   const dummy = () => ({ sp: 'ghost', x: -1e6, y: -1e6, w: 1, h: 1, dead: true, dummy: true });
   const baseSpawnEnemy = E.spawnEnemy;
   let spawning = false;
@@ -105,8 +114,10 @@
     }
     if (spawning && ELITES.has(id)) {
       if (now() - lastElite < ELITE_GAP || E.enemies.some((e) => ELITES.has(e.sp) && !e.dead)) return dummy();
+      // elites wait until you carry an iron-strength weapon, and never turn up in your first three minutes
+      if (eliteTier() < 1 || now() - firstSeen < 180) return dummy();
       lastElite = now();
-      const e = baseSpawnEnemy(id, x, y); eliteIntro(id); return e;
+      const e = baseSpawnEnemy(id, x, y); e.eliteTier = eliteTier(); e.hp = e.maxhp = Math.round(e.hp * eliteScale()); eliteIntro(id, e.eliteTier); return e;
     }
     return baseSpawnEnemy(id, x, y);
   };
@@ -427,9 +438,10 @@
     drops: [['crystal_shard', 1, 8, 14], ['platinum_ore', 0.5, 2, 4], ['crystal_purple', 0.4, 1, 1], ['crystal_gold', 0.12, 1, 1]],
     tip: 'Its crystal shell takes almost nothing. Jump over its shockwave, and when it slams, its core cracks open for a moment: hit the glowing core.',
     blurb: 'A walking geode. Slams the ground hard enough to split its own shell.' });
-  function eliteIntro(id) {
+  function eliteIntro(id, tier) {
     const sp = RW.SPECIES[id]; if (!sp) return;
-    setTimeout(() => { U.banner(sp.name + ' nearby', P.seen[id] ? 'Something strong is close.' : sp.tip); }, 400);
+    const tag = tier >= 5 ? ' (Duat-crowned)' : tier >= 4 ? ' (Duat-touched)' : '';
+    setTimeout(() => { U.banner(sp.name + tag + ' nearby', P.seen[id] ? (tag ? 'It came back from the Duat stronger than before. And richer.' : 'Something strong is close.') : sp.tip); }, 400);
   }
   const B = E.behaviors;
   const pcOf = () => P.center();
