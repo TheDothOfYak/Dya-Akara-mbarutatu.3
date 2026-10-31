@@ -14,6 +14,10 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## How each hero mines
+- Every hero mines in his own way now, instead of swinging a tool. **Fuzzy** sucks the block in hard: bits of it stream into his mouth and he puffs up with each pull. **Acorn** headbutts it. **Rock** punches it with his stone fist. **Ghost** turns his arm see-through, slides it into the block, then makes it solid inside it to crack the block.
+- Only the look changed: how long each block takes, what you can mine, and what it drops are all the same as before.
+
 ## The acorn's vine
 - Press **C** (you can change it in Settings) to shoot a vine toward the mouse. It sticks to any block or tree up to 15 blocks away, and you swing from it.
 - Left and right pump the swing, **W** climbs up the vine, **S** lets out more, **Space** lets go with a hop (your double jump is still there afterwards), and **C** lets go too. Letting go mid-swing keeps your speed, so you can fling yourself across gaps.
