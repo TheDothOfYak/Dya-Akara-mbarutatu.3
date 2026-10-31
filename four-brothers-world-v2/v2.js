@@ -318,7 +318,7 @@
   P.mineTile = function (tx, ty, dt) {
     if (P.species !== 'rock') return baseMine.apply(this, arguments);
     const W = RW.world, id = W.get(tx, ty), t = RW.TILES[id];
-    const smashable = (i) => { const tt = RW.TILES[i]; return tt && tt.solid && (tt.hard == null ? 0 : tt.hard) <= SMASH_MAX_HARD && !tt.element && !RW.v2Built(i); };
+    const smashable = (i) => { const tt = RW.TILES[i]; return tt && tt.solid && (tt.hard == null ? 0 : tt.hard) <= Math.min(SMASH_MAX_HARD, P.power()) && !tt.element && !RW.v2Built(i); }; // a rock smashes what his fist rune can break
     if (!smashable(id)) return baseMine.apply(this, arguments);
     P.mine = null;
     if (smashCd > 0) return; smashCd = 0.32;
