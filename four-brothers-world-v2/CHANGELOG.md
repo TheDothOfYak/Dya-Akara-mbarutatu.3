@@ -2,6 +2,11 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## Phones and tablets
+- **Play on a phone or tablet.** On a touch screen the game shows its own controls: a joystick on the left (push it all the way to run), Jump, Hit, Use, Cast, Spell, Talk, Torch, Drop and Power (hero magic) on the right, and touch and hold anywhere in the world to swing, mine, chop or place a block right there. In the bag, tap to pick up and put down, and hold an item to eat or wear it. The HUD gets smaller and Chat gets a button. With a mouse and keyboard nothing changes. Code: `js/flake/fbw_touch.js`.
+- **More for phones.** Double-tap a spot to use or cast on it (the right-click: fishing, pets, chests, beds). Settings has a Touch controls section: button size, see-through buttons, left-handed (joystick on the right) and a buzz on each press. Hints say which button to tap instead of which key to press, Controls lists the touch controls, the screen stays on while you play, and the game can go full screen from a phone's home screen.
+- **Vine and Shape on touch.** The acorn gets a Vine button (it shoots up and ahead), and a Shape button shows while you hold a block. Power aims just ahead of you.
+
 ## How each hero moves
 - **Rock (heavy):** slow to start (about a second to full walk speed), skids a couple of blocks when he stops, and barely steers in the air. Stronger gravity, and no fall damage: a hard landing thuds and knocks nearby monsters. Hold sprint for a run-up and he smashes through dirt and sand (not stone) and rams monsters for speed-based damage. Enemies shove him half as hard.
 - **Ghost (light):** falls slowly and drifts on his own momentum, so he keeps going when you let go. Hover (hold jump) still works. Monsters shove him further.

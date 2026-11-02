@@ -56,6 +56,17 @@
   .t-note{margin-top:18px;font-size:13px;color:var(--ink-dim);opacity:.8}
   #loading{font-family:var(--display);letter-spacing:.3em;font-size:12px;color:var(--brass);margin-bottom:18px}
 
+  /* title on a phone or tablet: the keyboard list is no use, and a phone on its side is short */
+  @media (pointer:coarse){ .controls{display:none} }
+  @media (pointer:coarse) and (max-height:520px){
+    #title{padding:0 calc(5vw + env(safe-area-inset-right)) 0 calc(5vw + env(safe-area-inset-left))}
+    .t-box{padding:14px 0}
+    .t-title{font-size:clamp(30px,10vh,48px);margin:8px 0 4px}
+    .t-sub{font-size:16px;margin-bottom:12px}
+    .riddle{font-size:15px;line-height:1.45;margin-bottom:16px}
+    .t-note{margin-top:10px}
+  }
+
   /* ---------------- HUD ---------------- */
   #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
   #crosshair{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);opacity:.75}
@@ -373,6 +384,7 @@
   body.in-memory::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse at center,rgba(255,226,160,0) 45%,rgba(255,200,110,.35) 80%,rgba(120,80,20,.55) 100%);mix-blend-mode:screen}
   body.in-memory #game{filter:sepia(.35) saturate(1.2) brightness(1.06)}
 </style>
+  <script src="../js/flake/mobile.js" data-game="1" data-awake="1"></script><!-- phones and tablets only: no zoom on text boxes, screen stays on while playing -->
 </head>
 <body>
 <div id="game"></div>
