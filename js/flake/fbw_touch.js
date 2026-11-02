@@ -85,6 +85,13 @@
     const wx = P.x + P.w / 2 + (P.face || 1) * 22 * sc, wy = P.y + P.h * 0.45;
     aimAtClient((wx - RW.cam.x) * k + r.left, (wy - RW.cam.y) * k + r.top);
   }
+  // up and ahead, for the acorn's vine (a grapple wants to go up)
+  function aimUp() {
+    const P = RW.player; if (!P || !cv || !RW.cam) return;
+    const r = cv.getBoundingClientRect(), k = r.width / (cv.width || 1);
+    const wx = P.x + P.w / 2 + (P.face || 1) * 70, wy = P.y - 90;
+    aimAtClient((wx - RW.cam.x) * k + r.left, (wy - RW.cam.y) * k + r.top);
+  }
 
   /* ---------- the joystick ---------- */
   const STICK_R = 46;
@@ -161,6 +168,8 @@
     ['drop', 'Drop', 'drop', false, 'sm'],
     ['give', 'Give', 'give', false, 'sm'],
     ['ability', 'Power', 'ability', false, 'sm'],
+    ['vine', 'Vine', 'vine', false, 'sm'],
+    ['shape', 'Shape', 'shape', false, 'sm'],
   ];
   let aheadT = 0;
   function aheadLoop() {
@@ -175,7 +184,8 @@
       try { b.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       RW.audio && RW.audio.start && RW.audio.start();
       buzz();
-      if (action === 'attack' || action === 'use' || action === 'cast') { aimAhead(); if (action === 'attack' && !aheadT) aheadT = requestAnimationFrame(aheadLoop); }
+      if (action === 'vine') aimUp();
+      if (action === 'attack' || action === 'use' || action === 'cast' || action === 'ability') { aimAhead(); if (action === 'attack' && !aheadT) aheadT = requestAnimationFrame(aheadLoop); }
       press(action);
       if (!hold) setTimeout(() => release(action), 60);
     });
@@ -196,7 +206,7 @@
   }
 
   /* ---------- words: name the buttons, not the keys ---------- */
-  const LABEL = { left: 'Joystick', right: 'Joystick', up: 'Joystick up', down: 'Joystick down', jump: 'Jump', sprint: 'Joystick (push all the way)', attack: 'Hit', use: 'Use', cast: 'Cast', spell: 'Spell', interact: 'Talk', torch: 'Torch', drop: 'Drop', give: 'Give', ability: 'Power', bag: 'Bag', map: 'Map', guide: 'Guide', help: 'Controls', settings: 'Settings', chat: 'Chat' };
+  const LABEL = { left: 'Joystick', right: 'Joystick', up: 'Joystick up', down: 'Joystick down', jump: 'Jump', sprint: 'Joystick (push all the way)', attack: 'Hit', use: 'Use', cast: 'Cast', spell: 'Spell', interact: 'Talk', torch: 'Torch', drop: 'Drop', give: 'Give', ability: 'Power', vine: 'Vine', shape: 'Shape', bag: 'Bag', map: 'Map', guide: 'Guide', help: 'Controls', settings: 'Settings', chat: 'Chat' };
   let realKeys = 0;   // > 0 while the Settings key table or the HUD key hints draw: those want the real keys
   const kn0 = RW.keyName;
   if (kn0) RW.keyName = function (c) {
@@ -216,6 +226,8 @@
     [/\(R or right-click\)/g, '(Talk, or double-tap it)'], [/R or right-click/g, 'Talk, or double-tap it,'],
     [/ \(R\)/g, ' (Talk)'],
     [/Press H for controls\./g, 'Menu → Controls shows the buttons.'],
+    [/Press B to change it/g, 'Tap Shape to change it'],
+    [/Left\/right to swing, W to climb up it, S to let out vine, Space to let go\./g, 'Joystick left/right to swing, up to climb it, down to let out vine, Jump to let go.'],
     [/\bPress R\b/g, 'Tap Talk'], [/\bpress R\b/g, 'tap Talk'], [/\bPress T\b/g, 'Tap Torch'],
     [/ · right-click to wear/g, ' · hold it in the bag to wear'],
     [/Right-click armor in your bag/g, 'Hold armor in your bag'],
@@ -259,6 +271,8 @@
     ['Talk', 'Talk, read carvings, open chests, use waystones, rifts and Duat Altars'],
     ['Torch · Drop', 'Light your torch or put it away · drop what you hold'],
     ['Power', 'Your hero magic (V2)'],
+    ['Vine', 'Acorn: shoot a vine up and ahead to grapple and swing (V2)'],
+    ['Shape', 'Holding a block: switch building shape (V2)'],
     ['Hotbar', 'Tap a slot to hold it. Hold a slot to eat or wear what is in it'],
     ['Bag · Map · Guide', 'Top right. In the bag, tap to pick up and put down, hold to eat or wear'],
     ['Chat', 'Talk with the other players in your world'],
@@ -267,7 +281,7 @@
   function touchHelp() {
     const box = $('#help .keys'); if (!box) return;
     box.innerHTML = '';
-    HELP.forEach(([k, t]) => { if (k === 'Power' && !(RW.binds && RW.binds.ability)) return; const a = mk('kbd', null, k), b = mk('span', null, t); box.append(a, b); });
+    HELP.forEach(([k, t]) => { if ((k === 'Power' || k === 'Vine' || k === 'Shape') && !(RW.binds && RW.binds[k === 'Power' ? 'ability' : k.toLowerCase()])) return; const a = mk('kbd', null, k), b = mk('span', null, t); box.append(a, b); });
     const n = mk('span', 'label', 'Got a keyboard and mouse too? They still work.'); box.append(mk('span'), n);
   }
 
@@ -378,6 +392,9 @@
       vis('give', !LEGACY && RW.net && RW.net.transport);
       vis('ability', !LEGACY && !!(RW.binds && RW.binds.ability));
       vis('drop', !LEGACY && P.held && P.held());
+      vis('vine', !LEGACY && !!(RW.binds && RW.binds.vine) && P.species === 'acorn');
+      const h = P.held && P.held();
+      vis('shape', !LEGACY && !!(RW.binds && RW.binds.shape) && !!h && h.kind === 'place');
     }
   }
 

@@ -244,6 +244,13 @@
 
   // ====================== MONEY: what monsters, chests and hauntings give ======================
   const give = (id, n, x, y) => { if (n > 0) E.dropItem(id, n, x, y); };
+  const ELITE_LOOT = [null,
+    { coin: [30, 60], frag: 1, ember: [0.5], square: 0.35, extra: [] },
+    { coin: [50, 90], frag: 1, ember: [0.6], square: 0.4, extra: [['bronze_bar', 1, 2, 4], ['platinum_bar', 0.4, 1, 3]] },
+    { coin: [80, 130], frag: 2, ember: [1], square: 0.5, extra: [['platinum_bar', 1, 3, 5], ['stygian_bar', 0.3, 1, 2]] },
+    { coin: [120, 180], frag: 2, ember: [1, 0.5], square: 0.65, extra: [['stygian_bar', 1, 3, 5], ['soul_shard', 1, 4, 8]] },
+    { coin: [180, 260], frag: 3, ember: [1, 1], square: 0.8, extra: [['soulsteel_bar', 1, 2, 4], ['soul_shard', 1, 6, 10], ['mirror_shard', 0.3, 1, 1]] },
+  ];
   const baseKill = E.kill;
   E.kill = function (e) {
     const first = e && !e.dead && !e.v2paid; if (first) e.v2paid = true;
@@ -251,8 +258,15 @@
     if (first && !e.dummy) {
       const sp = RW.SPECIES[e.sp] || {}, c = ec(e), hp = e.maxhp || sp.hp || 20;
       if (e.isBoss || e === E.boss || sp.boss) { give('coin', RW.randi(140, 200), c.x, c.y); give('recipe_square', 1, c.x, c.y); give('key_fragment', 2, c.x, c.y); give('star_ember', 1, c.x, c.y); }
-      else if (sp.elite) { give('coin', RW.randi(30, 60), c.x, c.y); give('key_fragment', 1, c.x, c.y); if (Math.random() < 0.5) give('star_ember', 1, c.x, c.y); if (Math.random() < 0.35) give('recipe_square', 1, c.x, c.y); }
-      else if (sp.role === 'enemy' && Math.random() < 0.65) give('coin', Math.max(1, Math.round(hp / 30 + Math.random() * 2)), c.x, c.y);
+      else if (sp.elite) {
+        // what an elite carries grows with its tier (how strong your gear was when it climbed out of the Duat)
+        const t = Math.max(1, Math.min(5, e.eliteTier || 1)), L = ELITE_LOOT[t];
+        give('coin', RW.randi(L.coin[0], L.coin[1]), c.x, c.y); give('key_fragment', L.frag, c.x, c.y);
+        for (let i = 0; i < L.ember.length; i++) if (Math.random() < L.ember[i]) give('star_ember', 1, c.x, c.y);
+        if (Math.random() < L.square) give('recipe_square', 1, c.x, c.y);
+        L.extra.forEach(([id, ch, a, b]) => { if (RW.ITEMS[id] && Math.random() < ch) give(id, RW.randi(a, b), c.x, c.y); });
+      }
+      else if (sp.role === 'enemy' && Math.random() < 0.8) give('coin', Math.max(1, Math.round(hp / 25 + Math.random() * 2)), c.x, c.y);
     }
     return r;
   };
@@ -346,10 +360,10 @@
     art: { draw: 'fuzzyfolk', look: { fur: 'grey', hue: 0, tone: 0.04, fluff: 'shaggy', ears: 'none', eyes: 'happy', mouth: 'open', extra: 'none' } },
     blurb: 'A travelling fuzzy with very deep pockets. Shows up in every world, next to where you arrive.' });
   const STOCK = [
-    { id: 'recipe_square', price: 60, note: 'teaches the next gear recipes' },
+    { id: 'recipe_square', price: 45, note: 'teaches the next set of recipes' },
     { id: 'key_fragment', price: 40, note: 'three make a Legendary Key' },
     { id: 'chest_compass', price: 35, note: 'points to legendary chests', once: true },
-    { id: 'star_ember', price: 50, note: 'for weapon upgrades' },
+    { id: 'star_ember', price: 40, note: 'for weapon upgrades' },
   ];
   const baseInit = E.initNpcs;
   E.initNpcs = function () {
@@ -387,7 +401,7 @@
     const upgrade = () => {
       extra.innerHTML = ''; const h = P.held();
       if (!h || h.kind !== 'weapon') { says.textContent = 'Hold the weapon you want upgraded, then ask me again.'; return; }
-      const lvl = upg(h.id), cost = 40 * (lvl + 1);
+      const lvl = upg(h.id), cost = 30 * (lvl + 1);
       if (lvl >= 3) { says.textContent = 'Your ' + h.name + ' is already +3. It can\'t take any more.'; return; }
       says.textContent = 'Your ' + h.name + (lvl ? ' (+' + lvl + ')' : '') + '? For ' + cost + ' coins and one Star Ember, I\'ll make it +' + (lvl + 1) + ': it hits 20% harder.';
       const row = el('div', 'trade'); row.append(el('div', null, 'You have ' + coins() + ' coins and ' + P.count('star_ember') + ' Star Embers.'));

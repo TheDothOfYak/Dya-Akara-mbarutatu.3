@@ -7,7 +7,6 @@
 //  * Rare elites that need a trick to beat: Ghost Tank, Lütut, Thornback, Canopy Stalker, Geode Golem.
 //  * Cyitors, the Empire's elite peacekeepers, drawn from the brothers' sketch.
 //  * Lava blocks (Fuzzy World's mountains).
-//  * The fuzzy is drawn half again as big, and turns to run in profile.
 (function (RW) {
   const A = RW.art, E = RW.ent, U = RW.ui, N = RW.net, P = RW.player, TS = RW.TILE;
   const { px, rect, ell, line } = A; const mk = A.canvas;
@@ -92,7 +91,16 @@
 
   // ---- rare elites: at most one at a time, and a long gap between them ----
   const ELITES = new Set(['ghost_tank', 'lutut', 'thornback', 'canopy_stalker', 'geode_golem']);
-  const ELITE_GAP = 100; let lastElite = -1e9;
+  const ELITE_GAP = 100; let lastElite = -1e9; const firstSeen = now();
+  // how strong your best weapon is (upgrades not counted): elites are weaker until you've got good gear
+  const bestDmg = () => (P.inv || []).reduce((m, s) => { const it = s && RW.ITEMS[s.id]; return it && it.kind === 'weapon' && it.dmg ? Math.max(m, it.dmg) : m; }, 0);
+  // the stronger your gear, the stronger the elites that climb out of the Duat (and the more they carry)
+  //   tier 0: no elites yet; 1: iron; 2: bronze/platinum; 3: platinum/stygian; 4: stygian/soulsteel; 5: legendary
+  const eliteTier = () => { const d = bestDmg(); return d < 15 ? 0 : d < 25 ? 1 : d < 40 ? 2 : d < 60 ? 3 : d < 100 ? 4 : 5; };
+  const SCALE = [0.6, 0.6, 0.8, 1, 1.3, 1.6];
+  const eliteScale = () => SCALE[eliteTier()];
+  RW.v2elite = { tier: eliteTier, scale: eliteScale, bestDmg };
+  { const baseHurt = P.hurt; P.hurt = function (d, dir, src) { if (ELITES.has(src)) d = Math.round(d * eliteScale()); return baseHurt.call(this, d, dir, src); }; }
   const dummy = () => ({ sp: 'ghost', x: -1e6, y: -1e6, w: 1, h: 1, dead: true, dummy: true });
   const baseSpawnEnemy = E.spawnEnemy;
   let spawning = false;
@@ -106,8 +114,10 @@
     }
     if (spawning && ELITES.has(id)) {
       if (now() - lastElite < ELITE_GAP || E.enemies.some((e) => ELITES.has(e.sp) && !e.dead)) return dummy();
+      // elites wait until you carry an iron-strength weapon, and never turn up in your first three minutes
+      if (eliteTier() < 1 || now() - firstSeen < 180) return dummy();
       lastElite = now();
-      const e = baseSpawnEnemy(id, x, y); eliteIntro(id); return e;
+      const e = baseSpawnEnemy(id, x, y); e.eliteTier = eliteTier(); e.hp = e.maxhp = Math.round(e.hp * eliteScale()); eliteIntro(id, e.eliteTier); return e;
     }
     return baseSpawnEnemy(id, x, y);
   };
@@ -297,12 +307,18 @@
   };
   // a rock's hits smash dirt and stone, the block hit and a couple behind it
   const SMASH_MAX_HARD = 3;
+  // things people build (planks, bricks, doors, benches...) are never smashed in a line: only dirt, sand and stone are
+  let builtIds = null;
+  RW.v2Built = (i) => {
+    if (!builtIds) { builtIds = new Set(); RW.RECIPES.forEach((r) => { const it = RW.ITEMS[r.out]; if (it && it.kind === 'place' && it.place && !['dirt', 'stone', 'sand', 'mud'].includes(it.place) && RW.T[it.place] != null) builtIds.add(RW.T[it.place]); }); ['log', 'stump'].forEach((k) => { if (RW.T[k] != null) builtIds.add(RW.T[k]); }); }
+    return builtIds.has(i) || (RW.T.log != null && i === RW.T.log);
+  };
   let smashCd = 0;
   const baseMine = P.mineTile;
   P.mineTile = function (tx, ty, dt) {
     if (P.species !== 'rock') return baseMine.apply(this, arguments);
     const W = RW.world, id = W.get(tx, ty), t = RW.TILES[id];
-    const smashable = (i) => { const tt = RW.TILES[i]; return tt && tt.solid && (tt.hard == null ? 0 : tt.hard) <= SMASH_MAX_HARD && !tt.element; };
+    const smashable = (i) => { const tt = RW.TILES[i]; return tt && tt.solid && (tt.hard == null ? 0 : tt.hard) <= Math.min(SMASH_MAX_HARD, P.power()) && !tt.element && !RW.v2Built(i); }; // a rock smashes what his fist rune can break
     if (!smashable(id)) return baseMine.apply(this, arguments);
     P.mine = null;
     if (smashCd > 0) return; smashCd = 0.32;
@@ -422,9 +438,10 @@
     drops: [['crystal_shard', 1, 8, 14], ['platinum_ore', 0.5, 2, 4], ['crystal_purple', 0.4, 1, 1], ['crystal_gold', 0.12, 1, 1]],
     tip: 'Its crystal shell takes almost nothing. Jump over its shockwave, and when it slams, its core cracks open for a moment: hit the glowing core.',
     blurb: 'A walking geode. Slams the ground hard enough to split its own shell.' });
-  function eliteIntro(id) {
+  function eliteIntro(id, tier) {
     const sp = RW.SPECIES[id]; if (!sp) return;
-    setTimeout(() => { U.banner(sp.name + ' nearby', P.seen[id] ? 'Something strong is close.' : sp.tip); }, 400);
+    const tag = tier >= 5 ? ' (Duat-crowned)' : tier >= 4 ? ' (Duat-touched)' : '';
+    setTimeout(() => { U.banner(sp.name + tag + ' nearby', P.seen[id] ? (tag ? 'It came back from the Duat stronger than before. And richer.' : 'Something strong is close.') : sp.tip); }, 400);
   }
   const B = E.behaviors;
   const pcOf = () => P.center();
@@ -669,7 +686,7 @@
   const vexa = RW.SPECIES.vexa; if (vexa) vexa.blurb = 'Commander of the Pale Keep and of its Cyitors, the Empire\'s elite peacekeepers. Will forge stygian for you.';
   const ty = RW.TYPES && RW.TYPES.cyators; if (ty) { ty.name = 'Cyitors'; ty.blurb = 'The Empire\'s elite peacekeepers. One eye and two blade arms. They keep the peace on the Ghost World.'; }
   A._rockCache = {}; // rebuild any cached sprites so the new drawings are used
-  // ====================== FUZZY HERO: the medium-size fuzzy (1.5x), who turns to run sideways ======================
+  // ====================== (unused) the old medium-size fuzzy (1.5x), who turned to run sideways ======================
   // The medium fuzzy (42x45, 1.5x today's sprite), drawn the way the in-game fuzzy always looked:
   // his own fur palette, dithered 4-tone shading, a scalloped fur edge, a lighter muzzle, fur curls, a sheen on top,
   // rosy cheeks and a little smile. Kept from the newer requests: the round eye with the red rim, feet on the ground row,
@@ -757,11 +774,9 @@
     A.outline(c, '#1a100a');
     return c;
   };
-  // frames: 0 idle (turned three-quarters toward where he's facing), 1-4 run in profile, 5 jump, 6 swing, 7 swim
-  const fzCache = {};
-  A.fuzzySprites = (look) => {
-    look = look || A.DEFAULT_FUZZY; const key = JSON.stringify(look); if (fzCache[key]) return fzCache[key];
-    const out = []; for (let f = 0; f < 8; f++) { const r = A.fuzzyMed(look, f === 0 ? 'three' : 'side', f); const l = A.flip(r); l.hand = r.hand; out.push([r, l]); }
-    return (fzCache[key] = out);
-  };
+  // The Ghost World's bigger generator (v2s8.js) plugs in here, underneath the legendary-chest and town-portal steps
+  // that v2s2.js and v2s3.js wrap around every world's generator.
+  { const gd = RW.WORLDS.ghost; if (gd && gd.generate) { const g0 = gd.generate; gd.generate = function () { return (RW.v2GhostGen || g0).apply(this, arguments); }; } }
+  // The fuzzy hero is the original main-game sprite again (same size, same look). A.fuzzyMed above is the old 1.5x
+  // version, kept here unused in case it comes back; nothing installs it into A.fuzzySprites any more.
 })(window.RW);
