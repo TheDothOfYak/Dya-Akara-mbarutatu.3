@@ -204,31 +204,7 @@
       btn('Close', () => m.close(), 'primary'),
     ])]);
   };
-  G.saveMenu = function () {
-    const st = G.st, name = el('input', { cls: 'inp', value: st.setup.name + ' — day ' + st.day, style: { width: '320px' } });
-    const m = U.modal([el('h2', { text: 'Save the game' }), name, el('div', { cls: 'col', style: { marginTop: '8px' } }, [1, 2, 3, 4, 5].map(k => {
-      const ex = SU.save.listLocal().find(s => s.slot === String(k));
-      return btn('Slot ' + k + (ex ? ': ' + ex.name : ' (empty)'), async () => {
-        SU.save.saveLocal(st, String(k), name.value);
-        if (SU.save.cloudOk()) { try { await SU.save.saveCloud(st, String(k), name.value); } catch (e) { U.toast('Saved here, but the account save failed.'); } }
-        m.close(); U.toast('Saved.');
-      });
-    })), el('div', { cls: 'acts' }, [btn('Cancel', () => m.close())])]);
-  };
-  G.loadMenu = async function () {
-    const m = U.modal([el('h2', { text: 'Load a game' }), el('p', { cls: 'muted', text: 'Looking…' })]);
-    let cloud = [];
-    try { cloud = await SU.save.listCloud(); } catch (e) { cloud = []; }
-    const local = SU.save.listLocal();
-    const row = s => el('div', { cls: 'row frame' }, [el('div', { style: { flex: 1 } }, [el('b', { text: s.name || 'A game' }), el('div', { cls: 'small muted', text: 'Day ' + s.day + ' · ' + new Date(s.at).toLocaleString() + ' · ' + (s.where === 'cloud' ? 'on your account' : 'in this browser') })]),
-      btn('Load', () => { m.close(); G.loadSlot(s.where, s.slot); }, 'primary'), btn('✕', () => U.confirm('Delete this save?', s.name, async () => { if (s.where === 'cloud') await SU.save.deleteCloud(s.slot); else SU.save.deleteLocal(s.slot); m.close(); G.loadMenu(); }), 'icon')]);
-    m.box.innerHTML = '';
-    m.box.appendChild(el('h2', { text: 'Load a game' }));
-    if (!local.length && !cloud.length) m.box.appendChild(el('p', { text: 'There are no saved games yet.' }));
-    if (cloud.length) { m.box.appendChild(el('h3', { text: 'On your account' })); cloud.forEach(s => m.box.appendChild(row(s))); }
-    if (local.length) { m.box.appendChild(el('h3', { text: 'In this browser' })); local.forEach(s => m.box.appendChild(row(s))); }
-    m.box.appendChild(el('div', { cls: 'acts' }, [btn('Close', () => m.close())]));
-  };
+  /* G.saveMenu and G.loadMenu, the save and load screens, are in saveload.js */
   G.loadSlot = async function (where, slot) {
     let st = null;
     try { st = where === 'cloud' ? await SU.save.loadCloud(slot) : SU.save.loadLocal(slot); } catch (e) { console.error(e); }
