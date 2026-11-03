@@ -133,10 +133,10 @@
     if (p < 400000) return 'a legion';
     return 'a vast legion';
   };
-  S.countWord = function (n) {
-    if (n < 5) return 'A few'; if (n < 10) return 'Several'; if (n < 20) return 'A pack'; if (n < 50) return 'Lots';
-    if (n < 100) return 'A horde'; if (n < 250) return 'A throng'; if (n < 500) return 'A swarm'; if (n < 1000) return 'Zounds'; return 'A legion';
-  };
+  /* how big a stack looks to someone who can't count it: [from, to, word] */
+  S.COUNT_WORDS = [[1, 4, 'A few'], [5, 9, 'Several'], [10, 19, 'A pack'], [20, 49, 'Lots'], [50, 99, 'A horde'], [100, 249, 'A throng'], [250, 499, 'A swarm'], [500, 999, 'Zounds'], [1000, null, 'A legion']];
+  S.countWord = function (n) { const w = S.COUNT_WORDS.find(c => n <= (c[1] == null ? Infinity : c[1])) || S.COUNT_WORDS[S.COUNT_WORDS.length - 1]; return w[2]; };
+  S.countRange = function (n) { const w = S.COUNT_WORDS.find(c => n <= (c[1] == null ? Infinity : c[1])) || S.COUNT_WORDS[S.COUNT_WORDS.length - 1]; return w[1] == null ? w[0] + '+' : w[0] + '–' + w[1]; };
 
   /* ---------- heroes ---------- */
   S.heroStat = function (st, h, stat) {

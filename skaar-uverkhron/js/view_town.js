@@ -36,8 +36,9 @@
     T.top = el('div', { cls: 'town-top' }); scr.appendChild(T.top);
     T.ui = el('div', { cls: 'town-ui town-drawer' }); scr.appendChild(T.ui);
     T.open_ = T.open_ == null ? false : T.open_;
-    T.cv.onmousemove = e => { const b = hit(e); T.hoverB = b; U.tip(b ? '<b>' + D.BUILDINGS[b].name + '</b><br>' + D.BUILDINGS[b].desc : null, e.clientX, e.clientY); T.cv.style.cursor = b ? 'pointer' : 'default'; };
+    T.cv.onmousemove = e => { const b = hit(e); T.hoverB = b; U.tip(b ? '<b>' + D.BUILDINGS[b].name + '</b><br>' + D.BUILDINGS[b].desc + '<br><i class="muted">Click to use · right-click to look closer</i>' : null, e.clientX, e.clientY); T.cv.style.cursor = b ? 'pointer' : 'default'; };
     T.cv.onmouseleave = () => U.tip(null);
+    T.cv.oncontextmenu = e => { e.preventDefault(); const b = hit(e); if (b) T.buildingCard(T.town, b); };
     T.cv.onclick = e => { const b = hit(e); if (!b) return; const B = D.BUILDINGS[b];
       if (TAB_FOR[b] === 'tavern') return DL.tavern(T.town);
       if (TAB_FOR[b] === 'market') return DL.market(T.town);
@@ -249,6 +250,52 @@
     ({ build: buildTab, recruit: recruitTab, army: armyTab, heroes: heroesTab, vault: vaultTab, gate: gateTab, ship: shipTab }[T.tab] || buildTab)(body, town, st, P, vis);
   };
 
+  /* a building, close up (as the halls of the old games show it): its picture, what it does, what it needs, what it costs */
+  T.buildingCard = function (town, bid) {
+    const st = U.st, P = st.players[town.owner] || st.players[U.viewer], B = D.BUILDINGS[bid];
+    const built = town.built.includes(bid), chk = built ? { ok: false } : RU.canBuild(st, town, bid);
+    const W = 380, H = 260, cv = el('canvas', { width: W * 2, height: H * 2, cls: 'bc-pic' }); cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    const sp = SPOT[bid] || [0, 0, 'houses', 1];
+    let raf = 0;
+    /* draw the building once on a large sheet, find where it actually is, and fit it to the frame */
+    const pic = buildingPicture(sp[2], sp[3] || 1);
+    { const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0);
+      g.fillStyle = lin(g, 0, 0, 0, H, [[0, '#1a1430'], [0.6, '#3a2c4a'], [0.84, '#2a2234'], [1, '#141018']]); g.fillRect(0, 0, W, H);
+      g.fillStyle = 'rgba(255,240,200,0.5)'; for (let i = 0; i < 30; i++) g.fillRect((i * 97.3) % W, (i * 41.7) % (H * 0.5), 1.2, 1.2);
+      const b = pic.box, k = Math.min((W - 40) / b.w, (H - 30) / b.h, 1.6);
+      g.fillStyle = 'rgba(0,0,0,0.35)'; ell(g, W / 2, H - 18, b.w * k * 0.55, 9); g.fill();
+      g.globalAlpha = built ? 1 : 0.85; g.drawImage(pic.cv, b.x, b.y, b.w, b.h, W / 2 - b.w * k / 2, H - 14 - b.h * k, b.w * k, b.h * k); g.globalAlpha = 1;
+      if (!built) { g.fillStyle = 'rgba(20,16,30,0.15)'; g.fillRect(0, 0, W, H); } }
+    const needs = (B.req || []).map(r => el('div', { cls: 'small ' + (RU.has(town, r) ? 'good' : 'bad') }, [(RU.has(town, r) ? '✓ ' : '✗ ') + D.BUILDINGS[r].name]));
+    if (B.pop) needs.push(el('div', { cls: 'small ' + (town.pop >= B.pop ? 'good' : 'bad') }, [(town.pop >= B.pop ? '✓ ' : '✗ ') + B.pop + ' people (the town has ' + Math.floor(town.pop) + ')']));
+    if (B.unlock) needs.push(el('div', { cls: 'small ' + (RU.blueprintHere(st, town) ? 'good' : 'bad') }, [(RU.blueprintHere(st, town) ? '✓ ' : '✗ ') + 'The Rokarvac of the Nekh in town']));
+    const cr = B.dwell || B.dwellUp, C = cr && D.CREATURES[cr];
+    const info = el('div', { cls: 'bc-info' }, [
+      el('p', { text: B.desc }),
+      C ? el('div', { cls: 'row', style: { flexWrap: 'nowrap' } }, [U.creatureIcon(cr, 54, { color: P.color }), el('div', { cls: 'small' }, [el('b', { text: C.plural }), el('br'), 'Tier ' + C.tier + ' · ' + C.grow + ' a week · attack ' + C.atk + ', defense ' + C.def + ', health ' + C.hp, el('br'), el('a', { href: '#', cls: 'gold', onclick: e => { e.preventDefault(); DL.creatureCard(cr, { town }); }, text: 'More about them…' })])]) : null,
+      B.gold ? el('div', { cls: 'small' }, ['Income: ', el('b', { cls: 'gold', text: B.gold + ' gold a day' })]) : null,
+      B.housing ? el('div', { cls: 'small' }, ['Room for ', el('b', { cls: 'gold', text: B.housing + ' people' })]) : null,
+      B.teaches ? el('div', { cls: 'small' }, ['Teaches: ' + B.teaches.map(id => D.SKILLS[id].name).join(', ')]) : null,
+      needs.length ? el('div', { style: { marginTop: '6px' } }, [el('b', { cls: 'small muted', text: 'Needs' }), ...needs]) : null,
+      B.small ? el('div', { cls: 'small muted', text: 'Small: a second building may go up the same day.' }) : null,
+      el('div', { style: { marginTop: '8px' } }, built ? el('b', { cls: 'good', text: 'Built' }) : [el('b', { cls: 'small muted', text: 'Cost' }), el('div', {}, U.costView(B.cost, P))]),
+      !built && !chk.ok && chk.why ? el('div', { cls: 'warn small', style: { marginTop: '4px' }, text: chk.why }) : null]);
+    const m = U.modal([el('h2', { text: B.name }), el('div', { cls: 'bc' }, [cv, info]),
+      el('div', { cls: 'acts' }, [btn(built ? 'Close' : 'Not now', () => m.close()), !built && town.owner === U.viewer ? btn('Build', () => { const r = RU.build(st, town, bid); if (!r.ok) { U.toast(r.why); return; } m.close(); U.toast(B.name + ' is built.'); T.render(); U.refresh(); }, 'primary big') : null].map(b => { if (b && b.textContent === 'Build' && !chk.ok) b.disabled = true; return b; }))], { wide: true, onClose: () => cancelAnimationFrame(raf) });
+    m.box.classList.add('bc-box');
+  };
+
+  const PIC_CACHE = {};
+  function buildingPicture(kind, lvl) {
+    const key = kind + lvl; if (PIC_CACHE[key]) return PIC_CACHE[key];
+    const SW = 1000, SH = 900, OX = 500, OY = 650, cv = A.canvas(SW, SH), g = cv.getContext('2d');
+    g.save(); g.translate(OX, OY); drawBuilding(g, kind, lvl, 0.6, false); g.restore();
+    const d = g.getImageData(0, 0, SW, SH).data; let x0 = SW, y0 = SH, x1 = 0, y1 = 0;
+    for (let y = 0; y < SH; y += 2) for (let x = 0; x < SW; x += 2) if (d[(y * SW + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const box = x1 > x0 ? { x: Math.max(0, x0 - 6), y: Math.max(0, y0 - 6), w: Math.min(SW, x1 - x0 + 12), h: Math.min(SH, y1 - y0 + 12) } : { x: 0, y: 0, w: SW, h: SH };
+    return (PIC_CACHE[key] = { cv, box });
+  }
+
   function buildTab(body, town, st, P) {
     const grid = el('div', { cls: 'bgrid' });
     const seen = new Set();
@@ -261,11 +308,7 @@
       if (seen.has(bid)) return; seen.add(bid);
       const built = town.built.includes(bid);
       const chk = built ? { ok: false } : RU.canBuild(st, town, bid);
-      grid.appendChild(el('div', { cls: 'bcard' + (built ? ' done' : chk.ok ? ' ok' : ''), onclick: () => {
-        if (built) return;
-        if (!chk.ok) { U.toast(chk.why); return; }
-        U.confirm(B.name, el('div', {}, [el('p', { text: B.desc }), U.costView(B.cost, P)]), () => { const r = RU.build(st, town, bid); if (!r.ok) U.toast(r.why); T.render(); U.refresh(); }, null, ['Build', 'Not now']);
-      }, 'data-tip': '<b>' + B.name + '</b><br>' + B.desc + (B.req ? '<br><span class="muted">Needs: ' + B.req.map(r => D.BUILDINGS[r].name).join(', ') + '</span>' : '') + (B.pop ? '<br><span class="muted">Needs ' + B.pop + ' people.</span>' : '') + (B.small ? '<br><span class="muted">Small: a second one may go up the same day.</span>' : '') },
+      grid.appendChild(el('div', { cls: 'bcard' + (built ? ' done' : chk.ok ? ' ok' : ''), onclick: () => T.buildingCard(town, bid), oncontextmenu: e => { e.preventDefault(); T.buildingCard(town, bid); }, 'data-tip': '<b>' + B.name + '</b><br>' + B.desc + (B.req ? '<br><span class="muted">Needs: ' + B.req.map(r => D.BUILDINGS[r].name).join(', ') + '</span>' : '') + (B.pop ? '<br><span class="muted">Needs ' + B.pop + ' people.</span>' : '') + (B.small ? '<br><span class="muted">Small: a second one may go up the same day.</span>' : '') },
         [el('div', { text: B.name }), built ? el('div', { cls: 'c good', text: 'Built' }) : el('div', { cls: 'c' }, [U.costView(B.cost, P), !chk.ok && !chk.poor ? el('div', { cls: 'warn', text: chk.why }) : null])]));
     });
     body.appendChild(grid);
@@ -283,7 +326,7 @@
       const max = RU.maxRecruit(st, town, cr, d.base);
       const range = el('input', { type: 'range', min: 0, max, value: max, style: { width: '120px' } });
       const lab = el('div', { cls: 'small' }); const upd = () => { lab.innerHTML = ''; lab.appendChild(U.costView(RU.recruitCost(cr, +range.value), P)); }; range.oninput = upd; upd();
-      grid.appendChild(el('div', { cls: 'frame col', style: { width: '170px', alignItems: 'center' }, 'data-tip': DL.creatureTip(cr) }, [
+      grid.appendChild(el('div', { cls: 'frame col', style: { width: '170px', alignItems: 'center' }, 'data-tip': DL.creatureTip(cr) + '<br><i>Double-click for more.</i>', ondblclick: () => DL.creatureCard(cr, { town }) }, [
         U.creatureIcon(cr, 80, { color: P.color }), el('b', { text: C.plural }), el('div', { cls: 'small muted', text: (town.avail[d.base] || 0) + ' ready' + (C.pop ? ' · uses people' : '') }),
         el('div', { cls: 'small' }, U.costView(C.cost, P)), range, lab,
         btn('Recruit', () => { const slots = dest === 'hero' && vh ? vh.slots : town.garrison; const r = RU.recruit(st, town, cr, d.base, +range.value, slots, dest === 'hero' ? vh : null); if (!r.ok) U.toast(r.why); else U.toast(r.n + ' ' + C.plural + ' join.'); T.render(); U.refresh(); }, 'primary')]));
@@ -307,7 +350,7 @@
     if (vis) groups.push({ label: vh ? 'At the gate: ' + vh.name : 'At the gate: a squadron', slots: S.slotsOf(st, vis), hero: vh, onlyCaptain: !vh, keepOne: false });
     groups.push({ label: 'Garrison', slots: town.garrison });
     town.heroes.forEach(id => { const h = st.heroes[id]; if (h) groups.push({ label: h.name + ' (inside)' + (town.defender === id ? ' — defending general' : ''), slots: h.slots, hero: h }); });
-    body.appendChild(DL.armyEditor(groups, () => U.refresh()));
+    body.appendChild(DL.armyEditor(groups, () => U.refresh(), { town }));
     const acts = el('div', { cls: 'row', style: { marginTop: '8px' } });
     if (vis && vh) acts.appendChild(btn('Bring ' + vh.name + ' inside', () => { if (S.isEmptySlots(vh.slots) && false) return; RU.stationHero(st, vis, town); T.render(); U.refresh(); }, '', 'The hero leaves the map and stays in the town. They no longer count toward your ' + D.MAX_FIELD_HEROES + ' heroes on the map.'));
     if (vis && !vh && S.isEmptySlots(vis.slots)) RU.removeArmy(st, vis);

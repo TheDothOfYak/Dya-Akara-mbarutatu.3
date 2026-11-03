@@ -15,11 +15,13 @@
   /* ======================= army editor =======================
      groups: [{ label, slots, hero, onlyCaptain (hero-less army), keepOne }]
      Click a stack to pick it up, then click where it goes. */
-  DL.armyEditor = function (groups, onChange) {
+  DL.armyEditor = function (groups, onChange, ctx) {
+    ctx = ctx || {};
     const box = el('div', { cls: 'col' });
     let sel = null;   // { g, si, sub }   sub: index under a captain, or 'cap' for the whole squadron
     const P = me();
     function stackAt(g, si, sub) { const s = groups[g].slots[si]; if (!s) return null; if (sub == null || sub === 'cap') return s; return s.stacks[sub] || null; }
+    const card = (s, G) => { if (!s) return; if (s.kind === 'cap') { DL.captainCard(s.cap, G.hero); return; } DL.creatureCard(s.cr, { stack: s, slots: G.slots, town: ctx.town || (G.hero && S.heroLocation(st(), G.hero).town) || null, hero: G.hero, canDismiss: !(G.keepOne && countStacks(G) <= 1), onChange: () => { draw(); if (onChange) onChange(); } }); };
     function draw() {
       box.innerHTML = '';
       groups.forEach((G, gi) => {
@@ -29,7 +31,7 @@
         G.slots.forEach((s, si) => {
           if (G.onlyCaptain && si > 0 && !s) return;
           const isSel = sel && sel.g === gi && sel.si === si && (sel.sub == null || sel.sub === 'cap');
-          const cell = el('div', { cls: 'slot' + (s && s.kind === 'cap' ? ' cap' : '') + (isSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, null); } });
+          const cell = el('div', { cls: 'slot' + (s && s.kind === 'cap' ? ' cap' : '') + (isSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, null); }, ondblclick: e => { e.stopPropagation(); sel = null; draw(); card(s, G); } });
           if (!s) cell.appendChild(el('div', { cls: 'lbl', style: { marginTop: '32px' }, text: 'empty' }));
           else if (s.kind === 'stack') { const C = D.CREATURES[s.cr]; cell.appendChild(U.creatureIcon(s.cr, 60, { color: P.color })); cell.appendChild(el('div', { cls: 'lbl', text: C.plural })); cell.appendChild(el('span', { cls: 'cnt', text: s.n })); cell.setAttribute('data-tip', creatureTip(s.cr, s)); }
           else {
@@ -38,7 +40,7 @@
             const cap_ = RU.capCapacity(st(), cap, hero), used = RU.capUsed(s);
             const sq = el('div', { cls: 'squad' });
             s.stacks.forEach((x, k) => { const sSel = sel && sel.g === gi && sel.si === si && sel.sub === k;
-              sq.appendChild(el('div', { cls: 'sub' + (sSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, k); }, 'data-tip': creatureTip(x.cr, x) }, [U.creatureIcon(x.cr, 42, { color: P.color }), el('span', { cls: 'cnt', text: x.n })])); });
+              sq.appendChild(el('div', { cls: 'sub' + (sSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, k); }, ondblclick: e => { e.stopPropagation(); sel = null; draw(); card(x, G); }, 'data-tip': creatureTip(x.cr, x) + '<br><i>Double-click for more.</i>' }, [U.creatureIcon(x.cr, 42, { color: P.color }), el('span', { cls: 'cnt', text: x.n })])); });
             for (let k = used; k < cap_; k++) sq.appendChild(el('div', { cls: 'sub empty', onclick: e => { e.stopPropagation(); click(gi, si, 'add'); }, 'data-tip': 'Room under this captain' }));
             cell.appendChild(sq);
           }
@@ -46,7 +48,7 @@
         });
         box.appendChild(grid);
       });
-      box.appendChild(el('div', { cls: 'row small muted' }, [sel ? 'Click where it should go — an empty slot, under a captain, or onto the same creature to join them. ' : 'Click a stack or captain to pick it up. ', sel ? btn('Split', split, '', 'Split this stack in two') : null, sel ? btn('Put down', () => { sel = null; draw(); }) : null, sel && canDismiss() ? btn('Dismiss', dismiss, 'danger') : null]));
+      box.appendChild(el('div', { cls: 'row small muted' }, [sel ? 'Click where it should go — an empty slot, under a captain, or onto the same creature to join them. ' : 'Click a stack or captain to pick it up. Double-click one to see it close up (and upgrade it in town). ', sel ? btn('Split', split, '', 'Split this stack in two') : null, sel ? btn('Put down', () => { sel = null; draw(); }) : null, sel && canDismiss() ? btn('Dismiss', dismiss, 'danger') : null]));
     }
     function canDismiss() { if (!sel) return false; const G = groups[sel.g]; return !(G.keepOne && countStacks(G) <= 1); }
     function countStacks(G) { return G.slots.reduce((t, s) => t + (!s ? 0 : s.kind === 'stack' ? 1 : 1 + s.stacks.length), 0); }
@@ -127,6 +129,59 @@
     return '<b>' + c.name + '</b> — ' + D.CAPTAIN_RANKS[c.rank].name + ', ' + D.PEOPLES[c.people].name + '<br>Level ' + c.level + ' · Health ' + c.hp + ' · Attack ' + c.atk + ' · Defense ' + c.def + '<br>Morale +' + ((c.morale || 0) * 5 + (c.abil === 'banner' ? 10 : 0)) + ' to the squadron · Luck ' + (c.luck >= 0 ? '+' : '') + c.luck + ' · Leads ' + RU.capCapacity(st(), c, hero) + ' stacks<br><b>' + D.CAPTAIN_ABIL[c.abil].name + ':</b> ' + D.CAPTAIN_ABIL[c.abil].desc + (c.rank === 'naelst' ? '<br>As a Naelst Velki, lets Kalo’Eik shift allies through the Duat.' : '');
   }
   DL.captainTip = captainTip;
+
+  /* ======================= a creature, close up =======================
+     opts: { stack, slots (the slots it sits in), town (for upgrades), hero, onChange } */
+  const townRedraw = () => { const T = SU.townView; if (T && T.town && !document.getElementById('town').classList.contains('hidden')) T.render(); };
+  DL.creatureCard = function (cr, opts) {
+    opts = opts || {};
+    const C = D.CREATURES[cr], s = opts.stack, h = opts.hero, P = me();
+    const pic = el('canvas', { width: 440, height: 380, cls: 'cc-pic' }); pic.style.width = '220px'; pic.style.height = '190px';
+    let raf = 0; const t0 = performance.now();
+    const draw = now => { if (!pic.isConnected && now - t0 > 500) return; raf = requestAnimationFrame(draw); const g = pic.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, 220, 190);
+      g.fillStyle = A.radial(g, 110, 120, 140, A.mix(D.ELEMENTS[C.el] ? D.ELEMENTS[C.el].color || '#4a3a5a' : '#4a3a5a', '#120a18', 0.82), '#0c0910'); g.fillRect(0, 0, 220, 190);
+      g.fillStyle = 'rgba(0,0,0,.35)'; A.ell(g, 110, 168, 70, 12); g.fill();
+      const big = C.shape && C.shape[0] >= 4 ? 0.55 : C.shape && C.shape[0] * C.shape[1] >= 2 ? 0.7 : 0.9;
+      A.creature(g, C.art, 110, C.fly ? 150 : 166, 150 * big, { t: (now - t0) / 1000, tint: C.tint || (C.upgraded ? 1 : 0), color: P.color, noShadow: true }); };
+    raf = requestAnimationFrame(draw);
+    const atkB = h ? S.heroStat(st(), h, 'Strength') : 0, defB = h ? S.heroStat(st(), h, 'Defense') : 0;
+    const row = (k, v, tip) => el('div', { cls: 'cc-stat', 'data-tip': tip || null }, [el('span', { cls: 'muted', text: k }), el('b', { text: String(v) })]);
+    const shape = C.shape || (C.size === 2 ? [2, 1] : [1, 1]);
+    const stats = el('div', { cls: 'cc-stats' }, [
+      row('Attack', C.atk + (atkB ? ' (' + (C.atk + atkB) + ')' : ''), atkB ? 'With ' + h.name + '’s Strength' : null),
+      row('Defense', C.def + (defB ? ' (' + (C.def + defB) + ')' : ''), defB ? 'With ' + h.name + '’s Defense' : null),
+      row('Damage', C.dmg[0] + '–' + C.dmg[1]), row('Health', s && s.hpTop ? s.hpTop + ' / ' + C.hp : C.hp), row('Speed', C.spd + (C.fly ? ' (flies)' : '')),
+      C.ranged ? row('Shots', C.shots) : null, C.grow != null ? row('Growth', C.grow + ' a week') : null,
+      row('Size', shape[0] + '×' + shape[1] + ' hexes'), row('Captain places', C.capSlots || 1), row('Food', C.food + ' a week each'),
+      row('Element', D.ELEMENTS[C.el] ? D.ELEMENTS[C.el].name : C.el, 'Fights a little better on ' + (D.ELEMENTS[C.el] ? D.ELEMENTS[C.el].name : C.el) + ' ground'),
+      C.cost ? el('div', { cls: 'cc-stat' }, [el('span', { cls: 'muted', text: 'Cost' }), U.costView(C.cost, P)]) : null]);
+    const body = el('div', { cls: 'cc' }, [
+      el('div', { cls: 'cc-left' }, [pic, el('div', { cls: 'cc-count', text: s ? s.n + ' ' + (s.n === 1 ? C.name : C.plural) : C.plural }), s && s.grief ? el('div', { cls: 'small bad', text: 'Grieving: lower morale after heavy losses.' }) : null]),
+      el('div', { cls: 'cc-right' }, [stats,
+        (C.abil || []).length ? el('div', { cls: 'cc-abil' }, C.abil.map(a => el('div', { cls: 'small' }, ['• ', el('b', { text: a.replace(/\d$/, '') + ': ' }), D.ABIL[a] || '']))) : null,
+        el('p', { cls: 'small muted', text: C.desc })])]);
+    const acts = el('div', { cls: 'acts' });
+    const m = U.modal([el('h2', { text: C.name + (C.tier ? ' · tier ' + C.tier : '') + (C.faction ? '' : ' · wild') }), body, acts], { wide: true, onClose: () => cancelAnimationFrame(raf) });
+    m.box.classList.add('cc-box');
+    /* upgrading, where the town can */
+    const t = opts.town, up = C.up && D.CREATURES[C.up];
+    if (s && t && up && t.owner === U.viewer) {
+      const can = Object.values(D.BUILDINGS).some(b => b.dwellUp === C.up && t.built.includes(b.id));
+      const cost = {}; Object.entries(up.cost).forEach(([k, v]) => { const d = (v - (C.cost[k] || 0)) * s.n; if (d > 0) cost[k] = d; });
+      acts.appendChild(el('div', { cls: 'small', style: { marginRight: 'auto' } }, can ? ['Upgrade to ' + up.plural + ': ', U.costView(cost, P)] : ['Build the ' + (Object.values(D.BUILDINGS).find(b => b.dwellUp === C.up) || {}).name + ' in ' + t.name + ' to upgrade them to ' + up.plural + '.']));
+      if (can) acts.appendChild(btn('Upgrade', () => { const r = RU.upgradeStack(st(), t, s); if (!r.ok) { U.toast(r.why || 'Cannot.'); return; } m.close(); U.toast('They are ' + up.plural + ' now.'); if (opts.onChange) opts.onChange(); U.refresh(); townRedraw(); DL.creatureCard(s.cr, opts); }, 'primary'));
+    } else if (up) acts.appendChild(el('div', { cls: 'small muted', style: { marginRight: 'auto' }, text: 'Upgrades to ' + up.plural + ' in a town with its upgraded dwelling.' }));
+    if (s && opts.slots && opts.canDismiss !== false) acts.appendChild(btn('Dismiss', () => U.confirm('Dismiss', 'Send these ' + C.plural + ' away for good?', () => {
+      const i = opts.slots.indexOf(s); if (i >= 0) opts.slots[i] = null; else opts.slots.forEach(x => { if (x && x.kind === 'cap') { const k = x.stacks.indexOf(s); if (k >= 0) x.stacks.splice(k, 1); } });
+      m.close(); if (opts.onChange) opts.onChange(); U.refresh(); townRedraw(); }), 'danger'));
+    acts.appendChild(btn('Close', () => m.close(), 'primary'));
+    return m;
+  };
+  DL.captainCard = function (cap, hero) {
+    const P = me();
+    U.modal([el('h2', { text: cap.name }), el('div', { cls: 'row', style: { alignItems: 'flex-start', gap: '14px', flexWrap: 'nowrap' } }, [U.captainIcon(cap, 120, P.color), el('div', { html: captainTip(cap, hero) })]),
+      el('div', { cls: 'acts' }, [btn('Close', function () { this.closest('.overlay').remove(); }, 'primary')])]);
+  };
 
   /* ======================= an army on the map ======================= */
   DL.army = function (a) {
