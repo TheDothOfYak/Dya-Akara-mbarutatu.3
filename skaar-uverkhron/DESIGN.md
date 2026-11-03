@@ -252,3 +252,51 @@ this game (it may appear later as a special event).
 - Quests can be almost anything: from Kalo, families, towns, map characters.
 - The story campaign will be designed later.
 - Weekly events each week; a market day on the middle day of each week.
+
+---
+
+## 10. Choices made while building (not yet confirmed)
+
+These were filled in to get the game running. Every one of them is easy to change.
+
+- **Upgrades for creatures 1–4:** Blinkback Malsti, Velnurthalith Oathguard,
+  Thar Norvek Elder, Scarred Harkal. All stats, costs and abilities are first guesses.
+- **Wild groups are led by rogue Dearcàn captains** (hunters, outlaws, beast-tamers),
+  so the rule "leaders are always Dearcàn" holds for the wilds too. Their captains
+  drop captain cores; strong groups drop a hero-style core with skills.
+- **Buildings:** Muster Hall → Hall of Dusk → Duskhold Seat; Palisade Keep → Stone
+  Citadel → Duskwall Bastion; Tavern, Market, Granary, Farms, Terraces, Hall of Songs
+  (I–III) → Stygian Choir, Memory Vault, Shipyard, Duat Gate (the Duskareth's Duat art:
+  travel between your own towns), Stygian Well, Vel Sanctum, and the nine dwellings.
+- **Six training halls,** four skills each: Drill Yard, Road Lodge, Counting House,
+  Captains' Lodge, Hall of the Duat, Memory Pens. There are 24 skills and 26 songs
+  (tiers 1–5).
+- **A month is 42 days** (seven 6-day weeks).
+- **A captain leads 2 stacks** to start. Warcaller, Captaincy, and Command 4 / 8 add more.
+- **XP:** beating a hero's army gives half the usual XP for the creatures killed
+  (none for the hero), and you get their core.
+- **Morale and luck** run from −3 to +3. Morale moves a stack's turn order.
+- **The Kahizecvar** costs 2000 gold, 6 NgAkara and 6 Stygian, doubling each time.
+- **Urverk families** give free passage after you pay three times, or after you clear
+  wild creatures near their Urverk. Taking it by force: unless the hero has
+  Diplomacy 2, there's a 45% chance everyone who knows the trigger dies.
+- **The Nekh'Vorran** unlocks with any battle won in the eye. If a castle's
+  Nekh'Vorran falls, the castle can call another the next week.
+- **Ways to win** besides conquest: the prophecy (win 3 battles in the eye), the
+  treasury (200,000 gold), or the seat (hold a named town for a week, set in the editor).
+- **Kuni Byrd Aeries:** a hero with Beastmastery 3 can win a Kuni Byrd mount for
+  6000 gold and 30 food.
+- **Online:** when someone attacks you on their turn, the computer fights your side.
+- **Random maps** put each player on a different Tatu by default (the setup can put
+  everyone on Velki instead).
+
+## 11. Not built yet
+
+- Breeding herds (herds can be tamed, not bred).
+- The other two factions (SkarValorin, Elsha'ryn), the campaign, and the Dya'Akara
+  special event.
+- Swapping Relics between two heroes when they meet (armies can be swapped).
+- An undo button in the map editor, and editing details of placed things (amounts,
+  Urverk timings).
+- The computer doesn't use boats or map songs, and plays a fairly simple game.
+- Balance: every number is untested by people.
