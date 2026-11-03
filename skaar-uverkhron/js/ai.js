@@ -192,6 +192,8 @@
     }
     for (const s of best.p) {
       if (a.dead) return;
+      /* where a person can see, they watch the army walk */
+      if (hooks.watch) await hooks.watch(a, s.x, s.y);
       const r = RU.step(st, a, s.x, s.y);
       if (!r.moved && !r.event && !r.need) break;
       if (r.event || r.need) { await handle(st, P, a, r, hooks); break; }

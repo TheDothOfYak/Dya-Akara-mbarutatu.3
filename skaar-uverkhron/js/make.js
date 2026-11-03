@@ -49,7 +49,7 @@
     const c = {
       id: SU.uid(st, 'c'), name: opts.name || personName(R, people), people, rank, abil,
       morale: R.int(0, 1) + (abil === 'banner' ? 1 : 0), luck: R.int(0, 1) + (abil === 'charm' ? 1 : 0),
-      level: lvl, hp: D.CAPTAIN_BASE.hp + lvl * 12, atk: D.CAPTAIN_BASE.atk + lvl, def: D.CAPTAIN_BASE.def + lvl,
+      level: lvl, hp: D.CAPTAIN_BASE.hp + lvl * D.CAPTAIN_BASE.hpLevel, atk: D.CAPTAIN_BASE.atk + lvl, def: D.CAPTAIN_BASE.def + lvl,
       capacity: D.CAPTAIN_BASE.capacity + (abil === 'warcaller' ? 1 : 0), look: R.int(1, 1e9),
     };
     /* the rarest of all: a captain so good they lead only one stack, but lead it superbly */

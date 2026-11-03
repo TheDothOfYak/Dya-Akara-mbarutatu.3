@@ -266,3 +266,35 @@ table.grid th { color: var(--muted); font-weight: normal; }
 .key-sec { border: 1px solid var(--edge2); border-radius: 8px; padding: 10px; background: rgba(0,0,0,.2); }
 .key-tbl td { padding: 2px 8px; }
 @media (max-width: 760px) { .key-grid { grid-template-columns: 1fr; } }
+
+/* ---------- the town: a slim bar of buttons, and pages over everything ---------- */
+.town-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; padding: 10px 8px 12px; background: linear-gradient(rgba(16,12,8,0), rgba(16,12,8,.85)); pointer-events: none; }
+.town-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; pointer-events: auto; }
+.town-page { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: radial-gradient(ellipse at 50% 30%, rgba(40,30,20,.96), rgba(12,9,7,.98)); }
+.tp-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--edge); background: rgba(0,0,0,.35); }
+.tp-head h2 { margin: 0; font-size: 26px; color: var(--gold2); }
+.tp-body { flex: 1; overflow: auto; padding: 16px 22px; max-width: 1280px; width: 100%; margin: 0 auto; }
+.tp-dwell { display: flex; gap: 24px; align-items: center; justify-content: center; margin-top: 20px; }
+.tp-pic { border: 2px solid var(--edge); border-radius: 12px; background: radial-gradient(circle at 50% 60%, rgba(142,124,255,.16), rgba(0,0,0,.4)); box-shadow: 0 6px 24px rgba(0,0,0,.6); }
+@media (max-width: 760px) { .tp-dwell { flex-direction: column; } .tp-head { flex-wrap: wrap; } }
+.tp-body .btn.on, .town-page .btn.on { border-color: var(--gold2); background: linear-gradient(#7a5c24, #4a3612); color: #fff4d4; }
+
+/* ---------- the side bar: portraits and towns, as the old games had it ---------- */
+#roster { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; min-height: 120px; }
+.rcol { display: flex; flex-direction: column; gap: 4px; }
+.rtile { position: relative; display: flex; align-items: stretch; gap: 3px; padding: 3px; border: 1px solid var(--edge2); border-radius: 6px; background: rgba(0,0,0,.3); cursor: pointer; }
+.rtile:hover { border-color: var(--edge); }
+.rtile.on { border-color: var(--gold2); background: rgba(217,184,122,.16); box-shadow: 0 0 8px rgba(255,227,163,.25); }
+.rtile.asleep { opacity: .6; }
+.rtile canvas { flex: none; border-radius: 4px; }
+.rtile.town canvas { border: 1px solid var(--edge2); }
+.rstar { position: absolute; right: 3px; top: 1px; font-size: 12px; color: var(--gold2); text-shadow: 0 1px 2px #000; }
+.vbars { display: flex; gap: 2px; }
+.vbar { width: 6px; background: #000; border-radius: 2px; position: relative; overflow: hidden; }
+.vbar i { position: absolute; left: 0; right: 0; bottom: 0; display: block; }
+.vbar.mp i { background: linear-gradient(#b8e070, #4a8a2a); }
+.vbar.br i { background: linear-gradient(#b8a8ff, #4a3aa8); }
+#selinfo { padding: 6px 8px; min-height: 78px; font-size: 13px; }
+.si-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+.si-st { position: relative; width: 32px; height: 32px; background: rgba(0,0,0,.35); border-radius: 4px; }
+.si-st span { position: absolute; right: 1px; bottom: 0; font-size: 10px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }

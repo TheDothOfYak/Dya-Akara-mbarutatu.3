@@ -78,66 +78,66 @@
 
   /* ---- the Duskareth ---- */
   cr('malsti', { name: 'Malsti Punk', plural: 'Malsti Punks', faction: 'duskareth', tier: 1, art: 'malsti',
-    atk: 2, def: 7, dmg: [1, 2], hp: 10, spd: 5, grow: 14, cost: { gold: 30 }, food: 0.3, el: 'Fti', up: 'malsti2',
+    atk: 2, def: 5, dmg: [1, 3], hp: 8, spd: 5, grow: 14, cost: { gold: 30 }, food: 0.3, el: 'Fti', up: 'malsti2',
     abil: ['thief', 'dodge'], desc: 'The smallest of the Punk family, born of the Duat itself. Barely hurts anything, but very hard to kill — and its attacks can steal gold.' });
   cr('malsti2', { name: 'Blinkback Malsti', plural: 'Blinkback Malsti', faction: 'duskareth', tier: 1, upgraded: true, art: 'malsti', tint: 1,
-    atk: 3, def: 9, dmg: [1, 3], hp: 12, spd: 7, grow: 14, cost: { gold: 45 }, food: 0.3, el: 'Fti',
+    atk: 3, def: 6, dmg: [2, 3], hp: 10, spd: 7, grow: 14, cost: { gold: 45 }, food: 0.3, el: 'Fti',
     abil: ['thief2', 'dodge', 'blink'], desc: 'Older Malsti that blink through the Duat instead of walking, and carry off more of what they steal.' });
 
   cr('velnur', { name: 'Velnurthalith', plural: 'Velnurthaliths', faction: 'duskareth', tier: 2, art: 'velnur',
-    atk: 5, def: 5, dmg: [2, 4], hp: 15, spd: 4, grow: 10, cost: { gold: 70 }, food: 0.5, pop: 1, el: 'Ular', up: 'velnur2', people: true,
+    atk: 5, def: 6, dmg: [3, 5], hp: 18, spd: 4, grow: 9, cost: { gold: 80 }, food: 0.5, pop: 1, el: 'Ular', up: 'velnur2', people: true,
     abil: [], desc: 'Eikar, Keilia and Karnen of the Duskareth with spears, swords and axes. The backbone of every Duskareth army.' });
   cr('velnur2', { name: 'Velnurthalith Oathguard', plural: 'Oathguard', faction: 'duskareth', tier: 2, upgraded: true, art: 'velnur', tint: 1,
-    atk: 6, def: 7, dmg: [3, 5], hp: 19, spd: 5, grow: 10, cost: { gold: 100 }, food: 0.5, pop: 1, el: 'Ular', people: true,
+    atk: 7, def: 8, dmg: [4, 6], hp: 24, spd: 5, grow: 9, cost: { gold: 115 }, food: 0.5, pop: 1, el: 'Ular', people: true,
     abil: ['guard'], desc: 'Sworn Velnurthaliths in Stygian-edged mail. They answer every attack made on them.' });
 
   cr('ver', { name: 'Ver', plural: 'the Ver', faction: 'duskareth', tier: 3, art: 'ver',
-    atk: 6, def: 3, dmg: [2, 5], hp: 12, spd: 4, grow: 8, cost: { gold: 110 }, food: 0.5, pop: 1, el: 'Fti', up: 'ver2', people: true,
+    atk: 8, def: 5, dmg: [4, 7], hp: 25, spd: 4, grow: 7, cost: { gold: 150 }, food: 0.5, pop: 1, el: 'Fti', up: 'ver2', people: true,
     ranged: true, shots: 10, abil: ['release'], desc: 'The Thar Norvek, the Dark Screamers. Their scream strikes from afar, and sometimes it tears the Duat open and something comes out.' });
   cr('ver2', { name: 'Thar Norvek Elder', plural: 'Thar Norvek Elders', faction: 'duskareth', tier: 3, upgraded: true, art: 'ver', tint: 1,
-    atk: 8, def: 4, dmg: [3, 6], hp: 14, spd: 5, grow: 8, cost: { gold: 150 }, food: 0.5, pop: 1, el: 'Fti', people: true,
+    atk: 10, def: 6, dmg: [5, 8], hp: 30, spd: 5, grow: 7, cost: { gold: 200 }, food: 0.5, pop: 1, el: 'Fti', people: true,
     ranged: true, shots: 14, abil: ['release2', 'dread'], desc: 'Elders of the Ver. Their scream shakes the nerve of whatever it hits, and the Duat answers them more often.' });
 
   cr('harkal', { name: 'Harkal', plural: 'Harkal', faction: 'duskareth', tier: 4, art: 'harkal',
-    atk: 9, def: 6, dmg: [4, 7], hp: 26, spd: 7, size: 2, shape: [2, 1], grow: 6, cost: { gold: 190, food: 1 }, food: 1, el: 'Su', up: 'harkal2',
+    atk: 12, def: 9, dmg: [7, 11], hp: 45, spd: 7, size: 2, shape: [2, 1], grow: 5, cost: { gold: 260, food: 1 }, food: 1, el: 'Su', up: 'harkal2',
     abil: ['frenzy'], desc: 'The Su shark of the Duskareth. It swims through open air as easily as water, but cannot rise into the sky. Damage only makes it wilder.' });
   cr('harkal2', { name: 'Scarred Harkal', plural: 'Scarred Harkal', faction: 'duskareth', tier: 4, upgraded: true, art: 'harkal', tint: 1,
-    atk: 11, def: 8, dmg: [5, 9], hp: 32, spd: 8, size: 2, shape: [2, 1], grow: 6, cost: { gold: 260, food: 1 }, food: 1, el: 'Su',
+    atk: 14, def: 11, dmg: [9, 13], hp: 55, spd: 8, size: 2, shape: [2, 1], grow: 5, cost: { gold: 340, food: 1 }, food: 1, el: 'Su',
     abil: ['frenzy', 'scars'], desc: 'Old Harkal, toughened by scar on scar. Their frenzy rises faster, and they shrug off more.' });
 
   cr('kaloeik', { name: 'Kalo’Eik of the Duskareth', short: 'Kalo’Eik', plural: 'Kalo’Eik', faction: 'duskareth', tier: 5, art: 'kaloeik',
-    atk: 6, def: 15, dmg: [4, 8], hp: 62, spd: 4, grow: 4, cost: { gold: 340, stygian: 1 }, food: 1.5, pop: 1, el: 'Su', people: true,
+    atk: 12, def: 18, dmg: [10, 16], hp: 85, spd: 4, grow: 4, cost: { gold: 450, stygian: 1 }, food: 1.5, pop: 1, el: 'Su', people: true,
     abil: ['shift'], desc: 'Moon-folk who serve the Duskareth. Slow to anger and slower to fall. With a Naelst Velki captain in the army they can shift an ally through the Duat to anywhere they could walk.' });
 
   cr('tyndael', { name: 'Tyndael', plural: 'Tyndael', faction: 'duskareth', tier: 6, art: 'tyndael',
-    atk: 13, def: 9, dmg: [8, 14], hp: 46, spd: 9, grow: 3, cost: { gold: 560, timber: 1 }, food: 1, el: 'Eldi',
+    atk: 18, def: 14, dmg: [16, 24], hp: 110, spd: 9, grow: 3, cost: { gold: 800, timber: 1 }, food: 1, el: 'Eldi',
     ranged: true, fly: true, shots: 8, abil: ['burn'], desc: 'A living flame given shape: a round body, wide many-coloured wings and a crown of fire. Its feet never touch the ground.' });
 
   cr('xiweik', { name: 'Xiw’Eik', plural: 'Xiw’Eik', faction: 'duskareth', tier: 7, art: 'xiweik',
-    atk: 15, def: 11, dmg: [12, 20], hp: 72, spd: 9, size: 2, shape: [2, 1], capSlots: 2, grow: 2, cost: { gold: 920, stygian: 1, glowmoss: 1 }, food: 1.5, pop: 1, el: 'Eldi', people: true,
+    atk: 22, def: 18, dmg: [24, 36], hp: 170, spd: 9, size: 2, shape: [2, 1], capSlots: 2, grow: 2, cost: { gold: 1400, stygian: 1, glowmoss: 1 }, food: 1.5, pop: 1, el: 'Eldi', people: true,
     fly: true, abil: ['chaos'], desc: 'Children of the Xiw and the Eikar from the age of the Skyfalls: acorn folk with devil wings and horns, and songs of chaos.' });
 
   cr('lutut', { name: 'Lutut', plural: 'Lutut', faction: 'duskareth', tier: 8, art: 'lutut',
-    atk: 22, def: 18, dmg: [25, 40], hp: 190, spd: 11, size: 2, shape: [2, 2], capSlots: 2, grow: 1, cost: { gold: 2300, stygian: 2, stone: 2 }, food: 4, el: 'Fti',
+    atk: 30, def: 28, dmg: [48, 66], hp: 360, spd: 11, size: 2, shape: [2, 2], capSlots: 2, grow: 1, cost: { gold: 3500, stygian: 3, stone: 3 }, food: 4, el: 'Fti',
     fly: true, abil: ['screech', 'boulder'], desc: 'The great terror of the sky, patterned like carved stone. Its screech stuns, and in a siege it hurls boulders at the walls.' });
 
   cr('nekh', { name: 'Nekh’Vorran', plural: 'Nekh’Vorran', faction: 'duskareth', tier: 9, art: 'nekh', legendary: true,
-    atk: 34, def: 30, dmg: [60, 95], hp: 680, spd: 10, size: 2, shape: [6, 2], grow: 0, cost: { gold: 6500, stygian: 6, ngakara: 3 }, food: 12, el: 'Su',
+    atk: 44, def: 40, dmg: [110, 150], hp: 1200, spd: 10, size: 2, shape: [6, 2], grow: 0, cost: { gold: 10000, stygian: 8, ngakara: 4 }, food: 12, el: 'Su',
     abil: ['burrow', 'devour'], desc: 'The great worm of the Duat that the Duskareth follow. It surges up out of the ground anywhere on the field. Only one to a castle, and only one to a stack.' });
 
   /* ---- wild creatures ---- */
   cr('wildpunk', { name: 'Wild Punk', plural: 'Wild Punks', wild: true, tier: 1, art: 'punk',
-    atk: 4, def: 3, dmg: [1, 3], hp: 9, spd: 7, food: 0.3, el: 'Ular', herd: true, abil: [], desc: 'A faster, leaner cousin of the Domestic Punk: the same pumpkin-and-vine family, grown wild.' });
+    atk: 4, def: 3, dmg: [1, 3], hp: 10, spd: 7, food: 0.3, el: 'Ular', herd: true, abil: [], desc: 'A faster, leaner cousin of the Domestic Punk: the same pumpkin-and-vine family, grown wild.' });
   cr('dompunk', { name: 'Domestic Punk', plural: 'Domestic Punks', wild: true, tier: 2, art: 'punk', tint: 2,
-    atk: 4, def: 6, dmg: [2, 4], hp: 18, spd: 5, food: 0.4, el: 'Ular', herd: true, abil: [], desc: 'A pumpkin-and-vine beast of burden. Herds can be tamed.' });
+    atk: 4, def: 6, dmg: [2, 4], hp: 20, spd: 5, food: 0.4, el: 'Ular', herd: true, abil: [], desc: 'A pumpkin-and-vine beast of burden. Herds can be tamed.' });
   cr('uff', { name: 'Uff', plural: 'Uffs', wild: true, tier: 1, art: 'uff',
     atk: 3, def: 2, dmg: [1, 4], hp: 8, spd: 5, food: 0.2, el: 'Ular', abil: ['regrow'], desc: 'An oblivious wanderer on stalk legs, with a long neck, a striped head and spiky petal arms.' });
   cr('kuni', { name: 'Kuni Byrd', plural: 'Kuni Byrds', wild: true, tier: 6, art: 'kuni',
-    atk: 15, def: 9, dmg: [10, 16], hp: 55, spd: 12, fly: true, capSlots: 2, food: 1.5, el: 'Fti', abil: ['dive'], desc: 'A great aerial ambusher that dives from altitude. Fiercely territorial.' });
+    atk: 18, def: 14, dmg: [16, 24], hp: 110, spd: 12, fly: true, capSlots: 2, food: 1.5, el: 'Fti', abil: ['dive'], desc: 'A great aerial ambusher that dives from altitude. Fiercely territorial.' });
   cr('naga', { name: 'Su Naga', plural: 'Su Naga', wild: true, tier: 7, art: 'naga',
-    atk: 18, def: 16, dmg: [14, 24], hp: 120, spd: 7, size: 2, shape: [2, 1], capSlots: 2, food: 3, el: 'Su', abil: ['firsthead'], desc: 'A strategic, patient apex predator. "The Su Naga is calm — that is the most dangerous version of it."' });
+    atk: 24, def: 20, dmg: [26, 38], hp: 190, spd: 7, size: 2, shape: [2, 1], capSlots: 2, food: 3, el: 'Su', abil: ['firsthead'], desc: 'A strategic, patient apex predator. "The Su Naga is calm — that is the most dangerous version of it."' });
   cr('ularnaga', { name: 'Ular Naga', plural: 'Ular Naga', wild: true, beast: true, tier: 8, art: 'ularnaga',
-    atk: 20, def: 21, dmg: [16, 28], hp: 160, spd: 6, size: 2, shape: [2, 2], capSlots: 2, food: 3, el: 'Ular', abil: ['firsthead', 'heads'],
+    atk: 28, def: 28, dmg: [40, 56], hp: 330, spd: 6, size: 2, shape: [2, 2], capSlots: 2, food: 3, el: 'Ular', abil: ['firsthead', 'heads'],
     desc: 'A many-headed serpent of the earth on four heavy legs, scaled and armoured, with a spiked club tail. New heads grow as the old prove their strength.' });
   cr('mcfly', { name: 'RubberMcFly', plural: 'RubberMcFly', wild: true, tier: 1, art: 'mcfly',
     atk: 1, def: 2, dmg: [1, 1], hp: 6, spd: 9, fly: true, food: 0.1, el: 'Fti', abil: ['storm'], desc: 'The storm’s companions, among the only creatures that fly in the Sunear’Zikhron, and the only time they glow. Killing one is very bad luck.' });
@@ -218,7 +218,8 @@
     songkeeper: { name: 'Songkeeper', desc: 'Sometimes sings Mend over the squadron in battle.' },
     vanguard: { name: 'Vanguard', desc: 'The squadron acts sooner in battle.' },
   };
-  D.CAPTAIN_BASE = { hp: 45, atk: 6, def: 6, dmg: [4, 7], spd: 5, capacity: 2 };
+  /* captains are seasoned fighters: hard to kill, and they hit like a small stack */
+  D.CAPTAIN_BASE = { hp: 160, hpLevel: 30, atk: 10, def: 10, dmg: [8, 14], spd: 5, capacity: 2 };
 
   /* ---------------- skills (5 levels each) ---------------- */
   D.SKILLS = {
@@ -327,14 +328,17 @@
      be built the same day. Effects are read by rules.js. */
   D.BUILDINGS = {};
   function bd(id, o) { o.id = id; D.BUILDINGS[id] = o; }
-  bd('hall1', { name: 'Muster Hall', cost: {}, gold: 750, housing: 400, desc: 'The heart of the town. 750 gold a day.' });
-  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 2500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 300, gold: 1250, housing: 700, replaces: 'hall1', desc: '1250 gold a day, and room for more people.' });
-  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 5000, stone: 10, stygian: 4 }, req: ['hall2', 'fort2'], pop: 600, gold: 2000, housing: 1100, replaces: 'hall2', desc: '2000 gold a day. The seat of a Duskareth lord.' });
+  bd('hall1', { name: 'Muster Hall', cost: {}, gold: 1000, housing: 400, desc: 'The heart of the town. 1000 gold a day.' });
+  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 2500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 300, gold: 1750, housing: 700, replaces: 'hall1', desc: '1750 gold a day, and room for more people.' });
+  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 5000, stone: 10, stygian: 4 }, req: ['hall2', 'fort2'], pop: 600, gold: 3000, housing: 1100, replaces: 'hall2', desc: '3000 gold a day. The seat of a Duskareth lord.' });
   bd('fort1', { name: 'Palisade Keep', cost: { gold: 1500, wood: 5, stone: 5 }, walls: 1, growth: 0, desc: 'Walls and a gate. Needed for every dwelling above the second.' });
   bd('fort2', { name: 'Stone Citadel', cost: { gold: 3000, stone: 12 }, req: ['fort1'], pop: 250, walls: 2, growth: 25, replaces: 'fort1', desc: 'Stone walls and a tower. Creatures grow 25% faster.' });
   bd('fort3', { name: 'Duskwall Bastion', cost: { gold: 5000, stone: 15, stygian: 2 }, req: ['fort2'], pop: 450, walls: 3, growth: 50, replaces: 'fort2', desc: 'Three towers of the Ver. Creatures grow 50% faster.' });
   bd('tavern', { name: 'Tavern of the Lantern', cost: { gold: 500, wood: 5 }, small: true, desc: 'Hire heroes and squadron captains here.' });
   bd('market', { name: 'Market Square', cost: { gold: 500, wood: 5 }, small: true, desc: 'Trade resources. On market day, travelling sellers come.' });
+  bd('woodyard', { name: 'Woodcutters’ Yard', cost: { gold: 600, stone: 2 }, small: true, res: { wood: 2 }, desc: '+2 wood a day.' });
+  bd('stoneyard', { name: 'Stonecutters’ Yard', cost: { gold: 600, wood: 4 }, small: true, res: { stone: 2 }, desc: '+2 stone a day.' });
+  bd('muster', { name: 'Muster Ground', cost: { gold: 2000, wood: 8, stone: 8 }, req: ['hall2'], desc: 'Recruit here from the dwellings of every one of your towns: the troops come straight to this town.' });
   bd('granary', { name: 'Granary', cost: { gold: 800, wood: 6 }, small: true, food: 8, desc: '+8 food a day.' });
   bd('farms', { name: 'Duat-Edge Farms', cost: { gold: 1500, wood: 10 }, req: ['granary'], pop: 200, food: 16, desc: '+16 food a day. Needs 200 people to work them.' });
   bd('terraces', { name: 'Dusk Terraces', cost: { gold: 1000, stone: 6 }, small: true, housing: 300, desc: 'Homes for 300 more people.' });
@@ -368,7 +372,7 @@
   bd('d7', { name: 'Horned Chapel', cost: { gold: 5000, stygian: 3, glowmoss: 3, stone: 8 }, req: ['fort2', 'd5'], pop: 250, dwell: 'xiweik', desc: 'The Xiw’Eik sing their chaos here.' });
   bd('d8', { name: 'Lutut Crags', cost: { gold: 9000, stone: 20, stygian: 4 }, req: ['fort2', 'd6'], dwell: 'lutut', desc: 'A raw crag above the town where the Lutut nest.' });
   bd('d9', { name: 'Nekh Hollow', cost: { gold: 15000, stygian: 10, ngakara: 5, stone: 20 }, req: ['fort3', 'd8'], unlock: 'nekh', dwell: 'nekh', desc: 'A hole into the Duat itself. Built only once the Nekh’Vorran has been unlocked in the eye of the storm.' });
-  D.BUILD_ORDER = ['hall1', 'hall2', 'hall3', 'fort1', 'fort2', 'fort3', 'tavern', 'market', 'granary', 'farms', 'terraces', 'terraces2', 'songs1', 'songs2', 'songs3', 'choir',
+  D.BUILD_ORDER = ['hall1', 'hall2', 'hall3', 'fort1', 'fort2', 'fort3', 'tavern', 'market', 'woodyard', 'stoneyard', 'muster', 'granary', 'farms', 'terraces', 'terraces2', 'songs1', 'songs2', 'songs3', 'choir',
     't_drill', 't_road', 't_count', 't_capt', 't_duat', 't_pens', 'vault', 'shipyard', 'urverk', 'stygwell', 'sanctum',
     'd1', 'd1u', 'd2', 'd2u', 'd3', 'd3u', 'd4', 'd4u', 'd5', 'd6', 'd7', 'd8', 'd9'];
   D.START_BUILDINGS = ['hall1', 'tavern', 'fort1', 'd1', 'd2', 't_drill'];

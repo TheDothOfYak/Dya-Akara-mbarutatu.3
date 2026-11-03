@@ -278,7 +278,10 @@ changed from the Admin Panel without touching the code).
   (I–III) → Stygian Choir, Memory Vault, Shipyard, Duat Gate, Stygian Well, Vel
   Sanctum, six training halls, and the nine dwellings.
 - **A month is 42 days** (seven 6-day weeks).
-- **Captains** lead 2 stacks to start; Warcaller and Captaincy add more.
+- **Captains** lead 2 stacks to start; Warcaller and Captaincy add more. They are tough
+  (160 health and more with level) and hit like a small stack. When one falls, troops
+  with no room left in the army march home to the nearest town instead of deserting.
+- **Heroes** always come with a captain leading a stack, and a second stack.
   A very rare *peerless* captain (about 1 in 80) is far stronger but leads only one.
 - **XP and levels:** beating a hero's army gives half the usual XP for the creatures
   killed. Each level offers two stats and two skills; you pick one of each.
@@ -318,10 +321,17 @@ changed from the Admin Panel without touching the code).
 - **Meeting:** click another of your armies to walk over and trade (stacks, captains,
   Relics, cores); a squadron can join a hero's army whole.
 - **Population** changes a little every day.
+- **Tiers:** each tier is a big step up. Tier 8 (the Lutut) is the top of the town: very
+  strong, very costly, and exactly one a week.
+- **Economy:** halls pay 1000 / 1750 / 3000 gold a day; Woodcutters' and Stonecutters'
+  Yards; a Muster Ground recruits from every town's dwellings; recruit everything in one
+  click. Corralled punks can be mustered as troops, butchered for food, or put to work
+  (cheaper buildings in that town).
+- **Rekindle** can raise the enemy's fallen to fight for you only with Songcraft 5.
 - **Battles show the blows:** lunges, recoils, deaths after the blow lands, and bodies
   left on the field. **Rekindle** (tier 3 song, 16 Breath) raises fallen stacks from
   their bodies; the computer uses it too.
-- **Training** a basic skill costs 60 gold plus 40 for each skill the hero has.
+- **Training** a basic skill costs 100 gold.
 - **Looking closer:** right-click anything for its details; double-click a creature for
   its card (upgrade it there in town); buildings open a close-up before you build.
   A Key explains army-size words (A few 1–4 … A legion 1000+), path marks and ground.

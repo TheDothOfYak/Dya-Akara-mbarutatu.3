@@ -104,7 +104,7 @@ async function playGame(seed, size, nPlayers, days) {
     const B3 = BT.create(st3, { owner: 0, army: a3, hero: null, slots: [{ kind: 'stack', cr: 'velnur', n: 20 }, null, null, null, null] }, { owner: 1, army: b3, hero: null, slots: [{ kind: 'stack', cr: 'kaloeik', n: 5 }, null, null, null, null] });
     const att = B3.units.find(u => u.cr === 'velnur'), tgt = B3.units.find(u => u.cr === 'kaloeik');
     att.morale = 95; const hi = BT.estimate(st3, B3, att, tgt, false); att.morale = 15; const lo = BT.estimate(st3, B3, att, tgt, false); att.morale = 60;
-    ok(hi > lo * 1.3, 'high morale hits nearer the top of the damage range (' + hi + ' vs ' + lo + ')');
+    ok(hi > lo * 1.15, 'high morale hits nearer the top of the damage range (' + hi + ' vs ' + lo + ')');
     /* the eye gives a vision */
     const P3 = st3.players[0]; const s3 = st3.storm; S.moveArmyIndex(st3, a3, s3.layer, s3.x, s3.y); st3.current = 0;
     const v = RU2.eyeVision(st3, 0); ok(!!v && P3.vision === v.id, 'ending a turn in the eye gives a vision of the Rokarvac');

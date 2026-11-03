@@ -97,7 +97,8 @@
     const sd = B.sides[side];
     if (o.kind === 'cap') {
       const cap = o.cap, capt = o.hero ? S.skill(st, o.hero, 'captaincy') : 0;
-      Object.assign(u, { cap, name: cap.name, abil: [], shape: [1, 1], n: 1, hp: cap.hp, hpTop: cap.hp, startN: 1, atk: cap.atk + capt, def: cap.def + capt, dmg: [4 + cap.level, 7 + cap.level * 2], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: SU.clamp(60 + (cap.morale || 0) * 5 + (cap.elite ? 15 : 0), 0, 100) });
+      const chp = Math.max(cap.hp, (D.CAPTAIN_BASE.hp + (cap.level || 1) * D.CAPTAIN_BASE.hpLevel) * (cap.elite ? 2 : 1)), catk = Math.max(cap.atk, D.CAPTAIN_BASE.atk + (cap.level || 1) + (cap.elite ? 6 : 0)), cdef = Math.max(cap.def, D.CAPTAIN_BASE.def + (cap.level || 1) + (cap.elite ? 6 : 0));
+      Object.assign(u, { cap, name: cap.name, abil: [], shape: [1, 1], n: 1, hp: chp, hpTop: chp, startN: 1, atk: catk + capt, def: cdef + capt, dmg: [D.CAPTAIN_BASE.dmg[0] + cap.level * 2, D.CAPTAIN_BASE.dmg[1] + cap.level * 3], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: SU.clamp(60 + (cap.morale || 0) * 5 + (cap.elite ? 15 : 0), 0, 100) });
     } else {
       const c = D.CREATURES[o.cr];
       const n = o.parts ? o.parts.reduce((t, p) => t + p.ref.n, 0) : o.n;
@@ -147,8 +148,10 @@
   function unitAt(B, c, r) { for (const u of B.units) { if (u.n <= 0) continue; for (const [cc, rr] of cellsOf(u)) if (cc === c && rr === r) return u; } return null; }
   B_.unitAt = unitAt;
   /* the bodies of a fallen stack lie where it fell */
-  B_.bodyAt = (B, c, r) => B.units.find(u => u.n <= 0 && u.kind === 'stack' && cellsOf(u).some(([cc, rr]) => cc === c && rr === r)) || null;
-  B_.canRaise = (B, u, side) => !!(u && u.n <= 0 && u.kind === 'stack' && !u.temp && u.side === side && !D.CREATURES[u.cr].legendary && fits(B, u.c, u.r, u.shape, u.side, u));
+  B_.bodyAt = (B, c, r) => B.units.find(u => u.n <= 0 && !u.raised && u.kind === 'stack' && cellsOf(u).some(([cc, rr]) => cc === c && rr === r)) || null;
+  /* your own fallen may be raised; the enemy's only by a master singer (Songcraft 5), and then they fight for you */
+  B_.canRaise = (B, u, side, enemyOk) => !!(u && u.n <= 0 && u.kind === 'stack' && !u.temp && !u.raised && (u.side === side || enemyOk) && !D.CREATURES[u.cr].legendary && fits(B, u.c, u.r, u.shape, side, u));
+  B_.raiseEnemyOk = (st, B, side) => { const h = B.sides[side].heroId && st.heroes[B.sides[side].heroId]; return !!(h && S.skill(st, h, 'songcraft') >= 5); };
   B_.alive = B => B.units.filter(u => u.n > 0);
 
   /* ======================= turn order ======================= */
@@ -451,10 +454,16 @@
     if ((need === 'ally' || need === 'allyMove') && (!target || target.side !== side)) return { ok: false, why: 'Choose one of your stacks.' };
     if ((need === 'enemy' || need === 'enemyArea') && (!target || target.side === side)) return { ok: false, why: 'Choose an enemy stack.' };
     if (need === 'captain' && (!target || target.kind !== 'cap' || target.side !== side)) return { ok: false, why: 'Choose one of your captains.' };
-    if (need === 'body' && !B_.canRaise(B, target, side)) return { ok: false, why: target && target.n <= 0 && target.side === side ? 'Something stands on their bodies.' : 'Choose where one of your fallen stacks lies.' };
+    if (need === 'body' && !B_.canRaise(B, target, side, B_.raiseEnemyOk(st, B, side))) return { ok: false, why: target && target.n <= 0 && target.side !== side && !B_.raiseEnemyOk(st, B, side) ? 'Only a master singer (Songcraft 5) can raise the enemy’s fallen.' : target && target.n <= 0 ? 'Something stands on their bodies.' : 'Choose where fallen bodies lie.' };
     switch (song) {
       case 'mend': heal(B, target, P * 3); break;
-      case 'rekindle': { target.hpTop = target.hp; heal(B, target, P * 6); if (target.n <= 0) return { ok: false, why: 'The song is not strong enough to raise even one.' };
+      case 'rekindle': if (target.side !== side) {
+        /* the enemy's fallen rise for the singer */
+        const k = Math.min(target.startN, Math.floor(P * 6 / target.hp)); if (k < 1) return { ok: false, why: 'The song is not strong enough to raise even one.' };
+        const nu = addUnit(st, B, side, { kind: 'stack', cr: target.cr, n: k, hero: h }, target.c, target.r); if (!nu) return { ok: false, why: 'There is no room for them to stand.' };
+        nu.turned = true; nu.done = true; target.raised = true;
+        B.anim.push({ kind: 'rise', uid: nu.uid, nAfter: nu.n, hpAfter: nu.hpTop }); say(B, k + ' ' + target.name + ' rise from where they fell — and turn against their own.'); break;
+      } else { target.hpTop = target.hp; heal(B, target, P * 6); if (target.n <= 0) return { ok: false, why: 'The song is not strong enough to raise even one.' };
         target.morale = Math.max(40, target.morale == null ? 60 : target.morale); target.fx = {}; target.done = true; target.grief = 0;
         B.anim.push({ kind: 'rise', uid: target.uid, nAfter: target.n, hpAfter: target.hpTop }); say(B, target.n + ' ' + target.name + ' rise from where they fell.'); break; }
       case 'rally': target.morale = Math.min(100, (target.morale == null ? 60 : target.morale) + 15 + (P > 40 ? 10 : 0)); break;
@@ -542,7 +551,7 @@
     const hurt = allies.filter(u => u.n < u.startN * 0.7).sort((a, b) => b.hp * (b.startN - b.n) - a.hp * (a.startN - a.n))[0];
     const big = foes.slice().sort((a, b) => b.n * b.hp - a.n * a.hp)[0];
     if (has('massmend') && allies.filter(u => u.n < u.startN * 0.7).length >= 2) return { song: 'massmend' };
-    if (has('rekindle')) { const body = B.units.filter(u => B_.canRaise(B, u, side)).sort((a, b) => b.startN * b.hp - a.startN * a.hp)[0]; if (body && body.startN * body.hp >= 60) return { song: 'rekindle', target: body }; }
+    if (has('rekindle')) { const body = B.units.filter(u => B_.canRaise(B, u, side, B_.raiseEnemyOk(st, B, side))).sort((a, b) => b.startN * b.hp - a.startN * a.hp)[0]; if (body && body.startN * body.hp >= 60) return { song: 'rekindle', target: body }; }
     if (has('nekhcall') && big) return { song: 'nekhcall', target: big };
     if (has('tide') && big) return { song: 'tide', target: big };
     if (hurt && has('mend')) return { song: 'mend', target: hurt };
@@ -604,7 +613,7 @@
       if (f.side === lose && !wildCoreGiven && wildStrong(lose)) { wildCoreGiven = true; const c = M.wildCore(st, B.sides[lose].power0); giveCoreTo(st, B, win, c, rep); rep.cores.push(c.id); return; }
       capCore(f);
     };
-    B.fallenCaps.forEach(f => { removeCaptain(st, B.sides[f.side].slots, f.cap.id); loserCapCore(f); });
+    B.fallenCaps.forEach(f => { const home = removeCaptain(st, B.sides[f.side].slots, f.cap.id, B.sides[f.side].owner, B); if (home.length) (rep.wentHome = rep.wentHome || []).push(...home); loserCapCore(f); });
     /* the loser */
     if (!rep.surrendered) {
       const la = sideArmy(lose), lh = sideHero(lose);
@@ -620,10 +629,15 @@
       /* surrender: the hero and their army go home */
       const la = sideArmy(lose); if (la) { const t = S.townsOf(st, la.owner)[0]; if (t && la.heroId) { RU.stationHero(st, la, t); } else if (la) { RU.removeArmy(st, la); } }
     }
+    /* enemies raised by Rekindle march with the side that raised them, if it won and has room */
+    B.units.forEach(u => { if (u.turned && u.n > 0 && u.side === win) { const sl = B.sides[win].slots; if (sl && RU.addToSlots(st, sl, u.cr, u.n, sideHero(win))) rep.raised = (rep.raised || 0) + u.n; } });
     /* tidy the winner's slots: empty stacks go */
     cleanSlots(B.sides[win].slots);
     const wa = sideArmy(win);
-    if (wa && !wa.heroId && !wa.wild && !S.captainsIn(wa.slots).length) { rep.scattered = true; RU.removeArmy(st, wa); }
+    /* a squadron that lost its captain cannot stay out: its troops march home to the nearest town */
+    if (wa && !wa.heroId && !wa.wild && !S.captainsIn(wa.slots).length) { rep.scattered = true;
+      const t = nearestTown(st, wa.owner, B); S.stacksIn(wa.slots).forEach(x => { if (x.n > 0 && t && RU.addToSlots(st, t.garrison, x.cr, x.n, null, { noCap: true })) (rep.wentHome = rep.wentHome || []).push({ cr: x.cr, n: x.n, town: t.name }); });
+      RU.removeArmy(st, wa); }
     if (wa && S.isEmptySlots(S.slotsOf(st, wa)) && !wa.heroId) RU.removeArmy(st, wa);
     /* the eye of the storm */
     if (B.inEye && B.sides[win].owner >= 0) {
@@ -648,14 +662,23 @@
     const spot = RU.freeNear(st, B.layer, B.x, B.y);
     if (spot) { const o = { id: SU.uid(st, 'o'), type: 'core', layer: B.layer, x: spot[0], y: spot[1], core: core.id }; st.objects[o.id] = o; S.place(st, o); }
   }
-  function removeCaptain(st, slots, capId) {
-    if (!slots) return;
+  function removeCaptain(st, slots, capId, owner, B) {
+    const home = [];
+    if (!slots) return home;
     const i = slots.findIndex(s => s && s.kind === 'cap' && s.cap.id === capId); if (i < 0) return;
     const s = slots[i]; const stacks = s.stacks.concat(s.reserve || []).filter(x => x && x.n > 0);
     slots[i] = null;
     /* without a captain, a slot holds one stack; the rest find room or scatter */
     stacks.sort((a, b) => b.n * D.CREATURES[b.cr].hp - a.n * D.CREATURES[a.cr].hp);
-    stacks.forEach((x, k) => { if (k === 0 && !slots[i]) { slots[i] = { kind: 'stack', cr: x.cr, n: x.n, grief: x.grief }; return; } RU.addToSlots(st, slots, x.cr, x.n, null, { noCap: true }); });
+    stacks.forEach((x, k) => { if (k === 0 && !slots[i]) { slots[i] = { kind: 'stack', cr: x.cr, n: x.n, grief: x.grief }; return; }
+      if (RU.addToSlots(st, slots, x.cr, x.n, null, { noCap: true })) return;
+      /* no room without their captain: they march back to the nearest of their towns */
+      if (owner >= 0) { const t = nearestTown(st, owner, B); if (t && RU.addToSlots(st, t.garrison, x.cr, x.n, null, { noCap: true })) home.push({ cr: x.cr, n: x.n, town: t.name }); } });
+    return home;
+  }
+  function nearestTown(st, owner, B) {
+    const ts = S.townsOf(st, owner); if (!ts.length) return null;
+    return ts.slice().sort((a, b) => (a.layer !== B.layer) - (b.layer !== B.layer) || Math.hypot(a.x - B.x, a.y - B.y) - Math.hypot(b.x - B.x, b.y - B.y))[0];
   }
   function cleanSlots(slots) {
     if (!slots) return;

@@ -650,9 +650,11 @@
       rep.unlocked ? el('p', { cls: 'gold', text: 'You won in the eye of the Sunear’Zikhron! The Nekh’Vorran can now be called to your towns (build the Nekh Hollow).' }) : null,
       rep.captured ? el('p', { cls: 'gold', text: 'You have taken ' + rep.captured + '.' }) : null,
       rep.cursed ? el('p', { cls: 'bad', text: 'A RubberMcFly was killed. Bad luck will follow this army for a while.' }) : null,
+      rep.wentHome && rep.wentHome.length ? el('p', { cls: 'warn', text: 'Without their captain, ' + rep.wentHome.map(x => x.n + ' ' + D.CREATURES[x.cr].plural + ' went home to ' + x.town).join(', ') + '.' }) : null,
+      rep.raised ? el('p', { cls: 'gold', text: rep.raised + ' of the enemy, raised by Rekindle, now march with you.' }) : null,
       rep.respect ? el('p', { cls: 'gold', text: rep.respect + ' saw you clear the land around their Urverk. Your armies may pass it free.' }) : null,
       rep.eyeWins && (st().setup.win || {}).kind === 'prophecy' ? el('p', { cls: 'gold', text: 'Battles won in the eye: ' + rep.eyeWins + ' of ' + ((st().setup.win || {}).n || 3) + '.' }) : null,
-      rep.scattered ? el('p', { cls: 'bad', text: 'With its captain gone, the squadron scatters.' }) : null,
+      rep.scattered ? el('p', { cls: 'bad', text: 'With its captain gone, the squadron cannot stay out in the field.' }) : null,
     ];
     U.modal([el('h2', { text: won === null ? 'The battle is over' : won ? 'Victory' : 'Defeat' }), ...lines, el('div', { cls: 'acts' }, [btn('Continue', function () { this.closest('.overlay').remove(); if (then) then(); }, 'primary')])], { dismiss: false });
   };

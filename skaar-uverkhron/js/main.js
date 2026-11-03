@@ -161,7 +161,17 @@
     const st = G.st, P = S.cur(st);
     U.busy = true; U.refresh();
     $('status').textContent = P.name + ' is thinking…';
-    try { await SU.ai.takeTurn(st, { battle: spec => G.runBattle(spec) }); }
+    /* a person watching (on this device) sees the computer's armies move where they have seen the land */
+    const watcher = st.players.findIndex((Q, i) => Q.kind === 'human' && Q.alive && G.localHuman(i));
+    const watch = watcher < 0 ? null : async (a, x, y) => {
+      const L = st.layers[a.layer], E = st.players[watcher].explored[a.layer];
+      if (!E[a.y * L.w + a.x] && !E[y * L.w + x]) return;
+      if (V.layer !== a.layer) { V.setLayer(a.layer); U.refresh(); }
+      const sx = (a.x + 0.5 - V.cam.x) * V.ts + V.w / 2, sy = (a.y + 0.5 - V.cam.y) * V.ts + V.h / 2;
+      if (sx < 0 || sy < 0 || sx > V.w || sy > V.h) V.centerOn(a.layer, a.x, a.y);
+      await V.watchStep(a, x, y);
+    };
+    try { await SU.ai.takeTurn(st, { battle: spec => G.runBattle(spec), watch }); }
     catch (e) { console.error('AI turn failed', e); }
     U.busy = false;
     if (st.over) return G.gameOver();

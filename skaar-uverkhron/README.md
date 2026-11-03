@@ -28,6 +28,13 @@ the game is built.
 - **Meeting:** with an army picked, click another of your armies to walk over and
   trade stacks, captains, Relics and memory cores. A squadron can join a hero's army.
   Shift-click picks the other army instead.
+- **The side bar** (as in the old games): hero and squadron portraits with movement and
+  Breath bars on the left, your towns on the right; below, the stacks of whatever you
+  picked. Right-click any castle to see its garrison.
+- **Watching:** the computer's armies walk where you have seen the land, and the view
+  follows them.
+- **Towns:** a slim row of buttons; each one, or a click on a building, opens a full page
+  for that one thing. Dwellings have their own recruiting page.
 - **Close up:** double-click (or right-click) a creature to see its card, and upgrade
   it there when the town can. Clicking a building to build opens its close-up: the
   picture, what it does, what it needs and what it costs.
