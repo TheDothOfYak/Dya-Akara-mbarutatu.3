@@ -101,7 +101,7 @@
 
   /* ======================= the game on screen ======================= */
   U.start = function (st) {
-    U.st = st; U.selected = null;
+    U.st = st; U.selected = null; U.busy = false;
     V.setGame(st);
     $('game').classList.remove('hidden');
     V.resize();

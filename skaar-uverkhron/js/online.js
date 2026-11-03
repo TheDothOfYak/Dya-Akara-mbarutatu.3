@@ -135,7 +135,7 @@
   O.enter = async function (c) {
     let r; try { r = await getRoom(c); } catch (e) { U.alert('Could not reach the room', e.message); return; }
     if (!r || !r.state) { U.alert('Not ready', 'That game has not started yet.'); return; }
-    room = r;
+    room = r; O.stopWatching();
     const st = S.deserialize(r.state); st.online = { code: c, seq: r.seq };
     SU.game.st = st; U.closeAll(); document.getElementById('title').classList.add('hidden');
     U.start(st);
@@ -145,6 +145,7 @@
   function myIndex(st) { const me = acc(); return st.players.findIndex(P => P.account === (me && me.id)); }
   O.isMine = (st, pi) => { const me = acc(); return !!(me && st.players[pi] && st.players[pi].account === me.id); };
   O.isHost = st => { const me = acc(); return !!(room && me && room.host === me.id); };
+  O.stopWatching = () => { clearInterval(watching); watching = null; U.busy = false; };
   /* someone else is playing: watch the room until it is our turn again */
   O.waitTurn = function (st) {
     U.viewer = Math.max(0, myIndex(st));

@@ -14,7 +14,7 @@
 
   /* ======================= the title ======================= */
   G.title = function () {
-    U.closeAll();
+    U.closeAll(); if (SU.online.stopWatching) SU.online.stopWatching(); U.busy = false;
     $('game').classList.add('hidden'); $('town').classList.add('hidden'); $('battle').classList.add('hidden');
     const t = $('title'); t.classList.remove('hidden'); t.innerHTML = '';
     const cv = el('canvas', { cls: 'bg' }); t.appendChild(cv);
