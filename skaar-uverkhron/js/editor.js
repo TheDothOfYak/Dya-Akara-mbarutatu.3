@@ -91,6 +91,13 @@
       case 'wild': pick('Strength', [[800, 'A few'], [2500, 'A band'], [7000, 'A host'], [18000, 'A horde'], [45000, 'A legion'], [100000, 'A vast legion']], 'power'); pick('Creatures', [['', 'Any'], ...Object.keys(D.CREATURES).filter(c => !D.CREATURES[c].upgraded).map(c => [c, D.CREATURES[c].plural])], 'cr'); break;
       case 'erase': opts.appendChild(el('p', { cls: 'small muted', text: 'Click a thing to remove it.' })); break;
     }
+    est.mapWin = est.mapWin || { kind: 'conquer' };
+    const towns = Object.values(est.objects).filter(o => o.type === 'town');
+    P.appendChild(el('div', { cls: 'col frame' }, [el('div', { cls: 'small muted', text: 'How to win' }),
+      el('select', { cls: 'inp', onchange: e => { est.mapWin.kind = e.target.value; render(); } }, Object.entries(D.WIN).map(([k, w]) => el('option', { value: k, selected: est.mapWin.kind === k ? 'selected' : null }, w.name))),
+      est.mapWin.kind === 'town' ? el('select', { cls: 'inp', onchange: e => est.mapWin.town = e.target.value }, [el('option', { value: '' }, 'Choose the town…'), ...towns.map(t => el('option', { value: t.id, selected: est.mapWin.town === t.id ? 'selected' : null }, t.name + ' (' + D.LAYERS[t.layer].name + ')'))]) : null,
+      est.mapWin.kind === 'gold' ? el('input', { cls: 'inp', type: 'number', value: est.mapWin.gold || 200000, step: 10000, oninput: e => est.mapWin.gold = +e.target.value }) : null,
+      est.mapWin.kind === 'prophecy' ? el('input', { cls: 'inp', type: 'number', value: est.mapWin.n || 3, min: 1, max: 9, oninput: e => est.mapWin.n = +e.target.value }) : null]));
     const starts = Object.values(est.objects).filter(o => o.type === 'town' && o.start).length;
     P.appendChild(el('div', { cls: 'small muted', text: starts + ' starting town' + (starts === 1 ? '' : 's') + ' (that many players at most).' }));
     P.appendChild(el('div', { cls: 'col', style: { marginTop: '6px' } }, [
@@ -189,12 +196,12 @@
     const wild = Object.values(st.armies).filter(a => a.wild && !a.dead).map(a => ({ layer: a.layer, x: a.x, y: a.y, power: a.power0 || Math.round(S.power(a.slots)), cr: a.edCr || null, guard: a.guard || null, roam: !!a.roam, herd: !!a.herd }));
     const objects = {}; Object.values(st.objects).forEach(o => { const c = SU.deep(o); delete c._k; objects[o.id] = c; });
     const starts = Object.values(st.objects).filter(o => o.type === 'town' && o.start).map(o => o.id);
-    return { id: st.mapId || ('m' + Date.now().toString(36)), name: st.setup.name || 'A map', desc: st.mapDesc || '', size: st.setup.size, layers: packed.layers, objects, wild, starts, moons: st.moons || [], nextId: st.nextId, at: Date.now() };
+    return { id: st.mapId || ('m' + Date.now().toString(36)), name: st.setup.name || 'A map', desc: st.mapDesc || '', size: st.setup.size, layers: packed.layers, objects, wild, starts, moons: st.moons || [], nextId: st.nextId, at: Date.now(), win: st.mapWin || { kind: 'conquer' } };
   };
   E.mapToState = function (map) {
     const st = S.deserialize({ version: 1, seed: 1, rngState: 9, nextId: map.nextId || 5000, day: 1, current: 0, setup: { size: map.size, name: map.name, players: [] }, layers: map.layers, objects: SU.deep(map.objects), armies: {}, heroes: {}, cores: {}, players: [], storm: null, weekEvent: 'none', monthEvent: 'none', log: [], moons: map.moons || [] });
     (map.wild || []).forEach(w => { const a = M.wild(st, w.layer, w.x, w.y, w.power, w.cr ? { cr: w.cr, stacks: 1 } : { roam: w.roam }); a.guard = w.guard; a.power0 = w.power; a.edCr = w.cr; a.herd = !!w.herd; });
-    st.mapId = map.id; st.mapDesc = map.desc;
+    st.mapId = map.id; st.mapDesc = map.desc; st.mapWin = map.win || { kind: 'conquer' };
     return st;
   };
   /* a playable game from a made map */
@@ -202,6 +209,7 @@
     const st = E.mapToState(map);
     st.seed = setup.seed || (Math.random() * 1e9) | 0; st.rngState = st.seed ^ 0x5bd1e995; st._rng = null;
     st.setup = SU.deep(setup); st.setup.name = setup.name || map.name; st.setup.mapName = map.name;
+    if (map.win && map.win.kind !== 'conquer') st.setup.win = SU.deep(map.win);
     st.players = setup.players.map((pc, i) => M.player(st, i, pc));
     const starts = (map.starts || []).map(id => st.objects[id]).filter(Boolean);
     st._starts = [];

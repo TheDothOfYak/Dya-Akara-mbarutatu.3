@@ -602,9 +602,15 @@
     /* the eye of the storm */
     if (B.inEye && B.sides[win].owner >= 0) {
       const P = st.players[B.sides[win].owner];
+      P.stormWins = (P.stormWins || 0) + 1; rep.eyeWins = P.stormWins;
       if (!P.unlocked.includes('nekh')) { P.unlocked.push('nekh'); rep.unlocked = 'nekh'; S.log(st, P.name + ' won a battle in the eye of the Sunear’Zikhron. The Nekh’Vorran answers.', P.idx); }
     }
     if (B.killedMcfly[win] && wa) { wa.cursed = 1; wa.cursedUntil = st.day + 6; rep.cursed = true; }
+    /* clearing wild creatures near a family's Urverk earns their respect: they let you pass free */
+    if (B.sides[win].owner >= 0 && B.sides[lose].owner < 0 && !rep.surrendered) {
+      Object.values(st.objects).forEach(o => { if (o.type === 'urverk' && o.toll && o.toll.alive && o.layer === B.layer && Math.hypot(o.x - B.x, o.y - B.y) <= 5 && !o.toll.respect[B.sides[win].owner]) {
+        o.toll.respect[B.sides[win].owner] = 1; const l = st.objects[o.link]; if (l && l.toll) l.toll.respect[B.sides[win].owner] = 1; rep.respect = o.toll.family; } });
+    }
     /* temporary armies (from the Duat) vanish */
     B.sides.forEach(s => { const a = s.armyId && st.armies[s.armyId]; if (a && a.temp) delete st.armies[a.id]; });
     RU.checkPlayers(st);

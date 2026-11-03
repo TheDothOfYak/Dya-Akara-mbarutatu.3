@@ -93,6 +93,8 @@
         cfg.map ? null : el('tr', {}, [el('td', { text: 'Size' }), el('td', {}, sel(cfg.size, [['S', 'Small'], ['M', 'Medium'], ['L', 'Large'], ['XL', 'Extra large']], v => cfg.size = v))]),
         cfg.map ? null : el('tr', {}, [el('td', { text: 'Starts' }), el('td', {}, sel(cfg.spread ? 'spread' : 'velki', [['spread', 'Spread across the three Tatu'], ['velki', 'Everyone on Velki']], v => cfg.spread = v === 'spread'))]),
         cfg.map ? null : el('tr', {}, [el('td', { text: 'Wild creatures' }), el('td', {}, sel(cfg.wild, [['weak', 'Few and weak'], ['normal', 'Normal'], ['strong', 'Many and fierce']], v => cfg.wild = v))]),
+        cfg.map && cfg.map.win && cfg.map.win.kind !== 'conquer' ? el('tr', {}, [el('td', { text: 'Victory' }), el('td', { cls: 'gold', text: D.WIN[cfg.map.win.kind].name + ' — ' + D.WIN[cfg.map.win.kind].desc })])
+          : el('tr', {}, [el('td', { text: 'Victory' }), el('td', {}, [sel(cfg.winKind || 'conquer', [['conquer', D.WIN.conquer.name], ['prophecy', D.WIN.prophecy.name], ['gold', D.WIN.gold.name]], v => cfg.winKind = v), el('div', { cls: 'small muted', text: D.WIN[cfg.winKind || 'conquer'].desc + (cfg.winKind === 'gold' ? ' (200,000 gold)' : '') + ' Taking every rival’s towns always wins too.' })])]),
       ]));
       b.appendChild(el('h3', { text: 'Players', style: { marginTop: '10px' } }));
       const tbl = el('table', { cls: 'setup' }, [el('tr', {}, ['', 'Name', 'Who', 'Level', 'Team', 'Colour', ''].map(x => el('th', { cls: 'small muted', text: x })))]);
@@ -117,7 +119,8 @@
     const players = cfg.players.map(p => ({ kind: p.kind, name: p.name || 'Player', ai: p.ai, team: p.team, color: D.PLAYER_COLORS.find(c => c.id === p.colorId).c, colorId: p.colorId, account: p.account || null }));
     U.toast('Shaping the Mbaru Tatu…');
     setTimeout(() => {
-      const setup = { size: cfg.size, spread: cfg.spread, wild: cfg.wild, name: cfg.name, players, seed: cfg.seed };
+      const win = cfg.map && cfg.map.win && cfg.map.win.kind !== 'conquer' ? cfg.map.win : { kind: cfg.winKind || 'conquer', n: 3, gold: 200000 };
+      const setup = { size: cfg.size, spread: cfg.spread, wild: cfg.wild, name: cfg.name, players, seed: cfg.seed, win };
       const st = cfg.map ? SU.editor.gameFromMap(cfg.map, setup) : SU.mapgen.newGame(setup);
       if (cfg.online) st.online = cfg.online;
       G.play(st);
@@ -260,7 +263,8 @@
     const st = G.st; if (!st.over || G._overShown === st) return; G._overShown = st;
     const won = st.over.winners.some(i => st.players[i].kind === 'human' && G.localHuman(i));
     const names = st.over.winners.map(i => st.players[i].name).join(' and ');
-    U.modal([el('h2', { text: won ? 'Victory' : 'The game is over' }), el('p', { text: names + (st.over.winners.length > 1 ? ' hold' : ' holds') + ' the Mbaru Tatu after ' + SU.plural(st.day, 'day') + '.' }),
+    const how = { prophecy: ' heard the true prophecy in the eye of the storm', gold: ' filled the treasury', town: ' held the seat for a week', conquer: (st.over.winners.length > 1 ? ' hold' : ' holds') + ' the Mbaru Tatu' }[st.over.how || 'conquer'];
+    U.modal([el('h2', { text: won ? 'Victory' : 'The game is over' }), el('p', { text: names + how + ' after ' + SU.plural(st.day, 'day') + '.' }),
       el('div', { cls: 'acts' }, [btn('Look at the map', function () { this.closest('.overlay').remove(); }), btn('To the title', function () { this.closest('.overlay').remove(); G.title(); }, 'primary')])], { dismiss: false });
   };
 

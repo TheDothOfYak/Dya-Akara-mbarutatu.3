@@ -223,6 +223,11 @@
       case 'fair': DL.fair(a, o); break;
       case 'shipyard': DL.shipyard(a, o); break;
       case 'shrine': DL.shrine(a, o); break;
+      case 'aerie': {
+        const h2 = S.heroOf(st(), a), P = me(), cost = { gold: 6000, food: 30 };
+        U.confirm('Kuni Byrd Aerie', el('div', {}, [el('p', { text: 'A young Kuni Byrd watches ' + h2.name + ' with one golden eye. Win its trust and it will carry you — over water and mountains too, if your whole army flies.' }), U.costView(cost, P)]), () => {
+          if (!RU.afford(P, cost)) { U.toast('Not enough.'); return; } RU.pay(P, cost); h2.mount = 'kuni'; o.taken = true; U.toast(h2.name + ' now rides a Kuni Byrd!'); U.refresh(); }, null, ['Win its trust', 'Leave it']);
+        break; }
     }
   };
 
@@ -530,6 +535,8 @@
       rep.unlocked ? el('p', { cls: 'gold', text: 'You won in the eye of the Sunear’Zikhron! The Nekh’Vorran can now be called to your towns (build the Nekh Hollow).' }) : null,
       rep.captured ? el('p', { cls: 'gold', text: 'You have taken ' + rep.captured + '.' }) : null,
       rep.cursed ? el('p', { cls: 'bad', text: 'A RubberMcFly was killed. Bad luck will follow this army for a while.' }) : null,
+      rep.respect ? el('p', { cls: 'gold', text: rep.respect + ' saw you clear the land around their Urverk. Your armies may pass it free.' }) : null,
+      rep.eyeWins && (st().setup.win || {}).kind === 'prophecy' ? el('p', { cls: 'gold', text: 'Battles won in the eye: ' + rep.eyeWins + ' of ' + ((st().setup.win || {}).n || 3) + '.' }) : null,
       rep.scattered ? el('p', { cls: 'bad', text: 'With its captain gone, the squadron scatters.' }) : null,
     ];
     U.modal([el('h2', { text: won === null ? 'The battle is over' : won ? 'Victory' : 'Defeat' }), ...lines, el('div', { cls: 'acts' }, [btn('Continue', function () { this.closest('.overlay').remove(); if (then) then(); }, 'primary')])], { dismiss: false });

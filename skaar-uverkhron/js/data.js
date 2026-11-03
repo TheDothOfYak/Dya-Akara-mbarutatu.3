@@ -397,6 +397,7 @@
     shipyard: { name: 'Shipyard', desc: 'Build a ship here.' },
     trainer: { name: 'Wandering Trainer', desc: 'Teaches one level of a skill you already have, for gold. Once a week.', once: 'week' },
     shrine: { name: 'Kalo Shrine', desc: 'Merge with a memory core in the Kahizecvar.', kalo: true },
+    aerie: { name: 'Kuni Byrd Aerie', desc: 'A rare nest of Kuni Byrds. A hero with Beastmastery 3 may win one as a mount.', once: 'map' },
   };
 
   /* ---------------- events ---------------- */
@@ -417,6 +418,14 @@
     { id: 'plenty', name: 'A month of plenty', desc: 'Every dwelling grows double this week.' },
     { id: 'guild', name: 'The Guild fair', desc: 'Every market sells at half price on the next market day.' },
   ];
+
+  /* ---------------- how a game is won ---------------- */
+  D.WIN = {
+    conquer: { name: 'Conquest', desc: 'Take every town of every rival.' },
+    prophecy: { name: 'The prophecy', desc: 'Win battles in the eye of the Sunear’Zikhron. The first to win three hears the true prophecy, and wins.' },
+    gold: { name: 'The treasury', desc: 'Be the first to gather the gold named for this map.' },
+    town: { name: 'The seat', desc: 'Take the named town and hold it for a whole week.' },
+  };
 
   /* ---------------- AI personalities ---------------- */
   D.AI_LEVELS = {

@@ -247,6 +247,11 @@
       case 'shrine':
         if (!h) return { stop: true, msg: 'The Kalo of the shrine will speak only with a hero.' };
         return { stop: true, need: 'shrine', obj: o };
+      case 'aerie':
+        if (!h) return { stop: true, msg: 'Kuni Byrds wheel overhead. Only a hero could hope to ride one.' };
+        if (o.taken) return { stop: true, msg: 'The aerie is empty now.' };
+        if (S.skill(st, h, 'beasts') < 3) return { stop: true, msg: 'The Kuni Byrds will not let ' + h.name + ' near. It takes Beastmastery 3 to win one.' };
+        return { stop: true, need: 'aerie', obj: o };
     }
     return { stop: true };
   }
@@ -730,7 +735,12 @@
     });
     const alive = st.players.filter(P => P.alive);
     const teams = new Set(alive.map(P => P.team ? 't' + P.team : 'p' + P.idx));
-    if (teams.size <= 1 && !st.over) { st.over = { winners: alive.map(P => P.idx), day: st.day }; SU.emit('gameover', st.over); }
+    const win = (pi, how) => { if (st.over) return; const P = st.players[pi]; const mates = alive.filter(Q => Q.idx === pi || (P.team && Q.team === P.team)); st.over = { winners: mates.map(Q => Q.idx), day: st.day, how }; SU.emit('gameover', st.over); };
+    if (teams.size <= 1 && !st.over) { st.over = { winners: alive.map(P => P.idx), day: st.day, how: 'conquer' }; SU.emit('gameover', st.over); return; }
+    const W = st.setup.win || { kind: 'conquer' };
+    if (W.kind === 'prophecy') { const P = alive.find(P => (P.stormWins || 0) >= (W.n || 3)); if (P) win(P.idx, 'prophecy'); }
+    if (W.kind === 'gold') { const P = alive.find(P => P.res.gold >= (W.gold || 200000)); if (P) win(P.idx, 'gold'); }
+    if (W.kind === 'town') { const t = st.objects[W.town]; if (t && t.owner >= 0) { if (t.heldBy !== t.owner) { t.heldBy = t.owner; t.heldSince = st.day; } else if (st.day - t.heldSince >= D.WEEK) win(t.owner, 'town'); } }
   };
 
   /* ======================= the turn and the day ======================= */

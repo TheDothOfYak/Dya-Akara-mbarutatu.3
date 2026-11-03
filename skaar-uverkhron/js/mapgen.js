@@ -346,6 +346,7 @@
         if (kind === 'songstone') o.song = R.pick(D.SONG_IDS.filter(s => D.SONGS[s].tier <= 3));
         put(o, big.includes(kind) ? [[-1, 0], [0, -1], [-1, -1]] : null); }
       put({ type: 'visit', kind: 'tavern', visited: {} });
+      if (li === 2 || area > 3000) put({ type: 'visit', kind: 'aerie', visited: {} }, null, (x, y) => farFromStarts(st, li, x, y, 10));
       put({ type: 'visit', kind: 'fair', visited: {} }, [[-1, 0], [0, -1], [-1, -1]]);
       for (let k = 0; k < (area > 3000 ? 2 : 1); k++) { const p = randomFree(st, li, reg, R, (x, y) => nearWater(L, x, y) && farFromStarts(st, li, x, y, 4)); if (p) addObj(st, { type: 'visit', kind: 'shipyard', layer: li, x: p[0], y: p[1], visited: {} }); }
       /* herds to tame */
@@ -424,6 +425,7 @@
       else if (o.type === 'scroll') guard(o, 1.5);
       else if (o.type === 'urverk' && R.chance(o.kind === 'kalo' ? 1 : 0.55)) guard(o, o.layer === 3 ? 2 : 1.3);
       else if (o.type === 'visit' && o.kind === 'shrine') guard(o, 3);
+      else if (o.type === 'visit' && o.kind === 'aerie') guard(o, 2.5);
       else if (o.type === 'pile' && o.layer === 3) guard(o, 1);
     });
     /* roamers */
