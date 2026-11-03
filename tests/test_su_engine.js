@@ -115,6 +115,33 @@ async function playGame(seed, size, nPlayers, days) {
     /* mounts */
     a3.mpMax = RU2.mpMax(st3, a3); const before = a3.mpMax; RU2.addMounts(st3, a3, 9); ok(RU2.mpMax(st3, a3) > before * 1.2, 'a punk for every stack: the army travels further');
   }
+  /* the new-game choices: difficulty, starting hero, bonus, map options */
+  { const D = SU.data;
+    const mk = extra => SU.mapgen.newGame(Object.assign({ size: 'S', seed: 77, players: [{ kind: 'human', name: 'A', bonus: 'gold' }, { kind: 'ai', name: 'B', bonus: 'gold' }] }, extra));
+    const easy = mk({ difficulty: 'wanderer' }), hard = mk({ difficulty: 'elster' });
+    ok(easy.players[0].res.gold > hard.players[0].res.gold * 2, 'difficulty sets a person’s starting stores (' + easy.players[0].res.gold + ' vs ' + hard.players[0].res.gold + ')');
+    ok(easy.players[1].res.gold === hard.players[1].res.gold, 'but not the computer’s');
+    const tpl = D.START_HEROES[2];
+    const sh = mk({ players: [{ kind: 'human', name: 'A', hero: { people: tpl.people, base: tpl.base, name: tpl.name }, bonus: 'relic' }, { kind: 'ai', name: 'B' }] });
+    const h0 = Object.values(sh.heroes).find(h => h.owner === 0);
+    ok(h0.name === tpl.name && h0.people === tpl.people && h0.skills[tpl.base], 'the chosen starting hero leads you');
+    ok(Object.keys(h0.relics).length >= 1 && sh.players[0].bonus === 'relic', 'the Relic bonus is given');
+    ok(mk({ storm: false }).storm === null, 'a calm game has no storm');
+    const wet = mk({ water: 'lots' }), dry = mk({ water: 'little' });
+    const waterOf = st => { let n = 0; st.layers.slice(0, 3).forEach(L => { for (let i = 0; i < L.t.length; i++) if (SU.state.TCODES[L.t[i]] === 'water') n++; }); return n; };
+    ok(waterOf(wet) > waterOf(dry), 'more water when asked (' + waterOf(wet) + ' vs ' + waterOf(dry) + ')');
+    const g = SU.mapgen.newGame({ size: 'G', seed: 5, players: [{ kind: 'ai', name: 'A' }, { kind: 'ai', name: 'B' }] });
+    ok(g.layers[0].w === SU.mapgen.SIZES.G, 'a Gigantic map is ' + SU.mapgen.SIZES.G + ' wide');
+    /* the Admin Panel's numbers */
+    const atk0 = D.CREATURES.malsti.atk, cost0 = D.BUILDINGS.tavern.cost;
+    ok(D.applyBalance({ creatures: { malsti: { atk: 9, dmg: [3, 2] } }, buildings: { tavern: { cost: { gold: 1 } } } }) === 3, 'balance changes apply');
+    ok(D.CREATURES.malsti.atk === 9 && D.CREATURES.malsti.dmg[0] === 2 && D.BUILDINGS.tavern.cost.gold === 1, 'and change the creature and the building');
+    D.CREATURES.malsti.atk = atk0; D.CREATURES.malsti.dmg = [1, 2]; D.BUILDINGS.tavern.cost = cost0;
+    /* every person out: the game ends */
+    const fo = mk({}); fo.players[0].alive = false; Object.values(fo.objects).forEach(o => { if (o.owner === 0) o.owner = -1; }); Object.values(fo.armies).forEach(a => { if (a.owner === 0) a.dead = true; }); Object.values(fo.heroes).forEach(h => { if (h.owner === 0) h.dead = true; });
+    fo.players.push(Object.assign({}, fo.players[1], { idx: 2, name: 'C' })); Object.values(fo.objects).find(o => o.type === 'town' && o.owner === -1).owner = 2; SU.rules.checkPlayers(fo);
+    ok(fo.over && fo.over.fallen, 'when every person has fallen the game ends');
+  }
   console.log(fails ? fails + ' failure(s)' : 'all good');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -26,16 +26,18 @@ the game is built.
   up (hover to see when). Some are kept by families who charge a toll; pay three
   times, or clear the wild creatures near them, and you pass free. Some crossings are
   dangerous: you may lose troops, come out somewhere else, or meet rogue Duskareth.
-  You can take a family's Urverk by force, but if you're careless (without
-  Diplomacy 2) everyone who knows its trigger may die. A dead Urverk can be revived
+  You can take a family's Urverk by force, but there is a 50% chance everyone who
+  knows its trigger dies (5% less for each level of Diplomacy). A dead Urverk can be revived
   through a seer's quest.
 - **Heroes** are generals. They don't fight; they direct their army and sing. Hire
   them at a tavern, then train them at the town's training halls: each hall teaches
   4 skills and offers 2 at random, 2 lessons a day, and a hero can't leave town until
   they have 5 basic skills. Up to 5 heroes can be out on the map at once, and any
   number can stay inside a castle (choose one as the defending general). Leveling up
-  raises one stat at random, and you pick one of two skills to raise.
-- **Squadron captains** are Dearcàn who each lead a little group of stacks.
+  offers two stats and two skills: you pick one of each.
+- **Squadron captains** are Dearcàn who each lead a little group of stacks: two to
+  start, more with Command, Captaincy and some abilities. A very rare *peerless*
+  captain is far stronger but leads only one.
   A squadron can go out without a hero: it can take mines and pick up resources and
   gold, but it can't take towns or carry Relics. In battle, captains stand in front
   of their squadron and fight. If one falls, the squadron loses heart.
@@ -47,29 +49,60 @@ the game is built.
   Captain cores go to a Memory Vault to make a new captain with the fallen one's
   abilities.
 - **Food** feeds your armies and towns. Hungry armies lose morale, then desert.
-  Population grows with food, and some buildings need people to work them.
-- **Morale** is per stack: being fed, heavy recent losses, captains, Command and
-  Heartening all affect it, and it changes how soon a stack acts. **Luck** sometimes
+  Towns feed themselves except in a week of famine; only spare food makes the
+  population grow faster. Some buildings need people to work them.
+- **Mounts:** heroes ride Domestic Punks (a rare few win a Kuni Byrd). Herds of wild
+  punks can be corralled home to the farmers, and bought back at the town's paddock
+  as mounts: an army with a punk for every stack travels further. Nobody rides in
+  battle.
+- **Morale** is per stack, out of 100, and 60 is steady: being fed, heavy recent
+  losses, captains, Command and Heartening all move it. High morale rolls damage
+  nearer the top of the range, low nearer the bottom; very low morale slows a stack
+  and can freeze it. A captain's fall costs his squadron about 20.
+- **Shooters** do double damage with exactly one hex between them and the target,
+  and can't shoot when an enemy is next to them. **Luck** sometimes
   spares a stack from a blow. Bad luck can make some of a stack trip on their own
   blades.
 - **The Sunear'Zikhron** wanders the Tatu. Inside it, movement slows, production
   halves, the fog comes back and RubberMcFly gather (killing one is bad luck). It
-  must touch every part of a Tatu before passing through the Duat to the next. **Win
-  a battle in its eye** to unlock the **Nekh'Vorran**: one per castle.
-- **Weeks** are 6 days, and day 4 is **market day**: travelling sellers and fairs
-  (bet on punk races and Dya'Akara matches). A month is 42 days. Weeks and months
+  must touch every part of a Tatu before passing through the Duat to the next, and
+  its size and speed change from day to day (extremes are rare). It refills the
+  Breath of heroes inside it and washes buried memory cores out of the ground.
+  **End a turn in its eye** for a vision of where the **Rokarvac of the Nekh** lies,
+  under guard. It is never used up: while a hero carries it into one of your towns,
+  that town can build the Nekh Hollow, and the **Nekh'Vorran** can be recruited
+  weekly.
+- **Weeks** are 6 days, and day 4 is **market day**: travelling sellers, creatures
+  and captains from outside the factions, and fairs (bet on punk races and
+  Dya'Akara matches). A month is 42 days. Weeks and months
   bring events.
 - **Keys:** E end turn · N next army · H hero · K kingdom · Q map songs · Z sleep ·
   1–4 layers · arrows to look around. In battle: W wait · D defend · S sing.
 
 ## Modes
 
-- **Against the computer:** easy, normal, hard or brutal.
+- **A new game** opens a full screen: pick a random map or a made map (filter by
+  size, see all four layers), the difficulty (Wanderer 80% to Elster 200%: it sets
+  your starting stores and the computer's level), and for each player their colour,
+  who plays, faction, starting hero, starting bonus (gold, resources or a Relic) and
+  team. The random map generator has five sizes (Small to Gigantic), water, wild
+  creatures, where players start (anywhere, one Tatu each, or all on Velki), the
+  storm on or off, the goal, and a seed with a preview. **Play the starter map** on
+  the title is one click.
+- **Against the computer:** easy, normal, hard or brutal; each computer player also
+  draws a personality for the game (conqueror, raider, builder, explorer, turtle).
 - **Same device:** people take turns, and the map hides between turns.
 - **Online** (signed in): make a room, give friends the 5-letter code, and fill any
   seat with the computer. Play live, or take your turn whenever you like. There's an
-  optional turn timer. When someone attacks you on their turn, the computer fights
-  for you.
+  optional turn timer and a chat for the room. **The computer never fights for a
+  person:** when someone attacks you, the battle waits for you to come, and you
+  play your own side on your own device (both devices run the same battle; only
+  your choices travel). The attacker can call it off while waiting.
+- **Saving and loading** shows your saves beside a picture of the map, the day,
+  the difficulty, the goal and every player.
+- **Your records** (on the title): your solo games against the computer, with a
+  score and a title for each win, your bests by difficulty, and your fastest win.
+  There is no leaderboard.
 - **Map editor:** paint terrain, trees and roads on all four layers. Place towns,
   starting towns, mines, treasure, places to visit, linked Urverk and wild groups.
   You can also start from a random map. Save maps in the browser, play them, or
@@ -94,9 +127,12 @@ the game is built.
 | `js/view_battle.js` | the battle screen |
 | `js/ui.js`, `js/dialogs.js` | the side panel, top bar, and every window |
 | `js/save.js` | saves in the browser and on the account |
+| `js/saveload.js` | the save and load screens |
+| `js/pregame.js` | the new-game screen and the random map options |
+| `js/records.js` | your records from solo games |
 | `js/editor.js` | the map editor and map sharing |
-| `js/online.js` | online rooms |
-| `js/main.js` | the title, new-game setup, turn flow, battles and the menu |
+| `js/online.js` | online rooms, battles between people on two devices, the room chat |
+| `js/main.js` | the title, turn flow, battles and the menu |
 
 Everything up to `ai.js` runs without a page, and `tests/test_su_engine.js` plays
 computer-against-computer games under node (it's part of `npm test`).
@@ -106,3 +142,10 @@ computer-against-computer games under node (it's part of `npm test`).
 - `su_rooms:<account>`: the rooms a player is in
 - `su_room:<code>`: an online game
 - `su_map:<id>`: a shared map, waiting for or given approval
+- `su_fight:<code>`: a battle between two people in an online game (the game as it
+  was when the battle began, and each person's choices)
+- `su_chat:<code>:<time>`: one chat message in an online room
+- `su_rec:<account>`: your records from solo games
+- `su_balance`: creature numbers and building costs changed in the Admin Panel
+  (Admin Panel → Skaar Uverkhron → Creatures & Costs); the game loads them before
+  any game starts
