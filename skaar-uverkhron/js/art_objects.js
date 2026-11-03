@@ -33,6 +33,14 @@
 
   /* ---------- the Duskareth town ---------- */
 
+
+  /* a glimmer of the Vyrenalur's trail: motes of light hanging in the air */
+  A.glimmer = function (ctx, o, x, y, ts, t) {
+    const cx = x + ts / 2, cy = y + ts * 0.45;
+    ctx.save(); ctx.shadowColor = '#fff2b0'; ctx.shadowBlur = ts * 0.4;
+    for (let i = 0; i < 7; i++) { const a = t * 0.8 + i * 0.9, r = ts * (0.12 + (i % 3) * 0.08); ctx.fillStyle = rgba('#fff6c8', 0.5 + 0.4 * Math.sin(t * 3 + i)); ell(ctx, cx + Math.cos(a) * r, cy + Math.sin(a * 1.3) * r * 0.7 - (i % 2) * ts * 0.1, ts * 0.04, ts * 0.04); ctx.fill(); }
+    ctx.fillStyle = rgba('#fffbe0', 0.85); ell(ctx, cx, cy, ts * 0.07, ts * 0.07); ctx.fill(); ctx.restore();
+  };
   /* an Elsha'ryn town on the map: a great tree with grown houses, a hedge wall, lantern moss */
   A.groveTown = function (ctx, o, x, y, ts, t, color) {
     const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (o.built.includes('hall3') ? 2 : o.built.includes('hall2') ? 1 : 0);
@@ -302,6 +310,7 @@
       case 'core': return A.coreOnGround(ctx, Object.assign({ kind: st.cores[o.core] && st.cores[o.core].kind }, o), x, y, ts, t);
       case 'boat': return A.boat(ctx, o, x, y, ts, t, color);
       case 'vision': return A.visionSite(ctx, o, x, y, ts, t);
+      case 'glimmer': return A.glimmer(ctx, o, x, y, ts, t);
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

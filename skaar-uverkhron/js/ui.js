@@ -266,6 +266,7 @@
       case 'core': { const c = st.cores[o.core]; return 'A memory core' + (c ? ' (' + c.name + ')' : ''); }
       case 'boat': return 'A boat';
       case 'vision': return 'Where the Rokarvac of the Nekh lies';
+      case 'glimmer': return 'A glimmer of the Vyrenalur’s trail';
     }
     return '';
   }

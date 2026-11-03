@@ -114,7 +114,9 @@
     }
     function dismiss() {
       const G = groups[sel.g]; const s = G.slots[sel.si];
-      U.confirm('Dismiss', 'Send them away for good?', () => { if (sel.sub != null && sel.sub !== 'cap') s.stacks.splice(sel.sub, 1); else G.slots[sel.si] = null; sel = null; draw(); if (onChange) onChange(); });
+      U.confirm('Dismiss', 'Send them away for good?', () => { const gone = sel.sub != null && sel.sub !== 'cap' ? s.stacks[sel.sub] : s; if (sel.sub != null && sel.sub !== 'cap') s.stacks.splice(sel.sub, 1); else G.slots[sel.si] = null;
+        const broke = gone && gone.kind === 'cap' ? gone.stacks.filter(x => x.changed) : gone && gone.changed ? [gone] : []; if (broke.length) { RU.oathTaken(st(), U.viewer, broke); U.toast('The Oath is broken. The forest takes them.'); }
+        sel = null; draw(); if (onChange) onChange(); });
     }
     draw();
     return box;
@@ -173,6 +175,7 @@
     } else if (up) acts.appendChild(el('div', { cls: 'small muted', style: { marginRight: 'auto' }, text: 'Upgrades to ' + up.plural + ' in a town with its upgraded dwelling.' }));
     if (s && opts.slots && opts.canDismiss !== false) acts.appendChild(btn('Dismiss', () => U.confirm('Dismiss', 'Send these ' + C.plural + ' away for good?', () => {
       const i = opts.slots.indexOf(s); if (i >= 0) opts.slots[i] = null; else opts.slots.forEach(x => { if (x && x.kind === 'cap') { const k = x.stacks.indexOf(s); if (k >= 0) x.stacks.splice(k, 1); } });
+      if (s.changed) { RU.oathTaken(st(), U.viewer, [s]); U.toast('The Oath is broken. The forest takes them.'); }
       m.close(); if (opts.onChange) opts.onChange(); U.refresh(); townRedraw(); }), 'danger'));
     acts.appendChild(btn('Close', () => m.close(), 'primary'));
     return m;
@@ -652,6 +655,8 @@
       rep.cursed ? el('p', { cls: 'bad', text: 'A RubberMcFly was killed. Bad luck will follow this army for a while.' }) : null,
       rep.wentHome && rep.wentHome.length ? el('p', { cls: 'warn', text: 'Without their captain, ' + rep.wentHome.map(x => x.n + ' ' + D.CREATURES[x.cr].plural + ' went home to ' + x.town).join(', ') + '.' }) : null,
       rep.raised ? el('p', { cls: 'gold', text: rep.raised + ' of the enemy, raised by Rekindle, now march with you.' }) : null,
+      rep.sprengjuBack ? el('p', { cls: 'gold', text: rep.sprengjuBack + ' of the spent Sprengju came back.' }) : null,
+      rep.oathBroken ? el('p', { cls: 'bad', text: 'The Oath is broken: the forest has taken ' + rep.oathBroken + ' Changed creatures.' }) : null,
       rep.respect ? el('p', { cls: 'gold', text: rep.respect + ' saw you clear the land around their Urverk. Your armies may pass it free.' }) : null,
       rep.eyeWins && (st().setup.win || {}).kind === 'prophecy' ? el('p', { cls: 'gold', text: 'Battles won in the eye: ' + rep.eyeWins + ' of ' + ((st().setup.win || {}).n || 3) + '.' }) : null,
       rep.scattered ? el('p', { cls: 'bad', text: 'With its captain gone, the squadron cannot stay out in the field.' }) : null,

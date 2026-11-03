@@ -9,7 +9,7 @@ let fails = 0;
 const ok = (cond, msg) => { if (!cond) { fails++; console.error('FAIL: ' + msg); } };
 
 async function playGame(seed, size, nPlayers, days) {
-  const players = []; for (let i = 0; i < nPlayers; i++) players.push({ kind: 'ai', name: 'AI ' + i, ai: ['easy', 'normal', 'hard'][i % 3], team: 0, color: SU.data.PLAYER_COLORS[i].c });
+  const players = []; for (let i = 0; i < nPlayers; i++) players.push({ kind: 'ai', name: 'AI ' + i, faction: i % 2 ? 'elsharyn' : 'duskareth', ai: ['easy', 'normal', 'hard'][i % 3], team: 0, color: SU.data.PLAYER_COLORS[i].c });
   const st = SU.mapgen.newGame({ size, players, seed, spread: true, wild: 'normal', name: 'test' });
   ok(st.layers.length === 4, 'four layers');
   ok(Object.values(st.objects).filter(o => o.type === 'town').length >= nPlayers, 'a town each');
@@ -170,6 +170,35 @@ async function playGame(seed, size, nPlayers, days) {
     ok(BT.bodyAt(B6, v6.c, v6.r) === v6, 'the fallen lie where they fell');
     ok(BT.sing(st6, B6, 0, 'rekindle', v6).ok && v6.n > 0 && v6.n <= v6.startN, 'Rekindle raises some of them (' + v6.n + ' of ' + v6.startN + ')');
     const B7 = BT.create(st6, { owner: 0, army: a6, hero: null, slots: [{ kind: 'stack', cr: 'harkal', n: 3 }, null, null, null, null] }, { owner: -1, army: w6, hero: null, slots: w6.slots }, { layer: w6.layer, x: w6.x, y: w6.y });
+    /* the Elsha'ryn */
+    { const D2 = SU.data, RU2 = SU.rules, M2 = SU.make;
+      const se = SU.mapgen.newGame({ size: 'M', seed: 31, players: [{ kind: 'human', name: 'E', faction: 'elsharyn' }, { kind: 'ai', name: 'D' }] });
+      const Pe = se.players[0], te = S.townsOf(se, 0)[0], ae = Object.values(se.armies).find(x => x.owner === 0 && x.heroId), he = se.heroes[ae.heroId];
+      ok(te.faction === 'elsharyn' && te.built.includes('e1') && !RU2.canBuild(se, te, 'd3').ok, 'an Elsha’ryn town builds its own buildings');
+      ok(he.faction === 'elsharyn' && he.slots[0].cap.rank === 'jukeeper', 'an Elsha’ryn hero starts with a Ju-Keeper');
+      RU2.elshDay(se, Pe, 0, true); const gl = Object.values(se.objects).filter(o => o.type === 'glimmer' && o.owner === 0);
+      ok(gl.length === 3, 'three glimmers of the Vyrenalur’s trail each week');
+      gl.forEach(o => RU2.visit(se, ae, o)); ok(RU2.carries(he, 'vyrantler'), 'three glimmers lead to the Shed Antler');
+      /* a Ju-Keeper's volleys, half back */
+      const cap = M2.captain(se, { faction: 'elsharyn', rank: 'jukeeper' }), spr = { cr: 'sprengju', n: 40 };
+      const BJ = BT.create(se, { owner: 0, army: null, hero: null, slots: [M2.capSlot(cap, [spr]), null, null, null, null] }, { owner: 1, army: null, hero: null, slots: [{ kind: 'stack', cr: 'velnur', n: 30 }, null, null, null, null] }, { layer: ae.layer, x: ae.x, y: ae.y });
+      ok(!BJ.units.some(u => u.cr === 'sprengju'), 'a Ju-Keeper’s Sprengju ride in the pouch, not on the field');
+      BT.autoRun(se, BJ); const rj = BT.finish(se, BJ); ok(rj.sprengjuBack > 0 && spr.n === 40 - 2 * rj.sprengjuBack + rj.sprengjuBack, 'half of the spent Sprengju come back (' + rj.sprengjuBack + ')');
+      /* the Stryx never moves, and binds */
+      const BS = BT.create(se, { owner: 0, army: null, hero: null, slots: [{ kind: 'stack', cr: 'stryx', n: 10 }, null, null, null, null] }, { owner: 1, army: null, hero: null, slots: [{ kind: 'stack', cr: 'harkal', n: 6 }, null, null, null, null] }, { layer: ae.layer, x: ae.x, y: ae.y });
+      ok(BT.reach(BS, BS.units.find(u => u.cr === 'stryx')).size === 1, 'a Stryx never moves');
+      BT.autoRun(se, BS); ok(BS.log.some(l => /Vines bind/.test(l)), 'a Stryx binds what it strikes up close');
+      /* growing, the Oath */
+      RU2.giveRelic(se, he, 'bandring'); te.built.push('altar'); Pe.res = Object.fromEntries(D2.RES.map(r => [r, 1e5]));
+      ok(!RU2.growStart(se, te, he, 'vyrantler', 'timber').ok, 'the Shed Antler cannot be grown on');
+      ok(RU2.growStart(se, te, he, 'bandring', 'timber').ok && !RU2.growTake(se, te, he).ok, 'a Relic takes three days to grow');
+      se.day += 3; ok(RU2.growTake(se, te, he).ok && RU2.grownEls(he).includes('Eldi'), 'the grown Relic takes its element');
+      const sw = { kind: 'stack', cr: 'speareikar', n: 10 }; he.slots[2] = sw; ok(RU2.changeStack(se, Pe, sw).ok && sw.changed, 'a stack can be Changed at the Oath Tree');
+      const BO = BT.create(se, { owner: 0, army: ae, hero: he, slots: he.slots }, { owner: 1, army: null, hero: null, slots: [{ kind: 'stack', cr: 'lutut', n: 5 }, null, null, null, null] }, { layer: ae.layer, x: ae.x, y: ae.y });
+      BT.surrender(se, BO, 0, 0); const ro = BT.finish(se, BO); ok(ro.oathBroken === 10 && !he.slots.includes(sw), 'surrender breaks the Oath: the forest takes the Changed');
+      /* an Elsha'ryn computer player builds */
+      ok(D2.LINEUP.elsharyn.length === 9 && D2.LINEUP.elsharyn.every(c => D2.CREATURES[c]), 'nine Elsha’ryn creatures');
+    }
     BT.autoRun(st6, B7); const blows = B7.anim.filter(x => x.kind === 'dmg');
     ok(blows.length > 0 && blows.every(x => typeof x.nAfter === 'number'), 'every blow records how many are left, so the screen shows deaths when the blow lands');
   }

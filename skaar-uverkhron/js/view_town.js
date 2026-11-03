@@ -31,7 +31,7 @@
   };
   /* an Elsha'ryn town grows its hall as a great tree, and its walls as a living hedge */
   function spotOf(b) { const sp = SPOT[b]; if (!sp || !T.town || T.town.faction !== 'elsharyn') return sp; if (sp[2] === 'hall') return [sp[0], sp[1], 'greattree', sp[3]]; if (sp[2] === 'wall') return [sp[0], sp[1], 'hedgewall', sp[3]]; if (sp[2] === 'houses' || sp[2] === 'stonehouses') return [sp[0], sp[1], 'roothouses', sp[2] === 'houses' ? 1 : 2]; return sp; }
-  const TAB_FOR = { tavern: 'tavern', market: 'market', vault: 'vault', shipyard: 'ship', urverk: 'gate' };
+  const TAB_FOR = { tavern: 'tavern', market: 'market', vault: 'vault', shipyard: 'ship', urverk: 'gate', memtree: 'memtree', altar: 'altar', oathtree: 'oath', grove: 'heroes' };
 
   T.open = function (town, visitor) {
     T.town = town; T.tab = T.tab || 'build';
@@ -343,6 +343,9 @@
     /* tabs */
     const tabs = [['build', 'Build'], ['recruit', 'Recruit'], ['army', 'Garrison & heroes'], ['heroes', 'Training & songs'], ['vault', 'Memory Vault'], ['tavern', 'Tavern'], ['market', 'Market']];
     if (RU.has(town, 'urverk')) tabs.push(['gate', 'Duat Gate']);
+    if (RU.has(town, 'memtree')) tabs.push(['memtree', 'Memory Tree']);
+    if (RU.has(town, 'altar')) tabs.push(['altar', 'Growing Altar']);
+    if (RU.has(town, 'oathtree')) tabs.push(['oath', 'Oath Tree']);
     if (RU.has(town, 'shipyard')) tabs.push(['ship', 'Shipyard']);
     T.ui.innerHTML = '';
     T.ui.appendChild(el('div', { cls: 'town-buttons' }, tabs.map(([id, n]) => btn(n, () => { if (id === 'tavern') return DL.tavern(town); if (id === 'market') { if (!RU.has(town, 'market')) { U.toast('Build a Market Square first.'); return; } return DL.market(town); }
@@ -351,13 +354,13 @@
     const pg = T.pageEl; pg.innerHTML = '';
     pg.classList.toggle('hidden', !T.open_);
     if (!T.open_) return;
-    const TITLE = { build: 'Build', recruit: 'Recruit', army: 'Garrison & heroes', heroes: 'Training & songs', vault: 'Memory Vault', gate: 'Duat Gate', ship: 'Shipyard' };
+    const TITLE = { build: 'Build', recruit: 'Recruit', army: 'Garrison & heroes', heroes: 'Training & songs', vault: 'Memory Vault', gate: 'Duat Gate', ship: 'Shipyard', memtree: 'Memory Tree', altar: 'Growing Altar', oath: 'Oath Tree' };
     const title = T.tab === 'dwelling' ? (Object.values(D.BUILDINGS).find(b => b.dwell === T.pageArg) || {}).name || 'Dwelling' : TITLE[T.tab] || 'Build';
     pg.appendChild(el('div', { cls: 'tp-head' }, [el('h2', { text: title }), el('span', { cls: 'small muted', text: town.name }), el('span', { cls: 'spacer' }),
       el('span', { cls: 'row', style: { gap: '10px' } }, D.RES.map(r => el('span', { cls: 'res', 'data-tip': '<b>' + D.RES_INFO[r].name + '</b>' }, [U.resIcon(r, 16), SU.fmt(P.res[r])]))),
       btn('✕ Back to the town', () => { T.open_ = false; T.render(); }, 'primary', 'Esc')]));
     const body = el('div', { cls: 'tp-body' }); pg.appendChild(body);
-    ({ build: buildTab, recruit: recruitTab, army: armyTab, heroes: heroesTab, vault: vaultTab, gate: gateTab, ship: shipTab, dwelling: (b, t, s, p, v) => dwellingPage(b, t, s, p, v, T.pageArg) }[T.tab] || buildTab)(body, town, st, P, vis);
+    ({ build: buildTab, recruit: recruitTab, army: armyTab, heroes: heroesTab, vault: vaultTab, gate: gateTab, ship: shipTab, memtree: memtreePage, altar: altarPage, oath: oathPage, dwelling: (b, t, s, p, v) => dwellingPage(b, t, s, p, v, T.pageArg) }[T.tab] || buildTab)(body, town, st, P, vis);
   };
 
   /* a building, close up (as the halls of the old games show it): its picture, what it does, what it needs, what it costs */
@@ -528,8 +531,47 @@
       }
       const tier = Math.max(0, ...town.built.map(b => D.BUILDINGS[b].songTier || 0));
       if (tier) row.appendChild(el('div', { cls: 'row', style: { marginTop: '6px' } }, [btn('Learn the songs of this town', () => { const l = RU.learnTownSongs(st, town, h); U.toast(l.length ? h.name + ' learned ' + l.map(s => D.SONGS[s].name).join(', ') + '.' : S.skill(st, h, 'songcraft') ? 'Nothing new here for ' + h.name + '.' : h.name + ' has no Songcraft.'); T.render(); }, 'duat'), el('span', { cls: 'small muted', text: 'Songs up to tier ' + tier + ', for heroes with Songcraft.' })]));
+      if (RU.has(town, 'grove')) row.appendChild(el('div', { cls: 'row', style: { marginTop: '6px' } }, [el('span', { cls: 'small gold', text: 'The Protected Grove: ' }),
+        ...D.GROVE_SONGS.map(sid => h.songs.includes(sid) ? el('span', { cls: 'small muted', text: D.SONGS[sid].name + ' (known) ' }) : btn('Learn ' + D.SONGS[sid].name, () => { if (!S.skill(st, h, 'songcraft')) { U.toast(h.name + ' needs Songcraft to sing.'); return; } h.songs.push(sid); U.toast(h.name + ' learned ' + D.SONGS[sid].name + '. It works only near your Groves.'); T.render(); }, 'duat', D.SONGS[sid].desc))]));
       body.appendChild(row);
     });
+  }
+
+  /* ---------------- the Elsha'ryn's pages ---------------- */
+  function heroesHere(town, st, vis) { const hs = town.heroes.map(id => st.heroes[id]).filter(Boolean); if (vis && vis.heroId) hs.unshift(st.heroes[vis.heroId]); return hs; }
+  /* the Memory Tree: where every rival hero last fought */
+  function memtreePage(body, town, st, P) {
+    body.appendChild(el('p', { cls: 'muted', text: 'The Elsha’ryn track memory: those who were there in a memory can be found. Here is where every rival hero last fought.' }));
+    const rivals = Object.values(st.heroes).filter(h => h.owner >= 0 && h.owner !== town.owner && !h.dead && !S.allies(st, h.owner, town.owner));
+    if (!rivals.length) { body.appendChild(el('p', { text: 'No rival heroes walk the Tatu.' })); return; }
+    rivals.forEach(h => { const f = (st.lastFought || {})[h.id];
+      body.appendChild(el('div', { cls: 'row frame', style: { marginBottom: '6px' } }, [U.portrait(h.people, h.look, st.players[h.owner].color, 36), el('div', { style: { flex: 1 } }, [el('b', { text: h.name }), el('div', { cls: 'small muted', text: st.players[h.owner].name + ' · level ' + h.level })]),
+        el('span', { cls: 'small', text: f ? 'Fought on ' + D.LAYERS[f.layer].name + ', ' + (st.day - f.day === 0 ? 'today' : st.day - f.day === 1 ? 'yesterday' : (st.day - f.day) + ' days ago') : 'Has not fought yet.' }),
+        f ? btn('Look', () => { T.close(); P.explored[f.layer] && S.reveal(st, town.owner, f.layer, f.x, f.y, 2); V.setLayer(f.layer); V.centerOn(f.layer, f.x, f.y); U.refresh(); }) : null])); });
+  }
+  /* the Growing Altar: grow a plant or raw metal onto a Relic */
+  function altarPage(body, town, st, P, vis) {
+    body.appendChild(el('p', { cls: 'muted', text: 'Grow-forging: a plant or raw metal grown onto a Relic over three days becomes part of it. The Relic takes that element, and the army of the hero who carries it fights as if on home ground wherever that element rules.' }));
+    const hs = heroesHere(town, st, vis);
+    if (town.altar) { const a = town.altar, left = a.ready - st.day;
+      body.appendChild(el('div', { cls: 'frame', style: { marginBottom: '10px' } }, [el('div', { cls: 'row' }, [U.relicIcon(a.rid, 40), el('b', { text: D.RELICS[a.rid].name }), el('span', { cls: 'gold', text: ' growing ' + D.ELEMENTS[a.el].name }), el('span', { cls: 'small muted', text: left > 0 ? ' — ready in ' + SU.plural(left, 'day') : ' — ready' })]),
+        left <= 0 ? el('div', { cls: 'row', style: { marginTop: '6px' } }, hs.length ? hs.map(h => btn('Give it to ' + h.name, () => { const r = RU.growTake(st, town, h); if (!r.ok) U.toast(r.why); else U.toast(D.RELICS[r.rid].name + ' is grown: ' + D.ELEMENTS[r.el].name + '.'); T.render(); }, 'primary')) : [el('span', { cls: 'small muted', text: 'Bring a hero here to take it.' })]) : null]));
+      return; }
+    if (!hs.length) { body.appendChild(el('p', { text: 'Bring a hero with a Relic into the town.' })); return; }
+    hs.forEach(h => { const rel = Object.values(h.relics).filter(r => r && !D.RELICS[r].special);
+      body.appendChild(el('div', { cls: 'frame', style: { marginBottom: '8px' } }, [el('b', { text: h.name }),
+        rel.length ? el('div', { cls: 'col', style: { marginTop: '6px' } }, rel.map(rid => el('div', { cls: 'row' }, [U.relicIcon(rid, 32), el('span', { style: { width: '200px' }, text: D.RELICS[rid].name + ((h.grownEl || {})[rid] ? ' (grown ' + D.ELEMENTS[h.grownEl[rid]].name + ')' : '') }),
+          ...Object.entries(RU.GROW).map(([res, elx]) => btn('Grow ' + D.ELEMENTS[elx].name, () => { const r = RU.growStart(st, town, h, rid, res); if (!r.ok) U.toast(r.why); else U.toast('The altar begins to grow ' + D.RELICS[rid].name + '.'); T.render(); U.refresh(); }, '', 'With ' + D.RES_INFO[res].name + ': 500 gold and 3 ' + D.RES_INFO[res].name + ' · ' + D.ELEMENTS[elx].desc))]))) : el('p', { cls: 'small muted', text: 'Carries no Relic.' })])); });
+  }
+  /* the Oath Tree: change a stack */
+  function oathPage(body, town, st, P, vis) {
+    body.appendChild(el('p', { cls: 'muted', text: 'Changed stacks are stronger (a quarter more health, +2 attack and defense) and bound by oath. If their hero surrenders, or they are dismissed, the forest takes them: they become a wild Stryx thicket.' }));
+    const groups = [['Garrison', town.garrison]]; const vh = vis && S.heroOf(st, vis); if (vh) groups.push([vh.name + '’s army', vh.slots]);
+    groups.forEach(([label, slots]) => { const st_ = S.stacksIn(slots).filter(s => D.CREATURES[s.cr].faction === 'elsharyn' && !D.CREATURES[s.cr].legendary);
+      body.appendChild(el('h3', { text: label }));
+      if (!st_.length) { body.appendChild(el('p', { cls: 'small muted', text: 'No Elsha’ryn stacks here.' })); return; }
+      st_.forEach(s => body.appendChild(el('div', { cls: 'row frame', style: { marginBottom: '4px' } }, [U.creatureIcon(s.cr, 36, { color: P.color }), el('span', { style: { flex: 1 }, text: s.n + ' ' + D.CREATURES[s.cr].plural + (s.changed ? ' — Changed' : '') }),
+        s.changed ? el('span', { cls: 'gold small', text: 'Sworn' }) : el('span', { cls: 'small' }, U.costView(RU.oathCost(s), P)), s.changed ? null : btn('Change them', () => U.confirm('The Oath', 'Once Changed they are bound by oath. If their hero surrenders, or they are dismissed, the forest takes them.', () => { const r = RU.changeStack(st, P, s); if (!r.ok) U.toast(r.why); T.render(); U.refresh(); }), 'primary')]))); });
   }
 
   function vaultTab(body, town, st, P, vis) {

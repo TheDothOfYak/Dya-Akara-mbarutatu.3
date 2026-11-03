@@ -112,7 +112,9 @@
       const capBonus = o.cap ? { atk: o.cap.abil === 'drillmaster' ? 1 : 0, def: o.cap.abil === 'shieldbearer' ? 1 : 0 } : { atk: 0, def: 0 };
       const grief = o.parts ? Math.max(...o.parts.map(p => p.ref.grief || 0)) : 0;
       const morale = RU.stackMorale(st, { grief }, o.cap, o.hero, { hungry: sd.hungry, fed: !sd.hungry && sd.owner >= 0, sanctum: sd.sanctum });
-      Object.assign(u, { cr: o.cr, name: c.plural, n, hp, hpTop: hp, startN: n, atk: c.atk + capBonus.atk, def: c.def + capBonus.def, dmg: c.dmg, spd: c.spd + (o.cap && o.cap.abil === 'vanguard' ? 1 : 0),
+      /* Changed by the Oath: stronger, and bound to it */
+      const changed = !!(o.parts && o.parts.length && o.parts.every(p => p.ref.changed)); if (changed) hp = Math.round(hp * 1.25);
+      Object.assign(u, { changed, cr: o.cr, name: c.plural, n, hp, hpTop: hp, startN: n, atk: c.atk + capBonus.atk + (changed ? 2 : 0), def: c.def + capBonus.def + (changed ? 2 : 0), dmg: c.dmg, spd: c.spd + (o.cap && o.cap.abil === 'vanguard' ? 1 : 0),
         size: c.size || 1, shape: B_.shapeOf(c), ranged: !!c.ranged, shots: c.shots || 0, fly: !!(c.fly || (c.abil || []).includes('blink') || (c.abil || []).includes('burrow')), abil: c.abil || [], parts: o.parts, morale, temp: !!o.temp });
     }
     u.capId = o.cap ? o.cap.id : null;
@@ -415,8 +417,9 @@
     const R = SU.rng(st);
     const sa = B.sides[a.side], sdf = B.sides[t.side];
     const ha = sa.heroId && st.heroes[sa.heroId], ht = sdf.heroId && st.heroes[sdf.heroId];
-    let A = a.atk + (ha ? S.heroStat(st, ha, 'Strength') : 0) + (a.cr && D.CREATURES[a.cr].el === B.el ? 1 : 0) + (a.fx.comfort ? 2 : 0);
-    let Df = t.def + (ht ? S.heroStat(st, ht, 'Defense') : 0) + (t.cr && D.CREATURES[t.cr].el === B.el ? 1 : 0) + (t.fx.comfort ? 2 : 0);
+    const homeA = (a.cr && D.CREATURES[a.cr].el === B.el) || (ha && RU.grownEls(ha).includes(B.el)), homeT = (t.cr && D.CREATURES[t.cr].el === B.el) || (ht && RU.grownEls(ht).includes(B.el));
+    let A = a.atk + (ha ? S.heroStat(st, ha, 'Strength') : 0) + (homeA ? 1 : 0) + (a.fx.comfort ? 2 : 0);
+    let Df = t.def + (ht ? S.heroStat(st, ht, 'Defense') : 0) + (homeT ? 1 : 0) + (t.fx.comfort ? 2 : 0);
     if (t.defending) Df = Math.round(Df * 1.3);
     if (B.siege && t.side === 1 && t.c > B.siege.wc && ranged && a.side === 0) Df += 3;
     const f = A >= Df ? Math.min(3, 1 + 0.05 * (A - Df)) : Math.max(0.3, 1 - 0.025 * (Df - A));
@@ -701,6 +704,8 @@
       });
     });
     B.units.forEach(u => { if (!u.ammo) return; u.ammo.forEach(a => { if (!a.used) return; const back = Math.floor(a.used * 0.5); a.ref.n = Math.max(0, a.ref.n - a.used + back); rep.sprengjuBack = (rep.sprengjuBack || 0) + back; if (a.used - back > 0) rep.lost[u.side].push({ cr: a.ref.cr, n: a.used - back }); }); });
+    /* the Elsha'ryn remember where every hero fought */
+    st.lastFought = st.lastFought || {}; B.sides.forEach(sd => { if (sd.heroId) st.lastFought[sd.heroId] = { layer: B.layer, x: B.x, y: B.y, day: st.day }; });
     /* XP for the winning hero: for creatures and squadrons beaten, not for heroes */
     const loserHadHero = !!B.sides[lose].heroId;
     let xp = 0; rep.lost[lose].forEach(l => xp += l.n * D.CREATURES[l.cr].hp);
@@ -734,8 +739,10 @@
         if (t) { t.garrison = [null, null, null, null, null]; if (lose === 1 && B.sides[win].owner >= 0 && sideArmy(win)) { RU.captureTown(st, t, B.sides[win].owner); const wa = sideArmy(win); S.moveArmyIndex(st, wa, t.layer, t.x, t.y); rep.captured = t.name; } }
       }
     } else {
-      /* surrender: the hero and their army go home */
-      const la = sideArmy(lose); if (la) { const t = S.townsOf(st, la.owner)[0]; if (t && la.heroId) { RU.stationHero(st, la, t); } else if (la) { RU.removeArmy(st, la); } }
+      /* surrender: the hero and their army go home, but the forest takes any who swore the Oath */
+      const la = sideArmy(lose);
+      if (la) { const sl = S.slotsOf(st, la), broke = []; sl.forEach((s, i) => { if (s && s.kind === 'stack' && s.changed) { broke.push(s); sl[i] = null; } else if (s && s.kind === 'cap') s.stacks = s.stacks.filter(x => { if (x.changed) { broke.push(x); return false; } return true; }); });
+        if (broke.length) { RU.oathTaken(st, la.owner, broke, B.layer, B.x, B.y); rep.oathBroken = broke.reduce((k, s) => k + s.n, 0); } } if (la) { const t = S.townsOf(st, la.owner)[0]; if (t && la.heroId) { RU.stationHero(st, la, t); } else if (la) { RU.removeArmy(st, la); } }
     }
     /* enemies raised by Rekindle march with the side that raised them, if it won and has room */
     B.units.forEach(u => { if (u.turned && u.n > 0 && u.side === win) { const sl = B.sides[win].slots; if (sl && RU.addToSlots(st, sl, u.cr, u.n, sideHero(win))) rep.raised = (rep.raised || 0) + u.n; } });

@@ -253,7 +253,7 @@
       if (d <= r) L.ob[i] = 0;
       if (dusk && d <= r + 1.5) L.t[i] = T[dusk];
       /* the Elsha'ryn live in deep woods: trees close around the town */
-      if (dusk === 'grass' && d > r + 0.6 && d <= r + 2.6 && !L.road[i] && ((x * 7 + y * 13) % 3 === 0)) L.ob[i] = OB.forest;
+      if (dusk === 'grass' && d > r + 0.6 && d <= r + 2.6 && !L.road[i] && ((x * 7 + y * 13) % 3 === 0)) L.ob[i] = OB.tree;
     }
   }
 
