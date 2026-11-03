@@ -384,8 +384,8 @@
     if (!R_.addToSlots(st, tmp, cr, n, hero)) return { ok: false, why: 'No room: free a slot first.' };
     R_.pay(P, R_.recruitCost(cr, n));
     t.avail[base] -= n; if (D.CREATURES[cr].pop) t.pop -= n;
-    if (cr === 'nekh') t.nekhCount = 1;
     slots.splice(0, slots.length, ...tmp);
+    if (cr === 'nekh') { t.nekhCount = 1; S.stacksIn(slots).forEach(x => { if (x.cr === 'nekh' && !x.home) x.home = t.id; }); }
     return { ok: true, n };
   };
   R_.upgradeStack = function (st, t, stack) {
@@ -790,7 +790,7 @@
       P.res.food -= eat; P.lastEat = eat;
       if (P.res.food < 0) {
         P.res.food = 0; P.hungry = (P.hungry || 0) + 1;
-        if (P.hungry >= 3) { /* desertion */ Object.values(st.armies).forEach(a => { if (a.owner === pi && !a.dead) S.stacksIn(S.slotsOf(st, a)).forEach(s => { s.n -= Math.ceil(s.n * 0.05); }); }); S.log(st, 'Hunger: some of ' + P.name + '’s troops have deserted.', pi); }
+        if (P.hungry >= 3) { /* desertion (the great beasts stay) */ Object.values(st.armies).forEach(a => { if (a.owner === pi && !a.dead) { S.stacksIn(S.slotsOf(st, a)).forEach(s => { if (!D.CREATURES[s.cr].legendary) s.n -= Math.ceil(s.n * 0.05); }); if (SU.battle) SU.battle._cleanSlots(S.slotsOf(st, a)); } }); S.log(st, 'Hunger: some of ' + P.name + '’s troops have deserted.', pi); }
       } else P.hungry = 0;
       /* breath, and food refills it */
       heroes.forEach(h => { const mx = M.breathMax(st, h); const inTown = (S.heroLocation(st, h).town); let gain = inTown ? mx : Math.ceil(mx * 0.12) + (P.hungry ? 0 : 1); if (st.weekEvent === 'song') gain *= 2; h.breath = Math.min(mx, h.breath + gain); });

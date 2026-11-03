@@ -23,7 +23,7 @@
     t_drill: [1010, 740, 'yard'], t_road: [1460, 720, 'lodge'], t_count: [350, 620, 'counting'], t_capt: [1110, 570, 'lodge2'], t_duat: [700, 430, 'duattower'], t_pens: [1540, 610, 'pens'],
     vault: [905, 470, 'vault'], shipyard: [70, 790, 'dock'], urverk: [1250, 470, 'ring'], stygwell: [530, 610, 'well'], sanctum: [990, 410, 'sanctum'],
     d1: [300, 740, 'burrow'], d1u: [300, 740, 'burrow', 2], d2: [580, 790, 'barracks'], d2u: [580, 790, 'barracks', 2], d3: [1310, 420, 'spire'], d3u: [1310, 420, 'spire', 2],
-    d4: [1050, 655, 'pool'], d4u: [1050, 655, 'pool', 2], d5: [420, 470, 'cloister'], d6: [1530, 430, 'roost'], d7: [210, 440, 'chapel'], d8: [1420, 300, 'crag'], d9: [800, 360, 'hole'],
+    d4: [1050, 655, 'pool'], d4u: [1050, 655, 'pool', 2], d5: [420, 470, 'cloister'], d6: [1530, 430, 'roost'], d7: [210, 440, 'chapel'], d8: [1430, 400, 'crag'], d9: [800, 360, 'hole'],
   };
   const TAB_FOR = { tavern: 'tavern', market: 'market', vault: 'vault', shipyard: 'ship', urverk: 'gate' };
 

@@ -554,6 +554,8 @@
       u.parts.forEach((p, k) => {
         const share = k === u.parts.length - 1 ? left : Math.round(left * p.ref.n / Math.max(1, tot));
         const before = p.ref.n; p.ref.n = Math.max(0, share); left -= p.ref.n;
+        /* a fallen Nekh'Vorran frees its castle to call another */
+        if (p.ref.cr === 'nekh' && p.ref.n === 0 && p.ref.home && st.objects[p.ref.home]) st.objects[p.ref.home].nekhCount = 0;
         const frac = before ? 1 - p.ref.n / before : 0;
         if (frac > 0.5) p.ref.grief = 2; else if (frac > 0.25) p.ref.grief = Math.max(p.ref.grief || 0, 1);
       });
