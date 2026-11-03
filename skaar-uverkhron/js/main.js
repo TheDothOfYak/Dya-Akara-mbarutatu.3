@@ -31,6 +31,7 @@
         btn('Load a game', () => G.loadMenu(), 'big'),
         btn('Online games', () => SU.online.menu(), 'big'),
         btn('Map editor', () => SU.editor.open(), 'big'),
+        btn('Your records', () => SU.records.show(), 'big', 'Your solo games against the computer'),
         btn('How to play', () => G.howTo(), 'big'),
         el('a', { href: '../index.html', cls: 'btn', style: { textDecoration: 'none', marginTop: '8px' } }, '← Back to Flake Games'),
       ]),
@@ -229,7 +230,12 @@
     const won = st.over.winners.some(i => st.players[i].kind === 'human' && G.localHuman(i));
     const names = st.over.winners.map(i => st.players[i].name).join(' and ');
     const how = { prophecy: ' heard the true prophecy in the eye of the storm', gold: ' filled the treasury', town: ' held the seat for a week', conquer: (st.over.winners.length > 1 ? ' hold' : ' holds') + ' the Mbaru Tatu' }[st.over.how || 'conquer'];
-    U.modal([el('h2', { text: won ? 'Victory' : 'The game is over' }), el('p', { text: names + how + ' after ' + SU.plural(st.day, 'day') + '.' }),
+    const solo = SU.records && SU.records.isSolo(st);
+    const score = solo ? SU.records.score(st, won) : 0;
+    const recLine = el('p', { cls: 'small muted', text: solo ? 'Written in your records.' : '' });
+    if (solo) SU.records.add(st).then(g => { if (!g) recLine.textContent = ''; });
+    U.modal([el('h2', { text: won ? 'Victory' : st.over.fallen ? 'Defeat' : 'The game is over' }), el('p', { text: (st.over.fallen && !won ? 'You have fallen. ' : '') + (names ? names + how : 'Nobody holds the Mbaru Tatu') + ' after ' + SU.plural(st.day, 'day') + '.' }),
+      solo && won ? el('p', {}, ['Your score: ', el('b', { cls: 'gold', text: String(score) }), ' — the title of ', el('b', { cls: 'gold', text: SU.records.title(score) }), '.']) : null, recLine,
       el('div', { cls: 'acts' }, [btn('Look at the map', function () { this.closest('.overlay').remove(); }), btn('To the title', function () { this.closest('.overlay').remove(); G.title(); }, 'primary')])], { dismiss: false });
   };
 

@@ -321,6 +321,7 @@
       rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('fbw:' + accId + ':*')),
       rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('su:' + accId + ':*')),
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_rooms:' + accId)),
+      rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_rec:' + accId)),
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('ban:' + accId)),
       rest('DELETE', 'dya_bans?account_id=eq.' + id),
     ].map(p => p.catch(() => null)));

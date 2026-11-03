@@ -766,6 +766,8 @@
     const teams = new Set(alive.map(P => P.team ? 't' + P.team : 'p' + P.idx));
     const win = (pi, how) => { if (st.over) return; const P = st.players[pi]; const mates = alive.filter(Q => Q.idx === pi || (P.team && Q.team === P.team)); st.over = { winners: mates.map(Q => Q.idx), day: st.day, how }; SU.emit('gameover', st.over); };
     if (teams.size <= 1 && !st.over) { st.over = { winners: alive.map(P => P.idx), day: st.day, how: 'conquer' }; SU.emit('gameover', st.over); return; }
+    /* every person is out: the game ends, even if computer players are still fighting each other */
+    if (!st.over && st.players.some(P => P.kind === 'human') && !alive.some(P => P.kind === 'human')) { st.over = { winners: alive.map(P => P.idx), day: st.day, how: 'conquer', fallen: true }; SU.emit('gameover', st.over); return; }
     const W = st.setup.win || { kind: 'conquer' };
     if (W.kind === 'prophecy') { const P = alive.find(P => (P.stormWins || 0) >= (W.n || 3)); if (P) win(P.idx, 'prophecy'); }
     if (W.kind === 'gold') { const P = alive.find(P => P.res.gold >= (W.gold || 200000)); if (P) win(P.idx, 'gold'); }
