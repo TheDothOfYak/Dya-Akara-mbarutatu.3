@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0a10">
+  <title>Skaar Uverkhron — Flake Games</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23120c24'/><circle cx='50' cy='50' r='30' fill='none' stroke='%238e7cff' stroke-width='8'/><circle cx='50' cy='50' r='9' fill='%23ffe3a3'/></svg>">
+  <link rel="stylesheet" href="css/su.css">
+  <script>window.DYA_APP = 'su';</script>
+</head>
+<body>
+  <!-- the adventure map -->
+  <div id="game" class="hidden">
+    <div id="topbar"></div>
+    <div id="mapwrap"><canvas id="map"></canvas></div>
+    <div id="status">Welcome to the Mbaru Tatu.</div>
+    <div id="side">
+      <canvas id="mini" width="234" height="180"></canvas>
+      <div id="layers"></div>
+      <div class="lhead"><span>Heroes</span><span id="herocount"></span></div>
+      <div class="list" id="herolist"></div>
+      <div class="lhead"><span>Squadrons</span></div>
+      <div class="list" id="squadlist"></div>
+      <div class="lhead"><span>Towns</span></div>
+      <div class="list" id="townlist"></div>
+      <div id="sidebtns">
+        <button class="btn" id="b-next" title="Next army (N)">Next</button>
+        <button class="btn" id="b-sleep" title="Leave this army until you wake it (Z)">Sleep</button>
+        <button class="btn" id="b-songs" title="Map songs (S)">Songs</button>
+        <button class="btn" id="b-hero" title="Hero (H)">Hero</button>
+        <button class="btn" id="b-kingdom" title="Your kingdom (K)">Kingdom</button>
+        <button class="btn" id="b-menu" title="Menu (Esc)">Menu</button>
+        <button class="btn primary big" id="endturn" title="End your turn (E)">End Turn</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="town" class="screen hidden"></div>
+  <div id="battle" class="screen hidden"></div>
+  <div id="title" class="screen"></div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/flake/account.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/make.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/mapgen.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/art_objects.js"></script>
+  <script src="js/view_map.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/dialogs.js"></script>
+  <script src="js/view_town.js"></script>
+  <script src="js/view_battle.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
