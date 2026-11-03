@@ -42,6 +42,13 @@
       a: '#9be06a', sky: { cx: 0.92, cy: 0.9, maxR: 20, labels: false, sun: [0.62, 0.0] },
       skyNarrow: { cx: 0.88, cy: 0.2, maxR: 12, labels: false, sun: [0.55, 0.0] },
     },
+    su: {
+      kicker: 'Heroes, towns and the Duat',
+      vibe: 'Lead the Duskareth across Velki, Xikia, Leotik and their moons. Build your castles, train your heroes, send squadrons out under their captains, cross the worlds through the Urverk, and chase the eye of the Sunear’Zikhron until the Nekh’Vorran answers you.',
+      feats: ['Turn-based strategy', 'Three worlds and their moons', 'Heroes and captains', 'Memory cores', 'Map editor', 'Online play'],
+      a: '#b9a8ff', sky: { cx: 0.82, cy: 0.72, maxR: 64, labels: true, sun: [0.96, 0.06] },
+      skyNarrow: { cx: 0.5, cy: 0.12, maxR: 34, labels: true, sun: [0.92, 0.04] },
+    },
   };
   const MINI_ICON = { ld: '🗝' };
 

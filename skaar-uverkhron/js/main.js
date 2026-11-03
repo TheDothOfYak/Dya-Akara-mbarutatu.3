@@ -171,7 +171,7 @@
   G.endTurn = function () {
     const st = G.st; if (!U.myTurn()) return;
     const idle = Object.values(st.armies).filter(a => !a.dead && a.owner === st.current && !a.sleep && a.mp >= a.mpMax && a.heroId);
-    const go = () => { U.selected = null; V.path = null; RU.endTurn(st); if (st.online) SU.online.pushTurn(st); G.beginTurn(); };
+    const go = async () => { U.selected = null; V.path = null; RU.endTurn(st); if (st.online) { U.busy = true; await SU.online.pushTurn(st); U.busy = false; } G.beginTurn(); };
     if (idle.length && !G.noIdleWarning) U.confirm('End your turn?', SU.plural(idle.length, 'hero has', 'heroes have') + ' not moved today.', go, null, ['End turn', 'Not yet']);
     else go();
   };
@@ -184,7 +184,7 @@
     U.busy = false;
     if (st.over) return G.gameOver();
     RU.endTurn(st);
-    if (st.online) SU.online.pushTurn(st);
+    if (st.online) await SU.online.pushTurn(st);
     setTimeout(() => G.beginTurn(), 30);
   };
 

@@ -1,5 +1,5 @@
 # FLAKE GAMES
-### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Little Dungeon
+### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Skaar Uverkhron · Little Dungeon
 
 Every game in this repo, behind one home page and one account. Zero dependencies, no build step — pure HTML/CSS/JavaScript.
 
@@ -12,6 +12,7 @@ Every game in this repo, behind one home page and one account. Zero dependencies
 | Dya'Akara (the token game) | `dya-akara.html` |
 | Torcain's Run (3D RPG) | `rpg/index.html` |
 | The 4 Brothers Worlds (2D platformer) | `four-brothers-world/index.html` |
+| Skaar Uverkhron (turn-based strategy) | `skaar-uverkhron/index.html` |
 | Little Dungeon (mini game, once Legends of Pia'don) | `mini-games/little-dungeon/index.html` |
 
 **One account for everything.** You sign in (or create an account) once, on the home page; every main game picks that up, and every game has a way back to the home page. **Mini games need no account:** a guest plays straight away (Little Dungeon keeps a guest's run in the browser and pays no gold); a guest who signs in later carries their run in progress onto the account. The account *is* the old Dya'Akara account (the same `dya_accounts` row, email and password), so nobody had to make a new one. Opening a main game while signed out sends you to the home page to sign in, then straight back. Code: `js/flake/account.js`.
@@ -72,6 +73,10 @@ Create an account on the Flake Games home page and open Dya'Akara; after you cho
 ## 4 Brothers World (2D pixel platformer)
 
 A separate game by four brothers lives in **`four-brothers-world/`** — open `four-brothers-world/index.html` (or pick **The 4 Brothers Worlds** on the Flake Games home page). See `four-brothers-world/README.md` for how to play.
+
+## Skaar Uverkhron (turn-based strategy)
+
+A turn-based strategy game across the Mbaru Tatu lives in **`skaar-uverkhron/`** — open `skaar-uverkhron/index.html` (or pick **Skaar Uverkhron** on the Flake Games home page). You lead the Duskareth across four map layers (Velki, Xikia, Leotik and the Kalo), with towns of nine creatures, heroes who train at halls and carry memory cores, squadron captains, Urverk portals, the Sunear’Zikhron storm, hex battles with songs and sieges, a map editor, and online rooms. See `skaar-uverkhron/README.md` for how to play and how it is built, and `skaar-uverkhron/DESIGN.md` for every design decision. Saves go to the account as `dya_config` rows `su:<account>:<slot>`.
 
 ## Torcain's Run (3D single-player RPG)
 

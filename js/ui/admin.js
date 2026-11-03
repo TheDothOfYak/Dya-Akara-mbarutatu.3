@@ -394,9 +394,10 @@
     { id: 'rpg', label: '⛵ Torcain’s Run', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
     { id: '4bw', label: '🌍 The 4 Brothers Worlds', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans', 'Guide'] },
     { id: 'ld', label: '🃏 Little Dungeon', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
+    { id: 'su', label: '🏰 Skaar Uverkhron', nav: ['Game Overview', 'Game Players', 'Shared Maps', 'Online Rooms', 'Announcements', 'Bans'] },
   ];
   /* which live-broadcast target each section's Announcements page starts on */
-  const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld' };
+  const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld', su: 'su' };
   const sectionOf = id => SECTIONS.find(x => x.id === id) || SECTIONS[0];
   function goto(sec, v) { section = sec; view = v || sectionOf(sec).nav[0]; panel(); }
   function studio() { return window.FLAKE ? FLAKE.hubConfig().studio : 'Flake Games'; }
@@ -576,6 +577,22 @@
     },
   };
 
+  SAVES.su = {
+    name: 'Skaar Uverkhron',
+    async list() {
+      const rows = await F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('su:*') + '&select=key,updated_at,name:value->>name,day:value->>day&order=updated_at.desc');
+      const by = {};
+      (rows || []).forEach(r => { const id = r.key.split(':')[1]; const b = by[id] = by[id] || { id, at: 0, games: [] }; b.at = Math.max(b.at, Date.parse(r.updated_at)); b.games.push((r.name || 'a game') + ' (day ' + r.day + ')'); });
+      return Object.values(by).map(b => ({ id: b.id, at: b.at, about: b.games.slice(0, 3).join(' · ') + (b.games.length > 3 ? ' …' : '') }));
+    },
+    async get(id) {
+      const rows = await F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('su:' + id + ':*') + '&select=key,value');
+      const out = {}; (rows || []).forEach(r => { out[r.key.split(':').slice(2).join(':')] = r.value; }); return out;
+    },
+    async put(id, parts) { await Promise.all(Object.keys(parts).map(k => upsert('su:' + id + ':' + k, parts[k]))); },
+    async reset(id) { await F.rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('su:' + id + ':*')); },
+  };
+
   /* look at and edit one player's save, as JSON */
   async function editSave(game, id) {
     const S = SAVES[game];
@@ -625,6 +642,7 @@
   }
 
   const BLURB = {
+    su: 'The turn-based strategy game, under skaar-uverkhron/. Each player’s saved games are dya_config rows su:<account>:<slot>; shared maps (su_map:<id>) wait for approval under Shared Maps; online games are su_room:<code>.',
     rpg: 'The 3D adventure, under rpg/. Story progress saves to each player’s account at every Nur Lantern and story beat. Its roadmap is rpg/ROADMAP.md.',
     '4bw': 'The four brothers’ pixel platformer, under four-brothers-world/. Each player’s hero, bag and world save to their account, a row per save key. Its guides are under Guide.',
     ld: 'The mini game (once Legends of Pia’don, inside Dya’Akara), under mini-games/little-dungeon/. No account needed; signed-in players keep a run in progress on their account and a won solo run pays gold.',
@@ -914,6 +932,47 @@
       const holder = U.el('div', { cls: 'panel' }, [loading()]);
       body.appendChild(holder);
       SAVES[game].list().then(rows => savesTable(holder, game, rows)).catch(e => errLine(holder, 'saves', e));
+    },
+
+    /* ================= SKAAR UVERKHRON: shared maps and online rooms ================= */
+    'Shared Maps'(body) {
+      if (onlineNote(body)) return;
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Maps players made in the map editor and sent to be shared. Approve one and everyone can choose it when starting a game; reject it and it stays hidden.' }));
+      const holder = U.el('div', { cls: 'panel' }, [loading()]);
+      body.appendChild(holder);
+      F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('su_map:*') + '&select=key,updated_at,name:value->>name,desc:value->>desc,author:value->>author,players:value->>players,size:value->>size,status:value->>status&order=updated_at.desc').then(rows => {
+        holder.innerHTML = '';
+        if (!rows || !rows.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'No maps have been shared yet.' })); return; }
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['Map', 'By', 'Players', 'Size', 'Status', ''].map(h => U.el('th', { text: h }))));
+        rows.forEach(r => {
+          const setStatus = async st => { const full = await F.rest('GET', 'dya_config?select=value&key=eq.' + encodeURIComponent(r.key)); const v = full && full[0] && full[0].value; if (!v) return; v.status = st; await upsert(r.key, v); rerender(); };
+          const td = U.el('td', { style: 'white-space:normal' });
+          if (r.status !== 'approved') td.appendChild(U.el('button', { cls: 'btn small primary', text: 'Approve', onclick: () => setStatus('approved').catch(e => alert(e.message)) }));
+          if (r.status !== 'rejected') td.appendChild(U.el('button', { cls: 'btn small', text: r.status === 'approved' ? 'Withdraw' : 'Reject', onclick: () => setStatus('rejected').catch(e => alert(e.message)) }));
+          td.appendChild(U.el('button', { cls: 'btn small danger', text: 'Delete', onclick: () => { if (confirm('Delete this map for good?')) F.rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent(r.key)).then(rerender).catch(e => alert(e.message)); } }));
+          tbl.appendChild(U.el('tr', {}, [U.el('td', { style: 'white-space:normal', html: '<b>' + U.esc(r.name || '?') + '</b><br><span class="muted small">' + U.esc(r.desc || '') + '</span>' }), U.el('td', { text: r.author || '—' }), U.el('td', { text: r.players || '—' }), U.el('td', { text: r.size || '—' }), U.el('td', { text: r.status || 'pending' }), td]));
+        });
+        holder.appendChild(tbl);
+      }).catch(e => errLine(holder, 'shared maps', e));
+    },
+    'Online Rooms'(body) {
+      if (onlineNote(body)) return;
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Every online game room. Ending a room stops the game for everyone in it.' }));
+      const holder = U.el('div', { cls: 'panel' }, [loading()]);
+      body.appendChild(holder);
+      F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('su_room:*') + '&select=key,updated_at,name:value->>name,status:value->>status,seq:value->>seq,turnOf:value->>turnOf,seats:value->seats&order=updated_at.desc').then(rows => {
+        holder.innerHTML = '';
+        if (!rows || !rows.length) { holder.appendChild(U.el('p', { cls: 'muted small', text: 'No online rooms.' })); return; }
+        const tbl = U.el('table', { cls: 'adm' });
+        tbl.appendChild(U.el('tr', {}, ['Room', 'Players', 'Status', 'Last move', ''].map(h => U.el('th', { text: h }))));
+        rows.forEach(r => {
+          const seats = (r.seats || []).map(x => x.kind === 'ai' ? 'computer' : x.name || 'open').join(', ');
+          const td = U.el('td', {}, [U.el('button', { cls: 'btn small danger', text: 'End room', onclick: () => { if (confirm('End this room for everyone?')) F.rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent(r.key)).then(rerender).catch(e => alert(e.message)); } })]);
+          tbl.appendChild(U.el('tr', {}, [U.el('td', { text: (r.name || '') + ' · ' + r.key.slice(8) }), U.el('td', { style: 'white-space:normal', text: seats }), U.el('td', { text: (r.status || '') + (r.status === 'playing' ? ' (turn ' + r.seq + ')' : '') }), U.el('td', { text: U.timeAgo(Date.parse(r.updated_at)) }), td]));
+        });
+        holder.appendChild(tbl);
+      }).catch(e => errLine(holder, 'online rooms', e));
     },
 
     /* ================= OVERVIEW ================= */

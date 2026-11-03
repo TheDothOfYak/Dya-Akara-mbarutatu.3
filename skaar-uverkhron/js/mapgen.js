@@ -452,5 +452,6 @@
     });
     delete st._starts;
   }
+  G.startArmies = startArmies;
   G._internals = { components, mainRegion, freeAt };
 })(typeof window !== 'undefined' ? window : globalThis);

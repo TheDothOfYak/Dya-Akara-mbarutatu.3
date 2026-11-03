@@ -71,23 +71,71 @@
     return (blended[k] = c);
   }
   const PRI = {}; D.TERRAIN_ORDER.forEach((t, i) => PRI[t] = i);
+  /* a wobbly round blob for one tile: neighbours' blobs merge into smooth shapes */
+  function blob(g, cxp, cyp, ts, seed) {
+    const n = 11, R = SU.makeRng(seed * 7919 + 13);
+    g.beginPath();
+    const pts = [];
+    for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; const r = ts * (0.66 + R.next() * 0.16); pts.push([cxp + Math.cos(a) * r, cyp + Math.sin(a) * r]); }
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    let m0 = mid(pts[n - 1], pts[0]); g.moveTo(m0[0], m0[1]);
+    for (let k = 0; k < n; k++) { const p = pts[k], q = pts[(k + 1) % n], m = mid(p, q); g.quadraticCurveTo(p[0], p[1], m[0], m[1]); }
+    g.closePath();
+  }
+  const patCache = {};
+  function terrainPattern(g, tid, ts) {
+    const k = tid + ts; if (!patCache[k]) { const c = A.canvas(ts * 3, ts * 3), h = c.getContext('2d'); for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) h.drawImage(A.terrainTex(tid, (x * 2 + y * 3) % 4, ts), x * ts, y * ts); patCache[k] = c; }
+    return g.createPattern(patCache[k], 'repeat');
+  }
   function bakeChunk(li, cx, cy) {
-    const st = V.st, L = st.layers[li], ts = V.ts;
-    const c = A.canvas(CH * ts, CH * ts), g = c.getContext('2d');
-    const DIRS = [['n', 0, -1], ['s', 0, 1], ['w', -1, 0], ['e', 1, 0], ['nw', -1, -1], ['ne', 1, -1], ['sw', -1, 1], ['se', 1, 1]];
-    for (let ty = 0; ty < CH; ty++) for (let tx = 0; tx < CH; tx++) {
-      const x = cx * CH + tx, y = cy * CH + ty; if (!S.inside(L, x, y)) continue;
-      const i = y * L.w + x, tid = S.TCODES[L.t[i]], px = tx * ts, py = ty * ts;
-      g.drawImage(A.terrainTex(tid, L.v[i] % 4, ts), px, py);
-      /* neighbours with a higher priority bleed over this tile */
-      const over = [];
-      DIRS.forEach(([d, dx, dy]) => { const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) return; const nt = S.TCODES[L.t[yy * L.w + xx]]; if (PRI[nt] > PRI[tid]) over.push([PRI[nt], nt, d, L.v[yy * L.w + xx] % 4]); });
-      over.sort((a, b) => a[0] - b[0]).forEach(([, nt, d, v]) => g.drawImage(maskedTex(nt, v, d, ts), px, py));
-      if (tid === 'water') {
-        /* deeper water away from the shore */
-        let shore = false; for (let dy = -1; dy <= 1 && !shore; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (S.inside(L, xx, yy) && S.TCODES[L.t[yy * L.w + xx]] !== 'water') { shore = true; break; } }
-        if (!shore) { g.fillStyle = 'rgba(8,24,48,0.28)'; g.fillRect(px, py, ts, ts); }
+    const st = V.st, L = st.layers[li], ts = V.ts, W = CH * ts;
+    const c = A.canvas(W, W), g = c.getContext('2d');
+    const at = (x, y) => S.inside(L, x, y) ? S.TCODES[L.t[y * L.w + x]] : null;
+    /* the plain tiles first */
+    const present = new Set();
+    for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) {
+      const x = cx * CH + tx, y = cy * CH + ty; const tid = at(x, y); if (!tid) continue;
+      present.add(tid);
+      if (tx >= 0 && ty >= 0 && tx < CH && ty < CH) g.drawImage(A.terrainTex(tid, L.v[y * L.w + x] % 4, ts), tx * ts, ty * ts);
+    }
+    /* then each terrain, lowest first, as merged blobs that spill over the tile edges */
+    const order = [...present].sort((a, b) => PRI[a] - PRI[b]);
+    const layer = A.canvas(W, W), lg = layer.getContext('2d');
+    order.forEach((tid, oi) => {
+      if (oi === 0) return;
+      lg.globalCompositeOperation = 'source-over'; lg.clearRect(0, 0, W, W);
+      lg.fillStyle = terrainPattern(lg, tid, ts); lg.fillRect(0, 0, W, W);
+      for (let ty = 0; ty < CH; ty++) for (let tx = 0; tx < CH; tx++) { const x = cx * CH + tx, y = cy * CH + ty; if (at(x, y) === tid) lg.drawImage(A.terrainTex(tid, L.v[y * L.w + x] % 4, ts), tx * ts, ty * ts); }
+      lg.globalCompositeOperation = 'destination-in';
+      lg.fillStyle = '#fff';
+      const mask = A.canvas(W, W), mg = mask.getContext('2d'); mg.fillStyle = '#fff';
+      let any = false;
+      for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) {
+        const x = cx * CH + tx, y = cy * CH + ty; if (at(x, y) !== tid) continue; any = true;
+        /* a tile with every neighbour the same needs no wobble: fill it square */
+        blob(mg, tx * ts + ts / 2, ty * ts + ts / 2, ts, x * 92821 + y * 68917 + li);
+        mg.fill();
+        const same = (dx, dy) => at(x + dx, y + dy) === tid || !at(x + dx, y + dy);
+        if (same(1, 0) && same(-1, 0) && same(0, 1) && same(0, -1)) mg.fillRect(tx * ts - 1, ty * ts - 1, ts + 2, ts + 2);
+        /* bridge straight runs so long edges don't scallop */
+        if (same(1, 0)) mg.fillRect(tx * ts + ts / 2, ty * ts + ts * 0.18, ts, ts * 0.64);
+        if (same(0, 1)) mg.fillRect(tx * ts + ts * 0.18, ty * ts + ts / 2, ts * 0.64, ts);
       }
+      if (!any) return;
+      lg.drawImage(mask, 0, 0);
+      /* a soft dark rim where land meets water, lighter where land meets land */
+      g.save(); g.shadowColor = tid === 'void' ? 'rgba(0,0,0,0)' : (order[0] === 'water' && oi === 1 ? 'rgba(10,30,50,0.55)' : 'rgba(0,0,0,0.25)'); g.shadowBlur = ts * 0.18;
+      g.drawImage(layer, 0, 0); g.restore();
+    });
+    /* deeper water away from the shore, as one soft shape */
+    if (present.has('water')) {
+      const dm = A.canvas(W, W), dg = dm.getContext('2d'); dg.fillStyle = '#000'; let any = false;
+      for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) {
+        const x = cx * CH + tx, y = cy * CH + ty; if (at(x, y) !== 'water') continue;
+        let shore = false; for (let dy = -2; dy <= 2 && !shore; dy++) for (let dx = -2; dx <= 2; dx++) { const t2 = at(x + dx, y + dy); if (t2 && t2 !== 'water') { shore = true; break; } }
+        if (!shore) { blob(dg, tx * ts + ts / 2, ty * ts + ts / 2, ts * 1.05, x * 31 + y * 17); dg.fill(); any = true; }
+      }
+      if (any) { g.save(); g.globalAlpha = 0.24; g.filter = 'blur(' + Math.round(ts * 0.25) + 'px)'; g.drawImage(dm, 0, 0); g.restore(); }
     }
     /* roads: cobbled paths between neighbouring road tiles */
     g.lineCap = 'round'; g.lineJoin = 'round';
@@ -290,15 +338,20 @@
   /* ======================= input ======================= */
   function bindInput() {
     const cv = V.cv; let drag = null, moved = false;
-    cv.addEventListener('mousedown', e => { drag = { x: e.clientX, y: e.clientY, cx: V.cam.x, cy: V.cam.y, btn: e.button }; moved = false; });
+    let paintLast = null;
+    cv.addEventListener('mousedown', e => {
+      drag = { x: e.clientX, y: e.clientY, cx: V.cam.x, cy: V.cam.y, btn: e.button }; moved = false;
+      if (V.paintMode && e.button === 0) { const r = cv.getBoundingClientRect(); const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top); paintLast = tt.x + ',' + tt.y; drag.paint = true; SU.emit('mappaint', { x: tt.x, y: tt.y, first: true }); }
+    });
     window.addEventListener('mousemove', e => {
       const r = cv.getBoundingClientRect();
-      if (drag && drag.btn === 0) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 6) moved = true; if (moved) { V.cam.x = drag.cx - dx / V.ts; V.cam.y = drag.cy - dy / V.ts; } }
+      if (drag && drag.paint) { const r = cv.getBoundingClientRect(); const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top); const k = tt.x + ',' + tt.y; if (k !== paintLast) { paintLast = k; SU.emit('mappaint', { x: tt.x, y: tt.y, first: false }); } }
+      else if (drag && (drag.btn === 0 || (drag.btn === 2 && V.paintMode))) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 6) moved = true; if (moved) { V.cam.x = drag.cx - dx / V.ts; V.cam.y = drag.cy - dy / V.ts; } }
       if (e.target === cv) { const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top); if (!V.hover || tt.x !== V.hover.x || tt.y !== V.hover.y) { V.hover = tt; SU.emit('hover', tt); } }
     });
     window.addEventListener('mouseup', e => {
       if (!drag) return; const was = drag; drag = null;
-      if (moved) return;
+      if (moved || was.paint) return;
       const r = cv.getBoundingClientRect(); if (e.target !== cv) return;
       const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top);
       if (was.btn === 2) SU.emit('mapinfo', { x: tt.x, y: tt.y, sx: e.clientX, sy: e.clientY });
