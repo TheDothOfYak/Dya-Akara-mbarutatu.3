@@ -21,7 +21,16 @@ the game is built.
   layers with the buttons on the right or the keys 1–4.
 - **Moving:** click an army, click a place to see the path, then click again to go.
   Green arrows mean you get there today, red means later days, and ⚔ means a fight.
-  Right-click anything to learn about it. Drag to look around, and scroll to zoom.
+  Right-click anything to learn about it (the info stays up until you click). Drag to
+  look around, and scroll to zoom. The **Key** button explains army-size words (A few
+  1–4, Several 5–9, A pack 10–19, Lots 20–49, A horde 50–99, A throng 100–249, A swarm
+  250–499, Zounds 500–999, A legion 1000+), the marks on paths and the ground.
+- **Meeting:** with an army picked, click another of your armies to walk over and
+  trade stacks, captains, Relics and memory cores. A squadron can join a hero's army.
+  Shift-click picks the other army instead.
+- **Close up:** double-click (or right-click) a creature to see its card, and upgrade
+  it there when the town can. Clicking a building to build opens its close-up: the
+  picture, what it does, what it needs and what it costs.
 - **Urverk** are the portals between the worlds. Some open only when the worlds line
   up (hover to see when). Some are kept by families who charge a toll; pay three
   times, or clear the wild creatures near them, and you pass free. Some crossings are
@@ -36,7 +45,7 @@ the game is built.
   number can stay inside a castle (choose one as the defending general). Leveling up
   offers two stats and two skills: you pick one of each.
 - **Squadron captains** are Dearcàn who each lead a little group of stacks: two to
-  start, more with Command, Captaincy and some abilities. A very rare *peerless*
+  start, more with Captaincy and some abilities. A very rare *peerless*
   captain is far stronger but leads only one.
   A squadron can go out without a hero: it can take mines and pick up resources and
   gold, but it can't take towns or carry Relics. In battle, captains stand in front
@@ -49,16 +58,21 @@ the game is built.
   Captain cores go to a Memory Vault to make a new captain with the fallen one's
   abilities.
 - **Food** feeds your armies and towns. Hungry armies lose morale, then desert.
-  Towns feed themselves except in a week of famine; only spare food makes the
+  Towns feed themselves except in a week of famine. People come and go a little
+  every day; only spare food makes the
   population grow faster. Some buildings need people to work them.
 - **Mounts:** heroes ride Domestic Punks (a rare few win a Kuni Byrd). Herds of wild
   punks can be corralled home to the farmers, and bought back at the town's paddock
   as mounts: an army with a punk for every stack travels further. Nobody rides in
   battle.
 - **Morale** is per stack, out of 100, and 60 is steady: being fed, heavy recent
-  losses, captains, Command and Heartening all move it. High morale rolls damage
+  losses, captains, Heartening and some Relics all move it. High morale rolls damage
   nearer the top of the range, low nearer the bottom; very low morale slows a stack
   and can freeze it. A captain's fall costs his squadron about 20.
+- **In battle** you see every blow: the attacker lunges, the target reels and flares,
+  and numbers change as the blow lands. A stack that dies topples over and its bodies
+  stay where it fell. The song **Rekindle** (tier 3) raises some of a fallen stack
+  from its bodies, if nothing stands on them.
 - **Shooters** do double damage with exactly one hex between them and the target,
   and can't shoot when an enemy is next to them. **Luck** sometimes
   spares a stack from a blow. Bad luck can make some of a stack trip on their own

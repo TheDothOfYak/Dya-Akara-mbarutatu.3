@@ -235,3 +235,34 @@ table.grid th { color: var(--muted); font-weight: normal; }
 .rec-row .res { color: var(--bad); }
 .rec-row.won .res { color: var(--good); }
 @media (max-width: 700px) { .rec-row { grid-template-columns: 44px 1fr 56px; } .rec-row > :nth-child(n+4) { display: none; } }
+
+/* ---------- a creature close up ---------- */
+.dlg.cc-box { width: 720px; }
+.cc { display: flex; gap: 16px; align-items: flex-start; }
+.cc-left { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; }
+.cc-pic { border: 1px solid var(--edge); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.6), inset 0 0 30px rgba(0,0,0,.6); }
+.cc-count { color: var(--gold2); font-size: 18px; }
+.cc-right { flex: 1; min-width: 0; }
+.cc-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 14px; margin-bottom: 8px; }
+.cc-stat { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dotted rgba(107,86,52,.4); padding: 2px 0; }
+.cc-stat b { color: var(--gold2); font-weight: normal; }
+.cc-abil { margin: 6px 0; }
+@media (max-width: 700px) { .cc { flex-direction: column; align-items: center; } .cc-stats { grid-template-columns: 1fr; } }
+
+/* ---------- a building, close up ---------- */
+.dlg.bc-box { width: 760px; }
+.bc { display: flex; gap: 16px; align-items: flex-start; }
+.bc-pic { flex: none; border: 2px solid var(--edge); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.6); }
+.bc-info { flex: 1; min-width: 0; }
+.bc-info p { margin-top: 0; }
+@media (max-width: 760px) { .bc { flex-direction: column; } .bc-pic { width: 100% !important; height: auto !important; } }
+
+/* ---------- right-click info and the key ---------- */
+.tip.pinned { border-color: var(--gold); box-shadow: 0 6px 24px rgba(0,0,0,.7), 0 0 0 1px rgba(255,227,163,.25); }
+.ai-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.ai-row { display: flex; align-items: center; gap: 8px; }
+.ai-row img { background: rgba(0,0,0,.3); border-radius: 6px; }
+.key-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+.key-sec { border: 1px solid var(--edge2); border-radius: 8px; padding: 10px; background: rgba(0,0,0,.2); }
+.key-tbl td { padding: 2px 8px; }
+@media (max-width: 760px) { .key-grid { grid-template-columns: 1fr; } }

@@ -15,9 +15,9 @@
     const R = SU.rng(st); opts = opts || {};
     const people = opts.people || R.weighted(Object.keys(D.PEOPLES), p => p === 'eikar' ? 4 : p === 'karnen' ? 1.5 : 2);
     const id = SU.uid(st, 'h');
-    const stats = { Strength: 1, Defense: 1, Command: 1, Zikhron: 1, Stride: 1, Cunning: 1 };
+    const stats = { Strength: 1, Defense: 1, Stride: 1, Cunning: 1 };
     Object.entries(D.PEOPLES[people].lean).forEach(([k, v]) => stats[k] += v);
-    for (let i = 0; i < 3; i++) stats[R.pick(D.STATS)]++;
+    for (let i = 0; i < 2; i++) stats[R.pick(D.STATS)]++;
     const base = opts.base || R.pick(D.SKILL_IDS);
     const specCr = R.pick(['malsti', 'velnur', 'ver', 'harkal', 'kaloeik', 'tyndael', 'xiweik', 'lutut', D.PEOPLES[people].buff]);
     const h = {
@@ -35,7 +35,7 @@
   };
   M.breathMax = function (st, h) {
     const sc = S.skill(st, h, 'songcraft');
-    return Math.round((10 + sc * 10 + S.heroStat(st, h, 'Zikhron') * 2 + S.relicMod(st, h, 'breath')) * (1 + S.skillVal(st, h, 'breathwork') / 100));
+    return Math.round((12 + sc * 10 + (h.level || 1) + S.relicMod(st, h, 'breath')) * (1 + S.skillVal(st, h, 'breathwork') / 100));
   };
   M.heroCost = 2500;
 
@@ -86,7 +86,7 @@
   M.drawOffer = function (st, core, hero) {
     if (core.kind !== 'hero') return;
     const R = SU.rng(st);
-    const n = 5 + Math.floor(S.heroStat(st, hero, 'Zikhron') / 3) + S.skillVal(st, hero, 'memory');
+    const n = 5 + S.skillVal(st, hero, 'memory');
     const pool = core.skills.slice();
     R.shuffle(pool);
     core.offer = [];

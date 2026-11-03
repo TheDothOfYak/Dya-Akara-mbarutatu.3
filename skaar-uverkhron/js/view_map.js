@@ -294,7 +294,7 @@
       const last = i === p.steps.length - 1;
       ctx.fillStyle = ok ? 'rgba(120,230,110,0.85)' : 'rgba(230,90,70,0.85)';
       ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1;
-      if (last) { ctx.beginPath(); ctx.arc(cx, cy, ts * 0.17, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (p.target) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(ts * 0.26) + 'px Georgia'; ctx.textAlign = 'center'; ctx.fillText(p.target === 'battle' ? '⚔' : p.target === 'visit' ? '✦' : '', cx, cy + ts * 0.09); } }
+      if (last) { ctx.beginPath(); ctx.arc(cx, cy, ts * 0.17, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (p.target) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(ts * 0.26) + 'px Georgia'; ctx.textAlign = 'center'; ctx.fillText(p.target === 'battle' ? '⚔' : p.target === 'visit' ? '✦' : p.target === 'meet' ? '⇄' : '', cx, cy + ts * 0.09); } }
       else { const n = p.steps[i + 1]; const a = Math.atan2(n.y - s.y, n.x - s.x); ctx.save(); ctx.translate(cx, cy); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(ts * 0.14, 0); ctx.lineTo(-ts * 0.08, -ts * 0.09); ctx.lineTo(-ts * 0.08, ts * 0.09); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
     });
   }
@@ -403,7 +403,7 @@
       const r = cv.getBoundingClientRect(); if (e.target !== cv) return;
       const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top);
       if (was.btn === 2) SU.emit('mapinfo', { x: tt.x, y: tt.y, sx: e.clientX, sy: e.clientY });
-      else SU.emit('mapclick', tt);
+      else SU.emit('mapclick', Object.assign(tt, { shift: e.shiftKey || e.ctrlKey || e.metaKey }));
     });
     cv.addEventListener('contextmenu', e => e.preventDefault());
     cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); V.zoom(e.deltaY < 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top); }, { passive: false });

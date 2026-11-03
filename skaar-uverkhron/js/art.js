@@ -298,7 +298,8 @@
     const lunge = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) * s * 0.25 : 0;
     ctx.translate(lunge, 0);
     fn(ctx, s / 30, o.t || 0, o);
-    if (o.flash) { ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = rgba('#ffffff', o.flash * 0.6); ctx.fillRect(-60 * s / 30, -90 * s / 30, 120 * s / 30, 100 * s / 30); }
+    /* struck: the creature itself flares (drawn again, added on top), nothing around it */
+    if (o.flash > 0.05) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, o.flash) * 0.55 * (o.alpha != null ? o.alpha : 1); fn(ctx, s / 30, o.t || 0, Object.assign({}, o, { flash: 0 })); ctx.restore(); }
     ctx.restore();
   };
   const CREATURE = A.CREATURE = {};

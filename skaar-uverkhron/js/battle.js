@@ -146,6 +146,9 @@
   }
   function unitAt(B, c, r) { for (const u of B.units) { if (u.n <= 0) continue; for (const [cc, rr] of cellsOf(u)) if (cc === c && rr === r) return u; } return null; }
   B_.unitAt = unitAt;
+  /* the bodies of a fallen stack lie where it fell */
+  B_.bodyAt = (B, c, r) => B.units.find(u => u.n <= 0 && u.kind === 'stack' && cellsOf(u).some(([cc, rr]) => cc === c && rr === r)) || null;
+  B_.canRaise = (B, u, side) => !!(u && u.n <= 0 && u.kind === 'stack' && !u.temp && u.side === side && !D.CREATURES[u.cr].legendary && fits(B, u.c, u.r, u.shape, u.side, u));
   B_.alive = B => B.units.filter(u => u.n > 0);
 
   /* ======================= turn order ======================= */
@@ -362,7 +365,7 @@
   function applyDamage(st, B, a, t, d, verb) {
     let left = d, killed = 0;
     while (left > 0 && t.n > 0) { if (left >= t.hpTop) { left -= t.hpTop; t.n--; killed++; t.hpTop = t.hp; } else { t.hpTop -= left; left = 0; } }
-    B.anim.push({ kind: 'dmg', uid: t.uid, amount: d, killed });
+    B.anim.push({ kind: 'dmg', uid: t.uid, amount: d, killed, nAfter: t.n, hpAfter: t.hpTop });
     say(B, (a ? a.name + ' ' + verb + ' the ' + t.name : 'The ' + t.name + ' ' + verb) + ' for ' + d + (killed ? '. ' + killed + ' fall.' : '.'));
     if (t.n <= 0) unitFell(st, B, t, a);
     return killed;
@@ -428,7 +431,7 @@
   /* ======================= songs ======================= */
   B_.songPower = function (st, h, sid) {
     const sc = S.skill(st, h, 'songcraft');
-    let p = 10 + sc * 8 + S.heroStat(st, h, 'Zikhron') * 2;
+    let p = 12 + sc * 8 + Math.floor((h.level || 1) / 2);
     if (['duatstep', 'dusklash', 'tide', 'nekhcall'].includes(sid)) p *= 1 + S.skillVal(st, h, 'duatcraft') / 200;
     return Math.round(p);
   };
@@ -448,8 +451,12 @@
     if ((need === 'ally' || need === 'allyMove') && (!target || target.side !== side)) return { ok: false, why: 'Choose one of your stacks.' };
     if ((need === 'enemy' || need === 'enemyArea') && (!target || target.side === side)) return { ok: false, why: 'Choose an enemy stack.' };
     if (need === 'captain' && (!target || target.kind !== 'cap' || target.side !== side)) return { ok: false, why: 'Choose one of your captains.' };
+    if (need === 'body' && !B_.canRaise(B, target, side)) return { ok: false, why: target && target.n <= 0 && target.side === side ? 'Something stands on their bodies.' : 'Choose where one of your fallen stacks lies.' };
     switch (song) {
       case 'mend': heal(B, target, P * 3); break;
+      case 'rekindle': { target.hpTop = target.hp; heal(B, target, P * 6); if (target.n <= 0) return { ok: false, why: 'The song is not strong enough to raise even one.' };
+        target.morale = Math.max(40, target.morale == null ? 60 : target.morale); target.fx = {}; target.done = true; target.grief = 0;
+        B.anim.push({ kind: 'rise', uid: target.uid, nAfter: target.n, hpAfter: target.hpTop }); say(B, target.n + ' ' + target.name + ' rise from where they fell.'); break; }
       case 'rally': target.morale = Math.min(100, (target.morale == null ? 60 : target.morale) + 15 + (P > 40 ? 10 : 0)); break;
       case 'quickstep': target.fx.quick = 3; break;
       case 'dimsight': target.fx.dim = 3; break;
@@ -535,6 +542,7 @@
     const hurt = allies.filter(u => u.n < u.startN * 0.7).sort((a, b) => b.hp * (b.startN - b.n) - a.hp * (a.startN - a.n))[0];
     const big = foes.slice().sort((a, b) => b.n * b.hp - a.n * a.hp)[0];
     if (has('massmend') && allies.filter(u => u.n < u.startN * 0.7).length >= 2) return { song: 'massmend' };
+    if (has('rekindle')) { const body = B.units.filter(u => B_.canRaise(B, u, side)).sort((a, b) => b.startN * b.hp - a.startN * a.hp)[0]; if (body && body.startN * body.hp >= 60) return { song: 'rekindle', target: body }; }
     if (has('nekhcall') && big) return { song: 'nekhcall', target: big };
     if (has('tide') && big) return { song: 'tide', target: big };
     if (hurt && has('mend')) return { song: 'mend', target: hurt };

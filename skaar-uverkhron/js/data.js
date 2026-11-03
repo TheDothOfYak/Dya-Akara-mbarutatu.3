@@ -18,10 +18,10 @@
   /* ---------------- resources ---------------- */
   D.RES = ['gold', 'wood', 'stone', 'food', 'stygian', 'ngakara', 'timber', 'glowmoss'];
   D.RES_INFO = {
-    gold: { name: 'Gold', common: true, color: '#e8c25a' },
-    wood: { name: 'Wood', common: true, color: '#9a6a3a' },
-    stone: { name: 'Stone', common: true, color: '#a8a39a' },
-    food: { name: 'Food', common: true, color: '#c9a24e' },
+    gold: { name: 'Gold', common: true, color: '#e8c25a', desc: 'Pays for everything: buildings, creatures, heroes. Towns make it every day.' },
+    wood: { name: 'Wood', common: true, color: '#9a6a3a', desc: 'For buildings, boats and the halls of the town.' },
+    stone: { name: 'Stone', common: true, color: '#a8a39a', desc: 'For walls, dwellings and the great buildings.' },
+    food: { name: 'Food', common: true, color: '#c9a24e', desc: 'Feeds your people and armies every day. Hungry armies lose heart, then desert.' },
     stygian: { name: 'Stygian', common: false, color: '#8e7cff', desc: 'Soul iron. Relics, Duat powers, the Kahizecvar and the greatest creatures.' },
     ngakara: { name: 'NgAkara', common: false, color: '#5fd3c6', desc: 'Drawn from the head of the Su Naga. You do not have to kill the Naga to take it.' },
     timber: { name: 'Eldi Aagac Timber', short: 'Timber', common: false, color: '#e0703a', desc: 'Fireproof wood of the fire trees.' },
@@ -176,15 +176,13 @@
   D.PEOPLES = {
     eikar: { name: 'Eikar', desc: 'The acorn people.', lean: { Cunning: 1, Stride: 1 }, buff: 'malsti' },
     keilia: { name: 'Keilia', desc: 'Builders of the Mbaru Tatu.', lean: { Defense: 2 }, buff: 'velnur', builder: true },
-    kaloeik: { name: 'Kalo’Eik', desc: 'The moon-folk.', lean: { Zikhron: 2 }, buff: 'kaloeik' },
-    karnen: { name: 'Karnen', desc: 'A small, skilled people.', lean: { Strength: 1, Command: 1 }, buff: 'ver' },
+    kaloeik: { name: 'Kalo’Eik', desc: 'The moon-folk.', lean: { Cunning: 1, Defense: 1 }, buff: 'kaloeik' },
+    karnen: { name: 'Karnen', desc: 'A small, skilled people.', lean: { Strength: 2 }, buff: 'ver' },
   };
-  D.STATS = ['Strength', 'Defense', 'Command', 'Zikhron', 'Stride', 'Cunning'];
+  D.STATS = ['Strength', 'Defense', 'Stride', 'Cunning'];
   D.STAT_INFO = {
     Strength: 'Adds to every creature’s attack.',
     Defense: 'Adds to every creature’s defense.',
-    Command: 'Raises morale. At 4 and 8, your captains can each lead one more stack.',
-    Zikhron: 'Memory. Each 3 points lets a core offer one more skill, and you learn 2% faster per point.',
     Stride: 'How far the army moves each day.',
     Cunning: 'The whole army acts sooner in battle, and you see more of enemy armies.',
   };
@@ -255,6 +253,7 @@
      tier 1..5, breath cost, where: 'battle' | 'map'. */
   D.SONGS = {
     mend: { name: 'Mend', tier: 1, breath: 5, where: 'battle', target: 'ally', desc: 'Heals a stack (and raises a few of its fallen).' },
+    rekindle: { name: 'Rekindle', tier: 3, breath: 16, where: 'battle', target: 'body', desc: 'Raises a fallen stack from where its bodies lie: some of them stand and fight again.' },
     rally: { name: 'Rally', tier: 1, breath: 4, where: 'battle', target: 'ally', desc: 'Lifts one stack’s morale for the battle.' },
     quickstep: { name: 'Quickstep', tier: 1, breath: 5, where: 'battle', target: 'ally', desc: 'A stack moves faster for 3 rounds.' },
     dimsight: { name: 'Dim Sight', tier: 1, breath: 5, where: 'battle', target: 'enemy', desc: 'An enemy stack’s ranged attacks do less for 3 rounds.' },
@@ -292,11 +291,11 @@
   D.RELICS = {};
   function rel(id, o) { o.id = id; D.RELICS[id] = o; }
   rel('hood', { name: 'Duskweave Hood', slot: 'head', rare: 'common', mods: { Cunning: 1 } });
-  rel('aagac', { name: 'Old Ahoac Aagac', slot: 'head', rare: 'rare', mods: { Command: 1, Stride: 1 }, desc: 'An acorn hat that has seen a great many roads.' });
-  rel('ringcrown', { name: 'Crown of the Stygian Ring', slot: 'head', rare: 'great', mods: { Strength: 2, Defense: 2, Command: 2 } });
+  rel('aagac', { name: 'Old Ahoac Aagac', slot: 'head', rare: 'rare', mods: { morale: 5, Stride: 1 }, desc: 'An acorn hat that has seen a great many roads.' });
+  rel('ringcrown', { name: 'Crown of the Stygian Ring', slot: 'head', rare: 'great', mods: { Strength: 2, Defense: 2, morale: 10 } });
   rel('charmcord', { name: 'Knotted Charm Cord', slot: 'neck', rare: 'common', mods: { luck: 1 } });
   rel('tooth', { name: 'Harkal Tooth Necklace', slot: 'neck', rare: 'common', mods: { Strength: 1 } });
-  rel('memstone', { name: 'Memory Stone', slot: 'neck', rare: 'rare', mods: { Zikhron: 2 } });
+  rel('memstone', { name: 'Memory Stone', slot: 'neck', rare: 'rare', mods: { breath: 6 } });
   rel('naganeck', { name: 'Naga-Scale Torc', slot: 'neck', rare: 'great', mods: { Defense: 3, breath: 10 } });
   rel('leathers', { name: 'Road Leathers', slot: 'body', rare: 'common', mods: { Defense: 1 } });
   rel('mail', { name: 'Stygian-Edged Mail', slot: 'body', rare: 'rare', mods: { Defense: 2, Strength: 1 } });
@@ -305,10 +304,10 @@
   rel('tuun', { name: 'Duat-Forged Tuun', slot: 'hand', rare: 'rare', mods: { Strength: 3 }, desc: 'A sword. Tuun is Dearcineon for sword.' });
   rel('saklay', { name: 'Saklay of the Ver', slot: 'hand', rare: 'great', mods: { Strength: 2, rangedPct: 15 }, desc: 'A bow and arrow, as the Dearcineon has it.' });
   rel('buckler', { name: 'Punk-Hide Buckler', slot: 'off', rare: 'common', mods: { Defense: 1 } });
-  rel('moonshield', { name: 'Moonstone Shield', slot: 'off', rare: 'rare', mods: { Defense: 2, Zikhron: 1 } });
+  rel('moonshield', { name: 'Moonstone Shield', slot: 'off', rare: 'rare', mods: { Defense: 2, breath: 3 } });
   rel('boots', { name: 'Wayfarer’s Boots', slot: 'feet', rare: 'common', mods: { Stride: 1 } });
   rel('duatboots', { name: 'Boots of the Vel', slot: 'feet', rare: 'great', mods: { Stride: 3, duatSafe: 25 } });
-  rel('bandring', { name: 'Iron Band', slot: 'ring', rare: 'common', mods: { Command: 1 } });
+  rel('bandring', { name: 'Iron Band', slot: 'ring', rare: 'common', mods: { morale: 5 } });
   rel('eyering', { name: 'Ring of the Open Eye', slot: 'ring', rare: 'rare', mods: { Cunning: 2, sight: 1 } });
   rel('breathring', { name: 'Ring of Long Breath', slot: 'ring', rare: 'rare', mods: { breath: 15 } });
   rel('waterskin', { name: 'Bottomless Waterskin', slot: 'misc', rare: 'common', mods: { foodPct: -15 } });
@@ -317,7 +316,7 @@
   rel('shard', { name: 'Urverk Shard', slot: 'misc', rare: 'great', mods: { duatSafe: 40, Stride: 1 } });
   rel('songbook', { name: 'Rokarvac of Songs', slot: 'misc', rare: 'rare', mods: { breath: 10, Zikhron: 1 }, desc: 'Rokarvac: a journal, a story, a writing book.' });
   rel('stormglass', { name: 'Stormglass', slot: 'misc', rare: 'great', mods: { stormSense: 1, luck: 1 } });
-  rel('aerolfeather', { name: 'Feather of the Aerolhorn', slot: 'misc', rare: 'skaar', mods: { Strength: 3, Defense: 3, Command: 2, luck: 1 } });
+  rel('aerolfeather', { name: 'Feather of the Aerolhorn', slot: 'misc', rare: 'skaar', mods: { Strength: 3, Defense: 3, morale: 10, luck: 1 } });
   rel('nekhprint', { name: 'Rokarvac of the Nekh', slot: 'misc', rare: 'skaar', mods: {}, desc: 'The worm’s writing-book: how to open a Nekh Hollow. Not used up — any town it is carried into can build the Nekh Hollow while it is there.', special: true });
   D.RELIC_IDS = Object.keys(D.RELICS).filter(r => !D.RELICS[r].special);
   D.RARE_ORDER = ['common', 'rare', 'great', 'skaar'];
@@ -388,8 +387,8 @@
   D.VISIT = {
     ring: { name: 'Old Duelling Ring', desc: '+1 Strength, once per hero.', once: 'hero', stat: 'Strength' },
     bulwark: { name: 'Bulwark Stone', desc: '+1 Defense, once per hero.', once: 'hero', stat: 'Defense' },
-    banner: { name: 'Fallen Banner', desc: '+1 Command, once per hero.', once: 'hero', stat: 'Command' },
-    library: { name: 'Kalo’Eik Library', desc: '+1 Zikhron, once per hero.', once: 'hero', stat: 'Zikhron' },
+    banner: { name: 'Fallen Banner', desc: 'The stories of an old war: 1000 experience, once per hero.', once: 'hero', xp: 1000 },
+    library: { name: 'Kalo’Eik Library', desc: 'Old memories on the shelves: 500 experience and full Breath, once per hero.', once: 'hero', xp: 500, breath: true },
     milestone: { name: 'Ahoac Milestone', desc: '+1 Stride, once per hero.', once: 'hero', stat: 'Stride' },
     maze: { name: 'Riddle Hedge', desc: '+1 Cunning, once per hero.', once: 'hero', stat: 'Cunning' },
     tower: { name: 'Watchtower', desc: 'Clears the fog for a long way around.', once: 'player' },
