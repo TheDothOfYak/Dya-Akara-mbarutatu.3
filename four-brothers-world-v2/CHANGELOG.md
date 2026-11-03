@@ -19,6 +19,11 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## Three new hero moves
+- **Acorn roll:** while running on the ground, press **S** and he tucks into a ball and rolls, about twice as fast as running and faster still downhill. Rolling into monsters bowls them over. Jump to hop out of it; press S again or let go of left/right to stop. It uses a little stamina.
+- **Ghost slip:** keep pushing into a thin wall (one or two blocks thick) and the ghost fades and slips through to the other side. Not through thicker walls, locked doors, carvings or places he isn't allowed.
+- **Wind:** outdoors the wind blows in gusts that change direction now and then (white streaks blow past). It pushes the fuzzy around, a lot in the air and more when he's puffed up, a little on the ground. His runes help him hold steady. No wind underground, underwater, on a vine or on his cloud.
+
 ## Runes instead of picks: the Ancient Rune Keeper
 - **Picks are gone.** How hard a block you can break comes only from your runes, and each hero's runes are their own: the **acorn** gets a harder cap (it changes colour to the rune's material), the **fuzzy** stronger suction (the air he pulls glows), the **rock** a heavier fist (made of the rune's material), and the **ghost** a stronger permanence (his arm turns the rune's colour when it goes solid).
 - **The Ancient Rune Keeper** stands near where you arrive in Fuzzy, Acorn, Rock and Ghost World. Bring him materials, monster parts and coins, and he carves your next rune. 1 Flint (breaks stone): 3 flint, 6 rubble, 3 monster parts, 15 coins. 2 Stone (iron ore): 20 stone, 4 flint, 5 parts, 30 coins. 3 Iron (bronze ore): iron bars. 4 Bronze (platinum). 5 Platinum (stygian). 6 Stygian, 7 Soulsteel and 8 the Duat rune each dig faster.
