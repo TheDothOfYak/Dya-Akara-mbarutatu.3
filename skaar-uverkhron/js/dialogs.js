@@ -141,8 +141,18 @@
     const ha = S.heroOf(st(), a), hb = S.heroOf(st(), b);
     const m = U.modal([el('h2', { text: 'Armies meet' }),
       DL.armyEditor([{ label: ha ? ha.name : 'Squadron', slots: S.slotsOf(st(), a), hero: ha, onlyCaptain: !ha, keepOne: true }, { label: hb ? hb.name : 'Squadron', slots: S.slotsOf(st(), b), hero: hb, onlyCaptain: !hb, keepOne: true }], () => U.refresh()),
-      ha && hb ? el('p', { cls: 'small muted', text: 'Heroes can swap Relics from the hero window.' }) : null,
+      ha && hb ? relicSwap(ha, hb) : null,
       el('div', { cls: 'acts' }, [btn('Done', () => m.close(), 'primary')])], { wide: true });
+    function relicSwap(x, y) {
+      const box = el('div', { cls: 'col', style: { marginTop: '8px' } });
+      const draw = () => { box.innerHTML = ''; box.appendChild(el('b', { cls: 'gold', text: 'Relics' }));
+        [[x, y], [y, x]].forEach(([from, to]) => {
+          const items = Object.entries(from.relics).filter(([, r]) => r).map(([sl, r]) => ({ sl, r })).concat((from.pack || []).map(r => ({ r })));
+          box.appendChild(el('div', { cls: 'row' }, [el('span', { style: { width: '160px' }, cls: 'small', text: from.name + ':' }), items.length ? null : el('span', { cls: 'small muted', text: 'none' }),
+            ...items.map(it => el('div', { cls: 'relslot', 'data-tip': relicTip(it.r) + '<br><i>Click to give it to ' + to.name + '.</i>', onclick: () => { if (it.sl) delete from.relics[it.sl]; else from.pack.splice(from.pack.indexOf(it.r), 1); RU.giveRelic(st(), to, it.r); draw(); } }, U.relicIcon(it.r, 36)))]));
+        }); };
+      draw(); return box;
+    }
   };
 
   /* ======================= hero window ======================= */

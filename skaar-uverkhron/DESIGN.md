@@ -295,7 +295,6 @@ These were filled in to get the game running. Every one of them is easy to chang
 - Breeding herds (herds can be tamed, not bred).
 - The other two factions (SkarValorin, Elsha'ryn), the campaign, and the Dya'Akara
   special event.
-- Swapping Relics between two heroes when they meet (armies can be swapped).
 - An undo button in the map editor, and editing details of placed things (amounts,
   Urverk timings).
 - The computer doesn't use boats or map songs, and plays a fairly simple game.
