@@ -124,7 +124,7 @@
   }
   DL.creatureTip = creatureTip;
   function captainTip(c, hero) {
-    return '<b>' + c.name + '</b> — ' + D.CAPTAIN_RANKS[c.rank].name + ', ' + D.PEOPLES[c.people].name + '<br>Level ' + c.level + ' · Health ' + c.hp + ' · Attack ' + c.atk + ' · Defense ' + c.def + '<br>Morale ' + (c.morale >= 0 ? '+' : '') + c.morale + ' · Luck ' + (c.luck >= 0 ? '+' : '') + c.luck + ' · Leads ' + RU.capCapacity(st(), c, hero) + ' stacks<br><b>' + D.CAPTAIN_ABIL[c.abil].name + ':</b> ' + D.CAPTAIN_ABIL[c.abil].desc + (c.rank === 'naelst' ? '<br>As a Naelst Velki, lets Kalo’Eik shift allies through the Duat.' : '');
+    return '<b>' + c.name + '</b> — ' + D.CAPTAIN_RANKS[c.rank].name + ', ' + D.PEOPLES[c.people].name + '<br>Level ' + c.level + ' · Health ' + c.hp + ' · Attack ' + c.atk + ' · Defense ' + c.def + '<br>Morale +' + ((c.morale || 0) * 5 + (c.abil === 'banner' ? 10 : 0)) + ' to the squadron · Luck ' + (c.luck >= 0 ? '+' : '') + c.luck + ' · Leads ' + RU.capCapacity(st(), c, hero) + ' stacks<br><b>' + D.CAPTAIN_ABIL[c.abil].name + ':</b> ' + D.CAPTAIN_ABIL[c.abil].desc + (c.rank === 'naelst' ? '<br>As a Naelst Velki, lets Kalo’Eik shift allies through the Duat.' : '');
   }
   DL.captainTip = captainTip;
 
@@ -166,7 +166,12 @@
       const xpNext = S.xpFor(h.level + 1);
       body.appendChild(el('div', { cls: 'row' }, [U.portrait(h.people, h.look, P.color, 72), el('div', {}, [el('h2', { text: h.name }), el('div', { cls: 'muted', text: D.PEOPLES[h.people].name + ' of the Duskareth · Level ' + h.level + ' · ' + h.xp + ' / ' + xpNext + ' XP' }),
         el('div', { cls: 'small' }, ['Breath ' + Math.round(h.breath) + ' / ' + M.breathMax(st(), h), ' · Specialty: ', el('span', { cls: 'gold', text: D.CREATURES[h.spec.cr].plural + ' +' + h.spec.pct + '%' }), ' · Mount: ' + (h.mount === 'kuni' ? 'Kuni Byrd' : 'Domestic Punk')])]), el('div', { cls: 'spacer' }), btn('Close', () => m.close(), 'primary')]));
-      if (h.levelUps.length) { const u = h.levelUps[0]; body.appendChild(el('div', { cls: 'frame', style: { borderColor: '#d9b87a', margin: '8px 0' } }, [el('b', { cls: 'gold', text: '★ Level ' + u.level + '!' }), ' ' + u.stat + ' +1. Raise a skill: ', ...u.choice.map(id => btn(D.SKILLS[id].name + ' → ' + Math.min(5, (h.skills[id] || 0) + 1), () => { RU.resolveLevelUp(st(), h, id); render(); }, 'primary')), u.choice.length ? null : btn('OK', () => { RU.resolveLevelUp(st(), h); render(); })])); }
+      if (h.levelUps.length) { const u = h.levelUps[0]; const sts = u.stats || [u.stat];
+        const pickS = h._pickStat && sts.includes(h._pickStat) ? h._pickStat : null, pickK = h._pickSkill && u.choice.includes(h._pickSkill) ? h._pickSkill : null;
+        const done = () => { if ((pickS || sts.length < 2) && (h._pickSkill || !u.choice.length)) { RU.resolveLevelUp(st(), h, h._pickSkill, h._pickStat || sts[0]); h._pickStat = h._pickSkill = null; } render(); };
+        body.appendChild(el('div', { cls: 'frame', style: { borderColor: '#d9b87a', margin: '8px 0' } }, [el('b', { cls: 'gold', text: '★ Level ' + u.level + '! ' }),
+          'Raise a stat: ', ...sts.map(x => btn(x + ' ' + h.stats[x] + ' → ' + (h.stats[x] + 1), () => { h._pickStat = x; done(); }, pickS === x ? 'primary' : '')),
+          u.choice.length ? el('span', { text: '  and a skill: ' }) : null, ...u.choice.map(id => btn(D.SKILLS[id].name + ' → ' + Math.min(5, (h.skills[id] || 0) + 1), () => { h._pickSkill = id; done(); }, pickK === id ? 'primary' : ''))])); }
       body.appendChild(statRow);
       /* skills */
       const own = Object.entries(h.skills);
@@ -260,7 +265,7 @@
       b.appendChild(el('h3', { text: 'Squadron captains', style: { marginTop: '10px' } }));
       const where = town ? 'the town garrison' : 'your army';
       b.appendChild(el('div', { cls: 'row', style: { alignItems: 'stretch' } }, P.tavern.captains.map((c, i) => el('div', { cls: 'frame col', style: { width: '200px' } }, [el('div', { cls: 'row' }, [U.captainIcon(c, 40, P.color), el('div', {}, [el('b', { text: c.name }), el('div', { cls: 'small muted', text: D.CAPTAIN_RANKS[c.rank].name + ' · ' + D.PEOPLES[c.people].name })])]),
-        el('div', { cls: 'small' }, ['Level ' + c.level + ' · Morale ' + c.morale + ' · Luck ' + c.luck]),
+        el('div', { cls: 'small' }, ['Level ' + c.level + ' · Morale +' + ((c.morale || 0) * 5) + ' · Luck ' + c.luck + ' · Leads ' + c.capacity + (c.elite ? ' (peerless)' : '')]),
         el('div', { cls: 'small', 'data-tip': D.CAPTAIN_ABIL[c.abil].desc }, [el('span', { cls: 'gold', text: D.CAPTAIN_ABIL[c.abil].name }), ': ' + D.CAPTAIN_ABIL[c.abil].desc]),
         btn('Hire — ' + M.captainCost(c) + ' gold', () => { const slots = town ? town.garrison : S.slotsOf(st(), a); const r = RU.hireCaptain(st(), P, town, i, slots); if (!r.ok) U.toast(r.why || 'Cannot hire.'); else U.toast(c.name + ' joins ' + where + '.'); render(); SU.emit('town'); }, 'primary')]))));
       b.appendChild(el('div', { cls: 'acts' }, [btn('Leave', () => m.close())]));
@@ -410,7 +415,9 @@
     const can = tame > 0 || warden, food = Math.ceil(stx.n * 0.8);
     U.modal([el('h2', { text: 'A herd of ' + C.plural }), el('p', { text: stx.n + ' ' + C.plural + ' graze here, wary of you.' }),
       el('p', { cls: 'small muted', text: can ? 'You know how to handle beasts. They can be tamed for ' + food + ' food.' : 'Without Beastmastery (or a Beastwarden captain) they will not let you near.' }),
+      el('p', { cls: 'small muted', text: 'Or drive them home: they follow this army, and the farmers of the first of your towns it reaches take them in. You can then buy them there as mounts, so your armies travel further.' }),
       el('div', { cls: 'acts' }, [btn('Leave them', function () { this.closest('.overlay').remove(); }), btn('Drive them off', function () { this.closest('.overlay').remove(); SU.game.battle({ attacker: a, defender: w }); }, 'danger'),
+        btn('Corral them home', function () { if (a.corral) { U.toast('This army is already driving a herd.'); return; } a.corral = { cr: stx.cr, n: stx.n }; RU.removeArmy(st(), w); this.closest('.overlay').remove(); U.toast('The herd follows you. Bring it to one of your towns.'); U.refresh(); }),
         can ? btn('Tame them', function () { if (P.res.food < food) { U.toast('Not enough food.'); return; } if (!RU.addToSlots(st(), S.slotsOf(st(), a), stx.cr, stx.n, h)) { U.toast('No room for them.'); return; } P.res.food -= food; RU.removeArmy(st(), w); this.closest('.overlay').remove(); U.toast('The herd follows you now.'); U.refresh(); }, 'primary') : null])]);
   };
 
@@ -425,7 +432,7 @@
       if (r.need === 'toll') {
         const P = me(); const resp = o.toll.paid && o.toll.paid[a.owner] || 0;
         const mm = U.modal([el('h2', { text: o.toll.family }), el('p', { text: '“The toll is ' + r.price + ' gold. Pay it three times and you are a friend of the house: your armies pass free for ever.”' }), el('p', { cls: 'small muted', text: 'You have paid ' + resp + ' of 3 times.' }),
-          el('div', { cls: 'acts' }, [btn('Turn back', () => mm.close()), btn('Take the Urverk by force', () => { mm.close(); U.confirm('By force?', 'If you are careless you might kill everyone who knows the trigger — and then nobody can work this Urverk.', () => tollFight()); }, 'danger'), btn('Pay ' + r.price, () => { mm.close(); cross('pay'); }, 'primary')])]);
+          el('div', { cls: 'acts' }, [btn('Turn back', () => mm.close()), btn('Take the Urverk by force', () => { mm.close(); U.confirm('By force?', 'There is a ' + Math.round(Math.max(0, 0.5 - 0.05 * (S.heroOf(st(), a) ? S.skill(st(), S.heroOf(st(), a), 'diplomacy') : 0)) * 100) + '% chance that everyone who knows the trigger dies in the fighting — and then nobody can work this Urverk. Diplomacy makes it less likely.', () => tollFight()); }, 'danger'), btn('Pay ' + r.price, () => { mm.close(); cross('pay'); }, 'primary')])]);
         return;
       }
       if (!r.ok) { if (r.msg) U.alert('Urverk', r.msg); return; }
@@ -436,9 +443,9 @@
       const g = RU.tempWild(st(), a, 3000 + st().day * 200, ['velnur', 'ver', 'kaloeik']);
       SU.game.battle({ attacker: a, defender: g, temp: true, after: rep => {
         if (rep.winner !== 0) return;
-        const h = S.heroOf(st(), a); const careful = h && S.skill(st(), h, 'diplomacy') >= 2;
+        const h = S.heroOf(st(), a); const risk = Math.max(0, 0.5 - 0.05 * (h ? S.skill(st(), h, 'diplomacy') : 0));
         const both = [o, st().objects[o.link]].filter(Boolean);
-        if (!careful && SU.rng(st()).chance(0.45)) { both.forEach(u => { u.triggerKnown = false; if (u.toll) u.toll.alive = false; }); U.alert('Silence', 'Everyone who knew the trigger lies dead. The Urverk is still. Perhaps a seer knows someone who remembers it.'); }
+        if (SU.rng(st()).chance(risk)) { both.forEach(u => { u.triggerKnown = false; if (u.toll) u.toll.alive = false; }); U.alert('Silence', 'Everyone who knew the trigger lies dead. The Urverk is still. Perhaps a seer knows someone who remembers it.'); }
         else { both.forEach(u => { if (u.toll) { u.toll.alive = false; } }); U.alert('The Urverk is yours', 'The family yields and teaches you the trigger. Nobody will ask you for a toll here again.'); }
         U.refresh();
       } });
@@ -514,13 +521,14 @@
         b.appendChild(el('h3', { text: 'Travelling sellers' }));
         const offers = RU.marketOffers(st(), town);
         b.appendChild(el('div', { cls: 'col' }, offers.map((o, i) => { if (o.sold) return null;
-          const label = o.kind === 'relic' ? D.RELICS[o.relic].name : o.kind === 'song' ? 'A scroll of ' + D.SONGS[o.song].name : o.kind === 'res' ? o.amt + ' ' + D.RES_INFO[o.res].name : o.n + ' ' + D.CREATURES[o.cr].plural + ' for hire';
+          const label = o.kind === 'relic' ? D.RELICS[o.relic].name : o.kind === 'song' ? 'A scroll of ' + D.SONGS[o.song].name : o.kind === 'res' ? o.amt + ' ' + D.RES_INFO[o.res].name : o.kind === 'captain' ? 'A travelling captain: ' + o.cap.name + ' (' + D.CAPTAIN_RANKS[o.cap.rank].name + ', ' + D.CAPTAIN_ABIL[o.cap.abil].name + ')' : o.n + ' ' + D.CREATURES[o.cr].plural + ' for hire';
           return el('div', { cls: 'row frame' }, [el('span', { style: { flex: 1 } }, label), U.costView(o.cost, P), btn('Buy', () => {
             if (!RU.afford(P, o.cost)) { U.toast('Not enough.'); return; }
             const h = town.defender && st().heroes[town.defender] || (town.heroes[0] && st().heroes[town.heroes[0]]) || (S.armyAt(st(), town.layer, town.x, town.y) && S.heroOf(st(), S.armyAt(st(), town.layer, town.x, town.y)));
             if ((o.kind === 'relic' || o.kind === 'song') && !h) { U.toast('A hero must be in town to take it.'); return; }
             if (o.kind === 'song' && !RU.canSing(st(), h, o.song)) { U.toast(h.name + ' cannot sing a tier ' + D.SONGS[o.song].tier + ' song yet.'); return; }
             if (o.kind === 'creature' && !RU.addToSlots(st(), town.garrison, o.cr, o.n)) { U.toast('No room in the garrison.'); return; }
+            if (o.kind === 'captain') { const i = town.garrison.findIndex(x => !x); if (i < 0) { U.toast('No room in the garrison.'); return; } town.garrison[i] = M.capSlot(o.cap, []); }
             RU.pay(P, o.cost);
             if (o.kind === 'relic') RU.giveRelic(st(), h, o.relic); if (o.kind === 'song') RU.learnSong(st(), h, o.song); if (o.kind === 'res') P.res[o.res] += o.amt;
             o.sold = true; render(); U.refresh();

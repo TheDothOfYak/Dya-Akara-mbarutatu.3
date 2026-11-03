@@ -228,9 +228,34 @@
     ctx.restore();
   };
 
+  /* where the Rokarvac of the Nekh lies: a ring of standing stones over a crack into the Duat */
+  A.visionSite = function (ctx, o, x, y, ts, t) {
+    const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.85;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ell(ctx, cx, gy, 22 * s, 7 * s); ctx.fill();
+    ctx.shadowColor = '#4fb4e8'; ctx.shadowBlur = 14 * s;
+    ctx.fillStyle = radial(ctx, cx, gy - 4 * s, 16 * s, 'rgba(160,220,255,0.9)', 'rgba(20,30,60,0.2)'); ell(ctx, cx, gy - 2 * s, 14 * s, 4 * s); ctx.fill();
+    ctx.shadowBlur = 0;
+    [-16, -8, 8, 16].forEach((dx, i) => { const h = (14 + (i % 2) * 6) * s; ctx.fillStyle = lin(ctx, cx + dx * s - 3 * s, 0, cx + dx * s + 3 * s, 0, [[0, '#6a6480'], [1, '#2a2638']]);
+      ctx.beginPath(); ctx.moveTo(cx + dx * s - 3 * s, gy - (i === 0 || i === 3 ? 0 : 3) * s); ctx.lineTo(cx + dx * s - 2 * s, gy - h); ctx.lineTo(cx + dx * s + 2 * s, gy - h - 2 * s); ctx.lineTo(cx + dx * s + 3 * s, gy - (i === 0 || i === 3 ? 0 : 3) * s); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * s); });
+    const f = 0.6 + Math.sin(t * 2) * 0.3; ctx.strokeStyle = rgba('#9fd8ff', f); ctx.lineWidth = 1.4 * s;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(cx, gy - 14 * s - i * 5 * s, (4 + i * 3) * s, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+    ctx.restore();
+  };
+
   /* draw any map object */
+  /* every built place sits on trampled earth, so it belongs to the land */
+  function groundPatch(ctx, o, x, y, ts) {
+    const big = o.type === 'town' ? 2.1 : o.type === 'mine' || o.type === 'urverk' ? 1.25 : o.type === 'visit' ? 0.85 : 0;
+    if (!big) return;
+    const cx = o.type === 'mine' ? x : x + ts / 2, cy = y + ts * (o.type === 'town' ? 0.55 : 0.75);
+    const g = ctx.createRadialGradient(cx, cy, ts * 0.1, cx, cy, ts * big);
+    g.addColorStop(0, 'rgba(70,52,34,0.42)'); g.addColorStop(0.6, 'rgba(70,52,34,0.22)'); g.addColorStop(1, 'rgba(70,52,34,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, cy, ts * big, ts * big * 0.5, 0, 0, TAU); ctx.fill();
+  }
   A.object = function (ctx, st, o, x, y, ts, t) {
     const color = o.owner >= 0 ? st.players[o.owner].color : D.NEUTRAL_COLOR;
+    groundPatch(ctx, o, x, y, ts);
     switch (o.type) {
       case 'town': return A.town(ctx, o, x, y, ts, t, color);
       case 'mine': return A.mine(ctx, o, x, y, ts, t, color);
@@ -242,6 +267,7 @@
       case 'scroll': return A.scroll(ctx, o, x, y, ts, t);
       case 'core': return A.coreOnGround(ctx, Object.assign({ kind: st.cores[o.core] && st.cores[o.core].kind }, o), x, y, ts, t);
       case 'boat': return A.boat(ctx, o, x, y, ts, t, color);
+      case 'vision': return A.visionSite(ctx, o, x, y, ts, t);
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

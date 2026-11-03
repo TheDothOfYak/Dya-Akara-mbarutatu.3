@@ -260,47 +260,71 @@ this game (it may appear later as a special event).
 
 ---
 
-## 10. Choices made while building (not yet confirmed)
+## 10. Choices made while building, and what was decided since
 
-These were filled in to get the game running. Every one of them is easy to change.
+Every number here is easy to change (and creature numbers and building costs can be
+changed from the Admin Panel without touching the code).
 
 - **Upgrades for creatures 1–4:** Blinkback Malsti, Velnurthalith Oathguard,
-  Thar Norvek Elder, Scarred Harkal. All stats, costs and abilities are first guesses.
-- **Wild groups are led by rogue Dearcàn captains** (hunters, outlaws, beast-tamers),
-  so the rule "leaders are always Dearcàn" holds for the wilds too. Their captains
-  drop captain cores; strong groups drop a hero-style core with skills.
+  Thar Norvek Elder, Scarred Harkal (names kept for now). One figure stands for
+  each stack in battle.
+- **Wild groups** are led by rogue Dearcàn captains, except pure beasts with no
+  leader: the Ular Naga (a four-legged, many-headed earth Naga, 2×2 hexes, bites
+  two foes at once), Su Naga, RubberMcFly and the wild punk herds. Kuni Byrds are
+  never wild: a hero with Beastmastery 3 can win one at a Kuni Byrd Aerie as a
+  rare mount.
 - **Buildings:** Muster Hall → Hall of Dusk → Duskhold Seat; Palisade Keep → Stone
   Citadel → Duskwall Bastion; Tavern, Market, Granary, Farms, Terraces, Hall of Songs
-  (I–III) → Stygian Choir, Memory Vault, Shipyard, Duat Gate (the Duskareth's Duat art:
-  travel between your own towns), Stygian Well, Vel Sanctum, and the nine dwellings.
-- **Six training halls,** four skills each: Drill Yard, Road Lodge, Counting House,
-  Captains' Lodge, Hall of the Duat, Memory Pens. There are 24 skills and 26 songs
-  (tiers 1–5).
+  (I–III) → Stygian Choir, Memory Vault, Shipyard, Duat Gate, Stygian Well, Vel
+  Sanctum, six training halls, and the nine dwellings.
 - **A month is 42 days** (seven 6-day weeks).
-- **A captain leads 2 stacks** to start. Warcaller, Captaincy, and Command 4 / 8 add more.
-- **XP:** beating a hero's army gives half the usual XP for the creatures killed
-  (none for the hero), and you get their core.
-- **Morale and luck** run from −3 to +3. Morale moves a stack's turn order.
-- **The Kahizecvar** costs 2000 gold, 6 NgAkara and 6 Stygian, doubling each time.
+- **Captains** lead 2 stacks to start; Warcaller, Captaincy and Command 4 / 8 add more.
+  A very rare *peerless* captain (about 1 in 80) is far stronger but leads only one.
+- **XP and levels:** beating a hero's army gives half the usual XP for the creatures
+  killed. Each level offers two stats and two skills; you pick one of each.
+- **Morale** is out of 100, 60 is steady. It skews damage rolls (high toward the top
+  of the range, low toward the bottom); below 35 a stack slows, below 25 it may
+  freeze. A captain's fall costs his squadron 20. **Luck** runs −3 to +3.
+- **Shooting:** double damage with exactly one hex between shooter and target, half
+  beyond 10 hexes, none when an enemy is adjacent. The battle grid stays hexes.
+- **The Kahizecvar** costs 5000 gold and 10 of every other resource, doubling each time.
 - **Urverk families** give free passage after you pay three times, or after you clear
-  wild creatures near their Urverk. Taking it by force: unless the hero has
-  Diplomacy 2, there's a 45% chance everyone who knows the trigger dies.
-- **The Nekh'Vorran** unlocks with any battle won in the eye. If a castle's
-  Nekh'Vorran falls, the castle can call another the next week.
+  wild creatures near their Urverk. Taking one by force: a 50% chance that everyone
+  who knows the trigger dies, 5% less per level of Diplomacy.
+- **The Nekh'Vorran:** end a turn in the eye of the storm and your hero has a vision
+  of the Rokarvac of the Nekh, lying under a strong guard somewhere on the map. It is
+  a blueprint, never used up: while a hero carries it in one of your towns, that town
+  can build the Nekh Hollow. The Nekh'Vorran is then recruited weekly.
+- **The storm** changes its size, eye and speed from day to day on a bell curve
+  (extremes are rare but happen). It refills Breath and washes buried cores up.
+- **Food** is balanced so towns go hungry only in a week of famine; only spare food
+  speeds population growth. Herds can be corralled home and bought back as mounts
+  (mounts are for travel only).
+- **Market day** brings creatures and a captain from outside the factions.
 - **Ways to win** besides conquest: the prophecy (win 3 battles in the eye), the
-  treasury (200,000 gold), or the seat (hold a named town for a week, set in the editor).
-- **Kuni Byrd Aeries:** a hero with Beastmastery 3 can win a Kuni Byrd mount for
-  6000 gold and 30 food.
-- **Online:** when someone attacks you on their turn, the computer fights your side.
-- **Random maps** put each player on a different Tatu by default (the setup can put
-  everyone on Velki instead).
+  treasury (200,000 gold), or the seat (hold a named town for a week). The game ends
+  when every person is out.
+- **Starting:** random starts, kept apart; with three players, one on each Tatu.
+  Five difficulty levels (Wanderer, Ahoac, Captain, Onnar, Elster) set a person's
+  starting stores and the computer's level; a starting hero and a starting bonus are
+  chosen before the game.
+- **Five map sizes:** Small, Medium, Large, Extra large, Gigantic.
+- **Computer personalities:** each computer player draws one for the game
+  (conqueror, raider, builder, explorer, turtle).
+- **Online:** the computer never fights for a person. An attack on someone on
+  another device waits for them; both devices run the same battle and only the
+  choices travel. Rooms have a chat.
+- **Records:** only personal records for solo games; no leaderboard.
 
 ## 11. Not built yet
 
-- Breeding herds (herds can be tamed, not bred).
 - The other two factions (SkarValorin, Elsha'ryn), the campaign, and the Dya'Akara
-  special event.
+  special event (on hold).
+- Siege extras: moats, special defenses, siege machines.
+- Sound (to be written by the creator).
 - An undo button in the map editor, and editing details of placed things (amounts,
   Urverk timings).
-- The computer doesn't use boats or map songs, and plays a fairly simple game.
+- Online battles need both people there at once; an attack on someone who is away
+  waits until it is called off.
+- The computer doesn't use boats or map songs.
 - Balance: every number is untested by people.

@@ -52,9 +52,14 @@
       level: lvl, hp: D.CAPTAIN_BASE.hp + lvl * 12, atk: D.CAPTAIN_BASE.atk + lvl, def: D.CAPTAIN_BASE.def + lvl,
       capacity: D.CAPTAIN_BASE.capacity + (abil === 'warcaller' ? 1 : 0), look: R.int(1, 1e9),
     };
+    /* the rarest of all: a captain so good they lead only one stack, but lead it superbly */
+    if (opts.rank !== 'rogue' && (opts.elite || R.chance(0.012))) {
+      c.elite = true; c.capacity = 1; c.hp *= 2; c.atk += 6; c.def += 6; c.morale += 3; c.luck += 1;
+      c.name += ' the Peerless';
+    }
     return c;
   };
-  M.captainCost = c => 600 + c.level * 250 + (c.rank === 'naelst' ? 400 : 0);
+  M.captainCost = c => 600 + c.level * 250 + (c.rank === 'naelst' ? 400 : 0) + (c.elite ? 4000 : 0);
   M.capSlot = (cap, stacks) => ({ kind: 'cap', cap, stacks: stacks || [], reserve: [] });
 
   /* ---------- memory cores ---------- */
@@ -121,7 +126,7 @@
   const WILD_TABLE = [
     // [creature, minPower, weight, layers]
     ['wildpunk', 0, 6], ['uff', 0, 4], ['dompunk', 0, 4], ['malsti', 0, 3], ['velnur', 0, 3], ['ver', 2000, 2],
-    ['harkal', 5000, 3], ['kaloeik', 12000, 2], ['tyndael', 15000, 2], ['kuni', 20000, 2], ['xiweik', 30000, 1.5], ['naga', 40000, 1.5], ['lutut', 70000, 1],
+    ['harkal', 5000, 3], ['kaloeik', 12000, 2], ['tyndael', 15000, 2], ['xiweik', 30000, 1.5], ['naga', 40000, 1.5], ['ularnaga', 45000, 1.5], ['lutut', 70000, 1],
   ];
   M.wild = function (st, layer, x, y, power, opts) {
     const R = SU.rng(st); opts = opts || {};
@@ -134,12 +139,16 @@
       const c = D.CREATURES[cr]; const unit = c.hp * (c.dmg[0] + c.dmg[1]) * 0.5 * (1 + (c.atk + c.def) * 0.04) * (c.ranged ? 1.3 : 1) * (c.fly ? 1.15 : 1);
       return { cr, n: Math.max(1, Math.round(per / unit)) };
     });
-    /* group them under rogue captains: each captain leads up to 2 stacks */
+    /* group them under rogue captains: each captain leads up to 2 stacks.
+       Pure beasts (the Naga, herds, RubberMcFly) follow no one. */
     const slots = [null, null, null, null, null];
     let si = 0;
-    for (let k = 0; k < stacks.length && si < 5; k += 2) {
+    const beasts = stacks.filter(x => { const C = D.CREATURES[x.cr]; return C.beast || C.herd && (opts.herd || opts.stacks === 1) || x.cr === 'naga' || x.cr === 'mcfly'; });
+    const led = stacks.filter(x => !beasts.includes(x));
+    beasts.forEach(x => { if (si < 5) slots[si++] = { kind: 'stack', cr: x.cr, n: x.n }; });
+    for (let k = 0; k < led.length && si < 5; k += 2) {
       const cap = M.captain(st, { rank: 'rogue', level: SU.clamp(1 + Math.floor(power / 15000), 1, 8) });
-      slots[si++] = M.capSlot(cap, stacks.slice(k, k + 2));
+      slots[si++] = M.capSlot(cap, led.slice(k, k + 2));
     }
     const a = M.army(st, -1, layer, x, y, null, slots);
     a.wild = true; a.guard = opts.guard || null; a.roam = !!opts.roam; a.herd = !!(opts.herd || (D.CREATURES[kinds[0]].herd && stacks.length === 1 && R.chance(0.6)));
@@ -151,7 +160,7 @@
   M.player = function (st, idx, cfg) {
     return {
       idx, name: cfg.name || ('Player ' + (idx + 1)), color: cfg.color || D.PLAYER_COLORS[idx].c, colorId: cfg.colorId || D.PLAYER_COLORS[idx].id,
-      kind: cfg.kind || 'human', ai: cfg.ai || 'normal', team: cfg.team || 0, account: cfg.account || null,
+      kind: cfg.kind || 'human', ai: cfg.ai || 'normal', team: cfg.team || 0, account: cfg.account || null, faction: cfg.faction || 'duskareth',
       res: Object.assign({}, D.START_RES), alive: true, explored: st.layers.map(L => new Uint8Array(L.w * L.h)),
       unlocked: [], tavern: { heroes: [], captains: [] }, knownUrverk: [], vault: [], hungry: 0,
       startLayer: 0, daysWithoutTown: 0, respect: {}, quests: [], stormWins: 0,

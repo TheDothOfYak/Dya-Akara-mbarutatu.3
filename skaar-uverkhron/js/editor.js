@@ -208,7 +208,7 @@
   E.gameFromMap = function (map, setup) {
     const st = E.mapToState(map);
     st.seed = setup.seed || (Math.random() * 1e9) | 0; st.rngState = st.seed ^ 0x5bd1e995; st._rng = null;
-    st.setup = SU.deep(setup); st.setup.name = setup.name || map.name; st.setup.mapName = map.name;
+    st.setup = SU.deep(setup); st.setup.name = setup.name || map.name; st.setup.mapName = map.name; st.setup.size = map.size || setup.size;
     if (map.win && map.win.kind !== 'conquer') st.setup.win = SU.deep(map.win);
     st.players = setup.players.map((pc, i) => M.player(st, i, pc));
     const starts = (map.starts || []).map(id => st.objects[id]).filter(Boolean);
@@ -217,7 +217,7 @@
     starts.slice(st.players.length).forEach(t => { delete t.start; t.owner = -1; });
     S.rebuild(st);
     SU.mapgen.startArmies(st);
-    st.storm = RU.newStorm(st);
+    st.storm = setup.storm === false ? null : RU.newStorm(st);
     SU.syncRng(st);
     return st;
   };

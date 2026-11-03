@@ -13,8 +13,11 @@
   const YS = 0.74;   // the slant: hexes are squashed so the field reads as ground
   const rgba = A.rgba;
 
-  /* control(side) → 'human' | 'ai'; done(report) */
-  BV.start = function (B, control, done) {
+  /* control(side) → 'human' | 'ai' | 'remote'; done(report).
+     net (online battles): { send(cmd), next() → cmd or null }. Both devices run the same
+     battle from the same state; only a person's choices travel, the dice agree. */
+  BV.start = function (B, control, done, net) {
+    BV.net = net || null;
     BV.B = B; BV.control = control; BV.done = done; BV.anims = []; BV.pos = {}; BV.mode = null; BV.hover = null; BV.over = false;
     const scr = document.getElementById('battle'); scr.innerHTML = ''; scr.classList.remove('hidden');
     SU.mapView.hidden = true;
@@ -198,7 +201,7 @@
     const f = u.side === 0 ? 1 : -1;
     if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.75, u.cap, col, t + u.uid, f, u._pose);
     else {
-      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, mcfly: 2 }[C.art] || 1.6);
+      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2 }[C.art] || 1.6);
       const extra = C.art === 'nekh' ? { flat: true, stretch: 3.9 } : {};
       A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1), color: col }, extra));
     }
@@ -235,7 +238,7 @@
     const sd = B.sides[u.side], act = BT.activeUnit(B);
     const lines = [];
     if (u.kind === 'cap') lines.push('<b>Captain ' + U.esc(u.name) + '</b> — ' + D.CAPTAIN_RANKS[u.cap.rank].name, 'Health ' + u.hpTop + ' / ' + u.hp + ' · Attack ' + u.atk + ' · Defense ' + u.def, D.CAPTAIN_ABIL[u.cap.abil].name + ': ' + D.CAPTAIN_ABIL[u.cap.abil].desc);
-    else { const C = D.CREATURES[u.cr]; lines.push('<b>' + u.n + ' ' + C.plural + '</b> (' + U.esc(sd.label) + ')', 'Attack ' + u.atk + ' · Defense ' + u.def + ' · Damage ' + C.dmg[0] + '–' + C.dmg[1], 'Health ' + u.hpTop + ' / ' + u.hp + ' · Speed ' + u.spd + (u.ranged ? ' · Shots ' + u.shots : ''), 'Morale ' + (u.morale > 0 ? '+' : '') + (u.morale || 0) + (B.el === C.el ? ' · comfortable here' : '')); }
+    else { const C = D.CREATURES[u.cr]; lines.push('<b>' + u.n + ' ' + C.plural + '</b> (' + U.esc(sd.label) + ')', 'Attack ' + u.atk + ' · Defense ' + u.def + ' · Damage ' + C.dmg[0] + '–' + C.dmg[1], 'Health ' + u.hpTop + ' / ' + u.hp + ' · Speed ' + u.spd + (u.ranged ? ' · Shots ' + u.shots : ''), 'Morale ' + (u.morale == null ? 60 : u.morale) + ' (' + BT.moraleWord(u.morale == null ? 60 : u.morale) + ')' + (B.el === C.el ? ' · comfortable here' : '')); }
     if (act && act.side !== u.side && humanTurn()) { const shoot = BT.canShoot(B, act); const est = BT.estimate(U.st, B, act, u, shoot); lines.push('<span class="gold">' + (shoot ? 'Shoot' : 'Attack') + ': about ' + est + ' damage, ' + Math.min(u.n, Math.floor(est / u.hp)) + '–' + Math.min(u.n, Math.ceil(est / u.hp)) + ' fall</span>'); }
     BV.card.innerHTML = lines.join('<br>'); BV.card.classList.remove('hidden');
     BV.card.style.left = Math.min(window.innerWidth - 240, e.clientX + 16) + 'px'; BV.card.style.top = Math.max(10, e.clientY - 80) + 'px';
@@ -243,7 +246,17 @@
 
   /* ======================= controls ======================= */
   function humanTurn() { const B = BV.B, u = BT.activeUnit(B); return !!(u && !B.over && BV.control(u.side) === 'human' && !animating()); }
-  function act(a) { if (!humanTurn()) return; const r = BT.act(U.st, BV.B, a); if (!r.ok) { if (r.why) U.toast(r.why); return; } BV.mode = null; after(); }
+  BV._act = a => act(a);   /* for the tests */
+  function act(a) { if (!humanTurn()) return; const r = BT.act(U.st, BV.B, a); if (!r.ok) { if (r.why) U.toast(r.why); return; } send({ k: 'act', a: { type: a.type, t: a.target ? a.target.uid : null, c: a.c, r: a.r } }); BV.mode = null; after(); }
+  function send(cmd) { if (BV.net) BV.net.send(cmd); }
+  /* a move made on the other player's device */
+  function applyRemote(cmd) {
+    const B = BV.B, U_ = uid => uid == null ? null : B.units.find(x => x.uid === uid) || null;
+    if (cmd.k === 'act') return BT.act(U.st, B, Object.assign({}, cmd.a, { target: U_(cmd.a.t) }));
+    if (cmd.k === 'sing') return BT.sing(U.st, B, cmd.side, cmd.song, U_(cmd.t), cmd.c, cmd.r);
+    if (cmd.k === 'surr') return BT.surrender(U.st, B, cmd.side, cmd.cost);
+    return { ok: false };
+  }
   function after() { drainAnims(); renderBar(); setTimeout(tick, 60); }
   function click(h, mx, my) {
     const B = BV.B; if (!h || !humanTurn()) return;
@@ -267,6 +280,7 @@
     const B = BV.B, side = BT.activeUnit(B).side;
     const res = BT.sing(U.st, B, side, song, target, c, r);
     if (!res.ok) { U.toast(res.why || 'That song cannot go there.'); return; }
+    send({ k: 'sing', side, song, t: target ? target.uid : null, c, r });
     BV.mode = null; after();
   }
   function songMenu() {
@@ -289,7 +303,7 @@
     BV.bar.innerHTML = '';
     if (B.over) return;
     const mine = u && BV.control(u.side) === 'human';
-    BV.bar.appendChild(el('div', { cls: 'gold', style: { minWidth: '260px' } }, u ? (mine ? 'Your move: ' : 'Waiting: ') + (u.kind === 'cap' ? 'Captain ' + u.name : u.n + ' ' + u.name) + ' (round ' + B.round + ')' : ''));
+    BV.bar.appendChild(el('div', { cls: 'gold', style: { minWidth: '260px' } }, u ? (mine ? 'Your move: ' : BV.control(u.side) === 'remote' ? (st.players[B.sides[u.side].owner] || {}).name + ' is choosing: ' : 'Waiting: ') + (u.kind === 'cap' ? 'Captain ' + u.name : u.n + ' ' + u.name) + ' (round ' + B.round + ')' : ''));
     if (!mine) return;
     BV.bar.appendChild(btn('Wait (W)', () => act({ type: 'wait' }), '', 'Act later this round'));
     BV.bar.appendChild(btn('Defend (D)', () => act({ type: 'defend' }), '', '+30% defense until its next turn'));
@@ -304,7 +318,8 @@
   function surrender(side) {
     const B = BV.B, st = U.st, other = B.sides[1 - side];
     const base = BT.surrenderCost(st, B, side);
-    const go = cost => { const r = BT.surrender(st, B, side, cost); if (!r.ok) { U.toast(r.why); return; } after(); };
+    const go = cost => { const r = BT.surrender(st, B, side, cost); if (!r.ok) { U.toast(r.why); return; } send({ k: 'surr', side, cost }); after(); };
+    if (BV.net) { U.confirm('Surrender?', 'Pay ' + base + ' gold to leave the field. Your hero and army go home.', () => go(base)); return; }
     if (other.owner >= 0 && st.players[other.owner].kind === 'human' && other.owner !== B.sides[side].owner) {
       /* the other player names the price */
       const inp = el('input', { cls: 'inp', type: 'number', value: base, min: 0, step: 100 });
@@ -320,6 +335,12 @@
     if (B.over) return finish();
     const u = BT.activeUnit(B); if (!u) return finish();
     renderBar();
+    if (BV.control(u.side) === 'remote') {
+      const cmd = BV.net && BV.net.next();
+      if (!cmd) { setTimeout(tick, 400); return; }
+      const r = applyRemote(cmd); if (!r || !r.ok) console.warn('A move from the other device did not fit', cmd);
+      drainAnims(); renderBar(); setTimeout(tick, 60); return;
+    }
     if (BV.control(u.side) === 'ai') { setTimeout(() => { if (BV.over || !BT.activeUnit(B) || animating()) { setTimeout(tick, 60); return; } BT.aiMove(U.st, B); drainAnims(); renderBar(); setTimeout(tick, 60); }, SU.ui.fast ? 80 : 260); }
   }
   function finish() {

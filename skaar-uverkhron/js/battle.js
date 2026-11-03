@@ -97,7 +97,7 @@
     const sd = B.sides[side];
     if (o.kind === 'cap') {
       const cap = o.cap, capt = o.hero ? S.skill(st, o.hero, 'captaincy') : 0;
-      Object.assign(u, { cap, name: cap.name, abil: [], shape: [1, 1], n: 1, hp: cap.hp, hpTop: cap.hp, startN: 1, atk: cap.atk + capt, def: cap.def + capt, dmg: [4 + cap.level, 7 + cap.level * 2], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: cap.morale || 0 });
+      Object.assign(u, { cap, name: cap.name, abil: [], shape: [1, 1], n: 1, hp: cap.hp, hpTop: cap.hp, startN: 1, atk: cap.atk + capt, def: cap.def + capt, dmg: [4 + cap.level, 7 + cap.level * 2], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: SU.clamp(60 + (cap.morale || 0) * 5 + (cap.elite ? 15 : 0), 0, 100) });
     } else {
       const c = D.CREATURES[o.cr];
       const n = o.parts ? o.parts.reduce((t, p) => t + p.ref.n, 0) : o.n;
@@ -151,7 +151,7 @@
   /* ======================= turn order ======================= */
   B_.initiative = function (B, u) {
     const sd = B.sides[u.side];
-    let i = u.spd + (u.morale || 0) + Math.floor(sd.cunning / 3) + (u.fx.quick ? 2 : 0) - (u.fx.slow ? 2 : 0) + (sd.sanctum ? 1 : 0);
+    let i = u.spd + Math.floor(sd.cunning / 3) + (u.fx.quick ? 2 : 0) - (u.fx.slow ? 2 : 0) + (sd.sanctum ? 1 : 0) - B_.moraleSlow(u);
     return i;
   };
   function nextRound(st, B) {
@@ -180,6 +180,7 @@
       if (u.fx.burn) { const d = u.fx.burn; u.fx.burn = 0; applyDamage(st, B, null, u, d, 'burns'); if (u.n <= 0) { if (checkOver(st, B)) return; continue; } }
       if (u.fx.stun) { u.fx.stun = 0; say(B, u.name + ' are stunned and lose their turn.'); continue; }
       if (u.fx.confused) { u.fx.confused = 0; say(B, u.name + ' are confused and lose their turn.'); continue; }
+      if (u.kind === 'stack' && u.morale != null && u.morale < 25 && SU.rng(st).chance((25 - u.morale) / 50)) { say(B, 'The ' + u.name + ' freeze in fear.'); B.anim.push({ kind: 'luck', uid: u.uid }); continue; }
       B.active = u.uid;
       /* the Xiw'Eik sing their chaos */
       if (u.abil && u.abil.includes('chaos') && SU.rng(st).chance(0.3)) chaosSong(st, B, u);
@@ -199,11 +200,14 @@
     return false;
   }
   B_.activeUnit = B => B.units.find(u => u.uid === B.active) || null;
+  /* morale (0–100, 60 steady): low morale slows a stack, and very low can freeze it */
+  B_.moraleSlow = u => { const m = u.morale == null ? 60 : u.morale; return m < 20 ? 2 : m < 35 ? 1 : 0; };
+  B_.moraleWord = m => m >= 90 ? 'fearless' : m >= 75 ? 'eager' : m >= 55 ? 'steady' : m >= 35 ? 'uneasy' : m >= 20 ? 'shaken' : 'broken';
 
   /* ======================= movement ======================= */
   /* every head-cell the unit can reach this turn → {c,r,d} */
   B_.reach = function (B, u) {
-    const sp = Math.max(1, u.spd + (u.fx.quick ? 2 : 0) - (u.fx.slow ? 2 : 0));
+    const sp = Math.max(1, u.spd + (u.fx.quick ? 2 : 0) - (u.fx.slow ? 2 : 0) - B_.moraleSlow(u));
     const out = new Map(); out.set(key(u.c, u.r), { c: u.c, r: u.r, d: 0 });
     if (u.fly) {
       for (let r = 0; r < B.rows; r++) for (let c = 0; c < B.cols; c++) { const d = HX.dist(u.c, u.r, c, r); if (d <= sp && fits(B, c, r, u.shape, u.side, u, true)) out.set(key(c, r), { c, r, d }); }
@@ -314,15 +318,19 @@
     if (B.siege && t.side === 1 && t.c > B.siege.wc && ranged && a.side === 0) Df += 3;
     const f = A >= Df ? Math.min(3, 1 + 0.05 * (A - Df)) : Math.max(0.3, 1 - 0.025 * (Df - A));
     const [mn, mx] = a.dmg;
+    /* morale skews each blow toward the top (high) or bottom (low) of its damage range */
+    const mor = a.morale == null ? 60 : a.morale, bias = (mor - 60) / 40;
+    const k = bias >= 0 ? 1 / (1 + bias * 1.5) : 1 + -bias * 1.5;      // roll^k
     let base;
-    if (avgOnly) base = a.n * (mn + mx) / 2;
-    else if (a.n <= 10) { base = 0; for (let i = 0; i < a.n; i++) base += R.int(mn, mx); }
-    else base = a.n * (mn + (mx - mn) * R.range(0.3, 0.7));
+    if (avgOnly) base = a.n * (mn + (mx - mn) / (k + 1));
+    else if (a.n <= 12) { base = 0; for (let i = 0; i < a.n; i++) base += mn + (mx - mn) * Math.pow(R.next(), k); }
+    else base = a.n * (mn + (mx - mn) / (k + 1) * R.range(0.85, 1.15));
     let d = base * f;
     if (ha) d *= 1 + (ranged ? S.skillVal(st, ha, 'marks') + S.relicMod(st, ha, 'rangedPct') : S.skillVal(st, ha, 'drill')) / 100;
     if (ha && ha.spec && a.cr && (a.cr === ha.spec.cr || D.CREATURES[a.cr].up === ha.spec.cr || D.CREATURES[ha.spec.cr] && D.CREATURES[ha.spec.cr].up === a.cr)) d *= 1 + ha.spec.pct / 100;
     if (ranged && a.fx.dim) d *= 0.6;
-    if (ranged && B.siege && B.siege.cells && HX.dist(a.c, a.r, t.c, t.r) > 10) d *= 0.5;
+    if (ranged) { const dist = Math.min(...cellsOf(a).flatMap(([c1, r1]) => cellsOf(t).map(([c2, r2]) => HX.dist(c1, r1, c2, r2))));
+      if (dist === 2) d *= 2; else if (dist > 10) d *= 0.5; }
     if (a.abil && a.abil.includes('frenzy')) d *= 1 + 0.5 * (1 - a.n / Math.max(1, a.startN)) + (a.abil.includes('scars') ? 0.1 : 0);
     if (a.abil && a.abil.includes('dive') && a.firstStrike) d *= 1.5;
     if (ht) d *= 1 - S.skillVal(st, ht, 'shieldwall') / 100;
@@ -343,7 +351,8 @@
     if (a.abil) {
       if ((a.abil.includes('thief') || a.abil.includes('thief2')) && !retaliation) steal(st, B, a, t, d);
       if (a.abil.includes('burn') && t.n > 0) t.fx.burn = Math.round(d * 0.15);
-      if (a.abil.includes('dread') && t.n > 0) { t.morale = Math.max(-3, (t.morale || 0) - 1); }
+      if (a.abil.includes('dread') && t.n > 0) { t.morale = Math.max(0, (t.morale == null ? 60 : t.morale) - 10); }
+      if (a.abil.includes('heads') && !retaliation) { const other = B_.alive(B).find(o => o.side === t.side && o !== t && B_.adjacent(a, o)); if (other) applyDamage(st, B, a, other, Math.round(d * 0.5), 'bite'); }
       if (a.abil.includes('screech') && a.firstStrike && t.n > 0 && R.chance(0.35)) { t.fx.stun = 1; say(B, 'The Lutut’s screech stuns the ' + t.name + '!'); }
       if (a.abil.includes('devour')) heal(B, a, Math.round(d * 0.25));
     }
@@ -363,7 +372,7 @@
     if (t.cr === 'mcfly' && a) { B.killedMcfly[a.side] = true; say(B, 'A RubberMcFly is killed. That is very bad luck.'); }
     if (t.kind === 'cap') {
       say(B, 'Captain ' + t.name + ' has fallen! Their squadron loses heart.');
-      B.units.forEach(x => { if (x.squad === t.squad && x.n > 0) x.morale = Math.max(-3, (x.morale || 0) - 2); });
+      B.units.forEach(x => { if (x.squad === t.squad && x.n > 0) x.morale = Math.max(0, (x.morale == null ? 60 : x.morale) - 20); });
       B.fallenCaps.push({ side: t.side, cap: t.cap, path: t.path, ward: !!t.fx.ward });
     } else if (B.reserves) {
       /* a reservist captain's reserve steps in */
@@ -441,7 +450,7 @@
     if (need === 'captain' && (!target || target.kind !== 'cap' || target.side !== side)) return { ok: false, why: 'Choose one of your captains.' };
     switch (song) {
       case 'mend': heal(B, target, P * 3); break;
-      case 'rally': target.morale = Math.min(3, (target.morale || 0) + 1 + (P > 40 ? 1 : 0)); break;
+      case 'rally': target.morale = Math.min(100, (target.morale == null ? 60 : target.morale) + 15 + (P > 40 ? 10 : 0)); break;
       case 'quickstep': target.fx.quick = 3; break;
       case 'dimsight': target.fx.dim = 3; break;
       case 'shroud': target.fx.shroud = 1; break;
@@ -451,7 +460,7 @@
       case 'duatstep': if (c == null || !fits(B, c, r, target.shape, target.side, target)) return { ok: false, why: 'Choose an empty spot.' }; B.anim.push({ kind: 'blink', uid: target.uid, from: [target.c, target.r], to: [c, r] }); target.c = c; target.r = r; break;
       case 'ward': target.fx.ward = 1; break;
       case 'dusklash': applyDamage(st, B, null, target, P * 3, 'are lashed by shadow'); break;
-      case 'massrally': allies.forEach(u => u.morale = Math.min(3, (u.morale || 0) + 1)); break;
+      case 'massrally': allies.forEach(u => u.morale = Math.min(100, (u.morale == null ? 60 : u.morale) + 12)); break;
       case 'tide': foes.filter(u => u === target || B_.adjacent(u, target)).forEach(u => applyDamage(st, B, null, u, P * 2, 'are swept by the Tide of Shadows')); break;
       case 'massmend': allies.forEach(u => heal(B, u, P * 2)); break;
       case 'nekhcall': foes.filter(u => u === target || B_.adjacent(u, target)).forEach(u => applyDamage(st, B, null, u, P * 4, 'are swallowed by the ground')); break;
@@ -606,7 +615,7 @@
     /* tidy the winner's slots: empty stacks go */
     cleanSlots(B.sides[win].slots);
     const wa = sideArmy(win);
-    if (wa && !wa.heroId && !S.captainsIn(wa.slots).length) { rep.scattered = true; RU.removeArmy(st, wa); }
+    if (wa && !wa.heroId && !wa.wild && !S.captainsIn(wa.slots).length) { rep.scattered = true; RU.removeArmy(st, wa); }
     if (wa && S.isEmptySlots(S.slotsOf(st, wa)) && !wa.heroId) RU.removeArmy(st, wa);
     /* the eye of the storm */
     if (B.inEye && B.sides[win].owner >= 0) {

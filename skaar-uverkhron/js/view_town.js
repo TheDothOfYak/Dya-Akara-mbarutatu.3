@@ -34,13 +34,15 @@
     scr.innerHTML = '';
     T.cv = el('canvas', { cls: 'bg' }); scr.appendChild(T.cv);
     T.top = el('div', { cls: 'town-top' }); scr.appendChild(T.top);
-    T.ui = el('div', { cls: 'town-ui', style: { gridTemplateColumns: '1fr', top: '58%', overflowY: 'auto' } }); scr.appendChild(T.ui);
+    T.ui = el('div', { cls: 'town-ui town-drawer' }); scr.appendChild(T.ui);
+    T.open_ = T.open_ == null ? false : T.open_;
     T.cv.onmousemove = e => { const b = hit(e); T.hoverB = b; U.tip(b ? '<b>' + D.BUILDINGS[b].name + '</b><br>' + D.BUILDINGS[b].desc : null, e.clientX, e.clientY); T.cv.style.cursor = b ? 'pointer' : 'default'; };
     T.cv.onmouseleave = () => U.tip(null);
     T.cv.onclick = e => { const b = hit(e); if (!b) return; const B = D.BUILDINGS[b];
       if (TAB_FOR[b] === 'tavern') return DL.tavern(T.town);
       if (TAB_FOR[b] === 'market') return DL.market(T.town);
       if (B.dwell || B.dwellUp) T.tab = 'recruit'; else if (B.teaches || B.songTier) T.tab = 'heroes'; else if (TAB_FOR[b]) T.tab = TAB_FOR[b]; else T.tab = 'build';
+      T.open_ = true;
       T.render(); };
     T.render();
     if (!T.raf) { const loop = now => { T.raf = requestAnimationFrame(loop); if (!document.getElementById('town').classList.contains('hidden')) draw(now / 1000); }; T.raf = requestAnimationFrame(loop); }
@@ -53,9 +55,9 @@
   function layout() {
     const r = T.cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
     if (T.cv.width !== Math.round(r.width * dpr) || T.cv.height !== Math.round(r.height * dpr)) { T.cv.width = Math.round(r.width * dpr); T.cv.height = Math.round(r.height * dpr); }
-    const areaH = r.height * 0.6;
-    const sc = Math.min(r.width / VW, areaH / (VH * 0.9));
-    return { dpr, sc, ox: (r.width - VW * sc) / 2, oy: areaH - VH * 0.94 * sc, w: r.width, h: r.height };
+    /* the picture covers the whole screen (cropped at the edges if it must) */
+    const sc = Math.max(r.width / VW, r.height / VH);
+    return { dpr, sc, ox: (r.width - VW * sc) / 2, oy: (r.height - VH * sc) / 2, w: r.width, h: r.height };
   }
   function hit(e) {
     const r = T.cv.getBoundingClientRect(), L = layout();
@@ -81,23 +83,77 @@
     g.fillStyle = '#2a2240'; g.beginPath(); g.moveTo(-400, 520); for (let x = -400; x <= VW + 400; x += 80) g.lineTo(x, 430 - Math.abs(Math.sin(x * 0.011)) * 120 - Math.sin(x * 0.037) * 30); g.lineTo(VW + 400, 600); g.lineTo(-400, 600); g.fill();
     g.fillStyle = '#1e1830'; g.beginPath(); g.moveTo(-400, 560); for (let x = -400; x <= VW + 400; x += 60) g.lineTo(x, 500 - Math.abs(Math.sin(x * 0.02 + 1)) * 60); g.lineTo(VW + 400, 620); g.lineTo(-400, 620); g.fill();
     g.fillStyle = lin(g, 0, 520, 0, 900, [[0, '#2e2840'], [1, '#141020']]); g.fillRect(-400, 540, VW + 800, 400);
-    g.strokeStyle = rgba('#8e7cff', 0.25); g.lineWidth = 2; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(i * 190 - 50, 900); g.lineTo(i * 190 + 30 + Math.sin(i) * 60, 620); g.stroke(); }
+    /* paths and a flagstone plaza before the hall */
+    g.fillStyle = lin(g, 0, 620, 0, 900, [[0, '#3a3448'], [1, '#26202f']]); g.beginPath(); g.ellipse(800, 700, 520, 120, 0, 0, Math.PI * 2); g.fill();
+    g.save(); g.beginPath(); g.ellipse(800, 700, 520, 120, 0, 0, Math.PI * 2); g.clip();
+    for (let yy = 590; yy < 830; yy += 16) for (let xx = 260 + ((yy / 16) % 2) * 14; xx < 1340; xx += 28) { g.fillStyle = 'rgba(255,255,255,' + (0.02 + ((xx * 7 + yy) % 5) * 0.012) + ')'; g.fillRect(xx, yy, 26, 14); g.strokeStyle = 'rgba(0,0,0,0.25)'; g.strokeRect(xx, yy, 26, 14); }
+    g.restore();
+    g.strokeStyle = rgba('#8e7cff', 0.22); g.lineWidth = 2; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(i * 190 - 50, 900); g.lineTo(i * 190 + 30 + Math.sin(i) * 60, 620); g.stroke(); }
+    /* lanterns */
+    [[330, 690], [560, 650], [1050, 650], [1280, 690], [800, 760]].forEach(([lx, ly], i) => { g.strokeStyle = '#2a2236'; g.lineWidth = 4; g.beginPath(); g.moveTo(lx, ly); g.lineTo(lx, ly - 60); g.stroke();
+      g.save(); g.shadowColor = '#ffcf6a'; g.shadowBlur = 24; g.fillStyle = 'rgba(255,214,130,' + (0.8 + Math.sin(t * 3 + i) * 0.15) + ')'; g.beginPath(); g.ellipse(lx, ly - 66, 7, 9, 0, 0, Math.PI * 2); g.fill(); g.restore();
+      g.fillStyle = radial(g, lx, ly - 30, 70, 'rgba(255,200,120,0.14)', 'rgba(255,200,120,0)'); g.beginPath(); g.ellipse(lx, ly, 70, 22, 0, 0, Math.PI * 2); g.fill(); });
     if (town.coast || town.built.includes('shipyard')) { g.fillStyle = lin(g, 0, 700, 0, 900, [[0, '#2a5f86'], [1, '#12344e']]); g.beginPath(); g.moveTo(-400, 700); g.quadraticCurveTo(100, 690, 180, 900); g.lineTo(-400, 900); g.fill(); }
     /* buildings, back to front */
     const list = town.built.filter(b => SPOT[b]).sort((a, b) => SPOT[a][1] - SPOT[b][1]);
     list.forEach(b => { const [x, y, kind, lvl] = SPOT[b]; g.save(); g.translate(x, y); drawBuilding(g, kind, lvl || 1, t, b === T.hoverB); g.restore(); });
+    /* mist low over the land */
+    for (let k = 0; k < 3; k++) { const yy = 560 + k * 50, off = (t * (6 + k * 4)) % 400; g.fillStyle = lin(g, 0, yy - 30, 0, yy + 30, [[0, 'rgba(180,170,220,0)'], [0.5, 'rgba(180,170,220,' + (0.08 - k * 0.02) + ')'], [1, 'rgba(180,170,220,0)']]); g.fillRect(-400 + off - 400, yy - 30, VW + 1600, 60); }
     /* the visiting hero at the gate */
     const vis = visitor(); if (vis && vis.heroId) A.mountedHero(g, 860, 880, 70, st.heroes[vis.heroId], st.players[town.owner].color, t, -1);
     g.restore();
   }
+  /* a block of masonry seen from the front and a little to the side */
   function stone(g, x, y, w, h, col) {
-    g.fillStyle = lin(g, x, y, x + w, y + h, [[0, shade(col, 15)], [1, shade(col, -35)]]); g.fillRect(x, y, w, h);
-    g.strokeStyle = 'rgba(8,6,12,0.4)'; g.lineWidth = 1.2;
-    for (let r = y + 12; r < y + h; r += 12) { g.beginPath(); g.moveTo(x, r); g.lineTo(x + w, r); g.stroke(); }
-    g.strokeStyle = 'rgba(8,6,12,0.85)'; g.lineWidth = 2; g.strokeRect(x, y, w, h);
+    const d = Math.min(w * 0.28, 30), dy = d * 0.5;
+    /* contact shadow */
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(x + w / 2 + d * 0.5, y + h + 4, w * 0.62 + d * 0.5, 10, 0, 0, Math.PI * 2); g.fill();
+    /* side face, in shade */
+    g.fillStyle = lin(g, x + w, y, x + w + d, y, [[0, shade(col, -42)], [1, shade(col, -58)]]);
+    g.beginPath(); g.moveTo(x + w, y); g.lineTo(x + w + d, y - dy); g.lineTo(x + w + d, y + h - dy); g.lineTo(x + w, y + h); g.closePath(); g.fill();
+    /* top */
+    g.fillStyle = shade(col, 22); g.beginPath(); g.moveTo(x, y); g.lineTo(x + d, y - dy); g.lineTo(x + w + d, y - dy); g.lineTo(x + w, y); g.closePath(); g.fill();
+    /* front face with light from the left */
+    g.fillStyle = lin(g, x, y, x + w, y + h, [[0, shade(col, 18)], [0.7, col], [1, shade(col, -22)]]); g.fillRect(x, y, w, h);
+    /* brick courses, staggered, each stone a little different */
+    const R = SU.makeRng(Math.round(x * 3 + y * 7 + w));
+    g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+    for (let r = 0, yy = y; yy < y + h; r++, yy += 11) for (let xx = x - (r % 2) * 9; xx < x + w; xx += 18) {
+      g.fillStyle = rgba(R.chance(0.5) ? '#ffffff' : '#000000', R.range(0.02, 0.08)); g.fillRect(xx + 1, yy + 1, 16, 9);
+      g.strokeStyle = 'rgba(8,6,12,0.28)'; g.lineWidth = 1; g.strokeRect(xx + 0.5, yy + 0.5, 18, 11);
+    }
+    /* weathering at the foot */
+    g.fillStyle = lin(g, 0, y + h - 30, 0, y + h, [[0, 'rgba(10,8,16,0)'], [1, 'rgba(10,8,16,0.45)']]); g.fillRect(x, y + h - 30, w, 30);
+    g.restore();
+    g.strokeStyle = 'rgba(8,6,12,0.55)'; g.lineWidth = 1.2; g.strokeRect(x, y, w, h);
+    /* side courses */
+    g.strokeStyle = 'rgba(0,0,0,0.25)'; for (let yy = y + 11; yy < y + h; yy += 11) { g.beginPath(); g.moveTo(x + w, yy); g.lineTo(x + w + d, yy - dy); g.stroke(); }
   }
-  function roof(g, x, y, w, h, col) { g.fillStyle = lin(g, x, y - h, x + w, y, [[0, shade(col, 25)], [1, shade(col, -40)]]); g.beginPath(); g.moveTo(x - 8, y); g.lineTo(x + w / 2, y - h); g.lineTo(x + w + 8, y); g.closePath(); g.fill(); outline(g, 2); }
-  function windowLit(g, x, y, w, h, col) { g.save(); g.shadowColor = col || '#ffcf6a'; g.shadowBlur = 12; g.fillStyle = col || '#ffcf6a'; g.beginPath(); g.moveTo(x, y + h); g.lineTo(x, y + w / 2); g.arc(x + w / 2, y + w / 2, w / 2, Math.PI, 0); g.lineTo(x + w, y + h); g.closePath(); g.fill(); g.restore(); }
+  /* a pitched roof of tiles: the gable at the front, a slope running back */
+  function roof(g, x, y, w, h, col) {
+    const d = Math.min(w * 0.28, 30), dy = d * 0.5;
+    /* the far slope, receding */
+    g.fillStyle = lin(g, x + w / 2, y - h, x + w + d, y, [[0, shade(col, -20)], [1, shade(col, -48)]]);
+    g.beginPath(); g.moveTo(x + w / 2, y - h); g.lineTo(x + w / 2 + d, y - h - dy); g.lineTo(x + w + 8 + d, y - dy); g.lineTo(x + w + 8, y); g.closePath(); g.fill();
+    /* tile rows on the slope */
+    g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 1;
+    for (let k = 1; k < 6; k++) { const f = k / 6; g.beginPath(); g.moveTo(SU.lerp(x + w / 2, x + w + 8, f), SU.lerp(y - h, y, f)); g.lineTo(SU.lerp(x + w / 2, x + w + 8, f) + d, SU.lerp(y - h, y, f) - dy); g.stroke(); }
+    /* the gable */
+    g.fillStyle = lin(g, x, y - h, x + w, y, [[0, shade(col, 28)], [1, shade(col, -26)]]);
+    g.beginPath(); g.moveTo(x - 8, y); g.lineTo(x + w / 2, y - h); g.lineTo(x + w + 8, y); g.closePath(); g.fill();
+    g.save(); g.clip(); g.strokeStyle = 'rgba(0,0,0,0.22)';
+    for (let yy = y - h + 8; yy < y; yy += 8) { g.beginPath(); g.moveTo(x - 10, yy); g.lineTo(x + w + 10, yy); g.stroke(); for (let xx = x - 10 + ((yy / 8) % 2) * 6; xx < x + w + 10; xx += 12) { g.beginPath(); g.moveTo(xx, yy); g.lineTo(xx, yy + 8); g.stroke(); } }
+    g.restore();
+    g.strokeStyle = shade(col, 40); g.lineWidth = 2; g.beginPath(); g.moveTo(x + w / 2, y - h); g.lineTo(x + w / 2 + d, y - h - dy); g.stroke();
+    g.strokeStyle = 'rgba(8,6,12,0.6)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x - 8, y); g.lineTo(x + w / 2, y - h); g.lineTo(x + w + 8, y); g.stroke();
+  }
+  function windowLit(g, x, y, w, h, col) {
+    const shape = () => { g.beginPath(); g.moveTo(x, y + h); g.lineTo(x, y + w / 2); g.arc(x + w / 2, y + w / 2, w / 2, Math.PI, 0); g.lineTo(x + w, y + h); g.closePath(); };
+    g.save(); g.fillStyle = 'rgba(10,8,14,0.8)'; g.translate(-2, -2); g.scale(1, 1); shape(); g.lineWidth = 4; g.strokeStyle = 'rgba(30,24,36,0.9)'; g.stroke(); g.restore();
+    g.save(); g.shadowColor = col || '#ffcf6a'; g.shadowBlur = 14; g.fillStyle = lin(g, x, y, x, y + h, [[0, A.mix(col || '#ffcf6a', '#ffffff', 0.4)], [1, col || '#ffcf6a']]); shape(); g.fill(); g.restore();
+    g.strokeStyle = 'rgba(40,28,20,0.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x + w / 2, y + 2); g.lineTo(x + w / 2, y + h); g.moveTo(x, y + h * 0.55); g.lineTo(x + w, y + h * 0.55); g.stroke();
+    g.fillStyle = 'rgba(160,150,170,0.6)'; g.fillRect(x - 2, y + h, w + 4, 3);
+  }
   function glowOrb(g, x, y, r, col, t) { g.save(); g.shadowColor = col; g.shadowBlur = r * 2; g.fillStyle = radial(g, x, y, r, '#ffffff', col); ell(g, x, y + Math.sin(t * 2) * 3, r, r); g.fill(); g.restore(); }
   function drawBuilding(g, kind, lvl, t, hov) {
     if (hov) { g.save(); g.shadowColor = '#ffe3a3'; g.shadowBlur = 24; }
@@ -185,8 +241,11 @@
     if (RU.has(town, 'urverk')) tabs.push(['gate', 'Duat Gate']);
     if (RU.has(town, 'shipyard')) tabs.push(['ship', 'Shipyard']);
     T.ui.innerHTML = '';
-    T.ui.appendChild(el('div', { cls: 'tabs' }, tabs.map(([id, n]) => btn(n, () => { if (id === 'tavern') return DL.tavern(town); if (id === 'market') { if (!RU.has(town, 'market')) { U.toast('Build a Market Square first.'); return; } return DL.market(town); } T.tab = id; T.render(); }, T.tab === id ? 'on' : ''))));
-    const body = el('div', { cls: 'panel', style: { padding: '10px' } }); T.ui.appendChild(body);
+    T.ui.classList.toggle('open', !!T.open_);
+    T.ui.appendChild(el('div', { cls: 'tabs drawer-tabs' }, tabs.map(([id, n]) => btn(n, () => { if (id === 'tavern') return DL.tavern(town); if (id === 'market') { if (!RU.has(town, 'market')) { U.toast('Build a Market Square first.'); return; } return DL.market(town); }
+      if (T.tab === id && T.open_) T.open_ = false; else { T.tab = id; T.open_ = true; } T.render(); }, T.tab === id && T.open_ ? 'on' : '')).concat([T.open_ ? btn('▾ Hide', () => { T.open_ = false; T.render(); }, 'icon', 'Hide the panel and look at the town') : null])));
+    const body = el('div', { cls: 'panel drawer-body', style: { padding: '10px' } }); T.ui.appendChild(body);
+    if (!T.open_) { body.style.display = 'none'; return; }
     ({ build: buildTab, recruit: recruitTab, army: armyTab, heroes: heroesTab, vault: vaultTab, gate: gateTab, ship: shipTab }[T.tab] || buildTab)(body, town, st, P, vis);
   };
 
@@ -235,6 +294,11 @@
     const collect = (slots, label) => S.stacksIn(slots).forEach(s => { const C = D.CREATURES[s.cr]; if (C.up && Object.values(D.BUILDINGS).some(b => b.dwellUp === C.up && town.built.includes(b.id))) ups.push({ s, label }); });
     collect(town.garrison, 'garrison'); if (vh) collect(vh.slots, vh.name);
     if (ups.length) body.appendChild(el('div', { cls: 'col', style: { marginTop: '8px' } }, [el('b', { cls: 'gold', text: 'Upgrade' }), ...ups.map(({ s, label }) => el('div', { cls: 'row' }, [s.n + ' ' + D.CREATURES[s.cr].plural + ' (' + label + ') → ' + D.CREATURES[D.CREATURES[s.cr].up].plural, btn('Upgrade', () => { const r = RU.upgradeStack(st, town, s); if (!r.ok) U.toast(r.why || 'Cannot.'); T.render(); U.refresh(); })]))]));
+    /* the farmers' paddock: corralled punks, sold as mounts (for travel, never ridden into battle) */
+    body.appendChild(el('div', { cls: 'frame', style: { marginTop: '8px' } }, [el('b', { cls: 'gold', text: 'The paddock' }),
+      el('p', { cls: 'small muted', text: (town.punks || 0) + ' punks with the farmers. Corral wild herds here to fill it' + (RU.has(town, 'granary') ? '; with a Granary they breed a little each week.' : '; build a Granary and they will breed.') + ' An army with a punk for every stack travels 25% further.' }),
+      vis ? el('div', { cls: 'row' }, ['The army at the gate has ' + RU.mountsOf(st, vis) + ' mounts for ' + S.stacksIn(S.slotsOf(st, vis)).filter(x => x.n > 0).length + ' stacks' + (RU.mounted(st, vis) ? ' — everyone rides.' : '.'),
+        btn('Buy one (' + RU.MOUNT_COST + ' gold)', () => { if (!(town.punks > 0)) { U.toast('The paddock is empty.'); return; } if (P.res.gold < RU.MOUNT_COST) { U.toast('Not enough gold.'); return; } P.res.gold -= RU.MOUNT_COST; town.punks--; RU.addMounts(st, vis, 1); vis.mpMax = RU.mpMax(st, vis); T.render(); U.refresh(); })]) : el('p', { cls: 'small muted', text: 'Bring an army to the gate to buy mounts.' })]));
   }
 
   function armyTab(body, town, st, P, vis) {

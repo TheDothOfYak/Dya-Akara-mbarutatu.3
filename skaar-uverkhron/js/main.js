@@ -14,7 +14,7 @@
 
   /* ======================= the title ======================= */
   G.title = function () {
-    U.closeAll(); if (SU.online.stopWatching) SU.online.stopWatching(); U.busy = false;
+    U.closeAll(); if (SU.online.stopWatching) SU.online.stopWatching(); if (SU.online.chatStop) SU.online.chatStop(); U.busy = false;
     $('game').classList.add('hidden'); $('town').classList.add('hidden'); $('battle').classList.add('hidden');
     const t = $('title'); t.classList.remove('hidden'); t.innerHTML = '';
     const cv = el('canvas', { cls: 'bg' }); t.appendChild(cv);
@@ -31,6 +31,7 @@
         btn('Load a game', () => G.loadMenu(), 'big'),
         btn('Online games', () => SU.online.menu(), 'big'),
         btn('Map editor', () => SU.editor.open(), 'big'),
+        btn('Your records', () => SU.records.show(), 'big', 'Your solo games against the computer'),
         btn('How to play', () => G.howTo(), 'big'),
         el('a', { href: '../index.html', cls: 'btn', style: { textDecoration: 'none', marginTop: '8px' } }, '← Back to Flake Games'),
       ]),
@@ -76,46 +77,7 @@
   };
 
   /* ======================= new game ======================= */
-  G.setup = function (opts) {
-    opts = opts || {};
-    const acc = SU.save.account();
-    const cfg = { size: 'M', spread: true, wild: 'normal', name: 'A new game', players: [
-      { kind: 'human', name: acc ? acc.name : 'You', ai: 'normal', team: 0, colorId: 'red' },
-      { kind: 'ai', name: 'Computer', ai: 'normal', team: 0, colorId: 'blue' },
-    ], map: opts.map || null };
-    const m = U.modal(el('div'), { wide: true });
-    function render() {
-      const b = m.box; b.innerHTML = '';
-      b.appendChild(el('h2', { text: 'A new game' }));
-      const sel = (val, list, on) => { const s = el('select', { onchange: e => { on(e.target.value); render(); } }, list.map(([v, n]) => el('option', { value: v, selected: v === val ? 'selected' : null }, n))); return s; };
-      b.appendChild(el('table', { cls: 'setup' }, [
-        el('tr', {}, [el('td', { text: 'Name' }), el('td', {}, el('input', { cls: 'inp', value: cfg.name, oninput: e => cfg.name = e.target.value }))]),
-        el('tr', {}, [el('td', { text: 'Map' }), el('td', {}, [cfg.map ? el('span', { cls: 'gold', text: cfg.map.name + ' ' }) : 'Random', ' ', btn('Choose a made map…', () => SU.editor.pickMap(mp => { cfg.map = mp; while (cfg.players.length > (mp.starts || []).length && cfg.players.length > 2) cfg.players.pop(); render(); })), cfg.map ? btn('Random instead', () => { cfg.map = null; render(); }) : null])]),
-        cfg.map ? null : el('tr', {}, [el('td', { text: 'Size' }), el('td', {}, sel(cfg.size, [['S', 'Small'], ['M', 'Medium'], ['L', 'Large'], ['XL', 'Extra large']], v => cfg.size = v))]),
-        cfg.map ? null : el('tr', {}, [el('td', { text: 'Starts' }), el('td', {}, sel(cfg.spread ? 'spread' : 'velki', [['spread', 'Spread across the three Tatu'], ['velki', 'Everyone on Velki']], v => cfg.spread = v === 'spread'))]),
-        cfg.map ? null : el('tr', {}, [el('td', { text: 'Wild creatures' }), el('td', {}, sel(cfg.wild, [['weak', 'Few and weak'], ['normal', 'Normal'], ['strong', 'Many and fierce']], v => cfg.wild = v))]),
-        cfg.map && cfg.map.win && cfg.map.win.kind !== 'conquer' ? el('tr', {}, [el('td', { text: 'Victory' }), el('td', { cls: 'gold', text: D.WIN[cfg.map.win.kind].name + ' — ' + D.WIN[cfg.map.win.kind].desc })])
-          : el('tr', {}, [el('td', { text: 'Victory' }), el('td', {}, [sel(cfg.winKind || 'conquer', [['conquer', D.WIN.conquer.name], ['prophecy', D.WIN.prophecy.name], ['gold', D.WIN.gold.name]], v => cfg.winKind = v), el('div', { cls: 'small muted', text: D.WIN[cfg.winKind || 'conquer'].desc + (cfg.winKind === 'gold' ? ' (200,000 gold)' : '') + ' Taking every rival’s towns always wins too.' })])]),
-      ]));
-      b.appendChild(el('h3', { text: 'Players', style: { marginTop: '10px' } }));
-      const tbl = el('table', { cls: 'setup' }, [el('tr', {}, ['', 'Name', 'Who', 'Level', 'Team', 'Colour', ''].map(x => el('th', { cls: 'small muted', text: x })))]);
-      cfg.players.forEach((p, i) => tbl.appendChild(el('tr', {}, [
-        el('td', { text: (i + 1) + '.' }),
-        el('td', {}, el('input', { cls: 'inp', value: p.name, style: { width: '130px' }, oninput: e => p.name = e.target.value })),
-        el('td', {}, sel(p.kind, [['human', 'A person (this device)'], ['ai', 'The computer']], v => { p.kind = v; if (v === 'ai' && p.name === 'You') p.name = 'Computer'; })),
-        el('td', {}, p.kind === 'ai' ? sel(p.ai, Object.entries(D.AI_LEVELS).map(([k, v]) => [k, v.name]), v => p.ai = v) : ''),
-        el('td', {}, sel(String(p.team), [['0', 'Alone'], ['1', 'Team 1'], ['2', 'Team 2'], ['3', 'Team 3']], v => p.team = +v)),
-        el('td', {}, sel(p.colorId, D.PLAYER_COLORS.map(c => [c.id, c.name]), v => p.colorId = v)),
-        el('td', {}, cfg.players.length > 2 ? btn('✕', () => { cfg.players.splice(i, 1); render(); }, 'icon') : ''),
-      ])));
-      b.appendChild(tbl);
-      const maxP = cfg.map ? (cfg.map.starts || []).length : 6;
-      if (cfg.players.length < maxP) b.appendChild(btn('+ Add a player', () => { const used = cfg.players.map(p => p.colorId); cfg.players.push({ kind: 'ai', name: 'Computer ' + cfg.players.length, ai: 'normal', team: 0, colorId: D.PLAYER_COLORS.find(c => !used.includes(c.id)).id }); render(); }));
-      b.appendChild(el('p', { cls: 'small muted', text: 'Everyone plays the Duskareth in this first version. Two or more people on this device take turns; the screen hides between turns. For games with friends on other devices, use Online games on the title screen.' }));
-      b.appendChild(el('div', { cls: 'acts' }, [btn('Back', () => m.close()), btn('Begin', () => { m.close(); G.newGame(cfg); }, 'primary big')]));
-    }
-    render();
-  };
+  /* G.setup, the new-game screen, is in pregame.js */
   /* one click: the starter map, you against an easy computer player */
   G.quickStart = async function () {
     const map = await SU.editor.loadBuiltin({ id: 'starter', file: 'starter.json' }).catch(() => null);
@@ -126,11 +88,12 @@
       { kind: 'ai', name: 'The Rival', ai: 'easy', team: 0, colorId: 'blue' }] });
   };
   G.newGame = function (cfg) {
-    const players = cfg.players.map(p => ({ kind: p.kind, name: p.name || 'Player', ai: p.ai, team: p.team, color: D.PLAYER_COLORS.find(c => c.id === p.colorId).c, colorId: p.colorId, account: p.account || null }));
+    const players = cfg.players.map(p => ({ kind: p.kind, name: p.name || 'Player', ai: p.ai, team: p.team, color: D.PLAYER_COLORS.find(c => c.id === p.colorId).c, colorId: p.colorId, account: p.account || null,
+      faction: p.faction || 'duskareth', hero: p.hero || null, bonus: p.bonus || 'random' }));
     U.toast('Shaping the Mbaru Tatu…');
     setTimeout(() => {
       const win = cfg.map && cfg.map.win && cfg.map.win.kind !== 'conquer' ? cfg.map.win : { kind: cfg.winKind || 'conquer', n: 3, gold: 200000 };
-      const setup = { size: cfg.size, spread: cfg.spread, wild: cfg.wild, name: cfg.name, players, seed: cfg.seed, win };
+      const setup = { size: cfg.size, spread: cfg.spread, starts: cfg.starts, wild: cfg.wild, water: cfg.water, storm: cfg.storm, difficulty: cfg.difficulty || 'captain', name: cfg.name, players, seed: cfg.seed, win };
       const st = cfg.map ? SU.editor.gameFromMap(cfg.map, setup) : SU.mapgen.newGame(setup);
       if (cfg.online) st.online = cfg.online;
       G.play(st);
@@ -168,6 +131,12 @@
       U.refresh();
       SU.save.autosave(st);
       weekNews(st);
+      /* a vision from the eye of the storm, seen at the end of the last turn */
+      const P2 = st.players[st.current], vo = P2.vision && st.objects[P2.vision];
+      if (vo && P2.visionShown !== vo.id) { P2.visionShown = vo.id;
+        U.alert('A vision in the eye', el('div', {}, [el('p', { text: 'In the stillness at the heart of the Sunear’Zikhron, your hero sees it: the Rokarvac of the Nekh, lying on ' + D.LAYERS[vo.layer].name + ', guarded by things that do not sleep.' }),
+          el('p', { cls: 'small muted', text: 'Recover it with a hero. It is not used up: carry it into any of your towns and that town can build the Nekh Hollow while it is there.' })]),
+          () => { V.centerOn(vo.layer, vo.x, vo.y); U.refresh(); }); }
     };
     if (humans(st).length > 1 && !st.online) {
       $('game').style.visibility = 'hidden';
@@ -202,19 +171,30 @@
   };
 
   /* ======================= battles ======================= */
-  /* spec: { attacker, defender, town, def, temp, after(rep) } — resolves with the report */
+  /* spec: { attacker, defender, town, def, temp, after(rep) } — resolves with the report
+     (or null when an online battle is called off before it starts) */
+  G.buildBattle = function (st, spec) {
+    const atk = spec.attacker, def = spec.defender;
+    const sideOf = a => ({ owner: a.owner, army: a, hero: S.heroOf(st, a), slots: S.slotsOf(st, a) });
+    if (spec.town) {
+      const t = spec.town, d = spec.def || RU.townDefense(st, t);
+      const h = d && d.hero;
+      return BT.create(st, sideOf(atk), { owner: t.owner, army: null, hero: h, slots: h ? h.slots : t.garrison, town: t, label: (h ? h.name + ' in ' : '') + t.name }, { town: t, layer: t.layer, x: t.x, y: t.y, extraDefSlots: h ? t.garrison : null });
+    }
+    return BT.create(st, sideOf(atk), sideOf(def), { layer: def.temp ? atk.layer : def.layer, x: def.temp ? atk.x : def.x, y: def.temp ? atk.y : def.y });
+  };
+  /* who plays each side on this device: a person here, the computer, or a person on another device */
+  G.controlFor = function (st, B) {
+    return side => { const o = B.sides[side].owner; if (o < 0 || st.players[o].kind !== 'human') return 'ai'; return G.localHuman(o) ? 'human' : st.online ? 'remote' : 'ai'; };
+  };
   G.runBattle = function (spec) {
     const st = G.st;
+    /* online, against a person on another device: they come and fight it themselves */
+    const owners = [spec.attacker.owner, spec.town ? spec.town.owner : spec.defender && spec.defender.owner];
+    const remote = st.online && owners.some(o => o >= 0 && st.players[o] && st.players[o].kind === 'human' && !G.localHuman(o));
+    if (remote) return SU.online.fight(st, spec).then(r => { if (r && spec.after) spec.after(r); U.refresh(); V.invalidate(); if (st.over) setTimeout(G.gameOver, 400); return r; });
     return new Promise(resolve => {
-      const atk = spec.attacker, def = spec.defender;
-      const sideOf = a => ({ owner: a.owner, army: a, hero: S.heroOf(st, a), slots: S.slotsOf(st, a) });
-      let B;
-      if (spec.town) {
-        const t = spec.town, d = spec.def || RU.townDefense(st, t);
-        const h = d && d.hero;
-        B = BT.create(st, sideOf(atk), { owner: t.owner, army: null, hero: h, slots: h ? h.slots : t.garrison, town: t, label: (h ? h.name + ' in ' : '') + t.name }, { town: t, layer: t.layer, x: t.x, y: t.y, extraDefSlots: h ? t.garrison : null });
-      } else B = BT.create(st, sideOf(atk), sideOf(def), { layer: def.temp ? atk.layer : def.layer, x: def.temp ? atk.x : def.x, y: def.temp ? atk.y : def.y });
-      const control = side => { const o = B.sides[side].owner; return o >= 0 && st.players[o].kind === 'human' && G.localHuman(o) ? 'human' : 'ai'; };
+      const B = G.buildBattle(st, spec), control = G.controlFor(st, B);
       const done = rep => { U.refresh(); V.invalidate(); if (spec.after) spec.after(rep); resolve(rep); if (st.over) setTimeout(G.gameOver, 400); };
       if (control(0) === 'ai' && control(1) === 'ai') { BT.autoRun(st, B); const rep = BT.finish(st, B); done(rep); return; }
       SU.battleView.start(B, control, (rep) => done(rep));
@@ -236,31 +216,7 @@
       btn('Close', () => m.close(), 'primary'),
     ])]);
   };
-  G.saveMenu = function () {
-    const st = G.st, name = el('input', { cls: 'inp', value: st.setup.name + ' — day ' + st.day, style: { width: '320px' } });
-    const m = U.modal([el('h2', { text: 'Save the game' }), name, el('div', { cls: 'col', style: { marginTop: '8px' } }, [1, 2, 3, 4, 5].map(k => {
-      const ex = SU.save.listLocal().find(s => s.slot === String(k));
-      return btn('Slot ' + k + (ex ? ': ' + ex.name : ' (empty)'), async () => {
-        SU.save.saveLocal(st, String(k), name.value);
-        if (SU.save.cloudOk()) { try { await SU.save.saveCloud(st, String(k), name.value); } catch (e) { U.toast('Saved here, but the account save failed.'); } }
-        m.close(); U.toast('Saved.');
-      });
-    })), el('div', { cls: 'acts' }, [btn('Cancel', () => m.close())])]);
-  };
-  G.loadMenu = async function () {
-    const m = U.modal([el('h2', { text: 'Load a game' }), el('p', { cls: 'muted', text: 'Looking…' })]);
-    let cloud = [];
-    try { cloud = await SU.save.listCloud(); } catch (e) { cloud = []; }
-    const local = SU.save.listLocal();
-    const row = s => el('div', { cls: 'row frame' }, [el('div', { style: { flex: 1 } }, [el('b', { text: s.name || 'A game' }), el('div', { cls: 'small muted', text: 'Day ' + s.day + ' · ' + new Date(s.at).toLocaleString() + ' · ' + (s.where === 'cloud' ? 'on your account' : 'in this browser') })]),
-      btn('Load', () => { m.close(); G.loadSlot(s.where, s.slot); }, 'primary'), btn('✕', () => U.confirm('Delete this save?', s.name, async () => { if (s.where === 'cloud') await SU.save.deleteCloud(s.slot); else SU.save.deleteLocal(s.slot); m.close(); G.loadMenu(); }), 'icon')]);
-    m.box.innerHTML = '';
-    m.box.appendChild(el('h2', { text: 'Load a game' }));
-    if (!local.length && !cloud.length) m.box.appendChild(el('p', { text: 'There are no saved games yet.' }));
-    if (cloud.length) { m.box.appendChild(el('h3', { text: 'On your account' })); cloud.forEach(s => m.box.appendChild(row(s))); }
-    if (local.length) { m.box.appendChild(el('h3', { text: 'In this browser' })); local.forEach(s => m.box.appendChild(row(s))); }
-    m.box.appendChild(el('div', { cls: 'acts' }, [btn('Close', () => m.close())]));
-  };
+  /* G.saveMenu and G.loadMenu, the save and load screens, are in saveload.js */
   G.loadSlot = async function (where, slot) {
     let st = null;
     try { st = where === 'cloud' ? await SU.save.loadCloud(slot) : SU.save.loadLocal(slot); } catch (e) { console.error(e); }
@@ -274,14 +230,25 @@
     const won = st.over.winners.some(i => st.players[i].kind === 'human' && G.localHuman(i));
     const names = st.over.winners.map(i => st.players[i].name).join(' and ');
     const how = { prophecy: ' heard the true prophecy in the eye of the storm', gold: ' filled the treasury', town: ' held the seat for a week', conquer: (st.over.winners.length > 1 ? ' hold' : ' holds') + ' the Mbaru Tatu' }[st.over.how || 'conquer'];
-    U.modal([el('h2', { text: won ? 'Victory' : 'The game is over' }), el('p', { text: names + how + ' after ' + SU.plural(st.day, 'day') + '.' }),
+    const solo = SU.records && SU.records.isSolo(st);
+    const score = solo ? SU.records.score(st, won) : 0;
+    const recLine = el('p', { cls: 'small muted', text: solo ? 'Written in your records.' : '' });
+    if (solo) SU.records.add(st).then(g => { if (!g) recLine.textContent = ''; });
+    U.modal([el('h2', { text: won ? 'Victory' : st.over.fallen ? 'Defeat' : 'The game is over' }), el('p', { text: (st.over.fallen && !won ? 'You have fallen. ' : '') + (names ? names + how : 'Nobody holds the Mbaru Tatu') + ' after ' + SU.plural(st.day, 'day') + '.' }),
+      solo && won ? el('p', {}, ['Your score: ', el('b', { cls: 'gold', text: String(score) }), ' — the title of ', el('b', { cls: 'gold', text: SU.records.title(score) }), '.']) : null, recLine,
       el('div', { cls: 'acts' }, [btn('Look at the map', function () { this.closest('.overlay').remove(); }), btn('To the title', function () { this.closest('.overlay').remove(); G.title(); }, 'primary')])], { dismiss: false });
   };
 
   /* ======================= start ======================= */
   document.addEventListener('DOMContentLoaded', () => {
     V.init($('map'), $('mini'));
-    const go = () => G.title();
+    /* the numbers set in the Admin Panel, before any game starts */
+    const balance = () => {
+      if (!(root.FLAKE && root.FLAKE.configured && root.FLAKE.configured() && root.FLAKE.rest)) return Promise.resolve();
+      const get = root.FLAKE.rest('GET', 'dya_config?select=value&key=eq.su_balance').then(r => { if (r && r[0]) D.applyBalance(r[0].value); }).catch(() => {});
+      return Promise.race([get, new Promise(ok => setTimeout(ok, 3000))]);
+    };
+    const go = () => balance().then(() => G.title());
     /* main games need the one Flake Games account; local testing does not */
     if (root.FLAKE && root.FLAKE.gate && root.FLAKE.configured && root.FLAKE.configured() && !DEV && !/[?&]guest=1/.test(location.search)) root.FLAKE.gate('su').then(go);
     else go();

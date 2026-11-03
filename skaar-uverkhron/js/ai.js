@@ -14,11 +14,16 @@
   const AI = SU.ai = {};
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+  let STYLE = null;
   const BUILD_PRIORITY = ['t_road', 'd3', 'granary', 'd4', 'market', 'fort2', 'hall2', 'd5', 'd1u', 'd2u', 't_capt', 'd6', 'terraces', 'd3u', 'songs1', 't_duat', 'vault', 'd4u', 'farms', 'd7', 'fort3', 'hall3', 'd8', 'terraces2', 'stygwell', 'songs2', 't_count', 't_pens', 'sanctum', 'd9', 'urverk', 'songs3', 'choir'];
 
   AI.takeTurn = async function (st, hooks) {
     const pi = st.current, P = st.players[pi], lvl = D.AI_LEVELS[P.ai] || D.AI_LEVELS.normal;
     P.explored.forEach(E => E.fill(1));   /* the computer knows the land */
+    /* each computer player has a personality for the whole game */
+    if (!P.style) P.style = SU.rng(st).pick(Object.keys(D.AI_STYLES));
+    STYLE = D.AI_STYLES[P.style] || D.AI_STYLES.conqueror;
+    Object.values(st.heroes).forEach(h => { if (h.owner === pi && !h.dead) while (h.levelUps.length) RU.resolveLevelUp(st, h); });
     /* a little help (or hindrance) by difficulty */
     if (lvl.bonus !== 1 && S.cal(st.day).dow === 1) P.res.gold += Math.round(1500 * (lvl.bonus - 1));
     hireAndTrain(st, P);
@@ -42,7 +47,7 @@
     const R = SU.rng(st);
     /* build */
     /* one building a day, and never at the cost of the army */
-    const keep = st.day < 4 ? 0 : 2500 + Math.min(4000, st.day * 60);
+    const keep = st.day < 4 ? 0 : (2500 + Math.min(4000, st.day * 60)) * (STYLE ? STYLE.keep : 1);
     const bid = BUILD_PRIORITY.find(b => RU.canBuild(st, t, b).ok && P.res.gold - (D.BUILDINGS[b].cost.gold || 0) > keep);
     if (bid) RU.build(st, t, bid);
     /* recruit: best creatures first, into the garrison, keeping money for heroes we still want */
@@ -64,7 +69,7 @@
   function collectGarrison(st, t, h) {
     if (!h) return;
     /* keep a little for defence once the town is big */
-    const keep = S.townsOf(st, h.owner).length > 1 ? 0.2 : 0.1;
+    const keep = STYLE && STYLE.garrison ? STYLE.garrison : S.townsOf(st, h.owner).length > 1 ? 0.2 : 0.1;
     t.garrison.forEach((s, i) => {
       if (!s) return;
       if (s.kind === 'cap') { const j = h.slots.findIndex(x => !x); if (j >= 0) { h.slots[j] = s; t.garrison[i] = null; } return; }
@@ -76,7 +81,7 @@
     const towns = S.townsOf(st, P.idx).filter(t => RU.has(t, 'tavern'));
     const field = S.fieldHeroes(st, P.idx).length;
     const inside = towns.reduce((n, t) => n + t.heroes.length, 0);
-    const want = Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length + (P.res.gold > 20000 ? 2 : 0));
+    const want = Math.max(1, Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length + (P.res.gold > 20000 ? 2 : 0) + (STYLE ? STYLE.heroes : 0)));
     if (towns.length && field + inside < want && P.res.gold > M.heroCost + 300) {
       const t = towns[0]; if (P.tavern.heroes.length) RU.hireHero(st, P, t, P.tavern.heroes[0]);
     }
@@ -104,7 +109,9 @@
     Object.values(st.objects).forEach(o => {
       if (o.layer !== a.layer || o.gone) return;
       let v = 0;
-      if (o.type === 'pile') v = o.res === 'gold' ? o.amt / 100 : D.RES_INFO[o.res].common ? o.amt * 1.2 : o.amt * 4;
+      if (o.type === 'pile') v = (o.res === 'gold' ? o.amt / 100 : D.RES_INFO[o.res].common ? o.amt * 1.2 : o.amt * 4) * (STYLE ? STYLE.treasure : 1);
+      else if (o.type === 'vision' && h) v = 70;
+      else if (o.type === 'relic' && o.relic === 'nekhprint' && h) v = 90;
       else if (o.type === 'chest') v = 14;
       else if (o.type === 'relic' && h) v = { common: 14, rare: 24, great: 40, skaar: 60 }[D.RELICS[o.relic].rare];
       else if (o.type === 'mine' && o.owner !== a.owner && !(o.owner >= 0 && S.allies(st, o.owner, a.owner))) v = o.kind === 'gold' ? 30 : D.RES_INFO[D.MINES[o.kind].res].common ? 16 : 22;
@@ -116,7 +123,9 @@
         const dest = st.objects[o.link];
         if (dest && dest.layer !== a.layer && Object.values(st.objects).some(t => t.type === 'town' && t.layer === dest.layer && t.owner !== a.owner && !(t.owner >= 0 && S.allies(st, t.owner, a.owner)))) v = 40 + myPow / 2000;
       }
-      else if (o.type === 'town' && o.owner === a.owner && h && (o.x !== a.x || o.y !== a.y)) { const gp = S.power(o.garrison); if (gp > myPow * 0.3 && gp > 1200) v = 10 + gp / 600; }
+      else if (o.type === 'town' && o.owner === a.owner && h && (o.x !== a.x || o.y !== a.y)) { const gp = S.power(o.garrison); if (gp > myPow * 0.3 && gp > 1200) v = 10 + gp / 600;
+        /* carrying the worm's Rokarvac: bring it to a town that is ready for the Nekh Hollow */
+        if (RU.carries(h, 'nekhprint') && !o.built.includes('d9') && RU.has(o, 'fort3') && o.built.includes('d8')) v = Math.max(v, 60); }
       else if (o.type === 'town' && o.owner !== a.owner && h && !(o.owner >= 0 && S.allies(st, o.owner, a.owner))) {
         const def = RU.townDefense(st, o); const dp = def ? S.power(def.slots, def.hero) * 1.3 + (def.hero ? S.power(def.hero.slots, def.hero) : 0) : 0;
         if (dp < myPow * 0.75) v = 80;
@@ -140,7 +149,7 @@
     const myPow = S.power(S.slotsOf(st, a), h);
     /* walls and towers make a town much harder than its garrison looks */
     const def = t => { const d = RU.townDefense(st, t); const walls = t.built.reduce((m, b) => Math.max(m, D.BUILDINGS[b].walls || 0), 0); return d ? (S.power(d.slots, d.hero) + (d.hero ? S.power(d.hero.slots, d.hero) : 0)) * (1.4 + walls * 0.35) + walls * 1500 : 0; };
-    const towns = Object.values(st.objects).filter(t => t.type === 'town' && t.owner !== a.owner && !(t.owner >= 0 && S.allies(st, t.owner, a.owner)) && def(t) < myPow * 0.8)
+    const towns = Object.values(st.objects).filter(t => t.type === 'town' && t.owner !== a.owner && !(t.owner >= 0 && S.allies(st, t.owner, a.owner)) && def(t) < myPow * (0.5 + 0.2 * (STYLE ? STYLE.war : 1)))
       .sort((p, q) => ((p.layer !== a.layer) - (q.layer !== a.layer)) || ((q.owner >= 0) - (p.owner >= 0)) || Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y));
     for (const t of towns.slice(0, 4)) {
       if (t.layer === a.layer) {

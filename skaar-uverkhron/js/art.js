@@ -73,11 +73,20 @@
   const obCache = {};
   /* returns {c, ox, oy}: draw at (tileX*ts - ox, tileY*ts - oy) */
   A.obstacle = function (kind, variant, ts) {
-    const k = kind + '_' + (variant % 6) + '_' + ts; if (obCache[k]) return obCache[k];
+    const k = kind + (A._single ? 's' : '') + '_' + (variant % 6) + '_' + ts; if (obCache[k]) return obCache[k];
     const R = SU.makeRng(variant % 6 * 131 + kind.length * 7);
     const W = ts * 2, H = ts * 2.4, c = canvas(W, H), g = c.getContext('2d');
     const cx = W / 2, gy = H - ts * 0.55; const s = ts / 48;
     g.save(); g.translate(cx, gy);
+    if ((kind === 'tree' || kind === 'glowtree') && !A._single) {
+      /* a little copse: two or three trees of different sizes */
+      const n = R.chance(0.6) ? 3 : 2, spots = [[-9, -3, 0.78], [8, -1, 0.86], [0, 4, 1]].slice(3 - n);
+      g.fillStyle = 'rgba(18,30,12,0.3)'; ell(g, 0, 2 * s, 22 * s, 7 * s); g.fill();
+      g.restore(); A._single = true;
+      spots.forEach(([dx, dy, k], i) => { const sub = A.obstacle(kind, variant + i * 7 + 1, Math.round(ts * k)); g.drawImage(sub.c, cx + dx * s - sub.c.width / 2, gy + dy * s - sub.c.height + ts * k * 0.55); });
+      A._single = false;
+      return (obCache[k] = { c, ox: W / 2 - ts / 2, oy: gy - ts * 0.78 });
+    }
     if (kind === 'tree' || kind === 'glowtree') {
       g.save(); g.scale(1, 1); shadow(g, 14 * s, 5 * s); g.restore();
       g.fillStyle = lin(g, -3 * s, 0, 3 * s, 0, [[0, '#4a3220'], [1, '#2a1b10']]); g.beginPath(); g.moveTo(-3 * s, 0); g.lineTo(-2 * s, -16 * s); g.lineTo(2 * s, -16 * s); g.lineTo(3 * s, 0); g.fill();
@@ -107,15 +116,31 @@
       for (let i = 0; i < 12; i++) { const x = R.range(-12, 12) * s, h = R.range(10, 22) * s; g.strokeStyle = R.chance(0.5) ? '#7a8a44' : '#5e7034'; g.lineWidth = 1.6 * s; g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + R.range(-3, 3) * s, -h * 0.6, x + R.range(-4, 4) * s, -h); g.stroke();
         if (R.chance(0.4)) { g.fillStyle = '#5a3a20'; ell(g, x + R.range(-1, 1) * s, -h + 2 * s, 1.4 * s, 3.2 * s); g.fill(); } }
     } else if (kind === 'mountain' || kind === 'ridge') {
-      const big = kind === 'mountain'; const w = (big ? 30 : 18) * s, h = (big ? 46 : 22) * s * R.range(0.85, 1.15);
-      g.fillStyle = 'rgba(0,0,0,0.3)'; ell(g, 0, 0, w * 1.1, w * 0.3); g.fill();
-      const peak = R.range(-0.25, 0.25) * w;
-      g.fillStyle = lin(g, -w, 0, w, 0, [[0, '#9c968a'], [0.45, '#7d776c'], [0.55, '#5b564e'], [1, '#423e38']]);
-      g.beginPath(); g.moveTo(-w, 0); g.lineTo(-w * 0.55, -h * 0.45); g.lineTo(peak, -h); g.lineTo(w * 0.5, -h * 0.5); g.lineTo(w, 0); g.closePath(); g.fill();
-      g.fillStyle = rgba('#2c2925', 0.35); g.beginPath(); g.moveTo(peak, -h); g.lineTo(w * 0.5, -h * 0.5); g.lineTo(w, 0); g.lineTo(peak + w * 0.1, 0); g.closePath(); g.fill();
-      g.strokeStyle = rgba('#2c2925', 0.5); g.lineWidth = 1 * s; for (let i = 0; i < 4; i++) { g.beginPath(); const x0 = peak + R.range(-0.4, 0.4) * w; g.moveTo(x0, -h * R.range(0.5, 0.8)); g.lineTo(x0 + R.range(-6, 6) * s, -h * R.range(0.1, 0.3)); g.stroke(); }
-      if (big) { g.fillStyle = '#f2f5fa'; g.beginPath(); g.moveTo(peak, -h); g.lineTo(peak - w * 0.28, -h * 0.68); g.lineTo(peak - w * 0.1, -h * 0.72); g.lineTo(peak + w * 0.05, -h * 0.64); g.lineTo(peak + w * 0.22, -h * 0.74); g.closePath(); g.fill(); }
-      g.beginPath(); g.moveTo(-w, 0); g.lineTo(-w * 0.55, -h * 0.45); g.lineTo(peak, -h); g.lineTo(w * 0.5, -h * 0.5); g.lineTo(w, 0); outline(g, 1.2 * s);
+      /* a painted range: two or three overlapping peaks of different heights, lit from the
+         upper left, rock strata and scree, snow only on the tallest — no hard outline */
+      const big = kind === 'mountain';
+      const peaks = big ? [[R.range(-14, -4), R.range(30, 40), R.range(16, 20)], [R.range(4, 14), R.range(36, 52), R.range(18, 24)], [R.range(-2, 4), R.range(22, 30), R.range(12, 16)]] : [[R.range(-8, 0), R.range(14, 20), 12], [R.range(4, 10), R.range(10, 16), 10]];
+      g.fillStyle = 'rgba(20,16,12,0.28)'; ell(g, 4 * s, 1 * s, (big ? 34 : 20) * s, (big ? 9 : 5) * s); g.fill();
+      peaks.sort((p1, p2) => p1[1] - p2[1]).forEach(([px, ph, pw], i) => {
+        const x0 = px * s, h = ph * s, w = pw * s, tipx = x0 + R.range(-0.2, 0.2) * w;
+        const tone = big ? ['#8f897c', '#7d776a', '#6e685c'][i % 3] : '#857f70';
+        /* lit face */
+        g.fillStyle = lin(g, x0 - w, -h, x0, 0, [[0, shade(tone, 22)], [1, shade(tone, -8)]]);
+        g.beginPath(); g.moveTo(x0 - w, 0); g.quadraticCurveTo(x0 - w * 0.55, -h * 0.5, tipx, -h); g.lineTo(tipx + w * 0.08, -h * 0.6); g.quadraticCurveTo(x0, -h * 0.25, x0 + w * 0.15, 0); g.closePath(); g.fill();
+        /* shadowed face */
+        g.fillStyle = lin(g, x0, -h, x0 + w, 0, [[0, shade(tone, -28)], [1, shade(tone, -48)]]);
+        g.beginPath(); g.moveTo(tipx, -h); g.quadraticCurveTo(x0 + w * 0.55, -h * 0.5, x0 + w, 0); g.lineTo(x0 + w * 0.15, 0); g.quadraticCurveTo(x0, -h * 0.25, tipx + w * 0.08, -h * 0.6); g.closePath(); g.fill();
+        /* strata and cracks */
+        g.strokeStyle = rgba('#2a2620', 0.28); g.lineWidth = 0.8 * s;
+        for (let k = 0; k < 4; k++) { const yy = -h * R.range(0.15, 0.7), xx = tipx + R.range(-0.5, 0.4) * w * (1 + yy / h); g.beginPath(); g.moveTo(xx, yy); g.lineTo(xx + R.range(3, 8) * s, yy + R.range(1, 4) * s); g.stroke(); }
+        g.strokeStyle = rgba('#fffaf0', 0.18); g.beginPath(); g.moveTo(tipx, -h); g.quadraticCurveTo(x0 - w * 0.5, -h * 0.5, x0 - w * 0.9, -1 * s); g.stroke();
+        /* snow on the tallest */
+        if (big && h > 38 * s) { g.fillStyle = 'rgba(244,247,252,0.95)'; g.beginPath(); g.moveTo(tipx, -h); g.quadraticCurveTo(tipx - w * 0.25, -h * 0.82, tipx - w * 0.34, -h * 0.68); g.lineTo(tipx - w * 0.12, -h * 0.74); g.lineTo(tipx + w * 0.02, -h * 0.66); g.lineTo(tipx + w * 0.2, -h * 0.75); g.quadraticCurveTo(tipx + w * 0.12, -h * 0.86, tipx, -h); g.fill();
+          g.fillStyle = 'rgba(160,180,210,0.5)'; g.beginPath(); g.moveTo(tipx, -h); g.lineTo(tipx + w * 0.2, -h * 0.75); g.lineTo(tipx + w * 0.06, -h * 0.72); g.closePath(); g.fill(); }
+        g.strokeStyle = 'rgba(30,24,18,0.35)'; g.lineWidth = 0.7 * s; g.beginPath(); g.moveTo(x0 - w, 0); g.quadraticCurveTo(x0 - w * 0.55, -h * 0.5, tipx, -h); g.quadraticCurveTo(x0 + w * 0.55, -h * 0.5, x0 + w, 0); g.stroke();
+      });
+      /* scree at the foot */
+      for (let k = 0; k < 6; k++) { g.fillStyle = rgba(k % 2 ? '#9a9486' : '#5f5a50', 0.8); ell(g, R.range(-24, 24) * s, R.range(-2, 1) * s, R.range(1, 2.5) * s, R.range(0.6, 1.4) * s); g.fill(); }
     } else if (kind === 'rock') {
       shadow(g, 10 * s, 3 * s);
       for (let i = 0; i < 3; i++) { const x = (i - 1) * 6 * s, r = R.range(4, 8) * s; g.fillStyle = radial(g, x, -r * 0.6, r, '#a9a395', '#5f5a50'); ell(g, x, -r * 0.6, r, r * 0.75); g.fill(); outline(g, 1 * s); }
@@ -128,119 +153,138 @@
     return (obCache[k] = { c, ox: W / 2 - ts / 2, oy: gy - ts * 0.78 });
   };
 
-  /* ======================= Dearcàn figures: heroes and captains ======================= */
-  /* people: eikar keilia kaloeik karnen. o: { f, t, color (player), look, weapon, mounted, scale } */
+  /* ======================= the Dearcàn: heroes and captains =======================
+     As the other Flake Games draw them:
+       EIKAR — an acorn: the nut is the body (and the face), the Aagac cap on top
+               with its stem, little limbs.
+       KEILIA — taller, a pinecone: dark pine-wood scales, one eye, and a cape of
+               pinecone scales falling from the head to the calf.
+       KARNEN — small, quick and angular, in a worn triangular hat.
+       KALO'EIK — moon-folk: a pale, silvered acorn with a crescent on the cap.
+     (x,y) is the feet. o: { color, look, weapon, t, f, seated, helm, armor, swing, noShadow } */
+  const SKIN = { eikar: ['#b9863f', '#a8743a', '#c7954e', '#9a6a34'], kaloeik: ['#d6dcec', '#c8d0e6', '#e2e6f2'], keilia: ['#5a3e26', '#4a3220', '#634630'], karnen: ['#8a6a54', '#9a7a5c', '#7a5c48'] };
+  function weaponAt(ctx, wpn, S_, t, team, sw) {
+    ctx.save(); ctx.rotate(-0.2 + (sw || 0));
+    if (wpn === 'spear') { ctx.strokeStyle = '#7a5a34'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(0, 7 * S_); ctx.lineTo(0, -19 * S_); ctx.stroke(); ctx.fillStyle = '#d8dce6'; ctx.beginPath(); ctx.moveTo(-1.6 * S_, -18 * S_); ctx.lineTo(0, -24 * S_); ctx.lineTo(1.6 * S_, -18 * S_); ctx.fill(); }
+    else if (wpn === 'sword') { ctx.strokeStyle = '#d8dce6'; ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -13 * S_); ctx.stroke(); ctx.strokeStyle = '#c9a24e'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(-2.4 * S_, -1 * S_); ctx.lineTo(2.4 * S_, -1 * S_); ctx.stroke(); }
+    else if (wpn === 'axe') { ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(0, 4 * S_); ctx.lineTo(0, -13 * S_); ctx.stroke(); ctx.fillStyle = lin(ctx, 0, -13 * S_, 6 * S_, -7 * S_, [[0, '#e6e9f0'], [1, '#8a8f9a']]); ctx.beginPath(); ctx.moveTo(0, -13 * S_); ctx.quadraticCurveTo(7 * S_, -13 * S_, 6 * S_, -6 * S_); ctx.lineTo(0, -8 * S_); ctx.fill(); }
+    else if (wpn === 'staff') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.5 * S_; ctx.beginPath(); ctx.moveTo(0, 9 * S_); ctx.lineTo(0, -19 * S_); ctx.stroke(); ctx.shadowColor = '#8e7cff'; ctx.shadowBlur = 8 * S_; ctx.fillStyle = '#c9b8ff'; ell(ctx, 0, -20 * S_, 2.2 * S_, 2.2 * S_); ctx.fill(); ctx.shadowBlur = 0; }
+    else if (wpn === 'hammer') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(0, 4 * S_); ctx.lineTo(0, -11 * S_); ctx.stroke(); ctx.fillStyle = lin(ctx, -4 * S_, 0, 4 * S_, 0, [[0, '#9aa0aa'], [1, '#585e68']]); ctx.fillRect(-4 * S_, -15 * S_, 8 * S_, 5 * S_); ctx.fillStyle = '#4fe0e8'; ctx.fillRect(-1 * S_, -14 * S_, 2 * S_, 3 * S_); }
+    else if (wpn === 'banner') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(0, 7 * S_); ctx.lineTo(0, -25 * S_); ctx.stroke(); const wv = Math.sin(t * 4) * 1.5 * S_; ctx.fillStyle = team; ctx.beginPath(); ctx.moveTo(0, -25 * S_); ctx.quadraticCurveTo(6 * S_, -24 * S_ + wv, 11 * S_, -22 * S_); ctx.lineTo(10 * S_, -16 * S_ + wv); ctx.quadraticCurveTo(5 * S_, -17 * S_ - wv, 0, -16 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_); }
+    ctx.restore();
+  }
+  function limbs(ctx, S_, hipY, hipW, legLen, col, t, seated, stride) {
+    if (seated) return;
+    const st = stride || 0;
+    ctx.strokeStyle = shade(col, -45); ctx.lineWidth = 2.4 * S_; ctx.lineCap = 'round';
+    [-1, 1].forEach(sd => { ctx.beginPath(); ctx.moveTo(sd * hipW, hipY); ctx.lineTo(sd * hipW * 1.1 + sd * st * S_, 0); ctx.stroke();
+      ctx.fillStyle = shade(col, -55); ell(ctx, sd * hipW * 1.1 + sd * st * S_ + 1.2 * S_, -0.3 * S_, 2 * S_, 1 * S_); ctx.fill(); });
+  }
+  function arm(ctx, S_, fromX, fromY, toX, toY, col) { ctx.strokeStyle = shade(col, -35); ctx.lineWidth = 2.2 * S_; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.quadraticCurveTo((fromX + toX) / 2 + 1 * S_, (fromY + toY) / 2 + 1.5 * S_, toX, toY); ctx.stroke(); ctx.fillStyle = shade(col, -10); ell(ctx, toX, toY, 1.5 * S_, 1.5 * S_); ctx.fill(); }
+
   A.person = function (ctx, x, y, s, people, o) {
     o = o || {}; const f = o.f || 1, t = o.t || 0, R = SU.makeRng(o.look || 7);
     ctx.save(); ctx.translate(x, y); ctx.scale(f, 1);
-    const bob = Math.sin(t * 3 + (o.look || 0)) * 0.6 * s / 30;
-    const k = people === 'keilia' ? 1.35 : people === 'karnen' ? 0.78 : 1;
+    const k = people === 'keilia' ? 1.35 : people === 'karnen' ? 0.8 : 1;
     const S_ = s / 30 * k;
-    if (!o.noShadow) { ctx.save(); shadow(ctx, 9 * S_, 3 * S_); ctx.restore(); }
-    ctx.translate(0, bob);
-    const team = o.color || '#c43a3a';
-    const skin = people === 'eikar' ? R.pick(['#b9863f', '#a8743a', '#c7954e']) : people === 'kaloeik' ? '#cfd6ea' : people === 'karnen' ? R.pick(['#8a6a54', '#9a7a5c']) : R.pick(['#c49a72', '#a87a58', '#d4a882']);
-    /* legs */
-    ctx.fillStyle = '#2a2018'; ctx.fillRect(-4 * S_, -9 * S_, 3 * S_, 9 * S_); ctx.fillRect(1.2 * S_, -9 * S_, 3 * S_, 9 * S_);
-    ctx.fillStyle = '#18100a'; ell(ctx, -2.4 * S_, -0.6 * S_, 2.6 * S_, 1.2 * S_); ctx.fill(); ell(ctx, 2.8 * S_, -0.6 * S_, 2.6 * S_, 1.2 * S_); ctx.fill();
-    /* cloak (Keilia: hair like armour, cape to the calf) */
-    if (people === 'keilia') {
-      ctx.fillStyle = lin(ctx, -10 * S_, -26 * S_, 8 * S_, -4 * S_, [[0, '#6a4a2e'], [1, '#3a2614']]);
-      ctx.beginPath(); ctx.moveTo(-7 * S_, -26 * S_); ctx.quadraticCurveTo(-12 * S_, -12 * S_, -9 * S_, -4 * S_); ctx.lineTo(6 * S_, -5 * S_); ctx.quadraticCurveTo(8 * S_, -16 * S_, 5 * S_, -26 * S_); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = rgba('#2a1a0c', 0.6); ctx.lineWidth = 0.8 * S_; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(-8 * S_ + i * 2.4 * S_, -22 * S_ + (i % 2) * 2 * S_); ctx.quadraticCurveTo(-9 * S_ + i * 2.6 * S_, -14 * S_, -8 * S_ + i * 2.6 * S_, -6 * S_); ctx.stroke(); }
-    } else {
-      ctx.fillStyle = lin(ctx, -8 * S_, -24 * S_, 6 * S_, -6 * S_, [[0, shade(team, -10)], [1, shade(team, -55)]]);
-      ctx.beginPath(); ctx.moveTo(-6 * S_, -23 * S_); ctx.quadraticCurveTo(-11 * S_, -12 * S_, -8 * S_ + Math.sin(t * 2) * 0.6 * S_, -7 * S_); ctx.lineTo(-1 * S_, -9 * S_); ctx.closePath(); ctx.fill();
-    }
-    /* body */
-    const tunic = people === 'kaloeik' ? '#3a3a62' : o.armor ? '#5a5f6a' : '#4a3a2a';
-    ctx.fillStyle = lin(ctx, -6 * S_, -24 * S_, 6 * S_, -8 * S_, [[0, shade(tunic, 25)], [1, shade(tunic, -35)]]);
-    ctx.beginPath(); ctx.moveTo(-5.5 * S_, -24 * S_); ctx.quadraticCurveTo(-7 * S_, -15 * S_, -5 * S_, -8 * S_); ctx.lineTo(5 * S_, -8 * S_); ctx.quadraticCurveTo(7 * S_, -15 * S_, 5.5 * S_, -24 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.9 * S_);
-    /* team sash */
-    ctx.strokeStyle = team; ctx.lineWidth = 2 * S_; ctx.beginPath(); ctx.moveTo(-5 * S_, -22 * S_); ctx.lineTo(4.5 * S_, -11 * S_); ctx.stroke();
-    ctx.fillStyle = '#c9a24e'; ell(ctx, 0, -10 * S_, 1.4 * S_, 1.2 * S_); ctx.fill();
-    /* arms + weapon */
-    const wpn = o.weapon || 'spear';
-    ctx.strokeStyle = shade(tunic, -10); ctx.lineWidth = 2.6 * S_; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(4.5 * S_, -21 * S_); ctx.lineTo(8 * S_, -14 * S_); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-4.5 * S_, -21 * S_); ctx.lineTo(-6.5 * S_, -14 * S_); ctx.stroke();
-    ctx.fillStyle = skin; ell(ctx, 8 * S_, -14 * S_, 1.5 * S_, 1.5 * S_); ctx.fill();
-    const sw = o.swing || 0;
-    ctx.save(); ctx.translate(8 * S_, -14 * S_); ctx.rotate(-0.2 + sw);
-    if (wpn === 'spear') { ctx.strokeStyle = '#7a5a34'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(0, 8 * S_); ctx.lineTo(0, -20 * S_); ctx.stroke(); ctx.fillStyle = '#d8dce6'; ctx.beginPath(); ctx.moveTo(-1.6 * S_, -19 * S_); ctx.lineTo(0, -25 * S_); ctx.lineTo(1.6 * S_, -19 * S_); ctx.fill(); }
-    else if (wpn === 'sword') { ctx.strokeStyle = '#d8dce6'; ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -14 * S_); ctx.stroke(); ctx.strokeStyle = '#c9a24e'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(-2.4 * S_, -1 * S_); ctx.lineTo(2.4 * S_, -1 * S_); ctx.stroke(); }
-    else if (wpn === 'axe') { ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(0, 4 * S_); ctx.lineTo(0, -14 * S_); ctx.stroke(); ctx.fillStyle = lin(ctx, 0, -14 * S_, 6 * S_, -8 * S_, [[0, '#e6e9f0'], [1, '#8a8f9a']]); ctx.beginPath(); ctx.moveTo(0, -14 * S_); ctx.quadraticCurveTo(7 * S_, -14 * S_, 6 * S_, -7 * S_); ctx.lineTo(0, -9 * S_); ctx.fill(); }
-    else if (wpn === 'staff') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.5 * S_; ctx.beginPath(); ctx.moveTo(0, 10 * S_); ctx.lineTo(0, -20 * S_); ctx.stroke(); ctx.shadowColor = '#8e7cff'; ctx.shadowBlur = 8 * S_; ctx.fillStyle = '#c9b8ff'; ell(ctx, 0, -21 * S_, 2.2 * S_, 2.2 * S_); ctx.fill(); ctx.shadowBlur = 0; }
-    else if (wpn === 'hammer') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(0, 4 * S_); ctx.lineTo(0, -12 * S_); ctx.stroke(); ctx.fillStyle = lin(ctx, -4 * S_, 0, 4 * S_, 0, [[0, '#9aa0aa'], [1, '#585e68']]); ctx.fillRect(-4 * S_, -16 * S_, 8 * S_, 5 * S_); }
-    else if (wpn === 'banner') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(0, 8 * S_); ctx.lineTo(0, -26 * S_); ctx.stroke(); const wv = Math.sin(t * 4) * 1.5 * S_; ctx.fillStyle = team; ctx.beginPath(); ctx.moveTo(0, -26 * S_); ctx.quadraticCurveTo(6 * S_, -25 * S_ + wv, 11 * S_, -23 * S_); ctx.lineTo(10 * S_, -17 * S_ + wv); ctx.quadraticCurveTo(5 * S_, -18 * S_ - wv, 0, -17 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_); }
-    ctx.restore();
-    /* head */
-    const hy = -29 * S_;
-    if (people === 'eikar') {
-      /* an acorn: the body of the nut is the face, the Aagac (hat) is part of them */
-      ctx.fillStyle = radial(ctx, 0, hy + 1 * S_, 6.5 * S_, shade(skin, 30), shade(skin, -25));
-      ctx.beginPath(); ctx.moveTo(-5.6 * S_, hy - 1 * S_); ctx.quadraticCurveTo(-6 * S_, hy + 6 * S_, 0, hy + 7.5 * S_); ctx.quadraticCurveTo(6 * S_, hy + 6 * S_, 5.6 * S_, hy - 1 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.9 * S_);
-      const cap = R.pick(['#5a3a1c', '#6a4a24', '#4a2e16', '#3a2a17']);
-      ctx.fillStyle = radial(ctx, 0, hy - 3 * S_, 7 * S_, shade(cap, 30), shade(cap, -30));
-      ctx.beginPath(); ctx.ellipse(0, hy - 1 * S_, 7 * S_, 5 * S_, 0, Math.PI, TAU); ctx.fill(); outline(ctx, 0.9 * S_);
-      ctx.strokeStyle = rgba('#1e1208', 0.5); ctx.lineWidth = 0.6 * S_;
-      for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 2.6 * S_, hy - 1 * S_); ctx.lineTo(i * 2.2 * S_, hy - 4.5 * S_); ctx.stroke(); }
-      ctx.strokeStyle = shade(cap, -20); ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(0, hy - 5.8 * S_); ctx.quadraticCurveTo(1 * S_, hy - 8.5 * S_, 2.5 * S_, hy - 8.8 * S_); ctx.stroke();
-      ctx.fillStyle = '#1a1008'; ell(ctx, 1.8 * S_, hy + 2.2 * S_, 0.9 * S_, 1.1 * S_); ctx.fill(); ell(ctx, 4.2 * S_, hy + 2 * S_, 0.8 * S_, 1 * S_); ctx.fill();
-      ctx.strokeStyle = rgba('#3a2010', 0.6); ctx.lineWidth = 0.6 * S_; ctx.beginPath(); ctx.moveTo(1 * S_, hy + 3.8 * S_); ctx.lineTo(2.6 * S_, hy + 4 * S_); ctx.stroke();
-    } else {
-      ctx.fillStyle = radial(ctx, 0, hy, 5.2 * S_, shade(skin, 25), shade(skin, -25)); ell(ctx, 0, hy, 4.6 * S_, 5.2 * S_); ctx.fill(); outline(ctx, 0.9 * S_);
-      if (people === 'keilia') { ctx.fillStyle = '#5a3a1e'; ctx.beginPath(); ctx.ellipse(-1 * S_, hy - 2 * S_, 5.2 * S_, 4 * S_, 0, Math.PI * 0.9, TAU * 1.02); ctx.fill(); ctx.fillRect(-5.5 * S_, hy - 2 * S_, 2.5 * S_, 8 * S_); }
-      if (people === 'kaloeik') { ctx.shadowColor = '#bcd0ff'; ctx.shadowBlur = 6 * S_; ctx.strokeStyle = '#e8eeff'; ctx.lineWidth = 0.9 * S_; ctx.beginPath(); ctx.arc(0, hy - 1 * S_, 6.4 * S_, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); ctx.shadowBlur = 0; ctx.fillStyle = '#9aa6d8'; ctx.beginPath(); ctx.ellipse(0, hy - 2.5 * S_, 4.8 * S_, 3 * S_, 0, Math.PI, TAU); ctx.fill(); }
-      if (people === 'karnen') { ctx.fillStyle = '#3a2a1e'; ctx.beginPath(); ctx.ellipse(0, hy - 2.8 * S_, 4.8 * S_, 2.6 * S_, 0, Math.PI, TAU); ctx.fill(); ctx.fillStyle = skin; ell(ctx, -4.6 * S_, hy - 1 * S_, 1.4 * S_, 2.2 * S_); ctx.fill(); }
-      ctx.fillStyle = '#1a1008'; ell(ctx, 1.8 * S_, hy + 0.2 * S_, 0.8 * S_, 1 * S_); ctx.fill(); ell(ctx, 3.6 * S_, hy, 0.7 * S_, 0.9 * S_); ctx.fill();
-    }
-    if (o.helm) { ctx.fillStyle = lin(ctx, -5 * S_, hy - 6 * S_, 5 * S_, hy, [[0, '#c9ccd6'], [1, '#6a6f7a']]); ctx.beginPath(); ctx.ellipse(0, hy - 2.4 * S_, 5.4 * S_, 4.2 * S_, 0, Math.PI, TAU); ctx.fill(); outline(ctx, 0.8 * S_); }
+    if (!o.noShadow && !o.seated) { shadow(ctx, 8 * S_, 2.6 * S_); }
+    const bob = Math.sin(t * 3 + (o.look || 0)) * 0.5 * S_; ctx.translate(0, bob);
+    const team = o.color || '#c43a3a', wpn = o.weapon || 'spear';
+    const skin = R.pick(SKIN[people] || SKIN.eikar);
+    if (people === 'keilia') drawKeilia(ctx, S_, t, o, skin, team, wpn, R);
+    else if (people === 'karnen') drawKarnen(ctx, S_, t, o, skin, team, wpn, R);
+    else drawAcornFolk(ctx, S_, t, o, skin, team, wpn, R, people === 'kaloeik');
     ctx.restore();
   };
+  /* EIKAR and KALO'EIK: the acorn */
+  function drawAcornFolk(ctx, S_, t, o, skin, team, wpn, R, moon) {
+    limbs(ctx, S_, -5 * S_, 3 * S_, 5, skin, t, o.seated, o.stride);
+    /* a cloak in the team's colour, behind */
+    ctx.fillStyle = lin(ctx, -9 * S_, -20 * S_, 6 * S_, -4 * S_, [[0, shade(team, -5)], [1, shade(team, -50)]]);
+    ctx.beginPath(); ctx.moveTo(-6 * S_, -19 * S_); ctx.quadraticCurveTo(-12 * S_, -10 * S_, -9 * S_ + Math.sin(t * 2) * 0.6 * S_, -4 * S_); ctx.lineTo(-2 * S_, -6 * S_); ctx.closePath(); ctx.fill();
+    /* the nut: widest under the cap, rounding to a point below */
+    ctx.fillStyle = radial(ctx, -2 * S_, -15 * S_, 13 * S_, shade(skin, 30), shade(skin, -30));
+    ctx.beginPath(); ctx.moveTo(-8 * S_, -19 * S_); ctx.bezierCurveTo(-9.5 * S_, -11 * S_, -5 * S_, -4 * S_, 0, -3 * S_); ctx.bezierCurveTo(5 * S_, -4 * S_, 9.5 * S_, -11 * S_, 8 * S_, -19 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.strokeStyle = rgba('#ffffff', 0.16); ctx.lineWidth = 1.2 * S_; ctx.beginPath(); ctx.moveTo(-5.5 * S_, -16 * S_); ctx.quadraticCurveTo(-6.5 * S_, -11 * S_, -3.5 * S_, -7 * S_); ctx.stroke();
+    /* armour or a belt */
+    if (o.armor) { ctx.fillStyle = lin(ctx, 0, -13 * S_, 0, -8 * S_, [[0, '#9aa0aa'], [1, '#585e68']]); ctx.beginPath(); ctx.moveTo(-8.3 * S_, -13 * S_); ctx.quadraticCurveTo(0, -11 * S_, 8.3 * S_, -13 * S_); ctx.lineTo(7 * S_, -8.5 * S_); ctx.quadraticCurveTo(0, -6.5 * S_, -7 * S_, -8.5 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_); }
+    else { ctx.strokeStyle = team; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(-7.8 * S_, -10 * S_); ctx.quadraticCurveTo(0, -8 * S_, 7.8 * S_, -10 * S_); ctx.stroke(); }
+    /* face: eyes and the markings beneath them */
+    const ey = -15.5 * S_;
+    ctx.fillStyle = '#1a1008'; ell(ctx, 1.8 * S_, ey, 0.9 * S_, 1.1 * S_); ctx.fill(); ell(ctx, 4.8 * S_, ey - 0.2 * S_, 0.8 * S_, 1 * S_); ctx.fill();
+    ctx.strokeStyle = moon ? rgba('#bcd0ff', 0.9) : rgba('#3a2010', 0.65); ctx.lineWidth = 0.6 * S_;
+    ctx.beginPath(); ctx.moveTo(0.8 * S_, ey + 1.8 * S_); ctx.lineTo(3.3 * S_, ey + 3.2 * S_); ctx.lineTo(5.8 * S_, ey + 1.6 * S_); ctx.stroke();
+    /* arms: one holds the weapon */
+    arm(ctx, S_, -7 * S_, -13 * S_, -9 * S_, -8 * S_, skin);
+    ctx.save(); ctx.translate(9 * S_, -10 * S_); weaponAt(ctx, wpn, S_, t, team, o.swing); ctx.restore();
+    arm(ctx, S_, 7 * S_, -13 * S_, 9 * S_, -10 * S_, skin);
+    /* the Aagac: the acorn cap, part of them, stem and all */
+    const cap = moon ? '#9aa6d8' : R.pick(['#5a3a1c', '#6a4a24', '#4a2e16', '#3a2a17']);
+    ctx.fillStyle = radial(ctx, -2 * S_, -23 * S_, 10 * S_, shade(cap, 35), shade(cap, -35));
+    ctx.beginPath(); ctx.moveTo(-9.6 * S_, -18.5 * S_); ctx.quadraticCurveTo(-9.5 * S_, -26.5 * S_, 0, -27 * S_); ctx.quadraticCurveTo(9.5 * S_, -26.5 * S_, 9.6 * S_, -18.5 * S_); ctx.quadraticCurveTo(0, -16.5 * S_, -9.6 * S_, -18.5 * S_); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.strokeStyle = rgba('#1e1208', 0.45); ctx.lineWidth = 0.55 * S_;
+    for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 2.6 * S_, -18 * S_); ctx.lineTo(i * 2.1 * S_ + 0.6 * S_, -24.5 * S_); ctx.stroke(); }
+    for (let j = 0; j < 2; j++) { ctx.beginPath(); ctx.moveTo(-8.6 * S_, -20.3 * S_ - j * 2.4 * S_); ctx.quadraticCurveTo(0, -22.2 * S_ - j * 2.6 * S_, 8.6 * S_, -20.3 * S_ - j * 2.4 * S_); ctx.stroke(); }
+    ctx.strokeStyle = shade(cap, -25); ctx.lineWidth = 1.5 * S_; ctx.beginPath(); ctx.moveTo(0, -26.6 * S_); ctx.quadraticCurveTo(0.6 * S_, -29.5 * S_, 2.6 * S_, -29.8 * S_); ctx.stroke();
+    if (moon) { ctx.save(); ctx.shadowColor = '#e8eeff'; ctx.shadowBlur = 6 * S_; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1 * S_; ctx.beginPath(); ctx.arc(-1 * S_, -22.5 * S_, 2.6 * S_, Math.PI * 0.6, Math.PI * 1.6); ctx.stroke(); ctx.restore(); }
+    if (o.helm) { ctx.fillStyle = lin(ctx, 0, -27 * S_, 0, -19 * S_, [[0, '#d8dce6'], [1, '#6a6f7a']]); ctx.beginPath(); ctx.moveTo(-9.8 * S_, -19 * S_); ctx.quadraticCurveTo(-9.6 * S_, -27.5 * S_, 0, -28 * S_); ctx.quadraticCurveTo(9.6 * S_, -27.5 * S_, 9.8 * S_, -19 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_); }
+  }
+  /* KEILIA: the pinecone — dark scaled wood, one eye, and a cape of scales */
+  function drawKeilia(ctx, S_, t, o, skin, team, wpn, R) {
+    limbs(ctx, S_, -4 * S_, 3.2 * S_, 5, skin, t, o.seated, o.stride);
+    /* the scale-hair cape, from the crown to the calf */
+    const capeCol = shade(skin, -10);
+    ctx.fillStyle = lin(ctx, -10 * S_, -28 * S_, 0, -2 * S_, [[0, shade(capeCol, 15)], [1, shade(capeCol, -35)]]);
+    ctx.beginPath(); ctx.moveTo(-3 * S_, -28 * S_); ctx.quadraticCurveTo(-13 * S_, -18 * S_, -10 * S_ + Math.sin(t * 2) * 0.5 * S_, -2 * S_); ctx.lineTo(2 * S_, -4 * S_); ctx.quadraticCurveTo(-4 * S_, -14 * S_, 2 * S_, -27 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_);
+    ctx.fillStyle = rgba('#1a0e06', 0.35);
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 2; c++) { const sx = -9 * S_ + c * 3.5 * S_ + (r % 2) * 1.6 * S_ + r * 0.3 * S_, sy = -24 * S_ + r * 3 * S_; ctx.beginPath(); ctx.moveTo(sx - 1.6 * S_, sy); ctx.quadraticCurveTo(sx, sy + 2.6 * S_, sx + 1.6 * S_, sy); ctx.fill(); }
+    /* the body: a pinecone, broad in the middle, pointed above */
+    ctx.fillStyle = radial(ctx, -1 * S_, -15 * S_, 13 * S_, shade(skin, 35), shade(skin, -35));
+    ctx.beginPath(); ctx.moveTo(0, -30 * S_); ctx.bezierCurveTo(7 * S_, -28 * S_, 8.5 * S_, -16 * S_, 7 * S_, -8 * S_); ctx.quadraticCurveTo(5 * S_, -3 * S_, 0, -3 * S_); ctx.quadraticCurveTo(-5 * S_, -3 * S_, -7 * S_, -8 * S_); ctx.bezierCurveTo(-8.5 * S_, -16 * S_, -7 * S_, -28 * S_, 0, -30 * S_); ctx.fill(); outline(ctx, 0.8 * S_);
+    /* overlapping scales in a lattice */
+    ctx.save(); ctx.clip();
+    for (let r = 0; r < 9; r++) for (let c = -3; c <= 3; c++) { const sx = c * 3.2 * S_ + (r % 2) * 1.6 * S_, sy = -28 * S_ + r * 3 * S_;
+      ctx.fillStyle = rgba(r % 2 ? '#2a180c' : '#1e1208', 0.32); ctx.beginPath(); ctx.moveTo(sx - 1.7 * S_, sy); ctx.quadraticCurveTo(sx, sy + 3 * S_, sx + 1.7 * S_, sy); ctx.lineTo(sx, sy + 1 * S_); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = rgba('#d8a878', 0.18); ctx.lineWidth = 0.5 * S_; ctx.beginPath(); ctx.moveTo(sx - 1.6 * S_, sy + 0.2 * S_); ctx.quadraticCurveTo(sx, sy + 2.6 * S_, sx + 1.6 * S_, sy + 0.2 * S_); ctx.stroke(); }
+    ctx.restore();
+    /* the single eye */
+    ctx.fillStyle = '#efe6cc'; ell(ctx, 2.4 * S_, -21 * S_, 2.2 * S_, 1.8 * S_); ctx.fill(); outline(ctx, 0.5 * S_);
+    ctx.fillStyle = '#1a1008'; ell(ctx, 3 * S_, -21 * S_, 1.1 * S_, 1.2 * S_); ctx.fill();
+    ctx.strokeStyle = rgba('#1a0e06', 0.8); ctx.lineWidth = 0.7 * S_; ctx.beginPath(); ctx.moveTo(0, -23.6 * S_); ctx.quadraticCurveTo(2.4 * S_, -24.4 * S_, 4.8 * S_, -23.4 * S_); ctx.stroke();
+    /* a belt in the team's colour */
+    ctx.strokeStyle = team; ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(-7.6 * S_, -11 * S_); ctx.quadraticCurveTo(0, -9 * S_, 7.6 * S_, -11 * S_); ctx.stroke();
+    if (o.armor) { ctx.fillStyle = lin(ctx, 0, -18 * S_, 0, -12 * S_, [[0, '#9aa0aa'], [1, '#585e68']]); ctx.fillRect(-6.5 * S_, -17 * S_, 13 * S_, 5 * S_); outline(ctx, 0.6 * S_); }
+    arm(ctx, S_, -6.5 * S_, -15 * S_, -9 * S_, -9 * S_, skin);
+    ctx.save(); ctx.translate(9.5 * S_, -11 * S_); weaponAt(ctx, wpn === 'hammer' && !o.builder ? 'axe' : wpn, S_, t, team, o.swing); ctx.restore();
+    arm(ctx, S_, 6.5 * S_, -15 * S_, 9.5 * S_, -11 * S_, skin);
+    if (o.helm) { ctx.fillStyle = lin(ctx, 0, -31 * S_, 0, -25 * S_, [[0, '#d8dce6'], [1, '#6a6f7a']]); ctx.beginPath(); ctx.moveTo(-5 * S_, -25 * S_); ctx.lineTo(0, -32 * S_); ctx.lineTo(5 * S_, -25 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_); }
+  }
+  /* KARNEN: small, quick, angular, in a worn triangular hat */
+  function drawKarnen(ctx, S_, t, o, skin, team, wpn, R) {
+    limbs(ctx, S_, -5 * S_, 2.6 * S_, 5, skin, t, o.seated, o.stride);
+    ctx.fillStyle = lin(ctx, -7 * S_, -20 * S_, 7 * S_, -4 * S_, [[0, shade(skin, 30)], [1, shade(skin, -30)]]);
+    ctx.beginPath(); ctx.moveTo(0, -21 * S_); ctx.lineTo(7 * S_, -12 * S_); ctx.lineTo(3.5 * S_, -4 * S_); ctx.lineTo(-3.5 * S_, -4 * S_); ctx.lineTo(-7 * S_, -12 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.fillStyle = team; ctx.beginPath(); ctx.moveTo(-6 * S_, -11 * S_); ctx.lineTo(6 * S_, -11 * S_); ctx.lineTo(4.6 * S_, -8 * S_); ctx.lineTo(-4.6 * S_, -8 * S_); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#1a1008'; ell(ctx, 1.5 * S_, -15.5 * S_, 0.8 * S_, 1 * S_); ctx.fill(); ell(ctx, 3.8 * S_, -15.6 * S_, 0.7 * S_, 0.9 * S_); ctx.fill();
+    arm(ctx, S_, -5.5 * S_, -13 * S_, -8 * S_, -8 * S_, skin);
+    ctx.save(); ctx.translate(8 * S_, -10 * S_); weaponAt(ctx, wpn, S_, t, team, o.swing); ctx.restore();
+    arm(ctx, S_, 5.5 * S_, -13 * S_, 8 * S_, -10 * S_, skin);
+    ctx.fillStyle = lin(ctx, 0, -27 * S_, 0, -19 * S_, [[0, '#6a5a3a'], [1, '#3a2e1a']]);
+    ctx.beginPath(); ctx.moveTo(-9 * S_, -19 * S_); ctx.lineTo(0, -28 * S_); ctx.lineTo(9 * S_, -19 * S_); ctx.quadraticCurveTo(0, -17.5 * S_, -9 * S_, -19 * S_); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.strokeStyle = rgba('#e8d8a8', 0.3); ctx.lineWidth = 0.6 * S_; ctx.beginPath(); ctx.moveTo(-6 * S_, -20.5 * S_); ctx.lineTo(0, -26 * S_); ctx.stroke();
+  }
 
-  /* a hero on a mount, for the map */
+  /* a hero on the map: on a Domestic Punk (a faceless pumpkin walking on vines), or a Kuni Byrd */
   A.mountedHero = function (ctx, x, y, s, hero, color, t, f) {
     ctx.save(); ctx.translate(x, y); ctx.scale(f || 1, 1);
-    const S_ = s / 30, step = Math.sin(t * 8) * (hero.moving ? 1 : 0);
+    const S_ = s / 30;
     shadow(ctx, 14 * S_, 4 * S_);
     if (hero.mount === 'kuni') { A.creature(ctx, 'kuni', 0, 0, s * 0.9, { t, f: 1, noShadow: true }); ctx.translate(0, -16 * S_); }
     else {
-      /* a Domestic Punk, saddled: the pumpkin-and-vine beast of the roads */
-      const body = '#d27426', vine = '#3d6a24', dvine = '#2a4a18';
-      ctx.lineCap = 'round';
-      /* vine tail, curling */
-      ctx.strokeStyle = vine; ctx.lineWidth = 1.6 * S_;
-      ctx.beginPath(); ctx.moveTo(-12 * S_, -14 * S_); ctx.bezierCurveTo(-18 * S_, -16 * S_, -20 * S_, -8 * S_ + Math.sin(t * 3) * S_, -16 * S_, -7 * S_); ctx.stroke();
-      ctx.beginPath(); ctx.arc(-15.5 * S_, -8.6 * S_, 1.6 * S_, 0, Math.PI * 1.5); ctx.stroke();
-      /* four vine legs with leafy feet */
-      [[-9, 1, dvine], [5, -1, dvine], [-5, -1, vine], [9, 1, vine]].forEach(([lx, ph, c]) => {
-        ctx.strokeStyle = c; ctx.lineWidth = 2.6 * S_;
-        const fx = lx * S_ + step * ph * 3 * S_;
-        ctx.beginPath(); ctx.moveTo(lx * S_, -9 * S_); ctx.bezierCurveTo(lx * S_ - 2 * S_, -5 * S_, fx + 2 * S_, -3 * S_, fx, 0); ctx.stroke();
-        ctx.fillStyle = '#5a8a34'; ell(ctx, fx + 1.4 * S_, -0.4 * S_, 2.2 * S_, 1 * S_, 0.2); ctx.fill();
-      });
-      /* the pumpkin body, deeply ribbed */
-      ctx.fillStyle = radial(ctx, 2 * S_, -16 * S_, 14 * S_, shade(body, 40), shade(body, -45)); ell(ctx, 0, -14 * S_, 13 * S_, 8.5 * S_); ctx.fill(); outline(ctx, 1.1 * S_);
-      ctx.strokeStyle = rgba('#7a3608', 0.6); ctx.lineWidth = 1 * S_;
-      for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.ellipse(i * 3.6 * S_, -14 * S_, 1.8 * S_, 8 * S_, 0, -1.35, 1.35); ctx.stroke(); }
-      /* saddle blanket in the hero's colour, and a strap */
-      ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(-7 * S_, -21 * S_); ctx.quadraticCurveTo(0, -23 * S_, 7 * S_, -21 * S_); ctx.lineTo(6 * S_, -11 * S_); ctx.quadraticCurveTo(0, -9.5 * S_, -6 * S_, -11 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
-      ctx.strokeStyle = '#d9b87a'; ctx.lineWidth = 0.8 * S_; ctx.beginPath(); ctx.moveTo(-6.5 * S_, -12 * S_); ctx.quadraticCurveTo(0, -10.5 * S_, 6.5 * S_, -12 * S_); ctx.stroke();
-      /* the head: a smaller pumpkin with a carved face, a stem and a leaf */
-      const hx = 14 * S_, hy = -20 * S_ + Math.sin(t * 3) * 0.5 * S_;
-      ctx.fillStyle = radial(ctx, hx, hy - 1 * S_, 6 * S_, shade(body, 45), shade(body, -35)); ell(ctx, hx, hy, 6.2 * S_, 5.2 * S_); ctx.fill(); outline(ctx, 0.9 * S_);
-      ctx.strokeStyle = rgba('#7a3608', 0.6); ctx.lineWidth = 0.7 * S_; [-2.2, 0, 2.2].forEach(dx => { ctx.beginPath(); ctx.ellipse(hx + dx * S_, hy, 1 * S_, 4.8 * S_, 0, -1.3, 1.3); ctx.stroke(); });
-      ctx.fillStyle = '#2a1206'; ctx.beginPath(); ctx.moveTo(hx + 1 * S_, hy - 1.6 * S_); ctx.lineTo(hx + 2.8 * S_, hy - 2.6 * S_); ctx.lineTo(hx + 2.6 * S_, hy - 0.6 * S_); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(hx + 3.8 * S_, hy - 1.4 * S_); ctx.lineTo(hx + 5.2 * S_, hy - 2.4 * S_); ctx.lineTo(hx + 5 * S_, hy - 0.4 * S_); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(hx + 0.8 * S_, hy + 1.4 * S_); ctx.lineTo(hx + 2 * S_, hy + 2.6 * S_); ctx.lineTo(hx + 3 * S_, hy + 1.8 * S_); ctx.lineTo(hx + 4 * S_, hy + 2.8 * S_); ctx.lineTo(hx + 5.4 * S_, hy + 1.4 * S_); ctx.lineTo(hx + 4 * S_, hy + 3.6 * S_); ctx.lineTo(hx + 2 * S_, hy + 3.6 * S_); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = '#4a3a1a'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(hx - 0.5 * S_, hy - 5 * S_); ctx.quadraticCurveTo(hx - 1 * S_, hy - 8 * S_, hx + 1.5 * S_, hy - 8.5 * S_); ctx.stroke();
-      ctx.fillStyle = '#5a9a34'; ell(ctx, hx - 3.2 * S_, hy - 6.6 * S_, 2.8 * S_, 1.3 * S_, 0.5); ctx.fill(); outline(ctx, 0.5 * S_);
-      /* reins */
-      ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 0.7 * S_; ctx.beginPath(); ctx.moveTo(hx - 2 * S_, hy + 1 * S_); ctx.quadraticCurveTo(6 * S_, -20 * S_, 3 * S_, -24 * S_); ctx.stroke();
-      ctx.translate(0, -11.5 * S_);   /* sat down into the saddle */
+      CREATURE.punk(ctx, S_ * 1.05, t, { tint: 2, noShadow: true, moving: hero.moving, saddle: color });
+      ctx.translate(-1 * S_, -21 * S_);
     }
-    A.person(ctx, 0, 0, s * 0.82, hero.people, { color, look: hero.look, weapon: 'banner', t, noShadow: true });
+    A.person(ctx, 0, 0, s * 0.72, hero.people, { color, look: hero.look, weapon: 'banner', t, noShadow: true, seated: true });
     ctx.restore();
   };
 
@@ -258,44 +302,72 @@
     ctx.restore();
   };
   const CREATURE = A.CREATURE = {};
-  CREATURE.malsti = function (ctx, S_, t, o) {
-    /* the smallest Punk, Duat-born: violet-dark pumpkin body, vine legs */
-    const up = o.tint === 1; const body = up ? '#7a4aa5' : '#5a3a75', dark = '#241733';
-    if (!o.noShadow) shadow(ctx, 9 * S_, 3 * S_);
-    const hop = Math.abs(Math.sin(t * 5)) * 2 * S_;
-    ctx.translate(0, -hop);
-    ctx.strokeStyle = '#2f4a2a'; ctx.lineWidth = 1.6 * S_; ctx.lineCap = 'round';
-    [[-5, 0.2], [-2, -0.3], [2, 0.3], [5, -0.2]].forEach(([lx, ph]) => { ctx.beginPath(); ctx.moveTo(lx * S_, -6 * S_); ctx.quadraticCurveTo(lx * S_ + Math.sin(t * 6 + ph * 9) * 1.5 * S_, -3 * S_, lx * 1.2 * S_, hop); ctx.stroke(); });
-    ctx.fillStyle = radial(ctx, 0, -10 * S_, 9 * S_, shade(body, 40), dark); ell(ctx, 0, -10 * S_, 8.5 * S_, 6.5 * S_); ctx.fill(); outline(ctx, 1 * S_);
-    ctx.strokeStyle = rgba('#1a0f24', 0.6); ctx.lineWidth = 0.8 * S_; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(i * 3 * S_, -10 * S_, 1.4 * S_, 6 * S_, 0, -1.2, 1.2); ctx.stroke(); }
-    /* glowing Duat eyes */
-    ctx.shadowColor = '#c9a8ff'; ctx.shadowBlur = 6 * S_; ctx.fillStyle = '#e6d8ff'; ell(ctx, 3 * S_, -11 * S_, 1.4 * S_, 1.1 * S_); ctx.fill(); ell(ctx, 6.2 * S_, -11.4 * S_, 1.2 * S_, 1 * S_); ctx.fill(); ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#2f4a2a'; ctx.lineWidth = 1.3 * S_; ctx.beginPath(); ctx.moveTo(-1 * S_, -16 * S_); ctx.quadraticCurveTo(-3 * S_, -21 * S_, 1 * S_, -22 * S_); ctx.stroke();
-    ctx.fillStyle = '#4a7a3a'; ell(ctx, 1.5 * S_, -22 * S_, 2 * S_, 1.1 * S_, -0.4); ctx.fill();
-    /* a little sack of stolen gold */
-    ctx.fillStyle = '#8a6a3a'; ell(ctx, -7 * S_, -7 * S_, 2.6 * S_, 2.4 * S_); ctx.fill(); outline(ctx, 0.7 * S_); ctx.fillStyle = '#e8c25a'; ell(ctx, -7 * S_, -9.4 * S_, 1 * S_, 0.7 * S_); ctx.fill();
-    if (up) { ctx.globalAlpha *= 0.5; ctx.strokeStyle = '#c9a8ff'; ctx.lineWidth = 1 * S_; ctx.beginPath(); ctx.arc(0, -10 * S_, 11 * S_ + Math.sin(t * 4) * S_, 0, TAU); ctx.stroke(); ctx.globalAlpha /= 0.5; }
-  };
+  /* THE PUNK FAMILY — faceless pumpkins. Every vine, legs and arms alike, sprouts
+     from the stem cluster at the crown: the legs arch out and drape to the ground,
+     the arms reach up and out with curled, grasping tips. (Dya'Akara, Torcain's Run.) */
+  function punkBody(ctx, S_, t, o, P) {
+    const moving = !!o.moving || o.pose === 'attack', attack = o.pose === 'attack';
+    const bw = P.w * S_, bh = P.h * S_, y0 = -P.lift * S_ - bh + Math.sin(t * 2.2) * 0.4 * S_;
+    const crown = y0 - bh * 0.8;
+    /* vine legs: from the crown, arching out, down to curled feet */
+    for (let i = 0; i < P.legs; i++) {
+      const fr = P.legs === 1 ? 0.5 : i / (P.legs - 1), dir = fr < 0.5 ? -1 : 1;
+      const step = moving ? Math.sin(t * 8 + i * 2.2) : 0;
+      const fx = (fr - 0.5) * bw * 2.3 + step * 2 * S_, fy = -Math.max(0, step) * 1.6 * S_;
+      const ox = (fr - 0.5) * bw * 0.2, mx = (ox + fx) / 2 + dir * bw * 0.55, my = (crown + fy) / 2 - 1 * S_;
+      ctx.strokeStyle = shade(P.vine, i % 2 ? -30 : -12); ctx.lineWidth = P.legW * S_; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ox, crown); ctx.bezierCurveTo(ox + (mx - ox) * 0.5, crown - 3 * S_, mx, my, fx, fy); ctx.stroke();
+      ctx.lineWidth = P.legW * 0.7 * S_; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.quadraticCurveTo(fx + dir * 2.4 * S_, fy + 0.4 * S_, fx + dir * 1.2 * S_, fy - 1.6 * S_); ctx.stroke();
+    }
+    /* the pumpkin */
+    ctx.fillStyle = lin(ctx, 0, y0 - bh, 0, y0 + bh, [[0, shade(P.rind, 30)], [0.6, P.rind], [1, shade(P.rind, -40)]]);
+    ell(ctx, 0, y0, bw, bh); ctx.fill(); outline(ctx, 0.7 * S_);
+    /* deep ribs hugging the surface, meeting at stem and base */
+    ctx.strokeStyle = rgba(shade(P.rind, -45), 0.75); ctx.lineWidth = Math.max(0.6, 0.7 * S_);
+    for (let i = 0; i < P.ribs; i++) { const fr = (i / (P.ribs - 1)) * 2 - 1, px = fr * bw * 0.97; ctx.beginPath();
+      for (let k = 0; k <= 14; k++) { const v = -1 + 2 * k / 14, xx = px * Math.sqrt(Math.max(0, 1 - v * v)), yy = y0 + v * bh; k ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke(); }
+    ctx.fillStyle = rgba('#ffffff', 0.16); ell(ctx, -bw * 0.35, y0 - bh * 0.4, bw * 0.28, bh * 0.22, -0.4); ctx.fill();
+    if (P.cracks) { ctx.save(); ctx.shadowColor = '#c88aff'; ctx.shadowBlur = 6 * S_; ctx.strokeStyle = rgba('#c88aff', 0.6 + Math.sin(t * 3) * 0.3); ctx.lineWidth = 0.7 * S_;
+      [[-0.5, -0.4, -0.2, 0.1, -0.4, 0.5], [0.3, -0.6, 0.5, -0.1, 0.2, 0.4]].forEach(c => { ctx.beginPath(); ctx.moveTo(c[0] * bw, y0 + c[1] * bh); ctx.lineTo(c[2] * bw, y0 + c[3] * bh); ctx.lineTo(c[4] * bw, y0 + c[5] * bh); ctx.stroke(); }); ctx.restore(); }
+    /* a saddle blanket for a mount */
+    if (o.saddle) { ctx.fillStyle = o.saddle; ctx.beginPath(); ctx.moveTo(-bw * 0.62, y0 - bh * 0.62); ctx.quadraticCurveTo(0, y0 - bh * 1.12, bw * 0.62, y0 - bh * 0.62); ctx.lineTo(bw * 0.5, y0 - bh * 0.05); ctx.quadraticCurveTo(0, y0 + bh * 0.08, -bw * 0.5, y0 - bh * 0.05); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_);
+      ctx.strokeStyle = '#d9b87a'; ctx.lineWidth = 0.7 * S_; ctx.beginPath(); ctx.moveTo(-bw * 0.48, y0 - bh * 0.15); ctx.quadraticCurveTo(0, y0, bw * 0.48, y0 - bh * 0.15); ctx.stroke(); }
+    /* the stem at the crown, and a leaf */
+    ctx.strokeStyle = shade(P.vine, -40); ctx.lineWidth = P.stemW * S_; ctx.beginPath(); ctx.moveTo(0, crown + 1 * S_); ctx.quadraticCurveTo(0.6 * S_, crown - 2.5 * S_, 2.2 * S_, crown - 3.6 * S_); ctx.stroke();
+    ctx.fillStyle = shade(P.vine, 10); ell(ctx, -2.4 * S_, crown - 1.6 * S_, 2.6 * S_, 1.2 * S_, 0.5); ctx.fill();
+    /* grasping vine arms: up and out from the crown */
+    for (let i = 0; i < P.arms; i++) {
+      const sp = P.arms === 1 ? 0 : i / (P.arms - 1) - 0.5, lash = attack ? Math.max(0, Math.sin(t * 12 - i)) : 0;
+      let ang = -Math.PI / 2 + sp * 1.6 + Math.sin(t * 2.3 + i * 1.7) * 0.2; if (attack) ang = -0.3 + sp * 0.5 - lash * 0.4;
+      const reach = P.reach * S_ * (1 + lash * 0.5), ox = sp * bw * 0.18;
+      const tx = ox + Math.cos(ang) * reach, ty = crown + Math.sin(ang) * reach, mx = ox + Math.cos(ang) * reach * 0.5 - Math.sin(ang) * 1.6 * S_, my = crown + Math.sin(ang) * reach * 0.5;
+      ctx.strokeStyle = shade(P.vine, 8); ctx.lineWidth = P.armW * S_; ctx.beginPath(); ctx.moveTo(ox, crown); ctx.quadraticCurveTo(mx, my, tx, ty); ctx.stroke();
+      ctx.beginPath(); ctx.arc(tx, ty, 1.2 * S_, ang, ang + Math.PI * 1.3); ctx.stroke();
+      ctx.fillStyle = shade(P.vine, -10); ell(ctx, mx, my, 1.4 * S_, 0.7 * S_, ang); ctx.fill();
+    }
+    return { crown, y0, bh };
+  }
   CREATURE.punk = function (ctx, S_, t, o) {
-    const dom = o.tint === 2; const body = dom ? '#c86e2a' : '#b5562a';
-    if (!o.noShadow) shadow(ctx, 13 * S_, 4 * S_);
-    ctx.strokeStyle = '#3d5a22'; ctx.lineWidth = 2.2 * S_; ctx.lineCap = 'round';
-    [[-8, 0], [-3, 1], [3, 2], [8, 3]].forEach(([lx, ph]) => { ctx.beginPath(); ctx.moveTo(lx * S_, -8 * S_); ctx.quadraticCurveTo(lx * S_ + Math.sin(t * 5 + ph) * 2 * S_, -3 * S_, lx * S_ + Math.sin(t * 5 + ph) * 2 * S_, 0); ctx.stroke(); });
-    const w = dom ? 13 : 11;
-    ctx.fillStyle = radial(ctx, 0, -13 * S_, w * S_, shade(body, 35), shade(body, -40)); ell(ctx, 0, -13 * S_, w * S_, 8 * S_); ctx.fill(); outline(ctx, 1.1 * S_);
-    ctx.strokeStyle = rgba('#5a2a10', 0.6); ctx.lineWidth = 1 * S_; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(i * 4 * S_, -13 * S_, 2 * S_, 7.5 * S_, 0, -1.3, 1.3); ctx.stroke(); }
-    ctx.fillStyle = '#1a1008'; ell(ctx, 8 * S_, -15 * S_, 1.2 * S_, 1.3 * S_); ctx.fill(); ell(ctx, 4.5 * S_, -15.5 * S_, 1.1 * S_, 1.2 * S_); ctx.fill();
-    ctx.strokeStyle = '#1a1008'; ctx.lineWidth = 0.9 * S_; ctx.beginPath(); ctx.moveTo(4 * S_, -11 * S_); ctx.quadraticCurveTo(6.5 * S_, -9.5 * S_, 9 * S_, -11.5 * S_); ctx.stroke();
-    ctx.strokeStyle = '#3d5a22'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(0, -21 * S_); ctx.quadraticCurveTo(2 * S_, -25 * S_, 5 * S_, -25 * S_); ctx.stroke();
-    ctx.fillStyle = '#5a8a34'; ell(ctx, -3 * S_, -22 * S_, 3 * S_, 1.5 * S_, 0.5); ctx.fill();
-    /* vine arms */
-    ctx.strokeStyle = '#3d5a22'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(9 * S_, -10 * S_); ctx.quadraticCurveTo(14 * S_, -12 * S_ + Math.sin(t * 4) * 2 * S_, 15 * S_, -6 * S_); ctx.stroke();
+    const dom = o.tint === 2;
+    if (!o.noShadow) shadow(ctx, 12 * S_, 3.5 * S_);
+    return punkBody(ctx, S_, t, o, dom
+      ? { w: 11, h: 8.5, lift: 5.5, ribs: 9, rind: '#d97c2b', vine: '#3f7d3a', legs: 4, legW: 2.4, arms: o.saddle ? 0 : 3, armW: 1.6, reach: 12, stemW: 2.2 }
+      : { w: 8.5, h: 7.5, lift: 7, ribs: 7, rind: '#b8641f', vine: '#2e5c2a', legs: 4, legW: 1.7, arms: 2, armW: 1.3, reach: 12, stemW: 1.8 });
+  };
+  CREATURE.malsti = function (ctx, S_, t, o) {
+    /* the smallest Punk, sprouted from a Duat Seedling: violet rind with glowing cracks */
+    const up = o.tint === 1;
+    if (!o.noShadow) shadow(ctx, 8 * S_, 2.6 * S_);
+    const hop = Math.abs(Math.sin(t * 5)) * 1.6 * S_; ctx.translate(0, -hop);
+    punkBody(ctx, S_, t, o, { w: 6.5, h: 5.5, lift: 5, ribs: 6, rind: up ? '#7a4aa5' : '#5a3a75', vine: '#2a1c36', legs: 4, legW: 1.4, arms: 2, armW: 1.1, reach: 8, stemW: 1.3, cracks: true });
+    /* a little sack of stolen gold */
+    ctx.fillStyle = '#8a6a3a'; ell(ctx, -8 * S_, -4 * S_, 2.4 * S_, 2.2 * S_); ctx.fill(); outline(ctx, 0.6 * S_); ctx.fillStyle = '#e8c25a'; ell(ctx, -8 * S_, -6.2 * S_, 1 * S_, 0.7 * S_); ctx.fill();
+    if (up) { ctx.globalAlpha *= 0.45; ctx.strokeStyle = '#c9a8ff'; ctx.lineWidth = 1 * S_; ctx.beginPath(); ctx.arc(0, -11 * S_, 10 * S_ + Math.sin(t * 4) * S_, 0, TAU); ctx.stroke(); ctx.globalAlpha /= 0.45; }
   };
   CREATURE.velnur = function (ctx, S_, t, o) {
-    /* a mixed band: an Eikar, a Keilia, a Karnen, armed */
+    /* one figure stands for the stack: a Velnurthalith of the Duskareth */
     const up = o.tint === 1, col = o.color || '#6a4ad0';
-    const men = [[-7, 'keilia', 'axe', 2], [0, 'eikar', 'spear', 5], [7, 'karnen', 'sword', 9]];
-    men.forEach(([dx, p, w, lk]) => A.person(ctx, dx * S_, (lk % 3) * 0.6 * S_, 22 * S_, p, { color: col, look: lk + (up ? 40 : 0), weapon: w, t: t + lk, armor: up, helm: up && p !== 'eikar', swing: o.pose === 'attack' ? 0.9 : 0 }));
+    A.person(ctx, 0, 0, 27 * S_, up ? 'keilia' : 'eikar', { color: col, look: up ? 44 : 5, weapon: up ? 'axe' : 'spear', t, armor: up, helm: up, swing: o.pose === 'attack' ? 0.9 : 0, noShadow: o.noShadow });
   };
   CREATURE.ver = function (ctx, S_, t, o) {
     /* the Ver, the Dark Screamers: hooded, throat-lit, screaming */
@@ -337,20 +409,51 @@
     ctx.fillStyle = '#f0ece0'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo((15 + i * 2) * S_, 2.6 * S_); ctx.lineTo((16 + i * 2) * S_, 4 * S_ + open * 0.4); ctx.lineTo((17 + i * 2) * S_, 2.4 * S_); ctx.fill(); }
   };
   CREATURE.kaloeik = function (ctx, S_, t, o) {
-    /* moon-folk: tall, robed, pale and calm, with a ward of Stygian */
+    /* Kalo'Eik who serve the Duskareth: tall moon-pale acorns in long robes, with a ward of Stygian */
     if (!o.noShadow) shadow(ctx, 10 * S_, 3 * S_);
     const glow = 0.5 + Math.sin(t * 2) * 0.2;
-    ctx.fillStyle = lin(ctx, -10 * S_, -38 * S_, 10 * S_, 0, [[0, '#4a5288'], [1, '#1e2244']]);
-    ctx.beginPath(); ctx.moveTo(-6 * S_, -32 * S_); ctx.quadraticCurveTo(-13 * S_, -14 * S_, -11 * S_, 0); ctx.lineTo(11 * S_, 0); ctx.quadraticCurveTo(13 * S_, -14 * S_, 6 * S_, -32 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 1.1 * S_);
-    ctx.strokeStyle = rgba('#c9d6ff', 0.4); ctx.lineWidth = 1 * S_; ctx.beginPath(); ctx.moveTo(0, -30 * S_); ctx.lineTo(0, -1 * S_); ctx.stroke();
-    ctx.fillStyle = '#c9a24e'; for (let i = 0; i < 4; i++) { ell(ctx, 0, (-26 + i * 6) * S_, 1 * S_, 1 * S_); ctx.fill(); }
-    /* the shield-staff */
-    ctx.strokeStyle = '#8a8fb0'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(10 * S_, 0); ctx.lineTo(10 * S_, -42 * S_); ctx.stroke();
-    ctx.shadowColor = '#bcd0ff'; ctx.shadowBlur = 12 * S_ * glow; ctx.strokeStyle = rgba('#e8eeff', 0.9); ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.arc(10 * S_, -44 * S_, 4 * S_, Math.PI * 0.6, Math.PI * 2.4); ctx.stroke(); ctx.shadowBlur = 0;
-    /* head with crescent */
-    ctx.fillStyle = radial(ctx, 0, -36 * S_, 6 * S_, '#f0f4ff', '#a8b0d0'); ell(ctx, 0, -36 * S_, 5 * S_, 5.6 * S_); ctx.fill(); outline(ctx, 0.9 * S_);
-    ctx.fillStyle = '#1a1a30'; ell(ctx, 2 * S_, -36 * S_, 0.8 * S_, 1 * S_); ctx.fill(); ell(ctx, 4 * S_, -36.2 * S_, 0.7 * S_, 0.9 * S_); ctx.fill();
-    ctx.shadowColor = '#e8eeff'; ctx.shadowBlur = 8 * S_; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.arc(-1 * S_, -42 * S_, 5 * S_, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = lin(ctx, -10 * S_, -26 * S_, 10 * S_, 0, [[0, '#4a5288'], [1, '#1e2244']]);
+    ctx.beginPath(); ctx.moveTo(-7 * S_, -20 * S_); ctx.quadraticCurveTo(-12 * S_, -8 * S_, -10 * S_, 0); ctx.lineTo(10 * S_, 0); ctx.quadraticCurveTo(12 * S_, -8 * S_, 7 * S_, -20 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.9 * S_);
+    ctx.fillStyle = '#c9a24e'; for (let i = 0; i < 3; i++) { ell(ctx, 0, (-15 + i * 5) * S_, 0.9 * S_, 0.9 * S_); ctx.fill(); }
+    ctx.strokeStyle = '#8a8fb0'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(11 * S_, 0); ctx.lineTo(11 * S_, -40 * S_); ctx.stroke();
+    ctx.save(); ctx.shadowColor = '#bcd0ff'; ctx.shadowBlur = 12 * S_ * glow; ctx.strokeStyle = rgba('#e8eeff', 0.9); ctx.lineWidth = 1.5 * S_; ctx.beginPath(); ctx.arc(11 * S_, -42 * S_, 4 * S_, Math.PI * 0.6, Math.PI * 2.4); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.translate(0, -16 * S_); A.person(ctx, 0, 0, 28 * S_, 'kaloeik', { look: 11, weapon: 'none', t, noShadow: true, seated: true, color: '#3a3f68' }); ctx.restore();
+  };
+  CREATURE.ularnaga = function (ctx, S_, t, o) {
+    /* the Ular Naga: a many-headed serpent of the earth on four heavy legs, armoured in scale, with a spiked club tail */
+    if (!o.noShadow) shadow(ctx, 20 * S_, 5 * S_);
+    const c1 = '#57713d', c2 = '#3c4f2a', belly = '#a8a868';
+    const sw = Math.sin(t * 2) * 0.12;
+    /* club tail */
+    ctx.save(); ctx.translate(-16 * S_, -10 * S_); ctx.rotate(-0.3 + sw);
+    ctx.strokeStyle = c2; ctx.lineWidth = 5 * S_; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-8 * S_, -2 * S_, -15 * S_, -7 * S_); ctx.stroke();
+    ctx.fillStyle = radial(ctx, -16 * S_, -8 * S_, 5 * S_, '#8a9a6a', c2); ell(ctx, -16 * S_, -8 * S_, 4.4 * S_, 3.8 * S_); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.fillStyle = '#d8d0b8'; for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; ctx.beginPath(); ctx.moveTo(-16 * S_ + Math.cos(a) * 3.6 * S_, -8 * S_ + Math.sin(a) * 3.2 * S_); ctx.lineTo(-16 * S_ + Math.cos(a) * 7 * S_, -8 * S_ + Math.sin(a) * 6 * S_); ctx.lineTo(-16 * S_ + Math.cos(a + 0.4) * 3.6 * S_, -8 * S_ + Math.sin(a + 0.4) * 3.2 * S_); ctx.fill(); }
+    ctx.restore();
+    /* four heavy legs */
+    [[-11, 0.6], [-4, -0.6], [5, 0.6], [12, -0.6]].forEach(([lx, ph], i) => { const st = Math.sin(t * 3 + ph * 3) * 1.2 * S_; ctx.fillStyle = i % 2 ? shade(c2, -20) : c2;
+      ctx.beginPath(); ctx.moveTo(lx * S_ - 3 * S_, -10 * S_); ctx.quadraticCurveTo(lx * S_ - 4 * S_ + st, -4 * S_, lx * S_ - 3.2 * S_ + st, 0); ctx.quadraticCurveTo(lx * S_ + st, 1 * S_, lx * S_ + 3.4 * S_ + st, 0); ctx.quadraticCurveTo(lx * S_ + 3 * S_, -5 * S_, lx * S_ + 3 * S_, -10 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_);
+      ctx.fillStyle = '#d8d0b8'; for (let c = -1; c <= 1; c++) { ell(ctx, lx * S_ + st + c * 1.6 * S_ + 0.6 * S_, -0.2 * S_, 0.6 * S_, 0.9 * S_); ctx.fill(); } });
+    /* the body */
+    ctx.fillStyle = lin(ctx, 0, -20 * S_, 0, -4 * S_, [[0, shade(c1, 20)], [0.7, c1], [0.72, belly], [1, shade(belly, -25)]]);
+    ell(ctx, 0, -12 * S_, 18 * S_, 8 * S_); ctx.fill(); outline(ctx, 0.9 * S_);
+    ctx.save(); ell(ctx, 0, -12 * S_, 18 * S_, 8 * S_); ctx.clip();
+    for (let r = 0; r < 4; r++) for (let c = -6; c <= 6; c++) { ctx.strokeStyle = rgba('#1e2a14', 0.35); ctx.lineWidth = 0.6 * S_; ctx.beginPath(); ctx.arc(c * 3 * S_ + (r % 2) * 1.5 * S_, -19 * S_ + r * 3 * S_, 1.8 * S_, 0.2, Math.PI - 0.2); ctx.stroke(); }
+    ctx.restore();
+    /* a ridge of plates */
+    ctx.fillStyle = '#8a9a6a'; for (let i = -4; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 3.6 * S_ - 1.6 * S_, -19.4 * S_); ctx.lineTo(i * 3.6 * S_, -23.5 * S_); ctx.lineTo(i * 3.6 * S_ + 1.6 * S_, -19.4 * S_); ctx.fill(); }
+    /* the heads, each on its own neck */
+    [[12, -40, 1.5, 0], [4, -33, 1.25, 1.7], [20, -29, 1.2, 3.1]].forEach(([hx, hy, k, ph]) => {
+      const nx = hx * S_ + Math.sin(t * 1.7 + ph) * 1.5 * S_, ny = hy * S_ + Math.cos(t * 1.5 + ph) * 1 * S_;
+      ctx.strokeStyle = c1; ctx.lineWidth = 4.4 * S_ * k; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(8 * S_, -15 * S_); ctx.quadraticCurveTo(nx - 6 * S_, (ny - 15 * S_) / 2, nx, ny); ctx.stroke();
+      ctx.strokeStyle = rgba('#1e2a14', 0.35); ctx.lineWidth = 0.7 * S_; ctx.stroke();
+      ctx.fillStyle = radial(ctx, nx + 1 * S_, ny - 1 * S_, 5 * S_ * k, '#7a9a54', c2);
+      ctx.beginPath(); ctx.moveTo(nx - 3 * S_ * k, ny - 2.6 * S_ * k); ctx.quadraticCurveTo(nx + 3 * S_ * k, ny - 4 * S_ * k, nx + 7 * S_ * k, ny - 0.5 * S_ * k); ctx.quadraticCurveTo(nx + 3 * S_ * k, ny + 3.2 * S_ * k, nx - 3 * S_ * k, ny + 2.4 * S_ * k); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_);
+      ctx.fillStyle = '#ffd86a'; ell(ctx, nx + 2.2 * S_ * k, ny - 1.4 * S_ * k, 0.9 * S_ * k, 0.7 * S_ * k); ctx.fill();
+      ctx.fillStyle = '#d8d0b8'; ctx.beginPath(); ctx.moveTo(nx - 1 * S_ * k, ny - 2.6 * S_ * k); ctx.lineTo(nx - 3.4 * S_ * k, ny - 6 * S_ * k); ctx.lineTo(nx + 0.6 * S_ * k, ny - 3 * S_ * k); ctx.fill();
+      if (o.pose === 'attack') { ctx.fillStyle = '#3a1418'; ctx.beginPath(); ctx.moveTo(nx + 7 * S_ * k, ny - 0.5 * S_ * k); ctx.lineTo(nx + 1 * S_ * k, ny + 0.6 * S_ * k); ctx.lineTo(nx + 6 * S_ * k, ny + 2.4 * S_ * k); ctx.fill(); }
+    });
   };
   CREATURE.tyndael = function (ctx, S_, t, o) {
     /* a living flame: round body, wide many-coloured wings, a crown of fire; it never lands */
