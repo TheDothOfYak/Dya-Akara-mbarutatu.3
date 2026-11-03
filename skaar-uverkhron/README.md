@@ -69,6 +69,10 @@ the game is built.
   losses, captains, Heartening and some Relics all move it. High morale rolls damage
   nearer the top of the range, low nearer the bottom; very low morale slows a stack
   and can freeze it. A captain's fall costs his squadron about 20.
+- **In battle** you see every blow: the attacker lunges, the target reels and flares,
+  and numbers change as the blow lands. A stack that dies topples over and its bodies
+  stay where it fell. The song **Rekindle** (tier 3) raises some of a fallen stack
+  from its bodies, if nothing stands on them.
 - **Shooters** do double damage with exactly one hex between them and the target,
   and can't shoot when an enemy is next to them. **Luck** sometimes
   spares a stack from a blow. Bad luck can make some of a stack trip on their own

@@ -18,7 +18,8 @@
      battle from the same state; only a person's choices travel, the dice agree. */
   BV.start = function (B, control, done, net) {
     BV.net = net || null;
-    BV.B = B; BV.control = control; BV.done = done; BV.anims = []; BV.pos = {}; BV.mode = null; BV.hover = null; BV.over = false;
+    BV.B = B; BV.control = control; BV.done = done; BV.anims = []; BV.pos = {}; BV.off = {}; BV.mode = null; BV.hover = null; BV.over = false;
+    B.units.forEach(u => { u._n = u.n; u._hp = u.hpTop; u._dying = 0; });
     const scr = document.getElementById('battle'); scr.innerHTML = ''; scr.classList.remove('hidden');
     SU.mapView.hidden = true;
     BV.cv = el('canvas', { cls: 'bg' }); scr.appendChild(BV.cv);
@@ -66,8 +67,8 @@
   }
   function unitCenter(u, G) {
     G = G || geo();
-    const p = BV.pos[u.uid] || center(u.c, u.r, G), o = footOffset(u, G);
-    return { x: p.x + o.x, y: p.y + o.y };
+    const p = BV.pos[u.uid] || center(u.c, u.r, G), o = footOffset(u, G), d = BV.off && BV.off[u.uid];
+    return { x: p.x + o.x + (d ? d.x : 0), y: p.y + o.y + (d ? d.y : 0) };
   }
 
   /* ======================= animation queue ======================= */
@@ -75,18 +76,25 @@
   function animating() { return BV.anims.length > 0 || BV.cur; }
   function stepAnims(now) {
     const G = geo();
-    if (!BV.cur && BV.anims.length) { BV.cur = BV.anims.shift(); BV.cur.t0 = now; BV.cur.dur = { move: 260, hit: 320, shoot: 380, dmg: 80, blink: 300, song: 450, tower: 360, wall: 300, boulder: 420, luck: 200, chaos: 380 }[BV.cur.kind] || 200; if (SU.ui.fast) BV.cur.dur *= 0.5; }
+    if (!BV.cur && BV.anims.length) { BV.cur = BV.anims.shift(); BV.cur.t0 = now; BV.cur.dur = { move: 260, hit: 520, shoot: 460, dmg: 160, blink: 300, song: 450, tower: 360, wall: 300, boulder: 420, luck: 200, chaos: 380, rise: 700 }[BV.cur.kind] || 200; if (SU.ui.fast) BV.cur.dur *= 0.5; }
     const a = BV.cur; if (!a) return;
     const k = Math.min(1, (now - a.t0) / a.dur);
     const u = a.uid != null && BV.B.units.find(x => x.uid === a.uid);
     if (a.kind === 'move' && u) { const p = center(a.from[0], a.from[1], G), q = center(a.to[0], a.to[1], G); BV.pos[u.uid] = { x: SU.lerp(p.x, q.x, k), y: SU.lerp(p.y, q.y, k) - (a.fly ? Math.sin(k * Math.PI) * G.R * 1.2 : Math.abs(Math.sin(k * Math.PI * 3)) * G.R * 0.12) }; if (k >= 1) delete BV.pos[u.uid]; }
     if (a.kind === 'blink' && u) { u._alpha = k < 0.5 ? 1 - k * 2 : (k - 0.5) * 2; if (k >= 1) u._alpha = 1; }
     if ((a.kind === 'hit' || a.kind === 'shoot' || a.kind === 'boulder' || a.kind === 'wall') && u) { u._pose = 'attack'; u._poseT = k; if (k >= 1) u._pose = null; }
+    if (a.kind === 'hit' && u) { const tu = BV.B.units.find(x => x.uid === a.target);
+      if (tu) { const p = center(u.c, u.r, G), q = center(tu.c, tu.r, G), L = Math.max(1, Math.hypot(q.x - p.x, q.y - p.y)), dx = (q.x - p.x) / L, dy = (q.y - p.y) / L;
+        const lunge = k < 0.55 ? Math.sin(k / 0.55 * Math.PI / 2) : Math.cos((k - 0.55) / 0.45 * Math.PI / 2);
+        BV.off[u.uid] = { x: dx * G.R * 0.75 * lunge, y: dy * G.R * 0.75 * lunge - Math.sin(k * Math.PI) * G.R * 0.12 };
+        if (k >= 0.5 && !a._struck) { a._struck = true; tu._flash = 1; tu._reel = 1; tu._reelDir = [dx, dy]; spark(q.x - dx * G.R * 0.3, q.y - G.R * 0.7, now); }
+        if (k >= 1) delete BV.off[u.uid]; } }
+    if (a.kind === 'shoot' && k >= 0.95 && !a._struck) { a._struck = true; const tu = BV.B.units.find(x => x.uid === a.target); if (tu) { tu._flash = 1; tu._reel = 0.6; const p = u ? center(u.c, u.r, G) : center(tu.c, tu.r, G), q = center(tu.c, tu.r, G), L = Math.max(1, Math.hypot(q.x - p.x, q.y - p.y)); tu._reelDir = [(q.x - p.x) / L, (q.y - p.y) / L]; spark(q.x, q.y - G.R * 0.7, now); } }
+    if (a.kind === 'rise' && u) { if (!a._seen) { a._seen = true; u._n = a.nAfter; u._hp = a.hpAfter; u._dying = 0; u._rise = 0; } u._rise = k; if (k >= 1) u._rise = null; }
     if (a.kind === 'chaos' && u) { u._pose = 'chaos'; if (k >= 1) u._pose = null; }
-    if (a.kind === 'dmg') { const t = BV.B.units.find(x => x.uid === a.uid); if (t) { t._flash = 1; (BV.floats = BV.floats || []).push({ uid: a.uid, text: '-' + a.amount + (a.killed ? '  ☠' + a.killed : ''), t0: now }); } }
+    if (a.kind === 'dmg' && !a._seen) { a._seen = true; const t = BV.B.units.find(x => x.uid === a.uid); if (t) { t._flash = 1; if (a.nAfter != null) { t._n = a.nAfter; t._hp = a.hpAfter; if (a.nAfter <= 0) t._dying = 1; } (BV.floats = BV.floats || []).push({ uid: a.uid, text: '-' + a.amount + (a.killed ? '  ☠' + a.killed : ''), t0: now }); } }
     if (a.kind === 'luck') (BV.floats = BV.floats || []).push({ uid: a.uid, text: '✦ luck', t0: now, col: '#9ff0a0' });
-    if (k >= 1) { BV.cur = null; if (a.kind === 'dmg') {} }
-    else if (a.kind === 'dmg') BV.cur = null;
+    if (k >= 1) BV.cur = null;
   }
 
   /* ======================= drawing ======================= */
@@ -94,6 +102,8 @@
     const B = BV.B; if (!B) return;
     const dt = Math.min(64, now - BV.last); BV.last = now; const t = (now - BV.t0) / 1000;
     stepAnims(now);
+    if (!animating()) B.units.forEach(u => { if (!(u._dying > 0)) { u._n = u.n; u._hp = u.hpTop; } });
+    B.units.forEach(u => { if (u._dying > 0) u._dying = Math.max(0, u._dying - dt / 750); if (u._reel > 0) u._reel = Math.max(0, u._reel - dt / 260); });
     const r = BV.cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
     if (BV.cv.width !== Math.round(r.width * dpr)) { BV.cv.width = Math.round(r.width * dpr); BV.cv.height = Math.round(r.height * dpr); BV.bgKey = null; }
     const g = BV.cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -112,8 +122,10 @@
     const items = [];
     B.obstacles.forEach(k => { const [c, rr] = k.split(',').map(Number); items.push({ y: center(c, rr, G).y, fn: () => drawObstacle(g, B.obstacleKind, center(c, rr, G), G.R) }); });
     if (B.siege) drawSiege(g, G, t, items);
+    const raising = BV.mode && BV.mode.kind === 'song' && D.SONGS[BV.mode.song].target === 'body';
     B.units.forEach(u => {
-      if (u.n <= 0 && !(u._dying > 0)) return;
+      const shownDead = (u._n != null ? u._n : u.n) <= 0;
+      if (shownDead && !(u._dying > 0)) { const p = unitCenter(u, G); items.push({ y: p.y - G.h, fn: () => drawBody(g, u, p, G, raising && BT.canRaise(B, u, BT.activeUnit(B) && BT.activeUnit(B).side), t) }); return; }
       const p = unitCenter(u, G);
       items.push({ y: p.y, fn: () => drawUnit(g, u, p, G, t, act) });
     });
@@ -136,6 +148,10 @@
     }
     if (a && a.kind === 'song') { const k = Math.min(1, (now - a.t0) / a.dur); const tu = a.target != null && B.units.find(x => x.uid === a.target); const p = tu ? unitCenter(tu, G) : { x: G.w / 2, y: G.h / 2 };
       g.save(); g.globalAlpha = 1 - k; g.strokeStyle = '#c9b8ff'; g.shadowColor = '#8e7cff'; g.shadowBlur = 20; g.lineWidth = 3; g.beginPath(); g.arc(p.x, p.y - G.R * 0.6, G.R * (0.5 + k * 2.5), 0, Math.PI * 2); g.stroke(); g.restore(); }
+    /* sparks where blows land */
+    BV.sparks = (BV.sparks || []).filter(s => now - s.t0 < 320);
+    BV.sparks.forEach(s => { const k = (now - s.t0) / 320; g.save(); g.globalAlpha = 1 - k; g.strokeStyle = '#fff2c0'; g.shadowColor = '#ffcf6a'; g.shadowBlur = 12; g.lineWidth = 2.2;
+      for (let i = 0; i < 7; i++) { const an = i * 0.9 + s.t0 % 7, r0 = G.R * (0.1 + k * 0.3), r1 = G.R * (0.3 + k * 0.6); g.beginPath(); g.moveTo(s.x + Math.cos(an) * r0, s.y + Math.sin(an) * r0); g.lineTo(s.x + Math.cos(an) * r1, s.y + Math.sin(an) * r1); g.stroke(); } g.restore(); });
     /* floating numbers */
     BV.floats = (BV.floats || []).filter(f => now - f.t0 < 1100);
     BV.floats.forEach(f => { const u = B.units.find(x => x.uid === f.uid); if (!u) return; const p = unitCenter(u, G), k = (now - f.t0) / 1100;
@@ -200,23 +216,44 @@
     if (isAct) { g.strokeStyle = 'rgba(255,236,160,' + (0.6 + Math.sin(t * 5) * 0.3) + ')'; g.lineWidth = 2; g.stroke(); }
     g.restore();
     const f = u.side === 0 ? 1 : -1;
+    g.save();
+    if (u._reel > 0 && u._reelDir) g.translate(u._reelDir[0] * G.R * 0.22 * u._reel, u._reelDir[1] * G.R * 0.22 * u._reel);
+    if (u._dying > 0) { const k = 1 - u._dying; g.globalAlpha = Math.max(0.35, 1 - k * 0.5); g.translate(p.x, p.y); g.rotate(-f * k * 1.35); g.translate(-p.x, -p.y); }
+    if (u._rise != null) { g.globalAlpha = Math.min(1, 0.2 + u._rise); g.translate(p.x, p.y); g.rotate(-f * (1 - u._rise) * 1.35); g.translate(-p.x, -p.y); }
     if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.75, u.cap, col, t + u.uid, f, u._pose);
     else {
       const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2 }[C.art] || 1.6);
       const extra = C.art === 'nekh' ? { flat: true, stretch: 3.9 } : {};
       A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1), color: col }, extra));
     }
+    g.restore();
+    if (u._dying > 0) return;
     /* count badge */
-    const txt = u.kind === 'cap' ? '★' : String(u.n);
+    const txt = u.kind === 'cap' ? '★' : String(u._n != null ? u._n : u.n);
     g.font = 'bold ' + Math.round(G.R * 0.38) + 'px Georgia'; const tw = g.measureText(txt).width + 10;
     const bx = p.x + (u.side === 0 ? G.R * 0.35 : -G.R * 0.35 - tw), by = p.y + G.R * 0.12;
     g.fillStyle = u.kind === 'cap' ? '#3a2a5a' : (u.side === 0 ? '#3a2a14' : '#2a1414'); g.strokeStyle = col; g.lineWidth = 1.5;
     g.beginPath(); g.roundRect ? g.roundRect(bx, by, tw, G.R * 0.5, 4) : g.rect(bx, by, tw, G.R * 0.5); g.fill(); g.stroke();
     g.fillStyle = '#ffe9b8'; g.textAlign = 'left'; g.fillText(txt, bx + 5, by + G.R * 0.4);
-    if (u.kind === 'cap' || u.n === 1) { const hpw = G.R * 0.9, frac = u.hpTop / u.hp; g.fillStyle = '#000'; g.fillRect(p.x - hpw / 2, p.y + G.R * 0.7, hpw, 3); g.fillStyle = frac > 0.5 ? '#8fd06a' : frac > 0.25 ? '#e8b84a' : '#e0665a'; g.fillRect(p.x - hpw / 2, p.y + G.R * 0.7, hpw * frac, 3); }
+    if (u.kind === 'cap' || (u._n != null ? u._n : u.n) === 1) { const hpw = G.R * 0.9, frac = (u._hp != null ? u._hp : u.hpTop) / u.hp; g.fillStyle = '#000'; g.fillRect(p.x - hpw / 2, p.y + G.R * 0.7, hpw, 3); g.fillStyle = frac > 0.5 ? '#8fd06a' : frac > 0.25 ? '#e8b84a' : '#e0665a'; g.fillRect(p.x - hpw / 2, p.y + G.R * 0.7, hpw * frac, 3); }
     const icons = []; if (u.fx.stun) icons.push('✶'); if (u.fx.slow) icons.push('⇣'); if (u.fx.quick) icons.push('⇡'); if (u.fx.shroud) icons.push('☁'); if (u.fx.burn) icons.push('🔥'); if (u.defending) icons.push('⛨'); if (u.fx.ward) icons.push('◈');
     if (icons.length) { g.font = Math.round(G.R * 0.32) + 'px Georgia'; g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(icons.join(' '), p.x, p.y - G.R * 1.9); }
   }
+  /* where a stack fell: its bodies stay on the field */
+  function drawBody(g, u, p, G, canRaise, t) {
+    const f = u.side === 0 ? 1 : -1, sw = (u.shape || [1, 1])[0];
+    g.save();
+    g.fillStyle = 'rgba(60,8,8,0.35)'; A.ell(g, p.x, p.y + G.R * 0.05, G.R * (0.75 + (sw - 1) * 0.8), G.R * 0.28); g.fill();
+    if (canRaise) { g.strokeStyle = 'rgba(200,184,255,' + (0.5 + Math.sin(t * 5) * 0.3) + ')'; g.lineWidth = 2; g.shadowColor = '#8e7cff'; g.shadowBlur = 12; g.stroke(); g.shadowBlur = 0; }
+    g.globalAlpha = 0.62; if ('filter' in g) g.filter = 'grayscale(0.75) brightness(0.55)';
+    g.translate(p.x, p.y); g.rotate(-f * 1.35); g.translate(-p.x, -p.y);
+    if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.6, u.cap, '#3a3a3a', 0, f);
+    else { const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.1, velnur: 1.7, ver: 1.6, harkal: 1.3, kaloeik: 1.4, tyndael: 1.4, xiweik: 2.2, lutut: 1.9, nekh: 2.2, ularnaga: 1.7, mcfly: 1.8 }[C.art] || 1.5);
+      A.creature(g, C.art, p.x, p.y, sc, { t: 0, f, tint: C.tint || (C.upgraded ? 1 : 0), noShadow: true, flat: C.art === 'nekh' }); }
+    g.restore();
+  }
+  /* a burst where a blow lands */
+  function spark(x, y, now) { (BV.sparks = BV.sparks || []).push({ x, y, t0: now }); }
   function drawIntent(g, G, act) {
     const B = BV.B, h = BV.hover, tgt = BT.unitAt(B, h.c, h.r);
     if (tgt && tgt.side !== act.side) {
@@ -235,6 +272,8 @@
   }
   function hoverCard(e) {
     const B = BV.B, h = BV.hover; const u = h && BT.unitAt(B, h.c, h.r);
+    const body = !u && h && BT.bodyAt(B, h.c, h.r);
+    if (body) { const C = D.CREATURES[body.cr]; BV.card.innerHTML = '<b>Here lie ' + body.startN + ' ' + U.esc(C.plural) + '</b> (' + U.esc(B.sides[body.side].label) + ')<br><span class="muted">A song of Rekindling could raise some of them.</span>'; BV.card.classList.remove('hidden'); BV.card.style.left = Math.min(window.innerWidth - 240, e.clientX + 16) + 'px'; BV.card.style.top = Math.max(10, e.clientY - 80) + 'px'; return; }
     if (!u) { BV.card.classList.add('hidden'); return; }
     const sd = B.sides[u.side], act = BT.activeUnit(B);
     const lines = [];
@@ -248,6 +287,7 @@
   /* ======================= controls ======================= */
   function humanTurn() { const B = BV.B, u = BT.activeUnit(B); return !!(u && !B.over && BV.control(u.side) === 'human' && !animating()); }
   BV._act = a => act(a);   /* for the tests */
+  BV._sing = (song, target, c, r) => doSing(song, target, c, r);
   function act(a) { if (!humanTurn()) return; const r = BT.act(U.st, BV.B, a); if (!r.ok) { if (r.why) U.toast(r.why); return; } send({ k: 'act', a: { type: a.type, t: a.target ? a.target.uid : null, c: a.c, r: a.r } }); BV.mode = null; after(); }
   function send(cmd) { if (BV.net) BV.net.send(cmd); }
   /* a move made on the other player's device */
@@ -271,6 +311,7 @@
     const B = BV.B, m = BV.mode, sd = BT.activeUnit(B).side;
     if (m.kind === 'song') {
       const S_ = D.SONGS[m.song];
+      if (S_.target === 'body') { const bd = BT.bodyAt(BV.B, h.c, h.r); if (!bd) { U.toast('Click where one of your fallen stacks lies.'); return; } doSing(m.song, bd); return; }
       if (S_.target === 'allyMove') { if (!m.target) { if (t && t.side === sd) { m.target = t; U.toast('Now click where they should go.'); } return; } doSing(m.song, m.target, h.c, h.r); return; }
       doSing(m.song, t); return;
     }
@@ -291,7 +332,7 @@
     const songs = h.songs.filter(s => D.SONGS[s].where === 'battle');
     const m = U.modal([el('h2', { text: h.name + ' sings' }), el('p', { cls: 'small muted', text: 'Breath ' + Math.round(h.breath) + '. One song a round.' }),
       el('div', { cls: 'col' }, songs.map(sid => { const s = D.SONGS[sid]; const ok = h.breath >= s.breath && RU.canSing(U.st, h, sid);
-        return el('div', { cls: 'row frame' }, [el('div', { style: { flex: 1 } }, [el('b', { text: s.name }), el('div', { cls: 'small muted', text: s.desc })]), el('span', { cls: 'small', text: s.breath + ' Breath' }), btn('Sing', () => { m.close(); if (s.target === 'none') doSing(sid, null); else { BV.mode = { kind: 'song', song: sid }; U.toast({ ally: 'Click one of your stacks.', allyMove: 'Click one of your stacks.', enemy: 'Click an enemy stack.', enemyArea: 'Click an enemy stack.', captain: 'Click one of your captains.' }[s.target]); renderBar(); } }, 'duat', null)].map(x => { if (x && x.tagName === 'BUTTON' && !ok) x.disabled = true; return x; })); })),
+        return el('div', { cls: 'row frame' }, [el('div', { style: { flex: 1 } }, [el('b', { text: s.name }), el('div', { cls: 'small muted', text: s.desc })]), el('span', { cls: 'small', text: s.breath + ' Breath' }), btn('Sing', () => { m.close(); if (s.target === 'none') doSing(sid, null); else { BV.mode = { kind: 'song', song: sid }; U.toast({ ally: 'Click one of your stacks.', allyMove: 'Click one of your stacks.', enemy: 'Click an enemy stack.', enemyArea: 'Click an enemy stack.', captain: 'Click one of your captains.', body: 'Click where one of your fallen stacks lies.' }[s.target]); renderBar(); } }, 'duat', null)].map(x => { if (x && x.tagName === 'BUTTON' && !ok) x.disabled = true; return x; })); })),
       el('div', { cls: 'acts' }, [btn('Close', () => m.close())])]);
   }
   function renderBar() {

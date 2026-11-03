@@ -318,6 +318,9 @@ changed from the Admin Panel without touching the code).
 - **Meeting:** click another of your armies to walk over and trade (stacks, captains,
   Relics, cores); a squadron can join a hero's army whole.
 - **Population** changes a little every day.
+- **Battles show the blows:** lunges, recoils, deaths after the blow lands, and bodies
+  left on the field. **Rekindle** (tier 3 song, 16 Breath) raises fallen stacks from
+  their bodies; the computer uses it too.
 - **Training** a basic skill costs 60 gold plus 40 for each skill the hero has.
 - **Looking closer:** right-click anything for its details; double-click a creature for
   its card (upgrade it there in town); buildings open a close-up before you build.

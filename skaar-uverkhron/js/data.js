@@ -253,6 +253,7 @@
      tier 1..5, breath cost, where: 'battle' | 'map'. */
   D.SONGS = {
     mend: { name: 'Mend', tier: 1, breath: 5, where: 'battle', target: 'ally', desc: 'Heals a stack (and raises a few of its fallen).' },
+    rekindle: { name: 'Rekindle', tier: 3, breath: 16, where: 'battle', target: 'body', desc: 'Raises a fallen stack from where its bodies lie: some of them stand and fight again.' },
     rally: { name: 'Rally', tier: 1, breath: 4, where: 'battle', target: 'ally', desc: 'Lifts one stack’s morale for the battle.' },
     quickstep: { name: 'Quickstep', tier: 1, breath: 5, where: 'battle', target: 'ally', desc: 'A stack moves faster for 3 rounds.' },
     dimsight: { name: 'Dim Sight', tier: 1, breath: 5, where: 'battle', target: 'enemy', desc: 'An enemy stack’s ranged attacks do less for 3 rounds.' },
