@@ -29,7 +29,8 @@
     BV.cv.onmousemove = e => { const r = BV.cv.getBoundingClientRect(); BV.mx = e.clientX - r.left; BV.my = e.clientY - r.top; BV.hover = pick(BV.mx, BV.my); hoverCard(e); };
     BV.cv.onmouseleave = () => { BV.hover = null; BV.card.classList.add('hidden'); };
     BV.cv.onclick = e => { const r = BV.cv.getBoundingClientRect(); click(pick(e.clientX - r.left, e.clientY - r.top), e.clientX - r.left, e.clientY - r.top); };
-    BV.cv.oncontextmenu = e => { e.preventDefault(); };
+    BV.cv.oncontextmenu = e => { e.preventDefault(); const B = BV.B, h = BV.hover; const u = B && h && BT.unitAt(B, h.c, h.r); if (!u) return;
+      if (u.kind === 'cap') SU.dialogs.captainCard(u.cap); else SU.dialogs.creatureCard(u.cr, { stack: { cr: u.cr, n: u.n, hpTop: u.hpTop } }); };
     drainAnims();
     renderBar();
     if (!BV.raf) { const loop = now => { BV.raf = requestAnimationFrame(loop); if (!document.getElementById('battle').classList.contains('hidden')) frame(now); }; BV.raf = requestAnimationFrame(loop); }

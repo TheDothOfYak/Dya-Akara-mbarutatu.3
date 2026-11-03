@@ -96,17 +96,17 @@ this game (it may appear later as a special event).
   and no attack. They direct the troops.
 - **Hired at a tavern** (where squadron captains are also hired).
 - **Base stats:** **Strength** (adds to every creature's attack), **Defense** (adds to
-  every creature's defense), **Command** (troop morale, how many stacks captains can
-  lead), **Zikhron** (how many skills a core offers, and learning), **Stride** (how far
-  the army moves each day) and **Cunning** (who moves first in battle, and how much you
-  can see of enemy armies). Stats can go up and down. Relics, armour and other gear
+  every creature's defense), **Stride** (how far the army moves each day) and
+  **Cunning** (who moves first in battle, and how much you can see of enemy armies).
+  (Command and Zikhron were dropped: morale comes from skills, captains and Relics;
+  a hero's Breath grows with their level.) Stats can go up and down. Relics, armour and other gear
   affect them.
 - **Heroes on the field:** at most **5 heroes out on the map** per player. Inside a
   castle a player may keep as many as they like, but must choose which one is the
   **defending general**.
 - **Peoples:** a hero's people (Eikar, Keilia, Kalo'Eik, Karnen…) and the hero
   themself can give a better buff to certain creatures.
-- **Leveling up** raises one stat at random and levels up a skill.
+- **Leveling up** offers two stats and two skills; you pick one of each.
 - **XP:** heroes gain XP from defeating squadrons, wild creatures and groups, and
   from completing quests. **Defeating a hero gives no XP**; you get their memory
   core instead.
@@ -278,7 +278,7 @@ changed from the Admin Panel without touching the code).
   (I–III) → Stygian Choir, Memory Vault, Shipyard, Duat Gate, Stygian Well, Vel
   Sanctum, six training halls, and the nine dwellings.
 - **A month is 42 days** (seven 6-day weeks).
-- **Captains** lead 2 stacks to start; Warcaller, Captaincy and Command 4 / 8 add more.
+- **Captains** lead 2 stacks to start; Warcaller and Captaincy add more.
   A very rare *peerless* captain (about 1 in 80) is far stronger but leads only one.
 - **XP and levels:** beating a hero's army gives half the usual XP for the creatures
   killed. Each level offers two stats and two skills; you pick one of each.
@@ -315,6 +315,13 @@ changed from the Admin Panel without touching the code).
   another device waits for them; both devices run the same battle and only the
   choices travel. Rooms have a chat.
 - **Records:** only personal records for solo games; no leaderboard.
+- **Meeting:** click another of your armies to walk over and trade (stacks, captains,
+  Relics, cores); a squadron can join a hero's army whole.
+- **Population** changes a little every day.
+- **Training** a basic skill costs 60 gold plus 40 for each skill the hero has.
+- **Looking closer:** right-click anything for its details; double-click a creature for
+  its card (upgrade it there in town); buildings open a close-up before you build.
+  A Key explains army-size words (A few 1–4 … A legion 1000+), path marks and ground.
 
 ## 11. Not built yet
 

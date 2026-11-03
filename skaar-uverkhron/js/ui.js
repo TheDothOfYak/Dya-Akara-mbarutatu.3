@@ -66,7 +66,15 @@
     tipEl.style.left = Math.min(window.innerWidth - r.width - 8, x + 14) + 'px'; tipEl.style.top = Math.min(window.innerHeight - r.height - 8, y + 14) + 'px';
   };
   /* hover tooltips on any element with data-tip */
-  document.addEventListener('mousemove', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) U.tip(t.getAttribute('data-tip'), e.clientX, e.clientY); else if (tipEl && !U._mapTip) U.tip(null); });
+  document.addEventListener('mousemove', e => { if (U._pinned) return; const t = e.target.closest && e.target.closest('[data-tip]'); if (t) U.tip(t.getAttribute('data-tip'), e.clientX, e.clientY); else if (tipEl && !U._mapTip) U.tip(null); });
+  /* right-click: a creature opens its card; anything else with a tip keeps the tip up until the next click */
+  document.addEventListener('contextmenu', e => {
+    const c = e.target.closest && e.target.closest('[data-cr]');
+    if (c) { e.preventDefault(); U.tip(null); SU.dialogs.creatureCard(c.getAttribute('data-cr')); return; }
+    const t = e.target.closest && e.target.closest('[data-tip]');
+    if (t) { e.preventDefault(); U.tip(t.getAttribute('data-tip'), e.clientX, e.clientY); U._pinned = true; if (tipEl) tipEl.classList.add('pinned'); }
+  });
+  document.addEventListener('mousedown', e => { if (U._pinned && e.button === 0) { U._pinned = false; if (tipEl) tipEl.classList.remove('pinned'); U.tip(null); } }, true);
 
   /* small canvases: icons and portraits */
   U.resIcon = function (res, size) { const c = el('canvas', { width: size * 2, height: size * 2 }); c.style.width = size + 'px'; c.style.height = size + 'px'; A.resIcon(c.getContext('2d'), res, size, size * 1.05, size * 0.95); return c; };
@@ -177,13 +185,25 @@
   function obName(k) { return { 1: 'forest', 2: 'pines', 3: 'mountains', 4: 'rocks', 5: 'dead trees', 6: 'crystals', 7: 'reeds', 8: 'palms', 9: 'glowing trees', 10: 'ridge' }[k] || ''; }
   function bodyObj(st, layer, x, y) { if (!st._block[layer][y * st.layers[layer].w + x]) return null; return Object.values(st.objects).find(o => o.layer === layer && !o.gone && S.footprint(o).some(([dx, dy]) => o.x + dx === x && o.y + dy === y)); }
   U.bodyObj = bodyObj;
+  const ICON_URL = {};
+  const iconUrl = cr => ICON_URL[cr] || (ICON_URL[cr] = U.creatureIcon(cr, 40).toDataURL());
+  /* an army seen from outside: what it is, each stack with a picture and how many (or about how many) */
+  U.armyInfoHtml = function (a) {
+    const st = U.st, h = S.heroOf(st, a), slots = S.slotsOf(st, a);
+    const mh = Object.values(st.armies).filter(x => x.owner === U.viewer && x.heroId).map(x => S.heroStat(st, st.heroes[x.heroId], 'Cunning'));
+    const exact = a.owner === U.viewer || (mh.length ? Math.max(...mh) : 0) >= 6;
+    const who = a.wild ? (a.herd ? 'A herd of wild punks' : a.mcfly ? 'RubberMcFly' : 'Wild creatures') : (h ? h.name + ' (' + st.players[a.owner].name + ')' : st.players[a.owner].name + '’s squadron');
+    const caps = S.captainsIn(slots);
+    const rows = S.stacksIn(slots).filter(s => s.n > 0).map(s => '<div class="ai-row"><img src="' + iconUrl(s.cr) + '" width="40" height="40"><span><b>' + (exact ? s.n : S.countWord(s.n)) + '</b> ' + D.CREATURES[s.cr].plural + (exact ? '' : ' <span class="muted">(' + S.countRange(s.n) + ')</span>') + '</span></div>').join('');
+    return '<b>' + U.esc(who) + '</b>' + (a.guard ? ' <span class="muted">— guarding</span>' : '') + (caps.length ? '<div class="small">Led by ' + caps.map(c => U.esc(c.name) + ' (' + D.CAPTAIN_RANKS[c.rank].name + ')').join(', ') + '</div>' : '') + '<div class="ai-list">' + rows + '</div>' + (exact ? '' : '<div class="small muted">A hero with Cunning 6 could count them exactly. The Key (on the right) lists what the words mean.</div>');
+  };
   function armyText(a, full) {
     const st = U.st, h = S.heroOf(st, a), slots = S.slotsOf(st, a);
     if (a.owner === U.viewer) return (h ? h.name : 'Your squadron') + (full ? ': ' + S.stacksIn(slots).map(s => s.n + ' ' + D.CREATURES[s.cr].plural).join(', ') : '');
     const cunning = (() => { const mh = Object.values(st.armies).filter(x => x.owner === U.viewer && x.heroId).map(x => S.heroStat(st, st.heroes[x.heroId], 'Cunning')); return mh.length ? Math.max(...mh) : 0; })();
     const who = a.wild ? (a.herd ? 'A herd' : a.mcfly ? 'RubberMcFly' : 'Wild creatures') : (h ? h.name + ' (' + st.players[a.owner].name + ')' : st.players[a.owner].name + '’s squadron');
     const stacks = S.stacksIn(slots).filter(s => s.n > 0);
-    const desc = stacks.map(s => (cunning >= 6 ? s.n : S.countWord(s.n)) + ' ' + D.CREATURES[s.cr].plural).join(', ');
+    const desc = stacks.map(s => (cunning >= 6 ? s.n : S.countWord(s.n) + (full ? ' (' + S.countRange(s.n) + ')' : '')) + ' ' + D.CREATURES[s.cr].plural).join(', ');
     return who + ': ' + desc + (a.guard ? ' (guarding)' : '');
   }
   function objText(o, full) {
@@ -220,8 +240,12 @@
     if (a && a.owner === U.viewer) { SU.dialogs.army(a); return; }
     const o = S.objAt(st, V.layer, e.x, e.y) || bodyObj(st, V.layer, e.x, e.y);
     if (o && o.type === 'town' && o.owner === U.viewer) { SU.townView.open(o); return; }
+    const L = st.layers[V.layer], seen = S.inside(L, e.x, e.y) && U.viewerPlayer().explored[V.layer][e.y * L.w + e.x];
+    /* someone else's army: each stack with a picture */
+    const html = a && seen ? U.armyInfoHtml(a) : null;
     const txt = U.describe(V.layer, e.x, e.y, true);
-    if (txt) { U._mapTip = true; U.tip('<b>' + U.esc(txt).replace(' — ', '</b><br>').replace(/ — /g, '<br>') + (txt.indexOf(' — ') < 0 ? '</b>' : ''), e.sx, e.sy); setTimeout(() => { U._mapTip = false; }, 2500); }
+    const body = html || (txt ? '<b>' + U.esc(txt).replace(' — ', '</b><br>').replace(/ — /g, '<br>') + (txt.indexOf(' — ') < 0 ? '</b>' : '') : null);
+    if (body) { U.tip(body + '<div class="small muted" style="margin-top:4px">Click anywhere to close.</div>', e.sx, e.sy); U._pinned = true; }
   });
   SU.on('mapclick', t => {
     if (!U.st || U.modalOpen() || U.pickTile) return;
@@ -313,6 +337,7 @@
     $('b-songs').onclick = () => { const a = U.selectedArmy(); if (a && a.heroId) SU.dialogs.mapSongs(a); else U.toast('Select a hero first.'); };
     $('b-hero').onclick = () => { const a = U.selectedArmy(); if (a && a.heroId) SU.dialogs.hero(U.st.heroes[a.heroId]); else if (a) SU.dialogs.army(a); else U.toast('Select a hero first.'); };
     $('b-kingdom').onclick = () => SU.dialogs.kingdom();
+    if ($('b-key')) $('b-key').onclick = () => SU.dialogs.mapKey();
     $('b-menu').onclick = () => SU.game.menu();
     $('endturn').onclick = () => SU.game.endTurn();
     SU.on('key', e => {
@@ -323,6 +348,7 @@
       if (k === 'e' && U.myTurn()) SU.game.endTurn();
       else if (k === 'n') U.nextArmy();
       else if (k === 'h') $('b-hero').click();
+      else if (k === '?' || k === '/') SU.dialogs.mapKey();
       else if (k === 'k') SU.dialogs.kingdom();
       else if (k === 'q') $('b-songs').click();
       else if (k === 'z') $('b-sleep').click();

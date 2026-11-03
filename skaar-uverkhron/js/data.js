@@ -18,10 +18,10 @@
   /* ---------------- resources ---------------- */
   D.RES = ['gold', 'wood', 'stone', 'food', 'stygian', 'ngakara', 'timber', 'glowmoss'];
   D.RES_INFO = {
-    gold: { name: 'Gold', common: true, color: '#e8c25a' },
-    wood: { name: 'Wood', common: true, color: '#9a6a3a' },
-    stone: { name: 'Stone', common: true, color: '#a8a39a' },
-    food: { name: 'Food', common: true, color: '#c9a24e' },
+    gold: { name: 'Gold', common: true, color: '#e8c25a', desc: 'Pays for everything: buildings, creatures, heroes. Towns make it every day.' },
+    wood: { name: 'Wood', common: true, color: '#9a6a3a', desc: 'For buildings, boats and the halls of the town.' },
+    stone: { name: 'Stone', common: true, color: '#a8a39a', desc: 'For walls, dwellings and the great buildings.' },
+    food: { name: 'Food', common: true, color: '#c9a24e', desc: 'Feeds your people and armies every day. Hungry armies lose heart, then desert.' },
     stygian: { name: 'Stygian', common: false, color: '#8e7cff', desc: 'Soul iron. Relics, Duat powers, the Kahizecvar and the greatest creatures.' },
     ngakara: { name: 'NgAkara', common: false, color: '#5fd3c6', desc: 'Drawn from the head of the Su Naga. You do not have to kill the Naga to take it.' },
     timber: { name: 'Eldi Aagac Timber', short: 'Timber', common: false, color: '#e0703a', desc: 'Fireproof wood of the fire trees.' },

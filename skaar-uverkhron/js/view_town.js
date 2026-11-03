@@ -234,7 +234,7 @@
     T.top.innerHTML = '';
     T.top.appendChild(el('h2', { text: town.name }));
     T.top.appendChild(el('span', { cls: 'panel', style: { padding: '4px 10px' } }, [Math.floor(town.pop) + ' / ' + RU.housing(town) + ' people' + (town.popChange ? ' (' + (town.popChange > 0 ? '+' : '') + town.popChange + ' today)' : '') + ' · +' + RU.townIncome(st, town).gold + ' gold a day · ' + (town.builtToday >= RU.buildsPerDay(st, town) ? 'built today' : 'can build today')]));
-    T.top.appendChild(el('span', { cls: 'panel row', style: { padding: '4px 10px', gap: '10px' } }, D.RES.map(r => el('span', { cls: 'res' }, [U.resIcon(r, 16), SU.fmt(P.res[r])]))));
+    T.top.appendChild(el('span', { cls: 'panel row', style: { padding: '4px 10px', gap: '10px' } }, D.RES.map(r => el('span', { cls: 'res', 'data-tip': '<b>' + D.RES_INFO[r].name + '</b>' + (D.RES_INFO[r].desc ? '<br>' + D.RES_INFO[r].desc : '') }, [U.resIcon(r, 16), SU.fmt(P.res[r])]))));
     T.top.appendChild(el('span', { cls: 'spacer' }));
     T.top.appendChild(btn('Leave town', () => T.close(), 'primary'));
     /* tabs */
@@ -326,7 +326,7 @@
       const max = RU.maxRecruit(st, town, cr, d.base);
       const range = el('input', { type: 'range', min: 0, max, value: max, style: { width: '120px' } });
       const lab = el('div', { cls: 'small' }); const upd = () => { lab.innerHTML = ''; lab.appendChild(U.costView(RU.recruitCost(cr, +range.value), P)); }; range.oninput = upd; upd();
-      grid.appendChild(el('div', { cls: 'frame col', style: { width: '170px', alignItems: 'center' }, 'data-tip': DL.creatureTip(cr) + '<br><i>Double-click for more.</i>', ondblclick: () => DL.creatureCard(cr, { town }) }, [
+      grid.appendChild(el('div', { cls: 'frame col', style: { width: '170px', alignItems: 'center' }, 'data-tip': DL.creatureTip(cr) + '<br><i>Double-click for more.</i>', ondblclick: () => DL.creatureCard(cr, { town }), oncontextmenu: e => { e.preventDefault(); e.stopPropagation(); DL.creatureCard(cr, { town }); } }, [
         U.creatureIcon(cr, 80, { color: P.color }), el('b', { text: C.plural }), el('div', { cls: 'small muted', text: (town.avail[d.base] || 0) + ' ready' + (C.pop ? ' · uses people' : '') }),
         el('div', { cls: 'small' }, U.costView(C.cost, P)), range, lab,
         btn('Recruit', () => { const slots = dest === 'hero' && vh ? vh.slots : town.garrison; const r = RU.recruit(st, town, cr, d.base, +range.value, slots, dest === 'hero' ? vh : null); if (!r.ok) U.toast(r.why); else U.toast(r.n + ' ' + C.plural + ' join.'); T.render(); U.refresh(); }, 'primary')]));

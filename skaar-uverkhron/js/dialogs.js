@@ -31,16 +31,16 @@
         G.slots.forEach((s, si) => {
           if (G.onlyCaptain && si > 0 && !s) return;
           const isSel = sel && sel.g === gi && sel.si === si && (sel.sub == null || sel.sub === 'cap');
-          const cell = el('div', { cls: 'slot' + (s && s.kind === 'cap' ? ' cap' : '') + (isSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, null); }, ondblclick: e => { e.stopPropagation(); sel = null; draw(); card(s, G); } });
+          const cell = el('div', { cls: 'slot' + (s && s.kind === 'cap' ? ' cap' : '') + (isSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, null); }, ondblclick: e => { e.stopPropagation(); sel = null; draw(); card(s, G); }, oncontextmenu: e => { if (!s) return; e.preventDefault(); e.stopPropagation(); card(s, G); } });
           if (!s) cell.appendChild(el('div', { cls: 'lbl', style: { marginTop: '32px' }, text: 'empty' }));
-          else if (s.kind === 'stack') { const C = D.CREATURES[s.cr]; cell.appendChild(U.creatureIcon(s.cr, 60, { color: P.color })); cell.appendChild(el('div', { cls: 'lbl', text: C.plural })); cell.appendChild(el('span', { cls: 'cnt', text: s.n })); cell.setAttribute('data-tip', creatureTip(s.cr, s)); }
+          else if (s.kind === 'stack') { const C = D.CREATURES[s.cr]; cell.appendChild(U.creatureIcon(s.cr, 60, { color: P.color })); cell.appendChild(el('div', { cls: 'lbl', text: C.plural })); cell.appendChild(el('span', { cls: 'cnt', text: s.n })); cell.setAttribute('data-tip', creatureTip(s.cr, s) + '<br><i>Double-click or right-click for more.</i>'); }
           else {
             const cap = s.cap; cell.appendChild(el('div', { cls: 'row', style: { gap: '4px' } }, [U.captainIcon(cap, 30, P.color), el('div', { cls: 'lbl', style: { textAlign: 'left' } }, [cap.name, el('br'), D.CAPTAIN_RANKS[cap.rank].name])]));
             cell.setAttribute('data-tip', captainTip(cap, hero));
             const cap_ = RU.capCapacity(st(), cap, hero), used = RU.capUsed(s);
             const sq = el('div', { cls: 'squad' });
             s.stacks.forEach((x, k) => { const sSel = sel && sel.g === gi && sel.si === si && sel.sub === k;
-              sq.appendChild(el('div', { cls: 'sub' + (sSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, k); }, ondblclick: e => { e.stopPropagation(); sel = null; draw(); card(x, G); }, 'data-tip': creatureTip(x.cr, x) + '<br><i>Double-click for more.</i>' }, [U.creatureIcon(x.cr, 42, { color: P.color }), el('span', { cls: 'cnt', text: x.n })])); });
+              sq.appendChild(el('div', { cls: 'sub' + (sSel ? ' sel' : ''), onclick: e => { e.stopPropagation(); click(gi, si, k); }, ondblclick: e => { e.stopPropagation(); sel = null; draw(); card(x, G); }, oncontextmenu: e => { e.preventDefault(); e.stopPropagation(); card(x, G); }, 'data-tip': creatureTip(x.cr, x) + '<br><i>Double-click for more.</i>' }, [U.creatureIcon(x.cr, 42, { color: P.color }), el('span', { cls: 'cnt', text: x.n })])); });
             for (let k = used; k < cap_; k++) sq.appendChild(el('div', { cls: 'sub empty', onclick: e => { e.stopPropagation(); click(gi, si, 'add'); }, 'data-tip': 'Room under this captain' }));
             cell.appendChild(sq);
           }
@@ -196,6 +196,7 @@
     const ha = S.heroOf(st(), a), hb = S.heroOf(st(), b);
     /* a squadron whose captain has gone over to a hero is no more */
     const tidy = () => { [a, b].forEach(x => { if (!x.dead && !x.heroId && !S.stacksIn(x.slots).length && !S.captainsIn(x.slots).length) RU.removeArmy(st(), x); }); U.refresh(); V.invalidate(); };
+    const sqName = x => { const c = S.captainsIn(x.slots)[0]; return c ? c.name + '’s squadron' : 'A squadron'; };
     const sq = !ha ? a : !hb ? b : null, hh = sq === a ? hb : sq === b ? ha : null;
     const join = () => {
       const hs = hh.slots, room = hs.filter(x => !x).length, need = sq.slots.filter(Boolean).length;
@@ -203,9 +204,9 @@
       sq.slots.forEach((x, i) => { if (!x) return; hs[hs.indexOf(null)] = x; sq.slots[i] = null; });
       m.close(); U.toast('The squadron joins ' + hh.name + '’s army.');
     };
-    const m = U.modal([el('h2', { text: ha && hb ? ha.name + ' meets ' + hb.name : 'Armies meet' }),
+    const m = U.modal([el('h2', { text: (ha ? ha.name : sqName(a)) + ' meets ' + (hb ? hb.name : sqName(b)) }),
       el('p', { cls: 'small muted', text: 'Click a stack, captain or Relic to pick it up, then click where it goes.' }),
-      DL.armyEditor([{ label: ha ? ha.name : 'Squadron', slots: S.slotsOf(st(), a), hero: ha, onlyCaptain: !ha, keepOne: !!ha }, { label: hb ? hb.name : 'Squadron', slots: S.slotsOf(st(), b), hero: hb, onlyCaptain: !hb, keepOne: !!hb }], () => U.refresh()),
+      DL.armyEditor([{ label: ha ? ha.name : sqName(a), slots: S.slotsOf(st(), a), hero: ha, onlyCaptain: !ha, keepOne: !!ha }, { label: hb ? hb.name : sqName(b), slots: S.slotsOf(st(), b), hero: hb, onlyCaptain: !hb, keepOne: !!hb }], () => U.refresh()),
       ha && hb ? relicSwap(ha, hb) : null,
       ha && hb ? coreSwap(ha, hb) : null,
       el('div', { cls: 'acts' }, [sq && hh ? btn('Join ' + hh.name + '’s army', join, '', 'The whole squadron, captain and all, marches with the hero') : null, btn('Done', () => m.close(), 'primary')])], { wide: true, onClose: tidy });
@@ -563,6 +564,23 @@
   SU.on('mapclick', t => { if (U.pickTile) { const f = U.pickTile; U.pickTile = null; f(t); } });
 
   /* ======================= the kingdom ======================= */
+  /* the key: what the words, marks and ground mean */
+  DL.mapKey = function () {
+    const sec = (title, kids) => el('div', { cls: 'key-sec' }, [el('h3', { text: title }), ...kids]);
+    const sizes = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, [el('th', { cls: 'small muted', text: 'Word' }), el('th', { cls: 'small muted', text: 'How many' })]), ...S.COUNT_WORDS.map(([a, b, w]) => el('tr', {}, [el('td', { cls: 'gold', text: w }), el('td', { text: b == null ? a + ' or more' : a + '–' + b })]))]);
+    const marks = [['→ green', 'The path: reached today'], ['→ red', 'The path: later days'], ['⚔', 'The path ends in a fight'], ['✦', 'The path ends at something to visit'], ['⇄', 'The path ends at one of your own armies: meet and trade'], ['◌ blue ring', 'The Sunear’Zikhron: the storm (its still eye in the middle)']];
+    const ground = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, ['Ground', 'Moving', 'Element'].map(x => el('th', { cls: 'small muted', text: x }))),
+      ...Object.values(D.TERRAIN).filter(t => !t.void).map(t => el('tr', {}, [el('td', { text: t.name }), el('td', { text: t.pass === false ? 'boats only' : t.cost === 100 ? 'normal' : Math.round(t.cost) + '% (slower)' }), el('td', { text: t.el ? D.ELEMENTS[t.el].name : '' })])),
+      el('tr', {}, [el('td', { text: 'Road' }), el('td', { text: D.ROAD_COST + '% (faster)' }), el('td', {})])]);
+    const res = el('div', { cls: 'col' }, D.RES.map(r => el('div', { cls: 'row', style: { flexWrap: 'nowrap' } }, [U.resIcon(r, 22), el('b', { text: D.RES_INFO[r].name }), el('span', { cls: 'small muted', text: (D.RES_INFO[r].desc || '') + ' ' + Object.values(D.MINES).filter(m => m.res === r).map(m => '(' + m.name + ')').join(' ') })])));
+    const m = U.modal([el('h2', { text: 'Key' }), el('div', { cls: 'key-grid' }, [
+      sec('Army sizes', [el('p', { cls: 'small muted', text: 'Other armies are shown by words, not numbers, unless your hero has Cunning 6.' }), sizes]),
+      sec('On the map', [el('div', { cls: 'col' }, marks.map(([k, d]) => el('div', { cls: 'row small' }, [el('b', { cls: 'gold', style: { minWidth: '80px' }, text: k }), d]))),
+        el('p', { cls: 'small muted', text: 'Click to see a path, click again to go. Right-click anything to learn about it. Shift-click one of your armies to pick it while another is picked. Double-click a creature to see it close up.' })]),
+      sec('Ground', [ground]), sec('Resources', [res])]),
+      el('div', { cls: 'acts' }, [btn('Close', () => m.close(), 'primary')])], { wide: true });
+  };
+
   DL.kingdom = function () {
     const P = me(), stt = st();
     const towns = S.townsOf(stt, U.viewer);
@@ -586,8 +604,9 @@
     function render() {
       const b = m.box; b.innerHTML = '';
       b.appendChild(el('h2', { text: 'Market Square' + (S.isMarketDay(st()) ? ' — market day!' : '') }));
-      const pickRow = (label, cur, set) => el('div', { cls: 'row' }, [el('span', { style: { width: '50px' }, text: label }), ...D.RES.map(r => el('button', { cls: 'btn icon' + (cur === r ? ' primary' : ''), onclick: () => { set(r); render(); }, 'data-tip': D.RES_INFO[r].name + ': ' + SU.fmt(P.res[r]) }, U.resIcon(r, 22)))]);
-      b.appendChild(pickRow('Give', from, r => from = r)); b.appendChild(pickRow('Get', to, r => to = r));
+      const pickRow = (label, cur, set, give) => el('div', { cls: 'row' }, [el('span', { style: { width: '50px' }, text: label }), ...D.RES.map(r => el('button', { cls: 'btn icon' + (cur === r ? ' primary' : ''), onclick: () => { set(r); render(); },
+        'data-tip': '<b>' + D.RES_INFO[r].name + '</b> — you have ' + SU.fmt(P.res[r]) + (D.RES_INFO[r].desc ? '<br>' + D.RES_INFO[r].desc : '') + (r !== (give ? to : from) ? '<br>' + (give ? '1 ' + D.RES_INFO[r].name + ' → ' + (+RU.tradeRate(st(), P, r, to).toFixed(2)) + ' ' + D.RES_INFO[to].name : '1 ' + D.RES_INFO[from].name + ' → ' + (+RU.tradeRate(st(), P, from, r).toFixed(2)) + ' ' + D.RES_INFO[r].name) : '') }, U.resIcon(r, 22)))]);
+      b.appendChild(pickRow('Give', from, r => from = r, true)); b.appendChild(pickRow('Get', to, r => to = r, false));
       const rate = RU.tradeRate(st(), P, from, to);
       const inp = el('input', { cls: 'inp', type: 'range', min: 0, max: P.res[from] || 0, value: Math.min(amt, P.res[from] || 0), style: { width: '300px' } });
       const out = el('span', { cls: 'gold' }); const upd = () => { amt = +inp.value; out.textContent = amt + ' ' + D.RES_INFO[from].name + ' → ' + Math.floor(amt * rate) + ' ' + D.RES_INFO[to].name; }; inp.oninput = upd; upd();
@@ -598,7 +617,9 @@
         const offers = RU.marketOffers(st(), town);
         b.appendChild(el('div', { cls: 'col' }, offers.map((o, i) => { if (o.sold) return null;
           const label = o.kind === 'relic' ? D.RELICS[o.relic].name : o.kind === 'song' ? 'A scroll of ' + D.SONGS[o.song].name : o.kind === 'res' ? o.amt + ' ' + D.RES_INFO[o.res].name : o.kind === 'captain' ? 'A travelling captain: ' + o.cap.name + ' (' + D.CAPTAIN_RANKS[o.cap.rank].name + ', ' + D.CAPTAIN_ABIL[o.cap.abil].name + ')' : o.n + ' ' + D.CREATURES[o.cr].plural + ' for hire';
-          return el('div', { cls: 'row frame' }, [el('span', { style: { flex: 1 } }, label), U.costView(o.cost, P), btn('Buy', () => {
+          const tip = o.kind === 'relic' ? relicTip(o.relic) : o.kind === 'song' ? '<b>' + D.SONGS[o.song].name + '</b> (tier ' + D.SONGS[o.song].tier + ', ' + D.SONGS[o.song].breath + ' Breath)<br>' + D.SONGS[o.song].desc : o.kind === 'res' ? '<b>' + D.RES_INFO[o.res].name + '</b>' + (D.RES_INFO[o.res].desc ? '<br>' + D.RES_INFO[o.res].desc : '') : o.kind === 'captain' ? captainTip(o.cap, null) : creatureTip(o.cr) + '<br><i>Right-click for more.</i>';
+          const pic = o.kind === 'relic' ? U.relicIcon(o.relic, 34) : o.kind === 'creature' ? U.creatureIcon(o.cr, 40, { color: P.color }) : o.kind === 'captain' ? U.captainIcon(o.cap, 36, P.color) : o.kind === 'res' ? U.resIcon(o.res, 26) : null;
+          return el('div', { cls: 'row frame', 'data-tip': tip, 'data-cr': o.kind === 'creature' ? o.cr : null, oncontextmenu: o.kind === 'captain' ? e => { e.preventDefault(); e.stopPropagation(); DL.captainCard(o.cap); } : null }, [pic, el('span', { style: { flex: 1 } }, label), U.costView(o.cost, P), btn('Buy', () => {
             if (!RU.afford(P, o.cost)) { U.toast('Not enough.'); return; }
             const h = town.defender && st().heroes[town.defender] || (town.heroes[0] && st().heroes[town.heroes[0]]) || (S.armyAt(st(), town.layer, town.x, town.y) && S.heroOf(st(), S.armyAt(st(), town.layer, town.x, town.y)));
             if ((o.kind === 'relic' || o.kind === 'song') && !h) { U.toast('A hero must be in town to take it.'); return; }
