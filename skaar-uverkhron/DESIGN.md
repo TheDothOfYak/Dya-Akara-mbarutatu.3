@@ -237,7 +237,7 @@ this game (it may appear later as a special event).
 |---|---|---|
 | **Duskareth** (first) | the Nekh'Vorran | The Duat |
 | SkarValorin (later) | the Aerolhorn | The Great Anvil (they still hold it at this point in history), and the Aerolhorn |
-| Elsha'ryn (later) | the Vyrenalur | Grow-forging, and the oath-breaking transformations |
+| **Elsha'ryn** (second, built) | the Vyrenalur | Memory tracking, grow-forging, Grove songs, the Oath (see README) |
 
 ## 8. Battles
 
@@ -338,8 +338,9 @@ changed from the Admin Panel without touching the code).
 
 ## 11. Not built yet
 
-- The other two factions (SkarValorin, Elsha'ryn), the campaign, and the Dya'Akara
-  special event (on hold).
+- The SkarValorin, the campaign, and the Dya'Akara special event (on hold).
+- The Elsha'ryn's common buildings (tavern, market, halls) still use the Duskareth look
+  in their town; the computer does not hunt glimmers for the Shed Antler yet.
 - Siege extras: moats, special defenses, siege machines.
 - Sound (to be written by the creator).
 - An undo button in the map editor, and editing details of placed things (amounts,

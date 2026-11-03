@@ -130,6 +130,40 @@ the game is built.
   share them. Shared maps appear for everyone after an admin approves them
   (Admin Panel → Skaar Uverkhron → Shared Maps).
 
+## The Elsha'ryn (the second faction)
+
+The luminous forest, who follow the Vyrenalur. Trackers of memory and grow-forgers,
+mostly Eikar and Kalo'Eik. Their towns stand in deep woods: a great hollow tree for a
+hall, a living hedge for walls, root houses. Their captains are Ju-Keepers, Grovewardens
+and Memory Trackers.
+
+| # | Creature | Upgrade | What it does |
+|---|---|---|---|
+| 1 | Sprengju | Nur Sprengju | Little flying carrots that burst on contact (the attackers are spent; nothing strikes back). Under a **Ju-Keeper** captain they ride in a pouch and are loosed in volleys like arrows. Half of all spent Sprengju come back after the battle. |
+| 2 | Spear Eikar | Grovewarden Spears | Plain, steady spears. |
+| 3 | Stryx | Old Stryx | Throw rocks and never move; just as strong up close, and bind (cannot move) whatever they strike up close until the Stryx dies or a song moves it. |
+| 4 | Albali Byrd | Albali Elder | One horn. Flies; instead of attacking it can restore the health of an ally beside it (it raises nobody). |
+| 5 | Tonguatjis | — | Shelled; its tongue strikes from two hexes away and drags its prey in. |
+| 6 | Saklay'Punk'Eik | — | Eikar archers on Domestic Punks: move and then shoot, and shoot even when engaged. |
+| 7 | Api Buta | — | The Blind Beast, a huge basalt slug (4×2 hexes, the biggest of the faction): fire breath scorches the one behind its prey; blind (sight powers do not touch it), fireproof. |
+| 8 | Sru Vorn | — | The top of the town, one a week. Once a battle, on a random early round, digs a hidden acid bog: enemies who step in burn and are stuck for a turn. |
+| 9 | The Vyrenalur | — | Light Shadow. Every other round it slips into shadow (nothing can target it); its charge is a line of light; its trail glows for three rounds and heals Eikar in it. Kipsu come out of the woods to follow it as their own stack. |
+
+**Their powers:**
+- **Memory tracking:** they see every memory core, buried ones too, and can pick up the
+  buried ones. The **Memory Tree** shows where every rival hero last fought.
+- **Grow-forging (Growing Altar):** grow Glowmoss (Fti), Timber (Eldi), NgAkara (Su) or
+  Stone (Ular) onto a Relic over three days; its bearer's army fights at home on that
+  element's ground anywhere.
+- **Grove songs (Protected Grove):** Grovelight and Rootsnare work only in battles near
+  your Groves; a hero who goes too far forgets them.
+- **The Oath (Oath Tree):** Changed stacks are stronger (a quarter more health, +2 attack
+  and defense) and bound by oath: if their hero surrenders, or they are dismissed, the
+  forest takes them as a wild Stryx thicket.
+- **The Vyrenalur's trail:** each week three glimmers appear in the woods (only you see
+  yours); reach all three in one week and find the **Shed Antler**, which lets a town
+  build the Clearing of Light while it is there.
+
 ## How it's built
 
 | File | What it holds |
