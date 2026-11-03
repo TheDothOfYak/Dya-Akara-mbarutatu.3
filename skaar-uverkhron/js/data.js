@@ -99,10 +99,10 @@
     ranged: true, shots: 14, abil: ['release2', 'dread'], desc: 'Elders of the Ver. Their scream shakes the nerve of whatever it hits, and the Duat answers them more often.' });
 
   cr('harkal', { name: 'Harkal', plural: 'Harkal', faction: 'duskareth', tier: 4, art: 'harkal',
-    atk: 9, def: 6, dmg: [4, 7], hp: 26, spd: 7, size: 2, grow: 6, cost: { gold: 190, food: 1 }, food: 1, el: 'Su', up: 'harkal2',
+    atk: 9, def: 6, dmg: [4, 7], hp: 26, spd: 7, size: 2, shape: [2, 1], grow: 6, cost: { gold: 190, food: 1 }, food: 1, el: 'Su', up: 'harkal2',
     abil: ['frenzy'], desc: 'The Su shark of the Duskareth. It swims through open air as easily as water, but cannot rise into the sky. Damage only makes it wilder.' });
   cr('harkal2', { name: 'Scarred Harkal', plural: 'Scarred Harkal', faction: 'duskareth', tier: 4, upgraded: true, art: 'harkal', tint: 1,
-    atk: 11, def: 8, dmg: [5, 9], hp: 32, spd: 8, size: 2, grow: 6, cost: { gold: 260, food: 1 }, food: 1, el: 'Su',
+    atk: 11, def: 8, dmg: [5, 9], hp: 32, spd: 8, size: 2, shape: [2, 1], grow: 6, cost: { gold: 260, food: 1 }, food: 1, el: 'Su',
     abil: ['frenzy', 'scars'], desc: 'Old Harkal, toughened by scar on scar. Their frenzy rises faster, and they shrug off more.' });
 
   cr('kaloeik', { name: 'Kalo’Eik of the Duskareth', short: 'Kalo’Eik', plural: 'Kalo’Eik', faction: 'duskareth', tier: 5, art: 'kaloeik',
@@ -114,15 +114,15 @@
     ranged: true, fly: true, shots: 8, abil: ['burn'], desc: 'A living flame given shape: a round body, wide many-coloured wings and a crown of fire. Its feet never touch the ground.' });
 
   cr('xiweik', { name: 'Xiw’Eik', plural: 'Xiw’Eik', faction: 'duskareth', tier: 7, art: 'xiweik',
-    atk: 15, def: 11, dmg: [12, 20], hp: 72, spd: 9, grow: 2, cost: { gold: 920, stygian: 1, glowmoss: 1 }, food: 1.5, pop: 1, el: 'Eldi', people: true,
+    atk: 15, def: 11, dmg: [12, 20], hp: 72, spd: 9, size: 2, shape: [2, 1], capSlots: 2, grow: 2, cost: { gold: 920, stygian: 1, glowmoss: 1 }, food: 1.5, pop: 1, el: 'Eldi', people: true,
     fly: true, abil: ['chaos'], desc: 'Children of the Xiw and the Eikar from the age of the Skyfalls: acorn folk with devil wings and horns, and songs of chaos.' });
 
   cr('lutut', { name: 'Lutut', plural: 'Lutut', faction: 'duskareth', tier: 8, art: 'lutut',
-    atk: 22, def: 18, dmg: [25, 40], hp: 190, spd: 11, size: 2, capSlots: 2, grow: 1, cost: { gold: 2300, stygian: 2, stone: 2 }, food: 4, el: 'Fti',
+    atk: 22, def: 18, dmg: [25, 40], hp: 190, spd: 11, size: 2, shape: [2, 2], capSlots: 2, grow: 1, cost: { gold: 2300, stygian: 2, stone: 2 }, food: 4, el: 'Fti',
     fly: true, abil: ['screech', 'boulder'], desc: 'The great terror of the sky, patterned like carved stone. Its screech stuns, and in a siege it hurls boulders at the walls.' });
 
   cr('nekh', { name: 'Nekh’Vorran', plural: 'Nekh’Vorran', faction: 'duskareth', tier: 9, art: 'nekh', legendary: true,
-    atk: 34, def: 30, dmg: [60, 95], hp: 680, spd: 10, size: 2, grow: 0, cost: { gold: 6500, stygian: 6, ngakara: 3 }, food: 12, el: 'Su',
+    atk: 34, def: 30, dmg: [60, 95], hp: 680, spd: 10, size: 2, shape: [6, 2], grow: 0, cost: { gold: 6500, stygian: 6, ngakara: 3 }, food: 12, el: 'Su',
     abil: ['burrow', 'devour'], desc: 'The great worm of the Duat that the Duskareth follow. It surges up out of the ground anywhere on the field. Only one to a castle, and only one to a stack.' });
 
   /* ---- wild creatures ---- */
@@ -135,7 +135,7 @@
   cr('kuni', { name: 'Kuni Byrd', plural: 'Kuni Byrds', wild: true, tier: 6, art: 'kuni',
     atk: 15, def: 9, dmg: [10, 16], hp: 55, spd: 12, fly: true, capSlots: 2, food: 1.5, el: 'Fti', abil: ['dive'], desc: 'A great aerial ambusher that dives from altitude. Fiercely territorial.' });
   cr('naga', { name: 'Su Naga', plural: 'Su Naga', wild: true, tier: 7, art: 'naga',
-    atk: 18, def: 16, dmg: [14, 24], hp: 120, spd: 7, size: 2, capSlots: 2, food: 3, el: 'Su', abil: ['firsthead'], desc: 'A strategic, patient apex predator. "The Su Naga is calm — that is the most dangerous version of it."' });
+    atk: 18, def: 16, dmg: [14, 24], hp: 120, spd: 7, size: 2, shape: [2, 1], capSlots: 2, food: 3, el: 'Su', abil: ['firsthead'], desc: 'A strategic, patient apex predator. "The Su Naga is calm — that is the most dangerous version of it."' });
   cr('mcfly', { name: 'RubberMcFly', plural: 'RubberMcFly', wild: true, tier: 1, art: 'mcfly',
     atk: 1, def: 2, dmg: [1, 1], hp: 6, spd: 9, fly: true, food: 0.1, el: 'Fti', abil: ['storm'], desc: 'The storm’s companions, among the only creatures that fly in the Sunear’Zikhron, and the only time they glow. Killing one is very bad luck.' });
 

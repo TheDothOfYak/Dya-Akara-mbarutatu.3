@@ -25,7 +25,7 @@
       faction: 'duskareth', look: R.int(1, 1e9), level: 1, xp: 0, stats,
       skills: { [base]: 1 }, base, trainedToday: 0,
       songs: [], breath: 0, relics: {}, linked: [], pouch: [], cores: [], kahiz: {}, kahizCount: 0,
-      spec: { cr: specCr, pct: 10 }, mount: 'horse', slots: [null, null, null, null, null],
+      spec: { cr: specCr, pct: 10 }, mount: 'punk', slots: [null, null, null, null, null],
       levelUps: [], dead: false,
     };
     if (base === 'songcraft') h.songs.push(R.pick(['mend', 'rally', 'quickstep', 'dimsight']));

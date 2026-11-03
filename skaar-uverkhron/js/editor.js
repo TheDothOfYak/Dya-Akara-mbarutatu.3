@@ -243,16 +243,21 @@
   E.loadShared = async function (id) { const rows = await root.FLAKE.rest('GET', 'dya_config?select=value&key=eq.' + encodeURIComponent('su_map:' + id)); return rows && rows[0] ? rows[0].value.map : null; };
 
   /* choose a map: yours, or shared ones */
+  /* maps that come with the game (maps/index.json) */
+  E.listBuiltin = async function () { try { const r = await fetch('maps/index.json', { cache: 'no-cache' }); return r.ok ? (await r.json()).map(m => Object.assign({ builtin: true }, m)) : []; } catch (e) { return []; } };
+  E.loadBuiltin = async function (entry) { const r = await fetch('maps/' + (entry.file || entry.id + '.json'), { cache: 'no-cache' }); return r.ok ? r.json() : null; };
   E.pickMap = async function (cb, forEditing) {
     const m = U.modal([el('h2', { text: forEditing ? 'Open a map' : 'Choose a map' }), el('p', { cls: 'muted', text: 'Looking…' })], { wide: true });
     let shared = []; try { shared = await E.listShared(); } catch (e) { shared = []; }
+    const builtin = await E.listBuiltin();
     const mine = E.listLocal();
     m.box.innerHTML = '';
     m.box.appendChild(el('h2', { text: forEditing ? 'Open a map' : 'Choose a map' }));
     const row = (mp, load) => el('div', { cls: 'row frame' }, [el('div', { style: { flex: 1 } }, [el('b', { text: mp.name }), el('div', { cls: 'small muted', text: [mp.desc, (mp.starts ? mp.starts.length : mp.players) + ' players', { S: 'small', M: 'medium', L: 'large', XL: 'extra large' }[mp.size], mp.author ? 'by ' + mp.author : ''].filter(Boolean).join(' · ') })]),
       btn(forEditing ? 'Open' : 'Play', async () => { const full = await load(); if (!full) { U.toast('Could not load that map.'); return; } m.close(); cb(full); }, 'primary'),
-      !mp.shared ? btn('✕', () => U.confirm('Delete this map?', mp.name, () => { localStorage.removeItem(MKEY + mp.id); m.close(); E.pickMap(cb, forEditing); }), 'icon') : null]);
-    m.box.appendChild(el('h3', { text: 'Your maps' }));
+      !mp.shared && !mp.builtin ? btn('✕', () => U.confirm('Delete this map?', mp.name, () => { localStorage.removeItem(MKEY + mp.id); m.close(); E.pickMap(cb, forEditing); }), 'icon') : null]);
+    if (builtin.length) { m.box.appendChild(el('h3', { text: 'Maps that come with the game' })); builtin.forEach(mp => m.box.appendChild(row(mp, () => E.loadBuiltin(mp)))); }
+    m.box.appendChild(el('h3', { text: 'Your maps', style: { marginTop: '10px' } }));
     if (!mine.length) m.box.appendChild(el('p', { cls: 'small muted', text: 'None yet. Make one in the map editor.' }));
     mine.forEach(mp => m.box.appendChild(row(mp, async () => mp)));
     m.box.appendChild(el('h3', { text: 'Shared maps', style: { marginTop: '10px' } }));

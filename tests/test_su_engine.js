@@ -57,6 +57,19 @@ async function playGame(seed, size, nPlayers, days) {
   ok(hb.dead, 'a beaten hero dies for good');
   ok(rep.cores.length >= 1 && ha.pouch.length + ha.cores.length >= 1, 'the victor takes the memory core');
   ok(st.players[0].res.gold + st.players[1].res.gold === goldAB, 'stolen gold changes hands, none appears from nowhere');
+  /* footprints: Harkal 1 slot 2 hexes; Xiw'Eik 2 slots 2 hexes; Lutut 2 slots 2×2; Nekh'Vorran 6×2 */
+  { const D = SU.data; const st2 = SU.mapgen.newGame({ size: 'S', players: [{ kind: 'human', name: 'A' }, { kind: 'human', name: 'B' }], seed: 6 });
+    const a2 = Object.values(st2.armies).find(x => x.owner === 0), b2 = Object.values(st2.armies).find(x => x.owner === 1);
+    const h2 = st2.heroes[a2.heroId]; h2.slots = [{ kind: 'stack', cr: 'nekh', n: 1 }, { kind: 'stack', cr: 'lutut', n: 2 }, { kind: 'stack', cr: 'xiweik', n: 3 }, { kind: 'stack', cr: 'harkal', n: 4 }, null];
+    const B2 = BT.create(st2, { owner: 0, army: a2, hero: h2, slots: h2.slots }, { owner: 1, army: b2, hero: st2.heroes[b2.heroId], slots: st2.heroes[b2.heroId].slots });
+    const hexes = cr => { const u = B2.units.find(x => x.cr === cr); return u ? BT.cellsOf(u).length : 0; };
+    ok(hexes('nekh') === 12, 'the Nekh’Vorran covers 6×2 hexes (' + hexes('nekh') + ')');
+    ok(hexes('lutut') === 4, 'a Lutut covers 2×2 hexes');
+    ok(hexes('xiweik') === 2 && hexes('harkal') === 2, 'Xiw’Eik and Harkal cover 2 hexes');
+    ok((D.CREATURES.harkal.capSlots || 1) === 1 && D.CREATURES.xiweik.capSlots === 2 && D.CREATURES.lutut.capSlots === 2, 'captain places: Harkal 1, Xiw’Eik 2, Lutut 2');
+    const cells = new Set(); let overlap = false; B2.units.forEach(u => BT.cellsOf(u).forEach(([c, r]) => { const k = c + ',' + r; if (cells.has(k)) overlap = true; cells.add(k); if (c < 0 || r < 0 || c >= B2.cols || r >= B2.rows) overlap = true; }));
+    ok(!overlap, 'nobody stands on anyone else, and everyone is on the field');
+    BT.autoRun(st2, B2); ok(!!B2.over, 'a battle with the big creatures finishes'); }
   /* training: a new hero can't leave until they have five skills */
   const t = S.townsOf(st, 0)[0]; st.players[0].res.gold = 99999;
   const P = st.players[0]; RU.refreshTavern(st, P);

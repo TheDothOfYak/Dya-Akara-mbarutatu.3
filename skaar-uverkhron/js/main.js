@@ -26,7 +26,8 @@
       el('div', { cls: 'sub', text: 'The greatest factions of the Mbaru Tatu' }),
       el('div', { cls: 'menu' }, [
         auto ? btn('Continue — ' + auto.name.replace(' (autosave)', '') + ', day ' + auto.day, () => G.loadSlot('local', 'auto'), 'primary big') : null,
-        btn('New game', () => G.setup(), auto ? 'big' : 'primary big'),
+        btn('Play the starter map', () => G.quickStart(), auto ? 'big' : 'primary big', 'The First Dusk: you against one computer player on Velki'),
+        btn('New game', () => G.setup(), 'big'),
         btn('Load a game', () => G.loadMenu(), 'big'),
         btn('Online games', () => SU.online.menu(), 'big'),
         btn('Map editor', () => SU.editor.open(), 'big'),
@@ -114,6 +115,15 @@
       b.appendChild(el('div', { cls: 'acts' }, [btn('Back', () => m.close()), btn('Begin', () => { m.close(); G.newGame(cfg); }, 'primary big')]));
     }
     render();
+  };
+  /* one click: the starter map, you against an easy computer player */
+  G.quickStart = async function () {
+    const map = await SU.editor.loadBuiltin({ id: 'starter', file: 'starter.json' }).catch(() => null);
+    if (!map) { U.alert('Could not load the starter map', 'Try New game for a random map instead.'); return; }
+    const acc = SU.save.account();
+    G.newGame({ map, name: map.name, players: [
+      { kind: 'human', name: acc ? acc.name : 'You', ai: 'normal', team: 0, colorId: 'red' },
+      { kind: 'ai', name: 'The Rival', ai: 'easy', team: 0, colorId: 'blue' }] });
   };
   G.newGame = function (cfg) {
     const players = cfg.players.map(p => ({ kind: p.kind, name: p.name || 'Player', ai: p.ai, team: p.team, color: D.PLAYER_COLORS.find(c => c.id === p.colorId).c, colorId: p.colorId, account: p.account || null }));

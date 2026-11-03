@@ -119,7 +119,7 @@
   };
   function creatureTip(cr, s) {
     const C = D.CREATURES[cr];
-    return '<b>' + C.name + '</b> (tier ' + C.tier + ')<br>Attack ' + C.atk + ' · Defense ' + C.def + ' · Damage ' + C.dmg[0] + '–' + C.dmg[1] + '<br>Health ' + C.hp + ' · Speed ' + C.spd + (C.ranged ? ' · Shots ' + C.shots : '') + (C.fly ? ' · Flies' : '') + (C.size === 2 ? ' · Two hexes' : '') + (C.capSlots ? ' · Takes 2 of a captain’s places' : '') +
+    return '<b>' + C.name + '</b> (tier ' + C.tier + ')<br>Attack ' + C.atk + ' · Defense ' + C.def + ' · Damage ' + C.dmg[0] + '–' + C.dmg[1] + '<br>Health ' + C.hp + ' · Speed ' + C.spd + (C.ranged ? ' · Shots ' + C.shots : '') + (C.fly ? ' · Flies' : '') + ((C.shape || (C.size === 2 ? [2, 1] : [1, 1]))[0] * (C.shape || [1, 1])[1] > 1 ? ' · ' + (C.shape || [2, 1])[0] + '×' + (C.shape || [2, 1])[1] + ' hexes' : '') + (C.capSlots ? ' · Takes 2 of a captain’s places' : '') +
       '<br>Comfortable on ' + D.ELEMENTS[C.el].name + ' ground · eats ' + C.food + ' food a week' + ((C.abil || []).length ? '<br>' + C.abil.map(a => '• ' + (D.ABIL[a] || a)).join('<br>') : '') + (s && s.grief ? '<br><span class="bad">Grieving: lower morale after heavy losses.</span>' : '') + '<br><span class="muted">' + C.desc + '</span>';
   }
   DL.creatureTip = creatureTip;

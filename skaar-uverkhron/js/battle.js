@@ -91,13 +91,13 @@
     });
   }
   function addUnit(st, B, side, o, c, r) {
-    const spot = freeSpotNear(B, c, r, o.kind === 'stack' ? (D.CREATURES[o.cr].size || 1) : 1, side);
+    const spot = freeSpotNear(B, c, r, o.kind === 'stack' ? B_.shapeOf(D.CREATURES[o.cr]) : [1, 1], side);
     if (!spot) return null;
     const u = { uid: B.nextUid++, side, kind: o.kind, squad: o.squad, c: spot[0], r: spot[1], done: false, waited: false, defending: false, retaliated: 0, fx: {}, firstStrike: true, firstHit: 0 };
     const sd = B.sides[side];
     if (o.kind === 'cap') {
       const cap = o.cap, capt = o.hero ? S.skill(st, o.hero, 'captaincy') : 0;
-      Object.assign(u, { cap, name: cap.name, abil: [], n: 1, hp: cap.hp, hpTop: cap.hp, startN: 1, atk: cap.atk + capt, def: cap.def + capt, dmg: [4 + cap.level, 7 + cap.level * 2], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: cap.morale || 0 });
+      Object.assign(u, { cap, name: cap.name, abil: [], shape: [1, 1], n: 1, hp: cap.hp, hpTop: cap.hp, startN: 1, atk: cap.atk + capt, def: cap.def + capt, dmg: [4 + cap.level, 7 + cap.level * 2], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: cap.morale || 0 });
     } else {
       const c = D.CREATURES[o.cr];
       const n = o.parts ? o.parts.reduce((t, p) => t + p.ref.n, 0) : o.n;
@@ -108,22 +108,29 @@
       const grief = o.parts ? Math.max(...o.parts.map(p => p.ref.grief || 0)) : 0;
       const morale = RU.stackMorale(st, { grief }, o.cap, o.hero, { hungry: sd.hungry, fed: !sd.hungry && sd.owner >= 0, sanctum: sd.sanctum });
       Object.assign(u, { cr: o.cr, name: c.plural, n, hp, hpTop: hp, startN: n, atk: c.atk + capBonus.atk, def: c.def + capBonus.def, dmg: c.dmg, spd: c.spd + (o.cap && o.cap.abil === 'vanguard' ? 1 : 0),
-        size: c.size || 1, ranged: !!c.ranged, shots: c.shots || 0, fly: !!(c.fly || (c.abil || []).includes('blink') || (c.abil || []).includes('burrow')), abil: c.abil || [], parts: o.parts, morale, temp: !!o.temp });
+        size: c.size || 1, shape: B_.shapeOf(c), ranged: !!c.ranged, shots: c.shots || 0, fly: !!(c.fly || (c.abil || []).includes('blink') || (c.abil || []).includes('burrow')), abil: c.abil || [], parts: o.parts, morale, temp: !!o.temp });
     }
     u.capId = o.cap ? o.cap.id : null;
     B.units.push(u);
     return u;
   }
-  function freeSpotNear(B, c, r, size, side) {
-    for (let d = 0; d < 8; d++) for (let dr = -d; dr <= d; dr++) for (let dc = -d; dc <= d; dc++) {
+  function freeSpotNear(B, c, r, shape, side) {
+    for (let d = 0; d < 10; d++) for (let dr = -d; dr <= d; dr++) for (let dc = -d; dc <= d; dc++) {
       if (Math.max(Math.abs(dc), Math.abs(dr)) !== d) continue;
-      const cc = c + dc, rr = r + dr; if (fits(B, cc, rr, size, side, null)) return [cc, rr];
+      const cc = c + dc, rr = r + dr; if (fits(B, cc, rr, shape, side, null)) return [cc, rr];
     }
     return null;
   }
-  /* a unit of `size` with its head at (c,r): the tail goes back toward its own side */
+  /* footprints: [hexes along the row, rows]. The head is at (c,r); the body runs back
+     toward its own side, and down. A Harkal is 2×1, a Lutut 2×2, the Nekh'Vorran 6×2. */
+  B_.shapeOf = C => C.shape || (C.size === 2 ? [2, 1] : [1, 1]);
+  function shapeCells(shape, side, c, r) {
+    const dir = side === 0 ? -1 : 1, out = [];
+    for (let k = 0; k < shape[1]; k++) for (let j = 0; j < shape[0]; j++) out.push([c + dir * j, r + k]);
+    return out;
+  }
   B_.tail = (u, c, r) => [c + (u.side === 0 ? -1 : 1), r];
-  function cellsOf(u, c, r) { c = c == null ? u.c : c; r = r == null ? u.r : r; return u.size === 2 ? [[c, r], B_.tail(u, c, r)] : [[c, r]]; }
+  function cellsOf(u, c, r) { c = c == null ? u.c : c; r = r == null ? u.r : r; return shapeCells(u.shape || [1, 1], u.side, c, r); }
   B_.cellsOf = cellsOf;
   function inField(B, c, r) { return c >= 0 && r >= 0 && c < B.cols && r < B.rows; }
   function blockedCell(B, c, r, side, flying) {
@@ -132,9 +139,9 @@
     if (B.siege) { const w = B.siege.cells.get(key(c, r)); if (w && w.hp > 0 && !(w.gate && side === 1)) return true; if (B.siege.towers.some(t => t.c === c && t.r === r)) return true; }
     return false;
   }
-  function fits(B, c, r, size, side, self, flying) {
-    const cells = size === 2 ? [[c, r], [c + (side === 0 ? -1 : 1), r]] : [[c, r]];
-    for (const [cc, rr] of cells) { if (blockedCell(B, cc, rr, side, flying)) return false; const o = unitAt(B, cc, rr); if (o && o !== self) return false; }
+  function fits(B, c, r, shape, side, self, flying) {
+    if (!Array.isArray(shape)) shape = shape === 2 ? [2, 1] : [1, 1];
+    for (const [cc, rr] of shapeCells(shape, side, c, r)) { if (blockedCell(B, cc, rr, side, flying)) return false; const o = unitAt(B, cc, rr); if (o && o !== self) return false; }
     return true;
   }
   function unitAt(B, c, r) { for (const u of B.units) { if (u.n <= 0) continue; for (const [cc, rr] of cellsOf(u)) if (cc === c && rr === r) return u; } return null; }
@@ -199,7 +206,7 @@
     const sp = Math.max(1, u.spd + (u.fx.quick ? 2 : 0) - (u.fx.slow ? 2 : 0));
     const out = new Map(); out.set(key(u.c, u.r), { c: u.c, r: u.r, d: 0 });
     if (u.fly) {
-      for (let r = 0; r < B.rows; r++) for (let c = 0; c < B.cols; c++) { const d = HX.dist(u.c, u.r, c, r); if (d <= sp && fits(B, c, r, u.size, u.side, u, true)) out.set(key(c, r), { c, r, d }); }
+      for (let r = 0; r < B.rows; r++) for (let c = 0; c < B.cols; c++) { const d = HX.dist(u.c, u.r, c, r); if (d <= sp && fits(B, c, r, u.shape, u.side, u, true)) out.set(key(c, r), { c, r, d }); }
       return out;
     }
     const q = [[u.c, u.r, 0]];
@@ -207,7 +214,7 @@
       const [c, r, d] = q.shift(); if (d >= sp) continue;
       for (const [nc, nr] of HX.neighbors(c, r)) {
         const k = key(nc, nr); if (out.has(k)) continue;
-        if (!fits(B, nc, nr, u.size, u.side, u)) continue;
+        if (!fits(B, nc, nr, u.shape, u.side, u)) continue;
         out.set(k, { c: nc, r: nr, d: d + 1 });
         /* stop next to an enemy: you can't walk past them */
         const zoc = HX.neighbors(nc, nr).some(([a, b]) => { const o = unitAt(B, a, b); return o && o.side !== u.side; });
@@ -261,8 +268,8 @@
     }
     else if (act.type === 'shift') {
       if (!B_.canShift(B, u)) return { ok: false };
-      const t = act.target; if (!t || t.side !== u.side || t.size !== 1 || t === u) return { ok: false };
-      if (HX.dist(u.c, u.r, act.c, act.r) > u.spd || !fits(B, act.c, act.r, 1, t.side, t)) return { ok: false, why: 'Out of reach.' };
+      const t = act.target; if (!t || t.side !== u.side || t.shape[0] * t.shape[1] !== 1 || t === u) return { ok: false };
+      if (HX.dist(u.c, u.r, act.c, act.r) > u.spd || !fits(B, act.c, act.r, [1, 1], t.side, t)) return { ok: false, why: 'Out of reach.' };
       B.anim.push({ kind: 'blink', uid: t.uid, from: [t.c, t.r], to: [act.c, act.r] });
       t.c = act.c; t.r = act.r; say(B, 'The Kalo’Eik shift the ' + t.name + ' through the Duat.');
     }
@@ -384,7 +391,7 @@
   }
   function releaseFromDuat(st, B, u) {
     const n = Math.max(2, Math.round(u.n * 0.5));
-    const spot = freeSpotNear(B, u.c + (u.side === 0 ? 1 : -1), u.r, 1, u.side);
+    const spot = freeSpotNear(B, u.c + (u.side === 0 ? 1 : -1), u.r, [1, 1], u.side);
     if (!spot) return;
     const t = addUnit(st, B, u.side, { kind: 'stack', cr: 'malsti', parts: null, squad: u.squad, cap: null, temp: true }, spot[0], spot[1]);
     if (t) { t.n = n; t.startN = n; t.temp = true; t.parts = null; B.queue.push(t.uid); B.anim.push({ kind: 'blink', uid: t.uid, to: [t.c, t.r] }); say(B, 'The scream tears the Duat open: ' + n + ' Malsti Punks tumble out!'); }
@@ -441,7 +448,7 @@
       case 'hush': B.sides[1 - side].hushed = 2; break;
       case 'comfort': target.fx.comfort = 1; break;
       case 'weight': target.fx.slow = 3; break;
-      case 'duatstep': if (c == null || !fits(B, c, r, target.size, target.side, target)) return { ok: false, why: 'Choose an empty spot.' }; B.anim.push({ kind: 'blink', uid: target.uid, from: [target.c, target.r], to: [c, r] }); target.c = c; target.r = r; break;
+      case 'duatstep': if (c == null || !fits(B, c, r, target.shape, target.side, target)) return { ok: false, why: 'Choose an empty spot.' }; B.anim.push({ kind: 'blink', uid: target.uid, from: [target.c, target.r], to: [c, r] }); target.c = c; target.r = r; break;
       case 'ward': target.fx.ward = 1; break;
       case 'dusklash': applyDamage(st, B, null, target, P * 3, 'are lashed by shadow'); break;
       case 'massrally': allies.forEach(u => u.morale = Math.min(3, (u.morale || 0) + 1)); break;

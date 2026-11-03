@@ -206,17 +206,39 @@
     shadow(ctx, 14 * S_, 4 * S_);
     if (hero.mount === 'kuni') { A.creature(ctx, 'kuni', 0, 0, s * 0.9, { t, f: 1, noShadow: true }); ctx.translate(0, -16 * S_); }
     else {
-      /* a Domestic Punk, saddled: the beast of the roads */
-      const body = '#c86e2a';
-      ctx.strokeStyle = '#3d5a22'; ctx.lineWidth = 2.2 * S_; ctx.lineCap = 'round';
-      [[-8, 1], [-3, -1], [3, 1], [8, -1]].forEach(([lx, ph]) => { ctx.beginPath(); ctx.moveTo(lx * S_, -8 * S_); ctx.quadraticCurveTo(lx * S_ + step * ph * 2 * S_, -3 * S_, lx * S_ + step * ph * 3 * S_, 0); ctx.stroke(); });
-      ctx.fillStyle = radial(ctx, 0, -12 * S_, 12 * S_, shade(body, 35), shade(body, -35)); ell(ctx, 0, -12 * S_, 12 * S_, 7 * S_); ctx.fill(); outline(ctx, 1 * S_);
-      ctx.strokeStyle = rgba('#6a3210', 0.55); ctx.lineWidth = 0.9 * S_; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(i * 4 * S_, -12 * S_, 1.6 * S_, 6.5 * S_, 0, -1.3, 1.3); ctx.stroke(); }
-      ctx.fillStyle = radial(ctx, 12 * S_, -16 * S_, 5 * S_, shade(body, 35), shade(body, -30)); ell(ctx, 12 * S_, -16 * S_, 5 * S_, 4.4 * S_); ctx.fill(); outline(ctx, 0.9 * S_);
-      ctx.fillStyle = '#1a1008'; ell(ctx, 14 * S_, -17 * S_, 0.9 * S_, 0.9 * S_); ctx.fill();
-      ctx.strokeStyle = '#3d5a22'; ctx.lineWidth = 1.2 * S_; ctx.beginPath(); ctx.moveTo(11 * S_, -20 * S_); ctx.quadraticCurveTo(10 * S_, -24 * S_, 13 * S_, -25 * S_); ctx.stroke();
-      ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(-6 * S_, -18 * S_); ctx.lineTo(6 * S_, -18 * S_); ctx.lineTo(5 * S_, -10 * S_); ctx.lineTo(-5 * S_, -10 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
-      ctx.translate(0, -14 * S_);
+      /* a Domestic Punk, saddled: the pumpkin-and-vine beast of the roads */
+      const body = '#d27426', vine = '#3d6a24', dvine = '#2a4a18';
+      ctx.lineCap = 'round';
+      /* vine tail, curling */
+      ctx.strokeStyle = vine; ctx.lineWidth = 1.6 * S_;
+      ctx.beginPath(); ctx.moveTo(-12 * S_, -14 * S_); ctx.bezierCurveTo(-18 * S_, -16 * S_, -20 * S_, -8 * S_ + Math.sin(t * 3) * S_, -16 * S_, -7 * S_); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-15.5 * S_, -8.6 * S_, 1.6 * S_, 0, Math.PI * 1.5); ctx.stroke();
+      /* four vine legs with leafy feet */
+      [[-9, 1, dvine], [5, -1, dvine], [-5, -1, vine], [9, 1, vine]].forEach(([lx, ph, c]) => {
+        ctx.strokeStyle = c; ctx.lineWidth = 2.6 * S_;
+        const fx = lx * S_ + step * ph * 3 * S_;
+        ctx.beginPath(); ctx.moveTo(lx * S_, -9 * S_); ctx.bezierCurveTo(lx * S_ - 2 * S_, -5 * S_, fx + 2 * S_, -3 * S_, fx, 0); ctx.stroke();
+        ctx.fillStyle = '#5a8a34'; ell(ctx, fx + 1.4 * S_, -0.4 * S_, 2.2 * S_, 1 * S_, 0.2); ctx.fill();
+      });
+      /* the pumpkin body, deeply ribbed */
+      ctx.fillStyle = radial(ctx, 2 * S_, -16 * S_, 14 * S_, shade(body, 40), shade(body, -45)); ell(ctx, 0, -14 * S_, 13 * S_, 8.5 * S_); ctx.fill(); outline(ctx, 1.1 * S_);
+      ctx.strokeStyle = rgba('#7a3608', 0.6); ctx.lineWidth = 1 * S_;
+      for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.ellipse(i * 3.6 * S_, -14 * S_, 1.8 * S_, 8 * S_, 0, -1.35, 1.35); ctx.stroke(); }
+      /* saddle blanket in the hero's colour, and a strap */
+      ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(-7 * S_, -21 * S_); ctx.quadraticCurveTo(0, -23 * S_, 7 * S_, -21 * S_); ctx.lineTo(6 * S_, -11 * S_); ctx.quadraticCurveTo(0, -9.5 * S_, -6 * S_, -11 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
+      ctx.strokeStyle = '#d9b87a'; ctx.lineWidth = 0.8 * S_; ctx.beginPath(); ctx.moveTo(-6.5 * S_, -12 * S_); ctx.quadraticCurveTo(0, -10.5 * S_, 6.5 * S_, -12 * S_); ctx.stroke();
+      /* the head: a smaller pumpkin with a carved face, a stem and a leaf */
+      const hx = 14 * S_, hy = -20 * S_ + Math.sin(t * 3) * 0.5 * S_;
+      ctx.fillStyle = radial(ctx, hx, hy - 1 * S_, 6 * S_, shade(body, 45), shade(body, -35)); ell(ctx, hx, hy, 6.2 * S_, 5.2 * S_); ctx.fill(); outline(ctx, 0.9 * S_);
+      ctx.strokeStyle = rgba('#7a3608', 0.6); ctx.lineWidth = 0.7 * S_; [-2.2, 0, 2.2].forEach(dx => { ctx.beginPath(); ctx.ellipse(hx + dx * S_, hy, 1 * S_, 4.8 * S_, 0, -1.3, 1.3); ctx.stroke(); });
+      ctx.fillStyle = '#2a1206'; ctx.beginPath(); ctx.moveTo(hx + 1 * S_, hy - 1.6 * S_); ctx.lineTo(hx + 2.8 * S_, hy - 2.6 * S_); ctx.lineTo(hx + 2.6 * S_, hy - 0.6 * S_); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(hx + 3.8 * S_, hy - 1.4 * S_); ctx.lineTo(hx + 5.2 * S_, hy - 2.4 * S_); ctx.lineTo(hx + 5 * S_, hy - 0.4 * S_); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(hx + 0.8 * S_, hy + 1.4 * S_); ctx.lineTo(hx + 2 * S_, hy + 2.6 * S_); ctx.lineTo(hx + 3 * S_, hy + 1.8 * S_); ctx.lineTo(hx + 4 * S_, hy + 2.8 * S_); ctx.lineTo(hx + 5.4 * S_, hy + 1.4 * S_); ctx.lineTo(hx + 4 * S_, hy + 3.6 * S_); ctx.lineTo(hx + 2 * S_, hy + 3.6 * S_); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#4a3a1a'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(hx - 0.5 * S_, hy - 5 * S_); ctx.quadraticCurveTo(hx - 1 * S_, hy - 8 * S_, hx + 1.5 * S_, hy - 8.5 * S_); ctx.stroke();
+      ctx.fillStyle = '#5a9a34'; ell(ctx, hx - 3.2 * S_, hy - 6.6 * S_, 2.8 * S_, 1.3 * S_, 0.5); ctx.fill(); outline(ctx, 0.5 * S_);
+      /* reins */
+      ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 0.7 * S_; ctx.beginPath(); ctx.moveTo(hx - 2 * S_, hy + 1 * S_); ctx.quadraticCurveTo(6 * S_, -20 * S_, 3 * S_, -24 * S_); ctx.stroke();
+      ctx.translate(0, -11.5 * S_);   /* sat down into the saddle */
     }
     A.person(ctx, 0, 0, s * 0.82, hero.people, { color, look: hero.look, weapon: 'banner', t, noShadow: true });
     ctx.restore();
@@ -410,10 +432,14 @@
   CREATURE.nekh = function (ctx, S_, t, o) {
     /* the great worm of the Duat, rearing out of the ground: segmented, su-blue seams, a round many-toothed maw */
     const col = '#3a4a63', col2 = '#1f2b40', ridge = '#4fb4e8';
-    const rise = o.pose === 'attack' ? 1.1 : 1, N = 18;
-    ctx.fillStyle = rgba('#2a2018', 0.55); ell(ctx, -6 * S_, 0, 30 * S_, 7 * S_); ctx.fill();
+    /* o.flat: lying long across the field, head raised (battle); o.stretch: how long */
+    const st_ = o.stretch || 1, flat = !!o.flat;
+    const rise = (o.pose === 'attack' ? 1.1 : 1) * (flat ? 0.42 : 1), N = flat ? 30 : 18;
+    ctx.fillStyle = rgba('#2a2018', 0.55); ell(ctx, (-6 - (st_ - 1) * 12) * S_, 0, (30 + (st_ - 1) * 13) * S_, 7 * S_); ctx.fill();
     const pts = [];
-    for (let i = 0; i <= N; i++) { const u = i / N; const px = SU.lerp(-26, 14, u) * S_ + Math.sin(u * 6 - t * 2) * 2.5 * S_; const h = 62 * S_ * rise * 0.5 * (1 - Math.cos(u * Math.PI)); const w = 11 * S_ * (0.45 + 0.55 * Math.sin(Math.min(u, 0.92) * Math.PI)); pts.push({ x: px, y: -h, w }); }
+    for (let i = 0; i <= N; i++) { const u = i / N; const px = SU.lerp(-26 * st_, 14, u) * S_ + Math.sin(u * 6 * st_ - t * 2) * 2.5 * S_;
+      const lift = flat ? Math.pow(u, 3) : 0.5 * (1 - Math.cos(u * Math.PI));
+      const h = 62 * S_ * rise * lift + (flat ? 8 * S_ * (1 - lift) : 0); const w = 11 * S_ * (0.45 + 0.55 * Math.sin(Math.min(u, 0.92) * Math.PI)); pts.push({ x: px, y: -h, w }); }
     for (let i = 0; i <= N; i++) { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(N, i + 1)]; const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1; pts[i].nx = -dy / l; pts[i].ny = dx / l; }
     ctx.fillStyle = lin(ctx, -20 * S_, -60 * S_, 20 * S_, 0, [[0, shade(col, 30)], [0.6, col], [1, shade(col, -35)]]);
     ctx.beginPath(); ctx.moveTo(pts[0].x + pts[0].nx * pts[0].w, pts[0].y + pts[0].ny * pts[0].w);

@@ -184,6 +184,11 @@ this game (it may appear later as a special event).
 - **#9 creatures** (such as the Nekh'Vorran) cannot be placed under a captain.
 - Some big creatures take **two of a captain's slots**. Slots are not hexes: a
   creature can take one slot but two hexes on the battlefield.
+  - **Harkal:** 1 slot, 2 hexes. **Xiw'Eik:** 2 slots, 2 hexes wide.
+    **Lutut:** 2 slots, 2×2 hexes. **Nekh'Vorran:** 6 hexes long and 2 wide
+    (never under a captain).
+- **Heroes ride Domestic Punks** (pumpkin-and-vine beasts), or a Kuni Byrd if
+  they win one.
 - Some captains can keep certain troops as **reserves** that step in during battle.
 
 ### Morale and luck

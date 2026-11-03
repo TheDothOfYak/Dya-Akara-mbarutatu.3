@@ -53,10 +53,17 @@
     for (let r = 0; r < B.rows; r++) for (let c = 0; c < B.cols; c++) { const p = center(c, r, G); const d = Math.hypot(mx - p.x, (my - p.y) / YS); if (d < bd) { bd = d; best = { c, r }; } }
     return bd < G.R ? best : null;
   }
+  /* the middle of a unit's whole footprint (big creatures cover several hexes) */
+  function footOffset(u, G) {
+    const cells = BT.cellsOf(u, u.c, u.r); if (cells.length === 1) return { x: 0, y: 0 };
+    const h = center(u.c, u.r, G); let x = 0, y = 0;
+    cells.forEach(([c, r]) => { const q = center(c, r, G); x += q.x; y += q.y; });
+    return { x: x / cells.length - h.x, y: y / cells.length - h.y };
+  }
   function unitCenter(u, G) {
-    const p = BV.pos[u.uid] || center(u.c, u.r, G);
-    if (u.size === 2 && !BV.pos[u.uid]) { const [tc, tr] = BT.tail(u, u.c, u.r); const q = center(tc, tr, G); return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }; }
-    return p;
+    G = G || geo();
+    const p = BV.pos[u.uid] || center(u.c, u.r, G), o = footOffset(u, G);
+    return { x: p.x + o.x, y: p.y + o.y };
   }
 
   /* ======================= animation queue ======================= */
@@ -184,14 +191,16 @@
     const B = BV.B, sd = B.sides[u.side], col = sd.owner >= 0 ? U.st.players[sd.owner].color : D.NEUTRAL_COLOR;
     const isAct = act && act.uid === u.uid;
     /* the base: a coloured ring under each stack */
-    g.save(); g.fillStyle = rgba(col, isAct ? 0.55 : 0.3); A.ell(g, p.x, p.y, G.R * (u.size === 2 ? 1.5 : 0.8), G.R * 0.36 * (u.size === 2 ? 1.1 : 1)); g.fill();
+    const sw = (u.shape || [1, 1])[0], sh = (u.shape || [1, 1])[1];
+    g.save(); g.fillStyle = rgba(col, isAct ? 0.55 : 0.3); A.ell(g, p.x, p.y, G.R * (0.8 + (sw - 1) * 0.85), G.R * 0.36 * (1 + (sh - 1) * 1.6)); g.fill();
     if (isAct) { g.strokeStyle = 'rgba(255,236,160,' + (0.6 + Math.sin(t * 5) * 0.3) + ')'; g.lineWidth = 2; g.stroke(); }
     g.restore();
     const f = u.side === 0 ? 1 : -1;
     if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.75, u.cap, col, t + u.uid, f, u._pose);
     else {
-      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 1.9, lutut: 1.25, nekh: 1.45, kuni: 1.5, naga: 1.5, mcfly: 2 }[C.art] || 1.6);
-      A.creature(g, C.art, p.x, p.y, sc, { t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1), color: col });
+      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, mcfly: 2 }[C.art] || 1.6);
+      const extra = C.art === 'nekh' ? { flat: true, stretch: 3.9 } : {};
+      A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1), color: col }, extra));
     }
     /* count badge */
     const txt = u.kind === 'cap' ? '★' : String(u.n);
@@ -251,7 +260,7 @@
       if (S_.target === 'allyMove') { if (!m.target) { if (t && t.side === sd) { m.target = t; U.toast('Now click where they should go.'); } return; } doSing(m.song, m.target, h.c, h.r); return; }
       doSing(m.song, t); return;
     }
-    if (m.kind === 'shift') { if (!m.target) { if (t && t.side === sd && t.size === 1 && t.uid !== BT.activeUnit(B).uid) { m.target = t; U.toast('Now click where they should go.'); } return; } act({ type: 'shift', target: m.target, c: h.c, r: h.r }); return; }
+    if (m.kind === 'shift') { if (!m.target) { if (t && t.side === sd && t.shape[0] * t.shape[1] === 1 && t.uid !== BT.activeUnit(B).uid) { m.target = t; U.toast('Now click where they should go.'); } return; } act({ type: 'shift', target: m.target, c: h.c, r: h.r }); return; }
     if (m.kind === 'boulder') { const w = B.siege && B.siege.cells.get(h.c + ',' + h.r); if (w && w.hp > 0) act({ type: 'boulder', c: h.c, r: h.r }); return; }
   }
   function doSing(song, target, c, r) {
