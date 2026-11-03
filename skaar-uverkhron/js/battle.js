@@ -97,7 +97,7 @@
     const sd = B.sides[side];
     if (o.kind === 'cap') {
       const cap = o.cap, capt = o.hero ? S.skill(st, o.hero, 'captaincy') : 0;
-      Object.assign(u, { cap, name: cap.name, n: 1, hp: cap.hp, hpTop: cap.hp, startN: 1, atk: cap.atk + capt, def: cap.def + capt, dmg: [4 + cap.level, 7 + cap.level * 2], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: cap.morale || 0 });
+      Object.assign(u, { cap, name: cap.name, abil: [], n: 1, hp: cap.hp, hpTop: cap.hp, startN: 1, atk: cap.atk + capt, def: cap.def + capt, dmg: [4 + cap.level, 7 + cap.level * 2], spd: D.CAPTAIN_BASE.spd + (cap.abil === 'vanguard' ? 2 : 0), size: 1, path: o.path, people: cap.people, morale: cap.morale || 0 });
     } else {
       const c = D.CREATURES[o.cr];
       const n = o.parts ? o.parts.reduce((t, p) => t + p.ref.n, 0) : o.n;

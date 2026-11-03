@@ -76,7 +76,8 @@
         if (boat) return S.passable(st, layer, x, y, { boat: true }) || S.passable(st, layer, x, y);
         return S.passable(st, layer, x, y, { fly }) || (!fly && boatAt(st, layer, x, y));
       }
-      if (S.objAt(st, layer, x, y) || S.armyAt(st, layer, x, y)) return false;
+      if (S.objAt(st, layer, x, y)) return false;
+      const ar = S.armyAt(st, layer, x, y); if (ar && !(popts && popts.throughWild && ar.wild)) return false;
       if (popts && popts.avoid && popts.avoid(x, y)) return false;
       return boat ? S.passable(st, layer, x, y, { boat: true }) : S.passable(st, layer, x, y, { fly });
     };
@@ -93,8 +94,6 @@
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue; const xx = x + dx, yy = y + dy;
         if (!S.inside(L, xx, yy) || !ok(xx, yy)) continue;
-        /* no cutting corners past blocked tiles */
-        if (dx && dy && !fly && !boat && !S.passable(st, layer, x + dx, y) && !S.passable(st, layer, x, y + dy)) continue;
         const j = yy * w + xx; const ng = g[i] + R_.stepCost(st, a, layer, x, y, xx, yy);
         if (ng < g[j]) { g[j] = ng; prev[j] = i; push(ng + Math.max(Math.abs(tx - xx), Math.abs(ty - yy)) * 70, j); }
       }
@@ -815,6 +814,8 @@
     /* the wilds: groups grow each week, herds and roamers wander */
     if (newWeek) Object.values(st.armies).forEach(a => { if (!a.wild || a.dead || a.mcfly) return;
       const mul = st.monthEvent === 'migration' && newMonth ? 2 : 1.06;
+      /* wild groups grow, but never past three times their first size */
+      if (a.power0 && S.power(a.slots) > a.power0 * 3) return;
       S.stacksIn(a.slots).forEach(s => s.n = Math.ceil(s.n * mul)); });
     R_.wildDay(st);
     R_.checkPlayers(st);

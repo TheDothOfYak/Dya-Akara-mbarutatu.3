@@ -44,6 +44,7 @@
     placeWild(st, regions);
     S.rebuild(st);
     startArmies(st);
+    delete st._reserve;
     st.storm = SU.rules ? SU.rules.newStorm(st) : null;
     SU.syncRng(st);
     return st;
@@ -141,7 +142,9 @@
     const comps = components(L, ok);
     const set = new Uint8Array(L.w * L.h);
     /* the Kalo: every moon counts */
-    (li === 3 ? comps : comps.slice(0, 1).concat(comps.slice(1).filter(c => c.length > 40))).forEach(c => c.forEach(i => set[i] = 1));
+    /* towns, mines and Urverk go on each world's main land, so they can be walked to;
+       the Kalo: every moon counts */
+    (li === 3 ? comps : comps.slice(0, 1)).forEach(c => c.forEach(i => set[i] = 1));
     return set;
   }
 
@@ -149,16 +152,23 @@
   function freeAt(st, li, x, y, reg, foot) {
     const L = st.layers[li]; if (!S.inside(L, x, y) || x < 2 || y < 3 || x > L.w - 3 || y > L.h - 2) return false;
     const i = y * L.w + x; if (!reg[i] || L.ob[i] || st._block[li][i] || st._occ[li][i]) return false;
+    const R = st._reserve && st._reserve[li];
+    if (R && R[i]) return false;
     if (S.armyAt(st, li, x, y)) return false;
     if (L.road[i] && !foot) return false;
     for (const [dx, dy] of (foot || [])) { const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) return false; const j = yy * L.w + xx;
-      if (st._block[li][j] || st._occ[li][j] || L.road[j] || D.TERRAIN[S.TCODES[L.t[j]]].pass === false) return false; }
+      if (st._block[li][j] || st._occ[li][j] || L.road[j] || D.TERRAIN[S.TCODES[L.t[j]]].pass === false || (R && R[j])) return false; }
     /* the tile in front must be open, so it can be reached */
     if (!reg[(y + 1) * L.w + x] && !reg[y * L.w + x + 1] && !reg[y * L.w + x - 1]) return false;
     return true;
   }
   function addObj(st, o) { o.id = o.id || SU.uid(st, 'o'); st.objects[o.id] = o; S.place(st, o); /* clear the body tiles of trees */
-    const L = st.layers[o.layer]; S.footprint(o).forEach(([dx, dy]) => { const xx = o.x + dx, yy = o.y + dy; if (S.inside(L, xx, yy)) L.ob[yy * L.w + xx] = 0; }); return o; }
+    const L = st.layers[o.layer]; S.footprint(o).forEach(([dx, dy]) => { const xx = o.x + dx, yy = o.y + dy; if (S.inside(L, xx, yy)) L.ob[yy * L.w + xx] = 0; });
+    /* keep the way in clear: nothing else may be built in front of an entrance */
+    if (!st._reserve) st._reserve = st.layers.map(L2 => new Uint8Array(L2.w * L2.h));
+    const front = o.type === 'town' ? [[0, 1], [-1, 1], [1, 1], [0, 2]] : (o.type === 'pile' || o.type === 'chest' || o.type === 'scroll' || o.type === 'relic') ? [] : [[0, 1], [-1, 1], [1, 1]];
+    front.forEach(([dx, dy]) => { const xx = o.x + dx, yy = o.y + dy; if (S.inside(L, xx, yy)) { st._reserve[o.layer][yy * L.w + xx] = 1; L.ob[yy * L.w + xx] = 0; } });
+    return o; }
   function randomFree(st, li, reg, R, test, foot, tries) {
     const L = st.layers[li];
     for (let k = 0; k < (tries || 300); k++) { const x = R.int(2, L.w - 3), y = R.int(3, L.h - 2); if (freeAt(st, li, x, y, reg, foot) && (!test || test(x, y))) return [x, y]; }
@@ -288,7 +298,9 @@
   }
   function nearWater(L, x, y) { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, yy = y + dy; if (S.inside(L, xx, yy) && L.t[yy * L.w + xx] === T.water) return true; } return false; }
   function farFromStarts(st, li, x, y, d) { return st._starts.every(s => s.li !== li || Math.hypot(s.x - x, s.y - y) >= d); }
-  function distToStart(st, li, x, y) { let d = 60; st._starts.forEach(s => { if (s.li === li) d = Math.min(d, Math.hypot(s.x - x, s.y - y)); }); return d; }
+  /* how far from the nearest start, for sizing guards: on a world nobody starts on,
+     treat everything as middling-far rather than impossibly far */
+  function distToStart(st, li, x, y) { let d = 60; st._starts.forEach(s => { if (s.li === li) d = Math.min(d, Math.hypot(s.x - x, s.y - y)); }); return Math.min(d, st._starts.some(s => s.li === li) ? 30 : 18); }
 
   /* ---------- Urverk ---------- */
   const FAMILIES = ['the House of Orrin', 'the Vessil family', 'the Keepers of Thren', 'the Lantern-Wardens', 'the Duskmoor clan', 'the Ashfeld family', 'the Sons of Quora'];
@@ -374,8 +386,11 @@
     const land = i => D.TERRAIN[S.TCODES[L.t[i]]].pass !== false;
     const open = i => { if (!land(i) || L.ob[i] || st._block[li][i]) return false; const o = S.objAt(st, li, i % w, (i / w) | 0); return !o || vanish(o); };
     const want = i => open(i) || (!!S.objAt(st, li, i % w, (i / w) | 0));   /* every object's visit tile must be reachable */
-    const seeds = Object.values(st.objects).filter(o => o.layer === li && (o.type === 'town' || (li === 3 && o.type === 'urverk')));
+    let seeds = Object.values(st.objects).filter(o => o.layer === li && (o.type === 'town' || (li === 3 && o.type === 'urverk')));
+    if (!seeds.length) seeds = Object.values(st.objects).filter(o => o.layer === li && o.type === 'urverk');
     if (!seeds.length) return;
+    /* on a Tatu, flood from ONE town (a player's if there is one) and carve toward every other */
+    if (li !== 3) seeds = [seeds.find(o => o.type === 'town' && o.owner >= 0) || seeds[0]];
     const reach = new Uint8Array(N);
     const flood = from => { const q = from.slice(); from.forEach(i => reach[i] = 1); while (q.length) { const i = q.pop(), x = i % w, y = (i / w) | 0;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) continue; const j = yy * w + xx; if (reach[j]) continue; if (open(j)) { reach[j] = 1; q.push(j); } else if (want(j)) reach[j] = 2; } } };

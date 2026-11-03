@@ -76,7 +76,7 @@
     const towns = S.townsOf(st, P.idx).filter(t => RU.has(t, 'tavern'));
     const field = S.fieldHeroes(st, P.idx).length;
     const inside = towns.reduce((n, t) => n + t.heroes.length, 0);
-    const want = Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length);
+    const want = Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length + (P.res.gold > 20000 ? 2 : 0));
     if (towns.length && field + inside < want && P.res.gold > M.heroCost + 300) {
       const t = towns[0]; if (P.tavern.heroes.length) RU.hireHero(st, P, t, P.tavern.heroes[0]);
     }
@@ -133,6 +133,30 @@
     });
     return out;
   }
+  /* the war plan: a strong hero marches on the weakest rival town it can beat,
+     through an Urverk toward that town's world if it must */
+  function warPath(st, P, a, danger) {
+    const h = S.heroOf(st, a); if (!h || st.day < 18) return null;
+    const myPow = S.power(S.slotsOf(st, a), h);
+    /* walls and towers make a town much harder than its garrison looks */
+    const def = t => { const d = RU.townDefense(st, t); const walls = t.built.reduce((m, b) => Math.max(m, D.BUILDINGS[b].walls || 0), 0); return d ? (S.power(d.slots, d.hero) + (d.hero ? S.power(d.hero.slots, d.hero) : 0)) * (1.4 + walls * 0.35) + walls * 1500 : 0; };
+    const towns = Object.values(st.objects).filter(t => t.type === 'town' && t.owner !== a.owner && !(t.owner >= 0 && S.allies(st, t.owner, a.owner)) && def(t) < myPow * 0.8)
+      .sort((p, q) => ((p.layer !== a.layer) - (q.layer !== a.layer)) || ((q.owner >= 0) - (p.owner >= 0)) || Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y));
+    for (const t of towns.slice(0, 4)) {
+      if (t.layer === a.layer) {
+        const p = RU.path(st, a, t.x, t.y, { avoid: danger }); if (p && p.length) return { t: { x: t.x, y: t.y, o: t }, p };
+        /* the road is blocked by wild creatures: clear the first one we can beat */
+        const p2 = RU.path(st, a, t.x, t.y, { throughWild: true });
+        if (p2) { const blk = p2.map(s => S.armyAt(st, a.layer, s.x, s.y) || RU.guardNear(st, a.layer, s.x, s.y)).find(w => w && w.wild);
+          if (blk && S.power(blk.slots) < myPow * 0.6) { const p3 = RU.path(st, a, blk.x, blk.y); if (p3 && p3.length) return { t: { x: blk.x, y: blk.y, army: blk }, p: p3 }; } }
+        continue;
+      }
+      const gates = Object.values(st.objects).filter(o => o.type === 'urverk' && o.layer === a.layer && o.triggerKnown && st.objects[o.link] && (st.objects[o.link].layer === t.layer || st.objects[o.link].layer !== a.layer && st.objects[o.link].layer !== 3) && (o.kind !== 'danger' || myPow > 25000) && RU.urverkNext(st, o) >= 0 && RU.urverkNext(st, o) <= 6)
+        .sort((p, q) => ((st.objects[p.link].layer !== t.layer) - (st.objects[q.link].layer !== t.layer)) || Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y));
+      for (const g of gates) { const p = RU.path(st, a, g.x, g.y, { avoid: danger }); if (p && p.length) return { t: { x: g.x, y: g.y, o: g }, p, war: true }; }
+    }
+    return null;
+  }
   async function moveArmy(st, P, a, hooks, lvl) {
     const h = S.heroOf(st, a);
     let best = null, bestScore = 0;
@@ -144,6 +168,10 @@
       const cost = p[p.length - 1].g; const days = cost / Math.max(1, a.mpMax);
       const score = t.v * lvl.aggression / (0.6 + days);
       if (score > bestScore) { bestScore = score; best = { t, p }; }
+    }
+    /* the strongest hero goes to war when it can win */
+    if (h && S.fieldHeroes(st, a.owner).every(o => o === a || S.power(S.slotsOf(st, o)) <= S.power(S.slotsOf(st, a)))) {
+      const w = warPath(st, P, a, danger); if (w && (!best || bestScore < 40 || w.t.army || (w.t.o && w.t.o.type === 'town'))) best = w;
     }
     /* nothing to do: go home and gather troops, or try an Urverk */
     if (!best) {
@@ -183,7 +211,11 @@
       if (res.need === 'toll' && P.res.gold > res.price + 3000) { const r2 = RU.crossUrverk(st, a, ev.obj, 'pay'); if (r2.event) await fight(st, hooks, r2.event.attacker, r2.event.defender, null); }
       else if (res.event) await fight(st, hooks, res.event.attacker, res.event.defender, null);
     }
-    else if (ev.kind === 'herd') { const ws = S.stacksIn(ev.other.slots)[0]; if (h && S.skill(st, h, 'beasts') && ws && P.res.food > ws.n) { if (RU.addToSlots(st, S.slotsOf(st, a), ws.cr, ws.n, h)) { P.res.food -= Math.ceil(ws.n * 0.8); RU.removeArmy(st, ev.other); } } }
+    else if (ev.kind === 'herd') {
+      const ws = S.stacksIn(ev.other.slots)[0];
+      if (h && S.skill(st, h, 'beasts') && ws && P.res.food > ws.n && RU.addToSlots(st, S.slotsOf(st, a), ws.cr, ws.n, h)) { P.res.food -= Math.ceil(ws.n * 0.8); RU.removeArmy(st, ev.other); }
+      else if (S.power(ev.other.slots) < S.power(S.slotsOf(st, a), h) * 0.6) await fight(st, hooks, a, ev.other, null);   /* drive them off */
+    }
     else if (ev.kind === 'meet') {
       /* a squadron meeting a hero joins the hero's army, captain and all */
       const other = ev.other, j = h ? h.slots.findIndex(x => !x) : -1;
@@ -195,5 +227,5 @@
     const spec = { attacker, defender, town, def };
     return hooks.battle(spec);
   }
-  AI._targets = targets;
+  AI._targets = targets; AI._warPath = warPath; AI._moveArmy = moveArmy;
 })(typeof window !== 'undefined' ? window : globalThis);
