@@ -29,6 +29,7 @@
       sides: [mkSide(st, atk, 0), mkSide(st, def, 1)], units: [], obstacles: new Set(), round: 0, queue: [], active: null,
       log: [], over: null, siege: null, nextUid: 1, fallenCaps: [], stolen: [0, 0], killedMcfly: [false, false],
       inEye: RU.inEye(st, opts.layer != null ? opts.layer : (atk.army ? atk.army.layer : 0), lx, ly), anim: [],
+      grove: [atk, def].map(sd => !!(sd.owner >= 0 && RU.nearGrove && RU.nearGrove(st, sd.owner, opts.layer != null ? opts.layer : (atk.army ? atk.army.layer : 0), lx, ly))),
     };
     if (opts.town) setupSiege(st, B, opts.town);
     deploy(st, B, 0, atk.slots, atk.hero);
@@ -75,8 +76,11 @@
       const rowC = SU.clamp(Math.round((gi + 0.5) * usedRows / n - 0.5), 1, B.rows - 2);
       const squad = 'q' + side + (extra ? 'x' : '') + gi;
       g.squad = squad;
+      /* a Ju-Keeper's Sprengju ride in pouches, not on the field */
+      const ammo = g.cap && g.cap.rank === 'jukeeper' ? g.stacks.filter(s => /^sprengju/.test(s.ref.cr)) : [];
+      if (ammo.length) g.stacks = g.stacks.filter(s => !ammo.includes(s));
       /* captain in front */
-      if (g.cap) addUnit(st, B, side, { kind: 'cap', cap: g.cap, path: [g.si], squad, hero, extra }, front + (extra ? -dir : 0), rowC);
+      if (g.cap) addUnit(st, B, side, { kind: 'cap', cap: g.cap, path: [g.si], squad, hero, extra, ammo }, front + (extra ? -dir : 0), rowC);
       /* stacks of the same creature in one squadron fight as one */
       const merged = {};
       g.stacks.forEach(s => { (merged[s.ref.cr] = merged[s.ref.cr] || []).push(s); });
@@ -112,6 +116,9 @@
         size: c.size || 1, shape: B_.shapeOf(c), ranged: !!c.ranged, shots: c.shots || 0, fly: !!(c.fly || (c.abil || []).includes('blink') || (c.abil || []).includes('burrow')), abil: c.abil || [], parts: o.parts, morale, temp: !!o.temp });
     }
     u.capId = o.cap ? o.cap.id : null;
+    if (o.ammo && o.ammo.length) { u.ammo = o.ammo.map(x => ({ ref: x.ref, used: 0 })); u.ranged = true; u.shots = 99; }
+    /* the Sru Vorn digs its bog once, on a round of its own choosing early on */
+    if (u.abil && u.abil.includes('bog')) u.bogRound = SU.rng(st).int(1, 5);
     B.units.push(u);
     return u;
   }
@@ -148,9 +155,9 @@
   function unitAt(B, c, r) { for (const u of B.units) { if (u.n <= 0) continue; for (const [cc, rr] of cellsOf(u)) if (cc === c && rr === r) return u; } return null; }
   B_.unitAt = unitAt;
   /* the bodies of a fallen stack lie where it fell */
-  B_.bodyAt = (B, c, r) => B.units.find(u => u.n <= 0 && !u.raised && u.kind === 'stack' && cellsOf(u).some(([cc, rr]) => cc === c && rr === r)) || null;
+  B_.bodyAt = (B, c, r) => B.units.find(u => u.n <= 0 && !u.raised && !u.spent && u.kind === 'stack' && cellsOf(u).some(([cc, rr]) => cc === c && rr === r)) || null;
   /* your own fallen may be raised; the enemy's only by a master singer (Songcraft 5), and then they fight for you */
-  B_.canRaise = (B, u, side, enemyOk) => !!(u && u.n <= 0 && u.kind === 'stack' && !u.temp && !u.raised && (u.side === side || enemyOk) && !D.CREATURES[u.cr].legendary && fits(B, u.c, u.r, u.shape, side, u));
+  B_.canRaise = (B, u, side, enemyOk) => !!(u && u.n <= 0 && u.kind === 'stack' && !u.temp && !u.raised && !u.spent && (u.side === side || enemyOk) && !D.CREATURES[u.cr].legendary && fits(B, u.c, u.r, u.shape, side, u));
   B_.raiseEnemyOk = (st, B, side) => { const h = B.sides[side].heroId && st.heroes[B.sides[side].heroId]; return !!(h && S.skill(st, h, 'songcraft') >= 5); };
   B_.alive = B => B.units.filter(u => u.n > 0);
 
@@ -173,6 +180,8 @@
     const ini = {}; B.queue.forEach(id => ini[id] = B_.initiative(B, B.units.find(x => x.uid === id)) + R.next() * 0.5);
     B.queue.sort((a, b) => ini[b] - ini[a]);
     say(B, '— Round ' + B.round + ' —');
+    if (B.trail) Object.keys(B.trail).forEach(k => { if (B.trail[k].until < B.round) delete B.trail[k]; });
+    B_.alive(B).forEach(u => { if (u.abil && u.abil.includes('fade') && B.round % 2 === 0) say(B, 'The ' + u.name + ' slips into shadow.'); });
     /* towers shoot */
     if (B.siege) B.siege.towers.forEach(t => { if (t.hp > 0) towerShoot(st, B, t); });
     advance(st, B);
@@ -188,6 +197,8 @@
       if (u.fx.confused) { u.fx.confused = 0; say(B, u.name + ' are confused and lose their turn.'); continue; }
       if (u.kind === 'stack' && u.morale != null && u.morale < 25 && SU.rng(st).chance((25 - u.morale) / 50)) { say(B, 'The ' + u.name + ' freeze in fear.'); B.anim.push({ kind: 'luck', uid: u.uid }); continue; }
       B.active = u.uid;
+      if (u.abil && u.abil.includes('bog') && !u.bogDone && B.round >= (u.bogRound || 1)) digBog(st, B, u);
+      trailHeal(B, u);
       /* the Xiw'Eik sing their chaos */
       if (u.abil && u.abil.includes('chaos') && SU.rng(st).chance(0.3)) chaosSong(st, B, u);
       /* captains with Songkeeper sometimes sing Mend over their squadron */
@@ -215,6 +226,7 @@
   B_.reach = function (B, u) {
     const sp = Math.max(1, u.spd + (u.fx.quick ? 2 : 0) - (u.fx.slow ? 2 : 0) - B_.moraleSlow(u));
     const out = new Map(); out.set(key(u.c, u.r), { c: u.c, r: u.r, d: 0 });
+    if ((u.abil && u.abil.includes('rooted')) || B_.bound(B, u) || u.fx.stuck > 0 || u.skirmished) return out;
     if (u.fly) {
       for (let r = 0; r < B.rows; r++) for (let c = 0; c < B.cols; c++) { const d = HX.dist(u.c, u.r, c, r); if (d <= sp && fits(B, c, r, u.shape, u.side, u, true)) out.set(key(c, r), { c, r, d }); }
       return out;
@@ -236,12 +248,20 @@
   B_.adjacent = function (a, b) { for (const [c1, r1] of cellsOf(a)) for (const [c2, r2] of cellsOf(b)) if (HX.dist(c1, r1, c2, r2) === 1) return true; return false; };
   function adjacentAt(u, c, r, t) { for (const [c1, r1] of cellsOf(u, c, r)) for (const [c2, r2] of cellsOf(t)) if (HX.dist(c1, r1, c2, r2) === 1) return true; return false; }
   B_.enemyAdjacent = (B, u) => B_.alive(B).some(o => o.side !== u.side && B_.adjacent(u, o));
-  B_.canShoot = (B, u) => u.ranged && u.shots > 0 && !B_.enemyAdjacent(B, u);
+  B_.ammoLeft = u => u.ammo ? u.ammo.reduce((t, a) => t + Math.max(0, a.ref.n - a.used), 0) : 0;
+  B_.canShoot = (B, u) => u.ranged && u.shots > 0 && (!u.ammo || B_.ammoLeft(u) > 0) && ((u.abil && u.abil.includes('alwaysshoot')) || !B_.enemyAdjacent(B, u));
+  /* the Vyrenalur slips into shadow every other round: nothing can target it */
+  B_.targetable = (B, t) => !!t && !(t.abil && t.abil.includes('fade') && B.round % 2 === 0);
+  B_.bound = (B, u) => { if (!u.fx.bound) return false; const b = B.units.find(x => x.uid === u.fx.bound); if (!b || b.n <= 0) { delete u.fx.bound; return false; } return true; };
+  const minDist = (a, t) => Math.min(...cellsOf(a).flatMap(([c1, r1]) => cellsOf(t).map(([c2, r2]) => HX.dist(c1, r1, c2, r2))));
+  B_.minDist = minDist;
+  B_.canTongue = (B, u, t) => !!(u.abil && u.abil.includes('tongue') && t && t.side !== u.side && t.n > 0 && minDist(u, t) === 2 && B_.targetable(B, t));
   /* where the unit could stand to strike target t this turn (cells it can reach that touch t) */
   B_.attackSpots = function (B, u, t, reach) {
     reach = reach || B_.reach(B, u);
     const spots = [];
     reach.forEach(v => { if (adjacentAt(u, v.c, v.r, t)) spots.push(v); });
+    if (!spots.length && B_.canTongue(B, u, t)) spots.push({ c: u.c, r: u.r, d: 0, tongue: true });
     return spots.sort((a, b) => a.d - b.d);
   };
 
@@ -252,26 +272,53 @@
     const u = B_.activeUnit(B); if (!u || B.over) return { ok: false };
     const R = SU.rng(st);
     const res = { ok: true };
-    if (act.type === 'wait') { if (u.waited) return { ok: false, why: 'Already waited.' }; u.waited = true; B.queue.push(u.uid); say(B, u.name + ' wait.'); }
+    if (act.type === 'wait') { if (u.waited) return { ok: false, why: 'Already waited.' }; if (u.skirmished) return { ok: false, why: 'They have moved: shoot, or defend.' }; u.waited = true; B.queue.push(u.uid); say(B, u.name + ' wait.'); }
     else if (act.type === 'defend') { u.defending = true; say(B, u.name + ' defend.'); }
     else if (act.type === 'move') {
       const reach = B_.reach(B, u); const v = reach.get(key(act.c, act.r)); if (!v) return { ok: false, why: 'Too far.' };
       B.anim.push({ kind: 'move', uid: u.uid, from: [u.c, u.r], to: [act.c, act.r], fly: u.fly });
-      u.c = act.c; u.r = act.r; badLuckStep(st, B, u);
+      const from = [u.c, u.r]; u.c = act.c; u.r = act.r; badLuckStep(st, B, u); trailFrom(B, u, from); stepIn(st, B, u);
+      /* Saklay'Punk'Eik ride and then shoot */
+      if (u.abil.includes('skirmish') && !u.skirmished && u.n > 0 && !B.over) { u.skirmished = true; return res; }
+    }
+    else if (act.type === 'heal') {
+      /* an Albali Byrd restores an ally beside it instead of attacking (health only: it raises nobody) */
+      const t = act.target; if (!u.abil.includes('heal') || !t || t.side !== u.side || t === u || t.n <= 0 || !B_.adjacent(u, t)) return { ok: false, why: 'Choose an ally next to it.' };
+      if (t.hpTop >= t.hp) return { ok: false, why: 'They are not hurt.' };
+      const amt = Math.min(t.hp - t.hpTop, u.n * (u.cr === 'albali2' ? 16 : 12)); t.hpTop += amt; delete t.fx.burn;
+      B.anim.push({ kind: 'heal', uid: t.uid, amount: amt, src: u.uid }); say(B, 'The ' + u.name + ' restore the ' + t.name + ' (+' + amt + ').');
     }
     else if (act.type === 'attack') {
       const t = act.target; if (!t || t.n <= 0 || t.side === u.side) return { ok: false };
+      if (!B_.targetable(B, t)) return { ok: false, why: 'It has slipped into shadow: nothing can touch it this round.' };
+      /* the Tonguatjis strikes from two hexes away and drags its prey in */
+      if (!B_.adjacent(u, t) && (act.c == null || (act.c === u.c && act.r === u.r)) && B_.canTongue(B, u, t)) {
+        strike(st, B, u, t, false);
+        if (t.n > 0 && !D.CREATURES[t.cr || 'malsti'].legendary && (t.shape || [1, 1])[0] * (t.shape || [1, 1])[1] <= 2) {
+          let best = null, bd = 1e9; cellsOf(u).forEach(([c0, r0]) => HX.neighbors(c0, r0).forEach(([c, r]) => { if (fits(B, c, r, t.shape, t.side, t)) { const d = HX.dist(c, r, t.c, t.r); if (d < bd) { bd = d; best = [c, r]; } } }));
+          if (best) { B.anim.push({ kind: 'move', uid: t.uid, from: [t.c, t.r], to: best }); t.c = best[0]; t.r = best[1]; delete t.fx.bound; say(B, 'The Tonguatjis drag the ' + t.name + ' in.'); stepIn(st, B, t); }
+        }
+        endTurn(st, B); return res;
+      }
       if (!B_.adjacent(u, t) || (act.c != null && (act.c !== u.c || act.r !== u.r))) {
         const reach = B_.reach(B, u); const v = act.c != null ? reach.get(key(act.c, act.r)) : B_.attackSpots(B, u, t, reach)[0];
         if (!v || !adjacentAt(u, v.c, v.r, t)) return { ok: false, why: 'Cannot reach.' };
-        if (v.c !== u.c || v.r !== u.r) { B.anim.push({ kind: 'move', uid: u.uid, from: [u.c, u.r], to: [v.c, v.r], fly: u.fly }); u.c = v.c; u.r = v.r; badLuckStep(st, B, u); if (u.n <= 0) { endTurn(st, B); return res; } }
+        if (v.c !== u.c || v.r !== u.r) { B.anim.push({ kind: 'move', uid: u.uid, from: [u.c, u.r], to: [v.c, v.r], fly: u.fly }); const from = [u.c, u.r]; u.c = v.c; u.r = v.r; badLuckStep(st, B, u); trailFrom(B, u, from); stepIn(st, B, u); if (u.n <= 0) { endTurn(st, B); return res; } }
       }
+      /* Sprengju burst on contact: they are spent, nothing strikes back, and half come back after the battle */
+      if (u.abil.includes('explode')) { const n0 = u.n; strike(st, B, u, t, false); u.exploded = (u.exploded || 0) + n0; u.n = 0; u.spent = true;
+        B.anim.push({ kind: 'dmg', uid: u.uid, amount: 0, killed: 0, nAfter: 0, hpAfter: u.hp }); say(B, n0 + ' ' + u.name + ' burst.'); endTurn(st, B); return res; }
       strike(st, B, u, t, false);
+      /* fire and light carry on past the target */
+      if (u.abil.includes('firebreath')) behind(B, u, t, 1).forEach(o => applyDamage(st, B, u, o, Math.round(damage(st, B, u, o, false) * 0.5), 'scorch'));
+      if (u.abil.includes('lightline')) behind(B, u, t, 2).forEach(o => applyDamage(st, B, u, o, Math.round(damage(st, B, u, o, false) * 0.6), 'pierce with light'));
       if (t.n > 0 && u.n > 0 && (t.retaliated === 0 || (t.abil && t.abil.includes('guard'))) && !t.fx.stun) { t.retaliated++; strike(st, B, t, u, false, true); }
     }
     else if (act.type === 'shoot') {
       const t = act.target; if (!B_.canShoot(B, u) || !t || t.n <= 0 || t.side === u.side) return { ok: false };
       if (t.fx.shroud) return { ok: false, why: 'That stack is shrouded.' };
+      if (!B_.targetable(B, t)) return { ok: false, why: 'It has slipped into shadow: nothing can touch it this round.' };
+      if (u.ammo) { volley(st, B, u, t); endTurn(st, B); return res; }
       u.shots--; strike(st, B, u, t, true);
       const rel = u.abil.includes('release2') ? 0.22 : u.abil.includes('release') ? 0.12 : 0;
       if (rel && R.chance(rel)) releaseFromDuat(st, B, u);
@@ -281,7 +328,7 @@
       const t = act.target; if (!t || t.side !== u.side || t.shape[0] * t.shape[1] !== 1 || t === u) return { ok: false };
       if (HX.dist(u.c, u.r, act.c, act.r) > u.spd || !fits(B, act.c, act.r, [1, 1], t.side, t)) return { ok: false, why: 'Out of reach.' };
       B.anim.push({ kind: 'blink', uid: t.uid, from: [t.c, t.r], to: [act.c, act.r] });
-      t.c = act.c; t.r = act.r; say(B, 'The Kalo’Eik shift the ' + t.name + ' through the Duat.');
+      t.c = act.c; t.r = act.r; delete t.fx.bound; say(B, 'The Kalo’Eik shift the ' + t.name + ' through the Duat.');
     }
     else if (act.type === 'wall' || act.type === 'boulder') {
       const w = B.siege && B.siege.cells.get(key(act.c, act.r)); if (!w || w.hp <= 0) return { ok: false };
@@ -298,7 +345,57 @@
     return res;
   };
   B_.canShift = (B, u) => u.cr === 'kaloeik' && B.units.some(x => x.side === u.side && x.kind === 'cap' && x.cap.rank === 'naelst' && x.n > 0) || (u.cr === 'kaloeik' && B.sides[u.side].naelstInArmy);
-  function endTurn(st, B) { const u = B_.activeUnit(B); if (u) u.done = true; B.active = null; advance(st, B); }
+  function endTurn(st, B) { const u = B_.activeUnit(B); if (u) { u.done = true; u.skirmished = false; if (u.fx.stuck > 0) u.fx.stuck--; } B.active = null; advance(st, B); }
+  /* a Ju-Keeper looses a volley of Sprengju from the pouch */
+  function volley(st, B, u, t) {
+    const cap = u.cap || {}, left = B_.ammoLeft(u); let n = Math.min(left, 10 + 5 * (cap.level || 1));
+    const cr = (u.ammo.find(a => a.ref.n - a.used > 0) || u.ammo[0]).ref.cr, C = D.CREATURES[cr];
+    const sw = { uid: u.uid, side: u.side, kind: 'stack', cr, atk: C.atk + (cap.level || 1), def: C.def, dmg: C.dmg, n, morale: u.morale, fx: u.fx, abil: [], c: u.c, r: u.r, shape: [1, 1] };
+    const d = damage(st, B, sw, t, true);
+    for (const a of u.ammo) { const k = Math.min(n, a.ref.n - a.used); a.used += k; n -= k; if (!n) break; }
+    B.anim.push({ kind: 'shoot', uid: u.uid, target: t.uid, cr });
+    applyDamage(st, B, u, t, d, 'loose a swarm of ' + sw.n + ' Sprengju at');
+  }
+  /* the enemies standing in a line behind a target, away from the attacker */
+  function behind(B, u, t, n) {
+    const out = []; let [ac, ar] = cellsOf(u).sort((a, b) => HX.dist(a[0], a[1], t.c, t.r) - HX.dist(b[0], b[1], t.c, t.r))[0];
+    let [c, r] = cellsOf(t).sort((a, b) => HX.dist(ac, ar, a[0], a[1]) - HX.dist(ac, ar, b[0], b[1]))[0];
+    for (let k = 0; k < n + 2 && out.length < n; k++) {
+      const d0 = HX.dist(ac, ar, c, r), nx = HX.neighbors(c, r).filter(([x, y]) => HX.dist(ac, ar, x, y) === d0 + 1);
+      if (!nx.length) break; [c, r] = nx[0];
+      const o = unitAt(B, c, r); if (o && o !== t && o.side !== u.side && !out.includes(o) && B_.targetable(B, o)) out.push(o);
+    }
+    return out;
+  }
+  /* where the Vyrenalur runs, its trail glows for three rounds */
+  function trailFrom(B, u, from) {
+    if (!u.abil || !u.abil.includes('trail')) return;
+    B.trail = B.trail || {}; let [c, r] = from; const mark = (cc, rr) => cellsOf(u, cc, rr).forEach(([x, y]) => B.trail[key(x, y)] = { until: B.round + 3, side: u.side });
+    for (let k = 0; k < 30; k++) { mark(c, r); if (c === u.c && r === u.r) break; const nx = HX.neighbors(c, r).sort((a, b) => HX.dist(a[0], a[1], u.c, u.r) - HX.dist(b[0], b[1], u.c, u.r))[0]; if (!nx) break; [c, r] = nx; }
+  }
+  function inTrail(B, u) { const T = B.trail; if (!T) return false; return cellsOf(u).some(([c, r]) => { const v = T[key(c, r)]; return v && v.side === u.side && v.until >= B.round; }); }
+  /* stepping somewhere: into a hidden acid bog, or into the Vyrenalur's trail */
+  function stepIn(st, B, u) {
+    if (u.n <= 0) return;
+    (B.bogs || []).forEach(g => { if (g.side === u.side || g.hit.includes(u.uid)) return; if (!cellsOf(u).some(([c, r]) => g.cells.includes(key(c, r)))) return;
+      g.hit.push(u.uid); g.revealed = true; u.fx.stuck = 2; B.anim.push({ kind: 'bog', uid: u.uid }); applyDamage(st, B, null, u, g.dmg, 'blunder into an acid bog and burn'); });
+    trailHeal(B, u);
+  }
+  function trailHeal(B, u) {
+    if (u.n <= 0 || !u.cr || !D.CREATURES[u.cr].eikar || u.trailHealed === B.round || !inTrail(B, u)) return;
+    u.trailHealed = B.round; const before = u.n * u.hp - (u.hp - u.hpTop); heal(B, u, Math.max(10, Math.round(u.startN * u.hp * 0.06)));
+    B.anim.push({ kind: 'heal', uid: u.uid, amount: u.n * u.hp - (u.hp - u.hpTop) - before }); say(B, 'The trail of light heals the ' + u.name + '.');
+  }
+  function digBog(st, B, u) {
+    u.bogDone = true; const foes = B_.alive(B).filter(x => x.side !== u.side); if (!foes.length) return;
+    const R = SU.rng(st), t = foes.sort((a, b) => minDist(u, a) - minDist(u, b))[0];
+    let best = null, bd = 1e9;
+    for (let r = 0; r < B.rows; r++) for (let c = 0; c < B.cols; c++) { const du = Math.min(...cellsOf(u).map(([x, y]) => HX.dist(x, y, c, r))); if (du < 2 || du > 4) continue; const dt = HX.dist(c, r, t.c, t.r) + R.next() * 0.5; if (dt < bd) { bd = dt; best = [c, r]; } }
+    if (!best) return;
+    const cells = [best].concat(HX.neighbors(best[0], best[1])).filter(([c, r]) => c >= 0 && r >= 0 && c < B.cols && r < B.rows && !B.obstacles.has(key(c, r)) && !unitAt(B, c, r)).map(([c, r]) => key(c, r));
+    (B.bogs = B.bogs || []).push({ side: u.side, cells, dmg: 40 + u.n * 30, revealed: false, hit: [] });
+    B.anim.push({ kind: 'bog', uid: u.uid }); say(B, 'The ' + u.name + ' churn the ground and slink back: somewhere there is an acid bog now.');
+  }
   function badLuckStep(st, B, u) {
     const sd = B.sides[u.side]; const luck = sideLuck(st, B, sd, u);
     if (u.kind === 'stack' && u.n > 3 && luck < 0 && SU.rng(st).chance(-luck * 0.04)) { const k = Math.max(1, Math.round(u.n * 0.05)); u.n -= k; say(B, 'Bad luck! ' + k + ' ' + u.name + ' trip and fall on their own blades.'); }
@@ -356,8 +453,10 @@
     t.firstHit = 1;
     if (a.abil) {
       if ((a.abil.includes('thief') || a.abil.includes('thief2')) && !retaliation) steal(st, B, a, t, d);
-      if (a.abil.includes('burn') && t.n > 0) t.fx.burn = Math.round(d * 0.15);
-      if (a.abil.includes('dread') && t.n > 0) { t.morale = Math.max(0, (t.morale == null ? 60 : t.morale) - 10); }
+      if (a.abil.includes('burn') && t.n > 0 && !(t.abil && t.abil.includes('fireproof'))) t.fx.burn = Math.round(d * 0.15);
+      /* a Stryx binds whatever it strikes up close, until it dies */
+      if (a.abil.includes('bind') && !ranged && t.n > 0) { t.fx.bound = a.uid; say(B, 'Vines bind the ' + t.name + ' where they stand.'); }
+      if (a.abil.includes('dread') && t.n > 0 && !(t.abil && t.abil.includes('blind'))) { t.morale = Math.max(0, (t.morale == null ? 60 : t.morale) - 10); }
       if (a.abil.includes('heads') && !retaliation) { const other = B_.alive(B).find(o => o.side === t.side && o !== t && B_.adjacent(a, o)); if (other) applyDamage(st, B, a, other, Math.round(d * 0.5), 'bite'); }
       if (a.abil.includes('screech') && a.firstStrike && t.n > 0 && R.chance(0.35)) { t.fx.stun = 1; say(B, 'The Lutut’s screech stuns the ' + t.name + '!'); }
       if (a.abil.includes('devour')) heal(B, a, Math.round(d * 0.25));
@@ -423,7 +522,7 @@
     else applyDamage(st, B, null, g, Math.round(u.n * 3), 'are caught in their own song of chaos');
   }
   function towerShoot(st, B, t) {
-    const foes = B_.alive(B).filter(x => x.side === 0); if (!foes.length) return;
+    const foes = B_.alive(B).filter(x => x.side === 0 && B_.targetable(B, x)); if (!foes.length) return;
     const tg = foes.sort((a, b) => (b.n * (b.dmg[0] + b.dmg[1])) - (a.n * (a.dmg[0] + a.dmg[1])))[0];
     const hero = B.sides[1].heroId && st.heroes[B.sides[1].heroId];
     const d = Math.round((14 + B.siege.level * 6 + B.round * 2) * (1 + (hero ? S.skillVal(st, hero, 'siege') / 100 : 0)));
@@ -453,6 +552,9 @@
     const need = S_.target;
     if ((need === 'ally' || need === 'allyMove') && (!target || target.side !== side)) return { ok: false, why: 'Choose one of your stacks.' };
     if ((need === 'enemy' || need === 'enemyArea') && (!target || target.side === side)) return { ok: false, why: 'Choose an enemy stack.' };
+    if ((need === 'enemy' || need === 'enemyArea') && !B_.targetable(B, target)) return { ok: false, why: 'It has slipped into shadow.' };
+    if (song === 'dimsight' && target && target.abil && target.abil.includes('blind')) return { ok: false, why: 'It has no eyes to dim.' };
+    if (S_.grove && !B.grove[side]) return { ok: false, why: 'Grove songs work only near your Elsha’ryn towns.' };
     if (need === 'captain' && (!target || target.kind !== 'cap' || target.side !== side)) return { ok: false, why: 'Choose one of your captains.' };
     if (need === 'body' && !B_.canRaise(B, target, side, B_.raiseEnemyOk(st, B, side))) return { ok: false, why: target && target.n <= 0 && target.side !== side && !B_.raiseEnemyOk(st, B, side) ? 'Only a master singer (Songcraft 5) can raise the enemy’s fallen.' : target && target.n <= 0 ? 'Something stands on their bodies.' : 'Choose where fallen bodies lie.' };
     switch (song) {
@@ -473,13 +575,15 @@
       case 'hush': B.sides[1 - side].hushed = 2; break;
       case 'comfort': target.fx.comfort = 1; break;
       case 'weight': target.fx.slow = 3; break;
-      case 'duatstep': if (c == null || !fits(B, c, r, target.shape, target.side, target)) return { ok: false, why: 'Choose an empty spot.' }; B.anim.push({ kind: 'blink', uid: target.uid, from: [target.c, target.r], to: [c, r] }); target.c = c; target.r = r; break;
+      case 'duatstep': if (c == null || !fits(B, c, r, target.shape, target.side, target)) return { ok: false, why: 'Choose an empty spot.' }; B.anim.push({ kind: 'blink', uid: target.uid, from: [target.c, target.r], to: [c, r] }); target.c = c; target.r = r; delete target.fx.bound; delete target.fx.stuck; break;
+      case 'grovelight': allies.forEach(u => { const amt = Math.min(u.hp - u.hpTop, P * 2); if (amt > 0) { u.hpTop += amt; B.anim.push({ kind: 'heal', uid: u.uid, amount: amt }); } }); break;
+      case 'rootsnare': foes.filter(u => (u === target || B_.adjacent(u, target)) && B_.targetable(B, u)).forEach(u => { u.fx.stuck = 2; say(B, 'Roots hold the ' + u.name + '.'); }); break;
       case 'ward': target.fx.ward = 1; break;
       case 'dusklash': applyDamage(st, B, null, target, P * 3, 'are lashed by shadow'); break;
       case 'massrally': allies.forEach(u => u.morale = Math.min(100, (u.morale == null ? 60 : u.morale) + 12)); break;
-      case 'tide': foes.filter(u => u === target || B_.adjacent(u, target)).forEach(u => applyDamage(st, B, null, u, P * 2, 'are swept by the Tide of Shadows')); break;
+      case 'tide': foes.filter(u => (u === target || B_.adjacent(u, target)) && B_.targetable(B, u)).forEach(u => applyDamage(st, B, null, u, P * 2, 'are swept by the Tide of Shadows')); break;
       case 'massmend': allies.forEach(u => heal(B, u, P * 2)); break;
-      case 'nekhcall': foes.filter(u => u === target || B_.adjacent(u, target)).forEach(u => applyDamage(st, B, null, u, P * 4, 'are swallowed by the ground')); break;
+      case 'nekhcall': foes.filter(u => (u === target || B_.adjacent(u, target)) && B_.targetable(B, u)).forEach(u => applyDamage(st, B, null, u, P * 4, 'are swallowed by the ground')); break;
       default: return { ok: false };
     }
     h.breath -= S_.breath; sd.sung = true;
@@ -507,7 +611,7 @@
   /* ======================= the computer's moves ======================= */
   B_.aiMove = function (st, B) {
     const u = B_.activeUnit(B); if (!u) return null;
-    const side = u.side, foes = B_.alive(B).filter(x => x.side !== side);
+    const side = u.side, foes = B_.alive(B).filter(x => x.side !== side && B_.targetable(B, x));
     const sd = B.sides[side], h = sd.heroId && st.heroes[sd.heroId];
     /* sing first if there's a good song */
     if (h && B_.canSingNow(st, B, side)) {
@@ -515,6 +619,8 @@
       if (pick) { const r = B_.sing(st, B, side, pick.song, pick.target); if (r.ok && !B.over && B_.activeUnit(B) === u) return B_.aiMove(st, B); }
     }
     const val = t => (t.n * (t.dmg[0] + t.dmg[1]) * (t.ranged ? 1.5 : 1) + (t.kind === 'cap' ? 300 : 0)) * (t.cr === 'mcfly' ? 0.05 : 1);
+    /* an Albali Byrd restores a badly hurt ally beside it */
+    if (u.abil.includes('heal')) { const hurt = B_.alive(B).filter(x => x.side === side && x !== u && B_.adjacent(u, x) && x.hp - x.hpTop >= x.hp * 0.35).sort((a, b) => val(b) - val(a))[0]; if (hurt) return B_.act(st, B, { type: 'heal', target: hurt }); }
     if (B_.canShoot(B, u)) {
       const tg = foes.filter(t => !t.fx.shroud).sort((a, b) => val(b) * Math.min(1, B_.estimate(st, B, u, b, true) / (b.hp * b.n)) - val(a) * Math.min(1, B_.estimate(st, B, u, a, true) / (a.hp * a.n)))[0];
       if (tg) return B_.act(st, B, { type: 'shoot', target: tg });
@@ -538,7 +644,7 @@
     });
     if (best) return B_.act(st, B, { type: 'attack', target: best.t, c: best.s.c, r: best.s.r });
     /* ranged units with no shots left, or far from everyone: close in */
-    if (u.ranged && u.shots > 0) return B_.act(st, B, { type: 'defend' });
+    if (u.ranged && u.shots > 0 && (!u.ammo || B_.ammoLeft(u) > 0)) return B_.act(st, B, { type: 'defend' });
     let tgt = null, td = 1e9; foes.forEach(t => { const d = HX.dist(u.c, u.r, t.c, t.r); if (d < td) { td = d; tgt = t; } });
     if (tgt) { let bv = null, bd = 1e9; reach.forEach(v => { const d = HX.dist(v.c, v.r, tgt.c, tgt.r); if (d < bd) { bd = d; bv = v; } });
       if (bv && (bv.c !== u.c || bv.r !== u.r)) return B_.act(st, B, { type: 'move', c: bv.c, r: bv.r }); }
@@ -583,6 +689,7 @@
       /* mending: some of the winner's fallen recover */
       if (u.side === win) { const h = sideHero(win); if (h) left = Math.min(tot, left + Math.floor((tot - u.n) * S.skillVal(st, h, 'mending') / 100)); }
       if (u.cr === 'uff' && u.side === win) left = Math.min(tot, left + Math.floor((tot - u.n) * 0.2));
+      if (u.exploded) { const back = Math.floor(u.exploded * 0.5); left = Math.min(tot, left + back); rep.sprengjuBack = (rep.sprengjuBack || 0) + back; }
       const lost = tot - left; if (lost > 0) rep.lost[u.side].push({ cr: u.cr, n: lost });
       u.parts.forEach((p, k) => {
         const share = k === u.parts.length - 1 ? left : Math.round(left * p.ref.n / Math.max(1, tot));
@@ -593,6 +700,7 @@
         if (frac > 0.5) p.ref.grief = 2; else if (frac > 0.25) p.ref.grief = Math.max(p.ref.grief || 0, 1);
       });
     });
+    B.units.forEach(u => { if (!u.ammo) return; u.ammo.forEach(a => { if (!a.used) return; const back = Math.floor(a.used * 0.5); a.ref.n = Math.max(0, a.ref.n - a.used + back); rep.sprengjuBack = (rep.sprengjuBack || 0) + back; if (a.used - back > 0) rep.lost[u.side].push({ cr: a.ref.cr, n: a.used - back }); }); });
     /* XP for the winning hero: for creatures and squadrons beaten, not for heroes */
     const loserHadHero = !!B.sides[lose].heroId;
     let xp = 0; rep.lost[lose].forEach(l => xp += l.n * D.CREATURES[l.cr].hp);

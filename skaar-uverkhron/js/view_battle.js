@@ -125,7 +125,7 @@
     const raising = BV.mode && BV.mode.kind === 'song' && D.SONGS[BV.mode.song].target === 'body';
     B.units.forEach(u => {
       const shownDead = (u._n != null ? u._n : u.n) <= 0;
-      if (shownDead && !(u._dying > 0)) { const p = unitCenter(u, G); items.push({ y: p.y - G.h, fn: () => { if (!u.raised) drawBody(g, u, p, G, raising && BT.activeUnit(B) && BT.canRaise(B, u, BT.activeUnit(B).side, BT.raiseEnemyOk(U.st, B, BT.activeUnit(B).side)), t); } }); return; }
+      if (shownDead && !(u._dying > 0)) { const p = unitCenter(u, G); items.push({ y: p.y - G.h, fn: () => { if (!u.raised && !u.spent) drawBody(g, u, p, G, raising && BT.activeUnit(B) && BT.canRaise(B, u, BT.activeUnit(B).side, BT.raiseEnemyOk(U.st, B, BT.activeUnit(B).side)), t); } }); return; }
       const p = unitCenter(u, G);
       items.push({ y: p.y, fn: () => drawUnit(g, u, p, G, t, act) });
     });

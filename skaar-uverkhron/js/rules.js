@@ -869,6 +869,9 @@
     }
     return null;
   };
+  /* the Grove songs work only near one of your Elsha'ryn towns with a Protected Grove */
+  R_.GROVE_REACH = 12;
+  R_.nearGrove = (st, owner, layer, x, y, reach) => S.townsOf(st, owner).some(t => t.layer === layer && D.factionOf(t.faction) === 'elsharyn' && R_.has(t, 'grove') && Math.hypot(t.x - x, t.y - y) <= (reach || R_.GROVE_REACH));
   R_.carries = (h, rid) => !!h && (Object.values(h.relics || {}).includes(rid) || (h.pack || []).includes(rid));
   /* is the worm's Rokarvac in this town right now (with a hero at the gate or inside)? */
   R_.blueprintHere = function (st, t, rid) {
