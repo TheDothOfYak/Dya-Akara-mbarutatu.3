@@ -891,6 +891,7 @@
         const fort = t.built.reduce((g, b) => Math.max(g, D.BUILDINGS[b].growth || 0), 0);
         R_.townDwellings(t).forEach(d => { const c = D.CREATURES[d.base]; if (d.base === 'nekh') { if (!t.nekhCount) t.avail.nekh = 1; return; }
           let g = Math.round(c.grow * (1 + fort / 100)); if (st.weekEvent === 'breed' && d.base === 'malsti') g *= 2; if (st.monthEvent === 'plenty' && newMonth) g *= 2;
+          if (c.tier >= 8) g = c.grow;   /* the top of the town: one a week, whatever the walls or the month */
           t.avail[d.base] = (t.avail[d.base] || 0) + g; });
         /* the farmers' paddock: corralled punks breed a little */
         if (t.punks > 0 && R_.has(t, 'granary')) t.punks = Math.round(t.punks * 1.1);
