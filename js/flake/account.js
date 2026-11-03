@@ -45,6 +45,7 @@
     { id: 'game', name: 'Dya’Akara', href: 'dya-akara.html', tagline: 'The token game of the Mbaru Tatu' },
     { id: 'rpg', name: 'Torcain’s Run', href: 'rpg/index.html', tagline: 'A 3D adventure across the Tatu' },
     { id: '4bw', name: 'The 4 Brothers Worlds', href: 'four-brothers-world/index.html', tagline: 'Dig, build and explore together' },
+    { id: 'su', name: 'Skaar Uverkhron', href: 'skaar-uverkhron/index.html', tagline: 'Strategy across the three Tatu' },
   ];
   const MINI = [
     { id: 'ld', name: 'Little Dungeon', href: 'mini-games/little-dungeon/index.html', tagline: 'A tiny card-battling dungeon crawl' },
@@ -318,6 +319,8 @@
     await Promise.all([
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('rpg_save:' + accId)),
       rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('fbw:' + accId + ':*')),
+      rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('su:' + accId + ':*')),
+      rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_rooms:' + accId)),
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('ban:' + accId)),
       rest('DELETE', 'dya_bans?account_id=eq.' + id),
     ].map(p => p.catch(() => null)));
