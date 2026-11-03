@@ -588,7 +588,7 @@
         const share = k === u.parts.length - 1 ? left : Math.round(left * p.ref.n / Math.max(1, tot));
         const before = p.ref.n; p.ref.n = Math.max(0, share); left -= p.ref.n;
         /* a fallen Nekh'Vorran frees its castle to call another */
-        if (p.ref.cr === 'nekh' && p.ref.n === 0 && p.ref.home && st.objects[p.ref.home]) st.objects[p.ref.home].nekhCount = 0;
+        if (D.CREATURES[p.ref.cr].legendary && p.ref.n === 0 && p.ref.home && st.objects[p.ref.home]) st.objects[p.ref.home].nekhCount = 0;
         const frac = before ? 1 - p.ref.n / before : 0;
         if (frac > 0.5) p.ref.grief = 2; else if (frac > 0.25) p.ref.grief = Math.max(p.ref.grief || 0, 1);
       });
@@ -665,7 +665,7 @@
   function removeCaptain(st, slots, capId, owner, B) {
     const home = [];
     if (!slots) return home;
-    const i = slots.findIndex(s => s && s.kind === 'cap' && s.cap.id === capId); if (i < 0) return;
+    const i = slots.findIndex(s => s && s.kind === 'cap' && s.cap.id === capId); if (i < 0) return home;
     const s = slots[i]; const stacks = s.stacks.concat(s.reserve || []).filter(x => x && x.n > 0);
     slots[i] = null;
     /* without a captain, a slot holds one stack; the rest find room or scatter */

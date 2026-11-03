@@ -130,7 +130,8 @@
     refresh(); timer = setInterval(refresh, POLL);
   };
   async function start(r) {
-    const players = r.seats.map(s => ({ kind: s.kind, name: s.name, ai: s.ai || 'normal', team: s.team || 0, color: D.PLAYER_COLORS.find(c => c.id === s.colorId).c, colorId: s.colorId, account: s.account || null }));
+    const players = r.seats.map(s => ({ kind: s.kind, name: s.name, ai: s.ai || 'normal', team: s.team || 0, color: D.PLAYER_COLORS.find(c => c.id === s.colorId).c, colorId: s.colorId, account: s.account || null,
+      faction: s.faction || (s.kind === 'ai' ? SU.rng({ rngState: Date.now() & 0xffff }).pick(D.FACTIONS.filter(f => f.ready).map(f => f.id)) : 'duskareth') }));
     const st = SU.mapgen.newGame(Object.assign({}, r.setup, { name: r.name, players }));
     st.online = { code: r.code };
     RU.startTurn(st);

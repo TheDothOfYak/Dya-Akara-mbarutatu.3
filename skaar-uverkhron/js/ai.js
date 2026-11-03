@@ -15,8 +15,12 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   let STYLE = null;
-  const BUILD_PRIORITY = ['t_road', 'd3', 'granary', 'd4', 'market', 'fort2', 'hall2', 'd5', 'd1u', 'd2u', 't_capt', 'd6', 'terraces', 'd3u', 'songs1', 't_duat', 'vault', 'd4u', 'farms', 'd7', 'fort3', 'hall3', 'd8', 'terraces2', 'stygwell', 'songs2', 't_count', 't_pens', 'sanctum', 'd9', 'urverk', 'songs3', 'choir'];
+  const BUILD_DUSK = ['t_road', 'd3', 'granary', 'd4', 'market', 'fort2', 'hall2', 'd5', 'd1u', 'd2u', 't_capt', 'd6', 'terraces', 'd3u', 'songs1', 't_duat', 'vault', 'd4u', 'farms', 'd7', 'fort3', 'hall3', 'd8', 'terraces2', 'stygwell', 'songs2', 't_count', 't_pens', 'sanctum', 'd9', 'urverk', 'songs3', 'choir'];
 
+  /* the Elsha'ryn build the same way, with their own dwellings and wonders */
+  const SWAP = { urverk: 'grove', stygwell: 'mossbed', sanctum: 'oathtree' };
+  const BUILD_ELSH = BUILD_DUSK.map(b => SWAP[b] || b.replace(/^d(\d)(u?)$/, 'e$1$2')).concat(['memtree', 'altar']);
+  const priorityFor = t => D.factionOf(t.faction) === 'elsharyn' ? BUILD_ELSH : BUILD_DUSK;
   AI.takeTurn = async function (st, hooks) {
     const pi = st.current, P = st.players[pi], lvl = D.AI_LEVELS[P.ai] || D.AI_LEVELS.normal;
     P.explored.forEach(E => E.fill(1));   /* the computer knows the land */
@@ -48,7 +52,7 @@
     /* build */
     /* one building a day, and never at the cost of the army */
     const keep = st.day < 4 ? 0 : (2500 + Math.min(4000, st.day * 60)) * (STYLE ? STYLE.keep : 1);
-    const bid = BUILD_PRIORITY.find(b => RU.canBuild(st, t, b).ok && P.res.gold - (D.BUILDINGS[b].cost.gold || 0) > keep);
+    const bid = priorityFor(t).find(b => RU.canBuild(st, t, b).ok && P.res.gold - (D.BUILDINGS[b].cost.gold || 0) > keep);
     if (bid) RU.build(st, t, bid);
     /* recruit: best creatures first, into the garrison, keeping money for heroes we still want */
     const field = S.fieldHeroes(st, P.idx).length + S.townsOf(st, P.idx).reduce((n, x) => n + x.heroes.length, 0);

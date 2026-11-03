@@ -350,10 +350,10 @@
     if (b.replaces && !t.built.includes(b.replaces) && !R_.has(t, b.replaces)) return { ok: false, why: 'Needs ' + D.BUILDINGS[b.replaces].name + ' first.' };
     if (Object.values(D.BUILDINGS).some(x => x.replaces === bid && R_.has(t, x.id))) return { ok: false, why: 'Built.' };
     for (const r of (b.req || [])) if (!R_.has(t, r)) return { ok: false, why: 'Needs ' + D.BUILDINGS[r].name + '.' };
-    if (['d3', 'd4', 'd5', 'd6'].includes(bid) && !R_.has(t, 'fort1')) return { ok: false, why: 'Needs walls.' };
+    if (b.faction && b.faction !== D.factionOf(t.faction)) return { ok: false, why: 'Not a building of this town’s people.', other: true };
     if (b.pop && t.pop < b.pop) return { ok: false, why: 'Needs ' + b.pop + ' people (the town has ' + Math.floor(t.pop) + ').' };
     if (b.coast && !t.coast) return { ok: false, why: 'This town is not by the water.' };
-    if (b.unlock && !R_.blueprintHere(st, t)) return { ok: false, why: 'A hero must bring the Rokarvac of the Nekh into this town. End a turn in the eye of the Sunear’Zikhron for a vision of where it lies.' };
+    if (b.unlock && !R_.blueprintHere(st, t, b.blueprint)) return { ok: false, why: b.blueprint === 'vyrantler' ? 'A hero must bring the Shed Antler of the Vyrenalur into this town. Follow the glimmers of its trail in the deep forest: three in one week.' : 'A hero must bring the Rokarvac of the Nekh into this town. End a turn in the eye of the Sunear’Zikhron for a vision of where it lies.' };
     const small = b.small;
     const limit = R_.buildsPerDay(st, t) + (small && !t.smallToday ? 1 : 0);
     if (t.builtToday >= limit) return { ok: false, why: 'Already built today.' };
@@ -367,20 +367,20 @@
     if (b.replaces) t.built = t.built.filter(x => x !== b.replaces);
     t.built.push(bid);
     if (b.small && !t.smallToday && t.builtToday >= R_.buildsPerDay(st, t)) t.smallToday = 1; else t.builtToday++;
-    if (b.dwell && b.dwell !== 'nekh') t.avail[b.dwell] = (t.avail[b.dwell] || 0) + D.CREATURES[b.dwell].grow;
-    if (bid === 'd9' && !t.nekhCount) t.avail.nekh = 1;
+    if (b.dwell && !D.CREATURES[b.dwell].legendary) t.avail[b.dwell] = (t.avail[b.dwell] || 0) + D.CREATURES[b.dwell].grow;
+    if (b.dwell && D.CREATURES[b.dwell].legendary && !t.nekhCount) t.avail[b.dwell] = 1;
     S.log(st, t.name + ' built the ' + b.name + '.', t.owner);
     return { ok: true };
   };
   /* which creature a dwelling sells: its upgraded form if that's built */
   R_.dwellingCreature = function (t, tier) {
-    const base = D.DUSK_LINEUP[tier - 1];
+    const base = D.LINEUP[D.factionOf(t.faction)][tier - 1];
     const up = D.CREATURES[base].up;
     return { base, up: up && Object.values(D.BUILDINGS).some(b => b.dwellUp === up && t.built.includes(b.id)) ? up : null };
   };
   R_.townDwellings = function (t) {
     const out = [];
-    D.DUSK_LINEUP.forEach((cr, i) => { const b = Object.values(D.BUILDINGS).find(b => b.dwell === cr); if (b && t.built.includes(b.id)) out.push({ tier: i + 1, base: cr, up: R_.dwellingCreature(t, i + 1).up, bid: b.id }); });
+    D.LINEUP[D.factionOf(t.faction)].forEach((cr, i) => { const b = Object.values(D.BUILDINGS).find(b => b.dwell === cr); if (b && t.built.includes(b.id)) out.push({ tier: i + 1, base: cr, up: R_.dwellingCreature(t, i + 1).up, bid: b.id }); });
     return out;
   };
   R_.PUNK_MUSTER = 10; R_.PUNK_FOOD = 6;
@@ -416,7 +416,7 @@
     let n = t.avail[base] || 0;
     Object.entries(c.cost).forEach(([k, v]) => n = Math.min(n, Math.floor((P.res[k] || 0) / v)));
     if (c.pop) n = Math.min(n, Math.floor(t.pop - 40));
-    if (cr === 'nekh') n = Math.min(n, t.nekhCount ? 0 : 1);
+    if (c.legendary) n = Math.min(n, t.nekhCount ? 0 : 1);
     return Math.max(0, n);
   };
   /* put n of a creature into a set of slots: join a matching single stack, else a free slot.
@@ -438,7 +438,7 @@
     R_.pay(P, R_.recruitCost(cr, n));
     t.avail[base] -= n; if (D.CREATURES[cr].pop) t.pop -= n;
     slots.splice(0, slots.length, ...tmp);
-    if (cr === 'nekh') { t.nekhCount = 1; S.stacksIn(slots).forEach(x => { if (x.cr === 'nekh' && !x.home) x.home = t.id; }); }
+    if (D.CREATURES[cr].legendary) { t.nekhCount = 1; S.stacksIn(slots).forEach(x => { if (x.cr === cr && !x.home) x.home = t.id; }); }
     return { ok: true, n };
   };
   R_.upgradeStack = function (st, t, stack) {
@@ -474,17 +474,19 @@
   /* ---------- the tavern ---------- */
   R_.refreshTavern = function (st, P) {
     const R = SU.rng(st);
-    P.tavern.heroes = (P.tavern.heroes || []).filter(id => st.heroes[id] && st.heroes[id].owner === -1).slice(0, 1);
-    while (P.tavern.heroes.length < 3) { const h = M.hero(st, { owner: -1 }); P.tavern.heroes.push(h.id); }
+    P.tavern.heroes = (P.tavern.heroes || []).filter(id => st.heroes[id] && st.heroes[id].owner === -1 && D.factionOf(st.heroes[id].faction) === D.factionOf(P.faction)).slice(0, 1);
+    while (P.tavern.heroes.length < 3) { const h = M.hero(st, { owner: -1, faction: P.faction }); P.tavern.heroes.push(h.id); }
     P.tavern.captains = [];
-    for (let i = 0; i < 4; i++) P.tavern.captains.push(M.captain(st, { level: R.int(1, 1 + Math.floor(st.day / 18)) }));
+    for (let i = 0; i < 4; i++) P.tavern.captains.push(M.captain(st, { level: R.int(1, 1 + Math.floor(st.day / 18)), faction: P.faction }));
   };
   /* every hero comes with a captain and a few troops of their own */
   R_.retinue = function (st, h) {
     if (S.stacksIn(h.slots).length) return;
-    const R = SU.rng(st), cap = M.captain(st, {});
-    h.slots[0] = M.capSlot(cap, [{ cr: 'malsti', n: R.int(10, 16) }]);
-    if (!h.slots[1]) h.slots[1] = { kind: 'stack', cr: 'velnur', n: R.int(3, 6) };
+    const R = SU.rng(st), fac = D.factionOf(h.faction), [c1, c2] = D.LINEUP[fac];
+    if (fac === 'elsharyn') { h.slots[0] = M.capSlot(M.captain(st, { faction: fac, rank: 'jukeeper' }), [{ cr: c1, n: R.int(18, 26) }]); if (!h.slots[1]) h.slots[1] = { kind: 'stack', cr: c2, n: R.int(4, 7) }; return; }
+    const cap = M.captain(st, { faction: fac });
+    h.slots[0] = M.capSlot(cap, [{ cr: c1, n: R.int(10, 16) }]);
+    if (!h.slots[1]) h.slots[1] = { kind: 'stack', cr: c2, n: R.int(3, 6) };
   };
   R_.hireHero = function (st, P, t, hid) {
     const h = st.heroes[hid];
@@ -869,10 +871,11 @@
   };
   R_.carries = (h, rid) => !!h && (Object.values(h.relics || {}).includes(rid) || (h.pack || []).includes(rid));
   /* is the worm's Rokarvac in this town right now (with a hero at the gate or inside)? */
-  R_.blueprintHere = function (st, t) {
+  R_.blueprintHere = function (st, t, rid) {
+    rid = rid || 'nekhprint';
     const hs = (t.heroes || []).map(id => st.heroes[id]);
     const a = S.armyAt(st, t.layer, t.x, t.y); if (a && a.owner === t.owner) hs.push(S.heroOf(st, a));
-    return hs.some(h => R_.carries(h, 'nekhprint'));
+    return hs.some(h => R_.carries(h, rid));
   };
   R_.endTurn = function (st) {
     R_.eyeVision(st, st.current);
@@ -923,7 +926,7 @@
       /* weekly: growth, people, the tavern */
       if (newWeek) towns.forEach(t => {
         const fort = t.built.reduce((g, b) => Math.max(g, D.BUILDINGS[b].growth || 0), 0);
-        R_.townDwellings(t).forEach(d => { const c = D.CREATURES[d.base]; if (d.base === 'nekh') { if (!t.nekhCount) t.avail.nekh = 1; return; }
+        R_.townDwellings(t).forEach(d => { const c = D.CREATURES[d.base]; if (c.legendary) { if (!t.nekhCount) t.avail[d.base] = 1; return; }
           let g = Math.round(c.grow * (1 + fort / 100)); if (st.weekEvent === 'breed' && d.base === 'malsti') g *= 2; if (st.monthEvent === 'plenty' && newMonth) g *= 2;
           if (c.tier >= 8) g = c.grow;   /* the top of the town: one a week, whatever the walls or the month */
           t.avail[d.base] = (t.avail[d.base] || 0) + g; });

@@ -105,7 +105,7 @@
     if (town.coast || town.built.includes('shipyard')) { g.fillStyle = lin(g, 0, 700, 0, 900, [[0, '#2a5f86'], [1, '#12344e']]); g.beginPath(); g.moveTo(-400, 700); g.quadraticCurveTo(100, 690, 180, 900); g.lineTo(-400, 900); g.fill(); }
     /* buildings, back to front */
     const list = town.built.filter(b => SPOT[b]).sort((a, b) => SPOT[a][1] - SPOT[b][1]);
-    list.forEach(b => { const [x, y, kind, lvl] = SPOT[b]; g.save(); g.translate(x, y); drawBuilding(g, kind, lvl || 1, t, b === T.hoverB); g.restore(); });
+    list.filter(b => SPOT[b]).forEach(b => { const [x, y, kind, lvl] = SPOT[b]; g.save(); g.translate(x, y); drawBuilding(g, kind, lvl || 1, t, b === T.hoverB); g.restore(); });
     /* mist low over the land */
     for (let k = 0; k < 3; k++) { const yy = 560 + k * 50, off = (t * (6 + k * 4)) % 400; g.fillStyle = lin(g, 0, yy - 30, 0, yy + 30, [[0, 'rgba(180,170,220,0)'], [0.5, 'rgba(180,170,220,' + (0.08 - k * 0.02) + ')'], [1, 'rgba(180,170,220,0)']]); g.fillRect(-400 + off - 400, yy - 30, VW + 1600, 60); }
     /* the visiting hero at the gate */
@@ -316,6 +316,7 @@
     const seen = new Set();
     D.BUILD_ORDER.forEach(bid => {
       const B = D.BUILDINGS[bid];
+      if (B.faction && B.faction !== D.factionOf(town.faction)) return;
       /* a chain (hall1 → hall2 → hall3) shows only its next step */
       if (B.replaces && !RU.has(town, B.replaces) && !town.built.includes(bid)) return;
       if (Object.values(D.BUILDINGS).some(x => x.replaces === bid && RU.has(town, x.id))) return;
