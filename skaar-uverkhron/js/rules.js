@@ -445,6 +445,13 @@
     P.tavern.captains = [];
     for (let i = 0; i < 4; i++) P.tavern.captains.push(M.captain(st, { level: R.int(1, 1 + Math.floor(st.day / 18)) }));
   };
+  /* every hero comes with a captain and a few troops of their own */
+  R_.retinue = function (st, h) {
+    if (S.stacksIn(h.slots).length) return;
+    const R = SU.rng(st), cap = M.captain(st, {});
+    h.slots[0] = M.capSlot(cap, [{ cr: 'malsti', n: R.int(10, 16) }]);
+    if (!h.slots[1]) h.slots[1] = { kind: 'stack', cr: 'velnur', n: R.int(3, 6) };
+  };
   R_.hireHero = function (st, P, t, hid) {
     const h = st.heroes[hid];
     if (!h || h.owner !== -1) return { ok: false };
@@ -453,6 +460,7 @@
     h.owner = P.idx; P.tavern.heroes = P.tavern.heroes.filter(x => x !== hid);
     t.heroes.push(hid); if (!t.defender) t.defender = hid;
     h.breath = M.breathMax(st, h);
+    R_.retinue(st, h);
     S.log(st, P.name + ' hired ' + h.name + '.', P.idx);
     return { ok: true, hero: h };
   };
@@ -480,7 +488,7 @@
 
   /* ---------- training halls ---------- */
   /* a basic skill is cheap to learn: the halls want heroes on the road */
-  R_.trainCost = h => 60 + Object.keys(h.skills).length * 40;
+  R_.trainCost = h => 100;
   R_.trainOffer = function (st, t, h, bid) {
     const B = D.BUILDINGS[bid]; if (!B.teaches || !t.built.includes(bid)) return null;
     if (Object.keys(h.skills).length >= 5) return null;

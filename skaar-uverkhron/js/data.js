@@ -218,7 +218,8 @@
     songkeeper: { name: 'Songkeeper', desc: 'Sometimes sings Mend over the squadron in battle.' },
     vanguard: { name: 'Vanguard', desc: 'The squadron acts sooner in battle.' },
   };
-  D.CAPTAIN_BASE = { hp: 45, atk: 6, def: 6, dmg: [4, 7], spd: 5, capacity: 2 };
+  /* captains are seasoned fighters: hard to kill, and they hit like a small stack */
+  D.CAPTAIN_BASE = { hp: 160, hpLevel: 30, atk: 10, def: 10, dmg: [8, 14], spd: 5, capacity: 2 };
 
   /* ---------------- skills (5 levels each) ---------------- */
   D.SKILLS = {
