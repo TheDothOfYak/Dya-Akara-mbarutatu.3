@@ -14,7 +14,7 @@
 
   /* ======================= the title ======================= */
   G.title = function () {
-    U.closeAll(); if (SU.online.stopWatching) SU.online.stopWatching(); U.busy = false;
+    U.closeAll(); if (SU.online.stopWatching) SU.online.stopWatching(); if (SU.online.chatStop) SU.online.chatStop(); U.busy = false;
     $('game').classList.add('hidden'); $('town').classList.add('hidden'); $('battle').classList.add('hidden');
     const t = $('title'); t.classList.remove('hidden'); t.innerHTML = '';
     const cv = el('canvas', { cls: 'bg' }); t.appendChild(cv);
@@ -170,19 +170,30 @@
   };
 
   /* ======================= battles ======================= */
-  /* spec: { attacker, defender, town, def, temp, after(rep) } — resolves with the report */
+  /* spec: { attacker, defender, town, def, temp, after(rep) } — resolves with the report
+     (or null when an online battle is called off before it starts) */
+  G.buildBattle = function (st, spec) {
+    const atk = spec.attacker, def = spec.defender;
+    const sideOf = a => ({ owner: a.owner, army: a, hero: S.heroOf(st, a), slots: S.slotsOf(st, a) });
+    if (spec.town) {
+      const t = spec.town, d = spec.def || RU.townDefense(st, t);
+      const h = d && d.hero;
+      return BT.create(st, sideOf(atk), { owner: t.owner, army: null, hero: h, slots: h ? h.slots : t.garrison, town: t, label: (h ? h.name + ' in ' : '') + t.name }, { town: t, layer: t.layer, x: t.x, y: t.y, extraDefSlots: h ? t.garrison : null });
+    }
+    return BT.create(st, sideOf(atk), sideOf(def), { layer: def.temp ? atk.layer : def.layer, x: def.temp ? atk.x : def.x, y: def.temp ? atk.y : def.y });
+  };
+  /* who plays each side on this device: a person here, the computer, or a person on another device */
+  G.controlFor = function (st, B) {
+    return side => { const o = B.sides[side].owner; if (o < 0 || st.players[o].kind !== 'human') return 'ai'; return G.localHuman(o) ? 'human' : st.online ? 'remote' : 'ai'; };
+  };
   G.runBattle = function (spec) {
     const st = G.st;
+    /* online, against a person on another device: they come and fight it themselves */
+    const owners = [spec.attacker.owner, spec.town ? spec.town.owner : spec.defender && spec.defender.owner];
+    const remote = st.online && owners.some(o => o >= 0 && st.players[o] && st.players[o].kind === 'human' && !G.localHuman(o));
+    if (remote) return SU.online.fight(st, spec).then(r => { if (r && spec.after) spec.after(r); U.refresh(); V.invalidate(); if (st.over) setTimeout(G.gameOver, 400); return r; });
     return new Promise(resolve => {
-      const atk = spec.attacker, def = spec.defender;
-      const sideOf = a => ({ owner: a.owner, army: a, hero: S.heroOf(st, a), slots: S.slotsOf(st, a) });
-      let B;
-      if (spec.town) {
-        const t = spec.town, d = spec.def || RU.townDefense(st, t);
-        const h = d && d.hero;
-        B = BT.create(st, sideOf(atk), { owner: t.owner, army: null, hero: h, slots: h ? h.slots : t.garrison, town: t, label: (h ? h.name + ' in ' : '') + t.name }, { town: t, layer: t.layer, x: t.x, y: t.y, extraDefSlots: h ? t.garrison : null });
-      } else B = BT.create(st, sideOf(atk), sideOf(def), { layer: def.temp ? atk.layer : def.layer, x: def.temp ? atk.x : def.x, y: def.temp ? atk.y : def.y });
-      const control = side => { const o = B.sides[side].owner; return o >= 0 && st.players[o].kind === 'human' && G.localHuman(o) ? 'human' : 'ai'; };
+      const B = G.buildBattle(st, spec), control = G.controlFor(st, B);
       const done = rep => { U.refresh(); V.invalidate(); if (spec.after) spec.after(rep); resolve(rep); if (st.over) setTimeout(G.gameOver, 400); };
       if (control(0) === 'ai' && control(1) === 'ai') { BT.autoRun(st, B); const rep = BT.finish(st, B); done(rep); return; }
       SU.battleView.start(B, control, (rep) => done(rep));

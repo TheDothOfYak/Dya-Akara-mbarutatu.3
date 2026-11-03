@@ -13,8 +13,11 @@
   const YS = 0.74;   // the slant: hexes are squashed so the field reads as ground
   const rgba = A.rgba;
 
-  /* control(side) → 'human' | 'ai'; done(report) */
-  BV.start = function (B, control, done) {
+  /* control(side) → 'human' | 'ai' | 'remote'; done(report).
+     net (online battles): { send(cmd), next() → cmd or null }. Both devices run the same
+     battle from the same state; only a person's choices travel, the dice agree. */
+  BV.start = function (B, control, done, net) {
+    BV.net = net || null;
     BV.B = B; BV.control = control; BV.done = done; BV.anims = []; BV.pos = {}; BV.mode = null; BV.hover = null; BV.over = false;
     const scr = document.getElementById('battle'); scr.innerHTML = ''; scr.classList.remove('hidden');
     SU.mapView.hidden = true;
@@ -243,7 +246,17 @@
 
   /* ======================= controls ======================= */
   function humanTurn() { const B = BV.B, u = BT.activeUnit(B); return !!(u && !B.over && BV.control(u.side) === 'human' && !animating()); }
-  function act(a) { if (!humanTurn()) return; const r = BT.act(U.st, BV.B, a); if (!r.ok) { if (r.why) U.toast(r.why); return; } BV.mode = null; after(); }
+  BV._act = a => act(a);   /* for the tests */
+  function act(a) { if (!humanTurn()) return; const r = BT.act(U.st, BV.B, a); if (!r.ok) { if (r.why) U.toast(r.why); return; } send({ k: 'act', a: { type: a.type, t: a.target ? a.target.uid : null, c: a.c, r: a.r } }); BV.mode = null; after(); }
+  function send(cmd) { if (BV.net) BV.net.send(cmd); }
+  /* a move made on the other player's device */
+  function applyRemote(cmd) {
+    const B = BV.B, U_ = uid => uid == null ? null : B.units.find(x => x.uid === uid) || null;
+    if (cmd.k === 'act') return BT.act(U.st, B, Object.assign({}, cmd.a, { target: U_(cmd.a.t) }));
+    if (cmd.k === 'sing') return BT.sing(U.st, B, cmd.side, cmd.song, U_(cmd.t), cmd.c, cmd.r);
+    if (cmd.k === 'surr') return BT.surrender(U.st, B, cmd.side, cmd.cost);
+    return { ok: false };
+  }
   function after() { drainAnims(); renderBar(); setTimeout(tick, 60); }
   function click(h, mx, my) {
     const B = BV.B; if (!h || !humanTurn()) return;
@@ -267,6 +280,7 @@
     const B = BV.B, side = BT.activeUnit(B).side;
     const res = BT.sing(U.st, B, side, song, target, c, r);
     if (!res.ok) { U.toast(res.why || 'That song cannot go there.'); return; }
+    send({ k: 'sing', side, song, t: target ? target.uid : null, c, r });
     BV.mode = null; after();
   }
   function songMenu() {
@@ -289,7 +303,7 @@
     BV.bar.innerHTML = '';
     if (B.over) return;
     const mine = u && BV.control(u.side) === 'human';
-    BV.bar.appendChild(el('div', { cls: 'gold', style: { minWidth: '260px' } }, u ? (mine ? 'Your move: ' : 'Waiting: ') + (u.kind === 'cap' ? 'Captain ' + u.name : u.n + ' ' + u.name) + ' (round ' + B.round + ')' : ''));
+    BV.bar.appendChild(el('div', { cls: 'gold', style: { minWidth: '260px' } }, u ? (mine ? 'Your move: ' : BV.control(u.side) === 'remote' ? (st.players[B.sides[u.side].owner] || {}).name + ' is choosing: ' : 'Waiting: ') + (u.kind === 'cap' ? 'Captain ' + u.name : u.n + ' ' + u.name) + ' (round ' + B.round + ')' : ''));
     if (!mine) return;
     BV.bar.appendChild(btn('Wait (W)', () => act({ type: 'wait' }), '', 'Act later this round'));
     BV.bar.appendChild(btn('Defend (D)', () => act({ type: 'defend' }), '', '+30% defense until its next turn'));
@@ -304,7 +318,8 @@
   function surrender(side) {
     const B = BV.B, st = U.st, other = B.sides[1 - side];
     const base = BT.surrenderCost(st, B, side);
-    const go = cost => { const r = BT.surrender(st, B, side, cost); if (!r.ok) { U.toast(r.why); return; } after(); };
+    const go = cost => { const r = BT.surrender(st, B, side, cost); if (!r.ok) { U.toast(r.why); return; } send({ k: 'surr', side, cost }); after(); };
+    if (BV.net) { U.confirm('Surrender?', 'Pay ' + base + ' gold to leave the field. Your hero and army go home.', () => go(base)); return; }
     if (other.owner >= 0 && st.players[other.owner].kind === 'human' && other.owner !== B.sides[side].owner) {
       /* the other player names the price */
       const inp = el('input', { cls: 'inp', type: 'number', value: base, min: 0, step: 100 });
@@ -320,6 +335,12 @@
     if (B.over) return finish();
     const u = BT.activeUnit(B); if (!u) return finish();
     renderBar();
+    if (BV.control(u.side) === 'remote') {
+      const cmd = BV.net && BV.net.next();
+      if (!cmd) { setTimeout(tick, 400); return; }
+      const r = applyRemote(cmd); if (!r || !r.ok) console.warn('A move from the other device did not fit', cmd);
+      drainAnims(); renderBar(); setTimeout(tick, 60); return;
+    }
     if (BV.control(u.side) === 'ai') { setTimeout(() => { if (BV.over || !BT.activeUnit(B) || animating()) { setTimeout(tick, 60); return; } BT.aiMove(U.st, B); drainAnims(); renderBar(); setTimeout(tick, 60); }, SU.ui.fast ? 80 : 260); }
   }
   function finish() {

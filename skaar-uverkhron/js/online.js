@@ -13,6 +13,13 @@
    wrote first). Everyone else watches the room. The host's device
    plays the computer players. Play live (everyone on at once) or
    take your turn whenever you like: it's the same room either way.
+
+   Battles between people: the computer never fights for a person.
+   'su_fight:<CODE>' holds the battle: the game as it was the moment
+   it began, and the list of choices each person makes. Both devices
+   run the same battle from the same state, so the dice agree; only
+   the choices travel. The attacker waits until the defender comes.
+   'su_chat:<CODE>:<time>' rows are the room's chat.
    ============================================================ */
 (function (root) {
   'use strict';
@@ -59,7 +66,7 @@
         btn(r.status === 'lobby' ? 'Open' : 'Play', () => { m.close(); r.status === 'lobby' ? O.lobby(r.code) : O.enter(r.code); }, 'primary'),
         btn('Leave', () => U.confirm('Leave this room?', 'You can rejoin with the code while the game is waiting for players.', async () => { await dropMyRoom(r.code); if (r.status === 'lobby' && mine >= 0) { r.seats[mine].account = null; r.seats[mine].name = 'Open seat'; await putRoom(r); } m.close(); O.menu(); }))]));
     });
-    m.box.appendChild(el('p', { cls: 'small muted', text: 'Play live with everyone at once, or take your turns whenever you like — rooms keep their place. When someone attacks you on their turn, the computer fights for you.' }));
+    m.box.appendChild(el('p', { cls: 'small muted', text: 'Play live with everyone at once, or take your turns whenever you like — rooms keep their place. When someone attacks you, you fight the battle yourself: the game waits for you to come.' }));
     m.box.appendChild(el('div', { cls: 'acts' }, [btn('Close', () => m.close())]));
   };
 
@@ -75,7 +82,7 @@
       const sel = (val, list, on) => el('select', { cls: 'inp', onchange: e => { on(e.target.value); render(); } }, list.map(([v, n]) => el('option', { value: v, selected: String(v) === String(val) ? 'selected' : null }, n)));
       b.appendChild(el('table', { cls: 'setup' }, [
         el('tr', {}, [el('td', { text: 'Name' }), el('td', {}, el('input', { cls: 'inp', value: room.name, oninput: e => room.name = e.target.value }))]),
-        el('tr', {}, [el('td', { text: 'Size' }), el('td', {}, sel(room.setup.size, [['S', 'Small'], ['M', 'Medium'], ['L', 'Large'], ['XL', 'Extra large']], v => room.setup.size = v))]),
+        el('tr', {}, [el('td', { text: 'Size' }), el('td', {}, sel(room.setup.size, [['S', 'Small'], ['M', 'Medium'], ['L', 'Large'], ['XL', 'Extra large'], ['G', 'Gigantic']], v => room.setup.size = v))]),
         el('tr', {}, [el('td', { text: 'Turn timer' }), el('td', {}, sel(room.timer || 0, [[0, 'None'], [120, '2 minutes'], [300, '5 minutes'], [600, '10 minutes']], v => room.timer = +v || null))]),
       ]));
       b.appendChild(el('h3', { text: 'Seats' }));
@@ -107,6 +114,7 @@
   /* ---------- waiting for everyone ---------- */
   O.lobby = function (c) {
     const me = acc(); let timer = null;
+    O.chatStart(c);
     const m = U.modal([el('h2', { text: 'Room ' + c }), el('p', { cls: 'muted', text: 'Loading…' })], { onClose: () => clearInterval(timer), wide: true });
     async function refresh() {
       let r; try { r = await getRoom(c); } catch (e) { return; }
@@ -137,6 +145,7 @@
     if (!r || !r.state) { U.alert('Not ready', 'That game has not started yet.'); return; }
     room = r; O.stopWatching();
     const st = S.deserialize(r.state); st.online = { code: c, seq: r.seq };
+    O.chatStart(c);
     SU.game.st = st; U.closeAll(); document.getElementById('title').classList.add('hidden');
     U.start(st);
     U.viewer = myIndex(st) >= 0 ? myIndex(st) : 0;
@@ -153,7 +162,8 @@
     document.getElementById('status').textContent = 'Waiting for ' + S.cur(st).name + '…';
     clearInterval(watching);
     watching = setInterval(async () => {
-      let r; try { r = await getRoom(st.online.code); } catch (e) { return; }
+      let r, f; try { [r, f] = await Promise.all([getRoom(st.online.code), getFight(st.online.code).catch(() => null)]); } catch (e) { return; }
+      if (f && f.status === 'waiting' && O.isMine(st, f.remotePi) && f.seq === st.online.seq && Math.abs(Date.now() - (f.at || 0)) < 120000) { clearInterval(watching); watching = null; called(st, f); return; }
       if (!r || r.seq === st.online.seq) return;
       clearInterval(watching); room = r;
       const nst = S.deserialize(r.state); nst.online = { code: r.code, seq: r.seq };
@@ -173,6 +183,111 @@
       st.online.seq = r.seq; room = r;
     } catch (e) { U.alert('Could not send your turn', e.message + ' — try ending your turn again.'); }
   };
+  /* ======================= battles between people ======================= */
+  const FKEY = c => 'su_fight:' + c;
+  async function getFight(c) { const r = await rest('GET', 'dya_config?select=value&key=eq.' + encodeURIComponent(FKEY(c))); return r && r[0] ? r[0].value : null; }
+  async function putFight(c, f) { f.at = Date.now(); await rest('POST', 'dya_config?on_conflict=key', { key: FKEY(c), value: f, updated_at: now() }, 'resolution=merge-duplicates'); }
+  const idsOf = spec => ({ atk: spec.attacker.id, def: spec.defender ? spec.defender.id : null, town: spec.town ? spec.town.id : null, temp: !!spec.temp });
+  const specOf = (st, ids) => ({ attacker: st.armies[ids.atk], defender: ids.def ? st.armies[ids.def] : null, town: ids.town ? st.objects[ids.town] : null, temp: ids.temp });
+
+  /* the attacker's side: send the battle, wait for the defender, then fight it together */
+  O.fight = async function (st, spec) {
+    const G = SU.game, c = st.online.code;
+    const atkPi = spec.attacker.owner, defPi = spec.town ? spec.town.owner : spec.defender.owner;
+    const remotePi = [defPi, atkPi].find(o => o >= 0 && st.players[o].kind === 'human' && !G.localHuman(o));
+    const f = { id: 'f' + Date.now().toString(36), status: 'waiting', atkPi, defPi, remotePi, ids: idsOf(spec), seq: st.online.seq, state: S.serialize(st), actions: [], by: (acc() || {}).id };
+    try { await putFight(c, f); } catch (e) { U.alert('Could not start the battle', e.message); return null; }
+    const who = st.players[remotePi].name;
+    const came = await new Promise(resolve => {
+      let t = null;
+      const m = U.modal([el('h2', { text: 'To battle' }), el('p', { text: 'Waiting for ' + who + ' to come and fight. In online games the computer never fights for a person.' }),
+        el('p', { cls: 'small muted', text: 'If ' + who + ' is not here, use the chat to call them, or call the battle off: your army stays where it is.' }),
+        el('div', { cls: 'acts' }, [btn('Call it off', () => { clearInterval(t); m.close(); resolve(false); }, 'danger')])], { dismiss: false });
+      let beat = 0;
+      t = setInterval(async () => {
+        let g; try { g = await getFight(c); } catch (e) { return; }
+        if (g && g.id === f.id && g.status === 'live') { clearInterval(t); m.close(); resolve(true); return; }
+        /* still here: keep the call fresh (only while nobody has answered it) */
+        if (++beat % 10 === 0) { f.at = Date.now(); rest('PATCH', 'dya_config?key=eq.' + encodeURIComponent(FKEY(c)) + '&value->>status=eq.waiting&value->>id=eq.' + f.id, { value: f, updated_at: now() }).catch(() => {}); }
+      }, 1500);
+    });
+    if (!came) { f.status = 'off'; putFight(c, f).catch(() => {}); return null; }
+    const B = G.buildBattle(st, specOf(st, f.ids));
+    const rep = await together(st, B, f);
+    f.status = 'done'; putFight(c, Object.assign({}, f, { actions: [], state: null })).catch(() => {});
+    return rep;
+  };
+  /* the defender's side: we have been attacked */
+  function called(st, f) {
+    const atk = st.players[f.atkPi];
+    U.modal([el('h2', { text: (atk ? atk.name : 'An enemy') + ' attacks!' }), el('p', { text: 'Your forces are under attack. Come and lead them: the battle waits for you.' }),
+      el('div', { cls: 'acts' }, [btn('To battle', async function () {
+        this.closest('.overlay').remove();
+        const G = SU.game, c = st.online.code;
+        const st2 = S.deserialize(f.state); st2.online = { code: c, seq: f.seq };
+        G.st = st2; U.busy = false; U.start(st2); U.viewer = Math.max(0, myIndex(st2));
+        try { f.status = 'live'; await putFight(c, f); } catch (e) { U.alert('Could not join the battle', e.message); O.waitTurn(st2); return; }
+        const B = G.buildBattle(st2, specOf(st2, f.ids));
+        await together(st2, B, f);
+        U.refresh(); SU.mapView.invalidate();
+        O.waitTurn(G.st);
+      }, 'primary big')])], { dismiss: false });
+  }
+  /* run the battle on this device, sending our choices and playing theirs */
+  function together(st, B, f) {
+    const c = st.online.code, log = (f.actions || []).slice();
+    let used = log.length, chain = Promise.resolve(), poll = null, closed = false;
+    const write = () => { const snap = Object.assign({}, f, { status: 'live', actions: log.slice() }); chain = chain.then(async () => { for (let i = 0; i < 20 && !closed; i++) { try { await putFight(c, snap); return; } catch (e) { await new Promise(r => setTimeout(r, 1500)); } } }); };
+    const net = {
+      send(cmd) { log.push(cmd); used = log.length; write(); },
+      next() { return used < log.length ? log[used++] : null; },
+    };
+    poll = setInterval(async () => { let g; try { g = await getFight(c); } catch (e) { return; } if (!g || g.id !== f.id) return; if (g.actions && g.actions.length > log.length) log.push(...g.actions.slice(log.length)); }, 1200);
+    return new Promise(resolve => {
+      SU.battleView.start(B, SU.game.controlFor(st, B), rep => { closed = true; clearInterval(poll); resolve(rep); }, net);
+    });
+  }
+
+  /* ======================= chat ======================= */
+  let chat = null;
+  const CKEY = c => 'su_chat:' + c + ':';
+  async function chatList(c) { const rows = await rest('GET', 'dya_config?select=key,value&key=like.' + encodeURIComponent(CKEY(c) + '*') + '&order=key.desc&limit=60'); return (rows || []).map(r => r.value).filter(Boolean).reverse(); }
+  async function chatSend(c, text) { const me = acc(); const k = CKEY(c) + Date.now().toString(36).padStart(9, '0') + Math.random().toString(36).slice(2, 6); await rest('POST', 'dya_config?on_conflict=key', { key: k, value: { name: me.name, acc: me.id, text: text.slice(0, 400), at: Date.now() }, updated_at: now() }, 'resolution=merge-duplicates'); }
+  /* the chat for a room: a button in the corner that opens a small panel */
+  O.chatStart = function (c) {
+    if (chat && chat.code === c) return;
+    O.chatStop();
+    const me = acc();
+    const box = el('div', { cls: 'chat panel hidden' }), msgs = el('div', { cls: 'chat-msgs' });
+    const inp = el('input', { cls: 'inp', placeholder: 'Say something…', maxlength: 400 });
+    const fab = el('button', { type: 'button', cls: 'btn chat-fab', title: 'Chat with the room' }, 'Chat');
+    box.appendChild(el('div', { cls: 'chat-head' }, [el('b', { text: 'Room ' + c }), el('span', { cls: 'spacer' }), btn('✕', () => { box.classList.add('hidden'); fab.classList.remove('hidden'); }, 'icon')]));
+    box.appendChild(msgs);
+    const go = async () => { const t = inp.value.trim(); if (!t) return; inp.value = ''; try { await chatSend(c, t); await pull(); } catch (e) { U.toast('Could not send: ' + e.message); } };
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') go(); });
+    box.appendChild(el('div', { cls: 'row', style: { flexWrap: 'nowrap' } }, [inp, btn('Send', go, 'primary')]));
+    fab.addEventListener('click', () => { box.classList.remove('hidden'); fab.classList.add('hidden'); chat.seen = chat.count; fab.textContent = 'Chat'; msgs.scrollTop = 1e6; setTimeout(() => inp.focus(), 20); });
+    document.body.appendChild(box); document.body.appendChild(fab);
+    chat = { code: c, box, fab, count: 0, seen: 0, timer: null };
+    async function pull() {
+      let list; try { list = await chatList(c); } catch (e) { return; }
+      if (!chat || chat.code !== c) return;
+      const open = !box.classList.contains('hidden'), last = list.length ? list[list.length - 1].at : 0;
+      if (last === chat.last) return;
+      chat.last = last;
+      msgs.innerHTML = '';
+      if (!list.length) msgs.appendChild(el('div', { cls: 'small muted', text: 'No messages yet.' }));
+      list.forEach(m => msgs.appendChild(el('div', { cls: 'chat-m' + (me && m.acc === me.id ? ' me' : '') }, [el('b', { text: m.name + ' ' }), el('span', { text: m.text }), el('span', { cls: 'small muted', text: ' ' + new Date(m.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) })])));
+      msgs.scrollTop = 1e6;
+      const fresh = list.filter(m => !me || m.acc !== me.id).length;
+      chat.count = fresh;
+      if (open) chat.seen = fresh; else if (fresh > chat.seen) fab.textContent = 'Chat (' + (fresh - chat.seen) + ')';
+    }
+    pull(); chat.timer = setInterval(pull, 5000);
+    chat.seen = Infinity; setTimeout(() => { if (chat) chat.seen = chat.count; }, 2500);
+  };
+  O.chatStop = function () { if (!chat) return; clearInterval(chat.timer); chat.box.remove(); chat.fab.remove(); chat = null; };
+
   /* the turn timer */
   let tTimer = null;
   SU.on('turn', () => {

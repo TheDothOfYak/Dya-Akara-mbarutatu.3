@@ -215,3 +215,13 @@ table.grid th { color: var(--muted); font-weight: normal; }
 .sl-p .dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 1px #000; }
 .sl-p.out { opacity: .5; text-decoration: line-through; }
 @media (max-width: 760px) { .sl-main { grid-template-columns: 1fr; max-height: none; } .sl-thumb { width: 100%; height: auto; aspect-ratio: 4/3; } }
+
+/* ---------- online chat ---------- */
+.chat-fab { position: fixed; left: 12px; bottom: 12px; z-index: 75; }
+.chat { position: fixed; left: 12px; bottom: 12px; z-index: 75; width: min(340px, calc(100vw - 24px)); height: 320px; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.chat-head { display: flex; align-items: center; gap: 6px; }
+.chat-msgs { flex: 1; overflow: auto; border: 1px solid var(--edge2); border-radius: 6px; background: rgba(0,0,0,.35); padding: 6px; user-select: text; -webkit-user-select: text; }
+.chat-m { margin-bottom: 4px; word-wrap: break-word; }
+.chat-m b { color: var(--gold); }
+.chat-m.me b { color: var(--su); }
+.chat .inp { flex: 1; min-width: 0; }

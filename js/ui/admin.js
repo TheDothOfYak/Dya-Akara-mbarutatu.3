@@ -642,7 +642,7 @@
   }
 
   const BLURB = {
-    su: 'The turn-based strategy game, under skaar-uverkhron/. Each player’s saved games are dya_config rows su:<account>:<slot>; shared maps (su_map:<id>) wait for approval under Shared Maps; online games are su_room:<code>.',
+    su: 'The turn-based strategy game, under skaar-uverkhron/. Each player’s saved games are dya_config rows su:<account>:<slot>; shared maps (su_map:<id>) wait for approval under Shared Maps; online games are su_room:<code> (with su_fight:<code> for a battle between people and su_chat:<code>:<time> for the room chat).',
     rpg: 'The 3D adventure, under rpg/. Story progress saves to each player’s account at every Nur Lantern and story beat. Its roadmap is rpg/ROADMAP.md.',
     '4bw': 'The four brothers’ pixel platformer, under four-brothers-world/. Each player’s hero, bag and world save to their account, a row per save key. Its guides are under Guide.',
     ld: 'The mini game (once Legends of Pia’don, inside Dya’Akara), under mini-games/little-dungeon/. No account needed; signed-in players keep a run in progress on their account and a won solo run pays gold.',
@@ -968,7 +968,7 @@
         tbl.appendChild(U.el('tr', {}, ['Room', 'Players', 'Status', 'Last move', ''].map(h => U.el('th', { text: h }))));
         rows.forEach(r => {
           const seats = (r.seats || []).map(x => x.kind === 'ai' ? 'computer' : x.name || 'open').join(', ');
-          const td = U.el('td', {}, [U.el('button', { cls: 'btn small danger', text: 'End room', onclick: () => { if (confirm('End this room for everyone?')) F.rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent(r.key)).then(rerender).catch(e => alert(e.message)); } })]);
+          const td = U.el('td', {}, [U.el('button', { cls: 'btn small danger', text: 'End room', onclick: () => { if (confirm('End this room for everyone?')) { const c = r.key.slice(8); Promise.all([F.rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent(r.key)), F.rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_fight:' + c)), F.rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('su_chat:' + c + ':*'))]).then(rerender).catch(e => alert(e.message)); } } })]);
           tbl.appendChild(U.el('tr', {}, [U.el('td', { text: (r.name || '') + ' · ' + r.key.slice(8) }), U.el('td', { style: 'white-space:normal', text: seats }), U.el('td', { text: (r.status || '') + (r.status === 'playing' ? ' (turn ' + r.seq + ')' : '') }), U.el('td', { text: U.timeAgo(Date.parse(r.updated_at)) }), td]));
         });
         holder.appendChild(tbl);
