@@ -76,46 +76,7 @@
   };
 
   /* ======================= new game ======================= */
-  G.setup = function (opts) {
-    opts = opts || {};
-    const acc = SU.save.account();
-    const cfg = { size: 'M', spread: true, wild: 'normal', name: 'A new game', players: [
-      { kind: 'human', name: acc ? acc.name : 'You', ai: 'normal', team: 0, colorId: 'red' },
-      { kind: 'ai', name: 'Computer', ai: 'normal', team: 0, colorId: 'blue' },
-    ], map: opts.map || null };
-    const m = U.modal(el('div'), { wide: true });
-    function render() {
-      const b = m.box; b.innerHTML = '';
-      b.appendChild(el('h2', { text: 'A new game' }));
-      const sel = (val, list, on) => { const s = el('select', { onchange: e => { on(e.target.value); render(); } }, list.map(([v, n]) => el('option', { value: v, selected: v === val ? 'selected' : null }, n))); return s; };
-      b.appendChild(el('table', { cls: 'setup' }, [
-        el('tr', {}, [el('td', { text: 'Name' }), el('td', {}, el('input', { cls: 'inp', value: cfg.name, oninput: e => cfg.name = e.target.value }))]),
-        el('tr', {}, [el('td', { text: 'Map' }), el('td', {}, [cfg.map ? el('span', { cls: 'gold', text: cfg.map.name + ' ' }) : 'Random', ' ', btn('Choose a made map…', () => SU.editor.pickMap(mp => { cfg.map = mp; while (cfg.players.length > (mp.starts || []).length && cfg.players.length > 2) cfg.players.pop(); render(); })), cfg.map ? btn('Random instead', () => { cfg.map = null; render(); }) : null])]),
-        cfg.map ? null : el('tr', {}, [el('td', { text: 'Size' }), el('td', {}, sel(cfg.size, [['S', 'Small'], ['M', 'Medium'], ['L', 'Large'], ['XL', 'Extra large']], v => cfg.size = v))]),
-        cfg.map ? null : el('tr', {}, [el('td', { text: 'Starts' }), el('td', {}, sel(cfg.spread ? 'spread' : 'velki', [['spread', 'Spread across the three Tatu'], ['velki', 'Everyone on Velki']], v => cfg.spread = v === 'spread'))]),
-        cfg.map ? null : el('tr', {}, [el('td', { text: 'Wild creatures' }), el('td', {}, sel(cfg.wild, [['weak', 'Few and weak'], ['normal', 'Normal'], ['strong', 'Many and fierce']], v => cfg.wild = v))]),
-        cfg.map && cfg.map.win && cfg.map.win.kind !== 'conquer' ? el('tr', {}, [el('td', { text: 'Victory' }), el('td', { cls: 'gold', text: D.WIN[cfg.map.win.kind].name + ' — ' + D.WIN[cfg.map.win.kind].desc })])
-          : el('tr', {}, [el('td', { text: 'Victory' }), el('td', {}, [sel(cfg.winKind || 'conquer', [['conquer', D.WIN.conquer.name], ['prophecy', D.WIN.prophecy.name], ['gold', D.WIN.gold.name]], v => cfg.winKind = v), el('div', { cls: 'small muted', text: D.WIN[cfg.winKind || 'conquer'].desc + (cfg.winKind === 'gold' ? ' (200,000 gold)' : '') + ' Taking every rival’s towns always wins too.' })])]),
-      ]));
-      b.appendChild(el('h3', { text: 'Players', style: { marginTop: '10px' } }));
-      const tbl = el('table', { cls: 'setup' }, [el('tr', {}, ['', 'Name', 'Who', 'Level', 'Team', 'Colour', ''].map(x => el('th', { cls: 'small muted', text: x })))]);
-      cfg.players.forEach((p, i) => tbl.appendChild(el('tr', {}, [
-        el('td', { text: (i + 1) + '.' }),
-        el('td', {}, el('input', { cls: 'inp', value: p.name, style: { width: '130px' }, oninput: e => p.name = e.target.value })),
-        el('td', {}, sel(p.kind, [['human', 'A person (this device)'], ['ai', 'The computer']], v => { p.kind = v; if (v === 'ai' && p.name === 'You') p.name = 'Computer'; })),
-        el('td', {}, p.kind === 'ai' ? sel(p.ai, Object.entries(D.AI_LEVELS).map(([k, v]) => [k, v.name]), v => p.ai = v) : ''),
-        el('td', {}, sel(String(p.team), [['0', 'Alone'], ['1', 'Team 1'], ['2', 'Team 2'], ['3', 'Team 3']], v => p.team = +v)),
-        el('td', {}, sel(p.colorId, D.PLAYER_COLORS.map(c => [c.id, c.name]), v => p.colorId = v)),
-        el('td', {}, cfg.players.length > 2 ? btn('✕', () => { cfg.players.splice(i, 1); render(); }, 'icon') : ''),
-      ])));
-      b.appendChild(tbl);
-      const maxP = cfg.map ? (cfg.map.starts || []).length : 6;
-      if (cfg.players.length < maxP) b.appendChild(btn('+ Add a player', () => { const used = cfg.players.map(p => p.colorId); cfg.players.push({ kind: 'ai', name: 'Computer ' + cfg.players.length, ai: 'normal', team: 0, colorId: D.PLAYER_COLORS.find(c => !used.includes(c.id)).id }); render(); }));
-      b.appendChild(el('p', { cls: 'small muted', text: 'Everyone plays the Duskareth in this first version. Two or more people on this device take turns; the screen hides between turns. For games with friends on other devices, use Online games on the title screen.' }));
-      b.appendChild(el('div', { cls: 'acts' }, [btn('Back', () => m.close()), btn('Begin', () => { m.close(); G.newGame(cfg); }, 'primary big')]));
-    }
-    render();
-  };
+  /* G.setup, the new-game screen, is in pregame.js */
   /* one click: the starter map, you against an easy computer player */
   G.quickStart = async function () {
     const map = await SU.editor.loadBuiltin({ id: 'starter', file: 'starter.json' }).catch(() => null);
@@ -126,11 +87,12 @@
       { kind: 'ai', name: 'The Rival', ai: 'easy', team: 0, colorId: 'blue' }] });
   };
   G.newGame = function (cfg) {
-    const players = cfg.players.map(p => ({ kind: p.kind, name: p.name || 'Player', ai: p.ai, team: p.team, color: D.PLAYER_COLORS.find(c => c.id === p.colorId).c, colorId: p.colorId, account: p.account || null }));
+    const players = cfg.players.map(p => ({ kind: p.kind, name: p.name || 'Player', ai: p.ai, team: p.team, color: D.PLAYER_COLORS.find(c => c.id === p.colorId).c, colorId: p.colorId, account: p.account || null,
+      faction: p.faction || 'duskareth', hero: p.hero || null, bonus: p.bonus || 'random' }));
     U.toast('Shaping the Mbaru Tatu…');
     setTimeout(() => {
       const win = cfg.map && cfg.map.win && cfg.map.win.kind !== 'conquer' ? cfg.map.win : { kind: cfg.winKind || 'conquer', n: 3, gold: 200000 };
-      const setup = { size: cfg.size, spread: cfg.spread, wild: cfg.wild, name: cfg.name, players, seed: cfg.seed, win };
+      const setup = { size: cfg.size, spread: cfg.spread, starts: cfg.starts, wild: cfg.wild, water: cfg.water, storm: cfg.storm, difficulty: cfg.difficulty || 'captain', name: cfg.name, players, seed: cfg.seed, win };
       const st = cfg.map ? SU.editor.gameFromMap(cfg.map, setup) : SU.mapgen.newGame(setup);
       if (cfg.online) st.online = cfg.online;
       G.play(st);

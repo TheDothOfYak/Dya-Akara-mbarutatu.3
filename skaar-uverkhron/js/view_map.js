@@ -344,6 +344,19 @@
     g.strokeRect(offx + (V.cam.x - V.w / 2 / V.ts) * sc, offy + (V.cam.y - V.h / 2 / V.ts) * sc, V.w / V.ts * sc, V.h / V.ts * sc);
     V.miniMap = { offx, offy, sc };
   }
+  /* a small picture of a whole layer, all of it seen: for the new-game screen and the saves */
+  V.thumb = function (st, li, W, H) {
+    const L = st.layers[li], c = A.canvas(W, H), g = c.getContext('2d');
+    const sc = Math.min(W / L.w, H / L.h), offx = (W - L.w * sc) / 2, offy = (H - L.h * sc) / 2;
+    g.fillStyle = '#05040a'; g.fillRect(0, 0, W, H);
+    for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const i = y * L.w + x; const base = MINI_COL[S.TCODES[L.t[i]]] || '#000';
+      g.fillStyle = L.ob[i] === S.OB.mountain ? '#6a655a' : L.ob[i] && L.ob[i] !== S.OB.rock ? A.shade(base, -25) : base; g.fillRect(offx + x * sc, offy + y * sc, Math.ceil(sc), Math.ceil(sc)); }
+    Object.values(st.objects).forEach(o => { if (o.layer !== li || o.hidden) return;
+      if (o.type === 'town') { g.fillStyle = o.owner >= 0 && st.players[o.owner] ? st.players[o.owner].color : o.start ? '#ffe3a3' : '#cfc6b0'; g.fillRect(offx + (o.x - 1.5) * sc, offy + (o.y - 2) * sc, Math.max(4, 3.5 * sc), Math.max(4, 3.5 * sc)); g.strokeStyle = '#000'; g.lineWidth = 1; g.strokeRect(offx + (o.x - 1.5) * sc, offy + (o.y - 2) * sc, Math.max(4, 3.5 * sc), Math.max(4, 3.5 * sc)); }
+      else if (o.type === 'mine') { g.fillStyle = o.owner >= 0 && st.players[o.owner] ? st.players[o.owner].color : '#9a9078'; g.fillRect(offx + (o.x - 0.5) * sc, offy + (o.y - 0.5) * sc, Math.max(2, 1.6 * sc), Math.max(2, 1.6 * sc)); }
+      else if (o.type === 'urverk') { g.fillStyle = '#c9b8ff'; g.fillRect(offx + o.x * sc, offy + o.y * sc, Math.max(2, 1.5 * sc), Math.max(2, 1.5 * sc)); } });
+    return c;
+  };
   V.miniClick = function (mx, my) { const m = V.miniMap; if (!m) return; V.cam.x = (mx - m.offx) / m.sc; V.cam.y = (my - m.offy) / m.sc; };
   V.invalidate = function () { V.miniCache = null; };
 

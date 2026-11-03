@@ -46,7 +46,7 @@
     S.rebuild(st);
     startArmies(st);
     delete st._reserve;
-    st.storm = SU.rules ? SU.rules.newStorm(st) : null;
+    st.storm = SU.rules && st.setup.storm !== false ? SU.rules.newStorm(st) : null;
     SU.syncRng(st);
     return st;
   };
@@ -63,7 +63,7 @@
       const nx = x / w, ny = y / h;
       let lobe = 0; cs.forEach(c => { const d = Math.hypot(nx - c[0], ny - c[1]) / c[2]; lobe = Math.max(lobe, 1 - d * d); });
       const edge = Math.min(nx, ny, 1 - nx, 1 - ny);
-      let e = ne.fbm(nx * 4, ny * 4, 5) * 0.9 + lobe * 0.95 - 0.08;
+      let e = ne.fbm(nx * 4, ny * 4, 5) * 0.9 + lobe * 0.95 - 0.08 + ({ little: 0.14, normal: 0, lots: -0.12 }[st.setup.water] || 0);
       if (edge < 0.06) e -= (0.06 - edge) * 14;
       elev[y * w + x] = e;
     }
@@ -467,8 +467,9 @@
   function startArmies(st) {
     const R = SU.rng(st);
     st._starts.forEach(s => {
-      const P = st.players[s.pi], t = st.objects[s.town];
-      const h = M.hero(st, { owner: s.pi });
+      const P = st.players[s.pi], t = st.objects[s.town], pc = (st.setup.players || [])[s.pi] || {};
+      /* the hero chosen before the game (or a random one) */
+      const h = M.hero(st, Object.assign({ owner: s.pi }, pc.hero ? { people: pc.hero.people, base: pc.hero.base, name: pc.hero.name } : {}));
       while (Object.keys(h.skills).length < 5) { const id = R.pick(D.SKILL_IDS); if (!h.skills[id]) h.skills[id] = 1; }
       if (h.skills.songcraft && !h.songs.length) h.songs.push('mend');
       h.breath = M.breathMax(st, h);
@@ -477,6 +478,15 @@
       h.slots[1] = { kind: 'stack', cr: 'malsti', n: R.int(8, 12) };
       M.army(st, s.pi, s.li, t.x, t.y, h.id);
       P.startTown = t.id;
+      /* difficulty: a person's starting stores */
+      const diff = D.DIFFICULTY.find(d => d.id === st.setup.difficulty);
+      if (diff && P.kind === 'human') D.RES.forEach(r => P.res[r] = Math.round(P.res[r] * diff.res));
+      /* the starting bonus */
+      const bonus = pc.bonus === 'random' || !pc.bonus ? R.pick(['gold', 'res', 'relic']) : pc.bonus;
+      if (bonus === 'gold') P.res.gold += 3000;
+      else if (bonus === 'res') { P.res.wood += 10; P.res.stone += 10; ['stygian', 'ngakara', 'timber', 'glowmoss'].forEach(r => P.res[r] += 3); }
+      else if (bonus === 'relic' && SU.rules) SU.rules.giveRelic(st, h, R.pick(D.RELIC_IDS.filter(r => D.RELICS[r].rare === 'common' || D.RELICS[r].rare === 'rare')));
+      P.bonus = bonus;
       S.reveal(st, s.pi, s.li, t.x, t.y, 8);
     });
     delete st._starts;

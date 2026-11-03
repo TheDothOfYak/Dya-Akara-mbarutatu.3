@@ -432,6 +432,26 @@
     town: { name: 'The seat', desc: 'Take the named town and hold it for a whole week.' },
   };
 
+  /* ---------------- difficulty: your starting stores, and how hard the computer plays ---------------- */
+  D.DIFFICULTY = [
+    { id: 'wanderer', name: 'Wanderer', pct: 80, res: 1.6, ai: 'easy', desc: 'Plenty to start with; the computer plays gently.' },
+    { id: 'ahoac', name: 'Ahoac', pct: 100, res: 1.25, ai: 'normal', desc: 'A comfortable start.' },
+    { id: 'captain', name: 'Captain', pct: 130, res: 1, ai: 'normal', desc: 'An even start.' },
+    { id: 'onnar', name: 'Onnar', pct: 160, res: 0.7, ai: 'hard', desc: 'Lean stores; a sharp computer.' },
+    { id: 'elster', name: 'Elster', pct: 200, res: 0.45, ai: 'brutal', desc: 'Almost nothing to start with; a ruthless computer.' },
+  ];
+  /* the heroes you can start with (or a random one) */
+  D.START_HEROES = [
+    { id: 'kiet', name: 'Kiet the Quiet', people: 'eikar', base: 'wayfind', desc: 'An Eikar scout who knows every road. Starts with Wayfinding.' },
+    { id: 'haldra', name: 'Haldra the Grey', people: 'keilia', base: 'steward', desc: 'A Keilia builder. Starts with Stewardship: more gold from her towns.' },
+    { id: 'thessa', name: 'Thessa Halfmoon', people: 'kaloeik', base: 'songcraft', desc: 'A Kalo’Eik singer. Starts with Songcraft and a song.' },
+    { id: 'rusk', name: 'Rusk Stormwalker', people: 'karnen', base: 'drill', desc: 'A Karnen drillmaster. Starts with Battle Drill: harder-hitting stacks.' },
+    { id: 'odda', name: 'Odda of the Ring', people: 'eikar', base: 'captaincy', desc: 'An Eikar who trains captains. Starts with Captaincy.' },
+    { id: 'gorran', name: 'Gorran the Patient', people: 'keilia', base: 'hearten', desc: 'A Keilia warden. Starts with Heartening: higher morale.' },
+  ];
+  D.BONUSES = { random: 'Random', gold: 'Gold (+3000)', res: 'Resources', relic: 'A Relic' };
+  D.FACTIONS = [{ id: 'duskareth', name: 'The Duskareth', follows: 'the Nekh’Vorran', ready: true }, { id: 'skarvalorin', name: 'The SkarValorin', follows: 'the Aerolhorn', ready: false }, { id: 'elsharyn', name: 'The Elsha’ryn', follows: 'the Vyrenalur', ready: false }];
+
   /* ---------------- computer personalities: one is drawn for each computer player ---------------- */
   D.AI_STYLES = {
     conqueror: { name: 'Conqueror', desc: 'Builds an army and goes for your towns.', war: 1.5, treasure: 0.8, keep: 1, heroes: 0 },

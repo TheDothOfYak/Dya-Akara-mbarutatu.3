@@ -123,7 +123,7 @@
   };
   async function start(r) {
     const players = r.seats.map(s => ({ kind: s.kind, name: s.name, ai: s.ai || 'normal', team: s.team || 0, color: D.PLAYER_COLORS.find(c => c.id === s.colorId).c, colorId: s.colorId, account: s.account || null }));
-    const st = SU.mapgen.newGame({ size: r.setup.size, spread: r.setup.spread, wild: r.setup.wild, name: r.name, players });
+    const st = SU.mapgen.newGame(Object.assign({}, r.setup, { name: r.name, players }));
     st.online = { code: r.code };
     RU.startTurn(st);
     r.status = 'playing'; r.state = S.serialize(st); r.seq = 1; r.turnOf = st.current;

@@ -160,7 +160,7 @@
   M.player = function (st, idx, cfg) {
     return {
       idx, name: cfg.name || ('Player ' + (idx + 1)), color: cfg.color || D.PLAYER_COLORS[idx].c, colorId: cfg.colorId || D.PLAYER_COLORS[idx].id,
-      kind: cfg.kind || 'human', ai: cfg.ai || 'normal', team: cfg.team || 0, account: cfg.account || null,
+      kind: cfg.kind || 'human', ai: cfg.ai || 'normal', team: cfg.team || 0, account: cfg.account || null, faction: cfg.faction || 'duskareth',
       res: Object.assign({}, D.START_RES), alive: true, explored: st.layers.map(L => new Uint8Array(L.w * L.h)),
       unlocked: [], tavern: { heroes: [], captains: [] }, knownUrverk: [], vault: [], hungry: 0,
       startLayer: 0, daysWithoutTown: 0, respect: {}, quests: [], stormWins: 0,

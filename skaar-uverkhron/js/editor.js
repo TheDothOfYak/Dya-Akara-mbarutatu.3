@@ -217,7 +217,7 @@
     starts.slice(st.players.length).forEach(t => { delete t.start; t.owner = -1; });
     S.rebuild(st);
     SU.mapgen.startArmies(st);
-    st.storm = RU.newStorm(st);
+    st.storm = setup.storm === false ? null : RU.newStorm(st);
     SU.syncRng(st);
     return st;
   };
