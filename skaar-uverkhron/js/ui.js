@@ -99,6 +99,22 @@
     A.creature(g, C.art, size * (C.size === 2 ? 0.45 : 0.5), size * (C.fly ? 0.98 : 0.92), size * big, { t: (opts && opts.t) || 0.4, tint: C.tint || (C.upgraded ? 1 : 0), color: opts && opts.color, noShadow: false });
     return c;
   };
+  const TOWN_PICS = {};
+  U.townIcon = function (t, size, color) {
+    const c = el('canvas', { width: size * 2, height: size * 2 }); c.style.width = size + 'px'; c.style.height = size + 'px';
+    const g = c.getContext('2d'); g.scale(2, 2);
+    g.fillStyle = A.radial(g, size / 2, size * 0.6, size * 0.7, '#3a3150', '#120c14'); g.fillRect(0, 0, size, size);
+    /* draw the castle large, find where it is, and shrink it to fit */
+    const lvl = t.built.join(','), key = lvl + color;
+    let pic = TOWN_PICS[key];
+    if (!pic) { const SW = 400, big = A.canvas(SW, SW), bg = big.getContext('2d'); try { A.town(bg, t, SW / 2 - 40, SW * 0.7, 80, 0.5, color); } catch (e) {}
+      const d = bg.getImageData(0, 0, SW, SW).data; let x0 = SW, y0 = SW, x1 = 0, y1 = 0;
+      for (let y = 0; y < SW; y += 2) for (let x = 0; x < SW; x += 2) if (d[(y * SW + x) * 4 + 3] > 30) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      pic = TOWN_PICS[key] = { cv: big, x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) }; }
+    const k = Math.min((size - 4) / pic.w, (size - 4) / pic.h);
+    g.drawImage(pic.cv, pic.x, pic.y, pic.w, pic.h, size / 2 - pic.w * k / 2, size - 2 - pic.h * k, pic.w * k, pic.h * k);
+    return c;
+  };
   U.captainIcon = function (cap, size, color) {
     const c = el('canvas', { width: size * 2, height: size * 2 }); c.style.width = size + 'px'; c.style.height = size + 'px';
     const g = c.getContext('2d'); g.scale(2, 2); A.captain(g, size * 0.5, size * 0.95, size * 0.82, cap, color || '#7a2a2a', 0.5, 1); return c;
@@ -139,17 +155,28 @@
     const mine = Object.values(st.armies).filter(a => !a.dead && a.owner === U.viewer);
     const heroes = mine.filter(a => a.heroId);
     $('herocount').textContent = heroes.length + ' / ' + D.MAX_FIELD_HEROES;
+    /* the roster, as the old games had it: portraits on the left (movement and Breath beside each), towns on the right */
+    const bars = (mp, br) => el('div', { cls: 'vbars' }, [el('div', { cls: 'vbar mp', 'data-tip': 'Movement left today' }, el('i', { style: { height: Math.round(100 * mp) + '%' } })), br == null ? null : el('div', { cls: 'vbar br', 'data-tip': 'Breath' }, el('i', { style: { height: Math.round(100 * br) + '%' } }))]);
     heroes.forEach(a => { const h = st.heroes[a.heroId];
-      hl.appendChild(el('div', { cls: 'litem' + (U.selected === a.id ? ' on' : ''), onclick: () => U.select(a.id, true), ondblclick: () => SU.dialogs.hero(h) },
-        [U.portrait(h.people, h.look, P.color, 34), el('div', { style: { flex: 1, minWidth: 0 } }, [el('div', { cls: 'nm', text: h.name }), el('div', { cls: 'small muted', text: 'Level ' + h.level + (a.sleep ? ' · asleep' : '') + (h.levelUps.length ? ' · ★ level up' : '') }), el('div', { cls: 'mpbar' }, el('i', { style: { width: Math.round(100 * a.mp / Math.max(1, a.mpMax)) + '%' } }))])])); });
-    const sl = $('squadlist'); sl.innerHTML = '';
+      hl.appendChild(el('div', { cls: 'rtile' + (U.selected === a.id ? ' on' : '') + (a.sleep ? ' asleep' : ''), onclick: () => { U.selTown = null; U.select(a.id, true); }, ondblclick: () => SU.dialogs.hero(h),
+        'data-tip': '<b>' + U.esc(h.name) + '</b><br>Level ' + h.level + (a.sleep ? ' · asleep' : '') + (h.levelUps.length ? ' · ★ level up' : '') + '<br><i class="muted">Click to pick · double-click for the hero</i>' },
+        [U.portrait(h.people, h.look, P.color, 44), bars(a.mp / Math.max(1, a.mpMax), h.breath / Math.max(1, SU.make.breathMax(st, h))), h.levelUps.length ? el('span', { cls: 'rstar', text: '★' }) : null])); });
     mine.filter(a => !a.heroId).forEach(a => { const cap = S.captainsIn(a.slots)[0];
-      sl.appendChild(el('div', { cls: 'litem' + (U.selected === a.id ? ' on' : ''), onclick: () => U.select(a.id, true), ondblclick: () => SU.dialogs.army(a) },
-        [cap ? U.captainIcon(cap, 30, P.color) : null, el('div', { style: { flex: 1 } }, [el('div', { cls: 'nm', text: cap ? cap.name + '’s squadron' : 'Squadron' }), el('div', { cls: 'mpbar' }, el('i', { style: { width: Math.round(100 * a.mp / Math.max(1, a.mpMax)) + '%' } }))])])); });
-    if (!sl.children.length) sl.appendChild(el('div', { cls: 'small muted', text: 'None. A captain can lead a squadron out of a town without a hero.' }));
+      hl.appendChild(el('div', { cls: 'rtile sq' + (U.selected === a.id ? ' on' : ''), onclick: () => { U.selTown = null; U.select(a.id, true); }, ondblclick: () => SU.dialogs.army(a),
+        'data-tip': '<b>' + U.esc(cap ? cap.name + '’s squadron' : 'A squadron') + '</b><br><i class="muted">Click to pick · double-click for the squadron</i>' },
+        [cap ? U.captainIcon(cap, 44, P.color) : el('div', { style: { width: '44px' } }), bars(a.mp / Math.max(1, a.mpMax), null)])); });
     const tl = $('townlist'); tl.innerHTML = '';
-    S.townsOf(st, U.viewer).forEach(t => tl.appendChild(el('div', { cls: 'litem', onclick: () => { V.centerOn(t.layer, t.x, t.y - 1); U.refresh(); }, ondblclick: () => SU.townView.open(t) },
-      [el('div', { cls: 'nm', style: { flex: 1 } }, [t.name, el('div', { cls: 'small muted', text: D.LAYERS[t.layer].name + ' · ' + Math.floor(t.pop) + ' people' + (t.builtToday ? '' : ' · can build') })])])));
+    S.townsOf(st, U.viewer).forEach(t => tl.appendChild(el('div', { cls: 'rtile town' + (U.selTown === t.id ? ' on' : ''), onclick: () => { U.selTown = t.id; U.selected = null; V.path = null; V.centerOn(t.layer, t.x, t.y - 1); if (V.layer !== t.layer) V.setLayer(t.layer); U.refresh(); }, ondblclick: () => SU.townView.open(t),
+      'data-tip': '<b>' + U.esc(t.name) + '</b><br>' + D.LAYERS[t.layer].name + ' · ' + Math.floor(t.pop) + ' people' + (t.builtToday ? '' : ' · can build today') + '<br><i class="muted">Click to pick · double-click to go in</i>' },
+      [U.townIcon(t, 44, P.color), t.builtToday ? null : el('span', { cls: 'rstar', text: '⚒', 'data-tip': 'Can build today' })])));
+    /* what is picked: its army, or the town's garrison */
+    const si = $('selinfo'); if (si) { si.innerHTML = '';
+      const sa = U.selectedArmy(), stn = U.selTown && st.objects[U.selTown];
+      const row = slots => el('div', { cls: 'si-row' }, S.stacksIn(slots).filter(s => s.n > 0).slice(0, 8).map(s => el('div', { cls: 'si-st', 'data-cr': s.cr, 'data-tip': D.CREATURES[s.cr].plural + ': ' + s.n }, [U.creatureIcon(s.cr, 30, { color: P.color }), el('span', { text: String(s.n) })])));
+      if (stn && stn.owner === U.viewer) si.appendChild(el('div', {}, [el('b', { cls: 'gold', text: stn.name }), el('div', { cls: 'small muted', text: '+' + RU.townIncome(st, stn).gold + ' gold a day · ' + Math.floor(stn.pop) + ' people' }), S.stacksIn(stn.garrison).length ? row(stn.garrison) : el('div', { cls: 'small muted', text: 'No garrison.' })]));
+      else if (sa) { const h = S.heroOf(st, sa), cap = S.captainsIn(sa.slots)[0];
+        si.appendChild(el('div', {}, [el('b', { cls: 'gold', text: h ? h.name : cap ? cap.name + '’s squadron' : 'A squadron' }), el('div', { cls: 'small muted', text: (h ? 'Level ' + h.level + ' · ' : '') + 'Movement ' + Math.round(sa.mp / 10) + ' / ' + Math.round(sa.mpMax / 10) + (h ? ' · Breath ' + Math.round(h.breath) : '') }), row(S.slotsOf(st, sa))])); }
+      else si.appendChild(el('div', { cls: 'small muted', text: 'Pick a hero, squadron or town.' })); }
     $('endturn').disabled = !U.myTurn();
     SU.emit('refresh');
   };
@@ -188,6 +215,23 @@
   const ICON_URL = {};
   const iconUrl = cr => ICON_URL[cr] || (ICON_URL[cr] = U.creatureIcon(cr, 40).toDataURL());
   /* an army seen from outside: what it is, each stack with a picture and how many (or about how many) */
+  /* a castle seen from outside: who holds it, how strong its walls are, and its garrison */
+  U.townInfoHtml = function (t) {
+    const st = U.st, mine = t.owner === U.viewer;
+    const mh = Object.values(st.armies).filter(x => x.owner === U.viewer && x.heroId).map(x => S.heroStat(st, st.heroes[x.heroId], 'Cunning'));
+    const exact = mine || (mh.length ? Math.max(...mh) : 0) >= 6;
+    const fort = RU.has(t, 'fort3') ? 'Duskwall Bastion' : RU.has(t, 'fort2') ? 'Stone Citadel' : RU.has(t, 'fort1') ? 'Palisade Keep' : 'no walls';
+    const def = t.defender && st.heroes[t.defender];
+    const gate = S.armyAt(st, t.layer, t.x, t.y);
+    const list = slots => S.stacksIn(slots).filter(s => s.n > 0).map(s => '<div class="ai-row"><img src="' + iconUrl(s.cr) + '" width="40" height="40"><span><b>' + (exact ? s.n : S.countWord(s.n)) + '</b> ' + D.CREATURES[s.cr].plural + (exact ? '' : ' <span class="muted">(' + S.countRange(s.n) + ')</span>') + '</span></div>').join('');
+    const caps = S.captainsIn(t.garrison);
+    return '<b>' + U.esc(t.name) + '</b> — ' + (t.owner >= 0 ? U.esc(st.players[t.owner].name) : 'unclaimed') + '<div class="small">' + fort + (mine ? ' · ' + Math.floor(t.pop) + ' people · +' + RU.townIncome(st, t).gold + ' gold a day' : '') + '</div>'
+      + (def ? '<div class="small">Defending general: ' + U.esc(def.name) + (exact ? ', level ' + def.level : '') + '</div>' : '')
+      + (caps.length ? '<div class="small">Captains: ' + caps.map(c => U.esc(c.name)).join(', ') + '</div>' : '')
+      + '<div class="small muted" style="margin-top:4px">Garrison</div><div class="ai-list">' + (list(t.garrison) || '<span class="small muted">empty</span>') + '</div>'
+      + (gate && gate.owner === t.owner ? '<div class="small muted" style="margin-top:4px">At the gate: ' + U.esc(S.heroOf(st, gate) ? S.heroOf(st, gate).name : 'a squadron') + '</div><div class="ai-list">' + list(S.slotsOf(st, gate)) + '</div>' : '')
+      + (exact ? '' : '<div class="small muted">A hero with Cunning 6 could count them exactly.</div>');
+  };
   U.armyInfoHtml = function (a) {
     const st = U.st, h = S.heroOf(st, a), slots = S.slotsOf(st, a);
     const mh = Object.values(st.armies).filter(x => x.owner === U.viewer && x.heroId).map(x => S.heroStat(st, st.heroes[x.heroId], 'Cunning'));
@@ -239,10 +283,9 @@
     const a = S.armyAt(st, V.layer, e.x, e.y);
     if (a && a.owner === U.viewer) { SU.dialogs.army(a); return; }
     const o = S.objAt(st, V.layer, e.x, e.y) || bodyObj(st, V.layer, e.x, e.y);
-    if (o && o.type === 'town' && o.owner === U.viewer) { SU.townView.open(o); return; }
     const L = st.layers[V.layer], seen = S.inside(L, e.x, e.y) && U.viewerPlayer().explored[V.layer][e.y * L.w + e.x];
     /* someone else's army: each stack with a picture */
-    const html = a && seen ? U.armyInfoHtml(a) : null;
+    const html = a && seen && !(o && o.type === 'town') ? U.armyInfoHtml(a) : o && o.type === 'town' && seen ? U.townInfoHtml(o) : null;
     const txt = U.describe(V.layer, e.x, e.y, true);
     const body = html || (txt ? '<b>' + U.esc(txt).replace(' — ', '</b><br>').replace(/ — /g, '<br>') + (txt.indexOf(' — ') < 0 ? '</b>' : '') : null);
     if (body) { U.tip(body + '<div class="small muted" style="margin-top:4px">Click anywhere to close.</div>', e.sx, e.sy); U._pinned = true; }

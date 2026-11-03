@@ -362,6 +362,12 @@
 
   /* ======================= movement animation ======================= */
   /* walk an army along steps, calling onStep(x,y) for each; resolves when it stops */
+  /* show one step of another player's army; resolves when it has been drawn */
+  V.watchStep = function (a, x, y) {
+    return new Promise(res => { let sent = false;
+      V.walk(a, () => { if (sent) return { stop: true }; sent = true; return { next: [x, y] }; }, () => res());
+      if (V.anim) { V.anim.follow = true; V.anim.speed = SU.ui && SU.ui.fast ? 45 : 95; } });
+  };
   V.walk = function (a, onStep, onDone) {
     V.anim = { army: a.id, fx: a.x, fy: a.y, from: [a.x, a.y], to: null, t: 0, onStep, onDone, last: performance.now() };
     nextStep();
@@ -375,11 +381,11 @@
   function stepAnim(now) {
     const an = V.anim; if (!an || !an.to) return;
     const dt = Math.min(64, now - an.last); an.last = now;
-    an.t += dt / (SU.ui && SU.ui.fast ? 60 : 130);
+    an.t += dt / (an.speed || (SU.ui && SU.ui.fast ? 60 : 130));
     const k = Math.min(1, an.t);
     an.fx = SU.lerp(an.from[0], an.to[0], k); an.fy = SU.lerp(an.from[1], an.to[1], k);
     const a = V.st.armies[an.army];
-    if (a && a.owner === V.viewer()) { V.cam.x += (an.fx + 0.5 - V.cam.x) * 0.15; V.cam.y += (an.fy + 0.5 - V.cam.y) * 0.15; }
+    if (a && (a.owner === V.viewer() || an.follow)) { V.cam.x += (an.fx + 0.5 - V.cam.x) * 0.15; V.cam.y += (an.fy + 0.5 - V.cam.y) * 0.15; }
     if (k >= 1) { an.fx = an.to[0]; an.fy = an.to[1]; an.to = null; nextStep(); }
   }
 
