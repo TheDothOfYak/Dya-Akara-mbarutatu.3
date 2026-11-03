@@ -206,7 +206,7 @@
       add(y, () => ctx.drawImage(sp.c, Math.round(ox + x * ts - sp.ox), Math.round(oy + y * ts - sp.oy)));
     }
     Object.values(st.objects).forEach(o => {
-      if (o.layer !== V.layer || o.gone || o.x < x0 - 3 || o.x > x1 + 3 || o.y < y0 || o.y > y1 + 3) return;
+      if (o.layer !== V.layer || o.gone || o.hidden || o.x < x0 - 3 || o.x > x1 + 3 || o.y < y0 || o.y > y1 + 3) return;
       if (!seen(o.x, o.y) && !(o.type === 'town' && seen(o.x, o.y - 1))) return;
       add(o.y, () => A.object(ctx, st, o, ox + o.x * ts, oy + o.y * ts, ts, t));
     });

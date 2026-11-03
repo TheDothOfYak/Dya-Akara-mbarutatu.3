@@ -81,7 +81,7 @@ async function playGame(seed, size, nPlayers, days) {
   /* the Kahizecvar keeps three skills and costs twice as much next time */
   const shrine = Object.values(st.objects).find(o => o.type === 'visit' && o.kind === 'shrine'); shrine.quest = false;
   const core = SU.make.wildCore(st, 60000); RU.takeCore(st, h, core.id);
-  P.res.ngakara = 999; P.res.stygian = 999;
+  SU.data.RES.forEach(r => P.res[r] = 999999);
   const before = Object.keys(h.skills).length, c1 = RU.kahizCost(h).ngakara;
   const kr = RU.kahizecvar(st, h, shrine, core.id, [0, 1, 2]);
   ok(kr.ok, 'the Kahizecvar works: ' + (kr.why || ''));
@@ -91,6 +91,30 @@ async function playGame(seed, size, nPlayers, days) {
   /* Urverk windows */
   const al = Object.values(st.objects).find(o => o.type === 'urverk' && o.window);
   if (al) { const n = RU.urverkNext(st, al); ok(n >= 0, 'an aligned Urverk opens again'); }
+  /* the rules asked for */
+  { const D = SU.data, RU2 = SU.rules;
+    const kc = RU2.kahizCost({ kahizCount: 0 }); ok(kc.gold === 5000 && D.RES.filter(r => r !== 'gold').every(r => kc[r] === 10), 'the Kahizecvar costs 5000 gold and 10 of everything');
+    ok(RU2.kahizCost({ kahizCount: 2 }).gold === 20000, 'and doubles each time');
+    const elite = SU.make.captain(st, { elite: true }); ok(RU2.capCapacity(st, elite, null) === 1, 'a peerless captain leads one stack');
+    ok(RU2.capCapacity(st, SU.make.captain(st, { abil: 'drillmaster' }), null) === 2, 'an ordinary captain leads two');
+    ok(RU2.stackMorale(st, {}, null, null, {}) === 60, 'morale is 60 out of 100 by default');
+    /* morale moves the damage roll */
+    const st3 = SU.mapgen.newGame({ size: 'S', players: [{ kind: 'human', name: 'A' }, { kind: 'human', name: 'B' }], seed: 9 });
+    const a3 = Object.values(st3.armies).find(x => x.owner === 0), b3 = Object.values(st3.armies).find(x => x.owner === 1);
+    const B3 = BT.create(st3, { owner: 0, army: a3, hero: null, slots: [{ kind: 'stack', cr: 'velnur', n: 20 }, null, null, null, null] }, { owner: 1, army: b3, hero: null, slots: [{ kind: 'stack', cr: 'kaloeik', n: 5 }, null, null, null, null] });
+    const att = B3.units.find(u => u.cr === 'velnur'), tgt = B3.units.find(u => u.cr === 'kaloeik');
+    att.morale = 95; const hi = BT.estimate(st3, B3, att, tgt, false); att.morale = 15; const lo = BT.estimate(st3, B3, att, tgt, false); att.morale = 60;
+    ok(hi > lo * 1.3, 'high morale hits nearer the top of the damage range (' + hi + ' vs ' + lo + ')');
+    /* the eye gives a vision */
+    const P3 = st3.players[0]; const s3 = st3.storm; S.moveArmyIndex(st3, a3, s3.layer, s3.x, s3.y); st3.current = 0;
+    const v = RU2.eyeVision(st3, 0); ok(!!v && P3.vision === v.id, 'ending a turn in the eye gives a vision of the Rokarvac');
+    const t3 = S.townsOf(st3, 0)[0]; t3.built.push('fort3', 'd8'); st3.players[0].res = Object.fromEntries(D.RES.map(r => [r, 1e6]));
+    ok(!RU2.canBuild(st3, t3, 'd9').ok, 'no Nekh Hollow without the Rokarvac in town');
+    const h3 = st3.heroes[a3.heroId]; RU2.giveRelic(st3, h3, 'nekhprint'); S.moveArmyIndex(st3, a3, t3.layer, t3.x, t3.y);
+    ok(RU2.canBuild(st3, t3, 'd9').ok, 'the Rokarvac at the gate lets the town build the Nekh Hollow');
+    /* mounts */
+    a3.mpMax = RU2.mpMax(st3, a3); const before = a3.mpMax; RU2.addMounts(st3, a3, 9); ok(RU2.mpMax(st3, a3) > before * 1.2, 'a punk for every stack: the army travels further');
+  }
   console.log(fails ? fails + ' failure(s)' : 'all good');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

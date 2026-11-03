@@ -15,6 +15,7 @@
 
   /* ======================= army numbers ======================= */
   R_.capCapacity = function (st, cap, hero) {
+    if (cap.elite) return 1;   /* the peerless lead one stack, and only one */
     let c = cap.capacity || 2;
     if (hero) { c += S.skillVal(st, hero, 'captaincy'); const cmd = S.heroStat(st, hero, 'Command'); c += cmd >= 8 ? 2 : cmd >= 4 ? 1 : 0; }
     return Math.min(c, 5);
@@ -30,9 +31,15 @@
     let mp = 1100 + R_.slowest(slots) * 45;
     if (h) mp += S.heroStat(st, h, 'Stride') * 90, mp *= 1 + S.skillVal(st, h, 'wayfind') / 100;
     if (!h) { const cap = S.captainsIn(slots)[0]; if (cap && cap.abil === 'duatwalker') mp *= 1.15; }
+    if (R_.mounted(st, a)) mp *= 1.25;
     if (a.boat) mp = 1500 * (1 + (h ? S.skillVal(st, h, 'seafaring') / 100 : 0));
     return Math.round(mp);
   };
+  /* punk mounts (for travel only: nobody rides them into battle) */
+  R_.mountsOf = (st, a) => a.heroId ? (st.heroes[a.heroId].mounts || 0) : (a.mounts || 0);
+  R_.mounted = (st, a) => { const n = S.stacksIn(S.slotsOf(st, a)).filter(x => x.n > 0).length; return n > 0 && R_.mountsOf(st, a) >= n; };
+  R_.addMounts = (st, a, k) => { if (a.heroId) st.heroes[a.heroId].mounts = (st.heroes[a.heroId].mounts || 0) + k; else a.mounts = (a.mounts || 0) + k; };
+  R_.MOUNT_COST = 120;
   R_.sight = function (st, a) {
     const h = S.heroOf(st, a); let r = 5;
     if (h) r += S.skillVal(st, h, 'scouting') + S.relicMod(st, h, 'sight');
@@ -145,7 +152,10 @@
       return { moved: true, stop: true, msg: 'Ashore.' };
     }
     moveTo(st, a, nx, ny, cost);
-    if (obj && obj.type === 'town') return { moved: true, stop: true, event: { kind: 'town', obj } };
+    if (obj && obj.type === 'town') {
+      if (a.corral && obj.owner === a.owner) { obj.punks = (obj.punks || 0) + a.corral.n; S.log(st, 'The farmers of ' + obj.name + ' take in ' + a.corral.n + ' ' + D.CREATURES[a.corral.cr].plural + '.', a.owner); a.corral = null; }
+      return { moved: true, stop: true, event: { kind: 'town', obj } };
+    }
     /* bad luck: some of a stack trip and fall on their own swords */
     const luck = R_.armyLuck(st, a);
     if (luck < 0 && SU.rng(st).chance(-luck * 0.012)) {
@@ -207,6 +217,10 @@
         R_.takeCore(st, h, o.core); gone();
         return { stop: true, msg: h.name + ' took up the memory core of ' + st.cores[o.core].name + '.', core: o.core };
       case 'visit': return visitPlace(st, a, h, P, o, R);
+      case 'vision':
+        if (!h) return { stop: true, msg: 'Something of the worm lies here. Only a hero can carry it.' };
+        R_.giveRelic(st, h, 'nekhprint'); gone(); if (st.players[o.seer]) st.players[o.seer].vision = null;
+        return { stop: true, msg: h.name + ' has found the Rokarvac of the Nekh! Carry it into a town to build the Nekh Hollow there.', relic: 'nekhprint' };
     }
     return { stop: true };
   };
@@ -282,7 +296,7 @@
     if (h.pouch.includes(cid)) { h.pouch = h.pouch.filter(x => x !== cid); h.cores.push(cid); }
     else if (h.pouch.length < 3) { h.cores = h.cores.filter(x => x !== cid); h.pouch.push(cid); }
   };
-  R_.kahizCost = h => { const m = Math.pow(2, h.kahizCount || 0); return { ngakara: 6 * m, stygian: 6 * m, gold: 2000 * m }; };
+  R_.kahizCost = h => { const m = Math.pow(2, h.kahizCount || 0); const c = { gold: 5000 * m }; D.RES.forEach(r => { if (r !== 'gold') c[r] = 10 * m; }); return c; };
   R_.kahizecvar = function (st, h, shrine, cid, picks) {
     const P = st.players[h.owner], cost = R_.kahizCost(h), core = st.cores[cid];
     if (!core || core.kind !== 'hero' || !h.pouch.includes(cid)) return { ok: false, why: 'Choose a core from the pouch.' };
@@ -326,7 +340,7 @@
     if (['d3', 'd4', 'd5', 'd6'].includes(bid) && !R_.has(t, 'fort1')) return { ok: false, why: 'Needs walls.' };
     if (b.pop && t.pop < b.pop) return { ok: false, why: 'Needs ' + b.pop + ' people (the town has ' + Math.floor(t.pop) + ').' };
     if (b.coast && !t.coast) return { ok: false, why: 'This town is not by the water.' };
-    if (b.unlock && !P.unlocked.includes(b.unlock)) return { ok: false, why: 'Win a battle in the eye of the Sunear’Zikhron to unlock the Nekh’Vorran.' };
+    if (b.unlock && !R_.blueprintHere(st, t)) return { ok: false, why: 'A hero must bring the Rokarvac of the Nekh into this town. End a turn in the eye of the Sunear’Zikhron for a vision of where it lies.' };
     const small = b.small;
     const limit = R_.buildsPerDay(st, t) + (small && !t.smallToday ? 1 : 0);
     if (t.builtToday >= limit) return { ok: false, why: 'Already built today.' };
@@ -396,8 +410,9 @@
     R_.pay(P, cost); stack.cr = c.up; return { ok: true };
   };
   R_.townIncome = function (st, t) {
-    const r = { gold: 0, food: 10 };
-    t.built.forEach(b => { const B = D.BUILDINGS[b]; if (B.gold) r.gold += B.gold; if (B.food) r.food += B.food * (st.weekEvent === 'harvest' ? 1.33 : 1); if (B.res) Object.entries(B.res).forEach(([k, v]) => r[k] = (r[k] || 0) + v); });
+    const hall = R_.has(t, 'hall3') ? 3 : R_.has(t, 'hall2') ? 2 : 1;
+    const r = { gold: 0, food: 8 + hall * 4 };
+    t.built.forEach(b => { const B = D.BUILDINGS[b]; if (B.gold) r.gold += B.gold; if (B.food) r.food += B.food * (st.weekEvent === 'harvest' ? 1.33 : st.weekEvent === 'lean' ? 0.5 : 1); if (B.res) Object.entries(B.res).forEach(([k, v]) => r[k] = (r[k] || 0) + v); });
     r.gold += Math.floor(t.pop * 0.8);
     return r;
   };
@@ -524,14 +539,15 @@
   };
 
   /* ======================= morale, luck, food ======================= */
+  /* morale is out of 100; 60 is a steady stack */
   R_.stackMorale = function (st, stack, cap, hero, ctx) {
-    let m = 0;
-    if (hero) m += Math.floor(S.heroStat(st, hero, 'Command') / 3) + S.skillVal(st, hero, 'hearten');
-    if (cap) m += (cap.morale || 0) + (cap.abil === 'banner' ? 1 : 0);
-    if (ctx && ctx.hungry) m -= 2; else if (ctx && ctx.fed) m += 1;
-    m -= stack.grief || 0;
-    if (ctx && ctx.sanctum) m += 2;
-    return SU.clamp(m, -3, 3);
+    let m = 60;
+    if (hero) m += S.heroStat(st, hero, 'Command') * 2 + S.skillVal(st, hero, 'hearten');
+    if (cap) m += (cap.morale || 0) * 5 + (cap.abil === 'banner' ? 10 : 0);
+    if (ctx && ctx.hungry) m -= 20; else if (ctx && ctx.fed) m += 5;
+    m -= (stack.grief || 0) * 10;
+    if (ctx && ctx.sanctum) m += 15;
+    return SU.clamp(Math.round(m), 0, 100);
   };
   R_.armyLuck = function (st, a) {
     const h = S.heroOf(st, a); let l = 0;
@@ -654,7 +670,12 @@
       s.layer = nl; s.x = p[0]; s.y = p[1]; s.r = Math.max(5, Math.round(st.layers[nl].w / 9));
       markCovered(st, s); return;
     }
-    const steps = st.weekEvent === 'surge' ? 2 : 1;
+    /* the storm breathes: its size, eye and speed wander, middling most often, extremes sometimes */
+    const bell = () => (R.next() + R.next() + R.next()) / 3;
+    const base = Math.max(5, Math.round(L.w / 9));
+    s.r = Math.max(3, Math.round(SU.lerp(s.r, base * (0.45 + 1.3 * bell()), 0.5)));
+    s.eye = Math.round(SU.lerp(s.eye || 1.6, 1 + 2 * bell(), 0.5) * 10) / 10;
+    const steps = (st.weekEvent === 'surge' ? 2 : 1) * (bell() > 0.75 ? 2 : 1);
     for (let k = 0; k < steps; k++) {
       /* drift toward the nearest untouched land, wandering as it goes */
       let best = todo[0], bd = 1e9; todo.forEach(p => { const d = Math.hypot(p[0] - s.x, p[1] - s.y) + R.range(0, 10); if (d < bd) { bd = d; best = p; } });
@@ -668,6 +689,9 @@
   R_.stormDay = function (st) {
     const s = st.storm, R = SU.rng(st);
     R_.moveStorm(st);
+    /* heroes in the storm breathe it in; buried memory cores are washed out of the ground */
+    Object.values(st.armies).forEach(a => { const h = S.heroOf(st, a); if (h && !a.dead && R_.inStorm(st, a.layer, a.x, a.y)) h.breath = M.breathMax(st, h); });
+    Object.values(st.objects).forEach(o => { if (o.hidden && R_.inStorm(st, o.layer, o.x, o.y)) { o.hidden = false; S.log(st, 'The Sunear’Zikhron uncovers a memory core on ' + D.LAYERS[o.layer].name + '.'); } });
     /* the fog comes back where it rages */
     st.players.forEach((P, pi) => {
       const L = st.layers[s.layer], E = P.explored[s.layer];
@@ -696,25 +720,31 @@
     h.xp += xp; const ups = [];
     while (h.xp >= S.xpFor(h.level + 1)) {
       h.level++;
-      const R = SU.rng(st), stat = R.pick(D.STATS); h.stats[stat]++;
-      /* and a skill: choose one of two of the hero's own skills to raise */
+      /* choose one of two stats, and one of two of the hero's own skills, to raise */
+      const R = SU.rng(st), stats = R.shuffle(D.STATS.slice()).slice(0, 2);
       const own = Object.keys(h.skills).filter(id => h.skills[id] < 5);
       R.shuffle(own);
       const choice = own.slice(0, 2);
-      h.levelUps.push({ level: h.level, stat, choice });
-      ups.push({ level: h.level, stat, choice });
+      h.levelUps.push({ level: h.level, stats, choice });
+      ups.push({ level: h.level, stats, choice });
     }
     if (ups.length) h.breath = Math.min(M.breathMax(st, h), h.breath + 5);
     return ups;
   };
-  R_.resolveLevelUp = function (st, h, skillId) {
+  R_.resolveLevelUp = function (st, h, skillId, stat) {
     const u = h.levelUps.shift(); if (!u) return;
+    const sts = u.stats || [u.stat]; const sp = stat && sts.includes(stat) ? stat : sts[0]; if (sp) h.stats[sp]++;
     const id = skillId && u.choice.includes(skillId) ? skillId : u.choice[0];
     if (id) h.skills[id] = Math.min(5, (h.skills[id] || 0) + 1);
     h.breath = Math.min(h.breath, M.breathMax(st, h));
   };
   /* a hero falls: gone for good, leaving a memory core where they fell */
   R_.killHero = function (st, h, layer, x, y, takerOwner, takerHero) {
+    if (R_.carries(h, 'nekhprint')) {
+      Object.keys(h.relics).forEach(k => { if (h.relics[k] === 'nekhprint') delete h.relics[k]; }); h.pack = (h.pack || []).filter(r => r !== 'nekhprint');
+      if (takerHero && !takerHero.dead) R_.giveRelic(st, takerHero, 'nekhprint');
+      else { const p = R_.freeNear(st, layer, x, y); if (p) { const o = { id: SU.uid(st, 'o'), type: 'relic', layer, x: p[0], y: p[1], relic: 'nekhprint' }; st.objects[o.id] = o; S.place(st, o); } }
+    }
     h.dead = true; h.owner = -2;
     const core = M.heroCore(st, h);
     if (takerHero && !takerHero.dead) { R_.takeCore(st, takerHero, core.id); return { core, taken: true }; }
@@ -751,7 +781,37 @@
     st.turnSeq++;
     SU.emit('turn', { player: st.current });
   };
+  /* end a turn with a hero in the eye of the storm and you are given a vision */
+  R_.eyeVision = function (st, pi) {
+    const P = st.players[pi]; if (!P || P.vision) return null;
+    if (Object.values(st.heroes).some(h => h.owner === pi && !h.dead && R_.carries(h, 'nekhprint'))) return null;
+    const a = Object.values(st.armies).find(x => !x.dead && x.owner === pi && x.heroId && R_.inEye(st, x.layer, x.x, x.y)); if (!a) return null;
+    const R = SU.rng(st);
+    for (let k = 0; k < 300; k++) {
+      const li = R.int(0, 2), p = randomLand(st, li); if (!p) continue;
+      if (S.townsOf(st, pi).some(t => t.layer === li && Math.hypot(t.x - p[0], t.y - p[1]) < 14)) continue;
+      if (!S.passable(st, li, p[0], p[1] + 1)) continue;
+      const o = { id: SU.uid(st, 'o'), type: 'vision', layer: li, x: p[0], y: p[1], seer: pi };
+      st.objects[o.id] = o; S.place(st, o);
+      const g = M.wild(st, li, p[0], p[1] + 1, 9000 + st.day * 450, { only: ['harkal', 'kaloeik', 'tyndael', 'xiweik', 'ularnaga', 'lutut'] }); g.guard = o.id;
+      if (S.armyAt(st, li, p[0], p[1] + 1) !== g) { const q = R_.freeNear(st, li, p[0], p[1] + 1); if (q) S.moveArmyIndex(st, g, li, q[0], q[1]); }
+      P.vision = o.id;
+      S.reveal(st, pi, li, p[0], p[1], 3);
+      S.log(st, P.name + ' was given a vision in the eye of the storm.', pi);
+      SU.emit('vision', { owner: pi, obj: o });
+      return o;
+    }
+    return null;
+  };
+  R_.carries = (h, rid) => !!h && (Object.values(h.relics || {}).includes(rid) || (h.pack || []).includes(rid));
+  /* is the worm's Rokarvac in this town right now (with a hero at the gate or inside)? */
+  R_.blueprintHere = function (st, t) {
+    const hs = (t.heroes || []).map(id => st.heroes[id]);
+    const a = S.armyAt(st, t.layer, t.x, t.y); if (a && a.owner === t.owner) hs.push(S.heroOf(st, a));
+    return hs.some(h => R_.carries(h, 'nekhprint'));
+  };
   R_.endTurn = function (st) {
+    R_.eyeVision(st, st.current);
     const n = st.players.length;
     let next = st.current;
     for (let k = 0; k < n; k++) {
@@ -773,6 +833,7 @@
       if (!P.alive) return;
       const towns = S.townsOf(st, pi);
       /* income */
+      const food0 = P.res.food;
       towns.forEach(t => { const inc = R_.townIncome(st, t); Object.entries(inc).forEach(([k, v]) => P.res[k] += v); t.builtToday = 0; t.smallToday = 0; if (t.sealed > 0) t.sealed--; });
       Object.values(st.objects).forEach(o => { if (o.type !== 'mine' || o.owner !== pi) return; const Mi = D.MINES[o.kind];
         let amt = Mi.amt; if (o.kind === 'food' && st.weekEvent === 'lean') amt /= 2; if (o.kind === 'food' && st.weekEvent === 'harvest') amt *= 1.33;
@@ -786,7 +847,7 @@
       let eat = 0;
       Object.values(st.armies).forEach(a => { if (a.dead || a.owner !== pi) return; eat += R_.dailyFood(st, S.slotsOf(st, a), S.heroOf(st, a)); });
       towns.forEach(t => { eat += R_.dailyFood(st, t.garrison) + t.pop * 0.01; (t.heroes || []).forEach(id => eat += R_.dailyFood(st, st.heroes[id].slots, st.heroes[id])); });
-      P.res.food -= eat; P.lastEat = eat;
+      P.lastFoodIn = P.res.food - food0; P.res.food -= eat; P.lastEat = eat;
       if (P.res.food < 0) {
         P.res.food = 0; P.hungry = (P.hungry || 0) + 1;
         if (P.hungry >= 3) { /* desertion (the great beasts stay) */ Object.values(st.armies).forEach(a => { if (a.owner === pi && !a.dead) { S.stacksIn(S.slotsOf(st, a)).forEach(s => { if (!D.CREATURES[s.cr].legendary) s.n -= Math.ceil(s.n * 0.05); }); if (SU.battle) SU.battle._cleanSlots(S.slotsOf(st, a)); } }); S.log(st, 'Hunger: some of ' + P.name + '’s troops have deserted.', pi); }
@@ -802,7 +863,11 @@
           let g = Math.round(c.grow * (1 + fort / 100)); if (st.weekEvent === 'breed' && d.base === 'malsti') g *= 2; if (st.monthEvent === 'plenty' && newMonth) g *= 2;
           t.avail[d.base] = (t.avail[d.base] || 0) + g; });
         const room = R_.housing(t) - t.pop;
-        let grow = t.pop * (P.hungry ? -0.04 : 0.06) + (P.res.food > 50 ? 10 : 0);
+        /* people come slowly; only food to spare brings more */
+        const spare = Math.max(0, (P.lastFoodIn || 0) - (P.lastEat || 0)) / Math.max(1, towns.length);
+        let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.03 + SU.clamp(spare / 60, 0, 0.07));
+        /* the farmers' paddock: corralled punks breed a little */
+        if (t.punks > 0 && R_.has(t, 'granary')) t.punks = Math.round(t.punks * 1.1);
         if (st.weekEvent === 'wanderers') grow += t.pop * 0.1;
         t.pop = SU.clamp(Math.round(t.pop + Math.min(grow, Math.max(0, room))), 60, Math.max(R_.housing(t), t.pop));
       });
@@ -871,6 +936,10 @@
     const res = R.pick(['stygian', 'ngakara', 'timber', 'glowmoss']);
     offers.push({ kind: 'res', res, amt: 5, cost: { gold: Math.round(1800 * half) } });
     offers.push({ kind: 'creature', cr: R.pick(['velnur', 'ver', 'harkal']), n: R.int(5, 10), cost: { gold: Math.round(600 * half) } });
+    /* travelling folk from outside the Duskareth */
+    const outsider = R.pick(['wildpunk', 'dompunk', 'uff', 'naga', 'ularnaga']), oc = D.CREATURES[outsider];
+    offers.push({ kind: 'creature', cr: outsider, n: Math.max(1, Math.round(R.int(18, 30) * 10 / (oc.hp * 0.6 + 4))), cost: { gold: Math.round((oc.tier * 350 + 300) * half) } });
+    offers.push({ kind: 'captain', cap: M.captain(st, { level: R.int(1, 2 + Math.floor(st.day / 20)), people: R.pick(['eikar', 'keilia', 'kaloeik', 'karnen']) }), cost: { gold: Math.round(1500 * half) } });
     t._offerWeek = wk; t._offers = offers;
     return offers;
   };

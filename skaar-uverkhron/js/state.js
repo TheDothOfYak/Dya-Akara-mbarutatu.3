@@ -64,7 +64,7 @@
     const L = st.layers[layer]; if (!S.inside(L, x, y)) return null;
     const k = st._occ[layer][y * L.w + x]; if (!k) return null;
     const o = st.objects[st._objList[k - 1]];
-    return o && o.layer === layer && o.x === x && o.y === y && !o.gone ? o : null;
+    return o && o.layer === layer && o.x === x && o.y === y && !o.gone && !o.hidden ? o : null;
   };
   S.armyAt = function (st, layer, x, y) {
     const L = st.layers[layer]; const id = st._armyAt[layer].get(y * L.w + x);

@@ -201,12 +201,16 @@
       case 'scroll': return 'A song scroll: ' + D.SONGS[o.song].name;
       case 'core': { const c = st.cores[o.core]; return 'A memory core' + (c ? ' (' + c.name + ')' : ''); }
       case 'boat': return 'A boat';
+      case 'vision': return 'Where the Rokarvac of the Nekh lies';
     }
     return '';
   }
 
   /* ---------- clicking the map ---------- */
-  SU.on('hover', t => { if (!U.st) return; const s = U.describe(V.layer, t.x, t.y); $('status').textContent = s || ' '; });
+  SU.on('hover', t => { if (!U.st) return; let s = U.describe(V.layer, t.x, t.y);
+    const o = S.objAt(U.st, V.layer, t.x, t.y) || bodyObj(U.st, V.layer, t.x, t.y);
+    if (o && o.type === 'town' && o.owner === U.viewer) s += o.x === t.x && o.y === t.y ? ' — click to walk a hero in through the gate' : ' — click to open the town';
+    $('status').textContent = s || ' '; });
   SU.on('mapinfo', e => {
     if (!U.st) return; const st = U.st;
     const a = S.armyAt(st, V.layer, e.x, e.y);
@@ -226,7 +230,9 @@
     if (own && own.owner === U.viewer && (!sel || own.id !== sel.id || !U.myTurn())) { U.select(own.id); return; }
     if (own && sel && own.id === sel.id) { const town = S.townAtArmy(st, own); if (town) SU.townView.open(town); else SU.dialogs.army(own); return; }
     const o = S.objAt(st, layer, t.x, t.y) || bodyObj(st, layer, t.x, t.y);
-    if (o && o.type === 'town' && o.owner === U.viewer && (!sel || !U.myTurn() || sel.layer !== layer)) { SU.townView.open(o); return; }
+    /* your own castle: clicking the castle opens it; clicking its gate walks a hero in */
+    const onGate = o && o.type === 'town' && o.x === t.x && o.y === t.y;
+    if (o && o.type === 'town' && o.owner === U.viewer && (!sel || !U.myTurn() || sel.layer !== layer || !onGate)) { SU.townView.open(o); return; }
     if (!sel || !U.myTurn()) return;
     if (sel.layer !== layer) { U.toast('That army is on ' + D.LAYERS[sel.layer].name + '. Go through an Urverk to cross.'); return; }
     let tx = t.x, ty = t.y;
@@ -316,6 +322,8 @@
     });
     SU.on('log', () => {});
     SU.on('lost', e => { if (e.owner === U.viewer) U.toast('You lost ' + e.what + '!', 4000); });
+    /* the eye's vision: shown when the player whose turn it was is watching */
+    SU.on('vision', e => { if (!U.st || e.owner !== U.viewer) return; U._pendingVision = e.obj; });
   }
   document.addEventListener('DOMContentLoaded', wire);
 })(typeof window !== 'undefined' ? window : globalThis);

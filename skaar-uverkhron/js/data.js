@@ -136,6 +136,9 @@
     atk: 15, def: 9, dmg: [10, 16], hp: 55, spd: 12, fly: true, capSlots: 2, food: 1.5, el: 'Fti', abil: ['dive'], desc: 'A great aerial ambusher that dives from altitude. Fiercely territorial.' });
   cr('naga', { name: 'Su Naga', plural: 'Su Naga', wild: true, tier: 7, art: 'naga',
     atk: 18, def: 16, dmg: [14, 24], hp: 120, spd: 7, size: 2, shape: [2, 1], capSlots: 2, food: 3, el: 'Su', abil: ['firsthead'], desc: 'A strategic, patient apex predator. "The Su Naga is calm — that is the most dangerous version of it."' });
+  cr('ularnaga', { name: 'Ular Naga', plural: 'Ular Naga', wild: true, beast: true, tier: 8, art: 'ularnaga',
+    atk: 20, def: 21, dmg: [16, 28], hp: 160, spd: 6, size: 2, shape: [2, 2], capSlots: 2, food: 3, el: 'Ular', abil: ['firsthead', 'heads'],
+    desc: 'A many-headed serpent of the earth on four heavy legs, scaled and armoured, with a spiked club tail. New heads grow as the old prove their strength.' });
   cr('mcfly', { name: 'RubberMcFly', plural: 'RubberMcFly', wild: true, tier: 1, art: 'mcfly',
     atk: 1, def: 2, dmg: [1, 1], hp: 6, spd: 9, fly: true, food: 0.1, el: 'Fti', abil: ['storm'], desc: 'The storm’s companions, among the only creatures that fly in the Sunear’Zikhron, and the only time they glow. Killing one is very bad luck.' });
 
@@ -161,6 +164,7 @@
     burrow: 'Moves underground: goes over anything.',
     devour: 'Each strike also heals it.',
     regrow: 'Some of the fallen sprout again after the battle.',
+    heads: 'Many heads: each strike also bites another enemy beside it.',
     dive: 'Its first attack each battle hits much harder.',
     firsthead: 'Its first head is near-invincible: the first blow against it each round is halved.',
     storm: 'Glows in the storm. Killing them brings bad luck.',
@@ -233,7 +237,7 @@
     plunder: { name: 'Plunder', desc: 'More from piles, chests and battles.', per: [10, 20, 30, 40, 50], unit: '% more found' },
     learning: { name: 'Learning', desc: 'More experience.', per: [5, 10, 15, 20, 25], unit: '% XP' },
     captaincy: { name: 'Captaincy', desc: 'Your captains lead more stacks and fight better.', per: [0, 1, 1, 2, 2], unit: ' more stacks per captain (+captain attack)' },
-    hearten: { name: 'Heartening', desc: 'Raises your army’s morale.', per: [1, 1, 2, 2, 3], unit: ' morale' },
+    hearten: { name: 'Heartening', desc: 'Raises your army’s morale.', per: [5, 8, 12, 16, 20], unit: ' morale (out of 100)' },
     fortune: { name: 'Fortune', desc: 'Raises your army’s luck.', per: [1, 1, 2, 2, 3], unit: ' luck' },
     mending: { name: 'Mending', desc: 'After a won battle, some of the fallen recover.', per: [8, 14, 20, 26, 32], unit: '% of the fallen' },
     songcraft: { name: 'Songcraft', desc: 'Sing songs. Each level opens the next tier of songs and deepens your Breath.', per: [1, 2, 3, 4, 5], unit: ' highest song tier' },
@@ -314,7 +318,8 @@
   rel('songbook', { name: 'Rokarvac of Songs', slot: 'misc', rare: 'rare', mods: { breath: 10, Zikhron: 1 }, desc: 'Rokarvac: a journal, a story, a writing book.' });
   rel('stormglass', { name: 'Stormglass', slot: 'misc', rare: 'great', mods: { stormSense: 1, luck: 1 } });
   rel('aerolfeather', { name: 'Feather of the Aerolhorn', slot: 'misc', rare: 'skaar', mods: { Strength: 3, Defense: 3, Command: 2, luck: 1 } });
-  D.RELIC_IDS = Object.keys(D.RELICS);
+  rel('nekhprint', { name: 'Rokarvac of the Nekh', slot: 'misc', rare: 'skaar', mods: {}, desc: 'The worm’s writing-book: how to open a Nekh Hollow. Not used up — any town it is carried into can build the Nekh Hollow while it is there.', special: true });
+  D.RELIC_IDS = Object.keys(D.RELICS).filter(r => !D.RELICS[r].special);
   D.RARE_ORDER = ['common', 'rare', 'great', 'skaar'];
   D.RARE_COLOR = { common: '#cfc6b0', rare: '#6fb4ff', great: '#c48cff', skaar: '#ffcc55' };
 
@@ -408,7 +413,7 @@
     { id: 'dance', name: 'The Dancing Kalo', desc: 'A small Kalo of Xikia dances on its near pass. Every Kalo Urverk is open this week.' },
     { id: 'surge', name: 'A Sunear’Zikhron surge', desc: 'The storm moves twice as fast this week.' },
     { id: 'breed', name: 'A week of the punks', desc: 'Malsti Punks grow twice as fast.' },
-    { id: 'lean', name: 'A lean week', desc: 'Food from mines is halved.' },
+    { id: 'lean', name: 'A week of famine', desc: 'Blight on the fields: farms and farmsteads make half as much food.' },
     { id: 'song', name: 'A singing week', desc: 'Breath comes back twice as fast.' },
     { id: 'wanderers', name: 'Wanderers on the roads', desc: 'More Dearcàn come to every town: +10% population.' },
   ];
@@ -425,6 +430,15 @@
     prophecy: { name: 'The prophecy', desc: 'Win battles in the eye of the Sunear’Zikhron. The first to win three hears the true prophecy, and wins.' },
     gold: { name: 'The treasury', desc: 'Be the first to gather the gold named for this map.' },
     town: { name: 'The seat', desc: 'Take the named town and hold it for a whole week.' },
+  };
+
+  /* ---------------- computer personalities: one is drawn for each computer player ---------------- */
+  D.AI_STYLES = {
+    conqueror: { name: 'Conqueror', desc: 'Builds an army and goes for your towns.', war: 1.5, treasure: 0.8, keep: 1, heroes: 0 },
+    raider: { name: 'Raider', desc: 'Many fast heroes taking mines and treasure.', war: 1, treasure: 1.4, keep: 0.8, heroes: 1 },
+    builder: { name: 'Builder', desc: 'Grows its towns first and strikes late.', war: 0.7, treasure: 1, keep: 1.6, heroes: -1 },
+    explorer: { name: 'Explorer', desc: 'Crosses the worlds, hunts shrines, cores and Relics.', war: 0.9, treasure: 1.6, keep: 1, heroes: 0, urverk: 1.8 },
+    turtle: { name: 'Turtle', desc: 'Walls up and waits for you to break yourself on them.', war: 0.5, treasure: 0.9, keep: 1.3, heroes: -1, garrison: 0.5 },
   };
 
   /* ---------------- AI personalities ---------------- */

@@ -12,7 +12,8 @@
   const G = SU.mapgen = {};
   const T = S.TC, OB = S.OB;
 
-  G.SIZES = { S: 40, M: 54, L: 70, XL: 90 };
+  G.SIZES = { S: 40, M: 54, L: 70, XL: 90, G: 120 };
+  G.SIZE_NAMES = { S: 'Small', M: 'Medium', L: 'Large', XL: 'Extra large', G: 'Gigantic' };
 
   G.newGame = function (setup) {
     const seed = setup.seed || (Math.random() * 1e9) | 0;
@@ -183,31 +184,41 @@
   /* ---------- towns ---------- */
   function placeTowns(st, regions) {
     const R = SU.rng(st), np = st.players.length;
-    const spread = st.setup.spread !== false;
+    /* where everyone starts: three players get a Tatu each; otherwise it's random
+       (or all on Velki, or spread, if the setup says so) */
+    const mode = st.setup.starts || (st.setup.spread === false ? 'velki' : 'random');
+    const layerFor = (() => { if (mode === 'velki') return () => 0; if (mode === 'spread' || np === 3) { const order = R.shuffle([0, 1, 2]); return pi => order[pi % 3]; } return () => R.int(0, 2); })();
     const foot = [[-1, 0], [1, 0], [-1, -1], [0, -1], [1, -1], [-1, -2], [0, -2], [1, -2], [0, 1], [-1, 1], [1, 1]];
     st._starts = [];
     const placed = [[], [], []];
-    st.players.forEach((P, pi) => {
-      const li = spread ? (np === 2 ? pi : pi % 3) : 0;
-      P.startLayer = li;
-      const L = st.layers[li];
-      let best = null, bestD = -1;
+    const minGap = Math.round((G.SIZES[st.setup.size] || 54) * 0.42);
+    const findSpot = li => { const L = st.layers[li]; let best = null, bestD = -1;
       for (let k = 0; k < 500; k++) {
         const x = R.int(4, L.w - 5), y = R.int(5, L.h - 4);
         if (!townSpot(st, li, x, y, regions[li], foot)) continue;
         const d = placed[li].length ? Math.min(...placed[li].map(p => Math.hypot(p[0] - x, p[1] - y))) : Math.min(x, y, L.w - x, L.h - y) + R.range(0, 10);
         if (d > bestD) { bestD = d; best = [x, y]; }
       }
+      return { best, d: placed[li].length ? bestD : 99 }; };
+    st.players.forEach((P, pi) => {
+      let li = layerFor(pi), f = findSpot(li);
+      /* too close to a rival on that world: try the others */
+      if (mode !== 'velki' && (!f.best || f.d < minGap)) [0, 1, 2].filter(l => l !== li).some(l => { const g = findSpot(l); if (g.best && g.d >= minGap) { li = l; f = g; return true; } return false; });
+      P.startLayer = li;
+      const L = st.layers[li];
+      let best = f.best;
       if (!best) best = forceSpot(st, li, regions[li]);
       placed[li].push(best);
       const t = M.town(st, li, best[0], best[1], pi);
       t.coast = nearWater(L, best[0], best[1] + 1) || nearWater(L, best[0] - 1, best[1]) || nearWater(L, best[0] + 1, best[1]);
       clearAround(st, li, best[0], best[1], 3, true);
+      /* a few defenders at home, so nobody's town falls on day two */
+      t.garrison[0] = { kind: 'stack', cr: 'malsti', n: 14 + R.int(0, 6) }; t.garrison[1] = { kind: 'stack', cr: 'velnur', n: 6 + R.int(0, 3) };
       addObj(st, t);
       st._starts.push({ pi, li, x: best[0], y: best[1], town: t.id });
     });
     /* neutral towns */
-    const extra = { S: 1, M: 1, L: 2, XL: 3 }[st.setup.size] || 1;
+    const extra = { S: 1, M: 1, L: 2, XL: 3, G: 4 }[st.setup.size] || 1;
     for (let li = 0; li < 3; li++) for (let k = 0; k < extra; k++) {
       let best = null, bestD = -1; const L = st.layers[li];
       for (let j = 0; j < 400; j++) { const x = R.int(4, L.w - 5), y = R.int(5, L.h - 4); if (!townSpot(st, li, x, y, regions[li], foot)) continue;
@@ -306,7 +317,7 @@
   const FAMILIES = ['the House of Orrin', 'the Vessil family', 'the Keepers of Thren', 'the Lantern-Wardens', 'the Duskmoor clan', 'the Ashfeld family', 'the Sons of Quora'];
   function placeUrverk(st, regions, moons) {
     const R = SU.rng(st), size = st.setup.size;
-    const perPair = size === 'S' ? 2 : size === 'XL' ? 4 : 3;
+    const perPair = size === 'S' ? 2 : size === 'XL' ? 4 : size === 'G' ? 5 : 3;
     const foot = [[-1, -1], [0, -1], [1, -1]];
     const make = (li, kind, extra) => {
       const p = randomFree(st, li, regions[li], R, (x, y) => farFromStarts(st, li, x, y, 7), foot, 600);
@@ -358,6 +369,7 @@
         if (kind === 'songstone') o.song = R.pick(D.SONG_IDS.filter(s => D.SONGS[s].tier <= 3));
         put(o, big.includes(kind) ? [[-1, 0], [0, -1], [-1, -1]] : null); }
       put({ type: 'visit', kind: 'tavern', visited: {} });
+      for (let k = 0; k < Math.max(1, Math.round(area / 900)); k++) { const p = randomFree(st, li, reg, R, (x, y) => farFromStarts(st, li, x, y, 6)); if (p) { const c = M.wildCore(st, 20000 + R.int(0, 40000)); addObj(st, { type: 'core', layer: li, x: p[0], y: p[1], core: c.id, hidden: true }); } }
       if (li === 2 || area > 3000) put({ type: 'visit', kind: 'aerie', visited: {} }, null, (x, y) => farFromStarts(st, li, x, y, 10));
       put({ type: 'visit', kind: 'fair', visited: {} }, [[-1, 0], [0, -1], [-1, -1]]);
       for (let k = 0; k < (area > 3000 ? 2 : 1); k++) { const p = randomFree(st, li, reg, R, (x, y) => nearWater(L, x, y) && farFromStarts(st, li, x, y, 4)); if (p) addObj(st, { type: 'visit', kind: 'shipyard', layer: li, x: p[0], y: p[1], visited: {} }); }

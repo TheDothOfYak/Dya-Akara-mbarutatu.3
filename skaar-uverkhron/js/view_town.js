@@ -235,6 +235,11 @@
     const collect = (slots, label) => S.stacksIn(slots).forEach(s => { const C = D.CREATURES[s.cr]; if (C.up && Object.values(D.BUILDINGS).some(b => b.dwellUp === C.up && town.built.includes(b.id))) ups.push({ s, label }); });
     collect(town.garrison, 'garrison'); if (vh) collect(vh.slots, vh.name);
     if (ups.length) body.appendChild(el('div', { cls: 'col', style: { marginTop: '8px' } }, [el('b', { cls: 'gold', text: 'Upgrade' }), ...ups.map(({ s, label }) => el('div', { cls: 'row' }, [s.n + ' ' + D.CREATURES[s.cr].plural + ' (' + label + ') → ' + D.CREATURES[D.CREATURES[s.cr].up].plural, btn('Upgrade', () => { const r = RU.upgradeStack(st, town, s); if (!r.ok) U.toast(r.why || 'Cannot.'); T.render(); U.refresh(); })]))]));
+    /* the farmers' paddock: corralled punks, sold as mounts (for travel, never ridden into battle) */
+    body.appendChild(el('div', { cls: 'frame', style: { marginTop: '8px' } }, [el('b', { cls: 'gold', text: 'The paddock' }),
+      el('p', { cls: 'small muted', text: (town.punks || 0) + ' punks with the farmers. Corral wild herds here to fill it' + (RU.has(town, 'granary') ? '; with a Granary they breed a little each week.' : '; build a Granary and they will breed.') + ' An army with a punk for every stack travels 25% further.' }),
+      vis ? el('div', { cls: 'row' }, ['The army at the gate has ' + RU.mountsOf(st, vis) + ' mounts for ' + S.stacksIn(S.slotsOf(st, vis)).filter(x => x.n > 0).length + ' stacks' + (RU.mounted(st, vis) ? ' — everyone rides.' : '.'),
+        btn('Buy one (' + RU.MOUNT_COST + ' gold)', () => { if (!(town.punks > 0)) { U.toast('The paddock is empty.'); return; } if (P.res.gold < RU.MOUNT_COST) { U.toast('Not enough gold.'); return; } P.res.gold -= RU.MOUNT_COST; town.punks--; RU.addMounts(st, vis, 1); vis.mpMax = RU.mpMax(st, vis); T.render(); U.refresh(); })]) : el('p', { cls: 'small muted', text: 'Bring an army to the gate to buy mounts.' })]));
   }
 
   function armyTab(body, town, st, P, vis) {
