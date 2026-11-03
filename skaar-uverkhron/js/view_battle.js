@@ -94,6 +94,8 @@
     if (a.kind === 'chaos' && u) { u._pose = 'chaos'; if (k >= 1) u._pose = null; }
     if (a.kind === 'dmg' && !a._seen) { a._seen = true; const t = BV.B.units.find(x => x.uid === a.uid); if (t) { t._flash = 1; if (a.nAfter != null) { t._n = a.nAfter; t._hp = a.hpAfter; if (a.nAfter <= 0) t._dying = 1; } (BV.floats = BV.floats || []).push({ uid: a.uid, text: '-' + a.amount + (a.killed ? '  ☠' + a.killed : ''), t0: now }); } }
     if (a.kind === 'luck') (BV.floats = BV.floats || []).push({ uid: a.uid, text: '✦ luck', t0: now, col: '#9ff0a0' });
+    if (a.kind === 'heal' && !a._seen) { a._seen = true; const t = BV.B.units.find(x => x.uid === a.uid); if (t) { t._hp = t.hpTop; t._n = t.n; (BV.floats = BV.floats || []).push({ uid: a.uid, text: '+' + a.amount, t0: now, col: '#9ff0a0' }); } }
+    if (a.kind === 'bog' && !a._seen) { a._seen = true; (BV.floats = BV.floats || []).push({ uid: a.uid, text: '≋ acid', t0: now, col: '#b8f070' }); }
     if (k >= 1) BV.cur = null;
   }
 
@@ -118,6 +120,12 @@
       g.strokeStyle = 'rgba(255,240,210,0.13)'; g.lineWidth = 1; g.stroke();
     }
     if (BV.hover && reach) { const p = center(BV.hover.c, BV.hover.r, G); hexPath(g, p.x, p.y, G.R * 0.97); g.strokeStyle = 'rgba(255,236,190,0.7)'; g.lineWidth = 2; g.stroke(); }
+    /* the Vyrenalur's trail, and acid bogs (yours, or ones somebody has stepped in) */
+    if (B.trail) Object.entries(B.trail).forEach(([k, v]) => { if (v.until < B.round) return; const [c, rr] = k.split(',').map(Number), p = center(c, rr, G), left = (v.until - B.round + 1) / 4;
+      hexPath(g, p.x, p.y, G.R * 0.9); g.fillStyle = 'rgba(255,246,200,' + (0.1 + 0.18 * left + 0.05 * Math.sin(t * 3 + c)) + ')'; g.fill(); });
+    (B.bogs || []).forEach(bg => { if (!bg.revealed && BV.control(bg.side) !== 'human') return; bg.cells.forEach(k => { const [c, rr] = k.split(',').map(Number), p = center(c, rr, G);
+      hexPath(g, p.x, p.y, G.R * 0.92); g.fillStyle = bg.revealed ? 'rgba(120,170,40,0.45)' : 'rgba(120,170,40,0.18)'; g.fill(); g.strokeStyle = 'rgba(190,240,90,0.5)'; g.lineWidth = 1; g.stroke();
+      for (let i = 0; i < 3; i++) { const bx = p.x + Math.sin(t * 1.3 + i * 2.1 + c) * G.R * 0.4, by = p.y + Math.cos(t * 1.1 + i + rr) * G.R * 0.18; g.fillStyle = 'rgba(200,250,120,0.5)'; A.ell(g, bx, by, 2.5, 2); g.fill(); } }); });
     /* things on the field, back to front */
     const items = [];
     B.obstacles.forEach(k => { const [c, rr] = k.split(',').map(Number); items.push({ y: center(c, rr, G).y, fn: () => drawObstacle(g, B.obstacleKind, center(c, rr, G), G.R) }); });
@@ -142,6 +150,8 @@
       g.save();
       if (a.kind === 'boulder') { g.fillStyle = A.radial(g, x, y, G.R * 0.35, '#a8a395', '#4a4640'); A.ell(g, x, y, G.R * 0.3, G.R * 0.26); g.fill(); }
       else if (cr && cr.art === 'tyndael') { g.shadowColor = '#ff8a3a'; g.shadowBlur = 16; g.fillStyle = A.radial(g, x, y, G.R * 0.3, '#fff2b0', '#ff6a10'); A.ell(g, x, y, G.R * 0.26, G.R * 0.26); g.fill(); }
+      else if (cr && cr.art === 'sprengju') { for (let i = 0; i < 5; i++) { const ox = Math.sin(i * 2.3 + k * 9) * G.R * 0.4, oy = Math.cos(i * 1.7 + k * 7) * G.R * 0.3; g.save(); g.translate(x + ox - i * 6, y + oy); g.rotate(Math.atan2(to.y - from.y, to.x - from.x));
+        g.shadowColor = '#ffb43a'; g.shadowBlur = 8; g.fillStyle = '#ff8c3a'; g.beginPath(); g.moveTo(7, 0); g.lineTo(-4, -3); g.lineTo(-4, 3); g.closePath(); g.fill(); g.fillStyle = '#6ab04a'; g.fillRect(-7, -2, 3, 4); g.restore(); } }
       else if (cr && cr.art === 'ver') { g.strokeStyle = 'rgba(200,180,255,0.8)'; g.lineWidth = 2; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(x - i * 8, y, G.R * (0.2 + i * 0.12), -0.8, 0.8); g.stroke(); } }
       else { g.strokeStyle = '#e8e0d0'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x - (to.x - from.x) * 0.06, y - (to.y - from.y) * 0.06); g.stroke(); }
       g.restore();
@@ -222,9 +232,10 @@
     if (u._rise != null) { g.globalAlpha = Math.min(1, 0.2 + u._rise); g.translate(p.x, p.y); g.rotate(-f * (1 - u._rise) * 1.35); g.translate(-p.x, -p.y); }
     if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.75, u.cap, col, t + u.uid, f, u._pose);
     else {
-      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2 }[C.art] || 1.6);
+      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2, sprengju: 2.1, speareikar: 1.9, stryx: 1.75, albali: 1.7, tonguatjis: 2.1, saklaypunk: 1.8, apibuta: 2.9, sruvorn: 1.9, vyrenalur: 2.9, kipsu: 2.1 }[C.art] || 1.6);
       const extra = C.art === 'nekh' ? { flat: true, stretch: 3.9 } : {};
-      A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1), color: col }, extra));
+      const faded = u.abil && u.abil.includes('fade') && B.round % 2 === 0;
+      A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: (u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1)) * (faded ? 0.32 : 1), color: col }, extra));
     }
     g.restore();
     if (u._dying > 0) return;
@@ -236,7 +247,7 @@
     g.beginPath(); g.roundRect ? g.roundRect(bx, by, tw, G.R * 0.5, 4) : g.rect(bx, by, tw, G.R * 0.5); g.fill(); g.stroke();
     g.fillStyle = '#ffe9b8'; g.textAlign = 'left'; g.fillText(txt, bx + 5, by + G.R * 0.4);
     if (u.kind === 'cap' || (u._n != null ? u._n : u.n) === 1) { const hpw = G.R * 0.9, frac = (u._hp != null ? u._hp : u.hpTop) / u.hp; g.fillStyle = '#000'; g.fillRect(p.x - hpw / 2, p.y + G.R * 0.7, hpw, 3); g.fillStyle = frac > 0.5 ? '#8fd06a' : frac > 0.25 ? '#e8b84a' : '#e0665a'; g.fillRect(p.x - hpw / 2, p.y + G.R * 0.7, hpw * frac, 3); }
-    const icons = []; if (u.fx.stun) icons.push('✶'); if (u.fx.slow) icons.push('⇣'); if (u.fx.quick) icons.push('⇡'); if (u.fx.shroud) icons.push('☁'); if (u.fx.burn) icons.push('🔥'); if (u.defending) icons.push('⛨'); if (u.fx.ward) icons.push('◈');
+    const icons = []; if (u.fx.stun) icons.push('✶'); if (u.fx.slow) icons.push('⇣'); if (u.fx.quick) icons.push('⇡'); if (u.fx.shroud) icons.push('☁'); if (u.fx.burn) icons.push('🔥'); if (u.defending) icons.push('⛨'); if (u.fx.ward) icons.push('◈'); if (u.fx.bound) icons.push('⛓'); if (u.fx.stuck > 0) icons.push('≋'); if (u.ammo) icons.push('🥕' + BT.ammoLeft(u));
     if (icons.length) { g.font = Math.round(G.R * 0.32) + 'px Georgia'; g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(icons.join(' '), p.x, p.y - G.R * 1.9); }
   }
   /* where a stack fell: its bodies stay on the field */
@@ -277,6 +288,8 @@
     if (!u) { BV.card.classList.add('hidden'); return; }
     const sd = B.sides[u.side], act = BT.activeUnit(B);
     const lines = [];
+    const notes = []; if (u.ammo) notes.push(BT.ammoLeft(u) + ' Sprengju in the pouch'); if (u.fx.bound) notes.push('bound by vines'); if (u.fx.stuck > 0) notes.push('stuck'); if (u.abil && u.abil.includes('fade') && B.round % 2 === 0) notes.push('in shadow: nothing can touch it this round');
+    if (notes.length) lines.push('<span class="gold">' + notes.join(' · ') + '</span>');
     if (u.kind === 'cap') lines.push('<b>Captain ' + U.esc(u.name) + '</b> — ' + D.CAPTAIN_RANKS[u.cap.rank].name, 'Health ' + u.hpTop + ' / ' + u.hp + ' · Attack ' + u.atk + ' · Defense ' + u.def, D.CAPTAIN_ABIL[u.cap.abil].name + ': ' + D.CAPTAIN_ABIL[u.cap.abil].desc);
     else { const C = D.CREATURES[u.cr]; lines.push('<b>' + u.n + ' ' + C.plural + '</b> (' + U.esc(sd.label) + ')', 'Attack ' + u.atk + ' · Defense ' + u.def + ' · Damage ' + C.dmg[0] + '–' + C.dmg[1], 'Health ' + u.hpTop + ' / ' + u.hp + ' · Speed ' + u.spd + (u.ranged ? ' · Shots ' + u.shots : ''), 'Morale ' + (u.morale == null ? 60 : u.morale) + ' (' + BT.moraleWord(u.morale == null ? 60 : u.morale) + ')' + (B.el === C.el ? ' · comfortable here' : '')); }
     if (act && act.side !== u.side && humanTurn()) { const shoot = BT.canShoot(B, act); const est = BT.estimate(U.st, B, act, u, shoot); lines.push('<span class="gold">' + (shoot ? 'Shoot' : 'Attack') + ': about ' + est + ' damage, ' + Math.min(u.n, Math.floor(est / u.hp)) + '–' + Math.min(u.n, Math.ceil(est / u.hp)) + ' fall</span>'); }
@@ -303,6 +316,7 @@
     const B = BV.B; if (!h || !humanTurn()) return;
     const u = BT.activeUnit(B), t = BT.unitAt(B, h.c, h.r);
     if (BV.mode) return modeClick(h, t);
+    if (t && t.side === u.side && t !== u && u.abil && u.abil.includes('heal') && BT.adjacent(u, t) && t.hpTop < t.hp) { act({ type: 'heal', target: t }); return; }
     if (t && t.side !== u.side) { if (BT.canShoot(B, u)) act({ type: 'shoot', target: t }); else { const s = bestSpot(u, t); if (s) act({ type: 'attack', target: t, c: s.c, r: s.r }); else U.toast('Out of reach.'); } return; }
     if (B.siege && u.side === 0) { const w = B.siege.cells.get(h.c + ',' + h.r); if (w && w.hp > 0) { act({ type: 'wall', c: h.c, r: h.r }); return; } }
     if (!t || t === u) { if (!t) act({ type: 'move', c: h.c, r: h.r }); }
@@ -347,6 +361,8 @@
     const mine = u && BV.control(u.side) === 'human';
     BV.bar.appendChild(el('div', { cls: 'gold', style: { minWidth: '260px' } }, u ? (mine ? 'Your move: ' : BV.control(u.side) === 'remote' ? (st.players[B.sides[u.side].owner] || {}).name + ' is choosing: ' : 'Waiting: ') + (u.kind === 'cap' ? 'Captain ' + u.name : u.n + ' ' + u.name) + ' (round ' + B.round + ')' : ''));
     if (!mine) return;
+    if (u.abil && u.abil.includes('heal')) BV.bar.appendChild(el('span', { cls: 'small muted', text: 'Click a hurt ally beside it to restore it.' }));
+    if (u.skirmished) BV.bar.appendChild(el('span', { cls: 'small muted', text: 'They have ridden: shoot, or defend.' }));
     BV.bar.appendChild(btn('Wait (W)', () => act({ type: 'wait' }), '', 'Act later this round'));
     BV.bar.appendChild(btn('Defend (D)', () => act({ type: 'defend' }), '', '+30% defense until its next turn'));
     const sd = B.sides[u.side], h = sd.heroId && st.heroes[sd.heroId];

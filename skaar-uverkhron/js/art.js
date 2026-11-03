@@ -170,6 +170,8 @@
     else if (wpn === 'axe') { ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 1.6 * S_; ctx.beginPath(); ctx.moveTo(0, 4 * S_); ctx.lineTo(0, -13 * S_); ctx.stroke(); ctx.fillStyle = lin(ctx, 0, -13 * S_, 6 * S_, -7 * S_, [[0, '#e6e9f0'], [1, '#8a8f9a']]); ctx.beginPath(); ctx.moveTo(0, -13 * S_); ctx.quadraticCurveTo(7 * S_, -13 * S_, 6 * S_, -6 * S_); ctx.lineTo(0, -8 * S_); ctx.fill(); }
     else if (wpn === 'staff') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.5 * S_; ctx.beginPath(); ctx.moveTo(0, 9 * S_); ctx.lineTo(0, -19 * S_); ctx.stroke(); ctx.shadowColor = '#8e7cff'; ctx.shadowBlur = 8 * S_; ctx.fillStyle = '#c9b8ff'; ell(ctx, 0, -20 * S_, 2.2 * S_, 2.2 * S_); ctx.fill(); ctx.shadowBlur = 0; }
     else if (wpn === 'hammer') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(0, 4 * S_); ctx.lineTo(0, -11 * S_); ctx.stroke(); ctx.fillStyle = lin(ctx, -4 * S_, 0, 4 * S_, 0, [[0, '#9aa0aa'], [1, '#585e68']]); ctx.fillRect(-4 * S_, -15 * S_, 8 * S_, 5 * S_); ctx.fillStyle = '#4fe0e8'; ctx.fillRect(-1 * S_, -14 * S_, 2 * S_, 3 * S_); }
+    else if (wpn === 'bow') { const dr = sw ? 1 : 0; ctx.strokeStyle = '#7a5a34'; ctx.lineWidth = 1.3 * S_; ctx.beginPath(); ctx.arc(0, -4 * S_, 9 * S_, -1.2, 1.2); ctx.stroke(); ctx.strokeStyle = '#e8e0d0'; ctx.lineWidth = 0.5 * S_; ctx.beginPath(); ctx.moveTo(Math.cos(-1.2) * 9 * S_, -4 * S_ + Math.sin(-1.2) * 9 * S_); ctx.lineTo(-dr * 4 * S_, -4 * S_); ctx.lineTo(Math.cos(1.2) * 9 * S_, -4 * S_ + Math.sin(1.2) * 9 * S_); ctx.stroke(); if (!dr) { ctx.strokeStyle = '#d8dce6'; ctx.lineWidth = 0.7 * S_; ctx.beginPath(); ctx.moveTo(-3 * S_, -4 * S_); ctx.lineTo(11 * S_, -4 * S_); ctx.stroke(); } }
+    else if (wpn === 'pouch') { ctx.fillStyle = '#7a5a34'; ell(ctx, 0, 0, 4 * S_, 4.4 * S_); ctx.fill(); outline(ctx, 0.6 * S_); ctx.fillStyle = '#ff8c3a'; [[-1.6, -4], [0.6, -5], [2.2, -3.6]].forEach(([x, y]) => { ctx.save(); ctx.translate(x * S_, y * S_); ctx.rotate(-1.2 + x * 0.3); ctx.beginPath(); ctx.moveTo(0, -3 * S_); ctx.lineTo(-1 * S_, 0); ctx.lineTo(1 * S_, 0); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#5aa04a'; ctx.fillRect(-0.8 * S_, 0, 1.6 * S_, 1.2 * S_); ctx.fillStyle = '#ff8c3a'; ctx.restore(); }); }
     else if (wpn === 'banner') { ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.4 * S_; ctx.beginPath(); ctx.moveTo(0, 7 * S_); ctx.lineTo(0, -25 * S_); ctx.stroke(); const wv = Math.sin(t * 4) * 1.5 * S_; ctx.fillStyle = team; ctx.beginPath(); ctx.moveTo(0, -25 * S_); ctx.quadraticCurveTo(6 * S_, -24 * S_ + wv, 11 * S_, -22 * S_); ctx.lineTo(10 * S_, -16 * S_ + wv); ctx.quadraticCurveTo(5 * S_, -17 * S_ - wv, 0, -16 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_); }
     ctx.restore();
   }
@@ -617,9 +619,205 @@
     ctx.shadowBlur = 0; ctx.fillStyle = '#1a2a10'; ell(ctx, 2 * S_, -0.8 * S_, 0.7 * S_, 0.7 * S_); ctx.fill();
   };
 
+
+  /* ======================= the Elsha'ryn ======================= */
+  /* SPRENGJU — little flying carrots, glowing, a leafy top, a trail of sparks. A few stand for the stack. */
+  CREATURE.sprengju = function (ctx, S_, t, o) {
+    const up = o.tint === 1;
+    [[0, 0, 1], [-7, 4, 0.8], [6, 6, 0.75]].forEach(([dx, dy, k], i) => {
+      const bob = Math.sin(t * 6 + i * 2) * 2 * S_, x = dx * S_, y = (-16 + dy) * S_ + bob, s = S_ * k;
+      if (!o.noShadow && i === 0) { ctx.fillStyle = 'rgba(0,0,0,0.2)'; ell(ctx, 0, 0, 8 * S_, 2.4 * S_); ctx.fill(); }
+      ctx.save(); ctx.translate(x, y); ctx.rotate(0.5 + Math.sin(t * 4 + i) * 0.15 + (o.pose === 'attack' ? 0.6 : 0));
+      /* sparks behind */
+      for (let k2 = 0; k2 < 3; k2++) { ctx.fillStyle = rgba(up ? '#fff0a0' : '#ffd24a', 0.7 - k2 * 0.2); ell(ctx, -9 * s - k2 * 3 * s, Math.sin(t * 9 + k2 + i) * 1.4 * s, 1.2 * s, 1 * s); ctx.fill(); }
+      ctx.shadowColor = up ? '#fff0a0' : '#ffb43a'; ctx.shadowBlur = 8 * s;
+      ctx.fillStyle = lin(ctx, -6 * s, -2 * s, 7 * s, 2 * s, [[0, up ? '#ffb050' : '#ff8c3a'], [1, up ? '#ffe0a0' : '#ffc070']]);
+      ctx.beginPath(); ctx.moveTo(-5 * s, -2.6 * s); ctx.quadraticCurveTo(2 * s, -2.4 * s, 8 * s, 0); ctx.quadraticCurveTo(2 * s, 2.4 * s, -5 * s, 2.6 * s); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; outline(ctx, 0.5 * s);
+      ctx.strokeStyle = rgba('#a04a10', 0.6); ctx.lineWidth = 0.5 * s; for (let r = 0; r < 3; r++) { ctx.beginPath(); ctx.moveTo((-2 + r * 3) * s, -2 * s); ctx.lineTo((-1.4 + r * 3) * s, 2 * s); ctx.stroke(); }
+      ctx.fillStyle = '#5aa04a'; [-0.6, 0, 0.6].forEach(a => { ctx.save(); ctx.translate(-5 * s, 0); ctx.rotate(Math.PI + a); ell(ctx, 3 * s, 0, 3 * s, 0.9 * s); ctx.fill(); ctx.restore(); });
+      ctx.restore();
+    });
+  };
+  /* SPEAR EIKAR — an Eikar of the forest with a long spear (Grovewarden Spears wear bark plates) */
+  CREATURE.speareikar = function (ctx, S_, t, o) {
+    const up = o.tint === 1;
+    A.person(ctx, 0, 0, 27 * S_, 'eikar', { color: o.color || '#3f7d3a', look: up ? 61 : 23, weapon: 'spear', t, armor: up, helm: false, swing: o.pose === 'attack' ? 0.9 : 0, noShadow: o.noShadow });
+    /* a leaf over the cap */
+    ctx.fillStyle = up ? '#8fbf3f' : '#5aa04a'; ell(ctx, -2 * S_, -27 * S_, 3.6 * S_, 1.4 * S_, -0.4); ctx.fill(); outline(ctx, 0.5 * S_);
+  };
+  /* STRYX — stone armour, vine limbs, no legs: rooted where it fell */
+  CREATURE.stryx = function (ctx, S_, t, o) {
+    const up = o.tint === 1, stone = up ? '#7a7a6e' : '#8a8478', vine = up ? '#3d6a38' : '#4d7a44';
+    if (!o.noShadow) shadow(ctx, 12 * S_, 3 * S_);
+    /* roots, spread over the ground */
+    ctx.strokeStyle = shade(vine, -25); ctx.lineCap = 'round';
+    for (let i = 0; i < 6; i++) { const a = (i / 5 - 0.5) * 2.6; ctx.lineWidth = (2 - Math.abs(a) * 0.4) * S_; ctx.beginPath(); ctx.moveTo(Math.sin(a) * 3 * S_, -2 * S_); ctx.quadraticCurveTo(Math.sin(a) * 8 * S_, 0, Math.sin(a) * 13 * S_, 1.4 * S_); ctx.stroke(); }
+    /* the stone body: stacked plates */
+    const plates = [[0, -6, 9, 6], [0, -14, 8, 5.5], [0, -21, 6, 4.5]];
+    plates.forEach(([x, y, w, h], i) => { ctx.fillStyle = lin(ctx, -w * S_, y * S_, w * S_, y * S_, [[0, shade(stone, 18)], [0.6, stone], [1, shade(stone, -35)]]); ell(ctx, x * S_, y * S_, w * S_, h * S_); ctx.fill(); outline(ctx, 0.8 * S_);
+      ctx.strokeStyle = rgba('#3a3830', 0.4); ctx.lineWidth = 0.6 * S_; ctx.beginPath(); ctx.moveTo((x - w * 0.5) * S_, (y - h * 0.2) * S_); ctx.lineTo((x + w * 0.1) * S_, (y + h * 0.3) * S_); ctx.stroke(); });
+    if (up) { ctx.fillStyle = rgba('#7ab04a', 0.7); ell(ctx, -3 * S_, -24 * S_, 4 * S_, 1.6 * S_); ctx.fill(); ell(ctx, 5 * S_, -10 * S_, 3 * S_, 1.2 * S_); ctx.fill(); }
+    /* vines wrapping it, and two vine arms; one holds a rock */
+    ctx.strokeStyle = vine; ctx.lineWidth = 1.2 * S_; ctx.beginPath(); ctx.moveTo(-8 * S_, -4 * S_); ctx.bezierCurveTo(-2 * S_, -10 * S_, 4 * S_, -12 * S_, 6 * S_, -20 * S_); ctx.stroke();
+    const throwing = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0;
+    [[-1, -16], [1, -17]].forEach(([sd, y], i) => { const ang = sd < 0 ? Math.PI + 0.6 : -0.9 - throwing * 1.4 + Math.sin(t * 2 + i) * 0.1; const ex = sd * 6 * S_ + Math.cos(ang) * 10 * S_, ey = y * S_ + Math.sin(ang) * 10 * S_;
+      ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(sd * 5 * S_, y * S_); ctx.quadraticCurveTo(sd * 10 * S_, (y - 4) * S_, ex, ey); ctx.stroke();
+      if (sd > 0) { ctx.fillStyle = radial(ctx, ex, ey - 1 * S_, 3 * S_, '#b8b2a4', '#5a564c'); ell(ctx, ex, ey - 1 * S_, 2.8 * S_, 2.4 * S_); ctx.fill(); outline(ctx, 0.5 * S_); } });
+    /* a crack of an eye */
+    ctx.fillStyle = '#d8f0a0'; ell(ctx, 2.4 * S_, -21.5 * S_, 1.4 * S_, 0.6 * S_); ctx.fill();
+  };
+  /* ALBALI BYRD — a great pale bird with a single red horn under its healing film */
+  CREATURE.albali = function (ctx, S_, t, o) {
+    const up = o.tint === 1, body = up ? '#f2eee2' : '#e8e3d4', horn = '#b03030';
+    if (!o.noShadow) shadow(ctx, 11 * S_, 3 * S_);
+    const hov = Math.sin(t * 2.6) * 1.6 * S_; ctx.translate(0, -15 * S_ + hov);
+    const flap = Math.sin(t * 6) * 0.5 + (o.pose === 'attack' ? 0.4 : 0);
+    /* far wing */
+    ctx.save(); ctx.rotate(-0.4 - flap); ctx.fillStyle = shade(body, -18); ctx.beginPath(); ctx.moveTo(-2 * S_, -2 * S_); ctx.quadraticCurveTo(-8 * S_, -16 * S_, -16 * S_, -14 * S_); ctx.quadraticCurveTo(-10 * S_, -6 * S_, -4 * S_, 2 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_); ctx.restore();
+    /* tail */
+    ctx.fillStyle = shade(body, -10); ctx.beginPath(); ctx.moveTo(-8 * S_, 0); ctx.lineTo(-17 * S_, 3 * S_); ctx.lineTo(-15 * S_, -1 * S_); ctx.lineTo(-18 * S_, -3 * S_); ctx.lineTo(-8 * S_, -3 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_);
+    /* body */
+    ctx.fillStyle = lin(ctx, 0, -6 * S_, 0, 6 * S_, [[0, '#ffffff'], [0.5, body], [1, shade(body, -22)]]); ell(ctx, 0, 0, 10 * S_, 6 * S_, -0.15); ctx.fill(); outline(ctx, 0.8 * S_);
+    /* head and beak */
+    ctx.fillStyle = body; ell(ctx, 9 * S_, -6 * S_, 4.2 * S_, 3.8 * S_); ctx.fill(); outline(ctx, 0.7 * S_);
+    ctx.fillStyle = '#d9a441'; ctx.beginPath(); ctx.moveTo(12.5 * S_, -6.5 * S_); ctx.lineTo(17 * S_, -5 * S_); ctx.lineTo(12.5 * S_, -4.2 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.5 * S_);
+    ctx.fillStyle = '#1a1410'; ell(ctx, 10.5 * S_, -7 * S_, 0.8 * S_, 0.8 * S_); ctx.fill();
+    /* the one horn, filmed and glistening */
+    ctx.fillStyle = lin(ctx, 8 * S_, -9 * S_, 10 * S_, -17 * S_, [[0, shade(horn, -20)], [1, shade(horn, 30)]]); ctx.beginPath(); ctx.moveTo(7.5 * S_, -9 * S_); ctx.quadraticCurveTo(8 * S_, -15 * S_, 11 * S_, -18 * S_); ctx.quadraticCurveTo(10 * S_, -13 * S_, 10.5 * S_, -9.4 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.5 * S_);
+    ctx.fillStyle = rgba('#d0fff0', 0.35 + Math.sin(t * 3) * 0.15); ell(ctx, 9.6 * S_, -14 * S_, 1 * S_, 3 * S_, 0.4); ctx.fill();
+    /* near wing */
+    ctx.save(); ctx.rotate(0.3 + flap * 0.8); ctx.fillStyle = lin(ctx, 0, -12 * S_, 0, 4 * S_, [[0, '#ffffff'], [1, shade(body, -14)]]); ctx.beginPath(); ctx.moveTo(0, -1 * S_); ctx.quadraticCurveTo(-4 * S_, -18 * S_, -14 * S_, -17 * S_); ctx.quadraticCurveTo(-8 * S_, -8 * S_, -2 * S_, 3 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_);
+    ctx.strokeStyle = rgba('#a09a8c', 0.7); ctx.lineWidth = 0.5 * S_; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-2 * S_ - i * 2 * S_, -2 * S_ - i * 2 * S_); ctx.lineTo(-6 * S_ - i * 2.2 * S_, -10 * S_ - i * 1.6 * S_); ctx.stroke(); } ctx.restore();
+    /* legs tucked */
+    ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 0.9 * S_; ctx.beginPath(); ctx.moveTo(1 * S_, 5 * S_); ctx.lineTo(0, 9 * S_); ctx.moveTo(4 * S_, 5 * S_); ctx.lineTo(3.5 * S_, 9 * S_); ctx.stroke();
+  };
+  /* TONGUATJIS — a great shelled snapper of the deep forest, and a tongue many times its length */
+  CREATURE.tonguatjis = function (ctx, S_, t, o) {
+    const shell = '#4f6b3a', skin = '#7a6a4a', tongue = '#d46a6a';
+    if (!o.noShadow) shadow(ctx, 20 * S_, 4 * S_);
+    const step = Math.sin(t * 3) * 1 * S_;
+    /* stubby legs */
+    ctx.fillStyle = shade(skin, -20); [[-12, 0], [-4, 1], [6, 0], [13, 1]].forEach(([x, k], i) => { ell(ctx, x * S_, -2 * S_ + (i % 2 ? step : -step) * 0.5, 2.6 * S_, 3.6 * S_); ctx.fill(); outline(ctx, 0.6 * S_); });
+    /* head, low and forward, jaws */
+    const snap = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0.15 + Math.sin(t * 1.5) * 0.05;
+    ctx.fillStyle = skin; ell(ctx, 19 * S_, -7 * S_, 6 * S_, 4.4 * S_, 0.1); ctx.fill(); outline(ctx, 0.7 * S_);
+    ctx.fillStyle = shade(skin, -15); ctx.beginPath(); ctx.moveTo(15 * S_, -5 * S_); ctx.lineTo(26 * S_, -4 * S_ + snap * 3 * S_); ctx.lineTo(16 * S_, -2 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_);
+    ctx.fillStyle = '#f0e0a0'; ell(ctx, 21 * S_, -9.4 * S_, 1.1 * S_, 1 * S_); ctx.fill(); ctx.fillStyle = '#1a1208'; ell(ctx, 21.3 * S_, -9.4 * S_, 0.5 * S_, 0.7 * S_); ctx.fill();
+    /* the tongue: rolled in, or lashing out */
+    const lash = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0;
+    ctx.strokeStyle = tongue; ctx.lineCap = 'round'; ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(24 * S_, -4.5 * S_);
+    if (lash > 0.05) { ctx.quadraticCurveTo(34 * S_, -10 * S_ * lash, 24 * S_ + 40 * S_ * lash, -5 * S_); ctx.stroke(); ctx.fillStyle = tongue; ell(ctx, 24 * S_ + 40 * S_ * lash, -5 * S_, 2.4 * S_, 1.8 * S_); ctx.fill(); }
+    else { ctx.quadraticCurveTo(27 * S_, -2 * S_, 25 * S_, -1 * S_); ctx.stroke(); }
+    /* the domed shell, plated, mossy */
+    ctx.fillStyle = lin(ctx, 0, -22 * S_, 0, -2 * S_, [[0, shade(shell, 30)], [0.6, shell], [1, shade(shell, -40)]]); ctx.beginPath(); ctx.moveTo(-17 * S_, -3 * S_); ctx.quadraticCurveTo(-16 * S_, -22 * S_, 1 * S_, -23 * S_); ctx.quadraticCurveTo(17 * S_, -22 * S_, 17 * S_, -3 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 1 * S_);
+    ctx.strokeStyle = rgba('#203018', 0.6); ctx.lineWidth = 0.8 * S_; [[-9, -6, -6, -18], [0, -4, 1, -21], [9, -6, 7, -18]].forEach(([a, b, c, d]) => { ctx.beginPath(); ctx.moveTo(a * S_, b * S_); ctx.lineTo(c * S_, d * S_); ctx.stroke(); });
+    ctx.beginPath(); ctx.moveTo(-14 * S_, -11 * S_); ctx.quadraticCurveTo(0, -15 * S_, 14 * S_, -11 * S_); ctx.stroke();
+    ctx.fillStyle = rgba('#8fbf3f', 0.55); ell(ctx, -4 * S_, -20 * S_, 5 * S_, 1.6 * S_); ctx.fill(); ell(ctx, 7 * S_, -17 * S_, 3 * S_, 1.2 * S_); ctx.fill();
+  };
+  /* SAKLAY'PUNK'EIK — an Eikar archer on a Domestic Punk */
+  CREATURE.saklaypunk = function (ctx, S_, t, o) {
+    if (!o.noShadow) shadow(ctx, 13 * S_, 3.6 * S_);
+    ctx.save(); CREATURE.punk(ctx, S_ * 1.05, t, { tint: 2, noShadow: true, moving: o.moving || o.pose === 'attack', saddle: o.color || '#3f7d3a' }); ctx.restore();
+    ctx.save(); ctx.translate(-1 * S_, -21 * S_);
+    A.person(ctx, 0, 0, 22 * S_, 'eikar', { color: o.color || '#3f7d3a', look: 17, weapon: 'bow', t, noShadow: true, seated: true, swing: o.pose === 'attack' ? 1 : 0 });
+    ctx.restore();
+  };
+  /* API BUTA — the Blind Beast: a huge slug of charred basalt veined with embers, fire tentacles at the mouth, no eyes */
+  CREATURE.apibuta = function (ctx, S_, t, o) {
+    if (!o.noShadow) shadow(ctx, 34 * S_, 5 * S_);
+    const L = 34 * S_, wv = Math.sin(t * 1.4) * 1.2 * S_;
+    /* heat shimmer */
+    ctx.fillStyle = rgba('#ff8a3a', 0.08 + Math.sin(t * 3) * 0.03); ell(ctx, 0, -10 * S_, L * 1.08, 15 * S_); ctx.fill();
+    /* the body: long, low, ridged */
+    ctx.fillStyle = lin(ctx, 0, -20 * S_, 0, 0, [[0, '#4a3a34'], [0.5, '#2a2220'], [1, '#120c0a']]);
+    ctx.beginPath(); ctx.moveTo(-L, -1 * S_); ctx.quadraticCurveTo(-L * 1.05, -9 * S_, -L * 0.7, -12 * S_ + wv);
+    ctx.quadraticCurveTo(-L * 0.2, -20 * S_ - wv, L * 0.35, -18 * S_ + wv); ctx.quadraticCurveTo(L * 0.85, -17 * S_, L * 0.95, -8 * S_); ctx.quadraticCurveTo(L, -1 * S_, L * 0.8, 0); ctx.closePath(); ctx.fill(); outline(ctx, 1.1 * S_);
+    /* the slime foot */
+    ctx.fillStyle = rgba('#5a2a14', 0.7); ell(ctx, 0, -0.6 * S_, L * 0.95, 2 * S_); ctx.fill();
+    /* ember veins, glowing */
+    ctx.save(); ctx.shadowColor = '#ff6a10'; ctx.shadowBlur = 8 * S_; ctx.strokeStyle = rgba('#ff8a3a', 0.65 + Math.sin(t * 2) * 0.25); ctx.lineWidth = 1 * S_;
+    [[-0.8, -6, -0.5, -12, -0.2, -9], [-0.3, -15, 0, -11, 0.25, -16], [0.2, -8, 0.45, -13, 0.7, -9], [-0.6, -12, -0.4, -16, -0.1, -15]].forEach(v => { ctx.beginPath(); ctx.moveTo(v[0] * L, v[1] * S_); ctx.lineTo(v[2] * L, v[3] * S_); ctx.lineTo(v[4] * L, v[5] * S_); ctx.stroke(); });
+    ctx.restore();
+    /* the wide mouth, and its fire tentacles */
+    const breath = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0;
+    ctx.fillStyle = '#1a0806'; ell(ctx, L * 0.93, -6 * S_, 3.6 * S_, 2.6 * S_ + breath * 2 * S_); ctx.fill();
+    ctx.save(); ctx.shadowColor = '#ffb43a'; ctx.shadowBlur = 10 * S_;
+    for (let i = 0; i < 2; i++) { const sd = i ? 1 : -1; ctx.strokeStyle = i ? '#ffd24a' : '#ff8a3a'; ctx.lineWidth = 2 * S_; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(L * 0.92, -9 * S_ + sd * 2 * S_);
+      ctx.bezierCurveTo(L * 1.1, -14 * S_ + sd * 4 * S_ + Math.sin(t * 4 + i) * 2 * S_, L * 1.2, -4 * S_ + sd * 3 * S_, L * 1.08 + Math.sin(t * 5 + i) * 2 * S_, -2 * S_ + sd * S_); ctx.stroke(); }
+    for (let i = 0; i < 6; i++) { ctx.strokeStyle = rgba('#ff8a3a', 0.7); ctx.lineWidth = 1 * S_; const x = L * (0.55 + i * 0.07); ctx.beginPath(); ctx.moveTo(x, -1 * S_); ctx.quadraticCurveTo(x + 1 * S_, 2 * S_, x + Math.sin(t * 6 + i) * 1.5 * S_, 3.6 * S_); ctx.stroke(); }
+    if (breath > 0.05) { ctx.fillStyle = rgba('#ffb43a', 0.6 * breath); ell(ctx, L * 1.25, -6 * S_, 9 * S_ * breath, 4 * S_ * breath); ctx.fill(); ctx.fillStyle = rgba('#fff0a0', 0.7 * breath); ell(ctx, L * 1.15, -6 * S_, 4 * S_ * breath, 2 * S_ * breath); ctx.fill(); }
+    ctx.restore();
+  };
+  /* SRU VORN — a heavy, low lizard with matted fur like armour, curved tusks, a spiked ball-tail and acid saliva */
+  CREATURE.sruvorn = function (ctx, S_, t, o) {
+    const fur = '#6b5b45', acid = '#8fbf3f';
+    if (!o.noShadow) shadow(ctx, 24 * S_, 4.4 * S_);
+    const step = Math.sin(t * 2.5) * 1.2 * S_, lunge = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) * 3 * S_ : 0;
+    /* the tail and its spiked ball */
+    ctx.strokeStyle = shade(fur, -20); ctx.lineWidth = 4 * S_; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-14 * S_, -7 * S_); ctx.quadraticCurveTo(-24 * S_, -6 * S_ + Math.sin(t * 2) * 2 * S_, -29 * S_, -12 * S_); ctx.stroke();
+    ctx.fillStyle = '#5a4a38'; ell(ctx, -30 * S_, -13 * S_, 4 * S_, 4 * S_); ctx.fill(); outline(ctx, 0.7 * S_);
+    ctx.fillStyle = '#d8d0b8'; for (let i = 0; i < 7; i++) { const a = i / 7 * TAU; ctx.beginPath(); ctx.moveTo(-30 * S_ + Math.cos(a) * 3.6 * S_, -13 * S_ + Math.sin(a) * 3.6 * S_); ctx.lineTo(-30 * S_ + Math.cos(a + 0.2) * 6.4 * S_, -13 * S_ + Math.sin(a + 0.2) * 6.4 * S_); ctx.lineTo(-30 * S_ + Math.cos(a + 0.4) * 3.6 * S_, -13 * S_ + Math.sin(a + 0.4) * 3.6 * S_); ctx.fill(); }
+    /* short heavy legs */
+    ctx.fillStyle = shade(fur, -30); [[-10, 1], [-3, -1], [8, 1], [14, -1]].forEach(([x, k]) => { ctx.fillRect((x - 2.4) * S_, -6 * S_ + k * step, 4.8 * S_, 6 * S_); ctx.fillStyle = '#3a3026'; ell(ctx, x * S_, 0, 3 * S_, 1.4 * S_); ctx.fill(); ctx.fillStyle = shade(fur, -30); });
+    /* the body: low and broad, shaggy */
+    ctx.fillStyle = lin(ctx, 0, -18 * S_, 0, -3 * S_, [[0, shade(fur, 20)], [0.6, fur], [1, shade(fur, -35)]]); ell(ctx, 0, -10 * S_, 18 * S_, 8 * S_); ctx.fill(); outline(ctx, 1 * S_);
+    ctx.strokeStyle = rgba('#3a2e20', 0.55); ctx.lineWidth = 0.7 * S_; for (let i = 0; i < 16; i++) { const x = (-15 + i * 2) * S_; ctx.beginPath(); ctx.moveTo(x, -16 * S_ + Math.abs(i - 8) * 0.5 * S_); ctx.quadraticCurveTo(x - 1 * S_, -11 * S_, x + 0.6 * S_, -5 * S_); ctx.stroke(); }
+    /* the head, tusks and acid */
+    ctx.save(); ctx.translate(lunge, 0);
+    ctx.fillStyle = shade(fur, -8); ell(ctx, 19 * S_, -9 * S_, 7 * S_, 5 * S_, 0.1); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.fillStyle = '#efe6cc'; [[0], [1]].forEach(([k]) => { const y = -6 * S_ + k * 1.6 * S_; ctx.beginPath(); ctx.moveTo(22 * S_, y); ctx.quadraticCurveTo(29 * S_, y + 1 * S_, 28 * S_, y - 6 * S_); ctx.quadraticCurveTo(26 * S_, y - 1 * S_, 22 * S_, y - 1.6 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.5 * S_); });
+    ctx.fillStyle = '#e0f070'; ell(ctx, 21 * S_, -12 * S_, 1 * S_, 0.8 * S_); ctx.fill(); ctx.fillStyle = '#1a1a08'; ell(ctx, 21.3 * S_, -12 * S_, 0.4 * S_, 0.7 * S_); ctx.fill();
+    ctx.fillStyle = rgba(acid, 0.75); const drip = (t * 0.8) % 1; ell(ctx, 24 * S_, -4 * S_ + drip * 4 * S_, 0.9 * S_, 1.4 * S_); ctx.fill(); ell(ctx, 21 * S_, -3.6 * S_, 1.6 * S_, 0.8 * S_); ctx.fill();
+    ctx.restore();
+  };
+  /* THE VYRENALUR — Light Shadow: a stag whose hide is shadow dappled with moving light, crowned by antlers of pure light */
+  CREATURE.vyrenalur = function (ctx, S_, t, o) {
+    if (!o.noShadow) shadow(ctx, 22 * S_, 4 * S_);
+    const hide = '#1a1a2c', walk = o.moving || o.pose === 'attack' ? Math.sin(t * 7) : Math.sin(t * 1.2) * 0.15, charge = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0;
+    /* slender legs */
+    ctx.strokeStyle = shade(hide, 10); ctx.lineCap = 'round'; ctx.lineWidth = 2.2 * S_;
+    [[-12, 1], [-8, -1], [10, -1], [14, 1]].forEach(([x, k]) => { const a = walk * 0.35 * k; ctx.beginPath(); ctx.moveTo(x * S_, -16 * S_); ctx.lineTo((x + Math.sin(a) * 5 - 1) * S_, -8 * S_); ctx.lineTo((x + Math.sin(a) * 3) * S_, 0); ctx.stroke(); });
+    ctx.translate(0, 3 * S_);
+    /* the body */
+    ctx.fillStyle = lin(ctx, 0, -26 * S_, 0, -12 * S_, [[0, '#2c2c48'], [1, '#0c0c18']]); ctx.beginPath(); ctx.moveTo(-16 * S_, -16 * S_); ctx.quadraticCurveTo(-17 * S_, -25 * S_, -6 * S_, -25 * S_); ctx.quadraticCurveTo(8 * S_, -27 * S_, 15 * S_, -24 * S_); ctx.quadraticCurveTo(19 * S_, -18 * S_, 14 * S_, -14 * S_); ctx.quadraticCurveTo(0, -12 * S_, -16 * S_, -16 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
+    /* the neck and head, lowered to charge */
+    ctx.save(); ctx.translate(13 * S_, -23 * S_); ctx.rotate(0.55 + charge * 0.7);
+    ctx.fillStyle = '#1e1e34'; ctx.beginPath(); ctx.moveTo(-3 * S_, 2 * S_); ctx.quadraticCurveTo(2 * S_, -8 * S_, 4 * S_, -12 * S_); ctx.lineTo(9 * S_, -10 * S_); ctx.quadraticCurveTo(5 * S_, -2 * S_, 4 * S_, 3 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_);
+    ctx.fillStyle = '#20203a'; ell(ctx, 8 * S_, -12 * S_, 4.6 * S_, 2.6 * S_, 0.3); ctx.fill(); outline(ctx, 0.6 * S_);
+    ctx.fillStyle = '#fff6c8'; ell(ctx, 8 * S_, -13 * S_, 0.8 * S_, 0.8 * S_); ctx.fill();
+    /* antlers of pure light, trailing threads like sunbeams */
+    ctx.save(); ctx.shadowColor = '#fff2b0'; ctx.shadowBlur = 14 * S_; ctx.strokeStyle = rgba('#fffbe0', 0.95); ctx.lineWidth = 1.3 * S_;
+    [[-1, 0], [1, 0.4]].forEach(([sd, off]) => { ctx.beginPath(); ctx.moveTo(6 * S_, -14 * S_); ctx.quadraticCurveTo((4 + sd * 4) * S_, -22 * S_, (2 + sd * 7) * S_, -30 * S_); ctx.stroke();
+      [[0.35, -4, -5], [0.6, 5, -6], [0.85, -3, -5]].forEach(([k, dx, dy]) => { const x = (6 + ((2 + sd * 7) - 6) * k) * S_, y = (-14 - 16 * k) * S_; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx * S_, y + dy * S_); ctx.stroke(); }); });
+    ctx.strokeStyle = rgba('#fff2b0', 0.35); ctx.lineWidth = 0.6 * S_; for (let i = 0; i < 4; i++) { const x = (2 + i * 2.6) * S_, y = (-26 - i) * S_; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 2 * S_ + Math.sin(t * 2 + i) * S_, y + 16 * S_); ctx.stroke(); }
+    ctx.restore(); ctx.restore();
+    /* light dappling the shadow-hide, drifting */
+    ctx.save(); ctx.beginPath(); ctx.moveTo(-16 * S_, -16 * S_); ctx.quadraticCurveTo(-17 * S_, -25 * S_, -6 * S_, -25 * S_); ctx.quadraticCurveTo(8 * S_, -27 * S_, 15 * S_, -24 * S_); ctx.quadraticCurveTo(19 * S_, -18 * S_, 14 * S_, -14 * S_); ctx.quadraticCurveTo(0, -12 * S_, -16 * S_, -16 * S_); ctx.clip();
+    for (let i = 0; i < 9; i++) { const x = ((i * 37 + t * 4) % 34 - 17) * S_, y = (-15 - (i * 13) % 10) * S_; ctx.fillStyle = rgba('#fff2b0', 0.28 + 0.18 * Math.sin(t * 2 + i)); ell(ctx, x, y, 1.8 * S_, 1.2 * S_); ctx.fill(); }
+    ctx.restore();
+    if (charge > 0.05) { ctx.fillStyle = rgba('#fff6c8', 0.35 * charge); ell(ctx, 26 * S_, -26 * S_, 14 * S_ * charge, 5 * S_ * charge, -0.2); ctx.fill(); }
+  };
+  /* KIPSU — a weasel's face, a fox's ears, a fluffy tail that glows */
+  CREATURE.kipsu = function (ctx, S_, t, o) {
+    if (!o.noShadow) shadow(ctx, 9 * S_, 2.6 * S_);
+    const hop = Math.abs(Math.sin(t * 6)) * (o.moving ? 2 : 0.4) * S_; ctx.translate(0, -hop);
+    /* the tail, glowing in its own pattern */
+    ctx.save(); ctx.shadowColor = '#68e0c8'; ctx.shadowBlur = 10 * S_; ctx.fillStyle = lin(ctx, -16 * S_, -10 * S_, -6 * S_, -4 * S_, [[0, '#9ff8e8'], [1, '#a3703f']]);
+    ctx.beginPath(); ctx.moveTo(-6 * S_, -6 * S_); ctx.quadraticCurveTo(-18 * S_, -4 * S_ + Math.sin(t * 3) * 2 * S_, -16 * S_, -16 * S_); ctx.quadraticCurveTo(-10 * S_, -14 * S_, -5 * S_, -9 * S_); ctx.closePath(); ctx.fill(); ctx.restore(); outline(ctx, 0.5 * S_);
+    ctx.fillStyle = rgba('#d0fff4', 0.8); for (let i = 0; i < 3; i++) { ell(ctx, (-14 + i * 2.6) * S_, (-12 + i) * S_, 0.9 * S_, 0.7 * S_); ctx.fill(); }
+    /* body and legs */
+    ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 1.4 * S_; [[-4, 1], [4, -1]].forEach(([x, k]) => { ctx.beginPath(); ctx.moveTo(x * S_, -5 * S_); ctx.lineTo((x + Math.sin(t * 8) * k) * S_, 0); ctx.stroke(); });
+    ctx.fillStyle = lin(ctx, 0, -10 * S_, 0, -3 * S_, [[0, '#c08a50'], [1, '#7a5230']]); ell(ctx, 0, -6.5 * S_, 7.5 * S_, 3.6 * S_); ctx.fill(); outline(ctx, 0.6 * S_);
+    /* head, pointed snout, big fox ears */
+    ctx.fillStyle = '#b8824a'; ell(ctx, 7.5 * S_, -9 * S_, 3.4 * S_, 2.8 * S_); ctx.fill(); outline(ctx, 0.5 * S_);
+    ctx.beginPath(); ctx.moveTo(10 * S_, -9.8 * S_); ctx.lineTo(13.6 * S_, -8.4 * S_); ctx.lineTo(10 * S_, -7.6 * S_); ctx.fill();
+    ctx.fillStyle = '#a3703f'; [[6, -1], [8.4, 1]].forEach(([x, k]) => { ctx.beginPath(); ctx.moveTo((x - 1.4) * S_, -11 * S_); ctx.lineTo((x + k * 0.6) * S_, -16 * S_); ctx.lineTo((x + 1.4) * S_, -11 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.4 * S_); });
+    ctx.fillStyle = '#1a1208'; ell(ctx, 9 * S_, -9.6 * S_, 0.6 * S_, 0.6 * S_); ctx.fill(); ell(ctx, 13.4 * S_, -8.4 * S_, 0.5 * S_, 0.4 * S_); ctx.fill();
+  };
+
   /* a captain on the battlefield: a person with a banner */
   A.captain = function (ctx, x, y, s, cap, color, t, f, pose) {
-    A.person(ctx, x, y, s, cap.people, { color, look: cap.look, weapon: cap.rank === 'naelst' ? 'staff' : cap.rank === 'thar' ? 'banner' : cap.people === 'keilia' ? 'hammer' : 'sword', t, f, helm: cap.rank === 'stamijan', armor: cap.level > 2, swing: pose === 'attack' ? 1 : 0 });
+    A.person(ctx, x, y, s, cap.people, { color, look: cap.look, weapon: cap.rank === 'jukeeper' ? 'pouch' : cap.rank === 'tracker' ? 'staff' : cap.rank === 'grovewarden' ? 'spear' : cap.rank === 'naelst' ? 'staff' : cap.rank === 'thar' ? 'banner' : cap.people === 'keilia' ? 'hammer' : 'sword', t, f, helm: cap.rank === 'stamijan', armor: cap.level > 2, swing: pose === 'attack' ? 1 : 0 });
   };
 
   /* ======================= resources (icons) ======================= */

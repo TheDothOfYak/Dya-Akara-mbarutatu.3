@@ -32,7 +32,41 @@
   }
 
   /* ---------- the Duskareth town ---------- */
+
+  /* an Elsha'ryn town on the map: a great tree with grown houses, a hedge wall, lantern moss */
+  A.groveTown = function (ctx, o, x, y, ts, t, color) {
+    const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (o.built.includes('hall3') ? 2 : o.built.includes('hall2') ? 1 : 0);
+    const c = cached('grove' + lvl + '_' + ts, ts * 3.4, ts * 3.6, g => {
+      const s = ts / 48, W = ts * 3.4, base = ts * 3.3, cx = W / 2;
+      g.fillStyle = 'rgba(0,0,0,0.32)'; ell(g, cx, base - 4 * s, W * 0.46, ts * 0.42); g.fill();
+      g.fillStyle = lin(g, 0, base - ts * 0.8, 0, base, [[0, '#2e4a24'], [1, '#1a2c16']]); ell(g, cx, base - ts * 0.35, W * 0.44, ts * 0.38); g.fill();
+      /* the great tree */
+      const tw = (22 + lvl * 3) * s, th = ts * (1.8 + lvl * 0.12);
+      g.fillStyle = lin(g, cx - tw, 0, cx + tw, 0, [[0, '#5a3e26'], [0.5, '#7a5634'], [1, '#3a2614']]);
+      g.beginPath(); g.moveTo(cx - tw * 1.6, base - ts * 0.6); g.quadraticCurveTo(cx - tw * 0.7, base - ts * 0.8, cx - tw * 0.6, base - th); g.lineTo(cx + tw * 0.6, base - th); g.quadraticCurveTo(cx + tw * 0.7, base - ts * 0.8, cx + tw * 1.6, base - ts * 0.6); g.closePath(); g.fill(); outline(g, 1.2 * s);
+      g.strokeStyle = rgba('#2a1a0c', 0.5); g.lineWidth = 1 * s; for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(cx + k * tw * 0.25, base - ts * 0.7); g.lineTo(cx + k * tw * 0.2, base - th + 6 * s); g.stroke(); }
+      /* the canopy */
+      const cy = base - th - ts * 0.35;
+      [[-1.1, 0.2, 1], [1.1, 0.25, 1], [0, -0.35, 1.3], [-0.55, -0.15, 1.05], [0.6, -0.1, 1.1]].forEach(([dx, dy, k], i) => { g.fillStyle = radial(g, cx + dx * ts * 0.55, cy + dy * ts * 0.55, ts * 0.6 * k, i % 2 ? '#5a8a3a' : '#4a7a32', '#1e3a18'); ell(g, cx + dx * ts * 0.55, cy + dy * ts * 0.55, ts * 0.55 * k, ts * 0.42 * k); g.fill(); outline(g, 0.8 * s); });
+      /* glowing windows and a doorway in the trunk */
+      g.save(); g.shadowColor = '#9ff8e8'; g.shadowBlur = 10 * s; g.fillStyle = '#c8fff0';
+      [[-0.3, 0.55], [0.3, 0.7], [0, 0.9]].slice(0, 2 + (lvl > 1 ? 1 : 0)).forEach(([dx, k]) => { ell(g, cx + dx * tw * 1.4, base - th * k, 2.6 * s, 3.4 * s); g.fill(); });
+      g.restore();
+      g.fillStyle = '#120c06'; g.beginPath(); g.moveTo(cx - 8 * s, base - ts * 0.62); g.lineTo(cx - 8 * s, base - ts * 0.62 - 12 * s); g.arc(cx, base - ts * 0.62 - 12 * s, 8 * s, Math.PI, 0); g.lineTo(cx + 8 * s, base - ts * 0.62); g.fill();
+      g.save(); g.shadowColor = '#68e0c8'; g.shadowBlur = 10 * s; g.strokeStyle = rgba('#9ff8e8', 0.8); g.lineWidth = 1.3 * s; g.stroke(); g.restore();
+      /* little grown houses round the roots */
+      for (let i = 0; i < 4; i++) { const hx = cx + (i < 2 ? -1 : 1) * (34 + (i % 2) * 16) * s, hy = base - ts * 0.72 - (i % 2) * 5 * s; g.fillStyle = '#6a4a2c'; ell(g, hx, hy, 8 * s, 7 * s); g.fill(); outline(g, 0.6 * s);
+        g.fillStyle = '#3e6a2e'; ell(g, hx, hy - 6 * s, 9 * s, 4 * s); g.fill(); outline(g, 0.5 * s); g.fillStyle = '#ffe9a0'; ell(g, hx, hy, 1.6 * s, 2 * s); g.fill(); }
+      /* a hedge wall once it has walls */
+      if (lvl >= 1) { const wy = base - ts * 0.58; for (let k = -58; k <= 58; k += 8) { g.fillStyle = k % 16 ? '#2e5a26' : '#3a6a2e'; ell(g, cx + k * s, wy - 6 * s, 6 * s, 7 * s + (o.built.includes('fort2') ? 2 * s : 0)); g.fill(); } outline(g, 0.6 * s); }
+      /* banners in the owner's colour */
+      g.fillStyle = '#5a3a20'; g.fillRect(cx + tw * 0.9, base - th - 4 * s, 1.4 * s, 22 * s);
+    });
+    ctx.drawImage(c, x + ts / 2 - c.width / 2, y + ts - ts * 3.3);
+    if (color) { ctx.fillStyle = color; const s = ts / 48, bx = x + ts / 2 + (22 + lvl * 3) * s * 0.9 + 1.4 * s, by = y + ts - ts * 3.3 + ts * 3.3 - ts * (1.8 + lvl * 0.12) - 4 * s; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + 10 * s, by + 3 * s); ctx.lineTo(bx, by + 7 * s); ctx.fill(); }
+  };
   A.town = function (ctx, o, x, y, ts, t, color) {
+    if (o.faction === 'elsharyn') return A.groveTown(ctx, o, x, y, ts, t, color);
     const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (o.built.includes('hall3') ? 2 : o.built.includes('hall2') ? 1 : 0);
     const c = cached('town' + lvl + '_' + ts, ts * 3.4, ts * 3.6, g => {
       const s = ts / 48, W = ts * 3.4, base = ts * 3.3, cx = W / 2;
