@@ -17,7 +17,7 @@
   R_.capCapacity = function (st, cap, hero) {
     if (cap.elite) return 1;   /* the peerless lead one stack, and only one */
     let c = cap.capacity || 2;
-    if (hero) { c += S.skillVal(st, hero, 'captaincy'); const cmd = S.heroStat(st, hero, 'Command'); c += cmd >= 8 ? 2 : cmd >= 4 ? 1 : 0; }
+    if (hero) c += S.skillVal(st, hero, 'captaincy');
     return Math.min(c, 5);
   };
   R_.capUsed = cap => (cap.stacks || []).reduce((t, s) => t + (s ? (D.CREATURES[s.cr].capSlots || 1) : 0), 0);
@@ -231,6 +231,12 @@
       if (o.visited[h.id]) return { stop: true, msg: h.name + ' has already been to the ' + V.name + '.' };
       o.visited[h.id] = 1; h.stats[V.stat]++;
       return { stop: true, msg: V.name + ': ' + h.name + ' gains +1 ' + V.stat + '.' };
+    }
+    if (V.xp) {
+      if (!h) return { stop: true, msg: V.name + ': only a hero can learn here.' };
+      if (o.visited[h.id]) return { stop: true, msg: h.name + ' has already been to the ' + V.name + '.' };
+      o.visited[h.id] = 1; R_.giveXp(st, h, V.xp); if (V.breath) h.breath = M.breathMax(st, h);
+      return { stop: true, msg: V.name + ': ' + h.name + ' gains ' + V.xp + ' experience' + (V.breath ? ' and breathes deep.' : '.') };
     }
     switch (o.kind) {
       case 'tower': S.reveal(st, a.owner, a.layer, o.x, o.y, 16); return { stop: true, msg: 'From the Watchtower you can see a long way.' };
@@ -473,7 +479,8 @@
   };
 
   /* ---------- training halls ---------- */
-  R_.trainCost = h => 150 + Object.keys(h.skills).length * 100;
+  /* a basic skill is cheap to learn: the halls want heroes on the road */
+  R_.trainCost = h => 60 + Object.keys(h.skills).length * 40;
   R_.trainOffer = function (st, t, h, bid) {
     const B = D.BUILDINGS[bid]; if (!B.teaches || !t.built.includes(bid)) return null;
     if (Object.keys(h.skills).length >= 5) return null;
@@ -542,7 +549,7 @@
   /* morale is out of 100; 60 is a steady stack */
   R_.stackMorale = function (st, stack, cap, hero, ctx) {
     let m = 60;
-    if (hero) m += S.heroStat(st, hero, 'Command') * 2 + S.skillVal(st, hero, 'hearten');
+    if (hero) m += S.skillVal(st, hero, 'hearten') + S.relicMod(st, hero, 'morale');
     if (cap) m += (cap.morale || 0) * 5 + (cap.abil === 'banner' ? 10 : 0);
     if (ctx && ctx.hungry) m -= 20; else if (ctx && ctx.fed) m += 5;
     m -= (stack.grief || 0) * 10;
@@ -716,7 +723,7 @@
   /* ======================= heroes: xp and death ======================= */
   R_.giveXp = function (st, h, xp) {
     if (!h || h.dead) return [];
-    xp = Math.round(xp * (1 + S.skillVal(st, h, 'learning') / 100 + S.heroStat(st, h, 'Zikhron') * 0.02));
+    xp = Math.round(xp * (1 + S.skillVal(st, h, 'learning') / 100));
     h.xp += xp; const ups = [];
     while (h.xp >= S.xpFor(h.level + 1)) {
       h.level++;
@@ -755,6 +762,19 @@
   R_.removeArmy = function (st, a) { a.dead = true; const L = st.layers[a.layer]; if (L && st._armyAt[a.layer].get(a.y * L.w + a.x) === a.id) st._armyAt[a.layer].delete(a.y * L.w + a.x); delete st.armies[a.id]; };
 
   /* ======================= players ======================= */
+  /* a town's people, one day: about 3% a week, up to 10% with food to spare, fewer when hungry */
+  R_.popDay = function (st, P, t, nTowns) {
+    const room = R_.housing(t) - t.pop;
+    const spare = Math.max(0, (P.lastFoodIn || 0) - (P.lastEat || 0)) / Math.max(1, nTowns || 1);
+    let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.03 + SU.clamp(spare / 60, 0, 0.07));
+    if (st.weekEvent === 'wanderers') grow += t.pop * 0.1;
+    grow = Math.min(grow, Math.max(0, room)) / D.WEEK + (t.popFrac || 0);
+    const whole = grow >= 0 ? Math.floor(grow) : Math.ceil(grow);
+    t.popFrac = grow - whole;
+    t.pop = SU.clamp(Math.round(t.pop + whole), 60, Math.max(R_.housing(t), t.pop));
+    t.popChange = whole;
+    return whole;
+  };
   R_.checkPlayers = function (st) {
     st.players.forEach((P, pi) => {
       if (!P.alive) return;
@@ -864,15 +884,11 @@
         R_.townDwellings(t).forEach(d => { const c = D.CREATURES[d.base]; if (d.base === 'nekh') { if (!t.nekhCount) t.avail.nekh = 1; return; }
           let g = Math.round(c.grow * (1 + fort / 100)); if (st.weekEvent === 'breed' && d.base === 'malsti') g *= 2; if (st.monthEvent === 'plenty' && newMonth) g *= 2;
           t.avail[d.base] = (t.avail[d.base] || 0) + g; });
-        const room = R_.housing(t) - t.pop;
-        /* people come slowly; only food to spare brings more */
-        const spare = Math.max(0, (P.lastFoodIn || 0) - (P.lastEat || 0)) / Math.max(1, towns.length);
-        let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.03 + SU.clamp(spare / 60, 0, 0.07));
         /* the farmers' paddock: corralled punks breed a little */
         if (t.punks > 0 && R_.has(t, 'granary')) t.punks = Math.round(t.punks * 1.1);
-        if (st.weekEvent === 'wanderers') grow += t.pop * 0.1;
-        t.pop = SU.clamp(Math.round(t.pop + Math.min(grow, Math.max(0, room))), 60, Math.max(R_.housing(t), t.pop));
       });
+      /* daily: people come and go a little every day; only food to spare brings more */
+      towns.forEach(t => R_.popDay(st, P, t, towns.length));
       if (newWeek) R_.refreshTavern(st, P);
       if (!towns.length) { P.daysWithoutTown = (P.daysWithoutTown || 0) + 1; if (P.daysWithoutTown >= 7 && P.alive) { P.alive = false; S.log(st, P.name + ' held no town for a week and is out of the game.', pi);
         Object.values(st.armies).forEach(a => { if (a.owner === pi) R_.removeArmy(st, a); }); } }

@@ -232,7 +232,7 @@
     /* top: name, people, and the way out */
     T.top.innerHTML = '';
     T.top.appendChild(el('h2', { text: town.name }));
-    T.top.appendChild(el('span', { cls: 'panel', style: { padding: '4px 10px' } }, [Math.floor(town.pop) + ' / ' + RU.housing(town) + ' people · +' + RU.townIncome(st, town).gold + ' gold a day · ' + (town.builtToday >= RU.buildsPerDay(st, town) ? 'built today' : 'can build today')]));
+    T.top.appendChild(el('span', { cls: 'panel', style: { padding: '4px 10px' } }, [Math.floor(town.pop) + ' / ' + RU.housing(town) + ' people' + (town.popChange ? ' (' + (town.popChange > 0 ? '+' : '') + town.popChange + ' today)' : '') + ' · +' + RU.townIncome(st, town).gold + ' gold a day · ' + (town.builtToday >= RU.buildsPerDay(st, town) ? 'built today' : 'can build today')]));
     T.top.appendChild(el('span', { cls: 'panel row', style: { padding: '4px 10px', gap: '10px' } }, D.RES.map(r => el('span', { cls: 'res' }, [U.resIcon(r, 16), SU.fmt(P.res[r])]))));
     T.top.appendChild(el('span', { cls: 'spacer' }));
     T.top.appendChild(btn('Leave town', () => T.close(), 'primary'));

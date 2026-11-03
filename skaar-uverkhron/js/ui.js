@@ -207,7 +207,10 @@
   }
 
   /* ---------- clicking the map ---------- */
+  const who = a => { const h = S.heroOf(U.st, a); if (h) return h.name; const c = S.captainsIn(a.slots)[0]; return c ? c.name + '’s squadron' : 'your squadron'; };
   SU.on('hover', t => { if (!U.st) return; let s = U.describe(V.layer, t.x, t.y);
+    const own = S.armyAt(U.st, V.layer, t.x, t.y), sel = U.selectedArmy();
+    if (own && own.owner === U.viewer && sel && own.id !== sel.id && U.myTurn()) s += ' — click to go and meet ' + who(own) + ' and trade · shift-click to pick it';
     const o = S.objAt(U.st, V.layer, t.x, t.y) || bodyObj(U.st, V.layer, t.x, t.y);
     if (o && o.type === 'town' && o.owner === U.viewer) s += o.x === t.x && o.y === t.y ? ' — click to walk a hero in through the gate' : ' — click to open the town';
     $('status').textContent = s || ' '; });
@@ -226,7 +229,14 @@
     if (!S.inside(L, t.x, t.y)) return;
     const own = S.armyAt(st, layer, t.x, t.y);
     const sel = U.selectedArmy();
-    /* clicking your own army: select it (or open its town / army) */
+    /* clicking another of your armies with one selected: walk over to meet it (click again to go);
+       shift-click (or no army selected) picks it instead */
+    if (own && own.owner === U.viewer && sel && own.id !== sel.id && U.myTurn() && !t.shift && own.layer === sel.layer && !S.townAtArmy(st, own)) {
+      if (V.path && V.path.tx === t.x && V.path.ty === t.y && V.path.army === sel.id) { U.move(sel, V.path.steps); return; }
+      U.preview(sel, t.x, t.y);
+      if (V.path) { V.path.target = 'meet'; $('status').textContent = 'Click again to go and meet ' + who(own) + ' and trade. (Shift-click to pick it instead.)'; }
+      return;
+    }
     if (own && own.owner === U.viewer && (!sel || own.id !== sel.id || !U.myTurn())) { U.select(own.id); return; }
     if (own && sel && own.id === sel.id) { const town = S.townAtArmy(st, own); if (town) SU.townView.open(town); else SU.dialogs.army(own); return; }
     const o = S.objAt(st, layer, t.x, t.y) || bodyObj(st, layer, t.x, t.y);

@@ -65,7 +65,7 @@
       /* moving a whole squadron (captain + troops) */
       if (from.sub === 'cap' || (fs.kind === 'stack' && from.sub == null)) {
         const moving = fs;
-        if (F.onlyCaptain && moving.kind === 'cap' && from.g !== to.g) return { why: 'A squadron cannot leave without its captain — move its troops instead.' };
+        if (F.onlyCaptain && moving.kind === 'cap' && from.g !== to.g && !(T.hero && !toSlot)) return { why: 'A squadron cannot leave without its captain — move its troops instead, or put the captain in an empty place in the hero’s army.' };
         if (T.onlyCaptain && to.si > 0) return { why: 'A squadron fights under its captain only.' };
         if (to.sub === 'add' || (to.sub != null && toSlot && toSlot.kind === 'cap')) {
           /* a single stack goes under a captain */
@@ -139,10 +139,31 @@
   };
   DL.exchange = function (a, b) {
     const ha = S.heroOf(st(), a), hb = S.heroOf(st(), b);
-    const m = U.modal([el('h2', { text: 'Armies meet' }),
-      DL.armyEditor([{ label: ha ? ha.name : 'Squadron', slots: S.slotsOf(st(), a), hero: ha, onlyCaptain: !ha, keepOne: true }, { label: hb ? hb.name : 'Squadron', slots: S.slotsOf(st(), b), hero: hb, onlyCaptain: !hb, keepOne: true }], () => U.refresh()),
+    /* a squadron whose captain has gone over to a hero is no more */
+    const tidy = () => { [a, b].forEach(x => { if (!x.dead && !x.heroId && !S.stacksIn(x.slots).length && !S.captainsIn(x.slots).length) RU.removeArmy(st(), x); }); U.refresh(); V.invalidate(); };
+    const sq = !ha ? a : !hb ? b : null, hh = sq === a ? hb : sq === b ? ha : null;
+    const join = () => {
+      const hs = hh.slots, room = hs.filter(x => !x).length, need = sq.slots.filter(Boolean).length;
+      if (room < need) { U.toast(hh.name + ' has room for ' + SU.plural(room, 'more group') + ' only.'); return; }
+      sq.slots.forEach((x, i) => { if (!x) return; hs[hs.indexOf(null)] = x; sq.slots[i] = null; });
+      m.close(); U.toast('The squadron joins ' + hh.name + '’s army.');
+    };
+    const m = U.modal([el('h2', { text: ha && hb ? ha.name + ' meets ' + hb.name : 'Armies meet' }),
+      el('p', { cls: 'small muted', text: 'Click a stack, captain or Relic to pick it up, then click where it goes.' }),
+      DL.armyEditor([{ label: ha ? ha.name : 'Squadron', slots: S.slotsOf(st(), a), hero: ha, onlyCaptain: !ha, keepOne: !!ha }, { label: hb ? hb.name : 'Squadron', slots: S.slotsOf(st(), b), hero: hb, onlyCaptain: !hb, keepOne: !!hb }], () => U.refresh()),
       ha && hb ? relicSwap(ha, hb) : null,
-      el('div', { cls: 'acts' }, [btn('Done', () => m.close(), 'primary')])], { wide: true });
+      ha && hb ? coreSwap(ha, hb) : null,
+      el('div', { cls: 'acts' }, [sq && hh ? btn('Join ' + hh.name + '’s army', join, '', 'The whole squadron, captain and all, marches with the hero') : null, btn('Done', () => m.close(), 'primary')])], { wide: true, onClose: tidy });
+    function coreSwap(x, y) {
+      const box = el('div', { cls: 'col', style: { marginTop: '8px' } });
+      const draw = () => { box.innerHTML = ''; box.appendChild(el('b', { cls: 'gold', text: 'Memory cores' }));
+        [[x, y], [y, x]].forEach(([from, to]) => {
+          const ids = from.pouch.concat(from.cores).filter(id => st().cores[id]);
+          box.appendChild(el('div', { cls: 'row' }, [el('span', { style: { width: '160px' }, cls: 'small', text: from.name + ':' }), ids.length ? null : el('span', { cls: 'small muted', text: 'none' }),
+            ...ids.map(id => { const c = st().cores[id]; return btn((from.pouch.includes(id) ? '◆ ' : '◇ ') + c.name, () => { from.pouch = from.pouch.filter(q => q !== id); from.cores = from.cores.filter(q => q !== id); if (c.kind === 'hero' && to.pouch.length < 3) to.pouch.push(id); else to.cores.push(id); draw(); }, '', 'Give this core to ' + to.name + (from.pouch.includes(id) ? ' (it is in the pouch, in use)' : '')); })]));
+        }); };
+      draw(); return box;
+    }
     function relicSwap(x, y) {
       const box = el('div', { cls: 'col', style: { marginTop: '8px' } });
       const draw = () => { box.innerHTML = ''; box.appendChild(el('b', { cls: 'gold', text: 'Relics' }));
@@ -215,7 +236,7 @@
     render();
     return m;
   };
-  function relicTip(rid) { const r = D.RELICS[rid]; return '<b style="color:' + D.RARE_COLOR[r.rare] + '">' + r.name + '</b> (' + r.rare + ')<br>' + Object.entries(r.mods).map(([k, v]) => (v > 0 ? '+' : '') + v + ' ' + ({ luck: 'luck', breath: 'Breath', rangedPct: '% ranged damage', duatSafe: '% safer Duat crossings', sight: 'sight', foodPct: '% food eaten', goldDay: ' gold a day', stormSense: 'sense the storm' }[k] || k)).join(', ') + (r.desc ? '<br><span class="muted">' + r.desc + '</span>' : ''); }
+  function relicTip(rid) { const r = D.RELICS[rid]; return '<b style="color:' + D.RARE_COLOR[r.rare] + '">' + r.name + '</b> (' + r.rare + ')<br>' + Object.entries(r.mods).map(([k, v]) => (v > 0 ? '+' : '') + v + ' ' + ({ luck: 'luck', breath: 'Breath', rangedPct: '% ranged damage', duatSafe: '% safer Duat crossings', sight: 'sight', foodPct: '% food eaten', goldDay: ' gold a day', stormSense: 'sense the storm', morale: ' morale for the whole army' }[k] || k)).join(', ') + (r.desc ? '<br><span class="muted">' + r.desc + '</span>' : ''); }
   DL.relicTip = relicTip;
 
   /* ======================= things that need an answer ======================= */

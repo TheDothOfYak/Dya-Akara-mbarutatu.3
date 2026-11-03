@@ -428,7 +428,7 @@
   /* ======================= songs ======================= */
   B_.songPower = function (st, h, sid) {
     const sc = S.skill(st, h, 'songcraft');
-    let p = 10 + sc * 8 + S.heroStat(st, h, 'Zikhron') * 2;
+    let p = 12 + sc * 8 + Math.floor((h.level || 1) / 2);
     if (['duatstep', 'dusklash', 'tide', 'nekhcall'].includes(sid)) p *= 1 + S.skillVal(st, h, 'duatcraft') / 200;
     return Math.round(p);
   };
