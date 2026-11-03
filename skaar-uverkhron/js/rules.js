@@ -337,6 +337,13 @@
     if (keilia >= 2 && t.pop >= 500) n++;
     return n;
   };
+  /* punks put to work in a town make its buildings cheaper: wood and stone up to 40% less, gold up to 20% */
+  R_.labourCut = t => Math.min(0.4, (t.labour || 0) / 100);
+  R_.buildCost = function (t, bid) {
+    const b = D.BUILDINGS[bid], k = R_.labourCut(t), o = {};
+    Object.entries(b.cost || {}).forEach(([r, v]) => { o[r] = r === 'gold' ? Math.round(v * (1 - k / 2)) : r === 'wood' || r === 'stone' ? Math.round(v * (1 - k)) : v; });
+    return o;
+  };
   R_.canBuild = function (st, t, bid) {
     const b = D.BUILDINGS[bid], P = st.players[t.owner];
     if (t.built.includes(bid)) return { ok: false, why: 'Built.' };
@@ -350,13 +357,13 @@
     const small = b.small;
     const limit = R_.buildsPerDay(st, t) + (small && !t.smallToday ? 1 : 0);
     if (t.builtToday >= limit) return { ok: false, why: 'Already built today.' };
-    if (!R_.afford(P, b.cost)) return { ok: false, why: 'Not enough resources.', poor: true };
+    if (!R_.afford(P, R_.buildCost(t, bid))) return { ok: false, why: 'Not enough resources.', poor: true };
     return { ok: true };
   };
   R_.build = function (st, t, bid) {
     const chk = R_.canBuild(st, t, bid); if (!chk.ok) return chk;
     const b = D.BUILDINGS[bid], P = st.players[t.owner];
-    R_.pay(P, b.cost);
+    R_.pay(P, R_.buildCost(t, bid));
     if (b.replaces) t.built = t.built.filter(x => x !== b.replaces);
     t.built.push(bid);
     if (b.small && !t.smallToday && t.builtToday >= R_.buildsPerDay(st, t)) t.smallToday = 1; else t.builtToday++;
@@ -375,6 +382,33 @@
     const out = [];
     D.DUSK_LINEUP.forEach((cr, i) => { const b = Object.values(D.BUILDINGS).find(b => b.dwell === cr); if (b && t.built.includes(b.id)) out.push({ tier: i + 1, base: cr, up: R_.dwellingCreature(t, i + 1).up, bid: b.id }); });
     return out;
+  };
+  R_.PUNK_MUSTER = 10; R_.PUNK_FOOD = 6;
+  R_.paddock = function (st, t, what, n, slots, hero) {
+    const P = st.players[t.owner]; n = Math.max(0, Math.floor(n));
+    if (what === 'rest') { n = Math.min(n, t.labour || 0); if (!n) return { ok: false, why: 'No punks are working.' }; t.labour -= n; t.punks = (t.punks || 0) + n; return { ok: true, n }; }
+    n = Math.min(n, t.punks || 0); if (!n) return { ok: false, why: 'The paddock is empty.' };
+    if (what === 'muster') {
+      if (P.res.gold < n * R_.PUNK_MUSTER) return { ok: false, why: 'Training them costs ' + R_.PUNK_MUSTER + ' gold each.' };
+      const tmp = SU.deep(slots); if (!R_.addToSlots(st, tmp, 'dompunk', n, hero)) return { ok: false, why: 'No room: free a slot first.' };
+      P.res.gold -= n * R_.PUNK_MUSTER; slots.splice(0, slots.length, ...tmp); t.punks -= n; return { ok: true, n };
+    }
+    if (what === 'butcher') { t.punks -= n; P.res.food += n * R_.PUNK_FOOD; return { ok: true, n, food: n * R_.PUNK_FOOD }; }
+    if (what === 'work') { t.punks -= n; t.labour = (t.labour || 0) + n; return { ok: true, n }; }
+    return { ok: false };
+  };
+  /* the dwellings a town can recruit from: its own, and with a Muster Ground every town of yours */
+  R_.recruitSources = function (st, t) {
+    const own = R_.townDwellings(t).map(d => Object.assign({ town: t }, d));
+    if (!R_.has(t, 'muster')) return own;
+    S.townsOf(st, t.owner).filter(o => o.id !== t.id).forEach(o => R_.townDwellings(o).forEach(d => own.push(Object.assign({ town: o }, d))));
+    return own;
+  };
+  /* recruit everything you can afford, the strongest first */
+  R_.recruitAll = function (st, t, slots, hero) {
+    const src = R_.recruitSources(st, t).sort((a, b) => b.tier - a.tier); let got = 0;
+    src.forEach(d => { const cr = d.up || d.base, n = R_.maxRecruit(st, d.town, cr, d.base); if (n > 0) { const r = R_.recruit(st, d.town, cr, d.base, n, slots, hero); if (r.ok) got += r.n; } });
+    return got;
   };
   R_.recruitCost = function (cr, n) { const c = D.CREATURES[cr].cost, o = {}; Object.entries(c).forEach(([k, v]) => o[k] = v * n); return o; };
   R_.maxRecruit = function (st, t, cr, base) {
@@ -894,7 +928,7 @@
           if (c.tier >= 8) g = c.grow;   /* the top of the town: one a week, whatever the walls or the month */
           t.avail[d.base] = (t.avail[d.base] || 0) + g; });
         /* the farmers' paddock: corralled punks breed a little */
-        if (t.punks > 0 && R_.has(t, 'granary')) t.punks = Math.round(t.punks * 1.1);
+        if (t.punks > 0 && R_.has(t, 'granary')) t.punks = Math.round(t.punks * 1.1);   /* working punks don't breed */
       });
       /* daily: people come and go a little every day; only food to spare brings more */
       towns.forEach(t => R_.popDay(st, P, t, towns.length));

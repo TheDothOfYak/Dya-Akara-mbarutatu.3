@@ -21,6 +21,7 @@
     terraces: [250, 560, 'houses'], terraces2: [140, 640, 'stonehouses'],
     songs1: [620, 520, 'dome', 1], songs2: [620, 520, 'dome', 2], songs3: [620, 520, 'dome', 3], choir: [620, 520, 'dome', 4],
     t_drill: [1010, 740, 'yard'], t_road: [1460, 720, 'lodge'], t_count: [350, 620, 'counting'], t_capt: [1110, 570, 'lodge2'], t_duat: [700, 430, 'duattower'], t_pens: [1540, 610, 'pens'],
+    woodyard: [1580, 760, 'lodge'], stoneyard: [120, 520, 'counting'], muster: [960, 800, 'yard'],
     vault: [905, 470, 'vault'], shipyard: [70, 790, 'dock'], urverk: [1250, 470, 'ring'], stygwell: [530, 610, 'well'], sanctum: [990, 410, 'sanctum'],
     d1: [300, 740, 'burrow'], d1u: [300, 740, 'burrow', 2], d2: [580, 790, 'barracks'], d2u: [580, 790, 'barracks', 2], d3: [1310, 420, 'spire'], d3u: [1310, 420, 'spire', 2],
     d4: [1050, 655, 'pool'], d4u: [1050, 655, 'pool', 2], d5: [420, 470, 'cloister'], d6: [1530, 430, 'roost'], d7: [210, 440, 'chapel'], d8: [1430, 400, 'crag'], d9: [800, 360, 'hole'],
@@ -34,7 +35,8 @@
     scr.innerHTML = '';
     T.cv = el('canvas', { cls: 'bg' }); scr.appendChild(T.cv);
     T.top = el('div', { cls: 'town-top' }); scr.appendChild(T.top);
-    T.ui = el('div', { cls: 'town-ui town-drawer' }); scr.appendChild(T.ui);
+    T.ui = el('div', { cls: 'town-bar' }); scr.appendChild(T.ui);
+    T.pageEl = el('div', { cls: 'town-page hidden' }); scr.appendChild(T.pageEl);
     T.open_ = T.open_ == null ? false : T.open_;
     T.cv.onmousemove = e => { const b = hit(e); T.hoverB = b; U.tip(b ? '<b>' + D.BUILDINGS[b].name + '</b><br>' + D.BUILDINGS[b].desc + '<br><i class="muted">Click to use · right-click to look closer</i>' : null, e.clientX, e.clientY); T.cv.style.cursor = b ? 'pointer' : 'default'; };
     T.cv.onmouseleave = () => U.tip(null);
@@ -42,15 +44,21 @@
     T.cv.onclick = e => { const b = hit(e); if (!b) return; const B = D.BUILDINGS[b];
       if (TAB_FOR[b] === 'tavern') return DL.tavern(T.town);
       if (TAB_FOR[b] === 'market') return DL.market(T.town);
-      if (B.dwell || B.dwellUp) T.tab = 'recruit'; else if (B.teaches || B.songTier) T.tab = 'heroes'; else if (TAB_FOR[b]) T.tab = TAB_FOR[b]; else T.tab = 'build';
-      T.open_ = true;
-      T.render(); };
+      if (B.dwell || B.dwellUp) return T.page('dwelling', B.dwell || Object.values(D.BUILDINGS).find(x => x.dwell && D.CREATURES[x.dwell].up === B.dwellUp).dwell);
+      if (B.teaches || B.songTier) return T.page('heroes');
+      if (/^hall/.test(b)) return T.page('build');
+      if (/^fort/.test(b)) return T.page('army');
+      if (b === 'muster' || b === 'granary' || b === 'farms') return T.page('recruit');
+      if (TAB_FOR[b]) return T.page(TAB_FOR[b]);
+      T.buildingCard(T.town, b); };
     T.render();
     if (!T.raf) { const loop = now => { T.raf = requestAnimationFrame(loop); if (!document.getElementById('town').classList.contains('hidden')) draw(now / 1000); }; T.raf = requestAnimationFrame(loop); }
   };
   T.close = function () { document.getElementById('town').classList.add('hidden'); V.hidden = false; U.tip(null); U.refresh(); };
   SU.on('town', () => { if (T.town && !document.getElementById('town').classList.contains('hidden')) T.render(); });
-  SU.on('screenkey', e => { if (document.getElementById('town').classList.contains('hidden')) return; if (e.key === 'Escape') T.close(); });
+  SU.on('screenkey', e => { if (document.getElementById('town').classList.contains('hidden')) return; if (e.key === 'Escape') { if (T.open_) { T.open_ = false; T.render(); } else T.close(); } });
+  /* open the page for one thing, over everything */
+  T.page = function (kind, arg) { T.tab = kind; T.pageArg = arg || null; T.open_ = true; T.render(); };
 
   function visitor() { const t = T.town, a = S.armyAt(U.st, t.layer, t.x, t.y); return a && a.owner === t.owner ? a : null; }
   function layout() {
@@ -242,12 +250,19 @@
     if (RU.has(town, 'urverk')) tabs.push(['gate', 'Duat Gate']);
     if (RU.has(town, 'shipyard')) tabs.push(['ship', 'Shipyard']);
     T.ui.innerHTML = '';
-    T.ui.classList.toggle('open', !!T.open_);
-    T.ui.appendChild(el('div', { cls: 'tabs drawer-tabs' }, tabs.map(([id, n]) => btn(n, () => { if (id === 'tavern') return DL.tavern(town); if (id === 'market') { if (!RU.has(town, 'market')) { U.toast('Build a Market Square first.'); return; } return DL.market(town); }
-      if (T.tab === id && T.open_) T.open_ = false; else { T.tab = id; T.open_ = true; } T.render(); }, T.tab === id && T.open_ ? 'on' : '')).concat([T.open_ ? btn('▾ Hide', () => { T.open_ = false; T.render(); }, 'icon', 'Hide the panel and look at the town') : null])));
-    const body = el('div', { cls: 'panel drawer-body', style: { padding: '10px' } }); T.ui.appendChild(body);
-    if (!T.open_) { body.style.display = 'none'; return; }
-    ({ build: buildTab, recruit: recruitTab, army: armyTab, heroes: heroesTab, vault: vaultTab, gate: gateTab, ship: shipTab }[T.tab] || buildTab)(body, town, st, P, vis);
+    T.ui.appendChild(el('div', { cls: 'town-buttons' }, tabs.map(([id, n]) => btn(n, () => { if (id === 'tavern') return DL.tavern(town); if (id === 'market') { if (!RU.has(town, 'market')) { U.toast('Build a Market Square first.'); return; } return DL.market(town); }
+      T.page(id); }))));
+    /* the page: one thing, over everything */
+    const pg = T.pageEl; pg.innerHTML = '';
+    pg.classList.toggle('hidden', !T.open_);
+    if (!T.open_) return;
+    const TITLE = { build: 'Build', recruit: 'Recruit', army: 'Garrison & heroes', heroes: 'Training & songs', vault: 'Memory Vault', gate: 'Duat Gate', ship: 'Shipyard' };
+    const title = T.tab === 'dwelling' ? (Object.values(D.BUILDINGS).find(b => b.dwell === T.pageArg) || {}).name || 'Dwelling' : TITLE[T.tab] || 'Build';
+    pg.appendChild(el('div', { cls: 'tp-head' }, [el('h2', { text: title }), el('span', { cls: 'small muted', text: town.name }), el('span', { cls: 'spacer' }),
+      el('span', { cls: 'row', style: { gap: '10px' } }, D.RES.map(r => el('span', { cls: 'res', 'data-tip': '<b>' + D.RES_INFO[r].name + '</b>' }, [U.resIcon(r, 16), SU.fmt(P.res[r])]))),
+      btn('✕ Back to the town', () => { T.open_ = false; T.render(); }, 'primary', 'Esc')]));
+    const body = el('div', { cls: 'tp-body' }); pg.appendChild(body);
+    ({ build: buildTab, recruit: recruitTab, army: armyTab, heroes: heroesTab, vault: vaultTab, gate: gateTab, ship: shipTab, dwelling: (b, t, s, p, v) => dwellingPage(b, t, s, p, v, T.pageArg) }[T.tab] || buildTab)(body, town, st, P, vis);
   };
 
   /* a building, close up (as the halls of the old games show it): its picture, what it does, what it needs, what it costs */
@@ -278,7 +293,7 @@
       B.teaches ? el('div', { cls: 'small' }, ['Teaches: ' + B.teaches.map(id => D.SKILLS[id].name).join(', ')]) : null,
       needs.length ? el('div', { style: { marginTop: '6px' } }, [el('b', { cls: 'small muted', text: 'Needs' }), ...needs]) : null,
       B.small ? el('div', { cls: 'small muted', text: 'Small: a second building may go up the same day.' }) : null,
-      el('div', { style: { marginTop: '8px' } }, built ? el('b', { cls: 'good', text: 'Built' }) : [el('b', { cls: 'small muted', text: 'Cost' }), el('div', {}, U.costView(B.cost, P))]),
+      el('div', { style: { marginTop: '8px' } }, built ? el('b', { cls: 'good', text: 'Built' }) : [el('b', { cls: 'small muted', text: 'Cost' }), el('div', {}, U.costView(RU.buildCost(town, bid), P)), RU.labourCut(town) ? el('div', { cls: 'small good', text: 'Punks at work here: ' + Math.round(RU.labourCut(town) * 100) + '% off wood and stone, ' + Math.round(RU.labourCut(town) * 50) + '% off gold.' }) : null]),
       !built && !chk.ok && chk.why ? el('div', { cls: 'warn small', style: { marginTop: '4px' }, text: chk.why }) : null]);
     const m = U.modal([el('h2', { text: B.name }), el('div', { cls: 'bc' }, [cv, info]),
       el('div', { cls: 'acts' }, [btn(built ? 'Close' : 'Not now', () => m.close()), !built && town.owner === U.viewer ? btn('Build', () => { const r = RU.build(st, town, bid); if (!r.ok) { U.toast(r.why); return; } m.close(); U.toast(B.name + ' is built.'); T.render(); U.refresh(); }, 'primary big') : null].map(b => { if (b && b.textContent === 'Build' && !chk.ok) b.disabled = true; return b; }))], { wide: true, onClose: () => cancelAnimationFrame(raf) });
@@ -309,27 +324,50 @@
       const built = town.built.includes(bid);
       const chk = built ? { ok: false } : RU.canBuild(st, town, bid);
       grid.appendChild(el('div', { cls: 'bcard' + (built ? ' done' : chk.ok ? ' ok' : ''), onclick: () => T.buildingCard(town, bid), oncontextmenu: e => { e.preventDefault(); T.buildingCard(town, bid); }, 'data-tip': '<b>' + B.name + '</b><br>' + B.desc + (B.req ? '<br><span class="muted">Needs: ' + B.req.map(r => D.BUILDINGS[r].name).join(', ') + '</span>' : '') + (B.pop ? '<br><span class="muted">Needs ' + B.pop + ' people.</span>' : '') + (B.small ? '<br><span class="muted">Small: a second one may go up the same day.</span>' : '') },
-        [el('div', { text: B.name }), built ? el('div', { cls: 'c good', text: 'Built' }) : el('div', { cls: 'c' }, [U.costView(B.cost, P), !chk.ok && !chk.poor ? el('div', { cls: 'warn', text: chk.why }) : null])]));
+        [el('div', { text: B.name }), built ? el('div', { cls: 'c good', text: 'Built' }) : el('div', { cls: 'c' }, [U.costView(RU.buildCost(town, bid), P), !chk.ok && !chk.poor ? el('div', { cls: 'warn', text: chk.why }) : null])]));
     });
     body.appendChild(grid);
   }
 
+  /* where recruits go: the garrison, or the army at the gate */
+  function destOf(town, st, vis) { const vh = vis && S.heroOf(st, vis); const dest = T.dest && (T.dest === 'garrison' || vh) ? T.dest : (vh ? 'hero' : 'garrison'); return { vh, dest, slots: dest === 'hero' && vh ? vh.slots : town.garrison, hero: dest === 'hero' ? vh : null }; }
+  function destRow(town, st, vis) { const d = destOf(town, st, vis); return el('div', { cls: 'row' }, ['Recruit into: ', btn('Garrison', () => { T.dest = 'garrison'; T.render(); }, d.dest === 'garrison' ? 'on' : ''), d.vh ? btn(d.vh.name + '’s army', () => { T.dest = 'hero'; T.render(); }, d.dest === 'hero' ? 'on' : '') : null]); }
+  /* one dwelling, close up: the creature, how many wait, what they cost */
+  function dwellingPage(body, town, st, P, vis, base) {
+    const d = RU.townDwellings(town).find(x => x.base === base);
+    if (!d) { body.appendChild(el('p', { text: 'This dwelling is not built yet.' })); return; }
+    const cr = d.up || d.base, C = D.CREATURES[cr], max = RU.maxRecruit(st, town, cr, d.base), dd = destOf(town, st, vis);
+    const pic = U.creatureIcon(cr, 220, { color: P.color }); pic.classList.add('tp-pic');
+    const range = el('input', { type: 'range', min: 0, max, value: max, style: { width: '260px' } });
+    const lab = el('div', {}); const upd = () => { lab.innerHTML = ''; lab.appendChild(el('b', { cls: 'gold', text: range.value + ' ' + C.plural + ' for ' })); lab.appendChild(U.costView(RU.recruitCost(cr, +range.value), P)); }; range.oninput = upd; upd();
+    body.appendChild(el('div', { cls: 'tp-dwell' }, [pic, el('div', { cls: 'col', style: { gap: '8px' } }, [
+      el('h3', { text: C.plural + ' · tier ' + C.tier }),
+      el('div', {}, [el('b', { cls: 'gold', text: String(town.avail[d.base] || 0) }), ' ready to join · ' + C.grow + ' more each week' + (C.tier >= 8 ? ' (only ever one a week)' : '')]),
+      el('div', { cls: 'small muted', text: 'Attack ' + C.atk + ' · Defense ' + C.def + ' · Damage ' + C.dmg[0] + '–' + C.dmg[1] + ' · Health ' + C.hp + ' · Speed ' + C.spd + (C.ranged ? ' · Shots ' + C.shots : '') + (C.fly ? ' · flies' : '') }),
+      el('div', {}, ['Each: ', U.costView(C.cost, P)]),
+      destRow(town, st, vis), range, lab,
+      el('div', { cls: 'row' }, [btn('Recruit', () => { const r = RU.recruit(st, town, cr, d.base, +range.value, dd.slots, dd.hero); if (!r.ok) U.toast(r.why); else U.toast(r.n + ' ' + C.plural + ' join.'); T.render(); U.refresh(); }, 'primary big'),
+        btn('All I can', () => { range.value = max; upd(); }), btn('More about them…', () => DL.creatureCard(cr, { town }))])])]));
+  }
   function recruitTab(body, town, st, P, vis) {
-    const dw = RU.townDwellings(town);
+    const src = RU.recruitSources(st, town), dd = destOf(town, st, vis);
+    body.appendChild(el('div', { cls: 'row' }, [destRow(town, st, vis), el('span', { cls: 'spacer' }),
+      btn('Recruit everything I can afford', () => { const n = RU.recruitAll(st, town, dd.slots, dd.hero); U.toast(n ? n + ' creatures join.' : 'Nothing more you can afford, or no room.'); T.render(); U.refresh(); }, 'primary', 'The strongest first, as many as your treasury and the slots allow')]));
+    if (RU.has(town, 'muster')) body.appendChild(el('p', { cls: 'small gold', text: 'The Muster Ground: recruit from the dwellings of all your towns. The troops come here.' }));
+    const dw = src;
     if (!dw.length) { body.appendChild(el('p', { text: 'Build dwellings to recruit creatures.' })); return; }
     const vh = vis && S.heroOf(st, vis);
     let dest = T.dest && (T.dest === 'garrison' || vh) ? T.dest : (vh ? 'hero' : 'garrison');
-    body.appendChild(el('div', { cls: 'row' }, ['Recruit into: ', btn('Garrison', () => { T.dest = 'garrison'; T.render(); }, dest === 'garrison' ? 'on' : ''), vh ? btn(vh.name + '’s army', () => { T.dest = 'hero'; T.render(); }, dest === 'hero' ? 'on' : '') : null]));
     const grid = el('div', { cls: 'row', style: { alignItems: 'stretch', marginTop: '8px' } });
     dw.forEach(d => {
-      const cr = d.up || d.base, C = D.CREATURES[cr];
-      const max = RU.maxRecruit(st, town, cr, d.base);
+      const cr = d.up || d.base, C = D.CREATURES[cr], from = d.town || town;
+      const max = RU.maxRecruit(st, from, cr, d.base);
       const range = el('input', { type: 'range', min: 0, max, value: max, style: { width: '120px' } });
       const lab = el('div', { cls: 'small' }); const upd = () => { lab.innerHTML = ''; lab.appendChild(U.costView(RU.recruitCost(cr, +range.value), P)); }; range.oninput = upd; upd();
-      grid.appendChild(el('div', { cls: 'frame col', style: { width: '170px', alignItems: 'center' }, 'data-tip': DL.creatureTip(cr) + '<br><i>Double-click for more.</i>', ondblclick: () => DL.creatureCard(cr, { town }), oncontextmenu: e => { e.preventDefault(); e.stopPropagation(); DL.creatureCard(cr, { town }); } }, [
-        U.creatureIcon(cr, 80, { color: P.color }), el('b', { text: C.plural }), el('div', { cls: 'small muted', text: (town.avail[d.base] || 0) + ' ready' + (C.pop ? ' · uses people' : '') }),
+      grid.appendChild(el('div', { cls: 'frame col', style: { width: '170px', alignItems: 'center' }, 'data-tip': DL.creatureTip(cr) + '<br><i>Double-click for more.</i>', ondblclick: () => from === town ? T.page('dwelling', d.base) : DL.creatureCard(cr, { town }), oncontextmenu: e => { e.preventDefault(); e.stopPropagation(); DL.creatureCard(cr, { town }); } }, [
+        U.creatureIcon(cr, 80, { color: P.color }), el('b', { text: C.plural }), el('div', { cls: 'small muted', text: (from.avail[d.base] || 0) + ' ready' + (from !== town ? ' in ' + from.name : '') + (C.pop ? ' · uses people' : '') }),
         el('div', { cls: 'small' }, U.costView(C.cost, P)), range, lab,
-        btn('Recruit', () => { const slots = dest === 'hero' && vh ? vh.slots : town.garrison; const r = RU.recruit(st, town, cr, d.base, +range.value, slots, dest === 'hero' ? vh : null); if (!r.ok) U.toast(r.why); else U.toast(r.n + ' ' + C.plural + ' join.'); T.render(); U.refresh(); }, 'primary')]));
+        btn('Recruit', () => { const slots = dest === 'hero' && vh ? vh.slots : town.garrison; const r = RU.recruit(st, from, cr, d.base, +range.value, slots, dest === 'hero' ? vh : null); if (!r.ok) U.toast(r.why); else U.toast(r.n + ' ' + C.plural + ' join.'); T.render(); U.refresh(); }, 'primary')]));
     });
     body.appendChild(grid);
     /* upgrades for stacks already here */
@@ -339,11 +377,23 @@
     if (ups.length) body.appendChild(el('div', { cls: 'col', style: { marginTop: '8px' } }, [el('b', { cls: 'gold', text: 'Upgrade' }), ...ups.map(({ s, label }) => el('div', { cls: 'row' }, [s.n + ' ' + D.CREATURES[s.cr].plural + ' (' + label + ') → ' + D.CREATURES[D.CREATURES[s.cr].up].plural, btn('Upgrade', () => { const r = RU.upgradeStack(st, town, s); if (!r.ok) U.toast(r.why || 'Cannot.'); T.render(); U.refresh(); })]))]));
     /* the farmers' paddock: corralled punks, sold as mounts (for travel, never ridden into battle) */
     body.appendChild(el('div', { cls: 'frame', style: { marginTop: '8px' } }, [el('b', { cls: 'gold', text: 'The paddock' }),
-      el('p', { cls: 'small muted', text: (town.punks || 0) + ' punks with the farmers. Corral wild herds here to fill it' + (RU.has(town, 'granary') ? '; with a Granary they breed a little each week.' : '; build a Granary and they will breed.') + ' An army with a punk for every stack travels 25% further.' }),
+      el('p', { cls: 'small muted', text: (town.punks || 0) + ' punks with the farmers' + (town.labour ? ', ' + town.labour + ' at work' : '') + '. Corral wild herds here to fill it' + (RU.has(town, 'granary') ? '; with a Granary they breed a little each week.' : '; build a Granary and they will breed.') + ' An army with a punk for every stack travels 25% further.' }),
+      paddockRow(town, st, P, vis),
       vis ? el('div', { cls: 'row' }, ['The army at the gate has ' + RU.mountsOf(st, vis) + ' mounts for ' + S.stacksIn(S.slotsOf(st, vis)).filter(x => x.n > 0).length + ' stacks' + (RU.mounted(st, vis) ? ' — everyone rides.' : '.'),
         btn('Buy one (' + RU.MOUNT_COST + ' gold)', () => { if (!(town.punks > 0)) { U.toast('The paddock is empty.'); return; } if (P.res.gold < RU.MOUNT_COST) { U.toast('Not enough gold.'); return; } P.res.gold -= RU.MOUNT_COST; town.punks--; RU.addMounts(st, vis, 1); vis.mpMax = RU.mpMax(st, vis); T.render(); U.refresh(); })]) : el('p', { cls: 'small muted', text: 'Bring an army to the gate to buy mounts.' })]));
   }
 
+  function paddockRow(town, st, P, vis) {
+    const n = el('input', { cls: 'inp', type: 'number', min: 1, value: Math.min(10, Math.max(1, town.punks || 1)), style: { width: '64px' } });
+    const dd = destOf(town, st, vis);
+    const go = what => { const r = RU.paddock(st, town, what, +n.value, dd.slots, dd.hero); if (!r.ok) { U.toast(r.why); return; }
+      U.toast({ muster: r.n + ' punks join as Domestic Punks.', butcher: r.n + ' punks make ' + r.food + ' food.', work: r.n + ' punks go to work: buildings here cost less.', rest: r.n + ' punks come back from work.' }[what]); T.render(); U.refresh(); };
+    return el('div', { cls: 'row', style: { marginTop: '6px' } }, [n, ' punks: ',
+      btn('Muster as troops (' + RU.PUNK_MUSTER + ' gold each)', () => go('muster'), '', 'They become a stack of Domestic Punks in ' + (dd.hero ? dd.hero.name + '’s army' : 'the garrison')),
+      btn('Butcher for food (+' + RU.PUNK_FOOD + ' each)', () => go('butcher'), '', 'Food for your people and armies'),
+      btn('Put to work', () => go('work'), '', 'Every 10 working punks take 10% off wood and stone (and 5% off gold) for buildings in this town, up to 40%'),
+      town.labour ? btn('Call them back from work', () => go('rest')) : null]);
+  }
   function armyTab(body, town, st, P, vis) {
     const groups = [];
     const vh = vis && S.heroOf(st, vis);

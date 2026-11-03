@@ -328,14 +328,17 @@
      be built the same day. Effects are read by rules.js. */
   D.BUILDINGS = {};
   function bd(id, o) { o.id = id; D.BUILDINGS[id] = o; }
-  bd('hall1', { name: 'Muster Hall', cost: {}, gold: 750, housing: 400, desc: 'The heart of the town. 750 gold a day.' });
-  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 2500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 300, gold: 1250, housing: 700, replaces: 'hall1', desc: '1250 gold a day, and room for more people.' });
-  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 5000, stone: 10, stygian: 4 }, req: ['hall2', 'fort2'], pop: 600, gold: 2000, housing: 1100, replaces: 'hall2', desc: '2000 gold a day. The seat of a Duskareth lord.' });
+  bd('hall1', { name: 'Muster Hall', cost: {}, gold: 1000, housing: 400, desc: 'The heart of the town. 1000 gold a day.' });
+  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 2500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 300, gold: 1750, housing: 700, replaces: 'hall1', desc: '1750 gold a day, and room for more people.' });
+  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 5000, stone: 10, stygian: 4 }, req: ['hall2', 'fort2'], pop: 600, gold: 3000, housing: 1100, replaces: 'hall2', desc: '3000 gold a day. The seat of a Duskareth lord.' });
   bd('fort1', { name: 'Palisade Keep', cost: { gold: 1500, wood: 5, stone: 5 }, walls: 1, growth: 0, desc: 'Walls and a gate. Needed for every dwelling above the second.' });
   bd('fort2', { name: 'Stone Citadel', cost: { gold: 3000, stone: 12 }, req: ['fort1'], pop: 250, walls: 2, growth: 25, replaces: 'fort1', desc: 'Stone walls and a tower. Creatures grow 25% faster.' });
   bd('fort3', { name: 'Duskwall Bastion', cost: { gold: 5000, stone: 15, stygian: 2 }, req: ['fort2'], pop: 450, walls: 3, growth: 50, replaces: 'fort2', desc: 'Three towers of the Ver. Creatures grow 50% faster.' });
   bd('tavern', { name: 'Tavern of the Lantern', cost: { gold: 500, wood: 5 }, small: true, desc: 'Hire heroes and squadron captains here.' });
   bd('market', { name: 'Market Square', cost: { gold: 500, wood: 5 }, small: true, desc: 'Trade resources. On market day, travelling sellers come.' });
+  bd('woodyard', { name: 'Woodcutters’ Yard', cost: { gold: 600, stone: 2 }, small: true, res: { wood: 2 }, desc: '+2 wood a day.' });
+  bd('stoneyard', { name: 'Stonecutters’ Yard', cost: { gold: 600, wood: 4 }, small: true, res: { stone: 2 }, desc: '+2 stone a day.' });
+  bd('muster', { name: 'Muster Ground', cost: { gold: 2000, wood: 8, stone: 8 }, req: ['hall2'], desc: 'Recruit here from the dwellings of every one of your towns: the troops come straight to this town.' });
   bd('granary', { name: 'Granary', cost: { gold: 800, wood: 6 }, small: true, food: 8, desc: '+8 food a day.' });
   bd('farms', { name: 'Duat-Edge Farms', cost: { gold: 1500, wood: 10 }, req: ['granary'], pop: 200, food: 16, desc: '+16 food a day. Needs 200 people to work them.' });
   bd('terraces', { name: 'Dusk Terraces', cost: { gold: 1000, stone: 6 }, small: true, housing: 300, desc: 'Homes for 300 more people.' });
@@ -369,7 +372,7 @@
   bd('d7', { name: 'Horned Chapel', cost: { gold: 5000, stygian: 3, glowmoss: 3, stone: 8 }, req: ['fort2', 'd5'], pop: 250, dwell: 'xiweik', desc: 'The Xiw’Eik sing their chaos here.' });
   bd('d8', { name: 'Lutut Crags', cost: { gold: 9000, stone: 20, stygian: 4 }, req: ['fort2', 'd6'], dwell: 'lutut', desc: 'A raw crag above the town where the Lutut nest.' });
   bd('d9', { name: 'Nekh Hollow', cost: { gold: 15000, stygian: 10, ngakara: 5, stone: 20 }, req: ['fort3', 'd8'], unlock: 'nekh', dwell: 'nekh', desc: 'A hole into the Duat itself. Built only once the Nekh’Vorran has been unlocked in the eye of the storm.' });
-  D.BUILD_ORDER = ['hall1', 'hall2', 'hall3', 'fort1', 'fort2', 'fort3', 'tavern', 'market', 'granary', 'farms', 'terraces', 'terraces2', 'songs1', 'songs2', 'songs3', 'choir',
+  D.BUILD_ORDER = ['hall1', 'hall2', 'hall3', 'fort1', 'fort2', 'fort3', 'tavern', 'market', 'woodyard', 'stoneyard', 'muster', 'granary', 'farms', 'terraces', 'terraces2', 'songs1', 'songs2', 'songs3', 'choir',
     't_drill', 't_road', 't_count', 't_capt', 't_duat', 't_pens', 'vault', 'shipyard', 'urverk', 'stygwell', 'sanctum',
     'd1', 'd1u', 'd2', 'd2u', 'd3', 'd3u', 'd4', 'd4u', 'd5', 'd6', 'd7', 'd8', 'd9'];
   D.START_BUILDINGS = ['hall1', 'tavern', 'fort1', 'd1', 'd2', 't_drill'];
