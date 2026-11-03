@@ -97,7 +97,12 @@ h1, h2, h3 { font-weight: normal; color: var(--gold); margin: 0 0 8px; letter-sp
 .setup td { padding: 3px 6px; }
 .setup select, .setup input, .inp { background: #120d09; color: var(--text); border: 1px solid var(--edge); border-radius: 4px; padding: 4px 6px; font: inherit; }
 
-.town-ui { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; background: linear-gradient(rgba(20,15,10,0), rgba(20,15,10,.92) 18%); }
+.town-ui { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr; gap: 8px; padding: 8px; }
+.town-drawer { pointer-events: none; }
+.town-drawer > * { pointer-events: auto; }
+.town-drawer .drawer-tabs { justify-content: center; background: linear-gradient(rgba(20,15,10,.0), rgba(20,15,10,.85)); padding: 10px 8px 4px; border-radius: 10px 10px 0 0; margin: 0; }
+.town-drawer.open { background: linear-gradient(rgba(16,12,8,0), rgba(16,12,8,.55) 12%); }
+.town-drawer .drawer-body { max-height: 46vh; overflow-y: auto; background: rgba(22,17,12,.93); backdrop-filter: blur(3px); }
 .town-top { position: absolute; left: 10px; top: 8px; right: 10px; display: flex; gap: 10px; align-items: center; }
 .town-top h2 { margin: 0; font-size: 24px; color: var(--gold2); text-shadow: 0 2px 6px #000; }
 .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }

@@ -244,8 +244,18 @@
   };
 
   /* draw any map object */
+  /* every built place sits on trampled earth, so it belongs to the land */
+  function groundPatch(ctx, o, x, y, ts) {
+    const big = o.type === 'town' ? 2.1 : o.type === 'mine' || o.type === 'urverk' ? 1.25 : o.type === 'visit' ? 0.85 : 0;
+    if (!big) return;
+    const cx = o.type === 'mine' ? x : x + ts / 2, cy = y + ts * (o.type === 'town' ? 0.55 : 0.75);
+    const g = ctx.createRadialGradient(cx, cy, ts * 0.1, cx, cy, ts * big);
+    g.addColorStop(0, 'rgba(70,52,34,0.42)'); g.addColorStop(0.6, 'rgba(70,52,34,0.22)'); g.addColorStop(1, 'rgba(70,52,34,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, cy, ts * big, ts * big * 0.5, 0, 0, TAU); ctx.fill();
+  }
   A.object = function (ctx, st, o, x, y, ts, t) {
     const color = o.owner >= 0 ? st.players[o.owner].color : D.NEUTRAL_COLOR;
+    groundPatch(ctx, o, x, y, ts);
     switch (o.type) {
       case 'town': return A.town(ctx, o, x, y, ts, t, color);
       case 'mine': return A.mine(ctx, o, x, y, ts, t, color);

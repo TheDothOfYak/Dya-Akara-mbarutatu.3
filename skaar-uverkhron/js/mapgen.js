@@ -92,7 +92,7 @@
       const i = y * w + x; if (L.t[i] === T.water) continue;
       const e = elev[i], f = nf.fbm(x / w * 7, y / h * 7, 3), tt = S.TCODES[L.t[i]];
       const coast = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => L.t[i + dx + dy * w] === T.water);
-      if (e > 0.66 && !coast && R.chance(0.75)) { L.ob[i] = OB.mountain; continue; }
+      if (e > 0.74 && !coast && R.chance(0.7)) { L.ob[i] = OB.mountain; continue; }
       if (f > (li === 1 ? 0.12 : 0.2) && !coast) {
         L.ob[i] = tt === 'snow' || tt === 'rough' ? OB.pine : tt === 'ash' ? OB.deadtree : tt === 'sand' ? OB.palm : tt === 'swamp' ? (R.chance(0.5) ? OB.reeds : OB.tree) : (R.chance(0.06) ? OB.glowtree : OB.tree);
         if (R.chance(0.2)) L.ob[i] = 0;   // clearings

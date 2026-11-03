@@ -78,8 +78,8 @@
     const g = c.getContext('2d'); g.scale(2, 2);
     g.fillStyle = A.radial(g, size / 2, size / 2, size * 0.7, A.shade(color || '#4a3a2a', 10), '#120c08'); g.beginPath(); g.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2); g.fill();
     g.save(); g.beginPath(); g.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2); g.clip();
-    const k = people === 'keilia' ? 1.35 : people === 'karnen' ? 0.78 : 1;
-    A.person(g, size * 0.47, size * 0.55 + size * 1.45, size * 1.5 / k, people, { color: color || '#7a2a2a', look, weapon: opts && opts.weapon || 'none', noShadow: true });
+    const k = people === 'keilia' ? 1.35 : people === 'karnen' ? 0.8 : 1, face = { keilia: 1.12, karnen: 0.85, kaloeik: 0.9, eikar: 0.9 }[people] || 0.9;
+    A.person(g, size * 0.45, size * 0.5 + size * face, size * 1.5 / k, people, { color: color || '#7a2a2a', look, weapon: opts && opts.weapon || 'none', noShadow: true });
     g.restore();
     g.strokeStyle = '#d9b87a'; g.lineWidth = 1.5; g.beginPath(); g.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2); g.stroke();
     return c;

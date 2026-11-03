@@ -137,6 +137,41 @@
       }
       if (any) { g.save(); g.globalAlpha = 0.24; g.filter = 'blur(' + Math.round(ts * 0.25) + 'px)'; g.drawImage(dm, 0, 0); g.restore(); }
     }
+    /* the land is never one flat colour: broad patches of light and shade */
+    if (!V._macro || V._macroLayer !== li) { V._macro = SU.noise2(V.st.seed + li * 101); V._macroLayer = li; }
+    const nz = V._macro;
+    { const sm = A.canvas(CH + 2, CH + 2), sg = sm.getContext('2d'), img = sg.createImageData(CH + 2, CH + 2);
+      for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) {
+        const x = cx * CH + tx, y = cy * CH + ty, tid = at(x, y), o4 = ((ty + 1) * (CH + 2) + tx + 1) * 4;
+        if (!tid || tid === 'water' || tid === 'void') continue;
+        const v = nz.fbm(x * 0.09, y * 0.09, 3);
+        if (v > 0) { img.data[o4] = 255; img.data[o4 + 1] = 240; img.data[o4 + 2] = 190; img.data[o4 + 3] = Math.round(v * 0.16 * 255); }
+        else { img.data[o4] = 10; img.data[o4 + 1] = 20; img.data[o4 + 2] = 10; img.data[o4 + 3] = Math.round(-v * 0.24 * 255); }
+      }
+      sg.putImageData(img, 0, 0);
+      g.save(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(sm, -ts * 0.5, -ts * 0.5, (CH + 2) * ts, (CH + 2) * ts); g.restore(); }
+    /* rocky ground under mountains, dark forest floor under woods (soft shapes, so ranges and forests read as places) */
+    const under = (test, col, alpha) => {
+      const m = A.canvas(W, W), mg = m.getContext('2d'); mg.fillStyle = col; let any = false;
+      for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) { const x = cx * CH + tx, y = cy * CH + ty; if (!S.inside(L, x, y) || !test(L.ob[y * L.w + x])) continue; any = true; blob(mg, tx * ts + ts / 2, ty * ts + ts * 0.62, ts * 0.95, x * 7 + y * 13 + 5); mg.fill(); }
+      if (any) { g.save(); g.globalAlpha = alpha; g.filter = 'blur(' + Math.round(ts * 0.12) + 'px)'; g.drawImage(m, 0, 0); g.restore(); }
+    };
+    under(o => o === S.OB.mountain || o === S.OB.ridge, '#6a6254', 0.75);
+    under(o => o === S.OB.tree || o === S.OB.pine || o === S.OB.glowtree, '#22341a', 0.45);
+    /* small things: tufts, flowers, pebbles */
+    const RR = SU.makeRng(cx * 7919 + cy * 104729 + li * 31);
+    for (let ty = 0; ty < CH; ty++) for (let tx = 0; tx < CH; tx++) {
+      const x = cx * CH + tx, y = cy * CH + ty, tid = at(x, y); if (!tid || L.ob[y * L.w + x] || L.road[y * L.w + x]) continue;
+      const n = tid === 'grass' ? 3 : tid === 'dirt' || tid === 'rough' || tid === 'sand' || tid === 'ash' ? 2 : tid === 'swamp' ? 2 : 0;
+      for (let k = 0; k < n; k++) { if (!RR.chance(0.55)) continue; const px = tx * ts + RR.range(4, ts - 4), py = ty * ts + RR.range(6, ts - 2);
+        if (tid === 'grass') { const kind = RR.next();
+          if (kind < 0.6) { g.strokeStyle = RR.chance(0.5) ? 'rgba(52,86,30,0.85)' : 'rgba(120,160,70,0.8)'; g.lineWidth = Math.max(1, ts / 40); for (let b = -2; b <= 2; b++) { g.beginPath(); g.moveTo(px + b * ts * 0.02, py); g.quadraticCurveTo(px + b * ts * 0.04, py - ts * 0.06, px + b * ts * 0.06, py - ts * (0.08 + Math.abs(b) * 0.01)); g.stroke(); } }
+          else if (kind < 0.8) { g.fillStyle = RR.pick(['#f1e48a', '#ffffff', '#e8a0c8', '#b5a0ff', '#ffb070']); for (let f = 0; f < 3; f++) { A.ell(g, px + RR.range(-4, 4) * ts / 48, py + RR.range(-2, 2) * ts / 48, ts * 0.022, ts * 0.022); g.fill(); } }
+          else { g.fillStyle = 'rgba(120,114,100,0.9)'; A.ell(g, px, py, ts * 0.045, ts * 0.03); g.fill(); g.fillStyle = 'rgba(0,0,0,0.25)'; A.ell(g, px + ts * 0.01, py + ts * 0.02, ts * 0.045, ts * 0.015); g.fill(); } }
+        else if (tid === 'swamp') { g.strokeStyle = 'rgba(110,130,60,0.8)'; g.lineWidth = Math.max(1, ts / 44); for (let b = -1; b <= 1; b++) { g.beginPath(); g.moveTo(px + b * 2, py); g.lineTo(px + b * 3, py - ts * 0.14); g.stroke(); } }
+        else { g.fillStyle = tid === 'ash' ? 'rgba(40,30,26,0.7)' : 'rgba(90,80,64,0.55)'; A.ell(g, px, py, ts * 0.035, ts * 0.024); g.fill(); }
+      }
+    }
     /* roads: cobbled paths between neighbouring road tiles */
     g.lineCap = 'round'; g.lineJoin = 'round';
     for (let pass = 0; pass < 2; pass++) for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) {

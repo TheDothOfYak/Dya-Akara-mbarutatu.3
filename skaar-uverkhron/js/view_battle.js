@@ -198,7 +198,7 @@
     const f = u.side === 0 ? 1 : -1;
     if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.75, u.cap, col, t + u.uid, f, u._pose);
     else {
-      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, mcfly: 2 }[C.art] || 1.6);
+      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2 }[C.art] || 1.6);
       const extra = C.art === 'nekh' ? { flat: true, stretch: 3.9 } : {};
       A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1), color: col }, extra));
     }
