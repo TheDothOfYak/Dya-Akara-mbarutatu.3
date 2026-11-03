@@ -394,7 +394,7 @@
     { id: 'rpg', label: '⛵ Torcain’s Run', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
     { id: '4bw', label: '🌍 The 4 Brothers Worlds', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans', 'Guide'] },
     { id: 'ld', label: '🃏 Little Dungeon', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
-    { id: 'su', label: '🏰 Skaar Uverkhron', nav: ['Game Overview', 'Game Players', 'Shared Maps', 'Online Rooms', 'Announcements', 'Bans'] },
+    { id: 'su', label: '🏰 Skaar Uverkhron', nav: ['Game Overview', 'Game Players', 'Creatures & Costs', 'Shared Maps', 'Online Rooms', 'Announcements', 'Bans'] },
   ];
   /* which live-broadcast target each section's Announcements page starts on */
   const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld', su: 'su' };
@@ -955,6 +955,69 @@
         });
         holder.appendChild(tbl);
       }).catch(e => errLine(holder, 'shared maps', e));
+    },
+    /* Skaar Uverkhron's numbers: dya_config 'su_balance' holds only what differs from the game's own data */
+    'Creatures & Costs'(body) {
+      if (onlineNote(body)) return;
+      body.appendChild(U.el('p', { cls: 'muted small mb', text: 'Change the creatures’ numbers and what buildings cost in Skaar Uverkhron. A changed box turns gold. Changes reach every game started or loaded after you save (online games in progress pick them up when their players reload).' }));
+      const holder = U.el('div', { cls: 'panel' }, [loading()]);
+      body.appendChild(holder);
+      const loadScript = src => new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = () => no(new Error('could not load ' + src)); document.head.appendChild(sc); });
+      const suData = () => window.SU && window.SU.data ? Promise.resolve(window.SU.data) : loadScript('skaar-uverkhron/js/core.js').then(() => loadScript('skaar-uverkhron/js/data.js')).then(() => window.SU.data);
+      const resText = cost => Object.entries(cost || {}).filter(([r]) => r !== 'gold').map(([r, n]) => r + ' ' + n).join(', ');
+      const parseRes = (txt, RES) => { const out = {}; String(txt || '').split(',').forEach(part => { const m = part.trim().match(/^([a-z]+)\s+(\d+)$/i); if (m && RES.includes(m[1].toLowerCase()) && m[1].toLowerCase() !== 'gold') out[m[1].toLowerCase()] = +m[2]; }); return out; };
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      const sortCost = c => { const o = {}; Object.keys(c).sort().forEach(k => { if (c[k]) o[k] = c[k]; }); return o; };
+      Promise.all([suData(), F.rest('GET', 'dya_config?select=value&key=eq.su_balance')]).then(([D, rows]) => {
+        const bal = (rows && rows[0] && rows[0].value) || {}; bal.creatures = bal.creatures || {}; bal.buildings = bal.buildings || {};
+        holder.innerHTML = '';
+        const status = U.el('span', { cls: 'muted small' });
+        const top = U.el('div', { cls: 'flex mb' }, [
+          U.el('button', { cls: 'btn small primary', text: 'Save', onclick: () => { bal.at = Date.now(); bal.rev = (bal.rev || 0) + 1; upsert('su_balance', bal).then(() => { status.textContent = 'Saved.'; }).catch(e => alert(e.message)); } }),
+          U.el('button', { cls: 'btn small danger', text: 'Put everything back', onclick: () => { if (!confirm('Go back to the game’s own numbers for every creature and building?')) return; bal.creatures = {}; bal.buildings = {}; upsert('su_balance', bal).then(rerender).catch(e => alert(e.message)); } }),
+          status]);
+        holder.appendChild(top);
+        /* one number box: shows the override or the default, and remembers only differences */
+        const box = (val, def, onSet, opts) => { opts = opts || {};
+          const i = U.el('input', { cls: 'txt', type: opts.text ? 'text' : 'number', value: val == null ? '' : val, style: 'width:' + (opts.w || 62) + 'px;padding:2px 4px' + (same(val, def) ? '' : ';border-color:var(--gold);color:var(--gold);background:rgba(217,184,122,.18)'), title: 'The game’s own: ' + (def == null ? '—' : def) });
+          if (opts.off) { i.disabled = true; i.value = ''; }
+          i.addEventListener('change', () => { onSet(i.value); const now = opts.read ? opts.read() : val; const ch = !same(now, def); i.style.borderColor = ch ? 'var(--gold)' : ''; i.style.color = ch ? 'var(--gold)' : ''; i.style.background = ch ? 'rgba(217,184,122,.18)' : ''; status.textContent = 'Not saved yet.'; });
+          return i; };
+        /* ---- creatures ---- */
+        holder.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Creatures' }));
+        const ct = U.el('table', { cls: 'adm' });
+        ct.appendChild(U.el('tr', {}, ['Creature', 'Tier', 'Attack', 'Defense', 'Dmg min', 'Dmg max', 'Health', 'Speed', 'Shots', 'Growth', 'Gold', 'Other cost'].map(h => U.el('th', { text: h }))));
+        Object.values(D.CREATURES).forEach(C => {
+          const o = () => bal.creatures[C.id] || (bal.creatures[C.id] = {});
+          const tidy = () => { if (bal.creatures[C.id] && !Object.keys(bal.creatures[C.id]).length) delete bal.creatures[C.id]; };
+          const cur = k => (bal.creatures[C.id] || {})[k] != null ? bal.creatures[C.id][k] : C[k];
+          const num = k => box(cur(k), C[k], v => { const n = v === '' ? null : Math.max(0, Math.round(+v)); if (n == null || n === C[k]) delete o()[k]; else o()[k] = n; tidy(); }, { read: () => cur(k), off: C[k] == null });
+          const dmgBox = j => box(cur('dmg')[j], C.dmg[j], v => { const d = cur('dmg').slice(); d[j] = Math.max(0, Math.round(+v || 0)); if (d[0] > d[1]) d[1 - j] = d[j]; if (same(d, C.dmg)) delete o().dmg; else o().dmg = d; tidy(); }, { read: () => cur('dmg')[j] });
+          const costOf = () => cur('cost') || {};
+          const setCost = c => { c = sortCost(c); if (same(c, sortCost(C.cost || {}))) delete o().cost; else o().cost = c; tidy(); };
+          ct.appendChild(U.el('tr', {}, [
+            U.el('td', { html: '<b>' + U.esc(C.name) + '</b>' + (C.faction ? '' : ' <span class="muted small">wild</span>') }), U.el('td', { text: C.tier }),
+            U.el('td', {}, [num('atk')]), U.el('td', {}, [num('def')]), U.el('td', {}, [dmgBox(0)]), U.el('td', {}, [dmgBox(1)]), U.el('td', {}, [num('hp')]), U.el('td', {}, [num('spd')]),
+            U.el('td', {}, [num('shots')]), U.el('td', {}, [num('grow')]),
+            U.el('td', {}, [box(costOf().gold, (C.cost || {}).gold, v => setCost(Object.assign({}, costOf(), { gold: Math.max(0, Math.round(+v || 0)) })), { read: () => costOf().gold, off: !C.cost, w: 72 })]),
+            U.el('td', {}, [box(resText(costOf()), resText(C.cost), v => setCost(Object.assign({ gold: costOf().gold }, parseRes(v, D.RES))), { text: true, w: 150, read: () => resText(costOf()), off: !C.cost })]),
+          ]));
+        });
+        holder.appendChild(U.el('div', { style: 'overflow-x:auto' }, [ct]));
+        /* ---- buildings ---- */
+        holder.appendChild(U.el('h3', { cls: 'gold mt mb', text: 'Building costs' }));
+        holder.appendChild(U.el('p', { cls: 'muted small mb', text: 'Other resources are written like “wood 5, stone 5”. The resources are: ' + D.RES.filter(r => r !== 'gold').join(', ') + '.' }));
+        const bt = U.el('table', { cls: 'adm' });
+        bt.appendChild(U.el('tr', {}, ['Building', 'Gold', 'Other cost'].map(h => U.el('th', { text: h }))));
+        Object.values(D.BUILDINGS).forEach(Bd => {
+          const costOf = () => (bal.buildings[Bd.id] && bal.buildings[Bd.id].cost) || Bd.cost || {};
+          const setCost = c => { c = sortCost(c); if (same(c, sortCost(Bd.cost || {}))) delete bal.buildings[Bd.id]; else bal.buildings[Bd.id] = { cost: c }; };
+          bt.appendChild(U.el('tr', {}, [U.el('td', { html: '<b>' + U.esc(Bd.name) + '</b> <span class="muted small">' + U.esc(Bd.id) + '</span>' }),
+            U.el('td', {}, [box(costOf().gold || 0, (Bd.cost || {}).gold || 0, v => setCost(Object.assign({}, costOf(), { gold: Math.max(0, Math.round(+v || 0)) })), { read: () => costOf().gold || 0, w: 80 })]),
+            U.el('td', {}, [box(resText(costOf()), resText(Bd.cost), v => setCost(Object.assign({ gold: costOf().gold }, parseRes(v, D.RES))), { text: true, w: 200, read: () => resText(costOf()) })])]));
+        });
+        holder.appendChild(U.el('div', { style: 'overflow-x:auto' }, [bt]));
+      }).catch(e => errLine(holder, 'the Skaar Uverkhron numbers', e));
     },
     'Online Rooms'(body) {
       if (onlineNote(body)) return;

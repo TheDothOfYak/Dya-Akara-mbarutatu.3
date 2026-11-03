@@ -452,6 +452,17 @@
   D.BONUSES = { random: 'Random', gold: 'Gold (+3000)', res: 'Resources', relic: 'A Relic' };
   D.FACTIONS = [{ id: 'duskareth', name: 'The Duskareth', follows: 'the Nekh’Vorran', ready: true }, { id: 'skarvalorin', name: 'The SkarValorin', follows: 'the Aerolhorn', ready: false }, { id: 'elsharyn', name: 'The Elsha’ryn', follows: 'the Vyrenalur', ready: false }];
 
+  /* ---------------- numbers changed in the Admin Panel (dya_config 'su_balance') ---------------- */
+  D.applyBalance = function (bal) {
+    if (!bal) return 0; let n = 0;
+    Object.entries(bal.creatures || {}).forEach(([id, o]) => { const C = D.CREATURES[id]; if (!C || !o) return;
+      ['atk', 'def', 'hp', 'spd', 'shots', 'grow'].forEach(k => { if (typeof o[k] === 'number' && o[k] >= 0) { C[k] = o[k]; n++; } });
+      if (Array.isArray(o.dmg) && o.dmg.length === 2) { C.dmg = [Math.min(o.dmg[0], o.dmg[1]), Math.max(o.dmg[0], o.dmg[1])]; n++; }
+      if (o.cost && typeof o.cost === 'object') { C.cost = Object.assign({}, o.cost); n++; } });
+    Object.entries(bal.buildings || {}).forEach(([id, o]) => { const B = D.BUILDINGS[id]; if (B && o && o.cost && typeof o.cost === 'object') { B.cost = Object.assign({}, o.cost); n++; } });
+    return n;
+  };
+
   /* ---------------- computer personalities: one is drawn for each computer player ---------------- */
   D.AI_STYLES = {
     conqueror: { name: 'Conqueror', desc: 'Builds an army and goes for your towns.', war: 1.5, treasure: 0.8, keep: 1, heroes: 0 },

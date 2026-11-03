@@ -236,7 +236,13 @@
   /* ======================= start ======================= */
   document.addEventListener('DOMContentLoaded', () => {
     V.init($('map'), $('mini'));
-    const go = () => G.title();
+    /* the numbers set in the Admin Panel, before any game starts */
+    const balance = () => {
+      if (!(root.FLAKE && root.FLAKE.configured && root.FLAKE.configured() && root.FLAKE.rest)) return Promise.resolve();
+      const get = root.FLAKE.rest('GET', 'dya_config?select=value&key=eq.su_balance').then(r => { if (r && r[0]) D.applyBalance(r[0].value); }).catch(() => {});
+      return Promise.race([get, new Promise(ok => setTimeout(ok, 3000))]);
+    };
+    const go = () => balance().then(() => G.title());
     /* main games need the one Flake Games account; local testing does not */
     if (root.FLAKE && root.FLAKE.gate && root.FLAKE.configured && root.FLAKE.configured() && !DEV && !/[?&]guest=1/.test(location.search)) root.FLAKE.gate('su').then(go);
     else go();
