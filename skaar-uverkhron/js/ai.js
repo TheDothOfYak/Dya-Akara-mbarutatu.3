@@ -21,6 +21,7 @@
     P.explored.forEach(E => E.fill(1));   /* the computer knows the land */
     /* a little help (or hindrance) by difficulty */
     if (lvl.bonus !== 1 && S.cal(st.day).dow === 1) P.res.gold += Math.round(1500 * (lvl.bonus - 1));
+    hireAndTrain(st, P);
     for (const t of S.townsOf(st, pi)) manageTown(st, P, t);
     hireAndTrain(st, P);
     const armies = () => Object.values(st.armies).filter(a => !a.dead && a.owner === pi);
@@ -40,13 +41,17 @@
   function manageTown(st, P, t) {
     const R = SU.rng(st);
     /* build */
-    for (let k = 0; k < 3; k++) {
-      const bid = BUILD_PRIORITY.find(b => RU.canBuild(st, t, b).ok && (P.res.gold - (D.BUILDINGS[b].cost.gold || 0) > 1500 || st.day < 4));
-      if (!bid) break; RU.build(st, t, bid);
-    }
-    /* recruit: best creatures first, into the garrison */
+    /* one building a day, and never at the cost of the army */
+    const keep = st.day < 4 ? 0 : 2500 + Math.min(4000, st.day * 60);
+    const bid = BUILD_PRIORITY.find(b => RU.canBuild(st, t, b).ok && P.res.gold - (D.BUILDINGS[b].cost.gold || 0) > keep);
+    if (bid) RU.build(st, t, bid);
+    /* recruit: best creatures first, into the garrison, keeping money for heroes we still want */
+    const field = S.fieldHeroes(st, P.idx).length + S.townsOf(st, P.idx).reduce((n, x) => n + x.heroes.length, 0);
+    const reserve = field < Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length) ? M.heroCost + 500 : 300;
     const dws = RU.townDwellings(t).sort((a, b) => b.tier - a.tier);
-    dws.forEach(d => { const cr = d.up || d.base; const n = RU.maxRecruit(st, t, cr, d.base); if (n > 0) RU.recruit(st, t, cr, d.base, n, t.garrison, null); });
+    dws.forEach(d => { const cr = d.up || d.base; const C = D.CREATURES[cr];
+      let n = RU.maxRecruit(st, t, cr, d.base); n = Math.min(n, Math.floor(Math.max(0, P.res.gold - reserve) / (C.cost.gold || 1)));
+      if (n > 0) RU.recruit(st, t, cr, d.base, n, t.garrison, null); });
     /* upgrade what we can */
     S.stacksIn(t.garrison).forEach(s => RU.upgradeStack(st, t, s));
     /* a captain for the garrison now and then */
@@ -71,8 +76,8 @@
     const towns = S.townsOf(st, P.idx).filter(t => RU.has(t, 'tavern'));
     const field = S.fieldHeroes(st, P.idx).length;
     const inside = towns.reduce((n, t) => n + t.heroes.length, 0);
-    const want = Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 12));
-    if (towns.length && field + inside < want && P.res.gold > M.heroCost + 2500) {
+    const want = Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length);
+    if (towns.length && field + inside < want && P.res.gold > M.heroCost + 300) {
       const t = towns[0]; if (P.tavern.heroes.length) RU.hireHero(st, P, t, P.tavern.heroes[0]);
     }
     S.townsOf(st, P.idx).forEach(t => {
@@ -85,7 +90,7 @@
         }
         if (RU.readyToLeave(h) && !(t.defender === id && t.heroes.length === 1 && S.townsOf(st, P.idx).length > 2)) {
           collectGarrison(st, t, h);
-          if (!S.isEmptySlots(h.slots)) RU.sendOut(st, t, h);
+          if (S.power(h.slots, h) > 1500) RU.sendOut(st, t, h);
         }
       });
     });
@@ -106,13 +111,19 @@
       else if (o.type === 'visit' && h && D.VISIT[o.kind].stat && !o.visited[h.id]) v = 12;
       else if (o.type === 'core' && h) v = 30;
       else if (o.type === 'scroll' && h && RU.canSing(st, h, o.song)) v = 10;
+      else if (o.type === 'urverk' && h && myPow > 14000 && o.triggerKnown && RU.urverkNext(st, o) <= 3 && RU.urverkNext(st, o) >= 0 && (o.kind !== 'danger' || myPow > 25000)) {
+        /* strong enough to go looking for rivals on another world */
+        const dest = st.objects[o.link];
+        if (dest && dest.layer !== a.layer && Object.values(st.objects).some(t => t.type === 'town' && t.layer === dest.layer && t.owner !== a.owner && !(t.owner >= 0 && S.allies(st, t.owner, a.owner)))) v = 40 + myPow / 2000;
+      }
+      else if (o.type === 'town' && o.owner === a.owner && h && (o.x !== a.x || o.y !== a.y)) { const gp = S.power(o.garrison); if (gp > myPow * 0.3 && gp > 1200) v = 10 + gp / 600; }
       else if (o.type === 'town' && o.owner !== a.owner && h && !(o.owner >= 0 && S.allies(st, o.owner, a.owner))) {
         const def = RU.townDefense(st, o); const dp = def ? S.power(def.slots, def.hero) * 1.3 + (def.hero ? S.power(def.hero.slots, def.hero) : 0) : 0;
         if (dp < myPow * 0.75) v = 80;
       }
       if (!v) return;
       const g = guardOf(st, o); if (g) { const gp = S.power(g.slots); if (gp > myPow * 0.7) return; v *= 1.2; }
-      out.push({ x: o.x, y: o.y, v, o });
+      out.push({ x: o.x, y: o.y, v, o, far: o.type === 'urverk' || o.type === 'town' });
     });
     Object.values(st.armies).forEach(e => {
       if (e.dead || e.layer !== a.layer || e.owner === a.owner || e.temp || (e.owner >= 0 && S.allies(st, e.owner, a.owner))) return;
@@ -125,9 +136,11 @@
   async function moveArmy(st, P, a, hooks, lvl) {
     const h = S.heroOf(st, a);
     let best = null, bestScore = 0;
-    const cands = targets(st, P, a).filter(t => Math.max(Math.abs(t.x - a.x), Math.abs(t.y - a.y)) < 26).sort((p, q) => (q.v / (1 + Math.hypot(q.x - a.x, q.y - a.y))) - (p.v / (1 + Math.hypot(p.x - a.x, p.y - a.y)))).slice(0, 10);
+    const cands = targets(st, P, a).filter(t => t.far || Math.max(Math.abs(t.x - a.x), Math.abs(t.y - a.y)) < 26).sort((p, q) => (q.v / (1 + Math.hypot(q.x - a.x, q.y - a.y))) - (p.v / (1 + Math.hypot(p.x - a.x, p.y - a.y)))).slice(0, 10);
+    const myPow = S.power(S.slotsOf(st, a), h);
+    const danger = (x, y) => { const g = RU.guardNear(st, a.layer, x, y); return g && S.power(g.slots) > myPow * 0.7; };
     for (const t of cands) {
-      const p = RU.path(st, a, t.x, t.y); if (!p || !p.length) continue;
+      const p = RU.path(st, a, t.x, t.y, { avoid: (x, y) => danger(x, y) && !(Math.abs(x - t.x) <= 1 && Math.abs(y - t.y) <= 1 && !danger(t.x, t.y)) }); if (!p || !p.length) continue;
       const cost = p[p.length - 1].g; const days = cost / Math.max(1, a.mpMax);
       const score = t.v * lvl.aggression / (0.6 + days);
       if (score > bestScore) { bestScore = score; best = { t, p }; }
@@ -135,9 +148,9 @@
     /* nothing to do: go home and gather troops, or try an Urverk */
     if (!best) {
       const home = S.townsOf(st, a.owner).filter(t => t.layer === a.layer).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y))[0];
-      if (home && h && (home.x !== a.x || home.y !== a.y) && S.armySize(home.garrison) > 0) { const p = RU.path(st, a, home.x, home.y); if (p) best = { t: { x: home.x, y: home.y, o: home }, p }; }
-      if (!best) { const u = Object.values(st.objects).filter(o => o.type === 'urverk' && o.layer === a.layer && RU.urverkOpen(st, o) && o.triggerKnown && !guardOf(st, o)).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y))[0];
-        if (u && h && SU.rng(st).chance(0.5)) { const p = RU.path(st, a, u.x, u.y); if (p) best = { t: { x: u.x, y: u.y, o: u }, p }; } }
+      if (home && h && (home.x !== a.x || home.y !== a.y) && S.armySize(home.garrison) > 0) { const p = RU.path(st, a, home.x, home.y, { avoid: danger }); if (p) best = { t: { x: home.x, y: home.y, o: home }, p }; }
+      if (!best) { const u = Object.values(st.objects).filter(o => o.type === 'urverk' && o.layer === a.layer && RU.urverkOpen(st, o) && o.triggerKnown && !guardOf(st, o) && (o.kind !== 'danger' || myPow > 15000)).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y))[0];
+        if (u && h && SU.rng(st).chance(0.5)) { const p = RU.path(st, a, u.x, u.y, { avoid: danger }); if (p) best = { t: { x: u.x, y: u.y, o: u }, p }; } }
       if (!best) return;
     }
     for (const s of best.p) {
@@ -165,7 +178,7 @@
       await fight(st, hooks, a, null, ev.town, def);
     }
     else if (ev.kind === 'town') { collectGarrison(st, ev.obj, h); manageTown(st, P, ev.obj); }
-    else if (ev.kind === 'urverk' && h) {
+    else if (ev.kind === 'urverk' && h && !(ev.obj.kind === 'danger' && S.power(h.slots, h) < 15000)) {
       const res = RU.crossUrverk(st, a, ev.obj);
       if (res.need === 'toll' && P.res.gold > res.price + 3000) { const r2 = RU.crossUrverk(st, a, ev.obj, 'pay'); if (r2.event) await fight(st, hooks, r2.event.attacker, r2.event.defender, null); }
       else if (res.event) await fight(st, hooks, res.event.attacker, res.event.defender, null);

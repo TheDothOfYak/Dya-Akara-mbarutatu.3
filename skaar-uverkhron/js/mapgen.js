@@ -40,6 +40,7 @@
     placeMines(st, regions);
     placeUrverk(st, regions, moons);
     placeTreasure(st, regions, moons);
+    for (let li = 0; li < 4; li++) connectLayer(st, li);
     placeWild(st, regions);
     S.rebuild(st);
     startArmies(st);
@@ -360,6 +361,44 @@
     });
     st._moons = moons;
     st.moons = moons.map(m => ({ name: m.name, x: m.x, y: m.y, r: m.r, tatu: m.tatu }));
+  }
+
+  /* ---------- make sure every open place can be reached ----------
+     Object bodies and trees can wall off pockets of land. Starting from
+     each town (or each moon's Urverk), flood the open land; then carve a
+     way through trees, rocks and mountains to anything left behind. */
+  function connectLayer(st, li) {
+    const L = st.layers[li], w = L.w, N = w * L.h;
+    const vanish = o => o && (o.type === 'pile' || o.type === 'chest' || o.type === 'relic' || o.type === 'scroll');
+    const land = i => D.TERRAIN[S.TCODES[L.t[i]]].pass !== false;
+    const open = i => { if (!land(i) || L.ob[i] || st._block[li][i]) return false; const o = S.objAt(st, li, i % w, (i / w) | 0); return !o || vanish(o); };
+    const want = i => open(i) || (!!S.objAt(st, li, i % w, (i / w) | 0));   /* every object's visit tile must be reachable */
+    const seeds = Object.values(st.objects).filter(o => o.layer === li && (o.type === 'town' || (li === 3 && o.type === 'urverk')));
+    if (!seeds.length) return;
+    const reach = new Uint8Array(N);
+    const flood = from => { const q = from.slice(); from.forEach(i => reach[i] = 1); while (q.length) { const i = q.pop(), x = i % w, y = (i / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) continue; const j = yy * w + xx; if (reach[j]) continue; if (open(j)) { reach[j] = 1; q.push(j); } else if (want(j)) reach[j] = 2; } } };
+    /* on the Kalo, each moon is its own world */
+    if (li === 3) { seeds.forEach(o => { const i = (o.y + 1) * w + o.x; if (S.inside(L, o.x, o.y + 1)) flood([i]); }); return; }
+    flood(seeds.map(o => (o.y + 1) * w + o.x).filter(i => i < N));
+    for (let pass = 0; pass < 40; pass++) {
+      let lost = -1; for (let i = 0; i < N; i++) if (!reach[i] && want(i) && regionLike(i)) { lost = i; break; }
+      if (lost < 0) break;
+      /* carve the cheapest way from the lost tile to the reached land */
+      const dist = new Float32Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1); dist[lost] = 0;
+      const q = [[0, lost]]; let hit = -1;
+      while (q.length) { let bi = 0; for (let k = 1; k < q.length; k++) if (q[k][0] < q[bi][0]) bi = k; const [d, i] = q[bi]; q[bi] = q[q.length - 1]; q.pop();
+        if (reach[i] === 1) { hit = i; break; } if (d > dist[i]) continue; const x = i % w, y = (i / w) | 0;
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) return; const j = yy * w + xx; if (!land(j) || st._block[li][j]) return; const ob = S.objAt(st, li, xx, yy);
+          if (ob && !vanish(ob) && reach[j] !== 1) return; const c = 1 + (L.ob[j] ? (L.ob[j] === OB.mountain ? 6 : 3) : 0); if (d + c < dist[j]) { dist[j] = d + c; prev[j] = i; q.push([d + c, j]); } });
+        if (q.length > 30000) break; }
+      if (hit < 0) { reach[lost] = 3; continue; }
+      const path = []; for (let i = hit; i >= 0; i = prev[i]) { path.push(i); if (i === lost) break; }
+      path.forEach(i => { L.ob[i] = 0; });
+      flood(path.filter(i => open(i)));
+      if (!reach[lost]) reach[lost] = 3;
+    }
+    function regionLike(i) { /* skip tiny unreachable specks between mountains */ return true; }
   }
 
   /* ---------- wild groups ---------- */

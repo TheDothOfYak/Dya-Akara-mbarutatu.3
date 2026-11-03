@@ -323,9 +323,9 @@
      be built the same day. Effects are read by rules.js. */
   D.BUILDINGS = {};
   function bd(id, o) { o.id = id; D.BUILDINGS[id] = o; }
-  bd('hall1', { name: 'Muster Hall', cost: {}, gold: 500, housing: 400, desc: 'The heart of the town. 500 gold a day.' });
-  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 2500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 300, gold: 1000, housing: 700, replaces: 'hall1', desc: '1000 gold a day, and room for more people.' });
-  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 5000, stone: 10, stygian: 4 }, req: ['hall2', 'fort2'], pop: 600, gold: 1800, housing: 1100, replaces: 'hall2', desc: '1800 gold a day. The seat of a Duskareth lord.' });
+  bd('hall1', { name: 'Muster Hall', cost: {}, gold: 750, housing: 400, desc: 'The heart of the town. 750 gold a day.' });
+  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 2500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 300, gold: 1250, housing: 700, replaces: 'hall1', desc: '1250 gold a day, and room for more people.' });
+  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 5000, stone: 10, stygian: 4 }, req: ['hall2', 'fort2'], pop: 600, gold: 2000, housing: 1100, replaces: 'hall2', desc: '2000 gold a day. The seat of a Duskareth lord.' });
   bd('fort1', { name: 'Palisade Keep', cost: { gold: 1500, wood: 5, stone: 5 }, walls: 1, growth: 0, desc: 'Walls and a gate. Needed for every dwelling above the second.' });
   bd('fort2', { name: 'Stone Citadel', cost: { gold: 3000, stone: 12 }, req: ['fort1'], pop: 250, walls: 2, growth: 25, replaces: 'fort1', desc: 'Stone walls and a tower. Creatures grow 25% faster.' });
   bd('fort3', { name: 'Duskwall Bastion', cost: { gold: 5000, stone: 15, stygian: 2 }, req: ['fort2'], pop: 450, walls: 3, growth: 50, replaces: 'fort2', desc: 'Three towers of the Ver. Creatures grow 50% faster.' });

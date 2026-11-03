@@ -62,7 +62,7 @@
     return Math.round(diag ? c * 1.41 : c);
   };
   /* A* from the army to (tx,ty). The goal may be an object or army (you stop on it). */
-  R_.path = function (st, a, tx, ty) {
+  R_.path = function (st, a, tx, ty, popts) {
     const layer = a.layer, L = st.layers[layer], w = L.w;
     if (!S.inside(L, tx, ty)) return null;
     const fly = R_.canFly(st, a), boat = a.boat, P = st.players[a.owner];
@@ -77,6 +77,7 @@
         return S.passable(st, layer, x, y, { fly }) || (!fly && boatAt(st, layer, x, y));
       }
       if (S.objAt(st, layer, x, y) || S.armyAt(st, layer, x, y)) return false;
+      if (popts && popts.avoid && popts.avoid(x, y)) return false;
       return boat ? S.passable(st, layer, x, y, { boat: true }) : S.passable(st, layer, x, y, { fly });
     };
     if (!ok(tx, ty)) return null;
@@ -93,7 +94,7 @@
         if (!dx && !dy) continue; const xx = x + dx, yy = y + dy;
         if (!S.inside(L, xx, yy) || !ok(xx, yy)) continue;
         /* no cutting corners past blocked tiles */
-        if (dx && dy && !fly && (!S.passable(st, layer, x + dx, y, { boat }) || !S.passable(st, layer, x, y + dy, { boat }))) { if (!(boat)) continue; }
+        if (dx && dy && !fly && !boat && !S.passable(st, layer, x + dx, y) && !S.passable(st, layer, x, y + dy)) continue;
         const j = yy * w + xx; const ng = g[i] + R_.stepCost(st, a, layer, x, y, xx, yy);
         if (ng < g[j]) { g[j] = ng; prev[j] = i; push(ng + Math.max(Math.abs(tx - xx), Math.abs(ty - yy)) * 70, j); }
       }
@@ -161,6 +162,13 @@
     S.moveArmyIndex(st, a, a.layer, x, y);
     S.reveal(st, a.owner, a.layer, x, y, R_.sight(st, a));
   }
+  R_.guardNear = function (st, layer, x, y) {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue; const o = S.armyAt(st, layer, x + dx, y + dy);
+      if (o && o.wild && !o.herd && o.guard && !o.dead) return o;
+    }
+    return null;
+  };
   function adjacentGuard(st, a) {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       if (!dx && !dy) continue; const o = S.armyAt(st, a.layer, a.x + dx, a.y + dy);
@@ -384,9 +392,9 @@
     R_.pay(P, cost); stack.cr = c.up; return { ok: true };
   };
   R_.townIncome = function (st, t) {
-    const r = { gold: 0, food: 3 };
+    const r = { gold: 0, food: 10 };
     t.built.forEach(b => { const B = D.BUILDINGS[b]; if (B.gold) r.gold += B.gold; if (B.food) r.food += B.food * (st.weekEvent === 'harvest' ? 1.33 : 1); if (B.res) Object.entries(B.res).forEach(([k, v]) => r[k] = (r[k] || 0) + v); });
-    r.gold += Math.floor(t.pop * 0.5);
+    r.gold += Math.floor(t.pop * 0.8);
     return r;
   };
   R_.townDefense = function (st, t) {
@@ -446,7 +454,7 @@
   };
 
   /* ---------- training halls ---------- */
-  R_.trainCost = h => 250 + Object.keys(h.skills).length * 150;
+  R_.trainCost = h => 150 + Object.keys(h.skills).length * 100;
   R_.trainOffer = function (st, t, h, bid) {
     const B = D.BUILDINGS[bid]; if (!B.teaches || !t.built.includes(bid)) return null;
     if (Object.keys(h.skills).length >= 5) return null;
@@ -494,17 +502,19 @@
   R_.sendOut = function (st, t, h) {
     if (!R_.readyToLeave(h)) return { ok: false, why: h.name + ' must learn all five basic skills at the training halls before leaving town.' };
     if (S.fieldHeroes(st, h.owner).length >= D.MAX_FIELD_HEROES) return { ok: false, why: 'Only ' + D.MAX_FIELD_HEROES + ' heroes can be out on the map at once.' };
-    if (S.armyAt(st, t.layer, t.x, t.y)) return { ok: false, why: 'Someone is already standing at the gate.' };
+    let spot = [t.x, t.y];
+    if (S.armyAt(st, t.layer, t.x, t.y)) { spot = R_.freeNear(st, t.layer, t.x, t.y + 1); if (!spot) return { ok: false, why: 'There is no room outside the gate.' }; }
     t.heroes = t.heroes.filter(x => x !== h.id); if (t.defender === h.id) t.defender = t.heroes[0] || null;
-    const a = M.army(st, h.owner, t.layer, t.x, t.y, h.id);
+    const a = M.army(st, h.owner, t.layer, spot[0], spot[1], h.id);
     a.mpMax = R_.mpMax(st, a); a.mp = h.leftToday ? 0 : a.mpMax;
     return { ok: true, army: a };
   };
   R_.sendSquadron = function (st, t, slotIdx) {   // a captain's squadron leaves the garrison on its own
     const s = t.garrison[slotIdx]; if (!s || s.kind !== 'cap') return { ok: false, why: 'Only a squadron with a captain can go out without a hero.' };
-    if (S.armyAt(st, t.layer, t.x, t.y)) return { ok: false, why: 'Someone is already standing at the gate.' };
+    let spot = [t.x, t.y];
+    if (S.armyAt(st, t.layer, t.x, t.y)) { spot = R_.freeNear(st, t.layer, t.x, t.y + 1); if (!spot) return { ok: false, why: 'There is no room outside the gate.' }; }
     t.garrison[slotIdx] = null;
-    const a = M.army(st, t.owner, t.layer, t.x, t.y, null, [s, null, null, null, null]);
+    const a = M.army(st, t.owner, t.layer, spot[0], spot[1], null, [s, null, null, null, null]);
     a.mpMax = R_.mpMax(st, a); a.mp = a.mpMax;
     return { ok: true, army: a };
   };
@@ -571,7 +581,7 @@
         else if (roll < 0.75) { const p = randomLand(st, dest.layer); if (p) { arrive(st, a, dest.layer, p[0], p[1]); a.mp = 0; return { ok: true, msg: 'The crossing went wrong. You come out of the Duat somewhere else entirely.' }; } }
         else {
           arrive(st, a, dest.layer, dest.x, dest.y + 1); a.mp = 0;
-          const g = R_.tempWild(st, a, 2000 + st.day * 250, ['malsti', 'velnur', 'ver', 'harkal', 'kaloeik']);
+          const g = R_.tempWild(st, a, 1000 + st.day * 160, ['malsti', 'velnur', 'ver', 'harkal', 'kaloeik']);
           return { ok: true, msg: 'A rogue band of Duskareth waits in the Duat.', event: { kind: 'battle', attacker: g, defender: a, ambush: true, temp: true } };
         }
       }
@@ -766,7 +776,7 @@
       /* food: armies and towns eat */
       let eat = 0;
       Object.values(st.armies).forEach(a => { if (a.dead || a.owner !== pi) return; eat += R_.dailyFood(st, S.slotsOf(st, a), S.heroOf(st, a)); });
-      towns.forEach(t => { eat += R_.dailyFood(st, t.garrison) + t.pop * 0.012; (t.heroes || []).forEach(id => eat += R_.dailyFood(st, st.heroes[id].slots, st.heroes[id])); });
+      towns.forEach(t => { eat += R_.dailyFood(st, t.garrison) + t.pop * 0.01; (t.heroes || []).forEach(id => eat += R_.dailyFood(st, st.heroes[id].slots, st.heroes[id])); });
       P.res.food -= eat; P.lastEat = eat;
       if (P.res.food < 0) {
         P.res.food = 0; P.hungry = (P.hungry || 0) + 1;

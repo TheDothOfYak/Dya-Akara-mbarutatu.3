@@ -242,7 +242,11 @@
     let prev = { x: a.x, y: a.y };
     const steps = p.map(s => { const c = RU.stepCost(st, a, a.layer, prev.x, prev.y, s.x, s.y); prev = s; return { x: s.x, y: s.y, cost: c }; });
     const end = S.armyAt(st, a.layer, tx, ty), eo = S.objAt(st, a.layer, tx, ty);
-    V.path = { army: a.id, layer: a.layer, tx, ty, steps, mp: a.mp, mpMax: a.mpMax, target: end && end.owner !== a.owner ? 'battle' : eo ? 'visit' : null };
+    let target = end && end.owner !== a.owner && !(end.wild && end.herd) ? 'battle' : eo ? 'visit' : null;
+    /* walking next to a guard means a fight there */
+    const gi = steps.findIndex((s, i) => i < steps.length - 1 && RU.guardNear(st, a.layer, s.x, s.y));
+    if (gi >= 0) { steps.length = gi + 1; target = 'battle'; }
+    V.path = { army: a.id, layer: a.layer, tx, ty, steps, mp: a.mp, mpMax: a.mpMax, target };
     const days = (() => { let mp = a.mp, d = 0; steps.forEach(s => { if (mp < s.cost) { d++; mp = a.mpMax; } mp -= s.cost; }); return d; })();
     $('status').textContent = days ? 'That is ' + SU.plural(days + 1, 'day') + ' away. Click again to go.' : 'Click again to go.';
   };
