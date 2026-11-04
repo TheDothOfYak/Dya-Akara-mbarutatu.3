@@ -97,6 +97,11 @@ the game is built.
   and captains from outside the factions, and fairs (bet on punk races and
   Dya'Akara matches). A month is 42 days. Weeks and months
   bring events.
+- **Growing towns:** towns grow about 7% a week, up to 17% with food to spare. Take
+  **villages** on the map (guarded, flagged like mines): each sends 30 settlers a week
+  to your nearest town. **Travellers** settle in a town some weeks (more often with a
+  tavern). Hold a **Feast** in a town once a week (1000 gold, 60 food) and 8% more
+  people (at least 25) come to stay. Build homes to make room for them.
 - **Where you can go:** point at any spot and the frame says it plainly: green (reachable
   today), gold (a few days away), orange ⚔ (the way passes a wild guard: you will stop and
   fight), red ✕ (you cannot go there). The bar at the bottom says why: water, mountains,
@@ -151,13 +156,13 @@ Ju-Keepers, Grovewardens and Memory Trackers.
 |---|---|---|---|
 | 1 | Sprengju | Nur Sprengju | Little flying carrots that burst on contact (the attackers are spent; nothing strikes back). Under a **Ju-Keeper** captain they ride in a pouch and are loosed in volleys like arrows. Half of all spent Sprengju come back after the battle. |
 | 2 | Spear Eikar | Grovewarden Spears | Plain, steady spears. |
-| 3 | Stryx | Old Stryx | Throw rocks and never move; just as strong up close, and bind (cannot move) whatever they strike up close until the Stryx dies or a song moves it. |
-| 4 | Albali Byrd | Albali Elder | One horn. Flies; instead of attacking it can restore the health of an ally beside it (it raises nobody). |
+| 3 | Stryx | Old Stryx | A wide, flat mesa of stone in three stepped tiers, mossy on top, glowing seams in its flanks and whipping vines. Throws rocks and never moves; just as strong up close, and binds (cannot move) whatever it strikes up close until the Stryx dies or a song moves it. |
+| 4 | Albali Byrd | Albali Elder | A round ball of cream feathers with big eyes and wide wings, and one bone-white horn in a glossy healing film. Flies; instead of attacking it can restore the health of an ally beside it (it raises nobody). |
 | 5 | Tonguatjis | — | Shelled; its tongue strikes from two hexes away and drags its prey in. |
 | 6 | Saklay'Punk'Eik | — | Eikar archers on Domestic Punks: move and then shoot, and shoot even when engaged. |
 | 7 | Api Buta | — | The Blind Beast, a huge basalt slug (4×2 hexes, the biggest of the faction): fire breath scorches the one behind its prey; blind (sight powers do not touch it), fireproof. |
 | 8 | Sru Vorn | — | The top of the town, one a week. Once a battle, on a random early round, digs a hidden acid bog: enemies who step in burn and are stuck for a turn. |
-| 9 | The Vyrenalur | — | Light Shadow. Every other round it slips into shadow (nothing can target it); its charge is a line of light; its trail glows for three rounds and heals Eikar in it. Kipsu come out of the woods to follow it as their own stack. |
+| 9 | The Vyrenalur | — | Light Shadow: a towering stag of shadow dappled with light, with a crown of antlers of pure light. Every other round it slips into shadow (nothing can target it); its charge is a line of light; its trail glows for three rounds and heals Eikar in it. Kipsu come out of the woods to follow it as their own stack. |
 
 **Their powers:**
 - **Memory tracking:** they see every memory core, buried ones too, and can pick up the
@@ -172,7 +177,9 @@ Ju-Keepers, Grovewardens and Memory Trackers.
   forest takes them as a wild Stryx thicket.
 - **The Vyrenalur's trail:** each week three glimmers appear in the woods (only you see
   yours); reach all three in one week and find the **Shed Antler**, which lets a town
-  build the Clearing of Light while it is there.
+  build the Clearing of Light while it is there. Ending a turn in the eye of the
+  storm also gives a vision of where one lies (each people is shown its own relic:
+  the Duskareth the Rokarvac of the Nekh, the Elsha'ryn a Shed Antler).
 
 ## How it's built
 

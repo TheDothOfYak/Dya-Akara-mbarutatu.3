@@ -655,50 +655,87 @@
     ctx.fillStyle = up ? '#8fbf3f' : '#5aa04a'; ell(ctx, -2 * S_, -27 * S_, 3.6 * S_, 1.4 * S_, -0.4); ctx.fill(); outline(ctx, 0.5 * S_);
   };
   /* STRYX — stone armour, vine limbs, no legs: rooted where it fell */
+  /* STRYX — as in the old stories: a wide, flat mesa of stone in three low stepped tiers, its top mossy and flat,
+     glowing mineral seams in its flanks, roots running out over the ground, and whipping vines with glowing buds */
   CREATURE.stryx = function (ctx, S_, t, o) {
-    const up = o.tint === 1, stone = up ? '#7a7a6e' : '#8a8478', vine = up ? '#3d6a38' : '#4d7a44';
-    if (!o.noShadow) shadow(ctx, 12 * S_, 3 * S_);
-    /* roots, spread over the ground */
-    ctx.strokeStyle = shade(vine, -25); ctx.lineCap = 'round';
-    for (let i = 0; i < 6; i++) { const a = (i / 5 - 0.5) * 2.6; ctx.lineWidth = (2 - Math.abs(a) * 0.4) * S_; ctx.beginPath(); ctx.moveTo(Math.sin(a) * 3 * S_, -2 * S_); ctx.quadraticCurveTo(Math.sin(a) * 8 * S_, 0, Math.sin(a) * 13 * S_, 1.4 * S_); ctx.stroke(); }
-    /* the stone body: stacked plates */
-    const plates = [[0, -6, 9, 6], [0, -14, 8, 5.5], [0, -21, 6, 4.5]];
-    plates.forEach(([x, y, w, h], i) => { ctx.fillStyle = lin(ctx, -w * S_, y * S_, w * S_, y * S_, [[0, shade(stone, 18)], [0.6, stone], [1, shade(stone, -35)]]); ell(ctx, x * S_, y * S_, w * S_, h * S_); ctx.fill(); outline(ctx, 0.8 * S_);
-      ctx.strokeStyle = rgba('#3a3830', 0.4); ctx.lineWidth = 0.6 * S_; ctx.beginPath(); ctx.moveTo((x - w * 0.5) * S_, (y - h * 0.2) * S_); ctx.lineTo((x + w * 0.1) * S_, (y + h * 0.3) * S_); ctx.stroke(); });
-    if (up) { ctx.fillStyle = rgba('#7ab04a', 0.7); ell(ctx, -3 * S_, -24 * S_, 4 * S_, 1.6 * S_); ctx.fill(); ell(ctx, 5 * S_, -10 * S_, 3 * S_, 1.2 * S_); ctx.fill(); }
-    /* vines wrapping it, and two vine arms; one holds a rock */
-    ctx.strokeStyle = vine; ctx.lineWidth = 1.2 * S_; ctx.beginPath(); ctx.moveTo(-8 * S_, -4 * S_); ctx.bezierCurveTo(-2 * S_, -10 * S_, 4 * S_, -12 * S_, 6 * S_, -20 * S_); ctx.stroke();
+    const up = o.tint === 1, rock = up ? '#7e7060' : '#8a7a62', rockD = up ? '#5e5244' : '#6a5c4a', top = up ? '#6e8a42' : '#7d8a4a', vine = '#3d6a32', glow = up ? '#ffc86a' : '#b8ff7a';
+    if (!o.noShadow) shadow(ctx, 18 * S_, 3.6 * S_);
+    /* roots, low and flat over the ground */
+    ctx.strokeStyle = '#4a3a28'; ctx.lineCap = 'round';
+    for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * 2.9; ctx.lineWidth = (2.2 - Math.abs(a) * 0.35) * S_; ctx.beginPath(); ctx.moveTo(Math.sin(a) * 12 * S_, -1 * S_); ctx.quadraticCurveTo(Math.sin(a) * 17 * S_, 0.6 * S_, Math.sin(a) * 21 * S_, 1.6 * S_); ctx.stroke(); }
+    /* three stepped tiers, wider than tall, a little uneven: the mesa */
+    const tiers = [[16.5, 0, 6.2, rock], [14.5, -6, 5.4, rock], [12.6, -11.2, 4.6, rockD]];
+    tiers.forEach(([w, y, h, col], i) => {
+      const yt = (y - h) * S_, yb = y * S_, j = k => Math.sin(k * 2.7 + i * 1.3) * 0.7 * S_;
+      ctx.fillStyle = lin(ctx, -w * S_, 0, w * S_, 0, [[0, shade(col, 22)], [0.55, col], [1, shade(col, -32)]]);
+      ctx.beginPath(); ctx.moveTo(-w * S_, yb); ctx.lineTo(-w * S_ + j(1), yt + 1 * S_); ctx.quadraticCurveTo(0, yt - 1.2 * S_ + j(2), w * S_ + j(3), yt + 1 * S_); ctx.lineTo(w * S_, yb); ctx.quadraticCurveTo(0, yb + 1.6 * S_, -w * S_, yb); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
+      /* the lip of the step, lit */
+      ctx.strokeStyle = rgba('#e8dcc0', 0.35); ctx.lineWidth = 0.8 * S_; ctx.beginPath(); ctx.moveTo(-w * 0.9 * S_, yt + 1.4 * S_); ctx.quadraticCurveTo(0, yt - 0.4 * S_, w * 0.7 * S_, yt + 1.4 * S_); ctx.stroke();
+      /* cracks */
+      ctx.strokeStyle = rgba('#2a2018', 0.4); ctx.lineWidth = 0.6 * S_; ctx.beginPath(); ctx.moveTo((-w * 0.4 + i * 3) * S_, yt + 2 * S_); ctx.lineTo((-w * 0.3 + i * 3) * S_, yb - 1 * S_); ctx.moveTo((w * 0.5 - i * 2) * S_, yt + 1.6 * S_); ctx.lineTo((w * 0.42 - i * 2) * S_, yb - 0.6 * S_); ctx.stroke();
+      /* glowing mineral seams in the flank */
+      ctx.save(); ctx.shadowColor = glow; ctx.shadowBlur = 5 * S_; ctx.fillStyle = rgba(glow, 0.65 + 0.25 * Math.sin(t * 2 + i));
+      for (let k = 0; k < 4; k++) { ell(ctx, (-w * 0.7 + k * w * 0.45 + i * 1.3) * S_, (y - h * 0.45 + (k % 2) * 1.2) * S_, 0.9 * S_, 0.6 * S_); ctx.fill(); } ctx.restore();
+    });
+    /* the flat mossy top, with a tuft of leaves */
+    ctx.fillStyle = lin(ctx, 0, -17 * S_, 0, -14.6 * S_, [[0, shade(top, 18)], [1, shade(top, -18)]]); ell(ctx, 0, -15.6 * S_, 12 * S_, 2.2 * S_); ctx.fill(); outline(ctx, 0.6 * S_);
+    ctx.fillStyle = vine; for (let i = 0; i < 5; i++) { ell(ctx, (-2 + i * 1.2) * S_, -17 * S_, 2.4 * S_, 0.9 * S_, (i - 2) * 0.5); ctx.fill(); }
+    /* loose boulders at the foot */
+    [[-15, 1, 2.6], [13, 1.4, 2.2], [17, 0.6, 1.6], [-18.5, 0.8, 1.6]].forEach(([x, y, r]) => { ctx.fillStyle = radial(ctx, (x - 0.6) * S_, (y - r) * S_, r * 1.4 * S_, shade(rockD, 25), shade(rockD, -25)); ell(ctx, x * S_, (y - r * 0.6) * S_, r * S_, r * 0.8 * S_); ctx.fill(); outline(ctx, 0.5 * S_); });
+    /* the vines, whipping from the top; one lashes forward with a rock when it throws */
     const throwing = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0;
-    [[-1, -16], [1, -17]].forEach(([sd, y], i) => { const ang = sd < 0 ? Math.PI + 0.6 : -0.9 - throwing * 1.4 + Math.sin(t * 2 + i) * 0.1; const ex = sd * 6 * S_ + Math.cos(ang) * 10 * S_, ey = y * S_ + Math.sin(ang) * 10 * S_;
-      ctx.lineWidth = 1.8 * S_; ctx.beginPath(); ctx.moveTo(sd * 5 * S_, y * S_); ctx.quadraticCurveTo(sd * 10 * S_, (y - 4) * S_, ex, ey); ctx.stroke();
-      if (sd > 0) { ctx.fillStyle = radial(ctx, ex, ey - 1 * S_, 3 * S_, '#b8b2a4', '#5a564c'); ell(ctx, ex, ey - 1 * S_, 2.8 * S_, 2.4 * S_); ctx.fill(); outline(ctx, 0.5 * S_); } });
-    /* a crack of an eye */
-    ctx.fillStyle = '#d8f0a0'; ell(ctx, 2.4 * S_, -21.5 * S_, 1.4 * S_, 0.6 * S_); ctx.fill();
+    for (let i = 0; i < 5; i++) {
+      const bx = (-6 + i * 3) * S_, by = -16 * S_, ph = t * 1.8 + i * 1.3, lash = i === 3 ? throwing : 0;
+      const ang = -Math.PI / 2 + (i - 2) * 0.46 + Math.sin(ph) * 0.24 + lash * 1.3, len = (15 + (i % 2) * 4) * S_;
+      const ex = bx + Math.cos(ang) * len, ey = by + Math.sin(ang) * len, mx = bx + Math.cos(ang - 0.5) * len * 0.55, my = by + Math.sin(ang - 0.5) * len * 0.55;
+      ctx.strokeStyle = vine; ctx.lineWidth = 1.7 * S_; ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(mx, my, ex, ey); ctx.stroke();
+      /* a curled tip with a glowing bud */
+      ctx.lineWidth = 0.9 * S_; ctx.beginPath(); ctx.arc(ex + 1.2 * S_, ey, 1.2 * S_, Math.PI, Math.PI * 2.4); ctx.stroke();
+      if (i === 3 && throwing > 0.05) { ctx.fillStyle = radial(ctx, ex, ey - 1 * S_, 3 * S_, '#b8a890', '#5a4c3c'); ell(ctx, ex, ey - 1.6 * S_, 2.8 * S_, 2.4 * S_); ctx.fill(); outline(ctx, 0.5 * S_); }
+      else { ctx.save(); ctx.shadowColor = glow; ctx.shadowBlur = 6 * S_; ctx.fillStyle = glow; ell(ctx, ex, ey, 1.1 * S_, 1.1 * S_); ctx.fill(); ctx.restore(); }
+    }
   };
   /* ALBALI BYRD — a great pale bird with a single red horn under its healing film */
+  /* ALBALI BYRD — as in the old stories: a round ball of cream feathers with big dark eyes and a small beak,
+     wide scalloped wings, and ONE bone-white horn in a glossy healing film, sliding out of a feather collar */
   CREATURE.albali = function (ctx, S_, t, o) {
-    const up = o.tint === 1, body = up ? '#f2eee2' : '#e8e3d4', horn = '#b03030';
-    if (!o.noShadow) shadow(ctx, 11 * S_, 3 * S_);
-    const hov = Math.sin(t * 2.6) * 1.6 * S_; ctx.translate(0, -15 * S_ + hov);
-    const flap = Math.sin(t * 6) * 0.5 + (o.pose === 'attack' ? 0.4 : 0);
-    /* far wing */
-    ctx.save(); ctx.rotate(-0.4 - flap); ctx.fillStyle = shade(body, -18); ctx.beginPath(); ctx.moveTo(-2 * S_, -2 * S_); ctx.quadraticCurveTo(-8 * S_, -16 * S_, -16 * S_, -14 * S_); ctx.quadraticCurveTo(-10 * S_, -6 * S_, -4 * S_, 2 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_); ctx.restore();
-    /* tail */
-    ctx.fillStyle = shade(body, -10); ctx.beginPath(); ctx.moveTo(-8 * S_, 0); ctx.lineTo(-17 * S_, 3 * S_); ctx.lineTo(-15 * S_, -1 * S_); ctx.lineTo(-18 * S_, -3 * S_); ctx.lineTo(-8 * S_, -3 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_);
-    /* body */
-    ctx.fillStyle = lin(ctx, 0, -6 * S_, 0, 6 * S_, [[0, '#ffffff'], [0.5, body], [1, shade(body, -22)]]); ell(ctx, 0, 0, 10 * S_, 6 * S_, -0.15); ctx.fill(); outline(ctx, 0.8 * S_);
-    /* head and beak */
-    ctx.fillStyle = body; ell(ctx, 9 * S_, -6 * S_, 4.2 * S_, 3.8 * S_); ctx.fill(); outline(ctx, 0.7 * S_);
-    ctx.fillStyle = '#d9a441'; ctx.beginPath(); ctx.moveTo(12.5 * S_, -6.5 * S_); ctx.lineTo(17 * S_, -5 * S_); ctx.lineTo(12.5 * S_, -4.2 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.5 * S_);
-    ctx.fillStyle = '#1a1410'; ell(ctx, 10.5 * S_, -7 * S_, 0.8 * S_, 0.8 * S_); ctx.fill();
-    /* the one horn, filmed and glistening */
-    ctx.fillStyle = lin(ctx, 8 * S_, -9 * S_, 10 * S_, -17 * S_, [[0, shade(horn, -20)], [1, shade(horn, 30)]]); ctx.beginPath(); ctx.moveTo(7.5 * S_, -9 * S_); ctx.quadraticCurveTo(8 * S_, -15 * S_, 11 * S_, -18 * S_); ctx.quadraticCurveTo(10 * S_, -13 * S_, 10.5 * S_, -9.4 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.5 * S_);
-    ctx.fillStyle = rgba('#d0fff0', 0.35 + Math.sin(t * 3) * 0.15); ell(ctx, 9.6 * S_, -14 * S_, 1 * S_, 3 * S_, 0.4); ctx.fill();
-    /* near wing */
-    ctx.save(); ctx.rotate(0.3 + flap * 0.8); ctx.fillStyle = lin(ctx, 0, -12 * S_, 0, 4 * S_, [[0, '#ffffff'], [1, shade(body, -14)]]); ctx.beginPath(); ctx.moveTo(0, -1 * S_); ctx.quadraticCurveTo(-4 * S_, -18 * S_, -14 * S_, -17 * S_); ctx.quadraticCurveTo(-8 * S_, -8 * S_, -2 * S_, 3 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_);
-    ctx.strokeStyle = rgba('#a09a8c', 0.7); ctx.lineWidth = 0.5 * S_; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-2 * S_ - i * 2 * S_, -2 * S_ - i * 2 * S_); ctx.lineTo(-6 * S_ - i * 2.2 * S_, -10 * S_ - i * 1.6 * S_); ctx.stroke(); } ctx.restore();
-    /* legs tucked */
-    ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 0.9 * S_; ctx.beginPath(); ctx.moveTo(1 * S_, 5 * S_); ctx.lineTo(0, 9 * S_); ctx.moveTo(4 * S_, 5 * S_); ctx.lineTo(3.5 * S_, 9 * S_); ctx.stroke();
+    const up = o.tint === 1, plume = up ? '#fbf4e2' : '#f4ecd8', belly = '#fffaf0', tip = up ? '#e2d2b0' : '#d6c6a6', pearl = '#fff0b0';
+    if (!o.noShadow) shadow(ctx, 9 * S_, 2.6 * S_);
+    const hov = Math.sin(t * 2.6) * 1.4 * S_; ctx.translate(0, -17 * S_ + hov);
+    const flap = Math.sin(t * 7) * 0.55 + (o.pose === 'attack' ? 0.5 : 0), R = 8.5 * S_;
+    /* a wing: the inner panel and the outer hand with scalloped feathers, dotted with pearls along the trailing edge */
+    const wing = (side, k) => { ctx.save(); ctx.translate(-1 * S_, -2 * S_); ctx.rotate(side * (0.25 + flap * k)); ctx.scale(1, side < 0 ? 0.85 : 1);
+      ctx.fillStyle = side < 0 ? shade(plume, -14) : plume; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-8 * S_, -10 * S_); ctx.lineTo(-10 * S_, -2 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_);
+      ctx.fillStyle = side < 0 ? shade(tip, -14) : tip; ctx.beginPath(); ctx.moveTo(-8 * S_, -10 * S_); ctx.quadraticCurveTo(-15 * S_, -14 * S_, -21 * S_, -9 * S_);
+      [[-19, -5], [-17, -6], [-15, -2], [-13, -3.5], [-11, 0], [-10, -2]].forEach(([x, y], i) => i % 2 ? ctx.lineTo(x * S_, y * S_) : ctx.quadraticCurveTo((x - 1.5) * S_, (y + 1.5) * S_, x * S_, y * S_)); ctx.closePath(); ctx.fill(); outline(ctx, 0.6 * S_);
+      ctx.fillStyle = rgba(pearl, 0.85); [[-18, -8], [-15.5, -6], [-13, -4.5], [-11, -3]].forEach(([x, y]) => { ell(ctx, x * S_, y * S_, 0.6 * S_, 0.6 * S_); ctx.fill(); }); ctx.restore(); };
+    wing(-1, 0.8);
+    /* tail puff */
+    ctx.fillStyle = tip; [-0.5, 0, 0.5].forEach(a => { ell(ctx, (-R / S_ - 1) * S_, (1 + a * 2) * S_, 3 * S_, 1.4 * S_, a * 0.6 - 0.2); ctx.fill(); outline(ctx, 0.4 * S_); });
+    /* the ball, and its paler belly */
+    ctx.fillStyle = radial(ctx, -2 * S_, -3 * S_, R * 1.2, '#ffffff', plume); ell(ctx, 0, 0, R, R * 0.97); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.fillStyle = rgba(belly, 0.85); ell(ctx, 3 * S_, 2.4 * S_, R * 0.6, R * 0.55); ctx.fill();
+    /* cheek tuft and a crown curl */
+    ctx.fillStyle = plume; ell(ctx, 6.6 * S_, 1 * S_, 1.8 * S_, 1.4 * S_); ctx.fill(); outline(ctx, 0.4 * S_);
+    ctx.beginPath(); ctx.moveTo(-2 * S_, -R + 0.6 * S_); ctx.quadraticCurveTo(-4.5 * S_, -R - 4 * S_, -1 * S_, -R - 3.5 * S_); ctx.quadraticCurveTo(-2 * S_, -R - 1.5 * S_, 0, -R + 0.4 * S_); ctx.fill(); outline(ctx, 0.4 * S_);
+    /* the big dark eye with a highlight, and the small orange beak */
+    ctx.fillStyle = '#1a1210'; ell(ctx, 4.2 * S_, -1.6 * S_, 1.7 * S_, 2 * S_); ctx.fill(); ctx.fillStyle = '#ffffff'; ell(ctx, 4.7 * S_, -2.3 * S_, 0.6 * S_, 0.6 * S_); ctx.fill();
+    ctx.fillStyle = '#eaa846'; ctx.beginPath(); ctx.moveTo(R - 0.6 * S_, 0); ctx.lineTo(R + 3.4 * S_, 0.9 * S_); ctx.lineTo(R - 0.4 * S_, 2.2 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.4 * S_);
+    /* pearly freckles under the eye */
+    ctx.fillStyle = rgba(pearl, 0.9); for (let k = 0; k < 3; k++) { ell(ctx, (3.4 + k * 1.1) * S_, (1.2 + k * 0.5) * S_, 0.45 * S_, 0.45 * S_); ctx.fill(); }
+    /* THE horn: one bone-white spike, angled forward out of a feather collar, inside a glossy film that shines */
+    const ext = o.pose === 'attack' ? 1 : 0.85;
+    ctx.save(); ctx.translate(2.4 * S_, -R + 1 * S_); ctx.rotate(0.55);
+    ctx.fillStyle = plume; ell(ctx, 0, 0, 2.6 * S_, 1.3 * S_); ctx.fill(); outline(ctx, 0.5 * S_);
+    ctx.fillStyle = rgba(pearl, 0.9); for (let k = 0; k < 5; k++) { ell(ctx, (-2 + k) * S_, 0.3 * S_, 0.4 * S_, 0.4 * S_); ctx.fill(); }
+    const hl = 12 * S_ * ext;
+    ctx.fillStyle = lin(ctx, 0, 0, 0, -hl, [[0, '#e8e0cc'], [1, '#fffdf4']]); ctx.beginPath(); ctx.moveTo(-1.3 * S_, 0); ctx.quadraticCurveTo(-0.6 * S_, -hl * 0.6, 0.9 * S_, -hl); ctx.quadraticCurveTo(0.4 * S_, -hl * 0.5, 1.3 * S_, 0); ctx.closePath(); ctx.fill(); outline(ctx, 0.5 * S_);
+    ctx.fillStyle = rgba('#fff6e0', 0.28 + Math.sin(t * 3) * 0.1); ctx.beginPath(); ctx.moveTo(-2 * S_, 0.4 * S_); ctx.quadraticCurveTo(-1.2 * S_, -hl * 0.65, 1 * S_, -hl - 1 * S_); ctx.quadraticCurveTo(1.2 * S_, -hl * 0.5, 2 * S_, 0.4 * S_); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.shadowColor = '#fff0c8'; ctx.shadowBlur = 8 * S_; ctx.fillStyle = rgba('#fffbe8', 0.9); ell(ctx, 0.9 * S_, -hl, 0.9 * S_, 0.9 * S_); ctx.fill(); ctx.restore();
+    ctx.restore();
+    /* tiny orange legs dangling, dark claws */
+    ctx.strokeStyle = '#e39a3c'; ctx.lineWidth = 0.9 * S_; [[-2, 1], [2, -1]].forEach(([x, k]) => { ctx.beginPath(); ctx.moveTo(x * S_, R - 0.6 * S_); ctx.lineTo((x + k * 0.5) * S_, R + 3 * S_); ctx.stroke(); ctx.strokeStyle = '#3a2a20'; ctx.beginPath(); ctx.moveTo((x - 1) * S_, R + 3.4 * S_); ctx.lineTo((x + 1.2) * S_, R + 3.2 * S_); ctx.stroke(); ctx.strokeStyle = '#e39a3c'; });
+    wing(1, 1);
   };
   /* TONGUATJIS — a great shelled snapper of the deep forest, and a tongue many times its length */
   CREATURE.tonguatjis = function (ctx, S_, t, o) {
@@ -780,31 +817,57 @@
     ctx.restore();
   };
   /* THE VYRENALUR — Light Shadow: a stag whose hide is shadow dappled with moving light, crowned by antlers of pure light */
+  /* THE VYRENALUR — Light Shadow, as in the old stories: a towering stag of shadow on long legs, chest deep and neck high,
+     its hide dappled with drifting light, eyes of light, a line of light down its face and spine,
+     and a great branching crown of antlers of pure light */
   CREATURE.vyrenalur = function (ctx, S_, t, o) {
-    if (!o.noShadow) shadow(ctx, 22 * S_, 4 * S_);
-    const hide = '#1a1a2c', walk = o.moving || o.pose === 'attack' ? Math.sin(t * 7) : Math.sin(t * 1.2) * 0.15, charge = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0;
-    /* slender legs */
-    ctx.strokeStyle = shade(hide, 10); ctx.lineCap = 'round'; ctx.lineWidth = 2.2 * S_;
-    [[-12, 1], [-8, -1], [10, -1], [14, 1]].forEach(([x, k]) => { const a = walk * 0.35 * k; ctx.beginPath(); ctx.moveTo(x * S_, -16 * S_); ctx.lineTo((x + Math.sin(a) * 5 - 1) * S_, -8 * S_); ctx.lineTo((x + Math.sin(a) * 3) * S_, 0); ctx.stroke(); });
-    ctx.translate(0, 3 * S_);
-    /* the body */
-    ctx.fillStyle = lin(ctx, 0, -26 * S_, 0, -12 * S_, [[0, '#2c2c48'], [1, '#0c0c18']]); ctx.beginPath(); ctx.moveTo(-16 * S_, -16 * S_); ctx.quadraticCurveTo(-17 * S_, -25 * S_, -6 * S_, -25 * S_); ctx.quadraticCurveTo(8 * S_, -27 * S_, 15 * S_, -24 * S_); ctx.quadraticCurveTo(19 * S_, -18 * S_, 14 * S_, -14 * S_); ctx.quadraticCurveTo(0, -12 * S_, -16 * S_, -16 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
-    /* the neck and head, lowered to charge */
-    ctx.save(); ctx.translate(13 * S_, -23 * S_); ctx.rotate(0.55 + charge * 0.7);
-    ctx.fillStyle = '#1e1e34'; ctx.beginPath(); ctx.moveTo(-3 * S_, 2 * S_); ctx.quadraticCurveTo(2 * S_, -8 * S_, 4 * S_, -12 * S_); ctx.lineTo(9 * S_, -10 * S_); ctx.quadraticCurveTo(5 * S_, -2 * S_, 4 * S_, 3 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.7 * S_);
-    ctx.fillStyle = '#20203a'; ell(ctx, 8 * S_, -12 * S_, 4.6 * S_, 2.6 * S_, 0.3); ctx.fill(); outline(ctx, 0.6 * S_);
-    ctx.fillStyle = '#fff6c8'; ell(ctx, 8 * S_, -13 * S_, 0.8 * S_, 0.8 * S_); ctx.fill();
-    /* antlers of pure light, trailing threads like sunbeams */
-    ctx.save(); ctx.shadowColor = '#fff2b0'; ctx.shadowBlur = 14 * S_; ctx.strokeStyle = rgba('#fffbe0', 0.95); ctx.lineWidth = 1.3 * S_;
-    [[-1, 0], [1, 0.4]].forEach(([sd, off]) => { ctx.beginPath(); ctx.moveTo(6 * S_, -14 * S_); ctx.quadraticCurveTo((4 + sd * 4) * S_, -22 * S_, (2 + sd * 7) * S_, -30 * S_); ctx.stroke();
-      [[0.35, -4, -5], [0.6, 5, -6], [0.85, -3, -5]].forEach(([k, dx, dy]) => { const x = (6 + ((2 + sd * 7) - 6) * k) * S_, y = (-14 - 16 * k) * S_; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx * S_, y + dy * S_); ctx.stroke(); }); });
-    ctx.strokeStyle = rgba('#fff2b0', 0.35); ctx.lineWidth = 0.6 * S_; for (let i = 0; i < 4; i++) { const x = (2 + i * 2.6) * S_, y = (-26 - i) * S_; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 2 * S_ + Math.sin(t * 2 + i) * S_, y + 16 * S_); ctx.stroke(); }
-    ctx.restore(); ctx.restore();
-    /* light dappling the shadow-hide, drifting */
-    ctx.save(); ctx.beginPath(); ctx.moveTo(-16 * S_, -16 * S_); ctx.quadraticCurveTo(-17 * S_, -25 * S_, -6 * S_, -25 * S_); ctx.quadraticCurveTo(8 * S_, -27 * S_, 15 * S_, -24 * S_); ctx.quadraticCurveTo(19 * S_, -18 * S_, 14 * S_, -14 * S_); ctx.quadraticCurveTo(0, -12 * S_, -16 * S_, -16 * S_); ctx.clip();
-    for (let i = 0; i < 9; i++) { const x = ((i * 37 + t * 4) % 34 - 17) * S_, y = (-15 - (i * 13) % 10) * S_; ctx.fillStyle = rgba('#fff2b0', 0.28 + 0.18 * Math.sin(t * 2 + i)); ell(ctx, x, y, 1.8 * S_, 1.2 * S_); ctx.fill(); }
+    const k = 0.78; S_ *= k;
+    if (!o.noShadow) shadow(ctx, 24 * S_, 4.5 * S_);
+    const hide = '#1e1c34', deep = '#13111f', light = '#ffe8a8';
+    const walk = o.moving ? Math.sin(t * 6) : Math.sin(t * 1.1) * 0.08, charge = o.pose === 'attack' ? Math.sin(Math.min(1, o.poseT || 0) * Math.PI) : 0;
+    const leg = (hx, hy, hind, ph, far) => { const sw = walk * (hind ? -1 : 1) * (ph ? -1 : 1) * 0.32;
+      const kx = hx + (hind ? 3 : 1) + Math.sin(sw) * 6, ky = hy + 13, fx = hx + (hind ? -1 : 1.5) + Math.sin(sw) * 9, fy = -0.5;
+      const hk = hind ? [kx - 4, ky + 6] : [kx + 0.5, ky + 6];
+      ctx.strokeStyle = far ? deep : shade(hide, 8); ctx.lineCap = 'round';
+      ctx.lineWidth = 6.2 * S_; ctx.beginPath(); ctx.moveTo(hx * S_, hy * S_); ctx.lineTo(kx * S_, ky * S_); ctx.stroke();
+      ctx.lineWidth = 3.4 * S_; ctx.beginPath(); ctx.moveTo(kx * S_, ky * S_); ctx.lineTo(hk[0] * S_, hk[1] * S_); ctx.lineTo(fx * S_, fy * S_); ctx.stroke();
+      ctx.fillStyle = '#0c0a14'; ell(ctx, (fx + 0.8) * S_, 0, 1.8 * S_, 1 * S_); ctx.fill(); };
+    /* far legs first */
+    leg(-14, -33, true, 1, true); leg(13, -33, false, 1, true);
+    /* the body: haunches, a long torso, a deep chest */
+    const body = () => { ctx.beginPath(); ctx.moveTo(-20 * S_, -36 * S_); ctx.quadraticCurveTo(-21 * S_, -46 * S_, -11 * S_, -46 * S_); ctx.quadraticCurveTo(4 * S_, -48 * S_, 12 * S_, -47 * S_); ctx.quadraticCurveTo(22 * S_, -46 * S_, 21 * S_, -36 * S_);
+      ctx.quadraticCurveTo(19 * S_, -27 * S_, 12 * S_, -29 * S_); ctx.quadraticCurveTo(0, -31 * S_, -12 * S_, -30 * S_); ctx.quadraticCurveTo(-20 * S_, -29 * S_, -20 * S_, -36 * S_); ctx.closePath(); };
+    ctx.fillStyle = lin(ctx, 0, -48 * S_, 0, -28 * S_, [[0, '#2c2a4a'], [1, deep]]); body(); ctx.fill(); outline(ctx, 0.9 * S_);
+    /* a short tail */
+    ctx.fillStyle = hide; ell(ctx, -21 * S_, -42 * S_, 2 * S_, 3 * S_, -0.5); ctx.fill(); ctx.fillStyle = rgba(light, 0.5); ell(ctx, -21.6 * S_, -41 * S_, 0.9 * S_, 1.6 * S_, -0.5); ctx.fill();
+    /* the neck rising high, and the head (lowered when it charges) */
+    const nod = charge * 0.9;
+    ctx.save(); ctx.translate(15 * S_, -44 * S_); ctx.rotate(nod);
+    ctx.fillStyle = lin(ctx, 0, -22 * S_, 6 * S_, 0, [[0, '#2a2846'], [1, hide]]); ctx.beginPath(); ctx.moveTo(-6 * S_, 3 * S_); ctx.quadraticCurveTo(-3 * S_, -12 * S_, 0, -21 * S_); ctx.lineTo(9 * S_, -20 * S_); ctx.quadraticCurveTo(13 * S_, -8 * S_, 10 * S_, 4 * S_); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * S_);
+    ctx.save(); ctx.translate(5.5 * S_, -22 * S_); ctx.rotate(0.35);
+    /* ear */
+    ctx.fillStyle = hide; ctx.beginPath(); ctx.moveTo(-2 * S_, -1.5 * S_); ctx.quadraticCurveTo(-7 * S_, -5 * S_, -8 * S_, -2 * S_); ctx.quadraticCurveTo(-5 * S_, 0, -1 * S_, 0.5 * S_); ctx.fill(); outline(ctx, 0.5 * S_);
+    /* the long head and darker snout */
+    ctx.fillStyle = lin(ctx, 0, -3 * S_, 0, 3 * S_, [[0, '#2a2846'], [1, hide]]); ell(ctx, 2 * S_, 0, 6.4 * S_, 3.9 * S_); ctx.fill(); outline(ctx, 0.6 * S_);
+    ctx.fillStyle = deep; ell(ctx, 8.6 * S_, 1.4 * S_, 4 * S_, 2.3 * S_, 0.2); ctx.fill(); outline(ctx, 0.5 * S_);
+    /* the eye of light, and a stripe of light down the face */
+    ctx.save(); ctx.shadowColor = '#fff0c0'; ctx.shadowBlur = 8 * S_; ctx.fillStyle = '#fff6d8'; ell(ctx, 2.6 * S_, -1 * S_, 1.1 * S_, 0.75 * S_); ctx.fill(); ctx.restore();
+    ctx.fillStyle = rgba(light, 0.75); for (let i = 0; i < 5; i++) { ell(ctx, (1 + i * 1.6) * S_, (-2.6 + i * 0.7) * S_, 0.6 * S_, 0.5 * S_); ctx.fill(); }
+    /* the antler crown: branching light, two antlers, trailing threads like sunbeams */
+    ctx.save(); ctx.shadowColor = '#fff2b0'; ctx.shadowBlur = (10 + charge * 10) * S_; ctx.strokeStyle = rgba('#fffbe0', 0.95); ctx.lineCap = 'round';
+    const branch = (x, y, a, len, w, d) => { const ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len; ctx.lineWidth = w * S_; ctx.beginPath(); ctx.moveTo(x * S_, y * S_); ctx.lineTo(ex * S_, ey * S_); ctx.stroke();
+      if (d > 0) { branch(ex, ey, a - 0.45, len * 0.72, w * 0.7, d - 1); branch(ex, ey, a + 0.38, len * 0.68, w * 0.7, d - 1); } };
+    branch(-1, -2.5, -1.95, 9, 1.6, 3); branch(0.5, -2.5, -1.35, 9.5, 1.6, 3);
+    ctx.strokeStyle = rgba('#fff2b0', 0.3); ctx.lineWidth = 0.5 * S_; for (let i = 0; i < 5; i++) { const x = (-6 + i * 3) * S_, y = (-22 - (i % 2) * 3) * S_; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 1.5 * S_ + Math.sin(t * 2 + i) * S_, y + 14 * S_); ctx.stroke(); }
+    ctx.restore(); ctx.restore(); ctx.restore();
+    /* near legs over the body */
+    leg(-13, -32, true, 0, false); leg(14, -32, false, 0, false);
+    /* light dappling the shadow-hide, drifting as if under a moving canopy; a line of light along the spine */
+    ctx.save(); body(); ctx.clip();
+    for (let i = 0; i < 12; i++) { const x = ((i * 37 + t * 3) % 42 - 21) * S_, y = (-31 - (i * 13) % 15) * S_; ctx.fillStyle = rgba(light, 0.22 + 0.16 * Math.sin(t * 1.7 + i)); ell(ctx, x, y, (1.4 + (i % 3) * 0.7) * S_, (1 + (i % 3) * 0.4) * S_); ctx.fill(); }
+    ctx.fillStyle = rgba(light, 0.6); for (let i = 0; i < 10; i++) { ell(ctx, (-16 + i * 3.4) * S_, (-46.2 + Math.sin(i * 0.7) * 0.6) * S_, 0.7 * S_, 0.5 * S_); ctx.fill(); }
     ctx.restore();
-    if (charge > 0.05) { ctx.fillStyle = rgba('#fff6c8', 0.35 * charge); ell(ctx, 26 * S_, -26 * S_, 14 * S_ * charge, 5 * S_ * charge, -0.2); ctx.fill(); }
+    if (charge > 0.05) { ctx.fillStyle = rgba('#fff6c8', 0.35 * charge); ell(ctx, 30 * S_, -36 * S_, 16 * S_ * charge, 6 * S_ * charge, 0.2); ctx.fill(); }
   };
   /* KIPSU — a weasel's face, a fox's ears, a fluffy tail that glows */
   CREATURE.kipsu = function (ctx, S_, t, o) {

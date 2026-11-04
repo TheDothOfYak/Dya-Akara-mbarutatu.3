@@ -459,6 +459,8 @@
     T.top.innerHTML = '';
     T.top.appendChild(el('h2', { text: town.name }));
     T.top.appendChild(el('span', { cls: 'panel', style: { padding: '4px 10px' } }, [Math.floor(town.pop) + ' / ' + RU.housing(town) + ' people' + (town.popChange ? ' (' + (town.popChange > 0 ? '+' : '') + town.popChange + ' today)' : '') + ' · +' + RU.townIncome(st, town).gold + ' gold a day · ' + (town.builtToday >= RU.buildsPerDay(st, town) ? 'built today' : 'can build today')]));
+    { const fc = RU.canFeast(st, town); if (town.owner === U.viewer) { const fb = btn('Feast', () => { const r = RU.feast(st, town); if (!r.ok) { U.toast(r.why); return; } U.toast('A feast in ' + town.name + ': ' + r.n + ' people came to stay.'); T.render(); U.refresh(); }, fc.ok ? '' : 'muted');
+      fb.setAttribute('data-tip', '<b>Hold a feast</b><br>' + D.FEAST.cost.gold + ' gold and ' + D.FEAST.cost.food + ' food: people from the country around come to stay (' + Math.round(D.FEAST.pct * 100) + '% more, at least ' + D.FEAST.min + '). Once a week.' + (fc.ok ? '<br><span class="good">+' + fc.gain + ' people now</span>' : '<br><span class="bad">' + (fc.why || '') + '</span>')); T.top.appendChild(fb); } }
     T.top.appendChild(el('span', { cls: 'panel row', style: { padding: '4px 10px', gap: '10px' } }, D.RES.map(r => el('span', { cls: 'res', 'data-tip': '<b>' + D.RES_INFO[r].name + '</b>' + (D.RES_INFO[r].desc ? '<br>' + D.RES_INFO[r].desc : '') }, [U.resIcon(r, 16), SU.fmt(P.res[r])]))));
     T.top.appendChild(el('span', { cls: 'spacer' }));
     T.top.appendChild(btn('Leave town', () => T.close(), 'primary'));

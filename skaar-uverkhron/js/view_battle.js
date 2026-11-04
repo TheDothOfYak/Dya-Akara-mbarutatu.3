@@ -250,7 +250,7 @@
     } }); });
   }
   /* how big each creature stands on the field (its body is drawn the same size when it falls) */
-  const SIZE = { malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2, sprengju: 2.1, speareikar: 1.9, stryx: 1.75, albali: 1.7, tonguatjis: 2.1, saklaypunk: 1.8, apibuta: 2.9, sruvorn: 1.9, vyrenalur: 2.9, kipsu: 2.1 };
+  const SIZE = { malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2, sprengju: 2.1, speareikar: 1.9, stryx: 1.45, albali: 2.1, tonguatjis: 2.1, saklaypunk: 1.8, apibuta: 2.9, sruvorn: 1.9, vyrenalur: 2.5, kipsu: 2.1 };
   function drawUnit(g, u, p, G, t, act) {
     const B = BV.B, sd = B.sides[u.side], col = sd.owner >= 0 ? U.st.players[sd.owner].color : D.NEUTRAL_COLOR;
     const isAct = act && act.uid === u.uid;

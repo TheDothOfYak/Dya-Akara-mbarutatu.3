@@ -160,14 +160,14 @@
 
   cr('stryx', { name: 'Stryx', plural: 'Stryx', faction: 'elsharyn', tier: 3, art: 'stryx',
     atk: 8, def: 9, dmg: [4, 7], hp: 30, spd: 0, grow: 7, cost: { gold: 160 }, food: 0.4, el: 'Ular', up: 'stryx2',
-    ranged: true, shots: 12, abil: ['rooted', 'bind'], desc: 'Stone armour and vine limbs, grown from a seed where it fell. Once rooted it never moves: it throws rocks, and hits just as hard up close. Whatever it strikes up close is bound by its vines until the Stryx dies.' });
+    ranged: true, shots: 12, abil: ['rooted', 'bind'], desc: 'A wide, flat mesa of stone in three stepped tiers, mossy on top, with glowing seams in its flanks and whipping vines. Grown from a seed where it fell; once rooted it never moves: it throws rocks, and hits just as hard up close. Whatever it strikes up close is bound by its vines until the Stryx dies.' });
   cr('stryx2', { name: 'Old Stryx', plural: 'Old Stryx', faction: 'elsharyn', tier: 3, upgraded: true, art: 'stryx', tint: 1,
     atk: 10, def: 11, dmg: [5, 8], hp: 36, spd: 0, grow: 7, cost: { gold: 230 }, food: 0.4, el: 'Ular',
     ranged: true, shots: 16, abil: ['rooted', 'bind'], desc: 'Stryx rooted for many seasons, mossy and heavy-handed.' });
 
   cr('albali', { name: 'Albali Byrd', plural: 'Albali Byrds', faction: 'elsharyn', tier: 4, art: 'albali',
     atk: 11, def: 9, dmg: [6, 10], hp: 38, spd: 8, grow: 5, cost: { gold: 270 }, food: 0.8, el: 'Fti', up: 'albali2',
-    fly: true, abil: ['heal'], desc: 'A great pale bird with a single horn coated in a healing film, the last form of a five-stage life that begins as a tree. Instead of attacking, it can restore an ally next to it.' });
+    fly: true, abil: ['heal'], desc: 'A round ball of cream feathers with big dark eyes and wide wings, and a single bone-white horn in a glossy healing film, the last form of a five-stage life that begins as a tree. Instead of attacking, it can restore an ally next to it.' });
   cr('albali2', { name: 'Albali Elder', plural: 'Albali Elders', faction: 'elsharyn', tier: 4, upgraded: true, art: 'albali', tint: 1,
     atk: 13, def: 11, dmg: [8, 12], hp: 46, spd: 9, grow: 5, cost: { gold: 350 }, food: 0.8, el: 'Fti',
     fly: true, abil: ['heal'], desc: 'Old Albali Byrds whose horn-film heals deeper.' });
@@ -190,7 +190,7 @@
 
   cr('vyrenalur', { name: 'Vyrenalur', plural: 'Vyrenalur', faction: 'elsharyn', tier: 9, art: 'vyrenalur', legendary: true,
     atk: 42, def: 38, dmg: [100, 140], hp: 1100, spd: 12, size: 2, shape: [3, 2], grow: 0, cost: { gold: 10000, glowmoss: 6, stygian: 3 }, food: 10, el: 'Fti',
-    abil: ['fade', 'lightline', 'trail'], desc: 'Light Shadow: the ancient stag of the deep forest, a body of shadow dappled with moving light under antlers of pure light. Every other round it slips into shadow and nothing can touch it; its charge is a line of light. Where it runs, its trail glows for three rounds, and Eikar in the trail are healed.' });
+    abil: ['fade', 'lightline', 'trail'], desc: 'Light Shadow: the towering stag of the deep forest, tall on long legs, a body of shadow dappled with moving light, eyes of light, under a great crown of antlers of pure light. Every other round it slips into shadow and nothing can touch it; its charge is a line of light. Where it runs, its trail glows for three rounds, and Eikar in the trail are healed.' });
 
   cr('kipsu', { name: 'Kipsu', plural: 'Kipsu', wild: true, tier: 2, art: 'kipsu',
     atk: 5, def: 4, dmg: [2, 4], hp: 14, spd: 8, food: 0.3, el: 'Ular', abil: [], desc: 'A pack animal with a weasel’s face, a fox’s ears and a glowing tail unique to each one. They follow the Vyrenalur anywhere.' });
@@ -484,6 +484,11 @@
       peoples: { eikar: 4, kaloeik: 3, keilia: 1, karnen: 1 }, guard: ['sprengju', 'speareikar', 'stryx'] },
   };
   D.factionOf = f => D.FACTION[f] ? f : 'duskareth';
+  /* ways a town grows besides its own families: villages that send settlers, travellers, and feasts */
+  D.VILLAGE_SETTLERS = 30;                           // people a held village sends to your nearest town each week
+  D.VILLAGE_NAMES = ['Brennock', 'Hollin', 'Esk Ford', 'Tamwick', 'Sorrel', 'Low Ashby', 'Mirren', 'Cobb’s End', 'Wendle', 'Ferrow', 'Pike Hill', 'Oddmoor', 'Lark Rise', 'Quillan', 'Fenwick', 'Thistledown'];
+  D.FEAST = { cost: { gold: 1000, food: 60 }, pct: 0.08, min: 25 };   // once a week in each town
+  D.TRAVELLERS = { chance: 0.35, pct: 0.06, min: 15 };                 // each week, each town may draw travellers
   /* the buildings every town has, as each people names them (the Duskareth names are the ones above) */
   D.LOOK = {
     elsharyn: {

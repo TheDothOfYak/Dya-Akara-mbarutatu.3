@@ -378,7 +378,7 @@
       const c = V.miniCache || A.canvas(W, H); const cg = c.getContext('2d');
       cg.fillStyle = '#05040a'; cg.fillRect(0, 0, W, H);
       for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const i = y * L.w + x; if (!E[i]) continue; cg.fillStyle = L.ob[i] === S.OB.mountain ? '#6a655a' : L.ob[i] && L.ob[i] !== S.OB.rock ? A.shade(MINI_COL[S.TCODES[L.t[i]]], -25) : MINI_COL[S.TCODES[L.t[i]]]; cg.fillRect(offx + x * sc, offy + y * sc, Math.ceil(sc), Math.ceil(sc)); }
-      Object.values(st.objects).forEach(o => { if (o.layer !== V.layer || !E[o.y * L.w + o.x]) return; if (o.type === 'town' || o.type === 'mine') { cg.fillStyle = S.color(st, o.owner); const r = o.type === 'town' ? 2.6 : 1.6; cg.fillRect(offx + (o.x - (o.type === 'town' ? 1 : 0.5)) * sc, offy + (o.y - (o.type === 'town' ? 1.5 : 0.5)) * sc, r * sc, r * sc); } if (o.type === 'urverk') { cg.fillStyle = '#c9b8ff'; cg.fillRect(offx + o.x * sc, offy + o.y * sc, 1.5 * sc, 1.5 * sc); } });
+      Object.values(st.objects).forEach(o => { if (o.layer !== V.layer || !E[o.y * L.w + o.x]) return; if (o.type === 'town' || o.type === 'mine' || o.type === 'village') { cg.fillStyle = S.color(st, o.owner); const r = o.type === 'town' ? 2.6 : 1.6; cg.fillRect(offx + (o.x - (o.type === 'town' ? 1 : 0.5)) * sc, offy + (o.y - (o.type === 'town' ? 1.5 : 0.5)) * sc, r * sc, r * sc); } if (o.type === 'urverk') { cg.fillStyle = '#c9b8ff'; cg.fillRect(offx + o.x * sc, offy + o.y * sc, 1.5 * sc, 1.5 * sc); } });
       V.miniCache = c; V.miniFrame = V.miniFrame || 1;
     }
     g.drawImage(V.miniCache, 0, 0);
@@ -397,7 +397,7 @@
       g.fillStyle = L.ob[i] === S.OB.mountain ? '#6a655a' : L.ob[i] && L.ob[i] !== S.OB.rock ? A.shade(base, -25) : base; g.fillRect(offx + x * sc, offy + y * sc, Math.ceil(sc), Math.ceil(sc)); }
     Object.values(st.objects).forEach(o => { if (o.layer !== li || o.hidden) return;
       if (o.type === 'town') { g.fillStyle = o.owner >= 0 && st.players[o.owner] ? st.players[o.owner].color : o.start ? '#ffe3a3' : '#cfc6b0'; g.fillRect(offx + (o.x - 1.5) * sc, offy + (o.y - 2) * sc, Math.max(4, 3.5 * sc), Math.max(4, 3.5 * sc)); g.strokeStyle = '#000'; g.lineWidth = 1; g.strokeRect(offx + (o.x - 1.5) * sc, offy + (o.y - 2) * sc, Math.max(4, 3.5 * sc), Math.max(4, 3.5 * sc)); }
-      else if (o.type === 'mine') { g.fillStyle = o.owner >= 0 && st.players[o.owner] ? st.players[o.owner].color : '#9a9078'; g.fillRect(offx + (o.x - 0.5) * sc, offy + (o.y - 0.5) * sc, Math.max(2, 1.6 * sc), Math.max(2, 1.6 * sc)); }
+      else if (o.type === 'mine' || o.type === 'village') { g.fillStyle = o.owner >= 0 && st.players[o.owner] ? st.players[o.owner].color : '#9a9078'; g.fillRect(offx + (o.x - 0.5) * sc, offy + (o.y - 0.5) * sc, Math.max(2, 1.6 * sc), Math.max(2, 1.6 * sc)); }
       else if (o.type === 'urverk') { g.fillStyle = '#c9b8ff'; g.fillRect(offx + o.x * sc, offy + o.y * sc, Math.max(2, 1.5 * sc), Math.max(2, 1.5 * sc)); } });
     return c;
   };
