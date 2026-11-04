@@ -49,7 +49,7 @@
     g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx, 0, TAU); g.fill(); g.restore();
   }
   A.groveTown = function (ctx, o, x, y, ts, t, color) {
-    const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (o.built.includes('hall3') ? 2 : o.built.includes('hall2') ? 1 : 0);
+    const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (['hall3', 'hall4', 'hall5'].some(b => o.built.includes(b)) ? 2 : o.built.includes('hall2') ? 1 : 0);
     const c = cached('grove' + lvl + '_' + ts, ts * 3.4, ts * 3.6, g => {
       const s = ts / 48, W = ts * 3.4, base = ts * 3.3, cx = W / 2;
       A.contact(g, cx, base - 4 * s, W * 0.46, ts * 0.42, 0.48);
@@ -81,7 +81,7 @@
   };
   A.town = function (ctx, o, x, y, ts, t, color) {
     if (o.faction === 'elsharyn') return A.groveTown(ctx, o, x, y, ts, t, color);
-    const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (o.built.includes('hall3') ? 2 : o.built.includes('hall2') ? 1 : 0);
+    const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (['hall3', 'hall4', 'hall5'].some(b => o.built.includes(b)) ? 2 : o.built.includes('hall2') ? 1 : 0);
     const c = cached('town' + lvl + '_' + ts, ts * 3.4, ts * 3.6, g => {
       const s = ts / 48, W = ts * 3.4, base = ts * 3.3, cx = W / 2;
       const stone = '#4a4560', roof = '#2a2440';

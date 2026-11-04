@@ -202,6 +202,13 @@ async function playGame(seed, size, nPlayers, days) {
     BT.autoRun(st6, B7); const blows = B7.anim.filter(x => x.kind === 'dmg');
     ok(blows.length > 0 && blows.every(x => typeof x.nAfter === 'number'), 'every blow records how many are left, so the screen shows deaths when the blow lands');
   }
+  /* the hall's five levels */
+  { const sh = SU.mapgen.newGame({ size: 'S', seed: 43, players: [{ kind: 'human', name: 'A' }, { kind: 'ai', name: 'B' }] });
+    const th = S.townsOf(sh, 0)[0], Ph = sh.players[0]; Ph.res = Object.fromEntries(SU.data.RES.map(r => [r, 1e6])); th.pop = 5000;
+    ['market', 'fort2', 'fort3', 'hall2', 'hall3', 'hall4', 'hall5'].forEach(b => { th.builtToday = 0; const r = RU.build(sh, th, b); ok(r.ok, 'can build ' + b + (r.why ? ' (' + r.why + ')' : '')); });
+    ok(th.built.includes('hall5') && !th.built.includes('hall4') && RU.has(th, 'hall3'), 'each hall replaces the one before');
+    th.pop = 0; ok(RU.townIncome(sh, th).gold === 5000, 'the fifth hall pays 5000 gold a day (' + RU.townIncome(sh, th).gold + ')');
+  }
   /* where an army can go, and why not */
   { const sw = SU.mapgen.newGame({ size: 'S', seed: 41, players: [{ kind: 'human', name: 'A' }, { kind: 'ai', name: 'B' }] });
     const D = SU.data; RU.startTurn(sw);

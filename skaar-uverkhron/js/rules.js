@@ -525,7 +525,7 @@
     R_.pay(P, cost); stack.cr = c.up; return { ok: true };
   };
   R_.townIncome = function (st, t) {
-    const hall = R_.has(t, 'hall3') ? 3 : R_.has(t, 'hall2') ? 2 : 1;
+    const hall = ['hall5', 'hall4', 'hall3', 'hall2'].map((b, i) => R_.has(t, b) ? 5 - i : 0).find(Boolean) || 1;
     const r = { gold: 0, food: 8 + hall * 4 };
     t.built.forEach(b => { const B = D.BUILDINGS[b]; if (B.gold) r.gold += B.gold; if (B.food) r.food += B.food * (st.weekEvent === 'harvest' ? 1.33 : st.weekEvent === 'lean' ? 0.5 : 1); if (B.res) Object.entries(B.res).forEach(([k, v]) => r[k] = (r[k] || 0) + v); });
     r.gold += Math.floor(t.pop * 0.8);

@@ -409,6 +409,8 @@
   bd('hall1', { name: 'Muster Hall', cost: {}, gold: 1000, housing: 400, desc: 'The heart of the town. 1000 gold a day.' });
   bd('hall2', { name: 'Hall of Dusk', cost: { gold: 3500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 200, gold: 1750, housing: 700, replaces: 'hall1', desc: '1750 gold a day, and room for more people.' });
   bd('hall3', { name: 'Duskhold Seat', cost: { gold: 7500, wood: 10, stone: 10, stygian: 3 }, req: ['hall2', 'fort2'], pop: 450, gold: 3000, housing: 1100, replaces: 'hall2', desc: '3000 gold a day. The seat of a Duskareth lord.' });
+  bd('hall4', { name: 'Duskhold Palace', cost: { gold: 10000, wood: 15, stone: 15, stygian: 5 }, req: ['hall3', 'fort3'], pop: 600, gold: 4000, housing: 1500, replaces: 'hall3', desc: '4000 gold a day. A palace of the Duskareth, its towers lit violet all night.' });
+  bd('hall5', { name: 'Throne of the Duat', cost: { gold: 15000, wood: 20, stone: 20, stygian: 8, ngakara: 4 }, req: ['hall4'], pop: 800, gold: 5000, housing: 2000, replaces: 'hall4', desc: '5000 gold a day. The highest seat a Duskareth town can raise.' });
   bd('fort1', { name: 'Palisade Keep', cost: { gold: 2000, wood: 5, stone: 10 }, walls: 1, growth: 0, desc: 'Walls and a gate. Needed for every dwelling above the second.' });
   bd('fort2', { name: 'Stone Citadel', cost: { gold: 3500, stone: 15 }, req: ['fort1'], pop: 250, walls: 2, growth: 25, replaces: 'fort1', desc: 'Stone walls and a tower. Creatures grow 25% faster.' });
   bd('fort3', { name: 'Duskwall Bastion', cost: { gold: 6000, stone: 20, stygian: 2 }, req: ['fort2'], pop: 400, walls: 3, growth: 50, replaces: 'fort2', desc: 'Three towers of the Ver. Creatures grow 50% faster.' });
@@ -469,7 +471,7 @@
   bd('altar', { name: 'Growing Altar', faction: 'elsharyn', cost: { gold: 2500, wood: 6, glowmoss: 3 }, req: ['hall2'], desc: 'Grow-forging: grow a plant or raw metal onto a Relic over three days. The Relic takes that element, and its bearer’s army fights at home on that ground.' });
   bd('grove', { name: 'Protected Grove', faction: 'elsharyn', cost: { gold: 3000, wood: 10, glowmoss: 4 }, req: ['hall2'], desc: 'Teaches the Grove songs. They work only in battles near your Elsha’ryn towns; carry them too far and they are forgotten.' });
   bd('oathtree', { name: 'Oath Tree', faction: 'elsharyn', cost: { gold: 3500, wood: 8, glowmoss: 4, stygian: 2 }, req: ['fort2'], desc: 'Stacks of the Elsha’ryn can be Changed here: stronger, and bound by oath. If their hero surrenders, or they are dismissed, the forest takes them.' });
-  D.BUILD_ORDER = ['hall1', 'hall2', 'hall3', 'fort1', 'fort2', 'fort3', 'tavern', 'market', 'woodyard', 'stoneyard', 'muster', 'granary', 'farms', 'terraces', 'terraces2', 'songs1', 'songs2', 'songs3', 'choir',
+  D.BUILD_ORDER = ['hall1', 'hall2', 'hall3', 'hall4', 'hall5', 'fort1', 'fort2', 'fort3', 'tavern', 'market', 'woodyard', 'stoneyard', 'muster', 'granary', 'farms', 'terraces', 'terraces2', 'songs1', 'songs2', 'songs3', 'choir',
     't_drill', 't_road', 't_count', 't_capt', 't_duat', 't_pens', 'vault', 'shipyard', 'urverk', 'stygwell', 'sanctum',
     'd1', 'd1u', 'd2', 'd2u', 'd3', 'd3u', 'd4', 'd4u', 'd5', 'd6', 'd7', 'd8', 'd9',
     'mossbed', 'memtree', 'altar', 'grove', 'oathtree', 'e1', 'e1u', 'e2', 'e2u', 'e3', 'e3u', 'e4', 'e4u', 'e5', 'e6', 'e7', 'e8', 'e9'];
@@ -488,6 +490,8 @@
       hall1: ['Root Hall', 'The heart of the grove, a hall grown inside a great tree. 1000 gold a day.'],
       hall2: ['Hall of Boughs', 'The tree grows wide and its boughs fill with homes. 1750 gold a day, and room for more people.'],
       hall3: ['Crown of the Forest', '3000 gold a day. The seat of an Elsha’ryn elder, crowned with light.'],
+      hall4: ['Elder Canopy', '4000 gold a day. The great tree spreads over the whole town, hung with lantern-moss.'],
+      hall5: ['The World Tree', '5000 gold a day. The oldest tree of the forest, its crown full of light.'],
       fort1: ['Thorn Hedge', 'A living hedge and a gate of roots. Needed for every dwelling above the second.'],
       fort2: ['Briarwall', 'The hedge grows thick, with watch-trees. Creatures grow 25% faster.'],
       fort3: ['Wall of the Ancients', 'Four watch-trees of the old forest. Creatures grow 50% faster.'],
