@@ -571,7 +571,7 @@
   DL.mapKey = function () {
     const sec = (title, kids) => el('div', { cls: 'key-sec' }, [el('h3', { text: title }), ...kids]);
     const sizes = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, [el('th', { cls: 'small muted', text: 'Word' }), el('th', { cls: 'small muted', text: 'How many' })]), ...S.COUNT_WORDS.map(([a, b, w]) => el('tr', {}, [el('td', { cls: 'gold', text: w }), el('td', { text: b == null ? a + ' or more' : a + '–' + b })]))]);
-    const marks = [['→ green', 'The path: reached today'], ['→ red', 'The path: later days'], ['⚔', 'The path ends in a fight'], ['✦', 'The path ends at something to visit'], ['⇄', 'The path ends at one of your own armies: meet and trade'], ['◌ blue ring', 'The Sunear’Zikhron: the storm (its still eye in the middle)']];
+    const marks = [['G', 'Show the way: green ground is reachable today, red stripes are blocked (water, mountains, thick woods, buildings), orange is beside a wild guard (you would stop there and fight)'], ['□ green', 'Pointing: you can reach it today'], ['□ gold', 'Pointing: you can reach it, but not today'], ['✕ red', 'Pointing: you cannot go there (the bar at the bottom says why)'], ['⚔ orange', 'Pointing: the way passes a wild guard, and you will fight it'], ['→ green', 'The path: reached today'], ['→ red', 'The path: later days'], ['⚔', 'The path ends in a fight'], ['✦', 'The path ends at something to visit'], ['⇄', 'The path ends at one of your own armies: meet and trade'], ['◌ blue ring', 'The Sunear’Zikhron: the storm (its still eye in the middle)']];
     const ground = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, ['Ground', 'Moving', 'Element'].map(x => el('th', { cls: 'small muted', text: x }))),
       ...Object.values(D.TERRAIN).filter(t => !t.void).map(t => el('tr', {}, [el('td', { text: t.name }), el('td', { text: t.pass === false ? 'boats only' : t.cost === 100 ? 'normal' : Math.round(t.cost) + '% (slower)' }), el('td', { text: t.el ? D.ELEMENTS[t.el].name : '' })])),
       el('tr', {}, [el('td', { text: 'Road' }), el('td', { text: D.ROAD_COST + '% (faster)' }), el('td', {})])]);
@@ -590,7 +590,7 @@
     const inc = {}; D.RES.forEach(r => inc[r] = 0);
     towns.forEach(t => Object.entries(RU.townIncome(stt, t)).forEach(([k, v]) => inc[k] += v));
     const mines = Object.values(stt.objects).filter(o => o.type === 'mine' && o.owner === U.viewer);
-    mines.forEach(o => { const Mi = D.MINES[o.kind]; inc[Mi.res] += D.RES_INFO[Mi.res].common ? Mi.amt : Mi.amt / 2; });
+    mines.forEach(o => { const Mi = D.MINES[o.kind]; inc[Mi.res] += Mi.amt; });
     const heroes = Object.values(stt.heroes).filter(h => h.owner === U.viewer && !h.dead);
     const m = U.modal([el('h2', { text: P.name + '’s kingdom' }),
       el('table', { cls: 'grid' }, [el('tr', {}, [el('th', { text: '' }), ...D.RES.map(r => el('th', {}, U.resIcon(r, 18)))]), el('tr', {}, [el('td', { text: 'Stores' }), ...D.RES.map(r => el('td', { text: SU.fmt(P.res[r]) }))]), el('tr', {}, [el('td', { text: 'A day' }), ...D.RES.map(r => el('td', { text: (r === 'food' ? '+' + Math.round(inc[r]) + ' / −' + Math.round(P.lastEat || 0) : '+' + SU.fmt(inc[r])) }))])]),

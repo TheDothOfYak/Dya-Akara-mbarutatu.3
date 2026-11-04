@@ -97,7 +97,13 @@ the game is built.
   and captains from outside the factions, and fairs (bet on punk races and
   Dya'Akara matches). A month is 42 days. Weeks and months
   bring events.
-- **Keys:** E end turn · N next army · H hero · K kingdom · Q map songs · Z sleep ·
+- **Where you can go:** point at any spot and the frame says it plainly: green (reachable
+  today), gold (a few days away), orange ⚔ (the way passes a wild guard: you will stop and
+  fight), red ✕ (you cannot go there). The bar at the bottom says why: water, mountains,
+  thick woods, the body of a building (go in by its entrance, which is marked), land you
+  have not explored, or something lying in a narrow gap. **Show the way** (G) shades
+  everything the picked army can reach today and stripes what blocks it.
+- **Keys:** E end turn · N next army · H hero · K kingdom · Q map songs · Z sleep · G show the way ·
   1–4 layers · arrows to look around. In battle: W wait · D defend · S sing.
 
 ## Modes

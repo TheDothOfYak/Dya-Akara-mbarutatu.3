@@ -24,7 +24,16 @@
   function radial(ctx, x, y, r, c0, c1) { const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r); g.addColorStop(0, c0); g.addColorStop(1, c1); return g; }
   function lin(ctx, x0, y0, x1, y1, stops) { const g = ctx.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, c]) => g.addColorStop(o, c)); return g; }
   function outline(ctx, w) { ctx.lineWidth = w || 1.4; ctx.strokeStyle = 'rgba(16,10,6,0.78)'; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(); }
-  function shadow(ctx, w, h) { ctx.fillStyle = 'rgba(0,0,0,0.28)'; ell(ctx, 0, 0, w, h); ctx.fill(); }
+  /* the one shadow everything casts on the ground: soft-edged, darkest under the feet, the same everywhere */
+  function contact(ctx, x, y, rx, ry, a) {
+    rx = Math.max(0.5, rx); ry = Math.max(0.3, ry); a = a == null ? 0.42 : a;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx);
+    const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+    gr.addColorStop(0, 'rgba(8,6,12,' + a + ')'); gr.addColorStop(0.55, 'rgba(8,6,12,' + (a * 0.62) + ')'); gr.addColorStop(1, 'rgba(8,6,12,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, rx, 0, TAU); ctx.fill(); ctx.restore();
+  }
+  A.contact = contact;
+  function shadow(ctx, w, h) { contact(ctx, 0, 0, w * 1.2, h * 1.25, 0.42); }
   A.ell = ell; A.radial = radial; A.lin = lin; A.outline = outline;
 
   /* ======================= terrain textures ======================= */
@@ -506,7 +515,7 @@
   CREATURE.lutut = function (ctx, S_, t, o) {
     /* vast flying predator patterned like carved stone, jaws for meat */
     const hov = Math.sin(t * 1.8) * 4 * S_;
-    if (!o.noShadow) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(ctx, 0, 0, 24 * S_, 6 * S_); ctx.fill(); }
+    if (!o.noShadow) { contact(ctx, 0, 0, 24 * S_, 6 * S_, 0.38); }
     ctx.translate(0, -34 * S_ + hov);
     const flap = Math.sin(t * 3.2) * 0.4;
     const stone = '#6d6a80', dark = '#44415c';
@@ -626,7 +635,7 @@
     const up = o.tint === 1;
     [[0, 0, 1], [-7, 4, 0.8], [6, 6, 0.75]].forEach(([dx, dy, k], i) => {
       const bob = Math.sin(t * 6 + i * 2) * 2 * S_, x = dx * S_, y = (-16 + dy) * S_ + bob, s = S_ * k;
-      if (!o.noShadow && i === 0) { ctx.fillStyle = 'rgba(0,0,0,0.2)'; ell(ctx, 0, 0, 8 * S_, 2.4 * S_); ctx.fill(); }
+      if (!o.noShadow && i === 0) { contact(ctx, 0, 0, 8 * S_, 2.4 * S_, 0.3); }
       ctx.save(); ctx.translate(x, y); ctx.rotate(0.5 + Math.sin(t * 4 + i) * 0.15 + (o.pose === 'attack' ? 0.6 : 0));
       /* sparks behind */
       for (let k2 = 0; k2 < 3; k2++) { ctx.fillStyle = rgba(up ? '#fff0a0' : '#ffd24a', 0.7 - k2 * 0.2); ell(ctx, -9 * s - k2 * 3 * s, Math.sin(t * 9 + k2 + i) * 1.4 * s, 1.2 * s, 1 * s); ctx.fill(); }

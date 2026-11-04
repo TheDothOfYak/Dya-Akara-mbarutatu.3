@@ -260,9 +260,50 @@
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     const fc = fogCanvas();
     ctx.drawImage(fc, 0, 0, fc.width, fc.height, ox - ts, oy - ts, fc.width * ts, fc.height * ts);
-    /* hover */
-    if (V.hover && S.inside(L, V.hover.x, V.hover.y)) { ctx.strokeStyle = 'rgba(255,236,190,0.5)'; ctx.lineWidth = 1.5; ctx.strokeRect(ox + V.hover.x * ts + 1, oy + V.hover.y * ts + 1, ts - 2, ts - 2); }
+    /* where the picked army can go today, and what blocks it */
+    if (V.showWay) drawWay(ctx, ox, oy, ts, x0, y0, x1, y1, t);
+    /* the pointer: reachable (green), later (gold), through a fight (orange), or not at all (red cross) */
+    const hm = V.hoverMark;
+    if (V.hover && S.inside(L, V.hover.x, V.hover.y)) {
+      const kind = hm && hm.kind, col = { ok: '120,230,110', later: '240,200,90', fight: '255,150,60', no: '235,80,70' }[kind] || '255,236,190';
+      const hx = hm && kind ? hm.x : V.hover.x, hy = hm && kind ? hm.y : V.hover.y;
+      ctx.strokeStyle = 'rgba(' + col + ',0.9)'; ctx.lineWidth = 2; ctx.strokeRect(ox + hx * ts + 2, oy + hy * ts + 2, ts - 4, ts - 4);
+      if (kind === 'no' && hm.why !== 'unexplored') { ctx.lineWidth = Math.max(2, ts * 0.06); ctx.lineCap = 'round'; const k = ts * 0.22, cx = ox + hx * ts + ts / 2, cy = oy + hy * ts + ts / 2;
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth += 2; ctx.beginPath(); ctx.moveTo(cx - k, cy - k); ctx.lineTo(cx + k, cy + k); ctx.moveTo(cx + k, cy - k); ctx.lineTo(cx - k, cy + k); ctx.stroke();
+        ctx.strokeStyle = 'rgba(' + col + ',1)'; ctx.lineWidth -= 2; ctx.stroke(); ctx.lineCap = 'butt'; }
+      if (kind === 'fight' && hm.at) markTile(ctx, ox, oy, ts, hm.at.x, hm.at.y, '255,150,60', '⚔', t);
+      if (kind === 'no' && hm.block) markTile(ctx, ox, oy, ts, hm.block.x, hm.block.y, '235,80,70', '!', t);
+    }
+    if (V.blockMark && performance.now() < V.blockMark.until) markTile(ctx, ox, oy, ts, V.blockMark.x, V.blockMark.y, '235,80,70', '!', t);
     drawMini();
+  }
+  /* a pulsing ring on a tile with a sign in it */
+  function markTile(ctx, ox, oy, ts, x, y, col, sign, t) {
+    const cx = ox + x * ts + ts / 2, cy = oy + y * ts + ts / 2, r = ts * (0.42 + Math.sin(t * 5) * 0.04);
+    ctx.strokeStyle = 'rgba(' + col + ',0.95)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(cx, cy - ts * 0.48, ts * 0.16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(' + col + ',1)'; ctx.font = 'bold ' + Math.round(ts * 0.22) + 'px Georgia'; ctx.textAlign = 'center'; ctx.fillText(sign, cx, cy - ts * 0.4);
+  }
+  /* the way overlay: green where the picked army can walk today, orange beside guards, red stripes where nobody walks */
+  function drawWay(ctx, ox, oy, ts, x0, y0, x1, y1, t) {
+    const st = V.st, L = st.layers[V.layer], a = SU.ui && SU.ui.selectedArmy && SU.ui.selectedArmy(), E = st.players[V.viewer()].explored[V.layer];
+    let R = null;
+    if (a && a.layer === V.layer && !a.dead) { const key = a.id + ':' + a.x + ',' + a.y + ':' + a.mp + ':' + st.day + ':' + Object.keys(st.armies).length + ':' + Object.keys(st.objects).length;
+      if (V._reachKey !== key) { V._reachKey = key; V._reach = SU.rules.reach(st, a); } R = V._reach; }
+    if (!V._hatch) { const c = A.canvas(16, 16), g = c.getContext('2d'); g.strokeStyle = 'rgba(235,80,70,0.55)'; g.lineWidth = 3; g.beginPath(); g.moveTo(-4, 4); g.lineTo(4, -4); g.moveTo(-4, 20); g.lineTo(20, -4); g.moveTo(12, 20); g.lineTo(20, 12); g.stroke(); V._hatch = ctx.createPattern(c, 'repeat'); }
+    for (let y = Math.max(0, y0); y <= Math.min(L.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(L.w - 1, x1); x++) {
+      const i = y * L.w + x; if (!E[i]) continue;
+      const px = ox + x * ts, py = oy + y * ts;
+      const thing = S.objAt(st, V.layer, x, y) || S.armyAt(st, V.layer, x, y);
+      if (!thing && SU.rules.blockedBy(st, V.layer, x, y, a && a.layer === V.layer ? a : null)) { ctx.fillStyle = 'rgba(120,20,20,0.22)'; ctx.fillRect(px, py, ts, ts); ctx.save(); ctx.translate(px, py); ctx.fillStyle = V._hatch; ctx.fillRect(0, 0, ts, ts); ctx.restore(); continue; }
+      if (R && R.cost[i] < Infinity) { ctx.fillStyle = R.stop[i] ? 'rgba(255,150,60,0.38)' : thing ? 'rgba(140,255,120,0.16)' : 'rgba(140,255,120,0.3)'; ctx.fillRect(px, py, ts, ts);
+        /* the edge of today's reach, drawn as a line */
+        ctx.strokeStyle = 'rgba(170,255,150,0.95)'; ctx.lineWidth = 2; ctx.beginPath();
+        const out = (dx, dy) => { const xx = x + dx, yy = y + dy; return !S.inside(L, xx, yy) || !(R.cost[yy * L.w + xx] < Infinity); };
+        if (out(0, -1)) { ctx.moveTo(px, py); ctx.lineTo(px + ts, py); } if (out(0, 1)) { ctx.moveTo(px, py + ts); ctx.lineTo(px + ts, py + ts); }
+        if (out(-1, 0)) { ctx.moveTo(px, py); ctx.lineTo(px, py + ts); } if (out(1, 0)) { ctx.moveTo(px + ts, py); ctx.lineTo(px + ts, py + ts); }
+        ctx.stroke(); }
+    }
   }
   function drawStars(ctx, t) {
     if (!V.stars) { const R = SU.makeRng(5); V.stars = []; for (let i = 0; i < 220; i++) V.stars.push([R.next(), R.next(), R.range(0.3, 1.4), R.next() * 6]); }
@@ -271,7 +312,9 @@
   function drawArmy(ctx, a, px, py, ts, t) {
     const st = V.st, cx = px + ts / 2, gy = py + ts * 0.86, col = S.color(st, a.owner);
     const h = S.heroOf(st, a), sel = SU.ui && SU.ui.selected === a.id;
-    if (sel) { ctx.strokeStyle = 'rgba(255,230,150,' + (0.6 + Math.sin(t * 4) * 0.3) + ')'; ctx.lineWidth = 2; A.ell(ctx, cx, gy, ts * 0.42, ts * 0.16); ctx.stroke(); }
+    /* at the feet: the owner's ring (as in battle), and a pulsing gold ring when picked */
+    if (a.owner >= 0 && !a.wild && !a.boat) { ctx.strokeStyle = A.rgba(col, 0.9); ctx.lineWidth = 2; A.ell(ctx, cx, gy, ts * 0.36, ts * 0.13); ctx.stroke(); }
+    if (sel) { ctx.strokeStyle = 'rgba(255,230,150,' + (0.6 + Math.sin(t * 4) * 0.3) + ')'; ctx.lineWidth = 2.5; A.ell(ctx, cx, gy, ts * 0.43, ts * 0.17); ctx.stroke(); }
     if (a.boat) { A.boat(ctx, a, px, py - ts * 0.1, ts, t, col); }
     if (h) { const moving = V.anim && V.anim.army === a.id; A.mountedHero(ctx, cx, gy - (a.boat ? ts * 0.25 : 0), ts * 0.78, Object.assign({ moving }, h), col, t, a.face || 1); }
     else if (a.wild) {
@@ -284,7 +327,7 @@
       if (cap) A.captain(ctx, cx, gy, ts * 0.62, cap, col, t, a.face || 1);
       A.flag(ctx, cx + ts * 0.2, gy - ts * 0.1, ts * 0.32, col, t);
     }
-    if (a.owner >= 0 && !a.wild) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx - ts * 0.38, py + ts * 0.98); ctx.lineTo(cx + ts * 0.38, py + ts * 0.98); ctx.lineTo(cx + ts * 0.3, py + ts * 1.04); ctx.lineTo(cx - ts * 0.3, py + ts * 1.04); ctx.fill(); }
+
   }
   function drawPath(ctx, ox, oy, ts, t) {
     const p = V.path; if (!p || !p.steps || p.layer !== V.layer) return;

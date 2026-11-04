@@ -184,7 +184,7 @@
   /* ---------- selecting ---------- */
   U.select = function (id, center) {
     const a = U.st.armies[id]; if (!a) { U.selected = null; V.path = null; U.refresh(); return; }
-    U.selected = id; V.path = null;
+    U.selected = id; V.path = null; V.hoverMark = null; U._wayKey = null;
     if (center) V.centerOn(a.layer, a.x, a.y);
     U.refresh();
   };
@@ -278,7 +278,39 @@
     if (own && own.owner === U.viewer && sel && own.id !== sel.id && U.myTurn()) s += ' — click to go and meet ' + who(own) + ' and trade · shift-click to pick it';
     const o = S.objAt(U.st, V.layer, t.x, t.y) || bodyObj(U.st, V.layer, t.x, t.y);
     if (o && o.type === 'town' && o.owner === U.viewer) s += o.x === t.x && o.y === t.y ? ' — click to walk a hero in through the gate' : ' — click to open the town';
+    const mark = U.wayMark(t.x, t.y, own, o); V.hoverMark = mark;
+    if (mark && mark.why) s += ' — ' + mark.why;
     $('status').textContent = s || ' '; });
+  /* how the pointer should look over (x,y): reachable today, later, through a fight, or not at all (and why) */
+  U.wayMark = function (x, y, own, o) {
+    const st = U.st, layer = V.layer, L = st.layers[layer]; if (!S.inside(L, x, y)) return null;
+    const seen = U.viewerPlayer().explored[layer][y * L.w + x], sel = U.selectedArmy();
+    if (!seen) return { x, y, kind: 'no', why: 'unexplored' };
+    if (own && own.owner === U.viewer) return null;
+    /* a building's body: point at its entrance instead */
+    const body = o && (o.x !== x || o.y !== y) ? o : null;
+    const tx = body ? body.x : x, ty = body ? body.y : y;
+    if (!sel || !U.myTurn() || sel.layer !== layer) { const b = !o && !S.armyAt(st, layer, x, y) && RU.blockedBy(st, layer, x, y, null); return b ? { x, y, kind: 'no', why: 'cannot go: ' + b } : null; }
+    if (sel.x === tx && sel.y === ty) return null;
+    const key = sel.id + ':' + sel.x + ',' + sel.y + ':' + sel.mp + ':' + tx + ',' + ty + ':' + st.day;
+    if (U._wayKey === key) return U._way;
+    let m;
+    const b = !body && !S.objAt(st, layer, x, y) && !S.armyAt(st, layer, x, y) && RU.blockedBy(st, layer, x, y, sel);
+    if (b) m = { x, y, kind: 'no', why: 'cannot go: ' + b };
+    else {
+      const p = RU.path(st, sel, tx, ty);
+      if (!p || !p.length) { m = { x, y, kind: 'no', why: 'cannot reach: ' + RU.whyNot(st, sel, tx, ty).replace(/\.$/, ''), block: RU.blockerOnWay(st, sel, tx, ty) }; }
+      else {
+        let mp = sel.mp, prev = { x: sel.x, y: sel.y }, days = 0, fight = null;
+        for (let i = 0; i < p.length; i++) { const c = RU.stepCost(st, sel, layer, prev.x, prev.y, p[i].x, p[i].y); if (mp < c && mp < sel.mpMax) { days++; mp = sel.mpMax; } mp -= c; prev = p[i];
+          if (i < p.length - 1 && RU.guardNear(st, layer, p[i].x, p[i].y)) { fight = p[i]; break; } }
+        m = fight ? { x, y, kind: 'fight', at: fight, why: 'the way passes a wild guard: you will stop and fight it at the orange mark' }
+          : { x, y, kind: days ? 'later' : 'ok', why: days ? SU.plural(days + 1, 'day') + ' away' : 'reachable today' };
+      }
+    }
+    if (body) { m.x = tx; m.y = ty; m.why = (m.why ? m.why + ' · ' : '') + 'heroes go in by the entrance (marked)'; }
+    U._wayKey = key; U._way = m; return m;
+  };
   SU.on('mapinfo', e => {
     if (!U.st) return; const st = U.st;
     const a = S.armyAt(st, V.layer, e.x, e.y);
@@ -322,7 +354,8 @@
   });
   U.preview = function (a, tx, ty) {
     const st = U.st, p = RU.path(st, a, tx, ty);
-    if (!p || !p.length) { V.path = null; U.toast('You cannot reach that from here.'); return; }
+    if (!p || !p.length) { V.path = null; const why = RU.whyNot(st, a, tx, ty); V.blockMark = Object.assign({ until: performance.now() + 4000 }, RU.blockerOnWay(st, a, tx, ty) || { x: tx, y: ty });
+      U.toast(why); $('status').textContent = why; return; }
     let prev = { x: a.x, y: a.y };
     const steps = p.map(s => { const c = RU.stepCost(st, a, a.layer, prev.x, prev.y, s.x, s.y); prev = s; return { x: s.x, y: s.y, cost: c }; });
     const end = S.armyAt(st, a.layer, tx, ty), eo = S.objAt(st, a.layer, tx, ty);
@@ -336,7 +369,7 @@
   };
   U.move = function (a, steps) {
     const st = U.st; let i = 0, pending = null;
-    V.path = null; U.busy = true; a.sleep = false;
+    V.path = null; V.hoverMark = null; U._wayKey = null; U.busy = true; a.sleep = false;
     V.walk(a, () => {
       if (pending) return { stop: true, res: pending };
       if (i >= steps.length || a.dead) return { stop: true };
@@ -382,6 +415,7 @@
     $('b-hero').onclick = () => { const a = U.selectedArmy(); if (a && a.heroId) SU.dialogs.hero(U.st.heroes[a.heroId]); else if (a) SU.dialogs.army(a); else U.toast('Select a hero first.'); };
     $('b-kingdom').onclick = () => SU.dialogs.kingdom();
     if ($('b-key')) $('b-key').onclick = () => SU.dialogs.mapKey();
+    if ($('b-way')) $('b-way').onclick = () => { V.showWay = !V.showWay; $('b-way').classList.toggle('primary', V.showWay); if (V.showWay && !U.selectedArmy()) U.toast('Pick an army to see where it can go today.'); };
     $('b-menu').onclick = () => SU.game.menu();
     $('endturn').onclick = () => SU.game.endTurn();
     SU.on('key', e => {
@@ -396,6 +430,7 @@
       else if (k === 'k') SU.dialogs.kingdom();
       else if (k === 'q') $('b-songs').click();
       else if (k === 'z') $('b-sleep').click();
+      else if (k === 'g') $('b-way').click();
       else if (k === ' ' || k === 'enter') { const a = U.selectedArmy(); if (a && V.path && V.path.army === a.id) U.move(a, V.path.steps); }
       else if (k === 'escape') SU.game.menu();
       else if (k >= '1' && k <= '4') { V.setLayer(+k - 1); U.refresh(); }

@@ -80,7 +80,7 @@
     const a = BV.cur; if (!a) return;
     const k = Math.min(1, (now - a.t0) / a.dur);
     const u = a.uid != null && BV.B.units.find(x => x.uid === a.uid);
-    if (a.kind === 'move' && u) { const p = center(a.from[0], a.from[1], G), q = center(a.to[0], a.to[1], G); BV.pos[u.uid] = { x: SU.lerp(p.x, q.x, k), y: SU.lerp(p.y, q.y, k) - (a.fly ? Math.sin(k * Math.PI) * G.R * 1.2 : Math.abs(Math.sin(k * Math.PI * 3)) * G.R * 0.12) }; if (k >= 1) delete BV.pos[u.uid]; }
+    if (a.kind === 'move' && u) { const p = center(a.from[0], a.from[1], G), q = center(a.to[0], a.to[1], G); const e = k * k * (3 - 2 * k); BV.pos[u.uid] = { x: SU.lerp(p.x, q.x, e), y: SU.lerp(p.y, q.y, e) - (a.fly ? Math.sin(k * Math.PI) * G.R * 1.2 : Math.sin(k * Math.PI) * G.R * 0.1) }; if (k >= 1) delete BV.pos[u.uid]; }
     if (a.kind === 'blink' && u) { u._alpha = k < 0.5 ? 1 - k * 2 : (k - 0.5) * 2; if (k >= 1) u._alpha = 1; }
     if ((a.kind === 'hit' || a.kind === 'shoot' || a.kind === 'boulder' || a.kind === 'wall') && u) { u._pose = 'attack'; u._poseT = k; if (k >= 1) u._pose = null; }
     if (a.kind === 'hit' && u) { const tu = BV.B.units.find(x => x.uid === a.target);
@@ -116,10 +116,15 @@
     for (let rr = 0; rr < B.rows; rr++) for (let c = 0; c < B.cols; c++) {
       const p = center(c, rr, G), k = c + ',' + rr;
       hexPath(g, p.x, p.y, G.R * 0.97);
-      if (reach && reach.has(k)) { g.fillStyle = 'rgba(255,230,160,0.13)'; g.fill(); }
-      g.strokeStyle = 'rgba(255,240,210,0.13)'; g.lineWidth = 1; g.stroke();
+      const can = reach && reach.has(k);
+      if (can) { g.fillStyle = 'rgba(150,255,130,0.12)'; g.fill(); }
+      g.strokeStyle = 'rgba(10,8,16,0.3)'; g.lineWidth = 1; g.stroke();
+      if (can) { hexPath(g, p.x, p.y, G.R * 0.9); g.strokeStyle = 'rgba(200,255,180,0.42)'; g.lineWidth = 1.2; g.stroke(); }
     }
-    if (BV.hover && reach) { const p = center(BV.hover.c, BV.hover.r, G); hexPath(g, p.x, p.y, G.R * 0.97); g.strokeStyle = 'rgba(255,236,190,0.7)'; g.lineWidth = 2; g.stroke(); }
+    /* the pointer, in the map's colours: green where you can step, red where you can't */
+    if (BV.hover && act && humanTurn()) { const p = center(BV.hover.c, BV.hover.r, G), k = BV.hover.c + ',' + BV.hover.r, there = BT.unitAt(B, BV.hover.c, BV.hover.r);
+      const col = there ? (there.side !== act.side ? '255,150,60' : '255,236,190') : reach && reach.has(k) ? '140,255,120' : '235,80,70';
+      hexPath(g, p.x, p.y, G.R * 0.97); g.strokeStyle = 'rgba(' + col + ',0.9)'; g.lineWidth = 2; g.stroke(); }
     /* the Vyrenalur's trail, and acid bogs (yours, or ones somebody has stepped in) */
     if (B.trail) Object.entries(B.trail).forEach(([k, v]) => { if (v.until < B.round) return; const [c, rr] = k.split(',').map(Number), p = center(c, rr, G), left = (v.until - B.round + 1) / 4;
       hexPath(g, p.x, p.y, G.R * 0.9); g.fillStyle = 'rgba(255,246,200,' + (0.1 + 0.18 * left + 0.05 * Math.sin(t * 3 + c)) + ')'; g.fill(); });
@@ -172,20 +177,47 @@
   }
   function hexPath(g, x, y, R) { g.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; const px = x + Math.cos(a) * R, py = y + Math.sin(a) * R * YS; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); }
   const GROUND = { grass: ['#4f7a32', '#36561f'], dirt: ['#7a5c3a', '#56402a'], rough: ['#6c675a', '#4a463c'], sand: ['#c2a66a', '#9a8048'], snow: ['#d8e2ea', '#a8b8c8'], swamp: ['#45543a', '#2c3826'], ash: ['#4a3a34', '#2c201c'], dusk: ['#3a3150', '#221c30'], moon: ['#a8a6b8', '#78768a'], water: ['#6a8a5a', '#4a6a3a'] };
+  /* the sky over each world, the same colours the towns use */
+  const SKY = { velki: [[0, '#14102a'], [0.55, '#3a2a55'], [0.85, '#a8566a'], [1, '#e89a6a']], xikia: [[0, '#0a1424'], [0.55, '#23405e'], [0.85, '#6a9ab8'], [1, '#c8e0ea']],
+    leotik: [[0, '#101a0c'], [0.55, '#2e4a24'], [0.85, '#8a9a4a'], [1, '#e0d08a']], kalo: [[0, '#020206'], [0.7, '#0c0c1c'], [1, '#2a2840']] };
+  /* what grows along the edge of the field, by ground (the map's own obstacle drawings) */
+  const EDGE = { grass: 'tree', dirt: 'tree', rough: 'rock', sand: 'palm', snow: 'pine', swamp: 'reeds', ash: 'deadtree', dusk: 'crystal', moon: 'crystal', water: 'reeds' };
   function drawBackground(g, G) {
     const B = BV.B, key = B.terrain + G.w + 'x' + G.h + (B.siege ? 's' : '');
     if (BV.bgKey !== key) {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const c = A.canvas(G.w * dpr, G.h * dpr), h = c.getContext('2d'); h.scale(dpr, dpr);
-      const [c0, c1] = GROUND[B.terrain] || GROUND.grass;
-      const horizon = G.oy - G.R * 2.2;
-      h.fillStyle = A.lin(h, 0, 0, 0, horizon, [[0, B.layer === 3 ? '#05050c' : '#20283a'], [1, B.layer === 3 ? '#1a1830' : '#6a7a8a']]); h.fillRect(0, 0, G.w, horizon + 2);
-      if (B.layer === 3) for (let i = 0; i < 120; i++) { h.fillStyle = 'rgba(255,255,255,0.7)'; h.fillRect((i * 173) % G.w, (i * 61) % horizon, 1.5, 1.5); }
-      h.fillStyle = A.shade(c1, -30); h.beginPath(); h.moveTo(0, horizon); for (let x = 0; x <= G.w; x += 40) h.lineTo(x, horizon - 20 - Math.abs(Math.sin(x * 0.013)) * 50); h.lineTo(G.w, horizon); h.fill();
-      h.fillStyle = A.lin(h, 0, horizon, 0, G.h, [[0, c1], [0.25, c0], [1, A.shade(c0, -40)]]); h.fillRect(0, horizon, G.w, G.h - horizon);
-      const tex = A.terrainTex(B.terrain === 'water' ? 'grass' : B.terrain, 1, 96);
-      h.globalAlpha = 0.35; for (let y = horizon; y < G.h; y += 96 * YS) for (let x = 0; x < G.w; x += 96) h.drawImage(tex, x, y, 96, 96 * YS); h.globalAlpha = 1;
-      const vg = h.createRadialGradient(G.w / 2, G.h * 0.55, G.h * 0.3, G.w / 2, G.h * 0.55, G.w * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)'); h.fillStyle = vg; h.fillRect(0, 0, G.w, G.h);
+      const terr = B.terrain === 'water' ? 'grass' : B.terrain, [c0, c1] = GROUND[B.terrain] || GROUND.grass;
+      const horizon = G.oy - G.R * 2.2, lid = (D.LAYERS[B.layer] || D.LAYERS[0]).id;
+      /* sky, stars, and two ridges fading into it */
+      h.fillStyle = A.lin(h, 0, 0, 0, horizon, SKY[lid] || SKY.velki); h.fillRect(0, 0, G.w, horizon + 2);
+      for (let i = 0; i < (lid === 'kalo' ? 140 : 50); i++) { h.fillStyle = 'rgba(255,255,255,' + (0.25 + (i % 4) * 0.12) + ')'; h.fillRect((i * 173) % G.w, (i * 61) % Math.max(1, horizon * 0.7), 1.5, 1.5); }
+      const top = (SKY[lid] || SKY.velki)[1][1];
+      [[0.55, 70, 0.011], [0.3, 40, 0.023]].forEach(([mix, hgt, f], k) => { h.fillStyle = A.mix(top, A.shade(c1, -40), 0.4 + k * 0.3);
+        h.beginPath(); h.moveTo(0, horizon + 4); for (let x = 0; x <= G.w + 40; x += 30) h.lineTo(x, horizon - 12 - Math.abs(Math.sin(x * f + k * 2)) * hgt - Math.sin(x * f * 3.1) * 10); h.lineTo(G.w, horizon + 4); h.fill(); });
+      /* the ground: the map's own tiles, full strength, each tile turned a different way so no grid shows */
+      const T = 96, tw = T, th = T * YS, R = SU.makeRng(B.cols * 31 + B.rows * 7 + terr.length);
+      h.save(); h.beginPath(); h.rect(0, horizon, G.w, G.h - horizon); h.clip();
+      for (let y = horizon - th; y < G.h + th; y += th * 0.8) for (let x = -tw; x < G.w + tw; x += tw * 0.8) h.drawImage(A.terrainTex(terr, R.int(0, 3), T), x + R.range(-8, 8), y, tw, th);
+      /* broad patches of light and shade, as on the map */
+      const nz = SU.noise2(B.cols * 13 + terr.length * 101), sm = A.canvas(48, 24), sg = sm.getContext('2d'), img = sg.createImageData(48, 24);
+      for (let yy = 0; yy < 24; yy++) for (let xx = 0; xx < 48; xx++) { const v = nz.fbm(xx * 0.18, yy * 0.18, 3), o4 = (yy * 48 + xx) * 4;
+        if (v > 0) { img.data[o4] = 255; img.data[o4 + 1] = 240; img.data[o4 + 2] = 190; img.data[o4 + 3] = Math.round(v * 0.18 * 255); } else { img.data[o4] = 10; img.data[o4 + 1] = 20; img.data[o4 + 2] = 10; img.data[o4 + 3] = Math.round(-v * 0.3 * 255); } }
+      sg.putImageData(img, 0, 0); h.imageSmoothingEnabled = true; h.imageSmoothingQuality = 'high'; h.drawImage(sm, 0, horizon, G.w, G.h - horizon);
+      /* small things: tufts and pebbles, drawn the map's way */
+      for (let i = 0; i < 260; i++) { const px = R.range(0, G.w), py = R.range(horizon + 6, G.h), sc = 0.6 + (py - horizon) / (G.h - horizon) * 0.8;
+        if (terr === 'grass' || terr === 'swamp') { h.strokeStyle = R.chance(0.5) ? 'rgba(52,86,30,0.8)' : 'rgba(120,160,70,0.75)'; h.lineWidth = 1.2; for (let k = -2; k <= 2; k++) { h.beginPath(); h.moveTo(px + k * 1.5 * sc, py); h.quadraticCurveTo(px + k * 2.5 * sc, py - 4 * sc, px + k * 3.5 * sc, py - 6 * sc); h.stroke(); }
+          if (terr === 'grass' && R.chance(0.2)) { h.fillStyle = R.pick(['#f1e48a', '#ffffff', '#e8a0c8', '#b5a0ff']); A.ell(h, px + 4, py - 2, 1.6 * sc, 1.6 * sc); h.fill(); } }
+        else { h.fillStyle = A.rgba(A.shade(c0, R.chance(0.5) ? 25 : -35), 0.55); A.ell(h, px, py, 2.6 * sc, 1.7 * sc); h.fill(); } }
+      /* the far edge of the field: a soft row of the land's own trees or rocks */
+      const edge = EDGE[B.terrain] || 'rock';
+      for (let x = -20; x < G.w + 40; x += G.R * 1.5) { const sp = A.obstacle(edge, (x * 7) & 3, Math.round(G.R * 2.4)); h.globalAlpha = 0.92; h.drawImage(sp.c, x - sp.c.width / 2 + Math.sin(x) * 8, horizon - sp.c.height * 0.62 + Math.cos(x * 0.3) * 4); }
+      h.globalAlpha = 1;
+      h.fillStyle = A.lin(h, 0, horizon - 30, 0, horizon + G.R * 1.2, [[0, A.rgba(A.mix(top, '#000000', 0.3), 0.55)], [1, 'rgba(0,0,0,0)']]); h.fillRect(0, horizon - 30, G.w, G.R * 1.2 + 30);
+      h.restore();
+      /* light falls from the upper left, as on the map */
+      const lg = h.createLinearGradient(0, horizon, G.w, G.h); lg.addColorStop(0, 'rgba(255,240,200,0.08)'); lg.addColorStop(1, 'rgba(0,0,0,0.18)'); h.fillStyle = lg; h.fillRect(0, horizon, G.w, G.h - horizon);
+      const vg = h.createRadialGradient(G.w / 2, G.h * 0.55, G.h * 0.3, G.w / 2, G.h * 0.55, G.w * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)'); h.fillStyle = vg; h.fillRect(0, 0, G.w, G.h);
       BV.bg = c; BV.bgKey = key;
     }
     g.drawImage(BV.bg, 0, 0, G.w, G.h);
@@ -217,25 +249,30 @@
       g.save(); g.shadowColor = '#b9a8ff'; g.shadowBlur = 10; g.fillStyle = '#d9ccff'; g.fillRect(p.x - 3, p.y - h * 0.7, 6, 10); g.restore();
     } }); });
   }
+  /* how big each creature stands on the field (its body is drawn the same size when it falls) */
+  const SIZE = { malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2, sprengju: 2.1, speareikar: 1.9, stryx: 1.75, albali: 1.7, tonguatjis: 2.1, saklaypunk: 1.8, apibuta: 2.9, sruvorn: 1.9, vyrenalur: 2.9, kipsu: 2.1 };
   function drawUnit(g, u, p, G, t, act) {
     const B = BV.B, sd = B.sides[u.side], col = sd.owner >= 0 ? U.st.players[sd.owner].color : D.NEUTRAL_COLOR;
     const isAct = act && act.uid === u.uid;
     /* the base: a coloured ring under each stack */
     const sw = (u.shape || [1, 1])[0], sh = (u.shape || [1, 1])[1];
-    g.save(); g.fillStyle = rgba(col, isAct ? 0.55 : 0.3); A.ell(g, p.x, p.y, G.R * (0.8 + (sw - 1) * 0.85), G.R * 0.36 * (1 + (sh - 1) * 1.6)); g.fill();
-    if (isAct) { g.strokeStyle = 'rgba(255,236,160,' + (0.6 + Math.sin(t * 5) * 0.3) + ')'; g.lineWidth = 2; g.stroke(); }
+    const rx = G.R * (0.8 + (sw - 1) * 0.85), ry = G.R * 0.36 * (1 + (sh - 1) * 1.6);
+    g.save(); A.contact(g, p.x, p.y, rx * 1.1, ry * 1.1, 0.45);
+    A.ell(g, p.x, p.y, rx, ry); g.strokeStyle = rgba(col, 0.85); g.lineWidth = 2; g.stroke();
+    /* the one whose turn it is: the same pulsing gold ring as a picked army on the map */
+    if (isAct) { A.ell(g, p.x, p.y, rx + 3, ry + 2); g.strokeStyle = 'rgba(255,230,150,' + (0.6 + Math.sin(t * 4) * 0.3) + ')'; g.lineWidth = 2.5; g.stroke(); }
     g.restore();
     const f = u.side === 0 ? 1 : -1;
     g.save();
     if (u._reel > 0 && u._reelDir) g.translate(u._reelDir[0] * G.R * 0.22 * u._reel, u._reelDir[1] * G.R * 0.22 * u._reel);
-    if (u._dying > 0) { const k = 1 - u._dying; g.globalAlpha = Math.max(0.35, 1 - k * 0.5); g.translate(p.x, p.y); g.rotate(-f * k * 1.35); g.translate(-p.x, -p.y); }
+    if (u._dying > 0) { const k = 1 - u._dying, e = k * k * (3 - 2 * k); g.globalAlpha = 1 - e * 0.38; if ('filter' in g && e > 0.02) g.filter = 'grayscale(' + (e * 0.75).toFixed(2) + ') brightness(' + (1 - e * 0.45).toFixed(2) + ')'; g.translate(p.x, p.y); g.rotate(-f * e * 1.35); g.translate(-p.x, -p.y); }
     if (u._rise != null) { g.globalAlpha = Math.min(1, 0.2 + u._rise); g.translate(p.x, p.y); g.rotate(-f * (1 - u._rise) * 1.35); g.translate(-p.x, -p.y); }
     if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.75, u.cap, col, t + u.uid, f, u._pose);
     else {
-      const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.3, punk: 1.7, uff: 2.1, velnur: 1.9, ver: 1.75, harkal: 1.45, kaloeik: 1.55, tyndael: 1.6, xiweik: 2.5, lutut: 2.1, nekh: 2.7, kuni: 1.5, naga: 1.5, ularnaga: 1.9, mcfly: 2, sprengju: 2.1, speareikar: 1.9, stryx: 1.75, albali: 1.7, tonguatjis: 2.1, saklaypunk: 1.8, apibuta: 2.9, sruvorn: 1.9, vyrenalur: 2.9, kipsu: 2.1 }[C.art] || 1.6);
+      const C = D.CREATURES[u.cr]; const sc = G.R * (SIZE[C.art] || 1.6);
       const extra = C.art === 'nekh' ? { flat: true, stretch: 3.9 } : {};
       const faded = u.abil && u.abil.includes('fade') && B.round % 2 === 0;
-      A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: (u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1)) * (faded ? 0.32 : 1), color: col }, extra));
+      A.creature(g, C.art, p.x + (C.art === 'nekh' ? f * G.R * 3.9 : 0), p.y + (C.art === 'nekh' ? G.R * 0.9 : sh > 1 ? G.R * 0.35 : 0), sc, Object.assign({ t: t + u.uid * 0.7, f, moving: !!BV.pos[u.uid], tint: C.tint || (C.upgraded ? 1 : 0), pose: u._pose, poseT: u._poseT, flash: u._flash, alpha: (u._alpha != null ? u._alpha : (u.temp ? 0.85 : 1)) * (faded ? 0.32 : 1), color: col }, extra));
     }
     g.restore();
     if (u._dying > 0) return;
@@ -254,12 +291,12 @@
   function drawBody(g, u, p, G, canRaise, t) {
     const f = u.side === 0 ? 1 : -1, sw = (u.shape || [1, 1])[0];
     g.save();
-    g.fillStyle = 'rgba(60,8,8,0.35)'; A.ell(g, p.x, p.y + G.R * 0.05, G.R * (0.75 + (sw - 1) * 0.8), G.R * 0.28); g.fill();
+    A.contact(g, p.x, p.y + G.R * 0.05, G.R * (0.8 + (sw - 1) * 0.8), G.R * 0.3, 0.4); g.fillStyle = 'rgba(80,10,10,0.25)'; A.ell(g, p.x, p.y + G.R * 0.05, G.R * (0.6 + (sw - 1) * 0.8), G.R * 0.2); g.fill();
     if (canRaise) { g.strokeStyle = 'rgba(200,184,255,' + (0.5 + Math.sin(t * 5) * 0.3) + ')'; g.lineWidth = 2; g.shadowColor = '#8e7cff'; g.shadowBlur = 12; g.stroke(); g.shadowBlur = 0; }
     g.globalAlpha = 0.62; if ('filter' in g) g.filter = 'grayscale(0.75) brightness(0.55)';
     g.translate(p.x, p.y); g.rotate(-f * 1.35); g.translate(-p.x, -p.y);
     if (u.kind === 'cap') A.captain(g, p.x, p.y, G.R * 1.6, u.cap, '#3a3a3a', 0, f);
-    else { const C = D.CREATURES[u.cr]; const sc = G.R * ({ malsti: 2.1, velnur: 1.7, ver: 1.6, harkal: 1.3, kaloeik: 1.4, tyndael: 1.4, xiweik: 2.2, lutut: 1.9, nekh: 2.2, ularnaga: 1.7, mcfly: 1.8 }[C.art] || 1.5);
+    else { const C = D.CREATURES[u.cr]; const sc = G.R * (SIZE[C.art] || 1.6) * 0.92;
       A.creature(g, C.art, p.x, p.y, sc, { t: 0, f, tint: C.tint || (C.upgraded ? 1 : 0), noShadow: true, flat: C.art === 'nekh' }); }
     g.restore();
   }
@@ -271,7 +308,7 @@
       const shoot = BT.canShoot(B, act);
       const p = unitCenter(tgt, G);
       g.save(); g.font = Math.round(G.R * 0.6) + 'px Georgia'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(shoot ? '➶' : '⚔', p.x, p.y - G.R * 1.2); g.restore();
-      if (!shoot) { const spot = bestSpot(act, tgt); if (spot) { const q = center(spot.c, spot.r, G); hexPath(g, q.x, q.y, G.R * 0.8); g.strokeStyle = 'rgba(255,120,90,0.9)'; g.lineWidth = 2; g.stroke(); } }
+      if (!shoot) { const spot = bestSpot(act, tgt); if (spot) { const q = center(spot.c, spot.r, G); hexPath(g, q.x, q.y, G.R * 0.8); g.strokeStyle = 'rgba(255,150,60,0.95)'; g.lineWidth = 2.5; g.stroke(); } }
     }
   }
   function bestSpot(u, t) {

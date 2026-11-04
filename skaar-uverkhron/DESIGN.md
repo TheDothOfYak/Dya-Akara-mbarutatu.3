@@ -348,6 +348,13 @@ changed from the Admin Panel without touching the code).
   Yards; a Muster Ground recruits from every town's dwellings; recruit everything in one
   click. Corralled punks can be mustered as troops, butchered for food, or put to work
   (cheaper buildings in that town).
+- **One look everywhere:** every creature, hero and building casts the same soft shadow;
+  battles are painted with the map's own ground, its light and shade, and the land's own
+  trees or rocks along the horizon; armies on the map and stacks in battle stand on the
+  same owner's ring, with the same gold ring for the one picked or acting; the map and
+  battle use the same colours for reachable (green), blocked (red) and a fight (orange).
+  Creatures walk (legs moving) between hexes, one step per hex, and a falling stack eases
+  into its body on the ground.
 - **Rekindle** can raise the enemy's fallen to fight for you only with Songcraft 5.
 - **Battles show the blows:** lunges, recoils, deaths after the blow lands, and bodies
   left on the field. **Rekindle** (tier 3 song, 16 Breath) raises fallen stacks from

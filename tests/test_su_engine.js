@@ -202,6 +202,28 @@ async function playGame(seed, size, nPlayers, days) {
     BT.autoRun(st6, B7); const blows = B7.anim.filter(x => x.kind === 'dmg');
     ok(blows.length > 0 && blows.every(x => typeof x.nAfter === 'number'), 'every blow records how many are left, so the screen shows deaths when the blow lands');
   }
+  /* where an army can go, and why not */
+  { const sw = SU.mapgen.newGame({ size: 'S', seed: 41, players: [{ kind: 'human', name: 'A' }, { kind: 'ai', name: 'B' }] });
+    const D = SU.data; RU.startTurn(sw);
+    const aw = Object.values(sw.armies).find(x => x.owner === 0 && x.heroId), Lw = sw.layers[aw.layer], Pw = sw.players[0];
+    aw.mp = aw.mpMax;
+    Pw.explored[aw.layer].fill(1);
+    const Rw = RU.reach(sw, aw);
+    ok(Rw.cost[aw.y * Lw.w + aw.x] === 0, 'the army stands where its reach starts');
+    let near = 0; for (let i = 0; i < Rw.cost.length; i++) if (Rw.cost[i] > 0 && Rw.cost[i] <= aw.mp) near++;
+    ok(near > 5, 'a fresh hero can reach some ground today (' + near + ' tiles)');
+    let wet = null, mtn = null, guarded = null;
+    for (let y = 0; y < Lw.h; y++) for (let x = 0; x < Lw.w; x++) { const i = y * Lw.w + x;
+      if (!wet && S.TCODES[Lw.t[i]] === 'water' && !Lw.ob[i]) wet = [x, y];
+      if (!mtn && Lw.ob[i] === S.OB.mountain) mtn = [x, y];
+      if (!guarded && !Lw.ob[i] && D.TERRAIN[S.TCODES[Lw.t[i]]].pass !== false && !sw._block[aw.layer][i] && !S.objAt(sw, aw.layer, x, y) && !S.armyAt(sw, aw.layer, x, y) && RU.guardNear(sw, aw.layer, x, y)) guarded = [x, y]; }
+    if (wet) ok(/water/.test(RU.whyNot(sw, aw, wet[0], wet[1])), 'water says you need a boat');
+    if (mtn) ok(/mountains/.test(RU.whyNot(sw, aw, mtn[0], mtn[1])), 'mountains say nobody crosses them');
+    Pw.explored[aw.layer].fill(0); Pw.explored[aw.layer][aw.y * Lw.w + aw.x] = 1;
+    ok(/not explored/.test(RU.whyNot(sw, aw, Math.min(Lw.w - 1, aw.x + 6), aw.y)), 'unexplored ground says explore first');
+    Pw.explored[aw.layer].fill(1);
+    if (guarded) { const Rg = RU.reach(sw, aw); const i = guarded[1] * Lw.w + guarded[0]; ok(Rg.cost[i] === Infinity || Rg.stop[i] === 1, 'beside a guard, the reach stops (a fight)'); }
+  }
   console.log(fails ? fails + ' failure(s)' : 'all good');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

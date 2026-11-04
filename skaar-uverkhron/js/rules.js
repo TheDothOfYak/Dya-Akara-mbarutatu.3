@@ -77,14 +77,14 @@
     const goalObj = S.objAt(st, layer, tx, ty), goalArmy = S.armyAt(st, layer, tx, ty);
     const ok = (x, y) => {
       const i = y * w + x;
-      if (P && !P.explored[layer][i] && i !== goal) return false;
+      if (P && !P.explored[layer][i] && i !== goal && !(popts && popts.seeAll)) return false;
       if (i === goal) {
         if (goalObj || goalArmy) return true;
         if (boat) return S.passable(st, layer, x, y, { boat: true }) || S.passable(st, layer, x, y);
         return S.passable(st, layer, x, y, { fly }) || (!fly && boatAt(st, layer, x, y));
       }
-      if (S.objAt(st, layer, x, y)) return false;
-      const ar = S.armyAt(st, layer, x, y); if (ar && !(popts && popts.throughWild && ar.wild)) return false;
+      if (S.objAt(st, layer, x, y) && !(popts && popts.throughObjects)) return false;
+      const ar = S.armyAt(st, layer, x, y); if (ar && !(popts && (popts.throughWild && ar.wild || popts.throughArmies))) return false;
       if (popts && popts.avoid && popts.avoid(x, y)) return false;
       return boat ? S.passable(st, layer, x, y, { boat: true }) : S.passable(st, layer, x, y, { fly });
     };
@@ -109,6 +109,68 @@
     const out = []; for (let i = goal; i !== start && i >= 0; i = prev[i]) out.push({ x: i % w, y: (i / w) | 0, g: g[i] });
     out.reverse();
     return out;
+  };
+  /* ---- why a tile cannot be reached: the plain answer a player needs ---- */
+  const OB_WHY = { 1: 'a forest', 2: 'pines', 3: 'mountains', 4: 'rocks', 5: 'dead trees', 6: 'crystals', 7: 'reeds', 8: 'palms', 9: 'glowing trees', 10: 'a ridge' };
+  R_.obstacleName = k => OB_WHY[k] || 'something';
+  /* what stands on (x,y) and blocks it, as a short phrase, or null when the ground is open */
+  R_.blockedBy = function (st, layer, x, y, a) {
+    const L = st.layers[layer]; if (!S.inside(L, x, y)) return 'the edge of the world';
+    const i = y * L.w + x, T = D.TERRAIN[S.TCODES[L.t[i]]], fly = a && R_.canFly(st, a);
+    if (a && a.boat) return T.water ? (L.ob[i] ? R_.obstacleName(L.ob[i]) + ' in the water' : null) : null;
+    if (T.void) return 'the Void (nothing crosses it)';
+    if (T.water && !fly) return 'water (you need a boat, or an army that all flies)';
+    if (L.ob[i] === S.OB.mountain) return 'mountains (not even flyers cross them)';
+    if (L.ob[i] && !fly) return R_.obstacleName(L.ob[i]) + ' (too thick to walk through; an army that all flies can cross)';
+    if (st._block[layer][i]) { const o = Object.values(st.objects).find(q => q.layer === layer && !q.gone && S.footprint(q).some(([dx, dy]) => q.x + dx === x && q.y + dy === y)); return o ? 'the body of a building: go in by its entrance' : 'a building'; }
+    return null;
+  };
+  /* everything an army can reach today: cost to each tile (Infinity where it can't), and the tiles where a guard stops it */
+  R_.reach = function (st, a) {
+    const layer = a.layer, L = st.layers[layer], w = L.w, n = w * L.h, P = st.players[a.owner];
+    const fly = R_.canFly(st, a), boat = a.boat;
+    const cost = new Float32Array(n).fill(Infinity), stop = new Uint8Array(n);
+    const open = (x, y) => { const i = y * w + x; if (P && !P.explored[layer][i]) return false; return boat ? S.passable(st, layer, x, y, { boat: true }) : S.passable(st, layer, x, y, { fly }); };
+    const start = a.y * w + a.x; cost[start] = 0;
+    const heap = [[0, start]];
+    const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    while (heap.length) {
+      const [c, i] = pop(); if (c > cost[i]) continue;
+      const x = i % w, y = (i / w) | 0;
+      /* you stop on things, and beside a guard (a fight) */
+      if (i !== start && (stop[i] || S.objAt(st, layer, x, y) || S.armyAt(st, layer, x, y))) continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) continue;
+        const j = yy * w + xx, thing = S.objAt(st, layer, xx, yy) || S.armyAt(st, layer, xx, yy);
+        if (!thing && !open(xx, yy)) continue;
+        if (thing && P && !P.explored[layer][j]) continue;
+        const nc = c + R_.stepCost(st, a, layer, x, y, xx, yy);
+        if (nc > a.mp) continue;
+        if (nc < cost[j]) { cost[j] = nc; if (!thing && R_.guardNear(st, layer, xx, yy)) stop[j] = 1; push(nc, j); }
+      }
+    }
+    return { cost, stop, w };
+  };
+  /* why a click can't be reached, worked out the way a player would ask it */
+  R_.whyNot = function (st, a, tx, ty) {
+    const L = st.layers[a.layer]; if (!S.inside(L, tx, ty)) return 'That is off the edge of the world.';
+    const P = st.players[a.owner], i = ty * L.w + tx;
+    if (P && !P.explored[a.layer][i]) return 'You have not explored there yet: nobody knows a way.';
+    const here = S.objAt(st, a.layer, tx, ty) || S.armyAt(st, a.layer, tx, ty);
+    const b = !here && R_.blockedBy(st, a.layer, tx, ty, a); if (b) return 'Blocked: ' + b + '.';
+    if (R_.path(st, a, tx, ty, { seeAll: true })) return 'The only way there runs through land you have not explored yet. Explore nearer first.';
+    const viaThings = R_.path(st, a, tx, ty, { throughObjects: true });
+    if (viaThings) { const o = viaThings.slice(0, -1).map(s => S.objAt(st, a.layer, s.x, s.y)).find(Boolean); if (o) return 'Something lying in a narrow gap blocks the way (at the marked spot). Walk onto it first to pick it up or visit it, then go on.'; }
+    const viaArmies = R_.path(st, a, tx, ty, { throughArmies: true, throughObjects: true });
+    if (viaArmies) { const ar = viaArmies.slice(0, -1).map(s => S.armyAt(st, a.layer, s.x, s.y)).find(Boolean); if (ar) return ar.wild ? 'A wild group stands in the way. Fight it (or wait for it to move) to get past.' : 'Another army stands in the way.'; }
+    return 'There is no way there from here on this land: water, mountains or thick woods close it off. Look for a boat, an Urverk, or another road.';
+  };
+  /* the first thing in the way, for marking it on the map */
+  R_.blockerOnWay = function (st, a, tx, ty) {
+    const p = R_.path(st, a, tx, ty, { throughArmies: true, throughObjects: true }); if (!p) return null;
+    const s = p.slice(0, -1).find(q => S.objAt(st, a.layer, q.x, q.y) || S.armyAt(st, a.layer, q.x, q.y));
+    return s ? { x: s.x, y: s.y } : null;
   };
   function boatAt(st, layer, x, y) { const o = S.objAt(st, layer, x, y); return o && o.type === 'boat'; }
 
