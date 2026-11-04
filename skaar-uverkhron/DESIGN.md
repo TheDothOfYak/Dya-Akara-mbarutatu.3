@@ -316,7 +316,8 @@ changed from the Admin Panel without touching the code).
   (conqueror, raider, builder, explorer, turtle).
 - **Online:** the computer never fights for a person. An attack on someone on
   another device waits for them; both devices run the same battle and only the
-  choices travel. Rooms have a chat.
+  choices travel. Rooms have a chat. Each person picks their own faction (or random)
+  in the room; the host picks for the computer seats.
 - **Records:** only personal records for solo games; no leaderboard.
 - **Meeting:** click another of your armies to walk over and trade (stacks, captains,
   Relics, cores); a squadron can join a hero's army whole.
@@ -359,8 +360,7 @@ changed from the Admin Panel without touching the code).
 ## 11. Not built yet
 
 - The SkarValorin, the campaign, and the Dya'Akara special event (on hold).
-- The Elsha'ryn's common buildings (tavern, market, halls) still use the Duskareth look
-  in their town; the computer does not hunt glimmers for the Shed Antler yet.
+- The computer does not hunt glimmers for the Shed Antler yet.
 - Siege extras: moats, special defenses, siege machines.
 - Sound (to be written by the creator).
 - An undo button in the map editor, and editing details of placed things (amounts,

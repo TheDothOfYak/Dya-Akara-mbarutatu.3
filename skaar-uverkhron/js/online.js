@@ -74,7 +74,7 @@
     const me = acc();
     const room = { code: code(), name: me.name + '’s game', host: me.id, status: 'lobby', seq: 0, turnOf: 0, timer: null,
       setup: { size: 'M', spread: true, wild: 'normal' },
-      seats: [{ kind: 'human', account: me.id, name: me.name, colorId: 'red', team: 0 }, { kind: 'human', account: null, name: 'Open seat', colorId: 'blue', team: 0 }] };
+      seats: [{ kind: 'human', account: me.id, name: me.name, colorId: 'red', team: 0, faction: 'random' }, { kind: 'human', account: null, name: 'Open seat', colorId: 'blue', team: 0, faction: 'random' }] };
     const m = U.modal(el('div'), { wide: true });
     function render() {
       const b = m.box; b.innerHTML = '';
@@ -88,14 +88,22 @@
       b.appendChild(el('h3', { text: 'Seats' }));
       room.seats.forEach((s, i) => b.appendChild(el('div', { cls: 'row' }, [(i + 1) + '.', i === 0 ? el('b', { text: s.name + ' (you)' }) : sel(s.kind, [['human', 'A person (open seat)'], ['ai', 'The computer']], v => { s.kind = v; s.name = v === 'ai' ? 'Computer' : 'Open seat'; s.ai = 'normal'; }),
         s.kind === 'ai' ? sel(s.ai || 'normal', Object.entries(D.AI_LEVELS).map(([k, v]) => [k, v.name]), v => s.ai = v) : null,
+        /* each person picks their own people (an open seat picks when they join); the host picks for the computer */
+        i === 0 || s.kind === 'ai' ? factionSel(s.faction, v => { s.faction = v; render(); }) : el('span', { cls: 'small muted', text: 'picks their own faction' }),
         sel(s.team, [[0, 'Alone'], [1, 'Team 1'], [2, 'Team 2'], [3, 'Team 3']], v => s.team = +v), sel(s.colorId, D.PLAYER_COLORS.map(c => [c.id, c.name]), v => s.colorId = v),
         i > 1 ? btn('✕', () => { room.seats.splice(i, 1); render(); }, 'icon') : null])));
-      if (room.seats.length < 6) b.appendChild(btn('+ Add a seat', () => { const used = room.seats.map(s => s.colorId); room.seats.push({ kind: 'human', account: null, name: 'Open seat', colorId: D.PLAYER_COLORS.find(c => !used.includes(c.id)).id, team: 0 }); render(); }));
+      if (room.seats.length < 6) b.appendChild(btn('+ Add a seat', () => { const used = room.seats.map(s => s.colorId); room.seats.push({ kind: 'human', account: null, name: 'Open seat', colorId: D.PLAYER_COLORS.find(c => !used.includes(c.id)).id, team: 0, faction: 'random' }); render(); }));
       b.appendChild(el('div', { cls: 'acts' }, [btn('Cancel', () => m.close()), btn('Make the room', async () => { try { await putRoom(room); await addMyRoom(room.code); m.close(); O.lobby(room.code); } catch (e) { U.alert('Could not make the room', e.message); } }, 'primary')]));
     }
     render();
   };
 
+  /* the choice of people: random, or any faction that is ready */
+  const factionName = f => f === 'random' || !f ? 'Random faction' : (D.FACTIONS.find(x => x.id === f) || { name: f }).name.replace(/^The /, '');
+  function factionSel(val, on) {
+    return el('select', { cls: 'inp', 'data-tip': 'Which people this seat plays', onchange: e => on(e.target.value) },
+      [['random', 'Random faction']].concat(D.FACTIONS.filter(f => f.ready).map(f => [f.id, f.name.replace(/^The /, '')])).map(([v, n]) => el('option', { value: v, selected: (val || 'random') === v ? 'selected' : null }, n)));
+  }
   O.join = function () {
     const inp = el('input', { cls: 'inp', placeholder: 'ABCDE', style: { textTransform: 'uppercase', width: '120px' } });
     const m = U.modal([el('h2', { text: 'Join a room' }), el('p', { text: 'Type the code your friend gave you.' }), inp, el('div', { cls: 'acts' }, [btn('Cancel', () => m.close()), btn('Join', async () => {
@@ -121,17 +129,22 @@
       if (!r) return;
       if (r.status === 'playing') { clearInterval(timer); m.close(); O.enter(c); return; }
       const isHost = r.host === me.id, full = r.seats.every(s => s.kind === 'ai' || s.account);
+      /* not while someone has the faction list open */
+      if (document.activeElement && document.activeElement.tagName === 'SELECT' && m.box.contains(document.activeElement)) return;
       const b = m.box; b.innerHTML = '';
       b.appendChild(el('h2', { text: r.name }));
       b.appendChild(el('p', {}, ['Give your friends this code: ', el('b', { cls: 'gold', style: { fontSize: '22px', letterSpacing: '3px' }, text: r.code })]));
-      b.appendChild(el('div', { cls: 'col' }, r.seats.map((s, i) => el('div', { cls: 'row frame' }, [el('span', { style: { width: '14px', height: '14px', borderRadius: '50%', background: D.PLAYER_COLORS.find(x => x.id === s.colorId).c } }), el('span', { text: s.kind === 'ai' ? 'The computer (' + (D.AI_LEVELS[s.ai || 'normal'].name) + ')' : s.account ? s.name : 'An open seat…' }), s.team ? el('span', { cls: 'small muted', text: 'Team ' + s.team }) : null]))));
+      b.appendChild(el('div', { cls: 'col' }, r.seats.map((s, i) => el('div', { cls: 'row frame' }, [el('span', { style: { width: '14px', height: '14px', borderRadius: '50%', background: D.PLAYER_COLORS.find(x => x.id === s.colorId).c } }), el('span', { text: s.kind === 'ai' ? 'The computer (' + (D.AI_LEVELS[s.ai || 'normal'].name) + ')' : s.account ? s.name : 'An open seat…' }),
+        s.account === me.id ? factionSel(s.faction, async v => { try { const fresh = await getRoom(c); const seat = fresh && fresh.status === 'lobby' && fresh.seats.find(x => x.account === me.id); if (!seat) return; seat.faction = v; await putRoom(fresh); refresh(); } catch (e) { U.toast('Could not change faction: ' + e.message); } })
+          : el('span', { cls: 'small muted', text: factionName(s.faction) }),
+        s.team ? el('span', { cls: 'small muted', text: 'Team ' + s.team }) : null]))));
       b.appendChild(el('div', { cls: 'acts' }, [btn('Close', () => m.close()), isHost ? btn(full ? 'Begin the game' : 'Waiting for players…', async () => { if (!full) return; await start(r); }, 'primary') : el('span', { cls: 'muted', text: 'The host will begin when everyone is here.' })]));
     }
     refresh(); timer = setInterval(refresh, POLL);
   };
   async function start(r) {
-    const players = r.seats.map(s => ({ kind: s.kind, name: s.name, ai: s.ai || 'normal', team: s.team || 0, color: D.PLAYER_COLORS.find(c => c.id === s.colorId).c, colorId: s.colorId, account: s.account || null,
-      faction: s.faction || (s.kind === 'ai' ? SU.rng({ rngState: Date.now() & 0xffff }).pick(D.FACTIONS.filter(f => f.ready).map(f => f.id)) : 'duskareth') }));
+    const players = r.seats.map((s, i) => ({ kind: s.kind, name: s.name, ai: s.ai || 'normal', team: s.team || 0, color: D.PLAYER_COLORS.find(c => c.id === s.colorId).c, colorId: s.colorId, account: s.account || null,
+      faction: s.faction && s.faction !== 'random' ? s.faction : SU.rng({ rngState: (Date.now() + i * 7919) & 0xffff }).pick(D.FACTIONS.filter(f => f.ready).map(f => f.id)) }));
     const st = SU.mapgen.newGame(Object.assign({}, r.setup, { name: r.name, players }));
     st.online = { code: r.code };
     RU.startTurn(st);

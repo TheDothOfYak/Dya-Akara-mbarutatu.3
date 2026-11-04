@@ -133,9 +133,13 @@ the game is built.
 ## The Elsha'ryn (the second faction)
 
 The luminous forest, who follow the Vyrenalur. Trackers of memory and grow-forgers,
-mostly Eikar and Kalo'Eik. Their towns stand in deep woods: a great hollow tree for a
-hall, a living hedge for walls, root houses. Their captains are Ju-Keepers, Grovewardens
-and Memory Trackers.
+mostly Eikar and Kalo'Eik. Their towns stand in deep woods and are laid out their own
+way: the Root Hall is a great tree off to one side, reached by stepping stones past a
+pond, inside a low thorn hedge. Every building has its own Elsha'ryn name and look: the
+Hollow Stump (tavern), the Barter Ring (market), the Singing Tree (songs), the Nut Store,
+Fruit Gardens, Deadfall Yard, Mossrock Cutters, Gathering Glade, Spear Ground, Trailpost,
+Tally Stump, Canopy Lodge, Starwell, Willow Pens and Root Vault. Their captains are
+Ju-Keepers, Grovewardens and Memory Trackers.
 
 | # | Creature | Upgrade | What it does |
 |---|---|---|---|

@@ -360,9 +360,9 @@
   R_.canBuild = function (st, t, bid) {
     const b = D.BUILDINGS[bid], P = st.players[t.owner];
     if (t.built.includes(bid)) return { ok: false, why: 'Built.' };
-    if (b.replaces && !t.built.includes(b.replaces) && !R_.has(t, b.replaces)) return { ok: false, why: 'Needs ' + D.BUILDINGS[b.replaces].name + ' first.' };
+    if (b.replaces && !t.built.includes(b.replaces) && !R_.has(t, b.replaces)) return { ok: false, why: 'Needs ' + D.bname(b.replaces, t.faction) + ' first.' };
     if (Object.values(D.BUILDINGS).some(x => x.replaces === bid && R_.has(t, x.id))) return { ok: false, why: 'Built.' };
-    for (const r of (b.req || [])) if (!R_.has(t, r)) return { ok: false, why: 'Needs ' + D.BUILDINGS[r].name + '.' };
+    for (const r of (b.req || [])) if (!R_.has(t, r)) return { ok: false, why: 'Needs ' + D.bname(r, t.faction) + '.' };
     if (b.faction && b.faction !== D.factionOf(t.faction)) return { ok: false, why: 'Not a building of this town’s people.', other: true };
     if (b.pop && t.pop < b.pop) return { ok: false, why: 'Needs ' + b.pop + ' people (the town has ' + Math.floor(t.pop) + ').' };
     if (b.coast && !t.coast) return { ok: false, why: 'This town is not by the water.' };
@@ -382,7 +382,7 @@
     if (b.small && !t.smallToday && t.builtToday >= R_.buildsPerDay(st, t)) t.smallToday = 1; else t.builtToday++;
     if (b.dwell && !D.CREATURES[b.dwell].legendary) t.avail[b.dwell] = (t.avail[b.dwell] || 0) + D.CREATURES[b.dwell].grow;
     if (b.dwell && D.CREATURES[b.dwell].legendary && !t.nekhCount) t.avail[b.dwell] = 1;
-    S.log(st, t.name + ' built the ' + b.name + '.', t.owner);
+    S.log(st, t.name + ' built the ' + D.bname(bid, t.faction) + '.', t.owner);
     return { ok: true };
   };
   /* which creature a dwelling sells: its upgraded form if that's built */

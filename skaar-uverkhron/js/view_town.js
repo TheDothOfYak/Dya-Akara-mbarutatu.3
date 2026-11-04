@@ -29,8 +29,26 @@
     d1: [300, 740, 'burrow'], d1u: [300, 740, 'burrow', 2], d2: [580, 790, 'barracks'], d2u: [580, 790, 'barracks', 2], d3: [1310, 420, 'spire'], d3u: [1310, 420, 'spire', 2],
     d4: [1050, 655, 'pool'], d4u: [1050, 655, 'pool', 2], d5: [420, 470, 'cloister'], d6: [1530, 430, 'roost'], d7: [210, 440, 'chapel'], d8: [1430, 400, 'crag'], d9: [800, 360, 'hole'],
   };
-  /* an Elsha'ryn town grows its hall as a great tree, and its walls as a living hedge */
-  function spotOf(b) { const sp = SPOT[b]; if (!sp || !T.town || T.town.faction !== 'elsharyn') return sp; if (sp[2] === 'hall') return [sp[0], sp[1], 'greattree', sp[3]]; if (sp[2] === 'wall') return [sp[0], sp[1], 'hedgewall', sp[3]]; if (sp[2] === 'houses' || sp[2] === 'stonehouses') return [sp[0], sp[1], 'roothouses', sp[2] === 'houses' ? 1 : 2]; return sp; }
+  /* an Elsha'ryn town is laid out its own way: the great tree of the hall off to one side, reached by a path
+     of stepping stones, and everything grown rather than built */
+  const SPOT_E = {
+    hall1: [520, 600, 'greattree', 1], hall2: [520, 600, 'greattree', 2], hall3: [520, 600, 'greattree', 3],
+    fort1: [800, 880, 'hedgewall', 1], fort2: [800, 880, 'hedgewall', 2], fort3: [800, 880, 'hedgewall', 3],
+    /* the back of the glade */
+    e6: [130, 470, 'range'], songs1: [270, 470, 'songtree', 1], songs2: [270, 470, 'songtree', 2], songs3: [270, 470, 'songtree', 3], choir: [270, 470, 'songtree', 4],
+    t_duat: [830, 430, 'starwell'], e9: [1070, 380, 'clearing'], memtree: [1280, 420, 'memtree'], e8: [1420, 470, 'bog'], oathtree: [1580, 520, 'oathtree'],
+    /* the middle */
+    e7: [160, 590, 'wallow'], altar: [880, 520, 'altar'], e4: [1010, 590, 'albalitree'], e2: [1190, 610, 'treelodge'], t_capt: [1340, 590, 'canopylodge'], granary: [1520, 630, 'nutstore'],
+    /* nearer */
+    terraces: [100, 700, 'roothouses', 1], terraces2: [100, 700, 'roothouses', 2], t_pens: [250, 660, 'willowpens'], mossbed: [700, 625, 'mossbed'], e5: [410, 720, 'hollow'],
+    market: [700, 700, 'barterring'], vault: [890, 660, 'rootvault'], e3: [1090, 700, 'seedbed'], tavern: [1270, 680, 'stumpinn'], farms: [1450, 730, 'gardens'],
+    /* by the hedge */
+    shipyard: [60, 800, 'raftdock'], woodyard: [170, 790, 'logpile'], e1: [330, 790, 'jufield'], stoneyard: [500, 790, 'mossrock'], muster: [640, 790, 'glade'],
+    grove: [960, 805, 'grovering'], t_drill: [1140, 790, 'speargrd'], t_count: [1300, 800, 'tallystump'], t_road: [1450, 810, 'trailpost'],
+  };
+  const elsh = () => T.town && T.town.faction === 'elsharyn';
+  function spotOf(b) { return elsh() ? SPOT_E[b] || SPOT[b] : SPOT[b]; }
+  const TALL = /^(hall|d8|d9|e8|e9|songs|choir|t_capt|t_duat)/;
   const TAB_FOR = { tavern: 'tavern', market: 'market', vault: 'vault', shipyard: 'ship', urverk: 'gate', memtree: 'memtree', altar: 'altar', oathtree: 'oath', grove: 'heroes' };
 
   T.open = function (town, visitor) {
@@ -43,7 +61,7 @@
     T.ui = el('div', { cls: 'town-bar' }); scr.appendChild(T.ui);
     T.pageEl = el('div', { cls: 'town-page hidden' }); scr.appendChild(T.pageEl);
     T.open_ = T.open_ == null ? false : T.open_;
-    T.cv.onmousemove = e => { const b = hit(e); T.hoverB = b; U.tip(b ? '<b>' + D.BUILDINGS[b].name + '</b><br>' + D.BUILDINGS[b].desc + '<br><i class="muted">Click to use · right-click to look closer</i>' : null, e.clientX, e.clientY); T.cv.style.cursor = b ? 'pointer' : 'default'; };
+    T.cv.onmousemove = e => { const b = hit(e); T.hoverB = b; U.tip(b ? '<b>' + D.bname(b, T.town.faction) + '</b><br>' + D.bdesc(b, T.town.faction) + '<br><i class="muted">Click to use · right-click to look closer</i>' : null, e.clientX, e.clientY); T.cv.style.cursor = b ? 'pointer' : 'default'; };
     T.cv.onmouseleave = () => U.tip(null);
     T.cv.oncontextmenu = e => { e.preventDefault(); const b = hit(e); if (b) T.buildingCard(T.town, b); };
     T.cv.onclick = e => { const b = hit(e); if (!b) return; const B = D.BUILDINGS[b];
@@ -77,7 +95,7 @@
     const r = T.cv.getBoundingClientRect(), L = layout();
     const vx = (e.clientX - r.left - L.ox) / L.sc, vy = (e.clientY - r.top - L.oy) / L.sc;
     let best = null, bd = 1e9;
-    T.town.built.forEach(b => { const sp = spotOf(b); if (!sp) return; const [x, y] = sp; const w = 110, h = b.startsWith('hall') || b === 'd9' || b === 'd8' ? 200 : 130;
+    T.town.built.forEach(b => { const sp = spotOf(b); if (!sp) return; const [x, y] = sp; const w = 110, h = TALL.test(b) ? 200 : 130;
       if (vx > x - w && vx < x + w && vy > y - h && vy < y + 20) { const d = Math.hypot(vx - x, vy - (y - h / 2)); if (d < bd) { bd = d; best = b; } } });
     return best;
   }
@@ -111,7 +129,7 @@
     /* the Elsha'ryn live under the canopy: great trunks, shafts of light, moss and lantern-moss */
     if (town.faction === 'elsharyn') forestBackdrop(g, t, town);
     /* buildings, back to front */
-    const list = town.built.filter(b => SPOT[b]).sort((a, b) => SPOT[a][1] - SPOT[b][1]);
+    const list = town.built.filter(b => spotOf(b)).sort((a, b) => spotOf(a)[1] - spotOf(b)[1]);
     list.forEach(b => { const [x, y, kind, lvl] = spotOf(b); g.save(); g.translate(x, y); drawBuilding(g, kind, lvl || 1, t, b === T.hoverB); g.restore(); });
     /* mist low over the land */
     for (let k = 0; k < 3; k++) { const yy = 560 + k * 50, off = (t * (6 + k * 4)) % 400; g.fillStyle = lin(g, 0, yy - 30, 0, yy + 30, [[0, 'rgba(180,170,220,0)'], [0.5, 'rgba(180,170,220,' + (0.08 - k * 0.02) + ')'], [1, 'rgba(180,170,220,0)']]); g.fillRect(-400 + off - 400, yy - 30, VW + 1600, 60); }
@@ -132,9 +150,15 @@
     /* the mossy ground and a plaza of roots */
     g.fillStyle = lin(g, 0, 540, 0, 900, [[0, '#2e4a24'], [1, '#16261a']]); g.fillRect(-400, 540, VW + 800, 400);
     g.fillStyle = lin(g, 0, 620, 0, 900, [[0, '#3a5a2c'], [1, '#22381c']]); g.beginPath(); g.ellipse(800, 700, 520, 120, 0, 0, TAU); g.fill();
-    g.strokeStyle = 'rgba(90,60,30,0.55)'; g.lineWidth = 6; for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(800, 700); g.quadraticCurveTo(800 + Math.cos(i * 0.7) * 300, 700 + Math.sin(i * 0.9) * 40, 800 + Math.cos(i * 0.7 + 0.3) * 520, 700 + Math.sin(i * 0.7) * 110); g.stroke(); }
-    /* lantern-moss on posts */
-    [[330, 690], [560, 650], [1050, 650], [1280, 690], [800, 760]].forEach(([lx, ly], i) => { g.strokeStyle = '#2a1c10'; g.lineWidth = 4; g.beginPath(); g.moveTo(lx, ly); g.lineTo(lx, ly - 60); g.stroke();
+    if (town.coast || town.built.includes('shipyard')) { g.fillStyle = lin(g, 0, 700, 0, 900, [[0, '#2a6a6a'], [1, '#12343e']]); g.beginPath(); g.moveTo(-400, 720); g.quadraticCurveTo(80, 710, 160, 900); g.lineTo(-400, 900); g.fill(); }
+    /* a pond of still water at the back of the glade, catching the light */
+    g.fillStyle = lin(g, 0, 560, 0, 620, [[0, '#2a5a5a'], [1, '#143a3a']]); g.beginPath(); g.ellipse(700, 585, 150, 26, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(200,255,240,0.18)'; for (let i = 0; i < 5; i++) { g.beginPath(); g.ellipse(640 + i * 30, 580 + (i % 2) * 6, 20 + Math.sin(t + i) * 4, 2, 0, 0, TAU); g.fill(); }
+    /* stepping stones from the gate to the door of the great tree */
+    for (let i = 0; i <= 13; i++) { const k = i / 13, x = SU.lerp(810, 520, k) + Math.sin(k * Math.PI) * 90, y = SU.lerp(870, 610, k), r = 22 - k * 9;
+      g.fillStyle = '#8a8a7a'; g.beginPath(); g.ellipse(x, y, r, r * 0.38, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.ellipse(x - r * 0.2, y - r * 0.08, r * 0.6, r * 0.18, 0, 0, TAU); g.fill(); }
+    /* lantern-moss on posts along the path */
+    [[740, 800], [890, 800], [640, 720], [790, 720], [560, 650]].forEach(([lx, ly], i) => { g.strokeStyle = '#2a1c10'; g.lineWidth = 4; g.beginPath(); g.moveTo(lx, ly); g.lineTo(lx, ly - 60); g.stroke();
       g.save(); g.shadowColor = '#9ff8e8'; g.shadowBlur = 24; g.fillStyle = 'rgba(160,250,230,' + (0.75 + Math.sin(t * 3 + i) * 0.15) + ')'; g.beginPath(); g.ellipse(lx, ly - 66, 8, 8, 0, 0, TAU); g.fill(); g.restore();
       g.fillStyle = radial(g, lx, ly - 30, 70, 'rgba(160,250,230,0.12)', 'rgba(160,250,230,0)'); g.beginPath(); g.ellipse(lx, ly, 70, 22, 0, 0, TAU); g.fill(); });
     /* drifting motes */
@@ -209,11 +233,11 @@
         g.save(); g.shadowColor = '#68e0c8'; g.shadowBlur = 18; g.strokeStyle = 'rgba(160,250,230,0.8)'; g.lineWidth = 3; g.stroke(); g.restore();
         if (lvl >= 3) glowOrb(g, 0, cy - 120, 16, '#fff2b0', t);
         break; }
-      case 'hedgewall': { const h = 50 + lvl * 16;
+      case 'hedgewall': { const h = 34 + lvl * 10;
         for (let x = -780; x < 780; x += 34) { g.fillStyle = (x / 34) % 2 ? '#26481e' : '#2e5626'; g.beginPath(); g.ellipse(x, -h * 0.5, 26, h * 0.62 + Math.sin(x) * 4, 0, 0, TAU); g.fill(); }
         g.strokeStyle = '#5a3a20'; g.lineWidth = 2; for (let x = -770; x < 770; x += 60) { g.beginPath(); g.moveTo(x, -h - 6); g.lineTo(x + 4, -h - 18); g.stroke(); }
-        if (lvl >= 2) [-500, 500].concat(lvl >= 3 ? [-200, 200] : []).forEach(x => { g.fillStyle = lin(g, x - 18, 0, x + 18, 0, [[0, '#4a3220'], [1, '#2e1e10']]); g.fillRect(x - 16, -h - 120, 32, h + 120); outline(g, 2);
-          g.fillStyle = '#3a6a2e'; g.beginPath(); g.ellipse(x, -h - 130, 60, 40, 0, 0, TAU); g.fill(); outline(g, 2); windowLit(g, x - 8, -h - 90, 16, 22, '#9ff8e8'); });
+        if (lvl >= 2) [-790, 790].concat(lvl >= 3 ? [-700, 700] : []).forEach(x => { g.fillStyle = lin(g, x - 18, 0, x + 18, 0, [[0, '#4a3220'], [1, '#2e1e10']]); g.fillRect(x - 16, -h - 150, 32, h + 150); outline(g, 2);
+          g.fillStyle = '#3a6a2e'; g.beginPath(); g.ellipse(x, -h - 160, 60, 40, 0, 0, TAU); g.fill(); outline(g, 2); windowLit(g, x - 8, -h - 110, 16, 22, '#9ff8e8'); });
         g.fillStyle = '#0a0804'; g.beginPath(); g.moveTo(-50, 0); g.lineTo(-50, -h + 10); g.arc(0, -h + 10, 50, Math.PI, 0); g.lineTo(50, 0); g.fill();
         g.save(); g.shadowColor = '#68e0c8'; g.shadowBlur = 20; g.strokeStyle = 'rgba(160,250,230,0.7)'; g.lineWidth = 3; g.stroke(); g.restore();
         break; }
@@ -258,11 +282,100 @@
         for (let i = 0; i < 7; i++) { const x = -80 + i * 27, y = -170 + Math.sin(i * 1.3) * 18; g.strokeStyle = 'rgba(200,190,230,0.5)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y - 30); g.lineTo(x, y); g.stroke(); g.save(); g.shadowColor = '#c9b8ff'; g.shadowBlur = 12; g.fillStyle = 'rgba(220,210,255,' + (0.7 + Math.sin(t * 2 + i) * 0.2) + ')'; g.beginPath(); g.arc(x, y + 6, 6, 0, TAU); g.fill(); g.restore(); } break; }
       case 'altar': { stone(g, -50, -50, 100, 50, '#6a6a5a'); g.strokeStyle = '#4a8a3a'; g.lineWidth = 3; for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(-40 + i * 16, 0); g.quadraticCurveTo(-30 + i * 14, -70 - Math.sin(t + i) * 6, -4 + i * 2, -90); g.stroke(); }
         g.save(); g.shadowColor = '#ffe3a3'; g.shadowBlur = 16; g.fillStyle = '#d0a23a'; g.beginPath(); g.ellipse(0, -94, 12, 8, 0, 0, TAU); g.fill(); g.restore(); break; }
-      case 'grovering': { for (let i = 0; i < 7; i++) { const a = Math.PI + i / 6 * Math.PI, x = Math.cos(a) * 130, y = Math.sin(a) * 30; g.fillStyle = '#3a2614'; g.fillRect(x - 8, y - 130, 16, 130); g.fillStyle = i % 2 ? '#3e6a2e' : '#4a7a32'; g.beginPath(); g.ellipse(x, y - 140, 42, 34, 0, 0, TAU); g.fill(); }
+      case 'grovering': { for (let i = 0; i < 7; i++) { const a = Math.PI + i / 6 * Math.PI, x = Math.cos(a) * 130, y = Math.sin(a) * 30; g.fillStyle = '#3a2614'; g.fillRect(x - 6, y - 80, 12, 80); g.fillStyle = i % 2 ? '#3e6a2e' : '#4a7a32'; g.beginPath(); g.ellipse(x, y - 90, 34, 26, 0, 0, TAU); g.fill(); }
         for (let i = 0; i < 14; i++) { g.fillStyle = 'rgba(255,250,170,' + (0.5 + 0.4 * Math.sin(t * 3 + i)) + ')'; g.beginPath(); g.arc(Math.sin(i * 7.1 + t * 0.4) * 100, -40 - (i * 37) % 90, 2.4, 0, TAU); g.fill(); } break; }
       case 'oathtree': { g.fillStyle = lin(g, -30, 0, 30, 0, [[0, '#3a2a1a'], [1, '#1e140a']]); g.beginPath(); g.moveTo(-40, 0); g.bezierCurveTo(-60, -60, 10, -90, -20, -160); g.lineTo(20, -160); g.bezierCurveTo(40, -90, -20, -60, 40, 0); g.fill(); outline(g, 2);
         g.fillStyle = '#26481e'; g.beginPath(); g.ellipse(0, -190, 90, 56, 0, 0, TAU); g.fill(); outline(g, 2);
         ['#c43a3a', '#d0a23a', '#9ff8e8', '#ffffff'].forEach((c, i) => { g.strokeStyle = c; g.lineWidth = 3; g.beginPath(); g.moveTo(-60 + i * 36, -160); g.quadraticCurveTo(-56 + i * 36 + Math.sin(t * 2 + i) * 6, -130, -58 + i * 36, -100); g.stroke(); }); break; }
+      /* ---------------- what every town has, the Elsha'ryn way ---------------- */
+      case 'stumpinn': { g.fillStyle = 'rgba(0,0,0,0.35)'; ell(g, 0, 4, 120, 14); g.fill();
+        g.fillStyle = lin(g, -90, 0, 90, 0, [[0, '#6a4a2c'], [0.5, '#8a6440'], [1, '#3a2614']]); g.beginPath(); g.moveTo(-100, 0); g.quadraticCurveTo(-84, -40, -80, -110); g.lineTo(80, -110); g.quadraticCurveTo(84, -40, 100, 0); g.closePath(); g.fill(); outline(g, 2);
+        g.strokeStyle = 'rgba(30,18,8,0.45)'; g.lineWidth = 2; for (let k = -4; k <= 4; k++) { g.beginPath(); g.moveTo(k * 21, -4); g.lineTo(k * 18, -108); g.stroke(); }
+        g.fillStyle = radial(g, -20, -170, 140, '#c8784a', '#5a2a18'); g.beginPath(); g.moveTo(-130, -112); g.quadraticCurveTo(-120, -205, 0, -210); g.quadraticCurveTo(120, -205, 130, -112); g.quadraticCurveTo(0, -96, -130, -112); g.fill(); outline(g, 2);
+        g.fillStyle = 'rgba(255,240,210,0.85)'; [[-60, -150, 11], [10, -184, 8], [62, -146, 12], [-20, -132, 6], [96, -126, 5]].forEach(([x, y, r]) => { ell(g, x, y, r, r * 0.7); g.fill(); });
+        windowLit(g, -62, -84, 18, 24, '#ffd88a'); windowLit(g, 44, -84, 18, 24, '#ffd88a');
+        g.fillStyle = '#1a0e06'; g.beginPath(); g.moveTo(-18, 0); g.lineTo(-18, -40); g.arc(0, -40, 18, Math.PI, 0); g.lineTo(18, 0); g.fill();
+        g.strokeStyle = '#3a2614'; g.lineWidth = 3; g.beginPath(); g.moveTo(94, -62); g.lineTo(128, -62); g.stroke(); glowOrb(g, 128, -48, 8, '#9ff8e8', t);
+        g.fillStyle = '#5a3e26'; g.fillRect(-150, -26, 44, 10); g.fillRect(-146, -16, 6, 16); g.fillRect(-116, -16, 6, 16); g.fillStyle = '#c9a24e'; ell(g, -136, -32, 6, 5); g.fill(); break; }
+      case 'barterring': [['#6a9a3a', -100, -4], ['#c9a24e', 0, -22], ['#b0603a', 100, -4]].forEach(([c, x, y]) => {
+          g.strokeStyle = '#4a3220'; g.lineWidth = 4; g.beginPath(); g.moveTo(x - 36, y - 30); g.lineTo(x - 30, y - 92); g.moveTo(x + 36, y - 30); g.lineTo(x + 30, y - 92); g.stroke();
+          g.fillStyle = '#5a3e26'; g.fillRect(x - 42, y - 32, 84, 12); outline(g, 1.5); g.fillRect(x - 36, y - 20, 8, 20); g.fillRect(x + 28, y - 20, 8, 20);
+          g.fillStyle = c; g.beginPath(); g.moveTo(x - 58, y - 84); g.quadraticCurveTo(x, y - 136, x + 58, y - 84); g.quadraticCurveTo(x, y - 98, x - 58, y - 84); g.fill(); outline(g, 2);
+          g.strokeStyle = shade(c, -40); g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y - 110); g.lineTo(x, y - 92); for (let k = -2; k <= 2; k++) { g.moveTo(x, y - 104 + Math.abs(k) * 3); g.lineTo(x + k * 18, y - 92 - Math.abs(k) * 2); } g.stroke();
+          g.fillStyle = '#8a5a2a'; ell(g, x - 16, y - 38, 13, 7); g.fill(); g.fillStyle = '#e8842c'; ell(g, x + 10, y - 40, 7, 7); g.fill(); g.fillStyle = '#9ff070'; ell(g, x + 24, y - 38, 5, 5); g.fill(); });
+        g.save(); g.shadowColor = '#9ff8e8'; g.shadowBlur = 14; g.fillStyle = 'rgba(160,250,230,0.85)'; ell(g, 0, -150 + Math.sin(t * 2) * 3, 7, 7); g.fill(); g.restore(); break;
+      case 'nutstore': { g.fillStyle = '#4a3220'; g.fillRect(-92, -150, 14, 150); g.fillRect(78, -156, 14, 156); outline(g, 1.5);
+        g.strokeStyle = '#5a3e26'; g.lineWidth = 12; g.lineCap = 'round'; g.beginPath(); g.moveTo(-100, -146); g.quadraticCurveTo(0, -190, 100, -152); g.stroke(); g.lineCap = 'butt';
+        g.fillStyle = '#3e6a2e'; [[-86, -160, 40], [94, -168, 40], [0, -186, 54]].forEach(([x, y, r]) => { ell(g, x, y, r, r * 0.55); g.fill(); });
+        for (let i = 0; i < 4; i++) { const x = -54 + i * 36, top = -166 + Math.abs(i - 1.5) * 6, y = -70 + (i % 2) * 14 + Math.sin(t + i) * 2;
+          g.strokeStyle = '#3a2614'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, top); g.lineTo(x, y - 26); g.stroke();
+          g.fillStyle = lin(g, x - 16, 0, x + 16, 0, [[0, '#d8b45e'], [1, '#7a5a24']]); g.beginPath(); g.moveTo(x - 16, y - 26); g.lineTo(x + 16, y - 26); g.quadraticCurveTo(x + 18, y, x, y + 4); g.quadraticCurveTo(x - 18, y, x - 16, y - 26); g.fill(); outline(g, 1.5);
+          g.strokeStyle = 'rgba(60,40,10,0.5)'; g.lineWidth = 1; for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(x - 16, y - 26 + k * 7); g.lineTo(x + 16, y - 26 + k * 7); g.stroke(); } }
+        g.fillStyle = '#7a5a24'; [[-40, -6], [-24, -4], [30, -6], [46, -3], [8, -4]].forEach(([x, y]) => { ell(g, x, y, 8, 6); g.fill(); }); break; }
+      case 'gardens': for (let r = 2; r >= 0; r--) for (let c = 0; c < 6; c++) { const x = -150 + c * 58 + (r % 2) * 26, y = -r * 26;
+          g.fillStyle = r % 2 ? '#3e6a2e' : '#4a7a32'; ell(g, x, y - 16, 28, 19); g.fill(); outline(g, 1);
+          g.save(); g.shadowColor = '#ffd060'; g.shadowBlur = 8; g.fillStyle = ['#ffcf5a', '#ff8a5a', '#c9f070'][(r + c) % 3]; for (let k = 0; k < 3; k++) { ell(g, x - 12 + k * 12, y - 20 - (k % 2) * 8, 3.6, 3.6); g.fill(); } g.restore(); } break;
+      case 'songtree': { const h = 160 + lvl * 25;
+        if (lvl >= 4) { g.save(); g.shadowColor = '#fff2b0'; g.shadowBlur = 30; g.fillStyle = 'rgba(255,246,200,0.55)'; ell(g, 0, -4, 96, 18); g.fill(); g.restore(); }
+        g.fillStyle = lin(g, -12, 0, 12, 0, [[0, '#ece6d4'], [1, '#9a9284']]); g.beginPath(); g.moveTo(-18, 0); g.quadraticCurveTo(-6, -h * 0.5, -8, -h); g.lineTo(8, -h); g.quadraticCurveTo(6, -h * 0.5, 18, 0); g.fill(); outline(g, 1.5);
+        g.strokeStyle = '#d8d2bc'; g.lineWidth = 3; [[-1, 0.72], [1, 0.8], [-1, 0.94], [1, 1]].forEach(([sd, k]) => { g.beginPath(); g.moveTo(0, -h * k); g.quadraticCurveTo(sd * 70, -h * k - 40, sd * 104, -h * k + 34); g.stroke(); });
+        g.fillStyle = '#4a7a5a'; [[-62, -h - 8, 72, 40], [62, -h, 72, 40], [0, -h - 40, 84, 46]].forEach(([x, y, a, b]) => { ell(g, x, y, a, b); g.fill(); });
+        for (let i = 0; i < 4 + lvl * 3; i++) { const sd = i % 2 ? 1 : -1, x = sd * (26 + (i * 23) % 76), y = -h + 14 + (i * 31) % 64;
+          g.strokeStyle = 'rgba(220,230,200,0.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y - 22); g.lineTo(x, y); g.stroke();
+          g.save(); g.shadowColor = '#bff8ff'; g.shadowBlur = 10; g.fillStyle = 'rgba(200,250,255,' + (0.65 + 0.25 * Math.sin(t * 2.5 + i)) + ')'; g.beginPath(); g.moveTo(x - 6, y + 9); g.quadraticCurveTo(x, y - 6, x + 6, y + 9); g.closePath(); g.fill(); g.restore(); }
+        g.fillStyle = 'rgba(200,255,230,0.5)'; g.font = '18px Georgia'; for (let i = 0; i < lvl * 2; i++) { const a = t * 0.6 + i * 1.3; g.fillText('♪', Math.cos(a) * 110, -h * 0.6 + Math.sin(a * 1.3) * 40 - ((t * 20 + i * 15) % 60)); }
+        break; }
+      case 'speargrd': g.fillStyle = '#3e5a2a'; ell(g, 0, -8, 120, 22); g.fill();
+        [[-74, -62], [66, -68]].forEach(([x, y]) => { g.strokeStyle = '#5a3a20'; g.lineWidth = 4; g.beginPath(); g.moveTo(x - 14, -8); g.lineTo(x, y); g.lineTo(x + 14, -8); g.stroke();
+          g.fillStyle = '#d8c08a'; ell(g, x, y, 20, 20); g.fill(); outline(g, 2); g.fillStyle = '#4a7a32'; ell(g, x, y, 12, 12); g.fill(); g.fillStyle = '#c43a3a'; ell(g, x, y, 5, 5); g.fill(); });
+        g.fillStyle = '#5a3a20'; g.fillRect(-24, -62, 50, 6); g.strokeStyle = '#7a5a34'; g.lineWidth = 3;
+        for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(-16 + i * 10, -4); g.lineTo(-12 + i * 10, -88); g.stroke(); g.fillStyle = '#d8dce6'; g.beginPath(); g.moveTo(-14 + i * 10, -88); g.lineTo(-12 + i * 10, -100); g.lineTo(-10 + i * 10, -88); g.fill(); }
+        break;
+      case 'trailpost': g.fillStyle = '#6a6a5a'; for (let i = 0; i < 5; i++) { ell(g, -96 + i * 44, -4 - (i % 2) * 4, 16, 6); g.fill(); }
+        g.fillStyle = lin(g, -10, 0, 10, 0, [[0, '#6a4a2c'], [1, '#3a2614']]); g.fillRect(-10, -150, 20, 150); outline(g, 2);
+        [[-1, -130, '#c9a24e'], [1, -108, '#9ff8e8'], [-1, -86, '#e8842c']].forEach(([sd, y, c]) => { g.fillStyle = '#7a5634'; g.beginPath(); g.moveTo(0, y - 9); g.lineTo(sd * 70, y - 9); g.lineTo(sd * 84, y); g.lineTo(sd * 70, y + 9); g.lineTo(0, y + 9); g.closePath(); g.fill(); outline(g, 1.5); g.fillStyle = c; g.fillRect(sd > 0 ? 18 : -52, y - 2, 34, 3); });
+        glowOrb(g, 0, -164, 8, '#9ff8e8', t); break;
+      case 'tallystump': g.fillStyle = lin(g, -60, 0, 60, 0, [[0, '#7a5634'], [1, '#3a2614']]); g.beginPath(); g.moveTo(-66, 0); g.lineTo(-56, -60); g.lineTo(56, -60); g.lineTo(66, 0); g.fill(); outline(g, 2);
+        g.fillStyle = '#b08a5a'; ell(g, 0, -60, 56, 14); g.fill(); outline(g, 1.5); g.strokeStyle = 'rgba(80,50,20,0.6)'; g.lineWidth = 1; for (let r = 10; r < 56; r += 10) { g.beginPath(); g.ellipse(0, -60, r, r * 0.25, 0, 0, TAU); g.stroke(); }
+        for (let i = 0; i < 5; i++) { const x = 74 + i * 9; g.strokeStyle = '#d8c08a'; g.lineWidth = 5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x - 12, -64); g.stroke(); g.strokeStyle = '#5a3a20'; g.lineWidth = 1; for (let k = 1; k < 5; k++) { g.beginPath(); g.moveTo(x - 2.4 * k - 3, -12 * k); g.lineTo(x - 2.4 * k + 3, -12 * k); g.stroke(); } }
+        A.resIcon(g, 'gold', 18, -76, 24); A.resIcon(g, 'gold', -12, -72, 18); break;
+      case 'canopylodge': g.fillStyle = lin(g, -18, 0, 18, 0, [[0, '#5a3e26'], [1, '#2e1e10']]); g.fillRect(-16, -210, 32, 210); outline(g, 2);
+        g.fillStyle = '#6a4a2c'; g.fillRect(-92, -152, 184, 12); outline(g, 2);
+        g.fillStyle = lin(g, -60, -210, 60, -150, [[0, '#7a5634'], [1, '#4a3220']]); g.fillRect(-60, -186, 120, 34); g.beginPath(); g.ellipse(0, -186, 64, 30, 0, Math.PI, 0); g.fill(); outline(g, 2);
+        g.fillStyle = '#3e6a2e'; ell(g, 0, -244, 112, 52); g.fill(); outline(g, 2); ell(g, -74, -214, 52, 30); g.fill(); ell(g, 82, -218, 52, 30); g.fill();
+        windowLit(g, -38, -180, 14, 18, '#ffe9a0'); windowLit(g, 24, -180, 14, 18, '#ffe9a0');
+        g.strokeStyle = '#c9a24e'; g.lineWidth = 2; g.beginPath(); g.moveTo(58, -142); g.lineTo(62, 0); g.moveTo(76, -142); g.lineTo(80, 0); for (let y = -130; y < 0; y += 14) { g.moveTo(59 + (-y) * 0.0, y); g.lineTo(78, y); } g.stroke();
+        A.flag(g, -84, -196, 34, '#c43a3a', t); break;
+      case 'starwell': { g.fillStyle = lin(g, 0, -280, 0, 0, [[0, 'rgba(200,220,255,0)'], [1, 'rgba(200,220,255,0.35)']]); g.beginPath(); g.moveTo(-20, -280); g.lineTo(20, -280); g.lineTo(48, -18); g.lineTo(-48, -18); g.fill();
+        for (let i = 0; i < 6; i++) { const a = Math.PI + (i + 0.5) / 6 * Math.PI, x = Math.cos(a) * 100, y = Math.sin(a) * 24 - 6, hh = 70 + (i % 2) * 16;
+          g.fillStyle = lin(g, x - 10, 0, x + 10, 0, [[0, '#ece8dc'], [1, '#8a867a']]); g.beginPath(); g.moveTo(x - 11, y); g.lineTo(x - 8, y - hh); g.quadraticCurveTo(x, y - hh - 10, x + 8, y - hh); g.lineTo(x + 11, y); g.fill(); outline(g, 1.5);
+          g.save(); g.shadowColor = '#bfe0ff'; g.shadowBlur = 8; g.fillStyle = '#bfe0ff'; g.fillRect(x - 2, y - hh * 0.7, 4, 10); g.restore(); }
+        g.fillStyle = '#d8d4c8'; ell(g, 0, -16, 66, 20); g.fill(); outline(g, 2); g.fillStyle = radial(g, 0, -16, 56, '#3a4a9a', '#0a0e2a'); ell(g, 0, -16, 54, 15); g.fill();
+        for (let i = 0; i < 9; i++) { g.fillStyle = 'rgba(255,255,255,' + (0.5 + 0.5 * Math.sin(t * 3 + i)) + ')'; g.fillRect(-42 + (i * 37) % 84, -24 + (i * 13) % 14, 2, 2); }
+        break; }
+      case 'willowpens': g.strokeStyle = '#8a7a3a'; g.lineWidth = 3; for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(0, -10 - k * 7, 100, 26, 0, Math.PI * 1.02, Math.PI * 1.98); g.stroke(); }
+        A.creature(g, 'punk', -20, -6, 34, { t, tint: 2 }); A.coreIcon(g, 50, -72, 16, t, 'hero');
+        g.strokeStyle = '#a89a5a'; for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(0, -10 - k * 7, 100, 26, 0, Math.PI * 0.03, Math.PI * 0.97); g.stroke(); }
+        g.strokeStyle = '#5a4a20'; g.lineWidth = 4; for (let i = 0; i < 10; i++) { const a = i / 10 * TAU, x = Math.cos(a) * 100, y = Math.sin(a) * 26; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x, y - 46); g.stroke(); } break;
+      case 'logpile': [[-60, -14], [-20, -14], [20, -14], [60, -14], [-40, -40], [0, -40], [40, -40], [-20, -66], [20, -66]].forEach(([x, y]) => {
+          g.fillStyle = '#5a3e26'; g.fillRect(x - 54, y - 13, 54, 26); g.fillStyle = '#c9a26a'; ell(g, x, y, 14, 14); g.fill(); outline(g, 1.5);
+          g.strokeStyle = 'rgba(90,60,30,0.6)'; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 7, 0, TAU); g.stroke(); });
+        g.fillStyle = '#3e6a2e'; ell(g, -40, -84, 34, 10); g.fill();
+        g.fillStyle = '#6a4a2c'; g.fillRect(96, -30, 44, 30); g.fillStyle = '#c9a26a'; ell(g, 118, -30, 22, 6); g.fill();
+        g.strokeStyle = '#5a3a20'; g.lineWidth = 4; g.beginPath(); g.moveTo(118, -32); g.lineTo(140, -84); g.stroke(); g.fillStyle = '#9a96a8'; g.beginPath(); g.moveTo(110, -38); g.lineTo(128, -30); g.lineTo(122, -50); g.closePath(); g.fill(); break;
+      case 'mossrock': [[-52, 0, 62, 44], [34, -4, 52, 38], [-8, -34, 42, 30]].forEach(([x, y, a, b]) => {
+          g.fillStyle = radial(g, x - a * 0.3, y - b, a * 1.2, '#a8a498', '#4a4840'); ell(g, x, y - b * 0.8, a, b); g.fill(); outline(g, 2);
+          g.fillStyle = '#4a7a32'; ell(g, x - a * 0.2, y - b * 1.45, a * 0.62, b * 0.32); g.fill(); });
+        stone(g, 76, -30, 40, 30, '#8a8678'); stone(g, 84, -58, 30, 26, '#8a8678'); break;
+      case 'glade': g.fillStyle = '#4a6a32'; ell(g, 0, -10, 120, 26); g.fill(); g.strokeStyle = 'rgba(160,250,230,0.4)'; g.lineWidth = 2; g.stroke();
+        for (let i = 0; i < 7; i++) { const a = Math.PI + i / 6 * Math.PI, x = Math.cos(a) * 118, y = Math.sin(a) * 24 - 10; g.strokeStyle = '#4a3220'; g.lineWidth = 4; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 92); g.stroke(); A.flag(g, x, y - 92, 26, i % 2 ? '#4a9a5a' : '#c9a24e', t + i); }
+        break;
+      case 'rootvault': g.fillStyle = '#0a0804'; g.beginPath(); g.ellipse(0, -4, 74, 90, 0, Math.PI, 0); g.fill(); A.coreIcon(g, 0, -46, 20, t, 'hero');
+        g.lineCap = 'round'; for (let i = 0; i < 7; i++) { const k = i / 6; g.strokeStyle = i % 2 ? '#5a3e26' : '#6a4a2c'; g.lineWidth = 15 - (i % 3) * 3;
+          g.beginPath(); g.moveTo(-108 + k * 40, 0); g.bezierCurveTo(-110 + k * 60, -150 + k * 30, 110 - (1 - k) * 60, -120 - k * 30, 108 - (1 - k) * 40, 0); g.stroke(); }
+        g.lineCap = 'butt'; g.fillStyle = '#3e6a2e'; ell(g, -34, -126, 44, 16); g.fill(); ell(g, 40, -118, 38, 14); g.fill(); break;
+      case 'raftdock': for (let x = -60; x < 110; x += 16) { g.fillStyle = (x / 16) % 2 ? '#6a4a2c' : '#5a3e26'; g.fillRect(x, -22, 14, 22); g.fillStyle = '#c9a26a'; ell(g, x + 7, -22, 7, 3); g.fill(); }
+        g.fillStyle = '#4a3220'; [-50, 30, 100].forEach(x => g.fillRect(x, -30, 8, 50)); A.boat(g, {}, -10, -64, 80, t, '#4a9a5a'); break;
       case 'hall': {
         const w = 150 + lvl * 50, h = 110 + lvl * 40;
         stone(g, -w / 2, -h, w, h, DUSK); roof(g, -w / 2, -h, w, 60 + lvl * 10, DARK);
@@ -341,20 +454,20 @@
     T.top.appendChild(el('span', { cls: 'spacer' }));
     T.top.appendChild(btn('Leave town', () => T.close(), 'primary'));
     /* tabs */
-    const tabs = [['build', 'Build'], ['recruit', 'Recruit'], ['army', 'Garrison & heroes'], ['heroes', 'Training & songs'], ['vault', 'Memory Vault'], ['tavern', 'Tavern'], ['market', 'Market']];
+    const tabs = [['build', 'Build'], ['recruit', 'Recruit'], ['army', 'Garrison & heroes'], ['heroes', 'Training & songs'], ['vault', D.bname('vault', town.faction)], ['tavern', 'Tavern'], ['market', 'Market']];
     if (RU.has(town, 'urverk')) tabs.push(['gate', 'Duat Gate']);
     if (RU.has(town, 'memtree')) tabs.push(['memtree', 'Memory Tree']);
     if (RU.has(town, 'altar')) tabs.push(['altar', 'Growing Altar']);
     if (RU.has(town, 'oathtree')) tabs.push(['oath', 'Oath Tree']);
     if (RU.has(town, 'shipyard')) tabs.push(['ship', 'Shipyard']);
     T.ui.innerHTML = '';
-    T.ui.appendChild(el('div', { cls: 'town-buttons' }, tabs.map(([id, n]) => btn(n, () => { if (id === 'tavern') return DL.tavern(town); if (id === 'market') { if (!RU.has(town, 'market')) { U.toast('Build a Market Square first.'); return; } return DL.market(town); }
+    T.ui.appendChild(el('div', { cls: 'town-buttons' }, tabs.map(([id, n]) => btn(n, () => { if (id === 'tavern') return DL.tavern(town); if (id === 'market') { if (!RU.has(town, 'market')) { U.toast('Build a ' + D.bname('market', town.faction) + ' first.'); return; } return DL.market(town); }
       T.page(id); }))));
     /* the page: one thing, over everything */
     const pg = T.pageEl; pg.innerHTML = '';
     pg.classList.toggle('hidden', !T.open_);
     if (!T.open_) return;
-    const TITLE = { build: 'Build', recruit: 'Recruit', army: 'Garrison & heroes', heroes: 'Training & songs', vault: 'Memory Vault', gate: 'Duat Gate', ship: 'Shipyard', memtree: 'Memory Tree', altar: 'Growing Altar', oath: 'Oath Tree' };
+    const TITLE = { build: 'Build', recruit: 'Recruit', army: 'Garrison & heroes', heroes: 'Training & songs', vault: D.bname('vault', town.faction), gate: 'Duat Gate', ship: D.bname('shipyard', town.faction), memtree: 'Memory Tree', altar: 'Growing Altar', oath: 'Oath Tree' };
     const title = T.tab === 'dwelling' ? (Object.values(D.BUILDINGS).find(b => b.dwell === T.pageArg) || {}).name || 'Dwelling' : TITLE[T.tab] || 'Build';
     pg.appendChild(el('div', { cls: 'tp-head' }, [el('h2', { text: title }), el('span', { cls: 'small muted', text: town.name }), el('span', { cls: 'spacer' }),
       el('span', { cls: 'row', style: { gap: '10px' } }, D.RES.map(r => el('span', { cls: 'res', 'data-tip': '<b>' + D.RES_INFO[r].name + '</b>' }, [U.resIcon(r, 16), SU.fmt(P.res[r])]))),
@@ -373,18 +486,18 @@
     /* draw the building once on a large sheet, find where it actually is, and fit it to the frame */
     const pic = buildingPicture(sp[2], sp[3] || 1);
     { const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0);
-      g.fillStyle = lin(g, 0, 0, 0, H, [[0, '#1a1430'], [0.6, '#3a2c4a'], [0.84, '#2a2234'], [1, '#141018']]); g.fillRect(0, 0, W, H);
+      g.fillStyle = lin(g, 0, 0, 0, H, elsh() ? [[0, '#06120e'], [0.6, '#1e4a34'], [0.84, '#2e4a24'], [1, '#16261a']] : [[0, '#1a1430'], [0.6, '#3a2c4a'], [0.84, '#2a2234'], [1, '#141018']]); g.fillRect(0, 0, W, H);
       g.fillStyle = 'rgba(255,240,200,0.5)'; for (let i = 0; i < 30; i++) g.fillRect((i * 97.3) % W, (i * 41.7) % (H * 0.5), 1.2, 1.2);
       const b = pic.box, k = Math.min((W - 40) / b.w, (H - 30) / b.h, 1.6);
       g.fillStyle = 'rgba(0,0,0,0.35)'; ell(g, W / 2, H - 18, b.w * k * 0.55, 9); g.fill();
       g.globalAlpha = built ? 1 : 0.85; g.drawImage(pic.cv, b.x, b.y, b.w, b.h, W / 2 - b.w * k / 2, H - 14 - b.h * k, b.w * k, b.h * k); g.globalAlpha = 1;
       if (!built) { g.fillStyle = 'rgba(20,16,30,0.15)'; g.fillRect(0, 0, W, H); } }
-    const needs = (B.req || []).map(r => el('div', { cls: 'small ' + (RU.has(town, r) ? 'good' : 'bad') }, [(RU.has(town, r) ? '✓ ' : '✗ ') + D.BUILDINGS[r].name]));
+    const needs = (B.req || []).map(r => el('div', { cls: 'small ' + (RU.has(town, r) ? 'good' : 'bad') }, [(RU.has(town, r) ? '✓ ' : '✗ ') + D.bname(r, town.faction)]));
     if (B.pop) needs.push(el('div', { cls: 'small ' + (town.pop >= B.pop ? 'good' : 'bad') }, [(town.pop >= B.pop ? '✓ ' : '✗ ') + B.pop + ' people (the town has ' + Math.floor(town.pop) + ')']));
     if (B.unlock) needs.push(el('div', { cls: 'small ' + (RU.blueprintHere(st, town) ? 'good' : 'bad') }, [(RU.blueprintHere(st, town) ? '✓ ' : '✗ ') + 'The Rokarvac of the Nekh in town']));
     const cr = B.dwell || B.dwellUp, C = cr && D.CREATURES[cr];
     const info = el('div', { cls: 'bc-info' }, [
-      el('p', { text: B.desc }),
+      el('p', { text: D.bdesc(bid, town.faction) }),
       C ? el('div', { cls: 'row', style: { flexWrap: 'nowrap' } }, [U.creatureIcon(cr, 54, { color: P.color }), el('div', { cls: 'small' }, [el('b', { text: C.plural }), el('br'), 'Tier ' + C.tier + ' · ' + C.grow + ' a week · attack ' + C.atk + ', defense ' + C.def + ', health ' + C.hp, el('br'), el('a', { href: '#', cls: 'gold', onclick: e => { e.preventDefault(); DL.creatureCard(cr, { town }); }, text: 'More about them…' })])]) : null,
       B.gold ? el('div', { cls: 'small' }, ['Income: ', el('b', { cls: 'gold', text: B.gold + ' gold a day' })]) : null,
       B.housing ? el('div', { cls: 'small' }, ['Room for ', el('b', { cls: 'gold', text: B.housing + ' people' })]) : null,
@@ -393,8 +506,8 @@
       B.small ? el('div', { cls: 'small muted', text: 'Small: a second building may go up the same day.' }) : null,
       el('div', { style: { marginTop: '8px' } }, built ? el('b', { cls: 'good', text: 'Built' }) : [el('b', { cls: 'small muted', text: 'Cost' }), el('div', {}, U.costView(RU.buildCost(town, bid), P)), RU.labourCut(town) ? el('div', { cls: 'small good', text: 'Punks at work here: ' + Math.round(RU.labourCut(town) * 100) + '% off wood and stone, ' + Math.round(RU.labourCut(town) * 50) + '% off gold.' }) : null]),
       !built && !chk.ok && chk.why ? el('div', { cls: 'warn small', style: { marginTop: '4px' }, text: chk.why }) : null]);
-    const m = U.modal([el('h2', { text: B.name }), el('div', { cls: 'bc' }, [cv, info]),
-      el('div', { cls: 'acts' }, [btn(built ? 'Close' : 'Not now', () => m.close()), !built && town.owner === U.viewer ? btn('Build', () => { const r = RU.build(st, town, bid); if (!r.ok) { U.toast(r.why); return; } m.close(); U.toast(B.name + ' is built.'); T.render(); U.refresh(); }, 'primary big') : null].map(b => { if (b && b.textContent === 'Build' && !chk.ok) b.disabled = true; return b; }))], { wide: true, onClose: () => cancelAnimationFrame(raf) });
+    const m = U.modal([el('h2', { text: D.bname(bid, town.faction) }), el('div', { cls: 'bc' }, [cv, info]),
+      el('div', { cls: 'acts' }, [btn(built ? 'Close' : 'Not now', () => m.close()), !built && town.owner === U.viewer ? btn('Build', () => { const r = RU.build(st, town, bid); if (!r.ok) { U.toast(r.why); return; } m.close(); U.toast(D.bname(bid, town.faction) + ' is built.'); T.render(); U.refresh(); }, 'primary big') : null].map(b => { if (b && b.textContent === 'Build' && !chk.ok) b.disabled = true; return b; }))], { wide: true, onClose: () => cancelAnimationFrame(raf) });
     m.box.classList.add('bc-box');
   };
 
@@ -422,8 +535,8 @@
       if (seen.has(bid)) return; seen.add(bid);
       const built = town.built.includes(bid);
       const chk = built ? { ok: false } : RU.canBuild(st, town, bid);
-      grid.appendChild(el('div', { cls: 'bcard' + (built ? ' done' : chk.ok ? ' ok' : ''), onclick: () => T.buildingCard(town, bid), oncontextmenu: e => { e.preventDefault(); T.buildingCard(town, bid); }, 'data-tip': '<b>' + B.name + '</b><br>' + B.desc + (B.req ? '<br><span class="muted">Needs: ' + B.req.map(r => D.BUILDINGS[r].name).join(', ') + '</span>' : '') + (B.pop ? '<br><span class="muted">Needs ' + B.pop + ' people.</span>' : '') + (B.small ? '<br><span class="muted">Small: a second one may go up the same day.</span>' : '') },
-        [el('div', { text: B.name }), built ? el('div', { cls: 'c good', text: 'Built' }) : el('div', { cls: 'c' }, [U.costView(RU.buildCost(town, bid), P), !chk.ok && !chk.poor ? el('div', { cls: 'warn', text: chk.why }) : null])]));
+      grid.appendChild(el('div', { cls: 'bcard' + (built ? ' done' : chk.ok ? ' ok' : ''), onclick: () => T.buildingCard(town, bid), oncontextmenu: e => { e.preventDefault(); T.buildingCard(town, bid); }, 'data-tip': '<b>' + D.bname(bid, town.faction) + '</b><br>' + D.bdesc(bid, town.faction) + (B.req ? '<br><span class="muted">Needs: ' + B.req.map(r => D.bname(r, town.faction)).join(', ') + '</span>' : '') + (B.pop ? '<br><span class="muted">Needs ' + B.pop + ' people.</span>' : '') + (B.small ? '<br><span class="muted">Small: a second one may go up the same day.</span>' : '') },
+        [el('div', { text: D.bname(bid, town.faction) }), built ? el('div', { cls: 'c good', text: 'Built' }) : el('div', { cls: 'c' }, [U.costView(RU.buildCost(town, bid), P), !chk.ok && !chk.poor ? el('div', { cls: 'warn', text: chk.why }) : null])]));
     });
     body.appendChild(grid);
   }
@@ -452,7 +565,7 @@
     const src = RU.recruitSources(st, town), dd = destOf(town, st, vis);
     body.appendChild(el('div', { cls: 'row' }, [destRow(town, st, vis), el('span', { cls: 'spacer' }),
       btn('Recruit everything I can afford', () => { const n = RU.recruitAll(st, town, dd.slots, dd.hero); U.toast(n ? n + ' creatures join.' : 'Nothing more you can afford, or no room.'); T.render(); U.refresh(); }, 'primary', 'The strongest first, as many as your treasury and the slots allow')]));
-    if (RU.has(town, 'muster')) body.appendChild(el('p', { cls: 'small gold', text: 'The Muster Ground: recruit from the dwellings of all your towns. The troops come here.' }));
+    if (RU.has(town, 'muster')) body.appendChild(el('p', { cls: 'small gold', text: 'The ' + D.bname('muster', town.faction) + ': recruit from the dwellings of all your towns. The troops come here.' }));
     const dw = src;
     if (!dw.length) { body.appendChild(el('p', { text: 'Build dwellings to recruit creatures.' })); return; }
     const vh = vis && S.heroOf(st, vis);
@@ -523,9 +636,9 @@
       row.appendChild(el('div', { cls: 'row' }, [U.portrait(h.people, h.look, P.color, 40), el('b', { text: h.name }), el('span', { cls: 'small muted', text: n + ' / 5 basic skills · trained ' + h.trainedToday + ' / 2 today' }), el('span', { cls: 'spacer' }), btn('Hero', () => DL.hero(h))]));
       row.appendChild(el('div', {}, Object.entries(h.skills).map(([id, lv]) => el('span', { cls: 'skillchip act' }, [D.SKILLS[id].name, el('span', { cls: 'pips', text: U.pips(lv) })]))));
       if (n < 5) {
-        if (!halls.length) row.appendChild(el('p', { cls: 'warn', text: 'This town has no training hall. Build one (Drill Yard, Road Lodge…) to train heroes.' }));
+        if (!halls.length) row.appendChild(el('p', { cls: 'warn', text: 'This town has no training hall. Build one (' + D.bname('t_drill', town.faction) + ', ' + D.bname('t_road', town.faction) + '…) to train heroes.' }));
         halls.forEach(bid => { const opts = RU.trainOffer(st, town, h, bid) || [];
-          row.appendChild(el('div', { cls: 'row', style: { marginTop: '4px' } }, [el('span', { style: { width: '150px' }, cls: 'small', text: D.BUILDINGS[bid].name + ':' }), opts.length ? null : el('span', { cls: 'small muted', text: 'Nothing new to learn here.' }),
+          row.appendChild(el('div', { cls: 'row', style: { marginTop: '4px' } }, [el('span', { style: { width: '150px' }, cls: 'small', text: D.bname(bid, town.faction) + ':' }), opts.length ? null : el('span', { cls: 'small muted', text: 'Nothing new to learn here.' }),
             ...opts.map(o => btn(D.SKILLS[o.id].name + (o.lv > 1 ? ' (level ' + o.lv + ')' : ''), () => { const r = RU.train(st, town, h, o); if (!r.ok) U.toast(r.why); T.render(); U.refresh(); }, 'primary', D.SKILLS[o.id].desc)),
             opts.length ? el('span', { cls: 'small' }, U.costView({ gold: RU.trainCost(h) }, P)) : null])); });
       }
@@ -575,7 +688,7 @@
   }
 
   function vaultTab(body, town, st, P, vis) {
-    if (!RU.has(town, 'vault')) { body.appendChild(el('p', { text: 'Build a Memory Vault to keep memory cores safe and to turn captain cores into new captains.' })); return; }
+    if (!RU.has(town, 'vault')) { body.appendChild(el('p', { text: 'Build a ' + D.bname('vault', town.faction) + ' to keep memory cores safe and to turn captain cores into new captains.' })); return; }
     const heroes = town.heroes.map(id => st.heroes[id]).filter(Boolean); if (vis && vis.heroId) heroes.unshift(st.heroes[vis.heroId]);
     /* heroes can leave their spare cores in the vault */
     heroes.forEach(h => h.cores.slice().forEach(cid => { const c = st.cores[cid]; if (c && c.kind === 'captain') { h.cores = h.cores.filter(x => x !== cid); P.vault.push(cid); } }));

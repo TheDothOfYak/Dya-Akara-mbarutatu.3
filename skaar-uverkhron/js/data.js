@@ -482,6 +482,40 @@
       peoples: { eikar: 4, kaloeik: 3, keilia: 1, karnen: 1 }, guard: ['sprengju', 'speareikar', 'stryx'] },
   };
   D.factionOf = f => D.FACTION[f] ? f : 'duskareth';
+  /* the buildings every town has, as each people names them (the Duskareth names are the ones above) */
+  D.LOOK = {
+    elsharyn: {
+      hall1: ['Root Hall', 'The heart of the grove, a hall grown inside a great tree. 1000 gold a day.'],
+      hall2: ['Hall of Boughs', 'The tree grows wide and its boughs fill with homes. 1750 gold a day, and room for more people.'],
+      hall3: ['Crown of the Forest', '3000 gold a day. The seat of an Elsha’ryn elder, crowned with light.'],
+      fort1: ['Thorn Hedge', 'A living hedge and a gate of roots. Needed for every dwelling above the second.'],
+      fort2: ['Briarwall', 'The hedge grows thick, with watch-trees. Creatures grow 25% faster.'],
+      fort3: ['Wall of the Ancients', 'Four watch-trees of the old forest. Creatures grow 50% faster.'],
+      tavern: ['Hollow Stump', 'A tavern in the stump of a fallen giant. Hire heroes and squadron captains here.'],
+      market: ['Barter Ring', 'Trade resources on the root-tables. On market day, travelling sellers come.'],
+      woodyard: ['Deadfall Yard', 'Wood from trees that fell on their own (the Elsha’ryn cut no living tree). +2 wood a day.'],
+      stoneyard: ['Mossrock Cutters', 'Stone lifted gently from under the moss. +2 stone a day.'],
+      muster: ['Gathering Glade', 'Recruit here from the dwellings of every one of your towns: the troops come straight to this town.'],
+      granary: ['Nut Store', 'Woven baskets of nuts and seeds hung high in the branches. +8 food a day.'],
+      farms: ['Fruit Gardens', 'Gardens of glowing fruit under the canopy. +16 food a day. Needs 200 people to tend them.'],
+      terraces: ['Root Houses', 'Round homes in the roots for 300 more people.'],
+      terraces2: ['Great Root Halls', 'Homes for 500 more people, deep in the oldest roots.'],
+      songs1: ['Singing Tree', 'A tree hung with bell-flowers. Heroes with Songcraft learn the first songs here.'],
+      songs2: ['Singing Tree II', 'More bells bloom. Second-tier songs.'],
+      songs3: ['Singing Tree III', 'The whole tree rings. Third-tier songs.'],
+      choir: ['Choir of Light', 'Fourth-tier songs, sung at a pool of light under the singing tree.'],
+      t_drill: ['Spear Ground', 'Training ground: Battle Drill, Shieldwall, Marksmanship, Field Tactics.'],
+      t_road: ['Trailpost', 'Where trackers set out: Wayfinding, Scouting, Provisioning, Seafaring.'],
+      t_count: ['Tally Stump', 'A stump notched with every trade: Stewardship, Diplomacy, Plunder, Learning.'],
+      t_capt: ['Canopy Lodge', 'A lodge high in the branches: Captaincy, Heartening, Fortune, Mending.'],
+      t_duat: ['Starwell', 'A well that shows the sky at noon: Songcraft, Breathwork, Duatcraft, Skyreading.'],
+      t_pens: ['Willow Pens', 'Woven willow pens: Memorykeeping, Beastmastery, Siegecraft, Stygiancraft.'],
+      vault: ['Root Vault', 'Keeps memory cores safe in the roots, and turns captain cores into new captains.'],
+      shipyard: ['Raft Landing', 'Build ships. Only in a town by the water.'],
+    },
+  };
+  D.bname = (bid, fac) => { const L = D.LOOK[fac] && D.LOOK[fac][bid]; return L ? L[0] : D.BUILDINGS[bid].name; };
+  D.bdesc = (bid, fac) => { const L = D.LOOK[fac] && D.LOOK[fac][bid]; return L ? L[1] : D.BUILDINGS[bid].desc; };
 
   /* ---------------- map objects ---------------- */
   D.MINES = {

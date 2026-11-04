@@ -220,7 +220,7 @@
     const st = U.st, mine = t.owner === U.viewer;
     const mh = Object.values(st.armies).filter(x => x.owner === U.viewer && x.heroId).map(x => S.heroStat(st, st.heroes[x.heroId], 'Cunning'));
     const exact = mine || (mh.length ? Math.max(...mh) : 0) >= 6;
-    const fort = RU.has(t, 'fort3') ? 'Duskwall Bastion' : RU.has(t, 'fort2') ? 'Stone Citadel' : RU.has(t, 'fort1') ? 'Palisade Keep' : 'no walls';
+    const fort = ['fort3', 'fort2', 'fort1'].filter(f => RU.has(t, f)).map(f => D.bname(f, t.faction))[0] || 'no walls';
     const def = t.defender && st.heroes[t.defender];
     const gate = S.armyAt(st, t.layer, t.x, t.y);
     const list = slots => S.stacksIn(slots).filter(s => s.n > 0).map(s => '<div class="ai-row"><img src="' + iconUrl(s.cr) + '" width="40" height="40"><span><b>' + (exact ? s.n : S.countWord(s.n)) + '</b> ' + D.CREATURES[s.cr].plural + (exact ? '' : ' <span class="muted">(' + S.countRange(s.n) + ')</span>') + '</span></div>').join('');

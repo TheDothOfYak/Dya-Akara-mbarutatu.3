@@ -333,7 +333,7 @@
     const m = U.modal(el('div'), { wide: true, onClose: () => U.refresh() });
     function render() {
       const b = m.box; b.innerHTML = '';
-      b.appendChild(el('h2', { text: 'The Tavern of the Lantern' }));
+      b.appendChild(el('h2', { text: town ? 'The ' + D.bname('tavern', town.faction) : 'The Tavern' }));
       b.appendChild(el('p', { cls: 'small muted', text: 'New faces come every week. A hero must learn all five basic skills at a town’s training halls before they can leave it. Only ' + D.MAX_FIELD_HEROES + ' heroes can be out on the map at once.' }));
       b.appendChild(el('h3', { text: 'Heroes — ' + M.heroCost + ' gold' }));
       b.appendChild(el('div', { cls: 'row', style: { alignItems: 'stretch' } }, P.tavern.heroes.map(id => { const h = st().heroes[id]; if (!h) return null;
@@ -606,7 +606,7 @@
     const m = U.modal(el('div'), { wide: true, onClose: () => U.refresh() });
     function render() {
       const b = m.box; b.innerHTML = '';
-      b.appendChild(el('h2', { text: 'Market Square' + (S.isMarketDay(st()) ? ' — market day!' : '') }));
+      b.appendChild(el('h2', { text: (town ? D.bname('market', town.faction) : 'The Market') + (S.isMarketDay(st()) ? ' — market day!' : '') }));
       const pickRow = (label, cur, set, give) => el('div', { cls: 'row' }, [el('span', { style: { width: '50px' }, text: label }), ...D.RES.map(r => el('button', { cls: 'btn icon' + (cur === r ? ' primary' : ''), onclick: () => { set(r); render(); },
         'data-tip': '<b>' + D.RES_INFO[r].name + '</b> — you have ' + SU.fmt(P.res[r]) + (D.RES_INFO[r].desc ? '<br>' + D.RES_INFO[r].desc : '') + (r !== (give ? to : from) ? '<br>' + (give ? '1 ' + D.RES_INFO[r].name + ' → ' + (+RU.tradeRate(st(), P, r, to).toFixed(2)) + ' ' + D.RES_INFO[to].name : '1 ' + D.RES_INFO[from].name + ' → ' + (+RU.tradeRate(st(), P, from, r).toFixed(2)) + ' ' + D.RES_INFO[r].name) : '') }, U.resIcon(r, 22)))]);
       b.appendChild(pickRow('Give', from, r => from = r, true)); b.appendChild(pickRow('Get', to, r => to = r, false));
