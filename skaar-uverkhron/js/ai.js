@@ -16,7 +16,7 @@
 
   let STYLE = null;
   /* as the old computer players did: the money buildings first, then the dwellings climbing the tiers */
-  const BUILD_DUSK = ['market', 'hall2', 'd3', 'd4', 't_road', 'granary', 'fort2', 'd5', 'd1u', 'd2u', 'd6', 'hall3', 't_capt', 'terraces', 'd3u', 'd7', 'songs1', 't_duat', 'vault', 'd4u', 'farms', 'fort3', 'd8', 'terraces2', 'stygwell', 'songs2', 't_count', 't_pens', 'sanctum', 'd9', 'urverk', 'songs3', 'choir'];
+  const BUILD_DUSK = ['market', 'hall2', 'd3', 'd4', 't_road', 'granary', 'fort2', 'd5', 'd1u', 'd2u', 'd6', 'hall3', 't_capt', 'terraces', 'd3u', 'd7', 'songs1', 't_duat', 'vault', 'd4u', 'farms', 'fort3', 'hall4', 'd8', 'hall5', 'terraces2', 'stygwell', 'songs2', 't_count', 't_pens', 'sanctum', 'd9', 'urverk', 'songs3', 'choir'];
 
   /* the Elsha'ryn build the same way, with their own dwellings and wonders */
   const SWAP = { urverk: 'grove', stygwell: 'mossbed', sanctum: 'oathtree' };

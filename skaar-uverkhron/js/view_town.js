@@ -15,7 +15,7 @@
 
   /* where each building stands in the picture (virtual 1600×900), and how it is drawn */
   const SPOT = {
-    hall1: [800, 600, 'hall', 1], hall2: [800, 600, 'hall', 2], hall3: [800, 600, 'hall', 3],
+    hall1: [800, 600, 'hall', 1], hall2: [800, 600, 'hall', 2], hall3: [800, 600, 'hall', 3], hall4: [800, 600, 'hall', 4], hall5: [800, 600, 'hall', 5],
     fort1: [800, 830, 'wall', 1], fort2: [800, 830, 'wall', 2], fort3: [800, 830, 'wall', 3],
     tavern: [1190, 690, 'inn'], market: [470, 720, 'stalls'], granary: [1360, 610, 'barn'], farms: [1430, 520, 'fields'],
     terraces: [250, 560, 'houses'], terraces2: [140, 640, 'stonehouses'],
@@ -32,7 +32,7 @@
   /* an Elsha'ryn town is laid out its own way: the great tree of the hall off to one side, reached by a path
      of stepping stones, and everything grown rather than built */
   const SPOT_E = {
-    hall1: [520, 600, 'greattree', 1], hall2: [520, 600, 'greattree', 2], hall3: [520, 600, 'greattree', 3],
+    hall1: [520, 600, 'greattree', 1], hall2: [520, 600, 'greattree', 2], hall3: [520, 600, 'greattree', 3], hall4: [520, 600, 'greattree', 4], hall5: [520, 600, 'greattree', 5],
     fort1: [800, 880, 'hedgewall', 1], fort2: [800, 880, 'hedgewall', 2], fort3: [800, 880, 'hedgewall', 3],
     /* the back of the glade */
     e6: [130, 470, 'range'], songs1: [270, 470, 'songtree', 1], songs2: [270, 470, 'songtree', 2], songs3: [270, 470, 'songtree', 3], choir: [270, 470, 'songtree', 4],
@@ -221,7 +221,7 @@
     const DUSK = '#4a4462', DARK = '#2a2440', VIOLET = '#8e7cff';
     switch (kind) {
       /* ---------------- the Elsha'ryn: grown, not built ---------------- */
-      case 'greattree': { const w = 90 + lvl * 34, h = 220 + lvl * 50;
+      case 'greattree': { const L3 = Math.min(lvl, 3), w = 90 + L3 * 34 + (lvl - L3) * 16, h = 220 + L3 * 50 + (lvl - L3) * 18;
         g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(0, 4, w * 1.4, 18, 0, 0, TAU); g.fill();
         g.fillStyle = lin(g, -w, 0, w, 0, [[0, '#4a3220'], [0.45, '#7a5634'], [1, '#2e1e10']]);
         g.beginPath(); g.moveTo(-w * 1.5, 0); g.quadraticCurveTo(-w * 0.7, -30, -w * 0.55, -h); g.lineTo(w * 0.55, -h); g.quadraticCurveTo(w * 0.7, -30, w * 1.5, 0); g.closePath(); g.fill(); outline(g, 2);
@@ -232,6 +232,9 @@
         g.fillStyle = '#100a04'; g.beginPath(); g.moveTo(-26, 0); g.lineTo(-26, -50); g.arc(0, -50, 26, Math.PI, 0); g.lineTo(26, 0); g.fill();
         g.save(); g.shadowColor = '#68e0c8'; g.shadowBlur = 18; g.strokeStyle = 'rgba(160,250,230,0.8)'; g.lineWidth = 3; g.stroke(); g.restore();
         if (lvl >= 3) glowOrb(g, 0, cy - 120, 16, '#fff2b0', t);
+        /* the Elder Canopy (4): lantern-moss hung through the boughs; the World Tree (5): its crown full of light */
+        if (lvl >= 4) for (let i = 0; i < 14; i++) { const lx = -300 + i * 46 + Math.sin(i * 2.3) * 14, ly = cy + 40 + Math.abs(Math.sin(i * 1.7)) * 70; g.strokeStyle = 'rgba(160,250,230,0.45)'; g.lineWidth = 1; g.beginPath(); g.moveTo(lx, ly - 30); g.lineTo(lx, ly); g.stroke(); g.save(); g.shadowColor = '#9ff8e8'; g.shadowBlur = 10; g.fillStyle = 'rgba(170,255,235,' + (0.7 + Math.sin(t * 2 + i) * 0.2) + ')'; g.beginPath(); g.arc(lx, ly + 4, 4, 0, TAU); g.fill(); g.restore(); }
+        if (lvl >= 5) { g.save(); g.globalCompositeOperation = 'lighter'; for (let i = 0; i < 9; i++) { const a = -Math.PI / 2 + (i - 4) * 0.28; g.strokeStyle = 'rgba(255,240,180,' + (0.12 + 0.06 * Math.sin(t * 1.5 + i)) + ')'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, cy - 60); g.lineTo(Math.cos(a) * 420, cy - 60 + Math.sin(a) * 300); g.stroke(); } g.restore(); glowOrb(g, 0, cy - 60, 22, '#fff6c8', t); }
         break; }
       case 'hedgewall': { const h = 34 + lvl * 10;
         for (let x = -780; x < 780; x += 34) { g.fillStyle = (x / 34) % 2 ? '#26481e' : '#2e5626'; g.beginPath(); g.ellipse(x, -h * 0.5, 26, h * 0.62 + Math.sin(x) * 4, 0, 0, TAU); g.fill(); }
@@ -377,13 +380,19 @@
       case 'raftdock': for (let x = -60; x < 110; x += 16) { g.fillStyle = (x / 16) % 2 ? '#6a4a2c' : '#5a3e26'; g.fillRect(x, -22, 14, 22); g.fillStyle = '#c9a26a'; ell(g, x + 7, -22, 7, 3); g.fill(); }
         g.fillStyle = '#4a3220'; [-50, 30, 100].forEach(x => g.fillRect(x, -30, 8, 50)); A.boat(g, {}, -10, -64, 80, t, '#4a9a5a'); break;
       case 'hall': {
-        const w = 150 + lvl * 50, h = 110 + lvl * 40;
-        stone(g, -w / 2, -h, w, h, DUSK); roof(g, -w / 2, -h, w, 60 + lvl * 10, DARK);
-        for (let i = 0; i < 2 + lvl; i++) windowLit(g, -w / 2 + 22 + i * (w - 44) / (1 + lvl), -h + 30, 16, 30, '#b9a8ff');
+        const L3 = Math.min(lvl, 3), w = 150 + L3 * 50, h = 110 + L3 * 40;
+        /* the palace (4) and the throne (5): tall towers either side, then gold crowns on them */
+        if (lvl >= 4) [-1, 1].forEach(sd => { const tx = sd * (w / 2 + 78) - 30, th = h * 1.35 + (lvl - 4) * 40;
+          stone(g, tx, -th, 60, th, '#3e3956'); g.fillStyle = DARK; g.beginPath(); g.moveTo(tx - 8, -th); g.lineTo(tx + 30, -th - 90); g.lineTo(tx + 68, -th); g.fill(); outline(g, 2);
+          for (let i = 0; i < 3; i++) windowLit(g, tx + 22, -th + 30 + i * 48, 16, 26, '#b9a8ff');
+          if (lvl >= 5) { g.save(); g.shadowColor = '#ffd27a'; g.shadowBlur = 24; g.fillStyle = '#e8c25a'; g.beginPath(); for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k - 2) * 0.35; g.moveTo(tx + 30, -th - 92); g.lineTo(tx + 30 + Math.cos(a) * 30, -th - 92 + Math.sin(a) * 30); } g.strokeStyle = '#ffe08a'; g.lineWidth = 3; g.stroke(); g.restore(); A.flag(g, tx + 30, -th - 96, 40, '#c9a24e', t + sd); } });
+        stone(g, -w / 2, -h, w, h, DUSK); roof(g, -w / 2, -h, w, 60 + L3 * 10, DARK);
+        for (let i = 0; i < 2 + L3; i++) windowLit(g, -w / 2 + 22 + i * (w - 44) / (1 + L3), -h + 30, 16, 30, lvl >= 5 ? '#ffe3a3' : '#b9a8ff');
         g.fillStyle = '#0a0812'; g.beginPath(); g.moveTo(-22, 0); g.lineTo(-22, -48); g.arc(0, -48, 22, Math.PI, 0); g.lineTo(22, 0); g.fill();
         if (lvl >= 2) { stone(g, -w / 2 - 50, -h * 0.8, 50, h * 0.8, DUSK); roof(g, -w / 2 - 50, -h * 0.8, 50, 70, DARK); stone(g, w / 2, -h * 0.8, 50, h * 0.8, DUSK); roof(g, w / 2, -h * 0.8, 50, 70, DARK); }
         if (lvl >= 3) { g.save(); g.shadowColor = VIOLET; g.shadowBlur = 30; g.fillStyle = lin(g, 0, -h - 260, 0, -h - 50, [[0, '#ffffff'], [1, '#5d4fb0']]); g.beginPath(); g.moveTo(-14, -h - 60); g.lineTo(0, -h - 280); g.lineTo(14, -h - 60); g.fill(); g.restore(); }
-        g.fillStyle = '#c9a24e'; g.beginPath(); g.arc(0, -h - 20 - lvl * 5, 12, 0, TAU); g.fill(); outline(g, 2);
+        g.fillStyle = '#c9a24e'; g.beginPath(); g.arc(0, -h - 20 - L3 * 5, 12 + (lvl >= 5 ? 6 : 0), 0, TAU); g.fill(); outline(g, 2);
+        if (lvl >= 5) glowOrb(g, 0, -h - 20 - L3 * 5, 10, '#ffe3a3', t);
         break; }
       case 'wall': {
         const h = 40 + lvl * 18, col = lvl === 1 ? '#5a4a3a' : '#575170';

@@ -344,7 +344,7 @@ changed from the Admin Panel without touching the code).
     and the top walls 400.
   - The computer builds its halls first, trades at the market for what a building
     lacks, and saves for the next building until the week's end.
-- **Economy:** halls pay 1000 / 1750 / 3000 gold a day; Woodcutters' and Stonecutters'
+- **Economy:** halls pay 1000 / 1750 / 3000 / 4000 / 5000 gold a day (five levels; the fourth needs the top walls and 600 people, the fifth 800); Woodcutters' and Stonecutters'
   Yards; a Muster Ground recruits from every town's dwellings; recruit everything in one
   click. Corralled punks can be mustered as troops, butchered for food, or put to work
   (cheaper buildings in that town).
