@@ -312,12 +312,70 @@
     ctx.restore();
   };
 
+  /* a family's keep: a square stone tower on a mound, a curtain wall, a banner in its holder's colour */
+  A.keep = function (ctx, o, x, y, ts, t, color) {
+    const fac = o.faction === 'elsharyn' ? 1 : 0;
+    const c = cached('keep' + fac + '_' + ts, ts * 2.4, ts * 2.6, g => {
+      const s = ts / 48, W = ts * 2.4, cx = W / 2 - ts * 0.3, gy = ts * 2.45;
+      A.contact(g, cx, gy - 4 * s, ts * 0.95, ts * 0.32, 0.45);
+      g.fillStyle = radial(g, cx, gy - 8 * s, 36 * s, '#6a5a44', '#3a2e22'); g.beginPath(); g.ellipse(cx, gy - 6 * s, 40 * s, 12 * s, 0, 0, TAU); g.fill();
+      const wall = fac ? '#7a8466' : '#8a8274', roof = fac ? '#3e5a2a' : '#4a2a3a';
+      stoneWall(g, cx - 34 * s, gy - 22 * s, 68 * s, 16 * s, s, wall); crenels(g, cx - 34 * s, gy - 22 * s, 68 * s, s, wall);
+      tower(g, cx - 12 * s, gy - 18 * s, 24 * s, 44 * s, s, shade(wall, 6), roof, '#ffcf6a');
+      tower(g, cx - 38 * s, gy - 8 * s, 10 * s, 18 * s, s, wall, roof); tower(g, cx + 28 * s, gy - 8 * s, 10 * s, 18 * s, s, wall, roof);
+      g.fillStyle = '#120c08'; g.beginPath(); g.moveTo(cx - 5 * s, gy - 6 * s); g.lineTo(cx - 5 * s, gy - 14 * s); g.arc(cx, gy - 14 * s, 5 * s, Math.PI, 0); g.lineTo(cx + 5 * s, gy - 6 * s); g.fill();
+      if (fac) { g.fillStyle = '#2e5626'; for (let i = 0; i < 5; i++) { ell(g, cx - 30 * s + i * 15 * s, gy - 22 * s, 6 * s, 4 * s); g.fill(); } }
+    });
+    ctx.drawImage(c, x + ts / 2 - ts * 0.9, y + ts - ts * 2.45 - ts * 0.05);
+    const s = ts / 48; A.flag(ctx, x + ts / 2 - 0.3 * ts, y + ts - 66 * s, ts * 0.4, o.owner >= 0 ? color : '#8a8478', t);
+  };
+  /* a watch post: a timber tower with a lantern, flying its owner's colours */
+  A.post = function (ctx, o, x, y, ts, t, color) {
+    const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.88;
+    ctx.save(); A.contact(ctx, cx, gy, 16 * s, 5 * s, 0.4);
+    ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 3 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - 9 * s, gy); ctx.lineTo(cx - 5 * s, gy - 30 * s); ctx.moveTo(cx + 9 * s, gy); ctx.lineTo(cx + 5 * s, gy - 30 * s);
+    ctx.moveTo(cx - 8 * s, gy - 8 * s); ctx.lineTo(cx + 7 * s, gy - 20 * s); ctx.moveTo(cx + 8 * s, gy - 8 * s); ctx.lineTo(cx - 7 * s, gy - 20 * s); ctx.stroke();
+    ctx.fillStyle = lin(ctx, 0, gy - 40 * s, 0, gy - 30 * s, [[0, '#8a6a44'], [1, '#5a3e24']]); ctx.fillRect(cx - 9 * s, gy - 38 * s, 18 * s, 8 * s); outline(ctx, 0.8 * s);
+    ctx.fillStyle = '#5a2a1a'; ctx.beginPath(); ctx.moveTo(cx - 11 * s, gy - 38 * s); ctx.lineTo(cx, gy - 46 * s); ctx.lineTo(cx + 11 * s, gy - 38 * s); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * s);
+    ctx.shadowColor = '#ffcf6a'; ctx.shadowBlur = 8 * s; ctx.fillStyle = rgba('#ffd88a', 0.75 + Math.sin(t * 3) * 0.2); ctx.fillRect(cx - 2 * s, gy - 36 * s, 4 * s, 4 * s);
+    ctx.restore(); A.flag(ctx, cx + 6 * s, gy - 44 * s, ts * 0.3, color, t);
+  };
+  /* a ruin: broken walls and fallen stones, perhaps with something left among them */
+  A.ruin = function (ctx, o, x, y, ts, t) {
+    const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.86;
+    ctx.save(); A.contact(ctx, cx, gy, 22 * s, 6 * s, 0.35);
+    [[-14, 14, 0.9], [2, 22, 1], [16, 9, 0.8]].forEach(([dx, h, k]) => { const px = cx + dx * s; ctx.fillStyle = lin(ctx, px - 6 * s, 0, px + 6 * s, 0, [[0, '#9a9284'], [1, '#5a554c']]);
+      ctx.beginPath(); ctx.moveTo(px - 6 * s, gy); ctx.lineTo(px - 6 * s, gy - h * s); ctx.lineTo(px - 2 * s, gy - (h - 4) * s); ctx.lineTo(px + 1 * s, gy - (h + 2) * s * k); ctx.lineTo(px + 6 * s, gy - (h - 6) * s); ctx.lineTo(px + 6 * s, gy); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * s); });
+    ctx.fillStyle = '#7a7466'; [[-22, 2], [-4, 4], [22, 3]].forEach(([dx, r]) => { ell(ctx, cx + dx * s, gy - 1 * s, (r + 1) * s, r * 0.7 * s); ctx.fill(); outline(ctx, 0.6 * s); });
+    ctx.strokeStyle = 'rgba(60,90,40,0.8)'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.moveTo(cx - 14 * s, gy - 12 * s); ctx.quadraticCurveTo(cx - 10 * s, gy - 4 * s, cx - 16 * s, gy); ctx.stroke();
+    if (o.loot) { ctx.shadowColor = '#ffe08a'; ctx.shadowBlur = 8 * s; ctx.fillStyle = rgba('#ffe08a', 0.6 + Math.sin(t * 3) * 0.3); ell(ctx, cx + 8 * s, gy - 3 * s, 2 * s, 2 * s); ctx.fill(); }
+    ctx.restore();
+  };
+  /* a caravan: a covered wagon drawn by Domestic Punks, under its owner's pennant */
+  A.caravan = function (ctx, a, x, y, ts, t, color, moving) {
+    const s = ts / 48, f = a.face || 1, cx = x + ts / 2, gy = y + ts * 0.86;
+    ctx.save(); A.contact(ctx, cx, gy, 22 * s, 6 * s, 0.4);
+    ctx.translate(cx, 0); ctx.scale(f, 1); ctx.translate(-cx, 0);
+    const bob = moving ? Math.sin(t * 10) * 1 * s : 0;
+    /* the wagon */
+    ctx.fillStyle = lin(ctx, 0, gy - 16 * s, 0, gy - 6 * s, [[0, '#8a6a44'], [1, '#4a3220']]); ctx.fillRect(cx - 16 * s, gy - 14 * s + bob, 24 * s, 7 * s); outline(ctx, 0.8 * s);
+    ctx.fillStyle = lin(ctx, 0, gy - 30 * s, 0, gy - 14 * s, [[0, '#efe2c0'], [1, '#b8a47a']]); ctx.beginPath(); ctx.moveTo(cx - 16 * s, gy - 14 * s + bob); ctx.quadraticCurveTo(cx - 16 * s, gy - 30 * s + bob, cx - 4 * s, gy - 30 * s + bob); ctx.quadraticCurveTo(cx + 8 * s, gy - 30 * s + bob, cx + 8 * s, gy - 14 * s + bob); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * s);
+    ctx.strokeStyle = rgba(color, 0.9); ctx.lineWidth = 2 * s; ctx.beginPath(); ctx.moveTo(cx - 14 * s, gy - 22 * s + bob); ctx.quadraticCurveTo(cx - 4 * s, gy - 26 * s + bob, cx + 6 * s, gy - 22 * s + bob); ctx.stroke();
+    [[-12, 0], [4, 0]].forEach(([dx]) => { ctx.fillStyle = '#3a2614'; ell(ctx, cx + dx * s, gy - 5 * s, 4.5 * s, 4.5 * s); ctx.fill(); ctx.strokeStyle = '#a8865a'; ctx.lineWidth = 1 * s; ctx.stroke(); });
+    /* the punk that pulls it */
+    ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 1.2 * s; ctx.beginPath(); ctx.moveTo(cx + 8 * s, gy - 10 * s); ctx.lineTo(cx + 14 * s, gy - 9 * s); ctx.stroke();
+    A.creature(ctx, 'punk', cx + 20 * s, gy, ts * 0.5, { t: t + a.x, f: 1, tint: 2, moving });
+    ctx.restore();
+    A.flag(ctx, cx - 10 * s * f, gy - 30 * s, ts * 0.28, color, t);
+  };
+
   /* draw any map object */
   /* every built place sits on trampled earth, so it belongs to the land */
   function groundPatch(ctx, o, x, y, ts) {
-    const big = o.type === 'town' ? 2.1 : o.type === 'mine' || o.type === 'urverk' ? 1.25 : o.type === 'visit' ? 0.85 : 0;
+    const big = o.type === 'town' ? 2.1 : o.type === 'mine' || o.type === 'urverk' || o.type === 'keep' ? 1.25 : o.type === 'visit' || o.type === 'ruin' ? 0.85 : 0;
     if (!big) return;
-    const cx = o.type === 'mine' ? x : x + ts / 2, cy = y + ts * (o.type === 'town' ? 0.55 : 0.75);
+    const cx = o.type === 'mine' || o.type === 'keep' ? x : x + ts / 2, cy = y + ts * (o.type === 'town' ? 0.55 : 0.75);
     const g = ctx.createRadialGradient(cx, cy, ts * 0.1, cx, cy, ts * big);
     g.addColorStop(0, 'rgba(70,52,34,0.42)'); g.addColorStop(0.6, 'rgba(70,52,34,0.22)'); g.addColorStop(1, 'rgba(70,52,34,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(cx, cy, ts * big, ts * big * 0.5, 0, 0, TAU); ctx.fill();
@@ -339,6 +397,9 @@
       case 'boat': return A.boat(ctx, o, x, y, ts, t, color);
       case 'vision': return A.visionSite(ctx, o, x, y, ts, t);
       case 'glimmer': return A.glimmer(ctx, o, x, y, ts, t);
+      case 'keep': return A.keep(ctx, o, x, y, ts, t, color);
+      case 'post': return A.post(ctx, o, x, y, ts, t, color);
+      case 'ruin': return A.ruin(ctx, o, x, y, ts, t);
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

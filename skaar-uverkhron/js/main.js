@@ -19,6 +19,7 @@
     const t = $('title'); t.classList.remove('hidden'); t.innerHTML = '';
     const cv = el('canvas', { cls: 'bg' }); t.appendChild(cv);
     titleArt(cv);
+    SU.save.dropOld();
     const auto = SU.save.listLocal().find(s => s.slot === 'auto');
     const acc = SU.save.account();
     const box = el('div', { cls: 'panel box' }, [
@@ -65,14 +66,17 @@
   G.howTo = function () {
     U.modal([el('h2', { text: 'How to play' }), el('div', { cls: 'small', html: [
       '<p><b>Win</b> by taking every town of every rival (some maps have other goals).</p>',
-      '<p><b>The map</b> has four layers: <b>Velki</b>, <b>Xikia</b>, <b>Leotik</b> and <b>the Kalo</b> (the moons). Switch with the buttons on the right (or keys 1–4). Click an army, click a place to see the path, click again to go. Right-click anything to learn about it. Drag to look around; scroll to zoom.</p>',
+      '<p><b>The map</b> has four layers: <b>Velki</b>, <b>Xikia</b>, <b>Leotik</b> and <b>the Kalo</b> (the moons). Switch with the buttons at the bottom left (or keys 1–4), or scroll all the way out (or press W) to see all the worlds turning and the Urverk between them. Click an army, click a place to see the path (with where you camp each night), click again to go. Right-click anything to learn about it. Drag to look around; scroll to zoom.</p>',
+      '<p><b>The drawing.</b> Everyone carries an old drawing of the Mbaru Tatu. Land you have not seen is shown as that drawing: true in shape, but old, and rougher far from any town. Land you have seen is the land itself; land you saw once but cannot see now is faded, as you remember it. <b>Map</b> (M) pulls out your map of every world, with your land, your caravans’ roads and the storm.</p>',
+      '<p><b>Territories.</b> The land is shared into named territories, held by whoever is the highest authority there: towns, keeps, watch posts and armies count; so do wild bands and free towns against you. Hold a territory and you have its mines, its villages and what the land yields. Caravans carry it home each day; bandits rob them on roads through land you do not hold. Watch posts (B) keep the roads safe.</p>',
+      '<p><b>Talking.</b> A hero or a captain can talk to anyone who can understand: bands led by a Dearcàn (hire them as mercenaries, pay them to leave or to let you pass), travellers (who found keeps and towns), free towns and keeps (gifts, treaties, joining your kingdom), and rivals (truces, open roads, trade).</p>',
       '<p><b>Urverk</b> are the portals between the worlds. Some work only when the worlds are in the right places; some are kept by families who ask a toll; some are dangerous. Hover over one to see when it opens.</p>',
       '<p><b>Heroes</b> are generals: they do not fight, they direct and sing. Hire them at a tavern, then train them at the training halls until they have five basic skills — only then can they leave town. Up to five heroes can be out on the map.</p>',
-      '<p><b>Squadron captains</b> lead groups of stacks. A squadron with a captain can go out without a hero, take mines and pick up resources (but not towns or Relics). Captains fight on the field, in front of their squadrons.</p>',
+      '<p><b>Squadron captains</b> lead groups of stacks. A squadron with a captain can go out without a hero, stand on land to hold it and take keeps (but not towns or Relics). Captains fight on the field, in front of their squadrons.</p>',
       '<p><b>Memory cores:</b> a fallen hero is gone for good, but leaves a core. Whoever takes it chooses two of five of its skills to use while they carry it — three cores fit in the pouch. At a <b>Kalo Shrine</b> on the moons, the <b>Kahizecvar</b> makes three of a core’s skills yours for ever.</p>',
       '<p><b>Food</b> feeds your armies and towns. Hungry armies lose heart, then desert. <b>Morale</b> (per stack) and <b>luck</b> matter in battle.</p>',
       '<p><b>The Sunear’Zikhron</b> storm wanders the Tatu. In it, everything is slower and production halves. Win a battle in its <b>eye</b> to unlock the <b>Nekh’Vorran</b>: one to each castle.</p>',
-      '<p><b>Weeks</b> are six days; day four is market day. Keys: E end turn, N next army, H hero, K kingdom, Q map songs, Z sleep.</p>'].join('') }),
+      '<p><b>Weeks</b> are six days; day four is market day. Keys: E end turn, N next army, H hero, K kingdom, M map, B watch post, W worlds, Q map songs, Z sleep, G show the way.</p>'].join('') }),
       el('div', { cls: 'acts' }, [btn('Close', function () { this.closest('.overlay').remove(); }, 'primary')])], { wide: true });
   };
 
@@ -131,6 +135,8 @@
       U.refresh();
       SU.save.autosave(st);
       weekNews(st);
+      /* envoys from rivals, waiting for an answer */
+      if (SU.realm.offersFor(st, st.current).length) setTimeout(() => SU.talk.offers(st.current), 200);
       /* a vision from the eye of the storm, seen at the end of the last turn */
       const P2 = st.players[st.current], vo = P2.vision && st.objects[P2.vision];
       if (vo && P2.visionShown !== vo.id) { P2.visionShown = vo.id;
@@ -232,6 +238,7 @@
     let st = null;
     try { st = where === 'cloud' ? await SU.save.loadCloud(slot) : SU.save.loadLocal(slot); } catch (e) { console.error(e); }
     if (!st) { U.alert('Could not load', 'That save could not be read.'); return; }
+    if (!S.current(st)) { U.alert('An old save', 'This game was saved before the land was shared out into territories, and cannot be played any more. Start a new game.'); return; }
     G.st = st; U.closeAll(); $('title').classList.add('hidden'); U.start(st);
     G.beginTurn();
   };

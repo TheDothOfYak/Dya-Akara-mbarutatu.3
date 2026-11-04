@@ -3,7 +3,7 @@
    saving and loading, and that nothing breaks along the way. */
 const path = require('path');
 const base = path.join(__dirname, '..', 'skaar-uverkhron', 'js');
-['core', 'data', 'state', 'make', 'rules', 'mapgen', 'battle', 'ai'].forEach(f => require(path.join(base, f + '.js')));
+['core', 'data', 'state', 'make', 'rules', 'realm', 'mapgen', 'battle', 'ai'].forEach(f => require(path.join(base, f + '.js')));
 const SU = globalThis.SU, S = SU.state, RU = SU.rules, BT = SU.battle;
 let fails = 0;
 const ok = (cond, msg) => { if (!cond) { fails++; console.error('FAIL: ' + msg); } };
@@ -242,6 +242,63 @@ async function playGame(seed, size, nPlayers, days) {
     ok(/not explored/.test(RU.whyNot(sw, aw, Math.min(Lw.w - 1, aw.x + 6), aw.y)), 'unexplored ground says explore first');
     Pw.explored[aw.layer].fill(1);
     if (guarded) { const Rg = RU.reach(sw, aw); const i = guarded[1] * Lw.w + guarded[0]; ok(Rg.cost[i] === Infinity || Rg.stop[i] === 1, 'beside a guard, the reach stops (a fight)'); }
+  }
+  /* the land: territories, who holds them, caravans, talking, pacts, travellers */
+  { const RL = SU.realm, D = SU.data;
+    const sr = SU.mapgen.newGame({ size: 'M', seed: 61, spread: true, players: [{ kind: 'human', name: 'A' }, { kind: 'ai', name: 'B' }] }); RU.startTurn(sr);
+    ok(sr.version >= 2 && S.current(sr), 'a new game is of the current version');
+    ok(sr.regions[0].length >= 9 && sr.regions[0].length <= 14, 'a medium Velki has about 11 territories (' + sr.regions[0].length + ')');
+    ok(sr.regions[3].length >= 3, 'every moon is a territory');
+    const home = S.townsOf(sr, 0)[0], hr = RL.regionAt(sr, home.layer, home.x, home.y + 1);
+    ok(hr && hr.owner === 0, 'your first town’s territory is yours from the start');
+    ok(hr.base.wood >= 2 && hr.base.stone >= 2 && hr.base.food >= 10, 'your first territory gives the basic resources');
+    ok(!Object.values(sr.objects).some(o => o.type === 'pile'), 'no loose piles of goods on the map');
+    ok(Object.values(sr.objects).filter(o => o.type === 'chest').every(o => o.buried && o.hidden), 'treasure chests are buried until someone tells of them');
+    ok(Object.values(sr.objects).some(o => o.type === 'keep'), 'families hold keeps');
+    ok(sr.sketch.some(o => o.t === 'town'), 'everyone carries a drawing with the towns on it');
+    /* mines are not flagged: they follow the territory */
+    const mn = Object.values(sr.objects).find(o => o.type === 'mine' && RL.regionAt(sr, o.layer, o.x, o.y + 1) !== hr && RL.regionAt(sr, o.layer, o.x, o.y + 1));
+    const a0 = Object.values(sr.armies).find(x => x.owner === 0 && x.heroId);
+    if (mn) { const spot = RU.freeNear(sr, mn.layer, mn.x, mn.y + 1); S.moveArmyIndex(sr, a0, mn.layer, spot[0], spot[1]); a0.mp = 5000; const r = RU.step(sr, a0, mn.x, mn.y); ok(mn.owner !== 0 && /territory/.test(r.msg || ''), 'walking into a mine does not take it: the territory does'); }
+    /* taking ground: stand there strong enough and it is yours at the end of the day */
+    const tr = sr.regions[home.layer].find(r => r.owner < 0 && !RL.placesIn(sr, r, ['town', 'keep']).length);
+    if (tr) {
+      RL.wildIn(sr, tr).forEach(w => RU.removeArmy(sr, w));
+      const spot = RU.freeNear(sr, tr.layer != null ? tr.li : tr.li, tr.x, tr.y) || [tr.x, tr.y]; S.moveArmyIndex(sr, a0, tr.li, spot[0], spot[1]);
+      RL.update(sr, true); ok(tr.owner === 0, 'an army standing on empty land takes it');
+      /* a caravan carries its goods home */
+      const g0 = sr.players[0].res.gold; RL.caravanDay(sr);
+      ok(tr.cv && (tr.cv.noRoute || (tr.cv.tiles && tr.cv.tiles.length > 1)), 'the territory gets a road home for its caravan');
+      if (tr.cv && tr.cv.tiles) { ok(Object.values(sr.armies).some(x => x.caravan && x.owner === 0 && !x.dead), 'a caravan walks the road'); }
+      /* a wild band moving in can take it back if nobody holds it */
+      S.moveArmyIndex(sr, a0, home.layer, home.x, home.y); const L = sr.layers[tr.li];
+      const w = SU.make.wild(sr, tr.li, tr.x, tr.y + 0, 60000, {}); S.moveArmyIndex(sr, w, tr.li, tr.x, tr.y);
+      RL.update(sr, true); ok(tr.owner !== 0, 'a strong band takes back land nobody stands on');
+      RU.removeArmy(sr, w);
+    }
+    /* talking: a band joins as mercenaries */
+    const band = Object.values(sr.armies).find(x => x.wild && !x.herd && RL.canHear(sr, x));
+    if (band) { sr.players[0].res.gold = 1e6; sr.heroes[a0.heroId].slots[2] = { kind: 'stack', cr: 'lutut', n: 30 }; let res; for (let k = 0; k < 40; k++) { band.talked = {}; res = RL.talkBand(sr, a0, band, 'join'); if (res.ok) break; }
+      ok(res && res.ok && band.owner === 0 && band.merc && !band.wild, 'a band can be hired as mercenaries'); const g = sr.players[0].res.gold; RL.payMercs(sr, 0); ok(sr.players[0].res.gold === g - band.merc.pay, 'mercenaries are paid each day');
+      sr.players[0].res.gold = 0; RL.payMercs(sr, 0); ok(band.owner === -1 && band.wild, 'unpaid mercenaries leave'); sr.players[0].res.gold = 1e6; }
+    ok(!RL.canTalk(sr, a0, { herd: true, slots: [{ kind: 'stack', cr: 'wildpunk', n: 5 }] }), 'beasts cannot be talked to');
+    /* a free town: gifts, a treaty, then it joins */
+    const nt = Object.values(sr.objects).find(o => o.type === 'town' && o.owner < 0) || Object.values(sr.objects).find(o => o.type === 'keep' && o.owner < 0);
+    if (nt) { ok(!RL.talkTown(sr, a0, nt, 'treaty').ok, 'strangers get no treaty'); for (let k = 0; k < 4; k++) RL.talkTown(sr, a0, nt, 'gift', 2500);
+      ok(RL.talkTown(sr, a0, nt, 'treaty').ok && nt.treaty[0], 'friends sign a treaty'); ok(RL.talkTown(sr, a0, nt, 'join').ok && nt.owner === 0, 'good friends join your kingdom'); }
+    /* rivals: a truce stops battles */
+    const b0 = Object.values(sr.armies).find(x => x.owner === 1 && x.heroId);
+    RL.accept(sr, { id: 'q1', from: 0, to: 1, kind: 'truce' });
+    ok(RL.atPeace(sr, 0, 1), 'a truce is made');
+    if (b0) { const spot = RU.freeNear(sr, b0.layer, b0.x, b0.y); S.moveArmyIndex(sr, a0, b0.layer, spot[0], spot[1]); a0.mp = 5000; const r = RU.step(sr, a0, b0.x, b0.y); ok(!r.event && /truce/.test(r.msg || ''), 'no battle with someone you are at truce with'); }
+    /* a watch post */
+    const pr = RL.canPost(sr, a0); if (pr.ok) { const pb = RL.buildPost(sr, a0); ok(pb.ok && RL.postIn(sr, pb.r, 0), 'a watch post can be raised'); }
+    /* travellers found a place */
+    const trv = RL.spawnTravellers(sr, 1); if (trv) { const before = Object.values(sr.objects).filter(o => o.type === 'keep' || o.type === 'town').length; const dest = RL.region(sr, trv.travellers.dest); RL.settle(sr, trv, dest); ok(Object.values(sr.objects).filter(o => o.type === 'keep' || o.type === 'town').length === before + 1, 'travellers found a keep or a town'); }
+    /* saves keep the land; old saves are refused */
+    const back = S.deserialize(S.serialize(sr)); ok(back.regions && back.layers[0].reg && back.layers[0].reg.length === sr.layers[0].reg.length && S.current(back), 'territories survive saving');
+    ok(RL.regionAt(back, home.layer, home.x, home.y + 1).owner === 0, 'and who holds them');
+    const old = JSON.parse(S.serialize(sr)); old.version = 1; delete old.regions; ok(!S.current(S.deserialize(old)), 'a save from before territories is refused');
   }
   console.log(fails ? fails + ' failure(s)' : 'all good');
   process.exit(fails ? 1 : 0);

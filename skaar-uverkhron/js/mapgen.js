@@ -18,7 +18,7 @@
   G.newGame = function (setup) {
     const seed = setup.seed || (Math.random() * 1e9) | 0;
     const st = {
-      version: 1, seed, rngState: seed ^ 0x5bd1e995, nextId: 1, day: 1, current: 0,
+      version: 2, seed, rngState: seed ^ 0x5bd1e995, nextId: 1, day: 1, current: 0,
       setup: SU.deep(setup), layers: [], objects: {}, armies: {}, heroes: {}, cores: {},
       players: [], storm: null, weekEvent: 'none', monthEvent: 'none', log: [], over: null, turnSeq: 0,
     };
@@ -38,6 +38,8 @@
     placeTowns(st, regions);
     S.rebuild(st);
     placeRoads(st);
+    /* the land shared out into named territories, and the keeps of the families who hold some of them */
+    if (SU.realm) { SU.realm.makeRegions(st); placeKeeps(st, regions); }
     placeMines(st, regions);
     placeVillages(st, regions);
     placeUrverk(st, regions, moons);
@@ -47,6 +49,7 @@
     S.rebuild(st);
     startArmies(st);
     delete st._reserve;
+    if (SU.realm) SU.realm.setup(st);
     st.storm = SU.rules && st.setup.storm !== false ? SU.rules.newStorm(st) : null;
     SU.syncRng(st);
     return st;
@@ -258,6 +261,28 @@
     }
   }
 
+  /* ---------- keeps: about half the territories without a town have one, held by a family ---------- */
+  function placeKeeps(st, regions) {
+    const R = SU.rng(st), RL = SU.realm, foot = [[-1, 0], [-1, -1], [0, -1]];
+    for (let li = 0; li < 3; li++) {
+      const L = st.layers[li];
+      (st.regions[li] || []).forEach(r => {
+        if (RL.placesIn(st, r, ['town']).length || !R.chance(0.55)) return;
+        const inR = (x, y) => L.reg[y * L.w + x] === r.k + 1 && farFromStarts(st, li, x, y, 8);
+        const p = nearFree(st, li, regions[li], R, r.x, r.y, 0, 6, foot, inR) || nearFree(st, li, regions[li], R, r.x, r.y, 0, 14, foot, inR) || randomFree(st, li, regions[li], R, inR, foot, 600);
+        if (!p) return;
+        const d = distToStart(st, li, p[0], p[1]);
+        const k = RL.makeKeep(st, li, p[0], p[1], -1, { power: (1400 + d * d * 30 + d * 180) * LAYER_MUL[li] * ({ weak: 0.6, normal: 1, strong: 1.5 }[st.setup.wild || 'normal']) });
+        k._noguard = true;
+        if (!st._reserve) st._reserve = st.layers.map(L2 => new Uint8Array(L2.w * L2.h));
+        [[0, 1], [-1, 1], [1, 1]].forEach(([dx, dy]) => { const xx = k.x + dx, yy = k.y + dy; if (S.inside(L, xx, yy)) { st._reserve[li][yy * L.w + xx] = 1; L.ob[yy * L.w + xx] = 0; } });
+        /* a road to the nearest town */
+        const t = Object.values(st.objects).filter(o => o.type === 'town' && o.layer === li).sort((a, b) => Math.hypot(a.x - k.x, a.y - k.y) - Math.hypot(b.x - k.x, b.y - k.y))[0];
+        if (t && Math.hypot(t.x - k.x, t.y - k.y) < 40) road(st, li, k.x, k.y + 1, t.x, t.y + 1);
+      });
+    }
+  }
+
   /* ---------- roads between the towns of each Tatu ---------- */
   function placeRoads(st) {
     for (let li = 0; li < 3; li++) {
@@ -371,10 +396,8 @@
     for (let li = 0; li < 3; li++) {
       const L = st.layers[li], reg = regions[li], area = L.w * L.h;
       const put = (o, foot, test) => { const p = randomFree(st, li, reg, R, test || ((x, y) => farFromStarts(st, li, x, y, 3)), foot); if (p) { o.layer = li; o.x = p[0]; o.y = p[1]; addObj(st, o); return o; } return null; };
-      for (let k = 0; k < area / 55; k++) { const res = R.weighted(D.RES, r => ({ gold: 4, wood: 3, stone: 3, food: 2, stygian: 1, ngakara: 0.6, timber: 0.8, glowmoss: 0.8 })[r]);
-        const amt = res === 'gold' ? R.pick([500, 750, 1000]) : res === 'food' ? R.int(8, 16) : D.RES_INFO[res].common ? R.int(4, 8) : R.int(2, 4);
-        put({ type: 'pile', res, amt }); }
-      for (let k = 0; k < area / 150; k++) put({ type: 'chest', gold: R.pick([1000, 1500, 2000]), xp: R.pick([500, 1000, 1500]) });
+      /* no loose piles of goods: the land's wealth comes from holding it. A few real treasure chests lie buried; a seer or a rumour tells where */
+      for (let k = 0; k < Math.max(1, area / 900); k++) put(G.buriedChest(R), null, (x, y) => farFromStarts(st, li, x, y, 10));
       for (let k = 0; k < area / 380; k++) put({ type: 'relic', relic: R.weighted(D.RELIC_IDS.filter(r => D.RELICS[r].rare !== 'skaar'), r => ({ common: 6, rare: 3, great: 1 })[D.RELICS[r].rare]) }, null, (x, y) => farFromStarts(st, li, x, y, 6));
       for (let k = 0; k < area / 500; k++) put({ type: 'scroll', song: R.pick(D.SONG_IDS.filter(s => D.SONGS[s].tier <= 3)) });
       const visits = ['ring', 'bulwark', 'banner', 'library', 'milestone', 'maze', 'tower', 'spring', 'camp', 'songstone', 'seer', 'trainer', 'seer'];
@@ -397,7 +420,7 @@
       const shrineFoot = [[-1, 0], [0, -1], [-1, -1]];
       for (let k = 0; k < 120; k++) { const x = m.x + R.int(-m.r + 2, m.r - 1), y = m.y + R.int(-m.r + 2, m.r - 1);
         if (freeAt(st, 3, x, y, reg3, shrineFoot)) { addObj(st, { type: 'visit', kind: 'shrine', layer: 3, x, y, moon: m.name, visited: {}, quest: null, keeper: R.pick(D.NAMES.kaloeik) }); m.shrine = [x, y]; break; } }
-      for (let k = 0; k < 3; k++) { const x = m.x + R.int(-m.r + 1, m.r - 1), y = m.y + R.int(-m.r + 1, m.r - 1); if (freeAt(st, 3, x, y, reg3)) addObj(st, { type: k === 0 ? 'relic' : 'pile', layer: 3, x, y, relic: R.pick(D.RELIC_IDS.filter(r => D.RELICS[r].rare === 'great' || D.RELICS[r].rare === 'rare')), res: R.pick(['stygian', 'ngakara', 'glowmoss']), amt: R.int(3, 6) }); }
+      for (let k = 0; k < 8; k++) { const x = m.x + R.int(-m.r + 1, m.r - 1), y = m.y + R.int(-m.r + 1, m.r - 1); if (freeAt(st, 3, x, y, reg3)) { addObj(st, { type: 'relic', layer: 3, x, y, relic: R.pick(D.RELIC_IDS.filter(r => D.RELICS[r].rare === 'great' || D.RELICS[r].rare === 'rare')) }); break; } }
     });
     st._moons = moons;
     st.moons = moons.map(m => ({ name: m.name, x: m.x, y: m.y, r: m.r, tatu: m.tatu }));
@@ -464,7 +487,7 @@
       if (o.type === 'mine') guard(o, o.kind === 'gold' || !D.RES_INFO[D.MINES[o.kind].res].common ? 1.4 : 1);
       else if (o.type === 'village') guard(o, 1.1);
       else if (o.type === 'relic') guard(o, D.RELICS[o.relic].rare === 'great' ? 3 : D.RELICS[o.relic].rare === 'rare' ? 2 : 1.3);
-      else if (o.type === 'chest' && R.chance(0.6)) guard(o, 1);
+      else if (o.type === 'chest' && !o.buried && R.chance(0.6)) guard(o, 1);
       else if (o.type === 'scroll') guard(o, 1.5);
       else if (o.type === 'urverk' && R.chance(o.kind === 'kalo' ? 1 : 0.55)) guard(o, o.layer === 3 ? 2 : 1.3);
       else if (o.type === 'visit' && o.kind === 'shrine') guard(o, 3);
@@ -516,5 +539,8 @@
     delete st._starts;
   }
   G.startArmies = startArmies;
+  /* a real treasure chest: worth a journey, and buried until someone tells you where */
+  G.buriedChest = R => ({ type: 'chest', gold: R.pick([3000, 4000, 5000]), xp: R.pick([2000, 2500, 3000]), relic: R.chance(0.35) ? R.pick(D.RELIC_IDS.filter(r => D.RELICS[r].rare === 'rare' || D.RELICS[r].rare === 'common')) : null, hidden: true, buried: true });
+  G.placeKeeps = placeKeeps;
   G._internals = { components, mainRegion, freeAt };
 })(typeof window !== 'undefined' ? window : globalThis);

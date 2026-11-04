@@ -733,6 +733,7 @@
       /* every captain still standing on the losing side is lost too */
       S.captainsIn(B.sides[lose].slots).forEach(cap => loserCapCore({ side: lose, cap }));
       if (lh) { const k = RU.killHero(st, lh, B.layer, B.x, B.y, B.sides[win].owner, wh); rep.heroDied = lh.name; rep.cores.push(k.core.id); if (!k.taken) rep.coreDropped = true; }
+      if (la && la.caravan && SU.realm) SU.realm.caravanLost(st, la, B.sides[win].owner, rep);
       if (la) RU.removeArmy(st, la);
       if (B.sides[lose].townId) {
         const t = st.objects[B.sides[lose].townId];
@@ -768,6 +769,7 @@
     }
     /* temporary armies (from the Duat) vanish */
     B.sides.forEach(s => { const a = s.armyId && st.armies[s.armyId]; if (a && a.temp) delete st.armies[a.id]; });
+    if (SU.realm && st.regions) SU.realm.update(st, true);
     RU.checkPlayers(st);
     return rep;
   };

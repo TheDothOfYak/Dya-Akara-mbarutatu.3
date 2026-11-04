@@ -365,6 +365,42 @@ changed from the Admin Panel without touching the code).
   its card (upgrade it there in town); buildings open a close-up before you build.
   A Key explains army-size words (A few 1–4 … A legion 1000+), path marks and ground.
 
+### The map, rethought so it does not feel like the old games
+- **The drawing instead of black fog.** Everyone has a drawing of the map from the start;
+  you do not know what a place looks like until you go there. The drawing is out of date
+  but never wrong about the shape of the land, and it is more accurate near towns. Rival
+  towns are marked only as towns. Land seen but out of sight is shown as remembered.
+- **The hero's map** is a button on the bottom bar, not tied to a hero: the hero's hands
+  hold the drawing, with the four worlds as tabs. It is never coloured in: colour is only
+  for ownership marks on things you have seen, the edge of your territory, and the edge
+  of rivals' land if you know it. The storm is always shown, with its trail, so it can be
+  tracked. Caravan routes are always up to date. Clicking it moves the view, not armies.
+- **The worlds view** replaces the layer buttons as the way to see everything: zoom all
+  the way out and the three Tatu and their moons turn, with the Urverk as threads.
+- **The bottom bar** replaces the side bar, with everything the side bar had.
+- **Territories instead of flagged mines.** Control is by being the highest authority
+  in a territory, so the game is a war of gaining ground rather than only taking castles
+  and killing heroes. You do not have to win over every single band to hold a territory,
+  but a real rival force stops you. Mines are kept, but you hold them by holding the
+  land. Territories away from your towns send their goods home by daily caravan; the
+  roads through land you do not hold have bandits. Caravans are real units that rivals
+  can attack, and routes can be protected (guards, watch posts, pacts).
+- **Movement points stay.** Paths show where each day ends, and the hero's map shows how
+  long the roads between places take.
+- **Talking.** You can only talk if you are Dearcàn (heroes are; Dearcàn means having the
+  mind to talk at a person's level or above), and only to Dearcàn. Talking can get you
+  almost anything: bands that join become mercenary bands you pay every day; towns and
+  keeps can sign a treaty (they stay independent: a deal and a good thing going) or join
+  your kingdom (you become their ruler); rivals can agree truces, open roads, trades,
+  even yielding, though it is much harder, since in the end you must beat each other.
+- **Turns stay turn-based**, and battles stay as they are.
+- **A changing map.** Travellers found keeps and full towns (towns can grow all the way to
+  completion, staying neutral until conquered, persuaded or bound by treaty). Families
+  raise keeps. Land left alone goes wild. The storm is huge and visible from afar, and it
+  floods low ground, washes out roads and uncovers ruins.
+- **Treasure** is rare and real: buried chests you are sent after by a quest or a rumour.
+- Saves from before territories cannot be loaded.
+
 ## 11. Not built yet
 
 - The SkarValorin, the campaign, and the Dya'Akara special event (on hold).

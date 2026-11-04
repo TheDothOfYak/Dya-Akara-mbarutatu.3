@@ -19,7 +19,7 @@
       players: st.players.map((p, i) => ({ name: p.name, kind: p.kind, color: p.color, alive: p.alive, towns: towns(i), heroes: heroes(i), ai: p.ai })), thumb };
   }
   SV.info = info;
-  function meta(st, name) { return { name: name || st.setup.name || 'A game', day: st.day, players: st.players.map(p => ({ name: p.name, kind: p.kind, color: p.color })), at: Date.now(), online: st.online ? st.online.code : null, info: info(st) }; }
+  function meta(st, name) { return { v: S.VERSION, name: name || st.setup.name || 'A game', day: st.day, players: st.players.map(p => ({ name: p.name, kind: p.kind, color: p.color })), at: Date.now(), online: st.online ? st.online.code : null, info: info(st) }; }
   SV.account = () => (root.FLAKE && root.FLAKE.session && root.FLAKE.session()) || null;
   SV.cloudOk = () => !!(root.FLAKE && root.FLAKE.configured && root.FLAKE.configured() && SV.account());
 
@@ -33,10 +33,12 @@
   };
   SV.listLocal = function () {
     const out = [];
-    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k || !k.startsWith(LKEY)) continue; try { const r = JSON.parse(localStorage.getItem(k)); out.push({ slot: k.slice(LKEY.length), name: r.name, day: r.day, at: r.at, players: r.players, info: r.info || null, where: 'local' }); } catch (e) {} } } catch (e) {}
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k || !k.startsWith(LKEY)) continue; try { const r = JSON.parse(localStorage.getItem(k)); out.push({ slot: k.slice(LKEY.length), name: r.name, day: r.day, at: r.at, players: r.players, info: r.info || null, where: 'local', v: r.v || 1 }); } catch (e) {} } } catch (e) {}
     return out.sort((a, b) => b.at - a.at);
   };
   SV.loadLocal = function (slot) { try { const r = JSON.parse(localStorage.getItem(LKEY + slot)); return r ? S.deserialize(r.data) : null; } catch (e) { console.error(e); return null; } };
+  /* saves from before the land was shared into territories are gone: they cannot be played on */
+  SV.dropOld = function () { SV.listLocal().filter(s => (s.v || 1) < S.VERSION).forEach(s => SV.deleteLocal(s.slot)); };
   SV.deleteLocal = function (slot) { try { localStorage.removeItem(LKEY + slot); } catch (e) {} };
 
   /* ---------- on the account ---------- */

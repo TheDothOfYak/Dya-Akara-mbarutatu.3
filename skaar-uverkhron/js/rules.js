@@ -66,6 +66,7 @@
       if (a.pathsong === st.day) c = Math.min(c, 100);
     }
     if (R_.inStorm(st, layer, x1, y1)) c *= 1.5;
+    if (!a.boat && st.floods && st.floods.length && R_.floodAt(st, layer, x1, y1)) c *= 1.6;
     return Math.round(diag ? c * 1.41 : c);
   };
   /* A* from the army to (tx,ty). The goal may be an object or army (you stop on it). */
@@ -147,7 +148,7 @@
         if (thing && P && !P.explored[layer][j]) continue;
         const nc = c + R_.stepCost(st, a, layer, x, y, xx, yy);
         if (nc > a.mp) continue;
-        if (nc < cost[j]) { cost[j] = nc; if (!thing && R_.guardNear(st, layer, xx, yy)) stop[j] = 1; push(nc, j); }
+        if (nc < cost[j]) { cost[j] = nc; if (!thing && R_.guardNear(st, layer, xx, yy, a.owner)) stop[j] = 1; push(nc, j); }
       }
     }
     return { cost, stop, w };
@@ -176,40 +177,57 @@
 
   /* ======================= stepping ======================= */
   /* move one tile along a path. Returns {moved, stop, event} */
-  R_.step = function (st, a, nx, ny) {
+  R_.step = function (st, a, nx, ny, opts) {
+    const RL = SU.realm;
     const cost = R_.stepCost(st, a, a.layer, a.x, a.y, nx, ny);
     if (a.mp < cost && a.mp < a.mpMax) return { moved: false, stop: true, why: 'tired' };
     let obj = S.objAt(st, a.layer, nx, ny); const other = S.armyAt(st, a.layer, nx, ny);
     if (!obj && R_.isElsh(st.players[a.owner])) obj = Object.values(st.objects).find(o => o.hidden && o.type === 'core' && o.layer === a.layer && o.x === nx && o.y === ny) || null;
+    /* a buried chest you were told of: dig where the seer said */
+    if (!obj && st.players[a.owner] && (st.players[a.owner].treasure || []).length) { const c = st.players[a.owner].treasure.map(id => st.objects[id]).find(o => o && o.buried && o.layer === a.layer && o.x === nx && o.y === ny); if (c) { c.hidden = false; c.buried = false; obj = c; } }
     a.face = nx > a.x ? 1 : nx < a.x ? -1 : a.face;
     /* bumping into something: visit it without stepping (except towns, which you enter) */
     if (other && other.id !== a.id) {
       a.mp = Math.max(0, a.mp - cost);
-      if (other.owner === a.owner) return { moved: false, stop: true, event: { kind: 'meet', other } };
+      if (other.owner === a.owner) {
+        /* your own caravan steps aside to let you by (unless you came to meet it) */
+        if (other.caravan && !(opts && opts.last)) { const ox = a.x, oy = a.y; S.moveArmyIndex(st, a, a.layer, nx, ny); S.moveArmyIndex(st, other, a.layer, ox, oy); S.reveal(st, a.owner, a.layer, nx, ny, R_.sight(st, a)); return { moved: true }; }
+        return { moved: false, stop: true, event: { kind: 'meet', other } };
+      }
       if (other.owner >= 0 && S.allies(st, a.owner, other.owner)) return { moved: false, stop: true };
+      if (other.owner >= 0 && RL && RL.atPeace(st, a.owner, other.owner)) return { moved: false, stop: true, msg: 'You are at truce with ' + st.players[other.owner].name + '. No blows until it ends.' };
       if (other.wild && other.herd) return { moved: false, stop: true, event: { kind: 'herd', other } };
       if (other.wild && S.stacksIn(other.slots).every(s => s.cr === 'kipsu') && S.stacksIn(S.slotsOf(st, a)).some(s => s.cr === 'vyrenalur' && s.n > 0)) {
         const slots = S.slotsOf(st, a), n = S.stacksIn(other.slots).reduce((k, s) => k + s.n, 0), kip = slots.findIndex(s => s && s.kind === 'stack' && s.cr === 'kipsu');
         if (kip >= 0 || slots.some(s => !s)) { if (kip >= 0) slots[kip].n += n; else slots[slots.findIndex(s => !s)] = { kind: 'stack', cr: 'kipsu', n, follow: 'vyrenalur' }; R_.removeArmy(st, other);
           return { moved: false, stop: true, msg: n + ' Kipsu fall in behind the Vyrenalur.' }; }
       }
+      /* anyone who can talk may be talked to first: wild bands with a Dearcàn among them, travellers, rivals */
+      if (RL && !other.mcfly && (other.wild || other.owner >= 0) && RL.canTalk(st, a, other) && !(opts && opts.attack)) return { moved: false, stop: true, event: { kind: 'encounter', other } };
       return { moved: false, stop: true, event: { kind: 'battle', attacker: a, defender: other } };
     }
-    if (obj && obj.type !== 'town' && obj.type !== 'boat') {
+    if (obj && obj.type !== 'town' && obj.type !== 'keep' && obj.type !== 'boat') {
       a.mp = Math.max(0, a.mp - cost);
       if (obj.type === 'urverk') return { moved: false, stop: true, event: { kind: 'urverk', obj } };
-      if (obj.type === 'mine' && obj.owner !== a.owner) { R_.flagMine(st, obj, a.owner); return { moved: false, stop: true, event: { kind: 'flagged', obj } }; }
-      if (obj.type === 'village' && obj.owner !== a.owner) { R_.flagVillage(st, obj, a.owner); return { moved: false, stop: true, event: { kind: 'village', obj } }; }
+      if (obj.type === 'mine') { const r = RL && RL.regionAt(st, obj.layer, obj.x, obj.y + 1); return { moved: false, stop: true, msg: 'The ' + D.MINES[obj.kind].name + ' works for whoever holds ' + (r ? r.name : 'this land') + (r && r.owner >= 0 ? ' (' + st.players[r.owner].name + ')' : '') + '. Take the territory to take its mines.' }; }
+      if (obj.type === 'village') { const r = RL && RL.regionAt(st, obj.layer, obj.x, obj.y + 1); return { moved: false, stop: true, msg: 'The village of ' + obj.name + ' sends ' + D.VILLAGE_SETTLERS + ' settlers a week to whoever holds ' + (r ? r.name : 'this land') + '.' }; }
+      if (obj.type === 'post') {
+        if (obj.owner === a.owner) return { moved: false, stop: true, msg: 'Your watch post. Its keepers watch the roads of this territory: your caravans pass it safely.' };
+        if (obj.owner >= 0 && RL && RL.atPeace(st, a.owner, obj.owner)) return { moved: false, stop: true, msg: 'A watch post of ' + st.players[obj.owner].name + '. You are at truce.' };
+        const was = obj.owner; obj.gone = true; S.unplace(st, obj); delete st.objects[obj.id];
+        if (was >= 0) { S.log(st, 'A watch post of ' + st.players[was].name + ' was burned.', was); SU.emit('lost', { owner: was, what: 'a watch post' }); }
+        if (RL) RL.update(st, true);
+        return { moved: false, stop: true, msg: 'You burn the watch post to the ground.' };
+      }
+      if (obj.type === 'ruin') return RL.searchRuin(st, a, obj);
       return R_.visit(st, a, obj);
     }
-    if (obj && obj.type === 'town') {
+    if (obj && (obj.type === 'town' || obj.type === 'keep')) {
       if (obj.owner !== a.owner && !(obj.owner >= 0 && S.allies(st, obj.owner, a.owner))) {
         a.mp = Math.max(0, a.mp - cost);
-        if (!a.heroId) return { moved: false, stop: true, msg: 'A squadron without a hero cannot take a town.' };
-        if (obj.sealed > 0) return { moved: false, stop: true, msg: obj.name + ' is sealed by a song. Nobody can attack it for ' + SU.plural(obj.sealed, 'more day') + '.' };
-        const defenders = R_.townDefense(st, obj);
-        if (!defenders) { R_.captureTown(st, obj, a.owner); moveTo(st, a, nx, ny, cost); return { moved: true, stop: true, event: { kind: 'captured', obj } }; }
-        return { moved: false, stop: true, event: { kind: 'siege', attacker: a, town: obj } };
+        if (obj.owner >= 0 && RL && RL.atPeace(st, a.owner, obj.owner)) return { moved: false, stop: true, msg: 'You are at truce with ' + st.players[obj.owner].name + '.' };
+        if (RL && RL.canSpeak(st, a) && !(opts && opts.attack)) return { moved: false, stop: true, event: { kind: 'parley', obj } };
+        return R_.assault(st, a, obj);
       }
     }
     /* boats */
@@ -221,6 +239,7 @@
       return { moved: true, stop: true, msg: 'Ashore.' };
     }
     moveTo(st, a, nx, ny, cost);
+    if (obj && obj.type === 'keep') return { moved: true, stop: true, event: { kind: 'keep', obj } };
     if (obj && obj.type === 'town') {
       if (a.corral && obj.owner === a.owner) { obj.punks = (obj.punks || 0) + a.corral.n; S.log(st, 'The farmers of ' + obj.name + ' take in ' + a.corral.n + ' ' + D.CREATURES[a.corral.cr].plural + '.', a.owner); a.corral = null; }
       return { moved: true, stop: true, event: { kind: 'town', obj } };
@@ -232,25 +251,39 @@
     }
     /* guards: stepping next to a wild group that guards something starts a fight */
     const guard = adjacentGuard(st, a);
-    if (guard) return { moved: true, stop: true, event: { kind: 'battle', attacker: guard, defender: a, ambush: true } };
+    if (guard) { if (SU.realm && SU.realm.canTalk(st, a, guard)) return { moved: true, stop: true, event: { kind: 'encounter', other: guard, ambush: true } };
+      return { moved: true, stop: true, event: { kind: 'battle', attacker: guard, defender: a, ambush: true } }; }
     return { moved: true };
+  };
+  /* march on a town or keep that is not yours: take it if nobody defends it, otherwise lay siege */
+  R_.assault = function (st, a, obj) {
+    if (obj.type === 'town' && !a.heroId) return { moved: false, stop: true, msg: 'A squadron without a hero cannot take a town.' };
+    if (obj.sealed > 0) return { moved: false, stop: true, msg: obj.name + ' is sealed by a song. Nobody can attack it for ' + SU.plural(obj.sealed, 'more day') + '.' };
+    const defenders = R_.townDefense(st, obj);
+    if (!defenders) {
+      R_.captureTown(st, obj, a.owner);
+      if (!S.armyAt(st, obj.layer, obj.x, obj.y) && Math.max(Math.abs(a.x - obj.x), Math.abs(a.y - obj.y)) <= 1) { S.moveArmyIndex(st, a, obj.layer, obj.x, obj.y); S.reveal(st, a.owner, a.layer, a.x, a.y, R_.sight(st, a)); }
+      return { moved: true, stop: true, event: { kind: 'captured', obj } };
+    }
+    return { moved: false, stop: true, event: { kind: 'siege', attacker: a, town: obj } };
   };
   function moveTo(st, a, x, y, cost) {
     a.mp = Math.max(0, a.mp - cost);
     S.moveArmyIndex(st, a, a.layer, x, y);
     S.reveal(st, a.owner, a.layer, x, y, R_.sight(st, a));
   }
-  R_.guardNear = function (st, layer, x, y) {
+  const lets = (st, o, owner) => owner != null && o.passFor && o.passFor[owner] >= st.day;
+  R_.guardNear = function (st, layer, x, y, owner) {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       if (!dx && !dy) continue; const o = S.armyAt(st, layer, x + dx, y + dy);
-      if (o && o.wild && !o.herd && o.guard && !o.dead) return o;
+      if (o && o.wild && !o.herd && o.guard && !o.dead && !lets(st, o, owner)) return o;
     }
     return null;
   };
   function adjacentGuard(st, a) {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       if (!dx && !dy) continue; const o = S.armyAt(st, a.layer, a.x + dx, a.y + dy);
-      if (o && o.wild && !o.herd && o.guard && !o.dead) return o;
+      if (o && o.wild && !o.herd && o.guard && !o.dead && !lets(st, o, a.owner)) return o;
     }
     return null;
   }
@@ -297,6 +330,7 @@
         return { stop: true, msg: 'Found ' + amt + ' ' + D.RES_INFO[o.res].name + '.', res: o.res };
       }
       case 'chest':
+        if (o.relic && h) { R_.giveRelic(st, h, o.relic); const rn = D.RELICS[o.relic].name; o.relic = null; S.log(st, h.name + ' found ' + rn + ' in a treasure chest.', a.owner); }
         if (!h) { const g = Math.round(o.gold * plunder); P.res.gold += g; gone(); return { stop: true, msg: 'The squadron opens the chest: ' + g + ' gold.' }; }
         return { stop: true, need: 'chest', obj: o };
       case 'relic':
@@ -571,6 +605,8 @@
     t.heroes = []; t.defender = null; t.garrison = [null, null, null, null, null];
     S.log(st, (owner >= 0 ? st.players[owner].name : 'The wilds') + ' took ' + t.name + '.', owner);
     if (prev >= 0) SU.emit('lost', { owner: prev, what: t.name });
+    if (t.treaty) t.treaty = {};
+    if (SU.realm) SU.realm.update(st, true);
     R_.checkPlayers(st);
   };
 
@@ -846,13 +882,11 @@
     /* heroes in the storm breathe it in; buried memory cores are washed out of the ground */
     Object.values(st.armies).forEach(a => { const h = S.heroOf(st, a); if (h && !a.dead && R_.inStorm(st, a.layer, a.x, a.y)) h.breath = M.breathMax(st, h); });
     Object.values(st.objects).forEach(o => { if (o.hidden && R_.inStorm(st, o.layer, o.x, o.y)) { o.hidden = false; S.log(st, 'The Sunear’Zikhron uncovers a memory core on ' + D.LAYERS[o.layer].name + '.'); } });
-    /* the fog comes back where it rages */
-    st.players.forEach((P, pi) => {
-      const L = st.layers[s.layer], E = P.explored[s.layer];
-      for (let y = Math.max(0, s.y - s.r); y <= Math.min(L.h - 1, s.y + s.r); y++) for (let x = Math.max(0, s.x - s.r); x <= Math.min(L.w - 1, s.x + s.r); x++)
-        if (Math.hypot(x - s.x, y - s.y) <= s.r - 1) E[y * L.w + x] = 0;
-      R_.revealAll(st, pi);
-    });
+    /* where it has been, so people can track it */
+    s.trail = (s.trail || []).concat([{ layer: s.layer, x: s.x, y: s.y, r: s.r, day: st.day }]).slice(-14);
+    /* it leaves its mark: low ground floods, roads wash out, old ruins come up out of the mud */
+    R_.stormMarks(st);
+    st.players.forEach((P, pi) => R_.revealAll(st, pi));
     /* RubberMcFly gather in it */
     const want = st.weekEvent === 'swarm' ? 6 : 3;
     const have = Object.values(st.armies).filter(a => !a.dead && a.mcfly && a.layer === s.layer).length;
@@ -861,10 +895,36 @@
     /* and leave when it goes */
     Object.values(st.armies).forEach(a => { if (a.mcfly && !a.dead && !R_.inStorm(st, a.layer, a.x, a.y)) { a.dead = true; S.moveArmyIndex(st, a, a.layer, a.x, a.y); delete st.armies[a.id]; } });
   };
+  /* floods: low ground by the water, under the storm, is hard going for a few days */
+  R_.FLOOD_DAYS = 4;
+  R_.floodAt = function (st, layer, x, y) {
+    if (!st.floods || !st.floods.length) return false;
+    if (!st._flood || st._floodKey !== st.floods.length + ':' + st.day) { st._flood = st.layers.map(L => new Uint8Array(L.w * L.h)); st.floods.forEach(f => { if (f.until >= st.day && st._flood[f.l]) st._flood[f.l][f.y * st.layers[f.l].w + f.x] = 1; }); st._floodKey = st.floods.length + ':' + st.day; }
+    return !!st._flood[layer][y * st.layers[layer].w + x];
+  };
+  R_.stormMarks = function (st) {
+    const s = st.storm, R = SU.rng(st), L = st.layers[s.layer];
+    st.floods = (st.floods || []).filter(f => f.until >= st.day);
+    const near = (x, y) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, yy = y + dy; if (S.inside(L, xx, yy) && D.TERRAIN[S.TCODES[L.t[yy * L.w + xx]]].water) return true; } return false; };
+    for (let k = 0; k < 50 && st.floods.length < 140; k++) { const a = R.range(0, Math.PI * 2), d = Math.sqrt(R.next()) * s.r; const x = Math.round(s.x + Math.cos(a) * d), y = Math.round(s.y + Math.sin(a) * d);
+      if (!S.inside(L, x, y)) continue; const t = S.TCODES[L.t[y * L.w + x]]; if (D.TERRAIN[t].pass === false || (t !== 'swamp' && t !== 'sand' && t !== 'grass' && t !== 'dirt') || !near(x, y)) continue;
+      if (!st.floods.some(f => f.l === s.layer && f.x === x && f.y === y)) st.floods.push({ l: s.layer, x, y, until: st.day + R_.FLOOD_DAYS }); }
+    st._floodKey = null;
+    /* a road washes out */
+    if (R.chance(0.25)) { for (let k = 0; k < 40; k++) { const x = s.x + R.int(-s.r, s.r), y = s.y + R.int(-s.r, s.r); if (!S.inside(L, x, y) || !L.road[y * L.w + x]) continue;
+        let n = 0; const run = [[x, y]]; while (run.length && n < 3) { const [cx, cy] = run.shift(); if (!L.road[cy * L.w + cx]) continue; L.road[cy * L.w + cx] = 0; n++; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { if (S.inside(L, cx + dx, cy + dy) && L.road[(cy + dy) * L.w + cx + dx]) run.push([cx + dx, cy + dy]); }); }
+        (st.washouts = st.washouts || []).push({ l: s.layer, x, y, day: st.day }); st.washouts = st.washouts.slice(-30);
+        S.log(st, 'The Sunear’Zikhron washed out a road on ' + D.LAYERS[s.layer].name + '.'); SU.emit('washout', { layer: s.layer, x, y }); break; } }
+    /* an old ruin comes up out of the mud in its wake */
+    if (R.chance(0.15) && s.layer < 3) { for (let k = 0; k < 60; k++) { const x = s.x + R.int(-s.r, s.r), y = s.y + R.int(-s.r, s.r);
+        if (!S.inside(L, x, y) || !S.passable(st, s.layer, x, y) || S.objAt(st, s.layer, x, y) || S.armyAt(st, s.layer, x, y) || L.road[y * L.w + x]) continue;
+        const o = { id: SU.uid(st, 'o'), type: 'ruin', layer: s.layer, x, y, owner: -1, storm: true, loot: { gold: 800 + R.int(0, 12) * 100, res: R.pick(['stygian', 'glowmoss', 'timber', 'ngakara']), amt: R.int(2, 4) } };
+        st.objects[o.id] = o; S.place(st, o); S.log(st, 'The storm uncovered an old ruin on ' + D.LAYERS[s.layer].name + '.'); break; } }
+  };
   R_.revealAll = function (st, pi) {
     Object.values(st.armies).forEach(a => { if (!a.dead && a.owner === pi) S.reveal(st, pi, a.layer, a.x, a.y, R_.sight(st, a)); });
     S.townsOf(st, pi).forEach(t => S.reveal(st, pi, t.layer, t.x, t.y, 6));
-    Object.values(st.objects).forEach(o => { if ((o.type === 'mine' || o.type === 'village') && o.owner === pi) S.reveal(st, pi, o.layer, o.x, o.y, 3); });
+    Object.values(st.objects).forEach(o => { if (o.owner !== pi || o.gone) return; if (o.type === 'mine' || o.type === 'village') S.reveal(st, pi, o.layer, o.x, o.y, 3); else if (o.type === 'keep') S.reveal(st, pi, o.layer, o.x, o.y, 5); else if (o.type === 'post') S.reveal(st, pi, o.layer, o.x, o.y, 5); });
   };
 
   /* ======================= heroes: xp and death ======================= */
@@ -926,7 +986,7 @@
     st.players.forEach((P, pi) => {
       if (!P.alive) return;
       const towns = S.townsOf(st, pi).length, heroes = Object.values(st.heroes).filter(h => h.owner === pi && !h.dead).length;
-      const armies = Object.values(st.armies).filter(a => !a.dead && a.owner === pi).length;
+      const armies = Object.values(st.armies).filter(a => !a.dead && a.owner === pi && !a.caravan).length;
       if (!towns && !armies && !heroes) { P.alive = false; S.log(st, P.name + ' has been defeated.', pi); }
     });
     const alive = st.players.filter(P => P.alive);
@@ -1074,22 +1134,21 @@
     if (newMonth) st.monthEvent = R.pick(D.MONTH_EVENTS).id;
     if (newWeek) st.weekEvent = st.day <= 7 ? 'none' : R.pick(D.WEEK_EVENTS).id;
     if (st.storm) R_.stormDay(st);
+    /* the land: who holds what, caravans on the roads, travellers, the wilds */
+    if (SU.realm) SU.realm.day(st, newWeek, newMonth);
     st.players.forEach((P, pi) => {
       if (!P.alive) return;
       const towns = S.townsOf(st, pi);
       /* income */
       const food0 = P.res.food;
       towns.forEach(t => { const inc = R_.townIncome(st, t); Object.entries(inc).forEach(([k, v]) => P.res[k] += v); t.builtToday = 0; t.smallToday = 0; if (t.sealed > 0) t.sealed--; });
-      Object.values(st.objects).forEach(o => { if (o.type !== 'mine' || o.owner !== pi) return; const Mi = D.MINES[o.kind];
-        let amt = Mi.amt; if (o.kind === 'food' && st.weekEvent === 'lean') amt /= 2; if (o.kind === 'food' && st.weekEvent === 'harvest') amt *= 1.33;
-        if (R_.inStorm(st, o.layer, o.x, o.y)) amt /= 2; if (o.harvest === st.day - 1) amt *= 2;
-        if (o.kind === 'ngakara') { if (!o.naga || !o.naga.alive) return; if (newWeek) { P.res.ngakara += o.naga.calm > 0 ? 2 : 1; if (o.naga.calm > 0) o.naga.calm--; } return; }
-        P.res[Mi.res] += Math.round(amt); });
+      /* the land: every territory you hold, its goods carried home by caravan */
+      if (SU.realm) { SU.realm.income(st, pi, newWeek); SU.realm.payMercs(st, pi); }
       const heroes = Object.values(st.heroes).filter(h => h.owner === pi && !h.dead);
       heroes.forEach(h => { P.res.gold += S.skillVal(st, h, 'steward') + S.relicMod(st, h, 'goldDay'); if (newWeek) P.res.stygian += S.skillVal(st, h, 'stygiancraft'); h.trainedToday = 0; h.leftToday = 0; });
       /* food: armies and towns eat */
       let eat = 0;
-      Object.values(st.armies).forEach(a => { if (a.dead || a.owner !== pi) return; eat += R_.dailyFood(st, S.slotsOf(st, a), S.heroOf(st, a)); });
+      Object.values(st.armies).forEach(a => { if (a.dead || a.owner !== pi || a.caravan) return; eat += R_.dailyFood(st, S.slotsOf(st, a), S.heroOf(st, a)); });
       towns.forEach(t => { eat += R_.dailyFood(st, t.garrison) + t.pop * 0.01; (t.heroes || []).forEach(id => eat += R_.dailyFood(st, st.heroes[id].slots, st.heroes[id])); });
       P.lastFoodIn = P.res.food - food0; P.res.food -= eat; P.lastEat = eat;
       if (P.res.food < 0) {
@@ -1140,21 +1199,13 @@
     const R = SU.rng(st);
     Object.values(st.armies).forEach(a => {
       if (!a.wild || a.dead || a.guard || a.temp) return;
-      if (!a.roam && !a.herd && !a.mcfly) {
-        /* any wild group may retake an unguarded mine it can see */
-        if (R.chance(0.15)) { const m = Object.values(st.objects).find(o => o.type === 'mine' && o.layer === a.layer && o.owner >= 0 && Math.hypot(o.x - a.x, o.y - a.y) < 5 && !S.armyAt(st, o.layer, o.x, o.y + 1));
-          if (m) { m.owner = -1; S.log(st, 'Wild creatures overran the ' + D.MINES[m.kind].name + '.'); SU.emit('lost', { owner: -1, what: D.MINES[m.kind].name }); } }
-        return;
-      }
+      if (a.travellers || a.merc) return;
+      if (!a.roam && !a.herd && !a.mcfly) return;   /* wild bands contest the territory they stand in (see realm.js) */
       for (let k = 0; k < (a.mcfly ? 3 : 2); k++) {
         const dx = R.int(-1, 1), dy = R.int(-1, 1); const x = a.x + dx, y = a.y + dy;
         if (Math.hypot(x - a.home.x, y - a.home.y) > 6 && !a.mcfly) continue;
         if (!S.passable(st, a.layer, x, y) || S.objAt(st, a.layer, x, y) || S.armyAt(st, a.layer, x, y)) continue;
         S.moveArmyIndex(st, a, a.layer, x, y);
-        /* a roamer next to an unguarded mine overruns it */
-        Object.values(st.objects).forEach(o => { if (o.type === 'mine' && o.layer === a.layer && o.owner >= 0 && Math.abs(o.x - x) <= 1 && Math.abs(o.y - y) <= 1 && !a.herd && !a.mcfly) {
-          const guard = S.armyAt(st, o.layer, o.x, o.y + 1);
-          if (!guard || (guard.owner !== o.owner) || R.chance(0.1)) { o.owner = -1; S.log(st, 'Wild creatures overran the ' + D.MINES[o.kind].name + '.'); } } });
       }
     });
   };

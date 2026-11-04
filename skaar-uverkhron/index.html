@@ -10,25 +10,31 @@
   <script>window.DYA_APP = 'su';</script>
 </head>
 <body>
-  <!-- the adventure map -->
+  <!-- the adventure map: the map takes the whole width; everything you need sits in the bar along the bottom -->
   <div id="game" class="hidden">
     <div id="topbar"></div>
-    <div id="mapwrap"><canvas id="map"></canvas></div>
+    <div id="mapwrap"><canvas id="map"></canvas><div id="maphint"></div></div>
     <div id="status">Welcome to the Mbaru Tatu.</div>
     <div id="side">
-      <canvas id="mini" width="234" height="180"></canvas>
-      <div id="layers"></div>
-      <div class="lhead"><span>Heroes <span id="herocount"></span></span><span>Towns</span></div>
-      <div id="roster"><div class="rcol" id="herolist"></div><div class="rcol" id="townlist"></div></div>
+      <div class="bb-mini">
+        <canvas id="mini" width="200" height="124" title="Click to look there"></canvas>
+        <div id="layers"></div>
+      </div>
+      <div class="bb-roster">
+        <div class="lhead"><span>Heroes <span id="herocount"></span></span></div>
+        <div id="roster"><div class="rcol" id="herolist"></div><div class="lhead"><span>Towns &amp; keeps</span></div><div class="rcol" id="townlist"></div></div>
+      </div>
       <div id="selinfo" class="panel"></div>
       <div id="sidebtns">
         <button class="btn" id="b-next" title="Next army (N)">Next</button>
         <button class="btn" id="b-sleep" title="Leave this army until you wake it (Z)">Sleep</button>
-        <button class="btn" id="b-songs" title="Map songs (S)">Songs</button>
+        <button class="btn" id="b-songs" title="Map songs (Q)">Songs</button>
         <button class="btn" id="b-hero" title="Hero (H)">Hero</button>
-        <button class="btn" id="b-kingdom" title="Your kingdom (K)">Kingdom</button>
+        <button class="btn" id="b-kingdom" title="Your kingdom and your territories (K)">Kingdom</button>
+        <button class="btn mapbtn" id="b-map" title="Pull out the map: every world, your territories, your caravans and the storm (M)">Map</button>
+        <button class="btn" id="b-post" title="Raise a watch post where the picked army stands: it guards your caravans through this territory (B)">Post</button>
+        <button class="btn" id="b-way" title="Show where the picked army can go today, and what blocks it (G)">Way</button>
         <button class="btn" id="b-key" title="What the words and marks mean (?)">Key</button>
-        <button class="btn" id="b-way" title="Show where the selected army can go today, and what blocks it (G)">Show the way</button>
         <button class="btn" id="b-menu" title="Menu (Esc)">Menu</button>
         <button class="btn primary big" id="endturn" title="End your turn (E)">End Turn</button>
       </div>
@@ -46,14 +52,17 @@
   <script src="js/state.js"></script>
   <script src="js/make.js"></script>
   <script src="js/rules.js"></script>
+  <script src="js/realm.js"></script>
   <script src="js/mapgen.js"></script>
   <script src="js/battle.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/art.js"></script>
   <script src="js/art_objects.js"></script>
   <script src="js/view_map.js"></script>
+  <script src="js/sketch.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/dialogs.js"></script>
+  <script src="js/talk.js"></script>
   <script src="js/view_town.js"></script>
   <script src="js/view_battle.js"></script>
   <script src="js/save.js"></script>
