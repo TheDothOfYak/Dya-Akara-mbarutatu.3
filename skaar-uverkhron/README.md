@@ -104,7 +104,7 @@ the game is built.
 
 - **A new game** opens a full screen: pick a random map or a made map (filter by
   size, see all four layers), the difficulty (Wanderer 80% to Elster 200%: it sets
-  your starting stores and the computer's level), and for each player their colour,
+  your starting stores, from 25,000 gold down to 3,000, and the computer's level), and for each player their colour,
   who plays, faction, starting hero, starting bonus (gold, resources or a Relic) and
   team. The random map generator has five sizes (Small to Gigantic), water, wild
   creatures, where players start (anywhere, one Tatu each, or all on Velki), the

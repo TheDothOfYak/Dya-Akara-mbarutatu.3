@@ -494,7 +494,7 @@
       P.startTown = t.id;
       /* difficulty: a person's starting stores */
       const diff = D.DIFFICULTY.find(d => d.id === st.setup.difficulty);
-      if (diff && P.kind === 'human') D.RES.forEach(r => P.res[r] = Math.round(P.res[r] * diff.res));
+      if (diff && P.kind === 'human') D.RES.forEach(r => { if (r === 'food') return; P.res[r] = r === 'gold' ? diff.start.gold : D.RES_INFO[r].common ? diff.start.common : diff.start.rare; });
       /* the starting bonus */
       const bonus = pc.bonus === 'random' || !pc.bonus ? R.pick(['gold', 'res', 'relic']) : pc.bonus;
       if (bonus === 'gold') P.res.gold += 3000;

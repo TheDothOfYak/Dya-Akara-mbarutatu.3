@@ -819,11 +819,11 @@
   R_.removeArmy = function (st, a) { a.dead = true; const L = st.layers[a.layer]; if (L && st._armyAt[a.layer].get(a.y * L.w + a.x) === a.id) st._armyAt[a.layer].delete(a.y * L.w + a.x); delete st.armies[a.id]; };
 
   /* ======================= players ======================= */
-  /* a town's people, one day: about 3% a week, up to 10% with food to spare, fewer when hungry */
+  /* a town's people, one day: about 5% a week, up to 13% with food to spare, fewer when hungry */
   R_.popDay = function (st, P, t, nTowns) {
     const room = R_.housing(t) - t.pop;
     const spare = Math.max(0, (P.lastFoodIn || 0) - (P.lastEat || 0)) / Math.max(1, nTowns || 1);
-    let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.03 + SU.clamp(spare / 60, 0, 0.07));
+    let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.05 + SU.clamp(spare / 60, 0, 0.08));
     if (st.weekEvent === 'wanderers') grow += t.pop * 0.1;
     grow = Math.min(grow, Math.max(0, room)) / D.WEEK + (t.popFrac || 0);
     const whole = grow >= 0 ? Math.floor(grow) : Math.ceil(grow);
@@ -990,7 +990,6 @@
         let amt = Mi.amt; if (o.kind === 'food' && st.weekEvent === 'lean') amt /= 2; if (o.kind === 'food' && st.weekEvent === 'harvest') amt *= 1.33;
         if (R_.inStorm(st, o.layer, o.x, o.y)) amt /= 2; if (o.harvest === st.day - 1) amt *= 2;
         if (o.kind === 'ngakara') { if (!o.naga || !o.naga.alive) return; if (newWeek) { P.res.ngakara += o.naga.calm > 0 ? 2 : 1; if (o.naga.calm > 0) o.naga.calm--; } return; }
-        if (!D.RES_INFO[Mi.res].common && cal.dow !== 1) { P.res[Mi.res] += 0; if ((st.day + o.x) % 2 === 0) P.res[Mi.res] += amt; return; }
         P.res[Mi.res] += Math.round(amt); });
       const heroes = Object.values(st.heroes).filter(h => h.owner === pi && !h.dead);
       heroes.forEach(h => { P.res.gold += S.skillVal(st, h, 'steward') + S.relicMod(st, h, 'goldDay'); if (newWeek) P.res.stygian += S.skillVal(st, h, 'stygiancraft'); h.trainedToday = 0; h.leftToday = 0; });

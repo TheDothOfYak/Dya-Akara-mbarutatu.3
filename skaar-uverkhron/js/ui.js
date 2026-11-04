@@ -254,7 +254,7 @@
     const st = U.st;
     switch (o.type) {
       case 'town': return o.name + (o.owner >= 0 ? ' (' + st.players[o.owner].name + ')' : ' (unclaimed)');
-      case 'mine': return D.MINES[o.kind].name + (o.owner >= 0 ? ' (' + st.players[o.owner].name + ')' : '') + ' — ' + D.MINES[o.kind].amt + ' ' + D.RES_INFO[D.MINES[o.kind].res].name + (D.RES_INFO[D.MINES[o.kind].res].common ? ' a day' : ' every other day') + (o.kind === 'ngakara' ? (o.naga && o.naga.alive ? '' : ' (the Naga is dead)') : '');
+      case 'mine': return D.MINES[o.kind].name + (o.owner >= 0 ? ' (' + st.players[o.owner].name + ')' : '') + ' — ' + D.MINES[o.kind].amt + ' ' + D.RES_INFO[D.MINES[o.kind].res].name + ' a day' + (o.kind === 'ngakara' ? (o.naga && o.naga.alive ? '' : ' (the Naga is dead)') : '');
       case 'urverk': { const open = RU.urverkOpen(st, o), n = RU.urverkNext(st, o), dest = st.objects[o.link];
         const kind = { aligned: 'opens when the worlds line up', toll: 'kept by ' + (o.toll ? o.toll.family : 'a family'), danger: 'a dangerous crossing', always: 'always open', kalo: 'to ' + (o.moon || 'a Kalo') }[o.kind];
         return 'Urverk (' + kind + ') to ' + (dest ? D.LAYERS[dest.layer].name : '?') + ' — ' + (!o.triggerKnown ? 'its trigger is lost' : open ? 'open' + (o.window ? ' for ' + SU.plural(RU.urverkOpenFor(st, o), 'more day') : '') : 'closed, opens in ' + SU.plural(n, 'day')); }
