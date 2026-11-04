@@ -18,9 +18,61 @@ the game is built.
   *prophecy* (win battles in the eye of the storm), the *treasury* (gather gold),
   or *the seat* (hold a named town for a week).
 - **The map has four layers:** Velki, Xikia, Leotik and the Kalo (the moons). Switch
-  layers with the buttons on the right or the keys 1–4.
+  layers with the buttons at the bottom left or the keys 1–4. Scroll all the way out (or
+  press W) for **the worlds**: the three Tatu and their moons turning, your towns and
+  armies on them, the storm, and the Urverk drawn as threads between the worlds (bright
+  when open today, dim when closed). Click a world to go down to it.
+- **The drawing:** everyone carries an old drawing of the whole Mbaru Tatu, made when the
+  game began. Land you have not seen is shown as that drawing, in ink on parchment: the
+  shape of the land is true, but it is old (what was built or ruined since is not on it),
+  and it is rougher the further it gets from any town. Land you have seen is the land
+  itself; land you saw once but cannot see now is faded, as you remember it, and you only
+  see armies moving where you can see now.
+- **The hero's map** (the Map button, or M): your hands holding the drawing of one world,
+  with a tab for each world. It is never coloured in: the only colours are who holds what
+  (the edge of your land in your colour, rivals' land you know of in theirs, flags on
+  places). It shows your caravans' roads (with a ! where bandits strike), how many days
+  the roads between places take, treasure you were told of, and the storm wherever it is,
+  with the days it was at each place before, so you can track it. Click to look there.
+- **Territories:** the land is shared into named territories (about 11 on a medium
+  Velki). A territory belongs to whoever is the highest authority in it: towns count 100,
+  keeps 60, watch posts 12, and armies standing there by their strength; wild bands and
+  free towns and keeps count against you (the biggest band in full, the rest a little,
+  guards half). Holding it already counts 20. To take a territory your authority must be
+  half again as large as everything against you; to keep it, at least as large. It
+  changes hands at the end of the day. Your first town's territory is yours from the start
+  and gives the basic resources (sometimes one rare one).
+- **Mines and villages** are not flagged any more: they belong to whoever holds their
+  territory, with what the land itself yields (a little gold, food from fields, wood from
+  woods, stone from hills, now and then something rare).
+- **Caravans:** a territory with a town of yours sends its goods straight in. Every other
+  one sends a caravan home each day, along a road to your nearest town on that world (or
+  to an Urverk that leads home). Bandits rob caravans on roads through land you do not
+  hold. Take that land, raise a **watch post** there (Post, or B: 1500 gold, 5 wood, 5
+  stone), give the caravan guards (walk an army onto it and trade), or make a pact of open
+  roads with whoever holds it. Rivals can attack your caravans and take what they carry.
+- **Talking:** only a Dearcàn can talk (a hero, a captain, one of the peoples), and only
+  to someone who can understand. Walk into a band led by a Dearcàn to hire it as
+  **mercenaries** (a band of its own that you move and pay every day; unpaid, it leaves),
+  pay it to leave the land, or pay it to let you pass for a week. Walk up to a free town
+  or a family's keep to give gifts, sign a **treaty** (they stay their own, but their land
+  does not stand against yours, your caravans pass, and trade pays you each day), or ask
+  them to **join your kingdom** (they become fully yours). A rival can be sent an envoy:
+  a truce, open roads, a trade, or a demand that they yield. Beasts cannot be talked to.
+- **Keeps:** families hold keeps in many territories. Take one by talking or by storming
+  it (a squadron can take a keep; only a hero can take a town). Your keep's garrison holds
+  the land around it.
+- **A land that changes:** travellers walk the roads and found new keeps and even new
+  towns in land nobody holds (or settle in your town, or raise a keep for you in your
+  land). Free towns grow all the way to completion on their own. Families raise keeps.
+  Land nobody holds goes wild, and its villages fall to ruin.
+- **Treasure** is rare and real: a few chests lie buried. A seer's quest or a tavern
+  rumour marks one on your map with an X; dig there with an army. Ruins (from abandoned
+  villages, or washed up by the storm) hold a little.
 - **Moving:** click an army, click a place to see the path, then click again to go.
-  Green arrows mean you get there today, red means later days, and ⚔ means a fight.
+  Green arrows mean you get there today, gold means later days, a numbered camp marks
+  where each day's march ends (and the total days at the end), ❝ means someone you can
+  talk to, and ⚔ means a fight.
   Right-click anything to learn about it (the info stays up until you click). Drag to
   look around, and scroll to zoom. The **Key** button explains army-size words (A few
   1–4, Several 5–9, A pack 10–19, Lots 20–49, A horde 50–99, A throng 100–249, A swarm
@@ -28,9 +80,12 @@ the game is built.
 - **Meeting:** with an army picked, click another of your armies to walk over and
   trade stacks, captains, Relics and memory cores. A squadron can join a hero's army.
   Shift-click picks the other army instead.
-- **The side bar** (as in the old games): hero and squadron portraits with movement and
-  Breath bars on the left, your towns on the right; below, the stacks of whatever you
-  picked. Right-click any castle to see its garrison.
+- **The bottom bar:** the map takes the whole width. Along the bottom: the little map
+  (land you have not seen in parchment, territory edges in their holders' colours) and
+  the world buttons, your heroes and squadrons with movement and Breath bars, your towns
+  and keeps, what is picked (and which territory it stands in), and the buttons (Next,
+  Sleep, Songs, Hero, Kingdom, Map, Post, Way, Key, Menu, End Turn). Right-click any
+  castle or keep to see its garrison, and anywhere to see whose territory it is.
 - **Watching:** the computer's armies walk where you have seen the land, and the view
   follows them.
 - **Towns:** a slim row of buttons; each one, or a click on a building, opens a full page
@@ -54,8 +109,8 @@ the game is built.
 - **Squadron captains** are Dearcàn who each lead a little group of stacks: two to
   start, more with Captaincy and some abilities. A very rare *peerless*
   captain is far stronger but leads only one.
-  A squadron can go out without a hero: it can take mines and pick up resources and
-  gold, but it can't take towns or carry Relics. In battle, captains stand in front
+  A squadron can go out without a hero: it can stand on land to hold it, take keeps and
+  talk, but it can't take towns or carry Relics. In battle, captains stand in front
   of their squadron and fight. If one falls, the squadron loses heart.
 - **Memory cores:** a fallen hero is gone for good and leaves a core. Whoever picks
   it up sees 5 of its skills and chooses 2 to use (change them any time out of
@@ -84,8 +139,11 @@ the game is built.
   and can't shoot when an enemy is next to them. **Luck** sometimes
   spares a stack from a blow. Bad luck can make some of a stack trip on their own
   blades.
-- **The Sunear'Zikhron** wanders the Tatu. Inside it, movement slows, production
-  halves, the fog comes back and RubberMcFly gather (killing one is bad luck). It
+- **The Sunear'Zikhron** wanders the Tatu: a huge wheel of cloud round a calm, lit eye,
+  darkening the land for miles around, with rain and lightning. Off the screen, an arrow
+  on the edge points to it. Inside it, movement slows, production halves and RubberMcFly
+  gather (killing one is bad luck). It leaves its mark: low ground by the water floods
+  (slow going for a few days), roads wash out, and old ruins come up out of the mud. It
   must touch every part of a Tatu before passing through the Duat to the next, and
   its size and speed change from day to day (extremes are rare). It refills the
   Breath of heroes inside it and washes buried memory cores out of the ground.
@@ -97,9 +155,8 @@ the game is built.
   and captains from outside the factions, and fairs (bet on punk races and
   Dya'Akara matches). A month is 42 days. Weeks and months
   bring events.
-- **Growing towns:** towns grow about 7% a week, up to 17% with food to spare. Take
-  **villages** on the map (guarded, flagged like mines): each sends 30 settlers a week
-  to your nearest town. **Travellers** settle in a town some weeks (more often with a
+- **Growing towns:** towns grow about 7% a week, up to 17% with food to spare. Each
+  **village** in your land sends 30 settlers a week to your nearest town. **Travellers** settle in a town some weeks (more often with a
   tavern). Hold a **Feast** in a town once a week (1000 gold, 60 food) and 8% more
   people (at least 25) come to stay. Build homes to make room for them.
 - **Where you can go:** point at any spot and the frame says it plainly: green (reachable
@@ -108,8 +165,8 @@ the game is built.
   thick woods, the body of a building (go in by its entrance, which is marked), land you
   have not explored, or something lying in a narrow gap. **Show the way** (G) shades
   everything the picked army can reach today and stripes what blocks it.
-- **Keys:** E end turn · N next army · H hero · K kingdom · Q map songs · Z sleep · G show the way ·
-  1–4 layers · arrows to look around. In battle: W wait · D defend · S sing.
+- **Keys:** E end turn · N next army · H hero · K kingdom · M map · B watch post · W worlds ·
+  Q map songs · Z sleep · G show the way · 1–4 layers · arrows to look around. In battle: W wait · D defend · S sing.
 
 ## Modes
 

@@ -91,12 +91,14 @@
     const at = (x, y) => S.inside(L, x, y) ? S.TCODES[L.t[y * L.w + x]] : null;
     const wet = t => t === 'water' || t === 'void' || t == null;
     const known = (x, y) => P && P.explored[li][y * L.w + x];
-    /* the sea: a faint wash and a few ripples */
+    /* the sea: a faint wash (one shape, so no seams) and a few ripples */
+    const wash = (kind, col) => { g.beginPath(); let any = false; for (let y = y0; y <= y1; y++) { let run = -1; for (let x = x0; x <= x1 + 1; x++) { const on = x <= x1 && at(x, y) === kind; if (on && run < 0) run = x; if (!on && run >= 0) { g.rect(ox + run * ts, oy + y * ts, (x - run) * ts, ts); run = -1; any = true; } } } if (any) { g.fillStyle = col; g.fill(); } };
+    wash('water', 'rgba(64,112,140,0.24)'); wash('void', 'rgba(28,22,40,0.55)');
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const t = at(x, y); if (!t) continue; const px = ox + x * ts, py = oy + y * ts;
-      if (t === 'water') { g.fillStyle = 'rgba(64,112,140,0.24)'; g.fillRect(px, py, ts + 0.5, ts + 0.5);
+      if (t === 'water') {
         if (hash(x, y, 1) < 0.18) { g.strokeStyle = 'rgba(59,42,23,0.35)'; g.lineWidth = Math.max(0.6, ts * 0.025); g.beginPath(); g.moveTo(px + ts * 0.15, py + ts * 0.5); g.quadraticCurveTo(px + ts * 0.32, py + ts * 0.38, px + ts * 0.5, py + ts * 0.5); g.quadraticCurveTo(px + ts * 0.68, py + ts * 0.62, px + ts * 0.85, py + ts * 0.5); g.stroke(); } }
-      else if (t === 'void') { g.fillStyle = 'rgba(28,22,40,0.55)'; g.fillRect(px, py, ts + 0.5, ts + 0.5); if (hash(x, y, 2) < 0.12) { g.fillStyle = 'rgba(240,230,200,0.7)'; g.fillRect(px + hash(x, y, 3) * ts, py + hash(x, y, 4) * ts, Math.max(1, ts * 0.04), Math.max(1, ts * 0.04)); } }
+      else if (t === 'void') { if (hash(x, y, 2) < 0.12) { g.fillStyle = 'rgba(240,230,200,0.7)'; g.fillRect(px + hash(x, y, 3) * ts, py + hash(x, y, 4) * ts, Math.max(1, ts * 0.04), Math.max(1, ts * 0.04)); } }
     }
     /* the coast, in ink */
     g.strokeStyle = INK; g.lineWidth = Math.max(1, ts * 0.055); g.lineCap = 'round'; g.lineJoin = 'round';
@@ -148,6 +150,18 @@
     return (chunks[k] = c);
   }
 
+  /* where a territory's name is written: the middle of its land, moved clear of any town or keep */
+  SK.labelAt = function (stt, r) {
+    if (r._lab) return r._lab;
+    const L = stt.layers[r.li]; let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < L.h; y += 2) for (let x = 0; x < L.w; x += 2) if (L.reg[y * L.w + x] === r.k + 1) { sx += x; sy += y; n++; }
+    let x = n ? Math.round(sx / n) : r.x, y = n ? Math.round(sy / n) : r.y;
+    if (L.reg[y * L.w + x] !== r.k + 1) { x = r.x; y = r.y; }
+    const busy = (xx, yy) => Object.values(stt.objects).some(o => o.layer === r.li && (o.type === 'town' || o.type === 'keep') && Math.abs(o.x - xx) <= 2 && yy - o.y >= -3 && yy - o.y <= 2);
+    for (let k = 0; k < 6 && busy(x, y); k++) { if (S.inside(L, x, y + 2) && L.reg[(y + 2) * L.w + x] === r.k + 1) y += 2; else if (S.inside(L, x, y - 4) && L.reg[(y - 4) * L.w + x] === r.k + 1) y -= 4; else break; }
+    return (r._lab = [x, y]);
+  };
+
   /* ======================= what you can see right now ======================= */
   let visCache = null;
   SK.visible = function (stt, pi) {
@@ -192,7 +206,7 @@
       if (o.t === 'town' && ts >= 36) { g.font = 'italic ' + Math.round(ts * 0.3) + 'px Georgia'; g.textAlign = 'center'; g.fillStyle = INK; g.fillText('a town', px, py + ts * 0.42); } });
     /* territory names, in a clerk's hand */
     if (stt.regions && ts >= 28) { g.textAlign = 'center'; g.fillStyle = 'rgba(59,42,23,0.85)'; g.font = 'italic ' + Math.max(11, Math.round(ts * 0.36)) + 'px Georgia';
-      stt.regions[li].forEach(r => { if (r.x < x0 - 6 || r.x > x1 + 6 || r.y < y0 - 2 || r.y > y1 + 2) return; g.fillText(r.name, ox + (r.x + 0.5) * ts, oy + (r.y + 0.2) * ts); }); }
+      stt.regions[li].forEach(r => { const p = SK.labelAt(stt, r); if (p[0] < x0 - 6 || p[0] > x1 + 6 || p[1] < y0 - 2 || p[1] > y1 + 2) return; g.fillText(r.name, ox + (p[0] + 0.5) * ts, oy + (p[1] + 0.2) * ts); }); }
     /* cut it to the land you have not seen */
     if (!maskC || maskC.width !== L.w + 2) { maskC = A.canvas(L.w + 2, L.h + 2); maskImg = maskC.getContext('2d').createImageData(L.w + 2, L.h + 2); }
     const d = maskImg.data;
@@ -225,25 +239,27 @@
     const col = r => r && r.owner >= 0 ? stt.players[r.owner].color : null;
     const inset = Math.max(1.5, ts * 0.06);
     ctx.save(); ctx.lineCap = 'round';
+    /* gather the edges by colour, then draw each colour in one stroke */
+    const owned = new Map(), wild = [];
     for (let y = Math.max(0, y0); y <= Math.min(L.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(L.w - 1, x1); x++) {
       const i = y * L.w + x, a = L.reg[i]; if (!a || !E[i]) continue;
-      const ra = regs[a - 1];
+      const c = col(regs[a - 1]), px = ox + x * ts, py = oy + y * ts;
       [[1, 0], [0, 1], [-1, 0], [0, -1]].forEach(([dx, dy]) => {
         const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) return; const b = L.reg[yy * L.w + xx]; if (!b || b === a) return;
-        const c = col(ra), px = ox + x * ts, py = oy + y * ts;
-        let sx, sy, ex, ey;
-        if (dx === 1) { sx = px + ts - inset; sy = py; ex = sx; ey = py + ts; } else if (dx === -1) { sx = px + inset; sy = py; ex = sx; ey = py + ts; }
-        else if (dy === 1) { sx = px; sy = py + ts - inset; ex = px + ts; ey = sy; } else { sx = px; sy = py + inset; ex = px + ts; ey = sy; }
-        if (c) { ctx.strokeStyle = A.rgba(c, 0.85); ctx.lineWidth = Math.max(2, ts * 0.07); ctx.setLineDash([]); }
-        else { if (dx < 0 || dy < 0) return; ctx.strokeStyle = 'rgba(255,240,200,0.28)'; ctx.lineWidth = Math.max(1, ts * 0.035); ctx.setLineDash([ts * 0.1, ts * 0.12]); sx = px + (dx ? ts : 0); sy = py + (dy ? ts : 0); ex = sx + (dy ? ts : 0); ey = sy + (dx ? ts : 0); }
-        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+        if (c) { let seg; if (dx === 1) seg = [px + ts - inset, py, px + ts - inset, py + ts]; else if (dx === -1) seg = [px + inset, py, px + inset, py + ts]; else if (dy === 1) seg = [px, py + ts - inset, px + ts, py + ts - inset]; else seg = [px, py + inset, px + ts, py + inset];
+          if (!owned.has(c)) owned.set(c, []); owned.get(c).push(seg); }
+        else if (dx > 0 || dy > 0) { if (col(regs[b - 1])) return; const sx = px + (dx ? ts : 0), sy = py + (dy ? ts : 0); wild.push([sx, sy, sx + (dy ? ts : 0), sy + (dx ? ts : 0)]); }
       });
     }
+    const stroke = list => { ctx.beginPath(); list.forEach(q => { ctx.moveTo(q[0], q[1]); ctx.lineTo(q[2], q[3]); }); ctx.stroke(); };
+    if (wild.length) { ctx.strokeStyle = 'rgba(255,240,200,0.28)'; ctx.lineWidth = Math.max(1, ts * 0.035); ctx.setLineDash([ts * 0.1, ts * 0.12]); stroke(wild); }
+    ctx.setLineDash([]); ctx.lineWidth = Math.max(2, ts * 0.07);
+    owned.forEach((list, c) => { ctx.strokeStyle = A.rgba(c, 0.85); stroke(list); });
     ctx.setLineDash([]);
     /* names, where you have seen the land */
     if (ts >= 36) { ctx.textAlign = 'center'; ctx.font = 'italic ' + Math.round(ts * 0.3) + 'px Georgia';
-      regs.forEach(r => { if (r.x < x0 - 4 || r.x > x1 + 4 || r.y < y0 || r.y > y1 || !E[r.y * L.w + r.x]) return;
-        const px = ox + (r.x + 0.5) * ts, py = oy + (r.y + 0.05) * ts, c = col(r);
+      regs.forEach(r => { const lp = SK.labelAt(stt, r); if (lp[0] < x0 - 4 || lp[0] > x1 + 4 || lp[1] < y0 || lp[1] > y1 || !E[lp[1] * L.w + lp[0]]) return;
+        const px = ox + (lp[0] + 0.5) * ts, py = oy + (lp[1] + 0.05) * ts, c = col(r);
         ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillText(r.name, px + 1, py + 1); ctx.fillStyle = c ? A.mix(c, '#ffffff', 0.55) : 'rgba(255,240,205,0.8)'; ctx.fillText(r.name, px, py); }); }
     ctx.restore();
   };
@@ -308,7 +324,7 @@
       g.setLineDash([]);
       /* the names of the territories */
       g.textAlign = 'center'; g.font = 'italic ' + Math.round(SU.clamp(sc * 1.1, 10, 15)) + 'px Georgia';
-      stt.regions[li].forEach(r => { const h = holder(r); g.fillStyle = h >= 0 ? A.shade(stt.players[h].color, -35) : 'rgba(59,42,23,0.9)'; g.fillText(r.name, (r.x + 0.5) * sc, (r.y + 0.1) * sc); });
+      stt.regions[li].forEach(r => { const h = holder(r), lp = SK.labelAt(stt, r); g.fillStyle = h >= 0 ? A.shade(stt.players[h].color, -35) : 'rgba(59,42,23,0.9)'; g.fillText(r.name, (lp[0] + 0.5) * sc, (lp[1] + 0.1) * sc); });
     }
     /* roads and how long they take */
     roadTimes(g, stt, li, sc);
@@ -433,8 +449,8 @@
         /* the thumb lies flat over the front of the paper, pointing in and a little up */
         g.save(); g.translate(-4, -8); g.rotate(-0.42);
         g.fillStyle = 'rgba(30,18,6,0.3)'; g.beginPath(); g.ellipse(24, 7, 26, 9, 0, 0, Math.PI * 2); g.fill();
-        g.fillStyle = A.lin(g, 0, -12, 0, 12, [[0, lh], [0.5, lw], [1, ld]]);
-        g.beginPath(); g.moveTo(-8, -12); g.lineTo(30, -10); g.bezierCurveTo(46, -10, 48, 10, 32, 10); g.lineTo(-8, 13); g.closePath(); g.fill();
+        g.fillStyle = A.lin(g, 0, -14, 0, 14, [[0.1, lh], [0.5, lw], [1, ld]]);
+        g.beginPath(); g.moveTo(-10, -11); g.bezierCurveTo(6, -16, 20, -14, 30, -10); g.bezierCurveTo(43, -5, 43, 8, 30, 9); g.bezierCurveTo(18, 10, 6, 14, -10, 14); g.closePath(); g.fill();
         g.strokeStyle = line; g.lineWidth = 2; g.stroke();
         /* the glove's seam at the tip, a crease at the joint, a gleam on the leather */
         g.strokeStyle = 'rgba(20,10,4,0.45)'; g.lineWidth = 1; g.setLineDash([2, 2]); g.beginPath(); g.moveTo(30, -8); g.bezierCurveTo(40, -6, 40, 6, 30, 8); g.stroke(); g.setLineDash([]);

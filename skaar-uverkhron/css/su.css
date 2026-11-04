@@ -333,3 +333,6 @@ table.grid th { color: var(--muted); font-weight: normal; }
 .relbar i { display: block; height: 100%; background: linear-gradient(90deg, #8a5a2a, #d9b87a); }
 .reg-row { cursor: pointer; }
 .reg-row:hover td { background: rgba(217,184,122,.08); }
+#game.editing .bb-mini { flex-direction: column; }
+#game.editing #mini { width: 234px; height: 150px; }
+#game.editing #layers .btn { flex: 1 1 45%; }
