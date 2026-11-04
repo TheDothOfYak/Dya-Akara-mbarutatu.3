@@ -32,14 +32,62 @@
   }
 
   /* ---------- the Duskareth town ---------- */
+
+
+  /* a glimmer of the Vyrenalur's trail: motes of light hanging in the air */
+  A.glimmer = function (ctx, o, x, y, ts, t) {
+    const cx = x + ts / 2, cy = y + ts * 0.45;
+    ctx.save(); ctx.shadowColor = '#fff2b0'; ctx.shadowBlur = ts * 0.4;
+    for (let i = 0; i < 7; i++) { const a = t * 0.8 + i * 0.9, r = ts * (0.12 + (i % 3) * 0.08); ctx.fillStyle = rgba('#fff6c8', 0.5 + 0.4 * Math.sin(t * 3 + i)); ell(ctx, cx + Math.cos(a) * r, cy + Math.sin(a * 1.3) * r * 0.7 - (i % 2) * ts * 0.1, ts * 0.04, ts * 0.04); ctx.fill(); }
+    ctx.fillStyle = rgba('#fffbe0', 0.85); ell(ctx, cx, cy, ts * 0.07, ts * 0.07); ctx.fill(); ctx.restore();
+  };
+  /* an Elsha'ryn town on the map: a great tree with grown houses, a hedge wall, lantern moss */
+  /* the ground a town stands on: a yard that fades into the land around it, not a hole in it */
+  function yard(g, x, y, rx, ry, col) {
+    g.save(); g.translate(x, y); g.scale(1, ry / rx);
+    const gr = g.createRadialGradient(0, 0, 0, 0, 0, rx); gr.addColorStop(0, rgba(col, 0.85)); gr.addColorStop(0.7, rgba(col, 0.6)); gr.addColorStop(1, rgba(col, 0));
+    g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx, 0, TAU); g.fill(); g.restore();
+  }
+  A.groveTown = function (ctx, o, x, y, ts, t, color) {
+    const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (o.built.includes('hall3') ? 2 : o.built.includes('hall2') ? 1 : 0);
+    const c = cached('grove' + lvl + '_' + ts, ts * 3.4, ts * 3.6, g => {
+      const s = ts / 48, W = ts * 3.4, base = ts * 3.3, cx = W / 2;
+      A.contact(g, cx, base - 4 * s, W * 0.46, ts * 0.42, 0.48);
+      yard(g, cx, base - ts * 0.35, W * 0.44, ts * 0.38, '#3a5a2c');
+      /* the great tree */
+      const tw = (22 + lvl * 3) * s, th = ts * (1.8 + lvl * 0.12);
+      g.fillStyle = lin(g, cx - tw, 0, cx + tw, 0, [[0, '#5a3e26'], [0.5, '#7a5634'], [1, '#3a2614']]);
+      g.beginPath(); g.moveTo(cx - tw * 1.6, base - ts * 0.6); g.quadraticCurveTo(cx - tw * 0.7, base - ts * 0.8, cx - tw * 0.6, base - th); g.lineTo(cx + tw * 0.6, base - th); g.quadraticCurveTo(cx + tw * 0.7, base - ts * 0.8, cx + tw * 1.6, base - ts * 0.6); g.closePath(); g.fill(); outline(g, 1.2 * s);
+      g.strokeStyle = rgba('#2a1a0c', 0.5); g.lineWidth = 1 * s; for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(cx + k * tw * 0.25, base - ts * 0.7); g.lineTo(cx + k * tw * 0.2, base - th + 6 * s); g.stroke(); }
+      /* the canopy */
+      const cy = base - th - ts * 0.35;
+      [[-1.1, 0.2, 1], [1.1, 0.25, 1], [0, -0.35, 1.3], [-0.55, -0.15, 1.05], [0.6, -0.1, 1.1]].forEach(([dx, dy, k], i) => { g.fillStyle = radial(g, cx + dx * ts * 0.55, cy + dy * ts * 0.55, ts * 0.6 * k, i % 2 ? '#5a8a3a' : '#4a7a32', '#1e3a18'); ell(g, cx + dx * ts * 0.55, cy + dy * ts * 0.55, ts * 0.55 * k, ts * 0.42 * k); g.fill(); outline(g, 0.8 * s); });
+      /* glowing windows and a doorway in the trunk */
+      g.save(); g.shadowColor = '#9ff8e8'; g.shadowBlur = 10 * s; g.fillStyle = '#c8fff0';
+      [[-0.3, 0.55], [0.3, 0.7], [0, 0.9]].slice(0, 2 + (lvl > 1 ? 1 : 0)).forEach(([dx, k]) => { ell(g, cx + dx * tw * 1.4, base - th * k, 2.6 * s, 3.4 * s); g.fill(); });
+      g.restore();
+      g.fillStyle = '#120c06'; g.beginPath(); g.moveTo(cx - 8 * s, base - ts * 0.62); g.lineTo(cx - 8 * s, base - ts * 0.62 - 12 * s); g.arc(cx, base - ts * 0.62 - 12 * s, 8 * s, Math.PI, 0); g.lineTo(cx + 8 * s, base - ts * 0.62); g.fill();
+      g.save(); g.shadowColor = '#68e0c8'; g.shadowBlur = 10 * s; g.strokeStyle = rgba('#9ff8e8', 0.8); g.lineWidth = 1.3 * s; g.stroke(); g.restore();
+      /* little grown houses round the roots */
+      for (let i = 0; i < 4; i++) { const hx = cx + (i < 2 ? -1 : 1) * (34 + (i % 2) * 16) * s, hy = base - ts * 0.72 - (i % 2) * 5 * s; g.fillStyle = '#6a4a2c'; ell(g, hx, hy, 8 * s, 7 * s); g.fill(); outline(g, 0.6 * s);
+        g.fillStyle = '#3e6a2e'; ell(g, hx, hy - 6 * s, 9 * s, 4 * s); g.fill(); outline(g, 0.5 * s); g.fillStyle = '#ffe9a0'; ell(g, hx, hy, 1.6 * s, 2 * s); g.fill(); }
+      /* a hedge wall once it has walls */
+      if (lvl >= 1) { const wy = base - ts * 0.58; for (let k = -58; k <= 58; k += 8) { g.fillStyle = k % 16 ? '#2e5a26' : '#3a6a2e'; ell(g, cx + k * s, wy - 6 * s, 6 * s, 7 * s + (o.built.includes('fort2') ? 2 * s : 0)); g.fill(); } outline(g, 0.6 * s); }
+      /* banners in the owner's colour */
+      g.fillStyle = '#5a3a20'; g.fillRect(cx + tw * 0.9, base - th - 4 * s, 1.4 * s, 22 * s);
+    });
+    ctx.drawImage(c, x + ts / 2 - c.width / 2, y + ts - ts * 3.3);
+    if (color) { ctx.fillStyle = color; const s = ts / 48, bx = x + ts / 2 + (22 + lvl * 3) * s * 0.9 + 1.4 * s, by = y + ts - ts * 3.3 + ts * 3.3 - ts * (1.8 + lvl * 0.12) - 4 * s; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + 10 * s, by + 3 * s); ctx.lineTo(bx, by + 7 * s); ctx.fill(); }
+  };
   A.town = function (ctx, o, x, y, ts, t, color) {
+    if (o.faction === 'elsharyn') return A.groveTown(ctx, o, x, y, ts, t, color);
     const lvl = (o.built.includes('fort3') ? 3 : o.built.includes('fort2') ? 2 : o.built.includes('fort1') ? 1 : 0) + (o.built.includes('hall3') ? 2 : o.built.includes('hall2') ? 1 : 0);
     const c = cached('town' + lvl + '_' + ts, ts * 3.4, ts * 3.6, g => {
       const s = ts / 48, W = ts * 3.4, base = ts * 3.3, cx = W / 2;
       const stone = '#4a4560', roof = '#2a2440';
-      g.fillStyle = 'rgba(0,0,0,0.32)'; ell(g, cx, base - 4 * s, W * 0.46, ts * 0.42); g.fill();
+      A.contact(g, cx, base - 4 * s, W * 0.46, ts * 0.42, 0.48);
       /* the ground of the town: dark flagstones */
-      g.fillStyle = lin(g, 0, base - ts * 0.8, 0, base, [[0, '#2a2438'], [1, '#1c1828']]); ell(g, cx, base - ts * 0.35, W * 0.44, ts * 0.38); g.fill();
+      yard(g, cx, base - ts * 0.35, W * 0.44, ts * 0.38, '#4a4258');
       /* back keep and the great spire of the Duat */
       tower(g, cx - 14 * s, base - ts * 1.25, 28 * s, 54 * s + lvl * 6 * s, s, '#3e3956', roof, '#8e7cff');
       g.save(); g.shadowColor = '#8e7cff'; g.shadowBlur = 14 * s; g.fillStyle = lin(g, cx, base - ts * 3.3, cx, base - ts * 2, [[0, '#d9ccff'], [1, '#5d4fb0']]);
@@ -69,7 +117,7 @@
   A.mine = function (ctx, o, x, y, ts, t, color) {
     const c = cached('mine' + o.kind + ts, ts * 2.4, ts * 2.4, g => {
       const s = ts / 48, W = ts * 2.4, cx = W / 2 - ts * 0.3, gy = ts * 2.15;
-      g.fillStyle = 'rgba(0,0,0,0.28)'; ell(g, cx, gy - 6 * s, ts * 0.95, ts * 0.3); g.fill();
+      A.contact(g, cx, gy - 6 * s, ts * 0.95, ts * 0.3, 0.42);
       const rockPile = (col, vein) => { [[-20, 0, 18], [6, -4, 22], [26, 2, 14]].forEach(([dx, dy, r]) => { g.fillStyle = radial(g, cx + dx * s, gy - 12 * s + dy * s, r * s, shade(col, 30), shade(col, -35)); g.beginPath(); g.moveTo(cx + (dx - r) * s, gy - 4 * s); g.quadraticCurveTo(cx + (dx - r * 0.6) * s, gy - (12 + r) * s + dy * s, cx + dx * s, gy - (14 + r) * s + dy * s); g.quadraticCurveTo(cx + (dx + r * 0.8) * s, gy - (8 + r * 0.6) * s, cx + (dx + r) * s, gy - 4 * s); g.closePath(); g.fill(); outline(g, 1 * s); });
         if (vein) { g.shadowColor = vein; g.shadowBlur = 8 * s; g.strokeStyle = vein; g.lineWidth = 1.6 * s; for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(cx + (-24 + i * 11) * s, gy - (10 + (i % 2) * 8) * s); g.lineTo(cx + (-20 + i * 11) * s, gy - (18 + (i % 3) * 6) * s); g.lineTo(cx + (-16 + i * 11) * s, gy - (14 + (i % 2) * 5) * s); g.stroke(); } g.shadowBlur = 0; } };
       const shaft = () => { g.fillStyle = '#0c0a08'; g.beginPath(); g.moveTo(cx - 8 * s, gy - 6 * s); g.lineTo(cx - 8 * s, gy - 18 * s); g.arc(cx, gy - 18 * s, 8 * s, Math.PI, 0); g.lineTo(cx + 8 * s, gy - 6 * s); g.fill(); g.strokeStyle = '#6a4a2a'; g.lineWidth = 2.4 * s; g.beginPath(); g.moveTo(cx - 9 * s, gy - 6 * s); g.lineTo(cx - 9 * s, gy - 26 * s); g.lineTo(cx + 9 * s, gy - 26 * s); g.lineTo(cx + 9 * s, gy - 6 * s); g.stroke(); };
@@ -94,7 +142,7 @@
     const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.9;
     const col = { aligned: '#6fb4ff', toll: '#e8c25a', danger: '#ff5a4a', always: '#b9a8ff', kalo: '#e8eeff' }[o.kind] || '#b9a8ff';
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ell(ctx, cx, gy, ts * 1.3, ts * 0.3); ctx.fill();
+    A.contact(ctx, cx, gy, ts * 1.3, ts * 0.3, 0.45);
     /* the stone ring */
     const R = ts * 0.95;
     ctx.lineWidth = 9 * s; ctx.strokeStyle = lin(ctx, cx - R, 0, cx + R, 0, [[0, '#8a8478'], [0.5, '#5a5650'], [1, '#3a3632']]);
@@ -122,7 +170,7 @@
   A.visit = function (ctx, o, x, y, ts, t) {
     const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.86;
     ctx.save();
-    const sh = (w) => { ctx.fillStyle = 'rgba(0,0,0,0.28)'; ell(ctx, cx, gy, w * s, w * 0.3 * s); ctx.fill(); };
+    const sh = (w) => A.contact(ctx, cx, gy, w * s, w * 0.3 * s, 0.42);
     const house = (hx, hy, w, h, wall, roof, lamp) => { ctx.fillStyle = lin(ctx, 0, hy - h, 0, hy, [[0, shade(wall, 20)], [1, shade(wall, -30)]]); ctx.fillRect(hx - w / 2, hy - h, w, h); outline(ctx, 1 * s); ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(hx - w / 2 - 3 * s, hy - h); ctx.lineTo(hx, hy - h - w * 0.55); ctx.lineTo(hx + w / 2 + 3 * s, hy - h); ctx.closePath(); ctx.fill(); outline(ctx, 1 * s); if (lamp) { ctx.shadowColor = lamp; ctx.shadowBlur = 8 * s; ctx.fillStyle = lamp; ctx.fillRect(hx - 2.5 * s, hy - h * 0.6, 5 * s, 5 * s); ctx.shadowBlur = 0; } };
     switch (o.kind) {
       case 'ring': sh(22); for (let i = 0; i < 7; i++) { const a = i / 7 * TAU; const px = cx + Math.cos(a) * 16 * s, py = gy - 6 * s + Math.sin(a) * 6 * s; ctx.fillStyle = lin(ctx, px - 3 * s, 0, px + 3 * s, 0, [[0, '#a8a395'], [1, '#5f5a50']]); ctx.fillRect(px - 3 * s, py - 12 * s, 6 * s, 12 * s); outline(ctx, 0.8 * s); } break;
@@ -158,13 +206,13 @@
   /* ---------- small things ---------- */
   A.pile = function (ctx, o, x, y, ts, t) {
     const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.72;
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(ctx, cx, gy + 4 * s, 12 * s, 4 * s); ctx.fill();
+    A.contact(ctx, cx, gy + 4 * s, 12 * s, 4 * s, 0.38);
     A.resIcon(ctx, o.res, cx - 4 * s, gy, 13 * s); A.resIcon(ctx, o.res, cx + 5 * s, gy + 2 * s, 11 * s);
     const sp = (Math.sin(t * 2 + x) + 1) / 2; if (sp > 0.85) { ctx.fillStyle = rgba('#ffffff', (sp - 0.85) * 6); ctx.beginPath(); ctx.moveTo(cx + 6 * s, gy - 14 * s); ctx.lineTo(cx + 7 * s, gy - 11 * s); ctx.lineTo(cx + 10 * s, gy - 10 * s); ctx.lineTo(cx + 7 * s, gy - 9 * s); ctx.lineTo(cx + 6 * s, gy - 6 * s); ctx.lineTo(cx + 5 * s, gy - 9 * s); ctx.lineTo(cx + 2 * s, gy - 10 * s); ctx.lineTo(cx + 5 * s, gy - 11 * s); ctx.fill(); }
   };
   A.chest = function (ctx, o, x, y, ts, t) {
     const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.78;
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(ctx, cx, gy + 2 * s, 13 * s, 4 * s); ctx.fill();
+    A.contact(ctx, cx, gy + 2 * s, 13 * s, 4 * s, 0.38);
     ctx.fillStyle = lin(ctx, 0, gy - 12 * s, 0, gy, [[0, '#9a6a3a'], [1, '#5a3a1a']]); ctx.fillRect(cx - 11 * s, gy - 11 * s, 22 * s, 11 * s); outline(ctx, 1 * s);
     ctx.fillStyle = lin(ctx, 0, gy - 20 * s, 0, gy - 11 * s, [[0, '#b07a44'], [1, '#6a4422']]); ctx.beginPath(); ctx.moveTo(cx - 11 * s, gy - 11 * s); ctx.quadraticCurveTo(cx, gy - 22 * s, cx + 11 * s, gy - 11 * s); ctx.closePath(); ctx.fill(); outline(ctx, 1 * s);
     ctx.strokeStyle = '#d9b87a'; ctx.lineWidth = 1.6 * s; ctx.beginPath(); ctx.moveTo(cx - 6 * s, gy - 17 * s); ctx.lineTo(cx - 6 * s, gy); ctx.moveTo(cx + 6 * s, gy - 17 * s); ctx.lineTo(cx + 6 * s, gy); ctx.stroke();
@@ -178,14 +226,14 @@
   };
   A.scroll = function (ctx, o, x, y, ts, t) {
     const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.74;
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(ctx, cx, gy + 4 * s, 10 * s, 3 * s); ctx.fill();
+    A.contact(ctx, cx, gy + 4 * s, 10 * s, 3 * s, 0.38);
     ctx.fillStyle = lin(ctx, 0, gy - 6 * s, 0, gy + 4 * s, [[0, '#f4e8c8'], [1, '#c9b48a']]); ctx.fillRect(cx - 10 * s, gy - 5 * s, 20 * s, 9 * s); outline(ctx, 0.8 * s);
     ctx.fillStyle = '#b8a070'; ell(ctx, cx - 10 * s, gy - 0.5 * s, 2.6 * s, 4.6 * s); ctx.fill(); ell(ctx, cx + 10 * s, gy - 0.5 * s, 2.6 * s, 4.6 * s); ctx.fill();
     ctx.fillStyle = '#7a2a2a'; ell(ctx, cx, gy - 0.5 * s, 2.4 * s, 2.4 * s); ctx.fill();
   };
   A.coreOnGround = function (ctx, o, x, y, ts, t) {
     const s = ts / 48, cx = x + ts / 2, cy = y + ts * 0.5 + Math.sin(t * 2) * 2 * s;
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(ctx, cx, y + ts * 0.86, 9 * s, 3 * s); ctx.fill();
+    A.contact(ctx, cx, y + ts * 0.86, 9 * s, 3 * s, 0.38);
     A.coreIcon(ctx, cx, cy, 13 * s, t, o.kind);
   };
   A.coreIcon = function (ctx, cx, cy, r, t, kind) {
@@ -232,7 +280,7 @@
   A.visionSite = function (ctx, o, x, y, ts, t) {
     const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.85;
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ell(ctx, cx, gy, 22 * s, 7 * s); ctx.fill();
+    A.contact(ctx, cx, gy, 22 * s, 7 * s, 0.45);
     ctx.shadowColor = '#4fb4e8'; ctx.shadowBlur = 14 * s;
     ctx.fillStyle = radial(ctx, cx, gy - 4 * s, 16 * s, 'rgba(160,220,255,0.9)', 'rgba(20,30,60,0.2)'); ell(ctx, cx, gy - 2 * s, 14 * s, 4 * s); ctx.fill();
     ctx.shadowBlur = 0;
@@ -268,6 +316,7 @@
       case 'core': return A.coreOnGround(ctx, Object.assign({ kind: st.cores[o.core] && st.cores[o.core].kind }, o), x, y, ts, t);
       case 'boat': return A.boat(ctx, o, x, y, ts, t, color);
       case 'vision': return A.visionSite(ctx, o, x, y, ts, t);
+      case 'glimmer': return A.glimmer(ctx, o, x, y, ts, t);
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

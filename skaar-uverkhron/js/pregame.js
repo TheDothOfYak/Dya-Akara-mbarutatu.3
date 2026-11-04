@@ -26,7 +26,7 @@
       winKind: 'conquer', seed: '', difficulty: pref.difficulty || 'captain',
       players: [
         { kind: 'human', name: acc ? acc.name : 'You', ai: 'auto', team: 0, colorId: 'red', faction: 'duskareth', hero: 'random', bonus: 'random' },
-        { kind: 'ai', name: 'Computer', ai: 'auto', team: 0, colorId: 'blue', faction: 'duskareth', hero: 'random', bonus: 'random' },
+        { kind: 'ai', name: 'Computer', ai: 'auto', team: 0, colorId: 'blue', faction: 'random', hero: 'random', bonus: 'random' },
       ],
     };
     view = { tab: opts.map ? 'maps' : 'random', filter: 'all' };
@@ -216,7 +216,7 @@
         el('td', {}, el('input', { cls: 'inp', value: p.name, style: { width: '120px' }, oninput: e => p.name = e.target.value })),
         el('td', {}, [sel(p.kind, [['human', 'A person'], ['ai', 'Computer']], v => { p.kind = v; if (v === 'ai' && /^You$/.test(p.name)) p.name = 'Computer'; }),
           p.kind === 'ai' ? sel(p.ai, [['auto', 'By difficulty']].concat(Object.entries(D.AI_LEVELS).map(([k, v]) => [k, v.name])), v => p.ai = v, { style: { marginLeft: '4px' } }) : null]),
-        el('td', {}, sel(p.faction, D.FACTIONS.map(f => [f.id, f.name.replace(/^The /, '') + (f.ready ? '' : ' (coming)'), !f.ready]), v => p.faction = v)),
+        el('td', {}, sel(p.faction, [['random', 'Random']].concat(D.FACTIONS.map(f => [f.id, f.name.replace(/^The /, '') + (f.ready ? '' : ' (coming)'), !f.ready])), v => p.faction = v)),
         el('td', {}, el('div', { cls: 'row', style: { flexWrap: 'nowrap', gap: '6px' } }, [hero ? U.portrait(hero.people, 7 + i, col.c, 30) : el('div', { cls: 'pg-rand', text: '?' }),
           sel(p.hero, [['random', 'Random']].concat(D.START_HEROES.map(h => [h.id, h.name, h.id !== p.hero && taken.includes(h.id)])), v => p.hero = v, { title: hero ? D.PEOPLES[hero.people].name + '. ' + hero.desc : 'A random hero of the Duskareth' })])),
         el('td', {}, sel(p.bonus, Object.entries(D.BONUSES), v => p.bonus = v)),
@@ -227,8 +227,8 @@
     box.appendChild(el('div', { cls: 'pg-tblwrap' }, tbl));
     const notes = cfg.players.map(p => [p, D.START_HEROES.find(h => h.id === p.hero)]).filter(x => x[1]);
     if (notes.length) box.appendChild(el('div', { cls: 'small', style: { margin: '6px 0' } }, notes.map(([p, h]) => el('div', {}, [el('b', { cls: 'gold', text: h.name }), ' (' + D.PEOPLES[h.people].name + ', ' + p.name + '): ' + h.desc]))));
-    if (cfg.players.length < maxPlayers()) box.appendChild(btn('+ Add a player', () => { const used = cfg.players.map(p => p.colorId); cfg.players.push({ kind: 'ai', name: 'Computer ' + cfg.players.length, ai: 'auto', team: 0, colorId: D.PLAYER_COLORS.find(c => !used.includes(c.id)).id, faction: 'duskareth', hero: 'random', bonus: 'random' }); render(); }));
-    box.appendChild(el('p', { cls: 'small muted', text: 'Only the Duskareth are ready in this version; the SkarValorin and the Elsha’ryn are coming. Two or more people on this device take turns, and the screen hides between turns. For friends on other devices, use Online games on the title screen.' }));
+    if (cfg.players.length < maxPlayers()) box.appendChild(btn('+ Add a player', () => { const used = cfg.players.map(p => p.colorId); cfg.players.push({ kind: 'ai', name: 'Computer ' + cfg.players.length, ai: 'auto', team: 0, colorId: D.PLAYER_COLORS.find(c => !used.includes(c.id)).id, faction: 'random', hero: 'random', bonus: 'random' }); render(); }));
+    box.appendChild(el('p', { cls: 'small muted', text: 'The Duskareth and the Elsha’ryn are ready; the SkarValorin are coming. Two or more people on this device take turns, and the screen hides between turns. For friends on other devices, use Online games on the title screen.' }));
     return box;
   }
 
@@ -236,7 +236,8 @@
     const d = diff();
     return cfg.players.map(p => {
       const h = D.START_HEROES.find(x => x.id === p.hero);
-      return { kind: p.kind, name: p.name, ai: p.kind === 'ai' ? (p.ai === 'auto' ? d.ai : p.ai) : 'normal', team: p.team, colorId: p.colorId, faction: p.faction,
+      const ready = D.FACTIONS.filter(f => f.ready).map(f => f.id);
+      return { kind: p.kind, name: p.name, ai: p.kind === 'ai' ? (p.ai === 'auto' ? d.ai : p.ai) : 'normal', team: p.team, colorId: p.colorId, faction: p.faction === 'random' ? ready[Math.floor(Math.random() * ready.length)] : p.faction,
         hero: h ? { people: h.people, base: h.base, name: h.name } : null, bonus: p.bonus };
     });
   }

@@ -15,8 +15,13 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   let STYLE = null;
-  const BUILD_PRIORITY = ['t_road', 'd3', 'granary', 'd4', 'market', 'fort2', 'hall2', 'd5', 'd1u', 'd2u', 't_capt', 'd6', 'terraces', 'd3u', 'songs1', 't_duat', 'vault', 'd4u', 'farms', 'd7', 'fort3', 'hall3', 'd8', 'terraces2', 'stygwell', 'songs2', 't_count', 't_pens', 'sanctum', 'd9', 'urverk', 'songs3', 'choir'];
+  /* as the old computer players did: the money buildings first, then the dwellings climbing the tiers */
+  const BUILD_DUSK = ['market', 'hall2', 'd3', 'd4', 't_road', 'granary', 'fort2', 'd5', 'd1u', 'd2u', 'd6', 'hall3', 't_capt', 'terraces', 'd3u', 'd7', 'songs1', 't_duat', 'vault', 'd4u', 'farms', 'fort3', 'd8', 'terraces2', 'stygwell', 'songs2', 't_count', 't_pens', 'sanctum', 'd9', 'urverk', 'songs3', 'choir'];
 
+  /* the Elsha'ryn build the same way, with their own dwellings and wonders */
+  const SWAP = { urverk: 'grove', stygwell: 'mossbed', sanctum: 'oathtree' };
+  const BUILD_ELSH = BUILD_DUSK.map(b => SWAP[b] || b.replace(/^d(\d)(u?)$/, 'e$1$2')).concat(['memtree', 'altar']);
+  const priorityFor = t => D.factionOf(t.faction) === 'elsharyn' ? BUILD_ELSH : BUILD_DUSK;
   AI.takeTurn = async function (st, hooks) {
     const pi = st.current, P = st.players[pi], lvl = D.AI_LEVELS[P.ai] || D.AI_LEVELS.normal;
     P.explored.forEach(E => E.fill(1));   /* the computer knows the land */
@@ -26,7 +31,7 @@
     Object.values(st.heroes).forEach(h => { if (h.owner === pi && !h.dead) while (h.levelUps.length) RU.resolveLevelUp(st, h); });
     /* a little help (or hindrance) by difficulty */
     if (lvl.bonus !== 1 && S.cal(st.day).dow === 1) P.res.gold += Math.round(1500 * (lvl.bonus - 1));
-    hireAndTrain(st, P);
+    /* build first, then heroes, as the old computer players did */
     for (const t of S.townsOf(st, pi)) manageTown(st, P, t);
     hireAndTrain(st, P);
     const armies = () => Object.values(st.armies).filter(a => !a.dead && a.owner === pi);
@@ -48,11 +53,18 @@
     /* build */
     /* one building a day, and never at the cost of the army */
     const keep = st.day < 4 ? 0 : (2500 + Math.min(4000, st.day * 60)) * (STYLE ? STYLE.keep : 1);
-    const bid = BUILD_PRIORITY.find(b => RU.canBuild(st, t, b).ok && P.res.gold - (D.BUILDINGS[b].cost.gold || 0) > keep);
+    /* the next thing wanted: short of wood, stone or a rare for it? trade spare stores or gold at the market */
+    const next = priorityFor(t).find(b => { const c = RU.canBuild(st, t, b); return c.ok || c.poor; });
+    if (next && RU.canBuild(st, t, next).poor) shopFor(st, P, t, next, D.BUILDINGS[next].gold ? 300 : keep);
+    /* a hall pays for itself within the week, so it never waits on the army's money */
+    const keepFor = b => D.BUILDINGS[b].gold ? 300 : keep;
+    const bid = priorityFor(t).find(b => RU.canBuild(st, t, b).ok && P.res.gold - (RU.buildCost(t, b).gold || 0) > keepFor(b));
     if (bid) RU.build(st, t, bid);
-    /* recruit: best creatures first, into the garrison, keeping money for heroes we still want */
+    /* recruit: best creatures first, into the garrison, keeping money for heroes we still want,
+       and (until the week's end, when the dwellings are full) for the next building */
     const field = S.fieldHeroes(st, P.idx).length + S.townsOf(st, P.idx).reduce((n, x) => n + x.heroes.length, 0);
-    const reserve = field < Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length) ? M.heroCost + 500 : 300;
+    const saving = next && !t.built.includes(next) && (D.BUILDINGS[next].gold || S.cal(st.day).dow < D.WEEK - 1) && st.day > 2 ? (RU.buildCost(t, next).gold || 0) : 0;
+    const reserve = (field < Math.min(D.MAX_FIELD_HEROES, 1 + Math.floor(st.day / 18), 1 + S.townsOf(st, P.idx).length) ? M.heroCost + 500 : 300) + saving;
     const dws = RU.townDwellings(t).sort((a, b) => b.tier - a.tier);
     dws.forEach(d => { const cr = d.up || d.base; const C = D.CREATURES[cr];
       let n = RU.maxRecruit(st, t, cr, d.base); n = Math.min(n, Math.floor(Math.max(0, P.res.gold - reserve) / (C.cost.gold || 1)));
@@ -65,6 +77,27 @@
     if (RU.has(t, 'vault')) P.vault.slice().forEach(cid => { if (t.garrison.some(s => !s)) RU.captainFromCore(st, P, t, cid, t.garrison); });
     /* a hero visiting takes the troops */
     const vis = S.armyAt(st, t.layer, t.x, t.y); if (vis && vis.owner === P.idx && vis.heroId) collectGarrison(st, t, st.heroes[vis.heroId]);
+  }
+  /* trade for what a building lacks: surplus food or other stores first, then gold */
+  function shopFor(st, P, t, bid, keep) {
+    if (!S.townsOf(st, P.idx).some(x => RU.has(x, 'market'))) return;
+    const cost = RU.buildCost(t, bid);
+    const spare = r => Math.max(0, (P.res[r] || 0) - (cost[r] || 0) - (r === 'food' ? 150 : 5));
+    for (const [r, need] of Object.entries(cost)) {
+      if (r === 'gold') continue;
+      let short = need - (P.res[r] || 0);
+      for (const from of D.RES) {
+        if (short <= 0) break;
+        if (from === r || from === 'gold' || !spare(from)) continue;
+        const rate = RU.tradeRate(st, P, from, r); if (rate <= 0) continue;
+        const give = Math.min(spare(from), Math.ceil(short / rate));
+        const got = RU.trade(st, P, from, r, give); if (got.ok) short -= got.get;
+      }
+      if (short > 0) {
+        const rate = RU.tradeRate(st, P, 'gold', r), give = Math.ceil((short + 0.5) / rate);
+        if (P.res.gold - give - (cost.gold || 0) > keep) RU.trade(st, P, 'gold', r, give);
+      }
+    }
   }
   function collectGarrison(st, t, h) {
     if (!h) return;

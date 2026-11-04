@@ -27,8 +27,8 @@
     timber: { name: 'Eldi Aagac Timber', short: 'Timber', common: false, color: '#e0703a', desc: 'Fireproof wood of the fire trees.' },
     glowmoss: { name: 'Glowmoss', common: false, color: '#9ff0a0', desc: 'Luminous moss from the deep forests. Songs are steeped in it.' },
   };
-  D.START_RES = { gold: 7500, wood: 20, stone: 20, food: 80, stygian: 4, ngakara: 4, timber: 3, glowmoss: 3 };
-  D.MARKET_VALUE = { gold: 1, wood: 120, stone: 120, food: 60, stygian: 500, ngakara: 500, timber: 400, glowmoss: 400 };
+  D.START_RES = { gold: 12000, wood: 20, stone: 20, food: 80, stygian: 6, ngakara: 6, timber: 6, glowmoss: 6 };
+  D.MARKET_VALUE = { gold: 1, wood: 125, stone: 125, food: 40, stygian: 250, ngakara: 250, timber: 250, glowmoss: 250 };
 
   /* ---------------- elements: also directions ---------------- */
   D.ELEMENTS = {
@@ -99,30 +99,30 @@
     ranged: true, shots: 14, abil: ['release2', 'dread'], desc: 'Elders of the Ver. Their scream shakes the nerve of whatever it hits, and the Duat answers them more often.' });
 
   cr('harkal', { name: 'Harkal', plural: 'Harkal', faction: 'duskareth', tier: 4, art: 'harkal',
-    atk: 12, def: 9, dmg: [7, 11], hp: 45, spd: 7, size: 2, shape: [2, 1], grow: 5, cost: { gold: 260, food: 1 }, food: 1, el: 'Su', up: 'harkal2',
+    atk: 12, def: 9, dmg: [7, 11], hp: 45, spd: 7, size: 2, shape: [2, 1], grow: 5, cost: { gold: 280 }, food: 1, el: 'Su', up: 'harkal2',
     abil: ['frenzy'], desc: 'The Su shark of the Duskareth. It swims through open air as easily as water, but cannot rise into the sky. Damage only makes it wilder.' });
   cr('harkal2', { name: 'Scarred Harkal', plural: 'Scarred Harkal', faction: 'duskareth', tier: 4, upgraded: true, art: 'harkal', tint: 1,
-    atk: 14, def: 11, dmg: [9, 13], hp: 55, spd: 8, size: 2, shape: [2, 1], grow: 5, cost: { gold: 340, food: 1 }, food: 1, el: 'Su',
+    atk: 14, def: 11, dmg: [9, 13], hp: 55, spd: 8, size: 2, shape: [2, 1], grow: 5, cost: { gold: 360 }, food: 1, el: 'Su',
     abil: ['frenzy', 'scars'], desc: 'Old Harkal, toughened by scar on scar. Their frenzy rises faster, and they shrug off more.' });
 
   cr('kaloeik', { name: 'Kalo’Eik of the Duskareth', short: 'Kalo’Eik', plural: 'Kalo’Eik', faction: 'duskareth', tier: 5, art: 'kaloeik',
-    atk: 12, def: 18, dmg: [10, 16], hp: 85, spd: 4, grow: 4, cost: { gold: 450, stygian: 1 }, food: 1.5, pop: 1, el: 'Su', people: true,
+    atk: 12, def: 18, dmg: [10, 16], hp: 85, spd: 4, grow: 4, cost: { gold: 480 }, food: 1.5, pop: 1, el: 'Su', people: true,
     abil: ['shift'], desc: 'Moon-folk who serve the Duskareth. Slow to anger and slower to fall. With a Naelst Velki captain in the army they can shift an ally through the Duat to anywhere they could walk.' });
 
   cr('tyndael', { name: 'Tyndael', plural: 'Tyndael', faction: 'duskareth', tier: 6, art: 'tyndael',
-    atk: 18, def: 14, dmg: [16, 24], hp: 110, spd: 9, grow: 3, cost: { gold: 800, timber: 1 }, food: 1, el: 'Eldi',
+    atk: 18, def: 14, dmg: [14, 22], hp: 95, spd: 9, grow: 3, cost: { gold: 850 }, food: 1, el: 'Eldi',
     ranged: true, fly: true, shots: 8, abil: ['burn'], desc: 'A living flame given shape: a round body, wide many-coloured wings and a crown of fire. Its feet never touch the ground.' });
 
   cr('xiweik', { name: 'Xiw’Eik', plural: 'Xiw’Eik', faction: 'duskareth', tier: 7, art: 'xiweik',
-    atk: 22, def: 18, dmg: [24, 36], hp: 170, spd: 9, size: 2, shape: [2, 1], capSlots: 2, grow: 2, cost: { gold: 1400, stygian: 1, glowmoss: 1 }, food: 1.5, pop: 1, el: 'Eldi', people: true,
+    atk: 22, def: 18, dmg: [24, 36], hp: 170, spd: 9, size: 2, shape: [2, 1], capSlots: 2, grow: 2, cost: { gold: 1500, stygian: 1 }, food: 1.5, pop: 1, el: 'Eldi', people: true,
     fly: true, abil: ['chaos'], desc: 'Children of the Xiw and the Eikar from the age of the Skyfalls: acorn folk with devil wings and horns, and songs of chaos.' });
 
   cr('lutut', { name: 'Lutut', plural: 'Lutut', faction: 'duskareth', tier: 8, art: 'lutut',
-    atk: 30, def: 28, dmg: [48, 66], hp: 360, spd: 11, size: 2, shape: [2, 2], capSlots: 2, grow: 1, cost: { gold: 3500, stygian: 3, stone: 3 }, food: 4, el: 'Fti',
+    atk: 30, def: 28, dmg: [48, 66], hp: 360, spd: 11, size: 2, shape: [2, 2], capSlots: 2, grow: 1, cost: { gold: 3500, stygian: 2 }, food: 4, el: 'Fti',
     fly: true, abil: ['screech', 'boulder'], desc: 'The great terror of the sky, patterned like carved stone. Its screech stuns, and in a siege it hurls boulders at the walls.' });
 
   cr('nekh', { name: 'Nekh’Vorran', plural: 'Nekh’Vorran', faction: 'duskareth', tier: 9, art: 'nekh', legendary: true,
-    atk: 44, def: 40, dmg: [110, 150], hp: 1200, spd: 10, size: 2, shape: [6, 2], grow: 0, cost: { gold: 10000, stygian: 8, ngakara: 4 }, food: 12, el: 'Su',
+    atk: 44, def: 40, dmg: [110, 150], hp: 1200, spd: 10, size: 2, shape: [6, 2], grow: 0, cost: { gold: 10000, stygian: 6, ngakara: 3 }, food: 12, el: 'Su',
     abil: ['burrow', 'devour'], desc: 'The great worm of the Duat that the Duskareth follow. It surges up out of the ground anywhere on the field. Only one to a castle, and only one to a stack.' });
 
   /* ---- wild creatures ---- */
@@ -142,10 +142,80 @@
   cr('mcfly', { name: 'RubberMcFly', plural: 'RubberMcFly', wild: true, tier: 1, art: 'mcfly',
     atk: 1, def: 2, dmg: [1, 1], hp: 6, spd: 9, fly: true, food: 0.1, el: 'Fti', abil: ['storm'], desc: 'The storm’s companions, among the only creatures that fly in the Sunear’Zikhron, and the only time they glow. Killing one is very bad luck.' });
 
-  D.DUSK_LINEUP = ['malsti', 'velnur', 'ver', 'harkal', 'kaloeik', 'tyndael', 'xiweik', 'lutut', 'nekh'];
+
+  /* ---- the Elsha'ryn, who follow the Vyrenalur ---- */
+  cr('sprengju', { name: 'Sprengju', plural: 'Sprengju', faction: 'elsharyn', tier: 1, art: 'sprengju',
+    atk: 4, def: 1, dmg: [3, 5], hp: 4, spd: 9, grow: 18, cost: { gold: 25 }, food: 0.1, el: 'Eldi', up: 'sprengju2',
+    fly: true, abil: ['explode'], desc: 'Little flying carrots: Ju woken by a shaving of a true Relic. They burst on contact. Under a Ju-Keeper captain they are not on the field at all: the captain looses them in volleys, and half of those spent come back after the battle.' });
+  cr('sprengju2', { name: 'Nur Sprengju', plural: 'Nur Sprengju', faction: 'elsharyn', tier: 1, upgraded: true, art: 'sprengju', tint: 1,
+    atk: 5, def: 2, dmg: [4, 7], hp: 5, spd: 10, grow: 18, cost: { gold: 35 }, food: 0.1, el: 'Eldi',
+    fly: true, abil: ['explode'], desc: 'Sprengju woken by a larger shaving. They burn brighter, and burst harder.' });
+
+  cr('speareikar', { name: 'Spear Eikar', plural: 'Spear Eikar', faction: 'elsharyn', tier: 2, art: 'speareikar',
+    atk: 6, def: 5, dmg: [3, 5], hp: 18, spd: 5, grow: 9, cost: { gold: 80 }, food: 0.5, pop: 1, el: 'Ular', up: 'speareikar2', people: true, eikar: true,
+    abil: [], desc: 'Eikar of the luminous forest with long spears. Steady, plain, and always there.' });
+  cr('speareikar2', { name: 'Grovewarden Spears', plural: 'Grovewarden Spears', faction: 'elsharyn', tier: 2, upgraded: true, art: 'speareikar', tint: 1,
+    atk: 8, def: 7, dmg: [4, 6], hp: 24, spd: 5, grow: 9, cost: { gold: 115 }, food: 0.5, pop: 1, el: 'Ular', people: true, eikar: true,
+    abil: [], desc: 'Spear Eikar who keep the paths of the grove, in bark-plated coats.' });
+
+  cr('stryx', { name: 'Stryx', plural: 'Stryx', faction: 'elsharyn', tier: 3, art: 'stryx',
+    atk: 8, def: 9, dmg: [4, 7], hp: 30, spd: 0, grow: 7, cost: { gold: 160 }, food: 0.4, el: 'Ular', up: 'stryx2',
+    ranged: true, shots: 12, abil: ['rooted', 'bind'], desc: 'Stone armour and vine limbs, grown from a seed where it fell. Once rooted it never moves: it throws rocks, and hits just as hard up close. Whatever it strikes up close is bound by its vines until the Stryx dies.' });
+  cr('stryx2', { name: 'Old Stryx', plural: 'Old Stryx', faction: 'elsharyn', tier: 3, upgraded: true, art: 'stryx', tint: 1,
+    atk: 10, def: 11, dmg: [5, 8], hp: 36, spd: 0, grow: 7, cost: { gold: 230 }, food: 0.4, el: 'Ular',
+    ranged: true, shots: 16, abil: ['rooted', 'bind'], desc: 'Stryx rooted for many seasons, mossy and heavy-handed.' });
+
+  cr('albali', { name: 'Albali Byrd', plural: 'Albali Byrds', faction: 'elsharyn', tier: 4, art: 'albali',
+    atk: 11, def: 9, dmg: [6, 10], hp: 38, spd: 8, grow: 5, cost: { gold: 270 }, food: 0.8, el: 'Fti', up: 'albali2',
+    fly: true, abil: ['heal'], desc: 'A great pale bird with a single horn coated in a healing film, the last form of a five-stage life that begins as a tree. Instead of attacking, it can restore an ally next to it.' });
+  cr('albali2', { name: 'Albali Elder', plural: 'Albali Elders', faction: 'elsharyn', tier: 4, upgraded: true, art: 'albali', tint: 1,
+    atk: 13, def: 11, dmg: [8, 12], hp: 46, spd: 9, grow: 5, cost: { gold: 350 }, food: 0.8, el: 'Fti',
+    fly: true, abil: ['heal'], desc: 'Old Albali Byrds whose horn-film heals deeper.' });
+
+  cr('tonguatjis', { name: 'Tonguatjis', plural: 'Tonguatjis', faction: 'elsharyn', tier: 5, art: 'tonguatjis',
+    atk: 12, def: 18, dmg: [10, 15], hp: 90, spd: 4, size: 2, shape: [2, 1], capSlots: 2, grow: 4, cost: { gold: 470 }, food: 1.5, el: 'Ular',
+    abil: ['tongue'], desc: 'A great shelled snapper of the deep forest. Its tongue strikes from two hexes away and drags its prey in.' });
+
+  cr('saklaypunk', { name: 'Saklay’Punk’Eik', plural: 'Saklay’Punk’Eik', faction: 'elsharyn', tier: 6, art: 'saklaypunk',
+    atk: 17, def: 12, dmg: [15, 23], hp: 105, spd: 8, size: 2, shape: [2, 1], capSlots: 2, grow: 3, cost: { gold: 820 }, food: 1.4, pop: 1, el: 'Ular', people: true, eikar: true,
+    ranged: true, shots: 12, abil: ['skirmish', 'alwaysshoot'], desc: 'Eikar archers on Domestic Punks. They can move and shoot in the same turn, and they shoot even with an enemy beside them.' });
+
+  cr('apibuta', { name: 'Api Buta', plural: 'Api Buta', faction: 'elsharyn', tier: 7, art: 'apibuta',
+    atk: 22, def: 20, dmg: [26, 38], hp: 220, spd: 4, size: 2, shape: [4, 2], capSlots: 2, grow: 2, cost: { gold: 1550, timber: 1 }, food: 2.5, el: 'Eldi',
+    abil: ['firebreath', 'blind', 'fireproof'], desc: 'The Blind Beast: a huge slug of charred basalt veined with embers, with fire tentacles before its mouth and no eyes at all. Its breath of fire scorches the one behind its prey. Fire does not harm it, and nothing that works by sight touches it.' });
+
+  cr('sruvorn', { name: 'Sru Vorn', plural: 'Sru Vorn', faction: 'elsharyn', tier: 8, art: 'sruvorn',
+    atk: 30, def: 30, dmg: [46, 64], hp: 400, spd: 7, size: 2, shape: [2, 2], capSlots: 2, grow: 1, cost: { gold: 3500, ngakara: 2 }, food: 4, el: 'Ular',
+    abil: ['bog', 'acid'], desc: 'A heavy, low lizard with matted fur like armour, curved tusks, a spiked ball-tail and acid saliva. Once a battle, early on, it digs a hidden acid bog (an Awvadhi): enemies who step in are burned and stuck.' });
+
+  cr('vyrenalur', { name: 'Vyrenalur', plural: 'Vyrenalur', faction: 'elsharyn', tier: 9, art: 'vyrenalur', legendary: true,
+    atk: 42, def: 38, dmg: [100, 140], hp: 1100, spd: 12, size: 2, shape: [3, 2], grow: 0, cost: { gold: 10000, glowmoss: 6, stygian: 3 }, food: 10, el: 'Fti',
+    abil: ['fade', 'lightline', 'trail'], desc: 'Light Shadow: the ancient stag of the deep forest, a body of shadow dappled with moving light under antlers of pure light. Every other round it slips into shadow and nothing can touch it; its charge is a line of light. Where it runs, its trail glows for three rounds, and Eikar in the trail are healed.' });
+
+  cr('kipsu', { name: 'Kipsu', plural: 'Kipsu', wild: true, tier: 2, art: 'kipsu',
+    atk: 5, def: 4, dmg: [2, 4], hp: 14, spd: 8, food: 0.3, el: 'Ular', abil: [], desc: 'A pack animal with a weasel’s face, a fox’s ears and a glowing tail unique to each one. They follow the Vyrenalur anywhere.' });
+
+  D.LINEUP = { duskareth: ['malsti', 'velnur', 'ver', 'harkal', 'kaloeik', 'tyndael', 'xiweik', 'lutut', 'nekh'],
+    elsharyn: ['sprengju', 'speareikar', 'stryx', 'albali', 'tonguatjis', 'saklaypunk', 'apibuta', 'sruvorn', 'vyrenalur'] };
+  D.DUSK_LINEUP = D.LINEUP.duskareth;
 
   /* ability text */
   D.ABIL = {
+    explode: 'Bursts on contact: the attackers are spent, and nothing strikes back. Half of the Sprengju spent come back after the battle.',
+    rooted: 'Never moves.',
+    bind: 'Whatever it strikes up close cannot move until this stack dies (or a song moves it).',
+    heal: 'Instead of attacking, it can restore the health of an ally next to it.',
+    tongue: 'Strikes from two hexes away and pulls its prey next to it.',
+    skirmish: 'Can move and then shoot in the same turn.',
+    alwaysshoot: 'Shoots even with an enemy beside it.',
+    firebreath: 'Its fire also scorches the enemy behind its target.',
+    blind: 'Has no eyes: songs and powers that work by sight do not touch it.',
+    fireproof: 'Fire does not harm it.',
+    bog: 'Once a battle, early on, digs a hidden acid bog. Enemies who step in are burned and stuck for a turn.',
+    acid: 'Its bite burns with acid.',
+    fade: 'Every other round it slips into shadow: nothing can target it.',
+    lightline: 'Its charge is a line of light: it strikes the enemies behind its target too.',
+    trail: 'Where it moves, its trail glows for three rounds; Eikar in the trail are healed.',
     thief: 'Steals a little gold from the enemy with each attack.',
     thief2: 'Steals more gold with each attack.',
     dodge: 'Often slips aside: 20% of attacks against it miss.',
@@ -203,6 +273,9 @@
     naelst: { name: 'Naelst Velki', desc: 'An Onnar of the Duskareth. Lets Kalo’Eik shift allies through the Duat.' },
     thar: { name: 'Thar', desc: 'A Ver who leads instead of screaming.' },
     rogue: { name: 'Rogue', desc: 'An outlaw, hunter or beast-tamer of the wilds.' },
+    jukeeper: { name: 'Ju-Keeper', desc: 'An Elsha’ryn who tends Sprengju. Their Sprengju ride in pouches, not on the field: the Ju-Keeper looses them at the enemy in volleys, and half of those spent come back after the battle.' },
+    grovewarden: { name: 'Grovewarden', desc: 'An Elsha’ryn keeper of the forest paths.' },
+    tracker: { name: 'Memory Tracker', desc: 'An Elsha’ryn who follows memory as others follow footprints.' },
   };
   D.CAPTAIN_ABIL = {
     drillmaster: { name: 'Drillmaster', desc: '+1 attack to the whole squadron.' },
@@ -280,8 +353,12 @@
     massmend: { name: 'Mass Mend', tier: 5, breath: 28, where: 'battle', target: 'none', desc: 'Heals every stack you command.' },
     nekhcall: { name: 'Call of the Nekh', tier: 5, breath: 32, where: 'battle', target: 'enemyArea', desc: 'The ground opens under a stack and everything around it.' },
     duatgate: { name: 'Duat Gate', tier: 5, breath: 30, where: 'map', desc: 'Walk through the Duat to any Urverk you have seen.' },
+    /* the Grove songs of the Elsha'ryn: taught only in a Protected Grove, and they work only near your Elsha'ryn towns */
+    grovelight: { name: 'Grovelight', tier: 1, breath: 8, where: 'battle', target: 'none', grove: true, desc: 'Grove song: light through the canopy restores the health of every stack you command.' },
+    rootsnare: { name: 'Rootsnare', tier: 1, breath: 10, where: 'battle', target: 'enemyArea', grove: true, desc: 'Grove song: roots hold an enemy stack and everything next to it where they stand for a turn.' },
   };
-  D.SONG_IDS = Object.keys(D.SONGS);
+  D.SONG_IDS = Object.keys(D.SONGS).filter(k => !D.SONGS[k].grove);
+  D.GROVE_SONGS = ['grovelight', 'rootsnare'];
   /* chaos songs the Xiw'Eik sing on their own */
   D.CHAOS = ['confuse', 'slow', 'hasten', 'scorch', 'backfire'];
 
@@ -319,6 +396,7 @@
   rel('stormglass', { name: 'Stormglass', slot: 'misc', rare: 'great', mods: { stormSense: 1, luck: 1 } });
   rel('aerolfeather', { name: 'Feather of the Aerolhorn', slot: 'misc', rare: 'skaar', mods: { Strength: 3, Defense: 3, morale: 10, luck: 1 } });
   rel('nekhprint', { name: 'Rokarvac of the Nekh', slot: 'misc', rare: 'skaar', mods: {}, desc: 'The worm’s writing-book: how to open a Nekh Hollow. Not used up — any town it is carried into can build the Nekh Hollow while it is there.', special: true });
+  rel('vyrantler', { name: 'Shed Antler of the Vyrenalur', slot: 'misc', rare: 'skaar', special: true, mods: {}, desc: 'An antler of pure light the Vyrenalur let fall. Not used up: any Elsha’ryn town it is carried into can build the Clearing of Light while it is there.' });
   D.RELIC_IDS = Object.keys(D.RELICS).filter(r => !D.RELICS[r].special);
   D.RARE_ORDER = ['common', 'rare', 'great', 'skaar'];
   D.RARE_COLOR = { common: '#cfc6b0', rare: '#6fb4ff', great: '#c48cff', skaar: '#ffcc55' };
@@ -329,11 +407,11 @@
   D.BUILDINGS = {};
   function bd(id, o) { o.id = id; D.BUILDINGS[id] = o; }
   bd('hall1', { name: 'Muster Hall', cost: {}, gold: 1000, housing: 400, desc: 'The heart of the town. 1000 gold a day.' });
-  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 2500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 300, gold: 1750, housing: 700, replaces: 'hall1', desc: '1750 gold a day, and room for more people.' });
-  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 5000, stone: 10, stygian: 4 }, req: ['hall2', 'fort2'], pop: 600, gold: 3000, housing: 1100, replaces: 'hall2', desc: '3000 gold a day. The seat of a Duskareth lord.' });
-  bd('fort1', { name: 'Palisade Keep', cost: { gold: 1500, wood: 5, stone: 5 }, walls: 1, growth: 0, desc: 'Walls and a gate. Needed for every dwelling above the second.' });
-  bd('fort2', { name: 'Stone Citadel', cost: { gold: 3000, stone: 12 }, req: ['fort1'], pop: 250, walls: 2, growth: 25, replaces: 'fort1', desc: 'Stone walls and a tower. Creatures grow 25% faster.' });
-  bd('fort3', { name: 'Duskwall Bastion', cost: { gold: 5000, stone: 15, stygian: 2 }, req: ['fort2'], pop: 450, walls: 3, growth: 50, replaces: 'fort2', desc: 'Three towers of the Ver. Creatures grow 50% faster.' });
+  bd('hall2', { name: 'Hall of Dusk', cost: { gold: 3500, wood: 5, stone: 5 }, req: ['hall1', 'market'], pop: 200, gold: 1750, housing: 700, replaces: 'hall1', desc: '1750 gold a day, and room for more people.' });
+  bd('hall3', { name: 'Duskhold Seat', cost: { gold: 7500, wood: 10, stone: 10, stygian: 3 }, req: ['hall2', 'fort2'], pop: 450, gold: 3000, housing: 1100, replaces: 'hall2', desc: '3000 gold a day. The seat of a Duskareth lord.' });
+  bd('fort1', { name: 'Palisade Keep', cost: { gold: 2000, wood: 5, stone: 10 }, walls: 1, growth: 0, desc: 'Walls and a gate. Needed for every dwelling above the second.' });
+  bd('fort2', { name: 'Stone Citadel', cost: { gold: 3500, stone: 15 }, req: ['fort1'], pop: 250, walls: 2, growth: 25, replaces: 'fort1', desc: 'Stone walls and a tower. Creatures grow 25% faster.' });
+  bd('fort3', { name: 'Duskwall Bastion', cost: { gold: 6000, stone: 20, stygian: 2 }, req: ['fort2'], pop: 400, walls: 3, growth: 50, replaces: 'fort2', desc: 'Three towers of the Ver. Creatures grow 50% faster.' });
   bd('tavern', { name: 'Tavern of the Lantern', cost: { gold: 500, wood: 5 }, small: true, desc: 'Hire heroes and squadron captains here.' });
   bd('market', { name: 'Market Square', cost: { gold: 500, wood: 5 }, small: true, desc: 'Trade resources. On market day, travelling sellers come.' });
   bd('woodyard', { name: 'Woodcutters’ Yard', cost: { gold: 600, stone: 2 }, small: true, res: { wood: 2 }, desc: '+2 wood a day.' });
@@ -342,11 +420,11 @@
   bd('granary', { name: 'Granary', cost: { gold: 800, wood: 6 }, small: true, food: 8, desc: '+8 food a day.' });
   bd('farms', { name: 'Duat-Edge Farms', cost: { gold: 1500, wood: 10 }, req: ['granary'], pop: 200, food: 16, desc: '+16 food a day. Needs 200 people to work them.' });
   bd('terraces', { name: 'Dusk Terraces', cost: { gold: 1000, stone: 6 }, small: true, housing: 300, desc: 'Homes for 300 more people.' });
-  bd('terraces2', { name: 'Keilia Stonehouses', cost: { gold: 2200, stone: 12 }, req: ['terraces'], pop: 400, housing: 500, desc: 'Homes for 500 more people, built the Keilia way.' });
+  bd('terraces2', { name: 'Keilia Stonehouses', cost: { gold: 2200, stone: 12 }, req: ['terraces'], pop: 350, housing: 500, desc: 'Homes for 500 more people, built the Keilia way.' });
   bd('songs1', { name: 'Hall of Songs', cost: { gold: 2000, wood: 5, stone: 5 }, songTier: 1, desc: 'Heroes with Songcraft learn the first songs here.' });
   bd('songs2', { name: 'Hall of Songs II', cost: { gold: 1500, wood: 5, stone: 5, glowmoss: 2 }, req: ['songs1'], songTier: 2, replaces: 'songs1', desc: 'Second-tier songs.' });
   bd('songs3', { name: 'Hall of Songs III', cost: { gold: 2000, wood: 5, stone: 5, glowmoss: 4 }, req: ['songs2'], pop: 300, songTier: 3, replaces: 'songs2', desc: 'Third-tier songs.' });
-  bd('choir', { name: 'Stygian Choir', cost: { gold: 4000, stygian: 5, glowmoss: 5 }, req: ['songs3'], pop: 500, songTier: 4, replaces: 'songs3', desc: 'Fourth-tier songs, sung over liquid Stygian.' });
+  bd('choir', { name: 'Stygian Choir', cost: { gold: 4000, stygian: 5, glowmoss: 5 }, req: ['songs3'], pop: 450, songTier: 4, replaces: 'songs3', desc: 'Fourth-tier songs, sung over liquid Stygian.' });
   bd('t_drill', { name: 'Drill Yard', cost: { gold: 1200, wood: 5 }, small: true, teaches: ['drill', 'shieldwall', 'marks', 'tactics'], desc: 'Training hall: Battle Drill, Shieldwall, Marksmanship, Field Tactics.' });
   bd('t_road', { name: 'Road Lodge', cost: { gold: 1200, wood: 5 }, small: true, teaches: ['wayfind', 'scouting', 'provision', 'seafaring'], desc: 'Training hall: Wayfinding, Scouting, Provisioning, Seafaring.' });
   bd('t_count', { name: 'Counting House', cost: { gold: 1500, stone: 5 }, small: true, teaches: ['steward', 'diplomacy', 'plunder', 'learning'], desc: 'Training hall: Stewardship, Diplomacy, Plunder, Learning.' });
@@ -355,31 +433,93 @@
   bd('t_pens', { name: 'Memory Pens', cost: { gold: 2000, stone: 5, wood: 5 }, small: true, teaches: ['memory', 'beasts', 'siege', 'stygiancraft'], desc: 'Training hall: Memorykeeping, Beastmastery, Siegecraft, Stygiancraft.' });
   bd('vault', { name: 'Memory Vault', cost: { gold: 2500, stone: 8, stygian: 2 }, desc: 'Keeps memory cores safe, and turns captain cores into new captains.' });
   bd('shipyard', { name: 'Shipyard', cost: { gold: 1500, wood: 15 }, coast: true, desc: 'Build ships. Only in a town by the water.' });
-  bd('urverk', { name: 'Duat Gate', cost: { gold: 4000, stygian: 6, stone: 10 }, req: ['hall2'], pop: 400, desc: 'Duskareth art: once a day, a hero here may step through the Duat to any of your other towns with a Duat Gate.' });
-  bd('stygwell', { name: 'Stygian Well', cost: { gold: 3000, stone: 8 }, req: ['hall2'], res: { stygian: 1 }, desc: '+1 Stygian a day.' });
-  bd('sanctum', { name: 'Vel Sanctum', cost: { gold: 2500, stygian: 3, glowmoss: 2 }, req: ['fort2'], desc: 'Defenders of this town get +2 morale and act sooner.' });
+  bd('urverk', { faction: 'duskareth', name: 'Duat Gate', cost: { gold: 4000, stygian: 6, stone: 10 }, req: ['hall2'], pop: 400, desc: 'Duskareth art: once a day, a hero here may step through the Duat to any of your other towns with a Duat Gate.' });
+  bd('stygwell', { faction: 'duskareth', name: 'Stygian Well', cost: { gold: 3000, stone: 8 }, req: ['hall2'], res: { stygian: 1 }, desc: '+1 Stygian a day.' });
+  bd('sanctum', { faction: 'duskareth', name: 'Vel Sanctum', cost: { gold: 2500, stygian: 3, glowmoss: 2 }, req: ['fort2'], desc: 'Defenders of this town get +2 morale and act sooner.' });
   /* dwellings */
-  bd('d1', { name: 'Punk Hollows', cost: { gold: 400, wood: 4 }, dwell: 'malsti', desc: 'Malsti Punks gather here, half in the world and half in the Duat.' });
-  bd('d1u', { name: 'Blinking Hollows', cost: { gold: 800, wood: 4, stygian: 1 }, req: ['d1'], dwellUp: 'malsti2', desc: 'Upgrades Malsti Punks to Blinkback Malsti.' });
-  bd('d2', { name: 'Velnur Barracks', cost: { gold: 900, wood: 5, stone: 5 }, pop: 50, dwell: 'velnur', desc: 'Velnurthaliths train here.' });
-  bd('d2u', { name: 'Oath Hall', cost: { gold: 1300, stone: 6, stygian: 1 }, req: ['d2'], pop: 120, dwellUp: 'velnur2', desc: 'Upgrades Velnurthaliths to the Oathguard.' });
-  bd('d3', { name: 'Screaming Spire', cost: { gold: 1200, stone: 8 }, req: ['fort1'], pop: 80, dwell: 'ver', desc: 'Home of the Ver.' });
-  bd('d3u', { name: 'Spire of the Thar', cost: { gold: 1600, stone: 6, glowmoss: 2 }, req: ['d3'], pop: 150, dwellUp: 'ver2', desc: 'Upgrades the Ver to Thar Norvek Elders.' });
-  bd('d4', { name: 'Harkal Deeps', cost: { gold: 1800, stone: 8, food: 10 }, req: ['fort1'], dwell: 'harkal', desc: 'A cold, deep pool where the Harkal circle.' });
-  bd('d4u', { name: 'Scarring Deeps', cost: { gold: 2200, stone: 6, ngakara: 2 }, req: ['d4'], dwellUp: 'harkal2', desc: 'Upgrades Harkal to Scarred Harkal.' });
-  bd('d5', { name: 'Moonward Cloister', cost: { gold: 2800, stone: 10, stygian: 2 }, req: ['fort1', 'd2'], pop: 150, dwell: 'kaloeik', desc: 'Kalo’Eik who serve the Duskareth live and teach here.' });
-  bd('d6', { name: 'Ember Roost', cost: { gold: 3500, timber: 4, stone: 6 }, req: ['fort1', 'd3'], dwell: 'tyndael', desc: 'A roost of fireproof timber for the Tyndael.' });
-  bd('d7', { name: 'Horned Chapel', cost: { gold: 5000, stygian: 3, glowmoss: 3, stone: 8 }, req: ['fort2', 'd5'], pop: 250, dwell: 'xiweik', desc: 'The Xiw’Eik sing their chaos here.' });
-  bd('d8', { name: 'Lutut Crags', cost: { gold: 9000, stone: 20, stygian: 4 }, req: ['fort2', 'd6'], dwell: 'lutut', desc: 'A raw crag above the town where the Lutut nest.' });
-  bd('d9', { name: 'Nekh Hollow', cost: { gold: 15000, stygian: 10, ngakara: 5, stone: 20 }, req: ['fort3', 'd8'], unlock: 'nekh', dwell: 'nekh', desc: 'A hole into the Duat itself. Built only once the Nekh’Vorran has been unlocked in the eye of the storm.' });
+  bd('d1', { faction: 'duskareth', name: 'Punk Hollows', cost: { gold: 500, wood: 5 }, dwell: 'malsti', desc: 'Malsti Punks gather here, half in the world and half in the Duat.' });
+  bd('d1u', { faction: 'duskareth', name: 'Blinking Hollows', cost: { gold: 800, wood: 5 }, req: ['d1'], dwellUp: 'malsti2', desc: 'Upgrades Malsti Punks to Blinkback Malsti.' });
+  bd('d2', { faction: 'duskareth', name: 'Velnur Barracks', cost: { gold: 1000, wood: 5, stone: 5 }, pop: 50, dwell: 'velnur', desc: 'Velnurthaliths train here.' });
+  bd('d2u', { faction: 'duskareth', name: 'Oath Hall', cost: { gold: 1300, wood: 5, stone: 5 }, req: ['d2'], pop: 120, dwellUp: 'velnur2', desc: 'Upgrades Velnurthaliths to the Oathguard.' });
+  bd('d3', { faction: 'duskareth', name: 'Screaming Spire', cost: { gold: 1500, stone: 8 }, req: ['fort1'], pop: 80, dwell: 'ver', desc: 'Home of the Ver.' });
+  bd('d3u', { faction: 'duskareth', name: 'Spire of the Thar', cost: { gold: 1800, stone: 5, glowmoss: 2 }, req: ['d3'], pop: 150, dwellUp: 'ver2', desc: 'Upgrades the Ver to Thar Norvek Elders.' });
+  bd('d4', { faction: 'duskareth', name: 'Harkal Deeps', cost: { gold: 2000, stone: 10 }, req: ['fort1'], dwell: 'harkal', desc: 'A cold, deep pool where the Harkal circle.' });
+  bd('d4u', { faction: 'duskareth', name: 'Scarring Deeps', cost: { gold: 2500, stone: 5, ngakara: 2 }, req: ['d4'], dwellUp: 'harkal2', desc: 'Upgrades Harkal to Scarred Harkal.' });
+  bd('d5', { faction: 'duskareth', name: 'Moonward Cloister', cost: { gold: 3000, stone: 10, stygian: 2 }, req: ['fort1', 'd2'], pop: 150, dwell: 'kaloeik', desc: 'Kalo’Eik who serve the Duskareth live and teach here.' });
+  bd('d6', { faction: 'duskareth', name: 'Ember Roost', cost: { gold: 4500, wood: 5, timber: 5 }, req: ['fort1', 'd3'], dwell: 'tyndael', desc: 'A roost of fireproof timber for the Tyndael.' });
+  bd('d7', { faction: 'duskareth', name: 'Horned Chapel', cost: { gold: 7000, stone: 10, stygian: 5, glowmoss: 5 }, req: ['fort2', 'd5'], pop: 250, dwell: 'xiweik', desc: 'The Xiw’Eik sing their chaos here.' });
+  bd('d8', { faction: 'duskareth', name: 'Lutut Crags', cost: { gold: 15000, stone: 20, stygian: 10 }, req: ['fort2', 'd6'], dwell: 'lutut', desc: 'A raw crag above the town where the Lutut nest.' });
+  bd('d9', { faction: 'duskareth', name: 'Nekh Hollow', cost: { gold: 20000, stone: 20, stygian: 15, ngakara: 10 }, req: ['fort3', 'd8'], unlock: 'nekh', dwell: 'nekh', desc: 'A hole into the Duat itself. Built only once the Nekh’Vorran has been unlocked in the eye of the storm.' });
+  /* ---- the Elsha'ryn town ---- */
+  bd('e1', { name: 'Ju Field', faction: 'elsharyn', cost: { gold: 500, wood: 5 }, dwell: 'sprengju', desc: 'A field of Ju, woken one by one by a shaving of a true Relic.' });
+  bd('e1u', { name: 'Shaving Stones', faction: 'elsharyn', cost: { gold: 800, wood: 5 }, req: ['e1'], dwellUp: 'sprengju2', desc: 'Larger shavings wake brighter Sprengju: Nur Sprengju.' });
+  bd('e2', { name: 'Spear Lodge', faction: 'elsharyn', cost: { gold: 1000, wood: 10 }, pop: 50, dwell: 'speareikar', desc: 'A lodge in the roots where Spear Eikar train.' });
+  bd('e2u', { name: 'Grovewarden Hall', faction: 'elsharyn', cost: { gold: 1300, wood: 10 }, req: ['e2'], pop: 120, dwellUp: 'speareikar2', desc: 'Upgrades Spear Eikar to Grovewarden Spears.' });
+  bd('e3', { name: 'Stryx Seedbed', faction: 'elsharyn', cost: { gold: 1500, stone: 8 }, req: ['fort1'], dwell: 'stryx', desc: 'Where Stryx seeds are sown and grow into stone.' });
+  bd('e3u', { name: 'The Old Stand', faction: 'elsharyn', cost: { gold: 1800, stone: 5, glowmoss: 2 }, req: ['e3'], dwellUp: 'stryx2', desc: 'Upgrades Stryx to Old Stryx.' });
+  bd('e4', { name: 'Albali Tree', faction: 'elsharyn', cost: { gold: 2000, wood: 10 }, req: ['fort1'], dwell: 'albali', desc: 'An Albali tree: the first of the Byrd’s five forms. The Byrds come home to it.' });
+  bd('e4u', { name: 'Elder Albali Tree', faction: 'elsharyn', cost: { gold: 2500, wood: 5, glowmoss: 2 }, req: ['e4'], dwellUp: 'albali2', desc: 'Upgrades Albali Byrds to Albali Elders.' });
+  bd('e5', { name: 'Tongue Hollow', faction: 'elsharyn', cost: { gold: 3000, wood: 10, glowmoss: 2 }, req: ['fort1', 'e2'], pop: 150, dwell: 'tonguatjis', desc: 'A damp hollow under the deep trees where the Tonguatjis wait.' });
+  bd('e6', { name: 'Punk Range', faction: 'elsharyn', cost: { gold: 4500, wood: 10, timber: 5 }, req: ['fort1', 'e3'], dwell: 'saklaypunk', desc: 'Paddocks and targets: Eikar learn to shoot from the backs of Domestic Punks.' });
+  bd('e7', { name: 'Ember Wallow', faction: 'elsharyn', cost: { gold: 7000, stone: 10, timber: 5, stygian: 5 }, req: ['fort2', 'e5'], pop: 250, dwell: 'apibuta', desc: 'A wallow of warm basalt where the Api Buta lie.' });
+  bd('e8', { name: 'Awvadhi Bog', faction: 'elsharyn', cost: { gold: 15000, stone: 20, ngakara: 10 }, req: ['fort2', 'e6'], dwell: 'sruvorn', desc: 'An acid bog at the forest’s edge. The Sru Vorn keep it.' });
+  bd('e9', { name: 'Clearing of Light', faction: 'elsharyn', cost: { gold: 20000, wood: 20, glowmoss: 15, stygian: 10 }, req: ['fort3', 'e8'], unlock: 'vyrenalur', blueprint: 'vyrantler', dwell: 'vyrenalur', desc: 'A clearing where the light falls through the canopy. Built only while a hero has brought the Shed Antler of the Vyrenalur into the town.' });
+  bd('mossbed', { name: 'Glowmoss Beds', faction: 'elsharyn', cost: { gold: 3000, wood: 8 }, req: ['hall2'], res: { glowmoss: 1 }, desc: '+1 Glowmoss a day.' });
+  bd('memtree', { name: 'Memory Tree', faction: 'elsharyn', cost: { gold: 2000, wood: 8 }, req: ['hall1'], desc: 'The Elsha’ryn track memory: here you can see where every rival hero last fought.' });
+  bd('altar', { name: 'Growing Altar', faction: 'elsharyn', cost: { gold: 2500, wood: 6, glowmoss: 3 }, req: ['hall2'], desc: 'Grow-forging: grow a plant or raw metal onto a Relic over three days. The Relic takes that element, and its bearer’s army fights at home on that ground.' });
+  bd('grove', { name: 'Protected Grove', faction: 'elsharyn', cost: { gold: 3000, wood: 10, glowmoss: 4 }, req: ['hall2'], desc: 'Teaches the Grove songs. They work only in battles near your Elsha’ryn towns; carry them too far and they are forgotten.' });
+  bd('oathtree', { name: 'Oath Tree', faction: 'elsharyn', cost: { gold: 3500, wood: 8, glowmoss: 4, stygian: 2 }, req: ['fort2'], desc: 'Stacks of the Elsha’ryn can be Changed here: stronger, and bound by oath. If their hero surrenders, or they are dismissed, the forest takes them.' });
   D.BUILD_ORDER = ['hall1', 'hall2', 'hall3', 'fort1', 'fort2', 'fort3', 'tavern', 'market', 'woodyard', 'stoneyard', 'muster', 'granary', 'farms', 'terraces', 'terraces2', 'songs1', 'songs2', 'songs3', 'choir',
     't_drill', 't_road', 't_count', 't_capt', 't_duat', 't_pens', 'vault', 'shipyard', 'urverk', 'stygwell', 'sanctum',
-    'd1', 'd1u', 'd2', 'd2u', 'd3', 'd3u', 'd4', 'd4u', 'd5', 'd6', 'd7', 'd8', 'd9'];
+    'd1', 'd1u', 'd2', 'd2u', 'd3', 'd3u', 'd4', 'd4u', 'd5', 'd6', 'd7', 'd8', 'd9',
+    'mossbed', 'memtree', 'altar', 'grove', 'oathtree', 'e1', 'e1u', 'e2', 'e2u', 'e3', 'e3u', 'e4', 'e4u', 'e5', 'e6', 'e7', 'e8', 'e9'];
   D.START_BUILDINGS = ['hall1', 'tavern', 'fort1', 'd1', 'd2', 't_drill'];
+  /* each faction: what a new town has, who lives there, its home ground and its captains */
+  D.FACTION = {
+    duskareth: { start: ['hall1', 'tavern', 'fort1', 'd1', 'd2', 't_drill'], neutral: ['hall1', 'fort1', 'd1', 'd2', 'tavern'], home: 'dusk', ranks: ['vel', 'stamijan', 'naelst', 'thar'],
+      peoples: { eikar: 4, keilia: 2, kaloeik: 2, karnen: 1.5 }, guard: ['malsti', 'velnur', 'ver'] },
+    elsharyn: { start: ['hall1', 'tavern', 'fort1', 'e1', 'e2', 't_drill'], neutral: ['hall1', 'fort1', 'e1', 'e2', 'tavern'], home: 'grass', ranks: ['jukeeper', 'grovewarden', 'tracker'],
+      peoples: { eikar: 4, kaloeik: 3, keilia: 1, karnen: 1 }, guard: ['sprengju', 'speareikar', 'stryx'] },
+  };
+  D.factionOf = f => D.FACTION[f] ? f : 'duskareth';
+  /* the buildings every town has, as each people names them (the Duskareth names are the ones above) */
+  D.LOOK = {
+    elsharyn: {
+      hall1: ['Root Hall', 'The heart of the grove, a hall grown inside a great tree. 1000 gold a day.'],
+      hall2: ['Hall of Boughs', 'The tree grows wide and its boughs fill with homes. 1750 gold a day, and room for more people.'],
+      hall3: ['Crown of the Forest', '3000 gold a day. The seat of an Elsha’ryn elder, crowned with light.'],
+      fort1: ['Thorn Hedge', 'A living hedge and a gate of roots. Needed for every dwelling above the second.'],
+      fort2: ['Briarwall', 'The hedge grows thick, with watch-trees. Creatures grow 25% faster.'],
+      fort3: ['Wall of the Ancients', 'Four watch-trees of the old forest. Creatures grow 50% faster.'],
+      tavern: ['Hollow Stump', 'A tavern in the stump of a fallen giant. Hire heroes and squadron captains here.'],
+      market: ['Barter Ring', 'Trade resources on the root-tables. On market day, travelling sellers come.'],
+      woodyard: ['Deadfall Yard', 'Wood from trees that fell on their own (the Elsha’ryn cut no living tree). +2 wood a day.'],
+      stoneyard: ['Mossrock Cutters', 'Stone lifted gently from under the moss. +2 stone a day.'],
+      muster: ['Gathering Glade', 'Recruit here from the dwellings of every one of your towns: the troops come straight to this town.'],
+      granary: ['Nut Store', 'Woven baskets of nuts and seeds hung high in the branches. +8 food a day.'],
+      farms: ['Fruit Gardens', 'Gardens of glowing fruit under the canopy. +16 food a day. Needs 200 people to tend them.'],
+      terraces: ['Root Houses', 'Round homes in the roots for 300 more people.'],
+      terraces2: ['Great Root Halls', 'Homes for 500 more people, deep in the oldest roots.'],
+      songs1: ['Singing Tree', 'A tree hung with bell-flowers. Heroes with Songcraft learn the first songs here.'],
+      songs2: ['Singing Tree II', 'More bells bloom. Second-tier songs.'],
+      songs3: ['Singing Tree III', 'The whole tree rings. Third-tier songs.'],
+      choir: ['Choir of Light', 'Fourth-tier songs, sung at a pool of light under the singing tree.'],
+      t_drill: ['Spear Ground', 'Training ground: Battle Drill, Shieldwall, Marksmanship, Field Tactics.'],
+      t_road: ['Trailpost', 'Where trackers set out: Wayfinding, Scouting, Provisioning, Seafaring.'],
+      t_count: ['Tally Stump', 'A stump notched with every trade: Stewardship, Diplomacy, Plunder, Learning.'],
+      t_capt: ['Canopy Lodge', 'A lodge high in the branches: Captaincy, Heartening, Fortune, Mending.'],
+      t_duat: ['Starwell', 'A well that shows the sky at noon: Songcraft, Breathwork, Duatcraft, Skyreading.'],
+      t_pens: ['Willow Pens', 'Woven willow pens: Memorykeeping, Beastmastery, Siegecraft, Stygiancraft.'],
+      vault: ['Root Vault', 'Keeps memory cores safe in the roots, and turns captain cores into new captains.'],
+      shipyard: ['Raft Landing', 'Build ships. Only in a town by the water.'],
+    },
+  };
+  D.bname = (bid, fac) => { const L = D.LOOK[fac] && D.LOOK[fac][bid]; return L ? L[0] : D.BUILDINGS[bid].name; };
+  D.bdesc = (bid, fac) => { const L = D.LOOK[fac] && D.LOOK[fac][bid]; return L ? L[1] : D.BUILDINGS[bid].desc; };
 
   /* ---------------- map objects ---------------- */
   D.MINES = {
-    gold: { name: 'Gold Seam', res: 'gold', amt: 800 },
+    gold: { name: 'Gold Seam', res: 'gold', amt: 1000 },
     wood: { name: 'Woodcutters’ Camp', res: 'wood', amt: 2 },
     stone: { name: 'Quarry', res: 'stone', amt: 2 },
     food: { name: 'Farmstead', res: 'food', amt: 10 },
@@ -437,11 +577,11 @@
 
   /* ---------------- difficulty: your starting stores, and how hard the computer plays ---------------- */
   D.DIFFICULTY = [
-    { id: 'wanderer', name: 'Wanderer', pct: 80, res: 1.6, ai: 'easy', desc: 'Plenty to start with; the computer plays gently.' },
-    { id: 'ahoac', name: 'Ahoac', pct: 100, res: 1.25, ai: 'normal', desc: 'A comfortable start.' },
-    { id: 'captain', name: 'Captain', pct: 130, res: 1, ai: 'normal', desc: 'An even start.' },
-    { id: 'onnar', name: 'Onnar', pct: 160, res: 0.7, ai: 'hard', desc: 'Lean stores; a sharp computer.' },
-    { id: 'elster', name: 'Elster', pct: 200, res: 0.45, ai: 'brutal', desc: 'Almost nothing to start with; a ruthless computer.' },
+    { id: 'wanderer', name: 'Wanderer', pct: 80, start: { gold: 25000, common: 30, rare: 12 }, ai: 'easy', desc: 'Plenty to start with (25,000 gold); the computer plays gently.' },
+    { id: 'ahoac', name: 'Ahoac', pct: 100, start: { gold: 15000, common: 20, rare: 8 }, ai: 'normal', desc: 'A comfortable start (15,000 gold).' },
+    { id: 'captain', name: 'Captain', pct: 130, start: { gold: 10000, common: 15, rare: 5 }, ai: 'normal', desc: 'An even start (10,000 gold).' },
+    { id: 'onnar', name: 'Onnar', pct: 160, start: { gold: 7000, common: 10, rare: 3 }, ai: 'hard', desc: 'Lean stores (7,000 gold); a sharp computer.' },
+    { id: 'elster', name: 'Elster', pct: 200, start: { gold: 3000, common: 5, rare: 1 }, ai: 'brutal', desc: 'Almost nothing to start with (3,000 gold); a ruthless computer.' },
   ];
   /* the heroes you can start with (or a random one) */
   D.START_HEROES = [
@@ -453,7 +593,7 @@
     { id: 'gorran', name: 'Gorran the Patient', people: 'keilia', base: 'hearten', desc: 'A Keilia warden. Starts with Heartening: higher morale.' },
   ];
   D.BONUSES = { random: 'Random', gold: 'Gold (+3000)', res: 'Resources', relic: 'A Relic' };
-  D.FACTIONS = [{ id: 'duskareth', name: 'The Duskareth', follows: 'the Nekh’Vorran', ready: true }, { id: 'skarvalorin', name: 'The SkarValorin', follows: 'the Aerolhorn', ready: false }, { id: 'elsharyn', name: 'The Elsha’ryn', follows: 'the Vyrenalur', ready: false }];
+  D.FACTIONS = [{ id: 'duskareth', name: 'The Duskareth', follows: 'the Nekh’Vorran', ready: true }, { id: 'skarvalorin', name: 'The SkarValorin', follows: 'the Aerolhorn', ready: false }, { id: 'elsharyn', name: 'The Elsha’ryn', follows: 'the Vyrenalur', ready: true }];
 
   /* ---------------- numbers changed in the Admin Panel (dya_config 'su_balance') ---------------- */
   D.applyBalance = function (bal) {

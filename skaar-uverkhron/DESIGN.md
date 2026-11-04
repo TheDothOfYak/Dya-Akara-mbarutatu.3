@@ -237,7 +237,7 @@ this game (it may appear later as a special event).
 |---|---|---|
 | **Duskareth** (first) | the Nekh'Vorran | The Duat |
 | SkarValorin (later) | the Aerolhorn | The Great Anvil (they still hold it at this point in history), and the Aerolhorn |
-| Elsha'ryn (later) | the Vyrenalur | Grow-forging, and the oath-breaking transformations |
+| **Elsha'ryn** (second, built) | the Vyrenalur | Memory tracking, grow-forging, Grove songs, the Oath (see README) |
 
 ## 8. Battles
 
@@ -316,17 +316,45 @@ changed from the Admin Panel without touching the code).
   (conqueror, raider, builder, explorer, turtle).
 - **Online:** the computer never fights for a person. An attack on someone on
   another device waits for them; both devices run the same battle and only the
-  choices travel. Rooms have a chat.
+  choices travel. Rooms have a chat. Each person picks their own faction (or random)
+  in the room; the host picks for the computer seats.
 - **Records:** only personal records for solo games; no leaderboard.
 - **Meeting:** click another of your armies to walk over and trade (stacks, captains,
   Relics, cores); a squadron can join a hero's army whole.
 - **Population** changes a little every day.
 - **Tiers:** each tier is a big step up. Tier 8 (the Lutut) is the top of the town: very
   strong, very costly, and exactly one a week.
+- **Balance (in the spirit of the old games):**
+  - Worth for gold climbs with tier: a tier 8 creature gives about 40 times what a
+    tier 1 does for each gold, tier 9 about 150 times. Both factions match within
+    about 15% at every tier.
+  - Tiers 1–6 cost gold alone; tier 7 one rare; tier 8 (3,500 gold) two; tier 9
+    (10,000 gold) nine.
+  - A full week of upgraded troops costs about 17,000 gold. A town with the top hall
+    makes 21,000 a week.
+  - Gold Seam 1000 a day; wood and stone mines 2 a day; rare mines 1 a day.
+  - The market trades at 125 for wood or stone, 250 for a rare and 40 for food (one
+    market gives 45% of that, more with more markets).
+  - Dwellings cost the same by tier for both peoples: 500 at tier 1, rising to 15,000
+    at tier 8 and 20,000 at tier 9, plus stone and rares higher up.
+  - A person's starting stores by difficulty: 25,000 / 15,000 / 10,000 / 7,000 /
+    3,000 gold, with common and rare resources to match. The computer starts with
+    12,000.
+  - Towns grow 5% a week, up to 13% with spare food. The top hall needs 450 people
+    and the top walls 400.
+  - The computer builds its halls first, trades at the market for what a building
+    lacks, and saves for the next building until the week's end.
 - **Economy:** halls pay 1000 / 1750 / 3000 gold a day; Woodcutters' and Stonecutters'
   Yards; a Muster Ground recruits from every town's dwellings; recruit everything in one
   click. Corralled punks can be mustered as troops, butchered for food, or put to work
   (cheaper buildings in that town).
+- **One look everywhere:** every creature, hero and building casts the same soft shadow;
+  battles are painted with the map's own ground, its light and shade, and the land's own
+  trees or rocks along the horizon; armies on the map and stacks in battle stand on the
+  same owner's ring, with the same gold ring for the one picked or acting; the map and
+  battle use the same colours for reachable (green), blocked (red) and a fight (orange).
+  Creatures walk (legs moving) between hexes, one step per hex, and a falling stack eases
+  into its body on the ground.
 - **Rekindle** can raise the enemy's fallen to fight for you only with Songcraft 5.
 - **Battles show the blows:** lunges, recoils, deaths after the blow lands, and bodies
   left on the field. **Rekindle** (tier 3 song, 16 Breath) raises fallen stacks from
@@ -338,8 +366,8 @@ changed from the Admin Panel without touching the code).
 
 ## 11. Not built yet
 
-- The other two factions (SkarValorin, Elsha'ryn), the campaign, and the Dya'Akara
-  special event (on hold).
+- The SkarValorin, the campaign, and the Dya'Akara special event (on hold).
+- The computer does not hunt glimmers for the Shed Antler yet.
 - Siege extras: moats, special defenses, siege machines.
 - Sound (to be written by the creator).
 - An undo button in the map editor, and editing details of placed things (amounts,

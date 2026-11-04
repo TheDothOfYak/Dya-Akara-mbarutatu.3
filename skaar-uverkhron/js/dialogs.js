@@ -114,7 +114,9 @@
     }
     function dismiss() {
       const G = groups[sel.g]; const s = G.slots[sel.si];
-      U.confirm('Dismiss', 'Send them away for good?', () => { if (sel.sub != null && sel.sub !== 'cap') s.stacks.splice(sel.sub, 1); else G.slots[sel.si] = null; sel = null; draw(); if (onChange) onChange(); });
+      U.confirm('Dismiss', 'Send them away for good?', () => { const gone = sel.sub != null && sel.sub !== 'cap' ? s.stacks[sel.sub] : s; if (sel.sub != null && sel.sub !== 'cap') s.stacks.splice(sel.sub, 1); else G.slots[sel.si] = null;
+        const broke = gone && gone.kind === 'cap' ? gone.stacks.filter(x => x.changed) : gone && gone.changed ? [gone] : []; if (broke.length) { RU.oathTaken(st(), U.viewer, broke); U.toast('The Oath is broken. The forest takes them.'); }
+        sel = null; draw(); if (onChange) onChange(); });
     }
     draw();
     return box;
@@ -173,6 +175,7 @@
     } else if (up) acts.appendChild(el('div', { cls: 'small muted', style: { marginRight: 'auto' }, text: 'Upgrades to ' + up.plural + ' in a town with its upgraded dwelling.' }));
     if (s && opts.slots && opts.canDismiss !== false) acts.appendChild(btn('Dismiss', () => U.confirm('Dismiss', 'Send these ' + C.plural + ' away for good?', () => {
       const i = opts.slots.indexOf(s); if (i >= 0) opts.slots[i] = null; else opts.slots.forEach(x => { if (x && x.kind === 'cap') { const k = x.stacks.indexOf(s); if (k >= 0) x.stacks.splice(k, 1); } });
+      if (s.changed) { RU.oathTaken(st(), U.viewer, [s]); U.toast('The Oath is broken. The forest takes them.'); }
       m.close(); if (opts.onChange) opts.onChange(); U.refresh(); townRedraw(); }), 'danger'));
     acts.appendChild(btn('Close', () => m.close(), 'primary'));
     return m;
@@ -330,7 +333,7 @@
     const m = U.modal(el('div'), { wide: true, onClose: () => U.refresh() });
     function render() {
       const b = m.box; b.innerHTML = '';
-      b.appendChild(el('h2', { text: 'The Tavern of the Lantern' }));
+      b.appendChild(el('h2', { text: town ? 'The ' + D.bname('tavern', town.faction) : 'The Tavern' }));
       b.appendChild(el('p', { cls: 'small muted', text: 'New faces come every week. A hero must learn all five basic skills at a town’s training halls before they can leave it. Only ' + D.MAX_FIELD_HEROES + ' heroes can be out on the map at once.' }));
       b.appendChild(el('h3', { text: 'Heroes — ' + M.heroCost + ' gold' }));
       b.appendChild(el('div', { cls: 'row', style: { alignItems: 'stretch' } }, P.tavern.heroes.map(id => { const h = st().heroes[id]; if (!h) return null;
@@ -568,7 +571,7 @@
   DL.mapKey = function () {
     const sec = (title, kids) => el('div', { cls: 'key-sec' }, [el('h3', { text: title }), ...kids]);
     const sizes = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, [el('th', { cls: 'small muted', text: 'Word' }), el('th', { cls: 'small muted', text: 'How many' })]), ...S.COUNT_WORDS.map(([a, b, w]) => el('tr', {}, [el('td', { cls: 'gold', text: w }), el('td', { text: b == null ? a + ' or more' : a + '–' + b })]))]);
-    const marks = [['→ green', 'The path: reached today'], ['→ red', 'The path: later days'], ['⚔', 'The path ends in a fight'], ['✦', 'The path ends at something to visit'], ['⇄', 'The path ends at one of your own armies: meet and trade'], ['◌ blue ring', 'The Sunear’Zikhron: the storm (its still eye in the middle)']];
+    const marks = [['G', 'Show the way: green ground is reachable today, red stripes are blocked (water, mountains, thick woods, buildings), orange is beside a wild guard (you would stop there and fight)'], ['□ green', 'Pointing: you can reach it today'], ['□ gold', 'Pointing: you can reach it, but not today'], ['✕ red', 'Pointing: you cannot go there (the bar at the bottom says why)'], ['⚔ orange', 'Pointing: the way passes a wild guard, and you will fight it'], ['→ green', 'The path: reached today'], ['→ red', 'The path: later days'], ['⚔', 'The path ends in a fight'], ['✦', 'The path ends at something to visit'], ['⇄', 'The path ends at one of your own armies: meet and trade'], ['◌ blue ring', 'The Sunear’Zikhron: the storm (its still eye in the middle)']];
     const ground = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, ['Ground', 'Moving', 'Element'].map(x => el('th', { cls: 'small muted', text: x }))),
       ...Object.values(D.TERRAIN).filter(t => !t.void).map(t => el('tr', {}, [el('td', { text: t.name }), el('td', { text: t.pass === false ? 'boats only' : t.cost === 100 ? 'normal' : Math.round(t.cost) + '% (slower)' }), el('td', { text: t.el ? D.ELEMENTS[t.el].name : '' })])),
       el('tr', {}, [el('td', { text: 'Road' }), el('td', { text: D.ROAD_COST + '% (faster)' }), el('td', {})])]);
@@ -587,7 +590,7 @@
     const inc = {}; D.RES.forEach(r => inc[r] = 0);
     towns.forEach(t => Object.entries(RU.townIncome(stt, t)).forEach(([k, v]) => inc[k] += v));
     const mines = Object.values(stt.objects).filter(o => o.type === 'mine' && o.owner === U.viewer);
-    mines.forEach(o => { const Mi = D.MINES[o.kind]; inc[Mi.res] += D.RES_INFO[Mi.res].common ? Mi.amt : Mi.amt / 2; });
+    mines.forEach(o => { const Mi = D.MINES[o.kind]; inc[Mi.res] += Mi.amt; });
     const heroes = Object.values(stt.heroes).filter(h => h.owner === U.viewer && !h.dead);
     const m = U.modal([el('h2', { text: P.name + '’s kingdom' }),
       el('table', { cls: 'grid' }, [el('tr', {}, [el('th', { text: '' }), ...D.RES.map(r => el('th', {}, U.resIcon(r, 18)))]), el('tr', {}, [el('td', { text: 'Stores' }), ...D.RES.map(r => el('td', { text: SU.fmt(P.res[r]) }))]), el('tr', {}, [el('td', { text: 'A day' }), ...D.RES.map(r => el('td', { text: (r === 'food' ? '+' + Math.round(inc[r]) + ' / −' + Math.round(P.lastEat || 0) : '+' + SU.fmt(inc[r])) }))])]),
@@ -603,7 +606,7 @@
     const m = U.modal(el('div'), { wide: true, onClose: () => U.refresh() });
     function render() {
       const b = m.box; b.innerHTML = '';
-      b.appendChild(el('h2', { text: 'Market Square' + (S.isMarketDay(st()) ? ' — market day!' : '') }));
+      b.appendChild(el('h2', { text: (town ? D.bname('market', town.faction) : 'The Market') + (S.isMarketDay(st()) ? ' — market day!' : '') }));
       const pickRow = (label, cur, set, give) => el('div', { cls: 'row' }, [el('span', { style: { width: '50px' }, text: label }), ...D.RES.map(r => el('button', { cls: 'btn icon' + (cur === r ? ' primary' : ''), onclick: () => { set(r); render(); },
         'data-tip': '<b>' + D.RES_INFO[r].name + '</b> — you have ' + SU.fmt(P.res[r]) + (D.RES_INFO[r].desc ? '<br>' + D.RES_INFO[r].desc : '') + (r !== (give ? to : from) ? '<br>' + (give ? '1 ' + D.RES_INFO[r].name + ' → ' + (+RU.tradeRate(st(), P, r, to).toFixed(2)) + ' ' + D.RES_INFO[to].name : '1 ' + D.RES_INFO[from].name + ' → ' + (+RU.tradeRate(st(), P, from, r).toFixed(2)) + ' ' + D.RES_INFO[r].name) : '') }, U.resIcon(r, 22)))]);
       b.appendChild(pickRow('Give', from, r => from = r, true)); b.appendChild(pickRow('Get', to, r => to = r, false));
@@ -652,6 +655,8 @@
       rep.cursed ? el('p', { cls: 'bad', text: 'A RubberMcFly was killed. Bad luck will follow this army for a while.' }) : null,
       rep.wentHome && rep.wentHome.length ? el('p', { cls: 'warn', text: 'Without their captain, ' + rep.wentHome.map(x => x.n + ' ' + D.CREATURES[x.cr].plural + ' went home to ' + x.town).join(', ') + '.' }) : null,
       rep.raised ? el('p', { cls: 'gold', text: rep.raised + ' of the enemy, raised by Rekindle, now march with you.' }) : null,
+      rep.sprengjuBack ? el('p', { cls: 'gold', text: rep.sprengjuBack + ' of the spent Sprengju came back.' }) : null,
+      rep.oathBroken ? el('p', { cls: 'bad', text: 'The Oath is broken: the forest has taken ' + rep.oathBroken + ' Changed creatures.' }) : null,
       rep.respect ? el('p', { cls: 'gold', text: rep.respect + ' saw you clear the land around their Urverk. Your armies may pass it free.' }) : null,
       rep.eyeWins && (st().setup.win || {}).kind === 'prophecy' ? el('p', { cls: 'gold', text: 'Battles won in the eye: ' + rep.eyeWins + ' of ' + ((st().setup.win || {}).n || 3) + '.' }) : null,
       rep.scattered ? el('p', { cls: 'bad', text: 'With its captain gone, the squadron cannot stay out in the field.' }) : null,

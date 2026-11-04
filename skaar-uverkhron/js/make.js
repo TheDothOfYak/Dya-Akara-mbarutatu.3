@@ -13,16 +13,17 @@
   /* ---------- heroes ---------- */
   M.hero = function (st, opts) {
     const R = SU.rng(st); opts = opts || {};
-    const people = opts.people || R.weighted(Object.keys(D.PEOPLES), p => p === 'eikar' ? 4 : p === 'karnen' ? 1.5 : 2);
+    const fac = D.factionOf(opts.faction), pw = D.FACTION[fac].peoples;
+    const people = opts.people || R.weighted(Object.keys(D.PEOPLES), p => pw[p] || 1);
     const id = SU.uid(st, 'h');
     const stats = { Strength: 1, Defense: 1, Stride: 1, Cunning: 1 };
     Object.entries(D.PEOPLES[people].lean).forEach(([k, v]) => stats[k] += v);
     for (let i = 0; i < 2; i++) stats[R.pick(D.STATS)]++;
     const base = opts.base || R.pick(D.SKILL_IDS);
-    const specCr = R.pick(['malsti', 'velnur', 'ver', 'harkal', 'kaloeik', 'tyndael', 'xiweik', 'lutut', D.PEOPLES[people].buff]);
+    const specCr = R.pick(D.LINEUP[fac].slice(0, 8).concat(fac === 'duskareth' ? [D.PEOPLES[people].buff] : []));
     const h = {
       id, name: opts.name || (personName(R, people) + ' ' + R.pick(D.EPITHETS)), people, owner: opts.owner == null ? -1 : opts.owner,
-      faction: 'duskareth', look: R.int(1, 1e9), level: 1, xp: 0, stats,
+      faction: fac, look: R.int(1, 1e9), level: 1, xp: 0, stats,
       skills: { [base]: 1 }, base, trainedToday: 0,
       songs: [], breath: 0, relics: {}, linked: [], pouch: [], cores: [], kahiz: {}, kahizCount: 0,
       spec: { cr: specCr, pct: 10 }, mount: 'punk', slots: [null, null, null, null, null],
@@ -42,12 +43,13 @@
   /* ---------- captains ---------- */
   M.captain = function (st, opts) {
     const R = SU.rng(st); opts = opts || {};
-    const people = opts.people || R.weighted(Object.keys(D.PEOPLES), p => p === 'eikar' ? 4 : p === 'keilia' ? 2.5 : 1.5);
-    const rank = opts.rank || R.weighted(['vel', 'stamijan', 'naelst', 'thar'], r => r === 'vel' ? 5 : r === 'naelst' ? 1.2 : 2);
+    const fac = D.factionOf(opts.faction), pw = D.FACTION[fac].peoples;
+    const people = opts.people || R.weighted(Object.keys(D.PEOPLES), p => pw[p] || 1);
+    const rank = opts.rank || R.weighted(D.FACTION[fac].ranks, r => ({ vel: 5, naelst: 1.2, jukeeper: 2.5, grovewarden: 3, tracker: 1.5 })[r] || 2);
     const abil = opts.abil || R.pick(Object.keys(D.CAPTAIN_ABIL));
     const lvl = opts.level || 1;
     const c = {
-      id: SU.uid(st, 'c'), name: opts.name || personName(R, people), people, rank, abil,
+      id: SU.uid(st, 'c'), name: opts.name || personName(R, people), people, rank, abil, faction: fac,
       morale: R.int(0, 1) + (abil === 'banner' ? 1 : 0), luck: R.int(0, 1) + (abil === 'charm' ? 1 : 0),
       level: lvl, hp: D.CAPTAIN_BASE.hp + lvl * D.CAPTAIN_BASE.hpLevel, atk: D.CAPTAIN_BASE.atk + lvl, def: D.CAPTAIN_BASE.def + lvl,
       capacity: D.CAPTAIN_BASE.capacity + (abil === 'warcaller' ? 1 : 0), look: R.int(1, 1e9),
@@ -98,21 +100,28 @@
   };
 
   /* ---------- towns ---------- */
-  M.town = function (st, layer, x, y, owner, name) {
-    const R = SU.rng(st);
+  M.town = function (st, layer, x, y, owner, name, faction) {
+    const R = SU.rng(st), fac = D.factionOf(faction);
     const t = {
-      id: SU.uid(st, 't'), type: 'town', faction: 'duskareth', layer, x, y, owner,
-      name: name || R.pick(TOWN_NAMES), built: D.START_BUILDINGS.slice(), pop: 260, builtToday: 0,
+      id: SU.uid(st, 't'), type: 'town', faction: fac, layer, x, y, owner,
+      name: name || R.pick(fac === 'elsharyn' ? GROVE_NAMES : TOWN_NAMES), built: D.FACTION[fac].start.slice(), pop: 260, builtToday: 0,
       avail: {}, garrison: [null, null, null, null, null], heroes: [], defender: null,
       shipyardTile: null, nekhCount: 0, sealed: 0,
     };
-    D.DUSK_LINEUP.forEach(c => t.avail[c] = 0);
-    t.avail.malsti = D.CREATURES.malsti.grow; t.avail.velnur = D.CREATURES.velnur.grow;
+    M.setFaction(t, fac);
     st.objects[t.id] = t;
     return t;
   };
   const TOWN_NAMES = ['Duskmere', 'Velthar', 'Onnar’s Rest', 'Nekhgate', 'Stygian Hollow', 'Lunmarch', 'Ashveil', 'Thar Kessal', 'Quorvane', 'Hollowmere', 'Vel’s Crossing', 'Dimholt', 'Thalos Edge', 'Umbrevale', 'Ringhold', 'Duat’s Mouth', 'Greywater', 'Sablekeep'];
-  M.TOWN_NAMES = TOWN_NAMES;
+  const GROVE_NAMES = ['Lunglade', 'Nur’s Hollow', 'Thornholt', 'Mossreach', 'Kipsu Run', 'Lanternwood', 'Albali Rest', 'Quora Grove', 'Stryxden', 'Ju Meadow', 'Rootsong', 'Vyren’s Ford', 'Glimmerdell', 'Oakshade'];
+  M.TOWN_NAMES = TOWN_NAMES; M.GROVE_NAMES = GROVE_NAMES;
+  /* make a town belong to a faction: its first buildings and its first creatures */
+  M.setFaction = function (t, fac, keepBuilt) {
+    fac = D.factionOf(fac); t.faction = fac; if (!keepBuilt) t.built = D.FACTION[fac].start.slice();
+    t.avail = {}; D.LINEUP[fac].forEach(c => t.avail[c] = 0);
+    const [a, b] = D.LINEUP[fac]; t.avail[a] = D.CREATURES[a].grow; t.avail[b] = D.CREATURES[b].grow;
+    return t;
+  };
 
   /* ---------- armies ---------- */
   M.army = function (st, owner, layer, x, y, heroId, slots) {
@@ -125,12 +134,14 @@
   /* ---------- wild groups: always led by a rogue Dearcàn ---------- */
   const WILD_TABLE = [
     // [creature, minPower, weight, layers]
-    ['wildpunk', 0, 6], ['uff', 0, 4], ['dompunk', 0, 4], ['malsti', 0, 3], ['velnur', 0, 3], ['ver', 2000, 2],
+    ['wildpunk', 0, 6], ['uff', 0, 4], ['dompunk', 0, 4], ['kipsu', 0, 3], ['malsti', 0, 3], ['velnur', 0, 3], ['ver', 2000, 2],
     ['harkal', 5000, 3], ['kaloeik', 12000, 2], ['tyndael', 15000, 2], ['xiweik', 30000, 1.5], ['naga', 40000, 1.5], ['ularnaga', 45000, 1.5], ['lutut', 70000, 1],
   ];
   M.wild = function (st, layer, x, y, power, opts) {
     const R = SU.rng(st); opts = opts || {};
-    const choices = WILD_TABLE.filter(w => w[1] <= power && (!opts.only || opts.only.includes(w[0])));
+    /* any creature can be asked for (a town's own guards); the table gives the usual ones their weights */
+    const table = opts.only ? opts.only.map(cr => WILD_TABLE.find(w => w[0] === cr) || [cr, 0, 2]) : WILD_TABLE;
+    let choices = table.filter(w => w[1] <= power); if (!choices.length) choices = table.slice(0, 1);
     const nStacks = opts.stacks || (power > 30000 ? R.int(2, 3) : power > 6000 ? R.int(1, 2) : 1);
     const kinds = [];
     for (let i = 0; i < nStacks; i++) kinds.push(opts.cr || R.weighted(choices, w => w[2] * (1 + w[1] / Math.max(1, power)))[0]);

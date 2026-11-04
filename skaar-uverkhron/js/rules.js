@@ -77,14 +77,14 @@
     const goalObj = S.objAt(st, layer, tx, ty), goalArmy = S.armyAt(st, layer, tx, ty);
     const ok = (x, y) => {
       const i = y * w + x;
-      if (P && !P.explored[layer][i] && i !== goal) return false;
+      if (P && !P.explored[layer][i] && i !== goal && !(popts && popts.seeAll)) return false;
       if (i === goal) {
         if (goalObj || goalArmy) return true;
         if (boat) return S.passable(st, layer, x, y, { boat: true }) || S.passable(st, layer, x, y);
         return S.passable(st, layer, x, y, { fly }) || (!fly && boatAt(st, layer, x, y));
       }
-      if (S.objAt(st, layer, x, y)) return false;
-      const ar = S.armyAt(st, layer, x, y); if (ar && !(popts && popts.throughWild && ar.wild)) return false;
+      if (S.objAt(st, layer, x, y) && !(popts && popts.throughObjects)) return false;
+      const ar = S.armyAt(st, layer, x, y); if (ar && !(popts && (popts.throughWild && ar.wild || popts.throughArmies))) return false;
       if (popts && popts.avoid && popts.avoid(x, y)) return false;
       return boat ? S.passable(st, layer, x, y, { boat: true }) : S.passable(st, layer, x, y, { fly });
     };
@@ -110,6 +110,68 @@
     out.reverse();
     return out;
   };
+  /* ---- why a tile cannot be reached: the plain answer a player needs ---- */
+  const OB_WHY = { 1: 'a forest', 2: 'pines', 3: 'mountains', 4: 'rocks', 5: 'dead trees', 6: 'crystals', 7: 'reeds', 8: 'palms', 9: 'glowing trees', 10: 'a ridge' };
+  R_.obstacleName = k => OB_WHY[k] || 'something';
+  /* what stands on (x,y) and blocks it, as a short phrase, or null when the ground is open */
+  R_.blockedBy = function (st, layer, x, y, a) {
+    const L = st.layers[layer]; if (!S.inside(L, x, y)) return 'the edge of the world';
+    const i = y * L.w + x, T = D.TERRAIN[S.TCODES[L.t[i]]], fly = a && R_.canFly(st, a);
+    if (a && a.boat) return T.water ? (L.ob[i] ? R_.obstacleName(L.ob[i]) + ' in the water' : null) : null;
+    if (T.void) return 'the Void (nothing crosses it)';
+    if (T.water && !fly) return 'water (you need a boat, or an army that all flies)';
+    if (L.ob[i] === S.OB.mountain) return 'mountains (not even flyers cross them)';
+    if (L.ob[i] && !fly) return R_.obstacleName(L.ob[i]) + ' (too thick to walk through; an army that all flies can cross)';
+    if (st._block[layer][i]) { const o = Object.values(st.objects).find(q => q.layer === layer && !q.gone && S.footprint(q).some(([dx, dy]) => q.x + dx === x && q.y + dy === y)); return o ? 'the body of a building: go in by its entrance' : 'a building'; }
+    return null;
+  };
+  /* everything an army can reach today: cost to each tile (Infinity where it can't), and the tiles where a guard stops it */
+  R_.reach = function (st, a) {
+    const layer = a.layer, L = st.layers[layer], w = L.w, n = w * L.h, P = st.players[a.owner];
+    const fly = R_.canFly(st, a), boat = a.boat;
+    const cost = new Float32Array(n).fill(Infinity), stop = new Uint8Array(n);
+    const open = (x, y) => { const i = y * w + x; if (P && !P.explored[layer][i]) return false; return boat ? S.passable(st, layer, x, y, { boat: true }) : S.passable(st, layer, x, y, { fly }); };
+    const start = a.y * w + a.x; cost[start] = 0;
+    const heap = [[0, start]];
+    const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    while (heap.length) {
+      const [c, i] = pop(); if (c > cost[i]) continue;
+      const x = i % w, y = (i / w) | 0;
+      /* you stop on things, and beside a guard (a fight) */
+      if (i !== start && (stop[i] || S.objAt(st, layer, x, y) || S.armyAt(st, layer, x, y))) continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) continue;
+        const j = yy * w + xx, thing = S.objAt(st, layer, xx, yy) || S.armyAt(st, layer, xx, yy);
+        if (!thing && !open(xx, yy)) continue;
+        if (thing && P && !P.explored[layer][j]) continue;
+        const nc = c + R_.stepCost(st, a, layer, x, y, xx, yy);
+        if (nc > a.mp) continue;
+        if (nc < cost[j]) { cost[j] = nc; if (!thing && R_.guardNear(st, layer, xx, yy)) stop[j] = 1; push(nc, j); }
+      }
+    }
+    return { cost, stop, w };
+  };
+  /* why a click can't be reached, worked out the way a player would ask it */
+  R_.whyNot = function (st, a, tx, ty) {
+    const L = st.layers[a.layer]; if (!S.inside(L, tx, ty)) return 'That is off the edge of the world.';
+    const P = st.players[a.owner], i = ty * L.w + tx;
+    if (P && !P.explored[a.layer][i]) return 'You have not explored there yet: nobody knows a way.';
+    const here = S.objAt(st, a.layer, tx, ty) || S.armyAt(st, a.layer, tx, ty);
+    const b = !here && R_.blockedBy(st, a.layer, tx, ty, a); if (b) return 'Blocked: ' + b + '.';
+    if (R_.path(st, a, tx, ty, { seeAll: true })) return 'The only way there runs through land you have not explored yet. Explore nearer first.';
+    const viaThings = R_.path(st, a, tx, ty, { throughObjects: true });
+    if (viaThings) { const o = viaThings.slice(0, -1).map(s => S.objAt(st, a.layer, s.x, s.y)).find(Boolean); if (o) return 'Something lying in a narrow gap blocks the way (at the marked spot). Walk onto it first to pick it up or visit it, then go on.'; }
+    const viaArmies = R_.path(st, a, tx, ty, { throughArmies: true, throughObjects: true });
+    if (viaArmies) { const ar = viaArmies.slice(0, -1).map(s => S.armyAt(st, a.layer, s.x, s.y)).find(Boolean); if (ar) return ar.wild ? 'A wild group stands in the way. Fight it (or wait for it to move) to get past.' : 'Another army stands in the way.'; }
+    return 'There is no way there from here on this land: water, mountains or thick woods close it off. Look for a boat, an Urverk, or another road.';
+  };
+  /* the first thing in the way, for marking it on the map */
+  R_.blockerOnWay = function (st, a, tx, ty) {
+    const p = R_.path(st, a, tx, ty, { throughArmies: true, throughObjects: true }); if (!p) return null;
+    const s = p.slice(0, -1).find(q => S.objAt(st, a.layer, q.x, q.y) || S.armyAt(st, a.layer, q.x, q.y));
+    return s ? { x: s.x, y: s.y } : null;
+  };
   function boatAt(st, layer, x, y) { const o = S.objAt(st, layer, x, y); return o && o.type === 'boat'; }
 
   /* ======================= stepping ======================= */
@@ -117,7 +179,8 @@
   R_.step = function (st, a, nx, ny) {
     const cost = R_.stepCost(st, a, a.layer, a.x, a.y, nx, ny);
     if (a.mp < cost && a.mp < a.mpMax) return { moved: false, stop: true, why: 'tired' };
-    const obj = S.objAt(st, a.layer, nx, ny), other = S.armyAt(st, a.layer, nx, ny);
+    let obj = S.objAt(st, a.layer, nx, ny); const other = S.armyAt(st, a.layer, nx, ny);
+    if (!obj && R_.isElsh(st.players[a.owner])) obj = Object.values(st.objects).find(o => o.hidden && o.type === 'core' && o.layer === a.layer && o.x === nx && o.y === ny) || null;
     a.face = nx > a.x ? 1 : nx < a.x ? -1 : a.face;
     /* bumping into something: visit it without stepping (except towns, which you enter) */
     if (other && other.id !== a.id) {
@@ -125,6 +188,11 @@
       if (other.owner === a.owner) return { moved: false, stop: true, event: { kind: 'meet', other } };
       if (other.owner >= 0 && S.allies(st, a.owner, other.owner)) return { moved: false, stop: true };
       if (other.wild && other.herd) return { moved: false, stop: true, event: { kind: 'herd', other } };
+      if (other.wild && S.stacksIn(other.slots).every(s => s.cr === 'kipsu') && S.stacksIn(S.slotsOf(st, a)).some(s => s.cr === 'vyrenalur' && s.n > 0)) {
+        const slots = S.slotsOf(st, a), n = S.stacksIn(other.slots).reduce((k, s) => k + s.n, 0), kip = slots.findIndex(s => s && s.kind === 'stack' && s.cr === 'kipsu');
+        if (kip >= 0 || slots.some(s => !s)) { if (kip >= 0) slots[kip].n += n; else slots[slots.findIndex(s => !s)] = { kind: 'stack', cr: 'kipsu', n, follow: 'vyrenalur' }; R_.removeArmy(st, other);
+          return { moved: false, stop: true, msg: n + ' Kipsu fall in behind the Vyrenalur.' }; }
+      }
       return { moved: false, stop: true, event: { kind: 'battle', attacker: a, defender: other } };
     }
     if (obj && obj.type !== 'town' && obj.type !== 'boat') {
@@ -217,6 +285,13 @@
         R_.takeCore(st, h, o.core); gone();
         return { stop: true, msg: h.name + ' took up the memory core of ' + st.cores[o.core].name + '.', core: o.core };
       case 'visit': return visitPlace(st, a, h, P, o, R);
+      case 'glimmer': {
+        if (!h || o.owner !== a.owner) return { stop: true, msg: 'A glimmer of light hangs in the air, and fades as you come near.' };
+        P.glimmerSeen = (P.glimmerSeen || []).concat([o.id]); gone();
+        if (P.glimmerSeen.length >= 3) { R_.giveRelic(st, h, 'vyrantler'); P.glimmerSeen = []; S.log(st, h.name + ' followed the Vyrenalur’s trail and found the Shed Antler.', a.owner);
+          return { stop: true, msg: 'At the end of the trail, in a clearing, lies an antler of pure light: the Shed Antler of the Vyrenalur. Carry it into one of your towns to build the Clearing of Light.', relic: 'vyrantler' }; }
+        return { stop: true, msg: 'A glimmer of the Vyrenalur’s trail: ' + P.glimmerSeen.length + ' of 3 this week. Find the others before the week ends.' };
+      }
       case 'vision':
         if (!h) return { stop: true, msg: 'Something of the worm lies here. Only a hero can carry it.' };
         R_.giveRelic(st, h, 'nekhprint'); gone(); if (st.players[o.seer]) st.players[o.seer].vision = null;
@@ -347,13 +422,13 @@
   R_.canBuild = function (st, t, bid) {
     const b = D.BUILDINGS[bid], P = st.players[t.owner];
     if (t.built.includes(bid)) return { ok: false, why: 'Built.' };
-    if (b.replaces && !t.built.includes(b.replaces) && !R_.has(t, b.replaces)) return { ok: false, why: 'Needs ' + D.BUILDINGS[b.replaces].name + ' first.' };
+    if (b.replaces && !t.built.includes(b.replaces) && !R_.has(t, b.replaces)) return { ok: false, why: 'Needs ' + D.bname(b.replaces, t.faction) + ' first.' };
     if (Object.values(D.BUILDINGS).some(x => x.replaces === bid && R_.has(t, x.id))) return { ok: false, why: 'Built.' };
-    for (const r of (b.req || [])) if (!R_.has(t, r)) return { ok: false, why: 'Needs ' + D.BUILDINGS[r].name + '.' };
-    if (['d3', 'd4', 'd5', 'd6'].includes(bid) && !R_.has(t, 'fort1')) return { ok: false, why: 'Needs walls.' };
+    for (const r of (b.req || [])) if (!R_.has(t, r)) return { ok: false, why: 'Needs ' + D.bname(r, t.faction) + '.' };
+    if (b.faction && b.faction !== D.factionOf(t.faction)) return { ok: false, why: 'Not a building of this town’s people.', other: true };
     if (b.pop && t.pop < b.pop) return { ok: false, why: 'Needs ' + b.pop + ' people (the town has ' + Math.floor(t.pop) + ').' };
     if (b.coast && !t.coast) return { ok: false, why: 'This town is not by the water.' };
-    if (b.unlock && !R_.blueprintHere(st, t)) return { ok: false, why: 'A hero must bring the Rokarvac of the Nekh into this town. End a turn in the eye of the Sunear’Zikhron for a vision of where it lies.' };
+    if (b.unlock && !R_.blueprintHere(st, t, b.blueprint)) return { ok: false, why: b.blueprint === 'vyrantler' ? 'A hero must bring the Shed Antler of the Vyrenalur into this town. Follow the glimmers of its trail in the deep forest: three in one week.' : 'A hero must bring the Rokarvac of the Nekh into this town. End a turn in the eye of the Sunear’Zikhron for a vision of where it lies.' };
     const small = b.small;
     const limit = R_.buildsPerDay(st, t) + (small && !t.smallToday ? 1 : 0);
     if (t.builtToday >= limit) return { ok: false, why: 'Already built today.' };
@@ -367,20 +442,20 @@
     if (b.replaces) t.built = t.built.filter(x => x !== b.replaces);
     t.built.push(bid);
     if (b.small && !t.smallToday && t.builtToday >= R_.buildsPerDay(st, t)) t.smallToday = 1; else t.builtToday++;
-    if (b.dwell && b.dwell !== 'nekh') t.avail[b.dwell] = (t.avail[b.dwell] || 0) + D.CREATURES[b.dwell].grow;
-    if (bid === 'd9' && !t.nekhCount) t.avail.nekh = 1;
-    S.log(st, t.name + ' built the ' + b.name + '.', t.owner);
+    if (b.dwell && !D.CREATURES[b.dwell].legendary) t.avail[b.dwell] = (t.avail[b.dwell] || 0) + D.CREATURES[b.dwell].grow;
+    if (b.dwell && D.CREATURES[b.dwell].legendary && !t.nekhCount) t.avail[b.dwell] = 1;
+    S.log(st, t.name + ' built the ' + D.bname(bid, t.faction) + '.', t.owner);
     return { ok: true };
   };
   /* which creature a dwelling sells: its upgraded form if that's built */
   R_.dwellingCreature = function (t, tier) {
-    const base = D.DUSK_LINEUP[tier - 1];
+    const base = D.LINEUP[D.factionOf(t.faction)][tier - 1];
     const up = D.CREATURES[base].up;
     return { base, up: up && Object.values(D.BUILDINGS).some(b => b.dwellUp === up && t.built.includes(b.id)) ? up : null };
   };
   R_.townDwellings = function (t) {
     const out = [];
-    D.DUSK_LINEUP.forEach((cr, i) => { const b = Object.values(D.BUILDINGS).find(b => b.dwell === cr); if (b && t.built.includes(b.id)) out.push({ tier: i + 1, base: cr, up: R_.dwellingCreature(t, i + 1).up, bid: b.id }); });
+    D.LINEUP[D.factionOf(t.faction)].forEach((cr, i) => { const b = Object.values(D.BUILDINGS).find(b => b.dwell === cr); if (b && t.built.includes(b.id)) out.push({ tier: i + 1, base: cr, up: R_.dwellingCreature(t, i + 1).up, bid: b.id }); });
     return out;
   };
   R_.PUNK_MUSTER = 10; R_.PUNK_FOOD = 6;
@@ -416,7 +491,7 @@
     let n = t.avail[base] || 0;
     Object.entries(c.cost).forEach(([k, v]) => n = Math.min(n, Math.floor((P.res[k] || 0) / v)));
     if (c.pop) n = Math.min(n, Math.floor(t.pop - 40));
-    if (cr === 'nekh') n = Math.min(n, t.nekhCount ? 0 : 1);
+    if (c.legendary) n = Math.min(n, t.nekhCount ? 0 : 1);
     return Math.max(0, n);
   };
   /* put n of a creature into a set of slots: join a matching single stack, else a free slot.
@@ -438,7 +513,7 @@
     R_.pay(P, R_.recruitCost(cr, n));
     t.avail[base] -= n; if (D.CREATURES[cr].pop) t.pop -= n;
     slots.splice(0, slots.length, ...tmp);
-    if (cr === 'nekh') { t.nekhCount = 1; S.stacksIn(slots).forEach(x => { if (x.cr === 'nekh' && !x.home) x.home = t.id; }); }
+    if (D.CREATURES[cr].legendary) { t.nekhCount = 1; S.stacksIn(slots).forEach(x => { if (x.cr === cr && !x.home) x.home = t.id; }); }
     return { ok: true, n };
   };
   R_.upgradeStack = function (st, t, stack) {
@@ -474,17 +549,19 @@
   /* ---------- the tavern ---------- */
   R_.refreshTavern = function (st, P) {
     const R = SU.rng(st);
-    P.tavern.heroes = (P.tavern.heroes || []).filter(id => st.heroes[id] && st.heroes[id].owner === -1).slice(0, 1);
-    while (P.tavern.heroes.length < 3) { const h = M.hero(st, { owner: -1 }); P.tavern.heroes.push(h.id); }
+    P.tavern.heroes = (P.tavern.heroes || []).filter(id => st.heroes[id] && st.heroes[id].owner === -1 && D.factionOf(st.heroes[id].faction) === D.factionOf(P.faction)).slice(0, 1);
+    while (P.tavern.heroes.length < 3) { const h = M.hero(st, { owner: -1, faction: P.faction }); P.tavern.heroes.push(h.id); }
     P.tavern.captains = [];
-    for (let i = 0; i < 4; i++) P.tavern.captains.push(M.captain(st, { level: R.int(1, 1 + Math.floor(st.day / 18)) }));
+    for (let i = 0; i < 4; i++) P.tavern.captains.push(M.captain(st, { level: R.int(1, 1 + Math.floor(st.day / 18)), faction: P.faction }));
   };
   /* every hero comes with a captain and a few troops of their own */
   R_.retinue = function (st, h) {
     if (S.stacksIn(h.slots).length) return;
-    const R = SU.rng(st), cap = M.captain(st, {});
-    h.slots[0] = M.capSlot(cap, [{ cr: 'malsti', n: R.int(10, 16) }]);
-    if (!h.slots[1]) h.slots[1] = { kind: 'stack', cr: 'velnur', n: R.int(3, 6) };
+    const R = SU.rng(st), fac = D.factionOf(h.faction), [c1, c2] = D.LINEUP[fac];
+    if (fac === 'elsharyn') { h.slots[0] = M.capSlot(M.captain(st, { faction: fac, rank: 'jukeeper' }), [{ cr: c1, n: R.int(18, 26) }]); if (!h.slots[1]) h.slots[1] = { kind: 'stack', cr: c2, n: R.int(4, 7) }; return; }
+    const cap = M.captain(st, { faction: fac });
+    h.slots[0] = M.capSlot(cap, [{ cr: c1, n: R.int(10, 16) }]);
+    if (!h.slots[1]) h.slots[1] = { kind: 'stack', cr: c2, n: R.int(3, 6) };
   };
   R_.hireHero = function (st, P, t, hid) {
     const h = st.heroes[hid];
@@ -804,11 +881,11 @@
   R_.removeArmy = function (st, a) { a.dead = true; const L = st.layers[a.layer]; if (L && st._armyAt[a.layer].get(a.y * L.w + a.x) === a.id) st._armyAt[a.layer].delete(a.y * L.w + a.x); delete st.armies[a.id]; };
 
   /* ======================= players ======================= */
-  /* a town's people, one day: about 3% a week, up to 10% with food to spare, fewer when hungry */
+  /* a town's people, one day: about 5% a week, up to 13% with food to spare, fewer when hungry */
   R_.popDay = function (st, P, t, nTowns) {
     const room = R_.housing(t) - t.pop;
     const spare = Math.max(0, (P.lastFoodIn || 0) - (P.lastEat || 0)) / Math.max(1, nTowns || 1);
-    let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.03 + SU.clamp(spare / 60, 0, 0.07));
+    let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.05 + SU.clamp(spare / 60, 0, 0.08));
     if (st.weekEvent === 'wanderers') grow += t.pop * 0.1;
     grow = Math.min(grow, Math.max(0, room)) / D.WEEK + (t.popFrac || 0);
     const whole = grow >= 0 ? Math.floor(grow) : Math.ceil(grow);
@@ -867,12 +944,84 @@
     }
     return null;
   };
+
+  /* ======================= the Elsha'ryn ======================= */
+  R_.isElsh = P => !!P && D.factionOf(P.faction) === 'elsharyn';
+  /* the forest takes those who break the Oath: they become a wild Stryx thicket near home */
+  R_.oathTaken = function (st, owner, stacks, layer, x, y) {
+    const n = stacks.reduce((t, s) => t + (s.n || 0) * (D.CREATURES[s.cr].tier || 1), 0); if (!n) return null;
+    const home = S.townsOf(st, owner)[0];
+    const L = layer != null ? layer : home ? home.layer : 0, X = x != null ? x : home ? home.x : 5, Y = y != null ? y : home ? home.y + 3 : 5;
+    const spot = R_.freeNear(st, L, X, Y); if (!spot) return null;
+    const g = M.wild(st, L, spot[0], spot[1], 600 + n * 120, { only: ['stryx'] });
+    S.log(st, 'The forest has taken the oath-breakers. A Stryx thicket stands where they were.', owner);
+    return g;
+  };
+  R_.oathCost = s => { const C = D.CREATURES[s.cr]; return { gold: Math.round((C.cost.gold || 0) * 0.4 * s.n), glowmoss: Math.max(1, Math.ceil(s.n * C.tier / 20)) }; };
+  R_.changeStack = function (st, P, s) {
+    const C = D.CREATURES[s.cr]; if (!C || C.faction !== 'elsharyn' || C.legendary || s.changed) return { ok: false, why: 'Only Elsha’ryn creatures, once.' };
+    const cost = R_.oathCost(s); if (!R_.afford(P, cost)) return { ok: false, why: 'Not enough.' };
+    R_.pay(P, cost); s.changed = true; return { ok: true };
+  };
+  /* grow-forging: a plant or raw metal grown onto a Relic over three days */
+  R_.GROW = { glowmoss: 'Fti', timber: 'Eldi', ngakara: 'Su', stone: 'Ular' };
+  R_.growStart = function (st, t, h, rid, res) {
+    const P = st.players[t.owner]; if (t.altar) return { ok: false, why: 'The altar is already growing a Relic.' };
+    if (!D.RELICS[rid] || D.RELICS[rid].special) return { ok: false, why: 'Nothing can be grown onto that.' };
+    const cost = { gold: 500 }; cost[res] = 3; if (!R_.afford(P, cost)) return { ok: false, why: 'Growing costs 500 gold and 3 ' + D.RES_INFO[res].name + '.' };
+    const slot = Object.keys(h.relics).find(k => h.relics[k] === rid); if (!slot) return { ok: false };
+    R_.pay(P, cost); delete h.relics[slot];
+    t.altar = { rid, el: R_.GROW[res], hero: h.id, ready: st.day + 3 };
+    return { ok: true };
+  };
+  R_.growTake = function (st, t, h) {
+    const a = t.altar; if (!a || st.day < a.ready) return { ok: false, why: 'Not grown yet.' };
+    R_.giveRelic(st, h, a.rid); h.grownEl = h.grownEl || {}; h.grownEl[a.rid] = a.el; t.altar = null; return { ok: true, el: a.el, rid: a.rid };
+  };
+  /* the elements a hero's grown Relics have taken (only Relics still carried) */
+  R_.grownEls = h => !h || !h.grownEl ? [] : Object.entries(h.grownEl).filter(([rid]) => R_.carries(h, rid)).map(([, el]) => el);
+  /* each day for the Elsha'ryn: Grove songs fade far from home, they sense memory cores, the Vyrenalur's trail, the Kipsu */
+  R_.elshDay = function (st, P, pi, newWeek) {
+    if (!R_.isElsh(P)) return;
+    const R = SU.rng(st);
+    Object.values(st.heroes).forEach(h => { if (h.owner !== pi || h.dead || !h.songs.some(s => D.SONGS[s].grove)) return;
+      const loc = S.heroLocation(st, h), a = loc.army;
+      const home = loc.town ? R_.has(loc.town, 'grove') && D.factionOf(loc.town.faction) === 'elsharyn' : a && R_.nearGrove(st, pi, a.layer, a.x, a.y, R_.GROVE_REACH * 1.5);
+      if (!home) { h.songs = h.songs.filter(s => !D.SONGS[s].grove); S.log(st, h.name + ' has gone too far from the Grove and forgotten its songs.', pi); } });
+    /* they track memory: every memory core is known to them, buried or not */
+    Object.values(st.objects).forEach(o => { if (o.type === 'core') S.reveal(st, pi, o.layer, o.x, o.y, 1); });
+    /* the Vyrenalur's trail: three glimmers in the deep woods each week */
+    const hasAntler = Object.values(st.heroes).some(h => h.owner === pi && !h.dead && R_.carries(h, 'vyrantler')) || S.townsOf(st, pi).some(t => t.built.includes('e9'));
+    const mine = Object.values(st.objects).filter(o => o.type === 'glimmer' && o.owner === pi);
+    if (newWeek || (!mine.length && !P.glimmerWeek)) {
+      mine.forEach(o => { S.unplace(st, o); delete st.objects[o.id]; }); P.glimmerSeen = []; P.glimmerWeek = st.day;
+      if (!hasAntler) { const home = st.objects[P.startTown] || S.townsOf(st, pi)[0]; const li = home ? home.layer : P.startLayer || 0, L = st.layers[li];
+        for (let k = 0, n = 0; k < 400 && n < 3; k++) { const x = R.int(2, L.w - 3), y = R.int(2, L.h - 3), i = y * L.w + x;
+          if (S.TCODES[L.t[i]] !== 'grass' || L.ob[i] || !S.passable(st, li, x, y) || S.objAt(st, li, x, y) || S.armyAt(st, li, x, y)) continue;
+          if (home && (Math.hypot(home.x - x, home.y - y) < 7 || Math.hypot(home.x - x, home.y - y) > 30)) continue;
+          if (!HX_forestNear(L, x, y)) continue;
+          const o = { id: SU.uid(st, 'o'), type: 'glimmer', layer: li, x, y, owner: pi }; st.objects[o.id] = o; S.place(st, o); n++; } }
+    }
+    /* Kipsu come to the Vyrenalur, and leave when it is gone */
+    Object.values(st.armies).forEach(a => { if (a.dead || a.owner !== pi) return; const slots = S.slotsOf(st, a), stacks = S.stacksIn(slots);
+      const vyr = stacks.some(s => s.cr === 'vyrenalur' && s.n > 0), kip = slots.findIndex(s => s && s.kind === 'stack' && s.cr === 'kipsu' && s.follow);
+      if (!vyr) { if (kip >= 0) { slots[kip] = null; S.log(st, 'Without the Vyrenalur, the Kipsu slip away into the trees.', pi); } return; }
+      const L = st.layers[a.layer], tt = S.TCODES[L.t[a.y * L.w + a.x]];
+      if ((tt === 'grass' || tt === 'dirt') && R.chance(0.2)) { const n = R.int(3, 8);
+        if (kip >= 0) { slots[kip].n = Math.min(40, slots[kip].n + n); } else { const free = slots.findIndex(s => !s); if (free >= 0) slots[free] = { kind: 'stack', cr: 'kipsu', n, follow: 'vyrenalur' }; else return; }
+        S.log(st, 'A pack of Kipsu comes out of the trees to follow the Vyrenalur.', pi); } });
+  };
+  function HX_forestNear(L, x, y) { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, yy = y + dy; if (S.inside(L, xx, yy) && (L.ob[yy * L.w + xx] === S.OB.tree || L.ob[yy * L.w + xx] === S.OB.glowtree)) return true; } return false; }
+  /* the Grove songs work only near one of your Elsha'ryn towns with a Protected Grove */
+  R_.GROVE_REACH = 12;
+  R_.nearGrove = (st, owner, layer, x, y, reach) => S.townsOf(st, owner).some(t => t.layer === layer && D.factionOf(t.faction) === 'elsharyn' && R_.has(t, 'grove') && Math.hypot(t.x - x, t.y - y) <= (reach || R_.GROVE_REACH));
   R_.carries = (h, rid) => !!h && (Object.values(h.relics || {}).includes(rid) || (h.pack || []).includes(rid));
   /* is the worm's Rokarvac in this town right now (with a hero at the gate or inside)? */
-  R_.blueprintHere = function (st, t) {
+  R_.blueprintHere = function (st, t, rid) {
+    rid = rid || 'nekhprint';
     const hs = (t.heroes || []).map(id => st.heroes[id]);
     const a = S.armyAt(st, t.layer, t.x, t.y); if (a && a.owner === t.owner) hs.push(S.heroOf(st, a));
-    return hs.some(h => R_.carries(h, 'nekhprint'));
+    return hs.some(h => R_.carries(h, rid));
   };
   R_.endTurn = function (st) {
     R_.eyeVision(st, st.current);
@@ -903,7 +1052,6 @@
         let amt = Mi.amt; if (o.kind === 'food' && st.weekEvent === 'lean') amt /= 2; if (o.kind === 'food' && st.weekEvent === 'harvest') amt *= 1.33;
         if (R_.inStorm(st, o.layer, o.x, o.y)) amt /= 2; if (o.harvest === st.day - 1) amt *= 2;
         if (o.kind === 'ngakara') { if (!o.naga || !o.naga.alive) return; if (newWeek) { P.res.ngakara += o.naga.calm > 0 ? 2 : 1; if (o.naga.calm > 0) o.naga.calm--; } return; }
-        if (!D.RES_INFO[Mi.res].common && cal.dow !== 1) { P.res[Mi.res] += 0; if ((st.day + o.x) % 2 === 0) P.res[Mi.res] += amt; return; }
         P.res[Mi.res] += Math.round(amt); });
       const heroes = Object.values(st.heroes).filter(h => h.owner === pi && !h.dead);
       heroes.forEach(h => { P.res.gold += S.skillVal(st, h, 'steward') + S.relicMod(st, h, 'goldDay'); if (newWeek) P.res.stygian += S.skillVal(st, h, 'stygiancraft'); h.trainedToday = 0; h.leftToday = 0; });
@@ -916,6 +1064,7 @@
         P.res.food = 0; P.hungry = (P.hungry || 0) + 1;
         if (P.hungry >= 3) { /* desertion (the great beasts stay) */ Object.values(st.armies).forEach(a => { if (a.owner === pi && !a.dead) { S.stacksIn(S.slotsOf(st, a)).forEach(s => { if (!D.CREATURES[s.cr].legendary) s.n -= Math.ceil(s.n * 0.05); }); if (SU.battle) SU.battle._cleanSlots(S.slotsOf(st, a)); } }); S.log(st, 'Hunger: some of ' + P.name + '’s troops have deserted.', pi); }
       } else P.hungry = 0;
+      R_.elshDay(st, P, pi, newWeek);
       /* breath, and food refills it */
       heroes.forEach(h => { const mx = M.breathMax(st, h); const inTown = (S.heroLocation(st, h).town); let gain = inTown ? mx : Math.ceil(mx * 0.12) + (P.hungry ? 0 : 1); if (st.weekEvent === 'song') gain *= 2; h.breath = Math.min(mx, h.breath + gain); });
       /* grief fades */
@@ -923,7 +1072,7 @@
       /* weekly: growth, people, the tavern */
       if (newWeek) towns.forEach(t => {
         const fort = t.built.reduce((g, b) => Math.max(g, D.BUILDINGS[b].growth || 0), 0);
-        R_.townDwellings(t).forEach(d => { const c = D.CREATURES[d.base]; if (d.base === 'nekh') { if (!t.nekhCount) t.avail.nekh = 1; return; }
+        R_.townDwellings(t).forEach(d => { const c = D.CREATURES[d.base]; if (c.legendary) { if (!t.nekhCount) t.avail[d.base] = 1; return; }
           let g = Math.round(c.grow * (1 + fort / 100)); if (st.weekEvent === 'breed' && d.base === 'malsti') g *= 2; if (st.monthEvent === 'plenty' && newMonth) g *= 2;
           if (c.tier >= 8) g = c.grow;   /* the top of the town: one a week, whatever the walls or the month */
           t.avail[d.base] = (t.avail[d.base] || 0) + g; });

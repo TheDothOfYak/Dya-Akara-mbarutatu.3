@@ -213,7 +213,7 @@
     st.players = setup.players.map((pc, i) => M.player(st, i, pc));
     const starts = (map.starts || []).map(id => st.objects[id]).filter(Boolean);
     st._starts = [];
-    st.players.forEach((P, pi) => { const t = starts[pi]; if (!t) return; t.owner = pi; t.built = D.START_BUILDINGS.slice(); t.pop = 260; delete t.start; P.startLayer = t.layer; st._starts.push({ pi, li: t.layer, x: t.x, y: t.y, town: t.id }); });
+    st.players.forEach((P, pi) => { const t = starts[pi]; if (!t) return; t.owner = pi; M.setFaction(t, P.faction); t.pop = 260; delete t.start; P.startLayer = t.layer; st._starts.push({ pi, li: t.layer, x: t.x, y: t.y, town: t.id }); });
     starts.slice(st.players.length).forEach(t => { delete t.start; t.owner = -1; });
     S.rebuild(st);
     SU.mapgen.startArmies(st);

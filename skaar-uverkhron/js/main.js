@@ -145,7 +145,7 @@
   };
   function weekNews(st) {
     const cal = S.cal(st.day);
-    if (cal.dow !== 1 || st.day === 1) { if (st.day === 1 && !st._welcomed) { st._welcomed = 1; U.alert('The Mbaru Tatu', 'You lead the Duskareth, who follow the Nekh’Vorran. Build up your town, train your heroes, and take the land. Somewhere the Sunear’Zikhron is turning: win a battle in its eye and the great worm will answer you.'); } return; }
+    if (cal.dow !== 1 || st.day === 1) { if (st.day === 1 && !st._welcomed) { st._welcomed = 1; U.alert('The Mbaru Tatu', st.players[st.current].faction === 'elsharyn' ? 'You lead the Elsha’ryn of the luminous forest, who follow the Vyrenalur. Grow your town, train your heroes, and take the land. Each week the glimmers of the Vyrenalur’s trail appear in the woods: follow all three in a week and it may answer you.' : 'You lead the Duskareth, who follow the Nekh’Vorran. Build up your town, train your heroes, and take the land. Somewhere the Sunear’Zikhron is turning: win a battle in its eye and the great worm will answer you.'); } return; }
     const we = D.WEEK_EVENTS.find(e => e.id === st.weekEvent) || D.WEEK_EVENTS[0];
     const me = D.MONTH_EVENTS.find(e => e.id === st.monthEvent);
     U.alert(cal.week === 1 ? 'A new month: ' + (me ? me.name : '') : 'Week ' + cal.week, el('div', {}, [cal.week === 1 && me && me.desc ? el('p', { text: me.desc }) : null, el('p', {}, [el('b', { text: we.name + '. ' }), we.desc]), el('p', { cls: 'small muted', text: 'Your creatures have grown, and new faces wait at the tavern.' })]));

@@ -97,14 +97,20 @@ the game is built.
   and captains from outside the factions, and fairs (bet on punk races and
   Dya'Akara matches). A month is 42 days. Weeks and months
   bring events.
-- **Keys:** E end turn · N next army · H hero · K kingdom · Q map songs · Z sleep ·
+- **Where you can go:** point at any spot and the frame says it plainly: green (reachable
+  today), gold (a few days away), orange ⚔ (the way passes a wild guard: you will stop and
+  fight), red ✕ (you cannot go there). The bar at the bottom says why: water, mountains,
+  thick woods, the body of a building (go in by its entrance, which is marked), land you
+  have not explored, or something lying in a narrow gap. **Show the way** (G) shades
+  everything the picked army can reach today and stripes what blocks it.
+- **Keys:** E end turn · N next army · H hero · K kingdom · Q map songs · Z sleep · G show the way ·
   1–4 layers · arrows to look around. In battle: W wait · D defend · S sing.
 
 ## Modes
 
 - **A new game** opens a full screen: pick a random map or a made map (filter by
   size, see all four layers), the difficulty (Wanderer 80% to Elster 200%: it sets
-  your starting stores and the computer's level), and for each player their colour,
+  your starting stores, from 25,000 gold down to 3,000, and the computer's level), and for each player their colour,
   who plays, faction, starting hero, starting bonus (gold, resources or a Relic) and
   team. The random map generator has five sizes (Small to Gigantic), water, wild
   creatures, where players start (anywhere, one Tatu each, or all on Velki), the
@@ -129,6 +135,44 @@ the game is built.
   You can also start from a random map. Save maps in the browser, play them, or
   share them. Shared maps appear for everyone after an admin approves them
   (Admin Panel → Skaar Uverkhron → Shared Maps).
+
+## The Elsha'ryn (the second faction)
+
+The luminous forest, who follow the Vyrenalur. Trackers of memory and grow-forgers,
+mostly Eikar and Kalo'Eik. Their towns stand in deep woods and are laid out their own
+way: the Root Hall is a great tree off to one side, reached by stepping stones past a
+pond, inside a low thorn hedge. Every building has its own Elsha'ryn name and look: the
+Hollow Stump (tavern), the Barter Ring (market), the Singing Tree (songs), the Nut Store,
+Fruit Gardens, Deadfall Yard, Mossrock Cutters, Gathering Glade, Spear Ground, Trailpost,
+Tally Stump, Canopy Lodge, Starwell, Willow Pens and Root Vault. Their captains are
+Ju-Keepers, Grovewardens and Memory Trackers.
+
+| # | Creature | Upgrade | What it does |
+|---|---|---|---|
+| 1 | Sprengju | Nur Sprengju | Little flying carrots that burst on contact (the attackers are spent; nothing strikes back). Under a **Ju-Keeper** captain they ride in a pouch and are loosed in volleys like arrows. Half of all spent Sprengju come back after the battle. |
+| 2 | Spear Eikar | Grovewarden Spears | Plain, steady spears. |
+| 3 | Stryx | Old Stryx | Throw rocks and never move; just as strong up close, and bind (cannot move) whatever they strike up close until the Stryx dies or a song moves it. |
+| 4 | Albali Byrd | Albali Elder | One horn. Flies; instead of attacking it can restore the health of an ally beside it (it raises nobody). |
+| 5 | Tonguatjis | — | Shelled; its tongue strikes from two hexes away and drags its prey in. |
+| 6 | Saklay'Punk'Eik | — | Eikar archers on Domestic Punks: move and then shoot, and shoot even when engaged. |
+| 7 | Api Buta | — | The Blind Beast, a huge basalt slug (4×2 hexes, the biggest of the faction): fire breath scorches the one behind its prey; blind (sight powers do not touch it), fireproof. |
+| 8 | Sru Vorn | — | The top of the town, one a week. Once a battle, on a random early round, digs a hidden acid bog: enemies who step in burn and are stuck for a turn. |
+| 9 | The Vyrenalur | — | Light Shadow. Every other round it slips into shadow (nothing can target it); its charge is a line of light; its trail glows for three rounds and heals Eikar in it. Kipsu come out of the woods to follow it as their own stack. |
+
+**Their powers:**
+- **Memory tracking:** they see every memory core, buried ones too, and can pick up the
+  buried ones. The **Memory Tree** shows where every rival hero last fought.
+- **Grow-forging (Growing Altar):** grow Glowmoss (Fti), Timber (Eldi), NgAkara (Su) or
+  Stone (Ular) onto a Relic over three days; its bearer's army fights at home on that
+  element's ground anywhere.
+- **Grove songs (Protected Grove):** Grovelight and Rootsnare work only in battles near
+  your Groves; a hero who goes too far forgets them.
+- **The Oath (Oath Tree):** Changed stacks are stronger (a quarter more health, +2 attack
+  and defense) and bound by oath: if their hero surrenders, or they are dismissed, the
+  forest takes them as a wild Stryx thicket.
+- **The Vyrenalur's trail:** each week three glimmers appear in the woods (only you see
+  yours); reach all three in one week and find the **Shed Antler**, which lets a town
+  build the Clearing of Light while it is there.
 
 ## How it's built
 

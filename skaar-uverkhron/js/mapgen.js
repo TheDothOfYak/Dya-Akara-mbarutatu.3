@@ -209,11 +209,13 @@
       let best = f.best;
       if (!best) best = forceSpot(st, li, regions[li]);
       placed[li].push(best);
-      const t = M.town(st, li, best[0], best[1], pi);
+      const fac = D.factionOf(P.faction);
+      const t = M.town(st, li, best[0], best[1], pi, null, fac);
       t.coast = nearWater(L, best[0], best[1] + 1) || nearWater(L, best[0] - 1, best[1]) || nearWater(L, best[0] + 1, best[1]);
-      clearAround(st, li, best[0], best[1], 3, true);
+      clearAround(st, li, best[0], best[1], 3, D.FACTION[fac].home);
       /* a few defenders at home, so nobody's town falls on day two */
-      t.garrison[0] = { kind: 'stack', cr: 'malsti', n: 14 + R.int(0, 6) }; t.garrison[1] = { kind: 'stack', cr: 'velnur', n: 6 + R.int(0, 3) };
+      const [g1, g2] = D.LINEUP[fac];
+      t.garrison[0] = { kind: 'stack', cr: g1, n: (fac === 'elsharyn' ? 20 : 14) + R.int(0, 6) }; t.garrison[1] = { kind: 'stack', cr: g2, n: 6 + R.int(0, 3) };
       addObj(st, t);
       st._starts.push({ pi, li, x: best[0], y: best[1], town: t.id });
     });
@@ -225,12 +227,13 @@
         const ps = placed[li]; const d = ps.length ? Math.min(...ps.map(p => Math.hypot(p[0] - x, p[1] - y))) : 99; if (d > bestD) { bestD = d; best = [x, y]; } }
       if (!best || bestD < 10) continue;
       placed[li].push(best);
-      const t = M.town(st, li, best[0], best[1], -1);
-      t.built = ['hall1', 'fort1', 'd1', 'd2', 'tavern'];
+      const nf = R.pick(D.FACTIONS.filter(f => f.ready).map(f => f.id));
+      const t = M.town(st, li, best[0], best[1], -1, null, nf);
+      t.built = D.FACTION[nf].neutral.slice();
       t.coast = nearWater(L, best[0], best[1] + 1);
       clearAround(st, li, best[0], best[1], 2, false);
       addObj(st, t);
-      const g = SU.make.wild(st, li, 0, 0, 2500 + R.int(0, 2500), { only: ['malsti', 'velnur', 'ver'] });
+      const g = SU.make.wild(st, li, 0, 0, 2500 + R.int(0, 2500), { only: D.FACTION[nf].guard });
       t.garrison = g.slots; delete st.armies[g.id];
     }
   }
@@ -241,13 +244,16 @@
     return land > 45;
   }
   function forceSpot(st, li, reg) { const L = st.layers[li]; for (let i = 0; i < L.w * L.h; i++) if (reg[i]) { const x = i % L.w, y = (i / L.w) | 0; if (x > 3 && y > 4 && x < L.w - 4 && y < L.h - 3) return [x, y]; } return [8, 8]; }
-  function clearAround(st, li, cx, cy, r, dusk) {
+  function clearAround(st, li, cx, cy, r, home) {
+    const dusk = home === true ? 'dusk' : home;
     const L = st.layers[li];
     for (let y = cy - r - 1; y <= cy + r + 1; y++) for (let x = cx - r - 1; x <= cx + r + 1; x++) {
       if (!S.inside(L, x, y)) continue; const i = y * L.w + x; const d = Math.hypot(x - cx, y - cy + 0.5);
       if (L.t[i] === T.water) continue;
       if (d <= r) L.ob[i] = 0;
-      if (dusk && d <= r + 1.5) L.t[i] = T.dusk;
+      if (dusk && d <= r + 1.5) L.t[i] = T[dusk];
+      /* the Elsha'ryn live in deep woods: trees close around the town */
+      if (dusk === 'grass' && d > r + 0.6 && d <= r + 2.6 && !L.road[i] && ((x * 7 + y * 13) % 3 === 0)) L.ob[i] = OB.tree;
     }
   }
 
@@ -469,18 +475,26 @@
     st._starts.forEach(s => {
       const P = st.players[s.pi], t = st.objects[s.town], pc = (st.setup.players || [])[s.pi] || {};
       /* the hero chosen before the game (or a random one) */
-      const h = M.hero(st, Object.assign({ owner: s.pi }, pc.hero ? { people: pc.hero.people, base: pc.hero.base, name: pc.hero.name } : {}));
+      const fac = D.factionOf(P.faction);
+      const h = M.hero(st, Object.assign({ owner: s.pi, faction: fac }, pc.hero ? { people: pc.hero.people, base: pc.hero.base, name: pc.hero.name } : {}));
       while (Object.keys(h.skills).length < 5) { const id = R.pick(D.SKILL_IDS); if (!h.skills[id]) h.skills[id] = 1; }
       if (h.skills.songcraft && !h.songs.length) h.songs.push('mend');
       h.breath = M.breathMax(st, h);
-      const cap = M.captain(st, { rank: 'stamijan', abil: R.pick(['drillmaster', 'shieldbearer', 'banner']) });
-      h.slots[0] = M.capSlot(cap, [{ cr: 'malsti', n: R.int(16, 22) }, { cr: 'velnur', n: R.int(6, 9) }]);
-      h.slots[1] = { kind: 'stack', cr: 'malsti', n: R.int(8, 12) };
+      if (fac === 'elsharyn') {
+        /* a Ju-Keeper with a pouch of Sprengju, a captain of spears, and a stack beside */
+        h.slots[0] = M.capSlot(M.captain(st, { faction: fac, rank: 'jukeeper', abil: R.pick(['drillmaster', 'shieldbearer', 'banner']) }), [{ cr: 'sprengju', n: R.int(26, 34) }]);
+        h.slots[1] = M.capSlot(M.captain(st, { faction: fac, rank: 'grovewarden', abil: R.pick(['drillmaster', 'shieldbearer', 'banner']) }), [{ cr: 'speareikar', n: R.int(7, 10) }]);
+        h.slots[2] = { kind: 'stack', cr: 'speareikar', n: R.int(4, 6) };
+      } else {
+        const cap = M.captain(st, { faction: fac, rank: 'stamijan', abil: R.pick(['drillmaster', 'shieldbearer', 'banner']) });
+        h.slots[0] = M.capSlot(cap, [{ cr: 'malsti', n: R.int(16, 22) }, { cr: 'velnur', n: R.int(6, 9) }]);
+        h.slots[1] = { kind: 'stack', cr: 'malsti', n: R.int(8, 12) };
+      }
       M.army(st, s.pi, s.li, t.x, t.y, h.id);
       P.startTown = t.id;
       /* difficulty: a person's starting stores */
       const diff = D.DIFFICULTY.find(d => d.id === st.setup.difficulty);
-      if (diff && P.kind === 'human') D.RES.forEach(r => P.res[r] = Math.round(P.res[r] * diff.res));
+      if (diff && P.kind === 'human') D.RES.forEach(r => { if (r === 'food') return; P.res[r] = r === 'gold' ? diff.start.gold : D.RES_INFO[r].common ? diff.start.common : diff.start.rare; });
       /* the starting bonus */
       const bonus = pc.bonus === 'random' || !pc.bonus ? R.pick(['gold', 'res', 'relic']) : pc.bonus;
       if (bonus === 'gold') P.res.gold += 3000;
