@@ -124,20 +124,20 @@
       case 'road': L.road[y * L.w + x] = tool.mode === 'del' ? 0 : 1; if (tool.mode !== 'del') L.ob[y * L.w + x] = 0; break;
       default: if (!first) return; place(li, x, y); return;
     }
-    V.chunks = {}; V.invalidate();
+    V.chunks = {}; V.fields = {}; V.invalidate();
   }
   function free(li, x, y, foot) {
     const L = est.layers[li]; if (!S.inside(L, x, y)) return false;
     const tiles = [[0, 0]].concat(foot || []);
     return tiles.every(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (!S.inside(L, xx, yy)) return false; const i = yy * L.w + xx; return D.TERRAIN[S.TCODES[L.t[i]]].pass !== false && !est._block[li][i] && !S.objAt(est, li, xx, yy) && !S.armyAt(est, li, xx, yy); });
   }
-  function add(o) { o.id = SU.uid(est, 'o'); est.objects[o.id] = o; const L = est.layers[o.layer]; S.footprint(o).concat([[0, 0]]).forEach(([dx, dy]) => { const xx = o.x + dx, yy = o.y + dy; if (S.inside(L, xx, yy)) L.ob[yy * L.w + xx] = 0; }); S.place(est, o); V.chunks = {}; V.invalidate(); return o; }
+  function add(o) { o.id = SU.uid(est, 'o'); est.objects[o.id] = o; const L = est.layers[o.layer]; S.footprint(o).concat([[0, 0]]).forEach(([dx, dy]) => { const xx = o.x + dx, yy = o.y + dy; if (S.inside(L, xx, yy)) L.ob[yy * L.w + xx] = 0; }); S.place(est, o); V.chunks = {}; V.fields = {}; V.invalidate(); return o; }
   function place(li, x, y) {
     const R = SU.makeRng(Date.now() & 0xffff);
     switch (tool.kind) {
       case 'town': { const probe = { type: 'town' }; if (!free(li, x, y, S.footprint(probe))) return U.toast('No room for a town there.');
         const t = M.town(est, li, x, y, -1); delete est.objects[t.id]; t.start = tool.owner === 'start'; if (!t.start) t.built = ['hall1', 'fort1', 'd1', 'd2', 'tavern']; add(t); t.id = t.id; break; }
-      case 'keep': { if (!free(li, x, y, [[-1, 0], [-1, -1], [0, -1]])) return U.toast('No room for a keep there.'); const k = SU.realm.makeKeep(est, li, x, y, -1, { power: +tool.power }); V.chunks = {}; V.invalidate(); break; }
+      case 'keep': { if (!free(li, x, y, [[-1, 0], [-1, -1], [0, -1]])) return U.toast('No room for a keep there.'); const k = SU.realm.makeKeep(est, li, x, y, -1, { power: +tool.power }); V.chunks = {}; V.fields = {}; V.invalidate(); break; }
       case 'mine': if (!free(li, x, y, [[-1, 0], [-1, -1], [0, -1]])) return U.toast('No room for a mine there.'); add({ type: 'mine', kind: tool.mine, layer: li, x, y, owner: -1, naga: tool.mine === 'ngakara' ? { alive: true, calm: 0 } : undefined }); break;
       case 'treasure': { if (!free(li, x, y)) return U.toast('Something is already there.'); const w = tool.what;
         if (w === 'chest') add({ type: 'chest', layer: li, x, y, gold: 4000, xp: 2500 });
@@ -165,7 +165,7 @@
         break; }
       case 'erase': {
         const a = S.armyAt(est, li, x, y); if (a) { RU.removeArmy(est, a); break; }
-        const o = S.objAt(est, li, x, y) || U.bodyObj(est, li, x, y); if (o) { S.unplace(est, o); delete est.objects[o.id]; if (o.link && est.objects[o.link]) delete est.objects[o.link].link; V.chunks = {}; V.invalidate(); }
+        const o = S.objAt(est, li, x, y) || U.bodyObj(est, li, x, y); if (o) { S.unplace(est, o); delete est.objects[o.id]; if (o.link && est.objects[o.link]) delete est.objects[o.link].link; V.chunks = {}; V.fields = {}; V.invalidate(); }
         break; }
     }
     render();
