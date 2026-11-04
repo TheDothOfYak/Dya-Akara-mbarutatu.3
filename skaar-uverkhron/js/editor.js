@@ -69,7 +69,7 @@
   }
 
   /* ---------- the tool panel ---------- */
-  const TOOLS = [['terrain', 'Terrain'], ['obstacle', 'Trees & rock'], ['road', 'Road'], ['town', 'Town'], ['mine', 'Mine'], ['treasure', 'Treasure'], ['visit', 'Places'], ['urverk', 'Urverk'], ['wild', 'Wild group'], ['erase', 'Erase']];
+  const TOOLS = [['terrain', 'Terrain'], ['obstacle', 'Trees & rock'], ['road', 'Road'], ['town', 'Town'], ['keep', 'Keep'], ['mine', 'Mine'], ['treasure', 'Treasure'], ['visit', 'Places'], ['urverk', 'Urverk'], ['wild', 'Wild group'], ['erase', 'Erase']];
   function render() {
     const P = panel; P.innerHTML = '';
     P.appendChild(el('div', { cls: 'lhead' }, [el('span', { text: 'Map editor' })]));
@@ -84,7 +84,8 @@
       case 'road': pick('Road', [['add', 'Lay road'], ['del', 'Take up road']], 'mode'); break;
       case 'town': pick('Owner', [['start', 'A starting town (one per player)'], ['neutral', 'An unclaimed town']], 'owner'); break;
       case 'mine': pick('Mine', Object.keys(D.MINES).map(k => [k, D.MINES[k].name]), 'mine'); break;
-      case 'treasure': pick('What', [['pile:gold', 'Gold'], ['pile:wood', 'Wood'], ['pile:stone', 'Stone'], ['pile:food', 'Food'], ['pile:stygian', 'Stygian'], ['pile:ngakara', 'NgAkara'], ['pile:timber', 'Timber'], ['pile:glowmoss', 'Glowmoss'], ['chest', 'Treasure chest'], ['relic', 'A random Relic'], ['scroll', 'A song scroll'], ['boat', 'A boat']], 'what'); break;
+      case 'keep': pick('Garrison', [[1500, 'A few'], [3500, 'A band'], [8000, 'A host'], [18000, 'A horde']], 'power'); opts.appendChild(el('p', { cls: 'small muted', text: 'A family’s keep. Whoever holds it holds much of its territory. Territories are drawn on the map when a game starts.' })); break;
+      case 'treasure': pick('What', [['chest', 'A buried treasure chest (found through quests)'], ['relic', 'A random Relic'], ['scroll', 'A song scroll'], ['boat', 'A boat']], 'what'); break;
       case 'visit': pick('Place', Object.keys(D.VISIT).map(k => [k, D.VISIT[k].name]), 'visit'); break;
       case 'urverk': pick('Kind', [['always', 'Always open'], ['aligned', 'Only when the worlds line up'], ['toll', 'Kept by a family (toll)'], ['danger', 'Dangerous crossing'], ['kalo', 'To a moon (Kalo)']], 'ukind');
         opts.appendChild(el('p', { cls: 'small muted', text: linkFrom ? 'Now click where the other end goes (any layer).' : 'Click to place one end, then the other end. They are linked.' })); break;
@@ -108,7 +109,7 @@
     ]));
     P.appendChild(el('p', { cls: 'small muted', text: 'Left-click (or drag) to paint. Right-drag or the arrow keys to look around. Scroll to zoom.' }));
   }
-  function defaults(k) { return { terrain: { terrain: 'grass', brush: 1 }, obstacle: { obstacle: 'tree', brush: 1 }, road: { mode: 'add' }, town: { owner: 'start' }, mine: { mine: 'gold' }, treasure: { what: 'pile:gold' }, visit: { visit: 'ring' }, urverk: { ukind: 'always' }, wild: { power: 2500, cr: '' }, erase: {} }[k] || {}; }
+  function defaults(k) { return { terrain: { terrain: 'grass', brush: 1 }, obstacle: { obstacle: 'tree', brush: 1 }, road: { mode: 'add' }, town: { owner: 'start' }, mine: { mine: 'gold' }, treasure: { what: 'chest' }, keep: { power: 3500 }, visit: { visit: 'ring' }, urverk: { ukind: 'always' }, wild: { power: 2500, cr: '' }, erase: {} }[k] || {}; }
 
   /* ---------- painting ---------- */
   SU.on('mappaint', t => { if (!E.active) return; apply(t.x, t.y, t.first); });
@@ -135,10 +136,10 @@
     switch (tool.kind) {
       case 'town': { const probe = { type: 'town' }; if (!free(li, x, y, S.footprint(probe))) return U.toast('No room for a town there.');
         const t = M.town(est, li, x, y, -1); delete est.objects[t.id]; t.start = tool.owner === 'start'; if (!t.start) t.built = ['hall1', 'fort1', 'd1', 'd2', 'tavern']; add(t); t.id = t.id; break; }
+      case 'keep': { if (!free(li, x, y, [[-1, 0], [-1, -1], [0, -1]])) return U.toast('No room for a keep there.'); const k = SU.realm.makeKeep(est, li, x, y, -1, { power: +tool.power }); V.chunks = {}; V.invalidate(); break; }
       case 'mine': if (!free(li, x, y, [[-1, 0], [-1, -1], [0, -1]])) return U.toast('No room for a mine there.'); add({ type: 'mine', kind: tool.mine, layer: li, x, y, owner: -1, naga: tool.mine === 'ngakara' ? { alive: true, calm: 0 } : undefined }); break;
       case 'treasure': { if (!free(li, x, y)) return U.toast('Something is already there.'); const w = tool.what;
-        if (w.startsWith('pile:')) { const res = w.slice(5); add({ type: 'pile', res, layer: li, x, y, amt: res === 'gold' ? 1000 : D.RES_INFO[res].common ? 8 : 3 }); }
-        else if (w === 'chest') add({ type: 'chest', layer: li, x, y, gold: 1500, xp: 1000 });
+        if (w === 'chest') add({ type: 'chest', layer: li, x, y, gold: 4000, xp: 2500 });
         else if (w === 'relic') add({ type: 'relic', layer: li, x, y, relic: R.pick(D.RELIC_IDS.filter(r => D.RELICS[r].rare !== 'skaar')) });
         else if (w === 'scroll') add({ type: 'scroll', layer: li, x, y, song: R.pick(D.SONG_IDS.filter(s => D.SONGS[s].tier <= 3)) });
         else if (w === 'boat') { const L = est.layers[li]; if (!D.TERRAIN[S.terrainAt(L, x, y)].water) return U.toast('Boats go on water.'); add({ type: 'boat', layer: li, x, y, owner: -1 }); }
@@ -199,7 +200,7 @@
     return { id: st.mapId || ('m' + Date.now().toString(36)), name: st.setup.name || 'A map', desc: st.mapDesc || '', size: st.setup.size, layers: packed.layers, objects, wild, starts, moons: st.moons || [], nextId: st.nextId, at: Date.now(), win: st.mapWin || { kind: 'conquer' } };
   };
   E.mapToState = function (map) {
-    const st = S.deserialize({ version: 1, seed: 1, rngState: 9, nextId: map.nextId || 5000, day: 1, current: 0, setup: { size: map.size, name: map.name, players: [] }, layers: map.layers, objects: SU.deep(map.objects), armies: {}, heroes: {}, cores: {}, players: [], storm: null, weekEvent: 'none', monthEvent: 'none', log: [], moons: map.moons || [] });
+    const st = S.deserialize({ version: 2, seed: 1, rngState: 9, nextId: map.nextId || 5000, day: 1, current: 0, setup: { size: map.size, name: map.name, players: [] }, layers: map.layers, objects: SU.deep(map.objects), armies: {}, heroes: {}, cores: {}, players: [], storm: null, weekEvent: 'none', monthEvent: 'none', log: [], moons: map.moons || [] });
     (map.wild || []).forEach(w => { const a = M.wild(st, w.layer, w.x, w.y, w.power, w.cr ? { cr: w.cr, stacks: 1 } : { roam: w.roam }); a.guard = w.guard; a.power0 = w.power; a.edCr = w.cr; a.herd = !!w.herd; });
     st.mapId = map.id; st.mapDesc = map.desc; st.mapWin = map.win || { kind: 'conquer' };
     return st;
@@ -215,8 +216,12 @@
     st._starts = [];
     st.players.forEach((P, pi) => { const t = starts[pi]; if (!t) return; t.owner = pi; M.setFaction(t, P.faction); t.pop = 260; delete t.start; P.startLayer = t.layer; st._starts.push({ pi, li: t.layer, x: t.x, y: t.y, town: t.id }); });
     starts.slice(st.players.length).forEach(t => { delete t.start; t.owner = -1; });
+    /* the land's wealth comes from holding it: loose piles go, and chests are buried until someone tells of them */
+    const R = SU.rng(st);
+    Object.values(st.objects).forEach(o => { if (o.type === 'pile') delete st.objects[o.id]; else if (o.type === 'chest') Object.assign(o, SU.mapgen.buriedChest(R), { id: o.id, layer: o.layer, x: o.x, y: o.y }); });
     S.rebuild(st);
     SU.mapgen.startArmies(st);
+    if (SU.realm) { st.regions = null; SU.realm.makeRegions(st); S.rebuild(st); SU.realm.setup(st); }
     st.storm = setup.storm === false ? null : RU.newStorm(st);
     SU.syncRng(st);
     return st;

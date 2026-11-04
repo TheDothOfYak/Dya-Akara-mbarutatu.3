@@ -55,7 +55,7 @@
   /* tiles an object's body covers, apart from the tile you visit it on */
   S.footprint = function (o) {
     if (o.type === 'town') return [[-1, 0], [1, 0], [-1, -1], [0, -1], [1, -1], [-1, -2], [0, -2], [1, -2]];
-    if (o.type === 'mine') return [[-1, 0], [-1, -1], [0, -1]];
+    if (o.type === 'mine' || o.type === 'keep') return [[-1, 0], [-1, -1], [0, -1]];
     if (o.type === 'urverk') return [[-1, -1], [0, -1], [1, -1]];
     if (o.type === 'visit' && (o.kind === 'shrine' || o.kind === 'tower' || o.kind === 'library' || o.kind === 'fair')) return [[-1, 0], [0, -1], [-1, -1]];
     return [];
@@ -203,17 +203,20 @@
       a.fill(v, i, i + n); i += n; }
     return a;
   }
+  /* saves from before the land was shared out into territories cannot be played on */
+  S.VERSION = 2;
+  S.current = st => !!st && (st.version || 1) >= S.VERSION && !!st.regions;
   S.serialize = function (st) {
     SU.syncRng(st);
     const out = {};
     Object.keys(st).forEach(k => { if (k[0] !== '_') out[k] = st[k]; });
-    out.layers = st.layers.map(L => ({ id: L.id, w: L.w, h: L.h, t: packBytes(L.t), ob: packBytes(L.ob), road: packBytes(L.road), v: packBytes(L.v) }));
+    out.layers = st.layers.map(L => ({ id: L.id, w: L.w, h: L.h, t: packBytes(L.t), ob: packBytes(L.ob), road: packBytes(L.road), v: packBytes(L.v), reg: L.reg ? packBytes(L.reg) : '' }));
     out.players = st.players.map(P => Object.assign({}, P, { explored: P.explored.map(e => packBytes(e)) }));
     return JSON.stringify(out, (k, v) => (k && k[0] === '_') ? undefined : v);
   };
   S.deserialize = function (json) {
     const st = typeof json === 'string' ? JSON.parse(json) : json;
-    st.layers = st.layers.map(L => ({ id: L.id, w: L.w, h: L.h, t: unpackBytes(L.t, L.w * L.h), ob: unpackBytes(L.ob, L.w * L.h), road: unpackBytes(L.road, L.w * L.h), v: unpackBytes(L.v || '', L.w * L.h) }));
+    st.layers = st.layers.map(L => { const o = { id: L.id, w: L.w, h: L.h, t: unpackBytes(L.t, L.w * L.h), ob: unpackBytes(L.ob, L.w * L.h), road: unpackBytes(L.road, L.w * L.h), v: unpackBytes(L.v || '', L.w * L.h) }; if (L.reg) o.reg = unpackBytes(L.reg, L.w * L.h); return o; });
     st.players.forEach(P => { P.explored = P.explored.map((e, li) => unpackBytes(e, st.layers[li].w * st.layers[li].h)); });
     S.rebuild(st);
     return st;

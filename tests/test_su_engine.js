@@ -3,7 +3,7 @@
    saving and loading, and that nothing breaks along the way. */
 const path = require('path');
 const base = path.join(__dirname, '..', 'skaar-uverkhron', 'js');
-['core', 'data', 'state', 'make', 'rules', 'mapgen', 'battle', 'ai'].forEach(f => require(path.join(base, f + '.js')));
+['core', 'data', 'state', 'make', 'rules', 'realm', 'mapgen', 'battle', 'ai'].forEach(f => require(path.join(base, f + '.js')));
 const SU = globalThis.SU, S = SU.state, RU = SU.rules, BT = SU.battle;
 let fails = 0;
 const ok = (cond, msg) => { if (!cond) { fails++; console.error('FAIL: ' + msg); } };
