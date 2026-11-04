@@ -19,6 +19,11 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
 - **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
 
+## The Geodling
+- **A little geode guy** lives in Rock World's Crystal Forest and caves. He's a round rock on two stubby feet with his front cracked open like a geode: white quartz, purple crystals and two shiny eyes. He wanders about and never hurts anyone.
+- **Shy.** Come close and he snaps shut into a plain rock. Shut, hits barely scratch him and knock him rolling away. Stand still (or back off) and he peeks out through the crack, then opens up again.
+- **Make friends.** If he opens up while you're right beside him, he likes you and leaves you a crystal shard (once each). Beat one and he drops 2 to 4 crystal shards, and now and then a purple crystal.
+
 ## Three new hero moves
 - **Acorn roll:** while running on the ground, press **S** and he tucks into a ball and rolls, about twice as fast as running and faster still downhill. Rolling into monsters bowls them over. Jump to hop out of it; press S again or let go of left/right to stop. It uses a little stamina.
 - **Ghost slip:** keep pushing into a thin wall (one or two blocks thick) and the ghost fades and slips through to the other side. Not through thicker walls, locked doors, carvings or places he isn't allowed.
