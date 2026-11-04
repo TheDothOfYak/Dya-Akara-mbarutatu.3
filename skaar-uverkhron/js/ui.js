@@ -261,11 +261,12 @@
       case 'visit': return D.VISIT[o.kind].name + (full ? ': ' + D.VISIT[o.kind].desc : '') + (o.kind === 'songstone' || o.kind === 'scroll' ? ' (' + D.SONGS[o.song].name + ')' : '');
       case 'pile': return D.RES_INFO[o.res].name;
       case 'chest': return 'A treasure chest';
+      case 'village': return 'The village of ' + o.name + (o.owner >= 0 ? ' (' + st.players[o.owner].name + ')' : '') + ' — while you hold it, ' + D.VILLAGE_SETTLERS + ' settlers a week go to your nearest town';
       case 'relic': return 'A Relic: ' + D.RELICS[o.relic].name;
       case 'scroll': return 'A song scroll: ' + D.SONGS[o.song].name;
       case 'core': { const c = st.cores[o.core]; return 'A memory core' + (c ? ' (' + c.name + ')' : ''); }
       case 'boat': return 'A boat';
-      case 'vision': return 'Where the Rokarvac of the Nekh lies';
+      case 'vision': return o.relic === 'vyrantler' ? 'Where a Shed Antler of the Vyrenalur lies' : 'Where the Rokarvac of the Nekh lies';
       case 'glimmer': return 'A glimmer of the Vyrenalur’s trail';
     }
     return '';
@@ -403,6 +404,7 @@
       case 'herd': SU.dialogs.herd(a, ev.other); break;
       case 'urverk': SU.dialogs.urverk(a, ev.obj); break;
       case 'flagged': U.toast('The ' + D.MINES[ev.obj.kind].name + ' is yours.'); V.invalidate(); break;
+      case 'village': U.toast('The village of ' + ev.obj.name + ' is yours: ' + D.VILLAGE_SETTLERS + ' settlers a week will go to your nearest town.'); V.invalidate(); break;
     }
     U.refresh();
   };

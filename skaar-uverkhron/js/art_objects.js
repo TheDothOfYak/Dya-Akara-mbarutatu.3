@@ -277,8 +277,29 @@
   };
 
   /* where the Rokarvac of the Nekh lies: a ring of standing stones over a crack into the Duat */
+  /* a village: three thatched houses round a well, smoke from a chimney, and the holder's flag */
+  A.village = function (ctx, o, x, y, ts, t, color) {
+    const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.86;
+    ctx.save(); A.contact(ctx, cx, gy, 26 * s, 6 * s, 0.4);
+    [[-14, -2, '#9a7a54'], [12, -3, '#8a6a44'], [-1, 2, '#a8865a']].forEach(([dx, dy, wall]) => { const hx = cx + dx * s, hy = gy + dy * s;
+      ctx.fillStyle = lin(ctx, 0, hy - 12 * s, 0, hy, [[0, shade(wall, 15)], [1, shade(wall, -25)]]); ctx.fillRect(hx - 8 * s, hy - 10 * s, 16 * s, 10 * s); outline(ctx, 0.8 * s);
+      ctx.fillStyle = lin(ctx, 0, hy - 22 * s, 0, hy - 9 * s, [[0, '#d8b45e'], [1, '#8a6a2a']]); ctx.beginPath(); ctx.moveTo(hx - 10 * s, hy - 9 * s); ctx.lineTo(hx, hy - 20 * s); ctx.lineTo(hx + 10 * s, hy - 9 * s); ctx.closePath(); ctx.fill(); outline(ctx, 0.8 * s);
+      ctx.fillStyle = '#ffd88a'; ctx.fillRect(hx - 2 * s, hy - 7 * s, 4 * s, 4 * s); });
+    for (let i = 0; i < 3; i++) { const k = (t * 0.4 + i / 3) % 1; ctx.fillStyle = rgba('#d0ccc4', 0.45 * (1 - k)); ell(ctx, cx + 14 * s + k * 6 * s, gy - 24 * s - k * 16 * s, (2 + k * 3) * s, (2 + k * 3) * s); ctx.fill(); }
+    ctx.restore();
+    A.flag(ctx, cx + 20 * s, gy - 6 * s, ts * 0.34, o.owner >= 0 ? color : '#8a8478', t);
+  };
   A.visionSite = function (ctx, o, x, y, ts, t) {
     const s = ts / 48, cx = x + ts / 2, gy = y + ts * 0.85;
+    if (o.relic === 'vyrantler') {
+      ctx.save(); A.contact(ctx, cx, gy, 20 * s, 6 * s, 0.4);
+      ctx.fillStyle = radial(ctx, cx, gy - 2 * s, 18 * s, 'rgba(255,246,200,0.55)', 'rgba(255,246,200,0)'); ell(ctx, cx, gy - 2 * s, 18 * s, 6 * s); ctx.fill();
+      [-14, 14].forEach(dx => { ctx.fillStyle = '#3a2614'; ctx.fillRect(cx + dx * s - 2 * s, gy - 26 * s, 4 * s, 26 * s); ctx.fillStyle = '#2e5626'; ell(ctx, cx + dx * s, gy - 28 * s, 9 * s, 8 * s); ctx.fill(); });
+      ctx.shadowColor = '#fff2b0'; ctx.shadowBlur = 12 * s; ctx.strokeStyle = rgba('#fffbe0', 0.75 + Math.sin(t * 2) * 0.2); ctx.lineCap = 'round';
+      const br = (bx, by, a, len, w, d) => { const ex = bx + Math.cos(a) * len, ey = by + Math.sin(a) * len; ctx.lineWidth = w * s; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(ex, ey); ctx.stroke(); if (d) { br(ex, ey, a - 0.5, len * 0.7, w * 0.7, d - 1); br(ex, ey, a + 0.45, len * 0.65, w * 0.7, d - 1); } };
+      br(cx - 8 * s, gy - 3 * s, -0.35, 9 * s, 2, 2);
+      ctx.restore(); return;
+    }
     ctx.save();
     A.contact(ctx, cx, gy, 22 * s, 7 * s, 0.45);
     ctx.shadowColor = '#4fb4e8'; ctx.shadowBlur = 14 * s;
@@ -306,6 +327,7 @@
     groundPatch(ctx, o, x, y, ts);
     switch (o.type) {
       case 'town': return A.town(ctx, o, x, y, ts, t, color);
+      case 'village': return A.village(ctx, o, x, y, ts, t, color);
       case 'mine': return A.mine(ctx, o, x, y, ts, t, color);
       case 'urverk': return A.urverk(ctx, o, x, y, ts, t, SU.rules.urverkOpen(st, o) && o.triggerKnown);
       case 'visit': return A.visit(ctx, o, x, y, ts, t);

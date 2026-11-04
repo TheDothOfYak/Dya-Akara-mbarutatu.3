@@ -134,8 +134,9 @@
       /* a vision from the eye of the storm, seen at the end of the last turn */
       const P2 = st.players[st.current], vo = P2.vision && st.objects[P2.vision];
       if (vo && P2.visionShown !== vo.id) { P2.visionShown = vo.id;
-        U.alert('A vision in the eye', el('div', {}, [el('p', { text: 'In the stillness at the heart of the Sunear’Zikhron, your hero sees it: the Rokarvac of the Nekh, lying on ' + D.LAYERS[vo.layer].name + ', guarded by things that do not sleep.' }),
-          el('p', { cls: 'small muted', text: 'Recover it with a hero. It is not used up: carry it into any of your towns and that town can build the Nekh Hollow while it is there.' })]),
+        const antler = vo.relic === 'vyrantler';
+        U.alert('A vision in the eye', el('div', {}, [el('p', { text: 'In the stillness at the heart of the Sunear’Zikhron, your hero sees it: ' + (antler ? 'a Shed Antler of the Vyrenalur, a crown of pure light lying in a clearing' : 'the Rokarvac of the Nekh') + ' on ' + D.LAYERS[vo.layer].name + ', guarded by things that do not sleep.' }),
+          el('p', { cls: 'small muted', text: 'Recover it with a hero. It is not used up: carry it into any of your towns and that town can build ' + (antler ? 'the Clearing of Light' : 'the Nekh Hollow') + ' while it is there.' })]),
           () => { V.centerOn(vo.layer, vo.x, vo.y); U.refresh(); }); }
     };
     if (humans(st).length > 1 && !st.online) {

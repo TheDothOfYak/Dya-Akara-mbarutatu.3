@@ -340,7 +340,8 @@ changed from the Admin Panel without touching the code).
   - A person's starting stores by difficulty: 25,000 / 15,000 / 10,000 / 7,000 /
     3,000 gold, with common and rare resources to match. The computer starts with
     12,000.
-  - Towns grow 5% a week, up to 13% with spare food. The top hall needs 450 people
+  - Towns grow 7% a week, up to 17% with spare food; villages send 30 settlers a week
+    each, travellers come some weeks, and a weekly feast draws 8% more. The top hall needs 450 people
     and the top walls 400.
   - The computer builds its halls first, trades at the market for what a building
     lacks, and saves for the next building until the week's end.

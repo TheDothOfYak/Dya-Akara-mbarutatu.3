@@ -39,6 +39,7 @@
     S.rebuild(st);
     placeRoads(st);
     placeMines(st, regions);
+    placeVillages(st, regions);
     placeUrverk(st, regions, moons);
     placeTreasure(st, regions, moons);
     for (let li = 0; li < 4; li++) connectLayer(st, li);
@@ -313,6 +314,14 @@
       }
     }
   }
+  /* villages: one near each start, more scattered over the worlds; guarded like mines */
+  function placeVillages(st, regions) {
+    const R = SU.rng(st), names = R.shuffle(D.VILLAGE_NAMES.slice()); let k = 0;
+    const add = (li, p) => addObj(st, { type: 'village', layer: li, x: p[0], y: p[1], owner: -1, name: names[k++ % names.length] + (k > names.length ? ' ' + Math.ceil(k / names.length) : '') });
+    st._starts.forEach(s => { const p = nearFree(st, s.li, regions[s.li], R, s.x, s.y, 6, 10, []); if (p) add(s.li, p); });
+    for (let li = 0; li < 3; li++) { const L = st.layers[li], n = Math.round(L.w * L.h / 520);
+      for (let i = 0; i < n; i++) { const p = randomFree(st, li, regions[li], R, (x, y) => farFromStarts(st, li, x, y, 8), []); if (p) add(li, p); } }
+  }
   function nearWater(L, x, y) { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, yy = y + dy; if (S.inside(L, xx, yy) && L.t[yy * L.w + xx] === T.water) return true; } return false; }
   function farFromStarts(st, li, x, y, d) { return st._starts.every(s => s.li !== li || Math.hypot(s.x - x, s.y - y) >= d); }
   /* how far from the nearest start, for sizing guards: on a world nobody starts on,
@@ -453,6 +462,7 @@
     };
     Object.values(st.objects).forEach(o => {
       if (o.type === 'mine') guard(o, o.kind === 'gold' || !D.RES_INFO[D.MINES[o.kind].res].common ? 1.4 : 1);
+      else if (o.type === 'village') guard(o, 1.1);
       else if (o.type === 'relic') guard(o, D.RELICS[o.relic].rare === 'great' ? 3 : D.RELICS[o.relic].rare === 'rare' ? 2 : 1.3);
       else if (o.type === 'chest' && R.chance(0.6)) guard(o, 1);
       else if (o.type === 'scroll') guard(o, 1.5);

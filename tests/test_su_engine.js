@@ -202,6 +202,18 @@ async function playGame(seed, size, nPlayers, days) {
     BT.autoRun(st6, B7); const blows = B7.anim.filter(x => x.kind === 'dmg');
     ok(blows.length > 0 && blows.every(x => typeof x.nAfter === 'number'), 'every blow records how many are left, so the screen shows deaths when the blow lands');
   }
+  /* ways towns grow: villages, feasts, travellers */
+  { const sv = SU.mapgen.newGame({ size: 'M', seed: 47, players: [{ kind: 'human', name: 'A' }, { kind: 'ai', name: 'B' }] }); RU.startTurn(sv);
+    const vs = Object.values(sv.objects).filter(o => o.type === 'village');
+    ok(vs.length >= 4, 'villages are placed on the map (' + vs.length + ')');
+    const tv = S.townsOf(sv, 0)[0], v = vs.sort((a, b) => Math.hypot(a.x - tv.x, a.y - tv.y) - Math.hypot(b.x - tv.x, b.y - tv.y))[0];
+    RU.flagVillage(sv, v, 0); tv.pop = 300; tv.built.push('terraces');
+    ok(v.owner === 0, 'a village can be taken');
+    const pop0 = tv.pop; while (S.cal(sv.day).dow !== 1 || sv.day === 1) RU.endTurn(sv);
+    ok(tv.pop >= pop0 + SU.data.VILLAGE_SETTLERS, 'a held village sends settlers each week (' + pop0 + ' → ' + Math.round(tv.pop) + ')');
+    sv.players[0].res.gold = 5000; sv.players[0].res.food = 500; const pf = tv.pop, fr = RU.feast(sv, tv);
+    ok(fr.ok && tv.pop >= pf + SU.data.FEAST.min && !RU.canFeast(sv, tv).ok, 'a feast draws people in, once a week');
+  }
   /* the hall's five levels */
   { const sh = SU.mapgen.newGame({ size: 'S', seed: 43, players: [{ kind: 'human', name: 'A' }, { kind: 'ai', name: 'B' }] });
     const th = S.townsOf(sh, 0)[0], Ph = sh.players[0]; Ph.res = Object.fromEntries(SU.data.RES.map(r => [r, 1e6])); th.pop = 5000;

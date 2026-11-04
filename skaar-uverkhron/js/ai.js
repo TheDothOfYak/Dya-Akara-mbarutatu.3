@@ -60,6 +60,8 @@
     const keepFor = b => D.BUILDINGS[b].gold ? 300 : keep;
     const bid = priorityFor(t).find(b => RU.canBuild(st, t, b).ok && P.res.gold - (RU.buildCost(t, b).gold || 0) > keepFor(b));
     if (bid) RU.build(st, t, bid);
+    /* a feast when there is gold to spare and room for people */
+    if (P.res.gold > keep + 6000 && P.res.food > 200 && RU.canFeast(st, t).ok) RU.feast(st, t);
     /* recruit: best creatures first, into the garrison, keeping money for heroes we still want,
        and (until the week's end, when the dwellings are full) for the next building */
     const field = S.fieldHeroes(st, P.idx).length + S.townsOf(st, P.idx).reduce((n, x) => n + x.heroes.length, 0);
@@ -146,6 +148,7 @@
       else if (o.type === 'vision' && h) v = 70;
       else if (o.type === 'relic' && o.relic === 'nekhprint' && h) v = 90;
       else if (o.type === 'chest') v = 14;
+      else if (o.type === 'village' && o.owner !== a.owner && !(o.owner >= 0 && S.allies(st, o.owner, a.owner))) v = 24;
       else if (o.type === 'relic' && h) v = { common: 14, rare: 24, great: 40, skaar: 60 }[D.RELICS[o.relic].rare];
       else if (o.type === 'mine' && o.owner !== a.owner && !(o.owner >= 0 && S.allies(st, o.owner, a.owner))) v = o.kind === 'gold' ? 30 : D.RES_INFO[D.MINES[o.kind].res].common ? 16 : 22;
       else if (o.type === 'visit' && h && D.VISIT[o.kind].stat && !o.visited[h.id]) v = 12;
@@ -158,7 +161,8 @@
       }
       else if (o.type === 'town' && o.owner === a.owner && h && (o.x !== a.x || o.y !== a.y)) { const gp = S.power(o.garrison); if (gp > myPow * 0.3 && gp > 1200) v = 10 + gp / 600;
         /* carrying the worm's Rokarvac: bring it to a town that is ready for the Nekh Hollow */
-        if (RU.carries(h, 'nekhprint') && !o.built.includes('d9') && RU.has(o, 'fort3') && o.built.includes('d8')) v = Math.max(v, 60); }
+        if (RU.carries(h, 'nekhprint') && !o.built.includes('d9') && RU.has(o, 'fort3') && o.built.includes('d8')) v = Math.max(v, 60);
+        if (RU.carries(h, 'vyrantler') && !o.built.includes('e9') && RU.has(o, 'fort3') && o.built.includes('e8')) v = Math.max(v, 60); }
       else if (o.type === 'town' && o.owner !== a.owner && h && !(o.owner >= 0 && S.allies(st, o.owner, a.owner))) {
         const def = RU.townDefense(st, o); const dp = def ? S.power(def.slots, def.hero) * 1.3 + (def.hero ? S.power(def.hero.slots, def.hero) : 0) : 0;
         if (dp < myPow * 0.75) v = 80;

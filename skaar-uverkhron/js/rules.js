@@ -199,6 +199,7 @@
       a.mp = Math.max(0, a.mp - cost);
       if (obj.type === 'urverk') return { moved: false, stop: true, event: { kind: 'urverk', obj } };
       if (obj.type === 'mine' && obj.owner !== a.owner) { R_.flagMine(st, obj, a.owner); return { moved: false, stop: true, event: { kind: 'flagged', obj } }; }
+      if (obj.type === 'village' && obj.owner !== a.owner) { R_.flagVillage(st, obj, a.owner); return { moved: false, stop: true, event: { kind: 'village', obj } }; }
       return R_.visit(st, a, obj);
     }
     if (obj && obj.type === 'town') {
@@ -260,6 +261,32 @@
     if (owner >= 0) S.log(st, st.players[owner].name + ' took the ' + D.MINES[o.kind].name + '.', owner);
     if (prev >= 0 && prev !== owner) SU.emit('lost', { owner: prev, what: D.MINES[o.kind].name });
   };
+  /* a village: hold it and its young people come to your nearest town each week */
+  R_.flagVillage = function (st, o, owner) {
+    const prev = o.owner; o.owner = owner;
+    if (owner >= 0) S.log(st, st.players[owner].name + ' took the village of ' + o.name + '.', owner);
+    if (prev >= 0 && prev !== owner) SU.emit('lost', { owner: prev, what: 'the village of ' + o.name });
+  };
+  /* the nearest town of yours to a place (same world first), with room for more people */
+  R_.nearestHome = function (st, pi, layer, x, y) {
+    const ts = S.townsOf(st, pi); if (!ts.length) return null;
+    return ts.slice().sort((a, b) => (a.layer !== layer) - (b.layer !== layer) || Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
+  };
+  /* people come to a town, as many as there is room for */
+  R_.welcome = function (t, n) { const room = Math.max(0, R_.housing(t) - t.pop), k = Math.max(0, Math.min(room, Math.round(n))); t.pop += k; return k; };
+  /* a feast: once a week a town can spend gold and food to draw people in from the country around */
+  R_.canFeast = function (st, t) {
+    const P = st.players[t.owner]; if (!P) return { ok: false };
+    if (t.feastWeek === S.cal(st.day).weekAbs) return { ok: false, why: 'This town has feasted this week.' };
+    if (R_.housing(t) - t.pop < 5) return { ok: false, why: 'No room for more people: build homes first.' };
+    if (!R_.afford(P, D.FEAST.cost)) return { ok: false, why: 'A feast needs ' + D.FEAST.cost.gold + ' gold and ' + D.FEAST.cost.food + ' food.', poor: true };
+    return { ok: true, gain: Math.min(R_.housing(t) - t.pop, Math.max(D.FEAST.min, Math.round(t.pop * D.FEAST.pct))) };
+  };
+  R_.feast = function (st, t) {
+    const c = R_.canFeast(st, t); if (!c.ok) return c;
+    R_.pay(st.players[t.owner], D.FEAST.cost); t.feastWeek = S.cal(st.day).weekAbs;
+    const n = R_.welcome(t, c.gain); S.log(st, 'A feast in ' + t.name + ': ' + n + ' people came to stay.', t.owner); return { ok: true, n };
+  };
   R_.visit = function (st, a, o) {
     const h = S.heroOf(st, a), P = st.players[a.owner], R = SU.rng(st);
     const plunder = 1 + S.skillVal(st, h, 'plunder') / 100;
@@ -292,10 +319,11 @@
           return { stop: true, msg: 'At the end of the trail, in a clearing, lies an antler of pure light: the Shed Antler of the Vyrenalur. Carry it into one of your towns to build the Clearing of Light.', relic: 'vyrantler' }; }
         return { stop: true, msg: 'A glimmer of the Vyrenalur’s trail: ' + P.glimmerSeen.length + ' of 3 this week. Find the others before the week ends.' };
       }
-      case 'vision':
-        if (!h) return { stop: true, msg: 'Something of the worm lies here. Only a hero can carry it.' };
-        R_.giveRelic(st, h, 'nekhprint'); gone(); if (st.players[o.seer]) st.players[o.seer].vision = null;
-        return { stop: true, msg: h.name + ' has found the Rokarvac of the Nekh! Carry it into a town to build the Nekh Hollow there.', relic: 'nekhprint' };
+      case 'vision': {
+        const rid = o.relic || 'nekhprint', antler = rid === 'vyrantler';
+        if (!h) return { stop: true, msg: antler ? 'An antler of pure light lies here. Only a hero can carry it.' : 'Something of the worm lies here. Only a hero can carry it.' };
+        R_.giveRelic(st, h, rid); gone(); if (st.players[o.seer]) st.players[o.seer].vision = null;
+        return { stop: true, msg: antler ? h.name + ' has found the Shed Antler of the Vyrenalur! Carry it into a town to build the Clearing of Light there.' : h.name + ' has found the Rokarvac of the Nekh! Carry it into a town to build the Nekh Hollow there.', relic: rid }; }
     }
     return { stop: true };
   };
@@ -428,7 +456,7 @@
     if (b.faction && b.faction !== D.factionOf(t.faction)) return { ok: false, why: 'Not a building of this town’s people.', other: true };
     if (b.pop && t.pop < b.pop) return { ok: false, why: 'Needs ' + b.pop + ' people (the town has ' + Math.floor(t.pop) + ').' };
     if (b.coast && !t.coast) return { ok: false, why: 'This town is not by the water.' };
-    if (b.unlock && !R_.blueprintHere(st, t, b.blueprint)) return { ok: false, why: b.blueprint === 'vyrantler' ? 'A hero must bring the Shed Antler of the Vyrenalur into this town. Follow the glimmers of its trail in the deep forest: three in one week.' : 'A hero must bring the Rokarvac of the Nekh into this town. End a turn in the eye of the Sunear’Zikhron for a vision of where it lies.' };
+    if (b.unlock && !R_.blueprintHere(st, t, b.blueprint)) return { ok: false, why: b.blueprint === 'vyrantler' ? 'A hero must bring the Shed Antler of the Vyrenalur into this town. Follow the glimmers of its trail in the deep forest (three in one week), or end a turn in the eye of the Sunear’Zikhron for a vision of where one lies.' : 'A hero must bring the Rokarvac of the Nekh into this town. End a turn in the eye of the Sunear’Zikhron for a vision of where it lies.' };
     const small = b.small;
     const limit = R_.buildsPerDay(st, t) + (small && !t.smallToday ? 1 : 0);
     if (t.builtToday >= limit) return { ok: false, why: 'Already built today.' };
@@ -836,7 +864,7 @@
   R_.revealAll = function (st, pi) {
     Object.values(st.armies).forEach(a => { if (!a.dead && a.owner === pi) S.reveal(st, pi, a.layer, a.x, a.y, R_.sight(st, a)); });
     S.townsOf(st, pi).forEach(t => S.reveal(st, pi, t.layer, t.x, t.y, 6));
-    Object.values(st.objects).forEach(o => { if (o.type === 'mine' && o.owner === pi) S.reveal(st, pi, o.layer, o.x, o.y, 3); });
+    Object.values(st.objects).forEach(o => { if ((o.type === 'mine' || o.type === 'village') && o.owner === pi) S.reveal(st, pi, o.layer, o.x, o.y, 3); });
   };
 
   /* ======================= heroes: xp and death ======================= */
@@ -881,11 +909,11 @@
   R_.removeArmy = function (st, a) { a.dead = true; const L = st.layers[a.layer]; if (L && st._armyAt[a.layer].get(a.y * L.w + a.x) === a.id) st._armyAt[a.layer].delete(a.y * L.w + a.x); delete st.armies[a.id]; };
 
   /* ======================= players ======================= */
-  /* a town's people, one day: about 5% a week, up to 13% with food to spare, fewer when hungry */
+  /* a town's people, one day: about 7% a week, up to 17% with food to spare, fewer when hungry */
   R_.popDay = function (st, P, t, nTowns) {
     const room = R_.housing(t) - t.pop;
     const spare = Math.max(0, (P.lastFoodIn || 0) - (P.lastEat || 0)) / Math.max(1, nTowns || 1);
-    let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.05 + SU.clamp(spare / 60, 0, 0.08));
+    let grow = P.hungry ? -t.pop * 0.04 : t.pop * (0.07 + SU.clamp(spare / 50, 0, 0.1));
     if (st.weekEvent === 'wanderers') grow += t.pop * 0.1;
     grow = Math.min(grow, Math.max(0, room)) / D.WEEK + (t.popFrac || 0);
     const whole = grow >= 0 ? Math.floor(grow) : Math.ceil(grow);
@@ -923,16 +951,20 @@
     SU.emit('turn', { player: st.current });
   };
   /* end a turn with a hero in the eye of the storm and you are given a vision */
+  /* the great relic each people needs for its top dwelling, and where they would build with it */
+  R_.factionRelic = P => R_.isElsh(P) ? { relic: 'vyrantler', dwelling: 'e9' } : { relic: 'nekhprint', dwelling: 'd9' };
   R_.eyeVision = function (st, pi) {
     const P = st.players[pi]; if (!P || P.vision) return null;
-    if (Object.values(st.heroes).some(h => h.owner === pi && !h.dead && R_.carries(h, 'nekhprint'))) return null;
+    const FR = R_.factionRelic(P);
+    if (Object.values(st.heroes).some(h => h.owner === pi && !h.dead && R_.carries(h, FR.relic))) return null;
+    if (S.townsOf(st, pi).some(t => t.built.includes(FR.dwelling))) return null;
     const a = Object.values(st.armies).find(x => !x.dead && x.owner === pi && x.heroId && R_.inEye(st, x.layer, x.x, x.y)); if (!a) return null;
     const R = SU.rng(st);
     for (let k = 0; k < 300; k++) {
       const li = R.int(0, 2), p = randomLand(st, li); if (!p) continue;
       if (S.townsOf(st, pi).some(t => t.layer === li && Math.hypot(t.x - p[0], t.y - p[1]) < 14)) continue;
       if (!S.passable(st, li, p[0], p[1] + 1)) continue;
-      const o = { id: SU.uid(st, 'o'), type: 'vision', layer: li, x: p[0], y: p[1], seer: pi };
+      const o = { id: SU.uid(st, 'o'), type: 'vision', layer: li, x: p[0], y: p[1], seer: pi, relic: FR.relic };
       st.objects[o.id] = o; S.place(st, o);
       const g = M.wild(st, li, p[0], p[1] + 1, 9000 + st.day * 450, { only: ['harkal', 'kaloeik', 'tyndael', 'xiweik', 'ularnaga', 'lutut'] }); g.guard = o.id;
       if (S.armyAt(st, li, p[0], p[1] + 1) !== g) { const q = R_.freeNear(st, li, p[0], p[1] + 1); if (q) S.moveArmyIndex(st, g, li, q[0], q[1]); }
@@ -1081,6 +1113,13 @@
       });
       /* daily: people come and go a little every day; only food to spare brings more */
       towns.forEach(t => R_.popDay(st, P, t, towns.length));
+      if (newWeek) {
+        /* settlers from the villages you hold */
+        Object.values(st.objects).forEach(o => { if (o.type !== 'village' || o.owner !== pi || o.gone) return; const home = R_.nearestHome(st, pi, o.layer, o.x, o.y); if (!home) return;
+          const n = R_.welcome(home, D.VILLAGE_SETTLERS); if (n > 0) S.log(st, n + ' settlers came from ' + o.name + ' to ' + home.name + '.', pi); });
+        /* travellers who like the look of a town stay */
+        towns.forEach(t => { if (!R.chance(D.TRAVELLERS.chance + (t.built.includes('tavern') ? 0.1 : 0))) return; const n = R_.welcome(t, Math.max(D.TRAVELLERS.min, t.pop * D.TRAVELLERS.pct)); if (n > 0) S.log(st, 'Travellers settled in ' + t.name + ' (+' + n + ' people).', pi); });
+      }
       if (newWeek) R_.refreshTavern(st, P);
       if (!towns.length) { P.daysWithoutTown = (P.daysWithoutTown || 0) + 1; if (P.daysWithoutTown >= 7 && P.alive) { P.alive = false; S.log(st, P.name + ' held no town for a week and is out of the game.', pi);
         Object.values(st.armies).forEach(a => { if (a.owner === pi) R_.removeArmy(st, a); }); } }
