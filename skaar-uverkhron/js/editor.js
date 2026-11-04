@@ -49,8 +49,9 @@
     E.active = true; U.st = null; U.viewer = 0;
     $('game').classList.remove('hidden'); V.resize();
     V.setGame(est); V.paintMode = true; V.setLayer(0); V.centerOn(0, est.layers[0].w >> 1, est.layers[0].h >> 1);
+    $('game').classList.add('editing');
     [...$('side').children].forEach(c => c.style.display = 'none');
-    $('mini').style.display = ''; $('layers').style.display = '';
+    $('mini').parentNode.style.display = ''; $('mini').style.display = ''; $('layers').style.display = '';
     panel = el('div', { cls: 'col', id: 'edpanel' }); $('side').appendChild(panel);
     $('topbar').innerHTML = ''; $('topbar').appendChild(el('span', { cls: 'gold', text: 'Skaar Uverkhron — map editor' })); $('topbar').appendChild(el('span', { cls: 'muted small', style: { marginLeft: 'auto' }, text: 'Keys 1–4 switch layers · right-drag to look around' }));
     buildLayerButtons();
@@ -60,7 +61,7 @@
     E.active = false; V.paintMode = false; est = null;
     if (panel) panel.remove(); panel = null;
     [...$('side').children].forEach(c => c.style.display = '');
-    $('game').classList.add('hidden');
+    $('game').classList.remove('editing'); $('game').classList.add('hidden');
     SU.game.title();
   };
   function buildLayerButtons() {

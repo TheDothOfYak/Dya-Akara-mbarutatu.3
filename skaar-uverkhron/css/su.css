@@ -36,19 +36,26 @@ h1, h2, h3 { font-weight: normal; color: var(--gold); margin: 0 0 8px; letter-sp
 .frame { border: 1px solid var(--edge2); border-radius: 6px; background: rgba(0,0,0,.25); padding: 8px; }
 
 /* ---------- the game screen ---------- */
-#game { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr 250px; grid-template-rows: 38px 1fr 26px; }
-#topbar { grid-column: 1 / 3; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: linear-gradient(#2a2016, #17110c); border-bottom: 1px solid var(--edge); overflow: hidden; }
+#game { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: 38px 1fr 24px 136px; }
+#topbar { grid-column: 1; display: flex; align-items: center; gap: 14px; padding: 0 10px; background: linear-gradient(#2a2016, #17110c); border-bottom: 1px solid var(--edge); overflow: hidden; }
 .res { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .res canvas { width: 20px; height: 20px; }
 #date { margin-left: auto; color: var(--gold); white-space: nowrap; }
 #mapwrap { position: relative; overflow: hidden; }
 #map { width: 100%; height: 100%; display: block; cursor: pointer; }
-#side { grid-row: 2 / 4; grid-column: 2; background: linear-gradient(#211a13, #140f0b); border-left: 1px solid var(--edge); display: flex; flex-direction: column; padding: 8px; gap: 8px; overflow-y: auto; }
-#mini { width: 234px; height: 180px; border: 1px solid var(--edge); border-radius: 4px; background: #05040a; cursor: crosshair; }
-#layers { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-#layers .btn { padding: 4px 6px; font-size: 12px; }
+/* the bar along the bottom: the little map and the worlds, your heroes and towns, what is picked, and the buttons */
+#side { grid-row: 4; grid-column: 1; background: linear-gradient(#251d15, #140f0b); border-top: 1px solid var(--edge); display: flex; align-items: stretch; padding: 6px 8px; gap: 8px; overflow: hidden; }
+.bb-mini { display: flex; gap: 4px; flex: none; }
+#mini { width: 200px; height: 124px; border: 1px solid var(--edge); border-radius: 4px; background: #05040a; cursor: crosshair; }
+#layers { display: flex; flex-direction: column; gap: 3px; width: 66px; }
+#layers .btn { padding: 2px 4px; font-size: 11px; flex: 1; }
+#layers .btn.worlds { font-size: 11px; background: linear-gradient(#2a2448, #141024); border-color: #5a4a98; color: #d8ccff; }
+.bb-roster { flex: 1 1 auto; min-width: 180px; display: flex; flex-direction: column; overflow: hidden; }
+.bb-roster .lhead { font-size: 10px; }
+#maphint { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); pointer-events: none; font-size: 12px; color: var(--gold2); text-shadow: 0 1px 3px #000; white-space: nowrap; }
+#b-map { background: linear-gradient(#6a5428, #3a2c12); border-color: #c9a24e; }
 #layers .btn.on { background: linear-gradient(#6a5020, #3e2e10); border-color: var(--gold2); }
-#status { grid-column: 1; background: #120d09; border-top: 1px solid var(--edge2); padding: 3px 10px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#status { grid-column: 1; grid-row: 3; background: #120d09; border-top: 1px solid var(--edge2); padding: 3px 10px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .list { display: flex; flex-direction: column; gap: 4px; }
 .lhead { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; display: flex; justify-content: space-between; }
 .litem { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border: 1px solid var(--edge2); border-radius: 6px; background: rgba(0,0,0,.25); cursor: pointer; }
@@ -58,8 +65,14 @@ h1, h2, h3 { font-weight: normal; color: var(--gold); margin: 0 0 8px; letter-sp
 .litem .nm { font-size: 13px; line-height: 1.15; }
 .mpbar { height: 4px; background: #000; border-radius: 2px; overflow: hidden; margin-top: 3px; }
 .mpbar i { display: block; height: 100%; background: linear-gradient(90deg, #6ab04a, #b8e070); }
-#sidebtns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: auto; }
-#endturn { grid-column: 1 / 3; }
+#sidebtns { display: grid; grid-template-columns: repeat(5, 74px) 110px; grid-template-rows: 1fr 1fr; gap: 4px; flex: none; }
+#sidebtns .btn { padding: 4px 6px; font-size: 13px; }
+#endturn { grid-column: 6; grid-row: 1 / 3; font-size: 16px !important; white-space: normal; }
+/* the map editor keeps its tall panel on the right */
+#game.editing { grid-template-columns: 1fr 250px; grid-template-rows: 38px 1fr 26px; }
+#game.editing #topbar { grid-column: 1 / 3; }
+#game.editing #side { grid-row: 2 / 4; grid-column: 2; flex-direction: column; border-top: none; border-left: 1px solid var(--edge); overflow-y: auto; }
+#game.editing #layers { flex-direction: row; flex-wrap: wrap; width: auto; }
 
 /* ---------- modal dialogs ---------- */
 .overlay { position: fixed; inset: 0; background: rgba(5,3,2,.6); display: flex; align-items: center; justify-content: center; z-index: 70; padding: 16px; }
@@ -135,10 +148,15 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 13px; }
 table.grid td, table.grid th { border-bottom: 1px solid var(--edge2); padding: 4px 6px; text-align: left; }
 table.grid th { color: var(--muted); font-weight: normal; }
 
+@media (max-width: 1100px) {
+  #sidebtns { grid-template-columns: repeat(5, 58px) 84px; }
+  #sidebtns .btn { font-size: 11px; padding: 3px 2px; }
+  #selinfo { width: 180px !important; }
+}
 @media (max-width: 760px) {
-  #game { grid-template-columns: 1fr; grid-template-rows: 38px 1fr 26px 200px; }
-  #side { grid-row: 4; grid-column: 1; flex-direction: row; flex-wrap: wrap; }
-  #mini { width: 160px; height: 120px; }
+  #game { grid-template-rows: 38px 1fr 24px auto; }
+  #side { flex-wrap: wrap; overflow-y: auto; max-height: 46vh; }
+  #mini { width: 150px; height: 94px; }
   .town-ui { grid-template-columns: 1fr; max-height: 60vh; overflow-y: auto; }
 }
 
@@ -279,9 +297,10 @@ table.grid th { color: var(--muted); font-weight: normal; }
 @media (max-width: 760px) { .tp-dwell { flex-direction: column; } .tp-head { flex-wrap: wrap; } }
 .tp-body .btn.on, .town-page .btn.on { border-color: var(--gold2); background: linear-gradient(#7a5c24, #4a3612); color: #fff4d4; }
 
-/* ---------- the side bar: portraits and towns, as the old games had it ---------- */
-#roster { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; min-height: 120px; }
-.rcol { display: flex; flex-direction: column; gap: 4px; }
+/* ---------- the bottom bar: portraits and towns in rows ---------- */
+#roster { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: hidden; }
+.rcol { display: flex; flex-direction: row; gap: 4px; overflow-x: auto; overflow-y: hidden; min-height: 50px; scrollbar-width: thin; }
+.rtile.caravan { opacity: .85; }
 .rtile { position: relative; display: flex; align-items: stretch; gap: 3px; padding: 3px; border: 1px solid var(--edge2); border-radius: 6px; background: rgba(0,0,0,.3); cursor: pointer; }
 .rtile:hover { border-color: var(--edge); }
 .rtile.on { border-color: var(--gold2); background: rgba(217,184,122,.16); box-shadow: 0 0 8px rgba(255,227,163,.25); }
@@ -294,7 +313,23 @@ table.grid th { color: var(--muted); font-weight: normal; }
 .vbar i { position: absolute; left: 0; right: 0; bottom: 0; display: block; }
 .vbar.mp i { background: linear-gradient(#b8e070, #4a8a2a); }
 .vbar.br i { background: linear-gradient(#b8a8ff, #4a3aa8); }
-#selinfo { padding: 6px 8px; min-height: 78px; font-size: 13px; }
+#selinfo { padding: 5px 8px; font-size: 12px; width: 250px; flex: none; overflow: hidden; }
+#selinfo .reg { color: var(--muted); font-size: 11px; margin-top: 2px; }
 .si-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
 .si-st { position: relative; width: 32px; height: 32px; background: rgba(0,0,0,.35); border-radius: 4px; }
 .si-st span { position: absolute; right: 1px; bottom: 0; font-size: 10px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+
+/* ---------- the hero's map: the drawing held in two hands ---------- */
+#heromap { position: fixed; inset: 0; z-index: 60; background: #0a0705; }
+#heromap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+/* ---------- talking ---------- */
+.talk-opts { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.talk-opt { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--edge2); border-radius: 6px; background: rgba(0,0,0,.25); }
+.talk-opt .what { flex: 1; }
+.talk-opt .what b { color: var(--gold2); }
+.talk-opt .odds { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.relbar { height: 6px; background: #000; border-radius: 3px; overflow: hidden; margin: 4px 0; }
+.relbar i { display: block; height: 100%; background: linear-gradient(90deg, #8a5a2a, #d9b87a); }
+.reg-row { cursor: pointer; }
+.reg-row:hover td { background: rgba(217,184,122,.08); }

@@ -30,11 +30,24 @@
     V.dpr = dpr; V.cv.width = Math.max(1, Math.round(r.width * dpr)); V.cv.height = Math.max(1, Math.round(r.height * dpr));
     V.w = r.width; V.h = r.height;
   };
-  V.setGame = function (st) { V.st = st; V.chunks = {}; V.fog = null; V.miniCache = null; };
+  V.setGame = function (st) { V.st = st; V.chunks = {}; V.fog = null; V.miniCache = null; V.worlds = false; if (SU.sketch) SU.sketch.reset(); };
+  SU.on('washout', () => { V.chunks = {}; V.miniCache = null; });
   V.viewer = () => V.st ? (SU.ui && SU.ui.viewer != null ? SU.ui.viewer : V.st.current) : 0;
   V.setLayer = function (li) { if (V.layer === li) return; V.layer = li; V.fog = null; V.miniCache = null; V.path = null; SU.emit('layer', li); };
+  /* zoomed all the way out: the worlds themselves, turning */
+  V.showWorlds = function (on) { V.worlds = on; V.path = null; SU.emit('worlds', on); };
+  /* go down from the worlds view to one world (or moon) */
+  V.enterWorld = function (p) {
+    V.showWorlds(false); V.setLayer(p.li); V.zoomI = 0; V.ts = ZOOMS[0]; V.chunks = {};
+    if (p.moon) { V.cam.x = p.moon.x + 0.5; V.cam.y = p.moon.y + 0.5; }
+    else { const st = V.st, me = V.viewer(); const t = S.townsOf(st, me).find(o => o.layer === p.li) || Object.values(st.armies).find(a => !a.dead && a.owner === me && a.layer === p.li); const L = st.layers[p.li];
+      if (t) { V.cam.x = t.x + 0.5; V.cam.y = t.y + 0.5; } else { V.cam.x = L.w / 2; V.cam.y = L.h / 2; } }
+    SU.emit('layer', p.li); if (SU.ui) SU.ui.refresh();
+  };
   V.centerOn = function (layer, x, y, instant) { V.setLayer(layer); V.cam.x = x + 0.5; V.cam.y = y + 0.5; };
   V.zoom = function (d, px, py) {
+    if (V.worlds) { if (d > 0) V.showWorlds(false); return; }
+    if (d < 0 && V.zoomI === 0 && !V.paintMode && SU.sketch) { V.showWorlds(true); return; }
     const ni = SU.clamp(V.zoomI + d, 0, ZOOMS.length - 1); if (ni === V.zoomI) return;
     const before = V.screenToTile(px != null ? px : V.w / 2, py != null ? py : V.h / 2, true);
     V.zoomI = ni; V.ts = ZOOMS[ni]; V.chunks = {};
@@ -211,6 +224,8 @@
     stepAnim(now);
     const ctx = V.ctx, st = V.st, L = st.layers[V.layer], ts = V.ts;
     ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
+    if (V.worlds && SU.sketch) { SU.sketch.drawWorlds(ctx, V.w, V.h, t); drawMini(); return; }
+    const SK = !V.paintMode && st.regions && SU.sketch ? SU.sketch : null;
     ctx.fillStyle = V.layer === 3 ? '#030308' : '#0b1a2a'; ctx.fillRect(0, 0, V.w, V.h);
     if (V.layer === 3) drawStars(ctx, t);
     const x0 = Math.floor(V.cam.x - V.w / 2 / ts) - 1, y0 = Math.floor(V.cam.y - V.h / 2 / ts) - 1;
@@ -228,6 +243,10 @@
       const px = ox + x * ts + ts * 0.2 + ph * ts * 0.15, py = oy + y * ts + ts * (0.3 + (L.v[i] % 5) * 0.1);
       ctx.beginPath(); ctx.moveTo(px, py); ctx.quadraticCurveTo(px + ts * 0.15, py - ts * 0.06, px + ts * 0.3, py); ctx.stroke();
     }
+    /* floods the storm left behind */
+    if (st.floods && st.floods.length) { ctx.fillStyle = 'rgba(90,140,170,0.32)'; st.floods.forEach(f => { if (f.l !== V.layer || f.until < st.day || f.x < x0 || f.x > x1 || f.y < y0 || f.y > y1) return; ctx.beginPath(); ctx.ellipse(ox + (f.x + 0.5) * ts, oy + (f.y + 0.55) * ts, ts * 0.62, ts * 0.42, 0, 0, Math.PI * 2); ctx.fill(); }); }
+    /* territory borders and names */
+    if (SK) SK.drawBorders(ctx, ox, oy, ts, V.layer, x0, y0, x1, y1);
     /* reachable path preview, under everything that stands up */
     drawPath(ctx, ox, oy, ts, t);
     /* things that stand up, row by row */
@@ -241,25 +260,40 @@
       add(y, () => ctx.drawImage(sp.c, Math.round(ox + x * ts - sp.ox), Math.round(oy + y * ts - sp.oy)));
     }
     const VP = V.st.players[V.viewer()], elshEye = !!(VP && VP.faction === 'elsharyn');
+    const vis = SK ? SK.visible(st, V.viewer()) : null, VI = vis && vis[V.layer];
+    const inSight = (x, y) => !VI || (S.inside(L, x, y) && VI[y * L.w + x]);
+    const mem = VP && VP.mem || {};
+    /* treasure you were told of: an X where to dig */
+    (VP && VP.treasure || []).forEach(id => { const o = st.objects[id]; if (!o || !o.buried || o.layer !== V.layer || o.x < x0 || o.x > x1 || o.y < y0 || o.y > y1) return;
+      add(o.y, () => { const cx = ox + (o.x + 0.5) * ts, cy = oy + (o.y + 0.6) * ts, k = ts * 0.22; ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = ts * 0.12; ctx.beginPath(); ctx.moveTo(cx - k, cy - k); ctx.lineTo(cx + k, cy + k); ctx.moveTo(cx + k, cy - k); ctx.lineTo(cx - k, cy + k); ctx.stroke();
+        ctx.strokeStyle = '#c02a1a'; ctx.lineWidth = ts * 0.08; ctx.stroke(); ctx.restore(); }); });
     Object.values(st.objects).forEach(o => {
       if (o.layer !== V.layer || o.gone || (o.hidden && !(o.type === 'core' && elshEye)) || (o.type === 'glimmer' && o.owner !== V.viewer()) || o.x < x0 - 3 || o.x > x1 + 3 || o.y < y0 || o.y > y1 + 3) return;
       if (!seen(o.x, o.y) && !(o.type === 'town' && seen(o.x, o.y - 1))) return;
-      add(o.y, () => A.object(ctx, st, o, ox + o.x * ts, oy + o.y * ts, ts, t));
+      /* out of sight: as you remember it (who held it when you last looked) */
+      const shown = !inSight(o.x, o.y) && o.owner !== undefined && o.owner !== V.viewer() && mem[o.id] !== undefined && mem[o.id] !== o.owner ? Object.assign({}, o, { owner: mem[o.id] }) : o;
+      add(o.y, () => A.object(ctx, st, shown, ox + o.x * ts, oy + o.y * ts, ts, t));
     });
     Object.values(st.armies).forEach(a => {
       if (a.dead || a.layer !== V.layer || a.x < x0 || a.x > x1 || a.y < y0 || a.y > y1 || a.temp) return;
       if (!seen(a.x, a.y)) return;
+      /* armies that move about are only seen where you can see now; guards and settled bands stay where you saw them */
+      if (a.owner !== V.viewer() && !inSight(a.x, a.y) && (a.owner >= 0 || a.roam || a.travellers || a.mcfly)) return;
       let ax = a.x, ay = a.y;
       if (V.anim && V.anim.army === a.id) { ax = V.anim.fx; ay = V.anim.fy; }
       add(Math.ceil(ay), () => drawArmy(ctx, a, ox + ax * ts, oy + ay * ts, ts, t));
     });
     Object.keys(rows).map(Number).sort((a, b) => a - b).forEach(y => rows[y].forEach(fn => fn()));
+    /* land you remember but cannot see now */
+    if (SK) SK.drawMemory(ctx, ox, oy, ts, V.layer);
     /* the storm */
     drawStorm(ctx, ox, oy, ts, t);
-    /* fog */
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    const fc = fogCanvas();
-    ctx.drawImage(fc, 0, 0, fc.width, fc.height, ox - ts, oy - ts, fc.width * ts, fc.height * ts);
+    /* land you have not seen: the old drawing everyone carries (the editor shows everything) */
+    if (SK) SK.drawOverlay(ctx, ox, oy, ts, V.layer);
+    else if (!V.paintMode) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      const fc = fogCanvas(); ctx.drawImage(fc, 0, 0, fc.width, fc.height, ox - ts, oy - ts, fc.width * ts, fc.height * ts); }
+    /* the storm on the horizon when it is off the screen, and its lightning lighting the sky */
+    stormFar(ctx, ox, oy, ts, t);
     /* where the picked army can go today, and what blocks it */
     if (V.showWay) drawWay(ctx, ox, oy, ts, x0, y0, x1, y1, t);
     /* the pointer: reachable (green), later (gold), through a fight (orange), or not at all (red cross) */
@@ -315,6 +349,7 @@
     /* at the feet: the owner's ring (as in battle), and a pulsing gold ring when picked */
     if (a.owner >= 0 && !a.wild && !a.boat) { ctx.strokeStyle = A.rgba(col, 0.9); ctx.lineWidth = 2; A.ell(ctx, cx, gy, ts * 0.36, ts * 0.13); ctx.stroke(); }
     if (sel) { ctx.strokeStyle = 'rgba(255,230,150,' + (0.6 + Math.sin(t * 4) * 0.3) + ')'; ctx.lineWidth = 2.5; A.ell(ctx, cx, gy, ts * 0.43, ts * 0.17); ctx.stroke(); }
+    if (a.caravan) { A.caravan(ctx, a, px, py, ts, t, col, false); return; }
     if (a.boat) { A.boat(ctx, a, px, py - ts * 0.1, ts, t, col); }
     if (h) { const moving = V.anim && V.anim.army === a.id; A.mountedHero(ctx, cx, gy - (a.boat ? ts * 0.25 : 0), ts * 0.78, Object.assign({ moving }, h), col, t, a.face || 1); }
     else if (a.wild) {
@@ -322,49 +357,91 @@
       const c = stacks[0] && D.CREATURES[stacks[0].cr];
       if (c) { const big = c.tier >= 7 ? 0.95 : c.tier >= 4 ? 0.85 : 0.75; A.creature(ctx, c.art, cx, gy, ts * big, { t: t + a.x, f: (a.x + a.y) % 2 ? 1 : -1, tint: c.tint || (c.upgraded ? 1 : 0) }); }
       if (a.herd) { ctx.fillStyle = 'rgba(160,220,120,0.9)'; ctx.font = 'bold ' + Math.round(ts * 0.26) + 'px Georgia'; ctx.textAlign = 'center'; ctx.fillText('♣', cx + ts * 0.32, py + ts * 0.25); }
+      if (a.travellers) { ctx.strokeStyle = '#4a3220'; ctx.lineWidth = Math.max(1, ts * 0.04); ctx.beginPath(); ctx.moveTo(cx + ts * 0.3, gy); ctx.lineTo(cx + ts * 0.3, gy - ts * 0.55); ctx.stroke(); ctx.fillStyle = '#efe2c0'; ctx.beginPath(); ctx.moveTo(cx + ts * 0.3, gy - ts * 0.55); ctx.lineTo(cx + ts * 0.48, gy - ts * 0.48); ctx.lineTo(cx + ts * 0.3, gy - ts * 0.4); ctx.fill(); }
     } else {
       const cap = S.captainsIn(S.slotsOf(st, a))[0];
       if (cap) A.captain(ctx, cx, gy, ts * 0.62, cap, col, t, a.face || 1);
+      else { const s0 = S.stacksIn(a.slots).find(x => x.n > 0); if (s0) A.creature(ctx, D.CREATURES[s0.cr].art, cx, gy, ts * 0.7, { t, f: a.face || 1 }); }
       A.flag(ctx, cx + ts * 0.2, gy - ts * 0.1, ts * 0.32, col, t);
+      if (a.merc) { ctx.fillStyle = '#ffd24a'; ctx.font = 'bold ' + Math.round(ts * 0.22) + 'px Georgia'; ctx.textAlign = 'center'; ctx.fillText('¤', cx - ts * 0.3, py + ts * 0.3); }
     }
 
   }
   function drawPath(ctx, ox, oy, ts, t) {
     const p = V.path; if (!p || !p.steps || p.layer !== V.layer) return;
-    let mp = p.mp;
+    /* which day each step is walked on, and where each night falls */
+    let mp = p.mp, day = 0; const dayOf = [];
+    p.steps.forEach(s => { if (mp < s.cost && mp < p.mpMax) { day++; mp = p.mpMax; } mp -= s.cost; dayOf.push(day); });
+    const nights = [];
     p.steps.forEach((s, i) => {
-      mp -= s.cost; const ok = mp >= 0 || i === 0 && p.mp === p.mpMax;
+      const ok = dayOf[i] === 0;
       const cx = ox + s.x * ts + ts / 2, cy = oy + s.y * ts + ts / 2;
       const last = i === p.steps.length - 1;
-      ctx.fillStyle = ok ? 'rgba(120,230,110,0.85)' : 'rgba(230,90,70,0.85)';
+      if (!last && dayOf[i + 1] !== dayOf[i]) nights.push({ cx, cy, n: dayOf[i] + 1 });
+      ctx.fillStyle = ok ? 'rgba(120,230,110,0.85)' : 'rgba(240,200,90,0.9)';
       ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1;
-      if (last) { ctx.beginPath(); ctx.arc(cx, cy, ts * 0.17, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (p.target) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(ts * 0.26) + 'px Georgia'; ctx.textAlign = 'center'; ctx.fillText(p.target === 'battle' ? '⚔' : p.target === 'visit' ? '✦' : p.target === 'meet' ? '⇄' : '', cx, cy + ts * 0.09); } }
+      if (last) { ctx.beginPath(); ctx.arc(cx, cy, ts * 0.17, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (p.target) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(ts * 0.26) + 'px Georgia'; ctx.textAlign = 'center'; ctx.fillText(p.target === 'battle' ? '⚔' : p.target === 'talk' ? '❝' : p.target === 'visit' ? '✦' : p.target === 'meet' ? '⇄' : '', cx, cy + ts * 0.09); } }
       else { const n = p.steps[i + 1]; const a = Math.atan2(n.y - s.y, n.x - s.x); ctx.save(); ctx.translate(cx, cy); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(ts * 0.14, 0); ctx.lineTo(-ts * 0.08, -ts * 0.09); ctx.lineTo(-ts * 0.08, ts * 0.09); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
     });
+    /* the end of each day's march: a numbered camp */
+    const tag = (cx, cy, txt, col) => { ctx.font = 'bold ' + Math.round(ts * 0.24) + 'px Georgia'; const w = Math.max(ts * 0.34, ctx.measureText(txt).width + ts * 0.14);
+      ctx.fillStyle = 'rgba(20,14,8,0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - w / 2, cy - ts * 0.62, w, ts * 0.3, ts * 0.08) : ctx.rect(cx - w / 2, cy - ts * 0.62, w, ts * 0.3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.fillText(txt, cx, cy - ts * 0.4); };
+    nights.forEach(nt => tag(nt.cx, nt.cy, 'day ' + nt.n, '#f0c85a'));
+    const end = p.steps[p.steps.length - 1]; if (end && dayOf[dayOf.length - 1] > 0) tag(ox + end.x * ts + ts / 2, oy + end.y * ts + ts / 2, SU.plural(dayOf[dayOf.length - 1] + 1, 'day'), '#ffe3a3');
+  }
+  /* the Sunear'Zikhron: a turning monster of weather. It darkens the land for miles around,
+     its cloud arms wheel round a calm, lit eye, rain sweeps under it, and its lightning lights the sky */
+  let puff = null;
+  function puffSprite() {
+    if (puff) return puff; const c = A.canvas(64, 64), g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(205,212,232,0.55)'); gr.addColorStop(0.5, 'rgba(120,128,160,0.35)'); gr.addColorStop(1, 'rgba(60,66,96,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return (puff = c);
   }
   function drawStorm(ctx, ox, oy, ts, t) {
     const s = V.st.storm; if (!s || s.layer !== V.layer) return;
-    const E = V.st.players[V.viewer()].explored[V.layer];
-    const cx = ox + (s.x + 0.5) * ts, cy = oy + (s.y + 0.5) * ts, r = s.r * ts;
+    const cx = ox + (s.x + 0.5) * ts, cy = oy + (s.y + 0.5) * ts, r = s.r * ts, eye = (s.eye || 1.6) * ts;
+    if (cx + r * 2 < 0 || cy + r * 2 < 0 || cx - r * 2 > V.w || cy - r * 2 > V.h) return;
     ctx.save();
-    const g = ctx.createRadialGradient(cx, cy, s.eye * ts, cx, cy, r);
-    g.addColorStop(0, 'rgba(30,40,70,0)'); g.addColorStop(0.15, 'rgba(30,40,70,0.45)'); g.addColorStop(0.85, 'rgba(25,35,60,0.35)'); g.addColorStop(1, 'rgba(25,35,60,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-    /* the spiral arms of the Waves of Memory */
-    ctx.strokeStyle = 'rgba(170,200,240,0.22)'; ctx.lineWidth = ts * 0.12; ctx.lineCap = 'round';
-    for (let arm = 0; arm < 4; arm++) { ctx.beginPath(); for (let k = 0; k < 60; k++) { const u = k / 60, a = arm * Math.PI / 2 + u * 5 - t * 0.35, rr = s.eye * ts + u * (r - s.eye * ts); const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr * 0.9; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
-    /* rain */
-    ctx.strokeStyle = 'rgba(190,215,255,0.35)'; ctx.lineWidth = 1;
-    const R = SU.makeRng(17);
-    for (let i = 0; i < 160; i++) { const a = R.next() * Math.PI * 2, d = Math.sqrt(R.next()) * r; if (d < s.eye * ts) continue; const px = cx + Math.cos(a) * d, py0 = cy + Math.sin(a) * d * 0.9; const py = py0 + ((t * 300 + i * 37) % (ts * 2)) - ts; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 3, py + 9); ctx.stroke(); }
+    /* the land darkens and greys as you come near */
+    const dk = ctx.createRadialGradient(cx, cy, eye, cx, cy, r * 1.9);
+    dk.addColorStop(0, 'rgba(12,16,34,0.18)'); dk.addColorStop(0.2, 'rgba(12,16,34,0.48)'); dk.addColorStop(0.52, 'rgba(14,18,36,0.42)'); dk.addColorStop(1, 'rgba(14,18,36,0)');
+    ctx.fillStyle = dk; ctx.beginPath(); ctx.arc(cx, cy, r * 1.9, 0, Math.PI * 2); ctx.fill();
+    /* the cloud arms */
+    const P = puffSprite(), R = SU.makeRng(23);
+    for (let arm = 0; arm < 5; arm++) for (let k = 0; k < 24; k++) {
+      const u = k / 24, a = arm * Math.PI * 2 / 5 + u * 4.2 - t * 0.22, rr = eye * 1.2 + u * (r * 1.05 - eye);
+      const px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr * 0.86, sz = ts * (1.2 + u * 1.6) * (0.8 + R.next() * 0.5);
+      ctx.globalAlpha = 0.42 + (1 - u) * 0.28; ctx.drawImage(P, px - sz, py - sz, sz * 2, sz * 2);
+    }
+    ctx.globalAlpha = 1;
+    /* rain under the clouds */
+    ctx.strokeStyle = 'rgba(190,215,255,0.32)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 220; i++) { const a = R.next() * Math.PI * 2, d = Math.sqrt(R.next()) * r; if (d < eye) continue; const px = cx + Math.cos(a) * d, py0 = cy + Math.sin(a) * d * 0.9; const py = py0 + ((t * 320 + i * 37) % (ts * 2)) - ts; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 3, py + 10); ctx.stroke(); }
     /* the eye: calm, lit from within */
-    const eg = ctx.createRadialGradient(cx, cy, 0, cx, cy, s.eye * ts * 1.4);
-    eg.addColorStop(0, 'rgba(255,245,210,0.35)'); eg.addColorStop(1, 'rgba(255,245,210,0)');
-    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(cx, cy, s.eye * ts * 1.4, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,240,200,' + (0.4 + Math.sin(t * 2) * 0.2) + ')'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, s.eye * ts, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    /* lightning now and then */
-    const fl = (t * 0.7) % 7; if (fl < 0.12) { ctx.strokeStyle = 'rgba(230,240,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); let px = cx + R.range(-r, r) * 0.6, py = cy - r * 0.6; ctx.moveTo(px, py); for (let k = 0; k < 6; k++) { px += R.range(-ts, ts); py += ts * 0.8; ctx.lineTo(px, py); } ctx.stroke(); }
+    const eg = ctx.createRadialGradient(cx, cy, 0, cx, cy, eye * 1.6);
+    eg.addColorStop(0, 'rgba(255,245,210,0.42)'); eg.addColorStop(0.6, 'rgba(255,245,210,0.14)'); eg.addColorStop(1, 'rgba(255,245,210,0)');
+    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(cx, cy, eye * 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,240,200,' + (0.4 + Math.sin(t * 2) * 0.2) + ')'; ctx.setLineDash([4, 6]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, eye, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    /* lightning */
+    const fl = (t * 0.6) % 6; if (fl < 0.14) { const B = SU.makeRng(Math.floor(t * 0.6 / 6) + 3); ctx.strokeStyle = 'rgba(235,242,255,0.95)'; ctx.shadowColor = '#cfe0ff'; ctx.shadowBlur = 14; ctx.lineWidth = 2.2; ctx.beginPath(); let px = cx + B.range(-r, r) * 0.7, py = cy - r * 0.7; ctx.moveTo(px, py); for (let k = 0; k < 7; k++) { px += B.range(-ts, ts); py += ts * 0.8; ctx.lineTo(px, py); } ctx.stroke(); ctx.shadowBlur = 0; V._flash = 1; }
     ctx.restore();
+  }
+  /* from far away: a dark smudge on the edge of the view, an arrow and how far; or a word if it is on another world */
+  function stormFar(ctx, ox, oy, ts, t) {
+    const s = V.st.storm; if (!s) return;
+    if (V._flash > 0) { ctx.fillStyle = 'rgba(220,230,255,' + (V._flash * 0.12) + ')'; ctx.fillRect(0, 0, V.w, V.h); V._flash = Math.max(0, V._flash - 0.12); }
+    if (s.layer !== V.layer) { const txt = 'The Sunear’Zikhron is on ' + D.LAYERS[s.layer].name; ctx.font = 'italic 12px Georgia'; const w = ctx.measureText(txt).width + 16;
+      ctx.fillStyle = 'rgba(14,12,24,0.75)'; ctx.fillRect(V.w - w - 8, V.h - 26, w, 20); ctx.fillStyle = 'rgba(210,220,255,0.95)'; ctx.textAlign = 'right'; ctx.fillText(txt, V.w - 16, V.h - 12); return; }
+    const cx = ox + (s.x + 0.5) * ts, cy = oy + (s.y + 0.5) * ts;
+    if (cx > -s.r * ts * 0.3 && cy > -s.r * ts * 0.3 && cx < V.w + s.r * ts * 0.3 && cy < V.h + s.r * ts * 0.3) return;
+    const mx = V.w / 2, my = V.h / 2, a = Math.atan2(cy - my, cx - mx);
+    const k = Math.min(Math.abs((V.w / 2 - 24) / (Math.cos(a) || 1e-6)), Math.abs((V.h / 2 - 24) / (Math.sin(a) || 1e-6)));
+    const ex = mx + Math.cos(a) * k, ey = my + Math.sin(a) * k;
+    const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, 140); g.addColorStop(0, 'rgba(14,18,36,0.6)'); g.addColorStop(1, 'rgba(14,18,36,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, 140, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); ctx.fillStyle = 'rgba(200,215,255,0.9)'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-6, -9); ctx.lineTo(-2, 0); ctx.lineTo(-6, 9); ctx.closePath(); ctx.fill(); ctx.restore();
+    const dist = Math.round(Math.hypot(s.x - V.cam.x, s.y - V.cam.y));
+    ctx.fillStyle = 'rgba(220,228,255,0.9)'; ctx.font = 'italic 12px Georgia'; ctx.textAlign = Math.cos(a) > 0.3 ? 'right' : Math.cos(a) < -0.3 ? 'left' : 'center';
+    ctx.fillText('the storm · ' + dist + ' tiles', ex - Math.cos(a) * 26, ey - Math.sin(a) * 26 + 4);
   }
 
   /* ======================= minimap ======================= */
@@ -377,7 +454,13 @@
     if (!V.miniCache || V.miniFrame++ % 20 === 0) {
       const c = V.miniCache || A.canvas(W, H); const cg = c.getContext('2d');
       cg.fillStyle = '#05040a'; cg.fillRect(0, 0, W, H);
-      for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const i = y * L.w + x; if (!E[i]) continue; cg.fillStyle = L.ob[i] === S.OB.mountain ? '#6a655a' : L.ob[i] && L.ob[i] !== S.OB.rock ? A.shade(MINI_COL[S.TCODES[L.t[i]]], -25) : MINI_COL[S.TCODES[L.t[i]]]; cg.fillRect(offx + x * sc, offy + y * sc, Math.ceil(sc), Math.ceil(sc)); }
+      for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const i = y * L.w + x, tc = S.TCODES[L.t[i]];
+        /* land you have not seen: the old drawing, in parchment and ink */
+        if (!E[i]) { cg.fillStyle = tc === 'void' ? '#1c1828' : tc === 'water' ? '#8c9a92' : L.ob[i] === S.OB.mountain ? '#8a7a58' : '#cdb98a'; cg.fillRect(offx + x * sc, offy + y * sc, Math.ceil(sc), Math.ceil(sc)); continue; }
+        cg.fillStyle = L.ob[i] === S.OB.mountain ? '#6a655a' : L.ob[i] && L.ob[i] !== S.OB.rock ? A.shade(MINI_COL[tc], -25) : MINI_COL[tc]; cg.fillRect(offx + x * sc, offy + y * sc, Math.ceil(sc), Math.ceil(sc)); }
+      /* the edges of land someone holds */
+      if (L.reg && st.regions) for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const i = y * L.w + x, a = L.reg[i]; if (!a || !E[i]) continue; const r = st.regions[V.layer][a - 1]; if (!r || r.owner < 0) continue;
+        if ([[1, 0], [0, 1], [-1, 0], [0, -1]].some(([dx, dy]) => { const xx = x + dx, yy = y + dy; return S.inside(L, xx, yy) && L.reg[yy * L.w + xx] && L.reg[yy * L.w + xx] !== a; })) { cg.fillStyle = st.players[r.owner].color; cg.fillRect(offx + x * sc, offy + y * sc, Math.ceil(sc), Math.ceil(sc)); } }
       Object.values(st.objects).forEach(o => { if (o.layer !== V.layer || !E[o.y * L.w + o.x]) return; if (o.type === 'town' || o.type === 'mine' || o.type === 'village') { cg.fillStyle = S.color(st, o.owner); const r = o.type === 'town' ? 2.6 : 1.6; cg.fillRect(offx + (o.x - (o.type === 'town' ? 1 : 0.5)) * sc, offy + (o.y - (o.type === 'town' ? 1.5 : 0.5)) * sc, r * sc, r * sc); } if (o.type === 'urverk') { cg.fillStyle = '#c9b8ff'; cg.fillRect(offx + o.x * sc, offy + o.y * sc, 1.5 * sc, 1.5 * sc); } });
       V.miniCache = c; V.miniFrame = V.miniFrame || 1;
     }
@@ -439,11 +522,13 @@
     let paintLast = null;
     cv.addEventListener('mousedown', e => {
       drag = { x: e.clientX, y: e.clientY, cx: V.cam.x, cy: V.cam.y, btn: e.button }; moved = false;
+      if (V.worlds) return;
       if (V.paintMode && e.button === 0) { const r = cv.getBoundingClientRect(); const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top); paintLast = tt.x + ',' + tt.y; drag.paint = true; SU.emit('mappaint', { x: tt.x, y: tt.y, first: true }); }
     });
     window.addEventListener('mousemove', e => {
       const r = cv.getBoundingClientRect();
       if (drag && drag.paint) { const r = cv.getBoundingClientRect(); const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top); const k = tt.x + ',' + tt.y; if (k !== paintLast) { paintLast = k; SU.emit('mappaint', { x: tt.x, y: tt.y, first: false }); } }
+      if (V.worlds && e.target === cv) { const txt = SU.sketch.worldsHover(e.clientX - r.left, e.clientY - r.top); SU.emit('worldshover', txt); drag = null; return; }
       else if (drag && (drag.btn === 0 || (drag.btn === 2 && V.paintMode))) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 6) moved = true; if (moved) { V.cam.x = drag.cx - dx / V.ts; V.cam.y = drag.cy - dy / V.ts; } }
       if (e.target === cv) { const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top); if (!V.hover || tt.x !== V.hover.x || tt.y !== V.hover.y) { V.hover = tt; SU.emit('hover', tt); } }
     });
@@ -451,6 +536,7 @@
       if (!drag) return; const was = drag; drag = null;
       if (moved || was.paint) return;
       const r = cv.getBoundingClientRect(); if (e.target !== cv) return;
+      if (V.worlds) { const p = SU.sketch.worldsHit(e.clientX - r.left, e.clientY - r.top); if (p) V.enterWorld(p); return; }
       const tt = V.screenToTile(e.clientX - r.left, e.clientY - r.top);
       if (was.btn === 2) SU.emit('mapinfo', { x: tt.x, y: tt.y, sx: e.clientX, sy: e.clientY });
       else SU.emit('mapclick', Object.assign(tt, { shift: e.shiftKey || e.ctrlKey || e.metaKey }));
@@ -461,7 +547,9 @@
     let tch = null;
     cv.addEventListener('touchstart', e => { if (e.touches.length !== 1) return; const t0 = e.touches[0]; tch = { x: t0.clientX, y: t0.clientY, cx: V.cam.x, cy: V.cam.y, moved: false, at: Date.now() }; }, { passive: true });
     cv.addEventListener('touchmove', e => { if (!tch || e.touches.length !== 1) return; const t0 = e.touches[0]; const dx = t0.clientX - tch.x, dy = t0.clientY - tch.y; if (Math.abs(dx) + Math.abs(dy) > 10) tch.moved = true; if (tch.moved) { V.cam.x = tch.cx - dx / V.ts; V.cam.y = tch.cy - dy / V.ts; } e.preventDefault(); }, { passive: false });
-    cv.addEventListener('touchend', e => { if (!tch) return; const t = tch; tch = null; if (t.moved) return; const r = cv.getBoundingClientRect(); const tt = V.screenToTile(t.x - r.left, t.y - r.top);
+    cv.addEventListener('touchend', e => { if (!tch) return; const t = tch; tch = null; if (t.moved) return; const r = cv.getBoundingClientRect();
+      if (V.worlds) { const p = SU.sketch.worldsHit(t.x - r.left, t.y - r.top); if (p) V.enterWorld(p); return; }
+      const tt = V.screenToTile(t.x - r.left, t.y - r.top);
       if (Date.now() - t.at > 550) SU.emit('mapinfo', { x: tt.x, y: tt.y, sx: t.x, sy: t.y }); else SU.emit('mapclick', tt); });
     if (V.mini) { const mc = e => { const r = V.mini.getBoundingClientRect(); V.miniClick((e.clientX - r.left) * V.mini.width / r.width, (e.clientY - r.top) * V.mini.height / r.height); };
       let md = false; V.mini.addEventListener('mousedown', e => { md = true; mc(e); }); window.addEventListener('mousemove', e => { if (md) mc(e); }); window.addEventListener('mouseup', () => md = false); }

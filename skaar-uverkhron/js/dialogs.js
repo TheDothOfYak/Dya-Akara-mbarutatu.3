@@ -348,6 +348,10 @@
         el('div', { cls: 'small' }, ['Level ' + c.level + ' · Morale +' + ((c.morale || 0) * 5) + ' · Luck ' + c.luck + ' · Leads ' + c.capacity + (c.elite ? ' (peerless)' : '')]),
         el('div', { cls: 'small', 'data-tip': D.CAPTAIN_ABIL[c.abil].desc }, [el('span', { cls: 'gold', text: D.CAPTAIN_ABIL[c.abil].name }), ': ' + D.CAPTAIN_ABIL[c.abil].desc]),
         btn('Hire — ' + M.captainCost(c) + ' gold', () => { const slots = town ? town.garrison : S.slotsOf(st(), a); const r = RU.hireCaptain(st(), P, town, i, slots); if (!r.ok) U.toast(r.why || 'Cannot hire.'); else U.toast(c.name + ' joins ' + where + '.'); render(); SU.emit('town'); }, 'primary')]))));
+      /* rumours: where a real treasure lies buried */
+      const chest = Object.values(st().objects).find(c => c.type === 'chest' && c.buried && !(P.treasure || []).includes(c.id));
+      if (chest) { const r = SU.realm.regionAt(st(), chest.layer, chest.x, chest.y); b.appendChild(el('div', { cls: 'frame row', style: { marginTop: '10px' } }, [el('div', { style: { flex: 1 } }, [el('b', { cls: 'gold', text: 'A rumour' }), el('div', { cls: 'small muted', text: 'An old drover swears there is a chest buried somewhere in ' + (r ? r.name : 'the wilds') + ' on ' + D.LAYERS[chest.layer].name + '. For a price, he will draw you the spot.' })]),
+        btn('Pay 1200 gold', () => { if (P.res.gold < 1200) { U.toast('Not enough gold.'); return; } P.res.gold -= 1200; P.treasure = (P.treasure || []).concat([chest.id]); S.reveal(st(), U.viewer, chest.layer, chest.x, chest.y, 2); U.toast('The spot is marked on your map with an X.'); render(); U.refresh(); })])); }
       b.appendChild(el('div', { cls: 'acts' }, [btn('Leave', () => m.close())]));
     }
     render();
@@ -372,19 +376,25 @@
       const kinds = ['bring'];
       if (wild) kinds.push('slay', 'slay');
       if (dead) kinds.push('trigger', 'trigger');
+      /* a buried chest nobody has been told of yet */
+      const chest = Object.values(st().objects).find(c => c.type === 'chest' && c.buried && !(P.treasure || []).includes(c.id));
+      if (chest) kinds.push('treasure', 'treasure');
       const kind = R.pick(kinds);
       if (kind === 'bring') { const res = R.pick(['wood', 'stone', 'stygian', 'glowmoss', 'timber', 'food']); o.quest = { kind, res, amt: D.RES_INFO[res].common ? R.int(10, 20) : R.int(3, 6), reward: { gold: R.pick([2500, 3500, 5000]), xp: R.pick([1000, 2000]) } }; }
       else if (kind === 'slay') o.quest = { kind, target: wild.id, desc: 'the ' + S.stacksIn(wild.slots).map(s => D.CREATURES[s.cr].plural).join(' and ') + ' at ' + wild.x + ',' + wild.y, reward: { gold: 3000, xp: 3000, relic: R.pick(D.RELIC_IDS.filter(r => D.RELICS[r].rare === 'rare')) } };
+      else if (kind === 'treasure') { const r = SU.realm.regionAt(st(), chest.layer, chest.x, chest.y); o.quest = { kind, target: chest.id, reward: {}, desc: 'a chest buried in ' + (r ? r.name : 'the wilds') + ' on ' + D.LAYERS[chest.layer].name, price: R.pick([600, 800, 1000]) }; }
       else o.quest = { kind, target: dead.id, reward: { xp: 2500 }, desc: 'the lost trigger of the Urverk at ' + dead.x + ',' + dead.y + ' on ' + D.LAYERS[dead.layer].name };
     }
     const q = o.quest;
     let text, done = false;
     if (q.kind === 'bring') { text = '“Bring me ' + q.amt + ' ' + D.RES_INFO[q.res].name + '.”'; done = (P.res[q.res] || 0) >= q.amt; }
     else if (q.kind === 'slay') { text = '“Rid the land of ' + q.desc + '.”'; done = !st().armies[q.target] || st().armies[q.target].dead; }
-    else { text = '“Find ' + q.desc + '. I know someone who remembers it — bring me 3 Glowmoss and 2000 gold for their trouble.”'; done = P.res.glowmoss >= 3 && P.res.gold >= 2000; }
-    const reward = 'Reward: ' + [q.reward.gold && q.reward.gold + ' gold', q.reward.xp && q.reward.xp + ' XP', q.reward.relic && D.RELICS[q.reward.relic].name].filter(Boolean).join(', ');
+    else if (q.kind === 'treasure') { text = '“There is ' + q.desc + '. Real treasure, not road scraps. For ' + q.price + ' gold I will mark the very spot on your map.”'; done = P.res.gold >= q.price && !!st().objects[q.target]; }
+    else { text = '“Find ' + q.desc + '. I know someone who remembers it — bring me 3 Glowmoss and 2000 gold for their trouble.”'; done = P.res.gold >= 2000 && P.res.glowmoss >= 3; }
+    const reward = q.kind === 'treasure' ? 'Reward: the chest is marked on your map with an X. Dig there with an army to open it.' : 'Reward: ' + [q.reward.gold && q.reward.gold + ' gold', q.reward.xp && q.reward.xp + ' XP', q.reward.relic && D.RELICS[q.reward.relic].name].filter(Boolean).join(', ');
     const m = U.modal([el('h2', { text: 'Seer’s Hut' }), el('p', { text }), el('p', { cls: 'small muted', text: reward }), el('div', { cls: 'acts' }, [btn('Later', () => m.close()), done && h ? btn('It is done', () => {
       if (q.kind === 'bring') P.res[q.res] -= q.amt;
+      if (q.kind === 'treasure') { P.res.gold -= q.price; P.treasure = (P.treasure || []).concat([q.target]); const c = st().objects[q.target]; if (c) { S.reveal(st(), U.viewer, c.layer, c.x, c.y, 2); V.centerOn(c.layer, c.x, c.y); } }
       if (q.kind === 'trigger') { P.res.glowmoss -= 3; P.res.gold -= 2000; const u = st().objects[q.target]; if (u) { u.triggerKnown = true; const l = st().objects[u.link]; if (l) l.triggerKnown = true; } }
       if (q.reward.gold) P.res.gold += q.reward.gold;
       if (q.reward.relic) RU.giveRelic(st(), h, q.reward.relic);
@@ -571,7 +581,8 @@
   DL.mapKey = function () {
     const sec = (title, kids) => el('div', { cls: 'key-sec' }, [el('h3', { text: title }), ...kids]);
     const sizes = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, [el('th', { cls: 'small muted', text: 'Word' }), el('th', { cls: 'small muted', text: 'How many' })]), ...S.COUNT_WORDS.map(([a, b, w]) => el('tr', {}, [el('td', { cls: 'gold', text: w }), el('td', { text: b == null ? a + ' or more' : a + '–' + b })]))]);
-    const marks = [['G', 'Show the way: green ground is reachable today, red stripes are blocked (water, mountains, thick woods, buildings), orange is beside a wild guard (you would stop there and fight)'], ['□ green', 'Pointing: you can reach it today'], ['□ gold', 'Pointing: you can reach it, but not today'], ['✕ red', 'Pointing: you cannot go there (the bar at the bottom says why)'], ['⚔ orange', 'Pointing: the way passes a wild guard, and you will fight it'], ['→ green', 'The path: reached today'], ['→ red', 'The path: later days'], ['⚔', 'The path ends in a fight'], ['✦', 'The path ends at something to visit'], ['⇄', 'The path ends at one of your own armies: meet and trade'], ['◌ blue ring', 'The Sunear’Zikhron: the storm (its still eye in the middle)']];
+    const marks = [['G', 'Show the way: green ground is reachable today, red stripes are blocked (water, mountains, thick woods, buildings), orange is beside a wild guard (you would stop there)'], ['□ green', 'Pointing: you can reach it today'], ['□ gold', 'Pointing: you can reach it, but not today'], ['✕ red', 'Pointing: you cannot go there (the bar at the bottom says why)'], ['⚔ orange', 'Pointing: the way passes a wild guard'], ['→ green', 'The path: walked today'], ['→ gold', 'The path: later days'], ['day 2', 'Where the army camps at the end of each day, and how many days it all takes'], ['⚔', 'The path ends in a fight'], ['❝', 'The path ends at someone you can talk to (or fight)'], ['✦', 'The path ends at something to visit'], ['⇄', 'The path ends at one of your own armies (or your caravan): meet and trade'],
+      ['parchment', 'Land you have not seen: the old drawing everyone carries. True in shape, but old, and rougher far from any town'], ['faded land', 'Land you have seen but cannot see now: as you remember it'], ['coloured border', 'The edge of a territory someone holds, in their colour'], ['wagon', 'A caravan, bringing a territory’s goods home'], ['¤', 'A mercenary band in someone’s pay'], ['the storm', 'The Sunear’Zikhron. Off the screen, an arrow at the edge points to it'], ['M', 'Pull out the map: every world, your land, your caravans and the storm'], ['W', 'The worlds: all of the Mbaru Tatu at once, and the Urverk between them']];
     const ground = el('table', { cls: 'setup key-tbl' }, [el('tr', {}, ['Ground', 'Moving', 'Element'].map(x => el('th', { cls: 'small muted', text: x }))),
       ...Object.values(D.TERRAIN).filter(t => !t.void).map(t => el('tr', {}, [el('td', { text: t.name }), el('td', { text: t.pass === false ? 'boats only' : t.cost === 100 ? 'normal' : Math.round(t.cost) + '% (slower)' }), el('td', { text: t.el ? D.ELEMENTS[t.el].name : '' })])),
       el('tr', {}, [el('td', { text: 'Road' }), el('td', { text: D.ROAD_COST + '% (faster)' }), el('td', {})])]);
@@ -580,7 +591,11 @@
       sec('Army sizes', [el('p', { cls: 'small muted', text: 'Other armies are shown by words, not numbers, unless your hero has Cunning 6.' }), sizes]),
       sec('On the map', [el('div', { cls: 'col' }, marks.map(([k, d]) => el('div', { cls: 'row small' }, [el('b', { cls: 'gold', style: { minWidth: '80px' }, text: k }), d]))),
         el('p', { cls: 'small muted', text: 'Click to see a path, click again to go. Right-click anything to learn about it. Shift-click one of your armies to pick it while another is picked. Double-click a creature to see it close up.' })]),
-      sec('Ground', [ground]), sec('Resources', [res])]),
+      sec('Ground', [ground]), sec('Resources', [res]),
+      sec('Territories', [el('p', { cls: 'small', text: 'The land is shared into named territories. A territory belongs to whoever is the highest authority in it: towns count 100, keeps 60, watch posts 12, and every army standing there counts by its strength. Wild bands count against you (the biggest in full, the rest for a little; guards only half). Holding it already counts 20.' }),
+        el('p', { cls: 'small', text: 'To take a territory, your authority must be half again as large as everything against you there; to keep it, at least as large. It changes hands at the end of the day.' }),
+        el('p', { cls: 'small', text: 'A territory gives you its mines, its villages’ settlers and what its land yields. Where a town of yours stands, the goods come straight in; elsewhere a caravan carries them home every day. Bandits rob caravans on roads through land you do not hold: take that land, raise a watch post there, give the caravan guards, or make a pact of open roads.' }),
+        el('p', { cls: 'small', text: 'Anyone who can talk can be talked to: walk into a band led by a Dearcàn, travellers, a free town or keep, or a rival. Beasts cannot be talked to.' })])]),
       el('div', { cls: 'acts' }, [btn('Close', () => m.close(), 'primary')])], { wide: true });
   };
 
@@ -590,13 +605,14 @@
     const inc = {}; D.RES.forEach(r => inc[r] = 0);
     towns.forEach(t => Object.entries(RU.townIncome(stt, t)).forEach(([k, v]) => inc[k] += v));
     const mines = Object.values(stt.objects).filter(o => o.type === 'mine' && o.owner === U.viewer);
-    mines.forEach(o => { const Mi = D.MINES[o.kind]; inc[Mi.res] += Mi.amt; });
+    Object.entries(SU.realm.wouldYield(stt, U.viewer)).forEach(([k, v]) => inc[k] += v);
     const heroes = Object.values(stt.heroes).filter(h => h.owner === U.viewer && !h.dead);
     const m = U.modal([el('h2', { text: P.name + '’s kingdom' }),
       el('table', { cls: 'grid' }, [el('tr', {}, [el('th', { text: '' }), ...D.RES.map(r => el('th', {}, U.resIcon(r, 18)))]), el('tr', {}, [el('td', { text: 'Stores' }), ...D.RES.map(r => el('td', { text: SU.fmt(P.res[r]) }))]), el('tr', {}, [el('td', { text: 'A day' }), ...D.RES.map(r => el('td', { text: (r === 'food' ? '+' + Math.round(inc[r]) + ' / −' + Math.round(P.lastEat || 0) : '+' + SU.fmt(inc[r])) }))])]),
       el('h3', { text: 'Towns', style: { marginTop: '10px' } }), el('table', { cls: 'grid' }, towns.map(t => el('tr', { style: { cursor: 'pointer' }, onclick: () => { m.close(); SU.townView.open(t); } }, [el('td', { text: t.name }), el('td', { text: D.LAYERS[t.layer].name }), el('td', { text: Math.floor(t.pop) + ' / ' + RU.housing(t) + ' people' }), el('td', { text: '+' + RU.townIncome(stt, t).gold + ' gold' }), el('td', { text: t.builtToday ? 'built today' : 'can build' })]))),
       el('h3', { text: 'Heroes', style: { marginTop: '10px' } }), el('table', { cls: 'grid' }, heroes.map(h => { const loc = S.heroLocation(stt, h); return el('tr', { style: { cursor: 'pointer' }, onclick: () => { m.close(); DL.hero(h); } }, [el('td', { text: h.name }), el('td', { text: 'Level ' + h.level }), el('td', { text: loc.army ? D.LAYERS[loc.army.layer].name : loc.town ? 'in ' + loc.town.name : '' }), el('td', { text: S.armySize(h.slots) + ' troops' })]); })),
-      el('p', { cls: 'small muted', text: mines.length + ' mines held, ' + Object.values(stt.objects).filter(o => o.type === 'village' && o.owner === U.viewer).length + ' villages (' + D.VILLAGE_SETTLERS + ' settlers a week each). ' + (P.unlocked.includes('nekh') ? 'The Nekh’Vorran answers your call.' : 'Win a battle in the eye of the storm to unlock the Nekh’Vorran.') }),
+      SU.talk.landSection(),
+      el('p', { cls: 'small muted', text: mines.length + ' mines and ' + Object.values(stt.objects).filter(o => o.type === 'village' && o.owner === U.viewer).length + ' villages in your land (' + D.VILLAGE_SETTLERS + ' settlers a week each). ' + (P.unlocked.includes('nekh') ? 'The Nekh’Vorran answers your call.' : 'Win a battle in the eye of the storm to unlock the Nekh’Vorran.') }),
       el('div', { cls: 'acts' }, [S.townsOf(stt, U.viewer).some(t => RU.has(t, 'market')) ? btn('Market', () => { m.close(); DL.market(); }) : null, btn('Close', () => m.close(), 'primary')])], { wide: true });
   };
 

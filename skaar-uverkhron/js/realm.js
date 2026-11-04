@@ -182,7 +182,7 @@
     st.sketch = Object.values(st.objects).filter(o => !o.hidden && !o.buried && ['town', 'keep', 'village', 'urverk', 'mine', 'visit'].includes(o.type)).filter(o => {
       if (o.type === 'town') return true;
       const d = o.layer === 3 ? 8 : near(o);
-      return o.type === 'urverk' ? d < 30 : o.type === 'keep' || o.type === 'village' ? d < 24 : d < 13;
+      return o.type === 'urverk' ? d < 30 : o.type === 'keep' || o.type === 'village' ? d < 24 : d < 9;
     }).map(o => ({ t: o.type, l: o.layer, x: o.x, y: o.y, k: o.kind || null, n: o.name || null }));
   };
 
