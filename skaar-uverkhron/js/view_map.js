@@ -1,6 +1,6 @@
 /* ============================================================
    SKAAR UVERKHRON — js/view_map.js
-   The adventure map on screen: ground painted as one lit relief
+   The adventure map on screen: ground painted as an old map (watercolour on parchment, inked coasts)
    and baked in chunks, roads, trees and mountains,
    objects and armies in depth order, the storm, soft fog of war,
    the path preview, panning and zooming.
@@ -66,36 +66,43 @@
      lines), a height field lit from the north-west gives hills, ranges and valleys,
      water darkens with depth and lightens into shallows and a line of surf, and a
      fine brush grain sits over everything. */
-  const SPT = 10;                // paint samples per tile (independent of zoom)
+  const SPT = 14;                // paint samples per tile (independent of zoom)
   const hex = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
   /* each land: a low, mid and high tone mixed by broad noise, then a speckle tone */
+  /* faded watercolour washes, as on an old painted map */
   const PAL = {
-    grass: { a: '#68843f', b: '#86a04c', c: '#a6b15e', h: 0.10, rough: 0.05 },
-    dirt:  { a: '#7d6243', b: '#9a7c55', c: '#ad9163', h: 0.14, rough: 0.06 },
-    rough: { a: '#6f6a5a', b: '#8a8270', c: '#a29a84', h: 0.34, rough: 0.16 },
-    sand:  { a: '#c4a873', b: '#d8c18e', c: '#e8d7a8', h: 0.03, rough: 0.04 },
-    snow:  { a: '#c9d4de', b: '#e2e9ef', c: '#f7f9fb', h: 0.46, rough: 0.12 },
-    swamp: { a: '#3f4a30', b: '#55603a', c: '#6a7146', h: 0.00, rough: 0.02 },
-    ash:   { a: '#3e3330', b: '#574842', c: '#6e5d55', h: 0.20, rough: 0.10 },
-    dusk:  { a: '#2c2540', b: '#3d3358', c: '#56487a', h: 0.12, rough: 0.05 },
-    moon:  { a: '#9693a8', b: '#b3b0c3', c: '#cfcddc', h: 0.18, rough: 0.12 },
+    grass: { a: '#8e9a58', b: '#a6ab68', c: '#c0bc80', h: 0.10, rough: 0.05 },
+    dirt:  { a: '#b08c5a', b: '#c09e6a', c: '#cfb17e', h: 0.14, rough: 0.06 },
+    rough: { a: '#968b70', b: '#a89c80', c: '#bbae91', h: 0.34, rough: 0.16 },
+    sand:  { a: '#d2bb88', b: '#ddc898', c: '#e7d6aa', h: 0.03, rough: 0.04 },
+    snow:  { a: '#d8d2c0', b: '#e6e0ce', c: '#f1ecdc', h: 0.46, rough: 0.12 },
+    swamp: { a: '#6c7150', b: '#7b805a', c: '#8b8c64', h: 0.00, rough: 0.02 },
+    ash:   { a: '#6b5a4e', b: '#7c6a5c', c: '#8e7b6a', h: 0.20, rough: 0.10 },
+    dusk:  { a: '#55476a', b: '#65577e', c: '#7c6c96', h: 0.12, rough: 0.05 },
+    moon:  { a: '#b2ab9b', b: '#c2bba9', c: '#d1cab8', h: 0.18, rough: 0.12 },
     void:  { a: '#040409', b: '#07070f', c: '#0c0c18', h: -0.6, rough: 0 },
-    water: { a: '#14324f', b: '#1f5272', c: '#3f8790', h: -0.3, rough: 0 },
+    water: { a: '#4f7680', b: '#6a8e8f', c: '#9db5a6', h: -0.3, rough: 0 },
   };
   const PALRGB = {}; Object.keys(PAL).forEach(k => PALRGB[k] = { a: hex(PAL[k].a), b: hex(PAL[k].b), c: hex(PAL[k].c) });
-  const ROCK = hex('#7a7262'), FOREST = hex('#2f4424'), REED = hex('#566238'), SURF = hex('#dfeee8'), WET = hex('#2e4a46');
+  const ROCK = hex('#9a8c72'), FOREST = hex('#5c6640'), REED = hex('#7b7c50'), SURF = hex('#c9c3a4'), WET = hex('#6c776a'), INK = hex('#4a3826'), PAPER = hex('#e8d9b4');
   const TOFF = {}; Object.keys(PAL).forEach((k, i) => TOFF[k] = i * 37.31 + 11.7);
   const sstep = (a, b, x) => { const t = SU.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-  /* a fine tileable brush grain laid over the paint */
+  /* the paper: fine fibres and speckle, tileable, laid over the paint */
   let grain = null;
   function grainTex() {
     if (grain) return grain;
     const N = 256, c = A.canvas(N, N), g = c.getContext('2d'), R = SU.makeRng(4242);
     g.fillStyle = '#808080'; g.fillRect(0, 0, N, N);
-    for (let i = 0; i < 1800; i++) {
-      const x = R.range(0, N), y = R.range(0, N), l = R.range(3, 9), a = R.range(-0.5, 0.5) + (R.chance(0.5) ? 0 : Math.PI);
-      g.strokeStyle = R.chance(0.5) ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'; g.lineWidth = R.range(0.8, 2.2); g.lineCap = 'round';
-      for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) { g.beginPath(); g.moveTo(x + ox, y + oy); g.lineTo(x + ox + Math.cos(a) * l, y + oy + Math.sin(a) * l); g.stroke(); }
+    const wrap = fn => { for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) fn(ox, oy); };
+    for (let i = 0; i < 900; i++) {          /* fibres */
+      const x = R.range(0, N), y = R.range(0, N), l = R.range(4, 14), a = R.range(0, Math.PI * 2), bend = R.range(-3, 3);
+      g.strokeStyle = R.chance(0.55) ? 'rgba(255,250,235,0.13)' : 'rgba(60,40,20,0.11)'; g.lineWidth = R.range(0.5, 1.2); g.lineCap = 'round';
+      wrap((ox, oy) => { g.beginPath(); g.moveTo(x + ox, y + oy); g.quadraticCurveTo(x + ox + Math.cos(a) * l / 2 + bend, y + oy + Math.sin(a) * l / 2 - bend, x + ox + Math.cos(a) * l, y + oy + Math.sin(a) * l); g.stroke(); });
+    }
+    for (let i = 0; i < 2600; i++) {         /* speckle */
+      const x = R.range(0, N), y = R.range(0, N), r = R.range(0.3, 1.1);
+      g.fillStyle = R.chance(0.6) ? 'rgba(70,48,24,' + R.range(0.08, 0.22).toFixed(2) + ')' : 'rgba(255,248,230,0.18)';
+      wrap((ox, oy) => { g.beginPath(); g.arc(x + ox, y + oy, r, 0, Math.PI * 2); g.fill(); });
     }
     return (grain = c);
   }
@@ -137,26 +144,27 @@
     const tw = new Map();
     /* samples */
     const N = CH * SPT + 4, s0x = cx * CH - 2 / SPT, s0y = cy * CH - 2 / SPT;
-    const H = new Float32Array(N * N), col = new Float32Array(N * N * 3), isW = new Float32Array(N * N), wet = new Float32Array(N * N), alpha = new Float32Array(N * N).fill(1);
+    const H = new Float32Array(N * N), col = new Float32Array(N * N * 3), isW = new Float32Array(N * N), wet = new Float32Array(N * N), alpha = new Float32Array(N * N).fill(1), LD = new Float32Array(N * N), LB = new Float32Array(N * N), EG = new Float32Array(N * N);
     for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
       const fx = s0x + (sx + 0.5) / SPT, fy = s0y + (sy + 0.5) / SPT, o = sy * N + sx;
       /* everything is read through a round, warped kernel over the nearby tiles, so no shape follows the grid */
       const qx = fx + NZ.warp.fbm(fx * 0.45, fy * 0.45, 3) * 0.55, qy = fy + NZ.warp2.fbm(fx * 0.45, fy * 0.45, 3) * 0.55;
       const gx = qx - bx - 0.5, gy = qy - by - 0.5, i0 = Math.floor(gx), j0 = Math.floor(gy);
-      let sW = 0, sL = 0, sH = 0, sM = 0, sF = 0, sR = 0, sWl = 0; tw.clear();
+      let sLb = 0, sW = 0, sL = 0, sH = 0, sM = 0, sF = 0, sR = 0, sWl = 0; tw.clear();
       for (let dj = -1; dj <= 2; dj++) for (let di = -1; di <= 2; di++) {
         const ii = SU.clamp(i0 + di, 0, TW - 1), jj = SU.clamp(j0 + dj, 0, TW - 1), p = jj * TW + ii;
         const ddx = gx - (i0 + di), ddy = gy - (j0 + dj), d2 = ddx * ddx + ddy * ddy;
         const w = Math.exp(-d2 * 1.9), wl = Math.exp(-d2 * 3.2);       // broad for height and cover, tighter for the lands
-        sW += w; sH += sm[p] * w; sM += mtn[p] * w; sF += wood[p] * w; sR += reed[p] * w;
+        sW += w; sLb += land[p] * w; sH += sm[p] * w; sM += mtn[p] * w; sF += wood[p] * w; sR += reed[p] * w;
         sWl += wl; sL += land[p] * wl; tw.set(tid[p], (tw.get(tid[p]) || 0) + wl);
       }
       const wn = NZ.edge.fbm(fx * 0.7, fy * 0.7, 3);
-      const ld = sL / sWl + wn * 0.16;
+      const ld = sL / sWl + wn * 0.2;
       let t = null, t2 = null, w1 = -9, w2 = -9;
       tw.forEach((w, tt) => { if (tt === 'water' || tt === 'void') return; w = w / sWl + NZ.tone.fbm(fx * 0.8 + TOFF[tt], fy * 0.8 - TOFF[tt], 2) * 0.22;
         if (w > w1) { t2 = t; w2 = w1; t = tt; w1 = w; } else if (w > w2) { t2 = tt; w2 = w; } });
       const blendK = t2 ? 0.5 + 0.5 * sstep(0, 0.12, w1 - w2) : 1;
+      LD[o] = ld; LB[o] = sLb / sW + wn * 0.04; EG[o] = t2 ? 1 - sstep(0, 0.07, w1 - w2) : 0;
       const isVoid = (tw.get('void') || 0) > (tw.get('water') || 0);
       if (!t) t = isVoid ? 'moon' : 'sand';
       const P = PALRGB[t] || PALRGB.grass, pr = PAL[t] || PAL.grass, PW = PALRGB.water;
@@ -188,8 +196,8 @@
         if (rk > 0.05) { const k = sstep(0.1, 0.8, rk) * 0.5; r += (REED[0] - r) * k; g += (REED[1] - g) * k; b += (REED[2] - b) * k; }
         /* marsh pools, ember seams in the ash, the dusk's violet veins */
         if (t === 'swamp') { const p = sstep(0.12, 0.2, NZ.tone2.fbm(fx * 1.1, fy * 1.1, 3)); wet[o] = p; r += (WET[0] - r) * p; g += (WET[1] - g) * p; b += (WET[2] - b) * p; }
-        if (t === 'ash') { const v = 1 - Math.abs(NZ.hill(fx * 0.9, fy * 0.9)) * 14; if (v > 0) { const k = v * 0.55; r += (230 - r) * k; g += (110 - g) * k * 0.8; b += (40 - b) * k * 0.4; } }
-        if (t === 'dusk') { const v = 1 - Math.abs(NZ.hill(fx * 0.8 + 50, fy * 0.8)) * 16; if (v > 0) { const k = v * 0.32; r += (150 - r) * k; g += (128 - g) * k; b += (255 - b) * k; } }
+        if (t === 'ash') { const v = 1 - Math.abs(NZ.hill(fx * 0.9, fy * 0.9)) * 14; if (v > 0) { const k = v * 0.4; r += (190 - r) * k; g += (104 - g) * k * 0.8; b += (60 - b) * k * 0.4; } }
+        if (t === 'dusk') { const v = 1 - Math.abs(NZ.hill(fx * 0.8 + 50, fy * 0.8)) * 16; if (v > 0) { const k = v * 0.3; r += (160 - r) * k; g += (140 - g) * k; b += (200 - b) * k; } }
         if (t === 'moon') { const v = NZ.tone2(fx * 1.6, fy * 1.6); if (v > 0.32) { r *= 0.82; g *= 0.82; b *= 0.86; } else if (v > 0.26) { r *= 1.12; g *= 1.12; b *= 1.1; } }
         /* sea-washed sand at the very edge of the land */
         const beach = isVoid ? 0 : sstep(0.62, 0.5, ld) * (t === 'snow' ? 0.3 : 0.75);
@@ -201,16 +209,37 @@
       else { r = r * la + wr * (1 - la); g = g * la + wg * (1 - la); b = b * la + wb * (1 - la); h = h * la + Math.min(h0, -0.05) * (1 - la); isW[o] = 1 - la; }
       H[o] = h; col[o * 3] = r; col[o * 3 + 1] = g; col[o * 3 + 2] = b;
     }
-    /* light from the north-west, and a little haze on the low ground */
+    /* soft light from the north-west; then the old map's ink and paper over it */
     const c = A.canvas(N, N), g2 = c.getContext('2d'), img = g2.createImageData(N, N), d = img.data;
     const k = SPT * 1.6;
+    const band = (x, at, w) => Math.max(0, 1 - Math.abs(x - at) / w);
     for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
       const o = sy * N + sx, xl = sx ? o - 1 : o, xr = sx < N - 1 ? o + 1 : o, yu = sy ? o - N : o, yd = sy < N - 1 ? o + N : o;
+      const fx = s0x + (sx + 0.5) / SPT, fy = s0y + (sy + 0.5) / SPT;
       const dx = (H[xr] - H[xl]) * k, dy = (H[yd] - H[yu]) * k;
-      let lit = SU.clamp(1 + (-dx - dy) * (0.6 - isW[o] * 0.4), 0.68, 1.32);
-      lit *= 1 + (1 - isW[o]) * (SU.clamp(H[o], -0.1, 0.9) * 0.12 - 0.06);
+      let lit = SU.clamp(1 + (-dx - dy) * (0.42 - isW[o] * 0.32), 0.76, 1.22);
+      lit *= 1 + (1 - isW[o]) * (SU.clamp(H[o], -0.1, 0.9) * 0.08 - 0.04);
       if (wet[o]) lit = lit * (1 - wet[o]) + wet[o];
-      d[o * 4] = SU.clamp(col[o * 3] * lit, 0, 255); d[o * 4 + 1] = SU.clamp(col[o * 3 + 1] * lit, 0, 255); d[o * 4 + 2] = SU.clamp(col[o * 3 + 2] * lit, 0, 255); d[o * 4 + 3] = alpha[o] * 255;
+      let r = col[o * 3] * lit, g = col[o * 3 + 1] * lit, b = col[o * 3 + 2] * lit;
+      /* the wash pools darker where one colour meets the next */
+      if (EG[o] > 0) { const e = 1 - EG[o] * 0.14; r *= e; g *= e; b *= e * 1.02; }
+      /* faded: drawn towards the paper, and towards sepia */
+      const lum = r * 0.3 + g * 0.59 + b * 0.11;
+      r = r * 0.74 + (lum * 1.06) * 0.1 + PAPER[0] * 0.16; g = g * 0.74 + (lum * 0.98) * 0.1 + PAPER[1] * 0.16; b = b * 0.74 + (lum * 0.82) * 0.1 + PAPER[2] * 0.16;
+      /* old stains and foxing in the paper */
+      const stn = NZ.edge.fbm(fx * 0.09 + 31, fy * 0.09 - 7, 4), fox = NZ.tone2(fx * 1.3 + 77, fy * 1.3);
+      const sk = sstep(0.18, 0.45, stn) * 0.1 + sstep(0.5, 0.56, fox) * 0.08;
+      if (sk > 0) { r *= 1 - sk * 0.6; g *= 1 - sk * 0.75; b *= 1 - sk; }
+      /* ink: a firm coastline and the old water-lines running out from it */
+      if (alpha[o] > 0.99) {
+        /* distance to the coast in samples, from the land field and its slope, so lines keep one width */
+        const ld = LD[o], gl = Math.hypot(LD[xr] - LD[xl], LD[yd] - LD[yu]) / 2, ds = gl > 0.004 ? (ld - 0.5) / gl : (ld - 0.5) * 250;
+        let ink = band(ds, 0, 0.95) * 0.9;
+        if (ds < -1.6) { const lb = LB[o], gb = Math.hypot(LB[xr] - LB[xl], LB[yd] - LB[yu]) / 2;
+          if (gb > 0.002) [[0.3, 0.5], [0.17, 0.38], [0.07, 0.26]].forEach(([lv, a]) => { ink = Math.max(ink, band((lb - lv) / gb, 0, 0.7) * a); }); }
+        if (ink > 0) { r += (INK[0] - r) * ink; g += (INK[1] - g) * ink; b += (INK[2] - b) * ink; }
+      } else if (alpha[o] > 0) { r = r * 0.8 + INK[0] * 0.2; g = g * 0.8 + INK[1] * 0.2; b = b * 0.8 + INK[2] * 0.2; }
+      d[o * 4] = SU.clamp(r, 0, 255); d[o * 4 + 1] = SU.clamp(g, 0, 255); d[o * 4 + 2] = SU.clamp(b, 0, 255); d[o * 4 + 3] = alpha[o] * 255;
     }
     g2.putImageData(img, 0, 0);
     return c;
@@ -231,8 +260,8 @@
     const fk = li + ':' + cx + ':' + cy, f = V.fields[fk] || (V.fields[fk] = paintField(li, cx, cy)), sp = ts / SPT;   /* the paint does not change with zoom */
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.drawImage(f, -2 * sp, -2 * sp, f.width * sp, f.height * sp);
-    /* the brush grain */
-    g.save(); g.globalCompositeOperation = 'soft-light'; g.globalAlpha = 0.9;
+    /* the paper's grain */
+    g.save(); g.globalCompositeOperation = 'overlay'; g.globalAlpha = 0.85;
     const gp = g.createPattern(grainTex(), 'repeat'); g.translate(-(cx * W) % 256, -(cy * W) % 256); g.fillStyle = gp; g.fillRect(0, 0, W + 256, W + 256); g.restore();
     /* keep the void open, so the stars show through */
     g.save(); g.globalCompositeOperation = 'destination-in'; g.drawImage(f, -2 * sp, -2 * sp, f.width * sp, f.height * sp); g.restore();
@@ -242,13 +271,13 @@
       const x = cx * CH + tx, y = cy * CH + ty, tid = at(x, y); if (!tid || L.ob[y * L.w + x] || L.road[y * L.w + x]) continue;
       const n = tid === 'grass' ? 2 : tid === 'swamp' || tid === 'rough' || tid === 'dirt' ? 1 : 0;
       for (let k = 0; k < n; k++) { if (!RR.chance(0.45)) continue; const px = tx * ts + RR.range(5, ts - 5), py = ty * ts + RR.range(7, ts - 3);
-        if (tid === 'grass' || tid === 'swamp') { g.strokeStyle = tid === 'swamp' ? 'rgba(120,130,70,0.7)' : RR.chance(0.5) ? 'rgba(48,66,28,0.55)' : 'rgba(170,180,100,0.5)'; g.lineWidth = Math.max(1, ts / 46); g.lineCap = 'round';
+        if (tid === 'grass' || tid === 'swamp') { g.strokeStyle = tid === 'swamp' ? 'rgba(80,76,48,0.6)' : 'rgba(74,64,38,' + (RR.chance(0.5) ? 0.45 : 0.3) + ')'; g.lineWidth = Math.max(1, ts / 46); g.lineCap = 'round';
           for (let b = -1; b <= 1; b++) { g.beginPath(); g.moveTo(px + b * ts * 0.025, py); g.quadraticCurveTo(px + b * ts * 0.04, py - ts * 0.05, px + b * ts * 0.06, py - ts * (tid === 'swamp' ? 0.13 : 0.08)); g.stroke(); }
-          if (tid === 'grass' && RR.chance(0.12)) { g.fillStyle = RR.pick(['rgba(240,226,150,0.85)', 'rgba(236,236,226,0.85)', 'rgba(214,150,170,0.8)']); A.ell(g, px + ts * 0.08, py - ts * 0.03, ts * 0.018, ts * 0.018); g.fill(); } }
-        else { g.fillStyle = 'rgba(60,54,44,0.35)'; A.ell(g, px, py + ts * 0.012, ts * 0.04, ts * 0.018); g.fill(); g.fillStyle = 'rgba(176,168,148,0.7)'; A.ell(g, px, py, ts * 0.032, ts * 0.022); g.fill(); }
+          if (tid === 'grass' && RR.chance(0.12)) { g.fillStyle = RR.pick(['rgba(190,150,80,0.7)', 'rgba(150,90,70,0.6)', 'rgba(120,110,70,0.6)']); A.ell(g, px + ts * 0.08, py - ts * 0.03, ts * 0.018, ts * 0.018); g.fill(); } }
+        else { g.strokeStyle = 'rgba(74,56,38,0.5)'; g.lineWidth = Math.max(1, ts / 60); A.ell(g, px, py, ts * 0.032, ts * 0.022); g.stroke(); }
       }
     }
-    /* roads: worn earth tracks that bend smoothly from tile to tile */
+    /* roads: drawn in red-brown ink as on old maps, bending smoothly from tile to tile */
     const segs = [];
     for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) {
       const x = cx * CH + tx, y = cy * CH + ty; if (!S.inside(L, x, y) || !L.road[y * L.w + x]) continue;
@@ -261,10 +290,9 @@
     const strokeRoads = (w, col) => { g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath();
       segs.forEach(s => { if (s.dot) { g.moveTo(s.dot[0] + 0.01, s.dot[1]); g.lineTo(s.dot[0], s.dot[1]); return; } g.moveTo(s.a[0], s.a[1]); g.quadraticCurveTo(s.c[0], s.c[1], s.b[0], s.b[1]); }); g.stroke(); };
     if (segs.length) {
-      g.save(); g.filter = 'blur(' + Math.max(1, Math.round(ts * 0.05)) + 'px)'; strokeRoads(ts * 0.4, 'rgba(52,40,26,0.45)'); g.restore();
-      strokeRoads(ts * 0.27, '#a48a62');
-      strokeRoads(ts * 0.17, '#bba27a');
-      g.save(); g.setLineDash([ts * 0.12, ts * 0.2]); strokeRoads(ts * 0.035, 'rgba(110,88,58,0.55)'); g.restore();
+      strokeRoads(ts * 0.26, 'rgba(226,206,160,0.55)');
+      strokeRoads(ts * 0.075, 'rgba(84,56,34,0.55)');
+      g.save(); g.setLineDash([ts * 0.16, ts * 0.11]); strokeRoads(ts * 0.06, '#8a3a24'); g.restore();
     }
     return c;
   }
@@ -294,7 +322,7 @@
     ctx.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
     if (V.worlds && SU.sketch) { SU.sketch.drawWorlds(ctx, V.w, V.h, t); drawMini(); return; }
     const SK = !V.paintMode && st.regions && SU.sketch ? SU.sketch : null;
-    ctx.fillStyle = V.layer === 3 ? '#030308' : '#14324f'; ctx.fillRect(0, 0, V.w, V.h);
+    ctx.fillStyle = V.layer === 3 ? '#030308' : '#6a8484'; ctx.fillRect(0, 0, V.w, V.h);
     if (V.layer === 3) drawStars(ctx, t);
     const x0 = Math.floor(V.cam.x - V.w / 2 / ts) - 1, y0 = Math.floor(V.cam.y - V.h / 2 / ts) - 1;
     const x1 = Math.ceil(V.cam.x + V.w / 2 / ts) + 1, y1 = Math.ceil(V.cam.y + V.h / 2 / ts) + 3;
@@ -304,7 +332,7 @@
       for (let cx = Math.max(0, Math.floor(x0 / CH)); cx <= Math.min(Math.floor((L.w - 1) / CH), Math.floor(x1 / CH)); cx++)
         ctx.drawImage(chunk(V.layer, cx, cy), Math.round(ox + cx * CH * ts), Math.round(oy + cy * CH * ts));
     /* water shimmer */
-    ctx.strokeStyle = 'rgba(214,238,236,0.14)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(74,56,38,0.22)'; ctx.lineWidth = 1;
     for (let y = Math.max(0, y0); y <= Math.min(L.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(L.w - 1, x1); x++) {
       const i = y * L.w + x; if (L.t[i] !== S.TC.water || (x * 7 + y * 13) % 3) continue;
       const ph = (t * 0.6 + (L.v[i] / 255) * 6) % 6; if (ph > 2) continue;
@@ -360,6 +388,9 @@
     if (SK) SK.drawOverlay(ctx, ox, oy, ts, V.layer);
     else if (!V.paintMode) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       const fc = fogCanvas(); ctx.drawImage(fc, 0, 0, fc.width, fc.height, ox - ts, oy - ts, fc.width * ts, fc.height * ts); }
+    /* the old map's edges, browned with age */
+    if (V.layer !== 3) { if (!V._vig || V._vig.w !== V.w || V._vig.h !== V.h) { const vg = ctx.createRadialGradient(V.w / 2, V.h / 2, Math.min(V.w, V.h) * 0.45, V.w / 2, V.h / 2, Math.hypot(V.w, V.h) * 0.62); vg.addColorStop(0, 'rgba(70,44,18,0)'); vg.addColorStop(1, 'rgba(70,44,18,0.32)'); V._vig = { w: V.w, h: V.h, g: vg }; }
+      ctx.fillStyle = V._vig.g; ctx.fillRect(0, 0, V.w, V.h); }
     /* the storm on the horizon when it is off the screen, and its lightning lighting the sky */
     stormFar(ctx, ox, oy, ts, t);
     /* where the picked army can go today, and what blocks it */

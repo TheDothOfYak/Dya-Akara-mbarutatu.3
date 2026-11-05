@@ -400,13 +400,15 @@ changed from the Admin Panel without touching the code).
   floods low ground, washes out roads and uncovers ruins.
 - **Treasure** is rare and real: buried chests you are sent after by a quest or a rumour.
 - Saves from before territories cannot be loaded.
-- **The ground is painted, not tiled.** The adventure map's land is one continuous lit
-  relief: each terrain is a soft field that wins where it is strongest, so borders run in
-  organic lines instead of along the grid; a height field (ranges high, sea deep) is lit
-  from the north-west; the sea darkens with depth into shallows, surf and sand; bare rock
-  shows under mountain ranges and dark leaf litter under woods; the palette is muted and
-  earthy, with a fine brush grain over it. Roads are worn earth tracks that bend from tile
-  to tile. The moons' void is left open so the stars show through.
+- **The ground is an old painted map, not tiles.** The adventure map's land is one
+  continuous watercolour on parchment: each terrain is a soft field that wins where it is
+  strongest, so borders run in organic lines (the wash pools a little darker where colours
+  meet) instead of along the grid; a height field (ranges high, sea deep) is lit softly from
+  the north-west; the colours are faded towards the paper and a little towards sepia; the
+  paper has fibres, speckle, old stains and browned edges. The coast is inked, with three
+  fading water-lines running out into the sea, as on old charts. Bare rock shows under
+  ranges and leaf litter under woods. Roads are dashed red-brown ink over a pale track.
+  The moons' void is left open so the stars show through.
 
 ## 11. Not built yet
 
