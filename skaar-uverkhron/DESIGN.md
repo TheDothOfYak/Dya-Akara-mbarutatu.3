@@ -409,12 +409,17 @@ changed from the Admin Panel without touching the code).
   fading water-lines running out into the sea, as on old charts. Bare rock shows under
   ranges and leaf litter under woods. Roads are dashed red-brown ink over a pale track.
 - **Ranges and woods are solid masses, not single pictures.** Every blocked mountain tile
-  joins its neighbours into one massif painted as shaded relief (it rises to a spine far
-  from its edge, with ridges, snow only on the high crests of wide ranges, and ink hatching
-  down the shaded slopes); every blocked wood tile joins into one canopy of many small
-  crowns (round trees, pointed pines, bare dead trees, reed beds, glowing trees). Both are
-  cut to the blocked tiles, inked all round and cast a shadow, so it is plain where an army
-  cannot walk. Lone boulders and crystals keep their own small pictures.
+  joins its neighbours into one range: an inked, shadowed base with a chain of tightly
+  packed, overlapping painted peaks on it (lit and shaded faces, hatching, snow on the tall
+  ones; taller along the middle of wide ranges, short on the northern edge so they never
+  hide open ground). Every blocked wood tile joins into one canopy of crowns (round trees,
+  pointed pines, bare dead trees, reed beds, glowing trees) whose outer crowns make its
+  scalloped, inked edge. The drawing keeps to the tiles: a blocked tile is always covered in
+  its middle and an open one always clear, so a narrow way through never looks closed.
+- **No pointless holes.** When a game starts, little patches of open land walled in by ranges
+  or woods (holding nothing, touching nothing else), dead-end notches reached only by a
+  diagonal squeeze, and boulders sitting inside a range are filled in with what surrounds
+  them. A squeeze that joins two places is a real way through and stays open.
   The moons' void is left open so the stars show through.
 
 ## 11. Not built yet

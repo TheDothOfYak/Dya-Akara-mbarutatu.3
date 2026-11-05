@@ -86,6 +86,64 @@
     return true;
   };
 
+  /* ---------- pockets: little patches of open land walled in by ranges or woods ----------
+     Nobody can reach them and nothing is in them, so they are filled in with what walls them
+     (and the masses on the map stay whole). A patch counts only if it is small, holds no object,
+     army or road, and touches no water, no object's body and no other open land. A lone boulder
+     mostly surrounded by a range or a wood joins it too. */
+  S.MASS_OB = [S.OB.mountain, S.OB.ridge, S.OB.tree, S.OB.pine, S.OB.glowtree, S.OB.palm, S.OB.deadtree, S.OB.reeds];
+  S.fillPockets = function (st, maxSize) {
+    let total = 0; for (let k = 0; k < 6; k++) { const n = fillOnce(st, maxSize); total += n; if (!n) break; } return total;
+  };
+  function fillOnce(st, maxSize) {
+    maxSize = maxSize || 12; let filled = 0;
+    st.layers.forEach((L, li) => {
+      const w = L.w, h = L.h, seen = new Uint8Array(w * h), blk = st._block && st._block[li], occ = st._occ && st._occ[li];
+      const open = i => !L.ob[i] && D.TERRAIN[S.TCODES[L.t[i]]].pass !== false && !(blk && blk[i]);
+      /* a lone boulder set inside a range or a wood becomes part of it (no little holes round it) */
+      for (let i = 0; i < w * h; i++) { if (L.ob[i] !== S.OB.rock || (occ && occ[i])) continue; const x = i % w, y = (i / w) | 0, cnt = {}; let n = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) { n++; continue; } const ob = L.ob[yy * w + xx]; if (ob && S.MASS_OB.indexOf(ob) >= 0) { n++; cnt[ob] = (cnt[ob] || 0) + 1; } }
+        if (n >= 5) { let best = 0, bn = 0; Object.keys(cnt).forEach(k => { if (cnt[k] > bn) { bn = cnt[k]; best = +k; } }); if (best) { L.ob[i] = best; filled++; } } }
+      for (let s0 = 0; s0 < w * h; s0++) {
+        if (seen[s0] || !open(s0)) continue;
+        const comp = [s0], wall = {}; seen[s0] = 1; let ok = true;
+        for (let k = 0; k < comp.length; k++) {
+          const i = comp[k], x = i % w, y = (i / w) | 0;
+          if (comp.length > maxSize || L.road[i] || (occ && occ[i]) || (st._armyAt && st._armyAt[li].has(i))) ok = false;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+            const j = yy * w + xx;
+            if (open(j)) { if (!seen[j]) { seen[j] = 1; comp.push(j); } continue; }
+            const ob = L.ob[j];
+            if (ob && S.MASS_OB.indexOf(ob) >= 0) wall[ob] = (wall[ob] || 0) + 1; else ok = false;   // water, void, a building's body, a boulder
+          }
+        }
+        if (!ok || comp.length > maxSize) continue;
+        let best = 0, bn = -1; Object.keys(wall).forEach(k => { const n = wall[k] + (+k === S.OB.mountain ? 0.5 : 0); if (n > bn) { bn = n; best = +k; } });
+        if (!best) continue;
+        comp.forEach(i => { L.ob[i] = best; }); filled += comp.length;
+      }
+      /* dead-end notches: a few open tiles reached only by squeezing diagonally between two blocked ones,
+         holding nothing, and leading nowhere else (a squeeze that joins two places is a real way through and stays) */
+      const lab = new Int32Array(w * h).fill(-1), comps = [];
+      for (let s0 = 0; s0 < w * h; s0++) { if (lab[s0] >= 0 || !open(s0)) continue; const c = [s0], id = comps.length; lab[s0] = id;
+        for (let k = 0; k < c.length; k++) { const i = c[k], x = i % w, y = (i / w) | 0; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) return; const j = yy * w + xx; if (lab[j] < 0 && open(j)) { lab[j] = id; c.push(j); } }); }
+        comps.push(c); }
+      comps.forEach((c, id) => {
+        if (c.length > 4) return; const via = new Set(), wall = {}; let ok = true;
+        c.forEach(i => { const x = i % w, y = (i / w) | 0; if (L.road[i] || (occ && occ[i]) || (st._armyAt && st._armyAt[li].has(i)) || !L.ob.length) ok = false;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx;
+            if (lab[j] === id) continue;
+            if (lab[j] >= 0) { if (dx && dy) via.add(lab[j]); else ok = false; continue; }
+            const ob = L.ob[j]; if (ob && S.MASS_OB.indexOf(ob) >= 0) wall[ob] = (wall[ob] || 0) + 1; else if (!dx || !dy) ok = false; } });
+        if (!ok || via.size > 1) return;
+        let best = 0, bn = -1; Object.keys(wall).forEach(k => { const n = wall[k] + (+k === S.OB.mountain ? 0.5 : 0); if (n > bn) { bn = n; best = +k; } });
+        if (best) { c.forEach(i => { L.ob[i] = best; }); filled += c.length; }
+      });
+    });
+    return filled;
+  }
+
   /* ---------- players ---------- */
   S.player = (st, i) => st.players[i];
   S.cur = st => st.players[st.current];

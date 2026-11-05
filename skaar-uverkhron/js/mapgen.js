@@ -47,6 +47,7 @@
     for (let li = 0; li < 4; li++) connectLayer(st, li);
     placeWild(st, regions);
     S.rebuild(st);
+    S.fillPockets(st);
     startArmies(st);
     delete st._reserve;
     if (SU.realm) SU.realm.setup(st);
