@@ -15,7 +15,7 @@
   V.init = function (canvas, mini) {
     V.cv = canvas; V.ctx = canvas.getContext('2d');
     V.mini = mini; V.mctx = mini ? mini.getContext('2d') : null;
-    V.zoomI = 2; V.ts = ZOOMS[V.zoomI];
+    V.zoomI = 2; V.ts = ZOOMS[V.zoomI]; V._lastTs = V.ts;
     V.cam = { x: 10, y: 10 }; V.layer = 0;
     V.chunks = {}; V.fields = {}; V.fog = null; V.fogKey = '';
     V.path = null; V.hover = null; V.anim = null; V.t0 = performance.now();
@@ -38,7 +38,7 @@
   V.showWorlds = function (on) { V.worlds = on; V.path = null; SU.emit('worlds', on); };
   /* go down from the worlds view to one world (or moon) */
   V.enterWorld = function (p) {
-    V.showWorlds(false); V.setLayer(p.li); V.zoomI = 0; V.ts = ZOOMS[0]; V.chunks = {};
+    V.showWorlds(false); V.setLayer(p.li); V.zoomI = 0; V.ts = ZOOMS[0]; pruneChunks();
     if (p.moon) { V.cam.x = p.moon.x + 0.5; V.cam.y = p.moon.y + 0.5; }
     else { const st = V.st, me = V.viewer(); const t = S.townsOf(st, me).find(o => o.layer === p.li) || Object.values(st.armies).find(a => !a.dead && a.owner === me && a.layer === p.li); const L = st.layers[p.li];
       if (t) { V.cam.x = t.x + 0.5; V.cam.y = t.y + 0.5; } else { V.cam.x = L.w / 2; V.cam.y = L.h / 2; } }
@@ -50,7 +50,7 @@
     if (d < 0 && V.zoomI === 0 && !V.paintMode && SU.sketch) { V.showWorlds(true); return; }
     const ni = SU.clamp(V.zoomI + d, 0, ZOOMS.length - 1); if (ni === V.zoomI) return;
     const before = V.screenToTile(px != null ? px : V.w / 2, py != null ? py : V.h / 2, true);
-    V.zoomI = ni; V.ts = ZOOMS[ni]; V.chunks = {};
+    V.zoomI = ni; V.ts = ZOOMS[ni]; pruneChunks();
     const after = V.screenToTile(px != null ? px : V.w / 2, py != null ? py : V.h / 2, true);
     V.cam.x += before.fx - after.fx; V.cam.y += before.fy - after.fy;
   };
@@ -84,6 +84,8 @@
     water: { a: '#4f7680', b: '#6a8e8f', c: '#9db5a6', h: -0.3, rough: 0 },
   };
   const PALRGB = {}; Object.keys(PAL).forEach(k => PALRGB[k] = { a: hex(PAL[k].a), b: hex(PAL[k].b), c: hex(PAL[k].c) });
+  const WOODCOL = { tree: hex('#4f5a33'), glowtree: hex('#43625a'), pine: hex('#3f4c3a'), palm: hex('#66703f'), deadtree: hex('#5e5244'), reeds: hex('#6b6c44') };
+  const MROCK = hex('#8f7a5c'), MSNOW = hex('#ece3cc'), MR0 = hex('#4e3d2c'), MR1 = hex('#94805f'), MR2 = hex('#dccca5');
   const ROCK = hex('#9a8c72'), FOREST = hex('#5c6640'), REED = hex('#7b7c50'), SURF = hex('#c9c3a4'), WET = hex('#6c776a'), INK = hex('#4a3826'), PAPER = hex('#e8d9b4');
   const TOFF = {}; Object.keys(PAL).forEach((k, i) => TOFF[k] = i * 37.31 + 11.7);
   const sstep = (a, b, x) => { const t = SU.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -121,6 +123,7 @@
     const bx = cx * CH - M, by = cy * CH - M;
     const tid = new Array(TW * TW), th = new Float32Array(TW * TW), land = new Float32Array(TW * TW);
     const mtn = new Float32Array(TW * TW), wood = new Float32Array(TW * TW), reed = new Float32Array(TW * TW);
+    const mtnM = new Float32Array(TW * TW), woodM = new Float32Array(TW * TW), wcol = new Float32Array(TW * TW * 3);
     const clampIn = (x, y) => [SU.clamp(x, 0, L.w - 1), SU.clamp(y, 0, L.h - 1)];
     for (let j = 0; j < TW; j++) for (let i = 0; i < TW; i++) {
       const [x, y] = clampIn(bx + i, by + j), k = y * L.w + x, t = S.TCODES[L.t[k]], ob = L.ob[k], o = j * TW + i;
@@ -129,7 +132,16 @@
       if (ob === S.OB.mountain) { mtn[o] = 1; th[o] += 0.9; } else if (ob === S.OB.ridge) { mtn[o] = 0.8; th[o] += 0.5; } else if (ob === S.OB.rock || ob === S.OB.crystal) { mtn[o] = 0.35; th[o] += 0.12; }
       if (ob === S.OB.tree || ob === S.OB.pine || ob === S.OB.glowtree || ob === S.OB.palm || ob === S.OB.deadtree) { wood[o] = ob === S.OB.deadtree || ob === S.OB.palm ? 0.4 : 1; th[o] += 0.04; }
       if (ob === S.OB.reeds) reed[o] = 1;
+      /* the solid masses: ranges and woods (what cannot be walked through) */
+      if (ob === S.OB.mountain || ob === S.OB.ridge) { mtnM[o] = 1; th[o] -= ob === S.OB.mountain ? 0.6 : 0.3; }
+      const wc = WOODCOL[S.OB_NAMES[ob]]; if (wc) { woodM[o] = 1; wcol[o * 3] = wc[0]; wcol[o * 3 + 1] = wc[1]; wcol[o * 3 + 2] = wc[2]; }
     }
+    /* how deep into a range each tile is (the spine of a wide range is far from its edge) */
+    const mdist = new Float32Array(TW * TW), mq = [];
+    for (let o = 0; o < TW * TW; o++) { mdist[o] = mtnM[o] ? 99 : 0; if (!mtnM[o]) mq.push(o); }
+    for (let qi = 0; qi < mq.length; qi++) { const o = mq[qi], i = o % TW, j = (o / TW) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const ii = i + dx, jj = j + dy; if ((!dx && !dy) || ii < 0 || jj < 0 || ii >= TW || jj >= TW) continue; const p = jj * TW + ii; if (mdist[p] > mdist[o] + 1) { mdist[p] = mdist[o] + 1; mq.push(p); } } }
+    for (let o = 0; o < TW * TW; o++) if (mdist[o] > 50) mdist[o] = 4;
     /* water deepens away from the shore */
     const dist = new Float32Array(TW * TW).fill(9), q = [];
     for (let o = 0; o < TW * TW; o++) if (land[o]) { dist[o] = 0; q.push(o); }
@@ -144,7 +156,7 @@
     const tw = new Map();
     /* samples */
     const N = CH * SPT + 4, s0x = cx * CH - 2 / SPT, s0y = cy * CH - 2 / SPT;
-    const H = new Float32Array(N * N), col = new Float32Array(N * N * 3), isW = new Float32Array(N * N), wet = new Float32Array(N * N), alpha = new Float32Array(N * N).fill(1), LD = new Float32Array(N * N), LB = new Float32Array(N * N), EG = new Float32Array(N * N);
+    const H = new Float32Array(N * N), col = new Float32Array(N * N * 3), isW = new Float32Array(N * N), wet = new Float32Array(N * N), alpha = new Float32Array(N * N).fill(1), MA = new Float32Array(N * N), SN = new Float32Array(N * N), FA = new Float32Array(N * N), LD = new Float32Array(N * N), LB = new Float32Array(N * N), EG = new Float32Array(N * N);
     for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
       const fx = s0x + (sx + 0.5) / SPT, fy = s0y + (sy + 0.5) / SPT, o = sy * N + sx;
       /* everything is read through a round, warped kernel over the nearby tiles, so no shape follows the grid */
@@ -158,6 +170,18 @@
         sW += w; sLb += land[p] * w; sH += sm[p] * w; sM += mtn[p] * w; sF += wood[p] * w; sR += reed[p] * w;
         sWl += wl; sL += land[p] * wl; tw.set(tid[p], (tw.get(tid[p]) || 0) + wl);
       }
+      /* the masses read straight off the tiles (no warp), so their edges are where the blocked tiles are */
+      let ma = 0, fa = 0, bm = 0, wr0 = 0, wg0 = 0, wb0 = 0;
+      { const hx = fx - bx - 0.5, hy = fy - by - 0.5, h0i = Math.floor(hx), h0j = Math.floor(hy); let sT = 0, sMm = 0, sWd = 0, sB = 0, sBw = 0;
+        for (let dj = -1; dj <= 2; dj++) for (let di = -1; di <= 2; di++) {
+          const ii = SU.clamp(h0i + di, 0, TW - 1), jj = SU.clamp(h0j + dj, 0, TW - 1), p = jj * TW + ii, ddx = hx - (h0i + di), ddy = hy - (h0j + dj), d2 = ddx * ddx + ddy * ddy;
+          const wl = Math.exp(-d2 * 2.2), wb = Math.exp(-d2 * 1.1);
+          sT += wl; sMm += mtnM[p] * wl; sB += mdist[p] * wb; sBw += wb;
+          if (woodM[p]) { sWd += wl; wr0 += wcol[p * 3] * wl; wg0 += wcol[p * 3 + 1] * wl; wb0 += wcol[p * 3 + 2] * wl; } }
+        const wob = NZ.edge(fx * 1.5, fy * 1.5) * 0.1 + NZ.tone(fx * 4, fy * 4) * 0.035;
+        ma = sstep(0.4, 0.5, sMm / sT + wob); fa = sstep(0.4, 0.5, sWd / sT + wob) * (1 - ma); bm = sB / sBw;
+        if (sWd > 0) { wr0 /= sWd; wg0 /= sWd; wb0 /= sWd; } }
+      MA[o] = ma; FA[o] = fa;
       const wn = NZ.edge.fbm(fx * 0.7, fy * 0.7, 3);
       const ld = sL / sWl + wn * 0.2;
       let t = null, t2 = null, w1 = -9, w2 = -9;
@@ -190,20 +214,30 @@
         r += (P.c[0] - r) * m2 * 0.6; g += (P.c[1] - g) * m2 * 0.6; b += (P.c[2] - b) * m2 * 0.6;
         if (blendK < 1) { const Q = PALRGB[t2] || PALRGB.grass, k2 = 1 - blendK; const qr = Q.a[0] + (Q.b[0] - Q.a[0]) * m1, qg = Q.a[1] + (Q.b[1] - Q.a[1]) * m1, qb = Q.a[2] + (Q.b[2] - Q.a[2]) * m1; r += (qr - r) * k2; g += (qg - g) * k2; b += (qb - b) * k2; }
         /* the ground under ranges goes to bare rock, under woods to dark leaf litter */
-        const mk = sM / sW * 1.35, wk = sF / sW * 1.35, rk = sR / sW * 1.35;
-        if (mk > 0.05 && t !== 'snow' && t !== 'moon') { const k = sstep(0.1, 0.75, mk) * 0.85; r += (ROCK[0] - r) * k; g += (ROCK[1] - g) * k; b += (ROCK[2] - b) * k; }
-        if (wk > 0.05 && t !== 'snow' && t !== 'dusk') { const k = sstep(0.15, 0.8, wk) * 0.55; r += (FOREST[0] - r) * k; g += (FOREST[1] - g) * k; b += (FOREST[2] - b) * k; }
-        if (rk > 0.05) { const k = sstep(0.1, 0.8, rk) * 0.5; r += (REED[0] - r) * k; g += (REED[1] - g) * k; b += (REED[2] - b) * k; }
+        const mk = sM / sW * 1.35;
+        if (mk > 0.05 && t !== 'snow' && t !== 'moon') { const k = sstep(0.1, 0.75, mk) * 0.35; r += (ROCK[0] - r) * k; g += (ROCK[1] - g) * k; b += (ROCK[2] - b) * k; }   /* stony foothills */
         /* marsh pools, ember seams in the ash, the dusk's violet veins */
         if (t === 'swamp') { const p = sstep(0.12, 0.2, NZ.tone2.fbm(fx * 1.1, fy * 1.1, 3)); wet[o] = p; r += (WET[0] - r) * p; g += (WET[1] - g) * p; b += (WET[2] - b) * p; }
         if (t === 'ash') { const v = 1 - Math.abs(NZ.hill(fx * 0.9, fy * 0.9)) * 14; if (v > 0) { const k = v * 0.4; r += (190 - r) * k; g += (104 - g) * k * 0.8; b += (60 - b) * k * 0.4; } }
         if (t === 'dusk') { const v = 1 - Math.abs(NZ.hill(fx * 0.8 + 50, fy * 0.8)) * 16; if (v > 0) { const k = v * 0.3; r += (160 - r) * k; g += (140 - g) * k; b += (200 - b) * k; } }
         if (t === 'moon') { const v = NZ.tone2(fx * 1.6, fy * 1.6); if (v > 0.32) { r *= 0.82; g *= 0.82; b *= 0.86; } else if (v > 0.26) { r *= 1.12; g *= 1.12; b *= 1.1; } }
+        /* woods: the canopy's dark floor (the crowns are drawn on top, sharp) */
+        if (fa > 0) { r += (wr0 - r) * fa; g += (wg0 - g) * fa; b += (wb0 - b) * fa; }
         /* sea-washed sand at the very edge of the land */
         const beach = isVoid ? 0 : sstep(0.62, 0.5, ld) * (t === 'snow' ? 0.3 : 0.75);
         if (isVoid) { const rim = 0.62 + 0.38 * sstep(0.5, 0.66, ld); r *= rim; g *= rim; b *= rim * 1.04; }   /* a moon's edge falls away into the dark */
         if (beach > 0) { const B = PALRGB.sand.b; r += (B[0] - r) * beach; g += (B[1] - g) * beach; b += (B[2] - b) * beach; }
         h += NZ.hill.fbm(fx * 0.32, fy * 0.32, 4) * (0.03 + pr.rough * 0.7) + (t === 'sand' ? Math.sin(fx * 2.2 + NZ.warp(fx * 0.3, fy * 0.3) * 4) * 0.03 : 0);
+        /* a range: one massif rising from its edge, with sharp ridges running through it and snow on the high crests */
+        if (ma > 0) {
+          const q1 = 1 - Math.abs(NZ.hill(fx * 0.42 + 200, fy * 0.42 - 40)), q2 = 1 - Math.abs(NZ.hill(fx * 1.0 + 300, fy * 1.0));
+          const rn = 0.7 * q1 * q1 + 0.3 * q2 * q2, rise = Math.sqrt(Math.max(0, bm - 0.3));
+          const hm = 0.15 + rise * 0.5 + rn * Math.min(1, bm * 0.8) * 0.5;
+          h = h * (1 - ma) + hm * ma;
+          let mr = MROCK[0], mg = MROCK[1], mb = MROCK[2];
+          SN[o] = sstep(0.6, 0.85, rn) * sstep(1.5, 2.6, bm) * 0.85 * ma;
+          r += (mr - r) * ma; g += (mg - g) * ma; b += (mb - b) * ma;
+        }
       }
       if (isVoid) { alpha[o] = la; }
       else { r = r * la + wr * (1 - la); g = g * la + wg * (1 - la); b = b * la + wb * (1 - la); h = h * la + Math.min(h0, -0.05) * (1 - la); isW[o] = 1 - la; }
@@ -221,6 +255,13 @@
       lit *= 1 + (1 - isW[o]) * (SU.clamp(H[o], -0.1, 0.9) * 0.08 - 0.04);
       if (wet[o]) lit = lit * (1 - wet[o]) + wet[o];
       let r = col[o * 3] * lit, g = col[o * 3 + 1] * lit, b = col[o * 3 + 2] * lit;
+      /* ranges: rock coloured by how it faces the light, dark umber to pale ochre, snow kept pale */
+      if (MA[o] > 0) { const sl = SU.clamp(0.46 + (-dx - dy) * 0.8, 0, 1), m = MA[o];
+        const rr = sl < 0.5 ? MR0[0] + (MR1[0] - MR0[0]) * sl * 2 : MR1[0] + (MR2[0] - MR1[0]) * (sl - 0.5) * 2,
+          rg = sl < 0.5 ? MR0[1] + (MR1[1] - MR0[1]) * sl * 2 : MR1[1] + (MR2[1] - MR1[1]) * (sl - 0.5) * 2,
+          rb = sl < 0.5 ? MR0[2] + (MR1[2] - MR0[2]) * sl * 2 : MR1[2] + (MR2[2] - MR1[2]) * (sl - 0.5) * 2;
+        const sn = SN[o], kr = rr + (Math.max(rr, MSNOW[0] * (0.7 + sl * 0.3)) - rr) * sn, kg = rg + (Math.max(rg, MSNOW[1] * (0.7 + sl * 0.3)) - rg) * sn, kb = rb + (Math.max(rb, MSNOW[2] * (0.72 + sl * 0.3)) - rb) * sn;
+        r += (kr - r) * m; g += (kg - g) * m; b += (kb - b) * m; }
       /* the wash pools darker where one colour meets the next */
       if (EG[o] > 0) { const e = 1 - EG[o] * 0.14; r *= e; g *= e; b *= e * 1.02; }
       /* faded: drawn towards the paper, and towards sepia */
@@ -242,6 +283,11 @@
       d[o * 4] = SU.clamp(r, 0, 255); d[o * 4 + 1] = SU.clamp(g, 0, 255); d[o * 4 + 2] = SU.clamp(b, 0, 255); d[o * 4 + 3] = alpha[o] * 255;
     }
     g2.putImageData(img, 0, 0);
+    /* the masses as masks, for the crisp ink drawn over them at full size */
+    const mask = (A_) => { const m = A.canvas(N, N), mg = m.getContext('2d'), mi = mg.createImageData(N, N), md = mi.data; let any = false;
+      for (let o = 0; o < N * N; o++) { md[o * 4] = md[o * 4 + 1] = md[o * 4 + 2] = 255; md[o * 4 + 3] = A_[o] * 255; if (A_[o] > 0.01) any = true; }
+      mg.putImageData(mi, 0, 0); return any ? m : null; };
+    c.mtn = mask(MA); c.wood = mask(FA); c.H = H; c.N = N;
     return c;
   }
   /* a road tile's links to its neighbours */
@@ -251,6 +297,77 @@
     [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { if (on(x + dx, y + dy)) out.push([dx, dy]); });
     [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([dx, dy]) => { if (on(x + dx, y + dy) && !on(x + dx, y) && !on(x, y + dy)) out.push([dx, dy]); });
     return out;
+  }
+  const MASS = { mountain: 1, ridge: 1, tree: 2, pine: 2, glowtree: 2, palm: 2, deadtree: 2, reeds: 2 };
+  V.MASS = MASS;
+  function drawMasses(g, f, li, cx, cy, ts, W, sp) {
+    const L = V.st.layers[li];
+    /* every layer here carries a margin of P px on each side (the paint reaches past the chunk), so outlines don't break at chunk edges */
+    const P = Math.max(2, Math.floor(2 * sp) - 1), WP = W + 2 * P;
+    const lay = () => { const m = A.canvas(WP, WP), mg = m.getContext('2d'); mg.translate(P, P); return [m, mg]; };
+    const up = src => { const [m, mg] = lay(); mg.imageSmoothingEnabled = true; mg.imageSmoothingQuality = 'high'; mg.drawImage(src, -2 * sp, -2 * sp, src.width * sp, src.height * sp); return m; };
+    const put = (dst, src, a) => { dst.globalAlpha = a == null ? 1 : a; dst.drawImage(src, -P, -P); dst.globalAlpha = 1; };
+    const fillAs = (mg, col) => { mg.save(); mg.setTransform(1, 0, 0, 1, 0, 0); mg.globalCompositeOperation = 'source-in'; mg.fillStyle = col; mg.fillRect(0, 0, WP, WP); mg.restore(); };
+    const shadowOf = (mask, dx, dy, col) => { const [m, mg] = lay(); mg.globalAlpha = 0.5; mg.drawImage(mask, dx * 0.5 - P, dy * 0.5 - P); mg.drawImage(mask, dx - P, dy - P); mg.globalAlpha = 1;
+      fillAs(mg, col); mg.globalCompositeOperation = 'destination-out'; mg.drawImage(mask, -P, -P); return m; };
+    const ring = (mask, r, col) => { const [e, eg] = lay(); eg.drawImage(mask, -P, -P); eg.globalCompositeOperation = 'destination-in';
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; eg.drawImage(mask, Math.cos(a) * r - P, Math.sin(a) * r - P); }
+      const [m, mg] = lay(); mg.drawImage(mask, -P, -P); fillAs(mg, col); mg.globalCompositeOperation = 'destination-out'; mg.drawImage(e, -P, -P); return m; };
+    const tilesOf = cls => { const out = []; for (let ty = -1; ty <= CH; ty++) for (let tx = -1; tx <= CH; tx++) { const x = cx * CH + tx, y = cy * CH + ty; if (!S.inside(L, x, y)) continue; const ob = S.OB_NAMES[L.ob[y * L.w + x]]; if (MASS[ob] === cls) out.push({ tx, ty, x, y, ob }); } return out; };
+    const inkW = Math.max(1.3, ts * 0.045);
+    /* ---- woods: a canopy of many small crowns, cut to the wood's edge ---- */
+    if (f.wood) {
+      const mask = up(f.wood), [cl, cg] = lay(), crowns = [];
+      tilesOf(2).forEach(t => { const R = SU.makeRng(t.x * 92821 + t.y * 68917 + li * 7 + 3), n = 3;
+        for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) crowns.push({ ob: t.ob, x: t.tx * ts + (i + 0.5 + R.range(-0.3, 0.3)) / n * ts, y: t.ty * ts + (j + 0.5 + R.range(-0.3, 0.3)) / n * ts, r: ts * R.range(0.17, 0.23), v: R.next() }); });
+      crowns.sort((a, b) => a.y - b.y);
+      cg.lineCap = 'round'; cg.lineJoin = 'round';
+      crowns.forEach(c => {
+        const r = c.r, x = c.x, y = c.y;
+        if (c.ob === 'pine') {
+          cg.fillStyle = 'rgba(30,34,24,0.45)'; cg.beginPath(); cg.moveTo(x + r * 0.2, y - r * 1.1); cg.lineTo(x + r * 1.0, y + r * 0.75); cg.lineTo(x - r * 0.6, y + r * 0.75); cg.closePath(); cg.fill();
+          cg.fillStyle = c.v < 0.5 ? '#55654a' : '#4c5c44'; cg.beginPath(); cg.moveTo(x, y - r * 1.2); cg.lineTo(x + r * 0.8, y + r * 0.6); cg.lineTo(x - r * 0.8, y + r * 0.6); cg.closePath(); cg.fill();
+          cg.fillStyle = 'rgba(214,214,180,0.35)'; cg.beginPath(); cg.moveTo(x, y - r * 1.2); cg.lineTo(x - r * 0.8, y + r * 0.6); cg.lineTo(x - r * 0.15, y + r * 0.35); cg.closePath(); cg.fill();
+          cg.strokeStyle = 'rgba(52,40,28,0.6)'; cg.lineWidth = Math.max(0.8, ts / 60); cg.beginPath(); cg.moveTo(x, y - r * 1.2); cg.lineTo(x + r * 0.8, y + r * 0.6); cg.lineTo(x - r * 0.8, y + r * 0.6); cg.stroke();
+        } else if (c.ob === 'deadtree') {
+          cg.strokeStyle = 'rgba(70,52,38,0.75)'; cg.lineWidth = Math.max(1, ts / 50);
+          cg.beginPath(); cg.moveTo(x, y + r * 0.7); cg.lineTo(x, y - r * 0.6); cg.moveTo(x, y - r * 0.1); cg.lineTo(x - r * 0.6, y - r * 0.7); cg.moveTo(x, y - r * 0.3); cg.lineTo(x + r * 0.6, y - r * 0.9); cg.stroke();
+        } else if (c.ob === 'reeds') {
+          cg.strokeStyle = 'rgba(70,72,40,0.7)'; cg.lineWidth = Math.max(0.8, ts / 64);
+          cg.beginPath(); for (let k = -2; k <= 2; k++) { cg.moveTo(x + k * r * 0.3, y + r * 0.6); cg.lineTo(x + k * r * 0.4, y - r * (0.5 + (k & 1) * 0.3)); } cg.stroke();
+        } else {
+          const glow = c.ob === 'glowtree', palm = c.ob === 'palm';
+          const base = glow ? '#5c8a7c' : palm ? '#7f8a4c' : c.v < 0.33 ? '#6a7440' : c.v < 0.66 ? '#717a45' : '#646d3d';
+          cg.fillStyle = 'rgba(30,32,18,0.45)'; cg.beginPath(); cg.arc(x + r * 0.28, y + r * 0.3, r, 0, Math.PI * 2); cg.fill();
+          cg.fillStyle = base; cg.beginPath(); cg.arc(x, y, r, 0, Math.PI * 2); cg.fill();
+          cg.fillStyle = glow ? 'rgba(190,255,230,0.45)' : 'rgba(226,222,170,0.38)'; cg.beginPath(); cg.arc(x - r * 0.28, y - r * 0.3, r * 0.55, 0, Math.PI * 2); cg.fill();
+          cg.strokeStyle = 'rgba(52,40,28,0.55)'; cg.lineWidth = Math.max(0.8, ts / 60); cg.beginPath(); cg.arc(x, y, r, Math.PI * 0.05, Math.PI * 0.95); cg.stroke();
+          if (glow) { cg.fillStyle = 'rgba(220,255,245,0.9)'; cg.beginPath(); cg.arc(x + r * 0.2, y - r * 0.1, Math.max(0.8, r * 0.12), 0, Math.PI * 2); cg.fill(); }
+        }
+      });
+      cg.globalCompositeOperation = 'destination-in'; cg.drawImage(mask, -P, -P);
+      put(g, shadowOf(mask, ts * 0.07, ts * 0.09, 'rgba(40,30,18,0.5)'));
+      put(g, cl);
+      put(g, ring(mask, inkW, 'rgba(58,42,26,0.85)'));
+    }
+    /* ---- ranges: one massif (its relief is in the paint), hatched with ink down its shaded slopes ---- */
+    if (f.mtn) {
+      const mask = up(f.mtn), [hl, hg] = lay(), N = f.N, H = f.H;
+      const Hat = (px, py) => { const sx = SU.clamp(Math.round(px / sp + 1.5), 1, N - 2), sy = SU.clamp(Math.round(py / sp + 1.5), 1, N - 2), o = sy * N + sx; return [(H[o + 1] - H[o - 1]), (H[o + N] - H[o - N]), H[o]]; };
+      hg.lineCap = 'round';
+      tilesOf(1).forEach(t => { const R = SU.makeRng(t.x * 7919 + t.y * 104729 + li * 13 + 1);
+        for (let k = 0; k < 14; k++) { const px = t.tx * ts + R.range(0.05, 0.95) * ts, py = t.ty * ts + R.range(0.05, 0.95) * ts;
+          const [gx, gy] = Hat(px, py), gl = Math.hypot(gx, gy); if (gl < 0.004) continue;
+          const shade = (gx + gy) / gl;                        // > 0: facing away from the light
+          const ux = gx / gl, uy = gy / gl, len = ts * (0.06 + Math.min(0.08, gl * 1.5));
+          if (shade < 0.15) continue;
+          hg.strokeStyle = 'rgba(50,34,20,' + (0.2 + shade * 0.3).toFixed(2) + ')'; hg.lineWidth = Math.max(0.8, ts / 60);
+          hg.beginPath(); hg.moveTo(px, py); hg.lineTo(px + ux * len, py + uy * len); hg.stroke(); } });
+      hg.globalCompositeOperation = 'destination-in'; hg.drawImage(mask, -P, -P);
+      put(g, shadowOf(mask, ts * 0.1, ts * 0.13, 'rgba(40,28,16,0.55)'));
+      put(g, hl);
+      put(g, ring(mask, inkW * 1.15, 'rgba(52,36,22,0.9)'));
+    }
   }
   function bakeChunk(li, cx, cy) {
     const st = V.st, L = st.layers[li], ts = V.ts, W = CH * ts;
@@ -294,7 +411,18 @@
       strokeRoads(ts * 0.075, 'rgba(84,56,34,0.55)');
       g.save(); g.setLineDash([ts * 0.16, ts * 0.11]); strokeRoads(ts * 0.06, '#8a3a24'); g.restore();
     }
+    /* the masses: ranges and woods, solid, inked round, casting a shadow, so it is plain where you cannot go */
+    drawMasses(g, f, li, cx, cy, ts, W, sp);
     return c;
+  }
+  /* keep only this zoom's chunks and the last zoom's (shown scaled while the new ones are drawn) */
+  function pruneChunks() { const keep = V.ts, prev = V._lastTs; Object.keys(V.chunks).forEach(k => { const z = +k.split(':')[3]; if (z !== keep && z !== prev) delete V.chunks[k]; }); V._lastTs = keep; }
+  /* a chunk to draw now: baked if this frame still has time, else an older zoom's, scaled */
+  function chunkNow(li, cx, cy) {
+    const k = li + ':' + cx + ':' + cy + ':' + V.ts; if (V.chunks[k]) return [V.chunks[k], 1];
+    if (performance.now() < V._bakeUntil) return [chunk(li, cx, cy), 1];
+    for (const z of ZOOMS) { const c = V.chunks[li + ':' + cx + ':' + cy + ':' + z]; if (c) return [c, V.ts / z]; }
+    return null;
   }
   function chunk(li, cx, cy) { const k = li + ':' + cx + ':' + cy + ':' + V.ts; if (!V.chunks[k]) V.chunks[k] = bakeChunk(li, cx, cy); return V.chunks[k]; }
 
@@ -327,10 +455,11 @@
     const x0 = Math.floor(V.cam.x - V.w / 2 / ts) - 1, y0 = Math.floor(V.cam.y - V.h / 2 / ts) - 1;
     const x1 = Math.ceil(V.cam.x + V.w / 2 / ts) + 1, y1 = Math.ceil(V.cam.y + V.h / 2 / ts) + 3;
     const ox = V.w / 2 - V.cam.x * ts, oy = V.h / 2 - V.cam.y * ts;
-    /* ground */
+    /* ground (a little drawing time each frame; what is not ready yet shows as the last zoom's picture) */
+    V._bakeUntil = performance.now() + 30;
     for (let cy = Math.max(0, Math.floor(y0 / CH)); cy <= Math.min(Math.floor((L.h - 1) / CH), Math.floor(y1 / CH)); cy++)
       for (let cx = Math.max(0, Math.floor(x0 / CH)); cx <= Math.min(Math.floor((L.w - 1) / CH), Math.floor(x1 / CH)); cx++)
-        ctx.drawImage(chunk(V.layer, cx, cy), Math.round(ox + cx * CH * ts), Math.round(oy + cy * CH * ts));
+        { const cs = chunkNow(V.layer, cx, cy); if (cs) ctx.drawImage(cs[0], Math.round(ox + cx * CH * ts), Math.round(oy + cy * CH * ts), cs[0].width * cs[1], cs[0].height * cs[1]); }
     /* water shimmer */
     ctx.strokeStyle = 'rgba(74,56,38,0.22)'; ctx.lineWidth = 1;
     for (let y = Math.max(0, y0); y <= Math.min(L.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(L.w - 1, x1); x++) {
@@ -351,7 +480,7 @@
     const rows = {};
     const add = (y, fn) => { (rows[y] = rows[y] || []).push(fn); };
     for (let y = Math.max(0, y0); y <= Math.min(L.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(L.w - 1, x1); x++) {
-      const ob = L.ob[y * L.w + x]; if (!ob || !seen(x, y)) continue;
+      const ob = L.ob[y * L.w + x]; if (!ob || !seen(x, y) || (!V.spriteObstacles && MASS[S.OB_NAMES[ob]])) continue;
       const sp = A.obstacle(S.OB_NAMES[ob], L.v[y * L.w + x], ts);
       add(y, () => ctx.drawImage(sp.c, Math.round(ox + x * ts - sp.ox), Math.round(oy + y * ts - sp.oy)));
     }

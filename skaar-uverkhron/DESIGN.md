@@ -408,6 +408,13 @@ changed from the Admin Panel without touching the code).
   paper has fibres, speckle, old stains and browned edges. The coast is inked, with three
   fading water-lines running out into the sea, as on old charts. Bare rock shows under
   ranges and leaf litter under woods. Roads are dashed red-brown ink over a pale track.
+- **Ranges and woods are solid masses, not single pictures.** Every blocked mountain tile
+  joins its neighbours into one massif painted as shaded relief (it rises to a spine far
+  from its edge, with ridges, snow only on the high crests of wide ranges, and ink hatching
+  down the shaded slopes); every blocked wood tile joins into one canopy of many small
+  crowns (round trees, pointed pines, bare dead trees, reed beds, glowing trees). Both are
+  cut to the blocked tiles, inked all round and cast a shadow, so it is plain where an army
+  cannot walk. Lone boulders and crystals keep their own small pictures.
   The moons' void is left open so the stars show through.
 
 ## 11. Not built yet
