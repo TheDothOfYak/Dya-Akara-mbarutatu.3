@@ -408,13 +408,18 @@ changed from the Admin Panel without touching the code).
   paper has fibres, speckle, old stains and browned edges. The coast is inked, with three
   fading water-lines running out into the sea, as on old charts. Bare rock shows under
   ranges and leaf litter under woods. Roads are dashed red-brown ink over a pale track.
-- **Ranges and woods are solid masses, not single pictures.** Every blocked mountain tile
-  joins its neighbours into one massif painted as shaded relief (it rises to a spine far
-  from its edge, with ridges, snow only on the high crests of wide ranges, and ink hatching
-  down the shaded slopes); every blocked wood tile joins into one canopy of many small
-  crowns (round trees, pointed pines, bare dead trees, reed beds, glowing trees). Both are
-  cut to the blocked tiles, inked all round and cast a shadow, so it is plain where an army
-  cannot walk. Lone boulders and crystals keep their own small pictures.
+- **Ranges and woods are solid masses, not single pictures.** Mountains are painted into the
+  land itself as shaded relief, with no outline and nothing stuck on top: every mountain tile
+  carries two or three peaks, and the range's height at each point is the highest of them,
+  carved with gullies, lit from the north-west, darker at its foot and snowy on the high
+  summits deep in wide ranges. Woods are one canopy of soft painted crowns (round trees,
+  pointed pines, bare dead trees, reed beds, glowing trees) whose outer crowns make its edge.
+  The drawing keeps to the tiles: a blocked tile is always covered in its middle and an open
+  one always clear, so a narrow way through never looks closed.
+- **No pointless holes.** When a game starts, little patches of open land walled in by ranges
+  or woods (holding nothing, touching nothing else), dead-end notches reached only by a
+  diagonal squeeze, and boulders sitting inside a range are filled in with what surrounds
+  them. A squeeze that joins two places is a real way through and stays open.
   The moons' void is left open so the stars show through.
 
 ## 11. Not built yet

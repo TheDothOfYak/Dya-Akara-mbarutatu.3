@@ -85,7 +85,7 @@
   };
   const PALRGB = {}; Object.keys(PAL).forEach(k => PALRGB[k] = { a: hex(PAL[k].a), b: hex(PAL[k].b), c: hex(PAL[k].c) });
   const WOODCOL = { tree: hex('#4f5a33'), glowtree: hex('#43625a'), pine: hex('#3f4c3a'), palm: hex('#66703f'), deadtree: hex('#5e5244'), reeds: hex('#6b6c44') };
-  const MROCK = hex('#8f7a5c'), MSNOW = hex('#ece3cc'), MR0 = hex('#4e3d2c'), MR1 = hex('#94805f'), MR2 = hex('#dccca5');
+  const MROCK = hex('#8f7a5c'), MSNOW = hex('#ece3cc'), MR0 = hex('#4a3a28'), MR1 = hex('#8c7656'), MR2 = hex('#d6c49c');
   const ROCK = hex('#9a8c72'), FOREST = hex('#5c6640'), REED = hex('#7b7c50'), SURF = hex('#c9c3a4'), WET = hex('#6c776a'), INK = hex('#4a3826'), PAPER = hex('#e8d9b4');
   const TOFF = {}; Object.keys(PAL).forEach((k, i) => TOFF[k] = i * 37.31 + 11.7);
   const sstep = (a, b, x) => { const t = SU.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -142,6 +142,14 @@
     for (let qi = 0; qi < mq.length; qi++) { const o = mq[qi], i = o % TW, j = (o / TW) | 0;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const ii = i + dx, jj = j + dy; if ((!dx && !dy) || ii < 0 || jj < 0 || ii >= TW || jj >= TW) continue; const p = jj * TW + ii; if (mdist[p] > mdist[o] + 1) { mdist[p] = mdist[o] + 1; mq.push(p); } } }
     for (let o = 0; o < TW * TW; o++) if (mdist[o] > 50) mdist[o] = 4;
+    /* the peaks: two or three on every mountain tile, set by the tile itself (so neighbouring chunks agree),
+       taller and broader deep inside a range; the range's height is the highest cone at each point */
+    const PK = new Array(TW * TW);
+    for (let j = 0; j < TW; j++) for (let i = 0; i < TW; i++) { const o = j * TW + i; if (!mtnM[o]) continue;
+      const x = bx + i, y = by + j, R = SU.makeRng(x * 73856093 ^ y * 19349663 ^ (li + 1) * 83492791), md = Math.min(mdist[o], 4), ridge = L.ob[SU.clamp(y, 0, L.h - 1) * L.w + SU.clamp(x, 0, L.w - 1)] === S.OB.ridge;
+      const list = []; const n = 2 + (R.chance(0.5) ? 1 : 0);
+      for (let k = 0; k < n; k++) list.push([x + R.range(0.15, 0.85), y + R.range(0.15, 0.85), (0.5 + 0.32 * (md - 1)) * R.range(0.75, 1.2) * (ridge ? 0.65 : 1), (0.8 + 0.2 * Math.min(md - 1, 2)) * R.range(0.85, 1.2)]);
+      PK[o] = list; }
     /* water deepens away from the shore */
     const dist = new Float32Array(TW * TW).fill(9), q = [];
     for (let o = 0; o < TW * TW; o++) if (land[o]) { dist[o] = 0; q.push(o); }
@@ -175,11 +183,18 @@
       { const hx = fx - bx - 0.5, hy = fy - by - 0.5, h0i = Math.floor(hx), h0j = Math.floor(hy); let sT = 0, sMm = 0, sWd = 0, sB = 0, sBw = 0;
         for (let dj = -1; dj <= 2; dj++) for (let di = -1; di <= 2; di++) {
           const ii = SU.clamp(h0i + di, 0, TW - 1), jj = SU.clamp(h0j + dj, 0, TW - 1), p = jj * TW + ii, ddx = hx - (h0i + di), ddy = hy - (h0j + dj), d2 = ddx * ddx + ddy * ddy;
-          const wl = Math.exp(-d2 * 2.2), wb = Math.exp(-d2 * 1.1);
+          const wl = Math.exp(-d2 * 1.7), wb = Math.exp(-d2 * 0.9);
           sT += wl; sMm += mtnM[p] * wl; sB += mdist[p] * wb; sBw += wb;
           if (woodM[p]) { sWd += wl; wr0 += wcol[p * 3] * wl; wg0 += wcol[p * 3 + 1] * wl; wb0 += wcol[p * 3 + 2] * wl; } }
-        const wob = NZ.edge(fx * 1.5, fy * 1.5) * 0.1 + NZ.tone(fx * 4, fy * 4) * 0.035;
-        ma = sstep(0.4, 0.5, sMm / sT + wob); fa = sstep(0.4, 0.5, sWd / sT + wob) * (1 - ma); bm = sB / sBw;
+        const wob = NZ.edge(fx * 0.9, fy * 0.9) * 0.07 + NZ.tone(fx * 3, fy * 3) * 0.02;
+        ma = sstep(0.4, 0.5, sMm / sT + wob); fa = sstep(0.4, 0.5, sWd / sT + wob); bm = sB / sBw;
+        /* true to the tiles: a blocked tile is always covered in its middle, an open tile always clear in its middle
+           (so a narrow way through never looks closed, and a mass never looks open) */
+        { const ti = SU.clamp(Math.floor(fx) - bx, 0, TW - 1), tj = SU.clamp(Math.floor(fy) - by, 0, TW - 1), tp = tj * TW + ti;
+          const e = Math.min(fx - Math.floor(fx), 1 - (fx - Math.floor(fx)), fy - Math.floor(fy), 1 - (fy - Math.floor(fy))), core = sstep(0.08, 0.22, e);
+          if (mtnM[tp]) ma = Math.max(ma, core); else ma = Math.min(ma, 1 - core);
+          if (woodM[tp]) fa = Math.max(fa, core); else fa = Math.min(fa, 1 - core); }
+        fa *= 1 - ma;
         if (sWd > 0) { wr0 /= sWd; wg0 /= sWd; wb0 /= sWd; } }
       MA[o] = ma; FA[o] = fa;
       const wn = NZ.edge.fbm(fx * 0.7, fy * 0.7, 3);
@@ -230,12 +245,15 @@
         h += NZ.hill.fbm(fx * 0.32, fy * 0.32, 4) * (0.03 + pr.rough * 0.7) + (t === 'sand' ? Math.sin(fx * 2.2 + NZ.warp(fx * 0.3, fy * 0.3) * 4) * 0.03 : 0);
         /* a range: one massif rising from its edge, with sharp ridges running through it and snow on the high crests */
         if (ma > 0) {
-          const q1 = 1 - Math.abs(NZ.hill(fx * 0.42 + 200, fy * 0.42 - 40)), q2 = 1 - Math.abs(NZ.hill(fx * 1.0 + 300, fy * 1.0));
-          const rn = 0.7 * q1 * q1 + 0.3 * q2 * q2, rise = Math.sqrt(Math.max(0, bm - 0.3));
-          const hm = 0.15 + rise * 0.5 + rn * Math.min(1, bm * 0.8) * 0.5;
-          h = h * (1 - ma) + hm * ma;
+          const ci = Math.floor(fx) - bx, cj = Math.floor(fy) - by; let hc = 0;
+          for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) { const ii = ci + di, jj = cj + dj; if (ii < 0 || jj < 0 || ii >= TW || jj >= TW) continue; const list = PK[jj * TW + ii]; if (!list) continue;
+            for (let q = 0; q < list.length; q++) { const P_ = list[q], v = 1 - Math.hypot(fx - P_[0], fy - P_[1]) / P_[3]; if (v > 0) { const c_ = P_[2] * v * v * (3 - 2 * v) * (0.55 + 0.45 * v); if (c_ > hc) hc = c_; } } }
+          /* gullies and spurs carved down the slopes */
+          const q1 = 1 - Math.abs(NZ.hill(fx * 1.6 + 200, fy * 1.6 - 40)), q2 = NZ.hill(fx * 4, fy * 4);
+          hc *= 0.86 + 0.14 * q1 * q1; hc += q2 * 0.012;
+          h = h * (1 - ma) + (0.05 + hc) * ma;
           let mr = MROCK[0], mg = MROCK[1], mb = MROCK[2];
-          SN[o] = sstep(0.6, 0.85, rn) * sstep(1.5, 2.6, bm) * 0.85 * ma;
+          SN[o] = sstep(0.95, 1.25, hc) * 0.9 * ma;
           r += (mr - r) * ma; g += (mg - g) * ma; b += (mb - b) * ma;
         }
       }
@@ -256,12 +274,13 @@
       if (wet[o]) lit = lit * (1 - wet[o]) + wet[o];
       let r = col[o * 3] * lit, g = col[o * 3 + 1] * lit, b = col[o * 3 + 2] * lit;
       /* ranges: rock coloured by how it faces the light, dark umber to pale ochre, snow kept pale */
-      if (MA[o] > 0) { const sl = SU.clamp(0.46 + (-dx - dy) * 0.8, 0, 1), m = MA[o];
+      if (MA[o] > 0) { const sl = SU.clamp(0.55 + (-dx - dy) * 0.11, 0, 1), m = MA[o], ao = 0.74 + 0.26 * sstep(0.08, 0.7, H[o]);
         const rr = sl < 0.5 ? MR0[0] + (MR1[0] - MR0[0]) * sl * 2 : MR1[0] + (MR2[0] - MR1[0]) * (sl - 0.5) * 2,
           rg = sl < 0.5 ? MR0[1] + (MR1[1] - MR0[1]) * sl * 2 : MR1[1] + (MR2[1] - MR1[1]) * (sl - 0.5) * 2,
           rb = sl < 0.5 ? MR0[2] + (MR1[2] - MR0[2]) * sl * 2 : MR1[2] + (MR2[2] - MR1[2]) * (sl - 0.5) * 2;
         const sn = SN[o], kr = rr + (Math.max(rr, MSNOW[0] * (0.7 + sl * 0.3)) - rr) * sn, kg = rg + (Math.max(rg, MSNOW[1] * (0.7 + sl * 0.3)) - rg) * sn, kb = rb + (Math.max(rb, MSNOW[2] * (0.72 + sl * 0.3)) - rb) * sn;
-        r += (kr - r) * m; g += (kg - g) * m; b += (kb - b) * m; }
+        r += (kr * ao - r) * m; g += (kg * ao - g) * m; b += (kb * ao - b) * m;
+      }
       /* the wash pools darker where one colour meets the next */
       if (EG[o] > 0) { const e = 1 - EG[o] * 0.14; r *= e; g *= e; b *= e * 1.02; }
       /* faded: drawn towards the paper, and towards sepia */
@@ -318,9 +337,11 @@
     /* ---- woods: a canopy of many small crowns, cut to the wood's edge ---- */
     if (f.wood) {
       const mask = up(f.wood), [cl, cg] = lay(), crowns = [];
-      tilesOf(2).forEach(t => { const R = SU.makeRng(t.x * 92821 + t.y * 68917 + li * 7 + 3), n = 3;
-        for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) crowns.push({ ob: t.ob, x: t.tx * ts + (i + 0.5 + R.range(-0.3, 0.3)) / n * ts, y: t.ty * ts + (j + 0.5 + R.range(-0.3, 0.3)) / n * ts, r: ts * R.range(0.17, 0.23), v: R.next() }); });
+      /* crowns scattered loosely (a few big, more small), and the wood's edge made of the outer crowns themselves */
+      tilesOf(2).forEach(t => { const R = SU.makeRng(t.x * 92821 + t.y * 68917 + li * 7 + 3), n = 6 + R.int(0, 2);
+        for (let i = 0; i < n; i++) { const big = i < 2; crowns.push({ ob: t.ob, x: t.tx * ts + R.range(0.14, 0.86) * ts, y: t.ty * ts + R.range(0.14, 0.86) * ts, r: ts * (big ? R.range(0.24, 0.3) : R.range(0.15, 0.21)), v: R.next() }); } });
       crowns.sort((a, b) => a.y - b.y);
+      { const mg = mask.getContext('2d'); mg.fillStyle = '#fff'; crowns.forEach(c => { if (c.ob === 'reeds' || c.ob === 'deadtree') return; mg.beginPath(); mg.arc(c.x, c.y, c.r * 0.92, 0, Math.PI * 2); mg.fill(); }); }
       cg.lineCap = 'round'; cg.lineJoin = 'round';
       crowns.forEach(c => {
         const r = c.r, x = c.x, y = c.y;
@@ -338,36 +359,22 @@
         } else {
           const glow = c.ob === 'glowtree', palm = c.ob === 'palm';
           const base = glow ? '#5c8a7c' : palm ? '#7f8a4c' : c.v < 0.33 ? '#6a7440' : c.v < 0.66 ? '#717a45' : '#646d3d';
-          cg.fillStyle = 'rgba(30,32,18,0.45)'; cg.beginPath(); cg.arc(x + r * 0.28, y + r * 0.3, r, 0, Math.PI * 2); cg.fill();
-          cg.fillStyle = base; cg.beginPath(); cg.arc(x, y, r, 0, Math.PI * 2); cg.fill();
-          cg.fillStyle = glow ? 'rgba(190,255,230,0.45)' : 'rgba(226,222,170,0.38)'; cg.beginPath(); cg.arc(x - r * 0.28, y - r * 0.3, r * 0.55, 0, Math.PI * 2); cg.fill();
-          cg.strokeStyle = 'rgba(52,40,28,0.55)'; cg.lineWidth = Math.max(0.8, ts / 60); cg.beginPath(); cg.arc(x, y, r, Math.PI * 0.05, Math.PI * 0.95); cg.stroke();
+          cg.fillStyle = 'rgba(28,30,16,0.5)'; cg.beginPath(); cg.arc(x + r * 0.22, y + r * 0.26, r, 0, Math.PI * 2); cg.fill();
+          const gr = cg.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r * 1.05);
+          gr.addColorStop(0, glow ? '#a6d8c4' : A.shade(base, 30)); gr.addColorStop(0.55, base); gr.addColorStop(1, A.shade(base, -30));
+          cg.fillStyle = gr; cg.beginPath(); cg.arc(x, y, r, 0, Math.PI * 2); cg.fill();
+          /* a few leaf-ticks, so a crown is foliage and not a ball */
+          cg.strokeStyle = 'rgba(40,40,20,0.35)'; cg.lineWidth = Math.max(0.7, ts / 80); cg.beginPath();
+          for (let q = 0; q < 3; q++) { const a = (c.v * 7 + q * 2.1) % (Math.PI * 2), rr = r * (0.35 + q * 0.15); cg.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); cg.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, r * 0.22, a + 0.6, a + 2.2); } cg.stroke();
+          cg.strokeStyle = 'rgba(40,36,20,0.28)'; cg.lineWidth = Math.max(0.7, ts / 70); cg.beginPath(); cg.arc(x, y, r * 0.96, Math.PI * 0.1, Math.PI * 0.9); cg.stroke();
           if (glow) { cg.fillStyle = 'rgba(220,255,245,0.9)'; cg.beginPath(); cg.arc(x + r * 0.2, y - r * 0.1, Math.max(0.8, r * 0.12), 0, Math.PI * 2); cg.fill(); }
         }
       });
       cg.globalCompositeOperation = 'destination-in'; cg.drawImage(mask, -P, -P);
-      put(g, shadowOf(mask, ts * 0.07, ts * 0.09, 'rgba(40,30,18,0.5)'));
+      put(g, shadowOf(mask, ts * 0.06, ts * 0.08, 'rgba(40,30,18,0.32)'));
       put(g, cl);
-      put(g, ring(mask, inkW, 'rgba(58,42,26,0.85)'));
     }
-    /* ---- ranges: one massif (its relief is in the paint), hatched with ink down its shaded slopes ---- */
-    if (f.mtn) {
-      const mask = up(f.mtn), [hl, hg] = lay(), N = f.N, H = f.H;
-      const Hat = (px, py) => { const sx = SU.clamp(Math.round(px / sp + 1.5), 1, N - 2), sy = SU.clamp(Math.round(py / sp + 1.5), 1, N - 2), o = sy * N + sx; return [(H[o + 1] - H[o - 1]), (H[o + N] - H[o - N]), H[o]]; };
-      hg.lineCap = 'round';
-      tilesOf(1).forEach(t => { const R = SU.makeRng(t.x * 7919 + t.y * 104729 + li * 13 + 1);
-        for (let k = 0; k < 14; k++) { const px = t.tx * ts + R.range(0.05, 0.95) * ts, py = t.ty * ts + R.range(0.05, 0.95) * ts;
-          const [gx, gy] = Hat(px, py), gl = Math.hypot(gx, gy); if (gl < 0.004) continue;
-          const shade = (gx + gy) / gl;                        // > 0: facing away from the light
-          const ux = gx / gl, uy = gy / gl, len = ts * (0.06 + Math.min(0.08, gl * 1.5));
-          if (shade < 0.15) continue;
-          hg.strokeStyle = 'rgba(50,34,20,' + (0.2 + shade * 0.3).toFixed(2) + ')'; hg.lineWidth = Math.max(0.8, ts / 60);
-          hg.beginPath(); hg.moveTo(px, py); hg.lineTo(px + ux * len, py + uy * len); hg.stroke(); } });
-      hg.globalCompositeOperation = 'destination-in'; hg.drawImage(mask, -P, -P);
-      put(g, shadowOf(mask, ts * 0.1, ts * 0.13, 'rgba(40,28,16,0.55)'));
-      put(g, hl);
-      put(g, ring(mask, inkW * 1.15, 'rgba(52,36,22,0.9)'));
-    }
+    /* ranges need nothing drawn here: they are painted into the land as relief */
   }
   function bakeChunk(li, cx, cy) {
     const st = V.st, L = st.layers[li], ts = V.ts, W = CH * ts;

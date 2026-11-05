@@ -129,6 +129,7 @@
   /* ======================= the game on screen ======================= */
   U.start = function (st) {
     U.st = st; U.selected = null; U.busy = false;
+    if (S.fillPockets) S.fillPockets(st);    /* walled-in patches nobody can reach become part of the range or wood around them */
     V.setGame(st);
     $('game').classList.remove('hidden');
     V.resize();
