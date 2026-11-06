@@ -70,7 +70,7 @@
       t: 0, day: o.day, bodies, list, S, ship, from: from.id, rank: o.rank || 0, events: [], acc: 0,
       docked: null, wrecked: false, hits: 0, damage: 0, hardHits: 0, mcfly: 0, top: 0, inWave: false, inMist: false, inStorm: false,
       tyndael: [], lutut: [], rocks: [], storms: [], mists: [], wave: null, flies: [], strikes: [], said: {},
-      hot: !!o.hot,
+      hot: !!o.hot, mass: 1 + (o.weight || 0) * 0.09, skiffs: [], rescued: 0, rescueCoins: 0, slings: 0, slingCd: {},
     };
     /* ---- hazards, by where they live ---- */
     const rank = f.rank;
@@ -102,6 +102,16 @@
     for (let i = 0; i < 3; i++) f.storms.push({ x: nekh.x + nekh.nx * (300 + i * 260) + (r() - 0.5) * 700, y: nekh.y + nekh.ny * (300 + i * 260) + (r() - 0.5) * 700, r: 300 + r() * 120, wx: 0, wy: 0, wt: 0, next: 1 + r() * 2 });
     /* the oath-mist round Aakalay, just beyond the Ashen Reach's pad */
     f.mists.push({ x: ash.x + Math.cos(SP.port('ashen').ang + 0.5) * 420 + ash.nx * 200, y: ash.y + Math.sin(SP.port('ashen').ang + 0.5) * 420 + ash.ny * 200, r: 520 });
+    /* now and then a skiff adrift, its seed gone cold, somewhere out in the sky */
+    if (o.skiff != null ? o.skiff : r() < 0.45) {
+      for (let tries = 0; tries < 40; tries++) {
+        const a = r() * TAU, d = 1400 + r() * 2600;
+        const x = pp.x + Math.cos(a) * d, y = pp.y + Math.sin(a) * d;
+        if (list.some(b => Math.hypot(x - b.x, y - b.y) < b.r + 420)) continue;
+        f.skiffs.push({ x, y, vx: (r() - 0.5) * 30, vy: (r() - 0.5) * 30, ph: r() * TAU, hold: 0, saved: false, reward: 30 + Math.round(r() * 40), who: SP.ADRIFT[Math.floor(r() * SP.ADRIFT.length)] });
+        break;
+      }
+    }
     /* the Waves of Memory, now and then */
     if (o.wave != null ? o.wave : r() < 0.5) {
       const dir = r() * TAU, nx = Math.cos(dir), ny = Math.sin(dir);
@@ -191,7 +201,7 @@
 
     /* boost: a hard push from the seed */
     if (input.boost && s.heat >= S.boostCost && s.stun <= 0) {
-      s.heat -= S.boostCost; s.vx += hx * S.boostKick; s.vy += hy * S.boostKick; s.boostT = 0.4;
+      s.heat -= S.boostCost; s.vx += hx * S.boostKick / f.mass; s.vy += hy * S.boostKick / f.mass; s.boostT = 0.4;
       f.events.push({ t: 'boost', x: s.x, y: s.y });
       if (s.grounded) s.grounded = null;
     }
@@ -213,7 +223,7 @@
 
     const P = pull(f, s.x, s.y);
     s.vx += P.ax * dt; s.vy += P.ay * dt;
-    if (s.thrusting) { s.vx += hx * S.thrust * dt; s.vy += hy * S.thrust * dt; }
+    if (s.thrusting) { s.vx += hx * S.thrust / f.mass * dt; s.vy += hy * S.thrust / f.mass * dt; }
     /* the air near a body is thick; the sky is nearly empty */
     let drag = 0.03;
     if (P.alt < 220) drag += (1 - P.alt / 220) * 0.9;
@@ -229,6 +239,11 @@
     const sp = Math.hypot(s.vx, s.vy), top = 900;
     if (sp > top) { s.vx *= top / sp; s.vy *= top / sp; }
     f.top = Math.max(f.top, sp);
+    /* a slingshot: skimming fast past a body, using its pull */
+    if (P.near && P.alt < 330 && P.alt > 40 && sp > 520 && (f.slingCd[P.near.id] || 0) < f.t) {
+      f.slingCd[P.near.id] = f.t + 10; f.slings++;
+      f.events.push({ t: 'sling', x: s.x, y: s.y, body: P.near.id }); say(f, 'sling');
+    }
     s.x += s.vx * dt; s.y += s.vy * dt;
 
     /* touching a body: land, dock, or bounce */
@@ -360,6 +375,17 @@
       }
       if (k.t < -0.3) f.strikes.splice(i, 1);
     }
+    /* skiffs adrift: come alongside slowly and hold there, and your vines take them in tow */
+    f.skiffs.forEach(k => {
+      if (k.saved) return;
+      k.ph += dt; k.x += k.vx * dt; k.y += k.vy * dt;
+      const d = Math.hypot(s.x - k.x, s.y - k.y), rel = Math.hypot(s.vx - k.vx, s.vy - k.vy);
+      if (d < 600 && !k.seen) { k.seen = true; say(f, 'distress'); }
+      if (d < 95 && rel < 120 && !s.grounded) {
+        k.hold += dt;
+        if (k.hold > 1.6) { k.saved = true; f.rescued++; f.rescueCoins += k.reward; f.events.push({ t: 'rescue', x: k.x, y: k.y, who: k.who, coins: k.reward }); say(f, 'rescue'); }
+      } else k.hold = Math.max(0, k.hold - dt * 2);
+    });
     /* the wave rolls on; RubberMcFly glow in it */
     const w = f.wave;
     if (w) {
@@ -385,6 +411,12 @@
 
   /* ================= jobs ================= */
   /* the jobs on a port's board today */
+  SP.portEvent = function (portId, day) {
+    let h = 0; for (let i = 0; i < portId.length; i++) h = (h * 31 + portId.charCodeAt(i)) | 0;
+    const r = rng((day + 1) * 7331 + h);
+    if (r() > 0.3) return null;
+    return SP.EVENTS[Math.floor(r() * SP.EVENTS.length)];
+  };
   SP.makeJobs = function (portId, day, rank, seed, count) {
     const r = rng(seed);
     const from = SP.port(portId);
@@ -401,7 +433,9 @@
       const base = 12 + dist / 85 + (far ? 14 : 0);
       const pay = Math.round(base * SP.JOBS[kind].pay * (1 + rank * 0.15) * (0.85 + r() * 0.3) / 5) * 5;
       const par = Math.round(dist / 300 + 10);
-      out.push({ id: 'j' + seed.toString(36) + i, kind, what: names[Math.floor(r() * names.length)], from: portId, to: to.id, pay, par, day });
+      const ev = SP.portEvent(to.id, day);
+      const boosted = ev && ev.kinds.indexOf(kind) >= 0;
+      out.push({ id: 'j' + seed.toString(36) + i, kind, what: names[Math.floor(r() * names.length)], from: portId, to: to.id, pay: boosted ? Math.round(pay * 1.5 / 5) * 5 : pay, par, day, event: boosted ? ev.name : null });
     }
     return out;
   };

@@ -57,6 +57,10 @@
     .prose h3 { margin: 14px 0 4px; } .prose p { margin: 6px 0; }
     kbd { background: #0a0c20; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 13px; }
     a { color: var(--gold); }
+    .event { color: #ffd36a; }
+    .pop { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); font: 700 30px Georgia, serif; text-shadow: 0 2px 10px rgba(0,0,0,.7); animation: popup 1.3s ease-out forwards; pointer-events: none; white-space: nowrap; }
+    @keyframes popup { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 30% { transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -40px); } }
+    .hb div { backdrop-filter: blur(3px); }
     .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 12px; z-index: 30; transition: opacity .5s; }
     .toast.out { opacity: 0; }
     /* the flight HUD */
@@ -114,6 +118,7 @@
   <script src="../../js/flake/account.js"></script>
   <script src="../../js/core/broadcast.js"></script><!-- live messages from the Admin Panel -->
   <script src="../../js/flake/mini_save.js"></script>
+  <script src="../../js/flake/canvas_fx.js"></script>
   <script src="js/sp_data.js"></script>
   <script src="js/sp_sim.js"></script>
   <script src="js/sp_art.js"></script>

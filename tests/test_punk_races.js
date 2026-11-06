@@ -85,6 +85,52 @@ check('a strong Punk beats a weak one on most tracks', strongWins >= 7, strongWi
   check('…and comes out past the far edge', u.x > g.x1);
 })();
 
+/* brittle branches, flips, slipstream, bumps, the weather */
+(function () {
+  const tr = PR.track('hedgeoak'), c = PR.makeCourse(tr);
+  const br = c.anchors.filter(a => a.brittle);
+  check('some branches are brittle', br.length > 3);
+  check('…never at a gap’s edge', br.every(a => !c.trees[a.tree].edge));
+  const a = br[0];
+  const u = PR.makeRunner(c, { id: 'me', stats: stats(5) });
+  u.mode = 'swing'; u.anchor = a; u.x = a.x; u.y = a.y + 150; u.len = 150; u.lenTarget = 150; u.vx = 200; u.vy = 0;
+  let t = 0;
+  for (let i = 0; i < 140; i++) PR.stepRunner(c, u, { hold: true }, t += PR.STEP);
+  check('hang on a brittle branch and it snaps', u.snaps === 1 && u.mode !== 'swing' && a.brokenUntil > t);
+  c.now = t;
+  const v = PR.makeRunner(c, { id: 'v', stats: stats(5) }); v.x = a.x - 100; v.y = a.y + 160;
+  check('a snapped branch cannot be caught', PR.pickAnchor(c, v) !== a);
+  /* a flip */
+  const w = PR.makeRunner(c, { id: 'w', stats: stats(5) });
+  w.mode = 'air'; w.x = 3000; w.y = c.surface(3000) - 900; w.vx = 300; w.vy = -400; w.boost = 0;
+  PR.stepRunner(c, w, { trick: true }, t);
+  for (let i = 0; i < 70; i++) PR.stepRunner(c, w, {}, t += PR.STEP);
+  check('a flip finished in the air fills the boost', w.flips === 1 && w.boost > 0.05 && w.combo === 1);
+  /* a flip that lands is botched */
+  const q = PR.makeRunner(c, { id: 'q', stats: stats(5) });
+  const gx = c.trees[5].x + 60;
+  q.mode = 'air'; q.x = gx; q.y = c.surface(gx) - PR.PUNK_R - 20; q.vx = 300; q.vy = 200;
+  PR.stepRunner(c, q, { trick: true }, t);
+  for (let i = 0; i < 30; i++) PR.stepRunner(c, q, {}, t += PR.STEP);
+  check('land mid-flip and you tumble', q.flips === 0 && q.stumble > 0);
+})();
+(function () {
+  const tr = PR.track('beuhk');
+  const race = PR.makeRace(tr, [{ id: 'a', ai: true, stats: stats(5) }, { id: 'b', ai: true, stats: stats(5) }], { mood: { time: 'day', weather: 'clear', wind: 0 } });
+  race.t = 1;
+  const [a, b] = race.runners;
+  a.x = 2000; a.y = race.course.surface(2000) - 400; a.mode = 'air'; a.vx = 400; a.vy = 0;
+  b.x = 2100; b.y = a.y; b.mode = 'air'; b.vx = 400; b.vy = 0;
+  PR.tick(race, PR.STEP * 1.01);
+  check('tucked in behind a rival is a slipstream', a.draft && !b.draft);
+  b.x = a.x + 30; b.y = a.y; a.vx = 600; b.vx = 100;
+  PR.tick(race, PR.STEP * 1.01);
+  check('Punks bump each other apart', Math.hypot(b.x - a.x, b.y - a.y) > PR.PUNK_R * 1.8 && b.vx > 100);
+  const moods = new Set(); for (let i = 1; i < 200; i++) { const m = PR.pickMood(PR.track('jungle' in {} ? 'jungle' : 'venomgrove'), i); moods.add(m.time + m.weather); }
+  check('races come at different times and weathers', moods.size >= 4);
+  check('a race keeps its mood for its seed', JSON.stringify(PR.pickMood(tr, 77)) === JSON.stringify(PR.pickMood(tr, 77)));
+})();
+
 /* money: odds, foals, pairing */
 const odds = PR.odds([10, 20, 30, 40]);
 check('better Punks get shorter odds', odds[0] > odds[1] && odds[1] > odds[2] && odds[2] > odds[3], odds.join(' '));

@@ -153,6 +153,16 @@
       A clean release throws you a little harder, sparkles, and fills your boost.</p>
       <h3>Boost</h3>
       <p>When the boost bar is full, press <kbd>Shift</kbd>, <kbd>X</kbd> or the ⚡ button. Ju fruit hanging in the air fill it too.</p>
+      <h3>Flips</h3>
+      <p>In the air, press <kbd>↓</kbd> or <kbd>S</kbd> (or the ↻ button) to flip. Finish the flip before you land and the boost fills, more for each flip in a row.
+      Land halfway round, and your Punk tumbles. Catching a branch mid-flip loses the flip.</p>
+      <h3>Brittle branches</h3>
+      <p>Grey, bare, cracked branch tips are dead wood. They hold for a moment, then snap. Let go before they do.</p>
+      <h3>Riding with the others</h3>
+      <p>Tuck in just behind a rival and you ride their <b>slipstream</b>: the air holds you back less. Punks bump into each other, so mind who is beside you.</p>
+      <h3>Weather and the hour</h3>
+      <p>Every race runs at its own time of day, from dawn to night, when the trees are hung with lanterns. Rain makes the bark harder to catch
+      and the ground slower, and wind blows for you or against you.</p>
       <h3>The ground</h3>
       <p>On the ground your Punk runs, and holding with no branch in reach jumps. Thorns and venom bogs slow you,
       water makes you swim (slowly: catch a branch to get out), and a fall into a chasm costs you a slow climb out.
@@ -491,14 +501,13 @@
   /* the loop */
   let last = performance.now();
   const perf = [];
-  try { A.lowFx = localStorage.getItem('pr-lowfx') === '1'; } catch (e) { /* ignore */ }
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (!R) return;
     /* a slow device gets the lighter picture (no light shafts, grading or foreground) */
     perf.push(dt); if (perf.length > 90) perf.shift();
-    if (perf.length === 90 && !A.lowFx) { const avg = perf.reduce((a, b) => a + b, 0) / 90; if (avg > 0.026) { A.lowFx = true; try { localStorage.setItem('pr-lowfx', '1'); } catch (e) { /* ignore */ } } }
+    if (perf.length === 90 && !A.lowFx) { const avg = perf.reduce((a, b) => a + b, 0) / 90; if (avg > 0.026) { A.lowFx = true; } }
     const race = R.race;
     if (!R.paused) {
       input.hold = !!(keys.vine || pointerVine);

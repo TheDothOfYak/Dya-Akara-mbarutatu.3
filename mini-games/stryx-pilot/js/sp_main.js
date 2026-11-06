@@ -130,7 +130,8 @@
         return el('div', { cls: 'job' }, [
           el('div', { cls: 'grow' }, [
             el('div', { text: jobLine(j) }),
-            el('div', { cls: 'muted small', text: SP.JOBS[j.kind].name + ' (' + SP.JOBS[j.kind].about + ') · on ' + bodyName(to.body) + ' · par ' + j.par + ' s' }),
+            el('div', { cls: 'muted small', text: SP.JOBS[j.kind].name + ' (' + SP.JOBS[j.kind].about + ') · on ' + bodyName(to.body) + ' · par ' + j.par + ' s' + (SP.JOBS[j.kind].weight >= 0.7 ? ' · heavy' : '') }),
+            j.event ? el('div', { cls: 'small event', text: '★ ' + j.event + ' at ' + to.name + ': pays half again' }) : null,
           ]),
           el('div', { cls: 'pay', text: j.pay }),
           btn('Take', () => {
@@ -169,6 +170,7 @@
           el('div', { cls: 'pname', text: p.name }),
           el('div', { cls: 'muted small', text: 'on ' + bodyName(p.body) + ' · day ' + (D.day + 1) + ' · ' + SP.RANKS[rk].name + ' (' + D.deliveries + ' delivered' + (nextRank ? ', ' + (nextRank.at - D.deliveries) + ' more to ' + nextRank.name : '') + ')' }),
           el('p', { text: p.blurb }),
+          SP.portEvent(p.id, D.day) ? el('p', { cls: 'small event', text: '★ ' + SP.portEvent(p.id, D.day).name + ' here today: ' + SP.portEvent(p.id, D.day).about + '.' }) : null,
           el('div', { cls: 'row' }, [
             btn('Take off ⛵', fly, 'primary big'),
             btn('How to fly', help, 'small'), btn('Records', records, 'small'),
@@ -208,6 +210,14 @@
       <h3>Jobs</h3>
       <p>Take jobs from a port’s board. Each pays when it reaches its port, more if you beat par. Fragile goods hate knocks, mail hates lateness,
       passengers tip for a smooth flight, and fire seeds can set the hold smouldering if you hit hard.</p>
+      <h3>Weight</h3>
+      <p>Crates are heavy, passengers and fire seeds less so, mail hardly at all. A full, heavy hold pushes and turns slower.</p>
+      <h3>Good flying pays</h3>
+      <p>Skim fast past a Tatu or a Kalo, close to its air, and its pull slings you on: the academy pays for every <b>slingshot</b>.
+      Ports sometimes have a market day, a festival, a wedding or the Guild’s post day, and jobs bound there pay half again.</p>
+      <h3>Folk adrift</h3>
+      <p>A red lantern blinking in the sky is a skiff whose seed has gone cold. Come alongside it slowly and <b>hold</b> there, and your vines take it in tow.
+      The folk aboard pay what they can.</p>
       <h3>The sky</h3>
       <p><b>Tyndael</b>, flying sparks with wings, swarm round Leotik and the Ashen Reach: lash them. A <b>Lutut</b> screeches (which stuns) and then dives:
       do not be where it is diving. Sky rock drifts along Bolo Kalo’s path. Storms come off Nekh FtiSular. The <b>oath-mist</b> by Aakalay chills a seed.
@@ -234,7 +244,7 @@
     ui.classList.add('hidden'); document.body.classList.add('flying');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !touchy);
-    const f = SP.makeFlight({ day: D.day, from: D.at, parts: D.parts, hull: hullNow(), rank: rank(), seed: (D.day + 7) * 7919 + D.flights * 13, hot: D.hold.some(j => j.kind === 'seeds') });
+    const f = SP.makeFlight({ day: D.day, from: D.at, parts: D.parts, hull: hullNow(), rank: rank(), seed: (D.day + 7) * 7919 + D.flights * 13, hot: D.hold.some(j => j.kind === 'seeds'), weight: D.hold.reduce((w, j) => w + (SP.JOBS[j.kind].weight || 0), 0) });
     A.parts.length = 0; A.resetCamera(f);
     FL = { f, from: D.at, ended: 0, log: [], logT: 0 };
     Object.assign(input, { turn: 0, thrust: false, brake: false, boost: false, lash: false, aim: null });
@@ -253,6 +263,8 @@
     const note = [];
     const coinsFly = f.mcfly * 6;
     if (f.mcfly) { D.coins += coinsFly; note.push('You caught ' + f.mcfly + ' RubberMcFly in the Waves of Memory: ' + coinsFly + ' coins.'); }
+    f.skiffs.filter(k => k.saved).forEach(k => { D.coins += k.reward; D.rescues = (D.rescues || 0) + 1; note.push('You towed ' + k.who + ' clear of the sky: they pressed ' + k.reward + ' coins on you.'); });
+    if (f.slings) { const c = f.slings * 6; D.coins += c; D.slings = (D.slings || 0) + f.slings; note.push(f.slings + ' slingshot' + (f.slings > 1 ? 's' : '') + ' round the pull of the Tatu: the academy pays ' + c + ' coins for good flying.'); }
     if (f.wrecked) {
       D.wrecks++;
       const fee = Math.min(D.coins, 40);
@@ -326,10 +338,13 @@
 
   /* the loop */
   let last = performance.now();
+  const perf = [];
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (!FL) return;
+    perf.push(dt); if (perf.length > 90) perf.shift();
+    if (perf.length === 90 && !A.lowFx && perf.reduce((a, b) => a + b, 0) / 90 > 0.026) { A.lowFx = true; }
     const f = FL.f;
     if (!FL.paused && !FL.ended) {
       input.turn = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
@@ -349,6 +364,8 @@
         else if (ev.t === 'hit') SFX.hit(ev.n); else if (ev.t === 'boost') SFX.boost(); else if (ev.t === 'lash') SFX.lash();
         else if (ev.t === 'pop') SFX.pop(); else if (ev.t === 'mcfly') SFX.mcfly(); else if (ev.t === 'screech') SFX.screech();
         else if (ev.t === 'bolt' && Math.hypot(ev.x - f.ship.x, ev.y - f.ship.y) < 900) SFX.bolt();
+        else if (ev.t === 'rescue') { SFX.dock(); pop('Rescued! +' + ev.coins, '#ffd890'); }
+        else if (ev.t === 'sling') { SFX.mcfly(); pop('Slingshot!', '#a8e8ff'); }
       });
       f.events.length = 0;
       A.stepParts(dt, f);
@@ -360,9 +377,14 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     const marks = new Set(D.hold.map(j => j.to));
     const targets = D.hold.map(j => ({ port: j.to, label: SP.port(j.to).name }));
+    f.skiffs.forEach(k => { if (!k.saved && Math.hypot(k.x - f.ship.x, k.y - f.ship.y) < 4500) targets.push({ x: k.x, y: k.y, label: 'Distress', color: '#ff8a7a' }); });
     FL.view = A.draw(ctx, W, H, f, now / 1000, { marks, targets, braking: input.brake });
     A.minimap(mctx, mini.width, mini.height, f, Array.from(marks));
     hud(f);
+  }
+  function pop(text, col) {
+    const p = el('div', { cls: 'pop', text }); p.style.color = col; $('hud').appendChild(p);
+    setTimeout(() => p.remove(), 1300);
   }
   function hud(f) {
     const s = f.ship, Sh = f.S;
@@ -385,6 +407,7 @@
     if (f.docked) msg = 'Docked: ' + SP.port(f.docked).name;
     else if (f.wrecked) msg = 'The hull is gone';
     else if (s.grounded && f.t < 3) msg = touchy ? 'Hold above the ship to lift off' : 'Hold ↑ to lift off';
+    else { const k = f.skiffs.find(k => !k.saved && k.hold > 0); if (k) msg = 'Towing… ' + Math.round(k.hold / 1.6 * 100) + '%'; }
     const m = $('hMsg'); m.textContent = msg; m.classList.toggle('hidden', !msg);
   }
 

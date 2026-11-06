@@ -138,5 +138,39 @@ check('passengers tip for a smooth flight', SP.settle({ kind: 'folk', pay: 100, 
 check('ranks climb with deliveries', SP.rankOf(0) === 0 && SP.rankOf(6) === 1 && SP.rankOf(100) === SP.RANKS.length - 1);
 check('better parts make a better ship', SP.ship(parts(5)).thrust > SP.ship(parts(1)).thrust && SP.ship(parts(5)).hullMax > SP.ship(parts(1)).hullMax);
 
+/* skiffs adrift, cargo weight, slingshots, port events */
+(function () {
+  const f = SP.makeFlight({ day: 0, from: 'rakar', parts: parts(2), seed: 21, skiff: true });
+  check('a skiff can be adrift', f.skiffs.length === 1 && f.skiffs.every(k => f.list.every(b => Math.hypot(k.x - b.x, k.y - b.y) > b.r + 300)));
+  const k = f.skiffs[0];
+  f.ship.grounded = null; f.ship.x = k.x - 40; f.ship.y = k.y; f.ship.vx = k.vx; f.ship.vy = k.vy;
+  for (let i = 0; i < 150 && !k.saved; i++) { SP.stepFlight(f, {}); f.ship.x = k.x - 40; f.ship.y = k.y; f.ship.vx = k.vx; f.ship.vy = k.vy; }
+  check('holding alongside a skiff takes it in tow', k.saved && f.rescued === 1 && f.rescueCoins === k.reward);
+  const g = SP.makeFlight({ day: 0, from: 'rakar', parts: parts(2), seed: 22, skiff: true });
+  const j = g.skiffs[0]; g.ship.grounded = null; g.ship.x = j.x - 40; g.ship.y = j.y; g.ship.vx = j.vx + 400; g.ship.vy = j.vy;
+  SP.stepFlight(g, {});
+  check('racing past a skiff does not rescue it', !j.saved && j.hold === 0);
+  /* weight */
+  const light = SP.makeFlight({ day: 0, from: 'rakar', parts: parts(2), seed: 23 }), heavy = SP.makeFlight({ day: 0, from: 'rakar', parts: parts(2), seed: 23, weight: 3 });
+  [light, heavy].forEach(q => { q.ship.grounded = null; q.ship.x = 40000; q.ship.y = 40000; q.ship.ang = 0; for (let i = 0; i < 60; i++) SP.stepFlight(q, { thrust: true }); });
+  check('a heavy hold answers more slowly', heavy.ship.vx < light.ship.vx * 0.85, heavy.ship.vx.toFixed(0) + ' vs ' + light.ship.vx.toFixed(0));
+  /* slingshot */
+  const sl = SP.makeFlight({ day: 0, from: 'rakar', parts: parts(2), seed: 24 });
+  const x = sl.bodies.xikia; sl.ship.grounded = null; sl.ship.x = x.x - 300; sl.ship.y = x.y - x.r - 160; sl.ship.vx = 800; sl.ship.vy = 0;
+  for (let i = 0; i < 30; i++) SP.stepFlight(sl, {});
+  check('skimming fast past a Tatu is a slingshot', sl.slings === 1);
+  for (let i = 0; i < 30; i++) SP.stepFlight(sl, {});
+  check('…once per pass, not every moment', sl.slings === 1);
+})();
+(function () {
+  let found = null;
+  for (let d = 0; d < 40 && !found; d++) SP.PORTS.forEach(p => { if (!found && SP.portEvent(p.id, d)) found = [p.id, d]; });
+  check('some ports have something on some days', !!found);
+  check('port events are the same each time they are asked', JSON.stringify(SP.portEvent(found[0], found[1])) === JSON.stringify(SP.portEvent(found[0], found[1])));
+  let boosted = 0;
+  for (let d = 0; d < 30; d++) SP.makeJobs('rakar', d, 3, d * 13 + 1, 8).forEach(j => { if (j.event) { boosted++; const ev = SP.portEvent(j.to, d); if (!ev || ev.kinds.indexOf(j.kind) < 0) boosted = -999; } });
+  check('jobs bound for an event pay more, and only the right kinds', boosted > 0, String(boosted));
+})();
+
 console.log('Stryx Pilot: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

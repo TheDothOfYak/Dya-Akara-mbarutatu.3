@@ -43,6 +43,13 @@
   ];
   SP.port = id => SP.PORTS.find(p => p.id === id);
 
+  /* What is happening at a port today (some days, some ports). Jobs bound there pay more. */
+  SP.EVENTS = [
+    { id: 'market', name: 'Market day', kinds: ['crates', 'seeds'], about: 'crates and fire seeds bound here pay half again' },
+    { id: 'festival', name: 'A festival', kinds: ['folk'], about: 'passengers bound here pay half again' },
+    { id: 'post', name: 'The Guild’s post day', kinds: ['mail'], about: 'mail bound here pays half again' },
+    { id: 'wedding', name: 'A wedding', kinds: ['fragile', 'folk'], about: 'fragile goods and guests bound here pay half again' },
+  ];
   /* The pilot's ranks, by deliveries made. */
   SP.RANKS = [
     { name: 'Fledgling Pilot', at: 0 },
@@ -54,11 +61,11 @@
 
   /* Kinds of job. */
   SP.JOBS = {
-    crates: { name: 'Crates', icon: '📦', pay: 1.0, about: 'Plain cargo. Get it there.' },
-    fragile: { name: 'Fragile', icon: '🏺', pay: 1.4, about: 'Every knock to the hull costs you some of the pay.' },
-    mail: { name: 'Mail', icon: '✉️', pay: 1.2, about: 'Late mail is paid half.' },
-    folk: { name: 'Passengers', icon: '🧑‍🤝‍🧑', pay: 1.3, about: 'They tip for a smooth flight and remember a rough one.' },
-    seeds: { name: 'Fire seeds', icon: '🔥', pay: 1.6, about: 'Hot. A hard knock can set the hold smouldering.' },
+    crates: { name: 'Crates', icon: '📦', pay: 1.0, weight: 1.0, about: 'Plain cargo. Get it there.' },
+    fragile: { name: 'Fragile', icon: '🏺', pay: 1.4, weight: 0.5, about: 'Every knock to the hull costs you some of the pay.' },
+    mail: { name: 'Mail', icon: '✉️', pay: 1.2, weight: 0.1, about: 'Late mail is paid half.' },
+    folk: { name: 'Passengers', icon: '🧑‍🤝‍🧑', pay: 1.3, weight: 0.7, about: 'They tip for a smooth flight and remember a rough one.' },
+    seeds: { name: 'Fire seeds', icon: '🔥', pay: 1.6, weight: 0.6, about: 'Hot. A hard knock can set the hold smouldering.' },
   };
   SP.CARGO = {
     crates: ['Grain from Beuhk', 'Punk-feed', 'Ju fruit', 'Tool crates', 'Barrels of cider', 'Cheese wheels', 'Bolts of cloth', 'Lamp-oil'],
@@ -79,6 +86,8 @@
   SP.partCost = (id, lvl) => Math.round((id === 'hold' ? 260 : 140) * Math.pow(lvl, 1.7));
 
   /* what the ship can do with its parts */
+  /* the names of folk adrift in skiffs */
+  SP.ADRIFT = ['two Kalo’Eik fishers', 'a Keilia surveyor', 'a lost Guild courier', 'three students from the Rakarvorac', 'a Karnen trader and her goats', 'an old Eikar who says he meant to do this'];
   SP.ship = function (p) {
     return {
       heatMax: 70 + p.seed * 30,
@@ -111,5 +120,9 @@
     wreck: ['The hull is gone. The academy will send a tow. They will not let me forget it.'],
     lash: ['Vines out.'],
     late: ['Late. The post-master will write a letter about this.'],
+    distress: ['A distress lantern. Someone is adrift out there.', 'A skiff is signalling. Its seed has gone cold.'],
+    rescue: ['Vines fast. We have them. They are very grateful and very loud.', 'Towed clear. The academy will hear of this, for once in a good way.'],
+    sling: ['A slingshot round the pull. I calculated that.', 'Round and out, faster than we came in.'],
+    heavy: ['Heavy hold. She answers slowly.'],
   };
 })(typeof window !== 'undefined' ? window : globalThis);
