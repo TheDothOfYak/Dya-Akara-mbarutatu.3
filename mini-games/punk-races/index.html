@@ -98,6 +98,15 @@
     #hudTip { position: absolute; bottom: 60px; left: 0; right: 0; text-align: center; color: #fff; font-size: 16px; }
     .hbtn { pointer-events: auto; background: rgba(0,0,0,.4); color: #fff; border: 1px solid rgba(255,255,255,.4); border-radius: 10px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer; }
     #touch { position: fixed; right: 18px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 4; }
+    #touch { display: flex; gap: 12px; align-items: flex-end; }
+    #trickBtn { width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,.35); border: 2px solid rgba(255,255,255,.45); color: #fff; font-size: 28px; }
+    .pop { position: absolute; left: 50%; top: 38%; transform: translateX(-50%); font: 700 34px Georgia, serif; text-shadow: 0 2px 8px rgba(0,0,0,.6); animation: popup 1.1s ease-out forwards; pointer-events: none; white-space: nowrap; }
+    .pop.small { font-size: 20px; top: 44%; }
+    @keyframes popup { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 30% { transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -40px) scale(1); } }
+    #draft { position: absolute; left: 16px; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 40px); color: #cfefff; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+    #hud { font-family: system-ui, sans-serif; }
+    #hudTop { background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,0)); padding: 6px 10px 18px; border-radius: 10px; }
+    #boostBar { backdrop-filter: blur(3px); }
     #boostBtn { width: 84px; height: 84px; border-radius: 50%; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.5); color: #fff; font-size: 34px; }
     #boostBtn.ready { background: rgba(232,160,58,.7); border-color: #ffe08a; box-shadow: 0 0 18px #ffe08a; }
     #pausebox { position: fixed; inset: 0; background: rgba(10,8,6,.7); z-index: 20; display: flex; align-items: center; justify-content: center; }
@@ -124,8 +133,9 @@
     <div id="boostBar"><div id="boostFill"></div></div>
     <div id="hudMsg" class="hidden"></div>
     <div id="hudTip" class="hidden"></div>
+    <div id="draft" class="hidden">slipstream</div>
   </div>
-  <div id="touch" class="hidden"><button id="boostBtn" type="button">⚡</button></div>
+  <div id="touch" class="hidden"><button id="trickBtn" type="button">↻</button><button id="boostBtn" type="button">⚡</button></div>
   <div id="pausebox" class="hidden"><div class="card"><h2 style="color:var(--gold);font-family:Georgia,serif">Paused</h2>
     <div class="row center"><button class="btn primary" id="resume" type="button">Carry on</button><button class="btn danger" id="quit" type="button">Leave the race</button></div></div></div>
   <div id="ui"></div>
@@ -134,6 +144,7 @@
   <script src="../../js/flake/account.js"></script>
   <script src="../../js/core/broadcast.js"></script><!-- live messages from the Admin Panel -->
   <script src="../../js/flake/mini_save.js"></script>
+  <script src="../../js/flake/canvas_fx.js"></script>
   <script src="js/pr_data.js"></script>
   <script src="js/pr_sim.js"></script>
   <script src="js/pr_art.js"></script>

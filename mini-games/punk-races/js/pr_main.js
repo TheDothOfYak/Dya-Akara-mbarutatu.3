@@ -48,6 +48,9 @@
     fall: () => beep(300, 0.5, 'triangle', 0.05, 90),
     go: () => beep(660, 0.3, 'square', 0.04),
     count: () => beep(440, 0.12, 'square', 0.03),
+    trick: n => { beep(660 + Math.min(4, n || 1) * 110, 0.12, 'triangle', 0.045, 1400); },
+    snap: () => { beep(240, 0.08, 'square', 0.05, 90); setTimeout(() => beep(160, 0.12, 'square', 0.04, 60), 40); },
+    bump: () => beep(140, 0.1, 'sine', 0.06, 80),
     finish: () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.05), i * 110)); },
   };
 
@@ -395,7 +398,7 @@
 
   /* ================= the race screen ================= */
   let R = null;              // the race being run, with its extras
-  const input = { hold: false, jump: false, boost: false };
+  const input = { hold: false, jump: false, boost: false, trick: false };
   const keys = {};
 
   function startRace(o) {
@@ -403,15 +406,16 @@
     document.body.classList.add('racing');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !touchy || o.kind === 'watch');
-    const race = PR.makeRace(o.track, o.entrants);
+    const race = PR.makeRace(o.track, o.entrants, { seed: (Date.now() ^ (o.track.seed * 7919)) & 0xffffff });
     A.indexCourse(race.course);
     A.parts.length = 0;
     const focus = race.runners.find(u => !u.ai) || race.runners[0];
     A.resetCamera(focus);
     R = Object.assign({ race, focus, lastCount: 4, endAt: 0, speed: o.kind === 'watch' ? 1.4 : 1, paused: false }, o);
-    input.hold = input.jump = input.boost = false;
+    input.hold = input.jump = input.boost = input.trick = false;
     $('skip').classList.toggle('hidden', o.kind !== 'watch');
-    $('hudTrack').textContent = o.track.name;
+    const md = race.course.mood;
+    $('hudTrack').textContent = o.track.name + ' · ' + ({ dawn: 'dawn', day: 'midday', dusk: 'dusk', night: 'night' })[md.time] + (md.weather === 'rain' ? ', rain' : md.weather === 'wind' ? (md.wind > 0 ? ', a tailwind' : ', a headwind') : '');
     resize();
   }
   function endRace() {
@@ -438,7 +442,7 @@
         D.records[o.track.id] = { time: Math.round(meU.time * 100) / 100, punk: p.name, at: Date.now(), ghost: race.record.slice(0, 12000) };
         lines.push(rec ? 'A new record for ' + o.track.name + '! (was ' + fmt(rec.time) + ')' : 'Your first time on ' + o.track.name + ' is on the board.');
       }
-      lines.push(meU.clean + ' clean releases · ' + meU.swings + ' swings' + (meU.falls ? ' · ' + meU.falls + ' falls' : '') + ' · top speed ' + Math.round(meU.best / 40 * 3.6) + ' km/h');
+      lines.push(meU.clean + ' clean releases · ' + meU.swings + ' swings' + (meU.flips ? ' · ' + meU.flips + ' flips (best combo ' + meU.bestCombo + ')' : '') + (meU.snaps ? ' · ' + meU.snaps + ' snapped branches' : '') + (meU.falls ? ' · ' + meU.falls + ' falls' : '') + ' · top speed ' + Math.round(meU.best / 40 * 3.6) + ' km/h');
     }
     if (o.bet) {
       const win = race.order[0] && race.order[0].id === o.bet.on;
@@ -461,11 +465,13 @@
   const touchy = matchMedia('(pointer: coarse)').matches;
   const isVineKey = k => k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W';
   const isBoostKey = k => k === 'Shift' || k === 'x' || k === 'X' || k === 'ArrowRight';
+  const isTrickKey = k => k === 'ArrowDown' || k === 's' || k === 'S' || k === 'c' || k === 'C';
   window.addEventListener('keydown', e => {
     if (!R) return;
     if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { togglePause(); return; }
     if (isVineKey(e.key)) { keys.vine = true; e.preventDefault(); }
     if (isBoostKey(e.key) && !e.repeat) { input.boost = true; e.preventDefault(); }
+    if (isTrickKey(e.key) && !e.repeat) { input.trick = true; e.preventDefault(); }
   });
   window.addEventListener('keyup', e => { if (isVineKey(e.key)) keys.vine = false; });
   let pointerVine = false;
@@ -473,6 +479,7 @@
   const up = () => { pointerVine = false; };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   $('boostBtn').addEventListener('pointerdown', e => { input.boost = true; e.preventDefault(); e.stopPropagation(); });
+  $('trickBtn').addEventListener('pointerdown', e => { input.trick = true; e.preventDefault(); e.stopPropagation(); });
   $('pause').addEventListener('click', () => togglePause());
   $('skip').addEventListener('click', () => { if (R) { PR.settle(R.race); } });
   window.addEventListener('blur', () => { keys.vine = false; pointerVine = false; if (R && R.kind !== 'watch' && R.race.t > 0 && !R.race.done) setPause(true); });
@@ -483,10 +490,15 @@
 
   /* the loop */
   let last = performance.now();
+  const perf = [];
+  try { A.lowFx = localStorage.getItem('pr-lowfx') === '1'; } catch (e) { /* ignore */ }
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (!R) return;
+    /* a slow device gets the lighter picture (no light shafts, grading or foreground) */
+    perf.push(dt); if (perf.length > 90) perf.shift();
+    if (perf.length === 90 && !A.lowFx) { const avg = perf.reduce((a, b) => a + b, 0) / 90; if (avg > 0.026) { A.lowFx = true; try { localStorage.setItem('pr-lowfx', '1'); } catch (e) { /* ignore */ } } }
     const race = R.race;
     if (!R.paused) {
       input.hold = !!(keys.vine || pointerVine);
@@ -501,6 +513,11 @@
             if (ev.t === 'vine') SFX.vine(); else if (ev.t === 'clean') SFX.clean(); else if (ev.t === 'boost') SFX.boost();
             else if (ev.t === 'fruit') SFX.fruit(); else if (ev.t === 'splash') SFX.splash(); else if (ev.t === 'fall') SFX.fall();
             else if (ev.t === 'finish') SFX.finish();
+            else if (ev.t === 'trick') { SFX.trick(ev.combo); pop(ev.combo > 1 ? 'Flip! ×' + ev.combo : 'Flip!', '#a8f0ff'); }
+            else if (ev.t === 'botch') { SFX.fall(); pop('Botched!', '#ff9a8a'); }
+            else if (ev.t === 'snap') { SFX.snap(); pop('Snap!', '#ffc890'); }
+            else if (ev.t === 'clean') pop('Clean!', '#fff3a0', true);
+            else if (ev.t === 'bump') SFX.bump();
           }
         });
         u.events.length = 0;
@@ -518,6 +535,13 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     A.draw(ctx, W, H, race, R.focus, now / 1000, { aim: R.kind !== 'watch', ghost: R.kind === 'trial' ? R.ghost : null });
     hud(race, now / 1000);
+  }
+  /* little words that pop up over the race */
+  function pop(text, col, small) {
+    if (!R || R.kind === 'watch') return;
+    const p = el('div', { cls: 'pop' + (small ? ' small' : ''), text });
+    p.style.color = col; $('hud').appendChild(p);
+    setTimeout(() => p.remove(), 1100);
   }
   function hud(race, now) {
     const st = PR.standings(race), f = R.focus;
@@ -542,7 +566,8 @@
     else if (f.finished) msg = place(f.place || pos) + '!';
     const m = $('hudMsg'); m.textContent = msg; m.classList.toggle('hidden', !msg);
     const tip = $('hudTip');
-    if (R.kind !== 'watch' && race.t >= 0 && race.t < 6 && D.races < 3) { tip.classList.remove('hidden'); tip.textContent = touchy ? 'Hold anywhere to catch a branch, let go to fly.' : 'Hold Space (or the mouse) to catch a branch, let go to fly. Shift to boost.'; }
+    $('draft').classList.toggle('hidden', !f.draft || R.kind === 'watch');
+    if (R.kind !== 'watch' && race.t >= 0 && race.t < 7 && D.races < 4) { tip.classList.remove('hidden'); tip.textContent = touchy ? 'Hold anywhere to catch a branch, let go to fly. ↻ flips in the air.' : 'Hold Space to catch a branch, let go to fly. ↓ flips in the air, Shift boosts.'; }
     else tip.classList.add('hidden');
   }
 

@@ -88,11 +88,11 @@
        (the anchors a vine can catch). A tall tree stands at each edge
        of a gap and leans over it, so every gap can be swung. */
     const tall = track.tall;
-    function addTree(x, H, lean) {
+    function addTree(x, H, lean, edge) {
       const base = course.groundAt(x);
       if (base == null) return;
       const top = base - H;
-      const tree = { x, base, top, H, lean: lean || 0, kind: track.theme, seed: r() };
+      const tree = { x, base, top, H, lean: lean || 0, kind: track.theme, seed: r(), edge: !!edge };
       course.trees.push(tree);
       const tips = 2 + (r() < 0.5 ? 1 : 0);
       for (let k = 0; k < tips; k++) {
@@ -122,8 +122,8 @@
       const g = course.gaps.find(gg => x > gg.x0 - 100 && x < gg.x1 + 100);
       if (g) {
         /* the two edge trees lean over the gap */
-        addTree(g.x0 - 50, tall[1] + 20, 50);
-        addTree(g.x1 + 50, tall[1] + 20, -50);
+        addTree(g.x0 - 50, tall[1] + 20, 50, true);
+        addTree(g.x1 + 50, tall[1] + 20, -50, true);
         /* a wide gap gets a hanging root in the middle to catch */
         if (g.x1 - g.x0 > 300) course.anchors.push({ x: (g.x0 + g.x1) / 2, y: course.surface((g.x0 + g.x1) / 2) - tall[0] - 40, tree: -1, root: true });
         x = g.x1 + 50 + track.trees[0] * (0.7 + r() * 0.4);
@@ -133,6 +133,10 @@
       x += track.trees[0] + r() * (track.trees[1] - track.trees[0]);
     }
     course.anchors.sort((a, b) => a.x - b.x);
+    /* some branches are dead and brittle: grey, cracked, and they snap if you hang on too long.
+       Never the trees at a gap's edge, never the hanging roots. */
+    course.anchors.forEach(a => { if (a.tree >= 0 && !course.trees[a.tree].edge && r() < (track.brittle != null ? track.brittle : 0.13)) a.brittle = true; });
+    course.now = 0;
 
     /* Ju fruit hang in the air between trees */
     for (let i = 0; i < track.fruit; i++) {
@@ -165,13 +169,13 @@
       mode: 'ground', anchor: null, len: 0, swingT: 0, boost: 0.3, boostT: 0, stumble: 0, climb: 0, swimT: 0,
       finished: false, time: 0, place: 0, fruit: {}, clean: 0, falls: 0, swings: 0, best: 0,
       wantVine: false, think: 0, target: 0.6, events: [], trail: [],
-      spin: 0, face: 1,
+      spin: 0, face: 1, flipT: 0, flipA: 0, flips: 0, combo: 0, bestCombo: 0, draft: false, bumps: 0, snaps: 0,
     };
   };
 
   /* the best branch tip for a vine, or null */
   PR.pickAnchor = function (course, u) {
-    const reach = u.d.reach;
+    const reach = u.d.reach * (course.mood && course.mood.weather === 'rain' ? 0.92 : 1);   // wet bark is hard to catch
     const A = course.anchors;
     let best = null, bestS = -1e9;
     /* the anchors are sorted by x: look only near this Punk */
@@ -185,8 +189,9 @@
       const dist = Math.hypot(dx, dy);
       if (dist > reach || dist < 70) continue;
       if (u.anchor === a) continue;
-      /* forward and well up, about three quarters of the reach away */
-      const s = dx * 1.2 + dy * 0.35 - Math.abs(dist - reach * 0.78) * 0.6;
+      if (a.brokenUntil && a.brokenUntil > course.now) continue;   // snapped off, not grown back yet
+      /* forward and well up, about three quarters of the reach away; sound wood before brittle */
+      const s = dx * 1.2 + dy * 0.35 - Math.abs(dist - reach * 0.78) * 0.6 - (a.brittle ? 45 : 0);
       if (s > bestS) { bestS = s; best = a; }
     }
     return best;
@@ -199,6 +204,7 @@
     const under = course.surface(a.x);
     u.lenTarget = Math.max(60, Math.min(u.len, under - R - a.y - 14));
     u.mode = 'swing'; u.swingT = 0; u.swings++;
+    if (u.flipT > 0) { u.flipT = 0; u.flipA = 0; u.combo = 0; }   // caught a branch mid-flip: the flip is lost
     u.events.push({ t: 'vine', x: a.x, y: a.y });
   }
   function release(u) {
@@ -225,8 +231,10 @@
   }
 
   /* one fixed step for one runner. input: { hold, jump, boost } (edges for jump/boost) */
+  PR.FLIP_T = 0.5;
   PR.stepRunner = function (course, u, input, t) {
     const dt = STEP, d = u.d;
+    const mood = course.mood || {};
     if (u.finished) {
       /* coast past the line */
       u.vx *= 0.985; u.x += u.vx * dt;
@@ -250,6 +258,17 @@
     if (!input.hold && u.mode === 'swing') release(u);
     u.heldLast = !!input.hold;
     if (input.boost) doBoost(u);
+    /* a flip in the air: finish it before you land and the boost fills; land mid-flip and you tumble */
+    if (input.trick && u.mode === 'air' && u.flipT <= 0) { u.flipT = PR.FLIP_T; u.events.push({ t: 'flipstart', x: u.x, y: u.y }); }
+    if (u.flipT > 0) {
+      u.flipT -= dt;
+      u.flipA = (1 - Math.max(0, u.flipT) / PR.FLIP_T) * Math.PI * 2;
+      if (u.flipT <= 0) {
+        u.flipT = 0; u.flipA = 0; u.flips++; u.combo++; u.bestCombo = Math.max(u.bestCombo, u.combo);
+        u.boost = Math.min(1, u.boost + 0.1 + Math.min(4, u.combo) * 0.03);
+        u.events.push({ t: 'trick', x: u.x, y: u.y, combo: u.combo });
+      }
+    }
 
     const zone = course.zoneAt(u.x);
     const slow = zone && (zone.kind === 'thorns' || zone.kind === 'venom');
@@ -258,7 +277,7 @@
       const s = course.groundAt(u.x);
       if (s == null) { u.mode = 'air'; }
       else {
-        let target = d.run * (slow ? (zone.kind === 'venom' ? 0.42 : 0.55) : 1) * (u.stumble > 0 ? 0.5 : 1);
+        let target = d.run * (slow ? (zone.kind === 'venom' ? 0.42 : 0.55) : 1) * (u.stumble > 0 ? 0.5 : 1) * (mood.weather === 'rain' ? 0.95 : 1) * (u.draft ? 1.06 : 1);
         const acc = u.vx < target ? 520 : 900;
         u.vx += clamp(target - u.vx, -acc * dt, acc * dt);
         /* downhill helps a little, uphill costs a little */
@@ -280,7 +299,9 @@
       u.vy += G * dt;
       if (u.boostT > 0) { u.vx += d.boost * 2.2 * dt; u.vy -= 300 * dt; }
       if (u.mode === 'air') {
-        u.vx *= 1 - d.drag * dt;
+        u.vx *= 1 - d.drag * (u.draft ? 0.45 : 1) * dt;
+        if (u.draft) u.vx += 70 * dt;
+        if (mood.wind) u.vx += mood.wind * dt;
         /* past a Punk's top speed the air holds it back hard */
         const sp = Math.hypot(u.vx, u.vy), top = 640 + u.stats.speed * 22;
         if (sp > top) { const k = 1 - Math.min(0.5, (sp - top) / sp * 2.2 * dt); u.vx *= k; u.vy *= k; }
@@ -294,6 +315,12 @@
         if (low > 0.2) { const p = d.pump * low * Math.sign(vt || 1); u.vx += tx * p * dt; u.vy += ty * p * dt; }
         u.swingT += dt;
         u.vx *= 1 - 0.02 * dt;
+        if (a.brittle && u.swingT > 0.75) {
+          /* the dead branch snaps */
+          a.brokenUntil = t + 6; u.snaps++;
+          u.events.push({ t: 'snap', x: a.x, y: a.y });
+          u.mode = 'air'; u.anchor = null;
+        }
         if (u.len > u.lenTarget) u.len = Math.max(u.lenTarget, u.len - 420 * dt);
       }
       /* geysers throw you up */
@@ -326,8 +353,10 @@
           if (u.vy > 0) u.vy = 0;
           if (u.vx < d.run) u.vx += Math.min(d.run - u.vx, 520 * dt);
         } else {
-          if (u.vy > 1000) { u.stumble = 0.4; u.vx *= 0.7; u.events.push({ t: 'thud', x: u.x, y: u.y + R }); }
+          if (u.flipT > 0) { u.flipT = 0; u.flipA = 0; u.combo = 0; u.stumble = 0.6; u.vx *= 0.6; u.events.push({ t: 'botch', x: u.x, y: u.y + R }); }
+          else if (u.vy > 1000) { u.stumble = 0.4; u.vx *= 0.7; u.events.push({ t: 'thud', x: u.x, y: u.y + R }); }
           else u.events.push({ t: 'land', x: u.x, y: u.y + R });
+          u.combo = 0;
           u.vy = 0; u.mode = 'ground';
         }
       }
@@ -336,7 +365,7 @@
       if (g) {
         const surf = Math.max(course.surface(g.x0), course.surface(g.x1));
         if (g.kind === 'water' && u.y > surf + 30 - R && u.mode !== 'swing') {
-          u.mode = 'swim'; u.vy *= 0.2; u.vx *= 0.5; u.swimT = 0; u.events.push({ t: 'splash', x: u.x, y: surf + 30 });
+          u.mode = 'swim'; u.vy *= 0.2; u.vx *= 0.5; u.swimT = 0; u.flipT = 0; u.flipA = 0; u.combo = 0; u.events.push({ t: 'splash', x: u.x, y: surf + 30 });
         } else if (g.kind === 'chasm' && u.y > surf + 260) {
           /* fell: a slow climb out, up the far side */
           u.falls++; u.x = g.x1 + 40; u.y = course.surface(u.x) - R; u.vx = 0; u.vy = 0;
@@ -392,6 +421,8 @@
       if (u.swingT > 2.6 + sk) u.wantVine = false;
       /* a slow swing that will not get past the anchor: let go early */
       if (!past && u.swingT > 1.2 && Math.hypot(u.vx, u.vy) < 120) u.wantVine = false;
+      /* off a brittle branch before it goes */
+      if (a.brittle && u.swingT > 0.5 + sk * 0.15) u.wantVine = false;
     } else if (u.think <= 0) {
       const a = PR.pickAnchor(course, u);
       const descending = u.mode !== 'air' || u.vy > -60;
@@ -410,14 +441,46 @@
     }
     if (u.mode === 'swim') inp.jump = Math.random() < 0.01 + sk * 0.02;
     if (u.boost >= 0.999 && (u.mode === 'air' || u.mode === 'ground') && Math.random() < 0.004 + sk * 0.01) inp.boost = true;
+    /* a flip, when there is height and time for one (good riders judge it; poor ones sometimes botch) */
+    if (u.mode === 'air' && u.flipT <= 0 && u.vy < -120) {
+      const h = course.surface(u.x) - u.y;
+      const timeUp = (-u.vy + Math.sqrt(u.vy * u.vy + 2 * 1500 * Math.max(0, h - 30))) / 1500;   // until it lands
+      const wants = (u.style === 'reckless' ? 0.05 : u.style === 'clean' ? 0.03 : 0.015) * (0.4 + sk);
+      if (timeUp > PR.FLIP_T + 0.25 - (1 - sk) * 0.35 && Math.random() < wants) { inp.trick = true; u.wantVine = false; }
+    }
+    /* don't grab a branch halfway round */
+    if (u.flipT > 0 && u.flipT > PR.FLIP_T * 0.1) u.wantVine = false;
     inp.hold = u.wantVine;
     return inp;
   };
 
   /* ================= a whole race ================= */
+  /* the time of day and the weather for a race (from its seed) */
+  PR.MOODS = {
+    farm: [['day', 'clear', 4], ['dawn', 'clear', 2], ['dusk', 'clear', 2], ['day', 'rain', 1], ['day', 'wind', 1], ['night', 'clear', 1]],
+    forest: [['day', 'clear', 3], ['dusk', 'clear', 2], ['day', 'rain', 2], ['dawn', 'clear', 1], ['night', 'clear', 1], ['day', 'wind', 1]],
+    river: [['day', 'clear', 3], ['dawn', 'clear', 2], ['day', 'rain', 2], ['dusk', 'clear', 1], ['night', 'clear', 1]],
+    mist: [['day', 'clear', 2], ['dawn', 'clear', 2], ['dusk', 'clear', 1], ['day', 'rain', 1], ['night', 'clear', 1]],
+    spires: [['day', 'clear', 3], ['dusk', 'clear', 2], ['day', 'wind', 2], ['dawn', 'clear', 1], ['night', 'clear', 1]],
+    ash: [['dusk', 'clear', 3], ['night', 'clear', 3], ['day', 'clear', 1], ['day', 'wind', 1]],
+    jungle: [['day', 'rain', 3], ['day', 'clear', 2], ['dusk', 'clear', 2], ['night', 'clear', 2]],
+    fair: [['day', 'clear', 4], ['dusk', 'clear', 3], ['night', 'clear', 2], ['day', 'wind', 1]],
+  };
+  PR.pickMood = function (track, seed) {
+    const r = rng(seed >>> 0 || 1);
+    const list = PR.MOODS[track.theme] || PR.MOODS.farm;
+    let tot = 0; list.forEach(m => { tot += m[2]; });
+    let k = r() * tot, m = list[0];
+    for (let i = 0; i < list.length; i++) { k -= list[i][2]; if (k <= 0) { m = list[i]; break; } }
+    const mood = { time: m[0], weather: m[1], wind: 0 };
+    if (mood.weather === 'wind') mood.wind = (r() < 0.5 ? -1 : 1) * (60 + r() * 50);   // a headwind or a tailwind
+    return mood;
+  };
+
   PR.makeRace = function (track, entrants, opts) {
     opts = opts || {};
     const course = PR.makeCourse(track);
+    course.mood = opts.mood || (opts.seed != null ? PR.pickMood(track, opts.seed) : { time: 'day', weather: 'clear', wind: 0 });
     const runners = entrants.map((e, i) => PR.makeRunner(course, Object.assign({ lane: i }, e)));
     return { track, course, runners, t: -3, step: 0, done: false, order: [], ghost: opts.ghost || null, record: [], acc: 0, finishedAt: 0 };
   };
@@ -428,13 +491,40 @@
     while (race.acc >= STEP) {
       race.acc -= STEP;
       if (race.t < 0) { race.t += STEP; continue; }
+      race.course.now = race.t;
+      /* slipstream: tucked in close behind another Punk, the air is kinder */
+      race.runners.forEach(u => {
+        u.draft = false;
+        if (u.finished || u.mode === 'swim' || u.climb > 0) return;
+        for (let i = 0; i < race.runners.length; i++) {
+          const o = race.runners[i]; if (o === u || o.finished) continue;
+          const dx = o.x - u.x, dy = o.y - u.y;
+          if (dx > 40 && dx < 190 && Math.abs(dy) < 70) { u.draft = true; break; }
+        }
+      });
       race.runners.forEach(u => {
         const inp = u.ai ? PR.aiInput(race.course, u, race.t) : (playerInput || { hold: false });
         PR.stepRunner(race.course, u, inp, race.t);
         if (inp.jump && !u.ai && playerInput) playerInput.jump = false;
         if (inp.boost && !u.ai && playerInput) playerInput.boost = false;
+        if (inp.trick && !u.ai && playerInput) playerInput.trick = false;
         if (u.finished && race.order.indexOf(u) < 0) { race.order.push(u); u.place = race.order.length; }
       });
+      /* Punks bump into each other */
+      for (let i = 0; i < race.runners.length; i++) for (let j = i + 1; j < race.runners.length; j++) {
+        const a = race.runners[i], b = race.runners[j];
+        if (a.finished || b.finished || a.climb > 0 || b.climb > 0) continue;
+        const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+        if (d > R * 1.9 || d < 0.01) continue;
+        const nx = dx / d, ny = dy / d, push = (R * 1.9 - d) / 2;
+        a.x -= nx * push; a.y -= ny * push; b.x += nx * push; b.y += ny * push;
+        const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+        if (rel < 0) {
+          const k = -rel * 0.55;
+          a.vx -= nx * k; a.vy -= ny * k; b.vx += nx * k; b.vy += ny * k;
+          if (-rel > 120) { a.bumps++; b.bumps++; a.events.push({ t: 'bump', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }); }
+        }
+      }
       if (race.step % 6 === 0) {
         const me = race.runners.find(u => !u.ai);
         if (me && !me.finished) race.record.push(Math.round(me.x), Math.round(me.y));
@@ -463,7 +553,7 @@
 
   /* run a whole race with nobody steering (for watched races and tests) */
   PR.simulate = function (track, entrants, maxT) {
-    const race = PR.makeRace(track, entrants.map(e => Object.assign({}, e, { ai: true })));
+    const race = PR.makeRace(track, entrants.map(e => Object.assign({}, e, { ai: true })), { mood: { time: 'day', weather: 'clear', wind: 0 } });
     const end = maxT || 240;
     while (!race.done && race.t < end) PR.tick(race, 0.1);
     if (!race.done) PR.settle(race);

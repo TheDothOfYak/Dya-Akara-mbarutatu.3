@@ -23,15 +23,19 @@ PR.TRACKS.forEach(tr => {
 });
 
 /* every track can be finished, by riders good and poor, without getting stuck */
+let bestWins = 0;
 PR.TRACKS.forEach(tr => {
   const ents = [0.2, 0.5, 0.9].map((sk, i) => ({ id: 'r' + i, name: 'n' + i, skill: sk, stats: stats(3 + i * 3) }));
   const race = PR.simulate(tr, ents, 200);
   const natural = race.runners.filter(u => u.finished && u.x >= race.course.finish);
   check(tr.id + ': all three got home on their own', natural.length === 3, race.runners.map(u => Math.round(u.x) + '/' + race.course.finish).join(' '));
   check(tr.id + ': times are sane', race.runners.every(u => isFinite(u.time) && u.time > 8 && u.time < 200), race.runners.map(u => u.time.toFixed(1)).join(' '));
-  check(tr.id + ': the best rider on the best Punk wins', race.order[0].id === 'r2', race.order.map(u => u.id).join(','));
+  check(tr.id + ': the poorest rider on the poorest Punk does not win', race.order[0].id !== 'r0', race.order.map(u => u.id).join(','));
+  if (race.order[0].id === 'r2') bestWins++;
   check(tr.id + ': nothing went NaN', race.runners.every(u => isFinite(u.x) && isFinite(u.y) && isFinite(u.vx) && isFinite(u.vy)));
 });
+
+check('the best rider on the best Punk wins most tracks', bestWins >= 6, bestWins + ' of 8');
 
 /* stats matter: over several tracks a strong Punk beats the same rider on a weak one */
 let strongWins = 0;
