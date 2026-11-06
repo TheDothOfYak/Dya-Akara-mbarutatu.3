@@ -2,6 +2,18 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## Weather magic (the fuzzy's V)
+- **Five weathers.** Tap **V** (**Power** on a touch screen) to call your weather where you aim. **Hold V** to open the weather wheel: point at a weather (or tap left and right) and let go to pick it.
+  - **Gust:** shoves monsters off ledges or into water, stops their charges, blows their shots away, and pushes your own clouds where you want them. It blows harder with the wind at your back.
+  - **Rain:** soaks monsters (wet monsters are slower and stop burning) and slowly heals you while you stand under it.
+  - **Storm:** lightning barely hurts dry monsters, but wet ones take 2.5x and it jumps from wet monster to wet monster. Monsters kept under it get soaked after a while. If you're wet and stand under your own storm, it can strike you too.
+  - **Whirlwind** (Whirlwind rune): sucks monsters in, lifts the light ones and drops them hard. Rain or a storm over it soaks or strikes everything inside at once.
+  - **Hail** (Squall rune): chills monsters; wet ones freeze solid. Frozen monsters can't move or hurt you, and your next hit shatters the ice for double damage.
+- **Each weather has its own cooldown**, so the fun is combining them: rain then storm, rain then hail, a storm over a whirlwind.
+- **The land feeds the clouds.** Over water, rain and storms last longer. Over snow, hail freezes even dry monsters. Over hot sand, rain dries up fast but lightning hits harder. Clouds drift with the wind.
+- **Runes make it stronger.** Every fuzzy rune adds a little power. Tempest makes weather last longer, Cyclone lets the whirlwind lift heavy monsters, and Thunderhead makes lightning jump further and to more monsters.
+- Code: `v2s19.js`.
+
 ## Phones and tablets
 - **Play on a phone or tablet.** On a touch screen the game shows its own controls: a joystick on the left (push it all the way to run), Jump, Hit, Use, Cast, Spell, Talk, Torch, Drop and Power (hero magic) on the right, and touch and hold anywhere in the world to swing, mine, chop or place a block right there. In the bag, tap to pick up and put down, and hold an item to eat or wear it. The HUD gets smaller and Chat gets a button. With a mouse and keyboard nothing changes. Code: `js/flake/fbw_touch.js`.
 - **More for phones.** Double-tap a spot to use or cast on it (the right-click: fishing, pets, chests, beds). Settings has a Touch controls section: button size, see-through buttons, left-handed (joystick on the right) and a buzz on each press. Hints say which button to tap instead of which key to press, Controls lists the touch controls, the screen stays on while you play, and the game can go full screen from a phone's home screen.
