@@ -2,6 +2,22 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## Tanglehold, the jungle village
+- **A new village in the Tanglewood Jungle** on Fuzzy World, on the way from the Tall Peaks to Gnarlroot's Hollow. Monsters don't come into it.
+- **The Word Temple:** a stepped temple with an old swirling door on top and the sages' library inside.
+- **Who lives there:** Chief Tassel and the four slinger tribes (Bandfur, Glyphfur, Spiralfur and Zigfur, each with fur painted in their own design), the four sages (Water, Fire, Leaf and Wind), and Scout Quickfoot of the light cavalry on his ridgeback lizard.
+- **Stilt huts** with ladders, a rope bridge, a lizard pen, and a warm mud pool under the west hut that heals you while you sit in it.
+- **The Strangler:** a giant tree west of the village with a rope to climb and platforms in its canopy.
+- **Old ruins** with a carving between the village and Gnarlroot's Hollow.
+- **Two quests:** Chief Tassel wants 6 Warthog Hides (a slingshot, 40 coins and a key fragment). Old Puddle the Water Sage lost a page of the Book of Wind at the top of the Strangler (50 coins and a Recipe Square).
+- **A secret:** once the page is home, each sage tells you one word. Find out what to do with them.
+
+## Fighting takes thinking
+- **Back hits:** a monster facing away from you takes 1.5x damage from your melee hits. Most beasts turn slowly, so circling, jumping over and baiting a charge pays off.
+- **Dazing:** every melee hit wears down a monster's balance (a little bar shows how close it is). When it breaks, the monster is dazed for a moment: it can't move or hurt you and takes 1.3x damage. Back hits wear it down twice as fast. Balance comes back if you stop hitting, and a monster can't be dazed again for 3 seconds after. Bosses never stop moving, but they stagger and take 1.25x damage for a moment.
+- **Bumps come in beats:** after a monster bumps into you, that same monster can't bump you again for just under a second. A crowd is still dangerous; one touch isn't a death sentence.
+- Code: `v2s20.js` (Tanglehold) and `v2s21.js` (fighting).
+
 ## Weather magic (the fuzzy's V)
 - **Five weathers.** Tap **V** (**Power** on a touch screen) to call your weather where you aim. **Hold V** to open the weather wheel: point at a weather (or tap left and right) and let go to pick it.
   - **Gust:** shoves monsters off ledges or into water, stops their charges, blows their shots away, and pushes your own clouds where you want them. It blows harder with the wind at your back.
