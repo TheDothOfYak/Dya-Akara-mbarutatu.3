@@ -200,7 +200,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   await F.saveHubConfig(hub2);
   check('the admin’s order is used, unnamed games go last', F.orderOf(F.hubConfig(), 'main').join(',') === '4bw,game,rpg,su');
   check('a hidden game is left out, coming-soon goes after', ids(F.shown(F.hubConfig(), 'main')) === '4bw,game,su,soon_x');
-  check('a coming-soon mini game shows with the mini games', ids(F.shown(F.hubConfig(), 'mini')) === 'ld,soon_m');
+  check('a coming-soon mini game shows with the mini games', ids(F.shown(F.hubConfig(), 'mini')) === 'ld,pr,sp,soon_m');
   check('a coming-soon slot has no link to play', F.shown(F.hubConfig(), 'main')[3].soon === true && !F.shown(F.hubConfig(), 'main')[3].href);
   await F.savePreview('rpg', 'data:image/jpeg;base64,AAAA');
   check('an uploaded preview reads back', (await F.fetchPreview('rpg')) === 'data:image/jpeg;base64,AAAA');
@@ -238,12 +238,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   check('the admin can rename a player', db.dya_accounts.find(x => x.id === newId).data.displayName === 'Renamed');
 
   /* delete: the account and every game's saves go */
-  db.dya_config.push({ key: 'rpg_save:' + newId, value: { v: 5 } }, { key: 'fbw:' + newId + ':rw_save_rock', value: '{}' }, { key: 'fbw:' + newId + ':~stamp', value: 'x' }, { key: 'rpg_save:someone_else', value: {} });
+  db.dya_config.push({ key: 'rpg_save:' + newId, value: { v: 5 } }, { key: 'fbw:' + newId + ':rw_save_rock', value: '{}' }, { key: 'fbw:' + newId + ':~stamp', value: 'x' }, { key: 'mini:pr:' + newId, value: { coins: 5 } }, { key: 'mini:sp:' + newId, value: { coins: 5 } }, { key: 'rpg_save:someone_else', value: {} }, { key: 'mini:pr:someone_else', value: {} });
   check('deleting needs your password', !!(await F.deleteAccount('wrong')).err && db.dya_accounts.some(x => x.id === newId));
   const del = await F.deleteAccount('fromadmin');
   check('you can delete your account', del.ok && !db.dya_accounts.some(x => x.id === newId));
   check('…with every game’s saves', !db.dya_config.some(x => x.key.indexOf(newId) >= 0));
-  check('…and nobody else’s', db.dya_config.some(x => x.key === 'rpg_save:someone_else'));
+  check('…and nobody else’s', db.dya_config.some(x => x.key === 'rpg_save:someone_else') && db.dya_config.some(x => x.key === 'mini:pr:someone_else'));
   check('…and you are signed out', F.session() === null);
 
   /* the Admin Panel's own password */

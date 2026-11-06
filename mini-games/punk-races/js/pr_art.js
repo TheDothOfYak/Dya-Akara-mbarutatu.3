@@ -72,7 +72,7 @@
     const c = race.course, cam = A.camera;
     /* the camera leads the Punk a little, and pulls back with speed */
     const sp = Math.hypot(focus.vx, focus.vy);
-    const zBase = Math.min(W / 1500, H / 760) * 1.05;
+    const zBase = Math.min(Math.max(W / 1500, W / 1100), H / 760) * 1.05;   // a phone held upright sees a little less ahead, bigger
     const zT = zBase * (1 - Math.min(0.22, sp / 5200));
     cam.z += (zT - cam.z) * 0.04;
     const lead = Math.max(-80, Math.min(260, focus.vx * 0.32));
@@ -80,7 +80,7 @@
     const yT = Math.min(focus.y, c.surface(focus.x) - 120) - 40;
     cam.y += (yT - cam.y) * 0.08;
     const z = cam.z;
-    const ox = W * 0.38 - cam.x * z, oy = H * 0.58 - cam.y * z;
+    const ox = W * 0.38 - cam.x * z, oy = H * (H > W ? 0.66 : 0.58) - cam.y * z;
     const SX = x => x * z + ox, SY = y => y * z + oy;
 
     /* sky */
