@@ -2,6 +2,15 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## New creatures, and Tanglehold fights back
+- **Ridgebacks** run wild in the Tanglewood and Tuftwood Forest: the light cavalry's lizards. Quick, and they charge in a straight line, so step aside and hit their backs.
+- **Shellbacks** roam the Tanglewood: the heavy cavalry's turtles. Hits from the front glance off the shell (a quarter of the damage, and it braces). Get behind one, or jump over it, and hit its back.
+- **Centipede bats** in the caves of Fuzzy and Acorn World: the **Skitterwing** (common), the **Broodwing** (deeper and rarer; its bite poisons you) and the **Gloomwing Matriarch** (deepest caves, very rare; she calls Skitterwings to her side).
+- **Captain Shellbrace**, the heavy cavalry's turtle rider, now guards Tanglehold's east gate.
+- **Tanglehold fights back:** when a monster comes into the village, the slingers throw stones at it and the sages tear words out of their books. Old Puddle's ball of water soaks it, Ember's fireball sets it alight, Sprig's thorn vine holds it in place and Gale's gust blows it back.
+- New drops: Ridgeback Scale, Shell Plate and Brood Venom.
+- Code: `v2s22.js`.
+
 ## Tanglehold, the jungle village
 - **A new village in the Tanglewood Jungle** on Fuzzy World, on the way from the Tall Peaks to Gnarlroot's Hollow. Monsters don't come into it.
 - **The Word Temple:** a stepped temple with an old swirling door on top and the sages' library inside.
