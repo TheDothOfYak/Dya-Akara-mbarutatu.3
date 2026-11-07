@@ -2,6 +2,19 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## Caves, lava, clams, weather and rupees
+- **Custom caves in Fuzzy World.** Every part of the world has its own caves, with its own rock and walls: the **Sandstone Galleries** under the desert (long banded halls on three levels with arched roofs, fossils in the rock), the **Root Hollows** under Tuftwood and the Deep Tanglewood (round earthy chambers with roots hanging from the roof that you can climb, and mushrooms), the **Magma Halls** under the Tall Peaks (a great hall of basalt columns, lavafalls pouring into a lava lake, stepping stones across it and a chest on the far ledge), the **Flooded Grottos** under the Tanglewood (half-drowned chambers, blue and green crystals, glowing lichen) and **Crystal Geodes** deep down (hollow agate shells lined with amethyst and crystals). Stalactites and stalagmites everywhere.
+- **No more straight holes down.** Caves are entered by sloping, switchbacking passages you can walk down.
+- **Lava flows.** Dig next to lava and it creeps out, pours off ledges and spreads (slower than water). It burns plants in its way. Where it meets water it hardens into glowing **Cooling Crust**, hot to stand on, which goes dark as basalt after a while. Lava looks molten now, with dark crust plates drifting on it and bubbles popping on top.
+- **Clams** on the sea floor of both oceans: little **Snapclams** that clap their shells to shoot through the water and bite, and **Grand Clams** that spit bubble jets and slam shut. A shut shell turns your hit aside, so strike while they're open. They drop clams to eat and pearls.
+- **Weather**: clear skies, drifting clouds, rain showers, thunderstorms with lightning, morning fog, and snow up on the peaks. Everyone in a world sees the same weather.
+- **Sunrises and sunsets** paint the sky: warm glows round the low sun, clouds lit gold and pink from below.
+- **The wind** only blows hard high up. On the ground it hardly pushes you; leaves, petals, seeds, sand and snow blow along low over the ground instead.
+- **Trees stand on the ground** (their roots reach into it) instead of hovering a hair above it.
+- **Broodwings** are a little tougher.
+- **Rupees instead of coins**: green rupees are worth 1, blue 5, red 20. Bigger monsters drop more. (Your money carries over.)
+- Code: `v2s24.js` (caves, lava, clams) and `v2s25.js` (weather, sky, wind, rupees).
+
 ## A bigger, more beautiful Fuzzy World
 - **Fuzzy World is half again as wide.** Past Gnarlroot's Hollow the jungle goes on into the **Deep Tanglewood**: giant trees with real bark, moss and buttress roots, crowns of leaves you can climb into along thick limbs, lianas to climb, ferns, jungle flowers and glowing mushrooms. Everything you've built in Fuzzy World stays exactly where it was.
 - **The waterfall and the Woolly Highlands:** at the end of the Deep Tanglewood a stream pours off a cliff into a pool. Climb the vines up the cliff to the Highlands, flat grassland where herds of **Curlmanes** graze. When one paws the ground, the whole herd charges in a straight line. Step aside and hit them as they thunder past.

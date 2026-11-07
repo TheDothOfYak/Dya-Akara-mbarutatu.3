@@ -30,10 +30,13 @@ Read this first. It says where everything lives, so a change doesn't need the wh
   NPC spots in `meta.jv.npcs`), ruins at 648, Gnarlroot's Hollow (boss grove) 664–744.
 - **748–1147 is new (v2s23):** Deep Tanglewood 748–979 (giant trees, Ridgeback Run home-tree + Herder Bramble at ~818, jungle scorpion den at 898),
   cliff + waterfall at ~984, Woolly Highlands 984–1120 (Curlmanes), slope down to the old jungle edge (old 748–764 → 1148–1164), then the eastern ocean.
-- Zones: 'deepjungle', 'highlands', 'den' (v2s23), 'jvillage' (v2s20), plus the base ones.
+- Zones: 'galleries', 'roothollow', 'magmahall', 'grotto', 'geode' (v2s24, only where the base zone is caves/deep), 'deepjungle', 'highlands', 'den' (v2s23), 'jvillage' (v2s20), plus the base ones.
+- Caves (v2s24): Galleries 34–142, Root Hollows 236–404 and 762–972, Magma Halls 418–544 (hall at x 482), Grottos 556–744, geodes at y 220–290. The base cave mouths (straight shafts) are switched off; each region has a sloping entrance.
 - Saves: block changes are stored by OLD index (800-wide); new land gets indexes from 256000 up (`toStore`/`fromStore` in v2s23). Keep this if the world changes again.
 
 ## What each module does (newest first)
+- v2s25: weather (`RW.v2weather`, `RW.v2setWeather(kind)` for testing), sunrise/sunset colours (hooks `RW.game.sky` on the first frame), clouds, rain/snow/fog/lightning, wind only strong high up (`E.move` wrap) and ground motes, tree root feet (`WD.drawTiles` wrap), Broodwing stats, rupees (`rupee_g/b/r` drops convert to 'coin' on pickup; page text says rupees).
+- v2s24: themed caves (`customCaves`, zones galleries/roothollow/magmahall/grotto/geode in `meta.v2caves`), cave rock + painted walls, hanging roots/stalactites/lichen, flowing lava + Cooling Crust (`WD.flowWater` wrap), lavafalls (`meta.v2lavafalls`), clams (`meta.v2clams` beds).
 - v2s23: wider Fuzzy World, Deep Tanglewood, giant trees (`giantTree`), home-trees (`homeTree`), dens (`den`), Mother Scorpion, Curlmanes, tame ridgebacks/shellbacks, fireflies/sunbeams/butterflies/far trees (`WD.drawHills`/`drawLight` wraps), waterfall, smoother ground (`seam`/`fillet`), everyday tree leaves and bark (outermost `A.drawDecor` wrap, replaces v2s9's flat squares, also draws v2s5's falling trees), restored slinger art (pixel data `SLING_OLD`).
 - v2s22: ridgeback/shellback/rider art and species, centipede bats, Captain Shellbrace, Tanglehold defenders.
 - v2s21: back hits, daze/poise, bump beats.
