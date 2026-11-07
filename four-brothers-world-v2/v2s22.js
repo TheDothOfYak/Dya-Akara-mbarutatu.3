@@ -182,48 +182,51 @@
   // A huge almond-shaped shell of hex plates, a crown of spikes on a big head, thick legs and a pointed
   // tail. The rider sits in a saddle on top, held on by straps that run down the shell.
   const TUR = { shell: '#8a7a44', shellHi: '#b8a866', shellDk: '#62542e', seam: '#3a3020', rim: '#56482a', rimHi: '#7a6a3e', skin: '#7a8a58', skinHi: '#a0b076', skinDk: '#55603c', skinDeep: '#3a4228', under: '#c4c092', nail: '#ece4cc', horn: '#ddd4b4', hornDk: '#a89e80', eye: '#ff9a2a' };
+  const TK = 1.6; // shellbacks are big: much bigger than ridgebacks
   function turtle(frame, rider) {
-    const W = 120, H = 84; const c = mk(W, H), g = c.ctx; const T = TUR;
+    const K = TK, k = (v) => v * K; // the turtle is drawn K times the size of its first sketch (the rider stays fuzzy-sized)
+    const W = Math.round(120 * K), H = Math.round(84 * K); const c = mk(W, H), g = c.ctx; const T = TUR;
     const walk = frame <= 3, charge = frame === 4, brace = frame === 5;
     const ph = walk ? (frame / 4) * Math.PI * 2 : 0;
     const bob = walk && frame % 2 ? -1 : 0;
-    const GY = 78, SX = 54, SW = 34, SH = 21, SB = 5, legLen = brace ? 1 : 11;
+    const GY = H - 6, SX = Math.round(k(54)), SW = k(34), SH = k(21), SB = k(5), legLen = brace ? 1 : k(11);
     const SY = GY - SB - legLen - 2 + bob; // the shell's widest line
     const sTop = (x) => { const u = (x - SX) / SW; return u * u >= 1 ? null : SY - SH * Math.pow(1 - u * u, 0.72); };
     const sBot = (x) => { const u = (x - SX) / SW; return u * u >= 1 ? null : SY + SB * Math.pow(1 - u * u, 0.9); };
     // --- legs: thick, scaly, three toenails ---
     const leg = (x, phase, far) => {
       const col = far ? T.skinDk : T.skin, hi = far ? T.skinDk : T.skinHi, dk = far ? T.skinDeep : T.skinDk;
-      if (brace) { const y = GY - 2; rect(g, x - 3, y, 8, 3, col); px(g, x - 3, y, hi); [0, 3, 6].forEach((k) => px(g, x - 3 + k, y + 2, T.nail)); return; }
-      const lift = walk ? Math.max(0, Math.sin(ph + phase)) * 2 : 0, step = walk ? Math.cos(ph + phase) * 1.5 : charge ? (phase ? 2 : -2) : 0;
-      const y0 = Math.round(sBot(x) - 4), y1 = GY - 2 - Math.round(lift);
+      if (brace) { const y = GY - 2; rect(g, x - 4, y, Math.round(k(8)), 3, col); px(g, x - 4, y, hi); [0, 3, 6, 9].forEach((q) => px(g, x - 4 + q, y + 2, T.nail)); return; }
+      const lift = walk ? Math.max(0, Math.sin(ph + phase)) * k(2) : 0, step = walk ? Math.cos(ph + phase) * k(1.5) : charge ? (phase ? k(2) : -k(2)) : 0;
+      const y0 = Math.round(sBot(x) - k(4)), y1 = GY - 2 - Math.round(lift);
       for (let y = y0; y <= y1; y++) {
-        const t = (y - y0) / Math.max(1, y1 - y0); const w = t < 0.3 ? 4 : t < 0.8 ? 3 : 4; const xs = Math.round(x + step * t);
+        const t = (y - y0) / Math.max(1, y1 - y0); const w = Math.round(t < 0.3 ? k(4) : t < 0.8 ? k(3) : k(4)); const xs = Math.round(x + step * t);
         rect(g, xs - w, y, w * 2 + 1, 1, col); px(g, xs - w, y, hi); px(g, xs + w, y, dk);
         if ((y + x) % 4 === 0 && t > 0.15 && t < 0.85) { px(g, xs - 1, y, dk); px(g, xs + 2, y + 1, dk); }
       }
-      const fx = Math.round(x + step); rect(g, fx - 4, y1 + 1, 9, 2, dk); rect(g, fx - 4, y1 + 1, 9, 1, col);
-      [0, 3, 6].forEach((k) => { px(g, fx - 3 + k, y1 + 2, T.nail); px(g, fx - 3 + k, y1 + 1, T.nail); });
+      const fx = Math.round(x + step), fw = Math.round(k(9)), f0 = fx - (fw >> 1); rect(g, f0, y1 + 1, fw, 2, dk); rect(g, f0, y1 + 1, fw, 1, col);
+      for (let q = 1; q < fw; q += 3) { px(g, f0 + q, y1 + 2, T.nail); px(g, f0 + q, y1 + 1, T.nail); }
     };
-    leg(SX - 12, Math.PI, true); leg(SX + 24, 0, true);
+    leg(Math.round(SX - k(12)), Math.PI, true); leg(Math.round(SX + k(24)), 0, true);
     // --- tail ---
-    const tw = walk ? Math.round(Math.sin(ph)) : 0;
-    poly(g, [[SX - SW + 6, SY - 3], [SX - SW + 6, SY + 3], [SX - SW - 9, SY + 3 + tw]], T.skin); line(g, SX - SW + 5, SY + 3, SX - SW - 8, SY + 3 + tw, T.skinDk); line(g, SX - SW + 4, SY - 1, SX - SW - 4, SY + 1 + tw, T.skinHi);
+    const tw = walk ? Math.round(Math.sin(ph) * K) : 0;
+    poly(g, [[SX - SW + k(6), SY - k(3)], [SX - SW + k(6), SY + k(3)], [SX - SW - k(9), SY + k(3) + tw]], T.skin); line(g, SX - SW + k(5), SY + k(3), SX - SW - k(8), SY + k(3) + tw, T.skinDk); line(g, SX - SW + k(4), SY - 1, SX - SW - k(4), SY + k(1) + tw, T.skinHi);
     // --- neck and head (the shell front covers where the neck goes in) ---
-    const hx = SX + SW + (brace ? 2 : charge ? 13 : 10), hy = SY - (brace ? 2 : charge ? 4 : 6) + (walk ? Math.round(Math.sin(ph * 2) * 0.6) : 0);
-    if (!brace) { poly(g, [[SX + SW - 10, SY - 7], [hx - 5, hy - 5], [hx - 5, hy + 5], [SX + SW - 10, SY + 4]], T.skin); line(g, SX + SW - 6, SY + 3, hx - 5, hy + 4, T.under); for (let k = 0; k < 3; k++) line(g, SX + SW - 3 + k * 3, SY - 5 + k * 0.5, SX + SW - 2 + k * 3, SY + 1 + k * 0.5, T.skinDk); }
+    const hx = Math.round(SX + SW + k(brace ? 2 : charge ? 13 : 10)), hy = Math.round(SY - k(brace ? 2 : charge ? 4 : 6) + (walk ? Math.round(Math.sin(ph * 2) * 0.6 * K) : 0));
+    if (!brace) { poly(g, [[SX + SW - k(10), SY - k(7)], [hx - k(5), hy - k(5)], [hx - k(5), hy + k(5)], [SX + SW - k(10), SY + k(4)]], T.skin); line(g, SX + SW - k(6), SY + k(3), hx - k(5), hy + k(4), T.under); for (let q = 0; q < 4; q++) line(g, SX + SW - k(3) + q * k(3), SY - k(5) + q * 0.5, SX + SW - k(2) + q * k(3), SY + k(1) + q * 0.5, T.skinDk); }
     // crown of spikes (from the sketch), drawn behind the head
-    [[-7, 4], [-4, 6], [-1, 7], [2, 6], [5, 4]].forEach(([dx, h]) => { for (let k = 0; k < h; k++) { const w = Math.max(0, Math.round((h - k) / 3)); for (let j = -w; j <= w; j++) px(g, hx + dx + j - Math.round(k * 0.5), hy - 4 - k, j <= 0 ? T.horn : T.hornDk); } });
-    for (let y = -6; y <= 5; y++) for (let x = -8; x <= 12; x++) {
-      const u = x / (x > 0 ? 12.5 : 8.5), v = y / (y < 0 ? 6 : 5); if (u * u + v * v > 1) continue;
+    [[-7, 4], [-4, 6], [-1, 7], [2, 6], [5, 4]].forEach(([dx, h0]) => { const h = Math.round(k(h0)); for (let q = 0; q < h; q++) { const w = Math.max(0, Math.round((h - q) / 3)); for (let j = -w; j <= w; j++) px(g, Math.round(hx + k(dx) + j - q * 0.5), Math.round(hy - k(4) - q), j <= 0 ? T.horn : T.hornDk); } });
+    for (let y = -Math.round(k(6)); y <= Math.round(k(5)); y++) for (let x = -Math.round(k(8)); x <= Math.round(k(12)); x++) {
+      const u = x / (x > 0 ? k(12.5) : k(8.5)), v = y / (y < 0 ? k(6) : k(5)); if (u * u + v * v > 1) continue;
       px(g, hx + x, hy + y, v < -0.5 ? T.skinHi : v > 0.55 ? T.under : (x + y) % 5 === 0 && v < 0.3 ? T.skinDk : T.skin);
     }
     // cheek spikes, brow, eye, nostril, mouth
-    [[-6, 2], [-3, 4]].forEach(([dx, dy]) => { line(g, hx + dx, hy + dy, hx + dx - 4, hy + dy + 2, T.horn); px(g, hx + dx - 4, hy + dy + 2, T.hornDk); });
-    line(g, hx, hy - 4, hx + 6, hy - 3, T.skinDeep); rect(g, hx + 2, hy - 3, 3, 3, '#1a120a'); px(g, hx + 3, hy - 2, T.eye); px(g, hx + 2, hy - 3, T.eye);
-    px(g, hx + 11, hy - 2, T.skinDeep); px(g, hx + 10, hy - 2, T.skinDeep);
-    if (charge) { poly(g, [[hx + 2, hy + 1], [hx + 13, hy - 1], [hx + 13, hy + 5], [hx + 3, hy + 4]], '#6a2228'); [5, 8, 11].forEach((x) => { px(g, hx + x, hy + 1, '#f0e8d8'); px(g, hx + x - 1, hy + 4, '#f0e8d8'); }); }
-    else { line(g, hx + 2, hy + 2, hx + 11, hy + 1, T.skinDeep); px(g, hx + 1, hy + 3, T.skinDeep); }
+    [[-6, 2], [-3, 4], [-9, 0]].forEach(([dx, dy]) => { const ax = Math.round(hx + k(dx)), ay = Math.round(hy + k(dy)); line(g, ax, ay, ax - Math.round(k(4)), ay + Math.round(k(2)), T.horn); px(g, ax - Math.round(k(4)), ay + Math.round(k(2)), T.hornDk); });
+    const ex = Math.round(hx + k(2.5)), ey = Math.round(hy - k(3));
+    line(g, hx, Math.round(hy - k(4)), Math.round(hx + k(6)), Math.round(hy - k(3.4)), T.skinDeep); rect(g, ex, ey, 4, 4, '#1a120a'); px(g, ex + 1, ey + 1, T.eye); px(g, ex + 2, ey + 1, T.eye); px(g, ex + 1, ey + 2, T.eye); px(g, ex + 2, ey, '#ffffff');
+    px(g, Math.round(hx + k(11)), Math.round(hy - k(2)), T.skinDeep); px(g, Math.round(hx + k(10.5)), Math.round(hy - k(2)), T.skinDeep);
+    if (charge) { poly(g, [[hx + k(2), hy + k(1)], [hx + k(13), hy - k(1)], [hx + k(13), hy + k(5)], [hx + k(3), hy + k(4)]], '#6a2228'); [5, 8, 11].forEach((x) => { px(g, Math.round(hx + k(x)), Math.round(hy + k(1)), '#f0e8d8'); px(g, Math.round(hx + k(x) - 1), Math.round(hy + k(4)), '#f0e8d8'); }); }
+    else { line(g, Math.round(hx + k(2)), Math.round(hy + k(2)), Math.round(hx + k(11)), Math.round(hy + k(1)), T.skinDeep); px(g, Math.round(hx + k(1)), Math.round(hy + k(3)), T.skinDeep); }
     // --- lance (behind the rider) and rider ---
     let r = null, rx = 0, ry = 0;
     if (rider) {
@@ -238,12 +241,12 @@
       g.drawImage(r, rx, ry);
     }
     // --- shell: an almond lens of hex plates ---
-    const HX = 7.6, HY = HX * 0.87; const cells = [];
-    for (let j = -2; j < 8; j++) for (let i = -2; i < 14; i++) cells.push([SX - 6 * HX + i * HX + (j & 1 ? HX / 2 : 0), SY - SH + 2 + j * HY]);
+    const HX = 7.6 * Math.sqrt(K), HY = HX * 0.87; const cells = [];
+    for (let j = -2; j < 12; j++) for (let i = -2; i < 20; i++) cells.push([SX - 9 * HX + i * HX + (j & 1 ? HX / 2 : 0), SY - SH + 2 + j * HY]);
     for (let x = SX - SW; x <= SX + SW; x++) {
       const t = sTop(x), b = sBot(x); if (t == null) continue;
       for (let y = Math.round(t); y <= Math.round(b); y++) {
-        const edge = Math.min(y - t, Math.abs(x - (SX - SW)) * 0.5, Math.abs(SX + SW - x) * 0.5);
+        const edge = Math.min(y - t, Math.abs(x - (SX - SW)) * 0.5, Math.abs(SX + SW - x) * 0.5) / Math.sqrt(K);
         let col;
         if (y > SY) col = (x & 3) === 0 ? T.seam : y === SY + 1 ? T.rimHi : T.rim; // the plastron rim
         else if (edge < 2.2 || y >= SY - 1) col = (x % 5 === 0) ? T.seam : y === Math.round(t) ? T.rimHi : T.rim; // marginal plates
@@ -252,10 +255,10 @@
           cells.forEach((p) => { const d = Math.hypot(x - p[0], y - p[1]); if (d < d1) { d2 = d1; d1 = d; best = p; } else if (d < d2) d2 = d; });
           const lx = x - best[0], ly = y - best[1];
           if (d2 - d1 < 1.05) col = T.seam;
-          else if (lx < 0 && ly < 0 && lx + ly > -5 && d1 < 3.2) col = T.shellHi;
-          else if (lx + ly > 2.5) col = T.shellDk;
+          else if (lx < 0 && ly < 0 && lx + ly > -5 * Math.sqrt(K) && d1 < 3.2 * Math.sqrt(K)) col = T.shellHi;
+          else if (lx + ly > 2.5 * Math.sqrt(K)) col = T.shellDk;
           else col = T.shell;
-          if (col === T.shell && x > SX + 14 && y > SY - 9) col = T.shellDk; // the shell rounds away from the light
+          if (col === T.shell && x > SX + k(14) && y > SY - k(9)) col = T.shellDk; // the shell rounds away from the light
         }
         px(g, x, y, col);
       }
@@ -263,12 +266,12 @@
     // --- saddle and straps ---
     if (rider) {
       const top0 = Math.round(sTop(SX));
-      [[-1, -26], [1, 26]].forEach(([s, end]) => { line(g, SX + s * 6, top0 + 2, SX + end, SY - 1, SADDLE.strap); line(g, SX + s * 7, top0 + 2, SX + end + s, SY - 1, SADDLE.strap); rect(g, SX + end - 1 + (s > 0 ? 0 : 0), SY - 2, 2, 2, SADDLE.trim); });
-      line(g, SX - 2, top0 + 3, SX - 12, SY - 1, SADDLE.strap); line(g, SX + 2, top0 + 3, SX + 12, SY - 1, SADDLE.strap); // the X across the shell
+      [[-1, -Math.round(k(26))], [1, Math.round(k(26))]].forEach(([s, end]) => { line(g, SX + s * 6, top0 + 2, SX + end, SY - 1, SADDLE.strap); line(g, SX + s * 7, top0 + 2, SX + end + s, SY - 1, SADDLE.strap); rect(g, SX + end - 1 + (s > 0 ? 0 : 0), SY - 2, 2, 2, SADDLE.trim); });
+      line(g, SX - 2, top0 + 3, Math.round(SX - k(12)), SY - 1, SADDLE.strap); line(g, SX + 2, top0 + 3, Math.round(SX + k(12)), SY - 1, SADDLE.strap); // the X across the shell
       rect(g, SX - 10, top0 - 2, 21, 4, SADDLE.cloth); rect(g, SX - 10, top0 - 2, 21, 1, SADDLE.hi); rect(g, SX - 9, top0 + 1, 19, 1, SADDLE.dk);
       for (let k = 0; k < 21; k += 2) px(g, SX - 10 + k, top0 + 2, SADDLE.trim);
     }
-    leg(SX - 22, 0, false); leg(SX + 16, Math.PI, false);
+    leg(Math.round(SX - k(22)), 0, false); leg(Math.round(SX + k(16)), Math.PI, false);
     return A.outline(c, '#12140c');
   }
   D.turtlerider = (o) => fitFrames([0, 1, 2, 3, 4, 5].map((f) => turtle(f, { look: (o && o.look) || RIDER_LOOK })));
@@ -432,7 +435,7 @@
     drops: [['ridge_scale', 0.8, 1, 2], ['warthog_hide', 0.2, 1, 1]],
     blurb: 'The light cavalry\'s lizard, running wild. Quick, and it charges in a straight line, so step aside and hit its back.' });
   S({ id: 'shellback', type: 'monsters', name: 'Shellback', world: 'fuzzy', role: 'enemy', status: 'active', art: { draw: 'shellback' },
-    w: 60, h: 34, hp: 280, dmg: 18, speed: 70, behavior: 'charger', armored: true,
+    w: 96, h: 54, hp: 320, dmg: 18, speed: 70, behavior: 'charger', armored: true,
     spawn: { worlds: ['fuzzy'], medium: 'surface', zones: ['jungle'], weight: 1.2 },
     drops: [['shell_plate', 1, 1, 3], ['ridge_scale', 0.3, 1, 1]],
     blurb: 'The heavy cavalry\'s turtle, running wild. Hits from the front glance off its shell. Get behind it, or jump over it, and hit its back.' });

@@ -2,6 +2,18 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## A bigger, more beautiful Fuzzy World
+- **Fuzzy World is half again as wide.** Past Gnarlroot's Hollow the jungle goes on into the **Deep Tanglewood**: giant trees with real bark, moss and buttress roots, crowns of leaves you can climb into along thick limbs, lianas to climb, ferns, jungle flowers and glowing mushrooms. Everything you've built in Fuzzy World stays exactly where it was.
+- **The waterfall and the Woolly Highlands:** at the end of the Deep Tanglewood a stream pours off a cliff into a pool. Climb the vines up the cliff to the Highlands, flat grassland where herds of **Curlmanes** graze. When one paws the ground, the whole herd charges in a straight line. Step aside and hit them as they thunder past.
+- **The jungle at night and by day:** fireflies drift and glow at dusk and through the night, sunbeams come down through the canopy with pollen turning in them, butterflies flit about, and giant trees stand far off in the haze.
+- **Home-trees in Tanglehold:** the stilt huts are gone. The village families now live in two huge home-trees with woven nest pods up in the branches, a fenced ring deck round each trunk, ladders and ropes, and a log swing. The healing mud pool is still there, now at the foot of the west tree.
+- **Ridgeback Run:** Herder Bramble keeps the cavalry's animals at a home-tree in the Deep Tanglewood.
+- **Ridgebacks and shellbacks are tame**, like horses. They graze and wander in small herds and leave you alone. Hit one and it will charge you until it calms down. Shellbacks are now much bigger than ridgebacks.
+- **Scorpion dens:** a rock mound full of burrows in the Sunbake Desert and a mossy one in the Deep Tanglewood. Winding tunnels with treasure in their side pockets lead to a chamber where the **Mother Scorpion** guards her hoard: three tails, a back of spikes. When she rears her tails back, get clear. After she strikes, her tails stick for a moment, and she takes extra damage. Beat her and the hoard is yours. She comes back after 20 minutes.
+- **Smoother ground everywhere:** where dirt, stone, mud and sand meet, the border now wanders naturally instead of following the block grid, and the inside corners of steps and cave walls curve (with grass growing along the curve on grassy ground), so hills and caves read as slopes. The jungle's mushrooms are new too: glowing orange lantern caps, red spotted toadstools and tall parasols. (Only the look changed; walking and digging work exactly as before.)
+- **Chief Tassel and the slinger tribes** wear their first, softer fur patterns again.
+- Code: `v2s23.js` (and the shellback's size in `v2s22.js`).
+
 ## New creatures, and Tanglehold fights back
 - **Ridgebacks** run wild in the Tanglewood and Tuftwood Forest: the light cavalry's lizards. Quick, and they charge in a straight line, so step aside and hit their backs.
 - **Shellbacks** roam the Tanglewood: the heavy cavalry's turtles. Hits from the front glance off the shell (a quarter of the damage, and it braces). Get behind one, or jump over it, and hit its back.
