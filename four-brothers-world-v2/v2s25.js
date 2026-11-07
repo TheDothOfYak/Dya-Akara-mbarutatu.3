@@ -12,7 +12,7 @@
   'use strict';
   const A = RW.art, D = A.drawers, E = RW.ent, P = RW.player, U = RW.ui, R = RW.register, TS = RW.TILE, WD = RW.world;
   if (!A || !E || !P || !WD) return;
-  const { px } = A; const mk = A.canvas;
+  const { px } = A; const mk = A.canvas; const { fitFrames } = A.h4 || {};
   const H2 = RW.hash2, clamp = RW.clamp, mix = RW.mix;
   const surfaceSky = () => WD.def && (WD.def.sky === 'normal' || WD.def.sky == null) && WD.def.fixedDay == null;
   // ======================= 1. WEATHER =======================
@@ -302,5 +302,85 @@
     } catch (e) { /* no observer: the words just stay */ }
     // the rupee counter is green-gem coloured
     const st = document.createElement('style'); st.textContent = '#v2coins{color:#7ff09a}'; document.head.appendChild(st);
+  }
+  // ======================= 9. CURLMANES, AGAIN: A CENTAUR WITH A FUZZY TOP HALF =======================
+  // A burly, woolly, four-legged body like a buffalo's, with a hump at the shoulders, and rising out of the front of
+  // it, where a horse's neck would be, a fuzzy: the same round, furry ball as the fuzzy heroes (drawn with the
+  // heroes' own fuzzy art), with its little paws for arms. A collar of tight curls hides the join, and a chain of
+  // curls runs back along the hump like a mane. Bulls are dark brown with short buffalo horns; cows are honey-coloured.
+  {
+    const CMV = { bull: { fur: 'brown', tone: -0.04, len: 1.08, horns: true }, cow: { fur: 'honey', tone: 0, len: 1, horns: false } };
+    const ink = '#1a0e0a';
+    // a short buffalo horn: thick at the base, out sideways, then up, with a dark tip
+    const horn = (g, x, y, sg, far) => {
+      const pts = [[0, 0, 2], [1, 0, 2], [2, -1, 2], [3, -1, 2], [4, -2, 1], [4, -3, 1], [5, -4, 1], [5, -5, 1]];
+      pts.forEach(([dx, dy, th], i) => { for (let k = 0; k < th; k++) px(g, x + dx * sg, y + dy + k, far ? (k ? '#7a6c54' : '#a89878') : i >= 6 ? '#5a4a3a' : k ? '#b8a888' : i < 4 ? '#e0d6bc' : '#f0e8d4'); });
+    };
+    function centaur(v, frame) {
+      const V = CMV[v] || CMV.bull, C = A.furColors({ fur: V.fur, tone: V.tone, hue: 0 });
+      const wool = [RW.mix(C.dark, '#000000', 0.35), C.dark, RW.mix(C.base, C.dark, 0.45), C.base, RW.mix(C.base, C.light, 0.5)];
+      const Wd = 96, Hd = 74, GY = 71, c = mk(Wd, Hd), g = c.ctx, L = V.len;
+      const run = frame >= 1 && frame <= 4, paw = frame === 5, ph = run ? ((frame - 1) / 4) * Math.PI * 2 : 0;
+      const bob = run ? Math.round(Math.sin(ph * 2) * 1.2) : paw ? 1 : 0;
+      const X = (x) => Math.round(6 + x * L);                       // stretch the bull a little longer
+      // ---- the body: a barrel like a horse's, deep at the chest ----
+      const blobs = [[X(20), 45 + bob, 14 * L, 10], [X(34), 47 + bob, 16 * L, 9], [X(49), 44 + bob, 11, 11]];
+      const inBody = (x, y) => { let best = 9; for (const [cx, cy, rx, ry] of blobs) { const a = Math.atan2(y - cy, x - cx), e = Math.hypot((x - cx) / rx, (y - cy) / ry) - 0.06 * Math.abs(Math.sin(a * 10)); if (e < best) best = e; } return best; };
+      const top = 33 + bob, bot = 56 + bob;
+      // tight curls: round tufts on a jittered grid, each lit on top with a dark curl underneath
+      const curl = (x, y, lit) => {
+        const C5 = 5, gx = Math.floor(x / C5), gy = Math.floor(y / C5); let d1 = 9, dx = 0, dy = 0, r = 2;
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const hx = gx + i, hy = gy + j, cx = hx * C5 + 1 + H2(hx, hy, 2701) * 3, cy = hy * C5 + 1 + H2(hy, hx, 2702) * 3, rr = 1.9 + H2(hx, hy, 2703) * 0.9, d = Math.hypot(x - cx, y - cy) / rr; if (d < d1) { d1 = d; dx = x - cx; dy = y - cy; r = rr; } }
+        let lv = lit;
+        if (d1 < 0.55) lv += dy < 0 ? 1 : 0.4; else if (d1 < 1) lv += dy < -0.5 ? 0.5 : dy > 0.4 || dx > 0.6 ? -1.1 : 0; else lv -= 0.6;
+        return wool[RW.clamp(Math.round(lv), 0, 4)];
+      };
+      // ---- legs: long and strong, woolly at the top, bare and dark below, with split hooves ----
+      const leg = (x0, phase, far, front) => {
+        const s = run ? Math.sin(ph + phase) * 6 : 0, lift = run ? Math.max(0, Math.cos(ph + phase)) * 4 : paw && front && !far ? 6 : 0;
+        const fx = x0 + s + (paw && front && !far ? 5 : 0), fy = GY - lift, ty = 49 + bob, knee = ty + (fy - ty) * 0.5, kx = x0 + (fx - x0) * 0.35 + (front ? 1 : -1) * (run ? Math.max(0, Math.cos(ph + phase)) * 2 : 0);
+        for (let y = ty; y <= fy; y++) {
+          const t = (y - ty) / Math.max(1, fy - ty), xc = y < knee ? x0 + (kx - x0) * ((y - ty) / (knee - ty)) : kx + (fx - kx) * ((y - knee) / Math.max(1, fy - knee)), half = 3.6 - t * 1.4;
+          for (let x = Math.floor(xc - half); x <= Math.ceil(xc + half); x++) { const u = (x - (xc - half)) / (2 * half);
+            let col = t < 0.4 ? curl(x, y, 2.6 - u * 1.6 - (far ? 1.3 : 0)) : RW.mix(far ? C.dark : RW.mix(C.base, C.dark, 0.55), ink, far ? 0.5 : 0.15 + u * 0.3);
+            if (y >= fy - 1) col = y === fy ? '#120a06' : '#2e1e14'; if (y >= fy - 1 && Math.abs(x - xc) < 0.6) col = '#5a4030';   // the hoof, and its split
+            px(g, x, y, col); }
+        }
+        for (let k = -2; k <= 2; k++) px(g, Math.round(kx + (fx - kx) * 0.75) + k, Math.round(knee + (fy - knee) * 0.75), wool[far ? 0 : 2]);   // a tuft at the fetlock
+      };
+      leg(X(16), Math.PI, true, false); leg(X(47), 0, true, true);
+      // ---- the body itself ----
+      for (let y = top - 6; y <= bot + 2; y++) for (let x = 0; x < Wd; x++) {
+        const e = inBody(x, y); if (e > 1) continue;
+        const gy = (y - top) / (bot - top); let lit = 3.2 - gy * 2.3 - (x < X(10) ? 0.4 : 0); if (e > 0.84) lit -= 0.7;
+        px(g, x, y, curl(x, y, lit));
+      }
+      // ---- the tail: a short rope ending in a curly tuft ----
+      for (let k = 0; k < 9; k++) px(g, X(6) - Math.round(k * 0.45), 44 + bob + k + (run ? Math.round(Math.sin(ph + k * 0.4)) : 0), wool[1]);
+      for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (i * i + j * j <= 5) px(g, X(2) + i, 54 + bob + j + (run ? Math.round(Math.sin(ph + 3)) : 0), (i + j) % 2 ? wool[2] : wool[1]);
+      leg(X(24), 0, false, false); leg(X(55), Math.PI, false, true);
+      // ---- the mane: a chain of tight curls running back along the top from the fuzzy ----
+      const curlBall = (mx, my, r) => { for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const d = Math.hypot(i, j); if (d <= r) px(g, Math.round(mx + i), Math.round(my + j), d > r - 0.8 ? wool[0] : (j < 0 && i < 1) ? wool[4] : wool[2]); } };
+      for (let k = 0; k < 5; k++) curlBall(X(42) - k * 4.4, 34 + bob + Math.round(k * 0.5) - (k === 0 ? 1 : 0), 2.4 - k * 0.08);
+      // ---- the fuzzy top half, sitting up on the chest like a centaur's ----
+      const look = { fur: V.fur, hue: 0, tone: V.tone, fluff: 'shaggy', ears: 'none', eyes: 'big', mouth: frame === 0 ? 'smile' : paw ? 'fangs' : 'open', extra: 'none' };
+      const fz = A.fuzzyFrame(look, paw ? 6 : run ? (frame % 2 ? 1 : 3) : 0);
+      const fx0 = X(52) - 14, fy0 = 9 + bob + (run ? Math.round(Math.cos(ph * 2) * 0.6) : 0) + (paw ? 2 : 0);
+      if (V.horns) [[fx0 + 6, -1]].forEach(([x, sg]) => horn(g, x, fy0 + 9, sg, true));      // the far horn, behind the head
+      g.drawImage(fz, 0, 0, 28, 26, fx0, fy0, 28, 26);                // the ball and its paws, not its feet
+      if (paw) [[fx0 + 10, fy0 + 10, 1], [fx0 + 18, fy0 + 10, -1]].forEach(([x, y, sg]) => { if (sg > 0) { px(g, x, y, ink); px(g, x + 1, y, ink); px(g, x + 2, y + 1, ink); px(g, x + 3, y + 1, ink); } else { px(g, x + 3, y, ink); px(g, x + 2, y, ink); px(g, x + 1, y + 1, ink); px(g, x, y + 1, ink); } });
+      if (V.horns) horn(g, fx0 + 22, fy0 + 9, 1, false);
+      // the collar of curls where the fuzzy meets the body
+      for (let k = 0; k < 7; k++) curlBall(fx0 + 4 + k * 3.4, fy0 + 25 - Math.round(Math.sin((k / 6) * Math.PI) * 1.5), 2.2);
+      // its arms: short and stout, reaching forward (a fist raised when it paws the ground)
+      const arm = (sx, sy, ex, ey, far) => { const n = Math.max(Math.abs(ex - sx), Math.abs(ey - sy)); for (let k = 0; k <= n; k++) { const x = Math.round(sx + (ex - sx) * k / n), y = Math.round(sy + (ey - sy) * k / n); px(g, x, y - 1, far ? C.dark : C.base); px(g, x, y, far ? C.dark : RW.mix(C.base, C.dark, 0.35)); px(g, x, y + 1, far ? RW.mix(C.dark, ink, 0.3) : RW.mix(C.dark, ink, 0.35)); }
+        for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) { const d = i * i + j * j; if (d <= 4.5) px(g, ex + i, ey + j, d > 2.5 ? RW.mix(C.dark, ink, 0.4) : far ? C.dark : i + j < 0 ? C.light : C.base); } };
+      const sw = run ? Math.round(Math.sin(ph) * 2) : 0;
+      arm(fx0 + 8, fy0 + 22, fx0 + 11 - sw, fy0 + 26, true);
+      if (paw) arm(fx0 + 22, fy0 + 22, fx0 + 27, fy0 + 17, false); else arm(fx0 + 22, fy0 + 22, fx0 + 26 + sw, fy0 + 26, false);
+      return A.outline(c, ink);
+    }
+    D.curlmane = (o) => fitFrames([0, 1, 2, 3, 4, 5].map((f) => centaur((o && o.v) || 'bull', f)));
+    if (A._spCache) ['curlmane_bull', 'curlmane_cow'].forEach((k) => delete A._spCache[k]);
   }
 })(window.RW);

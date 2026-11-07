@@ -13,7 +13,8 @@ V2 is built on the main game (v1.8), so it has everything the main game has (acc
 - **Trees stand on the ground** (their roots reach into it) instead of hovering a hair above it.
 - **Broodwings** are a little tougher.
 - **Rupees instead of coins**: green rupees are worth 1, blue 5, red 20. Bigger monsters drop more. (Your money carries over.)
-- Code: `v2s24.js` (caves, lava, clams) and `v2s25.js` (weather, sky, wind, rupees).
+- **Curlmanes redrawn as centaurs**: a burly woolly body like a buffalo's, with a fuzzy for the top half (the bulls have short buffalo horns). A collar and a mane of tight curls, little arms, and an angry face when they paw the ground.
+- Code: `v2s24.js` (caves, lava, clams) and `v2s25.js` (weather, sky, wind, rupees, Curlmanes).
 
 ## A bigger, more beautiful Fuzzy World
 - **Fuzzy World is half again as wide.** Past Gnarlroot's Hollow the jungle goes on into the **Deep Tanglewood**: giant trees with real bark, moss and buttress roots, crowns of leaves you can climb into along thick limbs, lianas to climb, ferns, jungle flowers and glowing mushrooms. Everything you've built in Fuzzy World stays exactly where it was.
