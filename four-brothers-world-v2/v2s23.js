@@ -1176,4 +1176,118 @@
       return r;
     };
   }
+  // ======================= 13. PRETTIER EVERYDAY TREES (every world) =======================
+  // The ordinary trees get the same treatment as the giant ones: crowns of soft, round leaf clumps lit from above
+  // (ragged where they meet the sky, with glints of sun), and trunks that look round: light down one side, shade
+  // down the other, bark grain, the odd knot, and roots that spread where the trunk meets the ground.
+  {
+    const TREE_PAL = {
+      leaves: ['#14361a', '#1c4a1e', '#276224', '#357f2c', '#4f9e3a', '#7cc452', '#a8e070'],
+      oakleaves: ['#0e2a10', '#163e16', '#20541e', '#2e6c28', '#43873a', '#62a24a', '#8cc062'],
+      albalileaves: ['#4a3a2a', '#7a6a40', '#a8925a', '#c8b06a', '#e0cc8a', '#f0e2b0', '#fffaf0'],
+    };
+    // v2s9 draws standing trees as flat squares (to match its falling tree); this wraps drawDecor again, outermost
+    const TD = {};
+    const leafy = (id) => { const d = RW.TILES[id].decor; return d === 'leaves' || d === 'oakleaves' || d === 'albalileaves' || d === 'canopy' || d === 'trunk'; };
+    const cache = new Map();
+    // Leaf clumps: overlapping round tufts (each lit from the top-left, its lower rim tucked under the tuft below it),
+    // big soft light and dark masses across the crown, rounded crown corners, and a scalloped edge against the sky.
+    function clumps(kind, wx, wy, open) {
+      const key = kind + ',' + (wx & 7) + ',' + (wy & 7) + ',' + open; let c = cache.get(key); if (c) return c;
+      const pal = TREE_PAL[kind]; c = mk(TS + 4, TS + 4); const g = c.ctx, R = 7, C = 8;
+      for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
+        // round off a crown corner where two open sides meet
+        const cxr = (open & 4) && x < R ? R - x : (open & 8) && x > 15 - R ? x - (15 - R) : 0;
+        const cyr = (open & 1) && y < R ? R - y : (open & 2) && y > 15 - R ? y - (15 - R) : 0;
+        if (cxr && cyr && Math.hypot(cxr, cyr) > R) continue;
+        const Xw = (wx & 7) * TS + x + 128, Yw = (wy & 7) * TS + y + 128;
+        const cx = Math.floor(Xw / C), cy = Math.floor(Yw / C); let d1 = 99, d2 = 99, by = 0, bx = 0, hue = 0;
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+          const hx = (cx + i) & 15, hy = (cy + j) & 15, px0 = (cx + i) * C + 1 + RW.hash2(hx, hy, 161) * 6, py0 = (cy + j) * C + 1 + RW.hash2(hx, hy, 162) * 6;
+          // a tuft lower down sits in front, so it wins ties: that tucks each tuft's bottom under its neighbour
+          const d = Math.hypot(Xw - px0, (Yw - py0) * 1.1) - RW.hash2(hx, hy, 163) * 1.5 - (py0 - Yw) * 0.12;
+          if (d < d1) { d2 = d1; d1 = d; by = Yw - py0; bx = Xw - px0; hue = RW.hash2(hx, hy, 164); } else if (d < d2) d2 = d;
+        }
+        // scalloped edge: near an open side keep only the middles of the tufts
+        const edge = Math.min((open & 1) ? y : 99, (open & 2) ? 15 - y : 99, (open & 4) ? x : 99, (open & 8) ? 15 - x : 99);
+        if (edge < 3 && d2 - d1 < 3 - edge) continue;
+        const mass = RW.noise2(Xw / 22, Yw / 18, 166);                              // big soft light and dark masses
+        let lv = 3.1 - by / 3.2 - bx / 7 + (hue - 0.5) * 0.8 + (mass - 0.5) * 1.6;
+        if (d2 - d1 < 1.2 && by > -1) lv = Math.min(lv, 1.2) - 0.4;                    // the dark crease under each tuft
+        if (open & 1) lv += 0.4; if (open & 2) lv -= 0.6 + (y > 9 ? 0.5 : 0);            // sunlit top, shaded underside
+        if (by < -1.5 && bx < 0.5 && d2 - d1 > 2.2 && RW.hash2(Xw, Yw, 165) > 0.55) lv += 1.1; // sun glints
+        px(g, x + 2, y + 2, pal[RW.clamp(Math.round(lv), 0, 6)]);
+      }
+      cache.set(key, c); return c;
+    }
+    const drawLeaves = (kind) => (g, t, x, y, time, h, wx, wy) => {
+      const W = RW.world, L = (a, b) => leafy(W.get(a, b));
+      const open = (L(wx, wy - 1) ? 0 : 1) | (L(wx, wy + 1) ? 0 : 2) | (L(wx - 1, wy) ? 0 : 4) | (L(wx + 1, wy) ? 0 : 8);
+      g.drawImage(clumps(kind, wx, wy, open), x - 2, y - 2);
+    };
+    TD.leaves = drawLeaves('leaves'); TD.oakleaves = drawLeaves('oakleaves'); TD.albalileaves = drawLeaves('albalileaves');
+    // trunks
+    const BK = { dark: ['#2e1e12', '#3e2a1a', '#4e3622', '#62452c', '#7a5836', '#946e46', '#ae8858'], pale: ['#7a766a', '#8e8a7e', '#a6a296', '#bab6aa', '#cecabe', '#dedace', '#eeeae0'] };
+    const trunkCache = new Map();
+    function trunkTile(pale, wx, wy, jl, jr, foot, li = 0, n = 1) {
+      const key = (pale ? 'p' : 'd') + (+jl) + (+jr) + (+foot) + ',' + (wx & 3) + ',' + (wy & 7) + ',' + li + ',' + n;
+      let c = trunkCache.get(key); if (c) return c;
+      c = mk(TS, TS); const q = c.ctx, P = pale ? BK.pale : BK.dark;
+      for (let j = 0; j < 16; j++) {
+        // the trunk's width at this row: 10 px, flaring out into roots over the last few pixels above the ground
+        const fl = foot ? Math.max(0, j - 10) : 0, x0 = jl ? 0 : 3 - Math.round(fl * 0.7), x1 = jr ? 16 : 13 + Math.round(fl * 0.7);
+        for (let i = Math.max(0, x0); i < Math.min(16, x1); i++) {
+          const u = n > 1 ? (li * 16 + i + 0.5) / (n * 16) : (i - x0 + 0.5) / (x1 - x0);       // across the whole trunk
+          let lv = 2.4 + Math.sin(Math.PI * u) * 2.2 + (u < 0.4 ? 0.9 : -0.3);
+          const Yw = (wy & 7) * 16 + j, Xw = (wx & 3) * 16 + i, gr = RW.noise2(Xw / 1.8, Yw / 9, 171);
+          if (gr < 0.3) lv -= 1.3; else if (gr > 0.72) lv += 0.6;
+          if (i === x0 || i === x1 - 1) lv = Math.min(lv, 1);                                 // dark edge
+          const kd = Math.hypot((Xw - 8 - (wx & 1) * 30) / 2, (Yw - 40 - ((wx * 7) & 31)) / 3); if (((wx * 13) & 3) === 0) { if (kd < 0.8) lv = 0.6; else if (kd < 1.4) lv += 0.8; } // the odd knot
+          px(q, i, j, P[RW.clamp(Math.round(lv), 0, 6)]);
+        }
+      }
+      trunkCache.set(key, c); return c;
+    }
+    TD.trunk = (g, t, x, y, time, h, wx, wy) => {
+      const W = RW.world, TT = (a, b) => RW.TILES[W.get(a, b)];
+      const isT = (a) => TT(a, wy).decor === 'trunk';
+      // inside a crown, leaves fill in round the trunk first
+      if (!t.pale) { const k = [TT(wx - 1, wy), TT(wx + 1, wy)].find((q) => q.decor === 'leaves' || q.decor === 'oakleaves'); if (k) {
+        TD[k.decor](g, k, x, y, time, 0, wx, wy);
+        // higher up in the crown the leaves hide the trunk; only its foot shows where it goes in
+        const b = W.get(wx, wy + 1), lb = TT(wx - 1, wy + 1).decor, rb = TT(wx + 1, wy + 1).decor;
+        if (RW.TILES[b].decor === 'trunk' && (lb === 'leaves' || lb === 'oakleaves' || rb === 'leaves' || rb === 'oakleaves')) return;
+      } }
+      const below = TT(wx, wy + 1);
+      let li = 0, ri = 0; while (li < 8 && isT(wx - li - 1)) li++; while (ri < 8 && isT(wx + ri + 1)) ri++;   // where this block sits in a wide trunk
+      g.drawImage(trunkTile(!!t.pale, wx, wy, li > 0, ri > 0, below.solid && below.decor !== 'trunk', li, li + ri + 1), x, y);
+    };
+    const baseDecor = A.drawDecor;
+    A.drawDecor = function (g, t, sx, sy, time, stage, x, y) {
+      if (t && (TD[t.decor] && t.decor !== 'trunk' || (t.decor === 'trunk' && t.tree))) return TD[t.decor](g, t, sx, sy, time, stage, x, y);
+      return baseDecor.apply(this, arguments);
+    };
+    // a falling tree (v2s5) wears the same leaves and bark: its tiles are gone from the world by then, so the
+    // open edges come from the falling pieces themselves
+    const FALL_KIND = { '#3a7a30': 'oakleaves', '#3f8a32': 'leaves', '#4a7a3a': 'leaves' };
+    const baseDP = E.drawPlayer;
+    E.drawPlayer = function (g, cam, p) {
+      const S = P.trees;
+      if (p !== P || !S || !S.falls.length) return baseDP.apply(this, arguments);
+      S.falls.forEach((f) => {
+        if (!f.set) { f.set = new Set(f.tiles.map((r) => r.tx + ',' + r.ty)); }
+        const has = (a, b) => f.set.has(a + ',' + b);
+        const k = Math.min(1, f.t / f.dur), a = (Math.PI / 2) * k * k * f.dir, drop = TS * k * k;
+        g.save(); g.translate(Math.round(f.px - cam.x), Math.round(f.py - cam.y + drop)); g.rotate(a);
+        f.tiles.forEach((r) => { if (r.leaf) return; g.drawImage(trunkTile(r.c === '#b8b0a0', r.tx, r.ty, has(r.tx - 1, r.ty), has(r.tx + 1, r.ty), false), Math.round(r.rx - 8), Math.round(r.ry - 8)); });
+        f.tiles.forEach((r) => {
+          if (!r.leaf) return; const open = (has(r.tx, r.ty - 1) ? 0 : 1) | (has(r.tx, r.ty + 1) ? 0 : 2) | (has(r.tx - 1, r.ty) ? 0 : 4) | (has(r.tx + 1, r.ty) ? 0 : 8);
+          g.drawImage(clumps(FALL_KIND[r.c] || 'leaves', r.tx, r.ty, open), Math.round(r.rx - 10), Math.round(r.ry - 10));
+        });
+        g.restore();
+      });
+      const keep = S.falls; S.falls = [];
+      try { return baseDP.apply(this, arguments); } finally { S.falls = keep; }
+    };
+  }
 })(window.RW);

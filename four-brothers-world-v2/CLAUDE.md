@@ -34,7 +34,7 @@ Read this first. It says where everything lives, so a change doesn't need the wh
 - Saves: block changes are stored by OLD index (800-wide); new land gets indexes from 256000 up (`toStore`/`fromStore` in v2s23). Keep this if the world changes again.
 
 ## What each module does (newest first)
-- v2s23: wider Fuzzy World, Deep Tanglewood, giant trees (`giantTree`), home-trees (`homeTree`), dens (`den`), Mother Scorpion, Curlmanes, tame ridgebacks/shellbacks, fireflies/sunbeams/butterflies/far trees (`WD.drawHills`/`drawLight` wraps), waterfall, restored slinger art (pixel data `SLING_OLD`).
+- v2s23: wider Fuzzy World, Deep Tanglewood, giant trees (`giantTree`), home-trees (`homeTree`), dens (`den`), Mother Scorpion, Curlmanes, tame ridgebacks/shellbacks, fireflies/sunbeams/butterflies/far trees (`WD.drawHills`/`drawLight` wraps), waterfall, smoother ground (`seam`/`fillet`), everyday tree leaves and bark (outermost `A.drawDecor` wrap, replaces v2s9's flat squares, also draws v2s5's falling trees), restored slinger art (pixel data `SLING_OLD`).
 - v2s22: ridgeback/shellback/rider art and species, centipede bats, Captain Shellbrace, Tanglehold defenders.
 - v2s21: back hits, daze/poise, bump beats.
 - v2s20: Tanglehold (temple, NPCs, quests, Strangler, ruins).
@@ -48,7 +48,7 @@ Read this first. It says where everything lives, so a change doesn't need the wh
 - Time of day: override `Date.now` (the day is 480 real seconds; `t = (now/1000 % 480)/480`, noon at 0.5).
 - Screenshots at 1100x680 show 34x21 tiles; for a wide view, hold the player at grid points and stitch shots.
 
-## Publishing (when git push is blocked)
-- Use the GitHub upload page in the browser: `github.com/TheDothOfYak/Dya-Akara-mbarutatu.3/upload/main/four-brothers-world-v2`.
-- Send the changed files in as compressed base64 chunks, rebuild them in the page, check each SHA-256, add them through the file input, commit straight to main.
-- Then check the "Deploy Dya'Akara to GitHub Pages" and "…Firebase Hosting" runs (re-run Pages if it times out) and the live files.
+## Publishing
+- From the session's clone: commit on `main` and `git push origin HEAD:main` (GitHub is linked with push access).
+- Then check the "Deploy Dya'Akara to GitHub Pages" and "…Firebase Hosting" runs: `gh run list -R TheDothOfYak/Dya-Akara-mbarutatu.3` (re-run Pages if it times out), and the live files.
+- If push is ever blocked again: use the GitHub upload page in the browser (`github.com/TheDothOfYak/Dya-Akara-mbarutatu.3/upload/main/four-brothers-world-v2`) and commit straight to main.
