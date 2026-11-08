@@ -390,4 +390,13 @@
     D.curlmane = (o) => fitFrames([0, 1, 2, 3, 4, 5].map((f) => centaur((o && o.v) || 'bull', f)));
     if (A._spCache) ['curlmane_bull', 'curlmane_cow'].forEach((k) => delete A._spCache[k]);
   }
+
+  // ======================= 7. READABLE RUNE KEEPER =======================
+  // His offer row has three parts (what's next, what he needs, the button). The two-column trade layout squeezed
+  // the first into a sliver one letter wide, so rows with three or more parts stack top to bottom instead.
+  {
+    const st = document.createElement('style');
+    st.textContent = '.trade:has(> :nth-child(3)) { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; } .trade:has(> :nth-child(3)) > * { max-width: 100%; }';
+    document.head.append(st);
+  }
 })(window.RW);
