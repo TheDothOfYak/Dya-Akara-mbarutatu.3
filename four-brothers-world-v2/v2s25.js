@@ -62,6 +62,7 @@
   const clouds = [];
   for (let i = 0; i < 14; i++) clouds.push({ x: H2(i, 1, 2511) * 2400, y: 0.08 + H2(i, 2, 2512) * 0.5, s: 0.6 + H2(i, 3, 2513) * 0.9, k: H2(i, 4, 2514), par: 0.05 + H2(i, 5, 2515) * 0.12 });
   const cloudCache = new Map();
+  let cloudLast = 0, cloudWind = 0.4, cloudDrift = 0;
   function cloudImg(i, s) {
     const key = i + ',' + Math.round(s * 10); let c = cloudCache.get(key); if (c) return c;
     const Wc = Math.round(150 * s), Hc = Math.round(52 * s); c = mk(Wc, Hc); const g = c.ctx;
@@ -100,19 +101,25 @@
       // the sun itself, big and red-gold near the horizon
       if (sk.sun > -0.12) { const r = 14 + glow * 6; g.fillStyle = sk.morning ? '#ffe2a8' : '#ffb070'; g.beginPath(); g.arc(sx, sy, r, 0, 6.29); g.fill(); g.fillStyle = 'rgba(255,255,230,0.6)'; g.beginPath(); g.arc(sx - r * 0.2, sy - r * 0.2, r * 0.55, 0, 6.29); g.fill(); }
     }
-    // clouds
-    const wind = RW.v2wind ? RW.v2wind.now() : 0.4, t = Date.now() / 1000, n = Math.round(3 + w.cover * 11);
+    // clouds: each frame they drift a little with a smoothed wind (gusts and turns ease in, so they never jump),
+    // and the weather fades them in and out instead of adding or removing them
+    const now = performance.now() / 1000, cdt = clamp(now - (cloudLast || now), 0, 0.1); cloudLast = now;
+    const wind = RW.v2wind ? RW.v2wind.now() : 0.4;
+    cloudWind += (wind - cloudWind) * Math.min(1, cdt * 0.4);
+    cloudDrift += cdt * 8 * cloudWind;
+    const shown = 3 + w.cover * 11;
     let under, midc, top;
     if (sk.night) { under = '#1e2234'; midc = '#2a3046'; top = '#3a4260'; }
     else { under = mix('#c8d0dc', sk.morning ? '#f08a8a' : '#e0604a', glow); midc = mix('#e4eaf2', sk.morning ? '#ffb89a' : '#ff9858', glow); top = mix('#ffffff', '#fff0c8', glow * 0.8); }
     const storm = clamp(w.dark * 2.2, 0, 1); under = mix(under, sk.night ? '#14161e' : '#5a606c', storm); midc = mix(midc, sk.night ? '#1c2030' : '#7a808c', storm); top = mix(top, sk.night ? '#262a3c' : '#9aa0aa', storm * 0.8);
     if (!sk.night && day < 0.4 && glow < 0.3) { under = mix(under, '#3a3c58', 0.5); midc = mix(midc, '#5a5a7a', 0.4); }
     const cols = [q(under), q(midc), q(top)];
-    for (let i = 0; i < n; i++) {
-      const c = clouds[i], img = cloudTint(i, c.s * (0.8 + w.cover * 0.5), cols);
-      const span = vw + 600, x = ((c.x + t * 6 * (0.4 + Math.abs(wind)) * Math.sign(wind || 1) - cam.x * c.par) % span + span) % span - 300;
+    for (let i = 0; i < clouds.length; i++) {
+      const fade = clamp(shown - i, 0, 1); if (fade <= 0) continue;
+      const c = clouds[i], img = cloudTint(i, c.s, cols);
+      const span = vw + 600, x = ((c.x + cloudDrift * (0.6 + c.k * 0.8) - cam.x * c.par) % span + span) % span - 300;
       const y = Math.round(seaY * c.y - 40 - cam.y * c.par * 0.2);
-      g.globalAlpha = 0.55 + w.cover * 0.4; g.drawImage(img, Math.round(x), y); g.globalAlpha = 1;
+      g.globalAlpha = (0.55 + w.cover * 0.4) * fade; g.drawImage(img, Math.round(x), y); g.globalAlpha = 1;
     }
   }
   const bHills = WD.drawHills;
