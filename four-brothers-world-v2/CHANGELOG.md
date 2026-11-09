@@ -2,6 +2,11 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## The Stormmark, chests for everyone
+- **The Stormmark.** Get struck by lightning and the storm lives in you for 3 minutes. Your eyes and outline glow cyan, a lightning rune burns on your forehead, and lightning crackles around you. Spark, Fire and Poison come out as Chain Lightning, a rock's ground slam throws a ring of lightning, and anything that touches you gets shocked, other players too. Thunderstorms strike heroes who stand out in them, or (fuzzy) cast Rain on yourself and stand under your own Storm.
+- **Storage Chests by hand**: 8 planks, no Knapping Stone needed. Every hero gets one free Storage Chest.
+- The dirt wall that hung in the sky on the slope left of Tuftwood is gone.
+
 ## Caves, lava, clams, weather and rupees
 - **Custom caves in Fuzzy World.** Every part of the world has its own caves, with its own rock and walls: the **Sandstone Galleries** under the desert (long banded halls on three levels with arched roofs, fossils in the rock), the **Root Hollows** under Tuftwood and the Deep Tanglewood (round earthy chambers with roots hanging from the roof that you can climb, and mushrooms), the **Magma Halls** under the Tall Peaks (a great hall of basalt columns, lavafalls pouring into a lava lake, stepping stones across it and a chest on the far ledge), the **Flooded Grottos** under the Tanglewood (half-drowned chambers, blue and green crystals, glowing lichen) and **Crystal Geodes** deep down (hollow agate shells lined with amethyst and crystals). Stalactites and stalagmites everywhere.
 - **No more straight holes down.** Caves are entered by sloping, switchbacking passages you can walk down.
