@@ -2,6 +2,12 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## Cloudtop, the land on the cloud
+- **A happy magic land on a cloud** floats high above Tuftwood. Press R at Tuftwood's town portal and float up. A cloud portal in the cloud village brings you back down, and if you fall off, a little cloud catches you and floats you gently down. It never rains up there.
+- **Bloomfield Meadows** (flowers everywhere and giant blooms), **Puffton** (the cloud village: a bakery, the mayor's hall, an inn, a workshop and a rainbow fountain), **the Candyfloss Grove** (candyfloss trees, rainbow bridges, and the Rainbow Falls pouring down to the land below) and **the Starlit Isles** (little floating islands under an evening sky).
+- **The cloud folk**: Sprinkles the donut (bakes Sprinkle Donuts from Sky Petals), the Bloomlings (flower folk), Tippy the triangle, Mayor Nimbus the cloud, Inchworth the long block (turns Rainbow Shards into Rainbow Bridges you can build with) and Mr. Doorley the house (rest at his inn).
+- **Only two bad guys**: the Scribbles in the Starlit Isles. They dash at you in a zigzag, then get dizzy, and that's when to hit them. Mayor Nimbus will thank you for calming them.
+
 ## Golden boss chests, silver den chests
 - **A big golden chest by every world boss**: Gnarlroot, the Warthog King, the Gemscale Leviathan (on the sea floor), the Hollow Wraith and the Possessed Reflections. It is sealed until you beat that boss. Each hero can open it once: a whole Legendary Key, a Gold Crystal, Star Embers, bars of that world's best metal, a legendary staff you don't have yet, and a big pile of rupees.
 - **A silver chest in every scorpion den.** Beat the Mother Scorpion and the chest on her den floor opens, once each time you beat her: Key Fragments, a Star Ember, crystals, bars (bronze in the desert den, platinum in the jungle den), a Mother's Carapace, sometimes a Legendary Key, and rupees.
