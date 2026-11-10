@@ -29,6 +29,7 @@
     xikia: { deep: '#123c56', sea: '#2e7a9a', shore: '#cfc690', land: ['#2f6a2c', '#3f7a34', '#5a7a4a', '#7a7468'], snow: '#eef2f0', sea0: 0.44, air: '#8af0c0', cities: 0.62, northMist: false, ice: true, size: 540, seed: 23 },
     leotik: { deep: '#0e3a2e', sea: '#1e5a4a', shore: '#8a8a5a', land: ['#1f5a26', '#2a6a22', '#3a4a1e', '#3a2a22'], snow: null, sea0: 0.47, air: '#c8f080', cities: 0.9, lava: true, size: 460, seed: 37 },
     kalo: { deep: '#5a5a66', sea: '#7a7a86', shore: '#8a8a94', land: ['#8a8a94', '#9a9aa4', '#6a6a76', '#aeaeb8'], snow: null, sea0: -1, air: '#d8d8ff', cities: 0.8, craters: true, relics: true, size: 300, seed: 51 },
+    karn: { deep: '#24324a', sea: '#2e6a78', shore: '#e8c890', land: ['#c8a050', '#a8803a', '#8a7a52', '#6a5a46'], snow: '#fff2d8', sea0: 0.46, air: '#ffd8a0', cities: 0.42, size: 560, seed: 91 },
     dancer: { deep: '#6a5a88', sea: '#8a7aa8', shore: '#a898c0', land: ['#b8a8d0', '#9a8ab8', '#c8b8e0', '#8a7aa8'], snow: null, sea0: -1, air: '#f0d0ff', cities: 2, craters: true, crystals: true, size: 260, seed: 63 },
   };
 
@@ -277,7 +278,7 @@
       ctx.fillStyle = L.sea; ctx.beginPath(); ctx.arc(b.x, b.y, R, 0, TAU); ctx.fill();
       return;
     }
-    const spin = b.look === 'dancer' ? Math.sin(now * 0.8) * 0.35 : 0;
+    const spin = b.rot || 0;                  /* the world turns: its face, and its clouds a little faster */
     ctx.save(); ctx.translate(b.x, b.y);
     /* up close, a clean edge and fine texture over the painting */
     const close = R * z > 650;
@@ -294,7 +295,7 @@
     /* clouds drift round */
     if (b.look !== 'kalo' && b.look !== 'dancer') {
       ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.clip();
-      ctx.rotate(now * 0.006);
+      ctx.rotate(now * 0.006 + spin * 0.15);
       ctx.globalAlpha = 0.88; ctx.drawImage(Bk.clo, -R * 1.02, -R * 1.02, R * 2.04, R * 2.04);
       /* cloud shadows */
       ctx.globalAlpha = 0.18; ctx.globalCompositeOperation = 'multiply';
@@ -329,12 +330,13 @@
     const lightAt = a => { const d = Math.cos(a - Math.atan2(SUN.y, SUN.x)); return Math.max(0, Math.min(1, d * 1.4 + 0.35)); };
     const land = L.land, R = b.r;
     /* mountains: a ridge line of noise, on land only */
-    const padAngles = SP.PORTS.filter(p => p.body === b.id).map(p => p.ang);
+    const rot = b.rot || 0;
+    const padAngles = SP.PORTS.filter(p => p.body === b.id).map(p => p.ang + rot);
     const ridge = a => {
       /* flat ground round each port's pad */
       let flat = 1;
       for (let i = 0; i < padAngles.length; i++) { const d = Math.abs(SP.angDiff(a, padAngles[i])) * R; if (d < 520) flat = Math.min(flat, Math.max(0, (d - 220) / 300)); }
-      const t = a * R / 420;
+      const t = (a - rot) * R / 420;            /* features belong to the ground, so they turn with it */
       const h = n.fbm(t + 100, 3, 4), land0 = n.fbm(t * 0.35 + 50, 9, 3);
       if (!L.craters && land0 < 0.45) return { h: 0, sea: true };
       return { h: Math.pow(Math.max(0, h - 0.35), 1.4) * (L.craters ? 160 : 420) * flat, sea: false, flat };
@@ -373,7 +375,7 @@
     if (!L.craters) {
       for (let a = a0; a <= a1; a += step * 0.3) {
         const rg = ridge(a); if (rg.sea || rg.h > 140 || rg.flat < 0.3) continue;
-        const k = hash(a * 1000);
+        const k = hash(Math.round((a - rot) * 1000));
         if (k < 0.35) continue;
         const rr = R - 2, x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr;
         const ux = Math.cos(a), uy = Math.sin(a), tx = -uy, ty = ux;
@@ -385,6 +387,16 @@
           ctx.fillRect(x + ux * hgt * 0.2 - 2, y + uy * hgt * 0.2 - 2, 4, 4);
           ctx.beginPath(); ctx.arc(x + ux * hgt * 0.62, y + uy * hgt * 0.62, hgt * 0.36, 0, TAU); ctx.arc(x + ux * hgt * 0.5 + tx * hgt * 0.25, y + uy * hgt * 0.5 + ty * hgt * 0.25, hgt * 0.28, 0, TAU); ctx.fill();
         }
+      }
+    }
+    /* Mba'Karn: lanterns all along its shore, waiting for a ship */
+    if (b.look === 'karn') {
+      for (let a = a0; a <= a1; a += step * 0.7) {
+        if (hash(Math.round((a - rot) * 700)) > 0.4) continue;
+        const rr = R + 14 + hash(a * 31) * 30, x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr;
+        const fl = 0.7 + 0.3 * Math.sin(now * 3 + a * 50);
+        ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.arc(x, y, 4, 0, TAU); ctx.fill();
+        FX.orb(gl, x, y, 46, '#ffb860', 0.8 * fl);
       }
     }
     /* sea at the horizon glitters */
@@ -458,10 +470,17 @@
   }
 
   /* ---------------- the Eldi ship ---------------- */
-  function drawShip(ctx, gl, s, S, now, braking) {
+  function nameTag(ctx, x, y, text, col, z) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(1 / z, 1 / z);
+    ctx.font = '600 12px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillText(text, 1, 1); ctx.fillStyle = col; ctx.fillText(text, 0, 0);
+    ctx.restore();
+  }
+  function drawShip(ctx, gl, s, S, now, braking, tint) {
     const K = sky();
     ctx.save(); gl.save();
     ctx.translate(s.x, s.y); ctx.rotate(s.ang); ctx.scale(1.3, 1.3);
+    if (tint) { ctx.fillStyle = tint; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.moveTo(6, -44); ctx.lineTo(6, -60); ctx.lineTo(22, -52); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; }
     gl.translate(s.x, s.y); gl.rotate(s.ang); gl.scale(1.3, 1.3);
     /* the flame of the seed */
     if (s.thrusting) {
@@ -553,7 +572,7 @@
     const P = SP.pull(f, s.x, s.y);
     const sp = Math.hypot(s.vx, s.vy);
     const zBase = Math.min(W, H) / 900;
-    const zT = zBase * Math.max(0.28, Math.min(1.1, 1.15 - P.alt / 1600 - sp / 1800));
+    const zT = zBase * Math.max(0.4, Math.min(1.1, 1.15 - P.alt / 2200 - sp / 2600));
     cam.z += (zT - cam.z) * 0.035;
     cam.x += (s.x + s.vx * 0.5 - cam.x) * 0.08; cam.y += (s.y + s.vy * 0.5 - cam.y) * 0.08;
     const z = cam.z;
@@ -586,7 +605,7 @@
     /* the Tatu and Kalo */
     f.list.forEach(b => { if (vis(b.x, b.y, b.r + 280)) drawBody(ctx, gl, b, view, now, b.r * z > 500 && P.near === b); });
     /* ports */
-    SP.PORTS.forEach(p => { const pp = SP.portPos(p, f.bodies); if (vis(pp.x, pp.y, 300)) drawPort(ctx, gl, p, f, view, now, opts.marks && opts.marks.has(p.id)); });
+    SP.portsIn(f.bodies).forEach(p => { const pp = SP.portPos(p, f.bodies); if (vis(pp.x, pp.y, 300)) drawPort(ctx, gl, p, f, view, now, opts.marks && opts.marks.has(p.id)); });
     /* storms */
     f.storms.forEach(st => {
       if (!vis(st.x, st.y, st.r + 100)) return;
@@ -656,6 +675,29 @@
       gl.fillStyle = 'rgba(255,150,50,.7)'; FX.ribbon(gl, T.map(p => [p[0], p[1]]), 2, 18);
       ctx.fillStyle = 'rgba(255,190,110,.18)'; FX.ribbon(ctx, T.map(p => [p[0], p[1]]), 1, 10);
     }
+    /* your hired crews' skiffs, running their routes */
+    (opts.fleet || []).forEach(q => {
+      if (!vis(q.x, q.y, 120)) return;
+      ctx.save(); ctx.translate(q.x, q.y); ctx.scale(0.62, 0.62); ctx.translate(-q.x, -q.y);
+      drawShip(ctx, gl, { x: q.x, y: q.y, ang: q.ang, heat: 1, thrusting: true, boostT: 0, lashT: 0, stun: 0 }, { heatMax: 1, lash: 100 }, now, false);
+      ctx.restore();
+      nameTag(ctx, q.x, q.y - 52, q.name, '#9fe0a0', view.z);
+    });
+    /* other pilots in the shared sky */
+    (opts.others || []).forEach(o => {
+      if (!vis(o.x, o.y, 160)) return;
+      FX.orb(gl, o.x, o.y, 90, o.raidingMe ? '#ff5a4a' : '#8ab0ff', o.raidingMe ? 0.6 : 0.18);
+      drawShip(ctx, gl, { x: o.x, y: o.y, ang: o.ang, heat: 1, thrusting: !!o.th, boostT: 0, lashT: 0, stun: 0 }, { heatMax: 1, lash: 100 }, now, false, o.color);
+      nameTag(ctx, o.x, o.y - 70, o.name + (o.cargo ? ' · ' + o.cargo + ' in the hold' : ''), o.raidingMe ? '#ff8a7a' : '#dfe6ff', view.z);
+      /* vines across: theirs onto you, or yours onto them */
+      if (o.raidingMe || o.mine) {
+        const a2 = o.mine ? s : o, b2 = o.mine ? o : s;
+        const pts = FX.quad(a2.x, a2.y, (a2.x + b2.x) / 2 + Math.sin(now * 9) * 14, (a2.y + b2.y) / 2 + 26, b2.x, b2.y, 10);
+        ctx.fillStyle = '#5a8a3a'; FX.ribbon(ctx, pts, 5, 3);
+        gl.fillStyle = 'rgba(200,255,150,.5)'; FX.ribbon(gl, pts, 6, 4);
+        if (o.mine && opts.raid) { ctx.strokeStyle = 'rgba(255,215,110,.95)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(o.x, o.y, 80, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, opts.raid)); ctx.stroke(); }
+      }
+    });
     drawShip(ctx, gl, s, f.S, now, opts.braking);
     if (s.lashT > 0) {
       ctx.strokeStyle = 'rgba(170,240,130,' + (s.lashT / 0.35) * 0.6 + ')'; ctx.lineWidth = 3;
@@ -817,14 +859,16 @@
   }
 
   /* ---------------- the little map in the corner ---------------- */
-  A.minimap = function (ctx, W, H, f, marks) {
+  A.minimap = function (ctx, W, H, f, marks, others, fleet) {
     ctx.clearRect(0, 0, W, H);
-    const k = Math.min(W, H) / 22000;
+    const k = Math.min(W, H) / 46000;
     const cx = W / 2 - f.bodies.velki.x * k, cy = H / 2 - f.bodies.velki.y * k;
-    const bg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.min(W, H) / 2);
-    bg.addColorStop(0, 'rgba(20,20,50,.75)'); bg.addColorStop(1, 'rgba(8,8,24,.8)');
-    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(W / 2, H / 2, Math.min(W, H) / 2 - 1, 0, TAU); ctx.fill();
+    const R0 = Math.min(W, H) / 2 - 1;
+    const bg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, R0);
+    bg.addColorStop(0, 'rgba(20,20,50,.75)'); bg.addColorStop(1, 'rgba(8,8,24,.85)');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(W / 2, H / 2, R0, 0, TAU); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(W / 2, H / 2, R0, 0, TAU); ctx.clip();
     f.list.forEach(b => {
       const L = A.LOOKS[b.look] || A.LOOKS.kalo;
       const x = cx + b.x * k, y = cy + b.y * k, r = Math.max(2.5, b.r * k);
@@ -832,41 +876,131 @@
       g.addColorStop(0, FX.shade(L.sea, 0.3)); g.addColorStop(1, L.deep);
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
     });
-    (marks || []).forEach(id => {
-      const pp = SP.portPos(SP.port(id), f.bodies);
-      ctx.fillStyle = '#ffd36a'; ctx.beginPath(); ctx.arc(cx + pp.x * k, cy + pp.y * k, 3, 0, TAU); ctx.fill();
-    });
+    (marks || []).forEach(id => { const pp = SP.portPos(SP.port(id), f.bodies); if (!pp) return; ctx.fillStyle = '#ffd36a'; ctx.beginPath(); ctx.arc(cx + pp.x * k, cy + pp.y * k, 3, 0, TAU); ctx.fill(); });
     f.skiffs.forEach(s2 => { if (!s2.saved) { ctx.fillStyle = '#ff7a6a'; ctx.fillRect(cx + s2.x * k - 2, cy + s2.y * k - 2, 4, 4); } });
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx + f.ship.x * k, cy + f.ship.y * k, 3, 0, TAU); ctx.fill();
+    (fleet || []).forEach(q => { ctx.fillStyle = '#9fe0a0'; ctx.fillRect(cx + q.x * k - 1.5, cy + q.y * k - 1.5, 3, 3); });
+    (others || []).forEach(o => { ctx.fillStyle = o.raidingMe ? '#ff5a4a' : o.color || '#8ab0ff'; ctx.beginPath(); ctx.arc(cx + o.x * k, cy + o.y * k, 2.6, 0, TAU); ctx.fill(); });
+    ctx.restore();
+    /* you (pinned to the rim, with an arrow, when you are off the chart) */
+    let sx = cx + f.ship.x * k, sy = cy + f.ship.y * k;
+    const dx = sx - W / 2, dy = sy - H / 2, d = Math.hypot(dx, dy);
+    if (d > R0 - 4) { sx = W / 2 + dx / d * (R0 - 6); sy = H / 2 + dy / d * (R0 - 6); ctx.fillStyle = '#ffe2a0'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText('off the chart', W / 2, H - 8); }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, TAU); ctx.fill();
   };
 
   /* ---------------- the chart of the sky (the port screen) ---------------- */
-  A.chart = function (ctx, W, H, day, here, marks, now) {
-    const L = SP.layout(day);
+  A.chart = function (ctx, W, H, T, here, marks, now, fleet) {
+    const L = SP.layout(T);
     drawSky(ctx, W, H, { x: now * 30, y: 0 }, 1, now);
-    const k = Math.min(W, H) / 21500;
+    const k = Math.min(W, H) / 44000;
     const cx = W / 2, cy = H / 2;
     ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1;
     SP.BODIES.forEach(b => { if (!b.orbit) return; const c = L[b.orbit[0]]; ctx.beginPath(); ctx.arc(cx + c.x * k, cy + c.y * k, b.orbit[1] * k, 0, TAU); ctx.stroke(); });
-    const BIG = b => b.r < 300 ? 3.2 : 2.2;
+    const BIG = b => A.mapBig(b, k);
     Object.values(L).forEach(b => {
       const x = cx + b.x * k, y = cy + b.y * k, r = b.r * k * BIG(b);
-      const Bk = bodyArt(b.look), Lk = A.LOOKS[b.look] || A.LOOKS.kalo;
-      FX.orb(ctx, x, y, r * 1.6, Lk.air, 0.25);
-      if (Bk) { ctx.drawImage(Bk.alb, x - r, y - r, r * 2, r * 2); ctx.drawImage(Bk.clo, x - r, y - r, r * 2, r * 2); ctx.drawImage(Bk.sha, x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(Bk.lit, x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = 'source-over'; }
-      else { ctx.fillStyle = Lk.sea; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
-      ctx.fillStyle = 'rgba(230,230,255,.9)'; ctx.font = (b.r < 300 ? '11px' : '13px') + ' Georgia, serif'; ctx.textAlign = 'center';
-      ctx.fillText(b.name, x, b.r >= 300 ? y + r + 15 : y - r - 6);
+      drawGlobe(ctx, b, x, y, r);
+      ctx.fillStyle = 'rgba(230,230,255,.9)'; ctx.font = (b.r < 400 ? '11px' : '13px') + ' Georgia, serif'; ctx.textAlign = 'center';
+      ctx.fillText(b.name, x, b.r >= 400 ? y + r + 15 : y - r - 6);
     });
-    SP.PORTS.forEach(p => {
+    SP.portsIn(L).forEach(p => {
       const pp = SP.portPos(p, L), bb = L[p.body], big = BIG(bb);
       const x = cx + (bb.x + (pp.x - bb.x) * big) * k, y = cy + (bb.y + (pp.y - bb.y) * big) * k;
-      const mk = marks && marks.has(p.id), ev = SP.portEvent && SP.portEvent(p.id, day);
+      const mk = marks && marks.has(p.id), ev = SP.portEvent && SP.portEvent(p.id, SP.skyDay(T));
       if (mk) FX.orb(ctx, x, y, 14, '#ffd36a', 0.7);
       ctx.fillStyle = p.id === here ? '#ffffff' : mk ? '#ffd36a' : ev ? '#ffb0e0' : 'rgba(200,200,230,.65)';
       ctx.beginPath(); ctx.arc(x, y, p.id === here ? 5 : mk ? 4 : 2.6, 0, TAU); ctx.fill();
       if (p.id === here) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 9 + Math.sin(now * 3) * 2, 0, TAU); ctx.stroke(); }
     });
+    (fleet || []).forEach(sh => { const q = SP.fleetPos(sh, T, L); if (q) { ctx.fillStyle = '#9fe0a0'; ctx.beginPath(); ctx.arc(cx + q.x * k, cy + q.y * k, 2.5, 0, TAU); ctx.fill(); } });
+    A.bakeSome();
+  };
+  /* a world drawn small (charts and the map): its painting, turned, lit */
+  function drawGlobe(ctx, b, x, y, r) {
+    const Bk = bodyArt(b.look), Lk = A.LOOKS[b.look] || A.LOOKS.kalo;
+    FX.orb(ctx, x, y, r * 1.6, Lk.air, 0.25);
+    if (Bk) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(b.rot || 0); ctx.drawImage(Bk.alb, -r, -r, r * 2, r * 2); ctx.drawImage(Bk.clo, -r, -r, r * 2, r * 2); ctx.restore();
+      ctx.drawImage(Bk.sha, x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(Bk.lit, x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = 'source-over';
+    } else { ctx.fillStyle = Lk.sea; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
+  }
+  /* how much bigger than life to draw a world at a scale, so it stays readable */
+  A.mapBig = function (b, k) { const px = b.r * k; return px >= 22 ? 1 : Math.min(b.r < 400 ? 4 : 3, 22 / Math.max(1, px)); };
+
+  /* ---------------- the sky map ---------------- */
+  A.map = function (ctx, W, H, o) {
+    const T = o.T, k = o.scale, L = SP.layout(T);
+    if (o.extra && o.extra.karn) L.karn = o.extra.karn;
+    drawSky(ctx, W, H, { x: o.cx * 0.2, y: o.cy * 0.2 }, 1, o.now);
+    const SX = x => (x - o.cx) * k + W / 2, SY = y => (y - o.cy) * k + H / 2;
+    /* a faint grid of the sky's leagues */
+    ctx.strokeStyle = 'rgba(160,170,255,.06)'; ctx.lineWidth = 1;
+    const step = Math.pow(10, Math.ceil(Math.log10(160 / k)));
+    for (let gx = Math.floor((o.cx - W / 2 / k) / step) * step; gx < o.cx + W / 2 / k; gx += step) { ctx.beginPath(); ctx.moveTo(SX(gx), 0); ctx.lineTo(SX(gx), H); ctx.stroke(); }
+    for (let gy = Math.floor((o.cy - H / 2 / k) / step) * step; gy < o.cy + H / 2 / k; gy += step) { ctx.beginPath(); ctx.moveTo(0, SY(gy)); ctx.lineTo(W, SY(gy)); ctx.stroke(); }
+    /* orbits, and each world's path over the next few minutes */
+    SP.BODIES.forEach(b => {
+      if (!b.orbit) return;
+      const c = L[b.orbit[0]];
+      ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.arc(SX(c.x), SY(c.y), b.orbit[1] * k, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,226,160,.45)'; ctx.lineWidth = 2; ctx.beginPath();
+      for (let s = 0; s <= 300; s += 15) { const Lf = SP.layout(T + s), q = Lf[b.id]; s ? ctx.lineTo(SX(q.x), SY(q.y)) : ctx.moveTo(SX(q.x), SY(q.y)); }
+      ctx.stroke(); ctx.lineWidth = 1;
+    });
+    /* the dangerous places */
+    const zone = (x, y, r, col, label) => { ctx.fillStyle = FX.rgba(col, 0.12); ctx.strokeStyle = FX.rgba(col, 0.45); ctx.setLineDash([3, 5]); ctx.beginPath(); ctx.arc(SX(x), SY(y), Math.max(8, r * k), 0, TAU); ctx.fill(); ctx.stroke(); ctx.setLineDash([]); if (label && r * k > 14) { ctx.fillStyle = FX.rgba(col, 0.85); ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, SX(x), SY(y) + Math.max(8, r * k) + 12); } };
+    const nekh = SP.portPos(SP.port('nekh'), L), ash = SP.portPos(SP.port('ashen'), L);
+    zone(nekh.x + nekh.nx * 600, nekh.y + nekh.ny * 600, 800, '#a0a8ff', 'storms');
+    zone(ash.x + ash.nx * 300, ash.y + ash.ny * 300, 700, '#c8e0ff', 'oath-mist');
+    zone(L.leotik.x, L.leotik.y, L.leotik.r + 1400, '#ff9a40', 'Tyndael & Lutut');
+    ctx.strokeStyle = 'rgba(200,190,180,.18)'; ctx.lineWidth = Math.max(2, 900 * k); ctx.beginPath(); ctx.arc(SX(L.velki.x), SY(L.velki.y), SP.body('bolo').orbit[1] * k, 0, TAU); ctx.stroke(); ctx.lineWidth = 1;
+    /* the worlds */
+    Object.values(L).forEach(b => {
+      const big = A.mapBig(b, k), r = b.r * k * big;
+      drawGlobe(ctx, b, SX(b.x), SY(b.y), r);
+      ctx.fillStyle = 'rgba(235,235,255,.92)'; ctx.font = (b.r >= 400 ? 'bold 14px' : '12px') + ' Georgia, serif'; ctx.textAlign = 'center';
+      ctx.fillText(b.name, SX(b.x), SY(b.y) - r - 8);
+    });
+    /* ports */
+    const routeAt = {};
+    (o.route || []).forEach((id, i) => { routeAt[id] = i + 1; });
+    const dueAt = {};
+    (o.hold || []).forEach(j => { dueAt[j.to] = Math.min(dueAt[j.to] || 1e18, j.taken + j.par); });
+    const portXY = p => { const pp = SP.portPos(p, L), b = L[p.body], big = A.mapBig(b, k); return [SX(b.x + (pp.x - b.x) * big), SY(b.y + (pp.y - b.y) * big)]; };
+    SP.portsIn(L).forEach(p => {
+      const [x, y] = portXY(p);
+      const inRoute = routeAt[p.id], due = dueAt[p.id];
+      if (due != null) FX.orb(ctx, x, y, 18, '#ffd36a', 0.6);
+      ctx.fillStyle = p.id === o.here ? '#fff' : inRoute ? '#9fe0ff' : due != null ? '#ffd36a' : 'rgba(210,210,240,.8)';
+      ctx.beginPath(); ctx.arc(x, y, inRoute || due != null || p.id === o.here ? 5 : 3.5, 0, TAU); ctx.fill();
+      const bodyPx = L[p.body].r * k * A.mapBig(L[p.body], k);
+      if (!(inRoute || due != null || p.id === o.here || bodyPx >= 46)) return;      /* names only when there is room for them */
+      ctx.font = (inRoute || due != null ? 'bold ' : '') + '11.5px system-ui'; ctx.textAlign = 'left';
+      const label = (inRoute ? inRoute + '. ' : '') + p.name + (due != null ? ' · due ' + SP.clockOf(due) : '');
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillText(label, x + 9, y + 4); ctx.fillStyle = inRoute ? '#bfeaff' : due != null ? '#ffe2a0' : 'rgba(225,225,250,.85)'; ctx.fillText(label, x + 8, y + 3);
+    });
+    /* the route */
+    if (o.route && o.route.length) {
+      ctx.strokeStyle = 'rgba(159,224,255,.85)'; ctx.lineWidth = 2.5; ctx.setLineDash([10, 7]);
+      ctx.beginPath();
+      let first = true;
+      if (o.ship) { ctx.moveTo(SX(o.ship.x), SY(o.ship.y)); first = false; }
+      else if (o.here) { const h = SP.port(o.here); if (L[h.body]) { const [x, y] = portXY(h); ctx.moveTo(x, y); first = false; } }
+      o.route.forEach(id => { const p = SP.port(id); if (!L[p.body]) return; const [x, y] = portXY(p); if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y); });
+      ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+    }
+    /* hired skiffs, other pilots, you */
+    (o.fleet || []).forEach(sh => { const q = SP.fleetPos(sh, T, L); if (!q) return; ctx.fillStyle = '#9fe0a0'; ctx.beginPath(); ctx.arc(SX(q.x), SY(q.y), 3.5, 0, TAU); ctx.fill(); ctx.font = '10px system-ui'; ctx.fillText(sh.crew, SX(q.x) + 6, SY(q.y) - 4); });
+    (o.others || []).forEach(p => { ctx.fillStyle = p.color || '#8ab0ff'; ctx.beginPath(); ctx.arc(SX(p.x), SY(p.y), 4, 0, TAU); ctx.fill(); ctx.font = '11px system-ui'; ctx.fillText(p.name, SX(p.x) + 7, SY(p.y) + 4); });
+    if (o.ship) {
+      const x = SX(o.ship.x), y = SY(o.ship.y);
+      FX.orb(ctx, x, y, 22, '#ffffff', 0.5);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(o.ship.ang); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-7, -7); ctx.lineTo(-3, 0); ctx.lineTo(-7, 7); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.font = 'bold 12px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText('you', x + 12, y - 8);
+    }
+    if (o.ahead) { ctx.fillStyle = 'rgba(255,226,160,.9)'; ctx.font = 'bold 14px system-ui'; ctx.textAlign = 'center'; ctx.fillText('The sky in ' + o.ahead / 60 + ' min (' + SP.clockOf(T) + ')', W / 2, 24); }
+    ctx.fillStyle = 'rgba(220,220,255,.55)'; ctx.font = '11px system-ui'; ctx.textAlign = 'left'; ctx.fillText('drag to look round · wheel or buttons to zoom · tap a port to add it to your route', 12, H - 12);
     A.bakeSome();
   };
 })();

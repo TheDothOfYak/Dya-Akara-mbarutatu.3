@@ -12,18 +12,36 @@
   'use strict';
   const SP = root.SP = root.SP || {};
 
+  /* The sky keeps its own time, the same for every pilot: the seconds since the
+     epoch below. A sky day is ten minutes. Everything moves with it, even while
+     you stand in a port, so a job taken is a clock ticking. */
+  SP.EPOCH = 1790000000;
+  SP.DAY = 600;
+  SP.skyNow = () => Date.now() / 1000 - SP.EPOCH;
+  SP.skyDay = T => Math.floor(T / SP.DAY);
+  /* the sky clock: 24 hours to a sky day */
+  SP.clockOf = T => { const d = ((T % SP.DAY) + SP.DAY) % SP.DAY / SP.DAY * 24; const h = Math.floor(d), m = Math.floor((d - h) * 60); return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; };
+  SP.mmss = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
   /* The bodies in the sky. Velki holds the centre; Xikia swings round it
      so close it is nearly a moon; Leotik swings further out; each keeps
-     its Kalo. orbit: [around, distance, angle on day 0, turn per day].
+     its Kalo. They are big and far apart: it is space travel, after all.
+     orbit: [around, distance, angle at time 0, radians per second].
+     spin: how fast each turns (radians per second); ports turn with it.
      g: pull at the surface (px/s²). */
   SP.BODIES = [
-    { id: 'velki', name: 'Velki', r: 1150, g: 74, orbit: null, look: 'velki', blurb: 'The largest Tatu: twelve continents and the largest ocean.' },
-    { id: 'bolo', name: 'Bolo Kalo', r: 210, g: 30, orbit: ['velki', 2300, 2.2, 0.85], look: 'kalo', blurb: 'One of Velki’s Kalo, home of the Kalo’Eik.' },
-    { id: 'xikia', name: 'Xikia', r: 640, g: 56, orbit: ['velki', 4700, 0.4, 0.32], look: 'xikia', blurb: 'The middle Tatu, held so tight by Velki it nearly orbits it like a moon.' },
-    { id: 'dancer', name: 'the Dancing Kalo', r: 140, g: 22, orbit: ['xikia', 1250, 1.0, 1.45], look: 'dancer', blurb: 'A small Kalo of Xikia that, on a near pass, is known to dance.' },
-    { id: 'leotik', name: 'Leotik', r: 520, g: 48, orbit: ['velki', 9200, 3.6, 0.13], look: 'leotik', blurb: 'The smallest Tatu, and by far the wildest. Most of it is unexplored.' },
+    { id: 'velki', name: 'Velki', r: 1700, g: 74, orbit: null, spin: 0.021, look: 'velki', blurb: 'The largest Tatu: twelve continents and the largest ocean.' },
+    { id: 'bolo', name: 'Bolo Kalo', r: 320, g: 32, orbit: ['velki', 4300, 2.2, 0.0087], spin: 0.05, look: 'kalo', blurb: 'One of Velki’s Kalo, home of the Kalo’Eik.' },
+    { id: 'xikia', name: 'Xikia', r: 950, g: 58, orbit: ['velki', 9800, 0.4, 0.0026], spin: 0.026, look: 'xikia', blurb: 'The middle Tatu, held so tight by Velki it nearly orbits it like a moon.' },
+    { id: 'dancer', name: 'the Dancing Kalo', r: 210, g: 24, orbit: ['xikia', 2400, 1.0, 0.0175], spin: 0.045, dance: true, look: 'dancer', blurb: 'A small Kalo of Xikia that, on a near pass, is known to dance.' },
+    { id: 'leotik', name: 'Leotik', r: 780, g: 50, orbit: ['velki', 19500, 3.6, 0.00116], spin: 0.033, look: 'leotik', blurb: 'The smallest Tatu, and by far the wildest. Most of it is unexplored.' },
   ];
-  SP.body = id => SP.BODIES.find(b => b.id === id);
+  /* Mba'Karn, the world of the Karnen. On no chart. They say it lies where the
+     Waves of Memory go, if you follow them far enough. */
+  SP.KARN = { id: 'karn', name: 'Mba’Karn', r: 1300, g: 60, spin: 0.012, look: 'karn', secret: true, blurb: 'The world of the Karnen. On no chart at all.' };
+  SP.KARN_RIDE = 280000;          // px ridden along the Sunear'Zikhron, in one go, before it shows
+  SP.KARN_FAR = 60000;            // and at least this far from Velki
+  SP.body = id => SP.BODIES.find(b => b.id === id) || (id === 'karn' ? SP.KARN : null);
 
   /* Ports: a pad on a body's surface at an angle (0 = right, going round
      clockwise as the screen draws it). rank: the pilot rank needed. */
@@ -40,6 +58,7 @@
     { id: 'dancer', name: 'the Dancer’s Ledge', body: 'dancer', ang: -2.4, rank: 1, blurb: 'A ledge on the small Kalo that dances. Hold on.' },
     { id: 'ulark', name: 'UlarKlug', body: 'leotik', ang: 2.9, rank: 2, blurb: 'The castle on Leotik, the Eikar foothold. Few pilots fly this far; most folk take the Urverk.' },
     { id: 'villtur', name: 'the ruins of Villtur', body: 'leotik', ang: -2.2, rank: 3, blurb: 'An island of ruins. Everything here wants to bite you, sting you, or both.' },
+    { id: 'mbakarn', name: 'Mba’Karn', body: 'karn', ang: -1.57, rank: 0, secret: true, blurb: 'The Karnen’s own world. Every town on the Mbaru Tatu has Karnen in it, quiet and skilled; nobody ever asked where they came from. Here is the answer: a warm, patient world at the far end of the Waves of Memory, its harbour lit with lanterns that have been waiting a very long time for a ship.' },
   ];
   SP.port = id => SP.PORTS.find(p => p.id === id);
 
@@ -85,6 +104,13 @@
   ];
   SP.partCost = (id, lvl) => Math.round((id === 'hold' ? 260 : 140) * Math.pow(lvl, 1.7));
 
+  /* Ships for hire: a crew and its skiff run a route for you while you fly your own.
+     They need a Ship's Pilot to vouch for them. */
+  SP.FLEET = { cost: n => 300 + n * 220, wage: 50, speed: 150, cut: 0.4, lose: 0.08, max: [0, 2, 3, 5], maxTrips: 14 };
+  SP.CREWS = ['the Kettlewick sisters', 'old Tumm and his nephew', 'a pair of Kalo’Eik smugglers (retired)', 'the Burl family', 'a Keilia who builds as she flies', 'three Karnen cousins', 'Odda’s foundlings, all grown', 'a Stryx from the Arena who wanted a quieter life'];
+  /* Raiding another pilot's ship: get alongside, hook your vines on, and hold there */
+  SP.RAID = { range: 190, time: 2.6, cooldown: 12, cut: 1 };
+
   /* what the ship can do with its parts */
   /* the names of folk adrift in skiffs */
   SP.ADRIFT = ['two Kalo’Eik fishers', 'a Keilia surveyor', 'a lost Guild courier', 'three students from the Rakarvorac', 'a Karnen trader and her goats', 'an old Eikar who says he meant to do this'];
@@ -124,5 +150,19 @@
     rescue: ['Vines fast. We have them. They are very grateful and very loud.', 'Towed clear. The academy will hear of this, for once in a good way.'],
     sling: ['A slingshot round the pull. I calculated that.', 'Round and out, faster than we came in.'],
     heavy: ['Heavy hold. She answers slowly.'],
+    karn1: ['The wave goes on. So do we.', 'Still the Waves of Memory. I have not seen their end. Nobody has, that I know of.'],
+    karn2: ['Nothing on the charts out here. Only memory, and something warm ahead of it.', 'The stars are wrong. I like it.'],
+    karn3: ['A world. There is no world here on any chart. There is now.'],
+    raidOn: ['Vines across. Hold alongside.'],
+    raided: ['Someone has their vines in our hold! Lash them off!'],
+    cut: ['Cut loose. They will not try that twice.'],
   };
+  /* rumours heard in ports (now and then) */
+  SP.RUMOURS = [
+    'An old Karnen on the dock says her grandmother came from the far end of the Waves of Memory. Nobody believes her. She doesn’t seem to mind.',
+    'They say a ship that rides the Sunear’Zikhron long enough, and never leaves it, comes to a world on no chart.',
+    'A pilot at the bar swears he flew the wave for half a day before his nerve failed him. “Further,” he keeps saying. “It goes further.”',
+    'Raiders hook their vines across from close alongside. Keep your lash ready, and keep near a port if your hold is full.',
+    'The Tatu never stop turning. A pad that faced you when you took off will have swung round by the time you get there.',
+  ];
 })(typeof window !== 'undefined' ? window : globalThis);
