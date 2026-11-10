@@ -1,5 +1,5 @@
 # FLAKE GAMES
-### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Skaar Uverkhron · Little Dungeon
+### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Skaar Uverkhron · Little Dungeon · Punk Races · Stryx Pilot
 
 Every game in this repo, behind one home page and one account. Zero dependencies, no build step — pure HTML/CSS/JavaScript.
 
@@ -14,10 +14,12 @@ Every game in this repo, behind one home page and one account. Zero dependencies
 | The 4 Brothers Worlds (2D platformer) | `four-brothers-world/index.html` |
 | Skaar Uverkhron (turn-based strategy) | `skaar-uverkhron/index.html` |
 | Little Dungeon (mini game, once Legends of Pia'don) | `mini-games/little-dungeon/index.html` |
+| Punk Races (mini game) | `mini-games/punk-races/index.html` |
+| Stryx Pilot (mini game) | `mini-games/stryx-pilot/index.html` |
 
 **One account for everything.** You sign in (or create an account) once, on the home page; every main game picks that up, and every game has a way back to the home page. **Mini games need no account:** a guest plays straight away (Little Dungeon keeps a guest's run in the browser and pays no gold); a guest who signs in later carries their run in progress onto the account. The account *is* the old Dya'Akara account (the same `dya_accounts` row, email and password), so nobody had to make a new one. Opening a main game while signed out sends you to the home page to sign in, then straight back. Code: `js/flake/account.js`.
 
-- **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` under `fbw:<id>:<key>`, one row per save key (its `js/cloud.js` section).
+- **Saves live on the account**, always online: Dya'Akara and Little Dungeon on the account row, Torcain's Run in `dya_config` `rpg_save:<id>`, the 4 Brothers Worlds in `dya_config` under `fbw:<id>:<key>`, one row per save key (its `js/cloud.js` section), and Punk Races and Stryx Pilot in `dya_config` `mini:pr:<id>` and `mini:sp:<id>` (`js/flake/mini_save.js`, which also keeps a guest's save in the browser and carries it onto the account at the first sign-in).
 - **A new account** made on the home page starts with just email, password and display name. The first time it opens Dya'Akara, the game asks for an appearance and home region, gives the starting resources, and runs the tutorial.
 - **Bans** can be for one game or for every game (Admin Panel → General → Bans, or each game's own Bans page). An every-game ban stops the account at the home page too.
 - **Your account** (click your name on the home page): change your display name or password, or delete the account and everything every game saved on it.
@@ -31,7 +33,7 @@ Every game in this repo, behind one home page and one account. Zero dependencies
 - **Players:** every account in every game, password reset requests, set a new password, rename, ban, Dya'Akara's own account editor, delete.
 - **Bans** and **Admin Password**.
 
-Then one button per game. Dya'Akara's is its original full panel (plus its own Announcements). Torcain's Run, the 4 Brothers Worlds and Little Dungeon each have an **Overview**, **Players** (every save: view and edit it as JSON, reset it, ban the player), **Announcements** aimed at that game, and **Bans**; the 4 Brothers also keep their **Guide**. A reset leaves a marker the game honours, so the copy in the player's browser doesn't come back.
+Then one button per game. Dya'Akara's is its original full panel (plus its own Announcements). Torcain's Run, the 4 Brothers Worlds, Little Dungeon, Punk Races and Stryx Pilot each have an **Overview**, **Players** (every save: view and edit it as JSON, reset it, ban the player), **Announcements** aimed at that game, and **Bans**; the 4 Brothers also keep their **Guide**. A reset leaves a marker the game honours, so the copy in the player's browser doesn't come back.
 
 **The admin password** is one password for every device, kept online as a slow salted hash (PBKDF2, in `dya_config` `admin_auth`). There is no built-in password any more. The first time `admin.html` opens after this change, it asks for the old admin password once and a new one (at least 8 characters). Change it any time under General → Admin Password. It guards the panel; it is not database security — the Supabase tables still accept writes from anyone holding the site's public key (see `supabase/schema.sql`).
 
@@ -73,6 +75,35 @@ Create an account on the Flake Games home page and open Dya'Akara; after you cho
 ## 4 Brothers World (2D pixel platformer)
 
 A separate game by four brothers lives in **`four-brothers-world/`** — open `four-brothers-world/index.html` (or pick **The 4 Brothers Worlds** on the Flake Games home page). See `four-brothers-world/README.md` for how to play.
+
+## Punk Races (mini game)
+
+A side-on race in **`mini-games/punk-races/`**: you ride a Punk (a pumpkin with no eyes and no mouth, its vines growing from the top round the stem) and swing it tree to tree on its own leg-vines against three rival riders.
+
+- **The vine:** hold `Space`, the mouse button, or anywhere on a touch screen, and a vine shoots to the glowing branch tip ahead and catches. Keep holding to swing (your Punk pumps at the bottom of the arc), and let go to fly. Hold again in the air to catch the next tree. On the ground, holding with no branch in reach jumps.
+- **A clean release** (let go just past the bottom while rising forward) throws you a little harder and fills the boost; `Shift`, `X` or the ⚡ button spends a full boost. Ju fruit in the air fill it too.
+- **Flips:** in the air, `↓`, `S` or the ↻ button flips your Punk. Finish before you land for boost (more for each flip in a row); land mid-flip and it tumbles.
+- **Brittle branches** (grey, bare and cracked) snap if you hang on, and take a few seconds to grow back. Tuck in behind a rival for a **slipstream**, and mind the others: Punks bump.
+- **Time and weather:** every race runs at dawn, midday, dusk or night (lanterns in the trees, torches at the gates, fireflies), and in clear weather, rain (wet bark is harder to catch) or wind.
+- **Eight tracks** across the three Tatu, each built from its own seed: Beuhk Lanes, Hedge-Oak Run, the Snow-Melt Ford, Mistwood (Velki's fog), the Velki Spires (deep chasms), the Ashen Reach (geysers that throw you high), Venomgrove (bogs) and the Market Day Derby. Water makes you swim, thorns and venom slow you, and a fall into a chasm costs a slow climb out.
+- **Modes:** four **cups** (three races each, points per place, a purse for the winner; winning one opens the next tracks), **quick races**, **time trials** against the ghost of your best run (beat par for gold), and **Watch & Bet**, the market-day way: pick a runner at the bookmaker's odds and watch.
+- **Your stable:** up to four Punks, each with Speed, Grip (vine reach), Spring (pumping and the clean release) and Nerve (boost). Train them with coins up to what each Punk can become, buy foals at the foal market (new ones after every race), pair two at the Grove for a foal that takes after both, and pick the colour of your rider's Aagac.
+- **The look:** each race is painted from its seed: ridged mountains and hills in layers of haze, tree crowns painted cluster by cluster and lit from the sun, bark, earth and rock textures, swaying grass and flowers, water that reflects the sky, ferns in the foreground, bloom on everything that glows, light shafts and colour grading for the hour. Slow devices drop the heaviest effects on their own.
+- Code: `js/pr_data.js` (tracks, cups, rivals, coats), `js/pr_sim.js` (the course, the swing physics, the rival riders; runs in node), `js/pr_art.js` (drawing), `js/pr_main.js` (the game). Shared effects (noise textures, bloom, ribbons, light shafts, grading): `js/flake/canvas_fx.js`. Tests: `tests/test_punk_races.js`.
+
+## Stryx Pilot (mini game)
+
+A flying game in **`mini-games/stryx-pilot/`**. You are a pilot Stryx, a flat stone grown into the pilot stump of an Eldi ship (a fire tree hollowed into a hull, pushed by a fire seed in the stern, with gold solar sails that win heat back from Pia'don's light), flying jobs between the ports of Velki, Xikia, Leotik and their Kalo.
+
+- **Flying:** `←` `→` turn, `↑` pushes (burning the seed's heat), `↓` turns the sails into the wind to slow you, `Space` is a hard push, `E` lashes your vines and knocks away anything close. With a mouse or a finger, hold anywhere and the ship turns toward it and pushes.
+- **The pull of the Tatu:** every Tatu and Kalo pulls you, the air near the ground is thick, and **landing** means touching down gently, nose up, on a port's pad. Come in fast and you knock the hull; wreck it and the academy tows you home.
+- **The sky moves:** the Tatu and Kalo turn a little every day, so routes change. Twelve ports, from the Stryx Rakarvorac (home) and Beuhk to Velkinovek, Fyrsti'Vilag, Nekh FtiSular, Su'Kryundel, the Bolo Kalo shorelands, the Dancing Kalo, UlarKlug and the ruins of Villtur; the far ones open as your rank grows.
+- **Jobs:** crates, fragile goods (knocks cost pay), mail (late mail is paid half), passengers (who tip for a smooth flight) and fire seeds (which can set the hold smouldering). Beat par for a bonus.
+- **Hazards:** Tyndael swarms round Leotik and the Ashen Reach, Lutut that screech (which stuns) and then dive, sky rock along Bolo Kalo's path, storm cells off Nekh FtiSular, and the oath-mist by Aakalay that chills a seed. Now and then **the Waves of Memory** roll across the sky: ride them for speed and heat, and catch the RubberMcFly glowing in them.
+- **The ship** grows at any port's shipwright: fire seed, solar sails, hull, pilot vines and hold. The bark-mender mends the hull. The Stryx keeps a dry pilot's log as you fly.
+- **More to fly for:** a heavy hold answers slowly; skimming fast past a Tatu is a paid **slingshot**; ports have market days, festivals, weddings and the Guild's post day (jobs bound there pay half again); and **skiffs adrift** blink red lanterns: hold alongside one and your vines take it in tow.
+- **The look:** the Tatu and Kalo are painted pixel by pixel from noise (seas, coasts, forests, mountains, ice, craters, Leotik's lava), with drifting clouds, a night side with town lamps, glints on the sea and a glow of air; up close their horizons rise in mountains and trees. A nebula and two layers of stars behind, an aurora for the Waves of Memory, and bloom on the seed, the embers in the hull, the lanterns and the lightning.
+- Code: `js/sp_data.js` (worlds, ports, jobs, parts, ranks, the log), `js/sp_sim.js` (the sky, the ship, the hazards, jobs and an autopilot; runs in node), `js/sp_art.js` (drawing), `js/sp_main.js` (the game). Tests: `tests/test_stryx_pilot.js`.
 
 ## Skaar Uverkhron (turn-based strategy)
 
@@ -360,6 +391,9 @@ node tests/test_netplay.js        # lockstep netplay: two simulated machines mus
 node tests/test_mods_market.js    # admin live-edit overrides + shared market: atomic buys, no token duplicates
 node tests/test_cloud_accounts.js # cross-device accounts: same login from a fresh "device", bans travel, offline fallback intact
 node tests/test_flake_accounts.js # one Flake Games account: home-page sign-in, new accounts filled in by Dya'Akara, per-game and every-game bans, the 4 Brothers save on the account
+node tests/test_punk_races.js     # Punk Races: courses built the same every time, every track finishable, the vine never stretches, odds, foals
+node tests/test_stryx_pilot.js    # Stryx Pilot: the sky, landing and docking, heat, the routes flyable, hazards, jobs and pay
+node tests/test_mini_save.js      # mini game saves: a guest's save, carried onto the account at sign-in, admin resets, bans
 node tests/test_hunt_run.js       # The Hunt: hunter/form/ground data, element-filtered draft pool, single-flavor Vaelk economy, the Quarry boss + its exact-stats piece reward, run progression
 ```
 

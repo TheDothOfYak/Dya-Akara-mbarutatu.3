@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0c1230">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Flake Games">
+  <title>Stryx Pilot — Flake Games</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='8' y='8' width='84' height='84' rx='18' fill='%230c1230'/><path d='M18 56q30-10 64-4q4 4 0 8q-34 6-64-4z' fill='%236b2f1e'/><circle cx='22' cy='56' r='6' fill='%23ffb040'/><path d='M46 50l-8-26l18 22zM60 50l-4-20l14 18z' fill='%23f0c85a' opacity='.8'/></svg>">
+  <script>window.DYA_APP = 'sp';</script>
+  <script src="../../js/flake/mobile.js" data-game="1" data-awake="1"></script>
+  <style>
+    :root { --bg: #0c1230; --card: #161a3a; --card2: #20244a; --line: #343a6a; --ink: #eef0ff; --muted: #a8acd0; --gold: #f0c860; --red: #e86a5a; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+    body.flying { overflow: hidden; touch-action: none; }
+    canvas#sky { position: fixed; inset: 0; display: block; }
+    #ui { position: fixed; inset: 0; overflow-y: auto; background: radial-gradient(ellipse at top, #2a2458 0%, #0c1230 70%); z-index: 5; }
+    .hidden { display: none !important; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 16px 16px 48px; }
+    .top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .top h1 { flex: 1; margin: 0; font: 700 26px/1.1 Georgia, serif; color: var(--gold); }
+    .coins { font-weight: 700; color: var(--gold); white-space: nowrap; }
+    .btn { background: var(--card2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font: inherit; cursor: pointer; }
+    .btn:hover:not(:disabled) { border-color: var(--gold); }
+    .btn:disabled { opacity: .45; cursor: default; }
+    .btn.primary { background: #6a4a1e; border-color: #c09a4a; font-weight: 600; }
+    .btn.danger { border-color: #7a3a3a; color: #f0b8b0; }
+    .btn.ghost { background: transparent; }
+    .btn.small { padding: 5px 10px; font-size: 13px; }
+    .btn.big { padding: 12px 24px; font-size: 18px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .card h3 { margin: 0 0 8px; color: var(--gold); font-family: Georgia, serif; }
+    .card.note { border-color: var(--gold); }
+    .card.note p { margin: 4px 0; }
+    .portcard { display: flex; gap: 16px; align-items: stretch; }
+    .chart { width: 360px; height: 260px; border-radius: 12px; flex: none; }
+    .pname { font: 700 22px Georgia, serif; color: var(--gold); }
+    .muted { color: var(--muted); } .small { font-size: 13px; } .center { text-align: center; }
+    .grow { flex: 1; min-width: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    .job { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #262a52; }
+    .job:first-child { border-top: 0; }
+    .pay { font: 700 18px Georgia, serif; color: var(--gold); min-width: 46px; text-align: right; }
+    .pay::before { content: '🪙 '; font-size: 13px; }
+    .bars { display: grid; gap: 4px; margin-top: 10px; max-width: 320px; }
+    .bar { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .bar span { width: 40px; color: var(--muted); }
+    .bar div { flex: 1; height: 8px; background: #0a0c20; border-radius: 4px; overflow: hidden; }
+    .bar i { display: block; height: 100%; }
+    .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .tbl th { text-align: left; color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px; }
+    .tbl td { padding: 6px; border-bottom: 1px solid #222650; }
+    .prose h3 { margin: 14px 0 4px; } .prose p { margin: 6px 0; }
+    kbd { background: #0a0c20; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 13px; }
+    a { color: var(--gold); }
+    .event { color: #ffd36a; }
+    .pop { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); font: 700 30px Georgia, serif; text-shadow: 0 2px 10px rgba(0,0,0,.7); animation: popup 1.3s ease-out forwards; pointer-events: none; white-space: nowrap; }
+    @keyframes popup { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 30% { transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -40px); } }
+    .hb div { backdrop-filter: blur(3px); }
+    .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 12px; z-index: 30; transition: opacity .5s; }
+    .toast.out { opacity: 0; }
+    /* the flight HUD */
+    #hud { position: fixed; inset: 0; pointer-events: none; z-index: 3; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+    #hTop { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 14px; display: grid; gap: 5px; width: 230px; }
+    .hb { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
+    .hb span { width: 34px; }
+    .hb div { flex: 1; height: 10px; background: rgba(0,0,0,.45); border-radius: 5px; overflow: hidden; border: 1px solid rgba(255,255,255,.25); }
+    .hb i { display: block; height: 100%; }
+    #hHull { background: linear-gradient(90deg, #a04a2a, #e88a4a); }
+    #hHeat { background: linear-gradient(90deg, #e86a20, #ffd070); }
+    #hHeatBar.low div { box-shadow: 0 0 10px #ff6a2a; }
+    #hStats { font-size: 13px; font-weight: 600; }
+    #hCargo { font-size: 13px; display: grid; gap: 2px; margin-top: 4px; }
+    #hCargo .late { color: #ff9a8a; }
+    #hLash { font-size: 12px; opacity: .5; } #hLash.ready { opacity: 1; color: #b8f090; }
+    #mini { position: absolute; top: max(10px, env(safe-area-inset-top)); right: 64px; }
+    #log { position: absolute; bottom: max(22px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); max-width: min(640px, 86vw); text-align: center; font: italic 16px Georgia, serif; color: #e8e8ff; background: rgba(10,10,30,.45); padding: 6px 14px; border-radius: 10px; }
+    #hMsg { position: absolute; top: 24%; left: 0; right: 0; text-align: center; font: 700 34px Georgia, serif; color: #fff; }
+    .hbtn { pointer-events: auto; background: rgba(0,0,0,.4); color: #fff; border: 1px solid rgba(255,255,255,.4); border-radius: 10px; padding: 6px 12px; font: inherit; cursor: pointer; }
+    #pause { position: absolute; top: max(10px, env(safe-area-inset-top)); right: 14px; }
+    #touch { position: fixed; right: 16px; bottom: max(70px, calc(env(safe-area-inset-bottom) + 60px)); z-index: 4; display: grid; grid-template-columns: auto auto; gap: 10px; }
+    #touch button { width: 72px; height: 72px; border-radius: 50%; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.45); color: #fff; font-size: 13px; font-weight: 700; }
+    #touch button.ready { border-color: #b8f090; box-shadow: 0 0 12px rgba(184,240,144,.6); }
+    #pausebox { position: fixed; inset: 0; background: rgba(6,8,20,.7); z-index: 20; display: flex; align-items: center; justify-content: center; }
+    #pausebox .card { min-width: 280px; text-align: center; }
+    @media (max-width: 720px) {
+      .portcard { flex-direction: column; } .chart { width: 100%; height: 240px; }
+      .top h1 { font-size: 20px; } #hTop { width: 170px; } #log { font-size: 14px; bottom: auto; top: 190px; }
+      #hMsg { font-size: 22px; top: 32%; padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="sky"></canvas>
+  <div id="hud" class="hidden">
+    <div id="hTop">
+      <div class="hb"><span>Hull</span><div><i id="hHull"></i></div></div>
+      <div class="hb" id="hHeatBar"><span>Heat</span><div><i id="hHeat"></i></div></div>
+      <div id="hStats"><span id="hSpeed"></span> · <span id="hTime"></span><br><span id="hAlt" class="small"></span></div>
+      <div id="hLash">🌿 vines ready (E)</div>
+      <div id="hCargo"></div>
+    </div>
+    <canvas id="mini"></canvas>
+    <button class="hbtn" id="pause" type="button">❚❚</button>
+    <div id="log" class="hidden"></div>
+    <div id="hMsg" class="hidden"></div>
+  </div>
+  <div id="touch" class="hidden"><button id="tLash" type="button">🌿 Lash</button><button id="tBoost" type="button">🔥 Push</button><button id="tBrake" type="button">⛵ Slow</button></div>
+  <div id="pausebox" class="hidden"><div class="card"><h2 style="color:var(--gold);font-family:Georgia,serif">Paused</h2>
+    <div class="row" style="justify-content:center"><button class="btn primary" id="resume" type="button">Fly on</button><button class="btn danger" id="abort" type="button">Turn back (tow, 20 coins)</button></div></div></div>
+  <div id="ui"></div>
+
+  <script src="../../js/config.js"></script>
+  <script src="../../js/flake/account.js"></script>
+  <script src="../../js/core/broadcast.js"></script><!-- live messages from the Admin Panel -->
+  <script src="../../js/flake/mini_save.js"></script>
+  <script src="../../js/flake/canvas_fx.js"></script>
+  <script src="js/sp_data.js"></script>
+  <script src="js/sp_sim.js"></script>
+  <script src="js/sp_art.js"></script>
+  <script src="js/sp_main.js"></script>
+</body>
+</html>

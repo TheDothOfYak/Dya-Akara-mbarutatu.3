@@ -394,10 +394,12 @@
     { id: 'rpg', label: '⛵ Torcain’s Run', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
     { id: '4bw', label: '🌍 The 4 Brothers Worlds', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans', 'Guide'] },
     { id: 'ld', label: '🃏 Little Dungeon', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
+    { id: 'pr', label: '🐾 Punk Races', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
+    { id: 'sp', label: '🪶 Stryx Pilot', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
     { id: 'su', label: '🏰 Skaar Uverkhron', nav: ['Game Overview', 'Game Players', 'Creatures & Costs', 'Shared Maps', 'Online Rooms', 'Announcements', 'Bans'] },
   ];
   /* which live-broadcast target each section's Announcements page starts on */
-  const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld', su: 'su' };
+  const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld', pr: 'pr', sp: 'sp', su: 'su' };
   const sectionOf = id => SECTIONS.find(x => x.id === id) || SECTIONS[0];
   function goto(sec, v) { section = sec; view = v || sectionOf(sec).nav[0]; panel(); }
   function studio() { return window.FLAKE ? FLAKE.hubConfig().studio : 'Flake Games'; }
@@ -577,6 +579,24 @@
     },
   };
 
+  /* the canvas mini games: one row each, 'mini:<game>:<account>' (js/flake/mini_save.js) */
+  function miniSaves(game, name, about) {
+    const key = id => 'mini:' + game + ':' + id;
+    return {
+      name,
+      async list() {
+        const rows = await F.rest('GET', 'dya_config?key=like.' + encodeURIComponent('mini:' + game + ':*') + '&select=key,updated_at,value&order=updated_at.desc');
+        return (rows || []).map(r => ({ id: r.key.slice(('mini:' + game + ':').length), at: Date.parse(r.updated_at), reset: !!(r.value && r.value.adminReset),
+          about: r.value && r.value.adminReset ? 'reset by an admin' : about(r.value || {}) }));
+      },
+      async get(id) { const r = await F.rest('GET', 'dya_config?key=eq.' + encodeURIComponent(key(id)) + '&select=value'); return { save: (r && r[0] && r[0].value) || null }; },
+      async put(id, parts) { const v = parts.save; v.savedAt = Date.now(); delete v.adminReset; await upsert(key(id), v); },
+      async reset(id) { await upsert(key(id), { adminReset: Date.now(), savedAt: Date.now() }); },
+    };
+  }
+  SAVES.pr = miniSaves('pr', 'Punk Races', v => [v.coins != null ? v.coins + ' coins' : '', v.punks ? v.punks.length + ' Punks' : '', v.wins != null ? v.wins + ' wins' : ''].filter(Boolean).join(' · '));
+  SAVES.sp = miniSaves('sp', 'Stryx Pilot', v => [v.coins != null ? v.coins + ' coins' : '', v.flights != null ? v.flights + ' flights' : '', v.rank || ''].filter(Boolean).join(' · '));
+
   SAVES.su = {
     name: 'Skaar Uverkhron',
     async list() {
@@ -646,6 +666,8 @@
     rpg: 'The 3D adventure, under rpg/. Story progress saves to each player’s account at every Nur Lantern and story beat. Its roadmap is rpg/ROADMAP.md.',
     '4bw': 'The four brothers’ pixel platformer, under four-brothers-world/. Each player’s hero, bag and world save to their account, a row per save key. Its guides are under Guide.',
     ld: 'The mini game (once Legends of Pia’don, inside Dya’Akara), under mini-games/little-dungeon/. No account needed; signed-in players keep a run in progress on their account and a won solo run pays gold.',
+    pr: 'The vine-swinging race mini game, under mini-games/punk-races/. No account needed; a signed-in player’s stable, purse and records are one dya_config row, mini:pr:<account>.',
+    sp: 'The flying mini game, under mini-games/stryx-pilot/. No account needed; a signed-in player’s Stryx, routes and records are one dya_config row, mini:sp:<account>.',
   };
   function gameIntro(body, id) {
     body.appendChild(U.el('p', { cls: 'muted small mb', text: BLURB[id] }));

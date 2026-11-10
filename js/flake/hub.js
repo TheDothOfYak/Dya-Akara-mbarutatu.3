@@ -50,7 +50,7 @@
       skyNarrow: { cx: 0.5, cy: 0.12, maxR: 34, labels: true, sun: [0.92, 0.04] },
     },
   };
-  const MINI_ICON = { ld: '🗝' };
+  const MINI_ICON = { ld: '🗝', pr: '🐾', sp: '🪶' };
 
   let hub = F.hubConfig();
   let session = F.session();
