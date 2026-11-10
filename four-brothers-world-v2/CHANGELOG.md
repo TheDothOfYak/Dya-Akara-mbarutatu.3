@@ -2,8 +2,9 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
-## Golden boss chests
+## Golden boss chests, silver den chests
 - **A big golden chest by every world boss**: Gnarlroot, the Warthog King, the Gemscale Leviathan (on the sea floor), the Hollow Wraith and the Possessed Reflections. It is sealed until you beat that boss. Each hero can open it once: a whole Legendary Key, a Gold Crystal, Star Embers, bars of that world's best metal, a legendary staff you don't have yet, and a big pile of rupees.
+- **A silver chest in every scorpion den.** Beat the Mother Scorpion and the chest on her den floor opens, once each time you beat her: Key Fragments, a Star Ember, crystals, bars (bronze in the desert den, platinum in the jungle den), a Mother's Carapace, sometimes a Legendary Key, and rupees.
 
 ## The Stormmark, chests for everyone
 - **The Stormmark.** Get struck by lightning and the storm lives in you for 3 minutes. Your eyes and outline glow cyan, a lightning rune burns on your forehead, and lightning crackles around you. Spark, Fire and Poison come out as Chain Lightning, a rock's ground slam throws a ring of lightning, and anything that touches you gets shocked, other players too. Thunderstorms strike heroes who stand out in them, or (fuzzy) cast Rain on yourself and stand under your own Storm.
