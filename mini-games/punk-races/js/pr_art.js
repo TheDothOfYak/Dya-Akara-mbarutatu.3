@@ -452,6 +452,22 @@
     }
     /* the runners, the one you follow on top */
     race.runners.slice().sort((a, b) => (a === focus) - (b === focus)).forEach(u => drawPunk(ctx, gl, u, view, u === focus));
+    /* the release gauge: while you swing, the arc is the clean-release window and the needle is where you are heading */
+    if (opts.aim && focus.mode === 'swing' && !focus.finished) {
+      const cx = focus.x, cy = focus.y - 10, rr = 74;
+      const a0 = -PR.CLEAN[1] * Math.PI / 180, a1 = -PR.CLEAN[0] * Math.PI / 180;
+      const head = Math.atan2(focus.vy, focus.vx), sp2 = Math.hypot(focus.vx, focus.vy);
+      const inWin = focus.vx > 0 && head > a0 && head < a1 && sp2 > 360;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a1); ctx.stroke();
+      ctx.strokeStyle = inWin ? 'rgba(255,230,110,.95)' : 'rgba(170,240,150,.55)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a1); ctx.stroke();
+      if (inWin) FX.orb(gl, cx + Math.cos(head) * rr, cy + Math.sin(head) * rr, 40, '#ffe070', 0.8);
+      if (sp2 > 60) {
+        ctx.strokeStyle = inWin ? '#fff6c0' : 'rgba(255,255,255,.7)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(head) * (rr - 14), cy + Math.sin(head) * (rr - 14)); ctx.lineTo(cx + Math.cos(head) * (rr + 12), cy + Math.sin(head) * (rr + 12)); ctx.stroke();
+      }
+      if (inWin) { ctx.font = 'bold 14px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff6c0'; ctx.fillText('let go!', cx + rr * 0.75, cy - rr * 0.95); }
+    }
     drawParts(ctx, gl, view);
     ambient(view, focus);
     gl.restore();
@@ -582,16 +598,7 @@
       }
     }
 
-    /* branches out to each tip */
     const tips = (v.c._tips && v.c._tips[i]) || [];
-    tips.forEach(a => {
-      const broken = a.brokenUntil && a.brokenUntil > v.race.t;
-      const tx = broken ? topX + (a.x - topX) * 0.4 : a.x + sway * 0.5, ty = broken ? t.top + 70 + (a.y - t.top - 70) * 0.4 : a.y;
-      const pts = FX.quad(topX, t.top + 80, (topX + tx) / 2, Math.min(ty, t.top + 70) - 24, tx, ty, 10);
-      ctx.fillStyle = a.brittle ? '#7a7066' : th.trunk;
-      FX.ribbon(ctx, pts, 12, broken ? 6 : 3.5);
-      ctx.fillStyle = FX.rgba(M.light, 0.15); FX.ribbon(ctx, pts.map(p => [p[0], p[1] - 2]), 4, 1);
-    });
 
     /* the crown */
     if (th.shape === 'dead') {
@@ -605,30 +612,58 @@
       for (let k = 0; k < 4; k++) { const ex = topX + (hash(i + k) - 0.5) * 60, ey = t.top + 50 + hash(i * 3 + k) * 90; FX.orb(gl, ex, ey, 10, '#ff8a3a', 0.5 + Math.sin(now * 5 + k + i) * 0.4); ctx.fillStyle = '#ffb060'; ctx.fillRect(ex - 1.5, ey - 1.5, 3, 3); }
     } else {
       const cr = Pp.crowns[Math.floor(hash(i + 0.5) * Pp.crowns.length)];
-      const s = (th.shape === 'spire' ? 1.1 : 1) * (0.85 + hash(i * 3.3) * 0.3);
+      const s = (th.shape === 'spire' ? 1.0 : 0.9) * (0.82 + hash(i * 3.3) * 0.2);
       const flip = hash(i * 7.7) > 0.5;
       ctx.save(); ctx.translate(topX, t.top + (th.shape === 'pine' ? 130 : 95)); if (flip) ctx.scale(-1, 1);
       ctx.rotate(sway * 0.004);
       ctx.drawImage(cr, -cr.width / 2 * s, -cr.height * 0.72 * s, cr.width * s, cr.height * s);
       ctx.restore();
     }
-    /* leaf clusters on the tips a vine can catch (brittle ones bare, grey and cracked) */
+    /* the branches a vine can catch: drawn over the leaves, reaching out past the crown,
+       each ending in a tuft with a pale ring so you can see it coming and time the swing.
+       Brittle ones are grey, bare and cracked; a snapped one is a broken stub. */
     tips.forEach(a => {
       const broken = a.brokenUntil && a.brokenUntil > v.race.t;
-      if (broken) return;
-      const ax = a.x + sway * 0.5, ay = a.y;
-      if (a.brittle) {
-        ctx.strokeStyle = '#8a8076'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-        for (let k = 0; k < 4; k++) { const an = -Math.PI / 2 + (k - 1.5) * 0.6; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + Math.cos(an) * 18, ay + Math.sin(an) * 18); ctx.stroke(); }
-        ctx.strokeStyle = '#3a2a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ax - 14, ay + 2); ctx.lineTo(ax - 8, ay - 3); ctx.lineTo(ax - 4, ay + 3); ctx.stroke();
+      const ax = a.x + sway * 0.6, ay = a.y;
+      const sx = topX + (a.x > t.x ? 8 : -8), sy = Math.max(t.top + 120, ay + 30);
+      const ex = broken ? sx + (ax - sx) * 0.35 : ax, ey = broken ? sy + (ay - sy) * 0.35 : ay;
+      const pts = FX.quad(sx, sy, sx + (ex - sx) * 0.55, Math.min(sy, ey) - 26, ex, ey, 12);
+      const wood = a.brittle ? '#8a8076' : FX.mix(th.trunk, '#0a1030', M.dark * 0.6);
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; FX.ribbon(ctx, pts.map(p => [p[0] + 2, p[1] + 4]), 16, broken ? 8 : 5);
+      ctx.fillStyle = wood; FX.ribbon(ctx, pts, 15, broken ? 8 : 5);
+      ctx.fillStyle = FX.rgba(a.brittle ? '#d8d0c4' : M.light, a.brittle ? 0.35 : 0.22); FX.ribbon(ctx, pts.map(p => [p[0], p[1] - 3]), 5, 1.4);
+      /* a twig or two off the limb */
+      for (let k = 4; k <= 8; k += 4) {
+        const p = pts[k], dir = a.x > t.x ? 1 : -1;
+        ctx.strokeStyle = wood; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + dir * 10, p[1] - 16 - hash(a.x + k) * 8); ctx.stroke();
+        if (!a.brittle && th.shape !== 'dead') FX.leaf(ctx, p[0] + dir * 10, p[1] - 18, -Math.PI / 2 + dir * 0.5, 11, th.leaf[2], FX.rgba(th.leaf[0], 0.5));
+      }
+      if (broken) {
+        ctx.fillStyle = '#c8b89a'; ctx.beginPath(); ctx.arc(ex, ey, 4, 0, TAU); ctx.fill();
         return;
       }
-      if (th.shape === 'dead') { ctx.fillStyle = '#3a2a22'; ctx.beginPath(); ctx.arc(ax, ay, 7, 0, TAU); ctx.fill(); return; }
-      for (let k = 0; k < 7; k++) {
-        const an = (k / 7) * TAU + hash(a.x + k) + Math.sin(now * 2 + k) * 0.08;
-        FX.leaf(ctx, ax, ay, an, 13 + hash(k + a.y) * 6, k % 2 ? th.leaf[2] : th.leaf[1], FX.rgba(th.leaf[0], 0.5));
+      if (a.brittle) {
+        ctx.strokeStyle = '#8a8076'; ctx.lineWidth = 2.5;
+        for (let k = 0; k < 4; k++) { const an = -Math.PI / 2 + (k - 1.5) * 0.6; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + Math.cos(an) * 18, ay + Math.sin(an) * 18); ctx.stroke(); }
+        ctx.strokeStyle = '#2a1a12'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ax - 22, ay - 6); ctx.lineTo(ax - 15, ay + 1); ctx.lineTo(ax - 9, ay - 6); ctx.lineTo(ax - 4, ay + 1); ctx.stroke();
+        ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(255,170,120,.75)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(ax, ay, 17, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+        return;
       }
-      ctx.fillStyle = th.leaf[3]; ctx.beginPath(); ctx.arc(ax - 3, ay - 3, 3, 0, TAU); ctx.fill();
+      /* the tuft at the tip, hanging a little */
+      if (th.shape === 'dead') { ctx.fillStyle = '#3a2a22'; ctx.beginPath(); ctx.arc(ax, ay, 8, 0, TAU); ctx.fill(); }
+      else for (let k = 0; k < 9; k++) {
+        const an = Math.PI / 2 + (k - 4) * 0.42 + Math.sin(now * 2 + k + a.x) * 0.08;
+        FX.leaf(ctx, ax, ay, an, 15 + hash(k + a.y) * 7, k % 2 ? th.leaf[2] : th.leaf[1], FX.rgba(th.leaf[0], 0.5));
+      }
+      /* the knot where a vine takes hold, and its ring */
+      ctx.fillStyle = FX.shade(wood, 0.2); ctx.beginPath(); ctx.arc(ax, ay, 5.5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,250,215,.8)'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(ax, ay, 17, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(ax, ay, 19.5, 0, TAU); ctx.stroke();
+      FX.orb(gl, ax, ay, 22, '#fff6c8', 0.25);
     });
     /* lanterns hung in the trees after dark */
     if ((M.moon || v.m.time === 'dusk') && hash(i * 1.9) > 0.55 && tips[0]) {

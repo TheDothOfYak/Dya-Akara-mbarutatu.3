@@ -88,19 +88,23 @@
        (the anchors a vine can catch). A tall tree stands at each edge
        of a gap and leans over it, so every gap can be swung. */
     const tall = track.tall;
+    const TIP_OUT = 150;                 // how far a branch tip reaches out from the trunk (past the crown)
+    const SPREAD = 1.35;                 // trees stand further apart than the track's numbers say
     function addTree(x, H, lean, edge) {
       const base = course.groundAt(x);
       if (base == null) return;
       const top = base - H;
       const tree = { x, base, top, H, lean: lean || 0, kind: track.theme, seed: r(), edge: !!edge };
       course.trees.push(tree);
-      const tips = 2 + (r() < 0.5 ? 1 : 0);
-      for (let k = 0; k < tips; k++) {
-        const side = k === 0 ? 1 : k === 1 ? -1 : (r() < 0.5 ? 1 : -1);
-        const ax = x + lean * 0.6 + side * (40 + r() * 60);
-        const ay = top + 30 + r() * 60 + (k === 2 ? 40 : 0);
-        course.anchors.push({ x: ax, y: ay, tree: course.trees.length - 1 });
-      }
+      /* one clear branch reaching forward, out past the crown; trees at a gap's edge
+         also reach back over it. More branches behind are added once every tree is placed. */
+      const tipAt = side => {
+        const ax = x + lean * 0.6 + side * (TIP_OUT + r() * 30);
+        const ay = top + 105 + r() * 40;
+        course.anchors.push({ x: ax, y: ay, tree: course.trees.length - 1, side });
+      };
+      tipAt(1);
+      if (edge) tipAt(-1);
     }
     course.groundAt = function (x) {
       for (let i = 0; i < course.gaps.length; i++) { const g = course.gaps[i]; if (x > g.x0 && x < g.x1) return null; }
@@ -126,11 +130,17 @@
         addTree(g.x1 + 50, tall[1] + 20, -50, true);
         /* a wide gap gets a hanging root in the middle to catch */
         if (g.x1 - g.x0 > 300) course.anchors.push({ x: (g.x0 + g.x1) / 2, y: course.surface((g.x0 + g.x1) / 2) - tall[0] - 40, tree: -1, root: true });
-        x = g.x1 + 50 + track.trees[0] * (0.7 + r() * 0.4);
+        x = g.x1 + 50 + track.trees[0] * SPREAD * (0.7 + r() * 0.4);
         continue;
       }
       addTree(x, tall[0] + r() * (tall[1] - tall[0]), (r() - 0.5) * 30);
-      x += track.trees[0] + r() * (track.trees[1] - track.trees[0]);
+      x += (track.trees[0] + r() * (track.trees[1] - track.trees[0])) * SPREAD;
+    }
+    /* where there is a long stretch behind a tree, it reaches back too */
+    for (let i = 1; i < course.trees.length; i++) {
+      const t = course.trees[i], p = course.trees[i - 1];
+      if (t.edge || t.x - p.x < 470) continue;
+      course.anchors.push({ x: t.x + t.lean * 0.6 - (TIP_OUT + r() * 25), y: t.top + 115 + r() * 35, tree: i, side: -1 });
     }
     course.anchors.sort((a, b) => a.x - b.x);
     /* some branches are dead and brittle: grey, cracked, and they snap if you hang on too long.
@@ -207,13 +217,14 @@
     if (u.flipT > 0) { u.flipT = 0; u.flipA = 0; u.combo = 0; }   // caught a branch mid-flip: the flip is lost
     u.events.push({ t: 'vine', x: a.x, y: a.y });
   }
+  PR.CLEAN = [14, 66];            // the release angles (degrees above flat) that count as clean
   function release(u) {
     if (u.mode !== 'swing') return;
     const sp = Math.hypot(u.vx, u.vy);
     const up = -u.vy, fw = u.vx;
     const ang = Math.atan2(up, fw) * 180 / Math.PI;     // 0 = flat ahead, 90 = straight up
     u.mode = 'air'; u.anchor = null;
-    if (fw > 0 && ang > 18 && ang < 62 && sp > 380) {
+    if (fw > 0 && ang > PR.CLEAN[0] && ang < PR.CLEAN[1] && sp > 360) {
       /* a clean release: thrown a little harder, and the boost fills */
       u.vx *= u.d.fling; u.vy *= u.d.fling;
       u.boost = Math.min(1, u.boost + u.d.fill);
@@ -250,10 +261,11 @@
     if (u.boostT > 0) u.boostT -= dt;
 
     /* the vine: press to catch, hold to swing, let go to fly */
-    if (input.hold && u.mode !== 'swing' && !u.heldLast) {
+    /* press to catch; and keep holding in the air, and the vine grabs the next branch the moment one is in reach */
+    if (input.hold && u.mode !== 'swing' && (!u.heldLast || u.mode === 'air')) {
       const a = PR.pickAnchor(course, u);
-      if (a) attach(course, u, a);
-      else if (u.mode === 'ground' || u.mode === 'swim') input.jump = true;
+      if (a && !(u.flipT > 0 && u.heldLast)) attach(course, u, a);
+      else if (!a && !u.heldLast && (u.mode === 'ground' || u.mode === 'swim')) input.jump = true;
     }
     if (!input.hold && u.mode === 'swing') release(u);
     u.heldLast = !!input.hold;
@@ -503,17 +515,21 @@
         }
       });
       race.runners.forEach(u => {
+        if (u.remote) return;                  // a friend's Punk online: its own device moves it
         const inp = u.ai ? PR.aiInput(race.course, u, race.t) : (playerInput || { hold: false });
         PR.stepRunner(race.course, u, inp, race.t);
         if (inp.jump && !u.ai && playerInput) playerInput.jump = false;
         if (inp.boost && !u.ai && playerInput) playerInput.boost = false;
         if (inp.trick && !u.ai && playerInput) playerInput.trick = false;
-        if (u.finished && race.order.indexOf(u) < 0) { race.order.push(u); u.place = race.order.length; }
       });
+      /* who is home, in the order of their times (a friend online reports their own) */
+      let added = false;
+      race.runners.forEach(u => { if (u.finished && race.order.indexOf(u) < 0) { race.order.push(u); added = true; } });
+      if (added) { race.order.sort((a, b) => a.time - b.time); race.order.forEach((u, i) => { u.place = i + 1; }); }
       /* Punks bump into each other */
       for (let i = 0; i < race.runners.length; i++) for (let j = i + 1; j < race.runners.length; j++) {
         const a = race.runners[i], b = race.runners[j];
-        if (a.finished || b.finished || a.climb > 0 || b.climb > 0) continue;
+        if (a.finished || b.finished || a.climb > 0 || b.climb > 0 || a.remote || b.remote) continue;
         const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
         if (d > R * 1.9 || d < 0.01) continue;
         const nx = dx / d, ny = dy / d, push = (R * 1.9 - d) / 2;

@@ -96,7 +96,12 @@ check('a strong Punk beats a weak one on most tracks', strongWins >= 7, strongWi
   u.mode = 'swing'; u.anchor = a; u.x = a.x; u.y = a.y + 150; u.len = 150; u.lenTarget = 150; u.vx = 200; u.vy = 0;
   let t = 0;
   for (let i = 0; i < 140; i++) PR.stepRunner(c, u, { hold: true }, t += PR.STEP);
-  check('hang on a brittle branch and it snaps', u.snaps === 1 && u.mode !== 'swing' && a.brokenUntil > t);
+  check('hang on a brittle branch and it snaps', u.snaps === 1 && u.anchor !== a && a.brokenUntil > t);
+  /* keep holding in the air and the vine grabs the next branch in reach */
+  const hz = PR.makeRunner(c, { id: 'hz', stats: stats(5) });
+  const tgt = c.anchors[10]; hz.mode = 'air'; hz.x = tgt.x - 150; hz.y = tgt.y + 140; hz.vx = 300; hz.vy = 0; hz.heldLast = true;
+  PR.stepRunner(c, hz, { hold: true }, t);
+  check('holding in the air catches the next branch in reach', hz.mode === 'swing');
   c.now = t;
   const v = PR.makeRunner(c, { id: 'v', stats: stats(5) }); v.x = a.x - 100; v.y = a.y + 160;
   check('a snapped branch cannot be caught', PR.pickAnchor(c, v) !== a);
@@ -129,6 +134,45 @@ check('a strong Punk beats a weak one on most tracks', strongWins >= 7, strongWi
   const moods = new Set(); for (let i = 1; i < 200; i++) { const m = PR.pickMood(PR.track('jungle' in {} ? 'jungle' : 'venomgrove'), i); moods.add(m.time + m.weather); }
   check('races come at different times and weathers', moods.size >= 4);
   check('a race keeps its mood for its seed', JSON.stringify(PR.pickMood(tr, 77)) === JSON.stringify(PR.pickMood(tr, 77)));
+})();
+
+/* racing online: what one device sends, another draws */
+(function () {
+  require(path.join(dir, 'pr_net.js'));
+  const NET = PR.net;
+  const tr = PR.track('ford');
+  const mk = (meId, remoteIds) => {
+    const ents = [{ id: 'kA', stats: stats(5) }, { id: 'kB', stats: stats(5) }, { id: 'ai0', ai: true, stats: stats(4), skill: 0.5 }].map(e => e.id === meId ? Object.assign({}, e, { id: 'me' }) : e);
+    const race = PR.makeRace(tr, ents, { seed: 1234 });
+    race.runners.forEach(u => { if (remoteIds.indexOf(u.id) >= 0) { u.remote = true; u.ai = false; } });
+    return race;
+  };
+  const host = mk('kA', ['kB']), guest = mk('kB', ['kA', 'ai0']);
+  check('every player gets the same course and weather from the seeds', JSON.stringify(host.course.mood) === JSON.stringify(guest.course.mood) && host.course.anchors.length === guest.course.anchors.length);
+  for (let i = 0; i < 60; i++) PR.tick(host, 0.1, { hold: i % 10 < 6 });
+  const packet = NET.pack(host, 'kA', true);
+  check('the host sends its own Punk and the rivals, not the friend it only draws', packet.map(e => e[0]).sort().join() === 'ai0,kA');
+  NET.unpack(guest, packet, 'kB');
+  for (let i = 0; i < 30; i++) NET.smooth(guest, 1 / 60);
+  const hA = host.runners.find(u => u.id === 'me'), gA = guest.runners.find(u => u.id === 'kA');
+  check('a friend’s Punk shows up where it really is', Math.abs(hA.x - gA.x) < 80 && gA.mode === hA.mode, Math.round(hA.x) + ' vs ' + Math.round(gA.x));
+  const before = gA.x; PR.tick(guest, 0.5, {});
+  check('this device never moves a friend’s Punk on its own', gA.x === before);
+  hA.finished = true; hA.time = 33.3;
+  for (let i = 0; i < 40; i++) PR.tick(guest, 0.1, {});
+  NET.unpack(guest, NET.pack(host, 'kA', true), 'kB');
+  PR.tick(guest, 0.05, {});
+  check('a friend’s finish arrives with their time', gA.finished && gA.time === 33.3 && guest.order.indexOf(gA) >= 0);
+  const rm = new NET.Room({ key: 'kA', name: 'Ama', coat: 'orange', stats: stats(3) }, {});
+  check('room codes are five letters', NET.code().length === 5 && NET.cleanCode(' ab-c12x ') === 'ABC12');
+  rm.host = true; rm.hostKey = 'kA'; rm.state = 'lobby'; rm.track = 'beuhk'; rm.roster = { kA: { key: 'kA', name: 'Ama', joined: 0, stats: stats(3) } }; rm.ch = { send() {} };
+  rm.onMessage({ t: 'hello', from: 'kB', name: 'Brakk', stats: stats(3) });
+  rm.onMessage({ t: 'hello', from: 'kC', name: 'Sefi', stats: stats(3) });
+  rm.onMessage({ t: 'hello', from: 'kD', name: 'Oddo', stats: stats(3) });
+  rm.onMessage({ t: 'hello', from: 'kE', name: 'Fifth', stats: stats(3) });
+  check('a room takes four riders, not five', rm.players().length === 4 && rm.players()[0].key === 'kA');
+  const spec = rm.start([{ id: 'ai0', ai: true, stats: stats(4) }]);
+  check('a full room starts with no rivals', spec.entrants.length === 4 && spec.entrants.every(e => e.human));
 })();
 
 /* money: odds, foals, pairing */
