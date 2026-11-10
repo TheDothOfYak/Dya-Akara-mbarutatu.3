@@ -80,6 +80,9 @@
     .swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
     .swatch.on { border-color: #fff; }
     a { color: var(--gold); }
+    .txt { background: #120d08; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; width: 100%; max-width: 280px; margin-top: 4px; }
+    .txt.code { text-transform: uppercase; letter-spacing: 4px; font-weight: 700; width: 140px; }
+    .roomcode { font: 700 54px Georgia, serif; letter-spacing: 10px; color: var(--gold); margin: 6px 0; }
     .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: #2c2218; border: 1px solid var(--gold); padding: 10px 18px; border-radius: 12px; z-index: 30; transition: opacity .5s; }
     .toast.out { opacity: 0; }
     /* the race HUD */
@@ -147,6 +150,7 @@
   <script src="../../js/flake/canvas_fx.js"></script>
   <script src="js/pr_data.js"></script>
   <script src="js/pr_sim.js"></script>
+  <script src="js/pr_net.js"></script>
   <script src="js/pr_art.js"></script>
   <script src="js/pr_main.js"></script>
 </body>

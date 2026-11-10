@@ -217,13 +217,14 @@
     if (u.flipT > 0) { u.flipT = 0; u.flipA = 0; u.combo = 0; }   // caught a branch mid-flip: the flip is lost
     u.events.push({ t: 'vine', x: a.x, y: a.y });
   }
+  PR.CLEAN = [14, 66];            // the release angles (degrees above flat) that count as clean
   function release(u) {
     if (u.mode !== 'swing') return;
     const sp = Math.hypot(u.vx, u.vy);
     const up = -u.vy, fw = u.vx;
     const ang = Math.atan2(up, fw) * 180 / Math.PI;     // 0 = flat ahead, 90 = straight up
     u.mode = 'air'; u.anchor = null;
-    if (fw > 0 && ang > 18 && ang < 62 && sp > 380) {
+    if (fw > 0 && ang > PR.CLEAN[0] && ang < PR.CLEAN[1] && sp > 360) {
       /* a clean release: thrown a little harder, and the boost fills */
       u.vx *= u.d.fling; u.vy *= u.d.fling;
       u.boost = Math.min(1, u.boost + u.d.fill);
@@ -260,10 +261,11 @@
     if (u.boostT > 0) u.boostT -= dt;
 
     /* the vine: press to catch, hold to swing, let go to fly */
-    if (input.hold && u.mode !== 'swing' && !u.heldLast) {
+    /* press to catch; and keep holding in the air, and the vine grabs the next branch the moment one is in reach */
+    if (input.hold && u.mode !== 'swing' && (!u.heldLast || u.mode === 'air')) {
       const a = PR.pickAnchor(course, u);
-      if (a) attach(course, u, a);
-      else if (u.mode === 'ground' || u.mode === 'swim') input.jump = true;
+      if (a && !(u.flipT > 0 && u.heldLast)) attach(course, u, a);
+      else if (!a && !u.heldLast && (u.mode === 'ground' || u.mode === 'swim')) input.jump = true;
     }
     if (!input.hold && u.mode === 'swing') release(u);
     u.heldLast = !!input.hold;
@@ -513,17 +515,21 @@
         }
       });
       race.runners.forEach(u => {
+        if (u.remote) return;                  // a friend's Punk online: its own device moves it
         const inp = u.ai ? PR.aiInput(race.course, u, race.t) : (playerInput || { hold: false });
         PR.stepRunner(race.course, u, inp, race.t);
         if (inp.jump && !u.ai && playerInput) playerInput.jump = false;
         if (inp.boost && !u.ai && playerInput) playerInput.boost = false;
         if (inp.trick && !u.ai && playerInput) playerInput.trick = false;
-        if (u.finished && race.order.indexOf(u) < 0) { race.order.push(u); u.place = race.order.length; }
       });
+      /* who is home, in the order of their times (a friend online reports their own) */
+      let added = false;
+      race.runners.forEach(u => { if (u.finished && race.order.indexOf(u) < 0) { race.order.push(u); added = true; } });
+      if (added) { race.order.sort((a, b) => a.time - b.time); race.order.forEach((u, i) => { u.place = i + 1; }); }
       /* Punks bump into each other */
       for (let i = 0; i < race.runners.length; i++) for (let j = i + 1; j < race.runners.length; j++) {
         const a = race.runners[i], b = race.runners[j];
-        if (a.finished || b.finished || a.climb > 0 || b.climb > 0) continue;
+        if (a.finished || b.finished || a.climb > 0 || b.climb > 0 || a.remote || b.remote) continue;
         const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
         if (d > R * 1.9 || d < 0.01) continue;
         const nx = dx / d, ny = dy / d, push = (R * 1.9 - d) / 2;

@@ -123,6 +123,7 @@
     const cupBusy = D.cupRun ? ' (in progress)' : '';
     const grid = el('div', { cls: 'grid' }, [
       tile('🏆', 'Cup Races' + cupBusy, 'Three races, points for each place, a purse for the winner.', cups),
+      tile('🌐', 'Race Friends Online', 'Host a room or join one with its code. No account needed.', onlineMenu),
       tile('🏁', 'Quick Race', 'One race against three rivals on any track you have reached.', () => pickTrack('quick')),
       tile('⏱', 'Time Trial', 'Just you and the ghost of your best run. Beat par for gold.', () => pickTrack('trial')),
       tile('🎟', 'Watch & Bet', 'The market-day way: pick a runner, put coins on it, and watch.', watchBet),
@@ -147,10 +148,15 @@
       <h3>The vine</h3>
       <p><b>Hold</b> <kbd>Space</kbd>, the mouse button, or anywhere on a touch screen. A vine shoots to the glowing branch tip ahead and catches.
       Keep holding and you swing under it: your Punk pumps at the bottom of the arc.</p>
-      <p><b>Let go</b> to fly off with all that speed, then hold again in the air to catch the next tree.</p>
+      <p><b>Let go</b> to fly off with all that speed. Hold again in the air (or just keep holding) and the vine grabs the next branch the moment one is in reach.
+      Every branch you can catch ends in a pale ring.</p>
       <h3>A clean release</h3>
       <p>Let go just past the bottom, while you are rising forward (between a gentle climb and a steep one).
       A clean release throws you a little harder, sparkles, and fills your boost.</p>
+      <p>While you swing, a gauge by your Punk shows the clean-release window and a needle for where you are heading. When it lights up, let go.</p>
+      <h3>Racing friends online</h3>
+      <p>Pick <b>Race Friends Online</b>, host a room and give your friends its five-letter code, or join theirs. Up to four riders; rivals fill the empty seats.
+      You don’t need an account: sign in only if you want your online races and wins kept on it.</p>
       <h3>Boost</h3>
       <p>When the boost bar is full, press <kbd>Shift</kbd>, <kbd>X</kbd> or the ⚡ button. Ju fruit hanging in the air fill it too.</p>
       <h3>Flips</h3>
@@ -406,6 +412,86 @@
     ], menu);
   }
 
+  /* ================= racing friends online ================= */
+  const NET = PR.net;
+  let ROOM = null;
+  const TAB = Math.random().toString(36).slice(2, 6);     // two tabs are two riders
+  function myKey() { if (!D.netKey) { D.netKey = 'k' + Math.random().toString(36).slice(2, 10); save(); } return D.netKey + TAB; }
+  function netName() { return (SAVE.who && SAVE.who.name) || D.netName || 'Guest ' + myKey().slice(1, 5).toUpperCase(); }
+  function meForNet() { const p = me(); return { key: myKey(), name: netName(), coat: p.coat, hat: D.hat, stats: Object.assign({}, p.stats) }; }
+  function onlineMenu(note) {
+    if (ROOM) { ROOM.leave(); ROOM = null; }
+    const nameBox = el('input', { cls: 'txt', value: netName(), maxlength: '18', 'aria-label': 'Your name' });
+    const codeBox = el('input', { cls: 'txt code', placeholder: 'CODE', maxlength: '5', 'aria-label': 'Room code', autocapitalize: 'characters' });
+    const status = el('p', { cls: 'muted small', text: note || '' });
+    const go = async (host) => {
+      if (!SAVE.who) { const n = nameBox.value.trim().slice(0, 18); if (n.length < 2) { toast('Pick a name (2 letters or more).'); return; } D.netName = n; save(); }
+      const code = host ? NET.code() : NET.cleanCode(codeBox.value);
+      if (!host && code.length !== 5) { toast('A room code is 5 letters.'); return; }
+      status.textContent = host ? 'Opening a room…' : 'Looking for room ' + code + '…';
+      const room = new NET.Room(meForNet(), {
+        onLobby: r => { if (ROOM === r && !R) lobby(); },
+        onStart: spec => onlineStart(spec),
+        onState: list => { if (R && R.kind === 'online') NET.unpack(R.race, list, myKey()); },
+        onClosed: why => { if (ROOM === room) { const inRace = !!R; ROOM.leave(); ROOM = null; if (!inRace) onlineMenu(why); else toast(why); } },
+      });
+      try {
+        ROOM = room;
+        await room.open(code, host);
+        if (host) room.setTrack(reached()[0].id);
+        lobby();
+      } catch (e) { ROOM = null; status.textContent = e.message; }
+    };
+    const who = SAVE.who
+      ? el('p', { cls: 'muted small', text: 'Racing as ' + netName() + '. Your online races and wins are kept on your account.' })
+      : el('div', {}, [el('label', { cls: 'small muted', text: 'Your name in the race' }), nameBox,
+        el('p', { cls: 'muted small', html: 'You can race online as a guest. <a href="#" id="netSignin">Sign in</a> if you want your stats kept on your account.' })]);
+    screen('Race Friends Online', [
+      el('div', { cls: 'card' }, [who]),
+      el('div', { cls: 'card' }, [el('h3', { text: 'Host a race' }), el('p', { cls: 'muted small', text: 'You pick the track. You get a code to give your friends; up to 4 riders, and rivals fill any empty seats.' }), btn('Host a room', () => go(true), 'primary')]),
+      el('div', { cls: 'card' }, [el('h3', { text: 'Join a friend' }), el('div', { cls: 'row' }, [codeBox, btn('Join', () => go(false), 'primary')])]),
+      status,
+    ], menu);
+    const si = $('netSignin'); if (si) si.addEventListener('click', e => { e.preventDefault(); save(); F.toSignIn(); });
+    codeBox.addEventListener('keydown', e => { if (e.key === 'Enter') go(false); });
+  }
+  function lobby() {
+    const r = ROOM; if (!r) return;
+    const players = r.players();
+    const list = el('div', { cls: 'list' }, players.map(p => el('div', { cls: 'card punk' + (p.key === myKey() ? ' active' : '') }, [
+      portrait({ coat: p.coat || 'orange' }, 56),
+      el('div', { cls: 'grow' }, [el('div', { cls: 'pname', text: p.name + (p.key === r.hostKey ? ' · host' : '') + (p.key === myKey() ? ' (you)' : '') }), p.stats ? statBars(p) : null]),
+    ])));
+    const empty = NET.MAX - players.length;
+    const tr = r.track ? PR.track(r.track) : null;
+    const hostBits = r.host ? el('div', { cls: 'card' }, [
+      el('h3', { text: 'The race' }),
+      el('div', { cls: 'row' }, [el('select', { onchange: e => r.setTrack(e.target.value) }, reached().map(t => el('option', { value: t.id, text: t.name, selected: t.id === r.track ? 'selected' : null })))]),
+      el('label', { cls: 'row small' }, [el('input', { type: 'checkbox', checked: r.fill ? 'checked' : null, onchange: e => r.setFill(e.target.checked) }), ' Fill the empty seats with rivals']),
+      el('div', { cls: 'row' }, [btn(players.length > 1 ? 'Start the race 🏁' : 'Start (you can race the rivals while you wait)', () => {
+        const spec = r.start(rivalsFor(null, 0.2 + PR.TRACKS.indexOf(PR.track(r.track)) * 0.1, 3, Date.now() & 0xfffff).map((x, i) => Object.assign(x, { id: 'ai' + i })));
+        if (spec) onlineStart(spec);
+      }, 'primary big')]),
+    ]) : el('div', { cls: 'card' }, [el('p', { text: tr ? 'The host has picked ' + tr.name + '. Waiting for them to start…' : 'Waiting for the host…' })]);
+    screen('Room ' + r.code, [
+      el('div', { cls: 'card center' }, [el('div', { cls: 'muted small', text: 'Give your friends this code' }), el('div', { cls: 'roomcode', text: r.code }),
+        el('div', { cls: 'muted small', text: NET.local ? 'Test mode: this room only reaches other tabs in this browser.' : (players.length + ' of ' + NET.MAX + ' riders' + (empty && r.fill ? ' · rivals will fill ' + empty + (empty > 1 ? ' seats' : ' seat') : '')) })]),
+      list, hostBits,
+    ], () => { if (ROOM) ROOM.leave(); ROOM = null; onlineMenu(); });
+  }
+  function onlineStart(spec) {
+    const r = ROOM; if (!r) return;
+    const k = myKey();
+    const entrants = spec.entrants.map(e => {
+      if (e.id === k) { const m = mine(); return Object.assign(m, { name: e.name, rider: e.rider }); }
+      return Object.assign({}, e, { ai: !!(r.host && !e.human), _remote: !(r.host && !e.human) });
+    });
+    const tr = PR.track(spec.track);
+    screen('Room ' + r.code, [el('div', { cls: 'card center' }, [el('p', { text: 'Starting on ' + tr.name + '…' })])]);
+    /* everyone's countdown lines up: the host sent the start a little ahead */
+    setTimeout(() => { if (ROOM === r) startRace({ track: tr, entrants, kind: 'online', moodSeed: spec.mood, room: r }); }, Math.max(0, spec.delay - 3000 - (r.host ? 0 : 60)));
+  }
+
   /* ================= the race screen ================= */
   let R = null;              // the race being run, with its extras
   const input = { hold: false, jump: false, boost: false, trick: false };
@@ -416,12 +502,13 @@
     document.body.classList.add('racing');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !touchy || o.kind === 'watch');
-    const race = PR.makeRace(o.track, o.entrants, { seed: (Date.now() ^ (o.track.seed * 7919)) & 0xffffff });
+    const race = PR.makeRace(o.track, o.entrants, { seed: o.moodSeed != null ? o.moodSeed : (Date.now() ^ (o.track.seed * 7919)) & 0xffffff });
+    race.runners.forEach((u, i) => { if (o.entrants[i]._remote) { u.remote = true; u.ai = false; } });
     A.indexCourse(race.course);
     A.parts.length = 0;
-    const focus = race.runners.find(u => !u.ai) || race.runners[0];
+    const focus = race.runners.find(u => u.id === 'me') || race.runners[0];
     A.resetCamera(focus);
-    R = Object.assign({ race, focus, lastCount: 4, endAt: 0, speed: o.kind === 'watch' ? 1.4 : 1, paused: false }, o);
+    R = Object.assign({ race, focus, lastCount: 4, endAt: 0, speed: o.kind === 'watch' ? 1.4 : 1, paused: false, sentAt: 0 }, o);
     input.hold = input.jump = input.boost = input.trick = false;
     $('skip').classList.toggle('hidden', o.kind !== 'watch');
     const md = race.course.mood;
@@ -439,9 +526,13 @@
     if (o.kind !== 'watch' && meU) {
       const p = me();
       p.races++; D.races++;
+      if (o.kind === 'online') {
+        D.online = D.online || { races: 0, wins: 0, podiums: 0 };
+        D.online.races++; if (meU.place === 1) D.online.wins++; if (meU.place <= 3) D.online.podiums++;
+      }
       if (o.kind !== 'trial') {
         const share = [1, 0.5, 0.25, 0.1][meU.place - 1] || 0;
-        purse = Math.round(o.track.purse * (o.kind === 'quick' ? 0.5 : 1) * share);
+        purse = Math.round(o.track.purse * (o.kind === 'quick' || o.kind === 'online' ? 0.5 : 1) * share);
         if (meU.place === 1) { p.wins++; D.wins++; }
         D.coins += purse;
         lines.push('You came ' + place(meU.place) + ' in ' + fmt(meU.time) + (purse ? ': ' + purse + ' coins.' : '.'));
@@ -465,6 +556,13 @@
     save();
     const table = el('table', { cls: 'tbl' }, [el('tr', {}, ['', 'Punk', 'Rider', 'Time'].map(h => el('th', { text: h })))].concat(race.order.map(u =>
       el('tr', { cls: u.id === 'me' ? 'mine' : '' }, [el('td', { text: place(u.place) }), el('td', { text: u.name }), el('td', { text: u.rider }), el('td', { text: fmt(u.time) })]))));
+    if (o.kind === 'online' && o.room === ROOM && ROOM) {
+      const r = ROOM;
+      lines.push('Online: ' + D.online.races + ' races, ' + D.online.wins + ' wins' + (SAVE.who ? ' (kept on your account).' : ' (kept in this browser; sign in to keep them on your account).'));
+      const back = r.host ? btn('Back to the room', () => { r.backToLobby(); lobby(); }, 'primary') : btn('Back to the room', () => { r.state = 'lobby'; lobby(); }, 'primary');
+      screen(o.track.name + ' · results', [el('div', { cls: 'card' }, lines.map(l => el('p', { text: l }))), el('div', { cls: 'card' }, [table]), el('div', { cls: 'row center' }, [back, btn('Leave the room', () => { r.leave(); ROOM = null; menu(); })])], () => { r.leave(); ROOM = null; menu(); });
+      return;
+    }
     const again = o.kind === 'cup' ? btn(D.cupRun && D.cupRun.i >= 3 ? 'The final standings' : 'Next race', cupNext, 'primary') :
       o.kind === 'quick' ? btn('Race again', () => quickRace(o.track), 'primary') :
       o.kind === 'trial' ? btn('Try again', () => timeTrial(o.track), 'primary') : btn('Another race', watchBet, 'primary');
@@ -492,11 +590,11 @@
   $('trickBtn').addEventListener('pointerdown', e => { input.trick = true; e.preventDefault(); e.stopPropagation(); });
   $('pause').addEventListener('click', () => togglePause());
   $('skip').addEventListener('click', () => { if (R) { PR.settle(R.race); } });
-  window.addEventListener('blur', () => { keys.vine = false; pointerVine = false; if (R && R.kind !== 'watch' && R.race.t > 0 && !R.race.done) setPause(true); });
-  function setPause(v) { if (!R) return; R.paused = v; $('pausebox').classList.toggle('hidden', !v); }
+  window.addEventListener('blur', () => { keys.vine = false; pointerVine = false; if (R && R.kind !== 'watch' && R.kind !== 'online' && R.race.t > 0 && !R.race.done) setPause(true); });
+  function setPause(v) { if (!R) return; R.paused = v && R.kind !== 'online'; $('pausebox').classList.toggle('hidden', !v); }
   function togglePause() { setPause(!R.paused); }
   $('resume').addEventListener('click', () => setPause(false));
-  $('quit').addEventListener('click', () => { if (!R) return; const o = R; R = null; document.body.classList.remove('racing'); $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('pausebox').classList.add('hidden'); if (o.bet) { D.bets.lost++; save(); } if (o.kind === 'cup') cupNext(); else menu(); });
+  $('quit').addEventListener('click', () => { if (!R) return; const o = R; R = null; document.body.classList.remove('racing'); $('hud').classList.add('hidden'); $('touch').classList.add('hidden'); $('pausebox').classList.add('hidden'); if (o.bet) { D.bets.lost++; save(); } if (o.kind === 'online') { if (ROOM) ROOM.leave(); ROOM = null; menu(); } else if (o.kind === 'cup') cupNext(); else menu(); });
 
   /* the loop */
   let last = performance.now();
@@ -512,6 +610,14 @@
     if (!R.paused) {
       input.hold = !!(keys.vine || pointerVine);
       PR.tick(race, dt * R.speed, input);
+      if (R.kind === 'online') {
+        NET.smooth(race, dt);
+        if (now - R.sentAt > NET.SEND_MS && R.room) { R.sentAt = now; R.room.send({ t: 'st', s: NET.pack(race, myKey(), R.room.host) }); }
+        /* home: wait for friends a while, then everyone is timed */
+        const meO = race.runners.find(u => u.id === 'me');
+        const humansLeft = race.runners.filter(u => u.remote && !u.finished && (!u.lastNet || now - u.lastNet < 6000)).length;
+        if (meO && meO.finished && !race.done && (humansLeft === 0 || race.t > meO.time + 20)) PR.settle(race);
+      }
       /* in a watched race, follow whoever leads */
       if (R.kind === 'watch') R.focus = PR.standings(race)[0];
       race.runners.forEach(u => {
@@ -537,7 +643,7 @@
       if (race.t >= 0 && R.lastCount > 0) { R.lastCount = 0; SFX.go(); }
       /* once you are home, the others get a few seconds, then everyone is timed */
       const meU = race.runners.find(u => u.id === 'me');
-      if (meU && meU.finished && !race.done && race.t > meU.time + 4) PR.settle(race);
+      if (meU && meU.finished && !race.done && race.t > meU.time + 4 && R.kind !== 'online') PR.settle(race);
       if (race.done && !R.endAt) R.endAt = now + 1600;
       if (R.endAt && now > R.endAt) { endRace(); return; }
     }
@@ -598,5 +704,5 @@
     if (!D.punks || !D.punks.length) { const b = blank(); D.punks = b.punks; D.active = b.active; }
     menu();
   });
-  window.PR_GAME = { get D() { return D; }, get R() { return R; }, menu, startRace, quickRace, timeTrial };
+  window.PR_GAME = { get D() { return D; }, get R() { return R; }, get ROOM() { return ROOM; }, menu, startRace, quickRace, timeTrial, onlineMenu };
 })();

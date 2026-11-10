@@ -452,6 +452,22 @@
     }
     /* the runners, the one you follow on top */
     race.runners.slice().sort((a, b) => (a === focus) - (b === focus)).forEach(u => drawPunk(ctx, gl, u, view, u === focus));
+    /* the release gauge: while you swing, the arc is the clean-release window and the needle is where you are heading */
+    if (opts.aim && focus.mode === 'swing' && !focus.finished) {
+      const cx = focus.x, cy = focus.y - 10, rr = 74;
+      const a0 = -PR.CLEAN[1] * Math.PI / 180, a1 = -PR.CLEAN[0] * Math.PI / 180;
+      const head = Math.atan2(focus.vy, focus.vx), sp2 = Math.hypot(focus.vx, focus.vy);
+      const inWin = focus.vx > 0 && head > a0 && head < a1 && sp2 > 360;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a1); ctx.stroke();
+      ctx.strokeStyle = inWin ? 'rgba(255,230,110,.95)' : 'rgba(170,240,150,.55)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, rr, a0, a1); ctx.stroke();
+      if (inWin) FX.orb(gl, cx + Math.cos(head) * rr, cy + Math.sin(head) * rr, 40, '#ffe070', 0.8);
+      if (sp2 > 60) {
+        ctx.strokeStyle = inWin ? '#fff6c0' : 'rgba(255,255,255,.7)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(head) * (rr - 14), cy + Math.sin(head) * (rr - 14)); ctx.lineTo(cx + Math.cos(head) * (rr + 12), cy + Math.sin(head) * (rr + 12)); ctx.stroke();
+      }
+      if (inWin) { ctx.font = 'bold 14px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff6c0'; ctx.fillText('let go!', cx + rr * 0.75, cy - rr * 0.95); }
+    }
     drawParts(ctx, gl, view);
     ambient(view, focus);
     gl.restore();
