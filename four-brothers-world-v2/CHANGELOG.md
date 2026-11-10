@@ -2,6 +2,9 @@
 
 V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
 
+## Sleep through the night
+- **Sleep in a bed at night and you wake up at sunrise.** The day still runs on the shared clock, so this only moves your own sky ahead. When the real sunrise comes, it lines up with everyone else's again.
+
 ## Cloudtop, the land on the cloud
 - **A happy magic land on a cloud** floats high above Tuftwood. Press R at Tuftwood's town portal and float up. A cloud portal in the cloud village brings you back down, and if you fall off, a little cloud catches you and floats you gently down. It never rains up there.
 - **Bloomfield Meadows** (flowers everywhere and giant blooms), **Puffton** (the cloud village: a bakery, the mayor's hall, an inn, a workshop and a rainbow fountain), **the Candyfloss Grove** (candyfloss trees, rainbow bridges, and the Rainbow Falls pouring down to the land below) and **the Starlit Isles** (little floating islands under an evening sky).
