@@ -41,6 +41,11 @@
   const open = (w) => tier() >= w.rune;
   const WX = (RW.v2weather = { pick: 'rain', cd: {}, held: false, hold: 0, wheel: false, hover: null, fields: [] });
   const fields = WX.fields;
+  // a shared 'can't hurt you' lock, so freezing, dazing and anything else that switches a monster off never fight
+  const LK = (RW.v2lock = RW.v2lock || {
+    on(e, why) { if (!e.v2locks) { e.v2locks = {}; e.v2baseHarmless = !!e.harmless; } e.v2locks[why] = 1; e.harmless = true; },
+    off(e, why) { if (!e.v2locks || !e.v2locks[why]) return; delete e.v2locks[why]; if (!Object.keys(e.v2locks).length) { e.harmless = e.v2baseHarmless; e.v2locks = null; } },
+  });
   const loadPick = () => { const p = P.flags && P.flags.wxPick; if (p && WBY[p] && open(WBY[p])) WX.pick = p; };
   const savePick = () => { P.flags = P.flags || {}; P.flags.wxPick = WX.pick; };
 
@@ -71,12 +76,12 @@
   const chill = (e, s) => { e.v2chill = Math.max(e.v2chill || 0, s); };
   function freeze(e, s) {
     if (isBoss(e)) { chill(e, s + 2); return; }
-    if (!(e.v2frozen > 0)) { e.v2frozeHarmless = !!e.harmless; RW.fx.text(ec(e).x, e.y - 6, 'FROZEN', '#d8f6ff'); RW.audio.sfx('crystal'); }
-    e.v2frozen = Math.max(e.v2frozen || 0, s); e.harmless = true; e.vx = 0; e.vy = 0; e.burn = 0;
+    if (!(e.v2frozen > 0)) { LK.on(e, 'frozen'); RW.fx.text(ec(e).x, e.y - 6, 'FROZEN', '#d8f6ff'); RW.audio.sfx('crystal'); }
+    e.v2frozen = Math.max(e.v2frozen || 0, s); e.vx = 0; e.vy = 0; e.burn = 0;
     if (!seen('wx_frozen')) U.toast('Frozen solid! It can\'t move or hurt you. Hit it to shatter the ice for double damage.');
   }
   function thaw(e, shattered) {
-    e.v2frozen = 0; e.harmless = !!e.v2frozeHarmless;
+    e.v2frozen = 0; LK.off(e, 'frozen');
     const c = ec(e);
     RW.fx.burst(c.x, c.y, ['#ffffff', '#d8f6ff', '#9ad8ff'], shattered ? 18 : 8, shattered ? 160 : 60, { kind: 'spark', life: 0.45 });
     if (shattered) { RW.fx.text(c.x, e.y - 10, 'SHATTER', '#ffffff', true); RW.audio.sfx('break'); RW.fx.shake(2, 0.15); }
