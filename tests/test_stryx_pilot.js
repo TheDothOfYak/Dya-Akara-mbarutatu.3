@@ -33,9 +33,9 @@ check('every port has its own pad (no two pads share a spot)', SP.PORTS.every(a 
 /* a ship on the pad stays put until it pushes */
 (function () {
   const f = SP.makeFlight({ day: 0, from: 'rakar', parts: parts(1), seed: 1 });
-  const x0 = f.ship.x;
   for (let i = 0; i < 120; i++) SP.stepFlight(f, {});
-  check('sits on the pad without pushing', f.ship.grounded && Math.abs(f.ship.x - x0) < 0.01 && !f.docked);
+  const pad = SP.portPos(SP.port('rakar'), f.bodies);
+  check('sits on the pad without pushing, turning with its world', f.ship.grounded && Math.hypot(f.ship.x - pad.x - pad.nx * SP.SHIP_R, f.ship.y - pad.y - pad.ny * SP.SHIP_R) < 3 && !f.docked);
   for (let i = 0; i < 60; i++) SP.stepFlight(f, { thrust: true });
   check('pushing lifts it off', !f.ship.grounded && f.ship.heat < f.S.heatMax);
 })();
@@ -170,6 +170,66 @@ check('better parts make a better ship', SP.ship(parts(5)).thrust > SP.ship(part
   let boosted = 0;
   for (let d = 0; d < 30; d++) SP.makeJobs('rakar', d, 3, d * 13 + 1, 8).forEach(j => { if (j.event) { boosted++; const ev = SP.portEvent(j.to, d); if (!ev || ev.kinds.indexOf(j.kind) < 0) boosted = -999; } });
   check('jobs bound for an event pay more, and only the right kinds', boosted > 0, String(boosted));
+})();
+
+/* the sky turns: orbits, spin, the clock, landing on a moving world */
+(function () {
+  const a = SP.layout(1000), b = SP.layout(1060);
+  check('worlds move along their orbits as the sky clock runs', Math.hypot(a.xikia.x - b.xikia.x, a.xikia.y - b.xikia.y) > 500);
+  check('worlds spin, and their ports turn with them', Math.abs(SP.angDiff(SP.portPos(SP.port('beuhk'), a).ang, SP.portPos(SP.port('beuhk'), b).ang)) > 0.5);
+  check('the worlds are far apart now', Math.hypot(a.leotik.x, a.leotik.y) > 18000 && SP.body('velki').r >= 1700);
+  check('the sky clock reads like a clock', /^\d\d:\d\d$/.test(SP.clockOf(12345)) && SP.clockOf(0) === '00:00' && SP.clockOf(SP.DAY / 2) === '12:00');
+  /* a ship let down gently onto a spinning, orbiting world docks, matching the ground's own speed */
+  const f = SP.makeFlight({ T0: 5000, from: 'velkinovek', parts: parts(1), seed: 31 });
+  const pp = SP.portPos(SP.port('beuhk'), f.bodies), gv = SP.groundVel(pp.body, pp.x, pp.y);
+  f.ship.grounded = null; f.ship.x = pp.x + pp.nx * 70; f.ship.y = pp.y + pp.ny * 70; f.ship.vx = gv[0]; f.ship.vy = gv[1]; f.ship.ang = Math.atan2(pp.ny, pp.nx);
+  for (let i = 0; i < 400 && !f.docked; i++) SP.stepFlight(f, {});
+  check('landing gently on a moving world docks', f.docked === 'beuhk' && f.hits === 0, f.docked + ' hits ' + f.hits);
+  /* hazards that belong to a world travel with it */
+  const g = SP.makeFlight({ T0: 7000, from: 'nekh', parts: parts(1), seed: 32 });
+  const st = g.storms[0], v0 = [g.bodies.velki.x, g.bodies.velki.y], d0 = Math.hypot(st.x - v0[0], st.y - v0[1]);
+  for (let i = 0; i < 600; i++) SP.stepFlight(g, {});
+  check('storms stay with Velki as it turns', Math.abs(Math.hypot(st.x - g.bodies.velki.x, st.y - g.bodies.velki.y) - d0) < 5);
+  check('jobs never go to the secret world', SP.makeJobs('rakar', 3, 3, 9, 40).every(j => !SP.port(j.to).secret));
+})();
+
+/* ships for hire */
+(function () {
+  const sh = SP.hireShip('t1', 'rakar', 'velkinovek', 10000, 'a crew');
+  const e0 = SP.fleetEarn(sh, 10000);
+  check('a new crew has earned nothing yet', e0.trips === 0 && e0.net === 0);
+  const e1 = SP.fleetEarn(sh, 10000 + SP.DAY);
+  check('a day later they have made trips and drawn wages', e1.trips > 0 && e1.wages === SP.FLEET.wage && e1.coins > 0);
+  check('earnings are capped while you are away', SP.fleetEarn(sh, 10000 + SP.DAY * 50).trips === SP.FLEET.maxTrips);
+  SP.fleetSettle(sh, 10000 + SP.DAY);
+  check('settling up starts their tally again', SP.fleetEarn(sh, 10000 + SP.DAY).trips === 0);
+  const q = SP.fleetPos(sh, 10000 + sh.trip * 0.5, SP.layout(10000 + sh.trip * 0.5));
+  check('their skiff is out in the sky between the ports', q && isFinite(q.x) && isFinite(q.ang));
+  const plan = SP.planRoute({ x: 0, y: 0 }, ['beuhk', 'velkinovek'], 10000);
+  check('a planned route gets arrival times, in order', plan.length === 2 && plan[0].eta > 0 && plan[1].eta > plan[0].eta);
+})();
+
+/* Mba'Karn: only at the far end of the Waves of Memory */
+(function () {
+  const f = SP.makeFlight({ T0: 9000, from: 'rakar', parts: parts(5), seed: 33, wave: true });
+  const w = f.wave, s = f.ship;
+  s.grounded = null;
+  let spawned = false;
+  for (let i = 0; i < 60 * 300 && !spawned; i++) {
+    /* keep the ship in the middle of the band, riding with it */
+    const along = s.x * w.flow[0] + s.y * w.flow[1];
+    s.x = w.nx * w.off + w.flow[0] * along; s.y = w.ny * w.off + w.flow[1] * along;
+    SP.stepFlight(f, { aim: Math.atan2(w.flow[1], w.flow[0]), thrust: true });
+    if (f.bodies.karn) spawned = true;
+  }
+  check('ride the waves far enough and Mba’Karn appears', spawned && f.waveRide >= SP.KARN_RIDE, 'rode ' + Math.round(f.waveRide));
+  check('…very far from home', Math.hypot(s.x - f.bodies.velki.x, s.y - f.bodies.velki.y) > SP.KARN_FAR);
+  const k = SP.portPos(SP.port('mbakarn'), f.bodies);
+  check('its harbour faces the ship coming in', k && Math.hypot(k.x - s.x, k.y - s.y) < Math.hypot(f.bodies.karn.x - s.x, f.bodies.karn.y - s.y));
+  const g = SP.makeFlight({ T0: 9000, from: 'rakar', parts: parts(5), seed: 34, wave: false });
+  g.ship.grounded = null; g.ship.x = 90000; g.ship.y = 0;
+  for (let i = 0; i < 600; i++) SP.stepFlight(g, { thrust: true, aim: 0 });
+  check('flying far without the waves finds nothing', !g.bodies.karn);
 })();
 
 console.log('Stryx Pilot: ' + pass + ' passed, ' + fail + ' failed');
