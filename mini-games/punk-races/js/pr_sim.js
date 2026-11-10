@@ -88,19 +88,23 @@
        (the anchors a vine can catch). A tall tree stands at each edge
        of a gap and leans over it, so every gap can be swung. */
     const tall = track.tall;
+    const TIP_OUT = 150;                 // how far a branch tip reaches out from the trunk (past the crown)
+    const SPREAD = 1.35;                 // trees stand further apart than the track's numbers say
     function addTree(x, H, lean, edge) {
       const base = course.groundAt(x);
       if (base == null) return;
       const top = base - H;
       const tree = { x, base, top, H, lean: lean || 0, kind: track.theme, seed: r(), edge: !!edge };
       course.trees.push(tree);
-      const tips = 2 + (r() < 0.5 ? 1 : 0);
-      for (let k = 0; k < tips; k++) {
-        const side = k === 0 ? 1 : k === 1 ? -1 : (r() < 0.5 ? 1 : -1);
-        const ax = x + lean * 0.6 + side * (40 + r() * 60);
-        const ay = top + 30 + r() * 60 + (k === 2 ? 40 : 0);
-        course.anchors.push({ x: ax, y: ay, tree: course.trees.length - 1 });
-      }
+      /* one clear branch reaching forward, out past the crown; trees at a gap's edge
+         also reach back over it. More branches behind are added once every tree is placed. */
+      const tipAt = side => {
+        const ax = x + lean * 0.6 + side * (TIP_OUT + r() * 30);
+        const ay = top + 105 + r() * 40;
+        course.anchors.push({ x: ax, y: ay, tree: course.trees.length - 1, side });
+      };
+      tipAt(1);
+      if (edge) tipAt(-1);
     }
     course.groundAt = function (x) {
       for (let i = 0; i < course.gaps.length; i++) { const g = course.gaps[i]; if (x > g.x0 && x < g.x1) return null; }
@@ -126,11 +130,17 @@
         addTree(g.x1 + 50, tall[1] + 20, -50, true);
         /* a wide gap gets a hanging root in the middle to catch */
         if (g.x1 - g.x0 > 300) course.anchors.push({ x: (g.x0 + g.x1) / 2, y: course.surface((g.x0 + g.x1) / 2) - tall[0] - 40, tree: -1, root: true });
-        x = g.x1 + 50 + track.trees[0] * (0.7 + r() * 0.4);
+        x = g.x1 + 50 + track.trees[0] * SPREAD * (0.7 + r() * 0.4);
         continue;
       }
       addTree(x, tall[0] + r() * (tall[1] - tall[0]), (r() - 0.5) * 30);
-      x += track.trees[0] + r() * (track.trees[1] - track.trees[0]);
+      x += (track.trees[0] + r() * (track.trees[1] - track.trees[0])) * SPREAD;
+    }
+    /* where there is a long stretch behind a tree, it reaches back too */
+    for (let i = 1; i < course.trees.length; i++) {
+      const t = course.trees[i], p = course.trees[i - 1];
+      if (t.edge || t.x - p.x < 470) continue;
+      course.anchors.push({ x: t.x + t.lean * 0.6 - (TIP_OUT + r() * 25), y: t.top + 115 + r() * 35, tree: i, side: -1 });
     }
     course.anchors.sort((a, b) => a.x - b.x);
     /* some branches are dead and brittle: grey, cracked, and they snap if you hang on too long.
