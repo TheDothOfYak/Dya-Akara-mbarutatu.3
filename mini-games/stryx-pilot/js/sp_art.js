@@ -202,6 +202,13 @@
       case 'rescue': puff(e.x, e.y, 30, { col: '#ffe0a0', sp: 220, r: 3, life: 1.0, kind: 'spark' }); A.ring(e.x, e.y, '#ffe0a0'); break;
       case 'sling': A.ring(e.x, e.y, '#a8e8ff'); puff(e.x, e.y, 16, { col: '#a8e8ff', sp: 160, r: 2.5, life: 0.7, kind: 'spark', vx: s.vx * 0.5, vy: s.vy * 0.5 }); break;
       case 'screech': A.ring(e.x, e.y, '#ff7a7a'); break;
+      case 'fire': puff(e.x, e.y, 8, { col: '#ffb040', sp: 140, r: 2.5, life: 0.35, kind: 'spark', vx: s.vx, vy: s.vy }); A.shake = Math.min(18, (A.shake || 0) + 1.5); break;
+      case 'shotHit': puff(e.x, e.y, 14, { col: '#ffcf8a', sp: 220, r: 2.5, life: 0.5, kind: 'spark' }); puff(e.x, e.y, 5, { col: '#3a2a3a', sp: 140, r: 3, life: 0.8, kind: 'chip' }); break;
+      case 'escortHit': puff(e.x, e.y, 8, { col: '#ffcf8a', sp: 160, r: 2, life: 0.4, kind: 'spark' }); break;
+      case 'ram': puff(e.x, e.y, 26, { col: '#ffcf8a', sp: 260, r: 3, life: 0.6, kind: 'spark' }); puff(e.x, e.y, 10, { col: '#4a2a1a', sp: 200, r: 4, life: 1, kind: 'chip' }); A.shake = Math.min(22, (A.shake || 0) + 10); break;
+      case 'struck': A.ring(e.x, e.y, '#ffe2a0'); puff(e.x, e.y, 30, { col: 'rgba(200,200,200,.6)', sp: 90, r: 8, life: 1.6, kind: 'smoke' }); break;
+      case 'escortDown': puff(e.x, e.y, 40, { col: '#ff9a40', sp: 280, r: 3, life: 1, kind: 'spark' }); break;
+      case 'board': A.ring(e.x, e.y, '#b8f090'); break;
     }
   };
   A.bolts = [];
@@ -476,6 +483,45 @@
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillText(text, 1, 1); ctx.fillStyle = col; ctx.fillText(text, 0, 0);
     ctx.restore();
   }
+  /* a pirate: a dark hull, sails in the faction's colour, a red pennant if there is a price on her captain */
+  function drawPirate(ctx, gl, p, now, z) {
+    const F = SP.FACTIONS[p.faction] || SP.FACTIONS.dusk, K = SP.SHIPKINDS[p.kind] || SP.SHIPKINDS.sloop;
+    const sc = { sloop: 1, brig: 1.2, cutter: 1.1, galleon: 1.5 }[p.kind] || 1, struck = p.state === 'struck';
+    ctx.save();
+    if (p.phase) ctx.globalAlpha = 0.25 + Math.sin(now * 20) * 0.08;
+    else if (p.faction === 'ghost') ctx.globalAlpha = 0.8;
+    FX.orb(gl, p.x, p.y, 110 * sc, p.wanted ? '#ff3a3a' : F.sail, struck ? 0.15 : 0.35);
+    ctx.translate(p.x, p.y); ctx.rotate(p.ang + (struck ? Math.sin(now * 0.8) * 0.15 : 0)); ctx.scale(1.3 * sc, 1.3 * sc);
+    /* the hull */
+    const hull = p.faction === 'ghost' ? '#5a6a7a' : p.faction === 'smug' ? '#5a3a1e' : '#2e1e2a';
+    const hg = ctx.createLinearGradient(0, -14, 0, 14); hg.addColorStop(0, FX.shade(hull, 0.25)); hg.addColorStop(1, FX.shade(hull, -0.4));
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.moveTo(48, 0); ctx.quadraticCurveTo(26, -16, -38, -12); ctx.lineTo(-44, 0); ctx.lineTo(-38, 12); ctx.quadraticCurveTo(26, 16, 48, 0); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.beginPath(); ctx.moveTo(40, -3); ctx.lineTo(-36, -4); ctx.moveTo(40, 3); ctx.lineTo(-36, 4); ctx.stroke();
+    /* sails: ragged, in the faction's colours; furled and a white rag up when struck */
+    if (!struck) {
+      [[10, 1], [-14, 0.8]].forEach(([mx, k]) => [-1, 1].forEach(sd => {
+        const reach = 38 * k, flap = Math.sin(now * 5 + mx + sd) * 3;
+        ctx.fillStyle = FX.rgba(F.sail, 0.88); ctx.beginPath(); ctx.moveTo(mx + 6, sd * 6); ctx.quadraticCurveTo(mx + 16 + flap, sd * reach * 0.6, mx + 4, sd * reach);
+        ctx.lineTo(mx - 2, sd * reach * 0.85); ctx.lineTo(mx - 6, sd * reach * 0.92); ctx.lineTo(mx - 8, sd * 6); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+      }));
+    } else {
+      ctx.fillStyle = 'rgba(240,240,230,.9)'; ctx.beginPath(); ctx.moveTo(4, -2); ctx.lineTo(4, -34); ctx.lineTo(20 + Math.sin(now * 6) * 3, -28); ctx.lineTo(4, -22); ctx.fill();
+      ctx.strokeStyle = '#2a1a10'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(4, -36); ctx.stroke();
+    }
+    if (p.wanted && !struck) { ctx.fillStyle = '#e83a3a'; ctx.beginPath(); ctx.moveTo(-20, -2); ctx.lineTo(-20, -28); ctx.lineTo(-4 + Math.sin(now * 7) * 3, -24); ctx.lineTo(-20, -18); ctx.fill(); }
+    ctx.restore();
+    if (F.knives && !p.phase) FX.orb(gl, p.x + Math.cos(p.ang) * 55 * sc, p.y + Math.sin(p.ang) * 55 * sc, 40, '#a080ff', 0.7);
+    /* her hull, and who she is */
+    if (!struck && p.hull < p.hullMax) {
+      ctx.save(); ctx.translate(p.x, p.y - 80 * sc); ctx.scale(1 / z, 1 / z);
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(-30, -3, 60, 6); ctx.fillStyle = '#e86a5a'; ctx.fillRect(-30, -3, 60 * Math.max(0, p.hull / p.hullMax), 6);
+      ctx.restore();
+    }
+    nameTag(ctx, p.x, p.y - 96 * sc, (p.wanted ? '☠ WANTED · ' : '') + p.captain + ' · the ' + p.ship, struck ? '#ffe2a0' : p.wanted ? '#ff8a7a' : '#e8c8ff', z);
+    if (struck) nameTag(ctx, p.x, p.y + 90 * sc, 'Struck! Hold alongside to board', '#ffe2a0', z);
+  }
   function drawShip(ctx, gl, s, S, now, braking, tint) {
     const K = sky();
     ctx.save(); gl.save();
@@ -698,6 +744,29 @@
         if (o.mine && opts.raid) { ctx.strokeStyle = 'rgba(255,215,110,.95)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(o.x, o.y, 80, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, opts.raid)); ctx.stroke(); }
       }
     });
+    /* pirates, your escorts, and everything flying between them */
+    (f.pirates || []).forEach(p => { if (p.state !== 'gone' && vis(p.x, p.y, 200)) drawPirate(ctx, gl, p, now, view.z); });
+    (f.escorts || []).forEach(e => {
+      if (!e.alive || !vis(e.x, e.y, 120)) return;
+      ctx.save(); ctx.translate(e.x, e.y); ctx.scale(0.78, 0.78); ctx.translate(-e.x, -e.y);
+      drawShip(ctx, gl, { x: e.x, y: e.y, ang: e.ang, heat: 1, thrusting: Math.hypot(e.vx, e.vy) > 120, boostT: 0, lashT: 0, stun: 0 }, { heatMax: 1, lash: 100 }, now, false, '#9fe0a0');
+      ctx.restore();
+      nameTag(ctx, e.x, e.y - 60, 'the ' + e.name + (e.hull < e.hullMax ? ' · ' + Math.round(e.hull / e.hullMax * 100) + '%' : ''), '#9fe0a0', view.z);
+    });
+    (f.shots || []).forEach(b => {
+      if (!vis(b.x, b.y, 40)) return;
+      if (b.kind === 'knife') {
+        FX.orb(gl, b.x, b.y, 36, '#a080ff', 0.9);
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(now * 18); ctx.fillStyle = '#e8e8ff'; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(0, -3); ctx.lineTo(14, 0); ctx.lineTo(0, 3); ctx.fill(); ctx.restore();
+      } else if (b.kind === 'stone') {
+        ctx.fillStyle = '#b8b0a0'; ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, TAU); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.stroke();
+      } else {
+        const a = Math.atan2(b.vy, b.vx), col = b.from === 'escort' ? '#b8f090' : '#ffb040';
+        FX.orb(gl, b.x, b.y, 44, col, 1);
+        ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - Math.cos(a) * 30, b.y - Math.sin(a) * 30); ctx.stroke();
+        ctx.fillStyle = '#fff6d0'; ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, TAU); ctx.fill();
+      }
+    });
     drawShip(ctx, gl, s, f.S, now, opts.braking);
     if (s.lashT > 0) {
       ctx.strokeStyle = 'rgba(170,240,130,' + (s.lashT / 0.35) * 0.6 + ')'; ctx.lineWidth = 3;
@@ -879,6 +948,7 @@
     (marks || []).forEach(id => { const pp = SP.portPos(SP.port(id), f.bodies); if (!pp) return; ctx.fillStyle = '#ffd36a'; ctx.beginPath(); ctx.arc(cx + pp.x * k, cy + pp.y * k, 3, 0, TAU); ctx.fill(); });
     f.skiffs.forEach(s2 => { if (!s2.saved) { ctx.fillStyle = '#ff7a6a'; ctx.fillRect(cx + s2.x * k - 2, cy + s2.y * k - 2, 4, 4); } });
     (fleet || []).forEach(q => { ctx.fillStyle = '#9fe0a0'; ctx.fillRect(cx + q.x * k - 1.5, cy + q.y * k - 1.5, 3, 3); });
+    (f.pirates || []).forEach(p => { if (p.state === 'gone') return; ctx.fillStyle = p.state === 'struck' ? '#ffe2a0' : p.wanted ? '#ff3a3a' : '#c070ff'; ctx.beginPath(); ctx.moveTo(cx + p.x * k, cy + p.y * k - 3); ctx.lineTo(cx + p.x * k + 3, cy + p.y * k + 2.5); ctx.lineTo(cx + p.x * k - 3, cy + p.y * k + 2.5); ctx.fill(); });
     (others || []).forEach(o => { ctx.fillStyle = o.raidingMe ? '#ff5a4a' : o.color || '#8ab0ff'; ctx.beginPath(); ctx.arc(cx + o.x * k, cy + o.y * k, 2.6, 0, TAU); ctx.fill(); });
     ctx.restore();
     /* you (pinned to the rim, with an arrow, when you are off the chart) */
@@ -992,6 +1062,7 @@
     }
     /* hired skiffs, other pilots, you */
     (o.fleet || []).forEach(sh => { const q = SP.fleetPos(sh, T, L); if (!q) return; ctx.fillStyle = '#9fe0a0'; ctx.beginPath(); ctx.arc(SX(q.x), SY(q.y), 3.5, 0, TAU); ctx.fill(); ctx.font = '10px system-ui'; ctx.fillText(sh.crew, SX(q.x) + 6, SY(q.y) - 4); });
+    (o.pirates || []).forEach(p => { if (p.state === 'gone') return; ctx.fillStyle = p.state === 'struck' ? '#ffe2a0' : p.wanted ? '#ff3a3a' : '#c070ff'; ctx.beginPath(); ctx.arc(SX(p.x), SY(p.y), 4, 0, TAU); ctx.fill(); if (p.wanted) { ctx.font = '11px system-ui'; ctx.fillText('☠ ' + p.captain, SX(p.x) + 7, SY(p.y) + 4); } });
     (o.others || []).forEach(p => { ctx.fillStyle = p.color || '#8ab0ff'; ctx.beginPath(); ctx.arc(SX(p.x), SY(p.y), 4, 0, TAU); ctx.fill(); ctx.font = '11px system-ui'; ctx.fillText(p.name, SX(p.x) + 7, SY(p.y) + 4); });
     if (o.ship) {
       const x = SX(o.ship.x), y = SY(o.ship.y);
