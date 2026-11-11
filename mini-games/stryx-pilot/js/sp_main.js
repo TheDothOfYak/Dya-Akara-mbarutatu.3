@@ -22,9 +22,11 @@
 
   /* ================= the save ================= */
   function blank() {
-    return { v: 2, coins: 100, at: 'rakar', parts: { seed: 1, sails: 1, hull: 1, vines: 1, hold: 1 }, hull: null,
+    return { v: 3, coins: 100, at: 'rakar', parts: { seed: 1, sails: 1, hull: 1, vines: 1, hold: 1, cannon: 1 }, hull: null,
       hold: [], deliveries: 0, earned: 0, flights: 0, wrecks: 0, records: {}, board: null, seenHelp: false, mcfly: 0,
-      route: [], fleet: [], sky: { mode: 'open', code: '' }, secrets: {}, raids: { done: 0, suffered: 0, cut: 0 }, netName: '' };
+      route: [], fleet: [], sky: { mode: 'open', code: '' }, secrets: {}, raids: { done: 0, suffered: 0, cut: 0 }, netName: '',
+      crew: [{ type: 'deckhand', n: 10 }, { type: 'slinger', n: 4 }], ships: [], rep: 0, wanted: [], bounties: null, hall: null,
+      battles: { won: 0, lost: 0, fled: 0, captured: 0, bounties: 0 } };
   }
   const SAVE = window.FLAKE_MINI.open('sp', blank);
   let D = null;
@@ -36,6 +38,23 @@
   const today = () => SP.skyDay(now());
   const TAB = Math.random().toString(36).slice(2, 6);
   const myKey = () => { if (!D.netKey) { D.netKey = 'k' + Math.random().toString(36).slice(2, 10); save(); } return D.netKey + TAB; };
+  /* reputation: what the ports think of you, and what it does to prices and pay */
+  const repT = () => SP.repOf(D.rep);
+  const price = n => Math.max(1, Math.round(n * repT().price));
+  const addRep = (n, why) => { const before = repT().name; D.rep += n; if (repT().name !== before) toast('The ports now think of you as: ' + repT().name + (why ? ' (' + why + ')' : '') + '.'); };
+  /* captains of your ships level up with what they do */
+  const lvlOf = xp => Math.min(10, 1 + Math.floor(Math.sqrt(Math.max(0, xp) / 3)));
+  const giveXp = (sh, n) => { const was = sh.lvl || 1; sh.xp = (sh.xp || 0) + n; sh.lvl = lvlOf(sh.xp); if (sh.lvl > was) toast(sh.captain + ' of the ' + sh.name + ' is now level ' + sh.lvl + '.'); };
+  /* your crew: up to SP.CREW_MAX stacks */
+  function addCrew(type, n) {
+    const st = D.crew.find(c => c.type === type);
+    if (st) { st.n += n; return true; }
+    if (D.crew.length >= SP.CREW_MAX) return false;
+    D.crew.push({ type, n }); return true;
+  }
+  const crewText = list => (list || []).filter(c => c.n > 0).map(c => c.n + ' ' + SP.UNITS[c.type].short).join(', ') || 'nobody';
+  /* everything that runs a route for you: hired crews, and captured ships you set on a route */
+  const routeShips = () => D.fleet.concat(D.ships.filter(sh => sh.role === 'route' && sh.trip));
   const myName = () => (SAVE.who && SAVE.who.name) || D.netName || 'Pilot ' + myKey().slice(1, 5).toUpperCase();
 
   /* ================= sounds ================= */
@@ -63,6 +82,8 @@
     boost: () => beep(180, 0.5, 'sawtooth', 0.04, 500),
     lash: () => beep(700, 0.15, 'triangle', 0.04, 300),
     pop: () => beep(900, 0.08, 'square', 0.02, 1400),
+    cannon: () => beep(240, 0.22, 'sawtooth', 0.045, 70),
+    thud: () => beep(150, 0.15, 'square', 0.04, 60),
     mcfly: () => { beep(1200, 0.1, 'sine', 0.04); setTimeout(() => beep(1600, 0.12, 'sine', 0.03), 60); },
     dock: () => { [392, 523, 659].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.05), i * 100)); },
     screech: () => beep(1800, 0.8, 'sawtooth', 0.03, 900),
@@ -136,7 +157,7 @@
         const p = SKY.pilots[from];
         if (D.hold.length < S().slots) { D.hold.push(Object.assign({}, job, { stolen: true })); pop('Raided: ' + job.what + '!', '#ffd36a'); }
         else pop('Your hold was full: the cargo tumbled into the sky.', '#ffb0a0');
-        D.raids.done++; save(); SFX.dock();
+        D.raids.done++; addRep(-6, 'raiding'); save(); SFX.dock();
         FL.raid = null; FL.raidCd = SP.RAID.cooldown;
         void p;
       },
@@ -184,7 +205,7 @@
       const r = chart.getBoundingClientRect(), dp = Math.min(2, window.devicePixelRatio || 1);
       if (chart.width !== Math.round(r.width * dp)) { chart.width = Math.round(r.width * dp); chart.height = Math.round(r.height * dp); }
       const c2 = chart.getContext('2d'); c2.setTransform(dp, 0, 0, dp, 0, 0);
-      A.chart(c2, r.width, r.height, now(), D.at, marks, performance.now() / 1000, D.fleet);
+      A.chart(c2, r.width, r.height, now(), D.at, marks, performance.now() / 1000, routeShips());
       chartRaf = requestAnimationFrame(drawChart);
     };
     cancelAnimationFrame(chartRaf);
@@ -226,7 +247,7 @@
     const yard = el('div', { cls: 'card' }, [
       el('h3', { text: 'The shipwright' }),
       el('div', {}, SP.PARTS.map(part => {
-        const lvl = D.parts[part.id], max = lvl >= part.max, cost = SP.partCost(part.id, lvl);
+        const lvl = D.parts[part.id] || 0, max = lvl >= part.max, cost = price(SP.partCost(part.id, lvl));
         return el('div', { cls: 'job' }, [
           el('div', { cls: 'grow' }, [el('div', { html: '<b>' + part.name + '</b> ' + '●'.repeat(lvl) + '○'.repeat(part.max - lvl) }), el('div', { cls: 'muted small', text: part.about })]),
           btn(max ? 'Best there is' : 'Grow it · ' + cost, () => {
@@ -239,7 +260,7 @@
         ]);
       })),
       el('div', { cls: 'job' }, [
-        el('div', { cls: 'grow' }, [el('div', { html: '<b>The bark-mender</b>' }), el('div', { cls: 'muted small', text: 'Hull ' + Math.round(hn) + ' of ' + hullMax + '. One coin a knot.' })]),
+        el('div', { cls: 'grow' }, [el('div', { html: '<b>The bark-mender</b>' }), el('div', { cls: 'muted small', text: 'Hull ' + Math.round(hn) + ' of ' + hullMax + '. One coin a knot' + (repT().price < 1 ? ' (less, for someone of your name)' : '') + '.' })]),
         btn(missing > 0 ? 'Mend it · ' + Math.min(missing, D.coins) : 'Sound', () => { const n = Math.min(missing, D.coins); D.coins -= n; D.hull = hn + n; save(); portScreen(); }, 'small', missing <= 0 || D.coins <= 0),
       ]),
     ]);
@@ -250,6 +271,7 @@
         el('div', { cls: 'grow' }, [
           el('div', { cls: 'pname', text: p.name }),
           el('div', { cls: 'muted small', text: 'on ' + bodyName(p.body) + ' · sky day ' + today() + ' · ' + SP.RANKS[rk].name + ' (' + D.deliveries + ' delivered' + (nextRank ? ', ' + (nextRank.at - D.deliveries) + ' more to ' + nextRank.name : '') + ')' }),
+          el('div', { cls: 'small rep', text: 'Reputation: ' + repT().name + ' (' + D.rep + ')' + (repT().price !== 1 ? ' · prices ×' + repT().price + ', pay ×' + repT().pay : '') }),
           el('p', { text: p.blurb }),
           SP.portEvent(p.id, today()) ? el('p', { cls: 'small event', text: '★ ' + SP.portEvent(p.id, today()).name + ' here today: ' + SP.portEvent(p.id, today()).about + '.' }) : null,
           rumour,
@@ -262,7 +284,7 @@
         ]),
         chart,
       ]),
-      hold, board, skyCard(), fleetCard(), yard,
+      hold, board, crewCard(), bountyCard(), fleetCard(), skyCard(), yard,
       SAVE.who ? el('p', { cls: 'muted small center', text: 'Saved to your Flake Games account' + (SAVE.online ? '' : ' (offline: kept in this browser for now)') + '.' })
         : el('p', { cls: 'muted small center', html: 'Flying as a guest: your ship is kept in this browser. <a href="#" id="signin">Sign in</a> to keep it, and your stats, on your account.' }),
     ];
@@ -292,32 +314,152 @@
       el('p', { cls: 'muted small', text: 'Raids: ' + D.raids.done + ' made · ' + D.raids.suffered + ' suffered · ' + D.raids.cut + ' fought off' }),
     ]);
   }
-  /* ships for hire */
-  function fleetCard() {
-    const rk = rank(), max = SP.FLEET.max[rk] || 0, T = now();
-    if (!max) return el('div', { cls: 'card' }, [el('h3', { text: 'Ships for hire' }), el('p', { cls: 'muted small', text: 'Crews will work under a Ship’s Pilot. Make ' + (SP.RANKS[1].at - D.deliveries) + ' more deliveries and they will come looking for you.' })]);
-    const rows = D.fleet.map(sh => {
-      const e = SP.fleetEarn(sh, T);
+  /* your crew, and the port's crew hall */
+  function hallFor() {
+    const day = today();
+    if (!D.hall || D.hall.port !== D.at || D.hall.day !== day) {
+      const r = SP.rng((day + 3) * 4241 + D.at.length * 97 + D.at.charCodeAt(0));
+      D.hall = { port: D.at, day, offers: (SP.HALLS[D.at] || ['deckhand']).map(type => { const T = SP.UNITS[type]; return { type, n: Math.max(1, Math.round((40 / Math.sqrt(T.cost)) * (0.6 + r() * 0.8))) }; }) };
+    }
+    return D.hall.offers;
+  }
+  function crewCard() {
+    const will = SP.WILL(D.parts);
+    const rows = D.crew.map(c => {
+      const T = SP.UNITS[c.type];
       return el('div', { cls: 'job' }, [
-        el('div', { cls: 'grow' }, [el('div', { html: '<b>' + sh.crew + '</b>: ' + SP.port(sh.from).name + ' ⇄ ' + SP.port(sh.to).name }),
-          el('div', { cls: 'muted small', text: e.trips + ' trips since you last paid them' + (e.lost ? ' (' + e.lost + ' lost to Tyndael)' : '') + ' · your cut ' + e.coins + ' · their wages ' + e.wages + ' · ' + (e.net >= 0 ? '+' : '') + e.net }) ]),
-        btn('Settle up', () => { const r = SP.fleetSettle(sh, now()); D.coins = Math.max(0, D.coins + r.net); save(); toast((r.net >= 0 ? 'You collect ' : 'You pay out ') + Math.abs(r.net) + ' coins.'); portScreen(); }, 'small primary'),
-        btn('Let go', () => { if (!confirm('Pay off ' + sh.crew + ' and let them go?')) return; const r = SP.fleetSettle(sh, now()); D.coins = Math.max(0, D.coins + r.net); D.fleet = D.fleet.filter(x => x !== sh); save(); portScreen(); }, 'small danger'),
+        el('div', { cls: 'grow' }, [el('div', { html: '<b>' + c.n + ' ' + T.name + '</b>' }), el('div', { cls: 'muted small', text: 'attack ' + T.atk + ' · defence ' + T.def + ' · harm ' + T.dmg[0] + '–' + T.dmg[1] + ' · health ' + T.hp + ' · speed ' + T.spd + (T.shots ? ' · ' + T.shots + ' shots' : '') + '. ' + T.about })]),
+        btn('Pay off', () => { if (!confirm('Pay off all ' + c.n + ' ' + T.name + ' and let them go ashore?')) return; D.crew = D.crew.filter(x => x !== c); save(); portScreen(); }, 'small danger'),
       ]);
     });
+    const hall = hallFor().map(o => {
+      const T = SP.UNITS[o.type], each = price(T.cost), room = D.crew.some(c => c.type === o.type) || D.crew.length < SP.CREW_MAX;
+      const take = n => { n = Math.min(n, o.n, Math.floor(D.coins / each)); if (n <= 0) { toast('Not enough coins.'); return; } if (!addCrew(o.type, n)) { toast('Your deck holds ' + SP.CREW_MAX + ' kinds of crew at most. Pay some off first.'); return; } D.coins -= n * each; o.n -= n; save(); beep(520, 0.12, 'triangle', 0.04); portScreen(); };
+      return el('div', { cls: 'job' }, [
+        el('div', { cls: 'grow' }, [el('div', { html: '<b>' + T.name + '</b> · ' + o.n + ' looking for a berth' }), el('div', { cls: 'muted small', text: T.about })]),
+        el('div', { cls: 'pay', text: each }),
+        btn('Sign 1', () => take(1), 'small', !o.n || D.coins < each || !room),
+        btn('Sign all you can', () => take(o.n), 'small primary', !o.n || D.coins < each || !room),
+      ]);
+    });
+    return el('div', { cls: 'card' }, [
+      el('h3', { text: 'Your crew' }),
+      el('p', { cls: 'muted small', text: 'Who fights when you board a pirate. Your Stryx commands from the pilot stump with ' + will + ' will (vines and seed grow it) and can give one order a round.' }),
+      rows.length ? el('div', {}, rows) : el('p', { cls: 'late small', text: 'Nobody! You cannot board anything until you sign on a crew.' }),
+      el('h3', { text: 'The crew hall at ' + SP.port(D.at).name, style: 'margin-top:12px' }),
+      el('div', {}, hall),
+      el('p', { cls: 'muted small', text: 'Every port recruits different folk. New faces come with each sky day. Folk you tow out of the sky sometimes join you, and a beaten pirate crew may sign on.' }),
+    ]);
+  }
+  /* the bounty board: wanted pirate captains */
+  function bountiesFor() {
+    const day = today();
+    if (!D.bounties || D.bounties.port !== D.at || D.bounties.day !== day) {
+      const r = SP.rng((day + 11) * 7907 + D.at.length * 131 + D.at.charCodeAt(1)), rk = rank(), list = [];
+      const n = 1 + Math.floor(r() * 2) + (rk >= 1 ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const faction = Object.keys(SP.FACTIONS)[Math.floor(r() * 3)], F = SP.FACTIONS[faction];
+        const body = F.where[Math.floor(r() * F.where.length)];
+        const kinds = ['sloop', 'brig', 'cutter'].concat(rk >= 1 ? ['galleon'] : []), kind = kinds[Math.floor(r() * kinds.length)];
+        const id = 'b' + day.toString(36) + D.at.slice(0, 3) + i;
+        if (D.wanted.some(w => w.id === id)) continue;
+        const K = SP.SHIPKINDS[kind];
+        list.push({ id, faction, kind, body, captain: SP.PIRATE_NAMES[Math.floor(r() * SP.PIRATE_NAMES.length)], ship: SP.SHIP_NAMES[Math.floor(r() * SP.SHIP_NAMES.length)],
+          reward: Math.round((120 + K.hull * 1.6 + rk * 90) * (faction === 'ghost' ? 1.4 : 1) / 10) * 10, rep: 10 + rk * 5 + (faction === 'ghost' ? 8 : 0), from: D.at });
+      }
+      D.bounties = { port: D.at, day, list };
+    }
+    return D.bounties.list;
+  }
+  const bountyLine = b => b.captain + ', captain of the ' + b.ship + ' (' + SP.FACTIONS[b.faction].name + ', a ' + SP.SHIPKINDS[b.kind].name + ')';
+  function bountyCard() {
+    const offers = bountiesFor().filter(b => !D.wanted.some(w => w.id === b.id));
+    const active = D.wanted.map(w => el('div', { cls: 'job' }, [
+      el('div', { cls: 'grow' }, [el('div', { html: (w.done ? '✅ ' : '🎯 ') + '<b>' + bountyLine(w) + '</b>' }),
+        el('div', { cls: 'muted small', text: w.done ? 'Taken! Claim the reward at any port.' : 'Last seen near ' + bodyName(w.body) + '. Her sails fly a red pennant: look for it in the sky.' })]),
+      el('div', { cls: 'pay', text: w.reward }),
+      w.done ? btn('Claim', () => {
+        D.coins += w.reward; D.battles.bounties++; addRep(w.rep, 'bounty');
+        D.wanted = D.wanted.filter(x => x !== w); save(); SFX.dock(); portScreen(['The port-reeve counts out ' + w.reward + ' coins for ' + w.captain + '. Word gets round (+' + w.rep + ' reputation).']);
+      }, 'small primary') : btn('Give up', () => { if (!confirm('Give up the hunt for ' + w.captain + '?')) return; D.wanted = D.wanted.filter(x => x !== w); save(); portScreen(); }, 'small danger'),
+    ]));
+    const list = offers.map(b => el('div', { cls: 'job' }, [
+      el('div', { cls: 'grow' }, [el('div', { html: '<b>WANTED:</b> ' + bountyLine(b) }), el('div', { cls: 'muted small', text: 'Seen near ' + bodyName(b.body) + '. ' + SP.FACTIONS[b.faction].about + ' Taken alive: +' + b.rep + ' reputation.' })]),
+      el('div', { cls: 'pay', text: b.reward }),
+      btn('Hunt', () => { if (D.wanted.filter(w => !w.done).length >= 2) { toast('Two hunts at once is enough for anyone.'); return; } D.wanted.push(Object.assign({}, b)); save(); portScreen(); }, 'small primary', D.wanted.filter(w => !w.done).length >= 2),
+    ]));
+    return el('div', { cls: 'card' }, [
+      el('h3', { text: 'The bounty board' }),
+      el('p', { cls: 'muted small', text: 'Wear a pirate down with your seed cannon (F) and your lash until she strikes her colours, then hold alongside and your crew boards her. Take a wanted captain and the bounty is yours.' }),
+      active.length ? el('div', {}, active) : null,
+      list.length ? el('div', {}, list) : el('p', { cls: 'muted small', text: 'No new notices today.' }),
+      el('p', { cls: 'muted small', text: 'Pirates taken: ' + D.battles.captured + ' · boardings won ' + D.battles.won + ', lost ' + D.battles.lost + ' · bounties claimed ' + D.battles.bounties }),
+    ]);
+  }
+  /* your fleet: one crew for hire to start you off, and every ship you take from the pirates */
+  const CAPTAINS = ['Hesk', 'Marra Quickvine', 'Old Tobbe', 'Ysolde', 'Ferro of Bolo Kalo', 'Brindle', 'Aun Tallbark', 'Pell the Younger', 'Sefa', 'Grandmother Oakum'];
+  const SHIP_MAX = 6, ESCORT_MAX = 2;
+  function fleetCard() {
+    const rk = rank(), routeMax = SP.FLEET.max[rk] || 0, T = now();
+    const running = routeShips().length;
     const dests = SP.PORTS.filter(q => q.id !== D.at && !q.secret && q.rank <= rk);
-    const pick = el('select', {}, dests.map(q => el('option', { value: q.id, text: q.name })));
-    const cost = SP.FLEET.cost(D.fleet.length);
-    const hire = D.fleet.length < max ? el('div', { cls: 'row' }, [el('span', { cls: 'small', text: 'Hire a crew to run ' + SP.port(D.at).name + ' ⇄ ' }), pick,
-      btn('Hire · ' + cost, () => {
-        if (D.coins < cost) { toast('Not enough coins.'); return; }
-        const crew = SP.CREWS.filter(c => !D.fleet.some(sh => sh.crew === c))[0] || 'a crew';
-        D.coins -= cost; D.fleet.push(SP.hireShip('h' + Date.now().toString(36), D.at, pick.value, now(), crew)); save();
-        toast(crew + ' sign on. Look for their skiff in the sky.'); portScreen();
-      }, 'small primary', D.coins < cost)]) : el('p', { cls: 'muted small', text: 'That is all the crews a ' + SP.RANKS[rk].name + ' can keep (' + max + ').' });
-    return el('div', { cls: 'card' }, [el('h3', { text: 'Ships for hire' }),
-      el('p', { cls: 'muted small', text: 'A crew runs a route for you, back and forth, while you fly your own. You take a cut of every trip and pay them a wage each sky day. Settle up at any port.' }),
-      rows.length ? el('div', {}, rows) : null, hire]);
+    const settleRow = sh => {
+      const e = SP.fleetEarn(sh, T);
+      return el('div', { cls: 'muted small', text: e.trips + ' trips since you last settled' + (e.lost ? ' (' + e.lost + ' lost to Tyndael)' : '') + ' · your cut ' + e.coins + ' · wages ' + e.wages + ' · ' + (e.net >= 0 ? '+' : '') + e.net });
+    };
+    const settle = sh => { const r = SP.fleetSettle(sh, now()); D.coins = Math.max(0, D.coins + r.net); if (sh.captain) giveXp(sh, r.trips); return r; };
+    const hired = D.fleet.map(sh => el('div', { cls: 'job' }, [
+      el('div', { cls: 'grow' }, [el('div', { html: '<b>' + sh.crew + '</b> (hired): ' + SP.port(sh.from).name + ' ⇄ ' + SP.port(sh.to).name }), settleRow(sh)]),
+      btn('Settle up', () => { const r = settle(sh); save(); toast((r.net >= 0 ? 'You collect ' : 'You pay out ') + Math.abs(r.net) + ' coins.'); portScreen(); }, 'small primary'),
+      btn('Let go', () => { if (!confirm('Pay off ' + sh.crew + ' and let them go?')) return; settle(sh); D.fleet = D.fleet.filter(x => x !== sh); save(); portScreen(); }, 'small danger'),
+    ]));
+    const pick = () => el('select', {}, dests.map(q => el('option', { value: q.id, text: q.name })));
+    const captured = D.ships.map(sh => {
+      const K = SP.SHIPKINDS[sh.kind] || SP.SHIPKINDS.sloop, down = sh.downUntil && sh.downUntil > T;
+      const head = el('div', { html: '<b>' + sh.name + '</b>, a ' + K.name + ' · Captain ' + sh.captain + ' (level ' + (sh.lvl || 1) + ')' + (down ? ' · <span class="late">being patched up until ' + SP.clockOf(sh.downUntil) + '</span>' : '') });
+      const kids = [head];
+      let acts = [];
+      if (sh.role === 'route') {
+        kids.push(el('div', { cls: 'small', text: 'Running ' + SP.port(sh.from).name + ' ⇄ ' + SP.port(sh.to).name }), settleRow(sh));
+        acts = [btn('Settle up', () => { const r = settle(sh); save(); toast((r.net >= 0 ? 'You collect ' : 'You pay out ') + Math.abs(r.net) + ' coins.'); portScreen(); }, 'small primary'),
+          btn('Call her in', () => { settle(sh); sh.role = 'docked'; sh.trip = 0; save(); portScreen(); }, 'small')];
+      } else if (sh.role === 'escort') {
+        kids.push(el('div', { cls: 'muted small', text: 'Flies beside you and fights for you. Her crew of ' + (K.crew * 2 + (sh.lvl || 1)) + ' come across when you board. ' + K.about }));
+        acts = [btn('Stand her down', () => { sh.role = 'docked'; save(); portScreen(); }, 'small')];
+      } else {
+        kids.push(el('div', { cls: 'muted small', text: K.about + ' Pays ×' + K.pay + ' on a route; hits for ' + K.escortDmg + ' as an escort.' }));
+        const sel = pick();
+        acts = [
+          el('span', { cls: 'small', text: SP.port(D.at).name + ' ⇄' }), sel,
+          btn('Set on the route', () => {
+            if (running >= Math.max(1, routeMax)) { toast('A ' + SP.RANKS[rk].name + ' can keep ' + Math.max(1, routeMax) + ' ship' + (Math.max(1, routeMax) > 1 ? 's' : '') + ' on routes.'); return; }
+            const base = SP.hireShip(sh.id, D.at, sel.value, now(), sh.name);
+            Object.assign(sh, base, { crew: sh.name, role: 'route', pay: Math.round(base.pay * K.pay * (1 + 0.08 * ((sh.lvl || 1) - 1))) });
+            save(); portScreen();
+          }, 'small primary', down || !dests.length),
+          btn('Escort me', () => { if (D.ships.filter(x => x.role === 'escort').length >= ESCORT_MAX) { toast('Two escorts is all you can lead.'); return; } sh.role = 'escort'; save(); portScreen(); }, 'small', down),
+          btn('Sell her · ' + Math.round(K.hull * 2.5), () => { if (!confirm('Sell the ' + sh.name + ' to the breakers?')) return; D.coins += Math.round(K.hull * 2.5); D.ships = D.ships.filter(x => x !== sh); save(); portScreen(); }, 'small danger'),
+        ];
+      }
+      return el('div', { cls: 'job' }, [el('div', { cls: 'grow' }, kids.concat([el('div', { cls: 'row' }, acts)]))]);
+    });
+    const cost = price(SP.FLEET.cost(0));
+    const sel = pick();
+    const hire = !routeMax ? el('p', { cls: 'muted small', text: 'A crew will hire on under a Ship’s Pilot. Make ' + (SP.RANKS[1].at - D.deliveries) + ' more deliveries and one will come looking for you.' })
+      : D.fleet.length ? null
+        : el('div', { cls: 'row' }, [el('span', { cls: 'small', text: 'Hire a crew to run ' + SP.port(D.at).name + ' ⇄ ' }), sel,
+          btn('Hire · ' + cost, () => {
+            if (D.coins < cost) { toast('Not enough coins.'); return; }
+            if (running >= routeMax) { toast('That is all the routes a ' + SP.RANKS[rk].name + ' can keep.'); return; }
+            const crew = SP.CREWS.filter(c => !D.fleet.some(sh => sh.crew === c))[0] || 'a crew';
+            D.coins -= cost; D.fleet.push(SP.hireShip('h' + Date.now().toString(36), D.at, sel.value, now(), crew)); save();
+            toast(crew + ' sign on. Look for their skiff in the sky.'); portScreen();
+          }, 'small primary', D.coins < cost || !dests.length)]);
+    return el('div', { cls: 'card' }, [el('h3', { text: 'Your fleet' }),
+      el('p', { cls: 'muted small', text: 'Only one crew will hire on for coin. Every other ship in your fleet you take from the pirates: board one, win, and she is yours. Put her on a route (you take a cut of every trip and pay a wage each sky day; settle at any port), or have her fly beside you as an escort. Captains level up as they work.' }),
+      hired.length ? el('div', {}, hired) : null, hire,
+      captured.length ? el('div', {}, captured) : el('p', { cls: 'muted small', text: 'No captured ships yet (' + SHIP_MAX + ' at most).' }),
+      (running || D.ships.length) ? el('p', { cls: 'muted small', text: 'Ships on routes: ' + running + ' of ' + Math.max(1, routeMax) + ' (a higher rank lets you run more).' }) : null]);
   }
   /* Mba'Karn: the world at the end of the Waves of Memory */
   function karnPort(note) {
@@ -341,7 +483,7 @@
       <h3>Flying</h3>
       <p><kbd>←</kbd> <kbd>→</kbd> (or <kbd>A</kbd> <kbd>D</kbd>) turn the ship. <kbd>↑</kbd> or <kbd>W</kbd> burns the seed and pushes.
       <kbd>↓</kbd> or <kbd>S</kbd> turns the sails into the wind to slow down. <kbd>Space</kbd> is a hard push from the seed.
-      <kbd>E</kbd> or <kbd>Shift</kbd> lashes out with your vines and knocks away anything close. <kbd>M</kbd> opens the sky map. <kbd>R</kbd> raids.</p>
+      <kbd>E</kbd> or <kbd>Shift</kbd> lashes out with your vines and knocks away anything close. <kbd>M</kbd> opens the sky map. <kbd>R</kbd> raids. <kbd>F</kbd> fires the seed cannon.</p>
       <p>With a mouse or a finger: <b>hold</b> anywhere and the ship turns toward it and pushes. The buttons do the rest.</p>
       <h3>The sky turns</h3>
       <p>The Tatu and Kalo are big and far apart, and they never stop: they orbit, and they spin, and their ports turn with them.
@@ -359,9 +501,21 @@
       <p>In the shared sky you see everyone else who is flying. Get alongside a ship carrying cargo, press <kbd>R</kbd>, and <b>hold</b> beside it:
       your vines go across, and when they hold long enough a job out of their hold is yours (raided goods pay less). If someone hooks <i>you</i>,
       lash (<kbd>E</kbd>) to cut their vines. A ship on the ground or in port cannot be raided.</p>
-      <h3>Ships for hire</h3>
-      <p>Once you are a Ship’s Pilot, crews will work for you: they run a route of your choosing, back and forth, and you take a cut.
-      You will see their skiffs in the sky.</p>
+      <h3>Pirates and boarding</h3>
+      <p>Duskareth raiders, smugglers and a ghost ship or two sail the sky, and anything with cargo is fair game to them. Fight back with the
+      <b>seed cannon</b> (<kbd>F</kbd>) and your lash, which also cuts their knives out of the air. Wear one down and she <b>strikes her colours</b>:
+      hold alongside her and your crew goes across.</p>
+      <p>A boarding is fought turn by turn on the two decks. Every stack acts in order of speed: move, attack (point from the side you want to
+      strike from), shoot, <b>wait</b> or <b>defend</b>. A stack hit hand to hand strikes back once a round. Shooters cannot shoot with an enemy beside them.
+      Your Stryx gives one <b>order</b> a round with its will: lash, rally, seed flare, sail gust or binding roots. Their captain has tricks too.
+      Win and the ship is yours. A beaten crew may strike before the end, and some of them may want to sign on.</p>
+      <h3>Your crew and your fleet</h3>
+      <p>Sign crew on at a port’s crew hall: every port recruits different folk. Only one crew will hire on for coin; every other ship in your fleet you
+      take from the pirates. Put a captured ship on a route, or have her fly with you as an <b>escort</b>: escorts fight beside you and send their
+      crews across when you board. Captains level up as they work.</p>
+      <h3>Bounties and your name</h3>
+      <p>The bounty board names wanted captains. Hunt one down (her sails fly a red pennant), take her, and claim the bounty at any port.
+      Good work raises your reputation: better prices, better pay. Raiding other pilots lowers it. Other pilots’ ships are never at risk, only their cargo.</p>
       <h3>The sky’s dangers and gifts</h3>
       <p><b>Tyndael</b> swarm round Leotik and the Ashen Reach. A <b>Lutut</b> screeches, then dives. Sky rock drifts along Bolo Kalo’s path,
       storms come off Nekh FtiSular, the <b>oath-mist</b> by Aakalay chills a seed. Skim past a world fast for a <b>slingshot</b>; tow <b>skiffs adrift</b> to safety.
@@ -425,7 +579,7 @@
     mapctx.setTransform(dp, 0, 0, dp, 0, 0);
     const T = (FL ? FL.f.T : now()) + MAP.ahead;
     const others = SKY ? SKY.flying().filter(p => p.x != null).map(p => ({ x: p.x, y: p.y, ang: p.ang, name: p.name, color: p.color })) : [];
-    A.map(mapctx, r.width, r.height, { T, cx: MAP.cx, cy: MAP.cy, scale: MAP.scale, ship: FL ? FL.f.ship : null, here: FL ? null : D.at, route: D.route, hold: D.hold, fleet: D.fleet, others, extra: FL ? FL.f.bodies : null, now: t, ahead: MAP.ahead });
+    A.map(mapctx, r.width, r.height, { T, cx: MAP.cx, cy: MAP.cy, scale: MAP.scale, ship: FL ? FL.f.ship : null, here: FL ? null : D.at, route: D.route, hold: D.hold, fleet: routeShips(), others, pirates: FL ? FL.f.pirates : null, extra: FL ? FL.f.bodies : null, now: t, ahead: MAP.ahead });
   }
   mapcv.addEventListener('pointerdown', e => { MAP.drag = { x: e.clientX, y: e.clientY, cx: MAP.cx, cy: MAP.cy }; MAP.moved = false; mapcv.setPointerCapture && mapcv.setPointerCapture(e.pointerId); });
   mapcv.addEventListener('pointermove', e => {
@@ -458,7 +612,7 @@
 
   /* ================= the flight ================= */
   let FL = null;
-  const input = { turn: 0, thrust: false, brake: false, boost: false, lash: false, aim: null };
+  const input = { turn: 0, thrust: false, brake: false, boost: false, lash: false, fire: false, aim: null };
   const keys = {};
   const touchy = matchMedia('(pointer: coarse)').matches;
   const online = () => SKY && SKY.state === 'on';
@@ -469,10 +623,12 @@
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !touchy);
     const T0 = now();
-    const f = SP.makeFlight({ T0, from: D.at, parts: D.parts, hull: hullNow(), rank: rank(), seed: (Math.floor(T0) * 7919 + D.flights * 13) >>> 0, hot: D.hold.some(j => j.kind === 'seeds'), weight: D.hold.reduce((w, j) => w + (SP.JOBS[j.kind].weight || 0), 0) });
+    const f = SP.makeFlight({ T0, from: D.at, parts: D.parts, hull: hullNow(), rank: rank(), seed: (Math.floor(T0) * 7919 + D.flights * 13) >>> 0, hot: D.hold.some(j => j.kind === 'seeds'), weight: D.hold.reduce((w, j) => w + (SP.JOBS[j.kind].weight || 0), 0),
+      cargo: D.hold.length, escorts: D.ships.filter(sh => sh.role === 'escort' && !(sh.downUntil > T0)).slice(0, ESCORT_MAX),
+      wanted: D.wanted.filter(w => !w.done).map(w => ({ id: 'w_' + w.id, bountyId: w.id, faction: w.faction, kind: w.kind, body: w.body, captain: w.captain, ship: w.ship })) });
     A.parts.length = 0; A.resetCamera(f);
     FL = { f, from: D.at, ended: 0, log: [], logT: 0, raid: null, raidCd: 0, sentAt: 0, raidSent: 0 };
-    Object.assign(input, { turn: 0, thrust: false, brake: false, boost: false, lash: false, aim: null });
+    Object.assign(input, { turn: 0, thrust: false, brake: false, boost: false, lash: false, fire: false, aim: null });
     say('takeoff');
     resize();
   }
@@ -492,7 +648,8 @@
     const note = [];
     const coinsFly = f.mcfly * 6;
     if (f.mcfly) { D.coins += coinsFly; note.push('You caught ' + f.mcfly + ' RubberMcFly in the Waves of Memory: ' + coinsFly + ' coins.'); }
-    f.skiffs.filter(k => k.saved).forEach(k => { D.coins += k.reward; D.rescues = (D.rescues || 0) + 1; note.push('You towed ' + k.who + ' clear of the sky: they pressed ' + k.reward + ' coins on you.'); });
+    f.skiffs.filter(k => k.saved).forEach(k => { D.coins += k.reward; D.rescues = (D.rescues || 0) + 1; note.push('You towed ' + k.who + ' clear of the sky: they pressed ' + k.reward + ' coins on you.'); D.rep += 2;
+      if (Math.random() < 0.6) { const t = ['deckhand', 'deckhand', 'rigger', 'slinger'][Math.floor(Math.random() * 4)], n = t === 'deckhand' ? 3 : 1; if (addCrew(t, n)) note.push('… and ' + n + ' of them (' + SP.UNITS[t].short + ') asked to sign on with you.'); } });
     if (f.slings) { const c = f.slings * 6; D.coins += c; D.slings = (D.slings || 0) + f.slings; note.push(f.slings + ' slingshot' + (f.slings > 1 ? 's' : '') + ' round the pull of the Tatu: the academy pays ' + c + ' coins for good flying.'); }
     if (f.wrecked) {
       D.wrecks++;
@@ -526,6 +683,8 @@
     here.forEach(j => {
       const time = T - j.taken;
       const r = SP.settle(j, f, time);
+      if (repT().pay !== 1) { const d = Math.round(r.pay * (repT().pay - 1)); r.pay += d; r.notes.push((d >= 0 ? 'your name +' : 'your name −') + Math.abs(d)); }
+      if (T <= dueOf(j)) D.rep += 1;
       D.coins += r.pay; D.earned += r.pay; D.deliveries++;
       note.push(SP.JOBS[j.kind].icon + ' ' + j.what + (T > dueOf(j) ? ' arrived late' : ' arrived in time') + ' (' + SP.mmss(time) + '): ' + r.pay + ' coins' + (r.notes.length ? ' (' + r.notes.join(', ') + ')' : '') + '.');
     });
@@ -550,6 +709,7 @@
     if (isK(e, [' ']) && !e.repeat) input.boost = true;
     if (isK(e, ['e', 'E', 'Shift']) && !e.repeat) input.lash = true;
     if (isK(e, ['r', 'R']) && !e.repeat) startRaid();
+    if (isK(e, ['f', 'F'])) input.fire = true;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].indexOf(e.key) >= 0) e.preventDefault();
   });
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -564,6 +724,8 @@
   hold('tLash', () => { input.lash = true; });
   hold('tBrake', () => { touchBrake = true; }, () => { touchBrake = false; });
   hold('tRaid', () => startRaid());
+  let touchFire = false;
+  hold('tFire', () => { touchFire = true; }, () => { touchFire = false; });
   $('mapBtn').addEventListener('click', () => { if (MAP.open) closeMap(); else openMap(); });
   $('pause').addEventListener('click', () => setPause(!FL.paused));
   $('resume').addEventListener('click', () => setPause(false));
@@ -611,6 +773,62 @@
     if (R.claimed && performance.now() - R.claimAt > 4000) { FL.raid = null; FL.raidCd = 3; }
   }
 
+  /* ---- boarding a pirate ---- */
+  function startBoarding(id) {
+    const f = FL && FL.f, p = f && f.pirates.find(q => q.id === id);
+    if (!p || FL.boarding || !SP.battleView) return;
+    if (!D.crew.some(c => c.n > 0)) {
+      pop('You have no crew to board with!', '#ffb0a0'); logLine('No crew. Sign some on in port before we try that.');
+      p.boardAsked = false; p.boardT = -4; return;
+    }
+    FL.boarding = id; f.boarding = true; engine(false);
+    const K = SP.SHIPKINDS[p.kind] || SP.SHIPKINDS.sloop;
+    /* your escorts' crews come across too */
+    const marines = f.escorts.filter(e => e.alive).map(e => { const k2 = SP.SHIPKINDS[e.kind] || SP.SHIPKINDS.sloop; return { type: e.lvl >= 4 ? 'rigger' : 'deckhand', n: k2.crew * 2 + (e.lvl || 1), escort: true }; });
+    const BS = SP.Battle.create({ mine: D.crew.map(c => ({ type: c.type, n: c.n })).concat(marines), theirs: p.crew, parts: D.parts, seed: p.seed + D.flights, captainName: p.captain });
+    const F2 = SP.FACTIONS[p.faction] || SP.FACTIONS.dusk;
+    SP.battleView.open({ S: BS, title: 'Boarding the ' + p.ship + ': ' + p.captain + (p.wanted ? ' (wanted!)' : ''), foeName: p.captain, foeShip: p.ship, foeSail: F2.sail, foeHull: p.faction === 'ghost' ? '#3a4a5a' : p.faction === 'smug' ? '#4a3420' : '#3a2a34',
+      onEnd: r => endBoarding(p, K, BS, r) });
+  }
+  function endBoarding(p, K, BS, r) {
+    if (!FL) return;
+    const f = FL.f, notes = [];
+    D.crew = SP.Battle.survivors(BS, 'A');
+    if (r.joiners) { if (addCrew(r.joiners.type, r.joiners.n)) notes.push(r.joiners.n + ' ' + SP.UNITS[r.joiners.type].short + ' sign on'); else notes.push('no room on deck for the ones who wanted to sign on'); }
+    if (r.won) {
+      SP.resolveBoard(f, p.id, true);
+      D.battles.won++; D.battles.captured++;
+      let loot = Math.round((K.hull * 0.8 + rank() * 20) * (p.wanted ? 1.5 : 1));
+      if (!r.take) loot += Math.round(K.hull * 1.2);
+      D.coins += loot; notes.unshift('+' + loot + ' coins of loot');
+      addRep(p.wanted ? 4 : 3, 'a pirate taken');
+      if (p.bountyId) { const w = D.wanted.find(x => x.id === p.bountyId); if (w) { w.done = true; notes.push('the bounty on ' + w.captain + ' is yours to claim at any port'); } }
+      if (r.take) {
+        if (D.ships.length >= SHIP_MAX) notes.push('but your fleet is full: she is sold to the breakers for ' + Math.round(K.hull * 2.5) + ' coins'), D.coins += Math.round(K.hull * 2.5);
+        else {
+          const capt = CAPTAINS.filter(c => !D.ships.some(sh => sh.captain === c))[0] || 'Mate ' + (D.ships.length + 1);
+          D.ships.push({ id: 's' + Date.now().toString(36), name: p.ship, kind: p.kind, captain: capt, lvl: 1, xp: 0, role: 'docked', taken: now() });
+          notes.push('the ' + p.ship + ' joins your fleet under Captain ' + capt + ' (set her to work in port)');
+        }
+      }
+      f.ship.vx += 60; logLine('She is ours. ' + notes.join('; ') + '.');
+      pop('Victory!', '#ffe2a0');
+    } else {
+      SP.resolveBoard(f, p.id, false);
+      if (r.fled) { D.battles.fled++; f.ship.hull = Math.max(1, f.ship.hull - f.S.hullMax * 0.08); logLine('We cut the vines and pulled clear.'); }
+      else {
+        D.battles.lost++;
+        f.ship.hull = Math.max(1, f.ship.hull - f.S.hullMax * 0.15);
+        if (D.hold.length) { const j = D.hold.splice(Math.floor(Math.random() * D.hold.length), 1)[0]; notes.push('they took ' + j.what + ' out of the hold'); f.cargo = D.hold.length; }
+        logLine('Beaten back. ' + (notes.join('; ') || 'They let us go with our lives') + '.');
+      }
+      pop(r.fled ? 'Cut loose' : 'Beaten back…', '#ffb0a0');
+    }
+    if (notes.length) toast(notes.join(' · '));
+    FL.boarding = null; f.boarding = false;
+    save();
+  }
+
   /* the loop */
   let last = performance.now();
   const perf = [];
@@ -624,10 +842,11 @@
     if (perf.length === 90 && !A.lowFx && perf.reduce((a, b) => a + b, 0) / 90 > 0.026) { A.lowFx = true; }
     const f = FL.f;
     const mapPause = MAP.open && !online();
-    if (!FL.paused && !FL.ended && !mapPause) {
+    if (!FL.paused && !FL.ended && !mapPause && !FL.boarding) {
       input.turn = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
       input.thrust = !!(keys.arrowup || keys.w);
       input.brake = !!(keys.arrowdown || keys.s) || touchBrake;
+      if (keys.f || touchFire) input.fire = true;
       input.aim = null;
       if (pointer && FL.view) {
         const sx = FL.view.SX(f.ship.x), sy = FL.view.SY(f.ship.y);
@@ -647,6 +866,13 @@
         else if (ev.t === 'rescue') { SFX.dock(); pop('Rescued! +' + ev.coins, '#ffd890'); }
         else if (ev.t === 'sling') { SFX.mcfly(); pop('Slingshot!', '#a8e8ff'); }
         else if (ev.t === 'karn') { SFX.karn(); pop('A world on no chart…', '#ffe0a0'); }
+        else if (ev.t === 'fire') SFX.cannon();
+        else if (ev.t === 'shotHit') SFX.thud();
+        else if (ev.t === 'ram') { SFX.hit(8); pop('Rammed!', '#ffb0a0'); }
+        else if (ev.t === 'pirate') { const p = f.pirates.find(q => q.id === ev.id); if (p) { SFX.alarm(); pop((p.wanted ? 'Wanted: ' : '') + p.captain + ' of the ' + p.ship + '!', '#ff8a7a'); } }
+        else if (ev.t === 'struck') { const p = f.pirates.find(q => q.id === ev.id); SFX.dock(); pop('She strikes her colours!', '#ffe2a0'); if (p) logLine('The ' + p.ship + ' is struck. Hold alongside her and we board.'); D.ships.filter(sh => sh.role === 'escort').forEach(sh => { if (f.escorts.some(e => e.id === sh.id && e.alive)) giveXp(sh, 2); }); }
+        else if (ev.t === 'escortDown') { const sh = D.ships.find(x => x.id === ev.id); if (sh) { sh.downUntil = now() + SP.DAY / 2; sh.role = 'docked'; save(); } pop('The ' + ev.name + ' is out of the fight!', '#ffb0a0'); }
+        else if (ev.t === 'board') startBoarding(ev.id);
       });
       f.events.length = 0;
       if (online()) {
@@ -665,8 +891,9 @@
     const targets = D.hold.map(j => ({ port: j.to, label: SP.port(j.to).name }));
     D.route.forEach((id, i) => { if (!marks.has(id)) targets.push({ port: id, label: (i + 1) + ' · ' + SP.port(id).name, color: '#9fe0ff' }); });
     f.skiffs.forEach(k => { if (!k.saved && Math.hypot(k.x - f.ship.x, k.y - f.ship.y) < 4500) targets.push({ x: k.x, y: k.y, label: 'Distress', color: '#ff8a7a' }); });
+    f.pirates.forEach(p => { if (p.state === 'gone') return; const d = Math.hypot(p.x - f.ship.x, p.y - f.ship.y); if (d < (p.wanted ? 9000 : 3600)) targets.push({ x: p.x, y: p.y, label: p.state === 'struck' ? 'Struck: board her!' : p.wanted ? 'WANTED: ' + p.captain : SP.FACTIONS[p.faction].name, color: p.state === 'struck' ? '#ffe2a0' : '#ff6a6a' }); });
     const others = SKY && online() ? SKY.flying().filter(p => p.x != null).map(p => ({ key: p.key, x: p.x, y: p.y, ang: p.ang || 0, vx: p.vx || 0, vy: p.vy || 0, th: p.net && p.net.th, name: p.name, color: p.color, cargo: p.net && p.net.h, raidingMe: p.net && p.net.r === myKey(), mine: FL.raid && FL.raid.target === p.key })) : [];
-    const fleet = D.fleet.map(sh => { const q = SP.fleetPos(sh, f.T, f.bodies); return q ? Object.assign(q, { name: sh.crew }) : null; }).filter(Boolean);
+    const fleet = routeShips().map(sh => { const q = SP.fleetPos(sh, f.T, f.bodies); return q ? Object.assign(q, { name: sh.crew }) : null; }).filter(Boolean);
     FL.view = A.draw(ctx, W, H, f, t / 1000, { marks, targets, braking: input.brake, others, fleet, raid: FL.raid ? FL.raid.t / SP.RAID.time : 0 });
     A.minimap(mctx, mini.width, mini.height, f, Array.from(marks), others, fleet);
     hud(f);
@@ -702,6 +929,7 @@
     });
     if (!D.hold.length) dues.appendChild(el('div', { cls: 'muted', text: 'nothing due' }));
     $('hLash').classList.toggle('ready', s.lashCd <= 0);
+    $('hFire').textContent = (s.cannonCd > 0 ? '💥 cannon…' : '💥 cannon ready (F)') + ' · crew ' + D.crew.reduce((n, c) => n + c.n, 0);
     $('tLash').classList.toggle('ready', s.lashCd <= 0);
     const target = online() && !FL.raid && FL.raidCd <= 0 ? raidTarget() : null;
     $('tRaid').classList.toggle('hidden', !online());
@@ -712,7 +940,7 @@
     else if (f.wrecked) msg = 'The hull is gone';
     else if (FL.raidedBy) msg = ((SKY && SKY.pilots[FL.raidedBy] && SKY.pilots[FL.raidedBy].name) || 'Someone') + ' is raiding your hold! Lash (E) to cut them off!';
     else if (s.grounded && f.t < 3) msg = touchy ? 'Hold above the ship to lift off' : 'Hold ↑ to lift off';
-    else { const k = f.skiffs.find(k => !k.saved && k.hold > 0); if (k) msg = 'Towing… ' + Math.round(k.hold / 1.6 * 100) + '%'; }
+    else { const k = f.skiffs.find(k => !k.saved && k.hold > 0); if (k) msg = 'Towing… ' + Math.round(k.hold / 1.6 * 100) + '%'; const b = f.pirates.find(p => p.state === 'struck' && p.boardT > 0); if (b && !FL.boarding) msg = 'Hold alongside… vines across ' + Math.min(100, Math.round(b.boardT * 100)) + '%'; }
     const m = $('hMsg'); m.textContent = msg; m.classList.toggle('hidden', !msg); m.classList.toggle('alarm', !!FL.raidedBy);
   }
 
@@ -742,6 +970,8 @@
     const T = now();
     D.hold.forEach(j => { if (!j.taken || j.taken < 1e6 || j.taken > T + 60) j.taken = T; if (j.par < 40) j.par = j.par + 45; });
     if (!SP.port(D.at)) D.at = 'rakar';
+    if (D.parts.cannon == null) D.parts.cannon = 1;
+    if (!D.battles.bounties) D.battles = Object.assign(blank().battles, D.battles);
     if (SAVE.banned) { screen('Stryx Pilot', [el('div', { cls: 'card', text: SAVE.banned })]); return; }
     portScreen();
     skyConnect();

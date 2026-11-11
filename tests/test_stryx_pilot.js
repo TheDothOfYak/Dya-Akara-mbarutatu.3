@@ -6,6 +6,10 @@ const dir = path.join(__dirname, '..', 'mini-games', 'stryx-pilot', 'js');
 require(path.join(dir, 'sp_data.js'));
 require(path.join(dir, 'sp_sim.js'));
 const SP = globalThis.SP;
+require(path.join(dir, 'sp_battle.js'));
+/* physics tests fly in an empty sky unless they ask for pirates */
+const makeFlight0 = SP.makeFlight;
+SP.makeFlight = o => makeFlight0(Object.assign({ pirates: false }, o));
 
 let pass = 0, fail = 0;
 function check(name, ok, extra) { if (ok) pass++; else { fail++; console.log('  ✗ ' + name + (extra ? ' — ' + extra : '')); } }
@@ -215,21 +219,101 @@ check('better parts make a better ship', SP.ship(parts(5)).thrust > SP.ship(part
   const w = f.wave, s = f.ship;
   s.grounded = null;
   let spawned = false;
-  for (let i = 0; i < 60 * 300 && !spawned; i++) {
+  for (let i = 0; i < 60 * 700 && !spawned; i++) {
     /* keep the ship in the middle of the band, riding with it */
     const along = s.x * w.flow[0] + s.y * w.flow[1];
     s.x = w.nx * w.off + w.flow[0] * along; s.y = w.ny * w.off + w.flow[1] * along;
     SP.stepFlight(f, { aim: Math.atan2(w.flow[1], w.flow[0]), thrust: true });
     if (f.bodies.karn) spawned = true;
   }
-  check('ride the waves far enough and Mba’Karn appears', spawned && f.waveRide >= SP.KARN_RIDE, 'rode ' + Math.round(f.waveRide));
-  check('…very far from home', Math.hypot(s.x - f.bodies.velki.x, s.y - f.bodies.velki.y) > SP.KARN_FAR);
+  check('ride the waves far enough and Mba’Karn appears', spawned && f.waveRide >= SP.KARN_RIDE, 'rode ' + Math.round(f.waveRide) + ', ' + Math.round(Math.hypot(SP.KARN.x - s.x, SP.KARN.y - s.y)) + ' px short');
+  check('…15,000 m from the heart of the Mbaru Tatu, and massive', Math.round(SP.KARN_DIST / 40) === 15000 && SP.KARN.r >= 6000 && Math.hypot(s.x, s.y) > 400000);
   const k = SP.portPos(SP.port('mbakarn'), f.bodies);
   check('its harbour faces the ship coming in', k && Math.hypot(k.x - s.x, k.y - s.y) < Math.hypot(f.bodies.karn.x - s.x, f.bodies.karn.y - s.y));
   const g = SP.makeFlight({ T0: 9000, from: 'rakar', parts: parts(5), seed: 34, wave: false });
-  g.ship.grounded = null; g.ship.x = 90000; g.ship.y = 0;
+  g.ship.grounded = null; g.ship.x = SP.KARN.x + SP.KARN.r + 3000; g.ship.y = SP.KARN.y;
   for (let i = 0; i < 600; i++) SP.stepFlight(g, { thrust: true, aim: 0 });
-  check('flying far without the waves finds nothing', !g.bodies.karn);
+  check('flying right up to it without the waves finds nothing', !g.bodies.karn);
+})();
+
+/* ---------------- boarding battles ---------------- */
+(function () {
+  const B = SP.Battle;
+  const mk = (mine, theirs, seed) => B.create({ mine, theirs, parts: { vines: 2, seed: 2 }, seed: seed || 5 });
+  let S = mk([{ type: 'deckhand', n: 10 }, { type: 'slinger', n: 4 }], [{ type: 'cutthroat', n: 8 }, { type: 'captain', n: 1 }]);
+  check('a battle starts on round 1 with someone to act', S.round === 1 && !!B.unit(S, S.turn));
+  check('the decks have a gap only planks cross', Object.values(S.cells).some(c => c.t === 'gap') && Object.values(S.cells).some(c => c.t === 'plank'));
+  const order = [S.turn].concat(S.queue).map(id => B.speed(B.unit(S, id)));
+  check('turns go by speed, fastest first', order.every((v, i) => i === 0 || v <= order[i - 1]), order.join(','));
+  /* a slinger shoots across the whole battle while no enemy is beside it */
+  const sl = S.units.find(u => u.type === 'slinger');
+  check('a slinger can shoot from its own deck', B.canShoot(S, sl));
+  /* retaliation: once a round */
+  S = mk([{ type: 'deckhand', n: 20 }], [{ type: 'bravo', n: 6 }], 9);
+  const a = S.units[0], d = S.units[1];
+  a.c = 5; a.r = 2; d.c = 7; d.r = 2; S.cells[B.key(6, 2)].t = 'plank';
+  S.turn = a.id;
+  const hpD = B.hpTotal(d), hpA = B.hpTotal(a);
+  B.act(S, { t: 'attack', target: d.id, c: 6, r: 2 });
+  check('a melee attack hurts the defender', B.hpTotal(d) < hpD);
+  check('…and the defender strikes back', B.hpTotal(a) < hpA && d.retaliated);
+  /* surrender */
+  S = mk([{ type: 'arena', n: 6 }, { type: 'deckhand', n: 30 }], [{ type: 'cutthroat', n: 12 }, { type: 'knife', n: 6 }], 3);
+  B.autoplay(S);
+  check('a hopeless pirate crew loses (or strikes its colours)', S.winner === 'A');
+  let surrendered = 0, joined = 0;
+  for (let i = 0; i < 30; i++) { const T = mk([{ type: 'arena', n: 5 }, { type: 'shield', n: 6 }, { type: 'deckhand', n: 20 }], [{ type: 'cutthroat', n: 10 }, { type: 'bravo', n: 6 }], 100 + i); B.autoplay(T); if (T.surrendered) { surrendered++; if (T.joiners) joined++; } }
+  check('beaten crews sometimes strike their colours, and some offer to sign on', surrendered > 0 && joined > 0, surrendered + ' surrendered');
+  /* orders */
+  S = mk([{ type: 'deckhand', n: 10 }], [{ type: 'cutthroat', n: 10 }], 4);
+  while (B.unit(S, S.turn).side !== 'A') B.aiStep(S);
+  const foe = S.units.find(u => u.side === 'B'), w0 = S.will, n0 = foe.n;
+  check('your Stryx can lash a pirate stack', B.cast(S, 'lash', foe.id) && foe.n < n0 && S.will === w0 - 3);
+  check('…once a round', !B.cast(S, 'lash', foe.id));
+  { const R = mk([{ type: 'deckhand', n: 10 }], [{ type: 'cutthroat', n: 10 }], 4); while (B.unit(R, R.turn).side !== 'A') B.aiStep(R);
+    const mine = R.units.find(u => u.side === 'A'), theirs = R.units.find(u => u.side === 'B');
+    check('orders cannot target the wrong side', !B.cast(R, 'rally', theirs.id) && !B.cast(R, 'lash', mine.id) && B.cast(R, 'roots', theirs.id) && theirs.rootT === 2 && !Object.keys(B.reach(R, theirs)).some(k => R.cells[k] && k !== B.key(theirs.c, theirs.r))); }
+  /* retreat */
+  S = mk([{ type: 'deckhand', n: 5 }], [{ type: 'cutthroat', n: 5 }], 6); B.retreat(S);
+  check('cutting the vines ends it as a loss, fled', S.winner === 'B' && S.fled);
+  /* survivors exclude escort marines */
+  S = mk([{ type: 'deckhand', n: 8 }, { type: 'deckhand', n: 6, escort: true }], [{ type: 'cutthroat', n: 2 }], 7); B.autoplay(S);
+  check('escort marines go home to their own ships', B.survivors(S, 'A').reduce((n, x) => n + x.n, 0) <= 8);
+  /* the starting crew against a starting pirate: winnable, not certain */
+  let wins = 0;
+  for (let i = 0; i < 40; i++) { const T = mk([{ type: 'deckhand', n: 10 }, { type: 'slinger', n: 4 }], B.pirateCrew('dusk', 'sloop', 0, 50 + i * 7), 200 + i); B.autoplay(T); if (T.winner === 'A') wins++; }
+  check('a starting crew beats a starting pirate most of the time, but not always', wins >= 20 && wins <= 39, wins + '/40');
+  const big = B.power(B.pirateCrew('dusk', 'galleon', 3, 9)), small = B.power(B.pirateCrew('dusk', 'sloop', 0, 9));
+  check('a galleon at high rank carries a far bigger crew than a sloop', big > small * 2);
+  check('wanted captains have tougher crews', B.power(B.pirateCrew('smug', 'brig', 1, 4, true)) > B.power(B.pirateCrew('smug', 'brig', 1, 4)));
+})();
+
+/* ---------------- pirates in the sky ---------------- */
+(function () {
+  const f = SP.makeFlight({ T0: 5000, from: 'rakar', parts: parts(2), seed: 77, rank: 1, cargo: 2, pirates: true, wanted: [{ id: 'w_x', bountyId: 'x', faction: 'dusk', kind: 'brig', body: 'velki', captain: 'Vesh the Thin', ship: 'Nightseed' }] });
+  check('pirates are out in the sky', f.pirates.length >= 2);
+  const w = f.pirates.find(p => p.wanted);
+  check('the wanted captain is out there, by name', w && w.captain === 'Vesh the Thin' && w.bountyId === 'x');
+  /* put the ship next to it and shoot until she strikes */
+  const s = f.ship; s.grounded = null; s.x = w.x - 400; s.y = w.y; s.vx = 0; s.vy = 0; s.ang = 0; s.heat = 1e6; f.S.heatMax = 1e6;
+  let struck = false, board = false;
+  for (let i = 0; i < 60 * 40 && !board; i++) {
+    const aim = Math.atan2(w.y - s.y, w.x - s.x);
+    const d = Math.hypot(w.x - s.x, w.y - s.y);
+    if (!struck) { s.x = w.x - Math.cos(aim) * 380; s.y = w.y - Math.sin(aim) * 380; s.vx = w.vx; s.vy = w.vy; s.hull = f.S.hullMax; }
+    else { s.x = w.x - 60; s.y = w.y; s.vx = w.vx; s.vy = w.vy; }
+    SP.stepFlight(f, { aim, fire: !struck, thrust: false });
+    if (w.state === 'struck') struck = true;
+    if (f.events.some(e => e.t === 'board' && e.id === w.id)) board = true;
+    f.events.length = 0;
+    void d;
+  }
+  check('the seed cannon wears a pirate down until she strikes', struck, w.state + ' hull ' + Math.round(w.hull));
+  check('holding alongside a struck ship starts a boarding', board);
+  SP.resolveBoard(f, w.id, true);
+  check('a ship taken leaves the sky', w.state === 'gone');
+  const g = SP.makeFlight({ T0: 5000, from: 'rakar', parts: parts(2), seed: 78, rank: 1, escorts: [{ id: 'e1', name: 'Thornbark', kind: 'cutter', lvl: 2 }] });
+  check('escorts fly with you', g.escorts.length === 1 && g.escorts[0].alive);
 })();
 
 console.log('Stryx Pilot: ' + pass + ' passed, ' + fail + ' failed');

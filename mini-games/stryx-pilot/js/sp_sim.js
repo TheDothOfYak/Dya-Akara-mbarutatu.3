@@ -80,6 +80,7 @@
     const bodies = SP.layout(T0);
     const list = Object.values(bodies);
     const S = SP.ship(o.parts);
+    const partsOf = o.parts;
     const from = SP.port(o.from);
     const pp = SP.portPos(from, bodies);
     const ship = {
@@ -91,6 +92,7 @@
       t: 0, T0, T: T0, day: SP.skyDay(T0), bodies, list, S, ship, from: from.id, waveRide: 0, outWave: 0, karnStage: 0, karn: false, rank: o.rank || 0, events: [], acc: 0,
       docked: null, wrecked: false, hits: 0, damage: 0, hardHits: 0, mcfly: 0, top: 0, inWave: false, inMist: false, inStorm: false,
       tyndael: [], lutut: [], rocks: [], storms: [], mists: [], wave: null, flies: [], strikes: [], said: {},
+      pirates: [], shots: [], escorts: [], cargo: o.cargo || 0, boarding: false, parts: partsOf,
       hot: !!o.hot, mass: 1 + (o.weight || 0) * 0.09, skiffs: [], rescued: 0, rescueCoins: 0, slings: 0, slingCd: {},
     };
     /* ---- hazards, by where they live ---- */
@@ -134,6 +136,9 @@
         break;
       }
     }
+    /* pirates, and your escorts flying with you */
+    SP.spawnPirates(f, r, o);
+    (o.escorts || []).forEach((e, i) => { const K = SP.SHIPKINDS[e.kind] || SP.SHIPKINDS.sloop; f.escorts.push({ id: e.id, name: e.name, kind: e.kind, lvl: e.lvl || 1, x: ship.x - 150 - i * 50, y: ship.y + (i % 2 ? 110 : -110), vx: 0, vy: 0, ang: ship.ang, hull: e.hull != null ? e.hull : K.hull, hullMax: K.hull, cd: 1, alive: true }); });
     /* the Waves of Memory, now and then */
     if (o.wave != null ? o.wave : r() < 0.5) {
       const dir = r() * TAU, nx = Math.cos(dir), ny = Math.sin(dir);
@@ -230,6 +235,14 @@
       s.heat -= S.boostCost; s.vx += hx * S.boostKick / f.mass; s.vy += hy * S.boostKick / f.mass; s.boostT = 0.4;
       f.events.push({ t: 'boost', x: s.x, y: s.y });
       if (s.grounded) s.grounded = null;
+    }
+    /* the seed cannon: a bolt of seed-heat */
+    if (s.cannonCd > 0) s.cannonCd -= dt;
+    if (input.fire && !(s.cannonCd > 0) && s.heat >= 10 && !s.grounded) {
+      const lvl = (f.parts && f.parts.cannon) || 1, sp2 = 1100;
+      s.heat -= 10; s.cannonCd = 0.6 - lvl * 0.05;
+      f.shots.push({ x: s.x + hx * 50, y: s.y + hy * 50, vx: hx * sp2 + s.vx, vy: hy * sp2 + s.vy, from: 'me', dmg: 10 + lvl * 4, life: 1.3, kind: 'bolt' });
+      f.events.push({ t: 'fire', x: s.x + hx * 50, y: s.y + hy * 50 });
     }
     /* the vine-lash: knocks away everything close */
     if (input.lash && s.lashCd <= 0) {
@@ -335,32 +348,196 @@
   }
   SP.carryAll = carryAll;
 
-  /* Mba'Karn: ride the Waves of Memory far enough, in one go, and it is there */
+  /* Mba'Karn: a massive world 15,000 m out. Ride the Waves of Memory far enough, in one go, and the
+     wave bends toward it; come close on the wave and it shows itself. */
   function karnWatch(f, inWave, dt) {
-    const s = f.ship;
-    if (f.karn) return;
+    const s = f.ship, K = SP.KARN, w = f.wave;
     if (inWave) { f.waveRide += Math.hypot(s.vx, s.vy) * dt; f.outWave = 0; }
-    else { f.outWave += dt; if (f.outWave > 10) { f.waveRide = 0; f.karnStage = 0; } }
-    if (f.karnStage < 1 && f.waveRide > SP.KARN_RIDE * 0.3) { f.karnStage = 1; say(f, 'karn1'); }
-    if (f.karnStage < 2 && f.waveRide > SP.KARN_RIDE * 0.65) { f.karnStage = 2; say(f, 'karn2'); }
-    const far = Math.hypot(s.x - f.bodies.velki.x, s.y - f.bodies.velki.y);
-    if (f.waveRide > SP.KARN_RIDE && far > SP.KARN_FAR) SP.spawnKarn(f);
+    else if (!f.karn) { f.outWave += dt; if (f.outWave > 10) { f.waveRide = 0; f.karnStage = 0; f.karnBend = false; } }
+    if (f.karnStage < 1 && f.waveRide > SP.KARN_RIDE * 0.35) { f.karnStage = 1; say(f, 'karn1'); }
+    if (f.karnStage < 2 && f.waveRide > SP.KARN_RIDE) { f.karnStage = 2; f.karnBend = true; say(f, 'bend'); }
+    if (f.karnStage < 3 && f.waveRide > SP.KARN_RIDE * 2.5) { f.karnStage = 3; say(f, 'karn2'); }
+    /* the wave turns, slowly, to carry its rider to Mba'Karn */
+    if (f.karnBend && w && inWave) {
+      const want = Math.atan2(K.y - s.y, K.x - s.x), cur = Math.atan2(w.flow[1], w.flow[0]);
+      const na = cur + Math.max(-0.06 * dt, Math.min(0.06 * dt, angDiff(cur, want)));
+      w.flow = [Math.cos(na), Math.sin(na)]; w.nx = -w.flow[1]; w.ny = w.flow[0];
+      w.off = s.x * w.nx + s.y * w.ny; w.speed = 0;
+    }
+    if (!f.karn && f.karnBend && Math.hypot(K.x - s.x, K.y - s.y) < K.r + SP.KARN_SEE) SP.spawnKarn(f);
   }
   SP.spawnKarn = function (f) {
-    const s = f.ship, w = f.wave, K = SP.KARN;
-    const fl = w ? w.flow : [Math.cos(s.ang), Math.sin(s.ang)];
-    const x = s.x + fl[0] * (K.r + 3800), y = s.y + fl[1] * (K.r + 3800);
+    const s = f.ship, K = SP.KARN;
     /* its harbour faces the ship as it comes in */
-    const face = Math.atan2(s.y - y, s.x - x);
+    const face = Math.atan2(s.y - K.y, s.x - K.x);
     const p = SP.port('mbakarn');
-    const o = { id: 'karn', name: K.name, r: K.r, g: K.g, look: 'karn', x, y, vx: 0, vy: 0, rot: face - p.ang, rot0: face - p.ang, T0: f.T, w: K.spin, fixed: true };
+    const o = { id: 'karn', name: K.name, r: K.r, g: K.g, look: 'karn', x: K.x, y: K.y, vx: 0, vy: 0, rot: face - p.ang, rot0: face - p.ang, T0: f.T, w: K.spin, fixed: true };
     f.bodies.karn = o; f.list.push(o);
-    f.karn = true; f.karnStage = 3;
-    f.events.push({ t: 'karn', x, y }); say(f, 'karn3');
+    f.karn = true; f.karnStage = 4;
+    f.events.push({ t: 'karn', x: K.x, y: K.y }); say(f, 'karn3');
+  };
+
+  /* ================= pirates, shots, escorts ================= */
+  /* pirates out in the sky: where they lurk depends on the faction; wanted captains are where their bounty says */
+  SP.spawnPirates = function (f, r, o) {
+    const rank = f.rank, specs = [];
+    if (o.pirates !== false) {
+      const n = Math.min(4, 1 + rank + (r() < 0.4 ? 1 : 0));
+      const bodies = ['velki', 'xikia', 'bolo', 'leotik'];
+      for (let i = 0; i < n; i++) {
+        const body = bodies[Math.floor(r() * bodies.length)];
+        const facs = Object.keys(SP.FACTIONS).filter(k => SP.FACTIONS[k].where.indexOf(body) >= 0);
+        const faction = facs[Math.floor(r() * facs.length)];
+        const kinds = ['sloop', 'sloop'].concat(rank >= 1 ? ['brig', 'cutter'] : []).concat(rank >= 2 ? ['galleon'] : []);
+        specs.push({ faction, kind: kinds[Math.floor(r() * kinds.length)], body });
+      }
+    }
+    (o.wanted || []).forEach(w => specs.push(Object.assign({ wanted: true }, w)));
+    specs.forEach((sp, i) => {
+      const b = f.bodies[sp.body] || f.bodies.velki, a = r() * TAU, d = b.r + 1600 + r() * 2600;
+      const K = SP.SHIPKINDS[sp.kind] || SP.SHIPKINDS.sloop, seed = Math.floor(r() * 1e9);
+      const x = b.x + Math.cos(a) * d, y = b.y + Math.sin(a) * d;
+      f.pirates.push({ id: sp.id || 'p' + i + '_' + seed.toString(36), faction: sp.faction, kind: sp.kind, wanted: !!sp.wanted, bountyId: sp.bountyId || null,
+        captain: sp.captain || SP.PIRATE_NAMES[seed % SP.PIRATE_NAMES.length], ship: sp.ship || SP.SHIP_NAMES[(seed >> 4) % SP.SHIP_NAMES.length],
+        x, y, vx: 0, vy: 0, ang: r() * TAU, hull: K.hull * (sp.wanted ? 1.5 : 1), hullMax: K.hull * (sp.wanted ? 1.5 : 1), state: 'patrol', hx: x, hy: y, on: b.id, cd: 1 + r() * 2, ph: r() * TAU, phase: 0, boardT: 0, seed,
+        crew: SP.Battle ? SP.Battle.pirateCrew(sp.faction, sp.kind, rank, seed, sp.wanted) : [] });
+    });
+  };
+  function stepPirates(f, dt) {
+    const s = f.ship;
+    f.pirates.forEach(p => {
+      if (p.state === 'gone') return;
+      const F = SP.FACTIONS[p.faction] || SP.FACTIONS.dusk, K = SP.SHIPKINDS[p.kind] || SP.SHIPKINDS.sloop;
+      const dx = s.x - p.x, dy = s.y - p.y, d = Math.hypot(dx, dy) || 1;
+      p.ph += dt; if (p.cd > 0) p.cd -= dt;
+      if (F.phase) { p.phase = (p.ph % 7) > 5.4 ? 1 : 0; }
+      let tx = p.x, ty = p.y, spd = K.speed;
+      if (p.state === 'struck') {
+        p.vx *= 1 - 0.6 * dt; p.vy *= 1 - 0.6 * dt;
+        /* hold alongside a struck ship and your vines go across: boarding */
+        const rel = Math.hypot(s.vx - p.vx, s.vy - p.vy);
+        if (d < 120 && rel < 170 && !s.grounded && !f.boarding) { p.boardT += dt; if (p.boardT > 1 && !p.boardAsked) { p.boardAsked = true; f.events.push({ t: 'board', id: p.id, x: p.x, y: p.y }); say(f, 'board'); } }
+        else p.boardT = Math.max(0, p.boardT - dt);
+      } else {
+        const hungry = p.faction !== 'smug' && (f.cargo > 0 || p.wanted || p.faction === 'ghost');
+        if (p.state === 'patrol') {
+          tx = p.hx + Math.cos(p.ph * 0.25) * 500; ty = p.hy + Math.sin(p.ph * 0.25) * 500; spd = K.speed * 0.4;
+          if (d < 2300 && (hungry || p.wanted)) { p.state = 'chase'; f.events.push({ t: 'pirate', id: p.id }); say(f, 'pirate'); }
+          if (d < 1500 && p.faction === 'smug') p.state = 'flee';
+        }
+        if (p.state === 'chase') {
+          const lead = Math.min(1.2, d / 700);
+          tx = s.x + s.vx * lead; ty = s.y + s.vy * lead;
+          if (d > 4200) p.state = 'patrol';
+          if (p.hull < p.hullMax * (F.flee ? 0.45 : 0.18) && !p.wanted) p.state = 'flee';
+          /* knives out of the Duat */
+          if (F.knives && d < 760 && p.cd <= 0 && !p.phase) {
+            const sp2 = 620, t = d / sp2, ax = s.x + s.vx * t - p.x, ay = s.y + s.vy * t - p.y, al = Math.hypot(ax, ay) || 1;
+            f.shots.push({ x: p.x, y: p.y, vx: ax / al * sp2 + p.vx * 0.3, vy: ay / al * sp2 + p.vy * 0.3, from: 'pirate', dmg: 4 + f.rank * 1.5 + (p.wanted ? 2 : 0), life: 2.2, kind: 'knife' });
+            p.cd = p.wanted ? 0.9 : 1.4; if (Math.random() < 0.3) say(f, 'knives');
+          }
+          if (!F.knives && d < 620 && p.cd <= 0) {
+            const sp2 = 560, al = d;
+            f.shots.push({ x: p.x, y: p.y, vx: dx / al * sp2, vy: dy / al * sp2, from: 'pirate', dmg: 4 + f.rank, life: 2, kind: 'stone' });
+            p.cd = 1.6;
+          }
+        }
+        if (p.state === 'flee') {
+          tx = p.x - dx / d * 1000; ty = p.y - dy / d * 1000; spd = K.speed * 1.1;
+          if (p.faction === 'smug' && d < 560 && p.cd <= 0) { f.shots.push({ x: p.x, y: p.y, vx: dx / d * 560, vy: dy / d * 560, from: 'pirate', dmg: 4 + f.rank, life: 2, kind: 'stone' }); p.cd = 1.8; }
+          if (d > 5200) p.state = 'patrol';
+        }
+        if (p.hull <= 0) { p.hull = 0; p.state = 'struck'; f.events.push({ t: 'struck', id: p.id, x: p.x, y: p.y }); say(f, 'struck'); }
+      }
+      /* steer, and keep clear of the worlds */
+      if (p.state !== 'struck') {
+        const ex = tx - p.x, ey = ty - p.y, el = Math.hypot(ex, ey) || 1;
+        const k = Math.min(1, el / 300);
+        p.vx += (ex / el * spd * k - p.vx) * 1.6 * dt; p.vy += (ey / el * spd * k - p.vy) * 1.6 * dt;
+        if (Math.hypot(p.vx, p.vy) > 20) { const want = Math.atan2(p.vy, p.vx); p.ang += Math.max(-K.turn * dt, Math.min(K.turn * dt, angDiff(p.ang, want))); }
+      }
+      for (let i = 0; i < f.list.length; i++) {
+        const b = f.list[i], bx = p.x - b.x, by = p.y - b.y, bd = Math.hypot(bx, by);
+        if (bd < b.r + 260) { p.vx += bx / bd * 400 * dt; p.vy += by / bd * 400 * dt; }
+      }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      /* rams: both hulls suffer, the faster one less */
+      if (d < SHIP_R + 46 && !s.grounded && p.state !== 'struck' && !p.phase) {
+        const nx = dx / d, ny = dy / d, rel = (p.vx - s.vx) * nx + (p.vy - s.vy) * ny;
+        const relSpeed = Math.abs(rel) + 40;
+        if (relSpeed > 140) {
+          const myPush = (s.vx * nx + s.vy * ny) < 0 ? 1 : 0.6;
+          p.hull -= relSpeed * 0.07 * (s.boostT > 0 ? 1.8 : 1) * myPush;
+          hurt(f, Math.round(relSpeed * 0.022), (s.x + p.x) / 2, (s.y + p.y) / 2, 'ram');
+          f.events.push({ t: 'ram', x: (s.x + p.x) / 2, y: (s.y + p.y) / 2 });
+        }
+        s.vx += nx * 160; s.vy += ny * 160; p.vx -= nx * 160; p.vy -= ny * 160;
+        s.x = p.x + nx * (SHIP_R + 47); s.y = p.y + ny * (SHIP_R + 47);
+      }
+    });
+  }
+  function stepShots(f, dt) {
+    const s = f.ship;
+    for (let i = f.shots.length - 1; i >= 0; i--) {
+      const b = f.shots[i];
+      b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+      let hit = false;
+      if (b.from === 'pirate') {
+        if (Math.hypot(b.x - s.x, b.y - s.y) < SHIP_R + 10 && !s.grounded && !f.docked) { hurt(f, Math.round(b.dmg), b.x, b.y, b.kind); hit = true; }
+        f.escorts.forEach(e => { if (!hit && e.alive && Math.hypot(b.x - e.x, b.y - e.y) < 34) { e.hull -= b.dmg; hit = true; f.events.push({ t: 'escortHit', x: b.x, y: b.y }); } });
+      } else {
+        for (let k = 0; k < f.pirates.length && !hit; k++) {
+          const p = f.pirates[k];
+          if (p.state === 'gone' || p.state === 'struck' || p.phase) continue;
+          if (Math.hypot(b.x - p.x, b.y - p.y) < 50) { p.hull -= b.dmg; hit = true; f.events.push({ t: 'shotHit', x: b.x, y: b.y, id: p.id }); if (p.state === 'patrol') p.state = 'chase'; }
+        }
+        f.tyndael.forEach(t => { if (!hit && t.alive && Math.hypot(b.x - t.x, b.y - t.y) < 26) { t.alive = false; hit = true; f.events.push({ t: 'pop', x: t.x, y: t.y }); } });
+      }
+      for (let k = 0; k < f.list.length && !hit; k++) { const bb = f.list[k]; if (Math.hypot(b.x - bb.x, b.y - bb.y) < bb.r) hit = true; }
+      if (hit || b.life <= 0) f.shots.splice(i, 1);
+    }
+  }
+  function stepEscorts(f, dt) {
+    const s = f.ship;
+    f.escorts.forEach((e, i) => {
+      if (!e.alive) return;
+      const K = SP.SHIPKINDS[e.kind] || SP.SHIPKINDS.sloop;
+      if (e.cd > 0) e.cd -= dt;
+      let foe = null, fd = 1500;
+      f.pirates.forEach(p => { if (p.state === 'chase' || p.state === 'flee' || (p.state === 'patrol' && Math.hypot(p.x - s.x, p.y - s.y) < 1600)) { const d = Math.hypot(p.x - e.x, p.y - e.y); if (d < fd && !p.phase) { fd = d; foe = p; } } });
+      let tx, ty;
+      if (foe && !s.grounded) {
+        tx = foe.x - Math.cos(e.ph = (e.ph || 0) + dt) * 320; ty = foe.y - Math.sin(e.ph) * 320;
+        if (fd < 900 && e.cd <= 0) {
+          const sp2 = 1000, dx = foe.x - e.x, dy = foe.y - e.y, dl = Math.hypot(dx, dy) || 1;
+          f.shots.push({ x: e.x, y: e.y, vx: dx / dl * sp2, vy: dy / dl * sp2, from: 'escort', dmg: K.escortDmg + (e.lvl || 1) * 2, life: 1.4, kind: 'bolt' });
+          e.cd = 1.3 - Math.min(0.5, (e.lvl || 1) * 0.06);
+        }
+      } else {
+        /* in formation, off your quarter */
+        const side = i % 2 ? 1 : -1, back = 170 + i * 40;
+        tx = s.x - Math.cos(s.ang) * back - Math.sin(s.ang) * side * 120; ty = s.y - Math.sin(s.ang) * back + Math.cos(s.ang) * side * 120;
+      }
+      const ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1, want = Math.min(1500, el * 2.2 + Math.hypot(s.vx, s.vy) * 0.6);
+      e.vx += (ex / el * want - e.vx) * 2.5 * dt; e.vy += (ey / el * want - e.vy) * 2.5 * dt;
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      if (Math.hypot(e.vx, e.vy) > 30) e.ang += angDiff(e.ang, Math.atan2(e.vy, e.vx)) * Math.min(1, 6 * dt);
+      if (e.hull <= 0) { e.alive = false; f.events.push({ t: 'escortDown', id: e.id, name: e.name, x: e.x, y: e.y }); }
+    });
+  }
+  /* after a boarding battle: a won ship is taken (it leaves the sky); a lost one limps off */
+  SP.resolveBoard = function (f, id, won) {
+    const p = f.pirates.find(q => q.id === id);
+    if (!p) return;
+    if (won) p.state = 'gone';
+    else { p.hull = p.hullMax * 0.5; p.state = 'flee'; p.boardAsked = false; p.boardT = 0; }
   };
 
   function lash(f) {
     const s = f.ship, R = f.S.lash;
+    /* knives cut out of the air, and pirates close by feel the vines */
+    for (let i = f.shots.length - 1; i >= 0; i--) { const b = f.shots[i]; if (b.from === 'pirate' && Math.hypot(b.x - s.x, b.y - s.y) < R) { f.shots.splice(i, 1); f.events.push({ t: 'thwack', x: b.x, y: b.y }); } }
+    f.pirates.forEach(p => { if (p.state !== 'gone' && p.state !== 'struck' && !p.phase && Math.hypot(p.x - s.x, p.y - s.y) < R + 50) { p.hull -= 8 + f.S.lash / 20; f.events.push({ t: 'shotHit', x: p.x, y: p.y, id: p.id }); } });
     f.tyndael.forEach(t => { if (t.alive && Math.hypot(t.x - s.x, t.y - s.y) < R) { t.alive = false; f.events.push({ t: 'pop', x: t.x, y: t.y }); } });
     f.rocks.forEach(k => {
       const dx = k.x - s.x, dy = k.y - s.y, d = Math.hypot(dx, dy) || 1;
@@ -376,6 +553,7 @@
 
   function stepHazards(f, dt) {
     const s = f.ship;
+    stepPirates(f, dt); stepShots(f, dt); stepEscorts(f, dt);
     /* Tyndael: they wheel about their flock, and chase a ship that comes near */
     f.tyndael.forEach(t => {
       if (!t.alive) return;
@@ -489,7 +667,7 @@
     while (f.acc >= STEP && !f.docked && !f.wrecked) {
       f.acc -= STEP;
       SP.stepFlight(f, input);
-      input.boost = false; input.lash = false;
+      input.boost = false; input.lash = false; input.fire = false;
     }
   };
 
