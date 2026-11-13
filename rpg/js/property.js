@@ -16,7 +16,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
-import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint, waterMaterial } from './gfx.js';
 import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 import { MANOR_SPOTS } from './interiors.js';
@@ -292,7 +292,7 @@ export function buildProperty(scene) {
   }
 
   /* ---------------- the lake, and the brook ---------------- */
-  const lakeMat = new THREE.MeshToonMaterial({ color: 0x4aa6c4, emissive: 0x0e4a62, emissiveIntensity: 0.35, gradientMap: ramp(), transparent: true, opacity: 0.86 });
+  const lakeMat = waterMaterial();
   {
     const wg = new THREE.CircleGeometry(620, 72); wg.rotateX(-Math.PI / 2);
     const w = noSolid(new THREE.Mesh(wg, lakeMat)); w.position.set(LAKE.x, WATER_LEVEL, LAKE.z); w.receiveShadow = true; w.renderOrder = 1; scene.add(w);
@@ -306,7 +306,7 @@ export function buildProperty(scene) {
       if (i < N) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
     }
     const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); bg.setIndex(idx); bg.computeVertexNormals();
-    const brook = new THREE.Mesh(bg, new THREE.MeshToonMaterial({ color: 0x5ac0d8, emissive: 0x1a6a80, emissiveIntensity: 0.45, gradientMap: ramp(), transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+    const brook = new THREE.Mesh(bg, waterMaterial({ color: 0x5ac0d8, deep: 0x2a7e98, emissive: 0x1a6a80, emissiveIntensity: 0.4, opacity: 0.85, scale: 2.2, side: THREE.DoubleSide }));
     scene.add(brook);
   }
 

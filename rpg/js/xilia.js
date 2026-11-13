@@ -11,7 +11,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
-import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint, waterMaterial } from './gfx.js';
 import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
@@ -322,7 +322,7 @@ export function buildXilia(scene) {
   /* one water level for every lake, pond and river (and the far valleys) */
   {
     const wg = new THREE.CircleGeometry(3600, 72); wg.rotateX(-Math.PI / 2);
-    const wm = new THREE.MeshToonMaterial({ color: 0x4aa6c4, emissive: 0x0e4a62, emissiveIntensity: 0.35, gradientMap: ramp(), transparent: true, opacity: 0.86 });
+    const wm = waterMaterial();
     const wmesh = new THREE.Mesh(wg, wm); wmesh.position.y = WATER_LEVEL; wmesh.receiveShadow = true; wmesh.renderOrder = 1; scene.add(wmesh);
   }
 

@@ -19,7 +19,7 @@
    the renderer, camera, input, dialogue and cards.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire } from './gfx.js';
+import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire, waterMaterial } from './gfx.js';
 import { buildHomeTree, buildForest } from './hometree.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
@@ -569,7 +569,7 @@ export function createRoad(ctx) {
     EV.log = { x: lx, z: lz, logs, hits: 0, open: false };
     // the ford: a cold stream right across the valley, and stepping stones over it
     const fy = baseH(FORD_Z) - 1.5;
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(150, 9), toon(0x5ac0d8, { emissive: 0x1a6a80, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }));
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(150, 9), waterMaterial({ color: 0x5ac0d8, deep: 0x2a7e98, emissive: 0x1a6a80, emissiveIntensity: 0.4, opacity: 0.85, scale: 2 }));
     water.rotation.x = -Math.PI / 2; water.position.set(roadX(FORD_Z), fy, FORD_Z); scene.add(water);
     const stones = [];
     [-3.4, -1.2, 1.1, 3.3].forEach((dz, i) => {

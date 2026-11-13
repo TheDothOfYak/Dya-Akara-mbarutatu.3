@@ -11,11 +11,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { paintPass } from './paint.js';
+import { addLens } from './lens.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { installSmoothStyle } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay, trunkAt } from './vines.js';
+import { MEADOW } from './terrain.js';
 import { routineFor, isIndoor, INDOORS } from './routines.js';
 import { createAmbient } from './ambient.js';
 import { buildSky, SUN_DIR } from './sky.js';
@@ -58,7 +60,7 @@ const $ = id => document.getElementById(id);
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 /* ---------------- settings ---------------- */
-const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, scale: 1 };
+const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, ao: true, scale: 1 };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
 installDetailCull();    // parts smaller than a pixel are not drawn (they still cost a draw call each)
@@ -170,9 +172,9 @@ function smoothTarget() {
 const composer = new EffectComposer(renderer, smoothTarget());
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 0.86);
-composer.addPass(bloom);
-composer.addPass(paintPass(ShaderPass));
-composer.addPass(new OutputPass());
+/* the lens (lens.js): contact shade from the picture's own depth, then the brushwork, then the grade */
+const lens = addLens(composer, camera, { bloom, paint: paintPass(ShaderPass), output: new OutputPass() });
+lens.shade.enabled = OPT.ao !== false;
 
 let particles = null;
 let solids = null;   // everything you can see is solid (solid.js), once the world is built
@@ -946,9 +948,27 @@ function startAttack(kind) {
   const arm = armOf(SAVE.inv.axe);
   // how it looks: lunges for the spears (heavy too, for the lance), the bow always draws
   const pose = arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
-  P.atk = { kind, pose, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur / (arm.spd || 1), arm };
+  P.atk = { kind, pose, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur / (arm.spd || 1), arm, riposte: P.riposte > 0 };
+  P.riposte = 0;
   P.comboIdx = kind; P.queued = false;
-  let f = lockDir() || camForward();
+  let f = lockDir();
+  if (!f) {   // no lock: toward the nearest foe ahead of where he's pushing (or looking), if one is in reach
+    const cf = camForward(), w = V3();
+    if (keys.KeyW || keys.ArrowUp) w.add(cf); if (keys.KeyS || keys.ArrowDown) w.sub(cf);
+    const cr = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
+    if (keys.KeyD || keys.ArrowRight) w.add(cr); if (keys.KeyA || keys.ArrowLeft) w.sub(cr);
+    if (touch.on) w.addScaledVector(cf, touch.move.y).addScaledVector(cr, touch.move.x);
+    const want = w.lengthSq() > 0.01 ? w.normalize() : cf;
+    let best = null, bs = 0.35;
+    if (!arm.ranged) for (const e of enemies.list) {
+      if (e.dead || e.hidden) continue;
+      const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+      if (d < 0.2 || d > ATK[kind].range * arm.rng + e.T.rad + 3.2 || Math.abs(e.pos.y - P.pos.y) > 2.5) continue;
+      const sc = (dx * want.x + dz * want.z) / d - d * 0.06;
+      if (sc > bs) { bs = sc; best = V3(dx / d, 0, dz / d); }
+    }
+    f = best || want;
+  }
   if (arm.crack) {   // the whip goes where the X is: he turns to it, and the lash is thrown out at it
     const reach = ATK[kind].range * arm.rng + 1, lp = lockPoint();
     const at = lp ? V3(lp.x, lp.y, lp.z) : lookAim(reach + 6).p, hip = V3(P.pos.x, P.pos.y + 1.2, P.pos.z), v = at.clone().sub(hip);
@@ -979,7 +999,7 @@ function updateAttack(dt) {
     const range = def.range * arm.rng;
     // a lance hits hardest at a run (or from a Punk's back); everything else as the weapon's weight says
     const charge = arm.charge ? 1 + clamp(Math.hypot(P.vel.x, P.vel.z) / 9, 0, 0.9) + (P.riding ? 0.5 : 0) : 1;
-    const dmg = def.dmg * axeMul() * arm.dmg * charge;
+    const dmg = def.dmg * axeMul() * arm.dmg * charge * (A.riposte ? 1.6 : 1);
     if (arm.crack && A.p > 0.5 && !A.cracked) {   // the whip's report, out at the end of the lash
       A.cracked = true; sfx.crack();
       const tp = torcain.weapon.userData.tip ? torcain.weapon.userData.tip.getWorldPosition(V3()) : V3(P.pos.x + fx * range, P.pos.y + 1, P.pos.z + fz * range);
@@ -1208,7 +1228,12 @@ function lookAim(maxD = 70) {
 function hurtPlayer(dmg, from, kb = 7, opts = {}) {
   if (P.dead || G.mode !== 'play') return false;
   if (P.iframes > 0 && !opts.force) {
-    if (P.roll) { particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 6, { color: 0xffffff, speed: 3, size: 0.3, life: 0.3 }); }
+    if (P.roll && !P.roll.perfect) {
+      P.roll.perfect = true; G.slow = 0.55; P.riposte = 2.2;
+      P.stam = Math.min(P.stamMax, P.stam + D.stamina.dodge + 12); P.iframes = Math.max(P.iframes, 0.5);
+      particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, 18, { color: 0xbfe8ff, speed: 5, size: 0.35, life: 0.45 });
+      dmgNumber(P.pos.x, P.pos.y + 2.5, P.pos.z, 'PERFECT', 'heal'); sfx.core && sfx.core();
+    }
     return false;
   }
   dmg *= FX.armor * (perk('shell') ? 0.9 : 1);
@@ -2584,6 +2609,7 @@ bindOpt('opt-sens', 'sens');
 bindOpt('opt-invert', 'invert', null, true);
 bindOpt('opt-vol', 'vol', () => setVolume(OPT.vol));
 bindOpt('opt-bloom', 'bloom', () => { bloom.enabled = OPT.bloom; }, true);
+bindOpt('opt-ao', 'ao', () => { lens.shade.enabled = OPT.ao; }, true);
 bindOpt('opt-shadows', 'shadows', () => { renderer.shadowMap.enabled = OPT.shadows; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }, true);
 bindOpt('opt-scale', 'scale', resize);
 bloom.enabled = OPT.bloom;
@@ -4535,6 +4561,7 @@ function updatePlayer(dt) {
   P.jumpBuf = Math.max(0, P.jumpBuf - dt);
   P.flareT = Math.max(0, P.flareT - dt);
   P.para = Math.max(0, P.para - dt);
+  P.riposte = Math.max(0, (P.riposte || 0) - dt);
   torcain.flash(Math.max(0, P.iframes - 0.25) * 2 * (P.roll ? 0 : 1) + P.flareT * 0.8 + (P.para > 0 ? 0.35 : 0));
 
   const act = canAct();
@@ -4557,7 +4584,7 @@ function updatePlayer(dt) {
   let sprint = (keys.ShiftLeft || keys.ShiftRight) && moving && !P.exhausted;
   if (sprint && D.stamina.sprint > 0) { P.stam -= D.stamina.sprint * dt; P.stamDelay = 0.5; if (P.stam <= 0) { P.stam = 0; P.exhausted = true; sprint = false; } }
   if (P.exhausted && P.stam > 25) P.exhausted = false;
-  let speed = sprint ? 11.5 : 7;
+  let speed = sprint ? 11.5 : G.lock && !P.riding ? 5.6 : 7;
   if (P.riding) { speed = rideGait(dt, moving, keys.ShiftLeft || keys.ShiftRight); sprint = false; }
   if (P.atk) speed *= P.riding ? 0.7 : 0.25;
   if (P.drink > 0) speed *= 0.35;
@@ -4566,11 +4593,10 @@ function updatePlayer(dt) {
 
   if (P.roll) {
     P.roll.t += dt;
-    const k = 1 - P.roll.t / P.roll.dur;
-    P.vel.x = P.roll.dir.x * 15 * Math.max(0.3, k); P.vel.z = P.roll.dir.z * 15 * Math.max(0.3, k);
-    torcain.body.rotation.x = (P.roll.t / P.roll.dur) * Math.PI * 2;
+    const k = 1 - P.roll.t / P.roll.dur, rs = 6.5 + 10.5 * Math.pow(Math.max(0, k), 0.7);
+    P.vel.x = P.roll.dir.x * rs; P.vel.z = P.roll.dir.z * rs;
     if (Math.random() < 0.5) particles.emit(P.pos.x, P.pos.y + 0.2, P.pos.z, { color: 0xd8c098, size: 0.5, life: 0.4, speed: 1.5 });
-    if (P.roll.t >= P.roll.dur) { P.roll = null; torcain.body.rotation.x = 0; }
+    if (P.roll.t >= P.roll.dur) P.roll = null;
   } else if (P.riding && (vineOn() || !P.onGround)) {
     // swinging and flying: momentum is yours to keep; WASD only nudges it, and you face the way you're going
     P.vel.x += wish.x * 9 * dt; P.vel.z += wish.z * 9 * dt;
@@ -4580,8 +4606,9 @@ function updatePlayer(dt) {
   } else {
     P.vel.x = damp(P.vel.x, wish.x * speed, accel, dt);
     P.vel.z = damp(P.vel.z, wish.z * speed, accel, dt);
-    if (moving && !P.atk) P.yaw = dampAngle(P.yaw, Math.atan2(wish.x, wish.z), 14, dt);
-    if (G.lock && !P.atk && !moving) { const ld = lockDir(); if (ld) P.yaw = dampAngle(P.yaw, Math.atan2(ld.x, ld.z), 10, dt); }
+    const ld = G.lock && !P.atk && !sprint && !P.riding && !P.swimming ? lockDir() : null;
+    if (ld) P.yaw = dampAngle(P.yaw, Math.atan2(ld.x, ld.z), 12, dt);
+    else if (moving && !P.atk) P.yaw = dampAngle(P.yaw, Math.atan2(wish.x, wish.z), 14, dt);
   }
   if (P.para > 0) { P.vel.x *= 0.8; P.vel.z *= 0.8; if (Math.random() < 0.4) particles.emit(P.pos.x, P.pos.y + 1.6, P.pos.z, { color: 0xffe0a0, size: 0.3, life: 0.5, speed: 2 }); }
 
@@ -4604,8 +4631,10 @@ function updatePlayer(dt) {
 
   P.coyote = P.onGround ? 0.12 : Math.max(0, P.coyote - dt);
   if (P.riding && P.jumpBuf > 0 && act) { P.jumpBuf = 0; if (touch.on && !vineOn()) vineShoot('L'); else rideSpace(); }
-  else if (P.jumpBuf > 0 && P.coyote > 0 && act && !P.steep && !P.riding && spend(D.stamina.jump)) { P.vel.y = P.swimming ? 9 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; sfx.jump(); }
+  else if (P.jumpBuf > 0 && P.coyote > 0 && act && !P.steep && !P.riding && spend(D.stamina.jump)) { P.vel.y = P.swimming ? 9 : 10.5; P.onGround = false; P.coyote = 0; P.jumpBuf = 0; P.hop = true; sfx.jump(); if (!P.swimming) particles.burst(P.pos.x, P.pos.y + 0.1, P.pos.z, 5, { color: 0xd8c098, speed: 1.6, size: 0.35, life: 0.35 }); }
   P.vel.y -= 28 * dt;
+  if (P.hop && P.vel.y > 0 && !P.onGround && !keys.Space && !touch.on && !P.riding) P.vel.y -= 34 * dt;   // let go early: a shorter hop
+  if (P.onGround || P.vel.y <= 0) P.hop = false;
   autoTick(dt, act);
   if (vineOn()) vineTick(dt, act);
   // gliding: hold Space while falling and Torcain's coat catches the wind
@@ -4647,7 +4676,8 @@ function updatePlayer(dt) {
   }
   const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y);
   if (P.pos.y <= g) {
-    if (!wasGround && P.vel.y < -12) { sfx.land(); particles.burst(P.pos.x, g + 0.1, P.pos.z, 10, { color: 0xd8c098, speed: 3, size: 0.5, life: 0.5 }); }
+    if (!wasGround && P.vel.y < -12) { sfx.land(); particles.burst(P.pos.x, g + 0.1, P.pos.z, 10, { color: 0xd8c098, speed: 3, size: 0.5, life: 0.5 }); G.shake = Math.max(G.shake, Math.min(0.3, -P.vel.y * 0.012)); }
+    else if (!wasGround && P.vel.y < -5) particles.burst(P.pos.x, g + 0.1, P.pos.z, 4, { color: 0xd8c098, speed: 1.5, size: 0.35, life: 0.35 });
     P.pos.y = g; P.vel.y = 0; P.onGround = true;
   } else if (wasGround && P.vel.y <= 0 && P.pos.y - g < 0.45) { P.pos.y = g; P.vel.y = 0; P.onGround = true; }
   else P.onGround = false;
@@ -4660,7 +4690,7 @@ function updatePlayer(dt) {
     if (!wasSwim) particles.burst(P.pos.x, lv, P.pos.z, P.vel.y < -6 ? 30 : 12, { color: 0xd8f4ff, speed: P.vel.y < -6 ? 5 : 2.5, size: 0.5, life: 0.7, gravity: 6 });
     P.pos.y = lv - SWIM_DEPTH; if (P.vel.y < 0) P.vel.y = 0;
     P.onGround = true; P.swimming = true;
-    if (P.roll) { P.roll = null; torcain.body.rotation.x = 0; }
+    if (P.roll) P.roll = null;
     if (Math.hypot(P.vel.x, P.vel.z) > 1 && Math.random() < 0.35) particles.emit(P.pos.x - P.vel.x * 0.05, lv + 0.05, P.pos.z - P.vel.z * 0.05, { vy: 0.6, color: 0xe8f8ff, size: 0.35, life: 0.6, speed: 0.8 });
   }
   if (wasSwim && !P.swimming && P.onGround) particles.burst(P.pos.x, P.pos.y + 0.2, P.pos.z, 8, { color: 0xd8f4ff, speed: 2, size: 0.35, life: 0.5, gravity: 6 });
@@ -4742,11 +4772,12 @@ function updatePlayer(dt) {
 
   placeWalker(torcain.root, P, dt);
   if (P.riding) torcain.root.position.y += mount ? mount.seat : 1.35;
+  MEADOW.who.copy(P.pos);   // the grass parts round him
   const dy = P.yaw - (P._ry ?? P.yaw); P._ry = P.yaw; turnRate = damp(turnRate, Math.atan2(Math.sin(dy), Math.cos(dy)) / Math.max(dt, 1e-3), 6, dt);
   torcain.root.rotation.set(0, P.yaw, 0);
   torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.pose || P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0,
-    ride: !!P.riding, rideSpeed: hs, rideBob: mount ? mount.gait || 0 : 0, rideRoll: P.riding ? clamp(-turnRate * 0.06, -0.22, 0.22) : 0 });
-  if (P.roll) torcain.body.rotation.x = (P.roll.t / P.roll.dur) * Math.PI * 2;
+    ride: !!P.riding, rideSpeed: hs, rideBob: mount ? mount.gait || 0 : 0, rideRoll: P.riding ? clamp(-turnRate * 0.06, -0.22, 0.22) : 0,
+    roll: P.roll ? { p: P.roll.t / P.roll.dur } : null, hurt: clamp(1 - (G.t - P.lastHurt) / 0.28, 0, 1) });
 }
 
 /* Phorus goes where the story takes him, and no further. On Torcain's own
@@ -5032,6 +5063,7 @@ function frame(now) {
     return;
   }
   if (G.hitstop > 0) { G.hitstop -= dt; dt *= 0.08; }
+  else if (G.slow > 0) { G.slow -= dt; dt *= 0.32 + 0.68 * (1 - Math.min(1, G.slow / 0.2)); }   // a perfect dodge: a breath of slowed time
   if (!frozen && solids) solids.update(rawDt);
   if (!frozen) {
     G.t += dt;
@@ -5154,9 +5186,7 @@ function startVelki() {
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
-      c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8));
-      c.addPass(paintPass(ShaderPass));
-      c.addPass(new OutputPass());
+      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
     },
@@ -5212,9 +5242,7 @@ function vkCtx() {
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
-      c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 0.86));
-      c.addPass(paintPass(ShaderPass));
-      c.addPass(new OutputPass());
+      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 0.86), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
     },

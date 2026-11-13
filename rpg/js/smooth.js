@@ -156,6 +156,19 @@ float flLand(vec3 W, vec3 N) {
   float cliff = smoothstep(0.32, 0.62, 1.0 - clamp(N.y, 0.0, 1.0));
   return patches * dapple * mix(strokes, 1.0, cliff);
 }
+/* bark: deep furrows running up the trunk, plated ridges between them, each plate its own shade, cracked across */
+float flBark(vec2 uv, float s) {
+  vec2 q = uv / s;
+  float wob = flN(vec2(q.x * 0.6, q.y * 0.22)) * 2.4 + flN(q * vec2(1.7, 0.5) + 9.0) * 0.8;
+  float col = q.x * 0.55 + wob * 0.35, id = floor(col);
+  float r = abs(fract(col) - 0.5) * 2.0;                                    // 0 on the ridge .. 1 down in the furrow
+  float row = q.y * 0.3 + flH(vec2(id, 1.0)) * 7.0, rid = floor(row);
+  float crack = smoothstep(0.0, 0.1, abs(fract(row) - 0.5) * 2.0 - 0.86 + 0.5 * r);
+  float plate = 0.84 + 0.3 * flH(vec2(id, rid));
+  float fine = 0.93 + 0.14 * flN(q * vec2(9.0, 1.6));
+  float body = plate * fine * (1.06 - 0.2 * r * r);
+  return mix(body, 0.46, max(smoothstep(0.62, 0.96, r), crack * 0.55));
+}
 #endif
 `;
 const FRAG_ALBEDO = `#include <color_fragment>
@@ -186,6 +199,15 @@ const FRAG_ALBEDO = `#include <color_fragment>
       pm = flLand(vFlW, normalize(vFlWN));
     #elif FL_PAINT == 8
       pm = an.y > 0.7 ? flStone(uv, vec2(0.6, 0.6)) : flBrick(uv);
+    #elif FL_PAINT == 9
+      {
+        #ifndef FL_PSCALE
+          #define FL_PSCALE 1.0
+        #endif
+        float bw = an.x / max(an.x + an.z, 1e-3);
+        pm = mix(flBark(vFlW.xy, FL_PSCALE), flBark(vFlW.zy, FL_PSCALE), smoothstep(0.3, 0.7, bw));
+        pm = mix(pm, 0.9 + 0.16 * flF(vFlW.xz * (0.8 / FL_PSCALE)), smoothstep(0.75, 0.95, an.y));
+      }
     #elif FL_PAINT == 7
       // cloth: soft folds hanging from the shoulders and belt, painted in light and shade
       float ang = atan(vFlP.z, vFlP.x);

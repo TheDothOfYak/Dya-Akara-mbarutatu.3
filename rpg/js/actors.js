@@ -198,23 +198,84 @@ export function rigLeg(parent, s, hip, o) {
   const fl = o.foot;
   const foot = new THREE.Mesh(new THREE.CapsuleGeometry(o.fh * 0.5, fl, 3, 8), o.boot);
   foot.rotation.x = Math.PI / 2; foot.scale.set(o.fw / o.fh, 1, 1); foot.position.set(0, -o.ah + o.fh * 0.5, fl * 0.3); ankle.add(foot);
-  return { s, thigh, knee, ankle };
+  return { s, thigh, knee, ankle, Lt: o.Lt, Ls: o.Ls, ah: o.ah, hip: hip.clone() };
 }
 
-/* step the legs: phase in radians, k = stride 0..1.3, air = airborne */
+/* ---------------- LEGS THAT STAND ON THE GROUND ----------------
+   A leg is solved from where its foot is, not swung from the hip: poseLeg() puts the ankle on a point
+   (in the space of the leg's parent, the pelvis), bends the knee forward, and keeps the sole level
+   however the pelvis above it tips, drops or turns. So a crouch is just a lower pelvis, a lean is a
+   tilted one, and a planted foot stays planted. */
+const _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion(), _lk = new THREE.Quaternion(), _le = new THREE.Euler(0, 0, 0, 'YXZ');
+const _lX = new THREE.Vector3(), _lY = new THREE.Vector3(), _lZ = new THREE.Vector3(), _lp = new THREE.Vector3(), _XA = new THREE.Vector3(1, 0, 0);
+export function poseLeg(L, T, pitch = 0, splay = 0, poleX = 0.12) {
+  const Lt = L.Lt, Ls = L.Ls;
+  _d.subVectors(T, L.thigh.position); let d = _d.length();
+  if (d < 1e-4) { _d.set(0, -1, 0); d = 1e-4; } else _d.divideScalar(d);
+  d = clamp(d, Math.abs(Lt - Ls) + 0.04, (Lt + Ls) * 0.998);
+  _lp.set(L.s * poleX, 0.18, 1);                                        // the knee goes forward, and a little out
+  _b.copy(_lp).addScaledVector(_d, -_lp.dot(_d));
+  if (_b.lengthSq() < 1e-6) _b.set(0, 0, 1); _b.normalize();
+  const ca = clamp((Lt * Lt + d * d - Ls * Ls) / (2 * Lt * d), -1, 1), sa = Math.sqrt(1 - ca * ca);
+  _lY.copy(_d).multiplyScalar(-ca).addScaledVector(_b, -sa);            // up the thigh
+  _lX.crossVectors(_b, _d).normalize();                                 // the knee's hinge
+  _lZ.crossVectors(_lX, _lY);
+  _m.makeBasis(_lX, _lY, _lZ);
+  L.thigh.quaternion.setFromRotationMatrix(_m);
+  const flex = Math.PI - Math.acos(clamp((Lt * Lt + Ls * Ls - d * d) / (2 * Lt * Ls), -1, 1));
+  L.knee.rotation.set(flex, 0, 0);
+  // the sole: level with the ground (the parent's), tipped toe-down by pitch, turned out by splay
+  _lq.setFromEuler(_le.set(pitch, splay, 0));
+  _lk.setFromAxisAngle(_XA, flex);
+  _lq2.copy(L.thigh.quaternion).multiply(_lk).invert();
+  L.ankle.quaternion.copy(_lq2.multiply(_lq));
+}
+
+/* how a body of this size walks and runs: strides a second, and how much of each stride a foot is down */
+const ramp3 = (v, pts) => { for (let i = 1; i < pts.length; i++) if (v <= pts[i][0]) return lerp(pts[i - 1][1], pts[i][1], clamp((v - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]), 0, 1)); return pts[pts.length - 1][1]; };
+export const cadence = v => ramp3(v, [[0, 1.2], [1.4, 1.75], [2.4, 2.15], [4, 2.5], [7, 3.0], [11.5, 3.55], [20, 4]]);
+export const dutyOf = v => ramp3(v, [[0, 0.64], [2.4, 0.62], [4, 0.5], [7, 0.37], [11.5, 0.3]]);
+
+/* where one foot is in its stride. ph 0..1 (0 = it lands), duty = the part of the stride it is down, SL = how far
+   the ground slides by under it while it is, H = how high it is carried, runK 0 walk .. 1 run.
+   out: { z (ahead of the hip), y (ankle above the ground, less its rest height), pitch } */
+export function footPath(ph, duty, SL, H, runK, out) {
+  const offP = 0.62 + 0.42 * runK;                                      // the heel is this far up as the toe leaves
+  if (ph < duty) {
+    const u = ph / duty;
+    out.z = SL * (0.5 - u);
+    const hs = u < 0.14 ? -(0.3 - 0.12 * runK) * (1 - u / 0.14) : 0;    // lands on the heel, toes up
+    const off = u > 0.56 ? Math.pow((u - 0.56) / 0.44, 1.6) * offP : 0; // rolls up onto the toe
+    out.pitch = hs + off;
+    out.y = Math.sin(Math.max(0, off)) * 0.085;
+  } else {
+    const q = (ph - duty) / (1 - duty), e = q * q * (3 - 2 * q);
+    out.z = SL * (-0.5 + e);
+    out.y = Math.sin(offP) * 0.085 * (1 - e) + H * Math.sin(Math.PI * Math.pow(q, 0.82));
+    out.pitch = lerp(offP + runK * 0.35 * Math.sin(Math.PI * q), -(0.3 - 0.12 * runK), Math.min(1, e * 1.15));
+  }
+  return out;
+}
+const _fp = { z: 0, y: 0, pitch: 0 }, _lt = new THREE.Vector3();
+
+/* step the legs: phase in radians, k = stride 0..1.3, air = airborne. (For the simpler rigs: their own code moves the
+   pelvis; this walks the feet under it, on the ground, by the same stride as everyone else's.) */
 export function strideLegs(legs, phase, k, air, dt, stance = 0) {
   const a = 1 - Math.exp(-18 * dt);
+  const v = k * 7, duty = dutyOf(v), cyc = ((phase / TAU) % 1 + 1) % 1, runK = clamp((v - 3) / 3.5, 0, 1), on = clamp(k / 0.12, 0, 1);
   legs.forEach((L, i) => {
-    const ph = phase + (i ? Math.PI : 0);
-    let th, kn;
-    if (air) { th = i ? -0.55 : 0.25; kn = i ? 0.9 : 0.55; }
+    if (L.Lt == null) return;
+    const body = L.thigh.parent, reach = L.Lt + L.Ls, gy = -body.position.y + L.ah, hy = L.thigh.position.y;
+    const st = L._st || (L._st = { p: new THREE.Vector3(L.thigh.position.x, gy, 0), pitch: 0 });
+    let x = L.thigh.position.x * (1.15 - 0.5 * runK * on), y = gy, z = 0, pitch = 0;
+    if (air) { y = hy - reach * (i ? 0.72 : 0.86); z = i ? 0.2 : -0.14; pitch = 0.5; }
     else if (k > 0.02) {
-      th = -Math.sin(ph) * 0.62 * k;
-      kn = (Math.max(0, Math.sin(ph - 1.1)) * 1.1 + 0.08) * Math.min(1, k * 1.2);
-    } else { th = stance * (i ? -0.32 : 0.22); kn = stance * (i ? 0.38 : 0.12); }
-    L.thigh.rotation.x = lerp(L.thigh.rotation.x, th, a);
-    L.knee.rotation.x = lerp(L.knee.rotation.x, kn, a);
-    L.ankle.rotation.x = -(L.thigh.rotation.x + L.knee.rotation.x) * (air ? 0.3 : 0.85);
+      const SL = Math.min(0.5 * reach * 2 * 0.62, 0.42 * reach + v * 0.06) * Math.min(1, k * 1.6);
+      footPath((cyc + (i ? 0.5 : 0)) % 1, duty, SL, (0.07 + 0.2 * runK) * reach * on, runK, _fp);
+      z = _fp.z + 0.02; y = gy + _fp.y; pitch = _fp.pitch;
+    } else { z = stance * (i ? -0.16 : 0.2) + (i ? -0.02 : 0.02); x *= 1 + stance * 0.4; }
+    st.p.x = lerp(st.p.x, x, a); st.p.y = lerp(st.p.y, y, a); st.p.z = lerp(st.p.z, z, a); st.pitch = lerp(st.pitch, pitch, a);
+    poseLeg(L, _lt.copy(st.p), st.pitch, L.s * 0.1 * (1 - on));
   });
 }
 
@@ -689,7 +750,45 @@ export function buildEikar(o = {}) {
   }
 
   // a cape from the shoulders, for the swagger (it can be put on and taken off: setCape below)
-  let cape = null, capeG = null, capeMat = null, wing = null;
+  let cape = null, capeG = null, capeMat = null, wing = null, capeSim = null;
+  const _cInv = new THREE.Matrix4(), _cv = new THREE.Vector3(), _cl = new THREE.Vector3();
+  function capeTick(dt, t, k) {
+    const C = capeSim, n = C.n, pv = C.prev;
+    cape.rotation.x = 0; cape.updateWorldMatrix(true, false);
+    const M = cape.matrixWorld, sc = M.getMaxScaleOnAxis() || 1, seg = C.seg * sc;
+    _cInv.copy(M).invert();
+    _cv.setFromMatrixPosition(M);
+    if (!C.live || _cv.distanceToSquared(n[0]) > 4 * sc * sc) {   // first time, or he was put somewhere else: hang it at rest
+      for (let r = 0; r < 9; r++) { n[r].set(0, -r * C.seg * 0.985, -r * C.seg * 0.17).applyMatrix4(M); pv[r].copy(n[r]); }
+      C.live = true;
+    }
+    n[0].copy(_cv); pv[0].copy(_cv);
+    const h = Math.min(dt, 1 / 30), keep = Math.exp(-1.5 * h), g = 9.8 * 0.9 * sc * h * h, home = 1 - Math.exp(-5 * h);
+    for (let r = 1; r < 9; r++) {
+      const P = n[r], Q = pv[r];
+      const vx = (P.x - Q.x) * keep, vy = (P.y - Q.y) * keep, vz = (P.z - Q.z) * keep;
+      Q.copy(P);
+      P.x += vx; P.y += vy - g; P.z += vz;
+      _cl.set(0, -r * C.seg * 0.985, -r * C.seg * 0.2).applyMatrix4(M); P.lerp(_cl, home);   // the cloth has some body: it wants to hang
+    }
+    for (let it = 0; it < 2; it++) for (let r = 1; r < 9; r++) {
+      // each link its own length; and never through his back or his legs: behind a plane that leans with him
+      _cl.copy(n[r]).applyMatrix4(_cInv);
+      const lim = -(0.012 + r * 0.011 + 0.035 * Math.sin(r / 8 * Math.PI)) - 0.004 * Math.sin(t * 6.2 + r * 0.9) * (0.4 + k) * r / 8;
+      if (_cl.z > lim) _cl.z = lim;
+      const mx = 0.035 * r; if (_cl.x > mx) _cl.x = mx; else if (_cl.x < -mx) _cl.x = -mx;
+      const top = -r * C.seg * 0.3; if (_cl.y > top) _cl.y = top;   // it trails; it never stands up over his head
+      n[r].copy(_cl).applyMatrix4(M);
+      _cv.subVectors(n[r], n[r - 1]); const d = _cv.length() || 1e-6;
+      n[r].copy(n[r - 1]).addScaledVector(_cv, seg / d);
+    }
+    const pos = cape.geometry.attributes.position, R = C.rest;
+    for (let r = 0; r < 9; r++) {
+      _cl.copy(n[r]).applyMatrix4(_cInv);
+      for (let c = 0; c < 5; c++) { const i = r * 5 + c; pos.setXYZ(i, _cl.x + R[i * 3], _cl.y, _cl.z + R[i * 3 + 2] + Math.sin(t * 7.3 + r * 1.1 + c * 1.7) * 0.006 * (0.3 + k) * r / 8); }
+    }
+    pos.needsUpdate = true; cape.geometry.computeVertexNormals();
+  }
   function makeCape(color) {
     capeG = new THREE.Group(); torso.add(capeG);
     capeMat = paint(toon(color, { side: THREE.DoubleSide }), 'cloth');
@@ -704,6 +803,10 @@ export function buildEikar(o = {}) {
     cg.computeVertexNormals();
     cape = new THREE.Mesh(cg, capeMat);
     cape.position.set(0, 0.39, -0.1); capeG.add(cape);
+    cape.frustumCulled = false;
+    // the cloth is real: a chain of points down its middle, hung from the shoulders, that swing, trail and settle
+    capeSim = { rest: Float32Array.from(pp.array), n: [], prev: [], seg: LEN / 8, live: false };
+    for (let r = 0; r < 9; r++) { capeSim.n.push(new THREE.Vector3()); capeSim.prev.push(new THREE.Vector3()); }
     for (const s of [-1, 1]) {
       const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), toon(0xe6b84a)); clasp.position.set(s * 0.1, 0.375, 0.07); capeG.add(clasp);
     }
@@ -820,6 +923,10 @@ export function buildEikar(o = {}) {
   let defKind = kind === 'spear' || kind === 'none' || kind === 'flask' ? 4 : kind === 'axe' ? 3 : 1;
   let s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
+  // the walk: where in the stride (0..1), which way the ground is going by, how fast he's turning and speeding up
+  let cyc = Math.random(), mvA = 0, yawRate = 0, accS = 0, lastSpd = 0, lastX = null, lastZ = 0, lastYaw = 0, stK = 0, rollK = 0, rollP = 0, hurtK = 0, hipTurn = 0, lungeZ = 0, crouchS = 0, moveT = 0;
+  const footI = legs.map(L => new THREE.Vector3(L.hip.x * 1.25, legOpts.ah, 0)), footT = new THREE.Vector3(), footB = new THREE.Vector3(), bodyInv = new THREE.Matrix4();
+  const FP = { z: 0, y: 0, pitch: 0 }, LEG = legOpts.Lt + legOpts.Ls;
   // the hand-drawn acting: squash & stretch, follow-through, blinks, glances, brows, talk
   let sq = 0, sqV = 0, lastY = null, wasAir = false, vyS = 0;
   let headX = 0, headY = 0, headXV = 0, hatX = -0.12, hatXV = 0;
@@ -952,7 +1059,26 @@ export function buildEikar(o = {}) {
       kS = lerp(kS, onGround ? clamp(spd / 7, 0, 1.3) : 0, 1 - Math.exp(-10 * dt));
       airK = lerp(airK, air ? 1 : 0, 1 - Math.exp(-14 * dt));
       const k = kS, moving = k > 0.035, walkK = clamp(k / 0.15, 0, 1);   // walkK: 0 standing .. 1 properly under way
-      phase += dt * (3 + Math.max(spd, k * 7) * 0.95) * walkK;
+      // the stride: so many a second for the speed, each foot down for its share of it, and the ground it covers meanwhile
+      const vS = Math.max(k * 7, moving ? Math.min(spd, 14) * 0.5 : 0), fq = cadence(vS), duty = dutyOf(vS), runK = clamp((vS - 3) / 3.6, 0, 1), sprK = clamp((vS - 8) / 3.5, 0, 1);
+      cyc = (cyc + dt * fq * walkK) % 1; phase = cyc * TAU;
+      moveT = moving ? moveT + dt : 0;
+      // which way he is really going (in his own frame), how fast he turns, how hard he speeds up or slows
+      {
+        const rx = root.position.x, rz = root.position.z, ryw = root.rotation.y;
+        let want = 0;
+        if (lastX !== null && dt > 1e-4) {
+          const vx = (rx - lastX) / dt, vz = (rz - lastZ) / dt, c = Math.cos(ryw), sn = Math.sin(ryw);
+          const lx = vx * c - vz * sn, lz = vx * sn + vz * c, mv = Math.hypot(lx, lz);
+          if (mv > 0.9 && mv < 40 && spd > 0.4 && onGround) want = Math.atan2(lx, lz);
+          const dy = Math.atan2(Math.sin(ryw - lastYaw), Math.cos(ryw - lastYaw)) / dt;
+          yawRate = lerp(yawRate, clamp(dy, -9, 9), 1 - Math.exp(-7 * dt));
+          accS = lerp(accS, clamp((spd - lastSpd) / dt, -40, 40), 1 - Math.exp(-9 * dt));
+        }
+        mvA += Math.atan2(Math.sin(want - mvA), Math.cos(want - mvA)) * (1 - Math.exp(-12 * dt));
+        lastX = rx; lastZ = rz; lastYaw = ryw; lastSpd = spd;
+      }
+      const upW = s * Math.cos(TAU * (cyc - 0.03)), upF = -upW;          // each arm goes forward with the other side's leg
       let gliding = false;
       for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && !own.has(c)) { gliding = true; break; } }
       if (st.glide != null) gliding = !!st.glide;
@@ -973,7 +1099,7 @@ export function buildEikar(o = {}) {
       const b = swingBlend;
 
       // ---- the weapon hand at rest ----
-      const sway = lerp(Math.sin(t * 1.6) * 0.008, Math.sin(phase) * 0.22 * k, walkK);   // arms swing against the legs
+      const sway = lerp(Math.sin(t * 1.6) * 0.008, upW * (0.1 + 0.08 * runK), walkK);   // arms swing against the legs
       if (kind === 'spear') { iT.set(s * 0.25, -0.06, 0.11 + sway * 0.5); iD.set(0, 1, 0.1); iB.set(1, 0, 0); }
       else if (kind === 'staff') { iT.set(s * 0.22, -0.02, 0.2 + sway * 0.4); iD.set(-s * 0.35, 1, 0.25); iB.set(0, 0, 1); }   // held across, both ends free
       else if (kind === 'whip') { iT.set(s * 0.25, -0.13, 0.12 + sway); iD.set(0, 0.35, 1); iB.set(s, 0, 0); }                // handle forward, the lash hanging
@@ -981,11 +1107,16 @@ export function buildEikar(o = {}) {
       else if (kind === 'sword') { iT.set(s * 0.24, -0.15, 0.1 + sway); iD.set(s * 0.12, -0.25, 1); iB.set(0, -1, 0); }
       else if (kind === 'axe') { iT.set(s * 0.2, 0.1 + sway * 0.2, 0.16); iD.set(s * 0.22, 0.72, -0.62); iB.set(s * 0.6, 0.4, 0.6); }
       else { iT.set(s * 0.23, -0.15, 0.04 + sway); iD.set(0, 1, 0.2); iB.set(-s, 0, 0); }
+      if (kind !== 'axe' && kind !== 'spear' && kind !== 'staff') { iT.y += walkK * runK * (0.2 + 0.07 * upW); iT.z += walkK * runK * 0.1 * upW; iT.x -= s * walkK * runK * 0.05 * Math.max(0, upW); }   // a run: the elbow bends and pumps
+      else iT.y += walkK * runK * 0.025 * upW;
 
       // ---- the swing ----
-      let tw = 0, ln = moving ? 0.16 * k : 0, crouch = 0, stance = 0;
+      let tw = 0, ln = walkK * (0.04 + 0.17 * runK + 0.11 * sprK) + clamp(accS * 0.011, -0.14, 0.16) * (onGround ? 1 : 0), crouch = 0, stance = 0, hipT = 0, lunge = 0;
       if (sw) {
-        const p = clamp(sw.p, 0, 1), e = 1 - Math.pow(1 - p, 2.4);
+        const p = clamp(sw.p, 0, 1);
+        // drawn back first (anticipation), then through fast, then carried on and settled
+        const q = clamp((p - 0.18) / 0.44, 0, 1), e = p < 0.18 ? -0.17 * Math.sin(p / 0.18 * Math.PI / 2) : -0.17 + 1.17 * (q * q * (3 - 2 * q)) + (p > 0.62 ? 0.04 * Math.sin((p - 0.62) / 0.38 * Math.PI) : 0);
+        const e01 = clamp(e, 0, 1);
         stance = 1;
         if (kind === 'bow') {
           sT.set(0.08, 0.36, 0.46); sD.set(-0.12, 1, 0); sB.set(1, 0, 0); tw = -0.35;
@@ -993,18 +1124,18 @@ export function buildEikar(o = {}) {
           const th = sw.kind === 1 ? lerp(-2.0, 1.9, e) : lerp(1.9, -2.0, e);
           sT.set(-0.06 + Math.sin(th) * 0.46, 0.14, Math.cos(th) * 0.46); sD.set(Math.sin(th), 0.08, Math.cos(th));
           if (sw.kind === 1) sB.set(Math.cos(th), 0, -Math.sin(th)); else sB.set(-Math.cos(th), 0, Math.sin(th));
-          tw = th * 0.32; ln = 0.1;
+          tw = th * 0.36; ln = 0.1 + 0.08 * e01; crouch = 0.05 + 0.03 * Math.sin(e01 * Math.PI); hipT = th * 0.3; lunge = 0.03 + 0.07 * e01;
         } else if (sw.kind === 3) {
           const ph = lerp(-2.4, 0.75, e);
           sD.set(0, -Math.sin(ph), Math.cos(ph));
           sT.set(-0.03, 0.42, 0.02).addScaledVector(sD, 0.34);
           sB.set(0, -Math.cos(ph), -Math.sin(ph));
-          ln = lerp(-0.15, 0.4, e); crouch = 0.07 * e;
+          ln = lerp(-0.2, 0.46, e01) - 0.1 * Math.min(0, e) * 4; crouch = 0.03 + 0.12 * e01 * e01; lunge = -0.03 + 0.12 * e01;
         } else {
           const th = Math.sin(p * Math.PI);
           sT.set(s * 0.1, 0.24, lerp(0.02, 0.5, th)); sD.set(0, 0.03, 1); sB.set(-s, 0, 0);
           if (kind === 'none' || kind === 'flask') sD.set(0, 1, 0.3);
-          tw = s * 0.35 * th; ln = 0.15 * th;
+          tw = s * 0.4 * th; ln = 0.2 * th; crouch = 0.03 + 0.07 * th; lunge = 0.16 * th; hipT = s * 0.22 * th;
         }
         wT.lerpVectors(iT, sT, b); wD.lerpVectors(iD, sD, b); wB.lerpVectors(iB, sB, b);
       } else { wT.copy(iT); wD.copy(iD); wB.copy(iB); }
@@ -1025,7 +1156,7 @@ export function buildEikar(o = {}) {
       else if (st.thrown) { fT.set(-s * 0.18, 0.8, 0.22); fD.set(0, 1, 0); fB.set(-s, 0, 0); }
       else if (st.talking) { fT.set(-s * 0.2, 0.08 + Math.sin(t * 4.3) * 0.05, 0.26 + Math.sin(t * 2.7) * 0.04); fD.set(-s * 0.2, 1, 0.4); fB.set(-s, 0, 0); }
       else {
-        fT.set(-s * 0.23, -0.15, 0.03 - sway); fD.set(0, 1, 0.2); fB.set(s, 0, 0);
+        fT.set(-s * (0.23 - 0.07 * runK * walkK * Math.max(0, upF)), -0.15 + walkK * (runK * (0.25 + 0.08 * upF) + 0.02 * upF), 0.03 + lerp(-sway, upF * (0.1 + 0.16 * runK), walkK)); fD.set(0, 1, 0.2); fB.set(s, 0, 0);
         if (sw) {
           if (sw.kind === 1 || sw.kind === 2) { sT.set(-s * 0.36, 0.08, -0.04); fT.lerp(sT, b); }
           else { sT.set(-s * 0.26, 0.02, -0.12); fT.lerp(sT, b); }
@@ -1033,31 +1164,103 @@ export function buildEikar(o = {}) {
       }
       if (glide > 0.01) { sT.set(-s * (SX + 0.5), SH + 0.01, -0.03); fT.lerp(sT, glide); fD.lerp(sD.set(-s, 0, 0), glide); }
       if ((st.ride || st.reins) && !sw && !st.drink) { sT.set(-s * 0.12, -0.02, 0.3); fT.lerp(sT, 0.85); fD.set(0, 0.4, 1); fB.set(s, 0, 0); }
-      if (!gliding && !sw && airK > 0.01) { fT.x += -s * 0.08 * airK; fT.y += 0.12 * airK; }
+      if (!gliding && !sw && airK > 0.01) { const fall = clamp(-vyS / 9, 0, 1); fT.x += -s * (0.1 + 0.14 * fall) * airK; fT.y += (0.1 + 0.26 * fall) * airK; fT.z += 0.06 * airK; }   // arms out for balance, up as he drops
 
-      // ---- torso, head, legs ----
+      // ---- pelvis, spine, legs ----
+      const roll = st.roll || null;
+      rollK = lerp(rollK, roll ? 1 : 0, 1 - Math.exp(-(roll ? 26 : 12) * dt)); if (roll) rollP = clamp(roll.p, 0, 1);
+      hurtK = lerp(hurtK, st.hurt || 0, 1 - Math.exp(-(st.hurt > hurtK ? 40 : 9) * dt));
+      stK = lerp(stK, stance, 1 - Math.exp(-(stance ? 22 : 7) * dt));
       twist = lerp(twist, tw * b, 1 - Math.exp(-20 * dt));
-      lean = lerp(lean, ln * (sw ? b : 1) * (1 - glide), 1 - Math.exp(-12 * dt));
-      // a real walk: the hips turn with each step and the shoulders turn against them
-      const hipYaw = Math.sin(phase) * 0.11 * k * walkK;
-      body.rotation.y = hipYaw;
-      torso.rotation.set(lean, twist - hipYaw * 1.9, Math.sin(phase) * 0.04 * k * walkK);
-      body.rotation.x = glide * 1.42;   // gliding: laid out flat along the way he's flying, like a hero in the old songs
-      body.rotation.z = -Math.sin(phase) * 0.045 * k * walkK + Math.sin(t * 0.7 + seed) * 0.012 * (1 - walkK);   // hips sway with the stride; idle weight shift
-      const bob = lerp(Math.sin(t * 2.2) * 0.006, Math.abs(Math.cos(phase)) * 0.045 * k, walkK);
-      body.position.y = HIP + bob - crouch - (sw ? 0.03 * b : 0);
+      hipTurn = lerp(hipTurn, hipT * b, 1 - Math.exp(-18 * dt));
+      lungeZ = lerp(lungeZ, lunge * b, 1 - Math.exp(-18 * dt));
+      crouchS = lerp(crouchS, crouch * b + (sw ? 0.02 * b : 0), 1 - Math.exp(-20 * dt));
+      lean = lerp(lean, ln * (sw ? Math.max(b, walkK) : 1) * (1 - glide), 1 - Math.exp(-9 * dt));
+      const bank = clamp(-yawRate * 0.045 * Math.min(1, vS / 6), -0.3, 0.3) * walkK * (1 - glide);   // into the turn
+      const cm = Math.cos(mvA), sm = Math.sin(mvA);
+      // a real walk: the hip of the leg that's reaching goes forward with it, the shoulders turn against the hips,
+      // the pelvis rides over the standing leg and dips to the one in the air
+      const hipYaw = (0.1 + 0.07 * runK) * Math.cos(phase) * walkK * Math.min(1, k * 3);
+      const hipRoll = -0.05 * Math.sin(phase) * walkK * (1 - runK * 0.75) + Math.sin(t * 0.7 + seed) * 0.014 * (1 - walkK);
+      const hipX = -0.02 * Math.sin(TAU * (cyc + 0.04)) * walkK * (1 - runK * 0.7) + Math.sin(t * 0.7 + seed) * 0.014 * (1 - walkK) * (1 - stK);
+      // how far the ground goes by under a planted foot; the pelvis comes down just enough for the legs to cover it
+      const SL = Math.min(vS * duty / fq, LEG * 1.28) * walkK;
+      const half = SL * 0.35, hipH = Math.sqrt(Math.max(0.09, LEG * LEG * 0.97 - half * half));
+      const stand = Math.min(HIP, legOpts.ah + hipH + 0.02) - 0.012 * walkK * (1 - runK);
+      const bob = lerp(Math.sin(t * 2.2) * 0.005, -(0.013 + 0.024 * runK) * Math.cos(2 * phase - runK * duty * TAU), walkK);
       // squash & stretch: a spring, kicked by landings and take-offs, held long while rising, volume kept
       const sqTarget = air ? clamp(vyS * 0.012, -0.05, 0.08) : 0;
       sqV += ((sqTarget - sq) * 140 - sqV * 13) * dt; sq += sqV * dt; sq = clamp(sq, -0.16, 0.14);
       const breath = Math.sin(t * 2.3 + seed) * 0.012 * (1 - walkK * 0.6);
       torso.scale.set(1 - sq * 0.5 - breath * 0.3, 1 + sq + breath, 1 - sq * 0.5 + breath * 0.4);
-      body.position.y -= Math.max(0, -sq) * 0.35;
+      const rollE = rollP * rollP * (3 - 2 * rollP), tuck = rollK * Math.sin(Math.min(1, rollP * 1.08) * Math.PI) ** 0.5, rollA = roll ? rollE * TAU : 0;
+      body.position.set(
+        hipX + sm * lean * 0.1,
+        lerp(stand + bob - crouchS - Math.max(0, -sq) * 0.9 - hurtK * 0.04 + airK * 0.02, 0.37 - Math.cos(rollA) * 0.2, tuck),
+        lungeZ + cm * lean * 0.12 - hurtK * 0.05 - Math.sin(rollA) * 0.2 * tuck);
+      body.rotation.set(
+        glide * 1.42 + lean * cm * 0.38 + rollA,   // gliding: laid out flat along the way he's flying, like a hero in the old songs
+        hipYaw + hipTurn,
+        hipRoll - lean * sm * 0.4 + bank * 0.45);
+      torso.rotation.set(
+        lean * cm * 0.62 - hurtK * 0.34 + tuck * 1.05 + airK * (vyS > 0 ? -0.06 : 0.12) * (1 - glide),
+        twist - hipYaw * 1.75 - hipTurn * 0.25,
+        -hipRoll * 1.5 - lean * sm * 0.6 + bank * 0.55 + Math.sin(phase) * 0.03 * walkK * runK);
+      // the feet: each one on its own spot of ground, carried forward when its turn comes
+      body.updateMatrix(); bodyInv.copy(body.matrix).invert();
+      const HF = (0.045 + 0.2 * runK + 0.1 * sprK) * walkK, rising = clamp(vyS / 6 + 0.5, 0, 1);
+      for (let i = 0; i < 2; i++) {
+        const L = legs[i], lead = L.s === -s;   // the leg opposite the weapon hand leads in a fight
+        // standing: feet a little apart and turned out; braced for a blow, the lead foot steps out and the other digs in
+        footT.set(L.hip.x * (1.25 + 0.75 * stK), legOpts.ah, (i ? -0.025 : 0.03) + stK * (lead ? 0.17 + lungeZ * 1.6 : -0.19));
+        const I = footI[i], dI = I.distanceTo(footT);
+        I.lerp(footT, 1 - Math.exp(-(stK > 0.5 ? 20 : 12) * dt));
+        const lift = Math.min(0.07, dI * 0.45);   // a foot that has to move is picked up, not slid
+        let fx = I.x, fy = I.y + lift, fz = I.z, pitch = lift * 3, splay = L.s * 0.2 * (1 - walkK);
+        if (walkK > 0.001) {
+          footPath((cyc + (i ? 0.5 : 0)) % 1, duty, SL, HF, runK, FP);
+          const gx = L.hip.x * lerp(1.05, 0.5, runK) + sm * FP.z, gz = cm * FP.z + 0.03 + lean * 0.1;
+          fx = lerp(fx, gx, walkK); fy = lerp(fy, legOpts.ah + FP.y, walkK); fz = lerp(fz, gz, walkK); pitch = lerp(pitch, FP.pitch * (0.35 + 0.65 * Math.abs(cm)), walkK);
+        }
+        if (airK > 0.001) {   // off the ground: one knee up on the way up, both legs reaching down for the landing
+          const hy = body.position.y - 0.02, up = i ? 1 : 0;
+          const ax = L.hip.x * lerp(1.5, 1.1, rising), ay = hy - lerp(0.6 + up * 0.03, up ? 0.38 : 0.6, rising), az = lerp(up ? 0.1 : -0.1, up ? 0.2 : -0.24, rising);
+          fx = lerp(fx, ax, airK); fy = lerp(fy, ay, airK); fz = lerp(fz, az, airK); pitch = lerp(pitch, 0.55, airK);
+        }
+        footB.set(fx, fy, fz).applyMatrix4(bodyInv);
+        if (tuck > 0.001) { footT.set(L.hip.x * 1.1, -0.02 - 0.2, 0.3); footB.lerp(footT, tuck); pitch = lerp(pitch, 0.2, tuck); }   // rolling: knees to the chest
+        poseLeg(L, footB, pitch - body.rotation.x * (1 - tuck) - (tuck > 0.001 ? 0 : 0), splay);
+        if (glide > 0.01 || rideK > 0.01) { const r = L.thigh.rotation, kk = Math.max(glide, rideK); r.set(r.x, r.y * (1 - kk), r.z * (1 - kk)); L.ankle.rotation.set(L.ankle.rotation.x, 0, 0); }
+      }
+      if (glide > 0.01) {   // tucked for the glide, eased in with it
+        const G2 = [[0.04, 0.06], [0.1, 0.12]];   // legs straight out behind, together
+        legs.forEach((L, i) => { L.thigh.rotation.x = lerp(L.thigh.rotation.x, G2[i][0], glide); L.knee.rotation.x = lerp(L.knee.rotation.x, G2[i][1], glide); L.ankle.rotation.x = lerp(L.ankle.rotation.x, 0.5, glide); });
+      }
+      // astride a mount: hips in the saddle, thighs forward and apart round its back, shins down its flanks;
+      // a little lean into the going, and the body gives with each stride instead of riding it stiff
+      rideK = lerp(rideK, st.ride || st.sit ? 1 : 0, 1 - Math.exp(-12 * dt));   // (sat on a bench or a log: the same fold, knees together)
+      if (rideK > 0.01) {
+        const rs = st.rideSpeed || 0, gait = st.rideBob || 0;
+        legs.forEach(L => {
+          const side = Math.sign(L.thigh.position.x) || 1;
+          L.thigh.rotation.x = lerp(L.thigh.rotation.x, st.sit ? -1.5 : -1.3, rideK); L.knee.rotation.x = lerp(L.knee.rotation.x, st.sit ? 1.5 : 1.35, rideK);
+          L.thigh.rotation.z = lerp(L.thigh.rotation.z, side * (st.sit ? 0.08 : 0.42), rideK); L.ankle.rotation.x = lerp(L.ankle.rotation.x, -0.15, rideK);
+        });
+        body.position.set(body.position.x * (1 - rideK), lerp(body.position.y, HIP - gait * 0.05, rideK), body.position.z * (1 - rideK));
+        body.rotation.x *= 1 - rideK; body.rotation.z *= 1 - rideK;
+        torso.rotation.x = lerp(torso.rotation.x, 0.1 + Math.min(rs / 20, 1) * 0.28 + gait * 0.06, rideK);
+        torso.rotation.z = lerp(torso.rotation.z, st.rideRoll || 0, rideK);
+      }
+      if (tuck > 0.001) {   // rolling: arms in tight
+        sT.set(s * 0.14, 0.12, 0.2); wT.lerp(sT, tuck * 0.8); sT.set(-s * 0.14, 0.1, 0.22); fT.lerp(sT, tuck);
+      }
+      if (hurtK > 0.01) { fT.y += hurtK * 0.1; fT.z += hurtK * 0.08; }
       // the head lags the body and overshoots it a little: follow-through
-      const hxT = (st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * 0.5) + Math.sin(phase * 2 - 0.9) * 0.05 * k * walkK + sq * 0.6;
+      const hxT = (st.drink ? -0.35 : (st.talking ? Math.sin(t * 6) * 0.06 : 0) - lean * cm * 0.72) + Math.sin(phase * 2 - 0.9) * 0.035 * walkK + sq * 0.6 - hurtK * 0.3 + tuck * 0.5 - (rideK > 0.01 ? torso.rotation.x * 0.6 * rideK : 0);
       const hyT = -twist * 0.6 + Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b) + lookX * 0.35;
       headXV += ((hxT - headX) * 160 - headXV * 16) * dt; headX += headXV * dt;
       headY = lerp(headY, hyT, 1 - Math.exp(-9 * dt));
-      head.rotation.set(headX - glide * 1.15, headY + hipYaw * 0.9, -body.rotation.z * 0.6);   // (flat out, he still looks ahead)   // the head stays on the road ahead
+      head.rotation.set(headX - glide * 1.15, headY + hipYaw * 0.75 + clamp(yawRate * 0.05, -0.35, 0.35) * walkK, -(body.rotation.z + torso.rotation.z) * 0.7);   // (flat out, he still looks ahead)   // the head stays on the road ahead
       // the cap rides on the head and trails its motion
       hatXV += ((-0.12 - headXV * 0.035 + sqV * 0.04 - hatX) * 120 - hatXV * 9) * dt; hatX += hatXV * dt;
       hat.rotation.x = clamp(hatX, -0.4, 0.2);
@@ -1078,32 +1281,11 @@ export function buildEikar(o = {}) {
       talkK = lerp(talkK, st.talking ? 1 : 0, 1 - Math.exp(-12 * dt));
       const syl = Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK;
       mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
-      strideLegs(legs, phase, moving ? k : 0, air, dt, sw && !moving ? b : 0);
-      if (glide > 0.01) {   // tucked for the glide, eased in with it
-        const G2 = [[0.04, 0.06], [0.1, 0.12]];   // legs straight out behind, together
-        legs.forEach((L, i) => { L.thigh.rotation.x = lerp(L.thigh.rotation.x, G2[i][0], glide); L.knee.rotation.x = lerp(L.knee.rotation.x, G2[i][1], glide); });
-      }
-      // astride a mount: hips in the saddle, thighs forward and apart round its back, shins down its flanks;
-      // a little lean into the going, and the body gives with each stride instead of riding it stiff
-      rideK = lerp(rideK, st.ride || st.sit ? 1 : 0, 1 - Math.exp(-12 * dt));   // (sat on a bench or a log: the same fold, knees together)
-      if (rideK > 0.01) {
-        const rs = st.rideSpeed || 0, gait = st.rideBob || 0;
-        legs.forEach(L => {
-          const side = Math.sign(L.thigh.position.x) || 1;
-          L.thigh.rotation.x = lerp(L.thigh.rotation.x, st.sit ? -1.5 : -1.3, rideK); L.knee.rotation.x = lerp(L.knee.rotation.x, st.sit ? 1.5 : 1.35, rideK);
-          L.thigh.rotation.z = side * (st.sit ? 0.08 : 0.42) * rideK; L.ankle.rotation.x = lerp(L.ankle.rotation.x, -0.15, rideK);
-        });
-        body.position.y = lerp(body.position.y, HIP - gait * 0.05, rideK);
-        torso.rotation.x = lerp(torso.rotation.x, 0.1 + Math.min(rs / 20, 1) * 0.28 + gait * 0.06, rideK);
-        torso.rotation.z = lerp(torso.rotation.z, st.rideRoll || 0, rideK);
-        head.rotation.x = lerp(head.rotation.x, -torso.rotation.x * 0.6, rideK);
-      } else legs.forEach(L => { L.thigh.rotation.z = 0; });
-
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
 
       if (wing) { wing.visible = glide > 0.08; wing.scale.set(Math.max(0.01, glide), 1, 1); cape.visible = glide < 0.5; if (cloakTrim) cloakTrim.visible = cape.visible; }
-      if (cape) cape.rotation.x = lerp(cape.rotation.x, 0.1 + k * 0.75 + airK * 0.45 + glide * 0.4 - lean * 0.6 + Math.sin(t * 6) * 0.04 * (k + 0.3), 1 - Math.exp(-8 * dt));
+      if (cape && cape.visible && capeG.visible && dt > 0) capeTick(dt, t, k);
       if (relic) { relic.rotation.y += dt * 3; relic.userData.glow.scale.setScalar(0.22 + (st.heat || 0) * 0.3 + Math.sin(t * 8) * 0.02); }
       if (nur) nur.position.set(0.55 + Math.sin(t * 1.3) * 0.12, 1.7 + Math.sin(t * 2.1) * 0.12, -0.2);
       if (weapon.userData.glow) weapon.userData.glow.material.opacity = 0.35 + b * 0.65;

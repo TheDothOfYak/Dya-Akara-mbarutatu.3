@@ -15,10 +15,11 @@ export function ramp() {
   return RAMP;
 }
 
-/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' | 'brick' */
-const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7, brick: 8 };
-export function paint(mat, kind) {
+/* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' | 'brick' | 'bark' */
+const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7, brick: 8, bark: 9 };
+export function paint(mat, kind, scale) {
   mat.defines = Object.assign({}, mat.defines, { FL_PAINT: PAINT_KINDS[kind] || 1 });
+  if (scale != null) mat.defines.FL_PSCALE = Number(scale).toFixed(3);   // how big the pattern is drawn (bark: 1 = an everyday tree)
   mat.needsUpdate = true;
   return mat;
 }
@@ -33,6 +34,53 @@ export function celAll(root) {
   });
   return root;
 }
+
+/* open water: a moving surface. Troughs and crests in two blues, the sky's colour laid over it where you look
+   along it, the sun broken into glitter on the ripples, a little foam where the crests gather. Lit, fogged and
+   shadowed like everything else (it is the toon material underneath). It keeps its own time. */
+const WATER_T = { value: 0 };
+export function waterMaterial({ color = 0x4aa6c4, deep = 0x12566e, emissive = 0x0e4a62, emissiveIntensity = 0.3, opacity = 0.86, scale = 1, side = THREE.FrontSide } = {}) {
+  const m = new THREE.MeshToonMaterial({ color, emissive, emissiveIntensity, gradientMap: ramp(), transparent: true, opacity, side });
+  const U = { uWaterT: WATER_T, uWaterDeep: { value: new THREE.Color(deep) }, uWaterSky: { value: new THREE.Color(0xcfe4f4) }, uWaterS: { value: scale } };
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vWaterP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vWaterP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = `varying vec3 vWaterP; uniform float uWaterT; uniform vec3 uWaterDeep; uniform vec3 uWaterSky; uniform float uWaterS;
+      float wH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float wN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(wH(i), wH(i + vec2(1, 0)), f.x), mix(wH(i + vec2(0, 1)), wH(i + vec2(1, 1)), f.x), f.y); }
+      float wW(vec2 p, float t) { return wN(p * 0.33 + vec2(t * 0.22, t * 0.16)) * 0.5 + wN(p * 0.85 + vec2(-t * 0.37, t * 0.3)) * 0.3 + wN(p * 2.2 + vec2(t * 0.6, -t * 0.45)) * 0.2; }
+      ` + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec2 wp = vWaterP.xz * uWaterS * 0.55;
+        float wh = wW(wp, uWaterT), whx = wW(wp + vec2(0.3, 0.0), uWaterT), whz = wW(wp + vec2(0.0, 0.3), uWaterT);
+        vec3 wn = normalize(vec3((wh - whx) * 2.2, 1.0, (wh - whz) * 2.2));
+        vec3 wv = normalize(cameraPosition - vWaterP);
+        float wfr = pow(1.0 - max(dot(wn, wv), 0.0), 3.0);
+        float wfoam = smoothstep(0.78, 0.84, wN(wp * 0.4 + vec2(uWaterT * 0.1, -uWaterT * 0.08)) * 0.55 + wh * 0.5);
+        diffuseColor.rgb = mix(uWaterDeep, diffuseColor.rgb, smoothstep(0.25, 0.8, wh));
+        diffuseColor.rgb = mix(diffuseColor.rgb, uWaterSky, wfr * 0.5);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.94, 0.98, 1.0), wfoam * 0.3);
+        diffuseColor.a = mix(diffuseColor.a, 1.0, clamp(wfr * 0.85 + wfoam * 0.3, 0.0, 1.0));`)
+      .replace('#include <opaque_fragment>', `
+        #if NUM_DIR_LIGHTS > 0
+        {
+          vec3 wl = normalize(inverseTransformDirection(directionalLights[0].direction, viewMatrix));
+          float wsp = pow(max(dot(wn, normalize(wl + wv)), 0.0), 140.0);
+          float wgl = pow(max(dot(normalize(wn + vec3(wN(wp * 6.0 + uWaterT) - 0.5, 0.0, wN(wp * 6.0 - uWaterT + 9.0) - 0.5) * 0.5), normalize(wl + wv)), 0.0), 60.0);
+          outgoingLight += directionalLights[0].color * (wsp * 0.7 + step(0.72, wgl) * wgl * 0.28);
+        }
+        #endif
+        #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => 'water';
+  m.onBeforeRender = (renderer, scene) => {
+    WATER_T.value = (performance.now() / 1000) % 3600;
+    if (scene && scene.fog) U.uWaterSky.value.copy(scene.fog.color).lerp(_wWhite, 0.45);
+  };
+  return m;
+}
+const _wWhite = new THREE.Color(0xa8d4f2);
 
 export function toon(color, opts = {}) {
   return new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: ramp() }, opts));

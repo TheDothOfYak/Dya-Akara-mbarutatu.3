@@ -27,7 +27,7 @@
    records ({ kind:'cyl', x, z, r, y0, y1 }): the roots, the hearth.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline } from './gfx.js';
+import { toon, addOutline, paint } from './gfx.js';
 import { mulberry32 } from './util.js';
 import { noSolid } from './solid.js';
 
@@ -150,7 +150,17 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     ys = ys.filter(y => !brk.some(b => Math.abs(b - y) < 0.35)).concat(brk.filter(b => b >= -2 && b <= TOPY));
     ys = [...new Set(ys)].sort((p, q) => p - q);
     const c = new THREE.Color();
-    const barkCol = (y, a) => { const groove = Math.pow(Math.abs(Math.sin(a * 11 + y * 0.012)), 6); return c.copy(bark).lerp(barkDark, groove * 0.7 + 0.15 * Math.sin(y * 0.03 + a * 3) ** 2); };
+    // broad shading only (the furrows are painted on, bark-fine, by the material): dark in the folds between the
+    // buttresses and at the foot, weathered paler up the bole, moss on the damp side low down
+    const mossC = new THREE.Color(0x56683a), paleC = bark.clone().lerp(new THREE.Color(0xb09a80), 0.35);
+    const barkCol = (y, a) => {
+      const yy = Math.max(0, y), fold = 0.5 - 0.5 * Math.sin(a * 7 + 1.3), foldK = fold * fold * Math.exp(-yy / (flareH * 1.2));
+      const streak = 0.5 + 0.5 * Math.sin(a * 5 + Math.sin(yy * 0.021 + a * 2) * 1.4);
+      c.copy(bark).lerp(paleC, Math.min(0.75, yy / (H * 0.5)) * (0.4 + 0.6 * streak));
+      c.lerp(barkDark, Math.min(0.85, foldK * 0.8 + 0.3 * Math.exp(-yy / (R * 0.5)) + 0.16 * streak * streak));
+      const moss = Math.max(0, Math.sin(a - 2.1)) * Math.exp(-yy / (R * 1.6)) * (0.35 + 0.65 * fold);
+      return c.lerp(mossC, moss * 0.55);
+    };
     const heartCol = (y, a) => { const ring = 0.5 + 0.5 * Math.sin(y * 0.55 + Math.sin(a * 3) * 1.5), grain = Math.pow(Math.abs(Math.sin(a * 23 + y * 0.04)), 8); return c.copy(heart).lerp(heartDark, ring * 0.35 + grain * 0.4); };
     const surf = (rows, rFn, colFn, inward) => {
       const pos = [], col = [], idx = [], NC = SA + 1;
@@ -164,7 +174,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
       geo.setIndex(idx); geo.computeVertexNormals(); return geo;
     };
-    const trunk = new THREE.Mesh(surf(ys, (y, a) => rAt(Math.max(0, y), a), barkCol, false), toon(0xffffff, { vertexColors: true }));
+    const trunk = new THREE.Mesh(surf(ys, (y, a) => rAt(Math.max(0, y), a), barkCol, false), paint(toon(0xffffff, { vertexColors: true }), 'bark', Math.max(1.2, R * 0.11)));
     trunk.castShadow = trunk.receiveShadow = true;
     root.add(noSolid(trunk));   // the walls are the tree's own walking rules (below), true to its swell
     // the heartwood, lit by the lamps in it rather than shadowed by the bark
@@ -188,8 +198,42 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     const hallFloor = new THREE.Mesh(new THREE.CircleGeometry(rIn(0) + 0.6, 64).rotateX(-Math.PI / 2), toon(0x7a5838, { side: THREE.DoubleSide })); hallFloor.position.y = 0.04; root.add(noSolid(hallFloor));
   }
 
-  /* ---- roots: out over the ground like ridges of hill (none across the great door) ---- */
-  const limbs = batch(root, new THREE.CylinderGeometry(0.7, 1, 1, 9, 1).translate(0, 0.5, 0), toon(0xffffff), 900);
+  /* ---- roots and limbs: each one a single limb of wood, swept smooth from its thick end to its tip ---- */
+  const woodG = { pos: [], col: [], idx: [] };
+  const _c = new THREE.Color(), mossR = new THREE.Color(0x4f6a36);
+  /* sweep a limb through pts ([{ p, r, tall? }]): round, or stood up into a fin where tall > 1 (a buttress). */
+  const sweep = (pts, { sides = 10, per = 5, c0 = bark, c1 = barkDark, moss = 0, upright = false, seed = 0 } = {}) => {
+    const curve = new THREE.CatmullRomCurve3(pts.map(q => q.p), false, 'centripetal'), n = (pts.length - 1) * per;
+    const T = V3(), N = V3(), B = V3(), P = V3(), prevN = V3(1, 0, 0), base = woodG.pos.length / 3;
+    for (let i = 0; i <= n; i++) {
+      const u = i / n, f = u * (pts.length - 1), k = Math.min(pts.length - 2, Math.floor(f)), t = f - k;
+      const r = pts[k].r + (pts[k + 1].r - pts[k].r) * t, tall = (pts[k].tall ?? 1) + ((pts[k + 1].tall ?? 1) - (pts[k].tall ?? 1)) * t;
+      curve.getPoint(u, P); curve.getTangent(u, T);
+      if (upright) { N.set(-T.z, 0, T.x); if (N.lengthSq() < 1e-6) N.set(1, 0, 0); N.normalize(); B.crossVectors(T, N).normalize(); if (B.y < 0) B.negate(); }
+      else { N.copy(prevN).addScaledVector(T, -prevN.dot(T)); if (N.lengthSq() < 1e-6) N.set(T.y, -T.x, 0); N.normalize(); B.crossVectors(T, N).normalize(); prevN.copy(N); }
+      for (let j = 0; j < sides; j++) {
+        const a = j / sides * TAU, ca = Math.cos(a), sa = Math.sin(a);
+        const knot = 1 + 0.07 * Math.sin(a * 3 + u * 9 + seed) + 0.05 * Math.sin(u * 23 + seed * 2);
+        const x = ca * r * knot, y = sa * r * tall * knot;
+        const px = P.x + N.x * x + B.x * y, py = P.y + N.y * x + B.y * y, pz = P.z + N.z * x + B.z * y;
+        woodG.pos.push(px, py, pz);
+        const upK = (N.y * ca + B.y * sa) * 0.5 + 0.5, ridge = Math.pow(Math.abs(Math.sin(a * 2.5 + Math.sin(u * 7 + seed) * 0.8)), 3);
+        _c.copy(c0).lerp(c1, 0.15 + 0.5 * ridge + 0.3 * (1 - upK));
+        if (moss) _c.lerp(mossR, moss * upK * upK * (0.5 + 0.5 * Math.sin(u * 5 + seed)));
+        woodG.col.push(_c.r, _c.g, _c.b);
+      }
+    }
+    for (let i = 0; i < n; i++) for (let j = 0; j < sides; j++) {
+      const p0 = base + i * sides + j, p1 = base + i * sides + (j + 1) % sides, q0 = p0 + sides, q1 = p1 + sides;
+      woodG.idx.push(p0, q0, p1, p1, q0, q1);
+    }
+    // close the tip
+    curve.getPoint(1, P); const tip = woodG.pos.length / 3; woodG.pos.push(P.x, P.y, P.z); woodG.col.push(c1.r, c1.g, c1.b);
+    for (let j = 0; j < sides; j++) woodG.idx.push(base + n * sides + j, tip, base + n * sides + (j + 1) % sides);
+  };
+
+  /* roots: great buttresses that stand out of the foot of the trunk and run out over the ground like ridges of hill,
+     forking as they go and sinking into the earth (none across the great door) */
   const nRoots = opts.roots ?? 9, rootReach = opts.rootReach ?? 2.25, rootAs = [];
   for (let i = 0; i < nRoots; i++) {
     const a = i / nRoots * TAU + rnd() * 0.3;
@@ -197,54 +241,126 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     if (Math.abs(angDiff(a, door.a)) < door.hw + 0.45) continue;
     rootAs.push(a);
     const r0 = RB * 0.92, reach = Math.max(RB * 1.3, RB * (rootReach - 0.4 + rnd() * 0.6)), steps = 7;   // (from out in the wall, clear of the hall)
-    let prev = V3(Math.cos(a) * r0, R * 0.9, Math.sin(a) * r0);
-    for (let s = 1; s <= steps; s++) {
+    const pts = [{ p: V3(Math.cos(a) * r0 * 0.8, R * 1.25, Math.sin(a) * r0 * 0.8), r: R * 0.5, tall: 1.9 }];
+    let forkAt = null;
+    for (let s = 0; s <= steps; s++) {
       const t = s / steps, d = r0 + (reach - r0) * t, wob = Math.sin(t * 4 + i) * 0.12;
-      const cur = V3(Math.cos(a + wob) * d, R * 0.9 * Math.pow(1 - t, 1.6) - t * 1.2, Math.sin(a + wob) * d);
       const rr = R * 0.42 * (1 - t * 0.75);
-      limbs.seg(prev, cur, rr, rr, barkDark.clone().lerp(bark, 0.5));
+      const cur = V3(Math.cos(a + wob) * d, R * 0.9 * Math.pow(1 - t, 1.6) - t * 1.2 - rr * 0.25, Math.sin(a + wob) * d);
+      pts.push({ p: cur, r: rr * (s === steps ? 0.5 : 1), tall: 1 + 0.75 * Math.pow(1 - t, 2) });
       // something to walk into: a post at each joint as high as the root is there
-      if (s < steps) colliders.push({ kind: 'cyl', x: x + cur.x, z: z + cur.z, r: rr * 0.85, y0: g - 3, y1: g + cur.y + rr * 0.7 });
-      prev = cur;
+      if (s > 0 && s < steps) colliders.push({ kind: 'cyl', x: x + cur.x, z: z + cur.z, r: rr * 0.85, y0: g - 3, y1: g + cur.y + rr * 0.95 });
+      if (s === steps - 3) forkAt = { p: cur.clone(), r: rr, d, wob };
+    }
+    pts.push({ p: pts[pts.length - 1].p.clone().add(V3(Math.cos(a) * R * 0.35, -R * 0.3, Math.sin(a) * R * 0.35)), r: 0.12 });
+    sweep(pts, { sides: 12, per: 4, moss: 0.5, upright: true, seed: i * 1.7, c0: bark, c1: barkDark });
+    // a lesser root forks off it and goes to ground on its own
+    if (forkAt) {
+      const sd = rnd() < 0.5 ? -1 : 1, fa = a + forkAt.wob + sd * (0.3 + rnd() * 0.25), L = (reach - forkAt.d) * (0.8 + rnd() * 0.5);
+      const f = [{ p: forkAt.p.clone().add(V3(0, -forkAt.r * 0.2, 0)), r: forkAt.r * 0.6, tall: 1.2 }];
+      for (let s = 1; s <= 3; s++) { const t = s / 3, d = forkAt.d + L * t; f.push({ p: V3(Math.cos(fa + sd * t * 0.2) * d, forkAt.p.y * (1 - t) - t * 1.4 - forkAt.r * 0.2, Math.sin(fa + sd * t * 0.2) * d), r: forkAt.r * 0.6 * (1 - t * 0.8) + 0.1 }); }
+      sweep(f, { sides: 8, per: 4, moss: 0.5, upright: true, seed: i * 2.3 + 5 });
     }
   }
 
-  /* ---- great limbs, out and up into the crown, from above the roof of the hollow ---- */
-  const leafB = batch(root, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 420, { shadow: true });
-  const crowns = [];
+  /* ---- great limbs, out and up into the crown, from above the roof of the hollow: each forks, and forks again,
+     and carries its leaves in clouds along its outer boughs — an oak the size of a hill ---- */
+  const leafGeo = (() => {   // one bough-end of leaf: a few rounded lobes run together, lit from above, deep green beneath
+    const lobes = [[0, 0, 0, 1], [0.62, 0.12, 0.2, 0.62], [-0.55, 0.05, 0.38, 0.66], [0.1, 0.1, -0.66, 0.6], [-0.2, 0.42, -0.1, 0.62], [0.35, -0.1, 0.6, 0.5]];
+    const pos = [], nor = [], col = [], unit = new THREE.IcosahedronGeometry(1, 1).toNonIndexed(), up = unit.attributes.position, v = V3(), nn = V3();
+    for (const [lx, ly, lz, lr] of lobes) for (let i = 0; i < up.count; i += 3) {
+      // drop the faces buried inside the other lobes
+      v.set(up.getX(i) + up.getX(i + 1) + up.getX(i + 2), up.getY(i) + up.getY(i + 1) + up.getY(i + 2), up.getZ(i) + up.getZ(i + 1) + up.getZ(i + 2)).multiplyScalar(lr / 3).add(nn.set(lx, ly, lz));
+      if (lobes.some(([ox, oy, oz, or]) => (ox !== lx || oy !== ly || oz !== lz) && v.distanceTo(nn.set(ox, oy, oz)) < or * 0.72)) continue;
+      for (let k = 0; k < 3; k++) {
+        v.set(up.getX(i + k), up.getY(i + k), up.getZ(i + k));
+        const bump = 1 + 0.07 * Math.sin(v.x * 9 + v.y * 7) + 0.06 * Math.sin(v.z * 11 - v.y * 5);
+        nn.copy(v).normalize();
+        pos.push(lx + v.x * lr * bump, (ly + v.y * lr * bump) * 0.74, lz + v.z * lr * bump);
+        // the light wraps the whole cloud, not each lobe: normals lean out from the middle of the cluster
+        const wx = (lx + v.x * lr) * 0.6 + nn.x * 0.4, wy = (ly + v.y * lr) * 0.6 + nn.y * 0.4 + 0.15, wz = (lz + v.z * lr) * 0.6 + nn.z * 0.4, wl = Math.hypot(wx, wy, wz) || 1;
+        nor.push(wx / wl, wy / wl, wz / wl);
+        const sh = 0.62 + 0.38 * Math.min(1, Math.max(0, (ly + v.y * lr + 0.75) / 1.5)) + 0.06 * Math.sin(v.x * 13 + v.z * 17);
+        col.push(sh * 0.96, sh, sh * 0.9);
+      }
+    }
+    const gg = new THREE.BufferGeometry();
+    gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    return gg;
+  })();
+  const leafB = batch(root, leafGeo, toon(0xffffff, { vertexColors: true }), 900, { shadow: true });
+  const leafTint = new THREE.Color(), leafAt = (c, s, sun = 0.5) => {
+    leafTint.set(leafCols[Math.floor(rnd() * leafCols.length)]).multiplyScalar(0.82 + 0.36 * sun + rnd() * 0.1);
+    leafB.put(c.x, c.y, c.z, s * (0.9 + rnd() * 0.3), s * (0.8 + rnd() * 0.25), s * (0.9 + rnd() * 0.3), (rnd() - 0.5) * 0.4, rnd() * TAU, (rnd() - 0.5) * 0.4, leafTint.getHex());
+  };
   const nLimbs = opts.limbs ?? 13;
   const limbPaths = [];   // each limb's joints, root to tip, with its radius there: for windows in the thick of it
+  const crownY0 = Math.max(H * 0.46, ceilY + R * 0.6), crownR = H * 0.5, crownTop = H * 1.0;
+  // how high the roof of leaf is over a point d out from the trunk: a broad dome, wide as the tree is tall
+  const domeY = d => crownY0 + (crownTop - crownY0) * Math.sqrt(Math.max(0, 1 - Math.pow(d / (crownR * 1.05), 2)));
+  const bough = (from, dir, len, r, depth, sd) => {
+    // one bough: curving up as it goes, leaves along its outer half, then two lesser ones
+    const pts = [{ p: from.clone(), r }], steps = 4;
+    let p = from.clone(); const d = dir.clone();
+    for (let s = 1; s <= steps; s++) {
+      d.y += 0.12; d.x += (rnd() - 0.5) * 0.3; d.z += (rnd() - 0.5) * 0.3; d.normalize();
+      p = p.clone().addScaledVector(d, len / steps);
+      pts.push({ p, r: r * (1 - s / steps * 0.55) });
+    }
+    sweep(pts, { sides: depth ? 6 : 8, per: 3, seed: sd, c0: bark, c1: barkDark });
+    const tip = pts[steps];
+    if (depth >= 2) { for (let k = 0; k < 3; k++) { const q = pts[2 + Math.min(2, k)].p; leafAt(V3(q.x + (rnd() - 0.5) * len * 0.5, q.y + len * (0.08 + rnd() * 0.16), q.z + (rnd() - 0.5) * len * 0.5), H * (0.05 + rnd() * 0.03), Math.min(1, q.y / H)); } return; }
+    for (let k = 0; k < 2; k++) {
+      const nd = d.clone(); const ang = (k ? 1 : -1) * (0.45 + rnd() * 0.4), cs = Math.cos(ang), sn = Math.sin(ang);
+      nd.set(d.x * cs - d.z * sn, d.y + 0.1 + rnd() * 0.25, d.x * sn + d.z * cs).normalize();
+      bough(tip.p, nd, len * (0.62 + rnd() * 0.15), tip.r * 0.8, depth + 1, sd + k * 3 + 1);
+    }
+    leafAt(V3(tip.p.x, tip.p.y + len * 0.1, tip.p.z), H * (0.05 + rnd() * 0.025), Math.min(1, tip.p.y / H));
+  };
   for (let i = 0; i < nLimbs; i++) {
     const a = i / nLimbs * TAU + rnd() * 0.5, y0 = Math.max(H * (0.48 + rnd() * 0.34), ceilY + R * 0.6), len = H * (0.34 + rnd() * 0.16), up = 0.25 + rnd() * 0.4;
     let prev = V3(Math.cos(a) * rAt(y0, a) * 0.6, y0, Math.sin(a) * rAt(y0, a) * 0.6);
     const steps = 6, path = [{ p: prev.clone(), r: R * 0.34 }];
+    const pts = [{ p: V3(Math.cos(a) * rAt(y0, a) * 0.2, y0 - R * 0.5, Math.sin(a) * rAt(y0, a) * 0.2), r: R * 0.42 }, { p: prev.clone(), r: R * 0.36 }];
     for (let s = 1; s <= steps; s++) {
       const t = s / steps, d = rAt(y0, a) * 0.6 + len * t;
       const cur = V3(Math.cos(a + Math.sin(t * 3 + i) * 0.1) * d, y0 + len * up * t + Math.sin(t * Math.PI) * len * 0.12, Math.sin(a + Math.sin(t * 3 + i) * 0.1) * d);
       const rr = R * 0.34 * (1 - t * 0.74);
-      limbs.seg(prev, cur, rr, rr, bark);
+      pts.push({ p: cur, r: rr });
       path.push({ p: cur.clone(), r: rr });
-      if (s >= steps - 2) crowns.push(cur.clone());
+      // boughs off it, alternate sides, from a third of the way out
+      if (s >= 2 && s < steps) {
+        const sd = (s % 2 ? 1 : -1) * (0.7 + rnd() * 0.5), ba = a + sd;
+        bough(cur, V3(Math.cos(ba), 0.3 + rnd() * 0.3, Math.sin(ba)).normalize(), len * (0.42 - t * 0.12), rr * 0.6, 1, i * 7 + s);
+      }
       prev = cur;
     }
+    sweep(pts, { sides: 10, per: 4, seed: i * 3.1, c0: bark, c1: barkDark });
+    bough(prev, prev.clone().sub(path[steps - 1].p).normalize(), len * 0.3, R * 0.09, 1, i * 11);
     limbPaths.push({ a, path });
-    // a few smaller boughs off each limb
-    for (let b = 0; b < 3; b++) {
-      const from = prev.clone().multiplyScalar(0.55 + b * 0.15); from.y = y0 + (prev.y - y0) * (0.55 + b * 0.15);
-      const ba = a + (rnd() - 0.5) * 1.6, bl = len * 0.35;
-      const to = from.clone().add(V3(Math.cos(ba) * bl, bl * 0.45, Math.sin(ba) * bl));
-      limbs.seg(from, to, R * 0.1, R * 0.1, bark); crowns.push(to);
-    }
   }
-  crowns.push(V3(0, H * 0.96, 0), V3(R * 2, H * 0.9, -R * 1.5), V3(-R * 2, H * 0.92, R * 1.2));
-  // a broad dome over it all, so from below it's a roof of leaf
-  for (let k = 0; k < 18; k++) { const a = k / 18 * TAU + rnd() * 0.3, d = H * (0.2 + rnd() * 0.25); crowns.push(V3(Math.cos(a) * d, H * (0.8 + rnd() * 0.12) - d * 0.25, Math.sin(a) * d)); }
-  // the crown: leaf-clouds round every bough end, big and soft
-  for (const c of crowns) {
-    for (let k = 0; k < 3; k++) {
-      const s = H * (0.075 + rnd() * 0.055);
-      leafB.put(c.x + (rnd() - 0.5) * s * 1.4, c.y + (rnd() - 0.2) * s * 0.7, c.z + (rnd() - 0.5) * s * 1.4, s, s * 0.62, s, rnd(), rnd() * 6, 0, leafCols[Math.floor(rnd() * leafCols.length)]);
+  // the leader: the trunk itself carries on up into the top of the crown, and forks there
+  {
+    const top = H * 0.92 - 2, lead = [{ p: V3(0, top - R, 0), r: rAt(top, 0) * 0.95 }, { p: V3(R * 0.3, top + H * 0.03, -R * 0.2), r: R * 0.3 }, { p: V3(R * 0.8, top + H * 0.07, -R * 0.5), r: R * 0.12 }];
+    sweep(lead, { sides: 10, per: 4, seed: 99 });
+    for (let k = 0; k < 4; k++) { const ba = k / 4 * TAU + rnd(); bough(lead[1].p, V3(Math.cos(ba), 0.55, Math.sin(ba)).normalize(), H * 0.13, R * 0.14, 1, 200 + k); }
+  }
+  // the roof of leaf: a broad, lumpy dome over all the boughs — from the ground under it, the sky is leaves
+  {
+    const rings = [[0.0, 1], [0.2, 6], [0.4, 11], [0.6, 15], [0.78, 18], [0.93, 20]];
+    for (const [f, n] of rings) for (let k = 0; k < n; k++) {
+      const a = k / n * TAU + rnd() * 0.5 + f * 3, d = crownR * (f + (rnd() - 0.5) * 0.12), y = domeY(d) - H * (0.02 + rnd() * 0.05) - (f > 0.9 ? H * 0.05 * rnd() : 0);
+      leafAt(V3(Math.cos(a) * d, y, Math.sin(a) * d), H * (0.062 + rnd() * 0.04) * (1 - f * 0.25), 0.75 + 0.25 * (1 - f));
     }
+    // and the under-storey of it: darker clouds hanging below the rim, so the crown has depth
+    for (let k = 0; k < 26; k++) { const a = k / 26 * TAU + rnd() * 0.4, d = crownR * (0.45 + rnd() * 0.5); leafAt(V3(Math.cos(a) * d, crownY0 + (domeY(d) - crownY0) * (0.25 + rnd() * 0.35), Math.sin(a) * d), H * (0.05 + rnd() * 0.03), 0.1); }
+  }
+  {
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute('position', new THREE.Float32BufferAttribute(woodG.pos, 3)); wg.setAttribute('color', new THREE.Float32BufferAttribute(woodG.col, 3));
+    wg.setIndex(woodG.idx); wg.computeVertexNormals();
+    const wm = new THREE.Mesh(wg, paint(toon(0xffffff, { vertexColors: true }), 'bark', Math.max(1, R * 0.08)));
+    wm.castShadow = wm.receiveShadow = true; root.add(noSolid(wm));
   }
 
   const wood = 0x8a6040, plank = 0xa87a50, frameC = 0x5a3a24;
@@ -464,7 +580,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     }
     for (const b of [inBox, inStep, inRope, inRib, inGlow, inLamp, inCloth, inRug, inPot, inHam]) b.done();
   }
-  limbs.done(); leafB.done();
+  leafB.done();
 
   /* ---- walking it: the bark and the heartwood are a wall all the way round but at the door; the floors and the stair
      are ground; the well has a rail round it on every floor, and off the floors the stair has one on its open side ---- */
