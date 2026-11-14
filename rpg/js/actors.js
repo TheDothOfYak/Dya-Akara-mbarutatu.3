@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint, celAll } from './gfx.js';
 import { lerp, clamp, mulberry32 } from './util.js';
 import { noSolid } from './solid.js';
+import { dress } from './assets.js';
 
 const TAU = Math.PI * 2;
 
@@ -1334,12 +1335,12 @@ export function buildEikar(o = {}) {
     glow(v) { bio.glow(v); },
     bio,
   };
-  return A;
+  return dress(A, o.model || 'eikar', o.model ? 'eikar' : null);   // played by a model of your own, if rpg/assets/models.json has one for them (assets.js)
 }
 
 export function buildTorcain() {
   return buildEikar({
-    skin: '#8a5a3a', cap: '#3d2618', marking: 0xffb04a, markColor: 0x2a1208, emblem: 0xc89aff, build: 1.1, capTall: 0.72,
+    model: 'torcain', skin: '#8a5a3a', cap: '#3d2618', marking: 0xffb04a, markColor: 0x2a1208, emblem: 0xc89aff, build: 1.1, capTall: 0.72,
     cape: 0x5e1f3e, relic: 0xff8a2a, weapon: 'axe', leg: 0x3c2414, foot: 0x2a160c, beltColor: 0x2c1a10,
     tunic: 0x3e3150, trim: 0xd8a84a, scale: 1.04,
   });
@@ -1347,7 +1348,7 @@ export function buildTorcain() {
 
 export function buildPhorus() {
   return buildEikar({
-    skin: '#7a8ca2', cap: '#2c3d52', marking: 0x9adfff, emblem: 0x7ad8ff, build: 1.12, capTall: 0.5, kalo: true,
+    model: 'phorus', skin: '#7a8ca2', cap: '#2c3d52', marking: 0x9adfff, emblem: 0x7ad8ff, build: 1.12, capTall: 0.5, kalo: true,
     weapon: 'sword', short: true, back: 'bow', leg: 0x34465a, foot: 0x26323e, beltColor: 0x4a5a6a, tunic: 0x2f5a6e, trim: 0xc8d8e8,
     quiver: 0x3a4a5a, nur: 0xbfeaff, scale: 0.98,
   });

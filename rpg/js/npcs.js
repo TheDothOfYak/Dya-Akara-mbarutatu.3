@@ -10,6 +10,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
+import { dress } from './assets.js';
 import { buildEikar, cartoon, faceActing, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
 import { mulberry32, lerp, clamp, railing } from './util.js';
 import { noSolid } from './solid.js';
@@ -382,9 +383,9 @@ export const NPCS = {
 };
 
 export function buildNpc(def) {
-  if (def.look === 'keilia') return cartoon(buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a, whip: def.id === 'venkin' }));
-  if (def.look === 'karnen') return cartoon(buildKarnen({ seed: def.id ? def.id.length : 5 }));
-  return buildEikar(NPC_LOOKS[def.look] || {});
+  if (def.look === 'keilia') return dress(cartoon(buildKeilia({ seed: def.id === 'kw1' ? 23 : 11, cloth: def.id === 'kw1' ? 0x5a4a2a : 0x4a5a34, eye: def.id === 'kw1' ? 0x8a6a2a : 0x7a8a2a, whip: def.id === 'venkin' })), 'npc_' + def.id, 'npc_keilia');
+  if (def.look === 'karnen') return dress(cartoon(buildKarnen({ seed: def.id ? def.id.length : 5 })), 'npc_' + def.id, 'npc_karnen');
+  return buildEikar(Object.assign({ model: 'npc_' + def.look }, NPC_LOOKS[def.look] || {}));
 }
 
 /* tents, a cookfire, crates, a smith's cauldron — the camp itself */

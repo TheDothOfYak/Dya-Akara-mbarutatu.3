@@ -12,6 +12,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
+import { loadModels, placeProps } from './assets.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
 import { installSmoothStyle } from './smooth.js';
@@ -128,6 +129,9 @@ const persist = () => {
 const flushSave = () => { try { if (G.mode !== 'title') persist(); } catch (e) { /* still loading */ } CLOUD.flush(); };
 addEventListener('pagehide', flushSave);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); });
+
+$('loading').textContent = 'LOADING…';
+await loadModels();   // your own models, if rpg/assets/models.json names any (assets.js)
 
 /* ---------------- renderer ---------------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -272,6 +276,7 @@ const young = () => !!F_.young && (REGION === 'xilia' || REGION === 'property');
 
 /* ---------------- player ---------------- */
 const torcain = buildTorcain();
+placeProps(scene, REGION, world.heightAt, (x, z, hw, hd, ang, bot, top) => world.col.add(x, z, hw, hd, ang, bot, top));   // your own scenery (rpg/assets/models.json)
 scene.add(torcain.root);
 const P = {
   pos: world.pier.start.clone(), vel: V3(), yaw: Math.PI, onGround: true, hp: 100, maxHp: 100, heat: 0,

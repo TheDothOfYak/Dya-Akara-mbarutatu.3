@@ -18,7 +18,7 @@ import * as THREE from 'three';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 
 const COARSE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-export const LENS = { ao: true, grade: true, shafts: true };
+export const LENS = { ao: true, grade: true, shafts: true, brush: false };
 const _sv = new THREE.Vector3(), _sp = new THREE.Vector3();
 
 /* give a composer's two buffers a depth picture each to read back (call once the composer is made, before it draws).
@@ -183,7 +183,7 @@ export function addLens(composer, camera, { bloom = null, paint = null, output =
   composer.addPass(tap);
   if (bloom) composer.addPass(bloom);
   composer.addPass(shade);
-  if (paint) composer.addPass(paint);
+  if (paint && LENS.brush) composer.addPass(paint);   // the oil-paint filter: only for the painted look
   composer.addPass(grade);
   if (output) composer.addPass(output);
   return { tap, shade, grade };

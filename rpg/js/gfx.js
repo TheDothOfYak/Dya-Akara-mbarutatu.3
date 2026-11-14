@@ -132,9 +132,12 @@ function inkFor(mat, color) {
   return c.getHex();
 }
 
+/* the hand-inked line round everything: off for the real-surface look (set INK.on before the world is built to bring it back) */
+export const INK = { on: false };
 export function addOutline(mesh, thickness = 0.04, color) {
   const o = new THREE.Mesh(mesh.geometry, outlineMaterial(thickness, color, inkFor(mesh.material, color)));
   o.name = 'outline';
+  o.visible = INK.on;   // the ink line belongs to the painted look; the real-surface look draws none
   o.castShadow = false; o.receiveShadow = false;
   mesh.add(o);
   return o;

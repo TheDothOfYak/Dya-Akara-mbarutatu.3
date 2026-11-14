@@ -29,7 +29,7 @@ import { createSolids, inColliders } from './solid.js';
 
 /* young Tanoc, thirteen, in his own first hat, with nothing in his hands */
 export function buildYoungTanoc() {
-  return buildEikar({
+  return buildEikar({ model: 'tanoc',
     skin: '#8a5a3a', cap: '#4a3020', marking: 0xffb04a, markColor: 0x2a1208, emblem: 0xc89aff, build: 0.92, capTall: 0.66,
     weapon: 'none', flasks: false, leg: 0x4a3420, foot: 0x2a1a0c, beltColor: 0x5a3a1c, tunic: 0x7a5a3a, trim: 0xc89a5a, scale: 0.86,
   });
