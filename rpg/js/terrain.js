@@ -131,6 +131,7 @@ export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84
       vec4 ip = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
       float sway = sin(uTime * 1.8 + ip.x * 0.35 + ip.z * 0.22) * 0.18 + sin(uTime * 3.1 + ip.x) * 0.05;
       transformed.x += sway * position.y; transformed.z += sway * 0.6 * position.y;`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n  normal = normalize(vNormal);');   // lit as the ground is, from either side
     mat.userData.shader = sh;
   };
   const mesh = new THREE.InstancedMesh(g, mat, N);
@@ -143,7 +144,7 @@ export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84
     if (clump < 0.42 && rng() < 0.7) continue;
     e.set((rng() - 0.5) * 0.4, rng() * Math.PI, (rng() - 0.5) * 0.4); q.setFromEuler(e);
     const s = 0.6 + rng() * 0.9;
-    m.compose(new THREE.Vector3(x, heightAt(x, z) - 0.05, z), q, new THREE.Vector3(s, s * (0.7 + clump), s));
+    m.compose(new THREE.Vector3(x, heightAt(x, z) - 0.05, z), q, new THREE.Vector3(s * 0.8, s * (0.7 + clump) * 0.62, s * 0.8));
     mesh.setMatrixAt(n, m); mesh.setColorAt(n, cc.set(tones[Math.floor(rng() * tones.length)]));
     n++;
   }
@@ -151,7 +152,108 @@ export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84
   mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
   mesh.computeBoundingSphere();
   scene.add(mesh);
+  buildMeadow(scene, ok, heightAt, tones);
   return mesh;
+}
+
+/* ------------------------------------------------------------------
+   The meadow underfoot. The tufts above are scattered thin over the
+   whole region, enough for far country; this is the grass you are
+   standing in: thick, blade by blade, wherever the region's own rule
+   says grass grows. It is laid in squares round the camera as you go
+   (a few squares a frame, reusing the ones left behind), thins away
+   with distance so it never ends at an edge, rolls in the wind in long
+   waves, and parts round whoever walks through it (MEADOW.who).
+   ------------------------------------------------------------------ */
+export const MEADOW = { who: new THREE.Vector3(0, -9999, 0), on: true };
+function buildMeadow(scene, ok, heightAt, tones) {
+  const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+  const C = 9, RAD = coarse ? 2 : 3, PER = coarse ? 520 : 1900, FAR = (RAD + 0.5) * C - 2;
+  // one blade: three tapering lengths, bowed over a little at the top; dark at the root, bright at the tip
+  const g = new THREE.BufferGeometry();
+  {
+    const P = [], Cc = [], I = [], hs = [0, 0.38, 0.72, 1], ws = [0.055, 0.046, 0.028, 0], bow = [0, 0.03, 0.11, 0.24], sh = [0.74, 0.9, 1.06, 1.2];
+    for (let k = 0; k < 3; k++) { P.push(-ws[k], hs[k], bow[k], ws[k], hs[k], bow[k]); Cc.push(sh[k], sh[k], sh[k], sh[k], sh[k], sh[k]); }
+    P.push(0, 1, bow[3]); Cc.push(sh[3], sh[3], sh[3] * 0.96);
+    I.push(0, 1, 2, 1, 3, 2, 2, 3, 4, 3, 5, 4, 4, 5, 6);
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(21).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(Cc, 3));
+    g.setIndex(I);
+  }
+  const U = { uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uWho: { value: MEADOW.who }, uFar: { value: FAR } };
+  const mat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: ramp(), side: THREE.DoubleSide });
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'uniform float uTime; uniform vec3 uCam; uniform vec3 uWho; uniform float uFar;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+      vec4 mwp = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+      float mk = 1.0 - smoothstep(uFar * 0.55, uFar, distance(mwp.xz, uCam.xz));       // thins away with distance
+      vec4 mvPosition = instanceMatrix * vec4(transformed * vec3(1.0, mk, 1.0), 1.0);
+      float mh = position.y * position.y * mk;
+      float gust = sin(uTime * 1.1 + mwp.x * 0.09 + mwp.z * 0.06) * 0.5 + 0.5;          // long waves crossing the field
+      float sway = sin(uTime * 2.3 + mwp.x * 0.8 + mwp.z * 0.55) * 0.05 + gust * 0.2 + sin(uTime * 5.1 + mwp.x * 2.1) * 0.02 * gust;
+      mvPosition.x += sway * mh; mvPosition.z += sway * 0.6 * mh;
+      vec2 md = mwp.xz - uWho.xz; float ml = length(md);
+      float press = (1.0 - smoothstep(0.25, 1.25, ml)) * (1.0 - smoothstep(0.5, 2.5, abs(mwp.y - uWho.y)));
+      mvPosition.xz += md / max(ml, 0.05) * press * 0.45 * position.y; mvPosition.y -= press * 0.3 * position.y;   // parted and trodden
+      mvPosition = modelViewMatrix * mvPosition;
+      gl_Position = projectionMatrix * mvPosition;`);
+    // lit as the ground it grows from is, whichever side of the blade you see
+    sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n  normal = normalize(vNormal);');
+  };
+  mat.customProgramCacheKey = () => 'meadow';
+  const cols = tones.map(t => new THREE.Color(t));
+  const hash = (x, z, k) => { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(z | 0, 0x165667b1) ^ Math.imul(k | 0, 0x9e3779b1); h = Math.imul(h ^ (h >>> 15), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  const pool = [], live = new Map();
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), cc = new THREE.Color();
+  const group = noSolid(new THREE.Group()); scene.add(group);
+  function fill(mesh, cx, cz) {
+    let n = 0;
+    for (let i = 0; i < PER; i++) {
+      const x = (cx + hash(cx, cz, i * 3 + 1)) * C, z = (cz + hash(cx, cz, i * 3 + 2)) * C;
+      if (!ok(x, z)) continue;
+      const clump = fbm(x * 0.06, z * 0.06, 2), r = hash(cx, cz, i * 3 + 3);
+      if (clump < 0.36 && r < 0.55) continue;                                         // thinner in the bare patches
+      const patch = fbm(x * 0.21 + 40, z * 0.21 - 17, 2);
+      e.set((hash(cx, cz, i + 20000) - 0.5) * 0.5, r * 6.283, (hash(cx, cz, i + 40000) - 0.5) * 0.5); q.setFromEuler(e);
+      const w = 0.5 + hash(cz, cx, i + 7777) * 0.55, h = (0.22 + clump * 0.36 + patch * 0.26) * (0.7 + r * 0.6);
+      m4.compose(v.set(x, heightAt(x, z) - 0.03, z), q, sc.set(w, h, w));
+      mesh.setMatrixAt(n, m4);
+      cc.copy(cols[Math.floor(hash(cx, cz, i + 60000) * cols.length) % cols.length]).multiplyScalar(0.86 + patch * 0.3);
+      mesh.setColorAt(n, cc);
+      n++;
+    }
+    mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.boundingSphere = mesh.boundingSphere || new THREE.Sphere();
+    mesh.boundingSphere.center.set((cx + 0.5) * C, heightAt((cx + 0.5) * C, (cz + 0.5) * C), (cz + 0.5) * C); mesh.boundingSphere.radius = C * 1.2 + 6;
+    mesh.visible = n > 0;
+  }
+  function take() {
+    if (pool.length) return pool.pop();
+    const mesh = new THREE.InstancedMesh(g, mat, PER);
+    mesh.receiveShadow = true; mesh.castShadow = false; mesh.setColorAt(0, cc.set(0xffffff));
+    group.add(mesh); return mesh;
+  }
+  // a thing that is always drawn, so the meadow hears about every frame and knows where the camera is
+  const tick = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3)), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }));
+  tick.frustumCulled = false; tick.userData.noOutline = true; group.add(tick);
+  const fwd = new THREE.Vector3();
+  tick.onBeforeRender = (renderer, sc_, camera) => {
+    if (!camera.isPerspectiveCamera) return;
+    group.visible = MEADOW.on;
+    U.uTime.value = (performance.now() / 1000) % 3600;
+    camera.getWorldDirection(fwd);
+    const px = camera.position.x + fwd.x * C * 1.2, pz = camera.position.z + fwd.z * C * 1.2;   // a little ahead of the camera: more of it where you look
+    U.uCam.value.set(px, camera.position.y, pz);
+    const ccx = Math.floor(px / C), ccz = Math.floor(pz / C);
+    for (const [k, c] of live) if (Math.abs(c.cx - ccx) > RAD + 1 || Math.abs(c.cz - ccz) > RAD + 1) { c.mesh.visible = false; pool.push(c.mesh); live.delete(k); }
+    let made = 0;
+    for (let r = 0; r <= RAD && made < 4; r++) for (let dz = -r; dz <= r && made < 4; dz++) for (let dx = -r; dx <= r && made < 4; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+      const k = (ccx + dx) + ',' + (ccz + dz); if (live.has(k)) continue;
+      const mesh = take(); fill(mesh, ccx + dx, ccz + dz); live.set(k, { cx: ccx + dx, cz: ccz + dz, mesh }); made++;
+    }
+  };
 }
 
 /* ------------------------------------------------------------------

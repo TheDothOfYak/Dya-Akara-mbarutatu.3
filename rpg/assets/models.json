@@ -1,0 +1,5 @@
+{
+  "_how": "See rpg/assets/README.md. Add an entry under \"models\" to replace a character or creature with your own .glb, or under \"props\" to stand a model in the world.",
+  "models": {},
+  "props": []
+}

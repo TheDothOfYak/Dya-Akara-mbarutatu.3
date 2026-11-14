@@ -278,6 +278,8 @@ The great ones are only ever seen from far off. The Aerolhorn crosses the sky no
 | Left click | Three-strike axe combo |
 | Right click | **Duat Strike**: the axe passes through the Duat to the foe you’re aiming at |
 | `T` or middle click | Lock on to a target |
+
+Fighting: locked on, he keeps facing the target and steps round it (sprint to break away). A swing with nothing locked goes at the nearest foe ahead. Roll through a blow at the last moment and time slows for a breath, the stamina comes back, and the next blow hits harder. Let go of `Space` early for a short hop.
 | `R` | Drink Albali film (heals and cures poison) |
 | `Q` | **Tukang Flare**: releases full heat as a fire nova |
 | `F` | **Nur Sense**: Phorus points out the next objective |
@@ -286,7 +288,11 @@ The great ones are only ever seen from far off. The Aerolhorn crosses the sky no
 | `I` `K` `J` `M` | Gear and pack / skills / quests / map |
 | `E` / `Tab` / `P` / `Esc` | Interact, talk or rest / Rokarvac journal / pause and settings (with a full-screen switch) / free the mouse and leave full screen |
 
-Code (`rpg/js/`): `xilia.js` (Beuhk), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `solid.js` makes everything you can see solid (all but the sky, water, grass and what's see-through or moving) on top of each region's hand-placed colliders, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades (bump `SAVE_V` to reset every run), `bounties.js` the bounty boards, `dya3d.js` Dya'Akara in 3D, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
+**The look and the motion.** Folk stand on the ground: legs are solved from the feet up, with a real stride (heel, toe, a carried swing), hips and shoulders turning against each other, a lean into speed and into turns, and blows that wind up, strike and follow through. Capes are cloth. The camera adds contact shade read from depth, then a colour grade (Settings can turn the shade off). Water moves and glitters, the meadow is laid blade by blade round you and parts as you walk, tree crowns are sprays of leaf with the sun coming through, bark is furrowed, and the home trees have swept buttress roots, forking limbs and a layered crown, still hollow and with nothing built on the outside.
+
+**Real surfaces and your own models.** Walls, ground, roofs, cobbles and bark carry photographed materials (Poly Haven, CC0) laid on in world space; the ink lines and the oil-paint filter are off. Any character or creature can be played by a `.glb` of your own, and any model stood in the world as scenery: put the file in `rpg/assets/models/`, add an entry to `rpg/assets/models.json`, and see `rpg/assets/README.md`.
+
+Code (`rpg/js/`): `lens.js` the depth shade and grade, `assets.js` your own models, `xilia.js` (Beuhk), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `solid.js` makes everything you can see solid (all but the sky, water, grass and what's see-through or moving) on top of each region's hand-placed colliders, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades (bump `SAVE_V` to reset every run), `bounties.js` the bounty boards, `dya3d.js` Dya'Akara in 3D, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
 
 ## Match Controls
 

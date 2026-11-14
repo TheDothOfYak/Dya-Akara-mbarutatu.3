@@ -372,7 +372,7 @@ export function createMegla(ctx) {
   resize();
 
   /* ---------------- the cast ---------------- */
-  const tanoc = buildEikar({
+  const tanoc = buildEikar({ model: 'tanoc',
     skin: '#8a5a3a', cap: '#4a3020', marking: 0xffb04a, markColor: 0x2a1208, emblem: 0xc89aff, build: 1.0, capTall: 0.7,
     weapon: 'axe', flasks: false, leg: 0x4a3420, foot: 0x2a1a0c, beltColor: 0x5a3a1c, tunic: 0x6a4a3a, trim: 0xc89a5a, scale: 0.95,
   });

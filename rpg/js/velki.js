@@ -10,7 +10,7 @@
    takes the run back when the air tears open.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, addOutline, outlineAll, glowSprite, Particles, paint } from './gfx.js';
+import { toon, ramp, addOutline, outlineAll, glowSprite, Particles, paint, waterMaterial } from './gfx.js';
 import { buildEikar, placeWalker } from './actors.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, orbitPitch, tiltUp, railing } from './util.js';
 import * as STORY from './story.js';
@@ -29,7 +29,7 @@ import { createSolids, inColliders } from './solid.js';
 
 /* young Tanoc, thirteen, in his own first hat, with nothing in his hands */
 export function buildYoungTanoc() {
-  return buildEikar({
+  return buildEikar({ model: 'tanoc',
     skin: '#8a5a3a', cap: '#4a3020', marking: 0xffb04a, markColor: 0x2a1208, emblem: 0xc89aff, build: 0.92, capTall: 0.66,
     weapon: 'none', flasks: false, leg: 0x4a3420, foot: 0x2a1a0c, beltColor: 0x5a3a1c, tunic: 0x7a5a3a, trim: 0xc89a5a, scale: 0.86,
   });
@@ -215,7 +215,7 @@ export function createVelki(ctx) {
 
   /* ---------------- the sea, the far country, the forest, and the home trees ---------------- */
   {
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(4200, 6400), new THREE.MeshToonMaterial({ color: 0x3a5a86, gradientMap: ramp() }));
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(4200, 6400), waterMaterial({ color: 0x3f6494, deep: 0x1c3558, emissive: 0x000000, emissiveIntensity: 0, opacity: 1, scale: 0.6 }));
     sea.rotation.x = -Math.PI / 2; sea.position.set(-2190, SEA_Y, 0); sea.receiveShadow = true; scene.add(sea);
     // the sun's road across the water, and a lip of surf along the beach
     const glint = new THREE.Mesh(new THREE.PlaneGeometry(2600, 70), new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: 0.32, depthWrite: false }));

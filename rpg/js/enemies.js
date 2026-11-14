@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { damp, dampAngle, clamp } from './util.js';
 import { glowSprite } from './gfx.js';
+import { dress } from './assets.js';
 import { buildVel, buildDummy } from './creatures.js';
 import { pivotNear } from './vines.js';
 import { cartoon } from './actors.js';
@@ -82,7 +83,7 @@ export function createEnemies(ctx) {
   function spawn(kind, x, z, group, extra = {}) {
     const T = TYPES[kind];
     if (!T) return null;   // a creature whose model isn't loaded in this build
-    const actor = cartoon(T.build());
+    const actor = dress(cartoon(T.build()), 'foe_' + kind);
     ctx.scene.add(actor.root);
     const hp = Math.round(T.hp * (T.miniboss ? D().bossHp : D().enemyHp));
     const e = Object.assign({

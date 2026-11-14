@@ -20,8 +20,54 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { ramp } from './gfx.js';
 import { mulberry32 } from './util.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let installed = false;
+
+/* ---------------- real surfaces ----------------
+   Photographed materials (Poly Haven, CC0 — see rpg/assets/README.md), one per kind of painted surface: colour and
+   relief. They load in the background; until one arrives its surface is plain. To change one, replace its two
+   files in rpg/assets/tex (<name>_a.jpg colour, <name>_n.jpg normal map, OpenGL style) and its entry in means.json. */
+const flat = (r, g, b) => { const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; };
+const surf = (name, s) => ({ name, s, a: { value: flat(128, 128, 128) }, n: { value: flat(128, 128, 255) }, m: { value: new THREE.Vector3(0.216, 0.216, 0.216) } });
+/* by paint kind (gfx.js PAINT_KINDS); s = metres one tile covers */
+const SURF = { 10: surf('rock', 2.2), 1: surf('stone', 2.6), 2: surf('plaster', 3.2), 3: surf('wood', 1.7), 4: surf('shingle', 1.6), 5: surf('cobble', 2.4), 6: surf('land', 3.4), 8: surf('brick', 2.2), 9: surf('bark', 1), rock: surf('rock', 3) };
+/* real shapes: boulders scanned from the ground (Poly Haven, CC0), cut down to a few hundred faces each. Every
+   plain rock in the game (a dodecahedron) takes one of them, and the rock surface with it. */
+const ROCKS = [];
+let readyDone; export const ready = new Promise(r => { readyDone = r; });   // resolves once the shapes are in (or can't be had)
+function loadShapes() {
+  if (typeof document === 'undefined') { readyDone(); return; }
+  const done = setTimeout(readyDone, 6000);
+  new GLTFLoader().load(new URL('../assets/shapes/rocks.glb', import.meta.url).href, g => {
+    g.scene.traverse(o => { if (o.isMesh) { const q = o.geometry.clone(); q.computeVertexNormals(); q.computeBoundingSphere(); ROCKS.push(q); } });
+    clearTimeout(done); readyDone();
+  }, undefined, () => { clearTimeout(done); readyDone(); });
+}
+let rockN = 0;
+function realRock(geo) {
+  if (done.has(geo)) return done.get(geo);
+  let out = geo;
+  if (ROCKS.length && geo.parameters && (geo.parameters.detail || 0) === 0 && untouchedOffset(geo)) {
+    const off = untouchedOffset(geo), r = geo.parameters.radius || 1;
+    out = ROCKS[rockN++ % ROCKS.length].clone().scale(r * 1.12, r * 1.12, r * 1.12).translate(off[0], off[1], off[2]);
+  }
+  done.set(geo, out);
+  return out;
+}
+function loadSurfaces() {
+  loadShapes();
+  if (typeof document === 'undefined') return;
+  const base = new URL('../assets/tex/', import.meta.url).href, L = new THREE.TextureLoader();
+  const set = (t, srgb) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t; };
+  fetch(base + 'means.json').then(r => r.json()).then(means => {
+    for (const S of Object.values(SURF)) {
+      const mean = means[S.name]; if (!mean) continue;
+      L.load(base + S.name + '_a.jpg', t => { S.a.value = set(t, true); const c = new THREE.Color().setRGB(mean[0], mean[1], mean[2], THREE.SRGBColorSpace); S.m.value.set(c.r, c.g, c.b); });
+      L.load(base + S.name + '_n.jpg', t => { S.n.value = set(t, false); });
+    }
+  }).catch(() => { /* no pictures: the surfaces stay plain */ });
+}
 
 /* ---------------- painted light ramp ---------------- */
 /* the old 4 bands ran 70 → 255; this keeps those ends but eases between them like paint */
@@ -87,6 +133,25 @@ const VERT_PARS = `varying vec3 vFlP; varying vec3 vFlN;
 #endif
 `;
 const FRAG_PARS = `varying vec3 vFlP; varying vec3 vFlN; uniform sampler2D uBrush;
+vec3 flBump = vec3(0.0);   // how the surface's own relief tips the light (world space), from its normal map
+#ifdef FL_PAINT
+uniform sampler2D uPaintA; uniform sampler2D uPaintN; uniform vec3 uPaintM; uniform float uPaintS;
+uniform sampler2D uPaintA2; uniform sampler2D uPaintN2; uniform vec3 uPaintM2;
+/* a photographed surface laid on from three sides (no UVs needed), as colour and as relief */
+vec3 flTriA(sampler2D t, vec3 p, vec3 w) { return texture2D(t, p.zy).rgb * w.x + texture2D(t, p.xz).rgb * w.y + texture2D(t, p.xy).rgb * w.z; }
+vec3 flTriN(sampler2D t, vec3 p, vec3 w) {
+  vec3 a = texture2D(t, p.zy).xyz * 2.0 - 1.0, b = texture2D(t, p.xz).xyz * 2.0 - 1.0, c = texture2D(t, p.xy).xyz * 2.0 - 1.0;
+  return vec3(0.0, a.y, a.x) * w.x + vec3(b.x, 0.0, b.y) * w.y + vec3(c.x, c.y, 0.0) * w.z;
+}
+#endif
+#ifdef FL_LEAF
+float flH3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float flN3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(flH3(i), flH3(i + vec3(1, 0, 0)), f.x), mix(flH3(i + vec3(0, 1, 0)), flH3(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(flH3(i + vec3(0, 0, 1)), flH3(i + vec3(1, 0, 1)), f.x), mix(flH3(i + vec3(0, 1, 1)), flH3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+/* sprays of leaves: 0 in the gaps between them .. 1 on a leaf's lit middle */
+float flLeaves(vec3 p) { float a = flN3(p * 8.5), b = flN3(p * 19.0 + 3.7); return a * 0.55 + b * 0.45; }
+#endif
 vec4 flTri(vec3 p, vec3 w) { return texture2D(uBrush, p.zy) * w.x + texture2D(uBrush, p.xz) * w.y + texture2D(uBrush, p.xy) * w.z; }
 #ifdef FL_PAINT
 varying vec3 vFlW; varying vec3 vFlWN;
@@ -156,19 +221,68 @@ float flLand(vec3 W, vec3 N) {
   float cliff = smoothstep(0.32, 0.62, 1.0 - clamp(N.y, 0.0, 1.0));
   return patches * dapple * mix(strokes, 1.0, cliff);
 }
+/* bark: deep furrows running up the trunk, plated ridges between them, each plate its own shade, cracked across */
+float flBark(vec2 uv, float s) {
+  vec2 q = uv / s;
+  float wob = flN(vec2(q.x * 0.6, q.y * 0.22)) * 2.4 + flN(q * vec2(1.7, 0.5) + 9.0) * 0.8;
+  float col = q.x * 0.55 + wob * 0.35, id = floor(col);
+  float r = abs(fract(col) - 0.5) * 2.0;                                    // 0 on the ridge .. 1 down in the furrow
+  float row = q.y * 0.3 + flH(vec2(id, 1.0)) * 7.0, rid = floor(row);
+  float crack = smoothstep(0.0, 0.1, abs(fract(row) - 0.5) * 2.0 - 0.86 + 0.5 * r);
+  float plate = 0.84 + 0.3 * flH(vec2(id, rid));
+  float fine = 0.93 + 0.14 * flN(q * vec2(9.0, 1.6));
+  float body = plate * fine * (1.06 - 0.2 * r * r);
+  return mix(body * 1.08, 0.4, max(smoothstep(0.38, 0.86, r), crack * 0.55));
+}
 #endif
 `;
 const FRAG_ALBEDO = `#include <color_fragment>
-  #ifndef FL_CEL
+  #ifdef FL_LEAF
+  float flLf = flLeaves(vFlP);
   {
-    vec3 tw = pow(abs(normalize(vFlN)), vec3(4.0)); tw /= dot(tw, vec3(1.0));
-    float strokes = flTri(vFlP * 0.9, tw).r, blotch = flTri(vFlP * 0.08 + 0.31, tw).g;
-    diffuseColor.rgb *= (0.9 + 0.2 * strokes) * (0.92 + 0.16 * blotch);
+    // foliage: not a smooth lump but sprays of leaf — the edge of the crown breaks up into them, the hollows
+    // between sprays go deep green, the tops of the sprays catch the light, and the underside of the crown is dark
+    float flNdv = abs(normalize(vNormal).z);
+    float flEdge = smoothstep(0.52, 0.08, flNdv);
+    if (flLf < flEdge * 0.74) discard;
+    float flUp = clamp(normalize(vFlN).y * 0.5 + 0.5, 0.0, 1.0);
+    diffuseColor.rgb *= mix(0.8, 1.14, smoothstep(0.3, 0.7, flLf)) * mix(0.8, 1.06, flUp);
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.08, 0.72), smoothstep(0.62, 0.85, flLf) * flUp);   // young leaf, yellower, where the sun gets in
   }
   #endif
   #ifdef FL_PAINT
+  #if FL_PAINT != 7
   {
-    // painted surface detail, laid out on whichever world plane the face looks along
+    // a real surface: its photographed colour (as light and shade and tint on the thing's own colour, so every
+    // region keeps its palette) and its relief, laid on in world space from whichever sides the face looks along
+    vec3 flAn = abs(normalize(vFlWN)), flW = pow(flAn, vec3(6.0)); flW /= (flW.x + flW.y + flW.z);
+    float flS = uPaintS;
+    #if FL_PAINT == 9
+      #ifdef FL_PSCALE
+        flS = max(0.9, FL_PSCALE * 5.0);
+      #endif
+    #endif
+    vec3 flP = vFlW / flS;
+    vec3 flDet = flTriA(uPaintA, flP, flW) / uPaintM;
+    vec3 flRel = flTriN(uPaintN, flP, flW);
+    #if FL_PAINT == 6
+    {
+      // the land: the same ground again much larger, so it never repeats to the eye; bare rock on the steep faces
+      vec3 flFar = flTriA(uPaintA, flP * 0.17 + 0.37, flW) / uPaintM;
+      float flNearK = 1.0 - smoothstep(10.0, 70.0, length(vViewPosition));
+      flDet = mix(flFar, flDet * (0.6 + 0.4 * flFar), flNearK); flRel *= flNearK;
+      float flCliff = smoothstep(0.3, 0.6, 1.0 - clamp(normalize(vFlWN).y, 0.0, 1.0));
+      vec3 flRP = vFlW / (flS * 2.4);
+      flDet = mix(flDet, flTriA(uPaintA2, flRP, flW) / uPaintM2, flCliff);
+      flRel = mix(flRel, flTriN(uPaintN2, flRP, flW) * 1.4, flCliff);
+      flDet *= 0.88 + 0.24 * flF(vFlW.xz * 0.035);                          // broad sunlit and dull patches
+    }
+    #endif
+    diffuseColor.rgb *= mix(vec3(1.0), clamp(flDet, 0.0, 2.2), 0.92);
+    flBump = flRel * 0.9;
+  }
+  #else
+  {
     vec3 an = abs(vFlWN);
     vec2 uv = an.y > 0.7 ? vFlW.xz : (an.x > an.z ? vFlW.zy : vFlW.xy);
     float pm = 1.0;
@@ -184,8 +298,23 @@ const FRAG_ALBEDO = `#include <color_fragment>
       pm = flCobble(uv);
     #elif FL_PAINT == 6
       pm = flLand(vFlW, normalize(vFlWN));
+      {
+        // close to, the ground has grain: tufts and bare flecks, fading out with distance so far country stays broad
+        float flNear = 1.0 - smoothstep(6.0, 42.0, length(vViewPosition));
+        float flTuft = flN(vFlW.xz * 5.3) * 0.6 + flN(vFlW.xz * 13.0 + 4.0) * 0.4;
+        pm *= mix(1.0, 0.86 + 0.26 * flTuft, flNear * (1.0 - smoothstep(0.32, 0.62, 1.0 - clamp(vFlWN.y, 0.0, 1.0))));
+      }
     #elif FL_PAINT == 8
       pm = an.y > 0.7 ? flStone(uv, vec2(0.6, 0.6)) : flBrick(uv);
+    #elif FL_PAINT == 9
+      {
+        #ifndef FL_PSCALE
+          #define FL_PSCALE 1.0
+        #endif
+        float bw = an.x / max(an.x + an.z, 1e-3);
+        pm = mix(flBark(vFlW.xy, FL_PSCALE), flBark(vFlW.zy, FL_PSCALE), smoothstep(0.3, 0.7, bw));
+        pm = mix(pm, 0.9 + 0.16 * flF(vFlW.xz * (0.8 / FL_PSCALE)), smoothstep(0.75, 0.95, an.y));
+      }
     #elif FL_PAINT == 7
       // cloth: soft folds hanging from the shoulders and belt, painted in light and shade
       float ang = atan(vFlP.z, vFlP.x);
@@ -194,40 +323,42 @@ const FRAG_ALBEDO = `#include <color_fragment>
     #endif
     diffuseColor.rgb *= pm;
   }
+  #endif
   #endif`;
 const FRAG_LIGHT = `
-  #ifdef FL_CEL
+  #ifdef FL_LEAF
+  #if NUM_DIR_LIGHTS > 0
   {
-    // the cast: a cool, violet-leaning shadow shape, and a crisp rim of light
-    float flLum = dot(outgoingLight, vec3(0.3, 0.59, 0.11)) / max(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)), 1e-3);
-    float flShade = 1.0 - smoothstep(0.55, 0.8, flLum);
-    outgoingLight *= mix(vec3(1.0), vec3(0.8, 0.84, 1.16), flShade * 0.85);
-    vec3 vdc = normalize(vViewPosition);
-    outgoingLight += diffuseColor.rgb * smoothstep(0.66, 0.7, 1.0 - max(dot(normal, vdc), 0.0)) * 0.28 * (1.0 - flShade * 0.5);
-  }
-  #else
-  {
-    vec3 vd = normalize(vViewPosition);
-    float ndv = max(dot(normal, vd), 0.0);
-    // a rim of light round the silhouette, as in every painted frame of the film
-    outgoingLight += diffuseColor.rgb * smoothstep(0.42, 0.9, 1.0 - ndv) * 0.22;
-    #if NUM_DIR_LIGHTS > 0
-      // a soft painted sheen where the key light glances off
-      vec3 flH = normalize(directionalLights[0].direction + vd);
-      float flS = smoothstep(0.86, 0.98, max(dot(normal, flH), 0.0));
-      outgoingLight += directionalLights[0].color * flS * 0.09 * (0.4 + 0.6 * max(dot(normal, directionalLights[0].direction), 0.0));
-    #endif
+    // the sun coming through the leaves when you look toward it
+    float flBack = pow(max(dot(normalize(vViewPosition), -directionalLights[0].direction), 0.0), 3.0);
+    outgoingLight += diffuseColor.rgb * directionalLights[0].color * flBack * 0.35 * smoothstep(0.35, 0.8, flLf);
   }
   #endif
+  #endif
+  {
+    // a soft highlight where the sun glances off, stronger at a grazing angle, and a little of the sky on every edge
+    vec3 flVd = normalize(vViewPosition);
+    float flNdv = max(dot(normal, flVd), 0.0);
+    #if NUM_DIR_LIGHTS > 0
+      vec3 flHv = normalize(directionalLights[0].direction + flVd);
+      float flNdl = max(dot(normal, directionalLights[0].direction), 0.0);
+      float flFr = 0.05 + 0.95 * pow(1.0 - max(dot(flHv, flVd), 0.0), 5.0);
+      #ifdef FL_CEL
+        outgoingLight += directionalLights[0].color * pow(max(dot(normal, flHv), 0.0), 26.0) * flNdl * (0.1 + flFr) * 0.22;
+      #else
+        outgoingLight += directionalLights[0].color * pow(max(dot(normal, flHv), 0.0), 18.0) * flNdl * (0.06 + flFr) * 0.16;
+      #endif
+    #endif
+    outgoingLight += diffuseColor.rgb * pow(1.0 - flNdv, 3.0) * 0.14;
+  }
   #include <opaque_fragment>`;
 /* toon materials without a ramp use three's built-in two-tone step: give them the painted falloff too */
 /* characters and creatures (FL_CEL) are drawn like the film's hand-animated cast instead: one crisp
    shadow shape, no gradient — the bold, graphic shading of Atlantis and Treasure Planet */
-const CEL_GRADIENT = `#ifdef FL_CEL
+const CEL_GRADIENT = `#if 1
 vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ) {
-  float d = dot( normal, lightDirection ) * 0.5 + 0.5;
-  float w = fwidth( d ) * 1.2 + 0.004;
-  return vec3( mix( 0.5, 1.0, smoothstep( 0.52 - w, 0.52 + w, d ) ) );
+  float d = clamp( dot( normal, lightDirection ) * 0.88 + 0.12, 0.0, 1.0 );
+  return vec3( d * d * ( 3.0 - 2.0 * d ) * 0.94 + 0.06 );
 }
 #else
 `;
@@ -372,7 +503,7 @@ function softPuff(radius, detail, cluster) {
 }
 const gemLike = m => !m || Array.isArray(m) || (m.emissive && m.emissiveIntensity > 0.3 && m.emissive.getHex() !== 0) || m.transparent;
 
-const CTORS = { IcosahedronGeometry: THREE.IcosahedronGeometry, BoxGeometry: THREE.BoxGeometry, SphereGeometry: THREE.SphereGeometry, CylinderGeometry: THREE.CylinderGeometry, ConeGeometry: THREE.ConeGeometry, CapsuleGeometry: THREE.CapsuleGeometry, TorusGeometry: THREE.TorusGeometry, CircleGeometry: THREE.CircleGeometry };
+const CTORS = { DodecahedronGeometry: THREE.DodecahedronGeometry, IcosahedronGeometry: THREE.IcosahedronGeometry, BoxGeometry: THREE.BoxGeometry, SphereGeometry: THREE.SphereGeometry, CylinderGeometry: THREE.CylinderGeometry, ConeGeometry: THREE.ConeGeometry, CapsuleGeometry: THREE.CapsuleGeometry, TorusGeometry: THREE.TorusGeometry, CircleGeometry: THREE.CircleGeometry };
 
 /* has anything moved the vertices since the constructor? returns the offset if only translated, else null */
 function untouchedOffset(geo) {
@@ -422,6 +553,17 @@ function smoothGeometry(geo) {
   return out;
 }
 
+/* is this puff foliage? (a crown, a bush, a clump: something with the colour of leaves — not a cloud, a snowdrift or a stone) */
+const _lc = new THREE.Color(), _hsl = { h: 0, s: 0, l: 0 };
+function leafy(o) {
+  const m = o.material;
+  if (!m || Array.isArray(m) || !m.isMeshToonMaterial || m.map) return false;
+  let n = 0, ok = 0;
+  const test = c => { c.getHSL(_hsl); n++; if (_hsl.s > 0.28 && _hsl.l > 0.12 && _hsl.l < 0.8 && _hsl.h > 0.02 && _hsl.h < 0.47) ok++; };   // reds and golds of autumn through to deep green
+  if (o.isInstancedMesh && o.instanceColor) { const N = Math.min(o.count, 24); for (let i = 0; i < N; i++) { o.getColorAt(Math.floor(i * o.count / N), _lc); _lc.multiply(m.color); test(_lc); } }
+  else test(_lc.copy(m.color));
+  return n > 0 && ok / n > 0.7;
+}
 const pending = [];
 function flush() {
   if (!pending.length) return;
@@ -431,10 +573,18 @@ function flush() {
       // an ink outline always takes the very shape its mesh ended up with
       if (o.name === 'outline' && o.parent && o.parent.isMesh) { if (o.parent.userData.smFrom === o.geometry) o.geometry = o.parent.geometry; return; }
       const from = o.geometry;
+      if (from.type === 'DodecahedronGeometry' && !gemLike(o.material) && o.material.isMeshToonMaterial && !o.material.map) {
+        const g = realRock(from);
+        if (g !== from) { o.geometry = g; o.userData.smFrom = from; const m = o.material; if (!(m.defines && m.defines.FL_PAINT)) { m.defines = Object.assign({}, m.defines, { FL_PAINT: 10 }); m.needsUpdate = true; } }
+        return;
+      }
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
         : smoothGeometry(o.geometry);
-      if (g !== o.geometry) { o.geometry = g; o.userData.smFrom = from; }
+      if (g !== o.geometry) {
+        o.geometry = g; o.userData.smFrom = from;
+        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } }
+      }
     }
   });
 }
@@ -445,6 +595,7 @@ export function installSmoothStyle() {
   installed = true;
   paintRamp();
   BRUSH.value = brushTexture();
+  loadSurfaces();
   THREE.MeshToonMaterial.prototype.onBeforeCompile = function (sh) {
     sh.uniforms.uBrush = BRUSH;
     sh.vertexShader = VERT_PARS + sh.vertexShader.replace('#include <begin_vertex>', VERT);
@@ -452,7 +603,10 @@ export function installSmoothStyle() {
       .replace('#include <gradientmap_pars_fragment>', THREE.ShaderChunk.gradientmap_pars_fragment.replace(HARD_STEP, SOFT_STEP)
         .replace('vec3 getGradientIrradiance', CEL_GRADIENT + 'vec3 getGradientIrradiance') + '\n#endif\n')
       .replace('#include <color_fragment>', FRAG_ALBEDO)
-      .replace('#include <opaque_fragment>', FRAG_LIGHT);
+      .replace('#include <opaque_fragment>', FRAG_LIGHT)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = normalize(normal + (viewMatrix * vec4(flBump, 0.0)).xyz);');
+    const kind = this.defines && this.defines.FL_PAINT, S = kind && SURF[kind];
+    if (S) { sh.uniforms.uPaintA = S.a; sh.uniforms.uPaintN = S.n; sh.uniforms.uPaintM = S.m; sh.uniforms.uPaintS = { value: S.s }; const R = kind === 6 ? SURF.rock : S; sh.uniforms.uPaintA2 = R.a; sh.uniforms.uPaintN2 = R.n; sh.uniforms.uPaintM2 = R.m; }
   };
   const add = THREE.Object3D.prototype.add;
   THREE.Object3D.prototype.add = function (...objs) {
