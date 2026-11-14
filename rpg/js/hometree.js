@@ -28,7 +28,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { toon, addOutline, paint } from './gfx.js';
-import { mulberry32 } from './util.js';
+import { mulberry32, lerp } from './util.js';
 import { noSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
@@ -100,7 +100,19 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
   const doorHw = doorW * 0.5 / rAt(doorH * 0.5, doorA), a0 = doorA + doorHw + 0.55;
   const stairA = y => a0 + (y - S0) / (topY - S0) * span;
   // the heights at which the stair passes round angle a
-  const stairYs = a => { const out = [], b = ((a - a0) % TAU + TAU) % TAU; for (let k = 0; k <= Math.ceil(turns) + 1; k++) { const t = (b + k * TAU) / span; if (t <= 1) out.push(S0 + t * (topY - S0)); } return out; };
+  // at every floor the stair runs level for a few strides — a landing, flush with the floor — and climbs a little
+  // steeper between to make it up
+  const landH = Math.min(risePerRad * 1.9 / rMean, ...levelYs.map((y, i) => (y - (levelYs[i - 1] ?? S0)) / 3.2));
+  const stairLift = y => {
+    let lo = S0, loEdge = S0;
+    for (const Ly of levelYs) {
+      if (y > Ly + landH) { lo = Ly; loEdge = Ly + landH; continue; }
+      if (y >= Ly - landH) return Ly;
+      return lo + (y - loEdge) / Math.max(1e-6, Ly - landH - loEdge) * (Ly - lo);
+    }
+    return y;
+  };
+  const stairYs = a => { const out = [], b = ((a - a0) % TAU + TAU) % TAU; for (let k = 0; k <= Math.ceil(turns) + 1; k++) { const t = (b + k * TAU) / span; if (t <= 1) out.push(stairLift(S0 + t * (topY - S0))); } return out; };
   const stairIn = (a, y0, y1) => stairYs(a).some(s => s > y0 && s < y1);
   // where the stair comes up through a floor, a slot is left open behind it, long enough to pass under the floor upright
   const WELL0 = -Math.max(0.5, 2.7 / risePerRad), WELL1 = 0.08;
@@ -178,7 +190,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     trunk.castShadow = trunk.receiveShadow = true;
     root.add(noSolid(trunk));   // the walls are the tree's own walking rules (below), true to its swell
     // the heartwood, lit by the lamps in it rather than shadowed by the bark
-    const inMat = toon(0xffffff, { vertexColors: true, side: THREE.DoubleSide });
+    const inMat = paint(toon(0xffffff, { vertexColors: true, side: THREE.DoubleSide }), 'bark', 0.55);   // heartwood: grain, checks and knots, not one smooth sheet
     const hollow = new THREE.Mesh(surf(ys.filter(y => y <= ceilY + 1e-6), y => rIn(y), heartCol, true), inMat);
     root.add(noSolid(hollow));
     // the cut faces: the sides, sill and head of every opening, through the thickness of the wall
@@ -239,9 +251,11 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     const a = i / nRoots * TAU + rnd() * 0.3;
     if (opts.rootSkip && opts.rootSkip(a)) continue;
     if (Math.abs(angDiff(a, door.a)) < door.hw + 0.45) continue;
+    if (openings.some(o => o.kind === 'hall' && Math.abs(angDiff(a, o.a)) < o.hw + 0.4)) continue;   // nor across the hall's windows
     rootAs.push(a);
     const r0 = RB * 0.92, reach = Math.max(RB * 1.3, RB * (rootReach - 0.4 + rnd() * 0.6)), steps = 7;   // (from out in the wall, clear of the hall)
-    const pts = [{ p: V3(Math.cos(a) * r0 * 0.8, R * 1.25, Math.sin(a) * r0 * 0.8), r: R * 0.5, tall: 1.9 }];
+    const rs = rAt(R * 1.2, a) + R * 0.1;   // out on the bark: nothing of a root comes through the wall into the hollow
+    const pts = [{ p: V3(Math.cos(a) * rs, R * 1.2, Math.sin(a) * rs), r: R * 0.2, tall: 2.6 }];
     let forkAt = null;
     for (let s = 0; s <= steps; s++) {
       const t = s / steps, d = r0 + (reach - r0) * t, wob = Math.sin(t * 4 + i) * 0.12;
@@ -435,7 +449,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
   {
     const inner = noSolid(new THREE.Group()); inner.userData.moves = false; root.add(inner);
     const IN = { shadow: false, recv: false };   // lamp-lit: the bark's shadow doesn't reach in here
-    const floorM = toon(plank, { side: THREE.DoubleSide }), fasciaM = toon(wood, { side: THREE.DoubleSide });
+    const floorM = paint(toon(0xc09a6a, { side: THREE.DoubleSide }), 'wood'), fasciaM = paint(toon(wood, { side: THREE.DoubleSide }), 'wood');
     const inBox = batch(inner, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 5200, IN);
     const inStep = batch(inner, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 1200, IN);
     const inRope = batch(inner, new THREE.CylinderGeometry(1, 1, 1, 5, 1).translate(0, 0.5, 0), toon(0x6a5a40), 1600, IN);
@@ -557,7 +571,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       const n = Math.min(1150, Math.round(span * rMean / 0.95));
       let prevPost = null;
       for (let i = 0; i <= n; i++) {
-        const t = i / n, a = a0 + t * span, y = S0 + t * (topY - S0), r = rIn(y) - 1.6;
+        const t = i / n, a = a0 + t * span, y = stairLift(S0 + t * (topY - S0)), r = rIn(y) - 1.6;
         inStep.put(Math.cos(a) * r, y, Math.sin(a) * r, 3.1, 0.35, 1.25, 0, -a, 0, plank);
         if (i % 4 === 0) {
           const atFloor = y < 1.6 || levels.some(L => y > L.y - 0.3 && y < L.y + 2.2);
@@ -579,6 +593,53 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         inLamp.put(Math.cos(a) * r, yb, Math.sin(a) * r, s, s * 1.3, s, 0, 0, 0, rnd() < 0.3 ? 0x9af0d8 : WARM[Math.floor(rnd() * WARM.length)]);
       }
     }
+    /* and it is a village, and a green one: ivy along every rail and up the walls, tubs of flowers on every floor,
+       strings of flags across the well and round the hall, lanterns of every colour */
+    {
+      const inLeafM = toon(0xffffff, { vertexColors: true }); inLeafM.defines = Object.assign({}, inLeafM.defines, { FL_LEAF: 1 });
+      const inLeaf = batch(inner, leafGeo, inLeafM, 2600, IN);
+      const fg = new THREE.BufferGeometry();
+      fg.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0, -1, 0], 3)); fg.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+      const inFlag = batch(inner, fg, toon(0xffffff, { side: THREE.DoubleSide }), 1400, IN);
+      const GREEN = [0x4f9a3c, 0x62ad48, 0x3f8436, 0x78b84e], BLOOM = [0xf07aa8, 0xf2c84a, 0xff9a4a, 0xc890f0, 0xffffff], FLAGS = [0xd94f4f, 0xe8b23a, 0x3f8fbf, 0x6ab04c, 0xb062c8, 0xf08a3a];
+      const pickC = arr => arr[Math.floor(rnd() * arr.length)];
+      const leaf = (px, py, pz, sc, c) => inLeaf.put(px, py, pz, sc, sc * 0.8, sc, rnd(), rnd() * TAU, rnd(), c);
+      const flags = (A, B, sag, n) => {   // a string of flags from A to B, hanging in a curve
+        let prev = A.clone();
+        for (let k = 1; k <= n; k++) {
+          const t = k / n, q = A.clone().lerp(B, t); q.y -= Math.sin(t * Math.PI) * sag;
+          inRope.seg(prev, q, 0.018, 0.018);
+          const m = prev.clone().lerp(q, 0.5); inFlag.put(m.x, m.y, m.z, 0.42, 0.5, 1, 0, Math.atan2(q.x - prev.x, q.z - prev.z) + Math.PI / 2, 0, FLAGS[k % FLAGS.length]);
+          prev = q;
+        }
+      };
+      const tub = (a, r, y) => {
+        inPot.put(Math.cos(a) * r, y, Math.sin(a) * r, 0.5, 0.55, 0.5, 0, 0, 0, pickC([0xb5653a, 0x9a5a3a, 0x7a8a9a]));
+        leaf(Math.cos(a) * r, y + 0.95, Math.sin(a) * r, 0.75 + rnd() * 0.3, pickC(GREEN));
+        for (let k = 0; k < 4; k++) { const b = rnd() * TAU, d = 0.25 + rnd() * 0.4; inLamp.put(Math.cos(a) * r + Math.cos(b) * d, y + 1.1 + rnd() * 0.4, Math.sin(a) * r + Math.sin(b) * d, 0.1, 0.1, 0.1, 0, 0, 0, pickC(BLOOM)); }
+      };
+      const vine = (a, r, y0, y1) => {
+        let prev = P(a, r, y0);
+        for (let y = y0 + 0.9; y <= y1; y += 0.9) { const q = P(a + Math.sin(y * 1.7 + a * 5) * 0.035, r, y); inRope.seg(prev, q, 0.035, 0.035, 0x3a6a30); leaf(q.x - Math.cos(a) * 0.15, q.y, q.z - Math.sin(a) * 0.15, 0.4 + rnd() * 0.25, pickC(GREEN)); prev = q; }
+      };
+      for (const L of levels) {
+        const y = L.y, rr = L.rWell + 0.22, n = Math.max(8, Math.round(rr * TAU / 2.1));
+        for (let k = 0; k < n; k++) {   // ivy over the rail, trailing down into the well, in flower here and there
+          const a = (k + rnd() * 0.5) / n * TAU;
+          leaf(Math.cos(a) * rr, y + 0.95, Math.sin(a) * rr, 0.42 + rnd() * 0.22, pickC(GREEN));
+          if (k % 2) leaf(Math.cos(a) * (rr - 0.25), y + 0.35 - rnd() * 0.5, Math.sin(a) * (rr - 0.25), 0.36 + rnd() * 0.2, pickC(GREEN));
+          if (k % 3 === 0) inLamp.put(Math.cos(a) * (rr + 0.1), y + 1.05, Math.sin(a) * (rr + 0.1), 0.09, 0.09, 0.09, 0, 0, 0, pickC(BLOOM));
+        }
+        const hi = Math.min(5.5, L.next - y - 1.2);
+        for (let k = 0; k < 9; k++) { const a = (k + 0.5) / 9 * TAU + rnd() * 0.2; if (!openAt(a, y + 2.5, 4) && !stairIn(a, y - 0.5, y + hi + 1)) vine(a, L.ri - 0.18, y + 0.1, y + hi); }
+        for (let k = 0; k < 6; k++) { const a = (k + 0.25) / 6 * TAU + rnd() * 0.3; if (!inSlot(L, a)) tub(a, lerp(L.rWell + 1.3, L.ri - 4.4, 0.3 + rnd() * 0.5), y); }
+        for (let k = 0; k < 3; k++) { const a = (k + (L.i % 2) * 0.5) / 3 * TAU + 0.4; flags(P(a, rr, y + 1.25), P(a + 2.3, rr, y + 1.25), 0.9, 12); }
+      }
+      // the hall: flags in a ring high over the hearth, tubs by the doorways, vines up between them
+      { const rh = Math.min(rIn(0) - 4, 9), nf = 10; for (let k = 0; k < nf; k++) flags(P(k / nf * TAU, rh, 5.2), P((k + 1) / nf * TAU, rh, 5.2), 0.5, 5);
+        for (let k = 0; k < 10; k++) { const a = (k + 0.5) / 10 * TAU; if (Math.abs(angDiff(a, door.a)) < door.hw + 0.3) continue; tub(a, rIn(0) - 2.6, 0.04); if (!openAt(a + 0.16, 4, 6) && !stairIn(a + 0.16, 0, 8)) vine(a + 0.16, rIn(2) - 0.2, 0.2, Math.min(7, levelYs[0] - 1)); } }
+      inLeaf.done(); inFlag.done();
+    }
     for (const b of [inBox, inStep, inRope, inRib, inGlow, inLamp, inCloth, inRug, inPot, inHam]) b.done();
   }
   leafB.done();
@@ -597,7 +658,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     }
     for (const ys of stairYs(a)) {
       const s = ys + 0.17; if (s > ly + STEP || s <= best) continue;
-      const rb = rIn(ys); if (r < rb - 3.25 || r > rb + 0.1) continue;
+      const rb = rIn(ys); if (r < rb - 3.4 || r > rb + 0.3) continue;
       best = s;
     }
     return best > -1e9 ? g + best : -1e9;
@@ -613,9 +674,9 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       // inside: the wall, the rail round the well, the stair's rail, and never under the stair where it's too low to stand
       let rMin = 0, rMax = ri - rad, fy = null;
       const L = levels.find(L => ly >= L.y - 0.4 && ly < L.y + 3.5);
-      if (L) { rMin = L.rWell + 0.3 + rad; fy = L.y; }
+      if (L) { fy = L.y; if (ly < L.y + 0.95) rMin = L.rWell + 0.3 + rad; }   // the rail round the well: over it, if you jump it
       else if (ly < 2.2) fy = hallY;
-      else rMin = ri - 3.2 + rad;
+      else { const tread = stairYs(a).filter(s => s <= ly + 0.3).pop(); if (tread == null || ly < tread + 0.95) rMin = ri - 3.2 + rad; }   // the stair's rail, likewise
       if (fy != null && ly < fy + 0.6 && r > ri - 3.4 - rad && stairYs(a).some(s => s > fy + STEP + 0.05 && s < fy + 2.6)) rMax = Math.min(rMax, ri - 3.4 - rad);
       if (rMin > rMax) rMin = rMax;
       if (r < rMin) put(rMin); else if (r > rMax) put(rMax);
