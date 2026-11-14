@@ -4783,6 +4783,7 @@ function updatePlayer(dt) {
   torcain.root.rotation.set(0, P.yaw, 0);
   torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.pose || P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0,
     ride: !!P.riding, rideSpeed: hs, rideBob: mount ? mount.gait || 0 : 0, rideRoll: P.riding ? clamp(-turnRate * 0.06, -0.22, 0.22) : 0,
+    armed: !!G.lock || G.bossActive || G.t - P.lastHurt < 5 || P.comboReset > 0,   // in a fight the axe stays in his hand; otherwise it rides on his back
     roll: P.roll ? { p: P.roll.t / P.roll.dur } : null, hurt: clamp(1 - (G.t - P.lastHurt) / 0.28, 0, 1) });
 }
 

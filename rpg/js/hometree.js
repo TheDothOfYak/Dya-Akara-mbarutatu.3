@@ -433,7 +433,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
 
   /* ---- the town inside ---- */
   {
-    const inner = noSolid(new THREE.Group()); root.add(inner);
+    const inner = noSolid(new THREE.Group()); inner.userData.moves = false; root.add(inner);
     const IN = { shadow: false, recv: false };   // lamp-lit: the bark's shadow doesn't reach in here
     const floorM = toon(plank, { side: THREE.DoubleSide }), fasciaM = toon(wood, { side: THREE.DoubleSide });
     const inBox = batch(inner, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 5200, IN);

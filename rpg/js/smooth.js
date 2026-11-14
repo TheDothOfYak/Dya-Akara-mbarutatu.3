@@ -564,11 +564,14 @@ function leafy(o) {
   else test(_lc.copy(m.color));
   return n > 0 && ok / n > 0.7;
 }
+/* is this part of something that moves about (a figure, a creature)? Those are built in a group marked not-solid */
+function moving(o) { for (let q = o.parent; q; q = q.parent) if (q.isGroup && q.userData && q.userData.noSolid && q.userData.moves !== false) return true; return false; }
 const pending = [];
 function flush() {
   if (!pending.length) return;
   const list = pending.splice(0);
   for (const root of list) root.traverse(o => {
+    if (o.isMesh && o.castShadow && moving(o)) o.castShadow = false;   // folk, beasts and carried things cast no shadow of their own: the land and what's built on it do
     if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && o.geometry && !o.userData.keepFacets) {
       // an ink outline always takes the very shape its mesh ended up with
       if (o.name === 'outline' && o.parent && o.parent.isMesh) { if (o.parent.userData.smFrom === o.geometry) o.geometry = o.parent.geometry; return; }

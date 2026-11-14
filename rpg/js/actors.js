@@ -698,8 +698,8 @@ export function buildEikar(o = {}) {
     const gl = glowSprite(kalo || duat ? markGlowCol : (o.marking || 0xffc46a), duat ? 0.13 : 0.09, duat ? 0.6 : 0.4); gl.position.set(s * (ex + 0.004), my, mz + 0.008); face.add(gl); markGlows.push(gl);
   }
   /* the markings, the same on every Eikar to the base of the neck: they rise to a peak on the bridge of the nose,
-     run out under the eyes along the tops of the cheekbones, down the sides of the face, and cross at the base of
-     the neck. (Below the crossing every Eikar's are their own — see the arms.) */
+     run out under the eyes along the tops of the cheekbones, down the sides of the face, and cross at the back of
+     the neck, at its base. (Below the crossing every Eikar's are their own — see the arms.) */
   {
     const sk = { x: HR * skull.scale.x, y: HR * skull.scale.y, z: HR * skull.scale.z }, jw = { cy: -0.06, cz: 0.03, x: 0.075 * jaw.scale.x, y: 0.075 * jaw.scale.y, z: 0.075 * jaw.scale.z };
     const v = new THREE.Vector3();
@@ -713,7 +713,7 @@ export function buildEikar(o = {}) {
     };
     const onNeck = q => {   // the neck: a tapering cylinder, 0.05 across at the collar to 0.042 under the jaw
       const r = lerp(0.05, 0.042, clamp((q.y - 0.36) / 0.12, 0, 1)) + 0.0006, x = clamp(q.x, -r * 0.98, r * 0.98);
-      const n = new THREE.Vector3(x, 0, Math.sqrt(r * r - x * x)).normalize();
+      const n = new THREE.Vector3(x, 0, -Math.sqrt(r * r - x * x)).normalize();   // round the BACK of the neck: that is where the lines cross
       return { p: new THREE.Vector3(n.x * r, q.y, n.z * r), n };
     };
     const W = kalo ? 1.12 : 1, V = (x, y) => new THREE.Vector3(x, y, 0);
@@ -843,7 +843,7 @@ export function buildEikar(o = {}) {
     for (let i = 0; i < wp.count; i++) { const x = wp.getX(i), y = wp.getY(i); wp.setZ(i, -0.12 - 0.07 * Math.cos(x / HX * Math.PI * 0.5) * (1 - Math.abs(y - SH) * 0.3)); }   // filled with wind
     wg.computeVertexNormals();
     wing = new THREE.Mesh(wg, capeMat); wing.visible = false; capeG.add(wing);
-    if (built) { capeG.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; addOutline(m, 0.012); } }); celAll(capeG); }   // (put on later: inked and cel-drawn like the rest)
+    if (built) { capeG.traverse(m => { if (m.isMesh && m.name !== 'outline') { addOutline(m, 0.012); } }); celAll(capeG); }   // (put on later: inked and cel-drawn like the rest)
   }
   let built = false;
   const outfit = {};
@@ -932,7 +932,6 @@ export function buildEikar(o = {}) {
 
   outlineAll(root, 0.012);
   celAll(root);   // drawn like the film's cast: crisp two-tone shading
-  root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
   const shade = footShade(0.36 * bw); root.add(shade);
   const rootScale = o.scale || 1;
   root.scale.setScalar(rootScale);
@@ -949,6 +948,8 @@ export function buildEikar(o = {}) {
   let s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
   // the walk: where in the stride (0..1), which way the ground is going by, how fast he's turning and speeding up
+  let slung = false, idleT = 9;   // the weapon rides on his back until it's wanted
+  const backMount = new THREE.Group(); backMount.position.set(-0.05, 0.02, -0.105 * (kalo ? 1.08 : 1) - 0.035); backMount.rotation.set(0.06, 0, -0.42); torso.add(backMount);
   let cyc = Math.random(), mvA = 0, yawRate = 0, accS = 0, lastSpd = 0, lastX = null, lastZ = 0, lastYaw = 0, stK = 0, rollK = 0, rollP = 0, hurtK = 0, hipTurn = 0, lungeZ = 0, crouchS = 0, moveT = 0;
   const footI = legs.map(L => new THREE.Vector3(L.hip.x * 1.25, legOpts.ah, 0)), footT = new THREE.Vector3(), footB = new THREE.Vector3(), bodyInv = new THREE.Matrix4();
   const FP = { z: 0, y: 0, pitch: 0 }, LEG = legOpts.Lt + legOpts.Ls;
@@ -960,7 +961,7 @@ export function buildEikar(o = {}) {
   bio.glow(0);
 
   /* ---- the wardrobe's pieces (see setOutfit) ---- */
-  const inkG = g => { g.traverse(m => { if (m.isMesh && m.name !== 'outline' && !m.userData.noOutline) { m.castShadow = true; addOutline(m, 0.012); } }); celAll(g); };
+  const inkG = g => { g.traverse(m => { if (m.isMesh && m.name !== 'outline' && !m.userData.noOutline) { addOutline(m, 0.012); } }); celAll(g); };
   const seamMat = c => new THREE.MeshBasicMaterial({ color: c });
   const DZW = 0.68 * (kalo ? 1.08 : 1);
   function buildPiece(slot, look, glow, key) {
@@ -1038,13 +1039,13 @@ export function buildEikar(o = {}) {
     setArms(cls) {
       const K = armsKit(cls);
       const vis = weapon.visible;
-      wHold.remove(weapon); if (off) { off.parent && off.parent.remove(off); off = null; }
+      weapon.parent && weapon.parent.remove(weapon); if (off) { off.parent && off.parent.remove(off); off = null; }
       if (arrow) { arrow.parent && arrow.parent.remove(arrow); arrow = null; }
       kind = K.pose; kit = K;
       W = kind === 'bow' ? arms[1] : arms[0]; Fr = kind === 'bow' ? arms[0] : arms[1];
       wPivot = W.upper; wHold = W.grip; s = W.s;
       drinkFlask.parent && drinkFlask.parent.remove(drinkFlask); Fr.grip.add(drinkFlask);
-      weapon = K.main; weapon.visible = vis; inkG(weapon); wHold.add(weapon);
+      weapon = K.main; weapon.visible = vis; inkG(weapon); (slung ? backMount : wHold).add(weapon);
       if (K.off) { off = K.off; inkG(off); Fr.grip.add(off); }
       if (kind === 'bow') { arrow = makeArrow(); arrow.visible = false; inkG(arrow); Fr.grip.add(arrow); }
       defKind = kind === 'spear' || kind === 'none' ? 4 : kind === 'axe' ? 3 : 1;
@@ -1123,6 +1124,11 @@ export function buildEikar(o = {}) {
       swingBlend = lerp(swingBlend, want, 1 - Math.exp(-(want > swingBlend ? 30 : 8) * dt));
       const b = swingBlend;
 
+      // ---- the weapon: in the hand for a fight, slung across the back the rest of the time ----
+      const wanted = !!sw || wind > 0.02 || atk > 0.02 || st.armed === true || kit.shield || kind === 'none' || kind === 'flask' || kind === 'whip';
+      idleT = wanted ? 0 : idleT + dt;
+      const sling = idleT > 1.6 && st.armed !== true;
+      if (sling !== slung) { slung = sling; (slung ? backMount : wHold).add(weapon); }
       // ---- the weapon hand at rest ----
       const sway = lerp(Math.sin(t * 1.6) * 0.008, upW * (0.1 + 0.08 * runK), walkK);   // arms swing against the legs
       if (kind === 'spear') { iT.set(s * 0.25, -0.06, 0.11 + sway * 0.5); iD.set(0, 1, 0.1); iB.set(1, 0, 0); }
@@ -1306,6 +1312,7 @@ export function buildEikar(o = {}) {
       talkK = lerp(talkK, st.talking ? 1 : 0, 1 - Math.exp(-12 * dt));
       const syl = Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK;
       mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
+      if (slung && !sw) { wT.set(s * (0.23 - 0.07 * runK * walkK * Math.max(0, upW)), -0.15 + walkK * (runK * (0.25 + 0.08 * upW) + 0.02 * upW), 0.03 + upW * (0.1 + 0.16 * runK) * walkK); wD.set(0, 1, 0.2); wB.set(-s, 0, 0); if (tuck > 0.001) { sT.set(s * 0.14, 0.12, 0.2); wT.lerp(sT, tuck * 0.8); } }   // an empty hand swings like the other
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
       // the shade at his feet: under the pelvis, gone when he leaves the ground or sits a mount
