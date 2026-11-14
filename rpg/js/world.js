@@ -361,7 +361,7 @@ export function buildWorld(scene) {
   /* ---------- kits ---------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 6500);   // the ruins: dressed stone
   const columns = new Kit(scene, new THREE.CylinderGeometry(1, 1.08, 1, 10), toon(0xffffff), 600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), toon(0xffffff), 300);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.07), 300);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600);
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff, {}), 500);
 
@@ -783,7 +783,7 @@ export function buildWorld(scene) {
   /* ================= the wider Reach ================= */
   const rng2 = mulberry32(8821);
   const pick2 = a => a[Math.floor(rng2() * a.length)];
-  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), toon(0xffffff), 1500);
+  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), paint(toon(0xffffff), 'bark', 0.07), 1500);
   const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2800);
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400);
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);

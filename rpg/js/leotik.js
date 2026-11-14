@@ -430,7 +430,7 @@ export function buildLeotik(scene) {
 
   /* ---------- kits ---------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 3600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), toon(0xffffff), 1300);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.08), 1300);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 2400);
   const crownsLo = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2600, false);
   const fronds = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 2000, false);

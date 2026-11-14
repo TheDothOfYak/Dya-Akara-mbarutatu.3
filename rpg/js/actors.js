@@ -201,6 +201,22 @@ export function rigLeg(parent, s, hip, o) {
   return { s, thigh, knee, ankle, Lt: o.Lt, Ls: o.Ls, ah: o.ah, hip: hip.clone() };
 }
 
+/* the dark a body leaves on the ground right under it: a soft round shade at the feet, which is what makes a
+   figure stand ON the ground and not float over it (the sun's own shadow falls where the sun puts it) */
+let SHADE_TEX = null;
+export function footShade(r = 0.42) {
+  if (!SHADE_TEX) {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(0.45, 'rgba(0,0,0,0.34)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    SHADE_TEX = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: SHADE_TEX, color: 0x1a1430, transparent: true, opacity: 0.8, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  m.position.y = 0.03; m.renderOrder = 2; m.userData.noOutline = true; m.name = 'shade';
+  return noSolid(m);
+}
+
 /* ---------------- LEGS THAT STAND ON THE GROUND ----------------
    A leg is solved from where its foot is, not swung from the hip: poseLeg() puts the ankle on a point
    (in the space of the leg's parent, the pelvis), bends the knee forward, and keeps the sole level
@@ -835,6 +851,13 @@ export function buildEikar(o = {}) {
   // arms and hands
   const armOpts = { L1: 0.25, L2: 0.27, ru: 0.043 * (kalo ? 1.08 : 1), rf: 0.036 * (kalo ? 1.08 : 1), rh: 0.04, skin: skinMat, cuff: beltMat };
   const arms = [-1, 1].map(s => rigArm(torso, s, new THREE.Vector3(s * SX, SH - 0.01, 0), armOpts));
+  // the tunic's short sleeves: a cap over each shoulder that moves with the arm, so the arm comes out of his clothes
+  // instead of being pinned to the side of them
+  for (const a of arms) {
+    const ru = armOpts.ru, cap = new THREE.Mesh(new THREE.SphereGeometry(ru * 1.5, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), tunicMat); cap.scale.set(1.05, 1.0, 1.1); cap.position.y = 0.004; a.upper.add(cap);
+    const slv = new THREE.Mesh(new THREE.CylinderGeometry(ru * 1.32, ru * 1.62, armOpts.L1 * 0.4, 14, 1, true), tunicMat); slv.position.y = -armOpts.L1 * 0.2; a.upper.add(slv);
+    const cuff = new THREE.Mesh(new THREE.TorusGeometry(ru * 1.6, 0.008, 4, 14), trimMat); cuff.rotation.x = Math.PI / 2; cuff.position.y = -armOpts.L1 * 0.4; a.upper.add(cuff);
+  }
   /* below the crossing every Eikar's markings are their own: broken pieces — dashes, hooks, chevrons, forks, dots —
      scattered over the shoulders and down the arms, never one line. Seeded by who they are, so the same each time. */
   {
@@ -909,6 +932,7 @@ export function buildEikar(o = {}) {
   outlineAll(root, 0.012);
   celAll(root);   // drawn like the film's cast: crisp two-tone shading
   root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
+  const shade = footShade(0.36 * bw); root.add(shade);
   const rootScale = o.scale || 1;
   root.scale.setScalar(rootScale);
   const own = new Set(root.children);
@@ -1283,6 +1307,8 @@ export function buildEikar(o = {}) {
       mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
+      // the shade at his feet: under the pelvis, gone when he leaves the ground or sits a mount
+      { const sk = Math.max(0, 1 - airK * 1.6) * (1 - rideK) * (1 - glide); shade.visible = sk > 0.02; shade.material.opacity = 0.8 * sk; shade.position.set(body.position.x, 0.03, body.position.z * 0.6); shade.scale.setScalar(1 + stK * 0.35 + tuck * 0.3); }
 
       if (wing) { wing.visible = glide > 0.08; wing.scale.set(Math.max(0.01, glide), 1, 1); cape.visible = glide < 0.5; if (cloakTrim) cloakTrim.visible = cape.visible; }
       if (cape && cape.visible && capeG.visible && dt > 0) capeTick(dt, t, k);

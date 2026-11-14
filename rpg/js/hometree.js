@@ -288,7 +288,8 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     return gg;
   })();
-  const leafB = batch(root, leafGeo, toon(0xffffff, { vertexColors: true }), 900, { shadow: true });
+  const leafMat = toon(0xffffff, { vertexColors: true }); leafMat.defines = Object.assign({}, leafMat.defines, { FL_LEAF: 1 });   // drawn as sprays of leaf (smooth.js)
+  const leafB = batch(root, leafGeo, leafMat, 900, { shadow: true });
   const leafTint = new THREE.Color(), leafAt = (c, s, sun = 0.5) => {
     leafTint.set(leafCols[Math.floor(rnd() * leafCols.length)]).multiplyScalar(0.82 + 0.36 * sun + rnd() * 0.1);
     leafB.put(c.x, c.y, c.z, s * (0.9 + rnd() * 0.3), s * (0.8 + rnd() * 0.25), s * (0.9 + rnd() * 0.3), (rnd() - 0.5) * 0.4, rnd() * TAU, (rnd() - 0.5) * 0.4, leafTint.getHex());
@@ -671,7 +672,7 @@ export function buildForest(scene, list, { rng, heightAt }) {
     const o = new THREE.Object3D(); arr.forEach((v, i) => { put(o, v); o.updateMatrix(); m.setMatrixAt(i, o.matrix); });
     m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
   };
-  inst(new THREE.CylinderGeometry(0.35, 0.5, 1, 6), toon(0x5a3a26), trunks, (o, [x, y, z, s, h]) => { o.position.set(x, y, z); o.scale.set(s, h, s); o.rotation.set(0, 0, 0); });
+  inst(new THREE.CylinderGeometry(0.35, 0.5, 1, 6), paint(toon(0x6a4630), 'bark', 0.07), trunks, (o, [x, y, z, s, h]) => { o.position.set(x, y, z); o.scale.set(s, h, s); o.rotation.set(0, 0, 0); });
   inst(new THREE.ConeGeometry(1, 1, 7), toon(0x2e5a36), cones, (o, [x, y, z, r, h]) => { o.position.set(x, y, z); o.scale.set(r, h, r); o.rotation.set(0, rng() * 6, 0); });
   inst(new THREE.IcosahedronGeometry(1, 0), toon(0x5a8a3a), crowns, (o, [x, y, z, r]) => { o.position.set(x, y, z); o.scale.set(r, r * 0.85, r); o.rotation.set(rng(), rng(), rng()); });
 }

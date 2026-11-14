@@ -312,7 +312,7 @@ export function buildProperty(scene) {
 
   /* ---------------- kits ---------------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 15000);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), toon(0xffffff), 9800, false);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), paint(toon(0xffffff), 'bark', 0.07), 9800, false);
   const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false);
   const tufts = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 4000, false);   // small leafy and flowery bits: boxes, ivy, moss, the garden
@@ -370,8 +370,8 @@ export function buildProperty(scene) {
     const roof = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: true }));
     scene.add(roof);
   }
-  const gTrunks = new Kit(scene, new THREE.CylinderGeometry(0.72, 1, 1, 12, 1, true), toon(0xffffff), 260, false);
-  const gLimbs = new Kit(scene, new THREE.CylinderGeometry(0.55, 1, 1, 7, 1, true), toon(0xffffff), 1900, false);
+  const gTrunks = new Kit(scene, new THREE.CylinderGeometry(0.72, 1, 1, 12, 1, true), paint(toon(0xffffff), 'bark', 0.7), 260, false);
+  const gLimbs = new Kit(scene, new THREE.CylinderGeometry(0.55, 1, 1, 7, 1, true), paint(toon(0xffffff), 'bark', 0.5), 1900, false);
   const gLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1500, false);
   const seams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), glowMat, 3400, false);
   const beads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 17000, false);
@@ -500,7 +500,7 @@ export function buildProperty(scene) {
   const colMists = [];
   const colossi = [];
   {
-    const barkMat = toon(0xffffff, { vertexColors: true });
+    const barkMat = paint(toon(0xffffff, { vertexColors: true }), 'bark', 1.8);
     const cLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1100, false);
     const cVines = new Kit(scene, new THREE.CylinderGeometry(1, 0.6, 1, 5, 1, true), toon(0xffffff), 9000, false);
     const cSeams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), colGlowMat, 1800, false);

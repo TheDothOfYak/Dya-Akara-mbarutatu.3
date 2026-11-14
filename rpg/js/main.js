@@ -4888,7 +4888,9 @@ function updatePhorus(dt) {
 function updateCamera(dt) {
   const swingK = P.riding && !P.onGround ? clamp((P.vel.length() - 8) / 22, 0, 1) : 0;   // swinging: pull back and widen with the speed
   CAM.dist = damp(CAM.dist, P.flying ? Math.max(CAM.wantDist, 14) : CAM.wantDist + swingK * 5, P.riding ? 4 : 8, dt);
-  if (!mainCine.active) { const fv = 60 + swingK * 12; if (Math.abs(camera.fov - fv) > 0.05) { camera.fov = damp(camera.fov, fv, 3, dt); camera.updateProjectionMatrix(); } }
+  // the view opens a little at a sprint, and draws in for the held breath of a perfect dodge
+  const sprintK = P.riding || P.flying ? 0 : clamp((Math.hypot(P.vel.x, P.vel.z) - 8) / 3.5, 0, 1);
+  if (!mainCine.active) { const fv = 60 + swingK * 12 + sprintK * 6 - (G.slow > 0 ? 5 : 0); if (Math.abs(camera.fov - fv) > 0.05) { camera.fov = damp(camera.fov, fv, G.slow > 0 ? 9 : 3, dt); camera.updateProjectionMatrix(); } }
   // lock-on steers the camera toward the target
   const lp = lockPoint();
   if (G.lock && !lp) G.lock = null;

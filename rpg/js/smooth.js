@@ -87,6 +87,14 @@ const VERT_PARS = `varying vec3 vFlP; varying vec3 vFlN;
 #endif
 `;
 const FRAG_PARS = `varying vec3 vFlP; varying vec3 vFlN; uniform sampler2D uBrush;
+#ifdef FL_LEAF
+float flH3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float flN3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(flH3(i), flH3(i + vec3(1, 0, 0)), f.x), mix(flH3(i + vec3(0, 1, 0)), flH3(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(flH3(i + vec3(0, 0, 1)), flH3(i + vec3(1, 0, 1)), f.x), mix(flH3(i + vec3(0, 1, 1)), flH3(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+/* sprays of leaves: 0 in the gaps between them .. 1 on a leaf's lit middle */
+float flLeaves(vec3 p) { float a = flN3(p * 8.5), b = flN3(p * 19.0 + 3.7); return a * 0.55 + b * 0.45; }
+#endif
 vec4 flTri(vec3 p, vec3 w) { return texture2D(uBrush, p.zy) * w.x + texture2D(uBrush, p.xz) * w.y + texture2D(uBrush, p.xy) * w.z; }
 #ifdef FL_PAINT
 varying vec3 vFlW; varying vec3 vFlWN;
@@ -172,6 +180,19 @@ float flBark(vec2 uv, float s) {
 #endif
 `;
 const FRAG_ALBEDO = `#include <color_fragment>
+  #ifdef FL_LEAF
+  float flLf = flLeaves(vFlP);
+  {
+    // foliage: not a smooth lump but sprays of leaf — the edge of the crown breaks up into them, the hollows
+    // between sprays go deep green, the tops of the sprays catch the light, and the underside of the crown is dark
+    float flNdv = abs(normalize(vNormal).z);
+    float flEdge = smoothstep(0.52, 0.08, flNdv);
+    if (flLf < flEdge * 0.74) discard;
+    float flUp = clamp(normalize(vFlN).y * 0.5 + 0.5, 0.0, 1.0);
+    diffuseColor.rgb *= mix(0.64, 1.16, smoothstep(0.3, 0.7, flLf)) * mix(0.66, 1.08, flUp);
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.08, 0.72), smoothstep(0.62, 0.85, flLf) * flUp);   // young leaf, yellower, where the sun gets in
+  }
+  #endif
   #ifndef FL_CEL
   {
     vec3 tw = pow(abs(normalize(vFlN)), vec3(4.0)); tw /= dot(tw, vec3(1.0));
@@ -197,6 +218,12 @@ const FRAG_ALBEDO = `#include <color_fragment>
       pm = flCobble(uv);
     #elif FL_PAINT == 6
       pm = flLand(vFlW, normalize(vFlWN));
+      {
+        // close to, the ground has grain: tufts and bare flecks, fading out with distance so far country stays broad
+        float flNear = 1.0 - smoothstep(6.0, 42.0, length(vViewPosition));
+        float flTuft = flN(vFlW.xz * 5.3) * 0.6 + flN(vFlW.xz * 13.0 + 4.0) * 0.4;
+        pm *= mix(1.0, 0.86 + 0.26 * flTuft, flNear * (1.0 - smoothstep(0.32, 0.62, 1.0 - clamp(vFlWN.y, 0.0, 1.0))));
+      }
     #elif FL_PAINT == 8
       pm = an.y > 0.7 ? flStone(uv, vec2(0.6, 0.6)) : flBrick(uv);
     #elif FL_PAINT == 9
@@ -218,6 +245,15 @@ const FRAG_ALBEDO = `#include <color_fragment>
   }
   #endif`;
 const FRAG_LIGHT = `
+  #ifdef FL_LEAF
+  #if NUM_DIR_LIGHTS > 0
+  {
+    // the sun coming through the leaves when you look toward it
+    float flBack = pow(max(dot(normalize(vViewPosition), -directionalLights[0].direction), 0.0), 3.0);
+    outgoingLight += diffuseColor.rgb * directionalLights[0].color * flBack * 0.35 * smoothstep(0.35, 0.8, flLf);
+  }
+  #endif
+  #endif
   #ifdef FL_CEL
   {
     // the cast: a cool, violet-leaning shadow shape, and a crisp rim of light
@@ -444,6 +480,17 @@ function smoothGeometry(geo) {
   return out;
 }
 
+/* is this puff foliage? (a crown, a bush, a clump: something with the colour of leaves — not a cloud, a snowdrift or a stone) */
+const _lc = new THREE.Color(), _hsl = { h: 0, s: 0, l: 0 };
+function leafy(o) {
+  const m = o.material;
+  if (!m || Array.isArray(m) || !m.isMeshToonMaterial || m.map) return false;
+  let n = 0, ok = 0;
+  const test = c => { c.getHSL(_hsl); n++; if (_hsl.s > 0.28 && _hsl.l > 0.12 && _hsl.l < 0.8 && _hsl.h > 0.02 && _hsl.h < 0.47) ok++; };   // reds and golds of autumn through to deep green
+  if (o.isInstancedMesh && o.instanceColor) { const N = Math.min(o.count, 24); for (let i = 0; i < N; i++) { o.getColorAt(Math.floor(i * o.count / N), _lc); _lc.multiply(m.color); test(_lc); } }
+  else test(_lc.copy(m.color));
+  return n > 0 && ok / n > 0.7;
+}
 const pending = [];
 function flush() {
   if (!pending.length) return;
@@ -456,7 +503,10 @@ function flush() {
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
         : smoothGeometry(o.geometry);
-      if (g !== o.geometry) { o.geometry = g; o.userData.smFrom = from; }
+      if (g !== o.geometry) {
+        o.geometry = g; o.userData.smFrom = from;
+        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } }
+      }
     }
   });
 }

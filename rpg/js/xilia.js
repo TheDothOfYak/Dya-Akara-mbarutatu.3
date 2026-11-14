@@ -328,7 +328,7 @@ export function buildXilia(scene) {
 
   /* ---------- kits ---------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 2600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), toon(0xffffff), 320);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.07), 320);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false); noSolid(crops.mesh);   // you wade through a field, like grass
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 300);
@@ -368,7 +368,7 @@ export function buildXilia(scene) {
   }
 
   /* the market square: paving, a fountain, stalls */
-  const plaza = new THREE.Mesh(new THREE.CylinderGeometry(22, 22.5, 0.4, 40), toon(0xe0caa0)); plaza.position.set(SQUARE.x, SQ_H - 0.15, SQUARE.z); plaza.receiveShadow = true; scene.add(plaza);
+  const plaza = new THREE.Mesh(new THREE.CylinderGeometry(22, 22.5, 0.4, 40), paint(toon(0xe6d2ac), 'cobble')); plaza.position.set(SQUARE.x, SQ_H - 0.15, SQUARE.z); plaza.receiveShadow = true; scene.add(plaza);
   const water = new THREE.MeshToonMaterial({ color: 0x5ac0d8, emissive: 0x1a6a80, emissiveIntensity: 0.5, gradientMap: ramp() });
   {
     const basin = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.5, 6, 24), toon(0xcab088)); basin.rotation.x = -Math.PI / 2; basin.position.set(SQUARE.x, SQ_H + 0.4, SQUARE.z - 6); addOutline(basin, 0.05); scene.add(basin);
@@ -555,7 +555,7 @@ export function buildXilia(scene) {
 
   /* ---------- the wild highlands: pine forest, broadleaf stands, boulders, scree under the ridges ---------- */
   const wrng = mulberry32(7331);            // its own stream, so the town's placements never shift
-  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), toon(0xffffff), 3400, false);
+  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), paint(toon(0xffffff), 'bark', 0.07), 3400, false);
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 6000, false);
   const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 1800, false);
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 700, false);

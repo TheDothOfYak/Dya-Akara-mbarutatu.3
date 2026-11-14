@@ -129,7 +129,7 @@ class GradePass extends Pass {
           float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
           c = max(mix(vec3(l), c, uSat), 0.0);                                   // colour
           c *= mix(uCool, uWarm, smoothstep(0.03, 0.75, l));                     // cool shadows, warm lights
-          c = pow(c / 0.2, vec3(uContrast)) * 0.2;                               // contrast, about a mid grey
+          c = mix(pow(c / 0.2, vec3(uContrast)) * 0.2, c, smoothstep(0.5, 1.6, l)); // contrast, about a mid grey (bright haze and glows left as they are)
           vec2 q = (vUv - 0.5) * vec2(1.0, 0.82);
           c *= 1.0 - uVig * smoothstep(0.32, 0.86, length(q));                    // the corners eased down
           gl_FragColor = vec4(c, src.a);
