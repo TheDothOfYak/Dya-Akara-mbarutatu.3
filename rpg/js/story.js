@@ -599,7 +599,7 @@ export const ARRIVAL = {
   ],
   bag: [
     ['buhkon', 'Here — take this. It’s Relic-bound: it holds what you put in it and won’t let go for anyone else.'],
-    ['buhkon', 'Those things that fell are Sniller amulets. Gather as many as you can before somebody who shouldn’t have them does.'],
+    ['buhkon', 'I don’t know what those things are that fell. Nobody’s ever seen the like. But nothing falls out of a sky like that for no reason — grab as many as you can, boy. Quick!'],
     ['buhkon', 'Some will be on the ground. Some will be up on the roofs, or stuck fast in a wall. Climb if you have to. Be quick.'],
     ['buhkon', 'And take my hatchet. Blunt side out. Things are going to be frightened.'],
   ],
