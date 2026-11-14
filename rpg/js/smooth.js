@@ -20,6 +20,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { ramp } from './gfx.js';
 import { mulberry32 } from './util.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let installed = false;
 
@@ -30,8 +31,32 @@ let installed = false;
 const flat = (r, g, b) => { const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; };
 const surf = (name, s) => ({ name, s, a: { value: flat(128, 128, 128) }, n: { value: flat(128, 128, 255) }, m: { value: new THREE.Vector3(0.216, 0.216, 0.216) } });
 /* by paint kind (gfx.js PAINT_KINDS); s = metres one tile covers */
-const SURF = { 1: surf('stone', 2.6), 2: surf('plaster', 3.2), 3: surf('wood', 1.7), 4: surf('shingle', 1.6), 5: surf('cobble', 2.4), 6: surf('land', 3.4), 8: surf('brick', 2.2), 9: surf('bark', 1), rock: surf('rock', 3) };
+const SURF = { 10: surf('rock', 2.2), 1: surf('stone', 2.6), 2: surf('plaster', 3.2), 3: surf('wood', 1.7), 4: surf('shingle', 1.6), 5: surf('cobble', 2.4), 6: surf('land', 3.4), 8: surf('brick', 2.2), 9: surf('bark', 1), rock: surf('rock', 3) };
+/* real shapes: boulders scanned from the ground (Poly Haven, CC0), cut down to a few hundred faces each. Every
+   plain rock in the game (a dodecahedron) takes one of them, and the rock surface with it. */
+const ROCKS = [];
+let readyDone; export const ready = new Promise(r => { readyDone = r; });   // resolves once the shapes are in (or can't be had)
+function loadShapes() {
+  if (typeof document === 'undefined') { readyDone(); return; }
+  const done = setTimeout(readyDone, 6000);
+  new GLTFLoader().load(new URL('../assets/shapes/rocks.glb', import.meta.url).href, g => {
+    g.scene.traverse(o => { if (o.isMesh) { const q = o.geometry.clone(); q.computeVertexNormals(); q.computeBoundingSphere(); ROCKS.push(q); } });
+    clearTimeout(done); readyDone();
+  }, undefined, () => { clearTimeout(done); readyDone(); });
+}
+let rockN = 0;
+function realRock(geo) {
+  if (done.has(geo)) return done.get(geo);
+  let out = geo;
+  if (ROCKS.length && geo.parameters && (geo.parameters.detail || 0) === 0 && untouchedOffset(geo)) {
+    const off = untouchedOffset(geo), r = geo.parameters.radius || 1;
+    out = ROCKS[rockN++ % ROCKS.length].clone().scale(r * 1.12, r * 1.12, r * 1.12).translate(off[0], off[1], off[2]);
+  }
+  done.set(geo, out);
+  return out;
+}
 function loadSurfaces() {
+  loadShapes();
   if (typeof document === 'undefined') return;
   const base = new URL('../assets/tex/', import.meta.url).href, L = new THREE.TextureLoader();
   const set = (t, srgb) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t; };
@@ -221,7 +246,7 @@ const FRAG_ALBEDO = `#include <color_fragment>
     float flEdge = smoothstep(0.52, 0.08, flNdv);
     if (flLf < flEdge * 0.74) discard;
     float flUp = clamp(normalize(vFlN).y * 0.5 + 0.5, 0.0, 1.0);
-    diffuseColor.rgb *= mix(0.64, 1.16, smoothstep(0.3, 0.7, flLf)) * mix(0.66, 1.08, flUp);
+    diffuseColor.rgb *= mix(0.8, 1.14, smoothstep(0.3, 0.7, flLf)) * mix(0.8, 1.06, flUp);
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.08, 0.72), smoothstep(0.62, 0.85, flLf) * flUp);   // young leaf, yellower, where the sun gets in
   }
   #endif
@@ -478,7 +503,7 @@ function softPuff(radius, detail, cluster) {
 }
 const gemLike = m => !m || Array.isArray(m) || (m.emissive && m.emissiveIntensity > 0.3 && m.emissive.getHex() !== 0) || m.transparent;
 
-const CTORS = { IcosahedronGeometry: THREE.IcosahedronGeometry, BoxGeometry: THREE.BoxGeometry, SphereGeometry: THREE.SphereGeometry, CylinderGeometry: THREE.CylinderGeometry, ConeGeometry: THREE.ConeGeometry, CapsuleGeometry: THREE.CapsuleGeometry, TorusGeometry: THREE.TorusGeometry, CircleGeometry: THREE.CircleGeometry };
+const CTORS = { DodecahedronGeometry: THREE.DodecahedronGeometry, IcosahedronGeometry: THREE.IcosahedronGeometry, BoxGeometry: THREE.BoxGeometry, SphereGeometry: THREE.SphereGeometry, CylinderGeometry: THREE.CylinderGeometry, ConeGeometry: THREE.ConeGeometry, CapsuleGeometry: THREE.CapsuleGeometry, TorusGeometry: THREE.TorusGeometry, CircleGeometry: THREE.CircleGeometry };
 
 /* has anything moved the vertices since the constructor? returns the offset if only translated, else null */
 function untouchedOffset(geo) {
@@ -548,6 +573,11 @@ function flush() {
       // an ink outline always takes the very shape its mesh ended up with
       if (o.name === 'outline' && o.parent && o.parent.isMesh) { if (o.parent.userData.smFrom === o.geometry) o.geometry = o.parent.geometry; return; }
       const from = o.geometry;
+      if (from.type === 'DodecahedronGeometry' && !gemLike(o.material) && o.material.isMeshToonMaterial && !o.material.map) {
+        const g = realRock(from);
+        if (g !== from) { o.geometry = g; o.userData.smFrom = from; const m = o.material; if (!(m.defines && m.defines.FL_PAINT)) { m.defines = Object.assign({}, m.defines, { FL_PAINT: 10 }); m.needsUpdate = true; } }
+        return;
+      }
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
         : smoothGeometry(o.geometry);

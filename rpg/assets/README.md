@@ -71,3 +71,7 @@ All of them are from [Poly Haven](https://polyhaven.com), licence CC0 (public do
 | `cobble` | cobblestone_floor_08 |
 | `brick` | medieval_red_brick |
 | `bark` | jolcham_oak_bark_01 |
+
+## Shapes (`shapes/`)
+
+`rocks.glb` holds nine boulders scanned from real ground, cut down to a few hundred faces each (positions only; the rock surface is laid on by the game). Every plain rock in the game takes one. From Poly Haven, CC0: rock_07, rock_09, rock_moss_set_01, boulder_01.

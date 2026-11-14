@@ -15,7 +15,7 @@ import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
-import { installSmoothStyle } from './smooth.js';
+import { installSmoothStyle, ready as smoothReady } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay, trunkAt } from './vines.js';
 import { MEADOW } from './terrain.js';
@@ -131,7 +131,7 @@ addEventListener('pagehide', flushSave);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); });
 
 $('loading').textContent = 'LOADING…';
-await loadModels();   // your own models, if rpg/assets/models.json names any (assets.js)
+await Promise.all([loadModels(), smoothReady]);   // your own models, if rpg/assets/models.json names any (assets.js)
 
 /* ---------------- renderer ---------------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });

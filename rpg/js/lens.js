@@ -139,7 +139,7 @@ class GradePass extends Pass {
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) },
-        uSharp: { value: COARSE ? 0.2 : 0.38 }, uSat: { value: 1.13 }, uContrast: { value: 1.09 }, uVig: { value: 0.3 },
+        uSharp: { value: COARSE ? 0.2 : 0.38 }, uSat: { value: 1.05 }, uContrast: { value: 1.09 }, uVig: { value: 0.3 },
         uCool: { value: new THREE.Color(0.93, 0.975, 1.09) }, uWarm: { value: new THREE.Color(1.05, 1.012, 0.945) },
       },
       vertexShader: VERT,
@@ -156,6 +156,8 @@ class GradePass extends Pass {
           ct = clamp(ct + (ct - nt) * uSharp, 0.0, 0.97); c = ct / (1.0 - ct);
           float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
           c = max(mix(vec3(l), c, uSat), 0.0);                                   // colour
+          { float mxc = max(c.r, max(c.g, c.b)), mnc = min(c.r, min(c.g, c.b)), st = (mxc - mnc) / max(mxc, 1e-3);
+            c = mix(c, vec3(l), smoothstep(0.6, 1.0, st) * 0.3); }                // the loudest colours brought back toward what a camera sees
           c *= mix(uCool, uWarm, smoothstep(0.03, 0.75, l));                     // cool shadows, warm lights
           c = mix(pow(c / 0.2, vec3(uContrast)) * 0.2, c, smoothstep(0.5, 1.6, l)); // contrast, about a mid grey (bright haze and glows left as they are)
           vec2 q = (vUv - 0.5) * vec2(1.0, 0.82);
