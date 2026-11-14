@@ -175,7 +175,7 @@ float flBark(vec2 uv, float s) {
   float plate = 0.84 + 0.3 * flH(vec2(id, rid));
   float fine = 0.93 + 0.14 * flN(q * vec2(9.0, 1.6));
   float body = plate * fine * (1.06 - 0.2 * r * r);
-  return mix(body, 0.46, max(smoothstep(0.62, 0.96, r), crack * 0.55));
+  return mix(body * 1.08, 0.4, max(smoothstep(0.38, 0.86, r), crack * 0.55));
 }
 #endif
 `;

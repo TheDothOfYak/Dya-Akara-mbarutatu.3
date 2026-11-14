@@ -328,7 +328,7 @@ export function buildXilia(scene) {
 
   /* ---------- kits ---------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 2600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.07), 320);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.12), 320);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false); noSolid(crops.mesh);   // you wade through a field, like grass
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 300);
@@ -555,7 +555,7 @@ export function buildXilia(scene) {
 
   /* ---------- the wild highlands: pine forest, broadleaf stands, boulders, scree under the ridges ---------- */
   const wrng = mulberry32(7331);            // its own stream, so the town's placements never shift
-  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), paint(toon(0xffffff), 'bark', 0.07), 3400, false);
+  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), paint(toon(0xffffff), 'bark', 0.12), 3400, false);
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 6000, false);
   const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 1800, false);
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 700, false);

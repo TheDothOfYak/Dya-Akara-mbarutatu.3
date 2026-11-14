@@ -175,6 +175,7 @@ const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.
 /* the lens (lens.js): contact shade from the picture's own depth, then the brushwork, then the grade */
 const lens = addLens(composer, camera, { bloom, paint: paintPass(ShaderPass), output: new OutputPass() });
 lens.shade.enabled = OPT.ao !== false;
+lens.shade.sun = { dir: SUN_DIR, light: sun };
 
 let particles = null;
 let solids = null;   // everything you can see is solid (solid.js), once the world is built

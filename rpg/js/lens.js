@@ -5,7 +5,8 @@
      leaf) the light can't get in, and it darkens, cool. Read
      from the picture's own depth, so everything in every region
      gets it for nothing;
-   · air: far country thins toward the sky's colour;
+   · shafts: where open sky shows between the camera and the sun,
+     its light streams across the picture;
    · the grade: a firmer contrast, a little more colour, cool
      shadows under warm lights, a touch of sharpening after the
      brushwork, and the corners of the frame eased down.
@@ -17,7 +18,8 @@ import * as THREE from 'three';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 
 const COARSE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-export const LENS = { ao: true, grade: true };
+export const LENS = { ao: true, grade: true, shafts: true };
+const _sv = new THREE.Vector3(), _sp = new THREE.Vector3();
 
 /* give a composer's two buffers a depth picture each to read back (call once the composer is made, before it draws).
    Each gets its own: a cloned target's depth texture would share the first one's, and reading it while drawing loops. */
@@ -42,15 +44,19 @@ class ShadePass extends Pass {
   constructor(camera, tap) {
     super();
     this.camera = camera; this.tap = tap;
+    this.sun = null;   // { dir: the live direction toward the sun, light: the sun's own light } — set it and its light streams (shafts)
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         tDiffuse: { value: null }, tDepth: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) },
         uProj: { value: new THREE.Matrix4() }, uProjInv: { value: new THREE.Matrix4() },
         uStrength: { value: 1 }, uRadius: { value: 0.75 }, uShade: { value: new THREE.Color(0.36, 0.38, 0.52) },
+        uSunUv: { value: new THREE.Vector2(0.5, 0.5) }, uSunK: { value: 0 }, uSunCol: { value: new THREE.Color(1, 0.85, 0.6) },
       },
       vertexShader: VERT,
       fragmentShader: `
         #define TAPS ${N_TAPS}
+        #define RAYS ${COARSE ? 8 : 18}
+        uniform vec2 uSunUv; uniform float uSunK; uniform vec3 uSunCol;
         uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 uTexel; uniform mat4 uProj; uniform mat4 uProjInv;
         uniform float uStrength; uniform float uRadius; uniform vec3 uShade; varying vec2 vUv;
         vec3 vpos(vec2 uv) {
@@ -59,14 +65,25 @@ class ShadePass extends Pass {
           return v.xyz / v.w;
         }
         float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+        /* shafts of light: where the open sky shows between here and the sun, its light streams across the picture */
+        vec3 shafts() {
+          if (uSunK <= 0.0) return vec3(0.0);
+          vec2 dv = uSunUv - vUv; float asp = uTexel.y / uTexel.x;
+          float near = 1.0 - smoothstep(0.15, 1.05, length(dv * vec2(asp, 1.0)));
+          if (near <= 0.0) return vec3(0.0);
+          vec2 st = dv / float(RAYS) * 0.9; vec2 u = vUv + st * ign(gl_FragCoord.xy + 17.0); float acc = 0.0;
+          for (int i = 0; i < RAYS; i++) { acc += step(0.99999, texture2D(tDepth, u).x) * (1.0 - float(i) / float(RAYS)); u += st; }
+          return uSunCol * (acc / float(RAYS)) * near * near * uSunK;
+        }
         void main() {
           vec4 src = texture2D(tDiffuse, vUv);
+          vec3 sh = shafts();
           float d = texture2D(tDepth, vUv).x;
-          if (d >= 0.99999) { gl_FragColor = src; return; }
+          if (d >= 0.99999) { gl_FragColor = vec4(src.rgb + sh * 0.5, src.a); return; }
           vec3 p = vpos(vUv);
           float dist = -p.z;
           float fade = 1.0 - smoothstep(60.0, 220.0, dist);
-          if (fade <= 0.0) { gl_FragColor = src; return; }
+          if (fade <= 0.0) { gl_FragColor = vec4(src.rgb + sh, src.a); return; }
           // the surface's facing, from the depth round it (the nearer neighbour each way, so edges stay clean)
           vec3 px1 = vpos(vUv + vec2(uTexel.x, 0.0)) - p, px0 = p - vpos(vUv - vec2(uTexel.x, 0.0));
           vec3 py1 = vpos(vUv + vec2(0.0, uTexel.y)) - p, py0 = p - vpos(vUv - vec2(0.0, uTexel.y));
@@ -84,7 +101,7 @@ class ShadePass extends Pass {
           float ao = clamp(1.0 - occ / float(TAPS) * 3.4 * uStrength, 0.0, 1.0);
           ao = mix(1.0, ao * ao * (3.0 - 2.0 * ao) * 0.9 + ao * 0.1, fade);
           ao = mix(ao, 1.0, smoothstep(1.2, 3.0, max(src.r, max(src.g, src.b))));   // glows aren't shaded
-          gl_FragColor = vec4(src.rgb * mix(uShade, vec3(1.0), ao), src.a);
+          gl_FragColor = vec4(src.rgb * mix(uShade, vec3(1.0), ao) + sh, src.a);
           #ifdef LENS_DEBUG
             gl_FragColor = vec4(vec3(ao), 1.0);
           #endif
@@ -99,6 +116,17 @@ class ShadePass extends Pass {
     const u = this.material.uniforms;
     u.tDiffuse.value = readBuffer.texture; u.tDepth.value = this.tap.depth;
     u.uProj.value.copy(this.camera.projectionMatrix); u.uProjInv.value.copy(this.camera.projectionMatrixInverse);
+    u.uSunK.value = 0;
+    if (this.sun && this.sun.dir && LENS.shafts) {
+      const v = _sv.copy(this.sun.dir).transformDirection(this.camera.matrixWorldInverse);
+      if (v.z < -0.08) {   // the sun is ahead of the camera
+        _sp.copy(this.camera.position).addScaledVector(this.sun.dir, 1000).project(this.camera);
+        u.uSunUv.value.set(_sp.x * 0.5 + 0.5, _sp.y * 0.5 + 0.5);
+        const L = this.sun.light;
+        u.uSunK.value = 0.55 * Math.min(1, -v.z * 2.5) * (L ? Math.min(1, L.intensity / 2.2) : 1) * Math.min(1, Math.max(0, this.sun.dir.y * 6 + 0.4));
+        if (L) u.uSunCol.value.copy(L.color).multiplyScalar(0.9);
+      }
+    }
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     renderer.render(this.quad, this.qcam);
   }

@@ -672,7 +672,7 @@ export function buildForest(scene, list, { rng, heightAt }) {
     const o = new THREE.Object3D(); arr.forEach((v, i) => { put(o, v); o.updateMatrix(); m.setMatrixAt(i, o.matrix); });
     m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
   };
-  inst(new THREE.CylinderGeometry(0.35, 0.5, 1, 6), paint(toon(0x6a4630), 'bark', 0.07), trunks, (o, [x, y, z, s, h]) => { o.position.set(x, y, z); o.scale.set(s, h, s); o.rotation.set(0, 0, 0); });
+  inst(new THREE.CylinderGeometry(0.35, 0.5, 1, 6), paint(toon(0x6a4630), 'bark', 0.12), trunks, (o, [x, y, z, s, h]) => { o.position.set(x, y, z); o.scale.set(s, h, s); o.rotation.set(0, 0, 0); });
   inst(new THREE.ConeGeometry(1, 1, 7), toon(0x2e5a36), cones, (o, [x, y, z, r, h]) => { o.position.set(x, y, z); o.scale.set(r, h, r); o.rotation.set(0, rng() * 6, 0); });
   inst(new THREE.IcosahedronGeometry(1, 0), toon(0x5a8a3a), crowns, (o, [x, y, z, r]) => { o.position.set(x, y, z); o.scale.set(r, r * 0.85, r); o.rotation.set(rng(), rng(), rng()); });
 }
