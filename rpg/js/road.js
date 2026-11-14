@@ -643,7 +643,11 @@ export function createRoad(ctx) {
     const st = stalls[0];
     for (let k = 0; k < 3; k++) {
       const off = (k - 1) * 0.9, x = st.x + Math.cos(st.ry) * off, z = st.z - Math.sin(st.ry) * off;
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.52, 0.62), toon([0x9a6a40, 0xb8844e, 0x8a5a36][k])); addOutline(m, 0.02);
+      // a real crate: boards with gaps between them over a dark inside, a post at each corner
+      const cw = [0x9a6a40, 0xb8844e, 0x8a5a36][k], m = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.48, 0.56), toon(0x2a1c12)), board = toon(cw), postM = toon(0x6a4628);
+      for (let side = 0; side < 4; side++) for (let b = 0; b < 3; b++) { const q = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.145, 0.03), board); const a = side * Math.PI / 2; q.position.set(Math.sin(a) * 0.3, -0.17 + b * 0.17, Math.cos(a) * 0.3); q.rotation.y = a; m.add(q); }
+      for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const q = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.06), postM); q.position.set(cx * 0.3, 0, cz * 0.3); m.add(q); }
+      for (let b = 0; b < 4; b++) { const q = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.03, 0.62), board); q.position.set(-0.235 + b * 0.157, 0.255, 0); m.add(q); }
       const it = addItem(V3(x, 1.28, z), 'Pick up a crate', null, m); it.act = () => takeCrate(it); MK.crates.push(it);
     }
     // the stall's own crates go (they're the ones you carry now)
@@ -656,7 +660,7 @@ export function createRoad(ctx) {
   function takeCrate(it) {
     if (MK.carrying) return;
     dropItem(it); MK.crates.splice(MK.crates.indexOf(it), 1);
-    MK.carrying = it.mesh; it.mesh.position.set(0, 2.05 / 0.86, 0.15); it.mesh.rotation.set(0, 0, 0); tanoc.root.add(it.mesh); sfx.ui();
+    MK.carrying = it.mesh; it.mesh.position.set(0, 0.98, 0.44); it.mesh.rotation.set(0, 0, 0); tanoc.root.add(it.mesh); sfx.ui();   // in his arms, against his chest
     const back = cartBack();
     MK.loadItem = addItem(V3(back.x, back.y + 1, back.z), 'Load the crate onto the cart', () => loadCrate());
     setGoal(back.x, back.y, back.z); packObjective();
@@ -696,7 +700,7 @@ export function createRoad(ctx) {
       return { p: V3(an.x + (tp.x - an.x) * 0.3, an.y + 5.6, an.z + (tp.z - an.z) * 0.3 + 1), l: V3(an.x, an.y + 6.2, an.z) };
     }, () => {
       // back to the boy, looking past him at the hat — and the square comes back to life while he goes for it
-      MK.frozen = false; ctx.blur(0);
+      MK.frozen = false; ctx.blur(3);   // the world stays a smear until his hat is back on his head
       CAM.yaw = Math.atan2(P.pos.x - hp.x, P.pos.z - hp.z); CAM.pitch = 0.22;
       objective(STORY.PRO_OBJ.hat, 'Walk to it and press E');
     });
@@ -1694,7 +1698,7 @@ export function createRoad(ctx) {
     const speed = Math.hypot(P.vel.x, P.vel.z);
     if (P.onGround && speed > 1) { P.stepPh += dt * speed * 0.55; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); } }
     placeWalker(tanoc.root, P, dt); tanoc.root.rotation.y = P.yaw;
-    tanoc.animate(dt, { speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null });
+    tanoc.animate(dt, { speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null, carry: !!(MK && MK.carrying) });
   }
   /* the cart: parked, driven along the road by Buhkon, or driven out of the city with the two of them aboard */
   function updateCart(dt) {

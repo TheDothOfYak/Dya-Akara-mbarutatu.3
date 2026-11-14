@@ -1125,9 +1125,9 @@ export function buildEikar(o = {}) {
       const b = swingBlend;
 
       // ---- the weapon: in the hand for a fight, slung across the back the rest of the time ----
-      const wanted = !!sw || wind > 0.02 || atk > 0.02 || st.armed === true || kit.shield || kind === 'none' || kind === 'flask' || kind === 'whip';
+      const wanted = (!!sw || wind > 0.02 || atk > 0.02 || st.armed === true || kit.shield || kind === 'none' || kind === 'flask' || kind === 'whip') && !st.carry;
       idleT = wanted ? 0 : idleT + dt;
-      const sling = idleT > 1.6 && st.armed !== true;
+      const sling = !!st.carry || (idleT > 1.6 && st.armed !== true);
       if (sling !== slung) { slung = sling; (slung ? backMount : wHold).add(weapon); }
       // ---- the weapon hand at rest ----
       const sway = lerp(Math.sin(t * 1.6) * 0.008, upW * (0.1 + 0.08 * runK), walkK);   // arms swing against the legs
@@ -1313,6 +1313,7 @@ export function buildEikar(o = {}) {
       const syl = Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK;
       mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
       if (slung && !sw) { wT.set(s * (0.23 - 0.07 * runK * walkK * Math.max(0, upW)), -0.15 + walkK * (runK * (0.25 + 0.08 * upW) + 0.02 * upW), 0.03 + upW * (0.1 + 0.16 * runK) * walkK); wD.set(0, 1, 0.2); wB.set(-s, 0, 0); if (tuck > 0.001) { sT.set(s * 0.14, 0.12, 0.2); wT.lerp(sT, tuck * 0.8); } }   // an empty hand swings like the other
+      if (st.carry) { wT.set(s * 0.27, 0.06, 0.36); wD.set(0, 1, 0.15); wB.set(-s, 0, 0); fT.set(-s * 0.27, 0.06, 0.36); fD.set(0, 1, 0.15); fB.set(s, 0, 0); }   // both arms round what he's carrying
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
       // the shade at his feet: under the pelvis, gone when he leaves the ground or sits a mount
