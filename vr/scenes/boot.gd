@@ -19,6 +19,10 @@ func _ready() -> void:
 		print("compile check done, %d bad" % bad)
 		get_tree().quit(1 if bad > 0 else 0)
 		return
+	if Game.args.has("selftest"):
+		var st = load("res://tests/self_test.gd").new()
+		add_child(st)
+		return
 	var want: String = Game.args.get("scene", "")
 	if want == "" or not SCENES.has(want) or not ResourceLoader.exists(SCENES[want]):
 		want = ""

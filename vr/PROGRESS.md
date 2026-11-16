@@ -8,11 +8,31 @@ Updated after every milestone. Newest state first.
 |---|---|---|
 | 0 | Foundation | **Done, gate passed** |
 | 1 | The match | **Done, gate passed** |
-| 2 | The tower | Next |
-| 3 | The town | Not started |
+| 2 | The tower | **Done, gate passed** |
+| 3 | The town | Next |
 | 4 | The workshop | Not started |
 | 5 | The wilds | Not started |
 | 6 | Multiplayer | Not started |
+
+## Milestone 2 — The tower (done)
+
+Gate: *collection persists; sandbox runs a two-token test.* Passes.
+
+Done
+- Local save file (`user://save.dat`): collection, pouches, open pouch, showcase, gold, materials. New game gives 32 tokens and a first pouch of 20.
+- Tower scene (`-- --scene=tower`, the default start): round room, desk, four element trays (Su, Eldi, Fti, Ular) with coins stacked in layers, open pouch on the desk with a live count out of 25 and a cost-and-element tag per token (grip a tag to pull that coin out), saved pouches on wall hooks (touch one to put it on the desk), eight display cases up the stair.
+- Flat browse panel: element filters, kind filter, sort by name, rarity or cost, list and grid views, pages. Pressing a row floats that token to your hand.
+- Grab a token for the physical coin; press A to wake the hologram with name, element, rarity, size, cost, stats, temperament, special rules, description and background. Grip with the other hand and pull apart to grow it to true size, where it stands on the floor to walk around.
+- Practice sandbox (`Sandbox`, usable in any scene): Duel option beside the hologram, or drop a coin on the field. Two tokens, normal creature rules, no resources or costs, pick up and move creatures (frozen while held), swap, pause, reset (same fight again), close.
+- Signpost by the door: practice match with the open pouch, town, workshop, wilds.
+
+Checked by
+- 59 headless checks pass (53 rules checks plus 6 save checks run with `-- --selftest`).
+- Tower autoplay (`-- --scene=tower --autoplay --fresh --save=bot`): pulled a coin from a tray into the pouch (20 to 21), woke two holograms, used Duel twice, and the sandbox ran both creatures. Screenshot inspected.
+
+Known problems and limits
+- The kind filter stands in for text search (no keyboard in VR yet).
+- Pouch names cannot be changed in VR yet.
 
 ## Milestone 1 — The match (done)
 

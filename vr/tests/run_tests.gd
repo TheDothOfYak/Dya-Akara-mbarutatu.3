@@ -232,3 +232,34 @@ func test_dropin() -> void:
 	heavy.queue_free()
 	r = checker.check_folder(folder)
 	ok("\n".join(r.problems).contains("triangles"), "a model over the triangle budget is reported")
+
+func _game() -> Node:
+	return root.get_node("Game") if root.has_node("Game") else null
+
+func test_sandbox() -> void:
+	var db := SpeciesDB.all()
+	var rng := DyaRng.new(3)
+	var a := DyaToken.mint(db.ular_naga, rng)
+	var b := DyaToken.mint(db.sru_vorn, rng)
+	var run := func(ticks: int) -> MatchSim:
+		var m := MatchSim.new({"seed": 77, "quiet": true, "mode": "sandbox", "teams": [{"name": "L", "pouch": [a]}, {"name": "R", "pouch": [b]}]}, db)
+		m.queue_input(0, {"type": "sb_place", "i": 0, "team": 0, "x": 700, "y": 500})
+		m.queue_input(1, {"type": "sb_place", "i": 0, "team": 1, "x": 900, "y": 500})
+		for i in ticks: m.do_tick()
+		return m
+	var m1: MatchSim = run.call(1200)
+	ok(m1.creatures.size() == 2, "sandbox places two tokens")
+	var hurt: bool = m1.creatures[0].hp < m1.creatures[0].max_hp or m1.creatures[1].hp < m1.creatures[1].max_hp or m1.creatures[0].dead or m1.creatures[1].dead
+	ok(hurt, "the two creatures fight under their normal rules")
+	ok(not m1.over and m1.teams[0].resources.Fti == 0 and m1.pulse_index == 0, "no resources, no pulses, no ending in the sandbox")
+	var m2: MatchSim = run.call(1200)
+	ok(m1.state_hash() == m2.state_hash(), "reset runs the same fight again")
+	var m3: MatchSim = run.call(2)
+	var c: Dictionary = m3.creatures[0]
+	m3._apply_input(0, {"type": "sb_hold", "id": c.id, "on": true})
+	m3._apply_input(0, {"type": "sb_move", "id": c.id, "x": 300, "y": 300})
+	for i in 60: m3.do_tick()
+	ok(c.x == 300.0 and c.y == 300.0, "a picked-up creature freezes where it is held")
+	m3._apply_input(0, {"type": "sb_hold", "id": c.id, "on": false})
+	for i in 200: m3.do_tick()
+	ok(c.x != 300.0 or c.y != 300.0 or c.state == "attack", "it carries on from where it is set down")

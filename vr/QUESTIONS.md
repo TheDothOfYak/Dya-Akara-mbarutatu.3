@@ -33,3 +33,11 @@ Where a rule was not written down, the plainest option was chosen so the build c
 21. **Throw reach on big fields.** A real throw of about 4 m counts as the creature's full reach; the coin is carried the rest of the way.
 22. **AI first move.** The AI opponent waits 20 seconds before its first move in a casual match.
 23. **Match length.** Relic runs end AI matches in one to two minutes. Is that the intended pace, or should Relic carriers be slower or hordes further apart?
+
+## Choices made in Milestone 2
+
+24. **Starting collection.** A new player gets 32 tokens (a mix of all 11 creatures) and a first pouch of 20. What should a new player really start with?
+25. **Search on the browse panel.** With no keyboard, a "Kind" button steps through creature kinds in place of typed search.
+26. **Saved pouches.** Three pouches to start. Touching one on its hook puts it on the desk as the open pouch.
+27. **Display cases.** Eight cases up the stair, one token each.
+28. **True size.** Life-size is 0.1 m per simulation unit, so the largest creatures (Skaar) are about 7.6 m across.

@@ -24,6 +24,7 @@ var proj_nodes := {}
 var zone_nodes := {}
 var orbs_above: Array = [] # big matches: your resources also float above you
 var player_team := 0
+var bare := false # sandbox and desk holograms: no hordes, props or stands
 var fx_root: Node3D
 var _t := 0.0
 var _edge: Node3D
@@ -38,11 +39,21 @@ func setup(match_sim: MatchSim, origin: Vector3, forward: Vector3, metres_per_un
 	var right := forward.cross(Vector3.UP).normalized()
 	var b := Basis(forward * unit, Vector3.UP * unit, right * unit)
 	global_transform = Transform3D(b, origin - b * Vector3(anchor_sim.x, 0, anchor_sim.y))
+	fx_root = Node3D.new()
+	add_child(fx_root)
+	if bare:
+		var g := MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(MatchSim.W, MatchSim.H)
+		g.mesh = pm
+		g.position = Vector3(MatchSim.W * 0.5, 0.5, MatchSim.H * 0.5)
+		g.material_override = _holo(Color(0.4, 0.7, 0.9, 0.25))
+		add_child(g)
+		_build_edge()
+		return
 	_build_terrain(terrain_id)
 	_build_edge()
 	_build_hordes()
-	fx_root = Node3D.new()
-	add_child(fx_root)
 	if unit * MatchSim.W >= 40.0:
 		_build_stands()
 

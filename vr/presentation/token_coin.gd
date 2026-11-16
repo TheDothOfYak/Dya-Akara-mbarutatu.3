@@ -136,6 +136,8 @@ func _unhook(hand: Hand) -> void:
 		hand.pressed.disconnect(_on_press)
 
 func _exit_tree() -> void:
+	if not is_queued_for_deletion():
+		return # only moving to another parent
 	if holder != null and is_instance_valid(holder):
 		_unhook(holder)
 		if holder.held == self:
