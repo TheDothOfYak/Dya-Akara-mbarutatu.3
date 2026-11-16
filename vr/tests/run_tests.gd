@@ -16,7 +16,7 @@ func _init() -> void:
 	var only := ""
 	for a in OS.get_cmdline_user_args():
 		only = a
-	for t in ["test_rng", "test_economy", "test_tokens", "test_rules", "test_replay", "test_match_ends", "test_sandbox",
+	for t in ["test_rng", "test_economy", "test_tokens", "test_rules", "test_flyers", "test_replay", "test_match_ends", "test_sandbox",
 			"test_dropin", "test_save", "test_town", "test_workshop", "test_wilds", "test_net"]:
 		if only != "" and t != only:
 			continue
@@ -116,6 +116,28 @@ func test_rules() -> void:
 	m.do_tick()
 	ok(m.over and m.result.winner == 0 and m.result.how == "concede", "concede ends the match")
 
+func test_flyers() -> void:
+	var db := SpeciesDB.all()
+	var rng := DyaRng.new(8)
+	var cfg := {"seed": 4, "quiet": true, "mode": "sandbox", "teams": [
+		{"name": "A", "pouch": [DyaToken.mint(db.lutut, rng)]}, {"name": "B", "pouch": [DyaToken.mint(db.sword_eikar, rng)]}]}
+	var m := MatchSim.new(cfg, db)
+	m.queue_input(0, {"type": "sb_place", "i": 0, "team": 0, "x": 300, "y": 500})
+	m.queue_input(0, {"type": "sb_place", "i": 0, "team": 1, "x": 1300, "y": 500})
+	m.do_tick()
+	var bird: Dictionary = m.creatures[0]
+	var eik: Dictionary = m.creatures[1]
+	ok(bird.flyer and bird.z == MatchSim.CRUISE_Z and eik.z == 0.0, "flyers take the field at altitude")
+	ok(bird.tether_tol > eik.tether_tol, "tether tolerance is per creature")
+	bird.x = MatchSim.W + 200.0 # over the crowd, past the ground edge
+	bird.y = 500.0
+	m.do_tick()
+	ok(not bird.dead and bird.tether_frac > 0.0, "a flyer may cross the ground edge within its tether")
+	bird.x = 1000.0
+	var hp0: float = eik.hp
+	for i in 1200: m.do_tick()
+	ok(eik.hp < hp0 or eik.dead, "the flyer dives on its prey")
+
 func _run_ai_match(seed_value: int, limit_ticks: int) -> MatchSim:
 	var m := MatchSim.new(make_cfg(seed_value), SpeciesDB.all())
 	while not m.over and m.tick < limit_ticks:
@@ -174,6 +196,8 @@ func test_dropin() -> void:
 	# drop a real model into a scratch creature folder and check it
 	var folder := "user://dropin_test/testbeast"
 	DirAccess.make_dir_recursive_absolute(folder)
+	if FileAccess.file_exists(folder + "/model.glb"):
+		DirAccess.remove_absolute(folder + "/model.glb")
 	var sp: Dictionary = SpeciesDB.get_sp("lutut").duplicate(true)
 	sp.id = "testbeast"
 	sp.erase("folder")

@@ -23,6 +23,7 @@ var velocity := Vector3.ZERO
 var throw_override := Vector3.ZERO # the simulator may supply a throw
 var laser_on := false
 var enabled := true
+var stick_captured := false # true while the stick is being used on an object (pouch, coin)
 
 var _last_pos := Vector3.ZERO
 var _touching := {}
@@ -33,7 +34,7 @@ var _mesh: MeshInstance3D
 func _ready() -> void:
 	_mesh = MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size = Vector3(0.07, 0.03, 0.11)
+	bm.size = Vector3(0.05, 0.02, 0.08)
 	_mesh.mesh = bm
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.85, 0.75, 0.6)

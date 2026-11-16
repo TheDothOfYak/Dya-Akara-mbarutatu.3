@@ -80,7 +80,7 @@ func _init(config: Dictionary, species_db: Dictionary) -> void:
 			"idx": i, "name": t.get("name", "Player %d" % (i + 1)), "controller": t.get("controller", "human"),
 			"ai_skill": float(t.get("ai_skill", 0.6)), "hoard": HOARDS[i], "resources": res, "pouch": pouch,
 			"stats": {"played": [], "eliminations": 0, "earned": 0, "relic_method": ""},
-			"ai": {"next_think": 2.0 + i, "focus": -1},
+			"ai": {"next_think": 2.0 + i + float(t.get("ai_warmup", 0.0)), "focus": -1},
 			"ai_rng": DyaRng.new(seed_value ^ ((i + 1) * 0x9E3779B9)),
 		})
 	if mode == "standard":
@@ -724,7 +724,7 @@ func serialize_replay() -> Dictionary:
 		var toks := []
 		for e in T.pouch:
 			toks.append(e.tok)
-		tc.append({"name": T.name, "controller": T.controller, "ai_skill": T.ai_skill, "pouch": toks})
+		tc.append({"name": T.name, "controller": T.controller, "ai_skill": T.ai_skill, "pouch": toks})  # warm-up needs no saving: AI inputs are in the log
 	return {"version": 1, "mode": mode, "seed": seed_value, "settings": settings.duplicate(), "teams": tc,
 		"time_limit": cfg.get("time_limit", 0.0), "terrain": cfg.get("terrain", "plains"),
 		"log": log.duplicate(true), "final_tick": tick, "final_hash": state_hash(), "result": result.duplicate()}

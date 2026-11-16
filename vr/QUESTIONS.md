@@ -21,3 +21,15 @@ Where a rule was not written down, the plainest option was chosen so the build c
 12. **Picking a thrown coin back up.** A thrown, unspawned coin can be walked out to and picked up again. Resources already rubbed into it stay on it.
 13. **Unpaying.** Resources rubbed into a token cannot be taken back out.
 14. **Nagas' first head.** "Near-invincible" is modelled as: once a Naga is down to its last head, it takes 40% damage.
+
+## Choices made in Milestone 1
+
+15. **Rubbing with a controller.** While holding a token, flick the thumbstick toward a resource (up Fti, right Su, down Eldi, left Ular), or touch the coin with your other hand to pay the next jewel you can afford. Is that close enough to "rub your thumb over the jewel" until hand tracking exists?
+16. **Rummaging by feel.** With a hand in the pouch, the thumbstick moves your fingers from token to token, and each gives a tick that is stronger for bigger creatures. Grip pulls it out. Should other things be felt too (rarity, element)?
+17. **Pulling all tokens out.** Pressing B with a hand in the pouch tips every token onto your table.
+18. **A token let go of in mid-air** (not thrown, not over the table) drops back into the pouch so it cannot be lost.
+19. **The table** appears in every match, not only big ones, so there is always somewhere to set tokens down.
+20. **Scale ring default.** With the scale ring at the bottom the match is Tabletop.
+21. **Throw reach on big fields.** A real throw of about 4 m counts as the creature's full reach; the coin is carried the rest of the way.
+22. **AI first move.** The AI opponent waits 20 seconds before its first move in a casual match.
+23. **Match length.** Relic runs end AI matches in one to two minutes. Is that the intended pace, or should Relic carriers be slower or hordes further apart?

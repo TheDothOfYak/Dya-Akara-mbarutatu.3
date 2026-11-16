@@ -8,6 +8,9 @@ var rig: XRRig = null
 var haptic_log: Array = []
 var move_penalty := 1.0 # hunger and tiredness slow you in the wilds
 var args := {}
+var sfx: Sfx
+var match_request := {}
+var last_match := {}
 
 var settings := {
 	"locomotion": "smooth", # or "teleport"
@@ -27,6 +30,10 @@ func _enter_tree() -> void:
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	load_settings()
+
+func _ready() -> void:
+	sfx = Sfx.new()
+	add_child(sfx)
 
 func load_settings() -> void:
 	var cf := ConfigFile.new()

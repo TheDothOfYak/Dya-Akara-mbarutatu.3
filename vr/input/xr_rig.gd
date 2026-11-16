@@ -98,8 +98,8 @@ func _physics_process(delta: float) -> void:
 		_vignette.material_override.set_shader_parameter("amount", 0.0)
 		return
 	var st: Dictionary = Game.settings
-	var mv := off_hand().stick
-	var tv := dominant().stick
+	var mv := Vector2.ZERO if off_hand().stick_captured else off_hand().stick
+	var tv := Vector2.ZERO if dominant().stick_captured else dominant().stick
 	var moving := false
 	if st.locomotion == "smooth":
 		if mv.length() > 0.15:

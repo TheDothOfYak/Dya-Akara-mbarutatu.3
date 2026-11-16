@@ -7,12 +7,40 @@ Updated after every milestone. Newest state first.
 | # | Milestone | State |
 |---|---|---|
 | 0 | Foundation | **Done, gate passed** |
-| 1 | The match | Next |
-| 2 | The tower | Not started |
+| 1 | The match | **Done, gate passed** |
+| 2 | The tower | Next |
 | 3 | The town | Not started |
 | 4 | The workshop | Not started |
 | 5 | The wilds | Not started |
 | 6 | Multiplayer | Not started |
+
+## Milestone 1 — The match (done)
+
+Gate: *full match vs AI starts, plays, ends; replay is exact.* Passes.
+
+Done
+- Match scene (`scenes/match.tscn`, run with `-- --scene=match`).
+- Setup: horde token with three turnable rings (pulse interval, resources per pulse, scale), default chaos with all rings at the bottom, tap the two hordes together to link, votes meet in the middle, tournament settings replace the vote.
+- On link: terrain hologram (plains, forest, mountain, desert) covering the arena and beyond, both hordes in their fixed spots, ground-edge outline, a Relic stone floating over each horde, a stand under table-sized fields, stadium stands and a crowd around big arenas.
+- Pouch on the hip, no sight into it: thumbstick moves your fingers, haptic ticks tell the size, grip pulls one token, B tips them all onto the table, letting go over the pouch puts one back.
+- Token coins show cost on the face as jewels in each resource's colour and shape. Rub to pay in pieces: thumbstick flick for one resource (up Fti, right Su, down Eldi, left Ular) or touch the coin with the other hand. Partial payment stays on the token.
+- Throw with the arm (release velocity), with reach scaled to the arena and clamped to the creature's reach. A token can be thrown unpaid and picked back up.
+- Spawn: hold grip + trigger for the laser, point at the coin, press A. Works at any time, no pulse wait.
+- No pulse timer: a tone, a ripple on both controllers and new resource shapes around the horde. In big arenas your resources also float above you.
+- Placeholder creatures with team rings, flyers at altitude over the crowd, per-creature tether with fade and dissolve, ghosting near your head, escalation layers on the pulse tone, victory or defeat shown on the hordes and a floating stats panel.
+- Audio engine: spatial sounds scaled to the arena, priority mixing with ducking, loud-event limiter with a warning cue, adaptive placeholder music, volume settings.
+- Replay saved after every match (`user://replays/last.replay`).
+- Autoplay bot (`-- --scene=match --autoplay`) that plays a whole match through the simulated hands.
+
+Checked by
+- 47 headless checks pass.
+- Autoplay ran three complete matches (tabletop, large table, person-sized) through the hand controls: link, rummage, rub, throw, laser spawn. Each ended by Relic capture and each saved replay reproduced the final state exactly.
+- Screenshots of setup and play inspected.
+
+Known problems and limits
+- Matches are short (about one to two minutes) because an unanswered Relic runner wins. The AI waits 20 seconds before its first move to give a new player time. Balance needs Yak's eye.
+- Rubbing uses the thumbstick or a touch from the other hand. A true thumb rub needs hand tracking, which is not built yet.
+- The opponent is shown as a simple figure. The terrain is scenery only.
 
 ## Milestone 0 — Foundation (done)
 
