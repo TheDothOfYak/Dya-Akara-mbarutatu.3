@@ -1,0 +1,25 @@
+{
+ "_note": "All lines here are Proposed placeholders. Yak writes each NPC's personal lines; shared templates cover rumors, guide hire, wagers and invitations. {name} {creature} {place} {token} {fee} are filled from game data.",
+ "greeting": {
+  "quiet": ["{name} nods."],
+  "cheerful": ["{name} waves. \"Good to see you.\""],
+  "boastful": ["\"{name}. You have heard of me.\""],
+  "busy": ["\"Make it quick, I have work.\""],
+  "gambler": ["\"{name}. Do you play?\""],
+  "wary": ["{name} looks you over before answering."]
+ },
+ "rumor": ["\"A {creature} has been seen in the {place}.\"", "\"They say a {creature} keeps to the {place}. I would not go alone.\"", "\"I heard a {creature} out in the {place} not long ago.\""],
+ "rumor_none": ["\"Nothing new that I have heard.\""],
+ "guide_offer": ["\"I can take you to the {creature} in the {place} for {fee} gold.\""],
+ "guide_accept": ["\"Follow me. Bring food.\""],
+ "guide_refuse": ["\"Not today. I have my own day to see to.\""],
+ "guide_poor": ["\"Come back with {fee} gold.\""],
+ "invite_accept": ["\"A game? Here and now, then.\"", "\"Gladly. Hordes out.\""],
+ "invite_decline": ["\"Not now.\"", "\"Another time.\""],
+ "wager_accept": ["\"Your {token} against my {stake}. Agreed.\""],
+ "wager_decline": ["\"I do not wager.\"", "\"Not for a token. A plain game, if you like.\""],
+ "wager_none": ["\"You have nothing in that pouch to stake.\""],
+ "after_win": ["\"Well played. It is yours.\""],
+ "after_loss": ["\"Mine now. Lose a wagered token and it is gone.\""],
+ "away": ["{name} is not interested in Dya'Akara and has other things to do."]
+}

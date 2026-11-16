@@ -107,6 +107,12 @@ func ensure_game() -> void:
 	if args.has("fresh") or not load_game():
 		new_game(int(args.get("seed", "0")))
 		save_game()
+	ensure_town()
+
+func ensure_town() -> void:
+	if data.get("town", {}).is_empty():
+		data.town = TownData.generate(int(data.seed))
+		save_game()
 
 func token_by_id(id: String) -> Dictionary:
 	for t in data.collection:

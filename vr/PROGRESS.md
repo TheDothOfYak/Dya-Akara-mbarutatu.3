@@ -9,10 +9,33 @@ Updated after every milestone. Newest state first.
 | 0 | Foundation | **Done, gate passed** |
 | 1 | The match | **Done, gate passed** |
 | 2 | The tower | **Done, gate passed** |
-| 3 | The town | Next |
-| 4 | The workshop | Not started |
+| 3 | The town | **Done, gate passed** |
+| 4 | The workshop | Next |
 | 5 | The wilds | Not started |
 | 6 | Multiplayer | Not started |
+
+## Milestone 3 — The town (done)
+
+Gate: *ask an NPC on the spot, play and settle a wager.* Passes.
+
+Done
+- Sri'Ciakala scene (`-- --scene=town`): market square, great trees with homes on four levels, the sea, the castle hill, tavern with four tables, signs to the tower, workshop, wilds, arena gate.
+- 16 stalls: weapons, food, armor, potions and misc (prices in `data/stalls.json`), 11 seller stalls with physical token listings and prices, and your own stall (list a token for the 2D listing fee, or sell to the Guild at 75%).
+- 100 Dya'kukull generated per town copy with the 2D name generator: name, level, home, daily routine in four parts, personality, whether they play at all, whether they wager, whether they guide, and a real collection that persists. About 40 are out in town at a time; the rest are at home or away.
+- Written dialogue only (`data/dialogue.json`, all Proposed placeholders): greeting by personality, rumors from the real creature population, guide hire, invitations, wagers.
+- Touch a person (or laser + A) to talk: ask for a game on the spot, wager a pouch token, ask for rumors, hire a guide. Tavern people play at tabletop scale. NPCs vote on the rings automatically.
+- Wagers settle when you return: a won token leaves the NPC's collection and enters yours; a lost one goes into theirs. Casual XP and gold are paid. Everything is saved.
+- Arena gate starts a tournament match with fixed scale and terrain and shows tournament cards (player details and every pouch creature).
+- Tavern sandbox against an AI token. Town clock: 24 minutes a day; stalls rotate and NPCs may buy your listings each day. Wrist label shows gold, day and town code.
+
+Checked by
+- 15 town checks in `-- --selftest` (21 selftest checks in all): 100 unique people, unwilling NPCs refuse, a willing NPC accepts, the match is played to an end, winning and losing both move the right token, saves round-trip exactly, market purchases work.
+- Town autoplay: walked to an NPC, talked by touch, pressed Wager and Start, and the wagered match then ran to its end in the match scene.
+
+Known problems and limits
+- No offers or negotiation table, Notify Me or Requests yet. Buy now, listing, Guild buyback, tax and listing fee are in.
+- People stroll in the square only; homes are scenery. Walking up the tree levels is not built.
+- The wager stake is chosen with a "Stake another token" button rather than by holding out a token.
 
 ## Milestone 2 — The tower (done)
 

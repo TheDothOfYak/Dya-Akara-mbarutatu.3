@@ -1,0 +1,30 @@
+{
+ "_note": "Proposed placeholder prices in gold. Tune here; no code changes needed.",
+ "rewards": {"casual_win_xp": 30, "casual_win_gold": 25, "casual_loss_xp": 10, "casual_loss_gold": 5},
+ "guide_fee": 40,
+ "market_tax": [0.03, 0.05, 0.07, 0.10, 0.13, 0.17, 0.20],
+ "listing_fee": 50,
+ "buyback_rate": 0.75,
+ "supply": [
+  {"stall": "Weapons", "items": [
+    {"id": "blade", "name": "Blade", "price": 120, "kit": "blade"},
+    {"id": "spear", "name": "Spear", "price": 140, "kit": "spear"},
+    {"id": "bow", "name": "Bow", "price": 180, "kit": "bow"},
+    {"id": "whip", "name": "Whip", "price": 160, "kit": "whip"}]},
+  {"stall": "Food", "items": [
+    {"id": "food", "name": "Trail food", "price": 8, "bag": "food", "amount": 1},
+    {"id": "meal", "name": "Cooked meal", "price": 20, "bag": "meals", "amount": 1},
+    {"id": "food5", "name": "Hunt supplies (5)", "price": 35, "bag": "food", "amount": 5}]},
+  {"stall": "Armor", "items": [
+    {"id": "armor_light", "name": "Light armor", "price": 150, "armor": "light"},
+    {"id": "armor_heavy", "name": "Heavy armor", "price": 320, "armor": "heavy"}]},
+  {"stall": "Potions and misc", "items": [
+    {"id": "potion", "name": "Potion", "price": 30, "bag": "potions", "amount": 1},
+    {"id": "knife", "name": "Knife", "price": 40, "kit": "knife"},
+    {"id": "rope", "name": "Rope", "price": 25, "kit": "rope"},
+    {"id": "trap", "name": "Trap", "price": 45, "kit_count": "trap"},
+    {"id": "bait", "name": "Bait", "price": 12, "kit_count": "bait"},
+    {"id": "okid", "name": "Buri Okid", "price": 60, "okid": 0},
+    {"id": "ngakara", "name": "NgAkara vial", "price": 50, "ngakara": 1}]}
+ ]
+}

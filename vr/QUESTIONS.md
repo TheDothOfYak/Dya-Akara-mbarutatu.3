@@ -41,3 +41,15 @@ Where a rule was not written down, the plainest option was chosen so the build c
 26. **Saved pouches.** Three pouches to start. Touching one on its hook puts it on the desk as the open pouch.
 27. **Display cases.** Eight cases up the stair, one token each.
 28. **True size.** Life-size is 0.1 m per simulation unit, so the largest creatures (Skaar) are about 7.6 m across.
+
+## Choices made in Milestone 3
+
+29. **NPC names.** Generated with the 2D game's Dearcineon name generator, one town seed per player. Should the 100 Dya'kukull instead be the exact same named people in every player's town?
+30. **All dialogue lines** in `data/dialogue.json` are Proposed placeholders for Yak to replace. Personal lines per NPC are not written.
+31. **Personalities** are working labels (quiet, cheerful, boastful, busy, gambler, wary) used only to pick a greeting.
+32. **Who wagers.** Gamblers always; others about 45% of the time. About 15% of townspeople do not play at all.
+33. **What an NPC stakes.** The token of theirs closest in rarity to yours.
+34. **Casual rewards.** Win 30 XP and 25 gold, loss 10 XP and 5 gold (in `data/stalls.json`). What are the real numbers?
+35. **Supply prices and guide fee** (40 gold) are placeholders in `data/stalls.json`.
+36. **Your listing price** defaults to the 2D baseline value for the rarity. There is no price slider yet.
+37. **Length of a day.** 24 minutes of play.

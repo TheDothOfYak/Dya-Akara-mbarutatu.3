@@ -152,6 +152,8 @@ func _link() -> void:
 	hint.pixel_size = 0.0007
 	hint.global_position = table.to_global(Vector3(0, 1.15, 0))
 	get_tree().create_timer(60.0).timeout.connect(func(): hint.visible = false)
+	if req.has("card"):
+		_show_cards()
 	phase = "play"
 
 func _build_table(f: Vector3) -> void:
@@ -165,6 +167,22 @@ func _build_table(f: Vector3) -> void:
 	table.rotation.y = atan2(-f.z, f.x) - PI / 2
 	WorldBuilder.box(Vector3(0.5, 0.03, 0.4), Vector3(0, 0.8, 0), Color(0.4, 0.3, 0.2), table)
 	WorldBuilder.cyl(0.03, 0.8, Vector3(0, 0.4, 0), Color(0.3, 0.22, 0.15), table)
+
+## Tournament cards: each player's details and every creature in their pouch with key info.
+## Casual matches have no cards.
+func _show_cards() -> void:
+	var c: Dictionary = req.card
+	var lines := ["%s\n%s · %s · %s · level %d %s" % [req.tournament.get("name", "Tournament"), c.name, c.planet, c.rank, int(c.level), c.get("title", "")]]
+	for t in my_pouch:
+		lines.append("%s · %s · %s · cost %d" % [t.name, t.element, DyaEconomy.SIZES[t.size_idx], DyaToken.cost_sum(t.cost)])
+	var l := WorldBuilder.label("\n".join(lines), table.to_global(Vector3(-0.1, 0.95, 0.15)), 0.00035, self, false)
+	l.rotation.y = table.rotation.y
+	var o: Dictionary = req.opponent
+	var lines2 := ["%s · Xikia · level %d" % [o.name, int(o.get("level", 1))]]
+	for t in o.pouch:
+		lines2.append("%s · %s · %s · cost %d" % [t.name, t.element, DyaEconomy.SIZES[t.size_idx], DyaToken.cost_sum(t.cost)])
+	var l2 := WorldBuilder.label("\n".join(lines2), table.to_global(Vector3(0.18, 0.95, 0.15)), 0.00035, self, false)
+	l2.rotation.y = table.rotation.y
 
 # ---------------------------------------------------------------- tokens in your hands
 

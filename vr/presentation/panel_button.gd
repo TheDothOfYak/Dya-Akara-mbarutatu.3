@@ -7,6 +7,7 @@ var action: Callable
 var label: Label3D
 var _plate: MeshInstance3D
 var _cool := 0.0
+static var _last_press_ms := 0 # one press at a time across all buttons, so a passing hand cannot hit two
 
 static func make(text: String, pos: Vector3, on_press: Callable, width := 0.18, text_size := 0.0011) -> PanelButton:
 	var b := PanelButton.new()
@@ -26,9 +27,10 @@ func _process(delta: float) -> void:
 	_cool = max(0.0, _cool - delta)
 
 func press(hand: Hand = null) -> void:
-	if _cool > 0.0:
+	if _cool > 0.0 or Time.get_ticks_msec() - _last_press_ms < 350:
 		return
 	_cool = 0.4
+	_last_press_ms = Time.get_ticks_msec()
 	if hand != null:
 		hand.rumble(0.4, 0.04)
 	Game.sfx.play("tick", global_position)
