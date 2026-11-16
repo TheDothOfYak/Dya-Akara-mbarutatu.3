@@ -1,0 +1,94 @@
+{
+ "id": "ular_naga",
+ "name": "Ular Naga",
+ "family": "Naga",
+ "element": "Ular",
+ "element2": null,
+ "rarity": [
+  2,
+  6
+ ],
+ "size": [
+  2,
+  4
+ ],
+ "stat_mul": {
+  "hp": 1.6,
+  "dmg": 1.4,
+  "speed": 0.9
+ },
+ "attack_range": 48,
+ "behavior": "ular_naga",
+ "tags": [
+  "carnivore",
+  "apex",
+  "naga"
+ ],
+ "vars": {
+  "tacticalIntelligence": [
+   0.1,
+   0.9
+  ],
+  "breathStamina": [
+   3,
+   8
+  ],
+  "headRegrow": [
+   0,
+   0.5
+  ],
+  "dominance": [
+   0.2,
+   1
+  ]
+ },
+ "picks": {
+  "headCount": [
+   1,
+   2,
+   2,
+   3,
+   3,
+   4,
+   5
+  ]
+ },
+ "desc": "A multi-headed serpent of the earth, scaled and armored, with a spiked club tail. New heads grow as the old prove their strength.",
+ "temperament": "Reckless and indiscriminate when young — it attacks anything in range without exception. With age it grows territorial and calculating.",
+ "special": "Its first head is near-invincible for the life of the token. Each head fights independently. Never goes for the Relic.",
+ "tether": 140,
+ "throw_reach": 640,
+ "habitat": "forest",
+ "wild": true,
+ "pieces": [
+  {
+   "kind": "shed scale",
+   "method": "pickup"
+  },
+  {
+   "kind": "tooth",
+   "method": "cut"
+  }
+ ],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "serpent",
+  "color": "#57713d",
+  "color2": "#3c4f2a",
+  "features": [
+   "heads",
+   "ridge",
+   "club_tail"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}

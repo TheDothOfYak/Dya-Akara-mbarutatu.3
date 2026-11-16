@@ -1,0 +1,87 @@
+{
+ "id": "wild_punk",
+ "name": "Wild Punk",
+ "family": "Punk Family",
+ "element": "Ular",
+ "element2": null,
+ "rarity": [
+  1,
+  3
+ ],
+ "size": [
+  1,
+  1
+ ],
+ "stat_mul": {
+  "hp": 0.9,
+  "dmg": 1.05,
+  "speed": 1.3
+ },
+ "attack_range": 60,
+ "behavior": "wild_punk",
+ "tags": [
+  "forest",
+  "herbivore"
+ ],
+ "vars": {
+  "vineLength": [
+   40,
+   80
+  ],
+  "territory": [
+   90,
+   200
+  ],
+  "aggressionThreshold": [
+   0.3,
+   0.7
+  ],
+  "breathCooldown": [
+   14,
+   24
+  ],
+  "dodge": [
+   0.25,
+   0.5
+  ]
+ },
+ "picks": {
+  "vineBehavior": [
+   "grab",
+   "smash",
+   "throw"
+  ]
+ },
+ "desc": "A faster, leaner cousin of the Domestic Punk — same pumpkin-and-vine family, grown wild.",
+ "temperament": "Territorial and evasive — it would rather fight while fleeing than ever stand its ground.",
+ "special": "Hoarder instinct: opportunistically grabs anything smaller that wanders too close.",
+ "tether": 100,
+ "throw_reach": 740,
+ "habitat": "forest",
+ "wild": true,
+ "pieces": [
+  {
+   "kind": "vine cutting",
+   "method": "cut"
+  }
+ ],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "punk",
+  "color": "#b8641f",
+  "color2": "#2e5c2a",
+  "features": [
+   "vines"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}

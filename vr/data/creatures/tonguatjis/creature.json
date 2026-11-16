@@ -1,0 +1,98 @@
+{
+ "id": "tonguatjis",
+ "name": "Tonguatjis",
+ "family": "Creature",
+ "element": "Ular",
+ "element2": null,
+ "rarity": [
+  2,
+  5
+ ],
+ "size": [
+  2,
+  3
+ ],
+ "stat_mul": {
+  "hp": 1.6,
+  "dmg": 1.25,
+  "speed": 0.7
+ },
+ "attack_range": 30,
+ "behavior": "tonguatjis",
+ "tags": [
+  "ambush",
+  "carnivore",
+  "shell"
+ ],
+ "vars": {
+  "tongueLength": [
+   90,
+   180
+  ],
+  "tongueSpeed": [
+   1,
+   2
+  ],
+  "patience": [
+   4,
+   16
+  ],
+  "jawStrength": [
+   1,
+   1.8
+  ],
+  "shellDurability": [
+   1,
+   1.6
+  ]
+ },
+ "picks": {
+  "postCatch": [
+   "eat",
+   "store",
+   "knockdown"
+  ],
+  "sizePreference": [
+   "small",
+   "any"
+  ]
+ },
+ "desc": "A great shelled, snapping-jawed creature of the deep forest, known for a tongue many times longer than its body.",
+ "temperament": "A slow crawler with near-bottomless patience — it waits for flying or water-bound prey to pass within range of that tongue.",
+ "special": "Prefers Fti and Su targets. Flees outright from any Lutut.",
+ "tether": 90,
+ "throw_reach": 620,
+ "habitat": "forest",
+ "wild": true,
+ "pieces": [
+  {
+   "kind": "shell shaving",
+   "method": "shave"
+  },
+  {
+   "kind": "tooth",
+   "method": "cut"
+  }
+ ],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "quad",
+  "color": "#4f6b3a",
+  "color2": "#d46a6a",
+  "features": [
+   "shell",
+   "tongue",
+   "low"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}

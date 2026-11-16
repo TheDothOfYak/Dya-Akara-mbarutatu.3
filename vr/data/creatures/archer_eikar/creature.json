@@ -1,0 +1,90 @@
+{
+ "id": "archer_eikar",
+ "name": "Archer Eikar",
+ "family": "Eikar",
+ "element": "Ular",
+ "element2": null,
+ "rarity": [
+  1,
+  5
+ ],
+ "size": [
+  1,
+  1
+ ],
+ "stat_mul": {
+  "hp": 0.8,
+  "dmg": 1.0,
+  "speed": 1.0
+ },
+ "attack_range": 170,
+ "behavior": "archer_unit",
+ "tags": [
+  "sentient",
+  "eikar"
+ ],
+ "vars": {
+  "bowQuality": [
+   0.7,
+   1.4
+  ],
+  "drawSpeed": [
+   0.7,
+   1.4
+  ],
+  "quiver": [
+   14,
+   30
+  ],
+  "positionalAwareness": [
+   0.3,
+   1
+  ],
+  "calm": [
+   0.3,
+   1
+  ]
+ },
+ "picks": {
+  "arrowType": [
+   "broadhead",
+   "bodkin",
+   "barbed"
+  ],
+  "movingShot": [
+   0,
+   0,
+   0,
+   0,
+   1
+  ]
+ },
+ "desc": "A positional Eikar shooter. Find a vantage. Hold it. Pick targets carefully.",
+ "temperament": "Calm, patient, and allergic to close range.",
+ "special": "Natural advantage against flyers and Su creatures.",
+ "tether": 80,
+ "throw_reach": 760,
+ "habitat": "town",
+ "wild": false,
+ "pieces": [],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "biped",
+  "color": "#c8a05c",
+  "color2": "#6d4a2e",
+  "features": [
+   "acorn",
+   "bow"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}

@@ -1,0 +1,94 @@
+{
+ "id": "sru_vorn",
+ "name": "Sru Vorn",
+ "family": "Creature",
+ "element": "Ular",
+ "element2": "Su",
+ "rarity": [
+  4,
+  6
+ ],
+ "size": [
+  3,
+  4
+ ],
+ "stat_mul": {
+  "hp": 1.7,
+  "dmg": 1.5,
+  "speed": 0.85
+ },
+ "attack_range": 42,
+ "behavior": "sru_vorn",
+ "tags": [
+  "carnivore",
+  "ambush",
+  "apex"
+ ],
+ "vars": {
+  "acidPotency": [
+   6,
+   18
+  ],
+  "preyThreshold": [
+   1,
+   2.4
+  ],
+  "territory": [
+   140,
+   260
+  ],
+  "patience": [
+   4,
+   14
+  ],
+  "bogActivity": [
+   0.3,
+   1
+  ]
+ },
+ "picks": {
+  "preservation": [
+   0,
+   0,
+   1
+  ]
+ },
+ "desc": "A heavy, low lizard with matted fur like armor, curved tusks, a spiked ball-tail, and acid saliva.",
+ "temperament": "Lazy until prey above a certain size wanders near — then it explodes from cover. Territorial by choice, not by limitation.",
+ "special": "Cultivates acid bog traps (Awvadhi) during downtime. Only hunts prey above its threshold size — smaller creatures are beneath its notice.",
+ "tether": 110,
+ "throw_reach": 600,
+ "habitat": "bog",
+ "wild": true,
+ "pieces": [
+  {
+   "kind": "tusk",
+   "method": "cut"
+  },
+  {
+   "kind": "matted fur",
+   "method": "shave"
+  }
+ ],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "quad",
+  "color": "#6b5b45",
+  "color2": "#8fbf3f",
+  "features": [
+   "tusks",
+   "ball_tail",
+   "low"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}

@@ -1,0 +1,90 @@
+{
+ "id": "lutut",
+ "name": "Lutut",
+ "family": "Creature",
+ "element": "Fti",
+ "element2": null,
+ "rarity": [
+  3,
+  6
+ ],
+ "size": [
+  3,
+  4
+ ],
+ "stat_mul": {
+  "hp": 1.4,
+  "dmg": 1.6,
+  "speed": 1.2
+ },
+ "attack_range": 40,
+ "behavior": "lutut",
+ "tags": [
+  "flyer",
+  "carnivore",
+  "apex"
+ ],
+ "vars": {
+  "screechPower": [
+   1.5,
+   4
+  ],
+  "preyThreshold": [
+   1.4,
+   2.6
+  ],
+  "diveSpeed": [
+   1.2,
+   1.9
+  ],
+  "landSpeed": [
+   0.6,
+   1
+  ]
+ },
+ "picks": {
+  "screechType": [
+   "targeted",
+   "targeted",
+   "targeted",
+   "area"
+  ]
+ },
+ "desc": "A vast flying predator marked with stone-carving-like patterns that deepen with age, and jaws built for processing meat.",
+ "temperament": "Reckless and relentless — the apex predator of apex predators, hunting Ular Naga and other great beasts as prey.",
+ "special": "Screech stuns prey from altitude before the dive.",
+ "tether": 420,
+ "throw_reach": 700,
+ "habitat": "sky",
+ "wild": true,
+ "pieces": [
+  {
+   "kind": "shed feather",
+   "method": "pickup"
+  },
+  {
+   "kind": "claw",
+   "method": "cut"
+  }
+ ],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "bird",
+  "color": "#6d6a80",
+  "color2": "#44415c",
+  "features": [
+   "wings",
+   "big_jaw"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}

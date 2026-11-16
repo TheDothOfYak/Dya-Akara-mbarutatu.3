@@ -1,0 +1,99 @@
+{
+ "id": "su_naga",
+ "name": "Su Naga",
+ "family": "Naga",
+ "element": "Su",
+ "element2": null,
+ "rarity": [
+  4,
+  6
+ ],
+ "size": [
+  3,
+  4
+ ],
+ "stat_mul": {
+  "hp": 1.9,
+  "dmg": 1.5,
+  "speed": 0.85
+ },
+ "attack_range": 55,
+ "behavior": "su_naga",
+ "tags": [
+  "su",
+  "carnivore",
+  "apex",
+  "naga",
+  "biolum"
+ ],
+ "vars": {
+  "tacticalIntelligence": [
+   0.5,
+   1
+  ],
+  "breathStamina": [
+   4,
+   9
+  ],
+  "patience": [
+   0.3,
+   1
+  ],
+  "deception": [
+   0.2,
+   1
+  ],
+  "biolumControl": [
+   0.3,
+   1
+  ]
+ },
+ "picks": {
+  "headCount": [
+   2,
+   2,
+   3,
+   3,
+   4,
+   5
+  ]
+ },
+ "desc": "A massive multi-headed sea serpent, ridged along its back and bioluminescent — light it uses both to speak and to deceive. Its electric-blue blood is NgAkara, the namesake material of Dya’Akara.",
+ "temperament": "A strategic apex predator, calculated and patient. \"The Su Naga is calm — that is the most dangerous version of it.\"",
+ "special": "First head near-invincible. Reads the field and strikes whatever threatens its side hardest; intercepts Relic carriers but never takes the Relic itself. Young Su Naga are reckless — patience comes with age.",
+ "tether": 160,
+ "throw_reach": 620,
+ "habitat": "sea",
+ "wild": true,
+ "pieces": [
+  {
+   "kind": "shed scale",
+   "method": "pickup"
+  },
+  {
+   "kind": "tooth",
+   "method": "cut"
+  }
+ ],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "serpent",
+  "color": "#2a6f8f",
+  "color2": "#68e0e8",
+  "features": [
+   "heads",
+   "ridge",
+   "glow"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}

@@ -1,0 +1,96 @@
+{
+ "id": "hvaleia",
+ "name": "Hvaleia",
+ "family": "Creature",
+ "element": "Su",
+ "element2": null,
+ "rarity": [
+  4,
+  6
+ ],
+ "size": [
+  3,
+  4
+ ],
+ "stat_mul": {
+  "hp": 2.1,
+  "dmg": 1.3,
+  "speed": 0.8
+ },
+ "attack_range": 46,
+ "behavior": "hvaleia",
+ "tags": [
+  "su",
+  "carnivore",
+  "apex",
+  "tank"
+ ],
+ "vars": {
+  "blowholes": [
+   2,
+   6
+  ],
+  "jetPotency": [
+   4,
+   12
+  ],
+  "clubSize": [
+   0.8,
+   1.5
+  ],
+  "tacticalIntelligence": [
+   0.3,
+   1
+  ],
+  "jetRange": [
+   80,
+   150
+  ]
+ },
+ "picks": {
+  "toxicJets": [
+   0,
+   0,
+   0,
+   1
+  ]
+ },
+ "desc": "An enormous, many-eyed hunter of the open water and the air above it, with a row of blowholes and a heavy clubbed tail.",
+ "temperament": "Always moving, always hunting — calculated and confident. Its all-around vision means it can never be caught by surprise.",
+ "special": "Jets knock back and stun small creatures (Litk/Mael only — larger creatures shrug them off). Tail club answers everything else.",
+ "tether": 150,
+ "throw_reach": 600,
+ "habitat": "sea",
+ "wild": true,
+ "pieces": [
+  {
+   "kind": "bone",
+   "method": "cut"
+  },
+  {
+   "kind": "shed scale",
+   "method": "pickup"
+  }
+ ],
+ "song": {
+  "placeholder": true,
+  "notes": [],
+  "file": ""
+ },
+ "placeholder": {
+  "body": "whale",
+  "color": "#33658a",
+  "color2": "#1e3f57",
+  "features": [
+   "blowholes",
+   "club_tail",
+   "many_eyes"
+  ]
+ },
+ "model": {
+  "file": "",
+  "scale": 1.0,
+  "animations": {}
+ },
+ "attachments": {}
+}
