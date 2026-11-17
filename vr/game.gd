@@ -112,6 +112,17 @@ func ensure_game() -> void:
 func ensure_town() -> void:
 	if data.get("town", {}).is_empty():
 		data.town = TownData.generate(int(data.seed))
+		Wilds.ensure(data)
+		if data.pieces.is_empty() and not data.wilds.creatures.is_empty() and not data.flags.has("starter_piece"):
+			# one found piece so the crafting ritual can be tried before the first hunt
+			var c: Dictionary = data.wilds.creatures[0]
+			for cr in data.wilds.creatures:
+				if int(cr.tok.rarity) < int(c.tok.rarity):
+					c = cr
+			data.pieces.append(WildsSim.take_piece(data.wilds, c, SpeciesDB.get_sp(c.species).pieces[0].kind, "found", c.habitat))
+			data.flags["starter_piece"] = true
+			data.okid[int(c.tok.rarity)] = max(int(data.okid[int(c.tok.rarity)]), int(DyaEconomy.CRAFT_COST[int(c.tok.rarity)][0]))
+			data.ngakara = max(int(data.ngakara), int(DyaEconomy.CRAFT_COST[int(c.tok.rarity)][1]))
 		save_game()
 
 func token_by_id(id: String) -> Dictionary:

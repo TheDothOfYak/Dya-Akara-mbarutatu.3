@@ -122,3 +122,43 @@ func test_town() -> void:
 	ok(Game.data.kit.whip == true, "the weapons stall sells a whip")
 	ok(TownData.stalls_cfg().supply.size() == 4, "four town stalls: weapons, food, armor, potions and misc")
 	ok(TownData.line("rumor", {"creature": "Lutut", "place": "sky"}).contains("Lutut"), "rumor templates fill in from creature data")
+
+func test_workshop() -> void:
+	Game.new_game(42)
+	Game.ensure_town()
+	ok(Game.data.pieces.size() == 1, "a new game has one found piece to try the ritual with")
+	var w: Dictionary = Game.data.wilds
+	var c: Dictionary = w.creatures[5]
+	var before: Dictionary = c.tok.duplicate(true)
+	var piece := WildsSim.take_piece(w, c, "tooth", "fought", c.habitat)
+	Game.data.pieces.append(piece)
+	var r: int = int(piece.tok.rarity)
+	Game.data.okid[r] = 0
+	ok(Crafting.craft(Game.data, piece).is_empty() and Game.data.pieces.has(piece), "crafting is refused when materials are short")
+	Game.data.okid[r] = DyaEconomy.CRAFT_COST[r][0] + 1
+	Game.data.ngakara = DyaEconomy.CRAFT_COST[r][1] + 2
+	var n0: int = Game.data.collection.size()
+	var tok := Crafting.craft(Game.data, piece)
+	ok(not tok.is_empty() and Game.data.collection.size() == n0 + 1 and not Game.data.pieces.has(piece), "the crafted token enters the collection")
+	ok(int(Game.data.okid[r]) == 1 and int(Game.data.ngakara) == 2, "Okid and NgAkara are spent by rarity (2D table)")
+	ok(tok.stats == before.stats and tok.behavior_value == before.behavior_value and tok.vars == before.vars and tok.species == c.species,
+		"the token is exactly the creature as it was when the piece was taken")
+	ok(tok.story.contains("fought") and tok.story.contains(TownData.HABITAT_NAMES[c.habitat]), "its background is written from the hunt")
+	var piece2 := WildsSim.take_piece(w, c, "tooth", "spared", c.habitat)
+	ok(piece2.tok.stats != piece.tok.stats, "a second piece from the same creature gives different stats")
+	# and it works in a match
+	Game.add_to_pouch(tok.id)
+	var m := MatchSim.new({"seed": 9, "quiet": true, "settings": {"chaos_interval": false, "chaos_amount": false, "pulse_interval": 2, "pulse_amount": 5},
+		"teams": [{"name": "You", "controller": "human", "pouch": [Game.token_by_id(tok.id)]}, {"name": "B", "controller": "human", "pouch": []}]}, SpeciesDB.all())
+	for i in 1500: m.do_tick()
+	var e: Dictionary = m.teams[0].pouch[0]
+	for el in MatchSim.ELS:
+		for k in e.cost[el]: m.queue_input(0, {"type": "pay", "i": 0, "el": el})
+	m.queue_input(0, {"type": "throw", "i": 0, "x": 500, "y": 500})
+	m.queue_input(0, {"type": "spawn", "i": 0})
+	for i in 5: m.do_tick()
+	ok(m.creatures.size() == 1 and m.creatures[0].max_hp == float(tok.stats.hp), "the crafted token is paid, thrown and spawned in a match")
+	Game.save_game()
+	Game.data = {}
+	Game.load_game()
+	ok(not Game.token_by_id(tok.id).is_empty(), "the crafted token persists")

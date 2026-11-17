@@ -53,3 +53,10 @@ Where a rule was not written down, the plainest option was chosen so the build c
 35. **Supply prices and guide fee** (40 gold) are placeholders in `data/stalls.json`.
 36. **Your listing price** defaults to the 2D baseline value for the rarity. There is no price slider yet.
 37. **Length of a day.** 24 minutes of play.
+
+## Choices made in Milestone 4
+
+38. **Which Okid a craft uses.** Okid of the same rarity as the token (Buri token, Buri Okid).
+39. **Starter piece.** A new game gives one found piece and enough materials to craft it.
+40. **Two pieces from one creature.** Each piece taken leaves the creature slightly changed (1 less health, a little more experience), so no two tokens ever match.
+41. **Story wording.** The background is plain facts for now: the creature, the habitat near Sri'Ciakala, and how the piece was taken. Yak may want different wording.

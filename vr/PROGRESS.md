@@ -10,9 +10,27 @@ Updated after every milestone. Newest state first.
 | 1 | The match | **Done, gate passed** |
 | 2 | The tower | **Done, gate passed** |
 | 3 | The town | **Done, gate passed** |
-| 4 | The workshop | Next |
-| 5 | The wilds | Not started |
+| 4 | The workshop | **Done, gate passed** |
+| 5 | The wilds | Next |
 | 6 | Multiplayer | Not started |
+
+## Milestone 4 — The workshop (done)
+
+Gate: *crafted token enters the collection and works in a match.* Passes.
+
+Done
+- Workshop scene (`-- --scene=workshop`): rack of pieces with tags (what it becomes, material cost, whether you have enough), Okid count and NgAkara vial on the bench, dark plate, Okid'Relic with a lid.
+- The ritual by hand: lay the piece on the plate, grab the vial and tilt it over the piece (the veins fill electric blue), seat the piece in the Okid'Relic, touch the lid to close, the creature's song plays and runes circle, the token flies to your hand. Skip button. Shelf button for pieces you are not ready to craft.
+- Rules: 2D cost table by rarity, refusal when short (empty vial, the piece will not take the fluid), token is exactly the creature when the piece was taken, behaviour value and background story locked at crafting, story written from where and how.
+- A new game starts with one found piece so the ritual can be tried before the first hunt.
+
+Checked by
+- 9 workshop checks in `-- --selftest` (30 in all), including paying, throwing and spawning the crafted token in a match.
+- Workshop autoplay did the whole ritual with the simulated hands; the collection went from 32 to 33 and the coin ended in the hand.
+
+Known problems and limits
+- Songs are placeholder melodies, one per creature.
+- Only the vial is a tool.
 
 ## Milestone 3 — The town (done)
 
