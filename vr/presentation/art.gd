@@ -178,14 +178,14 @@ static func grain() -> ImageTexture:
 			var u := float(x) / n * TAU
 			var v := float(y) / n * TAU
 			var a := sin(u * 3.0 + sin(v * 2.0) * 1.7) * 0.5 + sin(v * 5.0 + sin(u * 3.0) * 1.3) * 0.3 + sin((u + v) * 9.0) * 0.12 + sin(u * 17.0) * sin(v * 13.0) * 0.1
-			var g := clampf(0.86 + a * 0.13, 0.0, 1.0)
+			var g := clampf(0.93 + a * 0.065, 0.0, 1.0)
 			img.set_pixel(x, y, Color(g, g, g))
 	img.generate_mipmaps()
 	_grain = ImageTexture.create_from_image(img)
 	return _grain
 
 ## The standard surface: grain, a soft rim of sky light, gentle roughness.
-static func surface(col: Color, grain_scale := 0.6, rough := 0.9) -> StandardMaterial3D:
+static func surface(col: Color, grain_scale := 1.3, rough := 0.9) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = col
 	m.roughness = rough
@@ -226,8 +226,8 @@ void vertex() {
 	VERTEX.z += cos(TIME * 1.1 + wp.x * 0.4) * sway * hgt * 0.35;
 }
 void fragment() {
-	float n = fract(sin(dot(floor(wp.xz * 3.0) + floor(wp.y * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
-	ALBEDO = mix(col_low, col_high, hgt * 0.8 + n * 0.2);
+	float n = 0.5 + 0.25 * sin(wp.x * 2.3 + wp.y * 1.7) + 0.25 * sin(wp.z * 2.9 - wp.y * 1.3);
+	ALBEDO = mix(col_low, col_high, clamp(hgt * 0.8 + n * 0.2, 0.0, 1.0));
 	ROUGHNESS = 0.85;
 	BACKLIGHT = col_high * 0.22;
 	RIM = 0.15;
@@ -315,26 +315,36 @@ const HOLO_SHADER := """
 shader_type spatial;
 render_mode cull_disabled, unshaded, depth_draw_never;
 uniform vec4 tint : source_color = vec4(0.4, 0.8, 0.6, 0.5);
+uniform float ground = 0.0;
 varying vec3 wp;
 void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
 	float fres = pow(1.0 - abs(dot(NORMAL, VIEW)), 2.0);
 	float line = 0.75 + 0.25 * sin(wp.y * 260.0 + TIME * 3.0);
 	float shimmer = 0.9 + 0.1 * sin(TIME * 1.7 + wp.x * 9.0 + wp.z * 7.0);
-	ALBEDO = tint.rgb * (0.75 + fres * 0.9) * line * shimmer;
-	ALPHA = clamp(tint.a * (0.7 + fres * 0.8), 0.0, 1.0);
+	if (ground > 0.5) {
+		// the field itself: a faint wash of colour with a fine glowing lattice
+		vec2 g = abs(fract(UV * 32.0) - 0.5);
+		float grid = smoothstep(0.47, 0.5, max(g.x, g.y));
+		ALBEDO = tint.rgb * (0.8 + grid * 0.9) * shimmer;
+		ALPHA = clamp(tint.a * 0.45 + grid * 0.35, 0.0, 1.0);
+	} else {
+		ALBEDO = tint.rgb * (0.75 + fres * 0.9) * line * shimmer;
+		ALPHA = clamp(tint.a * (0.7 + fres * 0.8), 0.0, 1.0);
+	}
 }
 """
 static var _holo_shader: Shader
 
 ## Hologram look for match terrain: a soft tint, bright edges, a faint moving scanline.
-static func hologram(tint: Color) -> ShaderMaterial:
+static func hologram(tint: Color, ground := false) -> ShaderMaterial:
 	if _holo_shader == null:
 		_holo_shader = Shader.new()
 		_holo_shader.code = HOLO_SHADER
 	var m := ShaderMaterial.new()
 	m.shader = _holo_shader
 	m.set_shader_parameter("tint", tint)
+	m.set_shader_parameter("ground", 1.0 if ground else 0.0)
 	return m
 
 # ---------------------------------------------------------------- shapes
@@ -379,12 +389,8 @@ static func blob(seed_n: int, lump := 0.3, detail := 1.6) -> ArrayMesh:
 		norms[i] = d
 	arr[Mesh.ARRAY_VERTEX] = verts
 	arr[Mesh.ARRAY_NORMAL] = norms
-	var st := SurfaceTool.new()
-	var am := ArrayMesh.new()
-	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-	st.create_from(am, 0)
-	st.generate_normals()
-	var out := st.commit()
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	_blobs[key] = out
 	return out
 
@@ -422,6 +428,7 @@ static func tube(points: Array, radii: Array, sides := 8, wobble := 0.0, seed_n 
 			var d: Vector3 = rings[i + 1][k2]
 			st.add_vertex(a); st.add_vertex(c); st.add_vertex(b)
 			st.add_vertex(b); st.add_vertex(c); st.add_vertex(d)
+	st.index()
 	st.generate_normals()
 	return st.commit()
 
@@ -457,12 +464,13 @@ static func terrain(size: float, cells: int, height_fn: Callable, color_fn: Call
 				var y := hs[q[1] * n + q[0]]
 				st.set_color(color_fn.call(x, z, y))
 				st.add_vertex(Vector3(x, y, z))
+	st.index()
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
-	var m := surface(Color.WHITE, 0.25, 0.95)
+	var m := StandardMaterial3D.new()
+	m.roughness = 1.0
 	m.vertex_color_use_as_albedo = true
-	m.rim_enabled = false
 	mi.material_override = m
 	return mi
 
@@ -542,7 +550,7 @@ static func motes(parent: Node, pos: Vector3, extent: Vector3, col: Color, amoun
 	return p
 
 ## A hanging lantern: a warm glowing shade. `lit` adds a real light (use sparingly).
-static func lantern(parent: Node, pos: Vector3, col := Color(1.0, 0.72, 0.36), lit := false, size := 0.16) -> Node3D:
+static func lantern(parent: Node, pos: Vector3, col := Color(1.0, 0.8, 0.52), lit := false, size := 0.16) -> Node3D:
 	var n := Node3D.new()
 	n.position = pos
 	parent.add_child(n)
@@ -555,7 +563,7 @@ static func lantern(parent: Node, pos: Vector3, col := Color(1.0, 0.72, 0.36), l
 	if lit:
 		var l := OmniLight3D.new()
 		l.light_color = col
-		l.light_energy = 1.4
+		l.light_energy = 0.9
 		l.omni_range = 7.0
 		l.omni_attenuation = 1.6
 		n.add_child(l)
@@ -589,7 +597,7 @@ static func tree(parent: Node, pos: Vector3, height := 8.0, seed_n := 1, leaf_lo
 	n.position = pos
 	n.rotation.y = rng.randf() * TAU
 	parent.add_child(n)
-	var bark := surface(Color(0.3, 0.21, 0.14).lerp(Color(0.42, 0.34, 0.26), rng.randf()), 1.4, 1.0)
+	var bark := surface(Color(0.2, 0.16, 0.13).lerp(Color(0.32, 0.28, 0.24), rng.randf()), 1.4, 1.0)
 	var r0 := height * 0.055
 	var lean := Vector3(rng.randf_range(-0.12, 0.12), 0, rng.randf_range(-0.12, 0.12)) * height
 	var pts := []
@@ -600,7 +608,9 @@ static func tree(parent: Node, pos: Vector3, height := 8.0, seed_n := 1, leaf_lo
 		rr.append(r0 * lerpf(1.7, 0.45, pow(t, 0.6)))
 	add_mesh(n, tube(pts, rr, 7, 0.25, seed_n), bark)
 	var top: Vector3 = pts[5]
-	var leaf := foliage(leaf_low, leaf_high, 0.14, height * 0.3)
+	var shift := rng.randf()
+	var warm := Color(0.62, 0.66, 0.22) if shift < 0.5 else Color(0.2, 0.6, 0.5)
+	var leaf := foliage(leaf_low.lerp(warm.darkened(0.5), absf(shift - 0.5) * 0.9), leaf_high.lerp(warm, absf(shift - 0.5) * 0.9), 0.14, height * 0.3)
 	for i in 5:
 		var a := TAU * i / 5.0 + rng.randf()
 		var o := Vector3(cos(a), rng.randf_range(-0.15, 0.5), sin(a)) * height * rng.randf_range(0.1, 0.24)
@@ -618,8 +628,8 @@ static func ancient_tree(parent: Node, pos: Vector3, height := 46.0, girth := 4.
 	var n := Node3D.new()
 	n.position = pos
 	parent.add_child(n)
-	var bark := surface(Color(0.3, 0.25, 0.21).lerp(Color(0.38, 0.33, 0.28), rng.randf()), 0.22, 1.0)
-	var bark2 := surface(Color(0.25, 0.21, 0.18), 0.3, 1.0)
+	var bark := surface(Color(0.2, 0.17, 0.155).lerp(Color(0.27, 0.235, 0.21), rng.randf()), 0.22, 1.0)
+	var bark2 := surface(Color(0.17, 0.145, 0.13), 0.3, 1.0)
 	var pts := []
 	var rr := []
 	var lean := Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)) * 2.5
@@ -645,6 +655,7 @@ static func ancient_tree(parent: Node, pos: Vector3, height := 46.0, girth := 4.
 	var top: Vector3 = pts[8]
 	var leaf_a := foliage(Color(0.05, 0.24, 0.13), Color(0.3, 0.6, 0.26), 0.35, height * 0.2)
 	var leaf_b := foliage(Color(0.08, 0.3, 0.16), Color(0.5, 0.74, 0.32), 0.35, height * 0.2)
+	var bloom := foliage(Color(0.5, 0.3, 0.42), Color(1.0, 0.78, 0.86), 0.35, height * 0.2)
 	var boughs := 7
 	for i in boughs:
 		var a2 := TAU * i / boughs + rng.randf_range(-0.3, 0.3)
@@ -661,7 +672,7 @@ static func ancient_tree(parent: Node, pos: Vector3, height := 46.0, girth := 4.
 		var tip: Vector3 = bp[4]
 		for k in 3:
 			var s := height * rng.randf_range(0.13, 0.2)
-			add_mesh(n, blob((i + k) % 4, 0.36), leaf_a if (i + k) % 2 == 0 else leaf_b, tip + Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.2, 0.7), rng.randf_range(-1, 1)) * s * 0.7, Vector3(s, s * 0.62, s))
+			add_mesh(n, blob((i + k) % 4, 0.36), bloom if (i * 3 + k + seed_n) % 7 == 0 else (leaf_a if (i + k) % 2 == 0 else leaf_b), tip + Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.2, 0.7), rng.randf_range(-1, 1)) * s * 0.7, Vector3(s, s * 0.62, s))
 	for k in 5:
 		var s2 := height * rng.randf_range(0.16, 0.24)
 		add_mesh(n, blob(k % 4, 0.36), leaf_b if k % 2 == 0 else leaf_a, top + Vector3(rng.randf_range(-1, 1) * s2 * 0.6, height * 0.1 + k * 1.2, rng.randf_range(-1, 1) * s2 * 0.6), Vector3(s2, s2 * 0.62, s2))
@@ -703,8 +714,8 @@ static func hut(parent: Node, pos: Vector3, face: float, size := 1.5, seed_n := 
 
 ## A deck ringing a great trunk, with posts and a rail.
 static func deck(parent: Node, pos: Vector3, inner: float, outer: float, seed_n := 1) -> void:
-	var wood := surface(Color(0.46, 0.41, 0.35), 1.6)
-	var dark := surface(Color(0.28, 0.24, 0.2), 1.6)
+	var wood := surface(Color(0.36, 0.31, 0.27), 1.6)
+	var dark := surface(Color(0.2, 0.17, 0.15), 1.6)
 	var d := CylinderMesh.new()
 	d.top_radius = outer
 	d.bottom_radius = outer * 0.94

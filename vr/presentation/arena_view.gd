@@ -47,7 +47,7 @@ func setup(match_sim: MatchSim, origin: Vector3, forward: Vector3, metres_per_un
 		pm.size = Vector2(MatchSim.W, MatchSim.H)
 		g.mesh = pm
 		g.position = Vector3(MatchSim.W * 0.5, 0.5, MatchSim.H * 0.5)
-		g.material_override = _holo(Color(0.4, 0.7, 0.9, 0.25))
+		g.material_override = Art.hologram(Color(0.4, 0.7, 0.9, 0.4), true)
 		add_child(g)
 		_build_edge()
 		return
@@ -80,7 +80,7 @@ func _build_terrain(id: String) -> void:
 	pm.size = Vector2(MatchSim.W * 1.8, MatchSim.H * 2.0)
 	g.mesh = pm
 	g.position = Vector3(MatchSim.W * 0.5, 0.5, MatchSim.H * 0.5)
-	g.material_override = _holo(t.ground)
+	g.material_override = Art.hologram(t.ground, true)
 	add_child(g)
 	var rng := RandomNumberGenerator.new() # scenery only, never rules
 	rng.seed = sim.seed_value

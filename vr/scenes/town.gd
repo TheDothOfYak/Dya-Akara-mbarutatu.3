@@ -65,7 +65,7 @@ static func land_h(x: float, z: float) -> float:
 	return roll * (1.0 - flat) + hill + shore * (1.0 - flat * 0.6)
 
 static func land_col(x: float, z: float, y: float) -> Color:
-	var g := Color(0.3, 0.5, 0.24).lerp(Color(0.45, 0.6, 0.28), Art.fbm2(x * 0.06, z * 0.06))
+	var g := Color(0.26, 0.46, 0.22).lerp(Color(0.44, 0.6, 0.28), Art.fbm2(x * 0.06, z * 0.06)).lerp(Color(0.5, 0.56, 0.26), Art.n2(x * 0.5, z * 0.5) * 0.35)
 	var sand := Color(0.86, 0.78, 0.58)
 	var c := g.lerp(sand, smoothstep(-0.6, -2.2, y))
 	c = c.lerp(Color(0.5, 0.48, 0.44), smoothstep(16.0, 27.0, y) * 0.8)
@@ -123,7 +123,7 @@ func _build_village() -> void:
 		# a stair winding up round the bark
 		var step := BoxMesh.new()
 		step.size = Vector3(1.5, 0.12, 0.6)
-		var wood := Art.surface(Color(0.46, 0.35, 0.24), 1.6)
+		var wood := Art.surface(Color(0.34, 0.29, 0.25), 1.6)
 		for s2 in 96:
 			var sa := s2 * 0.2 + a
 			var sr := girth * 1.25 + 0.75
@@ -147,7 +147,7 @@ func _build_village() -> void:
 		var pole := WorldBuilder.cyl(0.07, 3.7, Vector3(cos(a3) * 12.5, 1.85, sin(a3) * 12.5), Color(0.3, 0.22, 0.15), self)
 		pole.name = "pole%d" % i
 	# roots run down into the sea and become the reef the town stands on
-	var root_m := Art.surface(Color(0.27, 0.23, 0.2), 0.3, 1.0)
+	var root_m := Art.surface(Color(0.18, 0.155, 0.14), 0.3, 1.0)
 	for i in 14:
 		var x := rng.randf_range(-70, 70)
 		var pts := []

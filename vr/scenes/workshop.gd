@@ -27,19 +27,25 @@ func _ready() -> void:
 	Art.light_scene(self, "dusk")
 	Art.backdrop(self, 4, 9.0, -0.12)
 	for lp in [Vector3(-2.6, 2.3, -2.4), Vector3(2.6, 2.3, -2.4), Vector3(-3.4, 2.1, 1.5), Vector3(3.4, 2.1, 1.5)]:
-		Art.lantern(self, lp, Color(1.0, 0.72, 0.38), true, 0.14)
-	WorldBuilder.box(Vector3(8.6, 0.3, 8.6), Vector3(0, 3.15, 0), Color(0.36, 0.27, 0.2), self)
+		Art.lantern(self, lp, Color(1.0, 0.84, 0.6), lp.z > 0.0, 0.12)
+	WorldBuilder.box(Vector3(8.6, 0.3, 8.6), Vector3(0, 3.15, 0), Color(0.3, 0.26, 0.22), self)
 	for bx in [-3, -1, 1, 3]:
 		WorldBuilder.box(Vector3(0.25, 0.3, 8.2), Vector3(bx, 2.9, 0), Color(0.3, 0.22, 0.16), self)
 	Art.motes(self, Vector3(0.3, 1.3, -0.2), Vector3(0.5, 0.5, 0.4), Color(0.4, 0.85, 1.0, 0.8), 24, 0.012, 0.08)
-	WorldBuilder.box(Vector3(8, 0.1, 8), Vector3(0, -0.05, 0), Color(0.36, 0.29, 0.23), self)
-	for w in [[Vector3(0, 1.5, -3), Vector3(8, 3, 0.2)], [Vector3(-4, 1.5, 0), Vector3(0.2, 3, 8)], [Vector3(4, 1.5, 0), Vector3(0.2, 3, 8)]]:
-		WorldBuilder.box(w[1], w[0], Color(0.5, 0.44, 0.38), self)
+	WorldBuilder.box(Vector3(8, 0.1, 8), Vector3(0, -0.05, 0), Color(0.3, 0.26, 0.23), self)
+	for w in [[Vector3(-4, 1.5, 0), Vector3(0.25, 3, 8)], [Vector3(4, 1.5, 0), Vector3(0.25, 3, 8)]]:
+		WorldBuilder.box(w[1], w[0], Color(0.62, 0.6, 0.57), self)
+	# the far wall is a wide window onto the sea and the sky
+	WorldBuilder.box(Vector3(8, 0.95, 0.25), Vector3(0, 0.475, -3), Color(0.62, 0.6, 0.57), self)
+	WorldBuilder.box(Vector3(8, 0.5, 0.25), Vector3(0, 2.75, -3), Color(0.62, 0.6, 0.57), self)
+	for wx in [-3.9, -1.3, 1.3, 3.9]:
+		WorldBuilder.box(Vector3(0.22, 1.6, 0.25), Vector3(wx, 1.75, -3), Color(0.3, 0.25, 0.21), self)
+	WorldBuilder.box(Vector3(8.2, 0.08, 0.45), Vector3(0, 0.97, -2.95), Color(0.34, 0.28, 0.23), self)
 	var lamp := OmniLight3D.new()
 	lamp.position = Vector3(0, 2.4, -0.5)
 	lamp.omni_range = 8.0
-	lamp.light_color = Color(1.0, 0.82, 0.6)
-	lamp.light_energy = 1.4
+	lamp.light_color = Color(1.0, 0.92, 0.8)
+	lamp.light_energy = 1.0
 	add_child(lamp)
 	rig = XRRig.new()
 	add_child(rig)
@@ -72,7 +78,7 @@ func _build_bench() -> void:
 	bench = Node3D.new()
 	bench.position = Vector3(0, 0, -0.25)
 	add_child(bench)
-	WorldBuilder.box(Vector3(1.8, 0.06, 0.7), Vector3(0, 0.8, 0), Color(0.42, 0.31, 0.21), bench)
+	WorldBuilder.box(Vector3(1.8, 0.06, 0.7), Vector3(0, 0.8, 0), Color(0.36, 0.3, 0.25), bench)
 	for x in [-0.8, 0.8]:
 		WorldBuilder.box(Vector3(0.08, 0.8, 0.6), Vector3(x, 0.4, 0), Color(0.33, 0.24, 0.16), bench)
 	# where the piece lies while you pour

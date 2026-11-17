@@ -127,7 +127,7 @@ func _build_land() -> void:
 	# meadow between the habitats
 	var meadow := func(x: float, z: float) -> bool:
 		return z > -84.0 and habitat_weight("bog", x, z) < 0.3 and habitat_weight("sky", x, z) < 0.5
-	Art.grass(self, 14000, Rect2(-170, -84, 340, 260), meadow, land_h, Color(0.12, 0.34, 0.14), Color(0.4, 0.58, 0.27), 0.55, 31)
+	Art.grass(self, 8000, Rect2(-170, -84, 340, 260), meadow, land_h, Color(0.12, 0.34, 0.14), Color(0.4, 0.58, 0.27), 0.55, 31)
 	Art.grass(self, 1200, Rect2(-150, -60, 300, 200), meadow, land_h, Color(0.2, 0.4, 0.2), Color(0.98, 0.78, 0.86), 0.34, 32)
 	Art.grass(self, 1200, Rect2(-150, -60, 300, 200), meadow, land_h, Color(0.2, 0.4, 0.2), Color(0.72, 0.7, 1.0), 0.32, 33)
 	for i in 30:
@@ -529,7 +529,7 @@ class Weapon:
 		position = slot
 		rotation = Vector3.ZERO
 
-	func _process(delta: float) -> void:
+	func _physics_process(delta: float) -> void: # measured on the physics clock so a slow frame cannot hide a swing
 		_cd = max(0.0, _cd - delta)
 		if _flying:
 			_fly.y -= 9.8 * delta

@@ -14,6 +14,27 @@ Updated after every milestone. Newest state first.
 | 5 | The wilds | **Done, gate passed** |
 | 6 | Multiplayer | **Gate passed; parts still to build (see below)** |
 
+## Art pass (after milestone 6)
+
+Yak asked for the game to be beautiful, not shapes on a blank background. Everything is still generated in code (`presentation/art.gd`), so it ships at no cost and any piece can be replaced by real art.
+
+Done
+- The sky over Xikia: Velki huge and close, Leotik small, Xikia's little Kalo, drifting cloud, Pia'don's light, stars at dusk. Haze, soft shadows, bloom and filmic tone in every scene.
+- Sri'Ciakala: seven massive ancient trees with flared roots, homes with lit windows on four decks each, stairs winding round the bark, rope bridges, strings of lanterns, blossom in the crowns, roots running down into the sea as reef, living water with foam at the shore, the castle on its hill with banners, a paved square, striped awnings on all 16 stalls, a thatched tavern, meadow grass and flowers that move in the wind, pollen and sea spray in the air.
+- The wilds: rolling land coloured by habitat, forest of varied trees with fireflies, bog pools with reeds and mist, weathered cliffs, a boulder shore, the sea, and a great-tree gate home.
+- The tower: high above the land at dusk, a balcony open to the sea and to Velki, stone walls, lanterns, rug, bookshelves.
+- The workshop: a wide window onto the evening, beams, lanterns. Matches, lobby and replays stand in open Xikia countryside. Match terrain is a true hologram with a glowing lattice.
+- Creatures and props have smooth forms, surface grain and a rim of sky light.
+- Weapon swings are now measured on the physics clock, so frame rate cannot hide a swing.
+
+Checked by
+- All 107 headless checks pass. The match, tower, town, workshop and wilds bots all pass again on the restyled scenes. Screenshots in `docs/`.
+
+Known problems and limits
+- Frame rate is untested on a headset. The town and the wilds are much heavier than before (thousands of grass tufts, many trees, shadows). They will need a lower-detail setting for a Quest-class headset.
+- Creatures are still built from simple shapes. They wait for real models through the drop-in folders.
+- You cannot yet walk up the stairs to the tree decks.
+
 ## What to do next (for whoever continues)
 
 1. Put it on a real headset. Nothing has run on hardware. Check OpenXR start-up, controller button names, comfort, frame rate at 72 fps, and every hand interaction.

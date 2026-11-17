@@ -77,3 +77,9 @@ Where a rule was not written down, the plainest option was chosen so the build c
 50. **Disconnects.** After 10 seconds the remaining player takes the win. The 2D alternative (continue against an AI) is not offered yet.
 51. **Network matches are plains terrain** with scale and pulse settings from the two players' ring votes.
 52. **Spectators** join with the town code, like players.
+
+## Choices made in the art pass
+
+53. **The sky from Xikia.** Velki is drawn very large with blue ocean and green-brown continents, Leotik small and dark-red, and one small pale Kalo for Xikia, following the 2D sky notes. Sizes, colours and positions are guesses.
+54. **How Sri'Ciakala looks.** Round thatched homes on wooden decks, rope bridges, coloured lanterns, striped market awnings, blossom in the trees, a stone castle with red banners. All of this is placeholder styling, not canon.
+55. **Time of day.** The town is in golden late afternoon, the tower and workshop at dusk, the wilds in the morning, matches at midday.
