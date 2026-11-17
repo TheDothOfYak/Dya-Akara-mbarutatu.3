@@ -15,9 +15,8 @@ var net: NetSession = null
 
 func _ready() -> void:
 	Game.ensure_game()
-	add_child(WorldBuilder.sky_environment(Color(0.45, 0.6, 0.85), Color(0.3, 0.36, 0.3)))
-	add_child(WorldBuilder.sun())
-	add_child(WorldBuilder.ground(60.0, Color(0.34, 0.4, 0.32)))
+	Art.light_scene(self, "golden")
+	Art.backdrop(self, 5, 10.0)
 	rig = XRRig.new()
 	add_child(rig)
 	rig.place(Vector3(0, 0, 0.9), 0.0)
@@ -39,6 +38,7 @@ func _ready() -> void:
 	board.add_child(PanelButton.make("Watch", Vector3(0.24, -0.22, 0), func(): _join(true), 0.2, 0.0009))
 	board.add_child(PanelButton.make("Back to town", Vector3(0, -0.31, 0), _back, 0.3, 0.0009))
 	_show("")
+	LookBot.maybe(self, rig)
 	Shots.maybe(self)
 
 func _show(status: String) -> void:

@@ -94,9 +94,8 @@ func _build_attachments() -> void:
 # ---------------------------------------------------------------- placeholder
 
 func _mat(col: Color, glow := false) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = col
-	m.roughness = 0.9
+	var m := Art.surface(col, 3.0, 0.75)
+	m.rim = 0.6
 	if glow:
 		m.emission_enabled = true
 		m.emission = col
@@ -123,10 +122,10 @@ static var _cyl: CylinderMesh
 static func _prims() -> void:
 	if _sphere != null:
 		return
-	_sphere = SphereMesh.new(); _sphere.radius = 0.5; _sphere.height = 1.0; _sphere.radial_segments = 10; _sphere.rings = 6
+	_sphere = SphereMesh.new(); _sphere.radius = 0.5; _sphere.height = 1.0; _sphere.radial_segments = 18; _sphere.rings = 10
 	_box = BoxMesh.new()
-	_cone = CylinderMesh.new(); _cone.top_radius = 0.0; _cone.bottom_radius = 0.5; _cone.height = 1.0; _cone.radial_segments = 8
-	_cyl = CylinderMesh.new(); _cyl.top_radius = 0.5; _cyl.bottom_radius = 0.5; _cyl.height = 1.0; _cyl.radial_segments = 8
+	_cone = CylinderMesh.new(); _cone.top_radius = 0.0; _cone.bottom_radius = 0.5; _cone.height = 1.0; _cone.radial_segments = 14
+	_cyl = CylinderMesh.new(); _cyl.top_radius = 0.5; _cyl.bottom_radius = 0.5; _cyl.height = 1.0; _cyl.radial_segments = 14
 
 func _build_placeholder() -> void:
 	_prims()

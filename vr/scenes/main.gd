@@ -3,10 +3,8 @@ extends Node3D
 ## simulator, with every creature's placeholder lined up for inspection.
 
 func _ready() -> void:
-	var env := WorldBuilder.sky_environment(Color(0.55, 0.7, 0.9), Color(0.35, 0.4, 0.35))
-	add_child(env)
-	add_child(WorldBuilder.sun())
-	add_child(WorldBuilder.ground(40.0, Color(0.32, 0.42, 0.3)))
+	Art.light_scene(self, "day")
+	Art.backdrop(self, 2, 9.0)
 	var rig := XRRig.new()
 	add_child(rig)
 	rig.place(Vector3(0, 0, 3.2), 0.0)

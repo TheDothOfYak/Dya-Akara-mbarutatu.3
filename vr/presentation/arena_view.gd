@@ -69,15 +69,8 @@ func floor_y() -> float:
 
 # ---------------------------------------------------------------- scenery
 
-func _holo(col: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = col
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.emission_enabled = true
-	m.emission = Color(col.r, col.g, col.b)
-	m.emission_energy_multiplier = 0.25
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return m
+func _holo(col: Color) -> Material:
+	return Art.hologram(col)
 
 func _build_terrain(id: String) -> void:
 	var t: Dictionary = TERRAINS.get(id, TERRAINS.plains)

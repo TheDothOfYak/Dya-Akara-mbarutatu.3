@@ -13,9 +13,8 @@ var info: Label3D
 var center := Vector3(0, 0.8, -1.2)
 
 func _ready() -> void:
-	add_child(WorldBuilder.sky_environment(Color(0.35, 0.45, 0.65), Color(0.25, 0.28, 0.3)))
-	add_child(WorldBuilder.sun())
-	add_child(WorldBuilder.ground(400.0, Color(0.28, 0.3, 0.32)))
+	Art.light_scene(self, "dusk")
+	Art.backdrop(self, 9, 200.0, -0.02, true, 24)
 	rig = XRRig.new()
 	add_child(rig)
 	rig.place(Vector3(0, 0, 0.4), 0.0)
@@ -36,6 +35,7 @@ func _ready() -> void:
 	bar.add_child(PanelButton.make("Leave", Vector3(0.4, 0, 0), func(): Game.goto(Game.data.get("flags", {}).get("replay_return", "res://scenes/tower.tscn")), 0.18))
 	info = WorldBuilder.label("", Vector3(0, 0.1, 0), 0.0009, bar)
 	seek(0)
+	LookBot.maybe(self, rig)
 	Shots.maybe(self)
 
 ## Rewind (or jump) by replaying from the start up to `tick`: exact every time.

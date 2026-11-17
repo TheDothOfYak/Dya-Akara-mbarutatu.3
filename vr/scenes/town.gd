@@ -22,9 +22,7 @@ var _clock_acc := 0.0
 func _ready() -> void:
 	Game.ensure_game()
 	town = Game.data.town
-	add_child(WorldBuilder.sky_environment(Color(0.45, 0.68, 0.9), Color(0.3, 0.42, 0.4)))
-	add_child(WorldBuilder.sun())
-	add_child(WorldBuilder.ground(400.0, Color(0.36, 0.44, 0.34)))
+	Art.light_scene(self, "golden")
 	_build_village()
 	rig = XRRig.new()
 	add_child(rig)
@@ -52,34 +50,147 @@ func _ready() -> void:
 		var bot = load("res://tools/town_bot.gd").new()
 		bot.scene = self
 		add_child(bot)
+	LookBot.maybe(self, rig)
 	Shots.maybe(self)
 
 # ---------------------------------------------------------------- the place
 
+## Height of the land at (x, z). The square, the tavern and the paths are level;
+## the shore falls away to the sea in the north and the castle hill rises in the south-east.
+static func land_h(x: float, z: float) -> float:
+	var flat := 1.0 - smoothstep(26.0, 60.0, Vector2(x, z).length())
+	var roll := (Art.fbm2(x * 0.02, z * 0.02) - 0.45) * 9.0
+	var hill := smoothstep(70.0, 12.0, Vector2(x - 95.0, z - 65.0).length()) * 30.0
+	var shore := smoothstep(-34.0, -62.0, z) * -4.5
+	return roll * (1.0 - flat) + hill + shore * (1.0 - flat * 0.6)
+
+static func land_col(x: float, z: float, y: float) -> Color:
+	var g := Color(0.3, 0.5, 0.24).lerp(Color(0.45, 0.6, 0.28), Art.fbm2(x * 0.06, z * 0.06))
+	var sand := Color(0.86, 0.78, 0.58)
+	var c := g.lerp(sand, smoothstep(-0.6, -2.2, y))
+	c = c.lerp(Color(0.5, 0.48, 0.44), smoothstep(16.0, 27.0, y) * 0.8)
+	# worn earth where people walk
+	var d := Vector2(x, z).length()
+	c = c.lerp(Color(0.58, 0.5, 0.38), smoothstep(17.0, 13.0, d) * 0.85)
+	return c
+
 func _build_village() -> void:
-	# the village grows out of massive ancient trees, on several levels
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(town.seed)
+	add_child(Art.terrain(520.0, 120, land_h, land_col))
+	# the sea beside the town
+	add_child(Art.water(Vector2(520, 300), Vector3(0, -1.6, -190), Vector2(0, 1), -48.0))
+	# the square: ringed paving round a well of old root
+	var stone := Art.surface(Color(0.66, 0.6, 0.5), 0.5)
+	var stone2 := Art.surface(Color(0.56, 0.5, 0.42), 0.5)
+	WorldBuilder.cyl(13.2, 0.07, Vector3(0, 0.035, 0), Color.WHITE, self).material_override = stone
+	for r in [12.2, 8.0, 4.0]:
+		var ring := MeshInstance3D.new()
+		var tm := TorusMesh.new()
+		tm.inner_radius = r - 0.35
+		tm.outer_radius = r
+		tm.rings = 48
+		tm.ring_segments = 4
+		ring.mesh = tm
+		ring.scale.y = 0.12
+		ring.position.y = 0.075
+		ring.material_override = stone2
+		add_child(ring)
+	Art.add_mesh(self, Art.blob(11, 0.3), Art.surface(Color(0.36, 0.27, 0.19), 0.4), Vector3(0, 0.3, 0), Vector3(1.6, 0.7, 1.6))
+	Art.lantern(self, Vector3(0, 1.6, 0), Color(0.5, 0.9, 1.0), true, 0.3)
+	# the massive ancient trees the village grows out of, with homes on four levels
+	var trees := []
 	for i in 7:
 		var a := TAU * i / 7.0 + 0.3
-		var r := 26.0 + rng.randf_range(0, 6)
-		var p := Vector3(cos(a) * r, 0, sin(a) * r)
-		WorldBuilder.cyl(3.2, 34.0, p + Vector3(0, 17, 0), Color(0.36, 0.26, 0.18), self, 2.2)
-		WorldBuilder.ball(11.0, p + Vector3(0, 36, 0), Color(0.2, 0.42, 0.24), self)
-		for lvl in 4:
-			# homes spread across the tree levels
-			var plat := WorldBuilder.cyl(5.5, 0.3, p + Vector3(0, 4.0 + lvl * 6.0, 0), Color(0.45, 0.35, 0.25), self)
-			plat.name = "level_%d_%d" % [i, lvl]
+		var r2 := 30.0 + rng.randf_range(0, 7)
+		var p := Vector3(cos(a) * r2, 0, sin(a) * r2)
+		p.y = land_h(p.x, p.z)
+		var t := Art.ancient_tree(self, p, rng.randf_range(42, 54), rng.randf_range(3.6, 4.8), i + int(town.seed) % 50)
+		trees.append(t)
+		var girth: float = t.get_meta("girth")
+		var k := 0
+		for ly in t.get_meta("levels"):
+			var c := p + Vector3(0, ly, 0)
+			var outer := girth * 1.25 + 4.2 - k * 0.4
+			Art.deck(self, c, girth, outer, i + k)
 			for h in 3:
-				var ha := a + h * 2.1 + lvl
-				WorldBuilder.box(Vector3(1.6, 1.6, 1.6), p + Vector3(cos(ha) * 4.0, 5.0 + lvl * 6.0, sin(ha) * 4.0), Color(0.6, 0.5, 0.38), self)
-	# the sea beside the town, and the castle on the hill above
-	var sea := WorldBuilder.box(Vector3(400, 0.2, 160), Vector3(0, 0.05, -120), Color(0.2, 0.45, 0.65, 0.85), self)
-	sea.name = "sea"
-	WorldBuilder.cyl(30.0, 26.0, Vector3(90, 13, 60), Color(0.4, 0.46, 0.36), self, 14.0)
-	WorldBuilder.box(Vector3(10, 9, 10), Vector3(90, 30, 60), Color(0.62, 0.6, 0.58), self)
-	# the square
-	WorldBuilder.cyl(13.0, 0.06, Vector3(0, 0.03, 0), Color(0.55, 0.5, 0.42), self)
+				var ha := a + h * TAU / 3.0 + k * 0.8
+				Art.hut(self, c + Vector3(cos(ha), 0, sin(ha)) * (outer - 1.7) + Vector3(0, 0.14, 0), -ha + PI / 2, 1.15, i * 5 + h + k)
+			for h in 4:
+				var la := a + h * TAU / 4.0 + 0.5 + k
+				Art.lantern(self, c + Vector3(cos(la) * outer * 0.95, 1.9, sin(la) * outer * 0.95), Color(1.0, 0.72, 0.36), h == 0 and k == 0)
+			k += 1
+		# a stair winding up round the bark
+		var step := BoxMesh.new()
+		step.size = Vector3(1.5, 0.12, 0.6)
+		var wood := Art.surface(Color(0.46, 0.35, 0.24), 1.6)
+		for s2 in 96:
+			var sa := s2 * 0.2 + a
+			var sr := girth * 1.25 + 0.75
+			var mi := Art.add_mesh(self, step, wood, p + Vector3(cos(sa) * sr, 0.25 + s2 * 0.24, sin(sa) * sr))
+			mi.rotation.y = -sa
+	# rope bridges and strings of lanterns between neighbouring trees
+	for i in 7:
+		var t1: Node3D = trees[i]
+		var t2: Node3D = trees[(i + 1) % 7]
+		var lv := 1 + i % 3
+		var y: float = t1.get_meta("levels")[lv]
+		var d := (t2.position - t1.position)
+		d.y = 0
+		var dn := d.normalized()
+		var g1: float = t1.get_meta("girth") * 1.25 + 4.0 - lv * 0.4
+		var g2: float = t2.get_meta("girth") * 1.25 + 4.0 - lv * 0.4
+		Art.bridge(self, t1.position + dn * g1 + Vector3(0, y + 0.15, 0), t2.position - dn * g2 + Vector3(0, y + 0.15, 0), 1.6)
+	for i in 8:
+		var a3 := TAU * i / 8.0
+		Art.lantern_string(self, Vector3(cos(a3) * 12.5, 3.6, sin(a3) * 12.5), Vector3(cos(a3 + TAU / 8.0) * 12.5, 3.6, sin(a3 + TAU / 8.0) * 12.5), 6, 0.7)
+		var pole := WorldBuilder.cyl(0.07, 3.7, Vector3(cos(a3) * 12.5, 1.85, sin(a3) * 12.5), Color(0.3, 0.22, 0.15), self)
+		pole.name = "pole%d" % i
+	# roots run down into the sea and become the reef the town stands on
+	var root_m := Art.surface(Color(0.27, 0.23, 0.2), 0.3, 1.0)
+	for i in 14:
+		var x := rng.randf_range(-70, 70)
+		var pts := []
+		var rr := []
+		for k2 in 8:
+			var t3 := k2 / 7.0
+			var z := lerpf(-30.0, -78.0, t3)
+			pts.append(Vector3(x + sin(t3 * 4.0 + i) * 4.0, land_h(x, z) + sin(t3 * PI * 2.5 + i) * 1.1 + 0.3, z))
+			rr.append(lerpf(1.1, 0.25, t3))
+		Art.add_mesh(self, Art.tube(pts, rr, 10, 0.3, i), root_m)
+	for i in 30:
+		var x2 := rng.randf_range(-110, 110)
+		var z2 := rng.randf_range(-74, -44)
+		Art.rock(self, Vector3(x2, land_h(x2, z2) + 0.1, z2), Vector3(rng.randf_range(0.5, 2.2), rng.randf_range(0.4, 1.3), rng.randf_range(0.5, 2.0)), i, Color(0.52, 0.5, 0.48))
+	# woodland beyond the village, grass and flowers between
+	for i in 70:
+		var a4 := rng.randf() * TAU
+		var r4 := rng.randf_range(48, 190)
+		var tp := Vector3(cos(a4) * r4, 0, sin(a4) * r4)
+		if tp.z < -40.0 or Vector2(tp.x - 95.0, tp.z - 65.0).length() < 16.0:
+			continue
+		tp.y = land_h(tp.x, tp.z) - 0.2
+		Art.tree(self, tp, rng.randf_range(7, 15), i)
+	var on_grass := func(x: float, z: float) -> bool:
+		var d2 := Vector2(x, z).length()
+		return d2 > 13.6 and z > -40.0 and Vector2(x - 17.0, z).length() > 6.3
+	Art.grass(self, 9000, Rect2(-60, -42, 120, 104), on_grass, land_h, Color(0.12, 0.34, 0.14), Color(0.4, 0.58, 0.27), 0.5, 5)
+	Art.grass(self, 500, Rect2(-45, -35, 90, 85), on_grass, land_h, Color(0.2, 0.42, 0.2), Color(1.0, 0.72, 0.85), 0.3, 6)
+	Art.grass(self, 400, Rect2(-45, -35, 90, 85), on_grass, land_h, Color(0.2, 0.42, 0.2), Color(1.0, 0.9, 0.45), 0.28, 7)
+	# the castle on the hill above, on good terms with the village below
+	var cst := Vector3(95, land_h(95, 65), 65)
+	var cs := Art.surface(Color(0.74, 0.7, 0.64), 0.25)
+	var roof := Art.surface(Color(0.3, 0.36, 0.5), 0.6)
+	WorldBuilder.box(Vector3(20, 9, 16), cst + Vector3(0, 3.5, 0), Color.WHITE, self).material_override = cs
+	WorldBuilder.box(Vector3(9, 15, 9), cst + Vector3(0, 7, 0), Color.WHITE, self).material_override = cs
+	for q in [[-10, -8], [10, -8], [-10, 8], [10, 8]]:
+		WorldBuilder.cyl(2.6, 15, cst + Vector3(q[0], 6.5, q[1]), Color.WHITE, self).material_override = cs
+		WorldBuilder.cyl(3.2, 5.0, cst + Vector3(q[0], 16.5, q[1]), Color.WHITE, self, 0.05).material_override = roof
+		Art.banner(self, cst + Vector3(q[0], 19, q[1]), 4.0, Color(0.85, 0.3, 0.25))
+	WorldBuilder.cyl(6.4, 7.0, cst + Vector3(0, 18, 0), Color.WHITE, self, 0.05).material_override = roof
+	# the air itself: pollen over the square, spray along the shore
+	Art.motes(self, Vector3(0, 2.5, 0), Vector3(22, 2.5, 22), Color(1.0, 0.95, 0.7, 0.8), 120, 0.03)
+	Art.motes(self, Vector3(0, 0.6, -52), Vector3(70, 0.6, 6), Color(0.9, 0.97, 1.0, 0.6), 90, 0.05, 0.12)
 
 func _stall_pos(i: int) -> Vector3:
 	var a := TAU * i / 16.0
@@ -93,12 +204,20 @@ func _build_stalls() -> void:
 		s.rotation.y = -TAU * i / 16.0 - PI / 2 # counters face the middle of the square
 		add_child(s)
 		stall_nodes.append(s)
-		var col := Color(0.55, 0.3, 0.25) if i < 4 else Color(0.3, 0.4, 0.55)
-		if i == 15: col = Color(0.75, 0.62, 0.3)
-		WorldBuilder.box(Vector3(1.8, 0.9, 0.6), Vector3(0, 0.45, 0), Color(0.45, 0.34, 0.24), s)
-		WorldBuilder.box(Vector3(2.1, 0.08, 1.2), Vector3(0, 2.2, -0.2), col, s)
-		for x in [-0.95, 0.95]:
-			WorldBuilder.box(Vector3(0.08, 2.2, 0.08), Vector3(x, 1.1, -0.6), Color(0.35, 0.26, 0.18), s)
+		var cols := [Color(0.82, 0.3, 0.26), Color(0.9, 0.62, 0.22), Color(0.3, 0.5, 0.72), Color(0.4, 0.62, 0.4), Color(0.62, 0.36, 0.62), Color(0.86, 0.46, 0.3)]
+		var col: Color = cols[i % cols.size()]
+		if i == 15: col = Color(0.95, 0.8, 0.3)
+		WorldBuilder.box(Vector3(1.9, 0.86, 0.62), Vector3(0, 0.43, 0), Color(0.5, 0.38, 0.26), s)
+		WorldBuilder.box(Vector3(2.0, 0.05, 0.72), Vector3(0, 0.885, 0), Color(0.62, 0.5, 0.36), s)
+		WorldBuilder.box(Vector3(1.92, 0.5, 0.02), Vector3(0, 0.6, 0.325), col.darkened(0.15), s)
+		Art.awning(s, Vector3(0, 2.45, 0.1), Vector2(2.5, 2.0), col, Color(0.96, 0.93, 0.86))
+		for x in [-1.1, 1.1]:
+			WorldBuilder.cyl(0.05, 2.75, Vector3(x, 1.37, -0.85), Color(0.35, 0.26, 0.18), s)
+			WorldBuilder.cyl(0.05, 2.05, Vector3(x, 1.02, 1.05), Color(0.35, 0.26, 0.18), s)
+		WorldBuilder.box(Vector3(0.5, 0.45, 0.5), Vector3(-1.5, 0.23, -0.3), Color(0.52, 0.4, 0.27), s)
+		WorldBuilder.box(Vector3(0.4, 0.35, 0.4), Vector3(-1.45, 0.62, -0.3), Color(0.46, 0.35, 0.24), s).rotation.y = 0.4
+		Art.add_mesh(s, Art.blob(i % 4, 0.1), Art.surface(col.lightened(0.2), 2.0), Vector3(1.45, 0.28, -0.25), Vector3(0.32, 0.28, 0.32))
+		Art.lantern(s, Vector3(0, 2.0, 0.75), Color(1.0, 0.76, 0.4), i % 4 == 0, 0.11)
 	_fill_stalls()
 
 func _fill_stalls() -> void:
@@ -153,15 +272,29 @@ func _fill_stalls() -> void:
 				k2 += 1
 
 func _build_tavern() -> void:
-	WorldBuilder.cyl(6.0, 0.08, tavern_pos + Vector3(0, 0.04, 0), Color(0.5, 0.38, 0.28), self)
-	WorldBuilder.label("Tavern", tavern_pos + Vector3(0, 3.2, 0), 0.008, self)
-	WorldBuilder.box(Vector3(10, 0.2, 10), tavern_pos + Vector3(0, 2.9, 0), Color(0.42, 0.3, 0.22), self)
-	for x in [-4.6, 4.6]:
-		for z in [-4.6, 4.6]:
-			WorldBuilder.box(Vector3(0.3, 2.9, 0.3), tavern_pos + Vector3(x, 1.45, z), Color(0.35, 0.25, 0.18), self)
+	var wood := Art.surface(Color(0.42, 0.3, 0.2), 1.4)
+	WorldBuilder.cyl(6.2, 0.1, tavern_pos + Vector3(0, 0.05, 0), Color(0.5, 0.38, 0.27), self)
+	for i in 8:
+		var a := TAU * i / 8.0 + PI / 8.0
+		var p := tavern_pos + Vector3(cos(a) * 5.6, 0, sin(a) * 5.6)
+		WorldBuilder.cyl(0.2, 3.1, p + Vector3(0, 1.55, 0), Color.WHITE, self).material_override = wood
+		Art.lantern(self, p + Vector3(-cos(a) * 0.5, 2.5, -sin(a) * 0.5), Color(1.0, 0.7, 0.36), i % 4 == 0, 0.13)
+	var roof := CylinderMesh.new()
+	roof.top_radius = 0.3
+	roof.bottom_radius = 7.4
+	roof.height = 4.2
+	roof.radial_segments = 16
+	Art.add_mesh(self, roof, Art.surface(Color(0.56, 0.42, 0.24), 2.5, 1.0), tavern_pos + Vector3(0, 5.1, 0))
+	WorldBuilder.label("Tavern", tavern_pos + Vector3(0, 3.0, 6.3), 0.006, self)
+	WorldBuilder.box(Vector3(2.6, 1.05, 0.7), tavern_pos + Vector3(0, 0.52, -4.6), Color(0.45, 0.32, 0.2), self)
+	for i in 4:
+		WorldBuilder.cyl(0.28, 0.5, tavern_pos + Vector3(-1.0 + i * 0.65, 1.3, -4.6), Color(0.5, 0.36, 0.22), self)
 	for i in 4:
 		var tp := tavern_pos + Vector3(-2.2 + 4.4 * (i % 2), 0, -2.0 + 4.0 * int(i / 2.0))
 		WorldBuilder.cyl(0.6, 0.05, tp + Vector3(0, 0.75, 0), Color(0.45, 0.33, 0.22), self)
+		Art.lantern(self, tp + Vector3(0, 0.9, 0), Color(1.0, 0.8, 0.5), false, 0.06)
+		for st in 3:
+			WorldBuilder.cyl(0.18, 0.45, tp + Vector3(cos(st * 2.1) * 0.95, 0.225, sin(st * 2.1) * 0.95), Color(0.4, 0.29, 0.19), self)
 		WorldBuilder.cyl(0.07, 0.75, tp + Vector3(0, 0.375, 0), Color(0.35, 0.25, 0.18), self)
 	var b := PanelButton.make("Sandbox against an AI", tavern_pos + Vector3(0, 1.3, 4.4), _tavern_sandbox, 0.45, 0.001)
 	b.rotation.y = PI
@@ -441,8 +574,12 @@ class NpcFigure:
 	func _ready() -> void:
 		var h := DyaRng.new(DyaRng.hash_str(npc.id))
 		var col := Color.from_hsv(h.next(), 0.35, 0.7)
-		WorldBuilder.cyl(0.2, 1.25, Vector3(0, 0.63, 0), col, self, 0.14)
-		WorldBuilder.ball(0.13, Vector3(0, 1.42, 0), Color(0.82, 0.68, 0.52), self)
+		WorldBuilder.cyl(0.27, 1.2, Vector3(0, 0.6, 0), col, self, 0.13)
+		WorldBuilder.cyl(0.19, 0.3, Vector3(0, 1.22, 0), col.darkened(0.25), self, 0.1)
+		WorldBuilder.ball(0.125, Vector3(0, 1.45, 0), Color(0.86, 0.7, 0.54), self)
+		Art.add_mesh(self, Art.blob(1, 0.08), Art.surface(col.darkened(0.35), 2.0), Vector3(0, 1.52, 0.02), Vector3(0.15, 0.12, 0.16))
+		for sx in [-1.0, 1.0]:
+			WorldBuilder.cyl(0.05, 0.6, Vector3(sx * 0.24, 0.93, 0.0), col.darkened(0.12), self).rotation.z = sx * 0.25
 		WorldBuilder.label(npc.name, Vector3(0, 1.72, 0), 0.0022, self)
 		var grab := Node3D.new() # the touch point is at chest height
 		add_to_group("touchable")

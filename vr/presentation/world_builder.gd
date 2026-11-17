@@ -2,35 +2,14 @@ class_name WorldBuilder
 extends RefCounted
 ## Small helpers for building low-poly placeholder scenery in code.
 
-static func sky_environment(sky_col: Color, ground_col: Color) -> WorldEnvironment:
-	var we := WorldEnvironment.new()
-	var env := Environment.new()
-	var sky := Sky.new()
-	var mat := ProceduralSkyMaterial.new()
-	mat.sky_top_color = sky_col.darkened(0.3)
-	mat.sky_horizon_color = sky_col.lightened(0.3)
-	mat.ground_horizon_color = ground_col.lightened(0.2)
-	mat.ground_bottom_color = ground_col.darkened(0.3)
-	sky.sky_material = mat
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.9
-	we.environment = env
-	return we
+static func sky_environment(_sky_col: Color = Color.WHITE, _ground_col: Color = Color.WHITE, preset: String = "day") -> WorldEnvironment:
+	return Art.sky(preset)
 
-static func sun() -> DirectionalLight3D:
-	var l := DirectionalLight3D.new()
-	l.rotation_degrees = Vector3(-50, 35, 0)
-	l.light_energy = 1.1
-	return l
+static func sun(preset: String = "day") -> DirectionalLight3D:
+	return Art.sun(preset)
 
 static func mat(col: Color, unshaded := false) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = col
-	m.roughness = 0.95
-	if col.a < 1.0:
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var m := Art.surface(col)
 	if unshaded:
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return m

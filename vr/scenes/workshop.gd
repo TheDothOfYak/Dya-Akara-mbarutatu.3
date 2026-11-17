@@ -24,14 +24,22 @@ var _song_t := 0.0
 
 func _ready() -> void:
 	Game.ensure_game()
-	add_child(WorldBuilder.sky_environment(Color(0.4, 0.5, 0.65), Color(0.25, 0.22, 0.2)))
-	add_child(WorldBuilder.sun())
+	Art.light_scene(self, "dusk")
+	Art.backdrop(self, 4, 9.0, -0.12)
+	for lp in [Vector3(-2.6, 2.3, -2.4), Vector3(2.6, 2.3, -2.4), Vector3(-3.4, 2.1, 1.5), Vector3(3.4, 2.1, 1.5)]:
+		Art.lantern(self, lp, Color(1.0, 0.72, 0.38), true, 0.14)
+	WorldBuilder.box(Vector3(8.6, 0.3, 8.6), Vector3(0, 3.15, 0), Color(0.36, 0.27, 0.2), self)
+	for bx in [-3, -1, 1, 3]:
+		WorldBuilder.box(Vector3(0.25, 0.3, 8.2), Vector3(bx, 2.9, 0), Color(0.3, 0.22, 0.16), self)
+	Art.motes(self, Vector3(0.3, 1.3, -0.2), Vector3(0.5, 0.5, 0.4), Color(0.4, 0.85, 1.0, 0.8), 24, 0.012, 0.08)
 	WorldBuilder.box(Vector3(8, 0.1, 8), Vector3(0, -0.05, 0), Color(0.36, 0.29, 0.23), self)
 	for w in [[Vector3(0, 1.5, -3), Vector3(8, 3, 0.2)], [Vector3(-4, 1.5, 0), Vector3(0.2, 3, 8)], [Vector3(4, 1.5, 0), Vector3(0.2, 3, 8)]]:
 		WorldBuilder.box(w[1], w[0], Color(0.5, 0.44, 0.38), self)
 	var lamp := OmniLight3D.new()
 	lamp.position = Vector3(0, 2.4, -0.5)
 	lamp.omni_range = 8.0
+	lamp.light_color = Color(1.0, 0.82, 0.6)
+	lamp.light_energy = 1.4
 	add_child(lamp)
 	rig = XRRig.new()
 	add_child(rig)
@@ -53,6 +61,7 @@ func _ready() -> void:
 		var bot = load("res://tools/workshop_bot.gd").new()
 		bot.scene = self
 		add_child(bot)
+	LookBot.maybe(self, rig)
 	Shots.maybe(self)
 
 func _leave(path: String) -> void:

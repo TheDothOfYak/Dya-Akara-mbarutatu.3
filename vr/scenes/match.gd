@@ -45,9 +45,8 @@ func _ready() -> void:
 	if not req.has("opponent"):
 		req["opponent"] = {"name": "Practice opponent", "pouch": Starter.make_pouch(int(req.seed) * 7 + 2, 12), "ai_skill": 0.6, "votes": {}}
 	my_pouch = req.pouch
-	add_child(WorldBuilder.sky_environment(Color(0.5, 0.66, 0.88), Color(0.32, 0.38, 0.32)))
-	add_child(WorldBuilder.sun())
-	add_child(WorldBuilder.ground(600.0, Color(0.3, 0.36, 0.3)))
+	Art.light_scene(self, "day")
+	Art.backdrop(self, int(req.seed) % 97, 200.0 if req.get("tournament", {}).has("votes") or req.get("net", false) else 26.0, -0.02, true, 30)
 	rig = XRRig.new()
 	add_child(rig)
 	rig.place(Vector3.ZERO, 0.0)
@@ -59,6 +58,7 @@ func _ready() -> void:
 		bot = load("res://tools/match_bot.gd").new()
 		bot.scene = self
 		add_child(bot)
+	LookBot.maybe(self, rig)
 	Shots.maybe(self)
 
 # ---------------------------------------------------------------- setup

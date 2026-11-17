@@ -25,8 +25,7 @@ func _ready() -> void:
 	Wilds.ensure(Game.data)
 	wilds = Game.data.wilds
 	hunt = HuntRules.new_hunt()
-	add_child(WorldBuilder.sky_environment(Color(0.5, 0.7, 0.9), Color(0.3, 0.42, 0.3)))
-	add_child(WorldBuilder.sun())
+	Art.light_scene(self, "morning")
 	_build_land()
 	rig = XRRig.new()
 	add_child(rig)
@@ -61,39 +60,89 @@ func _ready() -> void:
 		var bot = load("res://tools/wilds_bot.gd").new()
 		bot.scene = self
 		add_child(bot)
+	LookBot.maybe(self, rig)
 	Shots.maybe(self)
 
 # ---------------------------------------------------------------- the land
 
+## The ground you walk on is level; the land rises beyond the hunting ground
+## and falls away under the sea to the north.
+static func land_h(x: float, z: float) -> float:
+	var out := smoothstep(WildsSim.SIZE * 0.9, WildsSim.SIZE * 1.5, Vector2(x, z).length())
+	var sea := smoothstep(-96.0, -125.0, z) * -1.4
+	return out * (6.0 + Art.fbm2(x * 0.01, z * 0.01) * 38.0) + sea * (1.0 - out)
+
+static func habitat_weight(k: String, x: float, z: float) -> float:
+	var h: Dictionary = WildsSim.HABITATS[k]
+	return smoothstep(float(h.r) * 1.15, float(h.r) * 0.6, Vector2(x - h.x, z - h.z).length())
+
+static func land_col(x: float, z: float, y: float) -> Color:
+	var c := Color(0.3, 0.5, 0.24).lerp(Color(0.46, 0.6, 0.28), Art.fbm2(x * 0.05, z * 0.05))
+	c = c.lerp(Color(0.86, 0.78, 0.58), max(habitat_weight("shore", x, z), smoothstep(-80.0, -100.0, z)))
+	c = c.lerp(Color(0.16, 0.34, 0.17), habitat_weight("forest", x, z) * 0.8)
+	c = c.lerp(Color(0.27, 0.3, 0.17), habitat_weight("bog", x, z))
+	c = c.lerp(Color(0.52, 0.5, 0.47), habitat_weight("sky", x, z) * 0.85)
+	c = c.lerp(Color(0.5, 0.5, 0.5), smoothstep(14.0, 34.0, y))
+	return c
+
 func _build_land() -> void:
-	add_child(WorldBuilder.ground(WildsSim.SIZE * 2.4, Color(0.34, 0.45, 0.3)))
-	var cols := {"shore": Color(0.78, 0.72, 0.55), "sea": Color(0.18, 0.42, 0.62), "forest": Color(0.2, 0.38, 0.22), "bog": Color(0.3, 0.33, 0.2), "sky": Color(0.5, 0.5, 0.52)}
+	add_child(Art.terrain(WildsSim.SIZE * 3.6, 130, land_h, land_col))
+	add_child(Art.water(Vector2(WildsSim.SIZE * 3.6, 300), Vector3(0, -0.35, -245), Vector2(0, 1), -100.0))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(wilds.seed)
-	for k in WildsSim.HABITATS:
-		var h: Dictionary = WildsSim.HABITATS[k]
-		WorldBuilder.cyl(h.r, 0.04, Vector3(h.x, 0.02 if k != "sea" else 0.04, h.z), cols[k], self)
-		WorldBuilder.label(k.capitalize(), Vector3(h.x, 9, h.z), 0.03, self)
-		for i in 22:
-			var a := rng.randf() * TAU
-			var d := rng.randf() * float(h.r)
-			var p := Vector3(h.x + cos(a) * d, 0, h.z + sin(a) * d)
-			match k:
-				"forest":
-					WorldBuilder.cyl(0.35, 5.0, p + Vector3(0, 2.5, 0), Color(0.36, 0.26, 0.18), self)
-					WorldBuilder.cyl(2.2, 5.0, p + Vector3(0, 7, 0), Color(0.18, 0.4, 0.2), self, 0.0)
-				"bog":
-					WorldBuilder.cyl(rng.randf_range(1.5, 4.0), 0.03, p + Vector3(0, 0.05, 0), Color(0.45, 0.6, 0.2, 0.7), self)
-				"sky":
-					var hgt := rng.randf_range(6, 22)
-					WorldBuilder.cyl(rng.randf_range(1.5, 4.0), hgt, p + Vector3(0, hgt * 0.5, 0), Color(0.55, 0.55, 0.58), self, 0.8)
-				"shore":
-					WorldBuilder.ball(rng.randf_range(0.3, 0.9), p, Color(0.6, 0.58, 0.55), self)
-	# the gate back to town: walking through it ends the hunt
-	WorldBuilder.box(Vector3(0.4, 3, 0.4), Vector3(-1.6, 1.5, 6), Color(0.4, 0.3, 0.2), self)
-	WorldBuilder.box(Vector3(0.4, 3, 0.4), Vector3(1.6, 1.5, 6), Color(0.4, 0.3, 0.2), self)
-	WorldBuilder.box(Vector3(3.6, 0.4, 0.4), Vector3(0, 3.1, 6), Color(0.4, 0.3, 0.2), self)
-	WorldBuilder.label("Sri'Ciakala\n(walk through to end the hunt)", Vector3(0, 3.7, 6), 0.006, self)
+	var f: Dictionary = WildsSim.HABITATS.forest
+	for i in 90:
+		var a := rng.randf() * TAU
+		var d := sqrt(rng.randf()) * float(f.r) * 1.15
+		Art.tree(self, Vector3(f.x + cos(a) * d, -0.2, f.z + sin(a) * d), rng.randf_range(8, 19), i, Color(0.05, 0.24, 0.12), Color(0.34, 0.62, 0.26))
+	Art.motes(self, Vector3(f.x, 2.0, f.z), Vector3(f.r, 2.0, f.r), Color(0.8, 1.0, 0.5, 0.9), 160, 0.05)
+	# the bog: still dark pools, reeds, low mist
+	var b: Dictionary = WildsSim.HABITATS.bog
+	for i in 26:
+		var a2 := rng.randf() * TAU
+		var d2 := sqrt(rng.randf()) * float(b.r)
+		var pool := Art.add_mesh(self, Art.blob(i % 4, 0.25), Art.surface(Color(0.1, 0.16, 0.1, 0.82)), Vector3(b.x + cos(a2) * d2, 0.02, b.z + sin(a2) * d2), Vector3(rng.randf_range(2, 6), 0.03, rng.randf_range(2, 5)))
+		pool.material_override.roughness = 0.05
+		pool.material_override.metallic = 0.4
+		if i % 3 == 0:
+			Art.tree(self, pool.position + Vector3(rng.randf_range(-6, 6), -0.2, rng.randf_range(-6, 6)), rng.randf_range(5, 9), 200 + i, Color(0.16, 0.24, 0.12), Color(0.42, 0.48, 0.24))
+	var in_bog := func(x: float, z: float) -> bool: return habitat_weight("bog", x, z) > 0.2
+	Art.grass(self, 3500, Rect2(b.x - b.r, b.z - b.r, b.r * 2.0, b.r * 2.0), in_bog, land_h, Color(0.2, 0.26, 0.12), Color(0.62, 0.6, 0.32), 1.5, 21)
+	Art.motes(self, Vector3(b.x, 0.5, b.z), Vector3(b.r, 0.5, b.r), Color(0.85, 0.92, 0.85, 0.25), 120, 0.9, 0.01)
+	# the cliffs: tall weathered stone under the open sky where the flyers nest
+	var s: Dictionary = WildsSim.HABITATS.sky
+	for i in 34:
+		var a3 := rng.randf() * TAU
+		var d3 := sqrt(rng.randf()) * float(s.r) * 1.1
+		var hgt := rng.randf_range(7, 30)
+		var w := rng.randf_range(2.0, 6.5)
+		Art.rock(self, Vector3(s.x + cos(a3) * d3, hgt * 0.42, s.z + sin(a3) * d3), Vector3(w, hgt * 0.6, w * rng.randf_range(0.7, 1.2)), i, Color(0.56, 0.54, 0.52).lerp(Color(0.66, 0.6, 0.52), rng.randf()))
+	# the shore: boulders, driftwood, spray
+	var sh: Dictionary = WildsSim.HABITATS.shore
+	for i in 40:
+		var x := rng.randf_range(-150, 150)
+		var z := rng.randf_range(-104, -40)
+		Art.rock(self, Vector3(x, land_h(x, z) + 0.1, z), Vector3(rng.randf_range(0.4, 2.4), rng.randf_range(0.3, 1.5), rng.randf_range(0.4, 2.2)), i, Color(0.6, 0.58, 0.54))
+	Art.motes(self, Vector3(0, 0.7, -100), Vector3(160, 0.7, 6), Color(0.92, 0.98, 1.0, 0.6), 140, 0.06, 0.12)
+	# meadow between the habitats
+	var meadow := func(x: float, z: float) -> bool:
+		return z > -84.0 and habitat_weight("bog", x, z) < 0.3 and habitat_weight("sky", x, z) < 0.5
+	Art.grass(self, 14000, Rect2(-170, -84, 340, 260), meadow, land_h, Color(0.12, 0.34, 0.14), Color(0.4, 0.58, 0.27), 0.55, 31)
+	Art.grass(self, 1200, Rect2(-150, -60, 300, 200), meadow, land_h, Color(0.2, 0.4, 0.2), Color(0.98, 0.78, 0.86), 0.34, 32)
+	Art.grass(self, 1200, Rect2(-150, -60, 300, 200), meadow, land_h, Color(0.2, 0.4, 0.2), Color(0.72, 0.7, 1.0), 0.32, 33)
+	for i in 30:
+		var a4 := rng.randf() * TAU
+		var d4 := rng.randf_range(20, 190)
+		var p := Vector3(cos(a4) * d4, -0.2, sin(a4) * d4)
+		if meadow.call(p.x, p.z) and habitat_weight("forest", p.x, p.z) < 0.2 and p.length() > 14.0:
+			Art.tree(self, p, rng.randf_range(6, 12), 400 + i)
+	# the gate back to town stands between the roots of one of the great trees
+	var bark := Art.surface(Color(0.28, 0.23, 0.19), 0.3, 1.0)
+	Art.ancient_tree(self, Vector3(0, 0, 22), 48.0, 4.4, 3, 0)
+	for sx in [-1.0, 1.0]:
+		Art.add_mesh(self, Art.tube([Vector3(sx * 2.4, -0.3, 6), Vector3(sx * 2.0, 2.2, 6), Vector3(sx * 0.9, 3.6, 6), Vector3(0, 3.9, 6)], [0.55, 0.45, 0.36, 0.3], 9, 0.25, int(sx) + 5), bark)
+		Art.lantern(self, Vector3(sx * 1.5, 2.6, 5.6), Color(1.0, 0.74, 0.4), sx > 0.0)
+	WorldBuilder.label("Sri'Ciakala\n(walk through to end the hunt)", Vector3(0, 4.6, 6), 0.006, self)
 
 func _build_belt() -> void:
 	# your kit rides on your belt: weapons on the left hip, tools and food on a small panel
