@@ -11,8 +11,32 @@ Updated after every milestone. Newest state first.
 | 2 | The tower | **Done, gate passed** |
 | 3 | The town | **Done, gate passed** |
 | 4 | The workshop | **Done, gate passed** |
-| 5 | The wilds | Next |
-| 6 | Multiplayer | Not started |
+| 5 | The wilds | **Done, gate passed** |
+| 6 | Multiplayer | Next |
+
+## Milestone 5 — The wilds (done)
+
+Gate: *a hunt yields a piece, and the token matches the creature.* Passes.
+
+Done
+- Wilds scene (`-- --scene=wilds`): a walkable region around the town gate with shore, sea, forest, bog and the cliffs under the sky habitat. Walking back through the gate ends the hunt.
+- Persistent population (`sim/wilds_sim.gd`): 24 unique individuals (three of each launch creature and the Wild Punk), each one a token-shaped record with its own age, experience, temperament and stats, a home territory, health and a memory of you (seen, hurt, spared, fed). Saved with the town copy. Each day they age, roam, heal, forget a little, shed pieces, and the dead or old are replaced by newcomers.
+- Hunting as yourself (`sim/hunt_rules.gd`): no slots, levels, cooldowns or piece limits. Creatures act on temperament and memory, give a tell before striking, and yield at a quarter health, so killing is never required.
+- Pieces, each taken its own way: shed pieces are picked up off the ground; a tooth, tusk or claw is cut with the knife from a trapped or beaten creature; a shaving comes off a calm, trapped or beaten living creature. The piece records how and where.
+- Kit on your belt: blade, spear (must be thrust), bow (draw with the other hand), whip (the lash trails and cracks), knife. Damage comes from how fast the weapon really moves. Anything you let go of is thrown. Raise a weapon to block. Armor reduces damage and heavy armor tires you faster.
+- Tools: trap (holds a walker that steps on it), bait (draws a creature and is remembered), camp (cook, sleep on a bedroll which passes a day, token sandbox as holograms).
+- Survival: hunger and tiredness drain while away; an empty meter makes you slower and weaker. Food, cooked meals, sleep.
+- Failure: beaten, you wake in Sri'Ciakala without your food and new pieces. Tokens are never lost.
+- Guides paid in town mark the way to the creature they named.
+
+Checked by
+- 24 wilds checks in `-- --selftest` (54 in all).
+- Wilds autoplay: took blade and knife from the belt, fought a Sru Vorn down with real swings, cut a tusk from the yielding creature, walked back through the gate; the piece reached the workshop rack and the crafted token matched the creature exactly.
+
+Known problems and limits
+- Creature behaviour in the wilds is lighter than in a match: roam, flee, attack with a tell, yield. The full match decision trees are not used out here yet.
+- No foraging and no swimming; sea creatures come to the shallows.
+- Combat numbers are first guesses and need play on a headset.
 
 ## Milestone 4 — The workshop (done)
 

@@ -44,6 +44,9 @@ func _ready() -> void:
 	_build_signs()
 	_spawn_people()
 	_settle_last_match()
+	if Game.data.flags.has("wake_text"):
+		_say(Game.data.flags.wake_text)
+		Game.data.flags.erase("wake_text")
 	_update_wrist()
 	if Game.args.has("autoplay"):
 		var bot = load("res://tools/town_bot.gd").new()

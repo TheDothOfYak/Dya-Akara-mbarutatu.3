@@ -74,6 +74,7 @@ func new_game(seed_value: int = 0) -> void:
 		"pieces": [], "shelf": [],
 		"bag": {"food": 3, "meals": 0, "materials": []},
 		"kit": {"blade": true, "spear": false, "bow": false, "whip": false, "knife": true, "rope": false, "trap": 0, "bait": 0, "armor": ""},
+		"survival": {"hunger": 100.0, "tired": 100.0},
 		"town": {}, "wilds": {}, "flags": {},
 	}
 

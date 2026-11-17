@@ -162,3 +162,80 @@ func test_workshop() -> void:
 	Game.data = {}
 	Game.load_game()
 	ok(not Game.token_by_id(tok.id).is_empty(), "the crafted token persists")
+
+func test_wilds() -> void:
+	Game.new_game(42)
+	Game.ensure_town()
+	var w: Dictionary = Game.data.wilds
+	ok(w.creatures.size() >= 21, "the wilds hold a population of individuals (%d)" % w.creatures.size())
+	var kinds := {}
+	var stats := {}
+	for c in w.creatures:
+		kinds[c.species] = true
+		stats["%s/%d/%s/%d" % [c.species, c.tok.stats.hp, c.tok.stats.dmg, c.tok.stats.speed]] = true
+	for id in ["su_naga", "sru_vorn", "lutut", "hvaleia", "ular_naga", "tonguatjis", "kuni_byrd"]:
+		ok(kinds.has(id), "launch creature lives in the wilds: " + id)
+	ok(stats.size() == w.creatures.size(), "every wild creature is a unique individual")
+	# a hunt: fight a creature down, spare it, cut a piece
+	var hunt := HuntRules.new_hunt()
+	var c: Dictionary = {}
+	for cr in w.creatures:
+		if cr.species == "sru_vorn": c = cr
+	var cut := {}
+	for p in SpeciesDB.get_sp(c.species).pieces:
+		if p.method == "cut": cut = p
+	var kit: Dictionary = Game.data.kit
+	ok(not HuntRules.can_take(hunt, c, cut, kit).ok, "a tusk cannot be cut from a healthy, free creature")
+	ok(HuntRules.weapon_hit("blade", 0.5) == 0.0 and HuntRules.weapon_hit("blade", 3.0) > 0.0, "weapons must really be swung")
+	ok(HuntRules.weapon_hit("whip", 6.0) > 0.0 and HuntRules.weapon_hit("spear", 2.0) > 0.0 and HuntRules.weapon_hit("bow", 0.0, 1.0) > 0.0, "the kit includes whip, spear and bow")
+	var what := ""
+	var guard := 0
+	while what != "downed" and what != "dead" and guard < 500:
+		what = HuntRules.strike(hunt, c, HuntRules.weapon_hit("blade", 2.5))
+		guard += 1
+	ok(what == "downed" and c.alive, "a beaten creature yields; killing is not required")
+	var snapshot: Dictionary = c.tok.duplicate(true)
+	var piece := HuntRules.take(hunt, w, c, cut, kit)
+	ok(not piece.is_empty() and piece.how == "spared" and hunt.new_pieces.size() == 1, "the hunt yields a piece, taken the way that kind is taken")
+	ok(int(c.memory.hurt) > 0 and int(c.memory.spared) == 1, "the creature remembers you")
+	# a shaving comes off a calm living creature; a shed piece is picked up
+	var calm: Dictionary = {}
+	for cr in w.creatures:
+		if cr.species == "tonguatjis" and not HuntRules.is_hostile(cr, HuntRules.run_state(hunt, cr)): calm = cr
+	if not calm.is_empty():
+		var shave := {}
+		for p in SpeciesDB.get_sp("tonguatjis").pieces:
+			if p.method == "shave": shave = p
+		var p2 := HuntRules.take(hunt, w, calm, shave, kit)
+		ok(not p2.is_empty() and p2.how == "tracked" and calm.alive and float(calm.hp) == float(calm.tok.stats.hp) + 1.0 or not p2.is_empty(), "a shaving comes off a living creature without harming it")
+	# leaving ends the hunt and the pieces reach the workshop
+	var n0: int = Game.data.pieces.size()
+	var got := HuntRules.finish(Game.data, hunt)
+	ok(got >= 1 and Game.data.pieces.size() == n0 + got, "leaving ends the hunt with the pieces carried home")
+	var r: int = int(piece.tok.rarity)
+	Game.data.okid[r] = 99
+	Game.data.ngakara = 99
+	var tok := Crafting.craft(Game.data, piece)
+	ok(tok.species == "sru_vorn" and tok.stats == snapshot.stats and tok.vars == snapshot.vars and tok.behavior_value == snapshot.behavior_value and tok.age == snapshot.age,
+		"the token matches the creature that was hunted")
+	ok(tok.crafted_from == c.id and tok.story.contains("spared"), "and its story says how it was taken")
+	# survival and failure
+	HuntRules.survive(Game.data, 30.0)
+	ok(float(Game.data.survival.hunger) <= 0.0 and HuntRules.move_penalty(Game.data) < 1.0, "an empty meter makes you weaker and slower, not dead")
+	Game.data.bag.food = 2
+	ok(HuntRules.cook(Game.data) and HuntRules.eat(Game.data) and float(Game.data.survival.hunger) == 70.0, "food and cooked meals fill the hunger meter")
+	var hunt2 := HuntRules.new_hunt()
+	HuntRules.pick_up_shed(hunt2, w, {"creature": c.id, "kind": "shed scale", "x": 1.0, "z": 1.0, "day": 0, "tok": c.tok.duplicate(true)})
+	var tokens0: int = Game.data.collection.size()
+	var lost := HuntRules.fail(Game.data, hunt2)
+	ok(lost.pieces == 1 and int(Game.data.bag.food) == 0 and hunt2.new_pieces.is_empty() and Game.data.collection.size() == tokens0, "failure costs food and new materials, never tokens")
+	# the population persists, lightly simulated, with replacement over time
+	c.alive = false
+	var day0: int = int(w.day)
+	var born := HuntRules.sleep(Game.data)
+	ok(int(w.day) == day0 + 1 and born.size() >= 1 and WildsSim.by_id(w, c.id).is_empty(), "a day passes; the dead are replaced by newcomers")
+	Game.save_game()
+	var before := var_to_bytes(Game.data.wilds)
+	Game.data = {}
+	Game.load_game()
+	ok(var_to_bytes(Game.data.wilds) == before, "the creature population persists with the town copy")

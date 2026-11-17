@@ -12,6 +12,7 @@ func frames(n: int) -> void:
 func _ready() -> void:
 	ds = scene.rig.sim
 	ds.scripted = true
+	Game.args.erase("autoplay") # one scene per run
 	await frames(5)
 	var n0: int = Game.data.collection.size()
 	var p = scene.piece_nodes[0]

@@ -13,6 +13,7 @@ func frames(n: int) -> void:
 func _ready() -> void:
 	ds = scene.rig.sim
 	ds.scripted = true
+	Game.args.erase("autoplay") # one scene per run
 	_run()
 
 func _grab_tray_coin(skip := 0) -> TokenCoin:

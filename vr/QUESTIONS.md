@@ -60,3 +60,13 @@ Where a rule was not written down, the plainest option was chosen so the build c
 39. **Starter piece.** A new game gives one found piece and enough materials to craft it.
 40. **Two pieces from one creature.** Each piece taken leaves the creature slightly changed (1 less health, a little more experience), so no two tokens ever match.
 41. **Story wording.** The background is plain facts for now: the creature, the habitat near Sri'Ciakala, and how the piece was taken. Yak may want different wording.
+
+## Choices made in Milestone 5
+
+42. **Population size.** Three individuals of each launch creature plus three Wild Punks (24). How many should the wilds hold?
+43. **Yielding.** A creature at a quarter health stops fighting, and a piece can then be cut while it lives (recorded as "spared").
+44. **Creature size in the wilds.** 0.06 m per size unit, so a Skaar creature is about 4.6 m across. The token hologram's true size uses 0.1 m. Which is right?
+45. **Weapon and creature damage numbers** are placeholders in `sim/hunt_rules.gd`.
+46. **Sleeping** passes one day in the wilds. Creatures live roughly 250 days before being replaced.
+47. **Severe defeats and special hunts** cost nothing extra yet (open item 5).
+48. **Wild Punk in the wilds.** Included as huntable alongside the launch creatures. Should it be?

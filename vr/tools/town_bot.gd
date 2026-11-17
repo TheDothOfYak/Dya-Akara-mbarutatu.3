@@ -26,6 +26,7 @@ func _press(text_start: String) -> bool:
 func _ready() -> void:
 	ds = scene.rig.sim
 	ds.scripted = true
+	Game.args.erase("autoplay") # one scene per run
 	await frames(5)
 	print("TOWN people out: %d of %d, stalls: %d, listings: %d" % [scene.figures.size(), scene.town.npcs.size(), scene.stall_nodes.size(), scene.town.listings.size()])
 	var fig = null
