@@ -4,7 +4,7 @@ extends Node
 
 const SCENES := {"main": "res://scenes/main.tscn", "match": "res://scenes/match.tscn", "tower": "res://scenes/tower.tscn",
 	"town": "res://scenes/town.tscn", "workshop": "res://scenes/workshop.tscn", "wilds": "res://scenes/wilds.tscn",
-	"replay": "res://scenes/replay.tscn"}
+	"replay": "res://scenes/replay.tscn", "lobby": "res://scenes/lobby.tscn"}
 const DEFAULT_ORDER := ["tower", "match", "main"]
 
 func _ready() -> void:
@@ -22,6 +22,25 @@ func _ready() -> void:
 	if Game.args.has("selftest"):
 		var st = load("res://tests/self_test.gd").new()
 		add_child(st)
+		return
+	if Game.args.has("net_view"):
+		# join a running host straight into the VR match scene:  -- --net_view=join|spectate --addr=...
+		Game.ensure_game()
+		var ns := NetSession.new()
+		ns.name = "Net"
+		get_tree().root.add_child.call_deferred(ns)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		ns.join(Game.args.get("addr", "127.0.0.1"), Game.args.get("code", "ABC234"), "Viewer", Game.pouch_tokens().slice(0, 12), {}, Game.args.net_view == "spectate", int(Game.args.get("port", str(NetSession.PORT))))
+		while ns.sim == null:
+			ns.pump(0.0)
+			await get_tree().process_frame
+		Game.net = ns
+		Game.match_request = {"net": true}
+		Game.goto(SCENES["match"])
+		return
+	if Game.args.has("net"):
+		add_child(load("res://net/net_bot.gd").new())
 		return
 	var want: String = Game.args.get("scene", "")
 	if want == "" or not SCENES.has(want) or not ResourceLoader.exists(SCENES[want]):

@@ -36,6 +36,11 @@ func _run() -> void:
 	await frames(5)
 	# --- setup: turn a ring, grab my horde token, tap it on theirs
 	var tok: HordeToken = scene.my_token
+	if scene.net != null:
+		while scene.phase != "play":
+			await frames(2)
+		await _after_link()
+		return
 	if Game.args.has("scale"):
 		for k in int(Game.args.scale):
 			ds.pose(L, tok.beads[2].global_position + Vector3(0, 0.0, 0.06), Vector3.FORWARD)
@@ -50,6 +55,9 @@ func _run() -> void:
 	await frames(6)
 	ds.hand(R).set_button("grip", false)
 	await frames(10)
+	await _after_link()
+
+func _after_link() -> void:
 	if scene.phase != "play":
 		print("AUTOPLAY FAILED: hordes did not link")
 		get_tree().quit(1)
@@ -65,12 +73,14 @@ func _run() -> void:
 	while not sim.over and guard < 4000:
 		guard += 1
 		await wait(0.4)
+		if scene.me < 0:
+			continue
 		if sim.over:
 			break
 		# spawn anything of mine lying on the field, fully paid: laser + A
 		var acted := false
 		for i in scene.coins.keys():
-			if scene.where.get(i) == "field" and sim.entry_paid(sim.teams[0].pouch[i]):
+			if scene.where.get(i) == "field" and sim.entry_paid(sim.teams[scene.me].pouch[i]):
 				await _laser_spawn(scene.coins[i])
 				acted = true
 				break
@@ -78,7 +88,7 @@ func _run() -> void:
 			continue
 		var total := 0
 		for el in MatchSim.ELS:
-			total += sim.teams[0].resources[el]
+			total += sim.teams[scene.me].resources[el]
 		if total < 3 or scene.pouch.contents.is_empty():
 			continue
 		await _play_one()
@@ -100,6 +110,8 @@ func _run() -> void:
 		var h := r.run_to_end(int(loaded.final_tick))
 		ok = h == sim.state_hash() and h == int(loaded.final_hash) and r.result == sim.result
 	print("REPLAY EXACT" if ok else "REPLAY MISMATCH")
+	if scene.net != null:
+		print("NET RESULT view tick=%d winner=%d hash=%d desync=%s me=%d" % [sim.tick, sim.result.get("winner", -9), sim.state_hash(), str(scene.net.desync), scene.me])
 	if Game.args.has("shot"):
 		ds.unpose(R)
 		ds.unpose(L)
@@ -129,12 +141,12 @@ func _play_one() -> void:
 	ds.pose(R, rig.head_pos() + rig.head_forward() * 0.4 + Vector3(0.15, -0.3, 0))
 	await frames(3)
 	# rub the jewels: flick the stick toward each resource we still owe and have
-	var e: Dictionary = sim.teams[0].pouch[coin.index]
+	var e: Dictionary = sim.teams[scene.me].pouch[coin.index]
 	var dirs := {"Fti": Vector2(0, 1), "Su": Vector2(1, 0), "Eldi": Vector2(0, -1), "Ular": Vector2(-1, 0)}
 	for pass_n in 20:
 		var did := false
 		for el in MatchSim.ELS:
-			if e.paid[el] < e.cost[el] and sim.teams[0].resources[el] > 0:
+			if e.paid[el] < e.cost[el] and sim.teams[scene.me].resources[el] > 0:
 				hand.set_stick(dirs[el])
 				await frames(2)
 				hand.set_stick(Vector2.ZERO)
@@ -145,7 +157,7 @@ func _play_one() -> void:
 		if not did:
 			if e.extra_paid < e.deaths and not _owes_typed(e):
 				for el in MatchSim.ELS:
-					if sim.teams[0].resources[el] > 0:
+					if sim.teams[scene.me].resources[el] > 0:
 						hand.set_stick(dirs[el])
 						await frames(2)
 						hand.set_stick(Vector2.ZERO)
@@ -166,8 +178,8 @@ func _play_one() -> void:
 		return
 	# throw: a real arm swing is a release with velocity
 	var arena: ArenaView = scene.arena
-	var enemy: Vector2 = sim.teams[1].hoard
-	var own: Vector2 = sim.teams[0].hoard
+	var enemy: Vector2 = sim.teams[1 - scene.me].hoard
+	var own: Vector2 = sim.teams[scene.me].hoard
 	var want := own + (enemy - own) * (0.55 if e.sp.tags.has("sentient") else 0.3) + Vector2(0, (stats.thrown % 5 - 2) * 70.0)
 	var target := arena.to_world(want.x, want.y)
 	var from: Vector3 = hand.global_position

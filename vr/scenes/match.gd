@@ -33,6 +33,8 @@ var result_panel: Node3D = null
 var votes := {}
 var my_pouch: Array
 var bot = null
+var me := 0            # which side you are (1 when you joined a friend's town; -1 when watching from the stands)
+var net: NetSession = null
 
 func _ready() -> void:
 	req = Game.match_request.duplicate()
@@ -50,6 +52,8 @@ func _ready() -> void:
 	add_child(rig)
 	rig.place(Vector3.ZERO, 0.0)
 	Game.sfx.music("match")
+	if req.get("net", false) and Game.net != null and Game.net.sim != null:
+		net = Game.net
 	_build_setup()
 	if Game.args.has("autoplay"):
 		bot = load("res://tools/match_bot.gd").new()
@@ -92,6 +96,9 @@ func _build_setup() -> void:
 
 func _physics_process(_delta: float) -> void:
 	if phase == "setup":
+		if net != null:
+			_link()
+			return
 		if my_token.global_position.distance_to(their_token.global_position) < 0.1 or req.get("auto_link", false):
 			_link()
 
@@ -112,7 +119,18 @@ func _link() -> void:
 			{"name": "You", "controller": "human", "pouch": my_pouch},
 			{"name": req.opponent.name, "controller": "ai", "ai_skill": req.opponent.get("ai_skill", 0.6),
 				"ai_warmup": req.opponent.get("ai_warmup", 20.0), "pouch": req.opponent.pouch}]}
-	sim = MatchSim.new(cfg, SpeciesDB.all())
+	if net != null:
+		# a friend's match: the host already settled the votes; every machine runs the same simulation
+		sim = net.sim
+		me = net.my_team
+		votes = {"scale": sim.settings.scale}
+		terrain = sim.cfg.get("terrain", "plains")
+		if me >= 0:
+			my_pouch = []
+			for e in sim.teams[me].pouch:
+				my_pouch.append(e.tok)
+	else:
+		sim = MatchSim.new(cfg, SpeciesDB.all())
 	# The magic settles the field around the fixed horde spots: yours lands just in front of you.
 	var f := rig.head_forward()
 	var scale: float = votes.scale
@@ -122,7 +140,20 @@ func _link() -> void:
 	var origin := Vector3(head.x, floor_h, head.z) + f * (0.5 if small else 1.2)
 	arena = ArenaView.new()
 	add_child(arena)
-	arena.setup(sim, origin, f, scale, MatchSim.HOARDS[0], terrain)
+	if me < 0:
+		# spectators sit in the stands: they cannot fly, walk onto the field or react
+		arena.setup(sim, origin + f * (MatchSim.H * scale * 0.5 + 2.0), f.cross(Vector3.UP), scale, Vector2(MatchSim.W * 0.5, MatchSim.H * 0.5), terrain)
+		rig.move_enabled = false
+		rig.left.enabled = false
+		rig.right.enabled = false
+		hint.text = "You are watching from the stands."
+		my_token.visible = false
+		their_token.visible = false
+		opponent_fig.visible = false
+		phase = "play"
+		return
+	arena.player_team = me
+	arena.setup(sim, origin, f if me == 0 else -f, scale, MatchSim.HOARDS[me], terrain)
 	arena.show_edge()
 	if small:
 		# a plain stand under a table-sized field
@@ -133,7 +164,7 @@ func _link() -> void:
 	my_token.visible = false
 	their_token.visible = false
 	my_token.remove_from_group("grabbable")
-	opponent_fig.global_position = arena.to_world(MatchSim.HOARDS[1].x + 90.0, MatchSim.HOARDS[1].y)
+	opponent_fig.global_position = arena.to_world(MatchSim.HOARDS[1 - me].x + (90.0 if me == 0 else -90.0), MatchSim.HOARDS[1 - me].y)
 	opponent_fig.global_position.y = rig.global_position.y
 	opponent_fig.visible = not small
 	_build_table(f)
@@ -187,7 +218,7 @@ func _show_cards() -> void:
 # ---------------------------------------------------------------- tokens in your hands
 
 func _new_coin(i: int) -> TokenCoin:
-	var e: Dictionary = sim.teams[0].pouch[i]
+	var e: Dictionary = sim.teams[max(me, 0)].pouch[i]
 	var c := TokenCoin.make(e.tok, e.sp, i)
 	add_child(c)
 	c.set_cost(e.cost, e.paid, e.deaths, e.extra_paid)
@@ -228,7 +259,7 @@ func _coin_grabbed(c: TokenCoin, _hand: Hand) -> void:
 	_free_slot(c.index)
 	if where.get(c.index) == "field":
 		# walked onto the field and picked the coin back up
-		sim.queue_input(0, {"type": "recall", "i": c.index})
+		_send({"type": "recall", "i": c.index})
 	where[c.index] = "hand"
 
 func _coin_released(c: TokenCoin, hand: Hand, velocity: Vector3) -> void:
@@ -270,8 +301,8 @@ func predict_landing(from: Vector3, velocity: Vector3, sp: Dictionary) -> Vector
 func _throw(c: TokenCoin, hand: Hand, velocity: Vector3) -> void:
 	var i := c.index
 	var land := predict_landing(c.global_position, velocity, c.sp)
-	var p := sim.clamp_throw(0, c.sp, land.x, land.y)
-	sim.queue_input(0, {"type": "throw", "i": i, "x": p.x, "y": p.y})
+	var p := sim.clamp_throw(me, c.sp, land.x, land.y)
+	_send({"type": "throw", "i": i, "x": p.x, "y": p.y})
 	where[i] = "flying"
 	hand.rumble(0.5, 0.04) # the click as the coin leaves your hand
 	Game.sfx.play("throw", c.global_position)
@@ -286,16 +317,24 @@ func _throw(c: TokenCoin, hand: Hand, velocity: Vector3) -> void:
 			rig.left.rumble(0.3, 0.06)
 			rig.right.rumble(0.3, 0.06))
 
+func _send(input: Dictionary) -> void:
+	if me < 0:
+		return
+	if net != null:
+		net.send_input(input)
+	else:
+		sim.queue_input(me, input)
+
 func _pay(i: int, el: String) -> void:
-	sim.queue_input(0, {"type": "pay", "i": i, "el": el})
+	_send({"type": "pay", "i": i, "el": el})
 
 func _coin_flicked(c: TokenCoin, el: String) -> void:
 	_pay(c.index, el)
 
 ## A touch from the other hand rubs the next jewel you can afford.
 func _coin_touched(c: TokenCoin, _hand: Hand) -> void:
-	var e: Dictionary = sim.teams[0].pouch[c.index]
-	var res: Dictionary = sim.teams[0].resources
+	var e: Dictionary = sim.teams[max(me, 0)].pouch[c.index]
+	var res: Dictionary = sim.teams[max(me, 0)].resources
 	for el in MatchSim.ELS:
 		if e.paid[el] < e.cost[el] and res[el] > 0:
 			_pay(c.index, el)
@@ -309,14 +348,17 @@ func _coin_touched(c: TokenCoin, _hand: Hand) -> void:
 
 func _coin_lasered(c: TokenCoin, _hand: Hand) -> void:
 	if where.get(c.index) == "field":
-		sim.queue_input(0, {"type": "spawn", "i": c.index})
+		_send({"type": "spawn", "i": c.index})
 
 # ---------------------------------------------------------------- the match itself
 
 func _process(delta: float) -> void:
 	if sim == null or phase == "end_shown":
 		return
-	sim.step(delta)
+	if net != null:
+		net.pump(delta)
+	else:
+		sim.step(delta)
 	for ev in sim.events:
 		_on_event(ev)
 	sim.events.clear()
@@ -336,32 +378,32 @@ func _on_event(ev: Dictionary) -> void:
 			Game.sfx.play("pulse" if layer == 1 else "pulse%d" % layer, null, true)
 			rig.left.rumble(0.25, 0.12)
 			rig.right.rumble(0.25, 0.12)
-			var h: Vector2 = sim.teams[0].hoard
+			var h: Vector2 = sim.teams[max(me, 0)].hoard
 			arena.puff(h.x, h.y, 40.0, Color(0.8, 0.95, 1.0), 110.0)
 		"escalation":
 			Game.sfx.music("escalation")
 		"pay":
-			if ev.team == 0 and coins.has(ev.i):
-				var e: Dictionary = sim.teams[0].pouch[ev.i]
+			if ev.team == me and coins.has(ev.i):
+				var e: Dictionary = sim.teams[max(me, 0)].pouch[ev.i]
 				coins[ev.i].set_cost(e.cost, e.paid, e.deaths, e.extra_paid)
 				var hh := _holding_hand(ev.i)
 				if hh != null:
 					hh.rumble(0.7 if ev.done else 0.45, 0.12 if ev.done else 0.05)
 				Game.sfx.play("paid" if ev.done else "pay", coins[ev.i].global_position)
 		"deny":
-			if ev.team == 0:
+			if ev.team == me:
 				Game.sfx.play("deny")
 				var hh2 := _holding_hand(ev.i)
 				if hh2 != null:
 					hh2.rumble(0.15, 0.03)
 		"throw":
-			if ev.team == 1:
-				var e2: Dictionary = sim.teams[1].pouch[ev.i]
+			if ev.team != me:
+				var e2: Dictionary = sim.teams[1 - max(me, 0)].pouch[ev.i]
 				var ec := TokenCoin.make(e2.tok, e2.sp, ev.i, false)
 				ec.remove_from_group("grabbable")
 				ec.remove_from_group("touchable")
 				add_child(ec)
-				ec.global_position = arena.to_world(sim.teams[1].hoard.x, sim.teams[1].hoard.y, 40.0)
+				ec.global_position = arena.to_world(sim.teams[1 - max(me, 0)].hoard.x, sim.teams[1 - max(me, 0)].hoard.y, 40.0)
 				ec.fly_to(arena.to_world(ev.x, ev.y) + Vector3(0, 0.004, 0), 0.6, max(0.1, arena.unit * 120.0))
 				enemy_coins[ev.i] = ec
 			elif coins.has(ev.i):
@@ -373,7 +415,7 @@ func _on_event(ev: Dictionary) -> void:
 			pass
 		"deploy":
 			var cr = sim.creature_by_id(ev.id)
-			if ev.team == 0:
+			if ev.team == me:
 				if coins.has(ev.i):
 					coins[ev.i].queue_free()
 					coins.erase(ev.i)
@@ -397,7 +439,7 @@ func _on_event(ev: Dictionary) -> void:
 				if c2.id == ev.id:
 					arena.puff(c2.x, c2.y, c2.z + c2.radius, Color(0.7, 0.7, 0.9), c2.radius * 3.5)
 					Game.sfx.play("death", arena.to_world(c2.x, c2.y, c2.z), false, u)
-			if ev.team == 0 and int(ev.i) >= 0 and where.get(ev.i) == "alive":
+			if ev.team == me and int(ev.i) >= 0 and where.get(ev.i) == "alive":
 				# a defeated token returns to the pouch
 				where[ev.i] = "pouch"
 				pouch.put_back(ev.i)
@@ -412,7 +454,7 @@ func _on_event(ev: Dictionary) -> void:
 
 func _show_result(res: Dictionary) -> void:
 	phase = "end"
-	var won: bool = res.winner == 0
+	var won: bool = res.winner == me
 	var draw: bool = res.winner < 0
 	arena.set_result_glow(res.winner)
 	Game.sfx.play("win" if won else "lose", null, true)
@@ -424,8 +466,8 @@ func _show_result(res: Dictionary) -> void:
 	if f != null:
 		f.store_var(rep)
 		f.close()
-	Game.last_match = {"result": res.duplicate(), "request": req, "replay": rep, "stats": sim.teams[0].stats.duplicate(true)}
-	var T: Dictionary = sim.teams[0]
+	Game.last_match = {"result": res.duplicate(), "request": req, "replay": rep, "stats": sim.teams[max(me, 0)].stats.duplicate(true)}
+	var T: Dictionary = sim.teams[max(me, 0)]
 	result_panel = Node3D.new()
 	add_child(result_panel)
 	var fwd := rig.head_forward()
@@ -448,4 +490,8 @@ func _show_result(res: Dictionary) -> void:
 		WorldBuilder.ball(0.06, h + Vector3(0, 0.06, 0), Color(0.5, 0.35, 0.2), self)
 
 func _leave() -> void:
+	if net != null:
+		net.close()
+		net.queue_free()
+		Game.net = null
 	Game.goto(req.get("return_to", MATCH_SCENE))

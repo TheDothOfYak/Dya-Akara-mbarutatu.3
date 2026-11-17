@@ -8,6 +8,8 @@ The full-immersion VR version of Dya'Akara, built in **Godot 4.3 + OpenXR**. Des
 2. Open this `vr/` folder as a project and press Play.
 3. With a headset connected through OpenXR it runs in VR. With no headset it starts the **desktop simulator** automatically.
 
+Start somewhere else with `-- --scene=NAME`: `tower` (default), `match`, `town`, `workshop`, `wilds`, `lobby`, `replay`, `main` (creature line-up). Add `--autoplay` to watch a bot use the hands in `match`, `tower`, `town`, `workshop` or `wilds`; add `--fresh --save=test` to use a throwaway save.
+
 Desktop simulator controls:
 
 | Input | Does |
@@ -26,7 +28,10 @@ Desktop simulator controls:
 
 ```
 godot --headless --import                      # once, after cloning
-godot --headless -s tests/run_tests.gd         # rules, replays, saves
+godot --headless -s tests/run_tests.gd         # rules, replays, sandbox, model drop-in
+godot --headless -- --selftest                 # saves, town, wagers, workshop, wilds
+godot --headless -- --compile_check            # every script loads
+godot --headless -- --net=host                 # network check: run with --net=join and --net=spectate in two more terminals
 godot --headless -s tools/check_creatures.gd   # creature folders and dropped-in models
 ```
 
@@ -38,6 +43,8 @@ godot --headless -s tools/check_creatures.gd   # creature folders and dropped-in
 | `presentation/` | Presentation | Scenes, creature views, effects, audio |
 | `input/` | Input | Headset rig, hands, desktop simulator, grabbing, laser, throwing |
 | `data/` | Data | One folder per creature, loaders, saves, NPCs, dialogue |
+| `net/` | Multiplayer | Host-authoritative session: inputs only, one frame per tick |
+| `scenes/` | Scenes | Tower, match, town, workshop, wilds, lobby, replay |
 | `tools/` | Tools | Check script, screenshot helper |
 | `tests/` | Tests | Headless test runner |
 

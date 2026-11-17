@@ -110,6 +110,15 @@ func queue_input(team: int, input: Dictionary) -> void:
 			input[k] = roundf(float(input[k])) # whole units keep saved logs exact
 	input_queue.append({"tick": tick + 1, "team": team, "input": input, "seq": seq_counter})
 
+## Networked play: the host stamps every input with the tick it applies on, so
+## every machine applies the same inputs in the same order.
+func schedule_input(team: int, input: Dictionary, at_tick: int, seq: int) -> void:
+	input = input.duplicate()
+	for k in ["x", "y"]:
+		if input.has(k):
+			input[k] = roundf(float(input[k]))
+	input_queue.append({"tick": at_tick, "team": team, "input": input, "seq": seq})
+
 func entry_paid(e: Dictionary) -> bool:
 	for el in ELS:
 		if e.paid[el] < e.cost[el]:

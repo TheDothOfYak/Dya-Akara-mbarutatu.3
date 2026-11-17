@@ -70,3 +70,10 @@ Where a rule was not written down, the plainest option was chosen so the build c
 46. **Sleeping** passes one day in the wilds. Creatures live roughly 250 days before being replaced.
 47. **Severe defeats and special hunts** cost nothing extra yet (open item 5).
 48. **Wild Punk in the wilds.** Included as huntable alongside the launch creatures. Should it be?
+
+## Choices made in Milestone 6
+
+49. **Town codes need a meeting point for internet play.** With no server (to keep costs at zero) the joiner types the host's address and the town code. A tiny rendezvous service would let the code alone be enough. Is a small always-on service acceptable?
+50. **Disconnects.** After 10 seconds the remaining player takes the win. The 2D alternative (continue against an AI) is not offered yet.
+51. **Network matches are plains terrain** with scale and pulse settings from the two players' ring votes.
+52. **Spectators** join with the town code, like players.

@@ -5,7 +5,11 @@ extends RefCounted
 ## aiThink in the 2D engine, reshaped for the VR flow: pay in pieces, throw,
 ## then spawn at any time.
 
-static func think(sim: MatchSim, T: Dictionary) -> void:
+static func think(sim: MatchSim, T: Dictionary, sink: Callable = Callable()) -> void:
+	# `sink` lets a caller route the AI's inputs elsewhere (a networked bot); by default they go straight to the simulation
+	var send := func(tm: int, inp: Dictionary): sim.queue_input(tm, inp)
+	if sink.is_valid():
+		send = sink
 	if sim.time < T.ai.next_think:
 		return
 	var skill: float = T.ai_skill
@@ -47,7 +51,7 @@ static func think(sim: MatchSim, T: Dictionary) -> void:
 	for i in T.pouch.size():
 		var e: Dictionary = T.pouch[i]
 		if e.state == "thrown" and sim.entry_paid(e):
-			sim.queue_input(team, {"type": "spawn", "i": i})
+			send.call(team, {"type": "spawn", "i": i})
 
 	# 2. choose which token to work on
 	var focus: int = T.ai.focus
@@ -80,7 +84,7 @@ static func think(sim: MatchSim, T: Dictionary) -> void:
 		var need: int = e.cost[el] - e.paid[el]
 		var n: int = min(need, have[el])
 		for k in n:
-			sim.queue_input(team, {"type": "pay", "i": focus, "el": el})
+			send.call(team, {"type": "pay", "i": focus, "el": el})
 		have[el] -= n
 		due += need - n
 	var extra: int = e.deaths - e.extra_paid
@@ -91,7 +95,7 @@ static func think(sim: MatchSim, T: Dictionary) -> void:
 				best = el
 		if best == "":
 			break
-		sim.queue_input(team, {"type": "pay", "i": focus, "el": best})
+		send.call(team, {"type": "pay", "i": focus, "el": best})
 		have[best] -= 1
 		extra -= 1
 	if due > 0 or extra > 0:
@@ -115,5 +119,5 @@ static func think(sim: MatchSim, T: Dictionary) -> void:
 	else:
 		var f: float = lerpf(0.25, 0.5, min(1.0, skill)) + rng.range_f(-0.08, 0.12)
 		p = own + (enemy - own) * f + Vector2(rng.range_f(-jit, jit), rng.range_f(-jit * 2.0, jit * 2.0))
-	sim.queue_input(team, {"type": "throw", "i": focus, "x": p.x, "y": p.y})
+	send.call(team, {"type": "throw", "i": focus, "x": p.x, "y": p.y})
 	T.ai.focus = -1

@@ -10,6 +10,7 @@ var move_penalty := 1.0 # hunger and tiredness slow you in the wilds
 var args := {}
 var sfx: Sfx
 var match_request := {}
+var net: NetSession = null
 var last_match := {}
 
 var settings := {

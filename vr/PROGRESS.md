@@ -12,7 +12,37 @@ Updated after every milestone. Newest state first.
 | 3 | The town | **Done, gate passed** |
 | 4 | The workshop | **Done, gate passed** |
 | 5 | The wilds | **Done, gate passed** |
-| 6 | Multiplayer | Next |
+| 6 | Multiplayer | **Gate passed; parts still to build (see below)** |
+
+## What to do next (for whoever continues)
+
+1. Put it on a real headset. Nothing has run on hardware. Check OpenXR start-up, controller button names, comfort, frame rate at 72 fps, and every hand interaction.
+2. Walking around a friend's town together (avatars, shared NPCs). Today a friend joins by code for a match only.
+3. An internet rendezvous for town codes. Today the joiner types the host's address as well as the code (same network, or a forwarded port).
+4. Player-run and Guild-sealed tournament brackets. Today there is one tournament match at the arena gate, with cards, fixed scale and terrain.
+5. Port the rest of the 2D roster and the full 2D behaviour trees; use them in the wilds too.
+6. Hand tracking, offers and negotiation at stalls, foraging, Yak's lines, music, songs and models.
+
+## Milestone 6 — Multiplayer (gate passed)
+
+Gate: *two clients play one match together.* Passes.
+
+Done
+- `net/net_session.gd`: host-authoritative, deterministic. Every machine runs the same simulation and only inputs cross the network; the host stamps each input with its tick and sends one frame per tick; a state hash every 5 seconds catches drift.
+- Town code as the password to the host's town; a wrong code is refused in plain words. Each visitor plays with their own pouch from their own collection. Ring votes from both players meet in the middle.
+- Spectators receive the same frames (late joiners get the backlog), sit in the stands, cannot move onto the field and can send nothing.
+- Disconnects: 10 seconds to come back under the same name, then the remaining player takes the win.
+- Lobby scene (sign in the town square, or `-- --scene=lobby`): your town code and address, a keypad for the friend's address and code, your horde token to set ring votes, Host, Join, Watch.
+- The match scene plays either side or spectates, driven by the session.
+- Replays as holograms (`-- --scene=replay`, or "Watch last replay" by the arena gate): any of the five scales, free movement around the field, pause, rewind (re-simulated exactly), and an exactness check at the end.
+
+Checked by
+- Three headless processes (host, friend, spectator) played one match to the end with identical final state hashes and no drift; a joiner with the wrong code was refused.
+- A headless host plus two rendered clients: one played side 2 through the simulated hands in the VR match scene, one watched from the stands. All three ended at the same tick with the same hash, and the saved replay was exact.
+- All 107 headless checks pass (53 rules, 54 in-game).
+
+Not built yet
+- Walking around a shared town with a friend, internet play without typing an address, tournament brackets, in-VR friend invites (wrist menu, open question 1).
 
 ## Milestone 5 — The wilds (done)
 
