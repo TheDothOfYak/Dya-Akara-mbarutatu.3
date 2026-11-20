@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /tests/
+Disallow: /tools/
+Disallow: /supabase/
+
+Sitemap: https://dyaakara-yak.web.app/sitemap.xml

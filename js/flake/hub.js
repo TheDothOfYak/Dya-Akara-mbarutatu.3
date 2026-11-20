@@ -117,7 +117,9 @@
   /* ---------- the studio name ---------- */
   function paintStudio() {
     $('studio').textContent = hub.studio;
-    document.title = hub.studio;
+    // keep the page's full, searchable title (it lists the games); only swap in a renamed studio
+    paintStudio.base = paintStudio.base || document.title;
+    document.title = paintStudio.base.split('Flake Games').join(hub.studio || 'Flake Games');
   }
 
   /* ---------- account ---------- */

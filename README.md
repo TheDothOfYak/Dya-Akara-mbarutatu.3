@@ -54,6 +54,7 @@ python3 -m http.server 8000
 **Free permanent hosting:** every push to `main` auto-deploys to two places:
 - **GitHub Pages** — `https://<your-username>.github.io/Dya-Akara-mbarutatu.3/` (`.github/workflows/deploy-pages.yml`). Requires Settings → Pages → Source → **GitHub Actions**, once.
 - **Firebase Hosting** — `https://<your-firebase-project>.web.app` (`.github/workflows/deploy-firebase.yml`). Requires a one-time `FIREBASE_SERVICE_ACCOUNT` repository secret — see below.
+- **Search engines** — every page carries a description, link-preview tags and game details for Google and Bing, the home page lists every game as plain links, and `robots.txt` and `sitemap.xml` sit at the root. All of it is written by `node tools/seo.js`; run it again after adding a game or moving the site (the home address is `SITE` at the top of that file, currently the Firebase one). To get found faster, add the site in [Google Search Console](https://search.google.com/search-console) (and Bing Webmaster Tools) and submit `sitemap.xml`.
 
 Both serve the exact same static files, so both stay in sync automatically from now on.
 
