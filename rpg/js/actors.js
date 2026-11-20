@@ -655,7 +655,7 @@ export function buildEikar(o = {}) {
   const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 8), skinMat); jaw.scale.set(kalo ? 1.15 : 1.0, 0.75, 0.95); jaw.position.set(0, 0.06, 0.03); head.add(jaw);
   const face = new THREE.Group(); face.position.y = 0.12; head.add(face);
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1a0f08 });
-  const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfff6e6 });
+  const whiteMat = new THREE.MeshLambertMaterial({ color: 0xfff6e6, emissive: 0x6a645a });   // lit like the face round it (an unlit white would shine in the dark)
   const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const duat = o.duat === true ? 1 : (o.duat || 0);
   const markGlowCol = duat ? 0x6a18d8 : (o.marking || 0xbfe8ff);
