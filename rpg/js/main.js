@@ -4587,6 +4587,26 @@ function updatePlayer(dt) {
   if (P.flying) { flyKuni(dt, wish, moving, act); return; }
   if (P.climb) { climbTick(dt, act); return; }
   if (P.jumpBuf > 0 && act && !vineOn() && tryClimb(wish)) P.jumpBuf = 0;
+  /* climbing: run or jump at a wall, a ledge, a cart, a rock or a bank with Space held and he catches the top edge and
+     pulls himself up onto it — anything whose top is within a reach above his head */
+  if (P.mantle) {
+    const M = P.mantle; M.t += dt; const k = Math.min(1, M.t / M.dur), up = Math.min(1, k / 0.62), over = Math.max(0, (k - 0.5) / 0.5);
+    P.pos.set(lerp(M.x0, M.x1, over * over * (3 - 2 * over)), lerp(M.y0, M.y1, 1 - (1 - up) * (1 - up)), lerp(M.z0, M.z1, over * over * (3 - 2 * over)));
+    P.vel.set(0, 0, 0); P.onGround = false;
+    if (k >= 1) { P.mantle = null; P.onGround = true; P.pos.y = M.y1; sfx.land(); }
+    placeWalker(torcain.root, P, dt); torcain.root.rotation.set(0, P.yaw, 0);
+    torcain.animate(dt, { speed: 0, onGround: k > 0.85, t: G.t, thrown: k < 0.6, heat: P.heat / 100 });
+    return;
+  }
+  if (act && moving && !P.riding && !P.swimming && !P.roll && (P.jumpBuf > 0 || (keys.Space && !P.onGround)) && !P.gliding) {
+    const reach = 0.85, lx = P.pos.x + wish.x * reach, lz = P.pos.z + wish.z * reach;
+    const top = Math.max(world.heightAt(lx, lz), world.col.ground(lx, lz, P.pos.y + 3.1));
+    const rise = top - P.pos.y;
+    if (rise > 0.75 && rise < 3.2 && (!world.inBounds || world.inBounds(lx, lz)) && world.col.ground(lx, lz, P.pos.y + 3.1) > world.heightAt(lx, lz) + 0.2 && spend(D.stamina.jump)) {
+      P.mantle = { t: 0, dur: 0.32 + rise * 0.17, x0: P.pos.x, y0: P.pos.y, z0: P.pos.z, x1: lx, y1: top, z1: lz };
+      P.yaw = Math.atan2(wish.x, wish.z); P.jumpBuf = 0; P.atk = null; sfx.jump();
+    }
+  }
   let sprint = (keys.ShiftLeft || keys.ShiftRight) && moving && !P.exhausted;
   if (sprint && D.stamina.sprint > 0) { P.stam -= D.stamina.sprint * dt; P.stamDelay = 0.5; if (P.stam <= 0) { P.stam = 0; P.exhausted = true; sprint = false; } }
   if (P.exhausted && P.stam > 25) P.exhausted = false;

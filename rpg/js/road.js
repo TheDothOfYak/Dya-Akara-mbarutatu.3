@@ -284,11 +284,13 @@ export function createRoad(ctx) {
       }
     }
     const inst = (geo, mat, n, outline) => { const m = new THREE.InstancedMesh(geo, mat, Math.max(1, n)); m.count = 0; m.castShadow = m.receiveShadow = true; scene.add(m); if (outline) { const o = new THREE.InstancedMesh(geo, outlineInst(0.07), Math.max(1, n)); o.count = 0; m.userData.o = o; scene.add(o); } return m; };
-    const body = inst(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), toon(0xffffff), homes.length, true);
-    const cone = inst(new THREE.ConeGeometry(0.78, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0), toon(0xffffff), homes.length, true);
-    const dome = inst(new THREE.SphereGeometry(0.72, 14, 7, 0, TAU, 0, Math.PI / 2), toon(0xffffff), homes.length, true);
-    const band = inst(new THREE.BoxGeometry(1, 1, 1), toon(0x6a4428), homes.length * 2, false);
-    const door = inst(new THREE.BoxGeometry(1.2, 2.3, 0.2).translate(0, 1.15, 0), toon(0xffffff), homes.length, false);
+    for (const hm of homes) if (hm.roof === 'dome') hm.d = hm.w;   // a round roof sits on a round house
+    const body = inst(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), paint(toon(0xffffff), 'plaster'), homes.length, true);
+    const round = inst(new THREE.CylinderGeometry(0.5, 0.5, 1, 20).translate(0, 0.5, 0), paint(toon(0xffffff), 'plaster'), homes.length, true);
+    const cone = inst(new THREE.ConeGeometry(0.78, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0), paint(toon(0xffffff), 'shingle'), homes.length, true);
+    const dome = inst(new THREE.SphereGeometry(0.6, 18, 8, 0, TAU, 0, Math.PI / 2), paint(toon(0xffffff), 'shingle'), homes.length, true);
+    const band = inst(new THREE.BoxGeometry(1, 1, 1), paint(toon(0x6a4428), 'wood'), homes.length * 7, false);
+    const door = inst(new THREE.BoxGeometry(1.2, 2.3, 0.2).translate(0, 1.15, 0), paint(toon(0xffffff), 'wood'), homes.length, false);
     const win = inst(new THREE.PlaneGeometry(0.95, 1.2), new THREE.MeshBasicMaterial({ color: 0xffc878, side: THREE.DoubleSide }), homes.length * 8, false);
     const o = new THREE.Object3D(), col = new THREE.Color();
     const put = (m, x, y, z, sx, sy, sz, ry, c) => {
@@ -298,15 +300,18 @@ export function createRoad(ctx) {
     };
     for (const hm of homes) {
       const { x, z, w, d, h, ry } = hm, fx = Math.sin(ry), fz = Math.cos(ry), sx = Math.cos(ry), sz = -Math.sin(ry);
-      put(body, x, 0, z, w, h, d, ry, hm.wall);
-      put(band, x, h, z, w + 0.18, 0.26, d + 0.18, ry);
-      if (hm.floors > 1) put(band, x, 3.3, z, w + 0.14, 0.22, d + 0.14, ry);
+      const isRound = hm.roof === 'dome';
+      put(isRound ? round : body, x, 0, z, w, h, d, ry, hm.wall);
+      if (!isRound) { put(band, x, h, z, w + 0.18, 0.26, d + 0.18, ry); if (hm.floors > 1) put(band, x, 3.3, z, w + 0.14, 0.22, d + 0.14, ry);
+        for (const q of [-1, 1]) put(band, x + sx * q * (w / 2), h / 2, z + sz * q * (w / 2) , 0.24, h, d + 0.1, ry); }   // corner timbers
+      // a step, a lintel and a little porch roof at every door
+      put(band, x + fx * (d / 2 + 0.35), 0.1, z + fz * (d / 2 + 0.35), 1.7, 0.2, 0.7, ry); put(band, x + fx * (d / 2 + 0.3), 2.55, z + fz * (d / 2 + 0.3), 1.9, 0.14, 0.75, ry);
       if (hm.roof === 'cone') put(cone, x, h, z, Math.max(w, d) * 1.05, 2.6 + rng() * 0.8, Math.max(w, d) * 1.05, ry, hm.roofC);
       else put(dome, x, h, z, Math.max(w, d), Math.max(w, d) * 0.72, Math.max(w, d), ry, hm.roofC);
       put(door, x + fx * (d / 2 + 0.02), 0, z + fz * (d / 2 + 0.02), 1, 1, 1, ry, hm.door);
       for (let f = 0; f < hm.floors; f++) for (const s of [-1, 1]) {
         const wy = 1.9 + f * 3.3, side = f ? s * w * 0.27 : s * w * 0.3;
-        if (f || Math.abs(side) > 1.0) put(win, x + fx * (d / 2 + 0.04) + sx * side, wy, z + fz * (d / 2 + 0.04) + sz * side, 1, 1, 1, ry);
+        if (!isRound && (f || Math.abs(side) > 1.0)) put(win, x + fx * (d / 2 + 0.04) + sx * side, wy, z + fz * (d / 2 + 0.04) + sz * side, 1, 1, 1, ry);
         put(win, x + sx * s * (w / 2 + 0.04), wy, z + sz * s * (w / 2 + 0.04), 1, 1, 1, ry + Math.PI / 2);
       }
       const swap = Math.abs(Math.sin(ry)) > 0.5;
@@ -532,6 +537,52 @@ export function createRoad(ctx) {
     g.add(glowSprite(0x6af0e0, 1.3, 0.3)); return g;
   };
   let MK = null;   // the market's own state
+  /* wreckage of the war in the air: boulders and whole trees torn loose up there come down on the city, each under its
+     own growing shadow; where they land they stay, and the streets fill with it. In the frozen moment every piece of
+     it hangs where it is. */
+  const DEB = { on: false, next: 0, air: [], down: [] };
+  const debRock = new THREE.DodecahedronGeometry(1, 0), debTrunk = new THREE.CylinderGeometry(0.35, 0.5, 1, 7), debRing = new THREE.RingGeometry(0.6, 1, 18);
+  function debPiece(x, z, y) {
+    const tree = rng() < 0.3, s0 = tree ? 0.8 + rng() * 0.6 : 0.5 + rng() * 1.1, g = new THREE.Group();
+    if (tree) { const tr = new THREE.Mesh(debTrunk, paint(toon(0x6b4128), 'bark', 0.12)); tr.scale.set(s0, 6 * s0, s0); g.add(tr); const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), toon([0x5a8a3a, 0xc8922e, 0x4a7a34][Math.floor(rng() * 3)])); cr.scale.setScalar(2.1 * s0); cr.position.y = 3.6 * s0; g.add(cr); }
+    else { const rk = new THREE.Mesh(debRock, toon([0x8a8478, 0x7a7468, 0x9a9488][Math.floor(rng() * 3)])); rk.scale.set(s0, s0 * 0.8, s0); g.add(rk); }
+    g.traverse(o => { if (o.isMesh) o.castShadow = false; });
+    g.position.set(x, y, z); g.rotation.set(rng() * 6, rng() * 6, rng() * 6); scene.add(g);
+    return { g, x, z, tree, s: s0, vy: -6 - rng() * 8, spin: V3(rng() - 0.5, rng() - 0.5, rng() - 0.5).multiplyScalar(2.5), gy: heightAt(x, z) };
+  }
+  function debLand(d, quiet) {
+    d.g.position.y = d.gy + (d.tree ? 0.4 * d.s : 0.45 * d.s); if (d.tree) d.g.rotation.set(Math.PI / 2 - 0.08, d.g.rotation.y, 0);
+    DEB.down.push(d); if (DEB.down.length > 70) scene.remove(DEB.down.shift().g);
+    if (quiet) return;
+    const near = Math.hypot(d.x - P.pos.x, d.z - P.pos.z);
+    particles.burst(d.x, d.gy + 0.4, d.z, 26, { color: 0xc8b89a, speed: 7, size: 0.7, life: 0.8, gravity: 6 });
+    if (near < 45) { sfx.slam(); shake = Math.max(shake, 0.9 - near / 55); }
+  }
+  function startDebris(scatter = 26, hang = 16) {
+    if (DEB.on) return; DEB.on = true; DEB.next = 0.4;
+    for (let k = 0; k < scatter; k++) { const a = rng() * TAU, r = 14 + rng() * 120, q = freeSpot(P.pos.x + Math.cos(a) * r, P.pos.z + Math.sin(a) * r, 1.5); debLand(debPiece(q.x, q.z, 0), true); }   // what has come down already
+    for (let k = 0; k < hang; k++) { const a = rng() * TAU, r = 7 + rng() * 34; DEB.air.push(debPiece(P.pos.x + Math.cos(a) * r, P.pos.z + Math.sin(a) * r, 6 + rng() * 40)); }   // and what is on its way
+  }
+  function stopDebris() { DEB.on = false; for (const d of DEB.air) scene.remove(d.g); DEB.air.length = 0; }
+  function tickDebris(dt) {
+    if (!DEB.on || (MK && MK.frozen)) return;   // frozen: every piece of it hangs in the air
+    DEB.next -= dt;
+    if (DEB.next <= 0 && DEB.air.length < 14) {
+      DEB.next = 0.5 + rng() * 1.1;
+      const a = rng() * TAU, r = 7 + rng() * 38, q = freeSpot(P.pos.x + P.vel.x * 2 + Math.cos(a) * r, P.pos.z + P.vel.z * 2 + Math.sin(a) * r, 1.4);
+      if (Math.hypot(q.x - P.pos.x, q.z - P.pos.z) > 5) {
+        const d = debPiece(q.x, q.z, 70 + rng() * 30);
+        d.ring = new THREE.Mesh(debRing, new THREE.MeshBasicMaterial({ color: 0x1a0c08, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide })); d.ring.rotation.x = -Math.PI / 2; d.ring.position.set(q.x, d.gy + 0.07, q.z); d.ring.scale.setScalar(d.s * 2.4); scene.add(d.ring);
+        DEB.air.push(d);
+      }
+    }
+    for (let i = DEB.air.length - 1; i >= 0; i--) {
+      const d = DEB.air[i]; d.vy -= 16 * dt; d.g.position.y += d.vy * dt;
+      d.g.rotation.x += d.spin.x * dt; d.g.rotation.y += d.spin.y * dt; d.g.rotation.z += d.spin.z * dt;
+      if (d.ring) { const k = clamp(1 - (d.g.position.y - d.gy) / 80, 0, 1); d.ring.material.opacity = 0.15 + k * 0.5; d.ring.scale.setScalar(d.s * (2.6 - k * 1.2)); }
+      if (d.g.position.y <= d.gy + 0.5) { if (d.ring) scene.remove(d.ring); DEB.air.splice(i, 1); debLand(d); }
+    }
+  }
   const give = (id, n) => ctx.give && ctx.give(id, n);
   const fold = (o, op) => o.traverse(m => { if (m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = op; m.material.depthWrite = false; } });
 
@@ -616,7 +667,7 @@ export function createRoad(ctx) {
     CAM.yaw = Math.atan2(f.x, f.z); CAM.pitch = 0.22;
     tanoc.hat.visible = false; tanoc.weapon.visible = false;
     placeCart(CART0.x, CART0.z, Math.PI);
-    MK = { n: 0, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, loaded: 0, carrying: null, crates: [] };
+    MK = { n: 0, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, loaded: 0, carrying: null, crates: [], lying: true };
     makeCrowd();
     ctx.blur(5);
     // a whole Tatu away: up past Velki in the sky, and down into a market at midday
@@ -627,19 +678,27 @@ export function createRoad(ctx) {
     ], () => {
       ctx.play();
       ctx.location(...R.loc);
+      // he comes down out of the air into the Carpenter's wares: a crash, dust, and the stall's goods all round him
+      sfx.slam(); shake = 1.1; particles.burst(tp.x, 0.5, tp.z, 46, { color: 0xd8c098, speed: 6, size: 0.6, life: 0.9, gravity: 4 });
+      for (let k = 0; k < 9; k++) {
+        const a = k / 9 * TAU + rng(), d = 0.7 + rng() * 1.5, pot = k % 3 === 0;
+        const m = new THREE.Mesh(pot ? new THREE.CylinderGeometry(0.16, 0.11, 0.3, 9) : new THREE.BoxGeometry(0.34, 0.26, 0.3), toon(pot ? 0xb5653a : [0x9a6a40, 0xb8844e, 0x8a5a36][k % 3]));
+        m.position.set(tp.x + Math.cos(a) * d, pot ? 0.1 : 0.13, tp.z + Math.sin(a) * d); m.rotation.set(pot ? Math.PI / 2 : rng() * 0.5, rng() * 6, rng() * 0.6); scene.add(m);
+      }
       const W = PRO.wake;
       sayHeld(W.slice(0, 5), two, () => {
         tanoc.hat.visible = true; ctx.blur(0); sfx.heal();
         sayHeld(W.slice(5).concat(PRO.focus.slice(0, 2), R.wakeExtra, PRO.focus.slice(2)), (k, tt) => {
-          const a = Math.atan2(f.x, f.z) + Math.sin(tt * 0.15) * 0.6;   // drifting round the two of them, Velki above
-          return { p: V3(tp.x + Math.sin(a) * 5.5, 2.4 + Math.sin(tt * 0.2) * 0.4, tp.z + Math.cos(a) * 5.5), l: V3((tp.x + B.pos.x) / 2, 1.6, (tp.z + B.pos.z) / 2) };
+          // from down beside him where he lies, up past the Carpenter into the sky: Velki, hanging right over them
+          const a = Math.sin(tt * 0.15) * 0.25, vx = 0.5, vy = 0.84, vz = 0.2;
+          return { p: V3(tp.x - vx * 2.4 + Math.sin(a) * 1.2, 0.45, tp.z - vz * 2.4 - 1.6 + Math.cos(a) * 0.4), l: V3(tp.x + vx * 12, 1 + vy * 12, tp.z + vz * 12) };
         }, startPacking);
       });
     });
   }
   /* pack the stall: three crates from the stall to the back of the cart */
   function startPacking() {
-    sub = 'pack';
+    sub = 'pack'; if (MK) MK.lying = false;   // on his feet at last
     const st = stalls[0];
     for (let k = 0; k < 3; k++) {
       const off = (k - 1) * 0.9, x = st.x + Math.cos(st.ry) * off, z = st.z - Math.sin(st.ry) * off;
@@ -674,6 +733,13 @@ export function createRoad(ctx) {
   }
   function marketMaterialize() {
     sub = 'hat';
+    startDebris();
+    // and it is not only these two: the whole war has come down with them, hanging over the city
+    MK.extras = [];
+    for (let k = 0; k < 6; k++) {
+      const m = k % 2 ? buildSniller(1.1 + rng() * 0.5) : buildAngel(1.1 + rng() * 0.5), a = k / 6 * TAU + rng();
+      m.position.set(SQUARE.x + Math.cos(a) * (22 + rng() * 30), 16 + rng() * 22, SQUARE.z + Math.sin(a) * (22 + rng() * 30)); m.userData.setVis(1); m.userData.base = m.position.clone(); m.rotation.y = rng() * 6; scene.add(m); MK.extras.push(m);
+    }
     MK.angel = buildAngel(1.7); MK.angel.position.set(SQUARE.x - 7, 7, SQUARE.z - 2); scene.add(MK.angel);
     MK.sniller = buildSniller(1.6); MK.sniller.position.set(SQUARE.x + 7, 6, SQUARE.z - 4); scene.add(MK.sniller);
     MK.angel.userData.setVis(1); MK.sniller.userData.setVis(1);   // up close, and whole: nobody has ever seen them like this
@@ -737,7 +803,7 @@ export function createRoad(ctx) {
   function resumeEscape() {
     stage = 'market'; sub = 'amulets'; setDusk(0);
     MK = { n: 1, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, loaded: 3, carrying: null, crates: [] };
-    makeCrowd(); crowd.panic();
+    makeCrowd(); crowd.panic(); startDebris(40, 6);
     tanoc.hat.visible = true; tanoc.weapon.visible = true;
     squareSpots().slice(1).forEach(([x, z]) => { const it = addItem(V3(x, groundAt(x, z, 2.4) + 0.9, z), 'Pick up the Sniller amulet', null, amuletMesh()); it.act = () => marketAmulet(it); it.y0 = it.pos.y; MK.amulets.push(it); });
     ctx.play(); ctx.location(...R.loc);
@@ -798,6 +864,7 @@ export function createRoad(ctx) {
     for (const it of MK.crates || []) dropItem(it);
     if (MK.carrying) tanoc.root.remove(MK.carrying);
     if (MK.angel) scene.remove(MK.angel); if (MK.sniller) scene.remove(MK.sniller);
+    for (const m of (MK.extras || [])) scene.remove(m);
     if (crowd) for (const p of crowd.people) p.a.root.visible = false;
     for (const f of foes) scene.remove(f.a.root); foes.length = 0;
     MK = null;
@@ -843,6 +910,16 @@ export function createRoad(ctx) {
   function escSpawn() {
     const E = MK.esc, S = Math.PI / 2, top = HT.levels.length - 1;
     // round the home tree's floors inside, all the way down to the hall, and out in among its roots
+    // the tree is the sturdiest thing in the city, and folk know it: they have run for it, and sit huddled on its floors and in its hall
+    if (!HT.sheltered) {
+      HT.sheltered = true;
+      for (let k = 0; k < 16; k++) {
+        const lv = k < 6 ? -1 : (k % HT.levels.length), q = HT.levelSpot(lv, k * 2.4 + rng(), 0.25 + rng() * 0.6);
+        const a = buildEikar(Object.assign({ weapon: 'none', flasks: false, seed: 'sh' + k }, FOLK_LOOKS[k % FOLK_LOOKS.length]));
+        a.root.position.copy(q); a.root.rotation.y = rng() * 6; scene.add(a.root);
+        for (let i = 0; i < 14; i++) a.animate(0.05, { speed: 0, onGround: true, t: k + i * 0.05, sit: k % 3 !== 0, talking: k % 3 === 0 });
+      }
+    }
     escAmuletItem(HT.levelSpot(top, toCore + 1.9), 'Pick up the Sniller amulet', true);
     escAmuletItem(HT.levelSpot(top, toCore - 2.3, 0.85), 'Pick up the Sniller amulet', true);
     escAmuletItem(HT.levelSpot(2, toCore + 0.7), 'Pick up the Sniller amulet', true);
@@ -1118,7 +1195,7 @@ export function createRoad(ctx) {
   let D1 = null;
   function startDay1(rolling) {
     cleanMarket();
-    stage = 'day1'; sub = 'walk'; ctx.save('day1'); ctx.blur(0);
+    stage = 'day1'; sub = 'walk'; ctx.save('day1'); ctx.blur(0); stopDebris();
     tanoc.hat.visible = true; tanoc.weapon.visible = true;
     if (!rolling) {   // (a reload: the cart waits just outside the gate, Buhkon up on the bench)
       P.inCart = false; placeCart(roadX(GATE_Z - 10), GATE_Z - 10, Math.PI);
@@ -1698,7 +1775,7 @@ export function createRoad(ctx) {
     const speed = Math.hypot(P.vel.x, P.vel.z);
     if (P.onGround && speed > 1) { P.stepPh += dt * speed * 0.55; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); } }
     placeWalker(tanoc.root, P, dt); tanoc.root.rotation.y = P.yaw;
-    tanoc.animate(dt, { speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null, carry: !!(MK && MK.carrying) });
+    tanoc.animate(dt, { speed, onGround: P.onGround, t, swing: P.swing > 0 ? { kind: 1, p: 1 - P.swing / 0.42 } : null, carry: !!(MK && MK.carrying), lie: MK && MK.lying ? 1 : 0 });
   }
   /* the cart: parked, driven along the road by Buhkon, or driven out of the city with the two of them aboard */
   function updateCart(dt) {
@@ -1795,9 +1872,13 @@ export function createRoad(ctx) {
     if (K.on) follow(K, punk, dt, -1.8, 2.2, 11, stage === 'day4'); else punk.root.visible = false;
     if (K.on) punk.root.visible = true;
     updateFoes(dt, playing);
+    tickDebris(dt);
     // the market's own business
     if (MK) {
-      const slow = MK.frozen ? 0.25 : 1;
+      const slow = MK.frozen ? 0 : 1;   // the frozen moment: every one of them stopped dead
+      if (MK.frozen) MK.froze = MK.froze ?? t;
+      const tw = MK.frozen ? MK.froze : t;
+      for (const m of (MK.extras || [])) { m.userData.tick(tw, slow); if (MK.leaving) m.position.y += dt * 14; }
       for (const m of [MK.angel, MK.sniller]) if (m) {
         m.userData.tick(t * slow, slow);
         if (m.userData.base && !(m === MK.angel && MK.leaving)) m.position.set(m.userData.base.x + Math.sin(t * 0.7 + (m === MK.angel ? 0 : 2)) * 0.6, m.userData.base.y + Math.sin(t * 1.1 + (m === MK.angel ? 1 : 0)) * 0.5, m.userData.base.z + Math.cos(t * 0.6) * 0.4);
@@ -1821,7 +1902,7 @@ export function createRoad(ctx) {
       }
     }
     if (EV.cart && EV.cart.state === 'carry') EV.cart.wheel.rotation.x += Math.hypot(P.vel.x, P.vel.z) * dt / 0.6;   // turning as he rolls it
-    if (crowd && stage === 'market') crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });
+    if (crowd && (stage === 'market' || DEB.on)) crowd.update(dt, t, { freeze: MK && MK.frozen, stare: P.pos });   // and all through the escape: the city is running
     kit.update(t, dt, particles);
     if (stage === 'market') fountain.update(dt, t, particles, MK && MK.esc ? [] : [P.pos]);
     if (stage === 'market' && MK && MK.esc && playing) escTick(dt);

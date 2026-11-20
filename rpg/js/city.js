@@ -367,11 +367,26 @@ export function createCrowd(o) {
   function panic() {
     for (const p of people) {
       if (p.gone || p.fixed) continue;
-      p.run = true; p.state = 'go'; p.speed = 5 + rng() * 2; p.wait = rng() * 0.8;
+      p.run = true; p.state = 'go'; p.speed = 4.5 + rng() * 4; p.wait = rng() * 1.6; p.runs = 0;
       const ex = (o.exits || []).slice().sort((a, b) => a.distanceTo(p.pos) - b.distanceTo(p.pos))[Math.floor(rng() * 2)] || (o.exits || [])[0];
       if (!ex) continue;
       const [r, a] = toPolar(ex.x, ex.z); route(p, Math.max(streets[0].r, Math.min(streets[streets.length - 1].r, r)), a); p.plan.push(ex.clone()); p.exit = ex;
+      for (const q of p.plan) { if (q !== p.plan[p.plan.length - 1]) { q.x += (rng() - 0.5) * 3.4; q.z += (rng() - 0.5) * 3.4; } }   // a crowd, not a file: each keeps their own line down the street
     }
+  }
+  /* someone running has reached the door or gate they made for. Most don't get in (it's shut, or full): they turn and
+     run for another; some press themselves into the doorway and stay there; a few get inside and are gone. */
+  function arrived(p) {
+    p.runs = (p.runs || 0) + 1;
+    const far = (o.exits || []).filter(e => e.distanceTo(p.pos) > 14);
+    if (p.runs < 5 && far.length && rng() < 0.8) {
+      const ex = far[Math.floor(rng() * far.length)], [r, a] = toPolar(ex.x, ex.z);
+      route(p, Math.max(streets[0].r, Math.min(streets[streets.length - 1].r, r)), a); p.plan.push(ex.clone()); p.exit = ex; p.wait = rng() * 1.2;
+      for (const q of p.plan) { if (q !== p.plan[p.plan.length - 1]) { q.x += (rng() - 0.5) * 3.4; q.z += (rng() - 0.5) * 3.4; } }
+      return false;
+    }
+    if (rng() < 0.6) { p.run = false; p.fixed = true; p.cower = true; p.exit = null; return false; }   // hides where they are
+    return true;
   }
   const tmp = V3();
   return {
@@ -391,7 +406,7 @@ export function createCrowd(o) {
             if (d < (p.run ? 1.2 : 0.8)) {
               p.plan.shift();
               if (!p.plan.length) {
-                if (p.run && p.exit) { p.gone = true; p.a.root.visible = false; continue; }   // in through a door, or out of the gate
+                if (p.run && p.exit) { if (arrived(p)) { p.gone = true; p.a.root.visible = false; } continue; }   // in through a door, out of the gate — or on to the next
                 p.wait = p.spot ? 5 + rng() * 9 : 1 + rng() * 4;
                 p.look = p.spot && p.spot.look ? V3(p.spot.look[0], 0, p.spot.look[1]) : null;
               }

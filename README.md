@@ -275,6 +275,7 @@ The great ones are only ever seen from far off. The Aerolhorn crosses the sky no
 |---|---|
 | `W A S D` + mouse | Move and look (click the world to capture the mouse) |
 | `Shift` / `Space` / `C` | Sprint / jump / dodge roll |
+| `Space` held, running at a ledge | Climb: he catches the top of a wall, crate, cart or rock within reach and pulls himself up |
 | Left click | Three-strike axe combo |
 | Right click | **Duat Strike**: the axe passes through the Duat to the foe you’re aiming at |
 | `T` or middle click | Lock on to a target |
