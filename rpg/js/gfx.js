@@ -353,3 +353,22 @@ export function buildCampfire(scale = 1) {
   };
   return g;
 }
+
+/* warm pools of light on the ground under lamps: one instanced decal per glow found hung low over the ground, each in
+   its own lamp's colour. groundY(x, z, y) gives the floor under a lamp, heightAt(x, z) the land. The caller sets the
+   returned mesh's material.opacity with the dark (0 by day). */
+export function lightPools(scene, groundY, heightAt) {
+  const list = [], v = new THREE.Vector3(), white = new THREE.Color(1, 1, 1);
+  scene.traverse(o => {
+    if (!o.isSprite || !o.material || o.material.blending !== THREE.AdditiveBlending || list.length >= 160) return;
+    const c = o.material.color; if (o.scale.x < 0.9 || o.scale.x > 8 || c.r + c.g + c.b < 1.2) return;   // a lamp's glow: not a mote, not a whole sky
+    o.getWorldPosition(v); const gy = heightAt(v.x, v.z), h = v.y - gy; if (h < 0.4 || h > 9) return;
+    list.push([v.x, groundY(v.x, v.z, v.y) + 0.06, v.z, Math.min(7, 2.2 + h * 0.9), c.clone().lerp(white, 0.2)]);
+  });
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }), Math.max(1, list.length));
+  const o2 = new THREE.Object3D(); list.forEach(([x, y, z, r, c], i) => { o2.position.set(x, y, z); o2.scale.set(r, 1, r); o2.updateMatrix(); m.setMatrixAt(i, o2.matrix); m.setColorAt(i, c); });
+  m.count = list.length; m.userData.noOutline = true; m.renderOrder = 3; scene.add(m);
+  return m;
+}

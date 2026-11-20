@@ -10,7 +10,7 @@
    takes the run back when the air tears open.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, addOutline, outlineAll, glowSprite, mistSprite, Particles, paint, waterMaterial } from './gfx.js';
+import { toon, ramp, addOutline, outlineAll, glowSprite, mistSprite, Particles, paint, waterMaterial, lightPools } from './gfx.js';
 import { buildEikar, placeWalker } from './actors.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, orbitPitch, tiltUp, railing } from './util.js';
 import * as STORY from './story.js';
@@ -41,7 +41,7 @@ export function createVelki(ctx) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xd08a78, 280, 2600);
   const SUN = V3(-0.9, 0.12, -0.42).normalize();
-  let sunK = 0; const SUN_DAY = new THREE.Color(0xff9a5a), SUN_LOW = new THREE.Color(0xff5a32);
+  let sunK = 0, pools = null; const SUN_DAY = new THREE.Color(0xff9a5a), SUN_LOW = new THREE.Color(0xff5a32);
 
   /* ---------------- sky: the sun going down, the sky on fire ---------------- */
   const skyMat = new THREE.ShaderMaterial({
@@ -851,6 +851,8 @@ export function createVelki(ctx) {
     sunK = damp(sunK, stage === 'home' || stage === 'drill' || stage === 'drilled' || stage === 'leaving' || stage === 'chase' || stage === 'given' ? 0 : 1, 0.12, dt);
     SUN.set(-0.9, lerp(0.12, 0.022, sunK), -0.42).normalize();
     sun.color.copy(SUN_DAY).lerp(SUN_LOW, sunK); sun.intensity = lerp(2.4, 1.55, sunK);
+    if (!pools) pools = lightPools(scene, (x, z) => groundAt(x, z, 60), heightAt);   // and the lamps' light pools on the streets as it goes down
+    pools.material.opacity = 0.18 + 0.4 * sunK;
     sun.position.copy(P.pos).addScaledVector(SUN, 140); sun.target.position.copy(P.pos);
   }
   let G_warned = false;

@@ -14,7 +14,7 @@ import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
-import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
+import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools } from './gfx.js';
 import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay, trunkAt } from './vines.js';
@@ -6729,20 +6729,7 @@ else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add(
 else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); startFromTitle(arriveByPass); }
 
 /* warm pools of light under lamps: one instanced ground decal per warm glow found low over the ground */
-function makeLightPools() {
-  const list = [], v = V3();
-  scene.traverse(o => {
-    if (!o.isSprite || !o.material || o.material.blending !== THREE.AdditiveBlending || list.length >= 160) return;
-    const c = o.material.color; if (o.scale.x < 0.9 || o.scale.x > 8 || c.r + c.g + c.b < 1.2) return;   // a lamp's glow: not a mote, not a whole sky
-    o.getWorldPosition(v); const gy = world.heightAt(v.x, v.z), h = v.y - gy; if (h < 0.4 || h > 9) return;
-    list.push([v.x, Math.max(gy, world.col.ground(v.x, v.z, v.y, true)) + 0.06, v.z, Math.min(7, 2.2 + h * 0.9), c.clone()]);
-  });
-  const tex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(cv); })();
-  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }), Math.max(1, list.length));
-  const o2 = new THREE.Object3D(); list.forEach(([x, y, z, r, c], i) => { o2.position.set(x, y, z); o2.scale.set(r, 1, r); o2.updateMatrix(); m.setMatrixAt(i, o2.matrix); m.setColorAt(i, c.lerp(new THREE.Color(1, 1, 1), 0.2)); });   // each the colour of its own lamp
-  m.count = list.length; m.userData.noOutline = true; m.renderOrder = 3; scene.add(m);
-  return m;
-}
+function makeLightPools() { return lightPools(scene, (x, z, y) => Math.max(world.heightAt(x, z), world.col.ground(x, z, y, true)), world.heightAt); }
 
 /* debugging handle for the console */
 window.__torcain = {
