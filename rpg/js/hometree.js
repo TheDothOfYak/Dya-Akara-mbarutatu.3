@@ -52,6 +52,7 @@ function batch(parent, geo, mat, max, { shadow = true, recv = true } = {}) {
       m.setMatrixAt(m.count, o.matrix);
       if (c != null) m.setColorAt(m.count, col.set(c));
       m.count++;
+      m.boundingSphere = null;
     },
     // a segment from a to b (a unit cylinder along +y, base at 0)
     seg(a, b, r0, _r1, c = null) {

@@ -109,6 +109,7 @@ export class Kit {
   put(x, y, z, sx, sy, sz, rx, ry, rz, color) {
     if (this.mesh.count >= this.max) return -1;   // never draw past the buffer
     const i = this.mesh.count++;
+    this.mesh.boundingSphere = null;   // re-measured when next drawn: a kit added to after done() must not be culled by its old size
     this.e.set(rx, ry, rz); this.q.setFromEuler(this.e);
     this.m.compose(new THREE.Vector3(x, y, z), this.q, new THREE.Vector3(sx, sy, sz));
     this.mesh.setMatrixAt(i, this.m);
