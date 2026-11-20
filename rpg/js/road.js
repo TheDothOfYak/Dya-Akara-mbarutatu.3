@@ -653,8 +653,9 @@ export function createRoad(ctx) {
       streets: [{ r: 9.5 }, { r: 19 }, { r: 29 }, { r: 39 }, { r: 49 }], roads: [{ a: -Math.PI / 2 }], spots,
       exits: doors.concat([V3(0, 0, GATE_Z - 6)]),
     });
-    for (let i = 0; i < 30; i++) {
-      const r = [9.5, 19, 19, 29, 39][i % 5], a = rng() * TAU;
+    const N = matchMedia('(pointer: coarse)').matches ? 32 : 52;   // a market day: the streets are full
+    for (let i = 0; i < N; i++) {
+      const r = [9.5, 19, 19, 29, 39, 49][i % 6], a = rng() * TAU;
       const p = crowd.spawn(FOLK_LOOKS[i % FOLK_LOOKS.length], V3(CORE.x + Math.cos(a) * r, 0, CORE.z + Math.sin(a) * r));
       if (i < spots.length && i < 14) { const sp = spots[i]; p.pos.set(sp.x, 0, sp.z); p.spot = sp; p.wait = 3 + rng() * 9; p.look = V3(sp.look[0], 0, sp.look[1]); }
     }
