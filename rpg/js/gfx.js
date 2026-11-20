@@ -203,8 +203,8 @@ export function glowSprite(color, size = 1, opacity = 1) {
    Particles — one Points cloud, CPU-simulated, additive glow.
    ============================================================ */
 export class Particles {
-  constructor(scene, max = 2500) {
-    this.max = max;
+  constructor(scene, max = 2500, matte = false) {
+    this.max = max; this.matte = matte;
     this.pos = new Float32Array(max * 3);
     this.col = new Float32Array(max * 3);
     this.size = new Float32Array(max);
@@ -238,18 +238,22 @@ export class Particles {
         uniform sampler2D uMap; varying vec3 vCol; varying float vA;
         void main() {
           vec4 t = texture2D(uMap, gl_PointCoord);
-          gl_FragColor = vec4(vCol * t.rgb, t.a * vA);
+          gl_FragColor = MATTE ? vec4(vCol, t.a * vA * 0.7) : vec4(vCol * t.rgb, t.a * vA);
         }`,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      defines: { MATTE: matte ? 'true' : 'false' },
+      transparent: true, depthWrite: false, blending: matte ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
     this.points = new THREE.Points(geo, mat);
     this.points.frustumCulled = false;
     this.points.renderOrder = 10;
     scene.add(this.points);
     this.tmpC = new THREE.Color();
+    /* dust, smoke, splinters and earth don't shine: they go to a second system drawn as matte puffs */
+    this.dust = matte ? null : new Particles(scene, Math.min(1500, Math.ceil(max / 2)), true);
   }
 
   emit(x, y, z, o = {}) {
+    if (this.dust && (o.matte ?? this.dull(o.color ?? 0xffa040))) return this.dust.emit(x, y, z, o);
     const i = this.cursor; this.cursor = (this.cursor + 1) % this.max;
     const i3 = i * 3;
     this.pos[i3] = x; this.pos[i3 + 1] = y; this.pos[i3 + 2] = z;
@@ -275,7 +279,9 @@ export class Particles {
     }
   }
 
+  dull(c) { if (typeof c !== 'number') return false; const r = (c >> 16 & 255) / 255, g = (c >> 8 & 255) / 255, b = (c & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b); return (mx - mn) / Math.max(mx, 1e-3) < 0.33 && 0.3 * r + 0.59 * g + 0.11 * b < 0.8; }
   update(dt) {
+    if (this.dust) this.dust.update(dt);
     const n = this.max;
     for (let i = 0; i < n; i++) {
       if (this.life[i] <= 0) { this.alpha[i] = 0; this.size[i] = 0; continue; }
@@ -292,7 +298,7 @@ export class Particles {
     a.position.needsUpdate = a.color.needsUpdate = a.size.needsUpdate = a.alpha.needsUpdate = true;
   }
 
-  setScale(px) { this.points.material.uniforms.uScale.value = px; }
+  setScale(px) { this.points.material.uniforms.uScale.value = px; if (this.dust) this.dust.setScale(px); }
 }
 
 /* a teardrop flame tongue: round base at y=0, pointed tip at y=h, the tip leaning along +x */
