@@ -238,6 +238,41 @@ function buildMeadow(scene, ok, heightAt, tones) {
   // a thing that is always drawn, so the meadow hears about every frame and knows where the camera is
   const tick = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3)), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }));
   tick.frustumCulled = false; tick.userData.noOutline = true; group.add(tick);
+  /* butterflies over the meadow by day: a dozen or so drifting about ahead of you, wings beating, settling now and then */
+  const BN = coarse ? 8 : 16, wingG = new THREE.PlaneGeometry(0.26, 0.2).translate(0.13, 0, 0);
+  const bfly = new THREE.InstancedMesh(wingG, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, fog: true }), BN * 2); bfly.frustumCulled = false; bfly.userData.noOutline = true; group.add(bfly);
+  const BC = [0xf2c84a, 0xffffff, 0xf08a3a, 0x8ac0ff, 0xd890e8], bs = [];
+  for (let i = 0; i < BN; i++) { bs.push({ p: new THREE.Vector3(0, -999, 0), v: new THREE.Vector3(), ph: Math.random() * 9, rest: 0 }); const c = new THREE.Color(BC[i % BC.length]); bfly.setColorAt(i * 2, c); bfly.setColorAt(i * 2 + 1, c); }
+  const bm = new THREE.Matrix4(), bq = new THREE.Quaternion(), be = new THREE.Euler(0, 0, 0, 'YXZ'), bS = new THREE.Vector3(1, 1, 1), bfog = new THREE.Color();
+  let lastT = 0;
+  function butterflies(camera, scene, t) {
+    const dt = Math.min(0.05, Math.max(0, t - lastT)); lastT = t;
+    const day = !scene.fog || (bfog.copy(scene.fog.color), 0.3 * bfog.r + 0.59 * bfog.g + 0.11 * bfog.b) > 0.35;
+    bfly.visible = day && MEADOW.on;
+    if (!bfly.visible) return;
+    for (let i = 0; i < BN; i++) {
+      const b = bs[i], d = Math.hypot(b.p.x - fwd.x, b.p.z - fwd.z);
+      if (d > 26 || b.p.y < -900) {   // gone too far: a new one, somewhere over grass ahead
+        b.p.y = -999; b.v.set(0, 0, 0);
+        for (let k = 0; k < 6; k++) { const a = Math.random() * 6.283, r = 4 + Math.random() * 18, x = fwd.x + Math.cos(a) * r, z = fwd.z + Math.sin(a) * r; if (ok(x, z)) { b.p.set(x, heightAt(x, z) + 0.4 + Math.random() * 1.2, z); break; } }
+      }
+      if (b.p.y < -900) { bm.makeScale(0, 0, 0); bfly.setMatrixAt(i * 2, bm); bfly.setMatrixAt(i * 2 + 1, bm); continue; }   // no grass near enough for this one just now
+      b.ph += dt * (b.rest > 0 ? 3 : 22);
+      if (b.rest > 0) b.rest -= dt;
+      else {
+        b.v.x += (Math.sin(t * 0.7 + i * 3) * 1.4 - b.v.x) * dt * 1.5 + (Math.random() - 0.5) * 6 * dt; b.v.z += (Math.cos(t * 0.6 + i * 5) * 1.4 - b.v.z) * dt * 1.5 + (Math.random() - 0.5) * 6 * dt;
+        const gy = heightAt(b.p.x, b.p.z); b.v.y += ((gy + 0.6 + Math.sin(t * 1.3 + i) * 0.4 - b.p.y) * 2 - b.v.y) * dt * 2;
+        b.p.addScaledVector(b.v, dt);
+        if (Math.random() < dt * 0.08 && b.p.y - gy < 0.8) { b.rest = 1.5 + Math.random() * 3; b.p.y = gy + 0.32; }   // settles on a grass head for a moment
+      }
+      const flap = Math.sin(b.ph) * (b.rest > 0 ? 0.35 : 1.1), yaw = Math.atan2(b.v.x, b.v.z);
+      for (const sgn of [-1, 1]) {
+        be.set(0, yaw + Math.PI / 2 * sgn + Math.PI / 2, sgn * (0.3 + flap)); bq.setFromEuler(be);
+        bm.compose(b.p, bq, bS); bfly.setMatrixAt(i * 2 + (sgn > 0 ? 1 : 0), bm);
+      }
+    }
+    bfly.instanceMatrix.needsUpdate = true;
+  }
   const fwd = new THREE.Vector3();
   tick.onBeforeRender = (renderer, sc_, camera) => {
     if (!camera.isPerspectiveCamera) return;
@@ -246,6 +281,7 @@ function buildMeadow(scene, ok, heightAt, tones) {
     camera.getWorldDirection(fwd);
     const px = camera.position.x + fwd.x * C * 1.2, pz = camera.position.z + fwd.z * C * 1.2;   // a little ahead of the camera: more of it where you look
     U.uCam.value.set(px, camera.position.y, pz);
+    fwd.set(px, camera.position.y, pz); butterflies(camera, sc_, U.uTime.value);
     const ccx = Math.floor(px / C), ccz = Math.floor(pz / C);
     for (const [k, c] of live) if (Math.abs(c.cx - ccx) > LOAD + 1 || Math.abs(c.cz - ccz) > LOAD + 1) { c.mesh.visible = false; pool.push(c.mesh); live.delete(k); }
     let made = 0;
