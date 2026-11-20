@@ -883,14 +883,14 @@ export function buildProperty(scene) {
   })();
   const pBox = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 9000);
   const pCyl = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 10), paint(toon(0xffffff), 'auto'), 4200);
-  const pPyr = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, false, Math.PI / 4), toon(0xffffff), 300);
-  const pCone = new Kit(scene, new THREE.ConeGeometry(1, 1, 10), toon(0xffffff), 900);
+  const pPyr = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, false, Math.PI / 4), paint(toon(0xffffff), 'shingle'), 300);
+  const pCone = new Kit(scene, new THREE.ConeGeometry(1, 1, 10), paint(toon(0xffffff), 'shingle'), 900);
   const pPrism = new Kit(scene, prismG, toon(0xffffff), 500);
   const pPane = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), winMat, 1400, false);
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: true }); lampMat.color.setScalar(0.45);
   const pLamp = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), lampMat, 400, false);
   const pGlass = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: ramp(), transparent: true, opacity: 0.32, depthWrite: false }), 300, false);
-  const pDome = new Kit(scene, new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI / 2), toon(0xffffff), 300);
+  const pDome = new Kit(scene, new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI / 2), paint(toon(0xffffff), 'shingle'), 300);
   const lampGlows = [];
   const E2 = new THREE.Euler(0, 0, 0, 'YXZ'), Q2 = new THREE.Quaternion(), M2 = new THREE.Matrix4(), S2 = new THREE.Vector3(), P2 = new THREE.Vector3(), C2 = new THREE.Color();
   function put2(kit, x, y, z, sx, sy, sz, rx, ry, rz, color) {
