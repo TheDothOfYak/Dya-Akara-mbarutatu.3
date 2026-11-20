@@ -10,7 +10,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
-import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint, waterMaterial } from './gfx.js';
 import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
@@ -329,7 +329,7 @@ export function buildWorld(scene) {
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   let waterMesh = null;
-  const waterMat = new THREE.MeshToonMaterial({ color: 0x4f98b0, emissive: 0x0c3c4c, emissiveIntensity: 0.5, gradientMap: ramp(), map: ripTex });
+  const waterMat = waterMaterial({ color: 0x4f98b0, deep: 0x1c5468, emissive: 0x0c3c4c, emissiveIntensity: 0.35, opacity: 0.9 }); void ripTex;
   {
     const pos = [], idx = [];
     const addGeo = (g) => {

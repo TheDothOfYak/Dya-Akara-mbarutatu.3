@@ -21,7 +21,7 @@
    hold a great deal of it.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, glowSprite, paint } from './gfx.js';
+import { toon, addOutline, glowSprite, paint, waterMaterial } from './gfx.js';
 import { buildEikar } from './actors.js';
 import { mulberry32, railing } from './util.js';
 
@@ -831,7 +831,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       const w = 14, d = 16, h = 6.4, WC = '#7a6a5a';
       floorRect(g, -w / 2, -1.4, -d / 2, d / 2, 0, '#6a5a4a'); floorRect(g, 3.6, w / 2, -d / 2, d / 2, 0, '#6a5a4a');
       // the slip: water in a channel down the middle, glowing faintly from below
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(5, d), new THREE.MeshToonMaterial({ color: 0x3a8aa8, emissive: 0x0e4a62, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 })); water.rotation.x = -Math.PI / 2; water.position.set(1.1, -0.5, 0); g.add(water);
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(5, d), waterMaterial({ color: 0x3a8aa8, deep: 0x1a4a5a, emissive: 0x0e4a62, emissiveIntensity: 0.35, scale: 2, opacity: 0.85 })); water.rotation.x = -Math.PI / 2; water.position.set(1.1, -0.5, 0); g.add(water);
       box(g, 1.1, -1.2, 0, 5, 0.2, d, '#2a4a52', false, { outline: false });
       world.col.add(g.position.x + 1.1, 0, 2.5, d / 2, 0, -2, 0.7);   // the slip: mind the edge
       for (const q of [-1, 1]) box(g, 1.1 + q * 2.55, 0.1, 0, 0.2, 0.2, d, '#4a3020', false);

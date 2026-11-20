@@ -371,7 +371,7 @@ export function buildXilia(scene) {
 
   /* the market square: paving, a fountain, stalls */
   const plaza = new THREE.Mesh(new THREE.CylinderGeometry(22, 22.5, 0.4, 40), paint(toon(0xe6d2ac), 'cobble')); plaza.position.set(SQUARE.x, SQ_H - 0.15, SQUARE.z); plaza.receiveShadow = true; scene.add(plaza);
-  const water = new THREE.MeshToonMaterial({ color: 0x5ac0d8, emissive: 0x1a6a80, emissiveIntensity: 0.5, gradientMap: ramp() });
+  const water = waterMaterial({ color: 0x5ac0d8, deep: 0x2a7e98, emissive: 0x1a6a80, emissiveIntensity: 0.4, opacity: 0.9, scale: 3 });
   {
     const basin = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.5, 6, 24), paint(toon(0xcab088), 'stone')); basin.rotation.x = -Math.PI / 2; basin.position.set(SQUARE.x, SQ_H + 0.4, SQUARE.z - 6); addOutline(basin, 0.05); scene.add(basin);
     const pool = noSolid(new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), water)); pool.rotation.x = -Math.PI / 2; pool.position.set(SQUARE.x, SQ_H + 0.45, SQUARE.z - 6); scene.add(pool);
