@@ -10,6 +10,7 @@ const ROOT = path.resolve(__dirname, '..');
 const DONE = { xtalked: true, pro: 'done', arrivedA: true, arrivedL: true, talked: true };
 const SCENES = {
   xilia: { flags: DONE }, property: { region: 'property', flags: DONE }, aakalay: { region: 'aakalay', flags: DONE }, leotik: { region: 'leotik', flags: DONE },
+  megla: { region: 'property', flags: { young: true, pro: 'megla', meglaAt: 'ride' } },
   velki: null, market: { flags: { young: true, pro: 'road', roadAt: 'market' } }, escape: { flags: { young: true, pro: 'road', roadAt: 'escape' } },
 };
 const TYPES = { html: 'text/html', js: 'application/javascript', json: 'application/json', css: 'text/css', jpg: 'image/jpeg', png: 'image/png', glb: 'model/gltf-binary', webmanifest: 'application/json' };
