@@ -995,7 +995,37 @@ function lockDir() {
   return v.normalize();
 }
 
+/* the swing's trail: a ribbon of light swept behind the weapon's head while a blow is in the air, fading off its tail */
+const TRAIL = (() => {
+  const N = 14, pos = new Float32Array(N * 2 * 3), col = new Float32Array(N * 2 * 3), idx = [];
+  for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  m.frustumCulled = false; m.userData.noOutline = true; m.renderOrder = 9; m.visible = false; scene.add(m);
+  return { m, N, pos, col, pts: [], lo: V3(), hi: V3(), w: null, c: new THREE.Color() };
+})();
+function updateTrail(dt) {
+  const T = TRAIL, w = torcain.weapon, A = P.atk;
+  if (w && w !== T.w) { T.w = w; w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w); const inv = new THREE.Matrix4().copy(w.matrixWorld).invert(); b.applyMatrix4(inv); T.lo.set(0, b.min.y + (b.max.y - b.min.y) * 0.55, 0); T.hi.set(0, b.max.y * 0.98, 0); }
+  const live = A && !A.arm.ranged && A.p > 0.12 && A.p < 0.78 && w && w.visible;
+  if (live) {
+    w.updateWorldMatrix(true, false);
+    T.pts.unshift([T.lo.clone().applyMatrix4(w.matrixWorld), T.hi.clone().applyMatrix4(w.matrixWorld), 1]);
+    T.c.set(FX.burn ? 0xff8a3a : A.kind === 3 ? 0xffc070 : 0xd8c8ff);
+  }
+  for (const q of T.pts) q[2] -= dt * 5.5;
+  while (T.pts.length > T.N || (T.pts.length && T.pts[T.pts.length - 1][2] <= 0)) T.pts.pop();
+  T.m.visible = T.pts.length > 1;
+  if (!T.m.visible) return;
+  for (let i = 0; i < T.N; i++) {
+    const q = T.pts[Math.min(i, T.pts.length - 1)], a = Math.max(0, q[2]) * (1 - i / T.N) * 0.55, o = i * 6;
+    T.pos.set([q[0].x, q[0].y, q[0].z, q[1].x, q[1].y, q[1].z], o);
+    T.col.set([T.c.r * a * 0.3, T.c.g * a * 0.3, T.c.b * a * 0.3, T.c.r * a, T.c.g * a, T.c.b * a], o);
+  }
+  T.m.geometry.attributes.position.needsUpdate = true; T.m.geometry.attributes.color.needsUpdate = true;
+}
 function updateAttack(dt) {
+  updateTrail(dt);
   if (torcain.weapon) torcain.weapon.userData.aim = P.atk && P.atk.aim ? P.atk.aim : null;   // the whip's lash goes out at the X
   if (!P.atk) { P.comboReset = Math.max(0, P.comboReset - dt); return; }
   const A = P.atk, def = ATK[A.kind], arm = A.arm || ARMS.axe;
