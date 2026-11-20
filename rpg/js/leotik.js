@@ -666,7 +666,7 @@ export function buildLeotik(scene) {
 
   /* ---------- the Keep and the Urverk (north) ---------- */
   const kg = KEEP_H;
-  const keepDisk = new THREE.Mesh(new THREE.CylinderGeometry(28, 29, 0.6, 48), toon(0x8a8676));
+  const keepDisk = new THREE.Mesh(new THREE.CylinderGeometry(28, 29, 0.6, 48), paint(toon(0x8a8676), 'cobble'));
   keepDisk.position.set(KEEP.x, kg - 0.22, KEEP.z); keepDisk.receiveShadow = true; scene.add(keepDisk);
   for (let i = 0; i < 40; i++) {
     const a0 = i / 40 * Math.PI * 2, a1 = (i + 1) / 40 * Math.PI * 2, R = 31;
@@ -696,7 +696,7 @@ export function buildLeotik(scene) {
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
   });
   const portal = new THREE.Mesh(new THREE.CircleGeometry(5.3, 40), portalMat); portal.position.y = 7; urverk.add(portal);
-  const base = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 4), toon(0x5a5650)); base.position.y = 0.3; addOutline(base, 0.06); urverk.add(base);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 4), paint(toon(0x5a5650), 'stone')); base.position.y = 0.3; addOutline(base, 0.06); urverk.add(base);
   urverk.position.set(KEEP.x, kg, KEEP.z - 18);
   scene.add(urverk);
   col.add(KEEP.x, KEEP.z - 18, 7, 2, 0, kg - 1, kg + 13);

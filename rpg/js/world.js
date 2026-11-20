@@ -360,7 +360,7 @@ export function buildWorld(scene) {
 
   /* ---------- kits ---------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 6500);   // the ruins: dressed stone
-  const columns = new Kit(scene, new THREE.CylinderGeometry(1, 1.08, 1, 10), toon(0xffffff), 600);
+  const columns = new Kit(scene, new THREE.CylinderGeometry(1, 1.08, 1, 10), paint(toon(0xffffff), 'stone'), 600);
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.12), 300);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600);
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff, {}), 500);
@@ -453,7 +453,7 @@ export function buildWorld(scene) {
 
   /* ---------- the Zahreh plaza and the Oath Stone ---------- */
   const plazaY = PLAZA_H;
-  const plazaDisk = new THREE.Mesh(new THREE.CylinderGeometry(30, 31, 0.6, 48), toon(0xcfb48a));
+  const plazaDisk = new THREE.Mesh(new THREE.CylinderGeometry(30, 31, 0.6, 48), paint(toon(0xcfb48a), 'cobble'));
   plazaDisk.position.set(PLAZA.x, plazaY - 0.22, PLAZA.z); plazaDisk.receiveShadow = true; scene.add(plazaDisk);
   const ringMat = toon(0xa8865e);
   for (const r of [12, 22]) {
@@ -491,11 +491,11 @@ export function buildWorld(scene) {
   obelisk.position.y = 5; obelisk.rotation.y = Math.PI / 4; obelisk.castShadow = true;
   addOutline(obelisk, 0.08); oath.add(obelisk);
   const cap = new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), stygMat); cap.position.y = 10.6; cap.scale.y = 1.4; addOutline(cap, 0.06); oath.add(cap);
-  const dais = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7.2, 0.9, 5), toon(0x8a7058)); dais.position.y = 0.05; dais.receiveShadow = true; addOutline(dais, 0.06); oath.add(dais);
+  const dais = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7.2, 0.9, 5), paint(toon(0x8a7058), 'stone')); dais.position.y = 0.05; dais.receiveShadow = true; addOutline(dais, 0.06); oath.add(dais);
   const sockets = [];
   for (let i = 0; i < 5; i++) {
     const a = i / 5 * Math.PI * 2 + Math.PI / 2;
-    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 1.4, 6), toon(0x5b4a5e));
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 1.4, 6), paint(toon(0x5b4a5e), 'stone'));
     ped.position.set(Math.cos(a) * 5, 1.2, Math.sin(a) * 5); addOutline(ped, 0.04); oath.add(ped);
     const lit = glowSprite(0xb47cff, 2.4, 0); lit.position.set(Math.cos(a) * 5, 2.4, Math.sin(a) * 5); oath.add(lit);
     sockets.push({ ped, lit, filled: false });
@@ -707,7 +707,7 @@ export function buildWorld(scene) {
     bottom.rotation.x = Math.PI; bottom.position.y = -s * 1.25;
     grp.add(top, bottom);
     if (rng() < 0.6) {
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, s * 0.8, 6), toon(0x6b4128)); t.position.y = s * 0.5; grp.add(t);
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, s * 0.8, 6), paint(toon(0x6b4128), 'bark', 0.12)); t.position.y = s * 0.5; grp.add(t);
       const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.35, 1), toon(new THREE.Color(pick(LEAF)), {})); cr.position.y = s; grp.add(cr);
     }
     outlineAll(grp, 0.12);
