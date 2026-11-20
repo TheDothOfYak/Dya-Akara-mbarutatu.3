@@ -342,9 +342,9 @@ export function buildXilia(scene) {
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 2); return t;
   })();
   const roofMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: capTex, gradientMap: ramp() });
-  const wallMats = ['#f0dcb4', '#e8c89a', '#f4e6c8', '#dcc0a0'].map(c => toon(c));
+  const wallMats = ['#f0dcb4', '#e8c89a', '#f4e6c8', '#dcc0a0'].map(c => paint(toon(c), 'plaster'));
   const windowMat = new THREE.MeshBasicMaterial({ color: 0xffd890 });
-  const doorMat = toon(0x6a3a1e);
+  const doorMat = paint(toon(0x6a3a1e), 'wood'), frameM = paint(toon(0x5a3a20), 'wood');
   const houses = [];
   const doors = [];
   function cottage(x, z, r, rot, opts = {}) {
@@ -355,7 +355,9 @@ export function buildXilia(scene) {
     const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 1.3, 0.22, 6, 20), roofMat); rim.rotation.x = Math.PI / 2; rim.position.y = H - 0.2; grp.add(rim);
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 1.1, 6), toon(0x4a2c18)); stem.position.y = H + r * 0.95; stem.rotation.z = 0.3; grp.add(stem);
     const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 0.2), doorMat); door.position.set(0, 1.0, r + 0.02); grp.add(door);
-    for (const a of [1.2, -1.2, 2.6]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.38, 12), windowMat); w.position.set(Math.sin(a) * (r + 0.03), 2.0, Math.cos(a) * (r + 0.03)); w.rotation.y = a; w.userData.noOutline = true; grp.add(w); }
+    for (const a of [1.2, -1.2, 2.6]) { const rw = r * 1.025 + 0.06; const w = new THREE.Mesh(new THREE.CircleGeometry(0.38, 16), windowMat); w.position.set(Math.sin(a) * rw, 2.0, Math.cos(a) * rw); w.rotation.y = a; w.userData.noOutline = true; grp.add(w);
+      const fr = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.06, 6, 18), frameM); fr.position.copy(w.position); fr.rotation.y = a; grp.add(fr);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.8, 0.05), frameM); bar.position.copy(w.position); bar.rotation.y = a; grp.add(bar); }   // a round window, framed, standing proud of the curved wall
     const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 1.6, 6), toon(0x8a6a50)); chim.position.set(r * 0.6, H + 0.6, -r * 0.3); grp.add(chim);
     outlineAll(grp, 0.05);
     grp.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
