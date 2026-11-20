@@ -1650,7 +1650,17 @@ export function createRoad(ctx) {
   }
   function updateFoes(dt, playing) {
     for (const f of foes) {
-      if (f.dead) { if (f.deadT != null) { f.deadT += dt; f.a.root.scale.multiplyScalar(Math.max(0.001, 1 - dt * 2)); if (f.deadT > 0.7) { scene.remove(f.a.root); f.deadT = null; } } continue; }
+      if (f.dead) {   // knocked down (folk over backwards, beasts onto their side), lying a while, then settling into the earth
+        if (f.deadT != null) {
+          f.deadT += dt; const R = f.a.root;
+          if (f.fall == null) { f.fall = f.a.arms && f.a.legs ? 'back' : (Math.random() < 0.5 ? -1 : 1); R.rotation.order = 'YXZ'; f.y0 = R.position.y; }
+          const k = Math.min(1, f.deadT / 0.42), ang = Math.PI / 2 * 0.94 * k * k;
+          if (f.fall === 'back') R.rotation.x = -ang; else R.rotation.z = f.fall * ang;
+          const sink = Math.max(0, f.deadT - 2.2); R.position.y = f.y0 - sink * 0.8;
+          if (sink > 1.4) { scene.remove(R); f.deadT = null; }
+        }
+        continue;
+      }
       f.flash = Math.max(0, f.flash - dt * 5); f.a.flash && f.a.flash(f.flash);
       f.stun = Math.max(0, (f.stun || 0) - dt);
       const dx = P.pos.x - f.pos.x, dz = P.pos.z - f.pos.z, d = Math.hypot(dx, dz);
