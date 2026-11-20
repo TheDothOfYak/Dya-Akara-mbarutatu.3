@@ -948,7 +948,7 @@ export function buildEikar(o = {}) {
   let s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
   // the walk: where in the stride (0..1), which way the ground is going by, how fast he's turning and speeding up
-  let lieK = 0;   // flat on his back (st.lie)
+  let lieK = 0, swimK = 0, swimPh = 0;   // lying flat; swimming   // flat on his back (st.lie)
   let slung = false, idleT = 9;   // the weapon rides on his back until it's wanted
   const backMount = new THREE.Group(); backMount.position.set(-0.05, 0.02, -0.105 * (kalo ? 1.08 : 1) - 0.035); backMount.rotation.set(0.06, 0, -0.42); torso.add(backMount);
   let cyc = Math.random(), mvA = 0, yawRate = 0, accS = 0, lastSpd = 0, lastX = null, lastZ = 0, lastYaw = 0, stK = 0, rollK = 0, rollP = 0, hurtK = 0, hipTurn = 0, lungeZ = 0, crouchS = 0, moveT = 0;
@@ -1128,7 +1128,7 @@ export function buildEikar(o = {}) {
       // ---- the weapon: in the hand for a fight, slung across the back the rest of the time ----
       const wanted = (!!sw || wind > 0.02 || atk > 0.02 || st.armed === true || kit.shield || kind === 'none' || kind === 'flask' || kind === 'whip') && !st.carry;
       idleT = wanted ? 0 : idleT + dt;
-      const sling = !!st.carry || (idleT > 1.6 && st.armed !== true);
+      const sling = !!st.carry || !!st.swim || (idleT > 1.6 && st.armed !== true);
       if (sling !== slung) { slung = sling; (slung ? backMount : wHold).add(weapon); }
       // ---- the weapon hand at rest ----
       const sway = lerp(Math.sin(t * 1.6) * 0.008, upW * (0.1 + 0.08 * runK), walkK);   // arms swing against the legs
@@ -1225,7 +1225,8 @@ export function buildEikar(o = {}) {
       sqV += ((sqTarget - sq) * 140 - sqV * 13) * dt; sq += sqV * dt; sq = clamp(sq, -0.16, 0.14);
       const breath = Math.sin(t * 2.3 + seed) * 0.012 * (1 - walkK * 0.6);
       torso.scale.set(1 - sq * 0.5 - breath * 0.3, 1 + sq + breath, 1 - sq * 0.5 + breath * 0.4);
-      lieK = lerp(lieK, st.lie ? 1 : 0, 1 - Math.exp(-(st.lie ? 30 : 4) * dt));
+      swimK = lerp(swimK, st.swim ? 1 : 0, 1 - Math.exp(-6 * dt)); swimPh += dt * (2.2 + Math.min(spd, 6) * 0.35);
+      lieK = lerp(lieK, st.lie ? 1 : 0, 1 - Math.exp(-(st.lie ? 7 : 4) * dt));   // he goes down over a moment, not in a snap
       const rollE = rollP * rollP * (3 - 2 * rollP), tuck = rollK * Math.sin(Math.min(1, rollP * 1.08) * Math.PI) ** 0.5, rollA = roll ? rollE * TAU : 0;
       body.position.set(
         hipX + sm * lean * 0.1,
@@ -1243,6 +1244,11 @@ export function buildEikar(o = {}) {
         body.position.set(body.position.x * (1 - lieK), lerp(body.position.y, 0.17, lieK), lerp(body.position.z, -0.35, lieK));
         body.rotation.set(lerp(body.rotation.x, -1.5, lieK), body.rotation.y * (1 - lieK), body.rotation.z * (1 - lieK));
         torso.rotation.set(lerp(torso.rotation.x, 0.06, lieK), torso.rotation.y * (1 - lieK), torso.rotation.z * (1 - lieK));
+      }
+      if (swimK > 0.001) {   // swimming: laid forward in the water, head up, a breaststroke
+        body.position.set(body.position.x * (1 - swimK), lerp(body.position.y, HIP + 0.05, swimK), body.position.z * (1 - swimK));
+        body.rotation.set(lerp(body.rotation.x, 1.15, swimK), body.rotation.y * (1 - swimK), Math.sin(swimPh) * 0.06 * swimK);
+        torso.rotation.set(lerp(torso.rotation.x, -0.15, swimK), torso.rotation.y * (1 - swimK), torso.rotation.z * (1 - swimK));
       }
       // the feet: each one on its own spot of ground, carried forward when its turn comes
       body.updateMatrix(); bodyInv.copy(body.matrix).invert();
@@ -1267,6 +1273,7 @@ export function buildEikar(o = {}) {
         }
         footB.set(fx, fy, fz).applyMatrix4(bodyInv);
         if (tuck > 0.001) { footT.set(L.hip.x * 1.1, -0.02 - 0.2, 0.3); footB.lerp(footT, tuck); pitch = lerp(pitch, 0.2, tuck); }   // rolling: knees to the chest
+        if (swimK > 0.001) { const kick = Math.sin(swimPh * 2 + i * Math.PI); footT.set(L.hip.x * (1.3 + 0.5 * Math.max(0, Math.sin(swimPh))), -0.02 - LEG * 0.9, -0.12 + kick * 0.12); footB.lerp(footT, swimK); pitch = lerp(pitch, 1.2, swimK); }
         if (lieK > 0.001) { footT.set(L.hip.x * 1.5, -0.02 - LEG * 0.97, 0.05 + (i ? 0.07 : 0)); footB.lerp(footT, lieK); pitch = lerp(pitch, 0.6, lieK); }
         poseLeg(L, footB, pitch - body.rotation.x * (1 - tuck) * (1 - lieK), splay);
         if (glide > 0.01 || rideK > 0.01) { const r = L.thigh.rotation, kk = Math.max(glide, rideK); r.set(r.x, r.y * (1 - kk), r.z * (1 - kk)); L.ankle.rotation.set(L.ankle.rotation.x, 0, 0); }
@@ -1299,7 +1306,7 @@ export function buildEikar(o = {}) {
       const hyT = -twist * 0.6 + Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b) + lookX * 0.35;
       headXV += ((hxT - headX) * 160 - headXV * 16) * dt; headX += headXV * dt;
       headY = lerp(headY, hyT, 1 - Math.exp(-9 * dt));
-      head.rotation.set(headX - glide * 1.15, headY + hipYaw * 0.75 + clamp(yawRate * 0.05, -0.35, 0.35) * walkK, -(body.rotation.z + torso.rotation.z) * 0.7);   // (flat out, he still looks ahead)   // the head stays on the road ahead
+      head.rotation.set(headX - glide * 1.15 - swimK * 0.95, headY + hipYaw * 0.75 + clamp(yawRate * 0.05, -0.35, 0.35) * walkK, -(body.rotation.z + torso.rotation.z) * 0.7);   // (flat out, he still looks ahead)   // the head stays on the road ahead
       // the cap rides on the head and trails its motion
       hatXV += ((-0.12 - headXV * 0.035 + sqV * 0.04 - hatX) * 120 - hatXV * 9) * dt; hatX += hatXV * dt;
       hat.rotation.x = clamp(hatX, -0.4, 0.2);
@@ -1321,12 +1328,16 @@ export function buildEikar(o = {}) {
       const syl = Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK;
       mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
       if (slung && !sw) { wT.set(s * (0.23 - 0.07 * runK * walkK * Math.max(0, upW)), -0.15 + walkK * (runK * (0.25 + 0.08 * upW) + 0.02 * upW), 0.03 + upW * (0.1 + 0.16 * runK) * walkK); wD.set(0, 1, 0.2); wB.set(-s, 0, 0); if (tuck > 0.001) { sT.set(s * 0.14, 0.12, 0.2); wT.lerp(sT, tuck * 0.8); } }   // an empty hand swings like the other
+      if (swimK > 0.001) {   // reach forward together, sweep out round to the sides, draw in under the chest
+        const c = (swimPh % TAU) / TAU, rx = c < 0.4 ? lerp(0.1, 0.12, c / 0.4) : c < 0.75 ? lerp(0.12, 0.45, (c - 0.4) / 0.35) : lerp(0.45, 0.1, (c - 0.75) / 0.25), rz = c < 0.4 ? lerp(0.2, 0.62, c / 0.4) : c < 0.75 ? lerp(0.62, 0.15, (c - 0.4) / 0.35) : 0.2;
+        sT.set(s * rx, 0.3, rz); wT.lerp(sT, swimK); wD.set(s * 0.3, 0.2, 1); sT.set(-s * rx, 0.3, rz); fT.lerp(sT, swimK); fD.set(-s * 0.3, 0.2, 1);
+      }
       if (lieK > 0.001) { sT.set(s * 0.42, 0.12, 0.06); wT.lerp(sT, lieK); wD.set(s, 0.2, 0.3); sT.set(-s * 0.4, 0.2, 0.08); fT.lerp(sT, lieK); fD.set(-s, 0.3, 0.3); }   // arms flung out
       if (st.carry) { wT.set(s * 0.27, 0.06, 0.36); wD.set(0, 1, 0.15); wB.set(-s, 0, 0); fT.set(-s * 0.27, 0.06, 0.36); fD.set(0, 1, 0.15); fB.set(s, 0, 0); }   // both arms round what he's carrying
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
       // the shade at his feet: under the pelvis, gone when he leaves the ground or sits a mount
-      { const sk = Math.max(0, 1 - airK * 1.6) * (1 - rideK) * (1 - glide) * (1 - lieK); shade.visible = sk > 0.02; shade.material.opacity = 0.8 * sk; shade.position.set(body.position.x, 0.03, body.position.z * 0.6); shade.scale.setScalar(1 + stK * 0.35 + tuck * 0.3); }
+      { const sk = Math.max(0, 1 - airK * 1.6) * (1 - rideK) * (1 - glide) * (1 - lieK) * (1 - swimK); shade.visible = sk > 0.02; shade.material.opacity = 0.8 * sk; shade.position.set(body.position.x, 0.03, body.position.z * 0.6); shade.scale.setScalar(1 + stK * 0.35 + tuck * 0.3); }
 
       if (wing) { wing.visible = glide > 0.08; wing.scale.set(Math.max(0.01, glide), 1, 1); cape.visible = glide < 0.5; if (cloakTrim) cloakTrim.visible = cape.visible; }
       if (cape && cape.visible && capeG.visible && dt > 0) capeTick(dt, t, k);
