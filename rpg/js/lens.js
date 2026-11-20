@@ -73,7 +73,8 @@ class ShadePass extends Pass {
           if (near <= 0.0) return vec3(0.0);
           vec2 st = dv / float(RAYS) * 0.9; vec2 u = vUv + st * ign(gl_FragCoord.xy + 17.0); float acc = 0.0;
           for (int i = 0; i < RAYS; i++) { acc += step(0.99999, texture2D(tDepth, u).x) * (1.0 - float(i) / float(RAYS)); u += st; }
-          return uSunCol * (acc / float(RAYS)) * near * near * uSunK;
+          float a = acc / float(RAYS);
+          return uSunCol * a * (1.0 - a * 0.6) * near * near * near * uSunK;   // strongest where sky and shadow mix (the shafts), never a wash over everything
         }
         void main() {
           vec4 src = texture2D(tDiffuse, vUv);
@@ -123,7 +124,7 @@ class ShadePass extends Pass {
         _sp.copy(this.camera.position).addScaledVector(this.sun.dir, 1000).project(this.camera);
         u.uSunUv.value.set(_sp.x * 0.5 + 0.5, _sp.y * 0.5 + 0.5);
         const L = this.sun.light;
-        u.uSunK.value = 0.55 * Math.min(1, -v.z * 2.5) * (L ? Math.min(1, L.intensity / 2.2) : 1) * Math.min(1, Math.max(0, this.sun.dir.y * 6 + 0.4));
+        u.uSunK.value = 0.22 * Math.min(1, -v.z * 2.5) * (L ? Math.min(1, L.intensity / 2.2) : 1) * Math.min(1, Math.max(0, this.sun.dir.y * 6 + 0.4));
         if (L) u.uSunCol.value.copy(L.color).multiplyScalar(0.9);
       }
     }

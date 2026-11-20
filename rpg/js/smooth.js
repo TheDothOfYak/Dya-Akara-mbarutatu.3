@@ -294,7 +294,10 @@ const FRAG_ALBEDO = `#include <color_fragment>
     #elif FL_PAINT == 11
       flDet = mix(flDet, mix(vec3(1.0), flDet, 0.45), wPlas);
     #endif
-    diffuseColor.rgb *= mix(vec3(1.0), clamp(flDet, 0.0, 2.2), 0.92);
+    // mostly light and shade, a little of the picture's own tint: a ratio taken channel by channel runs wild where the
+    // photograph has almost none of a colour (a grey leaf on a green lawn turns the ground white)
+    flDet = mix(vec3(dot(flDet, vec3(0.3, 0.59, 0.11))), flDet, 0.3);
+    diffuseColor.rgb *= mix(vec3(1.0), clamp(flDet, 0.0, 1.8), 0.92);
     flBump = flRel * 0.9;
   }
   #else

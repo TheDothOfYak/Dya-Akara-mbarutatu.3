@@ -177,7 +177,7 @@ function smoothTarget() {
 }
 const composer = new EffectComposer(renderer, smoothTarget());
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 0.86);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 1.15);   // (threshold over 1: only what really shines blooms — a sunlit pale ground does not)
 /* the lens (lens.js): contact shade from the picture's own depth, then the brushwork, then the grade */
 const lens = addLens(composer, camera, { bloom, paint: paintPass(ShaderPass), output: new OutputPass() });
 lens.shade.enabled = OPT.ao !== false;
@@ -5271,7 +5271,7 @@ function startVelki() {
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
-      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
+      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 1.05), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
     },
@@ -5327,7 +5327,7 @@ function vkCtx() {
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
-      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 0.86), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
+      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 1.1), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
     },
@@ -6749,7 +6749,7 @@ window.__torcain = {
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, startMegla, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy, alch, finishFound,
   detailCull: setDetailCull, get solids() { return solids; },
-  G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
+  G, P, F, CAM, camera, scene, renderer, composer, lens, bloom, QA, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
   get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, enterRoom, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, lookAim, vineTarget, vineShoot, vineLet, rideSpace, get vines() { return P.vines; }, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };
