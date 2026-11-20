@@ -105,8 +105,13 @@ export function createCine(camera, opts = {}) {
           camera.position.lerpVectors(curL, curP, last / d);
         }
       }
+      // never aim the camera at the exact spot it sits — that flips its orientation
+      if (curP.distanceToSquared(curL) < 1e-4) curL.z -= 0.1;
       camera.lookAt(curL);
+      // a shot's lens: its own fov, or back to the scene's default. Without the else, a shot that
+      // changed the fov left every later shot stuck on that lens.
       if (s.fov) { camera.fov = s.fovTo ? s.fov + (s.fovTo - s.fov) * e : s.fov; camera.updateProjectionMatrix(); }
+      else if (camera.fov !== baseFov) { camera.fov = baseFov; camera.updateProjectionMatrix(); }
       const caps = s.caption ? (Array.isArray(s.caption) ? s.caption : [s.caption]) : [];
       const ci = caps.length ? Math.min(caps.length - 1, Math.floor(k * caps.length)) : -1;
       if (ci !== capI) { capI = ci; caption(ci >= 0 ? caps[ci] : null); }
