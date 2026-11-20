@@ -61,7 +61,8 @@ const $ = id => document.getElementById(id);
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 /* ---------------- settings ---------------- */
-const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, ao: true, scale: 1 };
+const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, ao: true, auto: true, scale: 1 };
+const QA = { scale: 1, step: 0, avg: 16.7, cool: 8 };   // the automatic quality steps (autoQuality, by the frame loop)
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
 installDetailCull();    // parts smaller than a pixel are not drawn (they still cost a draw call each)
@@ -185,7 +186,7 @@ let particles = null;
 let solids = null;   // everything you can see is solid (solid.js), once the world is built
 let VK = null, vkComposer = null;   // the Velki prologue's own little world, while it lasts
 function resize() {
-  const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale;
+  const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale * QA.scale;
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -2616,6 +2617,7 @@ bindOpt('opt-invert', 'invert', null, true);
 bindOpt('opt-vol', 'vol', () => setVolume(OPT.vol));
 bindOpt('opt-bloom', 'bloom', () => { bloom.enabled = OPT.bloom; }, true);
 bindOpt('opt-ao', 'ao', () => { lens.shade.enabled = OPT.ao; }, true);
+bindOpt('opt-auto', 'auto', () => { if (!OPT.auto && QA.step) { QA.step = 0; QA.scale = 1; lens.shade.enabled = OPT.ao; MEADOW.on = true; resize(); } }, true);
 bindOpt('opt-shadows', 'shadows', () => { renderer.shadowMap.enabled = OPT.shadows; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }, true);
 bindOpt('opt-scale', 'scale', resize);
 bloom.enabled = OPT.bloom;
@@ -5068,9 +5070,21 @@ let frameDt = 1 / 60;
    2nd refresh instead of pushing the whole bloom-and-shadow pipeline two or three times as often as anyone
    can see (a strict 60 on 144Hz would land 2, 3, 2, 3 refreshes apart, and that unevenness reads as judder). */
 let refreshMs = 1000 / 60, lastTick = 0, tickN = 0;
+/* keeping it smooth: if the frames come slow for a few seconds of play, the heaviest touches are given up one at a
+   time — the contact shade, then the thick meadow, then a little of the resolution — never more than the machine needs */
+function autoQuality(gap) {
+  if (OPT.auto === false || G.mode !== 'play' || G.paused || document.hidden || gap > 250) return;
+  QA.avg += (gap - QA.avg) * 0.03; QA.cool -= gap / 1000;
+  if (QA.cool > 0 || QA.avg < 31 || QA.step >= 3) return;   // under ~32 frames a second, for a while
+  QA.step++; QA.cool = 8; QA.avg = 20;
+  if (QA.step === 1) { lens.shade.enabled = false; if (vkComposer) vkComposer.passes.forEach(p => { if (p.tap) p.enabled = false; }); }
+  else if (QA.step === 2) MEADOW.on = false;
+  else { QA.scale = 0.8; resize(); }
+}
 function frame(now) {
   requestAnimationFrame(frame);
   const gap = now - lastTick; lastTick = now;
+  autoQuality(gap);
   if (gap > 3 && gap < 40) refreshMs += (gap - refreshMs) * 0.05;   // learn the screen's refresh rate (ignoring hitches)
   const every = Math.max(1, Math.floor(1000 / refreshMs / 60 + 0.25));
   if (++tickN < every) return;
