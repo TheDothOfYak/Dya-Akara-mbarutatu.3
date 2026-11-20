@@ -370,7 +370,7 @@ document.addEventListener('mousemove', e => {
 const mouseDown = new Set();
 document.addEventListener('mousedown', e => {
   if (G.mode !== 'title') initAudio();   // browsers only let sound start after a click
-  if (e.target.closest && e.target.closest('#d-choices, #rpg, #pk-box, #ctl')) return;
+  if (e.target.closest && e.target.closest('#d-choices, #rpg, #pk-box, #ctl, #osk')) return;
   if (G.mode === 'title' || overlayOpen()) return;
   if (G.mode === 'intro' || G.mode === 'trance') { if (!(TOK && !cardState)) skipCards(); return; }
   if (!locked && !touch.on) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
@@ -445,6 +445,7 @@ const ctl = createControls({
   zoom: (d, smooth) => { if (G.mode === 'play' || G.mode === 'scope') zoomCam(d, smooth); },
   context: () => menuRoot() ? 'menu' : G.mode === 'dialog' && !G.paused ? 'dialog' : 'play',
   singing: () => !!(TOK && TOK.step === 'sing'),
+  riding: () => G.mode === 'play' && !G.paused && (VK ? !!(VK.riding && VK.riding()) : !!P.riding),
   menuRoot, menuBack,
   toast: (t, d) => toast(t, d),
   sfx: () => sfx.ui && sfx.ui(),

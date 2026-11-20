@@ -45,9 +45,14 @@ const DEFS = [
   ['duat', 'Duat Strike · right vine · right hand', 'Fight', 'Mouse2', ['M:2', 'P:b7']],
   ['flask', 'Drink Albali film (heal)', 'Fight', 'KeyR', ['K:KeyR', 'P:b2']],
   ['throw', 'Throw Sprengju · hold a vine’s length', 'Fight', 'KeyX', ['K:KeyX', 'P:b6']],
-  ['punk', 'Punk shove (on her back)', 'Fight', 'CapsLock', ['K:CapsLock', 'K:KeyZ', 'P:b4&P:b2']],
-  ['autoswing', 'Auto-swing (hold, on a Punk)', 'Fight', 'AutoSwing', ['P:b4&P:b5']],
+  ['punk', 'Punk shove (on her back)', 'Fight', 'CapsLock', ['K:CapsLock', 'K:KeyZ']],
   ['autokey', 'Auto-swing key (hold with both attacks)', 'Fight', 'KeyU', ['K:KeyU']],
+
+  ['ride_l', 'Left vine (hold to swing)', 'On a Punk', 'Mouse0', ['P:b4', 'P:b6']],
+  ['ride_r', 'Right vine (hold to swing)', 'On a Punk', 'Mouse2', ['P:b5', 'P:b7']],
+  ['ride_hold', 'Hold the vines’ length (tap: keep holding)', 'On a Punk', 'KeyX', ['P:b11']],
+  ['ride_shove', 'Shove', 'On a Punk', 'CapsLock', ['P:b2']],
+  ['autoswing', 'Auto-swing (hold)', 'On a Punk', 'AutoSwing', ['P:b12']],
 
   ['interact', 'Talk · take · use · rest', 'Do', 'KeyE', ['K:KeyE', 'P:b3']],
   ['sense', 'Nur Sense', 'Do', 'KeyF', ['K:KeyF', 'P:b12']],
@@ -82,6 +87,8 @@ const DEFS = [
   ['ui_next', 'Next tab', 'Menu navigation', null, ['P:b5']],
   ['ui_sup', 'Scroll up', 'Menu navigation', null, ['P:a3-']],
   ['ui_sdown', 'Scroll down', 'Menu navigation', null, ['P:a3+']],
+  ['ui_del', 'On-screen keyboard: delete', 'Menu navigation', null, ['P:b2']],
+  ['ui_space', 'On-screen keyboard: space', 'Menu navigation', null, ['P:b3']],
 
   ['song_1', 'Song note 1 (leftmost)', 'The token song', 'Song1', ['K:KeyA', 'P:b14']],
   ['song_2', 'Song note 2', 'The token song', 'Song2', ['K:KeyS', 'P:b13']],
@@ -94,6 +101,9 @@ const MOVE = { move_f: [0, 1], move_b: [0, -1], move_l: [-1, 0], move_r: [1, 0] 
 const LOOK = { look_u: [0, -1], look_d: [0, 1], look_l: [-1, 0], look_r: [1, 0] };
 const MENU = new Set(ACTIONS.filter(a => a.group === 'Menu navigation').map(a => a.id));
 const SONG = new Set(['song_1', 'song_2', 'song_3', 'song_4']);
+const RIDE = new Set(ACTIONS.filter(a => a.group === 'On a Punk').map(a => a.id));
+const OSK_ONLY = new Set(['ui_del', 'ui_space']);
+const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 const CODES = new Set(ACTIONS.map(a => a.code).filter(Boolean));   // every code the game hears from an action
 
 /* ---------------- names for what you press ---------------- */
@@ -123,9 +133,10 @@ export function createControls(api) {
   function save() { version++; try { localStorage.setItem(LS_KEY, JSON.stringify({ v: 1, map, opt })); } catch (e) { /* ignore */ } }
 
   /* what each input does, indexed so a press is quick to look up */
-  let singles = new Map(), chords = [], mods = new Set();
+  let singles = new Map(), chords = [], mods = new Set(), rideIn = new Set();
   function rebuild() {
-    singles = new Map(); chords = []; mods = new Set();
+    singles = new Map(); chords = []; mods = new Set(); rideIn = new Set();
+    for (const id of RIDE) for (const b of map[id]) for (const p of b.split('&')) rideIn.add(p);
     for (const a of ACTIONS) for (const b of map[a.id]) {
       const parts = b.split('&');
       if (parts.length === 1) { if (!singles.has(b)) singles.set(b, []); singles.get(b).push(a.id); }
@@ -146,15 +157,19 @@ export function createControls(api) {
   const isPad = b => b.startsWith('P:');
   const isAxis = b => /^P:a/.test(b);
 
-  const context = () => (screen && !screen.classList.contains('hidden')) ? 'menu' : api.context();
+  const context = () => oskOpen() || (screen && !screen.classList.contains('hidden')) ? 'menu' : api.context();
   /* which actions count now. In a menu the controller drives the menu (not the game) and
      anything also bound to a menu move is the menu's; in talk the menu moves pick the answers */
   function enabled(id, bind, ctx) {
     if (MOVE[id] || LOOK[id]) return !isAxis(bind);   // the sticks are read as analog (see stick / look); keys still go through
     if (SONG.has(id)) return ctx === 'play' && api.singing();
+    if (OSK_ONLY.has(id)) return ctx === 'menu' && oskOpen();
     if (MENU.has(id)) return ctx === 'menu' || ctx === 'dialog';
+    const riding = ctx === 'play' && api.riding && api.riding();
+    if (RIDE.has(id)) return riding;
+    if (riding && bind.split('&').some(p => rideIn.has(p))) return false;   // on her back those buttons are her vines
     if (ctx === 'menu' && bind.split('&').some(isPad) && BY_ID[id].group !== 'Menus') return false;   // (Options still pauses and unpauses)
-    if (ctx !== 'play') for (const m of MENU) if (map[m].includes(bind)) return false;   // that input is the menu's now
+    if (ctx !== 'play') for (const m of MENU) if (!OSK_ONLY.has(m) && map[m].includes(bind)) return false;   // that input is the menu's now
     return true;
   }
 
@@ -258,11 +273,12 @@ export function createControls(api) {
       for (const k in next) if (!prev[k]) { device = 'pad'; if (api.wake) api.wake(); set(k, true); }
     }
     const ctx = capture ? 'capture' : context();
-    if (ctx !== lastCtx) { lastCtx = ctx; resolve(); }   // a menu opened (or shut) under a held button
+    const ck = ctx + (api.riding && api.riding() ? ':ride' : '') + (oskOpen() ? ':osk' : '');
+    if (ck !== lastCtx) { lastCtx = ck; resolve(); }   // a menu opened, or you got on or off her, under a held button   // a menu opened (or shut) under a held button
     // a combo button tapped on its own: let go of it again now
     if (pulses.length) { const p = pulses; pulses = []; for (const id of p) if (!active.has(id)) release(id); }
     // menu directions repeat while held
-    if (ctx === 'menu' || ctx === 'dialog') for (const id of ['ui_up', 'ui_down', 'ui_left', 'ui_right']) {
+    if (ctx === 'menu' || ctx === 'dialog') for (const id of ['ui_up', 'ui_down', 'ui_left', 'ui_right', 'ui_del']) {
       if (!active.has(id)) continue;
       menuHold[id] = (menuHold[id] ?? 0.4) - dt;
       if (menuHold[id] <= 0) { menuHold[id] = 0.11; menuPress(id, active.get(id), true); }
@@ -348,6 +364,18 @@ export function createControls(api) {
     #ctl-wait .panel{text-align:center;width:min(440px,92vw)}
     #ctl-wait .ctl-bar{height:4px;background:var(--brass);margin-top:14px;border-radius:2px;transform-origin:left}
     @media (max-width:600px){ #ctl .ctl-row{grid-template-columns:1fr} }
+    #osk{position:fixed;left:0;right:0;bottom:3vh;z-index:10002;display:flex;justify-content:center;pointer-events:none}
+    #osk.hidden{display:none}
+    #osk .panel{pointer-events:auto;padding:14px 16px;width:min(720px,96vw)}
+    #osk .osk-text{font-size:20px;min-height:34px;padding:4px 10px;margin-bottom:10px;border-bottom:1px solid var(--brass-dim);color:var(--ink);white-space:pre}
+    #osk .osk-caret{color:var(--brass);animation:oskb 1s steps(1) infinite}
+    @keyframes oskb{50%{opacity:0}}
+    #osk .osk-row{display:flex;gap:6px;justify-content:center;margin:6px 0}
+    #osk .osk-k{flex:1;max-width:58px;height:42px;font:600 16px var(--display);background:rgba(217,164,65,.12);color:var(--brass2);border:1px solid var(--brass-dim);border-radius:7px;cursor:pointer}
+    #osk .osk-k.wide{max-width:300px;flex:5}
+    #osk .osk-k.on,#osk .osk-k.done{background:var(--brass);color:var(--navy)}
+    #osk .osk-k[data-k="⌫"],#osk .osk-k[data-k="✓"],#osk .osk-k[data-k="⇧"]{max-width:120px;flex:2;font-size:13px}
+    #osk .osk-hint{text-align:center;font-size:12px;color:var(--ink-dim);margin-top:6px}
   `;
   document.head.appendChild(style);
 
@@ -388,7 +416,7 @@ export function createControls(api) {
     const c = candidates(root); if (!c.length) return null;
     return c.find(e => e.classList.contains('padfocus-first')) || c.find(e => e.classList.contains('btn') && !e.classList.contains('ghost') && !e.disabled) || c.find(e => e.classList.contains('btn')) || c[0];
   }
-  function menuRoot() { return capture ? null : (screen && !screen.classList.contains('hidden') ? screen : api.menuRoot()); }
+  function menuRoot() { return capture ? null : oskOpen() ? osk : (screen && !screen.classList.contains('hidden') ? screen : api.menuRoot()); }
   function menuTick(dt) {
     const root = menuRoot();
     if (root !== curRoot) { curRoot = root; focus(null); }
@@ -422,17 +450,19 @@ export function createControls(api) {
     const root = menuRoot(); if (!root) return;
     if (!cur) { focus(firstFocus(root)); return; }
     const a = centre(cur), list = candidates(root);
-    let best = null, bs = Infinity;
+    let best = null, bs = Infinity, bestIn = null, bsIn = Infinity;
     for (const e of list) {
       if (e === cur) continue;
       const b = centre(e), vx = b.x - a.x, vy = b.y - a.y;
       const along = vx * dx + vy * dy, across = Math.abs(vx * dy - vy * dx);
       if (along <= 4) continue;
-      // overlapping rows/columns count as straight ahead
-      const overlap = dx ? (b.r.bottom > a.r.top && b.r.top < a.r.bottom) : (b.r.right > a.r.left && b.r.left < a.r.right);
-      const s = along + across * (overlap ? 0.3 : 2.2);
+      const s = along + across * 2.2;
       if (s < bs) { bs = s; best = e; }
+      // something in the same row (or column) straight ahead wins over a nearer one off to the side
+      const overlap = dx ? (b.r.bottom > a.r.top + 2 && b.r.top < a.r.bottom - 2) : (b.r.right > a.r.left + 2 && b.r.left < a.r.right - 2);
+      if (overlap && along < bsIn) { bsIn = along; bestIn = e; }
     }
+    if (bestIn) best = bestIn;
     if (best) { focus(best); api.sfx && api.sfx(); }
   }
   function adjust(el, dir) {
@@ -469,7 +499,9 @@ export function createControls(api) {
       case 'ui_left': if (onCanvas) break; if (!(cur && adjust(cur, -1))) moveFocus(-1, 0); break;
       case 'ui_right': if (onCanvas) break; if (!(cur && adjust(cur, 1))) moveFocus(1, 0); break;
       case 'ui_ok': if (repeat || !cur) break; activate(cur); break;
-      case 'ui_back': if (repeat) break; if (root === screen) closeScreen(); else api.menuBack(root); break;
+      case 'ui_back': if (repeat) break; if (root === osk) closeOsk(false); else if (root === screen) closeScreen(); else api.menuBack(root); break;
+      case 'ui_del': oskType('⌫'); break;
+      case 'ui_space': if (!repeat) oskType(' '); break;
       case 'ui_prev': case 'ui_next': if (!repeat) tab(root, id === 'ui_next' ? 1 : -1); break;
     }
   }
@@ -480,7 +512,7 @@ export function createControls(api) {
       return;
     }
     if (el.tagName === 'SELECT') { adjust(el, 1); return; }
-    if (el.tagName === 'INPUT' && /^(text|search|email|password|number)$/.test(el.type)) { el.focus(); return; }
+    if (isText(el)) { openOsk(el); return; }
     api.sfx && api.sfx();
     el.click();
   }
@@ -493,6 +525,66 @@ export function createControls(api) {
     focus(null);
     api.sfx && api.sfx();
   }
+
+
+  /* ================================================================
+     THE ON-SCREEN KEYBOARD: a text box chosen with a controller (or
+     one that takes the cursor while you're playing with one) brings
+     it up. ✕ types the key under the highlight, □ deletes, △ is a
+     space, ○ puts it away; Done is Enter.
+     ================================================================ */
+  let osk = null, oskEl = null, oskShift = false;
+  const isText = el => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|email|password|number|)$/.test(el.type || '')));
+  function oskOpen() { return !!osk && !osk.classList.contains('hidden'); }
+  const ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl\'', '⇧zxcvbnm-.', ' ⌫✓'];
+  function renderOsk() {
+    const show = oskEl ? (oskEl.type === 'password' ? '•'.repeat(oskEl.value.length) : oskEl.value) : '';
+    osk.innerHTML = `<div class="panel brass"><div class="osk-text">${esc(show)}<span class="osk-caret">▏</span></div>` +
+      ROWS.map(r => `<div class="osk-row">` + [...r].map(k => {
+        const name = k === ' ' ? 'Space' : k === '⌫' ? '⌫ Delete' : k === '✓' ? 'Done' : k === '⇧' ? '⇧ Shift' : oskShift ? k.toUpperCase() : k;
+        return `<button type="button" class="osk-k${k === ' ' ? ' wide' : ''}${k === '⇧' && oskShift ? ' on' : ''}${k === '✓' ? ' done' : ''}" data-k="${esc(k)}">${esc(name)}</button>`;
+      }).join('') + `</div>`).join('') +
+      `<div class="osk-hint">✕ type · □ delete · △ space · ○ close</div></div>`;
+    osk.querySelectorAll('[data-k]').forEach(b => { b.onclick = () => oskType(b.dataset.k); });
+  }
+  function openOsk(el) {
+    if (oskOpen() && oskEl === el) return;
+    oskEl = el; oskShift = false;
+    if (!osk) {
+      osk = document.createElement('div'); osk.id = 'osk'; osk.setAttribute('data-root', '');
+      osk.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); });   // (and keep the text box's cursor)
+      document.body.appendChild(osk);
+    }
+    osk.classList.remove('hidden'); renderOsk();
+    const q = osk.querySelector('[data-k="q"]'); focus(q); curRoot = osk;
+  }
+  function closeOsk(enter) {
+    if (!oskOpen()) return;
+    osk.classList.add('hidden'); focus(null); curRoot = null;
+    const el = oskEl; oskEl = null;
+    if (el && enter) {
+      const o = { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true };
+      el.dispatchEvent(new KeyboardEvent('keydown', o)); el.dispatchEvent(new KeyboardEvent('keyup', o));
+      if (el.form && document.contains(el)) { try { el.form.requestSubmit(); } catch (e) { /* ignore */ } }
+    }
+  }
+  function oskType(k) {
+    if (!oskOpen() || !oskEl) return;
+    const el = oskEl;
+    if (k === '✓') { closeOsk(true); return; }
+    if (k === '⇧') { oskShift = !oskShift; const f = cur && cur.dataset.k; renderOsk(); const b = osk.querySelector(`[data-k="${CSS.escape(f || 'q')}"]`); if (b) focus(b); return; }
+    let v = el.value;
+    if (k === '⌫') v = v.slice(0, -1);
+    else { const max = el.maxLength > 0 ? el.maxLength : 1e9; if (v.length >= max) return; v += oskShift ? k.toUpperCase() : k; if (oskShift && k !== ' ') oskShift = false; }
+    el.value = v; el.dispatchEvent(new Event('input', { bubbles: true }));
+    const f = cur && cur.dataset.k; renderOsk();
+    const b = osk.querySelector(`[data-k="${CSS.escape(f || 'q')}"]`); if (b) focus(b);
+    api.sfx && api.sfx();
+  }
+  // a text box that takes the cursor while you're on a controller brings the keyboard up by itself
+  addEventListener('focusin', e => { if (device === 'pad' && isText(e.target) && !(osk && osk.contains(e.target))) setTimeout(() => { if (document.activeElement === e.target) openOsk(e.target); }, 0); });
+  // the box it was typing into went away (the panel closed): so does the keyboard
+  setInterval(() => { if (oskOpen() && (!oskEl || !document.contains(oskEl))) closeOsk(false); }, 300);
 
   /* ================================================================
      THE MAPPING SCREEN
@@ -534,7 +626,6 @@ export function createControls(api) {
     screen.classList.add('hidden'); focus(null); curRoot = null;
     if (onClose) { const f = onClose; onClose = null; f(); }
   }
-  const esc = s => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
   function renderScreen(keepFocus) {
     const list0 = screen.querySelector('.ctl-list'), scroll = list0 ? list0.scrollTop : 0;
     const fid = keepFocus && cur && cur.dataset ? (cur.dataset.add || cur.dataset.del || cur.id) : null;
@@ -631,7 +722,8 @@ export function createControls(api) {
   return {
     poll, key, mouse, wheel, releaseAll, stick, look, label,
     open: openScreen, close: closeScreen,
-    isOpen: () => !!screen && !screen.classList.contains('hidden'),
+    isOpen: () => (!!screen && !screen.classList.contains('hidden')) || oskOpen(),
+    keyboard: el => openOsk(el),
     capturing: () => !!capture,
     get device() { return device; },
     get padName() { return padName; },
