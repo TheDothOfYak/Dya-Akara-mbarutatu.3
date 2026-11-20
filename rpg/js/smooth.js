@@ -566,6 +566,46 @@ function leafy(o) {
 }
 /* is this part of something that moves about (a figure, a creature)? Those are built in a group marked not-solid */
 function moving(o) { for (let q = o.parent; q; q = q.parent) if (q.isGroup && q.userData && q.userData.noSolid && q.userData.moves !== false) return true; return false; }
+/* leaf cards: every crown in a forest of instanced crowns gets a scatter of little cut-out sprays of leaves round its
+   surface, so its edge is leaves against the sky and not the rim of a ball. One extra draw per forest. */
+let LEAF_TEX = null;
+function leafTexture() {
+  if (LEAF_TEX) return LEAF_TEX;
+  const N = 128, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), r = mulberry32(77);
+  for (let k = 0; k < 16; k++) {
+    const x = 18 + r() * 92, y = 18 + r() * 92, a = r() * Math.PI * 2, L = 15 + r() * 13, W = L * 0.42, l = Math.round(150 + r() * 105);
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.fillStyle = `rgb(${l},${l},${Math.round(l * 0.92)})`; g.beginPath(); g.moveTo(-L, 0); g.quadraticCurveTo(0, -W, L, 0); g.quadraticCurveTo(0, W, -L, 0); g.fill();
+    g.strokeStyle = `rgba(0,0,0,0.25)`; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-L * 0.9, 0); g.lineTo(L * 0.9, 0); g.stroke();
+    g.restore();
+  }
+  LEAF_TEX = new THREE.CanvasTexture(c); LEAF_TEX.colorSpace = THREE.SRGBColorSpace;
+  return LEAF_TEX;
+}
+const _km = new THREE.Matrix4(), _kc = new THREE.Matrix4(), _kq = new THREE.Quaternion(), _kp = new THREE.Vector3(), _ks = new THREE.Vector3(), _ke = new THREE.Euler(), _kcol = new THREE.Color();
+function addLeafCards(o) {
+  if (o.userData.leafCards || !o.parent || !o.count) return;
+  const K = 30, n = o.count, rng = mulberry32(n * 31 + 7);
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const mat = new THREE.MeshToonMaterial({ color: o.material.color, map: leafTexture(), alphaTest: 0.5, side: THREE.DoubleSide, gradientMap: o.material.gradientMap }); mat.defines = { FL_CARD: 1 };
+  const cards = new THREE.InstancedMesh(geo, mat, n * K);
+  for (let i = 0; i < n; i++) {
+    o.getMatrixAt(i, _km); if (o.instanceColor) o.getColorAt(i, _kcol); else _kcol.setRGB(1, 1, 1);
+    for (let k = 0; k < K; k++) {
+      const u = rng() * 2 - 1, th = rng() * Math.PI * 2, y = u * 0.85 + 0.12, rr = Math.sqrt(Math.max(0, 1 - y * y));
+      _kp.set(Math.cos(th) * rr, y, Math.sin(th) * rr).multiplyScalar(0.78 + rng() * 0.3);
+      _ke.set((rng() - 0.5) * 2.6, th + (rng() - 0.5) * 1.4, (rng() - 0.5) * 2.6); _kq.setFromEuler(_ke);
+      const sc = 0.55 + rng() * 0.35; _ks.set(sc, sc, sc);
+      _kc.compose(_kp, _kq, _ks).premultiply(_km);
+      cards.setMatrixAt(i * K + k, _kc);
+      cards.setColorAt(i * K + k, _kcol.clone().multiplyScalar(0.82 + rng() * 0.35 + (y > 0.4 ? 0.12 : 0)));
+    }
+  }
+  cards.count = n * K; cards.castShadow = false; cards.receiveShadow = true;
+  cards.userData.keepFacets = true; cards.userData.noOutline = true; cards.userData.noSolid = true; cards.userData.leafCards = true;
+  cards.computeBoundingSphere();
+  o.userData.leafCards = cards; o.parent.add(cards);
+}
 const pending = [];
 function flush() {
   if (!pending.length) return;
@@ -586,7 +626,7 @@ function flush() {
         : smoothGeometry(o.geometry);
       if (g !== o.geometry) {
         o.geometry = g; o.userData.smFrom = from;
-        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } }
+        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } if (o.isInstancedMesh && o.count <= 3000) addLeafCards(o); }
       }
     }
   });
@@ -607,7 +647,7 @@ export function installSmoothStyle() {
         .replace('vec3 getGradientIrradiance', CEL_GRADIENT + 'vec3 getGradientIrradiance') + '\n#endif\n')
       .replace('#include <color_fragment>', FRAG_ALBEDO)
       .replace('#include <opaque_fragment>', FRAG_LIGHT)
-      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = normalize(normal + (viewMatrix * vec4(flBump, 0.0)).xyz);');
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = normalize(normal + (viewMatrix * vec4(flBump, 0.0)).xyz);\n#ifdef FL_CARD\n  normal = normalize(mix(normal, (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz, 0.7));   // a spray of leaves is lit like the crown it hangs from\n#endif');
     const kind = this.defines && this.defines.FL_PAINT, S = kind && SURF[kind];
     if (S) { sh.uniforms.uPaintA = S.a; sh.uniforms.uPaintN = S.n; sh.uniforms.uPaintM = S.m; sh.uniforms.uPaintS = { value: S.s }; const R = kind === 6 ? SURF.rock : S; sh.uniforms.uPaintA2 = R.a; sh.uniforms.uPaintN2 = R.n; sh.uniforms.uPaintM2 = R.m; }
   };
