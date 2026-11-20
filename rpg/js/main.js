@@ -4795,7 +4795,7 @@ function updatePlayer(dt) {
   }
 
   const hs = Math.hypot(P.vel.x, P.vel.z);
-  if (P.onGround && hs > 1 && !P.roll) { P.stepPh += dt * hs * 0.32; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); } }
+  if (P.onGround && hs > 1 && !P.roll) { P.stepPh += dt * hs * 0.32; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); if (hs > 6 && !P.swimming && !P.riding) for (let k = 0; k < 2 + (hs > 9 ? 2 : 0); k++) particles.emit(P.pos.x - P.vel.x * 0.04, P.pos.y + 0.08, P.pos.z - P.vel.z * 0.04, { vx: (Math.random() - 0.5) * 0.8 - P.vel.x * 0.05, vy: 0.5 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.8 - P.vel.z * 0.05, color: 0xb8a888, size: 0.32 + Math.random() * 0.2, life: 0.55, drag: 2.5 }); } }   // a puff of dust off each footfall at a run
 
   updateAttack(dt);
 
