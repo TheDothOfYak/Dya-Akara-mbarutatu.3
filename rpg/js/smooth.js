@@ -120,6 +120,18 @@ const VERT = `#include <begin_vertex>
   #ifdef USE_INSTANCING
     vFlP += instanceMatrix[3].xyz * 0.37;
   #endif
+  #if defined(FL_LEAF) || defined(FL_CARD)
+  {
+    // the wind in the leaves: each crown sways on its own beat, the top more than the underside
+    vec3 flIp = vec3(0.0);
+    #ifdef USE_INSTANCING
+      flIp = instanceMatrix[3].xyz;
+    #endif
+    float flPh = uFlT * 1.1 + flIp.x * 0.07 + flIp.z * 0.05, flK = clamp(position.y * 0.5 + 0.6, 0.0, 1.2);
+    transformed.x += (sin(flPh) * 0.035 + sin(flPh * 2.7 + 1.3) * 0.012) * flK;
+    transformed.z += (sin(flPh * 0.8 + 2.0) * 0.025) * flK;
+  }
+  #endif
   #ifdef FL_PAINT
     vec4 flw = vec4(transformed, 1.0); vec3 flwn = objectNormal;
     #ifdef USE_INSTANCING
@@ -127,7 +139,7 @@ const VERT = `#include <begin_vertex>
     #endif
     vFlW = (modelMatrix * flw).xyz; vFlWN = normalize(mat3(modelMatrix) * flwn);
   #endif`;
-const VERT_PARS = `varying vec3 vFlP; varying vec3 vFlN;
+const VERT_PARS = `varying vec3 vFlP; varying vec3 vFlN; uniform float uFlT;
 #ifdef FL_PAINT
   varying vec3 vFlW; varying vec3 vFlWN;
 #endif
@@ -627,7 +639,9 @@ export function addLeafCards(o, cone = false) {
   o.userData.leafCards = cards; o.parent.add(cards); LEAF_CARDS.push(cards);
 }
 const pending = [];
+const FLT = { value: 0 };   // the wind's clock
 function flush() {
+  FLT.value = (performance.now() / 1000) % 3600;
   if (!pending.length) return;
   const list = pending.splice(0);
   for (const root of list) root.traverse(o => {
@@ -661,7 +675,7 @@ export function installSmoothStyle() {
   BRUSH.value = brushTexture();
   loadSurfaces();
   THREE.MeshToonMaterial.prototype.onBeforeCompile = function (sh) {
-    sh.uniforms.uBrush = BRUSH;
+    sh.uniforms.uBrush = BRUSH; sh.uniforms.uFlT = FLT;
     sh.vertexShader = VERT_PARS + sh.vertexShader.replace('#include <begin_vertex>', VERT);
     sh.fragmentShader = FRAG_PARS + sh.fragmentShader
       .replace('#include <gradientmap_pars_fragment>', THREE.ShaderChunk.gradientmap_pars_fragment.replace(HARD_STEP, SOFT_STEP)
