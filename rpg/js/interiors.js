@@ -24,6 +24,7 @@ import * as THREE from 'three';
 import { toon, addOutline, glowSprite, paint, waterMaterial } from './gfx.js';
 import { buildEikar } from './actors.js';
 import { mulberry32, railing } from './util.js';
+import { noSolid } from './solid.js';
 
 export const POCKET_X = 40000;           // every room lives out here, a long way past the edge of any land
 const ROOM_GAP = 220;
@@ -106,6 +107,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
   let exitVia = null;           // the door we're about to leave by, if not the one we came in by
   const doors = [];
   let BT = null;                // the batches for the room being built
+  let BG = null;                // and its group
 
   /* the land's own rules stop at the pocket: a flat floor, always in bounds, never water */
   {
@@ -124,8 +126,31 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
   /* ---------------- building blocks ---------------- */
   // batched unless it needs its own material (opts.mat / opts.mesh): `outline: false` → flat, `shadow: false` → structure
   const pick3 = opts => opts.outline === false ? BT.flat : opts.shadow === false ? BT.struct : BT.furn;
+  /* a piece of furniture you can bump into, exactly as big as it is drawn (sx, sy, sz: its full size before turning by
+     rx, ry, rz, the way Batch turns it). Marked .auto like solid.js's boxes, so folk walk their hand-placed routes. */
+  const _pc = new THREE.Vector3(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler(0, 0, 0, 'YXZ');
+  function piece(g, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) {
+    if (Math.max(sx, sy, sz) < 0.15) return;   // a trinket: a book, a cup, a peg
+    let lx0 = Infinity, lx1 = -Infinity, lz0 = Infinity, lz1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    const c = Math.cos(ry), s = Math.sin(ry);
+    if (rx || rz) _pq.setFromEuler(_pe.set(rx, ry, rz));
+    for (let i = 0; i < 8; i++) {
+      _pc.set((i & 1 ? 0.5 : -0.5) * sx, (i & 2 ? 0.5 : -0.5) * sy, (i & 4 ? 0.5 : -0.5) * sz);
+      if (rx || rz) _pc.applyQuaternion(_pq); else _pc.set(_pc.x * c + _pc.z * s, _pc.y, -_pc.x * s + _pc.z * c);
+      const lx = _pc.x * c - _pc.z * s, lz = _pc.x * s + _pc.z * c;
+      if (lx < lx0) lx0 = lx; if (lx > lx1) lx1 = lx; if (lz < lz0) lz0 = lz; if (lz > lz1) lz1 = lz;
+      if (_pc.y < y0) y0 = _pc.y; if (_pc.y > y1) y1 = _pc.y;
+    }
+    const cx = (lx0 + lx1) / 2, cz = (lz0 + lz1) / 2, wx = g.position.x + x + cx * c + cz * s, wz = z - cx * s + cz * c;
+    // small and low on the floor (a log on the hearth, a slipper, a coil of rope): stepped over, not climbed (as solid.js does)
+    if (y + y1 < world.col.ground(wx, wz, y + y0 + 0.1, true) + 0.25 && Math.max(lx1 - lx0, lz1 - lz0) < 3) return;
+    const h = world.col.add(wx, wz, (lx1 - lx0) / 2, (lz1 - lz0) / 2, ry, y + y0, y + y1);
+    h.auto = true;
+  }
+  const furnished = (col, opts) => BT && !col && opts.outline !== false && opts.shadow !== false;   // into the furniture batch, with no collider of its own
   function box(g, x, y, z, w, h, d, color, col, opts = {}) {
     let m = null;
+    if (furnished(col, opts) && !opts.mat && !opts.mesh) piece(g, x, y, z, w, h, d, opts.rx, opts.ry, opts.rz);
     if (BT && !opts.mat && !opts.mesh) pick3(opts).add(UNIT_BOX, x, y, z, opts.rx || 0, opts.ry || 0, opts.rz || 0, w, h, d, color);
     else {
       m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(color, opts.mat));
@@ -139,11 +164,15 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
   }
   function cyl(g, x, y, z, r0, r1, h, color, col, seg = 10, opts = {}) {
     const rr = Math.max(r1, 0.0001);
+    if (furnished(col, opts) && !opts.mat) { const r = Math.max(r0, r1) * 0.85; piece(g, x, y, z, r * 2, h, r * 2, opts.rx, opts.ry, opts.rz); }
     if (BT && !opts.mat) pick3(opts).add(unitCyl(r0 / rr, seg), x, y, z, opts.rx || 0, opts.ry || 0, opts.rz || 0, rr, h, rr, color);
     else { const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg), toon(color, opts.mat)); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.025); g.add(m); }
     if (col) world.col.add(g.position.x + x, g.position.z + z, Math.max(r0, r1) * 0.85, Math.max(r0, r1) * 0.85, 0, y - h / 2, y + h / 2);
   }
-  const put = (geo, x, y, z, sx, sy, sz, color, opts = {}) => pick3(opts).add(geo, x, y, z, opts.rx || 0, opts.ry || 0, opts.rz || 0, sx, sy, sz, color);
+  const put = (geo, x, y, z, sx, sy, sz, color, opts = {}) => {
+    if (furnished(false, opts)) { if (!geo.boundingBox) geo.computeBoundingBox(); const b = geo.boundingBox; piece(BG, x + (b.max.x + b.min.x) / 2 * sx, y + (b.max.y + b.min.y) / 2 * sy, z + (b.max.z + b.min.z) / 2 * sz, (b.max.x - b.min.x) * sx, (b.max.y - b.min.y) * sy, (b.max.z - b.min.z) * sz, opts.rx, opts.ry, opts.rz); }
+    return pick3(opts).add(geo, x, y, z, opts.rx || 0, opts.ry || 0, opts.rz || 0, sx, sy, sz, color);
+  };
   const glowPane = (x, y, z, w, h, d, color = '#fff0c8') => BT.glow.add(UNIT_BOX, x, y, z, 0, 0, 0, w, h, d, color);
   // glass you can see out of: it shows the land round the real building (see refreshView)
   const viewPane = (x, y, z, w, h, d) => BT.view.add(UNIT_BOX, x, y, z, 0, 0, 0, w, h, d, '#ffffff');
@@ -904,18 +933,23 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
     const g = new THREE.Group(); g.position.set(POCKET_X + (slot++) * ROOM_GAP, 0, 0); scene.add(g);
     const R = mulberry32(host.seed || (host.id.length * 7919 + 13));
     BT = { furn: new Batch(), struct: new Batch(), flat: new Batch(), glow: new Batch(), view: new Batch() };
+    BG = g;
     const info = (KINDS[host.kind] || KINDS.cottage)(g, R, host);
     if (info.extra) for (const it of info.extra) (info.items = info.items || []).push(it);
     if (info.upstairs) info.upstairs(info.items);
     // bake the batches: furniture casts shadows, the structure doesn't, the flat bits go without ink, the glass glows
-    const bake = (b, mat, cast, ink) => { const m = b.mesh(mat); if (!m) return; m.castShadow = cast; m.receiveShadow = true; if (ink) addOutline(m, 0.025); g.add(m); };
+    // (solid.js leaves these merged meshes alone: the structure — walls, floors, ceilings, stairs — has its colliders
+    // placed by hand, every piece of furniture got its own exact one as it was put down (piece()), and the flat bits
+    // are boards, rugs, skirting and legs. Cut up whole, a house's worth of rooms in one mesh, it came out in coarse
+    // cells that filled the doorways, blocked the stairs and laid invisible slabs over the floors.)
+    const bake = (b, mat, cast, ink) => { const m = b.mesh(mat); if (!m) return; m.castShadow = cast; m.receiveShadow = true; if (ink) addOutline(m, 0.025); noSolid(m); g.add(m); };
     bake(BT.furn, paint(toon(0xffffff, { vertexColors: true }), 'auto'), true, true);
     bake(BT.struct, paint(toon(0xffffff, { vertexColors: true }), 'auto'), false, true);
     bake(BT.flat, toon(0xffffff, { vertexColors: true }), false, false);
     bake(BT.glow, new THREE.MeshBasicMaterial({ vertexColors: true }), false, false);
     const viewMat = makeViewMat(host.yaw || 0);
     bake(BT.view, viewMat, false, false);
-    BT = null;
+    BT = null; BG = null;
     const folk = (info.folk || []).map(f => {
       const a = buildEikar(Object.assign({ weapon: 'none', flasks: false }, f.look)); a.root.position.set(g.position.x + f.x, 0, f.z); a.root.rotation.y = Math.PI; scene.add(a.root);
       world.col.add(g.position.x + f.x, f.z, 0.4, 0.4, 0, -1, 1.8);
