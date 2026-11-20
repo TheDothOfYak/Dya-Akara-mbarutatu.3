@@ -15,7 +15,7 @@ import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
-import { installSmoothStyle, ready as smoothReady } from './smooth.js';
+import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay, trunkAt } from './vines.js';
 import { MEADOW } from './terrain.js';
@@ -2648,7 +2648,7 @@ bindOpt('opt-invert', 'invert', null, true);
 bindOpt('opt-vol', 'vol', () => setVolume(OPT.vol));
 bindOpt('opt-bloom', 'bloom', () => { bloom.enabled = OPT.bloom; }, true);
 bindOpt('opt-ao', 'ao', () => { lens.shade.enabled = OPT.ao; }, true);
-bindOpt('opt-auto', 'auto', () => { if (!OPT.auto && QA.step) { QA.step = 0; QA.scale = 1; lens.shade.enabled = OPT.ao; MEADOW.on = true; resize(); } }, true);
+bindOpt('opt-auto', 'auto', () => { if (!OPT.auto && QA.step) { QA.step = 0; QA.scale = 1; lens.shade.enabled = OPT.ao; MEADOW.on = true; for (const c of LEAF_CARDS) c.visible = true; resize(); } }, true);
 bindOpt('opt-shadows', 'shadows', () => { renderer.shadowMap.enabled = OPT.shadows; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }, true);
 bindOpt('opt-scale', 'scale', resize);
 bloom.enabled = OPT.bloom;
@@ -5113,7 +5113,7 @@ function autoQuality(gap) {
   if (QA.cool > 0 || QA.avg < 31 || QA.step >= 3) return;   // under ~32 frames a second, for a while
   QA.step++; QA.cool = 8; QA.avg = 20;
   if (QA.step === 1) { lens.shade.enabled = false; if (vkComposer) vkComposer.passes.forEach(p => { if (p.tap) p.enabled = false; }); }
-  else if (QA.step === 2) MEADOW.on = false;
+  else if (QA.step === 2) { MEADOW.on = false; for (const c of LEAF_CARDS) c.visible = false; }
   else { QA.scale = 0.8; resize(); }
 }
 function frame(now) {

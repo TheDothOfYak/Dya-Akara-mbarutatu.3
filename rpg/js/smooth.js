@@ -599,6 +599,7 @@ function leafTexture() {
   return LEAF_TEX;
 }
 const _km = new THREE.Matrix4(), _kc = new THREE.Matrix4(), _kq = new THREE.Quaternion(), _kp = new THREE.Vector3(), _ks = new THREE.Vector3(), _ke = new THREE.Euler(), _kcol = new THREE.Color();
+export const LEAF_CARDS = [];   // every forest's cards (main.js's quality steps can put them away)
 export function addLeafCards(o, cone = false) {
   if (o.userData.leafCards || !o.parent || !o.count) return;
   const n = o.count, K = Math.round(Math.max(6, Math.min(30, 60000 / n))), rng = mulberry32(n * 31 + 7);
@@ -620,7 +621,7 @@ export function addLeafCards(o, cone = false) {
   cards.count = n * K; cards.castShadow = false; cards.receiveShadow = true;
   cards.userData.keepFacets = true; cards.userData.noOutline = true; cards.userData.noSolid = true; cards.userData.leafCards = true;
   cards.computeBoundingSphere();
-  o.userData.leafCards = cards; o.parent.add(cards);
+  o.userData.leafCards = cards; o.parent.add(cards); LEAF_CARDS.push(cards);
 }
 const pending = [];
 function flush() {
