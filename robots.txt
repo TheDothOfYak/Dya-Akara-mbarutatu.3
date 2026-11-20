@@ -1,0 +1,7 @@
+# Flake Games — https://dyaakara-yak.web.app
+# Let search engines crawl everything except the admin panel.
+User-agent: *
+Allow: /
+Disallow: /admin.html
+
+Sitemap: https://dyaakara-yak.web.app/sitemap.xml
