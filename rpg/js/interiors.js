@@ -21,7 +21,7 @@
    hold a great deal of it.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, glowSprite } from './gfx.js';
+import { toon, addOutline, glowSprite, paint } from './gfx.js';
 import { buildEikar } from './actors.js';
 import { mulberry32, railing } from './util.js';
 
@@ -909,8 +909,8 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
     if (info.upstairs) info.upstairs(info.items);
     // bake the batches: furniture casts shadows, the structure doesn't, the flat bits go without ink, the glass glows
     const bake = (b, mat, cast, ink) => { const m = b.mesh(mat); if (!m) return; m.castShadow = cast; m.receiveShadow = true; if (ink) addOutline(m, 0.025); g.add(m); };
-    bake(BT.furn, toon(0xffffff, { vertexColors: true }), true, true);
-    bake(BT.struct, toon(0xffffff, { vertexColors: true }), false, true);
+    bake(BT.furn, paint(toon(0xffffff, { vertexColors: true }), 'auto'), true, true);
+    bake(BT.struct, paint(toon(0xffffff, { vertexColors: true }), 'auto'), false, true);
     bake(BT.flat, toon(0xffffff, { vertexColors: true }), false, false);
     bake(BT.glow, new THREE.MeshBasicMaterial({ vertexColors: true }), false, false);
     const viewMat = makeViewMat(host.yaw || 0);
