@@ -764,7 +764,8 @@ export function createVelki(ctx) {
         if (p.pos.z < -150) { p.run = false; p.a.root.visible = false; }
       } else if (p.chase) {   // the captain, after the boy
         const dx = P.pos.x - p.pos.x, dz = P.pos.z - p.pos.z, d = Math.hypot(dx, dz) || 1;
-        if (d > 2.2) { p.pos.x += dx / d * 9 * dt; p.pos.z += dz / d * 9 * dt; p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 1); speed = 9; }
+        const run = Math.min(13, 6 + d * 0.5);   // gaining on him even if he sprints
+        if (d > 2.2) { p.pos.x += dx / d * run * dt; p.pos.z += dz / d * run * dt; p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 1); speed = run; }
         p.a.root.rotation.y = dampAngle(p.a.root.rotation.y, Math.atan2(dx, dz), 10, dt);
       } else if (p.patrol) {   // the watch, walking their length of the wall and back
         const W = p.patrol; W.a += W.dir * 1.5 / W.r * dt; if (W.a > W.a1) W.dir = -1; else if (W.a < W.a0) W.dir = 1;
