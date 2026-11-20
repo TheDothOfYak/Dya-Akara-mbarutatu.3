@@ -931,7 +931,7 @@ function arenaClamp(pos, R) {
 /* ================================================================
    PLAYER ACTIONS
    ================================================================ */
-const ATK = { 1: { dur: 0.42, dmg: 16, kb: 5, range: 3.0 }, 2: { dur: 0.42, dmg: 18, kb: 5, range: 3.0 }, 3: { dur: 0.62, dmg: 34, kb: 10, range: 3.5 } };
+const ATK = { 1: { dur: 0.42, dmg: 16, kb: 5, range: 3.0 }, 2: { dur: 0.42, dmg: 18, kb: 5, range: 3.0 }, 3: { dur: 0.62, dmg: 34, kb: 10, range: 3.5 }, 4: { dur: 0.5, dmg: 26, kb: 9, range: 3.7 } };   // 4: the running blow, out of a sprint
 const canAct = () => G.mode === 'play' && !P.dead && P.para <= 0 && !P.roll;
 
 function camForward() { return V3(-Math.sin(CAM.yaw), 0, -Math.cos(CAM.yaw)); }
@@ -946,7 +946,7 @@ function spend(cost) {
 function pressAttack() {
   if (VK) { if (VK.attack && G.mode === 'play') VK.attack(); return; }
   if (!canAct() || P.drink > 0) return;
-  if (!P.atk) startAttack(P.comboReset > 0 ? (P.comboIdx % 3) + 1 : 1);
+  if (!P.atk) startAttack(P.onGround && !P.riding && Math.hypot(P.vel.x, P.vel.z) > 9 && (keys.ShiftLeft || keys.ShiftRight) ? 4 : P.comboReset > 0 ? (P.comboIdx % 3) + 1 : 1);   // flat out: a running blow that carries him through
   else if (P.atk.p > 0.35) P.queued = true;
 }
 
@@ -954,7 +954,7 @@ function startAttack(kind) {
   if (!spend(kind === 3 ? D.stamina.heavy : D.stamina.attack)) { P.atk = null; return; }
   const arm = armOf(SAVE.inv.axe);
   // how it looks: lunges for the spears (heavy too, for the lance), the bow always draws
-  const pose = arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
+  const pose = kind === 4 ? (arm.thrust ? 4 : 1) : arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
   P.atk = { kind, pose, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur / (arm.spd || 1), arm, riposte: P.riposte > 0 };
   P.riposte = 0;
   P.comboIdx = kind; P.queued = false;
@@ -984,7 +984,7 @@ function startAttack(kind) {
     const h = Math.hypot(v.x, v.z); if (h > 0.3) f = V3(v.x / h, 0, v.z / h);
   }
   P.yaw = Math.atan2(f.x, f.z);
-  if (!arm.ranged) { P.vel.x += f.x * (kind === 3 ? 6 : 4); P.vel.z += f.z * (kind === 3 ? 6 : 4); }
+  if (!arm.ranged) { const push = kind === 3 ? 6 : kind === 4 ? 3 : 4; P.vel.x += f.x * push; P.vel.z += f.z * push; }
   kind === 3 ? sfx.heavy() : sfx.swing();
 }
 
@@ -4614,7 +4614,7 @@ function updatePlayer(dt) {
   if (P.exhausted && P.stam > 25) P.exhausted = false;
   let speed = sprint ? 11.5 : G.lock && !P.riding ? 5.6 : 7;
   if (P.riding) { speed = rideGait(dt, moving, keys.ShiftLeft || keys.ShiftRight); sprint = false; }
-  if (P.atk) speed *= P.riding ? 0.7 : 0.25;
+  if (P.atk) speed *= P.riding ? 0.7 : P.atk.kind === 4 ? 0.85 : 0.25;   // a running blow keeps his feet going
   if (P.drink > 0) speed *= 0.35;
   if (P.swimming) speed *= 0.6;
   const accel = P.onGround ? 14 : 4;

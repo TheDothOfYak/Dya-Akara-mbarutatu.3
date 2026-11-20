@@ -280,7 +280,7 @@ The great ones are only ever seen from far off. The Aerolhorn crosses the sky no
 | Right click | **Duat Strike**: the axe passes through the Duat to the foe you’re aiming at |
 | `T` or middle click | Lock on to a target |
 
-Fighting: locked on, he keeps facing the target and steps round it (sprint to break away). A swing with nothing locked goes at the nearest foe ahead. Roll through a blow at the last moment and time slows for a breath, the stamina comes back, and the next blow hits harder. Let go of `Space` early for a short hop.
+Fighting: locked on, he keeps facing the target and steps round it (sprint to break away). Attack out of a full sprint for a running blow that carries him through. A swing with nothing locked goes at the nearest foe ahead. Roll through a blow at the last moment and time slows for a breath, the stamina comes back, and the next blow hits harder. Let go of `Space` early for a short hop.
 | `R` | Drink Albali film (heals and cures poison) |
 | `Q` | **Tukang Flare**: releases full heat as a fire nova |
 | `F` | **Nur Sense**: Phorus points out the next objective |
