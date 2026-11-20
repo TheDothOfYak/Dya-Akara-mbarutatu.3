@@ -209,7 +209,7 @@ function buildMeadow(scene, ok, heightAt, tones) {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), cc = new THREE.Color();
   const group = noSolid(new THREE.Group()); scene.add(group);
   function fill(mesh, cx, cz) {
-    let n = 0;
+    let n = 0; const fl = mesh.userData.fl = [];
     for (let i = 0; i < PER; i++) {
       const x = (cx + hash(cx, cz, i * 3 + 1)) * C, z = (cz + hash(cx, cz, i * 3 + 2)) * C;
       if (!ok(x, z)) continue;
@@ -223,6 +223,7 @@ function buildMeadow(scene, ok, heightAt, tones) {
       cc.copy(cols[Math.floor(hash(cx, cz, i + 60000) * cols.length) % cols.length]).multiplyScalar(0.86 + patch * 0.3);
       mesh.setColorAt(n, cc);
       n++;
+      if (patch > 0.42 && hash(cx, cz, i + 90000) < 0.035) fl.push([x, heightAt(x, z) - 0.03 + h * (0.85 + hash(cx, cz, i + 91000) * 0.3), z, hash(cx, cz, i + 92000)]);   // wildflowers where the grass is lush
     }
     mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.boundingSphere = mesh.boundingSphere || new THREE.Sphere();
@@ -234,6 +235,20 @@ function buildMeadow(scene, ok, heightAt, tones) {
     const mesh = new THREE.InstancedMesh(g, mat, PER);
     mesh.receiveShadow = true; mesh.castShadow = false; mesh.setColorAt(0, cc.set(0xffffff));
     group.add(mesh); return mesh;
+  }
+  /* the wildflowers: one draw for every head and one for every stem, re-laid whenever the squares change */
+  const FN = 2400, FCOL = [0xf2d24a, 0xffffff, 0xe86a8a, 0xb48ae8, 0xf0903a, 0x8ab8ff].map(c => new THREE.Color(c));
+  const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshToonMaterial({ gradientMap: ramp() }), FN), stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.006, 0.009, 1, 3).translate(0, -0.5, 0), new THREE.MeshToonMaterial({ color: 0x5a8a3a, gradientMap: ramp() }), FN);
+  heads.userData.keepFacets = true; stems.userData.keepFacets = true; heads.count = stems.count = 0; heads.frustumCulled = stems.frustumCulled = false;
+  group.add(heads, stems);
+  function relayFlowers() {
+    let n = 0; const m = new THREE.Matrix4(), sc = new THREE.Vector3(), q = new THREE.Quaternion(), p = new THREE.Vector3();
+    for (const c of live.values()) for (const [x, y, z, r] of c.mesh.userData.fl || []) {
+      if (n >= FN) break;
+      const s = 0.05 + r * 0.04; m.compose(p.set(x, y, z), q, sc.set(s, s * 0.5, s)); heads.setMatrixAt(n, m); heads.setColorAt(n, FCOL[Math.floor(r * 97) % FCOL.length]);
+      m.compose(p, q, sc.set(1, y - heightAt(x, z) + 0.03, 1)); stems.setMatrixAt(n, m); n++;
+    }
+    heads.count = stems.count = n; heads.instanceMatrix.needsUpdate = stems.instanceMatrix.needsUpdate = true; if (heads.instanceColor) heads.instanceColor.needsUpdate = true;
   }
   // a thing that is always drawn, so the meadow hears about every frame and knows where the camera is
   const tick = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3)), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }));
@@ -283,13 +298,16 @@ function buildMeadow(scene, ok, heightAt, tones) {
     U.uCam.value.set(px, camera.position.y, pz);
     fwd.set(px, camera.position.y, pz); butterflies(camera, sc_, U.uTime.value);
     const ccx = Math.floor(px / C), ccz = Math.floor(pz / C);
-    for (const [k, c] of live) if (Math.abs(c.cx - ccx) > LOAD + 1 || Math.abs(c.cz - ccz) > LOAD + 1) { c.mesh.visible = false; pool.push(c.mesh); live.delete(k); }
+    let changed = false;
+    for (const [k, c] of live) if (Math.abs(c.cx - ccx) > LOAD + 1 || Math.abs(c.cz - ccz) > LOAD + 1) { c.mesh.visible = false; pool.push(c.mesh); live.delete(k); changed = true; }
     let made = 0;
     for (let r = 0; r <= LOAD && made < 4; r++) for (let dz = -r; dz <= r && made < 4; dz++) for (let dx = -r; dx <= r && made < 4; dx++) {
       if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
       const k = (ccx + dx) + ',' + (ccz + dz); if (live.has(k)) continue;
       const mesh = take(); fill(mesh, ccx + dx, ccz + dz); live.set(k, { cx: ccx + dx, cz: ccz + dz, mesh }); made++;
     }
+    if (changed || made) relayFlowers();
+    heads.visible = stems.visible = MEADOW.on;
   };
 }
 
