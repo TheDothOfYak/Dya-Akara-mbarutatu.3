@@ -5243,6 +5243,18 @@ function frame(now) {
   ship.update(tt, dt, particles);
   particles.update(frozen && G.mode !== 'title' ? 0 : dt);
   ripples.update(frozen && G.mode !== 'title' ? 0 : dt);
+  // now and then a fish rises somewhere near you: a ring on still water, a flick of spray
+  if (!frozen && G.mode === 'play' && world.water && !interiors.inside) {
+    G.fishT = (G.fishT ?? 3) - dt;
+    if (G.fishT <= 0) {
+      G.fishT = 2.5 + Math.random() * 5;
+      const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 22, x = P.pos.x + Math.cos(a) * r, z = P.pos.z + Math.sin(a) * r;
+      if (world.water.depth(x, z) > 0.8) {
+        const lv = world.water.level; ripples.spawn(x, lv, z, 0.9, 1.8); ripples.spawn(x, lv, z, 0.5, 1.2);
+        particles.burst(x, lv + 0.05, z, 4, { color: 0xe8f8ff, speed: 1.2, size: 0.2, life: 0.4, gravity: 8 });
+      }
+    }
+  }
   // the sun's shadow box follows you, snapped to its own texel grid so shadow edges don't crawl and shimmer as you move;
   // and indoors there is no sun at all (it used to throw the yard's shadows across the rooms)
   const focus = G.mode === 'title' ? V3(0, 0, 0) : snapShadow(P.pos);
