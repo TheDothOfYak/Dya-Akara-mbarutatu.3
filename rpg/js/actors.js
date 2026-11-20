@@ -1107,7 +1107,7 @@ export function buildEikar(o = {}) {
       }
       const upW = s * Math.cos(TAU * (cyc - 0.03)), upF = -upW;          // each arm goes forward with the other side's leg
       let gliding = false;
-      for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && !own.has(c)) { gliding = true; break; } }
+      for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && c.userData.glider) { gliding = true; break; } }   // only a glider marked as one: anything else carried (an amulet, a basket) is not a reason to lie flat out
       if (st.glide != null) gliding = !!st.glide;
       glide = lerp(glide, gliding ? 1 : 0, 1 - Math.exp(-(gliding ? 7 : 10) * dt));
       // vertical speed, read off the root, drives stretch going up and the squash on landing

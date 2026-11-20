@@ -3782,7 +3782,7 @@ function climbTick(dt, act) {
    The wing is the cape itself (actors.js): he lays out flat like a hero in the old songs and the cloth fills the
    space from wrist to wrist and down to his ankles. This empty marker only tells the rig he's gliding. */
 const glider = new THREE.Group();
-glider.visible = false; torcain.root.add(glider);
+glider.visible = false; glider.userData.glider = true; torcain.root.add(glider);
 /* what he wears: a cloak, something on the body, on the hands, on the feet (the Gear page). The cloak is what he
    glides with — young Tanoc can't glide without one; Torcain always has his coat. */
 const WEAR_SLOTS = [['cloak', 'Cloak'], ['body', 'Body'], ['hands', 'Hands'], ['feet', 'Feet']];

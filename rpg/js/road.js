@@ -26,7 +26,7 @@ import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } f
 import { buildVel } from './creatures.js';
 import { createCityKit, createCrowd, buildMudFountain, FOLK_LOOKS } from './city.js';
 import { createCine } from './cine.js';
-import { buildCart as buildCartModel, buildCampKit } from './cart.js';
+import { buildCart as buildCartModel, buildCampKit, buildWagon, makeWheel } from './cart.js';
 import { NPC_LOOKS } from './npcs.js';
 import { buildAngel, buildSniller } from './velki.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
@@ -591,18 +591,15 @@ export function createRoad(ctx) {
   {
     // the cart, tipped in the ditch, and its family
     const cx = roadX(CART_Z) + 6, cz = CART_Z, cg = heightAt(cx, cz);
-    const cart = new THREE.Group(); cart.position.set(cx, cg + 0.5, cz); cart.rotation.set(0, 0.2, -0.32);
-    const bed = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 3.8), toon(0x8a5a36)); cart.add(bed);
-    for (const sd of [-1, 1]) { const sideB = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 3.8), toon(0x7a4e2c)); sideB.position.set(sd * 1.2, 0.45, 0); cart.add(sideB); }
-    for (let k = 0; k < 5; k++) { const bx = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), toon([0x9a6a40, 0x8a3a2a, 0xd8b878][k % 3])); bx.position.set((k % 2 - 0.5) * 0.9, 0.45, -1.2 + k * 0.6); cart.add(bx); }
-    const wheelL = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.2, 14), toon(0x5a3a22)); wheelL.rotation.z = Math.PI / 2; wheelL.position.set(-1.3, -0.2, 0.9); cart.add(wheelL);
-    const wheelR = wheelL.clone(); wheelR.position.x = 1.3; wheelR.visible = false; cart.add(wheelR);
-    outlineAll(cart, 0.03); scene.add(cart); box(cx, cz, 1.4, 2.1, cg - 1, cg + 1.2);
+    // a farm wagon down on one corner where its back wheel came off, tipped into the ditch
+    const W = buildWagon({ lose: 1 }), cart = W.g; cart.position.set(cx, cg - 0.12, cz); cart.rotation.set(0.05, 0.2, -0.2);
+    const wheelR = makeWheel(0.62); wheelR.position.set(1.25, 0.62, -1.08); wheelR.visible = false; cart.add(wheelR);   // where the wheel goes back on
+    scene.add(cart); box(cx, cz, 1.4, 2.1, cg - 1, cg + 1.2);
     const fam = [{ skin: '#b8844e', cap: '#4a2a14', tunic: 0x6a8a4a }, { skin: '#c89a6a', cap: '#6a3a1a', tunic: 0xd8b878, scale: 0.7 }].map((lk, i) => {
       const a = buildEikar(Object.assign({ weapon: 'none', flasks: false }, lk)); a.root.position.set(cx + 2.4 + i * 1.1, heightAt(cx + 2.4, cz - 2), cz - 2 - i); a.root.rotation.y = -Math.PI / 2; scene.add(a.root); return a;
     });
     const wx = roadX(CART_Z - 26) + 30, wz = CART_Z - 26;
-    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.2, 14), toon(0x5a3a22)); wheel.rotation.set(Math.PI / 2, 0, 0.3); addOutline(wheel, 0.03);
+    const wheel = makeWheel(0.62); wheel.rotation.set(0, 0.3, Math.PI / 2);   // rolled off down the field, lying flat
     EV.cart = { x: cx, z: cz, g: cg, cart, wheelR, fam, wx, wz, wheel, state: 'idle' };
     // the fallen pine across the forest road: two heavy ends and a thinner middle you can chop
     const lx = roadX(LOG_Z), lz = LOG_Z, lg = heightAt(lx, lz);
@@ -727,7 +724,7 @@ export function createRoad(ctx) {
   function loadCrate() {
     dropItem(MK.loadItem); MK.loadItem = null;
     const m = MK.carrying; tanoc.root.remove(m); MK.carrying = null;
-    m.position.set(-0.5 + MK.loaded * 0.55, 1.42, -1.55 + (MK.loaded % 2) * 0.4); CART.load.add(m);
+    m.position.copy(CART.loadSpot(MK.loaded)); m.rotation.set(0, (MK.loaded - 1) * 0.08, 0); CART.load.add(m);   // set down in a row across the back of the bed
     MK.loaded++; sfx.slam(); setGoal(); packObjective();
     if (MK.loaded >= 3) { sub = 'packed'; ctx.bark('buhkon', 'Good lad. That’s the lot. Now — ', 2.5); setTimeout(() => { if (MK && sub === 'packed') marketMaterialize(); }, 1500); }
   }
@@ -932,8 +929,8 @@ export function createRoad(ctx) {
     // a market cart tipped over in the street, a well with its bucket left up, a garden bench
     {
       const c = V3(44, 0, 182), wood = toon(0x8a5a36);
-      const bed = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 3.6), wood); bed.position.set(c.x, 0.9, c.z); bed.rotation.z = 1.2; addOutline(bed, 0.03); scene.add(bed);
-      const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.2, 14), toon(0x5a3a20)); wh.position.set(c.x - 0.4, 1.9, c.z + 1.1); wh.rotation.z = -0.4; addOutline(wh, 0.03); scene.add(wh);
+      // a market wagon knocked right over onto its side, wheels in the air, its load all over the street
+      { const W = buildWagon({ goods: false, len: 3.4 }); W.g.position.set(c.x, 1.25, c.z); W.g.rotation.set(0, 0, 1.45); scene.add(W.g); void wood; }
       for (let k = 0; k < 5; k++) { const f = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), toon([0xe08a3a, 0xd04a3a, 0xe8c84a][k % 3])); f.position.set(c.x + 1.3 + (k % 3) * 0.4, 0.2, c.z - 1 + k * 0.5); scene.add(f); }
       box(c.x, c.z, 1.1, 1.9, -1, 1.8);
       escAmuletItem(V3(c.x + 2.6, 0, c.z + 0.4), ESC.cartAmulet);
@@ -1266,11 +1263,11 @@ export function createRoad(ctx) {
   /* he rolls it back beside him, a hand on the rim — it doesn't just vanish into his pockets */
   function carryWheel(C) {
     const w = C.wheel; if (C.glow) { w.remove(C.glow); C.glow = null; }
-    w.position.set(0.62 / 0.86, 0.6 / 0.86, 0.25 / 0.86); w.rotation.set(0, 0, Math.PI / 2); w.scale.setScalar(0.8 / 0.86); tanoc.root.add(w);
+    w.position.set(0.62 / 0.86, 0.64 / 0.86, 0.25 / 0.86); w.rotation.set(0, 0, 0); w.scale.setScalar(1 / 0.86);   // upright at his side, rolling as he walks tanoc.root.add(w);
   }
   function fixCart() {
     const C = EV.cart; dropItem(C.back); if (C.wheel.parent) C.wheel.parent.remove(C.wheel); C.state = 'done'; setGoal(camps[0].x, camps[0].y, camps[0].z);
-    C.cart.rotation.set(0, 0.2, 0); C.cart.position.y = C.g + 0.9; C.wheelR.visible = true;
+    C.cart.rotation.set(0, 0.2, 0); C.cart.position.y = C.g; C.wheelR.visible = true;
     particles.burst(C.x, C.g + 1, C.z, 20, { color: 0xd8c098, speed: 4, size: 0.5, life: 0.6 }); sfx.slam();
     DRIVE.block = null; setStop(camps[0].park);
     ctx.say(R.day1.cartFixed, () => { give('bun', 1); objective(R.obj.day1, 'Back up into the cart (E) — or walk alongside'); });
