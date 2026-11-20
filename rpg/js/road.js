@@ -554,7 +554,7 @@ export function createRoad(ctx) {
   }
   function debLand(d, quiet) {
     d.g.position.y = d.gy + (d.tree ? 0.4 * d.s : 0.45 * d.s); if (d.tree) d.g.rotation.set(Math.PI / 2 - 0.08, d.g.rotation.y, 0);
-    DEB.down.push(d); if (DEB.down.length > 70) scene.remove(DEB.down.shift().g);
+    DEB.down.push(d); if (DEB.down.length > 70) { const o = DEB.down.shift(); scene.remove(o.g); if (o.scorch) scene.remove(o.scorch); }
     // where it came down hard the ground is blackened and cracked, and now and then it has set something burning
     const sc = new THREE.Mesh(new THREE.CircleGeometry(d.s * (1.6 + rng()), 12), scorchM); sc.rotation.x = -Math.PI / 2; sc.position.set(d.x, d.gy + 0.04, d.z); scene.add(sc); d.scorch = sc;
     if (DEB.fires.length < 16 && rng() < 0.4) { const fl = glowSprite(0xff7a2a, 2.2 + d.s * 1.4, 0.85); fl.position.set(d.x, d.gy + 0.9 * d.s, d.z); scene.add(fl); DEB.fires.push({ fl, x: d.x, y: d.gy + 0.6 * d.s, z: d.z, s: d.s, ph: rng() * 6 }); }
