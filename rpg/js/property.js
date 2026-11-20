@@ -311,7 +311,7 @@ export function buildProperty(scene) {
   }
 
   /* ---------------- kits ---------------- */
-  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 15000);
+  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 15000);
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), paint(toon(0xffffff), 'bark', 0.12), 9800, false);
   const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false);
@@ -881,8 +881,8 @@ export function buildProperty(scene) {
     for (const t of [[a, cpt, b], [A, Bq, Cq], [a, A, Cq], [a, Cq, cpt], [b, cpt, Cq], [b, Cq, Bq], [a, b, Bq], [a, Bq, A]]) for (const p of t) v.push(...p);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g;
   })();
-  const pBox = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 9000);
-  const pCyl = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 10), toon(0xffffff), 4200);
+  const pBox = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 9000);
+  const pCyl = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 10), paint(toon(0xffffff), 'auto'), 4200);
   const pPyr = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, false, Math.PI / 4), toon(0xffffff), 300);
   const pCone = new Kit(scene, new THREE.ConeGeometry(1, 1, 10), toon(0xffffff), 900);
   const pPrism = new Kit(scene, prismG, toon(0xffffff), 500);

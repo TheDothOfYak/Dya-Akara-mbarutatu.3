@@ -31,7 +31,7 @@ let installed = false;
 const flat = (r, g, b) => { const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; };
 const surf = (name, s) => ({ name, s, a: { value: flat(128, 128, 128) }, n: { value: flat(128, 128, 255) }, m: { value: new THREE.Vector3(0.216, 0.216, 0.216) } });
 /* by paint kind (gfx.js PAINT_KINDS); s = metres one tile covers */
-const SURF = { 10: surf('rock', 2.2), 1: surf('stone', 2.6), 2: surf('plaster', 3.2), 3: surf('wood', 1.7), 4: surf('shingle', 1.6), 5: surf('cobble', 2.4), 6: surf('land', 3.4), 8: surf('brick', 2.2), 9: surf('bark', 1), rock: surf('rock', 3) };
+const SURF = { 11: surf('wood', 1.7), 10: surf('rock', 2.2), 1: surf('stone', 2.6), 2: surf('plaster', 3.2), 3: surf('wood', 1.7), 4: surf('shingle', 1.6), 5: surf('cobble', 2.4), 6: surf('land', 3.4), 8: surf('brick', 2.2), 9: surf('bark', 1), rock: surf('rock', 3) };
 /* real shapes: boulders scanned from the ground (Poly Haven, CC0), cut down to a few hundred faces each. Every
    plain rock in the game (a dodecahedron) takes one of them, and the rock surface with it. */
 const ROCKS = [];
@@ -137,6 +137,7 @@ vec3 flBump = vec3(0.0);   // how the surface's own relief tips the light (world
 #ifdef FL_PAINT
 uniform sampler2D uPaintA; uniform sampler2D uPaintN; uniform vec3 uPaintM; uniform float uPaintS;
 uniform sampler2D uPaintA2; uniform sampler2D uPaintN2; uniform vec3 uPaintM2;
+uniform sampler2D uPaintA3; uniform sampler2D uPaintN3; uniform vec3 uPaintM3;
 /* a photographed surface laid on from three sides (no UVs needed), as colour and as relief */
 vec3 flTriA(sampler2D t, vec3 p, vec3 w) { return texture2D(t, p.zy).rgb * w.x + texture2D(t, p.xz).rgb * w.y + texture2D(t, p.xy).rgb * w.z; }
 vec3 flTriN(sampler2D t, vec3 p, vec3 w) {
@@ -263,8 +264,18 @@ const FRAG_ALBEDO = `#include <color_fragment>
       #endif
     #endif
     vec3 flP = vFlW / flS;
+    #if FL_PAINT == 11
+      // a kit of many things in one: each piece takes the surface its own colour says it is — warm browns are timber,
+      // pale ones plaster, the greys stone
+      vec3 flC = diffuseColor.rgb; float flMx = max(flC.r, max(flC.g, flC.b)), flMn = min(flC.r, min(flC.g, flC.b)), flSat = (flMx - flMn) / max(flMx, 1e-3);
+      float flLum = dot(flC, vec3(0.3, 0.59, 0.11));
+      float wWood = step(0.18, flSat) * step(flC.b, flC.r) * (1.0 - step(0.62, flLum)), wPlas = (1.0 - wWood) * step(0.42, flLum), wStone = 1.0 - wWood - wPlas;
+      vec3 flDet = (flTriA(uPaintA, flP, flW) / uPaintM) * wWood + (flTriA(uPaintA2, vFlW / 3.2, flW) / uPaintM2) * wPlas + (flTriA(uPaintA3, vFlW / 2.6, flW) / uPaintM3) * wStone;
+      vec3 flRel = flTriN(uPaintN, flP, flW) * wWood + flTriN(uPaintN2, vFlW / 3.2, flW) * wPlas + flTriN(uPaintN3, vFlW / 2.6, flW) * wStone;
+    #else
     vec3 flDet = flTriA(uPaintA, flP, flW) / uPaintM;
     vec3 flRel = flTriN(uPaintN, flP, flW);
+    #endif
     #if FL_PAINT == 6
     {
       // the land: the same ground again much larger, so it never repeats to the eye; bare rock on the steep faces
@@ -649,7 +660,7 @@ export function installSmoothStyle() {
       .replace('#include <opaque_fragment>', FRAG_LIGHT)
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = normalize(normal + (viewMatrix * vec4(flBump, 0.0)).xyz);\n#ifdef FL_CARD\n  normal = normalize(mix(normal, (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz, 0.7));   // a spray of leaves is lit like the crown it hangs from\n#endif');
     const kind = this.defines && this.defines.FL_PAINT, S = kind && SURF[kind];
-    if (S) { sh.uniforms.uPaintA = S.a; sh.uniforms.uPaintN = S.n; sh.uniforms.uPaintM = S.m; sh.uniforms.uPaintS = { value: S.s }; const R = kind === 6 ? SURF.rock : S; sh.uniforms.uPaintA2 = R.a; sh.uniforms.uPaintN2 = R.n; sh.uniforms.uPaintM2 = R.m; }
+    if (S) { sh.uniforms.uPaintA = S.a; sh.uniforms.uPaintN = S.n; sh.uniforms.uPaintM = S.m; sh.uniforms.uPaintS = { value: S.s }; const R = kind === 6 ? SURF.rock : kind === 11 ? SURF[2] : S, R3 = kind === 11 ? SURF[1] : S; sh.uniforms.uPaintA2 = R.a; sh.uniforms.uPaintN2 = R.n; sh.uniforms.uPaintM2 = R.m; sh.uniforms.uPaintA3 = R3.a; sh.uniforms.uPaintN3 = R3.n; sh.uniforms.uPaintM3 = R3.m; }
   };
   const add = THREE.Object3D.prototype.add;
   THREE.Object3D.prototype.add = function (...objs) {

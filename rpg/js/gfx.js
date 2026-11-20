@@ -16,7 +16,7 @@ export function ramp() {
 }
 
 /* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' | 'brick' | 'bark' */
-const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7, brick: 8, bark: 9 };
+const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7, brick: 8, bark: 9, rock: 10, auto: 11 };   // auto: each piece by its own colour (timber, plaster or stone)
 export function paint(mat, kind, scale) {
   mat.defines = Object.assign({}, mat.defines, { FL_PAINT: PAINT_KINDS[kind] || 1 });
   if (scale != null) mat.defines.FL_PSCALE = Number(scale).toFixed(3);   // how big the pattern is drawn (bark: 1 = an everyday tree)
