@@ -4704,6 +4704,7 @@ function updatePlayer(dt) {
   }
   const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y);
   if (P.pos.y <= g) {
+    if (!wasGround && P.vel.y < -5) G.dipV = (G.dipV || 0) + Math.min(6, -P.vel.y * 0.22);   // the camera gives with a landing
     if (!wasGround && P.vel.y < -12) { sfx.land(); particles.burst(P.pos.x, g + 0.1, P.pos.z, 10, { color: 0xd8c098, speed: 3, size: 0.5, life: 0.5 }); G.shake = Math.max(G.shake, Math.min(0.3, -P.vel.y * 0.012)); }
     else if (!wasGround && P.vel.y < -5) particles.burst(P.pos.x, g + 0.1, P.pos.z, 4, { color: 0xd8c098, speed: 1.5, size: 0.35, life: 0.35 });
     P.pos.y = g; P.vel.y = 0; P.onGround = true;
@@ -4933,7 +4934,8 @@ function updateCamera(dt) {
       CAM.pitch = damp(CAM.pitch, 0.22, 3, dt);
     }
   }
-  const tgt = V3(P.pos.x, P.pos.y + (P.flying ? 2.6 : P.riding ? 3.0 : 1.9), P.pos.z);
+  G.dip = G.dip || 0; G.dipV = G.dipV || 0; G.dipV += (-G.dip * 90 - G.dipV * 13) * dt; G.dip += G.dipV * dt;   // a damped spring: down with the landing, and back
+  const tgt = V3(P.pos.x, P.pos.y + (P.flying ? 2.6 : P.riding ? 3.0 : 1.9) - Math.max(-0.1, G.dip) * 0.45, P.pos.z);
   // follow quickly across the ground, a little more gently up and down, so steps, stairs and landings don't jolt the view
   const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-(P.onGround || P.riding ? 9 : 14) * dt);
   CAM.target.x += (tgt.x - CAM.target.x) * kxz; CAM.target.z += (tgt.z - CAM.target.z) * kxz; CAM.target.y += (tgt.y - CAM.target.y) * ky;
