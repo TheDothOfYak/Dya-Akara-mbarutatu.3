@@ -19,7 +19,7 @@
    the renderer, camera, input, dialogue and cards.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire, waterMaterial } from './gfx.js';
+import { toon, addOutline, outlineAll, glowSprite, Particles, paint, buildCampfire, waterMaterial, lightPools } from './gfx.js';
 import { buildHomeTree, buildForest } from './hometree.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildWildPunk, buildKofi, buildRodak, buildDomesticPunk, buildKipsu } from './esik_land.js';
@@ -126,8 +126,11 @@ export function createRoad(ctx) {
   const SUN_DIR = V3(0.3, 0.8, 0.2).normalize();
   /* how late in the day: 0 noon, 1 dusk */
   let warm = 0;
+  let pools = null;   // lamplight on the ground, laid the first time it gets dark
   function setDusk(k) {
     warm = k;
+    if (k > 0.05 && !pools) pools = lightPools(scene, (x, z, y) => groundAt(x, z, y ?? 3), heightAt);
+    if (pools) pools.material.opacity = 0.6 * Math.max(0, (k - 0.15) / 0.85);
     skyU.uTop.value.set(0x4a8ad8).lerp(new THREE.Color(0x2a2058), k);
     skyU.uLow.value.set(0xd8ecff).lerp(new THREE.Color(0xffa070), k);
     skyU.uWarm.value = k;
