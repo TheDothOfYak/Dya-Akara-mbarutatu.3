@@ -50,13 +50,14 @@ class ShadePass extends Pass {
         tDiffuse: { value: null }, tDepth: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) },
         uProj: { value: new THREE.Matrix4() }, uProjInv: { value: new THREE.Matrix4() },
         uStrength: { value: 1 }, uRadius: { value: 0.75 }, uShade: { value: new THREE.Color(0.36, 0.38, 0.52) },
+        uDof: { value: 0 }, uFocus: { value: 6 },
         uSunUv: { value: new THREE.Vector2(0.5, 0.5) }, uSunK: { value: 0 }, uSunCol: { value: new THREE.Color(1, 0.85, 0.6) },
       },
       vertexShader: VERT,
       fragmentShader: `
         #define TAPS ${N_TAPS}
         #define RAYS ${COARSE ? 8 : 18}
-        uniform vec2 uSunUv; uniform float uSunK; uniform vec3 uSunCol;
+        uniform vec2 uSunUv; uniform float uSunK; uniform vec3 uSunCol; uniform float uDof; uniform float uFocus;
         uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform vec2 uTexel; uniform mat4 uProj; uniform mat4 uProjInv;
         uniform float uStrength; uniform float uRadius; uniform vec3 uShade; varying vec2 vUv;
         vec3 vpos(vec2 uv) {
@@ -76,8 +77,19 @@ class ShadePass extends Pass {
           float a = acc / float(RAYS);
           return uSunCol * a * (1.0 - a * 0.6) * near * near * near * uSunK;   // strongest where sky and shadow mix (the shafts), never a wash over everything
         }
+        /* a talk's depth of field: what is well behind (or in front of) the one speaking goes soft */
+        vec4 dof(vec4 src) {
+          if (uDof <= 0.0) return src;
+          float d = texture2D(tDepth, vUv).x;
+          float dist = d >= 0.99999 ? 1e4 : -vpos(vUv).z;
+          float coc = clamp(abs(dist - uFocus) / (uFocus * 1.2) - 0.15, 0.0, 1.0) * uDof;
+          if (coc < 0.02) return src;
+          vec3 acc = src.rgb; float rot = ign(gl_FragCoord.xy) * 6.2831853;
+          for (int i = 0; i < 8; i++) { float a = rot + float(i) * 2.3999632, r = (0.4 + float(i) / 8.0) * coc * 7.0; acc += texture2D(tDiffuse, vUv + vec2(cos(a), sin(a)) * r * uTexel).rgb; }
+          return vec4(acc / 9.0, src.a);
+        }
         void main() {
-          vec4 src = texture2D(tDiffuse, vUv);
+          vec4 src = dof(texture2D(tDiffuse, vUv));
           vec3 sh = shafts();
           float d = texture2D(tDepth, vUv).x;
           if (d >= 0.99999) { gl_FragColor = vec4(src.rgb + sh * 0.5, src.a); return; }
