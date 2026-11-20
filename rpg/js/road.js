@@ -541,6 +541,25 @@ export function createRoad(ctx) {
   /* wreckage of the war in the air: boulders and whole trees torn loose up there come down on the city, each under its
      own growing shadow; where they land they stay, and the streets fill with it. In the frozen moment every piece of
      it hangs where it is. */
+  /* loose things on the ground that take a kick: walk into one and it skitters off the way you were going, tumbling,
+     bouncing, sliding to a stop, and knocking into the others */
+  const KICK = [];
+  function tickKick(dt) {
+    if (!KICK.length) return;
+    const pv = Math.hypot(P.vel.x, P.vel.z);
+    for (const k of KICK) {
+      const p = k.m.position, dx = p.x - P.pos.x, dz = p.z - P.pos.z, d = Math.hypot(dx, dz);
+      if (d < k.r + 0.42 && pv > 0.5 && Math.abs(p.y - P.pos.y) < 1.2) {
+        const f = (P.vel.x * dx + P.vel.z * dz) / Math.max(d, 1e-3); if (f > 0) { k.v.x += (dx / Math.max(d, 1e-3)) * pv * 0.9 + P.vel.x * 0.3; k.v.z += (dz / Math.max(d, 1e-3)) * pv * 0.9 + P.vel.z * 0.3; k.v.y += 1.2 + pv * 0.18; k.w.set((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 9); if (pv > 3) sfx.step && sfx.step(); }
+      }
+      for (const o of KICK) { if (o === k) continue; const ex = p.x - o.m.position.x, ez = p.z - o.m.position.z, e = Math.hypot(ex, ez), mn = k.r + o.r; if (e < mn && e > 1e-4) { const push = (mn - e) * 0.5; p.x += ex / e * push; p.z += ez / e * push; const rel = (k.v.x - o.v.x) * ex / e + (k.v.z - o.v.z) * ez / e; if (rel < 0) { k.v.x -= rel * ex / e * 0.6; k.v.z -= rel * ez / e * 0.6; o.v.x += rel * ex / e * 0.6; o.v.z += rel * ez / e * 0.6; } } }
+      if (k.v.lengthSq() < 1e-4 && p.y <= k.y0 + heightAt(p.x, p.z) + 0.001) continue;
+      k.v.y -= 18 * dt; p.addScaledVector(k.v, dt);
+      k.m.rotation.x += k.w.x * dt; k.m.rotation.y += k.w.y * dt; k.m.rotation.z += k.w.z * dt;
+      const gy = heightAt(p.x, p.z) + k.y0;
+      if (p.y < gy) { p.y = gy; if (k.v.y < -1.5) k.v.y *= -0.35; else k.v.y = 0; const fr = Math.exp(-6 * dt); k.v.x *= fr; k.v.z *= fr; k.w.multiplyScalar(Math.exp(-5 * dt)); }
+    }
+  }
   const DEB = { on: false, next: 0, air: [], down: [], fires: [] };
   const scorchM = new THREE.MeshBasicMaterial({ color: 0x140c08, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
   const debRock = new THREE.DodecahedronGeometry(1, 0), debTrunk = new THREE.CylinderGeometry(0.35, 0.5, 1, 7), debRing = new THREE.RingGeometry(0.6, 1, 18);
@@ -695,6 +714,7 @@ export function createRoad(ctx) {
         const a = k / 9 * TAU + rng(), d = 0.7 + rng() * 1.5, pot = k % 3 === 0;
         const m = new THREE.Mesh(pot ? new THREE.CylinderGeometry(0.16, 0.11, 0.3, 9) : new THREE.BoxGeometry(0.34, 0.26, 0.3), toon(pot ? 0xb5653a : [0x9a6a40, 0xb8844e, 0x8a5a36][k % 3]));
         m.position.set(tp.x + Math.cos(a) * d, pot ? 0.1 : 0.13, tp.z + Math.sin(a) * d); m.rotation.set(pot ? Math.PI / 2 : rng() * 0.5, rng() * 6, rng() * 0.6); scene.add(m);
+        KICK.push({ m, v: V3(), w: V3(), r: pot ? 0.16 : 0.17, y0: pot ? 0.1 : 0.13 });   // loose: they skitter when you walk into them
       }
       const W = PRO.wake;
       sayHeld(W.slice(0, 5), two, () => {
@@ -1893,7 +1913,7 @@ export function createRoad(ctx) {
     if (K.on) follow(K, punk, dt, -1.8, 2.2, 11, stage === 'day4'); else punk.root.visible = false;
     if (K.on) punk.root.visible = true;
     updateFoes(dt, playing);
-    tickDebris(dt);
+    tickDebris(dt); tickKick(dt);
     // the market's own business
     if (MK) {
       const slow = MK.frozen ? 0 : 1;   // the frozen moment: every one of them stopped dead
