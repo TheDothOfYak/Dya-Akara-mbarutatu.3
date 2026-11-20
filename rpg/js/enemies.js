@@ -248,7 +248,7 @@ export function createEnemies(ctx) {
     else if (T.shallow) e.pos.y = Math.max(ground, W.level - 2.5);
     else e.pos.y = Math.max(ground, W.level - (T.sink || 0.4) + Math.sin(G.t * 0.5 + e.home.x) * 0.25);   // in the water, not on it: the body under, a fin or a back breaking the surface
     a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
-    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: G.t, windup: e.windup, attack: e.attackA, onGround: true });
+    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: G.t, windup: e.windup, attack: e.attackA, onGround: true, armed: e.state !== 'idle' && e.state !== 'wander' });
   }
 
   /* --------- per-frame --------- */

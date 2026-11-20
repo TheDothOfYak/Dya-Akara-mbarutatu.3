@@ -418,7 +418,7 @@ export function createVelki(ctx) {
       const cx = (ax + bx) / 2, cz = (az + bz) / 2, len = Math.hypot(bx - ax, bz - az), gy = Math.min(heightAt(ax, az), heightAt(bx, bz), heightAt(cx, cz));
       const seg = new THREE.Mesh(new THREE.BoxGeometry(3, 9 + 3, len + 0.4), wm);
       seg.position.set(cx, gy + 4.5 - 1.5, cz); seg.rotation.y = Math.atan2(bx - ax, bz - az); seg.castShadow = seg.receiveShadow = true; scene.add(seg);
-      if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 1.2), wm); cr.position.set(cx, gy + 9.6, cz); cr.rotation.y = seg.rotation.y; scene.add(cr); }
+      if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 1.4), wm); const ox = Math.cos(m), oz = Math.sin(m); cr.position.set(cx + ox * 1.2, gy + 9.6, cz + oz * 1.2); cr.rotation.y = seg.rotation.y; scene.add(cr); }   // merlons on the outer edge: the walk behind them is clear
       if (i % 26 === 13) { const tw = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.7, 13, 12), wm); tw.position.set(cx, gy + 6.5, cz); addOutline(tw, 0.05); scene.add(tw); const tc = new THREE.Mesh(new THREE.ConeGeometry(3, 3.6, 12), toon(0x5a2a14)); tc.position.set(cx, gy + 14.8, cz); addOutline(tc, 0.04); scene.add(tc); }
     });
     for (const s of [-1, 1]) {
@@ -492,14 +492,14 @@ export function createVelki(ctx) {
   const SOLDIER = { skin: '#9a6a40', cap: '#2a2a30', tunic: 0x4a4a5a, trim: 0xb8a070, leg: 0x3a3a44 };
   for (let k = 0; k < 8; k++) {
     const a0 = GATE_A + (k < 4 ? -1 : 1) * (0.2 + (k % 4) * 0.42), sp = person(0, 0, SOLDIER, { weapon: 'spear', build: 1.1, seed: 'w' + k });
-    sp.look = false; sp.patrol = { a: a0, a0: a0 - 0.16, a1: a0 + 0.16, dir: k % 2 ? 1 : -1, r: wallR(a0) };
+    sp.look = false; sp.armed = true; sp.patrol = { a: a0, a0: a0 - 0.16, a1: a0 + 0.16, dir: k % 2 ? 1 : -1, r: wallR(a0) };
   }
   for (const d of [-0.13, 0.13, -0.3, 0.3, -0.48, 0.48]) {
     const a = GATE_A + d, r = wallR(a), ar = person(Math.cos(a) * r, Math.sin(a) * r, SOLDIER, { weapon: 'bow', build: 1.05, seed: 'a' + d });
-    ar.look = false; ar.pos.y = heightAt(ar.pos.x, ar.pos.z) + 9; ar.a.root.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
+    ar.look = false; ar.armed = true; ar.pos.y = heightAt(ar.pos.x, ar.pos.z) + 9; ar.a.root.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
   }
   for (const d of [-0.21, 0.21]) {
-    const a = GATE_A + d, r = wallR(a), bx = Math.cos(a) * r, bz = Math.sin(a) * r, g = new THREE.Group(), wd = paint(toon(0x6a4428), 'wood'), iron = toon(0x4a4a52);
+    const a = GATE_A + d, r = wallR(a) - 0.4, bx = Math.cos(a) * r, bz = Math.sin(a) * r, g = new THREE.Group(), wd = paint(toon(0x6a4428), 'wood'), iron = toon(0x4a4a52);
     const bed = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 2.6), wd); bed.position.y = 1.0; bed.rotation.x = -0.28; g.add(bed);
     for (const q of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.14, 0.2), wd); arm.position.set(q * 0.7, 1.3, 0.95); arm.rotation.y = q * 0.45; g.add(arm); const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.1, 0.16), wd); leg.position.set(q * 0.45, 0.5, -0.3); leg.rotation.z = q * 0.25; g.add(leg); }
     const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.4, 6), iron); bolt.rotation.x = Math.PI / 2 - 0.28; bolt.position.set(0, 1.28, 0.3); g.add(bolt);
@@ -534,7 +534,7 @@ export function createVelki(ctx) {
     }
   }
   const warden = person(6.5, -54, { skin: '#9a6a40', cap: '#3a2a1a', tunic: 0x4a4a5a, trim: 0xb8a070 }, { weapon: 'spear', build: 1.15, scale: 1.05 });
-  warden.look = false;
+  warden.look = false; warden.armed = true;
   const crew = [-2.5, 0, 2.5].map((x, i) => {
     const p = person(x, -30 - i * 2, { skin: '#b07a48', cap: '#3a2414', tunic: 0xb87a2a, trim: 0xffd060, leg: 0x6a4a20 }, { build: 1.1, cape: 0x9a3a1a });
     p.look = false; p.run = false; p.delay = i * 0.5; return p;
@@ -777,7 +777,7 @@ export function createVelki(ctx) {
         const want = stage === 'spire' ? Math.atan2(P.pos.x - p.pos.x, P.pos.z - p.pos.z) : Math.PI;
         p.a.root.rotation.y = dampAngle(p.a.root.rotation.y, want, 3, dt);
       }
-      p.a.animate(dt, { speed, onGround: true, t: t + p.ph });
+      p.a.animate(dt, { speed, onGround: true, t: t + p.ph, armed: !!p.armed });
     }
   }
 

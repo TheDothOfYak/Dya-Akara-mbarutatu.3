@@ -1048,7 +1048,7 @@ export function createRoad(ctx) {
     // the guards: they look up and down the street; if they see you, they take one and send you back
     for (const gd of E.guards) {
       gd.yaw = gd.base + Math.sin(t * 0.5 + gd.ph) * 0.9;
-      gd.a.root.rotation.y = gd.yaw; gd.a.animate(dt, { speed: 0, onGround: true, t });
+      gd.a.root.rotation.y = gd.yaw; gd.a.animate(dt, { speed: 0, onGround: true, t, armed: true });
       gd.cone.position.set(gd.pos.x, gd.pos.y + 0.2, gd.pos.z); gd.cone.rotation.y = gd.yaw - Math.PI / 2;
       const dx = P.pos.x - gd.pos.x, dz = P.pos.z - gd.pos.z, d = Math.hypot(dx, dz), off = Math.abs(((Math.atan2(dx, dz) - gd.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
       let seen = MK.n > 0 && (d < 2.2 || (d < 11 && off < 0.6));
