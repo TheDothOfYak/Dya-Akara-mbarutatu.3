@@ -222,6 +222,21 @@ export function buildProperty(scene) {
   const inField = (x, z) => FIELDS.find(f => Math.abs(x - f.x) < f.w / 2 && Math.abs(z - f.z) < f.d / 2);
   const inPasture = (x, z) => Math.abs(x - PASTURE.x) < PASTURE.w / 2 && Math.abs(z - PASTURE.z) < PASTURE.d / 2;
   const nearBuildings = (x, z, pad = 0) => Math.hypot(x - TERRACE.x, z - TERRACE.z) < 95 + pad || Math.hypot(x - TOWER.x, z - TOWER.z) < 20 + pad;
+  /* no grass where something solid already stands on the ground: every building (hall() files one collider for its
+     whole footprint), the porch columns, the terraces, the dry-stone walls, tree trunks. The footprint test matches
+     the collider's own (rotation included), so blades stop at the porch edge instead of coming up through the boards. */
+  const onSolid = (x, z) => {
+    for (const o of col.near(x, z)) {
+      const dx = x - o.x, dz = z - o.z, lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c;
+      if (Math.abs(lx) <= o.hw + 0.3 && Math.abs(lz) <= o.hd + 0.3) return true;
+    }
+    return false;
+  };
+  /* …nor over the laid stone that carries no collider: the flagstone walks and the pebble edging. Their spots are
+     marked into a coarse grid as they are laid, and the grass reads it back. */
+  const PAVE = new Set(), PC = 1.3;
+  const pave = (x, z, r = 1) => { for (let cx = Math.floor((x - r) / PC); cx <= Math.floor((x + r) / PC); cx++) for (let cz = Math.floor((z - r) / PC); cz <= Math.floor((z + r) / PC); cz++) PAVE.add(cx + ',' + cz); };
+  const onPaved = (x, z) => PAVE.has(Math.floor(x / PC) + ',' + Math.floor(z / PC));
 
   /* ---------------- the ground: a fine mesh over the property, a wide one under everything, a far ring ---------------- */
   const c = new THREE.Color(), gA = new THREE.Color('#8fbf52'), gB = new THREE.Color('#b8c45a'), gC = new THREE.Color('#6aa048'),
@@ -1402,6 +1417,7 @@ export function buildProperty(scene) {
     for (let d = 0; d < L; d += 1.15) {
       let acc = 0, x = pts[0][0], z = pts[0][1], nx = 0, nz = 1;
       for (let i = 1; i < pts.length; i++) { const sl = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); if (acc + sl >= d) { const t = (d - acc) / sl; x = lerp(pts[i - 1][0], pts[i][0], t); z = lerp(pts[i - 1][1], pts[i][1], t); nx = -(pts[i][1] - pts[i - 1][1]) / sl; nz = (pts[i][0] - pts[i - 1][0]) / sl; break; } acc += sl; }
+      pave(x, z, 1.4);
       for (const q of [-0.6, 0.6]) { const fx = x + nx * q + (rng() - 0.5) * 0.25, fz = z + nz * q + (rng() - 0.5) * 0.25, s = 0.45 + rng() * 0.2; put2(pCyl, fx, heightAt(fx, fz) + 0.03, fz, s * 1.15, 0.12, s, 0, rng() * 6, 0, pick(['#b8b0a0', '#a8a094', '#c8bca8', '#9a9488'])); }
     }
   };
@@ -1417,7 +1433,7 @@ export function buildProperty(scene) {
       for (let d = 0; d < L; d += 1.7) {
         const x0 = ax + (bx - ax) * d / L, z0 = az + (bz - az) * d / L; acc += 1.7;
         if (x0 > from || x0 < to) continue;
-        for (const s of [-1, 1]) { const x = x0 + nx * off * s + (rng() - 0.5) * 0.3, z = z0 + nz * off * s + (rng() - 0.5) * 0.3, gg = heightAt(x, z); if (gg < WATER_LEVEL + 0.3 || nearBuildings(x, z, -70)) continue; const sz = 0.12 + rng() * 0.1; pebbles.put(x, gg + sz * 0.15, z, sz * 1.3, sz * 0.7, sz, rng(), rng(), rng(), pick(['#e8e4d8', '#d8d4c8', '#c8c4b8', '#f0ece0'])); }
+        for (const s of [-1, 1]) { const x = x0 + nx * off * s + (rng() - 0.5) * 0.3, z = z0 + nz * off * s + (rng() - 0.5) * 0.3, gg = heightAt(x, z); if (gg < WATER_LEVEL + 0.3 || nearBuildings(x, z, -70)) continue; const sz = 0.12 + rng() * 0.1; pebbles.put(x, gg + sz * 0.15, z, sz * 1.3, sz * 0.7, sz, rng(), rng(), rng(), pick(['#e8e4d8', '#d8d4c8', '#c8c4b8', '#f0ece0'])); pave(x, z, 0.8); }
       }
     }
   };
@@ -1635,7 +1651,7 @@ export function buildProperty(scene) {
   for (const k of [pBox, pCyl, pPyr, pCone, pPrism, pPane, pLamp, pGlass, pDome, pebbles, blooms, reeds, pads, glowPods, glowStrands]) k.done();
 
   blocks.done(); trunks.done(); cones.done(); crowns.done(); tufts.done(); crops.done(); rocks.done();
-  const grass = buildGrass(scene, rng, (x, z) => onLand(x, z) && heightAt(x, z) > WATER_LEVEL + 0.6 && pathDist(x, z) > 2.5 && laneDist(x, z) > 2 && Math.hypot(x - YARD.x, z - YARD.z) > 20 && !inField(x, z) && !nearBuildings(x, z, -60) && Math.hypot(x - POND.x, z - POND.z) > POND.r + 0.5,
+  const grass = buildGrass(scene, rng, (x, z) => onLand(x, z) && heightAt(x, z) > WATER_LEVEL + 0.6 && pathDist(x, z) > 2.5 && laneDist(x, z) > 2 && Math.hypot(x - YARD.x, z - YARD.z) > 20 && !inField(x, z) && !nearBuildings(x, z, -60) && Math.hypot(x - POND.x, z - POND.z) > POND.r + 0.5 && !onSolid(x, z) && !onPaved(x, z),
     heightAt, ['#8fbf52', '#a8c45a', '#7ab04a', '#c0c860', '#98b850'], 30000, 60, 0, 560);
 
   /* Zahreh flowers in the meadows */
