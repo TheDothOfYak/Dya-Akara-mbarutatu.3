@@ -948,7 +948,8 @@ export function buildEikar(o = {}) {
   let s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
   // the walk: where in the stride (0..1), which way the ground is going by, how fast he's turning and speeding up
-  let lieK = 0, swimK = 0, swimPh = 0;   // lying flat; swimming   // flat on his back (st.lie)
+  let lieK = 0, swimK = 0, swimPh = 0;
+  let gestT = 4 + Math.random() * 8, gest = null, gestK = 0;   // the little things folk do standing about: scratch, stretch, rub the neck, hands on hips   // lying flat; swimming   // flat on his back (st.lie)
   let slung = false, idleT = 9;   // the weapon rides on his back until it's wanted
   const backMount = new THREE.Group(); backMount.position.set(-0.05, 0.02, -0.105 * (kalo ? 1.08 : 1) - 0.035); backMount.rotation.set(0.06, 0, -0.42); torso.add(backMount);
   let cyc = Math.random(), mvA = 0, yawRate = 0, accS = 0, lastSpd = 0, lastX = null, lastZ = 0, lastYaw = 0, stK = 0, rollK = 0, rollP = 0, hurtK = 0, hipTurn = 0, lungeZ = 0, crouchS = 0, moveT = 0;
@@ -1333,6 +1334,22 @@ export function buildEikar(o = {}) {
         sT.set(s * rx, 0.3, rz); wT.lerp(sT, swimK); wD.set(s * 0.3, 0.2, 1); sT.set(-s * rx, 0.3, rz); fT.lerp(sT, swimK); fD.set(-s * 0.3, 0.2, 1);
       }
       if (lieK > 0.001) { sT.set(s * 0.42, 0.12, 0.06); wT.lerp(sT, lieK); wD.set(s, 0.2, 0.3); sT.set(-s * 0.4, 0.2, 0.08); fT.lerp(sT, lieK); fD.set(-s, 0.3, 0.3); }   // arms flung out
+      // standing about with nothing to do, now and then a little piece of business
+      {
+        const idle = !sw && !st.talking && !st.carry && !st.drink && !st.ride && !st.sit && !st.lie && !st.swim && walkK < 0.05 && onGround && !st.roll && glide < 0.05;
+        if (idle) { gestT -= dt; if (!gest && gestT <= 0) { gest = { kind: Math.floor(Math.random() * 4), t: 0, dur: 2.2 + Math.random() * 1.6 }; } } else { gestT = Math.max(gestT, 2.5); gest = null; }
+        if (gest) { gest.t += dt; if (gest.t > gest.dur) { gest = null; gestT = 5 + Math.random() * 10; } }
+        const want = gest ? Math.min(1, gest.t / 0.45, (gest.dur - gest.t) / 0.45) : 0;
+        gestK = lerp(gestK, want, 1 - Math.exp(-12 * dt));
+        if (gestK > 0.001 && gest) {
+          const w = gestK, kd = gest.kind, wig = Math.sin(t * 9) * 0.02;
+          if (kd === 0) { sT.set(-s * 0.06, 0.62 + wig, 0.04); fT.lerp(sT, w); fD.set(0, -0.3, 1); }                                  // scratches the back of his head
+          else if (kd === 1) { sT.set(-s * 0.2, 0.72, 0.02); fT.lerp(sT, w); if (slung) { sT.set(s * 0.2, 0.72, 0.02); wT.lerp(sT, w); } }   // a stretch, arms up
+          else if (kd === 2) { sT.set(-s * 0.12, 0.42, -0.06); fT.lerp(sT, w); }                                                   // rubs the back of his neck
+          else { sT.set(-s * 0.2, -0.02, -0.02); fT.lerp(sT, w); fD.set(-s, -0.4, 0); if (slung) { sT.set(s * 0.2, -0.02, -0.02); wT.lerp(sT, w); wD.set(s, -0.4, 0); } }   // hands on hips
+          if (kd === 1) torso.rotation.x -= 0.12 * w;
+        }
+      }
       if (st.carry) { wT.set(s * 0.27, 0.06, 0.36); wD.set(0, 1, 0.15); wB.set(-s, 0, 0); fT.set(-s * 0.27, 0.06, 0.36); fD.set(0, 1, 0.15); fB.set(s, 0, 0); }   // both arms round what he's carrying
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
