@@ -62,7 +62,8 @@ const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 /* ---------------- settings ---------------- */
 const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, ao: true, auto: true, scale: 1 };
-const QA = { scale: 1, step: 0, avg: 16.7, cool: 8 };   // the automatic quality steps (autoQuality, by the frame loop)
+const QA = { scale: 1, step: 0, avg: 16.7, cool: 8 };
+const WIN_DAY = new THREE.Color(0x3c4650);   // window glass by day (the night lights them: frame loop)   // the automatic quality steps (autoQuality, by the frame loop)
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
 installDetailCull();    // parts smaller than a pixel are not drawn (they still cost a draw call each)
@@ -5183,7 +5184,11 @@ function frame(now) {
   G.night = dn.night;
   // lamplight on the ground under every lamp and lantern, coming up as the dark does
   if (!G.pools) G.pools = makeLightPools();
-  { const o = 0.6 * Math.max(0, Math.min(1, (G.night - 0.15) / 0.5)); G.pools.material.opacity = o; G.pools.visible = o > 0.01; }
+  { const o = 0.6 * Math.max(0, Math.min(1, (G.night - 0.15) / 0.5)); G.pools.material.opacity = o; G.pools.visible = o > 0.01;
+    // and the windows: dark glass with a little sky in it by day, lamplit by night
+    if (!G.wins) { G.wins = []; const seen = new Set(); scene.traverse(q => { const m = q.material; if (!q.isMesh || !m || Array.isArray(m) || !m.isMeshBasicMaterial || seen.has(m) || m.map || m.transparent) return; const c = m.color; if (c.r > 0.85 && c.g > 0.5 && c.g < 0.9 && c.b > 0.25 && c.b < 0.7 && q.geometry && /Plane|Circle/.test(q.geometry.type)) { seen.add(m); G.wins.push({ m, lit: c.clone() }); } }); }
+    const lk = Math.max(0, Math.min(1, (G.night - 0.05) / 0.45)) * 0.85 + 0.15;
+    for (const w of G.wins) w.m.color.copy(WIN_DAY).lerp(w.lit, lk); }
   /* everyone's bioluminescence follows the dark (creatures handle their own in enemies.js / wilds.js) */
   if ((G.glowT = (G.glowT || 0) - dt) <= 0) {
     G.glowT = 0.25; const n = G.night;
