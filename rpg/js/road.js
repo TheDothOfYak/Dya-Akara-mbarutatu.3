@@ -949,6 +949,7 @@ export function createRoad(ctx) {
         const a = buildEikar(Object.assign({ weapon: 'none', flasks: false, seed: 'sh' + k }, FOLK_LOOKS[k % FOLK_LOOKS.length]));
         a.root.position.copy(q); a.root.rotation.y = rng() * 6; scene.add(a.root);
         for (let i = 0; i < 14; i++) a.animate(0.05, { speed: 0, onGround: true, t: k + i * 0.05, sit: k % 3 !== 0, talking: k % 3 === 0 });
+        if (k % 3 !== 0) a.root.position.y -= 0.4;   // sat down low, knees up, feet on the floor: not on a seat that isn't there
       }
     }
     escAmuletItem(HT.levelSpot(top, toCore + 1.9), 'Pick up the Sniller amulet', true);
