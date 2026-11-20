@@ -296,7 +296,11 @@ const FRAG_ALBEDO = `#include <color_fragment>
       flDet = mix(flFar, flDet * (0.6 + 0.4 * flFar), flNearK); flRel *= flNearK;
       float flCliff = smoothstep(0.3, 0.6, 1.0 - clamp(normalize(vFlWN).y, 0.0, 1.0));
       vec3 flRP = vFlW / (flS * 2.4);
-      flDet = mix(flDet, flTriA(uPaintA2, flRP, flW) / uPaintM2, flCliff);
+      // rock on the steep faces: close to, the rock picture; far off, the same rock drawn eight times larger, with
+      // strata running along the face, so a cliff a kilometre away still reads as rock and not a smooth wall
+      vec3 flRock = mix(flTriA(uPaintA2, flRP * 0.125 + 0.21, flW) / uPaintM2, flTriA(uPaintA2, flRP, flW) / uPaintM2, flNearK);
+      flRock *= 0.82 + 0.3 * flN(vec2(vFlW.y * 0.09 + flN(vFlW.xz * 0.004) * 6.0, (vFlW.x + vFlW.z) * 0.006));
+      flDet = mix(flDet, flRock, flCliff);
       flRel = mix(flRel, flTriN(uPaintN2, flRP, flW) * 1.4, flCliff);
       flDet *= 0.88 + 0.24 * flF(vFlW.xz * 0.035);                          // broad sunlit and dull patches
     }
