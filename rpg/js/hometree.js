@@ -30,6 +30,7 @@ import * as THREE from 'three';
 import { toon, addOutline, paint } from './gfx.js';
 import { mulberry32, lerp } from './util.js';
 import { noSolid } from './solid.js';
+import { addLeafCards } from './smooth.js';
 
 const TAU = Math.PI * 2;
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -647,6 +648,7 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
     for (const b of [inBox, inStep, inRope, inRib, inGlow, inLamp, inCloth, inRug, inPot, inHam]) b.done();
   }
   leafB.done();
+  addLeafCards(leafB.mesh);   // sprays of leaves round every cloud of the crown (smooth.js)
 
   /* ---- walking it: the bark and the heartwood are a wall all the way round but at the door; the floors and the stair
      are ground; the well has a rail round it on every floor, and off the floors the stair has one on its open side ---- */

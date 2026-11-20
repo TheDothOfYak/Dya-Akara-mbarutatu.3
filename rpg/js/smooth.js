@@ -583,7 +583,7 @@ function leafTexture() {
   return LEAF_TEX;
 }
 const _km = new THREE.Matrix4(), _kc = new THREE.Matrix4(), _kq = new THREE.Quaternion(), _kp = new THREE.Vector3(), _ks = new THREE.Vector3(), _ke = new THREE.Euler(), _kcol = new THREE.Color();
-function addLeafCards(o) {
+export function addLeafCards(o) {
   if (o.userData.leafCards || !o.parent || !o.count) return;
   const K = 30, n = o.count, rng = mulberry32(n * 31 + 7);
   const geo = new THREE.PlaneGeometry(1, 1);
