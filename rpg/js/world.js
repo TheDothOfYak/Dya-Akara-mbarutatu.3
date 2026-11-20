@@ -213,7 +213,7 @@ export function buildWorld(scene) {
   const c = new THREE.Color(), grassA = new THREE.Color('#a3ad4f'), grassB = new THREE.Color('#c6a14a'), grassC = new THREE.Color('#7f9a45'),
     dirt = new THREE.Color('#c99f6a'), pave = new THREE.Color('#d8bf94');
   const TC = Object.fromEntries(Object.entries({
-    litter: '#b5652c', litter2: '#8f4c26', ash: '#a29d95', ash2: '#7e7973', meadow: '#bdb65a', sand: '#d2bb8c', bed: '#6a7864', bed2: '#3c5560',
+    litter: '#b5652c', litter2: '#8f4c26', ash: '#8a857d', ash2: '#6c6863', meadow: '#bdb65a', sand: '#d2bb8c', bed: '#6a7864', bed2: '#3c5560',
     rock: '#938e87', rockD: '#6b6762', ridge: '#8a857f', ridgeD: '#5f5b57', abyss: '#2e2a28', snow: '#ebe7df', soil: '#6a4630', foot: '#8a6a3c',
   }).map(([k, v]) => [k, new THREE.Color(v)]));
   const segDist = (list, x, z) => {
