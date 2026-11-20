@@ -360,7 +360,18 @@ export function buildWorld(scene) {
 
   /* ---------- kits ---------- */
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paintMat(toon(0xffffff), 'stone'), 6500);   // the ruins: dressed stone
-  const columns = new Kit(scene, new THREE.CylinderGeometry(1, 1.08, 1, 10), paintMat(toon(0xffffff), 'stone'), 600);
+  // fluted drums: shallow grooves cut round the shaft, and a slight swell in the middle (entasis)
+  const colGeo = (() => {
+    const g = new THREE.CylinderGeometry(1, 1.08, 1, 40, 6), P = g.attributes.position;
+    for (let k = 0; k < P.count; k++) {
+      const x = P.getX(k), y = P.getY(k), z = P.getZ(k), r = Math.hypot(x, z);
+      if (r < 0.5) continue;   // the cap centres
+      const a = Math.atan2(z, x), f = 1 - 0.045 * Math.pow(Math.abs(Math.cos(a * 8)), 0.6) + 0.03 * (1 - 4 * y * y);
+      P.setX(k, x * f); P.setZ(k, z * f);
+    }
+    g.computeVertexNormals(); return g;
+  })();
+  const columns = new Kit(scene, colGeo, paintMat(toon(0xffffff), 'stone'), 600);
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paintMat(toon(0xffffff), 'bark', 0.12), 300);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600);
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff, {}), 500);
