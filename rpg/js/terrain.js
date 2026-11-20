@@ -168,7 +168,7 @@ export function buildGrass(scene, rng, ok, heightAt, tones = ['#a8b452', '#c4a84
 export const MEADOW = { who: new THREE.Vector3(0, -9999, 0), on: true };
 function buildMeadow(scene, ok, heightAt, tones) {
   const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-  const C = 9, RAD = coarse ? 2 : 3, PER = coarse ? 520 : 1900, FAR = (RAD + 0.5) * C - 2;
+  const C = 9, RAD = coarse ? 2 : 3, PER = coarse ? 420 : 1500, FAR = (RAD + 0.5) * C - 2, LOAD = RAD + 1;   // squares are laid a ring further out than the grass reaches, so none ever pops up in sight
   // one blade: three tapering lengths, bowed over a little at the top; dark at the root, bright at the tip
   const g = new THREE.BufferGeometry();
   {
@@ -246,9 +246,9 @@ function buildMeadow(scene, ok, heightAt, tones) {
     const px = camera.position.x + fwd.x * C * 1.2, pz = camera.position.z + fwd.z * C * 1.2;   // a little ahead of the camera: more of it where you look
     U.uCam.value.set(px, camera.position.y, pz);
     const ccx = Math.floor(px / C), ccz = Math.floor(pz / C);
-    for (const [k, c] of live) if (Math.abs(c.cx - ccx) > RAD + 1 || Math.abs(c.cz - ccz) > RAD + 1) { c.mesh.visible = false; pool.push(c.mesh); live.delete(k); }
+    for (const [k, c] of live) if (Math.abs(c.cx - ccx) > LOAD + 1 || Math.abs(c.cz - ccz) > LOAD + 1) { c.mesh.visible = false; pool.push(c.mesh); live.delete(k); }
     let made = 0;
-    for (let r = 0; r <= RAD && made < 4; r++) for (let dz = -r; dz <= r && made < 4; dz++) for (let dx = -r; dx <= r && made < 4; dx++) {
+    for (let r = 0; r <= LOAD && made < 4; r++) for (let dz = -r; dz <= r && made < 4; dz++) for (let dx = -r; dx <= r && made < 4; dx++) {
       if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
       const k = (ccx + dx) + ',' + (ccz + dz); if (live.has(k)) continue;
       const mesh = take(); fill(mesh, ccx + dx, ccz + dz); live.set(k, { cx: ccx + dx, cz: ccz + dz, mesh }); made++;

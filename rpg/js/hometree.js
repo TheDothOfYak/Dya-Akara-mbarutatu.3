@@ -440,6 +440,10 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
         if (L < 3) return;
         const r = rAt(top - L / 2, o.a) + 0.12, b = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(4, 2 * o.hw * r * 0.8), L), toon(opts.banners[k % opts.banners.length], { side: THREE.DoubleSide }));
         b.position.set(Math.cos(o.a) * r, top - L / 2, Math.sin(o.a) * r); b.rotation.y = faceRy(o.a); root.add(b);
+        // hung from a pole driven into the bark just under the sill, so it hangs from something and not the air
+        const rb = Math.max(...[-0.3, 0, 0.3].map(q => rAt(top, o.a + q * o.hw))) + 0.25, pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, Math.min(4.4, 2 * o.hw * r * 0.8 + 0.6), 6), toon(0x4a2a14));
+        pole.rotation.set(0, faceRy(o.a), Math.PI / 2); pole.position.set(Math.cos(o.a) * rb, top + 0.05, Math.sin(o.a) * rb); root.add(pole);
+        b.position.set(Math.cos(o.a) * rb, top - L / 2, Math.sin(o.a) * rb);
       });
     }
     for (const b of [winB, postB, archB]) b.done();

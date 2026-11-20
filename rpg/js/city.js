@@ -194,7 +194,15 @@ export function createCityKit(scene, o) {
       const f = new THREE.Mesh(flagGeo, flagMats[i % flagMats.length]); f.position.copy(p); f.lookAt(p.clone().add(V3(-(b.z - a.z), 0, b.x - a.x))); f.userData.ph = i; grp.add(f);
     }
     buntings.push(grp);
+    // each end tied off to something: a pole from the ground (a wall or a tree, where there is one, hides it)
+    for (const e of [a, b]) {
+      const gy = heightAt(e.x, e.z), h = e.y - gy + 0.35; if (h < 0.5) continue;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, h, 6), poleMat); pole.position.set(e.x, gy + h / 2, e.z); pole.castShadow = true; scene.add(pole);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), toon(0xc8a050)); knob.position.set(e.x, gy + h + 0.05, e.z); scene.add(knob);
+      if (box && !e.noBox) box(e.x, e.z, 0.12, 0.12, gy - 1, gy + h);
+    }
   }
+  const poleMat = paint(toon(0x5a3a20), 'wood');
   function paving(cx, cz, rings, color = 0xb89878) {
     const m = paint(toon(color), 'cobble');
     for (const r of rings) { const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.25, r + 0.25, 64), m); ring.rotation.x = -Math.PI / 2; ring.position.set(cx, heightAt(cx, cz) + 0.03, cz); ring.receiveShadow = true; scene.add(ring); }
