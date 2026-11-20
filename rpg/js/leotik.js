@@ -757,7 +757,11 @@ export function buildLeotik(scene) {
     for (let k = 0; k < 14; k++) {
       const a = Math.PI * 0.62 + k * 0.035, x = COVE.x - 58 + Math.cos(a) * 16 + k * 2.2, z = COVE.z - 30 + k * 4.6;
       if (rng() < 0.18) continue;
-      blocks.put(x, SEA - 3 + 3.6 + rng() * 0.8, z, 3.4 + rng(), 7 + rng() * 2, 2.6, rng() * 0.1, rng() * 0.5, rng() * 0.1, pick(STONE));
+      // tumbled boulders, the sea long since having taken the dressed stone
+      for (let j = 0; j < 3; j++) {
+        const sz = 1.4 + rng() * 1.3;
+        rocks.put(x + (rng() - 0.5) * 2.4, SEA + 0.2 + rng() * 0.9 - j * 0.3, z + (rng() - 0.5) * 3, sz * (1.1 + rng() * 0.4), sz * (0.7 + rng() * 0.3), sz, rng() * 3, rng() * 3, rng() * 3, j ? '#4f4c46' : pick(STONE));
+      }
     }
   }
 

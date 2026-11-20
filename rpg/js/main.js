@@ -14,7 +14,7 @@ import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
-import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools } from './gfx.js';
+import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools, paint } from './gfx.js';
 import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay, trunkAt } from './vines.js';
@@ -225,12 +225,17 @@ if (REGION === 'xilia') {
    on Leotik the one you came through has closed behind you. */
 function urverkRing(open) {
   const g = new THREE.Group();
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.42, 8, 32), toon(0x2a2236, { emissive: 0x6a3aff, emissiveIntensity: open ? 0.7 : 0.15 }));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.42, 14, 48), paint(toon(0x3e3a48, { emissive: 0x6a3aff, emissiveIntensity: open ? 0.7 : 0.03 }), 'rock', 0.6));
   ring.position.y = 3.6; addOutline(ring, 0.05); g.add(ring);
-  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const k = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.6), toon(0x4a4060)); k.position.set(Math.cos(a) * 3.2, 3.6 + Math.sin(a) * 3.2, 0); k.rotation.z = a; g.add(k); }
-  const base = new THREE.Mesh(new THREE.BoxGeometry(5, 0.6, 1.6), toon(0x5a5060)); base.position.y = 0.2; addOutline(base, 0.04); g.add(base);
+  // stygian teeth set into the ring, and a worn stone plinth with steps
+  const knobMat = paint(toon(0x4a4060), 'rock', 0.5);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const k = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), knobMat); k.scale.set(0.9, 1.3, 0.8); k.position.set(Math.cos(a) * 3.2, 3.6 + Math.sin(a) * 3.2, 0); k.rotation.z = a; g.add(k); }
+  const stone = paint(toon(0x6a6470), 'stone', 0.8);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 0.5, 9), stone); base.scale.z = 0.42; base.position.y = 0.2; addOutline(base, 0.04); g.add(base);
+  const step = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.5, 0.3, 9), stone); step.scale.z = 0.55; step.position.y = -0.05; g.add(step);
+  for (const sx of [-1, 1]) { const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 1.1, 7), stone); foot.position.set(sx * 1.6, 0.8, 0); g.add(foot); }
   const film = new THREE.Mesh(new THREE.CircleGeometry(2.9, 32), new THREE.MeshBasicMaterial({ color: 0xb48aff, transparent: true, opacity: open ? 0.55 : 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
-  film.position.y = 3.6; g.add(film);
+  film.position.y = 3.6; film.visible = !!open; g.add(film);
   g.userData.film = film; g.userData.ring = ring;
   return g;
 }
@@ -2261,7 +2266,7 @@ function afterLord() {
   });
 }
 
-function revealGate() { if (gate) { gate.visible = true; gate.userData.film.material.opacity = 0.55; gate.userData.ring.material.emissiveIntensity = 0.7; } }
+function revealGate() { if (gate) { gate.visible = true; gate.userData.film.material.opacity = 0.55; gate.userData.film.visible = true; gate.userData.ring.material.emissiveIntensity = 0.7; } }
 
 function showEnd(n) {
   G.mode = 'end';
