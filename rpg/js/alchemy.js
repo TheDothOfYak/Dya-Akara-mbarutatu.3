@@ -172,7 +172,7 @@ export function createAlchemy(ctx) {
   /* ---------------- the steady hand: stir when the needle's in the green ---------------- */
   let game = null;
   function steadyHand(level, name, cb) {
-    const el = document.createElement('div');
+    const el = document.createElement('div'); el.id = 'alch-game';
     el.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(10,6,4,.55);font-family:inherit';
     el.innerHTML = `<div style="background:#2a1c12;border:2px solid #c8a060;border-radius:10px;padding:18px 22px;width:min(420px,92vw);color:#f3e6c8;text-align:center;box-shadow:0 8px 30px #000a">
       <div style="font-size:18px;margin-bottom:4px">Brewing: <b>${name}</b></div>
