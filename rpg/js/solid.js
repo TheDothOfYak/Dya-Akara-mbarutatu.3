@@ -20,7 +20,8 @@
      past where you can ever go.
 
    Not solid: the sky, water, anything see-through or glowing (mist,
-   light, glass, holograms, sparks), grass, crops and reeds, flat
+   light, glass, holograms, sparks), leaves and hanging vines, grass,
+   crops and reeds, flat
    things lying on the ground, and anything that moves — folk,
    beasts, boats, carts, pickups — which look after their own
    collisions. Anything marked noSolid(o) (and all under it) is left
@@ -69,9 +70,15 @@ function plainShape(g, small) {
   }
 }
 
+/* leaves (a crown, a bush, a spray of leaf cards: smooth.js marks them as it softens them) and things that hang and
+   sway (vines, strands, threads): you brush through them */
+const SOFT = ['FL_LEAF', 'FL_CARD', 'FL_HANG'];
+const soft = m => !!(m && m.defines && SOFT.some(k => m.defines[k]));
+
 /* see-through, glowing, or not drawn: not a thing you can bump into */
 function ghostly(m) {
   if (!m || m.visible === false || m.colorWrite === false) return true;
+  if (soft(m)) return true;
   if (m.blending !== THREE.NormalBlending) return true;
   if (m.transparent && (m.opacity < 0.95 || !m.depthWrite || m.isShaderMaterial)) return true;
   if (m.wireframe) return true;
@@ -204,6 +211,7 @@ export function createSolids(scene, opts) {
     const e = M.elements, scale = Math.max(1e-4, Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10]));
     const bb = g.boundingBox;
     if (bb.isEmpty()) return [];
+    if ((Array.isArray(o.material) ? o.material : [o.material]).every(m => ghostly(m))) return [];   // (leaves are known for leaves only once smooth.js has been over them)
     const whole = worldBox({ x0: bb.min.x, x1: bb.max.x, y0: bb.min.y, y1: bb.max.y, z0: bb.min.z, z1: bb.max.z }, M);
     if (Math.max(whole.hw, whole.hd) * 2 > BIG) return [];                                        // land, sea, sky
     if (whole.top - whole.bot < FLAT && Math.min(whole.hw, whole.hd) * 2 > FLAT) return [];       // lying flat: a decal, water, a rug

@@ -20,6 +20,7 @@ import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint, wate
 import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 import { MANOR_SPOTS } from './interiors.js';
+import { hanging, swing } from './smooth.js';
 export { STEP };
 
 export const WATER_LEVEL = 0;
@@ -314,7 +315,7 @@ export function buildProperty(scene) {
   const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 15000);
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), paint(toon(0xffffff), 'bark', 0.12), 9800, false);
   const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false);
-  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false);
+  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false); noSolid(crowns.mesh);   // leaves: you brush through them (the trunks and boughs are solid)
   const tufts = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 4000, false);   // small leafy and flowery bits: boxes, ivy, moss, the garden
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 4200, false); noSolid(crops.mesh);   // you wade through it, like grass
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1400, false);
@@ -372,9 +373,12 @@ export function buildProperty(scene) {
   }
   const gTrunks = new Kit(scene, new THREE.CylinderGeometry(0.72, 1, 1, 12, 1, true), paint(toon(0xffffff), 'bark', 0.7), 260, false);
   const gLimbs = new Kit(scene, new THREE.CylinderGeometry(0.55, 1, 1, 7, 1, true), paint(toon(0xffffff), 'bark', 0.5), 1900, false);
-  const gLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1500, false);
+  const gLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1500, false); noSolid(gLeaves.mesh);
   const seams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), glowMat, 3400, false);
   const beads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 17000, false);
+  // the threads hanging from the leaf-clouds, and the drop of light on each one's end: they sway, and you walk through them
+  const threadKit = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), glowMat, 2000, false), threads = hanging(threadKit);
+  const dropKit = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 2000, false), drops = hanging(dropKit);
   const shelfG = new THREE.CylinderGeometry(1, 0.6, 0.18, 9, 1, false, 0, Math.PI); 
   const shelves = new Kit(scene, shelfG, glowMat, 1200, false);
   const mossCaps = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), glowMat, 500, false);
@@ -455,8 +459,9 @@ export function buildProperty(scene) {
         for (let b = 0; b < 12; b++) { const u = rng() * Math.PI * 2, v = Math.sqrt(rng()); beads.put(ex + Math.cos(u) * cr * v * 0.95, ey + 2 - cr * 0.5 * Math.sqrt(1 - v * v) * 0.95 - 0.1, ez + Math.sin(u) * cr * v * 0.95, 0.13, 0.13, 0.13, 0, 0, 0, glowCol()); }
         for (let b = 0; b < 3; b++) {
           const u = rng() * Math.PI * 2, v = rng() * cr * 0.8, hx = ex + Math.cos(u) * v, hz = ez + Math.sin(u) * v, hl = 4 + rng() * 9, hy = ey + 1 - cr * 0.3;
-          seams.put(hx, hy - hl / 2, hz, 0.05, hl, 0.05, 0, 0, 0, new THREE.Color('#1f4a3a'));
-          beads.put(hx, hy - hl, hz, 0.22, 0.3, 0.22, 0, 0, 0, glowCol());
+          const sw = swing(hy, hl);
+          threads.put(sw, hx, hy - hl / 2, hz, 0.05, hl, 0.05, 0, 0, 0, new THREE.Color('#1f4a3a'));
+          drops.put(sw, hx, hy - hl, hz, 0.22, 0.3, 0.22, 0, 0, 0, glowCol());
         }
       }
     }
@@ -487,7 +492,7 @@ export function buildProperty(scene) {
         caps.put(sx, g + s * 0.58, sz, s * 0.36, s * 0.26, s * 0.36, 0, 0, 0, c);
       }
     }
-    for (const k of [gTrunks, gLimbs, gLeaves, seams, beads, shelves, mossCaps, floorGlow, stems, caps]) k.done();
+    for (const k of [gTrunks, gLimbs, gLeaves, seams, beads, threadKit, dropKit, shelves, mossCaps, floorGlow, stems, caps]) k.done();
   }
   /* ---------------- the colossi ----------------
      Two trees out of the old world, eight times the height of the deepwood's giants: trunks you
@@ -501,8 +506,10 @@ export function buildProperty(scene) {
   const colossi = [];
   {
     const barkMat = paint(toon(0xffffff, { vertexColors: true }), 'bark', 1.8);
-    const cLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1100, false);
-    const cVines = new Kit(scene, new THREE.CylinderGeometry(1, 0.6, 1, 5, 1, true), toon(0xffffff), 9000, false);
+    const cLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1100, false); noSolid(cLeaves.mesh);
+    const cVines = new Kit(scene, new THREE.CylinderGeometry(1, 0.6, 1, 5, 1, true), toon(0xffffff), 9000, false), vines = hanging(cVines);   // (not solid: Brindle catches them by the latch points below)
+    const vineAs = h => ({ put: (...a) => vines.put(h, ...a) });   // a vine's lengths all swing as one, from its top
+    const cTips = new Kit(scene, new THREE.OctahedronGeometry(1, 0), colGlowMat, 3000, false), tips = hanging(cTips);   // the lights on the vines, swinging with them
     const cSeams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), colGlowMat, 1800, false);
     const cBeads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), colGlowMat, 15000, false);
     const cShelves = new Kit(scene, shelfG, colGlowMat, 420, false);
@@ -545,14 +552,14 @@ export function buildProperty(scene) {
     const VINE_C = ['#2a4a30', '#2e5236', '#34583a', '#263f2a'], vineCol = () => new THREE.Color(VINE_C[Math.floor(R0() * VINE_C.length)]).offsetHSL(0, 0, (R0() - 0.5) * 0.05);
     let R0 = Math.random;
     function strand(x, top, z, len, th, c) {
-      const segs = len > 30 ? 4 : len > 10 ? 3 : 2, sl = len / segs, ph = R0() * 6, sw = Math.min(2.2, len * 0.04);
+      const segs = len > 30 ? 4 : len > 10 ? 3 : 2, sl = len / segs, ph = R0() * 6, sw = Math.min(2.2, len * 0.04), h = swing(top, len), VK = vineAs(h);
       let px = x, pz = z, py = top;
       for (let q = 0; q < segs; q++) {
         const nx = x + Math.sin(ph + q * 1.7) * sw * (q + 1) / segs, nz = z + Math.cos(ph * 1.3 + q * 1.9) * sw * (q + 1) / segs, ny = py - sl;
-        limb(cVines, px, py, pz, nx, ny - 0.15, nz, th * (1 - q * 0.12), c);
+        limb(VK, px, py, pz, nx, ny - 0.15, nz, th * (1 - q * 0.12), c);
         px = nx; pz = nz; py = ny;
       }
-      return [px, py, pz];
+      return [px, py, pz, h];
     }
     const airC = new THREE.Color('#9ab8cc');   // a little of the sky's own blue in them: they are a long way off, and very tall
     const barkA = new THREE.Color('#4e3e30'), barkB = new THREE.Color('#6e5a46'), barkD = new THREE.Color('#2e241c'), mossC = new THREE.Color('#4e7a36'), mossB = new THREE.Color('#6a8e40'), lichen = new THREE.Color('#8a9478');
@@ -696,8 +703,8 @@ export function buildProperty(scene) {
           const u = R() * Math.PI * 2, v = Math.sqrt(R()) * r * 0.85, hx = x + Math.cos(u) * v, hz = z + Math.sin(u) * v, top = y - r * (0.2 + R() * 0.25);
           const room = top - heightAt(hx, hz) - 3, len = Math.min(room, 3 + Math.pow(R(), 1.8) * 110);
           if (len < 2) continue;
-          const [ex, ey, ez] = strand(hx, top, hz, len, 0.12 + R() * 0.38, vineCol());
-          if (R() < 0.3) cBeads.put(ex, ey - 0.3, ez, 0.35 + R() * 0.4, 0.5 + R() * 0.5, 0.35 + R() * 0.4, 0, R() * 6, 0, glowC());
+          const [ex, ey, ez, sw] = strand(hx, top, hz, len, 0.12 + R() * 0.38, vineCol());
+          if (R() < 0.3) tips.put(sw, ex, ey - 0.3, ez, 0.35 + R() * 0.4, 0.5 + R() * 0.5, 0.35 + R() * 0.4, 0, R() * 6, 0, glowC());
         }
       }
       let ropes = 0;
@@ -708,10 +715,10 @@ export function buildProperty(scene) {
           if (gd < WATER_LEVEL + 0.5) continue;
           const above = ly - gd, end = gd + Math.min(above - 8, 4 + Math.pow(R(), 1.4) * Math.max(10, above * 0.8)), len = ly - end;
           if (len < 6) continue;
-          const [ex, ey, ez] = strand(hx, ly - 1, hz, len, 0.4 + R() * 0.25, vineCol());
+          const [ex, ey, ez, sw] = strand(hx, ly - 1, hz, len, 0.4 + R() * 0.25, vineCol());
           if (R() < 0.7) strand(hx + (R() - 0.5) * 1.4, ly - 1, hz + (R() - 0.5) * 1.4, len * (0.4 + R() * 0.5), 0.18 + R() * 0.15, vineCol());
-          cBeads.put(ex, ey - 0.6, ez, 0.8 + R() * 0.6, 1.2 + R() * 0.8, 0.8 + R() * 0.6, 0, R() * 6, 0, glowC());
-          for (let q = Math.floor(R() * 5); q > 0; q--) { const f = R(); cBeads.put(lerp(ex, hx, f), lerp(ey, ly, f), lerp(ez, hz, f), 0.3 + R() * 0.35, 0.3 + R() * 0.35, 0.3 + R() * 0.35, 0, 0, 0, glowC()); }
+          tips.put(sw, ex, ey - 0.6, ez, 0.8 + R() * 0.6, 1.2 + R() * 0.8, 0.8 + R() * 0.6, 0, R() * 6, 0, glowC());
+          for (let q = Math.floor(R() * 5); q > 0; q--) { const f = R(); tips.put(sw, lerp(ex, hx, f), lerp(ey, ly, f), lerp(ez, hz, f), 0.3 + R() * 0.35, 0.3 + R() * 0.35, 0.3 + R() * 0.35, 0, 0, 0, glowC()); }
           trees.push({ x: ex, z: ez, g: gd, h: (ey - gd) / 0.95, r: 0 });   // Brindle swings from the ropes of the old trees: catch the end…
           if (len > 30) trees.push({ x: lerp(ex, hx, 0.5), z: lerp(ez, hz, 0.5), g: gd, h: (lerp(ey, ly, 0.5) - gd) / 0.95, r: 0 });   // …or higher up it
           ropes++;
@@ -720,7 +727,7 @@ export function buildProperty(scene) {
         for (let k = 6; k + 5 < Lb.pts.length; k += 6 + Math.floor(R() * 4)) {
           const a = Lb.pts[k], b = Lb.pts[k + 4 + Math.floor(R() * 2)], sag = 6 + R() * 16, th = 0.2 + R() * 0.2, c = vineCol(), N = 7;
           let prev = a;
-          for (let q = 1; q <= N; q++) { const f = q / N, p = [lerp(a[0], b[0], f), lerp(a[1], b[1], f) - Math.sin(f * Math.PI) * sag - 1, lerp(a[2], b[2], f)]; limb(cVines, prev[0], prev[1], prev[2], p[0], p[1], p[2], th, c); prev = p; }
+          for (let q = 1; q <= N; q++) { const f = q / N, p = [lerp(a[0], b[0], f), lerp(a[1], b[1], f) - Math.sin(f * Math.PI) * sag - 1, lerp(a[2], b[2], f)]; limb(vineAs(null), prev[0], prev[1], prev[2], p[0], p[1], p[2], th, c); prev = p; }
           const mx = lerp(a[0], b[0], 0.5), mz = lerp(a[2], b[2], 0.5), my = lerp(a[1], b[1], 0.5) - sag - 1;
           trees.push({ x: mx, z: mz, g: heightAt(mx, mz), h: (my - heightAt(mx, mz)) / 0.95, r: 0 });
         }
@@ -779,7 +786,7 @@ export function buildProperty(scene) {
       colMists.push(...mists.map(o => Object.assign(o, { cx, cz })));
       colossi.push({ id: C.id, name: C.name, x: cx, z: cz, g: g0, H, R: TR, ropes, mesh, roots: rootTops.map(t => t.map(p => [p[0], p[1], p[2]])) });   // roots: crest lines [x, z, topY], tip last
     }
-    for (const k of [cLeaves, cVines, cSeams, cBeads, cShelves, cCaps, cStems, cPads]) k.done();
+    for (const k of [cLeaves, cVines, cTips, cSeams, cBeads, cShelves, cCaps, cStems, cPads]) k.done();
   }
   // the path's own walls of trees, close and tall — out past the deepwood only: under the giants' roof there are
   // only giants (no little everyday pines and oaks among them)
@@ -1426,8 +1433,8 @@ export function buildProperty(scene) {
   /* no lamp posts on the land: the paths are lit by glow-trees — old broadleaves along them, hung with strands of the
      wood's own light at every length, that wake at dusk. Each leans a bough out over the path, and a Punk's vines catch
      in those boughs: tree to tree is the quick way along. (nx, nz) points from the path to the tree. */
-  const glowPods = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), colGlowMat, 3000, false);
-  const glowStrands = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 4), toon(0xffffff), 3000, false); noSolid(glowStrands.mesh);   // hanging strands: you brush through them
+  const glowPods = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), colGlowMat, 3000, false), pods = hanging(glowPods);
+  const glowStrands = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 4), toon(0xffffff), 3000, false), strands = hanging(glowStrands);   // hanging strands and their pods: they sway, and you brush through them
   const glowTree = (x, z, nx, nz) => {
     const g = heightAt(x, z), h = 10 + rng() * 3.5, bark = new THREE.Color('#4a3a2c').offsetHSL(0, 0, (rng() - 0.5) * 0.05).getStyle();
     const tx = x - nx * 1.2, tz = z - nz * 1.2, ty = g + h * 0.72;                                 // the trunk, leaning a little toward the path
@@ -1443,10 +1450,11 @@ export function buildProperty(scene) {
       const [cx, cy, cz, r] = clumps[k % clumps.length], u = rng() * Math.PI * 2, v = Math.sqrt(rng()) * r * 0.85;
       const sx = cx + Math.cos(u) * v, sz = cz + Math.sin(u) * v, top = cy - r * 0.45, len = 0.6 + Math.pow(rng(), 1.6) * Math.min(7.5, top - heightAt(sx, sz) - 1.8);
       if (len < 0.4) continue;
-      glowStrands.put(sx, top - len / 2, sz, 0.025, len, 0.025, (rng() - 0.5) * 0.08, 0, (rng() - 0.5) * 0.08, '#22402e');
+      const sw = swing(top, len);
+      strands.put(sw, sx, top - len / 2, sz, 0.025, len, 0.025, (rng() - 0.5) * 0.08, 0, (rng() - 0.5) * 0.08, '#22402e');
       const ps = 0.14 + rng() * 0.16;
-      glowPods.put(sx, top - len - ps * 0.6, sz, ps, ps * 1.5, ps, 0, rng() * 6, 0, new THREE.Color('#bfeee6').multiplyScalar(0.7 + rng() * 0.3));
-      if (rng() < 0.5) glowPods.put(sx, top - len * (0.3 + rng() * 0.4), sz, ps * 0.45, ps * 0.6, ps * 0.45, 0, 0, 0, '#9fdcd0');
+      pods.put(sw, sx, top - len - ps * 0.6, sz, ps, ps * 1.5, ps, 0, rng() * 6, 0, new THREE.Color('#bfeee6').multiplyScalar(0.7 + rng() * 0.3));
+      if (rng() < 0.5) pods.put(sw, sx, top - len * (0.3 + rng() * 0.4), sz, ps * 0.45, ps * 0.6, ps * 0.45, 0, 0, 0, '#9fdcd0');
     }
     // the light it throws on the path
     const s1 = glowSprite(0x9fe8d8, 11, 0); s1.position.set((tx + bx) / 2, g + h * 0.5, (tz + bz) / 2); scene.add(s1); lampGlows.push(s1);
