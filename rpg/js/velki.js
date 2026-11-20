@@ -41,6 +41,7 @@ export function createVelki(ctx) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xd08a78, 280, 2600);
   const SUN = V3(-0.9, 0.12, -0.42).normalize();
+  let sunK = 0; const SUN_DAY = new THREE.Color(0xff9a5a), SUN_LOW = new THREE.Color(0xff5a32);
 
   /* ---------------- sky: the sun going down, the sky on fire ---------------- */
   const skyMat = new THREE.ShaderMaterial({
@@ -845,6 +846,10 @@ export function createVelki(ctx) {
     }
     if (!cine.update(dt)) updateCamera(dt);
     // the sun follows the boy around for its shadows
+    // the sun going down: from the moment he says everyone's on the roofs, it sinks to the sea and reddens
+    sunK = damp(sunK, stage === 'home' || stage === 'drill' || stage === 'drilled' || stage === 'leaving' || stage === 'chase' || stage === 'given' ? 0 : 1, 0.12, dt);
+    SUN.set(-0.9, lerp(0.12, 0.022, sunK), -0.42).normalize();
+    sun.color.copy(SUN_DAY).lerp(SUN_LOW, sunK); sun.intensity = lerp(2.4, 1.55, sunK);
     sun.position.copy(P.pos).addScaledVector(SUN, 140); sun.target.position.copy(P.pos);
   }
   let G_warned = false;

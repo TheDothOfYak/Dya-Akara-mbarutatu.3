@@ -540,7 +540,8 @@ export function createRoad(ctx) {
   /* wreckage of the war in the air: boulders and whole trees torn loose up there come down on the city, each under its
      own growing shadow; where they land they stay, and the streets fill with it. In the frozen moment every piece of
      it hangs where it is. */
-  const DEB = { on: false, next: 0, air: [], down: [] };
+  const DEB = { on: false, next: 0, air: [], down: [], fires: [] };
+  const scorchM = new THREE.MeshBasicMaterial({ color: 0x140c08, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
   const debRock = new THREE.DodecahedronGeometry(1, 0), debTrunk = new THREE.CylinderGeometry(0.35, 0.5, 1, 7), debRing = new THREE.RingGeometry(0.6, 1, 18);
   function debPiece(x, z, y) {
     const tree = rng() < 0.3, s0 = tree ? 0.8 + rng() * 0.6 : 0.5 + rng() * 1.1, g = new THREE.Group();
@@ -553,6 +554,9 @@ export function createRoad(ctx) {
   function debLand(d, quiet) {
     d.g.position.y = d.gy + (d.tree ? 0.4 * d.s : 0.45 * d.s); if (d.tree) d.g.rotation.set(Math.PI / 2 - 0.08, d.g.rotation.y, 0);
     DEB.down.push(d); if (DEB.down.length > 70) scene.remove(DEB.down.shift().g);
+    // where it came down hard the ground is blackened and cracked, and now and then it has set something burning
+    const sc = new THREE.Mesh(new THREE.CircleGeometry(d.s * (1.6 + rng()), 12), scorchM); sc.rotation.x = -Math.PI / 2; sc.position.set(d.x, d.gy + 0.04, d.z); scene.add(sc); d.scorch = sc;
+    if (DEB.fires.length < 16 && rng() < 0.4) { const fl = glowSprite(0xff7a2a, 2.2 + d.s * 1.4, 0.85); fl.position.set(d.x, d.gy + 0.9 * d.s, d.z); scene.add(fl); DEB.fires.push({ fl, x: d.x, y: d.gy + 0.6 * d.s, z: d.z, s: d.s, ph: rng() * 6 }); }
     if (quiet) return;
     const near = Math.hypot(d.x - P.pos.x, d.z - P.pos.z);
     particles.burst(d.x, d.gy + 0.4, d.z, 26, { color: 0xc8b89a, speed: 7, size: 0.7, life: 0.8, gravity: 6 });
@@ -563,9 +567,16 @@ export function createRoad(ctx) {
     for (let k = 0; k < scatter; k++) { const a = rng() * TAU, r = 14 + rng() * 120, q = freeSpot(P.pos.x + Math.cos(a) * r, P.pos.z + Math.sin(a) * r, 1.5); debLand(debPiece(q.x, q.z, 0), true); }   // what has come down already
     for (let k = 0; k < hang; k++) { const a = rng() * TAU, r = 7 + rng() * 34; DEB.air.push(debPiece(P.pos.x + Math.cos(a) * r, P.pos.z + Math.sin(a) * r, 6 + rng() * 40)); }   // and what is on its way
   }
-  function stopDebris() { DEB.on = false; for (const d of DEB.air) scene.remove(d.g); DEB.air.length = 0; }
+  function stopDebris() { DEB.on = false; for (const d of DEB.air) scene.remove(d.g); DEB.air.length = 0; for (const f of DEB.fires) scene.remove(f.fl); DEB.fires.length = 0; }
   function tickDebris(dt) {
-    if (!DEB.on || (MK && MK.frozen)) return;   // frozen: every piece of it hangs in the air
+    if (!DEB.on) return;
+    for (const f of DEB.fires) {   // the fires: flame licking up, and a column of smoke leaning off on the wind
+      f.ph += dt; f.fl.material.opacity = 0.65 + Math.sin(f.ph * 9) * 0.12 + Math.sin(f.ph * 23) * 0.08;
+      if (MK && MK.frozen) continue;
+      if (Math.random() < 0.6) particles.emit(f.x + (Math.random() - 0.5) * f.s, f.y, f.z + (Math.random() - 0.5) * f.s, { vx: 0, vy: 2.2, vz: 0, color: Math.random() < 0.5 ? 0xff8a2a : 0xffc040, size: 0.5 * f.s + 0.2, life: 0.5 });
+      if (Math.random() < 0.35) particles.emit(f.x, f.y + 1.2, f.z, { vx: 0.9, vy: 2.6, vz: 0.3, color: 0x3a3430, size: 1.4 + f.s, life: 2.4 });
+    }
+    if (MK && MK.frozen) return;   // frozen: every piece of it hangs in the air
     DEB.next -= dt;
     if (DEB.next <= 0 && DEB.air.length < 14) {
       DEB.next = 0.5 + rng() * 1.1;
