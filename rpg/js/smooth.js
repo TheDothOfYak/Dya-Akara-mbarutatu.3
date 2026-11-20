@@ -289,6 +289,11 @@ const FRAG_ALBEDO = `#include <color_fragment>
       flDet *= 0.88 + 0.24 * flF(vFlW.xz * 0.035);                          // broad sunlit and dull patches
     }
     #endif
+    #if FL_PAINT == 2
+      flDet = mix(vec3(1.0), flDet, 0.45);   // limewash: the plaster's stains and patches only faintly through it
+    #elif FL_PAINT == 11
+      flDet = mix(flDet, mix(vec3(1.0), flDet, 0.45), wPlas);
+    #endif
     diffuseColor.rgb *= mix(vec3(1.0), clamp(flDet, 0.0, 2.2), 0.92);
     flBump = flRel * 0.9;
   }
