@@ -619,19 +619,19 @@ export function buildHomeTree(scene, x, z, g, opts = {}) {
       };
       const tub = (a, r, y) => {
         inPot.put(Math.cos(a) * r, y, Math.sin(a) * r, 0.5, 0.55, 0.5, 0, 0, 0, pickC([0xb5653a, 0x9a5a3a, 0x7a8a9a]));
-        leaf(Math.cos(a) * r, y + 0.95, Math.sin(a) * r, 0.75 + rnd() * 0.3, pickC(GREEN));
+        leaf(Math.cos(a) * r, y + 0.9, Math.sin(a) * r, 0.45 + rnd() * 0.2, pickC(GREEN));
         for (let k = 0; k < 4; k++) { const b = rnd() * TAU, d = 0.25 + rnd() * 0.4; inLamp.put(Math.cos(a) * r + Math.cos(b) * d, y + 1.1 + rnd() * 0.4, Math.sin(a) * r + Math.sin(b) * d, 0.1, 0.1, 0.1, 0, 0, 0, pickC(BLOOM)); }
       };
       const vine = (a, r, y0, y1) => {
         let prev = P(a, r, y0);
-        for (let y = y0 + 0.9; y <= y1; y += 0.9) { const q = P(a + Math.sin(y * 1.7 + a * 5) * 0.035, r, y); inRope.seg(prev, q, 0.035, 0.035, 0x3a6a30); leaf(q.x - Math.cos(a) * 0.15, q.y, q.z - Math.sin(a) * 0.15, 0.4 + rnd() * 0.25, pickC(GREEN)); prev = q; }
+        for (let y = y0 + 0.9; y <= y1; y += 0.9) { const q = P(a + Math.sin(y * 1.7 + a * 5) * 0.035, r, y); inRope.seg(prev, q, 0.035, 0.035, 0x3a6a30); leaf(q.x - Math.cos(a) * 0.15, q.y, q.z - Math.sin(a) * 0.15, 0.26 + rnd() * 0.16, pickC(GREEN)); prev = q; }
       };
       for (const L of levels) {
         const y = L.y, rr = L.rWell + 0.22, n = Math.max(8, Math.round(rr * TAU / 2.1));
         for (let k = 0; k < n; k++) {   // ivy over the rail, trailing down into the well, in flower here and there
           const a = (k + rnd() * 0.5) / n * TAU;
-          leaf(Math.cos(a) * rr, y + 0.95, Math.sin(a) * rr, 0.42 + rnd() * 0.22, pickC(GREEN));
-          if (k % 2) leaf(Math.cos(a) * (rr - 0.25), y + 0.35 - rnd() * 0.5, Math.sin(a) * (rr - 0.25), 0.36 + rnd() * 0.2, pickC(GREEN));
+          leaf(Math.cos(a) * rr, y + 1.05, Math.sin(a) * rr, 0.24 + rnd() * 0.14, pickC(GREEN));
+          if (k % 2) leaf(Math.cos(a) * (rr - 0.25), y - 0.2 - rnd() * 0.6, Math.sin(a) * (rr - 0.25), 0.22 + rnd() * 0.12, pickC(GREEN));   // trailing down into the well
           if (k % 3 === 0) inLamp.put(Math.cos(a) * (rr + 0.1), y + 1.05, Math.sin(a) * (rr + 0.1), 0.09, 0.09, 0.09, 0, 0, 0, pickC(BLOOM));
         }
         const hi = Math.min(5.5, L.next - y - 1.2);
