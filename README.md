@@ -297,6 +297,8 @@ Fighting: locked on, he keeps facing the target and steps round it (sprint to br
 
 **Real surfaces and your own models.** Walls, ground, roofs, cobbles and bark carry photographed materials (Poly Haven, CC0) laid on in world space; the ink lines and the oil-paint filter are off. Any character or creature can be played by a `.glb` of your own, and any model stood in the world as scenery: put the file in `rpg/assets/models/`, add an entry to `rpg/assets/models.json`, and see `rpg/assets/README.md`.
 
+**Smoke test.** `node tools/rpg-smoke.js` loads every region and the prologue scenes in a headless browser (Playwright with Chromium) and reports any script error; name scenes to run only those (`xilia`, `property`, `aakalay`, `leotik`, `velki`, `market`, `escape`).
+
 Code (`rpg/js/`): `lens.js` the depth shade and grade, `assets.js` your own models, `xilia.js` (Beuhk), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `solid.js` makes everything you can see solid (all but the sky, water, grass and what's see-through or moving) on top of each region's hand-placed colliders, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades (bump `SAVE_V` to reset every run), `bounties.js` the bounty boards, `dya3d.js` Dya'Akara in 3D, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
 
 ## Match Controls
