@@ -1,6 +1,8 @@
 # FLAKE GAMES
 ### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Skaar Uverkhron · Little Dungeon · Punk Races · Stryx Pilot
 
+**▶ Play now: [dyaakara-yak.web.app](https://dyaakara-yak.web.app)**
+
 Every game in this repo, behind one home page and one account. Zero dependencies, no build step — pure HTML/CSS/JavaScript.
 
 ## The home page and the one account

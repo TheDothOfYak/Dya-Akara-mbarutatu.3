@@ -62,7 +62,7 @@ const GAMES = [
 const HIDDEN = ['admin.html', 'four-brothers-world/The 4 Brothers Worlds v1.1.html', 'tools/creature-composer.html', 'tools/sprite-designer.html'];
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const url = file => SITE + (file === 'index.html' ? '' : file.split('/').map(encodeURIComponent).join('/'));
+const url = file => SITE + file.replace(/(^|\/)index\.html$/, '$1').split('/').map(encodeURIComponent).join('/');   // rpg/index.html → rpg/
 const studioLd = { '@type': 'Organization', name: STUDIO, alternateName: ALT_STUDIO, url: SITE, logo: SITE + 'img/icon-512.png' };
 
 function gameLd(g) {
