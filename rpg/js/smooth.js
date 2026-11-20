@@ -682,7 +682,7 @@ export function hanging(kit) {
   for (let i = 0; i < kit.max; i++) a[i * 3] = SPARE;
   const attr = new THREE.InstancedBufferAttribute(a, 3);
   m.geometry.setAttribute('aHang', attr);
-  m.userData.keepFacets = true; m.userData.noSolid = true;
+  m.userData.noSolid = true;
   const mat = src.clone(); mat.color = src.color;   // (the same colour object: a glow scaled with the dark stays in step)
   if (mat.isMeshToonMaterial) mat.defines = Object.assign({}, mat.defines, { FL_HANG: 1 });
   else {
@@ -722,6 +722,7 @@ function flush() {
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
         : smoothGeometry(o.geometry);
       if (g !== o.geometry) {
+        if (from.attributes.aHang) g.setAttribute('aHang', from.attributes.aHang);   // (a hanging thing keeps how it hangs: hanging())
         o.geometry = g; o.userData.smFrom = from;
         if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } if (o.isInstancedMesh && o.count <= 20000) addLeafCards(o); }
       }
