@@ -797,11 +797,36 @@ export function buildLeotik(scene) {
     const a = i / 5 * Math.PI * 2 + 0.4 + r2() * 0.6, r = 280 + r2() * 400, s = 6 + r2() * 10;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
     const grp = new THREE.Group();
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(s, s * 0.9, s * 0.35, 8), toon(0x3f6e38));
-    const bottom = new THREE.Mesh(new THREE.ConeGeometry(s * 0.92, s * 2.2, 8), toon(0x5a524a));
+    // a torn-off clod of island: a craggy root of rock under a turf lid, a few trees, roots trailing beneath
+    const jag = (geo, amt, seed) => {
+      const P = geo.attributes.position, v = new THREE.Vector3();
+      for (let k = 0; k < P.count; k++) {
+        v.fromBufferAttribute(P, k);
+        const n = fbm(v.x * 0.35 + seed, v.z * 0.35 - seed) - 0.5, rr = Math.hypot(v.x, v.z);
+        if (rr > 1e-3) { const f = 1 + n * amt; v.x *= f; v.z *= f; }
+        v.y += n * amt * s * 0.6;
+        P.setXYZ(k, v.x, v.y, v.z);
+      }
+      geo.computeVertexNormals(); return geo;
+    };
+    const top = new THREE.Mesh(jag(new THREE.CylinderGeometry(s, s * 0.92, s * 0.35, 18, 2), 0.18, i * 3.1), paint(toon(0x4a7a3a), 'land'));
+    const bottom = new THREE.Mesh(jag(new THREE.ConeGeometry(s * 0.95, s * 2.2, 16, 6), 0.45, i * 5.7), paint(toon(0x5a524a), 'rock', 1.5));
     bottom.rotation.x = Math.PI; bottom.position.y = -s * 1.25;
-    const tuft = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.45, 0), toon(0x2f6a3a)); tuft.position.set(s * 0.2, s * 0.45, -s * 0.1);
-    grp.add(top, bottom, tuft); outlineAll(grp, 0.12);
+    grp.add(top, bottom);
+    const trunkM = paint(toon(0x5a4030), 'bark', 0.2), crownM = toon(0x2f6a3a);
+    for (let k = 0; k < 3 + (r2() * 3 | 0); k++) {
+      const ta = r2() * Math.PI * 2, tr = r2() * s * 0.6, th = s * (0.5 + r2() * 0.5);
+      const tx = Math.cos(ta) * tr, tz = Math.sin(ta) * tr;
+      const tk = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.035, s * 0.06, th, 6), trunkM); tk.position.set(tx, s * 0.17 + th / 2, tz); grp.add(tk);
+      const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * (0.22 + r2() * 0.14), 1), crownM); cr.scale.y = 0.8; cr.position.set(tx, s * 0.17 + th, tz); grp.add(cr);
+    }
+    const rootM = toon(0x3a2e24);
+    for (let k = 0; k < 7; k++) {
+      const ra = r2() * Math.PI * 2, rr = s * (0.3 + r2() * 0.55), rl = s * (0.6 + r2() * 1.2);
+      const rt = new THREE.Mesh(new THREE.ConeGeometry(s * 0.03, rl, 4), rootM); rt.rotation.x = Math.PI; rt.rotation.z = (r2() - 0.5) * 0.4;
+      rt.position.set(Math.cos(ra) * rr, -s * 0.2 - rl / 2 - (1 - rr / s) * s * 0.5, Math.sin(ra) * rr); grp.add(rt);
+    }
+    outlineAll(grp, 0.12);
     grp.position.set(x, Math.max(0, heightAt(x, z), volcanoH(x, z)) + 130 + r2() * 90, z);
     grp.userData = { by: grp.position.y, ph: r2() * 6, sp: 0.15 + r2() * 0.25 };
     scene.add(grp); islets.push(grp);
