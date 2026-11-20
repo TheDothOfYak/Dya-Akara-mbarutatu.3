@@ -599,19 +599,19 @@ function leafTexture() {
   return LEAF_TEX;
 }
 const _km = new THREE.Matrix4(), _kc = new THREE.Matrix4(), _kq = new THREE.Quaternion(), _kp = new THREE.Vector3(), _ks = new THREE.Vector3(), _ke = new THREE.Euler(), _kcol = new THREE.Color();
-export function addLeafCards(o) {
+export function addLeafCards(o, cone = false) {
   if (o.userData.leafCards || !o.parent || !o.count) return;
-  const K = 30, n = o.count, rng = mulberry32(n * 31 + 7);
+  const n = o.count, K = Math.round(Math.max(6, Math.min(30, 60000 / n))), rng = mulberry32(n * 31 + 7);
   const geo = new THREE.PlaneGeometry(1, 1);
   const mat = new THREE.MeshToonMaterial({ color: o.material.color, map: leafTexture(), alphaTest: 0.5, side: THREE.DoubleSide, gradientMap: o.material.gradientMap }); mat.defines = { FL_CARD: 1 };
   const cards = new THREE.InstancedMesh(geo, mat, n * K);
   for (let i = 0; i < n; i++) {
     o.getMatrixAt(i, _km); if (o.instanceColor) o.getColorAt(i, _kcol); else _kcol.setRGB(1, 1, 1);
     for (let k = 0; k < K; k++) {
-      const u = rng() * 2 - 1, th = rng() * Math.PI * 2, y = u * 0.85 + 0.12, rr = Math.sqrt(Math.max(0, 1 - y * y));
-      _kp.set(Math.cos(th) * rr, y, Math.sin(th) * rr).multiplyScalar(0.78 + rng() * 0.3);
+      const u = rng() * 2 - 1, th = rng() * Math.PI * 2, y = cone ? -0.48 + Math.pow(rng(), 1.4) * 0.9 : u * 0.85 + 0.12, rr = cone ? (0.5 - y) * (0.92 + rng() * 0.12) : Math.sqrt(Math.max(0, 1 - y * y));
+      _kp.set(Math.cos(th) * rr, y, Math.sin(th) * rr).multiplyScalar(cone ? 1 : 0.78 + rng() * 0.3);   // round a crown, or down the sides of a pine's cone
       _ke.set((rng() - 0.5) * 2.6, th + (rng() - 0.5) * 1.4, (rng() - 0.5) * 2.6); _kq.setFromEuler(_ke);
-      const sc = 0.55 + rng() * 0.35; _ks.set(sc, sc, sc);
+      const sc = cone ? 0.28 + rng() * 0.2 : 0.55 + rng() * 0.35; _ks.set(sc, sc * (cone ? 0.6 : 1), sc);
       _kc.compose(_kp, _kq, _ks).premultiply(_km);
       cards.setMatrixAt(i * K + k, _kc);
       cards.setColorAt(i * K + k, _kcol.clone().multiplyScalar(0.82 + rng() * 0.35 + (y > 0.4 ? 0.12 : 0)));
@@ -637,6 +637,7 @@ function flush() {
         if (g !== from) { o.geometry = g; o.userData.smFrom = from; const m = o.material; if (!(m.defines && m.defines.FL_PAINT)) { m.defines = Object.assign({}, m.defines, { FL_PAINT: 10 }); m.needsUpdate = true; } }
         return;
       }
+      if (o.isInstancedMesh && o.geometry.type === 'ConeGeometry' && o.count <= 12000 && leafy(o) && o.geometry.parameters && o.geometry.parameters.height === 1) addLeafCards(o, true);   // pines: sprays of needles down the cone
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
         : smoothGeometry(o.geometry);
