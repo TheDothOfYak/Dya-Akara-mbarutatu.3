@@ -115,6 +115,7 @@ export function createRoad(ctx) {
   // Velki hangs in Xikia's sky — the boy's whole world, up there
   const velki = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 20), new THREE.MeshBasicMaterial({ color: 0x8fc4e8, fog: false }));
   scene.add(velki);
+  const VOFF_LOW = V3(1700, 900, 2300), VOFF_UP = V3(700, 2700, 400), VOFF = VOFF_LOW.clone();
   const velkiGlow = glowSprite(0x9fd6ff, 1500, 0.35); velkiGlow.material.fog = false; scene.add(velkiGlow);
   const kalo = [[700, 1100, -2300, 70, 0xe8e0d0], [-1500, 900, -2100, 50, 0xd8c8b8]].map(([x, y, z, r, c]) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), new THREE.MeshBasicMaterial({ color: c, fog: false })); m.userData.off = V3(x, y, z); scene.add(m); return m; });
 
@@ -677,6 +678,7 @@ export function createRoad(ctx) {
     tanoc.hat.visible = false; tanoc.weapon.visible = false;
     placeCart(CART0.x, CART0.z, Math.PI);
     MK = { n: 0, punk: null, calmed: false, hat: null, angel: null, sniller: null, leaving: 0, amulets: [], t: 0, loaded: 0, carrying: null, crates: [], lying: true };
+    VOFF.copy(VOFF_UP);   // it's there from the first frame he's in Xikia
     makeCrowd();
     ctx.blur(5);
     // a whole Tatu away: up past Velki in the sky, and down into a market at midday
@@ -699,7 +701,7 @@ export function createRoad(ctx) {
         tanoc.hat.visible = true; ctx.blur(0); sfx.heal();
         sayHeld(W.slice(5).concat(PRO.focus.slice(0, 2), R.wakeExtra, PRO.focus.slice(2)), (k, tt) => {
           // from down beside him where he lies, up past the Carpenter into the sky: Velki, hanging right over them
-          const a = Math.sin(tt * 0.15) * 0.25, vx = 0.5, vy = 0.84, vz = 0.2;
+          const a = Math.sin(tt * 0.15) * 0.25, vn = VOFF_UP.clone().normalize(), vx = vn.x, vy = vn.y, vz = vn.z;
           return { p: V3(tp.x - vx * 2.4 + Math.sin(a) * 1.2, 0.45, tp.z - vz * 2.4 - 1.6 + Math.cos(a) * 0.4), l: V3(tp.x + vx * 12, 1 + vy * 12, tp.z + vz * 12) };
         }, startPacking);
       });
@@ -1931,7 +1933,9 @@ export function createRoad(ctx) {
     if (!cine.update(dt)) updateCamera(dt);
     // the sky follows: Velki low in the south-east, the sun and its shadows on the boy
     sky.position.copy(camera.position);
-    velki.position.set(camera.position.x + 1700, camera.position.y + 900, camera.position.z + 2300); velkiGlow.position.copy(velki.position);
+    // Velki: low in the north-east most of the time; but in the market, the hour he falls, it hangs right overhead
+    VOFF.lerp(MK && MK.lying ? VOFF_UP : VOFF_LOW, 1 - Math.exp(-0.6 * dt));
+    velki.position.set(camera.position.x + VOFF.x, camera.position.y + VOFF.y, camera.position.z + VOFF.z); velkiGlow.position.copy(velki.position);
     for (const k of kalo) k.position.copy(camera.position).add(k.userData.off);
     sun.position.copy(P.pos).addScaledVector(SUN_DIR, 140); sun.target.position.copy(P.pos);
     ctx.hp(P.hp / 100);
