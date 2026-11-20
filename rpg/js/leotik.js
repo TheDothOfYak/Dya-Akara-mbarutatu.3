@@ -625,20 +625,46 @@ export function buildLeotik(scene) {
   /* ---------- acid bogs ---------- */
   const bogMat = new THREE.ShaderMaterial({
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 } }]),
-    vertexShader: `varying vec2 vP;
+    vertexShader: `varying vec2 vP; varying vec2 vU;
       #include <fog_pars_vertex>
-      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vP = wp.xz; vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
+      void main(){ vU = uv; vec4 wp = modelMatrix * vec4(position, 1.0); vP = wp.xz; vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
       #include <fog_vertex>
       }`,
-    fragmentShader: `varying vec2 vP; uniform float uTime;
+    // a murky, scummed-over acid pool: deep in the middle, a pale crust of foam at the rim, bubbles rising and breaking
+    fragmentShader: `varying vec2 vP; varying vec2 vU; uniform float uTime;
       #include <fog_pars_fragment>
+      float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ return vn(p) * 0.6 + vn(p * 2.3 + 7.1) * 0.3 + vn(p * 5.1 - 3.3) * 0.1; }
       void main(){
-        float w = sin(vP.x * 0.6 + uTime * 1.3) * sin(vP.y * 0.5 - uTime) * 0.5 + 0.5;
-        vec3 c = mix(vec3(0.35, 0.62, 0.12), vec3(0.75, 1.0, 0.35), w * w);
-        gl_FragColor = vec4(pow(c, vec3(2.2)) * 1.6, 1.0);
+        float d = length(vU - 0.5) * 2.0;
+        float deep = 1.0 - d * d;
+        vec2 q = vP * 0.35 + vec2(uTime * 0.05, -uTime * 0.03);
+        float n = fbm(q), m = fbm(q * 2.7 - uTime * 0.04);
+        vec3 c = mix(vec3(0.46, 0.56, 0.14), vec3(0.10, 0.20, 0.05), smoothstep(0.1, 0.9, deep));
+        // drifting scum
+        c = mix(c, vec3(0.50, 0.55, 0.24), smoothstep(0.55, 0.7, n) * 0.7);
+        c *= 0.85 + m * 0.3;
+        // a faint sickly glow from beneath
+        c += vec3(0.10, 0.22, 0.02) * (0.5 + 0.5 * sin(uTime * 0.9 + n * 6.0)) * deep;
+        // bubbles: one per cell, swelling then popping
+        vec2 g = vP * 0.9; vec2 ci = floor(g); vec2 cf = fract(g);
+        float r = h21(ci);
+        vec2 o = vec2(h21(ci + 3.1), h21(ci + 7.7)) * 0.6 + 0.2;
+        float ph = fract(uTime * (0.25 + r * 0.3) + r * 9.0);
+        float br = ph * 0.18 * step(0.55, r);
+        float bd = length(cf - o);
+        float ring = smoothstep(br, br - 0.03, bd) * smoothstep(br - 0.07, br - 0.03, bd) * (1.0 - ph);
+        c = mix(c, vec3(0.78, 0.86, 0.42), ring * 0.8 * deep);
+        // crusted foam at the rim
+        float rim = smoothstep(0.8, 0.95, d + (n - 0.5) * 0.12);
+        c = mix(c, vec3(0.72, 0.74, 0.46), rim * (0.55 + 0.45 * m));
+        float a = smoothstep(1.0, 0.94, d);
+        gl_FragColor = vec4(pow(c, vec3(2.2)), a);
         #include <fog_fragment>
       }`,
-    fog: true,
+    fog: true, transparent: true,
   });
   const hazards = [];
   for (const b of BOGS) {
