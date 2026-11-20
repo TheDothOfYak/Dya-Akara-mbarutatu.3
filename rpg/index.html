@@ -66,11 +66,21 @@
   .btn-row{display:flex;gap:12px;flex-wrap:wrap}
   .controls{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-top:26px;font-size:15px;color:var(--ink-dim)}
   .controls b{font-family:var(--display);font-weight:500;color:var(--brass2);font-size:13px;letter-spacing:.05em}
+  /* a short essentials line up front; the full list folds away so the splash stays clean */
+  .essentials{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-top:26px;font-size:15px;color:var(--ink)}
+  .essentials b{font-family:var(--display);font-weight:500;color:var(--brass2);font-size:13px;letter-spacing:.05em}
+  .ctrl-wrap{margin-top:14px;border-top:1px solid var(--brass-dim);padding-top:10px}
+  .ctrl-wrap summary{font-family:var(--display);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--brass);cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:8px;opacity:.85}
+  .ctrl-wrap summary::-webkit-details-marker{display:none}
+  .ctrl-wrap summary::before{content:'▸';font-size:10px;transition:transform .15s}
+  .ctrl-wrap[open] summary::before{transform:rotate(90deg)}
+  .ctrl-wrap summary:hover{opacity:1;color:var(--brass2)}
+  .ctrl-wrap .controls{margin-top:14px}
   .t-note{margin-top:18px;font-size:13px;color:var(--ink-dim);opacity:.8}
   #loading{font-family:var(--display);letter-spacing:.3em;font-size:12px;color:var(--brass);margin-bottom:18px}
 
   /* title on a phone or tablet: the keyboard list is no use, and a phone on its side is short */
-  @media (pointer:coarse){ .controls{display:none} }
+  @media (pointer:coarse){ .controls,.essentials,.ctrl-wrap{display:none} }
   @media (pointer:coarse) and (max-height:520px){
     #title{padding:0 calc(5vw + env(safe-area-inset-right)) 0 calc(5vw + env(safe-area-inset-left))}
     .t-box{padding:14px 0}
@@ -472,6 +482,14 @@
       <button class="btn" id="btn-begin" disabled>New Run</button>
       <a class="btn ghost" href="../index.html">Back to Flake Games</a>
     </div>
+    <div class="essentials">
+      <b>WASD</b><span>Move · <b>MOUSE</b> look · <b>SPACE</b> jump · <b>SHIFT</b> sprint</span>
+      <b>LMB</b><span>Axe combo · <b>C</b> dodge roll</span>
+      <b>E</b><span>Talk · take · use</span>
+      <b>TAB</b><span>Rokarvac (journal) · <b>ESC</b> pause</span>
+    </div>
+    <details class="ctrl-wrap">
+    <summary>All controls</summary>
     <div class="controls">
       <b>WASD</b><span>Move · <b>SHIFT</b> sprint · <b>SPACE</b> jump</span>
       <b>MOUSE</b><span>Look · wheel to zoom</span>
@@ -486,6 +504,7 @@
       <b>ON A PUNK</b><span><b>LMB</b> / <b>RMB</b> throw a vine at the X, hold to swing · <b>SPACE</b> pump · <b>SHIFT</b> / <b>C</b> reel in / let out · <b>X</b> hold the length · <b>CAPS</b> shove</span>
       <b>TAB</b><span>Rokarvac (journal) · <b>ESC</b> pause</span>
     </div>
+    </details>
     <div class="t-note" id="t-note">Best with a keyboard and mouse. Click the world to take the mouse; Esc gives it back. P pauses.</div>
   </div>
 </div>

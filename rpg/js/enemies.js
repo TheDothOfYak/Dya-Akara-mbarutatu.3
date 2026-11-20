@@ -160,6 +160,12 @@ export function createEnemies(ctx) {
     e.dead = true; e.state = 'dead'; e.timer = 0;
     ctx.sfx.die();
     ctx.particles.burst(e.pos.x, e.pos.y + 1, e.pos.z, 30, { color: e.T.color, speed: 9, size: 0.5, life: 0.9, gravity: -6 });
+    /* the last foe of a skirmish falls: a half-breath of slowed time and a harder jolt, so clearing a pack lands */
+    if (e.hostile && !e.T.disp && !list.some(o => o !== e && !o.dead && o.hostile)) {
+      ctx.G.slow = Math.max(ctx.G.slow || 0, 0.32);
+      ctx.G.shake = Math.max(ctx.G.shake || 0, 0.5);
+      ctx.particles.burst(e.pos.x, e.pos.y + 1.2, e.pos.z, 16, { color: 0xfff0c8, speed: 6, size: 0.4, life: 0.5, gravity: -4 });
+    }
     // Rodak travel in threes: fell one, and the whole pack is gone
     if (e.kind === 'rodak' && e.group != null) for (const o of list) if (o !== e && !o.dead && o.kind === 'rodak' && o.group === e.group) { o.state = 'flee'; o.timer = 6; o.hostile = false; }
     ctx.onKill(e);
