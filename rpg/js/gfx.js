@@ -202,6 +202,33 @@ export function glowSprite(color, size = 1, opacity = 1) {
 /* ============================================================
    Particles — one Points cloud, CPU-simulated, additive glow.
    ============================================================ */
+/* rings spreading on still water: swimming strokes, wading feet, something dropping in */
+export class Ripples {
+  constructor(scene, n = 28) {
+    const geo = new THREE.RingGeometry(0.86, 1, 40); geo.rotateX(-Math.PI / 2);
+    this.list = [];
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0, depthWrite: false, fog: true }));
+      m.visible = false; m.renderOrder = 2; m.frustumCulled = false; scene.add(m);
+      this.list.push({ m, t: 0, life: 1, s: 1 });
+    }
+    this.k = 0;
+  }
+  spawn(x, y, z, size = 1, life = 1.4) {
+    const r = this.list[this.k++ % this.list.length];
+    r.m.position.set(x, y + 0.03, z); r.t = 0; r.life = life; r.s = size; r.m.visible = true;
+  }
+  update(dt) {
+    for (const r of this.list) {
+      if (!r.m.visible) continue;
+      r.t += dt; const u = r.t / r.life;
+      if (u >= 1) { r.m.visible = false; continue; }
+      const k = r.s * (0.25 + Math.sqrt(u) * 1.9); r.m.scale.set(k, 1, k);
+      r.m.material.opacity = 0.34 * (1 - u) * (1 - u);
+    }
+  }
+}
+
 export class Particles {
   constructor(scene, max = 2500, matte = false) {
     this.max = max; this.matte = matte;

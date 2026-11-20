@@ -14,7 +14,7 @@ import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
-import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools, paint } from './gfx.js';
+import { Particles, Ripples, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools, paint } from './gfx.js';
 import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay, trunkAt } from './vines.js';
@@ -210,6 +210,7 @@ const sky = buildSky(scene, buildEldiShip, REGION === 'leotik' ? 'storm' : 'gold
 /* day and night: the sun crosses the sky; at night the Esik glow */
 const dn = createDayNight({ scene, sky, sun, hemi, rim, renderer, bloom, region: REGION, startHour: SAVE.hour ?? 9 });
 particles = new Particles(scene, 3500);
+const ripples = new Ripples(scene);
 resize();
 addEventListener('resize', resize);
 
@@ -4753,10 +4754,17 @@ function updatePlayer(dt) {
   if (world.water && g < world.water.level - SWIM_DEPTH - 0.05 && P.pos.y <= world.water.level - SWIM_DEPTH + 0.02 && world.water.depth(P.pos.x, P.pos.z) > SWIM_DEPTH) {
     const lv = world.water.level;
     if (!wasSwim) particles.burst(P.pos.x, lv, P.pos.z, P.vel.y < -6 ? 30 : 12, { color: 0xd8f4ff, speed: P.vel.y < -6 ? 5 : 2.5, size: 0.5, life: 0.7, gravity: 6 });
+    if (!wasSwim) { ripples.spawn(P.pos.x, lv, P.pos.z, P.vel.y < -6 ? 2.6 : 1.6, 1.6); ripples.spawn(P.pos.x, lv, P.pos.z, 1, 1.1); P.ripT = 0.3; }
+    P.ripT = (P.ripT || 0) - dt;
+    if (P.ripT <= 0) { const mv = Math.hypot(P.vel.x, P.vel.z) > 1; ripples.spawn(P.pos.x + P.vel.x * 0.06, lv, P.pos.z + P.vel.z * 0.06, mv ? 1.3 : 0.9, mv ? 1.2 : 1.8); P.ripT = mv ? 0.38 : 1.1; }
     P.pos.y = lv - SWIM_DEPTH; if (P.vel.y < 0) P.vel.y = 0;
     P.onGround = true; P.swimming = true;
     if (P.roll) P.roll = null;
     if (Math.hypot(P.vel.x, P.vel.z) > 1 && Math.random() < 0.35) particles.emit(P.pos.x - P.vel.x * 0.05, lv + 0.05, P.pos.z - P.vel.z * 0.05, { vy: 0.6, color: 0xe8f8ff, size: 0.35, life: 0.6, speed: 0.8 });
+  }
+  if (!P.swimming && world.water && P.pos.y < world.water.level - 0.05 && P.pos.y > world.water.level - SWIM_DEPTH - 0.2 && world.water.depth(P.pos.x, P.pos.z) > 0.05) {   // wading: rings round the shins
+    P.ripT = (P.ripT || 0) - dt;
+    if (P.ripT <= 0) { const mv = Math.hypot(P.vel.x, P.vel.z) > 1; ripples.spawn(P.pos.x, world.water.level, P.pos.z, mv ? 0.9 : 0.6, mv ? 1.0 : 1.6); P.ripT = mv ? 0.3 : 1.2; }
   }
   if (wasSwim && !P.swimming && P.onGround) particles.burst(P.pos.x, P.pos.y + 0.2, P.pos.z, 8, { color: 0xd8f4ff, speed: 2, size: 0.35, life: 0.5, gravity: 6 });
 
@@ -5234,6 +5242,7 @@ function frame(now) {
   if ((G.hudT = (G.hudT || 0) - dt) <= 0) { G.hudT = 1; const qh = $('q-head'); if (qh && qh.dataset.base) qh.textContent = qh.dataset.base + ' · ' + dn.label(); }
   ship.update(tt, dt, particles);
   particles.update(frozen && G.mode !== 'title' ? 0 : dt);
+  ripples.update(frozen && G.mode !== 'title' ? 0 : dt);
   // the sun's shadow box follows you, snapped to its own texel grid so shadow edges don't crawl and shimmer as you move;
   // and indoors there is no sun at all (it used to throw the yard's shadows across the rooms)
   const focus = G.mode === 'title' ? V3(0, 0, 0) : snapShadow(P.pos);
