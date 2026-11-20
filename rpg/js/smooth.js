@@ -643,7 +643,7 @@ function flush() {
         : smoothGeometry(o.geometry);
       if (g !== o.geometry) {
         o.geometry = g; o.userData.smFrom = from;
-        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } if (o.isInstancedMesh && o.count <= 3000) addLeafCards(o); }
+        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } if (o.isInstancedMesh && o.count <= 20000) addLeafCards(o); }
       }
     }
   });
