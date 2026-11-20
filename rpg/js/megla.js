@@ -29,7 +29,7 @@
    renderer, camera, input, dialogue and cards.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles, paint } from './gfx.js';
+import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles, paint, waterMaterial } from './gfx.js';
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
@@ -194,14 +194,14 @@ export function createMegla(ctx) {
     const pts = [], idx = [], N = 220;
     for (let i = 0; i <= N; i++) { const z = 20 + (PASS1 - 40 - 20) * i / N, x = riverX(z), y = Math.min(heightAt(x - 4, z), heightAt(x + 4, z), heightAt(x, z) + 1.4) - 0.2; pts.push(x - 3.4, y, z, x + 3.4, y, z); if (i < N) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2); }
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); rg.setIndex(idx); rg.computeVertexNormals();
-    scene.add(new THREE.Mesh(rg, new THREE.MeshToonMaterial({ color: 0x6ab0c8, emissive: 0x1a5a70, emissiveIntensity: 0.5, transparent: true, opacity: 0.85, side: THREE.DoubleSide })));
+    scene.add(new THREE.Mesh(rg, waterMaterial({ color: 0x6ab0c8, deep: 0x2a6a80, emissive: 0x1a5a70, emissiveIntensity: 0.35, opacity: 0.88, scale: 2.4, side: THREE.DoubleSide })));
   }
 
   /* ---------------- instanced kits ---------------- */
   const kit = (geo, mat, max, shadow = false) => { const m = new THREE.InstancedMesh(geo, mat, max); m.count = 0; m.castShadow = shadow; m.receiveShadow = true; scene.add(m); return m; };
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _c = new THREE.Color();
   const put = (k, x, y, z, sx, sy, sz, rx, ry, rz, color) => { if (k.count >= k.instanceMatrix.count) return; _e.set(rx, ry, rz); _q.setFromEuler(_e); _m.compose(V3(x, y, z), _q, V3(sx, sy, sz)); k.setMatrixAt(k.count, _m); k.setColorAt(k.count, _c.set(color)); k.count++; };
-  const trunks = kit(new THREE.CylinderGeometry(0.7, 1, 1, 9, 1, true), toon(0xffffff), 1400);
+  const trunks = kit(new THREE.CylinderGeometry(0.7, 1, 1, 9, 1, true), paint(toon(0xffffff), 'bark', 0.12), 1400);
   const cones = kit(new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 2600);
   const blobs = kit(new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
   const rocks = kit(new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);

@@ -148,6 +148,12 @@ export function createEnemies(ctx) {
   }
 
   function T_isPassive(e) { return !!e.T.disp; }
+  /* a blow lands: it rocks back from it and comes forward again (a quarter-second, more for light things) */
+  function flinch(e, a) {
+    const k = e.lastHit != null ? Math.max(0, 1 - (ctx.G.t - e.lastHit) / 0.32) : 0, st = Math.min(1.2, e.T.stagger ?? 1);
+    a.root.rotation.order = 'YXZ';
+    a.root.rotation.x = -Math.sin(k * Math.PI) * 0.26 * st;
+  }
 
   function kill(e) {
     endSwing(e);
@@ -247,8 +253,8 @@ export function createEnemies(ctx) {
     if (T.ai === 'airswim') e.pos.y = W.level + T.fly + Math.sin(G.t * 0.7 + e.home.x) * 0.5;
     else if (T.shallow) e.pos.y = Math.max(ground, W.level - 2.5);
     else e.pos.y = Math.max(ground, W.level - (T.sink || 0.4) + Math.sin(G.t * 0.5 + e.home.x) * 0.25);   // in the water, not on it: the body under, a fin or a back breaking the surface
-    a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
-    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: G.t, windup: e.windup, attack: e.attackA, onGround: true });
+    a.root.position.copy(e.pos); a.root.rotation.y = e.yaw; flinch(e, a);
+    if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: G.t, windup: e.windup, attack: e.attackA, onGround: true, armed: e.state !== 'idle' && e.state !== 'wander' });
   }
 
   /* --------- per-frame --------- */
@@ -263,12 +269,18 @@ export function createEnemies(ctx) {
   function updateOne(e, dt) {
     const P = ctx.P, G = ctx.G, a = e.actor, T = e.T;
     if (e.dead) {
+      /* it goes down: knocked off its feet the way the blow sent it (folk over backwards, beasts onto their side),
+         a bounce as it hits the ground, a while lying there, and then it settles into the earth and is gone */
       e.timer += dt;
-      if (e.s0 == null) e.s0 = a.root.scale.x;
-      const s0 = e.baseScale || e.s0;
-      a.root.scale.setScalar(Math.max(0.001, s0 * (1 - e.timer / (T.miniboss ? 2 : 0.6))));
-      a.root.rotation.z += dt * (T.miniboss ? 0.5 : 6);
-      if (e.timer > (T.miniboss ? 2 : 0.6)) { ctx.scene.remove(a.root); e.gone = true; }
+      if (e.fall == null) { e.fall = a.arms && a.legs ? 'back' : (Math.random() < 0.5 ? -1 : 1); a.root.rotation.order = 'YXZ'; e.y0 = a.root.position.y; }
+      const big = T.miniboss || T.elite, Tf = big ? 0.9 : 0.42, k = Math.min(1, e.timer / Tf);
+      const ang = (Math.PI / 2) * 0.94 * (k * k) + (k >= 1 ? Math.sin(Math.min(1, (e.timer - Tf) / 0.3) * Math.PI) * 0.07 * Math.exp(-(e.timer - Tf) * 6) : 0);
+      if (e.fall === 'back') a.root.rotation.x = -ang; else a.root.rotation.z = e.fall * ang;
+      if (e.timer < Tf) { e.pos.addScaledVector(e.vel, dt); e.vel.multiplyScalar(Math.exp(-5 * dt)); }   // carried on a little by the blow
+      if (k >= 1 && !e.thud) { e.thud = true; ctx.particles.burst(e.pos.x, e.pos.y + 0.2, e.pos.z, 14, { color: 0xc8b89a, speed: 3, size: 0.55, life: 0.6, gravity: 4 }); }
+      const lie = big ? 3.5 : 2.2, sink = Math.max(0, e.timer - lie);
+      a.root.position.set(e.pos.x, e.y0 - sink * (0.6 + T.rad * 0.5), e.pos.z);
+      if (sink > 1.4) { ctx.scene.remove(a.root); e.gone = true; }
       return;
     }
     const dx = P.pos.x - e.pos.x, dz = P.pos.z - e.pos.z, d = Math.hypot(dx, dz);
@@ -299,7 +311,7 @@ export function createEnemies(ctx) {
     /* dummies stand still on their posts */
     if (T.ai === 'static') {
       e.pos.set(e.home.x, ctx.world.heightAt(e.home.x, e.home.z) + (T.perch || 0), e.home.z); e.vel.set(0, 0, 0);
-      a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
+      a.root.position.copy(e.pos); a.root.rotation.y = e.yaw; flinch(e, a);
       a.animate(dt, { t: ctx.G.t });
       return;
     }
@@ -446,7 +458,7 @@ export function createEnemies(ctx) {
     // moving along the circle: the tangent
     const tx = -Math.sin(S.a) * S.dir, tz = Math.cos(S.a) * S.dir;
     e.vel.set(tx * S.v, 0, tz * S.v); e.yaw = Math.atan2(tx, tz);
-    a.root.position.copy(e.pos); a.root.rotation.y = e.yaw;
+    a.root.position.copy(e.pos); a.root.rotation.y = e.yaw; flinch(e, a);
     a.root.rotation.z = -S.dir * 0.4 * Math.sin(k * Math.PI);                    // leaning in toward the trunk
     // the swing is one of its own leg-vines, shot out and wrapped round the trunk (or post, or rock)
     if (a.root.visible) { a.root.updateMatrixWorld(true); a.animate(dt, { speed: 0, t: ctx.G.t, grab: { p: a.root.worldToLocal(S.anchor.clone()), k: Math.min(1, S.done * 5) }, air: Math.sin(k * Math.PI) }); }
@@ -497,7 +509,7 @@ export function createEnemies(ctx) {
     }
     if (e.pos.y < -60) { e.hp = 0; kill(e); }
     a.root.position.copy(e.pos);
-    a.root.rotation.y = e.yaw;
+    a.root.rotation.y = e.yaw; flinch(e, a);
     let grab = null; if (e.haul && a.root.visible) { a.root.updateMatrixWorld(true); grab = { p: a.root.worldToLocal(e.haul.A.clone()), k: Math.min(1, e.haul.t / 0.25) }; }
     if (a.root.visible) a.animate(dt, { grab, speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, windup: e.windup, attack: e.attackA, diving: e.state === 'dive', airborne: T.ai === 'flyer' && e.alt > 0.6, tail: e.tailT || 0, tailUp: e.windup && e.act === 'tail' ? 1 : 0, thrown: e.state === 'cast' });
   }
@@ -562,7 +574,7 @@ export function createEnemies(ctx) {
   function finishFlyer(e, dt) {
     const a = e.actor;
     a.root.position.copy(e.pos);
-    a.root.rotation.y = e.yaw;
+    a.root.rotation.y = e.yaw; flinch(e, a);
     if (a.root.visible) a.animate(dt, { speed: Math.hypot(e.vel.x, e.vel.z), t: ctx.G.t, diving: e.state === 'dive', airborne: e.alt > 0.6, windup: e.windup });
   }
 

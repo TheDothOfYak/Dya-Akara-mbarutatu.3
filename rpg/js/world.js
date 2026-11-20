@@ -10,7 +10,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
-import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
+import { toon, ramp, glowSprite, outlineAll, addOutline, paint as paintMat, waterMaterial } from './gfx.js';   // (paintMat: this file has its own paint(), the land's colouring)
 import { noSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
@@ -213,7 +213,7 @@ export function buildWorld(scene) {
   const c = new THREE.Color(), grassA = new THREE.Color('#a3ad4f'), grassB = new THREE.Color('#c6a14a'), grassC = new THREE.Color('#7f9a45'),
     dirt = new THREE.Color('#c99f6a'), pave = new THREE.Color('#d8bf94');
   const TC = Object.fromEntries(Object.entries({
-    litter: '#b5652c', litter2: '#8f4c26', ash: '#a29d95', ash2: '#7e7973', meadow: '#bdb65a', sand: '#d2bb8c', bed: '#6a7864', bed2: '#3c5560',
+    litter: '#b5652c', litter2: '#8f4c26', ash: '#8a857d', ash2: '#6c6863', meadow: '#bdb65a', sand: '#d2bb8c', bed: '#6a7864', bed2: '#3c5560',
     rock: '#938e87', rockD: '#6b6762', ridge: '#8a857f', ridgeD: '#5f5b57', abyss: '#2e2a28', snow: '#ebe7df', soil: '#6a4630', foot: '#8a6a3c',
   }).map(([k, v]) => [k, new THREE.Color(v)]));
   const segDist = (list, x, z) => {
@@ -279,7 +279,7 @@ export function buildWorld(scene) {
     };
     return [...grow(lo, -1).reverse(), ...a, ...grow(hi, 1)];
   }
-  const landMat = paint(toon(0xffffff, { vertexColors: true }), 'land');
+  const landMat = paintMat(toon(0xffffff, { vertexColors: true }), 'land');
   function gridMesh(xs, zs, skip, yAt) {
     const nx = xs.length, nz = zs.length, pos = new Float32Array(nx * nz * 3), idx = [];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
@@ -329,7 +329,7 @@ export function buildWorld(scene) {
     const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   let waterMesh = null;
-  const waterMat = new THREE.MeshToonMaterial({ color: 0x4f98b0, emissive: 0x0c3c4c, emissiveIntensity: 0.5, gradientMap: ramp(), map: ripTex });
+  const waterMat = waterMaterial({ color: 0x4f98b0, deep: 0x1c5468, emissive: 0x0c3c4c, emissiveIntensity: 0.35, opacity: 0.9 }); void ripTex;
   {
     const pos = [], idx = [];
     const addGeo = (g) => {
@@ -359,9 +359,20 @@ export function buildWorld(scene) {
   }
 
   /* ---------- kits ---------- */
-  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 6500);   // the ruins: dressed stone
-  const columns = new Kit(scene, new THREE.CylinderGeometry(1, 1.08, 1, 10), toon(0xffffff), 600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.12), 300);
+  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paintMat(toon(0xffffff), 'stone'), 6500);   // the ruins: dressed stone
+  // fluted drums: shallow grooves cut round the shaft, and a slight swell in the middle (entasis)
+  const colGeo = (() => {
+    const g = new THREE.CylinderGeometry(1, 1.08, 1, 40, 6), P = g.attributes.position;
+    for (let k = 0; k < P.count; k++) {
+      const x = P.getX(k), y = P.getY(k), z = P.getZ(k), r = Math.hypot(x, z);
+      if (r < 0.5) continue;   // the cap centres
+      const a = Math.atan2(z, x), f = 1 - 0.045 * Math.pow(Math.abs(Math.cos(a * 8)), 0.6) + 0.03 * (1 - 4 * y * y);
+      P.setX(k, x * f); P.setZ(k, z * f);
+    }
+    g.computeVertexNormals(); return g;
+  })();
+  const columns = new Kit(scene, colGeo, paintMat(toon(0xffffff), 'stone'), 600);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paintMat(toon(0xffffff), 'bark', 0.12), 300);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600);
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff, {}), 500);
 
@@ -453,7 +464,7 @@ export function buildWorld(scene) {
 
   /* ---------- the Zahreh plaza and the Oath Stone ---------- */
   const plazaY = PLAZA_H;
-  const plazaDisk = new THREE.Mesh(new THREE.CylinderGeometry(30, 31, 0.6, 48), toon(0xcfb48a));
+  const plazaDisk = new THREE.Mesh(new THREE.CylinderGeometry(30, 31, 0.6, 48), paintMat(toon(0xcfb48a), 'cobble'));
   plazaDisk.position.set(PLAZA.x, plazaY - 0.22, PLAZA.z); plazaDisk.receiveShadow = true; scene.add(plazaDisk);
   const ringMat = toon(0xa8865e);
   for (const r of [12, 22]) {
@@ -491,11 +502,11 @@ export function buildWorld(scene) {
   obelisk.position.y = 5; obelisk.rotation.y = Math.PI / 4; obelisk.castShadow = true;
   addOutline(obelisk, 0.08); oath.add(obelisk);
   const cap = new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), stygMat); cap.position.y = 10.6; cap.scale.y = 1.4; addOutline(cap, 0.06); oath.add(cap);
-  const dais = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7.2, 0.9, 5), toon(0x8a7058)); dais.position.y = 0.05; dais.receiveShadow = true; addOutline(dais, 0.06); oath.add(dais);
+  const dais = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7.2, 0.9, 5), paintMat(toon(0x8a7058), 'stone')); dais.position.y = 0.05; dais.receiveShadow = true; addOutline(dais, 0.06); oath.add(dais);
   const sockets = [];
   for (let i = 0; i < 5; i++) {
     const a = i / 5 * Math.PI * 2 + Math.PI / 2;
-    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 1.4, 6), toon(0x5b4a5e));
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 1.4, 6), paintMat(toon(0x5b4a5e), 'stone'));
     ped.position.set(Math.cos(a) * 5, 1.2, Math.sin(a) * 5); addOutline(ped, 0.04); oath.add(ped);
     const lit = glowSprite(0xb47cff, 2.4, 0); lit.position.set(Math.cos(a) * 5, 2.4, Math.sin(a) * 5); oath.add(lit);
     sockets.push({ ped, lit, filled: false });
@@ -707,7 +718,7 @@ export function buildWorld(scene) {
     bottom.rotation.x = Math.PI; bottom.position.y = -s * 1.25;
     grp.add(top, bottom);
     if (rng() < 0.6) {
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, s * 0.8, 6), toon(0x6b4128)); t.position.y = s * 0.5; grp.add(t);
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, s * 0.8, 6), paintMat(toon(0x6b4128), 'bark', 0.12)); t.position.y = s * 0.5; grp.add(t);
       const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.35, 1), toon(new THREE.Color(pick(LEAF)), {})); cr.position.y = s; grp.add(cr);
     }
     outlineAll(grp, 0.12);
@@ -783,7 +794,7 @@ export function buildWorld(scene) {
   /* ================= the wider Reach ================= */
   const rng2 = mulberry32(8821);
   const pick2 = a => a[Math.floor(rng2() * a.length)];
-  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), paint(toon(0xffffff), 'bark', 0.12), 1500);
+  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), paintMat(toon(0xffffff), 'bark', 0.12), 1500);
   const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2800);
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400);
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);

@@ -16,7 +16,7 @@ export function ramp() {
 }
 
 /* painted surface detail for a toon material (see smooth.js): 'stone' | 'plaster' | 'wood' | 'shingle' | 'cobble' | 'land' | 'cloth' | 'brick' | 'bark' */
-const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7, brick: 8, bark: 9 };
+const PAINT_KINDS = { stone: 1, plaster: 2, wood: 3, shingle: 4, cobble: 5, land: 6, cloth: 7, brick: 8, bark: 9, rock: 10, auto: 11 };   // auto: each piece by its own colour (timber, plaster or stone)
 export function paint(mat, kind, scale) {
   mat.defines = Object.assign({}, mat.defines, { FL_PAINT: PAINT_KINDS[kind] || 1 });
   if (scale != null) mat.defines.FL_PSCALE = Number(scale).toFixed(3);   // how big the pattern is drawn (bark: 1 = an everyday tree)
@@ -202,9 +202,36 @@ export function glowSprite(color, size = 1, opacity = 1) {
 /* ============================================================
    Particles — one Points cloud, CPU-simulated, additive glow.
    ============================================================ */
+/* rings spreading on still water: swimming strokes, wading feet, something dropping in */
+export class Ripples {
+  constructor(scene, n = 28) {
+    const geo = new THREE.RingGeometry(0.86, 1, 40); geo.rotateX(-Math.PI / 2);
+    this.list = [];
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0, depthWrite: false, fog: true }));
+      m.visible = false; m.renderOrder = 2; m.frustumCulled = false; scene.add(m);
+      this.list.push({ m, t: 0, life: 1, s: 1 });
+    }
+    this.k = 0;
+  }
+  spawn(x, y, z, size = 1, life = 1.4) {
+    const r = this.list[this.k++ % this.list.length];
+    r.m.position.set(x, y + 0.03, z); r.t = 0; r.life = life; r.s = size; r.m.visible = true;
+  }
+  update(dt) {
+    for (const r of this.list) {
+      if (!r.m.visible) continue;
+      r.t += dt; const u = r.t / r.life;
+      if (u >= 1) { r.m.visible = false; continue; }
+      const k = r.s * (0.25 + Math.sqrt(u) * 1.9); r.m.scale.set(k, 1, k);
+      r.m.material.opacity = 0.34 * (1 - u) * (1 - u);
+    }
+  }
+}
+
 export class Particles {
-  constructor(scene, max = 2500) {
-    this.max = max;
+  constructor(scene, max = 2500, matte = false) {
+    this.max = max; this.matte = matte;
     this.pos = new Float32Array(max * 3);
     this.col = new Float32Array(max * 3);
     this.size = new Float32Array(max);
@@ -238,18 +265,22 @@ export class Particles {
         uniform sampler2D uMap; varying vec3 vCol; varying float vA;
         void main() {
           vec4 t = texture2D(uMap, gl_PointCoord);
-          gl_FragColor = vec4(vCol * t.rgb, t.a * vA);
+          gl_FragColor = MATTE ? vec4(vCol, t.a * vA * 0.7) : vec4(vCol * t.rgb, t.a * vA);
         }`,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      defines: { MATTE: matte ? 'true' : 'false' },
+      transparent: true, depthWrite: false, blending: matte ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
     this.points = new THREE.Points(geo, mat);
     this.points.frustumCulled = false;
     this.points.renderOrder = 10;
     scene.add(this.points);
     this.tmpC = new THREE.Color();
+    /* dust, smoke, splinters and earth don't shine: they go to a second system drawn as matte puffs */
+    this.dust = matte ? null : new Particles(scene, Math.min(1500, Math.ceil(max / 2)), true);
   }
 
   emit(x, y, z, o = {}) {
+    if (this.dust && (o.matte ?? this.dull(o.color ?? 0xffa040))) return this.dust.emit(x, y, z, o);
     const i = this.cursor; this.cursor = (this.cursor + 1) % this.max;
     const i3 = i * 3;
     this.pos[i3] = x; this.pos[i3 + 1] = y; this.pos[i3 + 2] = z;
@@ -275,7 +306,9 @@ export class Particles {
     }
   }
 
+  dull(c) { if (typeof c !== 'number') return false; const r = (c >> 16 & 255) / 255, g = (c >> 8 & 255) / 255, b = (c & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b); return (mx - mn) / Math.max(mx, 1e-3) < 0.33 && 0.3 * r + 0.59 * g + 0.11 * b < 0.8; }
   update(dt) {
+    if (this.dust) this.dust.update(dt);
     const n = this.max;
     for (let i = 0; i < n; i++) {
       if (this.life[i] <= 0) { this.alpha[i] = 0; this.size[i] = 0; continue; }
@@ -292,7 +325,7 @@ export class Particles {
     a.position.needsUpdate = a.color.needsUpdate = a.size.needsUpdate = a.alpha.needsUpdate = true;
   }
 
-  setScale(px) { this.points.material.uniforms.uScale.value = px; }
+  setScale(px) { this.points.material.uniforms.uScale.value = px; if (this.dust) this.dust.setScale(px); }
 }
 
 /* a teardrop flame tongue: round base at y=0, pointed tip at y=h, the tip leaning along +x */
@@ -346,4 +379,23 @@ export function buildCampfire(scale = 1) {
     glow.material.opacity = 0.45 + Math.sin(t * 9) * 0.06 + Math.sin(t * 23) * 0.04;
   };
   return g;
+}
+
+/* warm pools of light on the ground under lamps: one instanced decal per glow found hung low over the ground, each in
+   its own lamp's colour. groundY(x, z, y) gives the floor under a lamp, heightAt(x, z) the land. The caller sets the
+   returned mesh's material.opacity with the dark (0 by day). */
+export function lightPools(scene, groundY, heightAt) {
+  const list = [], v = new THREE.Vector3(), white = new THREE.Color(1, 1, 1);
+  scene.traverse(o => {
+    if (!o.isSprite || !o.material || o.material.blending !== THREE.AdditiveBlending || list.length >= 160) return;
+    const c = o.material.color; if (o.scale.x < 0.9 || o.scale.x > 8 || c.r + c.g + c.b < 1.2) return;   // a lamp's glow: not a mote, not a whole sky
+    o.getWorldPosition(v); const gy = heightAt(v.x, v.z), h = v.y - gy; if (h < 0.4 || h > 9) return;
+    list.push([v.x, groundY(v.x, v.z, v.y) + 0.06, v.z, Math.min(7, 2.2 + h * 0.9), c.clone().lerp(white, 0.2)]);
+  });
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2 }), Math.max(1, list.length));
+  const o2 = new THREE.Object3D(); list.forEach(([x, y, z, r, c], i) => { o2.position.set(x, y, z); o2.scale.set(r, 1, r); o2.updateMatrix(); m.setMatrixAt(i, o2.matrix); m.setColorAt(i, c); });
+  m.count = list.length; m.userData.noOutline = true; m.renderOrder = 3; scene.add(m);
+  return m;
 }

@@ -108,17 +108,17 @@ export function createCityKit(scene, o) {
       if (rng() < 0.7) { const wx = x + Math.sin(ry) * (dz + 0.3) + Math.cos(ry) * 1.1, wz = z + Math.cos(ry) * (dz + 0.3) - Math.sin(ry) * 1.1; lantern(wx, g + 2.3, wz); }
     };
     if (kind === 'cottage') {
-      const w = 5 + rng() * 2.5, d = 5 + rng() * 2.5, h = 3.8 + rng() * 1.6; hw = w / 2; hd = d / 2; top = h + 2;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wall); b.position.y = h / 2; grp.add(b);
-      addQuoins(grp, w, d, h, wall.color);
-      const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.15, 0.25, d + 0.15), trim); band.position.y = h; grp.add(band);
+      // round, under its round acorn-cap roof
+      let w = 5 + rng() * 2.5, d = w, h = 3.8 + rng() * 1.6; const R = w * 0.6; w = d = R * 2; hw = R; hd = R; top = h + 2;
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 1.03, h, 28), wall); b.position.y = h / 2; grp.add(b);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(R + 0.06, 0.14, 6, 28), trim); band.rotation.x = Math.PI / 2; band.position.y = h; grp.add(band);
+      for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * TAU, post = new THREE.Mesh(new THREE.BoxGeometry(0.22, h, 0.16), trim); post.position.set(Math.sin(a) * (R + 0.04), h / 2, Math.cos(a) * (R + 0.04)); post.rotation.y = a; grp.add(post); }   // timbers round the wall
       const cap = new THREE.Mesh(new THREE.SphereGeometry(Math.max(w, d) * 0.72, 18, 9, 0, TAU, 0, Math.PI / 2), roof); cap.scale.y = 0.72; cap.position.y = h; grp.add(cap);
       const rim = new THREE.Mesh(new THREE.TorusGeometry(Math.max(w, d) * 0.7, 0.2, 6, 22), roof); rim.rotation.x = Math.PI / 2; rim.position.y = h + 0.05; grp.add(rim);
       const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 1.4, 6), toon(0x4a2a14)); stem.position.y = h + Math.max(w, d) * 0.52 + 0.4; stem.rotation.z = 0.25; grp.add(stem);
       top = h + Math.max(w, d) * 0.55;
-      doorAt(d / 2);
-      for (const sx of [-1, 1]) windowAt(grp, sx * w * 0.28, h * 0.55, d / 2 + 0.02, 0);
-      for (const sx of [-1, 1]) windowAt(grp, sx * (w / 2 + 0.02), h * 0.55, 0, sx * Math.PI / 2, 0.9, 1.1, false);
+      doorAt(R + 0.02);
+      for (const a of [-0.75, 0.75, -1.9, 1.9]) windowAt(grp, Math.sin(a) * (R + 0.08), h * 0.55, Math.cos(a) * (R + 0.08), a, Math.abs(a) > 1 ? 0.9 : undefined, Math.abs(a) > 1 ? 1.1 : undefined, Math.abs(a) < 1);
       if (rng() < 0.6) smokes.push(V3(x - Math.sin(ry) * d * 0.2, g + top + 0.5, z));
     } else if (kind === 'tall') {
       const w = 5.5 + rng() * 2, d = 5.5 + rng() * 2, floors = 2 + (rng() < 0.4 ? 1 : 0), fh = 3.2; hw = w / 2 + 0.3; hd = d / 2 + 0.3;
@@ -194,7 +194,15 @@ export function createCityKit(scene, o) {
       const f = new THREE.Mesh(flagGeo, flagMats[i % flagMats.length]); f.position.copy(p); f.lookAt(p.clone().add(V3(-(b.z - a.z), 0, b.x - a.x))); f.userData.ph = i; grp.add(f);
     }
     buntings.push(grp);
+    // each end tied off to something: a pole from the ground (a wall or a tree, where there is one, hides it)
+    for (const e of [a, b]) {
+      const gy = heightAt(e.x, e.z), h = e.y - gy + 0.35; if (h < 0.5) continue;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, h, 6), poleMat); pole.position.set(e.x, gy + h / 2, e.z); pole.castShadow = true; scene.add(pole);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), toon(0xc8a050)); knob.position.set(e.x, gy + h + 0.05, e.z); scene.add(knob);
+      if (box && !e.noBox) box(e.x, e.z, 0.12, 0.12, gy - 1, gy + h);
+    }
   }
+  const poleMat = paint(toon(0x5a3a20), 'wood');
   function paving(cx, cz, rings, color = 0xb89878) {
     const m = paint(toon(color), 'cobble');
     for (const r of rings) { const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.25, r + 0.25, 64), m); ring.rotation.x = -Math.PI / 2; ring.position.set(cx, heightAt(cx, cz) + 0.03, cz); ring.receiveShadow = true; scene.add(ring); }
@@ -367,11 +375,26 @@ export function createCrowd(o) {
   function panic() {
     for (const p of people) {
       if (p.gone || p.fixed) continue;
-      p.run = true; p.state = 'go'; p.speed = 5 + rng() * 2; p.wait = rng() * 0.8;
+      p.run = true; p.state = 'go'; p.speed = 4.5 + rng() * 4; p.wait = rng() * 1.6; p.runs = 0;
       const ex = (o.exits || []).slice().sort((a, b) => a.distanceTo(p.pos) - b.distanceTo(p.pos))[Math.floor(rng() * 2)] || (o.exits || [])[0];
       if (!ex) continue;
       const [r, a] = toPolar(ex.x, ex.z); route(p, Math.max(streets[0].r, Math.min(streets[streets.length - 1].r, r)), a); p.plan.push(ex.clone()); p.exit = ex;
+      for (const q of p.plan) { if (q !== p.plan[p.plan.length - 1]) { q.x += (rng() - 0.5) * 3.4; q.z += (rng() - 0.5) * 3.4; } }   // a crowd, not a file: each keeps their own line down the street
     }
+  }
+  /* someone running has reached the door or gate they made for. Most don't get in (it's shut, or full): they turn and
+     run for another; some press themselves into the doorway and stay there; a few get inside and are gone. */
+  function arrived(p) {
+    p.runs = (p.runs || 0) + 1;
+    const far = (o.exits || []).filter(e => e.distanceTo(p.pos) > 14);
+    if (p.runs < 5 && far.length && rng() < 0.8) {
+      const ex = far[Math.floor(rng() * far.length)], [r, a] = toPolar(ex.x, ex.z);
+      route(p, Math.max(streets[0].r, Math.min(streets[streets.length - 1].r, r)), a); p.plan.push(ex.clone()); p.exit = ex; p.wait = rng() * 1.2;
+      for (const q of p.plan) { if (q !== p.plan[p.plan.length - 1]) { q.x += (rng() - 0.5) * 3.4; q.z += (rng() - 0.5) * 3.4; } }
+      return false;
+    }
+    if (rng() < 0.6) { p.run = false; p.fixed = true; p.cower = true; p.exit = null; return false; }   // hides where they are
+    return true;
   }
   const tmp = V3();
   return {
@@ -391,7 +414,7 @@ export function createCrowd(o) {
             if (d < (p.run ? 1.2 : 0.8)) {
               p.plan.shift();
               if (!p.plan.length) {
-                if (p.run && p.exit) { p.gone = true; p.a.root.visible = false; continue; }   // in through a door, or out of the gate
+                if (p.run && p.exit) { if (arrived(p)) { p.gone = true; p.a.root.visible = false; } continue; }   // in through a door, out of the gate — or on to the next
                 p.wait = p.spot ? 5 + rng() * 9 : 1 + rng() * 4;
                 p.look = p.spot && p.spot.look ? V3(p.spot.look[0], 0, p.spot.look[1]) : null;
               }

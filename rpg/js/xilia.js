@@ -327,7 +327,7 @@ export function buildXilia(scene) {
   }
 
   /* ---------- kits ---------- */
-  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), toon(0xffffff), 2600);
+  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'wood'), 2600);
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.12), 320);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false); noSolid(crops.mesh);   // you wade through a field, like grass
@@ -342,9 +342,9 @@ export function buildXilia(scene) {
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 2); return t;
   })();
   const roofMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: capTex, gradientMap: ramp() });
-  const wallMats = ['#f0dcb4', '#e8c89a', '#f4e6c8', '#dcc0a0'].map(c => toon(c));
+  const wallMats = ['#f0dcb4', '#e8c89a', '#f4e6c8', '#dcc0a0'].map(c => paint(toon(c), 'plaster'));
   const windowMat = new THREE.MeshBasicMaterial({ color: 0xffd890 });
-  const doorMat = toon(0x6a3a1e);
+  const doorMat = paint(toon(0x6a3a1e), 'wood'), frameM = paint(toon(0x5a3a20), 'wood');
   const houses = [];
   const doors = [];
   function cottage(x, z, r, rot, opts = {}) {
@@ -355,8 +355,10 @@ export function buildXilia(scene) {
     const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 1.3, 0.22, 6, 20), roofMat); rim.rotation.x = Math.PI / 2; rim.position.y = H - 0.2; grp.add(rim);
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 1.1, 6), toon(0x4a2c18)); stem.position.y = H + r * 0.95; stem.rotation.z = 0.3; grp.add(stem);
     const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 0.2), doorMat); door.position.set(0, 1.0, r + 0.02); grp.add(door);
-    for (const a of [1.2, -1.2, 2.6]) { const w = new THREE.Mesh(new THREE.CircleGeometry(0.38, 12), windowMat); w.position.set(Math.sin(a) * (r + 0.03), 2.0, Math.cos(a) * (r + 0.03)); w.rotation.y = a; w.userData.noOutline = true; grp.add(w); }
-    const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 1.6, 6), toon(0x8a6a50)); chim.position.set(r * 0.6, H + 0.6, -r * 0.3); grp.add(chim);
+    for (const a of [1.2, -1.2, 2.6]) { const rw = r * 1.025 + 0.06; const w = new THREE.Mesh(new THREE.CircleGeometry(0.38, 16), windowMat); w.position.set(Math.sin(a) * rw, 2.0, Math.cos(a) * rw); w.rotation.y = a; w.userData.noOutline = true; grp.add(w);
+      const fr = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.06, 6, 18), frameM); fr.position.copy(w.position); fr.rotation.y = a; grp.add(fr);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.8, 0.05), frameM); bar.position.copy(w.position); bar.rotation.y = a; grp.add(bar); }   // a round window, framed, standing proud of the curved wall
+    const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 1.6, 6), paint(toon(0x8a6a50), 'stone')); chim.position.set(r * 0.6, H + 0.6, -r * 0.3); grp.add(chim);
     outlineAll(grp, 0.05);
     grp.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
     scene.add(grp);
@@ -369,11 +371,11 @@ export function buildXilia(scene) {
 
   /* the market square: paving, a fountain, stalls */
   const plaza = new THREE.Mesh(new THREE.CylinderGeometry(22, 22.5, 0.4, 40), paint(toon(0xe6d2ac), 'cobble')); plaza.position.set(SQUARE.x, SQ_H - 0.15, SQUARE.z); plaza.receiveShadow = true; scene.add(plaza);
-  const water = new THREE.MeshToonMaterial({ color: 0x5ac0d8, emissive: 0x1a6a80, emissiveIntensity: 0.5, gradientMap: ramp() });
+  const water = waterMaterial({ color: 0x5ac0d8, deep: 0x2a7e98, emissive: 0x1a6a80, emissiveIntensity: 0.4, opacity: 0.9, scale: 3 });
   {
-    const basin = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.5, 6, 24), toon(0xcab088)); basin.rotation.x = -Math.PI / 2; basin.position.set(SQUARE.x, SQ_H + 0.4, SQUARE.z - 6); addOutline(basin, 0.05); scene.add(basin);
+    const basin = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.5, 6, 24), paint(toon(0xcab088), 'stone')); basin.rotation.x = -Math.PI / 2; basin.position.set(SQUARE.x, SQ_H + 0.4, SQUARE.z - 6); addOutline(basin, 0.05); scene.add(basin);
     const pool = noSolid(new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), water)); pool.rotation.x = -Math.PI / 2; pool.position.set(SQUARE.x, SQ_H + 0.45, SQUARE.z - 6); scene.add(pool);
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.6, 8), toon(0xcab088)); pillar.position.set(SQUARE.x, SQ_H + 1.3, SQUARE.z - 6); addOutline(pillar, 0.04); scene.add(pillar);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.6, 8), paint(toon(0xcab088), 'stone')); pillar.position.set(SQUARE.x, SQ_H + 1.3, SQUARE.z - 6); addOutline(pillar, 0.04); scene.add(pillar);
     // a little bronze acorn on top — Beuhk remembers the Eikar with no hat
     const acorn = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10), toon(0xc8902a)); acorn.position.set(SQUARE.x, SQ_H + 3.1, SQUARE.z - 6); acorn.scale.y = 1.2; addOutline(acorn, 0.04); scene.add(acorn);
     for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; col.add(SQUARE.x + Math.cos(a) * 3.4, SQUARE.z - 6 + Math.sin(a) * 3.4, 1.4, 0.5, -a + Math.PI / 2, SQ_H - 1, SQ_H + 0.9); }
@@ -383,7 +385,7 @@ export function buildXilia(scene) {
   [[-12, 52], [-10, 60], [12, 52], [10, 62], [-4, 66], [6, 40]].forEach(([dx, dz], i) => {
     const x = SQUARE.x + dx, z = SQUARE.z + dz - 50 + 50, g = SQ_H;
     const grp = new THREE.Group(); grp.position.set(SQUARE.x + dx, g, dz); grp.rotation.y = Math.atan2(-dx, -(dz - SQUARE.z));
-    const table = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 1.4), toon(0x8a5a36)); table.position.y = 0.5; grp.add(table);
+    const table = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 1.4), paint(toon(0x8a5a36), 'wood')); table.position.y = 0.5; grp.add(table);
     for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 5), toon(0x5a3a20)); p.position.set(s * 1.4, 1.3, -0.6); grp.add(p); }
     const aw = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 2.0), toon(awnings[i % awnings.length])); aw.position.set(0, 2.6, -0.1); aw.rotation.x = 0.2; grp.add(aw);
     for (let k = 0; k < 4; k++) { const good = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), toon(pick([0xe08a3a, 0xd04a3a, 0xe8c84a, 0x6aa04a]))); good.position.set(-1 + k * 0.65, 1.15, 0.1); grp.add(good); }
@@ -394,7 +396,7 @@ export function buildXilia(scene) {
   // the town hearth
   const hearth = { x: SQUARE.x + 8, z: SQUARE.z + 10 };
   {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.28, 5, 12), toon(0x7a6a5a)); ring.rotation.x = -Math.PI / 2; ring.position.set(hearth.x, SQ_H + 0.15, hearth.z); scene.add(ring);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.28, 5, 12), paint(toon(0x7a6a5a), 'stone')); ring.rotation.x = -Math.PI / 2; ring.position.set(hearth.x, SQ_H + 0.15, hearth.z); scene.add(ring);
   }
   const hearthFire = glowSprite(0xff8a3a, 3.2, 0.95); hearthFire.position.set(hearth.x, SQ_H + 0.9, hearth.z); scene.add(hearthFire);
 
@@ -431,7 +433,7 @@ export function buildXilia(scene) {
     const { x: ex, z: ez } = WEST_EXIT, px = -WEST_N.z, pz = WEST_N.x;
     for (const s of [-1, 1]) {
       const tx = ex - WEST_N.x * 6 + px * s * 5.5, tz = ez - WEST_N.z * 6 + pz * s * 5.5, tg = heightAt(tx, tz);
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 16, 7), toon(0x5a3a26)); trunk.position.set(tx - px * s * 1.6, tg + 7.4, tz - pz * s * 1.6);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 16, 7), paint(toon(0x5a3a26), 'bark', 0.12)); trunk.position.set(tx - px * s * 1.6, tg + 7.4, tz - pz * s * 1.6);
       trunk.rotation.set(pz * s * 0.22, 0, -px * s * 0.22); addOutline(trunk, 0.05); trunk.castShadow = true; scene.add(trunk);
       for (let k = 0; k < 3; k++) { const cone = new THREE.Mesh(new THREE.ConeGeometry(3.4 - k * 0.8, 4.4, 7), toon(0x2f6a3a)); cone.position.set(tx - px * s * (3.2 + k * 0.4), tg + 12 + k * 2.6, tz - pz * s * (3.2 + k * 0.4)); addOutline(cone, 0.05); cone.castShadow = true; scene.add(cone); }
       col.add(tx, tz, 0.9, 0.9, 0, tg - 1, tg + 10);
@@ -467,11 +469,11 @@ export function buildXilia(scene) {
   // a windmill by the west fields
   {
     const x = -78, z = 2, g = heightAt(x, z);
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.8, 11, 10), toon(0xf0dcb4)); tower.position.set(x, g + 5.5, z); addOutline(tower, 0.06); tower.castShadow = true; scene.add(tower);
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.8, 11, 10), paint(toon(0xf0dcb4), 'plaster')); tower.position.set(x, g + 5.5, z); addOutline(tower, 0.06); tower.castShadow = true; scene.add(tower);
     const cap = new THREE.Mesh(new THREE.SphereGeometry(2.6, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), roofMat); cap.position.set(x, g + 11, z); scene.add(cap);
     col.add(x, z, 2.3, 2.3, 0, g - 1, g + 12);
     var mill = new THREE.Group(); mill.position.set(x, g + 9, z + 2.8); scene.add(mill);
-    for (let k = 0; k < 4; k++) { const blade = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 0.1), toon(0xe8d8b0)); blade.position.y = 3; const arm = new THREE.Group(); arm.rotation.z = k * Math.PI / 2; arm.add(blade); mill.add(arm); }
+    for (let k = 0; k < 4; k++) { const blade = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 0.1), paint(toon(0xe8d8b0), 'wood')); blade.position.y = 3; const arm = new THREE.Group(); arm.rotation.z = k * Math.PI / 2; arm.add(blade); mill.add(arm); }
   }
 
   /* ---------- forests and trees ---------- */

@@ -655,7 +655,7 @@ export function buildEikar(o = {}) {
   const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 8), skinMat); jaw.scale.set(kalo ? 1.15 : 1.0, 0.75, 0.95); jaw.position.set(0, 0.06, 0.03); head.add(jaw);
   const face = new THREE.Group(); face.position.y = 0.12; head.add(face);
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1a0f08 });
-  const whiteMat = new THREE.MeshBasicMaterial({ color: 0xfff6e6 });
+  const whiteMat = new THREE.MeshLambertMaterial({ color: 0xfff6e6, emissive: 0x6a645a });   // lit like the face round it (an unlit white would shine in the dark)
   const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const duat = o.duat === true ? 1 : (o.duat || 0);
   const markGlowCol = duat ? 0x6a18d8 : (o.marking || 0xbfe8ff);
@@ -698,8 +698,8 @@ export function buildEikar(o = {}) {
     const gl = glowSprite(kalo || duat ? markGlowCol : (o.marking || 0xffc46a), duat ? 0.13 : 0.09, duat ? 0.6 : 0.4); gl.position.set(s * (ex + 0.004), my, mz + 0.008); face.add(gl); markGlows.push(gl);
   }
   /* the markings, the same on every Eikar to the base of the neck: they rise to a peak on the bridge of the nose,
-     run out under the eyes along the tops of the cheekbones, down the sides of the face, and cross at the base of
-     the neck. (Below the crossing every Eikar's are their own — see the arms.) */
+     run out under the eyes along the tops of the cheekbones, down the sides of the face, and cross at the back of
+     the neck, at its base. (Below the crossing every Eikar's are their own — see the arms.) */
   {
     const sk = { x: HR * skull.scale.x, y: HR * skull.scale.y, z: HR * skull.scale.z }, jw = { cy: -0.06, cz: 0.03, x: 0.075 * jaw.scale.x, y: 0.075 * jaw.scale.y, z: 0.075 * jaw.scale.z };
     const v = new THREE.Vector3();
@@ -713,7 +713,7 @@ export function buildEikar(o = {}) {
     };
     const onNeck = q => {   // the neck: a tapering cylinder, 0.05 across at the collar to 0.042 under the jaw
       const r = lerp(0.05, 0.042, clamp((q.y - 0.36) / 0.12, 0, 1)) + 0.0006, x = clamp(q.x, -r * 0.98, r * 0.98);
-      const n = new THREE.Vector3(x, 0, Math.sqrt(r * r - x * x)).normalize();
+      const n = new THREE.Vector3(x, 0, -Math.sqrt(r * r - x * x)).normalize();   // round the BACK of the neck: that is where the lines cross
       return { p: new THREE.Vector3(n.x * r, q.y, n.z * r), n };
     };
     const W = kalo ? 1.12 : 1, V = (x, y) => new THREE.Vector3(x, y, 0);
@@ -843,7 +843,7 @@ export function buildEikar(o = {}) {
     for (let i = 0; i < wp.count; i++) { const x = wp.getX(i), y = wp.getY(i); wp.setZ(i, -0.12 - 0.07 * Math.cos(x / HX * Math.PI * 0.5) * (1 - Math.abs(y - SH) * 0.3)); }   // filled with wind
     wg.computeVertexNormals();
     wing = new THREE.Mesh(wg, capeMat); wing.visible = false; capeG.add(wing);
-    if (built) { capeG.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; addOutline(m, 0.012); } }); celAll(capeG); }   // (put on later: inked and cel-drawn like the rest)
+    if (built) { capeG.traverse(m => { if (m.isMesh && m.name !== 'outline') { addOutline(m, 0.012); } }); celAll(capeG); }   // (put on later: inked and cel-drawn like the rest)
   }
   let built = false;
   const outfit = {};
@@ -932,7 +932,6 @@ export function buildEikar(o = {}) {
 
   outlineAll(root, 0.012);
   celAll(root);   // drawn like the film's cast: crisp two-tone shading
-  root.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
   const shade = footShade(0.36 * bw); root.add(shade);
   const rootScale = o.scale || 1;
   root.scale.setScalar(rootScale);
@@ -949,6 +948,10 @@ export function buildEikar(o = {}) {
   let s = W.s;                 // weapon-hand side (-1 right, +1 left)
   let phase = 0, swingBlend = 0, glide = 0, twist = 0, lean = 0, glowA = 0, rideK = 0, kS = 0, airK = 0;
   // the walk: where in the stride (0..1), which way the ground is going by, how fast he's turning and speeding up
+  let lieK = 0, swimK = 0, swimPh = 0;
+  let gestT = 4 + Math.random() * 8, gest = null, gestK = 0;   // the little things folk do standing about: scratch, stretch, rub the neck, hands on hips   // lying flat; swimming   // flat on his back (st.lie)
+  let slung = false, idleT = 9;   // the weapon rides on his back until it's wanted
+  const backMount = new THREE.Group(); backMount.position.set(-0.05, 0.02, -0.105 * (kalo ? 1.08 : 1) - 0.035); backMount.rotation.set(0.06, 0, -0.42); torso.add(backMount);
   let cyc = Math.random(), mvA = 0, yawRate = 0, accS = 0, lastSpd = 0, lastX = null, lastZ = 0, lastYaw = 0, stK = 0, rollK = 0, rollP = 0, hurtK = 0, hipTurn = 0, lungeZ = 0, crouchS = 0, moveT = 0;
   const footI = legs.map(L => new THREE.Vector3(L.hip.x * 1.25, legOpts.ah, 0)), footT = new THREE.Vector3(), footB = new THREE.Vector3(), bodyInv = new THREE.Matrix4();
   const FP = { z: 0, y: 0, pitch: 0 }, LEG = legOpts.Lt + legOpts.Ls;
@@ -960,7 +963,7 @@ export function buildEikar(o = {}) {
   bio.glow(0);
 
   /* ---- the wardrobe's pieces (see setOutfit) ---- */
-  const inkG = g => { g.traverse(m => { if (m.isMesh && m.name !== 'outline' && !m.userData.noOutline) { m.castShadow = true; addOutline(m, 0.012); } }); celAll(g); };
+  const inkG = g => { g.traverse(m => { if (m.isMesh && m.name !== 'outline' && !m.userData.noOutline) { addOutline(m, 0.012); } }); celAll(g); };
   const seamMat = c => new THREE.MeshBasicMaterial({ color: c });
   const DZW = 0.68 * (kalo ? 1.08 : 1);
   function buildPiece(slot, look, glow, key) {
@@ -1038,13 +1041,13 @@ export function buildEikar(o = {}) {
     setArms(cls) {
       const K = armsKit(cls);
       const vis = weapon.visible;
-      wHold.remove(weapon); if (off) { off.parent && off.parent.remove(off); off = null; }
+      weapon.parent && weapon.parent.remove(weapon); if (off) { off.parent && off.parent.remove(off); off = null; }
       if (arrow) { arrow.parent && arrow.parent.remove(arrow); arrow = null; }
       kind = K.pose; kit = K;
       W = kind === 'bow' ? arms[1] : arms[0]; Fr = kind === 'bow' ? arms[0] : arms[1];
       wPivot = W.upper; wHold = W.grip; s = W.s;
       drinkFlask.parent && drinkFlask.parent.remove(drinkFlask); Fr.grip.add(drinkFlask);
-      weapon = K.main; weapon.visible = vis; inkG(weapon); wHold.add(weapon);
+      weapon = K.main; weapon.visible = vis; inkG(weapon); (slung ? backMount : wHold).add(weapon);
       if (K.off) { off = K.off; inkG(off); Fr.grip.add(off); }
       if (kind === 'bow') { arrow = makeArrow(); arrow.visible = false; inkG(arrow); Fr.grip.add(arrow); }
       defKind = kind === 'spear' || kind === 'none' ? 4 : kind === 'axe' ? 3 : 1;
@@ -1105,7 +1108,7 @@ export function buildEikar(o = {}) {
       }
       const upW = s * Math.cos(TAU * (cyc - 0.03)), upF = -upW;          // each arm goes forward with the other side's leg
       let gliding = false;
-      for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && !own.has(c)) { gliding = true; break; } }
+      for (let i = 0; i < root.children.length; i++) { const c = root.children[i]; if (c.isGroup && c.visible && c.userData.glider) { gliding = true; break; } }   // only a glider marked as one: anything else carried (an amulet, a basket) is not a reason to lie flat out
       if (st.glide != null) gliding = !!st.glide;
       glide = lerp(glide, gliding ? 1 : 0, 1 - Math.exp(-(gliding ? 7 : 10) * dt));
       // vertical speed, read off the root, drives stretch going up and the squash on landing
@@ -1123,6 +1126,11 @@ export function buildEikar(o = {}) {
       swingBlend = lerp(swingBlend, want, 1 - Math.exp(-(want > swingBlend ? 30 : 8) * dt));
       const b = swingBlend;
 
+      // ---- the weapon: in the hand for a fight, slung across the back the rest of the time ----
+      const wanted = (!!sw || wind > 0.02 || atk > 0.02 || st.armed === true || kit.shield || kind === 'none' || kind === 'flask' || kind === 'whip') && !st.carry;
+      idleT = wanted ? 0 : idleT + dt;
+      const sling = !!st.carry || !!st.swim || (idleT > 1.6 && st.armed !== true);
+      if (sling !== slung) { slung = sling; (slung ? backMount : wHold).add(weapon); }
       // ---- the weapon hand at rest ----
       const sway = lerp(Math.sin(t * 1.6) * 0.008, upW * (0.1 + 0.08 * runK), walkK);   // arms swing against the legs
       if (kind === 'spear') { iT.set(s * 0.25, -0.06, 0.11 + sway * 0.5); iD.set(0, 1, 0.1); iB.set(1, 0, 0); }
@@ -1218,6 +1226,8 @@ export function buildEikar(o = {}) {
       sqV += ((sqTarget - sq) * 140 - sqV * 13) * dt; sq += sqV * dt; sq = clamp(sq, -0.16, 0.14);
       const breath = Math.sin(t * 2.3 + seed) * 0.012 * (1 - walkK * 0.6);
       torso.scale.set(1 - sq * 0.5 - breath * 0.3, 1 + sq + breath, 1 - sq * 0.5 + breath * 0.4);
+      swimK = lerp(swimK, st.swim ? 1 : 0, 1 - Math.exp(-6 * dt)); swimPh += dt * (2.2 + Math.min(spd, 6) * 0.35);
+      lieK = lerp(lieK, st.lie ? 1 : 0, 1 - Math.exp(-(st.lie ? 7 : 4) * dt));   // he goes down over a moment, not in a snap
       const rollE = rollP * rollP * (3 - 2 * rollP), tuck = rollK * Math.sin(Math.min(1, rollP * 1.08) * Math.PI) ** 0.5, rollA = roll ? rollE * TAU : 0;
       body.position.set(
         hipX + sm * lean * 0.1,
@@ -1231,6 +1241,16 @@ export function buildEikar(o = {}) {
         lean * cm * 0.62 - hurtK * 0.34 + tuck * 1.05 + airK * (vyS > 0 ? -0.06 : 0.12) * (1 - glide),
         twist - hipYaw * 1.75 - hipTurn * 0.25,
         -hipRoll * 1.5 - lean * sm * 0.6 + bank * 0.55 + Math.sin(phase) * 0.03 * walkK * runK);
+      if (lieK > 0.001) {   // laid out on his back on the ground, looking straight up
+        body.position.set(body.position.x * (1 - lieK), lerp(body.position.y, 0.17, lieK), lerp(body.position.z, -0.35, lieK));
+        body.rotation.set(lerp(body.rotation.x, -1.5, lieK), body.rotation.y * (1 - lieK), body.rotation.z * (1 - lieK));
+        torso.rotation.set(lerp(torso.rotation.x, 0.06, lieK), torso.rotation.y * (1 - lieK), torso.rotation.z * (1 - lieK));
+      }
+      if (swimK > 0.001) {   // swimming: laid forward in the water, head up, a breaststroke
+        body.position.set(body.position.x * (1 - swimK), lerp(body.position.y, HIP + 0.05, swimK), body.position.z * (1 - swimK));
+        body.rotation.set(lerp(body.rotation.x, 1.15, swimK), body.rotation.y * (1 - swimK), Math.sin(swimPh) * 0.06 * swimK);
+        torso.rotation.set(lerp(torso.rotation.x, -0.15, swimK), torso.rotation.y * (1 - swimK), torso.rotation.z * (1 - swimK));
+      }
       // the feet: each one on its own spot of ground, carried forward when its turn comes
       body.updateMatrix(); bodyInv.copy(body.matrix).invert();
       const HF = (0.045 + 0.2 * runK + 0.1 * sprK) * walkK, rising = clamp(vyS / 6 + 0.5, 0, 1);
@@ -1254,7 +1274,9 @@ export function buildEikar(o = {}) {
         }
         footB.set(fx, fy, fz).applyMatrix4(bodyInv);
         if (tuck > 0.001) { footT.set(L.hip.x * 1.1, -0.02 - 0.2, 0.3); footB.lerp(footT, tuck); pitch = lerp(pitch, 0.2, tuck); }   // rolling: knees to the chest
-        poseLeg(L, footB, pitch - body.rotation.x * (1 - tuck) - (tuck > 0.001 ? 0 : 0), splay);
+        if (swimK > 0.001) { const kick = Math.sin(swimPh * 2 + i * Math.PI); footT.set(L.hip.x * (1.3 + 0.5 * Math.max(0, Math.sin(swimPh))), -0.02 - LEG * 0.9, -0.12 + kick * 0.12); footB.lerp(footT, swimK); pitch = lerp(pitch, 1.2, swimK); }
+        if (lieK > 0.001) { footT.set(L.hip.x * 1.5, -0.02 - LEG * 0.97, 0.05 + (i ? 0.07 : 0)); footB.lerp(footT, lieK); pitch = lerp(pitch, 0.6, lieK); }
+        poseLeg(L, footB, pitch - body.rotation.x * (1 - tuck) * (1 - lieK), splay);
         if (glide > 0.01 || rideK > 0.01) { const r = L.thigh.rotation, kk = Math.max(glide, rideK); r.set(r.x, r.y * (1 - kk), r.z * (1 - kk)); L.ankle.rotation.set(L.ankle.rotation.x, 0, 0); }
       }
       if (glide > 0.01) {   // tucked for the glide, eased in with it
@@ -1285,7 +1307,7 @@ export function buildEikar(o = {}) {
       const hyT = -twist * 0.6 + Math.sin(t * 0.5 + seed) * 0.18 * (1 - walkK) * (1 - b) + lookX * 0.35;
       headXV += ((hxT - headX) * 160 - headXV * 16) * dt; headX += headXV * dt;
       headY = lerp(headY, hyT, 1 - Math.exp(-9 * dt));
-      head.rotation.set(headX - glide * 1.15, headY + hipYaw * 0.75 + clamp(yawRate * 0.05, -0.35, 0.35) * walkK, -(body.rotation.z + torso.rotation.z) * 0.7);   // (flat out, he still looks ahead)   // the head stays on the road ahead
+      head.rotation.set(headX - glide * 1.15 - swimK * 0.95, headY + hipYaw * 0.75 + clamp(yawRate * 0.05, -0.35, 0.35) * walkK, -(body.rotation.z + torso.rotation.z) * 0.7);   // (flat out, he still looks ahead)   // the head stays on the road ahead
       // the cap rides on the head and trails its motion
       hatXV += ((-0.12 - headXV * 0.035 + sqV * 0.04 - hatX) * 120 - hatXV * 9) * dt; hatX += hatXV * dt;
       hat.rotation.x = clamp(hatX, -0.4, 0.2);
@@ -1306,10 +1328,33 @@ export function buildEikar(o = {}) {
       talkK = lerp(talkK, st.talking ? 1 : 0, 1 - Math.exp(-12 * dt));
       const syl = Math.max(0, Math.sin(t * 13 + Math.sin(t * 5.3) * 2)) * talkK;
       mouthIn.scale.y = 0.05 + syl * 0.75; mouthIn.visible = syl > 0.02; mouth.position.y = -0.06 + syl * 0.004;
+      if (slung && !sw) { wT.set(s * (0.23 - 0.07 * runK * walkK * Math.max(0, upW)), -0.15 + walkK * (runK * (0.25 + 0.08 * upW) + 0.02 * upW), 0.03 + upW * (0.1 + 0.16 * runK) * walkK); wD.set(0, 1, 0.2); wB.set(-s, 0, 0); if (tuck > 0.001) { sT.set(s * 0.14, 0.12, 0.2); wT.lerp(sT, tuck * 0.8); } }   // an empty hand swings like the other
+      if (swimK > 0.001) {   // reach forward together, sweep out round to the sides, draw in under the chest
+        const c = (swimPh % TAU) / TAU, rx = c < 0.4 ? lerp(0.1, 0.12, c / 0.4) : c < 0.75 ? lerp(0.12, 0.45, (c - 0.4) / 0.35) : lerp(0.45, 0.1, (c - 0.75) / 0.25), rz = c < 0.4 ? lerp(0.2, 0.62, c / 0.4) : c < 0.75 ? lerp(0.62, 0.15, (c - 0.4) / 0.35) : 0.2;
+        sT.set(s * rx, 0.3, rz); wT.lerp(sT, swimK); wD.set(s * 0.3, 0.2, 1); sT.set(-s * rx, 0.3, rz); fT.lerp(sT, swimK); fD.set(-s * 0.3, 0.2, 1);
+      }
+      if (lieK > 0.001) { sT.set(s * 0.42, 0.12, 0.06); wT.lerp(sT, lieK); wD.set(s, 0.2, 0.3); sT.set(-s * 0.4, 0.2, 0.08); fT.lerp(sT, lieK); fD.set(-s, 0.3, 0.3); }   // arms flung out
+      // standing about with nothing to do, now and then a little piece of business
+      {
+        const idle = !sw && !st.talking && !st.carry && !st.drink && !st.ride && !st.sit && !st.lie && !st.swim && walkK < 0.05 && onGround && !st.roll && glide < 0.05;
+        if (idle) { gestT -= dt; if (!gest && gestT <= 0) { gest = { kind: Math.floor(Math.random() * 4), t: 0, dur: 2.2 + Math.random() * 1.6 }; } } else { gestT = Math.max(gestT, 2.5); gest = null; }
+        if (gest) { gest.t += dt; if (gest.t > gest.dur) { gest = null; gestT = 5 + Math.random() * 10; } }
+        const want = gest ? Math.min(1, gest.t / 0.45, (gest.dur - gest.t) / 0.45) : 0;
+        gestK = lerp(gestK, want, 1 - Math.exp(-12 * dt));
+        if (gestK > 0.001 && gest) {
+          const w = gestK, kd = gest.kind, wig = Math.sin(t * 9) * 0.02;
+          if (kd === 0) { sT.set(-s * 0.06, 0.62 + wig, 0.04); fT.lerp(sT, w); fD.set(0, -0.3, 1); }                                  // scratches the back of his head
+          else if (kd === 1) { sT.set(-s * 0.2, 0.72, 0.02); fT.lerp(sT, w); if (slung) { sT.set(s * 0.2, 0.72, 0.02); wT.lerp(sT, w); } }   // a stretch, arms up
+          else if (kd === 2) { sT.set(-s * 0.12, 0.42, -0.06); fT.lerp(sT, w); }                                                   // rubs the back of his neck
+          else { sT.set(-s * 0.2, -0.02, -0.02); fT.lerp(sT, w); fD.set(-s, -0.4, 0); if (slung) { sT.set(s * 0.2, -0.02, -0.02); wT.lerp(sT, w); wD.set(s, -0.4, 0); } }   // hands on hips
+          if (kd === 1) torso.rotation.x -= 0.12 * w;
+        }
+      }
+      if (st.carry) { wT.set(s * 0.27, 0.06, 0.36); wD.set(0, 1, 0.15); wB.set(-s, 0, 0); fT.set(-s * 0.27, 0.06, 0.36); fD.set(0, 1, 0.15); fB.set(s, 0, 0); }   // both arms round what he's carrying
       poseArm(W, wT, wD, wB);
       poseArm(Fr, fT, fD, fB);
       // the shade at his feet: under the pelvis, gone when he leaves the ground or sits a mount
-      { const sk = Math.max(0, 1 - airK * 1.6) * (1 - rideK) * (1 - glide); shade.visible = sk > 0.02; shade.material.opacity = 0.8 * sk; shade.position.set(body.position.x, 0.03, body.position.z * 0.6); shade.scale.setScalar(1 + stK * 0.35 + tuck * 0.3); }
+      { const sk = Math.max(0, 1 - airK * 1.6) * (1 - rideK) * (1 - glide) * (1 - lieK) * (1 - swimK); shade.visible = sk > 0.02; shade.material.opacity = 0.8 * sk; shade.position.set(body.position.x, 0.03, body.position.z * 0.6); shade.scale.setScalar(1 + stK * 0.35 + tuck * 0.3); }
 
       if (wing) { wing.visible = glide > 0.08; wing.scale.set(Math.max(0.01, glide), 1, 1); cape.visible = glide < 0.5; if (cloakTrim) cloakTrim.visible = cape.visible; }
       if (cape && cape.visible && capeG.visible && dt > 0) capeTick(dt, t, k);

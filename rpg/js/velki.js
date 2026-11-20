@@ -10,7 +10,7 @@
    takes the run back when the air tears open.
    ============================================================ */
 import * as THREE from 'three';
-import { toon, ramp, addOutline, outlineAll, glowSprite, Particles, paint, waterMaterial } from './gfx.js';
+import { toon, ramp, addOutline, outlineAll, glowSprite, mistSprite, Particles, paint, waterMaterial, lightPools } from './gfx.js';
 import { buildEikar, placeWalker } from './actors.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, orbitPitch, tiltUp, railing } from './util.js';
 import * as STORY from './story.js';
@@ -41,6 +41,7 @@ export function createVelki(ctx) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xd08a78, 280, 2600);
   const SUN = V3(-0.9, 0.12, -0.42).normalize();
+  let sunK = 0, pools = null; const SUN_DAY = new THREE.Color(0xff9a5a), SUN_LOW = new THREE.Color(0xff5a32);
 
   /* ---------------- sky: the sun going down, the sky on fire ---------------- */
   const skyMat = new THREE.ShaderMaterial({
@@ -304,6 +305,7 @@ export function createVelki(ctx) {
   const lamps = [];
   const PLAZA = { x: 0, z: 34 };                      // the little fountain square in the south of the city, where Tanoc starts
   const kit = createCityKit(scene, { rng, heightAt, box, cyl, palette: 'velki' });
+  const HOUSES = [];   // every house built, for the folk who climb onto the roofs to watch
   const RINGS = [18, 28.5, 39, 49.5];
   for (let ring = 0; ring < RINGS.length; ring++) {
     const R = RINGS[ring], n = 9 + ring * 4;
@@ -313,7 +315,7 @@ export function createVelki(ctx) {
       if (Math.abs(x) < 6.5 && z > 0) continue;              // and the south lane
       if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 13) continue;
       if (inHomeZone(x, z, 6)) continue;                     // the home tree's roots
-      kit.house(x, z, Math.atan2(-x, -z), ring === 0 && i % 3 === 0 ? 'tall' : null);
+      HOUSES.push(kit.house(x, z, Math.atan2(-x, -z), ring === 0 && i % 3 === 0 ? 'tall' : null));
     }
   }
   // farmsteads by the fields
@@ -344,17 +346,43 @@ export function createVelki(ctx) {
   /* the spire: a stone needle with a stair winding up its outside */
   const SPIRE_TOP = 27, STEP_R = 4.5, NSTEPS = 48;
   {
-    const sm = toon(0xd0b090), dark = toon(0x8a6a50);
+    const sm = paint(toon(0xd0b090), 'stone'), dark = paint(toon(0x8a6a50), 'stone');
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.8, 0.6, 32), dark); plinth.position.y = 0.3; plinth.receiveShadow = true; addOutline(plinth, 0.04); scene.add(plinth);
     cyl(0, 0, 6.4, -1, 0.6);
     const core = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.7, SPIRE_TOP, 24), sm); core.position.y = SPIRE_TOP / 2; core.castShadow = core.receiveShadow = true; addOutline(core, 0.05); scene.add(core);
     cyl(0, 0, 3.6, -1, SPIRE_TOP);
     for (let k = 1; k < 6; k++) { const band = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.12, 5, 28), dark); band.rotation.x = Math.PI / 2; band.position.y = k * 4.8; scene.add(band); }
-    const rail = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.1, 5, 28), dark); rail.rotation.x = Math.PI / 2; rail.position.y = SPIRE_TOP + 0.9; scene.add(rail);
-    // a slim lamp-post at the very top, so nothing stands between you and the battle
-    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 4, 8), dark); pin.position.y = SPIRE_TOP + 2; pin.castShadow = true; addOutline(pin, 0.03); scene.add(pin);
-    cyl(0, 0, 0.25, SPIRE_TOP - 1, SPIRE_TOP + 4);
-    const tip = glowSprite(0xffd890, 3, 0.9); tip.position.y = SPIRE_TOP + 4.3; scene.add(tip); lamps.push(tip);
+    /* it is the city's watchtower, and looks it: a fighting top with a parapet (open where the stair comes up), a
+       timber roof on four posts with the watch-fire hung under it, a wooden gallery below the top, arrow slits up the
+       shaft, a door at the foot and the city's pennant at the peak */
+    const A_TOP = Math.PI / 2 + (NSTEPS - 1) * 0.33, timber = paint(toon(0x6a4428), 'wood'), slate = paint(toon(0x5a2a14), 'shingle');
+    const gapAt = a => Math.abs(Math.atan2(Math.sin(a - A_TOP), Math.cos(a - A_TOP))) < 0.5;
+    for (let k = 0; k < 20; k++) {
+      const a = k / 20 * TAU; if (gapAt(a)) continue;
+      const lo = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.7, 0.4), sm); lo.position.set(Math.cos(a) * 3.3, SPIRE_TOP + 0.35, Math.sin(a) * 3.3); lo.rotation.y = -a + Math.PI / 2; lo.castShadow = true; scene.add(lo);
+      if (k % 2 === 0) { const me = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 0.4), sm); me.position.set(Math.cos(a) * 3.3, SPIRE_TOP + 0.97, Math.sin(a) * 3.3); me.rotation.y = lo.rotation.y; scene.add(me); }
+      cyl(Math.cos(a) * 3.35, Math.sin(a) * 3.35, 0.36, SPIRE_TOP - 0.2, SPIRE_TOP + 0.75);
+    }
+    for (let k = 0; k < 4; k++) {
+      const a = Math.PI / 4 + k * Math.PI / 2, px = Math.cos(a) * 2.9, pz = Math.sin(a) * 2.9;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.4, 0.22), timber); post.position.set(px, SPIRE_TOP + 1.7, pz); post.rotation.y = -a; scene.add(post);
+      cyl(px, pz, 0.16, SPIRE_TOP, SPIRE_TOP + 3.4);
+    }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(4.6, 3, 16), slate); roof.position.y = SPIRE_TOP + 4.9; roof.castShadow = true; scene.add(roof);
+    const eave = new THREE.Mesh(new THREE.TorusGeometry(4.25, 0.12, 5, 24), timber); eave.rotation.x = Math.PI / 2; eave.position.y = SPIRE_TOP + 3.45; scene.add(eave);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.6, 6), timber); mast.position.y = SPIRE_TOP + 7.6; scene.add(mast);
+    const penn = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.6), toon(0xd8a040, { side: THREE.DoubleSide })); penn.geometry.translate(0.75, 0, 0); penn.position.set(0, SPIRE_TOP + 8.5, 0); penn.userData.pennant = true; scene.add(penn);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.26, 0.3, 10), toon(0x3a3438)); bowl.position.y = SPIRE_TOP + 2.75; scene.add(bowl);
+    for (let k = 0; k < 3; k++) { const a = k / 3 * TAU, ch = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.7, 4), toon(0x3a3438)); ch.position.set(Math.cos(a) * 0.3, SPIRE_TOP + 3.2, Math.sin(a) * 0.3); scene.add(ch); }
+    const tip = glowSprite(0xffb060, 2.6, 0.95); tip.position.y = SPIRE_TOP + 3.05; scene.add(tip); lamps.push(tip);
+    // the gallery: a timber walk hung out round the shaft under the fighting top, on brackets
+    const gal = new THREE.Mesh(new THREE.TorusGeometry(3.75, 0.3, 6, 28), timber); gal.rotation.x = Math.PI / 2; gal.scale.z = 0.7; gal.position.y = SPIRE_TOP - 0.45; scene.add(gal);
+    for (let k = 0; k < 12; k++) { const a = k / 12 * TAU + 0.1, br = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.3, 0.5), timber); br.position.set(Math.cos(a) * 3.62, SPIRE_TOP - 1.2, Math.sin(a) * 3.62); br.rotation.y = -a + Math.PI / 2; scene.add(br); }
+    // arrow slits, and the door at the foot (away from where the stair starts)
+    const slitM = new THREE.MeshBasicMaterial({ color: 0x1a120c });
+    for (let y = 5; y < SPIRE_TOP - 3; y += 4.8) for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + y * 0.21, sl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.5, 0.12), slitM); sl.position.set(Math.cos(a) * 3.6, y + 2.4, Math.sin(a) * 3.6); sl.rotation.y = -a + Math.PI / 2; scene.add(sl); }
+    { const a = -Math.PI * 0.2, door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.5, 0.25), timber); door.position.set(Math.cos(a) * 3.72, 1.85, Math.sin(a) * 3.72); door.rotation.y = -a + Math.PI / 2; scene.add(door);
+      const lint = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.3, 0.4), dark); lint.position.set(Math.cos(a) * 3.74, 3.25, Math.sin(a) * 3.74); lint.rotation.y = door.rotation.y; scene.add(lint); }
     const stepGeo = new THREE.BoxGeometry(1.9, 0.5, 1.9);
     for (let i = 0; i < NSTEPS; i++) {
       const a = Math.PI / 2 + i * 0.33, x = Math.cos(a) * STEP_R, z = Math.sin(a) * STEP_R, top = 0.6 + 0.55 * (i + 1);
@@ -390,7 +418,7 @@ export function createVelki(ctx) {
       const cx = (ax + bx) / 2, cz = (az + bz) / 2, len = Math.hypot(bx - ax, bz - az), gy = Math.min(heightAt(ax, az), heightAt(bx, bz), heightAt(cx, cz));
       const seg = new THREE.Mesh(new THREE.BoxGeometry(3, 9 + 3, len + 0.4), wm);
       seg.position.set(cx, gy + 4.5 - 1.5, cz); seg.rotation.y = Math.atan2(bx - ax, bz - az); seg.castShadow = seg.receiveShadow = true; scene.add(seg);
-      if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 1.2), wm); cr.position.set(cx, gy + 9.6, cz); cr.rotation.y = seg.rotation.y; scene.add(cr); }
+      if (i % 2 === 0) { const cr = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 1.4), wm); const ox = Math.cos(m), oz = Math.sin(m); cr.position.set(cx + ox * 1.2, gy + 9.6, cz + oz * 1.2); cr.rotation.y = seg.rotation.y; scene.add(cr); }   // merlons on the outer edge: the walk behind them is clear
       if (i % 26 === 13) { const tw = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.7, 13, 12), wm); tw.position.set(cx, gy + 6.5, cz); addOutline(tw, 0.05); scene.add(tw); const tc = new THREE.Mesh(new THREE.ConeGeometry(3, 3.6, 12), toon(0x5a2a14)); tc.position.set(cx, gy + 14.8, cz); addOutline(tc, 0.04); scene.add(tc); }
     });
     for (const s of [-1, 1]) {
@@ -404,10 +432,14 @@ export function createVelki(ctx) {
   }
   /* banners on the wall, streaming toward the battle */
   const banners = [];
+  let pennant = null; scene.traverse(o => { if (o.userData.pennant) pennant = o; });
   for (let i = 0; i < 10; i++) {
     const a = GATE_A + (i - 4.5) * 0.18; if (Math.abs(a - GATE_A) < 0.1) continue;
     const b = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 3.2), toon(i % 2 ? 0x8a2a3a : 0xd8a040, { side: THREE.DoubleSide }));
     b.position.set(Math.cos(a) * (WALL_R - 1.7), 7, Math.sin(a) * (WALL_R - 1.7)); b.rotation.y = -a + Math.PI / 2; b.userData.ph = i; scene.add(b); banners.push(b);
+    b.geometry.translate(0, -1.6, 0); b.position.y = 8.6;   // hung by its top edge from a pole on the wall, not adrift in the air
+    { const pole = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.1, 0.1), toon(0x4a2a14)); pole.position.set(b.position.x, 8.62, b.position.z); pole.rotation.y = b.rotation.y; scene.add(pole);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.6), toon(0x4a2a14)); arm.position.set(b.position.x + Math.cos(a) * 0.25, 8.62, b.position.z + Math.sin(a) * 0.25); arm.rotation.y = -a + Math.PI / 2; scene.add(arm); }
   }
 
   /* ---------------- people: the watching city, the warden, the Ahoac ---------------- */
@@ -440,8 +472,69 @@ export function createVelki(ctx) {
   }
   // stallkeepers
   for (const [x, z, ry] of [[-9.5, 30, 1.2], [9.5, 31, -1.3], [-7, 42.5, 2.5]]) { const p = crowd.spawn(FOLK_LOOKS[(x * 7 | 0) & 7], V3(x - Math.sin(ry) * 1.3, 0, z - Math.cos(ry) * 1.3)); p.fixed = true; p.look = V3(PLAZA.x, 0, PLAZA.z); }
+  /* up on the roofs: half the city has climbed up to watch (simple sitting figures, a handful of draws for all of them) */
+  {
+    const list = [];
+    for (const h of HOUSES) { if (!h || h.top == null || rng() < 0.35) continue; const n = 1 + Math.floor(rng() * 3); for (let k = 0; k < n; k++) list.push({ x: h.x + Math.cos(h.ry) * (k - (n - 1) / 2) * 0.9, y: h.top - 0.15, z: h.z - Math.sin(h.ry) * (k - (n - 1) / 2) * 0.9 }); }
+    const N = Math.max(1, Math.min(list.length, 90)), o = new THREE.Object3D(), c = new THREE.Color();
+    const bodies = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.17, 0.3, 3, 8), toon(0xffffff), N), heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 10, 8), toon(0xffffff), N), caps = new THREE.InstancedMesh(new THREE.SphereGeometry(0.145, 10, 6, 0, TAU, 0, Math.PI / 2), toon(0xffffff), N);
+    const TUN = [0x5a6a8a, 0x8a4a3a, 0x4a7a5a, 0x7a6a4a, 0x9a5a7a, 0xb87a2a], SK = ['#a8743e', '#c08a52', '#9a6a40', '#b07a48'];
+    for (let i = 0; i < Math.min(N, list.length); i++) {
+      const q = list[i];
+      o.rotation.set((rng() - 0.5) * 0.3, 0, 0); o.scale.setScalar(0.9 + rng() * 0.25);
+      o.position.set(q.x, q.y + 0.32, q.z); o.updateMatrix(); bodies.setMatrixAt(i, o.matrix); bodies.setColorAt(i, c.set(TUN[i % TUN.length]));
+      o.position.set(q.x, q.y + 0.74, q.z); o.updateMatrix(); heads.setMatrixAt(i, o.matrix); heads.setColorAt(i, c.set(SK[i % SK.length]));
+      o.position.set(q.x, q.y + 0.79, q.z); o.updateMatrix(); caps.setMatrixAt(i, o.matrix); caps.setColorAt(i, c.set(i % 3 ? 0x4a2a18 : 0x5a3018));
+    }
+    for (const m of [bodies, heads, caps]) { m.count = Math.min(N, list.length); m.userData.keepFacets = true; scene.add(m); }
+  }
+  /* the wall is manned: spearmen walking their lengths of it, archers standing to at the gate, a ballista either side */
+  const SOLDIER = { skin: '#9a6a40', cap: '#2a2a30', tunic: 0x4a4a5a, trim: 0xb8a070, leg: 0x3a3a44 };
+  for (let k = 0; k < 8; k++) {
+    const a0 = GATE_A + (k < 4 ? -1 : 1) * (0.2 + (k % 4) * 0.42), sp = person(0, 0, SOLDIER, { weapon: 'spear', build: 1.1, seed: 'w' + k });
+    sp.look = false; sp.armed = true; sp.patrol = { a: a0, a0: a0 - 0.16, a1: a0 + 0.16, dir: k % 2 ? 1 : -1, r: wallR(a0) };
+  }
+  for (const d of [-0.13, 0.13, -0.3, 0.3, -0.48, 0.48]) {
+    const a = GATE_A + d, r = wallR(a), ar = person(Math.cos(a) * r, Math.sin(a) * r, SOLDIER, { weapon: 'bow', build: 1.05, seed: 'a' + d });
+    ar.look = false; ar.armed = true; ar.pos.y = heightAt(ar.pos.x, ar.pos.z) + 9; ar.a.root.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
+  }
+  for (const d of [-0.21, 0.21]) {
+    const a = GATE_A + d, r = wallR(a) - 0.4, bx = Math.cos(a) * r, bz = Math.sin(a) * r, g = new THREE.Group(), wd = paint(toon(0x6a4428), 'wood'), iron = toon(0x4a4a52);
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 2.6), wd); bed.position.y = 1.0; bed.rotation.x = -0.28; g.add(bed);
+    for (const q of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.14, 0.2), wd); arm.position.set(q * 0.7, 1.3, 0.95); arm.rotation.y = q * 0.45; g.add(arm); const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.1, 0.16), wd); leg.position.set(q * 0.45, 0.5, -0.3); leg.rotation.z = q * 0.25; g.add(leg); }
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.4, 6), iron); bolt.rotation.x = Math.PI / 2 - 0.28; bolt.position.set(0, 1.28, 0.3); g.add(bolt);
+    const cord = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.03, 0.03), toon(0xd8c8a0)); cord.position.set(0, 1.2, 0.35); g.add(cord);
+    g.position.set(bx, heightAt(bx, bz) + 9, bz); g.rotation.y = Math.atan2(Math.cos(a), Math.sin(a)); g.scale.setScalar(1.25); scene.add(g);
+  }
+  /* storm round the war in the air: banks of dark cloud heaped about it, lit from inside when something strikes */
+  const stormLights = [];
+  {
+    for (let k = 0; k < 46; k++) {
+      const m = mistSprite([0x2e3642, 0x3a4350, 0x454a5c, 0x28303a][k % 4], 150 + rng() * 170, 60 + rng() * 60, 0.55 + rng() * 0.3);
+      m.position.set((rng() - 0.5) * 520, 30 + rng() * 120, -260 + (rng() - 0.5) * 220); m.material.fog = false; scene.add(m);
+    }
+    for (let k = 0; k < 4; k++) { const L = glowSprite(k % 2 ? 0xbfe8ff : 0xfff0c0, 150, 0); L.position.set(0, 80, -220); L.material.fog = false; scene.add(L); stormLights.push({ m: L, t: 0 }); }
+  }
+  /* ships standing in to the harbour: hulls, two masts, sails catching the last of the sun */
+  {
+    const hullM = paint(toon(0x5a3a22), 'wood'), sailM = toon(0xf0e0c0, { side: THREE.DoubleSide }), list = seaBits.boats || (seaBits.boats = []);
+    for (const [x, z, ry, sc] of [[-300, -60, 0.4, 1.5], [-380, 70, -0.3, 1.9], [-250, 170, 1.1, 1.2], [-470, -180, 0.8, 2.2], [-210, -190, -0.9, 1.1]]) {
+      if (x > SHORE(z) - 40) continue;
+      const g = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 8, 0, TAU, Math.PI / 2, Math.PI / 2), hullM); hull.scale.set(2.2, 2.4, 7.5); hull.position.y = 1.0; g.add(hull);
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.25, 12.5), hullM); deck.position.y = 1.0; g.add(deck);
+      const castle = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.6, 3), hullM); castle.position.set(0, 1.9, -5); g.add(castle);
+      for (const [mz, mh] of [[1.5, 13], [-2.6, 10]]) {
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, mh, 6), hullM); mast.position.set(0, 1 + mh / 2, mz); g.add(mast);
+        const sail = new THREE.Mesh(new THREE.PlaneGeometry(6.4, mh * 0.62, 4, 3), sailM); const sp = sail.geometry.attributes.position; for (let i = 0; i < sp.count; i++) sp.setZ(i, 0.9 * Math.cos(sp.getX(i) / 3.2 * Math.PI / 2)); sail.geometry.computeVertexNormals();
+        sail.position.set(0, 1 + mh * 0.62, mz + 0.2); g.add(sail);
+        const yard = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6.8, 5), hullM); yard.rotation.z = Math.PI / 2; yard.position.set(0, 1 + mh * 0.93, mz); g.add(yard);
+      }
+      g.position.set(x, SEA_Y + 0.1, z); g.rotation.y = ry; g.scale.setScalar(sc); scene.add(g); list.push(g);
+    }
+  }
   const warden = person(6.5, -54, { skin: '#9a6a40', cap: '#3a2a1a', tunic: 0x4a4a5a, trim: 0xb8a070 }, { weapon: 'spear', build: 1.15, scale: 1.05 });
-  warden.look = false;
+  warden.look = false; warden.armed = true;
   const crew = [-2.5, 0, 2.5].map((x, i) => {
     const p = person(x, -30 - i * 2, { skin: '#b07a48', cap: '#3a2414', tunic: 0xb87a2a, trim: 0xffd060, leg: 0x6a4a20 }, { build: 1.1, cape: 0x9a3a1a });
     p.look = false; p.run = false; p.delay = i * 0.5; return p;
@@ -521,8 +614,8 @@ export function createVelki(ctx) {
         ctx.objective(B4.drillObj(DR.n), B4.drillHint);
         if (DR.n >= 5) {
           for (const q of DR.sparks) { scene.remove(q.ball); scene.remove(q.ring); } DR.sparks.length = 0;
-          stage = 'drilled'; ctx.save && ctx.save('spire');
-          ctx.say(B4.done, () => { hasCloak = true; tanoc.setCape(CLOAK); ctx.give && ctx.give('ahoac_cloak', 1); ctx.hint && ctx.hint('The Ahoac cloak: jump, then hold Space while you fall.'); stage = 'spire'; said = 0; setBeacon(); ctx.objective(STORY.PRO_OBJ.spire, 'Shift to run · Space to jump'); });
+          stage = 'drilled';
+          ctx.say(B4.done, () => { stage = 'leaving'; ctx.objective(B4.leaveObj, B4.leaveHint); });   // sent home: he has to turn and go
           return;
         }
       }
@@ -669,6 +762,15 @@ export function createVelki(ctx) {
         p.pos.x += dx / d * 7.5 * dt; p.pos.z += dz / d * 7.5 * dt; p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 1);
         p.a.root.rotation.y = Math.atan2(dx, dz); speed = 7.5;
         if (p.pos.z < -150) { p.run = false; p.a.root.visible = false; }
+      } else if (p.chase) {   // the captain, after the boy
+        const dx = P.pos.x - p.pos.x, dz = P.pos.z - p.pos.z, d = Math.hypot(dx, dz) || 1;
+        const run = Math.min(13, 6 + d * 0.5);   // gaining on him even if he sprints
+        if (d > 2.2) { p.pos.x += dx / d * run * dt; p.pos.z += dz / d * run * dt; p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 1); speed = run; }
+        p.a.root.rotation.y = dampAngle(p.a.root.rotation.y, Math.atan2(dx, dz), 10, dt);
+      } else if (p.patrol) {   // the watch, walking their length of the wall and back
+        const W = p.patrol; W.a += W.dir * 1.5 / W.r * dt; if (W.a > W.a1) W.dir = -1; else if (W.a < W.a0) W.dir = 1;
+        const r = wallR(W.a); p.pos.set(Math.cos(W.a) * r, heightAt(Math.cos(W.a) * r, Math.sin(W.a) * r) + 9, Math.sin(W.a) * r);
+        p.a.root.rotation.y = dampAngle(p.a.root.rotation.y, Math.atan2(-Math.sin(W.a) * W.dir, Math.cos(W.a) * W.dir), 5, dt); speed = 1.5;
       } else if (p.look) {
         const want = Math.atan2(-p.pos.x * 0.15, -WALL_R - 100 - p.pos.z);
         p.a.root.rotation.y = dampAngle(p.a.root.rotation.y, want, 2, dt);
@@ -676,7 +778,7 @@ export function createVelki(ctx) {
         const want = stage === 'spire' ? Math.atan2(P.pos.x - p.pos.x, P.pos.z - p.pos.z) : Math.PI;
         p.a.root.rotation.y = dampAngle(p.a.root.rotation.y, want, 3, dt);
       }
-      p.a.animate(dt, { speed, onGround: true, t: t + p.ph });
+      p.a.animate(dt, { speed, onGround: true, t: t + p.ph, armed: !!p.armed });
     }
   }
 
@@ -691,6 +793,8 @@ export function createVelki(ctx) {
     fountain.update(dt, t, particles, [P.pos]);
     updateBattle(dt);
     banners.forEach(b => { b.rotation.x = Math.sin(t * 2 + b.userData.ph) * 0.12; });
+    if (pennant) pennant.rotation.y = Math.sin(t * 1.7) * 0.35 + 1.2;
+    for (const L of stormLights) { L.t -= dt; if (L.t <= 0) { L.t = 0.5 + Math.random() * 2.6; L.m.position.set((Math.random() - 0.5) * 420, 40 + Math.random() * 90, -200 + (Math.random() - 0.5) * 160); L.m.material.opacity = 0.75; } L.m.material.opacity = Math.max(0, L.m.material.opacity - dt * 2.2); }
     if (seaBits.boats) seaBits.boats.forEach((b, i) => { b.position.y = SEA_Y + 0.1 + Math.sin(t * 1.2 + i * 1.7) * 0.12; b.rotation.z = Math.sin(t * 0.9 + i) * 0.04; });
     lamps.forEach((l, i) => { l.material.opacity = 0.75 + Math.sin(t * 5 + i) * 0.12; });
     beacon.material.opacity = 0.6 + Math.sin(t * 4) * 0.3;
@@ -702,12 +806,24 @@ export function createVelki(ctx) {
       if (stage === 'home' && said === 0) { said = -1; ctx.say(B4.mom, () => ctx.objective(B4.basketObj, B4.basketHint)); }
       if (stage === 'home' && P.pos.z < -WALL_R + 5 && Math.abs(P.pos.x) < 6 && !G_warned) { G_warned = true; ctx.say([STORY.PROLOGUE.guard[0]]); }
       if (stage === 'drill') drillTick(dt);
+      // sent home: he walks off; once he is well away the captain comes running after him with the cloak
+      if (stage === 'leaving' && Math.hypot(P.pos.x - captain.pos.x, P.pos.z - captain.pos.z) > 15) { stage = 'chase'; captain.chase = true; ctx.bark('captain', B4.wait, 2.5); }
+      if (stage === 'chase' && Math.hypot(P.pos.x - captain.pos.x, P.pos.z - captain.pos.z) < 2.6) {
+        stage = 'given'; captain.chase = false; ctx.save && ctx.save('spire');
+        P.yaw = Math.atan2(captain.pos.x - P.pos.x, captain.pos.z - P.pos.z);
+        ctx.say(B4.sorry, () => { hasCloak = true; tanoc.setCape(CLOAK); ctx.give && ctx.give('ahoac_cloak', 1); ctx.hint && ctx.hint('The Ahoac cloak: jump, then hold Space while you fall.'); stage = 'spire'; said = 0; setBeacon(); ctx.objective(STORY.PRO_OBJ.spire, 'Shift to run · Space to jump'); });
+      }
       if (stage === 'spire') {
-        if (said === 0) { said = 1; ctx.say(STORY.PROLOGUE.start); }
+        if (said === 0) {
+          said = 1; ctx.say(STORY.PROLOGUE.start);
+          // and while he says it, the picture shows it: the folk up on the roofs, and the sun going down into the sea
+          const sd = V3(SUN.x, 0, SUN.z).normalize(), side = V3(-sd.z, 0, sd.x);
+          cine.play([{ dur: 9, cam: k => ({ p: V3(-sd.x * (34 - 14 * k) + side.x * (16 * k - 8), 21 - 5 * k, 6 - sd.z * (34 - 14 * k) + side.z * (16 * k - 8)), l: V3(sd.x * 300, 6 + 10 * k, sd.z * 300) }) }], null, { bars: true });
+        }
         if (P.pos.y > 6 && barkI === 0) { barkI = 1; ctx.bark('tanoc', STORY.PROLOGUE.barks[0], 3.5); }
         if (P.pos.y > 14 && barkI === 1) { barkI = 2; ctx.bark('tanoc', STORY.PROLOGUE.barks[1], 3.5); }
         if (P.pos.y > 22 && barkI === 2) { barkI = 3; ctx.bark('tanoc', STORY.PROLOGUE.barks[2], 3.5); }
-        if (P.pos.y > SPIRE_TOP - 0.3 && P.onGround) topReached();
+        if (P.pos.y > SPIRE_TOP - 0.3 && P.onGround && Math.hypot(P.pos.x, P.pos.z) < 3.0) topReached();   // out on the fighting top itself, not the last step
         // the warden turns you back at the gate until you've seen it from the top
         if (P.pos.z < -WALL_R + 5 && Math.abs(P.pos.x) < 6 && !G_warned) { G_warned = true; ctx.say([STORY.PROLOGUE.guard[0]], () => ctx.hint('The spire, then — nobody’s guarding that.')); }
       } else if (stage === 'gate' || stage === 'out') {
@@ -731,6 +847,12 @@ export function createVelki(ctx) {
     }
     if (!cine.update(dt)) updateCamera(dt);
     // the sun follows the boy around for its shadows
+    // the sun going down: from the moment he says everyone's on the roofs, it sinks to the sea and reddens
+    sunK = damp(sunK, stage === 'home' || stage === 'drill' || stage === 'drilled' || stage === 'leaving' || stage === 'chase' || stage === 'given' ? 0 : 1, 0.12, dt);
+    SUN.set(-0.9, lerp(0.12, 0.022, sunK), -0.42).normalize();
+    sun.color.copy(SUN_DAY).lerp(SUN_LOW, sunK); sun.intensity = lerp(2.4, 1.55, sunK);
+    if (!pools) pools = lightPools(scene, (x, z) => groundAt(x, z, 60), heightAt);   // and the lamps' light pools on the streets as it goes down
+    pools.material.opacity = 0.18 + 0.4 * sunK;
     sun.position.copy(P.pos).addScaledVector(SUN, 140); sun.target.position.copy(P.pos);
   }
   let G_warned = false;

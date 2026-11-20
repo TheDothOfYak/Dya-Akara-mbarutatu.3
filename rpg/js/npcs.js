@@ -114,7 +114,7 @@ export function buildKeilia(o = {}) {
   const skull = new THREE.Mesh(new THREE.SphereGeometry(HR, 18, 14), skin); skull.scale.set(0.95, 1.12, 1.0); skull.position.y = 0.15; head.add(skull);
   const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 8), skin); jaw.scale.set(1.0, 0.7, 0.95); jaw.position.set(0, 0.07, 0.035); head.add(jaw);
   const brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.022, 0.12, 3, 8), skin); brow.rotation.z = Math.PI / 2; brow.position.set(0, 0.215, 0.115); head.add(brow);
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.046, 12, 10), new THREE.MeshBasicMaterial({ color: 0xf6eedc })); white.scale.set(1.25, 1, 0.5); white.position.set(0, 0.17, 0.122); white.userData.noOutline = true; head.add(white);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.046, 12, 10), new THREE.MeshLambertMaterial({ color: 0xf6eedc, emissive: 0x6a645a })); white.scale.set(1.25, 1, 0.5); white.position.set(0, 0.17, 0.122); white.userData.noOutline = true; head.add(white);
   const iris = new THREE.Mesh(new THREE.SphereGeometry(0.029, 10, 8), new THREE.MeshBasicMaterial({ color: o.eye || 0x7a8a2a })); iris.scale.set(1, 1, 0.45); iris.position.set(0, 0.168, 0.136); iris.userData.noOutline = true; head.add(iris);
   const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), new THREE.MeshBasicMaterial({ color: 0x120a04 })); pupil.scale.set(1, 1.2, 0.4); pupil.position.set(0, 0.168, 0.145); pupil.userData.noOutline = true; head.add(pupil);
   const glint = new THREE.Mesh(new THREE.SphereGeometry(0.007, 5, 4), new THREE.MeshBasicMaterial({ color: 0xffffff })); glint.position.set(0.012, 0.182, 0.15); glint.userData.noOutline = true; head.add(glint);
@@ -261,7 +261,7 @@ export function buildKarnen(o = {}) {
   for (const s of [-1, 1]) {
     const ear = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.11, 3), skin); ear.rotation.z = -s * 1.25; ear.position.set(s * 0.12, 0.2, -0.04); head.add(ear);
     // triangular eyes on the two front faces
-    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.026, 3, Math.PI / 2 + (s > 0 ? 0.25 : -0.25)), new THREE.MeshBasicMaterial({ color: 0xf2e6c8 }));
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.026, 3, Math.PI / 2 + (s > 0 ? 0.25 : -0.25)), new THREE.MeshLambertMaterial({ color: 0xf2e6c8, emissive: 0x6a645a }));
     eye.position.set(s * 0.043, 0.2, 0.082); eye.rotation.y = s * 0.55; eye.userData.noOutline = true; head.add(eye); kEyes.push(eye);
     const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.012, 3, Math.PI / 2), dark); pupil.position.set(s * 0.043, 0.195, 0.086); pupil.rotation.y = s * 0.55; pupil.userData.noOutline = true; head.add(pupil); kEyes.push(pupil); kPupils.push(pupil);
     const brow = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.008), dark); brow.position.set(s * 0.045, 0.232, 0.08); brow.rotation.set(0, s * 0.55, s * 0.35); brow.userData.noOutline = true; head.add(brow); kBrows.push(brow);

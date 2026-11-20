@@ -56,6 +56,7 @@ python3 -m http.server 8000
 **Free permanent hosting:** every push to `main` auto-deploys to two places:
 - **GitHub Pages** — `https://<your-username>.github.io/Dya-Akara-mbarutatu.3/` (`.github/workflows/deploy-pages.yml`). Requires Settings → Pages → Source → **GitHub Actions**, once.
 - **Firebase Hosting** — `https://<your-firebase-project>.web.app` (`.github/workflows/deploy-firebase.yml`). Requires a one-time `FIREBASE_SERVICE_ACCOUNT` repository secret — see below.
+- **Search engines** — every page carries a description, link-preview tags and game details for Google and Bing, the home page lists every game as plain links, and `robots.txt` and `sitemap.xml` sit at the root. All of it is written by `node tools/seo.js`; run it again after adding a game or moving the site (the home address is `SITE` at the top of that file, currently the Firebase one). To get found faster, add the site in [Google Search Console](https://search.google.com/search-console) (and Bing Webmaster Tools) and submit `sitemap.xml`.
 
 Both serve the exact same static files, so both stay in sync automatically from now on.
 
@@ -277,11 +278,12 @@ The great ones are only ever seen from far off. The Aerolhorn crosses the sky no
 |---|---|
 | `W A S D` + mouse | Move and look (click the world to capture the mouse) |
 | `Shift` / `Space` / `C` | Sprint / jump / dodge roll |
+| `Space` held, running at a ledge | Climb: he catches the top of a wall, crate, cart or rock within reach and pulls himself up |
 | Left click | Three-strike axe combo |
 | Right click | **Duat Strike**: the axe passes through the Duat to the foe you’re aiming at |
 | `T` or middle click | Lock on to a target |
 
-Fighting: locked on, he keeps facing the target and steps round it (sprint to break away). A swing with nothing locked goes at the nearest foe ahead. Roll through a blow at the last moment and time slows for a breath, the stamina comes back, and the next blow hits harder. Let go of `Space` early for a short hop.
+Fighting: locked on, he keeps facing the target and steps round it (sprint to break away). Attack out of a full sprint for a running blow that carries him through. A swing with nothing locked goes at the nearest foe ahead. Roll through a blow at the last moment and time slows for a breath, the stamina comes back, and the next blow hits harder. Let go of `Space` early for a short hop.
 | `R` | Drink Albali film (heals and cures poison) |
 | `Q` | **Tukang Flare**: releases full heat as a fire nova |
 | `F` | **Nur Sense**: Phorus points out the next objective |
@@ -292,7 +294,13 @@ Fighting: locked on, he keeps facing the target and steps round it (sprint to br
 
 **The look and the motion.** Folk stand on the ground: legs are solved from the feet up, with a real stride (heel, toe, a carried swing), hips and shoulders turning against each other, a lean into speed and into turns, and blows that wind up, strike and follow through. Capes are cloth. The camera adds contact shade read from depth, then a colour grade (Settings can turn the shade off). Water moves and glitters, the meadow is laid blade by blade round you and parts as you walk, tree crowns are sprays of leaf with the sun coming through, bark is furrowed, and the home trees have swept buttress roots, forking limbs and a layered crown, still hollow and with nothing built on the outside.
 
+**Life in the world.** Butterflies and wildflowers in the meadows by day, lamplight pooling on the ground at night, windows dark by day and lit at night, soft cumulus in every sky, leaf sprays round every crown and needles on the pines. Folk standing about scratch their heads, stretch, or stand with hands on hips; soldiers and foes on guard keep their weapons in hand. Foes rock back when struck and fall over when beaten; Torcain collapses when beaten, swims a breaststroke, and leaves a trail of light through every blow.
+
+**Keeping it smooth.** If frames run slow for a few seconds of play the game gives up, one step at a time, the contact shade, the thick meadow, then a fifth of the resolution. Settings has a switch to turn this off. Characters and creatures cast no shadow of their own (buildings, trees and the land still do).
+
 **Real surfaces and your own models.** Walls, ground, roofs, cobbles and bark carry photographed materials (Poly Haven, CC0) laid on in world space; the ink lines and the oil-paint filter are off. Any character or creature can be played by a `.glb` of your own, and any model stood in the world as scenery: put the file in `rpg/assets/models/`, add an entry to `rpg/assets/models.json`, and see `rpg/assets/README.md`.
+
+**Smoke test.** `node tools/rpg-smoke.js` loads every region and the prologue scenes in a headless browser (Playwright with Chromium) and reports any script error; name scenes to run only those (`xilia`, `property`, `aakalay`, `leotik`, `megla`, `road`, `velki`, `market`, `escape`).
 
 Code (`rpg/js/`): `lens.js` the depth shade and grade, `assets.js` your own models, `xilia.js` (Beuhk), `world.js` (Aakalay) and `leotik.js` (Leotik) build the regions, `terrain.js` holds shared collision and instancing, `solid.js` makes everything you can see solid (all but the sky, water, grass and what's see-through or moving) on top of each region's hand-placed colliders, `sky.js` the skies, `ship.js` the Eldi ship, `actors.js` and `creatures.js` the models, `enemies.js` the creature AI, `progress.js` the difficulty, saves and upgrades (bump `SAVE_V` to reset every run), `bounties.js` the bounty boards, `dya3d.js` Dya'Akara in 3D, `story.js` all the text, and `main.js` the controls, combat, bosses and quests.
 

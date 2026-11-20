@@ -524,7 +524,7 @@ export const PROLOGUE = {
   ],
   start: [
     ['tanoc', 'Everyone’s on the rooftops. That’s no good — you can’t see anything past the wall from a roof.'],
-    ['tanoc', 'The spire, though. Nobody’s allowed up the spire. Which means nobody will be up there.'],
+    ['tanoc', 'The watchtower, though. The captain said it himself: nobody will be up there tonight.'],
   ],
   barks: [
     'Up, up, up. Don’t look down. …I looked down.',
@@ -599,7 +599,7 @@ export const ARRIVAL = {
   ],
   bag: [
     ['buhkon', 'Here — take this. It’s Relic-bound: it holds what you put in it and won’t let go for anyone else.'],
-    ['buhkon', 'Those things that fell are Sniller amulets. Gather as many as you can before somebody who shouldn’t have them does.'],
+    ['buhkon', 'I don’t know what those things are that fell. Nobody’s ever seen the like. But nothing falls out of a sky like that for no reason — grab as many as you can, boy. Quick!'],
     ['buhkon', 'Some will be on the ground. Some will be up on the roofs, or stuck fast in a wall. Climb if you have to. Be quick.'],
     ['buhkon', 'And take my hatchet. Blunt side out. Things are going to be frightened.'],
   ],
@@ -1598,13 +1598,21 @@ PROLOGUE.before = {
     ['captain', 'But I lied, a little. Tonight nobody who isn’t crew stands at the yard wall. Not this Skyfall. The sky’s wrong tonight — even the old ones say so.'],
     ['tanoc', 'That’s not fair!'],
     ['captain', 'No. It isn’t. Go home, Filugani. Watch it from the street. Come back when you’re fifteen and we’ll see about real boots.'],
-    ['tale', 'He turns to go. Behind him, somebody clears their throat.'],
+    ['tale', 'He turns to go.'],
+  ],
+  leaveObj: 'Go home, like the captain said',
+  leaveHint: 'Walk away from the Ahoac yard',
+  wait: 'Filugani! Wait!',
+  /* once he has walked off: the captain comes running after him */
+  sorry: [
+    ['tale', 'Boots on the cobbles behind him, running. The captain, out of breath, a rolled bundle under one arm.'],
     ['captain', 'Filugani. Wait. …That was a rotten thing to do to you, and I did it anyway. Here.'],
-    ['tale', 'The captain pulls a rolled bundle off the rack by the yard door: rust-red cloth, brass at the collar, cord loops for the wrists.'],
+    ['tale', 'He shakes the bundle out: rust-red cloth, brass at the collar, cord loops for the wrists.'],
     ['captain', 'A glide cloak. Standard issue — every Ahoac gets one; it’s how we come down off the towers without breaking our legs. That one’s a spare. Call it an apology.'],
     ['captain', 'Jump off something, spread your arms, and HOLD — let the cloth take the wind. Something low, Filugani. Low.'],
     ['tanoc', '…A real Ahoac cloak.'],
-    ['captain', 'A real one. Now go home before I change my mind.'],
+    ['captain', 'A real one. And Filugani — if a boy wanted to SEE tonight, and I am not saying he should… the old watchtower in the middle of the city. Every hand I have is on the wall. Nobody will be up there tonight.'],
+    ['captain', 'I never said that. Now go, before I change my mind.'],
     ['tale', 'Bells start ringing all across the city. The sun touches the sea.'],
   ],
 };

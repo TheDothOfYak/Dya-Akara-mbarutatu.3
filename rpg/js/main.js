@@ -14,8 +14,8 @@ import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
-import { Particles, glowSprite, mistSprite, toon, addOutline, outlineAll } from './gfx.js';
-import { installSmoothStyle, ready as smoothReady } from './smooth.js';
+import { Particles, Ripples, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools, paint } from './gfx.js';
+import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
 import { installDetailCull, setDetailCull } from './detail.js';
 import { latchAlongRay, trunkAt } from './vines.js';
 import { MEADOW } from './terrain.js';
@@ -61,7 +61,9 @@ const $ = id => document.getElementById(id);
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 /* ---------------- settings ---------------- */
-const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, ao: true, scale: 1 };
+const OPT = { sens: 1, invert: false, vol: 0.7, bloom: true, shadows: true, ao: true, auto: true, scale: 1 };
+const QA = { scale: 1, step: 0, avg: 16.7, cool: 8 };
+const WIN_DAY = new THREE.Color(0x3c4650);   // window glass by day (the night lights them: frame loop)   // the automatic quality steps (autoQuality, by the frame loop)
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('torcain-opts') || '{}')); } catch (e) { /* private mode */ }
 const saveOpts = () => { try { localStorage.setItem('torcain-opts', JSON.stringify(OPT)); } catch (e) { /* ignore */ } };
 installDetailCull();    // parts smaller than a pixel are not drawn (they still cost a draw call each)
@@ -175,7 +177,7 @@ function smoothTarget() {
 }
 const composer = new EffectComposer(renderer, smoothTarget());
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 0.86);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 1.15);   // (threshold over 1: only what really shines blooms — a sunlit pale ground does not)
 /* the lens (lens.js): contact shade from the picture's own depth, then the brushwork, then the grade */
 const lens = addLens(composer, camera, { bloom, paint: paintPass(ShaderPass), output: new OutputPass() });
 lens.shade.enabled = OPT.ao !== false;
@@ -185,7 +187,7 @@ let particles = null;
 let solids = null;   // everything you can see is solid (solid.js), once the world is built
 let VK = null, vkComposer = null;   // the Velki prologue's own little world, while it lasts
 function resize() {
-  const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale;
+  const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale * QA.scale;
   renderer.setPixelRatio(pr); composer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -208,6 +210,7 @@ const sky = buildSky(scene, buildEldiShip, REGION === 'leotik' ? 'storm' : 'gold
 /* day and night: the sun crosses the sky; at night the Esik glow */
 const dn = createDayNight({ scene, sky, sun, hemi, rim, renderer, bloom, region: REGION, startHour: SAVE.hour ?? 9 });
 particles = new Particles(scene, 3500);
+const ripples = new Ripples(scene);
 resize();
 addEventListener('resize', resize);
 
@@ -223,12 +226,17 @@ if (REGION === 'xilia') {
    on Leotik the one you came through has closed behind you. */
 function urverkRing(open) {
   const g = new THREE.Group();
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.42, 8, 32), toon(0x2a2236, { emissive: 0x6a3aff, emissiveIntensity: open ? 0.7 : 0.15 }));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.42, 14, 48), paint(toon(0x3e3a48, { emissive: 0x6a3aff, emissiveIntensity: open ? 0.7 : 0.03 }), 'rock', 0.6));
   ring.position.y = 3.6; addOutline(ring, 0.05); g.add(ring);
-  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const k = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.6), toon(0x4a4060)); k.position.set(Math.cos(a) * 3.2, 3.6 + Math.sin(a) * 3.2, 0); k.rotation.z = a; g.add(k); }
-  const base = new THREE.Mesh(new THREE.BoxGeometry(5, 0.6, 1.6), toon(0x5a5060)); base.position.y = 0.2; addOutline(base, 0.04); g.add(base);
+  // stygian teeth set into the ring, and a worn stone plinth with steps
+  const knobMat = paint(toon(0x4a4060), 'rock', 0.5);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const k = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), knobMat); k.scale.set(0.9, 1.3, 0.8); k.position.set(Math.cos(a) * 3.2, 3.6 + Math.sin(a) * 3.2, 0); k.rotation.z = a; g.add(k); }
+  const stone = paint(toon(0x6a6470), 'stone', 0.8);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 0.5, 9), stone); base.scale.z = 0.42; base.position.y = 0.2; addOutline(base, 0.04); g.add(base);
+  const step = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.5, 0.3, 9), stone); step.scale.z = 0.55; step.position.y = -0.05; g.add(step);
+  for (const sx of [-1, 1]) { const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 1.1, 7), stone); foot.position.set(sx * 1.6, 0.8, 0); g.add(foot); }
   const film = new THREE.Mesh(new THREE.CircleGeometry(2.9, 32), new THREE.MeshBasicMaterial({ color: 0xb48aff, transparent: true, opacity: open ? 0.55 : 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
-  film.position.y = 3.6; g.add(film);
+  film.position.y = 3.6; film.visible = !!open; g.add(film);
   g.userData.film = film; g.userData.ring = ring;
   return g;
 }
@@ -930,7 +938,7 @@ function arenaClamp(pos, R) {
 /* ================================================================
    PLAYER ACTIONS
    ================================================================ */
-const ATK = { 1: { dur: 0.42, dmg: 16, kb: 5, range: 3.0 }, 2: { dur: 0.42, dmg: 18, kb: 5, range: 3.0 }, 3: { dur: 0.62, dmg: 34, kb: 10, range: 3.5 } };
+const ATK = { 1: { dur: 0.42, dmg: 16, kb: 5, range: 3.0 }, 2: { dur: 0.42, dmg: 18, kb: 5, range: 3.0 }, 3: { dur: 0.62, dmg: 34, kb: 10, range: 3.5 }, 4: { dur: 0.5, dmg: 26, kb: 9, range: 3.7 } };   // 4: the running blow, out of a sprint
 const canAct = () => G.mode === 'play' && !P.dead && P.para <= 0 && !P.roll;
 
 function camForward() { return V3(-Math.sin(CAM.yaw), 0, -Math.cos(CAM.yaw)); }
@@ -945,7 +953,7 @@ function spend(cost) {
 function pressAttack() {
   if (VK) { if (VK.attack && G.mode === 'play') VK.attack(); return; }
   if (!canAct() || P.drink > 0) return;
-  if (!P.atk) startAttack(P.comboReset > 0 ? (P.comboIdx % 3) + 1 : 1);
+  if (!P.atk) startAttack(P.onGround && !P.riding && Math.hypot(P.vel.x, P.vel.z) > 9 && (keys.ShiftLeft || keys.ShiftRight) ? 4 : P.comboReset > 0 ? (P.comboIdx % 3) + 1 : 1);   // flat out: a running blow that carries him through
   else if (P.atk.p > 0.35) P.queued = true;
 }
 
@@ -953,7 +961,7 @@ function startAttack(kind) {
   if (!spend(kind === 3 ? D.stamina.heavy : D.stamina.attack)) { P.atk = null; return; }
   const arm = armOf(SAVE.inv.axe);
   // how it looks: lunges for the spears (heavy too, for the lance), the bow always draws
-  const pose = arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
+  const pose = kind === 4 ? (arm.thrust ? 4 : 1) : arm.thrust && (kind < 3 || arm.charge) ? 4 : kind;
   P.atk = { kind, pose, t: 0, p: 0, hit: new Set(), dur: ATK[kind].dur / (arm.spd || 1), arm, riposte: P.riposte > 0 };
   P.riposte = 0;
   P.comboIdx = kind; P.queued = false;
@@ -983,7 +991,7 @@ function startAttack(kind) {
     const h = Math.hypot(v.x, v.z); if (h > 0.3) f = V3(v.x / h, 0, v.z / h);
   }
   P.yaw = Math.atan2(f.x, f.z);
-  if (!arm.ranged) { P.vel.x += f.x * (kind === 3 ? 6 : 4); P.vel.z += f.z * (kind === 3 ? 6 : 4); }
+  if (!arm.ranged) { const push = kind === 3 ? 6 : kind === 4 ? 3 : 4; P.vel.x += f.x * push; P.vel.z += f.z * push; }
   kind === 3 ? sfx.heavy() : sfx.swing();
 }
 
@@ -993,7 +1001,37 @@ function lockDir() {
   return v.normalize();
 }
 
+/* the swing's trail: a ribbon of light swept behind the weapon's head while a blow is in the air, fading off its tail */
+const TRAIL = (() => {
+  const N = 14, pos = new Float32Array(N * 2 * 3), col = new Float32Array(N * 2 * 3), idx = [];
+  for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  m.frustumCulled = false; m.userData.noOutline = true; m.renderOrder = 9; m.visible = false; scene.add(m);
+  return { m, N, pos, col, pts: [], lo: V3(), hi: V3(), w: null, c: new THREE.Color() };
+})();
+function updateTrail(dt) {
+  const T = TRAIL, w = torcain.weapon, A = P.atk;
+  if (w && w !== T.w) { T.w = w; w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w); const inv = new THREE.Matrix4().copy(w.matrixWorld).invert(); b.applyMatrix4(inv); T.lo.set(0, b.min.y + (b.max.y - b.min.y) * 0.55, 0); T.hi.set(0, b.max.y * 0.98, 0); }
+  const live = A && !A.arm.ranged && A.p > 0.12 && A.p < 0.78 && w && w.visible;
+  if (live) {
+    w.updateWorldMatrix(true, false);
+    T.pts.unshift([T.lo.clone().applyMatrix4(w.matrixWorld), T.hi.clone().applyMatrix4(w.matrixWorld), 1]);
+    T.c.set(FX.burn ? 0xff8a3a : A.kind === 3 ? 0xffc070 : 0xd8c8ff);
+  }
+  for (const q of T.pts) q[2] -= dt * 5.5;
+  while (T.pts.length > T.N || (T.pts.length && T.pts[T.pts.length - 1][2] <= 0)) T.pts.pop();
+  T.m.visible = T.pts.length > 1;
+  if (!T.m.visible) return;
+  for (let i = 0; i < T.N; i++) {
+    const q = T.pts[Math.min(i, T.pts.length - 1)], a = Math.max(0, q[2]) * (1 - i / T.N) * 0.55, o = i * 6;
+    T.pos.set([q[0].x, q[0].y, q[0].z, q[1].x, q[1].y, q[1].z], o);
+    T.col.set([T.c.r * a * 0.3, T.c.g * a * 0.3, T.c.b * a * 0.3, T.c.r * a, T.c.g * a, T.c.b * a], o);
+  }
+  T.m.geometry.attributes.position.needsUpdate = true; T.m.geometry.attributes.color.needsUpdate = true;
+}
 function updateAttack(dt) {
+  updateTrail(dt);
   if (torcain.weapon) torcain.weapon.userData.aim = P.atk && P.atk.aim ? P.atk.aim : null;   // the whip's lash goes out at the X
   if (!P.atk) { P.comboReset = Math.max(0, P.comboReset - dt); return; }
   const A = P.atk, def = ATK[A.kind], arm = A.arm || ARMS.axe;
@@ -2229,7 +2267,7 @@ function afterLord() {
   });
 }
 
-function revealGate() { if (gate) { gate.visible = true; gate.userData.film.material.opacity = 0.55; gate.userData.ring.material.emissiveIntensity = 0.7; } }
+function revealGate() { if (gate) { gate.visible = true; gate.userData.film.material.opacity = 0.55; gate.userData.film.visible = true; gate.userData.ring.material.emissiveIntensity = 0.7; } }
 
 function showEnd(n) {
   G.mode = 'end';
@@ -2616,6 +2654,7 @@ bindOpt('opt-invert', 'invert', null, true);
 bindOpt('opt-vol', 'vol', () => setVolume(OPT.vol));
 bindOpt('opt-bloom', 'bloom', () => { bloom.enabled = OPT.bloom; }, true);
 bindOpt('opt-ao', 'ao', () => { lens.shade.enabled = OPT.ao; }, true);
+bindOpt('opt-auto', 'auto', () => { if (!OPT.auto && QA.step) { QA.step = 0; QA.scale = 1; lens.shade.enabled = OPT.ao; MEADOW.on = true; for (const c of LEAF_CARDS) c.visible = true; resize(); } }, true);
 bindOpt('opt-shadows', 'shadows', () => { renderer.shadowMap.enabled = OPT.shadows; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }, true);
 bindOpt('opt-scale', 'scale', resize);
 bloom.enabled = OPT.bloom;
@@ -3782,7 +3821,7 @@ function climbTick(dt, act) {
    The wing is the cape itself (actors.js): he lays out flat like a hero in the old songs and the cloth fills the
    space from wrist to wrist and down to his ankles. This empty marker only tells the rig he's gliding. */
 const glider = new THREE.Group();
-glider.visible = false; torcain.root.add(glider);
+glider.visible = false; glider.userData.glider = true; torcain.root.add(glider);
 /* what he wears: a cloak, something on the body, on the hands, on the feet (the Gear page). The cloak is what he
    glides with — young Tanoc can't glide without one; Torcain always has his coat. */
 const WEAR_SLOTS = [['cloak', 'Cloak'], ['body', 'Body'], ['hands', 'Hands'], ['feet', 'Feet']];
@@ -4587,12 +4626,32 @@ function updatePlayer(dt) {
   if (P.flying) { flyKuni(dt, wish, moving, act); return; }
   if (P.climb) { climbTick(dt, act); return; }
   if (P.jumpBuf > 0 && act && !vineOn() && tryClimb(wish)) P.jumpBuf = 0;
+  /* climbing: run or jump at a wall, a ledge, a cart, a rock or a bank with Space held and he catches the top edge and
+     pulls himself up onto it — anything whose top is within a reach above his head */
+  if (P.mantle) {
+    const M = P.mantle; M.t += dt; const k = Math.min(1, M.t / M.dur), up = Math.min(1, k / 0.62), over = Math.max(0, (k - 0.5) / 0.5);
+    P.pos.set(lerp(M.x0, M.x1, over * over * (3 - 2 * over)), lerp(M.y0, M.y1, 1 - (1 - up) * (1 - up)), lerp(M.z0, M.z1, over * over * (3 - 2 * over)));
+    P.vel.set(0, 0, 0); P.onGround = false;
+    if (k >= 1) { P.mantle = null; P.onGround = true; P.pos.y = M.y1; sfx.land(); }
+    placeWalker(torcain.root, P, dt); torcain.root.rotation.set(0, P.yaw, 0);
+    torcain.animate(dt, { speed: 0, onGround: k > 0.85, t: G.t, thrown: k < 0.6, heat: P.heat / 100 });
+    return;
+  }
+  if (act && moving && !P.riding && !P.swimming && !P.roll && (P.jumpBuf > 0 || (keys.Space && !P.onGround)) && !P.gliding) {
+    const reach = 0.85, lx = P.pos.x + wish.x * reach, lz = P.pos.z + wish.z * reach;
+    const top = Math.max(world.heightAt(lx, lz), world.col.ground(lx, lz, P.pos.y + 3.1));
+    const rise = top - P.pos.y;
+    if (rise > 0.75 && rise < 3.2 && (!world.inBounds || world.inBounds(lx, lz)) && world.col.ground(lx, lz, P.pos.y + 3.1) > world.heightAt(lx, lz) + 0.2 && spend(D.stamina.jump)) {
+      P.mantle = { t: 0, dur: 0.32 + rise * 0.17, x0: P.pos.x, y0: P.pos.y, z0: P.pos.z, x1: lx, y1: top, z1: lz };
+      P.yaw = Math.atan2(wish.x, wish.z); P.jumpBuf = 0; P.atk = null; sfx.jump();
+    }
+  }
   let sprint = (keys.ShiftLeft || keys.ShiftRight) && moving && !P.exhausted;
   if (sprint && D.stamina.sprint > 0) { P.stam -= D.stamina.sprint * dt; P.stamDelay = 0.5; if (P.stam <= 0) { P.stam = 0; P.exhausted = true; sprint = false; } }
   if (P.exhausted && P.stam > 25) P.exhausted = false;
   let speed = sprint ? 11.5 : G.lock && !P.riding ? 5.6 : 7;
   if (P.riding) { speed = rideGait(dt, moving, keys.ShiftLeft || keys.ShiftRight); sprint = false; }
-  if (P.atk) speed *= P.riding ? 0.7 : 0.25;
+  if (P.atk) speed *= P.riding ? 0.7 : P.atk.kind === 4 ? 0.85 : 0.25;   // a running blow keeps his feet going
   if (P.drink > 0) speed *= 0.35;
   if (P.swimming) speed *= 0.6;
   const accel = P.onGround ? 14 : 4;
@@ -4682,6 +4741,7 @@ function updatePlayer(dt) {
   }
   const g = world.col.ground(P.pos.x, P.pos.z, P.pos.y);
   if (P.pos.y <= g) {
+    if (!wasGround && P.vel.y < -5) G.dipV = (G.dipV || 0) + Math.min(6, -P.vel.y * 0.22);   // the camera gives with a landing
     if (!wasGround && P.vel.y < -12) { sfx.land(); particles.burst(P.pos.x, g + 0.1, P.pos.z, 10, { color: 0xd8c098, speed: 3, size: 0.5, life: 0.5 }); G.shake = Math.max(G.shake, Math.min(0.3, -P.vel.y * 0.012)); }
     else if (!wasGround && P.vel.y < -5) particles.burst(P.pos.x, g + 0.1, P.pos.z, 4, { color: 0xd8c098, speed: 1.5, size: 0.35, life: 0.35 });
     P.pos.y = g; P.vel.y = 0; P.onGround = true;
@@ -4694,10 +4754,17 @@ function updatePlayer(dt) {
   if (world.water && g < world.water.level - SWIM_DEPTH - 0.05 && P.pos.y <= world.water.level - SWIM_DEPTH + 0.02 && world.water.depth(P.pos.x, P.pos.z) > SWIM_DEPTH) {
     const lv = world.water.level;
     if (!wasSwim) particles.burst(P.pos.x, lv, P.pos.z, P.vel.y < -6 ? 30 : 12, { color: 0xd8f4ff, speed: P.vel.y < -6 ? 5 : 2.5, size: 0.5, life: 0.7, gravity: 6 });
+    if (!wasSwim) { ripples.spawn(P.pos.x, lv, P.pos.z, P.vel.y < -6 ? 2.6 : 1.6, 1.6); ripples.spawn(P.pos.x, lv, P.pos.z, 1, 1.1); P.ripT = 0.3; }
+    P.ripT = (P.ripT || 0) - dt;
+    if (P.ripT <= 0) { const mv = Math.hypot(P.vel.x, P.vel.z) > 1; ripples.spawn(P.pos.x + P.vel.x * 0.06, lv, P.pos.z + P.vel.z * 0.06, mv ? 1.3 : 0.9, mv ? 1.2 : 1.8); P.ripT = mv ? 0.38 : 1.1; }
     P.pos.y = lv - SWIM_DEPTH; if (P.vel.y < 0) P.vel.y = 0;
     P.onGround = true; P.swimming = true;
     if (P.roll) P.roll = null;
     if (Math.hypot(P.vel.x, P.vel.z) > 1 && Math.random() < 0.35) particles.emit(P.pos.x - P.vel.x * 0.05, lv + 0.05, P.pos.z - P.vel.z * 0.05, { vy: 0.6, color: 0xe8f8ff, size: 0.35, life: 0.6, speed: 0.8 });
+  }
+  if (!P.swimming && world.water && P.pos.y < world.water.level - 0.05 && P.pos.y > world.water.level - SWIM_DEPTH - 0.2 && world.water.depth(P.pos.x, P.pos.z) > 0.05) {   // wading: rings round the shins
+    P.ripT = (P.ripT || 0) - dt;
+    if (P.ripT <= 0) { const mv = Math.hypot(P.vel.x, P.vel.z) > 1; ripples.spawn(P.pos.x, world.water.level, P.pos.z, mv ? 0.9 : 0.6, mv ? 1.0 : 1.6); P.ripT = mv ? 0.3 : 1.2; }
   }
   if (wasSwim && !P.swimming && P.onGround) particles.burst(P.pos.x, P.pos.y + 0.2, P.pos.z, 8, { color: 0xd8f4ff, speed: 2, size: 0.35, life: 0.5, gravity: 6 });
 
@@ -4772,7 +4839,7 @@ function updatePlayer(dt) {
   }
 
   const hs = Math.hypot(P.vel.x, P.vel.z);
-  if (P.onGround && hs > 1 && !P.roll) { P.stepPh += dt * hs * 0.32; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); } }
+  if (P.onGround && hs > 1 && !P.roll) { P.stepPh += dt * hs * 0.32; if (P.stepPh > 1) { P.stepPh = 0; sfx.step(); if (hs > 6 && !P.swimming && !P.riding) for (let k = 0; k < 2 + (hs > 9 ? 2 : 0); k++) particles.emit(P.pos.x - P.vel.x * 0.04, P.pos.y + 0.08, P.pos.z - P.vel.z * 0.04, { vx: (Math.random() - 0.5) * 0.8 - P.vel.x * 0.05, vy: 0.5 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.8 - P.vel.z * 0.05, color: 0xb8a888, size: 0.32 + Math.random() * 0.2, life: 0.55, drag: 2.5 }); } }   // a puff of dust off each footfall at a run
 
   updateAttack(dt);
 
@@ -4783,6 +4850,9 @@ function updatePlayer(dt) {
   torcain.root.rotation.set(0, P.yaw, 0);
   torcain.animate(dt, { speed: P.roll || P.riding ? 0 : hs, onGround: P.onGround || P.riding, t: G.t, swing: P.atk ? { kind: P.atk.pose || P.atk.kind, p: clamp(P.atk.p, 0, 1) } : null, heat: P.heat / 100, drink: P.drink > 0,
     ride: !!P.riding, rideSpeed: hs, rideBob: mount ? mount.gait || 0 : 0, rideRoll: P.riding ? clamp(-turnRate * 0.06, -0.22, 0.22) : 0,
+    armed: !!G.lock || G.bossActive || G.t - P.lastHurt < 5 || P.comboReset > 0,   // in a fight the axe stays in his hand; otherwise it rides on his back
+    lie: P.dead ? 1 : 0,   // beaten: down on his back where he fell
+    swim: !!P.swimming,
     roll: P.roll ? { p: P.roll.t / P.roll.dur } : null, hurt: clamp(1 - (G.t - P.lastHurt) / 0.28, 0, 1) });
 }
 
@@ -4908,7 +4978,8 @@ function updateCamera(dt) {
       CAM.pitch = damp(CAM.pitch, 0.22, 3, dt);
     }
   }
-  const tgt = V3(P.pos.x, P.pos.y + (P.flying ? 2.6 : P.riding ? 3.0 : 1.9), P.pos.z);
+  G.dip = G.dip || 0; G.dipV = G.dipV || 0; G.dipV += (-G.dip * 90 - G.dipV * 13) * dt; G.dip += G.dipV * dt;   // a damped spring: down with the landing, and back
+  const tgt = V3(P.pos.x, P.pos.y + (P.flying ? 2.6 : P.riding ? 3.0 : 1.9) - Math.max(-0.1, G.dip) * 0.45, P.pos.z);
   // follow quickly across the ground, a little more gently up and down, so steps, stairs and landings don't jolt the view
   const kxz = 1 - Math.exp(-16 * dt), ky = 1 - Math.exp(-(P.onGround || P.riding ? 9 : 14) * dt);
   CAM.target.x += (tgt.x - CAM.target.x) * kxz; CAM.target.z += (tgt.z - CAM.target.z) * kxz; CAM.target.y += (tgt.y - CAM.target.y) * ky;
@@ -5047,9 +5118,21 @@ let frameDt = 1 / 60;
    2nd refresh instead of pushing the whole bloom-and-shadow pipeline two or three times as often as anyone
    can see (a strict 60 on 144Hz would land 2, 3, 2, 3 refreshes apart, and that unevenness reads as judder). */
 let refreshMs = 1000 / 60, lastTick = 0, tickN = 0;
+/* keeping it smooth: if the frames come slow for a few seconds of play, the heaviest touches are given up one at a
+   time — the contact shade, then the thick meadow, then a little of the resolution — never more than the machine needs */
+function autoQuality(gap) {
+  if (OPT.auto === false || G.mode !== 'play' || G.paused || document.hidden || gap > 250) return;
+  QA.avg += (gap - QA.avg) * 0.03; QA.cool -= gap / 1000;
+  if (QA.cool > 0 || QA.avg < 31 || QA.step >= 3) return;   // under ~32 frames a second, for a while
+  QA.step++; QA.cool = 8; QA.avg = 20;
+  if (QA.step === 1) { lens.shade.enabled = false; if (vkComposer) vkComposer.passes.forEach(p => { if (p.tap) p.enabled = false; }); }
+  else if (QA.step === 2) { MEADOW.on = false; for (const c of LEAF_CARDS) c.visible = false; }
+  else { QA.scale = 0.8; resize(); }
+}
 function frame(now) {
   requestAnimationFrame(frame);
   const gap = now - lastTick; lastTick = now;
+  autoQuality(gap);
   if (gap > 3 && gap < 40) refreshMs += (gap - refreshMs) * 0.05;   // learn the screen's refresh rate (ignoring hitches)
   const every = Math.max(1, Math.floor(1000 / refreshMs / 60 + 0.25));
   if (++tickN < every) return;
@@ -5142,6 +5225,14 @@ function frame(now) {
   }
   touch.update(dt);
   G.night = dn.night;
+  // lamplight on the ground under every lamp and lantern, coming up as the dark does
+  if (!G.pools) G.pools = makeLightPools();
+  { const U = lens.shade.material.uniforms; U.uDof.value = damp(U.uDof.value, G.mode === 'dialog' ? 1 : 0, 4, dt); U.uFocus.value = Math.max(2, camera.position.distanceTo(P.pos) - 0.3); }   // talk: the background goes soft
+  { const o = 0.6 * Math.max(0, Math.min(1, (G.night - 0.15) / 0.5)); G.pools.material.opacity = o; G.pools.visible = o > 0.01;
+    // and the windows: dark glass with a little sky in it by day, lamplit by night
+    if (!G.wins) { G.wins = []; const seen = new Set(); scene.traverse(q => { const m = q.material; if (!q.isMesh || !m || Array.isArray(m) || !m.isMeshBasicMaterial || seen.has(m) || m.map || m.transparent) return; const c = m.color; if (c.r > 0.85 && c.g > 0.5 && c.g < 0.9 && c.b > 0.25 && c.b < 0.7 && q.geometry && /Plane|Circle/.test(q.geometry.type)) { seen.add(m); G.wins.push({ m, lit: c.clone() }); } }); }
+    const lk = Math.max(0, Math.min(1, (G.night - 0.05) / 0.45)) * 0.85 + 0.15;
+    for (const w of G.wins) w.m.color.copy(WIN_DAY).lerp(w.lit, lk); }
   /* everyone's bioluminescence follows the dark (creatures handle their own in enemies.js / wilds.js) */
   if ((G.glowT = (G.glowT || 0) - dt) <= 0) {
     G.glowT = 0.25; const n = G.night;
@@ -5151,6 +5242,19 @@ function frame(now) {
   if ((G.hudT = (G.hudT || 0) - dt) <= 0) { G.hudT = 1; const qh = $('q-head'); if (qh && qh.dataset.base) qh.textContent = qh.dataset.base + ' · ' + dn.label(); }
   ship.update(tt, dt, particles);
   particles.update(frozen && G.mode !== 'title' ? 0 : dt);
+  ripples.update(frozen && G.mode !== 'title' ? 0 : dt);
+  // now and then a fish rises somewhere near you: a ring on still water, a flick of spray
+  if (!frozen && G.mode === 'play' && world.water && !interiors.inside) {
+    G.fishT = (G.fishT ?? 3) - dt;
+    if (G.fishT <= 0) {
+      G.fishT = 2.5 + Math.random() * 5;
+      const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 22, x = P.pos.x + Math.cos(a) * r, z = P.pos.z + Math.sin(a) * r;
+      if (world.water.depth(x, z) > 0.8) {
+        const lv = world.water.level; ripples.spawn(x, lv, z, 0.9, 1.8); ripples.spawn(x, lv, z, 0.5, 1.2);
+        particles.burst(x, lv + 0.05, z, 4, { color: 0xe8f8ff, speed: 1.2, size: 0.2, life: 0.4, gravity: 8 });
+      }
+    }
+  }
   // the sun's shadow box follows you, snapped to its own texel grid so shadow edges don't crawl and shimmer as you move;
   // and indoors there is no sun at all (it used to throw the yard's shadows across the rooms)
   const focus = G.mode === 'title' ? V3(0, 0, 0) : snapShadow(P.pos);
@@ -5194,7 +5298,7 @@ function startVelki() {
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
-      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.8), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
+      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 1.05), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
     },
@@ -5250,7 +5354,7 @@ function vkCtx() {
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
-      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 0.86), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
+      addLens(c, camera, { bloom: new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.55, 1.1), paint: paintPass(ShaderPass), output: new OutputPass() }).shade.enabled = OPT.ao !== false;
       const pr = Math.min(devicePixelRatio, 1.75) * OPT.scale; c.setPixelRatio(pr); c.setSize(innerWidth, innerHeight);
       vkComposer = c; return c;
     },
@@ -6650,13 +6754,16 @@ else if (BOOT === 'arrive' && REGION === 'leotik') { $('title').classList.add('h
 else if (BOOT === 'arriveA' && REGION === 'aakalay') { $('title').classList.add('hidden'); startFromTitle(arriveAakalay); }
 else if (BOOT === 'pass' && SAVE.passIn) { $('title').classList.add('hidden'); startFromTitle(arriveByPass); }
 
+/* warm pools of light under lamps: one instanced ground decal per warm glow found low over the ground */
+function makeLightPools() { return lightPools(scene, (x, z, y) => Math.max(world.heightAt(x, z), world.col.ground(x, z, y, true)), world.heightAt); }
+
 /* debugging handle for the console */
 window.__torcain = {
   bookAct, applyWear, openBook, get npcs() { return npcs; }, npcTalk, get DRILL() { return DRILL; }, learnArms, armsOptions, jobBoardTalk, takeJob, finishJob, get jobBoard() { return jobBoard; }, get apV() { return apV; }, whipDrill, get mount() { return mount; }, toggleRide, makeMount, updateMount, torcain, projectiles, restyleAxe,
   get vk() { return VK; }, F_: () => F_, apBuhkon, apRaid, apStep, apGoal, readStone, skipCards, get storehouse() { return storehouse; }, get festival() { return festival; }, get oldBoat() { return oldBoat; }, stones, get DLG() { return DLG; }, startRoad, startMegla, arriveBeuhk, leaveRoad, startMorning, youngTakeRelic, youngBuhkon, RELIC_SPOT, get young() { return young(); },
   sunear, startStorm, get shurgr() { return G.shurgr; }, prophecy, alch, finishFound,
   detailCull: setDetailCull, get solids() { return solids; },
-  G, P, F, CAM, camera, scene, renderer, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
+  G, P, F, CAM, camera, scene, renderer, composer, lens, bloom, QA, interiors, ship, THREE, enemies, world, cores, SAVE: () => SAVE, persist,
   advance: () => advanceDialog(), closeMemory, pressAttack, duatStrike, tukangFlare, nurSense, interact, dodge, drinkFilm, damageBoss,
   get dya() { return dyaMatch; }, useSlot, assignSlot, learnTrigger, fireStone, dn, wilds, callKuni, throwSprengju, get kuni() { return kuni; }, scars, get skor() { return skor; }, readScar, sitWithSkor, phorusQuest, startDya, dyaChallenge, singToken, buhkonTokens, glider, board, crates, pages, boardTalk, talkPhorus, amulets, nurHlyst, takeAmulet, gate, storehouse, interactables, get boss() { return boss; }, startBoss, npcs, feats, book, openBook, castSpell, learnSpell, xp, get TOK() { return TOK; }, enterRoom, get mount() { return mount; }, setObjective, SONG, tokKey, firstTokenLesson, makeMount, toggleRide, lookAim, vineTarget, vineShoot, vineLet, rideSpace, get vines() { return P.vines; }, startTrial, npcTalk, pickChoice, takeCore, wakePillar, playerDown, openLantern: () => openLantern(lanterns[0]), closeLantern,
 };

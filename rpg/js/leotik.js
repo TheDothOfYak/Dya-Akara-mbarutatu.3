@@ -625,20 +625,46 @@ export function buildLeotik(scene) {
   /* ---------- acid bogs ---------- */
   const bogMat = new THREE.ShaderMaterial({
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 } }]),
-    vertexShader: `varying vec2 vP;
+    vertexShader: `varying vec2 vP; varying vec2 vU;
       #include <fog_pars_vertex>
-      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vP = wp.xz; vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
+      void main(){ vU = uv; vec4 wp = modelMatrix * vec4(position, 1.0); vP = wp.xz; vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
       #include <fog_vertex>
       }`,
-    fragmentShader: `varying vec2 vP; uniform float uTime;
+    // a murky, scummed-over acid pool: deep in the middle, a pale crust of foam at the rim, bubbles rising and breaking
+    fragmentShader: `varying vec2 vP; varying vec2 vU; uniform float uTime;
       #include <fog_pars_fragment>
+      float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ return vn(p) * 0.6 + vn(p * 2.3 + 7.1) * 0.3 + vn(p * 5.1 - 3.3) * 0.1; }
       void main(){
-        float w = sin(vP.x * 0.6 + uTime * 1.3) * sin(vP.y * 0.5 - uTime) * 0.5 + 0.5;
-        vec3 c = mix(vec3(0.35, 0.62, 0.12), vec3(0.75, 1.0, 0.35), w * w);
-        gl_FragColor = vec4(pow(c, vec3(2.2)) * 1.6, 1.0);
+        float d = length(vU - 0.5) * 2.0;
+        float deep = 1.0 - d * d;
+        vec2 q = vP * 0.35 + vec2(uTime * 0.05, -uTime * 0.03);
+        float n = fbm(q), m = fbm(q * 2.7 - uTime * 0.04);
+        vec3 c = mix(vec3(0.46, 0.56, 0.14), vec3(0.10, 0.20, 0.05), smoothstep(0.1, 0.9, deep));
+        // drifting scum
+        c = mix(c, vec3(0.50, 0.55, 0.24), smoothstep(0.55, 0.7, n) * 0.7);
+        c *= 0.85 + m * 0.3;
+        // a faint sickly glow from beneath
+        c += vec3(0.10, 0.22, 0.02) * (0.5 + 0.5 * sin(uTime * 0.9 + n * 6.0)) * deep;
+        // bubbles: one per cell, swelling then popping
+        vec2 g = vP * 0.9; vec2 ci = floor(g); vec2 cf = fract(g);
+        float r = h21(ci);
+        vec2 o = vec2(h21(ci + 3.1), h21(ci + 7.7)) * 0.6 + 0.2;
+        float ph = fract(uTime * (0.25 + r * 0.3) + r * 9.0);
+        float br = ph * 0.18 * step(0.55, r);
+        float bd = length(cf - o);
+        float ring = smoothstep(br, br - 0.03, bd) * smoothstep(br - 0.07, br - 0.03, bd) * (1.0 - ph);
+        c = mix(c, vec3(0.78, 0.86, 0.42), ring * 0.8 * deep);
+        // crusted foam at the rim
+        float rim = smoothstep(0.8, 0.95, d + (n - 0.5) * 0.12);
+        c = mix(c, vec3(0.72, 0.74, 0.46), rim * (0.55 + 0.45 * m));
+        float a = smoothstep(1.0, 0.94, d);
+        gl_FragColor = vec4(pow(c, vec3(2.2)), a);
         #include <fog_fragment>
       }`,
-    fog: true,
+    fog: true, transparent: true,
   });
   const hazards = [];
   for (const b of BOGS) {
@@ -666,7 +692,7 @@ export function buildLeotik(scene) {
 
   /* ---------- the Keep and the Urverk (north) ---------- */
   const kg = KEEP_H;
-  const keepDisk = new THREE.Mesh(new THREE.CylinderGeometry(28, 29, 0.6, 48), toon(0x8a8676));
+  const keepDisk = new THREE.Mesh(new THREE.CylinderGeometry(28, 29, 0.6, 48), paint(toon(0x8a8676), 'cobble'));
   keepDisk.position.set(KEEP.x, kg - 0.22, KEEP.z); keepDisk.receiveShadow = true; scene.add(keepDisk);
   for (let i = 0; i < 40; i++) {
     const a0 = i / 40 * Math.PI * 2, a1 = (i + 1) / 40 * Math.PI * 2, R = 31;
@@ -696,7 +722,7 @@ export function buildLeotik(scene) {
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
   });
   const portal = new THREE.Mesh(new THREE.CircleGeometry(5.3, 40), portalMat); portal.position.y = 7; urverk.add(portal);
-  const base = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 4), toon(0x5a5650)); base.position.y = 0.3; addOutline(base, 0.06); urverk.add(base);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 4), paint(toon(0x5a5650), 'stone')); base.position.y = 0.3; addOutline(base, 0.06); urverk.add(base);
   urverk.position.set(KEEP.x, kg, KEEP.z - 18);
   scene.add(urverk);
   col.add(KEEP.x, KEEP.z - 18, 7, 2, 0, kg - 1, kg + 13);
@@ -757,7 +783,11 @@ export function buildLeotik(scene) {
     for (let k = 0; k < 14; k++) {
       const a = Math.PI * 0.62 + k * 0.035, x = COVE.x - 58 + Math.cos(a) * 16 + k * 2.2, z = COVE.z - 30 + k * 4.6;
       if (rng() < 0.18) continue;
-      blocks.put(x, SEA - 3 + 3.6 + rng() * 0.8, z, 3.4 + rng(), 7 + rng() * 2, 2.6, rng() * 0.1, rng() * 0.5, rng() * 0.1, pick(STONE));
+      // tumbled boulders, the sea long since having taken the dressed stone
+      for (let j = 0; j < 3; j++) {
+        const sz = 1.4 + rng() * 1.3;
+        rocks.put(x + (rng() - 0.5) * 2.4, SEA + 0.2 + rng() * 0.9 - j * 0.3, z + (rng() - 0.5) * 3, sz * (1.1 + rng() * 0.4), sz * (0.7 + rng() * 0.3), sz, rng() * 3, rng() * 3, rng() * 3, j ? '#4f4c46' : pick(STONE));
+      }
     }
   }
 
@@ -767,11 +797,36 @@ export function buildLeotik(scene) {
     const a = i / 5 * Math.PI * 2 + 0.4 + r2() * 0.6, r = 280 + r2() * 400, s = 6 + r2() * 10;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
     const grp = new THREE.Group();
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(s, s * 0.9, s * 0.35, 8), toon(0x3f6e38));
-    const bottom = new THREE.Mesh(new THREE.ConeGeometry(s * 0.92, s * 2.2, 8), toon(0x5a524a));
+    // a torn-off clod of island: a craggy root of rock under a turf lid, a few trees, roots trailing beneath
+    const jag = (geo, amt, seed) => {
+      const P = geo.attributes.position, v = new THREE.Vector3();
+      for (let k = 0; k < P.count; k++) {
+        v.fromBufferAttribute(P, k);
+        const n = fbm(v.x * 0.35 + seed, v.z * 0.35 - seed) - 0.5, rr = Math.hypot(v.x, v.z);
+        if (rr > 1e-3) { const f = 1 + n * amt; v.x *= f; v.z *= f; }
+        v.y += n * amt * s * 0.6;
+        P.setXYZ(k, v.x, v.y, v.z);
+      }
+      geo.computeVertexNormals(); return geo;
+    };
+    const top = new THREE.Mesh(jag(new THREE.CylinderGeometry(s, s * 0.92, s * 0.35, 18, 2), 0.18, i * 3.1), paint(toon(0x4a7a3a), 'land'));
+    const bottom = new THREE.Mesh(jag(new THREE.ConeGeometry(s * 0.95, s * 2.2, 16, 6), 0.45, i * 5.7), paint(toon(0x5a524a), 'rock', 1.5));
     bottom.rotation.x = Math.PI; bottom.position.y = -s * 1.25;
-    const tuft = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.45, 0), toon(0x2f6a3a)); tuft.position.set(s * 0.2, s * 0.45, -s * 0.1);
-    grp.add(top, bottom, tuft); outlineAll(grp, 0.12);
+    grp.add(top, bottom);
+    const trunkM = paint(toon(0x5a4030), 'bark', 0.2), crownM = toon(0x2f6a3a);
+    for (let k = 0; k < 3 + (r2() * 3 | 0); k++) {
+      const ta = r2() * Math.PI * 2, tr = r2() * s * 0.6, th = s * (0.5 + r2() * 0.5);
+      const tx = Math.cos(ta) * tr, tz = Math.sin(ta) * tr;
+      const tk = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.035, s * 0.06, th, 6), trunkM); tk.position.set(tx, s * 0.17 + th / 2, tz); grp.add(tk);
+      const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * (0.22 + r2() * 0.14), 1), crownM); cr.scale.y = 0.8; cr.position.set(tx, s * 0.17 + th, tz); grp.add(cr);
+    }
+    const rootM = toon(0x3a2e24);
+    for (let k = 0; k < 7; k++) {
+      const ra = r2() * Math.PI * 2, rr = s * (0.3 + r2() * 0.55), rl = s * (0.6 + r2() * 1.2);
+      const rt = new THREE.Mesh(new THREE.ConeGeometry(s * 0.03, rl, 4), rootM); rt.rotation.x = Math.PI; rt.rotation.z = (r2() - 0.5) * 0.4;
+      rt.position.set(Math.cos(ra) * rr, -s * 0.2 - rl / 2 - (1 - rr / s) * s * 0.5, Math.sin(ra) * rr); grp.add(rt);
+    }
+    outlineAll(grp, 0.12);
     grp.position.set(x, Math.max(0, heightAt(x, z), volcanoH(x, z)) + 130 + r2() * 90, z);
     grp.userData = { by: grp.position.y, ph: r2() * 6, sp: 0.15 + r2() * 0.25 };
     scene.add(grp); islets.push(grp);

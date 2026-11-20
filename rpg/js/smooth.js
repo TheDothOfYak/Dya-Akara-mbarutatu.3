@@ -31,7 +31,7 @@ let installed = false;
 const flat = (r, g, b) => { const t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; };
 const surf = (name, s) => ({ name, s, a: { value: flat(128, 128, 128) }, n: { value: flat(128, 128, 255) }, m: { value: new THREE.Vector3(0.216, 0.216, 0.216) } });
 /* by paint kind (gfx.js PAINT_KINDS); s = metres one tile covers */
-const SURF = { 10: surf('rock', 2.2), 1: surf('stone', 2.6), 2: surf('plaster', 3.2), 3: surf('wood', 1.7), 4: surf('shingle', 1.6), 5: surf('cobble', 2.4), 6: surf('land', 3.4), 8: surf('brick', 2.2), 9: surf('bark', 1), rock: surf('rock', 3) };
+const SURF = { 11: surf('wood', 1.7), 10: surf('rock', 2.2), 1: surf('stone', 2.6), 2: surf('plaster', 3.2), 3: surf('wood', 1.7), 4: surf('shingle', 1.6), 5: surf('cobble', 2.4), 6: surf('land', 3.4), 8: surf('brick', 2.2), 9: surf('bark', 1), rock: surf('rock', 3) };
 /* real shapes: boulders scanned from the ground (Poly Haven, CC0), cut down to a few hundred faces each. Every
    plain rock in the game (a dodecahedron) takes one of them, and the rock surface with it. */
 const ROCKS = [];
@@ -120,6 +120,18 @@ const VERT = `#include <begin_vertex>
   #ifdef USE_INSTANCING
     vFlP += instanceMatrix[3].xyz * 0.37;
   #endif
+  #if defined(FL_LEAF) || defined(FL_CARD)
+  {
+    // the wind in the leaves: each crown sways on its own beat, the top more than the underside
+    vec3 flIp = vec3(0.0);
+    #ifdef USE_INSTANCING
+      flIp = instanceMatrix[3].xyz;
+    #endif
+    float flPh = uFlT * 1.1 + flIp.x * 0.07 + flIp.z * 0.05, flK = clamp(position.y * 0.5 + 0.6, 0.0, 1.2);
+    transformed.x += (sin(flPh) * 0.035 + sin(flPh * 2.7 + 1.3) * 0.012) * flK;
+    transformed.z += (sin(flPh * 0.8 + 2.0) * 0.025) * flK;
+  }
+  #endif
   #ifdef FL_PAINT
     vec4 flw = vec4(transformed, 1.0); vec3 flwn = objectNormal;
     #ifdef USE_INSTANCING
@@ -127,7 +139,7 @@ const VERT = `#include <begin_vertex>
     #endif
     vFlW = (modelMatrix * flw).xyz; vFlWN = normalize(mat3(modelMatrix) * flwn);
   #endif`;
-const VERT_PARS = `varying vec3 vFlP; varying vec3 vFlN;
+const VERT_PARS = `varying vec3 vFlP; varying vec3 vFlN; uniform float uFlT;
 #ifdef FL_PAINT
   varying vec3 vFlW; varying vec3 vFlWN;
 #endif
@@ -137,6 +149,7 @@ vec3 flBump = vec3(0.0);   // how the surface's own relief tips the light (world
 #ifdef FL_PAINT
 uniform sampler2D uPaintA; uniform sampler2D uPaintN; uniform vec3 uPaintM; uniform float uPaintS;
 uniform sampler2D uPaintA2; uniform sampler2D uPaintN2; uniform vec3 uPaintM2;
+uniform sampler2D uPaintA3; uniform sampler2D uPaintN3; uniform vec3 uPaintM3;
 /* a photographed surface laid on from three sides (no UVs needed), as colour and as relief */
 vec3 flTriA(sampler2D t, vec3 p, vec3 w) { return texture2D(t, p.zy).rgb * w.x + texture2D(t, p.xz).rgb * w.y + texture2D(t, p.xy).rgb * w.z; }
 vec3 flTriN(sampler2D t, vec3 p, vec3 w) {
@@ -263,8 +276,18 @@ const FRAG_ALBEDO = `#include <color_fragment>
       #endif
     #endif
     vec3 flP = vFlW / flS;
+    #if FL_PAINT == 11
+      // a kit of many things in one: each piece takes the surface its own colour says it is — warm browns are timber,
+      // pale ones plaster, the greys stone
+      vec3 flC = diffuseColor.rgb; float flMx = max(flC.r, max(flC.g, flC.b)), flMn = min(flC.r, min(flC.g, flC.b)), flSat = (flMx - flMn) / max(flMx, 1e-3);
+      float flLum = dot(flC, vec3(0.3, 0.59, 0.11));
+      float wWood = step(0.18, flSat) * step(flC.b, flC.r) * (1.0 - step(0.62, flLum)), wPlas = (1.0 - wWood) * step(0.42, flLum), wStone = 1.0 - wWood - wPlas;
+      vec3 flDet = (flTriA(uPaintA, flP, flW) / uPaintM) * wWood + (flTriA(uPaintA2, vFlW / 3.2, flW) / uPaintM2) * wPlas + (flTriA(uPaintA3, vFlW / 2.6, flW) / uPaintM3) * wStone;
+      vec3 flRel = flTriN(uPaintN, flP, flW) * wWood + flTriN(uPaintN2, vFlW / 3.2, flW) * wPlas + flTriN(uPaintN3, vFlW / 2.6, flW) * wStone;
+    #else
     vec3 flDet = flTriA(uPaintA, flP, flW) / uPaintM;
     vec3 flRel = flTriN(uPaintN, flP, flW);
+    #endif
     #if FL_PAINT == 6
     {
       // the land: the same ground again much larger, so it never repeats to the eye; bare rock on the steep faces
@@ -273,12 +296,24 @@ const FRAG_ALBEDO = `#include <color_fragment>
       flDet = mix(flFar, flDet * (0.6 + 0.4 * flFar), flNearK); flRel *= flNearK;
       float flCliff = smoothstep(0.3, 0.6, 1.0 - clamp(normalize(vFlWN).y, 0.0, 1.0));
       vec3 flRP = vFlW / (flS * 2.4);
-      flDet = mix(flDet, flTriA(uPaintA2, flRP, flW) / uPaintM2, flCliff);
+      // rock on the steep faces: close to, the rock picture; far off, the same rock drawn eight times larger, with
+      // strata running along the face, so a cliff a kilometre away still reads as rock and not a smooth wall
+      vec3 flRock = mix(flTriA(uPaintA2, flRP * 0.125 + 0.21, flW) / uPaintM2, flTriA(uPaintA2, flRP, flW) / uPaintM2, flNearK);
+      flRock *= 0.82 + 0.3 * flN(vec2(vFlW.y * 0.09 + flN(vFlW.xz * 0.004) * 6.0, (vFlW.x + vFlW.z) * 0.006));
+      flDet = mix(flDet, flRock, flCliff);
       flRel = mix(flRel, flTriN(uPaintN2, flRP, flW) * 1.4, flCliff);
       flDet *= 0.88 + 0.24 * flF(vFlW.xz * 0.035);                          // broad sunlit and dull patches
     }
     #endif
-    diffuseColor.rgb *= mix(vec3(1.0), clamp(flDet, 0.0, 2.2), 0.92);
+    #if FL_PAINT == 2
+      flDet = mix(vec3(1.0), flDet, 0.45);   // limewash: the plaster's stains and patches only faintly through it
+    #elif FL_PAINT == 11
+      flDet = mix(flDet, mix(vec3(1.0), flDet, 0.45), wPlas);
+    #endif
+    // mostly light and shade, a little of the picture's own tint: a ratio taken channel by channel runs wild where the
+    // photograph has almost none of a colour (a grey leaf on a green lawn turns the ground white)
+    flDet = mix(vec3(dot(flDet, vec3(0.3, 0.59, 0.11))), flDet, 0.3);
+    diffuseColor.rgb *= mix(vec3(1.0), clamp(flDet, 0.0, 1.8), 0.92);
     flBump = flRel * 0.9;
   }
   #else
@@ -564,11 +599,57 @@ function leafy(o) {
   else test(_lc.copy(m.color));
   return n > 0 && ok / n > 0.7;
 }
+/* is this part of something that moves about (a figure, a creature)? Those are built in a group marked not-solid */
+function moving(o) { for (let q = o.parent; q; q = q.parent) if (q.isGroup && q.userData && q.userData.noSolid && q.userData.moves !== false) return true; return false; }
+/* leaf cards: every crown in a forest of instanced crowns gets a scatter of little cut-out sprays of leaves round its
+   surface, so its edge is leaves against the sky and not the rim of a ball. One extra draw per forest. */
+let LEAF_TEX = null;
+function leafTexture() {
+  if (LEAF_TEX) return LEAF_TEX;
+  const N = 128, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), r = mulberry32(77);
+  for (let k = 0; k < 16; k++) {
+    const x = 18 + r() * 92, y = 18 + r() * 92, a = r() * Math.PI * 2, L = 15 + r() * 13, W = L * 0.42, l = Math.round(150 + r() * 105);
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.fillStyle = `rgb(${l},${l},${Math.round(l * 0.92)})`; g.beginPath(); g.moveTo(-L, 0); g.quadraticCurveTo(0, -W, L, 0); g.quadraticCurveTo(0, W, -L, 0); g.fill();
+    g.strokeStyle = `rgba(0,0,0,0.25)`; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-L * 0.9, 0); g.lineTo(L * 0.9, 0); g.stroke();
+    g.restore();
+  }
+  LEAF_TEX = new THREE.CanvasTexture(c); LEAF_TEX.colorSpace = THREE.SRGBColorSpace;
+  return LEAF_TEX;
+}
+const _km = new THREE.Matrix4(), _kc = new THREE.Matrix4(), _kq = new THREE.Quaternion(), _kp = new THREE.Vector3(), _ks = new THREE.Vector3(), _ke = new THREE.Euler(), _kcol = new THREE.Color();
+export const LEAF_CARDS = [];   // every forest's cards (main.js's quality steps can put them away)
+export function addLeafCards(o, cone = false) {
+  if (o.userData.leafCards || !o.parent || !o.count) return;
+  const n = o.count, K = Math.round(Math.max(6, Math.min(30, 60000 / n))), rng = mulberry32(n * 31 + 7);
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const mat = new THREE.MeshToonMaterial({ color: o.material.color, map: leafTexture(), alphaTest: 0.5, side: THREE.DoubleSide, gradientMap: o.material.gradientMap }); mat.defines = { FL_CARD: 1 };
+  const cards = new THREE.InstancedMesh(geo, mat, n * K);
+  for (let i = 0; i < n; i++) {
+    o.getMatrixAt(i, _km); if (o.instanceColor) o.getColorAt(i, _kcol); else _kcol.setRGB(1, 1, 1);
+    for (let k = 0; k < K; k++) {
+      const u = rng() * 2 - 1, th = rng() * Math.PI * 2, y = cone ? -0.48 + Math.pow(rng(), 1.4) * 0.9 : u * 0.85 + 0.12, rr = cone ? (0.5 - y) * (0.92 + rng() * 0.12) : Math.sqrt(Math.max(0, 1 - y * y));
+      _kp.set(Math.cos(th) * rr, y, Math.sin(th) * rr).multiplyScalar(cone ? 1 : 0.78 + rng() * 0.3);   // round a crown, or down the sides of a pine's cone
+      _ke.set((rng() - 0.5) * 2.6, th + (rng() - 0.5) * 1.4, (rng() - 0.5) * 2.6); _kq.setFromEuler(_ke);
+      const sc = cone ? 0.28 + rng() * 0.2 : 0.55 + rng() * 0.35; _ks.set(sc, sc * (cone ? 0.6 : 1), sc);
+      _kc.compose(_kp, _kq, _ks).premultiply(_km);
+      cards.setMatrixAt(i * K + k, _kc);
+      cards.setColorAt(i * K + k, _kcol.clone().multiplyScalar(0.82 + rng() * 0.35 + (y > 0.4 ? 0.12 : 0)));
+    }
+  }
+  cards.count = n * K; cards.castShadow = false; cards.receiveShadow = true;
+  cards.userData.keepFacets = true; cards.userData.noOutline = true; cards.userData.noSolid = true; cards.userData.leafCards = true;
+  cards.computeBoundingSphere();
+  o.userData.leafCards = cards; o.parent.add(cards); LEAF_CARDS.push(cards);
+}
 const pending = [];
+const FLT = { value: 0 };   // the wind's clock
 function flush() {
+  FLT.value = (performance.now() / 1000) % 3600;
   if (!pending.length) return;
   const list = pending.splice(0);
   for (const root of list) root.traverse(o => {
+    if (o.isMesh && o.castShadow && moving(o)) o.castShadow = false;   // folk, beasts and carried things cast no shadow of their own: the land and what's built on it do
     if ((o.isMesh || o.isInstancedMesh) && !o.isSkinnedMesh && o.geometry && !o.userData.keepFacets) {
       // an ink outline always takes the very shape its mesh ended up with
       if (o.name === 'outline' && o.parent && o.parent.isMesh) { if (o.parent.userData.smFrom === o.geometry) o.geometry = o.parent.geometry; return; }
@@ -578,12 +659,13 @@ function flush() {
         if (g !== from) { o.geometry = g; o.userData.smFrom = from; const m = o.material; if (!(m.defines && m.defines.FL_PAINT)) { m.defines = Object.assign({}, m.defines, { FL_PAINT: 10 }); m.needsUpdate = true; } }
         return;
       }
+      if (o.isInstancedMesh && o.geometry.type === 'ConeGeometry' && o.count <= 12000 && leafy(o) && o.geometry.parameters && o.geometry.parameters.height === 1) addLeafCards(o, true);   // pines: sprays of needles down the cone
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
         : smoothGeometry(o.geometry);
       if (g !== o.geometry) {
         o.geometry = g; o.userData.smFrom = from;
-        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } }
+        if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } if (o.isInstancedMesh && o.count <= 20000) addLeafCards(o); }
       }
     }
   });
@@ -597,16 +679,16 @@ export function installSmoothStyle() {
   BRUSH.value = brushTexture();
   loadSurfaces();
   THREE.MeshToonMaterial.prototype.onBeforeCompile = function (sh) {
-    sh.uniforms.uBrush = BRUSH;
+    sh.uniforms.uBrush = BRUSH; sh.uniforms.uFlT = FLT;
     sh.vertexShader = VERT_PARS + sh.vertexShader.replace('#include <begin_vertex>', VERT);
     sh.fragmentShader = FRAG_PARS + sh.fragmentShader
       .replace('#include <gradientmap_pars_fragment>', THREE.ShaderChunk.gradientmap_pars_fragment.replace(HARD_STEP, SOFT_STEP)
         .replace('vec3 getGradientIrradiance', CEL_GRADIENT + 'vec3 getGradientIrradiance') + '\n#endif\n')
       .replace('#include <color_fragment>', FRAG_ALBEDO)
       .replace('#include <opaque_fragment>', FRAG_LIGHT)
-      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = normalize(normal + (viewMatrix * vec4(flBump, 0.0)).xyz);');
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = normalize(normal + (viewMatrix * vec4(flBump, 0.0)).xyz);\n#ifdef FL_CARD\n  normal = normalize(mix(normal, (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz, 0.7));   // a spray of leaves is lit like the crown it hangs from\n#endif');
     const kind = this.defines && this.defines.FL_PAINT, S = kind && SURF[kind];
-    if (S) { sh.uniforms.uPaintA = S.a; sh.uniforms.uPaintN = S.n; sh.uniforms.uPaintM = S.m; sh.uniforms.uPaintS = { value: S.s }; const R = kind === 6 ? SURF.rock : S; sh.uniforms.uPaintA2 = R.a; sh.uniforms.uPaintN2 = R.n; sh.uniforms.uPaintM2 = R.m; }
+    if (S) { sh.uniforms.uPaintA = S.a; sh.uniforms.uPaintN = S.n; sh.uniforms.uPaintM = S.m; sh.uniforms.uPaintS = { value: S.s }; const R = kind === 6 ? SURF.rock : kind === 11 ? SURF[2] : S, R3 = kind === 11 ? SURF[1] : S; sh.uniforms.uPaintA2 = R.a; sh.uniforms.uPaintN2 = R.n; sh.uniforms.uPaintM2 = R.m; sh.uniforms.uPaintA3 = R3.a; sh.uniforms.uPaintN3 = R3.n; sh.uniforms.uPaintM3 = R3.m; }
   };
   const add = THREE.Object3D.prototype.add;
   THREE.Object3D.prototype.add = function (...objs) {

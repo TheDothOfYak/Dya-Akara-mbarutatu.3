@@ -202,19 +202,32 @@ export function buildSky(scene, buildShip, palName = 'golden') {
   [big, wild, ringed, ...kalo].forEach(p => p.traverse(o => { if (o.material) o.material.fog = false; }));
 
   // high cloud banks drifting far overhead (no cloud sea below — the Tatu are whole worlds)
-  const puffs = new THREE.Group();
+  const puffs = new THREE.Group(), _cc = new THREE.Color(), _ce = new THREE.Color();
   const puffBase = new THREE.Color(pal.puff), puffEmis = new THREE.Color(0x6a3a40);
   const puffMat = new THREE.MeshToonMaterial({ color: pal.puff, emissive: 0x6a3a40, emissiveIntensity: 0.25 });
+  /* soft clouds: each bank a few billboards of painted cumulus (bright, sunlit tops, grey undersides, wispy edges),
+     coloured each frame like the old solid puffs were */
+  const cloudTex = (() => {
+    const W = 256, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), R = mulberry32(5);
+    for (let k = 0; k < 70; k++) {
+      const x = 30 + R() * (W - 60), y = 40 + R() * 60 * (1 - Math.abs(x - W / 2) / W), rr = 14 + R() * 30 * (1 - Math.abs(x - W / 2) / W * 1.2);
+      const top = 1 - (y - 30) / 80, l = Math.round(170 + 85 * Math.max(0, Math.min(1, top)));
+      const gr = g.createRadialGradient(x, y - rr * 0.3, rr * 0.1, x, y, rr);
+      gr.addColorStop(0, `rgba(${l},${l},${l},0.55)`); gr.addColorStop(0.6, `rgba(${l - 15},${l - 15},${l - 8},0.3)`); gr.addColorStop(1, 'rgba(160,160,170,0)');
+      g.fillStyle = gr; g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const cloudMats = [];
   for (let i = 0; i < 40; i++) {
     const a = rng() * Math.PI * 2, r = 520 + rng() * 1100;
     const bank = new THREE.Group();
-    const n = 3 + Math.floor(rng() * 5);
+    const n = 2 + Math.floor(rng() * 3);
     for (let j = 0; j < n; j++) {
-      const s = 18 + rng() * 32;
-      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), puffMat);
-      b.position.set((j - n / 2) * s * 0.9 + rng() * 6, rng() * s * 0.4, (rng() - 0.5) * s);
-      b.scale.y = 0.42;
-      bank.add(b);
+      const s2 = 70 + rng() * 90, m = new THREE.SpriteMaterial({ map: cloudTex, color: pal.puff, transparent: true, depthWrite: false, fog: false, opacity: 0.85 + rng() * 0.15 });
+      cloudMats.push(m);
+      const sp = new THREE.Sprite(m); sp.scale.set(s2 * 2, s2, 1); sp.position.set((j - n / 2) * s2 * 0.9 + rng() * 20, rng() * s2 * 0.15, (rng() - 0.5) * s2 * 0.6);
+      bank.add(sp);
     }
     bank.position.set(Math.cos(a) * r, 230 + rng() * 260 + r * 0.08, Math.sin(a) * r);
     bank.userData.drift = 0.6 + rng() * 1.4;
@@ -253,6 +266,8 @@ export function buildSky(scene, buildShip, palName = 'golden') {
       puffMat.color.copy(puffBase).lerp(st.cloudNight, st.night * 0.7);
       puffMat.emissive.copy(puffEmis).lerp(st.cloudGlow, Math.max(st.night, st.twilight));
       puffMat.emissiveIntensity = 0.25 + st.twilight * 0.25 - st.night * 0.05;
+      _cc.copy(puffMat.color).multiplyScalar(0.92).add(_ce.copy(puffMat.emissive).multiplyScalar(puffMat.emissiveIntensity * 1.6));
+      for (const m of cloudMats) m.color.copy(_cc);
     },
     update(t, dt, camPos) {
       dome.material.uniforms.uTime.value = t;
