@@ -8,9 +8,15 @@
    and makes every visible thing in it solid, using the same oriented
    boxes the regions already use (terrain.js Colliders):
 
-   · a plain shape (a box, a post, a ball, a cone, a trunk, a bough)
-     gets one box round it, turned the way the shape is turned, or, if
-     it's big, a stack of them that narrows as the shape does;
+   Every box stays inside what you can see: nothing is solid where
+   nothing is drawn.
+
+   · an upright box is its own collider, exactly;
+   · a bough (long and thin, lying more along than up) is a row of
+     short boxes along it, topped on the bark;
+   · any other plain shape (a ball, a cone, a rock, a post, a trunk)
+     is filled from the inside, band by band up its height, with
+     boxes whose corners just touch its surface;
    · anything else (merged furniture, a roof, an arch, a rail) is cut
      into cells from its own triangles (half a metre, coarser for big
      things), so a doorway or an arch stays open and only the parts
@@ -44,8 +50,7 @@ const CELL_MAX = 2;
 const FLAT = 0.08;           // thinner than this and level, it's a decal, a rug, a puddle
 const LOW = 0.25;            // this little above the ground is stepped over anyway
 const BIG = 400;             // bigger than this across is land, sea or sky
-const PLAIN = 6;             // plain shapes up to this across are one box each
-const SLABS = 8, SLAB = 1.2; // a bigger plain shape: a stack of boxes (this tall, at most this many), narrowing as the shape does
+const PLAIN = 6;             // plain shapes thinner than this are solid through (a trunk, a post, a rock), not shells
 const HIGH = 90;             // further above the land than this, it's sky (clouds, ships, planets)
 const MOST = 1500;           // boxes one shape may be cut into; more, and it's cut coarser
 const STILL = 0.5;           // seconds a newcomer must sit still before it is solid
@@ -108,18 +113,40 @@ function sample(geo, step, fn) {
     }
   }
 }
-/* a big plain shape as a stack of boxes up its own height, each as wide as the shape is there */
-function slabs(geo, n) {
-  return cached(geo, 's' + n, () => {
-    const bb = geo.boundingBox, h = (bb.max.y - bb.min.y) / n || 1, out = [];
-    sample(geo, Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z) / 24, (x, y, z) => {
-      const i = Math.min(n - 1, Math.max(0, Math.floor((y - bb.min.y) / h)));
-      const q = out[i] || (out[i] = { x0: x, x1: x, y0: bb.min.y + i * h, y1: bb.min.y + (i + 1) * h, z0: z, z1: z });
-      if (x < q.x0) q.x0 = x; if (x > q.x1) q.x1 = x; if (z < q.z0) q.z0 = z; if (z > q.z1) q.z1 = z;
-    });
-    return out.filter(Boolean);
+/* a convex shape filled from the inside: cut into bands up its height (in the world, however it is turned), and in
+   each band two squares, square on and turned an eighth, whose corners just touch its narrowest girth there. Their
+   outline is an eight-pointed star that never reaches outside the shape. The very top, where it rounds off to a
+   point, is left out: you stand a hand's breadth down into the crown of a boulder, never on air over it. */
+const _ip = new THREE.Vector3();
+function surfacePoints(geo) {
+  return cached(geo, 'pts', () => {
+    const bb = geo.boundingBox, all = [];
+    sample(geo, Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z) / 14, (x, y, z) => all.push(x, y, z));
+    const n = all.length / 3, keep = Math.min(n, 420), out = new Float32Array(keep * 3);
+    for (let i = 0; i < keep; i++) { const k = Math.floor(i * n / keep) * 3; out[i * 3] = all[k]; out[i * 3 + 1] = all[k + 1]; out[i * 3 + 2] = all[k + 2]; }
+    return out;
   });
 }
+function insideBoxes(geo, M) {
+  const P = surfacePoints(geo), n = P.length / 3, W = new Float32Array(P.length);
+  let y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < n; i++) { _ip.set(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]).applyMatrix4(M); W[i * 3] = _ip.x; W[i * 3 + 1] = _ip.y; W[i * 3 + 2] = _ip.z; if (_ip.y < y0) y0 = _ip.y; if (_ip.y > y1) y1 = _ip.y; }
+  const h = y1 - y0, nb = Math.max(2, Math.min(16, Math.ceil(h / 0.2))), bh = h / nb, out = [];
+  for (let b = 0; b < nb; b++) {
+    const lo = y0 + b * bh, hi = lo + bh;
+    let sx = 0, sz = 0, c = 0;
+    for (let i = 0; i < n; i++) { const y = W[i * 3 + 1]; if (y >= lo - 1e-4 && y <= hi + 1e-4) { sx += W[i * 3]; sz += W[i * 3 + 2]; c++; } }
+    if (c < 4) continue;
+    const cx = sx / c, cz = sz / c;
+    let r = Infinity;
+    for (let i = 0; i < n; i++) { const y = W[i * 3 + 1]; if (y >= lo - 1e-4 && y <= hi + 1e-4) r = Math.min(r, Math.hypot(W[i * 3] - cx, W[i * 3 + 2] - cz)); }
+    const a = r * 0.92 * Math.SQRT1_2;
+    if (!(a > 0.05)) continue;
+    for (const ang of [0, Math.PI / 4]) out.push({ x: cx, z: cz, hw: a, hd: a, ang, bot: lo, top: hi });
+  }
+  return out;
+}
+
 /* a bough in n lengths along its own y (the way it runs): each a box as long as that length runs over the ground, as
    wide as the bough is there, its top on the bark's top line (not round the whole tilted length, which reached out
    over the higher bark beside it and stood you on air) */
@@ -252,9 +279,13 @@ export function createSolids(scene, opts) {
     const bough = plain && length > girth * 2.5 && length > 1.2 && ay < 0.9;
     // (each length no longer than the bough is thick, and rising no more than a step: up a steep one, they're stairs)
     const seg = Math.max(0.5, Math.min(girth, 0.5 / Math.max(ay, 0.05)));
+    // an upright box is its own collider, exactly; any other plain shape (a rock, a post, a pot, a trunk, a ball)
+    // gets boxes that fit inside it, band by band up its height — never its bounding box, whose corners stood out
+    // past a round thing into thin air
+    const upright = g.type === 'BoxGeometry' && Math.abs(e[5]) / Math.max(1e-6, Math.hypot(e[4], e[5], e[6])) > 0.995;
     const parts = bough ? boughBoxes(g, bb, M, Math.min(64, Math.ceil(length / seg)), ay)
-      : plain && size < PLAIN ? [whole]
-      : plain ? slabs(g, Math.min(SLABS, Math.ceil((whole.top - whole.bot) / SLAB))).map(b => worldBox(b, M))
+      : plain && upright ? [whole]
+      : plain ? insideBoxes(g, M)
       : cut(g, Math.min(CELL_MAX, Math.max(CELL, size / 30)) / scale).map(b => worldBox(b, M));
     const out = [];
     for (const w of parts) {
