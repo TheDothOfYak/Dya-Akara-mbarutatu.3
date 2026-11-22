@@ -35,6 +35,7 @@ import { buildMeglaAagac } from './esik_sea.js';
 import { buildKuniByrd } from './esik_sky.js';
 import { createWilds } from './wilds.js';
 import { initTouch } from './touch.js';
+import { createControls } from './controls.js';
 import { createSunear } from './sunear.js';
 import { createVelki, buildAngel, buildSniller } from './velki.js';
 import { createRoad } from './road.js';
@@ -330,25 +331,27 @@ const keys = {};
 let mouseL = false, locked = false;
 const mouseBtn = { 0: false, 2: false };   // which buttons are down (U with both is the auto-swing)
 const typing = e => { const t = e.target; return !!(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))); };
+/* every key, mouse button, wheel notch and controller button goes through the button map (controls.js), which
+   sends the game the codes it has always known: Jump is 'Space' in here whatever it's bound to */
 addEventListener('keydown', e => {
   if (typing(e)) return;   // typing in the sign-in box isn't playing the game
   if (G.mode !== 'title') initAudio();
   if (e.code === 'Tab') e.preventDefault();
   if (e.repeat) return;
-  keys[e.code] = true;
+  if (ctl.key(e.code, true)) { if (e.code === 'Space' || e.code === 'Tab' || /^Arrow/.test(e.code)) e.preventDefault(); return; }
+  keys[e.code] = true;   // a key on nothing in the map still means itself (Enter, say)
   onKey(e.code);
 });
 let capsDownT = -1e9;
 addEventListener('keyup', e => {
-  keys[e.code] = false;
-  if (e.code === 'KeyX') rideXUp();
+  if (!ctl.key(e.code, false)) keys[e.code] = false;
   // a Mac sends Caps Lock's keydown only when it turns on and its keyup only when it turns off: count that keyup as a press too
-  if (e.code === 'CapsLock' && performance.now() - capsDownT > 400 && !typing(e) && G.mode === 'play') onKey('CapsLock');
+  if (e.code === 'CapsLock' && performance.now() - capsDownT > 400 && !typing(e) && G.mode === 'play') { ctl.key('CapsLock', true); ctl.key('CapsLock', false); }
 });
 addEventListener('keydown', e => { if (e.code === 'CapsLock') capsDownT = performance.now(); }, true);
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseL = false; mouseBtn[0] = mouseBtn[2] = false; if (P.vines) dropVines(); });
+addEventListener('blur', () => { ctl.releaseAll(); for (const k in keys) keys[k] = false; mouseL = false; mouseBtn[0] = mouseBtn[2] = false; if (P.vines) dropVines(); });
 const canvas = renderer.domElement;
-const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'rpg'].some(id => !$(id).classList.contains('hidden'));
+const overlayOpen = () => ['journal', 'pause', 'lantern', 'endcard', 'newgame', 'rpg'].some(id => !$(id).classList.contains('hidden')) || ctl.isOpen();
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
   // Esc only frees the mouse (and leaves full screen); P is the pause. Click the world to take the mouse back.
@@ -361,29 +364,94 @@ document.addEventListener('mousemove', e => {
   CAM.yaw -= e.movementX * s * (G.lock ? 0.25 : 1);
   CAM.pitch = clamp(CAM.pitch + e.movementY * s * (OPT.invert ? -1 : 1), PITCH_MIN, PITCH_MAX);
 });
+/* a mouse click: first the things any click does (skip, take the mouse, go on talking), then whatever
+   that button is mapped to */
+const mouseDown = new Set();
 document.addEventListener('mousedown', e => {
-  if (e.button === 0 || e.button === 2) mouseBtn[e.button] = true;
   if (G.mode !== 'title') initAudio();   // browsers only let sound start after a click
-  if (e.target.closest && e.target.closest('#d-choices, #rpg, #pk-box')) return;
+  if (e.target.closest && e.target.closest('#d-choices, #rpg, #pk-box, #ctl, #osk')) return;
   if (G.mode === 'title' || overlayOpen()) return;
   if (G.mode === 'intro' || G.mode === 'trance') { if (!(TOK && !cardState)) skipCards(); return; }
   if (!locked && !touch.on) { if (!G.paused && G.mode !== 'end') lockMouse(); return; }
   if (G.mode === 'dialog') { if (DLG && DLG.choices) pickChoice(DLG.sel); else advanceDialog(); return; }
   if (G.mode === 'memory') { closeMemory(); return; }
   if (G.mode !== 'play' || G.paused) return;
-  if (VK) { if (touch.on) return; if (VK.vine && VK.vine(e.button, true)) return; if (e.button === 0 && VK.attack) VK.attack(); return; }   // on her back in a scene of its own: her vines
   if (touch.on) return;   // on a touch screen the buttons do the fighting
-  if (dyaMatch) { if (e.button === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
-  if (P.climb && (e.button === 0 || e.button === 2)) { climbGrab(e.button === 0 ? 'L' : 'R'); return; }   // on a trunk: hand over hand (vine over vine, on her back)
-  if (P.riding && (e.button === 0 || e.button === 2) && (keys.KeyU || P.auto)) return;   // U held: both buttons are the auto-swing, not a throw
-  if (P.riding && (e.button === 0 || e.button === 2)) { vineShoot(e.button === 0 ? 'L' : 'R'); return; }   // on her back: her vines, not the axe
-  if (e.button === 0) { mouseL = true; pressAttack(); }
-  if (e.button === 1) { e.preventDefault(); toggleLock(); }
-  if (e.button === 2) duatStrike();
+  if (e.button === 1) e.preventDefault();
+  mouseDown.add(e.button); ctl.mouse(e.button, true);
 });
-document.addEventListener('mouseup', e => { if (e.button === 0 || e.button === 2) mouseBtn[e.button] = false; if (e.button === 0) mouseL = false; if (VK) { if (VK.vine) VK.vine(e.button, false); return; } if (P.auto) return; if (e.button === 0 || e.button === 2) vineLet(e.button === 0 ? 'L' : 'R'); });
+document.addEventListener('mouseup', e => { if (mouseDown.delete(e.button)) ctl.mouse(e.button, false); });
+/* what Attack (the game's 'mouse 0'), Duat Strike ('mouse 2') and the middle button do, from whatever they're bound to */
+function gameMouse(b, down) {
+  if (!down) {
+    if (b === 0 || b === 2) mouseBtn[b] = false;
+    if (b === 0) mouseL = false;
+    if (VK) { if (VK.vine) VK.vine(b, false); return; }
+    if (P.auto) return;
+    if (b === 0 || b === 2) vineLet(b === 0 ? 'L' : 'R');
+    return;
+  }
+  if (b === 0 || b === 2) mouseBtn[b] = true;
+  if (G.mode !== 'play' || G.paused || overlayOpen()) return;
+  if (VK) { if (VK.vine && VK.vine(b, true)) return; if (b === 0 && VK.attack) VK.attack(); return; }   // on her back in a scene of its own: her vines
+  if (dyaMatch) { if (b === 0) dyaMatch.throwAt(dyaAimPoint()); return; }
+  if (P.climb && (b === 0 || b === 2)) { climbGrab(b === 0 ? 'L' : 'R'); return; }   // on a trunk: hand over hand (vine over vine, on her back)
+  if (P.riding && (b === 0 || b === 2) && (keys.KeyU || keys.AutoSwing || P.auto)) return;   // U held: both buttons are the auto-swing, not a throw
+  if (P.riding && (b === 0 || b === 2)) { vineShoot(b === 0 ? 'L' : 'R'); return; }   // on her back: her vines, not the axe
+  if (b === 0) { mouseL = true; pressAttack(); }
+  if (b === 1) toggleLock();
+  if (b === 2) duatStrike();
+}
 document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });   // keep long-press paste in text fields
-addEventListener('wheel', e => { if (SCOPE) { SCOPE.fov = clamp(SCOPE.fov * (e.deltaY > 0 ? 1.15 : 0.87), 4, 40); return; } CAM.wantDist = clamp(CAM.wantDist + Math.sign(e.deltaY) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11); }, { passive: true });
+addEventListener('wheel', e => { if (overlayOpen() || G.mode === 'title' || !e.deltaY) return; ctl.wheel(e.deltaY); }, { passive: true });
+function zoomCam(dir, smooth) {
+  if (SCOPE) { SCOPE.fov = clamp(SCOPE.fov * (smooth ? Math.pow(1.15, dir) : dir > 0 ? 1.15 : 0.87), 4, 40); return; }
+  CAM.wantDist = clamp(CAM.wantDist + (smooth ? dir : Math.sign(dir)) * (dyaMatch ? 2 : 0.8), 3.2, dyaMatch ? 40 : 11);
+}
+/* the controller's sticks: move (read where the game reads a phone's joystick) and look */
+const stick = {
+  get on() { return touch.on || ctl.stick().x !== 0 || ctl.stick().y !== 0; },
+  get move() { const m = ctl.stick(); if (!touch.on) return m; return { x: clamp(touch.move.x + m.x, -1, 1), y: clamp(touch.move.y + m.y, -1, 1) }; },
+};
+function stickLook(dt) {
+  const v = ctl.look(); if (!v.x && !v.y) return;
+  if (SCOPE) { const k = 1.6 * dt * SCOPE.fov / 40; SCOPE.yaw -= v.x * k; SCOPE.pitch = clamp(SCOPE.pitch - v.y * k, -0.1, 1.55); return; }
+  if (G.paused || (G.mode !== 'play' && G.mode !== 'dialog' && G.mode !== 'memory')) return;
+  CAM.yaw -= v.x * 3.2 * dt * (G.lock ? 0.25 : 1);
+  CAM.pitch = clamp(CAM.pitch + v.y * 2.2 * dt * (OPT.invert ? -1 : 1), PITCH_MIN, PITCH_MAX);
+}
+/* which panel a controller is steering, and what its Back button does there */
+function menuRoot() {
+  for (const id of ['pk-box', 'alch-game']) { const el = $(id); if (el) return el; }
+  for (const id of ['newgame', 'lantern', 'endcard', 'pause', 'rpg', 'journal']) if (!$(id).classList.contains('hidden')) return $(id);
+  if (G.mode === 'title' && !$('title').classList.contains('fade')) return $('title');
+  return null;
+}
+function menuBack(root) {
+  const id = root.id;
+  if (id === 'pause') togglePause();
+  else if (id === 'rpg') book.close();
+  else if (id === 'journal') $('btn-jclose').click();
+  else if (id === 'lantern') closeLantern();
+  else if (id === 'newgame') $('btn-ngback').click();
+  else if (id === 'pk-box') $('pk-ok').click();
+  else if (id === 'alch-game') dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }));
+}
+const ctl = createControls({
+  keys, onKey: c => onKey(c),
+  onRelease(c) { if (c === 'KeyX') rideXUp(); },
+  mouse: (b, down) => gameMouse(b, down),
+  zoom: (d, smooth) => { if (G.mode === 'play' || G.mode === 'scope') zoomCam(d, smooth); },
+  context: () => menuRoot() ? 'menu' : G.mode === 'dialog' && !G.paused ? 'dialog' : 'play',
+  singing: () => !!(TOK && TOK.step === 'sing'),
+  riding: () => G.mode === 'play' && !G.paused && (VK ? !!(VK.riding && VK.riding()) : !!P.riding),
+  menuRoot, menuBack,
+  toast: (t, d) => toast(t, d),
+  sfx: () => sfx.ui && sfx.ui(),
+  wake: () => { if (G.mode !== 'title') initAudio(); },
+});
+$('btn-controls').onclick = () => ctl.open();
+$('btn-tcontrols').onclick = () => ctl.open();
 /* the game letting go of the mouse itself (a cutscene, a menu, a choice) is not you pressing Escape:
    remember when we did it, so the pointer-lock change that follows doesn't open the pause menu */
 let selfUnlockT = -1e9;
@@ -970,7 +1038,7 @@ function startAttack(kind) {
     if (keys.KeyW || keys.ArrowUp) w.add(cf); if (keys.KeyS || keys.ArrowDown) w.sub(cf);
     const cr = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
     if (keys.KeyD || keys.ArrowRight) w.add(cr); if (keys.KeyA || keys.ArrowLeft) w.sub(cr);
-    if (touch.on) w.addScaledVector(cf, touch.move.y).addScaledVector(cr, touch.move.x);
+    if (stick.on) w.addScaledVector(cf, stick.move.y).addScaledVector(cr, stick.move.x);
     const want = w.lengthSq() > 0.01 ? w.normalize() : cf;
     let best = null, bs = 0.35;
     if (!arm.ranged) for (const e of enemies.list) {
@@ -1164,6 +1232,7 @@ function dodge() {
   const f = camForward(), r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
   let ix = 0, iz = 0;
   if (keys.KeyW) iz += 1; if (keys.KeyS) iz -= 1; if (keys.KeyA) ix -= 1; if (keys.KeyD) ix += 1;
+  if (stick.on) { const m = stick.move; ix += m.x; iz += m.y; }
   const dir = V3().addScaledVector(f, iz).addScaledVector(r, ix);
   if (dir.lengthSq() < 0.01) dir.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw));
   dir.normalize();
@@ -3426,7 +3495,7 @@ const ROUTES = (world.swingRoutes || []).map(r => {
   return { ...r, cum, len: cum[cum.length - 1] };
 });
 P.auto = null;
-const autoChord = () => !!keys.KeyU && ((mouseBtn[0] && mouseBtn[2]) || (keys.ArrowLeft && keys.ArrowRight) || (keys.KeyA && keys.KeyD));
+const autoChord = () => !!keys.AutoSwing || !!keys.KeyU && ((mouseBtn[0] && mouseBtn[2]) || (keys.ArrowLeft && keys.ArrowRight) || (keys.KeyA && keys.KeyD));
 /* the nearest point of a route: how far along it (s), how far off it (d), and the way it runs there */
 function routeNear(R, x, z) {
   let best = { s: 0, d: 1e9, tx: 1, tz: 0 };
@@ -3780,7 +3849,7 @@ function climbGrab(side) {
 function climbTick(dt, act) {
   const C = P.climb, c = C.c;
   let up = 0, round = 0;
-  if (act) { if (keys.KeyS || keys.ArrowDown) up -= 1; if (keys.KeyA || keys.ArrowLeft) round -= 1; if (keys.KeyD || keys.ArrowRight) round += 1; if (touch.on) { up += Math.min(0, touch.move.y); round += touch.move.x; } }
+  if (act) { if (keys.KeyS || keys.ArrowDown) up -= 1; if (keys.KeyA || keys.ArrowLeft) round -= 1; if (keys.KeyD || keys.ArrowRight) round += 1; if (stick.on) { const m = stick.move; up += Math.min(0, m.y); round += m.x; } }
   if (act && (keys.KeyW || keys.ArrowUp) && !C.toldW) { C.toldW = true; hint('Left click, right click to climb — one over the other.'); }
   const sp = P.riding ? 8 : 2.8;
   const R0 = c.rad(C.y, C.phi) + (P.riding ? 1.4 : 0.55);
@@ -3887,7 +3956,7 @@ function castSpell(id) {
    drink. Change them in the book (I → Gear).
    ================================================================ */
 const SLOT_KEYS = ['KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'];
-const slotLabel = code => code === 'KeyQ' ? 'Q' : code.replace('Digit', '');
+const slotLabel = (code, short) => ctl.label(code === 'KeyQ' ? 'slot_q' : 'slot_' + code.replace('Digit', ''), short);
 const hasItem = id => (SAVE.inv.items[id] || 0) > 0;
 const knowsTrigger = id => !!SAVE.triggers[id];
 P.slotCd = {};
@@ -3970,10 +4039,12 @@ function secondWind() {
 function renderSpellBar() {
   $('spells').innerHTML = SLOT_KEYS.map(code => {
     const a = SLOT_ACTIONS[SAVE.slots[code]];
-    return `<div class="ab brass${a ? '' : ' empty'}" data-slot="${code}" id="slot-${code}" title="${a ? a.name : 'Empty — set it in the book (I)'}">${a ? a.icon : '·'}<span class="key">${slotLabel(code)}</span><div class="cd"></div></div>`;
+    return `<div class="ab brass${a ? '' : ' empty'}" data-slot="${code}" id="slot-${code}" title="${a ? a.name : 'Empty — set it in the book (I)'}">${a ? a.icon : '·'}<span class="key">${slotLabel(code, true)}</span><div class="cd"></div></div>`;
   }).join('');
 }
+let slotDevice = '';
 function updateSlotHud(dt) {
+  if (slotDevice !== ctl.device + ctl.version) { slotDevice = ctl.device + ctl.version; renderSpellBar(); }   // the keys shown follow what you play with
   for (const id in P.slotCd) P.slotCd[id] = Math.max(0, P.slotCd[id] - dt);
   for (const code of SLOT_KEYS) {
     const el = $('slot-' + code); if (!el) continue;
@@ -4459,7 +4530,7 @@ function startScope(door) {
 }
 function updateScope(dt) {
   if (!SCOPE) return;
-  if (touch.on) { SCOPE.yaw -= touch.move.x * dt * 0.6; SCOPE.pitch = clamp(SCOPE.pitch + touch.move.y * dt * 0.6, -0.1, 1.55); }
+  if (stick.on) { const m = stick.move; SCOPE.yaw -= m.x * dt * 0.6; SCOPE.pitch = clamp(SCOPE.pitch + m.y * dt * 0.6, -0.1, 1.55); }
   if (Math.abs(camera.fov - SCOPE.fov) > 0.01) { camera.fov = damp(camera.fov, SCOPE.fov, 6, dt); camera.updateProjectionMatrix(); }
   const cp = Math.cos(SCOPE.pitch);
   camera.position.copy(SCOPE.pos);
@@ -4609,7 +4680,7 @@ function updatePlayer(dt) {
     if (keys.KeyS || keys.ArrowDown) iz -= 1;
     if (keys.KeyA || keys.ArrowLeft) ix -= 1;
     if (keys.KeyD || keys.ArrowRight) ix += 1;
-    if (touch.on) { ix += touch.move.x; iz += touch.move.y; }
+    if (stick.on) { const m = stick.move; ix += m.x; iz += m.y; }
     if (mouseL && !P.atk && !P.riding) pressAttack();
   }
   const f = camForward(), r = V3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
@@ -5015,7 +5086,7 @@ function updateIntroCamera(dt) {
 }
 
 /* the use prompt is rewritten only when it changes (rebuilding it every frame made the page redo its layout each time) */
-function setPrompt(pe, label) { if (pe._k !== label) { pe._k = label; pe.innerHTML = `<kbd>E</kbd>${label}`; } }
+function setPrompt(pe, label) { if (pe._k !== label) { pe._k = label; pe.innerHTML = `<kbd>${ctl.label('interact')}</kbd>${label}`; } }
 function updateHUD() {
   $('hp-fill').style.transform = `scaleX(${Math.max(0, P.hp / P.maxHp)})`;
   $('hp-lag').style.transform = `scaleX(${Math.max(0, P.hp / P.maxHp)})`;
@@ -5035,7 +5106,7 @@ function updateHUD() {
   const stk = (P.poison > 0 ? 'p' : '') + (P.para > 0 ? 'z' : '');
   if ($('status')._k !== stk) { $('status')._k = stk; $('status').innerHTML = (P.poison > 0 ? '<span class="st poison">POISONED</span>' : '') + (P.para > 0 ? '<span class="st para">PARALYSED</span>' : ''); }
   $('poisonfx').style.opacity = P.poison > 0 ? 0.8 : 0;
-  $('resume').classList.toggle('hidden', locked || touch.on || G.paused || G.mode !== 'play' || overlayOpen() || !!(DLG && DLG.choices));
+  $('resume').classList.toggle('hidden', locked || touch.on || ctl.device === 'pad' || G.paused || G.mode !== 'play' || overlayOpen() || !!(DLG && DLG.choices));
   const pe = $('prompt'), pr = nearestPrompt();
   if (pr) { setPrompt(pe, pr.label); pe.classList.remove('hidden'); } else pe.classList.add('hidden');
   // a faint glow on the thing you could use, and nothing else
@@ -5135,6 +5206,7 @@ function frame(now) {
   const rawDt = Math.min(clock.getDelta(), 1 / 20);
   frameDt = Math.abs(rawDt - frameDt) > 0.012 ? rawDt : lerp(frameDt, rawDt, 0.2);
   let dt = frameDt;
+  ctl.poll(frameDt); stickLook(frameDt);   // the controller: buttons through the map, the look stick on the camera
   const frozen = G.paused || G.mode === 'title';
   if (VK) {   // Velki: its own little world, until the air tears open
     if (!G.paused) { G.t += dt; if (G.mode !== 'title') tickTime(SAVE, dt); VK.update(dt, G.mode === 'play' && !overlayOpen()); updateDialog(dt); tickUi(dt); updateSlotHud(dt); }
@@ -5287,7 +5359,7 @@ function startVelki() {
   G.mode = 'intro'; G.t = 0;
   $('hud').classList.remove('hidden'); $('hud').classList.add('velki');
   VK = createVelki({
-    camera, keys, touch, CAM, sfx,
+    camera, keys, touch: stick, CAM, sfx,
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
@@ -5343,7 +5415,7 @@ function askName(cb, title = 'NAME YOUR PUNK', ph = 'Pip') {
 /* what a self-contained scene (the road north, the Megla Aagac) borrows from the game: renderer, input, talk, cards, HUD */
 function vkCtx() {
   return {
-    camera, keys, touch, CAM, sfx,
+    camera, keys, touch: stick, CAM, sfx,
     makeComposer(sc) {
       const c = new EffectComposer(renderer, smoothTarget());
       c.addPass(new RenderPass(sc, camera));
@@ -5601,10 +5673,11 @@ function tokKey(code, up) {   // the lesson takes E (held for the pour) and the 
   return false;
 }
 /* the song: notes slide down four lanes; press each as it crosses the line */
-const SONG = { keys: ['KeyA', 'KeyS', 'KeyD', 'KeyF'], labels: ['A', 'S', 'D', 'F'], el: null, notes: [], t: 0, hit: 0, miss: 0 };
+const SONG = { keys: ['Song1', 'Song2', 'Song3', 'Song4'], labels: ['A', 'S', 'D', 'F'], el: null, notes: [], t: 0, hit: 0, miss: 0 };
 function songStart() {
   const T = STORY.FIRST_TOKEN;
   TOK.step = 'sing'; tokObjective(T.stepSing);
+  SONG.labels = [1, 2, 3, 4].map(i => ctl.label('song_' + i));
   const box = document.createElement('div'); box.id = 'song';
   box.style.cssText = 'position:fixed;left:50%;bottom:16vh;transform:translateX(-50%);width:min(360px,80vw);height:46vh;z-index:31;pointer-events:none;border-radius:12px;background:linear-gradient(rgba(20,12,40,.0),rgba(20,12,40,.55));border:1px solid rgba(200,160,255,.25)';
   box.innerHTML = SONG.labels.map((l, i) => `<div style="position:absolute;bottom:6px;left:${i * 25 + 12.5}%;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;border:2px solid #c8a0ff;color:#f0e0ff;font:600 15px var(--display,Georgia);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px #9a6aff">${l}</div>`).join('') + '<div style="position:absolute;left:0;right:0;bottom:28px;height:2px;background:rgba(220,190,255,.6)"></div>';

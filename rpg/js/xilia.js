@@ -233,6 +233,8 @@ export function buildXilia(scene) {
   const trees = [];   // trunks a Punk can swing round
   const pick = a => a[Math.floor(rng() * a.length)];
   const col = new Colliders(heightAt);
+  // no grass where something solid stands on the ground (houses, walls, trunks, rocks): its footprint, rotation and all
+  const onSolid = (x, z) => { for (const o of col.near(x, z)) { const dx = x - o.x, dz = z - o.z, lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c; if (Math.abs(lx) <= o.hw + 0.3 && Math.abs(lz) <= o.hd + 0.3) return true; } return false; };
   const roads = [[0, 175, 0, 50], [0, 50, 0, -80], [0, 50, 90, 10], [0, 50, -90, 40],
     [0, 80, PEN.x, PEN.z], [0, -80, GROVE.x, GROVE.z], [0, -60, HIDEOUT.x, HIDEOUT.z],
     [-90, 40, -132, 50], [-132, 50, -168, 58],          // the little road west out of town …
@@ -594,7 +596,7 @@ export function buildXilia(scene) {
   wTrunks.done(); wCones.done(); wCrowns.done(); wRocks.done();
 
   blocks.done(); trunks.done(); crowns.done(); crops.done(); rocks.done();
-  const grass = buildGrass(scene, rng, (x, z) => !(Math.hypot(x, z) > oldEdge(x, z) - 3 || roadDist(x, z) < 3 || Math.hypot(x - SQUARE.x, z - SQUARE.z) < 23 || inField(x, z)), heightAt,
+  const grass = buildGrass(scene, rng, (x, z) => !(Math.hypot(x, z) > oldEdge(x, z) - 3 || roadDist(x, z) < 3 || Math.hypot(x - SQUARE.x, z - SQUARE.z) < 23 || inField(x, z) || onSolid(x, z)), heightAt,
     ['#8fbf52', '#a8c45a', '#7ab04a', '#c0c860', '#98b850'], 26000);
 
   /* Zahreh flowers — plenty, here at home */

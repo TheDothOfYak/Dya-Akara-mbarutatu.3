@@ -198,6 +198,8 @@ export function buildWorld(scene) {
   const rng = mulberry32(1307);
   const pick = a => a[Math.floor(rng() * a.length)];
   const col = new Colliders(heightAt);
+  // no grass where something solid stands on the ground (houses, walls, trunks, rocks): its footprint, rotation and all
+  const onSolid = (x, z) => { for (const o of col.near(x, z)) { const dx = x - o.x, dz = z - o.z, lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c; if (Math.abs(lx) <= o.hw + 0.3 && Math.abs(lz) <= o.hd + 0.3) return true; } return false; };
   const trees = [];   // trunks a Punk can swing round
 
   /* places that matter */
@@ -950,6 +952,7 @@ export function buildWorld(scene) {
     if (Math.hypot(x, z) > oldEdge(x, z) + 12 || minE(x, z) < 1.08) return false;
     if (roadDist(x, z) < 3.5 || Math.abs(x) < 4 && z > 165) return false;
     if (Math.hypot(x - PLAZA.x, z - PLAZA.z) < 31) return false;
+    if (onSolid(x, z)) return false;
     return true;
   }, heightAt);
 

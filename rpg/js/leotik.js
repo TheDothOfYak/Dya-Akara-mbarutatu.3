@@ -262,6 +262,8 @@ export function buildLeotik(scene) {
   const rng = mulberry32(4409);
   const pick = a => a[Math.floor(rng() * a.length)];
   const col = new Colliders(heightAt);
+  // no grass where something solid stands on the ground (keep walls, houses, trunks, rocks): its footprint, rotation and all
+  const onSolid = (x, z) => { for (const o of col.near(x, z)) { const dx = x - o.x, dz = z - o.z, lx = dx * o.c - dz * o.s, lz = dx * o.s + dz * o.c; if (Math.abs(lx) <= o.hw + 0.3 && Math.abs(lz) <= o.hd + 0.3) return true; } return false; };
   const trees = [];   // trunks a Punk can swing round
 
   /* ---------- the pier's footing (fixed: quests and saves start here) ---------- */
@@ -864,6 +866,7 @@ export function buildLeotik(scene) {
   const grass = buildGrass(scene, rng, (x, z) => {
     if (coastD(x, z) < 4 || roadDist(x, z) < 3 || heightAt(x, z) < SEA + 1) return false;
     for (const b of BOGS) if (Math.hypot(x - b.x, z - b.z) < b.r + 1) return false;
+    if (onSolid(x, z)) return false;
     return Math.hypot(x - KEEP.x, z - KEEP.z) > 29;
   }, heightAt, ['#3f7a3a', '#4f8a3a', '#2f6a34', '#5a8a40', '#3a6a40'], 30000);
 
