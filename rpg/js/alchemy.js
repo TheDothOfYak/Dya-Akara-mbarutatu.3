@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { toon, glowSprite, addOutline } from './gfx.js';
 import { ITEMS, BREWS, hasAll, takeAll } from './items.js';
+import { folkSolid } from './solid.js';
 import { QUESTS } from './quests.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -62,7 +63,7 @@ export function createAlchemy(ctx) {
       if (world.col.ground(x, z, h + 0.4) <= h + 0.3 && world.col.ground(x + 1.5, z, h + 0.4) <= h + 0.3 && world.col.ground(x - 1.5, z, h + 0.4) <= h + 0.3) { at = V3(x, h, z); break; }
     }
     at = at || V3(yard.x - 12, H(yard.x - 12, yard.z - 10), yard.z - 10);
-    const g = new THREE.Group(); g.position.copy(at); g.rotation.y = Math.atan2(yard.x - at.x, yard.z - at.z); scene.add(g);
+    const g = new THREE.Group(); g.position.copy(at); g.rotation.y = Math.atan2(yard.x - at.x, yard.z - at.z); scene.add(folkSolid(g));   // (solid as drawn: solid.js)
     const wood = toon(0x7a5232), copper = toon(0xc87a3a, { emissive: 0x4a1a08, emissiveIntensity: 0.3 }), glass = toon(0x9adfe0, { emissive: 0x2a8a8a, emissiveIntensity: 0.35 });
     const part = (geo, mat, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; addOutline(m, 0.02); g.add(m); return m; };
     part(new THREE.BoxGeometry(2.6, 0.12, 1.1), wood, 0, 0.92, 0);
@@ -77,7 +78,6 @@ export function createAlchemy(ctx) {
     part(new THREE.CylinderGeometry(0.06, 0.08, 0.24, 8), toon(0xc8a040), 1.1, 1.1, 0.25);
     const fire = glowSprite(0xff8a3a, 0.9, 0.85); fire.position.set(-0.7, 1.05, 0); g.add(fire);
     const brewGlow = glowSprite(0x9affe0, 1.2, 0.5); brewGlow.position.set(0.75, 1.25, 0.1); g.add(brewGlow);
-    world.col.add(at.x, at.z, 1.35, 0.6, g.rotation.y, at.y - 1, at.y + 1);
     return { pos: at, fire, brewGlow };
   })();
 
@@ -144,10 +144,9 @@ export function createAlchemy(ctx) {
   };
   const tree = (() => {
     const p = land(420, 380), pt = glassPatch(p, 12, 1.2), bark = toon(0x2a2220);
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 7, 8), bark); trunk.position.y = 3.5; trunk.rotation.z = 0.08; addOutline(trunk, 0.04); pt.g.add(trunk);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 7, 8), bark); trunk.position.y = 3.5; trunk.rotation.z = 0.08; addOutline(trunk, 0.04); pt.g.add(folkSolid(trunk));
     const split = new THREE.Mesh(new THREE.BoxGeometry(0.12, 6, 0.9), new THREE.MeshBasicMaterial({ color: 0x7ac8ff })); split.position.y = 3.6; pt.g.add(split);
     for (let k = 0; k < 4; k++) { const br = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.2, 3, 5), bark); br.position.set(Math.cos(k * 1.7) * 0.9, 6 + k * 0.3, Math.sin(k * 1.7) * 0.9); br.rotation.set(Math.sin(k) * 0.9, 0, Math.cos(k * 1.7) * 0.9); pt.g.add(br); }
-    world.col.add(p.x, p.z, 0.7, 0.7, 0, p.y - 1, p.y + 7);
     return { pos: p, ...pt, regrow: 0 };
   })();
   const shardSpots = [land(-200, -640), S.warden ? land(S.warden.x + 60, S.warden.z + 60) : land(-400, -300)];

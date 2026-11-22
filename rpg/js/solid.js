@@ -44,9 +44,13 @@
 import * as THREE from 'three';
 
 export const noSolid = o => { o.userData.noSolid = true; return o; };
+/* a thing folk keep clear of too (a trunk, a boulder, a wall): its boxes are made here, fitted to it like any other,
+   but not marked .auto, so townsfolk and beasts walk round it as they would a box placed by hand. Use it instead of
+   placing a box by hand round something drawn: a hand-placed box never quite matches what you see. */
+export const folkSolid = o => { o.userData.folkSolid = true; return o; };
 
 const CELL = 0.5;            // metres: the finest a shape is cut into (bigger shapes, coarser: up to CELL_MAX)
-const CELL_MAX = 2;
+const CELL_MAX = 1;
 const FLAT = 0.08;           // thinner than this and level, it's a decal, a rug, a puddle
 const LOW = 0.25;            // this little above the ground is stepped over anyway
 const BIG = 400;             // bigger than this across is land, sea or sky
@@ -147,22 +151,83 @@ function insideBoxes(geo, M) {
   return out;
 }
 
-/* a bough in n lengths along its own y (the way it runs): each a box as long as that length runs over the ground, as
-   wide as the bough is there, its top on the bark's top line (not round the whole tilted length, which reached out
-   over the higher bark beside it and stood you on air) */
-const _bc = new THREE.Vector3();
-function boughBoxes(g, bb, M, n, ay) {
+/* a length of round tube (a bough, a root, a ring, a rail) from (x0,y0,z0) to (x1,y1,z1), radius r, filled from the
+   inside: two boxes crossed in its round section (a tall narrow one, a wide low one, their corners on the surface),
+   each as long as the length runs over the ground, its flat top at or under the surface at both ends. A length
+   standing more up than along is a pillar: two squares, square on and turned an eighth, inside it. */
+function segBoxes(x0, y0, z0, x1, y1, z1, r, out) {
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, L = Math.hypot(dx, dy, dz);
+  if (L < 1e-4 || r < 0.02) return;
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, mz = (z0 + z1) / 2, ay = Math.abs(dy) / L, flat = Math.sqrt(Math.max(0, 1 - ay * ay));
+  if (flat < 0.45) {
+    const a = r * Math.SQRT1_2 * 0.97;
+    for (const ang of [0, Math.PI / 4]) out.push({ x: mx, z: mz, hw: a, hd: a, ang, bot: Math.min(y0, y1), top: Math.max(y0, y1) });
+    return;
+  }
+  const uh = Math.hypot(dx, dz), ang = Math.atan2(-dz / uh, dx / uh), hw = L * flat / 2, rise = Math.abs(dy) / 2;
+  for (const [across, up] of [[0.5, 0.86], [0.86, 0.5]]) {
+    const v = r * up / flat, bot = my - v + rise, top = my + v - rise;
+    if (top - bot > 0.02) out.push({ x: mx, z: mz, hw, hd: r * across, ang, bot, top });
+  }
+}
+/* a run of points with a radius at each: lengths of tube between them, each cut short enough to stay on the surface */
+const _sa = new THREE.Vector3(), _sb = new THREE.Vector3();
+function tubeBoxes(pts, rad, out = []) {
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], r = Math.min(rad[i - 1], rad[i]);
+    const n = Math.max(1, Math.min(16, Math.ceil(Math.abs(b.y - a.y) / 0.16)));   // short enough up a slope that a flat top never stands off it
+    for (let k = 0; k < n; k++) {
+      _sa.lerpVectors(a, b, k / n); _sb.lerpVectors(a, b, (k + 1) / n);
+      segBoxes(_sa.x, _sa.y, _sa.z, _sb.x, _sb.y, _sb.z, r, out);
+    }
+  }
+  return out;
+}
+/* a bough (a cylinder lying more along than up): along its own y */
+function boughBoxes(g, bb, M, n) {
+  const e = M.elements, s = Math.min(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[8], e[9], e[10]));
+  // (a cylinder of few sides is narrower across its flats than at its corners: the circle inside the polygon; anything
+  // else lying along (a stretched octahedron, a capsule): the circle inside a diamond of its width, to be safe)
+  const p = g.parameters || {}, poly = Math.cos(Math.PI / Math.max(3, p.radialSegments || 32));
+  const cylR = g.type === 'CylinderGeometry' ? t => ((p.radiusBottom ?? 1) + ((p.radiusTop ?? 1) - (p.radiusBottom ?? 1)) * t) * poly : null;
+  const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2, pts = [], rad = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    pts.push(new THREE.Vector3(cx, bb.min.y + (bb.max.y - bb.min.y) * t, cz).applyMatrix4(M));
+    rad.push((cylR ? cylR(t) : Math.min(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2 * Math.SQRT1_2) * s);
+  }
+  return tubeBoxes(pts, rad);
+}
+/* a ring (TorusGeometry) or a tube along a curve (TubeGeometry): along its centreline */
+function ringBoxes(g, M) {
+  const p = g.parameters, e = M.elements, s = Math.min(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10]));
+  const pts = [], rad = [], poly = Math.cos(Math.PI / Math.max(3, (g.type === 'TorusGeometry' ? p.radialSegments : p.radialSegments) || 8));
+  if (g.type === 'TorusGeometry') {
+    const r = p.tube * s * poly, arc = p.arc ?? Math.PI * 2, n = Math.max(6, Math.min(128, Math.ceil(arc * p.radius * s / Math.max(0.25, Math.min(1.2, r * 1.5)))));
+    for (let i = 0; i <= n; i++) { const a = arc * i / n; pts.push(new THREE.Vector3(Math.cos(a) * p.radius, Math.sin(a) * p.radius, 0).applyMatrix4(M)); rad.push(r); }
+  } else {
+    const r = p.radius * s * poly, len = p.path.getLength() * s, n = Math.max(4, Math.min(96, Math.ceil(len / Math.max(0.25, Math.min(1.2, r * 1.5)))));
+    for (let i = 0; i <= n; i++) { pts.push(p.path.getPointAt(i / n, new THREE.Vector3()).applyMatrix4(M)); rad.push(r); }
+  }
+  return tubeBoxes(pts, rad);
+}
+/* a box turned off the upright (a tilted slab, a leaning plank): tiles across its face, small enough that each one's
+   top stands no more than a few centimetres off the slope */
+function tiledBoxes(bb, M) {
   const e = M.elements, sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
-  const ux = e[4], uz = e[6], uh = Math.hypot(ux, uz) || 1, ang = Math.atan2(-uz / uh, ux / uh), flat = Math.sqrt(Math.max(0, 1 - ay * ay));
-  const p = g.parameters || {}, cylR = g.type === 'CylinderGeometry' ? t => (p.radiusBottom ?? 1) + ((p.radiusTop ?? 1) - (p.radiusBottom ?? 1)) * t : null;
-  const segL = (bb.max.y - bb.min.y) * sy / n, cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+  const ay = Math.abs(e[5]) / sy, slope = Math.sqrt(Math.max(0, 1 - ay * ay)) / Math.max(ay, 0.05);
+  // (and through its height, for a tall one leaning: the bounding box of a leaning board holds a wedge of air each side)
+  const lean = Math.sqrt(Math.max(0, 1 - ay * ay));
+  const tile = Math.max(0.15, Math.min(1, 0.06 / Math.max(slope, 0.01)));
+  let nx = Math.max(1, Math.ceil((bb.max.x - bb.min.x) * sx / tile)), nz = Math.max(1, Math.ceil((bb.max.z - bb.min.z) * sz / tile)), ny = Math.max(1, Math.ceil((bb.max.y - bb.min.y) * sy * lean / 0.08));
+  nx = Math.min(nx, 24); nz = Math.min(nz, 24); ny = Math.min(ny, 24);
+  while (nx * ny * nz > 900) { if (nx >= ny && nx >= nz) nx--; else if (ny >= nz) ny--; else nz--; }
   const out = [];
-  for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) / n, ly = bb.min.y + (bb.max.y - bb.min.y) * t;
-    _bc.set(cx, ly, cz).applyMatrix4(M);
-    const r = (cylR ? cylR(t) : Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2) * Math.max(sx, sz);
-    const rise = segL * ay / 2, up = r * flat;
-    out.push({ x: _bc.x, z: _bc.z, hw: Math.max(0.15, segL * flat / 2), hd: r, ang, bot: _bc.y - up - rise, top: _bc.y + up + rise * 0.5 });
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) for (let k = 0; k < ny; k++) {
+    const x0 = bb.min.x + (bb.max.x - bb.min.x) * i / nx, x1 = bb.min.x + (bb.max.x - bb.min.x) * (i + 1) / nx;
+    const z0 = bb.min.z + (bb.max.z - bb.min.z) * j / nz, z1 = bb.min.z + (bb.max.z - bb.min.z) * (j + 1) / nz;
+    const y0 = bb.min.y + (bb.max.y - bb.min.y) * k / ny, y1 = bb.min.y + (bb.max.y - bb.min.y) * (k + 1) / ny;
+    out.push(worldBox({ x0, x1, y0, y1, z0, z1 }, M));
   }
   return out;
 }
@@ -235,6 +300,7 @@ export function createSolids(scene, opts) {
   let cursor = 0, rescanT = 0, clock = 0;
 
   const skipped = o => { for (let q = o; q; q = q.parent) if (q.userData.noSolid) return true; return false; };
+  const forFolk = o => { for (let q = o; q; q = q.parent) if (q.userData.folkSolid) return true; return false; };
   const shown = o => { for (let q = o; q; q = q.parent) { if (!q.visible) return false; if (q === scene) return true; } return false; };
   const sameAs = (a, b) => { for (let i = 0; i < 16; i++) if (Math.abs(a[i] - b[i]) > 0.01) return false; return true; };
 
@@ -257,6 +323,7 @@ export function createSolids(scene, opts) {
     const e = M.elements, scale = Math.max(1e-4, Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10]));
     const bb = g.boundingBox;
     if (bb.isEmpty()) return [];
+    if (skipped(o)) return [];   // (marked not solid since it was first seen: smooth.js finds the leaves and needles as it softens them)
     if ((Array.isArray(o.material) ? o.material : [o.material]).every(m => ghostly(m))) return [];   // (leaves are known for leaves only once smooth.js has been over them)
     const whole = worldBox({ x0: bb.min.x, x1: bb.max.x, y0: bb.min.y, y1: bb.max.y, z0: bb.min.z, z1: bb.max.z }, M);
     if (Math.max(whole.hw, whole.hd) * 2 > BIG) return [];                                        // land, sea, sky
@@ -283,9 +350,13 @@ export function createSolids(scene, opts) {
     // gets boxes that fit inside it, band by band up its height — never its bounding box, whose corners stood out
     // past a round thing into thin air
     const upright = g.type === 'BoxGeometry' && Math.abs(e[5]) / Math.max(1e-6, Math.hypot(e[4], e[5], e[6])) > 0.995;
-    const how = bough ? 'bough' : plain && upright ? 'exact' : plain ? 'inside' : 'cut';   // (kept on each box: how it was fitted)
-    const parts = bough ? boughBoxes(g, bb, M, Math.min(64, Math.ceil(length / seg)), ay)
-      : plain && upright ? [whole]
+    const ring = g.type === 'TorusGeometry' || (g.type === 'TubeGeometry' && g.parameters && g.parameters.path);
+    const box = g.type === 'BoxGeometry';
+    const how = ring ? 'ring' : box && upright ? 'exact' : box ? 'tiles' : bough ? 'bough' : plain ? 'inside' : 'cut';   // (kept on each box: how it was fitted)
+    const parts = ring ? ringBoxes(g, M)
+      : box && upright ? [whole]
+      : box ? tiledBoxes(bb, M)
+      : bough ? boughBoxes(g, bb, M, Math.min(64, Math.ceil(length / seg)))
       : plain ? insideBoxes(g, M)
       : cut(g, Math.min(CELL_MAX, Math.max(CELL, size / 30)) / scale).map(b => worldBox(b, M));
     for (const w of parts) w.how = how;
@@ -327,7 +398,7 @@ export function createSolids(scene, opts) {
     if (!e.handles) { e.handles = []; e.next = 0; }
     for (; e.next < n; e.next++) {
       if (performance.now() > until) return false;
-      for (const w of boxesOf(o, o.isInstancedMesh ? e.next : null)) { const h = col.add(w.x, w.z, w.hw, w.hd, w.ang, w.bot, w.top); h.auto = true; h.how = w.how; e.handles.push(h); }
+      for (const w of boxesOf(o, o.isInstancedMesh ? e.next : null)) { const h = col.add(w.x, w.z, w.hw, w.hd, w.ang, w.bot, w.top); h.auto = !e.folk; h.fitted = true; h.how = w.how; e.handles.push(h); }
     }
     e.ready = true; e.off = false;
     return true;
@@ -352,7 +423,7 @@ export function createSolids(scene, opts) {
       if (seen.has(o)) return;
       seen.add(o);
       if (!candidate(o) || skipped(o)) return;
-      const e = { obj: o, handles: null, moves: 0, since: clock, off: false, ready: false, queued: false };
+      const e = { obj: o, handles: null, moves: 0, since: clock, off: false, ready: false, queued: false, folk: forFolk(o) };
       stamp(e);
       list.push(e); fresh.push(e);
     });

@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint, waterMaterial } from './gfx.js';
-import { noSolid } from './solid.js';
+import { noSolid, folkSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
@@ -327,11 +327,13 @@ export function buildXilia(scene) {
   }
 
   /* ---------- kits ---------- */
-  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'wood'), 2600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.12), 320);
+  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'wood'), 2600); folkSolid(blocks.mesh);
+  // (what's drawn here is solid exactly as drawn — solid.js; folkSolid for what folk walk round too. No box gets placed
+  // round a drawn thing by hand: those never matched it, and stood out past it into thin air)
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.12), 320); folkSolid(trunks.mesh);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false); noSolid(crops.mesh);   // you wade through a field, like grass
-  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 300);
+  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 300); folkSolid(rocks.mesh);
   const keepOut = (x, z, extra = 0) => CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r + extra) || roadDist(x, z) < 5 + extra || Math.hypot(x, z) > oldEdge(x, z) - 14 || !!inField(x, z);
 
   /* ---------- Eikar cottages: round walls under an acorn-cap roof ---------- */
@@ -361,8 +363,7 @@ export function buildXilia(scene) {
     const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 1.6, 6), paint(toon(0x8a6a50), 'stone')); chim.position.set(r * 0.6, H + 0.6, -r * 0.3); grp.add(chim);
     outlineAll(grp, 0.05);
     grp.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
-    scene.add(grp);
-    col.add(x, z, r * 0.85, r * 0.85, 0, g - 1, g + H + 2);
+    scene.add(folkSolid(grp));
     houses.push({ x, z, r, chim: new THREE.Vector3(x + Math.cos(rot) * r * 0.6 + Math.sin(rot) * -r * 0.3, g + H + 1.4, z) });
     // most of the cottages open: walk up to the door and press E
     if (opts.door !== false && rng() < 0.85) doors.push({ id: 'x_c' + houses.length, name: opts.name || 'a cottage', kind: 'cottage', seed: 7000 + houses.length * 31, x: x + Math.sin(rot) * (r + 0.9), z: z + Math.cos(rot) * (r + 0.9), yaw: rot });
@@ -373,13 +374,11 @@ export function buildXilia(scene) {
   const plaza = new THREE.Mesh(new THREE.CylinderGeometry(22, 22.5, 0.4, 40), paint(toon(0xe6d2ac), 'cobble')); plaza.position.set(SQUARE.x, SQ_H - 0.15, SQUARE.z); plaza.receiveShadow = true; scene.add(plaza);
   const water = waterMaterial({ color: 0x5ac0d8, deep: 0x2a7e98, emissive: 0x1a6a80, emissiveIntensity: 0.4, opacity: 0.9, scale: 3 });
   {
-    const basin = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.5, 6, 24), paint(toon(0xcab088), 'stone')); basin.rotation.x = -Math.PI / 2; basin.position.set(SQUARE.x, SQ_H + 0.4, SQUARE.z - 6); addOutline(basin, 0.05); scene.add(basin);
+    const basin = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.5, 6, 24), paint(toon(0xcab088), 'stone')); basin.rotation.x = -Math.PI / 2; basin.position.set(SQUARE.x, SQ_H + 0.4, SQUARE.z - 6); addOutline(basin, 0.05); scene.add(folkSolid(basin));
     const pool = noSolid(new THREE.Mesh(new THREE.CircleGeometry(3.2, 24), water)); pool.rotation.x = -Math.PI / 2; pool.position.set(SQUARE.x, SQ_H + 0.45, SQUARE.z - 6); scene.add(pool);
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.6, 8), paint(toon(0xcab088), 'stone')); pillar.position.set(SQUARE.x, SQ_H + 1.3, SQUARE.z - 6); addOutline(pillar, 0.04); scene.add(pillar);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2.6, 8), paint(toon(0xcab088), 'stone')); pillar.position.set(SQUARE.x, SQ_H + 1.3, SQUARE.z - 6); addOutline(pillar, 0.04); scene.add(folkSolid(pillar));
     // a little bronze acorn on top — Beuhk remembers the Eikar with no hat
     const acorn = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10), toon(0xc8902a)); acorn.position.set(SQUARE.x, SQ_H + 3.1, SQUARE.z - 6); acorn.scale.y = 1.2; addOutline(acorn, 0.04); scene.add(acorn);
-    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; col.add(SQUARE.x + Math.cos(a) * 3.4, SQUARE.z - 6 + Math.sin(a) * 3.4, 1.4, 0.5, -a + Math.PI / 2, SQ_H - 1, SQ_H + 0.9); }
-    col.add(SQUARE.x, SQUARE.z - 6, 0.6, 0.6, 0, SQ_H - 1, SQ_H + 3.6);
   }
   const awnings = [0xc0392b, 0x2f6f8a, 0xd9a441, 0x5a8a3a, 0x8a3a6a];
   [[-12, 52], [-10, 60], [12, 52], [10, 62], [-4, 66], [6, 40]].forEach(([dx, dz], i) => {
@@ -390,8 +389,7 @@ export function buildXilia(scene) {
     const aw = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 2.0), toon(awnings[i % awnings.length])); aw.position.set(0, 2.6, -0.1); aw.rotation.x = 0.2; grp.add(aw);
     for (let k = 0; k < 4; k++) { const good = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), toon(pick([0xe08a3a, 0xd04a3a, 0xe8c84a, 0x6aa04a]))); good.position.set(-1 + k * 0.65, 1.15, 0.1); grp.add(good); }
     outlineAll(grp, 0.03); grp.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
-    scene.add(grp);
-    col.add(SQUARE.x + dx, dz, 1.6, 0.8, grp.rotation.y, g - 1, g + 1.1);
+    scene.add(folkSolid(grp));
   });
   // the town hearth
   const hearth = { x: SQUARE.x + 8, z: SQUARE.z + 10 };
@@ -421,11 +419,11 @@ export function buildXilia(scene) {
     for (let t = 0; t <= 1; t += 0.01) { const x = ax + (bx - ax) * t, z = az + (bz - az) * t, d = riverDist(x, z); if (d < best) { best = d; cx = x; cz = z; } }
     const dy = WATER_LEVEL + 1.6, L = 24;
     for (let k = -L / 2; k <= L / 2; k += 1.2) blocks.put(cx + Math.sin(ang) * k, dy, cz + Math.cos(ang) * k, 3.4, 0.28, 1.1, 0, ang, 0, k % 2.4 ? '#8a5a36' : '#9a6a40');
-    col.add(cx, cz, 1.7, L / 2, ang, dy - 4, dy + 0.14);
+    col.add(cx, cz, 1.7, L / 2, ang, dy - 0.14, dy + 0.14);   // the planks, as thick as they are (one slab: no feet down the cracks)
     for (const s of [-1, 1]) {
       const ox = Math.cos(ang) * s * 1.7, oz = -Math.sin(ang) * s * 1.7;
       blocks.put(cx + ox, dy + 0.9, cz + oz, 0.14, 0.14, L, 0, ang, 0, '#6a4428');
-      col.add(cx + ox, cz + oz, 0.12, L / 2, ang, dy, dy + 1.1);
+      col.add(cx + ox, cz + oz, 0.07, L / 2, ang, dy + 0.83, dy + 0.97);   // the rail, where the rail is (its posts are solid as drawn)
       for (let k = -L / 2; k <= L / 2; k += 4) blocks.put(cx + ox + Math.sin(ang) * k, dy + 0.45, cz + oz + Math.cos(ang) * k, 0.18, 0.9, 0.18, 0, 0, 0, '#6a4428');
     }
     for (let k = -L / 2 + 2; k <= L / 2 - 2; k += 4) for (const s of [-1, 1]) blocks.put(cx + Math.sin(ang) * k + Math.cos(ang) * s * 1.6, dy - 3, cz + Math.cos(ang) * k - Math.sin(ang) * s * 1.6, 0.4, 6, 0.4, 0, 0, 0, '#4a3020');
@@ -434,18 +432,16 @@ export function buildXilia(scene) {
     for (const s of [-1, 1]) {
       const tx = ex - WEST_N.x * 6 + px * s * 5.5, tz = ez - WEST_N.z * 6 + pz * s * 5.5, tg = heightAt(tx, tz);
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 16, 7), paint(toon(0x5a3a26), 'bark', 0.12)); trunk.position.set(tx - px * s * 1.6, tg + 7.4, tz - pz * s * 1.6);
-      trunk.rotation.set(pz * s * 0.22, 0, -px * s * 0.22); addOutline(trunk, 0.05); trunk.castShadow = true; scene.add(trunk);
+      trunk.rotation.set(pz * s * 0.22, 0, -px * s * 0.22); addOutline(trunk, 0.05); trunk.castShadow = true; scene.add(folkSolid(trunk));
       for (let k = 0; k < 3; k++) { const cone = new THREE.Mesh(new THREE.ConeGeometry(3.4 - k * 0.8, 4.4, 7), toon(0x2f6a3a)); cone.position.set(tx - px * s * (3.2 + k * 0.4), tg + 12 + k * 2.6, tz - pz * s * (3.2 + k * 0.4)); addOutline(cone, 0.05); cone.castShadow = true; scene.add(cone); }
-      col.add(tx, tz, 0.9, 0.9, 0, tg - 1, tg + 10);
     }
     const sx = ex - WEST_N.x * 12 + px * 4.6, sz = ez - WEST_N.z * 12 + pz * 4.6, sg = heightAt(sx, sz);
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3, 6), toon(0x5a3a22)); post.position.set(sx, sg + 1.5, sz); scene.add(post);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 3, 6), toon(0x5a3a22)); post.position.set(sx, sg + 1.5, sz); scene.add(folkSolid(post));
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const cg = cv.getContext('2d');
     cg.fillStyle = '#6b4a2c'; cg.fillRect(0, 0, 256, 128); cg.strokeStyle = '#3a2614'; cg.lineWidth = 8; cg.strokeRect(4, 4, 248, 120);
     cg.fillStyle = '#f4e2b8'; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.font = 'bold 28px Georgia, serif'; cg.fillText('The Forest Path', 128, 46); cg.font = 'italic 21px Georgia, serif'; cg.fillText('→ Buhkon Eldi’s', 128, 88);
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
     const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), new THREE.MeshToonMaterial({ map: tex, side: THREE.DoubleSide })); board.position.set(sx, sg + 2.5, sz); board.rotation.y = Math.atan2(-WEST_N.x, -WEST_N.z) + Math.PI / 2; scene.add(board);
-    col.add(sx, sz, 0.25, 0.25, 0, sg - 1, sg + 3);
   }
 
   /* ---------- Ruut's pen ---------- */
@@ -456,7 +452,7 @@ export function buildXilia(scene) {
     railing(ring, {
       post: (x, y, z, h) => blocks.put(x, y + h / 2 - 0.2, z, 0.2, h + 0.4, 0.2, 0, 0, 0, '#6a4428'),
       bar: (x, y, z, len, ry, rz) => blocks.put(x, y, z, len, 0.12, 0.08, 0, ry, rz, '#7a5232'),
-      col: (x, z, hw, hd, ang, y0, y1) => col.add(x, z, hw, 0.12, ang, y0 - 1, y1),
+      col: (x, z, hw, hd, ang, y0, y1) => col.add(x, z, hw, hd, ang, y0, y1),
     }, { h: 1.2, bars: [0.55, 1.0], gap: 4 });
   }
 
@@ -469,9 +465,8 @@ export function buildXilia(scene) {
   // a windmill by the west fields
   {
     const x = -78, z = 2, g = heightAt(x, z);
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.8, 11, 10), paint(toon(0xf0dcb4), 'plaster')); tower.position.set(x, g + 5.5, z); addOutline(tower, 0.06); tower.castShadow = true; scene.add(tower);
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.8, 11, 10), paint(toon(0xf0dcb4), 'plaster')); tower.position.set(x, g + 5.5, z); addOutline(tower, 0.06); tower.castShadow = true; scene.add(folkSolid(tower));
     const cap = new THREE.Mesh(new THREE.SphereGeometry(2.6, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), roofMat); cap.position.set(x, g + 11, z); scene.add(cap);
-    col.add(x, z, 2.3, 2.3, 0, g - 1, g + 12);
     var mill = new THREE.Group(); mill.position.set(x, g + 9, z + 2.8); scene.add(mill);
     for (let k = 0; k < 4; k++) { const blade = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 0.1), paint(toon(0xe8d8b0), 'wood')); blade.position.y = 3; const arm = new THREE.Group(); arm.rotation.z = k * Math.PI / 2; arm.add(blade); mill.add(arm); }
   }
@@ -486,7 +481,6 @@ export function buildXilia(scene) {
       const r = (1.6 + rng() * 1.3) * s;
       crowns.put(x + (rng() - 0.5) * 2.4 * s, g + h + (rng() - 0.2) * 1.8 * s, z + (rng() - 0.5) * 2.4 * s, r, r * 0.85, r, rng(), rng(), rng(), new THREE.Color(lc).offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.1).getStyle());
     }
-    col.add(x, z, 0.35 * s, 0.35 * s, 0, g - 1, g + h);
   }
   for (let i = 0; i < 1400 && trunks.mesh.count < 290; i++) {
     const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * 180, x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -501,7 +495,6 @@ export function buildXilia(scene) {
     if (keepOut(x, z) || Math.hypot(x - SQUARE.x, z - SQUARE.z) < 70) continue;
     const s = 0.4 + Math.pow(rng(), 3) * 2.4;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(['#b8a080', '#a89070', '#c8b090']));
-    if (s > 0.6) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
   }
 
   /* ---------- the Ember Grove: a young fire tree and its seed ---------- */
@@ -514,8 +507,7 @@ export function buildXilia(scene) {
     const leaf = new THREE.MeshToonMaterial({ color: 0xff6f22, emissive: 0xff4a10, emissiveIntensity: 0.55, gradientMap: ramp() });
     for (let k = 0; k < 10; k++) { const a = rng() * 6.28, r = rng() * 7; const b = new THREE.Mesh(new THREE.IcosahedronGeometry(3 + rng() * 2.5, 1), leaf); b.position.set(Math.cos(a) * r, 18 + rng() * 6, Math.sin(a) * r); ft.add(b); }
     outlineAll(ft, 0.1); ft.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
-    ft.position.set(x, g - 0.4, z); scene.add(ft);
-    col.add(x, z, 2.2, 2.2, 0, g - 1, g + 18);
+    ft.position.set(x, g - 0.4, z); scene.add(folkSolid(ft));
     const glow = glowSprite(0xff8a3a, 40, 0.3); glow.position.set(x, g + 20, z); scene.add(glow);
     seedSpot.set(x + 4, g + 0.6, z + 4);
   }
@@ -525,8 +517,7 @@ export function buildXilia(scene) {
     const { x, z } = HIDEOUT;
     for (const [dx, dz, r] of [[-6, 4, 0.3], [6, -2, -0.5], [0, -8, 0.1]]) {
       const tg2 = heightAt(x + dx, z + dz);
-      const tent = new THREE.Mesh(new THREE.ConeGeometry(3, 3.4, 5, 1, true), toon(0x2a2236, { side: THREE.DoubleSide })); tent.position.set(x + dx, tg2 + 1.6, z + dz); tent.rotation.y = r; tent.castShadow = true; scene.add(tent);
-      col.add(x + dx, z + dz, 1.9, 1.9, r, tg2 - 1, tg2 + 3);
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(3, 3.4, 5, 1, true), toon(0x2a2236, { side: THREE.DoubleSide })); tent.position.set(x + dx, tg2 + 1.6, z + dz); tent.rotation.y = r; tent.castShadow = true; scene.add(folkSolid(tent));
     }
     const sig = glowSprite(0x9a4aff, 6, 0.5); sig.position.set(x, heightAt(x, z) + 2, z); scene.add(sig);
   }
@@ -536,10 +527,9 @@ export function buildXilia(scene) {
   const pierY = 1.2, pierEnd = dockZ0 + 46;
   {
     for (let z = dockZ0 - 8; z < pierEnd; z += 1.6) blocks.put(0, pierY - 0.2, z, 6, 0.32, 1.45, 0, (rng() - 0.5) * 0.03, 0, rng() < 0.5 ? '#8a5a36' : '#9a6a40');
-    col.add(0, (dockZ0 - 8 + pierEnd) / 2, 3, (pierEnd - dockZ0 + 8) / 2, 0, pierY - 3, pierY);
+    col.add(0, (dockZ0 - 8 + pierEnd) / 2, 3, (pierEnd - dockZ0 + 8) / 2, 0, pierY - 0.36, pierY - 0.04);   // the planks, as thick as they are
     for (let z = dockZ0 - 6; z < pierEnd; z += 6) for (const s of [-1, 1]) { blocks.put(s * 3.1, pierY - 6, z, 0.5, 12, 0.5, 0, 0, 0, '#5a3a24'); blocks.put(s * 3.1, pierY + 0.6, z, 0.3, 1.2, 0.3, 0, 0, 0, '#5a3a24'); }
-    for (const s of [-1, 1]) { blocks.put(s * 3.1, pierY + 1.15, (dockZ0 + pierEnd) / 2, 0.18, 0.15, pierEnd - dockZ0, 0, 0, 0, '#5a3a24'); col.add(s * 3.25, (dockZ0 + pierEnd) / 2, 0.25, (pierEnd - dockZ0) / 2, 0, pierY - 1, pierY + 1.3); }
-    col.add(0, pierEnd + 0.3, 3.4, 0.3, 0, pierY - 1, pierY + 1.3);
+    for (const s of [-1, 1]) { blocks.put(s * 3.1, pierY + 1.15, (dockZ0 + pierEnd) / 2, 0.18, 0.15, pierEnd - dockZ0, 0, 0, 0, '#5a3a24'); col.add(s * 3.1, (dockZ0 + pierEnd) / 2, 0.09, (pierEnd - dockZ0) / 2, 0, pierY + 1.07, pierY + 1.23); }
   }
 
   /* ---------- floating islets ---------- */
@@ -557,10 +547,10 @@ export function buildXilia(scene) {
 
   /* ---------- the wild highlands: pine forest, broadleaf stands, boulders, scree under the ridges ---------- */
   const wrng = mulberry32(7331);            // its own stream, so the town's placements never shift
-  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), paint(toon(0xffffff), 'bark', 0.12), 3400, false);
+  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), paint(toon(0xffffff), 'bark', 0.12), 3400, false); folkSolid(wTrunks.mesh);
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 6000, false);
   const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 1800, false);
-  const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 700, false);
+  const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 700, false); folkSolid(wRocks.mesh);
   const PINE = ['#2f6a3a', '#3a7a40', '#2a5a34', '#467f44', '#356e3c'], BROAD = ['#6aa040', '#7ab04a', '#5a9a3a', '#8ab84a', '#c8a03a'];
   const WILD_KEEP = [...ALBALI.map(p => ({ x: p.x, z: p.z, r: 14 })), ...JU.map(j => ({ x: j.x, z: j.z, r: j.r + 3 })), { x: 0, z: 200, r: 30 }];
   const wildOK = (x, z) => {
@@ -590,7 +580,6 @@ export function buildXilia(scene) {
       const lc = BROAD[Math.floor(wrng() * BROAD.length)];
       for (let k = 0; k < 3; k++) { const rr = (1.8 + wrng() * 1.2) * s; wCrowns.put(x + (wrng() - 0.5) * 2.4 * s, g + h + (wrng() - 0.2) * 1.6 * s, z + (wrng() - 0.5) * 2.4 * s, rr, rr * 0.85, rr, wrng(), wrng(), wrng(), lc); }
     }
-    if (walk) col.add(x, z, 0.45 * s, 0.45 * s, 0, g - 1, g + 8);
   }
   for (let i = 0; i < 4000 && wRocks.mesh.count < 680; i++) {
     const a = wrng() * Math.PI * 2, r = 190 + wrng() * 420, x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -601,7 +590,6 @@ export function buildXilia(scene) {
     if (!scree && wrng() < 0.55) continue;
     const s = scree ? 2 + wrng() * 6 : 0.5 + Math.pow(wrng(), 3) * 3;
     wRocks.put(x, g + s * 0.25, z, s * (1 + wrng() * 0.5), s * 0.75, s, wrng() * 3, wrng() * 3, wrng() * 3, ['#9a9284', '#8a8478', '#a8a090', '#7e7a74'][Math.floor(wrng() * 4)]);
-    if (s > 0.6 && inBounds(x, z)) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
   }
   wTrunks.done(); wCones.done(); wCrowns.done(); wRocks.done();
 

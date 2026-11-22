@@ -717,6 +717,7 @@ function flush() {
         if (g !== from) { o.geometry = g; o.userData.smFrom = from; const m = o.material; if (!(m.defines && m.defines.FL_PAINT)) { m.defines = Object.assign({}, m.defines, { FL_PAINT: 10 }); m.needsUpdate = true; } }
         return;
       }
+      if (o.geometry.type === 'ConeGeometry' && leafy(o)) o.userData.noSolid = true;   // a pine's needles, like any leaves: you brush through them (the trunk is solid)
       if (o.isInstancedMesh && o.geometry.type === 'ConeGeometry' && o.count <= 12000 && leafy(o) && o.geometry.parameters && o.geometry.parameters.height === 1) addLeafCards(o, true);   // pines: sprays of needles down the cone
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)

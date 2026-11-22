@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, mistSprite, outlineAll, addOutline, paint, waterMaterial } from './gfx.js';
-import { noSolid } from './solid.js';
+import { noSolid, folkSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 import { MANOR_SPOTS } from './interiors.js';
 import { hanging, swing } from './smooth.js';
@@ -312,13 +312,15 @@ export function buildProperty(scene) {
   }
 
   /* ---------------- kits ---------------- */
-  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 15000);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), paint(toon(0xffffff), 'bark', 0.12), 9800, false);
+  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 15000); folkSolid(blocks.mesh);
+  // (what's drawn is solid exactly as drawn — solid.js, folkSolid for what folk walk round too. Nothing here gets a box
+  // placed round it by hand: those never matched, and stood out past things into thin air.)
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), paint(toon(0xffffff), 'bark', 0.12), 9800, false); folkSolid(trunks.mesh);
   const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false); noSolid(crowns.mesh);   // leaves: you brush through them (the trunks and boughs are solid)
   const tufts = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 4000, false);   // small leafy and flowery bits: boxes, ivy, moss, the garden
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 4200, false); noSolid(crops.mesh);   // you wade through it, like grass
-  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1400, false);
+  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1400, false); folkSolid(rocks.mesh);
   const pick = a => a[Math.floor(rng() * a.length)];
 
   /* ---------------- trees ---------------- */
@@ -331,14 +333,14 @@ export function buildProperty(scene) {
     const pc = pick(PINE);
     cones.put(x, g + h * 0.5, z, 3.1 * s, h * 0.62, 3.1 * s, 0, rng() * 6, 0, pc);
     cones.put(x, g + h * 0.82, z, 2.1 * s, h * 0.45, 2.1 * s, 0, rng() * 6, 0, pc);
-    if (walk) { col.add(x, z, 0.5 * s, 0.5 * s, 0, g - 1, g + h * 0.6); trees.push({ x, z, g, h, r: 0.5 * s }); }
+    if (walk) { trees.push({ x, z, g, h, r: 0.5 * s }); }
   }
   function broad(x, z, s, walk, lc) {
     const g = heightAt(x, z), h = (6 + rng() * 4) * s;
     trunks.put(x, g + h / 2 - 0.4, z, 0.48 * s, h, 0.48 * s, 0, rng() * 6, 0, '#6b4128');
     lc = lc || pick(BROAD);
     for (let k = 0; k < 4; k++) { const rr = (2.2 + rng() * 1.6) * s; crowns.put(x + (rng() - 0.5) * 3.2 * s, g + h + (rng() - 0.2) * 2.2 * s, z + (rng() - 0.5) * 3.2 * s, rr, rr * 0.85, rr, rng(), rng(), rng(), new THREE.Color(lc).offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.08).getStyle()); }
-    if (walk) { col.add(x, z, 0.46 * s, 0.46 * s, 0, g - 1, g + h); trees.push({ x, z, g, h, r: 0.46 * s }); }
+    if (walk) { trees.push({ x, z, g, h, r: 0.46 * s }); }
   }
   /* ---------------- the deepwood: the forest path under the old giants ----------------
      Trunks wider than a cart is long, going up and up into one roof of leaves that
@@ -371,8 +373,8 @@ export function buildProperty(scene) {
     const roof = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: true }));
     scene.add(roof);
   }
-  const gTrunks = new Kit(scene, new THREE.CylinderGeometry(0.72, 1, 1, 12, 1, true), paint(toon(0xffffff), 'bark', 0.7), 260, false);
-  const gLimbs = new Kit(scene, new THREE.CylinderGeometry(0.55, 1, 1, 7, 1, true), paint(toon(0xffffff), 'bark', 0.5), 1900, false);
+  const gTrunks = new Kit(scene, new THREE.CylinderGeometry(0.72, 1, 1, 12, 1, true), paint(toon(0xffffff), 'bark', 0.7), 260, false); folkSolid(gTrunks.mesh);
+  const gLimbs = new Kit(scene, new THREE.CylinderGeometry(0.55, 1, 1, 7, 1, true), paint(toon(0xffffff), 'bark', 0.5), 1900, false); folkSolid(gLimbs.mesh);
   const gLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1500, false); noSolid(gLeaves.mesh);
   const seams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), glowMat, 3400, false);
   const beads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 17000, false); noSolid(beads.mesh);   // specks of light: nothing to trip on
@@ -423,7 +425,6 @@ export function buildProperty(scene) {
       gt.g = g;
       const bark = new THREE.Color('#3e3228').offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.06).getStyle();
       gTrunks.put(x, g + h / 2, z, R, h, R, 0, rng() * 6, 0, bark);
-      col.add(x, z, R * 0.85, R * 0.85, 0, g - 1, g + 30);
       trees.push({ x, z, g, h, r: R });   // Brindle can swing from these
       // buttress roots fanning out over the ground
       const nr = 5 + Math.floor(rng() * 3);
@@ -480,7 +481,6 @@ export function buildProperty(scene) {
       const g = heightAt(x, z), s = 0.6 + Math.pow(rng(), 2) * 2.6, ry = rng() * 6;
       rocks.put(x, g + s * 0.3, z, s * 1.2, s * 0.8, s, 0, ry, 0, pick(['#5a5a54', '#4e504a', '#62605a']));
       mossCaps.put(x, g + s * 0.3 + s * 0.6, z, s * 1.0, s * 0.26, s * 0.86, (rng() - 0.5) * 0.3, ry, (rng() - 0.5) * 0.3, new THREE.Color(pick(['#2ad890', '#3ae8a8', '#5af0c8', '#4ac8e8'])).multiplyScalar(0.3 + rng() * 0.22));
-      col.add(x, z, s * 0.95, s * 0.85, ry, g - 1, g + s * 0.95);
     }
     for (let i = 0; i < 9000 && caps.mesh.count < 2300; i++) {
       const x = 600 + rng() * 640, z = (rng() - 0.5) * 140, pd = pathDist(x, z);
@@ -534,17 +534,23 @@ export function buildProperty(scene) {
       for (let k = 0; k < n - 1; k++) for (let s = 0; s < S; s++) { const i0 = base + k * (S + 1) + s, i1 = i0 + S + 1; M.i.push(i0, i1, i0 + 1, i0 + 1, i1, i1 + 1); }
     }
     /* the limbs are solid: short boxes along each one's back, so you can land on a great bough and walk along it
-       (and a Punk's vine catches on their edges, so you can swing from bough to bough all the way up) */
+       (and a Punk's vine catches on their edges, so you can swing from bough to bough all the way up). Each piece is a
+       pair of boxes crossed inside the limb's round section (a tall narrow one and a wide low one, their corners on
+       the bark), and short enough up a slope that its flat top never stands off the bark: nothing solid in the air
+       beside or above a limb */
+    const crossed = (x, z, hd, ang, y, ra, rb, bot = null) => {
+      col.add(x, z, ra * 0.5, hd, ang, bot ?? y - rb * 0.86, y + rb * 0.86);
+      col.add(x, z, ra * 0.86, hd, ang, bot ?? y - rb * 0.5, y + rb * 0.5);
+    };
     function limbCols(pts, radAt, t0 = 0.06) {
       const n = pts.length;
       for (let k = 1; k < n; k++) {
         const [x0, y0, z0] = pts[k - 1], [x1, y1, z1] = pts[k], L = Math.hypot(x1 - x0, z1 - z0), L3 = Math.hypot(L, y1 - y0), ang = Math.atan2(x1 - x0, z1 - z0);
-        const ns = Math.max(1, Math.ceil(L3 / 1.6));
+        const ns = Math.max(1, Math.ceil(L3 / 1.6), Math.ceil(Math.abs(y1 - y0) / 0.25));
         for (let q = 0; q < ns; q++) {
           const f = (q + 0.5) / ns, t = (k - 1 + f) / (n - 1), r = radAt(t);
-          if (t < t0 || r < 0.7) continue;
-          const y = lerp(y0, y1, f);
-          col.add(lerp(x0, x1, f), lerp(z0, z1, f), r * 0.78, L3 / ns / 2 + 0.12, ang, y - r * 0.9, y + r * 0.84);
+          if (t < t0 || r < 0.25) continue;
+          crossed(lerp(x0, x1, f), lerp(z0, z1, f), L / ns / 2 + 0.05, ang, lerp(y0, y1, f), r, r);
         }
       }
     }
@@ -592,11 +598,13 @@ export function buildProperty(scene) {
           out.lerp(mossB, smooth(0.66, 0.78, fbm(x * 0.03 - y * 0.02, z * 0.03 + 5, 2)) * smooth(H * 0.3, H * 0.15, rel) * 0.7);
         }, XR);
       }
-      // colliders round the trunk: three turned squares per band make a twelve-sided pillar
-      for (const [y0, y1] of [[-2, 8], [8, 20], [20, 45], [45, 90], [90, H]]) {
-        let r = 0; for (let k = 0; k < 24; k++) r = Math.max(r, trunkR(clamp((y0 + y1) / 2 / H, 0, 1), k / 24 * Math.PI * 2));
-        const [px, pz] = trunkAt(g0 + (y0 + y1) / 2);
-        for (let k = 0; k < 3; k++) col.add(px, pz, r * 0.86, r * 0.86, k * Math.PI / 6, g0 + y0 - 1, g0 + y1);
+      // colliders round the trunk: in bands up it (short ones: it leans), three turned squares per band, a twelve-pointed
+      // star whose points just touch the bark where the trunk is narrowest in that band — inside it all the way round
+      for (let y0 = -2; y0 < H; y0 += 4) {
+        const y1 = Math.min(H, y0 + 4);
+        let r = Infinity; for (const yy of [y0, (y0 + y1) / 2, y1]) for (let k = 0; k < 24; k++) r = Math.min(r, trunkR(clamp(yy / H, 0, 1), k / 24 * Math.PI * 2));
+        const [px, pz] = trunkAt(g0 + (y0 + y1) / 2), a = r * Math.SQRT1_2 * 0.97;
+        for (let k = 0; k < 3; k++) col.add(px, pz, a, a, k * Math.PI / 6, g0 + y0 - (y0 < 0 ? 1 : 0), g0 + y1);
       }
       /* buttress roots: fins of wood running out over the hill, and down into the lake on the Elder's side */
       const rootTops = [];
@@ -620,7 +628,8 @@ export function buildProperty(scene) {
           for (let k = 1; k < tops.length; k++) {
             const [x0, z0, t0, ra0] = tops[k - 1], [x1, z1, t1, ra1] = tops[k], len2 = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0);
             const ns = Math.max(1, Math.ceil(len2 / 0.75)), bot = Math.min(tops[k][5], tops[k - 1][5]) - 1;   // short pieces, so each is a step you can take
-            for (let q = 0; q < ns; q++) { const f = (q + 0.5) / ns; col.add(lerp(x0, x1, f), lerp(z0, z1, f), lerp(ra0, ra1, f) * 0.78, len2 / ns / 2 + 0.15, ang, bot, lerp(t0, t1, f)); }
+            // (each a pair crossed inside the root's oval section, from the ground up: its top on the crest, its sides on the bark)
+            for (let q = 0; q < ns; q++) { const f = (q + 0.5) / ns, rb = lerp(tops[k - 1][4], tops[k][4], f), mid = lerp(t0, t1, f) - rb; crossed(lerp(x0, x1, f), lerp(z0, z1, f), len2 / ns / 2 + 0.05, ang, mid, lerp(ra0, ra1, f), rb, bot); }
           }
           return tops;
         };
@@ -775,6 +784,8 @@ export function buildProperty(scene) {
       geo.setAttribute('position', new THREE.Float32BufferAttribute(M.p, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(M.c, 3)); geo.setIndex(M.i);
       geo.computeVertexNormals(); geo.computeBoundingSphere();
       const mesh = new THREE.Mesh(geo, barkMat); mesh.castShadow = false; mesh.receiveShadow = true; scene.add(mesh);   // too big for the sun's shadow map: it would only cost
+      noSolid(mesh);   // (its trunk, limbs and roots have their own colliders, fitted inside the bark above: cut up whole, the cells of a
+      // tree this size would be metres across)
       addOutline(mesh, 0.22);
       // banks of mist caught round the trunk and under the roof of leaves: you can tell how tall it is by the weather it wears
       const mists = [];
@@ -806,7 +817,6 @@ export function buildProperty(scene) {
     const swingTree = (x, z) => {
       const g = heightAt(x, z), fir = rng() < 0.35, h = (fir ? 22 : 17) + rng() * 7, R = 0.95 + rng() * 0.45;
       trunks.put(x, g + h * 0.38, z, R, h * 0.8, R, 0, rng() * 6, 0, bark);
-      col.add(x, z, R * 0.8, R * 0.8, 0, g - 1, g + h * 0.75);
       trees.push({ x, z, g, h, r: R });
       if (fir) {
         const pc = pick(PINE);
@@ -865,9 +875,12 @@ export function buildProperty(scene) {
     const { x, z } = FORT_TREE, g = heightAt(x, z);
     trunks.put(x, g + 4, z, 1.3, 9, 1.3, 0, 0, 0, '#6b4128');
     for (let k = 0; k < 7; k++) { const rr = 3.4 + rng() * 1.6; crowns.put(x + (rng() - 0.5) * 6, g + 11 + rng() * 2.5, z + (rng() - 0.5) * 6, rr, rr * 0.85, rr, rng(), rng(), rng(), pick(['#5a9a3a', '#6aa040', '#7ab04a'])); }
-    col.add(x, z, 1.0, 1.0, 0, g - 1, g + 9); trees.push({ x, z, g, h: 9, r: 1 });
-    blocks.put(x, g + 5.2, z, 5, 0.3, 5, 0, 0.3, 0, '#9a6a40'); col.add(x, z, 2.5, 2.5, 0.3, g + 4.9, g + 5.35);
-    for (let k = 0; k < 9; k++) { const ly = g + 0.45 + k * 0.56; blocks.put(x + 3.1, ly, z - 1.4, 0.9, 0.14, 0.14, 0, 0.3, 0, '#6a4428'); col.add(x + 3.1, z - 1.4 - 0.0, 0.5, 0.35, 0.3, g - 1, ly); }
+    trees.push({ x, z, g, h: 9, r: 1 });
+    blocks.put(x, g + 5.2, z, 5, 0.3, 5, 0, 0.3, 0, '#9a6a40');
+    // a ship's ladder up to it: treads stepping out from under the platform's edge, each one a step you take on what you
+    // see (it was rungs straight up, climbed on steps nobody could see)
+    { const ux = 3.1 / Math.hypot(3.1, 1.4), uz = -1.4 / Math.hypot(3.1, 1.4), ry = Math.atan2(ux, uz);
+      for (let k = 0; k < 9; k++) { const ly = g + 0.45 + k * 0.56, out = (8 - k) * 0.3; blocks.put(x + 3.1 + ux * out, ly, z - 1.4 + uz * out, 0.9, 0.14, 0.34, 0, ry, 0, '#6a4428'); } }
     for (const [dx, dz] of [[-2.4, 0], [2.4, 0], [0, -2.4], [0, 2.4]]) blocks.put(x + dx, g + 5.8, z + dz, Math.abs(dx) ? 0.12 : 4.8, 0.12, Math.abs(dz) ? 0.12 : 4.8, 0, 0.3, 0, '#6a4428');
   }
 
@@ -888,16 +901,16 @@ export function buildProperty(scene) {
     for (const t of [[a, cpt, b], [A, Bq, Cq], [a, A, Cq], [a, Cq, cpt], [b, cpt, Cq], [b, Cq, Bq], [a, b, Bq], [a, Bq, A]]) for (const p of t) v.push(...p);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g;
   })();
-  const pBox = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 9000);
-  const pCyl = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 10), paint(toon(0xffffff), 'auto'), 4200);
-  const pPyr = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, false, Math.PI / 4), paint(toon(0xffffff), 'shingle'), 300);
-  const pCone = new Kit(scene, new THREE.ConeGeometry(1, 1, 10), paint(toon(0xffffff), 'shingle'), 900);
-  const pPrism = new Kit(scene, prismG, toon(0xffffff), 500);
+  const pBox = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'auto'), 9000); folkSolid(pBox.mesh);
+  const pCyl = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 10), paint(toon(0xffffff), 'auto'), 4200); folkSolid(pCyl.mesh);
+  const pPyr = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, false, Math.PI / 4), paint(toon(0xffffff), 'shingle'), 300); folkSolid(pPyr.mesh);
+  const pCone = new Kit(scene, new THREE.ConeGeometry(1, 1, 10), paint(toon(0xffffff), 'shingle'), 900); folkSolid(pCone.mesh);
+  const pPrism = new Kit(scene, prismG, toon(0xffffff), 500); folkSolid(pPrism.mesh);
   const pPane = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), winMat, 1400, false);
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: true }); lampMat.color.setScalar(0.45);
   const pLamp = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), lampMat, 400, false);
   const pGlass = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: ramp(), transparent: true, opacity: 0.32, depthWrite: false }), 300, false);
-  const pDome = new Kit(scene, new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI / 2), paint(toon(0xffffff), 'shingle'), 300);
+  const pDome = new Kit(scene, new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI / 2), paint(toon(0xffffff), 'shingle'), 300); folkSolid(pDome.mesh);
   const lampGlows = [];
   const E2 = new THREE.Euler(0, 0, 0, 'YXZ'), Q2 = new THREE.Quaternion(), M2 = new THREE.Matrix4(), S2 = new THREE.Vector3(), P2 = new THREE.Vector3(), C2 = new THREE.Color();
   function put2(kit, x, y, z, sx, sy, sz, rx, ry, rz, color) {
@@ -909,7 +922,6 @@ export function buildProperty(scene) {
   const frame = (ox, oy, oz, rot) => ({ ox, oy, oz, rot, c: Math.cos(rot), s: Math.sin(rot) });
   const W = (F, lx, lz) => [F.ox + lx * F.c + lz * F.s, F.oz - lx * F.s + lz * F.c];
   function bp(F, kit, lx, ly, lz, sx, sy, sz, color, rx = 0, lry = 0, rz = 0) { const [x, z] = W(F, lx, lz); return put2(kit, x, F.oy + ly, z, sx, sy, sz, rx, F.rot + lry, rz, color); }
-  function bc(F, lx, lz, hw, hd, y0, y1, lry = 0) { const [x, z] = W(F, lx, lz); col.add(x, z, hw, hd, F.rot + lry, F.oy + y0, F.oy + y1); }
   function lantern(x, y, z, size = 1) {   // a hanging lantern: frame, warm glass, and a glow that wakes at dusk
     put2(pBox, x, y + 0.42 * size, z, 0.5 * size, 0.1 * size, 0.5 * size, 0, 0, 0, '#3a2a1a');
     put2(pLamp, x, y, z, 0.36 * size, 0.6 * size, 0.36 * size, 0, 0, 0, '#ffc870');
@@ -917,6 +929,7 @@ export function buildProperty(scene) {
     const s = glowSprite(0xffb860, 3.4 * size, 0); s.position.set(x, y, z); scene.add(s); lampGlows.push(s);
   }
   function finishGroup(grp) {
+    folkSolid(grp);
     outlineAll(grp, 0.05);
     grp.traverse(m => { if (m.isMesh && m.name !== 'outline') { m.castShadow = true; m.receiveShadow = true; } });
     scene.add(grp);
@@ -976,7 +989,6 @@ export function buildProperty(scene) {
       lantern(...(() => { const [lx, lz] = W(F, dx0 + dw / 2 + 0.6, d / 2 + 0.45); return [lx, g + dh + 0.1, lz]; })(), 0.9);
     }
     finishGroup(grp);
-    col.add(x, z, w / 2, d / 2, rot, g - 2, g + h + 3);
     const lz = d / 2 + 1.0;
     return { grp, g, F, door: { x: x + Math.cos(rot) * dx0 + Math.sin(rot) * lz, z: z - Math.sin(rot) * dx0 + Math.cos(rot) * lz, yaw: rot } };
   }
@@ -1002,7 +1014,7 @@ export function buildProperty(scene) {
     hall(HOUSE.x - 2, HOUSE.z + 19, ROT_E, 14, 12, 6.5, '#e8d4b0', { roof: 'cap', winY: [2.6], noDoor: true, shutters: '#3a6a7a', flowers: FLOWERS });               // south wing
     const F = main.F, g = main.g;
     // the porch: columns and steps up to the door, a balcony on its roof, a pediment over the steps
-    for (let k = 0; k < 6; k++) { const pz = HOUSE.z - 7 + k * 2.8, px = HOUSE.x + 11; blocks.put(px, g + 2.4, pz, 0.6, 4.8, 0.6, 0, 0, 0, '#f4ead4'); put2(pBox, px, g + 0.25, pz, 0.9, 0.5, 0.9, 0, 0, 0, '#d8ccb4'); put2(pBox, px, g + 4.65, pz, 0.85, 0.3, 0.85, 0, 0, 0, '#d8ccb4'); col.add(px, pz, 0.3, 0.3, 0, g - 1, g + 4.8); }
+    for (let k = 0; k < 6; k++) { const pz = HOUSE.z - 7 + k * 2.8, px = HOUSE.x + 11; blocks.put(px, g + 2.4, pz, 0.6, 4.8, 0.6, 0, 0, 0, '#f4ead4'); put2(pBox, px, g + 0.25, pz, 0.9, 0.5, 0.9, 0, 0, 0, '#d8ccb4'); put2(pBox, px, g + 4.65, pz, 0.85, 0.3, 0.85, 0, 0, 0, '#d8ccb4'); }
     blocks.put(HOUSE.x + 10, g + 4.9, HOUSE.z, 3.6, 0.4, 16, 0, 0, 0, '#6a3a22');
     blocks.put(HOUSE.x + 10.2, g + 0.15, HOUSE.z, 3.6, 0.3, 16, 0, 0, 0, '#c8b8a0'); col.add(HOUSE.x + 10.2, HOUSE.z, 1.8, 8, 0, g - 1, g + 0.3);
     for (let k = 0; k < 2; k++) { put2(pBox, HOUSE.x + 12.4 + k * 0.7, g + 0.1 - k * 0.1, HOUSE.z, 0.7, 0.2, 5.2 - k * 0.6, 0, 0, 0, '#c8b8a0'); }
@@ -1021,7 +1033,7 @@ export function buildProperty(scene) {
     for (const q of [-1, 1]) put2(pBox, HOUSE.x - 10.5 + q * 1.3, g + 0.85, HOUSE.z + 6, 0.5, 0.08, 0.5, 0, 0, 0, '#7a4e2c');
     // bay windows on the lake side, two storeys of glass with little roofs
     for (const q of [-1, 1]) {
-      bp(F, pBox, q * 7, 2.4, -8.8, 4.2, 4.8, 1.8, '#efe0c0'); bc(F, q * 7, -8.8, 2.1, 0.9, -1, 4.8);
+      bp(F, pBox, q * 7, 2.4, -8.8, 4.2, 4.8, 1.8, '#efe0c0');
       bp(F, pBox, q * 7, 0.2, -8.85, 4.6, 0.4, 2.0, '#9a8a78');
       for (const [lx, lz, sx, sz] of [[q * 7, -9.72, 2.8, 0.06], [q * 7 - 2.13, -8.8, 0.06, 1.0], [q * 7 + 2.13, -8.8, 0.06, 1.0]]) { bp(F, pPane, lx, 2.5, lz, sx, 1.9, sz, '#ffffff'); bp(F, pBox, lx, 2.5, lz + (sz < 0.1 ? -0.02 : 0), sz < 0.1 ? sx : 0.08, 0.1, sz < 0.1 ? 0.08 : sz, '#5a3a22'); }
       bp(F, pPyr, q * 7, 5.4, -8.6, 3.4, 1.3, 1.85, '#6a3a22');
@@ -1054,10 +1066,10 @@ export function buildProperty(scene) {
     // a canopy over the big doors, on brackets, and a bench under it
     bp(F, pBox, 0, 4.1, 6.4, 7, 0.25, 2.2, '#7a4a2a', -0.18);
     for (const q of [-1, 1]) { bp(F, pBox, q * 3.2, 3.6, 6.2, 0.18, 0.9, 1.6, '#5a3a22', 0.6); }
-    bp(F, pBox, -5.2, 0.9, 6.5, 2.8, 0.14, 0.8, '#9a6a40'); for (const q of [-1, 1]) bp(F, pBox, -5.2 + q * 1.2, 0.45, 6.5, 0.14, 0.9, 0.7, '#6a4428'); bc(F, -5.2, 6.5, 1.4, 0.4, -1, 0.95);
+    bp(F, pBox, -5.2, 0.9, 6.5, 2.8, 0.14, 0.8, '#9a6a40'); for (const q of [-1, 1]) bp(F, pBox, -5.2 + q * 1.2, 0.45, 6.5, 0.14, 0.9, 0.7, '#6a4428');
     // the forge chimney at the south gable, and a skylight
     { const [fx, fz] = W(F, -8.9, -2); chimney(fx, fz, g, g + 10.5, '#8a7a6a'); }
-    bc(F, -8.9, -2, 0.8, 0.8, -1, 10.5);
+   
     bp(F, pPane, 3, 5.8 + 2.78, 2.7, 3, 0.05, 1.8, '#ffffff', 0.62);
     // a hoist arm over the doors for lifting timber
     bp(F, pBox, 4.5, 6.0, 6.2, 0.25, 0.25, 2.8, '#5a3a22'); bp(F, pBox, 4.5, 5.0, 7.5, 0.04, 2, 0.04, '#d8c8a0'); bp(F, pBox, 4.5, 3.9, 7.5, 0.3, 0.3, 0.3, '#4a4a50');
@@ -1078,13 +1090,13 @@ export function buildProperty(scene) {
     bp(F, pCyl, 0, 8 + 7 * Math.tan(0.8) + 3.8, 0, 0.05, 1.6, 0.05, '#3a2a1a'); bp(F, pBox, 0, 8 + 7 * Math.tan(0.8) + 4.3, 0, 1.2, 0.3, 0.06, '#c8a040');
     // the silo
     const sx = BARN.x - 12.5, sz = BARN.z + 4, sg = heightAt(sx, sz);
-    put2(pCyl, sx, sg + 6, sz, 3.6, 12, 3.6, 0, 0, 0, '#a89888'); col.add(sx, sz, 3.2, 3.2, 0, sg - 1, sg + 12); col.add(sx, sz, 3.2, 3.2, Math.PI / 4, sg - 1, sg + 12);
+    put2(pCyl, sx, sg + 6, sz, 3.6, 12, 3.6, 0, 0, 0, '#a89888');
     for (let k = 1; k < 6; k++) put2(pCyl, sx, sg + k * 2, sz, 3.7, 0.18, 3.7, 0, 0, 0, '#7a6a5a');
     put2(pCone, sx, sg + 13.6, sz, 4.2, 3.2, 4.2, 0, 0, 0, '#5a3a24'); put2(pCyl, sx, sg + 15.6, sz, 0.06, 1.4, 0.06, 0, 0, 0, '#3a2a1a');
     // bales stacked by the door, and a water trough
     for (let k = 0; k < 7; k++) { const [x, z] = W(F, 5 + (k % 3) * 1.25, 8.6 + Math.floor(k / 3) * 0); put2(pBox, x, barn.g + 0.45 + (k > 2 ? 0.9 : 0) + (k > 5 ? 0.9 : 0), z + (k % 2) * 0.1, 1.2, 0.9, 0.9, 0, (rng() - 0.5) * 0.2, 0, '#d8b85a'); }
-    bc(F, 6.2, 8.6, 2, 0.5, -1, 1.8);
-    bp(F, pBox, -6, 0.4, 8.6, 3, 0.8, 1, '#7a5232'); bp(F, pPane, -6, 0.75, 8.6, 2.6, 0.04, 0.7, '#ffffff'); bc(F, -6, 8.6, 1.5, 0.5, -1, 0.8);
+   
+    bp(F, pBox, -6, 0.4, 8.6, 3, 0.8, 1, '#7a5232'); bp(F, pPane, -6, 0.75, 8.6, 2.6, 0.04, 0.7, '#ffffff');
   }
   const shed = hall(WOODSHED.x, WOODSHED.z, ROT_E, 7, 5, 3.4, '#8a6a4a', { roof: 'pitch', roofC: 0x5a3a24, doorW: 1.4, doorH: 2.2 });
   addDoor(shed.door, 'p_woodshed', 'The Woodshed', 'woodshed');
@@ -1094,11 +1106,10 @@ export function buildProperty(scene) {
     bp(F, pBox, 0, 2.9, -4.4, 7.4, 0.2, 3.8, '#5a3a24', 0.3);
     for (const q of [-1, 1]) bp(F, pBox, q * 3.4, 1.4, -6.1, 0.25, 2.8, 0.25, '#5a3a22');
     for (let row = 0; row < 5; row++) for (let k = 0; k < 16; k++) bp(F, pCyl, -3 + k * 0.4 + (row % 2) * 0.2, 0.22 + row * 0.38, -4.6, 0.19, 2.4, 0.19, rng() < 0.5 ? '#9a6a40' : '#b07a48', Math.PI / 2);
-    bc(F, 0, -4.6, 3.4, 1.3, -1, 2);
+   
     const [cx, cz] = W(F, 2.6, 4.2), cg = heightAt(cx, cz);
     put2(pCyl, cx, cg + 0.4, cz, 0.6, 0.8, 0.6, 0, 0, 0, '#8a5a36'); put2(pCyl, cx, cg + 0.81, cz, 0.55, 0.02, 0.55, 0, 0, 0, '#c8a070');
     put2(pBox, cx + 0.1, cg + 1.15, cz, 0.06, 0.7, 0.06, 0, 0, 0.5, '#6a4428'); put2(pBox, cx - 0.05, cg + 0.92, cz, 0.3, 0.2, 0.05, 0, 0, 0.5, '#9aa0a8');
-    col.add(cx, cz, 0.6, 0.6, 0, cg - 1, cg + 0.8);
   }
   // the tower: tall, fire-tree wood on a stone foot, with a stair winding round the outside to the lookout (and a door at its foot)
   const TOWER_H = 16;
@@ -1127,8 +1138,6 @@ export function buildProperty(scene) {
     const tl = glowSprite(0xffb860, 9, 0); tl.position.set(x, g + TOWER_H + 6.9, z); scene.add(tl); lampGlows.push(tl);
     for (const [dx, dz] of [[-2.9, -2.9], [2.9, -2.9], [2.9, 2.9], [-2.9, 2.9]]) { blocks.put(x + dx, g + TOWER_H + 2.4, z + dz, 0.3, 3.6, 0.3, 0, 0, 0, '#5a3a22'); put2(pBox, x + dx * 0.88, g + TOWER_H + 3.9, z + dz * 0.88, 0.2, 0.9, 0.2, 0, Math.atan2(dx, dz), 0.7, '#5a3a22'); }
     lantern(x, g + TOWER_H + 3.4, z, 1.2);
-    col.add(x, z, 2.5, 2.5, 0, g - 1, g + TOWER_H); col.add(x, z, 2.9, 2.9, 0, g - 1, g + 3.6);
-    col.add(x, z, 3.2, 3.2, 0, g + TOWER_H - 0.2, g + TOWER_H + 0.6);
     // a stair winding round all four sides, up to the top
     const path = [];
     const side = 4.3, n = 9;
@@ -1143,7 +1152,6 @@ export function buildProperty(scene) {
       blocks.put(bx, g + (sy - 0.4) / 2, bz, 0.3, Math.max(0.2, sy - 0.4), 0.3, 0, 0, 0, '#6a4428');
       const ox = Math.sign(bx - x) * (Math.abs(bx - x) > 4 ? 0.7 : 0), oz = Math.sign(bz - z) * (Math.abs(bz - z) > 4 ? 0.7 : 0);
       edge.push([bx + ox, g + sy, bz + oz]);
-      col.add(bx, bz, 0.75, 0.75, 0, g + sy - 0.5, g + sy);
     });
     // a hand-rail all the way up the outer edge
     railing(edge, {
@@ -1180,37 +1188,33 @@ export function buildProperty(scene) {
     const wx = WELL.x, wz = WELL.z, wg = heightAt(wx, wz);
     const well = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 1.2, 14), toon(0x9a8a78)); well.position.set(wx, wg + 0.6, wz); addOutline(well, 0.04); scene.add(well);
     put2(pCyl, wx, wg + 1.22, wz, 1.5, 0.12, 1.5, 0, 0, 0, '#b8b0a0'); put2(pCyl, wx, wg + 1.2, wz, 1.15, 0.1, 1.15, 0, 0, 0, '#1a2a30');
-    col.add(wx, wz, 1.3, 1.3, 0, wg - 1, wg + 1.2);
     for (const s of [-1, 1]) blocks.put(wx + s * 1.3, wg + 1.8, wz, 0.2, 2.4, 0.2, 0, 0, 0, '#6a4428');
     put2(pPrism, wx, wg + 2.9, wz, 3.4, 1.2, 2.4, 0, 0, 0, '#6a3a22');
     put2(pCyl, wx, wg + 2.2, wz, 0.18, 2.4, 0.18, 0, 0, Math.PI / 2, '#7a5232'); put2(pBox, wx + 1.5, wg + 2.0, wz, 0.08, 0.5, 0.08, 0, 0, 0, '#4a3a2a');
     put2(pCyl, wx + 0.9, wg + 1.45, wz + 0.9, 0.28, 0.4, 0.28, 0, 0, 0, '#7a5232');
     // the high post for the far dummy
     blocks.put(YARD.x + 14, heightAt(YARD.x + 14, YARD.z + 18) + 3, YARD.z + 18, 0.8, 6, 0.8, 0, 0, 0, '#6a4428');
-    col.add(YARD.x + 14, YARD.z + 18, 0.4, 0.4, 0, heightAt(YARD.x + 14, YARD.z + 18) - 1, heightAt(YARD.x + 14, YARD.z + 18) + 6);
     // a hay cart, with sides and shafts and a load on
     const cx = TIMBER.x - 12, cz = TIMBER.z - 12, cg = heightAt(cx, cz), CF = frame(cx, cg, cz, 0.4);
-    bp(CF, pBox, 0, 1, 0, 2.2, 0.3, 3.6, '#8a5a36'); col.add(cx, cz, 1.1, 1.8, 0.4, cg - 1, cg + 1.2);
+    bp(CF, pBox, 0, 1, 0, 2.2, 0.3, 3.6, '#8a5a36');
     for (const q of [-1, 1]) { bp(CF, pBox, q * 1.08, 1.45, 0, 0.1, 0.6, 3.6, '#7a4e2c'); for (let k = -1; k <= 1; k++) bp(CF, pBox, q * 1.1, 1.45, k * 1.6, 0.14, 0.7, 0.14, '#5a3a22'); bp(CF, pBox, q * 0.7, 0.75, 3.1, 0.12, 0.12, 3, '#6a4428', 0.25); }
     for (let k = 0; k < 5; k++) { const [hx, hz] = W(CF, (rng() - 0.5) * 1.2, (rng() - 0.5) * 2.6); tufts.put(hx, cg + 1.6 + rng() * 0.4, hz, 0.9, 0.55, 0.9, rng(), rng(), 0, pick(['#d8b85a', '#e0c068', '#c8a848'])); }
     for (const s of [-1, 1]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.2, 12), toon(0x5a3a22)); wh.rotation.z = Math.PI / 2; wh.rotation.y = 0.4; wh.position.set(cx + Math.cos(0.4) * s * 1.2, cg + 0.7, cz - Math.sin(0.4) * s * 1.2); addOutline(wh, 0.03); scene.add(wh); }
     for (let k = 0; k < 14; k++) { const lg = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2, 6), toon(0x7a4e2c)); lg.rotation.x = Math.PI / 2; lg.position.set(WOODSHED.x + 5 + (k % 5) * 0.46, heightAt(WOODSHED.x + 5, WOODSHED.z) + 0.25 + Math.floor(k / 5) * 0.42, WOODSHED.z + 4); scene.add(lg); }
-    col.add(WOODSHED.x + 6, WOODSHED.z + 4, 1.3, 1, 0, heightAt(WOODSHED.x + 5, WOODSHED.z) - 1, heightAt(WOODSHED.x + 5, WOODSHED.z) + 1.4);
     for (const [sx, sz] of [[TIMBER.x + 10, TIMBER.z - 9], [TIMBER.x + 13, TIMBER.z - 9]]) { const sg = heightAt(sx, sz); blocks.put(sx, sg + 0.8, sz, 0.2, 0.2, 1.6, 0, 0, 0, '#6a4428'); for (const s of [-1, 1]) blocks.put(sx + s * 0.4, sg + 0.4, sz, 0.12, 0.8, 0.12, 0, 0, s * 0.3, '#6a4428'); }
     put2(pBox, TIMBER.x + 11.5, heightAt(TIMBER.x + 11.5, TIMBER.z - 9) + 0.98, TIMBER.z - 9, 4.2, 0.12, 0.5, 0, 0, 0.03, '#c8a070');
     // the timber yard: a long lean-to over stacked, stickered boards, a sawpit, a pile of great logs
     {
       const tx = TIMBER.x + 4, tz = TIMBER.z + 2, tg = heightAt(tx, tz), TF = frame(tx, tg, tz, 0);
       bp(TF, pBox, 0, 3.6, 0, 14, 0.25, 6.4, '#5a3a24', 0.22);
-      for (const lx of [-6.6, 0, 6.6]) for (const lz of [-2.8, 2.8]) { bp(TF, pBox, lx, (lz < 0 ? 4.25 : 3.0) / 2, lz, 0.3, lz < 0 ? 4.25 : 3.0, 0.3, '#5a3a22'); bc(TF, lx, lz, 0.2, 0.2, -1, 3); }
+      for (const lx of [-6.6, 0, 6.6]) for (const lz of [-2.8, 2.8]) { bp(TF, pBox, lx, (lz < 0 ? 4.25 : 3.0) / 2, lz, 0.3, lz < 0 ? 4.25 : 3.0, 0.3, '#5a3a22'); }
       for (let st = 0; st < 3; st++) for (let row = 0; row < 7; row++) {
         const sx2 = -4.4 + st * 4.4;
         bp(TF, pBox, sx2, 0.2 + row * 0.26, 0, 3.6, 0.16, 4.6, WOOD_TONES[(row + st) % 4]);
         for (const q of [-1, 0, 1]) bp(TF, pBox, sx2, 0.31 + row * 0.26, q * 1.9, 3.7, 0.06, 0.12, '#5a3a22');
       }
-      bc(TF, 0, 0, 6.4, 2.4, -1, 2);
+     
       for (let k = 0; k < 5; k++) put2(pCyl, tx - 2 + (k % 3) * 1.4 + (k > 2 ? 0.7 : 0), tg + 0.6 + (k > 2 ? 1.1 : 0), tz + 7.5, 0.62, 6, 0.62, Math.PI / 2, 0, 0, '#7a5232');
-      col.add(tx - 0.6, tz + 7.5, 2.4, 3, 0, tg - 1, tg + 2.2);
       put2(pBox, tx + 9, tg + 0.02, tz + 7, 1.6, 0.06, 5, 0, 0, 0, '#3a2a1a');   // the sawpit
       put2(pBox, tx + 9, tg + 0.6, tz + 7, 0.35, 0.35, 5.4, 0, 0, 0, '#9a6a40');
       put2(pBox, tx + 9, tg + 1.5, tz + 7, 0.04, 1.8, 0.5, 0, 0, 0.1, '#9aa0a8');
@@ -1221,7 +1225,6 @@ export function buildProperty(scene) {
       put2(pCyl, gx, gg + 0.9, gz, 0.55, 0.16, 0.55, 0, 0.2, Math.PI / 2, '#a8a094');
       for (const q of [-1, 1]) put2(pBox, gx, gg + 0.45, gz + q * 0.3, 0.12, 0.9, 0.08, 0, 0.2, 0, '#6a4428');
       put2(pBox, gx + 0.6, gg + 0.4, gz, 0.5, 0.5, 0.5, 0, 0.2, 0, '#7a5232');
-      col.add(gx, gz, 0.6, 0.5, 0.2, gg - 1, gg + 1.4);
       const [bx2, bz2] = W(work.F, -7.6, 7.4), bg = heightAt(bx2, bz2);
       put2(pBox, bx2, bg + 0.6, bz2, 0.9, 0.4, 1.3, 0.1, 1.1, 0, '#7a4e2c'); put2(pCyl, bx2 + 0.6, bg + 0.3, bz2 + 0.2, 0.3, 0.08, 0.3, 0, 1.1, Math.PI / 2, '#4a3a2a');
       for (const q of [-1, 1]) put2(pBox, bx2 - 0.5 + q * 0.3, bg + 0.55, bz2 - 0.3, 0.06, 0.06, 1.5, 0.2, 1.1, 0, '#6a4428');
@@ -1231,7 +1234,7 @@ export function buildProperty(scene) {
     // the washing line behind the north wing: shirts, a quilt, Tanoc's spare hat-scarf
     {
       const ax = HOUSE.x - 20, az0 = HOUSE.z - 38, az1 = HOUSE.z - 20, lg = heightAt(ax, (az0 + az1) / 2);
-      for (const az of [az0, az1]) { put2(pBox, ax, heightAt(ax, az) + 1.3, az, 0.18, 2.6, 0.18, 0, 0, 0, '#6a4428'); put2(pBox, ax, heightAt(ax, az) + 2.5, az, 0.8, 0.1, 0.1, 0, 0, 0, '#6a4428'); col.add(ax, az, 0.2, 0.2, 0, lg - 1, lg + 2.6); }
+      for (const az of [az0, az1]) { put2(pBox, ax, heightAt(ax, az) + 1.3, az, 0.18, 2.6, 0.18, 0, 0, 0, '#6a4428'); put2(pBox, ax, heightAt(ax, az) + 2.5, az, 0.8, 0.1, 0.1, 0, 0, 0, '#6a4428'); }
       put2(pBox, ax, lg + 2.5, (az0 + az1) / 2, 0.03, 0.03, az1 - az0, 0, 0, 0, '#e8e0d0');
       const clothMat = toon(0xffffff, { side: THREE.DoubleSide });
       const CL = ['#f4f0e8', '#8a3a4a', '#3a6a8a', '#e8c84a', '#f4f0e8', '#6a8a4a', '#d87a5a'];
@@ -1262,7 +1265,7 @@ export function buildProperty(scene) {
     for (const run of runs) railing(run, {
       post: (px, py, pz, h) => blocks.put(px, py + h / 2 - 0.2, pz, 0.2, h + 0.4, 0.2, 0, 0, 0, '#6a4428'),
       bar: (px, py, pz, len, ry, rz) => blocks.put(px, py, pz, len, 0.12, 0.08, 0, ry, rz, '#7a5232'),
-      col: (cx, cz, hw, hd, ang, y0, y1) => col.add(cx, cz, hw, 0.12, ang, y0 - 1, y1),
+      col: (cx, cz, hw, hd, ang, y0, y1) => col.add(cx, cz, hw, hd, ang, y0, y1),
     }, { h: 1.2, bars: [0.55, 1.0], gap: 4 });
   }
   for (const f of FIELDS) {
@@ -1285,7 +1288,7 @@ export function buildProperty(scene) {
     const dy = WATER_LEVEL + 0.9;
     for (let k = -3; k < 14; k++) blocks.put(DOCK.x - k * 1.6, dy, DOCK.z, 1.45, 0.25, 3.4, 0, 0.02 * (k % 3), 0, k % 2 ? '#7a5232' : '#8a6040');
     for (let k = 0; k < 14; k += 2) for (const sd of [-1, 1]) blocks.put(DOCK.x - k * 1.6, dy - 2.5, DOCK.z + sd * 1.6, 0.3, 5, 0.3, 0, 0, 0, '#4a3020');
-    col.add(DOCK.x - 8 * 1.6 + 3.2, DOCK.z, 13, 1.7, 0, dy - 3, dy + 0.12);
+    col.add(DOCK.x - 8 * 1.6 + 3.2, DOCK.z, 13, 1.7, 0, dy - 0.125, dy + 0.125);   // the planks, as thick as they are (one slab: no feet down the cracks)
     // the boathouse beside the dock
     const bh = hall(shoreX + 14, DOCK.z + 16, Math.PI, 10, 9, 4.4, '#7a6a5a', { roof: 'pitch', roofC: 0x4a3a2a, doorW: 1.6, doorH: 2.4 });
     addDoor(bh.door, 'p_boathouse', 'The Boathouse', 'boathouse');
@@ -1293,9 +1296,9 @@ export function buildProperty(scene) {
     const tx = DOCK.x - 13 * 1.6 - 2.2;
     for (let k = -3; k <= 3; k++) put2(pBox, tx, dy, DOCK.z + k * 1.5, 3.4, 0.25, 1.4, 0, 0, 0, k % 2 ? '#7a5232' : '#8a6040');
     for (const q of [-4.4, 4.4]) for (const r of [-1.4, 1.4]) put2(pBox, tx + r, dy - 2.5, DOCK.z + q, 0.3, 5, 0.3, 0, 0, 0, '#4a3020');
-    col.add(tx, DOCK.z, 1.7, 5.2, 0, dy - 3, dy + 0.12);
+    col.add(tx, DOCK.z, 1.7, 5.2, 0, dy - 0.125, dy + 0.125);
     for (const k of [1, 5, 9, 12]) for (const sd of [-1, 1]) { put2(pCyl, DOCK.x - k * 1.6, dy + 0.4, DOCK.z + sd * 1.55, 0.17, 0.7, 0.17, 0, 0, 0, '#3a2a1a'); put2(pCyl, DOCK.x - k * 1.6, dy + 0.78, DOCK.z + sd * 1.55, 0.22, 0.08, 0.22, 0, 0, 0, '#2a1a10'); }
-    for (const q of [-4.4, 4.4]) { put2(pBox, tx - 1.4, dy + 1.6, DOCK.z + q, 0.22, 3, 0.22, 0, 0, 0, '#4a3420'); put2(pBox, tx - 1.0, dy + 3.05, DOCK.z + q, 1.0, 0.12, 0.12, 0, 0, 0, '#4a3420'); lantern(tx - 0.6, dy + 2.6, DOCK.z + q, 0.85); col.add(tx - 1.4, DOCK.z + q, 0.2, 0.2, 0, dy - 1, dy + 3); }
+    for (const q of [-4.4, 4.4]) { put2(pBox, tx - 1.4, dy + 1.6, DOCK.z + q, 0.22, 3, 0.22, 0, 0, 0, '#4a3420'); put2(pBox, tx - 1.0, dy + 3.05, DOCK.z + q, 1.0, 0.12, 0.12, 0, 0, 0, '#4a3420'); lantern(tx - 0.6, dy + 2.6, DOCK.z + q, 0.85); }
     // the rowboat, riding a little low, tied to the third bollard
     const rbx = DOCK.x - 9 * 1.6, rbz = DOCK.z + 3.6;
     put2(pDome, rbx, WATER_LEVEL + 0.55, rbz, 1.0, 0.6, 2.7, Math.PI, 0.05, 0, '#8a5a36');
@@ -1307,7 +1310,6 @@ export function buildProperty(scene) {
     put2(pCyl, DOCK.x + 1.2, dy + 0.6, DOCK.z + 1, 0.4, 1.0, 0.4, 0, 0, 0, '#7a4e2c');
     put2(pCyl, DOCK.x - 3, dy + 0.2, DOCK.z + 0.9, 0.5, 0.14, 0.5, 0, 0, 0, '#c8b080');
     put2(pBox, DOCK.x - 6, dy + 0.5, DOCK.z - 1.3, 0.05, 0.05, 3.4, 0.35, 0.6, 0, '#7a5232');   // somebody's fishing rod
-    col.add(DOCK.x + 2.3, DOCK.z - 1, 0.9, 0.5, 0, dy - 1, dy + 0.9);
     // the boathouse: a slipway down into the water, an upturned canoe on trestles, nets drying on a frame
     {
       const F = bh.F;
@@ -1315,7 +1317,7 @@ export function buildProperty(scene) {
       for (const q of [-1.6, 1.6]) { const [x, z] = W(F, 11, q); put2(pBox, x, Math.max(heightAt(x, z), WATER_LEVEL - 0.6) + 0.02, z, 13, 0.18, 0.2, 0, F.rot, 0, '#4a3020'); }
       const [cx2, cz2] = W(F, -2, -7.4), cg2 = heightAt(cx2, cz2);
       for (const q of [-1.2, 1.2]) { const [x, z] = W(F, -2 + q, -7.4); put2(pBox, x, cg2 + 0.4, z, 0.12, 0.8, 1.2, 0, F.rot, 0, '#6a4428'); }
-      put2(pDome, cx2, cg2 + 0.85, cz2, 0.6, 0.35, 2.2, 0, F.rot + Math.PI / 2, 0, '#c8783a'); col.add(cx2, cz2, 2.2, 0.7, F.rot, cg2 - 1, cg2 + 1.2);
+      put2(pDome, cx2, cg2 + 0.85, cz2, 0.6, 0.35, 2.2, 0, F.rot + Math.PI / 2, 0, '#c8783a');
       const [nx2, nz2] = W(F, 3.5, -7.2), ng = heightAt(nx2, nz2);
       for (const q of [-1.4, 1.4]) { const [x, z] = W(F, 3.5 + q, -7.2); put2(pBox, x, ng + 1.2, z, 0.14, 2.4, 0.14, 0, F.rot, 0, '#5a3a22'); }
       put2(pBox, nx2, ng + 2.35, nz2, 3.1, 0.1, 0.1, 0, F.rot, 0, '#5a3a22');
@@ -1337,12 +1339,12 @@ export function buildProperty(scene) {
     const bz = 3.4, bx = BROOK_X(bz);
     bridgeY = Math.max(heightAt(bx - 8, bz), heightAt(bx + 8, bz)) + 0.35;
     for (let k = -6; k <= 6; k++) blocks.put(bx + k * 1.0, bridgeY - 0.12, bz, 0.95, 0.24, 3.4, 0, 0.0, 0, k % 2 ? '#8a5a36' : '#9a6a40');
-    col.add(bx, bz, 6.5, 1.7, 0, bridgeY - 3, bridgeY);
-    for (const s of [-1, 1]) { blocks.put(bx, bridgeY + 0.9, bz + s * 1.7, 13, 0.14, 0.14, 0, 0, 0, '#6a4428'); col.add(bx, bz + s * 1.8, 6.5, 0.15, 0, bridgeY, bridgeY + 1.1); for (let k = -6; k <= 6; k += 3) blocks.put(bx + k, bridgeY + 0.45, bz + s * 1.7, 0.16, 0.9, 0.16, 0, 0, 0, '#6a4428'); }
+    col.add(bx, bz, 6.5, 1.7, 0, bridgeY - 0.24, bridgeY);   // the planks, as thick as they are
+    for (const s of [-1, 1]) { blocks.put(bx, bridgeY + 0.9, bz + s * 1.7, 13, 0.14, 0.14, 0, 0, 0, '#6a4428'); col.add(bx, bz + s * 1.7, 6.5, 0.07, 0, bridgeY + 0.83, bridgeY + 0.97); for (let k = -6; k <= 6; k += 3) blocks.put(bx + k, bridgeY + 0.45, bz + s * 1.7, 0.16, 0.9, 0.16, 0, 0, 0, '#6a4428'); }
     // the old gateposts at the top of the path, where the land opens
     for (const s of [-1, 1]) {
       const gx = CREST.x + 6, gz = CREST.z + s * 5, gg = heightAt(gx, gz);
-      blocks.put(gx, gg + 2.2, gz, 1.2, 4.4, 1.2, 0, 0, 0, '#9a8a78'); col.add(gx, gz, 0.6, 0.6, 0, gg - 1, gg + 4.4);
+      blocks.put(gx, gg + 2.2, gz, 1.2, 4.4, 1.2, 0, 0, 0, '#9a8a78');
       const acorn = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), toon(0xc8902a)); acorn.scale.y = 1.25; acorn.position.set(gx, gg + 5, gz); addOutline(acorn, 0.04); scene.add(acorn);
     }
     blocks.put(CREST.x + 6, heightAt(CREST.x + 6, CREST.z) + 4.6, CREST.z, 0.5, 0.5, 10.6, 0, 0, 0, '#6a4428');
@@ -1378,9 +1380,9 @@ export function buildProperty(scene) {
   /* ---------------- the lookout rocks, and the forest hollow ---------------- */
   {
     const { x, z } = OUTCROP, g = heightAt(x, z);
-    for (let k = 0; k < 14; k++) { const a = rng() * Math.PI * 2, d = 6 + rng() * 14, s = 2 + rng() * 4, rx = x + Math.cos(a) * d, rz = z + Math.sin(a) * d, rg = heightAt(rx, rz); rocks.put(rx, rg + s * 0.3, rz, s * 1.3, s * 0.8, s, rng() * 3, rng() * 3, rng() * 3, pick(['#9a9284', '#8a8478', '#a8a090'])); col.add(rx, rz, s * 0.9, s * 0.9, 0, rg - 1, rg + s * 0.9); }
+    for (let k = 0; k < 14; k++) { const a = rng() * Math.PI * 2, d = 6 + rng() * 14, s = 2 + rng() * 4, rx = x + Math.cos(a) * d, rz = z + Math.sin(a) * d, rg = heightAt(rx, rz); rocks.put(rx, rg + s * 0.3, rz, s * 1.3, s * 0.8, s, rng() * 3, rng() * 3, rng() * 3, pick(['#9a9284', '#8a8478', '#a8a090'])); }
     // the flat lookout slab at the very top
-    blocks.put(x, g + 0.6, z, 7, 1.2, 5, 0, 0.3, 0, '#9a9284'); col.add(x, z, 3.5, 2.5, 0.3, g - 1, g + 1.2);
+    blocks.put(x, g + 0.6, z, 7, 1.2, 5, 0, 0.3, 0, '#9a9284');
     const { x: hx, z: hz } = HOLLOW, hg = heightAt(hx, hz);
     for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2, lx = hx + Math.cos(a) * 9, lz = hz + Math.sin(a) * 9; const lgm = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 5, 7), toon(0x5a3a22)); lgm.rotation.z = Math.PI / 2; lgm.rotation.y = -a + Math.PI / 2; lgm.position.set(lx, heightAt(lx, lz) + 0.4, lz); addOutline(lgm, 0.03); scene.add(lgm); }
   }
@@ -1391,12 +1393,11 @@ export function buildProperty(scene) {
     const g = heightAt(x, z); if (g < WATER_LEVEL - 1) continue;
     const s = 0.5 + Math.pow(rng(), 3) * 3.4;
     rocks.put(x, g + s * 0.25, z, s * (1 + rng() * 0.5), s * 0.75, s, rng() * 3, rng() * 3, rng() * 3, pick(['#9a9284', '#8a8478', '#a8a090', '#b8a080']));
-    if (s > 0.6 && onLand(x, z)) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
   }
 
   /* ---------------- the grounds: flagstone walks, edged lanes and lanterns, dry-stone walls, the greenhouse,
      beehives, the pond, reeds and lilies on the shore, wildflowers, a swing, the outcrops, birds ---------------- */
-  const pebbles = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 7000, false);
+  const pebbles = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 7000, false); folkSolid(pebbles.mesh);
   const blooms = new Kit(scene, new THREE.OctahedronGeometry(1, 0), toon(0xffffff), 12000, false); noSolid(blooms.mesh);   // you wade through it, like grass
   const reeds = new Kit(scene, new THREE.ConeGeometry(0.12, 1, 4), toon(0xffffff), 9000, false); noSolid(reeds.mesh);   // you wade through it, like grass
   const padG = new THREE.CircleGeometry(1, 12, 0.35, Math.PI * 2 - 0.7).rotateX(-Math.PI / 2);
@@ -1458,7 +1459,6 @@ export function buildProperty(scene) {
     }
     // the light it throws on the path
     const s1 = glowSprite(0x9fe8d8, 11, 0); s1.position.set((tx + bx) / 2, g + h * 0.5, (tz + bz) / 2); scene.add(s1); lampGlows.push(s1);
-    col.add(x, z, 0.42, 0.42, 0, g - 1, g + h * 0.7);
     trees.push({ x, z, g, h: h * 0.75, r: 0.45 });
     trees.push({ x: bx, z: bz, g, h: (by - 0.3 - g) / 0.95, r: 0 });                                // the bough: swing from it
     trees.push({ x: (tx + bx) / 2, z: (tz + bz) / 2, g, h: ((ty + by) / 2 - g) / 0.95, r: 0 });
@@ -1489,7 +1489,6 @@ export function buildProperty(scene) {
       { const s = 0.38 + rng() * 0.14; pebbles.put(x, gg + 0.82, z, s * 1.25, s * 0.8, s, rng() * 0.3, ang, rng() * 0.3, pick(['#9a9284', '#a8a090', '#8a8478'])); }
       if (rng() < 0.55) tufts.put(x + (rng() - 0.5) * 0.4, gg + 1.12, z + (rng() - 0.5) * 0.4, 0.42, 0.14, 0.4, 0, rng() * 6, 0, pick(['#5a8a3a', '#6a9a40', '#7aa84a']));
     }
-    col.add((x0 + x1) / 2, (z0 + z1) / 2, 0.5, L / 2, ang, heightAt((x0 + x1) / 2, (z0 + z1) / 2) - 1, heightAt((x0 + x1) / 2, (z0 + z1) / 2) + 1.1);
   };
   const wallRun = pts => { for (let i = 0; i < pts.length - 1; i++) wallSeg(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]); };
   {
@@ -1518,7 +1517,7 @@ export function buildProperty(scene) {
     const GF = frame(GARDEN.x, heightAt(GARDEN.x, GARDEN.z), GARDEN.z, 0);
     for (const bx of [-5.6, 0, 5.6]) {
       bp(GF, pBox, bx, 0.25, 0.5, 3.0, 0.5, 10.5, '#7a4e2c'); bp(GF, pBox, bx, 0.48, 0.5, 2.7, 0.06, 10.2, '#4a3020');
-      bc(GF, bx, 0.5, 1.5, 5.25, -1, 0.5);
+     
       for (let k = 0; k < 9; k++) {
         const lz = -4 + k * 1.12, kind = (bx === 0) ? 2 : bx < 0 ? 0 : 1;
         for (const q of [-0.6, 0.6]) {
@@ -1555,8 +1554,8 @@ export function buildProperty(scene) {
     for (const s of [-1, 1]) { bp(F, pBox, 0, 1.3, s * 1.9, w - 1.4, 0.1, 1.1, '#9a6a40'); for (let k = 0; k < 12; k++) { const [px, pz] = W(F, -4 + k * 0.72, s * 1.9); put2(pCyl, px, g + 1.5, pz, 0.2, 0.3, 0.16, 0, 0, 0, '#b8643a'); tufts.put(px, g + 1.85, pz, 0.26, 0.3, 0.26, rng(), rng(), 0, rng() < 0.3 ? pick(FLOWERS) : pick(['#4a8a3a', '#6aa848', '#5a9a40'])); } }
     { const [tx, tz] = W(F, w / 2 - 1.2, 0); put2(pCyl, tx, g + 0.9, tz, 0.45, 0.8, 0.45, 0, 0, 0, '#8a5a36'); put2(pBox, tx, g + 1.7, tz, 0.12, 1.2, 0.12, 0, 0, 0, '#6a4428'); tufts.put(tx, g + 2.6, tz, 0.9, 0.8, 0.9, 0, 0, 0, '#3a7a34'); for (let k = 0; k < 6; k++) tufts.put(tx + (rng() - 0.5) * 1.2, g + 2.3 + rng() * 0.8, tz + (rng() - 0.5) * 1.2, 0.12, 0.14, 0.12, 0, 0, 0, '#f2d24a'); }
     // walls you can't walk through, and a door in the north side you can
-    bc(F, 0, d / 2, w / 2, 0.15, -1, 4); bc(F, -w / 2, 0, 0.15, d / 2, -1, 4); bc(F, w / 2, 0, 0.15, d / 2, -1, 4);
-    bc(F, -2.9, -d / 2, 2.1, 0.15, -1, 4); bc(F, 2.9, -d / 2, 2.1, 0.15, -1, 4);
+   
+   
     bp(F, pBox, 0, 1.6, -d / 2 - 0.02, 1.4, 0.12, 0.08, '#f4f0e8'); bp(F, pBox, 0, 0.5 + 2.2, -d / 2, 1.5, 0.12, 0.12, '#f4f0e8');
   }
   // the beehives below the orchard: straw skeps on a bench, lavender round about
@@ -1564,7 +1563,7 @@ export function buildProperty(scene) {
   {
     const { x, z } = HIVES, g = heightAt(x, z), F = frame(x, g, z, 0.3);
     bp(F, pBox, 0, 0.62, 0, 5.2, 0.12, 0.9, '#8a5a36'); for (const q of [-2.3, 0, 2.3]) bp(F, pBox, q, 0.3, 0, 0.14, 0.6, 0.7, '#6a4428');
-    bc(F, 0, 0, 2.6, 0.5, -1, 1.4);
+   
     for (let k = 0; k < 4; k++) {
       const [hx, hz] = W(F, -1.9 + k * 1.27, 0);
       put2(pDome, hx, g + 0.68, hz, 0.52, 0.8, 0.52, 0, rng() * 6, 0, '#d8a84a');
@@ -1584,7 +1583,6 @@ export function buildProperty(scene) {
     const bx = POND.x + POND.r + 4, bz = POND.z - 3, bg = heightAt(bx, bz);
     put2(pBox, bx, bg + 0.5, bz, 0.7, 0.1, 2.2, 0, 0.3, 0, '#8a5a36'); put2(pBox, bx + 0.3, bg + 0.85, bz - 0.1, 0.08, 0.6, 2.2, 0, 0.3, -0.15, '#8a5a36');
     for (const q of [-0.9, 0.9]) put2(pBox, bx + Math.sin(0.3) * q, bg + 0.25, bz + Math.cos(0.3) * q, 0.6, 0.5, 0.1, 0, 0.3, 0, '#6a4428');
-    col.add(bx, bz, 0.4, 1.1, 0.3, bg - 1, bg + 0.55);
   }
   // reeds and lilies along the lake shore
   for (let i = 0; i < 40000 && reeds.mesh.count < 8200; i++) {
@@ -1623,7 +1621,6 @@ export function buildProperty(scene) {
     for (let k = 0; k < n; k++) {
       const w = (big - k * big * 0.14) * (0.8 + rng() * 0.4), hh = 1.4 + rng() * 1.6, d2 = w * (0.6 + rng() * 0.3), ox = (rng() - 0.5) * w * 0.3, oz = (rng() - 0.5) * w * 0.3;
       put2(pBox, x + ox, y + hh / 2, z + oz, w, hh, d2, (rng() - 0.5) * 0.12, ry + (rng() - 0.5) * 0.5, (rng() - 0.5) * 0.12, pick(['#9a9284', '#8a8478', '#a8a090', '#948c80']));
-      col.add(x + ox, z + oz, w / 2, d2 / 2, ry, g - 1, y + hh);
       if (rng() < 0.7) tufts.put(x + ox, y + hh + 0.05, z + oz, w * 0.36, 0.22, d2 * 0.36, 0, ry, 0, pick(['#5a8a3a', '#6a9a40', '#7aa84a']));
       y += hh * 0.92; ry += (rng() - 0.5) * 0.6;
     }

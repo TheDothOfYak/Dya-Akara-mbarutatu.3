@@ -13,7 +13,7 @@ import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
 import { dress } from './assets.js';
 import { buildEikar, cartoon, faceActing, rigArm, poseArm, rigLeg, strideLegs, bioKit, bioDots, bioMesh } from './actors.js';
 import { mulberry32, lerp, clamp, railing } from './util.js';
-import { noSolid } from './solid.js';
+import { noSolid, folkSolid } from './solid.js';
 
 const TAU = Math.PI * 2;
 
@@ -391,7 +391,7 @@ export function buildNpc(def) {
 /* tents, a cookfire, crates, a smith's cauldron — the camp itself */
 export function buildCamp(scene, world, cx, cz, opts = {}) {
   const rng = mulberry32(opts.seed || 3);
-  const g = new THREE.Group();
+  const g = folkSolid(new THREE.Group());   // (the camp's tents, fire and gear are solid as drawn: solid.js)
   const H = (x, z) => world.heightAt(cx + x, cz + z);
   const add = (m, x, z, y = 0) => { m.position.set(cx + x, H(x, z) + y, cz + z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
   const tentCols = [0x8a3a2a, 0x2f6f8a, 0xc28b2c, 0x5a6a3a];
@@ -399,7 +399,6 @@ export function buildCamp(scene, world, cx, cz, opts = {}) {
     const tent = new THREE.Mesh(new THREE.ConeGeometry(3.2, 3.6, 4, 1, true), toon(tentCols[i % 4], { side: THREE.DoubleSide }));
     tent.rotation.y = r + Math.PI / 4; add(tent, x, z, 1.7);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.2, 5), toon(0x4a2a14)); add(pole, x, z, 2.1);
-    world.col.add(cx + x, cz + z, 2, 2, r, H(x, z) - 1, H(x, z) + 3.4);
   });
   // the cookfire
   const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.25, 5, 12), toon(0x6a6050)); ring.rotation.x = -Math.PI / 2; add(ring, 0, 0, 0.15);
@@ -409,7 +408,6 @@ export function buildCamp(scene, world, cx, cz, opts = {}) {
   const caul = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 8, 0, TAU, Math.PI * 0.35, Math.PI * 0.65), toon(0x3a3a40, { side: THREE.DoubleSide }));
   add(caul, 10, -9, 0.9);
   const caulGlow = glowSprite(0xffa040, 2.4, 0.8); add(caulGlow, 10, -9, 1.3);
-  world.col.add(cx + 10, cz - 9, 0.8, 0.8, 0, H(10, -9) - 1, H(10, -9) + 1.2);
   // crates, sacks, a trader's mat
   for (let i = 0; i < 9; i++) {
     const x = -10 + rng() * 6, z = 2 + rng() * 6;
@@ -428,7 +426,7 @@ export function buildCamp(scene, world, cx, cz, opts = {}) {
     for (const ring of runs) railing(ring, {
       post: (x, y, z, h) => { const m = new THREE.Mesh(postGeo, wood); m.scale.y = h + 0.3; add(m, x, z, h / 2 - 0.15); },
       bar: (x, y, z, len, ry, rz) => { const m = new THREE.Mesh(barGeo, railC); m.scale.x = len; m.rotation.set(0, ry, rz); m.position.set(cx + x, y, cz + z); m.castShadow = true; g.add(m); },
-      col: (x, z, hw, hd, ang, y0, y1) => world.col.add(cx + x, cz + z, hw, 0.1, ang, y0 - 1, y1),
+      col: (x, z, hw, hd, ang, y0, y1) => world.col.add(cx + x, cz + z, hw, hd, ang, y0, y1),
     }, { h: 1.2, bars: [0.5, 0.95], gap: 4 });
   }
   // lanterns on poles

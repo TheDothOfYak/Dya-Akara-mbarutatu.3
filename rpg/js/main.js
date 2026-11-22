@@ -41,7 +41,7 @@ import { createRoad } from './road.js';
 import { createMegla } from './megla.js';
 import { buildCart } from './cart.js';
 import { createCine } from './cine.js';
-import { createSolids, inColliders } from './solid.js';
+import { createSolids, inColliders, noSolid, folkSolid } from './solid.js';
 import { ITEMS, LOOT, add as invAddRaw, takeAll, hasAll, freshInventory, effects, RECIPES, BREWS, FORGE, bindId, ARMS, armOf, armKey } from './items.js';
 import { freshSkills, gainXp, PERKS, SPELLS, SPELL_ORDER, xpForLevel, canTake } from './skills.js';
 import { NPCS, NPC_LOOKS, buildNpc, buildCamp, buildKeilia } from './npcs.js';
@@ -268,8 +268,7 @@ const stones = (world.stones || []).map(s => {
   const m = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 0.5), toon(0x8a8070));
   m.position.set(s.x, y + 0.9, s.z); m.rotation.y = Math.atan2(-s.x, -s.z); m.rotation.z = 0.05; m.castShadow = true; addOutline(m, 0.04);
   const rune = glowSprite(0xffd27a, 1.2, 0.5); rune.position.set(0, 0.4, 0.3); m.add(rune);
-  scene.add(m);
-  world.col.add(s.x, s.z, 0.8, 0.3, m.rotation.y, y - 1, y + 2);
+  scene.add(folkSolid(m));   // (solid as drawn: solid.js)
   return Object.assign({}, s, { y, mesh: m, rune });
 });
 
@@ -1706,8 +1705,7 @@ const board = world.board && hasBoard(REGION) ? (() => {
   parts.forEach(m => { m.castShadow = true; addOutline(m, 0.03); });
   g.position.set(world.board.x, y, world.board.z);
   g.rotation.y = Math.atan2(world.PLAZA.x - world.board.x, world.PLAZA.z - world.board.z);
-  scene.add(g);
-  world.col.add(world.board.x, world.board.z, 1.2, 0.2, g.rotation.y, y - 1, y + 2.6);
+  scene.add(folkSolid(g));
   return { x: world.board.x, y, z: world.board.z, mesh: g };
 })() : null;
 
@@ -1728,8 +1726,7 @@ const jobBoard = REGION === 'property' && world.SITES && world.SITES.yard ? (() 
   parts.forEach(m => { m.castShadow = true; addOutline(m, 0.03); });
   g.position.set(v.x, y, v.z);
   g.rotation.y = Math.atan2(world.SITES.yard.x - v.x, world.SITES.yard.z - v.z);
-  scene.add(g);
-  world.col.add(v.x, v.z, 1.3, 0.45, g.rotation.y, y - 1, y + 2.6);
+  scene.add(folkSolid(g));
   return { x: v.x, y, z: v.z, mesh: g };
 })() : null;
 const jobState = id => SAVE.quests[id];
@@ -1832,7 +1829,7 @@ function takeCrate(c) {
 
 /* ---------------- Aakalay: the last journal, and Skor'Thal ---------------- */
 function pageMesh() {
-  const g = new THREE.Group();
+  const g = noSolid(new THREE.Group());   // a page to pick up, not a thing to bump into
   const paper = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.8), toon(0xf0e4c8, { side: THREE.DoubleSide })); paper.position.y = 0.9; paper.rotation.z = 0.2; g.add(paper);
   const glow = glowSprite(0xb48aff, 2.4, 0.55); glow.position.y = 0.9; g.add(glow);
   return g;
@@ -1851,8 +1848,7 @@ function readPage(pg) {
 /* the Megla Aagac: the one dark tree that grew where Otlið fell — scenery, not a foe */
 if (REGION === 'aakalay') {
   const pz = world.PLAZA, mx = pz.x + 21, mz = pz.z - 21, my = world.heightAt(mx, mz);
-  const megla = buildMeglaAagac({ seed: 31 }); megla.root.scale.setScalar(0.7); megla.root.position.set(mx, my - 0.2, mz); megla.root.rotation.y = 2.2; scene.add(megla.root);
-  world.col.add(mx, mz, 1.3, 1.3, 0, my - 1, my + 14);
+  const megla = buildMeglaAagac({ seed: 31 }); megla.root.scale.setScalar(0.7); megla.root.position.set(mx, my - 0.2, mz); megla.root.rotation.y = 2.2; scene.add(folkSolid(megla.root));   // (solid as drawn: solid.js)
   let mt = 0; G.meglaTick = dt => { mt += dt; megla.animate(dt, { speed: 0, t: mt }); if (megla.glow) megla.glow(G.night || 0); };
 }
 /* Skor'Thal: scarred trees that only answer Nur'Hlyst, then the den in the far north wood */
@@ -2009,7 +2005,7 @@ function amuletSpots() {
   return out;
 }
 function amuletMesh() {
-  const g = new THREE.Group();
+  const g = noSolid(new THREE.Group());   // a thing to pick up, not to bump into
   const gem = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28, 0), toon(0x6af0e0, { emissive: 0x2aa0a0, emissiveIntensity: 0.8 })); addOutline(gem, 0.03); g.add(gem);
   for (const s of [-1, 1]) { const horn = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 5, 10, Math.PI * 0.8), toon(0x9aa8b0)); horn.position.x = s * 0.3; horn.rotation.z = s > 0 ? -0.6 : Math.PI + 0.6; g.add(horn); }
   const glow = glowSprite(0x6af0e0, 1.3, 0.3); g.add(glow);
@@ -2060,8 +2056,7 @@ const storehouse = REGION === 'xilia' ? (() => {
   const parts = []; g.traverse(m => { if (m.isMesh) parts.push(m); }); parts.forEach(m => { m.castShadow = true; addOutline(m, 0.04); });
   g.position.set(x, y, z); g.rotation.y = Math.atan2(world.PLAZA.x - x, world.PLAZA.z - z);
   g.visible = SAVE.quests.q_camp === 'done';
-  scene.add(g);
-  if (g.visible) world.col.add(x, z, 3, 2.2, g.rotation.y, y - 1, y + 3.2);
+  scene.add(folkSolid(g));   // (solid once it's built and shown)
   return g;
 })() : null;
 
@@ -2688,7 +2683,7 @@ const npcs = (NPCS[REGION] || []).filter(def => camp || def.pos).map(def => {
   const yaw = camp ? Math.atan2(world.camp.x - x, world.camp.z - z) : Math.atan2(world.PLAZA.x - x, world.PLAZA.z - z);
   actor.root.rotation.y = yaw;
   scene.add(actor.root);
-  if (!def.wander && !routineFor(def.id, REGION, 12, 0)) world.col.add(x, z, 0.5, 0.5, 0, pos.y - 1, pos.y + 2.4);   // (folk who go about their day don't leave a post behind them)
+  if (!def.wander && !routineFor(def.id, REGION, 12, 0)) world.col.add(x, z, 0.3, 0.3, 0, pos.y, pos.y + 1.8);   // (a body's width, where they stand; folk who go about their day don't leave a post behind them)
   return { def, actor, pos, home: pos.clone(), goal: null, pause: Math.random() * 4, yaw, talking: 0 };
 });
 /* young Tanoc isn't Stamijan yet, and hasn't met Phorus: the folk of Beuhk talk to the Carpenter's boy */
@@ -3014,7 +3009,7 @@ function turnIn(n, qid) {
   if (r.spell) learnSpell(r.spell);
   if (r.points) { SAVE.skills.points += r.points; setTimeout(() => toast(`+${r.points} perk point — press K`, 3), 900); }
   if (r.flag === 'flask_bonus') applyUps(true);
-  if (qid === 'q_camp' && storehouse) { storehouse.visible = true; world.col.add(storehouse.position.x, storehouse.position.z, 3, 2.2, storehouse.rotation.y, storehouse.position.y - 1, storehouse.position.y + 3.2); }
+  if (qid === 'q_camp' && storehouse) storehouse.visible = true;
   if (r.flag === 'mount') makeMount(true);
   persist();
   n.talking = 4;
@@ -4345,7 +4340,6 @@ const passes = (world.passes || []).map(ps => {
       m.position.set(b.x + (Math.random() - 0.5) * 0.2, b.y + 0.5 + k * r * 1.3, b.z + (Math.random() - 0.5) * 0.2); m.rotation.set(k, k * 2, 0); grp.add(m);
     }
     const lamp = glowSprite(0xffc870, 2.2, 0.85); lamp.position.set(b.x, b.y + 4.4, b.z); grp.add(lamp);
-    world.col.add(b.x, b.z, 0.8, 0.8, 0, b.y - 1, b.y + 4);
   }
   // a signpost: where the road goes
   {
@@ -4353,7 +4347,6 @@ const passes = (world.passes || []).map(ps => {
     post.position.set(b.x, b.y + 1.5, b.z); grp.add(post);
     const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), new THREE.MeshToonMaterial({ map: signTexture([ps.name, (ps.dir ? ps.dir + ' · ' : '→ ') + REGION_NAME[ps.to]]), side: THREE.DoubleSide }));
     board.position.set(b.x, b.y + 2.5, b.z); board.rotation.y = Math.atan2(-ps.cx, -ps.sz); grp.add(board);
-    world.col.add(b.x, b.z, 0.25, 0.25, 0, b.y - 1, b.y + 3);
   }
   // mist where the road tops the ridge and runs on out of sight
   // (soft grey sheets lying low over the stones; it used to be glow sprites, which read as floating orbs of light)
@@ -5481,11 +5474,9 @@ function buildStall(ghost) {
 let stallG = null;
 function placeStall() {   // the built stall, wherever it was put
   if (REGION !== 'property' || !F_.stall || stallG) return;
-  const st = F_.stall; stallG = buildStall(false); stallG.position.set(st.x, world.heightAt(st.x, st.z), st.z); stallG.rotation.y = st.yaw; scene.add(stallG);
+  const st = F_.stall; stallG = buildStall(false); stallG.position.set(st.x, world.heightAt(st.x, st.z), st.z); stallG.rotation.y = st.yaw; scene.add(folkSolid(stallG));
   const c = Math.cos(st.yaw), sn = Math.sin(st.yaw), y = stallG.position.y;
   const at = (lx, lz) => [st.x + lx * c + lz * sn, st.z - lx * sn + lz * c];
-  { const [x, z] = at(0, -2.45); world.col.add(x, z, 3.2, 0.2, st.yaw, y - 1, y + 2.8); }
-  for (const s2 of [-1, 1]) { const [x, z] = at(s2 * 3.1, 0); world.col.add(x, z, 0.2, 2.5, st.yaw, y - 1, y + 2.2); }
   world.trees && world.trees.push({ x: st.x, z: st.z, g: y, h: 4.2, r: 0.4 });
 }
 placeStall();
@@ -5506,8 +5497,7 @@ function parkCart() {
   const f = V3(Math.sin(yaw), 0, Math.cos(yaw)), r = V3(f.z, 0, -f.x), wh = (a, b) => world.heightAt(x + f.x * a + r.x * b, z + f.z * a + r.z * b);
   const fl = wh(1.3, -1.32), fr = wh(1.3, 1.32), bl = wh(-1.3, -1.32), br = wh(-1.3, 1.32), y = (fl + fr + bl + br) / 4;
   c.g.rotation.order = 'YXZ';
-  c.g.position.set(x, y, z); c.g.rotation.set(-Math.atan2((fl + fr) / 2 - (bl + br) / 2, 2.6), yaw, Math.atan2((fr + br) / 2 - (fl + bl) / 2, 2.64)); scene.add(c.g);
-  world.col.add(x + Math.sin(yaw) * 0.8, z + Math.cos(yaw) * 0.8, 1.4, 3.6, yaw, y - 1, y + 2.4);
+  c.g.position.set(x, y, z); c.g.rotation.set(-Math.atan2((fl + fr) / 2 - (bl + br) / 2, 2.6), yaw, Math.atan2((fr + br) / 2 - (fl + bl) / 2, 2.64)); scene.add(folkSolid(c.g));
   homeCart = c;
 }
 parkCart();
@@ -5973,8 +5963,7 @@ const festival = REGION === 'xilia' && young() && !F_.megla && apStep() === AP.F
       const l = glowSprite([0xffc070, 0xff8ac8, 0x9adfff, 0xffe08a][(i + k) % 4], 1.1, 0.9); l.position.set(x, y, z); g.add(l); lamps.push(l);
     }
   }
-  scene.add(g);
-  world.col.add(fx, fz, 1.4, 1.4, 0, fy - 1, fy + 3.5);
+  scene.add(folkSolid(g));
   return { g, fire, lamps, x: fx, y: fy, z: fz };
 })() : null;
 
@@ -5994,8 +5983,7 @@ const oldBoat = REGION === 'property' && young() ? (() => {
   const parts = []; g.traverse(m => { if (m.isMesh) parts.push(m); });
   for (const m of parts) { m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.03); }
   g.position.set(x, y - 0.5, z); g.rotation.set(0, 0.4, 0.32);
-  scene.add(g);
-  world.col.add(x, z, 2.4, 7.5, 0.4, y - 1, y + 1.4);
+  scene.add(folkSolid(g));
   return { g, pos: V3(x, y + 0.6, z) };
 })() : null;
 
