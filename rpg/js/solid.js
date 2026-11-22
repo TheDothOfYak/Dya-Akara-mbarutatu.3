@@ -283,10 +283,12 @@ export function createSolids(scene, opts) {
     // gets boxes that fit inside it, band by band up its height — never its bounding box, whose corners stood out
     // past a round thing into thin air
     const upright = g.type === 'BoxGeometry' && Math.abs(e[5]) / Math.max(1e-6, Math.hypot(e[4], e[5], e[6])) > 0.995;
+    const how = bough ? 'bough' : plain && upright ? 'exact' : plain ? 'inside' : 'cut';   // (kept on each box: how it was fitted)
     const parts = bough ? boughBoxes(g, bb, M, Math.min(64, Math.ceil(length / seg)), ay)
       : plain && upright ? [whole]
       : plain ? insideBoxes(g, M)
       : cut(g, Math.min(CELL_MAX, Math.max(CELL, size / 30)) / scale).map(b => worldBox(b, M));
+    for (const w of parts) w.how = how;
     const out = [];
     for (const w of parts) {
       if (w.top - w.bot < 0.02) continue;
@@ -325,7 +327,7 @@ export function createSolids(scene, opts) {
     if (!e.handles) { e.handles = []; e.next = 0; }
     for (; e.next < n; e.next++) {
       if (performance.now() > until) return false;
-      for (const w of boxesOf(o, o.isInstancedMesh ? e.next : null)) { const h = col.add(w.x, w.z, w.hw, w.hd, w.ang, w.bot, w.top); h.auto = true; e.handles.push(h); }
+      for (const w of boxesOf(o, o.isInstancedMesh ? e.next : null)) { const h = col.add(w.x, w.z, w.hw, w.hd, w.ang, w.bot, w.top); h.auto = true; h.how = w.how; e.handles.push(h); }
     }
     e.ready = true; e.off = false;
     return true;
