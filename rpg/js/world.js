@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp, railing } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint as paintMat, waterMaterial } from './gfx.js';   // (paintMat: this file has its own paint(), the land's colouring)
-import { noSolid } from './solid.js';
+import { noSolid, folkSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP, makePass } from './terrain.js';
 export { STEP };
 
@@ -361,7 +361,9 @@ export function buildWorld(scene) {
   }
 
   /* ---------- kits ---------- */
-  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paintMat(toon(0xffffff), 'stone'), 6500);   // the ruins: dressed stone
+  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paintMat(toon(0xffffff), 'stone'), 6500); folkSolid(blocks.mesh);   // the ruins: dressed stone
+  // (the stones, columns, trunks and rocks below are made solid exactly as they're drawn — solid.js, folkSolid — never by a box
+  // placed round them by hand, which stood out past them into thin air)
   // fluted drums: shallow grooves cut round the shaft, and a slight swell in the middle (entasis)
   const colGeo = (() => {
     const g = new THREE.CylinderGeometry(1, 1.08, 1, 40, 6), P = g.attributes.position;
@@ -373,10 +375,10 @@ export function buildWorld(scene) {
     }
     g.computeVertexNormals(); return g;
   })();
-  const columns = new Kit(scene, colGeo, paintMat(toon(0xffffff), 'stone'), 600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paintMat(toon(0xffffff), 'bark', 0.12), 300);
-  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600);
-  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff, {}), 500);
+  const columns = new Kit(scene, colGeo, paintMat(toon(0xffffff), 'stone'), 600); folkSolid(columns.mesh);
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paintMat(toon(0xffffff), 'bark', 0.12), 300); folkSolid(trunks.mesh);
+  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600); noSolid(crowns.mesh);   // leaves: you brush through them (whatever their colour)
+  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff, {}), 500); folkSolid(rocks.mesh);
 
   /* a solid block standing on the ground; registers a collider */
   function block(x, z, w, d, h, ang = 0, color, opts = {}) {
@@ -392,7 +394,6 @@ export function buildWorld(scene) {
     columns.put(x, (g + top) / 2, z, r, top - g, r, 0, rng() * 6, 0, opts.color || pick(STONE));
     blocks.put(x, g + 0.6, z, r * 2.6, 1.2, r * 2.6, 0, 0, 0, pick(STONE));
     if (!opts.broken) blocks.put(x, top + 0.25, z, r * 2.5, 0.5, r * 2.5, 0, 0, 0, pick(STONE));
-    col.add(x, z, r * 0.95, r * 0.95, 0, g, top + 0.5);
     return top;
   }
 
@@ -483,7 +484,6 @@ export function buildWorld(scene) {
     const a = rng() * Math.PI * 2, r = 26 + rng() * 6, x = PLAZA.x + Math.cos(a) * r, z = PLAZA.z + Math.sin(a) * r;
     if (Math.hypot(x - 21, z + 31) < 9) continue;          // the Megla Aagac's ground
     columns.put(x, plazaY + 0.9, z, 1, 7, 1, 0, a, Math.PI / 2, pick(STONE));
-    col.add(x, z, 3.5, 0.9, a, plazaY - 1, plazaY + 1.9);
   }
 
   /* the Oath Stone itself: stygian, runed, five sockets for five memories */
@@ -515,9 +515,7 @@ export function buildWorld(scene) {
   }
   const oathGlow = glowSprite(0x9a5cff, 14, 0.25); oathGlow.position.y = 7; oath.add(oathGlow);
   oath.position.set(PLAZA.x, plazaY, PLAZA.z);
-  scene.add(oath);
-  col.add(PLAZA.x, PLAZA.z, 1.9, 1.9, Math.PI / 4, plazaY - 1, plazaY + 11);
-  col.add(PLAZA.x, PLAZA.z, 6, 6, 0, plazaY - 1, plazaY + 0.5);
+  scene.add(folkSolid(oath));
 
   /* ---------- site: the Drowned Library (west) ---------- */
   {
@@ -578,7 +576,6 @@ export function buildWorld(scene) {
       const pts = [new THREE.Vector3(Math.cos(a) * 2.5, 4, Math.sin(a) * 2.5), new THREE.Vector3(Math.cos(a) * 6, 1.4, Math.sin(a) * 6), new THREE.Vector3(Math.cos(a) * 9.5, -0.6, Math.sin(a) * 9.5)];
       const root = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 10, 1.1, 7), barkMat);
       fireTree.add(root);
-      col.add(x + Math.cos(a) * 6.5, z + Math.sin(a) * 6.5, 1.0, 2.8, -a + Math.PI / 2, g - 1, g + 1.4);
     }
     for (let k = 0; k < 6; k++) {
       const a = k / 6 * Math.PI * 2;
@@ -590,16 +587,15 @@ export function buildWorld(scene) {
     const leaf2 = new THREE.MeshToonMaterial({ color: 0xffb03a, emissive: 0xff7a10, emissiveIntensity: 0.5, gradientMap: ramp() });
     for (let k = 0; k < 16; k++) {
       const a = rng() * Math.PI * 2, r = rng() * 11;
-      const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(4 + rng() * 3.5, 1), rng() < 0.5 ? leaf : leaf2);
+      const blob = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(4 + rng() * 3.5, 1), rng() < 0.5 ? leaf : leaf2));   // (leaves: you brush through them)
       blob.position.set(Math.cos(a) * r, 29 + rng() * 9, Math.sin(a) * r);
       fireTree.add(blob);
     }
     outlineAll(fireTree, 0.12);
     fireTree.traverse(o => { if (o.isMesh && o.name !== 'outline') o.castShadow = true; });
     fireTree.position.set(x, g - 0.5, z);
-    scene.add(fireTree);
+    scene.add(folkSolid(fireTree));
     const glow = glowSprite(0xff8a3a, 60, 0.35); glow.position.set(x, g + 33, z); scene.add(glow);
-    col.add(x, z, 3.3, 3.3, 0, g - 2, g + 30);
     SITES.grove.coreAt = new THREE.Vector3(x - 2, g + 1.5, z + 8.5);
     SITES.grove.emberSrc = new THREE.Vector3(x, g + 30, z);
   }
@@ -621,12 +617,11 @@ export function buildWorld(scene) {
   {
     const { x, z } = SITES.garden, g = heightAt(x, z);
     const basin = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.7, 6, 28), toon(0xcdb08a));
-    basin.rotation.x = -Math.PI / 2; basin.position.set(x, g + 0.5, z); addOutline(basin, 0.05); scene.add(basin);
+    basin.rotation.x = -Math.PI / 2; basin.position.set(x, g + 0.5, z); addOutline(basin, 0.05); scene.add(folkSolid(basin));
     gardenWater = new THREE.Mesh(new THREE.CircleGeometry(5, 28), new THREE.MeshToonMaterial({ color: 0x4fb6c8, emissive: 0x1a5a70, emissiveIntensity: 0.5, gradientMap: ramp() }));
     gardenWater.rotation.x = -Math.PI / 2; gardenWater.position.set(x, g + 0.55, z); scene.add(gardenWater);
     for (let i = 0; i < 8; i++) {
       const a = i / 8 * Math.PI * 2;
-      col.add(x + Math.cos(a) * 5.2, z + Math.sin(a) * 5.2, 1.5, 0.6, -a + Math.PI / 2, g - 1, g + 1.1);
     }
     column(x, z, 0.6, 3.2, { broken: true });
     for (let i = 0; i < 10; i++) {
@@ -666,7 +661,6 @@ export function buildWorld(scene) {
       const r = (1.6 + rng() * 1.3) * s;
       crowns.put(x + (rng() - 0.5) * 2.4 * s, g + h + (rng() - 0.2) * 1.8 * s, z + (rng() - 0.5) * 2.4 * s, r, r * 0.85, r, rng(), rng(), rng(), new THREE.Color(lc).offsetHSL((rng() - 0.5) * 0.04, 0, (rng() - 0.5) * 0.1).getStyle());
     }
-    col.add(x, z, 0.35 * s, 0.35 * s, 0, g - 1, g + h);
   }
   for (let i = 0; i < 520 && trunks.mesh.count < 240; i++) {
     const a = rng() * Math.PI * 2, r = 30 + Math.sqrt(rng()) * 150, x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -681,7 +675,6 @@ export function buildWorld(scene) {
     if (Math.hypot(x, z) > oldEdge(x, z) - 4 || Math.hypot(x - 21, z + 31) < 8 || roadDist(x, z) < 5 || Math.hypot(x - PLAZA.x, z - PLAZA.z) < 32 || CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
     const s = 0.4 + Math.pow(rng(), 3) * 2.6;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(['#a98a6a', '#9a7a5c', '#b8977a', '#8b6e55']));
-    if (s > 0.6) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
   }
 
   /* ---------- the dock and its pier ---------- */
@@ -692,16 +685,15 @@ export function buildWorld(scene) {
     for (let z = dockZ0 - 8; z < pierEnd; z += 1.6) {
       blocks.put(0, pierY - 0.2, z, 6, 0.32, 1.45, 0, (rng() - 0.5) * 0.03, 0, rng() < 0.5 ? wood : '#9a6a40');
     }
-    col.add(0, (dockZ0 - 8 + pierEnd) / 2, 3, (pierEnd - dockZ0 + 8) / 2, 0, pierY - 3, pierY);
+    col.add(0, (dockZ0 - 8 + pierEnd) / 2, 3, (pierEnd - dockZ0 + 8) / 2, 0, pierY - 0.36, pierY - 0.04);   // the planks, as thick as they are (one slab: no feet down the cracks)
     for (let z = dockZ0 - 6; z < pierEnd; z += 6) for (const s of [-1, 1]) {
       blocks.put(s * 3.1, pierY - 6, z, 0.5, 12, 0.5, 0, 0, 0, woodD);
       blocks.put(s * 3.1, pierY + 0.6, z, 0.3, 1.2, 0.3, 0, 0, 0, woodD);
     }
     for (const s of [-1, 1]) {
       blocks.put(s * 3.1, pierY + 1.15, (dockZ0 + pierEnd) / 2, 0.18, 0.15, pierEnd - dockZ0, 0, 0, 0, woodD);
-      col.add(s * 3.25, (dockZ0 + pierEnd) / 2, 0.25, (pierEnd - dockZ0) / 2, 0, pierY - 1, pierY + 1.3);
+      col.add(s * 3.1, (dockZ0 + pierEnd) / 2, 0.09, (pierEnd - dockZ0) / 2, 0, pierY + 1.07, pierY + 1.23);   // the rail, where the rail is (the posts are solid as drawn)
     }
-    col.add(0, pierEnd + 0.3, 3.4, 0.3, 0, pierY - 1, pierY + 1.3);
   }
   PIER_BOX = { hw: 3.6, z0: dockZ0 - 9, z1: pierEnd + 0.6 };
   const lamps = [];
@@ -721,7 +713,7 @@ export function buildWorld(scene) {
     grp.add(top, bottom);
     if (rng() < 0.6) {
       const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, s * 0.8, 6), paintMat(toon(0x6b4128), 'bark', 0.12)); t.position.y = s * 0.5; grp.add(t);
-      const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.35, 1), toon(new THREE.Color(pick(LEAF)), {})); cr.position.y = s; grp.add(cr);
+      const cr = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.35, 1), toon(new THREE.Color(pick(LEAF)), {}))); cr.position.y = s; grp.add(cr);
     }
     outlineAll(grp, 0.12);
     grp.position.set(Math.cos(a) * r, 130 + rng() * 110, Math.sin(a) * r);
@@ -790,16 +782,16 @@ export function buildWorld(scene) {
     const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 3.4, 1, 6), pick(bannerMat));
     flag.geometry.translate(0.8, -1.7, 0);
     flag.position.set(x + 0.1, g + 6.8, z); flag.castShadow = true;
-    flag.userData.ph = rng() * 6; scene.add(flag); banners.push(flag);
+    flag.userData.ph = rng() * 6; scene.add(noSolid(flag)); banners.push(flag);   // (cloth, in the wind: you brush past it)
   }
 
   /* ================= the wider Reach ================= */
   const rng2 = mulberry32(8821);
   const pick2 = a => a[Math.floor(rng2() * a.length)];
-  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), paintMat(toon(0xffffff), 'bark', 0.12), 1500);
-  const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2800);
-  const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400);
-  const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);
+  const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), paintMat(toon(0xffffff), 'bark', 0.12), 1500); folkSolid(wTrunks.mesh);
+  const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2800); noSolid(wCrowns.mesh);   // leaves: you brush through them (whatever their colour)
+  const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400); noSolid(wCones.mesh);   // a pine's needles, like leaves: you brush through them
+  const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900); folkSolid(wRocks.mesh);
   const farTrees = new Kit(scene, new THREE.ConeGeometry(1, 1, 5), toon(0xffffff), 1600, false);
   const reeds = new Kit(scene, new THREE.CylinderGeometry(0.035, 0.07, 1, 3), toon(0xffffff), 1000, false); noSolid(reeds.mesh);   // you wade through reeds, like grass
   const slopeAt = (x, z) => { const h = heightAt(x, z); return Math.max(Math.abs(heightAt(x + 1.5, z) - h), Math.abs(heightAt(x, z + 1.5) - h)) / 1.5; };
@@ -823,14 +815,12 @@ export function buildWorld(scene) {
       wCrowns.put(x + (rng2() - 0.5) * 2.4 * s, g + h + (rng2() - 0.1) * 1.6 * s, z + (rng2() - 0.5) * 2.4 * s, r, r * 0.8, r, rng2() * 3, rng2() * 3, rng2() * 3,
         c.set(lc).offsetHSL((rng2() - 0.5) * 0.03, 0, (rng2() - 0.5) * 0.1).getStyle());
     }
-    col.add(x, z, 0.36 * s, 0.36 * s, 0, g - 1, g + h);
   }
   function pine(x, z, s) {
     const g = heightAt(x, z);
     trees.push({ x, z, g, h: 8 * s, r: 0.3 * s });
     wTrunks.put(x, g + 1.2, z, 0.3 * s, 3, 0.3 * s, 0, 0, 0, '#4a3020');
     wCones.put(x, g + 2 + 4.5 * s, z, 2.2 * s, 9 * s, 2.2 * s, 0, rng2() * 3, 0, pick2(['#55602e', '#6a5a28', '#4a5530', '#7a6a2a']));
-    col.add(x, z, 0.3 * s, 0.3 * s, 0, g - 1, g + 8 * s);
   }
   function deadTree(x, z, s) {
     const g = heightAt(x, z), h = 4 + s * 3.5;
@@ -839,7 +829,6 @@ export function buildWorld(scene) {
       const a = rng2() * TAU, l = (1.6 + rng2() * 2) * s;
       wTrunks.put(x + Math.cos(a) * l * 0.35, g + h * (0.55 + k * 0.15), z + Math.sin(a) * l * 0.35, 0.12 * s, l, 0.12 * s, Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9, '#55504b');
     }
-    col.add(x, z, 0.3 * s, 0.3 * s, 0, g - 1, g + h);
   }
   /* woods, copses and the dead of the ash flats */
   for (let i = 0; i < 14000 && wTrunks.mesh.count < 1300; i++) {
@@ -862,7 +851,6 @@ export function buildWorld(scene) {
     if (reserved.some(q => Math.hypot(x - q.x, z - q.z) < q.r)) continue;
     const s = 0.5 + Math.pow(rng2(), 2.5) * (d > -40 ? 4.5 : 2.6), g = heightAt(x, z);
     wRocks.put(x, g + s * 0.25, z, s * (1 + rng2() * 0.5), s * 0.75, s, rng2() * 3, rng2() * 3, rng2() * 3, pick2(['#8f8a84', '#7d7873', '#a39e97', '#6e6a66', '#9a8a74']));
-    if (s > 0.6 && d < -3) col.add(x, z, s * 0.8, s * 0.8, 0, g - 1, g + s * 0.9);
   }
 
   /* the abandoned outskirts — houses where the city spilled past its walls */
@@ -913,7 +901,6 @@ export function buildWorld(scene) {
       const a = i / 8 * TAU + 0.2, x = B.x + Math.cos(a) * 30, z = B.z + Math.sin(a) * 30, base = Math.max(heightAt(x, z), LEVEL - 0.8);
       const top = base + 2 + rng2() * 6, bot = heightAt(x, z) - 0.5;
       columns.put(x, (bot + top) / 2, z, 0.9, top - bot, 0.9, 0, rng2() * 6, 0, pick(STONE));
-      col.add(x, z, 0.9, 0.9, 0, bot, top);
     }
   }
 

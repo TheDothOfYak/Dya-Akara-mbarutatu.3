@@ -169,6 +169,13 @@ export function createVelki(ctx) {
   const STEP = 0.65, PR = 0.4, PH = 1.5;
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once the town is built
   const homeTrees = [];                   // (hollow, and lived in: each one walkable inside by its own rules, hometree.js)
+  /* you stand on what's drawn, exactly (the boxes solid.js fitted, `auto`): the solids placed by hand below are for folk, who
+     keep to them. They never quite matched what they stood for, and stood out past it into thin air. */
+  function groundYou(x, z, y) {
+    let g = heightAt(x, z);
+    for (const T of homeTrees) g = Math.max(g, T.ground(x, z, y));
+    return Math.max(g, auto.ground(x, z, y));
+  }
   function groundAt(x, z, y) {
     let g = heightAt(x, z);
     for (const T of homeTrees) g = Math.max(g, T.ground(x, z, y));
@@ -180,8 +187,9 @@ export function createVelki(ctx) {
     return g;
   }
   function resolve(p) {
-    if (p === P.pos) auto.resolve(p, PR, PH);   // you, not the folk: they keep to the colliders placed by hand
-    for (const s of solids) {
+    const you = p === P.pos;
+    if (you) auto.resolve(p, PR, PH);   // you: what's drawn, exactly; the folk keep to the solids placed by hand
+    if (!you) for (const s of solids) {
       if (Math.abs(p.x - s.x) > 30 || Math.abs(p.z - s.z) > 30) continue;
       if (!s.on || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (s.kind === 'box') {
@@ -195,10 +203,10 @@ export function createVelki(ctx) {
     for (const T of homeTrees) T.resolve(p, PR);
     // the city wall, a ring with one gap
     const r = Math.hypot(p.x, p.z), a = Math.atan2(p.z, p.x);
-    const inGap = Math.abs(Math.atan2(Math.sin(a - GATE_A), Math.cos(a - GATE_A))) < GATE_W && !(gateBar.on);
-    const WR = wallR(a);
-    if (!inGap && p.y < 9 && r > WR - 1.5 - PR && r < WR + 1.5 + PR) {
-      const to = r < WR ? WR - 1.5 - PR : WR + 1.5 + PR;
+    const inGap = Math.abs(Math.atan2(Math.sin(a - GATE_A), Math.cos(a - GATE_A))) < GATE_W;
+    const WR = wallR(a), half = inGap ? 0.12 : 1.5;   // the wall, as thick as it's drawn; in the gateway, the portcullis while it's down
+    if ((!inGap || gateBar.on) && p.y < 9 && r > WR - half - PR && r < WR + half + PR) {
+      const to = r < WR ? WR - half - PR : WR + half + PR;
       p.x *= to / r; p.z *= to / r;
     }
     // the edge of the world we built, and the sea's
@@ -213,6 +221,9 @@ export function createVelki(ctx) {
     }
     return y < heightAt(x, z) + 0.2 || homeTrees.some(T => T.solid(x, y, z)) || inColliders(auto, x, y, z);
   }
+  // (what solid.js leaves alone as already solid: the land, the home trees' own walls, and itself — not the solids placed by hand
+  // for the folk, or what's under them would never be made solid for you)
+  const solidYou = (x, y, z) => y < heightAt(x, z) + 0.2 || homeTrees.some(T => T.solid(x, y, z)) || inColliders(auto, x, y, z);
 
   /* ---------------- the sea, the far country, the forest, and the home trees ---------------- */
   {
@@ -407,6 +418,7 @@ export function createVelki(ctx) {
   }
   /* the wall, its gate, and the gate's towers */
   const gateBar = { on: true };   // the warden keeps you inside until you've seen it from the top
+  const portcullis = new THREE.Group();
   {
     const wm = paint(toon(0xb8987a), 'brick');   // the city wall is brick, crisp-cornered
     // segment by segment round its whole bowed line, each sat on the ground where it stands
@@ -429,6 +441,12 @@ export function createVelki(ctx) {
       const lamp = glowSprite(0xffa050, 3, 0.9); lamp.position.set(x - s * 2.8, 6, z + 3); scene.add(lamp); lamps.push(lamp);
     }
     const arch = new THREE.Mesh(new THREE.BoxGeometry(11, 2.4, 3.2), wm); arch.position.set(0, 10.2, -WALL_R); addOutline(arch, 0.04); scene.add(arch);
+    // the portcullis, down across the gateway until the warden draws it up: what holds you in is a thing you can see
+    const iron = toon(0x2e2a28), gy = heightAt(0, -WALL_R), span = Math.sin(GATE_W) * WALL_R * 2 + 0.6;
+    for (let x = -span / 2; x <= span / 2 + 1e-6; x += 0.55) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 9.2, 0.14), iron); b.position.set(x, gy + 4.4, -WALL_R); portcullis.add(b); }
+    for (const y of [1.2, 4.4, 7.6]) { const b = new THREE.Mesh(new THREE.BoxGeometry(span, 0.16, 0.18), iron); b.position.set(0, gy + y, -WALL_R); portcullis.add(b); }
+    for (const m of [...portcullis.children]) addOutline(m, 0.02);
+    scene.add(portcullis);
   }
   /* banners on the wall, streaming toward the battle */
   const banners = [];
@@ -562,7 +580,7 @@ export function createVelki(ctx) {
   let hasCloak = ctx.at === 'spire';
   const CLOAK = 0x9a3a1a;
   if (hasCloak) tanoc.setCape(CLOAK);
-  P.pos.y = Math.max(groundAt(P.pos.x, P.pos.z, 5), auto.ground(P.pos.x, P.pos.z, 5));
+  P.pos.y = groundYou(P.pos.x, P.pos.z, 5);
   CAM.yaw = 0; CAM.pitch = 0.18;
   const camPos = V3(2.5, 4, 54), camTgt = V3();
 
@@ -624,7 +642,7 @@ export function createVelki(ctx) {
   }
 
   function startGateStage() {
-    stage = 'gate'; gateBar.on = false; setBeacon();
+    stage = 'gate'; gateBar.on = false; portcullis.visible = false; setBeacon();   // (the warden draws the gate up)
     crew.forEach(c => { c.run = true; });
     ctx.objective(STORY.PRO_OBJ.gate, 'Walk out of the north gate. Nobody can make you.');
   }
@@ -697,7 +715,7 @@ export function createVelki(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;
-    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
+    const g = groundYou(P.pos.x, P.pos.z, P.pos.y);
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) {
       if (!P.onGround && P.vel.y < -8) sfx.land();
       P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12;
@@ -869,7 +887,7 @@ export function createVelki(ctx) {
     ], () => { camPos.copy(camera.position); done && done(); });
   }
 
-  const allSolid = createSolids(scene, { col: auto, heightAt, solidAt, focus: () => P.pos, reach: (x, z) => Math.hypot(x, z) < 325 });   // (resolve keeps you inside 320)
+  const allSolid = createSolids(scene, { col: auto, heightAt, solidAt: solidYou, focus: () => P.pos, reach: (x, z) => Math.hypot(x, z) < 325 });   // (resolve keeps you inside 320)
 
   function dispose() {
     scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });

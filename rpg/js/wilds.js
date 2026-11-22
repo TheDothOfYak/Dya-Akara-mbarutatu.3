@@ -168,7 +168,6 @@ export function createWilds(ctx) {
   const trees = (world.albaliSpots || []).map((p, i) => {
     const t = buildAlbaliAagac({ seed: 40 + i });
     const y = world.heightAt(p.x, p.z); t.root.position.set(p.x, y, p.z); t.root.rotation.y = i * 1.7; scene.add(t.root);
-    if (world.col) world.col.add(p.x, p.z, 0.9, 0.9, 0, y - 1, y + 6);
     return { ...p, y, t, next: 30 + Math.random() * 90, fruits: [], byrds: 0 };
   });
   const tame = region !== 'leotik';

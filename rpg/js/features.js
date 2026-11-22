@@ -60,7 +60,6 @@ export function buildFeatures(scene, world, region, save) {
   const chests = spots(world, rng, 11, { rMin: 30, rMax: 165, gap: 30 }).map((p, i) => {
     const id = region + '_chest_' + i;
     const m = chestMesh(); m.position.set(p.x, p.y, p.z); m.rotation.y = rng() * TAU; scene.add(m);
-    world.col.add(p.x, p.z, 0.65, 0.42, m.rotation.y, p.y - 1, p.y + 0.9);
     const loot = CHEST_LOOT[region] || CHEST_LOOT.xilia;
     const a = loot[Math.floor(rng() * loot.length)], b = loot[Math.floor(rng() * loot.length)];
     const c = { id, x: p.x, y: p.y, z: p.z, mesh: m, open: !!picked[id], items: { [a[0]]: a[1] }, shards: 20 + Math.floor(rng() * 40), seed: i % 4 === 0 };
@@ -133,7 +132,6 @@ export function buildFeatures(scene, world, region, save) {
     const disk = new THREE.Mesh(new THREE.CylinderGeometry(11, 11.5, 0.4, 32), stoneMat); disk.position.y = -0.05; disk.receiveShadow = true; g.add(disk);
     const altar = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.1, 1.2, 6), toon(0x3a3048)); altar.position.y = 0.6; addOutline(altar, 0.04); g.add(altar);
     const rune = glowSprite(0x7ad8ff, 2.2, done ? 0.15 : 0.8); rune.position.y = 1.6; g.add(rune);
-    world.col.add(x, z, 0.9, 0.9, 0, y - 1, y + 1.2);
     const t = { ...T, x, y, z, group: g, rune, done, active: false, timer: 0, parts: [], seq: [], step: 0, showT: 0 };
     if (T.kind === 'chime') {
       const cols = [0xff6a5a, 0x5ad86a, 0x5aa8ff, 0xffd05a];
@@ -141,7 +139,6 @@ export function buildFeatures(scene, world, region, save) {
         const a = i / 4 * TAU + Math.PI / 4;
         const m = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 2.6, 6), new THREE.MeshToonMaterial({ color: cols[i], emissive: cols[i], emissiveIntensity: 0.1, gradientMap: ramp() }));
         m.position.set(Math.cos(a) * 6.5, 1.3, Math.sin(a) * 6.5); addOutline(m, 0.05); g.add(m);
-        world.col.add(x + Math.cos(a) * 6.5, z + Math.sin(a) * 6.5, 0.6, 0.6, 0, y - 1, y + 2.6);
         t.parts.push({ mesh: m, x: x + Math.cos(a) * 6.5, z: z + Math.sin(a) * 6.5, glow: 0, i });
       }
     } else if (T.kind === 'brazier') {
@@ -156,7 +153,6 @@ export function buildFeatures(scene, world, region, save) {
       }
     } else if (T.kind === 'duat') {
       const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 9, 6), toon(0x2a2236)); pillar.position.y = 4.5; addOutline(pillar, 0.05); g.add(pillar);
-      world.col.add(x, z, 0.8, 0.8, 0, y - 1, y + 9);
     }
     return t;
   });

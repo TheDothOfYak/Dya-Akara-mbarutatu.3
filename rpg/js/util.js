@@ -59,7 +59,10 @@ export function tiltUp(camera, pitch) {
 
 /* a hand-rail along a run of points [x, y, z] (the walking surface under the rail): a post at each point (and
    between them, on a long span, so they're never more than `gap` apart), a bar
-   over their tops, and a collider under each span so nobody walks off through it. The callers draw and block:
+   over their tops, and a collider along each bar, exactly where the bar is (it stops you as the bar would: you can't
+   duck under a rail at hip height), so nobody walks off through it. The posts are solid as drawn (solid.js). On a
+   sloping span the bar's collider steps up in short lengths, so it never stands out above or below the bar.
+   The callers draw and block:
    `post(x, y, z, h)` stands a post of height h on (x, y, z); `bar(x, y, z, len, ry, rz)` is a bar centred on
    (x, y, z) lying along its local x, tipped up by rz and turned by ry; `col(x, z, hw, hd, ang, y0, y1)` blocks.
    A fence is the same thing with taller posts further apart and more than one bar (`bars`: their heights) */
@@ -72,6 +75,12 @@ export function railing(pts, { post, bar, col }, { h = 0.95, gap = 1.2, bars = [
     for (const hb of bars) bar(mx, (ay + by) / 2 + hb, mz, Math.hypot(run, by - ay) + 0.08, ry, rz);
     const n = Math.ceil(run / gap);
     for (let k = 1; k < n; k++) post(ax + dx * k / n, ay + (by - ay) * k / n, az + dz * k / n, h);
-    if (col) col(mx, mz, run / 2, 0.1, ry, Math.min(ay, by), Math.max(ay, by) + h + 0.05);
+    if (col) {
+      const k = Math.max(1, Math.ceil(Math.abs(by - ay) / 0.12));
+      for (const hb of bars) for (let q = 0; q < k; q++) {
+        const f0 = q / k, f1 = (q + 1) / k, y0 = ay + (by - ay) * f0 + hb, y1 = ay + (by - ay) * f1 + hb;
+        col(ax + dx * (f0 + f1) / 2, az + dz * (f0 + f1) / 2, run / k / 2 + (q === 0 || q === k - 1 ? 0.04 : 0), 0.07, ry, Math.min(y0, y1) - 0.06, Math.max(y0, y1) + 0.06);
+      }
+    }
   }
 }

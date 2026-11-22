@@ -16,7 +16,7 @@
 import * as THREE from 'three';
 import { mulberry32, fbm, smooth, lerp, clamp } from './util.js';
 import { toon, ramp, glowSprite, outlineAll, addOutline, paint } from './gfx.js';
-import { noSolid } from './solid.js';
+import { noSolid, folkSolid } from './solid.js';
 import { Colliders, Kit, buildGrass, STEP } from './terrain.js';
 export { STEP };
 
@@ -431,15 +431,17 @@ export function buildLeotik(scene) {
   }
 
   /* ---------- kits ---------- */
-  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 3600);
-  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.13), 1300);
-  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 2400);
-  const crownsLo = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2600, false);
-  const fronds = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 2000, false);
-  const fronds2 = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 3200, false);
+  const blocks = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 3600); folkSolid(blocks.mesh);
+  // (what's drawn here is solid exactly as drawn — solid.js; folkSolid for what folk walk round too. No box gets placed
+  // round a drawn thing by hand: those never matched it, and stood out past it into thin air)
+  const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.13), 1300); folkSolid(trunks.mesh);
+  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 2400); noSolid(crowns.mesh);   // leaves: you brush through them (whatever their colour)
+  const crownsLo = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2600, false); noSolid(crownsLo.mesh);   // leaves: you brush through them (whatever their colour)
+  const fronds = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 2000, false); noSolid(fronds.mesh);   // palm fronds, like leaves: you brush through them
+  const fronds2 = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 3200, false); noSolid(fronds2.mesh);
   const shrooms = new Kit(scene, new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshToonMaterial({ color: 0xffffff, emissive: 0x2a4a6a, emissiveIntensity: 0.7, gradientMap: ramp() }), 600, false);
   const stems = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 6), toon(0xe8e0d0), 600, false);
-  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1000);
+  const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1000); folkSolid(rocks.mesh);
   const lava = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), 400, false);
 
   function block(x, z, w, d, h, ang = 0, color, opts = {}) {
@@ -497,7 +499,6 @@ export function buildLeotik(scene) {
       const vl = 3 + rng() * 5;
       blocks.put(x + (rng() - 0.5) * 5 * s, g + h - vl / 2, z + (rng() - 0.5) * 5 * s, 0.08, vl, 0.08, 0, 0, 0, '#2f5a2a');
     }
-    col.add(x, z, 0.5 * s, 0.5 * s, 0, g - 1, g + h);
   }
   function fern(x, z, s, kit = fronds) {
     const g = heightAt(x, z);
@@ -524,7 +525,6 @@ export function buildLeotik(scene) {
       const a = k / 7 * Math.PI * 2 + rng() * 0.4;
       fronds2.put(px + Math.cos(a) * 1.4 * s, py - 0.3 * s, pz + Math.sin(a) * 1.4 * s, 0.45 * s, 3.4 * s, 0.06 * s, Math.cos(a) * 1.9, 0, -Math.sin(a) * 1.9, pick(['#4a8a3a', '#3f7a34', '#5a9a40']));
     }
-    col.add(x, z, 0.3 * s, 0.3 * s, 0, g - 1, g + 3);
   }
   // the old heart's jungle (unchanged)
   for (let i = 0; i < 900 && trunks.mesh.count < 300; i++) {
@@ -543,7 +543,6 @@ export function buildLeotik(scene) {
     if (coastD(x, z) < 4 || roadDist(x, z) < 5 || CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r)) continue;
     const s = 0.5 + Math.pow(rng(), 3) * 3;
     rocks.put(x, heightAt(x, z) + s * 0.3, z, s * (1 + rng() * 0.5), s * 0.7, s, rng() * 3, rng() * 3, rng() * 3, pick(STONE));
-    if (s > 0.6) col.add(x, z, s * 0.8, s * 0.8, 0, heightAt(x, z) - 1, heightAt(x, z) + s * 0.9);
   }
 
   /* ---------- the new country: jungle valleys, palms, rocky shores ---------- */
@@ -726,8 +725,7 @@ export function buildLeotik(scene) {
   const portal = new THREE.Mesh(new THREE.CircleGeometry(5.3, 40), portalMat); portal.position.y = 7; urverk.add(portal);
   const base = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 4), paint(toon(0x5a5650), 'stone')); base.position.y = 0.3; addOutline(base, 0.06); urverk.add(base);
   urverk.position.set(KEEP.x, kg, KEEP.z - 18);
-  scene.add(urverk);
-  col.add(KEEP.x, KEEP.z - 18, 7, 2, 0, kg - 1, kg + 13);
+  scene.add(folkSolid(urverk));
 
   /* ---------- the three Klug pillars ---------- */
   const klugTex = (() => {
@@ -752,8 +750,7 @@ export function buildLeotik(scene) {
     const p = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.7, 12, 6), m); p.position.y = 6; addOutline(p, 0.08); grp.add(p);
     const tip = new THREE.Mesh(new THREE.OctahedronGeometry(1.2, 0), m); tip.position.y = 12.8; addOutline(tip, 0.06); grp.add(tip);
     const glow = glowSprite(0xb48aff, 9, 0.0); glow.position.y = 9; grp.add(glow);
-    grp.position.set(ps.x, g - 0.3, ps.z); scene.add(grp);
-    col.add(ps.x, ps.z, 1.6, 1.6, 0, g - 1, g + 13);
+    grp.position.set(ps.x, g - 0.3, ps.z); scene.add(folkSolid(grp));
     pillars.push({ key: ps.key, x: ps.x, z: ps.z, y: g, mat: m, glow, woken: false });
   }
 
@@ -761,16 +758,15 @@ export function buildLeotik(scene) {
   {
     const wood = '#6a4a30', woodD = '#4a3020';
     for (let z = dockZ0 - 8; z < pierEnd; z += 1.6) blocks.put(0, pierY - 0.2, z, 6, 0.32, 1.45, 0, (rng() - 0.5) * 0.03, 0, rng() < 0.5 ? wood : '#7a5634');
-    col.add(0, (dockZ0 - 8 + pierEnd) / 2, 3, (pierEnd - dockZ0 + 8) / 2, 0, pierY - 3, pierY);
+    col.add(0, (dockZ0 - 8 + pierEnd) / 2, 3, (pierEnd - dockZ0 + 8) / 2, 0, pierY - 0.36, pierY - 0.04);   // the planks, as thick as they are
     for (let z = dockZ0 - 6; z < pierEnd; z += 6) for (const s of [-1, 1]) {
       blocks.put(s * 3.1, pierY - 6, z, 0.5, 12, 0.5, 0, 0, 0, woodD);
       blocks.put(s * 3.1, pierY + 0.6, z, 0.3, 1.2, 0.3, 0, 0, 0, woodD);
     }
     for (const s of [-1, 1]) {
       blocks.put(s * 3.1, pierY + 1.15, (dockZ0 + pierEnd) / 2, 0.18, 0.15, pierEnd - dockZ0, 0, 0, 0, woodD);
-      col.add(s * 3.25, (dockZ0 + pierEnd) / 2, 0.25, (pierEnd - dockZ0) / 2, 0, pierY - 1, pierY + 1.3);
+      col.add(s * 3.1, (dockZ0 + pierEnd) / 2, 0.09, (pierEnd - dockZ0) / 2, 0, pierY + 1.07, pierY + 1.23);   // the rail, where the rail is
     }
-    col.add(0, pierEnd + 0.3, 3.4, 0.3, 0, pierY - 1, pierY + 1.3);
     // the old stone quay the pier springs from, and a broken breakwater across the cove
     const qz = COVE.z - COVE.r;
     for (let x = -19; x <= 19; x += 2.6) {
@@ -780,7 +776,6 @@ export function buildLeotik(scene) {
     }
     for (const s of [-1, 1]) {
       blocks.put(s * 4.4, 1.2, qz - 1, 0.7, 1.6, 0.7, 0, 0, 0, '#5f5c52');   // bollards
-      col.add(s * 4.4, qz - 1, 0.35, 0.35, 0, 0, 2);
     }
     for (let k = 0; k < 14; k++) {
       const a = Math.PI * 0.62 + k * 0.035, x = COVE.x - 58 + Math.cos(a) * 16 + k * 2.2, z = COVE.z - 30 + k * 4.6;
@@ -820,7 +815,7 @@ export function buildLeotik(scene) {
       const ta = r2() * Math.PI * 2, tr = r2() * s * 0.6, th = s * (0.5 + r2() * 0.5);
       const tx = Math.cos(ta) * tr, tz = Math.sin(ta) * tr;
       const tk = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.035, s * 0.06, th, 6), trunkM); tk.position.set(tx, s * 0.17 + th / 2, tz); grp.add(tk);
-      const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * (0.22 + r2() * 0.14), 1), crownM); cr.scale.y = 0.8; cr.position.set(tx, s * 0.17 + th, tz); grp.add(cr);
+      const cr = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(s * (0.22 + r2() * 0.14), 1), crownM)); cr.scale.y = 0.8; cr.position.set(tx, s * 0.17 + th, tz); grp.add(cr);
     }
     const rootM = toon(0x3a2e24);
     for (let k = 0; k < 7; k++) {

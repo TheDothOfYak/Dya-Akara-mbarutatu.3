@@ -229,6 +229,8 @@ function taperTube(pts, r0, r1, tubular = 16, radial = 6) {
   for (let j = 0; j < radial; j++) idx.push(tubular * radial + j, tipI, tubular * radial + (j + 1) % radial);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  // (its centreline and radii, so solid.js can fill it from the inside like any other tube)
+  g.userData.tube = { pts: Array.from({ length: tubular + 1 }, (_, i) => { curve.getPointAt(i / tubular, P); return [P.x, P.y, P.z]; }), r0, r1, radial };
   return g;
 }
 /* rounded tapered capsule from y=0 to y=L (r0 at the base, r1 at the tip) */
@@ -967,8 +969,8 @@ export function buildAlbaliAagac(opts = {}) {
     add(root, taperTube([[0, y, 0], [dx * 1.6 * l, y + 1.4, dz * 1.6 * l], [dx * 3.0 * l, y + 2.9, dz * 3.0 * l]], 0.36, 0.14, 10, 7), barkM);
   });
   add(root, taperTube([[0, 4.8, 0], [0.2, 6.5, -0.2], [0, 7.8, 0.1]], 0.38, 0.16, 8, 7), barkM);
-  // broad round canopy of lumpy blobs
-  const canopy = new THREE.Group(); root.add(canopy);
+  // broad round canopy of lumpy blobs (leaves: you brush through them)
+  const canopy = noSolid(new THREE.Group()); root.add(canopy);
   const blobs = [[0, 8.4, 0, 3.7]];
   for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + 0.3; blobs.push([Math.sin(a) * 3.9, 7.4 + rnd() * 0.8, Math.cos(a) * 3.9, 2.6 + rnd() * 0.5]); }
   for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + 1; blobs.push([Math.sin(a) * 1.8, 10.1, Math.cos(a) * 1.8, 2.0]); }
@@ -1283,8 +1285,8 @@ export function buildMeglaAagac(opts = {}) {
     add(root, taperTube(p, 0.65, 0.12, 14, 7), woodM);
     tips.push(p[3]);
   }
-  // dark canopy masses
-  const canopy = new THREE.Group(); root.add(canopy);
+  // dark canopy masses (leaves: you brush through them)
+  const canopy = noSolid(new THREE.Group()); root.add(canopy);
   const blobs = [[0, 16.5, 0, 4.8]];
   tips.forEach(([x, y, z]) => blobs.push([x * 1.15, y + 0.4, z * 1.15, 3.2 + rnd() * 0.8]));
   for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.8; blobs.push([Math.sin(a) * 3, 18.4, Math.cos(a) * 3, 2.4]); }

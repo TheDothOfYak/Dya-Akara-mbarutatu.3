@@ -40,7 +40,7 @@ import { latchAlongRay } from './vines.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
 import { Colliders } from './terrain.js';
-import { createSolids, inColliders } from './solid.js';
+import { createSolids, inColliders, noSolid } from './solid.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -136,15 +136,18 @@ export function createMegla(ctx) {
   const near = (x, z) => grid.get(Math.floor(x / CELL) + ',' + Math.floor(z / CELL)) || [];
   const inside = (s, x, z) => (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r);
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
-  function groundAt(x, z, y) {
+  /* you stand on and bump into what's drawn, exactly (the boxes solid.js fitted, `auto`), and the few solids here that move with
+     what they stand for (marked .you: the boulders); the rest, placed by hand, are for the folk, who keep to them */
+  function groundAt(x, z, y, you = false) {
     let g = heightAt(x, z);
-    for (const s of near(x, z)) { if (s.off || s.y1 > y + STEP || s.y1 <= g) continue; if (inside(s, x, z)) g = s.y1; }
-    return g;
+    for (const s of near(x, z)) { if (s.off || (you && !s.you) || s.y1 > y + STEP || s.y1 <= g) continue; if (inside(s, x, z)) g = s.y1; }
+    return you ? Math.max(g, auto.ground(x, z, y)) : g;
   }
   function resolve(p, rad = PR) {
-    if (p === P.pos) auto.resolve(p, rad, PH);   // you, not the folk: they keep to the colliders placed by hand
+    const you = p === P.pos;
+    if (you) auto.resolve(p, rad, PH);
     for (const s of near(p.x, p.z)) {
-      if (s.off || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
+      if (s.off || (you && !s.you) || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (s.kind === 'box') {
         const dx = p.x - s.x, dz = p.z - s.z, ox = s.hw + rad - Math.abs(dx), oz = s.hd + rad - Math.abs(dz);
         if (ox > 0 && oz > 0) { if (ox < oz) p.x += Math.sign(dx || 1) * ox; else p.z += Math.sign(dz || 1) * oz; }
@@ -168,6 +171,9 @@ export function createMegla(ctx) {
     for (const s of near(x, z)) { if (s.off || y < s.y0 || y > s.y1) continue; if (inside(s, x, z)) return true; }
     return y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
   }
+  // (what solid.js leaves alone as already solid: the land and itself — not the folk's hand-placed solids, or what's under them
+  // would never be made solid for you)
+  const solidYou = (x, y, z) => y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
 
   /* ---------------- the ground ---------------- */
   {
@@ -202,8 +208,8 @@ export function createMegla(ctx) {
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _c = new THREE.Color();
   const put = (k, x, y, z, sx, sy, sz, rx, ry, rz, color) => { if (k.count >= k.instanceMatrix.count) return; _e.set(rx, ry, rz); _q.setFromEuler(_e); _m.compose(V3(x, y, z), _q, V3(sx, sy, sz)); k.setMatrixAt(k.count, _m); k.setColorAt(k.count, _c.set(color)); k.count++; };
   const trunks = kit(new THREE.CylinderGeometry(0.7, 1, 1, 9, 1, true), paint(toon(0xffffff), 'bark', 0.12), 1400);
-  const cones = kit(new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 2600);
-  const blobs = kit(new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
+  const cones = noSolid(kit(new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 2600));   // leaves and needles: you brush through them
+  const blobs = noSolid(kit(new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600));   // leaves and needles: you brush through them
   const rocks = kit(new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);
   const ferns = kit(new THREE.ConeGeometry(1, 1, 5), toon(0xffffff), 4000);
   const stones = kit(new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 1400, true);
@@ -302,7 +308,7 @@ export function createMegla(ctx) {
       const tx = x + sx * (h + 4), tz = z + sz * (h + 4), tg = heightAt(tx, tz);
       mk(new THREE.CylinderGeometry(1.3, 2.0, 24, 10), toon(0x3a2e2a), tx, tg + 12, tz);
       const plat = mk(new THREE.CylinderGeometry(3.2, 3.2, 0.4, 12), toon(0x4a3a30), tx, tg + 13, tz);
-      for (let k = 0; k < 3; k++) mk(new THREE.IcosahedronGeometry(5 + k, 1), keepMats.leaf, tx + (k - 1) * 3, tg + 19 + k * 2, tz + (k % 2) * 2);
+      for (let k = 0; k < 3; k++) noSolid(mk(new THREE.IcosahedronGeometry(5 + k, 1), keepMats.leaf, tx + (k - 1) * 3, tg + 19 + k * 2, tz + (k % 2) * 2));
       cyl(tx, tz, 1.8, tg - 1, tg + 12.6); cyl(tx, tz, 3.2, tg + 12.6, tg + 13.2);
       towers.push({ x: tx, z: tz, g: tg, top: tg + 13.2, plat });
     }
@@ -335,12 +341,19 @@ export function createMegla(ctx) {
       m.position.set(x, g + r * 0.6, zz); m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.04); scene.add(m);
       let crack = null;
       if (i === 2) { crack = glowSprite(0xff8a3a, 2.4, 0.15); crack.position.set(x, g + r * 0.9, zz + r * 0.7); scene.add(crack); }
-      rockfall.push({ i, x, z: zz, g, r, m, crack, s: cyl(x, zz, r * 0.95, g - 1, g + r * 1.4), done: false, hits: 0 });
+      // (solid inside the boulder: a broad drum under its shoulders and a narrow one up into its crown — it moves, so it
+      // keeps its own solids, and they go when it does)
+      rockfall.push({ i, x, z: zz, g, r, m, crack, s: Object.assign(cyl(x, zz, r * 0.72, g - 1, g + r * 1.12), { you: true }), s2: Object.assign(cyl(x, zz, r * 0.42, g - 1, g + r * 1.32), { you: true }), done: false, hits: 0 });
     });
     // and the heap either side, up the walls of the pass: too loose to climb
     for (let k = 0; k < 40; k++) {
       const side = k % 2 ? 1 : -1, lat = 13 + rng() * 45, x = px + side * lat, zz = z + (rng() - 0.5) * 10, g = heightAt(x, zz), sz = 1.2 + rng() * 2.6;
       put(rocks, x, g + sz * 0.4, zz, sz * 1.2, sz * 0.9, sz, rng() * 3, rng() * 3, rng() * 3, pick(['#8a8478', '#7a766e', '#6a665e']));
+    }
+    // and banked solid from the boulders to the walls of the pass, two rows deep: what stops you going round is scree you can see
+    for (const side of [-1, 1]) for (let lat = 10.5; lat < 27.5; lat += 1.6) for (const row of [0, 1]) {
+      const x = px + side * (lat + row * 0.8), zz = z + 0.6 + row * 1.9 + (rng() - 0.5) * 0.5, g = heightAt(x, zz), sz = 1.5 + rng() * 0.7;
+      put(rocks, x, g + sz * 0.45, zz, sz * 1.25, sz * 0.95, sz * 1.1, rng() * 0.6, rng() * 3, rng() * 0.6, pick(['#8a8478', '#7a766e', '#6a665e']));
     }
   }
   /* the old walkers' cairns, up in the mist */
@@ -649,7 +662,7 @@ export function createMegla(ctx) {
   }
   function updateSlide(dt) {
     const S = P.slide; S.t += dt; const k = Math.min(1, S.t / 0.55);
-    P.pos.x = lerp(S.from.x, S.to.x, k); P.pos.z = lerp(S.from.z, S.to.z, k); P.pos.y = groundAt(P.pos.x, P.pos.z, P.pos.y + 1);
+    P.pos.x = lerp(S.from.x, S.to.x, k); P.pos.z = lerp(S.from.z, S.to.z, k); P.pos.y = groundAt(P.pos.x, P.pos.z, P.pos.y + 1, true);
     tanoc.body && (tanoc.body.rotation.x = -Math.sin(k * Math.PI) * 1.1);
     particles.emit(P.pos.x, P.pos.y + 0.1, P.pos.z, { vx: 0, vy: 1, vz: 0, color: 0xc8a070, size: 0.5, life: 0.4, drag: 1 });
     if (!S.hit && k > 0.45) {
@@ -736,7 +749,7 @@ export function createMegla(ctx) {
       // she hauls: you leave the ground and go, even from a standstill
       const fx = S.A.x - P.pos.x, fz = S.A.z - P.pos.z, fd = Math.hypot(fx, fz) || 1, hv = Math.hypot(P.vel.x, P.vel.z);
       if (hv < 15 && !keys.KeyX) { P.vel.x += fx / fd * (15 - hv); P.vel.z += fz / fd * (15 - hv); }
-      if (P.onGround || P.pos.y - groundAt(P.pos.x, P.pos.z, P.pos.y) < 1.5) P.vel.y = Math.max(P.vel.y, 7);
+      if (P.onGround || P.pos.y - groundAt(P.pos.x, P.pos.z, P.pos.y, true) < 1.5) P.vel.y = Math.max(P.vel.y, 7);
       P.onGround = false; P.coyote = 0;
       S.L = V3(P.pos.x, P.pos.y + SW.hip, P.pos.z).distanceTo(S.A);
     }
@@ -787,7 +800,7 @@ export function createMegla(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos, P.ride ? 0.9 : PR);
     P.pos.y += P.vel.y * dt;
-    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
+    const g = groundAt(P.pos.x, P.pos.z, P.pos.y, true);
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12; }
     else if (P.onGround && P.pos.y - g < 1.2 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; }
     else P.onGround = false;
@@ -935,7 +948,7 @@ export function createMegla(ctx) {
   /* ---- the rockfall: her vines haul three boulders off the road; the split one wants fire ---- */
   const crackRock = () => rockfall.find(r => r.i === 2 && !r.done && stage === 'rocks');
   function clearRock(r) {
-    r.done = true; r.s.off = true;
+    r.done = true; r.s.off = true; r.s2.off = true;
     if (r.crack) scene.remove(r.crack);
     const left = rockfall.filter(q => !q.done).length;
     objective(M.rockObj(4 - left), M.rockHint, 4, 4 - left);
@@ -974,8 +987,7 @@ export function createMegla(ctx) {
     clearRock(r);
   }
   function rocksTick() {
-    if (P.pos.z < ROCK_Z + 6.5 && rockfall.some(r => !r.done)) {
-      P.pos.z = ROCK_Z + 6.5; P.vel.z = Math.max(0, P.vel.z);
+    if (P.pos.z < ROCK_Z + 6.5 && rockfall.some(r => !r.done)) {   // (the boulders and the banked scree stop you: no line drawn in the air)
       if (t - (D.blockT ?? -9) > 6) { D.blockT = t; ctx.bark('tanoc15', M.rockBlock, 3.5); }
     }
   }
@@ -1600,7 +1612,7 @@ export function createMegla(ctx) {
     D = {};
     const toClearing = () => { place(P, pathX(PASS1 - 30), PASS1 - 30, Math.PI); rodakPack(6, pathX(EDGE_Z) + 6, EDGE_Z + 2); };
     const rideFrom = z => { stage = 'ride'; sub = 'ride'; setLook('day', true); P.ride = true; K.on = true; place(P, pathX(z), z, Math.PI); D = { said: 2 }; objective('Ride north up the river pass', 'Shift to gallop — follow the river'); setGoal(CLEAR.x, heightAt(CLEAR.x, CLEAR.z), CLEAR.z); ctx.play(); };
-    const rocksDone = () => { for (const r of rockfall) { r.done = true; r.s.off = true; r.m.visible = false; if (r.crack) scene.remove(r.crack); } };
+    const rocksDone = () => { for (const r of rockfall) { r.done = true; r.s.off = true; r.s2.off = true; r.m.visible = false; if (r.crack) scene.remove(r.crack); } };
     const mistDone = () => { for (const c of cairns) { c.lit = true; c.glow.material.opacity = 0.85; } };
     if (at === 'rocks') { rideFrom(ROCK_Z + 50); return; }
     if (at === 'mist') { rocksDone(); rideFrom(MIST_Z0 + 30); D.rocks = 'done'; return; }
@@ -1627,7 +1639,7 @@ export function createMegla(ctx) {
   buildAnimal(); trail.forEach(g => { g.material.opacity = 0; });
 
   const allSolid = createSolids(scene, {
-    col: auto, heightAt, solidAt, focus: () => P.pos,
+    col: auto, heightAt, solidAt: solidYou, focus: () => P.pos,
     // where resolve lets you go: either side of the path, as far as the land's own walls
     reach: (x, z) => { const zz = zoneOf(z), lim = zz === 'pass' || zz === 'foot' ? 26 : zz === 'clear' ? 80 : 74; return z < 15 && z > END_Z + 5 && Math.abs(x - pathX(z)) < lim + 3; },
   });

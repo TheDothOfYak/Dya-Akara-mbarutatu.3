@@ -115,8 +115,30 @@ function brushTexture() {
 const BRUSH = { value: null };
 
 /* ---------------- shading ---------------- */
+/* things that hang (vines, strands, threads, the pods on their tips) swing in the wind like pendulums from where they
+   hang: aHang = (the height they hang from, their own phase, their own pace). Each point moves by how far below that
+   height it is, so a strand stays a strand and whatever hangs off its tip goes with it. A long rope swings through a
+   smaller angle than a short one. aHang.x far below everything (the default) and it doesn't move at all. */
+const HANG = `
+  #ifdef FL_HANG
+  {
+    vec4 flHw = vec4(transformed, 1.0);
+    #ifdef USE_INSTANCING
+      flHw = instanceMatrix * flHw;
+    #endif
+    flHw = modelMatrix * flHw;
+    float flD = max(0.0, aHang.x - flHw.y), flPh = uFlT * aHang.z + aHang.y;
+    float flA = 0.06 / (1.0 + flD / 25.0);
+    vec3 flOff = vec3(sin(flPh) + 0.3 * sin(flPh * 2.3 + 1.1), 0.0, 0.7 * sin(flPh * 0.83 + 0.7)) * flA * flD;
+    #ifdef USE_INSTANCING
+      flOff = inverse(mat3(instanceMatrix)) * flOff;
+    #endif
+    transformed += flOff;
+  }
+  #endif`;
 const VERT = `#include <begin_vertex>
-  vFlP = position; vFlN = normal;
+  vFlP = position; vFlN = normal;`;
+const VERT_REST = `
   #ifdef USE_INSTANCING
     vFlP += instanceMatrix[3].xyz * 0.37;
   #endif
@@ -139,7 +161,11 @@ const VERT = `#include <begin_vertex>
     #endif
     vFlW = (modelMatrix * flw).xyz; vFlWN = normalize(mat3(modelMatrix) * flwn);
   #endif`;
+const VERT_ALL = VERT + HANG + VERT_REST;
 const VERT_PARS = `varying vec3 vFlP; varying vec3 vFlN; uniform float uFlT;
+#ifdef FL_HANG
+  attribute vec3 aHang;
+#endif
 #ifdef FL_PAINT
   varying vec3 vFlW; varying vec3 vFlWN;
 #endif
@@ -644,6 +670,38 @@ export function addLeafCards(o, cone = false) {
 }
 const pending = [];
 const FLT = { value: 0 };   // the wind's clock
+/* make a Kit's things hang and sway (see HANG above), and never be solid: you brush through them. Its put(h, ...the
+   Kit's own put args) takes h = swing(top, len): the height the thing hangs from, and how long what hangs there is
+   (that sets the pace: a long rope swings slower). Give a pod on a strand's tip the strand's own h, and the two swing
+   together; give the kinked lengths of one vine the same h, and it swings as one. h null: it stays put (a liana
+   slung between two boughs). */
+const SPARE = -1e5;
+export const swing = (top, len, phase = Math.random() * 6.283) => ({ top, phase, pace: 0.6 + 1.2 / Math.sqrt(1 + Math.max(0, len) * 0.3) });
+export function hanging(kit) {
+  const m = kit.mesh, src = m.material, a = new Float32Array(kit.max * 3);
+  for (let i = 0; i < kit.max; i++) a[i * 3] = SPARE;
+  const attr = new THREE.InstancedBufferAttribute(a, 3);
+  m.geometry.setAttribute('aHang', attr);
+  m.userData.noSolid = true;
+  const mat = src.clone(); mat.color = src.color;   // (the same colour object: a glow scaled with the dark stays in step)
+  if (mat.isMeshToonMaterial) mat.defines = Object.assign({}, mat.defines, { FL_HANG: 1 });
+  else {
+    mat.defines = Object.assign({}, mat.defines, { FL_HANG: 1 });
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.uFlT = FLT;
+      sh.vertexShader = 'uniform float uFlT;\nattribute vec3 aHang;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + HANG);
+    };
+    mat.customProgramCacheKey = () => 'fl-hang';
+  }
+  m.material = mat;
+  return {
+    put(h, ...args) {
+      const i = kit.put(...args);
+      if (i >= 0 && h) { a[i * 3] = h.top; a[i * 3 + 1] = h.phase; a[i * 3 + 2] = h.pace; attr.needsUpdate = true; }
+      return i;
+    },
+  };
+}
 function flush() {
   FLT.value = (performance.now() / 1000) % 3600;
   if (!pending.length) return;
@@ -659,11 +717,13 @@ function flush() {
         if (g !== from) { o.geometry = g; o.userData.smFrom = from; const m = o.material; if (!(m.defines && m.defines.FL_PAINT)) { m.defines = Object.assign({}, m.defines, { FL_PAINT: 10 }); m.needsUpdate = true; } }
         return;
       }
+      if (o.geometry.type === 'ConeGeometry' && leafy(o)) o.userData.noSolid = true;   // a pine's needles, like any leaves: you brush through them (the trunk is solid)
       if (o.isInstancedMesh && o.geometry.type === 'ConeGeometry' && o.count <= 12000 && leafy(o) && o.geometry.parameters && o.geometry.parameters.height === 1) addLeafCards(o, true);   // pines: sprays of needles down the cone
       const g = o.geometry.type === 'IcosahedronGeometry'
         ? (o.geometry.parameters.detail <= 1 && !gemLike(o.material) ? smoothPuff(o.geometry, !o.isInstancedMesh ? 'hi' : o.instanceMatrix.count <= 3000 ? 'lo' : false) : o.geometry)
         : smoothGeometry(o.geometry);
       if (g !== o.geometry) {
+        if (from.attributes.aHang) g.setAttribute('aHang', from.attributes.aHang);   // (a hanging thing keeps how it hangs: hanging())
         o.geometry = g; o.userData.smFrom = from;
         if (from.type === 'IcosahedronGeometry' && leafy(o)) { const m = o.material; if (!(m.defines && m.defines.FL_LEAF)) { m.defines = Object.assign({}, m.defines, { FL_LEAF: 1 }); m.needsUpdate = true; } if (o.isInstancedMesh && o.count <= 20000) addLeafCards(o); }
       }
@@ -680,7 +740,7 @@ export function installSmoothStyle() {
   loadSurfaces();
   THREE.MeshToonMaterial.prototype.onBeforeCompile = function (sh) {
     sh.uniforms.uBrush = BRUSH; sh.uniforms.uFlT = FLT;
-    sh.vertexShader = VERT_PARS + sh.vertexShader.replace('#include <begin_vertex>', VERT);
+    sh.vertexShader = VERT_PARS + sh.vertexShader.replace('#include <begin_vertex>', VERT_ALL);
     sh.fragmentShader = FRAG_PARS + sh.fragmentShader
       .replace('#include <gradientmap_pars_fragment>', THREE.ShaderChunk.gradientmap_pars_fragment.replace(HARD_STEP, SOFT_STEP)
         .replace('vec3 getGradientIrradiance', CEL_GRADIENT + 'vec3 getGradientIrradiance') + '\n#endif\n')
