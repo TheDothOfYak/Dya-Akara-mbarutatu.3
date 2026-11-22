@@ -480,6 +480,7 @@
     <div class="btn-row">
       <button class="btn" id="btn-continue" disabled style="display:none">Continue</button>
       <button class="btn" id="btn-begin" disabled>New Run</button>
+      <button class="btn ghost" id="btn-tcontrols">Controls</button>
       <a class="btn ghost" href="../index.html">Back to Flake Games</a>
     </div>
     <div class="essentials">
@@ -502,14 +503,17 @@
       <b>I · K · J · M</b><span>Gear &amp; pack · skills · quests · map (fast travel)</span>
       <b>1–4</b><span>Spells, once learned · <b>H</b> whistle for your Punk · hold <b>SPACE</b> in the air to glide</span>
       <b>ON A PUNK</b><span><b>LMB</b> / <b>RMB</b> throw a vine at the X, hold to swing · <b>SPACE</b> pump · <b>SHIFT</b> / <b>C</b> reel in / let out · <b>X</b> hold the length · <b>CAPS</b> shove</span>
-      <b>TAB</b><span>Rokarvac (journal) · <b>ESC</b> pause</span>
+      <b>TAB</b><span>Rokarvac (journal) · <b>P</b> pause</span>
+      <b>CONTROLLER</b><span>PS4 / PS5 (or any) controller: left stick move · right stick look · <b>✕</b> jump · <b>○</b> dodge · <b>R1</b> attack · <b>R2</b> Duat Strike · <b>△</b> talk / use · <b>□</b> heal · <b>L1</b> quick slot (hold <b>L1</b> + D-pad for 1–4) · <b>Options</b> pause</span>
+      <b>ON A PUNK (PAD)</b><span><b>L1</b> / <b>L2</b> left vine · <b>R1</b> / <b>R2</b> right vine · <b>□</b> shove · <b>R3</b> hold the length · hold D-pad <b>↑</b> auto-swing</span>
+      <b>CONTROLS</b><span>Every button can be changed — <b>Controls</b> here or in the pause menu</span>
     </div>
     </details>
-    <div class="t-note" id="t-note">Best with a keyboard and mouse. Click the world to take the mouse; Esc gives it back. P pauses.</div>
+    <div class="t-note" id="t-note">Plays with a controller or with keyboard and mouse. Click the world to take the mouse; Esc gives it back. P (or Options) pauses.</div>
   </div>
 </div>
 
-<div id="resume" class="hidden"><div class="panel brass"><h2>Mouse free</h2><p>Click to take up the axe again. P pauses.</p></div></div>
+<div id="resume" class="hidden"><div class="panel brass"><h2>Mouse free</h2><p>Click to take up the axe again (or just use your controller). P pauses.</p></div></div>
 
 <div id="pause" class="hidden">
   <div class="panel brass">
@@ -523,7 +527,7 @@
     <div class="row"><span>Ease off detail when it runs slow</span><input type="checkbox" id="opt-auto" checked></div>
     <div class="row"><span>Full screen</span><input type="checkbox" id="opt-full"></div>
     <div class="row"><span>Render scale</span><input type="range" id="opt-scale" min="0.5" max="1" step="0.05" value="1"></div>
-    <div class="btn-row"><button class="btn" id="btn-resume">Resume</button><button class="btn ghost" id="btn-journal">Rokarvac</button><button class="btn ghost" id="btn-concede" style="display:none">Concede the match</button><a class="btn ghost" href="../index.html">Quit</a></div>
+    <div class="btn-row"><button class="btn" id="btn-resume">Resume</button><button class="btn ghost" id="btn-journal">Rokarvac</button><button class="btn ghost" id="btn-controls">Controls</button><button class="btn ghost" id="btn-concede" style="display:none">Concede the match</button><a class="btn ghost" href="../index.html">Quit</a></div>
   </div>
 </div>
 
@@ -550,7 +554,7 @@
   <div class="panel brass" style="width:min(640px,94vw)">
     <h2>Choose your Run</h2>
     <div class="diffs">
-      <div class="diff" id="d-easy"><h3>Easy</h3><p id="d-easy-p"></p></div>
+      <div class="diff padfocus-first" id="d-easy"><h3>Easy</h3><p id="d-easy-p"></p></div>
       <div class="diff real" id="d-real"><h3>Realistic</h3><p id="d-real-p"></p></div>
     </div>
     <p id="ng-warn" style="color:#ff9a8a;font-size:14px;text-align:center;margin-top:8px"></p>
