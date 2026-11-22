@@ -375,7 +375,7 @@ export function buildProperty(scene) {
   const gLimbs = new Kit(scene, new THREE.CylinderGeometry(0.55, 1, 1, 7, 1, true), paint(toon(0xffffff), 'bark', 0.5), 1900, false);
   const gLeaves = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1500, false); noSolid(gLeaves.mesh);
   const seams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), glowMat, 3400, false);
-  const beads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 17000, false);
+  const beads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 17000, false); noSolid(beads.mesh);   // specks of light: nothing to trip on
   // the threads hanging from the leaf-clouds, and the drop of light on each one's end: they sway, and you walk through them
   const threadKit = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), glowMat, 2000, false), threads = hanging(threadKit);
   const dropKit = new Kit(scene, new THREE.OctahedronGeometry(1, 0), glowMat, 2000, false), drops = hanging(dropKit);
@@ -511,7 +511,7 @@ export function buildProperty(scene) {
     const vineAs = h => ({ put: (...a) => vines.put(h, ...a) });   // a vine's lengths all swing as one, from its top
     const cTips = new Kit(scene, new THREE.OctahedronGeometry(1, 0), colGlowMat, 3000, false), tips = hanging(cTips);   // the lights on the vines, swinging with them
     const cSeams = new Kit(scene, new THREE.BoxGeometry(1, 1, 1), colGlowMat, 1800, false);
-    const cBeads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), colGlowMat, 15000, false);
+    const cBeads = new Kit(scene, new THREE.OctahedronGeometry(1, 0), colGlowMat, 15000, false); noSolid(cBeads.mesh);
     const cShelves = new Kit(scene, shelfG, colGlowMat, 420, false);
     const cCaps = new Kit(scene, new THREE.SphereGeometry(1, 8, 3, 0, Math.PI * 2, 0, Math.PI / 2), colGlowMat, 1600, false);
     const cStems = new Kit(scene, new THREE.CylinderGeometry(0.08, 0.11, 1, 5), toon(0xe8e0d0), 1600, false);

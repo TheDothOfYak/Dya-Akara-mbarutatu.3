@@ -120,6 +120,25 @@ function slabs(geo, n) {
     return out.filter(Boolean);
   });
 }
+/* a bough in n lengths along its own y (the way it runs): each a box as long as that length runs over the ground, as
+   wide as the bough is there, its top on the bark's top line (not round the whole tilted length, which reached out
+   over the higher bark beside it and stood you on air) */
+const _bc = new THREE.Vector3();
+function boughBoxes(g, bb, M, n, ay) {
+  const e = M.elements, sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
+  const ux = e[4], uz = e[6], uh = Math.hypot(ux, uz) || 1, ang = Math.atan2(-uz / uh, ux / uh), flat = Math.sqrt(Math.max(0, 1 - ay * ay));
+  const p = g.parameters || {}, cylR = g.type === 'CylinderGeometry' ? t => (p.radiusBottom ?? 1) + ((p.radiusTop ?? 1) - (p.radiusBottom ?? 1)) * t : null;
+  const segL = (bb.max.y - bb.min.y) * sy / n, cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n, ly = bb.min.y + (bb.max.y - bb.min.y) * t;
+    _bc.set(cx, ly, cz).applyMatrix4(M);
+    const r = (cylR ? cylR(t) : Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2) * Math.max(sx, sz);
+    const rise = segL * ay / 2, up = r * flat;
+    out.push({ x: _bc.x, z: _bc.z, hw: Math.max(0.15, segL * flat / 2), hd: r, ang, bot: _bc.y - up - rise, top: _bc.y + up + rise * 0.5 });
+  }
+  return out;
+}
 function cut(geo, cell) {
   return cached(geo, 'c' + Math.round(Math.log2(cell) * 2), () => cutNow(geo, cell));
 }
@@ -226,7 +245,15 @@ export function createSolids(scene, opts) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     // too thin to be a shell you could go into: a trunk, a bough, a vine, a pipe, a pillar
     const plain = plainShape(g, girth < PLAIN || (length > girth * 2.5 && girth < 12)) && !mats.some(m => m.side === THREE.BackSide);
-    const parts = plain && size < PLAIN ? [whole]
+    // a bough (long, thin, lying more along than up): short boxes one after another along it, each turned the way it
+    // runs, so you stand on the bark all the way along — one box round the whole of a sloping bough stood you on
+    // air over its low end
+    const ay = Math.abs(e[5]) / Math.max(1e-6, Math.hypot(e[4], e[5], e[6]));
+    const bough = plain && length > girth * 2.5 && length > 1.2 && ay < 0.9;
+    // (each length no longer than the bough is thick, and rising no more than a step: up a steep one, they're stairs)
+    const seg = Math.max(0.5, Math.min(girth, 0.5 / Math.max(ay, 0.05)));
+    const parts = bough ? boughBoxes(g, bb, M, Math.min(64, Math.ceil(length / seg)), ay)
+      : plain && size < PLAIN ? [whole]
       : plain ? slabs(g, Math.min(SLABS, Math.ceil((whole.top - whole.bot) / SLAB))).map(b => worldBox(b, M))
       : cut(g, Math.min(CELL_MAX, Math.max(CELL, size / 30)) / scale).map(b => worldBox(b, M));
     const out = [];
