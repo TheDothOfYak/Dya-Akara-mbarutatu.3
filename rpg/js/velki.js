@@ -445,7 +445,7 @@ export function createVelki(ctx) {
     const iron = toon(0x2e2a28), gy = heightAt(0, -WALL_R), span = Math.sin(GATE_W) * WALL_R * 2 + 0.6;
     for (let x = -span / 2; x <= span / 2 + 1e-6; x += 0.55) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 9.2, 0.14), iron); b.position.set(x, gy + 4.4, -WALL_R); portcullis.add(b); }
     for (const y of [1.2, 4.4, 7.6]) { const b = new THREE.Mesh(new THREE.BoxGeometry(span, 0.16, 0.18), iron); b.position.set(0, gy + y, -WALL_R); portcullis.add(b); }
-    portcullis.traverse(m => { if (m.isMesh) addOutline(m, 0.02); });
+    for (const m of [...portcullis.children]) addOutline(m, 0.02);
     scene.add(portcullis);
   }
   /* banners on the wall, streaming toward the battle */
