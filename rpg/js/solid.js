@@ -147,7 +147,7 @@ function insideBoxes(geo, M) {
     const cx = sx / c, cz = sz / c;
     let r = Infinity;
     for (let i = 0; i < n; i++) { const y = W[i * 3 + 1]; if (y >= lo - 1e-4 && y <= hi + 1e-4) r = Math.min(r, Math.hypot(W[i * 3] - cx, W[i * 3 + 2] - cz)); }
-    const a = r * 0.92 * Math.SQRT1_2;
+    const a = r * 0.88 * Math.SQRT1_2;
     if (!(a > 0.05)) continue;
     // (and no higher than the surface over it, nor lower than the surface under it: a rounded top — a cap, a dome, a
     // softened rim — comes down toward its edge)
@@ -193,7 +193,8 @@ function tubeBoxes(pts, rad, out = []) {
   const closed = pts[0].distanceTo(pts[n]) < 1e-3;
   const len = []; let total = 0;
   for (let i = 1; i <= n; i++) { len.push(pts[i - 1].distanceTo(pts[i])); total += len[i - 1]; }
-  const trimAt = (a, b, r) => { const L = a.distanceTo(b) || 1, ay = Math.abs(b.y - a.y) / L, flat = Math.sqrt(Math.max(0, 1 - ay * ay)); return flat < 0.45 ? 0 : r * ay / flat; };
+  // (a box reaching r/flat up from a leaning axis reaches r·ay/flat along it; a pillar's corner, r out from a steep axis, r·flat/ay)
+  const trimAt = (a, b, r) => { const L = a.distanceTo(b) || 1, ay = Math.max(1e-3, Math.abs(b.y - a.y) / L), flat = Math.sqrt(Math.max(0, 1 - ay * ay)); return flat < 0.45 ? r * flat / ay : r * ay / flat; };
   const t0 = closed ? 0 : trimAt(pts[0], pts[1], rad[0]), t1 = closed ? 0 : trimAt(pts[n - 1], pts[n], rad[n]);
   let s0 = 0;
   for (let i = 1; i <= n; i++) {
@@ -248,23 +249,60 @@ function ringBoxes(g, M) {
   }
   return tubeBoxes(pts, rad);
 }
-/* a box turned off the upright (a tilted slab, a leaning plank): tiles across its face, small enough that each one's
-   top stands no more than a few centimetres off the slope */
-function tiledBoxes(bb, M) {
-  const e = M.elements, sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
-  const ay = Math.abs(e[5]) / sy, slope = Math.sqrt(Math.max(0, 1 - ay * ay)) / Math.max(ay, 0.05);
-  // (and through its height, for a tall one leaning: the bounding box of a leaning board holds a wedge of air each side)
-  const lean = Math.sqrt(Math.max(0, 1 - ay * ay));
-  const tile = Math.max(0.15, Math.min(1, 0.06 / Math.max(slope, 0.01)));
-  let nx = Math.max(1, Math.ceil((bb.max.x - bb.min.x) * sx / tile)), nz = Math.max(1, Math.ceil((bb.max.z - bb.min.z) * sz / tile)), ny = Math.max(1, Math.ceil((bb.max.y - bb.min.y) * sy * lean / 0.08));
-  nx = Math.min(nx, 24); nz = Math.min(nz, 24); ny = Math.min(ny, 24);
-  while (nx * ny * nz > 900) { if (nx >= ny && nx >= nz) nx--; else if (ny >= nz) ny--; else nz--; }
+/* a box turned off the upright (a pitched roof, a tilted slab, a leaning plank): columns standing on a grid over its
+   footprint, each as high as the box is solid all the way across that column. Where a vertical line through the box
+   goes in and out is worked out exactly at each corner of a column; what's common to all four is inside the box over
+   the whole column (a box is convex). Neighbouring columns as high as each other are one box. (Its bounding box, or
+   tiles of it, held a wedge of air over the downhill side of a roof.) */
+const _iv = new THREE.Matrix4(), _p0 = new THREE.Vector3(), _py = new THREE.Vector3();
+function tiltedBoxes(bb, M) {
+  const e = M.elements;
+  // the yaw frame: along the box's most level axis
+  const axes = [[e[0], e[1], e[2]], [e[4], e[5], e[6]], [e[8], e[9], e[10]]];
+  let best = 0, bh = -1;
+  axes.forEach((a, k) => { const h = Math.hypot(a[0], a[2]) / (Math.hypot(a[0], a[1], a[2]) || 1); if (h > bh) { bh = h; best = k; } });
+  const A = axes[best], ah = Math.hypot(A[0], A[2]) || 1, ux = A[0] / ah, uz = A[2] / ah, wx = -uz, wz = ux;
+  // its corners, in that frame
+  let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity, slope = 0;
+  for (let i = 0; i < 8; i++) {
+    _p0.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).applyMatrix4(M);
+    const u = _p0.x * ux + _p0.z * uz, w = _p0.x * wx + _p0.z * wz;
+    if (u < u0) u0 = u; if (u > u1) u1 = u; if (w < w0) w0 = w; if (w > w1) w1 = w;
+  }
+  for (const a of axes) { const h = Math.hypot(a[0], a[2]), v = Math.abs(a[1]); if (h > 1e-6 && v > 1e-6) slope = Math.max(slope, Math.min(v / h, h / v)); }
+  let cell = Math.max(0.1, Math.min(0.6, 0.06 / Math.max(slope, 0.01)));
+  while (((u1 - u0) / cell) * ((w1 - w0) / cell) > 2500) cell *= 1.4;
+  const nu = Math.max(1, Math.ceil((u1 - u0) / cell)), nw = Math.max(1, Math.ceil((w1 - w0) / cell)), cu = (u1 - u0) / nu, cw = (w1 - w0) / nw;
+  _iv.copy(M).invert();
+  // where the vertical line at (x, z) is inside the box: [lo, hi] (empty: lo > hi)
+  const span = (x, z) => {
+    _p0.set(x, 0, z).applyMatrix4(_iv); _py.set(x, 1, z).applyMatrix4(_iv).sub(_p0);
+    let lo = -Infinity, hi = Infinity;
+    for (const k of ['x', 'y', 'z']) {
+      const a = _p0[k], b = _py[k], mn = bb.min[k], mx = bb.max[k];
+      if (Math.abs(b) < 1e-9) { if (a < mn || a > mx) return [1, 0]; continue; }
+      let t0 = (mn - a) / b, t1 = (mx - a) / b; if (t0 > t1) [t0, t1] = [t1, t0];
+      lo = Math.max(lo, t0); hi = Math.min(hi, t1);
+    }
+    return [lo, hi];
+  };
   const out = [];
-  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) for (let k = 0; k < ny; k++) {
-    const x0 = bb.min.x + (bb.max.x - bb.min.x) * i / nx, x1 = bb.min.x + (bb.max.x - bb.min.x) * (i + 1) / nx;
-    const z0 = bb.min.z + (bb.max.z - bb.min.z) * j / nz, z1 = bb.min.z + (bb.max.z - bb.min.z) * (j + 1) / nz;
-    const y0 = bb.min.y + (bb.max.y - bb.min.y) * k / ny, y1 = bb.min.y + (bb.max.y - bb.min.y) * (k + 1) / ny;
-    out.push(worldBox({ x0, x1, y0, y1, z0, z1 }, M));
+  for (let j = 0; j < nw; j++) {
+    let run = null;
+    for (let i = 0; i <= nu; i++) {
+      let lo = -Infinity, hi = Infinity;
+      if (i < nu) for (const [du, dw] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        const u = u0 + (i + du) * cu, w = w0 + (j + dw) * cw, [a, b] = span(u * ux + w * wx, u * uz + w * wz);
+        lo = Math.max(lo, a); hi = Math.min(hi, b);
+      }
+      const ok = i < nu && hi - lo > 0.02;
+      if (run && ok && Math.abs(run.lo - lo) < 0.05 && Math.abs(run.hi - hi) < 0.05 && Math.min(run.hi, hi) - Math.max(run.lo, lo) > 0.02) { run.i1 = i; run.lo = Math.max(run.lo, lo); run.hi = Math.min(run.hi, hi); continue; }
+      if (run) {
+        const uc = u0 + (run.i0 + run.i1 + 1) / 2 * cu, wc = w0 + (j + 0.5) * cw;
+        out.push({ x: uc * ux + wc * wx, z: uc * uz + wc * wz, hw: (run.i1 - run.i0 + 1) * cu / 2, hd: cw / 2, ang: Math.atan2(-uz, ux), bot: run.lo, top: run.hi });
+      }
+      run = ok ? { i0: i, i1: i, lo, hi } : null;
+    }
   }
   return out;
 }
@@ -391,7 +429,7 @@ export function createSolids(scene, opts) {
     const how = ring ? 'ring' : box && upright ? 'exact' : box ? 'tiles' : bough ? 'bough' : plain ? 'inside' : 'cut';   // (kept on each box: how it was fitted)
     const parts = ring ? ringBoxes(g, M)
       : box && upright ? [whole]
-      : box ? tiledBoxes(bb, M)
+      : box ? tiltedBoxes(bb, M)
       : bough ? boughBoxes(g, bb, M, Math.min(64, Math.ceil(length / seg)))
       : plain ? insideBoxes(o.geometry.attributes.position ? o.geometry : g, M)   // (the shape as drawn: smooth.js may have softened it, or swapped a plain rock for a lumpier one)
       : cut(g, Math.min(CELL_MAX, Math.max(CELL, size / 30)) / scale).map(b => worldBox(b, M));
