@@ -164,10 +164,10 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
   }
   function cyl(g, x, y, z, r0, r1, h, color, col, seg = 10, opts = {}) {
     const rr = Math.max(r1, 0.0001);
-    if (furnished(col, opts) && !opts.mat) { const r = Math.max(r0, r1) * 0.85; piece(g, x, y, z, r * 2, h, r * 2, opts.rx, opts.ry, opts.rz); }
+    if (furnished(col, opts) && !opts.mat) { const r = Math.min(r0, r1) * Math.cos(Math.PI / seg) * Math.SQRT1_2 * 0.97; piece(g, x, y, z, r * 2, h, r * 2, opts.rx, opts.ry, opts.rz); if (!opts.rx && !opts.rz) piece(g, x, y, z, r * 2, h, r * 2, 0, Math.PI / 4, 0); }
     if (BT && !opts.mat) pick3(opts).add(unitCyl(r0 / rr, seg), x, y, z, opts.rx || 0, opts.ry || 0, opts.rz || 0, rr, h, rr, color);
     else { const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg), toon(color, opts.mat)); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; addOutline(m, 0.025); g.add(m); }
-    if (col) world.col.add(g.position.x + x, g.position.z + z, Math.max(r0, r1) * 0.85, Math.max(r0, r1) * 0.85, 0, y - h / 2, y + h / 2);
+    if (col) { const a = Math.min(r0, r1) * Math.cos(Math.PI / seg) * Math.SQRT1_2 * 0.97; for (const ang of [0, Math.PI / 4]) world.col.add(g.position.x + x, g.position.z + z, a, a, ang, y - h / 2, y + h / 2); }   // (inside the round: two squares, an eight-pointed star)
   }
   const put = (geo, x, y, z, sx, sy, sz, color, opts = {}) => {
     if (furnished(false, opts)) { if (!geo.boundingBox) geo.computeBoundingBox(); const b = geo.boundingBox; piece(BG, x + (b.max.x + b.min.x) / 2 * sx, y + (b.max.y + b.min.y) / 2 * sy, z + (b.max.z + b.min.z) / 2 * sz, (b.max.x - b.min.x) * sx, (b.max.y - b.min.y) * sy, (b.max.z - b.min.z) * sz, opts.rx, opts.ry, opts.rz); }
@@ -437,12 +437,12 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       const ST = 12, rise = H1 / ST, sd = 0.7, st = [];
       for (let i = 0; i < ST; i++) st.push([6.6, 15.4 - sd / 2 - i * sd, 2.8, sd]);
       stairs(g, st, rise);
-      for (let i = 0; i < ST; i++) { const top = (i + 1) * rise, z = 15.4 - sd / 2 - i * sd; box(g, 5.25, top + 0.45, z, 0.08, 0.9, 0.08, '#f4ead4', false, { outline: false }); world.col.add(g.position.x + 5.2, z, 0.1, sd / 2, 0, top, top + 1.0); }
+      for (let i = 0; i < ST; i++) { const top = (i + 1) * rise, z = 15.4 - sd / 2 - i * sd; box(g, 5.25, top + 0.45, z, 0.08, 0.9, 0.08, '#f4ead4', false, { outline: false }); world.col.add(g.position.x + 5.25, z, 0.04, 0.04, 0, top, top + 0.9); }   // (each baluster as it is: too close together to slip between)
       box(g, 5.25, H1 / 2 + 0.95, 11.2, 0.14, 0.12, Math.hypot(H1, ST * sd), TRIM, false, { rx: Math.atan2(H1, ST * sd) });
       box(g, 5.25, 1.0, 15.4, 0.3, 2, 0.3, TRIM, false); put(SPHERE, 5.25, 2.1, 15.4, 0.22, 0.22, 0.22, '#c8a040');
       // the gallery balustrade
       for (let x = -7.6; x < 5.2; x += 0.5) box(g, x, H1 + 0.45, 7.05, 0.08, 0.9, 0.08, '#f4ead4', false, { outline: false });
-      box(g, -1.2, H1 + 0.95, 7.1, 13.6, 0.14, 0.2, TRIM, false); world.col.add(g.position.x - 1.4, 7.1, 6.6, 0.12, 0, H1, H1 + 1.0);
+      box(g, -1.2, H1 + 0.95, 7.1, 13.6, 0.14, 0.2, TRIM, false); world.col.add(g.position.x - 1.2, 7.1, 6.8, 0.1, 0, H1 + 0.88, H1 + 1.02);   // (the gallery rail, where the rail is)
       box(g, 0, H1 - 0.21, 7.05, 16.06, 0.46, 0.36, TRIM, false, { shadow: false });   // the gallery's edge beam wraps the floor's edge (it used to share its faces, and flickered)
       box(g, -7.4, 2.5, 7.1, 0.5, 5, 0.5, '#f4ead4', true);   // a pillar under the gallery
       chandelier(g, 0, 7.4, 13.5, 1.5, 60, 34);
@@ -614,7 +614,6 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       for (let k = 0; k < 6; k++) tool(g, 41 + k * 1.9, 3.6, -19.6, 0);
       // the lumber rack: boards on brackets up the east wall
       for (let r = 0; r < 4; r++) { for (const z of [-14, -8, -2]) box(g, 61.6, 0.8 + r * 1.2, z, 0.8, 0.1, 0.12, TRIM, false, { outline: false }); for (let k = 0; k < 3; k++) box(g, 61.4 - k * 0.25, 0.92 + r * 1.2 + k * 0.08, -8, 0.2, 0.08, 14, WOOD[(r + k) % 4], false); }
-      world.col.add(g.position.x + 61.4, -8, 0.6, 7, 0, 0, 5);
       // the half-built boat, ribs on a keel on trestles
       const BZ = -1.2;
       for (const z of [BZ - 2.9, BZ + 2.9]) { box(g, 48.5, 0.45, z, 2.2, 0.12, 0.3, '#7a4e2c', false); for (const q of [-0.9, 0.9]) box(g, 48.5 + q, 0.22, z, 0.12, 0.44, 0.28, '#5a3a22', false, { outline: false }); }
@@ -624,7 +623,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       box(g, 48.5, 1.2, BZ + 4.3, 0.25, 1.4, 0.25, '#8a5a36', false, { rx: -0.3 });
       // sawhorses with a board across, a shave-horse, a grindstone, a cradle half made
       for (const x of [40, 42.6]) { box(g, x, 0.75, 2.5, 0.16, 0.16, 1.4, '#7a5232', false); for (const q of [-0.5, 0.5]) for (const s of [-1, 1]) box(g, x + s * 0.25, 0.38, 2.5 + q, 0.08, 0.8, 0.08, '#6a4428', false, { rz: s * 0.3, outline: false }); }
-      box(g, 41.3, 0.88, 2.5, 3.6, 0.08, 0.5, '#c8a070', false); world.col.add(g.position.x + 41.3, 2.5, 1.9, 0.8, 0, 0, 0.9);
+      box(g, 41.3, 0.88, 2.5, 3.6, 0.08, 0.5, '#c8a070', false);
       box(g, 55, 0.55, 3.5, 0.4, 0.12, 2.4, '#7a5232', true); box(g, 55, 0.85, 3.0, 0.35, 0.5, 0.12, '#7a5232', false, { rx: 0.4 });
       cyl(g, 59.5, 0.9, 4.5, 0.5, 0.5, 0.14, '#a8a094', false, 16, { rz: Math.PI / 2 }); box(g, 59.5, 0.45, 4.5, 0.6, 0.9, 0.3, '#6a4428', true);
       box(g, 38.5, 0.6, -3, 1.6, 0.6, 0.9, '#a8784a', true); for (const q of [-1, 1]) put(halfTorus(0.5, 0.05), 38.5 + q * 0.75, 0.55, -3, 1, 1, 1, '#8a5a36', { ry: Math.PI / 2, rz: Math.PI });
@@ -778,7 +777,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       // the loft, and a stair up to it
       box(g, 0, LY - 0.15, -5.5, w - 2, 0.3, 9, '#7a5232', true, { shadow: false });
       for (let x = -10.5; x <= 7.2; x += 0.6) box(g, x, LY + 0.45, -0.9, 0.08, 0.9, 0.08, '#6a4428', false, { outline: false });
-      box(g, -1.65, LY + 0.95, -0.9, 17.9, 0.12, 0.16, TRIM, false); world.col.add(g.position.x - 1.65, -0.9, 8.95, 0.12, 0, LY, LY + 1.0);
+      box(g, -1.65, LY + 0.95, -0.9, 17.9, 0.12, 0.16, TRIM, false); world.col.add(g.position.x - 1.65, -0.9, 8.95, 0.08, 0, LY + 0.89, LY + 1.01);   // (the loft rail, where the rail is)
       const st = []; for (let i = 0; i < 11; i++) st.push([w / 2 - 3.6, d / 2 - 2.2 - i * 0.85, 1.6, 0.85]);
       stairs(g, st, 0.42);
       for (const ex of [w / 2 - 4.35, w / 2 - 2.85]) rails(g, st.map(([sx, sz], i) => [ex, (i + 1) * 0.42, sz]));   // railed both sides
@@ -829,8 +828,8 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       // the reading platform, off the third flight: a chair, a lamp, shelves waiting for books
       box(g, -0.4, MY - 0.15, -0.45, 4.4, 0.3, 3.7, '#8a5a36', true);
       for (let q = -2.2; q <= 1.6; q += 0.5) box(g, q, MY + 0.45, 1.35, 0.07, 0.9, 0.07, '#6a4428', false, { outline: false });
-      box(g, -0.3, MY + 0.92, 1.35, 4.0, 0.1, 0.12, TRIM, false); world.col.add(g.position.x - 0.3, 1.35, 2.0, 0.1, 0, MY, MY + 1);
-      box(g, -2.5, MY + 0.45, -0.45, 0.1, 0.9, 3.6, TRIM, false); world.col.add(g.position.x - 2.55, -0.45, 0.1, 1.8, 0, MY, MY + 1);
+      box(g, -0.3, MY + 0.92, 1.35, 4.0, 0.1, 0.12, TRIM, false); world.col.add(g.position.x - 0.3, 1.35, 2.0, 0.06, 0, MY + 0.87, MY + 0.97);
+      box(g, -2.5, MY + 0.45, -0.45, 0.1, 0.9, 3.6, TRIM, false); world.col.add(g.position.x - 2.5, -0.45, 0.05, 1.8, 0, MY, MY + 0.9);
       armchair(g, -1.4, -1.3, Math.PI * 0.75, 0x5a3a6a, MY);
       box(g, 0.4, MY + 0.3, -2.0, 0.6, 0.6, 0.6, '#6a4428', false); candle(g, 0.4, MY + 0.6, -2.0); book(g, 0.25, MY + 0.6, -1.85, 0.4, 0x2a4a7a, true);
       lamp(g, -0.4, MY + 2.4, -0.4, 0xffc070, 20, 12);
@@ -862,8 +861,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       // the slip: water in a channel down the middle, glowing faintly from below
       const water = new THREE.Mesh(new THREE.PlaneGeometry(5, d), waterMaterial({ color: 0x3a8aa8, deep: 0x1a4a5a, emissive: 0x0e4a62, emissiveIntensity: 0.35, scale: 2, opacity: 0.85 })); water.rotation.x = -Math.PI / 2; water.position.set(1.1, -0.5, 0); g.add(water);
       box(g, 1.1, -1.2, 0, 5, 0.2, d, '#2a4a52', false, { outline: false });
-      world.col.add(g.position.x + 1.1, 0, 2.5, d / 2, 0, -2, 0.7);   // the slip: mind the edge
-      for (const q of [-1, 1]) box(g, 1.1 + q * 2.55, 0.1, 0, 0.2, 0.2, d, '#4a3020', false);
+      for (const q of [-1, 1]) box(g, 1.1 + q * 2.55, 0.35, 0, 0.2, 0.7, d, '#4a3020', true);   // a timber kerb each side of the slip, knee high: mind the edge
       wall(g, 'x', -d / 2 - 0.2, -w / 2 - 0.4, w / 2 + 0.4, 0, h, WC, [[1.1, 4.6, 3.4]]);
       box(g, 1.1, 1.6, -d / 2 - 0.1, 4.4, 3.2, 0.1, '#bfe0ff', false, { outline: false, shadow: false });
       wall(g, 'x', d / 2 + 0.2, -w / 2 - 0.4, w / 2 + 0.4, 0, h, WC);
@@ -912,7 +910,6 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
       const w = 10, d = 9, h = 3.8;
       shell(g, R, { w, d, h, wall: '#8a6a4a', floor: '#6a5a40' });
       for (let row = 0; row < 5; row++) for (let k = 0; k < 10; k++) cyl(g, -4 + k * 0.4 + (row % 2) * 0.2, 0.2 + row * 0.36, -d / 2 + 1, 0.18, 0.18, 1.4, row % 2 ? '#9a6a40' : '#7a4e2c', false, 7, { rx: Math.PI / 2 });
-      world.col.add(g.position.x - 2, -d / 2 + 1, 2.1, 0.8, 0, 0, 1.8);
       // a partition, and the tool nook beyond
       wall(g, 'z', 2, -d / 2, 1, 0, h, '#7a5a3a', [[-1.5, 1.2, 2.3]], 0.2);
       for (let k = 0; k < 6; k++) tool(g, 3 + k * 0.55, 1.8 + (k % 2) * 0.6, -d / 2 + 0.15, k % 4);
@@ -952,7 +949,7 @@ export function createInteriors({ scene, world, say, give, picked, toast }) {
     BT = null; BG = null;
     const folk = (info.folk || []).map(f => {
       const a = buildEikar(Object.assign({ weapon: 'none', flasks: false }, f.look)); a.root.position.set(g.position.x + f.x, 0, f.z); a.root.rotation.y = Math.PI; scene.add(a.root);
-      world.col.add(g.position.x + f.x, f.z, 0.4, 0.4, 0, -1, 1.8);
+      world.col.add(g.position.x + f.x, f.z, 0.3, 0.3, 0, 0, 1.8);   // (a body's width)
       return { a, line: f.line, pos: new THREE.Vector3(g.position.x + f.x, 0, f.z) };
     });
     const sp = info.spawn || [0, info.d / 2 - Math.min(4, info.d * 0.3)], ou = info.out || [sp[0], info.d / 2 - 0.4];

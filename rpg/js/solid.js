@@ -74,7 +74,8 @@ function plainShape(g, small) {
       return true;
     case 'LatheGeometry': return small;
     case 'CylinderGeometry': return small || (!p.openEnded && !(p.thetaLength < Math.PI * 1.9));
-    case 'SphereGeometry': return small || (!(p.thetaLength < Math.PI * 0.9) && !(p.phiLength < Math.PI * 1.9));
+    // (a dome — the top of a ball, all the way round — is a cap on what's under it: solid through. A bowl isn't, unless small)
+    case 'SphereGeometry': return small || (!(p.phiLength < Math.PI * 1.9) && (!(p.thetaLength < Math.PI * 0.9) || !((p.thetaStart || 0) > 0.01)));
     default: return false;
   }
 }
@@ -191,18 +192,29 @@ function boughBoxes(g, bb, M, n) {
   const p = g.parameters || {}, poly = Math.cos(Math.PI / Math.max(3, p.radialSegments || 32));
   const cylR = g.type === 'CylinderGeometry' ? t => ((p.radiusBottom ?? 1) + ((p.radiusTop ?? 1) - (p.radiusBottom ?? 1)) * t) * poly : null;
   const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2, pts = [], rad = [];
+  // (anything but a cylinder — a stretched octahedron, a hull, a capsule — narrows along its length its own way: how
+  // far its surface comes in toward the axis, measured from its own points, near each step along it)
+  const P = cylR ? null : surfacePoints(g), sx = Math.hypot(e[0], e[1], e[2]), sz = Math.hypot(e[8], e[9], e[10]), H = bb.max.y - bb.min.y;
+  const near = t => {
+    let r = Infinity; const y = bb.min.y + H * t, w = H / n * 0.75 + 1e-6;
+    for (let i = 0; i < P.length; i += 3) if (Math.abs(P[i + 1] - y) <= w) r = Math.min(r, Math.hypot((P[i] - cx) * sx, (P[i + 2] - cz) * sz));
+    return r === Infinity ? 0 : r * 0.95;
+  };
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    pts.push(new THREE.Vector3(cx, bb.min.y + (bb.max.y - bb.min.y) * t, cz).applyMatrix4(M));
-    rad.push((cylR ? cylR(t) : Math.min(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2 * Math.SQRT1_2) * s);
+    pts.push(new THREE.Vector3(cx, bb.min.y + H * t, cz).applyMatrix4(M));
+    rad.push(cylR ? cylR(t) * s : near(t));
   }
   return tubeBoxes(pts, rad);
 }
 /* a ring (TorusGeometry) or a tube along a curve (TubeGeometry): along its centreline */
 function ringBoxes(g, M) {
   const p = g.parameters, e = M.elements, s = Math.min(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[4], e[5], e[6]), Math.hypot(e[8], e[9], e[10]));
-  const pts = [], rad = [], poly = Math.cos(Math.PI / Math.max(3, (g.type === 'TorusGeometry' ? p.radialSegments : p.radialSegments) || 8));
-  if (g.type === 'TorusGeometry') {
+  const pts = [], rad = [], poly = Math.cos(Math.PI / Math.max(3, (g.userData.tube ? g.userData.tube.radial : p.radialSegments) || 8));
+  if (g.userData.tube) {   // a tube that says where its centreline runs (esik_sea.js taperTube)
+    const T = g.userData.tube, n = T.pts.length - 1;
+    T.pts.forEach(([x, y, z], i) => { pts.push(new THREE.Vector3(x, y, z).applyMatrix4(M)); rad.push((T.r0 + (T.r1 - T.r0) * i / n) * s * poly); });
+  } else if (g.type === 'TorusGeometry') {
     const r = p.tube * s * poly, arc = p.arc ?? Math.PI * 2, n = Math.max(6, Math.min(128, Math.ceil(arc * p.radius * s / Math.max(0.25, Math.min(1.2, r * 1.5)))));
     for (let i = 0; i <= n; i++) { const a = arc * i / n; pts.push(new THREE.Vector3(Math.cos(a) * p.radius, Math.sin(a) * p.radius, 0).applyMatrix4(M)); rad.push(r); }
   } else {
@@ -350,7 +362,7 @@ export function createSolids(scene, opts) {
     // gets boxes that fit inside it, band by band up its height — never its bounding box, whose corners stood out
     // past a round thing into thin air
     const upright = g.type === 'BoxGeometry' && Math.abs(e[5]) / Math.max(1e-6, Math.hypot(e[4], e[5], e[6])) > 0.995;
-    const ring = g.type === 'TorusGeometry' || (g.type === 'TubeGeometry' && g.parameters && g.parameters.path);
+    const ring = g.type === 'TorusGeometry' || (g.type === 'TubeGeometry' && g.parameters && g.parameters.path) || !!g.userData.tube;
     const box = g.type === 'BoxGeometry';
     const how = ring ? 'ring' : box && upright ? 'exact' : box ? 'tiles' : bough ? 'bough' : plain ? 'inside' : 'cut';   // (kept on each box: how it was fitted)
     const parts = ring ? ringBoxes(g, M)
