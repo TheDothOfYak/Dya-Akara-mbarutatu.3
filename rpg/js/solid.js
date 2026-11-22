@@ -89,6 +89,7 @@ const soft = m => !!(m && m.defines && SOFT.some(k => m.defines[k]));
 function ghostly(m) {
   if (!m || m.visible === false || m.colorWrite === false) return true;
   if (soft(m)) return true;
+  if (m.isMeshBasicMaterial) return true;   // unlit: a glow (a lamp, a lit window, a crack of lava, a spark of fungus), not a thing
   if (m.blending !== THREE.NormalBlending) return true;
   if (m.transparent && (m.opacity < 0.95 || !m.depthWrite || m.isShaderMaterial)) return true;
   if (m.wireframe) return true;
@@ -133,10 +134,11 @@ function surfacePoints(geo) {
   });
 }
 function insideBoxes(geo, M) {
+  if (!geo.boundingBox) geo.computeBoundingBox();
   const P = surfacePoints(geo), n = P.length / 3, W = new Float32Array(P.length);
   let y0 = Infinity, y1 = -Infinity;
   for (let i = 0; i < n; i++) { _ip.set(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]).applyMatrix4(M); W[i * 3] = _ip.x; W[i * 3 + 1] = _ip.y; W[i * 3 + 2] = _ip.z; if (_ip.y < y0) y0 = _ip.y; if (_ip.y > y1) y1 = _ip.y; }
-  const h = y1 - y0, nb = Math.max(2, Math.min(16, Math.ceil(h / 0.2))), bh = h / nb, out = [];
+  const h = y1 - y0, nb = Math.max(2, Math.min(8, Math.ceil(h / 0.25))), bh = h / nb, out = [];
   for (let b = 0; b < nb; b++) {
     const lo = y0 + b * bh, hi = lo + bh;
     let sx = 0, sz = 0, c = 0;
@@ -175,7 +177,7 @@ function segBoxes(x0, y0, z0, x1, y1, z1, r, out) {
 const _sa = new THREE.Vector3(), _sb = new THREE.Vector3();
 function tubeBoxes(pts, rad, out = []) {
   for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i], r = Math.min(rad[i - 1], rad[i]);
+    const a = pts[i - 1], b = pts[i], r = Math.min(rad[i - 1], rad[i]) * 0.9;   // (a margin: softened by smooth.js, a tube's surface comes in a little)
     const n = Math.max(1, Math.min(16, Math.ceil(Math.abs(b.y - a.y) / 0.16)));   // short enough up a slope that a flat top never stands off it
     for (let k = 0; k < n; k++) {
       _sa.lerpVectors(a, b, k / n); _sb.lerpVectors(a, b, (k + 1) / n);
@@ -342,8 +344,9 @@ export function createSolids(scene, opts) {
     if (whole.top - whole.bot < FLAT && Math.min(whole.hw, whole.hd) * 2 > FLAT) return [];       // lying flat: a decal, water, a rug
     if (whole.bot > heightAt(whole.x, whole.z) + HIGH) return [];                                  // up in the sky
     if (opts.reach && !reachable(whole)) return [];                                                // out past where you can ever go
-    // a small plain shape is its own box, a big one a stack of them; anything else is cut up, in case it's
-    // a shell you go into or under (an arch, a room, a roof on posts)
+    // every box fits inside what's drawn: a plain shape is filled from the inside (by its own kind: a box exactly, a ring
+    // or tube along its centreline, a bough along its length, anything else band by band); anything else is cut up,
+    // in case it's a shell you go into or under (an arch, a room, a roof on posts)
     const size = Math.max(whole.hw * 2, whole.hd * 2, whole.top - whole.bot);
     // how thick it is across its own axis (a leaning bough is still only a bough), and how long along it
     const girth = Math.max((bb.max.x - bb.min.x) * Math.hypot(e[0], e[1], e[2]), (bb.max.z - bb.min.z) * Math.hypot(e[8], e[9], e[10]));
@@ -358,9 +361,7 @@ export function createSolids(scene, opts) {
     const bough = plain && length > girth * 2.5 && length > 1.2 && ay < 0.9;
     // (each length no longer than the bough is thick, and rising no more than a step: up a steep one, they're stairs)
     const seg = Math.max(0.5, Math.min(girth, 0.5 / Math.max(ay, 0.05)));
-    // an upright box is its own collider, exactly; any other plain shape (a rock, a post, a pot, a trunk, a ball)
-    // gets boxes that fit inside it, band by band up its height — never its bounding box, whose corners stood out
-    // past a round thing into thin air
+    // (never its bounding box, whose corners stood out past a round thing into thin air)
     const upright = g.type === 'BoxGeometry' && Math.abs(e[5]) / Math.max(1e-6, Math.hypot(e[4], e[5], e[6])) > 0.995;
     const ring = g.type === 'TorusGeometry' || (g.type === 'TubeGeometry' && g.parameters && g.parameters.path) || !!g.userData.tube;
     const box = g.type === 'BoxGeometry';
@@ -369,7 +370,7 @@ export function createSolids(scene, opts) {
       : box && upright ? [whole]
       : box ? tiledBoxes(bb, M)
       : bough ? boughBoxes(g, bb, M, Math.min(64, Math.ceil(length / seg)))
-      : plain ? insideBoxes(g, M)
+      : plain ? insideBoxes(o.geometry.attributes.position ? o.geometry : g, M)   // (the shape as drawn: smooth.js may have softened it, or swapped a plain rock for a lumpier one)
       : cut(g, Math.min(CELL_MAX, Math.max(CELL, size / 30)) / scale).map(b => worldBox(b, M));
     for (const w of parts) w.how = how;
     const out = [];

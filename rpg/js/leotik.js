@@ -435,8 +435,8 @@ export function buildLeotik(scene) {
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.13), 1300); folkSolid(trunks.mesh);
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 2400);
   const crownsLo = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2600, false);
-  const fronds = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 2000, false);
-  const fronds2 = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 3200, false);
+  const fronds = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 2000, false); noSolid(fronds.mesh);   // palm fronds, like leaves: you brush through them
+  const fronds2 = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 3200, false); noSolid(fronds2.mesh);
   const shrooms = new Kit(scene, new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshToonMaterial({ color: 0xffffff, emissive: 0x2a4a6a, emissiveIntensity: 0.7, gradientMap: ramp() }), 600, false);
   const stems = new Kit(scene, new THREE.CylinderGeometry(1, 1, 1, 6), toon(0xe8e0d0), 600, false);
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 1000); folkSolid(rocks.mesh);

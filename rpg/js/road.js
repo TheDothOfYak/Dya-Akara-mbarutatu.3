@@ -178,10 +178,13 @@ export function createRoad(ctx) {
   function treeResolve(p, rad) { for (const T of TREES) T.resolve(p, rad); }
   function treeSolid(x, y, z) { return TREES.some(T => T.solid(x, y, z)); }
   const auto = new Colliders(heightAt);   // and everything else you can see (solid.js), filled once it's all built
-  function groundAt(x, z, y, skip) {
+  /* you stand on and bump into what's drawn, exactly (the boxes solid.js fitted, `auto`), and the few solids that move with what
+     they stand for (marked .you: the cart, which rolls); the rest, placed by hand, are for the folk, who keep to them */
+  function groundAt(x, z, y, skip, you = false) {
     let g = Math.max(heightAt(x, z), treeGround(x, z, y));
+    if (you) g = Math.max(g, auto.ground(x, z, y));
     for (const s of solids) {
-      if (s === skip) continue;
+      if (s === skip || (you && !s.you)) continue;
       if (Math.abs(x - s.x) > 12 + (s.r || 0) || Math.abs(z - s.z) > 12 + (s.r || 0)) continue;
       if (s.y1 > y + STEP || s.y1 <= g) continue;
       if (s.kind === 'box' ? Math.abs(x - s.x) < s.hw && Math.abs(z - s.z) < s.hd : Math.hypot(x - s.x, z - s.z) < s.r) g = s.y1;
@@ -189,9 +192,10 @@ export function createRoad(ctx) {
     return g;
   }
   function resolve(p, rad = PR) {
-    if (p === P.pos) auto.resolve(p, rad, PH);   // you, not the folk: they keep to the colliders placed by hand
+    const you = p === P.pos;
+    if (you) auto.resolve(p, rad, PH);
     for (const s of solids) {
-      if (p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
+      if ((you && !s.you) || p.y + PH < s.y0 || p.y >= s.y1 - STEP) continue;
       if (Math.abs(p.x - s.x) > 12 + (s.r || 0) || Math.abs(p.z - s.z) > 12 + (s.r || 0)) continue;
       if (s.kind === 'box') {
         const dx = p.x - s.x, dz = p.z - s.z, ox = s.hw + rad - Math.abs(dx), oz = s.hd + rad - Math.abs(dz);
@@ -217,6 +221,9 @@ export function createRoad(ctx) {
     }
     return treeSolid(x, y, z) || y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
   }
+  // (what solid.js leaves alone as already solid: the land, the home trees' own walls, and itself — not the folk's hand-placed
+  // solids, or what's under them would never be made solid for you)
+  const solidYou = (x, y, z) => treeSolid(x, y, z) || y < heightAt(x, z) + 0.2 || inColliders(auto, x, y, z);
 
   /* ---------------- Fyrsti'Vilag, on Xikia ---------------- */
   const kit = createCityKit(scene, { rng, heightAt, box, cyl, palette: 'xikia' });
@@ -359,7 +366,7 @@ export function createRoad(ctx) {
   function buildCart() { const c = buildCartModel(); noSolid(c.g); scene.add(c.g); return c; }   // it rolls: CART.solid is its bulk
   const CART = Object.assign(buildCart(), { pos: V3(CART0.x, 0, CART0.z), yaw: Math.PI, speed: 0, roll: 0, path: null, driver: false, loose: null });
   CART.home = CART.punks.map(pk => ({ p: pk.root.position.clone(), s: pk.root.scale.clone() }));
-  CART.solid = box(CART.pos.x, CART.pos.z, 1.4, 3.2, -1, 2.4);
+  CART.solid = Object.assign(box(CART.pos.x, CART.pos.z, 1.4, 3.2, -1, 2.4), { you: true });   // (it rolls: not made solid as drawn, so its bulk is this)
   function placeCart(x, z, yaw) { CART.pos.set(x, groundAt(x, z, 60, CART.solid), z); CART.yaw = yaw; CART.speed = 0; }
   placeCart(CART0.x, CART0.z, Math.PI);
   /* out on the road the cart drives itself — Buhkon on the bench with the reins — along the road and never off it.
@@ -1797,7 +1804,7 @@ export function createRoad(ctx) {
     P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt;
     resolve(P.pos);
     P.pos.y += P.vel.y * dt;
-    const g = Math.max(groundAt(P.pos.x, P.pos.z, P.pos.y), auto.ground(P.pos.x, P.pos.z, P.pos.y));
+    const g = groundAt(P.pos.x, P.pos.z, P.pos.y, null, true);
     if (P.pos.y <= g + 0.02 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; P.onGround = true; P.coyote = 0.12; }
     else if (P.onGround && P.pos.y - g < 1.2 && P.vel.y <= 0) { P.pos.y = g; P.vel.y = 0; }
     else P.onGround = false;
@@ -2004,7 +2011,7 @@ export function createRoad(ctx) {
     if (at === 'day1') startDay1(); else if (at === 'day2') { D1 = { pebble: true }; startDay2(); } else if (at === 'day3') { K.on = true; startDay3(); } else if (at === 'day4') { K.on = true; startDay4(); } else startMarket();
   }
   const allSolid = createSolids(scene, {
-    col: auto, heightAt, solidAt, focus: () => P.pos,
+    col: auto, heightAt, solidAt: solidYou, focus: () => P.pos,
     // where resolve lets you go: the city, then the valley either side of the road, as far as its end
     reach: (x, z) => z > END + 5 && z < CITY.z + CITY_R + 2 && (z >= GATE_Z - 2 || Math.abs(x - roadX(z)) < (zone(z) === 'pass' ? 30 : 48) + 3),
   });

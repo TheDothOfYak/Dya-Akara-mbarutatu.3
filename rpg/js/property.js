@@ -316,7 +316,7 @@ export function buildProperty(scene) {
   // (what's drawn is solid exactly as drawn — solid.js, folkSolid for what folk walk round too. Nothing here gets a box
   // placed round it by hand: those never matched, and stood out past things into thin air.)
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 6, 1, true), paint(toon(0xffffff), 'bark', 0.12), 9800, false); folkSolid(trunks.mesh);
-  const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false);
+  const cones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 11000, false); noSolid(cones.mesh);   // a pine's needles, like leaves: you brush through them
   const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 13200, false); noSolid(crowns.mesh);   // leaves: you brush through them (the trunks and boughs are solid)
   const tufts = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 4000, false);   // small leafy and flowery bits: boxes, ivy, moss, the garden
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 4200, false); noSolid(crops.mesh);   // you wade through it, like grass

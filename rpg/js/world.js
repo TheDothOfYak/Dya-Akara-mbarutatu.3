@@ -585,7 +585,7 @@ export function buildWorld(scene) {
     const leaf2 = new THREE.MeshToonMaterial({ color: 0xffb03a, emissive: 0xff7a10, emissiveIntensity: 0.5, gradientMap: ramp() });
     for (let k = 0; k < 16; k++) {
       const a = rng() * Math.PI * 2, r = rng() * 11;
-      const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(4 + rng() * 3.5, 1), rng() < 0.5 ? leaf : leaf2);
+      const blob = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(4 + rng() * 3.5, 1), rng() < 0.5 ? leaf : leaf2));   // (leaves: you brush through them)
       blob.position.set(Math.cos(a) * r, 29 + rng() * 9, Math.sin(a) * r);
       fireTree.add(blob);
     }
@@ -788,7 +788,7 @@ export function buildWorld(scene) {
   const pick2 = a => a[Math.floor(rng2() * a.length)];
   const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), paintMat(toon(0xffffff), 'bark', 0.12), 1500); folkSolid(wTrunks.mesh);
   const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2800);
-  const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400);
+  const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400); noSolid(wCones.mesh);   // a pine's needles, like leaves: you brush through them
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900); folkSolid(wRocks.mesh);
   const farTrees = new Kit(scene, new THREE.ConeGeometry(1, 1, 5), toon(0xffffff), 1600, false);
   const reeds = new Kit(scene, new THREE.CylinderGeometry(0.035, 0.07, 1, 3), toon(0xffffff), 1000, false); noSolid(reeds.mesh);   // you wade through reeds, like grass

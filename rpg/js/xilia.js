@@ -505,7 +505,7 @@ export function buildXilia(scene) {
     const barkMat = toon(0x6a2c1c, { emissive: 0x3a0e04, emissiveIntensity: 0.4 });
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.8, 16, 10), barkMat); trunk.position.y = 8; ft.add(trunk);
     const leaf = new THREE.MeshToonMaterial({ color: 0xff6f22, emissive: 0xff4a10, emissiveIntensity: 0.55, gradientMap: ramp() });
-    for (let k = 0; k < 10; k++) { const a = rng() * 6.28, r = rng() * 7; const b = new THREE.Mesh(new THREE.IcosahedronGeometry(3 + rng() * 2.5, 1), leaf); b.position.set(Math.cos(a) * r, 18 + rng() * 6, Math.sin(a) * r); ft.add(b); }
+    for (let k = 0; k < 10; k++) { const a = rng() * 6.28, r = rng() * 7; const b = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(3 + rng() * 2.5, 1), leaf)); b.position.set(Math.cos(a) * r, 18 + rng() * 6, Math.sin(a) * r); ft.add(b); }
     outlineAll(ft, 0.1); ft.traverse(m => { if (m.isMesh && m.name !== 'outline') m.castShadow = true; });
     ft.position.set(x, g - 0.4, z); scene.add(folkSolid(ft));
     const glow = glowSprite(0xff8a3a, 40, 0.3); glow.position.set(x, g + 20, z); scene.add(glow);
@@ -548,7 +548,7 @@ export function buildXilia(scene) {
   /* ---------- the wild highlands: pine forest, broadleaf stands, boulders, scree under the ridges ---------- */
   const wrng = mulberry32(7331);            // its own stream, so the town's placements never shift
   const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), paint(toon(0xffffff), 'bark', 0.12), 3400, false); folkSolid(wTrunks.mesh);
-  const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 6000, false);
+  const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 6000, false); noSolid(wCones.mesh);   // a pine's needles, like leaves: you brush through them
   const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 1800, false);
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 700, false); folkSolid(wRocks.mesh);
   const PINE = ['#2f6a3a', '#3a7a40', '#2a5a34', '#467f44', '#356e3c'], BROAD = ['#6aa040', '#7ab04a', '#5a9a3a', '#8ab84a', '#c8a03a'];
