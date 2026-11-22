@@ -260,7 +260,7 @@ export function buildProperty(scene) {
     const P = g.attributes.position, N = g.attributes.normal, cc = new Float32Array(P.count * 3);
     for (let i = 0; i < P.count; i++) { fn(P.getX(i), P.getZ(i), P.getY(i), N.getY(i), c); cc[i * 3] = c.r; cc[i * 3 + 1] = c.g; cc[i * 3 + 2] = c.b; }
     g.setAttribute('color', new THREE.BufferAttribute(cc, 3));
-    const m = new THREE.Mesh(g, terrainMat); m.receiveShadow = true; scene.add(m); return m;
+    const m = noSolid(new THREE.Mesh(g, terrainMat)); m.receiveShadow = true; scene.add(m); return m;   // (the land: solid by heightAt, exactly — cut into boxes, its cells stood off its curves)
   };
   const RECTS = [{ x0: -760, x1: 560, z0: -620, z1: 620 }, { x0: 500, x1: 1290, z0: -130, z1: 130 },
     { x0: -1260, x1: -940, z0: -100, z1: 340 }, { x0: -720, x1: -400, z0: -900, z1: -620 }];   // fine ground round the colossi's roots

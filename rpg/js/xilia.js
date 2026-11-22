@@ -274,7 +274,7 @@ export function buildXilia(scene) {
     const P = g.attributes.position, N = g.attributes.normal, col = new Float32Array(P.count * 3);
     for (let i = 0; i < P.count; i++) { colorFn(P.getX(i), P.getZ(i), P.getY(i), N.getY(i), c); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const m = new THREE.Mesh(g, terrainMat); m.receiveShadow = true; scene.add(m); return m;
+    const m = noSolid(new THREE.Mesh(g, terrainMat)); m.receiveShadow = true; scene.add(m); return m;   // (the land: solid by heightAt, exactly)
   };
   {
     const SIZE = 460, SEG = 220;
