@@ -40,7 +40,7 @@ import { latchAlongRay } from './vines.js';
 import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tiltUp } from './util.js';
 import * as STORY from './story.js';
 import { Colliders } from './terrain.js';
-import { createSolids, inColliders } from './solid.js';
+import { createSolids, inColliders, noSolid } from './solid.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -208,8 +208,8 @@ export function createMegla(ctx) {
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _c = new THREE.Color();
   const put = (k, x, y, z, sx, sy, sz, rx, ry, rz, color) => { if (k.count >= k.instanceMatrix.count) return; _e.set(rx, ry, rz); _q.setFromEuler(_e); _m.compose(V3(x, y, z), _q, V3(sx, sy, sz)); k.setMatrixAt(k.count, _m); k.setColorAt(k.count, _c.set(color)); k.count++; };
   const trunks = kit(new THREE.CylinderGeometry(0.7, 1, 1, 9, 1, true), paint(toon(0xffffff), 'bark', 0.12), 1400);
-  const cones = kit(new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 2600);
-  const blobs = kit(new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
+  const cones = noSolid(kit(new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 2600));   // leaves and needles: you brush through them
+  const blobs = noSolid(kit(new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600));   // leaves and needles: you brush through them
   const rocks = kit(new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900);
   const ferns = kit(new THREE.ConeGeometry(1, 1, 5), toon(0xffffff), 4000);
   const stones = kit(new THREE.BoxGeometry(1, 1, 1), paint(toon(0xffffff), 'stone'), 1400, true);
@@ -308,7 +308,7 @@ export function createMegla(ctx) {
       const tx = x + sx * (h + 4), tz = z + sz * (h + 4), tg = heightAt(tx, tz);
       mk(new THREE.CylinderGeometry(1.3, 2.0, 24, 10), toon(0x3a2e2a), tx, tg + 12, tz);
       const plat = mk(new THREE.CylinderGeometry(3.2, 3.2, 0.4, 12), toon(0x4a3a30), tx, tg + 13, tz);
-      for (let k = 0; k < 3; k++) mk(new THREE.IcosahedronGeometry(5 + k, 1), keepMats.leaf, tx + (k - 1) * 3, tg + 19 + k * 2, tz + (k % 2) * 2);
+      for (let k = 0; k < 3; k++) noSolid(mk(new THREE.IcosahedronGeometry(5 + k, 1), keepMats.leaf, tx + (k - 1) * 3, tg + 19 + k * 2, tz + (k % 2) * 2));
       cyl(tx, tz, 1.8, tg - 1, tg + 12.6); cyl(tx, tz, 3.2, tg + 12.6, tg + 13.2);
       towers.push({ x: tx, z: tz, g: tg, top: tg + 13.2, plat });
     }

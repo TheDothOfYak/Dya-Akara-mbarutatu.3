@@ -331,7 +331,7 @@ export function buildXilia(scene) {
   // (what's drawn here is solid exactly as drawn — solid.js; folkSolid for what folk walk round too. No box gets placed
   // round a drawn thing by hand: those never matched it, and stood out past it into thin air)
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.12), 320); folkSolid(trunks.mesh);
-  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600);
+  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 1600); noSolid(crowns.mesh);   // leaves: you brush through them (whatever their colour)
   const crops = new Kit(scene, new THREE.ConeGeometry(0.25, 1, 5), toon(0xffffff), 1600, false); noSolid(crops.mesh);   // you wade through a field, like grass
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 300); folkSolid(rocks.mesh);
   const keepOut = (x, z, extra = 0) => CLEAR.some(c => Math.hypot(x - c.x, z - c.z) < c.r + extra) || roadDist(x, z) < 5 + extra || Math.hypot(x, z) > oldEdge(x, z) - 14 || !!inField(x, z);
@@ -549,7 +549,7 @@ export function buildXilia(scene) {
   const wrng = mulberry32(7331);            // its own stream, so the town's placements never shift
   const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.55, 0.8, 1, 5, 1, true), paint(toon(0xffffff), 'bark', 0.12), 3400, false); folkSolid(wTrunks.mesh);
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 7, 1, true), toon(0xffffff), 6000, false); noSolid(wCones.mesh);   // a pine's needles, like leaves: you brush through them
-  const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 1800, false);
+  const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 1800, false); noSolid(wCrowns.mesh);   // leaves: you brush through them (whatever their colour)
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 700, false); folkSolid(wRocks.mesh);
   const PINE = ['#2f6a3a', '#3a7a40', '#2a5a34', '#467f44', '#356e3c'], BROAD = ['#6aa040', '#7ab04a', '#5a9a3a', '#8ab84a', '#c8a03a'];
   const WILD_KEEP = [...ALBALI.map(p => ({ x: p.x, z: p.z, r: 14 })), ...JU.map(j => ({ x: j.x, z: j.z, r: j.r + 3 })), { x: 0, z: 200, r: 30 }];

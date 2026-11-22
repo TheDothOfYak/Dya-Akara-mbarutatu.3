@@ -483,8 +483,8 @@ export function createRoad(ctx) {
     }
     const inst = (geo, mat, list, put) => { const m = new THREE.InstancedMesh(geo, mat, list.length); const o = new THREE.Object3D(); list.forEach((v, i) => { put(o, v); o.updateMatrix(); m.setMatrixAt(i, o.matrix); }); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; };
     inst(trunkG, toon(0x6b4128), trunks, (o, [x, y, z, s, h]) => { o.position.set(x, y, z); o.scale.set(s, h, s); o.rotation.set(0, 0, 0); });
-    inst(crownG, toon(0x6aa040), crowns, (o, [x, y, z, r]) => { o.position.set(x, y, z); o.scale.set(r, r * 0.85, r); o.rotation.set(rng(), rng(), rng()); });
-    inst(coneG, toon(0x2f6a3a), cones, (o, [x, y, z, r, h]) => { o.position.set(x, y, z); o.scale.set(r, h, r); o.rotation.set(0, rng() * 6, 0); });
+    noSolid(inst(crownG, toon(0x6aa040), crowns, (o, [x, y, z, r]) => { o.position.set(x, y, z); o.scale.set(r, r * 0.85, r); o.rotation.set(rng(), rng(), rng()); }));
+    noSolid(inst(coneG, toon(0x2f6a3a), cones, (o, [x, y, z, r, h]) => { o.position.set(x, y, z); o.scale.set(r, h, r); o.rotation.set(0, rng() * 6, 0); }));   // leaves and needles: you brush through them
     inst(new THREE.DodecahedronGeometry(1, 0), toon(0x9a9284), rocks, (o, [x, y, z, s]) => { o.position.set(x, y, z); o.scale.set(s * 1.2, s * 0.75, s); o.rotation.set(rng() * 3, rng() * 3, 0); });
   }
   /* the camps: a fire in a clearing by the road. The tent and the little workbench come off the cart each

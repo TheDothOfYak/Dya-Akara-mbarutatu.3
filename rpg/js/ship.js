@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { toon, ramp, glowSprite, outlineAll } from './gfx.js';
 import { mulberry32 } from './util.js';
+import { noSolid } from './solid.js';
 import { buildStryx } from './esik_land.js';
 
 function barkTextures() {
@@ -123,7 +124,7 @@ export function buildEldiShip(opts = {}) {
   const leafMat = new THREE.MeshToonMaterial({ color: 0xff7a2a, emissive: 0xff4a10, emissiveIntensity: 0.7, gradientMap: ramp() });
   const rng = mulberry32(11);
   for (let i = 0; i < 9; i++) {
-    const l = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rng() * 0.6, 0), leafMat);
+    const l = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rng() * 0.6, 0), leafMat));
     l.position.set((rng() - 0.5) * 2.4, 17.4 + rng() * 1.6, -3.5 + (rng() - 0.5) * 2.4);
     body.add(l);
   }

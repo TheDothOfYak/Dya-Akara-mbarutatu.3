@@ -1860,7 +1860,7 @@ function scarTree() {
     const gash = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 0.08), rub);
     gash.position.set(-0.18 + i * 0.18, 1.6 + i * 0.12, 0.6 - Math.abs(i - 1) * 0.04); gash.rotation.z = 0.25; g.add(gash);
   }
-  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.1, 0), toon(0x3d5a2a)); crown.position.y = 5.6; g.add(crown);
+  const crown = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(2.1, 0), toon(0x3d5a2a))); crown.position.y = 5.6; g.add(crown);
   outlineAll(g);
   return g;
 }

@@ -375,7 +375,7 @@ export function buildWorld(scene) {
   })();
   const columns = new Kit(scene, colGeo, paintMat(toon(0xffffff), 'stone'), 600); folkSolid(columns.mesh);
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paintMat(toon(0xffffff), 'bark', 0.12), 300); folkSolid(trunks.mesh);
-  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600);
+  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff, {}), 1600); noSolid(crowns.mesh);   // leaves: you brush through them (whatever their colour)
   const rocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff, {}), 500); folkSolid(rocks.mesh);
 
   /* a solid block standing on the ground; registers a collider */
@@ -711,7 +711,7 @@ export function buildWorld(scene) {
     grp.add(top, bottom);
     if (rng() < 0.6) {
       const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, s * 0.8, 6), paintMat(toon(0x6b4128), 'bark', 0.12)); t.position.y = s * 0.5; grp.add(t);
-      const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.35, 1), toon(new THREE.Color(pick(LEAF)), {})); cr.position.y = s; grp.add(cr);
+      const cr = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.35, 1), toon(new THREE.Color(pick(LEAF)), {}))); cr.position.y = s; grp.add(cr);
     }
     outlineAll(grp, 0.12);
     grp.position.set(Math.cos(a) * r, 130 + rng() * 110, Math.sin(a) * r);
@@ -787,7 +787,7 @@ export function buildWorld(scene) {
   const rng2 = mulberry32(8821);
   const pick2 = a => a[Math.floor(rng2() * a.length)];
   const wTrunks = new Kit(scene, new THREE.CylinderGeometry(0.6, 1, 1, 6), paintMat(toon(0xffffff), 'bark', 0.12), 1500); folkSolid(wTrunks.mesh);
-  const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2800);
+  const wCrowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2800); noSolid(wCrowns.mesh);   // leaves: you brush through them (whatever their colour)
   const wCones = new Kit(scene, new THREE.ConeGeometry(1, 1, 6), toon(0xffffff), 400); noSolid(wCones.mesh);   // a pine's needles, like leaves: you brush through them
   const wRocks = new Kit(scene, new THREE.DodecahedronGeometry(1, 0), toon(0xffffff), 900); folkSolid(wRocks.mesh);
   const farTrees = new Kit(scene, new THREE.ConeGeometry(1, 1, 5), toon(0xffffff), 1600, false);

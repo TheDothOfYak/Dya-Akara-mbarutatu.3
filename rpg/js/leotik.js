@@ -433,8 +433,8 @@ export function buildLeotik(scene) {
   // (what's drawn here is solid exactly as drawn — solid.js; folkSolid for what folk walk round too. No box gets placed
   // round a drawn thing by hand: those never matched it, and stood out past it into thin air)
   const trunks = new Kit(scene, new THREE.CylinderGeometry(0.7, 1, 1, 7), paint(toon(0xffffff), 'bark', 0.13), 1300); folkSolid(trunks.mesh);
-  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 2400);
-  const crownsLo = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2600, false);
+  const crowns = new Kit(scene, new THREE.IcosahedronGeometry(1, 1), toon(0xffffff), 2400); noSolid(crowns.mesh);   // leaves: you brush through them (whatever their colour)
+  const crownsLo = new Kit(scene, new THREE.IcosahedronGeometry(1, 0), toon(0xffffff), 2600, false); noSolid(crownsLo.mesh);   // leaves: you brush through them (whatever their colour)
   const fronds = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 2000, false); noSolid(fronds.mesh);   // palm fronds, like leaves: you brush through them
   const fronds2 = new Kit(scene, new THREE.ConeGeometry(1, 1, 4, 1, true), toon(0xffffff, { side: THREE.DoubleSide }), 3200, false); noSolid(fronds2.mesh);
   const shrooms = new Kit(scene, new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshToonMaterial({ color: 0xffffff, emissive: 0x2a4a6a, emissiveIntensity: 0.7, gradientMap: ramp() }), 600, false);
@@ -813,7 +813,7 @@ export function buildLeotik(scene) {
       const ta = r2() * Math.PI * 2, tr = r2() * s * 0.6, th = s * (0.5 + r2() * 0.5);
       const tx = Math.cos(ta) * tr, tz = Math.sin(ta) * tr;
       const tk = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.035, s * 0.06, th, 6), trunkM); tk.position.set(tx, s * 0.17 + th / 2, tz); grp.add(tk);
-      const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(s * (0.22 + r2() * 0.14), 1), crownM); cr.scale.y = 0.8; cr.position.set(tx, s * 0.17 + th, tz); grp.add(cr);
+      const cr = noSolid(new THREE.Mesh(new THREE.IcosahedronGeometry(s * (0.22 + r2() * 0.14), 1), crownM)); cr.scale.y = 0.8; cr.position.set(tx, s * 0.17 + th, tz); grp.add(cr);
     }
     const rootM = toon(0x3a2e24);
     for (let k = 0; k < 7; k++) {
