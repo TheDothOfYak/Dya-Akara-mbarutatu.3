@@ -149,7 +149,17 @@ function insideBoxes(geo, M) {
     for (let i = 0; i < n; i++) { const y = W[i * 3 + 1]; if (y >= lo - 1e-4 && y <= hi + 1e-4) r = Math.min(r, Math.hypot(W[i * 3] - cx, W[i * 3 + 2] - cz)); }
     const a = r * 0.92 * Math.SQRT1_2;
     if (!(a > 0.05)) continue;
-    for (const ang of [0, Math.PI / 4]) out.push({ x: cx, z: cz, hw: a, hd: a, ang, bot: lo, top: hi });
+    // (and no higher than the surface over it, nor lower than the surface under it: a rounded top — a cap, a dome, a
+    // softened rim — comes down toward its edge)
+    const foot = a * Math.SQRT2 + 0.02, mid = (lo + hi) / 2;
+    let top = hi, bot = lo;
+    for (let i = 0; i < n; i++) {
+      const y = W[i * 3 + 1]; if (y < lo - bh || y > hi + bh) continue;
+      if (Math.hypot(W[i * 3] - cx, W[i * 3 + 2] - cz) > foot) continue;
+      if (y >= mid) top = Math.min(top, y); else bot = Math.max(bot, y);
+    }
+    if (top - bot < 0.02) continue;
+    for (const ang of [0, Math.PI / 4]) out.push({ x: cx, z: cz, hw: a, hd: a, ang, bot, top });
   }
   return out;
 }
@@ -173,14 +183,27 @@ function segBoxes(x0, y0, z0, x1, y1, z1, r, out) {
     if (top - bot > 0.02) out.push({ x: mx, z: mz, hw, hd: r * across, ang, bot, top });
   }
 }
-/* a run of points with a radius at each: lengths of tube between them, each cut short enough to stay on the surface */
+/* a run of points with a radius at each: lengths of tube between them, each cut short enough to stay on the surface.
+   An open end is cut square across the tube, so where the tube leans, a box reaching up or down from the axis near the
+   end would reach past it: the run is trimmed back from each open end by as much (none for a closed ring). */
 const _sa = new THREE.Vector3(), _sb = new THREE.Vector3();
 function tubeBoxes(pts, rad, out = []) {
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i], r = Math.min(rad[i - 1], rad[i]) * 0.9;   // (a margin: softened by smooth.js, a tube's surface comes in a little)
-    const n = Math.max(1, Math.min(16, Math.ceil(Math.abs(b.y - a.y) / 0.16)));   // short enough up a slope that a flat top never stands off it
-    for (let k = 0; k < n; k++) {
-      _sa.lerpVectors(a, b, k / n); _sb.lerpVectors(a, b, (k + 1) / n);
+  const n = pts.length - 1;
+  if (n < 1) return out;
+  const closed = pts[0].distanceTo(pts[n]) < 1e-3;
+  const len = []; let total = 0;
+  for (let i = 1; i <= n; i++) { len.push(pts[i - 1].distanceTo(pts[i])); total += len[i - 1]; }
+  const trimAt = (a, b, r) => { const L = a.distanceTo(b) || 1, ay = Math.abs(b.y - a.y) / L, flat = Math.sqrt(Math.max(0, 1 - ay * ay)); return flat < 0.45 ? 0 : r * ay / flat; };
+  const t0 = closed ? 0 : trimAt(pts[0], pts[1], rad[0]), t1 = closed ? 0 : trimAt(pts[n - 1], pts[n], rad[n]);
+  let s0 = 0;
+  for (let i = 1; i <= n; i++) {
+    const a = pts[i - 1], b = pts[i], L = len[i - 1], r = Math.min(rad[i - 1], rad[i]) * 0.9;   // (a margin: softened by smooth.js, a tube's surface comes in a little)
+    const f0 = Math.max(0, (t0 - s0) / (L || 1)), f1 = Math.min(1, (total - t1 - s0) / (L || 1));
+    s0 += L;
+    if (f1 <= f0) continue;
+    const k = Math.max(1, Math.min(16, Math.ceil(Math.abs(b.y - a.y) * (f1 - f0) / 0.16)));   // short enough up a slope that a flat top never stands off it
+    for (let q = 0; q < k; q++) {
+      _sa.lerpVectors(a, b, f0 + (f1 - f0) * q / k); _sb.lerpVectors(a, b, f0 + (f1 - f0) * (q + 1) / k);
       segBoxes(_sa.x, _sa.y, _sa.z, _sb.x, _sb.y, _sb.z, r, out);
     }
   }
