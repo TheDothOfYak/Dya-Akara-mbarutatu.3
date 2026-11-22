@@ -629,7 +629,9 @@ export function buildProperty(scene) {
             const [x0, z0, t0, ra0] = tops[k - 1], [x1, z1, t1, ra1] = tops[k], len2 = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0);
             const ns = Math.max(1, Math.ceil(len2 / 0.75)), bot = Math.min(tops[k][5], tops[k - 1][5]) - 1;   // short pieces, so each is a step you can take
             // (each a pair crossed inside the root's oval section, from the ground up: its top on the crest, its sides on the bark)
-            for (let q = 0; q < ns; q++) { const f = (q + 0.5) / ns, rb = lerp(tops[k - 1][4], tops[k][4], f), mid = lerp(t0, t1, f) - rb; crossed(lerp(x0, x1, f), lerp(z0, z1, f), len2 / ns / 2 + 0.05, ang, mid, lerp(ra0, ra1, f), rb, bot); }
+            // (where the root runs steeply down, its oval section leans with it: the crest stands lower over the centreline)
+            const lean = Math.cos(Math.atan2(Math.abs(t1 - t0), len2 || 1));
+            for (let q = 0; q < ns; q++) { const f = (q + 0.5) / ns, rb = lerp(tops[k - 1][4], tops[k][4], f), mid = lerp(t0, t1, f) - rb; crossed(lerp(x0, x1, f), lerp(z0, z1, f), len2 / ns / 2 + 0.05, ang, mid, lerp(ra0, ra1, f), rb * lean, bot); }
           }
           return tops;
         };
