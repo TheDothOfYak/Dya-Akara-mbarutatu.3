@@ -165,7 +165,7 @@
     g.textAlign = 'center';
     const ty = vh * 0.2;
     font(g, Math.min(96, vw * 0.105)); outlined(g, '4 Brothers World', vw / 2, ty, '#fff3d0', 12);
-    font(g, 30); outlined(g, 'V3  ·  the Tuftwood sample', vw / 2, ty + 44, '#ffd27a', 6);
+    font(g, 30); outlined(g, 'Tuftwood', vw / 2, ty + 44, '#ffd27a', 6);
     // pick who walks out first
     const gap = Math.min(170, (vw - 40) / 4), bx = vw / 2 - gap * 1.5, by = vh * 0.62;
     if (I.hit('right')) { UI.titleSel = (UI.titleSel + 1) % 4; A().sfx('page'); } if (I.hit('left')) { UI.titleSel = (UI.titleSel + 3) % 4; A().sfx('page'); }
@@ -182,7 +182,7 @@
     const blink = 0.6 + 0.4 * Math.sin(S.time * 4); g.globalAlpha = blink; font(g, 26);
     outlined(g, UI.touch ? 'tap again to begin' : 'A / D to choose     Space to begin', vw / 2, by + 132, '#ffe9a8', 5); g.globalAlpha = 1;
     if (V3.save.has()) { font(g, 22); outlined(g, UI.touch ? 'tap here to continue your saved walk' : 'C  continue your saved walk', vw / 2, by + 168, '#bfe6ff', 5); UI.hits.push({ x: vw / 2, y: by + 162, r: 150, ry: 18, fn: () => V3.game.continue() }); }
-    font(g, 15, 400); outlined(g, 'A sample of what V3 could be. Saves are kept apart from V2.', vw / 2, vh - 18, '#e6d6b8', 4);
+    font(g, 15, 400); outlined(g, 'A 4 Brothers minigame. Saves are kept in this browser.', vw / 2, vh - 18, '#e6d6b8', 4);
   };
 
   // ---------- touch ----------
@@ -241,7 +241,7 @@
     if (UI.journal) drawJournal(g, vw, vh);
     if (UI.end > 0) {
       const a = U.clamp((UI.end - 1) / 1.5, 0, 1); g.fillStyle = 'rgba(16,12,30,' + a * 0.78 + ')'; g.fillRect(0, 0, vw, vh); g.globalAlpha = a; g.textAlign = 'center';
-      font(g, 58); outlined(g, 'End of the sample', vw / 2, vh * 0.3, '#ffe9a8', 9);
+      font(g, 58); outlined(g, 'The end', vw / 2, vh * 0.3, '#ffe9a8', 9);
       font(g, 25, 400); ['The baby World Eater has seen the brothers.', 'In the full game, the rifts open from here: Tanglehold, Cloudtop, the Duat.', '', 'You found ' + F().found.size + ' of ' + F().all.length + ' surprises and ' + F().kept.size + ' of ' + F().keepsakes.length + ' keepsakes.', 'Tuftwood is still yours to wander.'].forEach((l, i) => outlined(g, l, vw / 2, vh * 0.42 + i * 36, '#fff8e6', 5));
       font(g, 24); if (UI.end > 3) { outlined(g, UI.touch ? 'tap to keep exploring' : 'Space to keep exploring', vw / 2, vh * 0.78, '#bfe6ff', 5); UI.hits.push({ x: vw / 2, y: vh / 2, r: 9999, fn: () => { UI.end = 0; } }); if (I.hit('jump') || I.hit('poke')) UI.end = 0; }
       g.globalAlpha = 1;

@@ -51,6 +51,7 @@
     { id: 'ld', name: 'Little Dungeon', href: 'mini-games/little-dungeon/index.html', tagline: 'A tiny card-battling dungeon crawl' },
     { id: 'pr', name: 'Punk Races', href: 'mini-games/punk-races/index.html', tagline: 'Swing a Punk tree to tree for the purse' },
     { id: 'sp', name: 'Stryx Pilot', href: 'mini-games/stryx-pilot/index.html', tagline: 'Fly cargo and folk between the three Tatu' },
+    { id: 'tw', name: 'Four Brothers: Tuftwood', href: 'mini-games/tuftwood/index.html', tagline: 'Four brothers, one painted forest' },
   ];
   const SCOPES = [['all', 'Every game']].concat(GAMES.concat(MINI).map(g => [g.id, g.name]));
 

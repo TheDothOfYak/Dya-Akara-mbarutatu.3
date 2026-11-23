@@ -50,7 +50,7 @@
       skyNarrow: { cx: 0.5, cy: 0.12, maxR: 34, labels: true, sun: [0.92, 0.04] },
     },
   };
-  const MINI_ICON = { ld: '🗝', pr: '🐾', sp: '🪶' };
+  const MINI_ICON = { ld: '🗝', pr: '🐾', sp: '🪶', tw: '🌰' };
 
   let hub = F.hubConfig();
   let session = F.session();
@@ -270,7 +270,7 @@
     slide.appendChild(el('p', { cls: 'g-vibe', text: look.vibe || '' }));
     slide.appendChild(el('ul', { cls: 'g-feats' }, (look.feats || []).map(f => el('li', { text: f }))));
     /* the 4 Brothers' big redesign, V2, plays from its own button next to the main game */
-    const extraBtns = g.id === '4bw' && !g.soon ? [el('button', { cls: 'play', type: 'button', text: 'Play V2', title: 'The V2 preview: new hero magic, legendary chests and more', style: 'margin-left:10px', onclick: () => play(Object.assign({}, g, { href: 'four-brothers-world-v2/index.html' })) }), el('button', { cls: 'play', type: 'button', text: 'V3 sample', title: 'A first look at V3: a hand-painted Tuftwood with all four brothers', style: 'margin-left:10px', onclick: () => play(Object.assign({}, g, { href: 'four-brothers-world-v3/index.html' })) })] : [];
+    const extraBtns = g.id === '4bw' && !g.soon ? [el('button', { cls: 'play', type: 'button', text: 'Play V2', title: 'The V2 preview: new hero magic, legendary chests and more', style: 'margin-left:10px', onclick: () => play(Object.assign({}, g, { href: 'four-brothers-world-v2/index.html' })) })] : [];
     if (b) extraBtns.forEach(x => { x.disabled = true; });
     slide.appendChild(el('div', { cls: 'g-actions' }, [playBtn].concat(extraBtns, [note])));
     slide.setAttribute('aria-label', (idx + 1) + ' of ' + list.length + ': ' + txt.name);
