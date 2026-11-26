@@ -322,6 +322,7 @@
     await Promise.all([
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('rpg_save:' + accId)),
       rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('fbw:' + accId + ':*')),
+      rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('fbw3:' + accId + ':*')),   // 4 Brothers V3
       rest('DELETE', 'dya_config?key=like.' + encodeURIComponent('su:' + accId + ':*')),
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_rooms:' + accId)),
       rest('DELETE', 'dya_config?key=eq.' + encodeURIComponent('su_rec:' + accId)),

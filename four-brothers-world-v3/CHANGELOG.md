@@ -1,0 +1,249 @@
+# 4 Brothers World V3
+
+V3 is built on V2: it has everything V2 has, and keeps its own heroes, worlds and rooms (V2 is untouched and still plays from Play V2). Everyone starts a fresh hero in V3.
+
+## A new Rock World, different every time
+- **Twice the size** (1280 x 700 blocks), and **every world rolls its own layout**. Friends who join your room are sent your world, so you all stand in the same caves.
+- **Layers:** the open sea (no more rock pillars sticking out of it), the upper crust with winding dry caves and your home cave, a band of great caverns, the water tubes, the vast flooded Heart Chamber, the deep veins.
+- **Vertical shafts** lead down: from the crust into every cavern (with ledges to rest on and a chain to climb), from your cave straight down into Stalagmere, and two long shafts down to the Heart Chamber. Water drains run from the cavern pools down to the tubes.
+- **Open caverns:** slim stalagmites rise from the floor and slim stalactites hang high from the roof, and both carry **farms** (mushrooms, moss, lichen and crystal sprouts on soil ledges).
+- **Stalagmere** is still the home town, with Gneiss, Wedgeworth, Cubert and Slagg's forge, and now a **Starter Chest** with the worst tools there are (a flint pick, a flint hand-axe, a little wood sword, a wood spear, torches and moss).
+- **3 to 5 more towns** with cave names (Micarest, Basaltvault, Gneissgrotto…), each with hanging houses, farms, lanterns and a chest.
+- The **Crystal Forest** with its crystal waterfalls, the **shipwrecks**, the **secret rooms** and every carving are still there.
+
+## The Gemscale Leviathan, remade
+- A **massive sea serpent**, about 48 blocks long, armoured in gem-studded plates with a glowing seam, a crest of crystals, swept crystal horns and a jaw full of teeth. It ripples as it swims, rows its fins, opens its jaw to roar, bite and fire.
+- **12,000 health, plus 30% for each extra player** in the chamber.
+- **Shield phases:** at 70% and 30% it raises a crystal shield and calls **Crystal Guardians** (4, then 6). Break them all to bring the shield down.
+- **Enraged at 30%:** red eyes, cracked glowing scales, faster, chained attacks.
+- **Attacks:** lunge and bite, crystal barrage, the **prism laser** (a thin aiming line first, then a sweeping beam), the **whirlpool** (pulls you toward it), **coil and crush** (swim out of the ring before it closes), **stalactite collapse** (watch for the marks), tail slam, and fish.
+- The chamber fills back up with water when the fight starts.
+
+## A sharper picture
+- The game draws at your screen's real resolution. Blocks are **20 x 20 pixels** (400 each), and **every block's edge is worn and uneven where it meets the air**.
+- Heroes, monsters and items are drawn from smoothed, doubled-up copies of their art. **Armour** shows metal plates with a lit edge, a dark rim and rivets. **Weapons and tools** are painted at twice the detail, and swings leave a trail in the weapon's colour. Glows are soft, sparks streak, lightning has a halo.
+- **Zoom:** - zooms out, = zooms in.
+
+## Fixes and controls
+- **Hosting:** opening a room no longer hangs when the room server is slow (it opens on the relay instead), the host reconnects after a wifi blip or a sleeping laptop, the relay is reopened if it drops, and big worlds go through the relay in small steps. A friend on an older copy is told to refresh.
+- **Dropping (Z):** what you drop stays on the ground until you walk away from it, and everyone in the room can see it and pick it up.
+- **The rock** breaks one block per punch; **hold Shift to smash a 2x2 square**. Blocks you place are never knocked out by accident (not by a 2x2 smash, a ram or a slam); you can still mine them on purpose.
+- **The rock can float:** press **C** in water to switch between floating up and sinking (S dives).
+- **The bag** marks the hotbar row clearly, with its keys.
+
+---
+
+# 4 Brothers World V2 (preview)
+
+V2 is built on the main game (v1.8), so it has everything the main game has (account saves, Acorn World's waystones, beds, market day and the rest), plus the V2 changes below. It keeps its own saves on your account, separate from the main game. The first time you play V2 in a browser, it starts from the hero you already have there.
+
+## Sleep through the night
+- **Sleep in a bed at night and you wake up at sunrise.** The day still runs on the shared clock, so this only moves your own sky ahead. When the real sunrise comes, it lines up with everyone else's again.
+
+## Cloudtop, the land on the cloud
+- **A happy magic land on a cloud** floats high above Tuftwood. Press R at Tuftwood's town portal and float up. A cloud portal in the cloud village brings you back down, and if you fall off, a little cloud catches you and floats you gently down. It never rains up there.
+- **Bloomfield Meadows** (flowers everywhere and giant blooms), **Puffton** (the cloud village: a bakery, the mayor's hall, an inn, a workshop and a rainbow fountain), **the Candyfloss Grove** (candyfloss trees, rainbow bridges, and the Rainbow Falls pouring down to the land below) and **the Starlit Isles** (little floating islands under an evening sky).
+- **The cloud folk**: Sprinkles the donut (bakes Sprinkle Donuts from Sky Petals), the Bloomlings (flower folk), Tippy the triangle, Mayor Nimbus the cloud, Inchworth the long block (turns Rainbow Shards into Rainbow Bridges you can build with) and Mr. Doorley the house (rest at his inn).
+- **Only two bad guys**: the Scribbles in the Starlit Isles. They dash at you in a zigzag, then get dizzy, and that's when to hit them. Mayor Nimbus will thank you for calming them.
+
+## Golden boss chests, silver den chests
+- **A big golden chest by every world boss**: Gnarlroot, the Warthog King, the Gemscale Leviathan (on the sea floor), the Hollow Wraith and the Possessed Reflections. It is sealed until you beat that boss. Each hero can open it once: a whole Legendary Key, a Gold Crystal, Star Embers, bars of that world's best metal, a legendary staff you don't have yet, and a big pile of rupees.
+- **A silver chest in every scorpion den.** Beat the Mother Scorpion and the chest on her den floor opens, once each time you beat her: Key Fragments, a Star Ember, crystals, bars (bronze in the desert den, platinum in the jungle den), a Mother's Carapace, sometimes a Legendary Key, and rupees.
+
+## The Stormmark, chests for everyone
+- **The Stormmark.** Get struck by lightning and the storm lives in you for 3 minutes. Your eyes and outline glow cyan, a lightning rune burns on your forehead, and lightning crackles around you. Spark, Fire and Poison come out as Chain Lightning, a rock's ground slam throws a ring of lightning, and anything that touches you gets shocked, other players too. Thunderstorms strike heroes who stand out in them, or (fuzzy) cast Rain on yourself and stand under your own Storm.
+- **Storage Chests by hand**: 8 planks, no Knapping Stone needed. Every hero gets one free Storage Chest.
+- The dirt wall that hung in the sky on the slope left of Tuftwood is gone.
+
+## Caves, lava, clams, weather and rupees
+- **Custom caves in Fuzzy World.** Every part of the world has its own caves, with its own rock and walls: the **Sandstone Galleries** under the desert (long banded halls on three levels with arched roofs, fossils in the rock), the **Root Hollows** under Tuftwood and the Deep Tanglewood (round earthy chambers with roots hanging from the roof that you can climb, and mushrooms), the **Magma Halls** under the Tall Peaks (a great hall of basalt columns, lavafalls pouring into a lava lake, stepping stones across it and a chest on the far ledge), the **Flooded Grottos** under the Tanglewood (half-drowned chambers, blue and green crystals, glowing lichen) and **Crystal Geodes** deep down (hollow agate shells lined with amethyst and crystals). Stalactites and stalagmites everywhere.
+- **No more straight holes down.** Caves are entered by sloping, switchbacking passages you can walk down.
+- **Lava flows.** Dig next to lava and it creeps out, pours off ledges and spreads (slower than water). It burns plants in its way. Where it meets water it hardens into glowing **Cooling Crust**, hot to stand on, which goes dark as basalt after a while. Lava looks molten now, with dark crust plates drifting on it and bubbles popping on top.
+- **Clams** on the sea floor of both oceans: little **Snapclams** that clap their shells to shoot through the water and bite, and **Grand Clams** that spit bubble jets and slam shut. A shut shell turns your hit aside, so strike while they're open. They drop clams to eat and pearls.
+- **Weather**: clear skies, drifting clouds, rain showers, thunderstorms with lightning, morning fog, and snow up on the peaks. Everyone in a world sees the same weather.
+- **Sunrises and sunsets** paint the sky: warm glows round the low sun, clouds lit gold and pink from below.
+- **The wind** only blows hard high up. On the ground it hardly pushes you; leaves, petals, seeds, sand and snow blow along low over the ground instead.
+- **Trees stand on the ground** (their roots reach into it) instead of hovering a hair above it.
+- **Broodwings** are a little tougher.
+- **Rupees instead of coins**: green rupees are worth 1, blue 5, red 20. Bigger monsters drop more. (Your money carries over.)
+- **Curlmanes redrawn as centaurs**: a burly woolly body like a buffalo's, with a fuzzy for the top half (the bulls have short buffalo horns). A collar and a mane of tight curls, little arms, and an angry face when they paw the ground.
+- Code: `v2s24.js` (caves, lava, clams) and `v2s25.js` (weather, sky, wind, rupees, Curlmanes).
+
+## A bigger, more beautiful Fuzzy World
+- **Fuzzy World is half again as wide.** Past Gnarlroot's Hollow the jungle goes on into the **Deep Tanglewood**: giant trees with real bark, moss and buttress roots, crowns of leaves you can climb into along thick limbs, lianas to climb, ferns, jungle flowers and glowing mushrooms. Everything you've built in Fuzzy World stays exactly where it was.
+- **The waterfall and the Woolly Highlands:** at the end of the Deep Tanglewood a stream pours off a cliff into a pool. Climb the vines up the cliff to the Highlands, flat grassland where herds of **Curlmanes** graze. When one paws the ground, the whole herd charges in a straight line. Step aside and hit them as they thunder past.
+- **The jungle at night and by day:** fireflies drift and glow at dusk and through the night, sunbeams come down through the canopy with pollen turning in them, butterflies flit about, and giant trees stand far off in the haze.
+- **Home-trees in Tanglehold:** the stilt huts are gone. The village families now live in two huge home-trees with woven nest pods up in the branches, a fenced ring deck round each trunk, ladders and ropes, and a log swing. The healing mud pool is still there, now at the foot of the west tree.
+- **Ridgeback Run:** Herder Bramble keeps the cavalry's animals at a home-tree in the Deep Tanglewood.
+- **Ridgebacks and shellbacks are tame**, like horses. They graze and wander in small herds and leave you alone. Hit one and it will charge you until it calms down. Shellbacks are now much bigger than ridgebacks.
+- **Scorpion dens:** a rock mound full of burrows in the Sunbake Desert and a mossy one in the Deep Tanglewood. Winding tunnels with treasure in their side pockets lead to a chamber where the **Mother Scorpion** guards her hoard: three tails, a back of spikes. When she rears her tails back, get clear. After she strikes, her tails stick for a moment, and she takes extra damage. Beat her and the hoard is yours. She comes back after 20 minutes.
+- **Smoother ground everywhere:** where dirt, stone, mud and sand meet, the border now wanders naturally instead of following the block grid, and the inside corners of steps and cave walls curve (with grass growing along the curve on grassy ground), so hills and caves read as slopes. The jungle's mushrooms are new too: glowing orange lantern caps, red spotted toadstools and tall parasols. (Only the look changed; walking and digging work exactly as before.)
+- **Prettier trees in every world:** crowns are made of soft, overlapping leaf tufts lit by the sun, with rounded tops and scalloped edges instead of square blocks, and trunks look round, with bark grain, the odd knot and roots that flare out at the ground. A tree you chop down keeps the same look as it falls.
+- **Chief Tassel and the slinger tribes** wear their first, softer fur patterns again.
+- Code: `v2s23.js` (and the shellback's size in `v2s22.js`).
+
+## New creatures, and Tanglehold fights back
+- **Ridgebacks** run wild in the Tanglewood and Tuftwood Forest: the light cavalry's lizards. Quick, and they charge in a straight line, so step aside and hit their backs.
+- **Shellbacks** roam the Tanglewood: the heavy cavalry's turtles. Hits from the front glance off the shell (a quarter of the damage, and it braces). Get behind one, or jump over it, and hit its back.
+- **Centipede bats** in the caves of Fuzzy and Acorn World: the **Skitterwing** (common), the **Broodwing** (deeper and rarer; its bite poisons you) and the **Gloomwing Matriarch** (deepest caves, very rare; she calls Skitterwings to her side).
+- **Captain Shellbrace**, the heavy cavalry's turtle rider, now guards Tanglehold's east gate.
+- **Tanglehold fights back:** when a monster comes into the village, the slingers throw stones at it and the sages tear words out of their books. Old Puddle's ball of water soaks it, Ember's fireball sets it alight, Sprig's thorn vine holds it in place and Gale's gust blows it back.
+- New drops: Ridgeback Scale, Shell Plate and Brood Venom.
+- Code: `v2s22.js`.
+
+## Tanglehold, the jungle village
+- **A new village in the Tanglewood Jungle** on Fuzzy World, on the way from the Tall Peaks to Gnarlroot's Hollow. Monsters don't come into it.
+- **The Word Temple:** a stepped temple with an old swirling door on top and the sages' library inside.
+- **Who lives there:** Chief Tassel and the four slinger tribes (Bandfur, Glyphfur, Spiralfur and Zigfur, each with fur painted in their own design), the four sages (Water, Fire, Leaf and Wind), and Scout Quickfoot of the light cavalry on his ridgeback lizard.
+- **Stilt huts** with ladders, a rope bridge, a lizard pen, and a warm mud pool under the west hut that heals you while you sit in it.
+- **The Strangler:** a giant tree west of the village with a rope to climb and platforms in its canopy.
+- **Old ruins** with a carving between the village and Gnarlroot's Hollow.
+- **Two quests:** Chief Tassel wants 6 Warthog Hides (a slingshot, 40 coins and a key fragment). Old Puddle the Water Sage lost a page of the Book of Wind at the top of the Strangler (50 coins and a Recipe Square).
+- **A secret:** once the page is home, each sage tells you one word. Find out what to do with them.
+
+## Fighting takes thinking
+- **Back hits:** a monster facing away from you takes 1.5x damage from your melee hits. Most beasts turn slowly, so circling, jumping over and baiting a charge pays off.
+- **Dazing:** every melee hit wears down a monster's balance (a little bar shows how close it is). When it breaks, the monster is dazed for a moment: it can't move or hurt you and takes 1.3x damage. Back hits wear it down twice as fast. Balance comes back if you stop hitting, and a monster can't be dazed again for 3 seconds after. Bosses never stop moving, but they stagger and take 1.25x damage for a moment.
+- **Bumps come in beats:** after a monster bumps into you, that same monster can't bump you again for just under a second. A crowd is still dangerous; one touch isn't a death sentence.
+- Code: `v2s20.js` (Tanglehold) and `v2s21.js` (fighting).
+
+## Weather magic (the fuzzy's V)
+- **Five weathers.** Tap **V** (**Power** on a touch screen) to call your weather where you aim. **Hold V** to open the weather wheel: point at a weather (or tap left and right) and let go to pick it.
+  - **Gust:** shoves monsters off ledges or into water, stops their charges, blows their shots away, and pushes your own clouds where you want them. It blows harder with the wind at your back.
+  - **Rain:** soaks monsters (wet monsters are slower and stop burning) and slowly heals you while you stand under it.
+  - **Storm:** lightning barely hurts dry monsters, but wet ones take 2.5x and it jumps from wet monster to wet monster. Monsters kept under it get soaked after a while. If you're wet and stand under your own storm, it can strike you too.
+  - **Whirlwind** (Whirlwind rune): sucks monsters in, lifts the light ones and drops them hard. Rain or a storm over it soaks or strikes everything inside at once.
+  - **Hail** (Squall rune): chills monsters; wet ones freeze solid. Frozen monsters can't move or hurt you, and your next hit shatters the ice for double damage.
+- **Each weather has its own cooldown**, so the fun is combining them: rain then storm, rain then hail, a storm over a whirlwind.
+- **The land feeds the clouds.** Over water, rain and storms last longer. Over snow, hail freezes even dry monsters. Over hot sand, rain dries up fast but lightning hits harder. Clouds drift with the wind.
+- **Runes make it stronger.** Every fuzzy rune adds a little power. Tempest makes weather last longer, Cyclone lets the whirlwind lift heavy monsters, and Thunderhead makes lightning jump further and to more monsters.
+- Code: `v2s19.js`.
+
+## Phones and tablets
+- **Play on a phone or tablet.** On a touch screen the game shows its own controls: a joystick on the left (push it all the way to run), Jump, Hit, Use, Cast, Spell, Talk, Torch, Drop and Power (hero magic) on the right, and touch and hold anywhere in the world to swing, mine, chop or place a block right there. In the bag, tap to pick up and put down, and hold an item to eat or wear it. The HUD gets smaller and Chat gets a button. With a mouse and keyboard nothing changes. Code: `js/flake/fbw_touch.js`.
+- **More for phones.** Double-tap a spot to use or cast on it (the right-click: fishing, pets, chests, beds). Settings has a Touch controls section: button size, see-through buttons, left-handed (joystick on the right) and a buzz on each press. Hints say which button to tap instead of which key to press, Controls lists the touch controls, the screen stays on while you play, and the game can go full screen from a phone's home screen.
+- **Vine and Shape on touch.** The acorn gets a Vine button (it shoots up and ahead), and a Shape button shows while you hold a block. Power aims just ahead of you.
+
+## How each hero moves
+- **Rock (heavy):** slow to start (about a second to full walk speed), skids a couple of blocks when he stops, and barely steers in the air. Stronger gravity, and no fall damage: a hard landing thuds and knocks nearby monsters. Hold sprint for a run-up and he smashes through dirt and sand (not stone) and rams monsters for speed-based damage. Enemies shove him half as hard.
+- **Ghost (light):** falls slowly and drifts on his own momentum, so he keeps going when you let go. Hover (hold jump) still works. Monsters shove him further.
+- **Fuzzy (bounces):** landing from a height bounces him, and he takes no fall damage. Tap jump just as you land for a big bounce, or hold S to stick the landing. Hold jump while falling and he sucks in air and floats down slowly (uses stamina).
+- **Acorn (climbs, glides):** clings to walls and slides slowly. Hold toward a wall and W to climb it (uses stamina). Space kicks him off the wall and gives his double jump back. Hold jump while falling to glide on a leaf (uses stamina).
+
+## Swimming
+- No more "hold jump to rise". Each jump press is a **stroke** in the direction you hold (up by default), then you glide against the water's drag. A stroke at the surface leaps you out. S dives.
+- **Fuzzies** drift up toward the surface. **Acorns** float and bob on top. **Ghosts** hang neutral where you stop.
+- **Air:** everyone but the rock needs air now. Fuzzies, acorns and ghosts have an air bar that runs out after 10 s with your head under water, and then you start drowning. Rocks still never drown.
+- **Rocks can't swim.** They sink, walk the bottom slowly, hop about a block and a half, and crawl up walls underwater (hold toward the wall and jump). They can still punch their way out.
+
+## The Geodling
+- **A little geode guy** lives in Rock World's Crystal Forest and caves. He's a round rock on two stubby feet with his front cracked open like a geode: white quartz, purple crystals and two shiny eyes. He wanders about and never hurts anyone.
+- **Shy.** Come close and he snaps shut into a plain rock. Shut, hits barely scratch him and knock him rolling away. Stand still (or back off) and he peeks out through the crack, then opens up again.
+- **Make friends.** If he opens up while you're right beside him, he likes you and leaves you a crystal shard (once each). Beat one and he drops 2 to 4 crystal shards, and now and then a purple crystal.
+
+## Three new hero moves
+- **Acorn roll:** while running on the ground, press **S** and he tucks into a ball and rolls, about twice as fast as running and faster still downhill. Rolling into monsters bowls them over. Jump to hop out of it; press S again or let go of left/right to stop. It uses a little stamina.
+- **Ghost slip:** keep pushing into a thin wall (one or two blocks thick) and the ghost fades and slips through to the other side. Not through thicker walls, locked doors, carvings or places he isn't allowed.
+- **Wind:** outdoors the wind blows in gusts that change direction now and then (white streaks blow past). It pushes the fuzzy around, a lot in the air and more when he's puffed up, a little on the ground. His runes help him hold steady. No wind underground, underwater, on a vine or on his cloud.
+
+## Runes instead of picks: the Ancient Rune Keeper
+- **Picks are gone.** How hard a block you can break comes only from your runes, and each hero's runes are their own: the **acorn** gets a harder cap (it changes colour to the rune's material), the **fuzzy** stronger suction (the air he pulls glows), the **rock** a heavier fist (made of the rune's material), and the **ghost** a stronger permanence (his arm turns the rune's colour when it goes solid).
+- **The Ancient Rune Keeper** stands near where you arrive in Fuzzy, Acorn, Rock and Ghost World. Bring him materials, monster parts and coins, and he carves your next rune. 1 Flint (breaks stone): 3 flint, 6 rubble, 3 monster parts, 15 coins. 2 Stone (iron ore): 20 stone, 4 flint, 5 parts, 30 coins. 3 Iron (bronze ore): iron bars. 4 Bronze (platinum). 5 Platinum (stygian). 6 Stygian, 7 Soulsteel and 8 the Duat rune each dig faster.
+- Without a rune you can only break soft things (dirt, sand, wood, gravel, flint). Old saves start with no runes; old picks are only weapons now. Pick recipes are gone, so a new hero starts with 58 recipes and 37 to learn.
+- The rock can only smash what his fist rune can break, and you see his fist punch each block he smashes (out of reach he just swings).
+- The fuzzy's iron-rune air is grey blue, so it stands out from his stone rune.
+
+## The fuzzy
+- **One puff jump.** A normal jump, then one puff in the air (and he can still hold jump to float down). His 3rd rune gives a second puff, his 5th a third.
+- **Cloud ride:** with the Duat rune, press jump again once your puffs are used up and he rides a cloud for about five seconds (hold jump to stay on). It refills on the ground.
+- He opens his mouth wide while he sucks up a block.
+
+## Building in shapes, pouring sand, cracks that stay
+- **Shapes:** press **B** to switch between one block (the default), a row of 3, a column of 3, a 2x2 square, or steps. A faint outline shows where they'll go. Each block uses one from your stack.
+- **Sand, snow and soul ash pour** when you dig out what holds them up, sliding off edges into a pile. Gravel drops straight down. Falling grains hurt monsters they land on, and wait on your head rather than fall into you. Only blocks near where you dig or build move.
+- **Cracks stay:** stop mining a block halfway and its cracks stay for 30 seconds, so you can come back to it.
+
+## Caves, chests and falling
+- **Fuzzy World's caves** have more than bats now: slimes, crystal crawlers and scorpions in the caves; ember crawlers, crystal crawlers, jungle slimes and spiky fish in the deep. Most bats down there give way to them.
+- **More chests:** 20 more Old Chests in Fuzzy World's caves, 12 in Rock World, 8 in the Ghost World.
+- **Every hero takes fall damage** (the rock, fuzzy and ghost used to take none). Up to 7 blocks is safe; past that it hurts a little more each block, and more again past 20 and 40 blocks (about 15 damage from 20 blocks, 33 from 30, 75 from 50). Floating down is always safe: the fuzzy's float, the acorn's leaf, the ghost's hover, a vine or a cloud.
+
+## Elites, the Duat Stone and coins
+- **Something is amiss in the Duat.** Elites (Ghost Tank, Lütut, Thornback, Canopy Stalker, Geode Golem) are souls climbing back out of the Duat, and they grow as your gear does. None come until you carry an iron-strength weapon, and never in your first three minutes. With iron they're at 60% health and damage, with bronze 80%, with platinum full strength, with stygian or soulsteel 130% (Duat-touched) and with a legendary weapon 160% (Duat-crowned).
+- **Stronger elites carry better things.** Iron-level ones drop what they always did (30–60 coins, a key fragment, sometimes a Star Ember or Recipe Square). Higher up they drop more coins (up to 180–260), more key fragments, Star Embers every time, Recipe Squares more often, and metal bars from bronze up to soulsteel. The strongest also drop soul shards and sometimes a Mirror Shard.
+- **The Duat Stone** stands a few steps from where you arrive in every world. Read it (R) to see how restless the Duat is right now. A banner tells you each time it gets worse.
+- **Coins:** ordinary monsters drop coins more often (8 in 10 instead of 6 or 7 in 10) and a little more of them. Tumble's prices: Recipe Square 45 (was 60), Star Ember 40 (was 50). Weapon upgrades cost 30, 60 and 90 coins (were 40, 80, 120), plus a Star Ember each as before.
+
+## Fewer recipes to start with
+- You start knowing only the basics: wood, flint, stone and iron gear, building blocks, workbenches and forges, metal bars, torches and food. That's 61 recipes instead of 102.
+- The other 40 come in eight sets, and each **Recipe Square** you read teaches the next one: bronze gear, the first monster weapons, platinum gear, more monster weapons, stygian gear, storm weapons, soulsteel weapons, and the old secrets (Mirrorblade, Gnarlroot Staff).
+- The crafting list only shows recipes you know, and says how many are left. Squares are in chests (a little more often now), dropped by elites and bosses, in legendary chests, and Tumble sells them.
+- The Stone Club recipe is gone (the Stone Hammer and Stone Sword do its job). Any you already have still work.
+- Old saves: squares you already read still count, and if you'd already moved past a metal, or have a monster weapon in your bag, you keep those monster-weapon recipes.
+
+## How each hero mines
+- Every hero mines in his own way now, instead of swinging a tool. **Fuzzy** sucks the block in hard: bits of it stream into his mouth and he puffs up with each pull. **Acorn** headbutts it. **Rock** punches it with his stone fist. **Ghost** turns his arm see-through, slides it into the block, then makes it solid inside it to crack the block.
+- Only the look changed: how long each block takes, what you can mine, and what it drops are all the same as before.
+
+## The acorn's vine
+- Press **C** (you can change it in Settings) to shoot a vine toward the mouse. It sticks to any block or tree up to 15 blocks away, and you swing from it.
+- Left and right pump the swing, **W** climbs up the vine, **S** lets out more, **Space** lets go with a hop (your double jump is still there afterwards), and **C** lets go too. Letting go mid-swing keeps your speed, so you can fling yourself across gaps.
+- It costs a little stamina to shoot, and lets go on its own if you hit water or the block it's holding breaks.
+
+## Puff jumps and solid-looking trees
+- **Fuzzy puff jumps.** After a normal jump, press jump in the air to suck in air and jump again, higher. You get two of these, each higher than the last (a normal jump is about 5 blocks; with both puffs about 16). They come back when you land or touch water, and each costs a little stamina. The fuzzy swells up while he's puffed, and holding jump while falling still floats him down.
+- **Trees** look the same standing as they do when they fall: leaves fill the whole block with a blotchy texture, and the trunk is a solid column. Albali trees stay gold and Ghost World trees stay pale.
+
+## A bigger Ghost World
+- The Ghost World is now 800x320 blocks (it was 520x240), about the size of Fuzzy World and Rock World. West to east: the Pale Hills and the Pale Keep, the Bonewood (a thick dead forest, with the Hanging Hollow), the Soulmire (black pools, boardwalks and a shrine island), Barrowtown (ruined houses, a graveyard, and the Barrow, a crypt underneath with a hidden room), the Mistspires (tall peaks with a Cyitor watchtower), and the Hollows.
+- Six new creatures with their own drawings: the Pale Hound, Grave Crawler, Mire Slime, Bone Grasper, Mire Eel and Mist Bat. They're in the Field Guide under a new Ghost World Wildlife tab.
+- Barrow Chests in the ruins hold ectoplasm, coins, Stygian and platinum ore, and sometimes key fragments or recipe squares.
+- It's a rebuilt world, so it's saved under a new name: blocks you changed in the old Ghost World don't carry over. Your bag and gear do, and you start again at the Pale Keep.
+
+## The Warthog King
+- The cliff on the west side of King's Clearing is now a gentle slope, and the slope counts as part of his arena, so he charges up it. There's no ledge left where he can't reach you.
+- If you get above him (a ledge, a tree, a tower you built), he leaps up at you and lands with a stomp.
+- The King's Clearing waystone moved back a little onto flat ground. If you had already woken it, it stays woken.
+
+## Running sideways
+- The fuzzy, rock, acorn and ghost now run (and jump) in a full side view: one eye at the front, only the near arm showing, and legs that really stride. Same sizes as before.
+- Idle, swing and swim frames are the original drawings. Hats, capes and armor still fit, since they follow each frame's outline.
+
+## Living trees
+- **Shake the leaves:** hit a tree's leaves (not the trunk) and nuts fall out, sometimes a Fuzzberry. The leaves stay. A patch of canopy gives again after a minute and a half. Acorns shake loose an extra nut. Tree Nuts heal a little.
+- **Timber!** Chop a trunk and the tree falls away from you, slowly at first, and hurts any monster it lands on. It hurts you too if you stand where it falls.
+- **Logs:** a felled tree lands as solid logs. Walk along them, or fell a tree across a gap, a pit or a stream and it is a bridge. Chop a log up for wood. Logs the tree doesn't have room to land on become loose wood.
+- **Stumps grow back:** the stump you leave grows a sapling after a couple of minutes, and then a whole new tree (as long as there's room). It keeps its timer in the save the way crops do. Chop the stump to clear it.
+- Giant trees and the village tree trunks still come down the old way, so the towns built in them stay safe.
+
+## The rock and building
+- Fixed: the rock smashed whatever he aimed at, including blocks he had just placed, because holding the mouse after placing a block counted as a swing. Now he never smashes with a block, torch or seed in his hand.
+- A smash has to wind up on the block first (about a sixth of a second), so a quick click does nothing.
+- He only smashes dirt, sand and stone in a line. Anything built (planks, bricks, doors, benches, chests, logs) is broken one block at a time, the normal way, and his run-up charge doesn't smash it either.
+- Right-clicking a door or a chest no longer slams the ground by accident.
+
+## Hero magic (V)
+- **Ghost:** turn invisible for 6 s. Monsters lose track of you, and your first hit from hiding lands twice as hard.
+- **Rock:** eat fire, lightning or poison crystals and they grow on you. Your punches carry the element, F slams the ground, and your hits smash stone 3 to 5 blocks deep.
+- **Fuzzy:** a storm cloud where you aim. Rain slows monsters under it, and lightning strikes them for 7 s.
+- **Acorn:** brambles burst up where you aim. Monsters in them are stuck and get scratched. Aim at your own feet for a healing sprout instead.
+
+## Staffs that each shoot their own way
+- **Ember Staff:** lobs a fireball that bursts into flame where it lands.
+- **Tide Staff:** a wave rolls along the ground through every monster in its way.
+- **Wisp Staff:** three wisps circle you, then hunt the nearest monsters, even through walls.
+- **Gnarlroot Staff:** a thorn that weaves through the air and splits in three when it hits.
+- **Starfur Staff:** a star that bounces off walls and pierces through monsters.
+
+## Money and treasure
+- **Coins** from monsters, chests and cleared hauntings. Rare monsters and bosses drop a lot.
+- **Tumble the Trader** waits next to where you arrive in every world. Tumble sells Recipe Squares, key fragments, Star Embers and a Chest Compass, and upgrades the weapon you're holding (up to +3, 20% stronger each time).
+- **Legendary chests:** two in every world, deep underground. Three key fragments make a Legendary Key. Inside are coins, Star Embers, a Recipe Square and one of the legendary staffs.
+- **Recipe Squares:** bronze, platinum, stygian and soulsteel gear has to be learned first. Each square teaches the next set.
+
+## Monsters and worlds
+- Ghosts are cloud blobs that fade in and out. Each area has a set number of them, and once you clear an area it stays quiet for a while.
+- Rare elites that take some thinking: Ghost Tank and Lütut (Ghost World and the Duat), Thornback (Fuzzy World), Canopy Stalker (Acorn World) and Geode Golem (Rock World).
+- Cyitors, the Empire's elite peacekeepers.
+- Fuzzy World's mountains are broad slopes, with long joined-up caves and lava underneath.
+- The fuzzy is back to his original main-game sprite and size (the 1.5x side-on one is gone).
