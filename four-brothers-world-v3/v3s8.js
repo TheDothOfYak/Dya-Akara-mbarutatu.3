@@ -302,7 +302,16 @@
   function paint(id) {
     if (cache[id]) return cache[id];
     const p = P[id]; if (!p) return null;
-    const c = mk(48, 48); c.ctx.imageSmoothingEnabled = true; if (p.fit) { c.ctx.translate(24 + (p.dx || 0), 24 + (p.dy || 0)); c.ctx.scale(p.fit, p.fit); c.ctx.translate(-24, -24); } p.fn(c.ctx); finish(c, p.pal); c.__noHD = true; cache[id] = c; return c;
+    const c = mk(48, 48); c.ctx.imageSmoothingEnabled = true; if (p.fit) { c.ctx.translate(24 + (p.dx || 0), 24 + (p.dy || 0)); c.ctx.scale(p.fit, p.fit); c.ctx.translate(-24, -24); } p.fn(c.ctx); finish(c, p.pal);
+    const it = RW.ITEMS[id], gc = it && it.v3glowc;
+    if (gc) { // the Leviathan's own gear: a halo in its glow colour and a few sparkles
+      const o = mk(48, 48), h = mk(48, 48); h.ctx.drawImage(c, 0, 0); h.ctx.globalCompositeOperation = 'source-in'; h.ctx.fillStyle = gc; h.ctx.fillRect(0, 0, 48, 48);
+      o.ctx.filter = 'blur(2px)'; o.ctx.globalAlpha = 0.9; o.ctx.drawImage(h, 0, 0); o.ctx.drawImage(h, 0, 0); o.ctx.filter = 'none'; o.ctx.globalAlpha = 1; o.ctx.drawImage(c, 0, 0);
+      const sp = (x, y, r) => { o.ctx.fillStyle = '#ffffff'; o.ctx.fillRect(x, y - r, 1, r * 2 + 1); o.ctx.fillRect(x - r, y, r * 2 + 1, 1); o.ctx.fillStyle = gc; o.ctx.fillRect(x - 1, y - 1, 1, 1); o.ctx.fillRect(x + 1, y + 1, 1, 1); };
+      sp(9, 9, 2); sp(40, 30, 2); sp(14, 40, 1); sp(36, 6, 1);
+      o.__noHD = true; cache[id] = o; return o;
+    }
+    c.__noHD = true; cache[id] = c; return c;
   }
   const artOf = (id) => { const it = RW.ITEMS[id]; return it && it.v3art ? it.v3art : P[id] ? id : null; };
   RW.v3art = { paint, has: (id) => !!artOf(id), artOf, painters: P, finish };

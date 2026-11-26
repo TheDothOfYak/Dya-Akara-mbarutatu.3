@@ -58,12 +58,26 @@
     g.setTransform(1, 0, 0, 1, 0, 0);
     VA.finish(c, ['#0c0a10', '#ffffff', '#e8e0d0'].concat(R, B)); return c;
   }
+  function axeIcon(it) { // a woodcutter's axe: a long haft, a single bearded blade, a little back spike
+    const c = mk(32, 32), g = c.ctx, a = hexOk(it.icon.a) ? it.icon.a : '#9aa3ad', b = hexOk(it.icon.b) ? it.icon.b : '#6b5a48', R = ramp(a), B = ramp(b);
+    g.imageSmoothingEnabled = true; g.translate(5, 27); g.rotate(-Math.PI / 4);
+    g.fillStyle = B[2]; g.fillRect(-2, -1.6, 32, 3.2); g.fillStyle = B[4]; g.fillRect(-2, -1.6, 32, 1); g.fillStyle = B[1]; for (let x = 0; x < 8; x += 2.2) g.fillRect(x, -1.6, 0.8, 3.2);
+    g.save(); g.translate(24, 0);
+    g.fillStyle = R[2]; g.beginPath(); g.moveTo(-4, -1.5); g.lineTo(-5, -6); g.quadraticCurveTo(-7, -13, -1, -15); g.quadraticCurveTo(7, -14, 7, -6); g.lineTo(4, -1.5); g.closePath(); g.fill();
+    g.fillStyle = R[4]; g.beginPath(); g.moveTo(-1, -15); g.quadraticCurveTo(-6.4, -12.6, -4.6, -6.2); g.lineTo(-3, -6.4); g.quadraticCurveTo(-4.4, -12, -0.6, -13.6); g.fill();
+    g.strokeStyle = R[6]; g.lineWidth = 0.9; g.beginPath(); g.moveTo(-6.2, -11); g.quadraticCurveTo(-6, -14.6, -1, -15); g.stroke();
+    g.fillStyle = R[1]; g.fillRect(-3.4, -3, 6.8, 6); g.fillStyle = R[3]; g.fillRect(-3, -2.6, 6, 1.4);
+    g.fillStyle = R[2]; g.beginPath(); g.moveTo(-2, 2.5); g.lineTo(0, 7); g.lineTo(2, 2.5); g.fill();
+    g.restore(); g.setTransform(1, 0, 0, 1, 0, 0);
+    VA.finish(c, ['#0c0a10', '#ffffff'].concat(R, B)); return c;
+  }
   const done = {};
   function bigFor(id, small) {
     if (done[id] !== undefined) return done[id];
     const it = RW.ITEMS[id]; let big = null;
     try {
       if (it && it.kind === 'weapon' && it.icon && it.icon.s === 'bow') big = bowIcon(it);
+      else if (it && it.kind === 'weapon' && it.icon && (it.icon.s === 'axe' || it.icon.s === 'handaxe')) big = axeIcon(it);
       else if (it && (it.kind === 'weapon' || it.kind === 'tool')) {
         const hd = RW.v3hdIcon && RW.v3hdIcon(id), cols = [it.icon && it.icon.a, it.icon && it.icon.b].filter(Boolean);
         if (hd) big = terrarify(hd, cols);
@@ -90,7 +104,7 @@
       const it = opts && opts.item && RW.ITEMS[opts.item];
       if (it && it.kind === 'weapon' && !it.ranged && !it.v3shot && !it.v3lantern && opts.swing > 0 && !opts.dead && RW.v3pix) {
         const prog = 1 - opts.swing / (opts.swingDur || 0.3); if (prog > 0.12 && prog < 0.9) {
-          const a1 = it.icon && hexOk(it.icon.a) ? it.icon.a : '#e8e0d0', f = p.face || 1, sc = opts.scale || 1;
+          const a1 = it.v3glowc || (it.icon && hexOk(it.icon.a) ? it.icon.a : '#e8e0d0'), f = p.face || 1, sc = opts.scale || 1;
           const cx = p.x + 6 - cam.x, cy = p.y + 12 - cam.y, R0 = ((it.reach || 24) * 0.75 + 8) * sc;
           RW.v3pix(g, (q) => {
             const end = -2.2 + prog * 3.0, start = Math.max(-2.2, end - 1.4);
@@ -105,7 +119,7 @@
   const baseDamage = E.damage;
   E.damage = function (e, d) {
     const r = baseDamage.apply(this, arguments);
-    try { const h = P.held && P.held(); if (e && h && h.kind === 'weapon' && RW.fx && RW.fx.burst) { const a1 = h.icon && hexOk(h.icon.a) ? h.icon.a : '#e8e0d0', b = e.hitbox ? e.hitbox() : e; RW.fx.burst(b.x + b.w / 2, b.y + b.h / 2, [a1, sh(a1, 0.4), sh(a1, -0.3)], 7, 150, { grav: 420, life: 0.4 }); } } catch (x) { }
+    try { const h = P.held && P.held(); if (e && h && h.kind === 'weapon' && RW.fx && RW.fx.burst) { const a1 = h.v3glowc || (h.icon && hexOk(h.icon.a) ? h.icon.a : '#e8e0d0'), b = e.hitbox ? e.hitbox() : e; RW.fx.burst(b.x + b.w / 2, b.y + b.h / 2, [a1, sh(a1, 0.4), sh(a1, -0.3)], 7, 150, { grav: 420, life: 0.4 }); } } catch (x) { }
     return r;
   };
   // a townsfolk timer can go negative or NaN (then its frame index is undefined and the whole draw stops): keep it sane

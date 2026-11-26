@@ -30,6 +30,8 @@
   Wp({ id: 'silentfathom', name: 'Silent Fathom', dmg: 110, spd: 0.35, v3shot: 'bolt', icon: { s: 'bow', a: '#d8d0b4', b: '#33244a' }, desc: 'Archer Core + Abyssite. A horn crossbow. 110 damage. Passive: bolts pierce every monster in a line, each one hit adds 15% damage to the next.' });
   Wp({ id: 'veilstaff', name: 'Veilstaff', dmg: 85, spd: 0.35, v3shot: 'mist', icon: { s: 'staff', a: '#585a68', b: '#33244a' }, desc: 'Mage Core + Abyssite. Mist bolts, 85 damage, that blind (monsters miss 30% of their hits on you) and slow. Passive: a kill raises a mist wraith that fights for you for 8 seconds.' });
   Wp({ id: 'soullantern', name: 'Soulbound Lantern', dmg: 0, spd: 0.4, v3lantern: true, icon: { s: 'lantern', a: '#2a7a5e', b: '#33244a' }, desc: 'Healer Core + Abyssite. Click to link your soul to another player, anywhere in the world (click again for the next player, or to unlink). While linked, you share each other\'s damage, and all of it is cut by 50%.' });
+  const GLOWC = { riftreaper: '#9a74e0', trenchfall: '#4cc4b8', gravewake: '#4cc4b8', wraithstring: '#d0dce0', drowneye: '#8af0e0', codex: '#9a74e0', tidetome: '#5ab894', ossuary: '#e0703a', silentfathom: '#7ab8e8', veilstaff: '#b8bccc', soullantern: '#5ab894' };
+  Object.keys(GLOWC).forEach((id) => { if (RW.ITEMS[id]) RW.ITEMS[id].v3glowc = GLOWC[id]; });
   const MATS = [
     { id: 'core_knight', name: 'Knight Core', desc: 'A dark crystal with a burning skull inside. Always dropped by the Drowned Knight. With Abyssite bars at a forge: the Ossuary Anchor.' },
     { id: 'core_archer', name: 'Archer Core', desc: 'Two cold eyes watch from inside it. Always dropped by the Drowned Archer. With Abyssite bars at a forge: Silent Fathom.' },
@@ -146,6 +148,11 @@
   };
   function tick(dt) {
     const c = pc();
+    const hh = P.held && P.held(); if (hh && hh.v3glowc && !P.dead && RW.game && RW.game.playing) {
+      const hx = c.x + P.face * 9, hy = c.y - 6; RW.fx.light && RW.fx.light(hx, hy, 0.2, 0.2, 0.25);
+      if (Math.random() < dt * 22) RW.fx.spawn({ x: hx + RW.rand(-6, 6), y: hy + RW.rand(-10, 4), vx: RW.rand(-10, 10), vy: RW.rand(-30, -10), life: 0.7, color: Math.random() < 0.3 ? '#ffffff' : hh.v3glowc, add: true, kind: 'glow', size: Math.random() < 0.3 ? 2 : 1 });
+      if (P.swingT > 0 && Math.random() < dt * 60) RW.fx.spawn({ x: hx + P.face * RW.rand(4, 22), y: hy + RW.rand(-16, 12), vx: P.face * RW.rand(20, 80), vy: RW.rand(-40, 20), life: 0.45, color: hh.v3glowc, add: true, kind: 'glow', size: 2 });
+    }
     for (let i = Q.length - 1; i >= 0; i--) {
       const s = Q[i]; s.life -= dt; s.t = (s.t || 0) + dt;
       if (s.k === 'seek' && s.tg && !s.tg.dead) { const b = boxOf(s.tg), a = Math.atan2(b.y + b.h / 2 - s.y, b.x + b.w / 2 - s.x), v = 520; s.vx = RW.lerp(s.vx, Math.cos(a) * v, Math.min(1, dt * 8)); s.vy = RW.lerp(s.vy, Math.sin(a) * v, Math.min(1, dt * 8)); }

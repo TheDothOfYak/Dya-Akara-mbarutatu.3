@@ -72,8 +72,8 @@
     else if (crack === 'split') { L(-3, -ry + 2, -1, ry - 2); L(-2, -ry + 2, 0, ry - 2); }
     // mineral veins in the colour chosen
     const P1 = parse(look.shape);
-    if (P1.vein !== 'none') { const vc = VEINS[P1.vein], vl = RW.shade(vc, 0.35);
-      for (let v = 0; v < 3; v++) { let x = -rx * 0.8 + v * 6, y = -ry * 0.5 + v * ry * 0.45; for (let k = 0; k < 40; k++) { x += 0.9; y += Math.sin(k * 0.45 + v * 2 + seed) * 0.9; if (inside(Math.round(x), Math.round(y)) > 0 && inside(Math.round(x), Math.round(y)) < 0.94) { A.px(g, cx + Math.round(x), cy + Math.round(y), vc); if (k % 7 === 3) A.px(g, cx + Math.round(x), cy + Math.round(y) - 1, vl); } } } }
+    if (P1.vein !== 'none') { const vc = RW.mix(VEINS[P1.vein], C.base, 0.55), vl = RW.mix(VEINS[P1.vein], C.light, 0.6);
+      for (let v = 0; v < 3; v++) { let x = -rx * 0.8 + v * 6, y = -ry * 0.5 + v * ry * 0.45; for (let k = 0; k < 40; k++) { x += 0.9; y += Math.sin(k * 0.45 + v * 2 + seed) * 0.9; if (inside(Math.round(x), Math.round(y)) > 0 && inside(Math.round(x), Math.round(y)) < 0.94) { A.px(g, cx + Math.round(x), cy + Math.round(y), vc); if (k % 9 === 4) A.px(g, cx + Math.round(x), cy + Math.round(y) - 1, vl); } } } }
     // things growing on or set into the boulder
     if (P1.extra === 'crystals') { const cc = P1.vein !== 'none' && P1.vein !== 'obsidian' ? VEINS[P1.vein] : '#7fd0f0';
       [[-0.7, -0.4, -2.4, 12], [-0.88, 0.05, -2.85, 9], [-0.45, -0.75, -2.0, 8]].forEach(([fx, fy, an, h]) => { const bx = cx + Math.round(fx * rx), by = cy + Math.round(fy * ry);
@@ -338,7 +338,17 @@
   // ---- the creator: Body, Arms and Moves rows for a rock, each one moving in the preview ----
   let liveLook = null;
   const baseDr2 = A.dressed;
-  A.dressed = function (species, look) { const cr = document.getElementById('creator'); if (species === 'rock' && cr && !cr.classList.contains('hidden-ui') && look) liveLook = look; return baseDr2.apply(this, arguments); };
+  A.dressed = function (species, look) {
+    const cr = document.getElementById('creator'), open = species === 'rock' && cr && !cr.classList.contains('hidden-ui') && look;
+    if (open) liveLook = look;
+    const out = baseDr2.apply(this, arguments);
+    // in the creator the rock stands still, facing you, unless you hover a move
+    if (open && arguments.length < 3 && out && out[0]) {
+      if (!RW.v3hoverMove) { const st = [out[0][0], out[0][0]]; return out.map(() => st); }
+      const t = performance.now() / 1000, k = Math.floor(t * 7) % 4, run = Math.floor(t / 2) % 2, fr = out[(run && out[8 + k] ? 8 : 1) + k] || out[1 + k] || out[0], mv = [fr[0], fr[0]]; return out.map(() => mv);
+    }
+    return out;
+  };
   function patchCreator() {
     const dyn = document.getElementById('c-dyn'); if (!dyn || dyn.__v3) return;
     const rows = Array.from(dyn.querySelectorAll('.opt')); const bodyRow = rows.find((r) => { const l = r.querySelector('.label'); return l && l.textContent === 'Body'; });
@@ -350,8 +360,8 @@
       const paint = () => { const cur = liveLook ? parse(liveLook.shape)[key] : null; Array.from(box.children).forEach((b) => b.setAttribute('aria-pressed', b.dataset.k === cur)); };
       Object.entries(map).forEach(([k, v]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = v; b.dataset.k = k;
         b.onclick = () => { if (!liveLook) return; const o = parse(liveLook.shape); o[key] = k; liveLook.shape = join(o); RW.audio.sfx('ui'); paint(); };
-        b.onmouseenter = () => { if (!liveLook || key !== 'move') return; b.__prev = liveLook.shape; const o = parse(liveLook.shape); o.move = k; liveLook.shape = join(o); };
-        b.onmouseleave = () => { if (b.__prev && liveLook && key === 'move' && parse(liveLook.shape).move === k && b.__prev !== liveLook.shape && !b.__clicked) liveLook.shape = b.__prev; b.__prev = null; };
+        b.onmouseenter = () => { if (!liveLook || key !== 'move') return; RW.v3hoverMove = true; b.__prev = liveLook.shape; const o = parse(liveLook.shape); o.move = k; liveLook.shape = join(o); };
+        b.onmouseleave = () => { if (key === 'move') RW.v3hoverMove = false; if (b.__prev && liveLook && key === 'move' && parse(liveLook.shape).move === k && b.__prev !== liveLook.shape && !b.__clicked) liveLook.shape = b.__prev; b.__prev = null; };
         box.append(b); });
       Array.from(box.children).forEach((b) => b.addEventListener('click', () => { b.__clicked = true; setTimeout(() => (b.__clicked = false), 50); }));
       after.after(r); setTimeout(paint, 60); return r;
