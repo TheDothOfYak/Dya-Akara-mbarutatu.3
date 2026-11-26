@@ -22,16 +22,23 @@
   const ARMS = { stubby: 'Stubby arms', long: 'Long arms', pebble: 'Pebble fists' };
   const MOVES = { trundle: 'Trundle', tumble: 'Tumble', wobble: 'Wobble', bounce: 'Bounce', scuttle: 'Scuttle' };
   const OLD = { tall: 'egg', stocky: 'round', slim: 'lumpy' };
-  const parse = (shape) => { const p = String(shape || 'round').split('.'); return { body: BODIES[p[0]] ? p[0] : OLD[p[0]] || 'round', arms: ARMS[p[1]] ? p[1] : 'stubby', move: MOVES[p[2]] ? p[2] : 'trundle' }; };
-  const join = (o) => o.body + '.' + o.arms + '.' + o.move;
+  const FACEX = { none: 'None', scar: 'Scar', chip: 'Chipped', freckles: 'Mineral freckles' };
+  const BODYX = { none: 'None', crystals: 'Crystal growths', gems: 'Embedded gems', barnacles: 'Barnacles & vines' };
+  const SIZES = { pebble: 'Pebble', small: 'Small', medium: 'Medium', large: 'Large', boulder: 'Boulder' };
+  const SIZE_K = { pebble: 0.8, small: 0.9, medium: 1, large: 1.1, boulder: 1.2 };
+  const VEINS = { none: 'None', gold: '#e8c050', silver: '#d8dce8', copper: '#d0783a', jade: '#4ab87a', ruby: '#d0384a', sapphire: '#3a78d8', amethyst: '#9a5ae0', obsidian: '#1a1622' };
+  const parse = (shape) => { const p = String(shape || 'round').split('.'); return { body: BODIES[p[0]] ? p[0] : OLD[p[0]] || 'round', arms: ARMS[p[1]] ? p[1] : 'stubby', move: MOVES[p[2]] ? p[2] : 'trundle',
+    face: FACEX[p[3]] ? p[3] : 'none', extra: BODYX[p[4]] ? p[4] : 'none', size: SIZES[p[5]] ? p[5] : 'medium', vein: VEINS[p[6]] ? p[6] : 'none' }; };
+  const join = (o) => { let s2 = o.body + '.' + o.arms + '.' + o.move; if ((o.face || 'none') !== 'none' || (o.extra || 'none') !== 'none' || (o.size || 'medium') !== 'medium' || (o.vein || 'none') !== 'none') s2 += '.' + (o.face || 'none') + '.' + (o.extra || 'none') + '.' + (o.size || 'medium') + '.' + (o.vein || 'none'); return s2; };
   // the creator lists three bodies; every combination (and the old names) still counts as a valid shape online
   const S2 = {}; Object.keys(BODIES).forEach((k) => (S2[k] = BODIES[k]));
   Object.keys(BODIES).forEach((b) => Object.keys(ARMS).forEach((a) => Object.keys(MOVES).forEach((m) => Object.defineProperty(S2, b + '.' + a + '.' + m, { value: BODIES[b], enumerable: false }))));
   Object.keys(OLD).forEach((k) => Object.defineProperty(S2, k, { value: BODIES[OLD[k]], enumerable: false }));
-  RW.SHAPES = S2; RW.ROCK_BODIES = BODIES; RW.ROCK_ARMS = ARMS; RW.ROCK_MOVES = MOVES;
+  const SHP = new Proxy(S2, { get(t, k) { if (k in t || typeof k !== 'string') return t[k]; const q = k.split('.'); if (q.length === 7 && BODIES[q[0]] && ARMS[q[1]] && MOVES[q[2]] && FACEX[q[3]] && BODYX[q[4]] && SIZES[q[5]] && VEINS[q[6]]) return BODIES[q[0]]; return undefined; } });
+  RW.SHAPES = SHP; RW.ROCK_FACEX = FACEX; RW.ROCK_BODYX = BODYX; RW.ROCK_SIZES = SIZES; RW.ROCK_VEINS = VEINS; RW.ROCK_BODIES = BODIES; RW.ROCK_ARMS = ARMS; RW.ROCK_MOVES = MOVES;
   if (A.DEFAULT_LOOK && A.DEFAULT_LOOK.shape === 'tall') A.DEFAULT_LOOK.shape = 'round.stubby.trundle';
   const baseRandomLook = A.randomLook;
-  if (baseRandomLook) A.randomLook = function () { const l = baseRandomLook.apply(this, arguments); l.shape = join({ body: RW.pick(Object.keys(BODIES)), arms: RW.pick(Object.keys(ARMS)), move: RW.pick(Object.keys(MOVES)) }); return l; };
+  if (baseRandomLook) A.randomLook = function () { const l = baseRandomLook.apply(this, arguments); l.shape = join({ body: RW.pick(Object.keys(BODIES)), arms: RW.pick(Object.keys(ARMS)), move: RW.pick(Object.keys(MOVES)), face: Math.random() < 0.4 ? RW.pick(Object.keys(FACEX)) : 'none', extra: Math.random() < 0.4 ? RW.pick(Object.keys(BODYX)) : 'none', size: Math.random() < 0.5 ? RW.pick(Object.keys(SIZES)) : 'medium', vein: Math.random() < 0.4 ? RW.pick(Object.keys(VEINS)) : 'none' }); return l; };
 
   const BAYER = [[0, 0.5], [0.75, 0.25]];
   const mix = (a, b, k) => RW.mix(a, b, k);
@@ -63,6 +70,20 @@
     if (crack === 'bolt' || crack === 'magma') { let x = -2, y = -ry + 3; const pts = [[x, y]]; for (let k = 0; k < 5; k++) { x += k % 2 ? -4 : 4; y += Math.ceil(ry * 1.7 / 5); pts.push([x, y]); } for (let k = 0; k < pts.length - 1; k++) { L(pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1]); L(pts[k][0] + 1, pts[k][1], pts[k + 1][0] + 1, pts[k + 1][1]); } if (crack === 'magma') pts.forEach(([a, b]) => A.px(g, cx + a, cy + b, '#ffd08a')); }
     else if (crack === 'web') { L(-6, -6, 0, 2); L(0, 2, 7, -3); L(0, 2, -2, 11); L(-9, 7, -2, 11); L(7, -3, 11, 4); }
     else if (crack === 'split') { L(-3, -ry + 2, -1, ry - 2); L(-2, -ry + 2, 0, ry - 2); }
+    // mineral veins in the colour chosen
+    const P1 = parse(look.shape);
+    if (P1.vein !== 'none') { const vc = VEINS[P1.vein], vl = RW.shade(vc, 0.35);
+      for (let v = 0; v < 3; v++) { let x = -rx * 0.8 + v * 6, y = -ry * 0.5 + v * ry * 0.45; for (let k = 0; k < 40; k++) { x += 0.9; y += Math.sin(k * 0.45 + v * 2 + seed) * 0.9; if (inside(Math.round(x), Math.round(y)) > 0 && inside(Math.round(x), Math.round(y)) < 0.94) { A.px(g, cx + Math.round(x), cy + Math.round(y), vc); if (k % 7 === 3) A.px(g, cx + Math.round(x), cy + Math.round(y) - 1, vl); } } } }
+    // things growing on or set into the boulder
+    if (P1.extra === 'crystals') { const cc = P1.vein !== 'none' && P1.vein !== 'obsidian' ? VEINS[P1.vein] : '#7fd0f0';
+      [[-0.7, -0.4, -2.4, 12], [-0.88, 0.05, -2.85, 9], [-0.45, -0.75, -2.0, 8]].forEach(([fx, fy, an, h]) => { const bx = cx + Math.round(fx * rx), by = cy + Math.round(fy * ry);
+        for (let k = 0; k < h; k++) { const w = Math.max(0, Math.round(2.6 * (1 - k / h) + 0.4)), x = Math.round(bx + Math.cos(an) * k), y = Math.round(by + Math.sin(an) * k); for (let j = -w; j <= w; j++) A.px(g, x, y + j, j < 0 ? RW.shade(cc, 0.4) : j === 0 ? cc : RW.shade(cc, -0.35)); }
+        A.px(g, Math.round(bx + Math.cos(an) * h), Math.round(by + Math.sin(an) * h), '#ffffff'); }); }
+    else if (P1.extra === 'gems') { [[-0.35, 0.35, '#d0384a'], [0.05, 0.6, '#3a78d8'], [-0.6, -0.1, '#4ab87a']].forEach(([fx, fy, col]) => { const x = cx + Math.round(fx * rx), y = cy + Math.round(fy * ry);
+        A.ell(g, x, y, 4, 3.4, '#8a6a28'); A.ell(g, x, y, 3, 2.6, col); A.rect(g, x - 2, y - 2, 2, 1, '#ffffff'); A.px(g, x + 2, y + 1, RW.shade(col, -0.45)); A.px(g, x + 1, y + 1, RW.shade(col, -0.4)); A.px(g, x - 3, y, '#c8a040'); A.px(g, x + 3, y, '#c8a040'); }); }
+    else if (P1.extra === 'barnacles') {
+      [[-0.7, 0.45], [-0.5, 0.7], [-0.85, 0.15], [-0.3, 0.8], [-0.62, 0.62]].forEach(([fx, fy], k) => { const x = cx + Math.round(fx * rx), y = cy + Math.round(fy * ry); A.ell(g, x, y, 3.2, 2.6, '#6a6458'); A.ell(g, x, y - 0.5, 2.6, 2, '#d8d0bc'); A.rect(g, x - 1, y - 2, 2, 2, '#2a2420'); A.px(g, x - 2, y - 1, '#f4eee0'); if (k % 2) A.px(g, x + 1, y + 1, '#8a8478'); });
+      [[-0.55, 9], [-0.2, 12], [-0.82, 7]].forEach(([fx, len], k) => { const x0 = cx + Math.round(fx * rx); let y = cy - ry + 2 + Math.round(Math.abs(fx) * 4); for (let j = 0; j < len; j++) { const x = x0 + Math.round(Math.sin(j * 0.6 + k) * 1); if (inside(x - cx, y - cy) > 0) { A.rect(g, x, y, 2, 1, j % 3 ? '#2f5a26' : '#4a7a36'); } if (j % 4 === 2) { A.px(g, x + 2, y, '#6ab04a'); A.px(g, x + 3, y - 1, '#6ab04a'); } y++; } }); }
     // face: three-quarters to the right
     const glow = RW.GLOWS[look.glow] || look.glow || RW.GLOWS.amber, eyes = look.eyes || 'round';
     const ex = Math.round(rx * 0.34), ey = Math.round(-ry * 0.2);
@@ -75,13 +96,78 @@
     if (mouth === 'line') A.rect(g, cx + ex - 3, my, 7, 2, mc);
     else if (mouth === 'grin') { A.rect(g, cx + ex - 5, my, 11, 2, mc); A.rect(g, cx + ex - 6, my - 2, 2, 2, mc); A.rect(g, cx + ex + 5, my - 2, 2, 2, mc); }
     else if (mouth === 'beard') for (let k = 0; k < 14; k++) A.line(g, cx + ex - 8 + k, my - 1, cx + ex - 8 + k, my + 3 + (k % 3) * 2, k % 2 ? '#5f7d4a' : '#4a6a3a');
-    // topper on the crown
-    const top = cy - Math.round(ry * (body === 'lumpy' ? 1.05 : 1)), tp = look.topper || 'mushroom';
-    if (tp === 'mushroom') { for (let r = 0; r < 8; r++) { const w = 18 + r * 2; A.rect(g, cx - 2 - (w >> 1), top - 9 + r, w, 1, r < 2 ? '#c07858' : '#9a5a42'); } A.rect(g, cx - 2 - 17, top - 1, 34, 2, '#6a3a2a'); [[-8, -6], [0, -8], [6, -5], [-2, -4], [10, -3], [-12, -3]].forEach(([a, b]) => A.rect(g, cx - 2 + a, top + b, 2, 2, '#e8d8c0')); }
-    else if (tp === 'moss') { for (let k = 0; k < 26; k++) A.line(g, cx - 14 + k, top + 2, cx - 14 + k, top - 2 - (k * 7 % 5), k % 2 ? '#6f8f4a' : '#4f6f3a'); }
-    else if (tp === 'crystal') { [[-6, 9], [0, 13], [6, 7]].forEach(([dx, h]) => { A.line(g, cx + dx, top + 2, cx + dx, top + 2 - h, '#6fb8e8'); A.line(g, cx + dx + 1, top + 2, cx + dx + 1, top + 3 - h, '#b8e8ff'); A.line(g, cx + dx - 1, top + 2, cx + dx - 1, top + 4 - h, '#4a8ac0'); }); }
-    else if (tp === 'lichen') { for (let k = 0; k < 18; k++) A.rect(g, cx - 9 + k, top + 1 - (k % 3 === 0 ? 1 : 0), 1, 2, k % 2 ? '#c8c86a' : '#a8a84a'); }
-    else if (tp === 'pebbles') { for (let k = 0; k < 5; k++) A.ell(g, cx - 10 + k * 5, top + 1 - (k % 2) * 2, 2, 2, k % 2 ? C.light : '#8a8a92'); }
+    if (P1.face === 'scar') { for (let k = 0; k < 15; k++) { const x = cx + ex + 8 - k, y = cy + ey - 8 + Math.round(k * 1.05); A.rect(g, x, y, 2, 1, RW.shade(C.dark, -0.55)); A.px(g, x + 2, y, C.light); if (k % 4 === 1) A.px(g, x - 1, y + 1, RW.shade(C.dark, -0.55)); } }
+    else if (P1.face === 'chip') { const qx = cx + rx - 4, qy = cy - Math.round(ry * 0.4); g.save(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.moveTo(qx - 7, qy - 6); g.lineTo(qx + 9, qy - 6); g.lineTo(qx + 9, qy + 6); g.lineTo(qx + 2, qy + 4); g.lineTo(qx - 2, qy); g.closePath(); g.fill(); g.restore();
+      for (let k = 0; k < 7; k++) { A.px(g, qx - 2 + k, qy + Math.round(k * 0.6), C.light); A.px(g, qx - 2 + k, qy + 1 + Math.round(k * 0.6), RW.shade(C.base, -0.1)); } A.px(g, qx - 3, qy - 1, C.light); }
+    else if (P1.face === 'freckles') { [[-7, 5], [-3, 7], [1, 5], [5, 7], [8, 5], [-5, 9], [4, 10]].forEach(([dx, dy], k) => { const x = cx + ex + dx, y = cy + ey + dy; A.rect(g, x, y, 2, 2, k % 3 ? '#e8c860' : '#c8e8ff'); A.px(g, x, y, '#ffffff'); }); }
+    // the head's top edge, column by column (everything on the crown sits snug on it)
+    const id0 = g.getImageData(0, 0, 80, 84).data, TOPY = [];
+    for (let x = 0; x < 80; x++) { let y = 0; while (y < 84 && id0[(y * 80 + x) * 4 + 3] < 10) y++; TOPY.push(y); }
+    const T2 = (x) => TOPY[RW.clamp(Math.round(x), 0, 79)];
+    const hcx = cx - 2, top = T2(hcx);
+    const along = (x0, x1, d, col) => { for (let x = x0; x <= x1; x++) { const y = T2(x); if (y < 84) A.px(g, x, y + d, col); } };
+    const span = (x0, x1) => { let l = x0, r = x1; while (l < r && T2(l) > top + 14) l++; while (r > l && T2(r) > top + 14) r--; return [l, r]; };
+    const hat = look.v3hat !== undefined ? look.v3hat : look.hat;
+    const wearsHat = hat && hat !== 'none' && RW.HATS && RW.HATS[hat];
+    const tp = wearsHat ? 'bare' : (look.topper || 'mushroom');
+    if (tp === 'mushroom') { // a domed cap pulled down on the crown: shaded bands, gills under the rim, raised spots
+      const [l, r] = span(hcx - 19, hcx + 17);
+      for (let x = l - 2; x <= r + 2; x++) { const y0 = T2(RW.clamp(x, l, r)) + 3, k = (x - (l - 2)) / (r - l + 4), dome = Math.round(Math.sin(k * Math.PI) * 10) + 2;
+        for (let y = y0 - dome; y <= y0; y++) { const t = (y - (y0 - dome)) / (dome + 1); A.px(g, x, y, t < 0.18 ? '#d88a68' : t < 0.55 ? '#b0644a' : t < 0.85 ? '#8a4a36' : '#6a3626'); }
+        A.px(g, x, y0 + 1, (x & 1) ? '#c8b898' : '#a8987a'); }
+      [[-9, -8, 3], [-1, -10, 3], [7, -7, 2], [-5, -4, 2], [12, -4, 2], [-14, -4, 2], [2, -5, 2]].forEach(([dx, dy, rr]) => { const x = hcx + dx, y = T2(x) + 3 + dy; A.ell(g, x, y, rr, rr - 0.5, '#efe2c8'); A.px(g, x - 1, y - 1, '#ffffff'); A.px(g, x + rr - 1, y + 1, '#c8b494'); });
+    } else if (tp === 'moss') { // layered strands following the head, a few tiny flowers
+      const [l, r] = span(hcx - 16, hcx + 15);
+      for (let x = l; x <= r; x++) { const y0 = T2(x) + 3, h = 4 + Math.round(RW.hash2(x, 3, 11) * 5) + (Math.abs(x - hcx) < 8 ? 2 : 0);
+        for (let k = 0; k < h; k++) A.px(g, x + (k > h - 3 ? (x % 2 ? 1 : -1) : 0), y0 - k, k < 2 ? '#3a5a2a' : k < h - 2 ? (x % 3 ? '#5f7d42' : '#4f6f36') : '#86a85a'); }
+      [[-8, 0], [3, 0], [10, 0]].forEach(([dx]) => { const x = hcx + dx, y = T2(x) - 6; A.px(g, x, y, '#f0e080'); A.px(g, x - 1, y, '#e8f0ff'); A.px(g, x + 1, y, '#e8f0ff'); A.px(g, x, y - 1, '#e8f0ff'); });
+    } else if (tp === 'crystal') { // faceted crystals growing out of the crown
+      [[-8, 10, -0.25], [0, 15, 0], [7, 9, 0.28], [-14, 6, -0.5], [13, 6, 0.5]].forEach(([dx, h, lean]) => { const bx = hcx + dx, by = T2(bx) + 4;
+        for (let k = 0; k < h; k++) { const w = Math.max(0, Math.round(2.6 * (1 - k / h) + 0.5)), x = Math.round(bx + lean * k); for (let j = -w; j <= w; j++) A.px(g, x + j, by - k, j < 0 ? '#9ad8ff' : j === 0 ? '#6fb8e8' : '#3e7ab0'); }
+        A.px(g, Math.round(bx + lean * (h - 1)), by - h, '#e8faff'); A.px(g, bx - 1, by - 2, '#e8faff'); });
+    } else if (tp === 'lichen') { // a crusty ring of lichen round the crown
+      const [l, r] = span(hcx - 15, hcx + 14);
+      for (let x = l; x <= r; x++) { const y0 = T2(x) + 2; for (let k = -1; k < 3; k++) { const h = RW.hash2(x, k + 5, 21); if (h < 0.8) A.px(g, x, y0 + k, h < 0.25 ? '#e0e08a' : h < 0.55 ? '#c0c060' : '#949440'); } if (x % 4 === 0) A.px(g, x, y0 - 2, '#d8d870'); }
+    } else if (tp === 'pebbles') { // a crown of little pebbles, set in a row
+      for (let k = 0; k < 6; k++) { const x = hcx - 13 + k * 5.2, y = T2(x) + 1 - (k % 2), cols = ['#8a8a96', C.light, '#a09484', '#7a7a86']; A.ell(g, x, y, 2.6, 2.3, '#3a3840'); A.ell(g, x, y, 2, 1.8, cols[k % 4]); A.px(g, x - 1, y - 1, '#e8e8f0'); }
+    }
+    // hats, pulled down snug, at twice the detail
+    if (wearsHat) {
+      const [l, r] = span(hcx - 17, hcx + 16), W2 = r - l;
+      if (hat === 'cap') { // a cloth cap in panels, a stitched seam, a button, the bill facing forward
+        for (let x = l; x <= r; x++) { const y0 = T2(x) + 5, k = (x - l) / W2, h = Math.round(Math.sin(k * Math.PI) * 7) + 4;
+          for (let y = y0 - h; y <= y0; y++) { const t = (y - y0 + h) / (h + 1); A.px(g, x, y, Math.abs(x - hcx) % 9 === 0 ? '#7a2424' : t < 0.25 ? '#e0625a' : t < 0.7 ? '#c0423a' : '#962e28'); } }
+        for (let x = l + 2; x < r; x += 2) A.px(g, x, T2(x) + 3, '#f0d0c0');
+        for (let x = r - 6; x <= r + 9; x++) { const y = T2(RW.clamp(x, l, r)) + 5; A.px(g, x, y, '#5a1a18'); A.px(g, x, y + 1, '#7a2420'); if (x > r) A.px(g, x, y - 1, '#a83430'); }
+        const by = T2(hcx) - 6; A.ell(g, hcx, by, 2, 1.5, '#f0e0d0'); A.px(g, hcx - 1, by - 1, '#ffffff');
+      } else if (hat === 'crown') { // a gold band with five points, engraved, set with gems
+        const by = (x) => T2(x) + 4;
+        for (let x = l + 1; x <= r - 1; x++) for (let y = by(x) - 5; y <= by(x); y++) A.px(g, x, y, y === by(x) - 5 ? '#fff0a0' : y === by(x) ? '#8a6418' : (x + y) % 5 === 0 ? '#c89428' : '#e8b838');
+        for (let k = 0; k < 5; k++) { const x = Math.round(l + 3 + k * (W2 - 6) / 4), h = k === 2 ? 9 : k % 2 ? 6 : 7; for (let j = 0; j < h; j++) { const w = Math.max(0, Math.round((1 - j / h) * 2)); for (let i = -w; i <= w; i++) A.px(g, x + i, by(x) - 6 - j, i < 0 ? '#fff0a0' : '#d8a430'); } A.ell(g, x, by(x) - 7 - h, 1.4, 1.4, '#ffe878'); }
+        [[-6, '#d0384a'], [1, '#3a78d8'], [8, '#4ab87a']].forEach(([dx, col]) => { const x = hcx + dx, y = by(x) - 3; A.rect(g, x - 1, y - 1, 3, 3, col); A.px(g, x - 1, y - 1, '#ffffff'); });
+      } else if (hat === 'flowers') { // a woven vine with flowers all the way round
+        for (let x = l; x <= r; x++) { const y = T2(x) + 2; A.px(g, x, y, x % 2 ? '#3a6a2a' : '#4a8a3a'); A.px(g, x, y + 1, '#2a4a1e'); if (x % 5 === 0) { A.px(g, x + 1, y - 1, '#6ab04a'); A.px(g, x + 2, y - 2, '#6ab04a'); } }
+        const FL = [['#e85a6a', '#ffd0d8'], ['#f0d040', '#fff4b0'], ['#f4f4f8', '#ffffff'], ['#6a8ae8', '#c8d8ff'], ['#e88a3a', '#ffd0a0']];
+        for (let k = 0; k < 6; k++) { const x = Math.round(l + 2 + k * (W2 - 4) / 5), y = T2(x) + 1, [c1, c2] = FL[k % 5]; [[0, -2], [2, 0], [0, 2], [-2, 0]].forEach(([a2, b2]) => A.ell(g, x + a2, y + b2 - 1, 1.5, 1.5, c1)); A.px(g, x - 1, y - 3, c2); A.px(g, x, y - 1, '#f8e070'); A.px(g, x, y, '#c8a030'); }
+      } else if (hat === 'wizard') { // a tall bent hat: a wide brim, a buckled band, stars and a moon
+        for (let x = l - 4; x <= r + 4; x++) { const y = T2(RW.clamp(x, l, r)) + 5; A.px(g, x, y, '#2a1a5a'); A.px(g, x, y - 1, '#4a2a8a'); A.px(g, x, y + 1, '#1a1040'); }
+        const base = top + 3, H2 = 22;
+        for (let j = 0; j < H2; j++) { const k = j / H2, w = Math.round((W2 / 2 - 2) * (1 - k) + 1), off = Math.round(k * k * 7) * -1; for (let i = -w; i <= w; i++) A.px(g, hcx + off + i, base - j, i < -w * 0.4 ? '#6a48b0' : i < w * 0.3 ? '#4f2f98' : '#3a2278'); }
+        A.px(g, hcx - 7, base - H2 + 1, '#f0d860'); for (let x = l + 3; x <= r - 3; x++) { const y = base - 1; A.px(g, x, y, '#2a1a4a'); A.px(g, x, y - 1, '#2a1a4a'); }
+        A.rect(g, hcx - 2, base - 3, 4, 3, '#e8c050'); A.px(g, hcx - 1, base - 2, '#2a1a4a');
+        [[-3, -8], [2, -13], [-4, -17]].forEach(([dx, dy]) => { const x = hcx + dx, y = base + dy; A.px(g, x, y, '#ffe878'); A.px(g, x - 1, y, '#c8a030'); A.px(g, x + 1, y, '#c8a030'); A.px(g, x, y - 1, '#c8a030'); A.px(g, x, y + 1, '#c8a030'); });
+        A.ell(g, hcx + 3, base - 7, 2, 2, '#f0e8b0'); A.ell(g, hcx + 4, base - 8, 1.6, 1.6, '#4f2f98');
+      } else if (hat === 'bandana') { // cloth wrapped over the crown, dotted, knotted at the back with two tails
+        for (let x = l; x <= r; x++) { const y0 = T2(x) + 6, h = Math.round(Math.sin((x - l) / W2 * Math.PI) * 3) + 5; for (let y = y0 - h; y <= y0; y++) A.px(g, x, y, y === y0 ? '#1e3e88' : y < y0 - h + 2 ? '#5a8ae8' : '#3a6ad0'); }
+        for (let x = l + 2; x < r; x += 4) for (let y = T2(x) + 2; y < T2(x) + 6; y += 3) A.px(g, x + ((y >> 1) & 1), y, '#f0f4ff');
+        const kx = l + 1, ky = T2(l + 3) + 5; A.ell(g, kx - 1, ky, 2.5, 2, '#2a52b0'); for (let k = 0; k < 7; k++) { A.px(g, kx - 3 - k * 0.7, ky + 1 + k, '#3a6ad0'); A.px(g, kx - 1 - k * 0.4, ky + 2 + k, '#2a52b0'); }
+      } else if (hat === 'bow') { // a big ribbon bow, folded loops and a knot, tied on the side of the head
+        const bx = hcx - 6, byy = T2(hcx - 6) + 1;
+        [-1, 1].forEach((sd) => { for (let j = 0; j < 9; j++) for (let i = 0; i < 9 - Math.abs(j - 4); i++) A.px(g, bx + sd * (2 + i), byy - 4 + j, i > 6 - Math.abs(j - 4) ? '#a02838' : j < 4 ? '#e85a6a' : '#d04a5a'); A.line(g, bx + sd * 3, byy - 1, bx + sd * 6, byy, '#8a1e2e'); });
+        A.rect(g, bx - 1, byy - 1, 3, 3, '#b83444'); A.px(g, bx - 1, byy - 1, '#ff9aa8');
+        for (let k = 0; k < 5; k++) { A.px(g, bx - 1 - k * 0.5, byy + 2 + k, '#d04a5a'); A.px(g, bx + 1 + k * 0.6, byy + 2 + k, '#c04050'); }
+      }
+    }
     return { c, rx, ry };
   }
   // limbs
@@ -180,6 +266,18 @@
     return out;
   };
 
+  // hats: the boulder paints them itself (snug, at twice the detail); the old 1x hat is skipped, and a helmet hides the hat
+  const baseDr3 = A.dressed;
+  A.dressed = function (species, look, armor) {
+    if (species === 'rock' && look && look.hat && look.hat !== 'none') { const head = armor && armor[0] && RW.ITEMS[armor[0]]; arguments[1] = Object.assign({}, look, { hat: 'none', v3hat: head ? 'none' : look.hat }); }
+    return baseDr3.apply(this, arguments);
+  };
+  // size: a pebble to a boulder (only the picture changes)
+  const baseDPs = E.drawPlayer;
+  E.drawPlayer = function (g, cam, p, look, opts) {
+    if (opts && (opts.species || 'rock') === 'rock' && look && look.shape) { const k = SIZE_K[parse(look.shape).size] || 1; if (k !== 1) arguments[4] = Object.assign({}, opts, { scale: (opts.scale || 1) * k }); }
+    return baseDPs.apply(this, arguments);
+  };
   // running: holding Shift (or moving fast, for other players) shows the move's own run frames
   const RUN_V = ((RW.HEROES.rock && RW.HEROES.rock.spd) || 92) * 1.15;
   const baseDP = E.drawPlayer;
@@ -216,7 +314,9 @@
     };
     const r1 = mkRow('Body', BODIES, 'body', bodyRow);
     const r2 = mkRow('Arms', ARMS, 'arms', r1);
-    mkRow('Moves', MOVES, 'move', r2, 'Hover a move to watch it in the picture. Every move is only a look: same speed and strength.');
+    const r3 = mkRow('Moves', MOVES, 'move', r2, 'Hover a move to watch it in the picture. Every move is only a look: same speed and strength.');
+    const VNAMES = {}; Object.keys(VEINS).forEach((k) => (VNAMES[k] = k === 'none' ? 'None' : k[0].toUpperCase() + k.slice(1)));
+    setTimeout(() => { const n3 = r3.nextElementSibling || r3; const r4 = mkRow('Face', FACEX, 'face', n3); const r5 = mkRow('Growths', BODYX, 'extra', r4); const r6 = mkRow('Size', SIZES, 'size', r5, 'Size is only a look too: every rock has the same reach and the same hitbox.'); setTimeout(() => mkRow('Veins', VNAMES, 'vein', r6.nextElementSibling || r6), 5); }, 5);
     bodyRow.remove();
   }
   new MutationObserver(() => { const dyn = document.getElementById('c-dyn'); if (dyn && !dyn.__v3) patchCreator(); }).observe(document.body, { childList: true, subtree: true });
