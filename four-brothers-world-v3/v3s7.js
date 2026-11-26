@@ -13,15 +13,17 @@
   if (!E || !P || !WD || !U || !A) return;
   const COLS = { amber: '#ffb347', cyan: '#6ff0ff', green: '#8dff8a', violet: '#c89bff', white: '#f4f4ff', ember: '#ff6a3a' };
   const CRYSTAL = { amber: ['crystal_gold'], cyan: ['crystal_blue'], green: ['crystal_green'], violet: ['crystal_purple'], ember: ['crystal_red'], white: ['crystal_red', 'crystal_blue', 'crystal_green', 'crystal_purple', 'crystal_gold'] };
-  const TIERS = { dim: { name: 'Dim', power: 0.18 }, bright: { name: 'Bright', power: 0.38 }, radiant: { name: 'Radiant', power: 0.93 } };
+  const TIERS = { dim: { name: 'Dim', power: 0.18 }, bright: { name: 'Bright', power: 0.38 }, radiant: { name: 'Radiant', power: 0.93 }, abyssal: { name: 'Abyssal', power: 1.25 } };
+  const SLOTS = ['trinket', 'trinket2', 'trinket3'];
   const CNAME = { amber: 'Amber', cyan: 'Cyan', green: 'Green', violet: 'Violet', white: 'White', ember: 'Ember' };
   const idOf = (t, c) => 'glow_' + t + '_' + c;
-  const parse = (id) => { const m = /^glow_(dim|bright|radiant)_([a-z]+)$/.exec(id || ''); return m && COLS[m[2]] ? { tier: m[1], col: m[2] } : null; };
+  const parse = (id) => { const m = /^glow_(dim|bright|radiant|abyssal)_([a-z]+)$/.exec(id || ''); return m && COLS[m[2]] ? { tier: m[1], col: m[2] } : null; };
   Object.keys(TIERS).forEach((t) => Object.keys(COLS).forEach((c) => {
     RW.register.item({ id: idOf(t, c), name: TIERS[t].name + ' ' + CNAME[c] + ' Glowstone', kind: 'armor', slot: 'trinket', def: 0, stack: 1,
-      icon: { s: 'v3glow', a: COLS[c], b: t }, desc: 'A trinket. Wear it (right-click) and you glow ' + CNAME[c].toLowerCase() + ', about ' + ({ dim: 3, bright: 9, radiant: 16 }[t]) + ' blocks round you. Recolour it at a forge for a matching crystal.' });
+      icon: { s: 'v3glow', a: COLS[c], b: t }, v3art: t === 'abyssal' ? 'glow_abyssal' : undefined, desc: 'A trinket. Wear it (right-click) and you glow ' + CNAME[c].toLowerCase() + ', about ' + ({ dim: 3, bright: 9, radiant: 16, abyssal: 22 }[t]) + ' blocks round you. Recolour it at a forge for a matching crystal.' });
   }));
   RW.register.recipe({ out: 'glow_dim_amber', in: { glow_mushroom: 3, stone: 2 } });
+  RW.register.recipe({ out: 'glow_abyssal_violet', in: { abyssite_bar: 4, leviathan_scale: 2 }, at: 'forge' });
   RW.register.recipe({ out: 'glow_bright_amber', in: { leviathan_scale: 1, platinum_bar: 1 }, at: 'forge' });
   // the icon: a gem on a little cord, brighter for the stronger ones
   A.iconExtra.v3glow = function (g, a, tier) {
@@ -31,6 +33,7 @@
     if (tier !== 'dim') { A.px(g, 8, 10 - r - 2, a); A.px(g, 8, 10 + r + 2, a); A.px(g, 8 - r - 2, 10, a); A.px(g, 8 + r + 2, 10, a); }
     if (tier === 'radiant') { A.px(g, 4, 6, '#ffffff'); A.px(g, 12, 14, '#ffffff'); A.px(g, 12, 6, a); A.px(g, 4, 14, a); }
   };
+  const worn = () => { const a = P.armor || {}; return SLOTS.map((k) => a[k]).find((id) => parse(id)) || null; };
   const rgb = (hex) => { const c = RW.hexToRgb(hex); return [c[0] / 255, c[1] / 255, c[2] / 255]; };
   const lightOf = (id) => { const q = parse(id); if (!q) return null; const c = rgb(COLS[q.col]), m = Math.max(c[0], c[1], c[2]) || 1, k = TIERS[q.tier].power / m; return [c[0] * k, c[1] * k, c[2] * k]; };
 
@@ -39,7 +42,7 @@
   const baseLight = WD.computeLight;
   WD.computeLight = function (tx0, ty0, tw, th, extra) {
     if (Array.isArray(extra) && RW.game && RW.game.playing) {
-      const mine = !P.dead && lightOf(P.armor && P.armor.trinket);
+      const mine = !P.dead && lightOf(worn());
       if (mine) extra.push({ x: P.x + 6, y: P.y + 10, r: mine[0], g: mine[1], b: mine[2], v3: true });
       if (N && N.peers) N.peers.forEach((p, key) => { const t = p.target, id = friends.get(key) || (t && friends.get(t.pid)); if (!id || !t || t.dead || t.w !== (WD.def && WD.def.id)) return; const l = lightOf(id); if (l) extra.push({ x: p.x + 6, y: p.y + 10, r: l[0], g: l[1], b: l[2], v3: true }); });
     }
@@ -47,7 +50,7 @@
   };
   if (N) {
     let last = null, beat = 0;
-    setInterval(() => { if (!N.transport || !RW.game || !RW.game.playing) return; const id = (P.armor && P.armor.trinket) || ''; beat++; if (id !== last || beat % 3 === 0) { last = id; N.send({ k: 'v3glow', id }); } }, 1500);
+    setInterval(() => { if (!N.transport || !RW.game || !RW.game.playing) return; const id = worn() || ''; beat++; if (id !== last || beat % 3 === 0) { last = id; N.send({ k: 'v3glow', id }); } }, 1500);
     N.on('v3glow', (m) => { if (typeof m.f !== 'string') return; if (m.id && parse(m.id)) friends.set(m.f, m.id); else friends.delete(m.f); });
     N.on('left', (m) => friends.delete(m.pid));
   }
@@ -63,7 +66,7 @@
   const baseDP = E.drawPlayer;
   E.drawPlayer = function (g, cam, p, look, opts) {
     let id = null;
-    if (p === P) id = P.armor && P.armor.trinket;
+    if (p === P) id = worn();
     else if (N && N.peers) N.peers.forEach((q, key) => { if (!id && Math.abs(q.x - p.x) < 1 && Math.abs(q.y - p.y) < 1) id = friends.get(key) || (q.target && friends.get(q.target.pid)); });
     const qq = parse(id);
     if (qq && opts && !opts.dead) {
@@ -73,7 +76,7 @@
           const sc = opts.scale || 1, w = fr.width * sc, h = fr.height * sc;
           const dx = Math.round(p.x - cam.x + 6 - w / 2), dy = Math.round(p.y - cam.y + 28 - h + ({ fuzzy: 2, acorn: 2, ghost: 3 }[opts.species] || 1));
           const rc = rim(fr, COLS[qq.col]), puls = 0.45 + 0.15 * Math.sin(performance.now() / 300);
-          g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = puls * (qq.tier === 'radiant' ? 1 : qq.tier === 'bright' ? 0.8 : 0.6);
+          g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = puls * (qq.tier === 'radiant' || qq.tier === 'abyssal' ? 1 : qq.tier === 'bright' ? 0.8 : 0.6);
           [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([ax, ay]) => g.drawImage(rc, dx + ax * 0.75, dy + ay * 0.75, w, h));
           g.restore();
         }
@@ -103,13 +106,16 @@
     const sb = document.getElementById('statsbox'); if (!sb) return r;
     const old = sb.querySelector('.v3trinket'); if (old) old.remove();
     const row = document.createElement('div'); row.className = 'wearing v3trinket';
-    const b = document.createElement('b'); b.textContent = 'Trinket'; row.append(b);
-    const id = P.armor && P.armor.trinket, it = RW.ITEMS[id];
-    const slot = document.createElement('div'); slot.className = 'slot armorslot'; const c = document.createElement('canvas'); c.width = c.height = 16; paint(c, it && it.id); slot.append(c);
-    slot.title = it ? it.name + ' (click to take off)' : 'No trinket. Right-click a Glowstone in your bag to wear it.';
-    slot.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); if (it) { P.unwear('trinket'); U.renderInv(); } });
-    if (it) U.attachTip(slot, () => ({ id: it.id }));
-    row.append(slot);
+    const b = document.createElement('b'); b.textContent = 'Trinkets'; row.append(b);
+    SLOTS.forEach((sl) => {
+      const tid = P.armor && P.armor[sl], tit = RW.ITEMS[tid];
+      const slot = document.createElement('div'); slot.className = 'slot armorslot'; const c = document.createElement('canvas'); c.width = c.height = 16; paint(c, tit && tit.id); slot.append(c);
+      slot.title = tit ? tit.name + ' (click to take off)' : 'Empty trinket slot. Right-click a trinket in your bag to wear it.';
+      slot.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); if (tit) { P.unwear(sl); U.renderInv(); } });
+      if (tit) U.attachTip(slot, () => ({ id: tit.id }));
+      row.append(slot);
+    });
+    const glowSlot = SLOTS.find((k) => parse(P.armor && P.armor[k])), id = glowSlot ? P.armor[glowSlot] : null;
     const q = parse(id);
     if (q) {
       const atForge = P.nearStation && P.nearStation('forge');
@@ -120,7 +126,7 @@
         const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'chip'; const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = COLS[col]; btn.append(sw, document.createTextNode(CNAME[col]));
         btn.title = col === 'white' ? 'Any crystal' : RW.ITEMS[CRYSTAL[col][0]] ? RW.ITEMS[CRYSTAL[col][0]].name : '';
         if (!need) btn.disabled = true;
-        btn.onclick = () => { if (!need) return; P.remove(need, 1); P.armor.trinket = idOf(q.tier, col); RW.audio.sfx('craft'); RW.fx.burst(P.x + 6, P.y + 10, [COLS[col], '#ffffff'], 14, 80, { add: true, kind: 'glow' }); U.toast('Your glowstone shines ' + CNAME[col].toLowerCase() + ' now.'); RW.game.saveSoon(); U.renderInv(); };
+        btn.onclick = () => { if (!need) return; P.remove(need, 1); P.armor[glowSlot] = idOf(q.tier, col); RW.audio.sfx('craft'); RW.fx.burst(P.x + 6, P.y + 10, [COLS[col], '#ffffff'], 14, 80, { add: true, kind: 'glow' }); U.toast('Your glowstone shines ' + CNAME[col].toLowerCase() + ' now.'); RW.game.saveSoon(); U.renderInv(); };
         row.append(btn);
       });
     }
@@ -128,5 +134,16 @@
     return r;
   };
   // trinkets never count as armour pieces for the armour look and the defence total (they have none anyway)
-  RW.v3glow = { COLS, TIERS, idOf, parse };
+  const baseWear = P.wear;
+  P.wear = function (it) {
+    if (!it || it.slot !== 'trinket') return baseWear.apply(this, arguments);
+    const a = P.armor; const fam = (id) => (parse(id) ? 'glow' : id);
+    let sl = SLOTS.find((k) => a[k] && fam(a[k]) === fam(it.id));
+    if (sl && a[sl] === it.id) { U.toast('You are already wearing that.'); return; }
+    if (!sl) sl = SLOTS.find((k) => !a[k]);
+    if (!sl) { U.toast('All three trinket slots are full. Take one off first (click it in the bag).'); return; }
+    const old = a[sl]; P.remove(it.id, 1); a[sl] = it.id; if (old) P.add(old, 1);
+    RW.audio.sfx('craft'); U.toast('You put on the ' + it.name + '.'); U.dirty(); RW.game.saveSoon();
+  };
+  RW.v3glow = { COLS, TIERS, idOf, parse, SLOTS, worn };
 })(window.RW);

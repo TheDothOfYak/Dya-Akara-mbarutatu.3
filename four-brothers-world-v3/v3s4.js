@@ -119,7 +119,7 @@
       const fs = fighters(), who = fs.length ? fs[k % fs.length] : { x: head(b).x, y: head(b).y };
       const ang = (k / 4) * Math.PI * 2 + Math.random() * 0.4, back = id === 'v3g_emerald' ? 380 : 240;
       const p = clampArena(who.x + Math.cos(ang) * back, who.y + Math.sin(ang) * back * 0.6, 40);
-      const e = E.spawnEnemy(id, p.x - 11, p.y - 16); e.hp = e.maxhp = hp; e.provoked = true;
+      const e = E.spawnEnemy(id, p.x - 14, p.y - 27); e.hp = e.maxhp = hp; e.provoked = true;
       RW.fx.burst(p.x, p.y, [GEMS[GCLASS[id].gem], '#ffffff'], 24, 140, { add: true, kind: 'glow', life: 0.8 });
     });
   }
@@ -586,6 +586,7 @@
     for (let i = 0; i < pts.length; i++) { const p1 = pts[i], p2 = pts[(i + 1) % pts.length]; g.fillStyle = i % 3 === 0 ? shade(col, 0.4) : i % 3 === 1 ? col : shade(col, -0.25); g.beginPath(); g.moveTo(cx, cy); g.lineTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.fill(); } }
   function glowDot(g, x, y, r, col) { g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.35, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); g.restore(); }
   function drawGuardian(g, x, y, e, time) {
+    if (RW.v3soul) return RW.v3soul(g, x, y, e, time);
     const G = GCLASS[e.sp] || GCLASS.v3g_ruby, gc = GEMS[G.gem], dk = shade(gc, -0.55), lt = shade(gc, 0.45);
     const t = e.t || time || 0, bob = Math.sin(t * 2.4) * 1.5, f = e.face || 1, a = e.act, u = e.actT && e.actD ? 1 - e.actT / e.actD : 0;
     g.save(); g.translate(Math.round(x), Math.round(y + bob)); g.scale(f, 1);
