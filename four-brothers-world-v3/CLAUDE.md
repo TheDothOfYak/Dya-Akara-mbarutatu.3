@@ -23,6 +23,8 @@ V3 is a copy of V2 (its `index.html` and `v2*.js` modules, unchanged apart from 
 - v3s13: Rock World towns (`RW.v3towns`): visitors moved from the start to Stalagmere, abandoned towns (`t.abandoned`, haunted chest tile `hauntchest`, zombie boulders `v3_zboulder`, possessed rocks `v3_possessed`, clear flag `P.flags.v3clear_<town>`), villagers `v3vil_0..11` (trader/jobs/elder; `RW.V3_TOWN_TRADES`, `RW.V3_JOBS`).
 - v2s4.js (V3 copy): rocks steer in the air (aup 0.45, abrake 0.9) and stop dead when A/D is let go (not in water, not just after a hit).
 - v2s13.js (V3 copy): B no longer cycles building shapes for rocks; for rocks T or B switch one mode, 1x1 or 2x2, for mining and placing (v3s6 sets P.flags.shape 0 or 3).
+- v3s14: characters and worlds like Terraria (`RW.v3slots`): Play opens a character list, then a world list. RW.store get/set map hero keys (`save_rock`, `save_backup_*`) to `@c<id>` and world keys (`edits_`, `explored_`, `bossdead_`, `chests_`, `mother_`, `clam_`, `cl_scrib_`, `v2_rockseed`, `duatunlock`) to `@w<id>`. Lists `v3_chars`/`v3_worlds`, picks `v3_curchar`/`v3_curworld`. Old saves migrate to c1/w1. G.start waits for a world pick (tests set `window.__v3direct = true`). Hero save carries `v3posBy` (positions per world) and `v3been`.
+- v3s3 also: you spawn in Stalagmere beside the starter chest (v3s13 sets def.spawn).
 - v3s3 also: Stalagmere homes for Gneiss, Wedgeworth (own house), Cubert and Slagg (walled forge); visitors go to the first lived-in town (v3s13).
 
 
