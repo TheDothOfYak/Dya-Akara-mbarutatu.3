@@ -6,6 +6,7 @@
 //    get paid) and an old-timer full of advice and rumours (including which towns went quiet).
 //  * Abandoned towns are dark. Zombie boulders shamble about and possessed rocks float and throw spirit orbs.
 //    A haunted chest sits in the middle: it opens once every corrupted rock in that town is gone (once per hero).
+//  * Making a new hero rolls a brand-new Rock World (new seed, the Leviathan alive again). Guests in a room still use the host's.
 (function (RW) {
   'use strict';
   const E = RW.ent, P = RW.player, WD = RW.world, U = RW.ui, A = RW.art, R = RW.register, TS = RW.TILE;
@@ -28,6 +29,8 @@
     const out = baseGen.apply(this, arguments);
     try {
       const m = out.meta, towns = m.towns || [], W = out.W, at = (x, y) => out.fg[y * W + x];
+      // you start in Stalagmere, beside the chest of old tools, with its own folk round you
+      const st = m.starter; if (st) { for (const dx of [-2, -3, 2, 3, -1, 1]) { const x = st.x + dx, y = st.y; const ok = !(RW.TILES[at(x, y)] || {}).solid && !(RW.TILES[at(x, y - 1)] || {}).solid && (RW.TILES[at(x, y + 1)] || {}).solid; if (ok) { def.spawn.x = x; def.spawn.y = y; break; } } }
       towns.forEach((t) => { t.abandoned = h32(t.name + ':' + (def.store || '')) < 0.42; });
       if (towns.length >= 2) { if (towns.every((t) => t.abandoned)) towns[0].abandoned = false; if (!towns.some((t) => t.abandoned)) towns[towns.length - 1].abandoned = true; }
       towns.forEach((t) => {
@@ -186,5 +189,25 @@
     } catch (e) { console.error(e); }
     return r;
   };
+  // ---------------- a new hero gets a brand-new Rock World ----------------
+  const N = RW.net;
+  (function hookNew() {
+    const G = RW.game; if (!G || !G.newCharacter) { setTimeout(hookNew, 30); return; }
+    if (G.newCharacter.__v3) return;
+    const baseNew = G.newCharacter;
+    G.newCharacter = function () {
+      const r = baseNew.apply(this, arguments);
+      const joined = N && N.transport === 'p2p' && !N.isHost; // a guest plays in the host's world
+      if (!joined) {
+        RW.store.set('v2_rockseed', 1 + Math.floor(Math.random() * 2147483000));
+        RW.state.bosses.rock = false; try { RW.store.set(N.key('bossdead_rock'), false); } catch (e) { /* fine */ }
+        RW.v3rematch = false; RW.v3reinit = true;
+      }
+      return r;
+    };
+    G.newCharacter.__v3 = true;
+    const baseStart = G.start;
+    G.start = async function () { if (RW.v3reinit) { RW.v3reinit = false; if (RW.world.def && RW.world.def.id === 'rock' && (P.world || P.startWorld) === 'rock') await G.enterWorld('rock'); } return baseStart.apply(this, arguments); };
+  })();
   RW.v3towns = { townAt };
 })(window.RW);

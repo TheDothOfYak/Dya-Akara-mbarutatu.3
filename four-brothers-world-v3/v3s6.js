@@ -93,7 +93,9 @@
     else if (eyes === 'sleepy') { A.rect(g, cx + ex - 7, cy + ey + 2, 4, 2, glow); A.rect(g, cx + ex + 1, cy + ey + 2, 4, 2, glow); A.rect(g, cx + ex - 8, cy + ey, 15, 2, C.dark); }
     else { A.rect(g, cx + ex - 7, cy + ey, 4, 4, glow); A.rect(g, cx + ex + 1, cy + ey, 4, 4, glow); A.rect(g, cx + ex - 7, cy + ey, 2, 2, '#ffffff'); A.rect(g, cx + ex + 1, cy + ey, 2, 2, '#ffffff'); }
     const my = cy + ey + 9, mouth = look.mouth || 'none', mc = RW.shade(C.dark, -0.45);
-    const lip = RW.shade(C.light, 0.2), dk = '#120c10', mx = Math.round(rx * 0.34) - 3;
+    const lumOf = (h) => { const n = parseInt(String(h).slice(1), 16); return ((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11) / 255; };
+    const darkRock = lumOf(C.base) < 0.32, mx = Math.round(rx * 0.34) - 3, lip = darkRock ? RW.shade(C.light, 0.55) : RW.shade(C.light, 0.2), dk = '#120c10';
+    if (darkRock && (mouth === 'line' || mouth === 'grin')) { const rim = RW.shade(C.light, 0.45); if (mouth === 'line') A.rect(g, cx + mx - 6, my - 2, 13, 5, rim); else { A.rect(g, cx + mx - 7, my - 2, 15, 6, rim); A.rect(g, cx + mx - 9, my - 4, 5, 5, rim); A.rect(g, cx + mx + 5, my - 4, 5, 5, rim); } }
     if (mouth === 'line') { A.rect(g, cx + mx - 5, my - 1, 11, 3, dk); A.rect(g, cx + mx - 4, my, 9, 1, '#3a2228'); A.rect(g, cx + mx - 5, my + 2, 11, 1, lip); }
     else if (mouth === 'grin') { A.rect(g, cx + mx - 6, my - 1, 13, 4, dk); A.rect(g, cx + mx - 8, my - 3, 3, 3, dk); A.rect(g, cx + mx + 6, my - 3, 3, 3, dk); for (let k = 0; k < 5; k++) A.rect(g, cx + mx - 5 + k * 2.4, my - 1, 2, 2, '#f0e8d8'); A.rect(g, cx + mx - 4, my + 2, 9, 1, '#5a2a30'); A.rect(g, cx + mx - 6, my + 3, 13, 1, lip); }
     else if (mouth === 'beard') for (let k = 0; k < 14; k++) A.line(g, cx + ex - 8 + k, my - 1, cx + ex - 8 + k, my + 3 + (k % 3) * 2, k % 2 ? '#5f7d4a' : '#4a6a3a');
