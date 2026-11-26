@@ -431,10 +431,12 @@
   const baseAct = P.actions;
   P.actions = function () {
     const r = baseAct.apply(this, arguments);
-    if (RW.input.actHit('mine2') && !(U.blocking && U.blocking())) {
+    const hitT = RW.input.actHit('mine2'), hitB = P.species === 'rock' && RW.input.actHit('shape');
+    if ((hitT || hitB) && !(U.blocking && U.blocking())) {
       if (P.species !== 'rock') U.toast('Only rocks can smash 2x2.');
-      else { RW.v3mine2 = !RW.v3mine2; RW.store.set('v3_mine2', RW.v3mine2); U.toast(RW.v3mine2 ? '2x2 mining: each punch smashes a 2x2 square. Press T for one block.' : '1x1 mining: one block per punch. Press T for 2x2.'); RW.audio.sfx('ui'); U.dirty(); }
+      else { RW.v3mine2 = !RW.v3mine2; RW.store.set('v3_mine2', RW.v3mine2); U.toast(RW.v3mine2 ? '2x2 mode: each punch smashes a 2x2 square, and blocks go down 2x2. Press T for one block.' : '1x1 mode: one block per punch, one block placed. Press T for 2x2.'); RW.audio.sfx('ui'); U.dirty(); }
     }
+    if (P.species === 'rock' && P.flags) P.flags.shape = RW.v3mine2 ? 3 : 0; // rocks build in the same two modes
     return r;
   };
   // the 2x2 square under the cursor, and the label on the hotbar

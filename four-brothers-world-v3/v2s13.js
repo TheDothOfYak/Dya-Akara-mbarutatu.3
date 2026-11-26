@@ -125,7 +125,7 @@
   P.update = function (dt) {
     const r = baseUpd.apply(this, arguments);
     const I = RW.input, typing = !!(U.blocking && U.blocking());
-    if (!typing && I.actHit && I.actHit('shape')) {
+    if (!typing && I.actHit && I.actHit('shape') && P.species !== 'rock') { // V3: rocks switch 1x1 / 2x2 with T or B (v3s6)
       P.flags.shape = (shapeNo() + 1) % SHAPES.length;
       U.toast('Building shape: ' + SHAPES[P.flags.shape].name + '. Press B to change it.');
     }

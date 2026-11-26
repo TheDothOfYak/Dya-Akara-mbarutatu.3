@@ -65,7 +65,7 @@
       if (vx * S.tgt < -8) { vx = approach(vx, 0, mag / (ground ? M.turn : M.aup) * dt); if (ground && Math.abs(S.vx0) > 50 && Math.random() < 0.5) dust(o.x + o.w / 2, o.y + o.h - 1, 1, -S.tgt * 40); }
       else if (Math.abs(vx) < Math.abs(want)) { vx = approach(vx, want, Math.abs(want) / (ground ? M.up : M.aup) * dt); if (ground && Math.abs(vx) < M.creep) vx = S.tgt * Math.min(M.creep, Math.abs(want)); }
       else vx = approach(vx, want, mag / (ground ? M.brake : M.abrake) * dt);
-    } else vx = approach(vx, 0, mag / (ground ? M.brake : M.abrake) * dt);
+    } else vx = (!P.water && !(performance.now() / 1000 - (P.lastHurt || -9) < 0.3)) ? 0 : approach(vx, 0, mag / (ground ? M.brake : M.abrake) * dt); // V3: full stop when you let go
     o.vx = Math.abs(vx) < 2 ? 0 : vx;
   }
 

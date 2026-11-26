@@ -1,6 +1,6 @@
 // 4 Brothers World V3 — part 13: Rock World towns.
-//  * Only Rock World's own folk (Gneiss, Slagg, Wedgeworth, Cubert) are by where you start. Tumble, the rune keeper and any
-//    other visitors move to Stalagmere, next to Gneiss's house.
+//  * Only Rock World's own folk (Gneiss, Slagg, Wedgeworth, Cubert) live in Stalagmere, each in a home. Tumble, the rune
+//    keeper and any other visitors move to the first lived-in town.
 //  * Each other town is lived in or abandoned (decided by the world's seed, at least one of each when there are two or more).
 //  * Lived-in towns have three villagers: a trader (coins for trinkets, tools and supplies), a job-giver (bring things,
 //    get paid) and an old-timer full of advice and rumours (including which towns went quiet).
@@ -156,7 +156,9 @@
     const r = baseInit.apply(this, arguments);
     if (!inRock()) return r;
     try {
-      const m = WD.meta, orig = new Set(Object.keys(m.npcs || {})), sp = WD.def.spawn, g = m.npcs && m.npcs.gneiss;
+      const m = WD.meta, orig = new Set(Object.keys(m.npcs || {})), sp = WD.def.spawn;
+      // visitors stay out of Stalagmere (only its own folk live there): they go to the first lived-in town
+      const lt = (m.towns || []).find((t) => !t.abandoned && t.homes && t.homes.length), g = lt ? { x: lt.homes[lt.homes.length - 1].x + 6, y: lt.homes[lt.homes.length - 1].y } : m.npcs && m.npcs.gneiss;
       // visitors move to Stalagmere
       if (sp && g) {
         let slot = 0;

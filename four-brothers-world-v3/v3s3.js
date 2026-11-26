@@ -336,10 +336,12 @@
       const ms = mites.map((x, i) => stalagmite(x, c, [0.38, 0.46, 0.34][i], true));
       [-0.78, -0.3, 0.3, 0.82].forEach((f, i) => stalactite(Math.round(c.cx + f * c.rx), c, 9 + (i % 2) * 4, true));
       const hy0 = Math.round(c.cy - c.ry * 0.18);
+      const bridge0 = (xa, xb, y) => { for (let x = Math.min(xa, xb); x <= Math.max(xa, xb); x++) if (get(x, y) === T.air) set(x, y, T.walkway); };
       const h1 = house(Math.round(c.cx - c.rx * 0.3), hy0, 13, 7, 'gneiss');
       const h2 = house(Math.round(c.cx + c.rx * 0.28), hy0 + 5, 11, 6, null);
       const h3 = house(Math.round(c.cx + c.rx * 0.78), hy0 + 12, 9, 6, 'cubert');
-      meta.npcs.wedgeworth = { x: h1.x0 + 4, y: h1.floorRow - 1 };
+      const h4 = house(Math.round(c.cx - c.rx * 0.74), hy0 + 9, 10, 6, 'wedgeworth'); // V3: Wedgeworth has his own home now
+      bridge0(h4.x1, h1.x0, Math.max(h4.floorRow, h1.floorRow) + 3);
       meta.npcs.guesthouse = { x: Math.round((h2.x0 + h2.x1) / 2), y: h2.floorRow - 1 };
       meta.carvings[(h2.x1 - 2) + ',' + (h2.floorRow - 1)] = 5; set(h2.x1 - 2, h2.floorRow - 1, T.tablet); // Triangle Accord
       const bridge = (xa, xb, y) => { for (let x = Math.min(xa, xb); x <= Math.max(xa, xb); x++) if (get(x, y) === T.air) set(x, y, T.walkway); };
@@ -347,8 +349,8 @@
       // Slagg's forge, on the middle stalagmite
       const m = ms[1], fy = Math.min(c.water - 4, m.top + 14), fx = mites[1] + Math.round(m.wAt(fy)) + 1;
       for (let x = fx; x <= fx + 9; x++) set(x, fy, T.brick);
-      set(fx + 1, fy - 1, T.forge); set(fx + 6, fy - 1, T.knapstone); set(fx + 4, fy - 3, T.lantern);
-      for (let y = ceilAt(fx + 4, fy - 4) + 1; y < fy - 3; y++) set(fx + 4, y, T.chain);
+      house(fx + 5, fy, 11, 6, null); // V3: Slagg's forge is his home too, walled and roofed
+      set(fx + 1, fy - 1, T.forge); set(fx + 7, fy - 1, T.knapstone);
       meta.npcs.slagg = { x: fx + 3, y: fy - 1 };
       // the starter chest: where the shaft from your cave lands
       const sx = HOME.x1 + 5; let sy = floorAt(sx, vilRoof + 1, H); if (get(sx, sy) === T.water) sy = c.water;
