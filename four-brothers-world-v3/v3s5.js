@@ -120,6 +120,7 @@
     }
     hdIcons[id] = c; return c;
   }
+  RW.v3hdIcon = hdIcon;
 
   // ================================= 3. drawing through the sharper copies =================================
   function sharpen(g, fn, self, args) {

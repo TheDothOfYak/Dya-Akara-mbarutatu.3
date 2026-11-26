@@ -109,7 +109,8 @@
     const span = (x0, x1) => { let l = x0, r = x1; while (l < r && T2(l) > top + 14) l++; while (r > l && T2(r) > top + 14) r--; return [l, r]; };
     const hat = look.v3hat !== undefined ? look.v3hat : look.hat;
     const wearsHat = hat && hat !== 'none' && RW.HATS && RW.HATS[hat];
-    const tp = wearsHat ? 'bare' : (look.topper || 'mushroom');
+    const helmOn = !!(look.v3armor && look.v3armor[0] && RW.ITEMS[look.v3armor[0]]);
+    const tp = wearsHat || helmOn ? 'bare' : (look.topper || 'mushroom');
     if (tp === 'mushroom') { // a domed cap pulled down on the crown: shaded bands, gills under the rim, raised spots
       const [l, r] = span(hcx - 19, hcx + 17);
       for (let x = l - 2; x <= r + 2; x++) { const y0 = T2(RW.clamp(x, l, r)) + 3, k = (x - (l - 2)) / (r - l + 4), dome = Math.round(Math.sin(k * Math.PI) * 10) + 2;
@@ -149,14 +150,16 @@
         for (let x = l; x <= r; x++) { const y = T2(x) + 2; A.px(g, x, y, x % 2 ? '#3a6a2a' : '#4a8a3a'); A.px(g, x, y + 1, '#2a4a1e'); if (x % 5 === 0) { A.px(g, x + 1, y - 1, '#6ab04a'); A.px(g, x + 2, y - 2, '#6ab04a'); } }
         const FL = [['#e85a6a', '#ffd0d8'], ['#f0d040', '#fff4b0'], ['#f4f4f8', '#ffffff'], ['#6a8ae8', '#c8d8ff'], ['#e88a3a', '#ffd0a0']];
         for (let k = 0; k < 6; k++) { const x = Math.round(l + 2 + k * (W2 - 4) / 5), y = T2(x) + 1, [c1, c2] = FL[k % 5]; [[0, -2], [2, 0], [0, 2], [-2, 0]].forEach(([a2, b2]) => A.ell(g, x + a2, y + b2 - 1, 1.5, 1.5, c1)); A.px(g, x - 1, y - 3, c2); A.px(g, x, y - 1, '#f8e070'); A.px(g, x, y, '#c8a030'); }
-      } else if (hat === 'wizard') { // a tall bent hat: a wide brim, a buckled band, stars and a moon
-        for (let x = l - 4; x <= r + 4; x++) { const y = T2(RW.clamp(x, l, r)) + 5; A.px(g, x, y, '#2a1a5a'); A.px(g, x, y - 1, '#4a2a8a'); A.px(g, x, y + 1, '#1a1040'); }
-        const base = top + 3, H2 = 22;
-        for (let j = 0; j < H2; j++) { const k = j / H2, w = Math.round((W2 / 2 - 2) * (1 - k) + 1), off = Math.round(k * k * 7) * -1; for (let i = -w; i <= w; i++) A.px(g, hcx + off + i, base - j, i < -w * 0.4 ? '#6a48b0' : i < w * 0.3 ? '#4f2f98' : '#3a2278'); }
-        A.px(g, hcx - 7, base - H2 + 1, '#f0d860'); for (let x = l + 3; x <= r - 3; x++) { const y = base - 1; A.px(g, x, y, '#2a1a4a'); A.px(g, x, y - 1, '#2a1a4a'); }
-        A.rect(g, hcx - 2, base - 3, 4, 3, '#e8c050'); A.px(g, hcx - 1, base - 2, '#2a1a4a');
-        [[-3, -8], [2, -13], [-4, -17]].forEach(([dx, dy]) => { const x = hcx + dx, y = base + dy; A.px(g, x, y, '#ffe878'); A.px(g, x - 1, y, '#c8a030'); A.px(g, x + 1, y, '#c8a030'); A.px(g, x, y - 1, '#c8a030'); A.px(g, x, y + 1, '#c8a030'); });
-        A.ell(g, hcx + 3, base - 7, 2, 2, '#f0e8b0'); A.ell(g, hcx + 4, base - 8, 1.6, 1.6, '#4f2f98');
+      } else if (hat === 'wizard') { // a tall bent hat on a flat round brim, a buckled band, stars and a moon
+        const base = top + 6, H2 = 22, bw = Math.round(W2 / 2) + 6, br = 3;
+        A.ell(g, hcx, base + 1, bw + 1, br + 1, '#140c30'); A.ell(g, hcx, base, bw, br, '#3a2278'); A.ell(g, hcx - 1, base - 1, bw - 2, br - 1.2, '#4f2f98');
+        for (let x = hcx - bw + 2; x <= hcx + bw - 2; x++) A.px(g, x, base + Math.round(Math.sqrt(Math.max(0, 1 - Math.pow((x - hcx) / bw, 2))) * br), '#6a48b0');
+        for (let j = 0; j < H2; j++) { const k = j / H2, w = Math.round((W2 / 2 - 3) * (1 - k) + 1), off = -Math.round(k * k * 7); for (let i = -w; i <= w; i++) A.px(g, hcx + off + i, base - 1 - j, i < -w * 0.4 ? '#6a48b0' : i < w * 0.3 ? '#4f2f98' : '#3a2278'); }
+        A.px(g, hcx - 7, base - H2, '#f0d860');
+        for (let x = hcx - Math.round(W2 / 2) + 3; x <= hcx + Math.round(W2 / 2) - 3; x++) { A.px(g, x, base - 2, '#2a1a4a'); A.px(g, x, base - 3, '#2a1a4a'); }
+        A.rect(g, hcx - 2, base - 4, 4, 3, '#e8c050'); A.px(g, hcx - 1, base - 3, '#2a1a4a');
+        [[-3, -9], [2, -14], [-4, -18]].forEach(([dx, dy]) => { const x = hcx + dx, y = base + dy; A.px(g, x, y, '#ffe878'); A.px(g, x - 1, y, '#c8a030'); A.px(g, x + 1, y, '#c8a030'); A.px(g, x, y - 1, '#c8a030'); A.px(g, x, y + 1, '#c8a030'); });
+        A.ell(g, hcx + 3, base - 8, 2, 2, '#f0e8b0'); A.ell(g, hcx + 4, base - 9, 1.6, 1.6, '#4f2f98');
       } else if (hat === 'bandana') { // cloth wrapped over the crown, dotted, knotted at the back with two tails
         for (let x = l; x <= r; x++) { const y0 = T2(x) + 6, h = Math.round(Math.sin((x - l) / W2 * Math.PI) * 3) + 5; for (let y = y0 - h; y <= y0; y++) A.px(g, x, y, y === y0 ? '#1e3e88' : y < y0 - h + 2 ? '#5a8ae8' : '#3a6ad0'); }
         for (let x = l + 2; x < r; x += 4) for (let y = T2(x) + 2; y < T2(x) + 6; y += 3) A.px(g, x + ((y >> 1) & 1), y, '#f0f4ff');
@@ -167,6 +170,44 @@
         A.rect(g, bx - 1, byy - 1, 3, 3, '#b83444'); A.px(g, bx - 1, byy - 1, '#ff9aa8');
         for (let k = 0; k < 5; k++) { A.px(g, bx - 1 - k * 0.5, byy + 2 + k, '#d04a5a'); A.px(g, bx + 1 + k * 0.6, byy + 2 + k, '#c04050'); }
       }
+    }
+    // armour, worn as real pieces: a chestplate with pauldrons, a helmet over the crown (Terraria-style ramps, rivets, trims)
+    const AR = look.v3armor || [], hI = RW.ITEMS[AR[0]], bI = RW.ITEMS[AR[1]];
+    const ramp = (c) => [RW.shade(c, -0.62), RW.shade(c, -0.4), RW.shade(c, -0.18), c, RW.shade(c, 0.28), RW.shade(c, 0.55)];
+    const acc = look.ac && look.ac !== 'auto' && RW.ACCENTS ? RW.ACCENTS[look.ac] : null;
+    if (bI) {
+      const Rm = ramp(bI.tint || '#9aa3ad'), y0 = cy + Math.round(ry * 0.18), y1 = cy + Math.round(ry * 0.86), bs = look.bs || 'auto';
+      for (let y = y0; y <= y1; y++) for (let x = cx - rx - 2; x <= cx + rx + 2; x++) {
+        const d = inside(x - cx, y - cy); if (d < 0) continue;
+        const band = Math.floor((y - y0) / 5), yy = (y - y0) % 5, nx = (x - cx) / rx;
+        let col = yy === 0 ? Rm[4] : yy === 4 ? Rm[1] : nx < -0.4 ? Rm[3] : nx > 0.5 ? Rm[2] : Rm[3];
+        if (bs === 'scale') col = ((x + (band % 2) * 2) % 4 === 0 || yy === 4) ? Rm[1] : yy === 0 ? Rm[4] : Rm[3];
+        if (d > 0.9) col = Rm[1]; if (d > 0.96) col = Rm[0];
+        A.px(g, x, y, col);
+        if (bs === 'studded' && yy === 2 && (x + band) % 5 === 0 && d < 0.88) { A.px(g, x, y, Rm[5]); A.px(g, x + 1, y + 1, Rm[0]); }
+      }
+      for (let x = cx - rx; x <= cx + rx; x++) { const d = inside(x - cx, y0 - cy); if (d >= 0) { A.px(g, x, y0, Rm[5]); A.px(g, x, y0 - 1, Rm[0]); } }
+      if (bs === 'fur') for (let x = cx - rx; x <= cx + rx; x++) { if (inside(x - cx, y0 - cy) < 0) continue; for (let k = 0; k < 3 + (x % 3 === 0 ? 1 : 0); k++) A.px(g, x, y0 - 1 + k, k === 0 ? '#e8dcc0' : x % 2 ? '#c8b894' : '#a89874'); }
+      if (bs === 'sash') for (let k = 0; k < 30; k++) { const x = cx - rx + 4 + k, y = y0 + Math.round(k * 0.55); if (inside(x - cx, y - cy) > 0) { A.px(g, x, y, acc || '#c83a3a'); A.px(g, x, y + 1, RW.shade(acc || '#c83a3a', -0.35)); A.px(g, x, y - 1, RW.shade(acc || '#c83a3a', 0.3)); } }
+      const emx = cx + Math.round(rx * 0.3), emy = cy + Math.round(ry * 0.45), ec2 = bI.glow || acc || Rm[5];
+      A.rect(g, emx - 2, emy - 2, 5, 5, Rm[0]); A.rect(g, emx - 1, emy - 1, 3, 3, ec2); A.px(g, emx - 1, emy - 1, '#ffffff');
+      [[-0.86, -1], [0.8, 1]].forEach(([fx, side]) => { const px0 = cx + Math.round(fx * rx), py0 = cy + Math.round(ry * 0.12); // pauldrons
+        A.ell(g, px0, py0, 6.4, 4.6, Rm[0]); A.ell(g, px0, py0, 5.6, 3.8, Rm[2]); A.ell(g, px0 - 1, py0 - 1, 4.4, 2.6, Rm[3]); A.rect(g, px0 - 3, py0 - 3, 4, 1, Rm[5]);
+        for (let k = -1; k <= 1; k++) A.px(g, px0 + k * 3, py0 + 2, Rm[1]); if (bI.glow) A.px(g, px0, py0, bI.glow); if (acc) A.rect(g, px0 - 4, py0 + 3, 8, 1, acc); });
+    }
+    if (hI) {
+      const Rm = ramp(hI.tint || '#9aa3ad'), yb = cy - Math.round(ry * 0.36), hs = look.hs || 'auto';
+      for (let x = cx - rx - 2; x <= cx + rx + 2; x++) { const t0 = T2(x); if (t0 >= yb) continue;
+        for (let y = t0 - 1; y <= yb; y++) { const k = (y - (t0 - 1)) / Math.max(1, yb - t0 + 1), nx = (x - cx) / rx; let col = k < 0.15 ? Rm[5] : nx < -0.35 ? Rm[4] : nx > 0.45 ? Rm[2] : Rm[3]; if (y === t0 - 1) col = Rm[0]; if (y >= yb - 1) col = y === yb ? Rm[0] : Rm[1]; A.px(g, x, y, col); }
+        if ((x - cx) % 6 === 0) A.px(g, x, yb - 1, Rm[5]); }
+      const nxp = cx + ex - 2; A.rect(g, nxp, yb, 3, 7, Rm[1]); A.px(g, nxp, yb, Rm[4]); A.px(g, nxp + 1, yb + 6, Rm[0]);
+      if (hI.glow) { A.px(g, cx - 3, top - 1, hI.glow); A.px(g, cx + 3, top, hI.glow); A.px(g, cx, yb - 3, hI.glow); }
+      const ac2 = acc || '#c83a3a', tt = T2(cx - 2);
+      if (hs === 'plume') for (let k = 0; k < 14; k++) { const x = cx - 2 - k, y = tt - 2 - Math.round(Math.sin(k / 13 * Math.PI) * 6) + (k > 9 ? k - 9 : 0); A.rect(g, x, y, 1, 3, k % 2 ? ac2 : RW.shade(ac2, 0.25)); A.px(g, x, y + 3, RW.shade(ac2, -0.4)); }
+      else if (hs === 'crest') for (let k = 0; k < 16; k++) { const x = cx + 6 - k, y = T2(x) - 3; A.rect(g, x, y, 1, 3, k % 2 ? ac2 : RW.shade(ac2, -0.25)); A.px(g, x, y - 1, RW.shade(ac2, 0.35)); }
+      else if (hs === 'horns') [-1, 1].forEach((sd) => { for (let k = 0; k < 9; k++) { const x = cx - 2 + sd * (8 + k), y = T2(cx - 2 + sd * 8) + 1 - Math.round(k * 1.1) - (k > 5 ? k - 5 : 0); A.rect(g, x, y, 2, 2, k < 6 ? '#e8e0c8' : '#c8bca0'); A.px(g, x, y + 2, '#8a8070'); } });
+      else if (hs === 'wings') [-1, 1].forEach((sd) => { for (let k = 0; k < 4; k++) for (let j = 0; j < 7 - k; j++) A.px(g, cx - 2 + sd * (rx - 3 + j), yb - 4 - k * 2 - Math.round(j * 0.5), j === 6 - k ? '#a8a8b8' : '#f0f0f0'); });
+      else if (hs === 'spike') { for (let k = 0; k < 8; k++) { const w = Math.max(0, Math.round((1 - k / 8) * 2)); for (let i = -w; i <= w; i++) A.px(g, cx - 2 + i, tt - 2 - k, i < 0 ? Rm[5] : Rm[2]); } }
     }
     return { c, rx, ry };
   }
@@ -269,7 +310,10 @@
   // hats: the boulder paints them itself (snug, at twice the detail); the old 1x hat is skipped, and a helmet hides the hat
   const baseDr3 = A.dressed;
   A.dressed = function (species, look, armor) {
-    if (species === 'rock' && look && look.hat && look.hat !== 'none') { const head = armor && armor[0] && RW.ITEMS[armor[0]]; arguments[1] = Object.assign({}, look, { hat: 'none', v3hat: head ? 'none' : look.hat }); }
+    if (species === 'rock' && look) {
+      const head = armor && armor[0] && RW.ITEMS[armor[0]], body = armor && armor[1] && RW.ITEMS[armor[1]];
+      if ((look.hat && look.hat !== 'none') || head || body) { arguments[1] = Object.assign({}, look, { hat: 'none', v3hat: head ? 'none' : look.hat, v3armor: [head ? armor[0] : '', body ? armor[1] : ''] }); arguments[2] = []; }
+    }
     return baseDr3.apply(this, arguments);
   };
   // size: a pebble to a boulder (only the picture changes)

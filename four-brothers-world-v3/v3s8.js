@@ -18,9 +18,12 @@
       a[i] = P[best][0]; a[i + 1] = P[best][1]; a[i + 2] = P[best][2]; a[i + 3] = 255;
     }
     if (!(opts && opts.noOutline)) {
-      const op = (x, y) => x >= 0 && y >= 0 && x < W && y < H && a[(y * W + x) * 4 + 3] > 0, out = [], o = hex(OUT);
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!op(x, y) && (op(x - 1, y) || op(x + 1, y) || op(x, y - 1) || op(x, y + 1))) out.push((y * W + x) * 4);
-      out.forEach((i) => { a[i] = o[0]; a[i + 1] = o[1]; a[i + 2] = o[2]; a[i + 3] = 255; });
+      // Terraria-style: each part is outlined in a deep shade of its own colour, and lit along its upper-left edges
+      const op = (x, y) => x >= 0 && y >= 0 && x < W && y < H && a[(y * W + x) * 4 + 3] > 0, out = [];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!op(x, y)) { let n = -1; for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) if (op(x + dx, y + dy)) { n = ((y + dy) * W + x + dx) * 4; break; } if (n >= 0) out.push([(y * W + x) * 4, n]); }
+      const lit = []; for (let y = 1; y < H; y++) for (let x = 1; x < W; x++) { const i = (y * W + x) * 4; if (a[i + 3] && (!op(x - 1, y) || !op(x, y - 1)) && op(x + 1, y) && op(x, y + 1)) lit.push(i); }
+      lit.forEach((i) => { a[i] = Math.min(255, a[i] + (255 - a[i]) * 0.35); a[i + 1] = Math.min(255, a[i + 1] + (255 - a[i + 1]) * 0.35); a[i + 2] = Math.min(255, a[i + 2] + (255 - a[i + 2]) * 0.35); });
+      out.forEach(([i, n]) => { a[i] = Math.round(a[n] * 0.28); a[i + 1] = Math.round(a[n + 1] * 0.26); a[i + 2] = Math.round(a[n + 2] * 0.32) + 6; a[i + 3] = 255; });
     }
     g.putImageData(d, 0, 0); return c;
   }
@@ -316,7 +319,7 @@
   const rawDI = CanvasRenderingContext2D.prototype.drawImage;
   CanvasRenderingContext2D.prototype.drawImage = function (img, x, y) {
     if (arguments.length === 3 && img && img.__big48 && x === 0 && y === 0 && this.canvas && this.canvas.width === 16 && this.canvas.height === 16 && !this.canvas.__world) {
-      const cv = this.canvas; cv.width = 48; cv.height = 48; cv.style.imageRendering = 'auto'; const g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; return rawDI.call(g, img.__big48, 0, 0);
+      const cv = this.canvas; cv.width = img.__big48.width; cv.height = img.__big48.height; cv.style.imageRendering = 'auto'; const g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; return rawDI.call(g, img.__big48, 0, 0);
     }
     return rawDI.apply(this, arguments);
   };
