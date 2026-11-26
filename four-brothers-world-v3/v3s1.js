@@ -5,7 +5,7 @@
 //    The version is bumped with every update, so a friend on an old copy is told to refresh instead of joining a broken game.
 //  * Dropping (Z, or Shift-click in the bag): what you drop stays on the ground until you walk away from it (it used to
 //    fly straight back into your bag). Everyone in the room sees it and anyone can pick it up.
-//  * The rock: one block per punch. Hold Shift to smash a 2x2 square (toward the side of the block your mouse is on).
+//  * The rock: one block per punch, or a 2x2 square in 2x2 mode (T, v3s6), toward the side of the block your mouse is on.
 //    A block you just placed is never smashed while you still hold the button, and blocks anybody placed are never
 //    knocked out by a 2x2 smash, a run-up ram or a ground slam: you can still mine them on purpose, at normal speed.
 //  * The rock can float: press C in water to switch between floating up and sinking. S dives while floating.
@@ -15,7 +15,7 @@
   const E = RW.ent, U = RW.ui, P = RW.player, WD = RW.world, N = RW.net, TS = RW.TILE;
   if (!E || !U || !P || !WD || !N) return;
 
-  RW.VERSION = '3.0.1'; // everyone in a room must match; bump with every update
+  RW.VERSION = '3.0.2'; // everyone in a room must match; bump with every update
 
   // =====================================================================================================
   // 1. HOSTING
@@ -261,7 +261,7 @@
     S.deliberate = i; S.ctxPlaced = isPlaced;
     if (P.species === 'rock' && !isPlaced) {
       S.smash = { tx, ty, done: false, area: null };
-      if (RW.input.act('sprint') && smashable(tx, ty)) { // Shift: a 2x2 square, toward the side of the block the mouse is on
+      if ((RW.v3mine2On ? RW.v3mine2On() : false) && smashable(tx, ty)) { // 2x2 mode (T): a 2x2 square, toward the side of the block the mouse is on
         const m = RW.mouseWorld ? RW.mouseWorld() : { x: tx * TS + 8, y: ty * TS + 8 };
         const sx = m.x / TS - tx >= 0.5 ? 1 : -1, sy = m.y / TS - ty >= 0.5 ? 1 : -1;
         S.smash.area = [[tx + sx, ty], [tx, ty + sy], [tx + sx, ty + sy]];
@@ -274,13 +274,6 @@
   P.actions = function () {
     if (!RW.input.act('attack')) S.hold = -1;
     return baseActions.apply(this, arguments);
-  };
-  // Shift no longer makes the rock run while he's punching a block (it means "2x2" then)
-  const baseUpdate = P.update;
-  P.update = function () {
-    const r = baseUpdate.apply(this, arguments);
-    if (P.species === 'rock' && RW.input.act('attack') && RW.input.act('sprint') && P.mine === null && Math.abs(P.vx) < 5) P.sprinting = false;
-    return r;
   };
 
   // =====================================================================================================

@@ -1,5 +1,18 @@
 # 4 Brothers World V3
 
+## Boulder rocks, a darker Rock World, the guardians' classes, glowstones (3.0.2)
+- **Rocks are boulders now**, drawn at twice the detail. In the creator: **Body** (Round, Egg or Lumpy boulder), **Arms** (Stubby, Long or Pebble fists) and **Moves** (Trundle, Tumble, Wobble, Bounce, Scuttle). Each move has its own walk and its own run when you hold Shift; hover a move in the creator to watch it. Moves are only looks: every rock is just as fast and strong. Rock colours, toppers, cracks, eyes, glow and mouths all carry over, and Gneiss, Slagg and the other rocks are boulders too.
+- **Rock World underground is very dark.** Tunnels and wild caves are nearly black, the towns a little brighter. Your own eye glow only reaches a few blocks down there.
+- **Glowstones:** a new **Trinket** row in the bag. Wear one and you glow (with a soft outline in its colour), in every world, and friends in your room see your light. **Dim** (about 3 blocks): 3 Glow Mushrooms + 2 stone, by hand. **Bright** (about 9): 1 Gemscale + 1 platinum bar, at a forge. **Radiant** (about 16): found in legendary chests. Six colours (amber, cyan, green, violet, white, ember): recolour the one you wear at a forge for 1 matching crystal.
+- **The Leviathan** is about 140 blocks long, with a bigger, heavier jaw, and it and its effects are drawn in chunky pixels (one per game unit). It never hides your hero.
+- **The Crystal Guardians are four classes** (400 health, +25% per extra player; both shields call all four):
+  - **Ruby Knight** (fire): sword slash; shield charge; a wave of crystal flame along the ground.
+  - **Sapphire Archer** (ice): arrows; a volley from above; a piercing frost arrow that slows you.
+  - **Amethyst Mage** (lightning): arcane bolts; chain lightning; blinks beside you and bursts into a ring of orbs.
+  - **Emerald Healer**: never attacks and can't heal the Leviathan, but it heals the other guardians and wards one against all hits. It hides at the back.
+- **Mining:** press **T** to switch the rock between 1x1 and 2x2 (the cursor shows the 2x2 square and the hotbar says "2x2"). Shift only runs now.
+- **Torches** light up only while you hold one: the off-hand torch key is gone.
+
 V3 is built on V2: it has everything V2 has, and keeps its own heroes, worlds and rooms (V2 is untouched and still plays from Play V2). Everyone starts a fresh hero in V3.
 
 ## A new Rock World, different every time

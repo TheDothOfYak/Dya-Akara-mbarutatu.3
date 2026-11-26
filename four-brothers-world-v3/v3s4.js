@@ -1,5 +1,5 @@
 // 4 Brothers World V3 — part 4: the Gemscale Leviathan, remade.
-//  * A massive sea serpent, about 48 blocks long, that coils through the flooded Heart Chamber. Its body is armoured
+//  * A massive sea serpent, about 140 blocks long, that coils through the flooded Heart Chamber. Its body is armoured
 //    plates over a glowing seam, with a crest of gem crystals down its back, swept crystal horns, a jaw full of teeth and
 //    a tail fan of crystal. Every part moves: the body ripples, the fins row, the jaw opens to roar, bite and fire.
 //  * 12,000 health, plus 30% for every extra player inside the chamber (checked as people come and go).
@@ -17,19 +17,25 @@
   'use strict';
   const E = RW.ent, P = RW.player, WD = RW.world, A = RW.art, U = RW.ui, N = RW.net, TS = RW.TILE;
   if (!E || !P || !WD || !A) return;
-  const LEV = 'gemscale_leviathan', GUARD = 'v3_guardian';
-  const BASE_HP = 12000, NSEG = 34, GAP = 22;
+  const LEV = 'gemscale_leviathan';
+  const BASE_HP = 12000, NSEG = 100, GAP = 22;
   const GEMS = ['#e0525a', '#4fa8f0', '#5fd98a', '#a86ef0', '#f2c94c', '#7fe3ff'];
   const now = () => performance.now() / 1000;
   const inRock = () => WD.def && WD.def.id === 'rock';
-  const segR = (i) => 30 - 21 * Math.pow(i / NSEG, 1.15); // 30 at the neck, 9 at the tail
+  const segR = (i) => 34 - 24 * Math.pow(i / NSEG, 1.3); // 34 at the neck, 10 at the tail
 
   // ================================= species =================================
   const sp = RW.SPECIES[LEV];
   if (sp) Object.assign(sp, { w: 68, h: 68, hp: BASE_HP, dmg: 26, speed: 200, blurb: 'A serpent as long as a town, armoured in gem-studded plates. It guards the Elder Crystals in the flooded Heart Chamber. Twice it hides behind a crystal shield and sends out its guardians: break them all to reach it again.' });
-  RW.register.species({ id: GUARD, type: 'monsters', name: 'Crystal Guardian', world: 'rock', role: 'enemy', status: 'active', art: { draw: 'v3guardian' },
-    w: 22, h: 30, hp: 320, dmg: 16, speed: 70, behavior: 'v3guardian', drops: [['crystal_dust', 0.8, 1, 3], ['leviathan_scale', 0.4, 1, 2]],
-    blurb: 'Gem golems the Leviathan calls out of the chamber walls. While any of them stands, its crystal shield holds.' });
+  const GCLASS = {
+    v3g_ruby: { gem: 0, cls: 'knight', name: 'Ruby Knight', blurb: 'A crystal knight with a kite shield and a burning blade. Slashes up close, charges behind its shield and sends a wave of crystal flame along the ground.' },
+    v3g_sapphire: { gem: 1, cls: 'archer', name: 'Sapphire Archer', blurb: 'A hooded crystal archer. Keeps its distance, looses arrows, rains a volley from above and fires a piercing frost arrow that slows you.' },
+    v3g_emerald: { gem: 2, cls: 'healer', name: 'Emerald Healer', blurb: 'A haloed crystal healer. It never attacks, and it cannot heal the Leviathan, but it mends the other guardians and wards them. It hides at the back: get to it first.' },
+    v3g_amethyst: { gem: 3, cls: 'mage', name: 'Amethyst Mage', blurb: 'A crystal mage with a floating staff. Throws arcane bolts, calls chain lightning, blinks beside you and bursts into a ring of orbs.' },
+  };
+  const isGuard = (e) => !!(e && GCLASS[e.sp]);
+  Object.keys(GCLASS).forEach((id) => RW.register.species({ id, type: 'monsters', name: GCLASS[id].name, world: 'rock', role: 'enemy', status: 'active', art: { draw: 'v3guardian_' + GCLASS[id].cls },
+    w: 22, h: 32, hp: 400, dmg: 16, speed: GCLASS[id].cls === 'knight' ? 95 : 80, behavior: 'v3guardian', drops: [['crystal_dust', 0.8, 1, 3], ['leviathan_scale', 0.4, 1, 2]], blurb: GCLASS[id].blurb }));
 
   // ================================= state helpers =================================
   const C = () => WD.meta && WD.meta.arena;
@@ -106,18 +112,18 @@
     RW.audio.sfx('roar'); RW.fx.shake(9, 1.1); if (txt) U.toast(txt);
   }
   function startShield(b, n) {
-    b.shield = n; roar(b, n === 4 ? 'The Leviathan raises a crystal shield! Break the Crystal Guardians to bring it down.' : 'The shield is back, and stronger. Break every guardian!');
+    b.shield = n; roar(b, b.shieldsDone === 0 ? 'The Leviathan raises a crystal shield! Break its four Crystal Guardians to bring it down.' : 'The shield is back, and its guardians are stronger. Break all four!');
     fx(b, 'v3shield', { x: 1 });
-    const a = arenaPx(), hp = Math.round(RW.SPECIES[GUARD].hp * (1 + 0.3 * Math.max(0, b.nFight - 1)) * (n === 6 ? 1.3 : 1));
-    for (let k = 0; k < n; k++) {
+    const hp = Math.round(400 * (1 + 0.25 * Math.max(0, b.nFight - 1)) * (b.shieldsDone ? 1.3 : 1));
+    ['v3g_ruby', 'v3g_sapphire', 'v3g_amethyst', 'v3g_emerald'].forEach((id, k) => {
       const fs = fighters(), who = fs.length ? fs[k % fs.length] : { x: head(b).x, y: head(b).y };
-      const ang = (k / n) * Math.PI * 2 + Math.random() * 0.4;
-      const p = clampArena(who.x + Math.cos(ang) * 260, who.y + Math.sin(ang) * 160, 40);
-      const e = E.spawnEnemy(GUARD, p.x - 11, p.y - 15); e.hp = e.maxhp = hp; e.gem = k % 4; e.provoked = true;
-      RW.fx.burst(p.x, p.y, [GEMS[k % 4], '#ffffff'], 24, 140, { add: true, kind: 'glow', life: 0.8 });
-    }
+      const ang = (k / 4) * Math.PI * 2 + Math.random() * 0.4, back = id === 'v3g_emerald' ? 380 : 240;
+      const p = clampArena(who.x + Math.cos(ang) * back, who.y + Math.sin(ang) * back * 0.6, 40);
+      const e = E.spawnEnemy(id, p.x - 11, p.y - 16); e.hp = e.maxhp = hp; e.provoked = true;
+      RW.fx.burst(p.x, p.y, [GEMS[GCLASS[id].gem], '#ffffff'], 24, 140, { add: true, kind: 'glow', life: 0.8 });
+    });
   }
-  const guardsLeft = () => E.enemies.filter((e) => e.sp === GUARD && !e.dead).length;
+  const guardsLeft = () => E.enemies.filter((e) => isGuard(e) && !e.dead).length;
 
   function ai(b, dt) {
     const a = arenaPx(), h = head(b), tg = target(b), F = fast(b);
@@ -131,7 +137,7 @@
     // shields and phases
     const frac = b.hp / b.maxhp;
     if (!b.shield && b.shieldsDone === 0 && frac <= 0.7) startShield(b, 4);
-    else if (!b.shield && b.shieldsDone === 1 && frac <= 0.3) startShield(b, 6);
+    else if (!b.shield && b.shieldsDone === 1 && frac <= 0.3) startShield(b, 4);
     if (b.shield && b.state !== 'roar' && guardsLeft() === 0) {
       b.shield = 0; b.shieldsDone++; fx(b, 'v3shield', null);
       b.phase = b.shieldsDone === 1 ? 2 : 3;
@@ -315,6 +321,7 @@
   // the shield: hits glance off
   const baseDamage = E.damage;
   E.damage = function (e, d) {
+    if (isGuard(e) && e.ward > 0) { if (!e._wT || now() - e._wT > 0.4) { e._wT = now(); RW.fx.text(e.x + 11, e.y - 6, 'Warded', '#c8ffd8'); RW.audio.sfx('crystal'); } return; }
     if (e && e.sp === LEV && inRock() && (e.shield || getFx(e, 'v3shield'))) {
       if (!e._shT || now() - e._shT > 0.4) { e._shT = now(); const h = head(e); RW.fx.text(h.x, h.y - 40, 'Shielded', '#c8f0ff'); RW.fx.burst(h.x, h.y, ['#c8f0ff', '#ffffff'], 6, 90, { add: true, kind: 'glow', life: 0.3 }); RW.audio.sfx('crystal'); }
       return;
@@ -323,19 +330,63 @@
   };
 
   // ---- guardians ----
+  // ---- guardians: four classes ----
+  const act = (e, k, t) => { e.act = k; e.actT = t; e.actD = t; };
   E.behaviors.v3guardian = function (e, dt, sp2) {
-    const pc = P.center(), c = { x: e.x + e.w / 2, y: e.y + e.h / 2 }, d = RW.dist(pc.x, pc.y, c.x, c.y);
-    e.t += dt; e.ct = (e.ct || 2 + Math.random() * 2) - dt;
-    const want = d > 46 ? 1 : -0.4;
-    e.vx = RW.lerp(e.vx, (pc.x - c.x) / (d || 1) * sp2.speed * want, dt * 2.5);
-    e.vy = RW.lerp(e.vy, (pc.y - 6 - c.y) / (d || 1) * sp2.speed * want + Math.sin(e.t * 2.4) * 18, dt * 2.5);
+    const G = GCLASS[e.sp]; if (!G) return;
+    const pc = P.center(), c = { x: e.x + e.w / 2, y: e.y + e.h / 2 }, d = RW.dist(pc.x, pc.y, c.x, c.y), toP = Math.atan2(pc.y - c.y, pc.x - c.x);
+    e.t += dt; e.actT = Math.max(0, (e.actT || 0) - dt); if (!e.actT) e.act = null;
+    e.cdA = (e.cdA == null ? 1 + Math.random() : e.cdA) - dt; e.cd1 = (e.cd1 == null ? 3 + Math.random() * 2 : e.cd1) - dt; e.cd2 = (e.cd2 == null ? 5 + Math.random() * 3 : e.cd2) - dt;
+    e.ward = Math.max(0, (e.ward || 0) - dt);
+    let want = 0, tx = pc.x, ty = pc.y - 6, spd = sp2.speed;
+    if (G.cls === 'knight') want = 20; else if (G.cls === 'archer') want = 200; else if (G.cls === 'mage') want = 150;
+    if (G.cls === 'healer') { // behind the others, away from you
+      const mates = E.enemies.filter((o) => isGuard(o) && o !== e && !o.dead);
+      const mx = mates.length ? mates.reduce((s2, o) => s2 + o.x, 0) / mates.length : c.x, my = mates.length ? mates.reduce((s2, o) => s2 + o.y, 0) / mates.length : c.y;
+      const ax = mx - pc.x, ay = my - pc.y, L = Math.hypot(ax, ay) || 1;
+      tx = mx + ax / L * 140; ty = my + ay / L * 80; if (d < 150) { tx = c.x - Math.cos(toP) * 200; ty = c.y - Math.sin(toP) * 120; spd *= 1.6; }
+    }
+    if (e.dash > 0) { e.dash -= dt; e.vx = Math.cos(e.dashA) * 380; e.vy = Math.sin(e.dashA) * 380; if (d < 26 && !e.dashHit && !P.dead) { e.dashHit = 1; P.hurt(22, Math.sign(pc.x - c.x) || 1, 'shield charge'); P.vx += Math.cos(e.dashA) * 240; P.vy -= 120; } }
+    else {
+      let vxT, vyT;
+      if (G.cls === 'healer') { const a2 = Math.atan2(ty - c.y, tx - c.x), dd = Math.hypot(tx - c.x, ty - c.y); vxT = Math.cos(a2) * spd * Math.min(1, dd / 40); vyT = Math.sin(a2) * spd * Math.min(1, dd / 40); }
+      else { const k = d > want + 20 ? 1 : d < want - 20 ? -0.7 : 0; vxT = Math.cos(toP) * spd * k + (G.cls !== 'knight' ? Math.cos(toP + 1.57) * 30 * Math.sin(e.t * 0.8) : 0); vyT = Math.sin(toP) * spd * k; }
+      e.vx = RW.lerp(e.vx, vxT, dt * 2.5); e.vy = RW.lerp(e.vy, vyT + Math.sin(e.t * 2.4) * 16, dt * 2.5);
+    }
     E.move(e, dt, {});
     e.face = pc.x >= c.x ? 1 : -1; e.frame = Math.floor(e.t * 4) % 2;
-    if (e.ct <= 0 && d < 260) { e.ct = 2.6; const a = Math.atan2(pc.y - c.y, pc.x - c.x); for (let k = -1; k <= 1; k++) shard(c.x, c.y, a + k * 0.2, 210, 10, GEMS[e.gem || 0]); RW.audio.sfx('crystal'); e.punch = 0.3; }
-    if (d < 22 && !P.dead) { P.hurt(sp2.dmg, Math.sign(pc.x - c.x) || 1, GUARD); e.punch = 0.3; }
-    e.punch = Math.max(0, (e.punch || 0) - dt);
-    RW.fx.light(c.x, c.y, 0.3, 0.3, 0.5);
+    const near = d < 420 && !P.dead, col = GEMS[G.gem];
+    if (G.cls === 'knight') {
+      if (near && d < 36 && e.cdA <= 0) { e.cdA = 1.1; act(e, 'slash', 0.35); setTimeout(() => { if (!e.dead && RW.dist(P.center().x, P.center().y, e.x + 11, e.y + 16) < 40) P.hurt(18, e.face, 'crystal blade'); }, 150); RW.audio.sfx('swing'); }
+      else if (near && d > 60 && d < 240 && e.cd1 <= 0) { e.cd1 = 6.5; act(e, 'charge', 0.6); e.dash = 0.55; e.dashA = toP; e.dashHit = 0; RW.audio.sfx('roar'); }
+      else if (near && d < 170 && e.cd2 <= 0) { e.cd2 = 8; act(e, 'cleave', 0.6); setTimeout(() => { if (e.dead) return; for (let k = 0; k < 7; k++) E.shots.push({ x: e.x + 11 + e.face * 10, y: e.y + 26 - k * 0.5, vx: e.face * (200 + k * 18), vy: (k - 3) * 6, life: 1.6, owner: 'e', dmg: 14, kind: 'fire', color: '#ff7a2e' }); RW.fx.shake(3, 0.2); RW.audio.sfx('fire'); }, 300); }
+    } else if (G.cls === 'archer') {
+      if (near && e.cd2 <= 0) { e.cd2 = 6; act(e, 'frost', 0.6); setTimeout(() => { if (e.dead) return; const a2 = Math.atan2(P.center().y - c.y, P.center().x - c.x); E.shots.push({ x: c.x, y: c.y, vx: Math.cos(a2) * 520, vy: Math.sin(a2) * 520, life: 1.8, owner: 'e', dmg: 14, kind: 'bshard', color: '#bfeaff', frost: 1 }); RW.audio.sfx('bow'); }, 450); }
+      else if (near && e.cd1 <= 0) { e.cd1 = 7; act(e, 'volley', 0.7); for (let k = 0; k < 7; k++) E.shots.push({ x: pc.x + RW.rand(-90, 90), y: pc.y - 190, vx: 0, vy: 320, life: 2, owner: 'e', dmg: 10, kind: 'rain', warn: 0.6 + k * 0.08, color: '#bfe8ff' }); RW.audio.sfx('bow'); }
+      else if (near && e.cdA <= 0) { e.cdA = 1.5; act(e, 'shoot', 0.4); E.shots.push({ x: c.x, y: c.y, vx: Math.cos(toP) * 340, vy: Math.sin(toP) * 340, life: 2, owner: 'e', dmg: 12, kind: 'arrow', color: '#bfe8ff' }); RW.audio.sfx('bow'); }
+    } else if (G.cls === 'mage') {
+      if (near && e.cd2 <= 0 && e.blink == null) { e.cd2 = 9; act(e, 'blink', 0.8); const a2 = Math.random() * 6.28; RW.fx.burst(c.x, c.y, [col, '#ffffff'], 16, 120, { add: true, kind: 'glow' }); e.x = pc.x + Math.cos(a2) * 90 - 11; e.y = pc.y + Math.sin(a2) * 60 - 16; RW.fx.burst(e.x + 11, e.y + 16, [col, '#ffffff'], 16, 120, { add: true, kind: 'glow' }); e.blink = 0.45; }
+      else if (near && e.cd1 <= 0) { e.cd1 = 7; act(e, 'chain', 0.9); e.chainT = 0.6; }
+      else if (near && e.cdA <= 0) { e.cdA = 1.6; act(e, 'bolt', 0.4); E.shots.push({ x: c.x, y: c.y, vx: Math.cos(toP) * 210, vy: Math.sin(toP) * 210, life: 2.6, owner: 'e', dmg: 12, kind: 'orb', color: col }); RW.audio.sfx('crystal'); }
+      if (e.blink != null) { e.blink -= dt; if (e.blink <= 0) { e.blink = null; for (let k = 0; k < 10; k++) E.shots.push({ x: e.x + 11, y: e.y + 16, vx: Math.cos(k * 0.628) * 170, vy: Math.sin(k * 0.628) * 170, life: 2, owner: 'e', dmg: 10, kind: 'orb', color: col }); RW.audio.sfx('crystal'); } }
+      if (e.chainT != null) { e.chainT -= dt; if (Math.random() < 0.5) RW.fx.bolt(c.x, c.y - 8, pc.x + RW.rand(-30, 30), pc.y + RW.rand(-30, 30), '#c8a6ff'); if (e.chainT <= 0) { e.chainT = null; for (let k = -1; k <= 1; k++) E.shots.push({ x: c.x, y: c.y - 8, vx: Math.cos(toP + k * 0.12) * 650, vy: Math.sin(toP + k * 0.12) * 650, life: 0.8, owner: 'e', dmg: 15, kind: 'spark', color: '#e8d8ff' }); RW.fx.bolt(c.x, c.y - 8, pc.x, pc.y, '#c8a6ff'); RW.audio.sfx('lightning'); } }
+    } else if (G.cls === 'healer') {
+      const mates = E.enemies.filter((o) => isGuard(o) && o !== e && !o.dead);
+      if (e.cd1 <= 0 && mates.some((o) => o.hp < o.maxhp * 0.9)) { e.cd1 = 5; act(e, 'heal', 0.8); mates.forEach((o) => { if (RW.dist(o.x, o.y, e.x, e.y) < 340) { const h = Math.round(o.maxhp * 0.22); o.hp = Math.min(o.maxhp, o.hp + h); RW.fx.text(o.x + 11, o.y - 4, '+' + h, '#8dff8a'); RW.fx.burst(o.x + 11, o.y + 16, ['#8dff8a', '#e8ffe0'], 10, 60, { add: true, kind: 'glow' }); } }); RW.fx.ring(c.x, c.y, '#8dff8a', 340, 0.7, 2); RW.audio.sfx('crystal'); }
+      else if (e.cd2 <= 0 && mates.length) { e.cd2 = 9; act(e, 'ward', 0.8); const o = mates.slice().sort((a2, b2) => a2.hp / a2.maxhp - b2.hp / b2.maxhp)[0]; o.ward = 4; RW.fx.burst(o.x + 11, o.y + 16, ['#c8ffd8', '#ffffff'], 14, 90, { add: true, kind: 'glow' }); RW.audio.sfx('crystal'); }
+    }
+    RW.fx.light(c.x, c.y, G.gem === 0 ? 0.5 : 0.25, G.gem === 2 ? 0.5 : 0.3, G.gem === 1 || G.gem === 3 ? 0.55 : 0.25);
   };
+  // frost arrows slow you; wards stop hits
+  P.v3slowT = 0;
+  const baseShots = E.updateShots;
+  E.updateShots = function (dt) {
+    P.v3slowT = Math.max(0, P.v3slowT - dt);
+    if (!P.dead) E.shots.forEach((s) => { if (s.frost && s.owner === 'e' && !(s.warn > 0) && Math.abs(s.x - (P.x + P.w / 2)) < P.w / 2 + 3 && Math.abs(s.y - (P.y + P.h / 2)) < P.h / 2 + 3) { if (P.v3slowT <= 0) U.toast('Frost! You are slowed.'); P.v3slowT = 2.5; } });
+    return baseShots.apply(this, arguments);
+  };
+  const baseMM = P.moveMul;
+  P.moveMul = function () { const m = baseMM ? baseMM.apply(this, arguments) : 1; return P.v3slowT > 0 ? m * 0.55 : m; };
 
   // ================================= drawing =================================
   const baseWater = WD.drawWater;
@@ -343,11 +394,16 @@
     const r = baseWater.apply(this, arguments);
     if (!inRock()) return r;
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
-    E.enemies.forEach((e) => { if (e.sp === GUARD) { e.customDraw = true; drawGuardian(g, e.x + ox + e.w / 2, e.y + oy + e.h / 2, e, time); } });
     const b = E.boss;
-    if (b && b.sp === LEV && b.segs) { drawFx(g, b, ox, oy, time, true); drawLev(g, b, ox, oy, time); drawFx(g, b, ox, oy, time, false); }
+    const all = (q) => { E.enemies.forEach((e) => { if (isGuard(e)) { e.customDraw = true; drawGuardian(q, e.x + ox + e.w / 2, e.y + oy + e.h / 2, e, time); } }); if (b && b.sp === LEV && b.segs) { drawFx(q, b, ox, oy, time, true); drawLev(q, b, ox, oy, time); drawFx(q, b, ox, oy, time, false); } };
+    if (RW.v3pix) RW.v3pix(g, all); else all(g);
+    // the serpent passes behind you, never over you
+    if (b && b.sp === LEV && lastMe && RW.game && RW.game.playing && !P.dead) { redraw = true; try { E.drawPlayer.apply(E, lastMe); } finally { redraw = false; } }
     return r;
   };
+  let lastMe = null, redraw = false;
+  const baseDPme = E.drawPlayer;
+  E.drawPlayer = function (g, cam, p) { if (p && (p === P || (p.x === P.x && p.y === P.y)) && !redraw) lastMe = Array.from(arguments); return baseDPme.apply(this, arguments); };
   const baseOver = RW.fx.drawOver;
   RW.fx.drawOver = function (g) { const r = baseOver.apply(this, arguments); const b = E.boss; if (inRock() && b && b.sp === LEV) drawShieldText(g, b); return r; };
 
@@ -440,14 +496,14 @@
   }
   function drawHead(g, b, x, y, ang, jaw, time, rage, flash) {
     const f = Math.cos(ang) >= 0 ? 1 : -1;
-    g.save(); g.translate(x, y); g.rotate(ang); if (f < 0) g.scale(1, -1);
+    g.save(); g.translate(x, y); g.rotate(ang); if (f < 0) g.scale(1, -1); g.scale(1.22, 1.22);
     const top = rage ? '#3a1820' : '#16343f', mid = rage ? '#5c2430' : '#25596a', bel = rage ? '#a87060' : '#8fc4bc';
-    const ja = jaw * 0.9;
+    const ja = jaw * 1.05;
     // lower jaw (drawn first, it hangs under)
-    g.save(); g.translate(-6, 6); g.rotate(ja);
+    g.save(); g.translate(-8, 6); g.rotate(ja); g.scale(1.35, 1.45); // a big, heavy lower jaw
     g.fillStyle = '#05070c'; g.beginPath(); g.moveTo(-14, -6); g.lineTo(52, 0); g.lineTo(48, 7); g.lineTo(-12, 14); g.closePath(); g.fill();
     g.fillStyle = bel; g.beginPath(); g.moveTo(-12, -4); g.lineTo(50, 1); g.lineTo(46, 6); g.lineTo(-10, 12); g.closePath(); g.fill();
-    g.fillStyle = '#f4efe2'; for (let k = 0; k < 7; k++) { const tx = 4 + k * 6.5; g.beginPath(); g.moveTo(tx, -1 - k * 0.05); g.lineTo(tx + 2.4, -7 + (k % 2)); g.lineTo(tx + 4.2, -0.6); g.fill(); }
+    g.fillStyle = '#f4efe2'; for (let k = 0; k < 7; k++) { const tx = 4 + k * 6.5; if (k % 2 === 0) { g.beginPath(); g.moveTo(tx + 1, -1); g.lineTo(tx + 2.6, -10); g.lineTo(tx + 4.2, -1); g.fill(); } g.beginPath(); g.moveTo(tx, -1 - k * 0.05); g.lineTo(tx + 2.4, -7 + (k % 2)); g.lineTo(tx + 4.2, -0.6); g.fill(); }
     g.restore();
     // the mouth's glow
     if (jaw > 0.15) { g.globalCompositeOperation = 'lighter'; const gl = g.createRadialGradient(18, 6, 2, 18, 6, 30); gl.addColorStop(0, rage ? 'rgba(255,90,40,0.9)' : b.state === 'beam' ? 'rgba(255,255,255,0.95)' : 'rgba(190,120,255,0.8)'); gl.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gl; g.beginPath(); g.arc(18, 6, 30, 0, 6.283); g.fill(); g.globalCompositeOperation = 'source-over'; }
@@ -486,7 +542,7 @@
     for (let i = 0; i < pts.length; i += 2) { const p = pts[i], r = (i ? p.r : 36) + 7 + Math.sin(time * 3 + i) * 1.5; g.strokeStyle = 'rgba(160,230,255,' + (0.18 + 0.12 * Math.sin(time * 4 - i * 0.6)) + ')'; g.lineWidth = 1.5; g.beginPath(); for (let k = 0; k <= 6; k++) { const a = k / 6 * 6.283 + time * 0.6; const xx = p.x + ox + Math.cos(a) * r, yy = p.y + oy + Math.sin(a) * r; if (k) g.lineTo(xx, yy); else g.moveTo(xx, yy); } g.stroke(); }
     // tethers to the guardians
     const h = head(b);
-    E.enemies.forEach((e) => { if (e.sp !== GUARD || e.dead) return; const ex = e.x + e.w / 2, ey = e.y + e.h / 2; g.strokeStyle = 'rgba(' + (e.gem === 0 ? '255,120,130' : e.gem === 1 ? '120,190,255' : e.gem === 2 ? '120,240,160' : '200,150,255') + ',' + (0.3 + 0.2 * Math.sin(time * 8 + ex)) + ')'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(ex + ox, ey + oy); const mx = (ex + h.x) / 2 + Math.sin(time * 3) * 20, my = (ey + h.y) / 2 - 30; g.quadraticCurveTo(mx + ox, my + oy, h.x + ox, h.y + oy); g.stroke(); });
+    E.enemies.forEach((e) => { if (!isGuard(e) || e.dead) return; const gm = GCLASS[e.sp].gem; const ex = e.x + e.w / 2, ey = e.y + e.h / 2; g.strokeStyle = 'rgba(' + (gm === 0 ? '255,120,130' : gm === 1 ? '120,190,255' : gm === 2 ? '120,240,160' : '200,150,255') + ',' + (0.3 + 0.2 * Math.sin(time * 8 + ex)) + ')'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(ex + ox, ey + oy); const mx = (ex + h.x) / 2 + Math.sin(time * 3) * 20, my = (ey + h.y) / 2 - 30; g.quadraticCurveTo(mx + ox, my + oy, h.x + ox, h.y + oy); g.stroke(); });
     g.restore();
   }
   function drawFx(g, b, ox, oy, time, under) {
@@ -524,30 +580,67 @@
     g.fillStyle = '#0c0a10'; g.fillText(s, v.w / 2 + 1, 75); g.fillStyle = '#c8f0ff'; g.fillText(s, v.w / 2, 74); g.restore();
   }
   // a Crystal Guardian: a faceted gem golem with an eye of light, crystal fists orbiting it
+  // the four guardians: a ruby knight, a sapphire archer, an amethyst mage, an emerald healer, cut from crystal
+  function facet(g, pts, col) { g.fillStyle = '#05070c'; g.beginPath(); pts.forEach(([a, b2], i) => (i ? g.lineTo(a, b2) : g.moveTo(a, b2))); g.closePath(); g.lineWidth = 2; g.strokeStyle = '#05070c'; g.stroke(); g.fill();
+    const cx = pts.reduce((s2, p) => s2 + p[0], 0) / pts.length, cy = pts.reduce((s2, p) => s2 + p[1], 0) / pts.length;
+    for (let i = 0; i < pts.length; i++) { const p1 = pts[i], p2 = pts[(i + 1) % pts.length]; g.fillStyle = i % 3 === 0 ? shade(col, 0.4) : i % 3 === 1 ? col : shade(col, -0.25); g.beginPath(); g.moveTo(cx, cy); g.lineTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.fill(); } }
+  function glowDot(g, x, y, r, col) { g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.35, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); g.restore(); }
   function drawGuardian(g, x, y, e, time) {
-    const gc = GEMS[e.gem || 0], dk = shade(gc, -0.55), lt = shade(gc, 0.45), bob = Math.sin((e.t || 0) * 2.4) * 1.5, f = e.face || 1;
-    const hit = e.hitT > 0; g.save(); g.translate(x, y + bob);
-    if (e.dead) g.globalAlpha = 0.4;
-    // orbiting fists
-    const pu = e.punch > 0 ? 1 - e.punch / 0.3 : 0;
-    [0, 1].forEach((k) => { const a = (e.t || 0) * 2 + k * Math.PI; const r = 14 + (k === 0 ? Math.sin(pu * Math.PI) * 10 : 0); const fx2 = Math.cos(a) * r * (k === 0 && pu ? f : 1), fy2 = Math.sin(a) * 6 + 2; if (Math.sin(a) < 0) return; g.fillStyle = dk; g.beginPath(); g.moveTo(fx2, fy2 - 5); g.lineTo(fx2 + 4, fy2); g.lineTo(fx2, fy2 + 5); g.lineTo(fx2 - 4, fy2); g.fill(); g.fillStyle = gc; g.beginPath(); g.moveTo(fx2, fy2 - 4); g.lineTo(fx2 + 3, fy2); g.lineTo(fx2, fy2 + 3); g.fill(); });
-    // body facets
-    const body = [[0, -17], [9, -9], [11, 4], [5, 16], [-5, 16], [-11, 4], [-9, -9]];
-    g.fillStyle = '#05070c'; g.beginPath(); body.forEach(([a, b2], i) => { const xx = a * 1.12, yy = b2 * 1.08; if (i) g.lineTo(xx, yy); else g.moveTo(xx, yy); }); g.fill();
-    for (let i = 0; i < body.length; i++) { const p1 = body[i], p2 = body[(i + 1) % body.length]; g.fillStyle = i % 3 === 0 ? lt : i % 3 === 1 ? gc : shade(gc, -0.25); g.beginPath(); g.moveTo(0, 0); g.lineTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.fill(); }
-    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 0.6; body.forEach(([a, b2]) => { g.beginPath(); g.moveTo(0, 0); g.lineTo(a, b2); g.stroke(); });
-    // the eye
-    g.globalCompositeOperation = 'lighter'; const eg = g.createRadialGradient(f * 2, -5, 0, f * 2, -5, 8); eg.addColorStop(0, 'rgba(255,255,255,0.95)'); eg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = eg; g.beginPath(); g.arc(f * 2, -5, 8, 0, 6.283); g.fill(); g.globalCompositeOperation = 'source-over';
-    g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(f * 2, -5, 2.6, 1.6, 0, 0, 6.283); g.fill(); g.fillStyle = '#05070c'; g.fillRect(f * 2 + f * 0.6 - 0.5, -6, 1, 2);
-    [0, 1].forEach((k) => { const a = (e.t || 0) * 2 + k * Math.PI; const r = 14 + (k === 0 ? Math.sin(pu * Math.PI) * 10 : 0); const fx2 = Math.cos(a) * r * (k === 0 && pu ? f : 1), fy2 = Math.sin(a) * 6 + 2; if (Math.sin(a) >= 0) return; g.fillStyle = dk; g.beginPath(); g.moveTo(fx2, fy2 - 5); g.lineTo(fx2 + 4, fy2); g.lineTo(fx2, fy2 + 5); g.lineTo(fx2 - 4, fy2); g.fill(); g.fillStyle = gc; g.beginPath(); g.moveTo(fx2, fy2 - 4); g.lineTo(fx2 + 3, fy2); g.lineTo(fx2, fy2 + 3); g.fill(); });
-    if (hit) { g.globalAlpha = 0.6; g.fillStyle = '#ffffff'; g.beginPath(); body.forEach(([a, b2], i) => { if (i) g.lineTo(a, b2); else g.moveTo(a, b2); }); g.fill(); }
+    const G = GCLASS[e.sp] || GCLASS.v3g_ruby, gc = GEMS[G.gem], dk = shade(gc, -0.55), lt = shade(gc, 0.45);
+    const t = e.t || time || 0, bob = Math.sin(t * 2.4) * 1.5, f = e.face || 1, a = e.act, u = e.actT && e.actD ? 1 - e.actT / e.actD : 0;
+    g.save(); g.translate(Math.round(x), Math.round(y + bob)); g.scale(f, 1);
+    if (e.ward > 0) { g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(180,255,200,' + (0.4 + 0.25 * Math.sin(t * 8)) + ')'; g.lineWidth = 1.5; g.beginPath(); for (let k = 0; k <= 6; k++) { const an = k / 6 * 6.283 + t; const xx = Math.cos(an) * 20, yy = Math.sin(an) * 22; k ? g.lineTo(xx, yy) : g.moveTo(xx, yy); } g.stroke(); g.restore(); }
+    if (G.cls === 'knight') {
+      // legs, crystal plate body, helm with a glowing visor, a kite shield in front, a burning blade behind
+      g.fillStyle = dk; g.fillRect(-6, 9, 5, 7); g.fillRect(2, 9, 5, 7);
+      const sw = a === 'slash' ? -2.4 + u * 3.6 : a === 'cleave' ? -1.8 + u * 2.6 : -0.9;
+      g.save(); g.translate(-5, -2); g.rotate(sw); g.fillStyle = '#05070c'; g.fillRect(-1.5, -22, 4, 22); g.fillStyle = '#ffb070'; g.fillRect(-0.5, -21, 2, 19); g.fillStyle = '#ff6a3a'; g.fillRect(-0.5, -21, 1, 19); g.fillStyle = dk; g.fillRect(-4, -2, 9, 2); g.restore();
+      if (a === 'slash' || a === 'cleave') glowDot(g, -5 + Math.cos(sw - 1.57) * 18, -2 + Math.sin(sw - 1.57) * 18, 7, 'rgba(255,140,60,0.6)');
+      facet(g, [[0, -9], [9, -5], [8, 8], [0, 11], [-8, 8], [-9, -5]], gc);
+      facet(g, [[0, -19], [6, -15], [6, -9], [0, -7], [-6, -9], [-6, -15]], shade(gc, -0.1));
+      g.fillStyle = '#05070c'; g.fillRect(-4, -14, 9, 2); g.fillRect(0, -14, 2, 5); glowDot(g, 2, -13, 4, 'rgba(255,170,120,0.8)');
+      const sx = a === 'charge' ? 11 : 8;
+      facet(g, [[sx, -7], [sx + 6, -5], [sx + 6, 4], [sx + 3, 10], [sx, 4]], lt); g.fillStyle = gc; g.fillRect(sx + 2, -3, 2, 6);
+      if (a === 'charge') glowDot(g, sx + 5, 0, 10, 'rgba(255,200,160,0.5)');
+    } else if (G.cls === 'archer') {
+      // hooded cloak, two glowing eyes in the hood, a crystal bow held out front, a quiver of shards
+      facet(g, [[0, -19], [7, -10], [9, 14], [-9, 14], [-7, -10]], shade(gc, -0.15));
+      g.fillStyle = '#05070c'; g.beginPath(); g.moveTo(0, -15); g.lineTo(5, -8); g.lineTo(-4, -8); g.fill();
+      glowDot(g, 1, -10, 3, 'rgba(190,235,255,0.9)'); glowDot(g, -2, -10, 2.5, 'rgba(190,235,255,0.7)');
+      g.fillStyle = dk; for (let k = 0; k < 3; k++) g.fillRect(-9 + k * 2, -12 - k, 1.5, 9); g.fillStyle = lt; for (let k = 0; k < 3; k++) g.fillRect(-9 + k * 2, -13 - k, 1.5, 2);
+      const pull = a === 'shoot' || a === 'frost' ? Math.min(1, u * 2) : a === 'volley' ? 0.6 : 0, bx = 11;
+      g.strokeStyle = '#05070c'; g.lineWidth = 3; g.beginPath(); g.arc(bx - 6, -2, 11, -1.1, 1.1); g.stroke(); g.strokeStyle = lt; g.lineWidth = 1.5; g.beginPath(); g.arc(bx - 6, -2, 11, -1.1, 1.1); g.stroke();
+      g.strokeStyle = 'rgba(230,250,255,0.85)'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(bx - 6 + Math.cos(-1.1) * 11, -2 + Math.sin(-1.1) * 11); g.lineTo(bx - 1 - pull * 7, -2); g.lineTo(bx - 6 + Math.cos(1.1) * 11, -2 + Math.sin(1.1) * 11); g.stroke();
+      if (pull) { g.fillStyle = a === 'frost' ? '#e8faff' : lt; g.fillRect(bx - 2 - pull * 7, -2.5, 12, 1.5); if (a === 'frost') glowDot(g, bx + 10, -2, 6, 'rgba(190,240,255,0.8)'); }
+      if (a === 'volley') { g.fillStyle = lt; g.save(); g.rotate(-1.2); g.fillRect(4, -1, 14, 1.5); g.restore(); }
+    } else if (G.cls === 'mage') {
+      // a tall pointed hood, a flared robe, a floating staff with an orb, runes when casting
+      facet(g, [[0, -8], [8, -2], [11, 15], [-11, 15], [-8, -2]], shade(gc, -0.1));
+      facet(g, [[1, -28], [6, -12], [6, -7], [-6, -7], [-6, -12]], gc);
+      g.fillStyle = '#05070c'; g.fillRect(-3, -12, 8, 4); glowDot(g, 2, -10, 3.5, 'rgba(230,200,255,0.9)');
+      const lift = a ? -3 : 0, sx = 11;
+      g.fillStyle = '#05070c'; g.fillRect(sx - 1, -14 + lift, 3, 30); g.fillStyle = dk; g.fillRect(sx, -13 + lift, 1.5, 28);
+      glowDot(g, sx + 0.5, -17 + lift, a ? 9 : 6, 'rgba(200,150,255,0.8)'); g.fillStyle = lt; g.beginPath(); g.arc(sx + 0.5, -17 + lift, 3, 0, 6.283); g.fill();
+      if (a === 'chain' || a === 'blink' || a === 'bolt') { g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(210,170,255,0.7)'; g.lineWidth = 1; for (let k = 0; k < 6; k++) { const an = k / 6 * 6.283 + t * 3; g.strokeRect(Math.cos(an) * 16 - 1.5, Math.sin(an) * 16 - 1.5, 3, 3); } g.restore(); }
+    } else {
+      // the healer: a halo, a soft robe, a staff topped with a crystal flower, a green aura when it heals
+      if (a === 'heal' || a === 'ward') glowDot(g, 0, 0, 26 * (0.6 + u * 0.6), 'rgba(140,255,160,0.35)');
+      facet(g, [[0, -9], [8, -3], [10, 15], [-10, 15], [-8, -3]], lt);
+      facet(g, [[0, -19], [5, -15], [5, -9], [0, -7], [-5, -9], [-5, -15]], gc);
+      g.fillStyle = '#05070c'; g.fillRect(-1, -14, 2, 1); g.fillRect(2, -14, 2, 1);
+      g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(220,255,200,' + (0.6 + 0.3 * Math.sin(t * 3)) + ')'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, -23, 7, 2.2, 0, 0, 6.283); g.stroke(); g.restore();
+      const sx = 10; g.fillStyle = '#05070c'; g.fillRect(sx - 1, -12, 3, 28); g.fillStyle = shade('#c8a070', -0.1); g.fillRect(sx, -11, 1.5, 26);
+      for (let k = 0; k < 4; k++) { const an = k * 1.57 + t; g.fillStyle = k % 2 ? gc : lt; g.beginPath(); g.ellipse(sx + 0.5 + Math.cos(an) * 3, -15 + Math.sin(an) * 3, 2.2, 1.2, an, 0, 6.283); g.fill(); }
+      glowDot(g, sx + 0.5, -15, 6, 'rgba(160,255,170,0.8)');
+    }
+    if (e.hitT > 0) { g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(-11, -24, 22, 40); }
     g.restore();
-    if (e.showBar > 0 && e.hp < e.maxhp) { g.fillStyle = '#0c0a10'; g.fillRect(x - 12, y - 26, 24, 3); g.fillStyle = gc; g.fillRect(x - 12, y - 26, 24 * Math.max(0, e.hp / e.maxhp), 3); }
+    if (e.showBar > 0 && e.hp < e.maxhp) { g.fillStyle = '#0c0a10'; g.fillRect(x - 12, y - 32, 24, 3); g.fillStyle = gc; g.fillRect(x - 12, y - 32, 24 * Math.max(0, e.hp / e.maxhp), 3); }
   }
 
   // field guide pictures, drawn from the same code
   const D = A.drawers || (A.drawers = {});
-  D.v3guardian = function () { return [0, 1].map((k) => { const c = document.createElement('canvas'); c.width = 34; c.height = 40; const g = c.getContext('2d'); drawGuardian(g, 17, 21, { t: k * 0.6, face: 1, gem: 1 }, 0); return c; }); };
+  Object.keys(GCLASS).forEach((id) => { D['v3guardian_' + GCLASS[id].cls] = function () { return [0, 1].map((k) => { const c = document.createElement('canvas'); c.width = 40; c.height = 50; const g = c.getContext('2d'); drawGuardian(g, 20, 28, { sp: id, t: k * 0.6, face: 1 }, 0); return c; }); }; });
   D.v3leviathan = function () {
     const c = document.createElement('canvas'); c.width = 180; c.height = 70; const g = c.getContext('2d');
     const b = { x: 140, y: 6, w: 68, h: 68, ang: 0.15, segs: [], phase: 1, state: 'roar', jaw: 0.5, t: 0 };
@@ -556,5 +649,5 @@
     return [c];
   };
   if (sp) { sp.art = { draw: 'v3leviathan' }; if (A._spCache) delete A._spCache[LEV]; }
-  RW.v3lev = { drawLev, drawGuardian, drawFx, initBoss, NSEG, GAP };
+  RW.v3lev = { drawLev, drawGuardian, drawFx, initBoss, NSEG, GAP, GCLASS };
 })(window.RW);

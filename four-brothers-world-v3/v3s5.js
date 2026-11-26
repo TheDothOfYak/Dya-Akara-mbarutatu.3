@@ -128,7 +128,7 @@
     g.drawImage = function (img, x, y, w, h) {
       const n = arguments.length;
       if ((n === 3 || n === 5) && img && img.getContext && img.width <= 256 && img.height <= 256 && !img.__noHD) {
-        const hd = img.__iconId && hdIcon(img.__iconId) || scale2x(img);
+        const hd = img.__hd2 || (img.__iconId && hdIcon(img.__iconId)) || scale2x(img);
         if (hd) return n === 3 ? raw.call(this, hd, x, y, img.width, img.height) : raw.call(this, hd, x, y, w, h);
       }
       return raw.apply(this, arguments);
@@ -146,7 +146,7 @@
   if (RW.net && RW.net.drawPeers) { const bp = RW.net.drawPeers; RW.net.drawPeers = function (g) { return sharpen(g, bp, this, arguments); }; }
 
   // a curved trail behind a swing, in the weapon's own colour
-  function swingTrail(g, cam, p, opts) {
+  function swingTrail(g0, cam, p, opts) { if (RW.v3pix && !g0.__inPix) { RW.v3pix(g0, (q) => { q.__inPix = true; swingTrail(q, cam, p, opts); q.__inPix = false; }, { add: true, soft: true }); return; } const g = g0;
     const it = RW.ITEMS[opts.item]; if (!it || it.ranged || it.kind !== 'weapon') return;
     const prog = 1 - opts.swing / (opts.swingDur || 0.3); if (prog < 0.12 || prog > 0.9) return;
     const f = p.face || 1, sc = opts.scale || 1, cx = p.x + 6 - cam.x + f * 3 * sc, cy = p.y + 14 - cam.y - 2 * sc, R = (it.reach || 18) * 0.85 * sc + 6;
@@ -180,6 +180,7 @@
     FX.bolts = [];
     let r;
     try {
+      const paint = (g) => {
       g.save(); g.globalCompositeOperation = 'lighter';
       for (const p of mine) {
         const t = p.life / p.max, x = p.x - cam.x, y = p.y - cam.y; g.globalAlpha = Math.min(1, t * 1.4);
@@ -193,6 +194,8 @@
         [[7, b.color, 0.18], [3, b.color, 0.5], [1, '#ffffff', 1]].forEach(([w, c, al]) => { g.globalAlpha = t * al; g.strokeStyle = c; g.lineWidth = w; g.lineJoin = 'round'; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x - cam.x, y - cam.y) : g.moveTo(x - cam.x, y - cam.y))); g.stroke(); });
       }
       g.restore();
+      };
+      if (RW.v3pix && (mine.length || bolts.length)) RW.v3pix(g, paint, { add: true, soft: true }); else paint(g);
       r = baseOver.apply(this, arguments);
     } finally { mine.forEach((p) => { p.add = true; }); FX.bolts = bolts; }
     return r;
