@@ -28,7 +28,7 @@ V3 is a copy of V2 (its `index.html` and `v2*.js` modules, unchanged apart from 
 - v3s16: hero maker: hover any chip/swatch to preview it (look captured from the preview's A.dressed calls; restored on mouseleave unless clicked; Species and Moves rows skipped), compact multi-column layout that fits 1100x680 without scrolling. v3s6's creator rows now re-patch whenever #c-dyn is rebuilt (marker `data-v3row`).
 - v3s6 also: worn helms are flat-topped great helms with an eye slit, nasal and cheek guards (caps/hoods/circlets stay open-faced).
 - v3s3 also: you spawn in Stalagmere beside the starter chest (v3s13 sets def.spawn).
-- v3s3 also: Stalagmere homes for Gneiss, Wedgeworth (own house), Cubert and Slagg (walled forge); visitors go to the first lived-in town (v3s13).
+- v3s3 also: Stalagmere (ry 60, about 100 blocks floor to roof) has homes for Gneiss, Wedgeworth, Cubert, Slagg (walled forge) and the rune keeper (guesthouse, placed by v3s13), all hanging, joined door to door by sagging walkway bridges on chains; the starter chest and your spawn are inside Gneiss's house. Other visitors go to the first lived-in town.
 
 
 Read this first. It says where everything lives, so a change doesn't need the whole game re-read.

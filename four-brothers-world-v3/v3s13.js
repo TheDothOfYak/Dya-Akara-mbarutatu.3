@@ -1,6 +1,6 @@
 // 4 Brothers World V3 — part 13: Rock World towns.
-//  * Only Rock World's own folk (Gneiss, Slagg, Wedgeworth, Cubert) live in Stalagmere, each in a home. Tumble, the rune
-//    keeper and any other visitors move to the first lived-in town.
+//  * Stalagmere is home to Gneiss, Slagg, Wedgeworth, Cubert and the rune keeper (in the guesthouse). Tumble and any other
+//    visitors move to the first lived-in town. You wake inside Gneiss's house.
 //  * Each other town is lived in or abandoned (decided by the world's seed, at least one of each when there are two or more).
 //  * Lived-in towns have three villagers: a trader (coins for trinkets, tools and supplies), a job-giver (bring things,
 //    get paid) and an old-timer full of advice and rumours (including which towns went quiet).
@@ -30,7 +30,7 @@
     try {
       const m = out.meta, towns = m.towns || [], W = out.W, at = (x, y) => out.fg[y * W + x];
       // you start in Stalagmere, beside the chest of old tools, with its own folk round you
-      const st = m.starter; if (st) { for (const dx of [-2, -3, 2, 3, -1, 1]) { const x = st.x + dx, y = st.y; const ok = !(RW.TILES[at(x, y)] || {}).solid && !(RW.TILES[at(x, y - 1)] || {}).solid && (RW.TILES[at(x, y + 1)] || {}).solid; if (ok) { def.spawn.x = x; def.spawn.y = y; break; } } }
+      const st = m.starter; if (st) { for (const dx of [2, 3, 4, 1, 5]) { const x = st.x + dx, y = st.y; const ok = !(RW.TILES[at(x, y)] || {}).solid && !(RW.TILES[at(x, y - 1)] || {}).solid && (RW.TILES[at(x, y + 1)] || {}).solid; if (ok) { def.spawn.x = x; def.spawn.y = y; break; } } }
       towns.forEach((t) => { t.abandoned = h32(t.name + ':' + (def.store || '')) < 0.42; });
       if (towns.length >= 2) { if (towns.every((t) => t.abandoned)) towns[0].abandoned = false; if (!towns.some((t) => t.abandoned)) towns[towns.length - 1].abandoned = true; }
       towns.forEach((t) => {
@@ -167,6 +167,7 @@
         let slot = 0;
         E.npcs.forEach((n) => {
           if (orig.has(n.id)) return;
+          if (n.id === 'v2_runekeeper' && m.npcs.guesthouse) { const q = m.npcs.guesthouse; n.x = q.x * TS + 2; n.y = (q.y + 1) * TS - n.h; n.home = q.x * TS; return; } // the rune keeper lives in Stalagmere's guesthouse
           const nx = (n.x + n.w / 2) / TS, ny = n.y / TS; if (Math.hypot(nx - sp.x, ny - sp.y) > 40) return;
           for (const dx of [10, -10, 14, -14, 18, -18, 22, -22, 7, -7]) {
             const x = g.x + dx + (slot % 2 ? 1 : 0); let y = g.y - 6; while (y < g.y + 90 && !WD.solid(x, y + 1)) y++; if (WD.isWaterAt && WD.isWaterAt(x * TS + 8, y * TS + 8)) continue;
@@ -176,6 +177,8 @@
           }
         });
       }
+      // the rune keeper always lives in Stalagmere's guesthouse
+      if (m.npcs && m.npcs.guesthouse && !E.npcs.some((n) => n.id === 'v2_runekeeper') && RW.SPECIES.v2_runekeeper) { const q = m.npcs.guesthouse; E.npcs.push({ id: 'v2_runekeeper', x: q.x * TS - 1, y: (q.y + 1) * TS - 34, w: 18, h: 34, home: q.x * TS, face: -1, t: Math.random() * 4, vx: 0, vy: 0 }); }
       // villagers in the lived-in towns
       const towns = m.towns || [], quiet = towns.filter((t) => t.abandoned).map((t) => t.name);
       towns.forEach((t, ti) => {

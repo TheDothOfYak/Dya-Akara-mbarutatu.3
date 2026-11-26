@@ -109,7 +109,7 @@
       }
       return null;
     };
-    const VIL = place('village', 104, 64, 800, [300, 980]) || (cav.push({ kind: 'village', cx: 640, cy: 320, rx: 104, ry: 64 }), cav[cav.length - 1]);
+    const VIL = place('village', 104, 60, 800, [300, 980]) || (cav.push({ kind: 'village', cx: 640, cy: 320, rx: 104, ry: 60 }), cav[cav.length - 1]); // about 100 blocks floor to roof
     const CRY = place('crystal', 92, 56, 800) || place('crystal', 70, 46, 800);
     const nTowns = ri(3, 5), names = new Set(['Stalagmere']);
     for (let i = 0; i < nTowns; i++) {
@@ -341,22 +341,31 @@
       const h2 = house(Math.round(c.cx + c.rx * 0.28), hy0 + 5, 11, 6, null);
       const h3 = house(Math.round(c.cx + c.rx * 0.78), hy0 + 12, 9, 6, 'cubert');
       const h4 = house(Math.round(c.cx - c.rx * 0.74), hy0 + 9, 10, 6, 'wedgeworth'); // V3: Wedgeworth has his own home now
-      bridge0(h4.x1, h1.x0, Math.max(h4.floorRow, h1.floorRow) + 3);
       meta.npcs.guesthouse = { x: Math.round((h2.x0 + h2.x1) / 2), y: h2.floorRow - 1 };
       meta.carvings[(h2.x1 - 2) + ',' + (h2.floorRow - 1)] = 5; set(h2.x1 - 2, h2.floorRow - 1, T.tablet); // Triangle Accord
-      const bridge = (xa, xb, y) => { for (let x = Math.min(xa, xb); x <= Math.max(xa, xb); x++) if (get(x, y) === T.air) set(x, y, T.walkway); };
-      bridge(h1.x1, h2.x0, h1.floorRow + 5); bridge(h2.x1, h3.x0, h2.floorRow + 4);
       // Slagg's forge, on the middle stalagmite
       const m = ms[1], fy = Math.min(c.water - 4, m.top + 14), fx = mites[1] + Math.round(m.wAt(fy)) + 1;
       for (let x = fx; x <= fx + 9; x++) set(x, fy, T.brick);
       house(fx + 5, fy, 11, 6, null); // V3: Slagg's forge is his home too, walled and roofed
       set(fx + 1, fy - 1, T.forge); set(fx + 7, fy - 1, T.knapstone);
       meta.npcs.slagg = { x: fx + 3, y: fy - 1 };
+      // V3: every house hangs in the air, joined door to door by sagging rope bridges held up by chains
+      const hs = [h4, h1, { x0: fx, x1: fx + 10, floorRow: fy }, h2, h3].sort((a, b) => a.x0 - b.x0);
+      const soft = (t) => t === T.spire || t === T.stone || t === T.soil || t === T.walkway || (CROPS.indexOf(t) >= 0);
+      const hang = (xa, ya, xb, yb) => {
+        const n = Math.max(1, xb - xa), sag = Math.min(4, Math.round(n / 9));
+        for (let x = xa; x <= xb; x++) {
+          const t = (x - xa) / n, y = Math.round(ya + (yb - ya) * t + Math.sin(t * Math.PI) * sag);
+          if (get(x, y) === T.air || soft(get(x, y))) set(x, y, T.walkway);
+          for (let k = 1; k <= 3; k++) if (soft(get(x, y - k))) set(x, y - k, T.air);   // a way through spires and farm ledges
+          if (x === xa + 1 || x === xb - 1 || x === Math.round((xa + xb) / 2)) { const top = ceilAt(x, y - 1); for (let yy = top + 1; yy < y; yy++) if (get(x, yy) === T.air) set(x, yy, T.chain); } // held up at both ends and the middle
+        }
+      };
+      for (let k = 1; k < hs.length; k++) { const a = hs[k - 1], b = hs[k]; if (b.x0 - a.x1 > 1) hang(a.x1 + 1, a.floorRow, b.x0 - 1, b.floorRow); }
       // the starter chest: where the shaft from your cave lands
       const sx = HOME.x1 + 5; let sy = floorAt(sx, vilRoof + 1, H); if (get(sx, sy) === T.water) sy = c.water;
       const landX = sx + 3; let ly = floorAt(landX, vilRoof + 1, H);
-      if (get(landX, ly) !== T.water && get(landX, ly - 1) === T.air) { set(landX, ly - 1, T.starterchest); meta.starter = { x: landX, y: ly - 1 }; }
-      else { set(h1.x0 + 2, h1.floorRow - 1, T.starterchest); meta.starter = { x: h1.x0 + 2, y: h1.floorRow - 1 }; }
+      set(h1.x0 + 2, h1.floorRow - 1, T.starterchest); meta.starter = { x: h1.x0 + 2, y: h1.floorRow - 1 }; // V3: you wake inside Gneiss's house
       lanterns(c, 9); shore(c);
       // a hidden cache below the mere
       meta.villageAt = { cx: c.cx, cy: c.cy };
