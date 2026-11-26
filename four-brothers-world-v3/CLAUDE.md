@@ -13,6 +13,16 @@ V3 is a copy of V2 (its `index.html` and `v2*.js` modules, unchanged apart from 
 - v3s6: boulder rocks (`A.rockSprites` replaced: 12 frames, 0-7 as before + 8-11 run; each 1x frame carries `__hd2` and `hand`). Body/arms/move travel in `look.shape` as `body.arms.move` (RW.SHAPES has hidden keys for every combo and the old tall/stocky/slim). Creator rows patched in by a MutationObserver on `#c-dyn`. Rock World underground ambient lowered (`def.ambientAt` wrap) and the player's own glow dimmed there (`WD.computeLight` wrap). `RW.v3pix(g, fn, {add, soft})`: draw on a 1-unit-per-pixel layer. T toggles `RW.v3mine2` (2x2 mining, used by v3s1); the `torch` action is removed.
 - v3s7: glowstones `glow_<dim|bright|radiant>_<colour>` (kind armor, slot `trinket`), light pushed into `WD.computeLight`, friends' glows via `v3glow` messages, outline in `E.drawPlayer`, radiant ones from legendary chests (`WD.setTile` wrap), Trinket row + recolour in `U.renderInv`.
 
+- v3s8: 48x48 Leviathan item art (`RW.v3art`: paint/has/finish; coloured outlines + upper-left light), A.icon carries `__big48`/`__hd2`; UI 16x16 canvases get the big picture (CanvasRenderingContext2D.drawImage patch); big weapons held 1.5x.
+- v3s9: drowned-soul guardians (`RW.v3soul`, sprites per class/pose at 1px/unit; v3s4's drawGuardian hands over), names, size 28x54, cores always drop.
+- v3s10: Leviathan loot (7 drops, 4 core crafts, cores, Abyssite ore tile `abyssite` + bars/helm/mail/pick, altar tile `levaltar` + rematch, krait pet, 12 trinkets and their effects, `E.v3shots`/`E.v3fx`/`E.v3allies`, soul link messages `v3link`/`v3share`, `v3heal`, `v3pet`, `v3rematch`).
+- v3s7 also: three trinket slots `trinket`/`trinket2`/`trinket3` (P.wear wrap: no doubles), Abyssal glowstone tier.
+- v3s6 also: look.shape may carry 7 parts `body.arms.move.face.extra.size.vein` (RW.SHAPES is a Proxy), hats/toppers/armour painted on the boulder (`look.v3hat`, `look.v3armor` set by an A.dressed wrap), creator rows Face/Growths/Size/Veins, still preview unless a move is hovered (`RW.v3hoverMove`).
+- v3s11: Terraria-style 32x32 icons for every weapon/tool/armour (`RW.v3terraria`), bow/axe painters, crisp swing crescents, coloured hit dust, NPC timer guard.
+- v3s12: Rock World fancy lighting (`RW.v3light`): smooth light (2-step upscale), block shading + AO layer, floor shadows; Settings > Lighting; auto turn-down under 45 fps.
+- v3s13: Rock World towns (`RW.v3towns`): visitors moved from the start to Stalagmere, abandoned towns (`t.abandoned`, haunted chest tile `hauntchest`, zombie boulders `v3_zboulder`, possessed rocks `v3_possessed`, clear flag `P.flags.v3clear_<town>`), villagers `v3vil_0..11` (trader/jobs/elder; `RW.V3_TOWN_TRADES`, `RW.V3_JOBS`).
+- v2s4.js (V3 copy): rocks steer in the air (aup 0.45, abrake 0.9).
+
 
 Read this first. It says where everything lives, so a change doesn't need the whole game re-read.
 

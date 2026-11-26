@@ -25,7 +25,7 @@
   // g: gravity multiplier, fall: fastest fall. up/brake/turn: seconds to reach top speed / to stop / to turn round on the ground.
   // aup/abrake: the same in the air. creep: the first little step you take from standing.
   const MOVE = {
-    rock: { g: 1.35, fall: 640, up: 1.15, brake: 0.7, turn: 0.32, aup: 3.2, abrake: 5, creep: 16 },
+    rock: { g: 1.35, fall: 640, up: 1.15, brake: 0.7, turn: 0.32, aup: 0.45, abrake: 0.9, creep: 16 }, // V3: steer in the air with A and D
     ghost: { g: 0.6, fall: 230, up: 0.5, brake: 0.6, turn: 0.4, aup: 0.85, abrake: 2.6, creep: 20 },
   };
   // swimmers: buoy: how hard the water pushes you up (0 = hangs where you stop). drag: how fast you slow down. stroke: a jump press.

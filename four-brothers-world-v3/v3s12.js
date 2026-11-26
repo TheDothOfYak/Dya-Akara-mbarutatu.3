@@ -1,6 +1,6 @@
 // 4 Brothers World V3 — part 12: realistic lighting in Rock World.
-//  * Smooth light: the light grid is blown up 4x, blurred and lightly saturated, so light fades softly instead of in squares.
-//  * Coloured light: torches warm, crystals and glowstones tint the rock their colour (saturation boost), with a soft glow.
+//  * Smooth light: the light grid is blown up in two cheap bilinear steps (2x then 4x), so light fades softly instead of in squares.
+//  * Coloured light: torches, crystals and glowstones tint the rock their colour (the light grid is coloured).
 //  * Block shading: faces of blocks that look toward the light are lit, faces turned away are dark, and rock deep inside
 //    a wall fades into shadow; air beside walls gets soft corner shadows (ambient occlusion).
 //  * Shadows: heroes, monsters, townsfolk and the Leviathan's head drop soft shadows on the floor, pushed away from the light.
@@ -14,7 +14,7 @@
   let pref = RW.store ? RW.store.get(KEY, true) !== false : true, level = 2; // 2 full, 1 smooth only, 0 off
   const on = () => pref && level > 0 && WD.def && WD.def.id === 'rock';
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.ctx = c.getContext('2d'); return c; };
-  const SUB = 4;
+  const SUB = 2;
   let A1 = mk(4, 4), A2 = mk(4, 4), SH = mk(4, 4), HL = mk(4, 4), shImg = null, hlImg = null, frame = 0;
 
   // ---------------- smooth, coloured light (replaces the light picture the base game draws) ----------------
@@ -26,13 +26,12 @@
     g.drawImage = function (img, x, y, w, h) {
       if (!caught && arguments.length === 5 && img && img.width < 400) {
         caught = true;
-        const W2 = img.width * SUB, H2 = img.height * SUB;
-        if (A1.width !== W2 || A1.height !== H2) { A1 = mk(W2, H2); A2 = mk(W2, H2); }
-        A1.ctx.imageSmoothingEnabled = true; A1.ctx.imageSmoothingQuality = 'high'; A1.ctx.clearRect(0, 0, W2, H2); A1.ctx.drawImage(img, 0, 0, W2, H2);
-        A2.ctx.clearRect(0, 0, W2, H2); A2.ctx.filter = 'blur(' + SUB * 0.7 + 'px) saturate(1.45)'; A2.ctx.drawImage(A1, 0, 0); A2.ctx.filter = 'none';
+        // two cheap bilinear steps (2x, then 4x) instead of a blur filter: soft, and quick
+        const W1 = img.width * 2, H1 = img.height * 2, W2 = img.width * 4, H2 = img.height * 4;
+        if (A1.width !== W1 || A1.height !== H1) { A1 = mk(W1, H1); A2 = mk(W2, H2); }
+        A1.ctx.imageSmoothingEnabled = true; A1.ctx.drawImage(img, 0, 0, W1, H1);
+        A2.ctx.imageSmoothingEnabled = true; A2.ctx.drawImage(A1, 0, 0, W2, H2);
         g.imageSmoothingEnabled = true; raw.call(this, A2, x, y, w, h);
-        // a soft glow where light is strong
-        g.save(); g.globalCompositeOperation = 'soft-light'; g.globalAlpha = 0.35; raw.call(this, A2, x, y, w, h); g.restore();
         return;
       }
       return raw.apply(this, arguments);
@@ -47,7 +46,7 @@
     const tx0 = Math.floor(cam.x / TS) - 1, ty0 = Math.floor(cam.y / TS) - 1, tw = Math.ceil(RW.view.w / TS) + 3, th = Math.ceil(RW.view.h / TS) + 3;
     const W2 = tw * SUB, H2 = th * SUB;
     if (SH.width !== W2 || SH.height !== H2) { SH = mk(W2, H2); HL = mk(W2, H2); shImg = SH.ctx.createImageData(W2, H2); hlImg = HL.ctx.createImageData(W2, H2); frame = 0; }
-    if ((frame++ & 1) === 0 || SH.__x !== tx0 || SH.__y !== ty0) {
+    if ((frame++ % 3) === 0 || SH.__x !== tx0 || SH.__y !== ty0) {
       SH.__x = tx0; SH.__y = ty0;
       const s = shImg.data, h = hlImg.data; s.fill(255); for (let i = 3; i < h.length; i += 4) h[i] = 0;
       const put = (px, py, v, hl) => { if (px < 0 || py < 0 || px >= W2 || py >= H2) return; const o = (py * W2 + px) * 4; const m = Math.max(0, Math.min(255, Math.round(255 * v))); if (m < s[o]) { s[o] = s[o + 1] = s[o + 2] = m; } if (hl) { h[o] = 255; h[o + 1] = 245; h[o + 2] = 225; h[o + 3] = Math.max(h[o + 3], Math.round(hl * 255)); } };
@@ -113,7 +112,7 @@
     const vis = (x, y) => x > cam.x - 40 && x < cam.x + RW.view.w + 40 && y > cam.y - 40 && y < cam.y + RW.view.h + 60;
     if (RW.game && RW.game.playing && !P.dead) dropShadow(g, cam, P.x + 6, P.y + P.h, 16 * (P.scale ? P.scale() : 1), P.h);
     if (RW.net && RW.net.peers) RW.net.peers.forEach((p) => { if (p.target && p.target.w === WD.def.id && vis(p.x, p.y)) dropShadow(g, cam, p.x + 6, p.y + 28, 16, 28); });
-    E.enemies.forEach((e) => { if (!e.dead && vis(e.x, e.y)) dropShadow(g, cam, e.x + e.w / 2, e.y + e.h, Math.max(10, e.w), e.h); });
+    let n = 0; E.enemies.forEach((e) => { if (n < 12 && !e.dead && vis(e.x, e.y)) { n++; dropShadow(g, cam, e.x + e.w / 2, e.y + e.h, Math.max(10, e.w), e.h); } });
     (E.npcs || []).forEach((n) => { if (vis(n.x, n.y)) dropShadow(g, cam, n.x + n.w / 2, n.y + n.h, Math.max(10, n.w), n.h); });
     const b = E.boss; if (b && !b.dead && vis(b.x, b.y)) dropShadow(g, cam, b.x + b.w / 2, b.y + b.h, b.w, b.h);
   }
