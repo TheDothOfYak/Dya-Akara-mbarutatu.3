@@ -328,7 +328,7 @@
   const rawDI = CanvasRenderingContext2D.prototype.drawImage;
   CanvasRenderingContext2D.prototype.drawImage = function (img, x, y) {
     if (arguments.length === 3 && img && img.__big48 && x === 0 && y === 0 && this.canvas && this.canvas.width === 16 && this.canvas.height === 16 && !this.canvas.__world) {
-      const cv = this.canvas; cv.width = img.__big48.width; cv.height = img.__big48.height; cv.style.imageRendering = 'auto'; const g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; return rawDI.call(g, img.__big48, 0, 0);
+      const cv = this.canvas; cv.width = img.__big48.width; cv.height = img.__big48.height; cv.style.imageRendering = 'pixelated'; const g = cv.getContext('2d'); g.imageSmoothingEnabled = false; return rawDI.call(g, img.__big48, 0, 0);
     }
     return rawDI.apply(this, arguments);
   };

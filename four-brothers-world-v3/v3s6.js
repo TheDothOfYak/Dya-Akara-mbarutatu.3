@@ -198,18 +198,30 @@
         A.ell(g, px0, py0, 6.4, 4.6, Rm[0]); A.ell(g, px0, py0, 5.6, 3.8, Rm[2]); A.ell(g, px0 - 1, py0 - 1, 4.4, 2.6, Rm[3]); A.rect(g, px0 - 3, py0 - 3, 4, 1, Rm[5]);
         for (let k = -1; k <= 1; k++) A.px(g, px0 + k * 3, py0 + 2, Rm[1]); if (bI.glow) A.px(g, px0, py0, bI.glow); if (acc) A.rect(g, px0 - 4, py0 + 3, 8, 1, acc); });
     }
-    if (hI) {
-      const Rm = ramp(hI.tint || '#9aa3ad'), yb = cy - Math.round(ry * 0.36), hs = look.hs || 'auto';
-      for (let x = cx - rx - 2; x <= cx + rx + 2; x++) { const t0 = T2(x); if (t0 >= yb) continue;
-        for (let y = t0 - 1; y <= yb; y++) { const k = (y - (t0 - 1)) / Math.max(1, yb - t0 + 1), nx = (x - cx) / rx; let col = k < 0.15 ? Rm[5] : nx < -0.35 ? Rm[4] : nx > 0.45 ? Rm[2] : Rm[3]; if (y === t0 - 1) col = Rm[0]; if (y >= yb - 1) col = y === yb ? Rm[0] : Rm[1]; A.px(g, x, y, col); }
-        if ((x - cx) % 6 === 0) A.px(g, x, yb - 1, Rm[5]); }
-      const nxp = cx + ex - 2; A.rect(g, nxp, yb, 3, 7, Rm[1]); A.px(g, nxp, yb, Rm[4]); A.px(g, nxp + 1, yb + 6, Rm[0]);
-      if (hI.glow) { A.px(g, cx - 3, top - 1, hI.glow); A.px(g, cx + 3, top, hI.glow); A.px(g, cx, yb - 3, hI.glow); }
-      const ac2 = acc || '#c83a3a', tt = T2(cx - 2);
+    if (hI) { // a real helm: flat-topped and square-shouldered, a brow band, an eye slit the eyes glow through, cheek guards
+      const Rm = ramp(hI.tint || '#9aa3ad'), hs = look.hs || 'auto', soft = /cap|hood|circlet/.test(hI.id || '');
+      const eyY = cy + ey, hl = cx - rx + 2, hr = cx + rx - 1, htop = top - 3, hbot = soft ? eyY - 3 : eyY + 6, ch = 4;
+      for (let y = htop; y <= hbot; y++) for (let x = hl; x <= hr; x++) {
+        const cut = Math.max(0, ch - (y - htop)); if (x < hl + cut || x > hr - cut) continue;               // chamfered top corners
+        if (y > eyY + 2 && x > hl + 5 && x < hr - 6 && !soft) continue;                                         // open below the slit (cheek guards either side)
+        const nx = (x - hl) / (hr - hl); let col = nx < 0.22 ? Rm[4] : nx < 0.55 ? Rm[3] : nx < 0.85 ? Rm[2] : Rm[1];
+        if (y === htop || x === hl + cut || x === hr - cut) col = Rm[0]; if (y === htop + 1 && x > hl + cut && x < hr - cut) col = Rm[5];
+        A.px(g, x, y, col);
+      }
+      const ridge = cx - 2; for (let y = htop + 1; y < eyY - 3; y++) { A.px(g, ridge, y, Rm[5]); A.px(g, ridge + 1, y, Rm[1]); }
+      const band = soft ? hbot - 1 : eyY - 3; for (let x = hl; x <= hr; x++) { A.px(g, x, band, Rm[1]); A.px(g, x, band + 1, Rm[0]); if ((x - hl) % 5 === 2) A.px(g, x, band, Rm[6] || Rm[5]); }
+      if (!soft) {
+        A.rect(g, hl + 4, eyY - 1, hr - hl - 7, 4, '#0a0810');                                                    // the eye slit
+        const glow = RW.GLOWS[look.glow] || look.glow || RW.GLOWS.amber; A.rect(g, cx + ex - 6, eyY, 3, 2, glow); A.rect(g, cx + ex + 2, eyY, 3, 2, glow);
+        A.rect(g, ridge, eyY - 2, 2, 7, Rm[1]); A.px(g, ridge, eyY - 2, Rm[4]);                                    // nasal guard
+        for (let y = eyY + 3; y <= hbot; y++) { A.px(g, hl + 5, y, Rm[0]); A.px(g, hr - 6, y, Rm[0]); }
+      }
+      if (hI.glow) { A.px(g, ridge, htop + 3, hI.glow); A.px(g, hl + 3, band, hI.glow); A.px(g, hr - 3, band, hI.glow); }
+      const ac2 = acc || '#c83a3a', tt = htop + 1;
       if (hs === 'plume') for (let k = 0; k < 14; k++) { const x = cx - 2 - k, y = tt - 2 - Math.round(Math.sin(k / 13 * Math.PI) * 6) + (k > 9 ? k - 9 : 0); A.rect(g, x, y, 1, 3, k % 2 ? ac2 : RW.shade(ac2, 0.25)); A.px(g, x, y + 3, RW.shade(ac2, -0.4)); }
-      else if (hs === 'crest') for (let k = 0; k < 16; k++) { const x = cx + 6 - k, y = T2(x) - 3; A.rect(g, x, y, 1, 3, k % 2 ? ac2 : RW.shade(ac2, -0.25)); A.px(g, x, y - 1, RW.shade(ac2, 0.35)); }
-      else if (hs === 'horns') [-1, 1].forEach((sd) => { for (let k = 0; k < 9; k++) { const x = cx - 2 + sd * (8 + k), y = T2(cx - 2 + sd * 8) + 1 - Math.round(k * 1.1) - (k > 5 ? k - 5 : 0); A.rect(g, x, y, 2, 2, k < 6 ? '#e8e0c8' : '#c8bca0'); A.px(g, x, y + 2, '#8a8070'); } });
-      else if (hs === 'wings') [-1, 1].forEach((sd) => { for (let k = 0; k < 4; k++) for (let j = 0; j < 7 - k; j++) A.px(g, cx - 2 + sd * (rx - 3 + j), yb - 4 - k * 2 - Math.round(j * 0.5), j === 6 - k ? '#a8a8b8' : '#f0f0f0'); });
+      else if (hs === 'crest') for (let k = 0; k < 16; k++) { const x = cx + 6 - k, y = htop - 3; A.rect(g, x, y, 1, 3, k % 2 ? ac2 : RW.shade(ac2, -0.25)); A.px(g, x, y - 1, RW.shade(ac2, 0.35)); }
+      else if (hs === 'horns') [-1, 1].forEach((sd) => { for (let k = 0; k < 9; k++) { const x = cx - 2 + sd * (8 + k), y = htop + 4 - Math.round(k * 1.1) - (k > 5 ? k - 5 : 0); A.rect(g, x, y, 2, 2, k < 6 ? '#e8e0c8' : '#c8bca0'); A.px(g, x, y + 2, '#8a8070'); } });
+      else if (hs === 'wings') [-1, 1].forEach((sd) => { for (let k = 0; k < 4; k++) for (let j = 0; j < 7 - k; j++) A.px(g, cx - 2 + sd * (rx - 3 + j), band - 2 - k * 2 - Math.round(j * 0.5), j === 6 - k ? '#a8a8b8' : '#f0f0f0'); });
       else if (hs === 'spike') { for (let k = 0; k < 8; k++) { const w = Math.max(0, Math.round((1 - k / 8) * 2)); for (let i = -w; i <= w; i++) A.px(g, cx - 2 + i, tt - 2 - k, i < 0 ? Rm[5] : Rm[2]); } }
     }
     return { c, rx, ry };
