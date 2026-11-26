@@ -365,12 +365,12 @@
     return out;
   };
   function patchCreator() {
-    const dyn = document.getElementById('c-dyn'); if (!dyn || dyn.__v3) return;
+    const dyn = document.getElementById('c-dyn'); if (!dyn || dyn.querySelector('[data-v3row]')) return;
     const rows = Array.from(dyn.querySelectorAll('.opt')); const bodyRow = rows.find((r) => { const l = r.querySelector('.label'); return l && l.textContent === 'Body'; });
     if (!bodyRow || !rows.some((r) => { const l = r.querySelector('.label'); return l && l.textContent === 'Rock'; })) return;
     dyn.__v3 = true;
     const mkRow = (label, map, key, after, note) => {
-      const r = document.createElement('div'); r.className = 'opt'; const l = document.createElement('span'); l.className = 'label'; l.textContent = label; const box = document.createElement('div'); box.className = 'chips'; r.append(l, box);
+      const r = document.createElement('div'); r.className = 'opt'; r.dataset.v3row = '1'; const l = document.createElement('span'); l.className = 'label'; l.textContent = label; const box = document.createElement('div'); box.className = 'chips'; r.append(l, box);
       if (note) { const n = document.createElement('div'); n.className = 'label'; n.style.cssText = 'opacity:.75;grid-column:1/-1;margin-top:-4px'; n.textContent = note; setTimeout(() => r.after(n), 0); }
       const paint = () => { const cur = liveLook ? parse(liveLook.shape)[key] : null; Array.from(box.children).forEach((b) => b.setAttribute('aria-pressed', b.dataset.k === cur)); };
       Object.entries(map).forEach(([k, v]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = v; b.dataset.k = k;
@@ -388,7 +388,7 @@
     setTimeout(() => { const n3 = r3.nextElementSibling || r3; const r4 = mkRow('Face', FACEX, 'face', n3); const r5 = mkRow('Growths', BODYX, 'extra', r4); const r6 = mkRow('Size', SIZES, 'size', r5, 'Size is only a look too: every rock has the same reach and the same hitbox.'); setTimeout(() => mkRow('Veins', VNAMES, 'vein', r6.nextElementSibling || r6), 5); }, 5);
     bodyRow.remove();
   }
-  new MutationObserver(() => { const dyn = document.getElementById('c-dyn'); if (dyn && !dyn.__v3) patchCreator(); }).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(() => { const dyn = document.getElementById('c-dyn'); if (dyn && !dyn.querySelector('[data-v3row]')) patchCreator(); }).observe(document.body, { childList: true, subtree: true });
   // the creator's picture uses the sharp frames too
   const pv = document.getElementById('preview');
   if (pv) { const pg = pv.getContext('2d'), raw = pg.drawImage; pg.drawImage = function (img) { if (img && img.__hd2 && arguments.length === 5) { const a = Array.from(arguments); a[0] = img.__hd2; return raw.apply(this, a); } return raw.apply(this, arguments); }; }
