@@ -93,8 +93,9 @@
     else if (eyes === 'sleepy') { A.rect(g, cx + ex - 7, cy + ey + 2, 4, 2, glow); A.rect(g, cx + ex + 1, cy + ey + 2, 4, 2, glow); A.rect(g, cx + ex - 8, cy + ey, 15, 2, C.dark); }
     else { A.rect(g, cx + ex - 7, cy + ey, 4, 4, glow); A.rect(g, cx + ex + 1, cy + ey, 4, 4, glow); A.rect(g, cx + ex - 7, cy + ey, 2, 2, '#ffffff'); A.rect(g, cx + ex + 1, cy + ey, 2, 2, '#ffffff'); }
     const my = cy + ey + 9, mouth = look.mouth || 'none', mc = RW.shade(C.dark, -0.45);
-    if (mouth === 'line') A.rect(g, cx + ex - 3, my, 7, 2, mc);
-    else if (mouth === 'grin') { A.rect(g, cx + ex - 5, my, 11, 2, mc); A.rect(g, cx + ex - 6, my - 2, 2, 2, mc); A.rect(g, cx + ex + 5, my - 2, 2, 2, mc); }
+    const lip = RW.shade(C.light, 0.2), dk = '#120c10', mx = Math.round(rx * 0.34) - 3;
+    if (mouth === 'line') { A.rect(g, cx + mx - 5, my - 1, 11, 3, dk); A.rect(g, cx + mx - 4, my, 9, 1, '#3a2228'); A.rect(g, cx + mx - 5, my + 2, 11, 1, lip); }
+    else if (mouth === 'grin') { A.rect(g, cx + mx - 6, my - 1, 13, 4, dk); A.rect(g, cx + mx - 8, my - 3, 3, 3, dk); A.rect(g, cx + mx + 6, my - 3, 3, 3, dk); for (let k = 0; k < 5; k++) A.rect(g, cx + mx - 5 + k * 2.4, my - 1, 2, 2, '#f0e8d8'); A.rect(g, cx + mx - 4, my + 2, 9, 1, '#5a2a30'); A.rect(g, cx + mx - 6, my + 3, 13, 1, lip); }
     else if (mouth === 'beard') for (let k = 0; k < 14; k++) A.line(g, cx + ex - 8 + k, my - 1, cx + ex - 8 + k, my + 3 + (k % 3) * 2, k % 2 ? '#5f7d4a' : '#4a6a3a');
     if (P1.face === 'scar') { for (let k = 0; k < 15; k++) { const x = cx + ex + 8 - k, y = cy + ey - 8 + Math.round(k * 1.05); A.rect(g, x, y, 2, 1, RW.shade(C.dark, -0.55)); A.px(g, x + 2, y, C.light); if (k % 4 === 1) A.px(g, x - 1, y + 1, RW.shade(C.dark, -0.55)); } }
     else if (P1.face === 'chip') { const qx = cx + rx - 4, qy = cy - Math.round(ry * 0.4); g.save(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.moveTo(qx - 7, qy - 6); g.lineTo(qx + 9, qy - 6); g.lineTo(qx + 9, qy + 6); g.lineTo(qx + 2, qy + 4); g.lineTo(qx - 2, qy); g.closePath(); g.fill(); g.restore();
@@ -176,7 +177,7 @@
     const ramp = (c) => [RW.shade(c, -0.62), RW.shade(c, -0.4), RW.shade(c, -0.18), c, RW.shade(c, 0.28), RW.shade(c, 0.55)];
     const acc = look.ac && look.ac !== 'auto' && RW.ACCENTS ? RW.ACCENTS[look.ac] : null;
     if (bI) {
-      const Rm = ramp(bI.tint || '#9aa3ad'), y0 = cy + Math.round(ry * 0.18), y1 = cy + Math.round(ry * 0.86), bs = look.bs || 'auto';
+      const Rm = ramp(bI.tint || '#9aa3ad'), y0 = cy + Math.round(ry * 0.5), y1 = cy + Math.round(ry * 0.86), bs = look.bs || 'auto';
       for (let y = y0; y <= y1; y++) for (let x = cx - rx - 2; x <= cx + rx + 2; x++) {
         const d = inside(x - cx, y - cy); if (d < 0) continue;
         const band = Math.floor((y - y0) / 5), yy = (y - y0) % 5, nx = (x - cx) / rx;
