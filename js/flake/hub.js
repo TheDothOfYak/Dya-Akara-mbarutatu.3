@@ -330,10 +330,10 @@
   /* the mouse wheel over the game card changes games (one step per flick) */
   let wheelT = 0;
   show.addEventListener('wheel', e => {
-    if (e.target.closest && e.target.closest('.strip')) return; // the strip scrolls sideways by itself
+    if (e.target.closest && e.target.closest('.strip')) { e.preventDefault(); const st = e.target.closest('.strip'); st.scrollLeft += (Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX); return; } // the strip scrolls sideways, never the page
+    e.preventDefault(); // the page never scrolls while the wheel is over the game card
     const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
     if (Math.abs(d) < 4) return;
-    e.preventDefault();
     const now = performance.now(); if (now - wheelT < 350) return; wheelT = now;
     go(idx + (d > 0 ? 1 : -1), d > 0 ? 1 : -1);
   }, { passive: false });
