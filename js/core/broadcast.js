@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/broadcast.js
    Live broadcasts from the Admin Panel to every open copy of the

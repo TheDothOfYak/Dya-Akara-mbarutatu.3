@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/ui.js
    Screen manager, topbar, toasts/notifications, token card

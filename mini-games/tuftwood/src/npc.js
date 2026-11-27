@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: the villagers. They talk differently to each brother and remember what you did.
 (function () {
   'use strict';

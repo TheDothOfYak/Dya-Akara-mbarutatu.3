@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 17: three hero moves.
 //  1. Acorn roll: while running on the ground, press S (down) and he tucks into a ball and rolls. Rolling builds up speed,
 //     much faster than running, and faster still going downhill. Bowling into monsters hurts them. Jump to hop out of it,

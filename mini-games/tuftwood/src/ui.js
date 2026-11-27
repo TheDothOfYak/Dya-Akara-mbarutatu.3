@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: HUD, speech, the Field Journal (a lined notebook page, like the paper the brothers were first drawn on),
 // the title screen and touch controls. All drawn on the canvas in screen units.
 (function () {

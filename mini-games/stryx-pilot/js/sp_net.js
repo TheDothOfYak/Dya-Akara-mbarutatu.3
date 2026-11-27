@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    STRYX PILOT — js/sp_net.js
    The shared sky. Every pilot online flies under the same sky

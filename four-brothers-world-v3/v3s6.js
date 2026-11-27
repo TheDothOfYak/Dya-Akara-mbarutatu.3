@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 6: boulder rocks, a darker Rock World, chunky boss pixels, 1x1 / 2x2 mining on T.
 //  * Rock heroes, rock villagers and every other rock are rounded boulders now, drawn at twice the detail.
 //    Body: Round, Egg or Lumpy boulder (replaces Tall / Stocky / Slim: old heroes get the nearest one).

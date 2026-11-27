@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 21: fights that reward thinking instead of mashing.
 //  1. Back hits: a monster that is facing away from you takes 1.5x damage from your melee hits, and shakes off its
 //     balance twice as fast. Most beasts turn slowly, so circling, jumping over and baiting a charge pays off.

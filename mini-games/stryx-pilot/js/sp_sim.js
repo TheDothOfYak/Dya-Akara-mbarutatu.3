@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    STRYX PILOT — js/sp_sim.js
    A flight, with no drawing: where the Tatu and Kalo are today,

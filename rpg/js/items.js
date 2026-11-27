@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Things you carry: materials gathered from the wilds and from
    the creatures you fell, meals cooked at a fire, axes forged

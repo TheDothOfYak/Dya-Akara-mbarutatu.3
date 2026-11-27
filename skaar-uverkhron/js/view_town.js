@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/view_town.js
    The town screen: a painted Duskareth town where every building

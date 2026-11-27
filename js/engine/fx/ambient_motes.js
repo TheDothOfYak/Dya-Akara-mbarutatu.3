@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: AMBIENT MOTES
    Life in the air above the field, chosen by terrain: fireflies in

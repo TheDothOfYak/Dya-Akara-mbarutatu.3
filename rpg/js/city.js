@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    CITY — the bits both Fyrsti'Vilags are made of (Velki's and
    Xikia's): houses of three or four kinds, with windows that glow

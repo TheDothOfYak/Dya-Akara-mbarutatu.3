@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless tests for the admin-panel feature additions:
    - per-species base cost range (token.js deriveCostVec)
    - craft-by-Okid stat mapping (state.craftToken)

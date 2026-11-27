@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Fully-authored hunt creatures: every per-enemy override the admin can set
    (exact stats, size, Naga head count via picks.headCount, behavior-tree
    override, element, individual variables) must actually take effect when the

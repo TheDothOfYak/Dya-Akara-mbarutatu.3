@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: core. Namespace, math, seeded random, input, event bus, safe stubs.
 (function () {
   'use strict';

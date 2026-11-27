@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 11: every hero mines in his own way.
 // Only how mining LOOKS changes. The time a block takes, what can be mined with what, stamina and drops are exactly
 // as before (this file never touches P.mine's progress).

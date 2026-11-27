@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    ALCHEMY on the Carpenter's land: his still in the yard, what
    brewing wants (well water, honey from the hives, glowcaps off

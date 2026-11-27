@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — js/flake/mobile.js
    Small things that make every page kinder on a phone or tablet.

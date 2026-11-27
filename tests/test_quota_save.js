@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for storage-quota resilience (js/core/state.js).
    Reproduces the "game stopped saving / reset my progress" bug: heavy
    replay history grows the world blob past localStorage's quota, so

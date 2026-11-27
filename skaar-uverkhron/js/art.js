@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/art.js
    Every picture in the game, drawn in code: terrain, trees and

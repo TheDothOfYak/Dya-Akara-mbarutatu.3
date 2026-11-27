@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/duel_online.js
    Real-player DUEL matchmaking + wager settlement.

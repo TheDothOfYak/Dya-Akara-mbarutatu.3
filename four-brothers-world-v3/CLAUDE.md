@@ -1,4 +1,8 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World V3: project map
+
+> **Copyright:** every new file starts with `© <year> Isaac Flake. All Rights Reserved.` in its comment style. See the root `CLAUDE.md`.
 
 V3 is a copy of V2 (its `index.html` and `v2*.js` modules, unchanged apart from the save and room names) plus V3's own modules, `v3s1.js` … `v3sN.js`. V2 stays as it is in `four-brothers-world-v2/`.
 

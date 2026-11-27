@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The Esik that fight back. One table of creature kinds, each
    with its own behaviour, plus the knives, venom globs and

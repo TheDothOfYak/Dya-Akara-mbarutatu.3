@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — js/flake/hub.js
    The home page (index.html): the whole Pia'don system turning

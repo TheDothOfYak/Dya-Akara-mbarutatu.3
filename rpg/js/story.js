@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    TORCAIN'S RUN — all the words of the game.
    Drawn from the Rokarvac: Noka has been carried off to a new

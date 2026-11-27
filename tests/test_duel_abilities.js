@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test: creatures use their special abilities in DUELS, not just
    in standard matches. Duel mode used to bypass the species behaviour tree
    entirely and issue a plain melee attack, so abilities like the Lutut's

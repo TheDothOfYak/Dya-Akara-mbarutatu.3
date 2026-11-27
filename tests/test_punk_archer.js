@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Punk dodge + smart Malsti raiding, garrisoned-archer fixes (infinite quiver,
    faster, biggest-threat), tower camo limit, creatures attacking walls, and a
    mounted rider carrying the relic home. */

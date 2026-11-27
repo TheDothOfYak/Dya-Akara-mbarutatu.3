@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 5: sharper heroes, armour, tools and effects.
 //  * Every hero, monster, villager and dropped item is drawn from a doubled-up copy of its pixel art (the Scale2x
 //    method: each pixel becomes four, and diagonal edges are smoothed), so outlines are finer on the new screen.

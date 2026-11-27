@@ -1,3 +1,4 @@
+# © 2026 Isaac Flake. All Rights Reserved.
 name: Keep Supabase awake
 
 # Supabase pauses free-plan projects after ~7 days without activity, which

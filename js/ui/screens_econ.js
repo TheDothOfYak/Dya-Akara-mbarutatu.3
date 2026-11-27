@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/screens_econ.js
    Collection (+ pouch builder sidebar + token detail),

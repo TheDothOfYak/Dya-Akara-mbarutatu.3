@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: LIGHTING
    Warm campfire light pooled at each hoard, and a soft vignette

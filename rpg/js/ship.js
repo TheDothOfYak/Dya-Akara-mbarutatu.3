@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    An Eldi Ship — a mature fire tree (Eldi Aagac) hollowed out
    into a hull. Fire never harms the wood; a living seed in the

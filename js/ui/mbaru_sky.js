@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/mbaru_sky.js
    The sky over the Mbaru Tatu, drawn true to the Rokarvac:

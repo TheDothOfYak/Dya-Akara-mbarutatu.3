@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    PUNK RACES — js/pr_net.js
    Racing friends online. No account needed: anyone can host or

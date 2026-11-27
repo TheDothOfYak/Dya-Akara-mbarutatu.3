@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 12: realistic lighting in Rock World.
 //  * Smooth light: the light grid is blown up in two cheap bilinear steps (2x then 4x), so light fades softly instead of in squares.
 //  * Coloured light: torches, crystals and glowstones tint the rock their colour (the light grid is coloured).

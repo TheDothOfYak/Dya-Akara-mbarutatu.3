@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — core/pia_run.js
    LITTLE DUNGEON — the run / map manager.

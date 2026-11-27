@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    STRYX PILOT — js/sp_data.js
    The worlds, the ports, the kinds of job, the ship's parts and

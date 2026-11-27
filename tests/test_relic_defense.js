@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Regression: relic defenders must actually HIT the thief.
 
    Bug: when an enemy stole your relic, the sentient Eikar/Keilia units

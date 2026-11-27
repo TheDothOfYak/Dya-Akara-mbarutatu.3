@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: the four brothers. Each one moves, fights and explores in his own way.
 // Art target: McKay's smooth references (clean dark-brown outline, soft gradients, big glossy eyes, w-smile with tongue).
 (function () {

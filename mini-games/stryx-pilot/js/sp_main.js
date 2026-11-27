@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    STRYX PILOT — js/sp_main.js
    The game around a flight: the port you are at (its job board,

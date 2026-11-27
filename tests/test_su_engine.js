@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Skaar Uverkhron: the rules without a screen. Generates maps, plays
    computer-vs-computer games for many days, checks battles, sieges,
    saving and loading, and that nothing breaks along the way. */

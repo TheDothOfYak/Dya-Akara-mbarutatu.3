@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/ai.js
    The computer players. Each turn: build and recruit in every

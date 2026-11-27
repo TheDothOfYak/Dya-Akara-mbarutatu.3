@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/account_cloud.js
    Cross-device accounts. A player's whole save — collection,

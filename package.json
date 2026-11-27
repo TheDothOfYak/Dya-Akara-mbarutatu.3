@@ -2,6 +2,9 @@
   "name": "dya-akara",
   "version": "1.0.0",
   "description": "Flake Games — Dya'Akara, Torcain's Run, the 4 Brothers Worlds, Skaar Uverkhron and Little Dungeon. Pure HTML/CSS/JS, no build step.",
+  "author": "Isaac Flake",
+  "license": "UNLICENSED",
+  "copyright": "© 2026 Isaac Flake. All Rights Reserved.",
   "private": true,
   "scripts": {
     "dev": "python3 -m http.server 8000 || npx --yes http-server -p 8000 -c-1 .",

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for real-player duel wager settlement (core/duel_online.js).
    The critical property: when two humans wager gold/NgAkara/Okid/tokens and
    both clients settle their OWN account from the shared result, the winner

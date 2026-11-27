@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/state.js
    The shape of a game, and the small queries everything uses.

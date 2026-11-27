@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 14: characters and worlds, like Terraria.
 //  * Play opens a character list (as many as you like; make, pick or delete), then a world list (make one with a name,
 //    pick or delete). Any character can play in any world. A world is a whole save: every planet, its bosses, its

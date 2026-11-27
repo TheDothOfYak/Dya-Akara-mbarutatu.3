@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 4: the Gemscale Leviathan, remade.
 //  * A massive sea serpent, about 140 blocks long, that coils through the flooded Heart Chamber. Its body is armoured
 //    plates over a glowing seam, with a crest of gem crystals down its back, swept crystal horns, a jaw full of teeth and

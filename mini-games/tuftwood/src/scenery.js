@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: the painted place itself. Ground, trees, cottages, the Hollow, the pond.
 // Style target (McKay's references): smooth shapes, clean dark-brown outlines, soft gradients, warm palette.
 (function () {

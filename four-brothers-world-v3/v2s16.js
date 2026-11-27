@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 16: busier Fuzzy World caves, more chests, and fall damage for every hero.
 //  1. Fuzzy World's caves get more than bats: crystal crawlers and scorpions in the caves, ember crawlers deeper down,
 //     and spiky fish in cave water.

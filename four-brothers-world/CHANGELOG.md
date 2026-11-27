@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World: versions
 
 ## v1.8

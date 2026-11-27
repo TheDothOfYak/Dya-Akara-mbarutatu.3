@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 23: a bigger, more beautiful Fuzzy World.
 //  * The slinger tribes wear their first, softer fur patterns again (stored pixel for pixel).
 //  * Ridgebacks and shellbacks are the cavalry's own animals, tame like horses: they graze and wander, and only fight

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    CHAPTER II — THE MEGLA AAGAC
    Two years on. A Sniller amulet out of Fyrsti'Vilag pulls north,

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 24: Fuzzy World's caves, lava that flows, and clams that fight.
 //  * Every part of Fuzzy World has its own caves now, each with its own rock and walls:
 //    the Sandstone Galleries under the desert (long banded halls on three levels, fossils in the rock),

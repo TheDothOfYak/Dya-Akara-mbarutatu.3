@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The Sunear'Zikhron — the Waves of Memory.
 

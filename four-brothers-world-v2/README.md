@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World — V2 (preview)
 
 The big redesign, kept separate from the main game so we can always go back.

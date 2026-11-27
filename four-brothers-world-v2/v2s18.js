@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 18: the Geodling, a little geode guy who lives in Rock World's crystal caves.
 // A round rock on two stubby feet, with his front cracked open like a geode: a ring of white quartz, purple crystal
 // points, and two shiny eyes looking out from the middle. He wanders about and never hurts anyone.

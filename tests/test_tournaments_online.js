@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for shared online tournaments (js/core/tournaments_online.js).
    Two "devices" share one mocked Supabase backend (the in-memory `db`).
    Verifies: real players hold the seats, the Dya'kukull only pad empty seats

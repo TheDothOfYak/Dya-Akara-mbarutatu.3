@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    CREATURES II — six more beasts of the Pia'don lore, built as
    procedural toon models in the same hand-painted look as the

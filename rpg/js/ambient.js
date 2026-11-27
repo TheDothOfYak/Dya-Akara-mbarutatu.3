@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    AMBIENT — the great ones you only ever see from far away.
    - The AEROLHORN: every so often, vast and slow, crossing the sky

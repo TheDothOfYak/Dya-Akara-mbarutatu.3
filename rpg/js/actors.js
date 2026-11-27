@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Who walks the ruins.
    EIKAR are the acorn people — athletic folk of human proportion,

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // V2 stage 4: every hero moves its own way, and swimming works in strokes instead of "hold jump to rise".
 //  * Rock: heavy. Slow to start, skids to a stop, barely steers in the air. A run-up charge smashes through dirt and sand and rams
 //    monsters. Landing from a height thuds. He can't swim: he sinks, walks the bottom, hops, and crawls up walls underwater.

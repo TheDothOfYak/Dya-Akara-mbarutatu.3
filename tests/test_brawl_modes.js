@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test: BRAWL — multi-player STANDARD matches with alliances.
    A Brawl is an ordinary standard match (resources, pulses, Relics, deploy)
    but with more than two players, each their own team/hoard/Relic, grouped

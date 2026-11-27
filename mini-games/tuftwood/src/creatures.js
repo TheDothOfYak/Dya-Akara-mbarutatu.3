@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: Tuftwood's creatures. Enemies have tells and weak spots; nothing drops loot.
 // Beaten creatures are "sent packing" (they scamper off in a puff), and come back later.
 (function () {

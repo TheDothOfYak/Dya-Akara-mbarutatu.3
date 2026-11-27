@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — data/species.js
    The full launch token roster (Master Design Doc, Part IV).

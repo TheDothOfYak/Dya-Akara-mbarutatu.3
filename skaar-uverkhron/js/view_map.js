@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/view_map.js
    The adventure map on screen: ground painted as an old map (watercolour on parchment, inked coasts)

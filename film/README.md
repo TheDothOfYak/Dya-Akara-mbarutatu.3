@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # da ávErk á Aakalay — The Legend of Aakalay (Part the First)
 
 A **self-contained, self-playing short film** (~23:00) rendered in the same art

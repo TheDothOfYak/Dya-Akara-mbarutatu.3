@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # Torcain's Run — young Tanoc's story: the 27-hour roadmap
 
 The first part of the RPG runs from the last Skyfall on Velki to the **final Sniller battle**. Main story only, it should take about **27 hours** for a first-time player on **Easy**. Realistic will run longer, and side quests, bounties and token matches don't count toward the 27.

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Difficulty, saving, and the Hurst upgrades bought with
    zikhron shards at a Nur Lantern.

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // V2 stage 5: living trees, and a fix for the rock smashing what he builds.
 //  * Shake the leaves (hit them) for nuts and berries. Leaves aren't destroyed, and a tree needs a minute and a half before it gives again.
 //  * Chop a tree and it doesn't vanish: it topples away from you, hurts anything it lands on (you too), and lies down as logs.

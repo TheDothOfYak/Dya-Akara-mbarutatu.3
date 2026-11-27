@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test: a species the organizer marks "not obtainable by players"
    (notCraftable, the Admin → Creatures toggle) must not reach players through
    the MARKET either — not just the random-grant rolls. Reproduces the report

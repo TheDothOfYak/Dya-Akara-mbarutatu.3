@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    THE ROAD NORTH — Tanoc's first days on Xikia.
    He wakes in Fyrsti'Vilag (Xikia's city of that name) in front of

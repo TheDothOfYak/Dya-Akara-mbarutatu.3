@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — data/abilities.js
    A human-readable CATALOG of everything the match engine actually

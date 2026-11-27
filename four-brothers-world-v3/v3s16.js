@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 16: a compact hero maker that previews on hover.
 //  * Hover any choice (rock, head, body, arms, cracks, eyes, glow, mouth, face, growths, size, veins, hat, cape...) and
 //    your hero shows it at once; move the mouse off and it goes back, unless you clicked. (Moves still animate on hover.)

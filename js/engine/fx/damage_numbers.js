@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: DAMAGE NUMBERS
    Small numbers float up when a creature is hurt (warm) or healed

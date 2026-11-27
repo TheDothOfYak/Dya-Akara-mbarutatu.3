@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for the HUNT (run-based summoner):
    - static data integrity (hunters, forms, grounds, Vaelk flavors)
    - pure run logic (start, draft pool filtering, node building, resolution)

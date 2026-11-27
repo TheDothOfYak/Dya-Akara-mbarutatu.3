@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: RELIC BEACON
    Each Relic throws a column of light in its owner's colour so it

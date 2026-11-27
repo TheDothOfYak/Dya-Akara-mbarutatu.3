@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The film look — Torcain's Run drawn the way a hand-painted
    animated feature is: painted light, not cartoon bands.

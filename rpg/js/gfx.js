@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Look & feel: hand-painted toon shading, ink outlines, glow
    sprites and a light CPU particle system.

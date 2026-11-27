@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Torcain's Run smoke test: loads the RPG in a headless browser into each region (and the prologue scenes), plays
    a few seconds, and reports any script error. No server needed: files are served straight from the repository.
    Needs Playwright with a Chromium (npm i -D playwright && npx playwright install chromium), then:

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 1: hosting that holds up, dropping things, the rock's digging and floating, the bag's hotbar.
 //  * Hosting: the room no longer hangs on "Opening a room…" when the room server is slow (it falls back to the relay),
 //    the host keeps trying to get back on the room server after a wifi blip or a sleeping laptop, the relay listener is

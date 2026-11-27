@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Esik of the sea (that swim through the air) and the flora of
    the Mbaru Tatu — toon models built to the creator's brief.

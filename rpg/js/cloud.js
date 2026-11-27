@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Torcain's Run, saved to your Flake Games account (the same
    account as Dya'Akara, signed in once on the home page — see

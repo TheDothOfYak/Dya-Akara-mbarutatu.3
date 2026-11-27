@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 14: the Duat Stone.
 // Something is amiss in the Duat: the elites are souls climbing back out of it, and they grow (and carry more) as your
 // gear gets better. A carved Duat Stone stands near where you arrive in every world. Read it (R) to see how restless

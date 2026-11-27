@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/screens_play.js
    Play hub, match setup (vote system), the Match HUD (token

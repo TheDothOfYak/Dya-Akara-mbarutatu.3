@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/talk.js
    Talking. Only a Dearcàn can talk (a hero, a captain, or one

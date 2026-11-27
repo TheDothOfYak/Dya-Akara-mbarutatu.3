@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    LEOTIK — the wildest and least explored of the three Tatu,
    home to more venomous and poisonous things than anyone can

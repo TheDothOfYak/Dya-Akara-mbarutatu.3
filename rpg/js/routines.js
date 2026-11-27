@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    ROUTINES — where folk are, and what they're doing, at each
    hour of the day. Pure data and lookups (no THREE, no DOM), so

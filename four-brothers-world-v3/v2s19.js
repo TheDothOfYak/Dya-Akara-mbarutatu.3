@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // V2 stage 19: the fuzzy's weather magic, reworked into weathers that work together.
 //
 //   Tap V (Power on a touch screen) to call the weather you have picked, where you aim.

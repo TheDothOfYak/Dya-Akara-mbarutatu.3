@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless tests for the Crafting Station / Reserve feature (built on top of
    the universal token designer + Guild Market from the sibling PR):
    - mods.js Reserve CRUD (designed specs owned by no one yet)

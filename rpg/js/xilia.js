@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    XILIA, on Xikia — the town where Tanoc's shell lay when Noka
    carried his Hurst across, and where the Carpenter, Buhkon Eldi,

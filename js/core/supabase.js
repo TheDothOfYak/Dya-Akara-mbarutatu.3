@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 (function () {
   'use strict';
   const cfg = window.DYA_CONFIG && window.DYA_CONFIG.supabase || {};

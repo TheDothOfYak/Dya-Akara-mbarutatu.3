@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    THE FOLK OF THE SKY — Xwi (Angels) and Snillers — and the war
    they fought in the air above the last Skyfall.

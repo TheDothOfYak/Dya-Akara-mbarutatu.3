@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* js/flake/mini_save.js: saves for the canvas mini games (Punk Races, Stryx Pilot).
    node tests/test_mini_save.js */
 'use strict';

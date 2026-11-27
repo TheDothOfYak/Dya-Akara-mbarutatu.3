@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/dialogs.js
    The windows: hero, army and exchange, the tavern, shrines and

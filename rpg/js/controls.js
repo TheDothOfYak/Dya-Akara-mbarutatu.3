@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Button mapping — every action in Torcain's Run can be put on
    any key, mouse button, mouse wheel, controller button, trigger

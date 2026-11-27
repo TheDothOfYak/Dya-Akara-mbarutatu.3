@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/screens_core.js
    Sign-in (Pia'don establishing shot), Main Menu, Settings,

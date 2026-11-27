@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Stryx Pilot (mini-games/stryx-pilot): the sky, the ship, landing, hazards and jobs.
    node tests/test_stryx_pilot.js */
 'use strict';

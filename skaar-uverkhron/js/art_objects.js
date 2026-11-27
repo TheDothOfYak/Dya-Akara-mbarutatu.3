@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/art_objects.js
    Things on the adventure map: towns, mines, Urverk, places to

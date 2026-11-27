@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 7: the Warthog King can't be cheesed from the cliff any more.
 // 1. The cliff on the west side of King's Clearing is cut into a gentle slope, and the slope counts as part of the
 //    arena, so there's no ledge to stand on where he can't charge.

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/audio.js
    Synthesized SFX via WebAudio. No music (composed by the

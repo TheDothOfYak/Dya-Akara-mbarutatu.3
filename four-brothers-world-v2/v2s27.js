@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 27: golden boss chests.
 //  * A big golden chest stands near every world boss (by the place its rift opens). It is sealed until that boss
 //    has been beaten. Each hero can open it once, and it holds much better things than the boss drops:

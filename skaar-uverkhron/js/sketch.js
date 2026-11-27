@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/sketch.js
    The drawn map. Everyone carries a drawing of the Mbaru Tatu,

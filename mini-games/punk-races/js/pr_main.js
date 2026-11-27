@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    PUNK RACES — js/pr_main.js
    The game around the race: the menus, your stable, the foal

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless tests for the admin "edit everything" tables and the live
    broadcast channel (js/core/broadcast.js) against a fake dya_config. */
 const path = require('path');

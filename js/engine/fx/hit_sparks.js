@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: HIT SPARKS & FALLS
    Sparks fly when a creature takes a hit — tinted by its element —

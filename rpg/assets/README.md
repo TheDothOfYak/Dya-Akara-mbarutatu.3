@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # Assets for Torcain's Run
 
 ## Your own models

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    THE ASHEN REACH — AAKALAY. A dead city of sandstone on the
    planet Xikia: stygian shards in the dust, a fire tree in the

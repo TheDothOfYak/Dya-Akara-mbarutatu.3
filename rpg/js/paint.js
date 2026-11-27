@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The painted frame: a Kuwahara oil-paint filter over the whole
    picture. Each pixel takes the average colour of whichever of

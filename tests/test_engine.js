@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless smoke test for the Dya'Akara match engine */
 const fs = require('fs'), path = require('path');
 const ROOT = require('path').join(__dirname, '..');

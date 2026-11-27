@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Character look: INK OUTLINE
    A thin dark outline around every creature, like an inked

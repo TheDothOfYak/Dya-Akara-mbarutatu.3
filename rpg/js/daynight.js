@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Day and night on the Tatu. One full day ≈ 18 real minutes
    (≈12.5 min of daylight, ≈5.5 min of night). Drives the sun /

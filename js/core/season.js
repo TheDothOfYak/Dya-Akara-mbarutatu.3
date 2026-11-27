@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/season.js
    The Guild's OFFICIAL SEASON — one long ranked ladder.

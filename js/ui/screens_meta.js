@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/screens_meta.js
    Adventures (Hunt: slots → Track → encounters → hidden-score

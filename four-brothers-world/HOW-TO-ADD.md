@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World: how to add things
 
 Everything lives on one global object, `RW`. Data files only call `RW.register.*`, so new content never needs engine changes.

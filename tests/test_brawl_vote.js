@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test: the multi-player Brawl pulse-settings vote.
    Every real player votes; the Dya'kukull only vote when there are fewer
    than two real players (with 2+ real people, the AI abstain). Votes combine

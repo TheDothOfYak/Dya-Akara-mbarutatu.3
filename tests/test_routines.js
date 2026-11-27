@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for everyone's day (rpg/js/routines.js): the Carpenter sleeps at night, gardens at
    sunrise, cooks dinner in the evening and reads in his study after it — except every third night,
    when he's in the workshop till past one. The folk of Beuhk keep hours of their own. */

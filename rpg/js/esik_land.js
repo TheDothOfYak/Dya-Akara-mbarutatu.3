@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    ESIK OF THE LAND — 3D models built from the creator's answers.
    All sizes are real-life metres, standing on y = 0, facing +z.

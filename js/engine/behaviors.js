@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — engine/behaviors.js
    Creature decision trees (Master Design Doc, Part VI).

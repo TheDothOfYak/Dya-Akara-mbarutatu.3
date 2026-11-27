@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Character look: LIVING MOTION
    Creatures breathe while idle, lean into a run, and stretch into

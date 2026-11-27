@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/matchvote.js
    Pure helpers for the pre-match settings vote and the authoritative

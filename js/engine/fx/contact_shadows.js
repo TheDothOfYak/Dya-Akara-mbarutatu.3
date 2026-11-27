@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: CONTACT SHADOWS
    A soft shadow under every creature so it sits on the ground.

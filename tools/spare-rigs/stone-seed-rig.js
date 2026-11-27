@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SPARE RIG (not wired) — "Stone Seed"
    The original Stryx sprite: a rooted stone-seed pod that grips the

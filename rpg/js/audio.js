@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Procedural sound — no audio files. A warm wind-and-pad bed,
    and small synthesized hits, whooshes and chimes.

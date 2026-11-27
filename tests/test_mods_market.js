@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless tests for the two big July systems:
    1) DYA.mods — the admin live-edit overrides layer
    2) DYA.marketOnline — the shared market with ATOMIC buys

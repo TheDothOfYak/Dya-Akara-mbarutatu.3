@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Character look: VOLUME SHADING
    Light falls on every creature from the upper left (Pia'don's

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The open sky of the Mbaru Tatu: a golden-hour etherium with
    daylight stars and nebula, the sister Tatu hanging close
