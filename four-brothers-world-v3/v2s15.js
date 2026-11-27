@@ -15,8 +15,8 @@
   if (!P || !E || !U || !A) return;
 
   // ====================== the runes ======================
-  const POWER = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12]; // V3: a 9th rune, Abyssite   // mining power with 0..8 runes (same numbers the picks had)
-  const COLOR = ['#fff6e0', '#5a5560', '#8a8478', '#a0a6ae', '#c8873a', '#d8e4ec', '#7a5ac8', '#5ad0e8', '#f2c94c', '#6c4aa8'];
+  const POWER = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 24]; // V3: the five ring runes (9-13) and Abyssite (14)   // mining power with 0..8 runes (same numbers the picks had)
+  const COLOR = ['#fff6e0', '#5a5560', '#8a8478', '#a0a6ae', '#c8873a', '#d8e4ec', '#7a5ac8', '#5ad0e8', '#f2c94c', '#e8806a', '#5aa04a', '#e0602a', '#d8d0b4', '#4a2a8a', '#6c4aa8'];
   const FUZZY_COLOR = { 3: '#7d98c4' };   // the fuzzy's iron-rune air is a grey blue, so it doesn't look like plain air
   const PARTS = ['slime_gel', 'bat_wing', 'warthog_hide', 'fish_scale', 'fish_spine', 'ectoplasm', 'crawler_shard', 'scorpion_stinger', 'kofi_hair', 'kipsu_fur', 'krabbi_shell', 'scute'];
   const RARE = ['ember_gland', 'fish_eye', 'eater_fang', 'warthog_tusk', 'living_vine', 'wraith_essence', 'lutut_tooth', 'harkal_tooth', 'hvaleia_oil', 'naga_scale', 'soul_shard', 'leviathan_scale'];
@@ -29,22 +29,35 @@
     { coins: 220, need: { stygian_bar: 6, platinum_bar: 3 }, rare: 8, breaks: 'everything a little faster' },
     { coins: 320, need: { soulsteel_bar: 4, soul_shard: 8 }, breaks: 'everything faster again' },
     { coins: 500, need: { soulsteel_bar: 8, mirror_shard: 2, star_ember: 3 }, breaks: 'everything as fast as a legendary weapon' },
-    { coins: 800, need: { abyssite_bar: 12 }, core: 1, breaks: 'everything fastest of all, and your 2x2 smash becomes 3x3' }, // V3: the Abyssite rune
+    // V3 rings: each ring's rune comes from its boss's ore, and only it breaks the seal into the next ring
+    { coins: 500, need: { coralite_bar: 8, fangstone: 3 }, breaks: 'the Kelp Grottos\' seal, their stone and verdigrite' },
+    { coins: 900, need: { verdigrite_bar: 12, leafscale: 5 }, breaks: 'the Scald Vents\' seal, basalt and cindrite' },
+    { coins: 1500, need: { cindrite_bar: 16, magmashell: 6 }, breaks: 'the Boneyard Hollows\' seal, fossil stone and fossilite' },
+    { coins: 2400, need: { fossilite_bar: 20, gravesteel: 8 }, breaks: 'the Hollow Dark\'s seal, void stone and nullstone' },
+    { coins: 3600, need: { nullstone_bar: 28, fangstone: 4, leafscale: 4, magmashell: 4, gravesteel: 4 }, breaks: 'the seal of the Heart Chamber itself' },
+    { coins: 800, need: { abyssite_bar: 12 }, core: 1, breaks: 'everything fastest of all, and your 2x2 smash becomes 3x3' }, // the Abyssite rune
   ];
-  const MAT = ['', 'Flint', 'Stone', 'Iron', 'Bronze', 'Platinum', 'Stygian', 'Soulsteel', 'Duat', 'Abyssite'];
+  const MAT = ['', 'Flint', 'Stone', 'Iron', 'Bronze', 'Platinum', 'Stygian', 'Soulsteel', 'Duat', 'Fangstone', 'Leafscale', 'Magmashell', 'Gravesteel', 'Nullstone', 'Abyssite'];
   const CORES = ['core_knight', 'core_archer', 'core_mage', 'core_healer'];
   const HERO = {
-    acorn: { what: 'cap', names: ['Bare Cap', 'Flint Cap', 'Stone Cap', 'Iron Cap', 'Bronze Cap', 'Platinum Cap', 'Stygian Cap', 'Soulsteel Cap', 'Duat Crown', 'Abyssal Crown'],
+    acorn: { what: 'cap', names: ['Bare Cap', 'Flint Cap', 'Stone Cap', 'Iron Cap', 'Bronze Cap', 'Platinum Cap', 'Stygian Cap', 'Soulsteel Cap', 'Duat Crown', 'Reef Crown', 'Frond Crown', 'Scald Crown', 'Grave Crown', 'Null Crown', 'Abyssal Crown'],
       say: 'Your cap grows harder. You can headbutt' },
-    fuzzy: { what: 'suction', names: ['Soft Breath', 'Breeze', 'Gust', 'Whirlwind', 'Squall', 'Tempest', 'Cyclone', 'Thunderhead', 'Sky Rune', 'Abyss Gale'],
+    fuzzy: { what: 'suction', names: ['Soft Breath', 'Breeze', 'Gust', 'Whirlwind', 'Squall', 'Tempest', 'Cyclone', 'Thunderhead', 'Sky Rune', 'Riptide', 'Kelp Gale', 'Steam Storm', 'Bone Wind', 'Void Squall', 'Abyss Gale'],
       say: 'The wind answers you more strongly. You can suck up' },
-    rock: { what: 'fist', names: ['Bare Fist', 'Flint Knuckles', 'Stone Fist', 'Iron Fist', 'Bronze Fist', 'Platinum Fist', 'Stygian Fist', 'Soulsteel Fist', 'Worldbreaker Fist', 'Abyssal Fist'],
+    rock: { what: 'fist', names: ['Bare Fist', 'Flint Knuckles', 'Stone Fist', 'Iron Fist', 'Bronze Fist', 'Platinum Fist', 'Stygian Fist', 'Soulsteel Fist', 'Worldbreaker Fist', 'Reefbreaker Fist', 'Frondcrusher Fist', 'Scaldfist', 'Gravesteel Fist', 'Null Fist', 'Abyssal Fist'],
       say: 'Your fist grows heavier. You can punch through' },
-    ghost: { what: 'permanence', names: ['Wisp', 'Mist', 'Shade', 'Firm', 'Solid', 'Dense', 'Anchored', 'Unfading', 'Eternal', 'Abyssal'],
+    ghost: { what: 'permanence', names: ['Wisp', 'Mist', 'Shade', 'Firm', 'Solid', 'Dense', 'Anchored', 'Unfading', 'Eternal', 'Tidebound', 'Rooted', 'Tempered', 'Grave-cold', 'Voidborne', 'Abyssal'],
       say: 'Your arm stays solid inside harder things. You can reach into' },
   };
   const hero = () => HERO[P.species] || HERO.rock;
-  const tier = () => Math.max(0, Math.min(9, (P.flags && P.flags.rune) | 0));
+  const tier = () => {
+    // old saves: rune 9 used to be Abyssite, now it is rune 14
+    if (P.flags && !P.flags.v3runeMig) { P.flags.v3runeMig = 1; if ((P.flags.rune | 0) === 9) P.flags.rune = 14; }
+    return Math.max(0, Math.min(14, (P.flags && P.flags.rune) | 0));
+  };
+  const ringsOn = () => !!(RW.v3ringsOn && RW.v3ringsOn());
+  // the next rune: in a world without the rings, Duat leads straight to Abyssite
+  const nextOf = (t) => (t >= 14 ? null : t === 8 && !ringsOn() ? 14 : t >= 9 && t < 14 && !ringsOn() ? 14 : t + 1);
   const runeName = (t) => (t > 0 ? MAT[t] + ' rune: ' : '') + hero().names[t];
   RW.v2runes = { tier, power: () => POWER[tier()], color: (t, who) => { const n = t == null ? tier() : t; return ((who || P.species) === 'fuzzy' && FUZZY_COLOR[n]) || COLOR[n]; }, name: runeName,
     puffs: () => 1 + (tier() >= 3 ? 1 : 0) + (tier() >= 5 ? 1 : 0), cloud: () => tier() >= 8 };
@@ -151,10 +164,10 @@
     const show = () => {
       acts.innerHTML = ''; extra.innerHTML = '';
       const t = tier(), H = hero();
-      extra.append(el('div', 'label', 'Your ' + H.what + ': ' + runeName(t) + (t ? ' (rune ' + t + ' of 9)' : ' (no runes yet)')));
-      if (t >= 9) { says.textContent = 'There is nothing left I can carve for you. You are as strong as the runes go.'; }
+      extra.append(el('div', 'label', 'Your ' + H.what + ': ' + runeName(t) + (t ? ' (rune ' + t + ' of 14)' : ' (no runes yet)')));
+      if (t >= 14) { says.textContent = 'There is nothing left I can carve for you. You are as strong as the runes go.'; }
       else {
-        const c = COST[t + 1], next = t + 1;
+        const next = nextOf(t), c = COST[next];
         says.textContent = RW.pick(LINES);
         if (!P.flags.runeIntro) { P.flags.runeIntro = 1; says.textContent = 'So. Another one the world holds too tightly. Everything here has a grip on you: stone, ore, the deep places. My runes loosen it, one carving at a time. Bring me pieces of the world, and pieces of what walks in it, and I will cut your next. The first is the smallest. The last opens the abyss.'; }
         const row = el('div', 'trade');
@@ -186,7 +199,7 @@
 
   // ====================== the acorn's harder cap ======================
   // his cap takes on the colour of the material his rune is made of (the shell keeps the colour you picked)
-  const CAPS = [null, ['#4a4650', '#2e2a34'], ['#7a7470', '#5a5450'], ['#8a9098', '#606870'], ['#a8672a', '#7a4818'], ['#b8c4cc', '#8a96a0'], ['#5a3a98', '#3a2470'], ['#3aa0b8', '#22707e'], ['#d8a83a', '#a07a20']];
+  const CAPS = [null, ['#4a4650', '#2e2a34'], ['#7a7470', '#5a5450'], ['#8a9098', '#606870'], ['#a8672a', '#7a4818'], ['#b8c4cc', '#8a96a0'], ['#5a3a98', '#3a2470'], ['#3aa0b8', '#22707e'], ['#d8a83a', '#a07a20'], ['#e8806a', '#a84a3a'], ['#5aa04a', '#2e6a2a'], ['#e0602a', '#8a3010'], ['#d8d0b4', '#8a8470'], ['#4a2a8a', '#24144a'], ['#6c4aa8', '#33244a']];
   // (the rune palette is only in the shell list while he's being drawn, so it never shows up in the character maker)
   const baseDrawCap = E.drawPlayer;
   E.drawPlayer = function (g, cam, p, look, opts) {

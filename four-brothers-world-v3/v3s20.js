@@ -136,15 +136,27 @@
     // the lower jaw, drawn straight then turned about the hinge
     const J = mk(40, 26), jg = J.ctx; jg.imageSmoothingEnabled = false;
     const jcol = (x, y, k) => { jg.fillStyle = col[k] || k; jg.fillRect(x, y, 1, 1); };
-    const JR = { 4: [1, 36, '5'], 5: [0, 37, '3'], 6: [0, 35, '0'], 7: [1, 32, 'b'], 8: [2, 26, 'b'], 9: [5, 18, '1'] };
-    // crooked teeth pointing up, then the gum they sit in
-    [[6, 2], [9, 1], [12, 3], [15, 1], [18, 2], [21, 4], [24, 1], [27, 2], [30, 1], [33, 3]].forEach(([x, L], k) => { for (let y = 0; y < L; y++) jcol(x, 3 - y, y === L - 1 ? 't' : 'u'); if (L >= 3) jcol(x + 1, 3, 'u'); });
-    Object.keys(JR).forEach((r) => { const [a, b, k] = JR[r]; for (let x = a; x <= b; x++) jcol(x, +r, k); });
-    for (let x = 5; x <= 34; x++) jcol(x, 4, 'g');
-    for (let x = 14; x <= 30; x += 8) { jcol(x, 5, '0'); jcol(x + 1, 6, '0'); } // seams between the jaw plates
-    jcol(36, 3, '4'); jcol(37, 3, '5'); jcol(37, 2, '5'); jcol(38, 1, '5'); // the chin, hooked up into a spike
-    if (open > 0.1) for (let x = 5; x < 26; x++) jcol(x, 3 - (x > 16 ? 1 : 0) + (sway && x > 21 ? -1 : 0), x % 7 ? T.tongue : T.gum); // the tongue along the floor of the jaw
-    for (let k = 0; k < 5; k++) { let x = 6 + k * 6, y = 10; const L = 8 + (k % 3) * 4; for (let i = 0; i < L; i++) { jcol(x, y + i, k % 2 ? T.fin[0] : P[1]); if (i % 3 === 2) x += ((i + k + sway) % 2 ? 1 : -1); } } // tendrils
+    // the jaw is built column by column: its inner edge dips in the middle and rises to the chin, the gum swells
+    // between the teeth, a strip of dark inner wall shows above the gum, and plates make up its outer side
+    const top = (x) => 5 + Math.round(Math.sin(Math.min(1, x / 34) * Math.PI) * 1.6) - (x > 33 ? x - 33 : 0) + (x < 3 ? 1 : 0);
+    const bot = (x) => 10 - (x > 24 ? Math.round((x - 24) / 2.5) : 0) - (x < 3 ? 3 - x : 0);
+    const TEETH = [[6, 2, 0], [9, 1, 1], [12, 3, 0], [15, 1, -1], [18, 2, 0], [21, 4, 1], [24, 1, 0], [27, 3, -1], [30, 1, 0], [33, 2, 1]];
+    for (let x = 0; x <= 38; x++) {
+      const t0 = top(x), b0 = bot(x); if (b0 <= t0) continue;
+      for (let y = t0; y <= b0; y++) {
+        const d = y - t0, k = d === 0 ? 'm' : d === 1 ? '5' : d === 2 ? '3' : y >= b0 ? '1' : y >= b0 - 1 ? 'b' : (x + y) % 9 === 0 ? '0' : '2';
+        jcol(x, y, k);
+      }
+      if (x % 8 === 4 && x < 32) { jcol(x, t0 + 3, '0'); jcol(x + 1, t0 + 4, '0'); } // seams between the jaw's outer plates
+    }
+    // the gum: a band along the inner edge that swells up between the teeth
+    for (let x = 3; x <= 34; x++) { const t0 = top(x), near = TEETH.some(([tx]) => Math.abs(tx - x) <= 1); jcol(x, t0, 'g'); if (!near) jcol(x, t0 - 1, 'g'); jcol(x, t0 + 1, x % 4 ? '5' : 'g'); }
+    // crooked teeth, rooted in the gum, leaning a little either way
+    TEETH.forEach(([x, Lt, lean]) => { const t0 = top(x); for (let y = 0; y < Lt; y++) jcol(x + (y === Lt - 1 ? lean : 0), t0 - 1 - y, y === Lt - 1 ? 't' : 'u'); if (Lt >= 3) jcol(x + 1, t0 - 1, 'u'); });
+    // the chin: hooked up into a spike
+    jcol(36, top(36) - 1, '4'); jcol(37, top(37) - 1, '5'); jcol(37, top(37) - 2, '5'); jcol(38, top(38) - 2, '5');
+    if (open > 0.1) for (let x = 4; x < 27; x++) { const ty = top(x) - 1 - (x > 16 ? 1 : 0) + (sway && x > 22 ? -1 : 0); jcol(x, ty, x % 7 ? T.tongue : T.gum); if (x > 6 && x < 22) jcol(x, ty - 1, x % 5 ? T.tongue : sh(T.tongue, 0.25)); } // the tongue, thick, lying along the floor of the jaw
+    for (let k = 0; k < 5; k++) { let x = 6 + k * 6, y = bot(6 + k * 6) + 1; const L = 8 + (k % 3) * 4; for (let i = 0; i < L; i++) { jcol(x, y + i, k % 2 ? T.fin[0] : P[1]); if (i % 3 === 2) x += ((i + k + sway) % 2 ? 1 : -1); } } // tendrils
     g.save(); g.translate(hx, hy); g.rotate(open); g.drawImage(J, -2, -5); g.restore();
     // upper teeth, crooked, hanging below the lip; two long fangs
     [[34, 2], [37, 1], [40, 3], [43, 1], [46, 5], [49, 2], [52, 1], [55, 3], [58, 4], [61, 1]].forEach(([x, L]) => { for (let y = 0; y < L; y++) px(OX + x, lipY + 1 + y, y === L - 1 ? 't' : 'u'); if (L >= 4) px(OX + x + 1, lipY + 1, 'u'); });
