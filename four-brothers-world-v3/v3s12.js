@@ -1,6 +1,6 @@
 // © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 12: realistic lighting in Rock World.
-//  * Smooth light: the light grid is blown up in two cheap bilinear steps (2x then 4x), so light fades softly instead of in squares.
+//  * Full-block light: one light level per block, drawn without smoothing (fast).
 //  * Coloured light: torches, crystals and glowstones tint the rock their colour (the light grid is coloured).
 //  * Block shading: faces of blocks that look toward the light are lit, faces turned away are dark, and rock deep inside
 //    a wall fades into shadow; air beside walls gets soft corner shadows (ambient occlusion).
@@ -27,12 +27,8 @@
     g.drawImage = function (img, x, y, w, h) {
       if (!caught && arguments.length === 5 && img && img.width < 400) {
         caught = true;
-        // two cheap bilinear steps (2x, then 4x) instead of a blur filter: soft, and quick
-        const W1 = img.width * 2, H1 = img.height * 2, W2 = img.width * 4, H2 = img.height * 4;
-        if (A1.width !== W1 || A1.height !== H1) { A1 = mk(W1, H1); A2 = mk(W2, H2); }
-        A1.ctx.imageSmoothingEnabled = true; A1.ctx.drawImage(img, 0, 0, W1, H1);
-        A2.ctx.imageSmoothingEnabled = true; A2.ctx.drawImage(A1, 0, 0, W2, H2);
-        g.imageSmoothingEnabled = true; raw.call(this, A2, x, y, w, h);
+        // full-block light, like old Terraria: one light level per block, nothing smoothed (the fastest)
+        g.imageSmoothingEnabled = false; raw.call(this, img, x, y, w, h);
         return;
       }
       return raw.apply(this, arguments);

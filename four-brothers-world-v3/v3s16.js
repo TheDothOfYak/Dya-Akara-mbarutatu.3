@@ -2,7 +2,7 @@
 // 4 Brothers World V3 — part 16: a compact hero maker that previews on hover.
 //  * Hover any choice (rock, head, body, arms, cracks, eyes, glow, mouth, face, growths, size, veins, hat, cape...) and
 //    your hero shows it at once; move the mouse off and it goes back, unless you clicked. (Moves still animate on hover.)
-//  * Choices sit in separate labelled boxes (Body, Head & Hat, Face, Details, Cape). While you hover, a line under the
+//  * Choices sit in separate labelled boxes (Face first, then Body, Head & Hat, Details, Cape). While you hover, a line under the
 //    picture says what you're trying on, and head and face choices also get a close-up of your hero's head.
 //  * The card grows or shrinks to fill the window without a scrollbar.
 (function (RW) {
@@ -65,9 +65,9 @@
   document.addEventListener('pointerdown', (ev) => { const b = ev.target && ev.target.closest && ev.target.closest('#creator button.chip, #creator button.swatch'); if (b && b === cur) { cur = null; saved = null; pressed = null; } }, true);
   // ---- what you're trying on: a line under the picture, and a close-up for head and face choices ----
   const GROUPS = [
+    ['Face', ['face', 'eyes', 'eye glow', 'mouth']],
     ['Body', ['rock', 'fur', 'shell', 'glow', 'color shift', 'shade', 'body', 'arms', 'size', 'moves', 'shape', 'fluff']],
     ['Head & Hat', ['head', 'hat', 'cap']],
-    ['Face', ['face', 'eyes', 'eye glow', 'mouth']],
     ['Details', ['cracks', 'growths', 'veins', 'extra']],
     ['Cape', ['cape']],
   ];

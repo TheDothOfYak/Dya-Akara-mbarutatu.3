@@ -201,6 +201,7 @@
     const baseNew = G.newCharacter;
     G.newCharacter = function () {
       const r = baseNew.apply(this, arguments);
+      if (P.species === 'rock' && RW.ITEMS.dirt) { P.add('dirt', 50); P.flags.gift_chest = 1; } // no chest of old tools and no free chest: just 50 dirt to build with
       const joined = N && N.transport === 'p2p' && !N.isHost; // a guest plays in the host's world
       if (!joined) {
         RW.store.set('v2_rockseed', 1 + Math.floor(Math.random() * 2147483000));

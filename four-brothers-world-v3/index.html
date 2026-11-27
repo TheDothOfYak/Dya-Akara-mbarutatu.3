@@ -11176,7 +11176,7 @@ window.RW = window.RW || {};
 <script src="v2s12.js?v=ac265a9884"></script>
 <script src="v2s13.js?v=1fcc14f948"></script>
 <script src="v2s14.js?v=cb4d83368e"></script>
-<script src="v2s15.js?v=c600a78eb5"></script>
+<script src="v2s15.js?v=f82b2363d3"></script>
 <script src="v2s16.js?v=65ee314281"></script>
 <script src="v2s17.js?v=73d20a8d03"></script>
 <script src="v2s18.js?v=a60e6ebcef"></script>
@@ -11191,22 +11191,23 @@ window.RW = window.RW || {};
 <script src="v2s27.js?v=1019a75a65"></script>
 <script src="v2s28.js?v=6747b98397"></script>
 <script src="v2s29.js?v=ba2c5de668"></script>
-<script src="v3s1.js?v=28346e54ac"></script>
+<script src="v3s1.js?v=5fa643ed90"></script>
 <script src="v3s2.js?v=279a36134f"></script>
-<script src="v3s3.js?v=7ac21918cc"></script>
+<script src="v3s3.js?v=0fba13782e"></script>
 <script src="v3s4.js?v=d4580bd04e"></script>
 <script src="v3s5.js?v=5c8dc2a8b4"></script>
 <script src="v3s6.js?v=8bbdfdcaff"></script>
 <script src="v3s7.js?v=71292b41b1"></script>
 <script src="v3s8.js?v=67e00ba7be"></script>
 <script src="v3s9.js?v=454ad40039"></script>
-<script src="v3s10.js?v=c7c323e9f1"></script>
+<script src="v3s10.js?v=b4ad328202"></script>
 <script src="v3s11.js?v=9098b6d11f"></script>
-<script src="v3s12.js?v=687bb116b7"></script>
-<script src="v3s13.js?v=9fdce079bd"></script>
+<script src="v3s12.js?v=31d92be14f"></script>
+<script src="v3s13.js?v=83e8058dab"></script>
 <script src="v3s14.js?v=2cb97540e7"></script>
 <script src="v3s15.js?v=3871c621f8"></script>
-<script src="v3s16.js?v=5c98a4ce6c"></script>
+<script src="v3s16.js?v=1018fe3454"></script>
+<script src="v3s17.js?v=cf3f71fab9"></script>
 <script>/* js/engine/main.js */
 // MAIN — boot, game loop, camera, sky (day/night + the ghost moon), saving.
 (function (RW) {
@@ -11348,7 +11349,7 @@ window.RW = window.RW || {};
         RW.ui.banner('Welcome to Tuftwood', 'A little wood sword, two spells, and a whole world of mountains to climb.');
         setTimeout(() => RW.ui.toast('Hold left mouse on a tree to chop wood. Right-click casts Spark, Q switches to Mend. Press H for controls.'), 4500);
       } else {
-        RW.ui.banner('You wake in Stalagmere', 'Bare fists. Gneiss, Wedgeworth, Cubert, Slagg and the rune keeper live here. A chest of old tools waits right beside you.');
+        RW.ui.banner('You wake in Stalagmere', 'Bare fists and 50 dirt to build with. Gneiss, Wedgeworth, Cubert, Slagg and the rune keeper live here. The rune keeper is in the guesthouse.');
         setTimeout(() => RW.ui.toast('Hold left mouse on gravel to punch it. The dark lumps are flint. Press H for controls.'), 4500);
       }
     } else RW.ui.banner('Welcome back, ' + P.name, RW.world.def.zones[RW.world.zoneAt(Math.floor(P.x / TS), Math.floor(P.y / TS))].name);

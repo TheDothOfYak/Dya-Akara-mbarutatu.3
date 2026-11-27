@@ -16,7 +16,7 @@
   const E = RW.ent, U = RW.ui, P = RW.player, WD = RW.world, N = RW.net, TS = RW.TILE;
   if (!E || !U || !P || !WD || !N) return;
 
-  RW.VERSION = '3.3.5'; // everyone in a room must match; bump with every update
+  RW.VERSION = '3.4.0'; // everyone in a room must match; bump with every update
 
   // =====================================================================================================
   // 1. HOSTING
@@ -266,6 +266,7 @@
         const m = RW.mouseWorld ? RW.mouseWorld() : { x: tx * TS + 8, y: ty * TS + 8 };
         const sx = m.x / TS - tx >= 0.5 ? 1 : -1, sy = m.y / TS - ty >= 0.5 ? 1 : -1;
         S.smash.area = [[tx + sx, ty], [tx, ty + sy], [tx + sx, ty + sy]];
+        if (RW.v2runes && RW.v2runes.tier() >= 9) { S.smash.area = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) S.smash.area.push([tx + dx, ty + dy]); } // the Abyssite rune: 3x3
       }
     }
     try { return baseMine.apply(this, arguments); }

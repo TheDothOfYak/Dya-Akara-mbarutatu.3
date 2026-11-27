@@ -15,8 +15,8 @@
   if (!P || !E || !U || !A) return;
 
   // ====================== the runes ======================
-  const POWER = [1, 2, 3, 4, 5, 6, 7, 8, 10];   // mining power with 0..8 runes (same numbers the picks had)
-  const COLOR = ['#fff6e0', '#5a5560', '#8a8478', '#a0a6ae', '#c8873a', '#d8e4ec', '#7a5ac8', '#5ad0e8', '#f2c94c'];
+  const POWER = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12]; // V3: a 9th rune, Abyssite   // mining power with 0..8 runes (same numbers the picks had)
+  const COLOR = ['#fff6e0', '#5a5560', '#8a8478', '#a0a6ae', '#c8873a', '#d8e4ec', '#7a5ac8', '#5ad0e8', '#f2c94c', '#6c4aa8'];
   const FUZZY_COLOR = { 3: '#7d98c4' };   // the fuzzy's iron-rune air is a grey blue, so it doesn't look like plain air
   const PARTS = ['slime_gel', 'bat_wing', 'warthog_hide', 'fish_scale', 'fish_spine', 'ectoplasm', 'crawler_shard', 'scorpion_stinger', 'kofi_hair', 'kipsu_fur', 'krabbi_shell', 'scute'];
   const RARE = ['ember_gland', 'fish_eye', 'eater_fang', 'warthog_tusk', 'living_vine', 'wraith_essence', 'lutut_tooth', 'harkal_tooth', 'hvaleia_oil', 'naga_scale', 'soul_shard', 'leviathan_scale'];
@@ -29,20 +29,22 @@
     { coins: 220, need: { stygian_bar: 6, platinum_bar: 3 }, rare: 8, breaks: 'everything a little faster' },
     { coins: 320, need: { soulsteel_bar: 4, soul_shard: 8 }, breaks: 'everything faster again' },
     { coins: 500, need: { soulsteel_bar: 8, mirror_shard: 2, star_ember: 3 }, breaks: 'everything as fast as a legendary weapon' },
+    { coins: 800, need: { abyssite_bar: 12 }, core: 1, breaks: 'everything fastest of all, and your 2x2 smash becomes 3x3' }, // V3: the Abyssite rune
   ];
-  const MAT = ['', 'Flint', 'Stone', 'Iron', 'Bronze', 'Platinum', 'Stygian', 'Soulsteel', 'Duat'];
+  const MAT = ['', 'Flint', 'Stone', 'Iron', 'Bronze', 'Platinum', 'Stygian', 'Soulsteel', 'Duat', 'Abyssite'];
+  const CORES = ['core_knight', 'core_archer', 'core_mage', 'core_healer'];
   const HERO = {
-    acorn: { what: 'cap', names: ['Bare Cap', 'Flint Cap', 'Stone Cap', 'Iron Cap', 'Bronze Cap', 'Platinum Cap', 'Stygian Cap', 'Soulsteel Cap', 'Duat Crown'],
+    acorn: { what: 'cap', names: ['Bare Cap', 'Flint Cap', 'Stone Cap', 'Iron Cap', 'Bronze Cap', 'Platinum Cap', 'Stygian Cap', 'Soulsteel Cap', 'Duat Crown', 'Abyssal Crown'],
       say: 'Your cap grows harder. You can headbutt' },
-    fuzzy: { what: 'suction', names: ['Soft Breath', 'Breeze', 'Gust', 'Whirlwind', 'Squall', 'Tempest', 'Cyclone', 'Thunderhead', 'Sky Rune'],
+    fuzzy: { what: 'suction', names: ['Soft Breath', 'Breeze', 'Gust', 'Whirlwind', 'Squall', 'Tempest', 'Cyclone', 'Thunderhead', 'Sky Rune', 'Abyss Gale'],
       say: 'The wind answers you more strongly. You can suck up' },
-    rock: { what: 'fist', names: ['Bare Fist', 'Flint Knuckles', 'Stone Fist', 'Iron Fist', 'Bronze Fist', 'Platinum Fist', 'Stygian Fist', 'Soulsteel Fist', 'Worldbreaker Fist'],
+    rock: { what: 'fist', names: ['Bare Fist', 'Flint Knuckles', 'Stone Fist', 'Iron Fist', 'Bronze Fist', 'Platinum Fist', 'Stygian Fist', 'Soulsteel Fist', 'Worldbreaker Fist', 'Abyssal Fist'],
       say: 'Your fist grows heavier. You can punch through' },
-    ghost: { what: 'permanence', names: ['Wisp', 'Mist', 'Shade', 'Firm', 'Solid', 'Dense', 'Anchored', 'Unfading', 'Eternal'],
+    ghost: { what: 'permanence', names: ['Wisp', 'Mist', 'Shade', 'Firm', 'Solid', 'Dense', 'Anchored', 'Unfading', 'Eternal', 'Abyssal'],
       say: 'Your arm stays solid inside harder things. You can reach into' },
   };
   const hero = () => HERO[P.species] || HERO.rock;
-  const tier = () => Math.max(0, Math.min(8, (P.flags && P.flags.rune) | 0));
+  const tier = () => Math.max(0, Math.min(9, (P.flags && P.flags.rune) | 0));
   const runeName = (t) => (t > 0 ? MAT[t] + ' rune: ' : '') + hero().names[t];
   RW.v2runes = { tier, power: () => POWER[tier()], color: (t, who) => { const n = t == null ? tier() : t; return ((who || P.species) === 'fuzzy' && FUZZY_COLOR[n]) || COLOR[n]; }, name: runeName,
     puffs: () => 1 + (tier() >= 3 ? 1 : 0) + (tier() >= 5 ? 1 : 0), cloud: () => tier() >= 8 };
@@ -134,10 +136,11 @@
     if (!Object.entries(c.need).every(([id, n]) => P.count(id) >= n)) return false;
     if (c.part && partsHave(PARTS) < c.part) return false;
     if (c.rare && partsHave(RARE) < c.rare) return false;
+    if (c.core && partsHave(CORES) < c.core) return false;
     return true;
   }
   function payParts(list, n) { for (const id of list) { if (n <= 0) break; const k = Math.min(n, P.count(id)); if (k) { P.remove(id, k); n -= k; } } }
-  function pay(c) { P.remove('coin', c.coins); Object.entries(c.need).forEach(([id, n]) => P.remove(id, n)); if (c.part) payParts(PARTS, c.part); if (c.rare) payParts(RARE, c.rare); }
+  function pay(c) { P.remove('coin', c.coins); Object.entries(c.need).forEach(([id, n]) => P.remove(id, n)); if (c.part) payParts(PARTS, c.part); if (c.rare) payParts(RARE, c.rare); if (c.core) payParts(CORES, c.core); }
   const LINES = ['Every hero breaks the world in their own way. I only make the way stronger.', 'Bring me the stuff of the world, and a little of what lives in it.', 'Runes do not care what you hold. They care what you are.', 'Something stirs in the Duat. Strong runes will be needed.'];
   function keeper() {
     U.openModal('talk');
@@ -148,15 +151,17 @@
     const show = () => {
       acts.innerHTML = ''; extra.innerHTML = '';
       const t = tier(), H = hero();
-      extra.append(el('div', 'label', 'Your ' + H.what + ': ' + runeName(t) + (t ? ' (rune ' + t + ' of 8)' : ' (no runes yet)')));
-      if (t >= 8) { says.textContent = 'There is nothing left I can carve for you. You are as strong as the runes go.'; }
+      extra.append(el('div', 'label', 'Your ' + H.what + ': ' + runeName(t) + (t ? ' (rune ' + t + ' of 9)' : ' (no runes yet)')));
+      if (t >= 9) { says.textContent = 'There is nothing left I can carve for you. You are as strong as the runes go.'; }
       else {
         const c = COST[t + 1], next = t + 1;
         says.textContent = RW.pick(LINES);
+        if (!P.flags.runeIntro) { P.flags.runeIntro = 1; says.textContent = 'So. Another one the world holds too tightly. Everything here has a grip on you: stone, ore, the deep places. My runes loosen it, one carving at a time. Bring me pieces of the world, and pieces of what walks in it, and I will cut your next. The first is the smallest. The last opens the abyss.'; }
         const row = el('div', 'trade');
         const bits = Object.entries(c.need).map(([id, n]) => n + ' ' + RW.ITEMS[id].name + ' (' + P.count(id) + ')');
         if (c.part) bits.push(c.part + ' monster parts, any kind (' + partsHave(PARTS) + ')');
         if (c.rare) bits.push(c.rare + ' rare monster parts (' + partsHave(RARE) + ')');
+        if (c.core) bits.push(c.core + ' guardian core, any kind (' + partsHave(CORES) + ')');
         bits.push(c.coins + ' coins (' + P.count('coin') + ')');
         row.append(el('div', null, 'Next: ' + runeName(next) + '. Breaks ' + c.breaks + '.' + (P.species === 'fuzzy' && (next === 3 || next === 5) ? ' Also one more puff jump.' : '') + (P.species === 'fuzzy' && next === 8 ? ' Also lets you ride a cloud.' : '')));
         row.append(el('div', 'label', 'He needs: ' + bits.join(', ') + '.'));

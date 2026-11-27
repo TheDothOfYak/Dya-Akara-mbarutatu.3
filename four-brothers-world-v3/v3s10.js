@@ -38,13 +38,13 @@
     { id: 'core_archer', name: 'Archer Core', desc: 'Two cold eyes watch from inside it. Always dropped by the Drowned Archer. With Abyssite bars at a forge: Silent Fathom.' },
     { id: 'core_mage', name: 'Mage Core', desc: 'An empty hood, leaking mist. Always dropped by the Drowned Mage. With Abyssite bars at a forge: the Veilstaff.' },
     { id: 'core_healer', name: 'Healer Core', desc: 'A sleeping drowned face. Always dropped by the Drowned Healer. With Abyssite bars at a forge: the Soulbound Lantern.' },
-    { id: 'abyssite_ore', name: 'Abyssite Ore', desc: 'Black ore with dark violet crystals. Its veins open in the Heart Chamber once the Leviathan is beaten. Needs a Stygian pick or better. Four make a bar at a forge.' },
+    { id: 'abyssite_ore', name: 'Abyssite Ore', desc: 'Black ore with dark violet crystals. Its veins open in the Heart Chamber once the Leviathan is beaten. Needs the Stygian rune or better. Four make a bar at a forge. Twelve bars and a guardian core buy the Abyssite rune.' },
     { id: 'abyssite_bar', name: 'Abyssite Bar', desc: 'Better than platinum. For Abyssite gear and the Leviathan\'s core weapons.' },
   ];
   MATS.forEach((m) => R.item(Object.assign({ kind: 'material', icon: { s: 'ore', a: '#6c4aa8', b: '#16121e' } }, m)));
   R.item({ id: 'abyssite_helm', name: 'Abyssite Helm', kind: 'armor', slot: 'head', def: 8, tint: '#33244a', glow: '#6c4aa8', icon: { s: 'helm', a: '#4a3270', b: '#16121e' }, desc: 'Better than platinum, better than stygian. Armour 8.' });
   R.item({ id: 'abyssite_mail', name: 'Abyssite Mail', kind: 'armor', slot: 'body', def: 12, tint: '#33244a', glow: '#6c4aa8', icon: { s: 'chest', a: '#4a3270', b: '#16121e' }, desc: 'Better than platinum, better than stygian. Armour 12.' });
-  Wp({ id: 'abyssite_pick', name: 'Abyssite Pickaxe', tier: 'abyssite', power: 9, dmg: 24, spd: 0.22, knock: 2, v3loot: false, icon: { s: 'pick', a: '#4a3270', b: '#36262a' }, desc: 'Mines anything, faster than any other pick.' });
+  Wp({ id: 'abyssite_pick', name: 'Abyssite Pickaxe', tier: 'abyssite', power: 9, dmg: 24, spd: 0.22, knock: 2, v3loot: false, icon: { s: 'pick', a: '#4a3270', b: '#36262a' }, desc: 'An old Abyssite pick. Mining strength comes from runes, so this is only a heavy weapon now. Ask the rune keeper for the Abyssite rune.' });
   R.item({ id: 'krait_pearl', name: 'Krait Pearl', kind: 'crystal', stack: 1, v3pet: true, icon: { s: 'pearl', a: '#1f8a8a', b: '#16141e' }, desc: 'From the Leviathan, the first time you beat it. Hold it and right-click to call your pet sea krait, or to send it home. It just follows you.' });
   const TR = [
     ['t_fang', 'Leviathan Fang', 'Combat: +15% damage. Sometimes dropped by the Leviathan.'],
@@ -65,7 +65,6 @@
     { out: 'abyssite_bar', in: { abyssite_ore: 4 }, at: 'forge' },
     { out: 'abyssite_helm', in: { abyssite_bar: 9, leviathan_scale: 1 }, at: 'forge' },
     { out: 'abyssite_mail', in: { abyssite_bar: 14, leviathan_scale: 2 }, at: 'forge' },
-    { out: 'abyssite_pick', in: { abyssite_bar: 10, stygian_bar: 2 }, at: 'forge' },
     { out: 'ossuary', in: { core_knight: 1, abyssite_bar: 8 }, at: 'forge' },
     { out: 'silentfathom', in: { core_archer: 1, abyssite_bar: 8 }, at: 'forge' },
     { out: 'veilstaff', in: { core_mage: 1, abyssite_bar: 8 }, at: 'forge' },

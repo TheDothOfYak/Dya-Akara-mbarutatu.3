@@ -366,7 +366,7 @@
       // the starter chest: where the shaft from your cave lands
       const sx = HOME.x1 + 5; let sy = floorAt(sx, vilRoof + 1, H); if (get(sx, sy) === T.water) sy = c.water;
       const landX = sx + 3; let ly = floorAt(landX, vilRoof + 1, H);
-      set(h1.x0 + 2, h1.floorRow - 1, T.starterchest); meta.starter = { x: h1.x0 + 2, y: h1.floorRow - 1 }; // V3: you wake inside Gneiss's house
+      meta.starter = { x: h1.x0 + 2, y: h1.floorRow - 1 }; // V3: you wake inside Gneiss's house (no chest now: you start with 50 dirt to build with)
       lanterns(c, 9); shore(c);
       // a hidden cache below the mere
       meta.villageAt = { cx: c.cx, cy: c.cy };
