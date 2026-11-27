@@ -2,8 +2,7 @@
 // 4 Brothers World V3 — part 18: items with Terraria's pixel count.
 //  * Bag, hotbar and held items are drawn with about as many pixels as a Terraria item: 16 across for ordinary
 //    weapons, tools, armour and everything else, 24 across for the Leviathan's gear (and 18 for trinkets).
-//    (Since McKay asked for about 40% more: 22 across for ordinary items, 34 for the Leviathan's gear, 25 for trinkets,
-//    all centred in their squares.)
+//    (McKay later asked for 16 across for everything, all centred. The Leviathan's weapons are held 1.5x bigger.)
 //    Each picture is shrunk by keeping the colour most of each block shows, then outlined and lit again at the
 //    new size, so it stays crisp instead of blurry.
 //  * Pickaxes are painted fresh, Terraria style: a thick curved head that tapers to two points, a socket, and a
@@ -69,7 +68,8 @@
     // the socket where head meets haft
     g.fillStyle = R[1]; g.fillRect(-3, -3, 6, 5.5); g.fillStyle = R[3]; g.fillRect(-2.6, -2.6, 5.2, 1.6); g.fillStyle = R[0]; g.fillRect(-3, 1.4, 6, 1.1);
     g.setTransform(1, 0, 0, 1, 0, 0);
-    VA.finish(c, ['#0c0a10', '#ffffff'].concat(R, B)); return c;
+    const dk = RW.v3pickDeco && RW.v3pickDeco[it.id]; if (dk) dk(g); // extra decorations (v3s19)
+    VA.finish(c, ['#0c0a10', '#ffffff'].concat(R, B, dk && RW.v3pickDeco.pal ? RW.v3pickDeco.pal : [])); return c;
   }
   const isPick = (it) => it && it.icon && it.icon.s === 'pick';
 
@@ -91,8 +91,8 @@
     [[2, 3], [N - 4, N - 9]].forEach(([x, y]) => { if (!a[(y * N + x) * 4 + 3]) { g.fillStyle = '#ffffff'; g.fillRect(x, y, 1, 1); g.fillStyle = col; g.fillRect(x - 1, y, 1, 1); g.fillRect(x + 1, y, 1, 1); g.fillRect(x, y - 1, 1, 1); g.fillRect(x, y + 1, 1, 1); } });
     return c;
   }
-  // sizes: Terraria's count plus about 40% (16 -> 22, 24 -> 34, 18 -> 25)
-  const SMALL = 22, BIG = 34, TRINK = 25;
+  // sizes: 16 across for everything (McKay: "make it 16 and 16")
+  const SMALL = 16, BIG = 16, TRINK = 16;
   const SIZE = (id) => { const it = RW.ITEMS[id] || {}; if (/^t_/.test(id) || it.v3trinket) return TRINK; if (id === 'abyssite_ore' || id === 'abyssite_bar' || /chest/.test(id)) return SMALL; return BIG; };
 
   // every picture sits in the middle of its square
@@ -104,7 +104,7 @@
     if (!dx && !dy) return c;
     const o = mk(N, N); o.ctx.drawImage(c, dx, dy); return o;
   }
-  const made = {}, HELD = new WeakMap();
+  const made = {}, HELD = new WeakMap(), key0 = (id) => VA.artOf(id);
   function artFor(id, c) {
     if (made[id] !== undefined) return made[id];
     const it = RW.ITEMS[id]; let out = null;
@@ -118,7 +118,7 @@
       else if (c.__big48) out = down(c.__big48, SMALL);
     } catch (e) { out = null; }
     if (out) out = center(out);
-    if (out) { out.__noHD = true; out.__iconId = id; HELD.set(out, out.width); }
+    if (out) { out.__noHD = true; out.__iconId = id; HELD.set(out, key0(id) && (RW.ITEMS[id] || {}).kind === 'weapon' ? 24 : 16); }
     made[id] = out; return out;
   }
   RW.v3pickIcon = pickIcon;
@@ -143,7 +143,7 @@
     g.drawImage = function (img, x, y, w, h) {
       if (arguments.length === 5 && x === -3 && y === -13 && w === 16 && h === 16) {
         const art = HELD.has(img) ? img : img && img.__big48 && HELD.has(img.__big48) ? img.__big48 : null;
-        if (art) { const S = art.width >= 30 ? 24 : 16, k = S / 16, sm = this.imageSmoothingEnabled; this.imageSmoothingEnabled = false; const r = raw.call(this, art, -3 * k, -13 * k, S, S); this.imageSmoothingEnabled = sm; return r; }
+        if (art) { const S = HELD.get(art) || 16, k = S / 16, sm = this.imageSmoothingEnabled; this.imageSmoothingEnabled = false; const r = raw.call(this, art, -3 * k, -13 * k, S, S); this.imageSmoothingEnabled = sm; return r; }
       }
       return raw.apply(this, arguments);
     };
