@@ -75,11 +75,18 @@
       g.strokeStyle = T.crack[1]; g.lineWidth = Math.max(1, R * 0.06); g.beginPath(); g.moveTo(cx - R * 0.5, cy - R * 0.5); g.lineTo(cx - R * 0.15, cy - R * 0.1); g.lineTo(cx - R * 0.3, cy + R * 0.3); g.moveTo(cx + R * 0.2, cy - R * 0.7); g.lineTo(cx + R * 0.35, cy - R * 0.25); g.stroke();
       poly(g, [[cx - R * 0.3, cy - R * 0.15], [cx + R * 0.2, cy - R * 0.2], [cx + R * 0.25, cy + R * 0.2], [cx - R * 0.25, cy + R * 0.22]], T.crack[0]); poly(g, [[cx - R * 0.15, cy - R * 0.08], [cx + R * 0.1, cy - R * 0.1], [cx + R * 0.12, cy + R * 0.1], [cx - R * 0.12, cy + R * 0.12]], T.crack[1]);
     }
+    // 3.16: hard plates on the body too: black seams, cracks, a scar now and then, barnacles on some lengths
+    { const BLK = '#020204', u = Math.max(1, Math.round(R * 0.06)), ln = (pts) => { g.strokeStyle = BLK; g.lineWidth = u; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(cx + x * R, cy + y * R) : g.moveTo(cx + x * R, cy + y * R))); g.stroke(); };
+      ln([[-0.5, -0.92], [-0.9, -0.42]]); ln([[0.5, -0.92], [0.9, -0.42]]); ln([[0.15, -0.92], [0.05, -0.42]]); // plate edges
+      if (v !== 1) ln([[-0.3, -0.8], [-0.22, -0.6], [-0.32, -0.46]]); if (v !== 2) ln([[0.35, -0.2], [0.42, 0.0], [0.34, 0.18]]); // cracks
+      if (v === 2) { g.strokeStyle = '#8a6e66'; g.lineWidth = u; g.beginPath(); g.moveTo(cx - R * 0.6, cy - R * 0.1); g.lineTo(cx + R * 0.3, cy + R * 0.3); g.stroke(); } // a scar
+      if (v === 0) [[-0.55, 0.15], [-0.42, 0.22], [-0.5, 0.3]].forEach(([x, y], k) => { const q = Math.max(1, Math.round(R * 0.08)); g.fillStyle = k % 2 ? '#c8c0a8' : '#9a9282'; g.fillRect(Math.round(cx + x * R), Math.round(cy + y * R), q, q); g.fillStyle = BLK; g.fillRect(Math.round(cx + x * R + q / 2), Math.round(cy + y * R + q / 2), 1, 1); }); // barnacles
+    }
     g.save();
     // the seam
     g.fillStyle = T.seam; g.fillRect(cx - R * 0.92, cy + R * 0.12, R * 1.84, Math.max(1, R * 0.05));
     g.restore();
-    VA.finish(c, palOf(T)); c.cy = cy; c.cx = cx; return c;
+    VA.finish(c, palOf(T).concat(['#8a6e66', '#9a9282', '#c8c0a8'])); c.cy = cy; c.cx = cx; return c;
   }
   const SKULL = [
     '.........4.......4.....................................................',
@@ -147,11 +154,11 @@
     for (let k = 0; k < 7; k++) { const x = 60 + k * 7; poly(g, [[x, lipY + 1], [x + 4, lipY + 1], [x + 2, lipY + 3]], T.ridge); }
     // the lower jaw, drawn flat then turned about the hinge
     const J = mk(74, 30), jg = J.ctx, jy = 5; // jy: the inner edge (where the teeth stand)
-    poly(jg, [[0, jy - 1], [64, jy - 1], [70, jy - 3], [73, jy - 4], [71, jy + 2], [64, jy + 7], [50, jy + 10], [36, jy + 12], [20, jy + 13], [6, jy + 11], [0, jy + 5]], P[1]); // outer side
-    poly(jg, [[2, jy + 6], [62, jy + 4], [50, jy + 9], [34, jy + 11], [18, jy + 12], [6, jy + 10]], P[0]); poly(jg, [[4, jy + 3], [60, jy + 2], [58, jy + 4], [4, jy + 5]], P[2]); // the shadowed underside, a plate edge
+    poly(jg, [[0, jy - 1], [66, jy - 1], [73, jy - 5], [72, jy + 3], [62, jy + 9], [8, jy + 12], [0, jy + 7]], P[1]); // outer side: a hard mandible, straight edges and sharp corners (3.16)
+    poly(jg, [[2, jy + 7], [62, jy + 5], [60, jy + 9], [8, jy + 12]], P[0]); poly(jg, [[4, jy + 3], [62, jy + 2], [62, jy + 4], [4, jy + 5]], P[2]); jg.fillStyle = '#020204'; jg.fillRect(4, jy + 5, 58, 1); for (const x of [18, 34, 50]) jg.fillRect(x, jy + 1, 1, 10); // the underside, a hard plate edge, black seams
     poly(jg, [[2, jy], [64, jy], [62, jy + 2], [2, jy + 3]], P[3]); // the lit lip line
-    [[14, 2.5, 7], [28, 2.2, 6], [42, 2, 5], [54, 1.6, 4]].forEach(([x, w, L]) => poly(jg, [[x - w, jy + 11 - x / 16], [x + 1, jy + 11 + L - x / 16], [x + w, jy + 11 - x / 16]], P[2])); // barbs under the jaw
-    for (let x = 8; x < 62; x += 9) poly(jg, [[x, jy + 2], [x + 2, jy + 2], [x - 1, jy + 7], [x - 3, jy + 7]], P[0]); // seams between the jaw plates
+    [[14, 2.5, 7], [28, 2.2, 6], [42, 2, 5], [56, 1.6, 4]].forEach(([x, w, L]) => { const y0 = jy + 12 - (x - 8) * 3 / 54; poly(jg, [[x - w, y0], [x - 2, y0 + L], [x + w, y0]], P[2]); }); // barbs under the jaw, raked back
+    
     poly(jg, [[3, jy - 1], [64, jy - 1], [64, jy + 1], [3, jy + 1]], T.gum); // the gum
     if (open > 0.3 || sway) poly(jg, [[6, jy - 2], [30, jy - 3 - (sway ? 1 : 0)], [44, jy - 2], [40, jy], [6, jy]], T.tongue); // the tongue lies along the floor of the jaw
     // lower teeth: a crooked row, long fangs near the front
@@ -273,6 +280,7 @@
     // head, jaw by the fight's state
     { const a = b.ang || 0, jaw = Math.max(0, Math.min(5, Math.round(((b.jaw || 0) - 0.08) / 0.11))), sway = Math.floor(time * 2.2) % 2, R = bucket(segR(0) * 1.15), s = sprite('head', stage, R, jaw + sway * 10), flip = Math.cos(a) < 0;
       const p = P[0]; drawRot(g, s, p.x + ox, p.y + oy, a, s.cx, s.cy, flip);
+      { const lx = (56 - s.cx) * PX * swell, ly = (38.4 - s.cy) * PX * swell * (flip ? -1 : 1); RW.v3levEye = { x: p.x + Math.cos(a) * lx - Math.sin(a) * ly, y: p.y + Math.sin(a) * lx + Math.cos(a) * ly, t: performance.now(), stage, dead }; }
       if (flash) { g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.45 * flash; drawRot(g, s, p.x + ox, p.y + oy, a, s.cx, s.cy, flip); g.restore(); } }
     // the crystal shield: a shimmering pixel ring around every third plate
     if ((b.shield || (b.fx || []).some((f) => f.type === 'v3shield')) && !dead) {
@@ -287,6 +295,18 @@
     g.restore(); g.imageSmoothingEnabled = sm;
   }
   RW.v3levDraw = draw;
+  // the eye glows faintly through the dark (drawn over the light layer, so it shows even where your light doesn't reach)
+  if (RW.fx && RW.fx.drawOver) { const baseOver = RW.fx.drawOver; RW.fx.drawOver = function (g, cam) {
+    const r = baseOver.apply(this, arguments), e = RW.v3levEye;
+    if (e && !e.dead && performance.now() - e.t < 200 && !(RW.v3lev && RW.v3lev.b && (RW.v3lev.b.fx || []).some((f) => f.type === 'v3hide'))) {
+      const x = Math.round(e.x - cam.x), y = Math.round(e.y - cam.y), pul = 0.75 + 0.25 * Math.sin(performance.now() / 300);
+      g.save(); g.globalCompositeOperation = 'lighter';
+      g.fillStyle = 'rgba(255,40,20,' + (0.10 * pul).toFixed(3) + ')'; g.fillRect(x - PX * 5, y - PX * 3, PX * 10, PX * 6);
+      g.fillStyle = 'rgba(255,40,20,' + (0.18 * pul).toFixed(3) + ')'; g.fillRect(x - PX * 3, y - PX * 2, PX * 6, PX * 4);
+      g.fillStyle = 'rgba(255,90,50,' + (0.55 * pul).toFixed(3) + ')'; g.fillRect(x - PX * 2, y - Math.round(PX / 2), PX * 4, PX);
+      g.restore();
+    }
+    return r; }; }
 
   // ---------------- the new moves' effects, in chunky pixels ----------------
   const blk = (g, x, y, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(x / PX) * PX, Math.round(y / PX) * PX, Math.max(PX, Math.round(w / PX) * PX), Math.max(PX, Math.round(h / PX) * PX)); };
