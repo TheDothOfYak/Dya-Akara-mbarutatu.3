@@ -102,13 +102,17 @@
     const P2 = [['charge', 3], ['barrage', 2], ['beam', 3], ['collapse', 2], ['whirl', 2], ['coil', 2], ['summon', 1], ['tail', 2]];
     const P3 = [['charge', 3], ['frenzy', 2], ['barrage', 2], ['beam', 3], ['collapse', 2], ['whirl', 2], ['coil', 3], ['tail', 2]];
     const SH = [['barrage', 3], ['collapse', 2], ['tail', 2], ['cruise', 2]];
-    const L = b.shield ? SH : b.phase === 3 ? P3 : b.phase === 2 ? P2 : P1;
+    // two moves of its own in every stage
+    P1.push(['gemrain', 2], ['surge', 2]); P2.push(['inhale', 2], ['shadow', 2]);
+    const P3b = P2.filter((m) => m[0] !== 'inhale' && m[0] !== 'shadow').concat([['bonestorm', 3], ['grasp', 3]]);
+    P3.push(['spiral', 3], ['meteor', 3]);
+    const L = b.shield ? SH : b.stage === 4 || b.phase === 3 ? P3 : b.stage === 3 ? P3b : b.phase === 2 ? P2 : P1;
     let tot = 0; L.forEach(([k, w]) => { if (k !== b.last) tot += w; });
     let r = Math.random() * tot; let s = L[0][0];
     for (const [k, w] of L) { if (k === b.last) continue; r -= w; if (r <= 0) { s = k; break; } }
     b.last = s; b.state = s; b.st = 0; b.did = 0; b.k = 0; clearMoves(b);
   }
-  function clearMoves(b) { ['v3beam', 'v3vortex', 'v3coil', 'v3slam'].forEach((t) => fx(b, t, null)); }
+  function clearMoves(b) { ['v3beam', 'v3vortex', 'v3coil', 'v3slam', 'v3surge', 'v3inhale', 'v3hide', 'v3warn', 'v3grasp'].forEach((t) => fx(b, t, null)); }
   const shard = (x, y, a, v, dmg, col) => E.shots.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 3.2, owner: 'e', dmg, kind: 'bshard', color: col || RW.pick(GEMS) });
   function mouth(b) { const h = head(b); return { x: h.x + Math.cos(b.ang) * 40 * K, y: h.y + Math.sin(b.ang) * 40 * K }; }
   function roar(b, txt) {
@@ -154,6 +158,9 @@
     }
     if (Math.random() < dt * 14) { const s = RW.pick(b.segs); RW.fx.spawn({ x: s.x + RW.rand(-8, 8), y: s.y + RW.rand(-8, 8), vy: -14, life: 0.7, color: b.phase === 3 ? RW.pick(['#ff5a3a', '#ffb070']) : RW.pick(GEMS), add: true, kind: 'glow' }); }
 
+    // bones thrown in the bone storm turn round and fly back to it
+    E.shots.forEach((q) => { if (q.v3boom == null) return; q.v3boom += dt; if (q.v3boom > 0.9) { const d = Math.hypot(h.x - q.x, h.y - q.y) || 1; q.vx += (h.x - q.x) / d * 900 * dt; q.vy += (h.y - q.y) / d * 900 * dt; const sp = Math.hypot(q.vx, q.vy); if (sp > 420) { q.vx *= 420 / sp; q.vy *= 420 / sp; } if (d < 120) q.life = 0; } });
+    { const lv = getFx(b, 'v3lava'); if (lv && b.t > lv.until) fx(b, 'v3lava', null); }
     switch (b.state) {
       case 'emerge':
         steer(b, dt, h.x, a.cy - 20 * K, 150, 1.2);
@@ -264,13 +271,109 @@
         if (!b.did) { b.did = 1; for (let k = 0; k < 3 + b.phase; k++) { const e = E.spawnEnemy(k % 2 ? 'spiky_fish' : 'creepy_fish', h.x + RW.rand(-80, 80) * K, h.y + RW.rand(-40, 40) * K); RW.fx.burst(e.x, e.y, '#a86ef0', 12, 80, { add: true, kind: 'glow' }); } RW.audio.sfx('roar'); }
         if (b.st > 1.2) { b.state = 'cruise'; b.st = 0; b.dur = 2; }
         break;
+      // ---------------- stage 1: gem rain, the surge ----------------
+      case 'gemrain': {
+        steer(b, dt, tg.x + Math.cos(b.t) * 300 * K, tg.y - 200 * K, 180, 2);
+        if (b.st > 0.6 && !b.did) {
+          b.did = 1; RW.audio.sfx('crystal'); RW.fx.shake(4, 0.4);
+          const n = b.phase >= 2 ? 16 : 12;
+          for (let i = 0; i < n; i++) { const sg = b.segs[(i * 7 + 3) % b.segs.length], tx = tg.x + RW.rand(-260, 260); E.shots.push({ x: sg.x, y: sg.y, vx: (tx - sg.x) / 1.7, vy: -430, grav: 500, life: 5, owner: 'e', dmg: 14, kind: 'rain', color: RW.pick(GEMS) }); }
+        }
+        if (b.st > 2.2) { b.state = 'cruise'; b.st = 0; b.dur = 1.2; }
+        break;
+      }
+      case 'surge': {
+        if (!b.did) { b.did = 1; b.sdir = tg.x > h.x ? 1 : -1; fx(b, 'v3surge', { x: b.sdir, y: 0 }); RW.audio.sfx('roar'); U.toast('The Leviathan sends a surge through the chamber!'); b.k = 0; }
+        steer(b, dt, a.cx - b.sdir * a.rx * 0.6, a.cy, 160, 2);
+        b.k += dt; if (b.k > 0.38) { b.k = 0; for (let j = 0; j < 3; j++) { const y = a.cy + RW.rand(-0.8, 0.8) * a.ry; E.shots.push({ x: a.cx - b.sdir * (a.rx - 40), y, vx: b.sdir * 420, vy: 0, life: 6, owner: 'e', dmg: 12, kind: 'bshard', color: '#bfeaff' }); } }
+        if (b.st > 3.4) { fx(b, 'v3surge', null); b.state = 'cruise'; b.st = 0; b.dur = 1.2; }
+        break;
+      }
+      // ---------------- stage 2: the abyss maw, the shadow dive ----------------
+      case 'inhale': {
+        const dir = tg.x > h.x ? 1 : -1;
+        if (!b.did) { b.did = 1; U.toast('It is breathing in. Get away from its mouth!'); RW.audio.sfx('roar'); }
+        if (b.st < 2.4) {
+          steer(b, dt, tg.x - dir * 520 * K / 3, tg.y - 40, 70, 2); b.ang = Math.atan2(tg.y - h.y, tg.x - h.x);
+          const m = mouth(b); fx(b, 'v3inhale', { x: Math.round(m.x), y: Math.round(m.y) });
+          for (let j = 0; j < 3; j++) { const an = Math.random() * 6.283, r = RW.rand(300, 900); RW.fx.spawn({ x: m.x + Math.cos(an) * r, y: m.y + Math.sin(an) * r, vx: -Math.cos(an) * r * 1.2, vy: -Math.sin(an) * r * 1.2, life: 0.8, color: '#8a5ad8', add: true, kind: 'glow', size: 2, drag: 1 }); }
+        } else if (!b.k) { b.k = 1; const m = mouth(b); fx(b, 'v3inhale', null); fx(b, 'v3chomp', { x: Math.round(m.x), y: Math.round(m.y) }); RW.audio.sfx('slam'); RW.fx.shake(9, 0.4); }
+        if (b.st > 2.9) { fx(b, 'v3chomp', null); b.state = 'cruise'; b.st = 0; b.dur = 1.2; }
+        break;
+      }
+      case 'shadow': {
+        const floorY = a.cy + a.ry - 30;
+        if (!b.did) { b.did = 1; b.dx0 = tg.x; fx(b, 'v3hide', { x: 1 }); U.toast('The Leviathan sinks into the dark...'); }
+        if (b.st < 1.7) {
+          steer(b, dt, b.dx0, a.cy + a.ry * 0.85, 300, 3);
+          if (b.st > 0.5) { b.dx0 = RW.lerp(b.dx0, tg.x, dt * 0.8); fx(b, 'v3warn', { x: Math.round(b.dx0), y: Math.round(floorY) }); if (Math.random() < dt * 40) RW.fx.spawn({ x: b.dx0 + RW.rand(-60, 60), y: floorY, vx: RW.rand(-8, 8), vy: RW.rand(-120, -60), life: 1, color: '#c8f0ff', kind: 'bubble' }); }
+        } else {
+          if (!b.k) { b.k = 1; fx(b, 'v3hide', null); fx(b, 'v3warn', null); b.ang = -Math.PI / 2; b.x = b.dx0 - b.w / 2; b.y = a.cy + a.ry - b.h / 2; RW.audio.sfx('roar'); RW.fx.shake(10, 0.6); }
+          steer(b, dt, b.dx0, a.cy - a.ry, 620, 1.5);
+        }
+        if (b.st > 3) { b.state = 'cruise'; b.st = 0; b.dur = 1.4; }
+        break;
+      }
+      // ---------------- stage 3: the bone storm, the grasp ----------------
+      case 'bonestorm': {
+        steer(b, dt, tg.x + (h.x < tg.x ? -380 : 380) * K / 2, tg.y - 120, 150, 2.5);
+        if (b.k < 3 && b.st > 0.5 + b.k * 0.55) {
+          b.k++; RW.audio.sfx('slam');
+          for (let j = 0; j < 6; j++) { const sg = b.segs[(j * 13 + b.k * 5) % b.segs.length], an = Math.atan2(tg.y - sg.y, tg.x - sg.x) + RW.rand(-0.5, 0.5); E.shots.push({ x: sg.x, y: sg.y, vx: Math.cos(an) * 340, vy: Math.sin(an) * 340, life: 4.5, owner: 'e', dmg: 13, kind: 'bshard', color: '#d8d0b4', v3boom: 0 }); }
+        }
+        if (b.st > 3) { b.state = 'cruise'; b.st = 0; b.dur = 1.2; }
+        break;
+      }
+      case 'grasp': {
+        steer(b, dt, tg.x, a.cy - a.ry * 0.5, 140, 2);
+        if (!b.did) {
+          b.did = 1; const pts = [];
+          const floorAt = (x, y) => { let ty = Math.floor(y / TS); for (let k = 0; k < 60; k++, ty++) if (WD.solid(Math.floor(x / TS), ty)) return ty * TS; return a.cy * 1 + a.ry; };
+          fighters().forEach((f) => pts.push({ x: Math.round(f.x), y: floorAt(f.x, f.y) }));
+          for (let j = 0; j < 3; j++) { const x = tg.x + RW.rand(-500, 500); pts.push({ x: Math.round(x), y: floorAt(x, tg.y) }); }
+          fx(b, 'v3grasp', { x: 1, pts, warn: 1 }); RW.audio.sfx('crystal');
+        }
+        const gr = getFx(b, 'v3grasp');
+        if (gr && gr.warn && b.st > 1.1) { fx(b, 'v3grasp', { x: 1, pts: gr.pts, warn: 0 }); RW.audio.sfx('slam'); RW.fx.shake(7, 0.4); }
+        if (b.st > 1.9) fx(b, 'v3grasp', null);
+        if (b.st > 2.3) { b.state = 'cruise'; b.st = 0; b.dur = 1.2; }
+        break;
+      }
+      // ---------------- stage 4: the molten spiral, the meteor crash ----------------
+      case 'spiral': {
+        if (!b.did) { b.did = 1; const p = clampArena(tg.x, tg.y, 120 * K); b.vx0 = p.x; b.vy0 = p.y; b.oa = Math.atan2(h.y - p.y, h.x - p.x); b.k = 0; }
+        if (b.st < 3.4) {
+          b.oa += dt * 2.6; steer(b, dt, b.vx0 + Math.cos(b.oa) * 150 * K, b.vy0 + Math.sin(b.oa) * 110 * K, 420, 6);
+          b.k += dt; if (b.k > 0.11) { b.k = 0; const m = mouth(b); [-1, 1].forEach((sd) => { const an = b.ang + sd * Math.PI / 2; E.shots.push({ x: m.x, y: m.y, vx: Math.cos(an) * 280, vy: Math.sin(an) * 280, life: 3.5, owner: 'e', dmg: 13, kind: 'bshard', color: RW.pick(['#ff5a3a', '#ffb070']) }); }); }
+        }
+        if (b.st > 3.8) { b.state = 'cruise'; b.st = 0; b.dur = 1.2; }
+        break;
+      }
+      case 'meteor': {
+        const roofY = a.cy - a.ry + 30 * K;
+        if (!b.did) { steer(b, dt, tg.x, roofY, 560, 3); if (h.y < roofY + 30 * K || b.st > 1.8) {
+          b.did = 1; b.st = 0; RW.fx.shake(14, 1); RW.audio.sfx('slam'); RW.fx.flash('#ff6a3a', 0.2);
+          const pools = [], tnow = b.t;
+          for (let i = 0; i < 16; i++) {
+            const x = tg.x + RW.rand(-700, 700), warn = 0.6 + i * 0.06;
+            E.shots.push({ x, y: roofY - 20, vx: 0, vy: 60, life: 6, owner: 'e', dmg: 20, kind: 'rain', grav: 520, warn, color: RW.pick(['#ff5a3a', '#ffb070', '#c83a20']) });
+            let ty = Math.floor(roofY / TS); for (let k = 0; k < 220 && !WD.solid(Math.floor(x / TS), ty); k++) ty++;
+            const fy = ty * TS, fall = Math.sqrt(2 * Math.max(10, fy - roofY) / 520);
+            pools.push({ x: Math.round(x), y: fy, t0: Math.round((tnow + warn + fall) * 100) / 100 });
+          }
+          fx(b, 'v3lava', { x: 1, pools, until: Math.round((tnow + 9) * 100) / 100 });
+        } }
+        else steer(b, dt, h.x + Math.cos(b.ang) * 40 * K, h.y + 60 * K, 160, 2);
+        if (b.did && b.st > 1.6) { b.state = 'cruise'; b.st = 0; b.dur = 1.3; }
+        break;
+      }
       default: b.state = 'cruise'; b.st = 0;
     }
     b.frame = Math.floor(b.t * 6) % 2;
   }
 
   // ---- what every player feels from the boss's effects (their own hero, on their own screen) ----
-  let beamCd = 0, vortCd = 0, crushDone = new WeakSet();
+  let beamCd = 0, vortCd = 0, lavaCd = 0, crushDone = new WeakSet();
   function feel(b, dt) {
     if (P.dead || !(RW.game && RW.game.playing)) return;
     const pc = { x: P.x + 6, y: P.y + 14 }; beamCd -= dt; vortCd -= dt;
@@ -287,6 +390,13 @@
       if (d < 34 * K && vortCd <= 0) { vortCd = 0.45; P.hurt(11, 1, 'whirlpool'); }
     }
     const co = getFx(b, 'v3coil');
+    const su = getFx(b, 'v3surge'); if (su) { P.vx += su.x * 1100 * dt; P.vx = RW.clamp(P.vx, -380, 380); }
+    const ih = getFx(b, 'v3inhale');
+    if (ih) { const dx = ih.x - pc.x, dy = ih.y - pc.y, d = Math.hypot(dx, dy) || 1; if (d < 1700) { const pull = Math.min(720, 520000 / (d + 300)); P.vx += dx / d * pull * dt * 2; P.vy += dy / d * pull * dt * 2; } }
+    const ch = getFx(b, 'v3chomp'); if (ch && !crushDone.has(ch)) { crushDone.add(ch); if (Math.hypot(pc.x - ch.x, pc.y - ch.y) < 200) { P.hurt(b.phase === 3 ? 60 : 45, Math.sign(pc.x - ch.x) || 1, 'jaws'); P.vy = -240; } }
+    const gp = getFx(b, 'v3grasp'); if (gp && !gp.warn && !crushDone.has(gp)) { crushDone.add(gp); (gp.pts || []).forEach((q) => { if (Math.abs(pc.x - q.x) < 44 && pc.y > q.y - 150 && pc.y < q.y + 12) { P.hurt(30, Math.sign(pc.x - q.x) || 1, 'bone spikes'); P.vy = -320; } }); }
+    const lv = getFx(b, 'v3lava'); lavaCd -= dt;
+    if (lv && lavaCd <= 0) (lv.pools || []).forEach((q) => { if (b.t >= q.t0 && Math.abs(pc.x - q.x) < 36 && Math.abs(pc.y + 12 - q.y) < 22 && lavaCd <= 0) { lavaCd = 0.5; P.hurt(9, 0, 'lava'); } });
     if (co && co.warn === 2 && !crushDone.has(co)) { crushDone.add(co); if (Math.hypot(pc.x - co.x, pc.y - co.y) < 110 * K) { P.hurt(b.phase === 3 ? 55 : 42, Math.sign(pc.x - co.x) || 1, 'coil'); P.vy = -260; } }
   }
 
@@ -310,7 +420,7 @@
     if (b.dead) { b.deadT = (b.deadT || 0) + dt; return; }
     ai(b, dt); feel(b, dt);
     // touching any part of it hurts
-    if (!P.dead && E.overlap(segHitbox(b), P)) P.hurt(RW.SPECIES[LEV].dmg * (b.phase === 3 ? 1.3 : 1), Math.sign(P.x - head(b).x) || 1, 'leviathan');
+    if (!P.dead && !getFx(b, 'v3hide') && E.overlap(segHitbox(b), P)) P.hurt(RW.SPECIES[LEV].dmg * (b.phase === 3 ? 1.3 : 1), Math.sign(P.x - head(b).x) || 1, 'leviathan');
   };
   // someone else runs the fight: rebuild the body behind the head we're sent, play the effects
   function mirror(b, dt) {
