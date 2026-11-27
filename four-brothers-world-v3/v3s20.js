@@ -158,6 +158,14 @@
     if (open > 0.1) for (let x = 4; x < 27; x++) { const ty = top(x) - 1 - (x > 16 ? 1 : 0) + (sway && x > 22 ? -1 : 0); jcol(x, ty, x % 7 ? T.tongue : T.gum); if (x > 6 && x < 22) jcol(x, ty - 1, x % 5 ? T.tongue : sh(T.tongue, 0.25)); } // the tongue, thick, lying along the floor of the jaw
     for (let k = 0; k < 5; k++) { let x = 6 + k * 6, y = bot(6 + k * 6) + 1; const L = 8 + (k % 3) * 4; for (let i = 0; i < L; i++) { jcol(x, y + i, k % 2 ? T.fin[0] : P[1]); if (i % 3 === 2) x += ((i + k + sway) % 2 ? 1 : -1); } } // tendrils
     g.save(); g.translate(hx, hy); g.rotate(open); g.drawImage(J, -2, -5); g.restore();
+    // the cheek: skin and muscle stretched between the jaws behind the corner of the mouth, so the jaw does not
+    // swing on a bare pin. It thins and pulls tight as the mouth opens, with muscle cords across it
+    { const reach = 9 + open * 10, ux = hx + reach, uy = lipY + 1, lx = hx + Math.cos(open) * reach, ly = hy + Math.sin(open) * reach;
+      poly(g, [[hx - 7, hy - 3], [ux, uy - 1], [lx, ly + 1], [hx - 5, hy + 5 + open * 6]], P[1]);
+      poly(g, [[hx - 5, hy - 1], [ux - 2, uy], [lx - 1, ly], [hx - 4, hy + 3 + open * 5]], T.gum);
+      for (let k = 0; k < 4; k++) { const t = 0.2 + k * 0.2, ax = hx - 5 + (ux - (hx - 5)) * t, ay = hy - 1 + (uy - (hy - 1)) * t, bx = hx - 4 + (lx - (hx - 4)) * t, by = hy + 3 + open * 5 + (ly - (hy + 3 + open * 5)) * t; g.strokeStyle = k % 2 ? T.ridge : P[0]; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.round(ax), Math.round(ay)); g.lineTo(Math.round(bx), Math.round(by)); g.stroke(); }
+      poly(g, [[hx - 8, hy - 4], [hx - 1, hy - 3], [hx - 2, hy + 4 + open * 5], [hx - 7, hy + 6 + open * 6]], P[2]); // the hinge itself, hidden under a plate of hide
+    }
     // upper teeth, crooked, hanging below the lip; two long fangs
     [[34, 2], [37, 1], [40, 3], [43, 1], [46, 5], [49, 2], [52, 1], [55, 3], [58, 4], [61, 1]].forEach(([x, L]) => { for (let y = 0; y < L; y++) px(OX + x, lipY + 1 + y, y === L - 1 ? 't' : 'u'); if (L >= 4) px(OX + x + 1, lipY + 1, 'u'); });
     // strings of spit when it gapes
