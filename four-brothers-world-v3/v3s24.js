@@ -38,7 +38,7 @@
       const r = row(); const L = RW.v3ringsLib, M = WD.meta || {};
       if (WD.def.spawn) r.append(el('button', 'Stalagmere', () => goTo(WD.def.spawn.x, WD.def.spawn.y)));
       if (L && RW.v3ringsOn && RW.v3ringsOn()) {
-        [['Coral', 5], ['Kelp', 4], ['Scald', 3], ['Boneyard', 2], ['Hollow Dark', 1]].forEach(([n, j]) => r.append(el('button', n, () => { const rx = (L.RX[j - 1] + L.RX[j]) / 2, ry = (L.RY[j - 1] + L.RY[j]) / 2; goTo(Math.round(L.CX), Math.round(L.CY - ry)); void rx; })));
+        [['Coral', 5], ['Kelp', 4], ['Scald', 3], ['Boneyard', 2], ['Hollow Dark', 1]].forEach(([n, j]) => r.append(el('button', n, () => goTo(Math.round(L.CX), L.midOf(j)))));
         (M.v3lairs || []).forEach((l) => r.append(el('button', 'Lair: ' + l.boss.replace('v3b_', ''), () => goTo(l.x, l.y))));
         if (M.v3shaft) r.append(el('button', 'Ring shaft', () => goTo(M.v3shaft.x, M.v3shaft.y1 - 4)));
       } else r.append(el('div', '(this world has no rings)'));

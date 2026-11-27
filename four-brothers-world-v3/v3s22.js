@@ -1,7 +1,8 @@
 // © 2026 Isaac Flake. All Rights Reserved.
-// 4 Brothers World V3 — part 22: the rings around the Leviathan's Heart Chamber (new worlds only).
-//  * Rock World grows downward (1280 x 1500). Below Stalagmere's cavern band, the hollow shell gives way to five
-//    flooded rings, one inside the other, all made of caves and caverns, with the Heart Chamber in the middle:
+// 4 Brothers World V3 — part 22: the deep bands above the Leviathan's Heart Chamber (new worlds only).
+//  * Rock World grows downward (1280 x 1500). Below Stalagmere's cavern band come five flooded bands, stacked
+//    straight down, each the full width of the world, all caves and caverns, with the Heart Chamber at the very bottom.
+//    (Until 3.11 they were rings round a chamber in the middle; the names `ring` / `v3rings` stay in the code.)
 //      Coral Caverns  : wide caverns crusted with coral, rock pillars, big open water. Ore: coralite.
 //      Kelp Grottos   : tall caves of stone-rooted kelp you can climb; kelp walls you cut, which grow back. Verdigrite.
 //      Scald Vents    : black basalt. The water is hot (it burns without Scald armour or a Chillshell Charm),
@@ -56,8 +57,10 @@
   if (A.buildTiles && A.tiles && !A.tiles[TL.sealHeart]) { try { A.buildTiles(); } catch (e) { /* drawn plain */ } }
 
   // ---------------- geometry ----------------
-  const W = 1280, H = 1500, CUT = 436, CX = 640, CY = 1010;
-  const RX = [240, 295, 365, 435, 505, 585], RY = [85, 130, 185, 240, 295, 355];
+  const W = 1280, H = 1500, CUT = 436, CX = 640;
+  // band tops, from the top down: coral, kelp, heat, bone, void, chamber (each wobbles a little, but runs straight across)
+  const TOP = [452, 612, 772, 932, 1092, 1262], BJ = [5, 4, 3, 2, 1, 0];
+  const HALL = 300; // the Heart Chamber hall runs CX-300 .. CX+300
   const RING = ['chamber', 'void', 'bone', 'heat', 'kelp', 'coral'];
   const SEAL = [TL.sealHeart, TL.sealVoid, TL.sealBone, TL.sealHeat, TL.sealKelp, TL.sealCoral];
   const ROCK = [null, TL.voidrock, TL.fossil, TL.basalt, TL.kelprock, TL.reef];
@@ -66,23 +69,25 @@
   let LAY = null; // this world's ring layout (wobble seeds), set by the generator
 
   function noiseFn(seed) { return (x, y) => RW.noise2(x, y, seed); }
-  // which region a block is in: 0 chamber, 1 void, 2 bone, 3 heat, 4 kelp, 5 coral, 6 the shell outside. Also whether it is in a seal.
+  // which band a block is in: 0 chamber, 1 void, 2 bone, 3 heat, 4 kelp, 5 coral, 6 the shell above. Also whether it is in a seal
+  // (the top 3 rows of every band).
+  function topAt(k, x) { if (!LAY) return TOP[k]; return LAY.tops[k][Math.max(0, Math.min(W - 1, Math.floor(x)))]; }
   function regionAt(x, y) {
     if (!LAY) return { j: 6, seal: false };
-    const dx = x - CX, dy = y - CY, th = Math.atan2(dy, dx);
-    for (let j = 0; j < 6; j++) {
-      const w = 1 + 0.035 * Math.sin(3 * th + LAY.a[j]) + 0.02 * Math.sin(7 * th + LAY.b[j]);
-      const q = Math.hypot(dx / RX[j], dy / RY[j]) / w;
-      if (q <= 1) { const q2 = Math.hypot(dx / (RX[j] - 3), dy / (RY[j] - 3)) / w; return { j, seal: q2 > 1 }; }
-    }
+    for (let k = 5; k >= 0; k--) { const t = topAt(k, x); if (y >= t) return { j: BJ[k], seal: y < t + 3 }; }
     return { j: 6, seal: false };
+  }
+  const midOf = (j) => { const k = BJ.indexOf(j); return k < 0 ? CUT : Math.round((TOP[k] + (k < 5 ? TOP[k + 1] : H)) / 2); };
+  function makeLay(seed) {
+    const tops = TOP.map((t, k) => { const a = new Int16Array(W); for (let x = 0; x < W; x++) a[x] = t + Math.round((RW.noise2(x / 70, k * 13.1, seed + 91) - 0.5) * 14 + (RW.noise2(x / 17, k * 7.7, seed + 92) - 0.5) * 4); return a; });
+    return { tops };
   }
   RW.v3ringAt = (x, y) => (RW.v3ringsOn() && y >= CUT ? regionAt(x, y) : null);
 
   // ---------------- the generator ----------------
   function build(gen) {
     const seed = (gen.meta && gen.meta.seed) || 1, rnd = (a, b, k) => RW.hash2(a, b, seed + (k || 0));
-    LAY = { a: [], b: [] }; for (let j = 0; j < 6; j++) { LAY.a.push(rnd(j, 1, 77) * 6.283); LAY.b.push(rnd(j, 2, 77) * 6.283); }
+    LAY = makeLay(seed);
     const Wo = gen.W, Ho = gen.H; if (Wo !== W) return gen;
     const fg = new gen.fg.constructor(W * H), bg = new gen.bg.constructor(W * H);
     fg.set(gen.fg.subarray(0, CUT * W)); bg.set(gen.bg.subarray(0, CUT * W));
@@ -113,12 +118,12 @@
       if (open) fg[i] = Tt.water;
       else fg[i] = n4(x / 6 + j * 50, y / 6) > 0.8 ? ORE[j] : ROCK[j];
     }
-    // 2. a winding tunnel round the middle of every ring, so each ring is one connected space
+    // 2. a winding tunnel along the middle of every band, end to end, so each band is one connected space
     for (let j = 1; j <= 5; j++) {
-      const rxm = (RX[j - 1] + RX[j]) / 2, rym = (RY[j - 1] + RY[j]) / 2, steps = 2400;
+      const ym = midOf(j), steps = W * 2;
       for (let s = 0; s < steps; s++) {
-        const th = s / steps * 6.2832, wob = 1 + 0.12 * (n2(s / 90 + j * 9, 3) - 0.5) * 2;
-        const x = Math.round(CX + Math.cos(th) * rxm * wob), y = Math.round(CY + Math.sin(th) * rym * wob), rad = 2 + Math.round(n3(s / 40, j) * 3);
+        const xf = 4 + s / steps * (W - 8), wob = (n2(s / 160 + j * 9, 3) - 0.5) * 90;
+        const x = Math.round(xf), y = Math.round(ym + wob), rad = 2 + Math.round(n3(s / 40, j) * 3);
         for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
           if (dx * dx + dy * dy > rad * rad) continue; const xx = x + dx, yy = y + dy, rr = regionAt(xx, yy);
           if (rr.j === j && !rr.seal) set(xx, yy, Tt.water);
@@ -127,17 +132,17 @@
     }
     const meta = Object.assign({}, gen.meta);
     // 3. lairs: a big cave in each boss ring
-    const lairs = [], lair = (boss, j, th, rx, ry) => {
-      const rxm = (RX[j - 1] + RX[j]) / 2, rym = (RY[j - 1] + RY[j]) / 2, x = Math.round(CX + Math.cos(th) * rxm), y = Math.round(CY + Math.sin(th) * rym);
+    const lairs = [], lair = (boss, j, xf, rx, ry) => {
+      const x = Math.round(W * xf), y = midOf(j) + 10;
       for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) { if ((dx / rx) ** 2 + (dy / ry) ** 2 > 1) continue; const rr = regionAt(x + dx, y + dy); if (rr.j === j && !rr.seal) set(x + dx, y + dy, Tt.water); }
       // a flat floor along the bottom
       for (let dx = -rx + 3; dx <= rx - 3; dx++) for (let k = 0; k < 3; k++) { const rr = regionAt(x + dx, y + ry - k); if (rr.j === j && !rr.seal) set(x + dx, y + ry - k, ROCK[j]); }
       lairs.push({ boss, ring: RING[j], x, y, rx, ry });
     };
-    lair('v3b_grindmaw', 5, 0.7, 34, 16);
-    lair('v3b_frondwraith', 4, 2.4, 26, 22);
-    lair('v3b_scaldjaw', 3, -0.6, 28, 16);
-    lair('v3b_gravekeeper', 2, 1.57, 44, 20);
+    lair('v3b_grindmaw', 5, 0.72, 34, 16);
+    lair('v3b_frondwraith', 4, 0.22, 26, 22);
+    lair('v3b_scaldjaw', 3, 0.62, 28, 16);
+    lair('v3b_gravekeeper', 2, 0.35, 44, 20);
     meta.v3lairs = lairs;
     // 4. each ring's features
     const kelp = [], vents = [], bones = [], fans = [];
@@ -167,20 +172,27 @@
     }
     // giant ribcages in the bone ring: a spine and its ribs arching over the open water
     for (let k = 0; k < 14; k++) {
-      const th = rnd(k, 3, 31) * 6.283, rr = (RX[1] + RX[2]) / 2, ry = (RY[1] + RY[2]) / 2, sx = Math.round(CX + Math.cos(th) * rr), sy = Math.round(CY + Math.sin(th) * ry);
+      const sx = Math.round(40 + rnd(k, 3, 31) * (W - 80)), sy = Math.round(midOf(2) + (rnd(k, 5, 31) - 0.5) * 110);
       const len = 30 + Math.round(rnd(k, 4, 31) * 20);
       for (let i = 0; i < len; i++) { const x = sx + i - (len >> 1), y = sy - 8; const r = regionAt(x, y); if (r.j === 2 && !r.seal) set(x, y, TL.bone); }
       for (let i = 0; i < len; i += 5) for (let a = 0; a <= 16; a++) { const an = a / 16 * Math.PI, x = sx + i - (len >> 1) + Math.round(Math.cos(an) * 3), y = sy - 8 + Math.round(Math.sin(an) * 12); const r = regionAt(x, y); if (r.j === 2 && !r.seal && rnd(x, y, 3) > 0.15) set(x, y, TL.bone); }
     }
-    // 5. the chamber: a rocky floor and roof spikes; the altar and the golden chest
+    // 5. the chamber: a long hall at the bottom of the world, jagged void stone at its corners, a rocky floor and roof spikes
     meta.roofSpikes = [];
-    for (let x = CX - RX[0] + 4; x <= CX + RX[0] - 4; x++) {
-      let yb = CY + RY[0]; while (yb > CY && !(regionAt(x, yb).j === 0 && !regionAt(x, yb).seal)) yb--;
-      const fl = 6 + Math.round(n1(x / 14, 7) * 8); for (let k = 0; k < fl; k++) if (regionAt(x, yb - k).j === 0 && !regionAt(x, yb - k).seal) set(x, yb - k, TL.voidrock);
-      let yt = CY - RY[0]; while (yt < CY && !(regionAt(x, yt).j === 0 && !regionAt(x, yt).seal)) yt++;
+    const hTop = Math.max(...LAY.tops[5]) + 3, hBot = H - 4, CY = Math.round((hTop + hBot) / 2), ARX = HALL - 10, ARY = Math.round((hBot - hTop) / 2) - 3;
+    for (let y = hTop - 6; y < H - 3; y++) for (let x = 2; x < W - 2; x++) {
+      const r = regionAt(x, y); if (r.j !== 0 || r.seal) continue;
+      // a boxy hall (a squared-off oval holds the fighting ground) whose corners break into stepped, angular rock
+      const inHall = Math.abs(x - CX) < HALL && y >= hTop - 2 && y <= hBot, q = (Math.abs(x - CX) / (ARX + 18)) ** 4 + (Math.abs(y - CY) / (ARY + 9)) ** 4;
+      set(x, y, inHall && q < 1 + (n3(Math.floor(x / 4) * 1.3, Math.floor(y / 3) * 1.3) - 0.5) * 0.9 ? Tt.water : TL.voidrock);
+    }
+    for (let x = CX - HALL + 6; x <= CX + HALL - 6; x++) {
+      let yb = hBot; while (yb > CY && get(x, yb) !== Tt.water) yb--;
+      const fl = 4 + Math.round(n1(x / 14, 7) * 7); for (let k = 0; k < fl; k++) set(x, yb - k, TL.voidrock);
+      let yt = hTop; while (yt < CY && get(x, yt) !== Tt.water) yt++;
       if (x % 7 === 0) { const L = 3 + Math.round(rnd(x, 1, 41) * 8); for (let k = 0; k < L; k++) set(x, yt + k, TL.voidrock); meta.roofSpikes.push({ x, y: yt + L }); }
     }
-    meta.arena = { cx: CX, cy: CY, rx: RX[0], ry: RY[0] }; meta.riftAt = { x: CX, y: CY + RY[0] - 14 };
+    meta.arena = { cx: CX, cy: CY, rx: ARX, ry: ARY }; meta.riftAt = { x: CX, y: CY + ARY - 14 };
     if (Tt.levaltar != null) { let y = CY; while (y < H - 2 && !RW.TILES[get(CX, y + 1)].solid) y++; set(CX, y, Tt.levaltar); meta.v3altar = { x: CX, y }; }
     if (Tt.goldchest != null && Tt.goldchestr != null) {
       outer: for (let dx = 20; dx < 160; dx++) for (const s of [1, -1]) { const x = CX + s * dx; let y = CY; while (y < H - 2 && !RW.TILES[get(x, y + 1)].solid) y++; if (water(x, y) && water(x + 1, y) && RW.TILES[get(x + 1, y + 1)].solid) { set(x, y, Tt.goldchest); set(x + 1, y, Tt.goldchestr); meta.goldChest = { x, y }; break outer; } }
@@ -194,7 +206,7 @@
     // 7. everything open inside the rings is under water
     for (let y = CUT; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (fg[i] === Tt.air) { const r = regionAt(x, y); if (r.j <= 5) fg[i] = Tt.water; } }
     meta.legend = (meta.legend || []).filter((p) => p.y < CUT);
-    meta.v3kelp = kelp; meta.v3vents = vents; meta.v3bones = bones; meta.v3fans = fans; meta.v3rings = { CX, CY, RX, RY, CUT, a: LAY.a, b: LAY.b };
+    meta.v3kelp = kelp; meta.v3vents = vents; meta.v3bones = bones; meta.v3fans = fans; meta.v3rings = { CX, CY, CUT, top: TOP, bands: true };
     return Object.assign({}, gen, { W, H, fg, bg, meta });
   }
 
@@ -203,7 +215,7 @@
     const gen = prevGen.apply(this, arguments);
     if (!RW.v3ringsOn()) { LAY = null; return gen; }
     let out = gen;
-    try { out = build(gen); def.store = 'rockv4_' + ((gen.meta && gen.meta.seed) || 1).toString(36); def.core = out.meta.arena; def.size = [W, H]; } catch (e) { console.warn('rings', e); LAY = null; }
+    try { out = build(gen); def.store = 'rockv5_' + ((gen.meta && gen.meta.seed) || 1).toString(36); def.core = out.meta.arena; def.size = [W, H]; } catch (e) { console.warn('rings', e); LAY = null; }
     return out;
   };
 
@@ -264,10 +276,10 @@
       let held = false;
       for (let yy = Math.floor(ty) - 1; yy <= Math.floor(ty) + 1 && !held; yy++) for (let xx = Math.floor(tx) - 1; xx <= Math.floor(tx) + 1; xx++) if (WD.get(xx, yy) === TL.anchor) { held = true; break; }
       if (!held) {
-        const dx = CX * TS - c.x, dy = CY * TS - c.y, d = Math.hypot(dx, dy) || 1, t = performance.now() / 1000;
-        const surge = 0.6 + 0.4 * Math.sin(t * 0.7 + c.x * 0.001);
-        P.vx += ((dx / d) * 120 + (-dy / d) * 160) * surge * dt; P.vy += ((dy / d) * 120 + (dx / d) * 160) * surge * dt;
-        if (Math.random() < dt * 8) RW.fx.spawn({ x: c.x + RW.rand(-40, 40), y: c.y + RW.rand(-30, 30), vx: (-dy / d) * 80, vy: (dx / d) * 80, life: 0.8, color: '#3a2a6a', add: true, kind: 'glow', size: 1 });
+        // streams run along the band, each layer of water the other way, and the whole dark pulls down toward the abyss
+        const t = performance.now() / 1000, dir = Math.sin(ty / 9 + 1.3) > 0 ? 1 : -1, surge = 0.6 + 0.4 * Math.sin(t * 0.7 + c.x * 0.001);
+        P.vx += dir * 210 * surge * dt; P.vy += 70 * surge * dt;
+        if (Math.random() < dt * 8) RW.fx.spawn({ x: c.x + RW.rand(-40, 40), y: c.y + RW.rand(-30, 30), vx: dir * 90, vy: 20, life: 0.8, color: '#3a2a6a', add: true, kind: 'glow', size: 1 });
       } else if (!P.flags.v3anchorTip) { P.flags.v3anchorTip = 1; U.toast('You hold on to the anchor. The current cannot take you here.'); }
     }
     // kelp walls grow back
@@ -276,13 +288,13 @@
   };
   // kelp walls: when one is cut, it grows back after a while if nothing is in the way
   const cut = [];
-  const baseSet = WD.set;
-  if (baseSet) WD.set = function (x, y, t) { const was = WD.get(x, y); const r = baseSet.apply(this, arguments); if (LAY && was === TL.kelpwall && t !== TL.kelpwall) cut.push({ x, y, at: performance.now() + 40000 }); return r; };
+  const baseSet = WD.setTile;
+  if (baseSet) WD.setTile = function (x, y, t) { const was = WD.get(x, y); const r = baseSet.apply(this, arguments); if (LAY && was === TL.kelpwall && t !== TL.kelpwall) cut.push({ x, y, at: performance.now() + 40000 }); return r; };
   let regT = 0;
   function regrow(dt) {
     if ((regT -= dt) > 0 || !cut.length) return; regT = 1;
     const now = performance.now(), c = pc();
-    for (let i = cut.length - 1; i >= 0; i--) { const k = cut[i]; if (now < k.at) continue; const t = WD.get(k.x, k.y); if ((t === RW.T.water || t === RW.T.air) && Math.hypot(k.x * TS + 8 - c.x, k.y * TS + 8 - c.y) > 40) { WD.set(k.x, k.y, TL.kelpwall); } cut.splice(i, 1); }
+    for (let i = cut.length - 1; i >= 0; i--) { const k = cut[i]; if (now < k.at) continue; const t = WD.get(k.x, k.y); if ((t === RW.T.water || t === RW.T.air) && Math.hypot(k.x * TS + 8 - c.x, k.y * TS + 8 - c.y) > 40) { WD.setTile(k.x, k.y, TL.kelpwall); } cut.splice(i, 1); }
   }
 
   // ================= drawing the rings' living things =================
@@ -331,5 +343,5 @@
     return r;
   };
 
-  RW.v3ringsLib = { TL, regionAt: (x, y) => regionAt(x, y), RING, NAMES, CX, CY, RX, RY, CUT };
+  RW.v3ringsLib = { TL, regionAt: (x, y) => regionAt(x, y), topAt: (k, x) => topAt(k, x), midOf, RING, NAMES, CX, CUT, TOP, BJ, HALL, W, H, ROCK, ORE, get on() { return !!LAY; } };
 })(window.RW);
