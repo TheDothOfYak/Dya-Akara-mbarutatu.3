@@ -97,3 +97,6 @@ Read this first. It says where everything lives, so a change doesn't need the wh
 - From the session's clone: commit on `main` and `git push origin HEAD:main` (GitHub is linked with push access).
 - Then check the "Deploy Dya'Akara to GitHub Pages" and "…Firebase Hosting" runs: `gh run list -R TheDothOfYak/Dya-Akara-mbarutatu.3` (re-run Pages if it times out), and the live files.
 - If push is ever blocked again: use the GitHub upload page in the browser (`github.com/TheDothOfYak/Dya-Akara-mbarutatu.3/upload/main/four-brothers-world-v3`) and commit straight to main.
+- v3s18: item pictures with a Terraria-like pixel count plus about 40% (`RW.v3pixArt(id)`): 22 across for ordinary weapons/tools/armour, 34 for the Leviathan's gear, 25 for trinkets, centred; shrunk by majority colour then re-outlined (`down`), held items drawn from the same picture (16 or 24 units). Pickaxes are repainted with a thick Terraria-style head (`RW.v3pickIcon`). Plain 16x16 items are drawn as they are (`__noHD`).
+- Hub (`js/flake/hub.js`, `css/hub.css`): bigger glowing page arrows, bigger dots with names, mouse wheel paging, game picture strip (#strip).
+- v3s6 now: B is the rocks' only 1x1/2x2 switch (mining only; building is always one block); holding jump in water floats a rock up.
