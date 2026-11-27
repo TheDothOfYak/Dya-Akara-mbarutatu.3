@@ -261,7 +261,7 @@
       const cool = (worn('scald_helm') && worn('scald_mail')) || worn('t_chill') || (RW.v3nearTile && RW.v3nearTile('v3k_2_chill', 4));
       let superhot = false;
       for (let yy = Math.floor(ty) - 2; yy <= Math.floor(ty) + 2 && !superhot; yy++) for (let xx = Math.floor(tx) - 2; xx <= Math.floor(tx) + 2; xx++) { const t = WD.get(xx, yy); if (t === TL.magma || t === TL.vent) { superhot = true; break; } }
-      if (heatT <= 0 && wet && (superhot || !cool)) { heatT = superhot ? 0.6 : 1.0; P.hurt(superhot ? 7 : 3, 0, superhot ? 'superheated rock' : 'scalding water'); RW.fx.burst(c.x, c.y, ['#ffffff', '#ffb070'], 5, 40, { add: true, kind: 'glow', life: 0.5, grav: -60 }); if (!cool && !superhot && !P.flags.v3hotTip) { P.flags.v3hotTip = 1; U.toast('The water here is scalding. Scald armour or a Chillshell Charm keeps it off you.'); } }
+      if (heatT <= 0 && wet && (superhot || !cool) && !(RW.v3buff && RW.v3buff('heat'))) { heatT = superhot ? 0.6 : 1.0; P.hurt(superhot ? 7 : 3, 0, superhot ? 'superheated rock' : 'scalding water'); RW.fx.burst(c.x, c.y, ['#ffffff', '#ffb070'], 5, 40, { add: true, kind: 'glow', life: 0.5, grav: -60 }); if (!cool && !superhot && !P.flags.v3hotTip) { P.flags.v3hotTip = 1; U.toast('The water here is scalding. Scald armour or a Chillshell Charm keeps it off you.'); } }
       // geysers: every vent blasts for a moment every few seconds and throws you upward
       const now = performance.now() / 1000;
       (M().v3vents || []).forEach((v) => { const ph = (now + v.ph) % 4.5; if (ph < 1.1 && Math.abs(v.x * TS + 8 - c.x) < 22 && c.y < v.y * TS && c.y > v.y * TS - 14 * TS) { P.vy = Math.min(P.vy, -480); } });
@@ -274,7 +274,7 @@
     // The Hollow Dark: currents drag you toward the abyss unless you hold on beside a glowing anchor
     if (here.j === 1 && wet) {
       let held = false;
-      for (let yy = Math.floor(ty) - 1; yy <= Math.floor(ty) + 1 && !held; yy++) for (let xx = Math.floor(tx) - 1; xx <= Math.floor(tx) + 1; xx++) { const q = WD.get(xx, yy); if (q === TL.anchor || q === RW.T.v3k_4_anchorstone) { held = true; break; } }
+      for (let yy = Math.floor(ty) - 1; yy <= Math.floor(ty) + 1 && !held; yy++) for (let xx = Math.floor(tx) - 1; xx <= Math.floor(tx) + 1; xx++) { const q = WD.get(xx, yy); if (q === TL.anchor || q === RW.T.v3k_4_anchorstone) { held = true; break; } } if (RW.v3buff && RW.v3buff('anchor')) held = true;
       if (!held) {
         // streams run along the band, each layer of water the other way, and the whole dark pulls down toward the abyss
         const t = performance.now() / 1000, dir = Math.sin(ty / 9 + 1.3) > 0 ? 1 : -1, surge = 0.6 + 0.4 * Math.sin(t * 0.7 + c.x * 0.001);

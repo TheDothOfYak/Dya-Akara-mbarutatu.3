@@ -109,7 +109,7 @@
       const f = document.getElementById('cfilter'); if (f) Array.from(f.querySelectorAll('button.chip')).forEach((b) => b.remove());
       const list = document.getElementById('rlist'); if (!list) return r;
       const Pl = P, boxes = RW.chests ? RW.chests.nearby() : [], cnt = (id) => Pl.count(id) + (RW.chests ? RW.chests.nearCount(id, boxes) : 0);
-      const near = { knap: Pl.nearStation('knap'), forge: Pl.nearStation('forge'), grow: Pl.nearStation('grow') };
+      const near = new Proxy({}, { get: (o, k) => (k in o ? o[k] : (o[k] = Pl.nearStation(k))) }); { const lab = f && f.querySelector('.label'); if (lab && near.v3brew && !/cauldron/.test(lab.textContent)) lab.textContent = lab.textContent.replace('Near: hands', 'Near: hands, brewing cauldron'); }
       const rows = RW.RECIPES.filter((q) => RW.ITEMS[q.out]).map((q) => { const haveAll = Object.entries(q.in).every(([id, n]) => cnt(id) >= n), station = !q.at || near[q.at]; return { q, ok: haveAll && station && !q.locked, haveAll, station }; });
       rows.sort((a, b) => (b.ok - a.ok) || ((b.haveAll ? 1 : 0) - (a.haveAll ? 1 : 0)));
       list.innerHTML = '';
@@ -122,7 +122,7 @@
         const ing = el('div', 'ing');
         Object.entries(q.in).forEach(([id, n]) => { if (!RW.ITEMS[id]) return; const have = cnt(id), ch = el('span', 'chip2 ' + (have >= n ? 'ok' : 'no')); const ic = el('canvas'); ic.width = ic.height = 16; paint(ic, id); ch.append(ic, document.createTextNode(Math.min(have, n) + '/' + n)); ch.title = RW.ITEMS[id].name; ing.append(ch); });
         mid.append(ing);
-        if (q.at) mid.append(el('div', 'at', (q.at === 'forge' ? 'At a forge' : q.at === 'grow' ? 'At a growing altar' : 'At a knapping stone') + (station ? '' : ' (not nearby)')));
+        if (q.at) mid.append(el('div', 'at', (q.at === 'forge' ? 'At a forge' : q.at === 'grow' ? 'At a growing altar' : q.at === 'v3brew' ? 'At a brewing cauldron' : 'At a knapping stone') + (station ? '' : ' (not nearby)')));
         if (q.locked) mid.append(el('div', 'lock', q.locked));
         const b = el('button', 'btn small', 'Craft'); b.type = 'button'; b.disabled = !ok; b.onclick = () => U.craft(q);
         if (U.attachTip) U.attachTip(c, () => ({ id: q.out }));

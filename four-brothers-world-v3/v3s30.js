@@ -13,7 +13,7 @@
   const WD = RW.world, E = RW.ent, TS = RW.TILE;
   if (!WD || !E) return;
   const BUILT = { brick: 1, plank: 1, plate: 1, stake: 1, books: 1 };
-  const NATTEX = { rough: 1, layer: 1, sand: 1, soil: 1, pebble: 1, nodule: 1, spire: 1 };
+  const NATTEX = { rough: 1, layer: 1, sand: 1, soil: 1, soil2: 1, pebble: 1, nodule: 1, spire: 1 };
   const T = () => RW.TILES;
   const on = () => WD.def && WD.def.id === 'rock';
   const shapeable = (id) => { const t = T()[id]; return !!(t && t.solid && !t.decor && NATTEX[t.tex] && !t.ore && !t.loot && !t.storage && !t.toggle && (t.hard || 0) < 50); };
