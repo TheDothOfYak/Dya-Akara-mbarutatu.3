@@ -30,6 +30,17 @@ The git history is Isaac's dated proof of when every idea, file and change was m
 - Keep the visible `© 2026 Isaac Flake. All Rights Reserved.` line in the pause/settings menus
   (class `copyright`). It stays small and in menus only, never over gameplay.
 
+## Pull request and commit names (always)
+- A pull request's title must say what the change actually does, in plain words a player or
+  Isaac would understand: e.g. "Skaar Uverkhron: add a save button to the pause menu".
+- Never use the branch name, a random or auto-generated name (like `claude/brave-keller-9rg1uw`),
+  "Update files", "Fixes", "WIP" or a vague label as the title.
+- Start with the game or area it touches (Dya'Akara, 4 Brothers World V3, Torcain's Run, Skaar Uverkhron,
+  Punk Races, Stryx Pilot, Tuftwood, Little Dungeon, Flake Games home, Repo), then what changed.
+- If one pull request covers several things, name the main one and list the rest in the description.
+- If the work changes after the PR is opened, update the title so it still matches.
+- Commit messages follow the same rule: say what changed, not just "update".
+
 ## Backups
 - `bash tools/backup.sh` makes `backups/flake-games-backup-<date>.zip` with the full dated history
   (`repo.bundle`), the files (`source.zip`), a commit log and SHA-256 fingerprints.
