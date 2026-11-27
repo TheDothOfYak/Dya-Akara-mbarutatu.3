@@ -291,7 +291,8 @@
         const im = el('img', { alt: '' }); previewSrc(x, src => { if (src) im.src = src; else im.remove(); });
         b.appendChild(im); b.appendChild(el('span', { text: nm })); strip.appendChild(b);
       });
-      const on = strip.querySelector('.thumb.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const on = strip.querySelector('.thumb.on'); // keep the current game's picture in view by scrolling the strip only, never the page
+      if (on) { const l = on.offsetLeft - strip.offsetLeft, r = l + on.offsetWidth; if (l < strip.scrollLeft) strip.scrollLeft = l; else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth; }
     }
     show.style.setProperty('--cycle', CYCLE_MS + 'ms');
     skyTarget = Object.assign({}, look[narrow() ? 'skyNarrow' : 'sky']);
