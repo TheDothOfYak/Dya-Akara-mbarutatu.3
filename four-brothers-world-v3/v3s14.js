@@ -136,6 +136,7 @@
       const id = uid('w'), name = (inp.value || '').trim().slice(0, 28) || RW.pick(NAME_A) + RW.pick(NAME_B);
       const l2 = worlds(); l2.push({ id, name, at: Date.now() }); setWorlds(l2);
       raw.set('v2_rockseed@w' + id, 1 + Math.floor(Math.random() * 2147483000));
+      raw.set('v3_rings@w' + id, 1); // new worlds have the rings around the Heart Chamber (v3s22)
       play(id);
     }));
     b.append(mk);
