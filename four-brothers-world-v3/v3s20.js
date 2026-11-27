@@ -56,26 +56,28 @@
     fan(g, cx + R * 0.35, cy - R * 0.55, -1.9, -2.75, 5, R * tall * 0.75, R * tall, T, true);
     // a ventral fin on some lengths
     if (v === 1) fan(g, cx + R * 0.2, cy + R * 0.6, 2.0, 2.7, 4, R * 0.7, R * 0.95, T, true);
-    // body
-    ellipse(g, cx, cy, R * 1.0, R * 0.98, P[1]);
-    ellipse(g, cx + R * 0.05, cy - R * 0.08, R * 0.94, R * 0.86, P[2]);
-    g.save(); g.beginPath(); g.ellipse(cx, cy, R * 1.0, R * 0.98, 0, 0, 6.283); g.clip();
-    g.fillStyle = P[0]; g.fillRect(cx - R * 1.1, cy - R * 1.1, R * 2.2, R * 0.38); // the dark ridge of the back
-    g.fillStyle = P[3]; g.fillRect(cx - R * 1.1, cy - R * 0.62, R * 2.2, R * 0.18); // light along the upper flank
-    if (stage === 3) { ellipse(g, cx, cy + R * 0.1, R * 0.9, R * 0.5, T.dark[1]); for (let k = 0; k < 3; k++) { g.strokeStyle = T.plate[4]; g.lineWidth = Math.max(1, R * 0.1); g.beginPath(); g.arc(cx - R * 0.45 + k * R * 0.45, cy + R * 0.05, R * 0.55, -2.4, -0.7); g.stroke(); } }
-    // the pale belly with its plates
-    g.fillStyle = B[1]; g.beginPath(); g.ellipse(cx, cy + R * 0.95, R * 1.3, R * 0.6, 0, 0, 6.283); g.fill();
-    g.fillStyle = B[2]; g.fillRect(cx - R * 1.1, cy + R * 0.38, R * 2.2, Math.max(1, R * 0.08));
-    for (let k = 0; k < 4; k++) { g.fillStyle = B[0]; g.fillRect(Math.round(cx - R + k * R * 0.55), cy + R * 0.45, 1, R * 0.5); }
-    // scales: rows of small dark arcs
-    for (let row = 0; row < 3; row++) for (let k = 0; k < 4; k++) { const x = cx - R * 0.75 + k * R * 0.5 + (row % 2) * R * 0.25, y = cy - R * 0.3 + row * R * 0.25; g.strokeStyle = P[1]; g.lineWidth = 1; g.beginPath(); g.arc(x, y, R * 0.14, 0.3, 2.8); g.stroke(); }
-    if (stage === 2) for (let k = 0; k < 2; k++) { const gx = cx - R * 0.3 + k * R * 0.6, gy = cy - R * 0.4, sz = Math.max(1.2, R * 0.1); poly(g, [[gx, gy - sz], [gx + sz, gy], [gx, gy + sz], [gx - sz, gy]], T.gems[k % T.gems.length]); }
+    // body: angular armour, no round shapes. An eight-sided ring: a back plate, two flank plates, belly plates
+    const oct = (k) => [[cx - R * 0.55 * k, cy - R * k], [cx + R * 0.55 * k, cy - R * k], [cx + R * k, cy - R * 0.45 * k], [cx + R * k, cy + R * 0.45 * k], [cx + R * 0.55 * k, cy + R * k], [cx - R * 0.55 * k, cy + R * k], [cx - R * k, cy + R * 0.45 * k], [cx - R * k, cy - R * 0.45 * k]];
+    poly(g, oct(1), P[0]);
+    poly(g, [[cx - R * 0.5, cy - R * 0.92], [cx + R * 0.5, cy - R * 0.92], [cx + R * 0.9, cy - R * 0.42], [cx - R * 0.9, cy - R * 0.42]], P[3]); // the back plate
+    poly(g, [[cx - R * 0.4, cy - R * 0.92], [cx + R * 0.5, cy - R * 0.92], [cx + R * 0.6, cy - R * 0.8], [cx - R * 0.5, cy - R * 0.8]], P[4]); // its lit edge
+    poly(g, [[cx - R * 0.92, cy - R * 0.36], [cx + R * 0.92, cy - R * 0.36], [cx + R * 0.92, cy + R * 0.36], [cx - R * 0.92, cy + R * 0.36]], P[2]); // the flank plate
+    poly(g, [[cx - R * 0.92, cy - R * 0.36], [cx + R * 0.92, cy - R * 0.36], [cx + R * 0.92, cy - R * 0.24], [cx - R * 0.92, cy - R * 0.24]], P[3]);
+    if (stage === 3) { poly(g, [[cx - R * 0.9, cy - R * 0.2], [cx + R * 0.9, cy - R * 0.2], [cx + R * 0.9, cy + R * 0.34], [cx - R * 0.9, cy + R * 0.34]], T.dark[1]); for (let k = 0; k < 3; k++) poly(g, [[cx - R * 0.6 + k * R * 0.45, cy - R * 0.3], [cx - R * 0.5 + k * R * 0.45, cy - R * 0.3], [cx - R * 0.4 + k * R * 0.45, cy + R * 0.3], [cx - R * 0.5 + k * R * 0.45, cy + R * 0.3]], T.plate[4]); }
+    // belly plates, each its own block with a seam
+    for (let k = 0; k < 3; k++) { const x0 = cx - R * 0.9 + k * R * 0.62; poly(g, [[x0, cy + R * 0.42], [x0 + R * 0.56, cy + R * 0.42], [x0 + R * 0.5 - (k === 2 ? R * 0.1 : 0), cy + R * 0.92], [x0 + R * 0.06 + (k === 0 ? R * 0.2 : 0), cy + R * 0.92]], B[1]); poly(g, [[x0, cy + R * 0.42], [x0 + R * 0.56, cy + R * 0.42], [x0 + R * 0.56, cy + R * 0.5], [x0, cy + R * 0.5]], B[2]); }
+    // scale notches along the flank, angular
+    for (let k = 0; k < 4; k++) { const x = cx - R * 0.7 + k * R * 0.45; poly(g, [[x, cy - R * 0.1], [x + R * 0.18, cy - R * 0.1], [x + R * 0.09, cy + R * 0.08]], P[1]); }
+    // the plate seams (dark lines)
+    g.fillStyle = P[0]; g.fillRect(cx - R * 0.95, cy - R * 0.42, R * 1.9, Math.max(1, R * 0.05)); g.fillRect(cx - R * 0.95, cy + R * 0.38, R * 1.9, Math.max(1, R * 0.05));
+    if (stage === 2) for (let k = 0; k < 2; k++) { const gx = cx - R * 0.3 + k * R * 0.6, gy = cy - R * 0.62, sz = Math.max(1.2, R * 0.1); poly(g, [[gx, gy - sz], [gx + sz, gy], [gx, gy + sz], [gx - sz, gy]], T.gems[k % T.gems.length]); }
     if (stage === 4) {
       g.strokeStyle = T.crack[1]; g.lineWidth = Math.max(1, R * 0.06); g.beginPath(); g.moveTo(cx - R * 0.5, cy - R * 0.5); g.lineTo(cx - R * 0.15, cy - R * 0.1); g.lineTo(cx - R * 0.3, cy + R * 0.3); g.moveTo(cx + R * 0.2, cy - R * 0.7); g.lineTo(cx + R * 0.35, cy - R * 0.25); g.stroke();
-      ellipse(g, cx - R * 0.05, cy + R * 0.02, R * 0.3, R * 0.24, T.crack[0]); ellipse(g, cx - R * 0.05, cy + R * 0.02, R * 0.2, R * 0.15, T.crack[1]); ellipse(g, cx - R * 0.08, cy - R * 0.01, R * 0.09, R * 0.07, T.crack[2]);
+      poly(g, [[cx - R * 0.3, cy - R * 0.15], [cx + R * 0.2, cy - R * 0.2], [cx + R * 0.25, cy + R * 0.2], [cx - R * 0.25, cy + R * 0.22]], T.crack[0]); poly(g, [[cx - R * 0.15, cy - R * 0.08], [cx + R * 0.1, cy - R * 0.1], [cx + R * 0.12, cy + R * 0.1], [cx - R * 0.12, cy + R * 0.12]], T.crack[1]);
     }
+    g.save();
     // the seam
-    g.fillStyle = T.seam; g.fillRect(cx - R * 1.1, cy + R * 0.12, R * 2.2, Math.max(1, R * 0.05));
+    g.fillStyle = T.seam; g.fillRect(cx - R * 0.92, cy + R * 0.12, R * 1.84, Math.max(1, R * 0.05));
     g.restore();
     VA.finish(c, palOf(T)); c.cy = cy; c.cx = cx; return c;
   }
@@ -168,7 +170,8 @@
     }
     for (let k = -3; k <= 3; k++) { const a = Math.PI + k * 0.24, L = R * (3.2 - Math.abs(k) * 0.25); poly(g, [[cx, cy - R * 0.25], [cx + Math.cos(a - 0.1) * L, cy + Math.sin(a - 0.1) * L], [cx + Math.cos(a + 0.1) * L, cy + Math.sin(a + 0.1) * L], [cx, cy + R * 0.25]], k % 2 ? T.fin[1] : T.fin[0]); }
     for (let k = -3; k <= 3; k++) { const a = Math.PI + k * 0.24, L = R * (3.1 - Math.abs(k) * 0.25); g.strokeStyle = T.fin[2]; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * L, cy + Math.sin(a) * L); g.stroke(); }
-    ellipse(g, cx, cy, R * 0.9, R * 0.8, T.plate[2]); ellipse(g, cx + R * 0.1, cy - R * 0.2, R * 0.5, R * 0.4, T.plate[3]);
+    poly(g, [[cx - R * 0.9, cy - R * 0.4], [cx - R * 0.4, cy - R * 0.8], [cx + R * 0.5, cy - R * 0.8], [cx + R * 0.9, cy - R * 0.3], [cx + R * 0.9, cy + R * 0.3], [cx + R * 0.5, cy + R * 0.8], [cx - R * 0.4, cy + R * 0.8], [cx - R * 0.9, cy + R * 0.4]], T.plate[2]);
+    poly(g, [[cx - R * 0.4, cy - R * 0.7], [cx + R * 0.5, cy - R * 0.7], [cx + R * 0.7, cy - R * 0.3], [cx - R * 0.5, cy - R * 0.3]], T.plate[3]);
     VA.finish(c, palOf(T)); c.cx = cx; c.cy = cy; return c;
   }
   // a big pectoral fin, hanging back and down from a segment
