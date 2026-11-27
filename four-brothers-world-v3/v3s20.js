@@ -148,19 +148,19 @@
     [[36, 48, 2.72, 20, 2], [33, 50, 2.88, 16, 1.8], [40, 52, 2.5, 14, 1.6], [30, 46, 3.02, 18, 1.6]].forEach(([x, y, a, L, w], k) => blade(g, x, y, a - sw * 0.03, L, w, k % 2 ? P[0] : P[1], P[3]));
     // the inside of the mouth: a dark wedge from the hinge to the lips, ridges on the palate, the throat
     const jawPt = (d, off) => [hx + Math.cos(open) * d - Math.sin(open) * (off || 0), hy + Math.sin(open) * d + Math.cos(open) * (off || 0)];
-    poly(g, [[hx - 2, hy - 1], [110, lipY], jawPt(62, -1), jawPt(4, 2)], T.mouth[0]);
+    poly(g, [[hx - 2, hy - 1], [99, lipY], jawPt(50, -1), jawPt(4, 2)], T.mouth[0]);
     poly(g, [[hx + 1, hy + 1], [hx + 9, hy - 1], [hx + 13, hy + 4 + open * 8], [hx + 5, hy + 6 + open * 12]], T.mouth[1]); // the throat
-    if (open > 0.4) { const [tx, ty] = jawPt(30, -6); poly(g, [[hx + 8, hy + 2], [tx + 8, ty - 2 - sway], [tx + 16, ty + 1], [hx + 14, hy + 8 + open * 10]], T.tongue); poly(g, [[tx + 8, ty - 2 - sway], [tx + 20, ty - 5], [tx + 16, ty + 1]], T.tongue); } // the tongue lifts from the throat, forked
+    if (open > 0.4) { const [tx, ty] = jawPt(22, -6); poly(g, [[hx + 6, hy + 1], [tx + 2, ty - 4 - sway], [tx + 8, ty - 3 - sway], [tx + 9, ty + 2], [hx + 12, hy + 9 + open * 10]], T.tongue); poly(g, [[tx + 6, ty - 3 - sway], [tx + 11, ty - 7 - sway], [tx + 9, ty - 1]], T.ridge); poly(g, [[tx + 7, ty + 1], [tx + 12, ty + 2], [tx + 8, ty + 3]], T.ridge); } // the tongue: short, thick and squared, with hooked barbs
     for (let k = 0; k < 7; k++) { const x = 60 + k * 7; poly(g, [[x, lipY + 1], [x + 4, lipY + 1], [x + 2, lipY + 3]], T.ridge); }
     // the lower jaw, drawn flat then turned about the hinge
-    const J = mk(74, 30), jg = J.ctx, jy = 5; // jy: the inner edge (where the teeth stand)
+    const JL = 0.8, J = mk(Math.ceil(74 * JL), 30), jg = J.ctx, jy = 5; jg.scale(JL, 1); // jy: the inner edge (where the teeth stand); 3.17: the lower jaw 20% shorter
     poly(jg, [[0, jy - 1], [66, jy - 1], [73, jy - 5], [72, jy + 3], [62, jy + 9], [8, jy + 12], [0, jy + 7]], P[1]); // outer side: a hard mandible, straight edges and sharp corners (3.16)
     poly(jg, [[2, jy + 7], [62, jy + 5], [60, jy + 9], [8, jy + 12]], P[0]); poly(jg, [[4, jy + 3], [62, jy + 2], [62, jy + 4], [4, jy + 5]], P[2]); jg.fillStyle = '#020204'; jg.fillRect(4, jy + 5, 58, 1); for (const x of [18, 34, 50]) jg.fillRect(x, jy + 1, 1, 10); // the underside, a hard plate edge, black seams
     poly(jg, [[2, jy], [64, jy], [62, jy + 2], [2, jy + 3]], P[3]); // the lit lip line
     [[14, 2.5, 7], [28, 2.2, 6], [42, 2, 5], [56, 1.6, 4]].forEach(([x, w, L]) => { const y0 = jy + 12 - (x - 8) * 3 / 54; poly(jg, [[x - w, y0], [x - 2, y0 + L], [x + w, y0]], P[2]); }); // barbs under the jaw, raked back
     
     poly(jg, [[3, jy - 1], [64, jy - 1], [64, jy + 1], [3, jy + 1]], T.gum); // the gum
-    if (open > 0.3 || sway) poly(jg, [[6, jy - 2], [30, jy - 3 - (sway ? 1 : 0)], [44, jy - 2], [40, jy], [6, jy]], T.tongue); // the tongue lies along the floor of the jaw
+    if (open > 0.3 || sway) { poly(jg, [[6, jy - 2], [20, jy - 4 - (sway ? 1 : 0)], [30, jy - 4], [34, jy - 1], [6, jy]], T.tongue); poly(jg, [[28, jy - 4], [32, jy - 6], [31, jy - 3]], T.ridge); } // a short thick tongue on the floor of the jaw, a barb at its tip
     // lower teeth: a crooked row, long fangs near the front
     const LT = [[9, 2], [12, 3], [15, 2], [18, 4], [21, 2], [24, 3], [27, 5], [31, 2], [34, 4], [37, 3], [41, 6], [45, 2], [48, 4], [52, 3], [57, 13], [62, 3], [65, 5], [68, 4]]; // 57: a tusk that rises past the upper lip
     LT.forEach(([x, L], k) => { const lean = L > 10 ? 1 : k % 3 === 0 ? 1 : 0, w = L > 10 ? 2.2 : L > 4 ? 1.2 : 0.8; poly(jg, [[x - w, jy - 0.5], [x + lean, jy - L], [x + w, jy - 0.5]], L > 4 ? fang : bone); if (L > 10) poly(jg, [[x + 0.4, jy - 0.5], [x + lean, jy - L], [x + w, jy - 0.5]], bone); });
@@ -172,39 +172,39 @@
       for (let k = 0; k < 4; k++) { const t = 0.2 + k * 0.2; g.strokeStyle = k % 2 ? T.ridge : P[0]; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.round(hx - 5 + (ux - hx + 5) * t), Math.round(hy - 1 + (uy - hy + 1) * t)); g.lineTo(Math.round(hx - 4 + (lx - hx + 4) * t), Math.round(hy + 3 + open * 5 + (ly - hy - 3 - open * 5) * t)); g.stroke(); }
     }
     // the skull: a wedge of armour plates
-    poly(g, [[24, 40], [28, 28], [42, 18], [60, 24], [70, 30], [74, 35], [92, 37], [104, 39], [110, 35], [114, 30], [115, 42], [110, 46], [56, lipY], [48, 46], [40, 55], [28, 51]], P[1]);
+    poly(g, [[24, 40], [28, 28], [42, 18], [60, 24], [70, 30], [74, 34], [86, 35], [96, 36], [101, 33], [104, 31], [106, 37], [105, 45], [102, 51], [99, 47], [56, lipY], [48, 46], [40, 55], [28, 51]], P[1]); // 3.17: a shorter, deeper snout ending in a hooked beak bent down over the jaw
     poly(g, [[29, 29], [42, 19], [58, 25], [52, 30], [40, 32], [30, 36]], P[3]); poly(g, [[31, 36], [40, 32], [52, 30], [56, 34], [44, 36], [34, 40]], P[2]); // the crown plates, lit
     poly(g, [[42, 19], [60, 24], [70, 30], [58, 29]], P[4]); // its sharp front edge
-    poly(g, [[44, 26], [62, 24], [70, 30], [58, 31], [46, 30]], P[4]); poly(g, [[70, 30], [74, 27], [72, 31]], P[4]); poly(g, [[46, 30], [58, 31], [70, 30], [66, 37], [48, 37]], dk); // 3.14: brow and eye further back and higher // the brow ridge with its spur, and the shadow under it
-    poly(g, [[73, 37], [92, 39], [104, 41], [96, 42], [76, 41]], P[3]); poly(g, [[92, 39], [104, 41], [109, 38], [111, 34], [107, 40]], P[4]); // the snout plates
-    poly(g, [[56, 41], [100, 43], [110, 46], [56, lipY]], P[2]); // the upper lip plate
+    poly(g, [[44, 26], [62, 24], [70, 30], [58, 31], [46, 30]], P[4]); poly(g, [[70, 30], [73, 27], [71.5, 31]], P[4]); poly(g, [[46, 30], [58, 31], [70, 30], [66, 37], [48, 37]], dk); // 3.14: brow and eye further back and higher // the brow ridge with its spur, and the shadow under it
+    poly(g, [[72.5, 37], [87.5, 39], [97, 41], [91, 42], [75, 41]], P[3]); poly(g, [[87.5, 39], [97, 41], [101, 38], [103, 34], [99.5, 40]], P[4]); // the snout plates
+    poly(g, [[56, 41], [94, 43], [102, 46], [56, lipY]], P[2]); // the upper lip plate
     poly(g, [[30, 40], [44, 36], [56, 38], [48, 44], [38, 47]], P[2]); poly(g, [[34, 41], [44, 38], [52, 39], [44, 42]], P[3]); // the cheek plate
     for (const [a, b, cc, d] of [[44, 35, 52, 44], [56, 38, 56, 46], [76, 41, 78, 46], [90, 42, 91, 46]]) { g.strokeStyle = P[0]; g.lineWidth = 1; g.beginPath(); g.moveTo(a, b); g.lineTo(cc, d); g.stroke(); } // seams
     [[78, 37, 4], [84, 38, 5], [90, 38, 4], [96, 39, 5], [102, 40, 3]].forEach(([x, y, L]) => poly(g, [[x - 2, y], [x - 1, y - L], [x + 2, y]], P[3])); // the spike ridge down the snout
-    poly(g, [[106, 41], [111, 40], [109, 43]], '#020204'); // the nostril
+    poly(g, [[99, 41], [103, 40], [101, 43]], '#020204'); // the nostril
     // 3.15: hard plates. Black seams cut straight along every plate edge, cracks split them, chunks are torn out of
     // the outline, old scars cross the face, raw flesh shows in the tears and barnacles crust the snout
     const BLK = '#020204', SCAR = '#8a6e66', FLESH = ['#3a0806', '#6a140e'], BARN = ['#9a9282', '#c8c0a8'];
     const ln = (pts, cc) => { g.strokeStyle = cc; g.lineWidth = 1; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x + 0.5, y + 0.5) : g.moveTo(x + 0.5, y + 0.5))); g.stroke(); };
-    ln([[30, 36], [40, 32], [52, 30], [58, 29]], BLK); ln([[34, 40], [44, 37], [56, 38]], BLK); ln([[73, 37], [76, 41]], BLK); ln([[56, 41], [100, 43]], BLK); ln([[104, 41], [109, 38]], BLK); // plate edges
-    ln([[36, 29], [38, 32], [36, 35], [37, 37]], BLK); ln([[84, 39], [86, 41], [85, 43]], BLK); ln([[42, 41], [45, 44], [43, 47]], BLK); ln([[64, 41], [66, 44]], BLK); // cracks
+    ln([[30, 36], [40, 32], [52, 30], [58, 29]], BLK); ln([[34, 40], [44, 37], [56, 38]], BLK); ln([[72.5, 37], [75, 41]], BLK); ln([[56, 41], [94, 43]], BLK); ln([[97, 41], [101, 38]], BLK); // plate edges
+    ln([[36, 29], [38, 32], [36, 35], [37, 37]], BLK); ln([[81, 39], [83, 41], [82, 43]], BLK); ln([[42, 41], [45, 44], [43, 47]], BLK); ln([[64, 41], [66, 44]], BLK); // cracks
     g.globalCompositeOperation = 'destination-out'; // torn out of the outline
-    poly(g, [[62, 25], [66, 27], [63, 29]], '#000'); poly(g, [[33, 50], [37, 52], [34, 54]], '#000'); poly(g, [[94, 37.5], [97, 38.5], [95, 40]], '#000');
+    poly(g, [[62, 25], [66, 27], [63, 29]], '#000'); poly(g, [[33, 50], [37, 52], [34, 54]], '#000'); poly(g, [[89, 37.5], [91.5, 38.5], [90, 40]], '#000');
     g.globalCompositeOperation = 'source-over';
     poly(g, [[63, 28.5], [65.5, 27.6], [64, 30]], FLESH[1]); poly(g, [[34, 52.5], [36.5, 52.4], [35, 55.5]], FLESH[0]); px(35, 56, FLESH[1]); // raw flesh in the tears
     ln([[37, 37], [43, 41], [49, 44], [53, 46]], SCAR); [[40, 38], [46, 42], [51, 45]].forEach(([x, y]) => ln([[x - 1, y + 1], [x + 1, y - 1]], SCAR)); // a long stitched scar down the cheek
     ln([[57, 26], [56, 30], [56, 36], [55, 39]], SCAR); // the old wound through the eye
-    [[98, 42], [100, 43], [102, 42], [88, 44], [70, 43]].forEach(([x, y], k) => { px(x, y, BARN[k % 2]); px(x + 1, y, BARN[1]); px(x, y + 1, BARN[0]); px(x + 1, y + 1, BLK); }); // barnacles
+    [[92.5, 42], [94, 43], [95.5, 42], [84.5, 44], [70, 43]].forEach(([x, y], k) => { px(x, y, BARN[k % 2]); px(x + 1, y, BARN[1]); px(x, y + 1, BARN[0]); px(x + 1, y + 1, BLK); }); // barnacles
     // the eye: a tiny red slit deep under the brow, burning
     const EYE = '#ff2a14', EYEH = '#ffc0a0', EYEG = '#7a1008';
     poly(g, [[51, 31.6], [61, 30.6], [59, 34], [52, 34]], BLK); poly(g, [[52.5, 32.2], [59.5, 31.4], [58, 32.9], [53.5, 33.1]], EYEG); poly(g, [[54, 32.3], [58.5, 31.7], [57.5, 32.6], [54.5, 32.8]], EYE); px(57, 32, EYEH);
     // upper teeth, hanging from the lip: every length, two long fangs
-    const UT = [[58, 2], [61, 3], [64, 2], [67, 4], [70, 2], [73, 3], [76, 5], [79, 2], [82, 3], [85, 4], [88, 2], [91, 6], [94, 3], [97, 2], [100, 8], [103, 3], [106, 5], [109, 3]];
+    const UT = [[58, 2], [61, 3], [64, 2], [67, 4], [70, 2], [72.5, 3], [75, 5], [77, 2], [79.5, 3], [82, 4], [84.5, 2], [87, 6], [89, 3], [91.5, 2], [94, 8], [96.5, 3], [99, 5], [101, 3]];
     UT.forEach(([x, L], k) => { const lean = k % 4 === 1 ? -1 : 0, y0 = lipY - 0.5 + (x - 56) * -0.01; poly(g, [[x - (L > 4 ? 1.3 : 0.8), y0], [x + lean, y0 + L], [x + (L > 4 ? 1.3 : 0.8), y0]], L > 4 ? fang : bone); });
-    [[74, 13], [97, 16]].forEach(([x, L]) => { poly(g, [[x - 2.4, lipY - 1], [x + 1, lipY + L], [x + 2.4, lipY - 1]], fang); poly(g, [[x + 0.3, lipY - 1], [x + 1, lipY + L], [x + 2.4, lipY - 1]], bone); px(x + 1, lipY + L - 1, sh(fang, -0.4)); }); // two great fangs that hang past the lower jaw even when it is shut
+    [[73, 13], [91, 16]].forEach(([x, L]) => { poly(g, [[x - 2.4, lipY - 1], [x + 1, lipY + L], [x + 2.4, lipY - 1]], fang); poly(g, [[x + 0.3, lipY - 1], [x + 1, lipY + L], [x + 2.4, lipY - 1]], bone); px(x + 1, lipY + L - 1, sh(fang, -0.4)); }); // two great fangs that hang past the lower jaw even when it is shut
     // strings of spit when it gapes
-    if (open > 0.45) for (let k = 0; k < 3; k++) { const x0 = 66 + k * 10, y0 = lipY + 2, y1 = jawPt(x0 - hx, 0)[1] - 4; for (let y = y0; y < y1; y++) px(x0 + ((y + k + sway) % 4 === 0 ? 1 : 0), y, T.spit); }
-    if (stage === 3) { poly(g, [[78, 41], [84, 41], [82, 44]], '#020204'); poly(g, [[40, 40], [46, 39], [44, 43]], '#020204'); } // a bared skull: holes in the plates
+    if (open > 0.45) for (let k = 0; k < 3; k++) { const x0 = 62 + k * 8, y0 = lipY + 2, y1 = jawPt(x0 - hx, 0)[1] - 4; for (let y = y0; y < y1; y++) px(x0 + ((y + k + sway) % 4 === 0 ? 1 : 0), y, T.spit); }
+    if (stage === 3) { poly(g, [[76.5, 41], [81, 41], [79.5, 44]], '#020204'); poly(g, [[40, 40], [46, 39], [44, 43]], '#020204'); } // a bared skull: holes in the plates
     if (stage === 4) { // more eyes, and cracks of fire through the plates
       [[44, 33], [64, 34], [70, 32]].forEach(([x, y]) => { poly(g, [[x - 2, y], [x + 3, y - 0.5], [x + 2, y + 1.5], [x - 1, y + 1.5]], '#020204'); px(x, y + 0.5, '#ff2a14'); px(x + 1, y + 0.5, '#ff2a14'); });
       g.strokeStyle = T.crack[1]; g.lineWidth = 1; g.beginPath(); g.moveTo(36, 33); g.lineTo(42, 37); g.lineTo(40, 42); g.moveTo(84, 41); g.lineTo(88, 44); g.moveTo(60, 31); g.lineTo(63, 35); g.stroke();
