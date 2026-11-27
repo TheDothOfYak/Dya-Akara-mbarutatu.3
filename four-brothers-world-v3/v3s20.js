@@ -22,133 +22,109 @@
   // ---------------- the four looks ----------------
   const GEMS = ['#e0525a', '#4fa8f0', '#5fd98a', '#a86ef0', '#f2c94c', '#7fe3ff'];
   const THEMES = {
-    1: { name: 'teal', plate: ['#0b1f26', '#123440', '#1b4b5a', '#256777', '#3a8792', '#5ba7a8'], belly: ['#5d8c88', '#83b2a8', '#b4dccf'], seam: '#6ee6ff', gems: GEMS, eye: '#f2c94c', mouth: ['#24123a', '#52288a'], teeth: ['#b8b098', '#ece6d0'], crest: GEMS, fin: ['#1b4b5a', '#3a8792', '#7fd8e0'] },
+    1: { name: 'teal', plate: ['#101c1c', '#18292a', '#22393a', '#2f4d4c', '#436663', '#5e8479'], belly: ['#6e6a58', '#958e72', '#bcb290'], seam: '#5ec8b8', gems: ['#e8c040'], eye: '#f2c94c', mouth: ['#1a0c0c', '#5a2018'], teeth: ['#b8b098', '#ece6d0'], crest: ['#6a3420', '#a85a30', '#d08a50'], fin: ['#3a140a', '#7a3418', '#b0602e'] },
     2: { name: 'abyssal', plate: ['#06050b', '#0e0a18', '#171226', '#221a36', '#30244c', '#433262'], belly: ['#251e32', '#352c46', '#4a3e5e'], seam: '#8a5ad8', gems: ['#6c4aa8', '#9a74e0', '#4a3270'], eye: '#b08aff', mouth: ['#120818', '#3a1a5a'], teeth: ['#8a8298', '#c8c0d4'], crest: ['#6c4aa8', '#9a74e0', '#4a3270'], fin: ['#171226', '#30244c', '#6c4aa8'] },
     3: { name: 'bone', plate: ['#4e4838', '#6e6852', '#948c70', '#b8ae90', '#d8d0b4', '#f0ead4'], belly: ['#0a0a10', '#14141c', '#20202a'], seam: '#3ae0d0', gems: ['#3ae0d0', '#a8fff4'], eye: '#4cf0e0', mouth: ['#04040a', '#141420'], teeth: ['#d8d0b4', '#f0ead4'], crest: ['#b8ae90', '#d8d0b4', '#948c70'], fin: ['#0c0c12', '#20202a', '#6e6852'], dark: ['#040406', '#0a0a10', '#14141c'] },
     4: { name: 'rage', plate: ['#080404', '#140a0a', '#221010', '#321616', '#461e1c', '#5e2a24'], belly: ['#3a1c18', '#56281e', '#7a3a24'], seam: '#ff5a3a', gems: ['#ff5a3a', '#ffb070', '#ffe0a0'], eye: '#ff3a2a', mouth: ['#2a0604', '#ff6a2a'], teeth: ['#d8c8b0', '#fff0d8'], crest: ['#ff5a3a', '#ffb070', '#c83a20'], fin: ['#221010', '#461e1c', '#ff6a3a'], crack: ['#c83a20', '#ff6a3a', '#ffc070'] },
   };
-  Object.keys(THEMES).forEach((k) => { const T = THEMES[k]; ['plate', 'belly', 'fin', 'teeth'].forEach((key) => { T[key] = T[key].map((c) => sh(c, -0.28)); }); if (k !== '1') T.crest = T.crest.map((c) => sh(c, -0.2)); });
+  Object.keys(THEMES).forEach((k) => { const T = THEMES[k]; ['plate', 'belly', 'fin', 'teeth'].forEach((key) => { if (k === '1' && key === 'fin') return; /* the rust fins stay as they are */ T[key] = T[key].map((c) => sh(c, -0.28)); }); if (k !== '1') T.crest = T.crest.map((c) => sh(c, -0.2)); });
   const palOf = (T) => ['#020204', '#ffffff'].concat(T.plate, T.belly, T.gems, T.crest, T.fin, T.mouth, T.teeth, [T.seam, T.eye, sh(T.eye, 0.5)], T.dark || [], T.crack || []);
 
   // ---------------- painters (pixel units, facing right) ----------------
   function ellipse(g, x, y, rx, ry, col) { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, Math.max(0.5, rx), Math.max(0.5, ry), 0, 0, 6.283); g.fill(); }
   function poly(g, pts, col) { g.fillStyle = col; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); }
   // one armoured segment; R is its radius in sprite pixels; v picks the extras on its back
+  // a webbed fan: spines from a root, the skin between them, ragged at the ends. ang0..ang1 measured from the root
+  function fan(g, x, y, ang0, ang1, n, L0, L1, T, rag) {
+    const tips = []; for (let k = 0; k < n; k++) { const t = n > 1 ? k / (n - 1) : 0, an = ang0 + (ang1 - ang0) * t, L = L0 + (L1 - L0) * t * (1 - t) * 4 * (rag ? 0.85 + ((k * 37) % 10) / 33 : 1); tips.push([x + Math.cos(an) * L, y + Math.sin(an) * L]); }
+    g.fillStyle = T.fin[1]; g.beginPath(); g.moveTo(x, y); tips.forEach(([tx, ty], k) => { if (k) { const p = tips[k - 1]; g.quadraticCurveTo((p[0] + tx) / 2 + (x - (p[0] + tx) / 2) * 0.22, (p[1] + ty) / 2 + (y - (p[1] + ty) / 2) * 0.22, tx, ty); } else g.lineTo(tx, ty); }); g.closePath(); g.fill();
+    tips.forEach(([tx, ty], k) => { g.strokeStyle = k % 2 ? T.fin[2] : T.fin[0]; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(tx, ty); g.stroke(); });
+  }
+  // one length of the body: smooth and scaled, a pale belly, a tall webbed sail along the back
   function paintSeg(T, R, v, stage) {
-    const low = stage === 4 ? 0.75 : 0.42, w = R * (stage === 4 ? 2.2 : 1.7) + 6, h = R * (2.72 + low) + 6, c = mk(w, h), g = c.ctx, cx = w / 2, cy = h - R * (1 + low) - 3;
-    if (stage === 4) { // jagged spikes bursting out of the top and bottom, before the body so their roots are hidden
+    const low = stage === 4 ? 0.75 : 0.6, w = R * (stage === 4 ? 2.6 : 2.4) + 6, h = R * (3.8 + low) + 6, c = mk(w, h), g = c.ctx, cx = w / 2, cy = h - R * (1 + low) - 3;
+    const P = T.plate, B = T.belly;
+    if (stage === 4) { // jagged spikes bursting out of the top and bottom
       [[-0.55, -1, 1.0, -0.5], [0.05, -1, 1.35, -0.15], [0.55, -1, 0.9, 0.3], [-0.35, 1, 0.8, -0.4], [0.35, 1, 0.95, 0.35]].forEach(([u, side, len, lean]) => {
         const bx = cx + u * R, by = cy + side * R * 0.7, tx = bx + lean * R, ty = by + side * len * R;
         poly(g, [[bx - R * 0.16, by], [tx, ty], [bx + R * 0.16, by]], T.plate[0]); poly(g, [[bx - R * 0.05, by], [tx, ty], [bx + R * 0.16, by]], T.crack[0]);
       });
     }
-    const P = T.plate, B = T.belly;
-    // the dorsal piece first, so the body overlaps its root
-    if (stage === 4) { /* the spikes stand in for the back pieces */ }
-    else if (v === 0) { // a crystal / bone spine
-      const col = T.crest[(R | 0) % T.crest.length], hh = R * 1.05;
-      poly(g, [[cx - R * 0.32, cy - R * 0.7], [cx + R * 0.12, cy - R * 0.62 - hh], [cx + R * 0.3, cy - R * 0.72]], sh(col, -0.4));
-      poly(g, [[cx - R * 0.12, cy - R * 0.72], [cx + R * 0.12, cy - R * 0.62 - hh], [cx + R * 0.3, cy - R * 0.72]], col);
-      poly(g, [[cx + R * 0.02, cy - R * 0.8], [cx + R * 0.12, cy - R * 0.62 - hh], [cx + R * 0.08, cy - R * 0.84]], sh(col, 0.5));
-    } else if (v === 1) { // a ragged dorsal fin
-      poly(g, [[cx - R * 0.6, cy - R * 0.6], [cx - R * 0.2, cy - R * 1.35], [cx + R * 0.1, cy - R * 1.0], [cx + R * 0.4, cy - R * 1.2], [cx + R * 0.55, cy - R * 0.62]], T.fin[1]);
-      for (let k = 0; k < 4; k++) { g.strokeStyle = T.fin[2]; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - R * 0.4 + k * R * 0.28, cy - R * 0.7); g.lineTo(cx - R * 0.25 + k * R * 0.22, cy - R * 1.2); g.stroke(); }
-    } else { // a pair of hooked back spikes
-      [[-0.3, 0.75], [0.25, 0.95]].forEach(([u, L]) => poly(g, [[cx + R * (u - 0.18), cy - R * 0.72], [cx + R * (u - 0.35), cy - R * (0.72 + L)], [cx + R * (u + 0.18), cy - R * 0.75]], T.crest[(R | 0) % T.crest.length]));
-    }
-    if (stage !== 4) for (const u of [-0.35, 0.3]) poly(g, [[cx + R * (u - 0.14), cy + R * 0.8], [cx + R * (u - 0.3), cy + R * 1.3], [cx + R * (u + 0.14), cy + R * 0.85]], T.crest[0]); // belly spikes
-    // body: a fat armoured ring
-    ellipse(g, cx, cy, R * 0.8, R, P[1]);
-    ellipse(g, cx + R * 0.04, cy - R * 0.08, R * 0.72, R * 0.88, P[2]);
-    ellipse(g, cx + R * 0.1, cy - R * 0.3, R * 0.56, R * 0.56, P[3]);
-    ellipse(g, cx + R * 0.16, cy - R * 0.44, R * 0.34, R * 0.3, P[4]);
-    if (stage === 3) { ellipse(g, cx + R * 0.05, cy + R * 0.15, R * 0.62, R * 0.55, T.dark[1]); }
-    // belly plates
-    g.save(); g.beginPath(); g.ellipse(cx, cy, R * 0.8, R, 0, 0, 6.283); g.clip();
-    g.fillStyle = B[1]; g.fillRect(cx - R, cy + R * 0.38, R * 2, R);
-    g.fillStyle = B[2]; g.fillRect(cx - R, cy + R * 0.38, R * 2, Math.max(1, R * 0.1));
-    for (let k = 0; k < 3; k++) { g.fillStyle = B[0]; g.fillRect(cx - R, cy + R * (0.56 + k * 0.16), R * 2, Math.max(1, R * 0.05)); }
-    // the plate's back edge: a dark crescent so the segments read as overlapping armour
-    g.strokeStyle = P[0]; g.lineWidth = Math.max(1, R * 0.12); g.beginPath(); g.ellipse(cx - R * 0.72, cy, R * 0.5, R * 1.1, 0, -1.2, 1.2); g.stroke();
-    g.strokeStyle = P[5]; g.lineWidth = Math.max(1, R * 0.06); g.beginPath(); g.ellipse(cx + R * 0.66, cy, R * 0.3, R * 0.95, 0, -1.1, 0.3); g.stroke();
-    // stage marks
-    if (stage === 1 || stage === 2) { // gem studs in a row along the back
-      for (let k = 0; k < 3; k++) { const gx = cx - R * 0.4 + k * R * 0.4, gy = cy - R * 0.55 + (k % 2) * R * 0.1, s = Math.max(1.2, R * 0.12), col = T.gems[((R | 0) + k) % T.gems.length];
-        poly(g, [[gx, gy - s], [gx + s, gy], [gx, gy + s], [gx - s, gy]], col); g.fillStyle = '#ffffff'; g.fillRect(Math.round(gx - s * 0.3), Math.round(gy - s * 0.5), 1, 1); }
-    } else if (stage === 3) { // ribs showing through
-      for (let k = 0; k < 3; k++) { g.strokeStyle = T.plate[4]; g.lineWidth = Math.max(1, R * 0.08); g.beginPath(); g.arc(cx - R * 0.35 + k * R * 0.35, cy + R * 0.05, R * 0.55, -2.4, -0.7); g.stroke(); }
-    } else if (stage === 4) { // glowing cracks
-      g.strokeStyle = T.crack[1]; g.lineWidth = Math.max(1, R * 0.06); g.beginPath(); g.moveTo(cx - R * 0.5, cy - R * 0.5); g.lineTo(cx - R * 0.15, cy - R * 0.1); g.lineTo(cx - R * 0.3, cy + R * 0.3); g.moveTo(cx + R * 0.2, cy - R * 0.7); g.lineTo(cx + R * 0.35, cy - R * 0.25); g.lineTo(cx + R * 0.15, cy + R * 0.05); g.stroke();
-      g.strokeStyle = T.crack[2]; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - R * 0.45, cy - R * 0.45); g.lineTo(cx - R * 0.17, cy - R * 0.12); g.stroke();
-    }
-    if (stage === 4) { // a molten core showing through a hole torn in the plate
+    // the dorsal sail: spines leaning back toward the tail, ragged webbing, taller on some lengths
+    const tall = v === 0 ? 2.5 : v === 1 ? 1.9 : 2.2;
+    fan(g, cx + R * 0.35, cy - R * 0.55, -1.9, -2.75, 5, R * tall * 0.75, R * tall, T, true);
+    // a ventral fin on some lengths
+    if (v === 1) fan(g, cx + R * 0.2, cy + R * 0.6, 2.0, 2.7, 4, R * 0.7, R * 0.95, T, true);
+    // body
+    ellipse(g, cx, cy, R * 1.0, R * 0.98, P[1]);
+    ellipse(g, cx + R * 0.05, cy - R * 0.08, R * 0.94, R * 0.86, P[2]);
+    g.save(); g.beginPath(); g.ellipse(cx, cy, R * 1.0, R * 0.98, 0, 0, 6.283); g.clip();
+    g.fillStyle = P[0]; g.fillRect(cx - R * 1.1, cy - R * 1.1, R * 2.2, R * 0.38); // the dark ridge of the back
+    g.fillStyle = P[3]; g.fillRect(cx - R * 1.1, cy - R * 0.62, R * 2.2, R * 0.18); // light along the upper flank
+    if (stage === 3) { ellipse(g, cx, cy + R * 0.1, R * 0.9, R * 0.5, T.dark[1]); for (let k = 0; k < 3; k++) { g.strokeStyle = T.plate[4]; g.lineWidth = Math.max(1, R * 0.1); g.beginPath(); g.arc(cx - R * 0.45 + k * R * 0.45, cy + R * 0.05, R * 0.55, -2.4, -0.7); g.stroke(); } }
+    // the pale belly with its plates
+    g.fillStyle = B[1]; g.beginPath(); g.ellipse(cx, cy + R * 0.95, R * 1.3, R * 0.6, 0, 0, 6.283); g.fill();
+    g.fillStyle = B[2]; g.fillRect(cx - R * 1.1, cy + R * 0.38, R * 2.2, Math.max(1, R * 0.08));
+    for (let k = 0; k < 4; k++) { g.fillStyle = B[0]; g.fillRect(Math.round(cx - R + k * R * 0.55), cy + R * 0.45, 1, R * 0.5); }
+    // scales: rows of small dark arcs
+    for (let row = 0; row < 3; row++) for (let k = 0; k < 4; k++) { const x = cx - R * 0.75 + k * R * 0.5 + (row % 2) * R * 0.25, y = cy - R * 0.3 + row * R * 0.25; g.strokeStyle = P[1]; g.lineWidth = 1; g.beginPath(); g.arc(x, y, R * 0.14, 0.3, 2.8); g.stroke(); }
+    if (stage === 2) for (let k = 0; k < 2; k++) { const gx = cx - R * 0.3 + k * R * 0.6, gy = cy - R * 0.4, sz = Math.max(1.2, R * 0.1); poly(g, [[gx, gy - sz], [gx + sz, gy], [gx, gy + sz], [gx - sz, gy]], T.gems[k % T.gems.length]); }
+    if (stage === 4) {
+      g.strokeStyle = T.crack[1]; g.lineWidth = Math.max(1, R * 0.06); g.beginPath(); g.moveTo(cx - R * 0.5, cy - R * 0.5); g.lineTo(cx - R * 0.15, cy - R * 0.1); g.lineTo(cx - R * 0.3, cy + R * 0.3); g.moveTo(cx + R * 0.2, cy - R * 0.7); g.lineTo(cx + R * 0.35, cy - R * 0.25); g.stroke();
       ellipse(g, cx - R * 0.05, cy + R * 0.02, R * 0.3, R * 0.24, T.crack[0]); ellipse(g, cx - R * 0.05, cy + R * 0.02, R * 0.2, R * 0.15, T.crack[1]); ellipse(g, cx - R * 0.08, cy - R * 0.01, R * 0.09, R * 0.07, T.crack[2]);
-      poly(g, [[cx + R * 0.5, cy - R * 0.9], [cx + R * 0.85, cy - R * 0.55], [cx + R * 0.55, cy - R * 0.5]], '#020204'); // a bite out of the plate
     }
-    // the glowing seam along the flank
-    g.fillStyle = T.seam; g.fillRect(cx - R * 0.8, cy + R * 0.1, R * 1.6, Math.max(1, R * 0.07));
+    // the seam
+    g.fillStyle = T.seam; g.fillRect(cx - R * 1.1, cy + R * 0.12, R * 2.2, Math.max(1, R * 0.05));
     g.restore();
     VA.finish(c, palOf(T)); c.cy = cy; c.cx = cx; return c;
   }
-  // a curved horn: thick at the root (bx, by), sweeping back by (dx, dy) with a bend
-  function horn(g, bx, by, dx, dy, thick, bend, col, tip) {
-    const mx = bx + dx * 0.5 + bend * dy * 0.3, my = by + dy * 0.5 - bend * dx * 0.3;
-    g.fillStyle = col; g.beginPath(); g.moveTo(bx - thick * 0.5, by + thick * 0.2); g.quadraticCurveTo(mx - thick * 0.3, my, bx + dx, by + dy); g.quadraticCurveTo(mx + thick * 0.4, my + thick * 0.2, bx + thick * 0.6, by - thick * 0.1); g.closePath(); g.fill();
-    if (tip) { g.strokeStyle = tip; g.lineWidth = Math.max(1, thick * 0.18); g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(mx, my - thick * 0.15, bx + dx, by + dy); g.stroke(); }
-  }
-  // the head: a dragon's. Facing right; jaw 0 = just parted (how it holds it), 1 = open, 2 = gaping
+  // the head, after McKay's sea serpent: long and low like an eel's, a pale ridge down the snout, a small eye set low,
+  // great webbed fans swept back from the cheeks and crown, thin tendrils hanging from the jaw, needle teeth of every
+  // length. Every outline is curved. Facing right; jaw 0 = just parted (how it holds it), 1 = open, 2 = gaping
   function paintHead(T, R, jaw, stage) {
-    const w = R * 5.6 + 8, h = R * 5 + 8, c = mk(w, h), g = c.ctx, cx = R * 2.2 + 4, cy = h * 0.52;
-    const P = T.plate, open = [0.1, 0.34, 0.62][jaw], hornC = stage === 3 ? T.plate[4] : stage === 4 ? T.plate[1] : T.teeth[0];
-    // the neck frill: a fan of long spines behind the skull, webbed
-    for (let k = 0; k < 4; k++) { const an = -2.4 + k * 0.42, L = R * (1.6 + (k % 2) * 0.6); poly(g, [[cx - R * 0.8, cy - R * 0.2], [cx - R * 0.8 + Math.cos(an) * L, cy - R * 0.2 + Math.sin(an) * L], [cx - R * 0.8 + Math.cos(an + 0.22) * L * 0.75, cy - R * 0.2 + Math.sin(an + 0.22) * L * 0.75]], k % 2 ? T.fin[1] : T.fin[0]); }
-    for (let k = 0; k < 4; k++) { const an = -2.4 + k * 0.42, L = R * (1.6 + (k % 2) * 0.6); g.strokeStyle = hornC; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - R * 0.8, cy - R * 0.2); g.lineTo(cx - R * 0.8 + Math.cos(an) * L, cy - R * 0.2 + Math.sin(an) * L); g.stroke(); }
-    // two great horns sweeping back from the crown, a smaller pair under them
-    horn(g, cx - R * 0.1, cy - R * 0.85, -R * 2.3, -R * 1.1, R * 0.42, 0.5, hornC, sh(hornC, 0.35));
-    horn(g, cx + R * 0.25, cy - R * 0.8, -R * 1.6, -R * 1.35, R * 0.3, 0.4, sh(hornC, -0.15), null);
-    if (stage === 4) for (let k = 0; k < 4; k++) horn(g, cx + R * (0.4 + k * 0.35), cy - R * 0.82, -R * 0.4, -R * (0.9 + (k % 2) * 0.5), R * 0.16, 0.2, k % 2 ? T.crack[0] : T.plate[0], null);
-    // the mouth's dark inside, a glow down the throat
-    poly(g, [[cx - R * 0.45, cy + R * 0.08], [cx + R * 3.1, cy - R * 0.02], [cx + R * 2.85, cy + R * (0.12 + open * 1.7)], [cx - R * 0.1, cy + R * (0.32 + open)]], T.mouth[0]);
-    if (open > 0.2) ellipse(g, cx + R * 0.2, cy + R * (0.2 + open * 0.5), R * 0.35, R * open * 0.4, T.mouth[1]);
-    // lower jaw with crooked teeth and a beard of spikes under the chin
-    const LT = [0.22, 0.4, 0.18, 0.5, 0.26, 0.34, 0.16, 0.44, 0.24];
-    g.save(); g.translate(cx - R * 0.4, cy + R * 0.12); g.rotate(open);
-    LT.forEach((L, k) => { const x = R * (0.75 + k * 0.27); poly(g, [[x - R * 0.07, R * 0.02], [x + R * 0.03, -R * L], [x + R * 0.08, R * 0.02]], k % 3 ? T.teeth[1] : T.teeth[0]); });
-    for (let k = 0; k < 3; k++) { const x = R * (0.4 + k * 0.6); poly(g, [[x - R * 0.12, R * 0.5], [x - R * 0.35, R * (0.95 + (k % 2) * 0.35)], [x + R * 0.1, R * 0.55]], k % 2 ? hornC : sh(hornC, -0.2)); }
-    poly(g, [[0, -R * 0.1], [R * 2.9, -R * 0.02], [R * 3.2, R * 0.14], [R * 2.5, R * 0.48], [R * 0.8, R * 0.66], [-R * 0.35, R * 0.42]], P[1]);
-    poly(g, [[R * 0.3, R * 0.4], [R * 2.4, R * 0.3], [R * 2.0, R * 0.55], [R * 0.6, R * 0.62]], T.belly[0]);
-    poly(g, [[R * 0.2, -R * 0.06], [R * 2.75, R * 0.0], [R * 2.6, R * 0.08], [R * 0.3, R * 0.04]], P[3]);
+    const w = R * 5.8 + 8, h = R * 5.2 + 8, c = mk(w, h), g = c.ctx, cx = R * 2.1 + 4, cy = h * 0.46;
+    const P = T.plate, open = [0.1, 0.32, 0.6][jaw];
+    const shape = (fill, pts) => { g.fillStyle = fill; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i += 2) g.quadraticCurveTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]); g.closePath(); g.fill(); };
+    // the crown fan and the great cheek fan, swept back
+    fan(g, cx - R * 0.2, cy - R * 0.55, -1.75, -3.0, 7, R * 1.5, R * 2.4, T, true);
+    fan(g, cx - R * 0.55, cy + R * 0.05, -2.55, 2.45, 8, R * 1.4, R * 2.1, T, true);
+    if (stage === 4) for (let k = 0; k < 4; k++) poly(g, [[cx + R * (0.2 + k * 0.4), cy - R * 0.62], [cx + R * (-0.2 + k * 0.4), cy - R * (1.3 + (k % 2) * 0.5)], [cx + R * (0.35 + k * 0.4), cy - R * 0.66]], k % 2 ? T.crack[0] : T.plate[0]);
+    // the mouth's inside
+    shape(T.mouth[0], [[cx - R * 0.5, cy + R * 0.1], [cx + R * 1.5, cy - R * 0.02], [cx + R * 3.1, cy + R * 0.02], [cx + R * 2.9, cy + R * (0.4 + open * 1.2)], [cx + R * 1.2, cy + R * (0.4 + open * 1.2)], [cx - R * 0.2, cy + R * (0.3 + open * 0.8)], [cx - R * 0.5, cy + R * 0.1]]);
+    if (open > 0.2) ellipse(g, cx + R * 0.3, cy + R * (0.22 + open * 0.5), R * 0.35, R * open * 0.35, T.mouth[1]);
+    // the lower jaw: long and thin, curving up at the chin; needle teeth; tendrils hanging from it
+    const LT = [0.16, 0.3, 0.12, 0.38, 0.2, 0.26, 0.1, 0.34, 0.18, 0.22];
+    g.save(); g.translate(cx - R * 0.45, cy + R * 0.12); g.rotate(open);
+    LT.forEach((L, k) => { const x = R * (0.6 + k * 0.25); poly(g, [[x - R * 0.04, R * 0.02], [x + R * 0.01, -R * L], [x + R * 0.05, R * 0.02]], k % 3 ? T.teeth[1] : T.teeth[0]); });
+    for (let k = 0; k < 5; k++) { const x0 = R * (0.4 + k * 0.42), L = R * (1.0 + (k % 3) * 0.35); g.strokeStyle = k % 2 ? T.fin[0] : P[1]; g.lineWidth = Math.max(1, R * 0.05); g.beginPath(); g.moveTo(x0, R * 0.4); g.quadraticCurveTo(x0 - R * 0.35, R * 0.4 + L * 0.5, x0 - R * 0.1 + Math.sin(k) * R * 0.2, R * 0.4 + L); g.stroke(); }
+    shape(P[1], [[-R * 0.35, -R * 0.08], [R * 1.4, -R * 0.1], [R * 2.9, -R * 0.02], [R * 3.25, R * 0.02], [R * 3.05, R * 0.2], [R * 2.0, R * 0.36], [R * 0.9, R * 0.5], [-R * 0.1, R * 0.56], [-R * 0.35, R * 0.38]]);
+    shape(T.belly[0], [[R * 0.1, R * 0.32], [R * 1.4, R * 0.3], [R * 2.6, R * 0.16], [R * 1.6, R * 0.42], [R * 0.3, R * 0.48]]);
     g.restore();
-    // upper teeth of every length; two long fangs hang past the lower jaw
-    const UT = [0.3, 0.16, 0.46, 0.2, 0.72, 0.24, 0.34, 0.14, 0.6, 0.2, 0.28, 0.18];
-    UT.forEach((L, k) => { const x = cx + R * (0.05 + k * 0.25), y = cy + R * 0.06; poly(g, [[x - R * 0.06, y], [x - R * 0.01, y + R * L], [x + R * 0.09, y]], L > 0.5 ? T.teeth[1] : k % 2 ? T.teeth[0] : T.teeth[1]); });
-    // the skull: long and wedge-shaped, a ridged snout ending in a hooked tip with a nose horn
-    poly(g, [[cx - R * 1.15, cy - R * 0.15], [cx - R * 0.8, cy - R * 0.85], [cx + R * 0.5, cy - R * 0.95], [cx + R * 1.3, cy - R * 0.7], [cx + R * 2.3, cy - R * 0.5], [cx + R * 3.0, cy - R * 0.32], [cx + R * 3.35, cy + R * 0.02], [cx + R * 3.05, cy + R * 0.14], [cx + R * 0.2, cy + R * 0.14], [cx - R * 0.95, cy + R * 0.45]], P[1]);
-    poly(g, [[cx - R * 0.8, cy - R * 0.72], [cx + R * 0.5, cy - R * 0.84], [cx + R * 1.3, cy - R * 0.6], [cx + R * 2.9, cy - R * 0.3], [cx + R * 0.6, cy - R * 0.3], [cx - R * 0.6, cy - R * 0.25]], P[2]);
-    // the snout ridge: a row of small spikes running down to the nose horn
-    for (let k = 0; k < 3; k++) { const x = cx + R * (1.4 + k * 0.5), y = cy - R * (0.64 - k * 0.1); poly(g, [[x - R * 0.12, y + R * 0.04], [x - R * 0.02, y - R * (0.22 - k * 0.02)], [x + R * 0.12, y + R * 0.04]], hornC); }
-    poly(g, [[cx + R * 2.85, cy - R * 0.3], [cx + R * 3.0, cy - R * 0.85], [cx + R * 3.15, cy - R * 0.26]], hornC);
-    // scales: little dark arcs over the plates
-    for (let k = 0; k < 9; k++) { const x = cx + R * (-0.5 + (k % 5) * 0.42 + (k > 4 ? 0.2 : 0)), y = cy - R * (k > 4 ? 0.35 : 0.58); g.strokeStyle = P[0]; g.lineWidth = 1; g.beginPath(); g.arc(x, y, R * 0.12, 0.2, 2.9); g.stroke(); }
-    // cheek spikes, pointing back
-    [[-0.6, 0.15, 1.0]].forEach(([u, v, L]) => poly(g, [[cx + R * u, cy + R * (v - 0.1)], [cx + R * (u - L), cy + R * (v + 0.15)], [cx + R * u, cy + R * (v + 0.12)]], sh(hornC, -0.1)));
-    // gill slits
-    for (let k = 0; k < 3; k++) poly(g, [[cx - R * (0.55 - k * 0.2), cy - R * 0.12], [cx - R * (0.48 - k * 0.2), cy - R * 0.12], [cx - R * (0.5 - k * 0.2), cy + R * 0.3], [cx - R * (0.58 - k * 0.2), cy + R * 0.3]], P[0]);
-    if (stage === 3) ellipse(g, cx + R * 2.0, cy - R * 0.15, R * 0.3, R * 0.1, T.dark[0]); // a hollow in the bare skull
-    // a deep socket under a heavy spiked brow; a narrow burning eye
-    ellipse(g, cx + R * 0.95, cy - R * 0.38, R * 0.34, R * 0.2, '#020204');
-    poly(g, [[cx + R * 0.7, cy - R * 0.36], [cx + R * 1.25, cy - R * 0.42], [cx + R * 1.2, cy - R * 0.3], [cx + R * 0.75, cy - R * 0.3]], T.eye);
-    g.fillStyle = sh(T.eye, 0.6); g.fillRect(Math.round(cx + R * 1.05), Math.round(cy - R * 0.4), 1, 1);
-    g.fillStyle = '#020204'; g.fillRect(Math.round(cx + R * 0.95), Math.round(cy - R * 0.44), 1, Math.max(1, Math.round(R * 0.16)));
-    poly(g, [[cx + R * 0.3, cy - R * 0.75], [cx + R * 1.55, cy - R * 0.52], [cx + R * 1.35, cy - R * 0.36], [cx + R * 0.95, cy - R * 0.46], [cx + R * 0.4, cy - R * 0.55]], P[0]);
-    poly(g, [[cx + R * 0.35, cy - R * 0.76], [cx + R * 1.5, cy - R * 0.55], [cx + R * 1.45, cy - R * 0.5], [cx + R * 0.38, cy - R * 0.68]], P[2]);
+    // upper needle teeth
+    const UT = [0.18, 0.1, 0.3, 0.14, 0.46, 0.12, 0.24, 0.1, 0.36, 0.14, 0.2, 0.12];
+    UT.forEach((L, k) => { const x = cx + R * (0.0 + k * 0.25), y = cy + R * 0.04; poly(g, [[x - R * 0.04, y], [x + R * 0.0, y + R * L], [x + R * 0.06, y]], L > 0.3 ? T.teeth[1] : k % 2 ? T.teeth[0] : T.teeth[1]); });
+    // the skull: a long low curve from the crown down to a pointed snout that dips at the tip
+    shape(P[1], [[cx - R * 1.1, cy + R * 0.3], [cx - R * 1.25, cy - R * 0.55], [cx - R * 0.3, cy - R * 0.85], [cx + R * 1.3, cy - R * 0.82], [cx + R * 2.5, cy - R * 0.38], [cx + R * 3.3, cy - R * 0.05], [cx + R * 3.25, cy + R * 0.08], [cx + R * 1.5, cy + R * 0.12], [cx + R * 0.1, cy + R * 0.1], [cx - R * 0.6, cy + R * 0.45], [cx - R * 1.1, cy + R * 0.3]]);
+    shape(P[2], [[cx - R * 0.9, cy - R * 0.5], [cx - R * 0.2, cy - R * 0.78], [cx + R * 1.2, cy - R * 0.74], [cx + R * 2.3, cy - R * 0.34], [cx + R * 3.05, cy - R * 0.06], [cx + R * 1.6, cy - R * 0.18], [cx + R * 0.2, cy - R * 0.22], [cx - R * 0.5, cy - R * 0.2], [cx - R * 0.9, cy - R * 0.5]]);
+    // the pale ridge down the top of the snout
+    g.strokeStyle = stage === 1 ? P[5] : P[4]; g.lineWidth = Math.max(1, R * 0.08); g.beginPath(); g.moveTo(cx - R * 0.6, cy - R * 0.74); g.quadraticCurveTo(cx + R * 1.3, cy - R * 0.84, cx + R * 3.0, cy - R * 0.12); g.stroke();
+    // scales
+    for (let row = 0; row < 2; row++) for (let k = 0; k < 6; k++) { const x = cx - R * 0.6 + k * R * 0.45 + row * R * 0.22, y = cy - R * (0.55 - row * 0.2) + k * R * 0.04; g.strokeStyle = P[0]; g.lineWidth = 1; g.beginPath(); g.arc(x, y, R * 0.12, 0.3, 2.8); g.stroke(); }
+    // cheek: a fold of skin running back from the mouth's corner
+    g.strokeStyle = P[0]; g.lineWidth = Math.max(1, R * 0.06); g.beginPath(); g.moveTo(cx - R * 0.4, cy + R * 0.15); g.quadraticCurveTo(cx - R * 0.9, cy - R * 0.05, cx - R * 1.0, cy + R * 0.32); g.stroke();
+    if (stage === 3) ellipse(g, cx + R * 1.8, cy - R * 0.3, R * 0.3, R * 0.09, T.dark[0]);
+    // a small eye set low, under a dark brow
+    ellipse(g, cx + R * 1.05, cy - R * 0.22, R * 0.22, R * 0.12, '#020204');
+    ellipse(g, cx + R * 1.1, cy - R * 0.21, R * 0.13, R * 0.07, T.eye);
+    g.fillStyle = '#020204'; g.fillRect(Math.round(cx + R * 1.1), Math.round(cy - R * 0.28), 1, Math.max(1, Math.round(R * 0.12)));
+    g.fillStyle = sh(T.eye, 0.6); g.fillRect(Math.round(cx + R * 1.16), Math.round(cy - R * 0.25), 1, 1);
+    shape(P[0], [[cx + R * 0.7, cy - R * 0.3], [cx + R * 1.1, cy - R * 0.42], [cx + R * 1.45, cy - R * 0.3], [cx + R * 1.1, cy - R * 0.34], [cx + R * 0.7, cy - R * 0.3]]);
     if (stage === 4) {
-      poly(g, [[cx + R * 0.15, cy + R * 0.12], [cx + R * 0.55, cy + R * 0.85], [cx + R * 0.95, cy + R * 1.15], [cx + R * 0.7, cy + R * 0.8], [cx + R * 0.38, cy + R * 0.1]], T.teeth[1]); // a curved tusk
-      [[1.7, -0.3, 0.08], [1.95, -0.2, 0.07], [0.35, -0.48, 0.08], [1.45, -0.12, 0.06]].forEach(([u, v, r]) => { ellipse(g, cx + R * u, cy + R * v, R * r * 1.5, R * r, '#020204'); ellipse(g, cx + R * u, cy + R * v, R * r, R * r * 0.6, T.eye); });
+      [[1.6, -0.3, 0.07], [1.85, -0.22, 0.06], [0.5, -0.4, 0.07], [1.35, -0.1, 0.05]].forEach(([u, vv, r]) => { ellipse(g, cx + R * u, cy + R * vv, R * r * 1.5, R * r, '#020204'); ellipse(g, cx + R * u, cy + R * vv, R * r, R * r * 0.6, T.eye); });
       g.strokeStyle = T.crack[1]; g.lineWidth = Math.max(1, R * 0.07); g.beginPath(); g.moveTo(cx - R * 0.4, cy - R * 0.6); g.lineTo(cx + R * 0.3, cy - R * 0.3); g.lineTo(cx + R * 0.1, cy); g.moveTo(cx + R * 2.1, cy - R * 0.45); g.lineTo(cx + R * 2.4, cy - R * 0.15); g.stroke();
     }
-    // nostrils at the hooked tip
-    poly(g, [[cx + R * 2.75, cy - R * 0.2], [cx + R * 3.0, cy - R * 0.14], [cx + R * 2.98, cy - R * 0.1], [cx + R * 2.75, cy - R * 0.15]], '#020204');
+    // nostril near the tip
+    ellipse(g, cx + R * 2.85, cy - R * 0.14, R * 0.08, R * 0.04, '#020204');
     VA.finish(c, palOf(T)); c.cx = cx; c.cy = cy; return c;
   }
   function paintTail(T, R, stage) {
