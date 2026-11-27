@@ -437,22 +437,32 @@
   // ================================= 4. 1x1 / 2x2 on T, no off-hand torch =================================
   RW.binds.torch = []; P.offTorch = false;
   const ti = RW.ACTIONS.findIndex((a) => a[0] === 'torch'); if (ti >= 0) RW.ACTIONS.splice(ti, 1);
-  if (!RW.ACTIONS.some((a) => a[0] === 'mine2')) { RW.ACTIONS.splice(Math.max(0, ti), 0, ['mine2', 'Rock: switch between 1x1 and 2x2 mining', ['KeyT']]); }
+  // B is the rocks' only 1x1 / 2x2 switch now: no T key, and the B line in Controls says so
+  { const sh2 = RW.ACTIONS.find((a) => a[0] === 'shape'); if (sh2) sh2[1] = 'Rocks: switch between 1x1 and 2x2 mining (others: building shape)'; }
   if (!RW.binds.mine2 || !RW.binds.mine2.length) RW.binds.mine2 = ['KeyT'];
   P.toggleTorch = function () { };
   const baseLit = P.torchLit;
   if (baseLit) P.torchLit = function () { P.offTorch = false; return baseLit.apply(this, arguments); };
+  // hold jump underwater and a rock floats up (let go and it sinks again)
+  const baseUpdF = P.update;
+  P.update = function (dt) {
+    const r = baseUpdF.apply(this, arguments);
+    if (P.species === 'rock' && !P.dead && RW.input.act('jump') && !(U.blocking && U.blocking()) && WD.isWaterAt(P.x + P.w / 2, P.y + P.h * 0.6)) P.vy = Math.max(-90, Math.min(P.vy || 0, 0) - 900 * (dt || 0.016));
+    return r;
+  };
   RW.v3mine2 = !!RW.store.get('v3_mine2', false);
   RW.v3mine2On = () => RW.v3mine2 && P.species === 'rock';
   const baseAct = P.actions;
   P.actions = function () {
     const r = baseAct.apply(this, arguments);
-    const hitT = RW.input.actHit('mine2'), hitB = P.species === 'rock' && RW.input.actHit('shape');
-    if ((hitT || hitB) && !(U.blocking && U.blocking())) {
+    const hitB = P.species === 'rock' && RW.input.actHit('shape'); // B is the only key for 1x1 / 2x2
+    if (hitB && !(U.blocking && U.blocking())) {
       if (P.species !== 'rock') U.toast('Only rocks can smash 2x2.');
-      else { RW.v3mine2 = !RW.v3mine2; RW.store.set('v3_mine2', RW.v3mine2); U.toast(RW.v3mine2 ? '2x2 mode: each punch smashes a 2x2 square, and blocks go down 2x2. Press T for one block.' : '1x1 mode: one block per punch, one block placed. Press T for 2x2.'); RW.audio.sfx('ui'); U.dirty(); }
+      else { RW.v3mine2 = !RW.v3mine2; RW.store.set('v3_mine2', RW.v3mine2); U.toast(RW.v3mine2 ? '2x2 mining: each punch smashes a 2x2 square. Press B for one block.' : '1x1 mining: one block per punch. Press B for 2x2.'); RW.audio.sfx('ui'); U.dirty(); }
     }
-    if (P.species === 'rock' && P.flags) P.flags.shape = RW.v3mine2 ? 3 : 0; // rocks build in the same two modes
+    if (P.species === 'rock' && P.flags) P.flags.shape = 0; // the mining mode never changes building: one block at a time
+    // hold jump underwater and a rock floats up
+
     return r;
   };
   // the 2x2 square under the cursor, and the label on the hotbar

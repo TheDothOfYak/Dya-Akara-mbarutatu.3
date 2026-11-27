@@ -303,7 +303,7 @@
   function paint(id) {
     if (cache[id]) return cache[id];
     const p = P[id]; if (!p) return null;
-    const c = mk(48, 48); c.ctx.imageSmoothingEnabled = true; if (p.fit) { c.ctx.translate(24 + (p.dx || 0), 24 + (p.dy || 0)); c.ctx.scale(p.fit, p.fit); c.ctx.translate(-24, -24); } p.fn(c.ctx); finish(c, p.pal);
+    const c = mk(48, 48); c.ctx.imageSmoothingEnabled = true; if (p.fit) { c.ctx.translate(24 + (p.dx || 0), 24 + (p.dy || 0)); c.ctx.scale(p.fit, p.fit); c.ctx.translate(-24, -24); } p.fn(c.ctx); if (p.deco) { c.ctx.setTransform(1, 0, 0, 1, 0, 0); p.deco(c.ctx); } finish(c, p.decoPal ? p.pal.concat(p.decoPal) : p.pal);
     const it = RW.ITEMS[id], gc = it && it.v3glowc;
     if (gc) { // the Leviathan's own gear: a halo in its glow colour and a few sparkles
       const o = mk(48, 48), h = mk(48, 48); h.ctx.drawImage(c, 0, 0); h.ctx.globalCompositeOperation = 'source-in'; h.ctx.fillStyle = gc; h.ctx.fillRect(0, 0, 48, 48);
@@ -315,7 +315,7 @@
     c.__noHD = true; cache[id] = c; return c;
   }
   const artOf = (id) => { const it = RW.ITEMS[id]; return it && it.v3art ? it.v3art : P[id] ? id : null; };
-  RW.v3art = { paint, has: (id) => !!artOf(id), artOf, painters: P, finish };
+  RW.v3art = { paint, has: (id) => !!artOf(id), artOf, painters: P, finish, clear: () => Object.keys(cache).forEach((k) => delete cache[k]) };
 
   // A.icon: a 16x16 picture (the small copy), with the 48x48 one riding along for everything that can show it
   const baseIcon = A.icon;
