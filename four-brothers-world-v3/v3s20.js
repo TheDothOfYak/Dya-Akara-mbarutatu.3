@@ -101,12 +101,11 @@
     const w = R * 5.6 + 8, h = R * 5 + 8, c = mk(w, h), g = c.ctx, cx = R * 2.2 + 4, cy = h * 0.52;
     const P = T.plate, open = [0.1, 0.34, 0.62][jaw], hornC = stage === 3 ? T.plate[4] : stage === 4 ? T.plate[1] : T.teeth[0];
     // the neck frill: a fan of long spines behind the skull, webbed
-    for (let k = 0; k < 6; k++) { const an = -2.5 + k * 0.32, L = R * (1.6 + (k % 2) * 0.6); poly(g, [[cx - R * 0.8, cy - R * 0.2], [cx - R * 0.8 + Math.cos(an) * L, cy - R * 0.2 + Math.sin(an) * L], [cx - R * 0.8 + Math.cos(an + 0.22) * L * 0.75, cy - R * 0.2 + Math.sin(an + 0.22) * L * 0.75]], k % 2 ? T.fin[1] : T.fin[0]); }
-    for (let k = 0; k < 6; k++) { const an = -2.5 + k * 0.32, L = R * (1.6 + (k % 2) * 0.6); g.strokeStyle = hornC; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - R * 0.8, cy - R * 0.2); g.lineTo(cx - R * 0.8 + Math.cos(an) * L, cy - R * 0.2 + Math.sin(an) * L); g.stroke(); }
+    for (let k = 0; k < 4; k++) { const an = -2.4 + k * 0.42, L = R * (1.6 + (k % 2) * 0.6); poly(g, [[cx - R * 0.8, cy - R * 0.2], [cx - R * 0.8 + Math.cos(an) * L, cy - R * 0.2 + Math.sin(an) * L], [cx - R * 0.8 + Math.cos(an + 0.22) * L * 0.75, cy - R * 0.2 + Math.sin(an + 0.22) * L * 0.75]], k % 2 ? T.fin[1] : T.fin[0]); }
+    for (let k = 0; k < 4; k++) { const an = -2.4 + k * 0.42, L = R * (1.6 + (k % 2) * 0.6); g.strokeStyle = hornC; g.lineWidth = 1; g.beginPath(); g.moveTo(cx - R * 0.8, cy - R * 0.2); g.lineTo(cx - R * 0.8 + Math.cos(an) * L, cy - R * 0.2 + Math.sin(an) * L); g.stroke(); }
     // two great horns sweeping back from the crown, a smaller pair under them
     horn(g, cx - R * 0.1, cy - R * 0.85, -R * 2.3, -R * 1.1, R * 0.42, 0.5, hornC, sh(hornC, 0.35));
     horn(g, cx + R * 0.25, cy - R * 0.8, -R * 1.6, -R * 1.35, R * 0.3, 0.4, sh(hornC, -0.15), null);
-    horn(g, cx - R * 0.55, cy - R * 0.35, -R * 1.5, -R * 0.15, R * 0.22, -0.3, sh(hornC, -0.25), null);
     if (stage === 4) for (let k = 0; k < 4; k++) horn(g, cx + R * (0.4 + k * 0.35), cy - R * 0.82, -R * 0.4, -R * (0.9 + (k % 2) * 0.5), R * 0.16, 0.2, k % 2 ? T.crack[0] : T.plate[0], null);
     // the mouth's dark inside, a glow down the throat
     poly(g, [[cx - R * 0.45, cy + R * 0.08], [cx + R * 3.1, cy - R * 0.02], [cx + R * 2.85, cy + R * (0.12 + open * 1.7)], [cx - R * 0.1, cy + R * (0.32 + open)]], T.mouth[0]);
@@ -115,7 +114,7 @@
     const LT = [0.22, 0.4, 0.18, 0.5, 0.26, 0.34, 0.16, 0.44, 0.24];
     g.save(); g.translate(cx - R * 0.4, cy + R * 0.12); g.rotate(open);
     LT.forEach((L, k) => { const x = R * (0.75 + k * 0.27); poly(g, [[x - R * 0.07, R * 0.02], [x + R * 0.03, -R * L], [x + R * 0.08, R * 0.02]], k % 3 ? T.teeth[1] : T.teeth[0]); });
-    for (let k = 0; k < 5; k++) { const x = R * (0.3 + k * 0.45); poly(g, [[x - R * 0.12, R * 0.5], [x - R * 0.35, R * (0.95 + (k % 2) * 0.35)], [x + R * 0.1, R * 0.55]], k % 2 ? hornC : sh(hornC, -0.2)); }
+    for (let k = 0; k < 3; k++) { const x = R * (0.4 + k * 0.6); poly(g, [[x - R * 0.12, R * 0.5], [x - R * 0.35, R * (0.95 + (k % 2) * 0.35)], [x + R * 0.1, R * 0.55]], k % 2 ? hornC : sh(hornC, -0.2)); }
     poly(g, [[0, -R * 0.1], [R * 2.9, -R * 0.02], [R * 3.2, R * 0.14], [R * 2.5, R * 0.48], [R * 0.8, R * 0.66], [-R * 0.35, R * 0.42]], P[1]);
     poly(g, [[R * 0.3, R * 0.4], [R * 2.4, R * 0.3], [R * 2.0, R * 0.55], [R * 0.6, R * 0.62]], T.belly[0]);
     poly(g, [[R * 0.2, -R * 0.06], [R * 2.75, R * 0.0], [R * 2.6, R * 0.08], [R * 0.3, R * 0.04]], P[3]);
@@ -127,12 +126,12 @@
     poly(g, [[cx - R * 1.15, cy - R * 0.15], [cx - R * 0.8, cy - R * 0.85], [cx + R * 0.5, cy - R * 0.95], [cx + R * 1.3, cy - R * 0.7], [cx + R * 2.3, cy - R * 0.5], [cx + R * 3.0, cy - R * 0.32], [cx + R * 3.35, cy + R * 0.02], [cx + R * 3.05, cy + R * 0.14], [cx + R * 0.2, cy + R * 0.14], [cx - R * 0.95, cy + R * 0.45]], P[1]);
     poly(g, [[cx - R * 0.8, cy - R * 0.72], [cx + R * 0.5, cy - R * 0.84], [cx + R * 1.3, cy - R * 0.6], [cx + R * 2.9, cy - R * 0.3], [cx + R * 0.6, cy - R * 0.3], [cx - R * 0.6, cy - R * 0.25]], P[2]);
     // the snout ridge: a row of small spikes running down to the nose horn
-    for (let k = 0; k < 5; k++) { const x = cx + R * (1.3 + k * 0.36), y = cy - R * (0.66 - k * 0.07); poly(g, [[x - R * 0.12, y + R * 0.04], [x - R * 0.02, y - R * (0.22 - k * 0.02)], [x + R * 0.12, y + R * 0.04]], hornC); }
+    for (let k = 0; k < 3; k++) { const x = cx + R * (1.4 + k * 0.5), y = cy - R * (0.64 - k * 0.1); poly(g, [[x - R * 0.12, y + R * 0.04], [x - R * 0.02, y - R * (0.22 - k * 0.02)], [x + R * 0.12, y + R * 0.04]], hornC); }
     poly(g, [[cx + R * 2.85, cy - R * 0.3], [cx + R * 3.0, cy - R * 0.85], [cx + R * 3.15, cy - R * 0.26]], hornC);
     // scales: little dark arcs over the plates
     for (let k = 0; k < 9; k++) { const x = cx + R * (-0.5 + (k % 5) * 0.42 + (k > 4 ? 0.2 : 0)), y = cy - R * (k > 4 ? 0.35 : 0.58); g.strokeStyle = P[0]; g.lineWidth = 1; g.beginPath(); g.arc(x, y, R * 0.12, 0.2, 2.9); g.stroke(); }
     // cheek spikes, pointing back
-    [[-0.6, 0.15, 1.0], [-0.4, 0.4, 0.8], [-0.75, -0.15, 0.7]].forEach(([u, v, L]) => poly(g, [[cx + R * u, cy + R * (v - 0.1)], [cx + R * (u - L), cy + R * (v + 0.15)], [cx + R * u, cy + R * (v + 0.12)]], sh(hornC, -0.1)));
+    [[-0.6, 0.15, 1.0]].forEach(([u, v, L]) => poly(g, [[cx + R * u, cy + R * (v - 0.1)], [cx + R * (u - L), cy + R * (v + 0.15)], [cx + R * u, cy + R * (v + 0.12)]], sh(hornC, -0.1)));
     // gill slits
     for (let k = 0; k < 3; k++) poly(g, [[cx - R * (0.55 - k * 0.2), cy - R * 0.12], [cx - R * (0.48 - k * 0.2), cy - R * 0.12], [cx - R * (0.5 - k * 0.2), cy + R * 0.3], [cx - R * (0.58 - k * 0.2), cy + R * 0.3]], P[0]);
     if (stage === 3) ellipse(g, cx + R * 2.0, cy - R * 0.15, R * 0.3, R * 0.1, T.dark[0]); // a hollow in the bare skull
@@ -143,7 +142,6 @@
     g.fillStyle = '#020204'; g.fillRect(Math.round(cx + R * 0.95), Math.round(cy - R * 0.44), 1, Math.max(1, Math.round(R * 0.16)));
     poly(g, [[cx + R * 0.3, cy - R * 0.75], [cx + R * 1.55, cy - R * 0.52], [cx + R * 1.35, cy - R * 0.36], [cx + R * 0.95, cy - R * 0.46], [cx + R * 0.4, cy - R * 0.55]], P[0]);
     poly(g, [[cx + R * 0.35, cy - R * 0.76], [cx + R * 1.5, cy - R * 0.55], [cx + R * 1.45, cy - R * 0.5], [cx + R * 0.38, cy - R * 0.68]], P[2]);
-    for (let k = 0; k < 3; k++) poly(g, [[cx + R * (0.45 + k * 0.35), cy - R * (0.74 - k * 0.07)], [cx + R * (0.3 + k * 0.35), cy - R * (1.08 - k * 0.07)], [cx + R * (0.62 + k * 0.35), cy - R * (0.72 - k * 0.07)]], hornC); // brow spikes
     if (stage === 4) {
       poly(g, [[cx + R * 0.15, cy + R * 0.12], [cx + R * 0.55, cy + R * 0.85], [cx + R * 0.95, cy + R * 1.15], [cx + R * 0.7, cy + R * 0.8], [cx + R * 0.38, cy + R * 0.1]], T.teeth[1]); // a curved tusk
       [[1.7, -0.3, 0.08], [1.95, -0.2, 0.07], [0.35, -0.48, 0.08], [1.45, -0.12, 0.06]].forEach(([u, v, r]) => { ellipse(g, cx + R * u, cy + R * v, R * r * 1.5, R * r, '#020204'); ellipse(g, cx + R * u, cy + R * v, R * r, R * r * 0.6, T.eye); });
