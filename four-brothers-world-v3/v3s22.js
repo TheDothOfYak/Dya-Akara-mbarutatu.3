@@ -89,7 +89,7 @@
     const seed = (gen.meta && gen.meta.seed) || 1, rnd = (a, b, k) => RW.hash2(a, b, seed + (k || 0));
     LAY = makeLay(seed);
     const Wo = gen.W, Ho = gen.H; if (Wo !== W) return gen;
-    const fg = new gen.fg.constructor(W * H), bg = new gen.bg.constructor(W * H);
+    const fg = new Uint16Array(W * H), bg = new gen.bg.constructor(W * H); // 3.20: 16-bit cells, so new worlds can hold more than 256 kinds of block
     fg.set(gen.fg.subarray(0, CUT * W)); bg.set(gen.bg.subarray(0, CUT * W));
     const WL = RW.W, Tt = RW.T;
     const set = (x, y, t) => { if (x >= 0 && y >= 0 && x < W && y < H) fg[y * W + x] = t; };
@@ -258,7 +258,7 @@
     // Scald Vents: hot water burns without Scald armour or a Chillshell Charm; superheated rock and vents burn anyway
     if (here.j === 3) {
       heatT -= dt;
-      const cool = (worn('scald_helm') && worn('scald_mail')) || worn('t_chill');
+      const cool = (worn('scald_helm') && worn('scald_mail')) || worn('t_chill') || (RW.v3nearTile && RW.v3nearTile('v3k_2_chill', 4));
       let superhot = false;
       for (let yy = Math.floor(ty) - 2; yy <= Math.floor(ty) + 2 && !superhot; yy++) for (let xx = Math.floor(tx) - 2; xx <= Math.floor(tx) + 2; xx++) { const t = WD.get(xx, yy); if (t === TL.magma || t === TL.vent) { superhot = true; break; } }
       if (heatT <= 0 && wet && (superhot || !cool)) { heatT = superhot ? 0.6 : 1.0; P.hurt(superhot ? 7 : 3, 0, superhot ? 'superheated rock' : 'scalding water'); RW.fx.burst(c.x, c.y, ['#ffffff', '#ffb070'], 5, 40, { add: true, kind: 'glow', life: 0.5, grav: -60 }); if (!cool && !superhot && !P.flags.v3hotTip) { P.flags.v3hotTip = 1; U.toast('The water here is scalding. Scald armour or a Chillshell Charm keeps it off you.'); } }
@@ -269,12 +269,12 @@
     // Boneyard Hollows: bone piles rise as skeleton fish when you come close
     if (here.j === 2) {
       boneT -= dt;
-      if (boneT <= 0) { boneT = 0.5; (M().v3bones || []).forEach((b) => { if ((b.t || 0) > performance.now()) return; if (Math.hypot(b.x * TS + 8 - c.x, b.y * TS - c.y) < 6 * TS) { b.t = performance.now() + 60000; const sp = RW.SPECIES.v3_skelfish ? 'v3_skelfish' : 'creepy_fish'; for (let k = 0; k < 2; k++) { const e = E.spawnEnemy(sp, b.x * TS + RW.rand(-10, 10), b.y * TS - 12); if (e) e.provoked = true; } RW.fx.debris(b.x * TS + 8, b.y * TS, ['#d8d0b4', '#ada488'], 14); RW.audio.sfx('break'); } }); }
+      if (boneT <= 0 && !(RW.v3nearTile && RW.v3nearTile('v3k_3_soullantern', 8))) { boneT = 0.5; (M().v3bones || []).forEach((b) => { if ((b.t || 0) > performance.now()) return; if (Math.hypot(b.x * TS + 8 - c.x, b.y * TS - c.y) < 6 * TS) { b.t = performance.now() + 60000; const sp = RW.SPECIES.v3_skelfish ? 'v3_skelfish' : 'creepy_fish'; for (let k = 0; k < 2; k++) { const e = E.spawnEnemy(sp, b.x * TS + RW.rand(-10, 10), b.y * TS - 12); if (e) e.provoked = true; } RW.fx.debris(b.x * TS + 8, b.y * TS, ['#d8d0b4', '#ada488'], 14); RW.audio.sfx('break'); } }); }
     }
     // The Hollow Dark: currents drag you toward the abyss unless you hold on beside a glowing anchor
     if (here.j === 1 && wet) {
       let held = false;
-      for (let yy = Math.floor(ty) - 1; yy <= Math.floor(ty) + 1 && !held; yy++) for (let xx = Math.floor(tx) - 1; xx <= Math.floor(tx) + 1; xx++) if (WD.get(xx, yy) === TL.anchor) { held = true; break; }
+      for (let yy = Math.floor(ty) - 1; yy <= Math.floor(ty) + 1 && !held; yy++) for (let xx = Math.floor(tx) - 1; xx <= Math.floor(tx) + 1; xx++) { const q = WD.get(xx, yy); if (q === TL.anchor || q === RW.T.v3k_4_anchorstone) { held = true; break; } }
       if (!held) {
         // streams run along the band, each layer of water the other way, and the whole dark pulls down toward the abyss
         const t = performance.now() / 1000, dir = Math.sin(ty / 9 + 1.3) > 0 ? 1 : -1, surge = 0.6 + 0.4 * Math.sin(t * 0.7 + c.x * 0.001);
