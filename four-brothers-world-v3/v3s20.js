@@ -120,7 +120,8 @@
   // (The 3.8 pixel-row skull, SKULL above, is kept for reference.) Facing right; jaw 0..5 from half open (how it holds
   // its mouth) to gaping; sway 0/1 moves the spines and the tongue.
   function paintHead(T, R, jaw, stage, sway) {
-    const W0 = 124, H0 = 92, c = mk(W0, H0), g = c.ctx, sw = sway ? 1 : -1;
+    const TALL = 1.2, W0 = 124, H0 = Math.round(92 * TALL), c = mk(W0, H0), g = c.ctx, sw = sway ? 1 : -1;
+    g.scale(1, TALL); g.imageSmoothingEnabled = false; // 3.13: the whole head 20% taller
     const P = T.plate, open = [0.24, 0.32, 0.41, 0.5, 0.6, 0.72][jaw] || 0.24;
     const dk = sh(P[0], -0.3), bone = T.teeth[0], fang = T.teeth[1];
     const px = (x, y, cc) => { g.fillStyle = cc; g.fillRect(Math.round(x), Math.round(y), 1, 1); };
@@ -167,7 +168,7 @@
     poly(g, [[24, 40], [28, 28], [42, 18], [60, 24], [70, 30], [74, 35], [92, 37], [104, 39], [110, 35], [114, 30], [115, 42], [110, 46], [56, lipY], [48, 46], [40, 55], [28, 51]], P[1]);
     poly(g, [[29, 29], [42, 19], [58, 25], [52, 30], [40, 32], [30, 36]], P[3]); poly(g, [[31, 36], [40, 32], [52, 30], [56, 34], [44, 36], [34, 40]], P[2]); // the crown plates, lit
     poly(g, [[42, 19], [60, 24], [70, 30], [58, 29]], P[4]); // its sharp front edge
-    poly(g, [[54, 32], [70, 30], [77, 36], [66, 37], [56, 36]], P[4]); poly(g, [[77, 36], [80, 34], [79, 37]], P[4]); poly(g, [[56, 36], [66, 37], [77, 36], [72, 40], [58, 40]], dk); // the brow ridge with its spur, and the shadow under it
+    poly(g, [[54, 30], [70, 28], [77, 34], [66, 35], [56, 34]], P[4]); poly(g, [[77, 34], [80, 32], [79, 35]], P[4]); poly(g, [[56, 34], [66, 35], [77, 34], [72, 39], [58, 39]], dk); // the brow ridge with its spur, and the shadow under it
     poly(g, [[73, 37], [92, 39], [104, 41], [96, 42], [76, 41]], P[3]); poly(g, [[92, 39], [104, 41], [109, 38], [111, 34], [107, 40]], P[4]); // the snout plates
     poly(g, [[56, 41], [100, 43], [110, 46], [56, lipY]], P[2]); // the upper lip plate
     poly(g, [[30, 40], [44, 36], [56, 38], [48, 44], [38, 47]], P[2]); poly(g, [[34, 41], [44, 38], [52, 39], [44, 42]], P[3]); // the cheek plate
@@ -175,7 +176,7 @@
     [[78, 37, 4], [84, 38, 5], [90, 38, 4], [96, 39, 5], [102, 40, 3]].forEach(([x, y, L]) => poly(g, [[x - 2, y], [x - 1, y - L], [x + 2, y]], P[3])); // the spike ridge down the snout
     poly(g, [[106, 41], [111, 40], [109, 43]], '#020204'); // the nostril
     // the eye: a narrow slant under the brow, glowing
-    poly(g, [[62, 38], [71, 37], [69, 40], [63, 40]], '#020204'); poly(g, [[64, 38], [70, 37.6], [68, 39], [64, 39.2]], T.eye); px(68, 38, sh(T.eye, 0.6));
+    poly(g, [[61, 36], [71, 35], [69, 38.5], [62, 38.5]], '#020204'); poly(g, [[63, 36.2], [70, 35.6], [68, 37.4], [63, 37.6]], T.eye); px(68, 36, sh(T.eye, 0.6));
     // upper teeth, hanging from the lip: every length, two long fangs
     const UT = [[58, 2], [61, 3], [64, 2], [67, 4], [70, 2], [73, 3], [76, 5], [79, 2], [82, 3], [85, 4], [88, 2], [91, 6], [94, 3], [97, 2], [100, 8], [103, 3], [106, 5], [109, 3]];
     UT.forEach(([x, L], k) => { const lean = k % 4 === 1 ? -1 : 0, y0 = lipY - 0.5 + (x - 56) * -0.01; poly(g, [[x - (L > 4 ? 1.3 : 0.8), y0], [x + lean, y0 + L], [x + (L > 4 ? 1.3 : 0.8), y0]], L > 4 ? fang : bone); });
@@ -186,7 +187,7 @@
       [[50, 33], [55, 35], [76, 33]].forEach(([x, y]) => { poly(g, [[x - 2, y], [x + 3, y - 0.5], [x + 2, y + 1.5], [x - 1, y + 1.5]], '#020204'); px(x, y + 0.5, T.eye); px(x + 1, y + 0.5, T.eye); });
       g.strokeStyle = T.crack[1]; g.lineWidth = 1; g.beginPath(); g.moveTo(36, 33); g.lineTo(42, 37); g.lineTo(40, 42); g.moveTo(84, 41); g.lineTo(88, 44); g.moveTo(60, 31); g.lineTo(63, 35); g.stroke();
     }
-    VA.finish(c, palOf(T).concat([dk])); c.cx = 46; c.cy = 40; return c;
+    VA.finish(c, palOf(T).concat([dk])); c.cx = 46; c.cy = Math.round(40 * TALL); return c;
   }
   function paintTail(T, R, stage) {
     const w = R * 4 + 8, h = R * 4 + 8, c = mk(w, h), g = c.ctx, cx = w - R - 4, cy = h / 2;
