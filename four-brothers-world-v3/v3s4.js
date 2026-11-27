@@ -19,7 +19,10 @@
   const E = RW.ent, P = RW.player, WD = RW.world, A = RW.art, U = RW.ui, N = RW.net, TS = RW.TILE;
   if (!E || !P || !WD || !A) return;
   const LEV = 'gemscale_leviathan';
-  const BASE_HP = 12000, NSEG = 100, GAP = 22;
+  const BASE_HP = 40000, NSEG = 100, GAP = 22;
+  // McKay: three times bigger, chunky pixels. The body is simulated at full size (GAPW apart, K times the radii);
+  // it is drawn at the old size inside a frame scaled by K, onto a layer of PX-unit pixels.
+  const K = 3, KS = 2, GAPW = GAP * K, PX = 1.5;
   const GEMS = ['#e0525a', '#4fa8f0', '#5fd98a', '#a86ef0', '#f2c94c', '#7fe3ff'];
   const now = () => performance.now() / 1000;
   const inRock = () => WD.def && WD.def.id === 'rock';
@@ -27,7 +30,7 @@
 
   // ================================= species =================================
   const sp = RW.SPECIES[LEV];
-  if (sp) Object.assign(sp, { w: 68, h: 68, hp: BASE_HP, dmg: 26, speed: 200, blurb: 'A serpent as long as a town, armoured in gem-studded plates. It guards the Elder Crystals in the flooded Heart Chamber. Twice it hides behind a crystal shield and sends out its guardians: break them all to reach it again.' });
+  if (sp) Object.assign(sp, { w: 68 * K, h: 68 * K, hp: BASE_HP, dmg: 26, speed: 200, blurb: 'A serpent as long as a town, armoured in gem-studded plates. It guards the Elder Crystals in the flooded Heart Chamber. Twice it hides behind a crystal shield and sends out its guardians: break them all to reach it again.' });
   const GCLASS = {
     v3g_ruby: { gem: 0, cls: 'knight', name: 'Ruby Knight', blurb: 'A crystal knight with a kite shield and a burning blade. Slashes up close, charges behind its shield and sends a wave of crystal flame along the ground.' },
     v3g_sapphire: { gem: 1, cls: 'archer', name: 'Sapphire Archer', blurb: 'A hooded crystal archer. Keeps its distance, looses arrows, rains a volley from above and fires a piercing frost arrow that slows you.' },
@@ -68,32 +71,32 @@
   // ================================= the fight =================================
   function initBoss(b) {
     const a = arenaPx();
-    b.v3 = true; b.customDraw = true; b.w = 68; b.h = 68; b.engaged = true;
-    b.ang = -Math.PI / 2; const hx = a.cx + (Math.random() - 0.5) * a.rx * 0.6, hy = a.cy + a.ry + 60;
+    b.v3 = true; b.customDraw = true; b.w = 68 * K; b.h = 68 * K; b.engaged = true;
+    b.ang = -Math.PI / 2; const hx = a.cx + (Math.random() - 0.5) * a.rx * 0.6, hy = a.cy + a.ry + 60 * K;
     b.x = hx - b.w / 2; b.y = hy - b.h / 2;
-    b.segs = []; for (let i = 0; i < NSEG; i++) b.segs.push({ x: hx, y: hy + GAP * (i + 1) });
-    b.faces = []; b.state = 'emerge'; b.st = 2.6; b.phase = 1; b.shield = 0; b.shieldsDone = 0; b.fx = [];
+    b.segs = []; for (let i = 0; i < NSEG; i++) b.segs.push({ x: hx, y: hy + GAPW * (i + 1) });
+    b.faces = []; b.state = 'emerge'; b.st = 2.6; b.phase = 1; b.stage = 1; b.shield = 0; b.shieldsDone = 0; b.fx = [];
     b.nFight = 1; b.maxhp = b.hp = BASE_HP; b.scaleT = 0;
     b.hitbox = () => segHitbox(b);
     refill();
   }
   function segHitbox(b) {
-    const pc = { x: P.x + 6, y: P.y + 14 }, h = head(b); let best = h, r = 32, bd = Math.hypot(pc.x - h.x, pc.y - h.y);
-    (b.segs || []).forEach((s, i) => { const d = Math.hypot(pc.x - s.x, pc.y - s.y); if (d < bd) { bd = d; best = s; r = segR(i) + 2; } });
+    const pc = { x: P.x + 6, y: P.y + 14 }, h = head(b); let best = h, r = 32 * K, bd = Math.hypot(pc.x - h.x, pc.y - h.y);
+    (b.segs || []).forEach((s, i) => { const d = Math.hypot(pc.x - s.x, pc.y - s.y); if (d < bd) { bd = d; best = s; r = segR(i) * K + 2; } });
     return { x: best.x - r, y: best.y - r, w: r * 2, h: r * 2 };
   }
-  function follow(b) { let x0 = b.x + b.w / 2, y0 = b.y + b.h / 2; for (const s of b.segs) { const dx = s.x - x0, dy = s.y - y0, d = Math.hypot(dx, dy) || 1; s.x = x0 + dx / d * GAP; s.y = y0 + dy / d * GAP; x0 = s.x; y0 = s.y; } }
+  function follow(b) { let x0 = b.x + b.w / 2, y0 = b.y + b.h / 2; for (const s of b.segs) { const dx = s.x - x0, dy = s.y - y0, d = Math.hypot(dx, dy) || 1; s.x = x0 + dx / d * GAPW; s.y = y0 + dy / d * GAPW; x0 = s.x; y0 = s.y; } }
   function steer(b, dt, tx, ty, speed, turn) {
-    const h = head(b); const want = Math.atan2(ty - h.y, tx - h.x); let da = want - b.ang;
+    speed *= KS; const h = head(b); const want = Math.atan2(ty - h.y, tx - h.x); let da = want - b.ang;
     while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
     b.ang += RW.clamp(da, -turn * dt, turn * dt);
     let nx = h.x + Math.cos(b.ang) * speed * dt, ny = h.y + Math.sin(b.ang) * speed * dt;
-    if (b.state !== 'emerge' && b.state !== 'dying') { const q = clampArena(nx, ny, 34); if (q.x !== nx || q.y !== ny) { nx = RW.lerp(nx, q.x, 0.5); ny = RW.lerp(ny, q.y, 0.5); } }
+    if (b.state !== 'emerge' && b.state !== 'dying') { const q = clampArena(nx, ny, 34 * K); if (q.x !== nx || q.y !== ny) { nx = RW.lerp(nx, q.x, 0.5); ny = RW.lerp(ny, q.y, 0.5); } }
     b.vx = (nx - h.x) / Math.max(dt, 1e-4); b.vy = (ny - h.y) / Math.max(dt, 1e-4);
     b.x = nx - b.w / 2; b.y = ny - b.h / 2; b.face = Math.cos(b.ang) >= 0 ? 1 : -1;
     follow(b);
   }
-  const fast = (b) => (b.phase === 3 ? 1.35 : b.phase === 2 ? 1.15 : 1);
+  const fast = (b) => (b.phase === 3 ? 1.35 : b.stage === 3 ? 1.25 : b.phase === 2 ? 1.15 : 1);
   function pick(b) {
     const P1 = [['charge', 3], ['barrage', 3], ['beam', 2], ['collapse', 2], ['whirl', 1], ['coil', 1], ['summon', 1], ['tail', 1]];
     const P2 = [['charge', 3], ['barrage', 2], ['beam', 3], ['collapse', 2], ['whirl', 2], ['coil', 2], ['summon', 1], ['tail', 2]];
@@ -107,7 +110,7 @@
   }
   function clearMoves(b) { ['v3beam', 'v3vortex', 'v3coil', 'v3slam'].forEach((t) => fx(b, t, null)); }
   const shard = (x, y, a, v, dmg, col) => E.shots.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 3.2, owner: 'e', dmg, kind: 'bshard', color: col || RW.pick(GEMS) });
-  function mouth(b) { const h = head(b); return { x: h.x + Math.cos(b.ang) * 40, y: h.y + Math.sin(b.ang) * 40 }; }
+  function mouth(b) { const h = head(b); return { x: h.x + Math.cos(b.ang) * 40 * K, y: h.y + Math.sin(b.ang) * 40 * K }; }
   function roar(b, txt) {
     clearMoves(b); b.state = 'roar'; b.st = 0; fx(b, 'v3roar', { x: Math.round(head(b).x), y: Math.round(head(b).y) });
     RW.audio.sfx('roar'); RW.fx.shake(9, 1.1); if (txt) U.toast(txt);
@@ -137,12 +140,15 @@
     }
     // shields and phases
     const frac = b.hp / b.maxhp;
-    if (!b.shield && b.shieldsDone === 0 && frac <= 0.7) startShield(b, 4);
-    else if (!b.shield && b.shieldsDone === 1 && frac <= 0.3) startShield(b, 4);
+    if (!b.shield && b.shieldsDone === 0 && frac <= 0.75) startShield(b, 4);
+    else if (!b.shield && b.shieldsDone === 1 && b.stage === 2 && frac <= 0.5) { // stage 3: it tears off its dark plates down to the bone
+      b.stage = 3; fx(b, 'v3stage', { x: 3 }); roar(b, 'The Leviathan tears off its plates. Bone and black underneath, and its eyes burn cold.'); RW.fx.flash('#3ae0d0', 0.25);
+    }
+    else if (!b.shield && b.shieldsDone === 1 && frac <= 0.25) startShield(b, 4);
     if (b.shield && b.state !== 'roar' && guardsLeft() === 0) {
       b.shield = 0; b.shieldsDone++; fx(b, 'v3shield', null);
-      b.phase = b.shieldsDone === 1 ? 2 : 3;
-      roar(b, b.phase === 2 ? 'The shield shatters! The Leviathan\'s crystals blaze.' : 'The shield shatters, and the Leviathan goes mad with rage!');
+      b.phase = b.shieldsDone === 1 ? 2 : 3; b.stage = b.shieldsDone === 1 ? 2 : 4; fx(b, 'v3stage', { x: b.stage });
+      roar(b, b.phase === 2 ? 'The shield shatters! The Leviathan\'s plates turn black as the abyss.' : 'The shield shatters, and the Leviathan goes mad with rage! Fire splits its plates.');
       RW.fx.flash(b.phase === 3 ? '#ff2a3a' : '#c8a6ff', 0.3);
       if (b.phase === 3) fx(b, 'v3rage', { x: 1 });
     }
@@ -150,17 +156,17 @@
 
     switch (b.state) {
       case 'emerge':
-        steer(b, dt, h.x, a.cy - 20, 150, 1.2);
+        steer(b, dt, h.x, a.cy - 20 * K, 150, 1.2);
         if (b.st > 1.2 && !b.did) { b.did = 1; fx(b, 'v3roar', { x: Math.round(h.x), y: Math.round(h.y) }); RW.audio.sfx('roar'); RW.fx.shake(8, 1.2); }
         if (b.st > 2.6) { b.state = 'cruise'; b.st = 0; b.dur = 1.6; }
         break;
       case 'roar':
-        steer(b, dt, h.x + Math.cos(b.ang) * 30, h.y - 30, 40, 2);
+        steer(b, dt, h.x + Math.cos(b.ang) * 30 * K, h.y - 30 * K, 40, 2);
         if (b.st > 1.6) { fx(b, 'v3roar', null); b.state = 'cruise'; b.st = 0; b.dur = 1; }
         break;
       case 'cruise': {
         b.oa = (b.oa || 0) + dt * 0.9 * F;
-        const R = b.shield ? 360 : 240;
+        const R = (b.shield ? 360 : 240) * K;
         steer(b, dt, tg.x + Math.cos(b.oa) * R, tg.y + Math.sin(b.oa) * R * 0.5, 230 * F, 2.4);
         if (b.st > (b.dur || 1.8) / F) pick(b);
         break;
@@ -180,7 +186,7 @@
         break;
       }
       case 'barrage': {
-        steer(b, dt, tg.x + (h.x < tg.x ? -260 : 260), tg.y - 40, 120, 2.5);
+        steer(b, dt, tg.x + (h.x < tg.x ? -260 : 260) * K, tg.y - 40 * K, 120, 2.5);
         const vol = b.phase === 3 ? 4 : 3;
         if (b.st > 0.5 + b.k * 0.42 && b.k < vol) {
           const m = mouth(b), a0 = Math.atan2(tg.y - m.y, tg.x - m.x);
@@ -199,22 +205,22 @@
           steer(b, dt, h.x, h.y, 20, 0); // hold still, the head turns to aim
           let want = Math.atan2(tg.y - m.y, tg.x - m.x), da = want - b.aim; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283; b.aim += RW.clamp(da, -1.6 * dt, 1.6 * dt);
           b.ang = b.aim;
-          fx(b, 'v3beam', { ax: Math.round(m.x), ay: Math.round(m.y), bx: Math.round(m.x + Math.cos(b.aim) * 1100), by: Math.round(m.y + Math.sin(b.aim) * 1100), warn: 1 });
+          fx(b, 'v3beam', { ax: Math.round(m.x), ay: Math.round(m.y), bx: Math.round(m.x + Math.cos(b.aim) * 1100 * K), by: Math.round(m.y + Math.sin(b.aim) * 1100 * K), warn: 1 });
           if (!b.k) { b.k = 1; RW.audio.sfx('crystal'); }
         } else if (b.st < charge + fire * sweeps) {
           const u = ((b.st - charge) % fire) / fire, sw = Math.floor((b.st - charge) / fire) % 2 ? -1 : 1;
           const ang = b.aim + b.sweepDir * sw * (u - 0.5) * 1.15;
           b.ang = ang; steer(b, dt, h.x - Math.cos(ang) * 10, h.y - Math.sin(ang) * 10, 10, 0); b.ang = ang;
-          fx(b, 'v3beam', { ax: Math.round(m.x), ay: Math.round(m.y), bx: Math.round(m.x + Math.cos(ang) * 1100), by: Math.round(m.y + Math.sin(ang) * 1100), warn: 0 });
+          fx(b, 'v3beam', { ax: Math.round(m.x), ay: Math.round(m.y), bx: Math.round(m.x + Math.cos(ang) * 1100 * K), by: Math.round(m.y + Math.sin(ang) * 1100 * K), warn: 0 });
           if (b.k === 1) { b.k = 2; RW.audio.sfx('lightning'); RW.fx.shake(4, fire * sweeps); }
         } else { fx(b, 'v3beam', null); b.state = 'cruise'; b.st = 0; b.dur = 1.2; }
         break;
       }
       case 'whirl': {
-        if (!b.did) { b.did = 1; const p = clampArena(tg.x, tg.y, 90); b.vx0 = p.x; b.vy0 = p.y; b.oa = Math.atan2(h.y - p.y, h.x - p.x); }
+        if (!b.did) { b.did = 1; const p = clampArena(tg.x, tg.y, 90 * K); b.vx0 = p.x; b.vy0 = p.y; b.oa = Math.atan2(h.y - p.y, h.x - p.x); }
         const dur = 4.6;
         if (b.st < dur) {
-          b.oa += dt * 2.2 * F; steer(b, dt, b.vx0 + Math.cos(b.oa) * 140, b.vy0 + Math.sin(b.oa) * 110, 320 * F, 4);
+          b.oa += dt * 2.2 * F; steer(b, dt, b.vx0 + Math.cos(b.oa) * 140 * K, b.vy0 + Math.sin(b.oa) * 110 * K, 320 * F, 4);
           fx(b, 'v3vortex', { x: Math.round(b.vx0), y: Math.round(b.vy0), ax: Math.round(Math.min(1, b.st / 0.8) * 100) });
         } else if (b.st < dur + 0.9) { fx(b, 'v3vortex', null); steer(b, dt, b.vx0, b.vy0, 600 * F, 2.5); }
         else { b.state = 'cruise'; b.st = 0; b.dur = 1.4; }
@@ -222,28 +228,28 @@
       }
       case 'coil': {
         if (!b.did) { b.did = 1; b.vx0 = tg.x; b.vy0 = tg.y; b.oa = Math.atan2(h.y - tg.y, h.x - tg.x); }
-        const dur = 3.4 / F, r = RW.lerp(280, 84, Math.min(1, b.st / dur));
+        const dur = 3.4 / F, r = RW.lerp(280, 84, Math.min(1, b.st / dur)) * K;
         if (b.st < dur) {
-          b.oa += dt * (440 * F) / r; steer(b, dt, b.vx0 + Math.cos(b.oa) * r, b.vy0 + Math.sin(b.oa) * r, 440 * F, 7);
+          b.oa += dt * (440 * F * KS) / r; steer(b, dt, b.vx0 + Math.cos(b.oa) * r, b.vy0 + Math.sin(b.oa) * r, 440 * F, 7);
           fx(b, 'v3coil', { x: Math.round(b.vx0), y: Math.round(b.vy0), ax: Math.round(r) });
-        } else if (!b.k) { b.k = 1; fx(b, 'v3coil', { x: Math.round(b.vx0), y: Math.round(b.vy0), ax: 60, warn: 2 }); RW.fx.shake(10, 0.5); RW.audio.sfx('slam'); }
+        } else if (!b.k) { b.k = 1; fx(b, 'v3coil', { x: Math.round(b.vx0), y: Math.round(b.vy0), ax: 60 * K, warn: 2 }); RW.fx.shake(10, 0.5); RW.audio.sfx('slam'); }
         else if (b.st > dur + 0.5) { fx(b, 'v3coil', null); b.state = 'cruise'; b.st = 0; b.dur = 1.6; }
-        else { b.oa += dt * 3; steer(b, dt, b.vx0 + Math.cos(b.oa) * 84, b.vy0 + Math.sin(b.oa) * 84, 300, 7); }
+        else { b.oa += dt * 3; steer(b, dt, b.vx0 + Math.cos(b.oa) * 84 * K, b.vy0 + Math.sin(b.oa) * 84 * K, 300, 7); }
         break;
       }
       case 'collapse': {
-        const roofY = a.cy - a.ry + 30;
-        if (!b.did) { steer(b, dt, tg.x, roofY, 520 * F, 3); if (h.y < roofY + 30 || b.st > 1.8) { b.did = 1; b.st = 0; RW.fx.shake(12, 0.9); RW.audio.sfx('slam'); RW.fx.ring(h.x, h.y - 20, '#c8b898', 140, 0.6, 3);
+        const roofY = a.cy - a.ry + 30 * K;
+        if (!b.did) { steer(b, dt, tg.x, roofY, 520 * F, 3); if (h.y < roofY + 30 * K || b.st > 1.8) { b.did = 1; b.st = 0; RW.fx.shake(12, 0.9); RW.audio.sfx('slam'); RW.fx.ring(h.x, h.y - 20, '#c8b898', 140, 0.6, 3);
           const spikes = (WD.meta.roofSpikes || []).filter((s) => Math.abs(s.x * TS - tg.x) < 26 * TS);
           const n = Math.min(spikes.length, b.phase === 3 ? 16 : b.phase === 2 ? 12 : 9);
           spikes.sort(() => Math.random() - 0.5).slice(0, n).forEach((s, i) => E.shots.push({ x: s.x * TS + 8 + RW.rand(-6, 6), y: s.y * TS + 4, vx: 0, vy: 40, life: 5, owner: 'e', dmg: 22, kind: 'rain', grav: 520, warn: 0.7 + i * 0.06, color: RW.pick(['#c8a6ff', '#7fe3ff', '#e8e0ff']) }));
           for (let k = 0; k < 6; k++) E.shots.push({ x: tg.x + RW.rand(-180, 180), y: roofY - 20, vx: 0, vy: 40, life: 5, owner: 'e', dmg: 18, kind: 'rain', grav: 520, warn: 0.9 + k * 0.1, color: '#c8b898' });
         } }
-        else { steer(b, dt, h.x + Math.cos(b.ang) * 40, h.y + 60, 160, 2); if (b.st > 1.3) { b.state = 'cruise'; b.st = 0; b.dur = 1.5; } }
+        else { steer(b, dt, h.x + Math.cos(b.ang) * 40 * K, h.y + 60 * K, 160, 2); if (b.st > 1.3) { b.state = 'cruise'; b.st = 0; b.dur = 1.5; } }
         break;
       }
       case 'tail': {
-        steer(b, dt, tg.x + (h.x < tg.x ? -200 : 200), tg.y + 60, 260 * F, 3);
+        steer(b, dt, tg.x + (h.x < tg.x ? -200 : 200) * K, tg.y + 60 * K, 260 * F, 3);
         if (b.st > 0.9 && !b.did) {
           b.did = 1; const t = b.segs[b.segs.length - 1];
           fx(b, 'v3slam', { x: Math.round(t.x), y: Math.round(t.y) });
@@ -254,14 +260,13 @@
         break;
       }
       case 'summon':
-        steer(b, dt, tg.x, tg.y - 120, 150, 2);
-        if (!b.did) { b.did = 1; for (let k = 0; k < 3 + b.phase; k++) { const e = E.spawnEnemy(k % 2 ? 'spiky_fish' : 'creepy_fish', h.x + RW.rand(-80, 80), h.y + RW.rand(-40, 40)); RW.fx.burst(e.x, e.y, '#a86ef0', 12, 80, { add: true, kind: 'glow' }); } RW.audio.sfx('roar'); }
+        steer(b, dt, tg.x, tg.y - 120 * K, 150, 2);
+        if (!b.did) { b.did = 1; for (let k = 0; k < 3 + b.phase; k++) { const e = E.spawnEnemy(k % 2 ? 'spiky_fish' : 'creepy_fish', h.x + RW.rand(-80, 80) * K, h.y + RW.rand(-40, 40) * K); RW.fx.burst(e.x, e.y, '#a86ef0', 12, 80, { add: true, kind: 'glow' }); } RW.audio.sfx('roar'); }
         if (b.st > 1.2) { b.state = 'cruise'; b.st = 0; b.dur = 2; }
         break;
       default: b.state = 'cruise'; b.st = 0;
     }
     b.frame = Math.floor(b.t * 6) % 2;
-    RW.fx.light(h.x, h.y, b.phase === 3 ? 0.8 : 0.5, b.phase === 3 ? 0.25 : 0.4, b.phase === 3 ? 0.25 : 0.8);
   }
 
   // ---- what every player feels from the boss's effects (their own hero, on their own screen) ----
@@ -273,16 +278,16 @@
     if (bm && !bm.warn && beamCd <= 0) {
       const dx = bm.bx - bm.ax, dy = bm.by - bm.ay, L2 = dx * dx + dy * dy, t = RW.clamp(((pc.x - bm.ax) * dx + (pc.y - bm.ay) * dy) / L2, 0, 1);
       const qx = bm.ax + dx * t, qy = bm.ay + dy * t;
-      if (Math.hypot(pc.x - qx, pc.y - qy) < 15) { beamCd = 0.3; P.hurt(b.phase === 3 ? 18 : 14, Math.sign(pc.x - qx) || 1, 'beam'); RW.fx.burst(pc.x, pc.y, ['#ffffff', '#ff9ad0', '#9ad8ff'], 6, 80, { add: true, kind: 'glow' }); }
+      if (Math.hypot(pc.x - qx, pc.y - qy) < 15 * K) { beamCd = 0.3; P.hurt(b.phase === 3 ? 18 : 14, Math.sign(pc.x - qx) || 1, 'beam'); RW.fx.burst(pc.x, pc.y, ['#ffffff', '#ff9ad0', '#9ad8ff'], 6, 80, { add: true, kind: 'glow' }); }
     }
     const vt = getFx(b, 'v3vortex');
     if (vt) {
       const dx = vt.x - pc.x, dy = vt.y - pc.y, d = Math.hypot(dx, dy) || 1, k = (vt.ax || 100) / 100;
-      if (d < 420) { const pull = Math.min(300, 52000 / (d + 60)) * k; P.vx += (dx / d) * pull * dt * 2.2 + (-dy / d) * pull * dt * 1.2; P.vy += (dy / d) * pull * dt * 2.2 + (dx / d) * pull * dt * 1.2; }
-      if (d < 34 && vortCd <= 0) { vortCd = 0.45; P.hurt(11, 1, 'whirlpool'); }
+      if (d < 420 * K) { const pull = Math.min(300, 52000 * K / (d + 60 * K)) * k; P.vx += (dx / d) * pull * dt * 2.2 + (-dy / d) * pull * dt * 1.2; P.vy += (dy / d) * pull * dt * 2.2 + (dx / d) * pull * dt * 1.2; }
+      if (d < 34 * K && vortCd <= 0) { vortCd = 0.45; P.hurt(11, 1, 'whirlpool'); }
     }
     const co = getFx(b, 'v3coil');
-    if (co && co.warn === 2 && !crushDone.has(co)) { crushDone.add(co); if (Math.hypot(pc.x - co.x, pc.y - co.y) < 110) { P.hurt(b.phase === 3 ? 55 : 42, Math.sign(pc.x - co.x) || 1, 'coil'); P.vy = -260; } }
+    if (co && co.warn === 2 && !crushDone.has(co)) { crushDone.add(co); if (Math.hypot(pc.x - co.x, pc.y - co.y) < 110 * K) { P.hurt(b.phase === 3 ? 55 : 42, Math.sign(pc.x - co.x) || 1, 'coil'); P.vy = -260; } }
   }
 
   // ================================= hooks =================================
@@ -311,7 +316,7 @@
   function mirror(b, dt) {
     b.customDraw = true; b.t = (b.t || 0) + dt;
     const h = head(b);
-    if (!b.segs) { b.segs = []; for (let i = 0; i < NSEG; i++) b.segs.push({ x: h.x, y: h.y + GAP * (i + 1) }); b.ang = -Math.PI / 2; }
+    if (!b.segs) { b.segs = []; for (let i = 0; i < NSEG; i++) b.segs.push({ x: h.x, y: h.y + GAPW * (i + 1) }); b.ang = -Math.PI / 2; }
     if (b.lh) { const dx = h.x - b.lh.x, dy = h.y - b.lh.y; if (dx * dx + dy * dy > 0.5) { let want = Math.atan2(dy, dx), da = want - b.ang; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283; b.ang += da * Math.min(1, dt * 10); } }
     const bm = (b.fx || []).find((f) => f.type === 'v3beam'); if (bm) b.ang = Math.atan2(bm.by - bm.ay, bm.bx - bm.ax);
     b.lh = h; follow(b);
@@ -396,12 +401,73 @@
     if (!inRock()) return r;
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
     const b = E.boss;
-    const all = (q) => { E.enemies.forEach((e) => { if (isGuard(e)) { e.customDraw = true; drawGuardian(q, e.x + ox + e.w / 2, e.y + oy + e.h / 2, e, time); } }); if (b && b.sp === LEV && b.segs) { drawFx(q, b, ox, oy, time, true); drawLev(q, b, ox, oy, time); drawFx(q, b, ox, oy, time, false); } };
+    const all = (q) => { E.enemies.forEach((e) => { if (isGuard(e)) { e.customDraw = true; drawGuardian(q, e.x + ox + e.w / 2, e.y + oy + e.h / 2, e, time); } }); };
     if (RW.v3pix) RW.v3pix(g, all); else all(g);
+    if (b && b.sp === LEV && b.segs) {
+      if (RW.v3levDraw) { // v3s20: pixel sprites, head + segments + tail; then its effects on a chunky layer
+        const jt = jawFor(b, time); b.jaw = RW.lerp(b.jaw || 0, jt, 0.2);
+        RW.v3levDraw(g, b, ox, oy, time);
+        chunky(g, (q) => { const B = small(b); drawFx(q, B, ox / K, oy / K, time, true); drawFx(q, B, ox / K, oy / K, time, false); });
+      } else chunky(g, (q) => { const B = small(b); drawFx(q, B, ox / K, oy / K, time, true); drawLev(q, B, ox / K, oy / K, time); drawFx(q, B, ox / K, oy / K, time, false); b.jaw = B.jaw; });
+    }
     // the serpent passes behind you, never over you
     if (b && b.sp === LEV && lastMe && RW.game && RW.game.playing && !P.dead) { redraw = true; try { E.drawPlayer.apply(E, lastMe); } finally { redraw = false; } }
     return r;
   };
+  // how far the jaw opens for what it is doing (the old drawing worked this out itself)
+  function jawFor(b, time) {
+    const st = b.state || '';
+    return st === 'roar' || st === 'emerge' ? 0.62 : (st === 'charge' || st === 'frenzy') ? (b.did ? 0.5 : 0.25 + 0.15 * Math.sin(time * 18)) : st === 'beam' ? 0.42 : st === 'whirl' ? 0.35 : st === 'barrage' ? 0.3 + 0.2 * Math.max(0, Math.sin(time * 9)) : 0.08;
+  }
+  // the serpent as the drawing code knows it: everything divided by K (drawn inside a frame scaled by K)
+  function small(b) {
+    const B = Object.create(b);
+    B.x = b.x / K; B.y = b.y / K; B.w = b.w / K; B.h = b.h / K; B.jaw = b.jaw;
+    B.segs = (b.segs || []).map((s) => ({ x: s.x / K, y: s.y / K }));
+    B.fx = (b.fx || []).map((f) => {
+      const o = Object.assign({}, f);
+      if (f.type === 'v3beam') { o.ax = f.ax / K; o.ay = f.ay / K; o.bx = f.bx / K; o.by = f.by / K; }
+      else if (f.x > 5 || f.y > 5) { o.x = f.x / K; o.y = f.y / K; if (f.type === 'v3coil') o.ax = f.ax / K; }
+      return o;
+    });
+    return B;
+  }
+  // chunky pixels: drawn onto a layer of PX-unit pixels, colours stepped into flat bands, a dark outline round it
+  // its own small palette, like every other sprite: teal plates, pale belly, gems, bone teeth, a violet mouth, rage reds
+  const QPAL = ['#03050a', '#0a1a20', '#12303a', '#1c4a58', '#2a6676', '#3f8690', '#5fa6a4', '#86c4b8', '#b4e0d4', '#e0f6f0', '#ffffff',
+    '#20101a', '#3a1a22', '#5a2630', '#7a3438', '#9a5a50', '#c08870', '#ff5a3a', '#ffb070',
+    '#e0525a', '#8a2a32', '#4fa8f0', '#22507a', '#5fd98a', '#2a7a4a', '#a86ef0', '#5a3290', '#f2c94c', '#8a6a1c', '#7fe3ff', '#2a8aa8',
+    '#f0ecd8', '#b8b098', '#3a2460', '#6a3aa8', '#ff9ad0', '#c8f0ff'];
+  const QP = []; QPAL.forEach((h) => { const n = parseInt(h.slice(1), 16); QP.push(n >> 16, (n >> 8) & 255, n & 255); });
+  const QC = new Map();
+  let lay = null;
+  function chunky(g, fn) {
+    const v = RW.view, W = Math.ceil(v.w / PX) + 2, H = Math.ceil(v.h / PX) + 2;
+    if (!lay || lay.width !== W || lay.height !== H) { lay = document.createElement('canvas'); lay.width = W; lay.height = H; lay.ctx = lay.getContext('2d', { willReadFrequently: true }); }
+    const o = lay.ctx; o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, W, H); o.setTransform(K / PX, 0, 0, K / PX, 0, 0);
+    try { fn(o); } catch (e) { console.warn('leviathan layer', e); }
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    const img = o.getImageData(0, 0, W, H), d = img.data, n = W * H, solid = new Uint8Array(n);
+    for (let i = 0, j = 0; j < n; i += 4, j++) {
+      if (d[i + 3] < 100) { d[i + 3] = 0; continue; }
+      d[i + 3] = 255; solid[j] = 1;
+      const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]; let q = QC.get(key);
+      if (q === undefined) { let bd = 1e9; q = 0; for (let k = 0; k < QP.length; k += 3) { const dr = d[i] - QP[k], dg = d[i + 1] - QP[k + 1], db = d[i + 2] - QP[k + 2], dd = dr * dr * 0.3 + dg * dg * 0.59 + db * db * 0.11; if (dd < bd) { bd = dd; q = k; } } if (QC.size > 60000) QC.clear(); QC.set(key, q); }
+      d[i] = QP[q]; d[i + 1] = QP[q + 1]; d[i + 2] = QP[q + 2];
+    }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const j = y * W + x; if (solid[j]) continue;
+      if ((x > 0 && solid[j - 1]) || (x < W - 1 && solid[j + 1]) || (y > 0 && solid[j - W]) || (y < H - 1 && solid[j + W])) { const i = j * 4; d[i] = 3; d[i + 1] = 5; d[i + 2] = 9; d[i + 3] = 255; }
+    }
+    o.putImageData(img, 0, 0);
+    g.save(); g.imageSmoothingEnabled = false; g.drawImage(lay, 0, 0, W * PX, H * PX); g.restore();
+  }
+  // the Heart Chamber is pitch black: you see the Leviathan only in your own light
+  const RDEF = RW.WORLDS && RW.WORLDS.rock;
+  if (RDEF && RDEF.ambientAt) {
+    const bAmb = RDEF.ambientAt;
+    RDEF.ambientAt = function (x, y) { const c = C(); if (c && inRock()) { const dx = (x - c.cx) / (c.rx + 3), dy = (y - c.cy) / (c.ry + 3); if (dx * dx + dy * dy <= 1) return 0; } return bAmb.apply(this, arguments); };
+  }
   let lastMe = null, redraw = false;
   const baseDPme = E.drawPlayer;
   E.drawPlayer = function (g, cam, p) { if (p && (p === P || (p.x === P.x && p.y === P.y)) && !redraw) lastMe = Array.from(arguments); return baseDPme.apply(this, arguments); };
@@ -492,7 +558,6 @@
     drawHead(g, b, X(h.x), Y(h.y), b.ang, b.jaw, time, rage, flash);
     g.restore();
     // lights along the body
-    for (let i = 0; i < pts.length; i += 3) RW.fx.light(pts[i].x, pts[i].y, rage ? 0.75 : 0.42, rage ? 0.28 : 0.6, rage ? 0.2 : 0.75);
     if (shield) drawShield(g, b, pts, ox, oy, time);
   }
   function drawHead(g, b, x, y, ang, jaw, time, rage, flash) {

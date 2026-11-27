@@ -148,5 +148,5 @@
     const all = E.npcs, near = all.filter((n) => heroes.some((h) => Math.abs(n.x - h.x) < far && Math.abs(n.y - h.y) < far));
     E.npcs = near; try { return baseNpcs.apply(this, arguments); } finally { all.forEach((n, i) => { }); E.npcs = all; }
   };
-  RW.v3map = { refreshMap, chests: KINDS };
+  RW.v3map = { refreshMap, chests: KINDS, state: st };
 })(window.RW);
