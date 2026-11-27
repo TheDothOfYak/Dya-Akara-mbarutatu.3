@@ -100,6 +100,7 @@
     if (s === 5) { g.moveTo(x + TS, y); pts.forEach(([a, b]) => g.lineTo(Math.max(a, x), Math.min(b, y + TS))); g.lineTo(x, y); }
     g.closePath();
   }
+  const solid4 = (x, y) => { const T2 = T(), ok = (q) => { const d = T2[q]; return !!(d && d.solid); }; return ok(G(x - 1, y)) && ok(G(x + 1, y)) && ok(G(x, y - 1)) && ok(G(x, y + 1)); };
   const naturalSolidT = (t) => !!(t && t.solid && !t.decor && !BUILT[t.tex] && !t.loot && !t.storage && !t.toggle && (t.hard || 0) < 50);
   const colOf = (t, k) => (t.ore && k === 2 ? t.ore : (t.colors && t.colors[k % 2]) || '#444');
   const baseTiles = WD.drawTiles;
@@ -109,12 +110,25 @@
     const tx0 = Math.floor(cam.x / TS) - 1, tx1 = Math.ceil((cam.x + vw) / TS) + 1, ty0 = Math.floor(cam.y / TS) - 1, ty1 = Math.ceil((cam.y + vh) / TS) + 1;
     for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) { const s = shapeAt(x, y); if (s) shapes.set(x + ',' + y, s); }
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
-    if (shapes.size) g.drawImage = function (img, x, y, w, h) {
+    g.drawImage = function (img, x, y, w, h) {
       if (img && (arguments.length === 3 || arguments.length === 5) && (arguments.length === 3 ? img.width === 16 : w === TS)) {
         const tx = Math.round((x - ox) / TS), ty = Math.round((y - oy) / TS);
         if (Math.abs(x - ox - tx * TS) < 0.01 && Math.abs(y - oy - ty * TS) < 0.01) {
+          const t = T()[G(tx, ty)];
           const s = shapes.get(tx + ',' + ty);
-          if (s && T()[WD.get(tx, ty)] && T()[WD.get(tx, ty)].solid) { g.save(); shapePath(g, s, x, y); g.clip(); const r = raw.apply(this, arguments); g.restore(); return r; }
+          if (s && t && t.solid) { g.save(); shapePath(g, s, x, y); g.clip(); const r = raw.apply(this, arguments); g.restore(); return r; }
+          // 3.23: no two blocks alike. A buried natural block is drawn turned (mirrored either way), a shade lighter or
+          // darker, with a couple of flecks of its own colours, so the same block never repeats in a pattern
+          if (t && naturalSolidT(t) && !t.ore && solid4(tx, ty) && !(RW.v3dbg && RW.v3dbg.novar)) {
+            const h = RW.hash2(tx, ty, 707), fx = h < 0.5, fy = t.tex !== 'layer' && RW.hash2(tx, ty, 708) < 0.5;
+            let r;
+            if (fx || fy) { g.save(); g.translate(x + (fx ? TS : 0), y + (fy ? TS : 0)); g.scale(fx ? -1 : 1, fy ? -1 : 1); r = arguments.length === 5 ? raw.call(this, img, 0, 0, TS, TS) : raw.call(this, img, 0, 0); g.restore(); } else r = raw.apply(this, arguments);
+            const k = RW.hash2(tx, ty, 709) - 0.5;
+            g.fillStyle = k > 0 ? 'rgba(255,255,255,' + (k * 0.1).toFixed(3) + ')' : 'rgba(0,0,0,' + (-k * 0.14).toFixed(3) + ')'; g.fillRect(x, y, TS, TS);
+            const c1 = (t.colors && t.colors[1]) || '#777', c2 = (t.colors && t.colors[2]) || '#333';
+            for (let q = 0; q < 3; q++) { const a1 = RW.hash2(tx * 3 + q, ty, 710), a2 = RW.hash2(tx, ty * 3 + q, 711); g.fillStyle = q % 2 ? c1 : c2; g.fillRect(x + Math.floor(a1 * 7) * 2, y + Math.floor(a2 * 7) * 2, 2, 2); }
+            return r;
+          }
         }
       }
       return raw.apply(this, arguments);
@@ -132,7 +146,7 @@
       if (floorShape(s)) { g.fillStyle = 'rgba(255,255,240,0.16)'; for (let q = 0; q < 8; q++) { const fx = q / 8, py = sy + surf(s, fx + 0.06); g.fillRect(sx + q * STEP, Math.round(py), STEP, 1); } }
     });
     // blending: speckles of each block into its neighbour along the seam
-    const T2 = T();
+    const T2 = T(); if (!(RW.v3dbg && RW.v3dbg.noblend))
     for (let y = ty0; y <= ty1; y++) for (let x = tx0; x <= tx1; x++) {
       const a = T2[WD.get(x, y)]; if (!naturalSolidT(a)) continue;
       for (const [dx, dy] of [[1, 0], [0, 1]]) {

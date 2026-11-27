@@ -16,7 +16,7 @@
   const E = RW.ent, U = RW.ui, P = RW.player, WD = RW.world, N = RW.net, TS = RW.TILE;
   if (!E || !U || !P || !WD || !N) return;
 
-  RW.VERSION = '3.22.0'; // everyone in a room must match; bump with every update
+  RW.VERSION = '3.23.0'; // everyone in a room must match; bump with every update
 
   // =====================================================================================================
   // 1. HOSTING
