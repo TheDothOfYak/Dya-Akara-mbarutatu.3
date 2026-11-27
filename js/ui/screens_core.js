@@ -324,6 +324,7 @@
       page.appendChild(head);
       const body = U.el('div', { cls: 'page-body', style: 'max-width:760px;margin:0 auto;width:100%' });
       page.appendChild(body);
+      page.appendChild(U.el('p', { cls: 'muted small center copyright', style: 'opacity:.6;font-size:11px;margin:18px 0 8px', text: '© 2026 Isaac Flake. All Rights Reserved.' }));
       scr.appendChild(page);
       root.appendChild(scr);
 

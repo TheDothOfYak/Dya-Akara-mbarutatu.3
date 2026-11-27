@@ -232,7 +232,7 @@
       btn((G.noIdleWarning ? '' : '✓ ') + 'Warn about heroes who have not moved', () => { G.noIdleWarning = !G.noIdleWarning; m.close(); }),
       btn('Quit to the title', () => { m.close(); U.confirm('Quit?', st && !st.online ? 'Your game is autosaved at the start of each turn.' : 'Leave this game?', () => G.title()); }),
       btn('Close', () => m.close(), 'primary'),
-    ])]);
+    ]), el('p', { cls: 'muted small copyright', style: { opacity: .6, fontSize: '11px', textAlign: 'center', marginTop: '10px' }, text: '© 2026 Isaac Flake. All Rights Reserved.' })]);
   };
   /* G.saveMenu and G.loadMenu, the save and load screens, are in saveload.js */
   G.loadSlot = async function (where, slot) {

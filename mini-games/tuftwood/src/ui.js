@@ -157,6 +157,7 @@
     g.fillStyle = '#fbf7ea'; g.fillRect(x + 66, y + h - 30, w - 70, 26);
     font(g, 16); g.textAlign = 'right'; g.fillStyle = '#9a8a7a'; g.fillText(UI.touch ? 'drag to scroll   tap outside to close' : 'A / D  turn page     W / S  scroll     Tab  close', x + w - 16, y + h - 12);
     g.restore();
+    font(g, 13, 400); g.textAlign = 'center'; g.fillStyle = 'rgba(251,247,234,.6)'; g.fillText('© 2026 Isaac Flake. All Rights Reserved.', vw / 2, y + h + 20);
     UI.hits.push({ x: -1, y: -1, r: 0, outside: [x, y, w, h], fn: UI.toggleJournal });
   };
 

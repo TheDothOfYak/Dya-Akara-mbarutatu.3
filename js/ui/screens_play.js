@@ -1720,6 +1720,7 @@
           },
         }));
         pauseOverlay.appendChild(col);
+        pauseOverlay.appendChild(U.el('p', { cls: 'muted small mt center copyright', style: 'opacity:.6;font-size:11px', text: '© 2026 Isaac Flake. All Rights Reserved.' }));
         scr.appendChild(pauseOverlay);
       }
       function closePause() { if (pauseOverlay) { pauseOverlay.remove(); pauseOverlay = null; } if (!NET) M.paused = false; }
