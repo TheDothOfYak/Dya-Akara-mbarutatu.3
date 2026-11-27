@@ -115,7 +115,7 @@
   const vn = (p, row, s) => { const i = Math.floor(p / 5), f = p / 5 - i, a = h2(i, row, s), b = h2(i + 1, row, s), q = f * f * (3 - 2 * f); return a + (b - a) * q; };
   const depth = (p, row, s, built) => built ? (vn(p, row, s) > 0.72 ? 1 : 0) : Math.floor(vn(p, row, s) * 3.4 + vn(p * 2.3, row, s + 5) * 1.4 + h2(p, row, s + 9) * 0.8);
   const masked = new Map();
-  const openAt = (x, y) => { if (!WD.inb(x, y)) return false; const t = RW.TILES[WD.get(x, y)]; return !t.solid && t.key !== 'water' && !t.liquid && !(t.decor && t.solid); };
+  const openAt = (x, y) => { if (!WD.inb(x, y)) return false; const t = RW.TILES[WD.get(x, y)]; return !t.solid && !(t.decor && t.solid); }; // 3.18: water counts as open too, so rock under water wears and rounds like rock in air
   const BUILT = { brick: 1, plank: 1, plate: 1, stake: 1, books: 1 };
   function wornTile(tx, ty, base, t) {
     const up = openAt(tx, ty - 1), dn = openAt(tx, ty + 1), lf = openAt(tx - 1, ty), rt = openAt(tx + 1, ty);

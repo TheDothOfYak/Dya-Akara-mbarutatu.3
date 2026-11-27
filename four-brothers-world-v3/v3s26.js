@@ -88,6 +88,14 @@
     if (meta.v3shaft) taken.push({ x0: meta.v3shaft.x - 8, x1: meta.v3shaft.x + 8, y0: 0, y1: H });
     const free = (x0, y0, x1, y1, j) => { if (taken.some((q) => x1 >= q.x0 && x0 <= q.x1 && y1 >= q.y0 && y0 <= q.y1)) return false; for (let y = y0; y <= y1; y += 2) for (let x = x0; x <= x1; x += 2) if (!inBand(x, y, j)) return false; return true; };
     const ROCKT = L.ROCK, OREt = L.ORE;
+    // 0. (3.18) smooth the cave walls: no lone blocks floating in the water, no one-block pits in the walls
+    for (let pass = 0; pass < 2; pass++) for (let y = L.CUT + 4; y < H - 4; y++) for (let x = 4; x < W - 4; x++) {
+      const r = L.regionAt(x, y); if (r.seal || r.j < 1 || r.j > 5) continue;
+      const i = y * W + x, t = fg[i], rock = ROCKT[r.j];
+      const sol = (q) => RW.TILES[q].solid, n = (sol(fg[i - 1]) ? 1 : 0) + (sol(fg[i + 1]) ? 1 : 0) + (sol(fg[i - W]) ? 1 : 0) + (sol(fg[i + W]) ? 1 : 0);
+      if (t === rock && n <= 1) fg[i] = Tt.water;
+      else if (t === Tt.water && n >= 3) { const r2 = [fg[i - 1], fg[i + 1], fg[i - W], fg[i + W]].filter((q) => q === rock).length; if (r2 >= 3) fg[i] = rock; }
+    }
     // 1. minerals
     for (let y = L.CUT; y < H - 3; y++) for (let x = 3; x < W - 3; x++) {
       const i = y * W + x, r = L.regionAt(x, y); if (r.seal || r.j < 1 || r.j > 5) continue;
