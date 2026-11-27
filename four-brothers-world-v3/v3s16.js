@@ -3,7 +3,8 @@
 //  * Hover any choice (rock, head, body, arms, cracks, eyes, glow, mouth, face, growths, size, veins, hat, cape...) and
 //    your hero shows it at once; move the mouse off and it goes back, unless you clicked. (Moves still animate on hover.)
 //  * Choices sit in separate labelled boxes (Face first, then Body, Head & Hat, Details, Cape). While you hover, a line under the
-//    picture says what you're trying on, and head and face choices also get a close-up of your hero's head.
+//    picture says what you're trying on, and the choice shows on your hero itself. Rows are striped and divided so
+//    neighbouring choices are easy to tell apart.
 //  * The card grows or shrinks to fill the window without a scrollbar.
 (function (RW) {
   'use strict';
@@ -30,6 +31,11 @@
   #v3groups .v3grp { border: 2px solid #3e3658; background: rgba(40, 34, 60, .35); padding: 4px 8px 6px; display: grid; gap: 3px; }
   #v3groups .v3grph { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #b8a8e8; border-bottom: 1px solid #3e3658; padding-bottom: 2px; margin-bottom: 1px; }
   #v3groups .v3grp > .label { font-size: 11px !important; opacity: .7; }
+  #v3groups .v3grp > .opt { padding: 3px 5px; border-left: 3px solid transparent; }
+  #v3groups .v3grp > .opt:nth-of-type(odd) { background: rgba(255, 255, 255, .045); }
+  #v3groups .v3grp > .opt + .opt { border-top: 1px solid rgba(160, 140, 220, .22); }
+  #v3groups .v3grp > .opt:hover { border-left-color: #b8a8e8; background: rgba(184, 168, 232, .10); }
+  #v3groups .v3grp > .opt > .label { color: #d8ccff; font-weight: bold; }
   #v3groups .v3tail { grid-column: 1 / -1; font-size: 11px !important; opacity: .7; }
   #v3try { font-size: 13px; color: #e8d890; min-height: 1.3em; margin-top: 4px; visibility: hidden; }
   #v3zoom { width: 100%; image-rendering: pixelated; border: 2px solid #3e3658; margin-top: 4px; display: none; background: #120f18; }
@@ -82,7 +88,7 @@
     if (!b) { tl.textContent = ''; tl.style.visibility = 'hidden'; zc.style.display = 'none'; zoomOn = false; return; }
     const rn = rowName(b), what = b.textContent.trim() || b.title || b.getAttribute('aria-label') || 'this colour';
     tl.textContent = 'Trying on: ' + rn + ' \u2014 ' + what; tl.style.visibility = 'visible';
-    const grp = groupOf(rn.toLowerCase()); zoomOn = grp === 'Head & Hat' || grp === 'Face'; zc.style.display = zoomOn ? 'block' : 'none';
+    zoomOn = false; zc.style.display = 'none'; // the try-on shows on your hero itself, no second picture
     if (zoomOn) requestAnimationFrame(drawZoom);
   }
   function drawZoom() {
