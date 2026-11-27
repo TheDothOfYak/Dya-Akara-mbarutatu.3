@@ -28,7 +28,8 @@
     4: { name: 'rage', plate: ['#080404', '#140a0a', '#221010', '#321616', '#461e1c', '#5e2a24'], belly: ['#3a1c18', '#56281e', '#7a3a24'], seam: '#ff5a3a', gems: ['#ff5a3a', '#ffb070', '#ffe0a0'], eye: '#ff3a2a', mouth: ['#2a0604', '#ff6a2a'], teeth: ['#d8c8b0', '#fff0d8'], crest: ['#ff5a3a', '#ffb070', '#c83a20'], fin: ['#221010', '#461e1c', '#ff6a3a'], crack: ['#c83a20', '#ff6a3a', '#ffc070'] },
   };
   Object.keys(THEMES).forEach((k) => { const T = THEMES[k]; ['plate', 'belly', 'fin', 'teeth'].forEach((key) => { if (k === '1' && key === 'fin') return; /* the rust fins stay as they are */ T[key] = T[key].map((c) => sh(c, -0.28)); }); if (k !== '1') T.crest = T.crest.map((c) => sh(c, -0.2)); });
-  const palOf = (T) => ['#020204', '#ffffff'].concat(T.plate, T.belly, T.gems, T.crest, T.fin, T.mouth, T.teeth, [T.seam, T.eye, sh(T.eye, 0.5)], T.dark || [], T.crack || []);
+  Object.keys(THEMES).forEach((k) => { const T = THEMES[k]; T.gum = sh(T.mouth[1], 0.2); T.tongue = sh(T.mouth[1], 0.5); T.ridge = sh(T.mouth[0], 0.6); T.spit = sh(T.teeth[1], -0.1); });
+  const palOf = (T) => ['#020204', '#ffffff', T.gum, T.tongue, T.ridge, T.spit].concat(T.plate, T.belly, T.gems, T.crest, T.fin, T.mouth, T.teeth, [T.seam, T.eye, sh(T.eye, 0.5)], T.dark || [], T.crack || []);
 
   // ---------------- painters (pixel units, facing right) ----------------
   function ellipse(g, x, y, rx, ry, col) { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, Math.max(0.5, rx), Math.max(0.5, ry), 0, 0, 6.283); g.fill(); }
@@ -78,54 +79,75 @@
     g.restore();
     VA.finish(c, palOf(T)); c.cy = cy; c.cx = cx; return c;
   }
-  // the head, after McKay's sea serpent: long and low like an eel's, a pale ridge down the snout, a small eye set low,
-  // great webbed fans swept back from the cheeks and crown, thin tendrils hanging from the jaw, needle teeth of every
-  // length. Every outline is curved. Facing right; jaw 0 = just parted (how it holds it), 1 = open, 2 = gaping
-  function paintHead(T, R, jaw, stage) {
-    const w = R * 5.8 + 8, h = R * 5.2 + 8, c = mk(w, h), g = c.ctx, cx = R * 2.1 + 4, cy = h * 0.46;
-    const P = T.plate, open = [0.1, 0.32, 0.6][jaw];
-    const shape = (fill, pts) => { g.fillStyle = fill; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i += 2) g.quadraticCurveTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]); g.closePath(); g.fill(); };
-    // the crown fan and the great cheek fan, swept back
-    fan(g, cx - R * 0.2, cy - R * 0.55, -1.75, -3.0, 7, R * 1.5, R * 2.4, T, true);
-    fan(g, cx - R * 0.55, cy + R * 0.05, -2.55, 2.45, 8, R * 1.4, R * 2.1, T, true);
-    if (stage === 4) for (let k = 0; k < 4; k++) poly(g, [[cx + R * (0.2 + k * 0.4), cy - R * 0.62], [cx + R * (-0.2 + k * 0.4), cy - R * (1.3 + (k % 2) * 0.5)], [cx + R * (0.35 + k * 0.4), cy - R * 0.66]], k % 2 ? T.crack[0] : T.plate[0]);
-    // the mouth's inside
-    shape(T.mouth[0], [[cx - R * 0.5, cy + R * 0.1], [cx + R * 1.5, cy - R * 0.02], [cx + R * 3.1, cy + R * 0.02], [cx + R * 2.9, cy + R * (0.4 + open * 1.2)], [cx + R * 1.2, cy + R * (0.4 + open * 1.2)], [cx - R * 0.2, cy + R * (0.3 + open * 0.8)], [cx - R * 0.5, cy + R * 0.1]]);
-    if (open > 0.2) ellipse(g, cx + R * 0.3, cy + R * (0.22 + open * 0.5), R * 0.35, R * open * 0.35, T.mouth[1]);
-    // the lower jaw: long and thin, curving up at the chin; needle teeth; tendrils hanging from it
-    const LT = [0.16, 0.3, 0.12, 0.38, 0.2, 0.26, 0.1, 0.34, 0.18, 0.22];
-    g.save(); g.translate(cx - R * 0.45, cy + R * 0.12); g.rotate(open);
-    LT.forEach((L, k) => { const x = R * (0.6 + k * 0.25); poly(g, [[x - R * 0.04, R * 0.02], [x + R * 0.01, -R * L], [x + R * 0.05, R * 0.02]], k % 3 ? T.teeth[1] : T.teeth[0]); });
-    for (let k = 0; k < 5; k++) { const x0 = R * (0.4 + k * 0.42), L = R * (1.0 + (k % 3) * 0.35); g.strokeStyle = k % 2 ? T.fin[0] : P[1]; g.lineWidth = Math.max(1, R * 0.05); g.beginPath(); g.moveTo(x0, R * 0.4); g.quadraticCurveTo(x0 - R * 0.35, R * 0.4 + L * 0.5, x0 - R * 0.1 + Math.sin(k) * R * 0.2, R * 0.4 + L); g.stroke(); }
-    shape(P[1], [[-R * 0.35, -R * 0.08], [R * 1.4, -R * 0.1], [R * 2.9, -R * 0.02], [R * 3.25, R * 0.02], [R * 3.05, R * 0.2], [R * 2.0, R * 0.36], [R * 0.9, R * 0.5], [-R * 0.1, R * 0.56], [-R * 0.35, R * 0.38]]);
-    shape(T.belly[0], [[R * 0.1, R * 0.32], [R * 1.4, R * 0.3], [R * 2.6, R * 0.16], [R * 1.6, R * 0.42], [R * 0.3, R * 0.48]]);
-    g.restore();
-    // upper needle teeth
-    const UT = [0.18, 0.1, 0.3, 0.14, 0.46, 0.12, 0.24, 0.1, 0.36, 0.14, 0.2, 0.12];
-    UT.forEach((L, k) => { const x = cx + R * (0.0 + k * 0.25), y = cy + R * 0.04; poly(g, [[x - R * 0.04, y], [x + R * 0.0, y + R * L], [x + R * 0.06, y]], L > 0.3 ? T.teeth[1] : k % 2 ? T.teeth[0] : T.teeth[1]); });
-    // the skull: a long low curve from the crown down to a pointed snout that dips at the tip
-    shape(P[1], [[cx - R * 1.1, cy + R * 0.3], [cx - R * 1.25, cy - R * 0.55], [cx - R * 0.3, cy - R * 0.85], [cx + R * 1.3, cy - R * 0.82], [cx + R * 2.5, cy - R * 0.38], [cx + R * 3.3, cy - R * 0.05], [cx + R * 3.25, cy + R * 0.08], [cx + R * 1.5, cy + R * 0.12], [cx + R * 0.1, cy + R * 0.1], [cx - R * 0.6, cy + R * 0.45], [cx - R * 1.1, cy + R * 0.3]]);
-    shape(P[2], [[cx - R * 0.9, cy - R * 0.5], [cx - R * 0.2, cy - R * 0.78], [cx + R * 1.2, cy - R * 0.74], [cx + R * 2.3, cy - R * 0.34], [cx + R * 3.05, cy - R * 0.06], [cx + R * 1.6, cy - R * 0.18], [cx + R * 0.2, cy - R * 0.22], [cx - R * 0.5, cy - R * 0.2], [cx - R * 0.9, cy - R * 0.5]]);
-    // the pale ridge down the top of the snout
-    g.strokeStyle = stage === 1 ? P[5] : P[4]; g.lineWidth = Math.max(1, R * 0.08); g.beginPath(); g.moveTo(cx - R * 0.6, cy - R * 0.74); g.quadraticCurveTo(cx + R * 1.3, cy - R * 0.84, cx + R * 3.0, cy - R * 0.12); g.stroke();
-    // scales
-    for (let row = 0; row < 2; row++) for (let k = 0; k < 6; k++) { const x = cx - R * 0.6 + k * R * 0.45 + row * R * 0.22, y = cy - R * (0.55 - row * 0.2) + k * R * 0.04; g.strokeStyle = P[0]; g.lineWidth = 1; g.beginPath(); g.arc(x, y, R * 0.12, 0.3, 2.8); g.stroke(); }
-    // cheek: a fold of skin running back from the mouth's corner
-    g.strokeStyle = P[0]; g.lineWidth = Math.max(1, R * 0.06); g.beginPath(); g.moveTo(cx - R * 0.4, cy + R * 0.15); g.quadraticCurveTo(cx - R * 0.9, cy - R * 0.05, cx - R * 1.0, cy + R * 0.32); g.stroke();
-    if (stage === 3) ellipse(g, cx + R * 1.8, cy - R * 0.3, R * 0.3, R * 0.09, T.dark[0]);
-    // a small eye set low, under a dark brow
-    ellipse(g, cx + R * 1.05, cy - R * 0.22, R * 0.22, R * 0.12, '#020204');
-    ellipse(g, cx + R * 1.1, cy - R * 0.21, R * 0.13, R * 0.07, T.eye);
-    g.fillStyle = '#020204'; g.fillRect(Math.round(cx + R * 1.1), Math.round(cy - R * 0.28), 1, Math.max(1, Math.round(R * 0.12)));
-    g.fillStyle = sh(T.eye, 0.6); g.fillRect(Math.round(cx + R * 1.16), Math.round(cy - R * 0.25), 1, 1);
-    shape(P[0], [[cx + R * 0.7, cy - R * 0.3], [cx + R * 1.1, cy - R * 0.42], [cx + R * 1.45, cy - R * 0.3], [cx + R * 1.1, cy - R * 0.34], [cx + R * 0.7, cy - R * 0.3]]);
-    if (stage === 4) {
-      [[1.6, -0.3, 0.07], [1.85, -0.22, 0.06], [0.5, -0.4, 0.07], [1.35, -0.1, 0.05]].forEach(([u, vv, r]) => { ellipse(g, cx + R * u, cy + R * vv, R * r * 1.5, R * r, '#020204'); ellipse(g, cx + R * u, cy + R * vv, R * r, R * r * 0.6, T.eye); });
-      g.strokeStyle = T.crack[1]; g.lineWidth = Math.max(1, R * 0.07); g.beginPath(); g.moveTo(cx - R * 0.4, cy - R * 0.6); g.lineTo(cx + R * 0.3, cy - R * 0.3); g.lineTo(cx + R * 0.1, cy); g.moveTo(cx + R * 2.1, cy - R * 0.45); g.lineTo(cx + R * 2.4, cy - R * 0.15); g.stroke();
+  const SKULL = [
+    '........666666666...................................',
+    '......666666666666666...............................',
+    '....665555555555555556666...........................',
+    '...6555555555555555555555555556666..................',
+    '..64444444444444444444422222222222..................',
+    '..434444444444344444444411111111112.................',
+    '.6444444344444444443444444ppppeppp2.................',
+    '.4441414144443444444444434ppeEepep226666666666......',
+    '.4441413144444444434444444pppepppp45555535555562....',
+    '.3331313133323333333333233333333332333333333325pp5..',
+    '.33313131333333332333333333323333333332233333335p55.',
+    '.333131313323333333333233333333332333333223323333355',
+    '.333121313333333233333333332333333333323333223333235',
+    '.222121212222222222222222222222222222222222222222222',
+    '..2222213333322222222222222222222222222222222222222.',
+    '...22233133333222222222222222222222222222222222222..',
+    '....113331333m11111111111111111111111111111111111...',
+    '.....13333333mm111111111111111111111111111111111....',
+    '....22233333322.....................................',
+    '......22222222......................................',
+  ];
+  // the head is pixel art by hand (SKULL, 52 x 20): a domed skull, a heavy brow over a deep socket, the drop in front
+  // of the eyes, then a long snout with a nasal bump, scars and a flared nostril at the hooked tip. The lower jaw,
+  // its teeth, the fans, the tendrils and the inside of the mouth are added around it for each pose.
+  // Facing right; jaw 0..5 from just parted (how it holds it) to gaping; sway 0/1 moves the fans and tendrils.
+  function paintHead(T, R, jaw, stage, sway) {
+    const W0 = 84, H0 = 72, c = mk(W0, H0), g = c.ctx, OX = 26, OY = 26, sw = sway ? 1 : -1;
+    const P = T.plate, open = [0.06, 0.16, 0.28, 0.4, 0.52, 0.64][jaw] || 0.06;
+    const col = { 1: P[0], 2: P[1], 3: P[2], 4: P[3], 5: P[4], 6: P[5], b: T.belly[0], c: T.belly[1], e: T.eye, E: sh(T.eye, 0.6), p: '#020204', m: T.mouth[0], g: T.gum, t: T.teeth[1], u: T.teeth[0] };
+    const px = (x, y, k) => { const cc = col[k] || k; g.fillStyle = cc; g.fillRect(x, y, 1, 1); };
+    g.imageSmoothingEnabled = false;
+    // fans: crown and cheek, swept back from behind the skull
+    fan(g, OX + 8, OY + 3, -1.8 + sw * 0.05, -3.0 + sw * 0.08, 7, 16, 25 + sw, T, true);
+    fan(g, OX + 4, OY + 12, -2.6 - sw * 0.06, 2.5 + sw * 0.06, 8, 13, 19 - sw, T, true);
+    if (stage === 4) [[12, 0, -10, -14], [18, 0, -6, -17], [24, 2, -4, -12]].forEach(([x, y, dx, dy], k) => { g.fillStyle = k % 2 ? T.crack[0] : P[0]; g.beginPath(); g.moveTo(OX + x - 2, OY + y + 1); g.lineTo(OX + x + dx, OY + y + dy); g.lineTo(OX + x + 2, OY + y + 1); g.closePath(); g.fill(); });
+    // the hinge of the jaw, and where the lips meet
+    const hx = OX + 10, hy = OY + 17, lipY = OY + 17;
+    // the inside of the mouth: dark, with the throat, ridges on the palate, and the tongue
+    if (open > 0.1) {
+      g.fillStyle = T.mouth[0]; g.beginPath(); g.moveTo(hx - 1, hy); g.lineTo(OX + 48, lipY); g.lineTo(hx + Math.cos(open) * 38, hy + Math.sin(open) * 38); g.closePath(); g.fill();
+      g.fillStyle = T.ridge; g.beginPath(); g.ellipse(hx + 6, hy + 2 + open * 6, 5, 1 + open * 7, 0, 0, 6.283); g.fill();
+      g.fillStyle = T.mouth[1]; g.beginPath(); g.ellipse(hx + 5, hy + 2 + open * 6, 2.5, 0.5 + open * 4, 0, 0, 6.283); g.fill();
+      for (let k = 0; k < 5; k++) { const x = OX + 20 + k * 5; px(x, lipY + 1, T.ridge); px(x - 1, lipY + 2, T.ridge); }
     }
-    // nostril near the tip
-    ellipse(g, cx + R * 2.85, cy - R * 0.14, R * 0.08, R * 0.04, '#020204');
-    VA.finish(c, palOf(T)); c.cx = cx; c.cy = cy; return c;
+    // the lower jaw, drawn straight then turned about the hinge
+    const J = mk(48, 26), jg = J.ctx; jg.imageSmoothingEnabled = false;
+    const jcol = (x, y, k) => { jg.fillStyle = col[k] || k; jg.fillRect(x, y, 1, 1); };
+    const JR = { 4: [1, 44, '5'], 5: [0, 45, '3'], 6: [0, 43, '2'], 7: [1, 39, 'b'], 8: [2, 32, 'b'], 9: [5, 22, '1'] };
+    // crooked teeth pointing up, then the gum they sit in
+    [[8, 2], [11, 1], [14, 3], [17, 1], [20, 2], [23, 4], [26, 1], [29, 2], [32, 1], [35, 3], [38, 1], [41, 2]].forEach(([x, L], k) => { for (let y = 0; y < L; y++) jcol(x, 3 - y, y === L - 1 ? 't' : 'u'); if (L >= 3) jcol(x + 1, 3, 'u'); });
+    Object.keys(JR).forEach((r) => { const [a, b, k] = JR[r]; for (let x = a; x <= b; x++) jcol(x, +r, k); });
+    for (let x = 7; x <= 42; x++) jcol(x, 4, 'g');
+    jcol(44, 3, '4'); jcol(45, 3, '5'); jcol(45, 2, '5'); // the chin curling up
+    if (open > 0.1) for (let x = 6; x < 30; x++) jcol(x, 3 - (x > 18 ? 1 : 0) + (sway && x > 24 ? -1 : 0), x % 7 ? T.tongue : T.gum); // the tongue along the floor of the jaw
+    for (let k = 0; k < 5; k++) { let x = 8 + k * 7, y = 10; const L = 8 + (k % 3) * 4; for (let i = 0; i < L; i++) { jcol(x, y + i, k % 2 ? T.fin[0] : P[1]); if (i % 3 === 2) x += ((i + k + sway) % 2 ? 1 : -1); } } // tendrils
+    g.save(); g.translate(hx, hy); g.rotate(open); g.drawImage(J, -2, -5); g.restore();
+    // upper teeth, crooked, hanging below the lip; two long fangs
+    [[15, 2], [18, 1], [21, 3], [24, 1], [27, 5], [30, 2], [33, 1], [36, 3], [39, 1], [42, 4], [45, 1]].forEach(([x, L]) => { for (let y = 0; y < L; y++) px(OX + x, lipY + 1 + y, y === L - 1 ? 't' : 'u'); if (L >= 4) px(OX + x + 1, lipY + 1, 'u'); });
+    // strings of spit when it gapes
+    if (open > 0.3) for (let k = 0; k < 3; k++) { const x0 = OX + 20 + k * 8, y0 = lipY + 1, y1 = hy + Math.sin(open) * (x0 - hx) - 3; for (let y = y0; y < y1; y++) px(x0 + ((y + k + sway) % 4 === 0 ? 1 : 0), y, T.spit); }
+    // the skull on top
+    SKULL.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const k = row[x]; if (k !== '.') px(OX + x, OY + y, k); } });
+    if (stage === 3) { for (const [x, y] of [[27, 6], [28, 9], [33, 9], [46, 10]]) px(OX + x, OY + y, 'p'); } // a bare skull: wider holes
+    if (stage === 4) { // more eyes, cracks of fire
+      for (const [x, y] of [[38, 9], [41, 10], [20, 6], [22, 8]]) { px(OX + x, OY + y, 'p'); px(OX + x + 1, OY + y, T.eye); px(OX + x + 2, OY + y, 'p'); }
+      [[10, 4], [11, 5], [12, 6], [12, 7], [13, 8], [36, 12], [37, 13], [38, 13], [39, 14]].forEach(([x, y]) => px(OX + x, OY + y, T.crack[1]));
+    }
+    VA.finish(c, palOf(T)); c.cx = OX + 20; c.cy = OY + 10; return c;
   }
   function paintTail(T, R, stage) {
     const w = R * 4 + 8, h = R * 4 + 8, c = mk(w, h), g = c.ctx, cx = w - R - 4, cy = h / 2;
@@ -155,7 +177,7 @@
   function sprite(kind, stage, R, v) {
     const key = kind + stage + ':' + R + ':' + (v || 0); let c = cache.get(key); if (c) return c;
     const T = THEMES[stage] || THEMES[1];
-    c = kind === 'seg' ? paintSeg(T, R, v, stage) : kind === 'head' ? paintHead(T, R, v, stage) : kind === 'tail' ? paintTail(T, R, stage) : paintFin(T, R);
+    c = kind === 'seg' ? paintSeg(T, R, v, stage) : kind === 'head' ? paintHead(T, R, v % 10, stage, v >= 10 ? 1 : 0) : kind === 'tail' ? paintTail(T, R, stage) : paintFin(T, R);
     cache.set(key, c); return c;
   }
   const bucket = (r) => Math.max(3, Math.round(r / PX / 2) * 2); // segment radius in sprite pixels, in steps of 2
@@ -193,7 +215,7 @@
       if (flash) { g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.45 * flash; drawRot(g, s, p.x + ox, p.y + oy, a, s.cx, s.cy, flip); g.restore(); }
     }
     // head, jaw by the fight's state
-    { const a = b.ang || 0, jaw = (b.jaw || 0) < 0.15 ? 0 : (b.jaw || 0) < 0.42 ? 1 : 2, R = bucket(segR(0) * 1.15), s = sprite('head', stage, R, jaw), flip = Math.cos(a) < 0;
+    { const a = b.ang || 0, jaw = Math.max(0, Math.min(5, Math.round(((b.jaw || 0) - 0.08) / 0.11))), sway = Math.floor(time * 2.2) % 2, R = bucket(segR(0) * 1.15), s = sprite('head', stage, R, jaw + sway * 10), flip = Math.cos(a) < 0;
       const p = P[0]; drawRot(g, s, p.x + ox, p.y + oy, a, s.cx, s.cy, flip);
       if (flash) { g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.45 * flash; drawRot(g, s, p.x + ox, p.y + oy, a, s.cx, s.cy, flip); g.restore(); } }
     // the crystal shield: a shimmering pixel ring around every third plate
