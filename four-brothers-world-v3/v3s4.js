@@ -442,6 +442,7 @@
   const QC = new Map();
   let lay = null;
   function chunky(g, fn) {
+    if (RW.v3zoom && RW.v3zoom.get() >= 3) { g.save(); g.scale(K, K); try { fn(g); } catch (e) { /* skip */ } g.restore(); return; } // far out: no pixel layer, it would be huge
     const v = RW.view, W = Math.ceil(v.w / PX) + 2, H = Math.ceil(v.h / PX) + 2;
     if (!lay || lay.width !== W || lay.height !== H) { lay = document.createElement('canvas'); lay.width = W; lay.height = H; lay.ctx = lay.getContext('2d', { willReadFrequently: true }); }
     const o = lay.ctx; o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, W, H); o.setTransform(K / PX, 0, 0, K / PX, 0, 0);
