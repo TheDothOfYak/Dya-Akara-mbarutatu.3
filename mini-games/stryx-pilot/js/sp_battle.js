@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    STRYX PILOT — js/sp_battle.js
    Boarding battles, in the spirit of the old hero-strategy games:

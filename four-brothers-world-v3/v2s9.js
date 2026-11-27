@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 9: the fuzzy's puff jumps, and trees drawn the way they look while they fall.
 // 1. Fuzzy: a normal jump, then in the air he sucks in air and jumps once more, higher. His runes (v2s15) add a
 //    second and a third puff later. They come back when he lands or swims. While he's puffed up he swells, and

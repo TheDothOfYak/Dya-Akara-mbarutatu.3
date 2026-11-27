@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World
 
 A 2D pixel open-world platformer by four brothers. Four worlds (Fuzzy, Acorn, Rock and Ghost), four heroes, and the Duat, where all four fight together. Acorn World also has Capstead's giant home trees, the Keilia keep (don't get caught where you shouldn't be), the Elsha'ryn grove, the Duskareth camp and the creatures of Torcain's Run, plus waystones, pets, fishing, farming, a house of your own, market days, rain, fog and the Sunear'Zikhron storm.

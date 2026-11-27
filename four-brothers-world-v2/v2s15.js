@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 15: runes instead of picks, and the Ancient Rune Keeper.
 // Picks are gone. How hard a block you can break depends only on your runes, and each hero's runes are their own:
 //   Acorn: a harder cap to headbutt with.   Fuzzy: stronger suction (earth-and-weather magic).

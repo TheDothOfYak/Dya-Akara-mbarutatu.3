@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # Going Online — the honest 10-minute guide
 
 **Read this first:** having a Firebase project and a `firebase.json` in the repo does **not**

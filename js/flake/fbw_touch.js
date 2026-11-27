@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — js/flake/fbw_touch.js
    Touch controls for the 4 Brothers Worlds (v1 and v2) on phones

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 3: a new, much bigger Rock World (1280 x 700), different in every world.
 //  * Each Rock World rolls its own layout from a seed kept in this browser. A friend who joins your room gets your
 //    seed with the world, so you both stand in the same caves. Block changes are kept per seed (def.store

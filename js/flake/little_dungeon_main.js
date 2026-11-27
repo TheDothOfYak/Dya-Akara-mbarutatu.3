@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — js/flake/little_dungeon_main.js
    Boot for Little Dungeon (mini-games/little-dungeon/), the mini

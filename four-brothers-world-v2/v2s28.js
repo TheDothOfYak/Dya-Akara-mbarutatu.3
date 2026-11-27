@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 28: Cloudtop, a happy magic land on a cloud high above Tuftwood.
 //  * A long cloud floats over Fuzzy World (tile x 190–670, the top at about row 30), right above Tuftwood village.
 //    Tuftwood's town portal now carries you up there; a cloud portal in the cloud village brings you back down.

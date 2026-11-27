@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — data/lore.js
    Lore tips, Dearcineon name generation, Hunt narratives &

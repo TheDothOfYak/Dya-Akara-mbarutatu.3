@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 10: the acorn's vine.
 // Press C (rebindable: "Acorn: shoot a vine") to throw a vine toward the mouse. It sticks to any solid block or
 // tree it reaches (up to 15 blocks away) and you swing from it: left/right pump the swing, W reels you in, S lets

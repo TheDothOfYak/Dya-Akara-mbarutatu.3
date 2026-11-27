@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    TORCAIN'S RUN — a single-player action RPG in the Mbaru Tatu.
    Third person: WASD + mouse. Torcain and Phorus follow Noka's

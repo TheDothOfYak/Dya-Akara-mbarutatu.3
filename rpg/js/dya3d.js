@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA, in the world.
    The token game of the Mbaru Tatu, played for real: Torcain stands

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 12: fewer recipes, and Recipe Squares teach the rest.
 // You start knowing only the basics (wood, flint, stone and iron gear, building blocks, stations, bars, food).
 // Everything else is in eight sets, and each Recipe Square you read teaches the next one:

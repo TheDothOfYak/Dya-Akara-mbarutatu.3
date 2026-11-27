@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 8: a bigger Ghost World.
 // The Ghost World grows from 520x240 to 800x320 blocks (about the size of Fuzzy World and Rock World), west to east:
 //   the Still Sea · the Pale Hills and the Pale Keep · the Bonewood (a dense dead forest, with the Hanging Hollow) ·

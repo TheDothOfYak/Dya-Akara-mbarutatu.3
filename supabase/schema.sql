@@ -1,3 +1,4 @@
+-- © 2026 Isaac Flake. All Rights Reserved.
 -- ============================================================
 -- DYA'AKARA — online schema
 -- Run this in your Supabase project (safe to RE-RUN — every

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: painting helpers. Everything is smooth vector paint: soft blobs, brush dabs, ink lines.
 (function () {
   'use strict';

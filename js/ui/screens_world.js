@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/screens_world.js
    The Rokarvac of the Mbaru Tatu — a primer on the worlds the

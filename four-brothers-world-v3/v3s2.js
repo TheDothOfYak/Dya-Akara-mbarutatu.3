@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 2: a sharper picture.
 //  * The game draws at your screen's real resolution instead of a small picture blown up. Positions in the world don't
 //    change (a block is still 16 units); only how finely things are drawn.

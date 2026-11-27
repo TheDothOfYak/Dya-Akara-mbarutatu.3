@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for the no-XP modes (js/core/state.js G.recordMatch).
    Practice against the machine (Quick Play vs AI) and Duels award gold and
    record stats, but MUST NOT grant XP or advance the player's level, so the

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for the shared pre-match vote / launch-info helpers
    (js/core/matchvote.js). These are the deterministic rules both live-match
    players and the local setup screen use, so the two sides always agree on

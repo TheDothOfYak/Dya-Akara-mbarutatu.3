@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Builds maps/starter.json: "The First Dusk", the map the title screen
    offers first. Run:  node skaar-uverkhron/tools/make_starter.js
    It tries seeds until both starting towns share Velki, can reach each

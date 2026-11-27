@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: the shape of Tuftwood. A smooth landscape, not a tile grid.
 // Ground is one height curve. On top of it: solid slabs, one-way platforms, thin walls, water, wind.
 (function () {

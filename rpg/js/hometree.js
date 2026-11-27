@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    HOME TREES — the great trees of the Tatu that folk live in.
    Each is a town on its own, and the town is INSIDE it: the

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 (function () {
   'use strict';
   window.V3 = window.V3 || {};

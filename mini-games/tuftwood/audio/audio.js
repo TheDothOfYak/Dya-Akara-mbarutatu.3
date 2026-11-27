@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* 4 Brothers World V3 — a small, entirely synthesized forest orchestra. */
 (function () {
   'use strict';

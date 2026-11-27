@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 15: chunkier pixels and a cleaner bag.
 //  * Items: the 48x48 Leviathan pictures are snapped down to 32x32 (their own colours, no blur), and every item picture is
 //    shown pixel-sharp. Rocks: the sharp frames are drawn with pixels half again as big (still sharper than the old 1x).

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // V2 — what makes 4 Brothers World its own game. Loaded after every other module and before main.js; it adds to and wraps
 // the older systems instead of rewriting them.
 //  * Ghosts are cloud blobs that fade in and out. Each haunted area holds a set number; clear them and it stays quiet for a while.

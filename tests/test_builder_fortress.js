@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* The Keilia Builder fortress overhaul: variable towers dimensioned off the
    best builder, garrisoned archers that can't be touched until the tower falls,
    the 2.5×/1.5× range bands, auto-firing wall-towers, the Builder's Hut upgrade

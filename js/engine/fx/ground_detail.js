@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: GROUND DETAIL
    Paints terrain texture over the flat field — grass blades,

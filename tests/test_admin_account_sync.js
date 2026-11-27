@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for admin→player account propagation.
    The Admin Panel edits a real player's account (e.g. re-statting one of
    their creatures). Those edits must actually reach the player's game:

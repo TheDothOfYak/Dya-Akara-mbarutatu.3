@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The wider wilds of a region:
    - wildlife scattered through the world's zones by biome, most of

@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # FLAKE GAMES
 ### Dya'Akara · Torcain's Run · The 4 Brothers Worlds · Skaar Uverkhron · Little Dungeon · Punk Races · Stryx Pilot
 

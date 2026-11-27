@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // V2: town portals. Every world has one beside where you arrive. Use it (R or right-click) to see where the other
 // players in your room are, in any world, and step out right next to one of them.
 (function (RW) {

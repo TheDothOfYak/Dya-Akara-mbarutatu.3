@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/screens_compendium.js
    The Vakarborac — a field guide to the Dearcàn of the Mbaru

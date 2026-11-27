@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World — V3
 
 Everything in V2, plus a new, much bigger Rock World that is different in every world, a remade Gemscale Leviathan, a sharper picture, and fixes for hosting, dropping and building. Play it from the **Play V3** button on the Flake Games home page.

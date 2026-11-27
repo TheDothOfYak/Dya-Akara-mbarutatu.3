@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for the official season ladder (js/core/season.js + economy).
    Verifies: rating maps to the right circuit, promotion awards an official
    title once per tier, and the shared matchmaking queue pairs two searchers

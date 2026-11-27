@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Cross-device persistence of admin curation.
    Simulates TWO devices sharing one Supabase (mocked dya_config table):
    - Device A (admin) deletes/edits Dya'kukull tokens and publishes.

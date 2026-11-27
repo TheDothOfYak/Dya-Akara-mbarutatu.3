@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Shared building blocks for every region: collision (oriented
    boxes in a spatial grid), instanced "kits" of repeated shapes,

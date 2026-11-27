@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    INSIDE — rooms behind doors, the way a house opens up in an
    old Hylian tale: walk to a door, press E, and you're inside a

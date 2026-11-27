@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Detail by screen size — the crowds, carts and gardens are built
    from thousands of little parts (eyes, knuckles, buttons, glow

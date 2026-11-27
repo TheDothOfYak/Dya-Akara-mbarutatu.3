@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: the small surprises. Pokeable things, secrets, rare events, keepsakes.
 // Every surprise has an id in F.all; finding one writes it into the Field Journal.
 (function () {

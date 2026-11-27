@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/editor.js
    The map editor. Paint terrain, trees, mountains and roads on

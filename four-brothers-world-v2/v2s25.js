@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 25: weather, sunrises and sunsets, a kinder wind, rupees, and the Curlmanes again.
 //  * Weather comes and goes: clear skies, drifting clouds, rain showers, thunderstorms with lightning, morning fog,
 //    and snow up on the peaks. Everyone in a world sees the same weather.

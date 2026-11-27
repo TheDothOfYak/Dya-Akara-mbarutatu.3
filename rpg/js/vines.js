@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    VINES — where a Punk's (or a Stryx's) vine can latch on.
    Anything solid will do: a tree, the eave of a house, the top

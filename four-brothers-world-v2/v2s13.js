@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 13: blocks that behave like what they're made of, and building in shapes.
 //  1. Sand, snow and soul ash pour: knock out what's under them and they run down, sliding off edges into a pile.
 //     Gravel drops straight down. Falling grains crush monsters they land on, but never fall into you (they wait).

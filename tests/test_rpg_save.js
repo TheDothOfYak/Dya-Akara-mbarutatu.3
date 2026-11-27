@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for the RPG's save versioning and chapter clocks
    (rpg/js/progress.js). A long run must survive updates: saves at or
    above MIN_SAVE_V load (migrated if older), runs from before it are

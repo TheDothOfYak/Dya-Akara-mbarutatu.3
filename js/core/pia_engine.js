@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — core/pia_engine.js
    LITTLE DUNGEON — the turn-based battle engine.

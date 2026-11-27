@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: the main loop, the camera, saving, and the few scripted moments.
 (function () {
   'use strict';

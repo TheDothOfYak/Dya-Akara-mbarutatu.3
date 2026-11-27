@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 9: the drowned-soul guardians.
 //  * The Leviathan's four guardians are drowned souls now, two and a half times as tall as a hero, in tattered robes:
 //    the Knight (a skull under its hood, crab-shell pauldrons, a bone cleaver; fire),

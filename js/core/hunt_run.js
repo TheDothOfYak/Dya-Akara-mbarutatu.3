@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/hunt_run.js
    The HUNT — run engine (a run-based summoner mode).

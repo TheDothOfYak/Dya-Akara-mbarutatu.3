@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Character look: THE KOFI GALTA
    From the creator's sketches: a long, crescent-shaped body with

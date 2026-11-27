@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 10: the Leviathan's loot.
 //  * Beat the Leviathan: one of seven abyssal drops at random (2 melee, 2 bows, 2 magic, 1 healing tome). The first time:
 //    a Krait Pearl (a pet sea krait) and a Radiant Glowstone too. Sometimes a Leviathan Fang trinket.

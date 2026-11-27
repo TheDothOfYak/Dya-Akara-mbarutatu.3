@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for single-session enforcement (js/core/session_guard.js).
    One account may be active in only one place at a time. Reuses the same
    mocked-Supabase scaffolding as test_cloud_accounts.js:

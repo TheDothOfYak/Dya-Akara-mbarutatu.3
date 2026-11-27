@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* The AI world (the Dya'kukull + their market) must never silently vanish.
    A bug let an empty/blank shared snapshot wipe every device's Dya'kukull,
    leaving no one online and a market with only real players' listings. These

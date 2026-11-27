@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Small shared helpers: seeded randomness, value noise, easing.
    ============================================================ */

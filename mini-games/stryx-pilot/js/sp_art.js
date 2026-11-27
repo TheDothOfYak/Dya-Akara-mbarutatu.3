@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    STRYX PILOT — js/sp_art.js
    Drawing a flight. The Tatu and Kalo are painted pixel by pixel

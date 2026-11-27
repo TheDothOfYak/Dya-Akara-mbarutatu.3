@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Character look: HIT FLASH
    A creature's whole body flashes pale for an instant when it is

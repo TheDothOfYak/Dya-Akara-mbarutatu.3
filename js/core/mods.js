@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/mods.js
    The live-editing layer. Everything the Admin Panel can change

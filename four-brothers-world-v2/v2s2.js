@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // V2 stage 2: the fuzzy's weather magic and the acorn's growth magic (V), staffs that each shoot their own way,
 // coins, Tumble the travelling trader, weapon upgrades, recipe squares and legendary chests.
 (function (RW) {

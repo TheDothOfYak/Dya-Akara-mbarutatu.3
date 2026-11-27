@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 26: chests for everyone, clean sky left of Tuftwood, and the Stormmark.
 //  * Storage Chests can be made by hand from 8 planks (no Knapping Stone needed), and every hero gets one free
 //    Storage Chest the first time they play after this update.

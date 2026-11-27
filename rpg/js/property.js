@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    THE CARPENTER'S PROPERTY — Buhkon Eldi's land, a region of its
    own, west of Beuhk in the high north of Xikia.

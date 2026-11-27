@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for cross-device accounts (js/core/account_cloud.js).
    Simulates two separate computers sharing one mocked Supabase
    backend: clearing localStorage and re-running G.init() between

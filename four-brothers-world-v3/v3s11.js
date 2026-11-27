@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 11: Terraria-style items everywhere.
 //  * Every weapon, tool and armour piece (not only the Leviathan's) gets a crisp 32x32 picture: its colours snapped
 //    to shaded ramps, each part outlined in a deep shade of its own colour, and lit along its upper-left edges.

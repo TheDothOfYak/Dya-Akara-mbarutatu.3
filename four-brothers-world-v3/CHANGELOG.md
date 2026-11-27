@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World V3
 
 ## Boulder rocks, a darker Rock World, the guardians' classes, glowstones (3.0.2)

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The big book of Torcain: gear, pack, skills, quests and the
    map — plus the trader's mat, the smith's cauldron and the

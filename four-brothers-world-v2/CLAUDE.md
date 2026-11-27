@@ -1,4 +1,8 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # 4 Brothers World V2: project map
+
+> **Copyright:** every new file starts with `© <year> Isaac Flake. All Rights Reserved.` in its comment style. See the root `CLAUDE.md`.
 
 Read this first. It says where everything lives, so a change doesn't need the whole game re-read.
 

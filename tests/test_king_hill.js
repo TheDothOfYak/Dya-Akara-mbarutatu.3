@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test: SURROUNDED — King of the Hill.
    One team holds the centre as the king and must protect its Relic for a set
    number of minutes; the ring of attackers races to steal it. The king's

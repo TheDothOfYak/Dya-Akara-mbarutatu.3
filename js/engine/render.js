@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — engine/render.js
    Canvas renderer for matches: terrain sets, creatures (via the

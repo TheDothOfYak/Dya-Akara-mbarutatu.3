@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/screens_hunt_run.js
    The HUNT — screens (a run-based summoner mode).

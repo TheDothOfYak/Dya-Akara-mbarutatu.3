@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Dynamic mounting: a "mount"-tagged creature (Domestic Punk, Kuni Byrd) spawns
    RIDERLESS and is mounted on the field by a friendly Eikar/Keilia. The pair
    then hits harder, shields part of every blow, grows stronger the longer they

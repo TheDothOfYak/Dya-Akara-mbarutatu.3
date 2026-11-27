@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Growing stronger: experience and levels, a perk tree in three
    branches, and the spells Torcain learns along the way.

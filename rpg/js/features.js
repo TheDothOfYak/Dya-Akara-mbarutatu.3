@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Things to find off the beaten road: loot chests, gathering
    spots (stygian ore, fire-tree logs, rubble, bog moss), and

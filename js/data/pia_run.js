@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — data/pia_run.js
    LITTLE DUNGEON — a turn-based roguelike card game.

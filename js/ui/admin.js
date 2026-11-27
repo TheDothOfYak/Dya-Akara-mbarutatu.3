@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — ui/admin.js
    The Admin Panel (Master Design Doc, Part XVI).

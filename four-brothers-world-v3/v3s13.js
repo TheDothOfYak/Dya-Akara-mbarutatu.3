@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 13: Rock World towns.
 //  * Stalagmere is home to Gneiss, Slagg, Wedgeworth, Cubert and the rune keeper (in the guesthouse). Tumble and any other
 //    visitors move to the first lived-in town. You wake inside Gneiss's house.

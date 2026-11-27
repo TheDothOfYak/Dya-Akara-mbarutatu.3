@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* 4 Brothers World: the hero and world saved to the Flake Games account (the Dya'Akara account).
    Runs the game's own core.js + cloud.js (pulled out of four-brothers-world/index.html)
    on several simulated computers that share one mocked Supabase dya_config table:

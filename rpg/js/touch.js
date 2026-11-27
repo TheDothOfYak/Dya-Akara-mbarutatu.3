@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Touch controls for phones and tablets.
    Left thumb: a floating joystick (push it all the way to run).

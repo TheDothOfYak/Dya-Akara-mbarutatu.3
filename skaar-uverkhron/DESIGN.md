@@ -1,3 +1,5 @@
+© 2026 Isaac Flake. All Rights Reserved.
+
 # Skaar Uverkhron — Design Document
 
 A turn-based fantasy strategy game set across the Mbaru Tatu, for Flake Games.

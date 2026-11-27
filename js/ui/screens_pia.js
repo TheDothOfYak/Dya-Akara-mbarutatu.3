@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — ui/screens_pia.js
    LITTLE DUNGEON — the deckbuilder's screens.

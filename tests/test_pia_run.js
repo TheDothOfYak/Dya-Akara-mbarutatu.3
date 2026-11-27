@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    tests/test_pia_run.js — LITTLE DUNGEON
    Headless checks: data integrity, the battle engine (cards,

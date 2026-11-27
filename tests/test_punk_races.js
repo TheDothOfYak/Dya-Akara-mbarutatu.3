@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Punk Races (mini-games/punk-races): the course, the physics and the rival riders.
    node tests/test_punk_races.js */
 'use strict';

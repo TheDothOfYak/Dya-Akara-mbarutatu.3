@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: ARENA FRAME
    Darkens the field toward its edges and rings the arena in a

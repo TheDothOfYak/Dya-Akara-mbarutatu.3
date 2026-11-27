@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    VELKI — the true beginning. Fyrsti'Vilag at sunset, in the year
    307A: the last Skyfall. Young Tanoc climbs the spire to watch the

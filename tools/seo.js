@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Search-engine tags for every page, plus robots.txt and sitemap.xml.
 
      node tools/seo.js
@@ -120,10 +121,10 @@ for (const f of HIDDEN) inject(f, null, '<!-- seo: written by tools/seo.js -->\n
 
 const today = new Date().toISOString().slice(0, 10);
 fs.writeFileSync(path.join(ROOT, 'sitemap.xml'),
-  '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+  '<?xml version="1.0" encoding="UTF-8"?>\n<!-- © 2026 Isaac Flake. All Rights Reserved. -->\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
   GAMES.map(g => `  <url><loc>${esc(url(g.file))}</loc><lastmod>${today}</lastmod><priority>${g.priority}</priority></url>`).join('\n') +
   '\n</urlset>\n');
 fs.writeFileSync(path.join(ROOT, 'robots.txt'),
-  'User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /tests/\nDisallow: /tools/\nDisallow: /supabase/\n\n' + `Sitemap: ${SITE}sitemap.xml\n`);
+  '# © 2026 Isaac Flake. All Rights Reserved.\nUser-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /tests/\nDisallow: /tools/\nDisallow: /supabase/\n\n' + `Sitemap: ${SITE}sitemap.xml\n`);
 
 console.log(`seo: ${GAMES.length} pages tagged, ${HIDDEN.length} kept out of search, sitemap.xml and robots.txt written for ${SITE}`);

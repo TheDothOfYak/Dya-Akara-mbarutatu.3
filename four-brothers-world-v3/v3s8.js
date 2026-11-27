@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 8: big detailed art for the Leviathan's loot.
 //  * Every Leviathan item (drops, core crafts, cores, Abyssite gear, trinkets, the krait pearl) is painted at 48x48:
 //    shaded in a few flat tones, picked out with highlights and a dark outline, the way Terraria items look.

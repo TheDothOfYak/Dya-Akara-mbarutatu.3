@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 20: Tanglehold, the jungle village (the slinger tribes, the sages and the Word Temple).
 // The first part draws the villagers (from the sketchbook sprites); the second builds the village.
 /* js/engine/art4.js */

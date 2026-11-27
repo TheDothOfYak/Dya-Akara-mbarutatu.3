@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for the one Flake Games account (js/flake/account.js):
    signing in on the home page with an existing Dya'Akara account,
    making a new account there that Dya'Akara then fills in, bans for one

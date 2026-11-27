@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for split world storage (js/core/state.js).
    The ~100 AI accounts (~2.8 MB) live in their own localStorage key and
    are only rewritten when they actually change, so ordinary player saves

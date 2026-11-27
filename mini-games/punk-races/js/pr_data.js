@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    PUNK RACES — js/pr_data.js
    The tracks, cups, rival riders, and what a Punk can look like.

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    PUNK RACES — js/pr_art.js
    Drawing the race, painted rather than drawn: a sky for each time

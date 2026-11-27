@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 29: sleep through the night.
 //  * Sleep in a bed at night and you wake up at sunrise. The day and night clock is shared by everyone (it runs on
 //    real time), so this moves only your own clock ahead. When the real sunrise comes, your clock lines up with

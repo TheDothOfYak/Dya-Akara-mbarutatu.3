@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The last of the old creature builders: the Duskareth Vel (an
    Eikar whose marks show the Duat's void-purple when he uses it)

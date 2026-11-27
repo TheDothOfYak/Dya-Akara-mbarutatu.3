@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: CAMERA SHAKE
    The view jolts when something big falls, a boss is struck hard,

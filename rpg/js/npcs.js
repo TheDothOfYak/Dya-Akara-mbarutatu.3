@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Folk of Beuhk and the Leotik camp. Eikar of every sort, a Kalo'Eik trader,
    KEILIA like Venkin and Orrin — taller than the Eikar, darker

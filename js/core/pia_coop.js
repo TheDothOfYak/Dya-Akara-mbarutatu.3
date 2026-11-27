@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — core/pia_coop.js
    LITTLE DUNGEON — session + co-op layer.

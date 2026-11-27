@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* Headless test for the lockstep netplay core (js/core/netplay.js):
    two independent Match instances — a "host" and a "guest" computer —
    exchange input frames through a loopback channel with simulated

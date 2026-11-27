@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3: sky, day and night, weather, far parallax, and the light/dark overlay.
 (function () {
   'use strict';

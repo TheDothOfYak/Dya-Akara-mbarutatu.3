@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Side quests from the folk of Beuhk and the Leotik camp. Each has a goal the
    game can check, words for offering / waiting / finishing, and

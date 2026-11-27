@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 6: every hero runs in a full side view.
 // Frames 1-4 (running) and 5 (in the air) are drawn in profile for the fuzzy, the acorn, the ghost and the rock:
 // one eye at the front, only the near arm showing, legs that really stride. The idle, swing and swim frames are the

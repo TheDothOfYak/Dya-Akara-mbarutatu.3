@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — data/hunt_run.js
    The HUNT — a run-based summoner mode (static design data).

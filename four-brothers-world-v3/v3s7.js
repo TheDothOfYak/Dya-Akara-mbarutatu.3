@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V3 — part 7: glow trinkets.
 //  * Worn in a new Trinket slot (its own row in the bag). While you wear one you glow, whatever you hold, in every world.
 //  * Three strengths: Dim (lights about 3 blocks round you), Bright (about 9) and Radiant (about 16).

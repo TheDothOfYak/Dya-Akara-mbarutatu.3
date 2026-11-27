@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Match visual: PULSE RIPPLE
    When a resource pulse reaches a hoard, a ring of light rolls

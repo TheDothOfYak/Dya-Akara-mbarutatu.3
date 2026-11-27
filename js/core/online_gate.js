@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/online_gate.js
    Makes Dya'Akara an ONLINE-FIRST game — phase 1 of moving off

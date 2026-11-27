@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    PUNK RACES — js/pr_sim.js
    The race itself, with no drawing: the course, how a Punk runs,

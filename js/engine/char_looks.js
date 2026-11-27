@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — engine/char_looks.js
    Plug-in slots for how creatures and people are drawn —

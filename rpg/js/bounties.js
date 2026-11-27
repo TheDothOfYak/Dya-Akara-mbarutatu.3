@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    Bounty boards: short, repeatable hunts posted by the folk of
    Beuhk and the Leotik camp. One bounty at a time; finish it at

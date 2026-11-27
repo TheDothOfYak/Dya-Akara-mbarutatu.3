@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    The lens — what the camera adds to the painted world:
    · contact shade: where things meet (a foot and the ground, a

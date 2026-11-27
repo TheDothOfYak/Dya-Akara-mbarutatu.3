@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    FLAKE GAMES — js/flake/canvas_fx.js
    Shared tricks that make a 2D canvas game look painted rather

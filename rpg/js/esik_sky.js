@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    ESIK OF THE SKY — the flying creatures of the Mbaru Tatu,
    built from the creator's answers (see the Esik model brief).

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/util.js
    Namespace, deterministic seeded RNG, general helpers.

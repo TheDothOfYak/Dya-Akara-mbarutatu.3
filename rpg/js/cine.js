@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    CINE — the moments you only watch. Letterbox bars slide in,
    the camera moves on its own along a list of shots, and the

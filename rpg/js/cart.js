@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    THE CARPENTER'S CART — and the two Punks that pull it. It goes
    the whole way home with them: the market, the road north, every

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — data/economy.js
    Progression & economy exactly per Master Design Doc Part IX.

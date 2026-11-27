@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 const fs=require('fs'),path=require('path');const ROOT=require('path').join(__dirname,'..');
 global.window=global;
 global.document={createElement:()=>({getContext:()=>null,style:{},addEventListener:()=>{}}),addEventListener:()=>{}};

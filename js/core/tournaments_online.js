@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    DYA'AKARA — core/tournaments_online.js
    REAL, shared, cross-device tournaments.

@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 // 4 Brothers World V2 — part 22: the cavalry's mounts running wild (ridgebacks, shellbacks), the centipede bats,
 // Captain Shellbrace, and Tanglehold's slingers and sages fighting off monsters that come into the village.
 // (drawings: the cavalry, the centipede bats, the sages' spells and the sling stone; same helpers as v2s20)

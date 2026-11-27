@@ -1,3 +1,4 @@
+// © 2026 Isaac Flake. All Rights Reserved.
 /* ============================================================
    SKAAR UVERKHRON — js/view_battle.js
    The battle on screen: a hex field seen at a slant, painted
