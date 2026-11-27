@@ -86,11 +86,22 @@ button { cursor: pointer; }
 .show-count b { color: var(--a); font-weight: normal; }
 .show-nav { display: flex; gap: 8px; }
 .arrow {
-  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
-  background: rgba(14, 12, 10, .7); color: var(--ink); font-size: 22px; line-height: 1;
-  transition: border-color .15s, color .15s;
+  width: 56px; height: 56px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--a) 75%, transparent);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--a) 30%, rgba(14, 12, 10, .85)), rgba(14, 12, 10, .85) 70%);
+  color: var(--a); font-size: 34px; line-height: 1; padding-bottom: 4px; cursor: pointer;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--a) 45%, transparent), inset 0 0 10px color-mix(in srgb, var(--a) 20%, transparent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--a) 80%, transparent);
+  transition: transform .12s, box-shadow .15s, color .15s, border-color .15s;
+  animation: arrowGlow 2.6s ease-in-out infinite alternate;
 }
-.arrow:hover, .arrow:focus-visible { border-color: var(--a); color: var(--a); outline: none; }
+.arrow:hover, .arrow:focus-visible {
+  border-color: var(--a); color: #fff; outline: none; transform: scale(1.1);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--a) 75%, transparent), inset 0 0 14px color-mix(in srgb, var(--a) 35%, transparent);
+}
+.arrow:active { transform: scale(.95); }
+@keyframes arrowGlow { from { box-shadow: 0 0 10px color-mix(in srgb, var(--a) 35%, transparent), inset 0 0 8px color-mix(in srgb, var(--a) 15%, transparent); } to { box-shadow: 0 0 22px color-mix(in srgb, var(--a) 60%, transparent), inset 0 0 12px color-mix(in srgb, var(--a) 25%, transparent); } }
+.show-nav { gap: 12px; }
 
 .slide { position: relative; }
 .slide-in { animation: slideIn .55s cubic-bezier(.2, .7, .2, 1); }
@@ -133,10 +144,21 @@ button { cursor: pointer; }
 .g-note { font-size: 13px; color: var(--ink-dim); }
 .g-note.bad { color: var(--red); }
 
-.dots { display: flex; gap: 8px; margin-top: 18px; }
-.dots button { width: 28px; height: 4px; border: 0; border-radius: 2px; background: rgba(255, 255, 255, .18); padding: 0; position: relative; overflow: hidden; }
-.dots button.on { background: rgba(255, 255, 255, .28); }
-.dots button.on::after { content: ''; position: absolute; inset: 0; background: var(--a); transform-origin: left; animation: fill var(--cycle, 10s) linear forwards; }
+.dots { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.dots button { width: 44px; height: 10px; border: 0; border-radius: 5px; background: rgba(255, 255, 255, .22); padding: 0; position: relative; overflow: visible; cursor: pointer; transition: background .15s, transform .12s; }
+.dots button:hover, .dots button:focus-visible { background: color-mix(in srgb, var(--a) 55%, rgba(255, 255, 255, .2)); transform: scaleY(1.3); outline: none; }
+.dots button::before { content: attr(data-name); position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); white-space: nowrap; font-size: 12px; letter-spacing: .06em; color: #fff; background: rgba(0, 0, 0, .8); border: 1px solid color-mix(in srgb, var(--a) 50%, transparent); padding: 3px 8px; border-radius: 4px; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 3; }
+.dots button:hover::before, .dots button:focus-visible::before { opacity: 1; }
+.dots button.on { background: rgba(255, 255, 255, .3); overflow: hidden; }
+.dots button.on:hover { overflow: visible; }
+.dots button.on::after { content: ''; position: absolute; inset: 0; border-radius: 5px; background: var(--a); transform-origin: left; animation: fill var(--cycle, 10s) linear forwards; }
+.strip { display: flex; gap: 8px; margin-top: 14px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: thin; }
+.strip .thumb { flex: 0 0 auto; width: 104px; border: 2px solid rgba(255, 255, 255, .12); border-radius: 7px; background: #0c0b10; padding: 0; overflow: hidden; cursor: pointer; color: var(--ink-dim); transition: border-color .15s, transform .12s, box-shadow .15s; }
+.strip .thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; opacity: .7; transition: opacity .15s; }
+.strip .thumb span { display: block; font-size: 11px; letter-spacing: .04em; padding: 3px 5px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.strip .thumb:hover, .strip .thumb:focus-visible { border-color: color-mix(in srgb, var(--a) 70%, transparent); transform: translateY(-2px); outline: none; }
+.strip .thumb:hover img, .strip .thumb.on img { opacity: 1; }
+.strip .thumb.on { border-color: var(--a); color: var(--ink); box-shadow: 0 0 14px color-mix(in srgb, var(--a) 45%, transparent); }
 .show.paused .dots button.on::after { animation-play-state: paused; }
 @keyframes fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 

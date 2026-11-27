@@ -280,8 +280,19 @@
     const dots = $('dots'); dots.innerHTML = '';
     list.forEach((x, i) => dots.appendChild(el('button', {
       type: 'button', role: 'tab', 'aria-selected': String(i === idx), 'aria-label': F.gameText(x, hub).name,
-      cls: i === idx ? 'on' : '', onclick: () => go(i),
+      cls: i === idx ? 'on' : '', onclick: () => go(i), 'data-name': F.gameText(x, hub).name, title: F.gameText(x, hub).name,
     })));
+    /* a strip of small game pictures under the dots: click one to jump straight to it */
+    const strip = $('strip');
+    if (strip) {
+      strip.innerHTML = '';
+      list.forEach((x, i) => {
+        const nm = F.gameText(x, hub).name, b = el('button', { type: 'button', cls: 'thumb' + (i === idx ? ' on' : ''), title: nm, 'aria-label': 'Show ' + nm, onclick: () => go(i) });
+        const im = el('img', { alt: '' }); previewSrc(x, src => { if (src) im.src = src; else im.remove(); });
+        b.appendChild(im); b.appendChild(el('span', { text: nm })); strip.appendChild(b);
+      });
+      const on = strip.querySelector('.thumb.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
     show.style.setProperty('--cycle', CYCLE_MS + 'ms');
     skyTarget = Object.assign({}, look[narrow() ? 'skyNarrow' : 'sky']);
   }
@@ -316,6 +327,16 @@
     if (e.key === 'ArrowLeft') go(idx - 1, -1);
     else if (e.key === 'ArrowRight') go(idx + 1, 1);
   });
+  /* the mouse wheel over the game card changes games (one step per flick) */
+  let wheelT = 0;
+  show.addEventListener('wheel', e => {
+    if (e.target.closest && e.target.closest('.strip')) return; // the strip scrolls sideways by itself
+    const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (Math.abs(d) < 4) return;
+    e.preventDefault();
+    const now = performance.now(); if (now - wheelT < 350) return; wheelT = now;
+    go(idx + (d > 0 ? 1 : -1), d > 0 ? 1 : -1);
+  }, { passive: false });
   /* swipe on a phone */
   let sx = null, sy = null;
   show.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
