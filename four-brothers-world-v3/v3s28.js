@@ -25,23 +25,26 @@
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y), T = TL(), get = (x, y) => T[WD.get(x, y)];
     // 1. a backing under every buried block, in runs of one colour
     if (!far) {
+      g.save(); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
       for (let y = y0; y <= y1; y++) {
         let runX = 0, runC = null, n = 0;
         const flush = () => { if (runC && n) { g.fillStyle = runC; g.fillRect(runX * TS + ox, y * TS + oy, n * TS, TS); } runC = null; n = 0; };
         for (let x = x0; x <= x1; x++) {
           const t = get(x, y);
-          const buried = solid(t) && solid(get(x - 1, y)) && solid(get(x + 1, y)) && solid(get(x, y - 1)) && solid(get(x, y + 1));
+          const full = (q) => !!q && q.key !== 'air' && q.key !== 'water' && !(q.platform && !q.solid), buried = solid(t) && full(get(x - 1, y)) && full(get(x + 1, y)) && full(get(x, y - 1)) && full(get(x, y + 1)); // 3.21: a decoration beside it still counts as covered
           const c = buried ? darkOf(t) : null;
           if (c !== runC) { flush(); runC = c; runX = x; }
           if (c) n++;
         }
         flush();
       }
+      g.restore();
     }
     const r = baseTiles.apply(this, arguments);
     if (far) return r;
     // 2. stepped fillets in inside corners
     const S = 2; // one step in world units (a pixel of the 20x20 blocks is 0.8)
+    g.save(); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; // a drawer before may have left these changed
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const here = get(x, y); if (!here || here.solid) continue;
       const u = get(x, y - 1), d = get(x, y + 1), l = get(x - 1, y), rt = get(x + 1, y);
@@ -59,6 +62,7 @@
       if (d && l) corner(d, l, 0, 1); if (d && rt) corner(d, rt, 1, 1);
       if (u && l) corner(u, l, 0, 0); if (u && rt) corner(u, rt, 1, 0);
     }
+    g.restore();
     return r;
   };
 

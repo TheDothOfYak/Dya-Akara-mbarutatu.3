@@ -37,7 +37,7 @@
   };
 
   // ---------------- block shading and corner shadows ----------------
-  const solidAt = (x, y) => { const t = RW.TILES[WD.get(x, y)]; return !!(t && t.solid && !t.decor); };
+  const solidAt = (x, y) => { const t = RW.TILES[WD.get(x, y)]; return !!(t && t.solid && !t.decor && !(RW.v3shapeAt && RW.v3shapeAt(x, y))); }; // 3.21: slopes and half blocks shade like the open space they mostly are
   const L = (x, y) => (WD.lightAt ? WD.lightAt(x * TS + 8, y * TS + 8) : 0.5);
   function shade(g, cam) {
     const tx0 = Math.floor(cam.x / TS) - 1, ty0 = Math.floor(cam.y / TS) - 1, tw = Math.ceil(RW.view.w / TS) + 3, th = Math.ceil(RW.view.h / TS) + 3;

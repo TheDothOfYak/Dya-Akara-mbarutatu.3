@@ -113,7 +113,20 @@
   // ---------------- 3. worn edges where a block meets the air ----------------
   // smooth noise along an edge, in block pixels, so the wear runs on from one block to the next
   const vn = (p, row, s) => { const i = Math.floor(p / 5), f = p / 5 - i, a = h2(i, row, s), b = h2(i + 1, row, s), q = f * f * (3 - 2 * f); return a + (b - a) * q; };
-  const depth = (p, row, s, built) => built ? (vn(p, row, s) > 0.72 ? 1 : 0) : Math.floor(vn(p, row, s) * 3.4 + vn(p * 2.3, row, s + 5) * 1.4 + h2(p, row, s + 9) * 0.8);
+  // 3.21: each kind of block wears to its own shape: rough stone jagged, strata in steps, sand and soil soft and
+  // rounded, crystal and glass cut flat at an angle, lumpy stone bumpy, spires and bone splintered
+  const PROF = {
+    rough: { a: 3.4, b: 1.4, c: 0.8, f: 1, q: 1 }, layer: { a: 2.6, b: 0.4, c: 0.2, f: 0.5, q: 3 }, sand: { a: 1.6, b: 0.3, c: 0, f: 0.45, q: 1 },
+    soil: { a: 2.0, b: 0.6, c: 0.2, f: 0.6, q: 1 }, facet: { a: 1.2, b: 0, c: 0, f: 0.3, q: 2 }, nodule: { a: 2.6, b: 2.2, c: 0.2, f: 1.6, q: 1 },
+    pebble: { a: 2.2, b: 1.8, c: 0.6, f: 1.8, q: 1 }, spire: { a: 3.0, b: 2.4, c: 1.6, f: 2.2, q: 1 }, bone: { a: 2.4, b: 1.6, c: 1.2, f: 1.4, q: 2 },
+    ore: { a: 3.0, b: 1.4, c: 0.8, f: 1, q: 1 },
+  };
+  let curProf = PROF.rough;
+  const depth = (p, row, s, built) => {
+    if (built) return vn(p, row, s) > 0.72 ? 1 : 0;
+    const P2 = curProf, d = vn(p * P2.f, row, s) * P2.a + vn(p * 2.3 * P2.f, row, s + 5) * P2.b + h2(p, row, s + 9) * P2.c;
+    return P2.q > 1 ? Math.floor(d / P2.q) * P2.q : Math.floor(d);
+  };
   const masked = new Map();
   const openAt = (x, y) => { if (!WD.inb(x, y)) return false; const t = RW.TILES[WD.get(x, y)]; return !t.solid && !(t.decor && t.solid); }; // 3.18: water counts as open too, so rock under water wears and rounds like rock in air
   const BUILT = { brick: 1, plank: 1, plate: 1, stake: 1, books: 1 };
@@ -123,15 +136,15 @@
     const key = tx + ',' + ty + ':' + idOf(base) + ':' + (up | 0) + (dn | 0) + (lf | 0) + (rt | 0);
     let c = masked.get(key); if (c) return c;
     if (masked.size > 5000) masked.clear();
-    const built = !!BUILT[t.tex], src = twin(base), sd = src.ctx.getImageData(0, 0, T20, T20), d = sd.data;
-    const keep = new Uint8Array(T20 * T20).fill(1), R = built ? 3 : 5 + Math.floor(h2(tx, ty, 77) * 4);
+    const built = !!BUILT[t.tex], src = twin(base), sd = src.ctx.getImageData(0, 0, T20, T20), d = sd.data; curProf = PROF[t.tex] || PROF.rough;
+    const keep = new Uint8Array(T20 * T20).fill(1), R = built ? 3 : (t.tex === 'sand' || t.tex === 'soil' ? 7 : t.tex === 'facet' ? 6 : 5) + Math.floor(h2(tx, ty, 77) * 4), cham = t.tex === 'facet' || t.tex === 'layer';
     for (let y = 0; y < T20; y++) for (let x = 0; x < T20; x++) {
       let k = 1;
       if (up && y < depth(tx * T20 + x, ty * 2, 11, built)) k = 0;
       if (dn && T20 - 1 - y < depth(tx * T20 + x, ty * 2 + 1, 12, built)) k = 0;
       if (lf && x < depth(ty * T20 + y, tx * 2, 13, built)) k = 0;
       if (rt && T20 - 1 - x < depth(ty * T20 + y, tx * 2 + 1, 14, built)) k = 0;
-      const cr = (cx, cy) => { const dx = x - cx, dy = y - cy; return dx * dx + dy * dy > R * R; };
+      const cr = (cx, cy) => { const dx = x - cx, dy = y - cy; return cham ? Math.abs(dx) + Math.abs(dy) > R * 1.25 : dx * dx + dy * dy > R * R; }; // crystal and strata are cut off flat; everything else rounds
       if (up && lf && x < R && y < R && cr(R, R)) k = 0;
       if (up && rt && x > T20 - 1 - R && y < R && cr(T20 - 1 - R, R)) k = 0;
       if (dn && lf && x < R && y > T20 - 1 - R && cr(R, T20 - 1 - R)) k = 0;
