@@ -277,7 +277,7 @@
     g.save(); g.translate(cx, Math.round(bodyCY)); g.rotate(q.rot + q.tilt + q.lean); g.scale(q.sx, q.sy); g.drawImage(B.c, -40, -52); g.restore();
     // the front arm and its fist (where held things go)
     let hand = { x: cx + B.rx * 0.6, y: sh.y + 6 };
-    if (q.limbs) { const f = arm(g, P0.arms, cx + Math.round(B.rx * 0.5), sh.y + 2, q.armF, armLen, C, true); hand = f; }
+    if (q.limbs) { const f = arm(g, P0.arms, cx + Math.round(B.rx * 0.5), sh.y + Math.round(B.ry * 0.45), q.armF, armLen, C, true); hand = f; } // 3.19: the shoulder sits below the eyes, so the arm never covers them
     else hand = { x: cx + 10, y: bodyCY };
     if (q.blur && P0.move === 'tumble') { g.fillStyle = 'rgba(220,210,190,0.35)'; for (let k = 0; k < 4; k++) g.fillRect(cx - B.rx - 10 - k * 3, Math.round(bodyCY) - 8 + k * 5, 8, 1); }
     A.outline(c, '#141218');
