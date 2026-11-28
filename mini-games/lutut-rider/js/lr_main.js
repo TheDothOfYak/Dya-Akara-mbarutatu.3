@@ -9,9 +9,9 @@
   'use strict';
   const LR = window.LR;
   /* the look of the ride: 'storybook' (Four Brothers: Tuftwood's painting) or 'pixel' (the 4 Brothers Worlds) */
-  let A = LR.art;
+  let A = LR.art = LR.art || (LR.looks && LR.looks.storybook);
   function setLook(k) {
-    if (!LR.looks || !LR.looks[k]) k = 'pixel';
+    if (!LR.looks || !LR.looks[k]) k = Object.keys(LR.looks || {})[0];
     A = LR.art = LR.looks[k];
     document.body.classList.toggle('storybook', k === 'storybook');
   }
@@ -353,13 +353,12 @@
     }
     ui.innerHTML = '<div class="wrap"><div class="top"><a class="btn ghost small" href="../../index.html">← Flake Games</a><h1>Lútut Rider</h1><div class="coins">🦷 ' + fmt(D.teeth) + '</div></div>' +
       '<div class="tabs">' + [['ride', 'Ride'], ['lutut', 'Lútut & upgrades'], ['feats', 'Feats & records'], ['help', 'How to ride']].map(t => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '" type="button">' + t[1] + '</button>').join('') + '</div>' +
-      body + '<p class="muted small center">' + who + ' · <button class="linkbtn" id="sndToggle" type="button">' + (D.sound ? '🔊 sound on' : '🔇 sound off') + '</button> · <button class="linkbtn" id="lookToggle" type="button">🎨 look: ' + (D.look === 'pixel' ? 'pixel (4 Brothers Worlds)' : 'storybook (Tuftwood)') + '</button></p>' +
+      body + '<p class="muted small center">' + who + ' · <button class="linkbtn" id="sndToggle" type="button">' + (D.sound ? '🔊 sound on' : '🔇 sound off') + '</button></p>' +
       '<p class="copyright">© 2026 Isaac Flake. All Rights Reserved.</p></div>';
     const hp = $('heroPic'); if (hp) A.portrait(hp, D.pick, 1.1);
     ui.querySelectorAll('canvas.pic').forEach(c => A.portrait(c, c.dataset.kind, 1.1));
     const rb = $('rideBtn'); if (rb) rb.onclick = startRide;
     $('sndToggle').onclick = () => { D.sound = !D.sound; save(); roost(); };
-    $('lookToggle').onclick = () => { D.look = D.look === 'pixel' ? 'storybook' : 'pixel'; setLook(D.look); save(); newDemo(); roost(); };
   }
   ui.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || b.disabled) return;
@@ -411,7 +410,7 @@
     D = d;
     if (!D.kinds[D.pick]) D.pick = 'young';
     if (!D.stages[D.stage]) D.stage = 'downs';
-    setLook(D.look);
+    setLook('storybook');
     if (D.rides > 0) for (const k in D.kinds) if (D.tamed[k] == null) D.tamed[k] = true;     // saves from before the taming: what you already rode is tame
     newDemo(); roost();
     requestAnimationFrame(frame);

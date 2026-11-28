@@ -24,16 +24,18 @@ goes wrong. You come back with teeth, spend them, and ride further next time.
   needle: its roll pulls you to the low side, lean against it; GRAB through screeches and barrel rolls; wildness
   drains while you stay steady; thrown off, you try again with a little wildness back), calm (it glides down: tamed).
   Harder for a grown (×1.3) and an old (×1.6) Lútut. If 3D can't start, the Lútut is simply given to you.
-- **The ride, storybook** (`js/lr_art_tw.js`, the default): painted the way Four Brothers: Tuftwood is
-  (`mini-games/tuftwood/src/paint.js`, `scenery.js`, `sky.js`, `heroes.js`): a warm ink line (#3a2a22) round
-  everything, gradients lit from the upper left, pom-pom trees, earth with strata, roots and inked pebbles, a
-  three-tone grass line with hanging turf and blades in front, glow clouds and light shafts, glossy storybook eyes,
-  a paper grain, Gaegu. The Lútut is painted in that manner (drop body, lamprey ring of teeth, glowing eye under a
-  heavy brow, horns, bat wings with finger bones, spiked tail ball); the Eikar has Tuftwood's acorn cap for its
-  Aagac. The roost menus switch to Tuftwood's parchment and ink with it.
-- **The ride, pixel** (`js/lr_art.js`): the 4 Brothers Worlds way: drawn at 9.6 art pixels to the metre into a small buffer
-  and scaled up with no smoothing. The Lútut is the 4 Brothers sprite (`img/fbw_lutut_*.png`, copied from
-  `art/lutut/sprites/`), turned in 7.5° steps; the rider sits on the back at a seat measured per frame.
+- **The ride** (`js/lr_art_tw.js`): Tuftwood's clarity with the real models' shapes. Everything round the Lútut is
+  painted the way Four Brothers: Tuftwood is (`mini-games/tuftwood/src/`): a warm ink line (#3a2a22), gradients lit
+  from the upper left, pom-pom trees, earth with strata, roots and inked pebbles, three-tone grass with hanging turf
+  and blades in front, glow clouds and light shafts, a paper grain, Gaegu; the roost menus in parchment and ink.
+- **The Lútut and the Eikar in the ride** are sprites rendered from Torcain's Run's 3D models (`img/model/*.png`):
+  side on and facing right like the 4 Brothers pixel sprite (turned 18° toward you so both wings read), posed by the
+  model's own clips (Fly ×8, Glide, Dive, Walk ×6, Stand, Suck, Screech, Hurt, Death; the Eikar sat astride, leaning
+  forward, falling), each with Tuftwood's ink outline. `img/model/frames.js` gives each frame's body middle, saddle,
+  mouth and tail ball, so the sprite lines up with the ride's hit points and the Eikar sits in the saddle.
+  Re-render after the model changes: `node mini-games/lutut-rider/tools/render_sprites.js` (needs Playwright; runs
+  on the software renderer). The mouth-to-tail length of the standing frame is the ride's Lútut length.
+- The earlier pixel look (`js/lr_art.js`, the 4 Brothers sprites in `img/fbw_lutut_*.png`) is kept but not loaded.
 
 ## Rules (all in `js/lr_sim.js`)
 - Lift = `0.06 × lift × CL(α) × v²`. CL rises with the angle of attack to a stall at 0.42 rad, then falls.

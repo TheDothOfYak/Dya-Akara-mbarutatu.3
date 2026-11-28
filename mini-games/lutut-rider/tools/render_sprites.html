@@ -1,0 +1,119 @@
+<!doctype html>
+<!-- © 2026 Isaac Flake. All Rights Reserved. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="copyright" content="© 2026 Isaac Flake. All Rights Reserved.">
+<title>Lútut Rider sprite renderer</title>
+<!--
+  Renders the ride's Lútut and Eikar frames from the real 3D models (the Lútut from
+  rpg/assets/models/lutut.glb, the Eikar from rpg/js/actors.js), side on and facing right,
+  each with a warm ink outline (Tuftwood's), into PNGs plus a JSON of where the body's middle,
+  the saddle, the mouth and the tail ball are in each frame.
+  Run it with:  node mini-games/lutut-rider/tools/render_sprites.js
+-->
+<script type="importmap">{ "imports": { "three": "../../../rpg/vendor/three.module.min.js", "three/addons/": "../../../rpg/vendor/addons/" } }</script>
+<style>body { margin: 0; background: #888; }</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { loadLutut, buildLututActor } from '../../../rpg/js/lutut3d.js';
+import { buildEikar } from '../../../rpg/js/actors.js';
+
+const PPM = 48;            // sprite pixels to the metre
+const YAW = -0.32;          // turned a little toward you, so both wings read
+const INK = '#3a2a22', OUTLINE = 2.6;
+
+const W = 900, H = 700;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.6;
+renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+/* light as in Torcain's Run's open regions, plus a cool rim so the near-black hide holds its shape */
+scene.add(new THREE.HemisphereLight(0xd0d8ff, 0xc0905e, 2.9));
+const sun = new THREE.DirectionalLight(0xffe0b8, 3.6); sun.position.set(-8, 10, 6); scene.add(sun);
+const rim = new THREE.DirectionalLight(0xb8c8ff, 2.6); rim.position.set(6, 6, -8); scene.add(rim);
+{ // an environment from a plain sky, so the model's own (PBR) materials read
+  const pm = new THREE.PMREMGenerator(renderer), env = new THREE.Scene();
+  env.add(new THREE.Mesh(new THREE.SphereGeometry(50, 16, 8), new THREE.MeshBasicMaterial({ color: 0x9ac0e8, side: THREE.BackSide })));
+  env.add(new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2).translate(0, -10, 0), new THREE.MeshBasicMaterial({ color: 0x6a7a40 })));
+  scene.environment = pm.fromScene(env, 0.04).texture;
+}
+/* side on: the model faces +z, so look along +x to see it face right */
+const cam = new THREE.OrthographicCamera(-W / 2 / PPM, W / 2 / PPM, H / 2 / PPM, -H / 2 / PPM, 0.1, 100);
+cam.position.set(-30, 0, 0); cam.lookAt(0, 0, 0);
+
+const v3 = new THREE.Vector3();
+function project(p) { v3.copy(p).project(cam); return [(v3.x * 0.5 + 0.5) * W, (-v3.y * 0.5 + 0.5) * H]; }
+
+/* the frame on a 2D canvas, cropped, with an ink outline round the silhouette */
+function grab(points) {
+  const src = renderer.domElement;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.drawImage(src, 0, 0);
+  const d = g.getImageData(0, 0, W, H).data;
+  let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const pad = 6; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  /* the silhouette, inked, spread a little in every direction, then the picture on top */
+  const sil = document.createElement('canvas'); sil.width = w; sil.height = h; const sg = sil.getContext('2d');
+  sg.drawImage(src, x0, y0, w, h, 0, 0, w, h); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = INK; sg.fillRect(0, 0, w, h);
+  const out = document.createElement('canvas'); out.width = w; out.height = h; const og = out.getContext('2d');
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; og.drawImage(sil, Math.cos(a) * OUTLINE, Math.sin(a) * OUTLINE); }
+  og.drawImage(src, x0, y0, w, h, 0, 0, w, h);
+  const pts = {}; for (const k in points) pts[k] = [+(points[k][0] - x0).toFixed(1), +(points[k][1] - y0).toFixed(1)];
+  return { png: out.toDataURL('image/png'), w, h, ...pts };
+}
+
+async function run() {
+  await loadLutut();
+  const out = { ppm: PPM, yaw: YAW, lutut: {}, eikar: {} };
+  const LA = buildLututActor({ variant: 'adult' }), L = LA.lutut;
+  L.driven = true; LA.root.rotation.y = YAW; scene.add(LA.root);
+  const col = name => L.colliders().find(c => c.name === name) || L.colliders()[0];
+  const shot = (name, t) => {
+    L.play(name, 0); LA.animate(1e-4, {});
+    if (t > 0) { const steps = Math.ceil(t / 0.02); for (let i = 0; i < steps; i++) LA.animate(t / steps, {}); }
+    LA.root.updateMatrixWorld(true); LA.animate(1e-4, {});
+    renderer.render(scene, cam);
+    const mid = col('col_body_mid'), up = new THREE.Vector3(0, 1, 0);
+    const seat = mid.p.clone().addScaledVector(up, mid.wr * 0.92);
+    return grab({ body: project(mid.p), seat: project(seat), mouth: project(L.mouth()), tail: project(L.tail()) });
+  };
+  const dur = n => L.acts[n].getClip().duration;
+  const add = (key, name, t) => { out.lutut[key] = shot(name, t); };
+  for (let i = 0; i < 8; i++) add('fly' + i, 'Fly', dur('Fly') * i / 8);
+  add('glide', 'Glide', dur('Glide') * 0.5);
+  add('dive', 'Dive', dur('Dive') * 0.45);
+  for (let i = 0; i < 6; i++) add('walk' + i, 'Walk', dur('Walk') * i / 6);
+  add('stand', 'Stand', dur('Stand') * 0.3);
+  add('suck', 'Suck', dur('Suck') * 0.45);
+  add('screech', 'Screech', dur('Screech') * 0.5);
+  add('hurt', 'Hurt', dur('Hurt') * 0.4);
+  add('death', 'Death', dur('Death') * 0.999);
+  scene.remove(LA.root);
+
+  /* the Eikar, sat as he rides, then tumbling */
+  const E = buildEikar({ skin: '#a8743e', cap: '#5a3a1e', marking: 0xffd27a, markColor: 0x2a1208, tunic: 0x3e6a5a, trim: 0xc8a050, weapon: 'none', satchel: false, flasks: false, build: 1, capTall: 0.62, cape: 0xc8503a });
+  E.root.rotation.order = 'YXZ'; scene.add(E.root);
+  const eshot = (st, lean) => {
+    E.root.rotation.set(lean || 0, YAW, 0);
+    for (let i = 0; i < 40; i++) E.animate(0.03, Object.assign({ t: i * 0.03, speed: 0 }, st));
+    E.root.updateMatrixWorld(true); renderer.render(scene, cam);
+    /* the hips, where the Eikar meets the saddle (a little over half a metre up, sat astride) */
+    return grab({ seat: project(new THREE.Vector3(0, 0, 0)), hip: project(E.root.localToWorld(new THREE.Vector3(0, 0.52, 0))) });
+  };
+  out.eikar.ride = eshot({ onGround: true, ride: true, reins: true, rideSpeed: 3, rideBob: 0.2 }, 0);
+  out.eikar.lean = eshot({ onGround: true, ride: true, reins: true, rideSpeed: 8, rideBob: 0.4 }, 0.35);
+  out.eikar.fall = eshot({ onGround: false, speed: 0 }, 0);
+  window.__done = out;
+}
+run().catch(e => { window.__error = String(e && e.stack || e); });
+</script>
+</body>
+</html>
