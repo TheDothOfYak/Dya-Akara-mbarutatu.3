@@ -27,10 +27,14 @@ for name,fn,nf,loop in CLIPS:
             pb.keyframe_insert('rotation_quaternion',frame=f+1,group=pb.name)
         P['root'].location=loc
         P['root'].keyframe_insert('location',frame=f+1,group='root')
+        scl=d.get('__scale__',{})
+        for bn in ('chest','spine'):
+            sv=scl.get(bn,1.0); P[bn].scale=(sv,sv,sv)
+            P[bn].keyframe_insert('scale',frame=f+1,group=bn)
     # stash into NLA so the exporter sees every action
     tr=A.animation_data.nla_tracks.new(); tr.name=name
     st=tr.strips.new(name,1,act); tr.mute=True
     print('clip',name,nf)
 A.animation_data.action=None
-for pb in P: pb.rotation_quaternion=(1,0,0,0); pb.location=(0,0,0)
+for pb in P: pb.rotation_quaternion=(1,0,0,0); pb.location=(0,0,0); pb.scale=(1,1,1)
 bpy.ops.wm.save_as_mainfile(filepath=W+'stage6.blend')

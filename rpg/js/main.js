@@ -14,6 +14,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
+import { loadLutut } from './lutut3d.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, Ripples, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools, paint } from './gfx.js';
 import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
@@ -135,7 +136,7 @@ addEventListener('pagehide', flushSave);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); });
 
 $('loading').textContent = 'LOADING…';
-await Promise.all([loadModels(), smoothReady]);   // your own models, if rpg/assets/models.json names any (assets.js)
+await Promise.all([loadModels(), smoothReady, loadLutut()]);   // your own models, if rpg/assets/models.json names any (assets.js), and the Lútut's (lutut3d.js)
 
 /* ---------------- renderer ---------------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -967,7 +968,7 @@ function updateProjectiles(dt) {
       else p.vel.y -= p.grav * dt;
       for (const e of enemies.list) {
         if (e.dead || p.hit.has(e)) continue;
-        if (Math.hypot(e.pos.x - p.pos.x, e.pos.y + 0.8 - p.pos.y, e.pos.z - p.pos.z) > e.T.rad + 0.6) continue;
+        if (e.reach ? e.reach(p.pos.x, p.pos.y, p.pos.z).gap > 0.45 : Math.hypot(e.pos.x - p.pos.x, e.pos.y + 0.8 - p.pos.y, e.pos.z - p.pos.z) > e.T.rad + 0.6) continue;
         p.hit.add(e); enemies.damage(e, p.dmg * (0.9 + Math.random() * 0.2), P.pos, 3, { stun: 0.3 * FX.stagger, burn: FX.burn, big: p.big });
         addHeat(5); G.hitstop = 0.03; particles.burst(p.pos.x, p.pos.y, p.pos.z, 10, { color: p.col, speed: 5, size: 0.35, life: 0.35 });
         if (!p.pierce) { p.life = 0; break; }
@@ -1121,9 +1122,11 @@ function updateAttack(dt) {
     for (const e of enemies.list) {
       if (e.dead || A.hit.has(e)) continue;
       const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
-      if (d > range + e.T.rad || Math.abs(e.pos.y - P.pos.y) > 2.2) continue;
+      const R = e.reach ? e.reach(P.pos.x, P.pos.y + 1.1, P.pos.z) : null;   // the Lútut: how far its nearest part is
+      if (R ? R.gap > range * 0.85 : (d > range + e.T.rad || Math.abs(e.pos.y - P.pos.y) > 2.2)) continue;
       const whirl = A.kind === 3 && (perk('whirl') || arm.whirl);
-      if (!whirl && d > 0.8 + e.T.rad && (dx * fx + dz * fz) / d < arm.arc) continue;
+      if (R) { const rh = Math.hypot(R.dx, R.dz); if (!whirl && R.gap > 0.6 && rh > 1e-3 && (R.dx * fx + R.dz * fz) / rh < arm.arc) continue; }
+      else if (!whirl && d > 0.8 + e.T.rad && (dx * fx + dz * fz) / d < arm.arc) continue;
       A.hit.add(e);
       const exec = perk('exec') && e.stun > 0 ? 1.5 : 1;
       enemies.damage(e, dmg * exec * (0.9 + Math.random() * 0.2), P.pos, def.kb, { big: A.kind === 3, stun: (A.kind === 3 ? 0.6 : 0.32) * FX.stagger * (arm.crack ? 1.8 : 1), burn: FX.burn });
@@ -4024,7 +4027,7 @@ function updateBolts(dt) {
     let hit = b.life <= 0 || p.y <= world.col.ground(p.x, p.z, p.y + 0.5) + 0.05;
     if (!hit) { const f = world.col.ray(prev, p); if (f < 1) { p.lerpVectors(prev, p, f); hit = true; } }   // it stops at walls
     for (const e of enemies.list) {
-      if (hit || e.dead || Math.hypot(e.pos.x - p.x, e.pos.y + 0.8 - p.y, e.pos.z - p.z) > e.T.rad + 1) continue;
+      if (hit || e.dead || (e.reach ? e.reach(p.x, p.y, p.z).gap > 0.8 : Math.hypot(e.pos.x - p.x, e.pos.y + 0.8 - p.y, e.pos.z - p.z) > e.T.rad + 1)) continue;
       enemies.damage(e, 22 * (young() ? 1 : axeMul()), P.pos, 4, { stun: 0.4, burn: true }); hit = true;
     }
     if (!hit && boss && !boss.dead && boss.pos && boss.pos.distanceTo(p) < 3) { damageBoss(30); hit = true; }

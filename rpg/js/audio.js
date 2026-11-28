@@ -92,5 +92,21 @@ export const sfx = {
   clang() { tone(820, 0.1, 0.25, 'square', sfxGain, 0, 500); noise(0.15, 0.35, 3200, 1400, 2); },
   talk() { tone(500 + Math.random() * 200, 0.025, 0.05, 'triangle'); },
   ui() { tone(660, 0.08, 0.12, 'triangle'); },
+  /* the Lútut (lutut3d.js): a first pass at its voice, made like everything else here */
+  _lutut(what, vol = 1) {
+    if (what === 'screech') {   // long and rising, like metal dragged on stone
+      noise(1.6, 0.5 * vol, 700, 3400, 6); noise(1.4, 0.3 * vol, 1500, 5200, 9, 'bandpass', 0.1);
+      tone(240, 0.16 * vol, 1.5, 'sawtooth', sfxGain, 0, 900); tone(253, 0.12 * vol, 1.5, 'square', sfxGain, 0.05, 960);
+      tone(60, 0.25 * vol, 0.6, 'sawtooth', sfxGain, 0, 45);
+    } else if (what === 'wing') {   // a heavy leathery whump
+      noise(0.28, 0.32 * vol, 220, 90, 1.4, 'lowpass'); noise(0.18, 0.08 * vol, 900, 300, 2);
+    } else if (what === 'suck') {   // the long indrawn rush through the lamprey mouth
+      noise(1.3, 0.4 * vol, 300, 2200, 1.2); noise(1.1, 0.2 * vol, 120, 500, 0.8, 'lowpass', 0.15);
+    } else if (what === 'dive') {   // the stoop: air tearing past folded wings
+      noise(1.1, 0.35 * vol, 2600, 600, 1.5);
+    } else if (what === 'tail') {   // the swing, then the spiked ball's weight
+      noise(0.35, 0.3 * vol, 400, 1600, 1.4);
+    }
+  },
   victory() { [392, 494, 587, 784, 988].forEach((f, i) => tone(f, 0.16, 2.2, 'triangle', sfxGain, i * 0.14)); },
 };

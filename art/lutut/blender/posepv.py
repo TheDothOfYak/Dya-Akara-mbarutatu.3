@@ -17,6 +17,8 @@ for spec in args[1].split(','):
         for axis,deg in d.get(pb.name,[]): q=Q(axis,deg)@q
         pb.rotation_mode='QUATERNION'; pb.rotation_quaternion=wq(pb,q)
     P['root'].location=loc
+    for pb in P: pb.scale=(1,1,1)
+    for bn,sv in d.get('__scale__',{}).items(): P[bn].scale=(sv,sv,sv)
     for v in args[2]:
         p=W+f'pp_{name}_{t}_{v}.png'; shot(p,*V[v],lens=32); ps.append(p)
 sheet(ps,W+args[0],len(args[2])*2 if len(args[2])<3 else len(args[2]),380)

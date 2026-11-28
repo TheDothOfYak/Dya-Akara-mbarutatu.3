@@ -15,6 +15,7 @@ import { buildEikar } from './actors.js';
 import * as L from './esik_land.js';
 import * as A from './esik_sky.js';
 import * as W from './esik_sea.js';
+import { buildLututActor } from './lutut3d.js';   // the Lútut model, or the built-in one if it isn't loaded
 import { buildKeilia, buildKarnen } from './npcs.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -138,7 +139,7 @@ export function speciesModel(id) {
     case 'kuni_byrd_wild': return A.buildKuniByrd({ seed });
     case 'kuni_byrd_ridden': return A.buildKuniByrd({ seed, saddle: true });
     case 'tyndael': return A.buildTyndael({ seed });
-    case 'lutut': return A.buildLutut({ seed, age: Math.random() });
+    case 'lutut': return buildLututActor({ seed, age: Math.random() });
     case 'rubbermcfly': return A.buildRubberMcFly({ seed });
     case 'makari_swarm': return A.buildMakariSwarm({ seed, moteScale: 4 });
     case 'hvaleia': return W.buildHvaleia();
