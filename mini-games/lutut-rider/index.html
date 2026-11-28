@@ -60,7 +60,7 @@
     .tab.on { background: #7a3a24; border-color: #d08a4a; }
     .hero { display: flex; gap: 16px; align-items: center; }
     .hero .ride { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-    .hero canvas { width: 300px; height: 200px; }
+    .hero canvas { width: 300px; height: 200px; image-rendering: pixelated; }
     .pname { font: 700 26px Georgia, serif; color: var(--gold); }
     .sname { font: 700 18px Georgia, serif; color: var(--gold); }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
@@ -69,7 +69,8 @@
     .stage { background: linear-gradient(160deg, color-mix(in srgb, var(--a) 35%, #1e1828), color-mix(in srgb, var(--b) 30%, #1e1828)); }
     .stage.on, .kind.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
     .stage.locked { filter: saturate(.4); }
-    .kind canvas { width: 100%; height: auto; aspect-ratio: 3 / 2; }
+    .kind canvas { width: 100%; height: auto; aspect-ratio: 3 / 2; image-rendering: pixelated; }
+    .welcome canvas { width: 300px; height: 200px; image-rendering: pixelated; }
     .dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--c); opacity: .5; }
     .dot.on { background: var(--c); opacity: 1; box-shadow: 0 0 8px var(--c); }
     .bars { display: grid; gap: 4px; margin-top: 8px; }
@@ -214,7 +215,6 @@
   <script src="js/lr_data.js"></script>
   <script src="js/lr_sim.js"></script>
   <script src="js/lr_art.js"></script>
-  <script src="../../js/engine/looks/lutut.js"></script><!-- the Lútut as Dya'Akara draws it -->
   <script src="js/lr_main.js"></script>
 </body>
 </html>

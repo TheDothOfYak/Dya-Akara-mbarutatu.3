@@ -17,6 +17,17 @@ goes wrong. You come back with teeth, spend them, and ride further next time.
   So you want to come in nose-level or nose-down and fast, the opposite of a careful landing, but too
   steep or too hard throws your Eikar.
 
+## How it looks
+- **The taming, in 3D** (`js/lr_tame3d.js`): Torcain's Run's Lútut model and Eikar, three.js from `rpg/vendor/`,
+  the same lighting as Torcain's Run's open regions. Phases: arrive (it circles and lands), creep (move only while
+  it isn't looking; caught moving, it screeches you back), leap (GRAB when close and it isn't looking), buck (balance
+  needle: its roll pulls you to the low side, lean against it; GRAB through screeches and barrel rolls; wildness
+  drains while you stay steady; thrown off, you try again with a little wildness back), calm (it glides down: tamed).
+  Harder for a grown (×1.3) and an old (×1.6) Lútut. If 3D can't start, the Lútut is simply given to you.
+- **The ride, the 4 Brothers Worlds way** (`js/lr_art.js`): drawn at 9.6 art pixels to the metre into a small buffer
+  and scaled up with no smoothing. The Lútut is the 4 Brothers sprite (`img/fbw_lutut_*.png`, copied from
+  `art/lutut/sprites/`), turned in 7.5° steps; the rider sits on the back at a seat measured per frame.
+
 ## Rules (all in `js/lr_sim.js`)
 - Lift = `0.06 × lift × CL(α) × v²`. CL rises with the angle of attack to a stall at 0.42 rad, then falls.
   Tucked wings give almost no lift and little drag.
