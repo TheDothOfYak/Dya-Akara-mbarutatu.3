@@ -23,6 +23,8 @@
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const lerp = (a, b, t) => a + (b - a) * t;
   const A = LR.art = {};
+  LR.looks = LR.looks || {};
+  LR.looks.pixel = A;
   const APM = A.APM = 9.6;                // art pixels to the metre (a grown Lútut's sprite at 1:1)
   const OUT = '#1a1420';                  // the outline every sprite has
 

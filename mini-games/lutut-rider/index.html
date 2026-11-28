@@ -25,6 +25,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Flake Games">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='8' y='8' width='84' height='84' rx='18' fill='%2316121e'/><path d='M30 62q-10-30 24-34q22 0 22 20q0 18-22 20z' fill='%232b2535'/><path d='M40 40l-22-20 28 12z' fill='%23463d55'/><circle cx='62' cy='44' r='5' fill='%23ffd040'/><circle cx='72' cy='56' r='7' fill='%233a0c16'/><path d='M30 62q-14 6-18 16' stroke='%232b2535' stroke-width='5' fill='none'/></svg>">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap">
   <script>window.DYA_APP = 'lr';</script>
   <script src="../../js/flake/mobile.js" data-game="1" data-awake="1"></script>
   <style>
@@ -144,6 +145,29 @@
     table.pay { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14.5px; }
     table.pay td { padding: 4px 6px; border-bottom: 1px solid #3a3050; text-align: left; } table.pay td:last-child { text-align: right; }
     table.pay tr.tot td { font: 700 19px Georgia, serif; color: var(--gold); border: 0; }
+    /* the storybook look: Tuftwood's warm parchment, ink lines and Gaegu */
+    body.storybook { --card: rgba(255,246,226,.94); --card2: #f3e2bf; --line: #3a2a22; --ink: #3a2a22; --muted: #7a6050; --gold: #c8642a; }
+    body.storybook #ui { background: linear-gradient(180deg, rgba(20,30,60,.25), rgba(20,30,60,.55) 50%, rgba(20,24,50,.75)); }
+    body.storybook .top h1, body.storybook h2, body.storybook .pname, body.storybook .sname, body.storybook .coins, body.storybook .res .bigdist, body.storybook #hDist, body.storybook .t3title, body.storybook .tab { font-family: Gaegu, "Comic Sans MS", cursive; }
+    body.storybook .top h1 { color: #fff4d0; font-size: 40px; -webkit-text-stroke: 1px #3a2a22; text-shadow: 0 3px 0 #3a2a22; }
+    body.storybook h2 { color: #fff4d0; font-size: 28px; text-shadow: 0 2px 0 #3a2a22; }
+    body.storybook .coins { color: #ffe9a0; font-size: 28px; text-shadow: 0 2px 0 #3a2a22; }
+    body.storybook .card { border: 3px solid #3a2a22; border-radius: 18px; box-shadow: 0 4px 0 rgba(58,42,34,.6); color: #3a2a22; }
+    body.storybook .btn { border: 2.5px solid #3a2a22; border-radius: 14px; color: #3a2a22; background: #fff4dc; font-weight: 700; box-shadow: 0 3px 0 #3a2a22; }
+    body.storybook .btn.primary { background: linear-gradient(#ffd27a, #f0a848); color: #3a2a22; }
+    body.storybook .btn.ghost { background: rgba(255,244,220,.85); }
+    body.storybook .tab { background: rgba(255,244,220,.85); color: #3a2a22; border: 2.5px solid #3a2a22; font-size: 20px; font-weight: 700; padding: 3px 14px; }
+    body.storybook .tab.on { background: linear-gradient(#ffd27a, #f0a848); }
+    body.storybook .chip { background: #fff4dc; border: 2px solid #3a2a22; color: #3a2a22; }
+    body.storybook .stage { background: linear-gradient(160deg, color-mix(in srgb, var(--a) 30%, #fff6e2), color-mix(in srgb, var(--b) 22%, #fff6e2)); }
+    body.storybook .stage.on, body.storybook .kind.on { box-shadow: 0 0 0 3px #f0a848 inset, 0 4px 0 rgba(58,42,34,.6); }
+    body.storybook .bar div, body.storybook .pips i { background: #e8d4b0; border-color: #3a2a22; }
+    body.storybook .muted { color: #7a6050; } body.storybook #ui > .wrap > .muted, body.storybook #ui .copyright { color: #fff4d0; }
+    body.storybook #hud { font-family: Gaegu, "Comic Sans MS", cursive; } body.storybook #hDist { font-size: 42px; }
+    body.storybook table.pay td { border-color: #d8c4a0; } body.storybook table.pay tr.tot td { color: #c8642a; }
+    body.storybook .pedal { border-radius: 50%; border: 3px solid #3a2a22; background: rgba(255,244,220,.75); color: #3a2a22; box-shadow: 0 4px 0 rgba(58,42,34,.6); font-family: Gaegu, "Comic Sans MS", cursive; font-size: 19px; }
+    body.storybook .hero canvas, body.storybook .kind canvas, body.storybook .welcome canvas { image-rendering: auto; }
+    body.storybook .pedal.down { background: rgba(255,210,122,.9); }
     /* the 3D taming */
     #tame { position: fixed; inset: 0; z-index: 25; background: #10121a; }
     .t3cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -214,7 +238,8 @@
   <script src="../../js/flake/mini_save.js"></script>
   <script src="js/lr_data.js"></script>
   <script src="js/lr_sim.js"></script>
-  <script src="js/lr_art.js"></script>
+  <script src="js/lr_art.js"></script><!-- the 4 Brothers Worlds pixel look -->
+  <script src="js/lr_art_tw.js"></script><!-- the Tuftwood storybook look -->
   <script src="js/lr_main.js"></script>
 </body>
 </html>

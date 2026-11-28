@@ -132,8 +132,9 @@ A distance game in **`mini-games/lutut-rider/`**. You are an Eikar on the back o
 - **Five regions:** Beuhk Downs, The Road North (trees, warm air), The Shard Canyons (mesas and chasms), Duskwater Marsh (pools: stone sinks) and Storm Ridge (gusting wind). Each has medals at 500, 1500, 3000 and 6000 m.
 - **Progress:** teeth from pickups, prey, tricks (clean landings, long air, skimming, loops, smashes) and distance. Raise a Grown or Old Lútut, upgrade the wing membrane, gullet, tail and saddle (10 levels each), unlock regions, earn feats.
 - **The opening is 3D:** before you ride a Lútut you tame it (`js/lr_tame3d.js`), with Torcain's Run's own Lútut model (`rpg/assets/models/lutut.glb`) and Eikar (`rpg/js/actors.js`). Creep up while it isn't looking, leap on, lean against its rolls and grab on through its screeches until it gives in. Every Lútut you raise is tamed this way first.
-- **The ride is drawn the 4 Brothers Worlds way:** pixel art in a small buffer scaled up with no smoothing. The Lútut is the 4 Brothers sprite (`img/fbw_lutut_*.png`, copied from `art/lutut/sprites/`); the Eikar, prey, stones, trees, teeth and land are pixel sprites in the same manner.
-- **Code:** `js/lr_data.js` (numbers), `js/lr_sim.js` (the land and the ride, no drawing, runs in Node), `js/lr_art.js` (the pixel drawing), `js/lr_tame3d.js` (the 3D taming), `js/lr_main.js` (the roost, the ride screen, pay, sounds, saving). Tests: `node tests/test_lutut_rider.js`.
+- **Two looks for the ride** (🎨 in the roost switches): **storybook**, painted the way Four Brothers: Tuftwood is (`js/lr_art_tw.js`: ink lines, soft gradients, pom-pom trees, three-tone grass, Gaegu), the default; and **pixel**, the 4 Brothers Worlds way.
+- **The pixel look:** pixel art in a small buffer scaled up with no smoothing. The Lútut is the 4 Brothers sprite (`img/fbw_lutut_*.png`, copied from `art/lutut/sprites/`); the Eikar, prey, stones, trees, teeth and land are pixel sprites in the same manner.
+- **Code:** `js/lr_data.js` (numbers), `js/lr_sim.js` (the land and the ride, no drawing, runs in Node), `js/lr_art_tw.js` (the storybook drawing), `js/lr_art.js` (the pixel drawing), `js/lr_tame3d.js` (the 3D taming), `js/lr_main.js` (the roost, the ride screen, pay, sounds, saving). Tests: `node tests/test_lutut_rider.js`.
 
 ## Skaar Uverkhron (turn-based strategy)
 

@@ -24,7 +24,14 @@ goes wrong. You come back with teeth, spend them, and ride further next time.
   needle: its roll pulls you to the low side, lean against it; GRAB through screeches and barrel rolls; wildness
   drains while you stay steady; thrown off, you try again with a little wildness back), calm (it glides down: tamed).
   Harder for a grown (×1.3) and an old (×1.6) Lútut. If 3D can't start, the Lútut is simply given to you.
-- **The ride, the 4 Brothers Worlds way** (`js/lr_art.js`): drawn at 9.6 art pixels to the metre into a small buffer
+- **The ride, storybook** (`js/lr_art_tw.js`, the default): painted the way Four Brothers: Tuftwood is
+  (`mini-games/tuftwood/src/paint.js`, `scenery.js`, `sky.js`, `heroes.js`): a warm ink line (#3a2a22) round
+  everything, gradients lit from the upper left, pom-pom trees, earth with strata, roots and inked pebbles, a
+  three-tone grass line with hanging turf and blades in front, glow clouds and light shafts, glossy storybook eyes,
+  a paper grain, Gaegu. The Lútut is painted in that manner (drop body, lamprey ring of teeth, glowing eye under a
+  heavy brow, horns, bat wings with finger bones, spiked tail ball); the Eikar has Tuftwood's acorn cap for its
+  Aagac. The roost menus switch to Tuftwood's parchment and ink with it.
+- **The ride, pixel** (`js/lr_art.js`): the 4 Brothers Worlds way: drawn at 9.6 art pixels to the metre into a small buffer
   and scaled up with no smoothing. The Lútut is the 4 Brothers sprite (`img/fbw_lutut_*.png`, copied from
   `art/lutut/sprites/`), turned in 7.5° steps; the rider sits on the back at a seat measured per frame.
 
