@@ -15,8 +15,8 @@ GitHub, so it stays in Drive. The game copy is `rpg/assets/models/lutut.glb` (To
 - `previews/`: renders.
 
 ## The look
-- Near-black hide with a faint violet cast, darker on the back, a touch lighter on the belly; dark red lamprey
-  gums and gullet, dull bone teeth, horns dark at the base to dull bone at the tips.
+- Near-black hide with a faint violet cast, darker on the back, a touch lighter on the belly; lips the same dark hide,
+  dark red only deep in the gullet, dull bone teeth, horns dark at the base to dull bone at the tips.
 - **Eyes:** the part-sphere domes under the brow, beside the horns, yellow over the whole eyeball, under clear
   (glossy, uncoloured) lids. The glow is on the eyeball only: it comes from the emissive texture, there are no
   lights, and the game keeps it under its bloom threshold so no halo spreads onto the face.
@@ -67,3 +67,8 @@ Put `lutut.obj` in a work folder, set `LUTUT_WORK` to that folder, then run each
 → `mat` → `anim` (motion in `motion.py`) → `export`. Then copy `lutut.glb` to `rpg/assets/models/`.
 Previews: `look.py`, `lookc.py` (eyes and body, day and night), `asheet.py`, `posepv.py` (single poses),
 `probe.py` (where the tail ball and mouth end up), `sprites2d.py` (side-view frames for the 2D games).
+
+## Seen on the Road North (`rpg/js/road.js`)
+On day two (the forest) and day four (the mountain pass), about twenty seconds into the day's walk, a Lútut
+crosses the sky over the mountains ahead: flapping on day two, gliding low through the pass on day four. The
+camera turns to watch it while Tanoc and the Carpenter talk about it, so it can't be missed.
