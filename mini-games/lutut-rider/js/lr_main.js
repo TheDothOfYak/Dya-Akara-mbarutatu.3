@@ -17,7 +17,7 @@
   /* ================= the save ================= */
   function blank() {
     return { v: 1, teeth: 0, pick: 'young', stage: 'downs', kinds: { young: { wings: 0, gullet: 0, tail: 0, saddle: 0 } }, stages: { downs: true },
-      best: {}, medals: {}, feats: {}, sound: true, rides: 0, tipsDone: false,
+      best: {}, medals: {}, feats: {}, tamed: {}, sound: true, rides: 0, tipsDone: false,
       stats: { runs: 0, dist: 0, eatenAll: 0, eaten: {}, smashed: 0, clean: 0, loops: 0, airMax: 0, skimMax: 0, teethAll: 0 } };
   }
   const SAVE = window.FLAKE_MINI.open('lr', blank);
@@ -109,6 +109,7 @@
 
   function startRide() {
     if (SAVE.banned) return;
+    if (!D.tamed[D.pick]) { toRoost(); return; }
     ac();
     run = LR.makeRun({ stage: D.stage, kind: D.pick, up: D.kinds[D.pick], best: D.best[D.stage] || 0 });
     view = A.makeView(); A.follow(view, run, W, H, 0, true); anim = { t: 0 }; evAt = 0; acc = 0; paused = false; resultsShown = false;
@@ -265,6 +266,21 @@
     newDemo(); ui.classList.remove('hidden'); roost(); windSound(0);
   }
 
+  /* ================= the taming (3D, js/lr_tame3d.js) ================= */
+  function tame(kind) {
+    if (mode === 'tame') return;
+    mode = 'tame'; ui.classList.add('hidden'); windSound(0); ac();
+    const done = res => {
+      D.tamed[kind] = true; D.pick = kind; save();
+      mode = 'roost'; ui.classList.remove('hidden'); newDemo(); roost();
+      if (res && res.why && res.result !== 'tamed' && res.why !== 'skipped') toastMsg('The 3D taming could not start here (' + res.why + '), so your Lútut is ready to ride.');
+    };
+    import('./lr_tame3d.js')
+      .then(T => T.runTame({ kind, host: $('tame'), snd: SND, auto: !!LR.main.autoTame, dt: LR.main.tameDt || 0, expose: st => { LR.main.tameState = st; } }))
+      .then(done, e => { console.warn('[tame]', e); $('tame').classList.add('hidden'); done({ result: 'skipped', why: (e && e.message) || 'no 3D' }); });
+  }
+  function toastMsg(t) { const el = document.createElement('div'); el.className = 'toast'; el.textContent = t; document.body.appendChild(el); setTimeout(() => el.remove(), 5000); }
+
   /* ================= the roost ================= */
   let tab = 'ride';
   function medalDots(sid) {
@@ -276,11 +292,15 @@
     const who = SAVE.who ? 'Signed in as <b>' + esc(SAVE.who.name) + '</b>' : 'Playing as a guest (this browser keeps your roost)';
     let body = '';
     if (SAVE.banned) body = '<div class="card note"><h3>Not allowed</h3><p>' + esc(SAVE.banned) + '</p></div>';
+    else if (!D.tamed.young && !D.rides) body = '<div class="card welcome"><h2>Every rider starts with a wild one</h2>' +
+      '<p>A young Lútut has come down in Beuhk Downs. Creep up on it, leap on its back and hold on until it gives in. Then it is yours to ride.</p>' +
+      '<canvas id="heroPic" width="300" height="200"></canvas><div class="row center"><button class="btn primary big" data-tame="young" type="button">🦇 Tame your first Lútut</button></div>' +
+      '<p class="muted small">The taming is in 3D. Lean with ◀ ▶ (← →), grab with Space.</p></div>';
     else if (tab === 'ride') {
       body = '<div class="card hero"><div class="grow"><div class="muted small">Riding out over</div><div class="pname">' + esc(S.name) + '</div>' +
         '<div class="muted">' + esc(S.blurb) + '</div><div class="row">' + medalDots(S.id) + '<span class="muted small">best ' + fmt(D.best[S.id] || 0) + ' m</span></div>' +
         '<div class="row"><span class="chip">' + esc(K.name) + '</span><span class="chip">🍖 ' + st.gullet + '</span><span class="chip">💎 ' + st.cracks + ' cracks</span></div></div>' +
-        '<div class="ride"><canvas id="heroPic" width="300" height="200"></canvas><button class="btn primary big" id="rideBtn" type="button">▶ Ride out</button></div></div>' +
+        '<div class="ride"><canvas id="heroPic" width="300" height="200"></canvas>' + (D.tamed[D.pick] ? '<button class="btn primary big" id="rideBtn" type="button">▶ Ride out</button>' : '<button class="btn primary big" data-tame="' + D.pick + '" type="button">🦇 Tame it first</button>') + '</div></div>' +
         '<h2>Regions</h2><div class="grid">' + LR.STAGES.map(s => {
           const open = D.stages[s.id], on = s.id === D.stage;
           return '<div class="card stage' + (on ? ' on' : '') + (open ? '' : ' locked') + '" style="--a:' + s.sky[0] + ';--b:' + s.ground + '">' +
@@ -296,7 +316,7 @@
         return '<div class="card kind' + (on ? ' on' : '') + '"><canvas class="pic" data-kind="' + id + '" width="300" height="200"></canvas>' +
           '<div class="sname">' + esc(k.name) + '</div><div class="small muted">' + esc(k.desc) + '</div><div class="bars">' +
           bar('Power', s.power / Math.pow(s.mass, 0.3), 1.9) + bar('Glide', s.lift / s.drag, 2) + bar('Gullet', s.gullet, 320) + bar('Tail', s.cracks + s.tailHit / 10, 9) + bar('Head', 13 / s.smashV, 2.2) + '</div>' +
-          '<div class="row">' + (own ? (on ? '<span class="chip ok">Riding this one</span>' : '<button class="btn small" data-pick="' + id + '" type="button">Ride this one</button>')
+          '<div class="row">' + (own && !D.tamed[id] ? '<button class="btn small primary" data-tame="' + id + '" type="button">🦇 Tame it</button>' : own ? (on ? '<span class="chip ok">Riding this one</span>' : '<button class="btn small" data-pick="' + id + '" type="button">Ride this one</button>')
             : '<button class="btn small" data-buykind="' + id + '" type="button"' + (D.teeth < k.cost ? ' disabled' : '') + '>Raise one · ' + fmt(k.cost) + ' 🦷</button>') + '</div></div>';
       }).join('') + '</div>' +
         '<h2>Upgrades: ' + esc(K.name) + '</h2><div class="card">' + LR.UPGRADES.map(u => {
@@ -320,7 +340,9 @@
         '<h3>Meat is your fuel</h3><p>The gullet empties as you fly and faster when you beat. Lútut eat meat and nothing else: fly into Rock Hoppers, Albali Byrds, Shellbacks and Mud Eels to suck them in. A Byrd\'s horns sting, and the wings go numb for a moment. A Shellback is heavy: you have to be going fast. Empty, you can only glide, and the ride ends when you stop.</p>' +
         '<h3>Head of stone, tail of glass</h3><p>The round head is near unbreakable: hit a standing stone (or, on a big Lútut, a tree) head first and fast, and it breaks. The thin tail is not. Land with the nose up, or slap down too hard, or drag the tail through a stone, and it cracks. Too many cracks and it shatters.</p>' +
         '<p>Your Eikar is thrown off by a landing that is far too hard, or too far off the slope (on its back). In the marsh, stay out of the water: stone sinks. In the canyons, clear the chasms.</p>' +
-        '<h3>Teeth</h3><p>Pick up the teeth on the way (worth more the further out you are), eat, break things, and do tricks: clean landings after a long flight, long air, skimming low and fast, loops. Every metre pays too. Reach 500, 1500, 3000 and 6000 m in a region for its medals.</p></div>';
+        '<h3>Teeth</h3><p>Pick up the teeth on the way (worth more the further out you are), eat, break things, and do tricks: clean landings after a long flight, long air, skimming low and fast, loops. Every metre pays too. Reach 500, 1500, 3000 and 6000 m in a region for its medals.</p>' +
+        '<h3>Taming</h3><p>Every Lútut starts wild. Raising a new one means taming it first, in 3D: creep up while it isn\'t looking, leap on, lean against its rolls and grab on through its screeches until its wildness runs out. Bigger ones fight harder.</p>' +
+        (D.tamed[D.pick] ? '<div class="row"><button class="btn" data-tame="' + D.pick + '" type="button">🦇 Play the taming again</button></div>' : '') + '</div>';
     }
     ui.innerHTML = '<div class="wrap"><div class="top"><a class="btn ghost small" href="../../index.html">← Flake Games</a><h1>Lútut Rider</h1><div class="coins">🦷 ' + fmt(D.teeth) + '</div></div>' +
       '<div class="tabs">' + [['ride', 'Ride'], ['lutut', 'Lútut & upgrades'], ['feats', 'Feats & records'], ['help', 'How to ride']].map(t => '<button class="tab' + (tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '" type="button">' + t[1] + '</button>').join('') + '</div>' +
@@ -335,10 +357,11 @@
     const b = e.target.closest('button'); if (!b || b.disabled) return;
     const d = b.dataset;
     if (d.tab) { tab = d.tab; roost(); ui.scrollTop = 0; return; }
+    if (d.tame) { tame(d.tame); return; }
     if (d.stage) { D.stage = d.stage; save(); newDemo(); roost(); return; }
     if (d.buystage) { const s = LR.stage(d.buystage); if (D.teeth >= s.cost) { D.teeth -= s.cost; D.stages[s.id] = true; D.stage = s.id; SND.buy(); save(); newDemo(); roost(); } return; }
     if (d.pick) { D.pick = d.pick; save(); newDemo(); roost(); return; }
-    if (d.buykind) { const k = LR.KINDS[d.buykind]; if (D.teeth >= k.cost) { D.teeth -= k.cost; D.kinds[d.buykind] = { wings: 0, gullet: 0, tail: 0, saddle: 0 }; D.pick = d.buykind; SND.buy(); save(); newDemo(); roost(); } return; }
+    if (d.buykind) { const k = LR.KINDS[d.buykind]; if (D.teeth >= k.cost) { D.teeth -= k.cost; D.kinds[d.buykind] = { wings: 0, gullet: 0, tail: 0, saddle: 0 }; D.pick = d.buykind; SND.buy(); save(); tame(d.buykind); } return; }
     if (d.up) {
       const up = D.kinds[D.pick], lv = up[d.up] || 0, cost = LR.upgCost(D.pick, lv);
       if (lv < LR.UPG_MAX && D.teeth >= cost) { D.teeth -= cost; up[d.up] = lv + 1; SND.buy(); save(); roost(); }
@@ -349,6 +372,7 @@
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
+    if (mode === 'tame') return;          // the 3D scene draws itself
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     if (mode === 'ride' || mode === 'results') {
       if (!paused) {
@@ -379,8 +403,9 @@
     D = d;
     if (!D.kinds[D.pick]) D.pick = 'young';
     if (!D.stages[D.stage]) D.stage = 'downs';
+    if (D.rides > 0) for (const k in D.kinds) if (D.tamed[k] == null) D.tamed[k] = true;     // saves from before the taming: what you already rode is tame
     newDemo(); roost();
     requestAnimationFrame(frame);
   });
-  LR.main = { auto: false, get D() { return D; }, get run() { return run; }, startRide, toRoost };
+  LR.main = { auto: false, autoTame: false, tame, get D() { return D; }, get run() { return run; }, startRide, toRoost };
 })();
