@@ -582,11 +582,15 @@
     anim.walkM = (anim.walkM || 0) + (run.grounded ? v * dt : 0);
     if (run.beating) { anim.flapOn = 0.25; anim.flap = ((anim.flap || 0) + dt * 1.6) % 1; }
     else if (anim.flapOn > 0) { anim.flapOn -= dt; anim.flap = ((anim.flap || 0) + dt * 1.6) % 1; }
-    const name = frameFor(run, anim), f = MF.lutut[name], im = ready('lutut', name);
+    /* with its Eikar sat on it, hands on the horns (rendered together); on its own once the Eikar is thrown */
+    let name = frameFor(run, anim);
+    if (!run.rider && name !== 'death' && MF.lutut[name + '_r']) name += '_r';
+    else if (!MF.lutut[name]) name = run.grounded ? 'stand' : 'glide';
+    const f = MF.lutut[name], im = ready('lutut', name);
     if (!im) return false;
     const sc = k * run.st.scale / PER_M;
     /* the dive clip already pitches the body nose-down, and so does the ride: take the clip's own pitch out */
-    const corr = name === 'dive' ? axis(f) - axis(STAND) : 0;
+    const corr = /^dive/.test(name) ? axis(f) - axis(STAND) : 0;
     g.save(); g.translate(x, y); g.rotate(-run.ang - corr);
     g.drawImage(im, -f.body[0] * sc, -f.body[1] * sc, f.w * sc, f.h * sc);
     /* cracks, pale, along the tail */
@@ -595,16 +599,6 @@
       g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx - r * 0.3, cy); g.lineTo(cx + r * 0.2, cy + r * 0.3); g.lineTo(cx - r * 0.1, cy + r * 0.8); stroke(g, Math.max(1.5, k * 0.12), '#fff4f0');
     }
     if (run.numb > 0) for (let i = 0; i < 6; i++) { const a = t * 3 + i; glow(g, (f.seat[0] - f.body[0]) * sc + Math.cos(a) * k * 1.2, (f.seat[1] - f.body[1]) * sc - k * 0.6 + Math.sin(a * 1.3) * k * 0.5, k * 0.18, '#c8e8ff', 0.8); }
-    /* the rider, sat in the saddle */
-    if (!run.rider) {
-      const rn = run.tucking ? 'lean' : 'ride', rf = MF.eikar[rn], rim = ready('eikar', rn);
-      if (rim) {
-        const rs = k / PER_M;          // the Eikar keeps its own size, whatever size the Lútut is
-        const bob = run.beating ? Math.sin((anim.flap || 0) * TAU) * k * 0.06 : 0;
-        const hp = rf.hip || rf.seat;
-        g.drawImage(rim, (f.seat[0] - f.body[0]) * sc - hp[0] * rs, (f.seat[1] - f.body[1]) * sc - hp[1] * rs + bob, rf.w * rs, rf.h * rs);
-      }
-    }
     g.restore();
     return true;
   }
@@ -691,13 +685,12 @@
     const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height, K = LR.KINDS[kind];
     g.clearRect(0, 0, W, H);
     if (MF) {
-      const im = ready('lutut', 'stand'), rim = ready('eikar', 'ride');
-      if (!im || !rim) { const again = () => A.portrait(canvas, kind); (MIMG['lutut:stand'] || {}).onload = again; (MIMG['eikar:ride'] || {}).onload = again; if (!im || !rim) return; }
-      const f = MF.lutut.stand, rf = MF.eikar.ride, hp = rf.hip || rf.seat, k = W * 0.84 / (f.w / PER_M * 1.15), sc = k * K.scale / PER_M, rs = k / PER_M;
+      const im = ready('lutut', 'stand_r');
+      if (!im) { (MIMG['lutut:stand_r'] || {}).onload = () => A.portrait(canvas, kind); return; }
+      const f = MF.lutut.stand_r, k = W * 0.84 / (f.w / PER_M * 1.15), sc = k * K.scale / PER_M;
       glow(g, W * 0.5, H * 0.84, W * 0.34, '#000000', 0.22);
       const x = W * 0.5 + (f.body[0] - f.w / 2) * sc, y = H * 0.58;
       g.drawImage(im, x - f.body[0] * sc, y - f.body[1] * sc, f.w * sc, f.h * sc);
-      g.drawImage(rim, x + (f.seat[0] - f.body[0]) * sc - hp[0] * rs, y + (f.seat[1] - f.body[1]) * sc - hp[1] * rs, rf.w * rs, rf.h * rs);
       return;
     }
     const k = H * 0.16, r = LR.R * K.scale * k;

@@ -19,7 +19,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { loadLutut, buildLututActor } from '../../../rpg/js/lutut3d.js';
-import { buildEikar } from '../../../rpg/js/actors.js';
+import { buildEikar, poseArm } from '../../../rpg/js/actors.js';
 
 const PPM = 48;            // sprite pixels to the metre
 const YAW = -0.32;          // turned a little toward you, so both wings read
@@ -70,47 +70,79 @@ function grab(points) {
   return { png: out.toDataURL('image/png'), w, h, ...pts };
 }
 
+/* where the rider goes, measured on the Lútut's drop-shaped head in collider radii (wr):
+   the hips just behind the horns, the hands on the horns (the Eikar steer by them, and hold on by them) */
+const SEAT = { fwd: 0.62, up: 0.97 };
+const HORN = { fwd: 1.14, up: 1.1, side: 0.26 };
+const LEAN = 0.42;          // tipped forward toward the horns
+const DEBUG = /debug/.test(location.search);
+
 async function run() {
   await loadLutut();
   const out = { ppm: PPM, yaw: YAW, lutut: {}, eikar: {} };
   const LA = buildLututActor({ variant: 'adult' }), L = LA.lutut;
   L.driven = true; LA.root.rotation.y = YAW; scene.add(LA.root);
+  const E = buildEikar({ skin: '#a8743e', cap: '#5a3a1e', marking: 0xffd27a, markColor: 0x2a1208, tunic: 0x3e6a5a, trim: 0xc8a050, weapon: 'none', satchel: false, flasks: false, build: 1, capTall: 0.62, cape: 0xc8503a });
+  scene.add(E.root); E.root.visible = false;
+  const dots = DEBUG ? [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.12), new THREE.MeshBasicMaterial({ color: 0xff2020, depthTest: false })); m.renderOrder = 9; scene.add(m); return m; }) : [];
   const col = name => L.colliders().find(c => c.name === name) || L.colliders()[0];
-  const shot = (name, t) => {
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+  /* the Eikar sat on it, this frame: hips on the head behind the horns, tipped forward, a hand on each horn */
+  function seatRider(mid) {
+    const f = L.mouth().clone().sub(mid.p).normalize();
+    const side = V(1, 0, 0).applyQuaternion(LA.root.quaternion);
+    const up = new THREE.Vector3().crossVectors(f, side).normalize(); if (up.y < 0) up.negate();
+    const sd = new THREE.Vector3().crossVectors(up, f).normalize();          // the rider's own +x
+    const basis = new THREE.Matrix4().makeBasis(sd, up, f);
+    const q = new THREE.Quaternion().setFromRotationMatrix(basis).multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), LEAN));
+    const seat = mid.p.clone().addScaledVector(f, mid.wr * SEAT.fwd).addScaledVector(up, mid.wr * SEAT.up);
+    E.root.quaternion.copy(q);
+    E.root.position.copy(seat).sub(V(0, 0.52, 0).applyQuaternion(q));       // the hips are 0.52 m above its feet, sat astride
+    for (let i = 0; i < 30; i++) E.animate(0.03, { t: i * 0.03, speed: 0, onGround: true, ride: true, reins: true, rideSpeed: 3, rideBob: 0 });
+    E.root.updateMatrixWorld(true);
+    const horn = s => mid.p.clone().addScaledVector(f, mid.wr * HORN.fwd).addScaledVector(up, mid.wr * HORN.up).addScaledVector(sd, s * mid.wr * HORN.side);
+    for (const a of E.arms) {
+      const T = E.torso.worldToLocal(horn(a.s));
+      poseArm(a, T, V(0, 1, 0.3).normalize(), V(a.s, 0, 0));
+    }
+    E.root.updateMatrixWorld(true);
+    if (DEBUG) { dots[0].position.copy(horn(-1)); dots[1].position.copy(horn(1)); dots[2].position.copy(seat); }
+    return seat;
+  }
+  const pose = (name, t) => {
     L.play(name, 0); LA.animate(1e-4, {});
     if (t > 0) { const steps = Math.ceil(t / 0.02); for (let i = 0; i < steps; i++) LA.animate(t / steps, {}); }
     LA.root.updateMatrixWorld(true); LA.animate(1e-4, {});
+  };
+  const shot = (name, t, rider) => {
+    pose(name, t);
+    const mid = col('col_body_mid');
+    let seat = mid.p.clone().addScaledVector(V(0, 1, 0), mid.wr * 0.92);
+    E.root.visible = !!rider;
+    if (rider) seat = seatRider(mid);
     renderer.render(scene, cam);
-    const mid = col('col_body_mid'), up = new THREE.Vector3(0, 1, 0);
-    const seat = mid.p.clone().addScaledVector(up, mid.wr * 0.92);
     return grab({ body: project(mid.p), seat: project(seat), mouth: project(L.mouth()), tail: project(L.tail()) });
   };
   const dur = n => L.acts[n].getClip().duration;
-  const add = (key, name, t) => { out.lutut[key] = shot(name, t); };
-  for (let i = 0; i < 8; i++) add('fly' + i, 'Fly', dur('Fly') * i / 8);
-  add('glide', 'Glide', dur('Glide') * 0.5);
-  add('dive', 'Dive', dur('Dive') * 0.45);
-  for (let i = 0; i < 6; i++) add('walk' + i, 'Walk', dur('Walk') * i / 6);
-  add('stand', 'Stand', dur('Stand') * 0.3);
-  add('suck', 'Suck', dur('Suck') * 0.45);
-  add('screech', 'Screech', dur('Screech') * 0.5);
-  add('hurt', 'Hurt', dur('Hurt') * 0.4);
-  add('death', 'Death', dur('Death') * 0.999);
-  scene.remove(LA.root);
+  /* with its rider, and (for after the Eikar is thrown, or the end) a few on its own */
+  const add = (key, name, t, alone) => { out.lutut[key + '_r'] = shot(name, t, true); if (alone) out.lutut[key] = shot(name, t, false); };
+  for (let i = 0; i < 8; i++) add('fly' + i, 'Fly', dur('Fly') * i / 8, i === 0);
+  add('glide', 'Glide', dur('Glide') * 0.5, true);
+  add('dive', 'Dive', dur('Dive') * 0.45, true);
+  for (let i = 0; i < 6; i++) add('walk' + i, 'Walk', dur('Walk') * i / 6, true);
+  add('stand', 'Stand', dur('Stand') * 0.3, true);
+  add('suck', 'Suck', dur('Suck') * 0.45, false);
+  add('screech', 'Screech', dur('Screech') * 0.5, false);
+  add('hurt', 'Hurt', dur('Hurt') * 0.4, false);
+  out.lutut.death = shot('Death', dur('Death') * 0.999, false);
+  scene.remove(LA.root); dots.forEach(d => scene.remove(d));
 
-  /* the Eikar, sat as he rides, then tumbling */
-  const E = buildEikar({ skin: '#a8743e', cap: '#5a3a1e', marking: 0xffd27a, markColor: 0x2a1208, tunic: 0x3e6a5a, trim: 0xc8a050, weapon: 'none', satchel: false, flasks: false, build: 1, capTall: 0.62, cape: 0xc8503a });
-  E.root.rotation.order = 'YXZ'; scene.add(E.root);
-  const eshot = (st, lean) => {
-    E.root.rotation.set(lean || 0, YAW, 0);
-    for (let i = 0; i < 40; i++) E.animate(0.03, Object.assign({ t: i * 0.03, speed: 0 }, st));
-    E.root.updateMatrixWorld(true); renderer.render(scene, cam);
-    /* the hips, where the Eikar meets the saddle (a little over half a metre up, sat astride) */
-    return grab({ seat: project(new THREE.Vector3(0, 0, 0)), hip: project(E.root.localToWorld(new THREE.Vector3(0, 0.52, 0))) });
-  };
-  out.eikar.ride = eshot({ onGround: true, ride: true, reins: true, rideSpeed: 3, rideBob: 0.2 }, 0);
-  out.eikar.lean = eshot({ onGround: true, ride: true, reins: true, rideSpeed: 8, rideBob: 0.4 }, 0.35);
-  out.eikar.fall = eshot({ onGround: false, speed: 0 }, 0);
+  /* the Eikar thrown, tumbling */
+  E.root.visible = true; E.root.position.set(0, 0, 0); E.root.quaternion.setFromEuler(new THREE.Euler(0, YAW, 0));
+  for (let i = 0; i < 40; i++) E.animate(0.03, { t: i * 0.03, speed: 0, onGround: false });
+  E.root.updateMatrixWorld(true); renderer.render(scene, cam);
+  out.eikar.fall = grab({ seat: project(V(0, 0, 0)) });
   window.__done = out;
 }
 run().catch(e => { window.__error = String(e && e.stack || e); });

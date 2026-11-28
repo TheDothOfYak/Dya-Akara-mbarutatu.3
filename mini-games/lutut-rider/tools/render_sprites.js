@@ -23,12 +23,13 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/p
     route.fulfill({ status: 200, contentType: TYPES[path.extname(f)] || 'application/octet-stream', body: fs.readFileSync(f) });
   });
   p.on('pageerror', e => console.error('page:', e.message));
-  await p.goto('http://sprites.local/mini-games/lutut-rider/tools/render_sprites.html');
+  await p.goto('http://sprites.local/mini-games/lutut-rider/tools/render_sprites.html' + (process.argv.includes('--debug') ? '?debug' : ''));
   await p.waitForFunction(() => window.__done || window.__error, null, { timeout: 240000 });
   const err = await p.evaluate(() => window.__error);
   if (err) { console.error(err); process.exit(1); }
   const out = await p.evaluate(() => window.__done);
   fs.mkdirSync(OUT, { recursive: true });
+  for (const f of fs.readdirSync(OUT)) if (/^(lutut|eikar)_.*\.png$/.test(f)) fs.unlinkSync(path.join(OUT, f));   // this run's frames replace the last run's
   const meta = { ppm: out.ppm, yaw: out.yaw, lutut: {}, eikar: {} };
   for (const group of ['lutut', 'eikar']) for (const [name, f] of Object.entries(out[group])) {
     const file = group + '_' + name + '.png';

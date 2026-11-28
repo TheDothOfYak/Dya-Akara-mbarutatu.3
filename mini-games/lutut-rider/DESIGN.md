@@ -31,7 +31,12 @@ goes wrong. You come back with teeth, spend them, and ride further next time.
 - **The Lútut and the Eikar in the ride** are sprites rendered from Torcain's Run's 3D models (`img/model/*.png`):
   side on and facing right like the 4 Brothers pixel sprite (turned 18° toward you so both wings read), posed by the
   model's own clips (Fly ×8, Glide, Dive, Walk ×6, Stand, Suck, Screech, Hurt, Death; the Eikar sat astride, leaning
-  forward, falling), each with Tuftwood's ink outline. `img/model/frames.js` gives each frame's body middle, saddle,
+  forward, falling), each with Tuftwood's ink outline.
+- **Where the Eikar sits:** up on the Lútut's head, just behind the horns, tipped forward, a hand on each horn: the
+  Eikar steer by the horns and hold on by them. The rider is rendered together with the Lútut in every riding frame
+  (`<pose>_r.png`), so it moves with each wingbeat and the wings pass in front of it; a few frames on its own are for
+  after the Eikar is thrown. The same seat and grip are used in the 3D taming (`SEAT`, `HORN`, `LEAN` in
+  `tools/render_sprites.html` and `js/lr_tame3d.js`: head radii forward and up from the body's middle). `img/model/frames.js` gives each frame's body middle, saddle,
   mouth and tail ball, so the sprite lines up with the ride's hit points and the Eikar sits in the saddle.
   Re-render after the model changes: `node mini-games/lutut-rider/tools/render_sprites.js` (needs Playwright; runs
   on the software renderer). The mouth-to-tail length of the standing frame is the ride's Lútut length.

@@ -18,7 +18,7 @@
    ============================================================ */
 import * as THREE from 'three';
 import { loadLutut, buildLututActor, LUTUT } from '../../../rpg/js/lutut3d.js';
-import { buildEikar } from '../../../rpg/js/actors.js';
+import { buildEikar, poseArm } from '../../../rpg/js/actors.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -305,7 +305,8 @@ export async function runTame(opts = {}) {
     } else if (ph === 'jump') {
       /* the leap: up and onto its back */
       say('Hup!', '');
-      const c = bodyC(), seat = c.p.clone().add(new THREE.Vector3(0, c.wr * 0.9, 0));
+      const c = bodyC(), fw = L.mouth().clone().sub(c.p).setY(0).normalize();
+      const seat = c.p.clone().addScaledVector(fw, c.wr * 0.62).add(new THREE.Vector3(0, c.wr * 0.97 - 0.52, 0));   // where seatRider will put it
       const u = clamp(S.pt / 0.6, 0, 1);
       S.ep.lerpVectors(S.jumpFrom, seat, u); S.ep.y += Math.sin(u * Math.PI) * 2.2;
       E.animate(dt, { t: S.t, speed: 0, onGround: false });
@@ -398,20 +399,35 @@ export async function runTame(opts = {}) {
     LA.root.position.copy(S.lp);
     LA.root.rotation.set(S.lpitch, S.lyaw, -S.lroll);
     LA.animate(dt, {});
-    if (S.phase !== 'thrown') E.root.position.copy(S.ep);
+    if (S.phase !== 'thrown' && !['takeoff', 'buck', 'calm'].includes(S.phase)) E.root.position.copy(S.ep);
     if (!['takeoff', 'buck', 'calm'].includes(S.phase) && S.phase !== 'thrown') E.root.rotation.set(0, S.phase === 'jump' ? S.lyaw : S.eyaw, 0);
     camera(dt);
     renderer.render(scene, cam);
   }
 
+  /* on its head, just behind the horns, tipped forward, a hand on each horn: the Eikar steer by the horns
+     and hold on by them (the same seat as the ride's sprites, tools/render_sprites.html) */
+  const SEAT = { fwd: 0.62, up: 0.97 }, HORN = { fwd: 1.14, up: 1.1, side: 0.26 }, LEAN = 0.42;
+  const _f = new THREE.Vector3(), _sd = new THREE.Vector3(), _up = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _ax = new THREE.Vector3(1, 0, 0);
   function seatRider(dt, bucking) {
     LA.root.updateMatrixWorld(true);
     const c = bodyC();
-    const up = new THREE.Vector3(0, 1, 0).applyEuler(LA.root.rotation);
-    S.ep.copy(c.p).addScaledVector(up, c.wr * 0.92);
-    E.root.position.copy(S.ep);
-    E.root.rotation.set(S.lpitch, S.lyaw, -S.lroll - S.bal * 0.55);
+    _f.copy(L.mouth()).sub(c.p).normalize();
+    const side = new THREE.Vector3(1, 0, 0).applyQuaternion(LA.root.quaternion);
+    _up.crossVectors(_f, side).normalize(); if (_up.dot(new THREE.Vector3(0, 1, 0).applyQuaternion(LA.root.quaternion)) < 0) _up.negate();
+    _sd.crossVectors(_up, _f).normalize();
+    _m.makeBasis(_sd, _up, _f);
+    _q.setFromRotationMatrix(_m).multiply(_q2.setFromAxisAngle(_ax, LEAN)).multiply(_q2.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -S.bal * 0.55));
+    const seat = c.p.clone().addScaledVector(_f, c.wr * SEAT.fwd).addScaledVector(_up, c.wr * SEAT.up);
+    E.root.quaternion.copy(_q);
+    E.root.position.copy(seat).sub(new THREE.Vector3(0, 0.52, 0).applyQuaternion(_q));
+    S.ep.copy(E.root.position);
     E.animate(dt, { t: S.t, speed: 0, onGround: true, ride: true, reins: true, rideRoll: -S.bal * 0.5, rideSpeed: bucking ? 8 : 2, rideBob: bucking ? 1 : 0.3 });
+    E.root.updateMatrixWorld(true);
+    for (const a of E.arms || []) {
+      const h = c.p.clone().addScaledVector(_f, c.wr * HORN.fwd).addScaledVector(_up, c.wr * HORN.up).addScaledVector(_sd, a.s * c.wr * HORN.side);
+      poseArm(a, E.torso.worldToLocal(h), new THREE.Vector3(0, 1, 0.3).normalize(), new THREE.Vector3(a.s, 0, 0));
+    }
   }
   function caught() {
     S.caught = 0; S.watch = 0.2; S.knock = 0.9; S.shake = 0.5;
