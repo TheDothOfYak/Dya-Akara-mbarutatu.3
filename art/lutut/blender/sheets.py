@@ -112,6 +112,6 @@ if __name__=='__main__':
 def sheet_dya():
     return sheet_painted('dya',['hover0','hover1','hover2','hover3','fly','suck','tail','screech','rest','hurt','death'],
         {'hover0':'Hover 1','hover1':'Hover 2','hover2':'Hover 3','hover3':'Hover 4','fly':'Moving','suck':'Attack (suck)','tail':'Tail swipe','screech':'Special: screech','rest':'Dormant (resting)','hurt':'Hurt','death':'Death'},
-        "Lútut — Dya'Akara (facing you, a little from above)","For the arena, the Compendium, Hunt Run and Pia Run: the hover cycle, moving, its attacks, the screech, resting, hurt and death.",
+        "Lútut — Dya'Akara (side profile, facing right)","For the arena, the Compendium, Hunt Run and Pia Run: the hover cycle, moving, its attacks, the screech, resting, hurt and death.",
         [(54,64,58),(40,36,52)],210,'sheet_dya.png',cols=6)
 if __name__=='__main__' and 'dya' in __import__('sys').argv: print(sheet_dya())

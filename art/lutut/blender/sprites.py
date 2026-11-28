@@ -51,12 +51,12 @@ look((0,0.35,8),(0,0.35,0),up=(1,0,0))
 for clip,t,name in ([] if ONLY_PIXEL else [('Fly',0,'fly0'),('Fly',1/6,'fly1'),('Fly',2/6,'fly2'),('Fly',3/6,'fly3'),('Fly',4/6,'fly4'),('Fly',5/6,'fly5'),
                     ('Glide',0.25,'glide'),('Dive',0.3,'dive0'),('Dive',0.5,'dive1'),('Screech',0.5,'screech')]):
     throat_glow(2.0 if clip=='Screech' else 0.0); pose(clip,t); shot(OUT+f'stryx_{name}.png'); JOBS.append(('stryx',name))
-# ---- Dya'Akara: facing you (its mouth toward the viewer), a little from above, 360 px
+# ---- Dya'Akara: side profile facing right, turned just a little toward the viewer and from a little above, 360 px
 if ONLY_DYA:
-    sc.render.resolution_x=sc.render.resolution_y=360; cam.data.ortho_scale=3.7; lighting('side')
-    look((0.9,-7.5,2.6),(0,0.1,0.62))
+    sc.render.resolution_x=sc.render.resolution_y=360; cam.data.ortho_scale=3.9; lighting('side')
+    look((-7.6,-1.1,1.9),(0,0.3,0.5))
     for clip,t,name in [('Idle',0,'hover0'),('Idle',0.25,'hover1'),('Idle',0.5,'hover2'),('Idle',0.75,'hover3'),('Fly',0.3,'fly'),
-                        ('Suck',0.5,'suck'),('TailSwipeL',0.5,'tail'),('Screech',0.5,'screech'),('Stand',0.3,'rest'),('Hurt',0.25,'hurt'),('Death',1.0,'death')]:
+                        ('Suck',0.5,'suck'),('TailSwipeR',0.5,'tail'),('Screech',0.5,'screech'),('Stand',0.3,'rest'),('Hurt',0.25,'hurt'),('Death',1.0,'death')]:
         throat_glow(2.0 if clip=='Screech' else 0.0); pose(clip,t); shot(OUT+f'dya_{name}.png'); JOBS.append(('dya',name))
     json.dump(JOBS,open(OUT+'jobs_dya.json','w')); raise SystemExit
 # ---- 4 Brothers: side view facing right, rendered at 512 then reduced to pixels; plus an eyes-only mask
