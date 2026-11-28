@@ -6,6 +6,9 @@
    elements and directions, the peoples, the Skaar Uverkhron,
    the Sunear'Zikhron, the token game itself, and Dearcineon.
    Content lives in DYA.lore.WORLD (data/lore.js).
+   NOT LOADED ANY MORE: this moved out of Dya'Akara to the Rokarvac
+   on the home page (rokarvac.html, js/flake/rokarvac.js). Kept as
+   the dated record of how it was.
    ============================================================ */
 (function () {
   'use strict';
