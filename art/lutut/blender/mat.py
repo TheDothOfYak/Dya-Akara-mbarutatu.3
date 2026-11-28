@@ -20,7 +20,7 @@ def tex(path,noncolor=False):
 b=tex('tex_base.png'); nt.links.new(b.outputs['Color'],bs.inputs['Base Color'])
 r=tex('tex_rough.png',True); sep=nt.nodes.new('ShaderNodeSeparateColor'); nt.links.new(r.outputs['Color'],sep.inputs[0]); nt.links.new(sep.outputs[0],bs.inputs['Roughness'])
 nm=tex('tex_normal.png',True); nmn=nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(nm.outputs['Color'],nmn.inputs['Color']); nt.links.new(nmn.outputs[0],bs.inputs['Normal'])
-g=tex('tex_glow.png'); nt.links.new(g.outputs['Color'],bs.inputs['Emission Color']); bs.inputs['Emission Strength'].default_value=1.0
+g=tex('tex_glow.png'); nt.links.new(g.outputs['Color'],bs.inputs['Emission Color']); bs.inputs['Emission Strength'].default_value=4.0
 bs.inputs['Metallic'].default_value=0.0
 bs.inputs['Specular IOR Level'].default_value=0.5
 L.data.materials.clear(); L.data.materials.append(m)

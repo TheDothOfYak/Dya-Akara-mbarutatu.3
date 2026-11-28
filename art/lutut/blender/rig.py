@@ -15,7 +15,15 @@ for e in arm.edit_bones:
 bpy.ops.object.mode_set(mode='OBJECT')
 bpy.ops.object.select_all(action='DESELECT'); L.select_set(True); A.select_set(True); bpy.context.view_layer.objects.active=A
 bpy.ops.object.parent_set(type='ARMATURE_AUTO')
-vg=L.vertex_groups; 
+vg=L.vertex_groups
+import numpy as _np
+ball=vg['tail_ball']; bc=mathutils.Vector((-0.05,1.33,-0.24)); nb=0
+for v in L.data.vertices:
+    if v.co.z<-0.1 and (v.co-bc).length<0.22:
+        for g in list(v.groups): vg[g.group].remove([v.index])
+        ball.add([v.index],1.0,'REPLACE'); nb+=1
+print('ball verts',nb)
+
 empty=[v.index for v in L.data.vertices if len(v.groups)==0]
 print('unweighted verts',len(empty),'of',len(L.data.vertices))
 bpy.ops.wm.save_as_mainfile(filepath=W+'stage2.blend')

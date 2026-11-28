@@ -87,21 +87,25 @@ tcol=mix(np.tile(hexc('#3a352f'),(n,1)),hexc('#a09480'),np.clip((0.045-thick)/0.
 col=np.where(teeth[:,None],tcol,col)
 # eyes: slanted almonds under the brow
 glow=np.zeros(n)
-for ex,s in ((-0.0875,-1),(0.075,1)):
-    ez=0.561
-    # find surface y at eye
-    sel=(np.abs(x-ex)<0.02)&(np.abs(z-ez)<0.02)&(N[:,1]<-0.2)
-    ey=y[sel].min() if sel.any() else -0.7
-    ang=math.radians(-18*(-s))   # inner corner lower
-    ca,sa=math.cos(ang),math.sin(ang)
-    dx,dz=x-ex,z-ez
-    u=dx*ca+dz*sa; v=-dx*sa+dz*ca
-    d=(u/0.044)**2+(v/0.017)**2
-    m=(d<1)&(y<ey+0.07)&(N[:,1]<0.3)
-    g=np.clip(1-d,0,1)**0.6*m
+import json as _js
+EYES={}
+for k,hit in (('L',(-0.13,-0.767,0.56)),('R',(0.136,-0.758,0.564))):
+    hit=np.array(hit)
+    near=np.where(np.linalg.norm(P-hit,axis=1)<0.03)[0]
+    c=near[np.argmax(cvb[near]+cvs[near]*0.3)]          # top of the dome
+    C=P[c]; Nc=N[c]
+    for _ in range(3):                                   # settle on the middle of the convex patch
+        m=np.where((np.linalg.norm(P-C,axis=1)<0.028)&(cvb>0.0)&((N@Nc)>0.3))[0]
+        C=P[m].mean(0); Nc=N[m].mean(0); Nc/=np.linalg.norm(Nc)
+    dist=np.linalg.norm(P-C,axis=1)
+    R=0.03
+    m=(dist<R)&((N@Nc)>0.15)
+    g=np.clip(1-(dist/R)**2,0,1)**0.7*m
     glow=np.maximum(glow,g)
-    print('eye',ex,ey,m.sum())
-eyec=mix(np.tile(hexc('#2a1c04'),(n,1)),hexc('#b8860b'),glow)
+    EYES[k]=dict(c=C.tolist(),n=Nc.tolist(),cnt=int(m.sum()))
+    print('eye',k,np.round(C,3),np.round(Nc,2),int(m.sum()))
+_js.dump(EYES,open(W+'eyes.json','w'))
+eyec=mix(np.tile(hexc('#4a3206'),(n,1)),hexc('#f0b820'),glow)
 col=np.where((glow>0)[:,None],mix(col,eyec,np.clip(glow*3,0,1)),col)
 col=np.clip(col,0,1)
 def attr(name,c):
@@ -109,12 +113,13 @@ def attr(name,c):
     a=me.color_attributes.new(name,'FLOAT_COLOR','POINT')
     rgba=np.ones((n,4)); rgba[:,:3]=c; a.data.foreach_set('color',rgba.ravel())
 attr('Col',col)
-rough=np.full(n,0.62)
+rough=np.full(n,0.72)
+rough=np.where(wing>0.3,0.86,rough)
 rough=np.where(horn>0,0.45,rough); rough=np.where(inside,0.22,rough); rough=np.where(gum,0.3,rough)
 rough=np.where(teeth,0.35,rough); rough=np.where(glow>0,0.2,rough)
 rough=rough+0.12*np.clip(cvs,0,1)
 attr('Rough',np.stack([rough]*3,1))
-g3=np.stack([glow*0.95,glow*0.68,glow*0.10],1)
+g3=np.stack([np.clip(glow*1.6,0,1)*1.0,np.clip(glow*1.6,0,1)*0.74,np.clip(glow*1.6,0,1)*0.16],1)
 attr('Glow',g3)
 np.save(W+'glowmask.npy',glow)
 bpy.ops.wm.save_as_mainfile(filepath=W+'stage3.blend')
