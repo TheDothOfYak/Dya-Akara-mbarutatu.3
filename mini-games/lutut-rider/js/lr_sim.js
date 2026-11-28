@@ -273,8 +273,10 @@
       ax -= axr / v * D; ay -= ayr / v * D;
     }
     if (beat) {
-      const T = 7.2 * st.power / Math.pow(st.mass, 0.3);
-      ax += Math.cos(run.ang) * T; ay += Math.sin(run.ang) * T + (run.grounded ? 0 : 2.4 * st.power);
+      /* a heavy stone can't climb on its wings alone: the higher the nose, the less a beat does */
+      const eff = run.grounded ? 1 : clamp(1 - Math.max(0, Math.sin(run.ang) - 0.3) / 0.6, 0.12, 1);
+      const T = 7.2 * st.power / Math.pow(st.mass, 0.3) * eff;
+      ax += Math.cos(run.ang) * T; ay += Math.sin(run.ang) * T + (run.grounded ? 0 : 2.4 * st.power * eff);
       /* slow on the ground (stuck at a stone, or starting up a steep slope): a big beat lifts it off its feet */
       if (run.grounded && Math.hypot(run.vx, run.vy) < 5 && run.leapCool <= 0 && run.t > 0.5) { run.vy += 7 * Math.sqrt(st.power); run.leapCool = 0.9; run.leapT = run.t; }
     }
@@ -293,6 +295,7 @@
     /* ---- pitch ---- */
     let torque = (beat ? 2.5 : tuck ? -4.2 : 0) * st.turn;
     if (!run.grounded && v > 0.4) torque += -6.5 * alpha * clamp(v / 15, 0.2, 1.6) - 0.5;
+    if (!run.grounded && v < 9 && Math.sin(run.ang) > 0) torque -= 5 * (1 - v / 9) * Math.sin(run.ang);      // stalled: the heavy head drops the nose
     run.av += torque * dt;
     run.av *= Math.exp(-2.6 * dt);
     run.ang = wrap(run.ang + run.av * dt);
@@ -326,7 +329,8 @@
       if (!run.grounded) run.rot = 0;
       run.grounded = true; run.air = 0;
       /* on the ground the body lies along the slope (nose up a touch while it beats to take off) */
-      const target = slope + (beat ? 0.2 : 0);
+      const back = Math.atan2(gh - land.h(run.x - 2.6 * r), 2.6 * r);      // lie along the land under the whole body, tail and all
+      const target = clamp(Math.min(slope, back), slope - 0.5, slope) + (beat ? 0.2 : 0);
       run.av = run.av * 0.6 + wrap(target - run.ang) * 9;
       if (run.over === 'thrown') run.av *= 0.5;
     } else { run.grounded = false; run.air += dt; }
@@ -350,7 +354,7 @@
         const ts = land.slope(P.tail[0]), nx = -Math.sin(ts), ny = Math.cos(ts);
         const imp = -(tvx * nx + tvy * ny);
         if (imp > st.tailHit && !run.over) crack(run, 'The tail struck the ground: cracked!');
-        run.av -= Math.max(0, imp) * 0.18 + (ty - P.tail[1]) * 2;
+        if (!run.grounded) run.av -= Math.max(0, imp) * 0.18 + (ty - P.tail[1]) * 2;
         if (!run.grounded) run.y += Math.min(0.5, ty - P.tail[1]) * 0.3;
       }
     }

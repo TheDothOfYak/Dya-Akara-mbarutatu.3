@@ -397,10 +397,11 @@
     { id: 'ld', label: '🃏 Little Dungeon', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
     { id: 'pr', label: '🐾 Punk Races', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
     { id: 'sp', label: '🪶 Stryx Pilot', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
+    { id: 'lr', label: '🦇 Lútut Rider', nav: ['Game Overview', 'Game Players', 'Announcements', 'Bans'] },
     { id: 'su', label: '🏰 Skaar Uverkhron', nav: ['Game Overview', 'Game Players', 'Creatures & Costs', 'Shared Maps', 'Online Rooms', 'Announcements', 'Bans'] },
   ];
   /* which live-broadcast target each section's Announcements page starts on */
-  const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld', pr: 'pr', sp: 'sp', su: 'su' };
+  const LIVE_TARGET = { general: 'all', game: 'game', rpg: 'rpg', '4bw': '4bw', ld: 'ld', pr: 'pr', sp: 'sp', lr: 'lr', su: 'su' };
   const sectionOf = id => SECTIONS.find(x => x.id === id) || SECTIONS[0];
   function goto(sec, v) { section = sec; view = v || sectionOf(sec).nav[0]; panel(); }
   function studio() { return window.FLAKE ? FLAKE.hubConfig().studio : 'Flake Games'; }
@@ -596,6 +597,7 @@
     };
   }
   SAVES.pr = miniSaves('pr', 'Punk Races', v => [v.coins != null ? v.coins + ' coins' : '', v.punks ? v.punks.length + ' Punks' : '', v.wins != null ? v.wins + ' wins' : ''].filter(Boolean).join(' · '));
+  SAVES.lr = miniSaves('lr', 'Lútut Rider', v => [v.teeth != null ? v.teeth + ' teeth' : '', v.stats && v.stats.runs != null ? v.stats.runs + ' rides' : '', v.bestAll ? 'best ' + v.bestAll + ' m' : ''].filter(Boolean).join(' · '));
   SAVES.sp = miniSaves('sp', 'Stryx Pilot', v => [v.coins != null ? v.coins + ' coins' : '', v.flights != null ? v.flights + ' flights' : '', v.rank || ''].filter(Boolean).join(' · '));
 
   SAVES.su = {
@@ -668,6 +670,7 @@
     '4bw': 'The four brothers’ pixel platformer, under four-brothers-world/. Each player’s hero, bag and world save to their account, a row per save key. Its guides are under Guide.',
     ld: 'The mini game (once Legends of Pia’don, inside Dya’Akara), under mini-games/little-dungeon/. No account needed; signed-in players keep a run in progress on their account and a won solo run pays gold.',
     pr: 'The vine-swinging race mini game, under mini-games/punk-races/. No account needed; a signed-in player’s stable, purse and records are one dya_config row, mini:pr:<account>.',
+    lr: 'The Lútut-riding mini game, under mini-games/lutut-rider/. No account needed; a signed-in player’s teeth, Lútut, upgrades, medals and records are one dya_config row, mini:lr:<account>.',
     sp: 'The flying mini game, under mini-games/stryx-pilot/. No account needed; a signed-in player’s Stryx, routes and records are one dya_config row, mini:sp:<account>.',
   };
   function gameIntro(body, id) {

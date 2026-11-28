@@ -42,8 +42,8 @@
     view.W = W; view.H = H;
     const gh = run.land.h(run.x), hag = Math.max(0, run.y - gh);
     const v = Math.hypot(run.vx, run.vy);
-    const span = clamp(Math.max(30 + v * 0.55, hag * 1.5 + 18), 30, 120);        // metres from top to bottom of the screen
-    const k = Math.min(H, W * 0.75) / span;
+    const span = clamp(Math.max(18 + v * 0.42, hag * 1.4 + 14), 18, 110);        // metres across the screen's middle size
+    const k = Math.min(Math.sqrt(W * H) * 0.92 / span, H / (hag * 1.3 + 12));     // short screens: keep the ground in view
     const ahead = clamp(run.vx, -10, 40) * 0.45;
     const cx = run.x + ahead + W * 0.12 / k;
     const cy = lerp(run.y, gh, clamp(hag / (span * 0.9), 0, 0.5)) + span * 0.06;
@@ -101,14 +101,16 @@
       ctx.beginPath(); ctx.ellipse(x, y, s * 2.2, s * 0.6, 0, 0, TAU); ctx.ellipse(x + s * 1.2, y - s * 0.3, s * 1.3, s * 0.6, 0, 0, TAU); ctx.ellipse(x - s * 1.1, y - s * 0.15, s, s * 0.5, 0, 0, TAU); ctx.fill();
     }
   }
+  /* a far range of hills: scale is the width of one hill in screen pixels; par how slowly it slides by */
   function farLand(ctx, v, S, par, col, amp, base, seed, scale) {
     const { W, H } = v;
+    const shift = v.cx * 18 * par, lift = clamp((v.cy - 20) * 18 * par * 0.12, -H * 0.1, H * 0.1);
     ctx.fillStyle = col;
     ctx.beginPath(); ctx.moveTo(0, H);
-    for (let px = 0; px <= W + 8; px += 8) {
-      const u = (px - W * 0.5) / v.k * par + v.cx * par;
-      const n = 0.6 * LR.noise(seed, u / scale) + 0.3 * LR.noise(seed + 5, u / (scale * 0.4)) + 0.1 * LR.noise(seed + 9, u / (scale * 0.12));
-      ctx.lineTo(px, H * base - n * H * amp - (v.cy * v.k * par * 0.15));
+    for (let px = 0; px <= W + 8; px += 6) {
+      const u = (px + shift) / scale;
+      const n = 0.62 * LR.noise(seed, u) + 0.28 * LR.noise(seed + 5, u * 2.7) + 0.1 * LR.noise(seed + 9, u * 8);
+      ctx.lineTo(px, H * base - (n * 0.5 + 0.5) * H * amp + lift);
     }
     ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
   }
@@ -409,12 +411,10 @@
     ctx.fillStyle = '#241c28'; ctx.beginPath(); ctx.moveTo(0, -r * 0.5); ctx.lineTo(-r * 1.4, -r * (1.6 + Math.sin(t * 9) * 0.5)); ctx.lineTo(-r * 0.6, -r * 0.2); ctx.fill();
     ctx.fillStyle = '#ffd040'; ctx.beginPath(); ctx.arc(r * 0.68, -r * 0.46, r * 0.15, 0, TAU); ctx.fill();
   }
-  /* o: { x, y (canvas px), r (px), ang (rad, y up), state, t, rider: {lean, scarf, reach} | null, tint } */
+  /* o: { x, y (canvas px), r (px), ang (rad, y up), state, t, rider: {lean, scarf, reach} | null } */
   A.lutut = function (ctx, o) {
     ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(-o.ang);
-    if (o.tint && 'filter' in ctx) ctx.filter = o.tint;
     if (LR.look) LR.look.draw(ctx, { r: o.r }, o.t, o.state); else standIn(ctx, o.r, o.t);
-    if ('filter' in ctx) ctx.filter = 'none';
     if (o.cracks) {   // cracks you can see, spreading along the tail
       ctx.strokeStyle = 'rgba(255,240,220,0.75)'; ctx.lineWidth = Math.max(1, o.r * 0.03);
       for (let c = 0; c < o.cracks; c++) {
@@ -462,9 +462,9 @@
     stepFx(dt, run.land);
     v.sx = v.shake ? (Math.random() - 0.5) * v.shake * 14 : 0; v.sy = v.shake ? (Math.random() - 0.5) * v.shake * 14 : 0;
     sky(ctx, v, S, t);
-    farLand(ctx, v, S, 0.08, S.far, 0.12, 0.62, S.seed + 101, 500);
-    farLand(ctx, v, S, 0.25, mix(S.mid, S.far, 0.35), 0.1, 0.74, S.seed + 202, 300);
-    farLand(ctx, v, S, 0.5, S.mid, 0.08, 0.86, S.seed + 303, 180);
+    farLand(ctx, v, S, 0.06, S.far, 0.3, 0.66, S.seed + 101, 520);
+    farLand(ctx, v, S, 0.16, mix(S.mid, S.far, 0.4), 0.24, 0.76, S.seed + 202, 340);
+    farLand(ctx, v, S, 0.32, S.mid, 0.18, 0.88, S.seed + 303, 210);
     if (S.night) { ctx.fillStyle = 'rgba(20,16,40,' + S.night * 0.35 + ')'; ctx.fillRect(0, 0, v.W, v.H); }
     thermals(ctx, v, run, t);
     const k = v.k, x0 = v.cx - v.W * 0.5 / k - 30, x1 = v.cx + v.W * 0.5 / k + 30;
@@ -481,8 +481,7 @@
     const state = A.lututState(run, anim, dt);
     const sp = Math.hypot(run.vx, run.vy);
     const lean = run.over === 'thrown' ? 0 : run.tucking ? 0.35 : run.grounded ? 0.1 : clamp(-run.av * 0.08, -0.3, 0.3) + 0.15;
-    const tint = run.st.kind === 'young' ? 'brightness(1.18) saturate(0.9)' : run.st.kind === 'old' ? 'brightness(0.86)' : null;
-    A.lutut(ctx, { x: X(v, run.x), y: Y(v, run.y), r: run.r * k, ang: run.ang, state, t: anim.t, cracks: run.cracks, numb: run.numb, tint,
+    A.lutut(ctx, { x: X(v, run.x), y: Y(v, run.y), r: run.r * k, ang: run.ang, state, t: anim.t, cracks: run.cracks, numb: run.numb,
       rider: run.rider ? null : { lean, scarf: sp / 25, reach: run.tucking ? 0.06 : 0 }, riderPx: 1.15 * k });
     if (run.rider) {
       const R = run.rider;
@@ -517,8 +516,7 @@
   A.portrait = function (canvas, kind, t) {
     const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
-    const K = LR.KINDS[kind], r = H * 0.2 * K.scale;
-    const tint = kind === 'young' ? 'brightness(1.18) saturate(0.9)' : kind === 'old' ? 'brightness(0.86)' : null;
-    A.lutut(ctx, { x: W * 0.6, y: H * 0.56, r, ang: 0.08, state: 'idle', t: t || 1.1, tint, rider: { lean: 0.12, scarf: 0.4 }, riderPx: H * 0.2 });
+    const K = LR.KINDS[kind], r = H * 0.25 * K.scale;
+    A.lutut(ctx, { x: W * 0.6, y: H * 0.56, r, ang: 0.08, state: 'idle', t: t || 1.1, rider: { lean: 0.12, scarf: 0.4 }, riderPx: H * 0.22 });
   };
 })();

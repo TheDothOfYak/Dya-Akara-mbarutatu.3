@@ -15,7 +15,7 @@
        maintenance: { on, title, text, target },
        reload: { at, target },   // "refresh everyone" button
      }
-   target: 'all' | 'hub' | 'game' | '4bw' | 'rpg' | 'ld' | 'pr' | 'sp' | 'su' | 'film'
+   target: 'all' | 'hub' | 'game' | '4bw' | 'rpg' | 'ld' | 'pr' | 'sp' | 'lr' | 'su' | 'film'
 
    Delivery: the admin writes the row AND sends it on the Supabase
    Realtime channel 'dya-live', so open pages update within a second.
@@ -43,6 +43,7 @@
     : /little-dungeon/i.test(path) ? 'ld'
     : /punk-races/i.test(path) ? 'pr'
     : /stryx-pilot/i.test(path) ? 'sp'
+    : /lutut-rider/i.test(path) ? 'lr'
     : /skaar-uverkhron/i.test(path) ? 'su'
     : /dya-akara\.html/i.test(path) ? 'game'
     : 'hub';
@@ -50,7 +51,7 @@
 
   const LIVE = {
     APP, KEY, CHANNEL,
-    TARGETS: [['all', 'Everywhere'], ['hub', 'Flake Games home page'], ['game', "Dya'Akara"], ['rpg', "Torcain's Run"], ['4bw', 'The 4 Brothers Worlds'], ['ld', 'Little Dungeon'], ['pr', 'Punk Races'], ['sp', 'Stryx Pilot'], ['su', 'Skaar Uverkhron'], ['film', 'The film page']],
+    TARGETS: [['all', 'Everywhere'], ['hub', 'Flake Games home page'], ['game', "Dya'Akara"], ['rpg', "Torcain's Run"], ['4bw', 'The 4 Brothers Worlds'], ['ld', 'Little Dungeon'], ['pr', 'Punk Races'], ['sp', 'Stryx Pilot'], ['lr', 'Lútut Rider'], ['su', 'Skaar Uverkhron'], ['film', 'The film page']],
     doc: null,
     state: { lastFetch: 0, lastPush: 0, error: null, realtime: 'off' },
     /* the card game swaps this for its own styled toast */
