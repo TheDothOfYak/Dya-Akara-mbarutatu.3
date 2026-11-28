@@ -27,6 +27,10 @@
      far        draw the distant Pia'don worlds (default true)
      storm      draw the Sunear'Zikhron (default true)
      bg         paint the space backdrop (default true)
+     onLayout   called every frame with where everything was drawn, in
+                CSS pixels of the canvas, so a page can make the bodies
+                clickable: { cluster: {x, y, rx, ry}, tatu: [{id, name, x, y, r}],
+                far: [{id, name, x, y, r}] (when drawn), star: {x, y, r} }
    ============================================================ */
 (function () {
   'use strict';
@@ -92,9 +96,9 @@
   ];
 
   const FAR = [
-    { name: 'Katkan', col: '#9a9aa4', x: 0.08, y: 0.16, r: 3.2, fuzz: true },
-    { name: 'Oskerarean', col: '#cfd8e8', x: 0.6, y: 0.1, r: 2.6, ghost: true },
-    { name: 'Su’Kryulndael', col: '#4a8fd0', x: 0.93, y: 0.72, r: 3.4 },
+    { id: 'katkan', name: 'Katkan', col: '#9a9aa4', x: 0.08, y: 0.16, r: 3.2, fuzz: true },
+    { id: 'oskerarean', name: 'Oskerarean', col: '#cfd8e8', x: 0.6, y: 0.1, r: 2.6, ghost: true },
+    { id: 'sukryulndael', name: 'Su’Kryulndael', col: '#4a8fd0', x: 0.93, y: 0.72, r: 3.4 },
   ];
 
   function shade(hex, amt) {
@@ -278,6 +282,16 @@
     /* the Sunear'Zikhron: wraps one world, then crosses through the Duat to the next */
     if (opts.storm !== false) drawStorm(ctx, bodies.filter(b => b.kind === 'tatu'), t);
 
+    if (opts.onLayout) {
+      const sr = Math.max(90, Math.min(w, h) * 0.2);
+      opts.onLayout({
+        cluster: { x: cx, y: cy, rx: R * 5.9, ry: R * (5.9 * TILT + 1.2) },
+        tatu: bodies.filter(b => b.kind === 'tatu').map(b => ({ id: b.p.id, name: b.p.name, x: b.x, y: b.y, r: b.r })),
+        far: opts.far === false ? [] : FAR.map(f => ({ id: f.id, name: f.name, x: f.x * w, y: f.y * h, r: f.r })),
+        star: { x: sun[0], y: sun[1], r: sr * 0.22 },
+      });
+    }
+
     /* labels */
     if (opts.labels) {
       bodies.forEach(b => {
@@ -365,5 +379,5 @@
     return { stop() { cancelAnimationFrame(raf); } };
   }
 
-  DYA.mbaruSky = { mount, TATU };
+  DYA.mbaruSky = { mount, TATU, FAR };
 })();

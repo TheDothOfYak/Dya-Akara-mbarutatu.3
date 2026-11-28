@@ -247,8 +247,8 @@
         /* the other games (Torcain's Run, the 4 Brothers Worlds, Little Dungeon)
            live on the Flake Games home page now, one door each */
         ['🏛 Dya Guild', () => UI.show('guild')],
-        ['📖 Vakarborac', () => UI.show('compendium')],
-        ['🪐 The Mbaru Tatu', () => UI.show('world')],
+        /* the Vakarborac and the world codex moved to the Rokarvac on the
+           Flake Games home page (rokarvac.html): click a world in the sky */
         ['👥 Friends', () => UI.show('friends')],
         ['⚙ Settings', () => UI.show('settings')],
       ];
@@ -269,24 +269,7 @@
 
       /* right: announcements / news (admin posts land here) */
       const right = U.el('div', { cls: 'menu-right' });
-      /* a field note from the Rokarvac — a new one each visit, or on request */
-      const tips = DYA.lore.TIPS || [];
-      if (tips.length) {
-        let ti = Math.floor(Math.random() * tips.length);
-        const noteBody = U.el('div', { cls: 'fn-body', text: tips[ti] });
-        const note = U.el('div', { cls: 'field-note' }, [
-          U.el('div', { cls: 'fn-head' }, [
-            U.el('span', { cls: 'fn-title', text: 'From the Rokarvac' }),
-            U.el('button', { cls: 'btn ghost small', title: 'Another note', text: '↻', onclick: () => {
-              ti = (ti + 1 + Math.floor(Math.random() * (tips.length - 1))) % tips.length;
-              noteBody.textContent = tips[ti];
-            } }),
-          ]),
-          noteBody,
-          U.el('button', { cls: 'btn ghost small mt', text: 'Read about the Mbaru Tatu ›', onclick: () => { DYA.audio.play('click'); UI.show('world'); } }),
-        ]);
-        right.appendChild(note);
-      }
+      /* (the field notes from the Rokarvac moved to rokarvac.html) */
       right.appendChild(U.el('h3', { cls: 'gold mb', text: 'Announcements' }));
       G.world.announcements.slice(0, 6).forEach(a => {
         right.appendChild(U.el('div', { cls: 'news-card' }, [
