@@ -7,7 +7,8 @@ import sys; sys.path.insert(0,__import__('os').path.dirname(__import__('os').pat
 import bpy, mathutils, os, json
 from rh import W
 OUT=W+'sprites/'; os.makedirs(OUT,exist_ok=True)
-ONLY_PIXEL='pixel' in sys.argv
+ONLY_PIXEL='pixel' in sys.argv or 'dya' in sys.argv
+ONLY_DYA='dya' in sys.argv
 bpy.ops.wm.open_mainfile(filepath=W+'Lutut.blend')
 for o in bpy.data.objects:
     if o.type=='EMPTY' or o.name=='Lutut_LOD1': o.hide_render=True
@@ -50,6 +51,14 @@ look((0,0.35,8),(0,0.35,0),up=(1,0,0))
 for clip,t,name in ([] if ONLY_PIXEL else [('Fly',0,'fly0'),('Fly',1/6,'fly1'),('Fly',2/6,'fly2'),('Fly',3/6,'fly3'),('Fly',4/6,'fly4'),('Fly',5/6,'fly5'),
                     ('Glide',0.25,'glide'),('Dive',0.3,'dive0'),('Dive',0.5,'dive1'),('Screech',0.5,'screech')]):
     throat_glow(2.0 if clip=='Screech' else 0.0); pose(clip,t); shot(OUT+f'stryx_{name}.png'); JOBS.append(('stryx',name))
+# ---- Dya'Akara: facing you (its mouth toward the viewer), a little from above, 360 px
+if ONLY_DYA:
+    sc.render.resolution_x=sc.render.resolution_y=360; cam.data.ortho_scale=3.7; lighting('side')
+    look((0.9,-7.5,2.6),(0,0.1,0.62))
+    for clip,t,name in [('Idle',0,'hover0'),('Idle',0.25,'hover1'),('Idle',0.5,'hover2'),('Idle',0.75,'hover3'),('Fly',0.3,'fly'),
+                        ('Suck',0.5,'suck'),('TailSwipeL',0.5,'tail'),('Screech',0.5,'screech'),('Stand',0.3,'rest'),('Hurt',0.25,'hurt'),('Death',1.0,'death')]:
+        throat_glow(2.0 if clip=='Screech' else 0.0); pose(clip,t); shot(OUT+f'dya_{name}.png'); JOBS.append(('dya',name))
+    json.dump(JOBS,open(OUT+'jobs_dya.json','w')); raise SystemExit
 # ---- 4 Brothers: side view facing right, rendered at 512 then reduced to pixels; plus an eyes-only mask
 sc.render.resolution_x=512; sc.render.resolution_y=384; cam.data.ortho_scale=3.6; lighting('side')
 look((-7.2,-1.6,3.0),(0,0.3,0.45))
