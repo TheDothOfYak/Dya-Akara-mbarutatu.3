@@ -1,6 +1,6 @@
 © 2026 Isaac Flake. All Rights Reserved.
 
-# Lútut model (third pass)
+# Lútut model (fourth pass)
 
 Built in Blender (5.3, run headless through the `bpy` Python module) from Isaac's sculpt `Lutut.obj`
 (Google Drive: Render / Lútut, about 100 MB, exported from Nomad Sculpt). The .obj is too big for
@@ -17,13 +17,10 @@ GitHub, so it stays in Drive. The game copy is `rpg/assets/models/lutut.glb` (To
 ## The look
 - Near-black hide with a faint violet cast, darker on the back, a touch lighter on the belly; dark red lamprey
   gums and gullet, dull bone teeth, horns dark at the base to dull bone at the tips.
-- **Eyes:** the part-sphere domes under the brow, beside the horns, yellow all over, under clear lids (an amber
-  sheen around each eye). They glow softly from the emissive texture only: there are no lights, so nothing else
-  is lit by them.
-- **Carvings (bioluminescence):** grooves cut into the hide (baked into the normal map) with dotted lines in
-  them: mostly dark purple, with blues and greens. Collar ring behind the face, hip ring, a band of chevrons
-  round the middle, a line down the spine and along the tail, ringed circles on the flanks, rings down the tail,
-  dotted lines along the wing bones. Dimmer than the eyes; brighter at night in the game.
+- **Eyes:** the part-sphere domes under the brow, beside the horns, yellow over the whole eyeball, under clear
+  (glossy, uncoloured) lids. The glow is on the eyeball only: it comes from the emissive texture, there are no
+  lights, and the game keeps it under its bloom threshold so no halo spreads onto the face.
+- No carvings or bioluminescent lines (tried and taken out).
 - **Throat:** the gullet is its own material (`LututThroat`) so the game can light it red while it screeches.
 - No neck: the head never moves on its own, only with the body.
 
@@ -59,14 +56,14 @@ walks a little, takes off, circles high, comes back in to land (glide or barrel)
 (stuns), circling, then a dive with the mouth flared that pulls you in; then it hangs low over you and clubs with
 its tail (under its belly, to the side you're on, or over its back if you're above it) or sucks, then climbs
 again. Your hits, arrows and fire bolts measure against its collision spheres, and you can't walk through its
-body. The tail also swings on its own when it turns or climbs. Age variants: young (smaller, faint lines),
-adult, old (bigger, darker, brighter lines). The low-detail mesh shows beyond 46 m. Sounds (screech, wingbeats,
+body. The tail also swings on its own when it turns or climbs. Age variants: young (smaller, paler, dimmer eyes),
+adult, old (bigger, darker). The low-detail mesh shows beyond 46 m. Sounds (screech, wingbeats,
 suck, dive, tail) are a first pass made with the game's own synthesiser (`audio.js`, `sfx._lutut`).
 
 ## Rebuilding
 Put `lutut.obj` in a work folder, set `LUTUT_WORK` to that folder, then run each script with
 `python3 <script>` (needs `pip install bpy`):
-`import_obj` → `s1` (clean, recentre, decimate) → `rig` (uses `bones.py`) → `paint` (uses `carve.py`) → `bake`
+`import_obj` → `s1` (clean, recentre, decimate) → `rig` (uses `bones.py`) → `paint` → `bake`
 → `mat` → `anim` (motion in `motion.py`) → `export`. Then copy `lutut.glb` to `rpg/assets/models/`.
-Previews: `look.py`, `lookc.py` (carvings, day and night), `asheet.py`, `posepv.py` (single poses),
+Previews: `look.py`, `lookc.py` (eyes and body, day and night), `asheet.py`, `posepv.py` (single poses),
 `probe.py` (where the tail ball and mouth end up), `sprites2d.py` (side-view frames for the 2D games).

@@ -60,36 +60,5 @@ bk.use_selected_to_active=False
 t=time.time(); bpy.ops.object.bake(type='AO'); print('bake AO',time.time()-t)
 img.filepath_raw=W+'tex_ao.png'; img.file_format='PNG'; img.save()
 H.hide_render=False
-# ---- position + normal maps of the game mesh -> dotted bioluminescent lines, per texel ----
-import numpy as np
-from carve import carve
-def geo_bake(out_name, socket):
-    m=bpy.data.materials.get('GeoSrc') or bpy.data.materials.new('GeoSrc'); m.use_nodes=True
-    t=m.node_tree; t.nodes.clear()
-    g=t.nodes.new('ShaderNodeNewGeometry'); e=t.nodes.new('ShaderNodeEmission'); o=t.nodes.new('ShaderNodeOutputMaterial')
-    t.links.new(g.outputs[socket],e.inputs['Color']); t.links.new(e.outputs[0],o.inputs[0])
-    img=bpy.data.images.new(out_name,RES,RES,float_buffer=True); img.colorspace_settings.name='Non-Color'
-    nd=t.nodes.new('ShaderNodeTexImage'); nd.image=img
-    for x in t.nodes: x.select=False
-    nd.select=True; t.nodes.active=nd
-    keep=list(L.data.materials); L.data.materials.clear(); L.data.materials.append(m)
-    bpy.ops.object.select_all(action='DESELECT'); L.select_set(True); bpy.context.view_layer.objects.active=L
-    bk.use_selected_to_active=False; sc.cycles.samples=1; bk.margin=0
-    bpy.ops.object.bake(type='EMIT')
-    L.data.materials.clear(); [L.data.materials.append(k) for k in keep]
-    a=np.array(img.pixels[:],dtype=np.float32).reshape(RES,RES,4)
-    return a
-Pm=geo_bake('posmap','Position'); Nm=geo_bake('normap','Normal')
-valid=(np.abs(Pm[...,:3]).sum(-1)>1e-6)
-Pv=Pm[...,:3][valid].astype(np.float64); Nv=Nm[...,:3][valid].astype(np.float64)
-Nv/=np.linalg.norm(Nv,axis=1,keepdims=True)+1e-9
-_,dot,dcol=carve(Pv,Nv)
-out=np.zeros((RES,RES,4),np.float32); out[...,3]=1
-out[...,:3][valid]=(dcol*np.clip(dot,0,1)[:,None]).astype(np.float32)
-# grow the dots into the bake margin so seams don't cut them
-im=bpy.data.images.new('dots',RES,RES,float_buffer=True); im.colorspace_settings.name='Non-Color'
-im.pixels[:]=out.ravel()
-im.filepath_raw=W+'tex_dots.exr'; im.file_format='OPEN_EXR'; im.save()
-print('dot texels',int((dot>0.05).sum()))
 bk.margin=6
 bpy.ops.wm.save_as_mainfile(filepath=W+'stage4.blend')

@@ -12,8 +12,7 @@
      tail, wings), each with its radius in extras (lutut_radius)
    - a low-detail mesh (Lutut_LOD1) on the same skeleton
    - the gullet as its own material (LututThroat), lit red as it screeches
-   - eyes and carved dotted lines in the emissive texture (dimmer lines,
-     brighter at night)
+   - the eyes in the emissive texture: nothing else on it glows
 
    It never bites: the lamprey mouth can't close. It sucks things in.
    ============================================================ */
@@ -35,11 +34,11 @@ export const LUTUT = {
   // when in each one-shot clip the blow lands (fraction of the clip)
   HIT: { TailSmack: [0.38, 0.6], TailSmackUp: [0.4, 0.58], TailSwipeL: [0.32, 0.56], TailSwipeR: [0.32, 0.56], Suck: [0.22, 0.82], Dive: [0.48, 0.7] },
 };
-/* young ones are smaller and their lines are faint; old ones are bigger, darker, and their lines glow more */
+/* young ones are smaller and a little paler, with dimmer eyes; old ones are bigger and darker */
 export const VARIANTS = {
-  young: { scale: 0.72, tint: 1.15, glow: 0.7 },
+  young: { scale: 0.72, tint: 1.15, glow: 0.85 },
   adult: { scale: 1.0, tint: 1.0, glow: 1.0 },
-  old: { scale: 1.15, tint: 0.85, glow: 1.4 },
+  old: { scale: 1.15, tint: 0.85, glow: 1.0 },
 };
 export const variantFor = age => (age < 0.3 ? 'young' : age > 0.75 ? 'old' : 'adult');
 
@@ -74,7 +73,7 @@ export function buildLututActor(opts = {}) {
       lods[lod].push(o);
       const m = o.material.clone(); o.material = m;
       if (/Throat/.test(m.name)) { m.userData.base = 0; m.emissiveIntensity = 0; throats.push(m); }
-      else { m.userData.base = m.emissiveIntensity || 2.5; m.color.multiplyScalar(V.tint); m.userData.col0 = m.color.clone(); skins.push(m); }
+      else { m.color.multiplyScalar(V.tint); m.userData.col0 = m.color.clone(); skins.push(m); }
     }
   });
   const hitMouth = cols.find(c => c.name === 'hit_mouth'), hitTail = cols.find(c => c.name === 'hit_tail');
@@ -119,9 +118,10 @@ export function buildLututActor(opts = {}) {
   }
   let night = 0, flashV = 0, throatK = 0;
   function shade(dt) {
-    const g = V.glow * (0.55 + 0.75 * night);
+    // the eyes are the only thing that glows; kept under the bloom threshold so the light stays on the eyeball
+    const g = Math.min(0.95, V.glow * (0.75 + 0.2 * night));
     for (const m of skins) {
-      m.emissiveIntensity = m.userData.base * g;
+      m.emissiveIntensity = g;
       if (flashV > 0.01) m.color.copy(m.userData.col0).multiplyScalar(1 + flashV * 3); else m.color.copy(m.userData.col0);
     }
     // the gullet glows red as it screeches

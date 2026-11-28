@@ -14,9 +14,7 @@ n=len(me.vertices)
 P=np.zeros(n*3); me.vertices.foreach_get('co',P); P=P.reshape(-1,3)
 N=np.zeros(n*3); me.vertices.foreach_get('normal',N); N=N.reshape(-1,3)
 E=np.zeros(len(me.edges)*2,dtype=np.int64); me.edges.foreach_get('vertices',E); E=E.reshape(-1,2)
-from carve import carve
-gdepth,DOT,DCOL=carve(P,N)
-P=P-N*gdepth[:,None]
+gdepth=np.zeros(n)   # no carvings
 me.vertices.foreach_set('co',P.ravel()); me.update()
 N=np.zeros(n*3); me.vertices.foreach_get('normal',N); N=N.reshape(-1,3)
 print('carved verts',int((gdepth>0).sum()))
@@ -128,6 +126,13 @@ for k,hit in (('L',(-0.13,-0.767,0.56)),('R',(0.136,-0.758,0.564))):
     rmax=np.percentile(np.linalg.norm(P[dome]-Cm,axis=1),90)
     dd=np.linalg.norm(P-Cm,axis=1)
     m|=(dd<rmax*0.92)&((N@Nc)>0.25)&(cvE>-0.35)
+    # keep only what joins the eyeball itself: no stray flecks on the lids
+    keepm=np.zeros(n,bool); q=deque([c]); keepm[c]=True
+    while q:
+        v=q.popleft()
+        for w2 in adj[v]:
+            if m[w2] and not keepm[w2]: keepm[w2]=True; q.append(w2)
+    m=keepm
     ring=(~m)&(dd<rmax+0.022)&((N@Nc)>-0.2)
     glow[m]=np.maximum(glow[m],0.75+0.25*np.clip(1-(dd[m]/rmax)**2,0,1))
     lid=np.maximum(lid,ring*np.clip(1-(dd-rmax)/0.022,0,1))
@@ -136,7 +141,6 @@ for k,hit in (('L',(-0.13,-0.767,0.56)),('R',(0.136,-0.758,0.564))):
 _js.dump(EYES,open(W+'eyes.json','w'))
 eyec=mix(np.tile(hexc('#c08a10'),(n,1)),hexc('#ffd040'),np.clip((glow-0.75)*4,0,1))
 col=np.where((glow>0)[:,None],eyec,col)
-col=mix(col,hexc('#6a4a10'),lid*0.75)
 col=np.clip(col,0,1)
 def attr(name,c):
     if name in me.color_attributes: me.color_attributes.remove(me.color_attributes[name])
@@ -151,7 +155,7 @@ rough=np.where(horn>0,0.45,rough); rough=np.where(inside,0.22,rough); rough=np.w
 rough=np.where(teeth,0.35,rough); rough=np.where(glow>0,0.18,rough); rough=np.where(lid>0.2,0.15,rough)
 rough=rough+0.12*np.clip(cvs,0,1)
 attr('Rough',np.stack([rough]*3,1))
-gl=np.clip(glow,0,1)+lid*0.35
+gl=np.clip(glow,0,1)        # the glow stays on the eyeballs: nothing around them glows
 g3=np.stack([gl*1.0,gl*0.72,gl*0.14],1)
 
 attr('Glow',g3)
