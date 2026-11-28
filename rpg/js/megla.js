@@ -34,7 +34,7 @@ import { toon, addOutline, outlineAll, glowSprite, mistSprite, Particles, paint,
 import { buildEikar, placeWalker, cartoon } from './actors.js';
 import { buildDomesticPunk, buildWildPunk, buildRodak, buildGynge, buildMalstiPunk, buildSruVorn } from './esik_land.js';
 import { buildVel } from './creatures.js';
-import { buildLutut } from './esik_sky.js';
+import { buildLututActor as buildLutut } from './lutut3d.js';   // the Lútut model, or the built-in one if it isn't loaded
 import { buildSniller } from './skyfolk.js';
 import { createCine } from './cine.js';
 import { latchAlongRay } from './vines.js';

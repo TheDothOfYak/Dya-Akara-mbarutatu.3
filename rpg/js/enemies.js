@@ -15,6 +15,7 @@ import { buildApiButa, buildCyitor, buildXiwKatkan } from './creatures2.js';
 import { buildWildPunk, buildDomesticPunk, buildMalstiPunk, buildKipsu, buildRodak, buildKofi, buildSruVorn, buildBigMommaKofi, buildUlarNaga, buildGynge, buildStryx, buildTonguatjis, buildMikoloMoko, buildUff } from './esik_land.js';
 import { buildAlbaliByrd, buildTyndael, buildKuniByrd, buildLutut, buildRubberMcFly, buildMakariSwarm } from './esik_sky.js';
 import { buildHvaleia, buildSuNaga, buildHarkal, buildRafKrabbi, buildGrothyn } from './esik_sea.js';
+import { buildLututActor, updateLututFoe, lututDead } from './lutut3d.js';
 
 const seed = () => (Math.random() * 1e9) >>> 0;
 /* a Kipsu can be anything from a lapful to a big dog */
@@ -59,7 +60,7 @@ export const TYPES = {
   eldi_grothyn: { name: 'Eldi Grothyn', build: () => buildGrothyn({ element: 'Eldi' }), hp: 120, dmg: 12, speed: 0.15, rad: 0.8, range: 5.5, aggro: 7, windup: 0.6, recover: 1.0, lunge: 0, shards: 14, ai: 'melee', color: 0xff8a3a },
   rubbermcfly: { name: 'RubberMcFly', build: () => buildRubberMcFly({ seed: seed() }), hp: 6, dmg: 0, speed: 4, rad: 0.15, range: 0, aggro: 0, shards: 2, ai: 'flyer', color: 0xffe08a, disp: 'neutral', altMul: 0.6, roam: 4 },
   makari: { name: 'Makari swarm', build: () => buildMakariSwarm({ seed: seed(), moteScale: 2 }), hp: 8, dmg: 0, speed: 3, rad: 0.6, range: 0, aggro: 0, shards: 2, ai: 'flyer', color: 0x9aff6a, disp: 'neutral', altMul: 0.4, roam: 3 },
-  lutut: { name: 'Lutut', build: () => buildLutut({ seed: seed(), age: Math.random() }), hp: 1300, dmg: 28, speed: 10, rad: 3.0, range: 3, aggro: 26, shards: 200, ai: 'flyer', elite: true, color: 0x9a7ac8, disp: 'neutral', altMul: 3, roam: 22 },
+  lutut: { name: 'Lutut', build: () => buildLututActor({ seed: seed(), age: Math.random() }), hp: 1300, dmg: 28, speed: 10, rad: 3.0, range: 3, aggro: 26, shards: 200, ai: 'flyer', elite: true, color: 0x9a7ac8, disp: 'neutral', altMul: 3, roam: 22 },
   kuni_wild: { name: 'Kuni Byrd', build: () => buildKuniByrd({ seed: seed() }), hp: 1600, dmg: 30, speed: 16, rad: 3.5, range: 3, aggro: 30, shards: 260, ai: 'flyer', elite: true, color: 0xd8c098, disp: 'neutral', altMul: 9, roam: 60 },
   su_naga: { name: 'Su Naga', build: () => buildSuNaga({ heads: 3 }), hp: 3600, dmg: 34, speed: 5, rad: 6, range: 9, aggro: 16, windup: 1.0, recover: 1.2, lunge: 5, shards: 420, ai: 'swim', water: true, sink: 4.4, stagger: 0, elite: true, miniboss: true, color: 0x6ad8ff, disp: 'neutral' },
   raf_krabbi: { name: 'Raf Krabbi', build: () => buildRafKrabbi({ seed: seed() }), hp: 26, dmg: 6, speed: 4, rad: 0.25, range: 1.2, aggro: 5, windup: 0.4, recover: 0.6, lunge: 4, shards: 5, ai: 'swim', water: true, shallow: true, status: 'paralyze', color: 0x6ad8ff },
@@ -93,6 +94,7 @@ export function createEnemies(ctx) {
       blinkCd: 2 + Math.random() * 2, windup: 0, attackA: 0, alt: T.ai === 'flyer' ? 3 : 0, hostile: T.ai !== 'scavenger' && !T.disp, stolen: 0,
       cd: 1 + Math.random() * 2, lastHit: -99, act: null,
     }, extra);
+    if (actor.lutut) e.reach = (x, y, z) => actor.lutut.reach(x, y, z);   // the Lútut model: hits measure against its body, not a circle
     list.push(e);
     return e;
   }
@@ -276,6 +278,7 @@ export function createEnemies(ctx) {
   function updateOne(e, dt) {
     const P = ctx.P, G = ctx.G, a = e.actor, T = e.T;
     if (e.dead) {
+      if (a.lutut && lututDead(e, dt, ctx)) return;
       /* it goes down: knocked off its feet the way the blow sent it (folk over backwards, beasts onto their side),
          a bounce as it hits the ground, a while lying there, and then it settles into the earth and is gone */
       e.timer += dt;
@@ -314,6 +317,9 @@ export function createEnemies(ctx) {
 
     /* water folk never leave the water */
     if (T.ai === 'swim' || T.ai === 'airswim') { updateSwimmer(e, dt, d, toP, playing, aggroR, wf); return; }
+
+    /* the Lútut model has a brain of its own (lutut3d.js) */
+    if (a.lutut) { updateLututFoe(e, dt, ctx, D()); return; }
 
     /* dummies stand still on their posts */
     if (T.ai === 'static') {

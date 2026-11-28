@@ -34,6 +34,7 @@ import { clamp, damp, dampAngle, smooth, lerp, mulberry32, fbm, orbitPitch, tilt
 import * as STORY from './story.js';
 import { Colliders } from './terrain.js';
 import { createSolids, inColliders, noSolid } from './solid.js';
+import { buildLututActor, lututSfx } from './lutut3d.js';
 
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -1170,6 +1171,44 @@ export function createRoad(ctx) {
     }
   }
 
+  /* ---------------- a Lútut over the mountains, on day two and day four ----------------
+     Twenty-odd seconds into the day's walk, one crosses the sky ahead, from the peaks on one side to the peaks on
+     the other: flapping over the forest on day two, gliding low through the pass on day four. The shot turns to
+     watch it while Tanoc and the Carpenter talk, so it can't be missed. */
+  const LF = { a: null, t: 0, dur: 1, wait: { day2: 0, day4: 0 }, done: {}, from: V3(), to: V3(), glide: false };
+  const LUTUT_SAY = {
+    day2: [['tanoc', 'Up there — over the mountains! What is that?'], ['buhkon', 'A Lútut. Don’t stare, and don’t shout. They hear a good deal better than they see.'], ['tanoc', 'It’s huge…'], ['buhkon', 'And it isn’t hungry, or it wouldn’t be up there. Keep walking.']],
+    day4: [['tanoc', 'It’s back — the black one, over the pass.'], ['buhkon', 'Maybe the same one. They nest in the crags up here.'], ['buhkon', 'Head down, stay by the cart, and let it go about its business.']],
+  };
+  function lututFlyStart(day) {
+    LF.done[day] = true;
+    const a = buildLututActor({ age: day === 'day4' ? 0.85 : 0.5 }); a.lutut && (a.lutut.driven = true);
+    scene.add(a.root); LF.a = a; LF.t = 0; LF.glide = day === 'day4';
+    const ahead = day === 'day4' ? 150 : 170, side = Math.random() < 0.5 ? -1 : 1, g = heightAt(P.pos.x, P.pos.z);
+    LF.from.set(P.pos.x + side * 560, g + (day === 'day4' ? 70 : 85), P.pos.z - ahead - 40);
+    LF.to.set(P.pos.x - side * 560, g + (day === 'day4' ? 75 : 95), P.pos.z - ahead + 30);
+    LF.dur = day === 'day4' ? 30 : 26;
+    if (a.lutut) a.lutut.play(LF.glide ? 'Glide' : 'Fly', 0);
+    setTimeout(() => lututSfx(sfx, 'screech', 0.35), 2500);
+    // hold the camera on it while they talk about it
+    sayHeld(LUTUT_SAY[day], () => ({ p: V3(P.pos.x + 2.5, P.pos.y + 1.7, P.pos.z + 5), l: LF.a ? LF.a.root.position.clone().add(V3(0, 4, 0)) : V3(P.pos.x, P.pos.y + 20, P.pos.z - 100) }), () => {});
+  }
+  function lututFlyTick(dt, playing) {
+    if (playing && (stage === 'day2' || stage === 'day4') && !LF.done[stage] && !LF.a && sub === 'walk') {
+      LF.wait[stage] += dt;
+      if (LF.wait[stage] > (stage === 'day4' ? 14 : 22)) lututFlyStart(stage);
+    }
+    const a = LF.a; if (!a) return;
+    LF.t += dt; const k = clamp(LF.t / LF.dur, 0, 1);
+    const p = V3().lerpVectors(LF.from, LF.to, k);
+    p.y += Math.sin(k * Math.PI) * (LF.glide ? -30 : 18) + Math.sin(LF.t * 1.1) * 1.5;   // day four: it sinks low through the pass
+    const dir = V3().subVectors(LF.to, LF.from);
+    a.root.position.copy(p); a.root.rotation.set(0, Math.atan2(dir.x, dir.z), Math.sin(LF.t * 0.6) * 0.12, 'YXZ');
+    if (a.lutut && LF.glide) { const want = k > 0.62 ? 'Fly' : 'Glide'; if (a.lutut.clip !== want) a.lutut.play(want, 0.6); }   // a few strong beats to climb out of the pass
+    a.glow && a.glow(stage === 'day4' ? 0.4 : 0);
+    a.animate(dt, { speed: 30, airborne: true, t });
+    if (k >= 1) { scene.remove(a.root); LF.a = null; }
+  }
   /* a new day: a few shots of the land with its words over them, the three of them walking on under it */
   function dayCine(cards, shots, done) {
     shots.forEach((sh, i) => { if (!sh.caption && cards[i]) sh.caption = cards[i]; });
@@ -1961,6 +2000,7 @@ export function createRoad(ctx) {
     if (stage === 'market' && MK && MK.esc && playing) escTick(dt);
     updateCart(dt);
     for (const c of clouds) c.position.x += dt * 2;
+    lututFlyTick(dt, playing);
     if (playing) { if (stage === 'day1') day1Tick(); if (stage === 'day2') { day2Tick(); day2Back(); } if (stage === 'day3') day3Tick(dt); if (stage === 'day4') day4Tick(dt); }
     updateBolts(dt);
     if (D1 && D1.sn) { D1.snT += dt; D1.sn.userData.tick(t); D1.sn.position.x += dt * 3; if (D1.snT > 9) { particles.burst(D1.sn.position.x, D1.sn.position.y + 4, D1.sn.position.z, 40, { color: 0x6af0e0, speed: 8, size: 1, life: 1 }); scene.remove(D1.sn); D1.sn = null; } }
