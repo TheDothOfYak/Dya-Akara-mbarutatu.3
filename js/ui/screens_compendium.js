@@ -4,6 +4,9 @@
    The Vakarborac — a field guide to the Dearcàn of the Mbaru
    Tatu, compiled for the Dya'Elkarg. Libraries and schools keep
    educational sets; this is yours.
+   NOT LOADED ANY MORE: this moved out of Dya'Akara to the Rokarvac
+   on the home page (rokarvac.html, js/flake/rokarvac.js). Kept as
+   the dated record of how it was.
    ============================================================ */
 (function () {
   'use strict';

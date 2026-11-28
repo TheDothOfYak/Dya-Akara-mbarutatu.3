@@ -15,6 +15,7 @@ import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { loadLutut } from './lutut3d.js';
+import { createLututViewer, LUTUT_NOTE } from './lutut_viewer.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, Ripples, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools, paint } from './gfx.js';
 import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
@@ -2687,11 +2688,16 @@ function toggleJournal() {
     const chs = CHAPTERS.filter(([k]) => SAVE.chTime[k] >= 30).map(([k, n]) => `${n}: ${fmtTime(SAVE.chTime[k])}`).join(' · ');
     $('j-mem').innerHTML = stats + (chs ? `<div class="jentry"><b>Time by chapter</b>${chs}</div>` : '') + mem + carv;
     const proph = (SAVE.prophecies || []).map(l => `<div class="jentry"><b>A true prophecy</b>“${l}”</div>`).join('');
-    $('j-codex').innerHTML = proph + [...STORY.CODEX, ...STORY.CODEX_MORE, ...STORY.CODEX_LORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
+    $('j-codex').innerHTML = `<div class="jentry"><b>The Lútut</b>${LUTUT_NOTE} <button class="btn ghost" id="j-lutut-open" style="margin-top:6px;padding:6px 14px;font-size:14px">Look at it</button></div>`
+      + proph + [...STORY.CODEX, ...STORY.CODEX_MORE, ...STORY.CODEX_LORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
+    $('j-lutut-open').onclick = () => { j.querySelector('.jgrid').classList.add('hidden'); $('j-lutut').classList.remove('hidden'); lututView.open(); };
     j.classList.remove('hidden'); G.paused = true;
     unlockMouse();
-  } else { j.classList.add('hidden'); G.paused = false; lockMouse(); }
+  } else { lututView.close(); lututBack(); j.classList.add('hidden'); G.paused = false; lockMouse(); }
 }
+/* the Lútut page in the Rokarvac: a viewer to turn it round and watch everything it does (lutut_viewer.js) */
+function lututBack() { $('j-lutut').classList.add('hidden'); $('journal').querySelector('.jgrid').classList.remove('hidden'); }
+const lututView = createLututViewer($('j-lutut'), lututBack);
 $('btn-jclose').onclick = () => { toggleJournal(); };
 function openPause() { if (overlayOpen()) return; G.paused = true; unlockMouse(); $('pause').classList.remove('hidden'); $('btn-concede').style.display = dyaMatch ? '' : 'none'; syncFull(); }
 /* P pauses and unpauses, whenever there's a game running to pause */
@@ -4525,12 +4531,49 @@ function startScope(door) {
   if (!el) {
     el = document.createElement('div'); el.id = 'scope';
     el.style.cssText = 'position:fixed;inset:0;z-index:9;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0 38vmin,rgba(0,0,0,.55) 39vmin,#000 41vmin);transition:opacity .4s';
-    el.innerHTML = '<div style="position:absolute;left:50%;bottom:6vh;transform:translateX(-50%);font:14px var(--body);color:#e8dcc0;opacity:.8;letter-spacing:.06em">mouse to look · wheel to focus · E to come away</div>';
+    el.innerHTML = '<div class="scope-hint" style="position:absolute;left:50%;bottom:6vh;transform:translateX(-50%);font:14px var(--body);color:#e8dcc0;opacity:.8;letter-spacing:.06em;white-space:nowrap">mouse to look · wheel to focus · E to come away</div>';
     document.body.appendChild(el);
+    scopeTouchControls(el);
   }
-  el.style.display = ''; $('hud').style.visibility = 'hidden'; $('prompt').classList.add('hidden');
+  el.style.display = '';
+  const tc = touch.on;   // on a phone: the glass takes the fingers (drag to look, pinch to focus) and shows its own buttons
+  el.style.pointerEvents = tc ? 'auto' : 'none';
+  el.querySelector('.scope-btns').style.display = tc ? 'flex' : 'none';
+  el.querySelector('.scope-hint').textContent = tc ? 'drag to look · pinch to focus' : 'mouse to look · wheel to focus · E to come away'; $('hud').style.visibility = 'hidden'; $('prompt').classList.add('hidden');
   sfx.ui(); fade(1, 0); setTimeout(() => fade(0, 0.6), 40);
   if (!locked) lockMouse();
+}
+/* fingers on the glass: one drags the view round, two pinch to focus; buttons to zoom and to come away */
+function scopeTouchControls(el) {
+  el.style.touchAction = 'none';
+  const bs = 'width:52px;height:52px;border-radius:50%;border:1px solid rgba(232,220,192,.5);background:rgba(20,16,10,.55);color:#e8dcc0;font:22px var(--body);display:flex;align-items:center;justify-content:center;touch-action:none';
+  const btns = document.createElement('div'); btns.className = 'scope-btns';
+  btns.style.cssText = 'position:absolute;right:max(16px,env(safe-area-inset-right));top:50%;transform:translateY(-50%);flex-direction:column;gap:14px';
+  const mk = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.style.cssText = bs; b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fn(); }); return b; };
+  btns.append(mk('+', () => { if (SCOPE) SCOPE.fov = clamp(SCOPE.fov * 0.75, 4, 40); }), mk('−', () => { if (SCOPE) SCOPE.fov = clamp(SCOPE.fov / 0.75, 4, 40); }), mk('✕', () => endScope()));
+  el.appendChild(btns);
+  const pts = new Map(); let pinch = 0;
+  const spread = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  el.addEventListener('pointerdown', e => {
+    if (!SCOPE || e.pointerType === 'mouse') return;
+    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pts.size === 2) pinch = spread();
+  });
+  el.addEventListener('pointermove', e => {
+    const p = pts.get(e.pointerId); if (!SCOPE || !p) return;
+    e.preventDefault();
+    if (pts.size >= 2) {
+      p.x = e.clientX; p.y = e.clientY;
+      const d = spread(); if (pinch > 0 && d > 0) SCOPE.fov = clamp(SCOPE.fov * pinch / d, 4, 40); pinch = d;
+      return;
+    }
+    const k = 0.0055 * OPT.sens * SCOPE.fov / 60;   // the further in, the slower it swings
+    SCOPE.yaw -= (e.clientX - p.x) * k;
+    SCOPE.pitch = clamp(SCOPE.pitch - (e.clientY - p.y) * k * (OPT.invert ? -1 : 1), -0.1, 1.55);
+    p.x = e.clientX; p.y = e.clientY;
+  });
+  const up = e => { pts.delete(e.pointerId); pinch = pts.size === 2 ? spread() : 0; };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 }
 function updateScope(dt) {
   if (!SCOPE) return;

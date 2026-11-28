@@ -59,8 +59,34 @@
   let idx = 0, timer = null, paused = false, pendingHref = null;
 
   /* ---------- the sky ---------- */
-  const skyOpts = Object.assign({ far: true, storm: true }, LOOK.game[narrow() ? 'skyNarrow' : 'sky']);
+  const skyOpts = Object.assign({ far: true, storm: true, onLayout: placeSpots }, LOOK.game[narrow() ? 'skyNarrow' : 'sky']);
   DYA.mbaruSky.mount($('sky'), skyOpts);
+
+  /* ---------- click a world in the sky to open its page of the Rokarvac
+     (rokarvac.html): the Mbaru Tatu (any of the three Tatu), the far worlds,
+     and Pia'don's star for whatever belongs to no one world ---------- */
+  const spots = {};
+  function spot(id, label, href, cls) {
+    const a = document.createElement('a');
+    a.className = 'sky-spot ' + (cls || ''); a.href = href; a.setAttribute('aria-label', label + ' · open the Rokarvac');
+    const t = document.createElement('span'); t.className = 'sky-label'; t.textContent = label; a.appendChild(t);
+    $('sky-spots').appendChild(a); spots[id] = a; return a;
+  }
+  function placeSpots(L) {
+    if (!$('sky-spots')) return;
+    if (!spots.mbaru) {
+      spot('mbaru', 'The Mbaru Tatu', 'rokarvac.html#mbaru', 'cluster');
+      L.tatu.forEach(t => spot('tatu-' + t.id, t.name, 'rokarvac.html#mbaru', 'tatu'));
+      L.far.forEach(f => spot(f.id, f.name, 'rokarvac.html#' + f.id, 'far'));
+      spot('piadon', 'Pia’don', 'rokarvac.html#piadon', 'star');
+    }
+    const at = (a, x, y, d) => { a.style.transform = 'translate(' + Math.round(x - d / 2) + 'px,' + Math.round(y - d / 2) + 'px)'; a.style.width = a.style.height = Math.round(d) + 'px'; };
+    /* the cluster's own label sits under it */
+    const c = spots.mbaru; c.style.transform = 'translate(' + Math.round(L.cluster.x) + 'px,' + Math.round(L.cluster.y + L.cluster.ry * 0.9) + 'px) translateX(-50%)';
+    L.tatu.forEach(t => at(spots['tatu-' + t.id], t.x, t.y, Math.max(26, t.r * 2.3)));
+    L.far.forEach(f => spots[f.id] && at(spots[f.id], f.x, f.y, 30));
+    at(spots.piadon, L.star.x, L.star.y, Math.max(44, L.star.r * 2));
+  }
   let skyTarget = null;
   function easeSky() {
     if (skyTarget) {

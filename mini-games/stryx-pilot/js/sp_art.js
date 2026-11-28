@@ -891,6 +891,7 @@
     }
   }
 
+  A.drawLutut = drawLutut;   /* the Rokarvac (rokarvac.html) shows it too */
   function drawLutut(ctx, gl, l, now) {
     const ang = Math.atan2(l.vy, l.vx) || 0, diving = l.state === 'dive', flap = diving ? 0.15 : Math.sin(now * 5 + l.ph) * 0.5;
     ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(ang);
