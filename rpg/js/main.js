@@ -15,6 +15,7 @@ import { paintPass } from './paint.js';
 import { addLens } from './lens.js';
 import { loadModels, placeProps } from './assets.js';
 import { loadLutut } from './lutut3d.js';
+import { createLututViewer, LUTUT_NOTE } from './lutut_viewer.js';
 import { clamp, lerp, damp, dampAngle, angleDiff, PITCH_MIN, PITCH_MAX, orbitPitch, tiltUp } from './util.js';
 import { Particles, Ripples, glowSprite, mistSprite, toon, addOutline, outlineAll, lightPools, paint } from './gfx.js';
 import { installSmoothStyle, ready as smoothReady, LEAF_CARDS } from './smooth.js';
@@ -2687,11 +2688,16 @@ function toggleJournal() {
     const chs = CHAPTERS.filter(([k]) => SAVE.chTime[k] >= 30).map(([k, n]) => `${n}: ${fmtTime(SAVE.chTime[k])}`).join(' · ');
     $('j-mem').innerHTML = stats + (chs ? `<div class="jentry"><b>Time by chapter</b>${chs}</div>` : '') + mem + carv;
     const proph = (SAVE.prophecies || []).map(l => `<div class="jentry"><b>A true prophecy</b>“${l}”</div>`).join('');
-    $('j-codex').innerHTML = proph + [...STORY.CODEX, ...STORY.CODEX_MORE, ...STORY.CODEX_LORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
+    $('j-codex').innerHTML = `<div class="jentry"><b>The Lútut</b>${LUTUT_NOTE} <button class="btn ghost" id="j-lutut-open" style="margin-top:6px;padding:6px 14px;font-size:14px">Look at it</button></div>`
+      + proph + [...STORY.CODEX, ...STORY.CODEX_MORE, ...STORY.CODEX_LORE].map(([k, v]) => `<div class="jentry"><b>${k}</b>${v}</div>`).join('');
+    $('j-lutut-open').onclick = () => { j.querySelector('.jgrid').classList.add('hidden'); $('j-lutut').classList.remove('hidden'); lututView.open(); };
     j.classList.remove('hidden'); G.paused = true;
     unlockMouse();
-  } else { j.classList.add('hidden'); G.paused = false; lockMouse(); }
+  } else { lututView.close(); lututBack(); j.classList.add('hidden'); G.paused = false; lockMouse(); }
 }
+/* the Lútut page in the Rokarvac: a viewer to turn it round and watch everything it does (lutut_viewer.js) */
+function lututBack() { $('j-lutut').classList.add('hidden'); $('journal').querySelector('.jgrid').classList.remove('hidden'); }
+const lututView = createLututViewer($('j-lutut'), lututBack);
 $('btn-jclose').onclick = () => { toggleJournal(); };
 function openPause() { if (overlayOpen()) return; G.paused = true; unlockMouse(); $('pause').classList.remove('hidden'); $('btn-concede').style.display = dyaMatch ? '' : 'none'; syncFull(); }
 /* P pauses and unpauses, whenever there's a game running to pause */

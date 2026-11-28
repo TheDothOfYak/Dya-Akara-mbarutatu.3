@@ -36,7 +36,7 @@ def wings(d, up=0.0, sweep=0.0, lag=0.0, twist=0.0, ffold=0.0, fold=0.0, spread=
         add(d,'upperarm'+s,sa((0,1,0),s),up*(1-k) + T['ua_y']*k)
         add(d,'upperarm'+s,sa((0,0,1),s),sweep*(1-k) + T['ua_z']*k)
         add(d,'upperarm'+s,(1,0,0),T['ua_x']*k)
-        add(d,'forearm'+s,sa((0,1,0),s),lag*0.6*(1-k) + T['fa_y']*k - 18*ffold*(1-k))
+        add(d,'forearm'+s,sa((0,1,0),s),T['fa_y']*k - 18*ffold*(1-k))
         for i in range(4):
             fz=T['fz'][i]*k + (-(22+12*i)*ffold + spread*(i-1.5)*0.5)*(1-k)
             add(d,f'finger{i+1}a'+s,sa((0,0,1),s),fz)
@@ -47,11 +47,12 @@ def wings(d, up=0.0, sweep=0.0, lag=0.0, twist=0.0, ffold=0.0, fold=0.0, spread=
 def flap(t, amp=28, bias=-6):
     ph=TAU*t
     up=bias+amp*cos(ph)                  # top of the stroke at t=0, bottom at 0.5
-    lag=-amp*0.35*sin(ph)
+    lag=0.0                             # no lag: everything on the wing moves with the arm, so nothing loops
     return up,lag,max(0.0,-sin(ph)),max(0.0,sin(ph))
 def beat(d,t,amp=28,bias=-6,base_twist=45,sweep=6):
     up,lag,u,dn=flap(t,amp,bias)
-    wings(d,up,sweep=sweep*sin(TAU*t),lag=lag,twist=base_twist+18*u-8*dn,ffold=0.6*u)
+    hi=0.5+0.5*cos(TAU*t)
+    wings(d,up,lag=lag,twist=base_twist,ffold=0.35*hi)
     return up
 TW=[(0.5+(i+1)/NT)*7/NT for i in range(NT)]
 def tail(d, ph, side=6.0, upamp=3.0, lift=0.0, curl=0.0, delay=0.32, rest=1.0):
@@ -127,7 +128,7 @@ def c_takeoff(t):
     else:
         tt=(t-0.5)/0.5*2.5             # two and a half strong beats
         up,lag,u,dn=flap(tt%1,44,-4)
-        wings(d,up,sweep=8*sin(TAU*tt),lag=lag*1.2,twist=40+16*u-10*dn,ffold=0.5*u,spread=6)
+        wings(d,up,lag=lag,twist=40,ffold=0.3*(0.5+0.5*(up+4)/44),spread=6)
     ph=TAU*t*4.5                       # running strides
     if t<0.5: gait(d,ph,stride=34*run,lift=48*run)
     crouch=seg(t,0.34,0.44)*(1-jump)
@@ -191,7 +192,7 @@ def c_dive(t):
     if t<0.62: wings(d,lerp(20,-10,st),sweep=-30*st,twist=60*st,fold=0.55*st,lag=-5)
     else:
         tt=(t-0.62)/0.38*1.5; up,lag,u,dn=flap(tt%1,46,-4)
-        wings(d,up,lag=lag,twist=40+16*u,ffold=0.5*u,spread=6)
+        wings(d,up,lag=lag,twist=40,ffold=0.3*(0.5+0.5*(up+4)/44),spread=6)
     mouth(d,lerp(4,30,flare)*(1-r)+4)
     scale(d,'chest',1+0.06*flare*(1-r))
     tail(d,TAU*t*2,6+10*pull,4,lift=10*st,delay=0.35); legs_dangle(d,TAU*t,3,tuck=45*st)

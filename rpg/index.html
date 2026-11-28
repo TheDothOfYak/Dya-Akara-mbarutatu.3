@@ -221,6 +221,22 @@
   .jentry{margin-bottom:12px;font-size:15px;line-height:1.4;color:var(--ink)}
   .jentry b{font-family:var(--display);font-weight:500;color:var(--brass2);display:block;font-size:14px}
   .jentry.locked{opacity:.4;font-style:italic}
+  /* the Lútut page in the Rokarvac (lutut_viewer.js) */
+  #j-lutut h3{font-family:var(--display);font-size:13px;letter-spacing:.24em;color:var(--brass);margin:0 0 6px;text-transform:uppercase}
+  #j-lutut .lv-note{margin:0 0 10px;font-size:14px;line-height:1.45;color:var(--ink)}
+  #j-lutut .lv-stage{position:relative;height:min(46vh,400px);min-height:240px;border-radius:10px;overflow:hidden;background:radial-gradient(120% 90% at 50% 30%,#3a3446 0%,#1a1720 60%,#0e0c12 100%)}
+  #j-lutut .lv-stage.night{background:radial-gradient(120% 90% at 50% 30%,#141222 0%,#07060a 70%)}
+  #j-lutut .lv-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+  #j-lutut .lv-status{position:absolute;left:12px;bottom:10px;font-size:13px;color:#c8c0d4;pointer-events:none;z-index:1}
+  #j-lutut .lv-status b{color:var(--brass2)}
+  #j-lutut .lv-hint{position:absolute;right:12px;bottom:10px;font-size:12px;color:#a49cb2;pointer-events:none;z-index:1}
+  #j-lutut .lv-clips{margin-top:10px}
+  #j-lutut .lv-grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+  #j-lutut .lv-grp>span{min-width:110px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--brass)}
+  #j-lutut .lv-b{padding:6px 12px;font-size:14px}
+  #j-lutut .lv-b.on{background:var(--brass);color:#140f05}
+  #j-lutut .lv-opts{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:8px;font-size:14px;color:var(--ink)}
+  #j-lutut .lv-opts label{display:flex;gap:6px;align-items:center}
   #endcard .panel{text-align:center;width:min(640px,92vw)}
   #endcard .riddle{text-align:left;margin:18px auto 24px;max-width:440px}
   #resume .panel{text-align:center}
@@ -549,6 +565,7 @@
       <div><h3>The riddle</h3><div class="riddle" id="j-riddle"></div><h3>Memories recovered</h3><div id="j-mem"></div></div>
       <div><h3>Notes</h3><div id="j-codex"></div></div>
     </div>
+    <div id="j-lutut" class="hidden"></div>
     <div class="btn-row"><button class="btn" id="btn-jclose">Close</button></div>
   </div>
 </div>
